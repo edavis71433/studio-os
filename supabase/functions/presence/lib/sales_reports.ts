@@ -97,6 +97,19 @@ export function wonAndLost(deals: Array<Record<string, unknown>>, nowIso: string
   const won = (deals || []).filter((d) => d && isWon(d) && inWindow(d));
   const lost = (deals || []).filter((d) => d && !isWon(d) && d.stage === 'lost' && inWindow(d));
   const v = (d: Record<string, unknown>) => n(d.expected_value_cents);
+  // Bold redesign (Analytics, Nov 2026): "Days to close" — the median days from a
+  // won deal's start to its win, over the six most recent wins, and the six before
+  // them so the page can say faster or slower. A deal with no start date is left
+  // out, never counted as zero days.
+  const spans = won.map((d) => ({ t: closeTime(d), start: Date.parse(String(d.created_at || '')) }))
+    .filter((x) => Number.isFinite(x.t) && Number.isFinite(x.start) && x.t >= x.start)
+    .sort((a, b) => b.t - a.t)
+    .map((x) => (x.t - x.start) / DAY);
+  const median = (xs: number[]): number | null => {
+    if (!xs.length) return null;
+    const s = [...xs].sort((a, b) => a - b), m = Math.floor(s.length / 2);
+    return Math.round(s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2);
+  };
   return {
     window_days: windowDays,
     won: { count: won.length, value_cents: won.reduce((a, d) => a + v(d), 0) },
@@ -106,6 +119,7 @@ export function wonAndLost(deals: Array<Record<string, unknown>>, nowIso: string
     lost_by_reason: groupBy(lost, (d) => reasonLabel(d.lost_reason), v, 8, 'Other reasons'),
     // item 69: "How did they find you?" next to where the deal came from
     won_by_found_via: groupBy(won, (d) => foundViaLabel(d.found_via), v, 8, 'Other'),
+    days_to_close: { median_days: median(spans.slice(0, 6)), count: Math.min(6, spans.length), prior_median_days: spans.length > 6 ? median(spans.slice(6, 12)) : null },
   };
 }
 

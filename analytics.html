@@ -210,6 +210,69 @@
   .rtable td.up{color:var(--good)} .rtable td.down{color:var(--bad)}
   .rbar{display:inline-block;height:8px;border-radius:4px;background:var(--p);vertical-align:middle;margin-right:6px}
   .rep-foot{font-size:12px;color:var(--faint);margin:10px 0 0}
+  /* ══ Bold redesign — Analytics (Nov 2026): the studio's own numbers lead —
+     four plain numbers, revenue against the year before, the pipeline as it
+     stands, where wins come from, the five reports one click away ══ */
+  .nums{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+  .num{background:var(--card);border:1px solid var(--line);border-radius:var(--dds-r-lg,14px);box-shadow:var(--shadow);padding:14px 16px;min-width:0}
+  .num-k{display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:12.5px;color:var(--soft);min-height:22px}
+  .num-k>span:first-child{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .dchip{flex:0 0 auto;font-size:11.5px;font-weight:600;border-radius:999px;padding:2px 8px;white-space:nowrap;background:color-mix(in srgb,var(--ink) 6%,transparent);color:var(--soft)}
+  .dchip.good{background:var(--good-soft);color:var(--good)}
+  .dchip.bad{background:color-mix(in srgb,var(--bad) 12%,transparent);color:var(--bad)}
+  .num-row{display:flex;align-items:flex-end;justify-content:space-between;gap:10px;margin-top:4px}
+  .num-v{font-size:28px;font-weight:650;letter-spacing:-.02em;line-height:1.1;font-variant-numeric:tabular-nums;white-space:nowrap}
+  .num-v.none{color:var(--faint);font-weight:500}
+  .spark{width:96px;height:28px;flex:0 1 96px;min-width:0}
+  .num-s{font-size:12px;color:var(--faint);margin-top:6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .gl-grid{display:grid;grid-template-columns:minmax(0,1.7fr) minmax(280px,1fr);gap:12px;margin-top:12px;align-items:start}
+  svg.rev6{display:none}
+  .gl-side{display:flex;flex-direction:column;gap:12px;min-width:0}
+  .lgd{display:inline-flex;align-items:center;gap:6px;font-size:11.5px;font-weight:600;border-radius:999px;padding:2px 8px}
+  .lgd.ty{background:var(--p-soft);color:var(--p)}
+  .lgd.ly{background:var(--warn-soft);color:var(--warn)}
+  .lgd.ly::before{content:"";width:12px;border-top:2px dashed currentColor}
+  .gl-sub{font-size:12.5px;color:var(--faint);margin:4px 0 0}
+  .gbars,.gwins{list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:8px}
+  .gb-pipe{display:flex;align-items:center;gap:10px;font-size:13px}
+  .gb-pipe .gb-fill{display:flex;align-items:center;min-width:0;border-radius:8px;background:var(--p-soft);color:var(--p);padding:5px 10px;font-weight:600;white-space:nowrap;overflow:hidden}
+  .gb-pipe .gb-l{overflow:hidden;text-overflow:ellipsis}
+  .gb-pipe .gb-c{font-weight:500;color:var(--soft)}
+  .gb-pipe b{margin-left:auto;font-variant-numeric:tabular-nums;white-space:nowrap}
+  .gwins li{display:flex;flex-direction:column;gap:5px}
+  .gw-t{display:flex;justify-content:space-between;gap:10px;font-size:13px}
+  .gw-t span:first-child{font-weight:600;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .gw-n{color:var(--soft);font-variant-numeric:tabular-nums;white-space:nowrap}
+  .gw-bar{display:block;height:6px;border-radius:999px;background:var(--line);overflow:hidden}
+  .gw-bar i{display:block;height:100%;border-radius:999px;background:var(--dds-grad-btn,var(--p))}
+  .replinks{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px;margin-top:12px}
+  .rl{font:inherit;font-size:13px;font-weight:500;text-align:left;display:flex;align-items:center;justify-content:space-between;gap:8px;background:var(--card);color:var(--ink);border:1px solid var(--line);border-radius:var(--dds-r-lg,12px);padding:10px 14px;cursor:pointer;box-shadow:var(--shadow);min-width:0}
+  .rl span{color:var(--p)}
+  .rl:hover{border-color:color-mix(in srgb,var(--p) 45%,var(--line))}
+  .bandsub{display:flex;gap:10px;align-items:center;flex-wrap:wrap;color:var(--soft);font-size:13px;margin:-2px 0 10px}
+  .band.sub{font-size:13.5px;color:var(--soft);font-weight:600;margin-top:var(--dds-s5,20px)}
+  .glance-off{background:var(--card);border:1px dashed var(--line);border-radius:var(--dds-r-lg,10px);padding:14px 16px}
+  @media (max-width:1180px){.replinks{grid-template-columns:repeat(3,minmax(0,1fr))}}
+  /* a tablet: one column, the numbers two by two, the reports a list */
+  @media (max-width:980px){
+    .gl-grid{grid-template-columns:1fr}
+    .nums{grid-template-columns:repeat(2,minmax(0,1fr))}
+    .replinks{grid-template-columns:1fr;gap:0;background:var(--card);border:1px solid var(--line);border-radius:var(--dds-r-lg,12px);overflow:hidden;box-shadow:var(--shadow)}
+    .rl{border:0;border-radius:0;border-top:1px solid var(--line);box-shadow:none;min-height:48px}
+    .rl:first-child{border-top:0}
+  }
+  @media (max-width:760px){
+    .num{padding:12px 14px}
+    .num-v{font-size:22px}
+    .spark{display:none}
+    .num-k{font-size:11.5px;text-transform:uppercase;letter-spacing:.04em}
+    .num-k .dchip{display:none}
+    .num-s{white-space:normal}
+    .subline .dot{display:none}
+    svg.rev12{display:none}
+    svg.rev6{display:block}
+  }
+  @media (pointer:coarse){.rl{min-height:48px}}
   @media print{
     body[data-print="report"] *{visibility:hidden!important;transition:none!important}
     body[data-print="report"] #repPrint,body[data-print="report"] #repPrint *{visibility:visible!important}
@@ -647,11 +710,11 @@ function websiteBand(d){
 }
 
 // ── render ──
-function headRow(title,subline,withPeriod){
+function headRow(title,subline,withPeriod,extra){
   return `<header class="toprow">
       <div><h1 class="title" id="pagehead" tabindex="-1">${esc(title)}</h1>
         <div class="subline">${subline}</div></div>
-      <div class="actions">${withPeriod?`<div class="seg" id="period" role="group" aria-label="Period">${PERIODS.map(p=>`<button type="button" data-period="${p[0]}" aria-pressed="${PERIOD===p[0]?'true':'false'}">${p[1]}</button>`).join('')}</div>`:''}<button type="button" class="btn" id="refreshBtn">Refresh</button></div>
+      <div class="actions">${extra||''}${withPeriod?`<div class="seg" id="period" role="group" aria-label="Period">${PERIODS.map(p=>`<button type="button" data-period="${p[0]}" aria-pressed="${PERIOD===p[0]?'true':'false'}">${p[1]}</button>`).join('')}</div>`:''}<button type="button" class="btn" id="refreshBtn">Refresh</button></div>
     </header>`;
 }
 // ── Sales review item 33 (Nov 2026): five fixed reports from GET /sales/reports,
@@ -669,9 +732,129 @@ async function loadReports(force){
   if(!$('reportsBody'))return;
   if(!REP||force){let r;try{r=await api('/sales/reports');}catch(_){r={ok:false};}
     const host=$('reportsBody');if(!host)return;
-    if(!r.ok){host.innerHTML='<p class="muted">Your reports couldn’t load just now — Refresh tries again. The numbers above are unaffected.</p>';return;}
+    if(!r.ok){host.innerHTML='<p class="muted">Your reports couldn’t load just now — Refresh tries again. The numbers above are unaffected.</p>';paintGlance(null);return;}
     REP=(r.body&&r.body.data)||{};}
   paintReports();
+  paintGlance(REP);
+}
+// print one report on its own (the report's own button, and the studio's "Print a report")
+function printReport(){
+  if(!$('repPrint'))return;
+  document.body.setAttribute('data-print','report');
+  const off=()=>{document.body.removeAttribute('data-print');window.removeEventListener('afterprint',off);};
+  window.addEventListener('afterprint',off);
+  window.print();
+  setTimeout(off,1000);   // a browser that never fires afterprint still gets the page back
+}
+// open one of the five reports from the studio's numbers above: it shows below, its tab focused
+function openReport(k){
+  if(!REPORTS.some(r=>r[0]===k))return;
+  REP_ON=k;try{localStorage.setItem('dds-report',k);}catch(_){/* storage may be denied */}
+  paintReports();
+  const sec=$('reports');if(sec)sec.scrollIntoView({block:'start',behavior:'smooth'});
+  const t=$('rt-'+k);if(t)t.focus({preventScroll:true});
+}
+
+// ── Bold redesign — Analytics (Nov 2026): the studio's own numbers lead. Four
+// plain numbers, revenue against the year before, the pipeline as it stands,
+// where wins come from, and the five reports one click away — all read from the
+// same /sales/reports the reports below use (one read). A number the read
+// can't give says so; it is never a zero. ──
+const glanceShell=()=>scope()?'':`<section class="glance" id="glance" aria-labelledby="glanceH"><h2 class="band" id="glanceH">Your studio</h2><div id="glanceBody"><div class="nums">${'<div class="num"><div class="st" style="height:74px"></div></div>'.repeat(4)}</div></div></section>`;
+const mon=(label)=>String(label||'').split(' ')[0];
+function spark(vals){
+  const v=(vals||[]).map(x=>Number(x)||0);if(v.length<2||!v.some(x=>x>0))return '';
+  const W=120,H=32,max=Math.max.apply(null,v),step=W/(v.length-1);
+  const pts=v.map((x,i)=>`${Math.round(i*step*10)/10},${Math.round((H-3-(x/max)*(H-6))*10)/10}`).join(' ');
+  return `<svg class="spark" viewBox="0 0 ${W} ${H}" aria-hidden="true" focusable="false"><polyline points="${pts}" fill="none" stroke="var(--good)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/></svg>`;
+}
+function numCard(o){
+  return `<div class="num"><div class="num-k"><span>${esc(o.label)}</span>${o.chip?`<span class="dchip ${o.chip.tone||''}">${esc(o.chip.text)}</span>`:''}</div>
+    <div class="num-row"><div class="num-v${o.none?' none':''}">${o.value}</div>${o.spark||''}</div><div class="num-s">${esc(o.sub||'')}</div></div>`;
+}
+function glanceNums(rep){
+  const rv=rep.revenue,o=rep.outcomes,pl=rep.pipeline,od=rep.overdue;
+  const out=[];
+  // 1. revenue this month (paid invoices), against last month, the twelve months in a line
+  if(rv&&!rv.unavailable&&Array.isArray(rv.months)&&rv.months.length>=2){
+    const ms=rv.months,cur=ms[ms.length-1],prev=ms[ms.length-2],d=(cur.this_year||0)-(prev.this_year||0);
+    out.push(numCard({label:'Revenue · '+mon(cur.label),value:esc(money(cur.this_year)),
+      chip:(cur.this_year||prev.this_year)?{text:(d>=0?'+':'−')+money(Math.abs(d))+' vs '+mon(prev.label),tone:d>=0?'good':'bad'}:null,
+      spark:spark(ms.map(m=>m.this_year)),sub:money(rv.total_this_year)+' in the last 12 months'}));
+  }else out.push(numCard({label:'Revenue',value:'—',none:true,sub:'Couldn’t load just now'}));
+  // 2. win rate over the last twelve months
+  if(o&&!o.unavailable&&o.won&&o.lost){
+    out.push(o.win_rate_pct==null?numCard({label:'Win rate',value:'—',none:true,sub:'No deals closed in the last 12 months'})
+      :numCard({label:'Win rate',value:esc(o.win_rate_pct+'%'),sub:`${num(o.won.count)} won · ${num(o.lost.count)} not a fit`}));
+  }else out.push(numCard({label:'Win rate',value:'—',none:true,sub:'Couldn’t load just now'}));
+  // 3. days to close — the median of the latest wins (an older server: what's overdue instead)
+  const dc=o&&!o.unavailable&&o.days_to_close;
+  if(dc){
+    if(dc.median_days==null)out.push(numCard({label:'Days to close',value:'—',none:true,sub:'No wins to count yet'}));
+    else{const df=dc.prior_median_days==null?null:dc.median_days-dc.prior_median_days;
+      out.push(numCard({label:'Days to close',value:esc(String(dc.median_days)),
+        chip:df==null||df===0?null:{text:(df<0?'−':'+')+Math.abs(df)+(Math.abs(df)===1?' day':' days'),tone:df<0?'good':'bad'},
+        sub:`median, last ${num(dc.count)} win${dc.count===1?'':'s'}`}));}
+  }else if(od&&!od.unavailable&&Array.isArray(od.rows)){
+    out.push(numCard({label:'Overdue',value:esc(money(od.total_cents||0)),sub:od.rows.length?`${num(od.rows.length)} invoice${od.rows.length===1?'':'s'} past due`:'nothing past due'}));
+  }else out.push(numCard({label:'Days to close',value:'—',none:true,sub:'Couldn’t load just now'}));
+  // 4. what the open deals are expected to bring in (each deal × its stage's chance)
+  if(pl&&!pl.unavailable&&pl.expected_cents!=null)out.push(numCard({label:'Expected',value:esc(money(pl.expected_cents)),sub:`${num(pl.count)} open deal${pl.count===1?'':'s'} × their chance`}));
+  else if(pl&&!pl.unavailable)out.push(numCard({label:'Open pipeline',value:esc(money(pl.value_cents||0)),sub:`${num(pl.count||0)} open deal${pl.count===1?'':'s'}`}));
+  else out.push(numCard({label:'Expected',value:'—',none:true,sub:'Couldn’t load just now'}));
+  return `<div class="nums">${out.join('')}</div>`;
+}
+// the last n months of paid invoices as bars, the same months a year before as a
+// dashed line (a phone draws six, so the month names stay readable)
+function revenueChart(rv,n){
+  const ms=rv.months.slice(-n),W=n>6?640:360,H=n>6?268:220,L=8,R=8,T=14,B=26,base=H-B;
+  const max=Math.max(1,...ms.map(m=>Math.max(m.this_year||0,m.last_year||0)));
+  const slot=(W-L-R)/ms.length,bw=Math.min(34,Math.round(slot*0.56));
+  const y=(v)=>Math.round((base-(v/max)*(base-T))*10)/10;
+  const cx=(i)=>Math.round((L+slot*i+slot/2)*10)/10;
+  const grid=[0.5,1].map(f=>`<line x1="${L}" x2="${W-R}" y1="${y(max*f)}" y2="${y(max*f)}" stroke="var(--line)" stroke-dasharray="3 4"/>`).join('');
+  const bars=ms.map((m,i)=>{const h=Math.max(m.this_year>0?3:0,base-y(m.this_year||0));const last=i===ms.length-1;
+    return `<rect x="${Math.round(cx(i)-bw/2)}" y="${base-h}" width="${bw}" height="${h}" rx="5" fill="${last?'var(--c3)':'var(--c1)'}"/><text x="${cx(i)}" y="${H-8}" text-anchor="middle" font-size="11" fill="var(--faint)">${esc(mon(m.label))}</text>`;}).join('');
+  const line=ms.map((m,i)=>`${cx(i)},${y(m.last_year||0)}`).join(' ');
+  const label=`Revenue by month, this year against the year before: ${ms.map(m=>`${m.label} ${money(m.this_year)} (a year before ${money(m.last_year)})`).join(', ')}`;
+  return `<svg class="chart rev rev${n}" viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(label)}" focusable="false" font-family="Inter, sans-serif">${grid}<line x1="${L}" x2="${W-R}" y1="${base}" y2="${base}" stroke="var(--line)"/>${bars}<polyline points="${line}" fill="none" stroke="var(--warn)" stroke-width="2" stroke-dasharray="5 4" stroke-linejoin="round"/></svg>`;
+}
+function paintGlance(rep){
+  const host=$('glanceBody');if(!host)return;
+  if(!rep){host.innerHTML='<p class="muted glance-off">Your studio’s numbers couldn’t load just now — Refresh tries again.</p>';return;}
+  const rv=rep.revenue,o=rep.outcomes,pl=rep.pipeline;
+  // the revenue chart
+  const revBody=(rv&&!rv.unavailable&&Array.isArray(rv.months)&&rv.months.length)
+    ?((rv.total_this_year||rv.total_last_year)?revenueChart(rv,12)+revenueChart(rv,6)+`<p class="chartnote">Paid invoices by the month they were paid · last 12 months ${esc(money(rv.total_this_year))} · the year before ${esc(money(rv.total_last_year))}</p>`:emptyState('No paid invoices yet','Invoices paid over the last two years will chart here, against the year before.'))
+    :'<p class="muted">This chart couldn’t load just now — Refresh tries again.</p>';
+  // the pipeline as it stands
+  let pipeBody;
+  if(pl&&!pl.unavailable&&Array.isArray(pl.rows)){
+    const pmax=Math.max(1,...pl.rows.map(r=>r.value_cents||0));
+    pipeBody=pl.count?`<ul class="gbars">${pl.rows.map(r=>`<li class="gb-pipe"><span class="gb-fill" style="width:${Math.max(22,Math.round(100*(r.value_cents||0)/pmax))}%"><span class="gb-l">${esc(r.label)}${r.count?` <span class="gb-c">· ${num(r.count)}</span>`:''}</span></span><b>${esc(money(r.value_cents||0))}</b></li>`).join('')}</ul>`
+      :emptyState('No open deals','Deals you add to the pipeline stack up here by stage.');
+  }else pipeBody='<p class="muted">The pipeline couldn’t load just now.</p>';
+  // where wins come from: how they found you, else where the deal came from
+  let winsBody,winsSub='Won in the last 12 months';
+  if(o&&!o.unavailable){
+    const fv=Array.isArray(o.won_by_found_via)?o.won_by_found_via.filter(g=>g&&g.count):[];
+    const useFv=fv.length&&fv.some(g=>!/not recorded/i.test(String(g.label||'')));
+    const groups=useFv?fv:(o.won_by_source||[]);
+    winsSub=useFv?'Won in the last 12 months, by how they found you':'Won in the last 12 months, by where the deal came from';
+    const wmax=Math.max(1,...groups.map(g=>g.value_cents||0));
+    winsBody=groups.length?`<ul class="gwins">${groups.map(g=>`<li><div class="gw-t"><span>${esc(g.label)}</span><span class="gw-n">${num(g.count)} win${g.count===1?'':'s'} · ${esc(money(g.value_cents||0))}</span></div><span class="gw-bar" aria-hidden="true"><i style="width:${Math.max(4,Math.round(100*(g.value_cents||0)/wmax))}%"></i></span></li>`).join('')}</ul>`
+      :emptyState('No wins yet','Deals you win show here by where they came from.');
+  }else winsBody='<p class="muted">This couldn’t load just now.</p>';
+  host.innerHTML=glanceNums(rep)
+    +`<div class="gl-grid">
+      <section class="card gl-rev" aria-labelledby="revH"><div class="card-h"><h3 id="revH">Revenue by month</h3><span class="hr"><span class="lgd ty">This year</span><span class="lgd ly">The year before</span></span></div><div class="cb">${revBody}</div></section>
+      <div class="gl-side">
+        <section class="card" aria-labelledby="pipeH"><div class="card-h"><h3 id="pipeH">Pipeline right now</h3><span class="hr"><a class="lk" href="${esc(withScope('/pipeline.html'))}">Open Pipeline</a></span></div><div class="cb">${pipeBody}</div></section>
+        <section class="card" aria-labelledby="winsH"><div class="card-h"><h3 id="winsH">Where wins come from</h3></div><p class="gl-sub">${esc(winsSub)}</p><div class="cb">${winsBody}</div></section>
+      </div>
+    </div>
+    <div class="replinks noprint" role="group" aria-label="Open a report">${REPORTS.map(([k,l])=>`<button type="button" class="rl" data-open-rep="${k}">${esc(l)} <span aria-hidden="true">→</span></button>`).join('')}</div>`;
+  host.querySelectorAll('[data-open-rep]').forEach(b=>b.addEventListener('click',()=>openReport(b.getAttribute('data-open-rep'))));
 }
 const rDays=(n)=>n==null?'—':n+(n===1?' day':' days');
 function rTable(head,rows,foot){return `<div class="rscroll"><table class="rtable"><thead><tr>${head.map(h=>`<th scope="col">${esc(h)}</th>`).join('')}</tr></thead><tbody>${rows.join('')}</tbody>${foot?`<tfoot><tr>${foot}</tr></tfoot>`:''}</table></div>`;}
@@ -720,13 +903,7 @@ function paintReports(){
     b.addEventListener('click',()=>pick(b.getAttribute('data-rep'),true));
     b.addEventListener('keydown',(e)=>{const j=e.key==='ArrowRight'?i+1:e.key==='ArrowLeft'?i-1:-9;if(j===-9)return;e.preventDefault();pick(tabs[(j+tabs.length)%tabs.length].getAttribute('data-rep'),true);});
   });
-  const pb=$('repPrintBtn');if(pb)pb.addEventListener('click',()=>{
-    document.body.setAttribute('data-print','report');
-    const off=()=>{document.body.removeAttribute('data-print');window.removeEventListener('afterprint',off);};
-    window.addEventListener('afterprint',off);
-    window.print();
-    setTimeout(off,1000);   // a browser that never fires afterprint still gets the page back
-  });
+  const pb=$('repPrintBtn');if(pb)pb.addEventListener('click',printReport);
 }
 function renderDash(d){
   if(WEBSITE_VIEW){
@@ -827,7 +1004,7 @@ function portfolioRollup(roster,ws,vTrunc){
   // vTrunc (data-honesty): the function's visitors_truncated marker — the bulk
   // visits read hit its cap, so NO per-client count is attributable as exact.
   const vs=Array.isArray(ws)&&ws.length&&ws.every(x=>x&&typeof x.site_id==='string'&&('visitors' in x))?new Map(ws.map(x=>[x.site_id,x.visitors])):null;
-  let h=`<h2 class="band">Customer by customer</h2>`;
+  let h=`<h3 class="band sub">Customer by customer</h3>`;
   if(roster===null){
     h+=`<div class="quiet" style="margin-top:0">The customer-by-customer list wouldn’t load just now — refresh in a moment. The numbers above are unaffected.</div>`;
     return h;
@@ -851,11 +1028,16 @@ function portfolioRollup(roster,ws,vTrunc){
 }
 function renderPortfolio(d,roster){
   const ws=Array.isArray(d.websites)?d.websites:null;
-  let h=headRow('Analytics',`<span class="chip p"><i class="d"></i>All customers</span><span>${esc(d.headline||'Across your customers.')}</span><span class="dot">·</span><span>As of ${esc(asOf())}</span>`,false);
+  // Bold redesign (Nov 2026): the studio's own numbers lead (glanceShell, filled
+  // by the reports read); the customers' roll-up follows under its own heading.
+  let h=headRow('Analytics',`<span>How the studio is doing — in plain numbers.</span><span class="dot">·</span><span>As of ${esc(asOf())}</span>`,false,
+    `<button type="button" class="btn" id="printRep" title="Print the report shown below on its own">Print a report</button>`);
+  h+=glanceShell();
+  h+=`<h2 class="band">Across your customers</h2><p class="bandsub"><span class="chip p"><i class="d"></i>All customers</span><span>${esc(d.headline||'Across your customers.')}</span></p>`;
   // KPI band — only from numbers the payload really carries (an older function
   // build without websites[] simply shows fewer tiles, never a fake zero)
   if(ws||d.client_count!=null){
-    h+=`<h2 class="band">Across your customers</h2><div class="stats" id="portfolioStats">`;
+    h+=`<div class="stats" id="portfolioStats">`;
     const clients=d.client_count!=null?d.client_count:ws.length;
     h+=tile({icon:'people',title:'Customers',link:['/agency.html','Open Studio'],value:num(clients),sub:'in your portfolio'});
     if(ws){
@@ -874,7 +1056,7 @@ function renderPortfolio(d,roster){
   // insight cards — the standard card anatomy (tone chip · title · number ·
   // sentence · links). An empty list on a SUCCESSFUL read is the honest
   // all-quiet; a failed read never reaches here (loadPortfolio → trouble).
-  h+=`<h2 class="band">What stands out</h2>`;
+  h+=`<h3 class="band sub">What stands out</h3>`;
   const ins=d.insights||[];
   // The all-quiet line speaks about "every client" — with ZERO clients that's a
   // contradiction, so the empty portfolio gets its own calm first-step line.
@@ -893,6 +1075,7 @@ function renderPortfolio(d,roster){
   $('main').innerHTML=h;
   loadReports();
   const rb=$('refreshBtn');if(rb)rb.addEventListener('click',()=>{REP=null;loadPortfolio(true).then(()=>{const b=$('refreshBtn');if(b)b.focus();});});
+  const pr=$('printRep');if(pr)pr.addEventListener('click',()=>{if($('repPrint'))printReport();else toast('Your reports are still loading — try again in a moment.');});
   // row click drills into the client's scoped Business dashboard; the name link
   // inside carries the keyboard/AT path, so plain rows stay non-focusable
   document.querySelectorAll('.tscroll tr[data-drill]').forEach(tr=>tr.addEventListener('click',(e)=>{
