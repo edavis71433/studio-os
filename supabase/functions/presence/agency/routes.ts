@@ -16,9 +16,9 @@ import { loadReceivables } from '../routes/sales.ts';
 import { resolveSite } from '../lib/site.ts';
 import type { AgencyMember } from './auth.ts';
 import type { PortfolioInput } from './portfolio.ts';
-import { buildKitPayload, applyPlan } from '../lib/kits.ts';
 import type { KitPayload } from '../lib/kits.ts';
-import { writeChangeEvent } from '../lib/provenance.ts';
+import { kitFromSite, applyKitTo } from './kit_io.ts';
+import { handleAgencySites } from './sites.ts';
 import { sendInviteLink } from '../lib/workspace.ts';
 import { brandFromKit } from '../lib/email_brand.ts';
 import { runEvidence } from '../evidence/engine.ts';
@@ -182,6 +182,14 @@ async function handleAgencyInner(req: Request, route: string, method: string, me
     return json({ data: { agency: member.agency_name, role: member.role, plan: member.plan, branding: member.branding, email: member.email, member_id: member.member_id } }, 200, cors);
   }
 
+  // ── the Sites and Domains pages, Pin and Duplicate (builder list items 43, 45, 52) ──
+  {
+    const r = await handleAgencySites(req, route, method, member, principal, cors, {
+      gather: sharedGather, ownSite: () => ownSiteOf(req.headers.get('x-dds-user-jwt') || '', principal),
+    });
+    if (r) return r;
+  }
+
   // ── the portfolio: directory + everything observable from one place ──
   if (route === '/agency/portfolio' && method === 'GET') {
     if (!can(member.role, 'read')) return forbid(cors);
@@ -313,19 +321,7 @@ async function handleAgencyInner(req: Request, route: string, method: string, me
     if (!UUID_RE.test(siteId) || !name) return json({ error: 'bad_request', message: 'A site_id and a kit name are needed.' }, 400, cors);
     const ids = await agencySiteIds(member.agency_id, true);
     if (!ids.includes(siteId)) return json({ error: 'not_found', message: 'Not one of your clients.' }, 404, cors);
-    const [siteQ, off, faqs, voiceQ, setQ, devQ] = await Promise.all([
-      svc(`presence_sites?id=eq.${siteId}&select=template_slug&limit=1`),
-      svc(`presence_offerings?site_id=eq.${siteId}&deleted_at=is.null&is_visible=is.true&select=name,category,description,price_text,sort_order&order=sort_order.asc&limit=100`),
-      svc(`presence_faqs?site_id=eq.${siteId}&deleted_at=is.null&is_visible=is.true&select=question,answer,sort_order&order=sort_order.asc&limit=50`),
-      svc(`presence_voice?site_id=eq.${siteId}&select=tone_notes,preferred_vocabulary,never_claim&limit=1`),
-      svc(`presence_settings?site_id=eq.${siteId}&select=industry_key,category_order&limit=1`),
-      svc(`presence_dev_customizations?site_id=eq.${siteId}&select=theme_tokens&limit=1`),
-    ]);
-    const payload = buildKitPayload({
-      industry_key: setQ.json?.[0]?.industry_key, template_slug: siteQ.json?.[0]?.template_slug,
-      category_order: setQ.json?.[0]?.category_order, offerings: off.json ?? [], faqs: faqs.json ?? [],
-      voice: voiceQ.json?.[0] ?? null, theme_tokens: devQ.json?.[0]?.theme_tokens ?? null,
-    });
+    const payload = await kitFromSite(siteId);
     const w = await svc('presence_starter_kits', {
       method: 'POST', headers: { Prefer: 'return=representation' },
       body: JSON.stringify({ agency_id: member.agency_id, name, industry_key: payload.industry_key, payload, created_from_site: siteId, created_by: member.email }),
@@ -352,38 +348,7 @@ async function handleAgencyInner(req: Request, route: string, method: string, me
       const kq = await svc(`presence_starter_kits?id=eq.${am[1]}&agency_id=eq.${member.agency_id}&select=payload,name&limit=1`);
       if (!kq.json?.[0]) return json({ error: 'not_found', message: 'Not one of your kits.' }, 404, cors);
       const kit = kq.json[0].payload as KitPayload;
-      const [off, faqs, voiceQ, setQ, devQ] = await Promise.all([
-        svc(`presence_offerings?site_id=eq.${siteId}&deleted_at=is.null&select=id&limit=1`),
-        svc(`presence_faqs?site_id=eq.${siteId}&deleted_at=is.null&select=id&limit=1`),
-        svc(`presence_voice?site_id=eq.${siteId}&select=tone_notes,preferred_vocabulary,never_claim&limit=1`),
-        svc(`presence_settings?site_id=eq.${siteId}&select=industry_key,category_order&limit=1`),
-        svc(`presence_dev_customizations?site_id=eq.${siteId}&select=theme_tokens&limit=1`),
-      ]);
-      const v0 = voiceQ.json?.[0];
-      const plan = applyPlan(kit, {
-        offerings_count: (off.json ?? []).length, faqs_count: (faqs.json ?? []).length,
-        has_voice: !!(v0 && (v0.tone_notes || v0.preferred_vocabulary || v0.never_claim)),
-        has_tokens: Object.keys(devQ.json?.[0]?.theme_tokens ?? {}).length > 0,
-        industry_key: String(setQ.json?.[0]?.industry_key || 'generic'),
-        category_order_count: (setQ.json?.[0]?.category_order ?? []).length,
-      });
-      if (plan.insert_offerings.length) {
-        await svc('presence_offerings', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify(plan.insert_offerings.map((o) => ({ ...o, site_id: siteId }))) });
-      }
-      if (plan.insert_faqs.length) {
-        await svc('presence_faqs', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify(plan.insert_faqs.map((f) => ({ ...f, site_id: siteId }))) });
-      }
-      if (plan.set_voice) await svc(`presence_voice?on_conflict=site_id`, { method: 'POST', headers: { Prefer: 'resolution=merge-duplicates,return=minimal' }, body: JSON.stringify({ site_id: siteId, ...plan.set_voice }) });
-      const setPatch: Record<string, unknown> = {};
-      if (plan.set_industry) setPatch.industry_key = plan.set_industry;
-      if (plan.set_category_order) setPatch.category_order = plan.set_category_order;
-      if (Object.keys(setPatch).length) await svc(`presence_settings?on_conflict=site_id`, { method: 'POST', headers: { Prefer: 'resolution=merge-duplicates,return=minimal' }, body: JSON.stringify({ site_id: siteId, ...setPatch }) });
-      if (plan.set_tokens) await svc(`presence_dev_customizations?on_conflict=site_id`, { method: 'POST', headers: { Prefer: 'resolution=merge-duplicates,return=minimal' }, body: JSON.stringify({ site_id: siteId, theme_tokens: plan.set_tokens, custom_css: '', custom_html: '' }) });
-      await writeChangeEvent({ siteId, entityType: 'settings', entityId: null, action: 'update', summary: `Applied the “${kq.json[0].name}” starter kit`, principal, provenance: 'human', fields: ['starter_kit'] });
-      return json({ data: {
-        applied: { offerings: plan.insert_offerings.length, faqs: plan.insert_faqs.length, voice: !!plan.set_voice, colors: !!plan.set_tokens, industry: plan.set_industry || null },
-        skipped: plan.skipped,
-      } }, 200, cors);
+      return json({ data: await applyKitTo(kit, siteId, principal, `Applied the “${kq.json[0].name}” starter kit`) }, 200, cors);
     }
   }
 

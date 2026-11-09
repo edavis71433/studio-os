@@ -150,6 +150,13 @@ export function buildNav(c: NavContext): NavSection[] {
     // Oct 2026 audit bug 10: ⌘K "kit" finds the starter kits (a card on Home; agency.html scrolls to #kits)
     home.push(hid('kits', 'Starter kits', '/agency.html#kits', 'Save one client’s setup as a kit and start the next client from it.'));
     sections.push({ key: 'home', label: 'Home', items: home });
+    // Builder list items 43 and 52 (Nov 2026): every client's website as a card, and
+    // every domain in one list (Squarespace's dashboard and its Domains tab). One place
+    // in the menu; Domains is a tab on the page and one search away.
+    if (f.hasWebsite) sections.push({ key: 'sites', label: 'Sites', items: [
+      { key: 'sites', label: 'Sites', href: '/sites.html', desc: 'Every client’s website as a card: a live picture, its address, when it renews and who can edit.' },
+      hid('domains', 'Domains', '/domains.html', 'Every domain your clients use: its status, where it’s registered, and when it expires.'),
+    ] });
   } else if (f.hasBusinessOS) {
     single('today', 'Today', '/today.html');
   }
