@@ -148,11 +148,11 @@ test.describe('Scope carry — convert redirects + APP_PAGES coverage', () => {
     '/portal/feed': { data: { role: 'business_owner', moments: [], notices: [], pending_approvals: [], last_published: null } },
     '/moments': { data: [] } };
 
-  test('Inbox enquiry pane: the → Deal convert redirect keeps ?client=', async ({ page }) => {
+  test('Inbox enquiry pane: the + Make it a deal redirect keeps ?client=', async ({ page }) => {
     await installApp(page, { api: { ...scopedApi, '/sales/deals': { data: { id: 'd-9' } } } });
     await page.goto(`/inbox.html?client=${CLIENT}#enquiries`);
     await page.locator('#rows [role=option]').filter({ hasText: 'Sam Rivera' }).click();
-    await page.locator('#rpane').getByRole('button', { name: '→ Deal' }).click();
+    await page.locator('#rpane').getByRole('button', { name: '+ Make it a deal' }).click();
     await page.waitForURL(new RegExp(`crm\\.html\\?deal=d-9&tab=deal&client=${CLIENT}`));
   });
 
