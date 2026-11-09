@@ -530,11 +530,68 @@
     search: '<circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/>',
     help: '<circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.7.3-1 .8-1 1.5"/><path d="M12 17h.01"/>',
     account: '<circle cx="12" cy="9" r="3.5"/><path d="M5 20a7 7 0 0 1 14 0"/>',
+    plus: '<path d="M12 5v14M5 12h14"/>',
     dot: '<circle cx="12" cy="12" r="3"/>',
     menu: '<path d="M4 7h16M4 12h16M4 17h16"/>'
   };
   function icon(key, cls) { return '<svg class="' + (cls || 'nic') + '" viewBox="0 0 24 24" aria-hidden="true" focusable="false">' + (ICON[key] || ICON.dot) + '</svg>'; }
   function bellInner(n) { return icon('bell') + (n > 0 ? '<span class="dot">' + (n > 9 ? '9+' : n) + '</span>' : ''); }
+
+  // ── "+ Create" (sales list item 70, the bold redesign, Nov 2026) ─────────────
+  // Timed against Salesforce, every everyday job (log a call, a new deal, an
+  // invoice, a proposal, a to-do) began by finding the customer and opening
+  // their page. A studio at studio level with the sales tools (Pipeline in its
+  // menu) gets one button for all of them on every page: the top of the
+  // sidebar, the middle of the phone bar, "c", ⌘K ("log a call") and any
+  // "#create:<kind>" link. create.js draws the forms; it loads while the
+  // browser is idle, so the first press opens at once.
+  function canCreate() {
+    if (!CTX || !CTX.is_agency || (CTX.scope && CTX.scope.name) || isReviewerCtx()) return false;
+    return (CTX.nav || []).some(function (s) { return s.key === 'pipeline'; });
+  }
+  var createP = null;
+  function loadCreate() {
+    if (window.ddsCreate) return Promise.resolve(window.ddsCreate);
+    if (!createP) createP = new Promise(function (resolve, reject) {
+      var sc = document.createElement('script');
+      sc.src = '/create.js'; sc.async = true;
+      sc.onload = function () { if (window.ddsCreate) resolve(window.ddsCreate); else { createP = null; reject(new Error('create')); } };
+      sc.onerror = function () { createP = null; sc.remove(); reject(new Error('create')); };
+      document.head.appendChild(sc);
+    });
+    return createP;
+  }
+  // viaKey: opened from the keyboard, so the menu's first job takes focus (a tap leaves no ring)
+  // preset: { deal_id } starts the form on that deal (a page that already knows
+  // it, like the Customers preview)
+  function openCreate(kind, from, viaKey, preset) {
+    if (!canCreate()) return false;
+    closeAllLayers(); closePalette();
+    loadCreate().then(function (c) { c.open(kind || '', from || null, !!viaKey, preset || null); }, function () {
+      if (window.ddsToast) window.ddsToast('Create didn’t load — check your connection and try again.', 'err');
+    });
+    return true;
+  }
+  window.ddsOpenCreate = openCreate;
+  // ⌘K finds them by what you'd type ("log a call", "invoice"); listed last so
+  // a page's own name still comes first
+  var CREATE_DESTS = [
+    { key: 'create_call', create: 'call', label: 'Log a call', section: 'Create', desc: 'phone call talked note' },
+    { key: 'create_deal', create: 'deal', label: 'New deal', section: 'Create', desc: 'add a deal lead' },
+    { key: 'create_invoice', create: 'invoice', label: 'Send an invoice', section: 'Create', desc: 'new invoice bill' },
+    { key: 'create_proposal', create: 'proposal', label: 'Send a proposal', section: 'Create', desc: 'new proposal quote' },
+    { key: 'create_todo', create: 'todo', label: 'Add a to-do', section: 'Create', desc: 'new task reminder' },
+  ].map(function (d) { d.href = '#create:' + d.create; return d; });
+  // "#create" or "#create:call" in the address (a link from another page, a
+  // bookmark) opens it once; the hash is cleared so a reload doesn't reopen it
+  var CREATE_HASH = /^#create(?::(call|deal|invoice|proposal|todo|customer|update))?$/;
+  function createFromHash() {
+    var m = CREATE_HASH.exec(location.hash || '');
+    if (!m || !canCreate()) return;
+    try { history.replaceState(history.state, '', location.pathname + location.search); } catch (_) { /* */ }
+    openCreate(m[1] || '', document.getElementById('dds-create'));
+  }
+  window.addEventListener('hashchange', createFromHash);
 
   function render() {
     var nav = (CTX && CTX.nav) || [];
@@ -547,6 +604,7 @@
     // lib/shell.ts stays byte-identical.
     var secKey = activeSectionKey(nav, activeKey);
     DESTS = flatten(nav);                          // ⌘K reaches EVERY capability (primary + utility)
+    if (canCreate()) DESTS = DESTS.concat(CREATE_DESTS);
     // Architecture v1.0: the primary bar is outcomes only; utility sections
     // (Connections, Settings, Help) render in the profile/overflow menu.
     // Oct 2026 nav cut: a section whose items are ALL hidden (⌘K-only) is not drawn.
@@ -597,6 +655,7 @@
       // its panel is the full grouped destination list the burger sheet held.
       '<button class="dds-ic dds-waffle" id="dds-waffle" aria-label="App Launcher" aria-haspopup="true" aria-expanded="false" aria-controls="dds-drawer"><span class="wic" aria-hidden="true"></span></button>' +
       brandHtml +
+      (canCreate() ? '<button type="button" class="dds-create" id="dds-create" aria-haspopup="dialog" aria-expanded="false" aria-keyshortcuts="c">' + icon('plus') + '<span class="lbl">Create</span><kbd aria-hidden="true">C</kbd></button>' : '') +
       '<nav class="dds-nav" aria-label="Workspace">' + navHtml + '</nav>' +
       '<div class="dds-search" id="dds-search" role="button" tabindex="0" aria-label="Search"><span>' + icon('search', 'nic') + '</span><span>Search</span><kbd>' + (/Mac|iPhone|iPad/.test(navigator.platform || '') ? '⌘K' : 'Ctrl K') + '</kbd></div>' +
       '<div class="dds-right">' +
@@ -608,6 +667,10 @@
     wire(nav);
     mountMobileBar(nav, activeKey, att);
     mountContextBar(scope);
+    if (canCreate()) {
+      (window.requestIdleCallback || function (f) { return setTimeout(f, 1500); })(function () { loadCreate()['catch'](function () { /* a press retries */ }); });
+      createFromHash();
+    }
   }
 
   // ── client context bar (Phase 1 overhaul) ────────────────────────────────────
@@ -662,9 +725,25 @@
     var herePath = normalizePath(location.pathname);
     var cur = function (href) { return normalizePath(href) === herePath ? ' aria-current="page"' : ''; };
     // Look refresh E: an icon over each word (the words stay the names)
-    bar.innerHTML =
-      '<a href="' + esc(withScope(home.href)) + '"' + cur(home.href) + '>' + icon(isReviewer ? 'messages' : 'home') + '<span class="mlbl">' + esc(home.label) + '</span></a>' +
-      (inbox ? '<a href="' + esc(withScope(inbox.href)) + '"' + cur(inbox.href) + '>' + icon('inbox') + '<span class="mlbl">' + esc(inbox.label) + (att > 0 ? ' <span class="mdot">' + (att > 9 ? '9+' : att) + '</span>' : '') + '</span></a>' : '') +
+    var homeA = '<a href="' + esc(withScope(home.href)) + '"' + cur(home.href) + '>' + icon(isReviewer ? 'messages' : 'home') + '<span class="mlbl">' + esc(home.label) + '</span></a>';
+    var inboxA = inbox ? '<a href="' + esc(withScope(inbox.href)) + '"' + cur(inbox.href) + '>' + icon('inbox') + '<span class="mlbl">' + esc(inbox.label) + (att > 0 ? ' <span class="mdot">' + (att > 9 ? '9+' : att) + '</span>' : '') + '</span></a>' : '';
+    // The bold redesign (item 70): a studio at studio level gets the sales loop,
+    // Home · Inbox · + · Pipeline · Customers. The + opens Create; the rest of
+    // the menu is the top bar's App Launcher, which opens the same drawer.
+    var first = function (key) { var f = null; (nav || []).forEach(function (s) { if (!f && s.key === key) f = visibleItems(s)[0] || null; }); return f; };
+    var pipe = canCreate() ? first('pipeline') : null, custs = pipe ? first('customers') : null;
+    if (pipe && custs) {
+      bar.className = 'sales';
+      bar.innerHTML = homeA + inboxA +
+        '<button type="button" id="dds-mbar-create" class="mplus" aria-label="Create" aria-haspopup="dialog" aria-expanded="false">' + icon('plus') + '</button>' +
+        '<a href="' + esc(withScope(pipe.href)) + '"' + cur(pipe.href) + '>' + icon('pipeline') + '<span class="mlbl">' + esc(pipe.label) + '</span></a>' +
+        '<a href="' + esc(withScope(custs.href)) + '"' + cur(custs.href) + '>' + icon('customers') + '<span class="mlbl">' + esc(custs.label) + '</span></a>';
+      document.body.appendChild(bar);
+      var plus = document.getElementById('dds-mbar-create');
+      plus.addEventListener('click', function (e) { e.stopPropagation(); openCreate('', plus, e.detail === 0); });
+      return;
+    }
+    bar.innerHTML = homeA + inboxA +
       '<button type="button" id="dds-mbar-menu" aria-expanded="false" aria-controls="dds-drawer" aria-haspopup="true">' + icon('menu') + '<span class="mlbl">Menu</span></button>';
     document.body.appendChild(bar);
     var mb = document.getElementById('dds-mbar-menu');
@@ -749,6 +828,8 @@
         else if (e.key === 'ArrowUp') { e.preventDefault(); if (links.length) links[Math.max(i - 1, 0)].focus(); }
       });
     });
+    var cr = document.getElementById('dds-create');
+    if (cr) cr.addEventListener('click', function (e) { e.stopPropagation(); openCreate('', cr, e.detail === 0); });
     // search
     var s = document.getElementById('dds-search');
     s.addEventListener('click', openPalette);
@@ -802,12 +883,15 @@
   // ── command palette ──
   var pal;
   function openPalette() {
+    if (window.ddsCreate && window.ddsCreate.isOpen()) window.ddsCreate.close();
     closeAllLayers();   // the palette is the front-most layer — no stacking under it
     if (!pal) {
       pal = el('<div class="dds-palette"><div class="box" role="dialog" aria-modal="true" aria-label="Search Studio OS"><input placeholder="Search Studio OS…" aria-label="Search" role="combobox" aria-expanded="true" aria-controls="dds-pal-list" aria-autocomplete="list"><div class="results" id="dds-pal-list" role="listbox" aria-label="Results"></div></div></div>');
       document.body.appendChild(pal);
       pal.addEventListener('click', function (e) {
         if (e.target === pal) return closePalette();
+        var cr = e.target && e.target.closest ? e.target.closest('a.res[data-create]') : null;
+        if (cr) { e.preventDefault(); openCreate(cr.getAttribute('data-create'), document.getElementById('dds-create')); return; }
         // a record selection feeds the Customers caret's "Recent" group
         var a = e.target && e.target.closest ? e.target.closest('a.res[data-rec-label]') : null;
         if (a) pushRecent(a.getAttribute('data-rec-label'), a.getAttribute('data-rec-href'));
@@ -816,6 +900,7 @@
       pal.querySelector('input').addEventListener('keydown', function (e) {
         var sel = pal.querySelector('.res.sel');
         if (e.key === 'Escape') return closePalette();
+        if (e.key === 'Enter' && sel && sel.hasAttribute('data-create')) { e.preventDefault(); openCreate(sel.getAttribute('data-create'), document.getElementById('dds-create'), true); return; }
         if (e.key === 'Enter' && sel) {
           if (sel.hasAttribute('data-rec-label')) pushRecent(sel.getAttribute('data-rec-label'), sel.getAttribute('data-rec-href'));
           location.href = sel.getAttribute('href');
@@ -844,7 +929,7 @@
     var qq = String(q || '').trim().toLowerCase();
     var list = qq ? DESTS.filter(function (d) { return d.label.toLowerCase().indexOf(qq) >= 0 || d.section.toLowerCase().indexOf(qq) >= 0 || (d.desc && d.desc.toLowerCase().indexOf(qq) >= 0); }) : DESTS;
     var box = pal.querySelector('.results');
-    var navHtml = list.map(function (d, i) { return '<a class="res' + (i === 0 ? ' sel' : '') + '" id="dds-res-' + i + '" role="option" aria-selected="' + (i === 0 ? 'true' : 'false') + '" href="' + esc(withScope(d.href)) + '">' + esc(d.label) + '<span class="s">' + esc(d.section) + '</span></a>'; }).join('');
+    var navHtml = list.map(function (d, i) { return '<a class="res' + (i === 0 ? ' sel' : '') + '" id="dds-res-' + i + '" role="option" aria-selected="' + (i === 0 ? 'true' : 'false') + '" href="' + esc(withScope(d.href)) + '"' + (d.create ? ' data-create="' + esc(d.create) + '"' : '') + '>' + esc(d.label) + '<span class="s">' + esc(d.section) + '</span></a>'; }).join('');
     box.innerHTML = navHtml || (qq ? '' : '');
     var inp0 = pal.querySelector('input'); if (inp0) inp0.setAttribute('aria-activedescendant', navHtml ? 'dds-res-0' : '');
     // ── Records + Files: global search across CRM records (GET /crm/search) AND
@@ -1267,7 +1352,7 @@
     var tag = t.tagName.toUpperCase();
     return tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || !!t.isContentEditable;
   }
-  function modalOpen() { return !!((pal && pal.classList.contains('open')) || tour); }
+  function modalOpen() { return !!((pal && pal.classList.contains('open')) || tour || (window.ddsCreate && window.ddsCreate.isOpen())); }
   var NEW_RE = /^(\+|new\b|add\b)/i;
   function onScreen(n) { return !!(n && n.getClientRects && n.getClientRects().length); }
   function findNewAction() {
@@ -1298,6 +1383,7 @@
       keys.querySelector('#dds-keys-close').addEventListener('click', closeShortcuts);
     }
     var rows = [[/Mac|iPhone|iPad/.test(navigator.platform || '') ? '⌘K' : 'Ctrl K', 'Search Studio OS'], ['/', 'Search'], ['n', 'New — the page’s + button'], ['?', 'These shortcuts'], ['Esc', 'Close whatever is open']];
+    if (canCreate()) rows.splice(3, 0, ['c', 'Create — log a call, a deal, an invoice…']);
     var html = rows.map(keyRow).join('');
     if (normalizePath(location.pathname) === '/inbox') html += '<div class="grp">In the Inbox</div>' + INBOX_KEYS.map(keyRow).join('');
     keys.querySelector('.body').innerHTML = html;
@@ -1310,6 +1396,7 @@
     if (typingIn(e.target)) return;
     if (e.key === '/') { if (modalOpen()) return; e.preventDefault(); openPalette(); }
     else if (e.key === '?') { if (modalOpen()) return; e.preventDefault(); toggleShortcuts(); }
+    else if (e.key === 'c' && !e.shiftKey && canCreate()) { if (modalOpen()) return; e.preventDefault(); openCreate('', document.getElementById('dds-create'), true); }
     else if (e.key === 'n' && !e.shiftKey) {
       if (modalOpen()) return;
       var t = findNewAction();
@@ -1595,6 +1682,7 @@
     }
     return [
       { sel: ['.dds-nav .sec > [data-href^="/today"]', '.dds-nav .sec > [data-href^="/agency"]', '#dds-mbar a[href^="/today"]', '#dds-mbar a[href^="/agency"]'], title: 'Home', text: 'This is your home — the one page that tells you what’s changed and what needs you. Nothing here is urgent by surprise.' },
+      { sel: ['#dds-create', '#dds-mbar-create'], title: 'Create', text: 'Log a call, add a deal, send an invoice or a proposal — from any page. You pick who inside the form, so there’s no hunting for their page first.' },
       { sel: ['.dds-nav .sec > button[data-sec="website"]', '.dds-nav .sec > [data-href^="/presence"]', '#dds-mbar-menu'], title: 'Your website', text: 'Everything about your website lives behind this one door — edit pages, update business info, and publish. Nothing goes live without your OK.', mtext: 'On a phone, Menu holds the rest — your Website (edit and publish) and your Customers live in there. Nothing goes live without your OK.' },
       { sel: ['.dds-nav .sec > button[data-sec="customers"]', '.dds-nav .sec > [data-href^="/customers"]'], title: 'Customers', text: 'Your customers and the people behind them — their deal, billing, project, files and messages on one record.' },
       { sel: ['#dds-waffle'], title: 'App Launcher', text: 'Every part of your studio, one tap — the full list of destinations, grouped and always within reach.' },

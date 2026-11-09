@@ -147,6 +147,9 @@
   Cache-Control: no-cache, must-revalidate
 /shell.css
   Cache-Control: no-cache, must-revalidate
+# "+ Create" (create.js) — the shell loads it on idle; same policy as shell.js
+/create.js
+  Cache-Control: no-cache, must-revalidate
 
 # Canonical extensionless page URLs (generated from sitemap.xml) — the /*.html
 # no-cache rule does not match these, so each gets the same policy explicitly.

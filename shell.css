@@ -739,3 +739,131 @@ html.dds-app .btn,html.dds-app a.btn,html.dds-app .rowact,html.dds-app .lbtn{bor
 html.dds-app[data-theme="dark"] .seg button[aria-pressed="true"],html.dds-app[data-theme="dark"] .seg button[aria-selected="true"],html.dds-app[data-theme="dark"] .seg button.on,html.dds-app[data-theme="dark"] .viewtog .chip.on{background:color-mix(in srgb,var(--dds-ink) 14%,var(--dds-card));box-shadow:none}
 /* a page's own .sec (Pipeline's detail sections) must not space out the nav */
 .dds-nav .sec{margin:0}
+
+/* ══ "+ Create" (sales list item 70, the bold redesign, Nov 2026) ═════════════
+   shell.js draws the button at the top of the sidebar and the + in the middle
+   of a studio's phone bar; create.js draws the menu and the forms in one
+   <dialog id="dds-cr">: beside the button on a computer (a form slides in from
+   the right), a sheet from the bottom on a phone. */
+.dds-create{display:none}
+@media (min-width:761px){
+  html.dds-side .dds-create{order:1;display:flex;align-items:center;gap:10px;width:100%;height:42px;margin:0 0 10px;padding:0 12px 0 14px;border:0;border-radius:999px;
+    background:var(--dds-grad-btn);color:var(--dds-on-p);font:inherit;font-size:14px;font-weight:650;letter-spacing:-.005em;cursor:pointer;
+    box-shadow:0 8px 18px -10px color-mix(in srgb,var(--dds-p) 85%,transparent)}
+  html.dds-side .dds-create .nic{display:block;width:18px;height:18px;stroke:currentColor;fill:none;stroke-width:2.2;stroke-linecap:round}
+  html.dds-side .dds-create .lbl{flex:1;text-align:left}
+  html.dds-side .dds-create kbd{font-family:var(--dds-sans);font-size:11px;font-weight:600;line-height:18px;padding:0 6px;border-radius:6px;border:0;background:color-mix(in srgb,var(--dds-on-p) 20%,transparent);color:inherit}
+  html.dds-side .dds-create:hover{filter:brightness(1.07)}
+  html.dds-side .dds-create:focus-visible{outline:2px solid var(--dds-p);outline-offset:2px}
+}
+/* a touch screen has no "C" key to press, nor ⌘K */
+@media (pointer:coarse){
+  html.dds-side .dds-create{height:44px}
+  html.dds-side .dds-create kbd,html .dds-search kbd,html.dds-side #dds-search kbd{display:none}
+}
+/* the studio's phone bar: Home · Inbox · + · Pipeline · Customers */
+@media (max-width:760.98px){
+  #dds-mbar.sales{align-items:center}
+  #dds-mbar.sales > a{min-width:0}
+  #dds-mbar.sales .mlbl{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  #dds-mbar .mplus{flex:0 0 auto;width:54px;height:54px;margin:-20px 6px 0;padding:0;border-radius:50%;display:grid;place-items:center;
+    background:var(--dds-grad-btn);color:var(--dds-on-p);box-shadow:0 0 0 4px var(--dds-card),0 12px 24px -10px color-mix(in srgb,var(--dds-p) 80%,transparent)}
+  #dds-mbar .mplus .nic{width:26px;height:26px;stroke-width:2.4}
+  #dds-mbar .mplus:active{background:var(--dds-grad-btn);filter:brightness(.94)}
+  #dds-mbar .mplus:focus-visible{outline:2px solid var(--dds-p);outline-offset:3px}
+}
+
+/* the dialog: the menu, then a form */
+.dds-cr{padding:0;border:0;margin:0;max-width:none;max-height:none;background:var(--dds-card);color:var(--dds-ink);font-family:var(--dds-sans);font-size:14px;box-shadow:var(--dds-shadow-pop);overflow:hidden}
+.dds-cr::backdrop{background:rgba(23,21,34,.32)}
+.dds-cr [hidden]{display:none !important}
+.dds-cr .sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.dds-cr .cr-ic{width:18px;height:18px;stroke:currentColor;fill:none;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round;display:block}
+.dds-cr button{font:inherit;color:inherit;cursor:pointer}
+.dds-cr :focus-visible{outline:2px solid var(--dds-p);outline-offset:2px}
+html.dds-cr-on body{overflow:hidden}
+/* the menu, beside the sidebar button (create.js places it) */
+.dds-cr.menu:not(.sheet){position:fixed;inset:auto;width:min(380px,calc(100vw - 16px));border-radius:var(--dds-r-lg,16px);border:1px solid var(--dds-line)}
+.dds-cr.menu:not(.sheet)::backdrop{background:transparent}
+.dds-cr .cr-menu{padding:8px}
+.dds-cr .cr-items{display:flex;flex-direction:column;gap:2px}
+.dds-cr .cr-item{display:flex;align-items:center;gap:12px;width:100%;padding:9px 10px;border:0;border-radius:var(--dds-r,12px);background:transparent;text-align:left}
+.dds-cr .cr-item:focus-visible{background:var(--dds-p-soft)}
+.dds-cr .cr-menu:focus{outline:none}
+/* hover tints only where there is hover: on a touch screen the tint sticks where the finger lifted */
+@media (hover:hover){.dds-cr .cr-item:hover{background:var(--dds-p-soft)}.dds-cr .cr-x:hover{color:var(--dds-ink)}.dds-cr .cr-chip:hover{border-color:var(--dds-p)}.dds-cr .cr-opt-row:hover{background:var(--dds-up)}}
+.dds-cr .cr-item:focus-visible{outline-offset:-2px}
+.dds-cr .cr-tile{flex:0 0 auto;width:36px;height:36px;border-radius:10px;display:grid;place-items:center;background:var(--dds-p-soft);color:var(--dds-p)}
+.dds-cr .cr-tx{flex:1;min-width:0;display:flex;flex-direction:column;gap:1px}
+.dds-cr .cr-tx b{font-weight:600;font-size:14px}
+.dds-cr .cr-tx small{font-size:12.5px;color:var(--dds-soft);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dds-cr .cr-item kbd{flex:0 0 auto;font-family:var(--dds-sans);font-size:11px;min-width:22px;text-align:center;padding:1px 5px;border-radius:6px;border:1px solid var(--dds-line);background:var(--dds-bg);color:var(--dds-faint)}
+/* a form slides in from the right on a computer */
+.dds-cr.form:not(.sheet){position:fixed;inset:0 0 0 auto;width:min(480px,100vw);height:100vh;height:100dvh;border-radius:var(--dds-r-xl,20px) 0 0 var(--dds-r-xl,20px);animation:dds-cr-in var(--dds-t-base,180ms) var(--dds-ease,ease-out)}
+@keyframes dds-cr-in{from{transform:translateX(28px);opacity:0}}
+@keyframes dds-cr-up{from{transform:translateY(32px);opacity:.4}}
+.dds-cr .cr-form{display:flex;flex-direction:column;height:100%;max-height:inherit}
+.dds-cr .cr-head{display:flex;align-items:flex-start;gap:12px;padding:20px 20px 12px;border-bottom:1px solid var(--dds-line)}
+.dds-cr .cr-head > div{flex:1;min-width:0}
+.dds-cr .cr-head h2{margin:0;font-family:var(--dds-serif);font-size:24px;font-weight:600;letter-spacing:-.015em;line-height:1.2}
+.dds-cr .cr-head p{margin:4px 0 0;color:var(--dds-soft);font-size:13px;line-height:1.4}
+.dds-cr .cr-x{flex:0 0 auto;width:36px;height:36px;border-radius:999px;border:0;background:var(--dds-up);color:var(--dds-soft);display:grid;place-items:center}
+.dds-cr .cr-body{flex:1;min-height:0;overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;padding:6px 20px 18px}
+.dds-cr .cr-l{display:block;margin:16px 0 6px;font-size:13px;font-weight:600;color:var(--dds-ink)}
+.dds-cr .cr-opt{font-weight:400;color:var(--dds-faint)}
+.dds-cr .cr-in{display:block;width:100%;box-sizing:border-box;min-height:44px;padding:10px 12px;border:1px solid var(--dds-line-strong);border-radius:var(--dds-r,12px);background:var(--dds-card);color:var(--dds-ink);font:inherit;font-size:15px}
+.dds-cr .cr-in::placeholder{color:var(--dds-faint)}
+.dds-cr .cr-in:focus{outline:none;border-color:var(--dds-p);box-shadow:0 0 0 3px color-mix(in srgb,var(--dds-p) 22%,transparent)}
+.dds-cr .cr-ta{min-height:84px;resize:vertical;line-height:1.45}
+.dds-cr .cr-date{max-width:220px;-webkit-appearance:none;appearance:none}
+.dds-cr .cr-money{max-width:220px;font-variant-numeric:tabular-nums}
+.dds-cr .cr-chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:2px}
+.dds-cr .cr-l + .cr-in + .cr-chips{margin-top:8px}
+.dds-cr .cr-chip{min-height:36px;padding:0 14px;border-radius:999px;border:1px solid var(--dds-line-strong);background:var(--dds-card);font-size:13.5px;font-weight:500;color:var(--dds-ink)}
+.dds-cr .cr-chip.on{background:var(--dds-p-soft);border-color:transparent;color:var(--dds-p);font-weight:600}
+/* who: a search box over a short list; once picked, one card with "Change" */
+.dds-cr .cr-hint{margin:8px 2px 4px;font-size:12px;font-weight:600;color:var(--dds-faint);text-transform:uppercase;letter-spacing:.04em}
+.dds-cr .cr-list{display:flex;flex-direction:column;gap:2px;max-height:264px;overflow-y:auto}
+.dds-cr .cr-opt-row{display:flex;align-items:center;gap:10px;min-height:48px;padding:6px 8px;border-radius:var(--dds-r,12px);cursor:pointer}
+.dds-cr .cr-opt-row[aria-selected="true"]{background:var(--dds-p-soft)}
+.dds-cr .cr-av{flex:0 0 auto;width:32px;height:32px;border-radius:50%;display:grid;place-items:center;background:var(--dds-grad-brand);color:#fff;font-size:12px;font-weight:700}
+.dds-cr .cr-ot{flex:1;min-width:0;display:flex;flex-direction:column;gap:1px}
+.dds-cr .cr-ot b{font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dds-cr .cr-ot small{font-size:12.5px;color:var(--dds-soft);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dds-cr .cr-picked{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:var(--dds-r,12px);background:var(--dds-up);border:1px solid var(--dds-line)}
+.dds-cr .cr-change{flex:0 0 auto;min-height:36px;padding:0 12px;border-radius:999px;border:1px solid var(--dds-line-strong);background:var(--dds-card);font-size:13px;font-weight:600}
+.dds-cr .cr-fill{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-top:8px}
+.dds-cr .cr-fl{font-size:12.5px;color:var(--dds-soft)}
+/* what the client gets: a small picture of the email */
+.dds-cr .cr-preview{display:flex;flex-direction:column;align-items:flex-start;gap:8px;margin-top:18px;padding:14px 16px;border-radius:var(--dds-r-lg,16px);background:var(--dds-up);border:1px dashed var(--dds-line-strong)}
+.dds-cr .cr-pl{font-size:11.5px;font-weight:600;color:var(--dds-faint);text-transform:uppercase;letter-spacing:.04em}
+.dds-cr .cr-preview b{font-weight:600;font-size:14.5px;line-height:1.35}
+.dds-cr .cr-paybtn{display:inline-block;padding:8px 18px;border-radius:999px;background:var(--dds-grad-btn);color:var(--dds-on-p);font-weight:600;font-size:13.5px}
+.dds-cr .cr-err{margin:0 20px 10px;padding:10px 12px;border-radius:var(--dds-r,12px);background:var(--dds-bad-soft);color:var(--dds-bad);font-size:13.5px;font-weight:500}
+.dds-cr .cr-err .cr-second{display:block;margin-top:8px;font:inherit;font-weight:600;color:var(--dds-bad);background:var(--dds-card);border:1px solid currentColor;border-radius:999px;padding:7px 14px;cursor:pointer}
+@media (pointer:coarse){.dds-cr .cr-err .cr-second{min-height:44px}}
+.dds-cr .cr-foot{display:flex;align-items:center;flex-wrap:wrap;gap:10px;padding:14px 20px calc(14px + env(safe-area-inset-bottom,0px));border-top:1px solid var(--dds-line);background:var(--dds-card)}
+.dds-cr .cr-note{flex:1 1 160px;min-width:0;font-size:12.5px;color:var(--dds-soft);line-height:1.35}
+.dds-cr .cr-cancel,.dds-cr .cr-go{min-height:44px;padding:0 18px;border-radius:999px;font-size:14px;font-weight:600}
+.dds-cr .cr-cancel{border:1px solid var(--dds-line-strong);background:var(--dds-card)}
+.dds-cr .cr-go{border:0;background:var(--dds-grad-btn);color:var(--dds-on-p);box-shadow:0 8px 18px -10px color-mix(in srgb,var(--dds-p) 85%,transparent)}
+.dds-cr .cr-go:disabled{opacity:.6;cursor:default;box-shadow:none}
+/* a phone: a sheet from the bottom with a grab bar; the menu is a grid of tiles */
+.dds-cr.sheet{position:fixed;inset:auto 0 0 0;width:100%;max-height:92vh;max-height:92dvh;border-radius:var(--dds-r-xl,20px) var(--dds-r-xl,20px) 0 0;animation:dds-cr-up var(--dds-t-base,180ms) var(--dds-ease,ease-out)}
+.dds-cr.sheet.form{height:92vh;height:92dvh}
+.dds-cr .cr-grab{width:40px;height:5px;border-radius:999px;background:var(--dds-line-strong);margin:8px auto 0;flex:0 0 auto}
+.dds-cr.sheet .cr-head{padding:12px 16px 10px}
+.dds-cr.sheet .cr-head h2{font-size:21px}
+.dds-cr.sheet .cr-body{padding:4px 16px 16px}
+.dds-cr.sheet .cr-foot{padding:12px 16px calc(12px + env(safe-area-inset-bottom,0px))}
+.dds-cr.sheet .cr-note{flex-basis:100%}
+.dds-cr.sheet .cr-go{flex:1}
+.dds-cr.sheet .cr-err{margin:0 16px 10px}
+.dds-cr .cr-menu.tiles{padding:0 16px calc(16px + env(safe-area-inset-bottom,0px))}
+.dds-cr .cr-menu.tiles .cr-h{margin:12px 2px 12px;font-family:var(--dds-serif);font-size:21px;font-weight:600}
+.dds-cr .cr-menu.tiles .cr-items{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.dds-cr .cr-menu.tiles .cr-item{flex-direction:column;justify-content:center;gap:8px;min-height:96px;padding:12px 6px;border:1px solid var(--dds-line);border-radius:var(--dds-r-lg,16px);background:var(--dds-card);text-align:center}
+.dds-cr .cr-menu.tiles .cr-tile{width:40px;height:40px;border-radius:12px}
+.dds-cr .cr-menu.tiles .cr-tx b{font-size:13px;line-height:1.25}
+@media (pointer:coarse){.dds-cr .cr-chip,.dds-cr .cr-change{min-height:44px}}
+@media (prefers-reduced-motion:reduce){.dds-cr.form,.dds-cr.sheet{animation:none}}

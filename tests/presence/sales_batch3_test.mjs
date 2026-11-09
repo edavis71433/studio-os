@@ -40,7 +40,7 @@ eq('the accepted notice opens its deal', W.noticeHrefFor({ kind: 'deal_signed', 
 eq('a malformed period keeps the kind\'s landing', W.noticeHrefFor({ kind: 'deal_signed', period: 'signed:nope' }), W.noticeHref('deal_signed'));
 eq('a lead reminder still deep-links its enquiry', W.noticeHrefFor({ kind: 'lead_followup', period: 'lead:l1' }), '/inbox.html#enquiries?sel=lead:l1');
 const pipe = read('pipeline.html');
-ok('#convert opens Billing at Convert', /WANT_CONVERT=location\.hash==='#convert'\|\|WANT_CONVERT_NEXT/.test(pipe) && /\(WANT_SCHEDULE\|\|WANT_CONVERT\)\?'billing'/.test(pipe));
+ok('#convert opens Billing at Convert', /WANT_CONVERT=location\.hash==='#convert'\|\|WANT_CONVERT_NEXT/.test(pipe) && /\(WANT_SCHEDULE\|\|WANT_CONVERT(\|\|WANT_PROPOSAL)?\)\?'billing'/.test(pipe));   // "+ Create → Send a proposal" lands on Billing too (item 70)
 ok('a won row that is not a customer says so and opens at Convert', /const needsConvert=\(d\)=>d\.stage==='won'&&!d\.converted_client_id;/.test(pipe) && /Not a customer yet — open to make them one/.test(pipe));
 const ny = read('supabase/functions/presence/agency/needs_you.ts');
 ok('Home\'s Convert row lands on Convert', /\$\{signed \? '#convert' : ''\}/.test(ny));
