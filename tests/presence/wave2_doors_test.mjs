@@ -14,6 +14,7 @@ const build = await read('../../scripts/build-public.sh');
 const redirects = await read('../../_redirects');
 const route = await read('../../supabase/functions/presence/routes/connections.ts');
 const index = await read('../../supabase/functions/presence/index.ts');
+const shellSrc = await read('../../shell.js');
 let pass = 0, fail = 0; const failed = [];
 const ok = (n, c) => { if (c) { pass++; console.log('PASS ', n); } else { fail++; failed.push(n); console.log('FAIL ', n); } };
 
@@ -41,8 +42,10 @@ ok('⌘K "health" → the Health Center for platform staff only', hits(staff, 'h
 ok('every new entry is ⌘K-only (hidden) — the menu did not grow', ['billing', 'plan', 'team', 'kits', 'health'].every((k) => flatten(staff).filter((i) => i.key === k).every((i) => i.hidden)));
 ok('the website’s "health check" desc still answers "health" for an owner (no regression)', hits(owner, 'health').some((h) => h.href === '/presence.html'));
 
-// ═══ change 11: the Health Center's door on the studio home ═══
-ok('agency.html: the status line reads "Platform: all clear" / "N areas need a look"', /Platform: all clear/.test(ag) && /need'\+\(n===1\?'s':''\)\+' a look/.test(ag) && /id="healthDoor" href="\/admin-health\.html"/.test(ag));
+// ═══ change 11: the Health Center's door. Item 96 (Nov 8) moved it from the studio's
+//     Home, where it was staff wording on the owner's page, to the account menu ═══
+ok('agency.html: no platform line on the studio Home (item 96)', !/Platform: all clear/.test(ag) && !/id="healthDoor"/.test(ag) && !/\/admin\/health-center/.test(ag));
+ok('shell.js: the account menu has "Platform health" for staff only, with its count', /CTX && CTX\.is_operator\) rows \+= '<a class="row" href="\/admin-health\.html" id="dds-health-row">Platform health/.test(shellSrc) && /api\('\/admin\/health-center'\)/.test(shellSrc) && /' areas need'\) \+ ' a look' : 'All clear'/.test(shellSrc));
 ok('agency.html: no text link under the kits any more', !/Platform health — background jobs/.test(ag));
 // Oct 2026 home rebuild: the kits card left the home — #kits opens Add a customer (where "Start from a kit" lives)
 ok('agency.html: #kits opens Add a customer, the kits card is gone', !/class="kitcard"/.test(ag) && /location\.hash!=='#kits'/.test(ag) && /Save as a starter kit/.test(ag));

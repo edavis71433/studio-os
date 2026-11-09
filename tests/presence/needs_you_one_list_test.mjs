@@ -147,7 +147,7 @@ ok('the bell\'s Needs-you tab lists the same rows at studio level', /studioLevel
 const today = read('today.html');
 ok('a studio account at studio level is sent to the one Home', /c0 && c0\.is_agency && !\(c0\.scope && c0\.scope\.site_id\) && !new URLSearchParams\(location\.search\)\.get\('client'\)\)\{ location\.replace\('\/agency\.html'\)/.test(today));
 const inbox = read('inbox.html');
-ok('the Inbox counts conversations in its own words', /\$\{need\} waiting for a reply · Sorted by newest/.test(inbox) && !/need\$\{need===1\?'s':''\} you/.test(inbox));
+ok('the Inbox counts conversations in its own words', /\$\{need\} waiting for a reply\$\{oldN\?`, \$\{oldN\} over a month old`:''\} · Sorted by newest/.test(inbox) && !/need\$\{need===1\?'s':''\} you/.test(inbox));
 const comp = read('supabase/functions/presence/analytics/compose.ts');
 ok('Analytics never says "nothing needs you" from the clients alone', !/quiet and current — nothing needs you/.test(comp));
 

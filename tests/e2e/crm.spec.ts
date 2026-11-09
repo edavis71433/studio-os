@@ -118,7 +118,7 @@ test.describe('Website enquiries (the Inbox’s Enquiries view)', () => {
     await expect(page.getByRole('heading', { level: 1, name: 'Inbox' })).toBeAttached();
     await expect(page.locator('h1')).toHaveCount(1);
     await expect(page.locator('#q')).toBeVisible();
-    await expect(page.locator('#lmeta')).toContainText('2 enquiries · 1 new · Sorted by newest');
+    await expect(page.locator('#lmeta')).toContainText('2 enquiries · 1 new, 1 over a month old · Sorted by newest');   // item 96: the new one is from July
     await expect(page.getByRole('button', { name: 'New enquiry' })).toBeVisible();
     await expect(page.locator('.efilt [data-ef="open"] .n')).toHaveText('2');
     await expect(page.locator('.efilt [data-ef="new"] .n')).toHaveText('1');
