@@ -64,6 +64,10 @@ export interface ChecklistStep {
   clientAction?: boolean;
   /** documents that the system ticks this step itself (see the tick call sites). */
   auto?: 'contract_signed' | 'deposit_paid' | 'site_live';
+  /** the Projects board's column while this is the step a project is on
+   *  (lib/service_delivery.ts boardFacts, ProjectStage) — the starter template's
+   *  four milestones: kickoff & brief, design & first draft, review & revisions, launch. */
+  stage: 'kickoff' | 'design' | 'review' | 'launch';
 }
 
 export const CHECKLIST_SOURCE_PREFIX = 'checklist:';
@@ -96,24 +100,31 @@ export const clientMayTick = (source: unknown): boolean => !isChecklistSource(so
 /** The ten steps, in delivery order. Ten steps = 10% each, by construction —
  *  nothing stores that number, progressOf just counts done/total. */
 export const DELIVERY_CHECKLIST: ChecklistStep[] = [
-  { key: 'agreement_signed',       title: 'Agreement signed',                    auto: 'contract_signed' },
-  { key: 'deposit_paid',           title: 'Deposit paid',                        auto: 'deposit_paid' },
+  { key: 'agreement_signed',       title: 'Agreement signed',                    auto: 'contract_signed', stage: 'kickoff' },
+  { key: 'deposit_paid',           title: 'Deposit paid',                        auto: 'deposit_paid', stage: 'kickoff' },
   // The client's homework — titled as the ASK, because this exact string is what
   // client.html prints on their to-do card. "Questionnaire returned" is the
   // studio's word for a thing the client has not done yet.
-  { key: 'questionnaire_returned', title: 'Send back your project questionnaire', clientAction: true },
-  { key: 'content_received',       title: 'Send your content and photos',         clientAction: true },
-  { key: 'draft_shared',           title: 'Design draft shared' },
-  { key: 'client_review',          title: 'Review the design draft',              clientAction: true },
-  { key: 'revisions',              title: 'Revisions' },
-  { key: 'domain_connected',       title: 'Domain connected' },
-  { key: 'site_live',              title: 'Site live',                            auto: 'site_live' },
-  { key: 'handover',               title: 'Handover' },
+  { key: 'questionnaire_returned', title: 'Send back your project questionnaire', clientAction: true, stage: 'kickoff' },
+  { key: 'content_received',       title: 'Send your content and photos',         clientAction: true, stage: 'kickoff' },
+  { key: 'draft_shared',           title: 'Design draft shared',                  stage: 'design' },
+  { key: 'client_review',          title: 'Review the design draft',              clientAction: true, stage: 'review' },
+  { key: 'revisions',              title: 'Revisions',                            stage: 'review' },
+  { key: 'domain_connected',       title: 'Domain connected',                     stage: 'launch' },
+  { key: 'site_live',              title: 'Site live',                            auto: 'site_live', stage: 'launch' },
+  { key: 'handover',               title: 'Handover',                             stage: 'launch' },
 ];
 
 /** Lookup by key (null for anything not in the list). */
 export const checklistStep = (key: string): ChecklistStep | null =>
   DELIVERY_CHECKLIST.find((s) => s.key === key) || null;
+
+/** The board stage of the step a `checklist:<key>` source addresses — null for
+ *  anything else (lib/service_delivery.ts boardFacts reads it through the route). */
+export const checklistStageOf = (source: unknown): ChecklistStep['stage'] | null => {
+  const key = checklistKeyOf(source);
+  return key ? checklistStep(key)?.stage ?? null : null;
+};
 
 /** The key a `checklist:<key>` source addresses — null for anything else
  *  (`manual`, `template`, empty). The inverse of checklistSource, and the one

@@ -142,3 +142,71 @@ export function reportSummary(inp: ReportInputs, nowIso: string): {
   const csat = ratings.length ? { count: ratings.length, average: Math.round((ratings.reduce((a, b) => a + b, 0) / ratings.length) * 10) / 10 } : null;
   return { progress, milestones, open_client_actions, overdue_tasks, pending_approvals, shared_files, last_activity_at: inp.lastActivityAt ?? null, csat };
 }
+
+// ── the Projects board (bold redesign, Nov 2026): where each project stands and
+// whose move it is, so the roster can be a board by stage instead of a table ──
+/** The board's columns, in delivery order — the starter template's four
+ *  milestones (Kickoff & brief, Design & first draft, Review & revisions,
+ *  Launch); each of the ten checklist steps names its own (project_checklist.ts). */
+export type ProjectStage = 'kickoff' | 'design' | 'review' | 'launch';
+export const PROJECT_STAGES: ProjectStage[] = ['kickoff', 'design', 'review', 'launch'];
+
+/** The stage a milestone's (or a task's) words name — null when they name none.
+ *  Launch and review are tried first: "Connect the domain and go live" is launch
+ *  work and "Share the draft for your review" is review work, though both also
+ *  say what was made. */
+export function stageOfWords(s: unknown): ProjectStage | null {
+  const t = String(s ?? '').toLowerCase();
+  if (!t.trim()) return null;
+  if (/\blaunch|go(es)?[ -]?live|site live|\bdomain|hand ?-?(off|over)|publish/.test(t)) return 'launch';
+  if (/review|revis|feedback|approv|sign[ -]?off|\bqa\b|\btesting\b/.test(t)) return 'review';
+  if (/design|draft|mock ?-?up|wireframe|\bbuild|develop|layout|\bcopy\b|copywrit/.test(t)) return 'design';
+  if (/kick ?-?off|brief|discover|onboard|intake|questionnaire|agreement|contract|deposit|content|photos|\blogo|assets|research|\bplan/.test(t)) return 'kickoff';
+  return null;
+}
+
+export interface BoardTask extends Orderable {
+  status: TaskStatus; title?: string | null; client_action_required?: boolean | null;
+  source?: string | null; milestone_id?: string | null; due_date?: string | null;
+}
+export interface BoardMilestone extends Orderable { title?: string | null; status?: string | null; }
+export interface BoardApproval { status?: string | null; title?: string | null; created_at?: string | null; }
+export interface BoardFacts {
+  /** the board column; null only when nothing says (the page shows "No stage yet", never a guess) */
+  stage: ProjectStage | null;
+  /** the first open task in order — what happens next, and whether it is the client's to do */
+  next: { title: string; theirs: boolean; due_date: string | null } | null;
+  /** what the client owes: the oldest pending approval, else the next step when it is theirs */
+  waiting: { kind: 'approval' | 'task'; title: string } | null;
+  /** open tasks past their due date */
+  overdue: number;
+}
+/** Where a project stands and whose move it is, from its own rows — already cut
+ *  to the viewer's side (forViewer), so a client never learns of an internal step.
+ *  The stage is the first open step's: a checklist step knows its own (the caller
+ *  passes the checklist's lookup, project_checklist.ts checklistStageOf, so this
+ *  file stays import-free), any other task takes its milestone's words and then
+ *  its own. With no open task saying, the first open milestone that does. Then the
+ *  ends: every step done → launch (it is finishing); nothing done yet → kickoff
+ *  (it is starting). Pure. */
+export function boardFacts(inp: { tasks: BoardTask[]; milestones: BoardMilestone[]; approvals: BoardApproval[] }, nowIso: string, stageOfSource: (source: unknown) => ProjectStage | null = () => null): BoardFacts {
+  const tasks = [...(inp.tasks || [])].sort(compareOrder);
+  const milestones = [...(inp.milestones || [])].sort(compareOrder);
+  const msTitle = new Map(milestones.map((m) => [String(m.id || ''), m.title]));
+  const open = tasks.filter((t) => t.status !== 'done');
+  const stageOfTask = (t: BoardTask): ProjectStage | null =>
+    stageOfSource(t.source) || stageOfWords(t.milestone_id ? msTitle.get(String(t.milestone_id)) : '') || stageOfWords(t.title);
+  let stage: ProjectStage | null = null;
+  for (const t of open) { stage = stageOfTask(t); if (stage) break; }
+  if (!stage) for (const m of milestones) { if (m.status !== 'complete') { stage = stageOfWords(m.title); if (stage) break; } }
+  if (!stage && ((tasks.length && !open.length) || (!tasks.length && milestones.length && milestones.every((m) => m.status === 'complete')))) stage = 'launch';
+  if (!stage && !tasks.some((t) => t.status === 'done')) stage = 'kickoff';
+  const n = open[0];
+  const next = n ? { title: String(n.title ?? '').trim(), theirs: n.client_action_required === true, due_date: n.due_date || null } : null;
+  const pending = (inp.approvals || []).filter((a) => a.status === 'pending')
+    .sort((a, b) => String(a.created_at || '').localeCompare(String(b.created_at || '')));
+  const waiting: BoardFacts['waiting'] = pending.length ? { kind: 'approval', title: String(pending[0].title ?? '').trim() }
+    : (next && next.theirs ? { kind: 'task', title: next.title } : null);
+  const overdue = open.filter((t) => deriveTaskState(t, nowIso).overdue).length;
+  return { stage, next, waiting, overdue };
+}

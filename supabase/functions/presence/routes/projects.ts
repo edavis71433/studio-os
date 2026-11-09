@@ -15,12 +15,12 @@ import { offerCsat, csatRatingsForProject } from '../lib/csat.ts';
 import { templateByKey, type ProjectTemplate } from '../lib/project_templates.ts';
 import {
   checklistState, checklistRowsFor, checklistStep, checklistKeyOf, isChecklistSource,
-  DELIVERY_CHECKLIST,
+  DELIVERY_CHECKLIST, checklistStageOf,
 } from '../lib/project_checklist.ts';
 import {
   isProjectStatus, canProjectTransition, isTaskStatus, canTaskTransition, isTaskPriority,
   deriveTaskState, compareOrder, nextSortOrder, forViewer, clampLimit, clampOffset, progressOf,
-  reportSummary, type ProjectStatus, type TaskStatus,
+  reportSummary, boardFacts, type BoardFacts, type ProjectStatus, type TaskStatus,
 } from '../lib/service_delivery.ts';
 import type { SiteRow } from '../lib/site.ts';
 import type { Principal } from '../../_shared/auth.ts';
@@ -288,7 +288,10 @@ export async function handleProjectReport(req: Request, jwt: string, site: SiteR
  *  clients" card, for many projects in one read. They asked /projects/:id/report once per
  *  project, up to 60 at a time. Counts the same rows the report counts for these two numbers,
  *  with the same visibility rule: the client side sees only client-visible projects and rows.
- *  Each table is read once for all of them, in pages, so the row cap can't shorten a count. */
+ *  Each table is read once for all of them, in pages, so the row cap can't shorten a count.
+ *  The bold redesign (Nov 2026) puts the roster on a board by stage, so the same rows also
+ *  answer where each project stands and whose move it is (boardFacts) — one more table,
+ *  the milestones, whose words place a project that isn't on the checklist. */
 export const PROGRESS_BATCH_MAX = 60;
 export async function handleProjectsProgress(req: Request, jwt: string, site: SiteRow, principal: Principal, cors: Record<string, string>): Promise<Response> {
   const asked = (new URL(req.url).searchParams.get('ids') || '').split(',').map((s) => s.trim().toLowerCase()).filter((s) => UUID_RE.test(s));
@@ -296,19 +299,23 @@ export async function handleProjectsProgress(req: Request, jwt: string, site: Si
   if (!ids.length) return json({ data: {} }, 200, cors);
   const studio = await isStudioSide(jwt, site, principal);
   const inIds = `in.(${ids.join(',')})`;
-  const [pj, tasks, approvals] = await Promise.all([
+  const [pj, tasks, approvals, milestones] = await Promise.all([
     svc(`presence_projects?id=${inIds}&site_id=eq.${site.id}&deleted_at=is.null&select=id,client_visible`),
-    svcAll(`presence_tasks?project_id=${inIds}&site_id=eq.${site.id}&deleted_at=is.null&select=id,project_id,status,client_visible`, 'id'),
-    svcAll(`presence_approvals?project_id=${inIds}&site_id=eq.${site.id}&deleted_at=is.null&select=id,project_id,status,client_visible`, 'id'),
+    svcAll(`presence_tasks?project_id=${inIds}&site_id=eq.${site.id}&deleted_at=is.null&select=id,project_id,status,client_visible,title,client_action_required,source,milestone_id,sort_order,due_date,created_at`, 'id'),
+    svcAll(`presence_approvals?project_id=${inIds}&site_id=eq.${site.id}&deleted_at=is.null&select=id,project_id,status,client_visible,title,created_at`, 'id'),
+    svcAll(`presence_milestones?project_id=${inIds}&site_id=eq.${site.id}&deleted_at=is.null&select=id,project_id,title,status,sort_order,created_at,client_visible`, 'id'),
   ]);
   if (!pj.ok) return json({ error: 'read_failed', message: 'The projects couldn’t be read just now.' }, 502, cors);
-  const out: Record<string, { progress: { total: number; done: number; pct: number }; pending_approvals: number }> = {};
+  const now = new Date().toISOString();
+  const out: Record<string, { progress: { total: number; done: number; pct: number }; pending_approvals: number } & BoardFacts> = {};
   for (const p of rows(pj)) {
     if (!studio && !p.client_visible) continue;
     const mine = <T extends { project_id: string }>(list: T[]) => list.filter((x) => x.project_id === p.id);
+    const myTasks = forViewer(mine(tasks), studio), myApprovals = forViewer(mine(approvals), studio);
     out[p.id] = {
-      progress: progressOf(forViewer(mine(tasks), studio)),
-      pending_approvals: forViewer(mine(approvals), studio).filter((a: any) => a.status === 'pending').length,
+      progress: progressOf(myTasks),
+      pending_approvals: myApprovals.filter((a: any) => a.status === 'pending').length,
+      ...boardFacts({ tasks: myTasks, milestones: forViewer(mine(milestones), studio), approvals: myApprovals }, now, checklistStageOf),
     };
   }
   return json({ data: out }, 200, cors);
