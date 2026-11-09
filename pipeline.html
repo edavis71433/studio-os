@@ -486,6 +486,21 @@ html.dds-embed #detailWrap{padding-top:0}
   .stats .st{background:var(--card);border:1px solid var(--line);border-radius:var(--dds-r-lg,16px);box-shadow:var(--shadow)}
   .stats .st:first-child{border-left:1px solid var(--line)}
   .stats .v{font-size:24px;font-weight:700;letter-spacing:-.02em}
+  /* phones: the four numbers keep their one short row (item 58) at the phone size, as in the
+     design's phone frame; 24px only fits a tile on a computer or a 2-by-2 phone. Each card is a
+     subgrid of the row, so a label that wraps ("Won this month") can't push its number below
+     the others, and the number spans its card, so fitTiles can see one that's too long. Open's
+     line says just what's expected: the header already counts the open deals. */
+  @media (min-width:361px) and (max-width:600px){
+    .stats{gap:6px;grid-template-rows:auto auto auto}
+    .stats .st{display:grid;grid-row:span 3;grid-template-rows:subgrid;grid-template-columns:minmax(0,1fr);row-gap:2px;align-content:start;padding:8px 7px}
+    .stats .st-main{display:contents}
+    .stats .st.st-exp{display:none}   /* still rides under Open on a phone (item 69) */
+    .stats .k{font-size:11px;line-height:1.3}
+    .stats .v{font-size:15px;letter-spacing:-.01em;overflow:hidden;text-overflow:ellipsis}
+    .stats .s{font-size:11px}
+    .stats .has-exp .across,.stats .has-exp .exp-sep{display:none}
+  }
   .stats .ico{border-radius:12px}
   .card{box-shadow:var(--shadow);transition:transform var(--dds-t-fast,120ms) var(--dds-ease,ease-out),box-shadow var(--dds-t-fast,120ms) var(--dds-ease,ease-out)}
   .card:hover{border-color:var(--line);transform:translateY(-1px);box-shadow:0 2px 4px rgba(23,21,34,.05),0 14px 28px -16px rgba(23,21,34,.24)}
@@ -636,11 +651,11 @@ const STAGES=['lead','qualified','proposal','contract','won','lost'];
 const STAGE_LABEL={lead:'New lead',qualified:'Qualified',proposal:'Proposal sent',contract:'Agreement out',won:'Won',lost:'Not a fit'};
 const stageLabel=(s)=>STAGE_LABEL[s]||s;
 // The badge reads as an OUTCOME where one exists: a converted deal is "Won ✓"
-// (calm green), a lost one is a muted "Lost" — active stages keep their labels.
+// (calm green), a lost one is a muted "Not a fit" — active stages keep their labels.
 const stageBadge=(s,signed)=>{
   // A signed agreement reads as its own positive state — never the stale "Agreement out".
   if(s==='contract'&&signed)return `<span class="stage won">Agreement signed ✓</span>`;
-  return `<span class="stage${s==='won'?' won':s==='lost'?' lost':''}">${s==='won'?'Won ✓':s==='lost'?'Lost':esc(stageLabel(s))}</span>`;
+  return `<span class="stage${s==='won'?' won':s==='lost'?' lost':''}">${s==='won'?'Won ✓':s==='lost'?'Not a fit':esc(stageLabel(s))}</span>`;
 };
 // Per-stage "Path" guidance — the calm one-line tip + suggested next action, so
 // a non-technical owner always knows what to do next. Mirrors the source of
@@ -762,6 +777,8 @@ function ago(iso){const then=Date.parse(iso);if(!isFinite(then))return'';const d
 const SI={phone:'<path d="M5 3h4l2 5-2.5 1.5a11 11 0 0 0 6 6L16 13l5 2v4a2 2 0 0 1-2 2A17 17 0 0 1 3 5a2 2 0 0 1 2-2z"/>',mail:'<rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 7l9 6 9-6"/>',users:'<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0"/><circle cx="17" cy="9" r="2.5"/><path d="M15.5 14.5A5 5 0 0 1 21.5 20"/>',pencil:'<path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/>',pipeline:'<rect x="3" y="4" width="5" height="16" rx="1"/><rect x="9.5" y="4" width="5" height="10" rx="1"/><rect x="16" y="4" width="5" height="13" rx="1"/>',eye:'<path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6S2 12 2 12z"/><circle cx="12" cy="12" r="3"/>',hourglass:'<path d="M6 2h12M6 22h12"/><path d="M7 2c0 6 5 6 5 10s-5 4-5 10M17 2c0 6-5 6-5 10s5 4 5 10"/>',clock:'<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>'};
 const svgi=(k)=>`<svg class="si" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">${SI[k]||SI.dot}</svg>`;
 const ACTKINDS=[['call',svgi('phone')+' Call'],['email',svgi('mail')+' Email'],['meeting',svgi('users')+' Meeting'],['note',svgi('pencil')+' Note']];
+// one word per action (bold redesign): the log button names what it logs, "Log call" as in + Create
+const logLabel=(k)=>k==='email'?'Log email':k==='meeting'?'Log meeting':k==='note'?'Add note':'Log call';
 let TOKEN="",FILTER="",DEALS=[],VIEW='list',DRAG=null;
 let DEALS_LOADED=false;
 // item 69: "How did they find you?" — the server's list (lib/found_via.ts), mirrored
@@ -1664,8 +1681,8 @@ async function renderSummary(gen){
   // item 69: Expected = each open deal's value times its stage's chance (Settings › The chance each stage closes).
   // Its own tile on a computer or tablet; on a phone the four tiles keep their one row (item 58), so it rides under Open.
   const ex=(s.expected&&open.count)?s.expected:null;
-  const expSub=ex?`<span class="exp-sub"> · ${money(ex.value_cents)||'$0'} expected</span>`:'';
-  const openT=open.count?tile('Open',money(open.value_cents)||'$0','across '+plur(open.count,'deal')+expSub,'open',''):tile('Open','$0','no open deals yet','open','');
+  const expSub=ex?`<span class="exp-sub"><span class="exp-sep"> · </span>${money(ex.value_cents)||'$0'} expected</span>`:'';
+  const openT=open.count?tile('Open',money(open.value_cents)||'$0',`<span class="across">across ${plur(open.count,'deal')}</span>`+expSub,'open','','',ex?'has-exp':''):tile('Open','$0','no open deals yet','open','');
   const expT=ex?tile('Expected',money(ex.value_cents)||'$0','at each stage’s chance','rate','info','','st-exp'):'';
   const wonT=wm.count?tile('Won this month',money(wm.value_cents)||'$0',plur(wm.count,'deal'),'won','good'):tile('Won this month','—','none yet','won','good');
   const winT=(wr.pct===null||wr.pct===undefined)?tile('Win rate','—','nothing won or ruled out yet','rate','info')
@@ -2972,7 +2989,7 @@ async function openDeal(id){
           <div class="qlog">
             <div class="kinds" id="qlKinds" role="group" aria-label="Type of activity">${qlKindBtns}</div>
             <textarea id="qlBody" rows="2" placeholder="What happened? (optional for a call, email, or meeting)"></textarea>
-            <div class="qrow"><label class="mut" for="qlDate" style="margin:0">When</label><input type="date" id="qlDate" max="${todayStr}" value="${todayStr}"><span style="flex:1"></span><button class="btn" id="qlSave">Log it</button></div>
+            <div class="qrow"><label class="mut" for="qlDate" style="margin:0">When</label><input type="date" id="qlDate" max="${todayStr}" value="${todayStr}"><span style="flex:1"></span><button class="btn" id="qlSave">${logLabel('call')}</button></div>
           </div>
           <ul class="tl">${tlHtml}</ul>
         </div>
@@ -3116,10 +3133,10 @@ async function openDeal(id){
     }
     const dta=$('dt-add'); if(dta) dta.onclick=async()=>{const t=($('dt-title').value||'').trim();if(!t){toast('Add a to-do first.');return;}dta.disabled=true;try{await api('/sales/deals/'+id+'/tasks','POST',{title:t,due_date:$('dt-due').value||undefined});$('dt-title').value='';$('dt-due').value='';if($('dt-preset'))$('dt-preset').value='';loadDealTasks(id);}catch(e){toast(nice(e),true);}dta.disabled=false;};
     // Activity quick-log: pick a kind, jot what happened (optional except a note),
-    // optionally date it, "Log it". A logged activity feeds the merged timeline +
+    // optionally date it, "Log call" (the button names the kind). A logged activity feeds the merged timeline +
     // "last contacted", so the drawer + card refresh after saving.
     let qlKind='call';
-    const qlKinds=$('qlKinds'); if(qlKinds) qlKinds.querySelectorAll('.kb').forEach(btn=>btn.onclick=()=>{qlKind=btn.dataset.k;qlKinds.querySelectorAll('.kb').forEach(x=>{x.classList.toggle('on',x===btn);x.setAttribute('aria-pressed',x===btn?'true':'false');});const ta=$('qlBody');if(ta)ta.placeholder=qlKind==='note'?'What do you want to remember about this deal?':'What happened? (optional for a call, email, or meeting)';});
+    const qlKinds=$('qlKinds'); if(qlKinds) qlKinds.querySelectorAll('.kb').forEach(btn=>btn.onclick=()=>{qlKind=btn.dataset.k;const sv=$('qlSave');if(sv)sv.textContent=logLabel(qlKind);qlKinds.querySelectorAll('.kb').forEach(x=>{x.classList.toggle('on',x===btn);x.setAttribute('aria-pressed',x===btn?'true':'false');});const ta=$('qlBody');if(ta)ta.placeholder=qlKind==='note'?'What do you want to remember about this deal?':'What happened? (optional for a call, email, or meeting)';});
     const qlSave=$('qlSave'); if(qlSave) qlSave.onclick=async()=>{const ta=$('qlBody');const body=(ta&&ta.value.trim())||'';if(qlKind==='note'&&!body){toast('Write a short note.',true);if(ta)ta.focus();return;}qlSave.disabled=true;try{await api('/sales/deals/'+id+'/activity','POST',{kind:qlKind,body,occurred_at:dayAtNoon($('qlDate')&&$('qlDate').value)});toast('Logged');openDeal(id);load();}catch(e){toast(nice(e),true);qlSave.disabled=false;}};
     // ONE send path per doc-kind (reused by the list buttons, "Save & send", and
     // the convert gate's "send first"). It records the link in LINKS, copies it,

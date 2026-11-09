@@ -141,7 +141,7 @@ let basePartial = null;
   ok('…a late next step cleared (as My tasks does)', /\^deal:\(\[0-9a-f-\]\{36\}\)\$/.test(doneOf) && /\{next_step:'',next_step_at:''\}/.test(doneOf));
   ok('…a notice dismissed', /\^notice:\(\[0-9a-f-\]\{36\}\)\$/.test(doneOf) && /\/commerce\/notices\/dismiss/.test(doneOf));
   ok('…and money, a broken site or a plan get no Done (doing the thing clears them)', !/money|broken|plan|publish/.test(doneOf.replace(/^.*?\{/, '')));
-  ok('My tasks is a tab of the list (and not a second card in the studio strip)', /if\(MYTASKS\)t\.push\(\{k:'tasks',label:'My tasks'/.test(home) && !/if\(tasks\)h\+=myTasksHtml\(\);/.test(home));
+  ok('My tasks is a tab of the list (and not a second card in the studio strip)', /if\(MYTASKS\)t\.push\(\{k:'tasks',label:'My to-dos'/.test(home) && !/if\(tasks\)h\+=myTasksHtml\(\);/.test(home));
   ok('the tabs follow the keyboard pattern (arrows, Home, End)', /if\(e\.key==='ArrowRight'\)j=\(i\+1\)%tabs\.length;else if\(e\.key==='ArrowLeft'\)/.test(home) && /aria-selected="\$\{x\.k===QTAB\?'true':'false'\}" tabindex="\$\{x\.k===QTAB\?'0':'-1'\}"/.test(home));
   ok('Go through them: → skips, Esc leaves, focus goes back to where it was', /if\(e\.key==='ArrowRight'&&!\(e\.target&&/.test(home) && /d\.addEventListener\('close',\(\)=>\{/.test(home) && /const back=op&&document\.contains\(op\)\?op:\$\('goThrough'\);if\(back\)back\.focus\(\);/.test(home));
   ok('…and on a phone a swipe left skips', /if\(dx<0\)skip\(\);else if\(dn\)take\(doneRow,dn\);/.test(home));

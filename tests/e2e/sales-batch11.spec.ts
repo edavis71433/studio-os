@@ -77,7 +77,7 @@ test.describe('item 53 — My tasks shows each project\'s next step', () => {
     await page.route(`**/functions/v1/presence/projects/${P1}/tasks/t1`, (route) => route.fulfill({ status: 200, contentType: 'application/json', body: '{"data":{}}' }));
     await page.goto('/agency.html');
     const tab = page.locator('#qt-tasks');   // item 70: My tasks is a tab of Home's list, and the tab carries the count
-    await expect(tab).toHaveText('My tasks 1');
+    await expect(tab).toHaveText('My to-dos 1');
     await tab.click();
     const card = page.locator('#my-tasks');
     await expect(card.locator('.trow')).toHaveCount(1);
@@ -85,7 +85,7 @@ test.describe('item 53 — My tasks shows each project\'s next step', () => {
     await expect(card.locator('.trow')).toHaveText([/Handover/]);                       // the lowest place on the checklist, not the first in the list
     await card.getByRole('button', { name: 'Show all 2' }).click();
     await expect(card.locator('.trow')).toHaveCount(2);
-    await expect(tab).toHaveText('My tasks 2');
+    await expect(tab).toHaveText('My to-dos 2');
   });
 });
 
