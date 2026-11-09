@@ -138,10 +138,11 @@ test.describe('Website enquiries (the Inbox’s Enquiries view)', () => {
     const pane = await pick(page, 'Sam Rivera');
     await expect(pane.locator('.card a[href^="mailto:"]')).toHaveAttribute('href', 'mailto:sam@example.com');
     await expect(pane.locator('.card .body').first()).toHaveText('Can I get a quote for a patio?');
-    // the action row, in the old board's order; Spam is the quiet one at the end
+    // the action row; since the bold redesign the deal and Spam sit in the pane's head
     const acts = pane.locator('.acts');
-    await expect(acts.locator('button')).toHaveText(['→ Deal', 'Make customer', 'Mark read', 'Not a fit', /Spam/]);
-    await expect(acts.locator('button.quiet')).toHaveText(/Spam/);
+    await expect(acts.locator('button')).toHaveText(['Make customer', 'Mark read', 'Not a fit']);   // bold redesign: + Make it a deal and Spam sit in the pane's head
+    await expect(pane.locator('#paneActs button')).toHaveText(['+ Make it a deal', /Spam/]);
+    await expect(pane.locator('#paneActs button.quiet')).toHaveText(/Spam/);   // still the quiet one
     // a read row (Dana) has no dot, its own initials, and no Mark read
     await backToList(page);
     const dana = rowOf(page, 'Dana Lee');
@@ -345,20 +346,49 @@ test.describe('Website enquiries (the Inbox’s Enquiries view)', () => {
     await expect(rowOf(page, 'Sam Rivera')).toContainText('In pipeline');
     const pane = await pick(page, 'Sam Rivera');
     await expect(pane.getByRole('link', { name: '✓ In pipeline — view deal' })).toHaveAttribute('href', '/crm.html?deal=d-7&tab=deal');
-    for (const name of ['→ Deal', 'Make customer', 'Not a fit']) await expect(pane.getByRole('button', { name })).toHaveCount(0);
+    for (const name of ['+ Make it a deal', 'Reply & make it a deal', 'Make customer', 'Not a fit']) await expect(pane.getByRole('button', { name })).toHaveCount(0);
     await expect(pane.locator('button.quiet')).toHaveCount(0);
   });
 
-  test('→ Deal turns the enquiry into a deal and the card flips to “In pipeline”', async ({ page }) => {
+  test('+ Make it a deal turns the enquiry into a deal and the card flips to “In pipeline”', async ({ page }) => {
     await installApp(page, { api: { '/sales/contacts': { data: { id: 'ct-1' } }, '/sales/deals': { data: { id: 'd-5' }, already_converted: true } } });
     await page.goto(ENQ);
     const pane = await pick(page, 'Sam Rivera');
     const deal = page.waitForRequest((r) => r.method() === 'POST' && /\/sales\/deals$/.test(new URL(r.url()).pathname));
-    await pane.getByRole('button', { name: '→ Deal' }).click();
+    await pane.getByRole('button', { name: '+ Make it a deal' }).click();
     expect((await deal).postDataJSON()).toMatchObject({ contact_id: 'ct-1', source: 'website_form', source_submission_id: 'l1' });
     // already_converted: no navigation, the card says where it is
     await expect(page.locator('.dds-toast')).toContainText('This enquiry is already in your pipeline.');
     await expect(pane.getByRole('link', { name: '✓ In pipeline — view deal' })).toHaveAttribute('href', '/crm.html?deal=d-5&tab=deal');
+  });
+
+  // bold redesign (Nov 2026): the head says what the one-click deal does, and the
+  // usual answer to an enquiry — reply, then make it a deal — is one button
+  test('the enquiry says in a line what + Make it a deal does', async ({ page }) => {
+    await installApp(page);
+    await page.goto(ENQ);
+    const pane = await pick(page, 'Sam Rivera');
+    await expect(pane.locator('.deal-explain')).toHaveText('Make it a deal puts “Sam Rivera — quote” on your board as a new lead, with their email, and marks this enquiry In pipeline. One click.');
+  });
+
+  test('Reply & make it a deal: the reply goes first, then the deal; a reply that fails starts no deal', async ({ page }) => {
+    let replyOk = false; const order: string[] = [];
+    await installApp(page, { api: { '/sales/contacts': { data: { id: 'ct-1' } }, '/sales/deals': { data: { id: 'd-5' }, already_converted: true } } });
+    await page.route('**/functions/v1/presence/forms/inbox/l1/reply', (route) => {
+      order.push('reply');
+      return route.fulfill({ status: replyOk ? 200 : 500, contentType: 'application/json', body: JSON.stringify(replyOk ? { data: { ok: true } } : { error: 'send_failed', message: 'That didn’t send.' }) });
+    });
+    page.on('request', (r) => { if (r.method() === 'POST' && /\/sales\/deals$/.test(new URL(r.url()).pathname)) order.push('deal'); });
+    await page.goto(ENQ);
+    const pane = await pick(page, 'Sam Rivera');
+    await pane.locator('#leadBody').fill('Hi Sam, happy to quote. What size is the patio?');
+    await pane.getByRole('button', { name: 'Reply & make it a deal' }).click();
+    await expect(page.locator('.dds-toast').last()).toContainText('That didn’t send.');
+    expect(order).toEqual(['reply']);                                  // no deal for a reply that didn't go
+    replyOk = true;
+    await pane.getByRole('button', { name: 'Reply & make it a deal' }).click();
+    await expect.poll(() => order).toEqual(['reply', 'reply', 'deal']);
+    await expect(pane.getByRole('link', { name: '✓ In pipeline — view deal' })).toBeVisible();
   });
 });
 

@@ -338,6 +338,16 @@
   /* The list column is 21rem up to 1100px, where the 24px view title spilled
      into "Send an update". That link is also under ⋯, so it steps aside there. */
   @media (min-width:1024px) and (max-width:1100px){a.lsend{display:none}}
+
+  /* ══ Bold redesign — the Inbox's enquiry: the one-click deal in the head, what
+     it does in a line, and Reply & make it a deal beside Send reply ══ */
+  #paneActs #leadSpam{order:-1}
+  #paneActs #leadDeal{border-radius:999px;font-weight:600}
+  .deal-explain{margin:10px 16px 0;padding:10px 14px;border-radius:var(--dds-r,12px);background:var(--p-soft);color:var(--p);font-size:13px;line-height:1.45}
+  .deal-explain b{font-weight:700}
+  #leadSendDeal{border-radius:999px;font-weight:600}
+  .lead-hint{font-size:12px;color:var(--faint);margin:6px 2px 0}
+  #leadDraft::before{content:"✦ ";color:var(--p)}
 </style>
 <link rel="stylesheet" href="/shell.css"><script src="/shell.js" defer></script>
 </head>
@@ -1324,6 +1334,8 @@ function paneApproval(host,it){
 // mail-app link stays as a quiet fallback. The triage that lived on the old
 // Enquiries page (leads.html) moved here with it: Make customer, Not a fit,
 // Spam, and the "✓ In pipeline — view deal" state of a converted enquiry.
+// Bold redesign (Nov 2026): the deal an enquiry becomes, named the way createDeal names it
+const leadDealTitle=(l)=>(l.name||l.email||'New enquiry')+((l.form_kind&&l.form_kind!=='contact')?(' — '+l.form_kind):'');
 function leadGreeting(l){return (l.name?`Hi ${String(l.name).split(' ')[0]},`:'Hi,')+'\n\nThanks for reaching out. ';}
 function paneLead(host,it){
   const l=it.lead||{};
@@ -1331,7 +1343,10 @@ function paneLead(host,it){
   const st=String(l.status||'new');
   const contact=[l.email?`<a class="link" href="mailto:${esc(l.email)}">${esc(l.email)}</a>`:'',l.phone?`<a class="link" href="tel:${esc(String(l.phone).replace(/[^0-9+]/g,''))}">${esc(l.phone)}</a>`:''].filter(Boolean).join(' · ');
   const note=(l.note&&typeof l.note.body==='string')?l.note:null;
-  host.innerHTML=paneHead(it,`<span class="pchip" style="background:var(--good-soft);color:var(--good)">${esc(it.chip)}</span>${leadState(l)?`<span class="pchip plain stchip ${esc(l.converted?'converted':st)}">${esc(leadState(l))}</span>`:''}${it.when?`<span>${esc(when(it.when))}</span>`:''}`)+
+  host.innerHTML=paneHead(it,`<span class="pchip" style="background:var(--good-soft);color:var(--good)">${esc(it.chip)}</span>${leadState(l)?`<span class="pchip plain stchip ${esc(l.converted?'converted':st)}">${esc(leadState(l))}</span>`:''}${it.when?`<span>${esc(when(it.when))}</span>`:''}`,
+    // bold redesign: the one-click deal sits in the head (Spam beside it); once in the pipeline, the way to it
+    l.converted?`<a class="btnlink" href="/crm.html?deal=${esc(l.deal_id||'')}&tab=deal" title="This website enquiry is in your pipeline">✓ In pipeline — view deal</a>`:`<button id="leadDeal" class="primary" title="Start a deal in your pipeline from this website enquiry">+ Make it a deal</button><button class="quiet" id="leadSpam" title="A bot or a vendor pitch — hidden for good">${si('flag')} Spam</button>`)+
+    (l.converted?'':`<div class="deal-explain" role="note"><b>Make it a deal</b> puts “${esc(leadDealTitle(l))}” on your board as a new lead${l.email?', with their email,':''} and marks this enquiry In pipeline. One click.</div>`)+
     `<div class="pbody"><div class="card">
       ${contact?`<div style="font-size:13.5px;color:var(--soft)">${contact}</div>`:''}
       ${l.message?`<div class="body">${esc(l.message)}</div>`:'<div class="body muted">No message — they just left their details.</div>'}
@@ -1340,16 +1355,14 @@ function paneLead(host,it){
         <textarea id="leadNote" maxlength="1000" placeholder="e.g. Called back — wants a quote in March">${esc(note?note.body:'')}</textarea>
         <div class="crow"><span class="muted" id="leadNoteAt" style="font-size:12px">${note&&note.at?'Saved '+esc(when(note.at)):''}</span><span class="spacer"></span><button type="button" id="leadNoteSave">Save note</button></div></div>
       <div class="acts">
-        ${l.converted?`<a class="btnlink" href="/crm.html?deal=${esc(l.deal_id||'')}&tab=deal" title="This website enquiry is in your pipeline">✓ In pipeline — view deal</a>`:`<button id="leadDeal" title="Start a deal in your pipeline from this website enquiry">→ Deal</button>`}
         ${(l.converted||!l.email)?'':`<button id="leadConvert" title="Set them up as a customer now — contact, customer and (optionally) a deal in one go">Make customer</button>`}
         ${st==='new'?`<button id="leadRead">Mark read</button>`:''}
         ${(l.converted||st==='not_a_fit'||st==='archived')?'':`<button id="leadNotFit" title="Not what you do, or not a real lead — it leaves the queue and stops counting">Not a fit</button>`}
-        ${l.converted?'':`<button class="quiet" id="leadSpam" title="A bot or a vendor pitch — hidden for good">${si('flag')} Spam</button>`}
       </div>
     </div></div>
     ${l.email?`<div class="pcomposer"><form id="leadForm"><label for="leadBody" style="font-size:12.5px;color:var(--faint)">Reply to ${esc(l.name||l.email)} — sent by email from your studio</label>
       <textarea id="leadBody" aria-label="Reply to ${esc(l.name||l.email)}">${esc(leadGreeting(l))}</textarea>
-      <div class="crow"><button type="button" id="leadDraft">Draft a reply</button><a class="link" id="leadMailto" href="${leadReplyHref(l)}" style="font-size:12.5px">Use your email app instead</a><span class="spacer"></span><button class="primary" type="submit" id="leadSend">Send reply</button></div></form></div>`
+      <div class="crow"><button type="button" id="leadDraft">Draft a reply</button><a class="link" id="leadMailto" href="${leadReplyHref(l)}" style="font-size:12.5px">Use your email app instead</a><span class="spacer"></span><button class="${l.converted?'primary':''}" type="submit" id="leadSend">Send reply</button>${l.converted?'':'<button class="primary" type="button" id="leadSendDeal">Reply &amp; make it a deal</button>'}</div><p class="lead-hint">${esc(String(l.name||'They').split(' ')[0])} gets this by email · their reply comes back here</p></form></div>`
     :`<p class="muted" style="margin:12px 16px;font-size:12.5px">They left no email — ${l.phone?'call them on '+esc(l.phone)+'.':'there’s no way to reply.'}</p>`}`;
   wireBack();
   // item 28: the studio's private note (saved on the enquiry; the status is left as it is)
@@ -1366,11 +1379,11 @@ function paneLead(host,it){
   const lm=$('leadMailto');if(lm)lm.addEventListener('click',()=>{if(String(l.status||'new')==='new')api('/forms/inbox/'+encodeURIComponent(it.lead_id),'POST',{status:'read'}).catch(()=>{});});
   const lf=$('leadForm');
   if(lf){
-    lf.onsubmit=async(e)=>{
-      e.preventDefault();
+    // one send for both buttons; true when it went
+    const sendLeadReply=async(btn,label)=>{
       const ta=$('leadBody');const body=(ta.value||'').trim();
-      if(!body||body===leadGreeting(l).trim()){toast('Write your reply first.');ta.focus();return;}
-      const btn=$('leadSend');btn.disabled=true;btn.textContent='Sending…';
+      if(!body||body===leadGreeting(l).trim()){toast('Write your reply first.');ta.focus();return false;}
+      btn.disabled=true;btn.textContent='Sending…';
       const r=await api('/forms/inbox/'+encodeURIComponent(it.lead_id)+'/reply','POST',{body});
       if(r.ok){
         ta.value='';
@@ -1378,11 +1391,16 @@ function paneLead(host,it){
         toast(`Sent to ${l.email} — their reply comes back here.`);
         leadMarked(it,'replied');   // the server marked it Replied; every row that shows it agrees
         clearLeadNudge(it.lead_id);   // …and its "waiting for a reply" nudge leaves now, not on the next load
-      }else{
-        toast((r.body&&r.body.message)||'Couldn’t send that — nothing went out. Try again, or use your email app.');
-        btn.disabled=false;btn.textContent='Send reply';
+        return true;
       }
+      toast((r.body&&r.body.message)||'Couldn’t send that — nothing went out. Try again, or use your email app.');
+      btn.disabled=false;btn.textContent=label;
+      return false;
     };
+    lf.onsubmit=async(e)=>{e.preventDefault();await sendLeadReply($('leadSend'),'Send reply');};
+    // the reply goes first; the deal follows only once it has (createDeal then opens it)
+    const sd=$('leadSendDeal');
+    if(sd)sd.addEventListener('click',async()=>{if(await sendLeadReply(sd,'Reply & make it a deal'))createDeal(it,sd);});
     insertSavedReplies('leadBody');   // C3: the saved-reply picker, when any exist
     const ld=$('leadDraft');if(ld)ld.addEventListener('click',()=>draftReply('leadBody',`A short, friendly reply from the studio to ${l.name||'someone'} who sent a ${KIND[l.form_kind]?KIND[l.form_kind].toLowerCase():'message'} through the website: "${String(l.message||'they left their details without a message').slice(0,280)}". Continue after the greeting already written; do not repeat it.`,ld));
   }

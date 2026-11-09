@@ -214,7 +214,7 @@ test.describe('Inbox — split-view console', () => {
     await expect(pane).toContainText('Can I get a quote for a patio?');
     await expect(pane.getByRole('button', { name: 'Send reply' })).toBeVisible();   // the reply is sent from here (audit change 5)
     await expect(pane.getByRole('link', { name: 'Use your email app instead' })).toHaveAttribute('href', /^mailto:sam%40example\.com/);
-    await expect(pane.getByRole('button', { name: '→ Deal' })).toBeVisible();
+    await expect(pane.getByRole('button', { name: '+ Make it a deal' })).toBeVisible();
     const readReq = page.waitForRequest((r) => r.method() === 'POST' && r.url().includes('/forms/inbox/l-9'));
     await pane.getByRole('button', { name: 'Mark read' }).click();
     expect((await readReq).postDataJSON()).toEqual({ status: 'read' });
