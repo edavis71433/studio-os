@@ -84,6 +84,26 @@ const gmailWrapped = 'hi\n\nOn Sun, Nov 8, 2026 at 3:17 PM Studio <hello@example
   ok('empty and missing bodies are safe', split('').text === '' && split(null).quoted === '' && split(undefined).text === '');
 }
 
+// the alert (server) and the pages (shell.js) must agree on what is the quote
+{
+  const L = await import('../../supabase/functions/presence/lib/inbound_email.ts');
+  const samples = [
+    gmailWrapped, gmailWrapped.replace(/\n/g, '\r\n'),
+    'hi\n\nOn Sun, Nov 8, 2026 at 4:13 PM Jordan Ellis <jordan@example.com> wrote:\n\n> hi\n>\n>> older\n',
+    'Sounds good!\n\nOn Nov 8, 2026, at 3:17 PM, Studio <hello@example.com> wrote:\n\n> Hi\n',
+    'Gracias\n\nEl dom, 8 nov 2026, Studio escribió:\n> Hola\n',
+    'Thanks!\n\n-----Original Message-----\nFrom: Studio\nSent: today\n\nHi\n',
+    'Thanks!\n\n________________________________\nFrom: Studio\nSent: today\n\nHi\n',
+    'Sounds good\n\n> a\n> b\n',
+    'See below.\n\nOn Sun wrote:\n> Which day?\nTuesday.\n',
+    'On Sun, Nov 8 wrote:\n> only a quote\n',
+    'From: the desk\nSent: today\nCall me?',
+    'Just a plain note.', '', '   ', null, undefined,
+  ];
+  const same = samples.every((t) => JSON.stringify(split(t)) === JSON.stringify(L.splitQuotedReply(t)));
+  ok('the alert and the pages find the SAME quote in every sample (shell.js ddsSplitQuote ≡ lib splitQuotedReply)', same);
+}
+
 // the kit + the pages that show emailed messages
 ok('shell.js exposes window.ddsQuote { split, html } and folds behind "Show earlier email"',
   /window\.ddsQuote = \{\s*split: ddsSplitQuote,\s*html: function \(text, esc\)/.test(shell) && /<details class="dds-quoted"><summary>Show earlier email<\/summary>/.test(shell));
@@ -122,6 +142,8 @@ ok('Project messages and support threads fold the quote (all three lists)', (pro
 // ═══ (a) + (b) pins: who wrote is named ═══
 ok('the inbound door matches clients and contacts WITH their names', /select=id,name,email,contact_email,contact_id,created_at/.test(inbound) && /select=id,name,email,created_at&order=created_at\.asc,id\.asc&limit=25/.test(inbound));
 ok('every studio alert from the email door names the sender (contact name, else their From name, else the address)', (inbound.match(/actorName: match\.name \|\| from_name \|\| from_email/g) || []).length === 4);
+ok('the email door hands the alert only what they wrote (the stored body keeps everything)', /const said = splitQuotedReply\(text\)\.text;/.test(inbound) && (inbound.match(/excerpt: said \|\| subject, viaEmail: true,/g) || []).length === 4 && !/excerpt: text \|\| subject/.test(inbound));
+ok('the stored body is still the WHOLE text (body: text || subject …)', /body: text \|\| subject \|\| '\(no content\)'/.test(inbound));
 ok('the alert falls back to actorName before "A client"', /whoRow\?\.name \|\| whoRow\?\.email \|\| String\(n\.actorName \|\| ''\)\.trim\(\) \|\| 'A client'/.test(bridge));
 ok('the Inbox names a contact before showing their email', /client: c\.client \|\| owners\.nameOf\[String\(r\.id\)\] \|\| owners\.emailOf\[String\(r\.id\)\] \|\| ''/.test(workspace));
 ok('Home names a contact before showing their email', /if \(owners\.nameOf\[r\.id\]\) r\.requester_name = owners\.nameOf\[r\.id\];/.test(agency) && /String\(s\.requester_name \|\| s\.requester_email \|\| ''\)\.trim\(\) \|\| 'A customer'/.test(needs));
@@ -169,6 +191,13 @@ try {
     ok('alert: an emailed-in contact is named in the subject ("New request from Jordan Ellis")', went === true && sent.length === 1 && sent[0].subject === 'New request from Jordan Ellis', JSON.stringify(sent[0]?.subject));
     ok('alert: and in the body', sent.length === 1 && /<b>Jordan Ellis<\/b>/.test(sent[0].html));
     ok('alert: it keeps the human reply-to (never the inbound address)', sent.length === 1 && !/reply\.example\.com/.test(String(sent[0].reply_to)));
+    sent.length = 0;
+    const long = 'First line of the answer\nsecond line ' + 'word '.repeat(200);
+    const went2 = await deliverStudioNotification({ agencySiteId: AGENCY, kind: 'client_request', threadKey: 'req:email-2', customerClientId: null, actorName: 'Jordan Ellis', viaEmail: true, subject: 'Re: Your proposal', excerpt: long, href: '/inbox.html' });
+    const h = sent[0]?.html || '';
+    ok('alert by email: "New email from Jordan Ellis" and "emailed you." (not "has a request for you")', went2 === true && sent[0]?.subject === 'New email from Jordan Ellis' && /<b>Jordan Ellis<\/b> emailed you\./.test(h) && !/has a request for you/.test(h));
+    ok('alert by email: the excerpt keeps its line breaks', /First line of the answer<br>second line/.test(h));
+    ok('alert by email: a long excerpt ends on a whole word with "…", never mid-word', /word…<\/blockquote>/.test(h) && !/wor…|wo…|w…/.test(h));
   }
 } finally {
   globalThis.fetch = realFetch;

@@ -25,7 +25,7 @@ import {
   parseAuthResults, senderAuthVerdict, autoResponderSignal, isSelfSender,
   filterSafe, filterKey, deriveRequesterKey, matchedStoredEmail, identityAliases,
   selectAppendTarget, missingColumnSignal, missingInsertColumns, referenceIds, messageIdVariants, maskEmail,
-  receivedEmailId, envelopeOf, mergeReceived,
+  receivedEmailId, envelopeOf, mergeReceived, splitQuotedReply,
 } from '../lib/inbound_email.ts';
 import { notifyStudioOfClientAction } from '../lib/service_bridge.ts';
 
@@ -341,6 +341,8 @@ export async function handleInboundEmail(req: Request): Promise<Response> {
   const parsed = parseInbound({ data });
   if (!parsed) return dropAck('unparseable');
   const { from_email, from_name, to_emails, subject, text, message_id } = parsed;
+  // item 71: the studio's alert quotes only what they wrote, not the thread under it
+  const said = splitQuotedReply(text).text;
 
   // (7) auto-responder → never land, never ack↔autoreply loop
   if (autoResponderSignal(data.headers)) return dropAck('auto_responder', from_email);
@@ -455,7 +457,7 @@ export async function handleInboundEmail(req: Request): Promise<Response> {
     await notifyStudioOfClientAction({
       agencySiteId: siteId, kind: 'client_request', threadKey: `req:${refTarget.id}`,
       customerClientId: match.kind === 'client' ? match.id : null, actorName: match.name || from_name || from_email, projectId: refTarget.project_id || null,
-      subject: String(refTarget.subject || subject || '').slice(0, 200), excerpt: text || subject,
+      subject: String(refTarget.subject || subject || '').slice(0, 200), excerpt: said || subject, viaEmail: true,
       href: refTarget.project_id ? `/crm.html?project=${refTarget.project_id}&tab=messages` : `/projects.html?support=${refTarget.id}`,
     }).catch(() => {});
     return ack();
@@ -495,7 +497,7 @@ export async function handleInboundEmail(req: Request): Promise<Response> {
       await notifyStudioOfClientAction({
         agencySiteId: siteId, kind: 'client_message', threadKey: `proj:${match.projectId}`,
         customerClientId: match.kind === 'client' ? match.id : null, actorName: match.name || from_name || from_email, projectId: match.projectId,
-        subject: String(subject || '').slice(0, 200), excerpt: text || subject,
+        subject: String(subject || '').slice(0, 200), excerpt: said || subject, viaEmail: true,
         href: `/crm.html?project=${match.projectId}&tab=messages`,
       }).catch(() => {});
       return ack();
@@ -544,7 +546,7 @@ export async function handleInboundEmail(req: Request): Promise<Response> {
     await notifyStudioOfClientAction({
       agencySiteId: siteId, kind: 'client_request', threadKey: `req:${target.id}`,
       customerClientId: match.kind === 'client' ? match.id : null, actorName: match.name || from_name || from_email, projectId: target.project_id || null,
-      subject: String(target.subject || subject || '').slice(0, 200), excerpt: text || subject,
+      subject: String(target.subject || subject || '').slice(0, 200), excerpt: said || subject, viaEmail: true,
       href: target.project_id ? `/crm.html?project=${target.project_id}&tab=messages` : `/projects.html?support=${target.id}`,
     }).catch(() => {});
     return ack();
@@ -564,7 +566,7 @@ export async function handleInboundEmail(req: Request): Promise<Response> {
   await notifyStudioOfClientAction({
     agencySiteId: siteId, kind: 'client_request', threadKey: `req:${newReq.row?.id || externalId}`,
     customerClientId: match.kind === 'client' ? match.id : null, actorName: match.name || from_name || from_email, projectId: null,
-    subject: String(subject || `Email from ${from_name || from_email}`).slice(0, 200), excerpt: text || subject,
+    subject: String(subject || `Email from ${from_name || from_email}`).slice(0, 200), excerpt: said || subject, viaEmail: true,
     href: newReq.row?.id ? `/projects.html?support=${newReq.row.id}` : '/inbox.html',
   }).catch(() => {});
   await ackSender(siteId, from_email);

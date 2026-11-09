@@ -441,6 +441,7 @@ export interface ClientActionNotice {
   bucket?: boolean;                 // default true (15-min window); false = once, forever (a terminal event)
   customerClientId?: string | null; // who acted — for the "who" line (best-effort)
   actorName?: string | null;        // who acted, when they are no client (an emailed-in contact): the "who" line's fallback
+  viaEmail?: boolean;               // it came in by email: "New email from …" / "emailed you." instead of the portal's words
   projectId?: string | null;        // which project — for the "what" line (best-effort)
   subject: string;                  // the short what: message subject / filename / request subject / decision
   excerpt?: string;                 // enough of the content to act on without logging in
@@ -521,8 +522,10 @@ export async function deliverStudioNotification(n: ClientActionNotice): Promise<
     const projectName = String(projRow?.name || '').slice(0, 120);
 
     const subject = String(n.subject || '').slice(0, 200);
-    const excerpt = String(n.excerpt || '').slice(0, 600);
-    const headline = `${HEADLINE[n.kind]} ${who}${projectName ? ` — ${projectName}` : ''}`;
+    // item 71: a long excerpt ends on a whole word with an ellipsis, never mid-word
+    const fullExcerpt = String(n.excerpt || '').trim();
+    const excerpt = fullExcerpt.length <= 600 ? fullExcerpt : `${fullExcerpt.slice(0, 600).replace(/\s+\S*$/, '')}…`;
+    const headline = `${n.viaEmail ? 'New email from' : HEADLINE[n.kind]} ${who}${projectName ? ` — ${projectName}` : ''}`;
 
     // The notice IS the throttle: created===true only on the first insert for
     // this (owner, kind, thread + 15-minute bucket). Pre-0116 the CHECK
@@ -565,14 +568,14 @@ export async function deliverStudioNotification(n: ClientActionNotice): Promise<
     const brand = await loadEmailBrand(n.agencySiteId);
     const link = `${SITE_BASE()}${n.href.startsWith('/') ? n.href : `/${n.href}`}`;
     const html =
-      `<p><b>${escHtml(who)}</b> ${LEAD[n.kind]}</p>` +
+      `<p><b>${escHtml(who)}</b> ${n.viaEmail ? 'emailed you.' : LEAD[n.kind]}</p>` +
       (projectName || subject
         ? `<table style="margin:8px 0;border-collapse:collapse">` +
           (projectName ? `<tr><td style="padding:2px 12px 2px 0;color:#666">Project</td><td><b>${escHtml(projectName)}</b></td></tr>` : '') +
           (subject ? `<tr><td style="padding:2px 12px 2px 0;color:#666">${n.kind === 'client_upload' ? 'File' : n.kind === 'client_approval' ? 'Decision' : 'Subject'}</td><td><b>${escHtml(subject)}</b></td></tr>` : '') +
           `</table>`
         : '') +
-      (excerpt ? `<blockquote style="margin:8px 0;padding:8px 14px;border-left:3px solid ${brand.accent};color:#444">${escHtml(excerpt)}</blockquote>` : '') +
+      (excerpt ? `<blockquote style="margin:8px 0;padding:8px 14px;border-left:3px solid ${brand.accent};color:#444">${escHtml(excerpt).replace(/\n/g, '<br>')}</blockquote>` : '') +
       `<p class="cta"><a href="${link}" style="display:inline-block;margin-top:6px;background:${brand.accent};color:#fff;padding:9px 16px;border-radius:999px;text-decoration:none">Open it in your workspace →</a></p>`;
 
     // ⚠ REPLY-TO — the load-bearing detail of this whole helper.
