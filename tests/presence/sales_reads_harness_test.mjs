@@ -89,7 +89,8 @@ const world = () => ({
   db.reset(world()); db.fail.add('presence_sales_templates');
   const v = await res(await S.handleSalesViews(req('GET', '/sales/views'), site, owner, cors));
   ok('2: saved views that couldn\'t be read are an error, not "no views"', v.status === 502 && v.body?.error === 'read_failed', JSON.stringify(v));
-  const l = await res(await B.handleBroadcastListCreate(req('POST', '/broadcasts/lists', { name: 'Picked', people: [{ email: 'bo@example.com' }] }), site, owner, cors));
+  // S4: a list only holds the studio's own people, so the save path is reached with a contact (Ana)
+  const l = await res(await B.handleBroadcastListCreate(req('POST', '/broadcasts/lists', { name: 'Picked', people: [{ email: 'ana@example.com' }] }), site, owner, cors));
   ok('2: a picked list that couldn\'t be saved says so', l.status === 502 && l.body?.error === 'write_failed', JSON.stringify(l));
 
   db.reset(world()); db.fail.add('presence_contacts');

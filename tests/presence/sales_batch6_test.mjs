@@ -42,7 +42,7 @@ ok('an audience is a segment or a list', B.isAudienceKey('contacts') && B.isAudi
 const sendable = await B.resolveSendable('site', 'list:list-0001', { fetchRows: async (k) => k === 'list:list-0001' ? [{ email: 'a@example.com' }, { email: 'off@example.com' }] : [], isSuppressed: async (e) => e === 'off@example.com' });
 eq('a list goes through the same suppression as any audience', [sendable.recipients.map((r) => r.email), sendable.suppressed], [['a@example.com'], 1]);
 const lib = read('supabase/functions/presence/lib/broadcast.ts');
-ok('a list is read from the site\'s own store; a removed list reaches no one', /const l = \(await loadPickedLists\(siteId\)\)\.find\(\(x\) => `list:\$\{x\.id\}` === key\);\s*return l \? l\.people\.slice\(0, RECIPIENT_CAP\) : \[\];/.test(lib));
+ok('a list is read from the site\'s own store; a removed list reaches no one', /const l = \(await loadPickedLists\(siteId\)\)\.find\(\(x\) => `list:\$\{x\.id\}` === key\);\s*if \(!l\) return \[\];[\s\S]{0,400}?return keepKnown\(l\.people, await knownEmails\(siteId\)\)\.kept\.slice\(0, RECIPIENT_CAP\);/.test(lib));
 
 // ── the routes ──
 const bc = read('supabase/functions/presence/routes/broadcasts.ts');

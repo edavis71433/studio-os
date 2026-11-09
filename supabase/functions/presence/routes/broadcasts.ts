@@ -23,6 +23,7 @@ import { anthropicModel } from '../writer/model.ts';
 import {
   SEGMENTS, isSegmentKey, segmentLabel, validSubject, cleanSubject, cleanBody,
   scheduleDecision, resolveSendable, audienceCount, dispatchBroadcast,
+  knownEmails, keepKnown, sentInLastDay, dailySendCap, overDailyCap, dailyCapMessage, DailyCapError,
   buildEmailHtml, renderSubject, type SegmentKey, type BroadcastRow,
   isAudienceKey, isListKey, loadPickedLists, type AudienceKey,
 } from '../lib/broadcast.ts';
@@ -63,16 +64,18 @@ export async function handleBroadcastSegments(site: SiteRow, cors: Record<string
   // Live audience size per preset (distinct valid addresses, pre-suppression — the
   // honest post-suppression count is shown on the specific broadcast's preview).
   // batch B (final pass, Nov 8): every count and the picked lists side by side, not one after another
-  const [pairs, picked] = await Promise.all([
+  const [pairs, picked, known] = await Promise.all([
     // batch D: a count that couldn't be read is null ("couldn't count"), never 0
     Promise.all(SEGMENTS.map(async (s) => [s.key, await audienceCount(site.id, s.key, { strict: true }).catch(() => null)] as const)),
     loadPickedLists(site.id).catch(() => []),
+    knownEmails(site.id).catch(() => null),   // S4: a list counts only the studio's own people
   ]);
   const counts: Record<string, number | null> = Object.fromEntries(pairs);
   // the studio's picked lists follow the presets, newest first (items 31 + 39)
-  const lists = picked.slice().reverse().map((l) => ({
-    key: `list:${l.id}`, label: l.name, description: `A list you picked · ${l.people.length} ${l.people.length === 1 ? 'person' : 'people'}`, count: l.people.length, list: true,
-  }));
+  const lists = picked.slice().reverse().map((l) => {
+    const n = known ? keepKnown(l.people, known).kept.length : l.people.length;
+    return { key: `list:${l.id}`, label: l.name, description: `A list you picked · ${n} ${n === 1 ? 'person' : 'people'}`, count: n, list: true };
+  });
   return json({ data: { segments: [...SEGMENTS.filter((s) => s.key !== 'customers' || counts[s.key] !== 0).map((s) => ({ ...s, count: counts[s.key] ?? null })), ...lists], partial: Object.values(counts).some((n) => n === null) } }, 200, cors);   // item 56: no customers, no customers list
 }
 
@@ -91,15 +94,23 @@ async function audienceLabelFor(siteId: string, key: string): Promise<string> {
 export async function handleBroadcastListCreate(req: Request, site: SiteRow, principal: Principal, cors: Record<string, string>): Promise<Response> {
   let body: any = {};
   try { body = await req.json(); } catch { return json({ error: 'bad_json' }, 400, cors); }
-  const people = normalizePeople(body?.people);
-  if (!people.length) return json({ error: 'validation', message: 'None of the people you picked has an email address.' }, 422, cors);
+  const picked = normalizePeople(body?.people);
+  if (!picked.length) return json({ error: 'validation', message: 'None of the people you picked has an email address.' }, 422, cors);
+  // S4 (final pass): a list only ever holds THIS studio's own people (its contacts,
+  // enquiries and customers), so Send an update can't mail people who never
+  // contacted you. When that can't be checked, nothing is saved.
+  let known: Set<string>;
+  try { known = await knownEmails(site.id); }
+  catch { return json({ error: 'unavailable', message: 'We couldn’t check who you picked just now. Please try again in a moment.' }, 503, cors); }
+  const { kept: people, dropped } = keepKnown(picked, known);
+  if (!people.length) return json({ error: 'validation', message: 'None of the people you picked is one of your contacts, enquiries or customers.' }, 422, cors);
   const day = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
   const name = String(body?.name || '').replace(/[\u0000-\u001f]/g, ' ').trim().slice(0, 80) || `Picked on ${day} · ${people.length} ${people.length === 1 ? 'person' : 'people'}`;
   const list = { id: newId(), name, people, created_at: nowIso() };
   // F9 (final pass): appended to whatever is saved now, so two lists made at once both stay
   const saved = await updateReservedJson(site.id, RESERVED_NAMES.broadcastLists, (cur) => normalizeLists([...normalizeLists(cur), list].slice(-MAX_LISTS)), principal.email || principal.userId || 'owner');
   if (!saved) return json({ error: 'write_failed', message: 'That list didn’t save — please try again.' }, 502, cors);
-  return json({ data: { id: list.id, key: `list:${list.id}`, name, count: people.length } }, 201, cors);
+  return json({ data: { id: list.id, key: `list:${list.id}`, name, count: people.length, left_out: dropped } }, 201, cors);
 }
 
 export async function handleBroadcastListDelete(site: SiteRow, principal: Principal, id: string, cors: Record<string, string>): Promise<Response> {
@@ -211,6 +222,14 @@ export async function handleBroadcastSend(req: Request, site: SiteRow, principal
   if (sendable.recipients.length === 0) {
     return json({ error: 'no_recipients', message: 'No reachable contacts in this list right now — everyone is either unsubscribed or has no email on file.' }, 400, cors);
   }
+  // S4: the per-studio daily cap. Checked before queueing or sending, so the studio
+  // hears why now rather than an update quietly waiting.
+  let used: number;
+  try { used = await sentInLastDay(site.id, Date.now(), id); } catch { return unavailable(cors); }
+  const cap = dailySendCap();
+  if (overDailyCap(used, sendable.recipients.length, cap)) {
+    return json({ error: 'daily_cap', message: dailyCapMessage(used, sendable.recipients.length, cap), used, cap, recipient_count: sendable.recipients.length }, 429, cors);
+  }
   // Large list → queue for the cron (scheduled_at = now) rather than dispatch inline.
   if (sendable.recipients.length > INLINE_CAP) {
     const up = await svc(`presence_broadcasts?id=eq.${id}&site_id=eq.${site.id}&status=in.(draft,scheduled)`, {
@@ -236,9 +255,11 @@ export async function handleBroadcastSend(req: Request, site: SiteRow, principal
     }).catch(() => {});
     void principal;
     return json({ data: { status: 'sent', sent_count: res.sent, skipped_count: res.skipped, failed_count: res.failed, recipient_count: res.recipients } }, 200, cors);
-  } catch (_e) {
+  } catch (e) {
     // release the claim so nothing is stranded 'sending' (per-recipient guard makes a retry safe)
     await svc(`presence_broadcasts?id=eq.${id}&site_id=eq.${site.id}&status=eq.sending`, { method: 'PATCH', body: JSON.stringify({ status: 'draft', updated_at: nowIso() }) }).catch(() => {});
+    // S4: another send got in first and the day's cap would now break — nothing went out
+    if (e instanceof DailyCapError) return json({ error: 'daily_cap', message: dailyCapMessage(e.used, e.n, e.cap), used: e.used, cap: e.cap, recipient_count: e.n }, 429, cors);
     return json({ error: 'send_failed', message: 'The send hit a snag — nothing further went out. Try again.' }, 502, cors);
   }
 }

@@ -559,7 +559,10 @@ async function load(soft){
   if(seg.ok){SEGMENTS=(seg.body.data&&seg.body.data.segments)||[];SEG_OK=true;
     // arriving from a list's "Send an update" (?list=<id>): that list is who it goes to
     const pick=new URLSearchParams(location.search).get('list');
-    if(pick&&!DRAFT&&SEGMENTS.some(x=>x.key==='list:'+pick)){SEL='list:'+pick;try{const u=new URL(location.href);u.searchParams.delete('list');history.replaceState(null,'',u.toString());}catch(_){/* */}}
+    // S4: the picked people who aren't your contacts, enquiries or customers were left off the list
+    const left=Number(new URLSearchParams(location.search).get('left'))||0;
+    if(left>0)toast(left===1?'1 of the people you picked isn’t one of your contacts, enquiries or customers, so they were left out.':`${left} of the people you picked aren’t among your contacts, enquiries or customers, so they were left out.`);
+    if(pick&&!DRAFT&&SEGMENTS.some(x=>x.key==='list:'+pick)){SEL='list:'+pick;try{const u=new URL(location.href);u.searchParams.delete('list');u.searchParams.delete('left');history.replaceState(null,'',u.toString());}catch(_){/* */}}
   }
   else if(!soft)SEG_OK=false;   // soft keeps the last good lists on screen
   if(list.ok){

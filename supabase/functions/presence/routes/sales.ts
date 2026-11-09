@@ -213,12 +213,17 @@ export async function handleSalesContacts(req: Request, site: SiteRow, principal
     // must still say whose they are rather than degrade to "—". It never widens
     // tenant scope (site_id is still pinned) and the roster never asks for it.
     const withDeleted = u.searchParams.get('include_deleted') === '1';
+    // item 65: ids=<uuid,…> looks up exactly those contacts (Pipeline's "Send an
+    // update" for picked deals read only the newest 100 and dropped older ones).
+    // Up to 100 per call, UUIDs only, still pinned to this site.
+    const ids = [...new Set(String(u.searchParams.get('ids') || '').split(',').map((x) => x.trim().toLowerCase()).filter((x) => UUID_RE.test(x)))].slice(0, 100);
     // Phase 2: client_id (migration 0130) rides the select — the roster links a
     // person to their customer. A database without the column 400s the widened
     // select; retry the narrow one so the roster never goes dark pre-apply.
     const mkPath = (cols: string) => {
       let p = `presence_contacts?site_id=eq.${site.id}${withDeleted ? '' : '&deleted_at=is.null'}&select=${cols}${withDeleted ? ',deleted_at' : ''}&order=updated_at.desc&limit=${limit}&offset=${offset}`;
       if (q) p += `&or=(name.ilike.*${encodeURIComponent(q)}*,email.ilike.*${encodeURIComponent(q)}*,company.ilike.*${encodeURIComponent(q)}*)`;
+      if (ids.length) p += `&id=in.(${ids.join(',')})`;
       return p;
     };
     let r = await svc(mkPath('id,name,email,phone,company,client_id,updated_at'));

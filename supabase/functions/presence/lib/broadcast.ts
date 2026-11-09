@@ -132,6 +132,39 @@ export function partitionSuppressed(recipients: Recipient[], suppressedLower: Se
   return { kept, skipped };
 }
 
+// ── S4 (final pass, Nov 8): a picked list only reaches the studio's own people ──
+/** Split picked people into those who are THIS studio's own (their address is one
+ *  of its contacts, enquiries or customers) and those who aren't. Case-insensitive.
+ *  Pure. */
+export function keepKnown<T extends { email?: unknown }>(people: T[], known: Set<string>): { kept: T[]; dropped: number } {
+  const kept: T[] = [];
+  let dropped = 0;
+  for (const p of people || []) {
+    if (known.has(String(p?.email ?? '').trim().toLowerCase())) kept.push(p);
+    else dropped++;
+  }
+  return { kept, dropped };
+}
+
+/** S4: every studio can reach at most this many people with updates in any 24
+ *  hours — one update at the biggest audience size, never the 25,000 that 50 picked
+ *  lists of 500 could add up to. BROADCAST_DAILY_CAP overrides it. */
+export function dailySendCap(): number {
+  const n = Number(Deno.env.get('BROADCAST_DAILY_CAP') || '');
+  return Number.isFinite(n) && n > 0 ? Math.floor(n) : 5000;
+}
+/** Would sending to `n` more people break the cap, given `used` in the last 24 hours? Pure. */
+export function overDailyCap(used: number, n: number, cap: number): boolean { return used + n > cap; }
+/** The words a studio sees when an update would break the cap. Pure. */
+export function dailyCapMessage(used: number, n: number, cap: number): string {
+  const f = (x: number) => x.toLocaleString('en-US');
+  return `Updates can reach ${f(cap)} people a day. ${f(used)} already went out in the last 24 hours, and this one would reach ${f(n)}. Send it tomorrow, or send it to fewer people.`;
+}
+/** Thrown by dispatchBroadcast when the cap would break: the caller holds the send, it is not a failure. */
+export class DailyCapError extends Error {
+  constructor(public used: number, public n: number, public cap: number) { super('daily_cap'); }
+}
+
 // ── Composition validation. Pure. ────────────────────────────────────────────
 export function validSubject(s: unknown): boolean {
   const t = String(s ?? '').trim();
@@ -172,7 +205,10 @@ export async function fetchAudienceRows(siteId: string, key: AudienceKey, opts: 
   const need = async (path: string) => { const r = await svc(path); if (opts.strict && !r.ok) throw new Error('audience_read_failed'); return rows(r); };
   if (isListKey(key)) {
     const l = (await loadPickedLists(siteId)).find((x) => `list:${x.id}` === key);
-    return l ? l.people.slice(0, RECIPIENT_CAP) : [];   // a removed list reaches no one
+    if (!l) return [];   // a removed list reaches no one
+    // S4: only the studio's own people, also for a list saved before this check.
+    // Strict: if they can't be read, this throws, so nothing goes to strangers.
+    return keepKnown(l.people, await knownEmails(siteId)).kept.slice(0, RECIPIENT_CAP);
   }
   if (key === 'customers') {
     // the studio's active service links prove who is a customer of THIS site
@@ -190,6 +226,27 @@ export async function fetchAudienceRows(siteId: string, key: AudienceKey, opts: 
     return await need(`${base}&created_at=gte.${encodeURIComponent(since)}&limit=${RECIPIENT_CAP}`);
   }
   return await need(`${base}&limit=${RECIPIENT_CAP}`);   // 'enquiries'
+}
+
+/** S4: the addresses that are THIS studio's own people: its contacts, its
+ *  enquiries and its customers (the same reads as those audiences). Strict: a read
+ *  that fails throws; it never reads as "nobody" or "everybody". */
+export async function knownEmails(siteId: string): Promise<Set<string>> {
+  const all = await Promise.all((['contacts', 'enquiries', 'customers'] as const).map((k) => fetchAudienceRows(siteId, k, { strict: true })));
+  return new Set(normalizeRecipients(all.flat()).map((r) => r.email));
+}
+
+/** S4: how many people this studio's updates reached in the last 24 hours (updates
+ *  that finished, plus any still going out). Throws when it can't be read. */
+export async function sentInLastDay(siteId: string, nowMs = Date.now(), notId = ''): Promise<number> {
+  const since = new Date(nowMs - 86400_000).toISOString();
+  const others = /^[0-9a-f-]{36}$/i.test(notId) ? `&id=neq.${notId}` : '';   // never count the update being sent
+  const [done, going] = await Promise.all([
+    svc(`presence_broadcasts?site_id=eq.${siteId}&status=eq.sent&sent_at=gte.${encodeURIComponent(since)}&select=sent_count&limit=1000`),
+    svc(`presence_broadcasts?site_id=eq.${siteId}&status=eq.sending${others}&select=recipient_count&limit=100`),
+  ]);
+  if (!done.ok || !going.ok) throw new Error('send_log_unavailable');
+  return rows(done).reduce((n, b: any) => n + (Number(b.sent_count) || 0), 0) + rows(going).reduce((n, b: any) => n + (Number(b.recipient_count) || 0), 0);
 }
 
 export interface SendableDeps {
@@ -232,6 +289,8 @@ export interface DispatchDeps extends SendableDeps {
   markFailedFn?: (broadcastId: string, email: string) => Promise<void>;
   recordSkippedFn?: (broadcastId: string, siteId: string, email: string) => Promise<void>;
   resolveFn?: (siteId: string, key: AudienceKey) => Promise<{ recipients: Recipient[]; suppressed: number; audience: number }>;
+  sentInLastDayFn?: (siteId: string, notId: string) => Promise<number>;
+  dailyCap?: number;
 }
 
 /** Insert a send-log row, ignoring duplicates. The unique(broadcast_id, lower(email))
@@ -272,6 +331,12 @@ export async function dispatchBroadcast(b: BroadcastRow, deps: DispatchDeps = {}
   const brand = await loadBrand(b.site_id);
   const businessName = brand?.name || 'us';
   const { recipients, suppressed } = await resolve(b.site_id, b.audience);
+  // S4: the daily cap, checked right before anything goes out (the callers check it
+  // earlier for a clear message; this catches two sends racing). Not a failure: the
+  // caller holds the update until the day allows it.
+  const cap = deps.dailyCap ?? dailySendCap();
+  const used = await (deps.sentInLastDayFn || ((siteId: string, notId: string) => sentInLastDay(siteId, Date.now(), notId)))(b.site_id, b.id);
+  if (overDailyCap(used, recipients.length, cap)) throw new DailyCapError(used, recipients.length, cap);
 
   let sent = 0, failed = 0, already = 0;
   for (const r of recipients) {
@@ -317,14 +382,16 @@ export async function runScheduledBroadcasts(limit = 25): Promise<{ dispatched: 
     const claimed = await claimScheduledBroadcast(row.id);
     if (!claimed) continue;                              // another tick took it
     try {
-      const res = await dispatchBroadcast(claimed);
+      const res = await dispatchBroadcast(claimed);   // throws DailyCapError when today's cap would break
       await svc(`presence_broadcasts?id=eq.${row.id}`, {
         method: 'PATCH',
         body: JSON.stringify({ status: 'sent', sent_at: new Date().toISOString(), recipient_count: res.recipients, sent_count: res.sent, skipped_count: res.skipped, failed_count: res.failed, updated_at: new Date().toISOString() }),
       }).catch(() => {});
       dispatched++; sent += res.sent; failures += res.failed;
-    } catch {
-      failures++;
+    } catch (e) {
+      // S4: a capped update simply waits: it goes out on a later tick, once the last
+      // 24 hours allow it. That is not a failure (it must not page the health check).
+      if (!(e instanceof DailyCapError)) failures++;
       // release the claim so the next tick retries (per-recipient guard prevents double-mail)
       await svc(`presence_broadcasts?id=eq.${row.id}&status=eq.sending`, { method: 'PATCH', body: JSON.stringify({ status: 'scheduled', updated_at: new Date().toISOString() }) }).catch(() => {});
     }
