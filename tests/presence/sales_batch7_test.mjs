@@ -35,7 +35,8 @@ const stages = R.dealsByStage([
 const prop = stages.rows.find((r) => r.stage === 'proposal');
 eq('the four open stages, in order', stages.rows.map((r) => r.stage), ['lead', 'qualified', 'proposal', 'contract']);
 eq('days in stage: from the move into it, else from when the deal was made', [prop.count, prop.value_cents, prop.avg_days, prop.longest_days, prop.longest_title], [2, 200000, 38, 68, 'Harbor Lane Bakery']);
-eq('an empty stage says so', stages.rows.find((r) => r.stage === 'qualified'), { stage: 'qualified', label: 'Qualified', count: 0, value_cents: 0, avg_days: null, longest_days: null, longest_title: '' });
+// item 69: a row also carries its chance and expected cents (null when the caller passes no percents)
+eq('an empty stage says so', stages.rows.find((r) => r.stage === 'qualified'), { stage: 'qualified', label: 'Qualified', count: 0, value_cents: 0, chance: null, expected_cents: null, avg_days: null, longest_days: null, longest_title: '' });
 eq('closed deals are not in the pipeline report', [stages.count, stages.value_cents], [3, 200000]);
 
 // ── 3. won and not a fit ──

@@ -675,8 +675,10 @@ function reportBody(key,d){
     return (d.total_this_year||d.total_last_year?'':'<p class="rep-sum">No paid invoices in the last two years yet.</p>')+rTable(['Month','This year','A year before','Change'],rows,`<td>Last 12 months</td><td>${esc(money(d.total_this_year))}</td><td>${esc(money(d.total_last_year))}</td><td class="${tch>0?'up':tch<0?'down':''}">${tch===0?'—':(tch>0?'+':'−')+esc(money(Math.abs(tch)))}</td>`);
   }
   if(key==='pipeline'){
-    const rows=d.rows.map(r=>`<tr><td>${esc(r.label)}</td><td>${r.count}</td><td>${esc(money(r.value_cents))}</td><td>${esc(rDays(r.avg_days))}</td><td>${r.longest_title?esc(r.longest_title)+' · '+esc(rDays(r.longest_days)):'—'}</td></tr>`);
-    return rTable(['Stage','Deals','Value','Average time in stage','Longest there'],rows,`<td>Open deals</td><td>${d.count}</td><td>${esc(money(d.value_cents))}</td><td></td><td></td>`)
+    // item 69: each stage's chance and what it is expected to bring in (an older server sends neither)
+    const exp=d.expected_cents!=null;
+    const rows=d.rows.map(r=>`<tr><td>${esc(r.label)}${exp&&r.chance!=null?` <span class="muted">· ${r.chance}%</span>`:''}</td><td>${r.count}</td><td>${esc(money(r.value_cents))}</td>${exp?`<td>${esc(money(r.expected_cents||0))}</td>`:''}<td>${esc(rDays(r.avg_days))}</td><td>${r.longest_title?esc(r.longest_title)+' · '+esc(rDays(r.longest_days)):'—'}</td></tr>`);
+    return rTable(['Stage','Deals','Value',...(exp?['Expected']:[]),'Average time in stage','Longest there'],rows,`<td>Open deals</td><td>${d.count}</td><td>${esc(money(d.value_cents))}</td>${exp?`<td>${esc(money(d.expected_cents||0))}</td>`:''}<td></td><td></td>`)
       +(d.partial?'<p class="rep-foot">Some stage history couldn’t be read, so a few deals count from the day they were made.</p>':'');
   }
   if(key==='outcomes'){

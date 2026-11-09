@@ -23,7 +23,7 @@ import { buildMyTasks, MY_TASKS_MAX } from '../lib/my_tasks.ts';
 import { revenueByMonth, dealsByStage, wonAndLost, enquiriesBySource, overdueInvoices, OPEN_STAGES as REPORT_OPEN_STAGES } from '../lib/sales_reports.ts';
 import { normalizeViews, normalizeViewList, isViewList } from '../lib/saved_views.ts';
 import { readReservedJson, readReservedJsonOrThrow, writeReservedJson, updateReservedJson, RESERVED_NAMES } from '../lib/reserved_store.ts';
-import { normalizeStageNames, stageLabels, loadStageLabels, forgetStageLabels, renameMovedTo, DEFAULT_STAGE_LABEL } from '../lib/stage_names.ts';
+import { normalizeStageNames, stageLabels, loadStageLabels, forgetStageLabels, renameMovedTo, DEFAULT_STAGE_LABEL, normalizeStageChances, stageChances, loadStageChances, forgetStageChances, expectedValue, DEFAULT_STAGE_CHANCE } from '../lib/stage_names.ts';
 import { validateRetainerInput, mergeRetainerState, type RetainerState } from '../commerce/retainers.ts';
 import { editionFor } from '../commerce/catalog.ts';
 import type { PlanKey } from '../commerce/catalog.ts';
@@ -302,19 +302,30 @@ export async function handleSalesContactFields(req: Request, site: SiteRow, prin
 
 // ═══ STAGE NAMES (sales review item 38) ═══════════════════════════════════════
 // The four open stages can be renamed; Won and Not a fit keep their names.
-// GET → { labels (all six), custom (just the renames) }; PUT { names } replaces
-// the renames (an empty name puts the default back). lib/stage_names.ts.
+// GET → { labels (all six), custom (just the renames), chances (all six percents,
+// item 69) }; PUT { names?, chances? } replaces whichever it is given (an empty
+// name, or a percent back at its default, puts the default back). A PUT with
+// only names never touches the percents, and the other way round.
 export async function handleSalesStages(req: Request, site: SiteRow, principal: Principal, cors: Record<string, string>): Promise<Response> {
+  const payload = (custom: Record<string, string>, chancesCustom: Record<string, number>) =>
+    ({ labels: stageLabels(custom), custom, defaults: DEFAULT_STAGE_LABEL, chances: stageChances(chancesCustom), chance_defaults: DEFAULT_STAGE_CHANCE });
   if (req.method === 'GET') {
-    const custom = normalizeStageNames(await readReservedJson(site.id, RESERVED_NAMES.stageNames));
-    return json({ data: { labels: stageLabels(custom), custom, defaults: DEFAULT_STAGE_LABEL } }, 200, cors);
+    const [names, chances] = await Promise.all([readReservedJson(site.id, RESERVED_NAMES.stageNames), readReservedJson(site.id, RESERVED_NAMES.stageChances)]);
+    return json({ data: payload(normalizeStageNames(names), normalizeStageChances(chances)) }, 200, cors);
   }
   if (req.method === 'PUT') {
     let b: any = {}; try { b = await req.json(); } catch { return json({ error: 'bad_json' }, 400, cors); }
-    const custom = normalizeStageNames(b?.names);
-    const ok = await writeReservedJson(site.id, RESERVED_NAMES.stageNames, custom, principal.email || principal.userId || 'system');
-    forgetStageLabels(site.id);   // batch B: the kept names go at once
-    return ok ? json({ data: { labels: stageLabels(custom), custom, defaults: DEFAULT_STAGE_LABEL } }, 200, cors) : json({ error: 'write_failed', message: 'Your stage names didn’t save — please try again.' }, 502, cors);
+    const by = principal.email || principal.userId || 'system';
+    const hasNames = !!b && typeof b === 'object' && 'names' in b, hasChances = !!b && typeof b === 'object' && 'chances' in b;
+    if (!hasNames && !hasChances) return json({ error: 'validation', message: 'Nothing to save.' }, 422, cors);
+    const [curNames, curChances] = await Promise.all([readReservedJson(site.id, RESERVED_NAMES.stageNames), readReservedJson(site.id, RESERVED_NAMES.stageChances)]);
+    const custom = hasNames ? normalizeStageNames(b.names) : normalizeStageNames(curNames);
+    const chancesCustom = hasChances ? normalizeStageChances(b.chances) : normalizeStageChances(curChances);
+    const okNames = hasNames ? await writeReservedJson(site.id, RESERVED_NAMES.stageNames, custom, by) : true;
+    const okChances = hasChances ? await writeReservedJson(site.id, RESERVED_NAMES.stageChances, chancesCustom, by) : true;
+    forgetStageLabels(site.id); forgetStageChances(site.id);   // batch B: what was kept goes at once
+    if (!okNames || !okChances) return json({ error: 'write_failed', message: `Your ${!okNames && !okChances ? 'stage names and percents' : !okNames ? 'stage names' : 'stage percents'} didn’t save — please try again.` }, 502, cors);
+    return json({ data: payload(custom, chancesCustom) }, 200, cors);
   }
   return json({ error: 'method_not_allowed' }, 405, cors);
 }
@@ -531,6 +542,7 @@ export async function handleSalesContact(req: Request, site: SiteRow, principal:
 export async function handleSalesSummary(req: Request, site: SiteRow, principal: Principal, cors: Record<string, string>): Promise<Response> {
   if (req.method !== 'GET') return json({ error: 'method_not_allowed' }, 405, cors);
   const namesP = loadStageLabels(site.id).catch(() => null);   // item 38 names; batch B: read with the others, not after
+  const chancesP = loadStageChances(site.id);   // item 69: each open stage's chance (defaults when unreadable)
   // A solo studio's whole pipeline is small; scan a generous cap. `truncated`
   // tells the truth if we ever hit it — the totals are then a floor, never a
   // fabricated whole-set sum.
@@ -556,7 +568,11 @@ export async function handleSalesSummary(req: Request, site: SiteRow, principal:
   const sum = summarizePipeline(deals, nowIso(), ALL_TIME_WINDOW_DAYS);
   const names = await namesP;   // item 38: the studio's own stage names
   if (names) sum.by_stage = sum.by_stage.map((s) => ({ ...s, label: names[s.stage] || s.label }));
-  return json({ data: { ...sum, ar }, truncated: deals.length >= CAP }, 200, cors);
+  // item 69: "Expected" = each open deal's value times its stage's percent
+  const chances = await chancesP;
+  const ex = expectedValue(deals, chances);
+  sum.by_stage = sum.by_stage.map((s) => ({ ...s, chance: chances[s.stage] ?? null, expected_cents: ex.by_stage[s.stage] ?? 0 }));
+  return json({ data: { ...sum, ar, expected: { value_cents: ex.value_cents } }, truncated: deals.length >= CAP }, 200, cors);
 }
 
 // ═══ RECEIVABLES — the "who owes me money" list behind the AR strip ═══
@@ -653,6 +669,7 @@ export async function handleSalesReports(_req: Request, site: SiteRow, _principa
   const now = nowIso();
   const failed = new Set<string>();
   const labelsP = loadStageLabels(site.id).catch(() => undefined);   // item 38 names; batch B: read with the others, not after
+  const chancesP = loadStageChances(site.id);   // item 69: each stage's percent, for the expected column
   const read = async (key: string, path: string) => { try { const r = await svc(path); if (!r.ok) { failed.add(key); return []; } return rows(r); } catch { failed.add(key); return []; } };
   const since24 = new Date(Date.now() - 2 * 366 * 86400_000).toISOString();
   const since365 = new Date(Date.now() - 366 * 86400_000).toISOString();
@@ -689,7 +706,7 @@ export async function handleSalesReports(_req: Request, site: SiteRow, _principa
   return json({ data: {
     generated_at: now,
     revenue: failed.has('revenue') ? { unavailable: true } : revenueByMonth(paid, now),
-    pipeline: dealsOff ? { unavailable: true } : { ...dealsByStage(deals, lastMoveInto, now, await labelsP), partial: failed.has('stages') },
+    pipeline: dealsOff ? { unavailable: true } : { ...dealsByStage(deals, lastMoveInto, now, await labelsP, await chancesP), partial: failed.has('stages') },
     outcomes: dealsOff ? { unavailable: true } : { ...wonAndLost(deals, now, 365, closedAt), partial: failed.has('closes') },
     enquiries: failed.has('enquiries') ? { unavailable: true } : enquiriesBySource(subs, becameDeal, now),
     overdue: failed.has('overdue') || !rcv ? { unavailable: true } : overdueInvoices((rcv as any).items || [], now),

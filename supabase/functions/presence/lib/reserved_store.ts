@@ -9,6 +9,7 @@ export const RESERVED_NAMES = {
   savedViews: '__saved_views__',          // sales review item 31
   broadcastLists: '__broadcast_lists__',  // sales review items 31 + 39
   stageNames: '__stage_names__',          // sales review item 38
+  stageChances: '__stage_chances__',      // sales review item 69: the chance each open stage closes
   calendarFeed: '__calendar_feed__',      // sales review item 46: the private calendar link
 } as const;
 

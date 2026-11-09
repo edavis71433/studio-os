@@ -204,6 +204,18 @@
       </div>
       <div style="margin-top:10px;display:flex;align-items:center;gap:10px"><button type="button" class="btn" id="snSave">Save stage names</button><span class="how" id="snMsg" role="status" style="margin:0"></span></div>
     </div>
+    <!-- sales review item 69: the chance each open stage closes (Won is 100%, Not a fit 0%) -->
+    <div class="swrow" style="display:block" id="stageChances">
+      <b style="font-weight:600">The chance each stage closes</b>
+      <div class="how">Pipeline’s Expected total is each open deal’s value times its stage’s chance. Won counts as 100% and Not a fit as 0%.</div>
+      <div class="stale">
+        <label><span data-stage-label="lead">New lead</span> <input type="number" id="sc-lead" min="0" max="100" step="1" placeholder="10" aria-label="Chance a deal at New lead closes, in percent"> %</label>
+        <label><span data-stage-label="qualified">Qualified</span> <input type="number" id="sc-qualified" min="0" max="100" step="1" placeholder="25" aria-label="Chance a deal at Qualified closes, in percent"> %</label>
+        <label><span data-stage-label="proposal">Proposal sent</span> <input type="number" id="sc-proposal" min="0" max="100" step="1" placeholder="50" aria-label="Chance a deal at Proposal sent closes, in percent"> %</label>
+        <label><span data-stage-label="contract">Agreement out</span> <input type="number" id="sc-contract" min="0" max="100" step="1" placeholder="75" aria-label="Chance a deal at Agreement out closes, in percent"> %</label>
+      </div>
+      <div style="margin-top:10px;display:flex;align-items:center;gap:10px"><button type="button" class="btn" id="scSave">Save percents</button><span class="how" id="scMsg" role="status" style="margin:0"></span></div>
+    </div>
   </section>
 </div>
 <script src="/vendor/supabase-js-2.45.4.js"></script>
@@ -559,8 +571,34 @@ function paintStageNames(d) {
 async function loadStageNames() {
   if (STAGE_NAMES_ASKED) return; STAGE_NAMES_ASKED = true;
   const r = await api('/sales/stages').catch(() => null);
-  if (r && r.ok) paintStageNames(r.body && r.body.data);
-  else { const box = $('stageNames'); if (box) box.hidden = true; }   // no sales area (or a failed read): the block hides, never a dead form
+  if (r && r.ok) { paintStageNames(r.body && r.body.data); paintStageChances(r.body && r.body.data); }
+  else { for (const id of ['stageNames', 'stageChances']) { const box = $(id); if (box) box.hidden = true; } }   // no sales area (or a failed read): the blocks hide, never a dead form
+}
+// ── sales review item 69: the chance each open stage closes (PUT /sales/stages { chances }) ──
+const CHANCE_DEFAULTS = { lead: 10, qualified: 25, proposal: 50, contract: 75 };
+function paintStageChances(d) {
+  const c = (d && d.chances) || {}, def = (d && d.chance_defaults) || CHANCE_DEFAULTS;
+  for (const k of STAGE_KEYS) {
+    const i = $('sc-' + k); if (!i || document.activeElement === i) continue;
+    i.placeholder = String(def[k] ?? CHANCE_DEFAULTS[k]);
+    i.value = String(c[k] ?? def[k] ?? CHANCE_DEFAULTS[k]);
+  }
+}
+async function saveStageChances() {
+  const btn = $('scSave'), msg = $('scMsg'); msg.textContent = '';
+  const chances = {};
+  for (const k of STAGE_KEYS) {
+    const raw = ($('sc-' + k).value || '').trim();
+    const n = raw === '' ? CHANCE_DEFAULTS[k] : Math.round(Number(raw));   // blank = the usual percent
+    if (!Number.isFinite(n) || n < 0 || n > 100) { toast('Each chance is a percent from 0 to 100.', true); $('sc-' + k).focus(); return; }
+    chances[k] = n;
+  }
+  btn.disabled = true;
+  const r = await api('/sales/stages', 'PUT', { chances });
+  btn.disabled = false;
+  if (!r.ok) { toast(nice(r.body, 'Your percents didn’t save — nothing was changed.'), true); return; }
+  paintStageChances(r.body && r.body.data);
+  msg.textContent = 'Saved. Pipeline’s Expected total uses these.';
 }
 async function saveStageNames() {
   const btn = $('snSave'), msg = $('snMsg'); btn.disabled = true; msg.textContent = '';
@@ -574,6 +612,7 @@ async function saveStageNames() {
 }
 function wireAutomations() {
   const sn = $('snSave'); if (sn) sn.addEventListener('click', saveStageNames);
+  const sc = $('scSave'); if (sc) sc.addEventListener('click', saveStageChances);   // item 69
   const flip = (id, key) => { const b = $(id); b.addEventListener('click', () => { const on = b.getAttribute('aria-checked') !== 'true'; b.setAttribute('aria-checked', on ? 'true' : 'false'); saveAutomation({ [key]: on }, () => b.setAttribute('aria-checked', on ? 'false' : 'true')); }); };
   flip('sw-ack', 'auto_ack_enquiries'); flip('sw-inv', 'invoice_reminders'); flip('sw-deal', 'deal_nudges'); flip('sw-rev', 'review_requests');
   const days = (id, key, min, max, fallback) => { const i = $(id); i.addEventListener('change', () => { let n = Math.trunc(Number(i.value)); if (!Number.isFinite(n) || n < min) n = fallback; if (n > max) n = max; i.value = String(n); saveAutomation({ [key]: n }); }); };
@@ -627,6 +666,14 @@ function signedOut() {
       const named = names.length ? ' — ' + names.slice(0, 2).map((n) => n.charAt(0).toUpperCase() + n.slice(1)).join(', ') + (names.length > 2 ? ' +' + (names.length - 2) : '') : '';
       if (on || attn) setStatus('connections', { text: `${on} connected${named}${attn ? ' · ' + attn + (attn === 1 ? ' needs' : ' need') + ' attention' : ''}`, cls: attn ? 'warn' : '' });
       else setStatus('connections', { text: 'Nothing connected yet', cls: '' });
+    }).catch(() => {});
+    // sales review item 69: the Domain & email card says which address your emails go out from, and whether
+    // the mail provider has it verified (GET /email/sending). Studio level only: a client's card is their desk.
+    if (!SCOPE && hasFeature('website')) api('/email/sending').then((r) => {
+      const d = (r && r.ok && r.body && r.body.data) || null; if (!d || !d.from) return;
+      if (d.sending === 'verified') setStatus('domains', { text: `Emails go out from ${d.from} · verified`, cls: '' });
+      else if (d.sending === 'not_verified') setStatus('domains', { text: `Emails go out from ${d.from} · not verified, so they may land in spam`, cls: 'warn' });
+      else setStatus('domains', { text: `Emails go out from ${d.from} · couldn’t check it just now`, cls: 'warn' });
     }).catch(() => {});
     wireDeletion();
     loadPlan().catch(() => {});

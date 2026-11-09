@@ -62,6 +62,7 @@ html.dds-embed #detailWrap{padding-top:0}
   .stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));border:1px solid var(--line);border-radius:var(--dds-r-lg,10px);background:var(--card);overflow:hidden}
   .stats .st{display:flex;align-items:center;gap:var(--dds-s3,12px);padding:var(--dds-s3,12px) var(--dds-s4,16px);border-left:1px solid var(--line);min-width:0}
   .stats .st:first-child{border-left:none}
+  .stats .exp-sub{display:none}   /* item 69: shown under Open on a phone only (its own tile elsewhere) */
   .stats .ico{width:36px;height:36px;border-radius:var(--dds-r,8px);display:grid;place-items:center;flex:0 0 auto;background:var(--p-soft);color:var(--p)}
   .stats .ico.good{background:var(--good-soft);color:var(--good)} .stats .ico.warn{background:var(--warn-soft);color:var(--warn)} .stats .ico.info{background:var(--dds-info-soft,#e8f1fb);color:var(--dds-info,#2a6fb5)}
   .stats .ico svg{width:17px;height:17px;stroke:currentColor;fill:none;stroke-width:1.75;stroke-linecap:round;stroke-linejoin:round}
@@ -323,6 +324,8 @@ html.dds-embed #detailWrap{padding-top:0}
     .stats .v{font-size:15px;white-space:nowrap;font-variant-numeric:tabular-nums}
     .stats .s{white-space:normal;line-height:1.35}
     .stats .st{padding:8px}   /* final pass, batch C: "$12,450" was cut off in a quarter of a phone */
+    .stats .st-exp{display:none}   /* item 69: on a phone Expected rides under Open, so the row stays four */
+    .stats .exp-sub{display:inline}
     #filters{flex-wrap:nowrap;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none;margin-left:-16px;margin-right:-16px;padding:0 16px 2px}
     #filters::-webkit-scrollbar{display:none}
     #filters .chip{flex:0 0 auto;white-space:nowrap}
@@ -1489,19 +1492,24 @@ async function renderSummary(gen){
     won:'<path d="M12 3v18"/><path d="M17 7.5c0-1.9-2.2-3-5-3s-5 1.1-5 3 2.2 2.5 5 3 5 1.1 5 3-2.2 3-5 3-5-1.1-5-3"/>',
     rate:'<path d="M4 19V5"/><path d="M4 19h16"/><path d="M8 15l4-5 3 3 5-6"/>',
     ar:'<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>'};
-  const tile=(k,v,sub,ico,tone,subCls)=>`<div class="st"><span class="ico ${tone||''}"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">${ICO[ico]}</svg></span><div class="st-main"><div class="k">${k}</div><div class="v">${v}</div>${sub?`<div class="s${subCls?' '+subCls:''}">${sub}</div>`:''}</div></div>`;
-  const openT=open.count?tile('Open',money(open.value_cents)||'$0','across '+plur(open.count,'deal'),'open',''):tile('Open','$0','no open deals yet','open','');
+  const tile=(k,v,sub,ico,tone,subCls,cls)=>`<div class="st${cls?' '+cls:''}"><span class="ico ${tone||''}"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">${ICO[ico]}</svg></span><div class="st-main"><div class="k">${k}</div><div class="v">${v}</div>${sub?`<div class="s${subCls?' '+subCls:''}">${sub}</div>`:''}</div></div>`;
+  // item 69: Expected = each open deal's value times its stage's chance (Settings › The chance each stage closes).
+  // Its own tile on a computer or tablet; on a phone the four tiles keep their one row (item 58), so it rides under Open.
+  const ex=(s.expected&&open.count)?s.expected:null;
+  const expSub=ex?`<span class="exp-sub"> · ${money(ex.value_cents)||'$0'} expected</span>`:'';
+  const openT=open.count?tile('Open',money(open.value_cents)||'$0','across '+plur(open.count,'deal')+expSub,'open',''):tile('Open','$0','no open deals yet','open','');
+  const expT=ex?tile('Expected',money(ex.value_cents)||'$0','at each stage’s chance','rate','info','','st-exp'):'';
   const wonT=wm.count?tile('Won this month',money(wm.value_cents)||'$0',plur(wm.count,'deal'),'won','good'):tile('Won this month','—','none yet','won','good');
   const winT=(wr.pct===null||wr.pct===undefined)?tile('Win rate','—','nothing won or ruled out yet','rate','info')
     :tile('Win rate',wr.pct+'%',`${wr.won} of ${wr.won+wr.lost}${(wr.window_days||0)>=3650?', all time':`, last ${wr.window_days||90} days`}`,'rate','info');
-  const cells=(s.by_stage||[]).map(b=>`<span class="sc"><span class="sc-l">${esc(b.label)}</span><span class="sc-n">${b.count}${b.value_cents?' · '+money(b.value_cents):''}</span></span>`).join('');
+  const cells=(s.by_stage||[]).map(b=>`<span class="sc"><span class="sc-l">${esc(b.label)}${b.chance!=null?` · ${b.chance}%`:''}</span><span class="sc-n">${b.count}${b.value_cents?' · '+money(b.value_cents):''}</span></span>`).join('');
   // AR tile — "who owes me money" across all deals, in one glance (open invoices).
   const ar=s.ar||{}; let arT='';
   // Oct 2026 (item 2): outstanding = what still waits (the server's ar runs the one
   // money formula); a processing payment is on its way and is named, not owed
   const arProc=(ar.processing_cents||0)>0?` · ${money(ar.processing_cents)} processing`:'';
   if((ar.count||0)>0||(ar.processing_count||0)>0){ arT=tile('Outstanding',money(ar.outstanding_cents)||'$0',((ar.count||0)>0?plur(ar.count,'invoice'):'All paid up')+((ar.overdue_count||0)>0?` · <strong style="color:var(--bad,#a3423a)">${money(ar.overdue_cents)} overdue</strong>`:'')+arProc+`&nbsp;· <a href="#" id="arOpen" style="color:var(--p);text-decoration:none;font-weight:600;white-space:nowrap">see who →</a>`,'ar','warn','multiline'); }
-  host.innerHTML=`<div class="stats">${openT}${wonT}${winT}${arT}</div>`
+  host.innerHTML=`<div class="stats">${openT}${expT}${wonT}${winT}${arT}</div>`
     +(open.count?`<div class="sum-stages">${cells}</div>`:'');
   fitTiles(host);   // final pass, batch C
   const ao=$('arOpen'); if(ao)ao.onclick=(e)=>{e.preventDefault();openReceivables();};
