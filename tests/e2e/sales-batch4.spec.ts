@@ -114,7 +114,7 @@ test.describe('item 26 — a repeat customer\'s projects and deals are lists', (
 
   test('two projects and two deals: each tab lists them all, each opening its own', async ({ page }) => {
     await installApp(page, { api: api(RECORD(lists)) });
-    await page.goto(`/crm.html?client=${CLIENT}`);
+    await page.goto(`/crm.html?client=${CLIENT}&tab=delivery`);   // the record opens on Activity since the bold redesign (part B); the project lists live on the Project tab
     const projects = page.locator('#allProjects');
     await expect(projects.locator('h2')).toHaveText('All projects · 2');
     await expect(projects.locator('.rrow')).toHaveCount(2);
@@ -131,7 +131,7 @@ test.describe('item 26 — a repeat customer\'s projects and deals are lists', (
 
   test('one of each: no extra list', async ({ page }) => {
     await installApp(page, { api: api(RECORD({ related_projects: lists.related_projects.slice(0, 1), related_deals: lists.related_deals.slice(0, 1) })) });
-    await page.goto(`/crm.html?client=${CLIENT}`);
+    await page.goto(`/crm.html?client=${CLIENT}&tab=delivery`);   // the record opens on Activity since the bold redesign (part B); the project lists live on the Project tab
     await expect(page.locator('.kv').first()).toContainText('Waiting on them');
     await expect(page.locator('#allProjects')).toHaveCount(0);
     await page.goto(`/crm.html?client=${CLIENT}&tab=deal`);

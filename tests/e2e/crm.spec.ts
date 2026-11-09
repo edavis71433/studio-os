@@ -742,7 +742,7 @@ test.describe('Relationship view', () => {
       '/sales/deals': { data: { deal: { id: DEAL, title: 'Site build', stage: 'qualified' }, proposals: [], contracts: [], invoices: [] } },
       ['/projects/' + PROJECT]: { data: { project: { id: PROJECT, name: 'Site', status: 'active' }, milestones: [], tasks: [], deliverables: [], progress: {} } },
     } });
-    await page.goto(`/crm.html?client=${CLIENT}&tab=details`);
+    await page.goto(`/crm.html?client=${CLIENT}&tab=activity`);   // Activity is the first tab since the bold redesign (part B), and holds the composer
     // record-section tablist: roving tabindex + arrows move AND select
     const tabs = page.locator('.tabs[role=tablist] [data-tab]');
     await expect(tabs.first()).toHaveAttribute('tabindex', '0');
