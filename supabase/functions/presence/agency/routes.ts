@@ -678,10 +678,10 @@ async function runStudioNeeds(member: AgencyMember, principal: Principal, jwt: s
     const rowsOf = <T,>(q: { ok: boolean; json: unknown }): T[] => (q.ok && Array.isArray(q.json) ? (q.json as T[]) : []);
     // Sales review B2: a request with no stamp and no project names its customer
     // through the requester's sign-in (stamped once), or at least their email.
-    const supportRows = rowsOf<{ id: string; project_id?: string | null; client_id?: string | null; requester?: string | null; requester_email?: string | null }>(supQ);
+    const supportRows = rowsOf<{ id: string; project_id?: string | null; client_id?: string | null; requester?: string | null; requester_email?: string | null; requester_name?: string | null }>(supQ);
     if (own && supportRows.length) {
       const owners = await healSupportOwners(own.id, supportRows);
-      for (const r of supportRows) { const cid = owners.clientOf[r.id]; if (cid && !r.client_id) r.client_id = cid; if (owners.emailOf[r.id]) r.requester_email = owners.emailOf[r.id]; }
+      for (const r of supportRows) { const cid = owners.clientOf[r.id]; if (cid && !r.client_id) r.client_id = cid; if (owners.emailOf[r.id]) r.requester_email = owners.emailOf[r.id]; if (owners.nameOf[r.id]) r.requester_name = owners.nameOf[r.id]; }
     }
     const invoices = (recv?.items ?? []) as Array<{ client_id: string | null; deal_id: string | null }>;
     const serviceLinks = rowsOf<{ project_id: string | null; customer_client_id: string | null; customer_site_id: string | null }>(slinkQ);
