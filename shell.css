@@ -584,3 +584,9 @@ html[data-dds-lacks~="configure"] [data-if-lacks="configure"][hidden]{display:bl
 .dds-req button:disabled{opacity:.6;cursor:default}
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .dds-req button.yes{color:#171320}}
 :root[data-theme="dark"] .dds-req button.yes{color:#171320}
+
+/* "How did they find you?" (sales review item 69): one picker style for the
+   deal page, Log an enquiry and the record. Safari ignores min-height on a
+   native select, so it draws its own arrow (batch C's .dds-bulk fix). */
+.dds-pick{-webkit-appearance:none;appearance:none;font:inherit;font-size:14px;color:var(--ink);background-color:var(--card);border:1px solid var(--line);border-radius:var(--dds-r,8px);padding:8px 30px 8px 10px;min-height:40px;max-width:100%;background-image:url("data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 width=%2710%27 height=%276%27 viewBox=%270 0 10 6%27%3E%3Cpath d=%27M1 1l4 4 4-4%27 fill=%27none%27 stroke=%27%236b6478%27 stroke-width=%271.6%27/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 11px center;background-size:10px 6px}
+@media (max-width:767px){.dds-pick{min-height:44px}}

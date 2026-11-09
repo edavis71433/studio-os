@@ -44,6 +44,8 @@ import {
 import { composeContactDetail } from '../crm/contact_detail.ts';
 import { normalizeFieldDefs, normalizeFieldValues, applyFieldValues, type CustomFieldDef } from '../crm/custom_fields.ts';
 import { findPossibleDuplicates } from '../crm/dedupe.ts';
+import { normalizeFoundVia } from '../lib/found_via.ts';   // sales review item 69: "How did they find you?"
+import { missingInsertColumns } from '../lib/inbound_email.ts';
 import { summarizeAttachments, attachmentWarning, duplicateHints, listSentence } from '../crm/contact_links.ts';
 import type { SiteRow } from '../lib/site.ts';
 import type { Principal } from '../../_shared/auth.ts';
@@ -262,12 +264,23 @@ export async function handleSalesContacts(req: Request, site: SiteRow, principal
       const matches = findPossibleDuplicates({ name, phone, email }, pool, 5);
       if (matches.length) return json({ error: 'possible_duplicate', matches, message: `This looks like someone you already have. Is it the same person?` }, 409, cors);
     }
-    const ins = await svc('presence_contacts', { method: 'POST', headers: { Prefer: 'return=representation' },
-      body: JSON.stringify({ site_id: site.id, name, email, phone, company: clean(b.company, 120), notes: clean(b.notes, 2000) }) });
+    const foundVia = normalizeFoundVia(b.found_via);   // item 69: "How did they find you?" ('' = not recorded)
+    const ins = await insertWithFoundVia('presence_contacts', { site_id: site.id, name, email, phone, company: clean(b.company, 120), notes: clean(b.notes, 2000), ...(foundVia ? { found_via: foundVia } : {}) });
     if (!ins.ok || !rows(ins)[0]) return json({ error: 'write_failed', message: 'That contact didn’t save — please try again.' }, 502, cors);
     return json({ data: rows(ins)[0] }, 201, cors);
   }
   return json({ error: 'method_not_allowed' }, 405, cors);
+}
+
+/** Item 69: insert a row; when the database doesn't have `found_via` yet
+ *  (APPLY-0143 not run), say so precisely and retry once without it — never
+ *  silently dropping anything else. */
+async function insertWithFoundVia(table: string, row: Record<string, unknown>) {
+  const post = (body: unknown) => svc(table, { method: 'POST', headers: { Prefer: 'return=representation' }, body: JSON.stringify(body) });
+  const r = await post(row);
+  if (r.ok || !('found_via' in row) || !missingInsertColumns(r.json, r.text, ['found_via']).length) return r;
+  const { found_via: _fv, ...rest } = row;
+  return post(rest);
 }
 
 // ═══ CONTACT CUSTOM FIELD DEFINITIONS (site-level, ≤5, no migration) ══════════
@@ -364,7 +377,9 @@ async function loadContact(siteId: string, id: string) {
   // deploy-order tolerant: `custom` lands with migration 0097 — try the full
   // select, fall back to the pre-0097 shape so a deploy ahead of the migration
   // never breaks the contacts surface (same posture as the deals next_step cols).
-  let r = await svc(`presence_contacts?id=eq.${id}&site_id=eq.${siteId}&deleted_at=is.null&select=id,name,email,phone,company,notes,created_at,updated_at,custom&limit=1`);
+  // item 69: found_via (APPLY-0143) first, then without it, then the pre-0097 shape
+  let r = await svc(`presence_contacts?id=eq.${id}&site_id=eq.${siteId}&deleted_at=is.null&select=id,name,email,phone,company,notes,created_at,updated_at,custom,found_via&limit=1`);
+  if (!r.ok) r = await svc(`presence_contacts?id=eq.${id}&site_id=eq.${siteId}&deleted_at=is.null&select=id,name,email,phone,company,notes,created_at,updated_at,custom&limit=1`);
   if (!r.ok) r = await svc(`presence_contacts?id=eq.${id}&site_id=eq.${siteId}&deleted_at=is.null&select=id,name,email,phone,company,notes,created_at,updated_at&limit=1`);
   return rows(r)[0] || null;
 }
@@ -458,6 +473,7 @@ export async function handleSalesContact(req: Request, site: SiteRow, principal:
     if (b.phone !== undefined) patch.phone = clean(b.phone, 40);
     if (b.company !== undefined) patch.company = clean(b.company, 120);
     if (b.notes !== undefined) patch.notes = clean(b.notes, 2000);
+    if (b.found_via !== undefined) patch.found_via = normalizeFoundVia(b.found_via);   // item 69
     if (b.email !== undefined) {
       const email = clean(b.email, 160).toLowerCase();
       if (email && email !== String(contact.email || '').toLowerCase()) {
@@ -477,6 +493,16 @@ export async function handleSalesContact(req: Request, site: SiteRow, principal:
     }
     if (!Object.keys(patch).length) return json({ error: 'empty_update' }, 400, cors);
     let up = await svc(`presence_contacts?id=eq.${id}&site_id=eq.${site.id}&select=id,name,email,phone,company,notes,updated_at,custom`, { method: 'PATCH', headers: { Prefer: 'return=representation' }, body: JSON.stringify(patch) });
+    // item 69, deploy-order tolerance: before APPLY-0143 there is no found_via column —
+    // the rest of the save still goes through, and the answer says what didn't stick.
+    let foundViaLate = false;
+    if (!up.ok && 'found_via' in patch && missingInsertColumns(up.json, up.text, ['found_via']).length) {
+      delete patch.found_via; foundViaLate = true;
+      if (!Object.keys(patch).length) return json({ error: 'found_via_unavailable', message: '“How did they find you?” needs a quick database update before it can be saved.' }, 409, cors);
+      up = await svc(`presence_contacts?id=eq.${id}&site_id=eq.${site.id}&select=id,name,email,phone,company,notes,updated_at,custom`, { method: 'PATCH', headers: { Prefer: 'return=representation' }, body: JSON.stringify(patch) });
+    }
+    if (up.ok && rows(up)[0] && foundViaLate) return json({ data: rows(up)[0], warning: 'found_via_unavailable', message: 'Saved — “How did they find you?” needs a quick database update before it sticks.' }, 200, cors);
+    if (up.ok && rows(up)[0] && 'found_via' in patch) return json({ data: { ...rows(up)[0], found_via: patch.found_via } }, 200, cors);
     // deploy-order tolerance: before 0097 the `custom` column doesn't exist — a
     // whole detail save (name/phone/notes) must not 502 over it.
     if (!up.ok && touchesCustom) {
@@ -675,7 +701,12 @@ export async function handleSalesReports(_req: Request, site: SiteRow, _principa
   const since365 = new Date(Date.now() - 366 * 86400_000).toISOString();
   const [paid, deals, subs, rcv] = await Promise.all([
     read('revenue', `presence_invoices?site_id=eq.${site.id}&deleted_at=is.null&status=eq.paid&paid_at=gte.${encodeURIComponent(since24)}&select=amount_cents,paid_at&limit=5000`),
-    read('deals', `presence_deals?site_id=eq.${site.id}&deleted_at=is.null&select=id,title,stage,source,source_submission_id,expected_value_cents,created_at,updated_at,converted_client_id,converted_at,lost_reason&limit=2000`),
+    // item 69: found_via rides along; before APPLY-0143 the same read without it
+    (async () => {
+      const cols = 'id,title,stage,source,source_submission_id,expected_value_cents,created_at,updated_at,converted_client_id,converted_at,lost_reason';
+      const r = await svc(`presence_deals?site_id=eq.${site.id}&deleted_at=is.null&select=${cols},found_via&limit=2000`).catch(() => null);
+      return r && r.ok ? rows(r) : read('deals', `presence_deals?site_id=eq.${site.id}&deleted_at=is.null&select=${cols}&limit=2000`);
+    })(),
     read('enquiries', `presence_form_submissions?site_id=eq.${site.id}&spam=is.false&created_at=gte.${encodeURIComponent(since365)}&select=id,source_page,status,created_at&limit=5000`),
     loadReceivables(site).catch(() => { failed.add('overdue'); return null; }),
   ]);
@@ -827,11 +858,18 @@ export async function handleSalesDeals(req: Request, site: SiteRow, principal: P
     // sales review item 32: an imported deal may start at any OPEN stage (it was
     // already there in the old tool). Won stays convert-only; Not a fit is not imported.
     const startStage = (!srcSub && ['qualified', 'proposal', 'contract'].includes(String(b.stage))) ? String(b.stage) : 'lead';
-    const ins = await svc('presence_deals', { method: 'POST', headers: { Prefer: 'return=representation' },
-      body: JSON.stringify({ site_id: site.id, contact_id: contactId, title, stage: startStage,
+    // item 69: how they found you: the pick, else "Website" for a website enquiry, else what their contact says
+    let foundVia = normalizeFoundVia(b.found_via);
+    if (!foundVia && srcSub) foundVia = 'Website';
+    if (!foundVia && contactId) {
+      const fr = await svc(`presence_contacts?id=eq.${contactId}&site_id=eq.${site.id}&select=found_via&limit=1`).catch(() => null);   // before APPLY-0143 this 400s: nothing to inherit
+      foundVia = fr && fr.ok ? normalizeFoundVia(rows(fr)[0]?.found_via) : '';
+    }
+    const ins = await insertWithFoundVia('presence_deals', { site_id: site.id, contact_id: contactId, title, stage: startStage,
         source: clean(b.source, 40) || (srcSub ? 'website_form' : 'manual'), source_submission_id: srcSub,
         expected_value_cents: Math.min(1_000_000_00, Math.max(0, Math.trunc(Number(b.expected_value_cents)) || 0)), // R6: bounded like line items
-        expected_close: closeDate || null, notes: clean(b.notes, 2000) || (enquiry ? clean(`Website enquiry: ${enquiry}`, 2000) : '') }) });
+        expected_close: closeDate || null, notes: clean(b.notes, 2000) || (enquiry ? clean(`Website enquiry: ${enquiry}`, 2000) : ''),
+        ...(foundVia ? { found_via: foundVia } : {}) });
     if (!ins.ok || !rows(ins)[0]) return json({ error: 'write_failed', message: 'That deal didn’t save — please try again.' }, 502, cors);
     const deal = rows(ins)[0];
     // Mark the originating website enquiry converted (system status) so the leads
@@ -901,6 +939,7 @@ export async function handleSalesDeal(req: Request, site: SiteRow, principal: Pr
     if (b.expected_value_cents !== undefined) patch.expected_value_cents = Math.min(1_000_000_00, Math.max(0, Math.trunc(Number(b.expected_value_cents)) || 0));
     if (b.expected_close !== undefined) { const cd = b.expected_close ? clean(b.expected_close, 10) : ''; if (cd && !DATE_RE.test(cd)) return json({ error: 'validation', message: 'Expected close must be a date (YYYY-MM-DD).' }, 422, cors); patch.expected_close = cd || null; }
     if (b.assigned_to !== undefined) patch.assigned_to = UUID_RE.test(b.assigned_to || '') ? b.assigned_to : null;
+    if (b.found_via !== undefined) patch.found_via = normalizeFoundVia(b.found_via);   // item 69: "How did they find you?"
     // The deal's CONTACT is editable AFTER creation. Both the name and the email
     // are optional on the create form, so a deal can start with contact_id null —
     // and a null contact is exactly why emailSalesDoc/emailInvoice return false,
@@ -930,8 +969,20 @@ export async function handleSalesDeal(req: Request, site: SiteRow, principal: Pr
       delete patch.next_step; delete patch.next_step_at;
       if (Object.keys(patch).length) up = await svc(`presence_deals?id=eq.${id}&site_id=eq.${site.id}&select=*`, { method: 'PATCH', headers: { Prefer: 'return=representation' }, body: JSON.stringify(patch) });
     }
+    // item 69: likewise before APPLY-0143 (no found_via column): the rest of the save goes through
+    if (!up.ok && 'found_via' in patch && missingInsertColumns(up.json, up.text, ['found_via']).length) {
+      delete patch.found_via;
+      if (!Object.keys(patch).length) return json({ error: 'found_via_unavailable', message: '“How did they find you?” needs a quick database update before it can be saved.' }, 409, cors);
+      up = await svc(`presence_deals?id=eq.${id}&site_id=eq.${site.id}&select=*`, { method: 'PATCH', headers: { Prefer: 'return=representation' }, body: JSON.stringify(patch) });
+    }
     if (!up.ok || !rows(up)[0]) return json({ error: 'write_failed' }, 502, cors);
-    return json({ data: rows(up)[0] }, 200, cors);
+    // item 69: set once, shown everywhere — the deal's person gets the same answer
+    // when theirs is still blank (best-effort; never overwrites one already given)
+    const savedDeal = rows(up)[0];
+    if (patch.found_via && savedDeal.contact_id && UUID_RE.test(String(savedDeal.contact_id))) {
+      await svc(`presence_contacts?id=eq.${savedDeal.contact_id}&site_id=eq.${site.id}&found_via=eq.`, { method: 'PATCH', body: JSON.stringify({ found_via: patch.found_via }) }).catch(() => {});
+    }
+    return json({ data: savedDeal }, 200, cors);
   }
   if (req.method === 'DELETE') {
     // Soft-delete: the deal leaves the pipeline but its history (events,

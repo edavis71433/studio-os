@@ -297,6 +297,8 @@
     <input id="ne-email" type="email" maxlength="160" autocomplete="off">
     <label for="ne-phone">Phone <span class="muted">(optional)</span></label>
     <input id="ne-phone" type="tel" maxlength="40" autocomplete="off">
+    <label for="ne-found">How did they find you? <span class="muted">(optional)</span></label>
+    <select id="ne-found" class="dds-pick"><option value="">Not sure yet</option><option>Google</option><option>Referral</option><option>Word of mouth</option><option>Social</option><option>Repeat client</option><option>Website</option><option>Other</option></select>
     <label for="ne-msg">What did they ask? <span class="muted">(optional)</span></label>
     <textarea id="ne-msg" maxlength="2000" placeholder="e.g. Wants a quote for a patio before spring"></textarea>
     <label class="check"><input id="ne-deal" type="checkbox" checked> Also open a deal in the pipeline</label>
@@ -1404,21 +1406,22 @@ function openConvert(it){
 // through the routes the page already uses; nothing new server-side.
 function openNew(){
   const dlg=$('newDlg'); if(!dlg)return;
-  $('ne-name').value='';$('ne-email').value='';$('ne-phone').value='';$('ne-msg').value='';$('ne-deal').checked=true;
+  $('ne-name').value='';$('ne-email').value='';$('ne-phone').value='';$('ne-msg').value='';$('ne-deal').checked=true;$('ne-found').value='';
   if(!dlg.open)dlg.showModal();   // showModal() focuses the first field (Name) itself — no timer, no WebKit focus race
   $('ne-cancel').onclick=()=>dlg.close();
   $('newForm').onsubmit=async(e)=>{
     e.preventDefault();
     const name=$('ne-name').value.trim(),email=$('ne-email').value.trim(),phone=$('ne-phone').value.trim(),msg=$('ne-msg').value.trim();
+    const found_via=$('ne-found').value;   // item 69: "How did they find you?" (saved on the person and the deal)
     if(!name&&!email&&!phone){toast('A name, email, or phone is enough to start.');return;}
     const go=$('ne-go'); go.disabled=true; go.textContent='Logging…';
     try{
-      const c=await api('/sales/contacts','POST',{name,email,phone,notes:msg?('Enquiry: '+msg):''});
+      const c=await api('/sales/contacts','POST',{name,email,phone,notes:msg?('Enquiry: '+msg):'',found_via});
       if(!c.ok){go.disabled=false;go.textContent='Log enquiry';toast((c.body&&c.body.message)||'Couldn’t log that just now.');return;}
       const contactId=c.body&&c.body.data&&c.body.data.id;
       let dealId=null;
       if($('ne-deal').checked){
-        const d=await api('/sales/deals','POST',{title:name||email||phone,contact_id:contactId,source:'manual',notes:msg?('Enquiry: '+msg):''});
+        const d=await api('/sales/deals','POST',{title:name||email||phone,contact_id:contactId,source:'manual',notes:msg?('Enquiry: '+msg):'',found_via});
         if(d.ok)dealId=d.body&&d.body.data&&d.body.data.id;
       }
       dlg.close(); go.disabled=false; go.textContent='Log enquiry';

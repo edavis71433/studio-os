@@ -4,6 +4,7 @@
 // (won by where the deal came from, not a fit by the reason given), enquiries by
 // the page they came from, and overdue invoices. No report builder (decision 7).
 // Pure: the route reads the rows, these shape them. All dates are UTC.
+import { foundViaLabel } from './found_via.ts';
 
 const DAY = 86400000;
 const n = (v: unknown) => Number(v) || 0;
@@ -103,6 +104,8 @@ export function wonAndLost(deals: Array<Record<string, unknown>>, nowIso: string
     win_rate_pct: won.length + lost.length ? Math.round((won.length / (won.length + lost.length)) * 100) : null,
     won_by_source: groupBy(won, (d) => sourceLabel(d.source), v, 8, 'Other sources'),
     lost_by_reason: groupBy(lost, (d) => reasonLabel(d.lost_reason), v, 8, 'Other reasons'),
+    // item 69: "How did they find you?" next to where the deal came from
+    won_by_found_via: groupBy(won, (d) => foundViaLabel(d.found_via), v, 8, 'Other'),
   };
 }
 

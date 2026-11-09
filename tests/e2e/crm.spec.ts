@@ -825,6 +825,7 @@ test.describe('Client record — editing and removing the contact', () => {
     expect(patched).toEqual({
       name: 'Jordan Ellis', company: 'Larkspur Kitchen + Wine Bar', email: 'jordan.ellis@example.com',
       phone: '(555) 010-2468 ext 2', custom: { referred_by: 'Referred by Marigold' },
+      found_via: '',   // item 69: "How did they find you?" rides the same save (not recorded here)
     });
   });
 

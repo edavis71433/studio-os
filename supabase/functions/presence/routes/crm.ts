@@ -481,7 +481,9 @@ export async function handleCrmRecord(req: Request, jwt: string, site: SiteRow, 
       // the contact is read beside the client and used only when the client gives no name
       const [c, ct] = await Promise.all([
         clientId ? svc(`clients?id=eq.${clientId}&select=name,email,contact_email&limit=1`).then(one) : Promise.resolve(null),
-        contactId ? svc(`presence_contacts?id=eq.${contactId}&site_id=eq.${AS}&select=name,company,email,phone&limit=1`).then(one) : Promise.resolve(null),
+        // item 69: found_via rides along; before APPLY-0143 the same read without it
+        contactId ? svc(`presence_contacts?id=eq.${contactId}&site_id=eq.${AS}&select=name,company,email,phone,found_via&limit=1`)
+          .then((r) => r.ok ? r : svc(`presence_contacts?id=eq.${contactId}&site_id=eq.${AS}&select=name,company,email,phone&limit=1`)).then(one) : Promise.resolve(null),
       ]);
       if (c) header = { name: c.name || c.email || 'Client', company: '', email: c.email || c.contact_email || '', phone: '', status: 'customer' };
       // item 22 (second half) + item 49: lead with the business, name the person
@@ -493,6 +495,7 @@ export async function handleCrmRecord(req: Request, jwt: string, site: SiteRow, 
         } catch { /* the plain header stands */ }
       }
       if (contactId && !header.name && ct) header = { name: ct.name || ct.email || 'Contact', company: ct.company || '', email: ct.email || '', phone: ct.phone || '', status: 'contact' };
+      if (ct && ct.found_via) header = { ...header, found_via: String(ct.found_via) };   // item 69: "How did they find you?"
       return header;
     })();
 
