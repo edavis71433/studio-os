@@ -1,8 +1,7 @@
 name: Deploy Edge Functions
 
-# Staging: every push to the `staging` branch deploys both functions to the
-# staging Supabase project.
-# Production: manual only. Actions tab -> Run workflow -> type
+# Production only (item 112, Nov 9 2026: the staging jobs went; the repository
+# has never had a staging project, so they could never run). Manual only. Actions tab -> Run workflow -> type
 # `deploy-production` into the confirmation box. Deploys from `main`, and only a
 # commit that passed the same checks as every pull request (ci.yml, run again here)
 # and the browser check (e2e.yml's `browser`, which this waits for).
@@ -11,11 +10,6 @@ name: Deploy Edge Functions
 # environment (Build Brief section 2.8).
 
 on:
-  push:
-    branches: [staging]
-    paths:
-      - "supabase/functions/**"
-      - ".github/workflows/deploy.yml"
   workflow_dispatch:
     inputs:
       confirm:
@@ -36,7 +30,7 @@ env:
 # commit main was at when it was dispatched, so the newer carries the older's code. A run
 # cancelled while it waited was replaced: don't rerun it.
 concurrency:
-  group: deploy-${{ github.event_name == 'workflow_dispatch' && 'production' || 'staging' }}
+  group: deploy-production
   cancel-in-progress: false
 
 jobs:
@@ -104,97 +98,6 @@ jobs:
             fi
             sleep "$poll"
           done
-
-  deploy-staging:
-    if: github.event_name == 'push'
-    needs: test
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Guard — canonical clever-api file must exist
-        run: test -f supabase/functions/clever-api/index.ts || { echo "clever-api/index.ts missing — see docs/runbooks/BYTE-CHECK.md item 1"; exit 1; }
-
-      # verify_jwt=false mirrors production (v247 setting): the function's own
-      # fail-closed gate is the auth layer; cron + public site call it bare.
-      - name: Deploy clever-api (staging)
-        env:
-          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
-        run: npx --yes "supabase@$SUPABASE_CLI_VERSION" functions deploy clever-api --no-verify-jwt --project-ref ${{ secrets.SUPABASE_PROJECT_REF_STAGING }}
-
-      - name: Deploy stripe-webhook (staging, no JWT verification)
-        env:
-          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
-        run: npx --yes "supabase@$SUPABASE_CLI_VERSION" functions deploy stripe-webhook --no-verify-jwt --project-ref ${{ secrets.SUPABASE_PROJECT_REF_STAGING }}
-
-      # Presence platform function (A2): the function does its own fail-closed
-      # auth, so --no-verify-jwt matches production. The benign "sdk.ts" read WARN
-      # does not fail the deploy; the smoke test below is the real gate.
-      - name: Deploy presence (staging)
-        env:
-          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
-        run: npx --yes "supabase@$SUPABASE_CLI_VERSION" functions deploy presence --no-verify-jwt --project-ref ${{ secrets.SUPABASE_PROJECT_REF_STAGING }}
-
-      # Free Tools (0136): public report read + unlock, and the internal lead
-      # alert. Each does its own gating (send-lead-alert checks the service key),
-      # so --no-verify-jwt matches the other public functions.
-      - name: Deploy tool-report (staging)
-        env:
-          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
-        run: npx --yes "supabase@$SUPABASE_CLI_VERSION" functions deploy tool-report --no-verify-jwt --project-ref ${{ secrets.SUPABASE_PROJECT_REF_STAGING }}
-
-      - name: Deploy unlock-report (staging)
-        env:
-          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
-        run: npx --yes "supabase@$SUPABASE_CLI_VERSION" functions deploy unlock-report --no-verify-jwt --project-ref ${{ secrets.SUPABASE_PROJECT_REF_STAGING }}
-
-      - name: Deploy send-lead-alert (staging)
-        env:
-          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
-        run: npx --yes "supabase@$SUPABASE_CLI_VERSION" functions deploy send-lead-alert --no-verify-jwt --project-ref ${{ secrets.SUPABASE_PROJECT_REF_STAGING }}
-
-      - name: Deploy site-review (staging)
-        env:
-          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
-        run: npx --yes "supabase@$SUPABASE_CLI_VERSION" functions deploy site-review --no-verify-jwt --project-ref ${{ secrets.SUPABASE_PROJECT_REF_STAGING }}
-
-      - name: Deploy ai-visibility (staging)
-        env:
-          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
-        run: npx --yes "supabase@$SUPABASE_CLI_VERSION" functions deploy ai-visibility --no-verify-jwt --project-ref ${{ secrets.SUPABASE_PROJECT_REF_STAGING }}
-
-      - name: Smoke test — clever-api version handshake
-        run: |
-          sleep 5
-          curl -s --fail -X POST \
-            "https://${{ secrets.SUPABASE_PROJECT_REF_STAGING }}.supabase.co/functions/v1/clever-api" \
-            -H "Content-Type: application/json" \
-            -d '{"type":"version"}' | tee /tmp/version.json
-          grep -q '"build"' /tmp/version.json
-
-      - name: Smoke test — presence catalog + gated route
-        run: |
-          base="https://${{ secrets.SUPABASE_PROJECT_REF_STAGING }}.supabase.co/functions/v1/presence"
-          curl -s --fail "$base/commerce/plans" | grep -q -i 'plan' || { echo "presence /commerce/plans smoke FAILED"; exit 1; }
-          code=$(curl -s -o /dev/null -w "%{http_code}" "$base/connections")
-          [ "$code" = "401" ] || { echo "presence /connections expected 401 (gated), got $code"; exit 1; }
-          # /system loads its route file on first use (lib/lazy.ts), so this also proves the bundle carries those files
-          code=$(curl -s -o /dev/null -w "%{http_code}" "$base/system/health")
-          [ "$code" = "403" ] || { echo "presence /system/health expected 403 (no secret), got $code"; exit 1; }
-          echo "presence smoke passed (catalog 200, /connections 401 gated, /system/health 403 without the secret)."
-
-      - name: Smoke test — Free Tools functions answer and gate
-        run: |
-          base="https://${{ secrets.SUPABASE_PROJECT_REF_STAGING }}.supabase.co/functions/v1"
-          code=$(curl -s -o /dev/null -w "%{http_code}" "$base/tool-report?id=00000000-0000-4000-8000-000000000000")
-          [ "$code" = "404" ] || { echo "tool-report expected 404 for an unknown id, got $code"; exit 1; }
-          code=$(curl -s -o /dev/null -w "%{http_code}" -X POST "$base/send-lead-alert" -H "Content-Type: application/json" -d '{}')
-          [ "$code" = "401" ] || { echo "send-lead-alert expected 401 without the service key, got $code"; exit 1; }
-          code=$(curl -s -o /dev/null -w "%{http_code}" -X POST "$base/site-review" -H "Content-Type: application/json" -d '{"url":"example.com"}')
-          [ "$code" = "403" ] || { echo "site-review expected 403 without a Turnstile token, got $code"; exit 1; }
-          code=$(curl -s -o /dev/null -w "%{http_code}" -X POST "$base/ai-visibility" -H "Content-Type: application/json" -d '{"business_name":"Smoke Test","city":"Burbank"}')
-          [ "$code" = "403" ] || { echo "ai-visibility expected 403 without a Turnstile token, got $code"; exit 1; }
-          echo "Free Tools smoke passed (tool-report 404, send-lead-alert 401, site-review and ai-visibility 403 without Turnstile)."
 
   deploy-production:
     if: github.event_name == 'workflow_dispatch'

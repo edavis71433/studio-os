@@ -12,13 +12,9 @@ on:
       ref:
         description: "Git ref (commit SHA or tag, e.g. v1.0.0-rc1) to redeploy — the known-good version"
         required: true
-      environment:
-        description: "staging or production"
-        required: true
-        default: staging
       confirm:
-        description: "Type rollback-production to roll back PRODUCTION (ignored for staging)"
-        required: false
+        description: "Type rollback-production to roll back PRODUCTION"
+        required: true
 
 env:
   # Pinned, not latest: CLI 3.0.0 (2026-11-02) refuses to deploy without a
@@ -34,7 +30,7 @@ env:
 # commit main was at when it was dispatched, so the newer carries the older's code. A run
 # cancelled while it waited was replaced: don't rerun it.
 concurrency:
-  group: deploy-${{ inputs.environment == 'production' && 'production' || 'staging' }}
+  group: deploy-production
   cancel-in-progress: false
 
 jobs:
@@ -42,29 +38,22 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       # The typed inputs arrive as data, never pasted into a script.
-      - name: Confirmation gate (production only)
+      - name: Confirmation gate
         env:
-          ENVIRONMENT: ${{ github.event.inputs.environment }}
           CONFIRM: ${{ github.event.inputs.confirm }}
         run: |
-          if [ "$ENVIRONMENT" = "production" ] && [ "$CONFIRM" != "rollback-production" ]; then
-            echo "Production rollback requires the confirmation phrase 'rollback-production'. Aborting."; exit 1
+          if [ "$CONFIRM" != "rollback-production" ]; then
+            echo "A rollback requires the confirmation phrase 'rollback-production'. Aborting."; exit 1
           fi
 
       - uses: actions/checkout@v4
         with:
           ref: ${{ github.event.inputs.ref }}
 
+      # Production is the only project (item 112, Nov 9 2026: staging went).
       - name: Resolve target project
         id: target
-        env:
-          ENVIRONMENT: ${{ github.event.inputs.environment }}
-        run: |
-          if [ "$ENVIRONMENT" = "production" ]; then
-            echo "ref=${{ secrets.SUPABASE_PROJECT_REF_PROD }}" >> "$GITHUB_OUTPUT"
-          else
-            echo "ref=${{ secrets.SUPABASE_PROJECT_REF_STAGING }}" >> "$GITHUB_OUTPUT"
-          fi
+        run: echo "ref=${{ secrets.SUPABASE_PROJECT_REF_PROD }}" >> "$GITHUB_OUTPUT"
 
       # Every function deploy.yml deploys. Until Nov 8 2026 this put back three of the
       # eight and left the Free Tools at the version being rolled back from.
