@@ -62,9 +62,12 @@ jobs:
           start_by=$(( $(date +%s) + ${START_MINUTES:-15} * 60 ))
           give_up=$(( $(date +%s) + ${WAIT_MINUTES:-80} * 60 ))
           while :; do
-            # The newest `browser` check from GitHub Actions on this commit, as "status conclusion"; empty when there is none yet.
-            state=$(gh api "repos/$REPO/commits/$SHA/check-runs?check_name=browser&filter=latest&per_page=20" \
-              --jq '[.check_runs[] | select(.name == "browser" and .app.slug == "github-actions")] | sort_by(.started_at) | last | select(. != null) | "\(.status) \(.conclusion // "")"') || state=unreadable
+            # The newest `browser` check from GitHub Actions on this commit, as "status conclusion".
+            # That job starts only once every device has finished, about 25 minutes in, so until
+            # then a device job ("browser on mobile" and the others) shows the check is under way:
+            # "devices". Empty when neither has started yet.
+            state=$(gh api "repos/$REPO/commits/$SHA/check-runs?filter=latest&per_page=100" \
+              --jq '[.check_runs[] | select(.app.slug == "github-actions")] | ([.[] | select(.name == "browser")] | sort_by(.started_at) | last) as $v | if $v != null then "\($v.status) \($v.conclusion // "")" elif any(.[]; .name | startswith("browser on ")) then "devices" else empty end') || state=unreadable
             case "$state" in
               "completed success")
                 echo "The browser check passed on this commit."
@@ -72,6 +75,8 @@ jobs:
               completed*)
                 echo "::error title=Browser check::The browser check on this commit ended ${state#completed }, so nothing was deployed. Fix it or re-run it, then run the deploy again."
                 exit 1 ;;
+              devices)
+                echo "The browser check is running on its devices; waiting for it." ;;
               "")
                 if [ "$(date +%s)" -ge "$start_by" ]; then
                   echo "::error title=Browser check::No browser check started on this commit, so nothing was deployed. Production goes out only from a commit that passed it."

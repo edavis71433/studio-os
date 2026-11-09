@@ -62,7 +62,7 @@ async function gate(answers, env = {}) {
 }
 const passed = await gate(['completed success']);
 ok('a passed browser check lets the deploy go', passed.code === 0 && passed.log.includes('passed'));
-ok('it asks about this commit\'s check called browser', passed.calls[0]?.startsWith('api repos/owner/repo/commits/abc123/check-runs?check_name=browser') && passed.calls[0].includes('--jq'), passed.calls[0]);
+ok('it asks about this commit\'s checks, once per look', passed.calls.length === 1 && passed.calls[0]?.startsWith('api repos/owner/repo/commits/abc123/check-runs?filter=latest&per_page=100') && passed.calls[0].includes('--jq'), passed.calls[0]);
 for (const end of ['failure', 'cancelled', 'timed_out', 'skipped', 'neutral', 'action_required', 'stale']) {
   const r = await gate([`completed ${end}`]);
   ok(`a browser check that ended ${end} stops the deploy`, r.code === 1 && r.log.includes(`::error title=Browser check::The browser check on this commit ended ${end}`));
@@ -73,6 +73,14 @@ const waitedFail = await gate(['in_progress ', 'completed failure']);
 ok('a browser check that fails while waited for stops the deploy', waitedFail.code === 1);
 const lateStart = await gate(['NONE', 'NONE', 'in_progress ', 'completed success'], { START_MINUTES: '5' });
 ok('a browser check that starts late is waited for', lateStart.code === 0 && lateStart.log.includes("hasn't started"));
+// Nov 8: the deploy after PR 182 gave up at 15 minutes while all three devices were still
+// running, because the browser job only starts once they've all finished.
+const devices = await gate(['devices', 'devices', 'completed success'], { START_MINUTES: '0' });
+ok('devices still running count as started, past the start window, and the deploy goes once browser passes', devices.code === 0 && devices.calls.length === 3 && devices.log.includes('running on its devices'));
+const devicesFail = await gate(['devices', 'completed failure'], { START_MINUTES: '0' });
+ok('…and a browser check that fails after its devices stops the deploy', devicesFail.code === 1 && devicesFail.log.includes('ended failure'));
+const devicesForever = await gate(['devices'], { WAIT_MINUTES: '0' });
+ok('…and devices that never finish stop the deploy in the end', devicesForever.code === 1 && devicesForever.log.includes("hadn't passed after 0 minutes"));
 const never = await gate(['NONE'], { START_MINUTES: '0' });
 ok('no browser check on the commit stops the deploy', never.code === 1 && never.log.includes('No browser check started on this commit'));
 const flaky = await gate(['FAIL', 'FAIL', 'completed success']);
@@ -98,7 +106,11 @@ if (hasJq && FILTER) {
   ok('the filter says nothing when there is no check', await jq({ check_runs: [] }) === '');
   ok('the filter takes the newest of two runs', await jq({ check_runs: [run({ started_at: '2026-11-08T11:00:00Z', conclusion: 'failure' }), run({})] }) === 'completed failure');
   ok('a check called browser from another app doesn\'t count', await jq({ check_runs: [run({ app: { slug: 'someone-else' } })] }) === '');
-  ok('a check with another name doesn\'t count', await jq({ check_runs: [run({ name: 'browser on tablet' })] }) === '');
+  ok('a check with another name doesn\'t count', await jq({ check_runs: [run({ name: 'scope' }), run({ name: 'test' })] }) === '');
+  ok('a device job running means the check is under way', await jq({ check_runs: [run({ name: 'scope' }), run({ name: 'browser on tablet', status: 'in_progress', conclusion: null })] }) === 'devices');
+  ok('a finished device job, before the browser job starts, still means under way', await jq({ check_runs: [run({ name: 'browser on mobile' })] }) === 'devices');
+  ok('once the browser job exists, it decides, whatever the devices say', await jq({ check_runs: [run({ name: 'browser on mobile', conclusion: 'failure' }), run({ status: 'in_progress', conclusion: null })] }) === 'in_progress ');
+  ok('a device job from another app doesn\'t count', await jq({ check_runs: [run({ name: 'browser on tablet', app: { slug: 'someone-else' } })] }) === '');
 }
 await Deno.remove(dir, { recursive: true });
 
