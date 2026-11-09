@@ -1096,7 +1096,9 @@ function trouble(){$('main').innerHTML=`<div class="center"><h2>We couldn’t lo
 let REQ_SEQ=0;
 async function load(){
   const seq=++REQ_SEQ;
-  const [r,rv]=await Promise.all([api('/studio/customers'),api('/sales/receivables').catch(()=>null)]);
+  // item 65: "overdue" on the studio's local day, the same day the pipeline and the record use
+  const ymd=(d)=>d.getFullYear()+'-'+('0'+(d.getMonth()+1)).slice(-2)+'-'+('0'+d.getDate()).slice(-2);
+  const [r,rv]=await Promise.all([api('/studio/customers'),api('/sales/receivables?today='+ymd(new Date())).catch(()=>null)]);
   if(seq!==REQ_SEQ)return;
   // item 42: what each customer owes, for the cards (best-effort: a failed read just shows no amount)
   OWED={};OWED_INFO={};for(const i of ((rv&&rv.ok&&rv.body&&rv.body.data&&rv.body.data.items)||[])){if(i&&i.client_id&&(i.state==='upcoming'||i.state==='overdue')){const k=String(i.client_id);OWED[k]=(OWED[k]||0)+(Number(i.amount_cents)||0);

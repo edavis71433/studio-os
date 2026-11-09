@@ -49,13 +49,13 @@ test.describe('B4 — a closed deal never reads as overdue', () => {
     const cards = page.locator('#list .card');
     await expect(cards).toHaveCount(3);
     await expect(cards.first()).toContainText('Acme website');
-    await expect(cards.first()).toContainText('Due: Follow up call');        // an open deal still says Due
+    await expect(cards.first()).toContainText('Overdue: Follow up call');    // an open deal still says it is late (item 65: "Overdue" once its day has passed)
     const closedDone = cards.filter({ hasText: 'Harbor Lane Bakery' });
     await expect(closedDone).not.toContainText('Sign Contract');
-    await expect(closedDone).not.toContainText('Due:');
+    await expect(closedDone).not.toContainText(/Due( today)?:|Overdue:/);
     const closedNext = cards.filter({ hasText: 'Northside Dental site' });
     await expect(closedNext).toContainText('Next: Send the welcome pack');
-    await expect(closedNext).not.toContainText('Due:');
+    await expect(closedNext).not.toContainText(/Due( today)?:|Overdue:/);
   });
 
   test('Table: closed rows sort after open ones under the default sort, with no red step', async ({ page }) => {
@@ -65,7 +65,7 @@ test.describe('B4 — a closed deal never reads as overdue', () => {
     const rows = page.locator('#table tbody tr');
     await expect(rows).toHaveCount(3);
     await expect(rows.first()).toContainText('Acme website');
-    await expect(rows.first().locator('.over')).toContainText('Due: Follow up call');
+    await expect(rows.first().locator('.over')).toContainText('Overdue: Follow up call');
     const closedDone = rows.filter({ hasText: 'Harbor Lane Bakery' });
     await expect(closedDone).not.toContainText('Sign Contract');
     await expect(closedDone.locator('.over')).toHaveCount(0);
@@ -79,7 +79,7 @@ test.describe('B4 — a closed deal never reads as overdue', () => {
     await page.goto('/pipeline.html');
     const closedDone = page.locator('#list .card').filter({ hasText: 'Harbor Lane Bakery' });
     await expect(closedDone).toContainText('Next: Sign Contract');
-    await expect(closedDone).not.toContainText('Due:');
+    await expect(closedDone).not.toContainText(/Due( today)?:|Overdue:/);
   });
 });
 

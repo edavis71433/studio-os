@@ -1984,7 +1984,9 @@ async function openBooking(){
 }
 function bookPickDate(t){
   BOOK.type=t;
-  const now=Date.now();const iso=(ms)=>new Date(ms).toISOString().slice(0,10);const min=iso(now+86400000),max=iso(now+(BOOK.maxDays||30)*86400000);
+  // item 65 (deep pass 6.2): days counted on the client's local calendar; the UTC
+  // slice offered the day after tomorrow as the earliest day from 5pm in Los Angeles
+  const iso=(n)=>{const d=new Date();d.setDate(d.getDate()+n);return d.getFullYear()+'-'+('0'+(d.getMonth()+1)).slice(-2)+'-'+('0'+d.getDate()).slice(-2);};const min=iso(1),max=iso(BOOK.maxDays||30);
   $('main').innerHTML=`<p><a class="link" href="#" id="bk-back">← Back</a></p><header><h1>${esc(t.name)}</h1><p class="sub">Pick a day, then a time.</p></header><section><div class="card"><label for="bk-date" style="display:block;font-weight:600;margin-bottom:6px">Day</label><input id="bk-date" type="date" min="${min}" max="${max}" value="${min}" ${bkInput}><div id="bk-slots" style="margin-top:14px"></div></div></section>`;
   const bb=$('bk-back');if(bb)bb.addEventListener('click',(e)=>{e.preventDefault();openBooking();});
   bookFocusH1();

@@ -44,12 +44,12 @@ ok('the record keeps three buttons in front', /const FRONT=\['act-log','act-mess
 // ── 42 ──
 const cust = read('customers.html');
 ok('a card shows what they owe and what is waiting; no "all clear" badge, no duplicate Open', /Owes \$\{esc\(fmtOwed\(owed\)\)\}/.test(cust) && /requests'\} waiting/.test(cust) && !/'all clear'\}<\/span><\/div>\s*<div class="acts">/.test(cust) && !/<button class="btn" data-open=/.test(cust));
-ok('owed comes from the same open invoices as Who owes you', /api\('\/sales\/receivables'\)\.catch\(\(\)=>null\)/.test(cust) && /i\.state==='upcoming'\|\|i\.state==='overdue'/.test(cust));
+ok('owed comes from the same open invoices as Who owes you', /api\('\/sales\/receivables\?today='\+ymd\(new Date\(\)\)\)\.catch\(\(\)=>null\)/.test(cust) && /i\.state==='upcoming'\|\|i\.state==='overdue'/.test(cust));
 
 // ── 45 ──
 const crm = read('crm.html');
-ok('opened by the customer\'s site alone, the timeline starts beside the record read', /if\(q0\.get\('client'\)&&!q0\.get\('deal'\)&&!q0\.get\('project'\)&&!q0\.get\('contact'\)&&!q0\.get\('client_id'\)\) ACT_EARLY=api\('\/crm\/activity\?'\)/.test(crm));
-ok('…and the first timeline load uses that read', /const r=\(early&&scopedCustomer&&\(await early\)\)\|\|await api\('\/crm\/activity\?'\+q\.join\('&'\)\);/.test(crm));
+ok('opened by the customer\'s site alone, the timeline starts beside the record read', /if\(q0\.get\('client'\)&&!q0\.get\('deal'\)&&!q0\.get\('project'\)&&!q0\.get\('contact'\)&&!q0\.get\('client_id'\)\) ACT_EARLY=api\('\/crm\/activity\?today='\+recTodayYmd\(\)\)/.test(crm));   // item 65: with the local day
+ok('…and the first timeline load uses that read', /const r=\(early&&scopedCustomer&&\(await early\)\)\|\|await api\('\/crm\/activity\?'\+q\.concat\('today='\+recTodayYmd\(\)\)\.join\('&'\)\);/.test(crm));
 
 console.log(`\n${pass} passed, ${fail} failed`);
 if (fail) { console.log('Failed:\n  ' + failed.join('\n  ')); Deno.exit(1); }
