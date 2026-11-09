@@ -121,6 +121,26 @@ export async function createContactAndClient(
 const RESEND_INBOUND_DOMAIN = Deno.env.get('RESEND_INBOUND_DOMAIN') || '';
 const PLATFORM_REPLY_TO = Deno.env.get('PLATFORM_REPLY_TO') || 'eric@davisdigitalstudio.com';
 
+// ROADMAP item 72: one plain address — no display name, no list, no spaces.
+const PLAIN_ADDRESS = /^[^\s@<>()[\]",;:]+@[^\s@<>()[\]",;:]+\.[^\s@<>()[\]",;:]+$/;
+/** The Reply-To a send carries. opts.replyTo wins: mail a site sends its OWN
+ *  customers (a booking confirmation, a reminder, a review request) passes the
+ *  business owner's email (lib/service_bridge.ts ownerReplyTo), so a salon's
+ *  customer who hits Reply reaches the salon, not the platform. It counts only
+ *  when it is one plain address and not one of the inbound domain's own: a
+ *  badly filled-in identity card must never make Resend refuse a booking
+ *  confirmation, and an inbound address is only ever reached through siteId,
+ *  which names the site the reply belongs to. Otherwise the rule is the one
+ *  this send always had: the site's inbound address for site conversation mail
+ *  (opts.siteId), else the platform's human reply-to. Pure; exported for
+ *  tests/presence/owner_reply_to_test.mjs. */
+export function replyToFor(opts?: { siteId?: string; replyTo?: string }): string {
+  const own = String(opts?.replyTo || '').trim();
+  const inbound = RESEND_INBOUND_DOMAIN && own.toLowerCase().endsWith(`@${RESEND_INBOUND_DOMAIN.toLowerCase()}`);
+  if (own.length <= 254 && PLAIN_ADDRESS.test(own) && !inbound) return own;
+  return (opts?.siteId && RESEND_INBOUND_DOMAIN) ? `${opts.siteId}@${RESEND_INBOUND_DOMAIN}` : PLATFORM_REPLY_TO;
+}
+
 // ── the text/plain alternative ───────────────────────────────────────────────
 // A plain-text part improves deliverability (spam-scoring) and serves text-only
 // clients — but only if it READS. Derived from the body HTML, and the structure
@@ -169,7 +189,7 @@ export function htmlToPlainText(html: string | null | undefined): string {
     .trim();
 }
 
-export async function sendEmail(to: string, subject: string, html: string, brand?: EmailBrand, opts?: { critical?: boolean; siteId?: string; headers?: Record<string, string> }): Promise<boolean> {
+export async function sendEmail(to: string, subject: string, html: string, brand?: EmailBrand, opts?: { critical?: boolean; siteId?: string; replyTo?: string; headers?: Record<string, string> }): Promise<boolean> {
   if (!RESEND_KEY) { console.warn('[commerce] RESEND_KEY unset — skipping email'); return false; }
   try {
     // Honor the suppression list at the ONE send point. critical:true =
@@ -199,11 +219,12 @@ export async function sendEmail(to: string, subject: string, html: string, brand
       // that site's inbound address (<siteId>@<domain>) so a customer's REPLY lands
       // back on /email/inbound and onto their conversation. Platform mail
       // (scheduler, deletion, commerce, invites…) never passes siteId and keeps the
-      // human platform reply-to. opts.headers are spread AFTER the List-Unsubscribe
-      // headers (e.g. the inbound ack's Auto-Submitted:auto-replied).
+      // human platform reply-to. Item 72: opts.replyTo (the business owner's own
+      // email) comes before both — see replyToFor. opts.headers are spread AFTER
+      // the List-Unsubscribe headers (e.g. the inbound ack's Auto-Submitted:auto-replied).
       body: JSON.stringify({
         from: EMAIL_FROM, to, subject, html: wrapped, text,
-        reply_to: (opts?.siteId && RESEND_INBOUND_DOMAIN) ? `${opts.siteId}@${RESEND_INBOUND_DOMAIN}` : PLATFORM_REPLY_TO,
+        reply_to: replyToFor(opts),
         headers: {
           'List-Unsubscribe': `<${unsubUrl}>, <mailto:support@davisdigitalstudio.com?subject=unsubscribe>`,
           'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click',

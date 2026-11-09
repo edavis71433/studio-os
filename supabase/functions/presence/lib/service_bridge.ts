@@ -421,6 +421,21 @@ export async function studioRecipient(agencySiteId: string): Promise<{ to: strin
   return { to, ownerClientId };
 }
 
+/** ROADMAP item 72: where a site's OWN customer's reply goes. A booking
+ *  confirmation, a reminder or a review request from a salon's site says "just
+ *  reply", and that reply belongs to the salon — so it is the site owner's own
+ *  address, read by the chain above (the identity card's email, else the owner's
+ *  clients row): the inbox this chain already sends that site's operator mail
+ *  to. Any site, not just a studio's. Pass it as sendEmail's opts.replyTo.
+ *  Never the site's inbound address (opts.siteId): that door lands mail only from
+ *  known contacts and clients, so a stranger who booked would be dropped.
+ *  '' when the site has no owner address or a read failed — sendEmail then keeps
+ *  the reply-to it always had. Never throws: a confirmation must not fail over
+ *  where its replies go. */
+export async function ownerReplyTo(siteId: string): Promise<string> {
+  try { return siteId ? (await studioRecipient(siteId)).to : ''; } catch { return ''; }
+}
+
 const HEADLINE: Record<ClientActionKind, string> = {
   client_message: 'New message from',
   client_upload: 'New file from',

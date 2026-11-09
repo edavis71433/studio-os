@@ -12,6 +12,7 @@ import { getTemplate } from '../lib/render.ts';
 import { serializeDraft } from '../lib/serializer.ts';
 import { sendEmail } from '../commerce/account.ts';
 import { loadEmailBrand } from '../lib/email_brand.ts';
+import { ownerReplyTo } from '../lib/service_bridge.ts';
 import { isStudioSide, studioDenied } from './projects.ts';
 import { buildActivityDetail } from '../crm/deal_activity.ts';
 import { decideWritePlan } from '../connected/writestore.ts';
@@ -343,11 +344,17 @@ async function acknowledgeEnquiry(siteId: string, sub: { name: string; email: st
   const { automationSettingsFor } = await import('../commerce/lifecycle.ts');   // lazy: lifecycle pulls in the whole sweep
   const auto = await automationSettingsFor(siteId);
   if (!auto.auto_ack_enquiries) return false;
-  const ident = await svc(`presence_identity?site_id=eq.${siteId}&select=business_name&limit=1`);
+  const [ident, brand, replyTo] = await Promise.all([
+    svc(`presence_identity?site_id=eq.${siteId}&select=business_name&limit=1`),
+    loadEmailBrand(siteId),
+    ownerReplyTo(siteId),
+  ]);
   const studio = String(ident.json?.[0]?.business_name || '').trim();
-  const brand = await loadEmailBrand(siteId);
   const copy = enquiryAckCopy({ name: sub.name, studio: studio || brand.name });
-  return await sendEmail(sub.email, copy.subject, `<p>${esc(copy.sentence)}</p>${copy.footer ? `<p style="color:#6b6478;font-size:13px">${esc(copy.footer)}</p>` : ''}`, brand, { critical: true, siteId });   // they wrote in; this is the reply they are waiting for
+  // Item 72: an answer to this reaches the owner's own email. Someone writing in for
+  // the first time is no contact yet, so the site's inbound address (siteId, left as
+  // the fallback) dropped their answer as a stranger's.
+  return await sendEmail(sub.email, copy.subject, `<p>${esc(copy.sentence)}</p>${copy.footer ? `<p style="color:#6b6478;font-size:13px">${esc(copy.footer)}</p>` : ''}`, brand, { critical: true, siteId, replyTo });   // they wrote in; this is the reply they are waiting for
 }
 
 async function notifyOwnerOfLead(siteId: string, sub: { form_kind: string; name: string; email: string; phone: string; message: string }) {
