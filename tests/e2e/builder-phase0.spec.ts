@@ -173,6 +173,19 @@ test.describe('one tip at a time', () => {
     await expect(tip).toHaveCount(0);      // Files has a tip too, but not on this visit
     await expect(page.locator('#view-media')).toBeVisible();
   });
+  // A tip gets its "show" a frame after it's added, and leaving the view inside that frame
+  // missed it: it came up over the next view (main's tablet run, Nov 8, twice in a row).
+  test('a tip still on its way in is retired too, and stays unseen for another visit', async ({ page }) => {
+    await installApp(page, { api: API });
+    await page.goto('/presence.html#faqs');                // a view with no tip of its own
+    await expect(page.locator('#view-faqs')).toBeVisible();
+    const added = await page.evaluate(() => { const ok = (window as any).ddsHint('probe-tip', 'A tip for this view'); (window as any).go('media'); return ok; });
+    expect(added).toBe(true);
+    await expect(page.locator('.dds-hint.dds-live')).toHaveCount(0);
+    await page.waitForTimeout(300);                        // past the frame that would have shown it
+    await expect(page.locator('.dds-hint.dds-live')).toHaveCount(0);
+    expect(await page.evaluate(() => JSON.parse(localStorage.getItem('dds-hints') || '{}')['probe-tip'])).toBeUndefined();
+  });
 });
 
 test.describe('the preview stage', () => {

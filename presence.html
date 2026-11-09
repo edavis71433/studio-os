@@ -2161,7 +2161,13 @@ let HINT_SHOWN = false;   // one tip per visit: three in a row is a lecture
 function contextHint(view) {
   // A tip explains the view it opened on, so leaving that view retires it. It was
   // staying up over the next tab, on top of whatever sat at the bottom of the page.
-  document.querySelectorAll(".dds-hint.dds-live.show .x").forEach((x) => x.click());
+  // A tip gets its "show" one frame after it's added; leaving inside that frame missed
+  // it, and it came up over the next view (main's tablet run, Nov 8). One not yet
+  // shown just goes, unseen, so it can teach another visit.
+  document.querySelectorAll(".dds-hint.dds-live").forEach((h) => {
+    if (!h.classList.contains("show")) { h.remove(); return; }
+    const x = h.querySelector(".x"); if (x) x.click();
+  });
   // A finger can't double-click: on a touch screen the editor's tip says to tap (list item 31).
   const fingers = (() => { try { return matchMedia("(hover: none), (pointer: coarse)").matches; } catch (_) { return false; } })();
   const h = view === "design" && fingers ? TOUCH_DESIGN_HINT : VIEW_HINTS[view];
