@@ -117,7 +117,7 @@
   /* Same pinned action column as contacts.html — "Manage their website" is the
      last cell and cannot wrap, so it is what a too-narrow table loses first.
      Kept in sync with contacts.html by hand (as .tscroll already is). */
-  td.c-email{overflow-wrap:anywhere}
+  td.c-email{overflow-wrap:anywhere;min-width:12rem}   /* bold redesign, part 2: on a phone the address broke after every few letters */
   th.acts,td.acts{width:1%;white-space:nowrap}
   /* Tablet-and-up only — see contacts.html: pinned on a phone the action cell
      covers the columns it sits beside. Phones default to Cards. */
@@ -172,6 +172,137 @@
   .btn{background:var(--dds-grad-btn);color:var(--dds-on-p,#fff);border-radius:999px;font-weight:600;box-shadow:0 6px 16px -8px color-mix(in srgb,var(--p) 70%,transparent)}
   .btn.ghost{background:var(--card);border:1px solid var(--dds-line-strong,#d6d4e2);color:var(--ink);box-shadow:none}
   .av{border-radius:50%;background:var(--dds-grad-brand);color:#fff}
+
+  /* ══ Bold redesign, part 2 (Nov 2026): Customers and People. The title sits
+     on the page, the views are chips with counts, rows carry an avatar, and a
+     row opens a preview beside the list (a sheet on phones). ══ */
+  .lhead{background:none;border:0;box-shadow:none;padding:0;margin-bottom:var(--dds-s4,16px)}
+  .lrow1{gap:10px;flex-wrap:wrap}
+  .lrow1 .viewdd{flex:0 1 auto}
+  .lrow1 .sp{flex:1 1 0;align-self:stretch;min-height:36px}
+  .lrow1 .seg.tabs2{margin:0}
+  .ptitle{font-family:var(--serif);font-weight:600;font-size:28px;line-height:1.15;letter-spacing:-.015em;padding:4px 8px}
+  @media (max-width:760px){.ptitle{font-size:19px;line-height:1.2}}
+  .lmeta{margin:2px 0 0 var(--dds-s2,8px);font-size:13px;color:var(--soft)}
+  .bar{margin-bottom:var(--dds-s3,12px)}
+  .trow{display:flex;align-items:center;gap:10px 16px;flex-wrap:wrap;margin:0 0 var(--dds-s3,12px)}
+  .chips{display:flex;gap:6px;flex-wrap:wrap;flex:1 1 320px;min-width:0}
+  .chip{font:inherit;font-size:13px;font-weight:500;border:1px solid var(--line);background:var(--card);color:var(--soft);border-radius:999px;padding:6px 12px;cursor:pointer;display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
+  .chip .n{font-size:11.5px;font-weight:600;color:var(--faint);font-variant-numeric:tabular-nums}
+  .chip:hover{border-color:color-mix(in srgb,var(--p) 45%,var(--line));color:var(--ink)}
+  .chip[aria-pressed="true"]{background:var(--p-soft);border-color:transparent;color:var(--p);font-weight:600}
+  .chip[aria-pressed="true"] .n{color:var(--p)}
+  .trow .ltools{margin:0;gap:4px 12px;flex:0 1 auto}
+  @media (max-width:760px){.chips{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;flex-basis:100%}.chips::-webkit-scrollbar{display:none}}
+  /* the table: an avatar beside the name, and the previewed row stays lit */
+  .nm{display:flex;align-items:center;gap:12px;min-width:0}
+  .av.sm{width:34px;height:34px;font-size:12.5px;letter-spacing:.02em}
+  tbody tr.pv-on,tbody tr.pv-on td.acts{background:var(--p-soft)}
+  /* the cards: one list of rows */
+  /* one grid for every row (subgrid), so the columns line up down the list; the
+     zero-width edge columns plus the gap are the side padding */
+  .clist{display:grid;grid-template-columns:0 40px minmax(0,1.3fr) minmax(0,1fr) auto auto 0;column-gap:16px;background:var(--card);border:1px solid var(--line);border-radius:var(--dds-r-lg,16px);box-shadow:var(--shadow);overflow:hidden}
+  .clist .cust{grid-column:1/-1;display:grid;grid-template-columns:subgrid;align-items:center;row-gap:4px;margin:0;border:0;border-bottom:1px solid var(--line);border-radius:0;box-shadow:none;padding:12px 0;cursor:pointer}
+  @supports not (grid-template-columns:subgrid){.clist{display:block}.clist .cust{grid-template-columns:inherit;column-gap:16px}}
+  .cust .av{grid-column:2} .cust .who{grid-column:3} .cust .what{grid-column:4} .cust .facts,.cust .nofacts{grid-column:5} .cust .cacts{grid-column:6}
+  .clist .cust:last-child{border-bottom:0}
+  .clist .cust:hover,.clist .cust.pv-on{background:var(--p-soft);border-color:var(--line)}
+  .cust .av{width:40px;height:40px;font-size:13.5px;letter-spacing:.02em}
+  .cust .who,.cust .what{display:flex;flex-direction:column;align-items:flex-start;min-width:0}
+  .cust .m,.cust .m1{max-width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .cust .m1{font-size:13.5px;color:var(--ink)}
+  .cust .what .m{margin-top:2px}
+  .nlink{font:inherit;color:var(--ink);background:none;border:0;padding:0;text-align:left;cursor:pointer;max-width:100%}
+  .nlink .n{display:block;max-width:100%;font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .nlink:hover .n{color:var(--p)}
+  .cust .facts{margin:0;justify-content:flex-end}
+  .fact.owe.late{color:var(--bad);background:color-mix(in srgb,var(--bad) 12%,transparent)}
+  .cust .cacts{display:flex;gap:6px;justify-content:flex-end}
+  @media (max-width:900px){
+    .clist{grid-template-columns:0 40px minmax(0,1fr) auto 0}
+    .cust .what{display:none}
+    .cust .facts,.cust .nofacts{grid-column:4}
+    .cust .cacts{grid-column:3/5;justify-content:flex-start;margin-top:4px}
+  }
+  /* beside the preview the list keeps what tells rows apart: the preview has
+     the record and the website, so the row actions and the email go */
+  @media (min-width:1180px){
+    body.cprev-open .clist{grid-template-columns:0 40px minmax(0,1.3fr) minmax(0,1fr) auto 0}
+    body.cprev-open .cust .cacts,body.cprev-open th.acts,body.cprev-open td.acts,
+    body.cprev-open table[aria-label="Customers"] [data-col="email"],body.cprev-open table[aria-label="Customers"] [data-col="project_count"]{display:none}
+    body.cprev-open table{min-width:0}
+  }
+  /* a phone: the title and + Add on one line, Customers | People across the next */
+  @media (max-width:760px){
+    .lrow1 .seg.tabs2{order:3;flex:1 1 100%}
+    .lrow1 .seg.tabs2 button{flex:1}
+  }
+  /* "+ Add" up to a tablet's width, so the title line holds; the rest is still read out */
+  @media (max-width:1100px){#addCust .long{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}}
+  a.btn{text-decoration:none}
+  /* People: names read as names, not underlined links; a phone gets rows */
+  table[aria-label="People"] thead th{padding:var(--dds-s3,12px) var(--dds-s4,16px)}
+  table[aria-label="People"] td a{color:var(--ink);text-decoration:none}
+  table[aria-label="People"] td a:hover{color:var(--p);text-decoration:underline}
+  table[aria-label="People"] td[data-col="name"] a{font-weight:600}
+  table[aria-label="People"] td a[href^="mailto:"]{color:var(--p)}
+  @media (max-width:760px){
+    .tscroll.people{overflow:visible}
+    table[aria-label="People"]{min-width:0}
+    table[aria-label="People"] thead{display:none}
+    table[aria-label="People"] tbody tr{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;border-bottom:1px solid var(--line)}
+    table[aria-label="People"] tbody tr:last-child{border-bottom:0}
+    table[aria-label="People"] tbody td{border-bottom:0}
+    table[aria-label="People"] td[data-col="email"],table[aria-label="People"] td[data-col="phone"],table[aria-label="People"] td.acts{display:none}
+  }
+  .pill.lead{background:var(--dds-up,#f7f6fb);color:var(--soft);text-transform:none}
+  /* the preview: a panel beside the list, laid over it below 1180px, a sheet on phones */
+  dialog.cprev{position:fixed;z-index:2147483002;inset:var(--dds-side-gap,12px) var(--dds-side-gap,12px) var(--dds-side-gap,12px) auto;margin:0;padding:0;width:min(420px,calc(100vw - 24px));height:auto;max-width:none;max-height:none;flex-direction:column;background:var(--card);color:var(--ink);border:1px solid var(--line);border-radius:var(--dds-r-xl,20px);box-shadow:0 24px 60px -12px rgba(23,21,34,.30),0 2px 6px rgba(23,21,34,.06);overflow:hidden;animation:cp-in .18s ease-out}
+  dialog.cprev[open]{display:flex}
+  dialog.cprev::backdrop{background:rgba(19,17,32,.36)}
+  /* on the dark canvas the light scrim barely shows; a darker one sets the box apart */
+  @media (prefers-color-scheme:dark){:root:not([data-theme="light"]) dialog.cprev::backdrop{background:rgba(4,3,10,.6)}}
+  :root[data-theme="dark"] dialog.cprev::backdrop{background:rgba(4,3,10,.6)}
+  @keyframes cp-in{from{transform:translateX(16px);opacity:0}to{transform:none;opacity:1}}
+  @keyframes cp-up{from{transform:translateY(24px);opacity:0}to{transform:none;opacity:1}}
+  @media (min-width:1180px){body.cprev-open .wrap{padding-right:calc(420px + var(--dds-side-gap,12px) * 2 + 8px)}}
+  @media (max-width:760px){dialog.cprev{inset:auto 0 0 0;width:auto;max-height:88dvh;border-radius:20px 20px 0 0;border-bottom:0;animation-name:cp-up}}
+  .cp-head{display:flex;align-items:center;gap:12px;padding:18px 18px 12px}
+  .cp-head .av{width:48px;height:48px;font-size:17px;flex:0 0 auto}
+  .cp-t{flex:1;min-width:0}
+  .cp-t h2{font-family:var(--sans);font-size:18px;font-weight:650;line-height:1.25;overflow-wrap:anywhere}
+  .cp-t h2:focus{outline:none}
+  .cp-t p{font-size:12.5px;color:var(--soft);margin-top:2px;overflow-wrap:anywhere}
+  .cp-x{flex:0 0 auto;width:36px;height:36px;border-radius:50%;border:0;background:transparent;color:var(--soft);font-size:22px;line-height:1;cursor:pointer}
+  .cp-x:hover{background:var(--dds-up,#f7f6fb);color:var(--ink)}
+  .cp-body{flex:1;overflow:auto;padding:0 18px 12px}
+  .cp-acts{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:4px 0 14px}
+  .cp-acts>*{display:flex;flex-direction:column;align-items:center;gap:6px;padding:12px 6px 10px;border-radius:var(--dds-r,12px);background:var(--dds-up,#f7f6fb);color:var(--ink);font:inherit;font-size:12.5px;font-weight:600;text-decoration:none;border:1px solid transparent;cursor:pointer}
+  .cp-acts>*:hover{border-color:color-mix(in srgb,var(--p) 40%,transparent);color:var(--p)}
+  .cp-acts svg{width:20px;height:20px;color:var(--p)}
+  .cp-facts{background:var(--dds-up,#f7f6fb);border-radius:var(--dds-r,12px);padding:4px 14px;margin:0 0 16px}
+  .cp-facts>div{display:grid;grid-template-columns:92px minmax(0,1fr);gap:10px;padding:8px 0;font-size:13px;border-bottom:1px solid var(--line)}
+  .cp-facts>div:last-child{border-bottom:0}
+  .cp-facts dt{color:var(--soft)}
+  .cp-facts dd{margin:0;font-weight:500;overflow-wrap:anywhere}
+  .cp-facts dd.warn{color:var(--warn)} .cp-facts dd.bad{color:var(--bad)}
+  .cp-facts a{color:var(--p);text-decoration:none;font-weight:600}
+  .cp-facts a:hover{text-decoration:underline}
+  .cp-wait{display:grid;gap:10px;padding:12px 14px}
+  .cp-l{font-family:var(--sans);font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--faint);margin:0 0 4px}
+  .cp-latest{list-style:none;padding:0;margin:0}
+  .cp-latest li{display:flex;gap:12px;justify-content:space-between;font-size:13px;padding:8px 0;border-bottom:1px solid var(--line)}
+  .cp-latest li:last-child{border-bottom:0}
+  .cp-latest time{color:var(--faint);white-space:nowrap;font-size:12px}
+  .cp-none{font-size:13px;color:var(--soft);padding:6px 0}
+  .cp-retry{font:inherit;font-weight:600;color:var(--p);background:none;border:0;padding:0;cursor:pointer}
+  .cp-foot{padding:12px 18px 16px;border-top:1px solid var(--line)}
+  .cp-open{display:flex;align-items:center;justify-content:center;gap:6px;width:100%;padding:11px 16px;border-radius:999px;border:1px solid var(--dds-line-strong,#d6d4e2);background:var(--card);color:var(--ink);font-weight:600;font-size:14px;text-decoration:none}
+  .cp-open:hover{border-color:var(--p);color:var(--p)}
+  .cp-skel{height:12px;border-radius:6px;background:linear-gradient(90deg,var(--dds-up,#f7f6fb),color-mix(in srgb,var(--ink) 8%,var(--card)),var(--dds-up,#f7f6fb));background-size:200% 100%;animation:cp-sh 1.2s linear infinite}
+  @keyframes cp-sh{to{background-position:-200% 0}}
+  @media (prefers-reduced-motion:reduce){dialog.cprev,.cp-skel{animation:none}}
+  @media (pointer:coarse){.chip{min-height:44px}.cp-x{width:44px;height:44px}.cp-acts>*{min-height:64px}.nlink{min-height:44px}}
 </style>
 <link rel="stylesheet" href="/shell.css"><script src="/shell.js" defer></script>
 </head>
@@ -267,21 +398,31 @@ document.addEventListener('click',(e)=>{
 });
 
 // ── list-view state: fixed views (D3) · display · sort · search ──────────────
-const VIEWS=[['all','All customers'],['active','Active'],['attention','Needs attention'],['on_hold','On hold'],['done','Complete / Archived']];
+// Bold redesign, part 2 (Nov 2026): "Needs you" (Home's word for it) and "Owes
+// you" (open invoices, /sales/receivables) join the views, and the chips under
+// the search are the same views with their counts.
+const VIEWS=[['all','All customers'],['attention','Needs you'],['owes','Owes you'],['active','Active'],['on_hold','On hold'],['done','Complete / Archived']];
 const VIEW_LABEL=Object.fromEntries(VIEWS);
+const CHIP_LABEL={all:'All',attention:'Needs you',owes:'Owes you',active:'Active',on_hold:'On hold',done:'Done'};
 let VIEWNAME='all',Q='';
-const viewMatch=(c)=>{
+const matchView=(v,c)=>{
   const st=String(c.status||'active');
-  if(VIEWNAME==='active')return st==='active';
-  if(VIEWNAME==='attention')return Number(c.open_support||0)>0;
-  if(VIEWNAME==='on_hold')return st==='on_hold';
-  if(VIEWNAME==='done')return st==='complete'||st==='archived';
+  if(v==='active')return st==='active';
+  if(v==='attention')return Number(c.open_support||0)>0;
+  if(v==='owes')return Number(OWED[String(c.client_id)]||0)>0;
+  if(v==='on_hold')return st==='on_hold';
+  if(v==='done')return st==='complete'||st==='archived';
   return true;
 };
-// Table ⇄ Cards display choice, persisted; small screens default to Cards.
+const viewMatch=(c)=>matchView(VIEWNAME,c);
+// two letters for an avatar: "Juniper Floral Co." → JF, "Marlow’s Kitchen" → MK
+const ini2=(s)=>{const w=String(s||'').trim().split(/\s+/).filter(x=>/^[\p{L}\p{N}]/u.test(x));if(!w.length)return '?';return (Array.from(w[0])[0]+(w[1]?Array.from(w[1])[0]:'')).toUpperCase();};
+// Table ⇄ Cards display choice, persisted. Since the bold redesign (part 2)
+// the rows ("Cards") are the default on every screen; the Table is one click
+// away and remembered.
 const DISPLAY_KEY='dds-display:customers';
 let DISPLAY=(function(){try{const v=localStorage.getItem(DISPLAY_KEY);if(v==='table'||v==='cards')return v;}catch(_){/* storage may be denied */}
-  return (window.matchMedia&&window.matchMedia('(max-width:759px)').matches)?'cards':'table';})();
+  return 'cards';})();
 function setDisplay(v){DISPLAY=v;try{localStorage.setItem(DISPLAY_KEY,v);}catch(_){/* */}render();}
 // sortable columns (the fields /studio/customers actually returns)
 const COLS=[
@@ -396,27 +537,54 @@ function sortedRows(){
   return list;
 }
 
-const lmetaText=(count)=>{
+// the line under the title: how many, what they owe you, how fresh (and the sort, in the table)
+const lmetaText=(list)=>{
+  if(TAB==='people'){
+    if(!PEOPLE||PEOPLE_FAILED)return '';
+    const not=PEOPLE.filter(p=>!p.client_id).length;
+    return `${PEOPLE.length} ${PEOPLE.length===1?'person':'people'}${not?` · ${not} not ${not===1?'a customer':'customers'} yet`:''}`;
+  }
+  const count=list.length;
+  const owed=list.reduce((a,c)=>a+(Number(OWED[String(c.client_id)])||0),0);
   const sortCol=COLS.find(x=>x[0]===SORT.key)||COLS[0];
-  return `${count} customer${count===1?'':'s'} · ${updatedLabel()}${DISPLAY==='table'?` · Sorted by ${sortCol[1]} — ${SORT.dir>0?'ascending':'descending'}`:''}`;
+  return `${count} customer${count===1?'':'s'}${owed?` · ${fmtOwed(owed)} owed to you`:''} · ${updatedLabel()}${DISPLAY==='table'?` · Sorted by ${sortCol[1]} — ${SORT.dir>0?'ascending':'descending'}`:''}`;
 };
-function headerHtml(count){
+// Bold redesign, part 2: the title sits on the page (the view menu IS the
+// title), with Customers | People and the add button beside it.
+function headerHtml(list){
+  const people=TAB==='people';
   return `<div class="lhead">
     <div class="lrow1">
-      <span class="obj-ic" aria-hidden="true">🏢</span>
-      <div class="viewdd">
+      ${people?'<p class="ptitle">People</p>':`<div class="viewdd">
         <button id="viewBtn" aria-haspopup="listbox" aria-expanded="false" aria-label="Customers view: ${esc(viewLabel())}"><span class="vl">${esc(viewLabel())}</span> <span class="car" aria-hidden="true">▾</span></button>
         <div id="viewMenu" role="listbox" aria-label="Customer views" hidden></div>
-      </div>
-      <div class="seg" role="group" aria-label="Display as">
-        <button id="dispTable" aria-pressed="${DISPLAY==='table'?'true':'false'}">Table</button>
-        <button id="dispCards" aria-pressed="${DISPLAY==='cards'?'true':'false'}">Cards</button>
-      </div>
-      <button class="lbtn" id="refreshBtn" aria-label="Refresh" title="Refresh">↻</button>
+      </div>`}
+      <span class="sp"></span>
+      ${tabsHtml()}
+      ${people?'<a class="btn ghost" href="/contacts.html">Add or edit people</a>':'<button class="btn" id="addCust" title="Set up an existing customer with their own workspace and a sign-in invitation">+ Add<span class="long"> a customer</span></button>'}
     </div>
-    <div class="lmeta" id="lmeta">${esc(lmetaText(count))}</div>
-    ${TAB==='customers'?`<div class="ltools"><button class="lbtn txt" id="saveView" type="button">Save view</button>${CURVIEW?'<button class="lbtn txt" id="dropView" type="button">Remove view</button>':''}${DISPLAY==='table'?'<span class="colsdd"><button class="lbtn txt" id="colsBtn" type="button" aria-haspopup="true" aria-expanded="false">Columns</button></span>':''}</div>`:''}
+    <div class="lmeta" id="lmeta">${esc(lmetaText(list))}</div>
   </div>`;
+}
+// the views as chips with their counts — an empty one is noise (the view menu still lists every view)
+function chipsHtml(){
+  const out=[];
+  for(const [v,l] of Object.entries(CHIP_LABEL)){
+    const n=v==='all'?CUSTOMERS.length:CUSTOMERS.filter(c=>matchView(v,c)).length;
+    const on=!CURVIEW&&VIEWNAME===v;
+    if(!n&&!on&&v!=='all')continue;
+    out.push(`<button type="button" class="chip" data-chip="${v}" aria-pressed="${on?'true':'false'}">${esc(l)} <span class="n">${n}</span></button>`);
+  }
+  return `<div class="chips" role="group" aria-label="Show">${out.join('')}</div>`;
+}
+function toolsHtml(){
+  return `<div class="trow">${chipsHtml()}<div class="ltools">
+    <div class="seg" role="group" aria-label="Display as"><button id="dispTable" aria-pressed="${DISPLAY==='table'?'true':'false'}">Table</button><button id="dispCards" aria-pressed="${DISPLAY==='cards'?'true':'false'}">Cards</button></div>
+    ${DISPLAY==='table'?'<span class="colsdd"><button class="lbtn txt" id="colsBtn" type="button" aria-haspopup="true" aria-expanded="false">Columns</button></span>':''}
+    <button class="lbtn txt" id="saveView" type="button">Save view</button>${CURVIEW?'<button class="lbtn txt" id="dropView" type="button">Remove view</button>':''}
+    <button class="lbtn txt" id="importCsv" type="button">Import CSV</button>
+    <button class="lbtn" id="refreshBtn" aria-label="Refresh" title="Refresh">↻</button>
+  </div></div>`;
 }
 
 function tableHtml(list){
@@ -424,14 +592,14 @@ function tableHtml(list){
   const allOn=list.length>0&&list.every(c=>PICKED.has(String(c.client_id)));
   const ths=`<th scope="col" class="pick"><input type="checkbox" id="pickAll" aria-label="Select all ${list.length} shown"${allOn?' checked':''}></th>`+shownCols().map(([k,label])=>{
     const on=SORT.key===k;
-    return `<th scope="col"${on?` aria-sort="${SORT.dir>0?'ascending':'descending'}"`:''}><button type="button" class="thb" data-sort="${k}">${esc(label)}${on?`<span class="arrow" aria-hidden="true">${SORT.dir>0?'▲':'▼'}</span>`:''}</button></th>`;
+    return `<th scope="col" data-col="${k}"${on?` aria-sort="${SORT.dir>0?'ascending':'descending'}"`:''}><button type="button" class="thb" data-sort="${k}">${esc(label)}${on?`<span class="arrow" aria-hidden="true">${SORT.dir>0?'▲':'▼'}</span>`:''}</button></th>`;
   }).join('')+'<th scope="col" class="acts"><span class="sr-only">Actions</span></th>';
   const trs=list.map(c=>{
     const att=Number(c.open_support||0);
     const st=String(c.status||'active');
-    const CELL={name:()=>`<td><span class="n">${esc(c.name||'Customer')}</span>${c.person_name?`<span class="pn">${esc(c.person_name)}</span>`:''}</td>`,email:()=>`<td class="c-email">${esc(c.email||'—')}</td>`,project_count:()=>`<td class="num">${Number(c.project_count||0)}</td>`,
+    const CELL={name:()=>`<td data-col="name"><span class="nm"><span class="av sm" aria-hidden="true">${esc(ini2(c.name))}</span><span><span class="n">${esc(c.name||'Customer')}</span>${c.person_name?`<span class="pn">${esc(c.person_name)}</span>`:''}</span></span></td>`,email:()=>`<td class="c-email" data-col="email">${esc(c.email||'—')}</td>`,project_count:()=>`<td class="num" data-col="project_count">${Number(c.project_count||0)}</td>`,
       open_support:()=>`<td><span class="badge ${att?'wait':'ok'}">${att?att+(att===1?' request':' requests'):'all clear'}</span></td>`,status:()=>`<td><span class="pill ${esc(st)}">${esc(st.replace('_',' '))}</span></td>`};
-    return `<tr data-open="${esc(c.client_id)}" tabindex="0" aria-label="Open ${esc(c.name||'Customer')}">
+    return `<tr data-open="${esc(c.client_id)}" tabindex="0" aria-label="Preview ${esc(c.name||'Customer')}">
       <td class="pick"><input type="checkbox" data-pick="${esc(c.client_id)}" aria-label="Select ${esc(c.name||'Customer')}"${PICKED.has(String(c.client_id))?' checked':''}></td>
       ${shownCols().map(([k])=>CELL[k]()).join('')}
       <td class="acts"><button class="rowact" data-rec="${esc(c.client_id)}">Open record</button>${c.customer_site_id?`<button class="rowact ghost" data-web="${esc(c.client_id)}">Their website</button>`:''}</td>
@@ -443,22 +611,23 @@ function tableHtml(list){
 // Sales review item 42: a card earns its place with a fact — what they owe you
 // (GET /sales/receivables, the same open invoices as Who owes you) and what is
 // waiting — never the same "all clear" badge on every card.
-let OWED={};
+let OWED={},OWED_INFO={};
 function cardsHtml(list){
-  let h='';
-  for(const c of list){
+  const rows=list.map(c=>{
+    const id=esc(c.client_id);
     const att=Number(c.open_support||0);
     const st=String(c.status||'active');
-    const owed=Number(OWED[String(c.client_id)]||0);
-    const facts=[owed?`<span class="fact owe">Owes ${esc(fmtOwed(owed))}</span>`:'',att?`<span class="fact wait">${att} ${att===1?'request':'requests'} waiting</span>`:''].filter(Boolean).join('');
-    h+=`<div class="cust"><div class="crow"><span class="av">${esc(initial(c.name))}</span>
-      <span><span class="n">${esc(c.name||'Customer')}</span><br><span class="m">${c.person_name?esc(c.person_name)+' · ':''}${esc(c.project_name||c.email||'No email on file')}${c.project_count>1?' · '+c.project_count+' projects':''}</span></span></div>
-      ${facts?`<div class="facts">${facts}</div>`:''}
-      <div class="acts"><span class="pill ${esc(st)}">${esc(st.replace('_',' '))}</span>
-        <span style="flex:1"></span>
-        <button class="btn" data-rec="${esc(c.client_id)}">Open record</button>${c.customer_site_id?`<button class="btn ghost" data-web="${esc(c.client_id)}">Their website</button>`:''}</div></div>`;
-  }
-  return h;
+    const owed=Number(OWED[String(c.client_id)]||0), late=Number((OWED_INFO[String(c.client_id)]||{}).late||0);
+    const facts=[owed?`<span class="fact owe${late?' late':''}">Owes ${esc(fmtOwed(owed))}</span>`:'',att?`<span class="fact wait">${att} ${att===1?'request':'requests'} waiting</span>`:''].filter(Boolean).join('');
+    return `<div class="cust" data-row="${id}">
+      <span class="av" aria-hidden="true">${esc(ini2(c.name))}</span>
+      <button type="button" class="who nlink" data-prev="${id}" aria-label="Preview ${esc(c.name||'Customer')}"><span class="n">${esc(c.name||'Customer')}</span><span class="m">${esc(c.person_name||c.email||'No email on file')}</span></button>
+      <span class="what"><span class="m1">${esc(c.project_name||'No project yet')}${c.project_count>1?' · '+c.project_count+' projects':''}</span><span class="m"><span class="pill ${esc(st)}">${esc(st.replace('_',' '))}</span></span></span>
+      ${facts?`<span class="facts">${facts}</span>`:'<span class="nofacts"></span>'}
+      <span class="cacts"><button class="rowact" data-rec="${id}">Open record</button>${c.customer_site_id?`<button class="rowact ghost" data-web="${id}">Their website</button>`:''}</span>
+    </div>`;
+  }).join('');
+  return `<div class="clist">${rows}</div>`;
 }
 
 function listHtml(list){
@@ -479,21 +648,38 @@ async function loadPeople(){
   if(TAB==='people')render();
 }
 function tabsHtml(){
-  return `<div class="seg tabs2" role="tablist" aria-label="Customers or contacts"><button role="tab" id="tabCustomers" aria-selected="${TAB==='customers'?'true':'false'}" aria-pressed="${TAB==='customers'?'true':'false'}">Customers</button><button role="tab" id="tabPeople" aria-selected="${TAB==='people'?'true':'false'}" aria-pressed="${TAB==='people'?'true':'false'}">Contacts${PEOPLE?` <span class="n">${PEOPLE.length}</span>`:''}</button></div>`;
+  return `<div class="seg tabs2" role="tablist" aria-label="Customers or people"><button role="tab" id="tabCustomers" aria-selected="${TAB==='customers'?'true':'false'}" aria-pressed="${TAB==='customers'?'true':'false'}">Customers</button><button role="tab" id="tabPeople" aria-selected="${TAB==='people'?'true':'false'}" aria-pressed="${TAB==='people'?'true':'false'}">People${PEOPLE?` <span class="n">${PEOPLE.length}</span>`:''}</button></div>`;
+}
+let PFILTER='all';
+function peopleChipsHtml(){
+  if(!PEOPLE||PEOPLE_FAILED||!PEOPLE.length)return '';
+  const yes=PEOPLE.filter(p=>p.client_id).length;
+  const ch=[['all','All',PEOPLE.length],['customers','Customers',yes],['not','Not yet',PEOPLE.length-yes]];
+  return `<div class="trow"><div class="chips" role="group" aria-label="Show">${ch.map(([v,l,n])=>(!n&&v!=='all'&&PFILTER!==v)?'':`<button type="button" class="chip" data-pchip="${v}" aria-pressed="${PFILTER===v?'true':'false'}">${l} <span class="n">${n}</span></button>`).join('')}</div></div>`;
 }
 function peopleHtml(){
   if(PEOPLE===null)return'<div class="spin" role="status" aria-label="Loading people"></div>';
   if(PEOPLE_FAILED)return'<p class="muted" style="padding:20px 0">We couldn’t load your people just now. <a href="/contacts.html">Open Contacts</a></p>';
   const q=Q.trim().toLowerCase();
-  const list=PEOPLE.filter(c=>!q||((c.name||'')+' '+(c.email||'')+' '+(c.company||'')).toLowerCase().includes(q));
-  if(!list.length)return`<p class="muted" style="padding:20px 0">${q?'No one matches “'+esc(Q)+'”.':'No people yet — a website enquiry, a deal or an added customer puts someone here.'}</p>`;
+  const list=PEOPLE.filter(c=>(PFILTER==='all'||(PFILTER==='customers')===!!c.client_id)&&(!q||((c.name||'')+' '+(c.email||'')+' '+(c.company||'')).toLowerCase().includes(q)));
+  if(!list.length)return`<p class="muted" style="padding:20px 0">${q?'No one matches “'+esc(Q)+'”.':PEOPLE.length?'No one here — try “All”.':'No people yet — a website enquiry, a deal or an added customer puts someone here.'}</p>`;
   const byClient={}; for(const c of CUSTOMERS)byClient[String(c.client_id)]=c;
   const trs=list.map(c=>{
     const cust=c.client_id?byClient[String(c.client_id)]:null;
     const rec=c.client_id?(cust&&cust.customer_site_id?`/crm.html?client=${esc(cust.customer_site_id)}`:`/crm.html?client_id=${esc(c.client_id)}`):`/crm.html?contact=${esc(c.id)}&tab=details`;
-    return `<tr><td><a href="${rec}" data-noscope="1">${esc(c.name||c.email||'Someone')}</a></td><td>${c.email?`<a href="mailto:${esc(c.email)}">${esc(c.email)}</a>`:'—'}</td><td>${esc(c.phone||'—')}</td><td>${c.client_id?`<a href="${rec}" data-noscope="1">${esc((cust&&cust.name)||c.company||'Customer')} ↗</a>`:esc(c.company||'—')}</td><td class="acts"><a class="rowact" href="${rec}" data-noscope="1">Open record</a></td></tr>`;
+    const nm=c.name||c.email||'Someone';
+    return `<tr data-person="${esc(c.id)}" tabindex="0" aria-label="Preview ${esc(nm)}"><td data-col="name"><span class="nm"><span class="av sm" aria-hidden="true">${esc(ini2(nm))}</span><span><a href="${rec}" data-noscope="1">${esc(nm)}</a>${c.company?`<span class="pn">${esc(c.company)}</span>`:''}</span></span></td><td data-col="email">${c.email?`<a href="mailto:${esc(c.email)}">${esc(c.email)}</a>`:'—'}</td><td data-col="phone">${esc(c.phone||'—')}</td><td data-col="customer">${c.client_id?`<a href="${rec}" data-noscope="1">${esc((cust&&cust.name)||c.company||'Customer')} ↗</a>`:'<span class="pill lead">Not yet</span>'}</td><td class="acts"><a class="rowact" href="${rec}" data-noscope="1">Open record</a></td></tr>`;
   }).join('');
-  return `<div class="tscroll"><table aria-label="People"><thead><tr><th scope="col">Name</th><th scope="col">Email</th><th scope="col">Phone</th><th scope="col">Customer</th><th scope="col" class="acts"><span class="sr-only">Actions</span></th></tr></thead><tbody>${trs}</tbody></table></div>`;
+  return `<div class="tscroll people"><table aria-label="People"><thead><tr><th scope="col">Name</th><th scope="col">Email</th><th scope="col">Phone</th><th scope="col">Customer</th><th scope="col" class="acts"><span class="sr-only">Actions</span></th></tr></thead><tbody>${trs}</tbody></table></div>`;
+}
+function wirePeople(){
+  const byId={}; for(const p of (PEOPLE||[]))byId[String(p.id)]=p;
+  document.querySelectorAll('tr[data-person]').forEach(tr=>{
+    const open=()=>openPreview(byId[tr.getAttribute('data-person')],tr,'person');
+    tr.addEventListener('click',(e)=>{if(e.target.closest('a,button,input'))return;open();});
+    tr.addEventListener('keydown',(e)=>{if((e.key==='Enter'||e.key===' ')&&!e.target.closest('a,button,input')){e.preventDefault();open();}});
+  });
+  pvMark();
 }
 function wireTabs(){
   const go=(t)=>{TAB=t;const u=new URL(location.href);if(t==='people')u.searchParams.set('tab','people');else u.searchParams.delete('tab');history.replaceState(null,'',u.toString());if(t==='people'&&PEOPLE===null)loadPeople();render();};
@@ -504,16 +690,18 @@ function wireTabs(){
 function render(){
   const list=sortedRows();
   if(TAB==='people'){
-    let hp=headerHtml(list.length)+tabsHtml();
-    hp+=`<div class="bar"><input class="search" id="search" aria-label="Search people" placeholder="Search people…" value="${esc(Q)}"><a class="btn ghost" href="/contacts.html" style="text-decoration:none">Add or edit people</a></div>`;
-    hp+=`<div id="listZone">${peopleHtml()}</div>`;
+    let hp=headerHtml(list);
+    hp+=`<div class="bar"><input class="search" id="search" aria-label="Search people" placeholder="Find a person, business or email" value="${esc(Q)}"></div>`;
+    hp+=`<div id="pchips">${peopleChipsHtml()}</div><div id="listZone">${peopleHtml()}</div>`;
     $('main').innerHTML=hp;
-    const s=$('search'); if(s)s.addEventListener('input',debounce(()=>{Q=s.value;const z=$('listZone');if(z)z.innerHTML=peopleHtml();}));
-    wireTabs(); if(PEOPLE===null)loadPeople();
+    const s=$('search'); if(s)s.addEventListener('input',debounce(()=>{Q=s.value;const z=$('listZone');if(z){z.innerHTML=peopleHtml();wirePeople();}}));
+    document.querySelectorAll('[data-pchip]').forEach(b=>b.addEventListener('click',()=>{const v=b.getAttribute('data-pchip');PFILTER=v;render();const nb=document.querySelector('[data-pchip="'+v+'"]');if(nb)nb.focus();}));
+    wireTabs(); wirePeople(); if(PEOPLE===null)loadPeople();
     return;
   }
-  let h=headerHtml(list.length)+tabsHtml();
-  h+=`<div class="bar"><input class="search" id="search" aria-label="Search customers" placeholder="Search customers…" value="${esc(Q)}"><button class="btn" id="addCust" title="Set up an existing customer with their own workspace and a sign-in invitation">+ Add a customer</button><button class="btn ghost" id="importCsv" type="button">Import CSV</button></div><div id="csvZone"></div>`;
+  let h=headerHtml(list);
+  h+=`<div class="bar"><input class="search" id="search" aria-label="Search customers" placeholder="Find a customer, person or email" value="${esc(Q)}"></div>`;
+  h+=toolsHtml()+'<div id="csvZone"></div>';
   h+=`<div id="listZone">${listHtml(list)}</div>`;
   const zPrev=document.getElementById('csvZone');const zKeep=zPrev&&zPrev.childNodes.length;
   $('main').innerHTML=h;
@@ -524,7 +712,7 @@ function render(){
 // input node is never rebuilt, so caret and focus survive without restoration.
 function renderListZone(){
   const list=sortedRows();
-  const lm=$('lmeta');if(lm)lm.textContent=lmetaText(list.length);
+  const lm=$('lmeta');if(lm)lm.textContent=lmetaText(list);
   const z=$('listZone');if(z){z.innerHTML=listHtml(list);wireList();}
 }
 
@@ -551,6 +739,7 @@ function wire(){
     vm.querySelectorAll('[data-view]').forEach(b=>b.addEventListener('click',()=>{VIEWNAME=b.getAttribute('data-view');CURVIEW='';PICKED.clear();render();const nb=$('viewBtn');if(nb)nb.focus();}));
     vm.querySelectorAll('[data-saved]').forEach(b=>b.addEventListener('click',()=>{const v=SAVED.find(x=>x.id===b.getAttribute('data-saved'));if(v)applySaved(v);const nb=$('viewBtn');if(nb)nb.focus();}));
   }
+  document.querySelectorAll('[data-chip]').forEach(b=>b.addEventListener('click',()=>{const v=b.getAttribute('data-chip');VIEWNAME=v;CURVIEW='';PICKED.clear();render();const nb=document.querySelector('[data-chip="'+v+'"]');if(nb)nb.focus();}));
   const sv=$('saveView');if(sv)sv.addEventListener('click',saveView);
   const dv=$('dropView');if(dv)dv.addEventListener('click',dropView);
   const cb=$('colsBtn');if(cb&&KIT())cb.addEventListener('click',(e)=>{e.stopPropagation();KIT().columnsMenu(cb,COLS.map(c=>[c[0],c[1]]),HIDDEN,(next)=>{HIDDEN=next;try{localStorage.setItem(COLS_KEY,JSON.stringify([...HIDDEN]));}catch(_){/* */}renderListZone();});});
@@ -575,11 +764,16 @@ function wireList(){
   // cards: explicit Open button; table: the row itself opens (Enter AND Space,
   // like pipeline's rows — preventDefault keeps Space from scrolling the page)
   document.querySelectorAll('button[data-open]').forEach(b=>b.addEventListener('click',()=>openCustomer(byId[b.getAttribute('data-open')])));
+  // Bold redesign, part 2: a row opens the preview beside the list (Open record
+  // still goes straight to the record)
   document.querySelectorAll('tr[data-open]').forEach(tr=>{
-    const open=(e)=>{if(e.target.closest('button,input,td.pick'))return;openCustomer(byId[tr.getAttribute('data-open')]);};
+    const open=(e)=>{if(e.target.closest('button,input,td.pick,a'))return;openPreview(byId[tr.getAttribute('data-open')],tr);};
     tr.addEventListener('click',open);
-    tr.addEventListener('keydown',(e)=>{if((e.key==='Enter'||e.key===' ')&&!e.target.closest('button,input')){e.preventDefault();openCustomer(byId[tr.getAttribute('data-open')]);}});
+    tr.addEventListener('keydown',(e)=>{if((e.key==='Enter'||e.key===' ')&&!e.target.closest('button,input,a')){e.preventDefault();openPreview(byId[tr.getAttribute('data-open')],tr);}});
   });
+  document.querySelectorAll('.cust[data-row]').forEach(card=>card.addEventListener('click',(e)=>{if(e.target.closest('button,a,input'))return;openPreview(byId[card.getAttribute('data-row')],card.querySelector('[data-prev]'));}));
+  document.querySelectorAll('[data-prev]').forEach(b=>b.addEventListener('click',()=>openPreview(byId[b.getAttribute('data-prev')],b)));
+  pvMark();
   document.querySelectorAll('[data-web]').forEach(b=>b.addEventListener('click',(e)=>{e.stopPropagation();manageSite(byId[b.getAttribute('data-web')]);}));
   document.querySelectorAll('[data-rec]').forEach(b=>b.addEventListener('click',(e)=>{e.stopPropagation();openCustomer(byId[b.getAttribute('data-rec')]);}));
   // item 31: pick rows, then act on them together
@@ -596,6 +790,173 @@ function wireList(){
   });
   const bc=$('bulkClear');if(bc)bc.addEventListener('click',()=>{PICKED.clear();renderListZone();refocus('#pickAll');});
 }
+
+// ── Bold redesign, part 2 (Nov 2026): the preview beside the list ───────────
+// A row opens what you need to act on a customer — Log call, Message, Invoice,
+// what they owe, the deal, the project, the next step and the latest — without
+// leaving the list. It is a native <dialog>: shown beside the list on wide
+// screens (the list still works), modal over it below 1180px (a sheet on
+// phones), so + Create's own modal form stacks above it the way the browser
+// means it to. It reads the same /crm/record and /crm/activity the record page
+// does, scoped to the customer's site the way crm.html is (the roster itself
+// stays unscoped, D7).
+const PV_STAGE={lead:'New lead',qualified:'Qualified',proposal:'Proposal sent',contract:'Agreement out',won:'Won',lost:'Not a fit'};
+const PV_STATUS={active:'In progress',on_hold:'On hold',complete:'Complete',archived:'Archived'};
+const PV_IC={
+  call:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2"/></svg>',
+  msg:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1.1-4.6A8 8 0 1 1 21 12z"/></svg>',
+  inv:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 3h12v18l-3-2-3 2-3-2-3 2z"/><path d="M9 8h6M9 12h6"/></svg>',
+};
+let PV=null,PV_SEQ=0,PV_BACK=null,PV_STAGES_ASKED=false;
+const PV_CACHE={};
+const pvWide=()=>!!(window.matchMedia&&window.matchMedia('(min-width:1180px)').matches);
+function pvSubject(kind,x){
+  if(!x)return null;
+  if(kind==='person'){
+    const cust=x.client_id?CUSTOMERS.find(c=>String(c.client_id)===String(x.client_id)):null;
+    if(cust)return pvSubject('customer',cust);   // a customer's person previews the customer
+    const name=x.name||x.email||'Someone';
+    return {key:'p:'+x.id,row:String(x.id),name,sub:[x.company,x.email].filter(Boolean).join(' · ')||'Not a customer yet',q:'?contact='+encodeURIComponent(x.id),site:'',href:'/crm.html?contact='+encodeURIComponent(x.id)+'&tab=details',cust:null,person:x};
+  }
+  const c=x,site=c.customer_site_id?String(c.customer_site_id):'';
+  const href=site?'/crm.html?client='+encodeURIComponent(site):c.client_id?'/crm.html?client_id='+encodeURIComponent(c.client_id):'/crm.html?project='+encodeURIComponent(c.project_id||'')+'&tab=delivery';
+  return {key:'c:'+c.client_id,row:String(c.client_id),name:c.name||'Customer',sub:[c.person_name,c.email].filter(Boolean).join(' · '),q:site?'?client='+encodeURIComponent(site):'?client_id='+encodeURIComponent(c.client_id),site,href,cust:c,person:null};
+}
+async function pvGet(path,site){
+  const h=H(); if(site)h['x-dds-scope-site']=site;
+  const r=await fetch(FN+path,{headers:h});
+  return {ok:r.ok,status:r.status,body:await r.json().catch(()=>({}))};
+}
+async function pvLoad(s){
+  if(PV_CACHE[s.key])return PV_CACHE[s.key];
+  const r=await pvGet('/crm/record'+s.q,s.site).catch(()=>null);
+  if(!r||!r.ok)return {failed:true};   // not cached: the next open asks again
+  const rec=(r.body&&r.body.data)||{}, id=rec.identity||{}, q=[];
+  if(id.project_id)q.push('project='+encodeURIComponent(id.project_id));
+  if(id.client_id)q.push('client_id='+encodeURIComponent(id.client_id));
+  if(id.deal_id)q.push('deal='+encodeURIComponent(id.deal_id));
+  let act=null;
+  if(q.length){const a=await pvGet('/crm/activity?'+q.join('&'),s.site).catch(()=>null);if(a&&a.ok&&a.body&&a.body.data)act=a.body.data;}
+  return (PV_CACHE[s.key]={rec,act});
+}
+function pvStages(){
+  if(PV_STAGES_ASKED)return;PV_STAGES_ASKED=true;
+  api('/sales/stages').then(r=>{const l=r.ok&&r.body&&r.body.data&&r.body.data.labels;if(l&&typeof l==='object'){Object.assign(PV_STAGE,l);if(PV)pvPaint();}}).catch(()=>{});
+}
+const pvAgo=(iso)=>{const t=Date.parse(iso||'');if(!t)return '';const m=Math.round((Date.now()-t)/60000);if(m<1)return 'just now';if(m<60)return m+' min';const h=Math.round(m/60);if(h<24)return h+'h';const d=Math.round(h/24);if(d<7)return d+'d';return new Date(t).toLocaleDateString(undefined,{month:'short',day:'numeric'});};
+const pvDay=(ymd)=>{const m=/^(\d{4})-(\d{2})-(\d{2})/.exec(String(ymd||''));if(!m)return '';const d=new Date(+m[1],+m[2]-1,+m[3]),t=new Date();t.setHours(0,0,0,0);const n=Math.round((d-t)/86400000);if(n===0)return 'today';if(n===1)return 'tomorrow';if(n===-1)return 'yesterday';return d.toLocaleDateString(undefined,{month:'short',day:'numeric'});};
+function pvFacts(s,d){
+  const c=s.cust,rec=d&&d.rec,hl=(rec&&rec.highlights)||{},id=(rec&&rec.identity)||{},act=d&&d.act,out=[];
+  // what they owe: the roster's own receivables for a customer, the record's for anyone else
+  const owed=c?Number(OWED[String(c.client_id)]||0):Number(hl.owed_cents||0);
+  const info=c?(OWED_INFO[String(c.client_id)]||{}):{};
+  if(owed)out.push(['Owes you',fmtOwed(owed)+(info.late?' · '+fmtOwed(info.late)+' overdue':info.due?' · due '+pvDay(info.due):''),info.late?'bad':'warn']);
+  if(id.deal_id)out.push(['Deal',`<a href="/pipeline.html?deal=${encodeURIComponent(id.deal_id)}" data-noscope="1">${esc(PV_STAGE[hl.stage]||hl.stage||'Open')}${Number(hl.value_cents)>0?' · '+esc(fmtOwed(hl.value_cents)):''}</a>`,'',true]);
+  if(c&&c.project_name)out.push(['Project',c.project_name+' · '+(PV_STATUS[c.status]||String(c.status||'active').replace('_',' '))+(c.project_count>1?' · '+c.project_count+' projects':''),'']);
+  const up=act&&Array.isArray(act.upcoming)?act.upcoming[0]:null;
+  if(up&&up.title)out.push(['Next step',up.title+(up.overdue?' · overdue':up.due?' · '+pvDay(up.due):''),up.overdue?'bad':'']);
+  if(c&&Number(c.open_support||0))out.push(['Requests',c.open_support+' waiting on you','warn']);
+  if(c&&c.customer_site_id)out.push(['Website',`<a href="/presence.html?client=${encodeURIComponent(c.customer_site_id)}" data-noscope="1">Edit their website →</a>`,'',true]);
+  return out;
+}
+function pvPaint(){
+  const box=$('cprev');if(!box||!PV)return;
+  const s=PV.s,d=PV.d,loading=!d,failed=!!(d&&d.failed);
+  const facts=pvFacts(s,d);
+  const latest=(d&&d.act&&Array.isArray(d.act.items))?d.act.items.filter(i=>i&&i.title).slice(0,3):[];
+  const skel='<div class="cp-skel"></div><div class="cp-skel" style="width:70%"></div><div class="cp-skel" style="width:85%"></div>';
+  const sep=s.href.indexOf('?')>=0?'&':'?';
+  // a redraw (the read landing, a reload after + Create) keeps focus on the same control
+  const fk=box.contains(document.activeElement)?(document.activeElement.getAttribute('data-k')||''):'';
+  box.innerHTML=`<div class="cp-head"><span class="av" aria-hidden="true">${esc(ini2(s.name))}</span><div class="cp-t"><h2 id="cprev-h" tabindex="-1" data-k="h">${esc(s.name)}</h2>${s.sub?`<p>${esc(s.sub)}</p>`:''}</div><button type="button" class="cp-x" data-pv-close data-k="x" aria-label="Close preview">×</button></div>
+    <div class="cp-body">
+      <div class="cp-acts" role="group" aria-label="Quick actions"><button type="button" data-pv="call" data-k="call">${PV_IC.call}<span>Log call</span></button><a href="${esc(s.href+sep+'act=message')}" data-noscope="1" data-k="msg">${PV_IC.msg}<span>Message</span></a><button type="button" data-pv="invoice" data-k="invoice">${PV_IC.inv}<span>Invoice</span></button></div>
+      ${facts.length?`<dl class="cp-facts">${facts.map(([k,v,tone,html])=>`<div><dt>${esc(k)}</dt><dd${tone?` class="${tone}"`:''}>${html?v:esc(v)}</dd></div>`).join('')}</dl>`:(loading?`<div class="cp-facts cp-wait" aria-hidden="true">${skel}</div>`:'')}
+      <h3 class="cp-l">Latest</h3>
+      ${loading?`<div class="cp-wait" role="status" aria-label="Loading">${skel}</div>`:failed?`<p class="cp-none">We couldn’t load the latest just now. <button type="button" class="cp-retry" data-pv-retry data-k="retry">Try again</button></p>`:latest.length?`<ul class="cp-latest">${latest.map(i=>`<li><span>${esc(i.title)}</span><time datetime="${esc(i.at||'')}">${esc(pvAgo(i.at))}</time></li>`).join('')}</ul>`:'<p class="cp-none">Nothing yet — a call, a message or an invoice shows up here.</p>'}
+    </div>
+    <div class="cp-foot"><a class="cp-open" href="${esc(s.href)}" data-noscope="1" data-k="open">Open full record <span aria-hidden="true">→</span></a></div>`;
+  if(fk){const n=box.querySelector(`[data-k="${fk}"]`)||$('cprev-h');if(n)n.focus({preventScroll:true});}
+}
+function pvMode(){
+  const box=$('cprev');if(!box||!PV)return;
+  const modal=!pvWide();
+  if(!box.open||box.matches(':modal')!==modal){
+    if(box.open)box.close();
+    try{if(modal)box.showModal();else box.show();}catch(_){box.setAttribute('open','');}
+  }
+  document.body.classList.toggle('cprev-open',!modal);
+}
+function pvMount(){
+  if($('cprev'))return;
+  const box=document.createElement('dialog');box.id='cprev';box.className='cprev';box.setAttribute('aria-labelledby','cprev-h');
+  document.body.append(box);
+  box.addEventListener('cancel',(e)=>{e.preventDefault();closePreview();});   // Escape on the modal one
+  box.addEventListener('click',(e)=>{
+    // a click on the backdrop (outside the box) closes it
+    if(e.target===box){const r=box.getBoundingClientRect();if(e.clientX<r.left||e.clientX>r.right||e.clientY<r.top||e.clientY>r.bottom){closePreview();return;}}
+    if(e.target.closest('[data-pv-close]')){closePreview();return;}
+    if(e.target.closest('[data-pv-retry]')){pvRefresh();return;}
+    const b=e.target.closest('[data-pv]');if(!b||!PV)return;
+    const kind=b.getAttribute('data-pv'),s=PV.s;
+    // + Create's drawers, started on this customer's deal — a tap before the
+    // record has landed waits for it rather than opening on no one; without
+    // + Create, the record's own forms
+    Promise.resolve(PV.d||PV.p).then((d)=>{
+      if(!PV||PV.s.key!==s.key)return;   // moved on to someone else meanwhile
+      const id=(d&&d.rec&&d.rec.identity)||{};
+      const nb=box.querySelector(`[data-pv="${kind}"]`)||b;
+      // + Create's form (PR 206) opens over this; deal_id asks it to start on this customer's deal
+      const ok=typeof window.ddsOpenCreate==='function'&&window.ddsOpenCreate(kind,nb,false,id.deal_id?{deal_id:id.deal_id}:undefined);
+      if(!ok)location.assign(s.href+(s.href.indexOf('?')>=0?'&':'?')+'act='+(kind==='invoice'?'invoice':'note'));
+    });
+  });
+  if(window.matchMedia)window.matchMedia('(min-width:1180px)').addEventListener('change',pvMode);
+}
+function pvMark(){
+  const key=PV?PV.s.row:'';
+  document.querySelectorAll('tr[data-open],.cust[data-row],tr[data-person]').forEach(n=>{
+    const on=!!key&&(n.getAttribute('data-open')||n.getAttribute('data-row')||n.getAttribute('data-person'))===key;
+    n.classList.toggle('pv-on',on);
+    if(n.tagName==='TR'){if(on)n.setAttribute('aria-current','true');else n.removeAttribute('aria-current');}
+  });
+}
+function openPreview(x,opener,kind){
+  const s=pvSubject(kind||'customer',x);if(!s)return;
+  pvMount();
+  const seq=++PV_SEQ;
+  PV={s,d:PV_CACHE[s.key]};
+  PV_BACK=opener||document.activeElement;
+  pvMode();pvPaint();pvMark();
+  const h=$('cprev-h');if(h)h.focus({preventScroll:true});
+  pvStages();
+  if(!PV.d){PV.p=pvLoad(s);PV.p.then(d=>{if(seq!==PV_SEQ||!PV)return;PV.d=d;pvPaint();});}
+}
+function pvRefresh(){
+  if(!PV)return;const s=PV.s,seq=++PV_SEQ;
+  PV.d=undefined;pvPaint();
+  PV.p=pvLoad(s);PV.p.then(d=>{if(seq!==PV_SEQ||!PV)return;PV.d=d;pvPaint();});
+}
+function closePreview(){
+  if(!PV)return;
+  const key=PV.s.row;PV=null;++PV_SEQ;
+  const box=$('cprev');
+  if(box){if(box.open)box.close();box.innerHTML='';}
+  document.body.classList.remove('cprev-open');
+  pvMark();
+  // back to the row it came from (or the same row, drawn again since)
+  let b=PV_BACK;PV_BACK=null;
+  if(!b||!b.isConnected)b=document.querySelector(`tr[data-open="${CSS.escape(key)}"],tr[data-person="${CSS.escape(key)}"],[data-prev="${CSS.escape(key)}"]`);
+  if(b)b.focus({preventScroll:true});
+}
+// Escape closes it — after whatever sits on top (+ Create's form, the add dialog, search)
+document.addEventListener('keydown',(e)=>{
+  if(e.key!=='Escape'||!PV||e.defaultPrevented)return;
+  if(document.querySelector('dialog[open]:not(#cprev),.dds-palette.open,.dds-keys.open'))return;
+  e.preventDefault();closePreview();
+});
+// a call, an invoice or a to-do made from + Create (it says so on window) → the preview and the list catch up
+window.addEventListener('dds:created',()=>{if(!TOKEN)return;load().catch(()=>{});});
 
 // ── ADD A CUSTOMER (C4) — contacts.html's flow, ported wholesale and kept in
 // sync by hand: set up an existing customer with their own workspace + a
@@ -738,7 +1099,9 @@ async function load(){
   const [r,rv]=await Promise.all([api('/studio/customers'),api('/sales/receivables').catch(()=>null)]);
   if(seq!==REQ_SEQ)return;
   // item 42: what each customer owes, for the cards (best-effort: a failed read just shows no amount)
-  OWED={};for(const i of ((rv&&rv.ok&&rv.body&&rv.body.data&&rv.body.data.items)||[])){if(i&&i.client_id&&(i.state==='upcoming'||i.state==='overdue'))OWED[String(i.client_id)]=(OWED[String(i.client_id)]||0)+(Number(i.amount_cents)||0);}
+  OWED={};OWED_INFO={};for(const i of ((rv&&rv.ok&&rv.body&&rv.body.data&&rv.body.data.items)||[])){if(i&&i.client_id&&(i.state==='upcoming'||i.state==='overdue')){const k=String(i.client_id);OWED[k]=(OWED[k]||0)+(Number(i.amount_cents)||0);
+    // part 2: the preview says what's overdue, or when the next one is due
+    const f=OWED_INFO[k]||(OWED_INFO[k]={late:0,due:''});if(i.state==='overdue')f.late+=Number(i.amount_cents)||0;else if(i.due_date&&(!f.due||i.due_date<f.due))f.due=String(i.due_date);}}
   if(r.status===401){signedOut();return;}
   if(r.status===403){notStudio();return;}
   if(!r.ok){trouble();return;}
@@ -747,6 +1110,7 @@ async function load(){
   { const live=new Set(CUSTOMERS.map(c=>String(c.client_id))); for(const id of [...PICKED])if(!live.has(id))PICKED.delete(id); }
   render();
   loadSavedViews();
+  if(PV){for(const k of Object.keys(PV_CACHE))delete PV_CACHE[k];pvRefresh();}   // a reload re-reads the open preview too
 }
 let VIEWS_ASKED=false;
 function loadSavedViews(){
