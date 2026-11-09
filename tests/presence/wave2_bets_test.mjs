@@ -44,7 +44,7 @@ const bell = (notices) => F.studioBellCount({ notices, newEnquiries: 0, proposed
 eq('8: the badge counts needs-you notices', bell([{ kind: 'publish_failed' }, { kind: 'domain_expiry' }]), 2);
 eq('8: an update notice renders but never rings the badge', bell([{ kind: 'publish_failed' }, { kind: 'invoice_paid' }, { kind: 'studio_published' }]), 1);
 eq('8: the client_* throttle rows stay out of the count', bell([{ kind: 'client_message' }, { kind: 'invoice_paid' }]), 0);
-ok('8: UPDATE_NOTICE_KINDS is the exact set', [...F.UPDATE_NOTICE_KINDS].sort().join() === ['invoice_paid', 'studio_published', 'welcome_back', 'win_back', 'approval_decided', 'booking_reminder'].sort().join());
+ok('8: UPDATE_NOTICE_KINDS is the exact set', [...F.UPDATE_NOTICE_KINDS].sort().join() === ['invoice_paid', 'studio_published', 'welcome_back', 'win_back', 'approval_decided', 'booking_reminder', 'invoice_upcoming'].sort().join());   // invoice_upcoming: sales review item 47
 // the feed tags every row kind
 ok('8: workspace.ts tags notices with tier + priority from the pure rules', /tier: noticeTier\(n\.kind\), priority: noticePriority\(n\.kind, n\.period\)/.test(workspace));
 ok('8: approvals are needs_you + priority', /\.map\(\(p\) => \(\{ \.\.\.p, tier: 'needs_you', priority: true \}\)\)/.test(workspace));

@@ -43,6 +43,8 @@ const CONTROLS = [
   ['POST /sales/invoices/:id/void', 'crm.html', `apiAg('/sales/invoices/'+b.getAttribute('data-void-inv')+'/void','POST',{})`, ['data-void-inv="${esc(v.id)}" data-needs="delete"']],
   ['POST /sales/deals/:id/retainer/cancel', 'pipeline.html', `api('/sales/deals/'+id+'/retainer/cancel','POST',{})`, ['id="cancelRetainer" data-needs="delete"']],
   ['POST /sales/deals/:id/retainer/cancel', 'crm.html', `apiAg('/sales/deals/'+d.id+'/retainer/cancel','POST',{})`, [`data-ret-cancel="1" data-needs="delete"`]],
+  ['DELETE /sales/estimates/:id', 'pipeline.html', `api('/sales/estimates/'+b.dataset.delEst,'DELETE')`, ['data-needs="delete" data-del-est=']],   // sales review item 47
+  ['POST /sales/recurring/:id/stop', 'pipeline.html', `api('/sales/recurring/'+sid+'/'+act,'POST',{})`, ['data-needs="delete" data-rec-stop=']],
   // the content path answers from contentWriteNeeds
   ['DELETE /offerings/:id', 'presence.html', 'api("DELETE", `/offerings/${o.id}`)', ['data-act="del" data-needs="delete"']],
   ['DELETE /faqs/:id', 'presence.html', 'api("DELETE", `/${collection}/${entity.id}`)', ['data-act="del" data-needs="delete"']],
@@ -94,7 +96,8 @@ const SOURCE = Object.fromEntries(PAGES.map((p) => [p, read(p)]));
   ok('the row delete and the card delete on Contacts both carry the mark', count(SOURCE['contacts.html'], 'data-needs="delete" data-del=') === 2);
   ok('the three builder "Remove for good" buttons all carry the mark', count(SOURCE['presence.html'], 'data-act="del" data-needs="delete"') === 3 && !SOURCE['presence.html'].includes('data-act="del">'));
   ok('both saved-template lists carry the mark', count(SOURCE['pipeline.html'], 'data-needs="delete" data-del-tpl=') === 2);
-  ok('no unmarked Void or template remove is left on the deal page', !/<button class="btn ghost( sm)?" data-(void-inv|del-tpl|del-prop|del-con)=/.test(SOURCE['pipeline.html']));
+  ok('no unmarked Void or template remove is left on the deal page', !/<button class="btn ghost( sm)?" data-(void-inv|del-tpl|del-prop|del-con|del-est|rec-stop)=/.test(SOURCE['pipeline.html']));
+  ok('the recurring invoice\'s Stop is the one marked action in its row (Skip, Change, Pause and Resume are edit)', count(SOURCE['pipeline.html'], 'data-needs="delete" data-rec-stop=') === 1 && !/data-needs="delete" data-rec-(skip|change|pause|resume)=/.test(SOURCE['pipeline.html']));
 }
 
 // ═══ 2. every decided route is either offered, and marked, or not offered at all ═══
@@ -102,7 +105,7 @@ const SOURCE = Object.fromEntries(PAGES.map((p) => [p, read(p)]));
   const decided = read('tests/presence/member_capability_test.mjs');
   const listed = (name) => [...decided.split('const DECIDED = {')[1].split(`\n  ${name}: [`)[1].split('\n  ],')[0].matchAll(/'((?:DELETE|POST|PUT|PATCH) [^']+)'/g)].map((m) => m[1]);
   const routes = [...listed('delete'), ...listed('configure')];
-  ok('the decided delete and configure lists were read', routes.length === 37, String(routes.length));   // item 69: POST and DELETE /email/log-address
+  ok('the decided delete and configure lists were read', routes.length === 39, String(routes.length));   // item 47: removing a draft estimate, stopping a recurring invoice
   const covered = new Set(CONTROLS.map(([r]) => r));
   const open = routes.filter((r) => !covered.has(r) && !NO_CONTROL[r]);
   ok('every decided delete and configure route is accounted for here', open.length === 0, open.join(', '));
@@ -126,7 +129,7 @@ const SOURCE = Object.fromEntries(PAGES.map((p) => [p, read(p)]));
     const fresh = sent(page).filter((call) => !known(page).includes(call));
     ok(`${page}: every DELETE it sends is decided`, fresh.length === 0, fresh.join(' | '));
   }
-  ok('tripwire: the DELETE scan found the calls it is meant to find', sent('pipeline.html').length === 4 && sent('presence.html').length === 12 && sent('contacts.html').length === 2 && sent('crm.html').length === 4 && sent('files.html').length === 1);
+  ok('tripwire: the DELETE scan found the calls it is meant to find', sent('pipeline.html').length === 5 && sent('presence.html').length === 12 && sent('contacts.html').length === 2 && sent('crm.html').length === 4 && sent('files.html').length === 1);
 
   const CONFIG = /\/(?:foundations\/(?:domain|prepare)|preview\/settings|site\/(?:offline|online)|bookings\/settings|sales\/contacts\/fields)\b/;
   const writes = new RegExp(`(?:api\\(\\s*["'](?:POST|PUT|DELETE)["']\\s*,\\s*["'\`]|act\\(["']|siteSetState\\(["'])${CONFIG.source}|api\\(["'\`]${CONFIG.source}["'\`]\\s*,\\s*["'](?:POST|PUT|DELETE)["']`, 'g');

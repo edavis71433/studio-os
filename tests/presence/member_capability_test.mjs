@@ -48,6 +48,8 @@ const { handleBroadcastListDelete } = await import(`${P}/routes/broadcasts.ts`);
 const { handleSalesStages } = await import(`${P}/routes/sales.ts`);
 const { handleCalendarLink } = await import(`${P}/routes/calendar.ts`);
 const { handleEmailLogAddress } = await import(`${P}/routes/email_log.ts`);
+const { handleEstimateDelete } = await import(`${P}/routes/estimates.ts`);   // sales review item 47
+const { handleRecurringAction } = await import(`${P}/routes/recurring_invoices.ts`);
 
 const ROOT = new URL('../../', import.meta.url);
 const read = (p) => Deno.readTextFileSync(new URL(p, ROOT));
@@ -74,7 +76,7 @@ const scopedStudio = () => principalOf('jwt-studio', { scope: { site_id: SITE_A,
 const platformStaff = () => principalOf('jwt-platform', { kind: 'staff', role: 'owner' });
 
 /* ── a tiny PostgREST: seats are real rows; any other read by the service role or the owner gets a row ── */
-const STATUS = { presence_launches: 'draft', presence_invoices: 'open', presence_publishes: 'live', presence_media: 'approved', presence_proposals: 'draft', presence_contracts: 'draft', presence_infra_plans: 'proposed', presence_connection_writes: 'proposed' };
+const STATUS = { presence_estimates: 'draft', presence_recurring_invoices: 'active', presence_launches: 'draft', presence_invoices: 'open', presence_publishes: 'live', presence_media: 'approved', presence_proposals: 'draft', presence_contracts: 'draft', presence_infra_plans: 'proposed', presence_connection_writes: 'proposed' };
 const rowOf = (table, id) => ({ id: id || ROW, site_id: SITE_A, status: STATUS[table] || 'draft', name: 'Thing', title: 'Thing', email: 'someone@example.com', metadata: {}, storage_path: `${SITE_A}/a.jpg`, mime: 'image/jpeg', bytes: 10, alt_text: 'a photo', stage: 'lead', deal_id: ROW, contact_id: ROW, project_id: ROW, client_id: CLIENT_A, snapshot_id: ROW, created_at: '2026-01-01T00:00:00Z', updated_at: '2026-01-01T00:00:00Z', deleted_at: null });
 let seats, siteRow, calls, outside, failSeatReads, fixture;
 function reset(fx = {}) {
@@ -136,6 +138,7 @@ const DECIDED = {
     'DELETE /redirects/:id', 'DELETE /sales/contacts/:id', 'DELETE /sales/contracts/:id', 'DELETE /sales/deals/:id',
     'DELETE /sales/proposals/:id', 'DELETE /sales/templates/:id', 'POST /comments/:id/delete',
     'POST /sales/deals/:id/retainer/cancel', 'POST /sales/invoices/:id/void', 'DELETE /broadcasts/lists/:id',
+    'DELETE /sales/estimates/:id', 'POST /sales/recurring/:id/stop',   // sales review item 47
   ],
   configure: [
     'DELETE /foundations/domain', 'DELETE /foundations/zone', 'DELETE /foundations/zone/records',
@@ -198,6 +201,9 @@ const DECIDED = {
     'POST /writer/drafts/:id/accept', 'POST /writer/drafts/:id/discard', 'POST /writer/generate',
     'POST /writer/rewrite', 'PUT /content-library/:id', 'PUT /media/:id', 'PUT /sales/services', 'PUT /service/faq',
     'PUT /service/saved-replies', 'PUT /sales/views',
+    // sales review item 47: estimates and recurring invoices (stopping one is delete, above)
+    'POST /sales/deals/:id/estimates', 'POST /sales/estimates/:id/send', 'POST /sales/estimates/:id/proposal', 'POST /sales/estimates/:id/invoice',
+    'POST /sales/deals/:id/recurring', 'PATCH /sales/recurring/:id', 'POST /sales/recurring/:id/pause', 'POST /sales/recurring/:id/resume', 'POST /sales/recurring/:id/skip',
   ],
   open: [
     'DELETE /crm/notes/:id', 'POST /client/notifications/read', 'POST /concierge/ask', 'POST /crm/notes',
@@ -218,6 +224,8 @@ const ALL = Object.entries(DECIDED).flatMap(([need, names]) => names.map((name) 
   ok('decided: domain, DNS and zone deletes are configure, so a developer keeps them', has('configure', 'DELETE /foundations/domain', 'DELETE /foundations/zone', 'DELETE /foundations/zone/records'));
   ok('decided: the everyday lists stay edit', has('edit', 'PUT /sales/services', 'PUT /service/faq', 'PUT /service/saved-replies', 'POST /bookings/types', 'PATCH /bookings/types/:id', 'POST /redirects'));
   ok('decided: archiving a file is not deleting it', has('edit', 'POST /assets/bulk') && has('approve', 'POST /assets/:id/status'));
+  ok('decided: stopping a recurring invoice is delete, like cancelling a retainer; staff can still start, change, pause and skip one', has('delete', 'POST /sales/recurring/:id/stop') && has('edit', 'POST /sales/deals/:id/recurring', 'PATCH /sales/recurring/:id', 'POST /sales/recurring/:id/pause', 'POST /sales/recurring/:id/skip'));
+  ok('decided: removing a draft estimate is delete; sending one and turning it into a draft proposal or invoice is edit', has('delete', 'DELETE /sales/estimates/:id') && has('edit', 'POST /sales/estimates/:id/send', 'POST /sales/estimates/:id/proposal', 'POST /sales/estimates/:id/invoice'));
   ok('decided: staff can still send what they can\'t withdraw', has('edit', 'POST /sales/deals/:id/invoice', 'POST /sales/invoices/:id/send') && has('publish', 'POST /broadcasts/:id/send'));
 
   const CONTENT = [['PUT', '/identity'], ['PUT', '/location'], ['PUT', '/voice'], ['PUT', '/settings'], ['PUT', '/brand/profile'], ['POST', '/pages/duplicate'], ['POST', '/offerings'], ['PUT', `/posts/${ROW}`], ['DELETE', `/faqs/${ROW}`]];
@@ -285,6 +293,8 @@ const CHANGED = [
   { name: 'POST /sales/invoices/:id/void', run: (r, p) => handleSalesInvoiceVoid(A, p, ROW, cors) },
   { name: 'DELETE /broadcasts/lists/:id', fx: { only: ['presence_sales_templates'], rows: { presence_sales_templates: { body: JSON.stringify([{ id: ROW, name: 'Picked', people: [{ email: 'a@example.com' }], created_at: '2026-01-01T00:00:00Z' }]) } } }, run: (r, p) => handleBroadcastListDelete(A, p, ROW, cors) },
   { name: 'POST /sales/deals/:id/retainer/cancel', fx: { rows: { presence_deals: { retainer: { status: 'pending' } } } }, run: (r, p) => handleSalesRetainerCancel(r, A, p, ROW, cors) },
+  { name: 'DELETE /sales/estimates/:id', run: (r, p) => handleEstimateDelete(A, p, ROW, cors) },     // sales review item 47
+  { name: 'POST /sales/recurring/:id/stop', run: (r, p) => handleRecurringAction(r, A, p, ROW, 'stop', cors) },
   { name: 'POST /foundations/domain', body: { domain: 'beta.example' }, run: (r, p) => handleDomain(r, 'POST', A, p, cors) },
   { name: 'DELETE /foundations/domain', run: (r, p) => handleDomain(r, 'DELETE', A, p, cors) },
   { name: 'PUT /foundations/dns', body: { records: [{ type: 'TXT', name: '@', value: 'v', ttl: 300 }] }, run: (r, p) => handleDnsPut(r, A, p, cors) },
@@ -429,6 +439,9 @@ const WRITE_HANDLERS = [
   'handleSalesServices', 'handleSalesTemplateDelete', 'handleSalesStages', 'handleSalesTemplates', 'handleSalesViews', 'handleSavedReplies',
   'handleCalendarLink',   // sales review item 46: POST and DELETE /calendar/link need configure
   'handleEmailLogAddress',   // sales review item 69: POST and DELETE /email/log-address need configure
+  // sales review item 47: estimates and recurring invoices (see DECIDED.edit and .delete)
+  'handleEstimateCreate', 'handleEstimateSend', 'handleEstimateToProposal', 'handleEstimateToInvoice', 'handleEstimateDelete',
+  'handleRecurringStart', 'handleRecurringChange', 'handleRecurringAction',
   'handleStudioRequests',   // final pass S1: POST /portal/studio-requests/:id/(accept|decline) are open; the route answers the owner only
   'handleScheduleCancel', 'handleScheduleCreate', 'handleSettings', 'handleShareSet', 'handleStockImport',
   'handleSupport', 'handleSupportMessage', 'handleSupportOne', 'handleSurveyRespond', 'handleTakeOffline',

@@ -101,11 +101,12 @@ const KEY = '[a-z0-9_]+';
 const MEMBER_WRITES: Array<[MemberWriteNeed, string[]]> = [
   ['delete', [
     `DELETE /(media|assets|redirects|content-library|publishes/checkpoints|bookings/types|knowledge/docs)/${ID}`,
-    `DELETE /sales/(contacts|deals|proposals|contracts|templates)/${ID}`,
+    `DELETE /sales/(contacts|deals|proposals|contracts|templates|estimates)/${ID}`,
     `DELETE /projects/${ID}/deliverables/${ID}`,
     `POST /comments/${ID}/delete`,
     `POST /sales/invoices/${ID}/void`,
     `POST /sales/deals/${ID}/retainer/cancel`,
+    `POST /sales/recurring/${ID}/stop`,   // sales review item 47: stopping a recurring invoice ends its billing, like cancelling a retainer
     'DELETE /broadcasts/lists/[A-Za-z0-9-]{6,40}',   // sales review items 31 + 39: removing a picked list
   ]],
   ['configure', [
@@ -183,7 +184,10 @@ const MEMBER_WRITES: Array<[MemberWriteNeed, string[]]> = [
     `PATCH /sales/(contacts|deals|deal-tasks)/${ID}`,
     `POST /sales/contacts/${ID}/restore`,
     'PUT /sales/services',
-    `POST /sales/deals/${ID}/(stage|activity|tasks|proposals|contracts|convert|resend-invite|invoice|schedule|retainer|send)`,
+    `POST /sales/deals/${ID}/(stage|activity|tasks|proposals|contracts|convert|resend-invite|invoice|schedule|retainer|send|estimates|recurring)`,
+    `POST /sales/estimates/${ID}/(send|proposal|invoice)`,   // sales review item 47: send an estimate, or turn it into a proposal or an invoice (drafts)
+    `PATCH /sales/recurring/${ID}`,
+    `POST /sales/recurring/${ID}/(pause|resume|skip)`,
     `POST /sales/invoices/${ID}/send`,
     `POST /sales/contracts/${ID}/(term|send)`,
     `POST /sales/proposals/${ID}/(send|revise)`,

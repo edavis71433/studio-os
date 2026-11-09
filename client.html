@@ -1505,13 +1505,13 @@ function fileRowHtml(f,ap){
     `<span class="fmeta">${mine?'Sent to your studio':'Shared by your studio'}${when?` · ${esc(when)}`:''}${due}</span></span>`+
     `<button class="fbtn" data-dl="${esc(f.id)}" aria-label="Download — ${esc(f.title)}">Download</button>${acts}</div>`;
 }
-// Documents (proposals & agreements): a Signed chip is the good/green state;
-// everything else stays purple. Meta = kind · signed/sent <date>.
+// Documents (proposals, agreements & estimates): a Signed chip is the good/green
+// state; everything else stays purple. Meta = kind · signed/sent <date>.
 function docRowHtml(d){
-  const contract=d.kind==='contract';const signed=!!(contract&&d.signed_at);
-  const status=contract?(signed?'Signed':'Awaiting signature'):(d.status==='accepted'?'Accepted':d.status==='declined'?'Declined':'Sent');
+  const contract=d.kind==='contract';const signed=!!(contract&&d.signed_at);const est=d.kind==='estimate';
+  const status=contract?(signed?'Signed':'Awaiting signature'):est?(d.status==='approved'?'Approved':d.status==='declined'?'Not now':'Sent'):(d.status==='accepted'?'Accepted':d.status==='declined'?'Declined':'Sent');
   const when=signed?fdate(d.signed_at):fdate(d.created_at);
-  const meta=(contract?'Agreement':'Proposal')+(when?` · ${signed?'signed':'sent'} ${when}`:'');
+  const meta=(contract?'Agreement':est?'Estimate':'Proposal')+(when?` · ${signed?'signed':'sent'} ${when}`:'');
   const view=d.view_url?`<a class="fbtn" href="${esc(d.view_url)}" target="_blank" rel="noopener" aria-label="View — ${esc(d.title)}">View</a>`:'';
   return `<div class="frow"><span class="fico" aria-hidden="true">${contract?si('pencil'):si('file')}</span>`+
     `<span class="fmain"><span class="fname">${esc(d.title)}</span><span class="fmeta">${esc(meta)}</span></span>`+

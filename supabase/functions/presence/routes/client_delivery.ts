@@ -21,6 +21,7 @@ import { notifHref, notifLabel, isRead } from '../lib/notifications.ts';
 import { moneyState, moneyBuckets } from '../lib/money_state.ts';
 import { isStudioSide, studioDenied, loadApprovals, clearApprovalOverdue } from './projects.ts';
 import { signDocToken, type DocKind } from '../lib/documents.ts';
+import { proposalTotals } from '../lib/sales_lifecycle.ts';
 import { linkSecret, docViewerUrl } from './sales.ts';
 import { readGsc, readSearchTerms } from './analytics.ts';
 import { aggregateVisits, type VisitRow } from '../lib/visits.ts';
@@ -276,7 +277,7 @@ export async function handleClientUploadCreate(req: Request, site: SiteRow, prin
   return json({ data: rows(ins)[0] }, 201, cors);
 }
 
-// ═══ DOCUMENTS (the client's proposals & agreements, findable in-portal) ═══
+// ═══ DOCUMENTS (the client's proposals, agreements and estimates, findable in-portal) ═══
 // A top client-portal gap: signing worked ONLY via an emailed link, so a client who
 // lost the email couldn't find their proposal/contract again. This lists every
 // document on the deals that made them a customer, with a branded view link (a short-
@@ -288,14 +289,17 @@ export async function handleClientDocuments(_req: Request, site: SiteRow, _princ
   const deals = rows(await svc(`presence_deals?converted_client_id=eq.${me}&deleted_at=is.null&select=id&limit=50`));
   if (!deals.length) return json({ data: { documents: [] } }, 200, cors);
   const ids = deals.map((d) => d.id).join(',');
-  const [props, cons] = await Promise.all([
+  const [props, cons, ests] = await Promise.all([
     svc(`presence_proposals?deal_id=in.(${ids})&status=in.(sent,accepted,declined,superseded)&deleted_at=is.null&select=id,title,status,subtotal_cents,created_at,site_id&order=created_at.desc&limit=100`),
     svc(`presence_contracts?deal_id=in.(${ids})&status=in.(sent,signed)&deleted_at=is.null&select=id,title,status,signed_at,created_at,site_id&order=created_at.desc&limit=100`),
+    // item 47: estimates they were sent (none before APPLY-0145: the read fails and adds nothing)
+    svc(`presence_estimates?deal_id=in.(${ids})&status=in.(sent,approved,declined)&deleted_at=is.null&select=id,title,status,line_items,created_at,site_id&order=created_at.desc&limit=100`),
   ]);
   const secret = linkSecret();
   const mk = async (kind: DocKind, id: string, siteId: string) => secret ? docViewerUrl(await signDocToken({ t: 'doc', k: kind, id, site_id: String(siteId), exp: Math.floor(Date.now() / 1000) + 30 * 86400 }, secret)) : null;
   const documents: any[] = [];
   for (const p of rows(props)) documents.push({ kind: 'proposal', id: p.id, title: clean(p.title, 200) || 'Proposal', status: p.status, amount: (Number(p.subtotal_cents) || 0) / 100, created_at: p.created_at, view_url: await mk('proposal', p.id, p.site_id) });
+  for (const e of rows(ests)) documents.push({ kind: 'estimate', id: e.id, title: clean(e.title, 200) || 'Estimate', status: e.status, amount: proposalTotals(e.line_items).total_cents / 100, created_at: e.created_at, view_url: await mk('estimate', e.id, e.site_id) });
   for (const c of rows(cons)) documents.push({ kind: 'contract', id: c.id, title: clean(c.title, 200) || 'Agreement', status: c.status, signed_at: c.signed_at, created_at: c.created_at, view_url: await mk('contract', c.id, c.site_id) });
   documents.sort((a, b) => String(b.created_at).localeCompare(String(a.created_at)));
   return json({ data: { documents } }, 200, cors);

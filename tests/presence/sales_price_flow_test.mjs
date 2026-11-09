@@ -145,7 +145,7 @@ const pipe = read('pipeline.html');
   ok('sign.html: Pay is the Stripe link only once signed — "Pay the $X deposit →"', /Pay the \$\{money\(dep\.amount_cents\)\} deposit →/.test(sign) && /else if\(dep&&dep\.url\)\{/.test(sign));
   ok('sign.html: accepted-but-no-agreement says the studio is preparing it (and the studio got the notice)', /your studio has been told and is preparing the agreement/.test(sign));
   ok('sign.html: the certificate block and the consent line survive on the one page', /Signature certificate/.test(sign) && /Typing your name here counts as your signature/.test(sign) && /Document fingerprint/.test(sign));
-  ok('sign.html: a per-document (old) link still renders the single document', /if\(d\.kind==='flow'\)renderFlow\(d,after\|\|null\);/.test(sign) && /else if\(d\.kind==='proposal'\)renderProposal\(d\);else renderContract\(d\);/.test(sign));
+  ok('sign.html: a per-document (old) link still renders the single document', /if\(d\.kind==='flow'\)renderFlow\(d,after\|\|null\);/.test(sign) && /else if\(d\.kind==='proposal'\)renderProposal\(d\);(?:else if\(d\.kind==='estimate'\)renderEstimate\(d\);)?else renderContract\(d\);/.test(sign));
   ok('sign.html: a stale version (409) still swaps the actions for "Load the latest version"', /Load the latest version/.test(sign));
 }
 
