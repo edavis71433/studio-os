@@ -168,7 +168,10 @@ jobs:
           curl -s --fail "$base/commerce/plans" | grep -q -i 'plan' || { echo "presence /commerce/plans smoke FAILED"; exit 1; }
           code=$(curl -s -o /dev/null -w "%{http_code}" "$base/connections")
           [ "$code" = "401" ] || { echo "presence /connections expected 401 (gated), got $code"; exit 1; }
-          echo "presence smoke passed (catalog 200, /connections 401 gated)."
+          # /system loads its route file on first use (lib/lazy.ts), so this also proves the bundle carries those files
+          code=$(curl -s -o /dev/null -w "%{http_code}" "$base/system/health")
+          [ "$code" = "403" ] || { echo "presence /system/health expected 403 (no secret), got $code"; exit 1; }
+          echo "presence smoke passed (catalog 200, /connections 401 gated, /system/health 403 without the secret)."
 
       - name: Smoke test — Free Tools functions answer and gate
         run: |
@@ -264,7 +267,10 @@ jobs:
           curl -s --fail "$base/commerce/plans" | grep -q -i 'plan' || { echo "presence /commerce/plans smoke FAILED"; exit 1; }
           code=$(curl -s -o /dev/null -w "%{http_code}" "$base/connections")
           [ "$code" = "401" ] || { echo "presence /connections expected 401 (gated), got $code"; exit 1; }
-          echo "presence smoke passed (catalog 200, /connections 401 gated)."
+          # /system loads its route file on first use (lib/lazy.ts), so this also proves the bundle carries those files
+          code=$(curl -s -o /dev/null -w "%{http_code}" "$base/system/health")
+          [ "$code" = "403" ] || { echo "presence /system/health expected 403 (no secret), got $code"; exit 1; }
+          echo "presence smoke passed (catalog 200, /connections 401 gated, /system/health 403 without the secret)."
 
       - name: Smoke test — Free Tools functions answer and gate
         run: |
