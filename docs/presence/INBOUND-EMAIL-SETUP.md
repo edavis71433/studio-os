@@ -27,17 +27,26 @@ briefly broken.
 
 ## Steps
 
-### 1. Verify an inbound domain in Resend (MX)
-In Resend → **Domains** → add the domain/subdomain you'll receive on, and add the
-**MX record(s)** Resend shows to your DNS. Wait for Resend to mark it
-**verified**. This is the ~15-minute part (mostly DNS propagation).
+### 1. Turn on receiving for the inbound domain in Resend (MX)
+In Resend → **Domains** → open the domain/subdomain you'll receive on → **Records**
+→ switch on **Enable receiving**. Resend then shows one **MX record**; add it to
+your DNS and wait for Resend to mark it verified. A domain verified for SENDING
+is not thereby set up for RECEIVING — the switch is separate, and until the MX
+exists every reply bounces with "domain couldn't be found".
 
-### 2. Add the inbound route
-In Resend → **Inbound** (or the domain's inbound settings) → add a route that
-forwards **`*@<domain>`** (catch-all) to a webhook. We rely on the catch-all so
-that **every** `<siteId>@<domain>` address works without per-tenant config.
+Production (Nov 2026): domain `reply.davisdigitalstudio.com`; the MX is host
+`reply`, value `receive.forge.rmta.net`, priority 10, added at Namecheap under
+Advanced DNS → Mail Settings (already **Custom MX**, so the Private Email records
+for `@` and the `send` / `send.reply` records stay as they are).
 
-### 3. Point the route at our webhook
+Receiving is a catch-all: once the MX is live, mail to **any** address at the
+domain reaches Resend, so **every** `<siteId>@<domain>` address works without
+per-tenant config.
+
+### 2. Add the webhook
+In Resend → **Webhooks** → **Add webhook**, listening for **`email.received`**.
+
+### 3. Point the webhook at our route
 Webhook URL (production):
 
 ```
@@ -45,6 +54,15 @@ https://qksstlqzbhesadrrofgn.supabase.co/functions/v1/presence/email/inbound
 ```
 
 Save. Resend will show a **signing secret** that starts with `whsec_`.
+
+> **The webhook is the envelope only.** Resend's `email.received` event carries
+> `email_id`, from, to, cc, subject and message_id — **not** the body, the
+> headers or the sender-auth verdict. The route reads the full message from
+> Resend's received-email API (`GET /emails/receiving/{email_id}`) with
+> **`RESEND_KEY`**, so that key must be a **Full access** key: a Sending-access
+> key is refused, the route answers 502, and Resend keeps redelivering until the
+> key is fixed (its retries run for about a day, and Resend → Webhooks → the
+> endpoint → a failed message → **Replay** resends one by hand after that).
 
 ### 4. Copy the signing secret — but do NOT set it yet
 Copy the `whsec_…` value somewhere safe. You will set it in **step 7**, *after* the
@@ -101,14 +119,17 @@ supabase secrets set RESEND_INBOUND_DOMAIN=<your-inbound-domain>  --project-ref 
 > pick up a changed `RESEND_INBOUND_SECRET` / `RESEND_INBOUND_DOMAIN`. (The new
 > **code** must already be deployed — that was step 5.)
 
-> **DKIM/SPF must be configured in Resend so it stamps a STRUCTURED verdict.**
-> The sender-auth gate (SA1) trusts ONLY the provider's structured
-> `dmarc`/`spf`/`dkim` verdict fields — it deliberately does **not** parse the
+> **The sender check uses Resend's own verdict.** The sender-auth gate (SA1)
+> trusts ONLY a structured verdict — it deliberately does **not** parse the
 > message's own `Authentication-Results` headers (an attacker controls those and
-> could forge a `dmarc=pass`). Consequence: **if Resend forwards a message with no
-> structured verdict, the mail FAILS CLOSED and is dropped.** Make sure DKIM/SPF
-> are set up in your Resend inbound/domain config so Resend authenticates the
-> sender and supplies the verdict; otherwise legitimate mail will silently drop.
+> could forge a `dmarc=pass`). Resend's received-email API reports the RECEIVING
+> server's checks as `authentication: { spf, dkim, dmarc }`, which is what the
+> gate reads. Those come without domains, so the "SPF and DKIM both aligned"
+> fallback can't apply: in practice the gate needs **`dmarc: pass`**. Mail from
+> the big providers (Gmail, Yahoo, Outlook, iCloud) normally passes; a sender whose own domain publishes no
+> DMARC record can't, and their mail is dropped with
+> `[inbound] dropped: sender_auth:dmarc_<result>` in the function logs. A message
+> with no verdict at all FAILS CLOSED the same way.
 
 ### 8. Apply migration 0114
 Apply the dedup keys (idempotency for re-delivered webhooks). In Supabase → SQL
@@ -167,6 +188,8 @@ safe.
 | Bad/expired signature | **401** |
 | Per-site flood (>30 / 10 min) | **429** |
 | Bad JSON / not `email.received` / unparseable | **200 ack** (dropped, masked warn) |
+| Full-message read fails (network, timeout, 429/5xx, key unset or refused, not JSON) | **502** (Resend retries) |
+| Full message gone (404) or over 8MB | **200 ack** (dropped) |
 | Auto-responder / bounce / bulk | **200 ack** (dropped) |
 | DMARC/SPF/DKIM verdict not ok | **200 ack** (dropped, verdict named in the warn) |
 | Our own / `@<inbound-domain>` sender | **200 ack** (dropped) |

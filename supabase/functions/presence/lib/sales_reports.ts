@@ -53,14 +53,17 @@ export function dealsByStage(deals: Array<{ id?: unknown; title?: unknown; stage
 }
 
 // ── 3. won and not a fit over the last year ──
-export const LOST_REASONS = ['Price', 'Timing', 'Went with someone else', 'No reply', 'Not a fit for us'];
+export const LOST_REASONS = ['Price', 'Timing', 'Went with someone else', 'No reply', 'Outside what we do'];
+// Final pass (Nov 8, batch C): "Not a fit for us" read like the stage itself. Deals already
+// marked with the old words count with the new ones.
+const REASON_ALIAS: Record<string, string> = { 'not a fit for us': 'Outside what we do' };
 export const SOURCE_LABEL: Record<string, string> = { website_form: 'Website enquiry', manual: 'Added by hand', import: 'Imported', referral: 'Referral', email: 'Email' };
 export const sourceLabel = (s: unknown) => { const k = String(s || '').trim(); return SOURCE_LABEL[k] || (k ? k.charAt(0).toUpperCase() + k.slice(1).replace(/_/g, ' ') : 'Not recorded'); };
 /** One spelling per reason: the five offered reasons match whatever the case; anything else groups by its own words. */
 export function reasonLabel(r: unknown): string {
   const t = String(r || '').replace(/\s+/g, ' ').trim();
   if (!t) return 'No reason given';
-  const hit = LOST_REASONS.find((x) => x.toLowerCase() === t.toLowerCase());
+  const hit = LOST_REASONS.find((x) => x.toLowerCase() === t.toLowerCase()) || REASON_ALIAS[t.toLowerCase()];
   return hit || (t.charAt(0).toUpperCase() + t.slice(1)).slice(0, 80);
 }
 function groupBy<T>(list: T[], key: (x: T) => string, value: (x: T) => number, cap: number, otherLabel: string) {

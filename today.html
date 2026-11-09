@@ -278,7 +278,7 @@ function scopeHref(base){const _c=new URLSearchParams(location.search).get('clie
 // ── slice 10 pure helpers (mirrored 1:1 in tests/presence/today_home_test.mjs) ──
 // The greeting's date line — "Friday, July 18".
 function dateLine(nowMs){return new Date(nowMs==null?Date.now():nowMs).toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric'});}
-const money=(c)=>'$'+((c||0)/100).toLocaleString(undefined,{maximumFractionDigits:0});
+const money=(c)=>{const v=(c||0)/100;return '$'+v.toLocaleString(undefined,Number.isInteger(v)?{maximumFractionDigits:0}:{minimumFractionDigits:2,maximumFractionDigits:2});};   // final pass, batch C: one money format (whole dollars, or with cents)
 // "This month" tiles from GET /analytics/dashboard — a tile exists only when its
 // section does (slice-8 has_data discipline: a null section or has_data:false
 // traffic read never becomes a fake zero; no sections → no card at all).
@@ -381,7 +381,7 @@ function customerRows(list){
       href:c.customer_site_id?'/crm.html?client='+encodeURIComponent(c.customer_site_id):'/crm.html?client_id='+encodeURIComponent(c.client_id)};
   });
 }
-function initials(n){return String(n||'').trim().split(/\s+/).slice(0,2).map(w=>w.charAt(0).toUpperCase()).join('')||'?';}
+function initials(n){return String(n||'').trim().split(/\s+/).map(w=>Array.from(w).find(ch=>/[\p{L}\p{N}\p{Extended_Pictographic}]/u.test(ch))||'').filter(Boolean).slice(0,2).map(ch=>{const up=ch.toUpperCase();return up.length===1?up:ch;}).join('')||'?';}   // batch C: an emoji or "ß" stays whole; a word's first letter, never a bracket
 
 // ── inline stroke icons for the band + stat tiles (crm.html's set) ──────────
 const SVG={

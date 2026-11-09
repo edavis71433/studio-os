@@ -22,7 +22,7 @@ import { moneyState, moneyBuckets } from '../lib/money_state.ts';
 import { buildMyTasks, MY_TASKS_MAX } from '../lib/my_tasks.ts';
 import { revenueByMonth, dealsByStage, wonAndLost, enquiriesBySource, overdueInvoices, OPEN_STAGES as REPORT_OPEN_STAGES } from '../lib/sales_reports.ts';
 import { normalizeViews, normalizeViewList, isViewList } from '../lib/saved_views.ts';
-import { readReservedJson, writeReservedJson, updateReservedJson, RESERVED_NAMES } from '../lib/reserved_store.ts';
+import { readReservedJson, readReservedJsonOrThrow, writeReservedJson, updateReservedJson, RESERVED_NAMES } from '../lib/reserved_store.ts';
 import { normalizeStageNames, stageLabels, loadStageLabels, forgetStageLabels, renameMovedTo, DEFAULT_STAGE_LABEL } from '../lib/stage_names.ts';
 import { validateRetainerInput, mergeRetainerState, type RetainerState } from '../commerce/retainers.ts';
 import { editionFor } from '../commerce/catalog.ts';
@@ -320,7 +320,12 @@ export async function handleSalesStages(req: Request, site: SiteRow, principal: 
 // One reserved JSON row (lib/reserved_store.ts); every write is normalized
 // (lib/saved_views.ts). PUT replaces ONE list's views and returns them all.
 export async function handleSalesViews(req: Request, site: SiteRow, principal: Principal, cors: Record<string, string>): Promise<Response> {
-  if (req.method === 'GET') return json({ data: normalizeViews(await readReservedJson(site.id, RESERVED_NAMES.savedViews)) }, 200, cors);
+  if (req.method === 'GET') {
+    // final pass (Nov 8, batch D): a failed read is not "no saved views" — the page then built
+    // its list from nothing, and its next save replaced the team's views
+    try { return json({ data: normalizeViews(await readReservedJsonOrThrow(site.id, RESERVED_NAMES.savedViews)) }, 200, cors); }
+    catch { return json({ error: 'read_failed', message: 'Your saved views couldn’t load just now.' }, 502, cors); }
+  }
   if (req.method === 'PUT') {
     let b: any = {}; try { b = await req.json(); } catch { return json({ error: 'bad_json' }, 400, cors); }
     if (!isViewList(b?.list)) return json({ error: 'validation', message: 'Which list are these views for?' }, 422, cors);
@@ -553,7 +558,8 @@ export async function handleSalesSummary(req: Request, site: SiteRow, principal:
 /** How far back the receivables payload's Paid bucket looks. */
 const PAID_WINDOW_DAYS = 30;
 export async function handleSalesReceivables(_req: Request, site: SiteRow, _principal: Principal, cors: Record<string, string>): Promise<Response> {
-  return json({ data: await loadReceivables(site) }, 200, cors);
+  try { return json({ data: await loadReceivables(site) }, 200, cors); }
+  catch { return json({ error: 'read_failed', message: 'Who owes you couldn’t load just now.' }, 502, cors); }   // batch D: never "all paid up" on a failed read
 }
 /** The receivables payload itself — shared with the agency home's "Needs you"
  *  (agency/routes.ts), so the money rows there, the roster's Outstanding column
@@ -568,6 +574,10 @@ export async function loadReceivables(site: SiteRow) {
   const SEL = 'id,title,amount_cents,due_date,deal_id,created_at,stripe_url';
   let invR = await svc(`presence_invoices?site_id=eq.${site.id}&deleted_at=is.null&status=eq.open&select=${SEL},processing_since&order=due_date.asc.nullslast,created_at.asc&limit=300`);
   if (!invR.ok) invR = await svc(`presence_invoices?site_id=eq.${site.id}&deleted_at=is.null&status=eq.open&select=${SEL}&order=due_date.asc.nullslast,created_at.asc&limit=300`);
+  // final pass (Nov 8, batch D): open invoices that couldn't be read are a failure, never an
+  // empty book — Who owes you said "all paid up", the overdue report $0 and Home's Needs you
+  // left the money out without saying it was partial. Every caller has its honest path.
+  if (!invR.ok) throw new Error('receivables_read_failed');
   const invs = rows(invR);
   // Oct 2026 benchmark (item 2): the Paid bucket — what landed in the last 30
   // days — rides along so the band can show all four states from ONE list.
@@ -1181,7 +1191,7 @@ async function emailSalesDoc(siteId: string, dealId: string | null, kind: 'propo
       : 'Your studio has prepared a proposal for you. Take a look whenever you’re ready — nothing is final until you accept.';
     const label = kind === 'contract' ? 'Review &amp; sign →' : 'Review the proposal →';
     const btn = `<a href="${url}" style="display:inline-block;margin-top:6px;background:${brand.accent};color:#fff;padding:9px 16px;border-radius:999px;text-decoration:none">${label}</a>`;
-    return await sendEmail(String(email), subject, `<p>${line}</p><p class="cta">${btn}</p>`, brand, { critical: true });   // a doc THEY are waiting to sign = transactional
+    return await sendEmail(String(email), subject, `<p>${line}</p><p class="cta">${btn}</p>`, brand, { critical: true, siteId });   // a doc THEY are waiting to sign = transactional; their answer lands in the Inbox
   } catch { return false; }
 }
 
@@ -1205,7 +1215,7 @@ async function emailSalesFlow(siteId: string, dealId: string, url: string | null
         : `${who} has prepared your proposal. Take a look whenever you’re ready — nothing is final until you accept.`;
     const label = has.contract ? 'Review &amp; sign →' : 'Review the proposal →';
     const btn = `<a href="${url}" style="display:inline-block;margin-top:6px;background:${brand.accent};color:#fff;padding:9px 16px;border-radius:999px;text-decoration:none">${label}</a>`;
-    return await sendEmail(String(email), `Your ${what} from ${brand.name}`, `<p>${line}</p><p class="cta">${btn}</p>`, brand, { critical: true });   // a doc THEY are waiting to sign = transactional
+    return await sendEmail(String(email), `Your ${what} from ${brand.name}`, `<p>${line}</p><p class="cta">${btn}</p>`, brand, { critical: true, siteId });   // a doc THEY are waiting to sign = transactional; their answer lands in the Inbox
   } catch { return false; }
 }
 
@@ -1224,7 +1234,7 @@ async function emailInvoice(siteId: string, dealId: string, title: string, url: 
     // A branded, printable copy of the invoice (a keepable record alongside the pay link).
     const doc = invoiceId ? await docLink('invoice', invoiceId, siteId) : null;
     const docLine = doc ? `<p style="margin-top:6px"><a href="${doc}" style="color:${brand.accentDark}">View / print your copy →</a></p>` : '';
-    return await sendEmail(String(email), `${title} — ${amount}`, `<p>Your studio has sent you ${article} ${safeTitle.toLowerCase()} for <strong>${amount}</strong>. You can pay securely here — nothing else needed.</p><p class="cta">${btn}</p>${docLine}`, brand, { critical: true });   // a payment link = transactional
+    return await sendEmail(String(email), `${title} — ${amount}`, `<p>Your studio has sent you ${article} ${safeTitle.toLowerCase()} for <strong>${amount}</strong>. You can pay securely here — nothing else needed.</p><p class="cta">${btn}</p>${docLine}`, brand, { critical: true, siteId });   // a payment link = transactional; their answer lands in the Inbox
   } catch { return false; }
 }
 
@@ -1511,7 +1521,7 @@ async function emailRetainerLink(siteId: string, dealId: string, url: string, am
     const btn = `<a href="${url}" style="display:inline-block;margin-top:6px;background:${brand.accent};color:#fff;padding:9px 16px;border-radius:999px;text-decoration:none">Set up your ${amount}/${per} retainer →</a>`;
     return await sendEmail(String(email), `Your retainer — ${amount} every ${per}`,
       `<p>Your studio has set up an ongoing retainer of <strong>${amount} every ${per}</strong>. You authorize it securely through Stripe — you’re always in control, and you can cancel any time.</p><p class="cta">${btn}</p>`,
-      brand, { critical: true });   // a payment authorization the client is expecting = transactional
+      brand, { critical: true, siteId });   // a payment authorization the client is expecting = transactional; their answer lands in the Inbox
   } catch { return false; }
 }
 
@@ -2081,7 +2091,7 @@ export async function handleSalesContractSign(req: Request, id: string, cors: Re
         `Signed at: ${signedAt.slice(0, 19).replace('T', ' ')} UTC<br>` +
         `Document fingerprint: <span style="font-family:ui-monospace,Menlo,Consolas,monospace;overflow-wrap:anywhere">${String(c.content_hash || '')}</span></div>` +
         docLine,
-        brand, { critical: true }).catch(() => false);   // their signed legal record = transactional
+        brand, { critical: true, siteId: tok.site_id }).catch(() => false);   // their signed legal record = transactional; their answer lands in the Inbox
     }
   } catch { /* the signature stands; the copy email is best-effort */ }
 
@@ -2523,7 +2533,7 @@ async function sendCustomerInvite(siteId: string, email: string, _isNewLogin: bo
     `</ul>` +
     cta +
     `<p style="font-size:13px;color:#6b6478">You can sign in any time at <a href="${base}/portal.html">your portal</a>. If anything looks off, just reply and tell me.</p>`,
-  brand, { critical: true }).catch(() => {});   // login access = transactional
+  brand, { critical: true, siteId }).catch(() => {});   // login access = transactional; "message me directly" — their answer lands in the Inbox
   return true;
 }
 

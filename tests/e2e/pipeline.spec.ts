@@ -480,7 +480,7 @@ test.describe('SS5 honest meta (fetch cap + at-cap wording)', () => {
     await expect(page.locator('.lhead .lmeta')).toContainText('2 open deals · $7,500 open');
     await expect(page.locator('.lhead .lmeta')).not.toContainText('total');
     // the board-foot still explains the hidden outcomes
-    await expect(page.locator('.board-foot')).toContainText('2 won or closed deals — see them in List view.');
+    await expect(page.locator('.board-foot')).toContainText('2 won or not-a-fit deals — see them in List view.');   // batch C: "closed" retired
     // switching to List restores the full-fetched-set semantics (item 1)
     await page.locator('#viewList').click();
     await expect(page.locator('#list .card')).toHaveCount(4);
@@ -661,8 +661,8 @@ test.describe('Deal drawer Path', () => {
     await expect(guide).toContainText('Follow up, then send the agreement once they say yes');          // action
     // forward is the brand "Mark stage complete" button (sentence case, Oct 2026 experience review)
     await expect(page.locator('#markComplete')).toContainText('Mark stage complete');
-    // "Mark as lost" stays the separate quiet action, outside the Path
-    await expect(page.locator('#markLost')).toContainText('Mark as lost');
+    // "Mark as not a fit" stays the separate quiet action, outside the Path (batch C: "lost" retired)
+    await expect(page.locator('#markLost')).toContainText('Mark as not a fit');
   });
 
   test('the current chevron toggles the guidance; the back-target asks before moving', async ({ page }) => {
@@ -891,12 +891,17 @@ const STARTER = [
   ['Site audit — Competitive Intelligence', '899'],
 ] as const;
 
+// final pass, batch C: on a phone "Manage services" lives under More in the toolbar
+async function openServices(page: import('@playwright/test').Page) {
+  if (await page.locator('#moreBtn').isVisible()) { await page.locator('#moreBtn').click(); await page.getByRole('menuitem', { name: 'Manage services' }).click(); }
+  else await page.locator('#mngServicesTop').click();
+}
 test.describe('services catalog — starter list (ask 1)', () => {
   test('“Manage services” is reachable from the page toolbar, not just inside a deal', async ({ page }) => {
     await installApp(page, { api: API });
     await page.goto('/pipeline.html');
-    await expect(page.locator('#mngServicesTop')).toBeVisible();
-    await page.locator('#mngServicesTop').click();
+    await expect(page.locator('#mngServicesTop, #moreBtn').locator('visible=true')).toHaveCount(1);   // the button, or More on a phone
+    await openServices(page);
     await expect(page.locator('#svcDlg')).toBeVisible();
   });
 
@@ -908,7 +913,7 @@ test.describe('services catalog — starter list (ask 1)', () => {
       return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: [] }) });
     });
     await page.goto('/pipeline.html');
-    await page.locator('#mngServicesTop').click();
+    await openServices(page);
     await expect(page.locator('#svcStarterNote')).toContainText('Starting points from your pricing page');
     await expect(page.locator('#svcRows .svc-row')).toHaveCount(STARTER.length);
     for (const [i, [name, price]] of STARTER.entries()) {
@@ -929,7 +934,7 @@ test.describe('services catalog — starter list (ask 1)', () => {
       return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: [] }) });
     });
     await page.goto('/pipeline.html');
-    await page.locator('#mngServicesTop').click();
+    await openServices(page);
     await page.locator('#svcRows .svc-row').nth(0).locator('.svc-price').fill('1750');   // his price, not ours
     await page.locator('#svcRows .svc-row').nth(5).locator('.svc-del').click();          // drop one he doesn't sell
     await page.locator('#svcSave').click();
@@ -944,7 +949,7 @@ test.describe('services catalog — starter list (ask 1)', () => {
   test('a catalog that already has services is shown as-is — no starter note, no seeding', async ({ page }) => {
     await installApp(page, { api: { ...API, '/sales/services': { data: [{ name: 'Logo refresh', price_cents: 60000 }] } } });
     await page.goto('/pipeline.html');
-    await page.locator('#mngServicesTop').click();
+    await openServices(page);
     await expect(page.locator('#svcRows .svc-row')).toHaveCount(1);
     await expect(page.locator('#svcRows .svc-name').first()).toHaveValue('Logo refresh');
     await expect(page.locator('#svcStarterNote')).toHaveCount(0);
@@ -959,7 +964,7 @@ test.describe('services catalog — starter list (ask 1)', () => {
     await page.route('**/functions/v1/presence/sales/services', (route) =>
       route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: [] }) }));
     await page.goto('/pipeline.html');
-    await page.locator('#mngServicesTop').click();
+    await openServices(page);
     await expect(page.locator('#svcRows .svc-row').first()).toBeVisible();
     await page.waitForTimeout(200);                                   // well past the old 20ms focus()
     // nothing inside the seeded editor may have grabbed the caret
@@ -978,7 +983,7 @@ test.describe('services catalog — starter list (ask 1)', () => {
   test('an editor that opens BLANK still takes the caret', async ({ page }) => {
     await installApp(page, { api: { ...API, '/sales/services': { data: [{ name: '', price_cents: 0 }] } } });
     await page.goto('/pipeline.html');
-    await page.locator('#mngServicesTop').click();
+    await openServices(page);
     await expect(page.locator('#svcRows .svc-row')).toHaveCount(1);
     await expect(page.locator('#svcRows .svc-name').first()).toHaveValue('');
     await expect(page.locator('#svcRows .svc-name').first()).toBeFocused();
@@ -987,7 +992,7 @@ test.describe('services catalog — starter list (ask 1)', () => {
   test('"Add a service" focuses the row it just added', async ({ page }) => {
     await installApp(page, { api: { ...API, '/sales/services': { data: [{ name: 'Logo refresh', price_cents: 60000 }] } } });
     await page.goto('/pipeline.html');
-    await page.locator('#mngServicesTop').click();
+    await openServices(page);
     await expect(page.locator('#svcRows .svc-row')).toHaveCount(1);
     await page.locator('#svcAdd').click();
     await expect(page.locator('#svcRows .svc-name').nth(1)).toBeFocused();

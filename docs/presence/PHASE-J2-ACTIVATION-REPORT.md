@@ -15,6 +15,8 @@
 | **The full operational cycle executed live** on staging AND prod — observations→judgment→recommendation→moments + scheduled-publish check + the Phase-RL lifecycle sweep in one tick | staging: `{ran:1, steps all true, lifecycle:{...}}`; prod: clean run, 0 failures |
 | **⏰ CRON SCHEDULED — the big one** — `presence-cycle` every 15 minutes via pg_cron + pg_net on **both projects**, secret pulled from Vault at call time (never stored in job text or the repo) | `cron.job` rows (active=true, `*/15 * * * *`) both envs; the exact cron command fired once → **HTTP 200 with a real cycle result** in `net._http_response` |
 
+> **Note (Nov 2026):** by November the live jobs no longer matched the cron row above. `supabase/ops/schedule-presence-cron.sql` is the current schedule; `docs/presence/APPLY-cron-vault-prod.sql` and `APPLY-cron-vault-staging.sql` brought both projects back to it.
+
 With cron live, the platform now runs itself: observation cycles, scheduled publishes (15-minute granularity), retries, and the revenue-lifecycle sweep — unattended.
 
 ## Operational verification (Step 3) — evidence per system

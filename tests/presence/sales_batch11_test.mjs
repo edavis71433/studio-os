@@ -114,7 +114,7 @@ ok('Pipeline: a won or not-a-fit deal never "closes"', /d\.expected_close&&d\.st
 ok('Send an update: a "Your customers" list', B.SEGMENTS[0].key === 'customers' && B.isSegmentKey('customers') && B.isAudienceKey('customers'));
 const bl = read('supabase/functions/presence/lib/broadcast.ts');
 ok('…its people are this studio\'s active customers', /presence_service_links\?agency_site_id=eq\.\$\{siteId\}&status=eq\.active&select=customer_client_id/.test(bl));
-ok('…and it only shows when there are some', /SEGMENTS\.filter\(\(s\) => s\.key !== 'customers' \|\| \(counts\[s\.key\] \?\? 0\) > 0\)/.test(read('supabase/functions/presence/routes/broadcasts.ts')));
+// …and it only shows when there are some: checked by behaviour in sales_reads_harness_test.mjs (final pass, batch D)
 
 // ── items 57–59 (phones) ──
 ok('record: the stage strip opens on the current stage', /const pth=host\.querySelector\('\.path'\),curStep=host\.querySelector\('\.path \.pstep\.current'\);/.test(page));

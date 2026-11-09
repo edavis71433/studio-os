@@ -36,7 +36,9 @@ export function normalizeView(raw: unknown): SavedView | null {
   const base = KEY_RE.test(String(r.base || '')) ? String(r.base) : '';
   const cols = Array.isArray(r.cols) ? [...new Set(r.cols.map((c) => String(c)).filter((c) => KEY_RE.test(c)))].slice(0, MAX_COLS) : [];
   const s = r.sort as Record<string, unknown> | null | undefined;
-  const sort = s && KEY_RE.test(String(s.key || '')) ? { key: String(s.key), dir: (Number(s.dir) < 0 ? -1 : 1) as 1 | -1 } : null;
+  // final pass (Nov 8, batch D): "desc" and "asc" are understood — "desc" read as NaN and sorted ascending
+  const desc = s && (String(s.dir).trim().toLowerCase() === 'desc' || Number(s.dir) < 0);
+  const sort = s && KEY_RE.test(String(s.key || '')) ? { key: String(s.key), dir: (desc ? -1 : 1) as 1 | -1 } : null;
   return { id, name, base, q: str(r.q, 80), cols, sort };
 }
 

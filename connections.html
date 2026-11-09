@@ -482,7 +482,7 @@ async function paintCalendar(){
       <p class="calp quiet">Google reads the link a few times a day, so a new booking can take a few hours to show. Anyone with the link can see these events, so keep it to yourself.</p>
       <div class="calacts"><button type="button" class="btn" id="calNew" data-needs="configure">Make a new link</button><button type="button" class="btn ghost" id="calOff" data-needs="configure">Turn it off</button></div>`;
   }
-  host.innerHTML = `<div class="sec-h"><h2>Calendar</h2></div><div class="list"><div class="calbox"><div class="calt">Google Calendar</div>${inner}</div></div>`;
+  host.innerHTML = `<div class="sec-h"><h2>Calendar</h2></div><div class="list"><div class="calbox"><div class="calt">Your calendar</div>${inner}</div></div>`;
   host.hidden = false;
   const make = async (btn, method, okMsg) => {
     btn.disabled = true;
@@ -492,7 +492,7 @@ async function paintCalendar(){
   };
   const mk = $('calMake'); if(mk) mk.addEventListener('click', () => make(mk, 'POST', 'Your calendar link is ready.'));
   const cp = $('calCopy'); if(cp) cp.addEventListener('click', async () => {
-    const u = $('calUrl'); try { await navigator.clipboard.writeText(u.value); toast('Copied.'); } catch(_e){ u.select(); toast('Press Copy on your keyboard.'); }
+    const u = $('calUrl'); try { await navigator.clipboard.writeText(u.value); toast('Copied.'); } catch(_e){ u.select(); toast('Press ⌘C (Ctrl+C on Windows) to copy it.'); }
   });
   const nw = $('calNew'); if(nw) nw.addEventListener('click', async () => {
     if(!(await askConfirm('Make a new link?', 'The old link stops working, so calendars using it go quiet until you add the new one.', 'Make a new link'))) return;

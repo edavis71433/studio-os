@@ -11,7 +11,7 @@ Supersedes `docs/SECRETS-INVENTORY.md` (which predates the Connected Platform an
 | `SUPABASE_URL` | PostgREST/auth base | **yes** | Code falls back to the prod URL — **staging MUST set it explicitly** |
 | `SERVICE_ROLE_KEY` | privileged DB/auth (svc) | **yes** | Alias accepted: `SUPABASE_SERVICE_ROLE_KEY`. Rotate ~90d |
 | `ANON_KEY` | RLS-scoped caller reads | **yes** | Alias: `SUPABASE_ANON_KEY` |
-| `SCHEDULER_SECRET` | gates `/system/*` cron endpoints | **yes** (for the unattended cycle) | Also embedded in the pg_cron job body — rotate both together |
+| `SCHEDULER_SECRET` | gates `/system/*` cron endpoints | **yes** (for the unattended cycle) | The pg_cron jobs read a copy from Vault (`presence_scheduler_secret`) when they run and send it in the request body. After a rotation, update that entry on the same project, and for production also staging's `watchdog_target_secret` |
 | `RESEND_KEY` | outbound email | yes (email on) | via `EMAIL_FROM` sender |
 | `EMAIL_FROM` | sender identity | yes (email on) | |
 | `OPS_ALERT_EMAIL` | failure alerts | recommended | a cycle with failures emails here |

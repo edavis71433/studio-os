@@ -145,14 +145,15 @@ test.describe('Settings page', () => {
     await expect(page.locator('#planLine')).toHaveText('Studio · Active · renews Nov 3');
   });
 
-  test('Domain & email: platform staff keep the operators-only view, even drilled in', async ({ page }) => {
+  test('Domain & email: platform staff get the same desk as anyone — drilled in, the client\'s', async ({ page }) => {
+    // final pass (Nov 8, F10): the operator's card used to go to the platform Health Center
+    // (sales review B12); now it is the site in scope's own desk, and the platform view is a
+    // staff card of its own at studio level only
     await installApp(page, { api: { ...API, '/portal/context': { data: { ...SCOPED_CTX.data, is_operator: true } } } });
     await page.goto('/settings.html?client=' + CLIENT);
-    await expect(page.locator('[data-card="domains"]')).toHaveAttribute('href', '/admin-health.html');
-    await expect(page.locator('[data-card="domains"]')).toHaveAttribute('data-noscope', '1');
-    // sales review B12: the card says where it goes, not "put your site on your own domain"
-    await expect(page.locator('[data-card="domains"]')).toContainText('Health Center');
-    await expect(page.locator('[data-card="domains"]')).not.toContainText('Put your site on your own domain');
+    await expect(page.locator('[data-card="domains"]')).toHaveAttribute('href', /\/presence\.html.*client=.*#domain|\/presence\.html#domain.*client=/);
+    await expect(page.locator('[data-card="domains"]')).toContainText('Put your site on your own domain');
+    await expect(page.locator('[data-card="domains_all"]')).toHaveCount(0);
   });
 
   // ── scope honesty while drilled in (?client=) ───────────────────────────────

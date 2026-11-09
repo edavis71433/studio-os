@@ -37,7 +37,7 @@ test.describe('item 31 — Customers: saved views, columns, pick and act', () =>
     await expect(page.locator('tbody tr')).toHaveCount(2);                               // the attention view: open requests only
     await expect(page.locator('tbody tr td:nth-child(2)').first()).toContainText('Zeta Gym');   // name, descending
     await expect(page.locator('thead th.pick input')).toHaveAttribute('aria-label', 'Select all 2 shown');
-    await expect(page.locator('thead th:not(.pick)')).toHaveText([/Name/, /Needs you/, /Actions/]);
+    await expect(page.locator('thead th:not(.pick)')).toHaveText([/Name/, /Requests/, /Actions/]);   // final pass, batch C: it counts requests
     await page.locator('#saveView').click();
     const dlg = page.getByRole('dialog', { name: 'Save this view' });
     await dlg.getByLabel('Name').fill('Open requests');
@@ -73,6 +73,7 @@ test.describe('item 31 — Customers: saved views, columns, pick and act', () =>
     const bar = page.getByRole('region', { name: 'Selected customers' });
     await expect(bar).toContainText('2 selected');
     await bar.getByLabel('Mark the selected customers as').selectOption('on_hold');
+    await bar.getByRole('button', { name: 'Yes, mark them' }).click();   // final pass, batch C: it asks first
     await expect.poll(() => marks.length).toBe(2);
     expect(marks).toEqual([['p1', { to: 'on_hold' }], ['p3', { to: 'on_hold' }]]);
     await expect(page.getByRole('region', { name: 'Selected customers' })).toHaveCount(0);   // done: the picks clear
@@ -108,7 +109,9 @@ test.describe('item 32 — import customers and deals from a CSV', () => {
     await page.route('**/functions/v1/presence/sales/contacts', (route) => { if (route.request().method() !== 'POST') return route.fallback(); contacts.push(route.request().postDataJSON()); return route.fulfill({ status: 201, contentType: 'application/json', body: JSON.stringify({ data: { id: 'ct-' + contacts.length } }) }); });
     await page.route('**/functions/v1/presence/sales/deals', (route) => { if (route.request().method() !== 'POST') return route.fallback(); deals.push(route.request().postDataJSON()); return route.fulfill({ status: 201, contentType: 'application/json', body: '{"data":{}}' }); });
     await page.goto('/pipeline.html');
-    await page.getByRole('button', { name: 'Import CSV' }).click();
+    // final pass, batch C: on a phone Import CSV lives under More
+    if (await page.locator('#moreBtn').isVisible()) { await page.locator('#moreBtn').click(); await page.getByRole('menuitem', { name: 'Import CSV' }).click(); }
+    else await page.getByRole('button', { name: 'Import CSV' }).click();
     await page.locator('#csvZone input[type=file]').setInputFiles({ name: 'deals.csv', mimeType: 'text/csv', buffer: Buffer.from('Deal,Amount,Stage,Contact,Email,Close date\nWebsite rebuild,"$2,400",Proposal,Ana Ruiz,ana@harbor.example,2026-12-01\nOld win,500,Closed Won,,,\nLogo refresh,300,,,,\n') });
     await expect(page.locator('#csvZone')).toContainText('3 deals found');
     await page.locator('#csvZone').getByRole('button', { name: 'Import 3' }).click();
@@ -116,6 +119,26 @@ test.describe('item 32 — import customers and deals from a CSV', () => {
     expect(contacts).toEqual([{ name: 'Ana Ruiz', email: 'ana@harbor.example' }]);
     expect(deals).toContainEqual({ title: 'Website rebuild', stage: 'proposal', expected_value_cents: 240000, contact_id: 'ct-1', expected_close: '2026-12-01', source: 'import' });
     expect(deals).toContainEqual({ title: 'Logo refresh', stage: 'lead', expected_value_cents: 30000, source: 'import' });
+  });
+
+  // final pass, batch D: what Excel actually saves — a byte-order mark before the header,
+  // CRLF lines, "" inside quotes, a line break inside a cell, and money written 1.200,50
+  test('deals from Excel: a byte-order mark, quotes, a line break in a cell, and 1.200,50', async ({ page }) => {
+    const contacts: unknown[] = [], deals: unknown[] = [];
+    await installApp(page, { api: { '/sales/deals': { data: [] }, '/sales/summary': { data: { total: 0 } } } });
+    await page.route('**/functions/v1/presence/sales/contacts', (route) => { if (route.request().method() !== 'POST') return route.fallback(); contacts.push(route.request().postDataJSON()); return route.fulfill({ status: 201, contentType: 'application/json', body: JSON.stringify({ data: { id: 'ct-' + contacts.length } }) }); });
+    await page.route('**/functions/v1/presence/sales/deals', (route) => { if (route.request().method() !== 'POST') return route.fallback(); deals.push(route.request().postDataJSON()); return route.fulfill({ status: 201, contentType: 'application/json', body: '{"data":{}}' }); });
+    await page.goto('/pipeline.html');
+    if (await page.locator('#moreBtn').isVisible()) { await page.locator('#moreBtn').click(); await page.getByRole('menuitem', { name: 'Import CSV' }).click(); }
+    else await page.getByRole('button', { name: 'Import CSV' }).click();
+    const csv = '\uFEFFDeal,Amount,Stage,Contact,Notes\r\nMenu redesign,"1.200,50",Qualified,"Ana ""Ani"" Ruiz","two lines\r\nof notes"\r\nPhoto day,"€ 950",,,\r\n';
+    await page.locator('#csvZone input[type=file]').setInputFiles({ name: 'deals.csv', mimeType: 'text/csv', buffer: Buffer.from(csv, 'utf8') });
+    await expect(page.locator('#csvZone')).toContainText('2 deals found');   // the header was found, and the quoted line break stayed in its row
+    await page.locator('#csvZone').getByRole('button', { name: 'Import 2' }).click();
+    await expect.poll(() => deals.length).toBe(2);
+    expect(contacts).toEqual([{ name: 'Ana "Ani" Ruiz' }]);
+    expect(deals).toContainEqual({ title: 'Menu redesign', stage: 'qualified', expected_value_cents: 120050, contact_id: 'ct-1', source: 'import' });
+    expect(deals).toContainEqual({ title: 'Photo day', stage: 'lead', expected_value_cents: 95000, source: 'import' });
   });
 });
 
@@ -140,15 +163,22 @@ test.describe('item 31 — Pipeline: views and pick-and-act in the Table', () =>
     await installApp(page, { api: PIPE });
     await page.route('**/functions/v1/presence/sales/deals/*/stage', (route) => { moved.push(new URL(route.request().url()).pathname.split('/').slice(-2)[0]); return route.fulfill({ status: 200, contentType: 'application/json', body: '{"data":{}}' }); });
     await page.route('**/functions/v1/presence/broadcasts/lists', (route) => { listBody = route.request().postDataJSON(); return route.fulfill({ status: 201, contentType: 'application/json', body: JSON.stringify({ data: { id: 'list-0099' } }) }); });
+    // final pass, batch D: the reload must show the move (the old check counted 2 rows before and after)
+    await page.route(/\/functions\/v1\/presence\/sales\/deals(\?|$)/, (route) => {
+      if (route.request().method() !== 'GET' || !moved.length) return route.fallback();
+      const data = PIPE['/sales/deals'].data.map((d) => (moved.includes(d.id) ? { ...d, stage: 'lost' } : d));
+      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data }) });
+    });
     await page.goto('/pipeline.html');
     await page.getByLabel('Select Acme website').check();
     await page.getByLabel('Select Maple Street Studio').check();
     const bar = page.getByRole('region', { name: 'Selected deals' });
     await expect(bar).toContainText('2 selected');
     await bar.getByRole('button', { name: 'Mark as not a fit' }).click();
+    await bar.getByRole('button', { name: 'Yes, mark them' }).click();   // final pass, batch C: it asks first
     await expect(page.getByRole('region', { name: 'Selected deals' })).toHaveCount(0);   // the picks clear the moment it starts
     await expect.poll(() => moved).toEqual([OPEN]);
-    await expect(page.locator('#table tbody tr')).toHaveCount(2);                         // the reload has painted
+    await expect(page.locator('#table tbody tr').filter({ hasText: 'Acme website' })).toContainText('Lost');   // the reload has painted the move
     await page.getByLabel('Select Acme website').check();
     await page.getByLabel('Select Maple Street Studio').check();
     await page.getByRole('region', { name: 'Selected deals' }).getByRole('button', { name: 'Send an update' }).click();
