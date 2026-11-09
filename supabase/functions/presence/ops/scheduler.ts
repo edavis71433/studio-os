@@ -12,7 +12,7 @@
 import { svc } from '../lib/db.ts';
 import { runPipeline, takeSiteOffline } from '../routes/publish.ts';
 import { reconcileOnePublish, RECONCILE_STALE_MS, type InflightPublish } from '../lib/deploy_reconcile.ts';
-import { blocksNeedRewindow } from '../lib/content_window.ts';
+import { blocksNeedRewindow, nextWindowBoundary, windowedBlocks } from '../lib/content_window.ts';
 import type { Principal } from '../../_shared/auth.ts';
 import { runEvidence } from '../evidence/engine.ts';
 import { runJudgment } from '../judgment/engine.ts';
@@ -161,12 +161,25 @@ export async function runDuePublishes(limit = 25): Promise<CycleResult> {
 // frozen in the snapshot, so no unrelated draft edit can ride along. Idempotent
 // (skips a site already publishing or already enqueued) and best-effort (one site's
 // failure never stops another). Reuses the ONE pipeline — no second publish path.
+// Item 90 (Nov 8 2026): it read every live site's publish and whole snapshot every tick, to
+// find the few with a timed section. Each site now carries next_window_at, the next instant
+// one of its sections appears or comes down ('infinity' when none will; null when unknown,
+// which every live publish sets). A tick reads only the sites whose instant has come or isn't
+// known yet, works out the next one, and stores it. A site whose re-emit is needed but can't
+// be queued yet keeps its passed instant, so the next tick tries again. Before migration 0141
+// the column doesn't exist; the old scan of every live site runs instead.
 export async function runWindowExpiries(limit = 40): Promise<{ ok: true; run_type: 'window_expiry'; scanned: number; enqueued: number; site_ids: string[] }> {
   const nowIso = new Date().toISOString();
   // Live sites only — a window can only be stale on a site that's actually published.
   const cap = Math.max(1, Math.min(200, limit));
-  const sr = await svc(`presence_sites?status=eq.live&select=id&order=last_published_at.asc.nullsfirst&limit=${cap}`);
+  const flagged = await svc(`presence_sites?status=eq.live&or=(next_window_at.is.null,next_window_at.lte.${nowIso})&select=id&order=next_window_at.asc.nullsfirst&limit=${cap}`);
+  const flags = flagged.ok;
+  const sr = flags ? flagged : await svc(`presence_sites?status=eq.live&select=id&order=last_published_at.asc.nullsfirst&limit=${cap}`);
   const sites = (sr.ok && Array.isArray(sr.json)) ? sr.json as Array<{ id: string }> : [];
+  const setNext = async (siteId: string, at: string | null) => {
+    if (!flags) return;
+    await svc(`presence_sites?id=eq.${siteId}`, { method: 'PATCH', body: JSON.stringify({ next_window_at: at || 'infinity' }) }).catch(() => {});
+  };
   let enqueued = 0; const siteIds: string[] = [];
   for (const s of sites) {
     try {
@@ -175,11 +188,12 @@ export async function runWindowExpiries(limit = 40): Promise<{ ok: true; run_typ
       // for a normal publish ≈ snapshot.created_at, for a prior rewindow = its fire time,
       // so an already-flipped section never re-fires).
       const pub = (await svc(`presence_publishes?site_id=eq.${s.id}&status=eq.live&snapshot_id=not.is.null&select=snapshot_id,created_at,completed_at&order=created_at.desc&limit=1`)).json?.[0];
-      if (!pub?.snapshot_id) continue;
+      if (!pub?.snapshot_id) { await setNext(s.id, null); continue; }   // nothing live to re-emit until the next publish
       const liveIso = String(pub.completed_at || pub.created_at || '');
-      if (!liveIso) continue;
+      if (!liveIso) { await setNext(s.id, null); continue; }
       const snap = (await svc(`presence_snapshots?id=eq.${pub.snapshot_id}&select=content&limit=1`)).json?.[0];
-      if (!blocksNeedRewindow(snap?.content?.settings?.blocks, liveIso, nowIso)) continue;
+      const blocks = windowedBlocks(snap?.content?.settings);
+      if (!blocksNeedRewindow(blocks, liveIso, nowIso)) { await setNext(s.id, nextWindowBoundary(blocks, nowIso)); continue; }
       // idempotent: don't stack a rewindow while a publish is in flight or one is
       // already queued for this site (that publish will carry the flip anyway).
       const inflight = (await svc(`presence_publishes?site_id=eq.${s.id}&status=in.(queued,deploying)&select=id&limit=1`)).json;
