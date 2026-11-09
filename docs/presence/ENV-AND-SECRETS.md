@@ -34,6 +34,20 @@ Supersedes `docs/SECRETS-INVENTORY.md` (which predates the Connected Platform an
 | `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` | **Web Push** (device notifications) | **activation** (push) | base64url raw P-256 point / scalar. Absent → push cleanly off (`/push/key` reports disabled) |
 | `VAPID_SUBJECT` | push contact (`mailto:`/`https:`) | optional | defaults to support@davisdigitalstudio.com |
 | `RESEND_WEBHOOK_SECRET` | Resend bounce/complaint webhook (`/email/events`, svix) | recommended (email on) | absent → the endpoint 404s (surface doesn't exist); bounces then don't auto-suppress |
+| `RESEND_INBOUND_SECRET` | checks that an email reply coming in is really from Resend (svix) | optional (replies) | absent → the reply webhook 404s and replies never reach the Inbox |
+| `RESEND_INBOUND_DOMAIN` | the reply address domain that brings customers' replies into the Inbox | optional (replies) | absent → replies go to the sender's own mailbox |
+| `PLATFORM_REPLY_TO` | the reply-to address on the platform's own mail | optional | defaults to the studio's address |
+| `AGENCY_SITE_ID` | the platform's own agency site, the only site whose owner alerts may fall back to `OPS_ALERT_EMAIL` | optional | absent → that fallback doesn't exist and the alert is skipped, the safe default |
+| `NURTURE_DRIP` | switches on the day-7 follow-up email after a free review | optional | set to `1` to turn it on |
+| `APPROVAL_SECRET` | signs one-tap client approval links and the sales pages' signed links | recommended | falls back to `SCHEDULER_SECRET` |
+| `PREVIEW_LINK_SECRET` | signs shared draft links | optional | falls back to `APPROVAL_SECRET`, then `STATE_SIGNING_SECRET`, then `SCHEDULER_SECRET` |
+| `OPERATOR_SECRET` | lets a program act as the operator (the `x-operator-secret` header) for marketplace and enterprise management | optional | absent → only a signed-in staff member can do those |
+| `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` | managed domains: DNS run on Amazon Route 53 (`lib/route53.ts`) | optional (domains) | both needed; absent → those routes answer 503 |
+| `PEXELS_API_KEY` | the stock photo search (Pexels) | optional | absent → the stock search is off |
+| `HELP_POLISH` | switches on AI polish of the help answers | optional | set to `on`; off by default |
+| `VISITS_SALT` | salts the visit counter's visitor fingerprints | optional | falls back to `APPROVAL_SECRET` |
+| `TURNSTILE_SECRET` | the free tools' bot check (Cloudflare Turnstile) | **activation** (free tools) | absent → every free scan is refused as unverified |
+| `TOOLS_HASH_SALT` | salts the free tools' visitor counters | optional | falls back to the service key |
 
 ## Required vs Activation
 

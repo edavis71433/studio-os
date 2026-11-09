@@ -3,8 +3,8 @@
 // /system/health shows the owner every secret and switch the platform reads (SECRET_GROUPS in
 // routes/system.ts), and the two secrets documents say what each one is for. This walks the
 // presence function's code (index.ts and every module it imports) for each name it reads and
-// checks the name is on that list, is a setting with a default (SETTINGS below), or is a gap
-// already found (NOT_LISTED, NOT_DOCUMENTED). Names only: it reads source files, never the
+// checks the name is on that list or is a setting with a default (SETTINGS below), and that
+// every name on the list is described in a document. Names only: it reads source files, never the
 // environment, so it can't print a value.
 const results = [];
 const ok = (n, p, note = '') => { results.push({ n, p }); console.log(`${p ? 'PASS' : 'FAIL'}  ${n}${note ? ' — ' + note : ''}`); };
@@ -12,32 +12,8 @@ const ROOT = new URL('../../', import.meta.url);
 const read = (p) => Deno.readTextFileSync(new URL(p, ROOT));
 const FN = 'supabase/functions/';
 
-// Gaps found on Nov 8 2026, left for their own fix. Adding a name to SECRET_GROUPS (or to a
-// document) makes this test fail until the name comes off its list here.
-/** Secrets and switches the server reads that /system/health doesn't list. */
-const NOT_LISTED = {
-  AWS_ACCESS_KEY_ID: 'managed domains (lib/route53.ts), with AWS_SECRET_ACCESS_KEY',
-  AWS_SECRET_ACCESS_KEY: 'managed domains (lib/route53.ts)',
-  PEXELS_API_KEY: 'the stock photo search',
-  PREVIEW_LINK_SECRET: 'signs shared draft links (falls back to APPROVAL_SECRET, STATE_SIGNING_SECRET, SCHEDULER_SECRET)',
-  STATE_SIGNING_SECRET: 'a fallback signing secret for draft and approval links',
-  RESEND_INBOUND_SECRET: 'verifies email replies coming in',
-  RESEND_INBOUND_DOMAIN: 'the reply address domain that brings replies to the Inbox',
-  VAPID_PUBLIC_KEY: 'device notifications (Web Push)',
-  VAPID_PRIVATE_KEY: 'device notifications (Web Push)',
-  VAPID_SUBJECT: 'the contact sent with device notifications',
-  VISITS_SALT: 'salts the visit counter’s visitor hashes (falls back to APPROVAL_SECRET)',
-  TURNSTILE_SECRET: 'the free tools’ bot check',
-  TOOLS_HASH_SALT: 'salts the free tools’ visitor hashes (falls back to the service key)',
-  PSI_KEY: 'PageSpeed Insights for the free site review',
-  CONCIERGE_POLISH: 'switches on the AI polish of concierge answers',
-  HELP_POLISH: 'switches on the AI polish of help answers',
-  APP_URL: 'the app’s own address (the OAuth return page, font files, email links)',
-  PLATFORM_REPLY_TO: 'the reply-to address on platform mail',
-};
-/** Secrets and switches neither secrets document describes. */
-const NOT_DOCUMENTED = ['AGENCY_SITE_ID', 'APPROVAL_SECRET', 'NURTURE_DRIP', 'OPERATOR_SECRET', 'AWS_ACCESS_KEY_ID', 'AWS_SECRET_ACCESS_KEY', 'PEXELS_API_KEY',
-  'PREVIEW_LINK_SECRET', 'RESEND_INBOUND_SECRET', 'RESEND_INBOUND_DOMAIN', 'VISITS_SALT', 'TURNSTILE_SECRET', 'TOOLS_HASH_SALT', 'HELP_POLISH', 'PLATFORM_REPLY_TO'];
+// The 18 names missing from SECRET_GROUPS and the 15 missing from both documents, found on
+// Nov 8 2026, were added in the fix for item 111's findings, so every check here is strict.
 
 /** Names that only tune a default: a limit, a timer, a version stamp or an address override. */
 const SETTINGS = {
@@ -126,15 +102,18 @@ ok('reads the list /system/health shows, and the other names it accepts', LISTED
   ok('each second name is only ever read right after its first', !wrong.length, wrong.map(([s]) => s).join(', '));
 }
 {
-  const covered = (n) => LISTED.has(n) || ALIASES[n] || SECOND_NAMES[n] || SETTINGS[n] || NOT_LISTED[n];
+  const covered = (n) => LISTED.has(n) || ALIASES[n] || SECOND_NAMES[n] || SETTINGS[n];
   const loose = [...reads.keys()].filter((n) => !covered(n)).sort();
-  ok('every name the server reads is on the list, a setting, or a known gap', !loose.length,
+  ok('every name the server reads is on the list /system/health shows, or is a setting', !loose.length,
     loose.map((n) => `${n} (${reads.get(n).slice(0, 2).join(', ')})`).join('; ') + (loose.length ? '. A secret or a switch goes in SECRET_GROUPS (routes/system.ts); a tuned default goes in SETTINGS here' : ''));
-  const settled = Object.keys(NOT_LISTED).filter((n) => LISTED.has(n));
-  ok('no known gap has been listed since', !settled.length, settled.length ? `now listed, take it off NOT_LISTED: ${settled.join(', ')}` : '');
-  const unread = [...Object.keys(NOT_LISTED), ...Object.keys(SETTINGS), ...Object.keys(SECOND_NAMES)].filter((n) => !reads.has(n));
+  // the names found missing on Nov 8 2026 stay on the list
+  const NOV_8 = ['AWS_ACCESS_KEY_ID', 'AWS_SECRET_ACCESS_KEY', 'PEXELS_API_KEY', 'PREVIEW_LINK_SECRET', 'STATE_SIGNING_SECRET', 'RESEND_INBOUND_SECRET',
+    'RESEND_INBOUND_DOMAIN', 'VAPID_PUBLIC_KEY', 'VAPID_PRIVATE_KEY', 'VAPID_SUBJECT', 'VISITS_SALT', 'TURNSTILE_SECRET', 'TOOLS_HASH_SALT', 'PSI_KEY',
+    'CONCIERGE_POLISH', 'HELP_POLISH', 'APP_URL', 'PLATFORM_REPLY_TO'];
+  ok('the 18 names found missing on Nov 8 are on the list', NOV_8.length === 18 && NOV_8.every((n) => LISTED.has(n)), NOV_8.filter((n) => !LISTED.has(n)).join(', '));
+  const unread = [...Object.keys(SETTINGS), ...Object.keys(SECOND_NAMES)].filter((n) => !reads.has(n));
   ok('every name this test lists is still read', !unread.length, unread.join(', '));
-  const both = Object.keys(SETTINGS).filter((n) => LISTED.has(n) || NOT_LISTED[n]);
+  const both = Object.keys(SETTINGS).filter((n) => LISTED.has(n));
   ok('a setting is not also a secret', !both.length, both.join(', '));
 }
 {
@@ -152,10 +131,6 @@ ok('reads the list /system/health shows, and the other names it accepts', LISTED
   const dead = [...LISTED].filter((n) => !everywhere.has(n) && !reads.has(n) && !FAMILY.test(n));
   ok('every listed name is read by some function', everywhere.size > reads.size && !dead.length, dead.join(', '));
 }
-{
-  const missing = Object.keys(NOT_LISTED).filter((n) => !LISTED.has(n));
-  console.log(`KNOWN  ${missing.length} names the server reads aren’t on the list /system/health shows: ${missing.join(', ')}`);
-}
 
 // ── the two secrets documents ──
 {
@@ -165,14 +140,8 @@ ok('reads the list /system/health shows, and the other names it accepts', LISTED
   for (const m of docs.matchAll(/`([A-Z][A-Z0-9_]*)`\s*\/\s*`(_[A-Z0-9_]+)`/g)) named.add(m[1].slice(0, m[1].lastIndexOf('_')) + m[2]);
   const families = docs.includes('`CONNECTED_<PROVIDER_KEY>_CLIENT_ID` / `_SECRET`') && docs.includes('`CONNECTED_<KEY>_WRITE');
   ok('the documents describe the connection families', families);
-  const secrets = [...new Set([...LISTED, ...Object.keys(NOT_LISTED)])];
-  const undescribed = secrets.filter((n) => !named.has(n) && !(FAMILY.test(n) && families));
-  const loose = undescribed.filter((n) => !NOT_DOCUMENTED.includes(n));
-  ok('every secret and switch is described in a secrets document, or is a known gap', !loose.length, loose.join(', '));
-  const settled = NOT_DOCUMENTED.filter((n) => !undescribed.includes(n));
-  ok('no known gap has been described since', !settled.length, settled.length ? `now described, take it off NOT_DOCUMENTED: ${settled.join(', ')}` : '');
-  ok('every known gap is a secret or a switch the server reads', NOT_DOCUMENTED.every((n) => secrets.includes(n)) && NOT_DOCUMENTED.length > 0, NOT_DOCUMENTED.filter((n) => !secrets.includes(n)).join(', '));
-  console.log(`KNOWN  ${undescribed.length} of them aren’t described in docs/presence/ENV-AND-SECRETS.md or docs/SECRETS-INVENTORY.md: ${undescribed.join(', ')}`);
+  const undescribed = [...LISTED].filter((n) => !named.has(n) && !(FAMILY.test(n) && families));
+  ok('every secret and switch on the list is described in docs/presence/ENV-AND-SECRETS.md or docs/SECRETS-INVENTORY.md', LISTED.size > 0 && !undescribed.length, undescribed.join(', '));
 }
 
 const failed = results.filter((r) => !r.p);
