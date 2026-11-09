@@ -22,6 +22,7 @@ Supersedes `docs/SECRETS-INVENTORY.md` (which predates the Connected Platform an
 | `VISUAL_MODEL_KEY` | **AI Visual Studio** image model | **activation** (Visual) | absent → generation honestly "not switched on"; upload still works |
 | `VISUAL_MODEL_URL` | image endpoint override | optional | default OpenAI images |
 | `VISUAL_MODEL_NAME` | image model name override | optional | default `gpt-image-1` |
+| `REPLICATE_API_TOKEN` | the photo editor's **Cut out the subject** (Replicate, open model pinned in `lib/cutout.ts`) | optional | absent → the button doesn't show; the free plain-background tool still works. About $0.0004 a photo; Replicate deletes inputs and outputs after an hour |
 | `STRIPE_SECRET` | checkout + subscriptions | **activation** (billing) | **TEST key on staging, always** |
 | `SITE_URL` | Stripe success/cancel + connect redirect base | yes | staging: the staging/preview URL |
 | `BILLING_SYNC_SECRET` | gates the Stripe webhook sync tier | recommended | |

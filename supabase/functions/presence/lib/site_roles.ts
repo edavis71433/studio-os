@@ -167,7 +167,7 @@ const MEMBER_WRITES: Array<[MemberWriteNeed, string[]]> = [
     'POST /assets/bulk',
     'POST /assets/folders/move',   // item 56: rename a folder, or take its files out — no file is deleted
     `PATCH /assets/${ID}`,
-    `POST /assets/${ID}/(replace|rollback|duplicate|suggest|remove-background)`,
+    `POST /assets/${ID}/(replace|rollback|duplicate|suggest|remove-background|cutout)`,
     'POST /visual/generate',
     `POST /visual/plans/${ID}/(vary|edit)`,
     `POST /notes/${ID}/(dismiss|accept)`,

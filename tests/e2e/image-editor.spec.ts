@@ -22,6 +22,8 @@ function png(w: number, h: number, fn: (x: number, y: number) => [number, number
 const RED: [number, number, number, number] = [220, 40, 40, 255], BLUE: [number, number, number, number] = [40, 60, 220, 255];
 const PHOTO_PNG = png(800, 600, (x) => (x < 400 ? RED : BLUE));
 const LOGO_PNG = png(400, 300, (x, y) => (Math.hypot(x - 200, y - 150) < 90 ? [30, 40, 120, 255] : [252, 251, 250, 255]));
+// what the cut-out service answers for the photo: the same size, only a round subject left
+const CUT_PNG = png(800, 600, (x, y) => (Math.hypot(x - 400, y - 300) < 150 ? [200, 120, 60, 255] : [0, 0, 0, 0]));
 
 const NOW = new Date().toISOString();
 const id = (n: number) => `${String(n).padStart(8, '0')}-0000-4000-8000-${String(n).padStart(12, '0')}`;
@@ -34,9 +36,9 @@ const PHOTO = file(1, { name: 'Storefront', metadata: { title: 'Storefront', cap
 const LOGO = file(2, { name: 'Logo', metadata: { title: 'Logo' }, alt_text: 'Our round logo', mime: 'image/jpeg', width: 400, height: 300, brand: true });
 const DOC = file(3, { name: 'Price list', kind: 'document', mime: 'application/pdf', metadata: { title: 'Price list' }, width: null, height: null });
 const COPY = file(90, { name: 'Storefront (edited)', metadata: { title: 'Storefront (edited)', edited_from: PHOTO.id, edited_from_name: 'Storefront' }, collection: 'Outside', width: 600, height: 600 });
-const detail = (asset: Record<string, unknown>) => ({ data: {
+const detail = (asset: Record<string, unknown>, extra: Record<string, unknown> = {}) => ({ data: {
   asset, usage: [], usage_complete: true, versions: { has_history: false }, summary: { headline: 'Not on your site yet.' },
-  thumb_fallback: `/__e2e_photo__/${asset.id}.png`, download_url: `/__e2e_photo__/${asset.id}.png?download=1`,
+  thumb_fallback: `/__e2e_photo__/${asset.id}.png`, download_url: `/__e2e_photo__/${asset.id}.png?download=1`, ...extra,
 } });
 const STORAGE = { used_bytes: 125 * 1048576, files: 42, max_bytes: 1073741824, max_files: 100, level: 'ok' };
 const api = (extra: Record<string, unknown> = {}) => ({
@@ -319,5 +321,90 @@ test.describe('Photo editor — leaving, undo, who sees it', () => {
     await expect(dlg.getByRole('tab', { name: 'Background' })).toBeInViewport();
     const wide = await page.evaluate(() => document.documentElement.scrollWidth);
     expect(wide).toBeLessThanOrEqual(vw + 1);
+  });
+});
+
+// ── Cut out the subject: the server's cut-out service (lib/cutout.ts), mocked ──
+const JOB = 'pred0000starting.' + 'A'.repeat(32);
+const withCutout = { ['/assets/' + PHOTO.id]: detail(PHOTO, { cutout_available: true }), ['/assets/' + LOGO.id]: detail(LOGO, { cutout_available: true }) };
+/** Answer the cut-out calls: `first` for the POST (a PNG, a job, or a refusal), the PNG for a job. */
+async function cutoutService(page: Page, first: 'png' | 'job' | 'refuse') {
+  const calls: string[] = [];
+  await page.route(/\/functions\/v1\/presence\/assets\/(cutout\/|[0-9a-f-]{36}\/cutout)/, (route) => {
+    const p = fnPath(route);
+    calls.push(`${route.request().method()} ${p}`);
+    if (p.startsWith('/assets/cutout/')) return route.fulfill({ status: 200, contentType: 'image/png', body: CUT_PNG });
+    if (first === 'job') return route.fulfill({ status: 202, contentType: 'application/json', body: JSON.stringify({ data: { pending: true, job: JOB, note: 'Starting up.' } }) });
+    if (first === 'refuse') return route.fulfill({ status: 429, contentType: 'application/json', body: JSON.stringify({ error: 'rate_limited', message: 'That’s a lot of requests in a short time — please wait a minute and try again.' }) });
+    return route.fulfill({ status: 200, contentType: 'image/png', body: CUT_PNG });
+  });
+  return calls;
+}
+
+test.describe('Photo editor — cut out the subject', () => {
+  test('Remove background on a busy photo cuts out the subject by itself, even while the service starts up', async ({ page }) => {
+    const seen = await setup(page, { api: withCutout });
+    const calls = await cutoutService(page, 'job');
+    const dlg = await openEditor(page, PHOTO, 'Remove background');   // red and blue halves: no one plain edge colour
+    await expect(dlg.locator('#ie-cut-say')).toContainText('Cut out.', { timeout: 15000 });
+    expect(calls).toEqual([`POST /assets/${PHOTO.id}/cutout`, `GET /assets/cutout/${JOB}`]);
+    await expect(dlg.locator('#ie-cut')).toHaveText('Put the background back');
+    await expect(dlg.locator('#ie-bg-on')).toBeDisabled();   // the plain tool has nothing left to do
+    await dlg.getByRole('button', { name: 'Save as a new file' }).click();
+    await expect(dlg).toHaveCount(0);
+    expect(seen.uploads[0]).toMatchObject({ mime: 'image/png', width: 800, height: 600 });
+    const pic = await savedPicture(page, [[10, 10], [790, 590], [400, 300]]);
+    expect(pic.px[0][3]).toBe(0);
+    expect(pic.px[1][3]).toBe(0);
+    expect(pic.px[2]).toEqual([200, 120, 60, 255]);
+    expect((seen.patches[0] as { metadata: { edits: { cutout: boolean } } }).metadata.edits.cutout).toBe(true);
+  });
+
+  test('a plain backdrop keeps the free tool: the service isn’t asked', async ({ page }) => {
+    await setup(page, { api: withCutout });
+    const calls = await cutoutService(page, 'png');
+    const dlg = await openEditor(page, LOGO, 'Remove background');
+    await expect(dlg.locator('#ie-bg-say')).toContainText(/Took out \d+% of the picture\./);
+    await expect(dlg.locator('#ie-cut')).toHaveText('Cut out the subject');
+    await page.waitForTimeout(400);
+    expect(calls).toEqual([]);
+  });
+
+  test('cut out by hand, put the background back, cut out again: one call to the service', async ({ page }) => {
+    await setup(page, { api: withCutout });
+    const calls = await cutoutService(page, 'png');
+    const dlg = await openEditor(page);
+    await dlg.getByRole('tab', { name: 'Background' }).click();
+    await dlg.getByRole('button', { name: 'Cut out the subject' }).click();
+    await expect(dlg.locator('#ie-cut')).toHaveText('Put the background back');
+    await expect(dlg.locator('#ie-save')).toBeEnabled();
+    await dlg.getByRole('button', { name: 'Put the background back' }).click();
+    await expect(dlg.locator('#ie-cut')).toHaveText('Cut out the subject');
+    await expect(dlg.locator('#ie-save')).toBeDisabled();   // back to the photo as it was
+    await dlg.getByRole('button', { name: 'Cut out the subject' }).click();
+    await expect(dlg.locator('#ie-cut')).toHaveText('Put the background back');
+    await dlg.getByRole('button', { name: 'Undo' }).click();
+    await expect(dlg.locator('#ie-cut')).toHaveText('Cut out the subject');
+    expect(calls).toEqual([`POST /assets/${PHOTO.id}/cutout`]);
+  });
+
+  test('a refused cut-out says why and changes nothing', async ({ page }) => {
+    await setup(page, { api: withCutout });
+    await cutoutService(page, 'refuse');
+    const dlg = await openEditor(page);
+    await dlg.getByRole('tab', { name: 'Background' }).click();
+    await dlg.getByRole('button', { name: 'Cut out the subject' }).click();
+    await expect(dlg.locator('#ie-cut-say')).toContainText('That’s a lot of requests in a short time');
+    await expect(dlg.locator('#ie-cut-say')).toHaveClass(/ie-err/);
+    await expect(dlg.locator('#ie-cut')).toHaveText('Cut out the subject');
+    await expect(dlg.locator('#ie-save')).toBeDisabled();
+  });
+
+  test('without the service’s key there is no cut-out button', async ({ page }) => {
+    await setup(page);
+    const dlg = await openEditor(page, LOGO, 'Remove background');
+    await expect(dlg.locator('#ie-bg-say')).toContainText('Took out');
+    await expect(dlg.locator('#ie-cut')).toHaveCount(0);
+    await expect(dlg.getByText('Cut out the subject')).toHaveCount(0);
   });
 });

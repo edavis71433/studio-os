@@ -261,6 +261,27 @@ export async function signSocialCrop(storagePath: string, mime: string, t: { wid
   } catch { return null; }
 }
 
+/** Items 39 + 117: the photo the cut-out model fetches. The original itself when
+ *  it is already within `side` on its long side; otherwise a contain transform to
+ *  that size (shape kept). Signed for 15 minutes: long enough for a model that is
+ *  still starting, dead soon after. Documents have no cut-out → null. */
+export async function signCutoutSource(storagePath: string, mime: string, width: number | null | undefined, height: number | null | undefined, side = 3000): Promise<string | null> {
+  if (!isImageMime(mime)) return null;
+  const small = Number(width) > 0 && Number(height) > 0 && Math.max(Number(width), Number(height)) <= side;
+  if (!small) {
+    try {
+      const objectPath = storagePath.replace(`${BUCKET}/`, '');
+      const r = await fetch(`${SB_URL}/storage/v1/object/sign/${BUCKET}/${objectPath}`, {
+        method: 'POST', headers: { apikey: SB_SERVICE, Authorization: `Bearer ${SB_SERVICE}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ expiresIn: 900, transform: { width: side, height: side, resize: 'contain', quality: 90 } }),
+      });
+      const j = await r.json().catch(() => null);
+      return j?.signedURL ? `${SB_URL}/storage/v1${j.signedURL}` : null;
+    } catch { return null; }
+  }
+  return await signOriginal(storagePath, 900);   // already small enough: the file itself, never re-encoded
+}
+
 /** DAM-1 (Files): a short-lived signed DOWNLOAD URL for the ORIGINAL object (no
  *  transform) — used for "Download" and for previewing documents. Optionally sets
  *  a friendly download filename. */

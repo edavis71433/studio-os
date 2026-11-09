@@ -73,6 +73,7 @@ const SECRET_GROUPS: Record<string, SecretDef[]> = {
   ai: [
     { name: 'ANTHROPIC_KEY', required: false, enables: 'AI drafting / concierge / coach (without it: honest "AI unavailable", never filler)' },
     { name: 'VISUAL_MODEL_KEY', required: false, enables: 'AI Visual Studio image generation (gated off without it)' },
+    { name: 'REPLICATE_API_TOKEN', required: false, enables: 'the photo editor’s “Cut out the subject” (Replicate; without it the button doesn’t show)' },
   ],
   // These are the names connected/auth.ts ACTUALLY reads (credsSource): a
   // provider's own CONNECTED_<PROVIDER_KEY>_CLIENT_ID/_SECRET pair, else, for a
