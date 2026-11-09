@@ -1,4 +1,6 @@
 # Environments runbook — staging, migration runner, scripted deploys
+> **Nov 9 2026 (list item 112):** there is one environment, production. The repository never had a staging project, so the staging jobs in deploy.yml and rollback.yml could never run; they are gone, and the workflows only start by hand. Where this file says staging, read it as history.
+
 
 Build Brief step 1. Nothing below touches production except where marked
 **[PROD]**, and those steps run only after explicit approval.

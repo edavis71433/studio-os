@@ -24,7 +24,8 @@ ok('the pre-deploy gate is ci.yml itself', /^ {4}uses: \.\/\.github\/workflows\/
 ok('ci.yml can be called by another workflow', /^on:\n(?: {2}.*\n|(?: {4}.*\n))*? {2}workflow_call:/m.test(CI));
 ok('the deploy has no test loop or typecheck of its own to drift', !/deno check|_test\.mjs|setup-deno/.test(DEPLOY));
 ok('production waits for the gate and for the browser check', /^ {4}needs: \[test, browser-gate\]$/m.test(JOBS['deploy-production'] || ''));
-ok('staging waits for the gate', /^ {4}needs: test$/m.test(JOBS['deploy-staging'] || ''));
+ok('there is no staging job (item 112: no staging project ever existed)', !JOBS['deploy-staging'] && !DEPLOY.includes('SUPABASE_PROJECT_REF_STAGING') && !ROLLBACK.includes('SUPABASE_PROJECT_REF_STAGING'));
+ok('a deploy only starts by hand', /^on:\n {2}workflow_dispatch:/m.test(DEPLOY) && !/^ {2}push:/m.test(DEPLOY.slice(0, DEPLOY.indexOf('\njobs:'))));
 ok('the browser gate runs for every production deploy', /^ {4}if: github\.event_name == 'workflow_dispatch'$/m.test(JOBS['browser-gate'] || '') && /^ {4}if: github\.event_name == 'workflow_dispatch'$/m.test(JOBS['deploy-production'] || ''));
 ok('the browser gate may read checks and nothing else', /^ {4}permissions:\n {6}checks: read\n(?! {6})/m.test(JOBS['browser-gate'] || ''));
 ok('nothing can pass on its own failure', !DEPLOY.includes('continue-on-error') && !ROLLBACK.includes('continue-on-error'));
@@ -36,11 +37,11 @@ for (const [name, wf] of [['deploy.yml', DEPLOY], ['rollback.yml', ROLLBACK]]) {
 
 // ── One at a time (Nov 9 2026) ───────────────────────────────────────────────
 // Two dispatches used to run side by side, and the older could land last. A production
-// deploy or rollback now waits its turn in one shared queue; staging has its own.
+// deploy or rollback now waits its turn in one shared queue.
 const queue = (wf) => wf.match(/^concurrency:\n {2}group: (.+)\n {2}cancel-in-progress: (\w+)$/m);
 const dq = queue(DEPLOY), rq = queue(ROLLBACK);
-ok('a production deploy waits for the one before it', dq?.[1] === "deploy-${{ github.event_name == 'workflow_dispatch' && 'production' || 'staging' }}" && dq?.[2] === 'false', dq?.[0]);
-ok('a rollback waits in the same queue as the deploys of its environment', rq?.[1] === "deploy-${{ inputs.environment == 'production' && 'production' || 'staging' }}" && rq?.[2] === 'false', rq?.[0]);
+ok('a production deploy waits for the one before it', dq?.[1] === 'deploy-production' && dq?.[2] === 'false', dq?.[0]);
+ok('a rollback waits in the same queue as the deploys', rq?.[1] === 'deploy-production' && rq?.[2] === 'false', rq?.[0]);
 ok('the queue is set for the whole run, ahead of the jobs', DEPLOY.indexOf('\nconcurrency:') < DEPLOY.indexOf('\njobs:') && ROLLBACK.indexOf('\nconcurrency:') < ROLLBACK.indexOf('\njobs:'));
 
 // ── The browser gate's real step, against a stand-in gh ──────────────────────
@@ -132,7 +133,6 @@ const deployed = (job) => new Set([...(JOBS[job] || '').matchAll(/functions depl
 const rolledBack = new Set((ROLLBACK.match(/for fn in ([\w -]+); do/)?.[1] || '').trim().split(/\s+/));
 for (const name of functions) {
   ok(`production deploys ${name}`, deployed('deploy-production').has(name));
-  ok(`staging deploys ${name}`, deployed('deploy-staging').has(name));
   ok(`rollback puts back ${name}`, rolledBack.has(name));
 }
 ok('rollback skips a function its ref doesn\'t have, and says so', ROLLBACK.includes('if [ ! -f "supabase/functions/$fn/index.ts" ]') && ROLLBACK.includes('::warning title=Not rolled back::'));
