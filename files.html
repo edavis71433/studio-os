@@ -20,6 +20,10 @@
     --sans:'Inter',-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
   }
   *{box-sizing:border-box;margin:0}
+  /* the reset above also took the browser's margin:auto off a modal <dialog>, so
+     every question on this page (askConfirm, askPrompt, folders, repeats) opened in
+     the top-left corner — put the centring back, with the slide-over's own dim */
+  dialog{margin:auto} dialog::backdrop{background:rgba(27,21,37,.42)}
   body{background:var(--bg);color:var(--ink);font-family:var(--sans);line-height:1.5;-webkit-font-smoothing:antialiased}
   .wrap{max-width:var(--dds-w-data,1600px);margin:0 auto;padding:var(--dds-s7,32px) var(--dds-s5,20px) 90px}
   /* minmax(0,1fr): the wide table must scroll INSIDE .tscroll, never blow the
@@ -203,12 +207,12 @@
   .field input:focus,.field textarea:focus{outline:2px solid var(--p);outline-offset:1px;border-color:var(--p)}
   .where{background:var(--card);border:1px solid var(--line);border-radius:var(--dds-r-lg,10px);padding:var(--dds-s3,12px) var(--dds-s4,16px);margin:var(--dds-s4,16px) 0}
   .where .hl{font-size:14px;font-weight:600;margin-bottom:var(--dds-s2,8px)}
-  .where ul{list-style:none;display:flex;flex-direction:column;gap:6px}
+  .where ul{list-style:none;display:flex;flex-direction:column;gap:6px;padding:0}
   .where li{font-size:13.5px;color:var(--soft);display:flex;align-items:center;gap:var(--dds-s2,8px)}
   .where li .dot{width:7px;height:7px}
   .where li a.ulink{color:var(--soft);text-decoration:none} .where li a.ulink:hover{color:var(--p);text-decoration:underline}
   .vrow{background:var(--warn-soft);border-radius:var(--dds-r,8px);padding:10px var(--dds-s3,12px);font-size:13px;color:var(--warn);margin:var(--dds-s3,12px) 0;display:flex;align-items:center;gap:var(--dds-s2,8px)}
-  .vrow button{margin-left:auto}
+  .vrow button{margin-left:auto;flex:none;white-space:nowrap}
   .acts{display:flex;flex-wrap:wrap;gap:var(--dds-s2,8px);margin-top:var(--dds-s4,16px)}
   .acts .btn{padding:var(--dds-s2,8px) var(--dds-s3,12px);font-size:13px}
   .btn.warn{color:var(--danger);border-color:transparent;background:none;padding-left:var(--dds-s1,4px)}
@@ -217,6 +221,28 @@
   .chip{font-size:12px;background:var(--p-soft);color:var(--p);padding:var(--dds-s1,4px) var(--dds-s2,8px);border-radius:999px}
   .toast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%) translateY(20px);background:var(--ink);color:var(--bg);padding:var(--dds-s3,12px) var(--dds-s5,20px);border-radius:var(--dds-r,8px);font-size:13.5px;font-weight:600;opacity:0;pointer-events:none;transition:all var(--dds-t-base,200ms) var(--dds-ease,ease-out);z-index:50}
   .toast.on{opacity:1;transform:translateX(-50%) translateY(0)}
+  /* items 56 + 115: the storage meter — the same limits the upload door refuses on */
+  .store{margin-top:var(--dds-s2,8px);display:flex;align-items:center;gap:10px;flex-wrap:wrap;font-size:12px;color:var(--faint)}
+  .storebar{flex:0 0 160px;height:6px;border-radius:999px;background:var(--line);overflow:hidden}
+  .storebar i{display:block;height:100%;background:var(--p);border-radius:inherit}
+  .store.low .storebar i{background:var(--warn)} .store.full .storebar i{background:var(--danger)}
+  .store b{font-weight:600;color:var(--warn)} .store.full b{color:var(--danger)}
+  @media (max-width:720px){.storebar{flex-basis:100%}}
+  /* item 56: folders — the open folder's bar, and the folder chooser */
+  .fbar{display:flex;align-items:center;gap:var(--dds-s2,8px);flex-wrap:wrap;margin:-4px 0 var(--dds-s3,12px);font-size:13.5px;color:var(--soft)}
+  .fbar svg{width:16px;height:16px;flex:none}
+  .fbar b{color:var(--ink);font-weight:600}
+  .fbar .btn{padding:6px var(--dds-s3,12px);font-size:12.5px}
+  .fpick{display:flex;flex-wrap:wrap;gap:6px;margin:4px 0 12px}
+  .fopt{font:inherit;font-size:13px;border:1px solid var(--line);background:var(--bg);color:var(--ink);border-radius:999px;padding:6px var(--dds-s3,12px);cursor:pointer}
+  .fopt:hover,.fopt:focus-visible{border-color:var(--p);color:var(--p)}
+  /* item 115: where used in two groups, a repeat of the same photo, the description nudge */
+  .where .sub{font-size:12px;color:var(--faint);font-weight:500;margin:10px 0 6px}
+  .where .sub:first-of-type{margin-top:0}
+  .althint{font-size:12.5px;color:var(--warn);margin-top:6px;line-height:1.4}
+  .rlist{list-style:none;display:flex;flex-direction:column;gap:6px;margin:8px 0 0;padding:0;font-size:13px}
+  .rlist li{display:flex;align-items:center;gap:var(--dds-s2,8px)}
+  .rlist .rthumb{width:40px;height:30px;border-radius:var(--dds-r-sm,6px);background:var(--p-soft) center/cover no-repeat;flex:none}
   .drop{border:2px dashed var(--p);border-radius:var(--dds-r-lg,10px);background:var(--p-soft);color:var(--p);text-align:center;padding:var(--dds-s6,24px);margin-bottom:var(--dds-s4,16px);font-weight:600;display:none}
   .drop.on{display:block}
   footer{margin-top:44px;padding-top:var(--dds-s5,20px);border-top:1px solid var(--line);color:var(--faint);font-size:12.5px;text-align:center}
@@ -266,7 +292,8 @@ const IC={
   studio:'<path d="M4 20V9.5L12 4l8 5.5V20z" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M9.5 20v-6h5v6" fill="none" stroke="currentColor" stroke-width="1.5"/>',
   people:'<circle cx="9" cy="8.5" r="3.2" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M2.5 19.5a6.5 6.5 0 0 1 13 0M16 5.6a3.2 3.2 0 0 1 0 5.8M17.5 13.6a6.5 6.5 0 0 1 4 5.9" fill="none" stroke="currentColor" stroke-width="1.5"/>',
   check:'<path d="M5 12l4.5 4.5L19 7" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>',
-  lock:'<rect x="5" y="11" width="14" height="10" rx="2" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M8 11V8a4 4 0 0 1 8 0v3" fill="none" stroke="currentColor" stroke-width="1.6"/>'
+  lock:'<rect x="5" y="11" width="14" height="10" rx="2" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M8 11V8a4 4 0 0 1 8 0v3" fill="none" stroke="currentColor" stroke-width="1.6"/>',
+  folder:'<path d="M3 7a2 2 0 0 1 2-2h4l2 2.5h8a2 2 0 0 1 2 2V17a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/>'
 };
 const svg=(p,cls)=>`<svg class="${cls||''}" viewBox="0 0 24 24" fill="none">${p}</svg>`;
 
@@ -284,6 +311,7 @@ const COLS=[
   {key:'archive',label:'Archive',ic:'arch',f:{status:'archived'}},
 ];
 let S={col:'all',q:'',client:'',caps:[],policy:'immediate',assets:[],full:[],counts:{},countsOk:false,health:[],canEdit:true,loadedOnce:false,current:null,cards:[],   // countsOk stays false until a collections read SUCCEEDS — unknown never paints as 0
+  folder:'',newFolders:[],storage:null,   // item 56: the open folder (col 'folder'), folders made here and still empty; the meter
   selectMode:false,selected:new Set(),   // multi-select bulk actions
   stockResults:[],stockQ:'',stockState:null,stockProvider:'',stockLicense:''};   // FD-T10 stock library state
 let LOADED_AT=0;
@@ -413,15 +441,110 @@ function askConfirm(title, body, okLabel){
   });
 }
 function bytes(n){if(!n)return'';if(n<1024)return n+' B';if(n<1048576)return(n/1024).toFixed(0)+' KB';return(n/1048576).toFixed(1)+' MB';}
+// the meter's sizes run to gigabytes, and a whole number reads "1 GB", not "1.0 GB"
+function bigBytes(n){
+  n=Number(n)||0;
+  const u=n>=1073741824?[n/1073741824,'GB']:n>=1048576?[n/1048576,'MB']:[Math.max(n,0)/1024,'KB'];
+  const v=u[0]>=100||Number.isInteger(u[0])?Math.round(u[0]):Number(u[0].toFixed(1));
+  return v+' '+u[1];
+}
+
+// ── item 56: folders ─────────────────────────────────────────────────────────
+// A folder is the collection its files carry — no second store. The list comes
+// from /assets/collections, whose counts are what opening each folder shows.
+// Templates and Downloads keep their own rows above, and the stock door files its
+// photos under 'stock'. A folder made here stays in S.newFolders until a file goes
+// in; until then only this page knows it, and it says so.
+const FIXED_FOLDERS=new Set(['Templates','Downloads']);
+const folderLabel=(n)=>n==='stock'?'Stock photos':String(n||'');
+function cleanFolder(v){return String(v==null?'':v).replace(/[\u0000-\u001f\u007f]/g,'').replace(/\s+/g,' ').trim().slice(0,80);}
+function folderNames(){
+  const have=S.countsOk?Object.keys(S.counts):[];
+  const all=new Set([...have,...S.newFolders].filter(n=>n&&!FIXED_FOLDERS.has(n)));
+  if(S.col==='folder'&&S.folder&&!FIXED_FOLDERS.has(S.folder))all.add(S.folder);   // the open one, even mid-rename
+  return [...all].sort((a,b)=>folderLabel(a).localeCompare(folderLabel(b)));
+}
+function openFolder(name){S.col='folder';S.folder=name;S.q='';S.selected.clear();S.selectMode=false;return load();}
+async function newFolder(){
+  const n=S.selected.size;
+  const raw=await askPrompt('New folder',n?`The ${n} selected file${n===1?'':'s'} go into it.`:'Add files to it once it’s made — it keeps once a file is in it.','Create','e.g. Menu photos');
+  const name=cleanFolder(raw);if(!name)return;
+  if(n){
+    const r=await api('/assets/bulk','POST',{action:'collection',ids:[...S.selected],collection:name});
+    if(!r.ok){toast((r.body&&r.body.message)||'Couldn’t move those files');return;}
+  }else if(!folderNames().includes(name))S.newFolders.push(name);
+  return openFolder(name);
+}
+async function renameFolder(){
+  const from=S.folder;
+  const raw=await askPrompt('Rename this folder','Its files move with it.','Rename','Folder name',folderLabel(from));
+  const to=cleanFolder(raw);if(!to||to===from||to===folderLabel(from))return;
+  if(!(S.counts[from]>0)&&S.newFolders.includes(from)){   // still empty: only this page knows it
+    S.newFolders=S.newFolders.map(x=>x===from?to:x);return openFolder(to);
+  }
+  const r=await api('/assets/folders/move','POST',{from,to});
+  if(!r.ok){toast((r.body&&r.body.message)||'Couldn’t rename that folder');return;}
+  S.newFolders=S.newFolders.filter(x=>x!==from);
+  toast('Renamed to “'+folderLabel(to)+'”');
+  return openFolder(to);
+}
+async function removeFolder(){
+  const from=S.folder;const n=S.countsOk?(S.counts[from]||0):null;
+  const files=n?`Its ${n} file${n===1?'':'s'} stay in Files — only the folder goes.`:'Its files stay in Files — only the folder goes.';
+  if(!(await askConfirm('Remove the folder “'+folderLabel(from)+'”?',files,'Remove folder')))return;
+  if(n!==0||!S.newFolders.includes(from)){
+    const r=await api('/assets/folders/move','POST',{from,to:''});
+    if(!r.ok){toast((r.body&&r.body.message)||'Couldn’t remove that folder');return;}
+  }
+  S.newFolders=S.newFolders.filter(x=>x!==from);
+  S.col='all';S.folder='';
+  toast('Folder removed — its files are in All files');
+  return load();
+}
+// Pick a folder: the existing ones are one tap; a new name works too. Resolves
+// {name} or {clear:true} (out of folders), or null on cancel.
+function askFolder(title,body,opts){
+  return new Promise((resolve)=>{
+    const dlg=document.createElement('dialog');
+    dlg.style.cssText='border:none;border-radius:14px;padding:0;max-width:420px;width:92%;box-shadow:0 20px 60px rgba(30,19,56,.28);background:var(--card,#fff);color:var(--ink,#1b1525)';
+    const box=document.createElement('div');box.style.cssText='padding:20px';
+    const h=document.createElement('div');h.textContent=title;h.style.cssText='font-weight:600;margin-bottom:6px';box.appendChild(h);
+    if(body){const p=document.createElement('div');p.textContent=body;p.style.cssText='font-size:13px;color:var(--soft,#6b6478);margin-bottom:10px';box.appendChild(p);}
+    let done=false;const finish=(v)=>{if(done)return;done=true;try{dlg.close();}catch(e){}dlg.remove();resolve(v);};
+    const names=folderNames();
+    if(names.length){
+      const list=document.createElement('div');list.className='fpick';list.setAttribute('role','group');list.setAttribute('aria-label','Your folders');
+      names.forEach(n=>{const b=document.createElement('button');b.type='button';b.className='fopt';b.textContent=folderLabel(n);b.addEventListener('click',()=>finish({name:n}));list.appendChild(b);});
+      box.appendChild(list);
+    }
+    const lab=document.createElement('label');lab.htmlFor='fdlg-new';lab.textContent=names.length?'Or a new folder':'Folder name';lab.style.cssText='display:block;font-size:12px;color:var(--faint,#746b8a);font-weight:500;margin-bottom:4px';box.appendChild(lab);
+    const inp=document.createElement('input');inp.type='text';inp.id='fdlg-new';inp.maxLength=80;inp.placeholder='e.g. Menu photos';
+    inp.style.cssText='width:100%;padding:9px 11px;border:1px solid var(--line,#ddd);border-radius:9px;background:var(--bg,#faf8f5);color:inherit;font:inherit;font-size:14px';box.appendChild(inp);
+    const row=document.createElement('div');row.style.cssText='display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap;margin-top:14px';
+    const mk=(label,primary)=>{const b=document.createElement('button');b.type='button';b.textContent=label;
+      b.style.cssText=primary?'font:inherit;font-size:13px;font-weight:600;border:1px solid var(--p,#5b3fa0);background:var(--p,#5b3fa0);color:#fff;border-radius:999px;padding:8px 16px;cursor:pointer':'font:inherit;font-size:13px;font-weight:600;border:1px solid var(--line,#ddd);background:transparent;color:var(--ink,#1b1525);border-radius:999px;padding:8px 15px;cursor:pointer';
+      return b;};
+    if(opts&&opts.canClear){const out=mk('Take out of folders',false);out.style.marginRight='auto';out.addEventListener('click',()=>finish({clear:true}));row.appendChild(out);}
+    const cancel=mk('Cancel',false),ok=mk('Move',true);
+    row.appendChild(cancel);row.appendChild(ok);box.appendChild(row);dlg.appendChild(box);document.body.appendChild(dlg);
+    const submit=()=>{const v=cleanFolder(inp.value);if(v)finish({name:v});else inp.focus();};
+    cancel.addEventListener('click',()=>finish(null));
+    ok.addEventListener('click',submit);
+    inp.addEventListener('keydown',(e)=>{if(e.key==='Enter'){e.preventDefault();submit();}});
+    dlg.addEventListener('cancel',(e)=>{e.preventDefault();finish(null);});
+    dlg.showModal();setTimeout(()=>{const first=box.querySelector('.fopt');(first||inp).focus();},20);
+  });
+}
 // Small styled text prompt — matches askConfirm; resolves the trimmed string, or null on cancel/empty.
-function askPrompt(title, body, okLabel, placeholder){
+function askPrompt(title, body, okLabel, placeholder, value){
   return new Promise((resolve)=>{
     const dlg=document.createElement('dialog');
     dlg.style.cssText='border:none;border-radius:14px;padding:0;max-width:400px;width:92%;box-shadow:0 20px 60px rgba(30,19,56,.28);background:var(--card,#fff);color:var(--ink,#1b1525)';
     const box=document.createElement('div'); box.style.cssText='padding:20px';
     const h=document.createElement('div'); h.textContent=title; h.style.cssText='font-weight:600;margin-bottom:6px'; box.appendChild(h);
     if(body){ const p=document.createElement('div'); p.textContent=body; p.style.cssText='font-size:13px;color:var(--soft,#6b6478);margin-bottom:10px'; box.appendChild(p); }
-    const inp=document.createElement('input'); inp.type='text'; inp.placeholder=placeholder||''; inp.maxLength=80;
+    const inp=document.createElement('input'); inp.type='text'; inp.placeholder=placeholder||''; inp.maxLength=80; inp.value=value||'';
+    inp.setAttribute('aria-label',title);
     inp.style.cssText='width:100%;padding:9px 11px;border:1px solid var(--line,#ddd);border-radius:9px;background:var(--bg,#faf8f5);color:inherit;font:inherit;font-size:14px'; box.appendChild(inp);
     const row=document.createElement('div'); row.style.cssText='display:flex;gap:8px;justify-content:flex-end;margin-top:14px';
     const mk=(label,primary)=>{ const b=document.createElement('button'); b.type='button'; b.textContent=label;
@@ -435,7 +558,7 @@ function askPrompt(title, body, okLabel, placeholder){
     ok.addEventListener('click',submit);
     inp.addEventListener('keydown',(e)=>{ if(e.key==='Enter'){ e.preventDefault(); submit(); } });
     dlg.addEventListener('cancel',(e)=>{ e.preventDefault(); finish(null); });
-    dlg.showModal(); setTimeout(()=>inp.focus(),20);
+    dlg.showModal(); setTimeout(()=>{ inp.focus(); if(value)inp.select(); },20);
   });
 }
 
@@ -453,6 +576,7 @@ function qstr(){
   const c=COLS.find(x=>x.key===S.col)||COLS[0];
   const p=new URLSearchParams();
   Object.entries(c.f).forEach(([k,v])=>p.set(k,v));
+  if(S.col==='folder'&&S.folder)p.set('collection',S.folder);   // item 56: a folder is a server filter, like Templates
   if(S.q.trim())p.set('q',S.q.trim());
   p.set('limit','300');
   return p.toString();
@@ -504,11 +628,13 @@ async function load(soft){
   const full=(a.body.data&&a.body.data.assets)||[];
   S.full=full;
   S.policy=(a.body.data&&a.body.data.policy)||'immediate';
+  S.storage=(a.body.data&&a.body.data.storage)||null;   // absent on a server from before the meter: no meter, never a guess
   if(S.col==='all'&&!S.q.trim()){deriveRailCounts(full,a.body.data&&a.body.data.total);deriveClientRail(full);}
   applyFilters();
   S.health=(h.ok&&h.body.data&&h.body.data.findings)||[];   // health is a nudge — its failure just means no nudge
   S.countsOk=!!col.ok;   // collections failure degrades the rail count-less, with a notice — never fake zeros
   S.counts=buildCounts((col.ok&&col.body.data)||[]);
+  if(S.countsOk)S.newFolders=S.newFolders.filter(n=>!(S.counts[n]>0));   // a folder made here is real once a file is in it
   S.loadedOnce=true;LOADED_AT=Date.now();
   render();
 }
@@ -537,7 +663,21 @@ function railHtml(){
   return COLS.map(c=>{
     const n=railN(c.key);
     return `<button class="col ${S.col===c.key?'on':''}" data-col="${c.key}"${S.col===c.key?' aria-current="true"':''}>${svg(IC[c.ic],'ic')}<span>${c.label}</span>${n!==undefined?`<span class="n">${n}</span>`:''}</button>`;
-  }).join('')+clientRailHtml();
+  }).join('')+folderRailHtml()+clientRailHtml();
+}
+// Item 56: the owner's own folders, each with what opening it shows. Counts
+// follow the same rule as every rail count: none until a collections read works.
+function folderRailHtml(){
+  const names=folderNames();
+  if(!names.length&&!S.canEdit)return'';
+  const row=(n)=>{
+    const on=S.col==='folder'&&S.folder===n;
+    const c=S.countsOk?(S.counts[n]||0):undefined;
+    return `<button class="col ${on?'on':''}" data-folder="${esc(n)}"${on?' aria-current="true"':''}>${svg(IC.folder,'ic')}<span>${esc(folderLabel(n))}</span>${c!==undefined?`<span class="n">${c}</span>`:''}</button>`;
+  };
+  return `<div class="railsec" role="group" aria-label="Folders"><div class="railhead">Folders</div>`+
+    names.map(row).join('')+
+    (S.canEdit?`<button class="railmore" id="newFolder">＋ New folder</button>`:'')+`</div>`;
 }
 // The Clients section of the same rail. It appears only once files actually
 // belong to clients — an empty "Clients" heading is scaffolding, not a feature.
@@ -561,7 +701,9 @@ function clientRailHtml(){
 // A collection re-reads the server; a client is a lens over the page already in
 // hand, so it re-filters in place. Clicking the active client clears it.
 function wireRail(){
-  document.querySelectorAll('#rail [data-col]').forEach(b=>b.onclick=()=>{S.col=b.dataset.col;S.q='';S.selected.clear();load();});
+  document.querySelectorAll('#rail [data-col]').forEach(b=>b.onclick=()=>{S.col=b.dataset.col;S.folder='';S.q='';S.selected.clear();load();});
+  document.querySelectorAll('#rail [data-folder]').forEach(b=>b.onclick=()=>openFolder(b.dataset.folder));
+  const nf=$('newFolder');if(nf)nf.onclick=()=>newFolder();
   document.querySelectorAll('#rail [data-client]').forEach(b=>b.onclick=()=>{
     const v=b.dataset.client;
     S.client=(v&&S.client===v)?'':v;
@@ -647,16 +789,37 @@ function lheadHtml(shown){
       <button class="lbtn" id="refreshBtn" aria-label="Refresh" title="Refresh">↻</button>
     </div>
     <div class="lmeta">${shown} file${shown===1?'':'s'}${(()=>{const n=(S.full||[]).filter(r=>r.client_private).length;return n?` · ${n} private to a client`:'';})()} · ${esc(updatedLabel())}${DISPLAY==='table'?` · Sorted by ${esc(sortCol[1])} — ${SORT.dir>0?'ascending':'descending'}`:''}</div>
+    ${storageHtml()}
   </header>`;
+}
+// ── items 56 + 115: how much space is used ───────────────────────────────────
+// The server counts what the upload door refuses on: every live file (archived
+// and private ones still take space), against the smaller of the template's
+// file cap and the site's storage. Two limits, so the bar follows the nearer one.
+// Archiving frees nothing — the sentence says delete, because that's what does.
+function storageHtml(){
+  const st=S.storage;if(!st||!(st.max_bytes>0))return'';
+  const pctB=Math.min(100,st.used_bytes/st.max_bytes*100);
+  const pctF=st.max_files>0?Math.min(100,st.files/st.max_files*100):0;
+  const pct=Math.max(pctB,pctF);
+  const said=`${bigBytes(st.used_bytes)} of ${bigBytes(st.max_bytes)} used · ${st.files} of ${st.max_files} files`;
+  const warn=st.level==='full'?'Full — delete files you no longer need before adding more.'
+    :st.level==='low'?'Nearly full — deleting files you no longer need frees space; archiving doesn’t.':'';
+  return `<div class="store ${esc(st.level||'ok')}" id="storage"><div class="storebar" role="meter" aria-label="Storage used" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${Math.round(pct)}" aria-valuetext="${esc(said)}"><i style="width:${pct.toFixed(1)}%"></i></div><span>${esc(said)}</span>${warn?`<b>${esc(warn)}</b>`:''}</div>`;
 }
 function render(){
   normalizeSort();   // a column that vanished takes its sort with it — before anything reads SORT
   const rows=sortRows(S.assets);
   const nudge=renderNudge();
   const notice=S.countsOk?'':`<div class="notice">Collection counts aren’t available just now — your files are all here.</div>`;
+  const inFolder=S.col==='folder'&&S.folder;
   const bodyHtml=rows.length
     ?(DISPLAY==='table'?tableHtml(rows):`<div class="grid">${rows.map(tile).join('')}</div>`)
-    :`<div class="empty"><h2>${S.q?'No files match that search.':'Nothing here yet.'}</h2><p>${S.canEdit?'Drag files in, or use Add files above.':'Files your studio adds will appear here.'}</p></div>`;
+    :inFolder&&!S.q
+      ?`<div class="empty"><h2>This folder is empty.</h2><p>${S.canEdit?'Add files here, or tick files in All files and choose Move to folder. A new folder keeps once a file is in it.':'Files your studio puts in this folder will appear here.'}</p></div>`
+      :`<div class="empty"><h2>${S.q?'No files match that search.':'Nothing here yet.'}</h2><p>${S.canEdit?'Drag files in, or use Add files above.':'Files your studio adds will appear here.'}</p></div>`;
+  // item 56: the open folder names itself, with its two moves
+  const fbar=inFolder?`<div class="fbar">${svg(IC.folder)}<span>Folder <b>${esc(folderLabel(S.folder))}</b>${S.canEdit?' · new files go in here':''}</span>${S.canEdit?`<button class="btn" id="fRename">Rename</button><button class="btn" id="fRemove">Remove folder</button>`:''}</div>`:'';
   // Any re-render must never destroy a focused search input's value or caret
   // (contacts.html's contract) — capture before the innerHTML swap, restore after.
   const act=document.activeElement;const wasQ=!!(act&&act.id==='q');
@@ -667,8 +830,9 @@ function render(){
       <div>
         ${lheadHtml(rows.length)}
         ${notice}
+        ${fbar}
         <div class="bar">
-          <div class="search">${svg(IC.search)}<input id="q" type="search" aria-label="Search files" placeholder="Search files — try “logo”" value="${esc(S.q)}" autocomplete="off"></div>
+          <div class="search">${svg(IC.search)}<input id="q" type="search" aria-label="${inFolder?'Search this folder':'Search files'}" placeholder="${inFolder?'Search this folder':'Search files — try “logo”'}" value="${esc(S.q)}" autocomplete="off"></div>
           ${S.canEdit&&DISPLAY==='grid'&&S.assets.length?`<button class="btn" id="selbtn">${S.selectMode?'Done':'Select'}</button>`:''}
           ${S.canEdit?`<button class="btn primary" id="add">＋ Add files</button>`:''}
         </div>
@@ -742,7 +906,7 @@ function bulkBar(){
     <button class="btn" data-bulk="all">${n&&n>=S.assets.length?'Clear all':'Select all'}</button>
     <span class="sp">
       <button class="btn" data-bulk="tag"${n?'':' disabled'}>Add tag</button>
-      <button class="btn" data-bulk="collection"${n?'':' disabled'}>Move to collection…</button>
+      <button class="btn" data-bulk="collection"${n?'':' disabled'}>Move to folder…</button>
       ${approve?approve.replace('data-bulk="approve"',`data-bulk="approve"${n?'':' disabled'}`):''}
       <button class="btn" data-bulk="download"${n?'':' disabled'}>Download</button>
       <button class="btn" data-bulk="archive"${n?'':' disabled'}>Archive</button>
@@ -774,13 +938,13 @@ function tile(a){
     return `<div class="tile ${sel?'sel':''}" data-pick="${a.id}" role="button" tabindex="0" aria-pressed="${sel?'true':'false'}" aria-label="${sel?'Deselect':'Select'} ${esc(a.name)}">
       <div class="check">${sel?svg(IC.check):''}</div>
       <div class="thumb" ${t}>${inner}</div>${badge}
-      <div class="meta"><div class="nm">${esc(a.name)}</div><div class="use"><span class="dot ${dotCls}"></span>${useTxt}</div></div>
+      <div class="meta"><div class="nm" title="${esc(a.name)}">${esc(a.name)}</div><div class="use"><span class="dot ${dotCls}"></span>${useTxt}</div></div>
     </div>`;
   }
   const star=S.canEdit?`<button class="star" data-fav="${a.id}" title="Favorite">${svg(a.favorite?IC.star:IC.starO)}</button>`:'';
   return `<div class="tile" data-open="${a.id}" role="button" tabindex="0" aria-label="Open ${esc(a.name)}">
     <div class="thumb" ${t}>${inner}</div>${badge}${star}
-    <div class="meta"><div class="nm">${esc(a.name)}</div><div class="use"><span class="dot ${dotCls}"></span>${useTxt}</div></div>
+    <div class="meta"><div class="nm" title="${esc(a.name)}">${esc(a.name)}</div><div class="use"><span class="dot ${dotCls}"></span>${useTxt}</div></div>
   </div>`;
 }
 function wire(){
@@ -821,6 +985,8 @@ function wire(){
     const nb=document.querySelector('[data-sort="'+k+'"]');if(nb)nb.focus();
   });
   const add=$('add');if(add)add.onclick=()=>$('picker').click();
+  const fr=$('fRename');if(fr)fr.onclick=()=>renameFolder();
+  const fx=$('fRemove');if(fx)fx.onclick=()=>removeFolder();
   const tidy=$('tidy');if(tidy)tidy.onclick=()=>{S.q='';S.col='all';SORT={key:'added',dir:-1};load();};
 }
 function togglePick(id){ if(S.selected.has(id))S.selected.delete(id); else S.selected.add(id); render();
@@ -833,13 +999,20 @@ async function onBulk(action){
   if(action==='download')return bulkDownload(ids);
   const body={action,ids};
   if(action==='tag'){ const tag=await askPrompt('Add a tag','This tag is added to '+ids.length+' file'+(ids.length===1?'':'s')+'.','Add tag','e.g. summer, hero'); if(!tag)return; body.tag=tag; }
-  else if(action==='collection'){ const collection=await askPrompt('Move to a collection','Move '+ids.length+' file'+(ids.length===1?'':'s')+' into a collection.','Move','e.g. Brand, Contracts'); if(!collection)return; body.collection=collection; }
+  else if(action==='collection'){
+    // item 56: one tap on a folder you have, a new name, or out of folders altogether
+    const inOne=ids.some(id=>{const a=S.assets.find(x=>x.id===id);return a&&a.collection;});
+    const pick=await askFolder('Move to a folder','Move '+ids.length+' file'+(ids.length===1?'':'s')+' into a folder.',{canClear:inOne});
+    if(!pick)return;
+    if(pick.clear)body.clear=true; else body.collection=pick.name;
+  }
   else if(action==='archive'){ if(!(await askConfirm('Archive '+ids.length+' file'+(ids.length===1?'':'s')+'?','Archived files leave your library view but aren’t deleted — you can restore them from Archive.','Archive')))return; }
   const r=await api('/assets/bulk','POST',body);
   if(!r.ok){toast((r.body&&r.body.message)||'Could not apply that');return;}
   const d=r.body.data||{}; const done=d.applied||0; const miss=(d.missing||[]).length;
   const verb=action==='tag'?'Tagged':action==='collection'?'Moved':action==='archive'?'Archived':'Approved';
-  toast(done?`${verb} ${done} file${done===1?'':'s'}${miss?` · ${miss} skipped`:''}`:'Nothing changed');
+  const where=action==='collection'?(body.clear?' out of folders':` to “${folderLabel(body.collection)}”`):'';
+  toast(done?`${verb} ${done} file${done===1?'':'s'}${where}${miss?` · ${miss} skipped`:''}`:'Nothing changed');
   S.selected.clear(); S.selectMode=false; load();
 }
 // Bulk Download: one signed URL per file, saved via anchor clicks. Non-destructive,
@@ -931,8 +1104,28 @@ function renderDetail(){
   // EC-1 cohesion: each "where used" entry clicks through to the Website editor —
   // the file's home and where it's edited/removed. Scope-aware for agency drill-in.
   const siteHref=(hash)=>{const c=scope();return '/presence.html'+(hash||'')+(c?(hash&&hash.indexOf('?')>=0?'&':'?')+'client='+encodeURIComponent(c):'');};
-  const surfaceHash={brand:'#design',seo:'#business',services:'',blog:'#updates'};
-  const usage=(d.usage||[]).map(u=>`<li><span class="dot ${u.live?'live':'used'}"></span><a href="${esc(siteHref(surfaceHash[u.surface]||''))}" class="ulink">${u.live?'Live — ':''}${esc(u.label)}</a></li>`).join('')||`<li><span class="dot un"></span>Not used on your site yet.</li>`;
+  // Item 115: every place, in two groups — on your website, then elsewhere (the
+  // Brand Kit's email logo, a saved section no page shows yet, a project file).
+  const surfaceHash={brand:'#design',cover:'#design',section:'#design',library:'#design',brand_kit:'#design',seo:'#business',page_share:'#search',services:'#offerings',blog:'#updates'};
+  const hrefOf=(u)=>u.surface==='project'?'/projects.html'+(scope()?'?client='+encodeURIComponent(scope()):''):siteHref(surfaceHash[u.surface]||'');
+  const cap=(t)=>{t=String(t||'');return t.charAt(0).toUpperCase()+t.slice(1);};
+  const useLi=(u)=>`<li><span class="dot ${u.live?'live':'used'}"></span><a href="${esc(hrefOf(u))}" class="ulink">${u.live?'Live — ':''}${esc(cap(u.label))}</a></li>`;
+  const onSite=(d.usage||[]).filter(u=>u.site!==false),offSite=(d.usage||[]).filter(u=>u.site===false);
+  const inProject=offSite.some(u=>u.surface==='project');
+  const usage=(onSite.length||offSite.length)
+    ?(onSite.length?`${offSite.length?'<div class="sub">On your website</div>':''}<ul>${onSite.map(useLi).join('')}</ul>`:'')
+      +(offSite.length?`<div class="sub">${onSite.length?'Elsewhere':'Not on your website, but used'}</div><ul>${offSite.map(useLi).join('')}</ul>`:'')
+    :`<ul><li><span class="dot un"></span>${d.usage_complete===false?'We couldn’t check every place just now — try again before you delete or replace it.':'Not used on your site yet.'}</li></ul>`;
+  const usageNote=(d.usage_complete===false&&(onSite.length||offSite.length))?'<div class="amuted">We couldn’t check every place just now, so there may be more.</div>':'';
+  // Item 115: the same photo stored more than once, named so one can go
+  const repeats=(d.repeats||[]).length?`<div class="vrow" id="repeatRow">${esc((d.repeats.some(r=>r.exact)?'The same file is also in Files as ':'This looks like a copy of ')+d.repeats.map(r=>'“'+r.name+'”'+(r.archived?' (in Archive)':'')).join(', ')+'.')}<button class="btn" data-repeat="${esc(d.repeats[0].id)}">Open it</button></div>`:'';
+  // Item 115: a description that is still the file name says nothing to a screen reader
+  const altLooksLikeName=(()=>{
+    const alt=String(a.alt_text||'').trim(),title=String((a.metadata&&a.metadata.title)||'').trim();
+    if(!alt||a.kind!=='image')return false;
+    if(title&&alt.toLowerCase()===title.toLowerCase())return true;
+    return /^(img|dsc[nf]?|pxl|mvimg|dji|gopr|screenshot|screen shot|whatsapp image|photo|image|picture)[\s_.-]*\d[\w\s.:()-]*$/i.test(alt)||/^\d[\d_.\s-]{5,}$/.test(alt);
+  })();
   const ver=d.versions&&d.versions.has_history?`<div class="vrow">Replaced a previous version.<button class="btn" onclick="rollback('${a.id}')">Undo replace</button></div>`:'';
   const tags=(a.tags||[]).map(t=>`<span class="chip">${esc(t)}</span>`).join('');
   const meta=a.metadata||{};
@@ -948,11 +1141,12 @@ function renderDetail(){
     <div style="font-size:12.5px;color:var(--faint)">${esc(a.kind==='document'?'PDF document':'Photo')} · ${bytes(a.bytes)}${a.width?` · ${a.width}×${a.height}`:''}${a.client_id?` · ${esc(clientLabel(a))}’s work`:''}</div>
     ${a.client_id?`<div class="field privfield"><label class="switch${a.client_private?'':' off'}" for="f-private"><input type="checkbox" id="f-private"${a.client_private?' checked':''}${ed?'':' disabled'}><i aria-hidden="true"></i>Private to this client</label><div class="amuted" id="f-private-note">${a.client_private?`Only shows under ${esc(clientLabel(a))} and on their record. Never offered when you pick images for a site.`:'In the shared library and the site picker like any other file.'}</div></div>`:''}
     <div class="field"><label for="f-name">Name</label><input id="f-name" value="${esc(a.name)}" ${ed?'':'disabled'}></div>
-    ${a.kind==='image'?`<div class="field"><label for="f-alt">Description (alt text)</label><textarea id="f-alt" ${ed?'':'disabled'} placeholder="What’s in this photo? Helps search & screen readers.">${esc(a.alt_text||'')}</textarea></div>`:''}
+    ${repeats}
+    ${a.kind==='image'?`<div class="field"><label for="f-alt">Description (alt text)</label><textarea id="f-alt" ${ed?'':'disabled'} placeholder="What’s in this photo? Helps search & screen readers."${altLooksLikeName?' aria-describedby="f-alt-hint"':''}>${esc(a.alt_text||'')}</textarea>${altLooksLikeName?`<div class="althint" id="f-alt-hint">This is still the file name. Say what’s in the photo — screen readers read it out, and search engines use it.</div>`:''}</div>`:''}
     <div class="field"><label for="f-cap">Caption</label><input id="f-cap" value="${esc(meta.caption||'')}" ${ed?'':'disabled'}></div>
-    <div class="field"><label for="f-col">Collection</label><input id="f-col" value="${esc(a.collection||'')}" placeholder="e.g. Brand, Contracts" ${ed?'':'disabled'}></div>
+    <div class="field"><label for="f-col">Folder</label><input id="f-col" list="f-col-list" value="${esc(a.collection||'')}" placeholder="No folder — type or pick one" ${ed?'':'disabled'}><datalist id="f-col-list">${[...new Set([...folderNames(),...FIXED_FOLDERS])].map(n=>`<option value="${esc(n)}">`).join('')}</datalist></div>
     <div class="field"><label for="f-tags">Tags (comma-separated)</label><input id="f-tags" value="${esc((a.tags||[]).join(', '))}" ${ed?'':'disabled'}>${tags?`<div class="tags">${tags}</div>`:''}</div>
-    <div class="where"><div class="hl">Where it’s used</div><ul>${usage}</ul><div style="font-size:12.5px;color:var(--faint);margin-top:8px">${esc((d.summary&&d.summary.headline)||'')}</div></div>
+    <div class="where" id="whereUsed"><div class="hl">Where it’s used</div>${usage}${usageNote}<div style="font-size:12.5px;color:var(--faint);margin-top:8px">${esc((d.summary&&d.summary.headline)||'')}</div>${inProject&&ed?'<div class="amuted">Delivered in a project, so it stays the version that was sent. Upload a new version to the project instead of replacing it here.</div>':''}</div>
     ${a.kind==='image'?`<div class="social" id="social-slot"><div class="hl">Social sizes</div><div style="font-size:12.5px;color:var(--faint)">Preparing crops…</div></div>`:''}
     ${a.kind==='image'?`<div class="social" id="cards-slot"><div class="hl">Branded cards</div><div style="font-size:12.5px;color:var(--faint)">Preparing cards…</div></div>`:''}
     <div id="rbg-slot"></div>
@@ -960,14 +1154,15 @@ function renderDetail(){
     ${ed?`<div class="acts">
       <button class="btn" onclick="saveDetail()">Save details</button>
       ${a.kind==='image'?`<button class="btn" onclick="removeBg('${a.id}',this)">Remove background</button>`:''}
-      <button class="btn" onclick="$('replacer').click()">Replace…</button>
+      ${inProject?'':`<button class="btn" onclick="$('replacer').click()">Replace…</button>`}
       <button class="btn" onclick="duplicate('${a.id}')">Duplicate</button>
       <button class="btn" onclick="download('${a.id}')">Download</button>
       ${a.asset_status==='archived'?`<button class="btn" onclick="setAssetStatus('${a.id}','restore')">Restore</button>`:`<button class="btn" onclick="setAssetStatus('${a.id}','archive')">Archive</button>`}
-      <button class="btn warn" data-needs="delete" onclick="del('${a.id}',${d.usage&&d.usage.length?'true':'false'})">Delete</button>
+      <button class="btn warn" data-needs="delete" onclick="del('${a.id}')">Delete</button>
     </div>`:`<div class="acts"><button class="btn" onclick="download('${a.id}')">Download</button></div>`}`;
   wirePreviews($('panel'));
   const pv2=$('f-private'); if(pv2)pv2.onchange=()=>setPrivate(a.id,pv2.checked,pv2);
+  $('panel').querySelectorAll('[data-repeat]').forEach(b=>b.onclick=()=>openDetail(b.dataset.repeat));
   if(a.kind==='image'){loadSocial(a.id);loadCards(a.id,'');}
 }
 // Oct 2026 review (0131): the switch writes straight away through the SAME
@@ -1163,8 +1358,10 @@ async function decideFile(id,action){
   if(r.ok){toast(action==='approve'?('Approved'+(r.body.data&&r.body.data.requires_publish?' — publish to go live':'')):'Sent back for changes');closeDetail();load();}
   else toast((r.body&&r.body.message)||'Could not do that');
 }
-async function del(id,inUse){
-  if(inUse){toast('This file is in use — remove it from the page or archive it first.');return;}
+async function del(id){
+  // the SAME places the panel lists (the server refuses on them too)
+  const uses=(S.current&&S.current.asset&&S.current.asset.id===id&&S.current.usage)||[];
+  if(uses.length){toast('This file is in use ('+uses[0].label+(uses.length>1?' and '+(uses.length-1)+' more':'')+') — remove it there first, or archive it.');return;}
   if(!(await askConfirm('Delete this file permanently?','This cannot be undone.','Delete')))return;
   const r=await api('/assets/'+id,'DELETE');
   if(r.ok){toast('Deleted');closeDetail();load();}else toast((r.body&&r.body.message)||'Could not delete');
@@ -1175,18 +1372,82 @@ async function dimsOf(file){
   if(!file.type.startsWith('image/'))return{};
   try{const bmp=await createImageBitmap(file);const d={width:bmp.width,height:bmp.height};bmp.close&&bmp.close();return d;}catch(_){return{};}
 }
+// ── item 115: a photo already in Files is named before it's stored twice ─────
+// The page holds the bytes, so it works out each file's SHA-256 here; the server
+// (GET /assets/match) answers from that, or, for files stored before anything
+// kept a hash, from the exact size and pixels. A server from before this answers
+// 404, and every file simply uploads as it always did.
+async function fileHash(file){
+  try{
+    if(!(window.crypto&&crypto.subtle))return'';
+    const d=await crypto.subtle.digest('SHA-256',await file.arrayBuffer());
+    return [...new Uint8Array(d)].map(b=>b.toString(16).padStart(2,'0')).join('');
+  }catch(_){return'';}
+}
+async function repeatOf(file,dims,hash){
+  const p=new URLSearchParams();
+  if(hash)p.set('hash',hash);
+  p.set('bytes',String(file.size));
+  if(dims.width&&dims.height){p.set('width',String(dims.width));p.set('height',String(dims.height));}
+  let r;try{r=await api('/assets/match?'+p.toString());}catch(_){return null;}
+  const m=r&&r.ok&&r.body&&r.body.data&&r.body.data.match;
+  return m&&m.id?m:null;
+}
+// One question for the whole batch. Skipping is the default (Escape too), so
+// nothing is stored twice by accident. Resolves 'skip', 'keep', or {open:id}.
+function askRepeats(list){
+  return new Promise((resolve)=>{
+    const one=list.length===1;
+    const dlg=document.createElement('dialog');dlg.id='repeatDlg';
+    dlg.style.cssText='border:none;border-radius:14px;padding:0;max-width:440px;width:92%;box-shadow:0 20px 60px rgba(30,19,56,.28);background:var(--card,#fff);color:var(--ink,#1b1525)';
+    const box=document.createElement('div');box.style.cssText='padding:20px';
+    const h=document.createElement('div');h.style.cssText='font-weight:600;margin-bottom:6px';
+    h.textContent=one?'This is already in Files':`${list.length} of these are already in Files`;box.appendChild(h);
+    const ul=document.createElement('ul');ul.className='rlist';
+    list.forEach(({file,match})=>{
+      const li=document.createElement('li');
+      const th=document.createElement('span');th.className='rthumb';
+      if(match.thumb)th.style.backgroundImage='url("'+String(match.thumb).replace(/["\\]/g,'')+'")';
+      const t=document.createElement('span');
+      const where=match.archived?' (in Archive)':match.folder?` (in the folder “${folderLabel(match.folder)}”)`:'';
+      t.textContent=`“${file.name}” ${match.exact?'is the same file as':'looks the same as'} “${match.name}”${where}.`;
+      li.appendChild(th);li.appendChild(t);ul.appendChild(li);
+    });
+    box.appendChild(ul);
+    const row=document.createElement('div');row.style.cssText='display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap;margin-top:16px';
+    const mk=(label,primary)=>{const b=document.createElement('button');b.type='button';b.textContent=label;
+      b.style.cssText=primary?'font:inherit;font-size:13px;font-weight:600;border:1px solid var(--p,#5b3fa0);background:var(--p,#5b3fa0);color:#fff;border-radius:999px;padding:8px 16px;cursor:pointer':'font:inherit;font-size:13px;font-weight:600;border:1px solid var(--line,#ddd);background:transparent;color:var(--ink,#1b1525);border-radius:999px;padding:8px 15px;cursor:pointer';
+      return b;};
+    let done=false;const finish=(v)=>{if(done)return;done=true;try{dlg.close();}catch(e){}dlg.remove();resolve(v);};
+    const keep=mk('Upload anyway',false);keep.addEventListener('click',()=>finish('keep'));row.appendChild(keep);
+    if(one){const op=mk('Open the one in Files',false);op.addEventListener('click',()=>finish({open:list[0].match.id}));row.appendChild(op);}
+    const skip=mk(one?'Skip it':'Skip them',true);skip.addEventListener('click',()=>finish('skip'));row.appendChild(skip);
+    box.appendChild(row);dlg.appendChild(box);document.body.appendChild(dlg);
+    dlg.addEventListener('cancel',(e)=>{e.preventDefault();finish('skip');});
+    dlg.showModal();setTimeout(()=>skip.focus(),20);
+  });
+}
 async function uploadFiles(files){
   // Count what actually landed — the summary toast tells the truth ("Uploaded N ·
   // M failed"), instead of the old unconditional "Uploaded" over any failures.
-  let ok=0,fail=0,firstErr='';
-  for(const file of files){
+  let ok=0,fail=0,firstErr='',skipped=0,openAfter='';
+  const target=S.col==='folder'?S.folder:'';   // item 56: a file added inside a folder lands in it
+  // item 115: look every file up first, so ONE question covers the batch
+  const prep=[];
+  for(const file of files){const dims=await dimsOf(file);const hash=await fileHash(file);prep.push({file,dims,hash,match:await repeatOf(file,dims,hash)});}
+  let todo=prep;
+  const reps=prep.filter(x=>x.match);
+  if(reps.length){
+    const ans=await askRepeats(reps);
+    if(ans!=='keep'){todo=prep.filter(x=>!x.match);skipped=reps.length;if(ans&&ans.open)openAfter=ans.open;}
+  }
+  for(const {file,dims,hash} of todo){
     const isDoc=file.type==='application/pdf';
     let name=(file.name||'file').replace(/\.[a-z0-9]+$/i,'');
     // Never gate the upload on a modal or drop the file — default the alt text to the
     // filename (as documents already do); you can refine it in the detail panel after.
     let alt=name.trim().length>=3?name:'Photo';
-    const dims=await dimsOf(file);
-    let up; try{up=await api('/media/upload-url','POST',{mime:file.type,bytes:file.size,alt_text:isDoc?name:alt,width:dims.width,height:dims.height});}catch(_){up={ok:false,body:{}};}
+    let up; try{up=await api('/media/upload-url','POST',{mime:file.type,bytes:file.size,alt_text:isDoc?name:alt,width:dims.width,height:dims.height,content_hash:hash||undefined});}catch(_){up={ok:false,body:{}};}
     if(!up.ok){fail++;firstErr=firstErr||(up.body&&up.body.message)||'';continue;}
     let put; try{put=await fetch(up.body.data.upload_url,{method:'PUT',headers:{'Content-Type':file.type},body:file});}catch(_){put={ok:false};}
     if(!put.ok){fail++;continue;}
@@ -1196,23 +1457,27 @@ async function uploadFiles(files){
     // name was its alt text (and 'Photo' when the filename was too short to use).
     // Writing the title here decouples NAME from DESCRIPTION for good: refining a
     // photo's alt text in the detail panel can never rename the file again.
-    if(name.trim())await api('/assets/'+up.body.data.media_id,'PATCH',{name}).catch(()=>{});
+    if(name.trim()||target)await api('/assets/'+up.body.data.media_id,'PATCH',{name,...(target?{collection:target}:{})}).catch(()=>{});
     ok++;
   }
+  const skipNote=skipped?` · skipped ${skipped} already in Files`:'';
   toast(fail
-    ?(ok?`Uploaded ${ok} · ${fail} failed`:(firstErr||'Uploads failed — nothing was added'))
-    :`Uploaded ${ok} file${ok===1?'':'s'}`);
-  if(ok)load();
+    ?(ok?`Uploaded ${ok} · ${fail} failed${skipNote}`:(firstErr||'Uploads failed — nothing was added'))
+    :ok?`Uploaded ${ok} file${ok===1?'':'s'}${skipNote}`
+    :skipped?`Nothing new — ${skipped===1?'that file is':'those files are'} already in Files`:`Uploaded ${ok} files`);
+  if(ok)await load();
+  if(openAfter)openDetail(openAfter);
 }
 $('picker').onchange=(e)=>{const f=[...e.target.files];e.target.value='';if(f.length)uploadFiles(f);};
 $('replacer').onchange=async(e)=>{
   const file=e.target.files[0];e.target.value='';if(!file||!S.current)return;
   const old=S.current.asset;
-  const _extra=(S.current.usage&&S.current.usage.length)?` This updates it in ${S.current.usage.length} place(s) on your site.`:'';
+  const _n=(S.current.usage||[]).length;   // every place where-used lists is repointed (item 115)
+  const _extra=_n?` This updates it in ${_n} place${_n===1?'':'s'}.`:'';
   if(!(await askConfirm('Replace this file?',`Replace “${old.name}” with ${file.name}.`+_extra,'Replace')))return;
   const isDoc=file.type==='application/pdf';const dims=await dimsOf(file);
   const alt=isDoc?old.name:(old.alt_text||old.name);
-  const up=await api('/media/upload-url','POST',{mime:file.type,bytes:file.size,alt_text:alt,width:dims.width,height:dims.height});
+  const up=await api('/media/upload-url','POST',{mime:file.type,bytes:file.size,alt_text:alt,width:dims.width,height:dims.height,content_hash:(await fileHash(file))||undefined});
   if(!up.ok){toast((up.body&&up.body.message)||'Upload could not start');return;}
   const put=await fetch(up.body.data.upload_url,{method:'PUT',headers:{'Content-Type':file.type},body:file});
   if(!put.ok){toast('Upload failed');return;}

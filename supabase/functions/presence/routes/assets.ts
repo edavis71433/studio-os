@@ -11,6 +11,8 @@
 //   GET   /assets/health          — plain findings (missing alt, unused, oversized, dupes)
 //   GET   /assets/duplicates      — duplicate groups
 //   GET   /assets/usage           — per-asset in_use map
+//   GET   /assets/match           — is this file already here? (?hash=&bytes=&width=&height=)
+//   POST  /assets/folders/move    — { from, to } rename a folder, or ('' ) take its files out
 //   GET   /assets/:id             — one file: metadata + complete where-used + versions
 //   GET   /assets/:id/download    — signed original download URL
 //   PATCH /assets/:id             — { tags, collection, metadata, brand, alt_text }  (rename/move/favorite)
@@ -38,7 +40,12 @@ import {
   canDelete, nextAssetStatus, assetApprovalPolicy, displayName, usageSummary, carryForwardMetadata,
   fileKind, isFavorite, isClientUpload, replaceNeedsApproval, fileState, clientsByMedia,
   normalizeBulkRequest, mergeTag, partitionOwned, type Asset, type ApprovalPolicy, type UsageRef, type MediaClient,
+  settingsMediaUses, repointSettingsMedia, mediaIdsIn, findRepeats, storageSummary, normalizeFolderMove, folderName, HASH_RE,
+  type LibraryItem, type RepeatProbe, type StorageSummary,
 } from '../lib/dam.ts';
+import { vocabFor } from '../lib/industry_vocab.ts';
+import { mediaQuota } from '../lib/media_guard.ts';
+import { getTemplate } from '../lib/render.ts';
 import { socialCropList } from '../lib/social_crops.ts';
 import { composeSocialCards, HEADLINE_MAX } from '../lib/social_card.ts';
 import { brandFromKit } from '../lib/email_brand.ts';
@@ -83,25 +90,40 @@ async function loadAsset(siteId: string, id: string, includeDeleted = false): Pr
 }
 
 // ── the complete, authoritative usage graph — mirrors serializer.ts exactly ───
-// Every place the RENDERER resolves a media id: settings.logo_media_id,
-// settings.og_media_id, offerings.media_id (visible), posts.hero_media_id
-// (published). Returns labelled refs per media id — the "where used" value-add.
-async function referencedRefs(site: SiteRow): Promise<Map<string, UsageRef[]>> {
-  const [settingsR, offs, posts] = await Promise.all([
-    svc(`presence_settings?site_id=eq.${site.id}&select=logo_media_id,og_media_id&limit=1`),
+// Item 115: every place the RENDERER resolves a media id — the logo, cover and
+// share image, every section on every page (a linked saved section through its
+// library item) and each page's own share image (settingsMediaUses) — plus
+// services and updates; and, off the website, the Brand Kit logo, saved sections
+// no page shows, and project files. Returns labelled refs per media id.
+// `complete` is false when a read that could name a use failed: Delete then
+// refuses instead of trusting a list with a hole in it. The library read is the
+// one exception — deleteMedia never consulted it, so its failure costs nothing
+// that was protected before.
+const SETTINGS_MEDIA_COLS = 'logo_media_id,og_media_id,cover_media_id,blocks,pages,page_seo,brand_kit,industry_key';
+interface Refs { map: Map<string, UsageRef[]>; complete: boolean; library: LibraryItem[]; offeringLabel: string; settings: Record<string, unknown> | null }
+async function referencedRefs(site: SiteRow): Promise<Refs> {
+  const [settingsR, offs, posts, dels, libR] = await Promise.all([
+    svc(`presence_settings?site_id=eq.${site.id}&select=${SETTINGS_MEDIA_COLS}&limit=1`),
     svc(`presence_offerings?site_id=eq.${site.id}&deleted_at=is.null&media_id=not.is.null&select=media_id,name,is_visible`),
     svc(`presence_posts?site_id=eq.${site.id}&deleted_at=is.null&hero_media_id=not.is.null&select=hero_media_id,title,status`),
+    svc(`presence_deliverables?site_id=eq.${site.id}&deleted_at=is.null&select=media_id,title&limit=${DELIVERABLE_CAP}`),
+    svc(`presence_content_library?site_id=eq.${site.id}&select=id,name,payload&limit=500`),
   ]);
-  const map = new Map<string, UsageRef[]>();
-  const add = (id: string | null | undefined, ref: UsageRef) => { if (!id) return; map.set(id, [...(map.get(id) || []), ref]); };
-  const s = arr(settingsR)[0] || {};
-  add(s.logo_media_id, { surface: 'brand', label: 'your logo (site-wide)', live: false });
-  add(s.og_media_id, { surface: 'seo', label: 'your social share image', live: false });
-  for (const o of arr(offs)) add(o.media_id, { surface: 'services', label: `“${o.name}”${o.is_visible === false ? ' (hidden)' : ''}`, live: false });
+  const settings = (arr(settingsR)[0] as Record<string, unknown> | undefined) || null;
+  const library = libR.ok ? (arr(libR) as LibraryItem[]) : [];
+  const offeringLabel = vocabFor(settings?.industry_key as string | undefined).offeringLabel;
+  const map = settingsMediaUses(settings, { library, offeringLabel });
+  const add = (id: string | null | undefined, ref: UsageRef) => { if (!id) return; const k = String(id).toLowerCase(); map.set(k, [...(map.get(k) || []), ref]); };
+  for (const o of arr(offs)) add(o.media_id, { surface: 'services', label: `“${o.name}” on your ${offeringLabel} page${o.is_visible === false ? ' (hidden)' : ''}`, live: false });
   for (const p of arr(posts)) add(p.hero_media_id, { surface: 'blog', label: `the update “${p.title}”${p.status !== 'published' ? ' (draft)' : ''}`, live: false });
-  return map;
+  for (const d of arr(dels)) add(d.media_id, { surface: 'project', label: `the project file “${String(d.title || '').trim() || 'Untitled'}”`, live: false, site: false });
+  return { map, complete: settingsR.ok && offs.ok && posts.ok && dels.ok, library, offeringLabel, settings };
 }
-function refsSet(map: Map<string, UsageRef[]>): Set<string> { return new Set(map.keys()); }
+/** Ids used ON THE WEBSITE — the "On your site" column, health's "not on your
+ *  site", and whether a Replace touches the live site. */
+function siteRefs(map: Map<string, UsageRef[]>): Set<string> {
+  return new Set([...map].filter(([, refs]) => refs.some((r) => r.site !== false)).map(([id]) => id));
+}
 
 /** The media ids actually on the CURRENT live site — the live snapshot's manifest.
  *  Lets "where used" distinguish live vs pending-next-publish. */
@@ -261,8 +283,8 @@ function present(a: Asset, opts: { in_use?: boolean; thumb?: string | null; clie
 // ── the library ──────────────────────────────────────────────────────────────
 export async function handleAssetsList(req: Request, site: SiteRow, cors: Record<string, string>) {
   const url = new URL(req.url);
-  const [assets, refMap, live, byClient] = await Promise.all([loadAssets(site.id), referencedRefs(site), liveMediaIds(site), clientByMedia(site)]);
-  const refs = refsSet(refMap);
+  const [assets, refInfo, live, byClient] = await Promise.all([loadAssets(site.id), referencedRefs(site), liveMediaIds(site), clientByMedia(site)]);
+  const refs = siteRefs(refInfo.map);
   const rows = searchAssets(assets, {
     collection: url.searchParams.get('collection') || undefined,
     tag: url.searchParams.get('tag') || undefined,
@@ -280,25 +302,86 @@ export async function handleAssetsList(req: Request, site: SiteRow, cors: Record
     total: assets.length, shown: page.length,
     live_count: [...live].length,
     policy: await policyFor(site),
+    storage: storageFor(site, assets),
   } }, 200, cors);
 }
 
+// Items 56 + 115: the storage meter reads the rows and the limits the upload
+// door refuses on — the template's file cap (routes/media.ts) and the site quota
+// (createUpload). loadAssets is every live row, archived and private included.
+function storageFor(site: SiteRow, assets: Asset[]): StorageSummary {
+  const q = mediaQuota();
+  const cap = getTemplate(site.template_slug, site.template_version)?.manifest.entities.media?.max ?? 100;
+  return storageSummary(assets, { maxBytes: q.maxBytes, maxFiles: Math.min(cap, q.maxFiles) });
+}
+
 export async function handleAssetsCollections(site: SiteRow, cors: Record<string, string>) {
-  return json({ data: collectionsOf(await loadAssets(site.id)) }, 200, cors);
+  // item 56: a folder's count is what opening it shows — an archived file sits in
+  // Archive, and a client-private one only under its client, never a shared view
+  const rows = (await loadAssets(site.id)).filter((a) => a.asset_status !== 'archived' && a.client_private !== true);
+  return json({ data: collectionsOf(rows) }, 200, cors);
 }
 export async function handleAssetsTags(site: SiteRow, cors: Record<string, string>) {
   return json({ data: tagsOf(await loadAssets(site.id)) }, 200, cors);
 }
 export async function handleAssetsHealth(site: SiteRow, cors: Record<string, string>) {
-  const [assets, refMap] = await Promise.all([loadAssets(site.id), referencedRefs(site)]);
-  return json({ data: { findings: assetHealth(assets, refsSet(refMap)) } }, 200, cors);
+  const [assets, refInfo] = await Promise.all([loadAssets(site.id), referencedRefs(site)]);
+  return json({ data: { findings: assetHealth(assets, siteRefs(refInfo.map)) } }, 200, cors);
 }
 export async function handleAssetsDuplicates(site: SiteRow, cors: Record<string, string>) {
   return json({ data: { groups: detectDuplicates(await loadAssets(site.id)) } }, 200, cors);
 }
 export async function handleAssetsUsage(site: SiteRow, cors: Record<string, string>) {
-  const [assets, refMap] = await Promise.all([loadAssets(site.id), referencedRefs(site)]);
-  return json({ data: { usage: usageMap(assets, refsSet(refMap)) } }, 200, cors);
+  const [assets, refInfo] = await Promise.all([loadAssets(site.id), referencedRefs(site)]);
+  return json({ data: { usage: usageMap(assets, siteRefs(refInfo.map)) } }, 200, cors);
+}
+
+// ── item 115: is this file already here? ─────────────────────────────────────
+// The page hashes a file before it uploads it and asks first, so a photo already
+// in Files is named instead of quietly stored twice. Two narrow reads: the hash
+// (indexed since 0063), and the exact size and dimensions for rows from before
+// any door wrote a hash. findRepeats decides what counts as the same file.
+async function sameContentRows(siteId: string, p: RepeatProbe): Promise<Asset[]> {
+  const reads: Array<Promise<{ ok: boolean; json?: unknown }>> = [];
+  if (p.hash && HASH_RE.test(p.hash)) reads.push(readMedia((cols) => `presence_media?site_id=eq.${siteId}&deleted_at=is.null&content_hash=eq.${p.hash}&select=${cols}&order=created_at.asc&limit=10`));
+  if (p.bytes && p.width && p.height) reads.push(readMedia((cols) => `presence_media?site_id=eq.${siteId}&deleted_at=is.null&bytes=eq.${p.bytes}&width=eq.${p.width}&height=eq.${p.height}&select=${cols}&order=created_at.asc&limit=10`));
+  return (await Promise.all(reads)).flatMap((r) => arr(r)) as Asset[];
+}
+function probeOf(url: URL): RepeatProbe {
+  const int = (k: string) => { const n = Number(url.searchParams.get(k)); return Number.isInteger(n) && n > 0 ? n : null; };
+  const hash = String(url.searchParams.get('hash') || '').toLowerCase();
+  return { hash: HASH_RE.test(hash) ? hash : null, bytes: int('bytes'), width: int('width'), height: int('height') };
+}
+export async function handleAssetsMatch(req: Request, site: SiteRow, cors: Record<string, string>) {
+  const probe = probeOf(new URL(req.url));
+  const best = findRepeats(await sameContentRows(site.id, probe), probe)[0];
+  if (!best) return json({ data: { match: null } }, 200, cors);
+  const a = best.asset;
+  return json({ data: { match: {
+    id: a.id, name: fileName(a), kind: fileKind(a.mime), exact: best.match === 'exact', created_at: a.created_at,
+    folder: a.collection || '', archived: a.asset_status === 'archived', client_private: a.client_private === true ? true : undefined,
+    thumb: await signThumb(a.storage_path, a.mime || ''),
+  } } }, 200, cors);
+}
+
+// ── item 56: rename a folder, fold it into another, or take its files out ────
+// A folder is the `collection` its files carry, so this is ONE site-scoped write
+// over every live file in it — archived ones too, or restoring one would bring
+// the old name back.
+export async function handleAssetsFolderMove(req: Request, site: SiteRow, principal: Principal, cors: Record<string, string>) {
+  let body: unknown = {}; try { body = await req.json(); } catch { /* */ }
+  const norm = normalizeFolderMove(body);
+  if (!norm.ok) return json({ error: norm.error, message: norm.message }, 400, cors);
+  const r = await svc(`presence_media?site_id=eq.${site.id}&deleted_at=is.null&collection=eq.${encodeURIComponent(norm.from)}&select=id`, {
+    method: 'PATCH', headers: { Prefer: 'return=representation' }, body: JSON.stringify({ collection: norm.to }),
+  });
+  if (!r.ok) return json({ error: 'write_failed', message: 'That didn’t save — try again.' }, 502, cors);
+  const moved = arr(r).length;
+  if (moved) {
+    const files = `${moved} file${moved === 1 ? '' : 's'}`;
+    await writeChangeEvent({ siteId: site.id, entityType: 'media', entityId: arr(r)[0].id, action: 'update', summary: norm.to ? `Moved ${files} from the folder “${norm.from}” to “${norm.to}”` : `Took ${files} out of the folder “${norm.from}”`, principal, provenance: 'human', fields: ['collection'] });
+  }
+  return json({ data: { ok: true, from: norm.from, to: norm.to, moved } }, 200, cors);
 }
 
 // ── bulk actions — one move applied to a SELECTION (add a tag / move to a
@@ -360,7 +443,7 @@ export async function handleAssetsBulk(req: Request, site: SiteRow, principal: P
 
   if (applied > 0) {
     const label = action === 'tag' ? `Tagged ${applied} file${applied === 1 ? '' : 's'} “${norm.tag}”`
-      : action === 'collection' ? `Moved ${applied} file${applied === 1 ? '' : 's'} to “${norm.collection}”`
+      : action === 'collection' ? (norm.collection ? `Moved ${applied} file${applied === 1 ? '' : 's'} to “${norm.collection}”` : `Took ${applied} file${applied === 1 ? '' : 's'} out of their folders`)
       : action === 'archive' ? `Archived ${applied} file${applied === 1 ? '' : 's'}`
       : `Approved ${applied} file${applied === 1 ? '' : 's'}`;
     await writeChangeEvent({ siteId: site.id, entityType: 'media', entityId: rows[0]?.id || site.id, action: 'update', summary: label, principal, provenance: 'human', fields: ['bulk', action] });
@@ -463,15 +546,21 @@ export async function handleAssetCards(req: Request, site: SiteRow, id: string, 
 export async function handleAssetDetail(site: SiteRow, id: string, cors: Record<string, string>) {
   const asset = await loadAsset(site.id, id);
   if (!asset) return json({ error: 'not_found', message: 'That file isn’t here.' }, 404, cors);
-  const [refMap, live, thumb, thumbFallback, download] = await Promise.all([
+  const probe: RepeatProbe = { hash: asset.content_hash || null, bytes: asset.bytes, width: asset.width, height: asset.height };
+  const [refInfo, live, thumb, thumbFallback, download, twins] = await Promise.all([
     referencedRefs(site), liveMediaIds(site),
     signThumb(asset.storage_path, asset.mime || ''),
     // the untransformed original, so the panel's big preview has somewhere honest
     // to go when the transformed one won't load (see lib/media.ts signOriginal)
     signOriginalImage(asset.storage_path, asset.mime || ''),
     signDownload(asset.storage_path, `${fileName(asset)}`),
+    sameContentRows(site.id, probe),
   ]);
-  const usage = (refMap.get(id) || []).map((r) => ({ ...r, live: live.has(id) }));
+  // `live` is the file's own fact (it's in the live snapshot), so it only speaks
+  // for its places ON the website — never the Brand Kit or a project file
+  const usage = (refInfo.map.get(id) || []).map((r) => ({ ...r, live: r.site !== false && live.has(id) }));
+  // item 115: the same photo stored more than once — named, so the owner can keep one
+  const repeats = findRepeats(twins, probe, id).slice(0, 3).map((x) => ({ id: x.asset.id, name: fileName(x.asset), exact: x.match === 'exact', archived: x.asset.asset_status === 'archived' }));
   // versions: the immediate prior (what this replaced) + whether a newer exists
   const meta = (asset.metadata || {}) as Record<string, unknown>;
   let prior: { id: string; name: string; created_at?: string } | null = null;
@@ -481,8 +570,8 @@ export async function handleAssetDetail(site: SiteRow, id: string, cors: Record<
   }
   const supersededBy = typeof meta.replaced_by === 'string' ? String(meta.replaced_by) : null;
   return json({ data: {
-    asset: present(asset, { in_use: usage.length > 0, thumb }),
-    usage, summary: usageSummary(usage),
+    asset: present(asset, { in_use: usage.some((u) => u.site !== false), thumb }),
+    usage, summary: usageSummary(usage), usage_complete: refInfo.complete, repeats,
     versions: { prior, superseded_by: supersededBy, has_history: !!prior },
     thumb_fallback: thumbFallback,
     download_url: download,
@@ -632,7 +721,7 @@ export async function handleAssetUpdate(req: Request, site: SiteRow, principal: 
   const meta: Record<string, unknown> = { ...(cur.metadata || {}) };
   let metaTouched = false;
   if (Array.isArray(b.tags)) patch.tags = b.tags.map((t: unknown) => String(t).trim().toLowerCase()).filter(Boolean).slice(0, 40);
-  if (typeof b.collection === 'string') patch.collection = b.collection.trim().slice(0, 80);
+  if (typeof b.collection === 'string') patch.collection = folderName(b.collection);   // item 56: the one folder-name rule
   if (typeof b.brand === 'boolean') patch.brand = b.brand;
   // 0131: "Private to this client" — only meaningful for a file the delivery graph
   // ties to a client; the roster shows the switch only there, the server just
@@ -718,14 +807,27 @@ export async function handleAssetStatus(req: Request, site: SiteRow, principal: 
 // the existing publish action (the approval-gated pipeline for team/enterprise).
 async function repointReferences(site: SiteRow, fromId: string, toId: string): Promise<string[]> {
   const affected: string[] = [];
-  const st = await svc(`presence_settings?site_id=eq.${site.id}&select=logo_media_id,og_media_id&limit=1`);
-  const s = arr(st)[0] || {};
-  const setPatch: Record<string, unknown> = {};
-  if (s.logo_media_id === fromId) { setPatch.logo_media_id = toId; affected.push('your logo'); }
-  if (s.og_media_id === fromId) { setPatch.og_media_id = toId; affected.push('your social share image'); }
+  // Item 115: the SAME places where-used names — the cover, every section on every
+  // page, each page's share image, the Brand Kit logo — not just the logo and the
+  // share image. A section left pointing at the retired version lost its photo.
+  const [st, libR] = await Promise.all([
+    svc(`presence_settings?site_id=eq.${site.id}&select=${SETTINGS_MEDIA_COLS}&limit=1`),
+    svc(`presence_content_library?site_id=eq.${site.id}&select=id,name,payload&limit=500`),
+  ]);
+  const s = (arr(st)[0] as Record<string, unknown> | undefined) || null;
+  const library = libR.ok ? (arr(libR) as LibraryItem[]) : [];
+  const offeringLabel = vocabFor(s?.industry_key as string | undefined).offeringLabel;
+  for (const r of settingsMediaUses(s, { library, offeringLabel }).get(fromId.toLowerCase()) || []) affected.push(r.label);
+  const setPatch = repointSettingsMedia(s, fromId, toId);
   if (Object.keys(setPatch).length) await svc(`presence_settings?site_id=eq.${site.id}`, { method: 'PATCH', body: JSON.stringify(setPatch) });
+  // a saved section keeps its own copy of a photo's id, and every page linking it shows that copy
+  for (const it of library) {
+    if (!mediaIdsIn(it.payload).has(fromId.toLowerCase())) continue;
+    const moved = repointSettingsMedia({ blocks: [it.payload] }, fromId, toId).blocks as unknown[] | undefined;
+    if (moved) await svc(`presence_content_library?id=eq.${it.id}&site_id=eq.${site.id}`, { method: 'PATCH', body: JSON.stringify({ payload: moved[0] }) });
+  }
   const offs = await svc(`presence_offerings?site_id=eq.${site.id}&media_id=eq.${fromId}&deleted_at=is.null&select=name`);
-  for (const o of arr(offs)) affected.push(`“${o.name}”`);
+  for (const o of arr(offs)) affected.push(`“${o.name}” on your ${offeringLabel} page`);
   if (arr(offs).length) await svc(`presence_offerings?site_id=eq.${site.id}&media_id=eq.${fromId}`, { method: 'PATCH', body: JSON.stringify({ media_id: toId }) });
   const posts = await svc(`presence_posts?site_id=eq.${site.id}&hero_media_id=eq.${fromId}&deleted_at=is.null&select=title`);
   for (const p of arr(posts)) affected.push(`the update “${p.title}”`);
@@ -749,9 +851,15 @@ export async function handleAssetReplace(req: Request, site: SiteRow, principal:
   if (cf.tags) newPatch.tags = cf.tags;
   if (cf.brand) newPatch.brand = cf.brand;
 
+  // Item 115: a project file stays the version that was delivered. Retiring it here
+  // broke the project's download at once (project_delivery.ts reads live rows only),
+  // and storage cleanup removed the file itself a week later.
+  const refInfo = await referencedRefs(site);
+  if ((refInfo.map.get(id) || []).some((r) => r.surface === 'project')) {
+    return json({ error: 'in_project', message: 'This file was delivered in a project, so it stays as it is. Upload the new version to the project instead.' }, 409, cors);
+  }
   // ── DAM-2: does this replacement need approval before it can go live? ──
-  const refMap = await referencedRefs(site);
-  const inUse = refsSet(refMap).has(id);
+  const inUse = siteRefs(refInfo.map).has(id);
   const policy = await policyFor(site);
   if (replaceNeedsApproval(policy, inUse, b.submit_for_approval === true)) {
     // STAGED: the old (approved) version stays live; the new one waits as pending.
@@ -811,10 +919,14 @@ export async function handleAssetDuplicate(site: SiteRow, principal: Principal, 
 
 // ── safe delete — never remove a live file ────────────────────────────────────
 export async function handleAssetDelete(site: SiteRow, principal: Principal, id: string, cors: Record<string, string>) {
-  const refMap = await referencedRefs(site);
-  const check = canDelete({ id } as Asset, refsSet(refMap).has(id));
-  if (!check.ok) return json({ error: 'in_use', message: 'This file is in use on your site — remove it from the page first, or archive it instead.' }, 409, cors);
+  const refInfo = await referencedRefs(site);
+  // a read that failed may be hiding the one place this file is used — say so, keep the file
+  if (!refInfo.complete) return json({ error: 'usage_unknown', message: 'We couldn’t check where this file is used just now, so it wasn’t deleted. Try again in a moment.' }, 503, cors);
+  const uses = refInfo.map.get(id) || [];
+  const check = canDelete({ id } as Asset, uses.length > 0);
+  if (!check.ok) return json({ error: 'in_use', message: `This file is in use: ${uses.slice(0, 2).map((u) => u.label).join(' and ')}${uses.length > 2 ? ` and ${uses.length - 2} more` : ''}. Remove it there first, or archive it instead.` }, 409, cors);
   void principal; // media RLS + site scope enforce ownership; kept for a consistent signature
   const r = await deleteMedia(site.id, id);
+  if ('error' in r && r.error === 'in_use') return json(r, 409, cors);   // its own check found a use: say which, not "try again"
   return r.ok ? json({ data: { ok: true } }, 200, cors) : json({ error: 'delete_failed', message: 'That didn’t delete — try again.' }, 502, cors);
 }

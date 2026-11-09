@@ -171,7 +171,7 @@ const DECIDED = {
     'PATCH /projects/:id/deliverables/:id2', 'PATCH /projects/:id/milestones/:id2', 'PATCH /projects/:id/tasks/:id2',
     'PATCH /sales/contacts/:id', 'PATCH /sales/deal-tasks/:id', 'PATCH /sales/deals/:id', 'PATCH /support/:id',
     'POST /visibility/check', 'POST /approve/send', 'POST /assets/:id/duplicate', 'POST /assets/:id/remove-background',
-    'POST /assets/:id/replace', 'POST /assets/:id/rollback', 'POST /assets/:id/suggest', 'POST /assets/bulk',
+    'POST /assets/:id/replace', 'POST /assets/:id/rollback', 'POST /assets/:id/suggest', 'POST /assets/bulk', 'POST /assets/folders/move',
     'POST /bookings/appointments/:id/cancel', 'POST /bookings/appointments/:id/complete',
     'POST /bookings/appointments/:id/confirm', 'POST /bookings/appointments/:id/no_show', 'POST /bookings/types',
     'POST /brand/reports/:id/dismiss', 'POST /brand/review', 'POST /broadcasts', 'POST /broadcasts/lists', 'POST /broadcasts/:id/cancel',
@@ -394,7 +394,7 @@ const CHANGED = [
 const WRITE_HANDLERS = [
   'handleVisibilityCheck', 'handleApprovalDecide', 'handleApprovalsCreate', 'handleApproveSend', 'handleAssetDelete', 'handleAssetDuplicate',
   'handleAssetRemoveBackground', 'handleAssetReplace', 'handleAssetRollback', 'handleAssetStatus',
-  'handleAssetSuggest', 'handleAssetUpdate', 'handleAssetsBulk', 'handleBackOnline', 'handleBookingCancel',
+  'handleAssetSuggest', 'handleAssetUpdate', 'handleAssetsBulk', 'handleAssetsFolderMove', 'handleBackOnline', 'handleBookingCancel',
   'handleBookingConfirm', 'handleBookingMark', 'handleBookingSettingsPut', 'handleBookingTypeCreate',
   'handleBookingTypeDelete', 'handleBookingTypeUpdate', 'handleBrandKitApply', 'handleBrandKitPut',
   'handleBrandProfilePut', 'handleBrandReportDismiss', 'handleBrandReviewRun', 'handleBroadcastCancel',

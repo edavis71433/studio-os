@@ -39,7 +39,7 @@ import { handleSavedReplies, handleFaqAdmin, handleClientFaq } from './routes/se
 import { handlePublish, handleRestore, handlePublishHistory, handleVersionLabel, handleCompareVersions, handleTimewarp, handleCheckpointList, handleCheckpointSave, handleCheckpointRestore, handleCheckpointDelete, handleTakeOffline, handleBackOnline } from './routes/publish.ts';
 import { handleLaunchList, handleLaunchCreate, handleLaunchGet, handleLaunchRecapture, handleLaunchDecide, handleLaunchSchedule, handleLaunchPromote, handleLaunchRollback, handleLaunchCancel } from './routes/launches.ts';
 import { handleMediaUpload, handleMediaUpdate, handleMediaDelete } from './routes/media.ts';
-import { handleAssetsList, handleAssetsCollections, handleAssetsTags, handleAssetsHealth, handleAssetsDuplicates, handleAssetsUsage, handleAssetsBulk, handleAssetUpdate, handleAssetStatus, handleAssetDelete, handleAssetDetail, handleAssetDownload, handleAssetReplace, handleAssetRollback, handleAssetDuplicate, handleAssetSuggest, handleAssetSocial, handleAssetCards, handleAssetRemoveBackground } from './routes/assets.ts';
+import { handleAssetsList, handleAssetsCollections, handleAssetsTags, handleAssetsHealth, handleAssetsDuplicates, handleAssetsUsage, handleAssetsBulk, handleAssetsMatch, handleAssetsFolderMove, handleAssetUpdate, handleAssetStatus, handleAssetDelete, handleAssetDetail, handleAssetDownload, handleAssetReplace, handleAssetRollback, handleAssetDuplicate, handleAssetSuggest, handleAssetSocial, handleAssetCards, handleAssetRemoveBackground } from './routes/assets.ts';
 import { handleVisualKinds, handleVisualGenerate, handleVisualList, handleVisualGet, handleVisualVary, handleVisualEdit, handleVisualDecide } from './routes/visual.ts';
 import { handleAdmin, handleDomain } from './routes/admin.ts';
 import { handleCollection, handleLocation, handleVoice, handleSettings, handleBlockSuggestions, handlePageDuplicate, handlePageRefs, SPECS } from './routes/content.ts';
@@ -586,6 +586,8 @@ async function route_(req: Request, cors: Record<string, string>): Promise<Respo
   if (route === '/assets/duplicates' && method === 'GET') return handleAssetsDuplicates(site, cors);
   if (route === '/assets/usage' && method === 'GET') return handleAssetsUsage(site, cors);
   if (route === '/assets/bulk' && method === 'POST') return handleAssetsBulk(req, site, principal, cors);
+  if (route === '/assets/match' && method === 'GET') return handleAssetsMatch(req, site, cors);   // item 115: already in Files?
+  if (route === '/assets/folders/move' && method === 'POST') return handleAssetsFolderMove(req, site, principal, cors);   // item 56
   {
     const msoc = route.match(/^\/assets\/([0-9a-f-]{36})\/social$/);
     if (msoc && method === 'GET') return handleAssetSocial(site, msoc[1], cors);
