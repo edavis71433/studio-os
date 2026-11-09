@@ -517,7 +517,7 @@ function render(){
   if(VIEWNAME==='archived'&&ARCH_STATE!=='ok'){
     h+=`<div class="center"><p class="muted">${ARCH_STATE==='failed'?'Archived clients wouldn’t load just now.':'Loading archived clients…'}</p>${ARCH_STATE==='failed'?'<p style="margin-top:12px"><button type="button" class="btn ghost" id="archRetry">Try again</button></p>':''}</div>`;
   }else if(!list.length){
-    h+=`<div class="center"><p class="muted">${VIEWNAME==='archived'?'Nothing archived.':CLIENTS.length?'No clients match that.':'No clients yet.'}</p>${CLIENTS.length?'':'<p style="margin-top:14px"><button type="button" class="btn" id="addCustEmpty">+ Add a customer</button></p>'}</div>`;
+    h+=`<div class="center"><p class="muted">${VIEWNAME==='archived'?'Nothing archived.':CLIENTS.length?'No customers match that.':'No customers yet.'}</p>${CLIENTS.length?'':'<p style="margin-top:14px"><button type="button" class="btn" id="addCustEmpty">+ Add a customer</button></p>'}</div>`;
   }else{
     h+=DISPLAY==='table'?tableHtml(list):cardsHtml(list);
   }

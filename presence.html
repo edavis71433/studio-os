@@ -1522,7 +1522,7 @@ body.pd-dragging *{cursor:grabbing !important}
                   <div id="dcModeSeg" class="dpdevseg dcmodeseg" role="group" aria-label="Canvas mode">
                     <button type="button" data-dcmode="edit" class="on" aria-pressed="true" title="Build this page — edit, arrange and add sections">Edit</button>
                     <button type="button" data-dcmode="comments" id="btnComments" aria-pressed="false" title="Feedback on this draft — notes from you and your client, section by section">Comments</button>
-                    <button type="button" data-dcmode="timewarp" aria-pressed="false" title="See your site as it looked on any past date">Past dates</button>
+                    <button type="button" data-dcmode="timewarp" aria-pressed="false" title="See your site as it looked in any earlier version, on any past date">Versions</button>
                   </div>
                   <div id="dpDevSeg" class="dpdevseg" role="group" aria-label="Preview at different screen sizes">
                     <button type="button" data-dpdev="desktop" class="on" aria-pressed="true" aria-label="Desktop" title="See your page on a desktop"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4"/></svg></button>
@@ -1634,7 +1634,7 @@ body.pd-dragging *{cursor:grabbing !important}
 <!-- mobile dock -->
 <nav class="dock" id="dock" aria-label="Editor sections">
   <button data-tab="today" class="on" aria-pressed="true">Site</button>
-  <button data-tab="sections" aria-pressed="false">Menu</button>
+  <button data-tab="sections" aria-pressed="false">Sections</button>
   <button data-tab="preview" aria-pressed="false">Preview</button>
   <button data-tab="publish" id="dockPublish" aria-pressed="false">Publish</button>
 </nav>
@@ -3471,12 +3471,14 @@ $("btnAddPost").addEventListener("click", () => inlineAdd("postAddWrap",
    on-site search (lib/search_index.ts matchDocs). Answers "where's that FAQ I
    wrote?" without hunting through tabs. ── */
 function findLabel() { try { return (VOCAB && VOCAB.label) || "Menu"; } catch (_) { return "Menu"; } }
+// Item 92: the places carry the menu's own names and Edit mode its button's. They were written
+// out here a second time and had drifted ("Business & settings", "Design").
+function findPlaces() {
+  return SITE_TABS.filter(([v]) => $("view-" + v)).map(([v, label]) => [v, v === "offerings" ? findLabel() : label]).concat([["design", "Edit site"]]);
+}
 function findDataset() {
   const ds = [];
-  [["business", "Business & settings"], ["offerings", findLabel()], ["faqs", "Questions"],
-   ["testimonials", "Testimonials"], ["updates", "Updates"], ["media", "Files"],
-   ["bookings", "Bookings"], ["reviews", "Reviews"], ["design", "Design"], ["history", "Versions"]]
-    .forEach(([v, label]) => ds.push({ view: v, kind: "Section", title: label, text: "" }));
+  findPlaces().forEach(([v, label]) => ds.push({ view: v, kind: "Section", title: label, text: "" }));
   (S.offerings || []).forEach((o) => ds.push({ view: "offerings", kind: findLabel(), title: o.name || "", text: [o.category, o.description, o.price_text].filter(Boolean).join(" ") }));
   (S.faqs || []).forEach((f) => ds.push({ view: "faqs", kind: "Question", title: f.question || "", text: f.answer || "" }));
   (S.testimonials || []).forEach((t) => ds.push({ view: "testimonials", kind: "Testimonials", title: t.author || t.quote || "", text: t.quote || "" }));
@@ -3988,7 +3990,7 @@ function renderReviews(wrap, data) {
 
   // ── 3. Showing on your site (approved) ──────────────────────────────────────
   const approved = reviews.filter((r) => r.status === "approved");
-  const c3 = rvCard("Showing on your site" + (agg.count ? " · " + (agg.average % 1 === 0 ? agg.average : agg.average.toFixed(1)) + "★ from " + agg.count : ""), "Approved reviews. Add the “Reviews wall” section to a page (Design → add a section) to display them — with honest star ratings for search. Changes appear the next time you publish.");
+  const c3 = rvCard("Showing on your site" + (agg.count ? " · " + (agg.average % 1 === 0 ? agg.average : agg.average.toFixed(1)) + "★ from " + agg.count : ""), "Approved reviews. Add the “Reviews wall” section to a page (Edit site → add a section) to display them — with honest star ratings for search. Changes appear the next time you publish.");
   if (!approved.length) c3.appendChild(el("p", "hint", "No approved reviews yet. Approve one above and it’ll show here."));
   approved.forEach((r) => c3.appendChild(rvRow(r)));
   wrap.appendChild(c3);
@@ -4056,7 +4058,7 @@ function renderMediaGrid(grid, manage, onPick) {
   grid.innerHTML = "";
   if (!S.media.length) {
     if (manage) grid.innerHTML = `<div class="estate" style="grid-column:1/-1;padding:30px 0"><div class="eq">No photos yet.</div><div class="eh">Add a few of your best. They’ll be ready to place anywhere on your site.</div></div>`;
-    else grid.innerHTML = `<p style="color:var(--ink-2);font-size:13px">No photographs in the collection yet.</p>`;
+    else grid.innerHTML = `<p style="color:var(--ink-2);font-size:13px">No files in this collection yet.</p>`;
     return;
   }
   S.media.forEach((m) => grid.appendChild(mediaCell(grid, m, manage, onPick)));
@@ -5159,7 +5161,7 @@ function renderRecent() {
   const sch = el("a", null, "Schedule it for later"); sch.href = "#schedule"; sch.addEventListener("click", (e) => { e.preventDefault(); openRitual({ schedule: true }); }); qt.appendChild(sch); qt.appendChild(el("span", null, " — pick a time and it goes live on its own."));
   q.appendChild(qt); list.appendChild(q);
 }
-const sectionWord = (s) => ({ offerings: "menu", faqs: "questions", testimonials: "testimonials", updates: "updates", business: "business", media: "photographs", site: "your site" }[s] || s);
+const sectionWord = (s) => ({ offerings: "menu", faqs: "questions", testimonials: "testimonials", updates: "updates", business: "business", media: "files", site: "your site" }[s] || s);
 function renderPublishButton() {
   const c = S.changes;
   const label = c && c.count > 0 ? `Publish ${c.count} change${c.count === 1 ? "" : "s"}` : "Publish";
@@ -5721,7 +5723,7 @@ async function runPublish(btn, firstPublish) {
   }
 }
 async function pollPublish(n, firstPublish) {
-  if (n > 30) { $("ritSub").textContent = "This is taking longer than usual — it’s still working, and History will show how it ends. You can safely step away."; return; }
+  if (n > 30) { $("ritSub").textContent = "This is taking longer than usual — it’s still working, and Versions will show how it ends. You can safely step away."; return; }
   await new Promise((r) => setTimeout(r, 4000));
   try {
     const pubs = (await api("GET", "/publishes")).data;
@@ -10903,7 +10905,7 @@ function pfPaint(grid, allow, seq) {
   // FL_load's client-side kind filter so a PDF can never ride in as a "photo section"
   const imgs = (S.media || []).filter((m) => (m.kind == null || m.kind === "image") && (!allow || allow.has(String(m.id))));
   if (!imgs.length) {
-    grid.innerHTML = `<p style="grid-column:1/-1;color:var(--ink-2);font-size:13px">${pfQ().trim() ? "No files match that search." : ((S.media || []).length ? "Nothing in this collection yet." : "No photographs in the collection yet.")}</p>`;
+    grid.innerHTML = `<p style="grid-column:1/-1;color:var(--ink-2);font-size:13px">${pfQ().trim() ? "No files match that search." : ((S.media || []).length ? "Nothing in this collection yet." : "No files in this collection yet.")}</p>`;
     return;
   }
   imgs.slice(0, PF_CAP).forEach((m) => {

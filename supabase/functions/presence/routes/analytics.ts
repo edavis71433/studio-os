@@ -299,7 +299,7 @@ export async function handleAnalyticsPortfolio(jwt: string, cors: Record<string,
   // batch B (final pass, Nov 8): the site list and the gather side by side, and
   // the gather shared with any portfolio read arriving at the same moment
   const [siteIds, input] = await Promise.all([agencySiteIds(member.agency_id), sharedGather(member.agency_id, nowIso)]);
-  if (!siteIds.length) return json({ data: { headline: 'No clients yet.', insights: [] } }, 200, cors);
+  if (!siteIds.length) return json({ data: { headline: 'No customers yet.', insights: [] } }, 200, cors);
   // SS7 fix (review-confirmed): gather() is deliberately UNFILTERED (archived
   // links included, for /agency/portfolio?archived=true) — but THIS band must
   // count the SAME clients as client_count (agencySiteIds, active-only) and the

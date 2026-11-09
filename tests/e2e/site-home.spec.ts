@@ -223,9 +223,11 @@ test.describe('the menu in the sidebar', () => {
 
 test.describe('on a phone', () => {
   test.beforeEach(({ page }) => { test.skip(!isPhone(page), 'the phone layout'); });
-  test('the dock says Site and Menu, and the Menu sheet is grouped', async ({ page }) => {
+  test('the dock says Site and Sections, and the Sections sheet is grouped', async ({ page }) => {
     await mount(page, '/presence.html');
     await expect(page.locator('#dock button[data-tab="today"]')).toHaveText('Site');
+    // item 92: the button is named for the sheet it opens; on a restaurant's phone "Menu" was also the dishes
+    await expect(page.locator('#dock button[data-tab="sections"]')).toHaveText('Sections');
     await page.locator('#dock button[data-tab="sections"]').click();
     await expect(page.locator('#sectionsNav .grp[data-grp="Content"]')).toBeVisible();
     await page.locator('#sectionsNav .navitem[data-view="pages"]').click();
@@ -1348,5 +1350,32 @@ test.describe('the welcome list', () => {
     await expect(page.frameLocator('#siteFrame').locator('h1').first()).toBeVisible();
     await page.waitForTimeout(300);
     await expect(page.locator('#ssTodo')).toBeHidden();
+  });
+});
+
+test.describe('one name per thing (item 92)', () => {
+  test('Find anything names each place as the menu does, and Edit mode as its button does', async ({ page }) => {
+    test.skip(isPhone(page), 'a phone has no Find anything box');
+    await mount(page, '/presence.html#business');
+    const input = page.locator('#findInput');
+    const titles = async (q: string) => {
+      await input.fill(q);
+      await expect(page.locator('#findResults')).toBeVisible();
+      return (await page.locator('#findResults .findhit .ft').allTextContents()).map((s) => s.trim());
+    };
+    expect(await titles('business')).toContain('Business details');
+    expect(await titles('edit')).toContain('Edit site');
+    expect(await titles('versions')).toContain('Versions');
+    expect(await titles('files')).toContain('Files');
+    const seen = [...await titles('s'), ...await titles('e'), ...await titles('d')];
+    expect(seen).not.toContain('Business & settings');
+    expect(seen).not.toContain('Design');
+    await input.fill('edit');
+    await page.locator('#findResults .findhit', { hasText: 'Edit site' }).click();
+    await expect(page.locator('html')).toHaveClass(/dc-edit/);
+  });
+  test('Edit mode’s past-versions button says Versions', async ({ page }) => {
+    await mount(page, '/presence.html#design');
+    await expect(page.locator('#dcModeSeg [data-dcmode="timewarp"]')).toHaveText('Versions');
   });
 });

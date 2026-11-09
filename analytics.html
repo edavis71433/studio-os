@@ -402,7 +402,7 @@ function salesBand(d){
   // for the reader to guess. (Older function builds send no `scope`; the line
   // simply doesn't appear, exactly as shipped.)
   if(s.scope==='client'){
-    h+=`<p class="scopenote">Your deal and invoices with this client. Enquiries and support below are theirs. Your full pipeline lives at the studio level — leave this client to see it.</p>`;
+    h+=`<p class="scopenote">Your deal and invoices with this customer. Enquiries and support below are theirs. Your full pipeline lives at the studio level — leave this customer to see it.</p>`;
   }
   const trunc=(t)=>t?' · based on recent activity':'';
   h+=`<div class="stats" id="salesStats">`;
@@ -800,7 +800,7 @@ function insightCard(i){
     :many&&many.length===1
     ?`<div class="links"><a href="${esc(many[0].href)}">${esc(many[0].cta||i.cta||'Take a look')}</a></div>`
     :i.href?`<div class="links"><a href="${esc(i.href)}">${esc(i.cta||'Take a look')}</a></div>`:'';
-  return `<section class="card insight"><div class="card-h"><h3>${esc(i.title||'Across your clients')}</h3><span class="chip tchip ${tone}"><i class="d"></i>${chipText}</span></div>
+  return `<section class="card insight"><div class="card-h"><h3>${esc(i.title||'Across your customers')}</h3><span class="chip tchip ${tone}"><i class="d"></i>${chipText}</span></div>
     ${(i.number!=null&&i.number!=='')?`<p class="kn">${esc(i.number)}</p>`:''}<p class="isent">${esc(i.sentence)}</p>${i.detail?`<p class="kd">${esc(i.detail)}</p>`:''}${links}</section>`;
 }
 function portfolioRollup(roster,ws,vTrunc){
@@ -815,13 +815,13 @@ function portfolioRollup(roster,ws,vTrunc){
   // vTrunc (data-honesty): the function's visitors_truncated marker — the bulk
   // visits read hit its cap, so NO per-client count is attributable as exact.
   const vs=Array.isArray(ws)&&ws.length&&ws.every(x=>x&&typeof x.site_id==='string'&&('visitors' in x))?new Map(ws.map(x=>[x.site_id,x.visitors])):null;
-  let h=`<h2 class="band">Client by client</h2>`;
+  let h=`<h2 class="band">Customer by customer</h2>`;
   if(roster===null){
-    h+=`<div class="quiet" style="margin-top:0">The client-by-client list wouldn’t load just now — refresh in a moment. The numbers above are unaffected.</div>`;
+    h+=`<div class="quiet" style="margin-top:0">The customer-by-customer list wouldn’t load just now — refresh in a moment. The numbers above are unaffected.</div>`;
     return h;
   }
   if(!roster.length){
-    h+=`<div class="card">${emptyState('No clients yet','Businesses you add from your Studio tools will be listed here.')}</div>`;
+    h+=`<div class="card">${emptyState('No customers yet','Businesses you add from your Studio tools will be listed here.')}</div>`;
     return h;
   }
   const rows=roster.map(c=>{
@@ -831,21 +831,21 @@ function portfolioRollup(roster,ws,vTrunc){
     const vcell=vs?`<td class="r">${(vTrunc||v==null)?'<span class="muted">—</span>':num(Number(v)||0)}</td>`:'';
     return `<tr data-drill="${esc(drill)}"><td><a href="${esc(drill)}">${esc(c.name||'(unnamed)')}</a></td><td>${esc(c.edition||'presence')}${c.status?' · '+esc(c.status):''}</td><td>${att?`<span class="pill wait">${num(att)} waiting</span>`:'<span class="pill ok">all clear</span>'}</td><td class="r">${num(lw)}</td>${vcell}</tr>`;
   }).join('');
-  h+=`<div class="tscroll"><table><caption>Clients — plan, what’s waiting, enquiries${vs?', visitors':''}. Open a row for that client’s Business dashboard.</caption><thead><tr><th scope="col">Client</th><th scope="col">Plan</th><th scope="col">Waiting</th><th class="r" scope="col">Enquiries waiting</th>${vs?'<th class="r" scope="col">Visitors (7 days)</th>':''}</tr></thead><tbody>${rows}</tbody></table></div>`;
+  h+=`<div class="tscroll"><table><caption>Customers — plan, what’s waiting, enquiries${vs?', visitors':''}. Open a row for that customer’s Business dashboard.</caption><thead><tr><th scope="col">Customer</th><th scope="col">Plan</th><th scope="col">Waiting</th><th class="r" scope="col">Enquiries waiting</th>${vs?'<th class="r" scope="col">Visitors (7 days)</th>':''}</tr></thead><tbody>${rows}</tbody></table></div>`;
   // the one honest line for the — column: a partial count per client would be
   // wrong, so nothing pretends. Everything else in the table is exact.
-  if(vs&&vTrunc)h+=`<p class="rollnote">A busy week — visits crossed what the portfolio can count client by client, so visitor numbers are hidden rather than shown short. The other columns are exact.</p>`;
+  if(vs&&vTrunc)h+=`<p class="rollnote">A busy week — visits crossed what the portfolio can count customer by customer, so visitor numbers are hidden rather than shown short. The other columns are exact.</p>`;
   return h;
 }
 function renderPortfolio(d,roster){
   const ws=Array.isArray(d.websites)?d.websites:null;
-  let h=headRow('Analytics',`<span class="chip p"><i class="d"></i>All clients</span><span>${esc(d.headline||'Across your clients.')}</span><span class="dot">·</span><span>As of ${esc(asOf())}</span>`,false);
+  let h=headRow('Analytics',`<span class="chip p"><i class="d"></i>All customers</span><span>${esc(d.headline||'Across your customers.')}</span><span class="dot">·</span><span>As of ${esc(asOf())}</span>`,false);
   // KPI band — only from numbers the payload really carries (an older function
   // build without websites[] simply shows fewer tiles, never a fake zero)
   if(ws||d.client_count!=null){
-    h+=`<h2 class="band">Across your clients</h2><div class="stats" id="portfolioStats">`;
+    h+=`<h2 class="band">Across your customers</h2><div class="stats" id="portfolioStats">`;
     const clients=d.client_count!=null?d.client_count:ws.length;
-    h+=tile({icon:'people',title:'Clients',link:['/agency.html','Open Studio'],value:num(clients),sub:'in your portfolio'});
+    h+=tile({icon:'people',title:'Customers',link:['/agency.html','Open Studio'],value:num(clients),sub:'in your portfolio'});
     if(ws){
       const att=ws.filter(w=>w&&w.needs_attention).length;
       h+=tile({icon:'warn',tone:'warn',title:'Needs attention',value:num(att),mod:att?'warn':'',sub:att?'worth a look today':'all clear'});
@@ -871,8 +871,8 @@ function renderPortfolio(d,roster){
   // own count is patched in below once the shell context lands, so this line
   // never says "nothing needs you" on a day Today says four things do.
   if(!ins.length)h+=clientCount>0
-    ?`<div class="quiet" id="allQuiet" style="margin-top:0"><b>All quiet.</b> Every client is current — <span id="allQuietStudio">nothing needs you right now.</span></div>`
-    :`<div class="quiet" style="margin-top:0"><b>Nothing to watch yet.</b> Add your first client from your Studio tools and their numbers will roll up here.</div>`;
+    ?`<div class="quiet" id="allQuiet" style="margin-top:0"><b>All quiet.</b> Every customer is current — <span id="allQuietStudio">nothing needs you right now.</span></div>`
+    :`<div class="quiet" style="margin-top:0"><b>Nothing to watch yet.</b> Add your first customer from your Studio tools and their numbers will roll up here.</div>`;
   if(!ins.length&&clientCount>0&&window.ddsContext)window.ddsContext().then(ctx=>quietStudio(ctx&&ctx.attention_count)).catch(()=>{});
   if(ins.length)h+=`<div class="grid3" style="margin-top:0">${ins.map(insightCard).join('')}</div>`;
   h+=portfolioRollup(roster,ws,d.visitors_truncated===true);
@@ -955,7 +955,7 @@ async function loadPortfolio(soft){
   // honest couldn't-load line.
   const roster=(a&&a.ok&&Array.isArray(a.body.data))?a.body.data:null;
   if(roster!==null)ROSTER=roster;
-  else if(soft&&ROSTER)toast('Couldn’t refresh the client list just now.');
+  else if(soft&&ROSTER)toast('Couldn’t refresh the customer list just now.');
   else ROSTER=null;
   renderPortfolio(PF,ROSTER);
 }
