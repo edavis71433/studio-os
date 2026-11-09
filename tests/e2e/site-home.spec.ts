@@ -1213,6 +1213,38 @@ test.describe('Styles show on the page at once, and save behind', () => {
   });
 });
 
+test.describe('the Styles panel sets type and corners in one place (item 94)', () => {
+  // The brand kit offered "Headings & text" and "Corners" again, beside Colors and fonts' own
+  // Type and Corners, and the two could disagree on which was ticked.
+  const openStyles = async (page: Page, kit: unknown) => {
+    const writes = await mount(page, '/presence.html#design', { '/dev/brand-kit': { data: { brand_kit: kit } } });
+    await page.frameLocator('#designPreview').locator('#a h2').waitFor();
+    await page.evaluate(() => (window as any).openSettingsPanel('styles'));
+    await expect(page.locator('#brandKitCard')).toBeVisible();
+    return writes;
+  };
+  const kitPuts = (writes: Write[]) => writes.filter((w) => w.path === '/dev/brand-kit' && w.method === 'PUT').map((w) => w.body.brand_kit);
+  test('the brand kit has no second Type or Corners, and builds with the ones set below', async ({ page }) => {
+    const writes = await openStyles(page, null);
+    const kit = page.locator('#brandKitCard'), colors = page.locator('#designCard');
+    await expect(kit).not.toContainText('Headings & text');
+    await expect(kit).not.toContainText('Corners');
+    await expect(colors).toContainText('Type');
+    await expect(colors).toContainText('Corners');
+    await colors.getByRole('button', { name: /^Round/ }).click();
+    await expect(colors.getByRole('button', { name: /^Round/ })).toHaveText(/✓/);
+    await kit.getByRole('button', { name: 'Build & apply brand kit' }).click();
+    await expect.poll(() => kitPuts(writes).map((k) => k.corner)).toEqual(['18px']);
+  });
+  test('re-applying a saved kit keeps the corners chosen since, instead of bringing back its own', async ({ page }) => {
+    const writes = await openStyles(page, { primary: '#2f5d8a', corner: '2px' });
+    await page.locator('#designCard').getByRole('button', { name: /^Round/ }).click();
+    await page.locator('#brandKitCard').getByRole('button', { name: 'Apply my brand' }).click();
+    await expect.poll(() => kitPuts(writes).map((k) => k.corner)).toEqual(['18px']);
+    await expect.poll(() => writes.filter((w) => w.path === '/dev/brand-kit/apply').length).toBe(1);
+  });
+});
+
 test.describe('Publish waits for what was just typed', () => {
   test('a section edit still saving when Publish is pressed lands before the review reads', async ({ page }) => {
     const writes = await mount(page, '/presence.html#design');
