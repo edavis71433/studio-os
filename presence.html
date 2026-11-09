@@ -40,12 +40,10 @@
   --seg-ring:0 1px 4px rgba(0,0,0,.12); /* chip state indicator: soft shadow in light, plum ring in dark (1.4.11) */
   --dock-bg:var(--ink); --dock-fg:color-mix(in srgb,var(--paper) 78%,transparent);
   --dock-on-bg:var(--paper); --dock-on-fg:var(--ink); --dock-border:transparent;
-  --dp-owncolors:"";               /* §1.4 dark-only caption suffix on .dp-title */
 }
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
   --fill-ink:#141318; --plum-tint:#272136; --plum-line:#443861; --scrim-ink:#000; --seg-chip:#3a3944; --seg-ring:0 0 0 1.5px var(--plum);
   --dock-bg:var(--sheet); --dock-fg:var(--ink-2); --dock-on-bg:var(--plum-soft); --dock-on-fg:var(--ink); --dock-border:var(--hair);
-  --dp-owncolors:" — shown in its own colors";
 }}
 :root[data-theme="dark"]{--fill-ink:#141318;--plum-tint:#272136;--plum-line:#443861;--scrim-ink:#000;--seg-chip:#3a3944;--seg-ring:0 0 0 1.5px var(--plum);--dock-bg:var(--sheet);--dock-fg:var(--ink-2);--dock-on-bg:var(--plum-soft);--dock-on-fg:var(--ink);--dock-border:var(--hair);--dp-owncolors:" — shown in its own colors"}
 @media (prefers-reduced-motion: reduce){ :root{--dur:0ms} *{animation-duration:.001ms !important;transition-duration:.001ms !important} }
@@ -213,41 +211,7 @@ button:disabled{opacity:.55;cursor:default}
 .hb-chip.warn{background:var(--amber-soft);border-color:transparent;color:var(--amber)} .hb-chip.warn .d{background:var(--amber)}
 .hb-chip.p{background:var(--plum-soft);border-color:transparent;color:var(--plum)} .hb-chip.p .d{background:var(--plum)}
 .hb-chip.bad{background:var(--clay-soft);border-color:transparent;color:var(--clay)} .hb-chip.bad .d{background:var(--clay)}
-.hb-stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));border:1px solid var(--hair);border-radius:var(--r-lg);margin-top:var(--dds-s5,20px);background:var(--sheet)}
-.hb-stat{padding:var(--dds-s4,16px) var(--dds-s4,16px);border-left:1px solid var(--hair);min-width:0;display:flex;align-items:center;gap:var(--dds-s3,12px);color:inherit;text-decoration:none;text-align:left;font:inherit}
-.hb-stat:first-child{border-left:none}
-a.hb-stat:hover .v,button.hb-stat:hover .v{color:var(--plum)}
-.hb-stat .ico{width:38px;height:38px;border-radius:var(--dds-r,8px);display:grid;place-items:center;flex:0 0 auto;background:var(--plum-soft);color:var(--plum)}
-.hb-stat .ico.good{background:var(--sage-soft);color:var(--sage)} .hb-stat .ico.warn{background:var(--amber-soft);color:var(--amber)} .hb-stat .ico.info{background:var(--info-soft);color:var(--info)} .hb-stat .ico.bad{background:var(--clay-soft);color:var(--clay)}
-.hb-stat .ico svg{width:18px;height:18px;stroke:currentColor;fill:none;stroke-width:1.75;stroke-linecap:round;stroke-linejoin:round}
-.hb-stat .txt{min-width:0;flex:1}
-.hb-stat .k,.hb-stat .v,.hb-stat .s{display:block}
-.hb-stat .k{font-size:12px;color:var(--ink-3)}
-.hb-stat .v{font-size:20px;font-weight:600;letter-spacing:-.01em;font-variant-numeric:tabular-nums;line-height:1.2;transition:color var(--dur) var(--ease)}
-.hb-stat .s{font-size:12px;color:var(--ink-3);margin-top:1px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-@media (max-width:900px){
-  .hb-stats{grid-template-columns:repeat(2,minmax(0,1fr))}
-  .hb-stat:nth-child(odd){border-left:none}
-  .hb-stat:nth-child(n+3){border-top:1px solid var(--hair)}
-}
-/* phones keep the 2-column grid above, as compact tiles — never one tile per
-   row at ~260px each (experience review #5) */
-@media (max-width:600px){
-  .hb-stat{gap:9px;padding:10px 12px}
-  .hb-stat .ico{width:28px;height:28px;border-radius:var(--dds-r,8px)}
-  .hb-stat .ico svg{width:14px;height:14px}
-  .hb-stat .k,.hb-stat .s{font-size:11.5px}
-  .hb-stat .v{font-size:16px}
-}
-.hb-band{display:flex;align-items:center;gap:var(--dds-s3,12px);padding:10px var(--dds-s4,16px);border:1px solid var(--hair);background:var(--sheet);border-radius:var(--r-lg);margin-top:var(--dds-s4,16px);flex-wrap:wrap}
-.hb-band.needs_attention{border-color:color-mix(in srgb,var(--amber) 30%,transparent);background:var(--amber-soft)}
-.hb-band.outdated{background:var(--paper)}
-.hb-band .lamp{width:28px;height:28px;border-radius:var(--dds-r,8px);background:var(--sheet);color:var(--amber);display:grid;place-items:center;flex:0 0 auto;border:1px solid var(--hair)}
-.hb-band .lamp svg{width:15px;height:15px;stroke:currentColor;fill:none;stroke-width:1.75;stroke-linecap:round;stroke-linejoin:round}
-.hb-band .t{flex:1 1 300px;font-size:13.5px} .hb-band .t b{font-weight:600} .hb-band .t span{color:var(--ink-2)}
 .hb-cols{display:flex;gap:var(--dds-s6,24px);margin-top:var(--dds-s5,20px);flex-wrap:wrap;align-items:flex-start}
-.hb-main{flex:999 1 480px;min-width:0}
-.hb-rail{flex:1 1 300px;min-width:0;display:flex;flex-direction:column;gap:var(--dds-s4,16px)}
 .hb-sec{margin-bottom:var(--dds-s6,24px)}
 .hb-sec-h{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:var(--dds-s2,8px)}
 .hb-sec-h h2{margin:0;font-size:14px;font-weight:600}
@@ -264,7 +228,6 @@ a.hb-stat:hover .v,button.hb-stat:hover .v{color:var(--plum)}
 .hb-row .acts{display:flex;gap:6px;align-items:center;margin-left:auto}
 .hb-row.quiet{color:var(--ink-2);background:var(--paper)}
 .hb-row.quiet .t span{color:var(--ink-2);font-size:12.5px}
-.hb-empty{padding:var(--dds-s5,20px) var(--dds-s4,16px);color:var(--ink-3);text-align:center;font-size:13px}
 .hb-card{border:1px solid var(--hair);border-radius:var(--r-lg);background:var(--sheet);padding:var(--dds-s4,16px)}
 .hb-card-h{display:flex;align-items:center;justify-content:space-between;gap:10px}
 .hb-card-h h2{margin:0;font-size:14px;font-weight:600}
@@ -294,21 +257,6 @@ a.hb-stat:hover .v,button.hb-stat:hover .v{color:var(--plum)}
 .hb-task .t span{display:block;color:var(--ink-3);font-size:12.5px}
 button.hb-task{cursor:pointer}
 button.hb-task:hover .t b{color:var(--plum)}
-.hb-swatches{display:flex;gap:var(--dds-s2,8px);margin-top:var(--dds-s3,12px);align-items:center;flex-wrap:wrap}
-.hb-swatches i{width:28px;height:28px;border-radius:var(--dds-r,8px);display:block;border:1px solid color-mix(in srgb,var(--ink) 8%,transparent);flex:0 0 auto}
-.hb-swatches span{font-size:13px;color:var(--ink-2);margin-left:var(--dds-s1,4px)}
-.hb-thumbs{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;margin-top:var(--dds-s3,12px)}
-.hb-thumbs span{aspect-ratio:1;border-radius:var(--dds-r-sm,6px);background:var(--paper);overflow:hidden;display:block;border:1px solid var(--hair)}
-.hb-thumbs img{width:100%;height:100%;object-fit:cover;display:block}
-.hb-links{display:flex;flex-direction:column;margin-top:6px}
-.hb-links a,.hb-links button{display:flex;align-items:center;gap:10px;padding:var(--dds-s2,8px) 0;border-top:1px solid var(--hair);font:inherit;font-size:13.5px;font-weight:500;color:var(--ink);text-decoration:none;text-align:left;width:100%}
-.hb-links a:first-child,.hb-links button:first-child{border-top:none}
-.hb-links a:hover,.hb-links button:hover{color:var(--plum)}
-.hb-links svg{width:15px;height:15px;stroke:currentColor;fill:none;stroke-width:1.75;stroke-linecap:round;stroke-linejoin:round;color:var(--ink-3);flex:0 0 auto}
-.hb-links a:hover svg,.hb-links button:hover svg{color:var(--plum)}
-.hb-links .go{margin-left:auto;color:var(--ink-3)}
-/* the concierge's letters, as cards in the main column */
-#notesWrap{margin-bottom:var(--dds-s6,24px)}
 
 /* ── editorial primitives ── */
 h1.doc{font-family:var(--serif);font-weight:500;font-size:24px;letter-spacing:-.01em;margin-bottom:6px}
@@ -365,30 +313,6 @@ h5.rune .whisper.ok{color:var(--sage)}
 .quietact:hover{color:var(--ink)}
 .smalltag{font-size:11.5px;letter-spacing:0;text-transform:none;color:var(--amber-text);font-weight:600}
 
-/* ── today: the concierge's letters ── */
-.letter{background:var(--sheet);border:1px solid var(--hair);border-radius:var(--r-lg);padding:var(--dds-s4,16px) var(--dds-s5,20px) var(--dds-s4,16px);position:relative;margin-bottom:10px;transition:opacity var(--dur) var(--ease),transform var(--dur) var(--ease),border-color var(--dur) var(--ease)}
-.letter:hover{border-color:var(--hair-2)}
-.letter.away{opacity:0;transform:translateX(24px)}
-.letter .wax{position:absolute;left:18px;top:-5px;width:10px;height:10px;border-radius:50%}
-.letter .wax.suggestion{background:var(--plum)}
-.letter .wax.celebration{background:var(--sage)}
-.letter .wax.caution{background:var(--amber)}
-.letter .lt{font-weight:600;font-size:14.5px;line-height:1.35}
-.letter .lr{color:var(--ink-2);font-size:13.5px;margin-top:var(--dds-s1,4px);max-width:56ch}
-.letter .la{margin-top:var(--dds-s4,16px);display:flex;gap:var(--dds-s5,20px);align-items:baseline;flex-wrap:wrap}
-/* the concierge thread inside a letter — a conversation with one host, not a chat app */
-.thread{margin-top:var(--dds-s4,16px);border-top:1px solid var(--hair);padding-top:var(--dds-s4,16px)}
-.chips{display:flex;gap:var(--dds-s2,8px);flex-wrap:wrap;margin-bottom:var(--dds-s1,4px)}
-.chip{font-size:12px;font-weight:550;padding:var(--dds-s1,4px) var(--dds-s3,12px);border-radius:100px;border:1px solid var(--hair-2);background:transparent;color:var(--ink-2);transition:all var(--dur) var(--ease)}
-.chip:hover{border-color:var(--plum);color:var(--plum)}
-.c-you{font-size:12.5px;color:var(--ink-2);margin-top:var(--dds-s3,12px);font-weight:550}
-.c-host{font-family:var(--serif);font-size:14.5px;line-height:1.7;margin-top:6px;max-width:56ch;white-space:pre-line}
-.c-host .lowconf{display:block;font-size:12px;font-style:italic;color:var(--ink-2);margin-top:var(--dds-s1,4px)}
-.c-acts{display:flex;gap:var(--dds-s5,20px);margin-top:var(--dds-s2,8px)}
-.askrow{display:flex;gap:10px;margin-top:var(--dds-s3,12px);align-items:baseline}
-.askrow input{flex:1;font-family:var(--serif);font-size:14px;background:transparent;border:none;border-bottom:1px solid var(--hair);padding:2px 0 6px;caret-color:var(--plum)}
-.askrow input:focus{outline:none;border-bottom-color:var(--plum)}
-.askrow button{flex:none}
 /* the writing desk (M9.5A) — ✦ marks drafted words, per the AI language freeze */
 .deskopt{border:1px solid var(--hair);border-radius:var(--r-lg);background:var(--paper);padding:var(--dds-s4,16px) var(--dds-s4,16px);margin-bottom:10px}
 .deskopt .dol{font-size:12px;letter-spacing:0;text-transform:none;color:var(--plum);font-weight:600;margin-bottom:6px}
@@ -486,9 +410,6 @@ html.dc-edit:not(.plan-watch) .dds-hint{bottom:88px !important}
 /* a watch plan observes: no building tools, no publish queue */
 html.plan-watch .ss-bar,html.plan-watch [data-grp="Content"],html.plan-watch .navitem[data-view="pages"],html.plan-watch .navitem[data-link="styles"],html.plan-watch .navitem[data-view="offerings"],html.plan-watch .navitem[data-view="faqs"],html.plan-watch .navitem[data-view="testimonials"],html.plan-watch .navitem[data-view="updates"],html.plan-watch .navitem[data-view="bookings"],html.plan-watch .navitem[data-view="reviews"],html.plan-watch .navitem[data-view="history"],html.plan-watch #pagesBar,html.plan-watch .dc-bar,html.plan-watch #btnAddFab,html.plan-watch #btnEditSite,html.plan-watch #trayPanel,html.plan-watch #designPreviewWrap>.hint,html.plan-watch #statWaiting,html.plan-watch #recentWrap,html.plan-watch #designPreview,html.plan-watch #view-design .docsub{display:none !important}
 #designPreviewEmpty.plan .ea{display:none}
-/* first-run strip: the three steps after the first visit, one line */
-.welcomebar{display:flex;flex-wrap:wrap;align-items:center;gap:var(--dds-s2,8px) var(--dds-s4,16px);background:var(--sheet);border:1px solid var(--hair);border-radius:var(--r-lg);padding:var(--dds-s3,12px) var(--dds-s4,16px);margin:var(--dds-s2,8px) 0 var(--dds-s4,16px);font-size:13.5px}
-.welcomebar .wb-k{color:var(--ink-2)}
 /* the builder's one icon set */
 .ti-ico svg,.dc-tree-ico svg,.pd-ico svg,.dc-tree-acts svg,.cm-badge svg{display:block}
 .tray-grp-h svg{display:inline-block;vertical-align:-3px;margin-right:6px}
@@ -496,13 +417,6 @@ html.plan-watch .ss-bar,html.plan-watch [data-grp="Content"],html.plan-watch .na
 .envelope{max-width:520px;margin:var(--dds-s4,16px) 0}
 .envelope h2{font-family:var(--serif);font-weight:500;font-size:26px;line-height:1.15;letter-spacing:-.01em;text-wrap:balance}
 .envelope p{color:var(--ink-2);margin-top:var(--dds-s3,12px);font-size:14.5px;max-width:46ch}
-.steps3{margin-top:var(--dds-s7,32px);display:flex;flex-direction:column;gap:10px}
-.step3{display:flex;gap:var(--dds-s5,20px);align-items:center;background:var(--sheet);border:1px solid var(--hair);border-radius:var(--r-lg);padding:var(--dds-s4,16px) var(--dds-s5,20px);text-align:left;width:100%;transition:border-color var(--dur) var(--ease)}
-.step3:hover{border-color:var(--hair-2)}
-.step3 .sn{width:28px;height:28px;flex:none;border-radius:50%;border:1.5px solid var(--hair-2);display:grid;place-items:center;font-size:13px;font-weight:600}
-.step3.done .sn{background:var(--sage);border-color:var(--sage);color:var(--paper)}
-.step3 .st{font-weight:600;font-size:14px}
-.step3 .sd{font-size:12.5px;color:var(--ink-2);margin-top:1px}
 
 /* ── document fields (business) ── */
 .hb-sub-h{font-size:12px;margin:var(--dds-s6,24px) 0 10px;color:var(--ink-3);font-weight:600;letter-spacing:0;text-transform:none}
@@ -535,10 +449,6 @@ html.plan-watch .ss-bar,html.plan-watch [data-grp="Content"],html.plan-watch .na
 .seo-setup h3{font-size:15px;font-weight:600;margin:0 0 var(--dds-s1,4px)}
 .seo-setup .field{margin-bottom:var(--dds-s4,16px)}
 .seo-setup .actions{display:flex;gap:var(--dds-s2,8px);flex-wrap:wrap;margin-top:var(--dds-s3,12px)}
-.seo-tasks{list-style:none;margin:0;padding:0}
-.seo-tasks li{display:flex;gap:var(--dds-s2,8px);align-items:baseline;padding:var(--dds-s1,4px) 0;font-size:13px}
-.seo-tasks li::before{content:"•";color:#a05a2c;font-weight:700}
-.seo-tasks a{color:var(--plum)}
 /* The Search tab: one score, then one card per question */
 .sv-card{border:1px solid var(--hair);border-radius:var(--dds-r-xl,14px);background:var(--sheet);padding:var(--dds-s4,16px) var(--dds-s5,20px);min-width:0}
 .sv-card h3{font-size:15px;font-weight:600;margin:0 0 var(--dds-s2,8px)}
@@ -633,7 +543,6 @@ html.plan-watch #svWords{display:none}
 .dish .dp{font-size:14px;font-weight:600;font-variant-numeric:tabular-nums;white-space:nowrap}
 .dish.offmenu .dn,.dish.offmenu .dp{color:var(--ink-2);text-decoration:line-through 1px}
 .dish.offmenu .dd{text-decoration:none}
-.dish .offtag{margin-left:10px}
 .addline{display:block;width:100%;text-align:left;font-size:13.5px;color:var(--plum);font-weight:600;padding:var(--dds-s3,12px) var(--dds-s2,8px);border-top:1px solid var(--hair);margin-top:var(--dds-s1,4px)}
 .addline:hover{background:var(--plum-soft);border-radius:var(--r)}
 
@@ -987,7 +896,6 @@ html.dds-has-shell.dds-has-ctxbar .stage{top:calc(var(--dds-shell-h) + var(--dds
 .tray-item.has-shot{flex-direction:column;align-items:stretch;gap:6px;padding:6px;margin:0;border-color:var(--hair,#eee)}
 .tray-item.has-shot .ti-ico{display:none}
 .tray-item .ti-shot{display:block;width:100%;height:auto;aspect-ratio:440/248;object-fit:cover;object-position:top;border-radius:6px;background:var(--wash,#f6f4fa);pointer-events:none}
-.tray-item.pd-source{opacity:.5}
 .tray-empty{font-size:12px;color:var(--ink-2);padding:var(--dds-s2,8px) 2px}
 
 /* left-rail tabs: [ Blocks | Files | Content tree ] — AEM's Components + Assets + Content Tree */
@@ -1084,10 +992,6 @@ body.pd-dragging *{cursor:grabbing !important}
 .blk-insertmenu{position:absolute;z-index:200;width:340px;max-width:92vw;max-height:60vh;overflow:auto;background:var(--sheet,#fff);border:1px solid var(--hair,#ddd);border-radius:var(--dds-r-xl,14px);box-shadow:0 18px 50px color-mix(in srgb,var(--scrim-ink) 28%,transparent);padding:var(--dds-s3,12px)}
 
 /* #5 — big device toggle + a CANVAS that dominates the screen */
-.dp-title{font-size:12px;font-weight:600;margin-bottom:var(--dds-s2,8px)}
-/* §1.4: in dark mode the caption says why the frame stays light — one line of
-   honesty about the site keeping its own (published) colors */
-.dp-title::after{content:var(--dp-owncolors,"");font-weight:500;color:var(--dds-soft)}
 .dpdevseg{display:inline-flex;gap:2px;background:var(--wash,#efece7);border-radius:var(--r);padding:var(--dds-s1,4px)}
 .dpdevseg button{font:inherit;font-size:13px;font-weight:500;padding:6px var(--dds-s4,16px);border-radius:var(--r-sm);border:none;background:transparent;color:var(--ink-2,#8a8172);cursor:pointer}
 .dpdevseg button.on{background:var(--seg-chip,var(--sheet,#fff));color:var(--ink,#1b1525);box-shadow:var(--seg-ring,0 1px 4px rgba(0,0,0,.12))}
@@ -1176,7 +1080,6 @@ body.pd-dragging *{cursor:grabbing !important}
   .topbar{padding:22px 22px 0}
   .topbar .pillbtn{display:none}
   .content{padding:26px 22px 160px}
-  .statement{font-size:25px}
   h1.doc{font-size:24px}
   .hdate{width:84px}
   .hentry{flex-wrap:wrap}
@@ -1189,7 +1092,6 @@ body.pd-dragging *{cursor:grabbing !important}
   .hrow{flex-wrap:wrap;row-gap:4px}
   .hrow .closedlab{margin-left:0;width:100%}
   .journal .jsec{width:76px}
-  .statement{font-size:22px}
 }
 /* touch devices: quiet text actions get honest tap targets */
 @media(pointer:coarse){
@@ -2702,18 +2604,6 @@ function artifactActs(entity, collection, rerender, words) {
   edit.addEventListener("click", (e) => { e.stopPropagation(); const h = acts.closest(".artifact"); const open = h.querySelector(".editor"); if (open) open.remove(); else h.appendChild(simpleEditor(entity, collection, words.fields, rerender, words)); });
   acts.appendChild(edit);
   return acts;
-}
-function stateWord(entity, collection, rerender, onWord, offWord) {
-  const on = entity.is_visible !== false;
-  const b = el("button", "quietact", on ? "" : offWord);
-  if (!on) b.classList.add("smalltag"), b.style.borderBottom = "none";
-  if (on) return null;
-  b.addEventListener("click", async (e) => {
-    e.stopPropagation();
-    try { const r = await api("PATCH", `/${collection}/${entity.id}`, { is_visible: true }); Object.assign(entity, r.data); rerender(); scheduleChangesRefresh(); }
-    catch (err) { toast(nice(err), true); }
-  });
-  return b;
 }
 function simpleEditor(entity, collection, fields, rerender, words) {
   const ed = el("div", "editor");
@@ -5285,32 +5175,6 @@ function closeTodoPanel() { const p = $("todoPanel"); if (p && p.classList.conta
   });
 })();
 
-/* ── the concierge's letters: moments + in-letter conversation (M9.4) ──
-   One host, five questions, session memory only — the thread lives in this
-   page and dies with it. Every answer arrives grounded from the server. */
-async function askInThread(thread, moment, question, shown, history) {
-  const row = thread.querySelector(".askrow");
-  thread.insertBefore(el("div", "c-you", shown), row);
-  const holder = el("div", "c-host", "…");
-  thread.insertBefore(holder, row);
-  try {
-    const r = await api("POST", "/concierge/ask", { question, topic_id: moment.id, history });
-    history.push({ topic_id: moment.id });
-    holder.textContent = r.data.answer;
-    if (r.data.low_confidence) holder.appendChild(el("span", "lowconf", "Part of this is judgment rather than measurement."));
-    if (r.data.actions && r.data.actions.length) {
-      const acts = el("div", "c-acts");
-      r.data.actions.forEach((a) => {
-        const b = el("button", "textact", a.label);
-        b.addEventListener("click", () => { if (a.section === "publish") openRitual(); else if (a.section === "preview") openPreview("draft"); else go(a.section); });
-        acts.appendChild(b);
-      });
-      holder.appendChild(acts);
-    }
-  } catch (err) {
-    holder.textContent = "That didn’t come through — your note is safe, ask again in a moment.";
-  }
-}
 function renderFactsProse() {
   const w = $("factsWrap"); const f = S.health && S.health.facts;
   const title = $("siteTitle"); if (title) title.textContent = (S.identity && S.identity.business_name) || "Your website";
@@ -11895,11 +11759,6 @@ async function dcSetColumns(bi, n) {
   if (BLOCKS_WORK.indexOf(b) < 0) return;   // gone while the question was up
   b.columns = dcResizeColumns(Array.isArray(b.columns) ? b.columns : [], n);
   dcRebalanceSpans(b);   // reset to even widths for the new count
-  dcCaptureScroll(); renderBlocksCard(); saveBlocks();
-}
-function dcSetSpan(bi, k, span) {
-  const b = BLOCKS_WORK[bi]; if (!b || b.type !== "columns" || !Array.isArray(b.columns) || !b.columns[k]) return;
-  b.columns[k].span = Math.max(1, Math.min(12, Math.round(Number(span) || 1)));
   dcCaptureScroll(); renderBlocksCard(); saveBlocks();
 }
 // ── on-canvas column resize (drag the divider; snaps to the 12-grid) ──
