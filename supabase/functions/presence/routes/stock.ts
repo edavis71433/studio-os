@@ -8,6 +8,7 @@ import { json } from '../../_shared/http.ts';
 import { svc } from '../lib/db.ts';
 import { importImage } from '../lib/media.ts';
 import { stockProvider } from '../lib/stock/registry.ts';
+import { StockProviderError, stockFailWords } from '../lib/stock/contract.ts';
 import { writeChangeEvent } from '../lib/provenance.ts';
 import { getTemplate } from '../lib/render.ts';
 import type { SiteRow } from '../lib/site.ts';
@@ -21,7 +22,13 @@ export async function handleStockSearch(req: Request, cors: Record<string, strin
   const url = new URL(req.url);
   const q = (url.searchParams.get('q') || '').slice(0, 100);
   const page = Math.max(1, Math.min(50, parseInt(url.searchParams.get('page') || '1', 10) || 1));
-  const images = await provider.search(q, page);
+  let images;
+  try { images = await provider.search(q, page); }
+  catch (e) {
+    const status = e instanceof StockProviderError ? e.status : 0;
+    console.warn(`[stock] ${provider.name} search failed: ${status ? `HTTP ${status}` : String(e).slice(0, 200)}`);
+    return json({ error: 'provider_failed', provider: provider.name, message: stockFailWords(provider.name, status) }, 502, cors);
+  }
   return json({ data: { provider: provider.name, license: provider.license, images } }, 200, cors);
 }
 

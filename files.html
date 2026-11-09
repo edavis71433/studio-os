@@ -314,7 +314,7 @@ const COLS=[
 let S={col:'all',q:'',client:'',caps:[],policy:'immediate',assets:[],full:[],counts:{},countsOk:false,health:[],canEdit:true,loadedOnce:false,current:null,cards:[],   // countsOk stays false until a collections read SUCCEEDS — unknown never paints as 0
   folder:'',newFolders:[],storage:null,   // item 56: the open folder (col 'folder'), folders made here and still empty; the meter
   selectMode:false,selected:new Set(),   // multi-select bulk actions
-  stockResults:[],stockQ:'',stockState:null,stockProvider:'',stockLicense:''};   // FD-T10 stock library state
+  stockResults:[],stockQ:'',stockState:null,stockProvider:'',stockLicense:'',stockError:''};   // FD-T10 stock library state
 let LOADED_AT=0;
 let REQ_SEQ=0;   // request-generation guard: a slow response that resolves after a newer request started is DISCARDED (C5)
 const updatedLabel=()=>{const m=Math.floor((Date.now()-LOADED_AT)/60000);return m<1?'Updated just now':'Updated '+m+' min ago';};
@@ -723,6 +723,7 @@ function renderStock(){
   const grid = S.stockState==='unavailable'
     ? `<div class="empty" style="grid-column:1/-1"><h2>The stock library isn’t turned on yet.</h2><p>Your studio can enable it. Once on, browse professional royalty-free photos and add them straight to your Files — hosted on your own site.</p></div>`
     : S.stockState==='loading' ? `<div class="empty" style="grid-column:1/-1"><h2>Searching…</h2></div>`
+    : S.stockState==='error' ? `<div class="empty" style="grid-column:1/-1" role="status"><h2>${esc(S.stockError)}</h2></div>`
     : (S.stockResults||[]).length ? S.stockResults.map(stockTile).join('')
     : `<div class="empty" style="grid-column:1/-1"><h2>${S.stockQ?'No photos match that search.':'Find a professional photo.'}</h2><p>Try “office”, “coffee”, “construction”, “salon”…</p></div>`;
   const note = S.stockLicense ? `Royalty-free from ${esc(S.stockProvider)} · ${esc(S.stockLicense)} · added to your Files and hosted on your own site.` : 'Professional royalty-free photos, added straight to your Files.';
@@ -745,6 +746,8 @@ async function loadStock(){
   const r=await api('/stock/search?q='+encodeURIComponent(S.stockQ||'')+'&page=1');
   if(gen!==REQ_SEQ||S.col!=='stock')return;   // a newer read started, or the user left stock — never paint over what they moved on to
   if(r.status===503){S.stockState='unavailable';return renderStock();}
+  // the server says why a search failed (Nov 9 2026: a refused Pexels key read as "No photos match")
+  if(!r.ok){S.stockResults=[];S.stockError=(r.body&&r.body.message)||'The stock library couldn’t search just now. Try again in a little while.';S.stockState='error';return renderStock();}
   if(r.ok&&r.body.data){S.stockResults=r.body.data.images||[];S.stockProvider=r.body.data.provider||'';S.stockLicense=(r.body.data.license&&r.body.data.license.name)||'';}
   else{S.stockResults=[];}
   S.stockState='ok'; renderStock();

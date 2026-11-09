@@ -22,7 +22,7 @@ import { json } from '../../_shared/http.ts';
 import { svc } from '../lib/db.ts';
 import { writeChangeEvent } from '../lib/provenance.ts';
 import { deleteMedia, signThumb, signDownload, signOriginalImage, copyObject, isImageMime, signSocialCrop, signCutoutSource } from '../lib/media.ts';
-import { cutoutConfigured, startCutout, checkCutout, jobFor, idFromJob, isPng, CUTOUT_MODEL, CUTOUT_MAX_SIDE, CUTOUT_MAX_BYTES, type CutoutState } from '../lib/cutout.ts';
+import { cutoutConfigured, startCutout, checkCutout, jobFor, idFromJob, isPng, cutoutFailWords, CUTOUT_MODEL, CUTOUT_MAX_SIDE, CUTOUT_MAX_BYTES, type CutoutState } from '../lib/cutout.ts';
 import { rateAllow, tooMany } from '../lib/ratelimit.ts';
 import type { SiteRow } from '../lib/site.ts';
 import type { Principal } from '../../_shared/auth.ts';
@@ -729,7 +729,7 @@ async function cutoutAnswer(site: SiteRow, st: CutoutState, cors: Record<string,
     return json({ data: { pending: true, job: await jobFor(site.id, st.id), note: 'Starting up. The first cut-out after a quiet spell can take a minute or two.' } }, 202, cors);
   }
   const failed = () => json({ error: 'cutout_failed', message: 'The cut-out didn’t come through, so nothing changed. Try again in a moment.' }, 502, cors);
-  if (st.state === 'failed') { console.warn(`[cutout] site=${site.id} failed: ${st.why}`); return failed(); }
+  if (st.state === 'failed') { console.warn(`[cutout] site=${site.id} failed: ${st.why}`); return json({ error: 'cutout_failed', message: cutoutFailWords(st.status) }, 502, cors); }
   try {
     const r = await fetch(st.output, { signal: AbortSignal.timeout(30000) });   // replicate.delivery only (readPrediction)
     if (!r.ok || Number(r.headers.get('content-length') || 0) > CUTOUT_MAX_BYTES) { await r.body?.cancel(); console.warn(`[cutout] site=${site.id} result HTTP ${r.status}`); return failed(); }

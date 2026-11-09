@@ -116,6 +116,14 @@ const bytesOf = async (r) => new Uint8Array(await r.arrayBuffer());
   ok('a failed prediction: 502 in plain words, and nothing logged', failed.status === 502 && /nothing changed/.test((await failed.json()).message) && W.meters === 0);
   reset({ start: { detail: 'Invalid version' }, startStatus: 422 });
   ok('Replicate refusing the request: 502', (await handleAssetCutout(site, principal, PHOTO, cors)).status === 502);
+  // Nov 9 2026: a refused key and an account with no credit both said "Try again in a moment"
+  reset({ start: { detail: 'You did not pass a valid authentication token' }, startStatus: 401 });
+  const refused = await handleAssetCutout(site, principal, PHOTO, cors), rb = await refused.json();
+  ok('a refused key says so, and that trying again won’t help', refused.status === 502 && /didn’t accept our key/.test(rb.message) && /won’t help/.test(rb.message) && W.meters === 0, rb.message);
+  reset({ start: { detail: 'You have insufficient credit to run this model.' }, startStatus: 402 });
+  const broke = await handleAssetCutout(site, principal, PHOTO, cors), bb = await broke.json();
+  ok('an account with no credit says so, and to wait after adding some', broke.status === 502 && /out of credit/.test(bb.message) && /wait a few minutes/.test(bb.message), bb.message);
+  ok('…anything else still says try again in a moment', C.cutoutFailWords(500) === C.cutoutFailWords() && /Try again in a moment/.test(C.cutoutFailWords()));
   reset({ start: { status: 'succeeded', output: 'https://evil.example/steal.png' } });
   const evil = await handleAssetCutout(site, principal, PHOTO, cors);
   ok('an answer pointing outside Replicate’s delivery host is never fetched', evil.status === 502 && !W.calls.some((c) => c.includes('evil.example')));
