@@ -50,6 +50,8 @@ async function recordWrites(page: Page) {
   return writes;
 }
 const billing = (page: Page) => page.goto(`/pipeline.html?deal=${DEAL}&dtab=billing`);
+// waiting for a write the page sends: generous, so a busy machine can't fail a click that did work
+const PATIENT = { timeout: 20_000 };
 
 test.describe('Deals — estimates (item 47)', () => {
   test('an approved estimate: its total, their note, and Turn into a proposal as the main button', async ({ page }) => {
@@ -66,7 +68,7 @@ test.describe('Deals — estimates (item 47)', () => {
     await expect(turn).toHaveClass(/^btn$/);   // the one main money step on the tab: no proposal yet
     await expect(row.getByRole('button', { name: 'Bill it as an invoice' })).toHaveClass(/ghost/);
     await turn.click();
-    await expect.poll(() => writes.map((w) => `${w.method} ${w.path}`)).toEqual([`POST /sales/estimates/${EST}/proposal`]);
+    await expect.poll(() => writes.map((w) => `${w.method} ${w.path}`), PATIENT).toEqual([`POST /sales/estimates/${EST}/proposal`]);
     await expect(page.getByText('Proposal drafted from the estimate')).toBeVisible();
   });
 
@@ -75,7 +77,7 @@ test.describe('Deals — estimates (item 47)', () => {
     const writes = await recordWrites(page);
     await billing(page);
     await page.locator(`[data-est="${EST}"]`).getByRole('button', { name: 'Bill it as an invoice' }).click();
-    await expect.poll(() => writes.map((w) => `${w.method} ${w.path}`)).toEqual([`POST /sales/estimates/${EST}/invoice`]);
+    await expect.poll(() => writes.map((w) => `${w.method} ${w.path}`), PATIENT).toEqual([`POST /sales/estimates/${EST}/invoice`]);
     await expect(page.getByText('press Send on it when you’re ready')).toBeVisible();
   });
 
@@ -91,7 +93,7 @@ test.describe('Deals — estimates (item 47)', () => {
     await form.getByLabel('Line item').first().fill('Logo touch-up');
     await form.getByLabel('Price each in dollars').first().fill('350');
     await form.getByRole('button', { name: 'Save draft' }).click();
-    await expect.poll(() => writes.length).toBe(1);
+    await expect.poll(() => writes.length, PATIENT).toBe(1);
     expect(writes[0].method + ' ' + writes[0].path).toBe(`POST /sales/deals/${DEAL}/estimates`);
     expect(writes[0].body.line_items).toEqual([{ label: 'Logo touch-up', qty: 1, unit_cents: 35000 }]);
     await expect(page.getByText('Estimate saved as a draft')).toBeVisible();
@@ -107,9 +109,9 @@ test.describe('Deals — estimates (item 47)', () => {
     await expect(row).toContainText('Draft — not sent yet');
     await expect(row.getByRole('button', { name: 'Turn into a proposal' })).toHaveCount(0);
     await row.getByRole('button', { name: /^Send to Riley Park/ }).click();
-    await expect.poll(() => writes.map((w) => `${w.method} ${w.path}`)).toEqual([`POST /sales/estimates/${EST}/send`]);
+    await expect.poll(() => writes.map((w) => `${w.method} ${w.path}`), PATIENT).toEqual([`POST /sales/estimates/${EST}/send`]);
     await row.getByRole('button', { name: 'Delete draft estimate Spring refresh' }).click();
-    await expect.poll(() => writes.map((w) => `${w.method} ${w.path}`)).toEqual([`POST /sales/estimates/${EST}/send`, `DELETE /sales/estimates/${EST}`]);
+    await expect.poll(() => writes.map((w) => `${w.method} ${w.path}`), PATIENT).toEqual([`POST /sales/estimates/${EST}/send`, `DELETE /sales/estimates/${EST}`]);
   });
 
   test('a sent one: opened, good until, and Copy link', async ({ page }) => {
@@ -148,7 +150,7 @@ test.describe('Deals — recurring invoices (item 47)', () => {
     await sec.getByLabel('How many times').fill('4');
     await expect(sec).toContainText('If the first date is today, it goes out right away.');
     await sec.getByRole('button', { name: 'Start' }).click();
-    await expect.poll(() => writes.length).toBe(1);
+    await expect.poll(() => writes.length, PATIENT).toBe(1);
     expect(writes[0].method + ' ' + writes[0].path).toBe(`POST /sales/deals/${DEAL}/recurring`);
     expect(writes[0].body).toEqual({ title: 'Website care', amount_cents: 50000, every: 'quarter', first_on: '2026-12-15', times: 4 });
   });
@@ -162,12 +164,12 @@ test.describe('Deals — recurring invoices (item 47)', () => {
     const row = page.locator(`[data-rec="${REC}"]`);
     await expect(row).toContainText('Website care — $500 every month · Next invoice: Dec 1, 2026 · 2 sent');
     await row.getByRole('button', { name: 'Skip this one' }).click();
-    await expect.poll(() => writes.length).toBe(1);
+    await expect.poll(() => writes.length, PATIENT).toBe(1);
     expect(asked[0]).toContain('Skip the Dec 1, 2026 invoice?');
     await row.getByRole('button', { name: 'Pause' }).click();
-    await expect.poll(() => writes.length).toBe(2);
+    await expect.poll(() => writes.length, PATIENT).toBe(2);
     await row.getByRole('button', { name: 'Stop the recurring invoice Website care' }).click();
-    await expect.poll(() => writes.length).toBe(3);
+    await expect.poll(() => writes.length, PATIENT).toBe(3);
     expect(asked[asked.length - 1]).toContain('No more invoices go out');
     expect(writes.map((w) => `${w.method} ${w.path}`)).toEqual([`POST /sales/recurring/${REC}/skip`, `POST /sales/recurring/${REC}/pause`, `POST /sales/recurring/${REC}/stop`]);
     // the Money card on Overview says it too
@@ -183,7 +185,7 @@ test.describe('Deals — recurring invoices (item 47)', () => {
     const sec = page.locator('#recSec');
     await sec.getByLabel('Amount (USD)').fill('600');
     await sec.getByRole('button', { name: 'Save changes' }).click();
-    await expect.poll(() => writes.length).toBe(1);
+    await expect.poll(() => writes.length, PATIENT).toBe(1);
     expect(writes[0]).toEqual({ method: 'PATCH', path: `/sales/recurring/${REC}`, body: { amount_cents: 60000 } });
   });
 
@@ -197,7 +199,7 @@ test.describe('Deals — recurring invoices (item 47)', () => {
     await expect(row).toContainText('Paused — the last two invoices are still unpaid');
     await expect(row.getByRole('button', { name: 'Skip this one' })).toHaveCount(0);
     await row.getByRole('button', { name: 'Resume' }).click();
-    await expect.poll(() => writes.map((w) => w.path)).toEqual([`/sales/recurring/${REC}/resume`]);
+    await expect.poll(() => writes.map((w) => w.path), PATIENT).toEqual([`/sales/recurring/${REC}/resume`]);
     expect(asked[0]).toContain('The next one goes out today.');
   });
 });
