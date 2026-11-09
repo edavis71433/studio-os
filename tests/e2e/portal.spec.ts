@@ -105,6 +105,37 @@ const CLIENT_API = {
   '/client/billing': { data: { invoices: [{ id: 'i1', name: 'Deposit', amount: 500, status: 'open', due_date: '2026-07-20', pay_url: 'https://pay.example/x' }], summary: { open_count: 1, paid_count: 0 } } },
 };
 
+// Item 86: the portal used to wait for each start-up read before asking the next one: five
+// round trips before Home could paint.
+test.describe('Client portal — start-up reads go out together (item 86)', () => {
+  test('the context, the projects and the feed go out at once, then the notifications and the Google ask together', async ({ page }) => {
+    await installApp(page, { api: CLIENT_API });
+    const log: string[] = [];
+    const path = (u: string) => new URL(u).pathname.replace(/^.*\/functions\/v1\/presence/, '');
+    page.on('request', (r) => { if (r.url().includes('/functions/v1/presence')) log.push('sent ' + path(r.url())); });
+    page.on('requestfinished', (r) => { if (r.url().includes('/functions/v1/presence')) log.push('done ' + path(r.url())); });
+    for (const slow of ['portal/context', 'client/notifications']) {
+      await page.route(`**/functions/v1/presence/${slow}`, async (route) => { await new Promise((r) => setTimeout(r, 600)); return route.fallback(); });
+    }
+    await page.goto('/client.html');
+    await expect(page.getByRole('heading', { name: 'Needs you' })).toBeVisible();
+    const at = (e: string) => log.indexOf(e);
+    expect(at('sent /client/projects')).toBeGreaterThanOrEqual(0);
+    expect(at('sent /client/projects')).toBeLessThan(at('done /portal/context'));
+    expect(at('sent /portal/feed')).toBeLessThan(at('done /portal/context'));
+    expect(at('sent /connections/ask')).toBeGreaterThanOrEqual(0);
+    expect(at('sent /connections/ask')).toBeLessThan(at('done /client/notifications'));
+  });
+  test('a reviewer still makes no client reads', async ({ page }) => {
+    await installApp(page, { api: { '/portal/context': REVIEWER_CTX, '/portal/feed': { data: { role: 'client_reviewer', moments: [], pending_approvals: [], last_published: null } } } });
+    const reads: string[] = [];
+    page.on('request', (r) => { const u = new URL(r.url()); if (u.pathname.includes('/functions/v1/presence/client/') || u.pathname.endsWith('/connections/ask')) reads.push(u.pathname); });
+    await page.goto('/client.html');
+    await page.waitForLoadState('networkidle');
+    expect(reads.filter((p) => !p.endsWith('/client/projects'))).toEqual([]);
+  });
+});
+
 test.describe('Client portal — Home queue + project record page', () => {
   test('Home "Needs you" is a queue card: kind chips, unread dot, inline actions', async ({ page }) => {
     await installApp(page, { api: CLIENT_API });

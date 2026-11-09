@@ -429,6 +429,18 @@ test.describe('Today — Lightning Home (slice 10)', () => {
     expect(reportsFetched).toEqual(['p1']);
   });
 
+  // Item 86: one read for every project's open approvals.
+  test('Waiting on clients counts every project in one read (item 86)', async ({ page }) => {
+    await installApp(page, { api: { ...PROJECTS_API, '/projects/progress': { data: { p1: { progress: { pct: 50, done: 1, total: 2 }, pending_approvals: 4 } } } } });
+    const asked: string[] = [];
+    page.on('request', (r) => { const u = new URL(r.url()); if (/\/projects\/(progress|[^/]+\/report)$/.test(u.pathname)) asked.push(u.pathname.split('/presence')[1] + u.search); });
+    await page.goto('/today.html');
+    const row = page.locator('#rail-waiting .rrows a');
+    await expect(row).toHaveCount(1);
+    await expect(row).toContainText('4 approvals');
+    expect(asked).toEqual(['/projects/progress?ids=p1']);   // the active project only, and no report per project
+  });
+
   test('Waiting on clients stays hidden when nothing is pending', async ({ page }) => {
     await installApp(page, { api: { ...PROJECTS_API, '/projects/p1/report': { data: { summary: { pending_approvals: 0 } } } } });
     await page.goto('/today.html');
