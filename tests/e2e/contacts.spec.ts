@@ -355,6 +355,54 @@ test.describe('Contacts — reachable at 390px', { tag: '@touch' }, () => {
   });
 });
 
+// ── Keyboard on a card (Nov 2026) ─────────────────────────────────────────────
+// A card opens the contact's record on Enter or Space — and it did that for
+// Enter on the email or phone link inside it too, so the link went to crm.html
+// instead of starting an email or a call. Links and buttons in a card act for
+// themselves now, as the table rows' always have. Keys only.
+test.describe('Contacts — keyboard on a card', () => {
+  test('Enter on the card’s email or phone link follows the link; only the card itself opens the record', async ({ page }) => {
+    await page.addInitScript(() => { try { localStorage.setItem('dds-display:contacts', 'cards'); } catch { /* denied */ } });
+    await installApp(page);
+    await mockContacts(page);
+    const records: string[] = [];
+    await page.route(/\/crm\.html\?/, (route) => {
+      records.push(route.request().url());
+      return route.fulfill({ contentType: 'text/html', body: '<!doctype html><title>Record</title>' });
+    });
+    await page.goto('/contacts.html');
+    const card = page.locator('.c[data-open="ct-marigold"]');
+    await expect(card).toBeVisible();
+    // Note each link click once the card has had its turn — and whether the page
+    // stopped it — then stop it here, so mailto: and tel: never reach the
+    // computer's own mail and phone apps.
+    await page.evaluate(() => {
+      const w = window as unknown as { __links: string[] };
+      w.__links = [];
+      document.addEventListener('click', (e) => {
+        const a = (e.target as Element).closest('a');
+        if (!a) return;
+        w.__links.push((e.defaultPrevented ? 'stopped ' : '') + a.getAttribute('href'));
+        e.preventDefault();
+      });
+    });
+    for (const link of [card.locator('.contact a[href^="mailto:"]'), card.locator('.contact a[href^="tel:"]')]) {
+      await link.focus();
+      await page.keyboard.press('Enter');
+      await page.keyboard.press(' ');   // Space doesn't follow a link, and doesn't open the record either
+      await expect(link).toBeFocused();
+    }
+    await expect.poll(() => page.evaluate(() => (window as unknown as { __links: string[] }).__links))
+      .toEqual(['mailto:marigold@example.com', 'tel:3105550134']);
+    expect(records).toEqual([]);
+    await expect(page).toHaveURL(/\/contacts\.html$/);
+    // the card itself still opens the record
+    await card.focus();
+    await page.keyboard.press('Enter');
+    await page.waitForURL(/\/crm\.html\?contact=ct-marigold&tab=details/);
+  });
+});
+
 test.describe('Contacts — studio scope is not regressed', () => {
   test('scoped into a client the page still says contacts are studio-level, with no row actions', async ({ page }) => {
     await installApp(page);
