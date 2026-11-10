@@ -131,15 +131,13 @@ async function route(token){
     var j = await r.json().catch(function(){ return {}; });
     if (r.ok && j && j.data && j.data.landing) {
       var d = j.data;
-      // FIX 4 — this is the STUDIO door. An operator-capable account whose landing
-      // is '/client.html' still goes to the operator workspace from here.
-      // Nov 2026 review (client portal finding 4): a CONVERTED client is recorded as
-      // the owner of their own site, so `sees_full_workspace` is true for them too,
-      // and this door used to drop them on Today with a one-item menu and the owner
-      // tools behind it. The server's `is_managed_client` is the answer: a client
-      // goes to their portal whichever door they used.
+      // FIX 4 — this is the STUDIO door. A "managed client" who ALSO owns a
+      // workspace is handed landing '/client.html' by /portal/context, but an
+      // operator-capable account signing in HERE must land in the operator
+      // workspace, not bounce to the client portal. Only a pure (non-operator)
+      // client follows a '/client.html' landing from the studio door.
       var operatorCapable = d.sees_full_workspace === true || d.is_agency || d.is_operator;
-      if (d.landing === '/client.html' && operatorCapable && d.is_managed_client !== true) {
+      if (d.landing === '/client.html' && operatorCapable) {
         location.href = d.is_agency ? '/agency.html' : '/today.html'; return;
       }
       location.href = d.landing; return;

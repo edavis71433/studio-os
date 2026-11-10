@@ -336,7 +336,7 @@ $('forgot').addEventListener('click', async function(){
   if (!sb) return;
   var em = $('empw').value.trim();
   if (!em) { errIn('err', 'Type your email above first, then tap “Forgot your password?” again.'); $('empw').focus(); return; }
-  try { await sb.auth.resetPasswordForEmail(em, { redirectTo: location.origin + '/set-password.html?next=/client.html' }); } catch(e){}   // review finding 1: ?next= picks the client sign-in store, so the new password signs them in
+  try { await sb.auth.resetPasswordForEmail(em, { redirectTo: location.origin + '/set-password.html' }); } catch(e){}
   show('resetSent');
 });
 

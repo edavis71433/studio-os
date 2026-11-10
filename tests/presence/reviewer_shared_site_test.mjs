@@ -1,10 +1,9 @@
-// ── Nov 2026 review, client portal findings 1, 4 and 5 ──
-//   deno run --allow-read --allow-env tests/presence/client_door_reviewer_test.mjs
-// 1: a client's password reset saves the sign-in where the portal looks for it.
-// 4: a converted client who signs in at the studio's door goes to their portal.
-// 5: a reviewer seat on a studio's shared site (one that holds work for clients)
-//    can't be added, and an existing one neither sees nor decides the waiting
-//    files there, because a reviewer is tied to a site, not to a project.
+// ── Nov 2026 review, client portal finding 5 ──
+//   deno run --allow-read --allow-env tests/presence/reviewer_shared_site_test.mjs
+// A reviewer seat on a studio's shared site (one that holds work for clients)
+// can't be added, and an existing one neither sees nor decides the waiting files
+// there, because a reviewer is tied to a site, not to a project. (Findings 1 and
+// 4, the reset link and the studio door, are PR 249's.)
 // Against a stubbed PostgREST: no Supabase, no credentials, no outside call.
 for (const [k, v] of Object.entries({ SUPABASE_URL: 'http://stub.local', SERVICE_ROLE_KEY: 'SERVICE-KEY', SUPABASE_ANON_KEY: 'ANON-KEY', SITE_URL: 'https://app.example' })) Deno.env.set(k, v);
 
@@ -79,20 +78,6 @@ const ws = read('supabase/functions/presence/routes/workspace.ts');
 ok('the feed hides waiting files from a reviewer on a shared site', /const filesHidden = role === 'client_reviewer' \? \(await isSharedStudioSite\(site\.id\)\) !== false : false;/.test(ws) && /fileQ\.ok && !filesHidden && fileQ\.json/.test(ws));
 ok('the badge does not count them either', /filesPending: role === 'client_reviewer' && \(await isSharedStudioSite\(site\.id\)\) !== false \? 0 :/.test(ws));
 ok('the add-a-person answer says what to do instead', /Open that client and invite the reviewer there instead\./.test(ws));
-
-// finding 4: the studio door follows the server's "this is a client"
-const studio = read('studio.html');
-ok('the studio door sends a converted client to their portal', /if \(d\.landing === '\/client\.html' && operatorCapable && d\.is_managed_client !== true\)/.test(studio));
-ok('…and still takes a studio owner to their workspace', /location\.href = d\.is_agency \? '\/agency\.html' : '\/today\.html'; return;/.test(studio) && /location\.href = d\.landing; return;/.test(studio));
-const nav = read('supabase/functions/presence/lib/navigation.ts');
-ok('the server lands a managed client on the portal', /if \(c\.role === 'client_reviewer' \|\| c\.isManagedClient\) return '\/client\.html';/.test(nav));
-
-// finding 1: both password resets a client can start pick the client sign-in store
-const portal = read('portal.html'), client = read('client.html'), setpw = read('set-password.html');
-ok('the client door’s reset link goes to the portal', /resetPasswordForEmail\(em, \{ redirectTo: location\.origin \+ '\/set-password\.html\?next=\/client\.html' \}\)/.test(portal));
-ok('the portal’s own Change password does too', /resetPasswordForEmail\(email,\{redirectTo:location\.origin\+'\/set-password\.html\?next=\/client\.html'\}\)/.test(client));
-ok('set-password writes that sign-in to the client store and allows the portal as next', /spNext\.indexOf\("\/client"\) === 0\) \? 'dds-client-auth'/.test(setpw) && /NEXT_OK = \[[^\]]*"\/client\.html"/.test(setpw));
-ok('no client page starts a reset without it', !/set-password\.html'\s*\}/.test(portal) && !/set-password\.html'\}/.test(client));
 
 const passed = results.filter((r) => r.p).length;
 console.log(`${passed}/${results.length} passed`);

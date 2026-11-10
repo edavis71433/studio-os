@@ -370,7 +370,7 @@ const CHANGED = [
   ok('failed read: staff can\'t set the brand kit', refused(await failing(seated('jwt-staff', 'business_staff'), kit)));
   ok('failed read: a reviewer can\'t archive a file', refused(await failing(seated('jwt-reviewer', 'client_reviewer'), status('archive'))));
   ok('failed read: a reviewer can\'t publish a file', refused(await failing(seated('jwt-reviewer', 'client_reviewer'), status('publish'))));
-  // on a client's own site (no service link names it as a studio's); a studio's shared site refuses reviewers (client_door_reviewer_test)
+  // on a client's own site (no service link names it as a studio's); a studio's shared site refuses reviewers (reviewer_shared_site_test)
   ok('failed read: a reviewer can still approve a file', (await failing(seated('jwt-reviewer', 'client_reviewer'), status('approve'), { empty: ['presence_service_links'] })).status !== 403);
   ok('failed read: a developer keeps developer mode', (await failing(seated('jwt-dev', 'developer'), palette)).status === 200);
   ok('failed read: an owner seat keeps the look', (await failing(seated('jwt-coowner', 'business_owner'), template)).status === 200);
