@@ -35,7 +35,7 @@ for (const [file, olds] of CHECKS) {
 }
 // and the new names are where the old ones were
 const presence = read('presence.html');
-ok('Edit mode’s past-versions button says Versions', /data-dcmode="timewarp"[^>]*>Versions<\/button>/.test(presence));
+ok('Edit mode’s past-versions button says Versions', /data-dcmode="timewarp"[^>]*><span class="dc-dk-l">Versions<\/span><\/button>/.test(presence));   // the dock item: an icon is drawn in front of the word at run time
 ok('the phone dock’s button is named for the sheet it opens', /data-tab="sections" aria-pressed="false">Sections<\/button>/.test(presence) && /<h2>Sections<\/h2>/.test(presence));
 ok('Find anything takes the places’ names from the menu', /function findPlaces\(\) \{\s*return SITE_TABS\.filter/.test(presence) && /\["design", "Edit site"\]/.test(presence));
 
