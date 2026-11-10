@@ -61,7 +61,7 @@ ok('gap 4: noted only — the welcome card shows once and is not measured as a r
 // Pages, the health check and the address on Search, what happened on Versions), and each tab
 // reads its own the first time it opens. The Overview shows none of them and reads none.
 {
-  const loadToday = presence.slice(presence.indexOf('async function loadToday('), presence.indexOf('/* ── the concierge\'s letters'));
+  const loadToday = presence.slice(presence.indexOf('async function loadToday('), presence.indexOf('\n}\n', presence.indexOf('async function loadToday(')));   // to its own closing brace
   const facts = presence.slice(presence.indexOf('function renderFactsProse()'), presence.indexOf('\n}\n', presence.indexOf('function renderFactsProse()')));
   const goFn = presence.slice(presence.indexOf('function go(view, early)'), presence.indexOf('\n}\n', presence.indexOf('function go(view, early)')));
   ok('gap 5: the Overview\'s load asks for none of the board extras', loadToday.includes('readChanges()') && !/hbLoadBoardExtras/.test(loadToday));

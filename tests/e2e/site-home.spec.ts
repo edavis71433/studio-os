@@ -856,19 +856,24 @@ test.describe('Pages: every page and the menu in one place', () => {
     await expect(page.locator('#view-pages')).toBeVisible();
   });
 
-  test('from Edit mode, the Pages button and a page’s ⋯ both reach the same place', async ({ page }) => {
+  test('from Edit mode, a page’s gear and its ⋯ open its settings in the Pages card, and Edit mode stays', async ({ page }) => {
     await mount(page, '/presence.html#design', withPages());
     await expect(page.locator('html')).toHaveClass(/dc-edit/);
-    if (!isPhone(page)) {
-      await page.locator('#dcPageSwitch').click();   // the pages live in the switcher's card
-      await page.locator('#pagesBar .page-pill', { hasText: 'Gallery' }).locator('.pp-menu').click();
-      await page.getByRole('button', { name: 'Page settings…' }).click();
-      await expect(page.locator('#pageSettings').getByRole('heading', { name: 'Gallery settings' })).toBeVisible();
-      await page.keyboard.press('Escape');
-    }
-    await page.evaluate(() => document.getElementById('btnNavEdit')!.click());
-    await expect(page.locator('#view-pages')).toBeVisible();
-    await expect(page.locator('html')).not.toHaveClass(/dc-edit/);
+    await page.locator('#dcPageSwitch').click();   // the floating studio, part three: the Pages card
+    const card = page.locator('#pagesCard');
+    await card.getByRole('button', { name: 'Settings for Gallery' }).click();
+    await expect(card.locator('#pageSettings').getByRole('heading', { name: 'Gallery settings' })).toBeVisible();
+    await card.getByRole('button', { name: 'All pages' }).click();
+    await expect(card.locator('#pageSettings')).toHaveCount(0);
+    await card.locator('.page-pill', { hasText: 'Gallery' }).locator('.pp-menu').click();
+    await page.getByRole('button', { name: 'Page settings…' }).click();
+    await expect(card.locator('#pageSettings').getByRole('heading', { name: 'Gallery settings' })).toBeVisible();
+    await page.keyboard.press('Escape');   // back to the list first, then the card goes
+    await expect(card.locator('#pcFind')).toBeVisible();
+    await page.keyboard.press('Escape');
+    await expect(card).toBeHidden();
+    await expect(page.locator('html')).toHaveClass(/dc-edit/);
+    await expect(page.locator('#view-pages')).toBeHidden();
   });
 });
 

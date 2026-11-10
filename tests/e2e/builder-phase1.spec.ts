@@ -319,7 +319,7 @@ test.describe('the Edit bar and the panels', () => {
       for (const sel of ['#btnEditExit', '#btnTrayOpen', '#dkPages', '#btnSettingsOpen', '#dkPhotos', '#btnComments', '#dkFind', '#btnUndo', '#btnRedo']) await expect(page.locator(sel)).toBeInViewport();
       await openPages(page);
       await expect(page.locator('#pagesBar .page-pill').first()).toBeVisible();
-      await expect(page.locator('#btnNavEdit')).toBeInViewport();
+      for (const sel of ['#btnPageAdd', '#btnPagesClose', '#pcFind']) await expect(page.locator(sel)).toBeInViewport();
     });
   }
   test('the canvas runs to the very bottom and the very left of the screen', async ({ page }) => {

@@ -31,7 +31,7 @@ test.describe('G13 in-place canvas text editor — the same page changes on a sl
     await expect.poll(() => sent.length, { timeout: 6000 }).toBe(2);
     expect(aboutIn(sent[1])?.hideNav).toBe(true);
     expect(aboutIn(sent[1])?.blocks[0].subtitle).toBe('Edit on about');
-    await expect(pill(page, 'About')).toContainText('(hidden)');
+    await expect(pill(page, 'About')).toHaveAttribute('data-nav', 'hidden');
   });
 
   test('Moving it on the Pages tab while that page\'s save is out keeps the edit', async ({ page }) => {
@@ -250,7 +250,7 @@ test.describe('G13 in-place canvas text editor — the same page changes on a sl
   test('a session opened while ＋ Page is on its way saves to its own page, not the new one', async ({ page }) => {
     const { frame, puts } = await mountPages(page);
     const { sent, release } = await holdPuts(page);
-    await openPages(page); await page.locator('#pagesBar .page-add').click();
+    await openPages(page); await page.locator('#pagesCard .page-add').click();
     await page.getByPlaceholder('e.g. Services, Gallery, Pricing').fill('Gallery');
     await page.getByRole('button', { name: 'Next: pick a layout' }).click();
     await page.locator('.dc-layout-card', { hasText: 'Blank page' }).click();
