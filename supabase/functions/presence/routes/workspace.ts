@@ -24,7 +24,7 @@ import { resolveAgencyMember } from '../agency/auth.ts';
 import { filterForRole, visibleTo } from '../lib/visibility.ts';
 import { svc, svcCount } from '../lib/db.ts';
 import { displayName } from '../lib/dam.ts';
-import { resolveSiteRoleCached, listSiteMembers, addSiteMember, revokeSiteMember, loadShares, overrideFor, setShare } from '../lib/workspace.ts';
+import { resolveSiteRoleCached, listSiteMembers, addSiteMember, revokeSiteMember, loadShares, overrideFor, setShare, isSharedStudioSite } from '../lib/workspace.ts';
 import { loadThreadMarks, newestClientMessageAt, threadUnread } from '../lib/thread_reads.ts';
 import { shapeClientConversations, studioBellCount, noticeDismissible, NOTICE_ACCOUNT_KINDS, freshEnquiries, invoiceReminderIds, renderableNotices, noticeTier, noticePriority } from '../lib/inbox_feed.ts';
 import { clearNotice } from '../lib/notice.ts';
@@ -222,7 +222,7 @@ export async function handlePortalContext(jwt: string, site: SiteRow, principal:
       newEnquiries: ((eQ.json as any[])?.length || 0),
       proposedPlans: (iQ || 0),
       proposedWrites: (wQ || 0),
-      filesPending: ((fQ.json as any[]) || []).filter((m) => (m.metadata || {}).pending_replace).length,
+      filesPending: role === 'client_reviewer' && (await isSharedStudioSite(site.id)) !== false ? 0 : ((fQ.json as any[]) || []).filter((m) => (m.metadata || {}).pending_replace).length,   // review finding 5
       openFeedback: (cmQ || 0),
       // P2-D: service delivery folds into the ONE attention surface (no second
       // bell). Both slots resolve empty for a caller without view_all, so the
@@ -398,6 +398,8 @@ export const FEED_ENQUIRIES = 50, FEED_CONVERSATIONS = 20, FEED_MESSAGE_CHARS = 
 export async function buildPortalFeed(jwt: string, site: SiteRow, principal: Principal): Promise<any> {
   const role = await resolveSiteRoleCached(principal, jwt, site.id);
   const seesFull = siteCan(role, 'view_all');   // owner surfaces get the notices rail; reviewers don't
+  // review finding 5: a reviewer on a studio's shared site gets no waiting files (they'd be every client's)
+  const filesHidden = role === 'client_reviewer' ? (await isSharedStudioSite(site.id)) !== false : false;
   const noEnq = Promise.resolve({ ok: true, json: [] as any[] });
   const swallow = () => ({ ok: false, json: [] as any[] });   // best-effort slots must never sink the whole feed
   // FIX 4: kick off the Content Tree read CONCURRENTLY with the feed's own queries
@@ -479,7 +481,7 @@ export async function buildPortalFeed(jwt: string, site: SiteRow, principal: Pri
     // DAM-2: a file replacement waiting for approval — same feed, links into Files
     // href is audience-aware: files.html is an OWNER page — a reviewer decides
     // from their own view, never a 403 wall.
-    ...(((fileQ.ok && fileQ.json) || []) as any[]).filter((m) => (m.metadata || {}).pending_replace).map((m) => ({ id: m.id, kind: 'file', title: `Replace ${displayName(m)}`, summary: 'A file replacement is waiting for your OK before it goes live.', decide_path: `/assets/${m.id}/status`, href: seesFull ? `/files.html?focus=${m.id}` : '/client.html' })),
+    ...(((fileQ.ok && !filesHidden && fileQ.json) || []) as any[]).filter((m) => (m.metadata || {}).pending_replace).map((m) => ({ id: m.id, kind: 'file', title: `Replace ${displayName(m)}`, summary: 'A file replacement is waiting for your OK before it goes live.', decide_path: `/assets/${m.id}/status`, href: seesFull ? `/files.html?focus=${m.id}` : '/client.html' })),
   ] : []).map((p) => ({ ...p, tier: 'needs_you', priority: true }));   // an approval is always an ask, always on top
   const last = (pubQ.ok && pubQ.json?.[0]) || null;
   // Phase FLOW: the notices rail joins the ONE global feed the shell bell reads,
@@ -730,8 +732,11 @@ export async function handleMemberAdd(req: Request, jwt: string, site: SiteRow, 
   let body: any = {}; try { body = await req.json(); } catch { /* */ }
   const res = await addSiteMember(site.id, String(body?.email || ''), body?.role, principal.userId || 'owner');
   if (!res.ok) {
-    const msg = res.error === 'bad_email' ? 'That doesn’t look like an email address.' : res.error === 'bad_role' ? 'Pick a valid role.' : 'That didn’t save — please try again.';
-    return json({ error: res.error, message: msg }, res.error === 'write_failed' ? 502 : 400, cors);
+    const msg = res.error === 'bad_email' ? 'That doesn’t look like an email address.' : res.error === 'bad_role' ? 'Pick a valid role.'
+      : res.error === 'shared_site' ? 'This is your studio’s own site, which holds every client’s files, so a reviewer here would see them all. Open that client and invite the reviewer there instead.'
+      : res.error === 'check_failed' ? 'We couldn’t check this site just now, so nobody was added. Try again in a moment.'
+      : 'That didn’t save — please try again.';
+    return json({ error: res.error, message: msg }, res.error === 'write_failed' || res.error === 'check_failed' ? 502 : 400, cors);
   }
   const message = res.emailed
     ? 'Invited — we’ve emailed them a sign-in link. They’ll see only what you choose to share.'

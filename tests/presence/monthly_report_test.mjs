@@ -5,6 +5,7 @@
 // as Analytics; the words say a part that couldn't be read rather than a zero.
 import {
   normalizeReportSetting, lastMonth, reportDueNow, foldReport, reportHtml, REPORT_NOTE_MAX, REPORT_SEND_DAYS,
+  applyReportChange, blockedReason, afterFailure, REPORT_MAX_TRIES, BLOCK_WORDS,
 } from '../../supabase/functions/presence/ops/monthly_report.ts';
 import { RESERVED_NAMES } from '../../supabase/functions/presence/lib/reserved_store.ts';
 
@@ -14,7 +15,8 @@ const read = (p) => Deno.readTextFileSync(new URL('../../' + p, import.meta.url)
 
 // the setting
 ok('the reserved row has a name', RESERVED_NAMES.monthlyReport === '__monthly_report__');
-ok('an empty row reads as off with no line', JSON.stringify(normalizeReportSetting(null)) === JSON.stringify({ enabled: false, note: '', last_month: null, updated_by: null, updated_at: null }));
+ok('an empty row reads as off with no line', JSON.stringify(normalizeReportSetting(null)) === JSON.stringify({ enabled: false, note: '', last_month: null, last_result: null, tries: null, updated_by: null, updated_at: null }));
+ok('what happened last is kept when well formed, dropped when not', normalizeReportSetting({ last_result: { month: '2026-10', status: 'skipped', reason: 'no_email', at: 'x' } }).last_result?.reason === 'no_email' && normalizeReportSetting({ last_result: { month: '2026-10', status: 'lost' } }).last_result === null && normalizeReportSetting({ last_result: { month: 'Oct', status: 'sent' } }).last_result === null);
 ok('only true turns it on', normalizeReportSetting({ enabled: 'yes' }).enabled === false && normalizeReportSetting({ enabled: true }).enabled === true);
 ok('the line is capped', normalizeReportSetting({ note: 'x'.repeat(REPORT_NOTE_MAX + 50) }).note.length === REPORT_NOTE_MAX);
 ok('a malformed last month is dropped', normalizeReportSetting({ last_month: 'October' }).last_month === null && normalizeReportSetting({ last_month: '2026-10' }).last_month === '2026-10');
@@ -34,6 +36,37 @@ ok('not due when last month was already sent', !reportDueNow({ ...on, last_month
 ok('due again the next month', reportDueNow({ ...on, last_month: '2026-10' }, '2026-12-02T00:00:00.000Z'));
 ok('never due while off', !reportDueNow(normalizeReportSetting({ enabled: false }), '2026-11-01T00:00:00.000Z'));
 
+// switching on (Nov 10 review, finding 4): the first report is next month's, as the card says
+{
+  const off = normalizeReportSetting({ enabled: false });
+  const onDec2 = applyReportChange(off, { enabled: true }, 'eric@example.com', '2026-12-02T10:00:00.000Z');
+  ok('switched on during the first days, last month counts as handled', onDec2.enabled && onDec2.last_month === '2026-11' && !reportDueNow(onDec2, '2026-12-02T11:00:00.000Z'));
+  ok('…and the report goes out the next month', reportDueNow(onDec2, '2027-01-01T06:00:00.000Z'));
+  const onMid = applyReportChange(off, { enabled: true }, null, '2026-11-10T10:00:00.000Z');
+  ok('switched on mid-month, the first report is the one for this month', onMid.last_month === '2026-10' && reportDueNow(onMid, '2026-12-01T06:00:00.000Z'));
+  const sentAlready = applyReportChange(normalizeReportSetting({ enabled: false, last_month: '2026-11' }), { enabled: true }, null, '2026-12-02T10:00:00.000Z');
+  ok('switching on never moves the mark backwards', sentAlready.last_month === '2026-11');
+  const noteOnly = applyReportChange(normalizeReportSetting({ enabled: true, last_month: '2026-09' }), { note: 'Hi' }, null, '2026-11-02T10:00:00.000Z');
+  ok('editing the line leaves the switch and the mark alone', noteOnly.enabled && noteOnly.last_month === '2026-09' && noteOnly.note === 'Hi');
+  ok('switching off keeps the mark', applyReportChange(onDec2, { enabled: false }, null, '2026-12-03T00:00:00.000Z').last_month === '2026-11');
+}
+
+// who can't be emailed (findings 2 and F4)
+ok('no address, or not an address, is no_email', blockedReason(null, null) === 'no_email' && blockedReason('not-an-address', null) === 'no_email');
+ok('an unsubscribe reads as unsubscribed; a bounce or complaint as bounced', blockedReason('a@b.co', 'opt_out') === 'unsubscribed' && blockedReason('a@b.co', 'bounce') === 'bounced' && blockedReason('a@b.co', 'complaint') === 'bounced');
+ok('a good address on no list is fine', blockedReason('a@b.co', null) === null);
+ok('every reason has words for the card', ['no_email', 'unsubscribed', 'bounced'].every((k) => typeof BLOCK_WORDS[k] === 'string' && BLOCK_WORDS[k].length > 5));
+
+// a send that fails (finding F4): tried again, a few times at most
+{
+  const claimed = normalizeReportSetting({ enabled: true, last_month: '2026-11' });
+  const once = afterFailure(claimed, '2026-11', '2026-10', '2026-12-02T00:00:00.000Z');
+  ok('a first failure lets the month go again', once.last_month === '2026-10' && once.tries?.count === 1 && once.last_result === null);
+  let s = once; for (let i = 1; i < REPORT_MAX_TRIES; i++) s = afterFailure({ ...s, last_month: '2026-11' }, '2026-11', '2026-10', '2026-12-02T00:00:00.000Z');
+  ok(`after ${REPORT_MAX_TRIES} it is handled, as failed`, s.last_month === '2026-11' && s.last_result?.status === 'failed' && s.tries?.count === REPORT_MAX_TRIES);
+  ok('a failure never moves someone else’s newer mark', afterFailure(normalizeReportSetting({ last_month: '2026-12' }), '2026-11', '2026-10', 'x').last_month === '2026-12');
+}
+
 // the fold
 const startMs = Date.parse(nov.startIso), endMs = Date.parse(nov.endIso);
 const pv = (day, path, who) => ({ ts: `2026-10-${day}T12:00:00.000Z`, kind: 'pageview', path, visitor_hash: who });
@@ -47,6 +80,9 @@ ok('enquiries pass through', d.enquiries === 2 && d.address === 'https://marlows
 ok('a capped read is marked', foldReport({ month: nov.month, label: nov.label, startMs, endMs, visits, enquiries: 0, publishes: [], address: '', visitsCap: visits.length }).truncated === true && d.truncated === false);
 const missing = foldReport({ month: nov.month, label: nov.label, startMs, endMs, visits: null, enquiries: null, publishes: null, address: '', visitsCap: 5000 });
 ok('a read that failed is null, not zero', missing.visitors === null && missing.pageviews === null && missing.enquiries === null && missing.publishes === null && missing.topPages.length === 0);
+
+// the reply address (full review Nov 10, D1): the STUDIO's site, so the reply door lets the client in
+ok('a reply to the report reaches the studio, not the client’s own site', /siteId: studio \|\| site\.id/.test(read('supabase/functions/presence/ops/monthly_report.ts')) && !/siteId: site\.id \}\);/.test(read('supabase/functions/presence/ops/monthly_report.ts')));
 
 // the words
 const full = reportHtml(d, { studioName: 'Davis Digital Studio', note: 'Thanks for a great month.\nThe new photos are working.', clientName: 'Marlow’s Kitchen' });
@@ -71,6 +107,11 @@ const index = read('supabase/functions/presence/index.ts');
 ok('the three site routes are registered', /'\/report\/monthly' && method === 'GET'/.test(index) && /'\/report\/monthly' && method === 'PUT'/.test(index) && /'\/report\/monthly\/preview' && method === 'POST'/.test(index));
 const settings = read('settings.html');
 ok('the Settings card is inside a client only and needs configure', /key: 'report'[^\n]*scopedOnly: true[^\n]*cap: 'configure'/.test(settings) && /c\.scopedOnly && !SCOPE/.test(settings));
+ok('the card reads what happened last, not the bare month mark', /function reportStatusLine\(d\)/.test(settings) && !/d\.last_month \? 'Last sent/.test(settings));
+const mr = read('supabase/functions/presence/ops/monthly_report.ts');
+ok('the job claims the month before it sends', mr.indexOf('const claimed = await SAVE(') > 0 && mr.indexOf('const claimed = await SAVE(') < mr.indexOf('await sendReport(site, win, claimedSetting'));
+ok('the visits are read in full pages, not one capped read', /svcPages\(`presence_visits\?site_id=eq\./.test(mr) && !/limit=\$\{VISITS_CAP\}/.test(mr));
+ok('switching on for a client who can’t be emailed is refused with the reason', /error: 'cannot_send', blocked: reach\.blocked/.test(mr));
 
 const passed = results.filter((r) => r.p).length;
 console.log(`${passed}/${results.length} passed`);

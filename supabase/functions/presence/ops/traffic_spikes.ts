@@ -4,16 +4,20 @@
 // three of them having any) and at least twenty, raise one `traffic_spike` notice,
 // an UPDATE on the ONE notice model (period day:<date>, so it can never repeat).
 // The studio's bell names the site; the owner's bell says "your website". No push:
-// good news can wait for the next look. The counting is pure and tested; the read
-// is one capped query over presence_visits, ordered so a cap means "most recent".
-import { svc } from '../lib/db.ts';
+// good news can wait for the next look. The counting is pure and tested.
+// Nov 2026 review (server findings 5, 8, 9): the words say "page views", which is
+// what is counted; the week is read in full pages (a cut-off or failed read says
+// nothing); and the check runs only in the first hour of the UTC day, since
+// "yesterday" doesn't change during the day (it used to re-read a week 96 times).
+import { svc, svcPages } from '../lib/db.ts';
 import { raiseNotice } from '../lib/notice.ts';
 import { siteOrigin } from '../lib/site.ts';
 
 export const SPIKE_MIN_VIEWS = 20;
 export const SPIKE_RATIO = 3;
 export const SPIKE_MIN_DAYS = 3;
-const VISITS_CAP = 20_000;
+const VISITS_PAGE = 1000, VISITS_PAGES = 50;   // every page or none; past 50,000 page views in eight days the check says nothing
+export const SPIKE_RUN_HOURS = 1;               // runs only in the first hour of the UTC day (the */15 tick gives it four tries)
 
 export interface VisitRow { site_id: string; ts: string }
 export interface Spike { site_id: string; yesterday: number; usual: number; ratio: number }
@@ -52,25 +56,26 @@ export function spikeSites(rows: VisitRow[], day: string): Spike[] {
 /** The words for one spike, for the owner's bell (the studio's bell adds the site's name). */
 export function spikeWords(sp: Spike, host: string | null): { headline: string; body: string } {
   return {
-    headline: `A busy day: ${sp.yesterday} visitors yesterday`,
+    headline: `A busy day: ${sp.yesterday} page views yesterday`,
     body: `That’s about ${sp.ratio} times a usual day${host ? ` for ${host}` : ''}. See where they came from on Analytics.`,
   };
 }
 
 /** The daily job. Yesterday in UTC; sites that are live and hosted here. */
-export async function runTrafficSpikes(limit = 200, nowIso = new Date().toISOString()): Promise<{ sites: number; spikes: number; truncated: boolean }> {
+export async function runTrafficSpikes(limit = 200, nowIso = new Date().toISOString()): Promise<{ sites: number; spikes: number; truncated: boolean; not_due?: boolean; read_failed?: boolean }> {
+  if (new Date(nowIso).getUTCHours() >= SPIKE_RUN_HOURS) return { sites: 0, spikes: 0, truncated: false, not_due: true };
   const day = daysBefore(dayOf(nowIso), 1);
   const sitesQ = await svc(`presence_sites?status=eq.live&edition=neq.monitor&client_id=not.is.null&select=id,client_id,custom_domain,netlify_site_id&order=last_published_at.desc.nullslast&limit=${limit}`);
   const sites = (Array.isArray(sitesQ.json) ? sitesQ.json : []) as Array<{ id: string; client_id: string; custom_domain: string | null; netlify_site_id: string | null }>;
   if (!sites.length) return { sites: 0, spikes: 0, truncated: false };
   const from = daysBefore(day, 7) + 'T00:00:00Z', to = day + 'T23:59:59.999Z';
   const ids = sites.map((s) => s.id).join(',');
-  const vq = await svc(`presence_visits?site_id=in.(${ids})&kind=eq.pageview&ts=gte.${from}&ts=lte.${to}&select=site_id,ts&order=ts.desc&limit=${VISITS_CAP}`);
-  const rows = (Array.isArray(vq.json) ? vq.json : []) as VisitRow[];
-  // past the cap the early days are missing, so "usual" would read too low and every
-  // site would look busy: say nothing rather than something wrong
-  const truncated = rows.length >= VISITS_CAP;
-  if (truncated) return { sites: sites.length, spikes: 0, truncated };
+  const vq = await svcPages(`presence_visits?site_id=in.(${ids})&kind=eq.pageview&ts=gte.${from}&ts=lte.${to}&select=site_id,ts`, 'ts', VISITS_PAGE, VISITS_PAGES);
+  // a failed page, or past the bound, means some days are missing, so "usual" would
+  // read wrong and ordinary days could look busy: say nothing rather than something wrong
+  if (!vq) return { sites: sites.length, spikes: 0, truncated: false, read_failed: true };
+  if (vq.truncated) return { sites: sites.length, spikes: 0, truncated: true };
+  const rows = vq.rows as VisitRow[];
   let spikes = 0;
   for (const sp of spikeSites(rows, day)) {
     const site = sites.find((s) => s.id === sp.site_id); if (!site) continue;
@@ -79,5 +84,5 @@ export async function runTrafficSpikes(limit = 200, nowIso = new Date().toISOStr
     const fresh = await raiseNotice({ siteId: site.id, clientId: site.client_id, kind: 'traffic_spike', period: `day:${day}`, headline: w.headline, body: w.body, push: false });
     if (fresh) spikes++;
   }
-  return { sites: sites.length, spikes, truncated };
+  return { sites: sites.length, spikes, truncated: false };
 }

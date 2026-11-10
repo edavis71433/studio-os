@@ -111,7 +111,7 @@ globalThis.fetch = async (url, init = {}) => {
   const eqs = Object.fromEntries([...u.searchParams.entries()].filter(([, v]) => v.startsWith('eq.')).map(([k, v]) => [k, v.slice(3)]));
   const row = () => ({ ...rowOf(table, eqs.id), ...(fixture.rows?.[table] || {}), ...eqs });
   if (method === 'GET') {
-    if (!seesAll || (fixture.only && !fixture.only.includes(table))) return reply([]);
+    if (!seesAll || (fixture.only && !fixture.only.includes(table)) || fixture.empty?.includes(table)) return reply([]);
     if (table === 'presence_publishes' && /status=(in\.\(queued|eq\.deploying|eq\.queued)/.test(query)) return reply([]);
     return reply([row()]);
   }
@@ -306,7 +306,7 @@ const CHANGED = [
   { name: 'DELETE /calendar/link', run: (r, p) => handleCalendarLink(r, A, p, cors) },
   { name: 'POST /email/log-address', run: (r, p) => handleEmailLogAddress(r, A, p, cors) },     // sales review item 69
   { name: 'DELETE /email/log-address', run: (r, p) => handleEmailLogAddress(r, A, p, cors) },
-  { name: 'PUT /report/monthly', body: { enabled: true }, run: (r, p) => handleReportPut(r, A, p, cors) },     // builder list item 58
+  { name: 'PUT /report/monthly', body: { note: 'A line for the client' }, run: (r, p) => handleReportPut(r, A, p, cors) },     // builder list item 58 (a line, not the switch: this stub answers every read with a row, which reads as a do-not-send entry)
   { name: 'POST /report/monthly/preview', fx: { only: ['clients'] }, run: (r, p) => handleReportPreview(A, p, cors) },   // with every read answering a row the address reads as suppressed; the send is the write
   { name: 'POST /site/offline', run: (r, p) => handleTakeOffline(A, p, cors) },
   { name: 'POST /site/online', fx: { site: { offline_at: '2026-01-01T00:00:00Z' } }, run: (r, p) => handleBackOnline(A, p, cors) },
@@ -352,8 +352,8 @@ const CHANGED = [
 // resolveSiteRole answers business_owner after a failed read. These routes used to ask
 // it directly, so one bad read made a staff member or a reviewer the owner.
 {
-  const failing = quiet(async (p, run) => {
-    reset();
+  const failing = quiet(async (p, run, fx) => {
+    reset(fx);
     failSeatReads = true;
     const out = await answer(await run(p));
     return { ...out, wrote: wrote() };
@@ -370,7 +370,8 @@ const CHANGED = [
   ok('failed read: staff can\'t set the brand kit', refused(await failing(seated('jwt-staff', 'business_staff'), kit)));
   ok('failed read: a reviewer can\'t archive a file', refused(await failing(seated('jwt-reviewer', 'client_reviewer'), status('archive'))));
   ok('failed read: a reviewer can\'t publish a file', refused(await failing(seated('jwt-reviewer', 'client_reviewer'), status('publish'))));
-  ok('failed read: a reviewer can still approve a file', (await failing(seated('jwt-reviewer', 'client_reviewer'), status('approve'))).status !== 403);
+  // on a client's own site (no service link names it as a studio's); a studio's shared site refuses reviewers (reviewer_shared_site_test)
+  ok('failed read: a reviewer can still approve a file', (await failing(seated('jwt-reviewer', 'client_reviewer'), status('approve'), { empty: ['presence_service_links'] })).status !== 403);
   ok('failed read: a developer keeps developer mode', (await failing(seated('jwt-dev', 'developer'), palette)).status === 200);
   ok('failed read: an owner seat keeps the look', (await failing(seated('jwt-coowner', 'business_owner'), template)).status === 200);
 
