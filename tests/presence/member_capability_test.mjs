@@ -20,6 +20,7 @@ for (const [k, v] of Object.entries({
   SUPABASE_URL: 'http://stub.local', SERVICE_ROLE_KEY: 'SERVICE-KEY', SUPABASE_ANON_KEY: 'ANON-KEY', SITE_URL: 'https://app.example',
   NETLIFY_AUTH_TOKEN: 'fake', AWS_ACCESS_KEY_ID: 'fake', AWS_SECRET_ACCESS_KEY: 'fake', AWS_REGION: 'us-east-1', ROUTE53_ENABLED: '1', DNS_ZONE_ENABLED: '1',
   RESEND_INBOUND_DOMAIN: 'reply.example.com',   // item 69: the log address needs a reply domain to be made
+  RESEND_KEY: 're_test_unused',   // builder list item 58: the report preview's send is the outside call that proves the owner reached it (the stub answers 404)
 })) Deno.env.set(k, v);
 
 const P = '../../supabase/functions/presence';
@@ -48,6 +49,7 @@ const { handleCalendarLink } = await import(`${P}/routes/calendar.ts`);
 const { handleEmailLogAddress } = await import(`${P}/routes/email_log.ts`);
 const { handleEstimateDelete } = await import(`${P}/routes/estimates.ts`);   // sales review item 47
 const { handleRecurringAction } = await import(`${P}/routes/recurring_invoices.ts`);
+const { handleReportPut, handleReportPreview } = await import(`${P}/ops/monthly_report.ts`);   // builder list item 58
 
 const ROOT = new URL('../../', import.meta.url);
 const read = (p) => Deno.readTextFileSync(new URL(p, ROOT));
@@ -143,6 +145,7 @@ const DECIDED = {
     'POST /preview/settings', 'POST /site/offline', 'POST /site/online', 'PUT /bookings/settings',
     'PUT /sales/contacts/fields', 'PUT /sales/stages', 'POST /calendar/link', 'DELETE /calendar/link',
     'POST /email/log-address', 'DELETE /email/log-address',
+    'PUT /report/monthly', 'POST /report/monthly/preview',   // builder list item 58
   ],
   approve: [
     'POST /approvals/:id/decide', 'POST /assets/:id/status', 'POST /client/approvals/:id/decide',
@@ -303,6 +306,8 @@ const CHANGED = [
   { name: 'DELETE /calendar/link', run: (r, p) => handleCalendarLink(r, A, p, cors) },
   { name: 'POST /email/log-address', run: (r, p) => handleEmailLogAddress(r, A, p, cors) },     // sales review item 69
   { name: 'DELETE /email/log-address', run: (r, p) => handleEmailLogAddress(r, A, p, cors) },
+  { name: 'PUT /report/monthly', body: { enabled: true }, run: (r, p) => handleReportPut(r, A, p, cors) },     // builder list item 58
+  { name: 'POST /report/monthly/preview', fx: { only: ['clients'] }, run: (r, p) => handleReportPreview(A, p, cors) },   // with every read answering a row the address reads as suppressed; the send is the write
   { name: 'POST /site/offline', run: (r, p) => handleTakeOffline(A, p, cors) },
   { name: 'POST /site/online', fx: { site: { offline_at: '2026-01-01T00:00:00Z' } }, run: (r, p) => handleBackOnline(A, p, cors) },
 ];
@@ -429,6 +434,7 @@ const WRITE_HANDLERS = [
   'handleSalesServices', 'handleSalesTemplateDelete', 'handleSalesStages', 'handleSalesTemplates', 'handleSalesViews', 'handleSavedReplies',
   'handleCalendarLink',   // sales review item 46: POST and DELETE /calendar/link need configure
   'handleEmailLogAddress',   // sales review item 69: POST and DELETE /email/log-address need configure
+  'handleReportPut', 'handleReportPreview',   // builder list item 58: PUT /report/monthly and its preview need configure
   // sales review item 47: estimates and recurring invoices (see DECIDED.edit and .delete)
   'handleEstimateCreate', 'handleEstimateSend', 'handleEstimateToProposal', 'handleEstimateToInvoice', 'handleEstimateDelete',
   'handleRecurringStart', 'handleRecurringChange', 'handleRecurringAction',
