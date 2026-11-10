@@ -291,3 +291,40 @@ test.describe('Home — after + Create (item 70)', () => {
     await expect.poll(() => reads.filter((p) => p === '/agency/needs-you').length).toBeGreaterThan(needs0);
   });
 });
+
+// ── Nov 10 review, bug hunt group A ──
+test.describe('Home: the bug hunt fixes (A5, A6, A13)', () => {
+  test('A5 — Skip waits while a Snooze saves; the snoozed row leaves and the next one is never lost', async ({ page }) => {
+    await installApp(page, { api: HOME });
+    await server(page);
+    let release: () => void = () => {};
+    const gate = new Promise<void>((r) => { release = r; });
+    await page.route(/\/functions\/v1\/presence\/agency\/needs-you\/snooze$/, async (route) => { await gate; return route.fallback(); });
+    await page.goto('/agency.html');
+    await page.locator('#goThrough').click();
+    const f = page.locator('#focusDlg');
+    await expect(f.locator('.fwhat')).toHaveText('Invoice $1,200 is overdue by 4 days.');
+    await f.locator('.fsnooze').click();
+    await f.locator('.fskip').click();                         // while the snooze is saving
+    await page.keyboard.press('ArrowRight');
+    await expect(f.locator('.fwhat')).toHaveText('Invoice $1,200 is overdue by 4 days.');
+    release();
+    await expect(f.locator('.fwhat')).toHaveText('New enquiry from Priya.');
+    await expect(f.locator('#fcount')).toContainText('1 of 5');
+  });
+
+  test('A13 — the opened-out list stays open when Home reads it again', async ({ page }) => {
+    const many = Array.from({ length: 11 }, (_, i) => ({ key: `notice:n${i}`, kind: 'notice', site_id: null, client_id: null, name: `Notice ${i + 1}`, what: 'answer a new review', when: '', verb: 'Open', href: '/inbox.html' }));
+    await installApp(page, { api: { ...HOME, '/agency/needs-you': needsYou(many) } });
+    await server(page);
+    await page.goto('/agency.html');
+    await expect(page.locator('#needs .row[data-need]')).toHaveCount(8);
+    await page.locator('#needsMore').click();
+    await expect(page.locator('#needs .row[data-need]')).toHaveCount(11);
+    const reread = page.waitForResponse((r) => /\/agency\/needs-you(\?|$)/.test(new URL(r.url()).pathname + new URL(r.url()).search));
+    await page.evaluate(() => window.dispatchEvent(new CustomEvent('dds:created', { detail: { kind: 'call' } })));
+    await reread;
+    await page.waitForTimeout(150);
+    await expect(page.locator('#needs .row[data-need]')).toHaveCount(11);
+  });
+});

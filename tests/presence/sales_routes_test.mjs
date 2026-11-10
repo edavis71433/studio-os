@@ -227,7 +227,7 @@ for (const p of ['agency.html', 'customers.html', 'contacts.html']) {
   ok(`${p}: the pricing box lives in CONNECT mode only (nothing is bought when the studio provisions)`, !/id="cu-signup"/.test(prov) && /id="cu-signup"/.test(conn) && /send them this to sign up/.test(conn));
   ok(`${p}: "Start from" kit select in provision mode (default "No kit — start empty")`, /id="cu-kit-wrap"/.test(prov) && /<select id="cu-kit"><option value="">No kit — start empty<\/option><\/select>/.test(prov));
   ok(`${p}: kits come from GET /agency/kits and apply to the NEW site via POST /agency/kits/:id/apply {site_id}`, /api\('\/agency\/kits'\)/.test(h) && /'\/agency\/kits\/'\+encodeURIComponent\(kitId\)\+'\/apply'/.test(h) && /\{site_id:d\.site_id\}/.test(h));
-  ok(`${p}: the done screen names the applied kit, and a kit never repaints the set-up as a failure`, /kitLine=k\.ok\?esc\(kitName\)\+' applied\.'/.test(h) && /id="cu-kit-line"/.test(h) && /if\(d\.already_exists\|\|d\.requested\)kitLine=/.test(h));
+  ok(`${p}: the done screen names the applied kit, and a kit never repaints the set-up as a failure`, /kitLine=kitOk\?esc\(kitName\)\+' applied\.'/.test(h) && /id="cu-kit-line"/.test(h) && /if\(d\.already_exists\|\|d\.requested\)kitLine=/.test(h));
   ok(`${p}: ${p === 'agency.html' ? 'the home always offers kits' : 'the kit field shows only for an agency (ddsContext.is_agency)'}`, p === 'agency.html' ? /async function cuIsAgency\(\)\{return true;\}/.test(h) : /return !!\(c&&c\.is_agency\)/.test(h));
 }
 {

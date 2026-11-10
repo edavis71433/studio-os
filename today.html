@@ -932,7 +932,7 @@ async function dismiss(id, btn){
       else { card.style.transition='opacity var(--dds-t-slow,320ms) var(--dds-ease,ease-out), transform var(--dds-t-slow,320ms) var(--dds-ease,ease-out)'; card.style.opacity='0'; card.style.transform='translateY(-6px)'; setTimeout(()=>card.remove(), 300); }
     }
   }
-  catch(_){ btn.disabled = false; }
+  catch(_){ btn.disabled = false; if(window.ddsToast) ddsToast('Couldn’t save that just now — try again in a moment.', 'err'); }   // bug hunt A14: a failed Dismiss or Done says so, like todoDone
 }
 // A lead_followup nudge the owner answered in the Inbox a moment ago clears here
 // at once (inbox.html leaves a 24-hour marker) — the server retires the notice on
@@ -960,7 +960,7 @@ async function dismissNotice(id, btn){
       else { row.style.transition='opacity var(--dds-t-base,200ms) var(--dds-ease,ease-out)'; row.style.opacity='0'; setTimeout(()=>row.remove(), 250); }
     }
   }
-  catch(_){ btn.disabled = false; }
+  catch(_){ btn.disabled = false; if(window.ddsToast) ddsToast('Couldn’t save that just now — try again in a moment.', 'err'); }   // bug hunt A14: a failed Dismiss or Done says so, like todoDone
 }
 // ── "Done" on a This-week row ────────────────────────────────────────────────
 // Clears the deal's next step through the EXISTING per-deal PATCH (the same
