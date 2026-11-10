@@ -2157,7 +2157,11 @@
   var pending = false;
   function schedule() { if (pending) return; pending = true; (window.requestAnimationFrame || setTimeout)(function () { pending = false; enhance(); }); }
   // Enter/Space activates a click-handler element (delegated → covers re-renders).
+  // An element that handles its own Enter/Space (a Pipeline card, a Files tile)
+  // calls preventDefault and has already acted — clicking it as well opened the
+  // card twice, and the second open took the focus-return target with it.
   document.addEventListener('keydown', function (e) {
+    if (e.defaultPrevented) return;
     if (e.key !== 'Enter' && e.key !== ' ' && e.key !== 'Spacebar') return;
     var t = e.target;
     if (!t || !t.matches) return;
