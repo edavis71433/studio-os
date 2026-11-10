@@ -620,6 +620,19 @@ async function openPhotos(){
   }));
   const first=d.querySelector('[data-pick]');if(first)first.focus();
 }
+// Files' "Use in an update" (bold redesign): ?photo=<id> puts that photo in the message
+// on a line of its own — only a shared, live image of the studio's own, the + Image
+// sheet's own rule; anything else says so and adds nothing
+async function takePhoto(){
+  const id=String(new URLSearchParams(location.search).get('photo')||'').toLowerCase();
+  if(!/^[0-9a-f-]{36}$/.test(id))return;
+  try{const u=new URL(location.href);u.searchParams.delete('photo');history.replaceState(null,'',u.toString());}catch(_){/* */}
+  let list;try{list=await loadPhotos();}catch(_){toast('Your photos couldn’t load just now — add it with + Image.');return;}
+  const a=list.find(x=>String(x.id).toLowerCase()===id);
+  if(!a){toast('That photo can’t go in an update — it may be private to a client or archived.');return;}
+  insertLine('!['+photoWords(a)+'](media:'+id+')');
+  toast('Your photo is in the message — write your update around it.');
+}
 function applyFormat(kind){
   const t=$('bodytx');if(!t)return;
   const a=t.selectionStart||0,b=t.selectionEnd||0,sel=t.value.slice(a,b);
@@ -809,7 +822,7 @@ async function load(soft){
 }
 (async function(){try{const{data}=await sb.auth.getSession();TOKEN=(data&&data.session&&data.session.access_token)||"";if(!TOKEN){signedOut();return;}
   ID_READY=api('/identity').then((r)=>{const d=r&&r.ok&&r.body&&r.body.data;if(!d)return;if(d.business_name)BIZ=String(d.business_name);const u=String(d.booking_url||'').trim();BOOK_URL=/^https:\/\/\S+$/i.test(u)?u:'';paintLive();}).catch(()=>{});   // best-effort: the live preview signs with it
-  await load();}catch(_){trouble();}})();
+  await load();takePhoto();}catch(_){trouble();}})();
 </script>
 </body>
 </html>
