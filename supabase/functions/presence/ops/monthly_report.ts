@@ -210,8 +210,10 @@ export async function readReportSetting(siteId: string): Promise<ReportSetting> 
   return normalizeReportSetting(await readReservedJson(siteId, RESERVED_NAMES.monthlyReport));
 }
 
-/** Compose and send one site's report for a window, to `to`. Replies go to the
- *  studio's Inbox: the studio's site is the reply home (review finding 1). */
+/** Compose and send one site's report for a window, to `to`. Replies belong to the
+ *  STUDIO's site: the reply door (routes/inbound_email.ts) admits a client only
+ *  through their link to the studio, so a reply address built from the client's
+ *  own site id would drop every reply as unknown (review finding 1). */
 export async function sendReport(site: SiteRow, win: ReturnType<typeof lastMonth>, setting: ReportSetting, to: string, opts: { preview?: boolean; clientName?: string | null } = {}): Promise<boolean> {
   const studio = await studioSiteOf(site.id);
   const [data, brand] = await Promise.all([loadReportData(site, win), studio ? loadEmailBrand(studio) : Promise.resolve(EMAIL_BRAND_DEFAULT)]);

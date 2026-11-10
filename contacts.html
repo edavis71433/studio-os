@@ -888,8 +888,11 @@ function openImport(){
   });
 }
 
-// Start a pipeline deal straight from a contact — no re-typing.
-async function newDeal(cid){
+// Start a pipeline deal straight from a contact — no re-typing. One at a time per
+// contact: a double-click on "New deal" used to make two deals.
+const NEWDEAL_BUSY=new Set();
+async function newDeal(cid){if(NEWDEAL_BUSY.has(cid))return;NEWDEAL_BUSY.add(cid);try{await newDealOnce(cid);}finally{NEWDEAL_BUSY.delete(cid);}}
+async function newDealOnce(cid){
   const c=findRow(cid);if(!c)return;
   const title=(c.name||c.company||c.email||'New')+' — project';
   try{

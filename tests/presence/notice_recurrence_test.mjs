@@ -89,6 +89,7 @@ const TERMINAL_OK = [
   // marker in the period expr → why once-per-key is HONEST for it
   { kind: 'publish_failed', marker: 'pub:', why: 'each publish attempt has its own pubId — a new failure is a new event id' },
   { kind: 'deal_followup', marker: 'invoiceReminderPeriod(', why: 'invremind:<id>:<leg> — an invoice settles exactly once (paid or voided); each of the three legs (−7 · due · +N) sends once by design (Oct 2026 studio audit, change 10)' },
+  { kind: 'deal_followup', marker: 'recuremail:', why: 'one row per invoice DATE whose email failed; that invoice is resent by hand, and next month’s has a new date, so a new key' },
   { kind: 'deal_followup', marker: 'remind:', why: 'the unsigned-doc reminder is deliberately once-ever (a silent ledger row)' },
   { kind: 'deal_followup', marker: 'declined:', why: 'a proposal is declined once; period is per-deal — see the adjacent-finding note' },
   { kind: 'deal_signed', marker: '${event}:', why: 'signing/acceptance is terminal per deal; the clear (convert) is terminal too' },

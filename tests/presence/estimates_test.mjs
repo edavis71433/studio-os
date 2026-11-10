@@ -286,5 +286,23 @@ const before0145 = (fn) => async (...a) => {
   ok('12: …and Start asks for Stripe first', start.status === 503 && /Connect Stripe/.test(start.body.message));
 }
 
+// ═══ 13. the first proposal or invoice is gone: the second one is real (full review Nov 10, F3) ═══
+{
+  world({ presence_estimates: [sentEstimate({ status: 'approved' })] });
+  const first = await res(await ES.handleEstimateToProposal(req('POST', '/x', {}), site, owner, EST, cors));
+  db.tables.presence_proposals[0].deleted_at = new Date().toISOString();
+  const second = await res(await ES.handleEstimateToProposal(req('POST', '/x', {}), site, owner, EST, cors));
+  const live = db.tables.presence_proposals.filter((p) => !p.deleted_at);
+  ok('13: after the first proposal was deleted, the next press makes one that stays', second.status === 201 && live.length === 1 && live[0].id !== first.body.data.id && est().proposal_id === live[0].id, JSON.stringify(second.body));
+  const third = await res(await ES.handleEstimateToProposal(req('POST', '/x', {}), site, owner, EST, cors));
+  ok('13: …and pressing again returns that one', third.status === 200 && third.body.already === true && third.body.data.id === live[0].id);
+  world({ presence_estimates: [sentEstimate({ status: 'approved' })], presence_deals: [{ id: DEAL, site_id: SITE, title: 'Blue Finch Café website', stage: 'won', contact_id: CT }] });
+  const inv1 = await res(await ES.handleEstimateToInvoice(req('POST', '/x', {}), site, owner, EST, cors));
+  db.tables.presence_invoices[0].deleted_at = new Date().toISOString();
+  const inv2 = await res(await ES.handleEstimateToInvoice(req('POST', '/x', {}), site, owner, EST, cors));
+  const liveInv = db.tables.presence_invoices.filter((v) => !v.deleted_at);
+  ok('13: the same for an invoice that was deleted', inv2.status === 201 && liveInv.length === 1 && liveInv[0].id !== inv1.body.data.id && est().invoice_id === liveInv[0].id, JSON.stringify(inv2.body));
+}
+
 console.log(`\n════ ESTIMATES (routes): ${pass}/${pass + fail} ${fail ? 'FAILED' : 'PASSED'} ════`);
 if (fail) Deno.exit(1);
