@@ -232,7 +232,8 @@
       <button type="button" class="sw" role="switch" id="sw-report" aria-checked="false" aria-labelledby="sw-report-l"></button>
       <div class="t"><b id="sw-report-l">Send this client a monthly report</b>
         <div class="how">In the first days of each month: visitors and pages viewed, enquiries, the pages people read most, and what changed. Sent to the email on their record, from your studio, with a reply address that reaches you.</div>
-        <div class="how" id="reportLast"></div></div>
+        <div class="how" id="reportLast"></div>
+        <div class="how" id="reportWarn" role="status" hidden style="color:var(--bad,#b3261e)"></div></div>
     </div>
     <div class="swrow" style="display:block">
       <b style="font-weight:600">A line from you</b>
@@ -716,8 +717,22 @@ function paintReport() {
   const d = REPORT || {};
   $('sw-report').setAttribute('aria-checked', d.enabled ? 'true' : 'false');
   if (document.activeElement !== $('report-note')) $('report-note').value = d.note || '';
-  const last = d.last_month ? 'Last sent: the ' + monthWords(d.last_month) + ' report.' : (d.enabled ? 'Nothing sent yet; the first report goes out in the first days of next month.' : '');
-  $('reportLast').textContent = last;
+  $('reportLast').textContent = reportStatusLine(d);
+  // Nov 2026 review (finding 2): a client who can't be emailed is said so on the card, never a silent "On"
+  const warn = d.blocked ? 'This client can’t get the report: ' + (REPORT_BLOCK_WORDS[d.blocked] || 'they can’t be emailed') + '.' + (d.blocked === 'no_email' ? ' Add their email on their record.' : '') : '';
+  $('reportWarn').textContent = warn; $('reportWarn').hidden = !warn;
+}
+const REPORT_BLOCK_WORDS = { no_email: 'there’s no email on their record', unsubscribed: 'they unsubscribed from emails', bounced: 'emails to them bounce' };
+// what happened last, in words: sent, skipped (why) or failed; `last_month` alone only means "handled"
+function reportStatusLine(d) {
+  const r = d.last_result;
+  if (r && r.month) {
+    const m = monthWords(r.month);
+    if (r.status === 'sent') return 'Last sent: the ' + m + ' report.';
+    if (r.status === 'skipped') return 'The ' + m + ' report wasn’t sent: ' + (REPORT_BLOCK_WORDS[r.reason] || 'they couldn’t be emailed') + '.';
+    if (r.status === 'failed') return 'The ' + m + ' report didn’t go out after three tries. The next one goes out as usual.';
+  }
+  return d.enabled ? 'Nothing sent yet; the first report goes out in the first days of next month.' : '';
 }
 function monthWords(ym) { const m = /^(\d{4})-(\d{2})$/.exec(String(ym || '')); if (!m) return ym; return new Date(Date.UTC(+m[1], +m[2] - 1, 1)).toLocaleDateString('en-US', { month: 'long', year: 'numeric', timeZone: 'UTC' }); }
 async function saveReport(patch, undo) {
@@ -725,7 +740,7 @@ async function saveReport(patch, undo) {
   const r = await api('/report/monthly', 'PUT', patch);
   REPORT_BUSY = false;
   if (!r.ok) { if (undo) undo(); toast(nice(r.body, 'That didn’t save — nothing was changed.'), true); return false; }
-  REPORT = r.body.data || { ...(REPORT || {}), ...patch }; paintReport();
+  REPORT = { ...(REPORT || {}), ...(r.body.data || patch) }; paintReport();   // keeps `blocked`, which only GET answers
   return true;
 }
 function wireReport() {

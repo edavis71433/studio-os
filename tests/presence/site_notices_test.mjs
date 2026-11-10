@@ -34,7 +34,7 @@ ok('three earlier days are enough, and quiet days count as zero', (() => { const
 ok('views outside the eight days are ignored', spikeSites(rows('g', { '2026-10-20': 500, ...usual, [DAY]: 25 }), DAY).length === 0);
 ok('the busiest spike comes first', (() => { const s = spikeSites(rows('h', { ...usual, [DAY]: 90 }).concat(rows('i', { ...usual, [DAY]: 35 })), DAY); return s.map((x) => x.site_id).join() === 'h,i'; })());
 const w = spikeWords(spikes[0], 'bacchus.example');
-ok('the words name the number, the ratio and the site', w.headline === 'A busy day: 40 visitors yesterday' && /about 4 times a usual day for bacchus\.example/.test(w.body) && /Analytics/.test(w.body));
+ok('the words name the number, the ratio and the site', w.headline === 'A busy day: 40 page views yesterday' && /about 4 times a usual day for bacchus\.example/.test(w.body) && /Analytics/.test(w.body));
 ok('without a host the words still read', !/for $/.test(spikeWords(spikes[0], null).body));
 
 // the kinds
@@ -47,7 +47,7 @@ const NOW = '2026-11-10T09:00:00.000Z';
 const names = { s1: 'Bacchus Kitchen', s2: 'Harbor Dental' };
 const notices = [
   { id: 'n1', site_id: 's1', kind: 'site_published', period: 'pub:p1', headline: 'Published 3 changes', body: 'The website is live with the latest changes.', created_at: '2026-11-09T20:00:00Z' },
-  { id: 'n2', site_id: 's2', kind: 'traffic_spike', period: 'day:2026-11-09', headline: 'A busy day: 48 visitors yesterday', body: 'About 3 times a usual day.', created_at: '2026-11-10T06:00:00Z' },
+  { id: 'n2', site_id: 's2', kind: 'traffic_spike', period: 'day:2026-11-09', headline: 'A busy day: 48 page views yesterday', body: 'About 3 times a usual day.', created_at: '2026-11-10T06:00:00Z' },
   { id: 'n3', site_id: 's1', kind: 'lead_followup', period: 'lead:x', headline: 'An enquiry is waiting', body: '', created_at: '2026-11-10T07:00:00Z' },   // an ask: Needs you has it
   { id: 'n4', site_id: 's1', kind: 'site_published', period: 'pub:old', headline: 'Published', body: '', created_at: '2026-10-01T00:00:00Z' },   // too old
   { id: 'n5', site_id: 'zz', kind: 'site_published', period: 'pub:p9', headline: 'Published', body: '', created_at: '2026-11-10T08:00:00Z' },   // not a client here

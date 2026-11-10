@@ -748,7 +748,7 @@ test.describe('item 47 — news per client site in the studio bell', () => {
       more: 0, rest: [], total: 1, snoozed: [], old: { count: 0, items: [] }, empty_line: '', partial: false, own_site: true, update_notices: [], snooze_ready: true,
       next_by_site: {}, next_by_client: {},
       news: [
-        { id: 'n2', site_id: 's2', name: 'Harbor Dental', kind: 'traffic_spike', headline: 'A busy day: 48 visitors yesterday', body: 'That’s about 3 times a usual day for harbordental.example. See where they came from on Analytics.', at: '2026-11-10T06:00:00Z', href: '/analytics.html?client=s2', tier: 'update' },
+        { id: 'n2', site_id: 's2', name: 'Harbor Dental', kind: 'traffic_spike', headline: 'A busy day: 48 page views yesterday', body: 'That’s about 3 times a usual day for harbordental.example. See where they came from on Analytics.', at: '2026-11-10T06:00:00Z', href: '/analytics.html?client=s2', tier: 'update' },
         { id: 'n1', site_id: 's1', name: 'Bacchus Kitchen', kind: 'site_published', headline: 'Published 3 changes', body: 'The website is live with the latest changes. Open it to see them.', at: '2026-11-09T20:00:00Z', href: '/presence.html?client=s1', tier: 'update' },
       ],
     } };
@@ -759,7 +759,7 @@ test.describe('item 47 — news per client site in the studio bell', () => {
     await expect(pop).toBeVisible();
     // the ask first (Needs you), then the news per site, each named
     await expect(pop.locator('.row').first()).toContainText('Bacchus Kitchen — an enquiry is waiting for a reply');
-    const spike = pop.locator('.row', { hasText: 'Harbor Dental — A busy day: 48 visitors yesterday' });
+    const spike = pop.locator('.row', { hasText: 'Harbor Dental — A busy day: 48 page views yesterday' });
     await expect(spike).toHaveAttribute('href', '/analytics.html?client=s2');
     await expect(spike).toHaveAttribute('data-tier', 'update');
     await expect(spike).toContainText('3 times a usual day');
