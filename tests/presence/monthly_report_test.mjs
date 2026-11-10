@@ -48,6 +48,9 @@ ok('a capped read is marked', foldReport({ month: nov.month, label: nov.label, s
 const missing = foldReport({ month: nov.month, label: nov.label, startMs, endMs, visits: null, enquiries: null, publishes: null, address: '', visitsCap: 5000 });
 ok('a read that failed is null, not zero', missing.visitors === null && missing.pageviews === null && missing.enquiries === null && missing.publishes === null && missing.topPages.length === 0);
 
+// the reply address (full review Nov 10, D1): the STUDIO's site, so the reply door lets the client in
+ok('a reply to the report reaches the studio, not the client’s own site', /siteId: studio \|\| site\.id/.test(read('supabase/functions/presence/ops/monthly_report.ts')) && !/siteId: site\.id \}\);/.test(read('supabase/functions/presence/ops/monthly_report.ts')));
+
 // the words
 const full = reportHtml(d, { studioName: 'Davis Digital Studio', note: 'Thanks for a great month.\nThe new photos are working.', clientName: 'Marlow’s Kitchen' });
 ok('the subject names the month', full.subject === 'Your website in October 2026');

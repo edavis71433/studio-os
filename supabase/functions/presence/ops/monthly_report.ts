@@ -132,10 +132,6 @@ async function studioSiteOf(siteId: string): Promise<string | null> {
     return Array.isArray(l.json) && l.json[0]?.agency_site_id ? String(l.json[0].agency_site_id) : null;
   } catch { return null; }
 }
-async function brandFor(site: SiteRow): Promise<EmailBrand> {
-  const studio = await studioSiteOf(site.id);
-  return studio ? await loadEmailBrand(studio) : EMAIL_BRAND_DEFAULT;
-}
 async function clientOf(site: SiteRow): Promise<{ email: string | null; name: string | null }> {
   if (!site.client_id) return { email: null, name: null };
   const c = await svc(`clients?id=eq.${encodeURIComponent(site.client_id)}&select=email,name&limit=1`).catch(() => ({ json: [] as unknown[] }));
@@ -149,11 +145,15 @@ export async function readReportSetting(siteId: string): Promise<ReportSetting> 
 
 /** Compose and send one site's report for a window; to the client unless `to` says otherwise. */
 export async function sendReport(site: SiteRow, win: ReturnType<typeof lastMonth>, setting: ReportSetting, to?: string | null, preview = false): Promise<boolean> {
-  const [data, brand, client] = await Promise.all([loadReportData(site, win), brandFor(site), clientOf(site)]);
+  // Replies belong to the STUDIO's site: the reply door (routes/inbound_email.ts)
+  // admits a client only through their link to the studio, so a reply address
+  // built from the client's own site id would drop every reply as unknown.
+  const [data, studio, client] = await Promise.all([loadReportData(site, win), studioSiteOf(site.id), clientOf(site)]);
+  const brand = studio ? await loadEmailBrand(studio) : EMAIL_BRAND_DEFAULT;
   const addr = to || client.email;
   if (!addr) return false;
   const { subject, html } = reportHtml(data, { studioName: brand.name, note: setting.note, clientName: client.name });
-  return await sendEmail(addr, preview ? `[Preview] ${subject}` : subject, html, brand, { siteId: site.id });
+  return await sendEmail(addr, preview ? `[Preview] ${subject}` : subject, html, brand, { siteId: studio || site.id });
 }
 
 /** The monthly job: on the first days of a month, every switched-on client site that
