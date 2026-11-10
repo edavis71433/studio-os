@@ -22,7 +22,7 @@ import { moneyState, moneyBuckets } from '../lib/money_state.ts';
 import { buildMyTasks, MY_TASKS_MAX } from '../lib/my_tasks.ts';
 import { revenueByMonth, dealsByStage, wonAndLost, enquiriesBySource, overdueInvoices, OPEN_STAGES as REPORT_OPEN_STAGES } from '../lib/sales_reports.ts';
 import { normalizeViews, normalizeViewList, isViewList } from '../lib/saved_views.ts';
-import { readReservedJson, readReservedJsonOrThrow, writeReservedJson, updateReservedJson, RESERVED_NAMES } from '../lib/reserved_store.ts';
+import { readReservedJsonOrThrow, writeReservedJson, updateReservedJson, RESERVED_NAMES } from '../lib/reserved_store.ts';
 import { normalizeStageNames, stageLabels, loadStageLabels, forgetStageLabels, renameMovedTo, DEFAULT_STAGE_LABEL, normalizeStageChances, stageChances, loadStageChances, forgetStageChances, expectedValue, DEFAULT_STAGE_CHANCE } from '../lib/stage_names.ts';
 import { validateRetainerInput, mergeRetainerState, type RetainerState } from '../commerce/retainers.ts';
 import { editionFor } from '../commerce/catalog.ts';
@@ -50,6 +50,7 @@ import { summarizeAttachments, attachmentWarning, duplicateHints, listSentence }
 import type { SiteRow } from '../lib/site.ts';
 import type { Principal } from '../../_shared/auth.ts';
 import { UUID_RE } from '../lib/uuid.ts';
+import { reopenEnquiry } from '../lib/enquiry_state.ts';
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;                       // expected_close: ISO date only
 const CONVERT_PLANS = new Set(['presence', 'cms_only', 'business_os_only', 'presence_monitor', 'presence_managed']);
@@ -347,8 +348,15 @@ export async function handleSalesContactFields(req: Request, site: SiteRow, prin
 export async function handleSalesStages(req: Request, site: SiteRow, principal: Principal, cors: Record<string, string>): Promise<Response> {
   const payload = (custom: Record<string, string>, chancesCustom: Record<string, number>) =>
     ({ labels: stageLabels(custom), custom, defaults: DEFAULT_STAGE_LABEL, chances: stageChances(chancesCustom), chance_defaults: DEFAULT_STAGE_CHANCE });
+  // bug hunt C4: a read that failed is not "nothing renamed, every percent as usual" —
+  // the page showed the defaults, and the next save wrote them over the real ones. Both
+  // reads are strict: the GET says it couldn't load (Settings then hides the blocks),
+  // and a PUT that can't read the half it keeps saves nothing.
+  const readBoth = () => Promise.all([readReservedJsonOrThrow(site.id, RESERVED_NAMES.stageNames), readReservedJsonOrThrow(site.id, RESERVED_NAMES.stageChances)]);
   if (req.method === 'GET') {
-    const [names, chances] = await Promise.all([readReservedJson(site.id, RESERVED_NAMES.stageNames), readReservedJson(site.id, RESERVED_NAMES.stageChances)]);
+    let names: unknown, chances: unknown;
+    try { [names, chances] = await readBoth(); }
+    catch { return json({ error: 'read_failed', message: 'Your deal stages couldn’t load just now.' }, 502, cors); }
     return json({ data: payload(normalizeStageNames(names), normalizeStageChances(chances)) }, 200, cors);
   }
   if (req.method === 'PUT') {
@@ -356,7 +364,9 @@ export async function handleSalesStages(req: Request, site: SiteRow, principal: 
     const by = principal.email || principal.userId || 'system';
     const hasNames = !!b && typeof b === 'object' && 'names' in b, hasChances = !!b && typeof b === 'object' && 'chances' in b;
     if (!hasNames && !hasChances) return json({ error: 'validation', message: 'Nothing to save.' }, 422, cors);
-    const [curNames, curChances] = await Promise.all([readReservedJson(site.id, RESERVED_NAMES.stageNames), readReservedJson(site.id, RESERVED_NAMES.stageChances)]);
+    let curNames: unknown, curChances: unknown;
+    try { [curNames, curChances] = await readBoth(); }
+    catch { return json({ error: 'read_failed', message: 'Your deal stages couldn’t be read just now, so nothing was saved. Please try again.' }, 502, cors); }
     const custom = hasNames ? normalizeStageNames(b.names) : normalizeStageNames(curNames);
     const chancesCustom = hasChances ? normalizeStageChances(b.chances) : normalizeStageChances(curChances);
     const okNames = hasNames ? await writeReservedJson(site.id, RESERVED_NAMES.stageNames, custom, by) : true;
@@ -1030,6 +1040,9 @@ export async function handleSalesDeal(req: Request, site: SiteRow, principal: Pr
     // lib/notice.ts dealFollowupPeriod), so the clear is PREFIX-based — every
     // bucket at once — plus the pre-bucket legacy exact key.
     if (site.client_id) { await clearNoticePrefix(site.client_id, 'deal_followup', dealFollowupPeriodPrefix(id)); await clearNotice(site.client_id, 'deal_followup', dealFollowupLegacyPeriod(id)); }
+    // bug hunt C5: the website enquiry it came from said "In pipeline — view deal" for
+    // ever, with nothing to open; it goes back to the queue (a customer's stays theirs)
+    if (deal.source_submission_id) await reopenEnquiry(site.id, deal.source_submission_id);
     return json({ data: { ok: true, deleted: true } }, 200, cors);
   }
   return json({ error: 'method_not_allowed' }, 405, cors);

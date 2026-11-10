@@ -388,6 +388,11 @@ export function studioLevelFeed<T extends { notices: any[]; moments: any[]; pend
   return { ...d, notices: (d.notices || []).filter((n) => !STUDIO_WEBSITE_NOTICE_KINDS.has(String(n?.kind ?? ''))), moments: [], pending_approvals: [] };
 }
 
+/** What the feed hands the Inbox, at most: the newest FEED_ENQUIRIES new enquiries,
+ *  the newest FEED_CONVERSATIONS conversations, and the first FEED_MESSAGE_CHARS of an
+ *  enquiry's message. `enquiries_more` / `client_messages_more` / `message_cut` say
+ *  when something was left out, so the Inbox can say so (bug hunt C2, C15). */
+export const FEED_ENQUIRIES = 50, FEED_CONVERSATIONS = 20, FEED_MESSAGE_CHARS = 400;
 /** The feed's rows — the Inbox, the bell panel and the studio's Needs-you list
  *  all read this one builder. */
 export async function buildPortalFeed(jwt: string, site: SiteRow, principal: Principal): Promise<any> {
@@ -421,7 +426,8 @@ export async function buildPortalFeed(jwt: string, site: SiteRow, principal: Pri
     // row so the bell + Inbox surface them like every other needs-you item.
     // Slice 2 widened the select (additive): the same read also feeds the per-lead
     // `enquiries` rows the Inbox list pane renders — never a second query.
-    seesFull ? svc(`presence_form_submissions?site_id=eq.${site.id}&spam=eq.false&status=eq.new&select=id,form_kind,name,email,phone,message,status,created_at&order=created_at.desc&limit=50`) : noEnq,
+    // (one past FEED_ENQUIRIES, so the Inbox can say when the list stops short; bug hunt C15)
+    seesFull ? svc(`presence_form_submissions?site_id=eq.${site.id}&spam=eq.false&status=eq.new&select=id,form_kind,name,email,phone,message,status,created_at&order=created_at.desc&limit=${FEED_ENQUIRIES + 1}`) : noEnq,
     // bridged-customer links (owner-only; the unread reads that DEPEND on them stay below)
     seesFull && site.client_id ? svc(`presence_service_links?customer_client_id=eq.${site.client_id}&status=eq.active&select=project_id,agency_site_id&limit=50`).catch(swallow) : noEnq,
     // FIX 5 inputs: open support requests + client message events (owner-only, best-effort).
@@ -495,7 +501,7 @@ export async function buildPortalFeed(jwt: string, site: SiteRow, principal: Pri
   // so one submission never stacks two rows. (inbox.html renders per-lead detail
   // from /forms/inbox and filters this aggregate kind to avoid a double listing.)
   if (seesFull) {
-    const newEnquiries = freshEnquiries((((enqQ.ok && enqQ.json) || []) as any[]).length, notices);
+    const newEnquiries = freshEnquiries(Math.min((((enqQ.ok && enqQ.json) || []) as any[]).length, FEED_ENQUIRIES), notices);
     if (newEnquiries > 0) notices.unshift({
       id: 'new-enquiries', kind: 'website_enquiry', period: null, dismissible: false, tier: 'needs_you', priority: false,
       headline: newEnquiries === 1 ? 'A new enquiry came in' : `${newEnquiries} new enquiries came in`,
@@ -558,7 +564,7 @@ export async function buildPortalFeed(jwt: string, site: SiteRow, principal: Pri
   // never clears them — an OPEN support request persists until resolved, and a
   // client message persists until the studio actually replies (the latest message
   // in the thread is no longer the client's). Owner/operator surfaces only.
-  let client_messages: any[] = [];
+  let client_messages: any[] = [], client_messages_more = false;
   if (seesFull) {
     try {
       // supR + evR landed in the initial wave above.
@@ -591,6 +597,13 @@ export async function buildPortalFeed(jwt: string, site: SiteRow, principal: Pri
         } catch { supClientAt = null; }
       }
       const supWhen = (r: any): string => supportActivityAt(r, supAnyAt[String(r.id)] || null) || String(r.updated_at || '');
+      // bug hunt C10: an open request the studio has answered is open, but no longer
+      // waiting for a reply — the Inbox's Needs reply goes by whose word was last
+      const supNeedsReply = (r: any): boolean => {
+        if (!supClientAt) return true;   // the messages read failed → as before
+        const last = supAnyAt[String(r.id)] || '';
+        return !last || supLatestClient(r) >= last;
+      };
       const supLatestClient = (r: any): string => {
         if (!supClientAt) return String(r.updated_at || '');   // read failed → today's behavior
         const reply = supClientAt[String(r.id)] || '';
@@ -663,10 +676,11 @@ export async function buildPortalFeed(jwt: string, site: SiteRow, principal: Pri
       // NAME. Stamping the id makes the lens whole. Purely additive: the page
       // falls back to matching a support row by project name when this is absent
       // (an older function build), so neither deploy order drops a row.
-      for (const r of sup) { const pid = r.project_id ? String(r.project_id) : ''; const c = clientFor(pid, String(r.requester || ''), r.client_id ? String(r.client_id) : ''); const profilePid = pid || (c.client_id ? clientToProject[c.client_id] || '' : ''); const tk = `support:${r.id}`; client_messages.push({ type: 'support', id: r.id, subject: String(r.subject || 'Support request').slice(0, 120), status: String(r.status || 'open'), priority: String(r.priority || 'normal'), assigned_to: r.assigned_to ? String(r.assigned_to) : null, project: pid ? (projById[pid]?.name || '') : '', project_id: pid, client_id: c.client_id, client: c.client || owners.nameOf[String(r.id)] || owners.emailOf[String(r.id)] || '', created_at: supWhen(r), thread_key: tk, unread: threadUnread(supLatestClient(r), markFor(tk), true), href: profilePid ? `/crm.html?project=${profilePid}&tab=messages` : `/projects.html?support=${r.id}` }); }
+      for (const r of sup) { const pid = r.project_id ? String(r.project_id) : ''; const c = clientFor(pid, String(r.requester || ''), r.client_id ? String(r.client_id) : ''); const profilePid = pid || (c.client_id ? clientToProject[c.client_id] || '' : ''); const tk = `support:${r.id}`; client_messages.push({ type: 'support', id: r.id, subject: String(r.subject || 'Support request').slice(0, 120), status: String(r.status || 'open'), priority: String(r.priority || 'normal'), assigned_to: r.assigned_to ? String(r.assigned_to) : null, project: pid ? (projById[pid]?.name || '') : '', project_id: pid, client_id: c.client_id, client: c.client || owners.nameOf[String(r.id)] || owners.emailOf[String(r.id)] || '', created_at: supWhen(r), thread_key: tk, unread: threadUnread(supLatestClient(r), markFor(tk), true), needs_reply: supNeedsReply(r), href: profilePid ? `/crm.html?project=${profilePid}&tab=messages` : `/projects.html?support=${r.id}` }); }
       for (const [pid, cv] of convo) { const c = clientFor(pid, ''); const needsReply = cv.needsReply; const tk = c.client_id ? `client:${c.client_id}` : `client:${pid}`; client_messages.push({ type: 'message', project: projById[pid]?.name || '', project_id: pid, client_id: c.client_id, client: c.client, created_at: cv.latest.created_at, needs_reply: needsReply, count: cv.count, thread_key: tk, unread: threadUnread(cv.latestClientAt, markFor(tk), needsReply), href: `/crm.html?project=${pid}&tab=messages` }); }
       client_messages.sort((a, b) => String(b.created_at).localeCompare(String(a.created_at)));
-      client_messages = client_messages.slice(0, 20).map((r) => ({ ...r, tier: (r.type === 'support' ? (r.status === 'open' || r.status === 'in_progress') : !!r.needs_reply) ? 'needs_you' : 'update', priority: false }));
+      client_messages_more = client_messages.length > FEED_CONVERSATIONS;   // C15: the Inbox says it shows the newest only
+      client_messages = client_messages.slice(0, FEED_CONVERSATIONS).map((r) => ({ ...r, tier: (r.type === 'support' ? (r.status === 'open' || r.status === 'in_progress') : !!r.needs_reply) ? 'needs_you' : 'update', priority: false }));
     } catch { /* best-effort — the inbox still renders without this section */ }
   }
   // Slice 2 (additive): per-lead rows so the Inbox list pane renders its Enquiries
@@ -678,15 +692,18 @@ export async function buildPortalFeed(jwt: string, site: SiteRow, principal: Pri
   // authoritative "no leads" and the Inbox would hide enquiries its own
   // /forms/inbox fetch still sees. Absent key → the frontend's Array.isArray
   // gate falls back to that fetch (deploy-order tolerance, both directions).
-  let enquiries: any[] | undefined = [];
+  let enquiries: any[] | undefined = [], enquiries_more = false;
   if (seesFull) {
     try {
+      enquiries_more = ((enqQ as any).ok && Array.isArray((enqQ as any).json)) && ((enqQ as any).json as any[]).length > FEED_ENQUIRIES;
       enquiries = ((enqQ as any).ok && Array.isArray((enqQ as any).json))
-        ? (((enqQ as any).json) as any[]).map((f) => {
+        ? (((enqQ as any).json) as any[]).slice(0, FEED_ENQUIRIES).map((f) => {
           const tk = `lead:${f.id}`;
           return {
             id: f.id, form_kind: String(f.form_kind || 'contact'), name: String(f.name || ''), email: String(f.email || ''),
-            phone: String(f.phone || ''), message: String(f.message || '').slice(0, 400), status: String(f.status || 'new'),
+            // bug hunt C2: the first FEED_MESSAGE_CHARS only, and a word when there is more
+            // (the Inbox keeps the queue's whole message; this is for when that read failed)
+            phone: String(f.phone || ''), message: String(f.message || '').slice(0, FEED_MESSAGE_CHARS), message_cut: String(f.message || '').length > FEED_MESSAGE_CHARS, status: String(f.status || 'new'),
             created_at: f.created_at, thread_key: tk, unread: threadUnread(String(f.created_at || ''), markFor(tk), true),
             tier: String(f.status || 'new') === 'new' ? 'needs_you' : 'update', priority: false,
           };
@@ -694,7 +711,7 @@ export async function buildPortalFeed(jwt: string, site: SiteRow, principal: Pri
         : undefined;
     } catch { enquiries = undefined; /* best-effort — the feed still works without the rows */ }
   }
-  const data = { role, moments, notices, pending_approvals: pending, last_published: last, client_messages, enquiries };
+  const data = { role, moments, notices, pending_approvals: pending, last_published: last, client_messages, enquiries, client_messages_more, enquiries_more };
   // studio level = an agency member on their own site, not drilled in
   if (seesFull && !principal.scope) {
     const member = await resolveAgencyMember(jwt).catch(() => null);

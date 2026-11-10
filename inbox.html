@@ -432,7 +432,10 @@ function replyReach(it){
 }
 let TOKEN="";
 sb.auth.onAuthStateChange(function(_e,s){if(s&&s.access_token)TOKEN=s.access_token;}); // keep token fresh (auto-refresh)
-async function api(path,method,body){const r=await fetch(FN+path,{method:method||'GET',headers:{'Content-Type':'application/json','Authorization':'Bearer '+SUPABASE_KEY,'x-dds-user-jwt':TOKEN,'x-dds-scope-site':(new URLSearchParams(location.search).get('client')||'')},body:body?JSON.stringify(body):undefined});return{ok:r.ok,status:r.status,body:await r.json().catch(()=>({}))};}
+// a dropped connection answers like a refusal (status 0) instead of throwing, so a
+// greyed Send, Save or status control gets its button back and says why (bug hunt C6)
+const NET_MSG='That didn’t go through — check your connection and try again.';
+async function api(path,method,body){let r;try{r=await fetch(FN+path,{method:method||'GET',headers:{'Content-Type':'application/json','Authorization':'Bearer '+SUPABASE_KEY,'x-dds-user-jwt':TOKEN,'x-dds-scope-site':(new URLSearchParams(location.search).get('client')||'')},body:body?JSON.stringify(body):undefined});}catch(_){return{ok:false,status:0,body:{message:NET_MSG}};}return{ok:r.ok,status:r.status,body:await r.json().catch(()=>({}))};}
 function when(iso){if(!iso)return'';const d=Math.floor((Date.now()-Date.parse(iso))/86400000);if(d<=0)return'today';if(d===1)return'yesterday';if(d<7)return d+' days ago';if(d<60){const w=Math.floor(d/7);return w+(w===1?' week':' weeks')+' ago';}const mo=Math.floor(d/30);return mo+(mo===1?' month':' months')+' ago';}
 // ── one icon set (Oct 2026 experience review): the shell's 2px-stroke SVGs, never an emoji as a control's icon ──
 const SI={cog:'<circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1L7 17M17 7l2.1-2.1"/>',eye:'<path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6S2 12 2 12z"/><circle cx="12" cy="12" r="3"/>',sparkles:'<path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8z"/><path d="M19 17l.7 2 2 .7-2 .7-.7 2-.7-2-2-.7 2-.7z"/>',inbox:'<path d="M3 13l2-8h14l2 8v6H3z"/><path d="M3 13h5l1.5 3h5L16 13h5"/>',message:'<path d="M21 12a8 8 0 0 1-8 8H8l-5 3 1.5-4.5A8 8 0 1 1 21 12z"/>',mail:'<rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 7l9 6 9-6"/>',phone:'<path d="M5 3h4l2 5-2.5 1.5a11 11 0 0 0 6 6L16 13l5 2v4a2 2 0 0 1-2 2A17 17 0 0 1 3 5a2 2 0 0 1 2-2z"/>',check:'<path d="M5 12l5 5 9-10"/>',pencil:'<path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/>',flag:'<path d="M5 21V4"/><path d="M5 4h12l-2 4 2 4H5"/>'};
@@ -449,6 +452,7 @@ function scoped(href){const c=new URLSearchParams(location.search).get('client')
 // ── state ─────────────────────────────────────────────────────────────────────
 let FEED={},LEADS=[],NOTIFS=[],ITEMS=[],SYSROWS=[],TOTAL=0;
 let FEED_FAILED=false,LEADS_FAILED=false;   // exactly-one-failed → the honest partial notice (both → the boot error)
+let CUT={queue:0,enq:0,convs:0};   // C15: lists the server cut at its limit — how many it sent of each
 // A view can be deep-linked by hash (#ok, #website, #enquiries…): the retired
 // Approvals (approval-center.html) and Website attention (attention.html) pages
 // redirect here as #ok and #website (Oct 2026 workflow audit, change 1).
@@ -577,7 +581,7 @@ function buildItems(feed,leads,notifs){
       name:c.client||'Support request',when:String(c.created_at||''),preview:c.subject||'A support request',
       chip:'Support'+(c.status?' · '+capFirst(String(c.status).replace(/_/g,' ')):''),chipCls:'support',status:String(c.status||'open'),
       priority:String(c.priority||'normal'),assigned_to:c.assigned_to?String(c.assigned_to):'',
-      unread:c.unread!=null?!!c.unread:true,needs:true,client_id:String(c.client_id||''),
+      unread:c.unread!=null?!!c.unread:true,needs:c.needs_reply!=null?!!c.needs_reply:true,client_id:String(c.client_id||''),   // C10: answered and still open is not "waiting for a reply"
       project_id:pid,projects:pid?[{id:pid,name:String(c.project||'')}]:[],href:String(c.href||'')});
   }
   for(const p of (feed.pending_approvals||[])){
@@ -591,8 +595,10 @@ function buildItems(feed,leads,notifs){
   // A feed row and a queue row for the same enquiry SHARE one lead object, so a
   // mark made from either view (read, replied, in pipeline) shows in both.
   const leadById=new Map((leads||[]).map(l=>[String(l.id),l]));
-  // (the feed's fields win where both carry one — it is the per-thread read)
-  const shared=(l)=>{const q=leadById.get(String(l.id));return (q&&q!==l)?Object.assign(q,l):l;};
+  // (the feed's fields win where both carry one — it is the per-thread read — except
+  // the message: the feed sends the first 400 characters, the queue the whole of it,
+  // and the end of an enquiry is often the phone number or the date they need; C2)
+  const shared=(l)=>{const q=leadById.get(String(l.id));if(!q||q===l)return l;const whole=String(q.message||'');Object.assign(q,l);if(whole.length>=String(l.message||'').length){q.message=whole;q.message_cut=false;}return q;};
   const enq=(Array.isArray(feed.enquiries)?feed.enquiries:(leads||[]).filter(l=>l.status!=='archived'&&l.status!=='not_a_fit')).map(shared);
   // Phase 4 (triage): one row per PERSON. The same visitor submitting four forms
   // showed as four rows ("Marco ×4"); they group under the newest, with a count.
@@ -846,7 +852,16 @@ const STATUS_LABEL={replied:'Replied',not_a_fit:'Not a fit',archived:'Not a fit'
 // stands — New, Read, Replied, Not a fit, or In pipeline (starting a deal is
 // how an enquiry is qualified) — in every view, not only the queue
 const LEAD_STATE={new:'New',read:'Read',replied:'Replied',not_a_fit:'Not a fit',archived:'Not a fit',converted:'In pipeline'};
-const leadState=(l)=>l?(l.converted?'In pipeline':(LEAD_STATE[String(l.status||'new')]||'')):'';
+// C5: "In pipeline" only while there is a live deal to open; made a customer with no
+// deal says Customer; marked converted but its deal since deleted reads as seen
+const inPipeline=(l)=>!!(l&&l.converted&&l.deal_id);
+const leadState=(l)=>{
+  if(!l)return '';
+  if(inPipeline(l))return 'In pipeline';
+  if(l.customer)return 'Customer';
+  const st=String(l.status||'new');
+  return st==='converted'?'Read':(LEAD_STATE[st]||'');
+};
 function rowChip(r){
   if(!r.lead)return r.chip||'';
   const st=leadState(r.lead);
@@ -904,13 +919,14 @@ function renderList(){
     // included) with the "M new" qualifier; the chips carry the totals.
     const newN=convs.filter(i=>i.lead&&String(i.lead.status||'new')==='new').length;
     const oldN=convs.filter(i=>i.lead&&String(i.lead.status||'new')==='new'&&oldOf(i)).length;
-    $('lmeta').textContent=`${convs.length} enquir${convs.length===1?'y':'ies'} · ${newN} new${oldN?`, ${oldN} over a month old`:''} · Sorted by ${SORT==='oldest'?'oldest':'newest'}`;
+    $('lmeta').textContent=`${convs.length} enquir${convs.length===1?'y':'ies'} · ${newN} new${oldN?`, ${oldN} over a month old`:''} · Sorted by ${SORT==='oldest'?'oldest':'newest'}${CUT.queue?` · Showing your newest ${CUT.queue} only`:''}`;
     paintEnqCounts();
   }else{
     // "N waiting for a reply", not "need you": Home's Needs-you list is the one
     // count of everything that needs the studio; this counts conversations (item 11)
     const oldN=convs.filter(i=>(i.unread||i.needs)&&oldOf(i)).length;
-    $('lmeta').textContent=`${convs.length} conversation${convs.length===1?'':'s'} · ${need} waiting for a reply${oldN?`, ${oldN} over a month old`:''} · Sorted by newest`;
+    const cut=[CUT.convs?`${CUT.convs} conversations`:'',CUT.enq?`${CUT.enq} new enquiries`:''].filter(Boolean);   // C15: the counts stop where the list was cut
+    $('lmeta').textContent=`${convs.length} conversation${convs.length===1?'':'s'} · ${need} waiting for a reply${oldN?`, ${oldN} over a month old`:''} · Sorted by newest${cut.length?` · Showing your newest ${cut.join(' and ')} only`:''}`;
   }
   paintVchips();   // the counts follow the data and the lens
   // partial-failure honesty: one of the two reads failed (loadData renders the
@@ -1138,7 +1154,7 @@ async function paneMessage(host,it){
       const ta=$('msgBody');const body=(ta.value||'').trim();if(!body)return;
       const btn=e.target.querySelector('button[type=submit]');btn.disabled=true;
       const rr=await api(reply,'POST',d.reply_to?{body,audience:'client'}:{body});
-      if(rr.ok){ta.value='';toast('Sent.');paneMessage(host,it);}
+      if(rr.ok){ta.value='';toast('Sent.');repliedTo(it,'You replied — waiting on them');paneMessage(host,it);}
       else{toast((rr.body&&rr.body.message)||'Couldn’t send.');btn.disabled=false;}
     };
     insertSavedReplies('msgBody');   // C3: the saved-reply picker, when any exist
@@ -1146,6 +1162,13 @@ async function paneMessage(host,it){
     pc.innerHTML='<p class="muted" style="font-size:13px">Replies open once this client has a project or an open support thread.</p>';
   }
   restoreComposer(it);   // a refresh() mid-draft puts the reply (and focus) back
+}
+// C10: a reply that went means the row is no longer waiting for one — its mark, the
+// chips' counts and "N waiting for a reply" drop now, not on the next Refresh. The
+// pane stays on the conversation (the list may no longer show it under Needs reply).
+function repliedTo(it,preview){
+  [it,ITEMS.find((x)=>x.id===it.id)].forEach((x)=>{if(x){x.needs=false;x.unread=false;if(preview)x.preview=preview;}});
+  renderList();
 }
 // thin adapter mirroring the server's crm/activity.ts mappers — kept in sync
 // with crm.html by hand (its convItem; only the channels this pane renders)
@@ -1325,7 +1348,7 @@ async function paneSupport(host,it){
     if(!rr.ok){toast((rr.body&&rr.body.message)||'Couldn’t send.');btns.forEach(b=>b.disabled=false);return;}
     ta.value='';
     if(andResolve){await setSupportStatus(host,it,'resolved');return;}   // its own toast says resolved
-    toast('Sent.');paneSupport(host,it);
+    toast('Sent.');repliedTo(it);paneSupport(host,it);
   };
   $('supForm').onsubmit=(e)=>{e.preventDefault();sendReply(false);};
   const rr2=$('supReplyResolve');if(rr2)rr2.addEventListener('click',()=>sendReply(true));
@@ -1374,26 +1397,28 @@ function paneLead(host,it){
   const st=String(l.status||'new');
   const contact=[l.email?`<a class="link" href="mailto:${esc(l.email)}">${esc(l.email)}</a>`:'',l.phone?`<a class="link" href="tel:${esc(String(l.phone).replace(/[^0-9+]/g,''))}">${esc(l.phone)}</a>`:''].filter(Boolean).join(' · ');
   const note=(l.note&&typeof l.note.body==='string')?l.note:null;
-  host.innerHTML=paneHead(it,`<span class="pchip" style="background:var(--good-soft);color:var(--good)">${esc(it.chip)}</span>${leadState(l)?`<span class="pchip plain stchip ${esc(l.converted?'converted':st)}">${esc(leadState(l))}</span>`:''}${it.when?`<span>${esc(when(it.when))}</span>`:''}`,
+  // C5: the deal link only with a deal to open; a customer without one can still be made a deal
+  const inPipe=inPipeline(l),settled=inPipe||!!l.customer;
+  host.innerHTML=paneHead(it,`<span class="pchip" style="background:var(--good-soft);color:var(--good)">${esc(it.chip)}</span>${leadState(l)?`<span class="pchip plain stchip ${esc(settled?'converted':st)}">${esc(leadState(l))}</span>`:''}${it.when?`<span>${esc(when(it.when))}</span>`:''}`,
     // bold redesign: the one-click deal sits in the head (Spam beside it); once in the pipeline, the way to it
-    l.converted?`<a class="btnlink" href="/crm.html?deal=${esc(l.deal_id||'')}&tab=deal" title="This website enquiry is in your pipeline">✓ In pipeline — view deal</a>`:`<button id="leadDeal" class="primary" title="Start a deal in your pipeline from this website enquiry">+ Make it a deal</button><button class="quiet" id="leadSpam" title="A bot or a vendor pitch — hidden for good">${si('flag')} Spam</button>`)+
-    (l.converted?'':`<div class="deal-explain" role="note"><b>Make it a deal</b> puts “${esc(leadDealTitle(l))}” on your board as a new lead${l.email?', with their email,':''} and marks this enquiry In pipeline. One click.</div>`)+
+    inPipe?`<a class="btnlink" href="/crm.html?deal=${esc(l.deal_id)}&tab=deal" title="This website enquiry is in your pipeline">✓ In pipeline — view deal</a>`:`<button id="leadDeal" class="primary" title="Start a deal in your pipeline from this website enquiry">+ Make it a deal</button>${l.customer?'':`<button class="quiet" id="leadSpam" title="A bot or a vendor pitch — hidden for good">${si('flag')} Spam</button>`}`)+
+    (inPipe?'':`<div class="deal-explain" role="note"><b>Make it a deal</b> puts “${esc(leadDealTitle(l))}” on your board as a new lead${l.email?', with their email,':''} and marks this enquiry In pipeline. One click.</div>`)+
     `<div class="pbody"><div class="card">
       ${contact?`<div style="font-size:13.5px;color:var(--soft)">${contact}</div>`:''}
-      ${l.message?`<div class="body">${esc(l.message)}</div>`:'<div class="body muted">No message — they just left their details.</div>'}
+      ${l.message?`<div class="body">${esc(l.message)}${l.message_cut?'…':''}</div>${l.message_cut?'<p class="muted" style="font-size:12.5px;margin:6px 0 0">This is the start of a longer message. Refresh to see all of it.</p>':''}`:'<div class="body muted">No message — they just left their details.</div>'}
       ${sent.map(r=>`<div class="lreply"><div class="muted" style="font-size:12.5px">You replied${r.at?' · '+esc(when(r.at)):''}</div><div class="body">${esc(r.body)}</div></div>`).join('')}
       <div class="lnote"><label for="leadNote">Your note <span class="muted">— never sent to them</span></label>
         <textarea id="leadNote" maxlength="1000" placeholder="e.g. Called back — wants a quote in March">${esc(note?note.body:'')}</textarea>
         <div class="crow"><span class="muted" id="leadNoteAt" style="font-size:12px">${note&&note.at?'Saved '+esc(when(note.at)):''}</span><span class="spacer"></span><button type="button" id="leadNoteSave">Save note</button></div></div>
       <div class="acts">
-        ${(l.converted||!l.email)?'':`<button id="leadConvert" title="Set them up as a customer now — contact, customer and (optionally) a deal in one go">Make customer</button>`}
+        ${(settled||!l.email)?'':`<button id="leadConvert" title="Set them up as a customer now — contact, customer and (optionally) a deal in one go">Make customer</button>`}
         ${st==='new'?`<button id="leadRead">Mark read</button>`:''}
-        ${(l.converted||st==='not_a_fit'||st==='archived')?'':`<button id="leadNotFit" title="Not what you do, or not a real lead — it leaves the queue and stops counting">Not a fit</button>`}
+        ${(settled||st==='not_a_fit'||st==='archived')?'':`<button id="leadNotFit" title="Not what you do, or not a real lead — it leaves the queue and stops counting">Not a fit</button>`}
       </div>
     </div></div>
     ${l.email?`<div class="pcomposer"><form id="leadForm"><label for="leadBody" style="font-size:12.5px;color:var(--faint)">Reply to ${esc(l.name||l.email)} — sent by email from your studio</label>
       <textarea id="leadBody" aria-label="Reply to ${esc(l.name||l.email)}">${esc(leadGreeting(l))}</textarea>
-      <div class="crow"><button type="button" id="leadDraft">Draft a reply</button><a class="link" id="leadMailto" href="${leadReplyHref(l)}" style="font-size:12.5px">Use your email app instead</a><span class="spacer"></span><button class="${l.converted?'primary':''}" type="submit" id="leadSend">Send reply</button>${l.converted?'':'<button class="primary" type="button" id="leadSendDeal">Reply &amp; make it a deal</button>'}</div><p class="lead-hint">${esc(String(l.name||'They').split(' ')[0])} gets this by email · their reply comes back here</p></form></div>`
+      <div class="crow"><button type="button" id="leadDraft">Draft a reply</button><a class="link" id="leadMailto" href="${leadReplyHref(l)}" style="font-size:12.5px">Use your email app instead</a><span class="spacer"></span><button class="${inPipe?'primary':''}" type="submit" id="leadSend">Send reply</button>${inPipe?'':'<button class="primary" type="button" id="leadSendDeal">Reply &amp; make it a deal</button>'}</div><p class="lead-hint">${esc(String(l.name||'They').split(' ')[0])} gets this by email · their reply comes back here</p></form></div>`
     :`<p class="muted" style="margin:12px 16px;font-size:12.5px">They left no email — ${l.phone?'call them on '+esc(l.phone)+'.':'there’s no way to reply.'}</p>`}`;
   wireBack();
   // item 28: the studio's private note (saved on the enquiry; the status is left as it is)
@@ -1414,7 +1439,9 @@ function paneLead(host,it){
     const sendLeadReply=async(btn,label)=>{
       const ta=$('leadBody');const body=(ta.value||'').trim();
       if(!body||body===leadGreeting(l).trim()){toast('Write your reply first.');ta.focus();return false;}
-      btn.disabled=true;btn.textContent='Sending…';
+      // C12: both send buttons grey while either is sending — one reply, one email
+      const both=[$('leadSend'),$('leadSendDeal')].filter(Boolean);
+      both.forEach((b)=>{b.disabled=true;});btn.textContent='Sending…';
       const r=await api('/forms/inbox/'+encodeURIComponent(it.lead_id)+'/reply','POST',{body});
       if(r.ok){
         ta.value='';
@@ -1425,7 +1452,7 @@ function paneLead(host,it){
         return true;
       }
       toast((r.body&&r.body.message)||'Couldn’t send that — nothing went out. Try again, or use your email app.');
-      btn.disabled=false;btn.textContent=label;
+      both.forEach((b)=>{b.disabled=false;});btn.textContent=label;
       return false;
     };
     lf.onsubmit=async(e)=>{e.preventDefault();await sendLeadReply($('leadSend'),'Send reply');};
@@ -1454,9 +1481,11 @@ function leadMarked(it,status){
   if(status!=='spam'&&it.lead)it.lead.status=status;
   const leaves=(x)=>status==='spam'||(!x.queue&&(status==='archived'||status==='not_a_fit'));
   ITEMS=ITEMS.filter(x=>!(x.kind==='lead'&&x.lead_id===id&&leaves(x)));
-  ITEMS.forEach(x=>{if(x.kind==='lead'&&x.lead_id===id&&status!=='new')x.unread=false;});
+  ITEMS.forEach(x=>{if(x.kind==='lead'&&x.lead_id===id){if(status!=='new')x.unread=false;if(status==='replied')x.needs=false;}});   // C10: replied is no longer waiting for a reply
   TOTAL=inboxCount();
-  if(SEL&&!visibleRows().some(r=>r.id===SEL))SEL='';
+  // a row that left the view is let go — except one just replied to, whose pane stays
+  // open on the reply that went (it only left Needs reply)
+  if(SEL&&status!=='replied'&&!visibleRows().some(r=>r.id===SEL))SEL='';
   renderList();renderPane();
   if(!SEL){const r=$('rows');if(r)r.focus();return;}
   const h=document.querySelector('#rpane .pname');
@@ -1519,7 +1548,7 @@ function openConvert(it){
         const dd=await api('/sales/deals','POST',{title:biz||l.name||email,contact_id:contactId,source:'website_form',source_submission_id:id});
         if(dd.ok)dealId=dd.body&&dd.body.data&&dd.body.data.id;
       }
-      l.converted=true; l.status='converted'; if(dealId)l.deal_id=dealId;
+      l.status='converted'; if(dealId){l.converted=true;l.deal_id=dealId;}else l.customer=true;   // C5: no deal → a customer, not "In pipeline"
       go.disabled=false; go.textContent='Make customer';
       dlg.close(); toast(d.already_exists?'They already had a workspace — opening their record.':'They’re a customer now. Opening their record.');
       leadMarked(it,'converted');
@@ -1600,6 +1629,7 @@ async function loadData(){
   FEED=(feed.ok&&feed.body.data)||{};
   LEADS=(leads.ok&&leads.body.data&&leads.body.data.submissions)||[];
   NOTIFS=(notifs.ok&&Array.isArray(notifs.body.data))?notifs.body.data:[];
+  CUT={queue:(leads.ok&&leads.body.data&&leads.body.data.more)?LEADS.length:0,enq:FEED.enquiries_more?(FEED.enquiries||[]).length:0,convs:FEED.client_messages_more?(FEED.client_messages||[]).length:0};
   ITEMS=buildItems(FEED,LEADS,NOTIFS);
   SYSROWS=buildSystem(FEED,NOTIFS);
   if(!TEAM&&ITEMS.some(x=>x.kind==='support'&&x.assigned_to))loadTeam().then(()=>{if(seq===REQ_SEQ)renderList();});   // item 34: name who has each request
@@ -1642,6 +1672,14 @@ function listClick(e,readFn,arrGet,drawFn){
   else if(e.target.closest('[data-mv=up]')&&i>0){readFn();const a=arrGet();[a[i-1],a[i]]=[a[i],a[i-1]];drawFn();}
   else if(e.target.closest('[data-mv=down]')){readFn();const a=arrGet();if(i<a.length-1){[a[i+1],a[i]]=[a[i],a[i+1]];drawFn();}}
 }
+// A sheet whose read failed shows that and keeps Save off: the empty list it would
+// otherwise show, saved, would write over the real replies or questions.
+function sheetUnread(msg,retry){
+  $('sheet-list').innerHTML=`<p class="muted empty">${esc(msg)} Nothing here can be saved until it loads.</p><button type="button" class="addbtn" id="sheet-retry">Try again</button>`;
+  $('sheet-add').hidden=true;$('sheet-save').disabled=true;
+  const ex=$('sheet-extra');if(ex)ex.hidden=true;
+  $('sheet-retry').onclick=retry;
+}
 function mvCells(i,n){return `<div class="mv"><button type="button" data-mv="up" ${i===0?'disabled':''} aria-label="Move up">↑</button><button type="button" data-mv="down" ${i===n-1?'disabled':''} aria-label="Move down">↓</button></div>`;}
 function focusNewRow(){const rows=$('sheet-list').querySelectorAll('[data-row]');const last=rows[rows.length-1];if(last){const f=last.querySelector('input,textarea');if(f)f.focus();}}
 
@@ -1651,7 +1689,8 @@ async function openSaved(){
   mountSheet(sheetShell('Saved replies','These are canned answers you can reuse when you reply to an enquiry. Nothing sends automatically — you choose when to use them.','Add a saved reply'));
   $('sheet-list').innerHTML='<div class="spin" role="status" aria-label="Loading"></div>';
   const r=await api('/service/saved-replies');
-  SR=(r.ok&&r.body.data&&r.body.data.replies)||[];
+  if(!r.ok)return void sheetUnread((r.body&&r.body.message)||'Your saved replies couldn’t load just now.',openSaved);
+  SR=(r.body.data&&r.body.data.replies)||[];
   drawSaved();
   $('sheet-list').onclick=(e)=>listClick(e,readSaved,()=>SR,drawSaved);
   $('sheet-add').onclick=()=>{readSaved();SR.push({id:'',title:'',body:''});drawSaved();focusNewRow();};
@@ -1683,7 +1722,8 @@ async function openFaq(){
   $('sheet-extra').innerHTML='<label class="fl"><span>Intro (optional)</span><input type="text" id="faq-intro" maxlength="500" placeholder="A friendly line above your questions…"></label>';
   $('sheet-list').innerHTML='<div class="spin" role="status" aria-label="Loading"></div>';
   const r=await api('/service/faq');
-  const d=(r.ok&&r.body.data)||{items:[]};
+  if(!r.ok)return void sheetUnread((r.body&&r.body.message)||'Your FAQ couldn’t load just now.',openFaq);
+  const d=r.body.data||{items:[]};
   FQ={intro:d.intro||'',items:(d.items||[]).map(x=>({q:x.q||'',a:x.a||''}))};
   $('faq-intro').value=FQ.intro;
   drawFaq();

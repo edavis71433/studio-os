@@ -33,7 +33,7 @@ ok('FIX1: new-enquiry count is deduped against the lead_followup cron notice (no
   /notices: await verifiedNotices\(site, \(\(nQ\.json as any\[\]\) \|\| \[\]\)\)/.test(workspace));
 ok('FIX1: the feed emits ONE synthetic website_enquiry row (deduped), keyed for the bell',
   /notices\.unshift\(\{[\s\S]*?kind: 'website_enquiry'/.test(workspace) &&
-  /const newEnquiries = freshEnquiries\(\(\(\(enqQ\.ok[\s\S]*?\)\.length, notices\)/.test(workspace));
+  /const newEnquiries = freshEnquiries\(Math\.min\(\(\(\(enqQ\.ok[\s\S]*?\)\.length, FEED_ENQUIRIES\), notices\)/.test(workspace));   // bug hunt C15: counted no further than the page
 ok('FIX1: the enquiry feed row is owner-only (reviewers never see leads)',
   /if \(seesFull\) \{[\s\S]*?kind: 'website_enquiry'/.test(workspace));
 ok('FIX1: inbox.html filters the aggregate row so it is not double-listed with /forms/inbox',

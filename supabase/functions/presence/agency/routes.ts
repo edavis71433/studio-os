@@ -21,7 +21,7 @@ import type { KitPayload } from '../lib/kits.ts';
 import { kitFromSite, applyKitTo } from './kit_io.ts';
 import { handleAgencySites } from './sites.ts';
 import { HIDEABLE_SECTIONS, normalizeHidden } from '../lib/navigation.ts';
-import { readReservedJson, writeReservedJson, RESERVED_NAMES } from '../lib/reserved_store.ts';
+import { readReservedJsonOrThrow, writeReservedJson, RESERVED_NAMES } from '../lib/reserved_store.ts';
 import { sendInviteLink } from '../lib/workspace.ts';
 import { brandFromKit } from '../lib/email_brand.ts';
 import { runEvidence } from '../evidence/engine.ts';
@@ -197,10 +197,15 @@ async function handleAgencyInner(req: Request, route: string, method: string, me
       if (!Array.isArray(b.hidden)) return json({ error: 'bad_request', message: 'Say which areas to hide, as a list.' }, 400, cors);
       const hidden = normalizeHidden(b.hidden);
       if (!(await writeReservedJson(own.id, RESERVED_NAMES.navHidden, { hidden }, member.email))) return json({ error: 'write_failed', message: 'That didn’t save.' }, 502, cors);
-      return json({ data: { hidden, choices: HIDEABLE_SECTIONS } }, 200, cors);
+      return json({ data: { hidden, choices: HIDEABLE_SECTIONS, can_edit: true } }, 200, cors);
     }
-    const hidden = normalizeHidden(await readReservedJson(own.id, RESERVED_NAMES.navHidden));
-    return json({ data: { hidden, choices: HIDEABLE_SECTIONS } }, 200, cors);
+    // bug hunt C4: a failed read is not "nothing hidden" — Settings showed every area on,
+    // and the next switch saved that over the real list. The page leaves the card away.
+    let stored: unknown;
+    try { stored = await readReservedJsonOrThrow(own.id, RESERVED_NAMES.navHidden); }
+    catch { return json({ error: 'read_failed', message: 'Your menu couldn’t load just now.' }, 502, cors); }
+    // C16: the page shows the switches by the same rule this PUT keeps (manage_clients)
+    return json({ data: { hidden: normalizeHidden(stored), choices: HIDEABLE_SECTIONS, can_edit: can(member.role, 'manage_clients') } }, 200, cors);
   }
 
   // ── the Sites and Domains pages, Pin and Duplicate (builder list items 43, 45, 52) ──
