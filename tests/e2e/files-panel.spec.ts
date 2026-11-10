@@ -12,7 +12,7 @@ import { installApp } from './helpers/app';
 const NOW = new Date().toISOString();
 const id = (n: number) => `aaaaaaaa-0000-4000-8000-0000000000${String(n).padStart(2, '0')}`;
 const base = { tags: [], asset_status: 'approved', state: 'approved', created_at: NOW, favorite: false, in_use: false, kind: 'image', mime: 'image/jpeg', bytes: 620000, width: 1600, height: 1100 };
-const SHOP = { ...base, id: id(1), name: 'Shopfront at dusk', alt_text: 'The Brightline Studio shopfront', in_use: true, collection: 'Spring promo' };
+const SHOP = { ...base, id: id(1), name: 'Shopfront at dusk', alt_text: 'The Brightline Studio shopfront', in_use: true, collection: 'Spring promo', tags: ['storefront', 'evening'] };
 const TEAM = { ...base, id: id(2), name: 'Team photo', alt_text: 'The team' };
 const PRIV = { ...base, id: id(3), name: 'Login screen', alt_text: 'Login screen', client_id: 'c1', client_name: 'Harbor Dental', client_private: true };
 const PDF = { ...base, id: id(4), name: 'Price list', alt_text: 'Price list', kind: 'document', mime: 'application/pdf', width: undefined, height: undefined };
@@ -59,6 +59,84 @@ test.describe('Files — the open file (bold redesign, part 2)', () => {
     await expect(page.locator('.tile[data-open="' + TEAM.id + '"]')).toBeFocused();
   });
 
+  test('a computer, in the table: the open file’s row is marked, and the mark moves', async ({ page }, info) => {
+    test.skip(info.project.name !== 'desktop-chromium', 'a computer-width layout');
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.addInitScript(() => { try { localStorage.setItem('dds-display:files', 'table'); } catch { /* */ } });
+    await installApp(page, { api: API });
+    await page.goto('/files.html');
+    await page.locator(`tr[data-open="${SHOP.id}"]`).click();
+    await expect(page.locator('#panel .ptitle')).toHaveText('Shopfront at dusk');
+    await expect(page.locator(`tr[data-open="${SHOP.id}"]`)).toHaveAttribute('aria-current', 'true');
+    await page.locator(`tr[data-open="${TEAM.id}"]`).click();
+    await expect(page.locator('#panel .ptitle')).toHaveText('Team photo');
+    await expect(page.locator(`tr[data-open="${TEAM.id}"]`)).toHaveAttribute('aria-current', 'true');
+    await expect(page.locator(`tr[data-open="${SHOP.id}"]`)).not.toHaveAttribute('aria-current', 'true');
+    await page.keyboard.press('Escape');
+    await expect(page.locator('tr[aria-current]')).toHaveCount(0);
+  });
+
+  test('a narrower computer: the header wraps beside the panel instead of squeezing + Add files', async ({ page }, info) => {
+    test.skip(info.project.name !== 'desktop-chromium', 'a computer-width layout');
+    await pinGrid(page);
+    await installApp(page, { api: API });
+    for (const width of [1180, 1240, 1320]) {
+      await page.setViewportSize({ width, height: 860 });
+      await page.goto('/files.html');
+      await open(page, 'Shopfront at dusk');
+      const panel = (await page.locator('#panel').boundingBox())!;
+      const [add, make, h1] = await Promise.all(['#add', '#makeImage', '#pagehead'].map((s) => page.locator(s).boundingBox()));
+      expect(add!.height, `+ Add files on one line at ${width}`).toBeLessThan(50);
+      expect(Math.abs(add!.y + add!.height / 2 - (h1!.y + h1!.height / 2)), `+ Add files beside the title at ${width}`).toBeLessThan(12);
+      for (const b of [add!, make!]) expect(b.x + b.width, `clear of the panel at ${width}`).toBeLessThanOrEqual(panel.x);
+      await page.keyboard.press('Escape');
+    }
+  });
+
+  test('a computer: when the page makes room, a picked client stays in sight in the strip', async ({ page }, info) => {
+    test.skip(info.project.name !== 'desktop-chromium', 'a computer-width layout');
+    await page.setViewportSize({ width: 1240, height: 860 });
+    await pinGrid(page);
+    const mine = [SHOP, { ...TEAM, client_id: 'c3', client_name: 'Blue Finch Café', project_id: 'p3' }];
+    await installApp(page, { api: { ...API,
+      '/assets/collections': { data: ['Brand', 'Spring promo', 'Menus', 'Signage', 'Team', 'Events'].map((name) => ({ name, count: 1 })) },
+      '/assets': { data: { assets: mine, total: 2, shown: 2, policy: 'immediate' } } } });
+    await page.goto('/files.html');
+    const inView = () => page.evaluate(() => { const r = document.getElementById('rail')!.getBoundingClientRect(); const c = document.querySelector('#rail [data-client="c3"]')!.getBoundingClientRect(); return c.left >= r.left - 1 && c.right <= r.right + 1; });
+    await page.locator('#rail [data-client="c3"]').click();
+    await open(page, 'Team photo');   // the panel docks and the strip narrows
+    await expect(page.locator('html')).toHaveClass(/files-docked/);
+    expect(await inView()).toBe(true);
+    await page.keyboard.press('Escape');
+    await expect(page.locator('html')).not.toHaveClass(/files-docked/);
+    expect(await inView()).toBe(true);
+    expect(await page.evaluate(() => window.scrollY)).toBe(0);   // the strip scrolled, never the page
+  });
+
+  test('the keyboard: Enter opens a file once, Escape goes back to it, and Space picks in Select mode', async ({ page }) => {
+    await pinGrid(page);
+    await installApp(page, { api: API });
+    let reads = 0;
+    page.on('request', (r) => { if (new URL(r.url()).pathname.endsWith('/assets/' + SHOP.id)) reads++; });
+    await page.goto('/files.html');
+    const tile = page.locator(`.tile[data-open="${SHOP.id}"]`);
+    await tile.focus();
+    await page.keyboard.press('Enter');
+    await expect(page.locator('#panel .ptitle')).toHaveText('Shopfront at dusk');
+    await page.waitForTimeout(300);
+    expect(reads).toBe(1);   // not twice (shell.js clicks role=button tiles on Enter too)
+    await page.keyboard.press('Escape');
+    await expect(tile).toBeFocused();
+    await page.locator('#selbtn').click();
+    const pick = page.locator(`.tile[data-pick="${TEAM.id}"]`);
+    await pick.focus();
+    await page.keyboard.press(' ');
+    await expect(page.locator('.bulkbar .cnt')).toHaveText('1 selected');
+    await page.locator(`.tile[data-pick="${TEAM.id}"]`).focus();   // the grid re-drew
+    await page.keyboard.press('Enter');
+    await expect(page.locator('.bulkbar .cnt')).toHaveText('0 selected');   // one press, one change
+  });
+
   test('a tablet keeps the slide-over: a dialog, the page dimmed', async ({ page }, info) => {
     test.skip(info.project.name !== 'tablet', 'the in-between width');
     await pinGrid(page);
@@ -84,6 +162,10 @@ test.describe('Files — the open file (bold redesign, part 2)', () => {
     await expect(page.locator('#panel')).toHaveAttribute('aria-modal', 'true');
     const z = await page.evaluate(() => [Number(getComputedStyle(document.getElementById('panel')!).zIndex), Number(getComputedStyle(document.getElementById('dds-mbar') || document.body).zIndex) || 0]);
     expect(z[0]).toBeGreaterThan(z[1]);
+    // its top edge shows in dark too, and the tags are labels at text size, not 44px buttons
+    await expect(page.locator('#panel')).toHaveCSS('border-top-width', '1px');
+    const tag = (await page.locator('#panel .tags .chip').first().boundingBox())!;
+    expect(tag.height).toBeLessThan(32);
   });
 
   test('the panel leads with the photo, its name and the two next steps', async ({ page }) => {
