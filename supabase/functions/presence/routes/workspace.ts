@@ -311,6 +311,8 @@ const NOTICE_HREF: Record<string, string> = {
   invoice_void_paid: '/pipeline.html',   // 0119: money landed on a WITHDRAWN invoice → the deal, where the voided row is
   publish_failed: '/presence.html#publish',
   studio_published: '/presence.html',   // audit change 2: the client's studio published for them → their Website overview
+  site_published: '/presence.html',     // builder list item 47: a publish finished → the Website overview (the studio's bell carries ?client=)
+  traffic_spike: '/analytics.html',     // builder list item 47: a busy day → Analytics, where the visitors came from
   site_down: '/presence.html#foundations',   // a confirmed outage → the foundations desk (domain/hosting/health)
   domain_expiry: '/presence.html#domain',
   search_setup: '/presence.html#search',
@@ -375,6 +377,7 @@ export async function handlePortalFeed(jwt: string, site: SiteRow, principal: Pr
 // the Website page — they read as sales work on Home and in the Inbox.
 export const STUDIO_WEBSITE_NOTICE_KINDS: ReadonlySet<string> = new Set([
   'search_setup', 'domain_expiry', 'publish_failed', 'connection_expired', 'site_down', 'email_auth', 'apex_drift', 'new_review', 'missing_required', 'client_feedback',
+  'site_published', 'traffic_spike',   // item 47: the studio's OWN site's news stays on its Website page; client sites' news reaches the bell through /agency/needs-you
 ]);
 /** Pure: the feed as the studio sees it at studio level. */
 export function studioLevelFeed<T extends { notices: any[]; moments: any[]; pending_approvals: any[] }>(d: T): T {

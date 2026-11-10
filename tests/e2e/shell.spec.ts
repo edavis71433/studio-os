@@ -740,6 +740,41 @@ test.describe('iOS tap semantics — tapping a menu item navigates', { tag: '@to
   });
 });
 
+// ── Builder list item 47 (Nov 2026): notifications per site in the studio's bell ──
+test.describe('item 47 — news per client site in the studio bell', () => {
+  test('each update names the site and opens the right place inside it; asks stay in Needs you', async ({ page }) => {
+    const needs = { data: {
+      rows: [{ key: 'enquiry:1', kind: 'enquiry', site_id: 's1', client_id: 'c1', name: 'Bacchus Kitchen', what: 'an enquiry is waiting for a reply', when: 'Sent 2h ago', verb: 'Reply', href: '/inbox.html?client=s1' }],
+      more: 0, rest: [], total: 1, snoozed: [], old: { count: 0, items: [] }, empty_line: '', partial: false, own_site: true, update_notices: [], snooze_ready: true,
+      next_by_site: {}, next_by_client: {},
+      news: [
+        { id: 'n2', site_id: 's2', name: 'Harbor Dental', kind: 'traffic_spike', headline: 'A busy day: 48 visitors yesterday', body: 'That’s about 3 times a usual day for harbordental.example. See where they came from on Analytics.', at: '2026-11-10T06:00:00Z', href: '/analytics.html?client=s2', tier: 'update' },
+        { id: 'n1', site_id: 's1', name: 'Bacchus Kitchen', kind: 'site_published', headline: 'Published 3 changes', body: 'The website is live with the latest changes. Open it to see them.', at: '2026-11-09T20:00:00Z', href: '/presence.html?client=s1', tier: 'update' },
+      ],
+    } };
+    await installApp(page, { api: { '/portal/context': { data: { ...crmCtx().data, is_agency: true, landing: '/agency.html', attention_count: 1, attention_stale: false, scope: null } }, '/agency/needs-you': needs } });
+    await page.goto('/today.html');
+    await page.locator('#dds-bell').click();
+    const pop = page.locator('.dds-pop[aria-label="Notifications"]');
+    await expect(pop).toBeVisible();
+    // the ask first (Needs you), then the news per site, each named
+    await expect(pop.locator('.row').first()).toContainText('Bacchus Kitchen — an enquiry is waiting for a reply');
+    const spike = pop.locator('.row', { hasText: 'Harbor Dental — A busy day: 48 visitors yesterday' });
+    await expect(spike).toHaveAttribute('href', '/analytics.html?client=s2');
+    await expect(spike).toHaveAttribute('data-tier', 'update');
+    await expect(spike).toContainText('3 times a usual day');
+    const pub = pop.locator('.row', { hasText: 'Bacchus Kitchen — Published 3 changes' });
+    await expect(pub).toHaveAttribute('href', '/presence.html?client=s1');
+    // the Updates tab keeps the news and drops the ask (the studio's own feed may add its own updates)
+    await pop.locator('[role=tab][data-tab="update"]').click();
+    await expect(pop.locator('.row', { hasText: 'Harbor Dental — A busy day' })).toHaveCount(1);
+    await expect(pop.locator('.row', { hasText: 'Bacchus Kitchen — Published 3 changes' })).toHaveCount(1);
+    await expect(pop.locator('.row', { hasText: 'an enquiry is waiting' })).toHaveCount(0);
+    // the badge counts asks only
+    await expect(page.locator('#dds-bell .dot')).toHaveText('1');
+  });
+});
+
 // ── Batch A (post-redesign audit) — shell regressions ────────────────────────
 test.describe('Batch A regressions — shell', () => {
   test('A3 — a FAILED feed read in the bell is honest, never "all caught up"', async ({ page }) => {

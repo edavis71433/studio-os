@@ -16,6 +16,7 @@ import { runRetentionSweep } from '../ops/retention.ts';
 import { reapMedia } from '../lib/media_gc.ts';
 import { reapSnapshots } from '../lib/snapshot_gc.ts';
 import { runRecurringInvoices } from './recurring_invoices.ts';   // sales review item 47: a fresh invoice on a schedule
+import { runTrafficSpikes } from '../ops/traffic_spikes.ts';
 import { runLifecycleSweep, runWeeklyDigest, runDomainWatch, runLeadFollowups, runDealFollowups, runRenewalReminders, runInvoiceReminders, runSalesDocReminders, runReviewRequests, runProspectNurture, runSupportAging, runAgreementRenewalReminders, runBookingReminders, runBookingFollowups, runEmailAuthNudges, runApexDriftWatch, runApprovalReminders } from '../commerce/lifecycle.ts';
 import { runScheduledBroadcasts } from '../lib/broadcast.ts';
 import { runDeletionSweep } from '../commerce/deletion.ts';
@@ -386,6 +387,7 @@ export async function handleSystem(req: Request, route: string, method: string, 
             ['stale_runs', () => reapStaleRuns()],   // FIRST: converts the previous run's stuck rows into countable failures
             ['digest', () => runWeeklyDigest()],
             ['domains', () => runDomainWatch(10)],
+            ['traffic_spikes', () => runTrafficSpikes(200)],   // builder list item 47: a busy day of visitors, said once per site per day
             ['email_auth', () => runEmailAuthNudges(20)],   // DNS #5: escalate persistent SPF/DMARC/DKIM gaps to one owner nudge
             ['apex_drift', () => runApexDriftWatch(10)],    // DNS: verify the apex still points home; surface drift as a finding
             ['retention', () => runRetentionSweep()],
@@ -443,6 +445,7 @@ export async function handleSystem(req: Request, route: string, method: string, 
       const deletion = await step('deletion', () => runDeletionSweep(25));         // P2-E W2: eligible account deletions
       const digest = await step('digest', () => runWeeklyDigest());                // CP-3: the Monday routine (7-day dedupe)
       const domains = await step('domains', () => runDomainWatch(10));             // INF: RDAP expiry+registrar, 24h dedupe
+      await step('traffic_spikes', () => runTrafficSpikes(200));                   // builder list item 47: a busy day of visitors, once per site per day (day:<date> dedupes)
       const emailAuth = await step('email_auth', () => runEmailAuthNudges(20));     // DNS #5: escalate persistent SPF/DMARC/DKIM gaps → one owner nudge
       const apexDrift = await step('apex_drift', () => runApexDriftWatch(10));       // DNS: verify the apex still points home; surface drift as a finding
       const leads = await step('leads', () => runLeadFollowups(20));               // CRM: nudge un-replied leads, once per lead
