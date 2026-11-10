@@ -431,6 +431,189 @@ html.dc-edit:not(.plan-watch) .dc-twbar[hidden]{display:none}
 #settingsPanel:not([data-mode="styles"]) #designGallery,#settingsPanel:not([data-mode="styles"]) #stylesAsk{display:none !important}
 #settingsPanel[data-mode="section"] #designHost>*:not(#blocksCard),#settingsPanel[data-mode="sections"] #designHost>*:not(#blocksCard),#settingsPanel[data-mode="forms"] #designHost>*:not(#formsCard){display:none}
 #settingsPanel[data-mode="section"] #blocksCard{margin-top:0 !important;border:0;padding:0;background:transparent}
+/* ── part two: the insides of the cards. One header idiom: a Fraunces title, a quiet line
+   under it, Done at the right; a segmented control under the title where a card has tabs. ── */
+html.dc-edit:not(.plan-watch) .dc-slideover .dc-panel-head{align-items:flex-start;padding:18px 16px 10px 20px;border-bottom:0}
+html.dc-edit:not(.plan-watch) .dc-slideover .dc-panel-tt{display:flex;flex-direction:column;gap:2px;min-width:0}
+html.dc-edit:not(.plan-watch) .dc-slideover .dc-panel-t{font-size:22px;font-weight:600;line-height:1.15;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+html.dc-edit:not(.plan-watch) .dc-slideover .dc-panel-sub{display:block;font-size:12.5px;color:var(--ink-2);line-height:1.3}
+.dc-panel-sub{display:none}
+.dc-panel-sub[hidden]{display:none !important}
+html.dc-edit:not(.plan-watch) .dc-close{height:36px;padding:0 14px;font-size:13px;flex:none}
+.dc-seg{display:flex;gap:2px;margin:0 20px 12px;padding:4px;border-radius:999px;background:var(--dc-raised,var(--paper));flex:0 0 auto}
+.dc-seg[hidden]{display:none}
+.dc-seg button{flex:1 1 0;min-width:0;height:36px;padding:0 8px;border:0;border-radius:999px;background:transparent;color:var(--ink-2);font:500 12.5px/1 var(--sans);cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dc-seg button:hover{color:var(--ink)}
+.dc-seg button[aria-selected="true"]{background:var(--sheet);color:var(--ink);font-weight:600;box-shadow:var(--dds-shadow)}
+.dc-seg button:focus-visible{outline:2px solid var(--plum);outline-offset:2px}
+.dc-panel-foot{flex:0 0 auto;padding:10px 20px 16px;font-size:12px;color:var(--ink-3);border-top:1px solid var(--hair)}
+.dc-panel-foot[hidden]{display:none}
+/* the inspector: one section, four tabs */
+#settingsPanel[data-mode="section"] #designHost{padding:0 20px 20px}
+#settingsPanel[data-mode="section"] #blocksCard .blk-sub{border:0 !important;padding:0 !important;margin:0 !important;background:transparent !important}
+.ins-pane{display:flex;flex-direction:column;gap:14px}
+.ins-pane[hidden]{display:none}
+.ins-field{display:flex;flex-direction:column;gap:6px}
+.ins-lbl{display:block;font-size:12.5px;font-weight:500;color:var(--ink-2);margin:0}
+.ins-note{font-size:12.5px;color:var(--ink-3);line-height:1.5}
+.ins-row{display:flex;align-items:center;justify-content:space-between;gap:10px;font-size:12.5px;color:var(--ink-3)}
+#settingsPanel[data-mode="section"] #blocksCard input:not([type=checkbox]):not([type=color]):not([type=date]):not([type=number]):not([type=range]),#settingsPanel[data-mode="section"] #blocksCard textarea,#settingsPanel[data-mode="section"] #blocksCard select{background:var(--dc-raised,var(--paper)) !important;border:1px solid var(--hair) !important;border-radius:12px !important;padding:11px 12px !important;font-size:14px !important;line-height:1.5 !important;color:var(--ink) !important;margin-bottom:10px !important}
+#settingsPanel[data-mode="section"] #blocksCard .ins-field input{margin-bottom:0 !important}
+#settingsPanel[data-mode="section"] #blocksCard input:focus-visible,#settingsPanel[data-mode="section"] #blocksCard textarea:focus-visible,#settingsPanel[data-mode="section"] #blocksCard select:focus-visible{outline:2px solid var(--plum);outline-offset:0}
+#settingsPanel[data-mode="section"] #blocksCard .hint{font-size:12px;color:var(--ink-3)}
+.ai-chips{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.ai-chip{font:600 12px/18px var(--sans);padding:3px 10px;border-radius:999px;border:0;background:var(--dc-raised,var(--paper));color:var(--ink-2);cursor:pointer}
+.ai-chip:hover{color:var(--ink)}
+.ai-chip.ai-main{background:var(--plum-soft);color:var(--plum)}
+.ai-chip:focus-visible{outline:2px solid var(--plum);outline-offset:2px}
+.ins-tiles{display:flex;gap:8px;flex-wrap:wrap}
+.ins-tile{flex:1 1 0;min-width:92px;max-width:50%;padding:0;border:0;background:transparent;text-align:left;cursor:pointer;color:var(--ink);font:inherit}
+.ins-tile-pic{height:64px;padding:10px;border-radius:10px;border:1px solid var(--hair);background:var(--dc-raised,var(--paper));display:flex;flex-direction:column;gap:5px;align-items:flex-start;justify-content:center}
+.ins-tile.on .ins-tile-pic{border:2px solid var(--plum);padding:9px}
+.ins-tile i{display:block;height:4px;border-radius:2px;background:var(--ink-3);opacity:.7}
+.ins-tile i.h{height:8px;background:var(--ink);opacity:1}
+.ins-tile .ins-tile-row{display:flex;gap:4px;width:100%}
+.ins-tile .ins-tile-row i{flex:1 1 0;height:14px;border-radius:3px}
+.ins-tile-l{display:block;margin-top:6px;font-size:12px;font-weight:500;color:var(--ink-2)}
+.ins-tile.on .ins-tile-l{color:var(--plum);font-weight:600}
+.ins-tile:focus-visible .ins-tile-pic{outline:2px solid var(--plum);outline-offset:2px}
+.ins-swatches{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.ins-sw{width:32px;height:32px;border-radius:50%;border:1px solid var(--hair-2);cursor:pointer;padding:0;flex:none;position:relative}
+.ins-sw.on{box-shadow:0 0 0 2px var(--sheet),0 0 0 4px var(--plum)}
+.ins-sw.none{background:var(--sheet)}
+.ins-sw.none::after{content:"";position:absolute;left:50%;top:15%;width:2px;height:70%;margin-left:-1px;background:var(--hair-2);transform:rotate(45deg)}
+.ins-sw.on.none::after{background:var(--plum)}
+.ins-sw:focus-visible{outline:2px solid var(--plum);outline-offset:2px}
+.ins-foot{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:18px;padding-top:12px;border-top:1px solid var(--hair);font-size:12.5px;color:var(--ink-3)}
+.ins-row>span{flex:1 1 auto}
+.ins-style>.ins-field{margin-top:14px}
+.ins-row .dc-actbtn{flex:none;white-space:nowrap}
+/* the Styles card: Looks, Fonts, Colours, Text. Rows are tagged with their tab; the rest hide. */
+#settingsPanel[data-mode="styles"][data-stab="looks"] .dc-panel-scroll [data-stab]:not([data-stab="looks"]),
+#settingsPanel[data-mode="styles"][data-stab="fonts"] .dc-panel-scroll [data-stab]:not([data-stab="fonts"]),
+#settingsPanel[data-mode="styles"][data-stab="colours"] .dc-panel-scroll [data-stab]:not([data-stab="colours"]),
+#settingsPanel[data-mode="styles"][data-stab="text"] .dc-panel-scroll [data-stab]:not([data-stab="text"]){display:none !important}
+html.dc-edit:not(.plan-watch) #settingsPanel #designHost{padding:0 20px 20px}
+html.dc-edit:not(.plan-watch) #settingsPanel #designGallery{padding:0 20px 14px}
+html.dc-edit:not(.plan-watch) #settingsPanel #designHost .field{border:0;box-shadow:none;border-radius:0;padding:0;margin:0 0 18px;background:transparent}
+html.dc-edit:not(.plan-watch) #settingsPanel #designCard>label{display:none}
+html.dc-edit:not(.plan-watch) #settingsPanel #designHost .field>label{font-size:12.5px;font-weight:500;color:var(--ink-2)}
+.st-looks{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.st-look{padding:0;border:0;background:transparent;text-align:left;cursor:pointer;font:inherit;color:var(--ink);min-width:0}
+.st-look-pic{height:78px;padding:8px;border-radius:10px;border:1px solid var(--hair);display:flex;flex-direction:column;gap:4px;align-items:flex-start;justify-content:center}
+.st-look.on .st-look-pic{border:2px solid var(--plum);padding:7px}
+.st-look i{display:block;height:3px;border-radius:1px;width:80%}
+.st-look i.h{height:7px;border-radius:2px;width:50%}
+.st-look i.b{height:8px;width:26px;margin-top:2px}
+.st-look-l{display:block;margin-top:6px;font-size:12.5px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.st-look.on .st-look-l{color:var(--plum);font-weight:600}
+.st-look:focus-visible .st-look-pic{outline:2px solid var(--plum);outline-offset:2px}
+.st-fontrow{display:flex;align-items:center;justify-content:space-between;gap:8px;width:100%;padding:10px 12px;border-radius:12px;border:1px solid var(--hair);background:var(--dc-raised,var(--paper));font:inherit;color:var(--ink);cursor:pointer;text-align:left;margin-top:8px}
+.st-fontrow:hover{border-color:var(--hair-2)}
+.st-fontrow .k{font-size:12.5px;color:var(--ink-2);font-weight:500;margin-right:8px}
+.st-fontrow .v{font-size:14px;font-weight:600;flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.st-fontrow svg{width:14px;height:14px;flex:none;color:var(--ink-2)}
+.st-logo{margin-top:12px}
+.st-logo .ins-swatches{margin-top:8px}
+/* the Add a section card */
+html.dc-edit:not(.plan-watch) #trayPanel .dc-tabs{display:none}
+.dc-tree-back{display:none}
+html.dc-edit:not(.plan-watch) .dc-tree-back{display:block;padding:0 20px 8px}
+html.dc-edit:not(.plan-watch) #designTray{padding:0 20px 20px}
+.tray-searchwrap{position:relative;margin:2px 0 10px}
+.tray-searchwrap svg{position:absolute;left:14px;top:50%;transform:translateY(-50%);width:18px;height:18px;color:var(--ink-3);pointer-events:none}
+html.dc-edit:not(.plan-watch) #trayPanel .tray-search{height:44px;margin:0;padding:0 14px 0 42px;border-radius:999px;background:var(--dc-raised,var(--paper));border:1px solid var(--hair);font-size:14px;color:var(--ink)}
+html.dc-edit:not(.plan-watch) #trayPanel .tray-search:focus-visible{outline:2px solid var(--plum);outline-offset:0}
+/* the Photos card */
+html.dc-edit:not(.plan-watch) .pf-chips.dc-seg{margin:0 20px 12px}
+html.dc-edit:not(.plan-watch) .pf-search{padding:0 20px 12px}
+html.dc-edit:not(.plan-watch) .pf-body{padding:0 20px 16px}
+html.dc-edit:not(.plan-watch) #panelFilesGrid{grid-template-columns:repeat(3,1fr);gap:8px;margin-top:0}
+html.dc-edit:not(.plan-watch) #panelFilesGrid .mcell{border:0;border-radius:10px;background:var(--dc-raised,var(--paper))}
+html.dc-edit:not(.plan-watch) #panelFilesGrid .mcell .alt{opacity:0;transition:opacity var(--dur) var(--ease);padding:16px 6px 6px;font-size:10px}
+html.dc-edit:not(.plan-watch) #panelFilesGrid .mcell:hover .alt,html.dc-edit:not(.plan-watch) #panelFilesGrid .mcell:focus-visible .alt{opacity:1}
+html.dc-edit:not(.plan-watch) #panelFilesGrid .mcell .badge{left:6px;top:6px;background:var(--sage-soft);color:var(--sage);font-size:10.5px;font-weight:600;letter-spacing:0;text-transform:none;padding:3px 8px}
+html.dc-edit:not(.plan-watch) #panelFilesGrid .medit{right:6px;top:6px;min-height:28px;min-width:28px;width:28px;padding:0;border-radius:999px;background:var(--sheet);color:var(--ink);box-shadow:var(--dds-shadow);display:inline-flex;align-items:center;justify-content:center;opacity:0}
+html.dc-edit:not(.plan-watch) #panelFilesGrid .mwrap:hover .medit,html.dc-edit:not(.plan-watch) #panelFilesGrid .medit:focus-visible{opacity:1}
+@media (pointer:coarse){html.dc-edit:not(.plan-watch) #panelFilesGrid .medit{opacity:1;min-height:32px;min-width:32px;width:32px}}
+html.dc-edit:not(.plan-watch) #panelFilesGrid .medit svg{width:14px;height:14px}
+.pf-acts{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:12px}
+.pf-upload{margin-top:10px;padding:12px;border-radius:12px;background:var(--dc-raised,var(--paper));display:flex;flex-direction:column;gap:8px}
+.pf-upload[hidden]{display:none}
+.pf-upload input[type=text]{width:100%;box-sizing:border-box;padding:10px 12px;border:1px solid var(--hair);border-radius:12px;font:inherit;font-size:14px;background:var(--sheet);color:var(--ink)}
+.pf-upload .row{display:flex;gap:8px;align-items:center}
+html.dc-edit:not(.plan-watch) .pf-note{font-size:12px;color:var(--ink-3);margin-top:12px}
+.tray-chips{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:4px}
+.tray-chip{font:600 12px/18px var(--sans);padding:3px 10px;border-radius:999px;border:0;background:var(--dc-raised,var(--paper));color:var(--ink-2);cursor:pointer}
+.tray-chip:hover{color:var(--ink)}
+.tray-chip.on{background:var(--plum-soft);color:var(--plum)}
+.tray-chip:focus-visible{outline:2px solid var(--plum);outline-offset:2px}
+html.dc-edit:not(.plan-watch) #designTray .tray-grp{margin-top:14px}
+html.dc-edit:not(.plan-watch) #designTray .tray-grp.shots{gap:10px}
+html.dc-edit:not(.plan-watch) #designTray .tray-grp-h{font-size:12.5px;font-weight:500;letter-spacing:0;text-transform:none;color:var(--ink-2);margin:0 0 2px}
+html.dc-edit:not(.plan-watch) #designTray .tray-item.has-shot{padding:0;border:0;background:transparent;gap:6px}
+html.dc-edit:not(.plan-watch) #designTray .tray-item .ti-shot{border:1px solid var(--hair);border-radius:10px;background:var(--dc-raised,var(--paper));aspect-ratio:155/86}
+html.dc-edit:not(.plan-watch) #designTray .tray-item:hover .ti-shot{border-color:var(--plum)}
+html.dc-edit:not(.plan-watch) #designTray .tray-item .ti-name{font-size:12.5px;font-weight:600;color:var(--ink)}
+html.dc-edit:not(.plan-watch) #designTray .tray-item .ti-alias{font-size:11px;color:var(--ink-3)}
+html.dc-edit:not(.plan-watch) #designTray .tray-item:not(.has-shot){padding:8px 10px;border:1px solid var(--hair);border-radius:10px}
+.tray-saved{display:flex;align-items:center;gap:8px;width:100%;margin-top:16px;padding:10px 12px;border:0;border-radius:12px;background:var(--plum-soft);color:var(--plum);font:600 13px/1.3 var(--sans);cursor:pointer;text-align:left}
+.tray-saved svg{width:16px;height:16px;flex:none}
+.tray-saved .sp{flex:1 1 auto}
+.tray-saved:focus-visible{outline:2px solid var(--plum);outline-offset:2px}
+html.dc-edit:not(.plan-watch) #designTray .tray-more{flex-direction:row;flex-wrap:wrap;gap:4px 16px;padding:12px 0 0;margin-top:14px}
+/* the Publish card: the publish page as a card at the right when it opens from the bar */
+html.dc-edit:not(.plan-watch) .ritualwrap.as-card{inset:auto;top:var(--dc-card-top);right:16px;bottom:16px;width:400px;max-width:calc(100vw - 32px);background:var(--sheet);border:1px solid color-mix(in srgb,var(--hair) 55%,transparent);border-radius:var(--dds-r-xl,20px);box-shadow:var(--dds-shadow-pop);z-index:86}
+html.dc-edit:not(.plan-watch) .ritualwrap.as-card .ritual{max-width:none;margin:0;padding:18px 20px 20px;position:relative}
+.ritualwrap.as-card .backline{margin:0;position:absolute;top:16px;right:16px}
+.ritualwrap.as-card #btnRitualBack{width:32px;height:32px;border-radius:999px;background:var(--dc-raised,var(--paper));color:var(--ink);font-size:0;display:inline-flex;align-items:center;justify-content:center}
+.ritualwrap.as-card #btnRitualBack::before{content:"✕";font-size:14px;line-height:1}
+.ritualwrap.as-card #btnRitualBack:hover{color:var(--plum)}
+.ritualwrap.as-card h1{font-size:22px;font-weight:600;margin:0 44px 2px 0;line-height:1.15}
+.ritualwrap.as-card .rsub{font-size:12.5px;margin-bottom:14px;max-width:none}
+.rit-live{display:none}
+.ritualwrap.as-card .rit-live{display:flex;align-items:center;gap:8px;padding:10px 12px;border-radius:12px;background:var(--sage-soft);color:var(--sage);font-size:12.5px;font-weight:500;margin-bottom:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.rit-live i{width:8px;height:8px;border-radius:50%;background:var(--sage);flex:none}
+.ritualwrap.as-card .rit-live[hidden]{display:none}
+.rit-h{display:none}
+.ritualwrap.as-card .rit-h{display:block;font-size:12.5px;font-weight:500;color:var(--ink-2);margin:0 0 4px}
+.ritualwrap.as-card .journal .jrow{gap:10px;padding:7px 0;border:0;align-items:center}
+.ritualwrap.as-card .journal .jsec{width:auto;padding:3px 10px;border-radius:999px;background:var(--dc-raised,var(--paper));color:var(--ink-2);font-size:12px;font-weight:600}
+.ritualwrap.as-card .blockprose{font-size:12.5px;font-weight:500;color:var(--ink-2);margin:14px 0 0;line-height:1.5}
+.ritualwrap.as-card .blocklist{border:0;margin-top:4px}
+.ritualwrap.as-card .blocklist li{border:0;padding:6px 0;font-size:13.5px;gap:0;justify-content:flex-start}
+.ritualwrap.as-card .blocklist li button{margin-left:auto}
+.rit-ck{display:none}
+.ritualwrap.as-card .rit-ck{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:999px;flex:none;margin-right:10px}
+.ritualwrap.as-card .rit-ck svg{width:12px;height:12px}
+.rit-ck.bad{background:var(--amber-soft);color:var(--amber)}
+.rit-ck.ok{background:var(--sage-soft);color:var(--sage)}
+.ritualwrap.as-card .blocklist li .rit-msg{flex:1 1 auto}
+.ritualwrap.as-card .blocklist li.ok .rit-msg{color:var(--ink-2)}
+.ritualwrap.as-card .blocklist button.textact{padding:0 14px;height:36px;border-radius:999px;background:var(--plum-soft);color:var(--plum);font-weight:600}
+.ritualwrap.as-card .blocklist button.textact:hover{text-decoration:none;background:color-mix(in srgb,var(--plum) 16%,var(--sheet))}
+.rit-ok{display:none}
+.ritualwrap.as-card .rit-ok{display:block}
+.ritualwrap.as-card .pubbtn{height:44px;padding:0 20px;border-radius:999px;background:var(--plum) var(--dds-grad-btn,linear-gradient(135deg,#6d3fd4 0%,#7a4bdd 100%));color:var(--dds-on-p,var(--fill-ink));box-shadow:0 6px 16px -8px color-mix(in srgb,var(--plum) 70%,transparent);margin-top:16px;font-size:14px}
+.ritualwrap.as-card .pubbtn:hover{filter:brightness(1.06)}
+.ritualwrap.as-card .pubbtn.quiet{background:transparent;color:var(--plum);border:1px solid var(--hair-2);box-shadow:none}
+.ritualwrap.as-card .notyet{display:inline-flex;align-items:center;height:36px;padding:0 14px;border-radius:999px;background:var(--plum-soft);color:var(--plum);font-size:13px;font-weight:600;margin:10px 8px 0 0}
+.ritualwrap.as-card .notyet:hover{color:var(--plum);background:color-mix(in srgb,var(--plum) 16%,var(--sheet))}
+.ritualwrap.as-card #ritActions>p{margin-top:14px !important;text-align:left !important;font-size:12px !important;font-style:normal !important;font-family:var(--sans) !important;color:var(--ink-3) !important}
+.ritualwrap.as-card .sched-panel{margin:14px 0 0 !important;max-width:none !important;border-radius:12px !important}
+.ritualwrap.as-card #ritSchedule{text-align:left !important;margin-top:14px !important}
+.ritualwrap.as-card #ritSchedule>div{margin-left:0 !important;margin-right:0 !important;max-width:none !important}
+.ritualwrap.as-card .receipt{margin:16px 0 0;max-width:none;padding:20px}
+.ritualwrap.as-card #ritActions a{margin-top:14px !important}
+.ritualwrap.as-card .pipe{margin-top:14px}
+@media(max-width:760px){
+  /* a phone's sheets keep their last rows above the dock, which floats over their bottom edge */
+  html.dc-edit:not(.plan-watch) .dc-slideover{padding-bottom:calc(80px + env(safe-area-inset-bottom,0px))}
+  html.dc-edit:not(.plan-watch) .ritualwrap.as-card .ritual{padding-bottom:calc(96px + env(safe-area-inset-bottom,0px))}
+  html.dc-edit:not(.plan-watch) .ritualwrap.as-card{top:auto;left:0;right:0;bottom:0;width:100%;max-width:100%;height:86vh;border-radius:var(--dds-r-xl,20px) var(--dds-r-xl,20px) 0 0;box-shadow:0 -8px 44px color-mix(in srgb,var(--scrim-ink) 30%,transparent)}
+}
+/* pill rows (pillRow) inside the inspector read as chips */
+#settingsPanel[data-mode="section"] #blocksCard .ins-pane>div>div>button{border-width:1px !important}
 .tray-more{display:flex;flex-direction:column;align-items:flex-start;gap:var(--dds-s2,8px);padding:var(--dds-s4,16px);margin-top:var(--dds-s2,8px);border-top:1px solid var(--hair)}
 /* a laptop or a tablet: the words on Exit, Undo and Redo go, the saved whisper
    steps aside and floats under the bar while a save is on its way */
@@ -1551,7 +1734,9 @@ body.pd-dragging *{cursor:grabbing !important}
                catalog, #designTray) · Files (NEW — a compact asset browser) · Content
                tree (the page tree, #designTreeList). Mount ids are unchanged. -->
           <aside id="trayPanel" class="dc-slideover dc-left" role="dialog" aria-modal="false" aria-label="Blocks, files and content tree" aria-hidden="true">
-            <div class="dc-panel-head"><span class="dc-panel-t">Your website</span><button type="button" class="dc-close" id="btnTrayClose" aria-label="Collapse this panel" title="Close (gives the canvas the whole screen)">✕</button></div>
+            <div class="dc-panel-head"><div class="dc-panel-tt"><span class="dc-panel-t" id="trayTitle">Your website</span><span class="dc-panel-sub" id="traySub" hidden></span></div><button type="button" class="dc-close" id="btnTrayClose" aria-label="Collapse this panel" title="Close (gives the canvas the whole screen)">Done</button></div>
+            <!-- the floating studio: the dock opens Add and Photos straight to their tab, so the tab row
+                 stays for the keyboard and the page outline, under the card's own title -->
             <div class="dc-tabs" role="tablist" aria-label="Page rail">
               <button type="button" class="dc-tab" id="tabAdd" role="tab" aria-selected="false" data-tab="add">Blocks</button>
               <button type="button" class="dc-tab" id="tabFiles" role="tab" aria-selected="false" data-tab="files">Files</button>
@@ -1559,12 +1744,25 @@ body.pd-dragging *{cursor:grabbing !important}
             </div>
             <div id="designTray" class="dc-tabpanel" role="tabpanel" aria-labelledby="tabAdd" hidden></div>
             <div id="designFilesWrap" class="dc-tabpanel" role="tabpanel" aria-labelledby="tabFiles" hidden></div>
-            <div id="designTreeWrap" class="dc-tabpanel" role="tabpanel" aria-labelledby="tabContents"><div id="designTreeList"></div></div>
+            <div id="designTreeWrap" class="dc-tabpanel" role="tabpanel" aria-labelledby="tabContents"><div class="dc-tree-back"><button type="button" class="textact" id="btnTreeBack">← Add a section</button></div><div id="designTreeList"></div></div>
           </aside>
           <!-- on-demand DESIGN SETTINGS (right slide-over with a scrim); cards mount
                into #designHost, id preserved -->
           <aside id="settingsPanel" class="dc-slideover dc-right" data-mode="styles" role="dialog" aria-modal="true" aria-label="Styles" aria-hidden="true">
-            <div class="dc-panel-head"><span class="dc-panel-t" id="settingsTitle">Styles</span><button type="button" class="dc-close" id="btnSettingsClose" aria-label="Close">✕</button></div>
+            <div class="dc-panel-head"><div class="dc-panel-tt"><span class="dc-panel-t" id="settingsTitle">Styles</span><span class="dc-panel-sub" id="settingsSub" hidden></span></div><button type="button" class="dc-close" id="btnSettingsClose" aria-label="Close">✕</button></div>
+            <!-- the floating studio, part two: one section's inspector has four tabs, and Styles has four of its own -->
+            <div class="dc-seg" id="inspectorSeg" role="tablist" aria-label="What to change in this section" hidden>
+              <button type="button" role="tab" data-itab="content" aria-selected="true">Content</button>
+              <button type="button" role="tab" data-itab="style" aria-selected="false">Style</button>
+              <button type="button" role="tab" data-itab="layout" aria-selected="false">Layout</button>
+              <button type="button" role="tab" data-itab="when" aria-selected="false">When</button>
+            </div>
+            <div class="dc-seg" id="stylesSeg" role="tablist" aria-label="What to change" hidden>
+              <button type="button" role="tab" data-stab="looks" aria-selected="true">Looks</button>
+              <button type="button" role="tab" data-stab="fonts" aria-selected="false">Fonts</button>
+              <button type="button" role="tab" data-stab="colours" aria-selected="false">Colours</button>
+              <button type="button" role="tab" data-stab="text" aria-selected="false">Text</button>
+            </div>
             <!-- one scroll container for the whole panel (theme gallery + design cards) -->
             <div class="dc-panel-scroll">
               <!-- The site's overall look (theme) lives here now — off the Design page,
@@ -1573,6 +1771,7 @@ body.pd-dragging *{cursor:grabbing !important}
               <div id="designGallery" hidden data-needs="owner"></div>
               <div id="designHost"></div>
             </div>
+            <div class="dc-panel-foot" id="stylesFoot" hidden>Nothing goes live until you publish.</div>
           </aside>
           <!-- G11: per-section review comments — the thread panel (right slide-over,
                same idiom as Design settings). Opened from a badge in the Content
@@ -1621,6 +1820,7 @@ body.pd-dragging *{cursor:grabbing !important}
     <div class="backline"><button class="quietact" id="btnRitualBack">← Back to your website</button></div>
     <h1 id="ritTitle" role="heading" aria-level="2">Here’s what changes.</h1>
     <p class="rsub" id="ritSub" aria-live="polite"></p>
+    <div id="ritLive" class="rit-live" hidden></div>
     <div id="ritBody" aria-live="polite"></div>
     <div id="ritBlockers"></div>
     <div id="ritActions"></div>
@@ -5557,13 +5757,14 @@ function ddsKeyFor(bi) {
   return null;
 }
 // ── actions (all REUSE the existing editor logic) ──
-function eeEditBlock(bi) {                       // open this one section's editor
+function eeEditBlock(bi, tab) {                  // open this one section's editor, on one of its tabs
   closePreview(); go("design");
   if (!$("blocksCard")) mountBlocksCard();
   const blk = BLOCKS_WORK && BLOCKS_WORK[bi];
   if (blk && blk.type === "form") { openSettingsPanel("forms"); return; }   // forms have their own builder
   const def = blk && BLOCK_DEFS.find((d) => d.type === blk.type);
   BLOCK_SOLO = bi;
+  INS_TAB = (tab === "style" || tab === "layout" || tab === "when") ? tab : "content";
   openSettingsPanel("section", (def && def.name) || "Section");
   BLOCK_FOCUS = bi; renderBlocksCard();          // consumes BLOCK_FOCUS → scroll + focus
 }
@@ -5645,6 +5846,7 @@ function openRitual(opts) {
   // the /changes read fails. (#btnPublish passes its click Event — the === true
   // guard keeps that falsy.)
   lastFocus = document.activeElement;
+  $("ritualWrap").classList.toggle("as-card", !!(opts && opts.card === true));   // from the bar: a card beside the page, the same words
   $("ritualWrap").classList.add("on"); document.body.style.overflow = "hidden";
   $("btnRitualBack").focus();
   loadRitual(!!(opts && opts.schedule === true));
@@ -5670,7 +5872,7 @@ function renderBlockerList(list) {
   box.appendChild(el("p", "blockprose", uniq.length === 1 ? "One thing to finish before this can publish:" : `${uniq.length} things to finish before this can publish:`));
   const ul = el("ul", "blocklist");
   uniq.forEach((b) => {
-    const li = el("li"); li.appendChild(el("span", null, b.message));
+    const li = el("li"); li.appendChild(ritMark(false)); li.appendChild(el("span", "rit-msg", b.message));
     const fix = el("button", "textact", "Fix"); fix.type = "button";
     fix.setAttribute("aria-label", "Fix: " + b.message);
     fix.addEventListener("click", () => {
@@ -5687,7 +5889,25 @@ function renderBlockerList(list) {
   });
   box.appendChild(ul);
 }
-function closeRitual() { $("ritualWrap").classList.remove("on"); document.body.style.overflow = ""; if (lastFocus && lastFocus.focus) { lastFocus.focus(); lastFocus = null; } loadToday(); }
+// the checklist's marks: amber for a real blocker, green for what is in place (item 35)
+function ritMark(ok) { const i = el("i", "rit-ck " + (ok ? "ok" : "bad")); i.innerHTML = uiIcon(ok ? "check" : "x", 12); i.setAttribute("aria-hidden", "true"); return i; }
+function renderReadyList() {
+  const box = $("ritBlockers"); if (!box) return;
+  box.appendChild(el("div", "rit-h rit-ok", "Before it goes live"));
+  const ul = el("ul", "blocklist rit-ok");
+  const li = el("li", "ok"); li.appendChild(ritMark(true)); li.appendChild(el("span", "rit-msg", "Everything needed is in place"));
+  ul.appendChild(li); box.appendChild(ul);
+}
+// the live row: where the site is, and when it last went up
+function renderRitualLive() {
+  const lv = $("ritLive"); if (!lv) return;
+  const u = typeof siteLiveUrl === "function" ? siteLiveUrl() : null, at = S.site && S.site.last_published_at;
+  if (!u || !at) { lv.hidden = true; return; }
+  lv.textContent = ""; lv.appendChild(el("i"));
+  lv.appendChild(document.createTextNode("Live · " + u.replace(/^https?:\/\//, "") + " · " + new Date(at).toLocaleDateString("en-US", { month: "short", day: "numeric" })));
+  lv.hidden = false;
+}
+function closeRitual() { $("ritualWrap").classList.remove("on"); $("ritualWrap").classList.remove("as-card"); document.body.style.overflow = ""; if (lastFocus && lastFocus.focus) { lastFocus.focus(); lastFocus = null; } loadToday(); }
 $("btnRitualBack").addEventListener("click", closeRitual);
 $("btnPublish").addEventListener("click", openRitual);
 async function loadRitual(toSchedule) {
@@ -5712,6 +5932,7 @@ async function loadRitual(toSchedule) {
     S.changes = c; REVIEWED = (c && c.draft_hash) || null;
     if (REVIEWED && !S.draftHash && !DRAFT_WRITES_OUT) S.draftHash = REVIEWED;   // as readChanges, when the page holds none
     renderPublishButton();
+    renderRitualLive();
     const body = $("ritBody"); body.innerHTML = "";
     const forClient = scopedClientName();
     if (forClient) {
@@ -5737,6 +5958,7 @@ async function loadRitual(toSchedule) {
       $("ritSub").textContent = `${c.count === 1 ? "One change" : c.count + " changes"}, read exactly as customers will experience ${c.count === 1 ? "it" : "them"}. Your live site stays as it is until the moment you decide.`;
     }
     if (c.count > 0 || c.first_publish) {
+      body.appendChild(el("div", "rit-h", "What changes"));
       const j = el("div", "journal");
       c.changes.forEach((ch) => {
         const row = el("div", "jrow");
@@ -5753,12 +5975,18 @@ async function loadRitual(toSchedule) {
       renderBlockerList(c.blocker_list);
     } else if (c.count > 0 || c.first_publish) {
       $("ritBlockers").innerHTML = "";
+      renderReadyList();
       const btn = el("button", "pubbtn", c.first_publish ? "Publish my site" : `Publish ${c.count === 1 ? "this change" : "these " + c.count + " changes"}`);
       btn.addEventListener("click", () => runPublish(btn, c.first_publish));
       acts.appendChild(btn);
       const ny = el("button", "notyet", "Not yet — keep them in the draft");
       ny.addEventListener("click", closeRitual);
       acts.appendChild(ny);
+      if ($("ritualWrap").classList.contains("as-card")) {   // the card keeps the page menu's draft link at hand
+        const share = el("button", "notyet", "Share a draft link"); share.type = "button"; share.title = "Copy a private, expiring link to this draft — no sign-in needed to view";
+        share.addEventListener("click", () => shareDraftLink());
+        acts.appendChild(share);
+      }
       const promise = el("p", null, "Publishing replaces your live site all at once — never partially, never halfway. Every version is kept, and any of them can come back.");
       promise.style.cssText = "font-family:var(--serif);font-style:italic;font-size:12.5px;color:var(--ink-2);text-align:center;margin-top:22px;line-height:1.7";
       acts.appendChild(promise);
@@ -7479,9 +7707,24 @@ async function saveTokens(change, msg) {
     toast(nice(err), true);
   }
 }
-function pillRow(host, label, opts, isOn, onPick) {
+// the tab a Styles row belongs to (the floating studio's Styles card hides the others)
+function stab(rowEl, tab) { const w = rowEl && (rowEl.classList && rowEl.classList.contains("ins-field") ? rowEl : rowEl.parentNode); if (w && w.dataset) w.dataset.stab = tab; return rowEl; }
+function pillRow(host, label, opts, isOn, onPick, style) {
   const wrapEl = el("div"); wrapEl.style.cssText = "margin-top:12px";
   wrapEl.appendChild(Object.assign(el("div", null, label), { style: "font-size:12px;font-weight:600;margin-bottom:6px" }));
+  if (style === "swatch") {   // round colour swatches; the name is the accessible name, as the pill's words were
+    const rowEl = el("div", "ins-swatches");
+    opts.forEach((o) => {
+      const on = isOn(o);
+      const b = el("button", "ins-sw" + (on ? " on" : "")); b.type = "button";
+      b.style.background = o.accent || "linear-gradient(135deg,#8c3b2e,#23635a)";
+      b.setAttribute("aria-label", (o.name || o[0]) + (on ? " ✓" : "")); b.title = o.name || o[0]; b.setAttribute("aria-pressed", String(on));
+      b.addEventListener("click", () => onPick(o));
+      rowEl.appendChild(b);
+    });
+    wrapEl.appendChild(rowEl); host.appendChild(wrapEl);
+    return rowEl;
+  }
   const rowEl = el("div"); rowEl.style.cssText = "display:flex;gap:7px;flex-wrap:wrap";
   opts.forEach((o) => {
     const on = isOn(o);
@@ -7500,6 +7743,34 @@ function pillRow(host, label, opts, isOn, onPick) {
 // type, PUTs /dev/brand-kit (server derives the SAME dev tokens), then the
 // granular Design Studio below fine-tunes. No second theme engine on the client.
 function normHexJs(x) { let h = String(x || "").trim().toLowerCase().replace(/^#/, ""); if (/^[0-9a-f]{3}$/.test(h)) h = h.replace(/(.)/g, "$1$1"); return /^[0-9a-f]{6}$/.test(h) ? "#" + h : null; }
+// The main colours in a logo: its picture drawn small, the pixels binned, the fullest bins
+// first (transparent, near-white and near-grey pixels skipped). Up to five, as hex.
+async function logoPalette(mediaId) {
+  const m = (S.media || []).find((x) => String(x.id) === String(mediaId));
+  const src = m && (m.thumb || m.url); if (!src) throw new Error("no picture");
+  const img = await new Promise((res, rej) => { const i = new Image(); i.crossOrigin = "anonymous"; i.onload = () => res(i); i.onerror = () => rej(new Error("load")); i.src = src; });
+  const c = document.createElement("canvas"); c.width = 48; c.height = 48;
+  const ctx = c.getContext("2d"); ctx.drawImage(img, 0, 0, 48, 48);
+  const d = ctx.getImageData(0, 0, 48, 48).data;   // throws on a cross-origin picture without CORS
+  const bins = new Map();
+  for (let i = 0; i < d.length; i += 4) {
+    const r = d[i], g = d[i + 1], b = d[i + 2], a = d[i + 3];
+    if (a < 128) continue;
+    if (r > 235 && g > 235 && b > 235) continue;                           // the paper behind the logo
+    if (Math.max(r, g, b) - Math.min(r, g, b) < 12 && r > 170) continue;   // light greys
+    const key = ((r >> 4) << 8) | ((g >> 4) << 4) | (b >> 4);
+    const bin = bins.get(key) || { n: 0, r: 0, g: 0, b: 0 }; bin.n++; bin.r += r; bin.g += g; bin.b += b; bins.set(key, bin);
+  }
+  const hex = (v) => Math.round(v).toString(16).padStart(2, "0");
+  const sorted = [...bins.values()].sort((x, y) => y.n - x.n).map((bin) => ({ n: bin.n, rgb: [bin.r / bin.n, bin.g / bin.n, bin.b / bin.n] }));
+  const out = [];
+  sorted.forEach((s) => {
+    if (out.length >= 5) return;
+    const far = out.every((o) => Math.abs(o[0] - s.rgb[0]) + Math.abs(o[1] - s.rgb[1]) + Math.abs(o[2] - s.rgb[2]) > 60);   // distinct enough to be a different colour
+    if (far) out.push(s.rgb);
+  });
+  return out.map(([r, g, b]) => "#" + hex(r) + hex(g) + hex(b));
+}
 async function mountBrandKitCard() {
   const host = $("designHost"); if (!host || $("brandKitCard")) return;
   let kit = null;
@@ -7514,7 +7785,7 @@ async function mountBrandKitCard() {
   // takes them as they stand when it is built or re-applied, so it never puts an older one back.
   const typeAndCorners = () => { const t = DESIGN_TOKENS || {}; return { heading_font: t.font_display || undefined, body_font: t.font_body || undefined, corner: t.radius || "" }; };
   const miniBtn = "font:inherit;font-size:12px;padding:5px 11px;border-radius:8px;border:1px solid var(--line,#ddd);background:transparent;cursor:pointer";
-  const card = el("div", "field"); card.id = "brandKitCard"; card.style.marginTop = "18px";
+  const card = el("div", "field"); card.id = "brandKitCard"; card.style.marginTop = "18px"; card.dataset.stab = "colours";
   card.appendChild(el("label", null, "Logo and brand color"));
   card.appendChild(el("div", "hint", "Set your logo and color once. Buttons, links and forms follow."));
   // logo
@@ -7532,6 +7803,30 @@ async function mountBrandKitCard() {
   colorInput.addEventListener("input", () => { hexInput.value = colorInput.value; st.primary = colorInput.value; });
   hexInput.addEventListener("change", () => { const h = normHexJs(hexInput.value); if (h) { st.primary = h; colorInput.value = h; hexInput.value = h; } });
   colorRow.append(colorInput, hexInput); card.appendChild(colorRow);
+  // Colours from my logo: read the logo's main colours and offer each as the brand colour
+  const fromLogo = el("div", "st-logo");
+  const lb = el("button", "dc-actbtn", "Colours from my logo"); lb.type = "button"; lb.title = "Read the main colours in your logo and offer them as the brand colour";
+  const out = el("div", "ins-swatches"); out.hidden = true; out.setAttribute("aria-live", "polite");
+  lb.addEventListener("click", async () => {
+    if (!st.logo_media_id) { toast("Choose a logo first, then its colours can be read."); try { logoBtn.focus(); } catch (_) {} return; }
+    lb.disabled = true; lb.textContent = "Reading your logo…";
+    const cols = await logoPalette(st.logo_media_id).catch(() => null);
+    lb.disabled = false; lb.textContent = "Colours from my logo";
+    out.textContent = ""; out.hidden = false;
+    if (!cols || !cols.length) { out.appendChild(el("span", "hint", "Couldn’t read the colours from that logo. Pick the colour above instead.")); return; }
+    out.appendChild(Object.assign(el("span", "hint", "From your logo — tap one to make it the brand colour:"), { style: "flex:0 0 100%;margin:0" }));
+    cols.forEach((h) => {
+      const b = el("button", "ins-sw"); b.type = "button"; b.style.background = h; b.title = h; b.setAttribute("aria-label", "Use " + h + " from your logo as the brand colour");
+      b.addEventListener("click", () => {
+        const safe = ovDarkenUntil(h, "#ffffff", 4.5);   // buttons carry white words: keep them readable
+        st.primary = safe; colorInput.value = safe; hexInput.value = safe;
+        out.querySelectorAll(".ins-sw").forEach((x) => x.classList.toggle("on", x === b));
+        toast(safe === h ? "Brand colour set — Build & apply brand kit to use it" : "Brand colour set, darkened a little so white text stays readable — Build & apply brand kit to use it");
+      });
+      out.appendChild(b);
+    });
+  });
+  fromLogo.append(lb, out); card.appendChild(fromLogo);
   card.appendChild(el("div", "hint", "Type and corners are set under Colors and fonts. The kit keeps whatever they are when you apply it."));
   // apply
   const apply = el("button", null, "Build & apply brand kit"); apply.type = "button";
@@ -7622,6 +7917,61 @@ function renderBrandImageryReport(host, d) {
 // The curated fonts, one list for headings and one for body text, each name shown in its
 // own face. Folded until opened: opening it loads each family's regular weight to draw the
 // names. A site only ever carries the families it picks.
+// A look is "on" when every token it sets is what the site has (Original: none of them set).
+function lookIsOn(l) {
+  const T = DESIGN_TOKENS || {}; const keys = Object.keys(LOOK_CLEAR);
+  const t = l.tokens || {};
+  if (!Object.keys(t).length) return keys.every((k) => !T[k]);
+  return keys.every((k) => String(T[k] || "") === String(t[k] || ""));
+}
+// Ready-made looks as small pictures of themselves: the page colour, a heading, two lines, a button.
+function lookTiles(host, label, looks, isOn, onPick) {
+  const wrap = el("div", "ins-field"); wrap.dataset.stab = "looks"; wrap.style.marginTop = "4px";
+  wrap.appendChild(el("div", "ins-lbl", label));
+  const grid = el("div", "st-looks");
+  looks.forEach((l) => {
+    const t = l.tokens || {}; const on = isOn(l);
+    const b = el("button", "st-look" + (on ? " on" : "")); b.type = "button"; b.setAttribute("aria-pressed", String(on));
+    const pic = el("div", "st-look-pic"); pic.style.background = t.bg || "#ffffff";
+    const ink = t.ink || "#1d1b22", acc = t.accent || ink;
+    const h = el("i", "h"); h.style.background = ink;
+    const l1 = el("i"); l1.style.background = ink; l1.style.opacity = ".45";
+    const l2 = el("i"); l2.style.background = ink; l2.style.opacity = ".45"; l2.style.width = "60%";
+    const bt = el("i", "b"); bt.style.background = acc; bt.style.borderRadius = t.radius === "2px" ? "1px" : "4px";
+    pic.append(h, l1, l2, bt); b.appendChild(pic);
+    b.appendChild(el("span", "st-look-l", (on ? "✓ " : "") + (l.name || "Original")));
+    b.title = (l.name || "Original") + (on ? " — in use" : "");
+    b.addEventListener("click", () => onPick(l));
+    grid.appendChild(b);
+  });
+  wrap.appendChild(grid); host.appendChild(wrap);
+  return wrap;
+}
+// The two faces in use, each a row that opens the font library (or the Type row when there is none).
+function fontRows(card, T) {
+  const wrap = el("div", "ins-field"); wrap.dataset.stab = "fonts"; wrap.style.marginTop = "4px";
+  wrap.appendChild(el("div", "ins-lbl", "Fonts · fewer fonts, faster site"));
+  const firstOf = (v) => String(v || "").split(",")[0].replace(/['"]/g, "").trim();
+  const nameOf = (tok) => {
+    const v = T[tok]; if (!v) return "Original";
+    const lib = (DESIGN_FONTS || []).find((f) => firstOf(v).toLowerCase() === String(f.css).toLowerCase()); if (lib) return lib.family;
+    const pre = TYPE_PRESETS.find((p) => p.tokens && p.tokens[tok] === v); if (pre) return pre.name;
+    return firstOf(v) || "Original";
+  };
+  [["font_display", "Headings"], ["font_body", "Text"]].forEach(([tok, k]) => {
+    const b = el("button", "st-fontrow"); b.type = "button"; b.title = "Change the " + k.toLowerCase() + " font";
+    b.appendChild(el("span", "k", k));
+    const v = el("span", "v", nameOf(tok)); if (T[tok]) v.style.fontFamily = T[tok]; b.appendChild(v);
+    b.insertAdjacentHTML("beforeend", uiIcon("chevron", 14));
+    b.addEventListener("click", () => {
+      const lib = card.querySelector("details.fontlib");
+      if (lib) { FONT_LIB_OPEN = true; lib.open = true; const grp = lib.querySelector('[aria-label="' + (tok === "font_display" ? "Headings" : "Body text") + ' font"]'); (grp || lib).scrollIntoView({ block: "nearest", behavior: "smooth" }); const f = grp && grp.querySelector("button"); if (f) f.focus({ preventScroll: true }); return; }
+      const type = [...card.querySelectorAll("[data-stab='fonts'] button")].find((x) => !x.classList.contains("st-fontrow")); if (type) { type.scrollIntoView({ block: "nearest" }); type.focus({ preventScroll: true }); }
+    });
+    wrap.appendChild(b);
+  });
+  card.appendChild(wrap);
+}
 function mountFontLibrary(card, T) {
   if (!DESIGN_FONTS.length) return;
   const firstOf = (v) => String(v || "").split(",")[0].replace(/['"]/g, "").trim().toLowerCase();
@@ -7630,7 +7980,7 @@ function mountFontLibrary(card, T) {
     st.textContent = DESIGN_FONTS.map((f) => `@font-face{font-family:'${f.css}';src:url(/fonts/library/${f.id}-400.woff2) format('woff2');font-weight:400;font-display:swap}`).join("");
     document.head.appendChild(st);
   }
-  const box = el("details", "fontlib"); box.style.cssText = "margin-top:12px";
+  const box = el("details", "fontlib"); box.style.cssText = "margin-top:12px"; box.dataset.stab = "fonts";
   const sum = el("summary", null, "More fonts: " + DESIGN_FONTS.length + " to choose from"); sum.style.cssText = "font-size:12px;font-weight:600;cursor:pointer";
   box.appendChild(sum);
   if (FONT_LIB_OPEN) box.open = true;
@@ -7669,34 +8019,32 @@ async function mountDesignCard(fresh = true) {
   // FD-T3: complete looks — a coordinated one-tap starting point (then fine-tune below).
   // This is the front door the owner reaches for first, so it leads the card and
   // explains itself (a look restyles the whole site; publishing stays approval-first).
-  const looksRow = pillRow(card, "Ready-made styles", STYLE_LOOKS, () => false, (l) => saveTokens({ ...LOOK_CLEAR, ...(l.tokens || {}) }, (l.name || "Original") + " style"));
-  if (looksRow && looksRow.parentNode) {
-    looksRow.parentNode.insertBefore(
-      el("div", "hint", "One tap restyles your whole site — colors, type and corners together, always readable. Nothing reaches your live site until you publish."),
-      looksRow);
-  }
+  // The floating studio: each look is a small picture of itself, the one in use ticked.
+  const looksWrap = lookTiles(card, "Ready-made looks", STYLE_LOOKS, lookIsOn, (l) => saveTokens({ ...LOOK_CLEAR, ...(l.tokens || {}) }, (l.name || "Original") + " style"));
+  looksWrap.appendChild(el("div", "hint", "One tap restyles your whole site — colors, type and corners together, always readable. Nothing reaches your live site until you publish."));
   const fixedColors = FIXED_COLOR_TEMPLATES.has((S.site && S.site.template_slug) || "");
-  if (fixedColors) card.appendChild(el("div", "hint", "This template keeps its own dark colors, so the color and background choices don't change it. Fonts, text size, corners and spacing do."));
+  if (fixedColors) card.appendChild(el("div", "hint", "This template keeps its own dark colors, so the color and background choices don't change it. Fonts, text size, corners and spacing do.")).dataset.stab = "colours";
   // colors
-  if (!fixedColors) pillRow(card, "Colors", PALETTES, (p) => (p.accent ? String(T.accent || "").toLowerCase() === p.accent : !T.accent),
-    (p) => saveTokens(p.key ? { ...p.tokens } : { accent: "", accent_dark: "", ink: "", soft: "" }, p.key ? p.name : "Original colors"));
+  if (!fixedColors) stab(pillRow(card, "Colors", PALETTES, (p) => (p.accent ? String(T.accent || "").toLowerCase() === p.accent : !T.accent),
+    (p) => saveTokens(p.key ? { ...p.tokens } : { accent: "", accent_dark: "", ink: "", soft: "" }, p.key ? p.name : "Original colors"), "swatch"), "colours");
   // type
-  pillRow(card, "Type", TYPE_PRESETS, (t) => (t.key ? T.font_display === t.tokens.font_display : !T.font_display),
-    (t) => saveTokens(t.key ? { ...t.tokens } : { font_display: "", font_body: "" }, t.key ? t.name : "Original type"));
+  fontRows(card, T);
+  stab(pillRow(card, "Type", TYPE_PRESETS, (t) => (t.key ? T.font_display === t.tokens.font_display : !T.font_display),
+    (t) => saveTokens(t.key ? { ...t.tokens } : { font_display: "", font_body: "" }, t.key ? t.name : "Original type")), "fonts");
   mountFontLibrary(card, T);
   // size / corners / background / density
-  pillRow(card, "Text size", SIZE_OPTS, (o) => String(T.font_scale || "") === o[1], (o) => saveTokens({ font_scale: o[1] }, "Text size: " + o[0]));
-  pillRow(card, "Corners", CORNER_OPTS, (o) => String(T.radius || "") === o[1], (o) => saveTokens({ radius: o[1] }, "Corners: " + o[0]));
-  if (!fixedColors) pillRow(card, "Background", BG_OPTS, (o) => String(T.bg || "") === o[1], (o) => saveTokens({ bg: o[1] }, "Background: " + o[0]));
-  pillRow(card, "Spacing", DENSITY_OPTS, (o) => String(T.spacing_scale || "") === o[1], (o) => saveTokens({ spacing_scale: o[1] }, "Spacing: " + o[0]));
+  stab(pillRow(card, "Text size", SIZE_OPTS, (o) => String(T.font_scale || "") === o[1], (o) => saveTokens({ font_scale: o[1] }, "Text size: " + o[0])), "text");
+  stab(pillRow(card, "Corners", CORNER_OPTS, (o) => String(T.radius || "") === o[1], (o) => saveTokens({ radius: o[1] }, "Corners: " + o[0])), "looks");
+  if (!fixedColors) stab(pillRow(card, "Background", BG_OPTS, (o) => String(T.bg || "") === o[1], (o) => saveTokens({ bg: o[1] }, "Background: " + o[0])), "colours");
+  stab(pillRow(card, "Spacing", DENSITY_OPTS, (o) => String(T.spacing_scale || "") === o[1], (o) => saveTokens({ spacing_scale: o[1] }, "Spacing: " + o[0])), "text");
   // DS-6/DS-7: layout choices — every template family renders both variants,
   // each in its own visual voice, so the controls show for all templates (G2).
   const heroRow = [["Classic", ""], ["Photo beside text", "split"]];
-  pillRow(card, "Front-page layout", heroRow, (o) => String((S.settings && S.settings.hero_layout) || "") === o[1],
-    async (o) => { try { await settingsPut({ hero_layout: o[1] }); const c2 = $("designCard"); if (c2) c2.remove(); mountDesignCard(); toast("Layout: " + o[0] + " — publish to apply"); scheduleChangesRefresh(); refreshDesignPreview(); } catch (err) { toast(nice(err), true); } });
+  stab(pillRow(card, "Front-page layout", heroRow, (o) => String((S.settings && S.settings.hero_layout) || "") === o[1],
+    async (o) => { try { await settingsPut({ hero_layout: o[1] }); const c2 = $("designCard"); if (c2) c2.remove(); mountDesignCard(); toast("Layout: " + o[0] + " — publish to apply"); scheduleChangesRefresh(); refreshDesignPreview(); } catch (err) { toast(nice(err), true); } }), "looks");
   const navRow = [["Standard", ""], ["Centered", "centered"]];
-  pillRow(card, "Header", navRow, (o) => String((S.settings && S.settings.nav_style) || "") === o[1],
-    async (o) => { try { await settingsPut({ nav_style: o[1] }); const c2 = $("designCard"); if (c2) c2.remove(); mountDesignCard(); toast("Header: " + o[0] + " — publish to apply"); scheduleChangesRefresh(); refreshDesignPreview(); } catch (err) { toast(nice(err), true); } });
+  stab(pillRow(card, "Header", navRow, (o) => String((S.settings && S.settings.nav_style) || "") === o[1],
+    async (o) => { try { await settingsPut({ nav_style: o[1] }); const c2 = $("designCard"); if (c2) c2.remove(); mountDesignCard(); toast("Header: " + o[0] + " — publish to apply"); scheduleChangesRefresh(); refreshDesignPreview(); } catch (err) { toast(nice(err), true); } }), "looks");
   // DS-8: suggest for my business (deterministic; owner approves by clicking Apply)
   const ik = (S.settings && S.settings.industry_key) || "generic";
   const sug = SUGGEST[ik];
@@ -7705,7 +8053,7 @@ async function mountDesignCard(fresh = true) {
     const p = PALETTES.find((x) => x.key === pk), t = TYPE_PRESETS.find((x) => x.key === tk);
     const already = p && t && String(T.accent || "").toLowerCase() === p.accent && T.font_display === t.tokens.font_display;
     if (p && t && !already) {
-      const rowEl = el("div"); rowEl.style.cssText = "margin-top:12px;display:flex;gap:8px;align-items:center;flex-wrap:wrap";
+      const rowEl = el("div"); rowEl.style.cssText = "margin-top:12px;display:flex;gap:8px;align-items:center;flex-wrap:wrap"; rowEl.dataset.stab = "colours";
       rowEl.appendChild(el("span", "hint", "Suggested for your kind of business: " + p.name + " + " + t.name + "."));
       const b = el("button", null, "Apply suggestion");
       b.type = "button"; b.style.cssText = "font:inherit;font-size:12px;padding:5px 12px;border-radius:999px;border:2px solid var(--plum,#5b3fa0);background:var(--plum-tint,#faf7ff);cursor:pointer";
@@ -7714,9 +8062,9 @@ async function mountDesignCard(fresh = true) {
       card.appendChild(rowEl);
     }
   }
-  card.appendChild(el("div", "hint", "Designed, readable combinations — contrast is checked so your site always stays easy to read. You can restore any earlier version."));
+  card.appendChild(el("div", "hint", "Designed, readable combinations — contrast is checked so your site always stays easy to read. You can restore any earlier version.")).dataset.stab = "looks";
   if (DESIGN_TOKENS && Object.keys(DESIGN_TOKENS).length && !PALETTES.some((p) => p.accent && String(DESIGN_TOKENS.accent || "").toLowerCase() === p.accent) && DESIGN_TOKENS.accent) {
-    card.appendChild(el("div", "hint", "A developer set custom colors — picking a palette replaces them."));
+    card.appendChild(el("div", "hint", "A developer set custom colors — picking a palette replaces them.")).dataset.stab = "colours";
   }
   host.appendChild(card);
   mountSectionsCard();
@@ -7745,7 +8093,7 @@ async function mountDevCssCard() {
   DEV_CSS_ALLOWED = !!(data && data.can_edit_css);
   if (!DEV_CSS_ALLOWED) return;   // owners see the palette, not the advanced editor
 
-  const wrap = el("details", "field"); wrap.id = "devCssCard"; wrap.style.marginTop = "18px";
+  const wrap = el("details", "field"); wrap.id = "devCssCard"; wrap.style.marginTop = "18px"; wrap.dataset.stab = "looks";
   const sum = el("summary", null, "Custom CSS (advanced)");
   sum.style.cssText = "cursor:pointer;font-weight:600;font-size:13px;color:var(--plum-deep,#3a2470);list-style:none;padding:2px 0";
   wrap.appendChild(sum);
@@ -8834,8 +9182,10 @@ const BLOCK_VARIANT_OPTS = {
 // Writes block.variant into the working copy — saved by the existing "Save sections".
 function blockVariantRow(idx, blk, sub) {
   const opts = BLOCK_VARIANT_OPTS[blk && blk.type]; if (!opts) return;
-  pillRow(sub, "Style", opts, (o) => String((BLOCKS_WORK[idx] && BLOCKS_WORK[idx].variant) || "") === o[1],
-    (o) => { const b = { ...BLOCKS_WORK[idx] }; if (o[1]) b.variant = o[1]; else delete b.variant; BLOCKS_WORK[idx] = b; renderBlocksCard(); });
+  const isOn = (o) => String((BLOCKS_WORK[idx] && BLOCKS_WORK[idx].variant) || "") === o[1];
+  const pick = (o) => { const b = { ...BLOCKS_WORK[idx] }; if (o[1]) b.variant = o[1]; else delete b.variant; BLOCKS_WORK[idx] = b; renderBlocksCard(); dcLiveFromPanel(); };
+  if (sub.classList && sub.classList.contains("ins-pane")) { insTiles(sub, "Layout", opts, isOn, pick); return; }   // the inspector: pictures
+  pillRow(sub, "Style", opts, isOn, pick);
 }
 // A calm, collapsed "Look of this section" control row — plain words, smart defaults,
 // no CSS. Lives INSIDE the block you're already editing (no separate panel). The
@@ -8843,6 +9193,16 @@ function blockVariantRow(idx, blk, sub) {
 function blockLookRow(idx, blk, sub) {
   const cur = (blk && blk.look) || {};
   const chosen = Object.keys(cur).some((k) => cur[k]);
+  if (sub && sub.content) {   // the inspector's panes: each choice on the tab it belongs to
+    const panes = sub;
+    const bands = [["", "Default"], ["tinted", "Tinted"], ["plain", "Plain"], ["accent", "Accent band"], ["dark", "Dark band"]];
+    pillRow(panes.style, "Background band", bands.map(([v, l]) => [l, v]), (o) => (cur.background || "") === o[1], (o) => lookSet(idx, "background", o[1]));
+    insTiles(panes.layout, "Width", [["Normal", ""], ["Full width", "full"]], (o) => (cur.width || "") === o[1], (o) => lookSet(idx, "width", o[1]));
+    pillRow(panes.layout, "Spacing", [["Tight", "tight"], ["Normal", ""], ["Roomy", "roomy"]], (o) => (cur.spacing || "") === o[1], (o) => lookSet(idx, "spacing", o[1]));
+    pillRow(panes.layout, "Text", [["Default", ""], ["Centered", "center"]], (o) => (cur.align || "") === o[1], (o) => lookSet(idx, "align", o[1]));
+    pillRow(panes.when, "Show on", [["All screens", ""], ["Desktop only", "mobile"], ["Phones only", "desktop"]], (o) => (cur.hideOn || "") === o[1], (o) => lookSet(idx, "hideOn", o[1]));
+    return;
+  }
   const OPTS = [
     ["background", "Background", [["", "Default"], ["tinted", "Tinted"], ["plain", "Plain"], ["accent", "Accent band"], ["dark", "Dark band"]]],
     ["width", "Width", [["", "Normal"], ["full", "Full width"]]],
@@ -8952,15 +9312,19 @@ async function ovConfirmContrastAck() {
 // Remember which section's style popover the owner opened, so the full redraw
 // after every pick doesn't collapse it under them.
 let OV_STYLE_OPEN = null;
-function blockStyleRow(idx, blk, sub) {
+function blockStyleRow(idx, blk, sub, flat) {
   const st = (BLOCKS_WORK[idx] && BLOCKS_WORK[idx].style) || {};
   const chosen = ["text_color", "bg_color", "accent", "font", "size", "align"].some((k) => st[k]);
-  const det = el("details"); det.style.cssText = "margin-top:8px;border-top:1px dashed var(--line,#e5e5e5);padding-top:8px";
-  det.open = chosen || OV_STYLE_OPEN === idx;
-  det.addEventListener("toggle", () => { if (det.open) OV_STYLE_OPEN = idx; else if (OV_STYLE_OPEN === idx) OV_STYLE_OPEN = null; });
-  const sum = el("summary", null, "Style this section" + (chosen ? "  ·  customised" : "  ·  optional"));
-  sum.style.cssText = "cursor:pointer;font-size:12px;font-weight:600;color:var(--soft,#6b6478)";
-  det.appendChild(sum);
+  // flat: the inspector's Style tab, where everything is in the open; otherwise the list's fold
+  const det = flat ? el("div", "ins-style") : el("details");
+  if (!flat) {
+    det.style.cssText = "margin-top:8px;border-top:1px dashed var(--line,#e5e5e5);padding-top:8px";
+    det.open = chosen || OV_STYLE_OPEN === idx;
+    det.addEventListener("toggle", () => { if (det.open) OV_STYLE_OPEN = idx; else if (OV_STYLE_OPEN === idx) OV_STYLE_OPEN = null; });
+    const sum = el("summary", null, "Style this section" + (chosen ? "  ·  customised" : "  ·  optional"));
+    sum.style.cssText = "cursor:pointer;font-size:12px;font-weight:600;color:var(--soft,#6b6478)";
+    det.appendChild(sum);
+  }
   // One writer: patch keys in (empty string = back to default → key deleted); an
   // empty object is deleted whole. A color change clears contrast_ack (§5) and a
   // custom background evicts the look's background band (§3 mutual exclusion).
@@ -8991,6 +9355,20 @@ function blockStyleRow(idx, blk, sub) {
   const well = (label, key) => {
     const cur = st[key] || "";
     const shades = ovShades(key);
+    if (flat) {   // round swatches from the site's own colours, the slashed circle for the default
+      const row = insSwatches(det, label, [["", "Default"], ...shades.map((h) => [h, h])], cur, (v) => setStyle({ [key]: v }, true));
+      const isCustom = !!cur && !shades.includes(cur);
+      const cust = el("button", "ai-chip" + (isCustom ? " ai-main" : ""), "Custom…" + (isCustom ? " ✓" : "")); cust.type = "button"; row.appendChild(cust);
+      const pairRow = el("div"); pairRow.style.cssText = "display:flex;align-items:center;gap:10px;flex:0 0 100%"; pairRow.hidden = !isCustom;
+      const colorInput = el("input"); colorInput.type = "color"; colorInput.value = cur || shades[0]; colorInput.style.cssText = "width:44px;height:32px;border:1px solid var(--line,#ddd);border-radius:8px;background:none;cursor:pointer;padding:0";
+      const hexInput = el("input"); hexInput.type = "text"; hexInput.value = isCustom ? cur : ""; hexInput.placeholder = "#8c3b2e"; hexInput.setAttribute("aria-label", label + " as a hex colour"); hexInput.style.cssText = "width:120px";
+      colorInput.addEventListener("input", () => { hexInput.value = colorInput.value; });
+      colorInput.addEventListener("change", () => setStyle({ [key]: colorInput.value }, true));
+      hexInput.addEventListener("change", () => { const h = normHexJs(hexInput.value); if (h) setStyle({ [key]: h }, true); });
+      pairRow.append(colorInput, hexInput); row.appendChild(pairRow);
+      cust.addEventListener("click", () => { pairRow.hidden = !pairRow.hidden; if (!pairRow.hidden) hexInput.focus(); });
+      return;
+    }
     const wrap = el("div"); wrap.style.cssText = "margin-top:12px";
     wrap.appendChild(Object.assign(el("div", null, label), { style: "font-size:12px;font-weight:600;margin-bottom:6px" }));
     const row = el("div"); row.style.cssText = "display:flex;gap:7px;flex-wrap:wrap;align-items:center";
@@ -9022,9 +9400,9 @@ function blockStyleRow(idx, blk, sub) {
     wrap.appendChild(pairRow);
     det.appendChild(wrap);
   };
-  well("Text", "text_color");
-  well("Background", "bg_color");
-  well("Accent", "accent");
+  well(flat ? "Text colour" : "Text", "text_color");
+  well(flat ? "Background · from your site colours" : "Background", "bg_color");
+  well(flat ? "Buttons" : "Accent", "accent");
   // LIVE CONTRAST (§5) — a chip per governing pair, with the one-tap fix beside a
   // failing one. Recomputed on every redraw (every pick redraws), so it's live.
   const pairs = ovStylePairs(st);
@@ -9045,7 +9423,7 @@ function blockStyleRow(idx, blk, sub) {
     det.appendChild(crow);
     if (pairs.some((p) => p.siteBg)) det.appendChild(Object.assign(el("div", "hint", "Text is checked against your page background."), { style: "margin-top:4px" }));
   }
-  det.appendChild(el("div", "hint", "Optional — give just this section its own colors, face, size or alignment. Everything else keeps your site's overall design."));
+  det.appendChild(el("div", "hint", flat ? "Only this section changes. Everything else keeps your site’s overall design." : "Optional — give just this section its own colors, face, size or alignment. Everything else keeps your site's overall design."));
   sub.appendChild(det);
 }
 // Phase EXP: auto-expiring content — an optional "Show this from / until" window on
@@ -9054,22 +9432,23 @@ function blockStyleRow(idx, blk, sub) {
 // Dates only (plain, intuitive); blank = always show. The server normalizes + the
 // render omits the section outside its window, and the platform auto-republishes the
 // live site at the boundary — so nobody has to remember to take it down.
-function blockWindowRow(idx, blk, sub) {
+function blockWindowRow(idx, blk, sub, flat) {
   const from = (blk && blk.show_from ? String(blk.show_from) : "").slice(0, 10);
   const until = (blk && blk.show_until ? String(blk.show_until) : "").slice(0, 10);
   const today = new Date().toISOString().slice(0, 10);
   const set = !!(from || until);
-  const det = el("details"); det.style.cssText = "margin-top:8px;border-top:1px dashed var(--line,#e5e5e5);padding-top:8px";
-  if (set) det.open = true;
+  const det = flat ? el("div", "ins-when") : el("details");
+  if (!flat) { det.style.cssText = "margin-top:8px;border-top:1px dashed var(--line,#e5e5e5);padding-top:8px"; if (set) det.open = true; }
   // A small state chip so the owner sees at a glance what's scheduled or expired.
   let chip = "", chipCss = "";
   if (from && from > today) { chip = "Scheduled — starts " + from; chipCss = "background:var(--dds-warn-soft,#fff4e0);color:var(--dds-warn,#8a5a00)"; }
   else if (until && until < today) { chip = "Expired — ended " + until; chipCss = "background:color-mix(in srgb,var(--ink,#1b1525) 7%,transparent);color:var(--soft,#6b6478)"; }
   else if (until) { chip = "Showing until " + until; chipCss = "background:var(--sage-soft,#eaf7ee);color:var(--sage,#1c6b34)"; }
   else if (from) { chip = "Showing since " + from; chipCss = "background:var(--sage-soft,#eaf7ee);color:var(--sage,#1c6b34)"; }
-  const sum = el("summary");
-  sum.style.cssText = "cursor:pointer;font-size:12px;font-weight:600;color:var(--soft,#6b6478);display:flex;align-items:center;gap:8px;flex-wrap:wrap";
-  sum.appendChild(document.createTextNode("Show this only for a while" + (set ? "" : "  ·  optional")));
+  const sum = el(flat ? "div" : "summary", flat ? "ins-lbl" : null);
+  if (!flat) sum.style.cssText = "cursor:pointer;font-size:12px;font-weight:600;color:var(--soft,#6b6478);display:flex;align-items:center;gap:8px;flex-wrap:wrap";
+  else sum.style.cssText = "display:flex;align-items:center;gap:8px;flex-wrap:wrap";
+  sum.appendChild(document.createTextNode("Show this only for a while" + (set || flat ? "" : "  ·  optional")));
   if (chip) { const c = el("span", null, chip); c.style.cssText = "font-size:11px;font-weight:600;padding:2px 9px;border-radius:999px;" + chipCss; sum.appendChild(c); }
   det.appendChild(sum);
   const row = el("div"); row.style.cssText = "display:flex;gap:14px;flex-wrap:wrap;align-items:center;margin-top:8px";
@@ -9146,7 +9525,7 @@ function renderBlocksCard() {
     // carries a real type + _clEdit, so it falls through to its normal editor below).
     if (blk && blk.type === "linked") { renderLinkedChip(blk, idx, card); return; }
     const def = BLOCK_DEFS.find((d) => d.type === blk.type); if (!def) return;
-    const sub = el("div"); sub.id = "blkSub-" + idx; sub.className = "blk-sub"; sub.style.cssText = "border:1px solid var(--line,#e5e5e5);border-radius:12px;padding:12px 14px;margin-top:10px";
+    const box = el("div"); box.id = "blkSub-" + idx; box.className = "blk-sub"; box.style.cssText = "border:1px solid var(--line,#e5e5e5);border-radius:12px;padding:12px 14px;margin-top:10px";
     const head = el("div"); head.style.cssText = "display:flex;align-items:center;gap:8px;margin-bottom:8px";
     // the panel's title already names this section when it's the only one showing
     const nm = el("div", null, solo !== null ? (blk.mediaNote || "") : def.name + (blk.mediaNote ? "  ·  " + blk.mediaNote : "")); nm.style.cssText = "flex:1;font-weight:600;font-size:13px";
@@ -9159,12 +9538,12 @@ function renderBlocksCard() {
     rm.addEventListener("click", () => { const wasSolo = solo !== null; panelRemove(idx); if (wasSolo) closeSettingsPanel(); renderBlocksCard(); });
     const sv = el("button", null, "Save for reuse"); sv.type = "button"; sv.title = "Save this section to your content library"; sv.style.cssText = miniBtn;
     sv.addEventListener("click", () => clSave(idx));   // CL-1
-    head.append(nm, sv, up, dn, rm); sub.appendChild(head);
+    head.append(nm, sv, up, dn, rm); box.appendChild(head);
     // CL-LINK: editing the SINGLE SOURCE (reached via a linked chip) — swap the
     // toolbar for a clear "update everywhere" flow so it can't be mistaken for a
     // normal, page-only edit.
     if (blk._clEdit) {
-      sub.style.borderColor = "var(--plum-line,#d9cef0)"; sub.style.background = "var(--plum-tint,#faf7ff)";
+      box.style.borderColor = "var(--plum-line,#d9cef0)"; box.style.background = "var(--plum-tint,#faf7ff)";
       head.textContent = "";
       const it = clItemById(blk._clEdit);
       const lbl = el("div", null, "Editing saved section" + (it ? " · " + it.name : "")); lbl.style.cssText = "flex:1;min-width:150px;font-weight:600;font-size:13px;color:var(--plum-deep,#3a2470)";
@@ -9173,11 +9552,26 @@ function renderBlocksCard() {
       upd.addEventListener("click", () => clUpdateSource(idx));
       cxl.addEventListener("click", () => { BLOCKS_WORK[idx] = { type: "linked", ref: blk._clEdit }; renderBlocksCard(); });
       head.append(lbl, upd, cxl);
-      sub.appendChild(Object.assign(el("div", "hint", "This is your saved section. Changes here update every place it’s linked — after you Update and publish. “Cancel” keeps it as it was."), { style: "margin:0 0 8px;font-size:12px;color:#6b4fa0" }));
+      box.appendChild(Object.assign(el("div", "hint", "This is your saved section. Changes here update every place it’s linked — after you Update and publish. “Cancel” keeps it as it was."), { style: "margin:0 0 8px;font-size:12px;color:#6b4fa0" }));
     }
+    // The floating studio: one section's editor is the inspector card. Its fields land on the
+    // Content tab and its look, layout and timing on their own tabs; the pill on the page
+    // already moves, duplicates and deletes, so the row of small buttons stays with the list.
+    else if (solo !== null) head.remove();
+    const panes = solo !== null ? insPanes(box) : null;
+    if (panes) {   // Layout keeps the two arrows: a keyboard's way to move, and the list's own pair
+      const pos = el("div", "ins-field"); pos.appendChild(el("div", "ins-lbl", "Position on the page"));
+      const row = el("div", "ins-swatches"); up.className = dn.className = "dc-actbtn"; up.style.cssText = dn.style.cssText = ""; up.title = "Move this section up"; dn.title = "Move this section down";
+      up.setAttribute("aria-label", "Move up"); dn.setAttribute("aria-label", "Move down");
+      if (up.disabled) up.style.opacity = ".35"; if (dn.disabled) dn.style.opacity = ".35";
+      row.append(up, dn); pos.appendChild(row); panes.layout.appendChild(pos);
+    }
+    const sub = panes ? panes.content : box;
+    if (panes) insHead(blk, def);
     const ti = el("input"); ti.type = "text"; ti.placeholder = "Section heading (optional)"; ti.value = blk.title || ""; ti.style.cssText = inputCss;
-    ti.addEventListener("change", () => { BLOCKS_WORK[idx] = { ...BLOCKS_WORK[idx], title: ti.value.trim() }; });
-    sub.appendChild(ti);
+    ti.addEventListener("change", () => { BLOCKS_WORK[idx] = { ...BLOCKS_WORK[idx], title: ti.value.trim() }; if (panes) insHead(BLOCKS_WORK[idx], def); });
+    if (panes) { const f = el("div", "ins-field"); ti.id = "insTitle-" + idx; const l = el("label", "ins-lbl", "Heading"); l.htmlFor = ti.id; f.append(l, ti); sub.appendChild(f); }
+    else sub.appendChild(ti);
     // "Write with AI" on the section heading itself — covers headings everywhere
     // (a divider/auto table-of-contents has no heading to write).
     if (!def.dividerSimple && !def.tocSimple) sub.appendChild(aiField(ti, { field: "heading" }));
@@ -9388,24 +9782,26 @@ function renderBlocksCard() {
       sub.appendChild(el("div", "hint", def.hint));
     }
     // Wave-1 G4: the "Style" pill row — only for block types with curated variants.
-    blockVariantRow(idx, blk, sub);
+    blockVariantRow(idx, blk, panes ? panes.layout : sub);
     // Phase T-STYLE: the shared "Look of this section" options — every content
     // section, but not the presentational divider or the auto-built table of contents.
-    if (!def.dividerSimple && !def.tocSimple) blockLookRow(idx, blk, sub);
+    if (!def.dividerSimple && !def.tocSimple) blockLookRow(idx, blk, panes || sub);
     // G27: the per-element style overrides popover — same sections as the look row.
-    if (!def.dividerSimple && !def.tocSimple) blockStyleRow(idx, blk, sub);
+    if (!def.dividerSimple && !def.tocSimple) blockStyleRow(idx, blk, panes ? panes.style : sub, !!panes);
     // Phase EXP: the shared "Show this only for a while" window — same set of sections
     // (a spacer/auto TOC has nothing to schedule).
-    if (!def.dividerSimple && !def.tocSimple) blockWindowRow(idx, blk, sub);
-    card.appendChild(sub);
+    if (!def.dividerSimple && !def.tocSimple) blockWindowRow(idx, blk, panes ? panes.when : sub, !!panes);
+    if (panes) insFinish(panes, idx, blk, def);
+    card.appendChild(box);
     // FD-T-LIB: a just-added section scrolls into view and takes focus, so it's
     // never "added but invisible" below the fold.
     // Item 77: someone already typing in this section's fields keeps the caret; on a busy
     // phone the timer can fire late, and the next words went into the heading.
     if (idx === focusIdx) setTimeout(() => { try {
-      sub.scrollIntoView({ behavior: "smooth", block: "center" });
+      if (panes && INS_TAB !== "content") return;   // opened on Style, Layout or When: the tab keeps the focus
+      box.scrollIntoView({ behavior: "smooth", block: "center" });
       const ae = document.activeElement;
-      if (!(ae && ae !== ti && sub.contains(ae) && /^(INPUT|TEXTAREA|SELECT)$/.test(ae.tagName))) ti.focus();
+      if (!(ae && ae !== ti && box.contains(ae) && /^(INPUT|TEXTAREA|SELECT)$/.test(ae.tagName))) ti.focus();
     } catch (_) {} }, 40);
   });
   if (solo === null) card.appendChild(blkGap(BLOCKS_WORK.length));   // #3/#4 — trailing "+" insert point / drop-line target
@@ -9572,10 +9968,19 @@ function aiField(inputEl, opts) {
   const label = opts.field || "";
   const miniPill = "font:inherit;font-size:12px;padding:4px 11px;border-radius:999px;border:1px solid var(--line,#ddd);background:var(--sheet,#fff);cursor:pointer";
   const usePill = "font:inherit;font-size:12px;font-weight:600;padding:4px 13px;border-radius:999px;border:2px solid var(--plum,#5b3fa0);background:var(--plum-tint,#faf7ff);color:var(--plum-deep,#3a2470);cursor:pointer";
-  const wrap = el("div"); wrap.style.cssText = "margin:0 0 8px";
-  const trigger = el("button", null, "✦ Write with AI"); trigger.type = "button"; trigger.title = "Draft or improve this text — you approve before anything changes";
-  trigger.style.cssText = "font:inherit;font-size:11.5px;padding:3px 10px;border-radius:999px;border:1px solid var(--plum-line,#d9cef0);background:var(--plum-tint,#faf7ff);color:var(--plum-deep,#3a2470);cursor:pointer";
-  wrap.appendChild(trigger);
+  const wrap = el("div", "ai-wrap"); wrap.style.cssText = "margin:0 0 8px";
+  const chips = el("div", "ai-chips");
+  const trigger = el("button", "ai-chip ai-main", "✦ Write with AI"); trigger.type = "button"; trigger.title = "Draft or improve this text — you approve before anything changes";
+  chips.appendChild(trigger);
+  // two quick asks beside it; each works from the words already in the field
+  const quick = (lbl, body) => {
+    const b = el("button", "ai-chip", lbl); b.type = "button"; b.title = lbl + " — a draft to pick from, nothing changes until you use it";
+    b.addEventListener("click", () => { if (!curText()) { panel.hidden = false; menu(); return; } panel.hidden = false; go(body()); });
+    chips.appendChild(b);
+  };
+  quick("Shorter", () => ({ action: "shorten", text: curText() }));
+  quick("Warmer", () => ({ action: "tone", text: curText(), tone: "warmer" }));
+  wrap.appendChild(chips);
   const panel = el("div"); panel.hidden = true; panel.style.cssText = "margin-top:8px;border:1px solid var(--plum-line,#e6ddf5);background:var(--plum-tint,#faf7ff);border-radius:10px;padding:10px 12px";
   wrap.appendChild(panel);
   const curText = () => (inputEl.value || "").trim();
@@ -10425,7 +10830,7 @@ function mountSectionsCard() {
   // A template that keeps the welcome section on top shows it there, with no arrows.
   const heroPinned = DC_HERO_MOVES === false;
   if (heroPinned) order = ["hero", ...order.filter((k) => k !== "hero")];
-  const card = el("div", "field"); card.id = "sectionsCard"; card.style.marginTop = "18px";
+  const card = el("div", "field"); card.id = "sectionsCard"; card.style.marginTop = "18px"; card.dataset.stab = "looks";
   card.appendChild(el("label", null, "Your home page"));
   order.forEach((key, idx) => {
     const def = HOME_SECTION_DEFS.find(([k]) => k === key); if (!def) return;
@@ -10456,7 +10861,7 @@ async function mountLookCard() {
   let looks = null;
   try { looks = await loadLooks(); } catch (_) { return; }
   if (!looks || (looks.templates || []).length < 2) return;
-  const card = el("div", "field"); card.id = "lookCard"; card.style.marginTop = "18px";
+  const card = el("div", "field"); card.id = "lookCard"; card.style.marginTop = "18px"; card.dataset.stab = "looks";
   card.appendChild(el("label", null, "Template"));
   const cur = looks.templates.find((t) => t.slug === looks.current.slug);
   card.appendChild(el("div", "hint", "Your template sets your whole layout. Colors and fonts are just below. You're on the “" + ((cur && cur.name) || looks.current.slug) + "” template — try another safely and preview it with your real content before deciding."));
@@ -10607,8 +11012,14 @@ function closeTrayPanel() {
 // Files (a compact asset browser) and Content tree (the page's component tree) —
 // mirroring AEM's Components + Assets + Content Tree rails.
 function dcRailTabName(name) { return (name === "add" || name === "files") ? name : "contents"; }
+// the card's title and the quiet line under it, per tab (the floating studio, part two)
+const TRAY_WORDS = { add: ["Add a section", "Drag a tile onto the page, or tap it"], files: ["Photos", "Tap one to place it in the section"], contents: ["Page outline", "Every section on this page, in order"] };
 function dcRailTab(name) {
   DC_RAIL_TAB = dcRailTabName(name);
+  const w = TRAY_WORDS[DC_RAIL_TAB], tt = $("trayTitle"), ts = $("traySub"), tp = $("trayPanel");
+  if (tt) tt.textContent = w[0];
+  if (ts) { ts.textContent = w[1]; ts.hidden = false; }
+  if (tp) tp.setAttribute("aria-label", w[0]);
   [["add", $("tabAdd"), $("designTray")],
    ["files", $("tabFiles"), $("designFilesWrap")],
    ["contents", $("tabContents"), $("designTreeWrap")]].forEach(([key, tab, panel]) => {
@@ -10660,6 +11071,7 @@ function closeSettingsPanel() {
 //   sections — the full list: ready-made layouts and saved sections
 //   forms    — the form builder
 const PANEL_TITLES = { styles: "Styles", sections: "All sections", forms: "Forms" };
+const PANEL_SUBS = { styles: "Changes show as you pick", sections: "Ready-made layouts and saved sections", forms: "Forms on this page" };
 function openSettingsPanel(mode, title) {
   const p = $("settingsPanel"), sc = $("dcScrim"); if (!p) return;
   const m = PANEL_TITLES[mode] || mode === "section" ? mode : "styles";
@@ -10669,6 +11081,12 @@ function openSettingsPanel(mode, title) {
   PANEL_MODE = m; p.dataset.mode = m;
   const name = title || PANEL_TITLES[m] || "Styles";
   const t = $("settingsTitle"); if (t) t.textContent = name;
+  const sb = $("settingsSub"); if (sb) { sb.textContent = PANEL_SUBS[m] || ""; sb.hidden = !PANEL_SUBS[m]; }
+  const iseg = $("inspectorSeg"); if (iseg) iseg.hidden = m !== "section";
+  const sseg = $("stylesSeg"); if (sseg) sseg.hidden = m !== "styles";
+  const sfoot = $("stylesFoot"); if (sfoot) sfoot.hidden = m !== "styles";
+  if (m === "section") insSyncSeg();
+  if (m === "styles") stylesTab(STYLES_TAB);
   p.setAttribute("aria-label", name);
   const modal = m !== "section" && m !== "styles";   // a section or a style change: keep the page in view, undimmed
   p.setAttribute("aria-modal", String(modal));
@@ -10684,8 +11102,116 @@ function openSettingsPanel(mode, title) {
     // already in a field in this panel: leave them there, or the words go nowhere
     const ae = document.activeElement;
     if (ae && ae !== p && ae !== document.body && p.contains(ae)) return;
-    (m === "section" && p.querySelector("#blocksCard input, #blocksCard textarea") || cl).focus();
+    (m === "section" && INS_TAB === "content" && p.querySelector("#blocksCard input, #blocksCard textarea")
+      || m === "section" && p.querySelector('#inspectorSeg [aria-selected="true"]') || cl).focus();
   } catch (_) {} }, 40);
+}
+// ── Styles (the floating studio, part two): Looks, Fonts, Colours and Text. Each card and
+// row in the panel is tagged with the tab it belongs to (data-stab); the rest hide.
+let STYLES_TAB = "looks";
+function stylesTab(name) {
+  STYLES_TAB = ["looks", "fonts", "colours", "text"].indexOf(name) >= 0 ? name : "looks";
+  const p = $("settingsPanel"); if (p) p.dataset.stab = STYLES_TAB;
+  const seg = $("stylesSeg"); if (seg) seg.querySelectorAll("[data-stab]").forEach((b) => b.setAttribute("aria-selected", String(b.dataset.stab === STYLES_TAB)));
+  const sc = p && p.querySelector(".dc-panel-scroll"); if (sc) sc.scrollTop = 0;
+}
+// ── the inspector (the floating studio, part two): one section, four tabs. Content holds the
+// fields; Style its colours and type; Layout its arrangement; When its dates and where it shows.
+let INS_TAB = "content";
+function insSyncSeg() {
+  const seg = $("inspectorSeg"); if (!seg) return;
+  seg.querySelectorAll("[data-itab]").forEach((b) => b.setAttribute("aria-selected", String(b.dataset.itab === INS_TAB)));
+}
+function insTab(name) {
+  INS_TAB = ["content", "style", "layout", "when"].indexOf(name) >= 0 ? name : "content";
+  insSyncSeg();
+  document.querySelectorAll("#blocksCard .ins-pane").forEach((p) => { p.hidden = p.dataset.pane !== INS_TAB; });
+}
+function insPanes(box) {
+  const panes = {};
+  ["content", "style", "layout", "when"].forEach((k) => { const p = el("div", "ins-pane"); p.dataset.pane = k; p.hidden = k !== INS_TAB; box.appendChild(p); panes[k] = p; });
+  return panes;
+}
+// the card's title is the section's own heading; the line under it says what kind, and where
+function insHead(blk, def) {
+  const t = $("settingsTitle"), sb = $("settingsSub"), p = $("settingsPanel");
+  const kind = (def && def.name) || "Section";
+  const name = String((blk && blk.title) || "").trim() || kind;
+  if (t) t.textContent = name;
+  if (sb) { sb.textContent = kind + " · on " + (typeof dcPageTitle === "function" ? dcPageTitle(DC_PAGE) : "Home"); sb.hidden = false; }
+  if (p) p.setAttribute("aria-label", name);
+}
+// picture tiles: a small sketch per choice, the chosen one outlined in plum
+function insTiles(host, label, opts, isOn, onPick) {
+  const wrap = el("div", "ins-field");
+  wrap.appendChild(el("div", "ins-lbl", label));
+  const row = el("div", "ins-tiles");
+  opts.forEach((o, i) => {
+    const on = isOn(o);
+    const b = el("button", "ins-tile" + (on ? " on" : "")); b.type = "button"; b.setAttribute("aria-pressed", String(on));
+    const pic = el("div", "ins-tile-pic");
+    if (i % 3 === 1) { const r = el("div", "ins-tile-row"); r.append(el("i"), el("i")); pic.appendChild(r); const l = el("i"); l.style.width = "70%"; pic.appendChild(l); }
+    else if (i % 3 === 2) { const r = el("div", "ins-tile-row"); r.append(el("i"), el("i"), el("i")); pic.appendChild(r); }
+    else { const h = el("i", "h"); h.style.width = "60%"; const a = el("i"); a.style.width = "85%"; const c = el("i"); c.style.width = "85%"; pic.append(h, a, c); }
+    b.appendChild(pic);
+    b.appendChild(el("span", "ins-tile-l", o.name || o[0]));
+    b.addEventListener("click", () => onPick(o));
+    row.appendChild(b);
+  });
+  wrap.appendChild(row); host.appendChild(wrap);
+  return row;
+}
+// round swatches; "" is the slashed circle for the default
+function insSwatches(host, label, opts, cur, onPick) {
+  const wrap = el("div", "ins-field");
+  wrap.appendChild(el("div", "ins-lbl", label));
+  const row = el("div", "ins-swatches");
+  opts.forEach(([val, name]) => {
+    const on = cur === val;
+    const b = el("button", "ins-sw" + (on ? " on" : "") + (val ? "" : " none")); b.type = "button";
+    if (val && /^#/.test(val)) b.style.background = val;
+    b.title = name; b.setAttribute("aria-label", label + ": " + name + (on ? " (chosen)" : "")); b.setAttribute("aria-pressed", String(on));
+    b.addEventListener("click", () => onPick(val));
+    row.appendChild(b);
+  });
+  wrap.appendChild(row); host.appendChild(wrap);
+  return row;
+}
+// one writer for the section's look (background band, width, spacing, alignment, which screens)
+function lookSet(idx, key, value) {
+  const b = { ...BLOCKS_WORK[idx] }; const look = { ...(b.look || {}) };
+  if (value) look[key] = value; else delete look[key];
+  if (Object.keys(look).length) b.look = look; else delete b.look;
+  // one background owner at a time (G27): a band here clears a custom background colour
+  if (key === "background" && value && b.style && b.style.bg_color) { const s = { ...b.style }; delete s.bg_color; delete s.contrast_ack; if (Object.keys(s).length) b.style = s; else delete b.style; }
+  BLOCKS_WORK[idx] = b;
+  renderBlocksCard();   // saves soon, as every change to the list does
+  dcLiveFromPanel();
+}
+// the footer under every tab: who can see this section, and the quiet tools
+function insFinish(panes, idx, blk, def) {
+  const box = panes.content.parentNode;
+  const notes = { style: "This section keeps your site’s style.", layout: "Nothing to lay out here.", when: "This section always shows." };
+  Object.keys(notes).forEach((k) => { if (!panes[k].childNodes.length) panes[k].appendChild(el("div", "ins-note", notes[k])); });
+  if (!(blk && blk._clEdit)) {
+    const keep = el("div", "ins-row"); keep.appendChild(el("span", null, "Keep a copy to reuse on other pages"));
+    const sv = el("button", "dc-actbtn", "Save for reuse"); sv.type = "button"; sv.title = "Save this section to your content library";
+    sv.addEventListener("click", () => clSave(idx)); keep.appendChild(sv); panes.when.appendChild(keep);
+  }
+  const foot = el("div", "ins-foot");
+  const key = typeof ddsKeyFor === "function" ? ddsKeyFor(idx) : null;
+  const hidden = !!(key && sectionsHiddenNow().indexOf(key) >= 0);
+  foot.appendChild(el("span", null, hidden ? "Hidden from visitors" : "Everyone can see this section"));
+  if (key) {
+    const b = el("button", "dc-actbtn dc-ghost", hidden ? "Show" : "Hide"); b.type = "button";
+    b.title = hidden ? "Show this section to visitors again" : "Hide this section from visitors (it stays here, ready to show again)";
+    b.addEventListener("click", () => {
+      if (hidden) Promise.resolve(saveSections(() => (S.settings && S.settings.sections_order) || [], () => sectionsHiddenNow().filter((k) => k !== key))).then(() => { previewIfOpen(); renderBlocksCard(); });
+      else { eeHideKey(key); closeSettingsPanel(); }
+    });
+    foot.appendChild(b);
+  }
+  box.appendChild(foot);
 }
 // ── the floating studio: the page switcher's card, the Live chip, the phone's More ──
 // The pages card holds what the old bar spread out: the page tabs (#pagesBar, the
@@ -10744,7 +11270,7 @@ function closeDesignPanels() { closePagesCard(false); dcDockMore(false); closeTr
   const on = (id, fn) => { const b = $(id); if (b) b.addEventListener("click", fn); };
   on("btnUndo", dcUndo); on("btnRedo", dcRedo);
   on("btnUndoTop", dcUndo); on("btnRedoTop", dcRedo);
-  on("btnEditExit", exitEditMode); on("dcBtnPublish", () => openRitual());
+  on("btnEditExit", exitEditMode); on("dcBtnPublish", () => openRitual({ card: true }));   // the floating studio: a card at the right, the page stays in view
   // Ctrl/⌘+Z = undo, Ctrl/⌘+Shift+Z (or Ctrl+Y) = redo — only while editing the design
   document.addEventListener("keydown", (e) => {
     if (!(e.ctrlKey || e.metaKey)) return;
@@ -10758,7 +11284,20 @@ function closeDesignPanels() { closePagesCard(false); dcDockMore(false); closeTr
   });
   on("btnTrayOpen", () => toggleTray("add")); on("btnAddFab", () => openTrayPanel("add")); on("btnTrayClose", closeDesignPanels);
   on("tabContents", () => dcRailTab("contents")); on("tabAdd", () => dcRailTab("add")); on("tabFiles", () => dcRailTab("files"));
+  on("btnTreeBack", () => { dcRailTab("add"); const s = $("designTray") && $("designTray").querySelector(".tray-search"); if (s) s.focus({ preventScroll: true }); });
   on("btnSettingsOpen", () => openSettingsPanel("styles")); on("btnSettingsClose", closeDesignPanels);
+  const segKeys = (seg, attr, pick) => {   // click or arrow keys move between a card's tabs
+    if (!seg) return;
+    seg.addEventListener("click", (e) => { const b = e.target.closest("[" + attr + "]"); if (b) pick(b.getAttribute(attr)); });
+    seg.addEventListener("keydown", (e) => {
+      if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
+      const tabs = [...seg.querySelectorAll("[" + attr + "]")], at = tabs.indexOf(document.activeElement); if (at < 0) return;
+      e.preventDefault(); const nx = tabs[(at + (e.key === "ArrowRight" ? 1 : tabs.length - 1)) % tabs.length]; pick(nx.getAttribute(attr)); nx.focus();
+    });
+  };
+  segKeys($("inspectorSeg"), "data-itab", insTab);
+  segKeys($("stylesSeg"), "data-stab", stylesTab);
+  const dg = $("designGallery"); if (dg) dg.dataset.stab = "looks";   // the template row belongs to Looks (member_ui_test pins the markup)
   on("btnNavEdit", () => { closePagesCard(false); go("pages"); });
   // the floating studio: the page switcher and the dock
   on("dcPageSwitch", () => togglePagesCard("dcPageSwitch")); on("dkPages", () => togglePagesCard("dkPages")); on("btnPagesClose", () => closePagesCard(true));
@@ -10997,6 +11536,8 @@ const BI_PATHS = {
   copy: '<rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>',
   scissors: '<circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M20 4L8.1 15.9M14.5 14.5L20 20M8.1 8.1L12 12"/>',
   x: '<path d="M18 6L6 18M6 6l12 12"/>',
+  chevron: '<path d="M6 9l6 6 6-6"/>',
+  check: '<path d="M20 6L9 17l-5-5"/>',
   up: '<path d="M12 19V5"/><path d="M5 12l7-7 7 7"/>',
   down: '<path d="M12 5v14"/><path d="M19 12l-7 7-7-7"/>',
 };
@@ -11027,16 +11568,28 @@ function mountBlockTray() {
   const host = $("designTray"); if (!host) return;
   renderBlockTray();
 }
+// the purpose chips' short words (the group headers keep their full names)
+const TRAY_CHIP_WORD = { "Get customers to act": "Get contacted", "Text & layout": "Words" };
+let TRAY_GROUP = "";   // one purpose chip, or every group
 function renderBlockTray() {
   const host = $("designTray"); if (!host) return;
   host.textContent = "";
-  host.appendChild(el("div", "hint", "Click to add it to the bottom of your page — or drag it onto the canvas and drop it exactly where you want. Everything stays readable on phones automatically."));
-  const search = el("input", "tray-search"); search.type = "search"; search.placeholder = "Search sections…"; search.value = TRAY_QUERY; search.setAttribute("aria-label", "Search sections to add");
+  const sw = el("div", "tray-searchwrap"); sw.insertAdjacentHTML("afterbegin", uiIcon("search", 18));
+  const search = el("input", "tray-search"); search.type = "search"; search.placeholder = "Find a section"; search.value = TRAY_QUERY; search.setAttribute("aria-label", "Search sections to add");
   search.addEventListener("input", () => { TRAY_QUERY = search.value; renderBlockTray(); const s2 = $("designTray") && $("designTray").querySelector(".tray-search"); if (s2) { s2.focus(); s2.setSelectionRange(TRAY_QUERY.length, TRAY_QUERY.length); } });
-  host.appendChild(search);
+  sw.appendChild(search); host.appendChild(sw);
+  // what the section is for: one chip each, All first
+  const chips = el("div", "tray-chips"); chips.setAttribute("role", "group"); chips.setAttribute("aria-label", "What the section is for");
+  [["", "All"], ...SECTION_GROUPS.map((g) => [g.label, TRAY_CHIP_WORD[g.label] || g.label])].forEach(([key, word]) => {
+    const c = el("button", "tray-chip" + (TRAY_GROUP === key ? " on" : ""), word); c.type = "button"; c.setAttribute("aria-pressed", String(TRAY_GROUP === key));
+    c.addEventListener("click", () => { TRAY_GROUP = key; renderBlockTray(); const c2 = $("designTray") && $("designTray").querySelector(".tray-chip.on"); if (c2) c2.focus({ preventScroll: true }); });
+    chips.appendChild(c);
+  });
+  host.appendChild(chips);
   const present = new Set((BLOCKS_WORK || []).map((b) => b && b.type));
   let shown = 0;
   SECTION_GROUPS.forEach((grp) => {
+    if (TRAY_GROUP && grp.label !== TRAY_GROUP) return;
     const defs = grp.types
       .map((ty) => BLOCK_DEFS.find((d) => d.type === ty))
       .filter((d) => d && !(BLOCK_SINGLETON.has(d.type) && present.has(d.type)))
@@ -11050,12 +11603,20 @@ function renderBlockTray() {
     host.appendChild(wrap);
   });
   if (!shown) host.appendChild(el("div", "tray-empty", TRAY_QUERY ? "No sections match “" + TRAY_QUERY + "”." : "Every section type is already on your page. Reorder or edit them in the middle."));
+  // the sections saved for reuse live in All sections; the row says how many, once known
+  if (CL_ITEMS === null && !CL_LOADING) {
+    CL_LOADING = true;
+    api("GET", "/content-library").then((r) => { CL_ITEMS = Array.isArray(r && r.data) ? r.data : []; }).catch(() => { CL_ITEMS = []; }).then(() => { CL_LOADING = false; if ($("designTray") && $("designTray").querySelector(".tray-saved")) renderBlockTray(); });
+  }
+  const saved = el("button", "tray-saved"); saved.type = "button"; saved.title = "Ready-made layouts and the sections you saved for reuse";
+  saved.insertAdjacentHTML("afterbegin", uiIcon("clock", 16));
+  saved.appendChild(el("span", "sp", "Saved sections" + (Array.isArray(CL_ITEMS) ? " · " + CL_ITEMS.length : "")));
+  saved.insertAdjacentHTML("beforeend", uiIcon("chevron", 14));
+  saved.addEventListener("click", () => openSettingsPanel("sections"));
+  host.appendChild(saved);
   const more = el("div", "tray-more");
-  [["Forms", "forms"], ["Ready-made layouts and saved sections", "sections"]].forEach(([label, mode]) => {
-    const b = el("button", "textact", label); b.type = "button";
-    b.addEventListener("click", () => openSettingsPanel(mode));
-    more.appendChild(b);
-  });
+  const forms = el("button", "textact", "Forms"); forms.type = "button"; forms.addEventListener("click", () => openSettingsPanel("forms")); more.appendChild(forms);
+  const outline = el("button", "textact", "Page outline"); outline.type = "button"; outline.addEventListener("click", () => dcRailTab("contents")); more.appendChild(outline);
   host.appendChild(more);
 }
 // The section's picture, or nothing when it can't load (the name still says what it is).
@@ -11084,7 +11645,8 @@ function trayItem(d) {
 // (FL_COLS chip defs, the /assets query shape) but never touches FL_S — which owns
 // #mediaGrid via FL_takeover — and its thumbnails render through
 // renderMediaGrid(grid, false, onPick), the exact contract the pickers use.
-const PF_CHIPS = ["all", "brand", "stock"];   // the panel is image-only, so a separate Photos chip would equal All
+const PF_CHIPS = ["all", "stock", "brand", "recent"];   // the panel is image-only, so Yours is every photo; Recent the newest two dozen
+const PF_CHIP_WORD = { all: "Yours", stock: "Stock", brand: "Brand", recent: "Recent" };
 const PF_S = { col: "all", seq: 0, key: null, allow: null, stock: { state: null, results: [] } };
 const PF_CAP = 60;   // the panel grid stays light — the full Files view carries the rest
 function pfQ() { const s = $("pfSearch"); return s ? s.value : ""; }   // the search box IS the query state
@@ -11098,38 +11660,85 @@ function mountPanelFiles() {
   const host = $("designFilesWrap"); if (!host) return;
   if (!host.querySelector(".pf-chips")) {
     host.textContent = "";
-    const bar = el("div", "flchips pf-chips");
+    // the floating studio's Photos card: Yours · Stock · Brand · Recent as one segmented control
+    const bar = el("div", "dc-seg pf-chips"); bar.setAttribute("role", "tablist"); bar.setAttribute("aria-label", "Which photos");
     PF_CHIPS.forEach((key) => {
-      const def = FL_COLS.find((x) => x.key === key) || { key, label: key };
-      const b = el("button", "flchip" + (PF_S.col === key ? " on" : ""), key === "all" ? "All photos" : def.label);
-      b.type = "button"; b.dataset.col = key;
+      const b = el("button", PF_S.col === key ? "on" : "", PF_CHIP_WORD[key] || key);
+      b.type = "button"; b.dataset.col = key; b.setAttribute("role", "tab"); b.setAttribute("aria-selected", String(PF_S.col === key));
       b.addEventListener("click", () => { if (PF_S.col === key) return; PF_S.col = key; pfPaintChips(); pfRefresh(); });
       bar.appendChild(b);
     });
     host.appendChild(bar);
     const sw = el("div", "pf-search");
+    const swrap = el("div", "tray-searchwrap"); swrap.insertAdjacentHTML("afterbegin", uiIcon("search", 18));
     const search = el("input", "tray-search"); search.type = "search"; search.id = "pfSearch";
-    search.placeholder = "Search your files…"; search.setAttribute("aria-label", "Search your files");
+    search.placeholder = "Search your photos"; search.setAttribute("aria-label", "Search your photos");
     let t = null;
     search.addEventListener("input", () => { clearTimeout(t); t = setTimeout(pfRefresh, 280); });
     search.addEventListener("keydown", (e) => { if (e.key === "Enter" && PF_S.col === "stock") { e.preventDefault(); pfRefresh(); } });
-    sw.appendChild(search); host.appendChild(sw);
+    swrap.appendChild(search); sw.appendChild(swrap); host.appendChild(sw);
     const body = el("div", "pf-body");
     const grid = el("div", "mediagrid"); grid.id = "panelFilesGrid";
     body.appendChild(grid);
-    body.appendChild(el("div", "pf-note", "Click a photo to use it — it fills the image slot you're picking for, or becomes a new photo section. You can also drag one onto the canvas."));
-    host.appendChild(body);
-    const foot = el("div", "pf-foot");
-    const link = el("button", "textact", "Open Files →"); link.type = "button";
+    // Upload a photo · Open Files
+    const acts = el("div", "pf-acts");
+    const up = el("button", "dc-actbtn", "Upload a photo"); up.type = "button";
+    const file = el("input"); file.type = "file"; file.id = "pfFile"; file.accept = "image/jpeg,image/png,image/webp"; file.hidden = true; file.setAttribute("aria-label", "Choose a photo to upload");
+    up.addEventListener("click", () => file.click());
+    const link = el("button", "dc-actbtn dc-ghost", "Open Files"); link.type = "button";
     link.title = "The full Files library — versions, where-used, crops";
     link.addEventListener("click", () => { closeDesignPanels(); go("media"); });
-    foot.appendChild(link); host.appendChild(foot);
+    acts.append(up, link); body.appendChild(acts); body.appendChild(file);
+    // a few words about the photograph, then it joins the collection: the same door Files uses
+    const prep = el("div", "pf-upload"); prep.hidden = true;
+    const alt = el("input"); alt.type = "text"; alt.maxLength = 200; alt.placeholder = "Describe this photograph — e.g. Fresh pasta on a white plate"; alt.setAttribute("aria-label", "Describe this photograph");
+    const row = el("div", "row");
+    const goB = el("button", "dc-actbtn", "Add it"); goB.type = "button";
+    const nm = el("button", "dc-actbtn dc-ghost", "Never mind"); nm.type = "button";
+    row.append(goB, nm); prep.append(alt, row); body.appendChild(prep);
+    file.addEventListener("change", () => { if (!file.files[0]) return; prep.hidden = false; alt.value = ""; alt.focus(); });
+    nm.addEventListener("click", () => { prep.hidden = true; file.value = ""; });
+    goB.addEventListener("click", async () => {
+      const f = file.files[0], words = alt.value.trim(); if (!f) { prep.hidden = true; return; }
+      if (words.length < 3) { toast("A few words about the photograph first — it matters.", true); alt.focus(); return; }
+      goB.disabled = true; goB.textContent = "Bringing it in…";
+      try {
+        const dims = await new Promise((res) => { const img = new Image(); img.onload = () => res({ w: img.naturalWidth, h: img.naturalHeight }); img.onerror = () => res({}); img.src = URL.createObjectURL(f); });
+        const r = await api("POST", "/media/upload-url", { mime: f.type, bytes: f.size, alt_text: words, width: dims.w, height: dims.h });
+        const put = await fetch(r.data.upload_url, { method: "PUT", headers: { "Content-Type": f.type }, body: f });
+        if (!put.ok) throw new Error("The photograph didn’t finish arriving — nothing was lost, try once more.");
+        prep.hidden = true; file.value = "";
+        await loadMedia(); PF_S.key = null; pfRefresh(); toast("In the collection");
+      } catch (err) { toast(nice(err), true); }
+      goB.disabled = false; goB.textContent = "Add it";
+    });
+    body.appendChild(el("div", "pf-note", "Tap a photo to use it: it fills the image you’re choosing for, or becomes a new photo section. Edit crops, straightens and removes a background; saving always makes a new copy."));
+    host.appendChild(body);
   }
   pfRefresh(true);
 }
 function pfPaintChips() {
   const host = $("designFilesWrap"); if (!host) return;
-  host.querySelectorAll(".flchip").forEach((b) => b.classList.toggle("on", b.dataset.col === PF_S.col));
+  host.querySelectorAll(".pf-chips [data-col]").forEach((b) => { const on = b.dataset.col === PF_S.col; b.classList.toggle("on", on); b.setAttribute("aria-selected", String(on)); });
+}
+// Edit on a photo in the card: the same editor as Files and the picker, a new file beside the original.
+async function pfEdit(m, btn) {
+  if (btn.disabled) return;
+  btn.disabled = true;
+  const ready = () => { btn.disabled = false; };
+  let d = null;
+  try { d = (await api("GET", "/assets/" + m.id)).data; } catch (err) { ready(); toast(nice(err), true); return; }
+  const a = d && d.asset;
+  const src = d && (d.thumb_fallback || d.download_url);
+  if (!a || !src) { ready(); toast("Couldn’t open this photo for editing. Try again in a moment.", true); return; }
+  let ed; try { ed = await loadPhotoEditor(); } catch (_) { ready(); toast("The photo editor didn’t load. Check your connection and try again.", true); return; }
+  ready();
+  const res = await ed.open({ src, fallbackSrc: d.download_url, name: a.name, mime: a.mime,
+    saveLabel: "Save a copy", note: "Saving makes a new file beside the original, which stays exactly as it is.",
+    cutout: d.cutout_available ? () => pickerCutout(a.id) : null, onSave: (out) => saveEditedCopy(a, out) });
+  if (!res || !res.saved || !res.value) return;
+  await loadMedia(); PF_S.key = null; pfRefresh();
+  toast(res.value.patched ? "Saved as a new file. The original is unchanged." : "Saved as a new file. Its name and folder didn’t copy over, so set them in Files.");
 }
 // Chips/search narrow the grid via the SAME /assets query shape FL_qstr builds —
 // but against PF_S, so the Files view's own state (FL_S) is never repointed.
@@ -11166,7 +11775,8 @@ function pfPaint(grid, allow, seq) {
   grid.innerHTML = "";
   // the panel is image-only, honestly: /media can carry documents too — mirror
   // FL_load's client-side kind filter so a PDF can never ride in as a "photo section"
-  const imgs = (S.media || []).filter((m) => (m.kind == null || m.kind === "image") && (!allow || allow.has(String(m.id))));
+  let imgs = (S.media || []).filter((m) => (m.kind == null || m.kind === "image") && (!allow || allow.has(String(m.id))));
+  if (PF_S.col === "recent") imgs = imgs.slice().sort((a, b) => String(b.created_at || "").localeCompare(String(a.created_at || ""))).slice(0, 24);
   if (!imgs.length) {
     grid.innerHTML = `<p style="grid-column:1/-1;color:var(--ink-2);font-size:13px">${pfQ().trim() ? "No files match that search." : ((S.media || []).length ? "Nothing in this collection yet." : "No files in this collection yet.")}</p>`;
     return;
@@ -11176,7 +11786,11 @@ function pfPaint(grid, allow, seq) {
     c.dataset.mid = String(m.id);                  // anchors the offer popover to THIS photo
     // drag a thumbnail onto the canvas → a new photo section at that gap (pd engine)
     c.addEventListener("pointerdown", (e) => pdStart(e, { kind: "media", mediaId: m.id, label: m.alt_text || "Photo", icon: uiIcon("image") }, c));
-    grid.appendChild(c);
+    if (EDITABLE_PHOTO.test(m.mime || "")) {   // the pencil in the corner: the same editor as Files
+      const w = pickerEditWrap(c, m, pfEdit);
+      const eb = w.querySelector(".medit"); if (eb) { eb.textContent = ""; eb.insertAdjacentHTML("afterbegin", uiIcon("pencil", 14)); }
+      grid.appendChild(w);
+    } else grid.appendChild(c);
   });
   if (imgs.length > PF_CAP) {
     const more = el("div", "pf-note", "Showing " + PF_CAP + " — refine your search or Open Files →");
@@ -12706,7 +13320,7 @@ function dcChromeInsets() {
   try {
     if (window.innerWidth <= 760) return out;   // a phone's cards are sheets, under the pill's row
     const fr = $("designPreview").getBoundingClientRect();
-    ["settingsPanel", "commentsPanel"].forEach((id) => { const p = $(id); if (p && p.classList.contains("on")) { const r = p.getBoundingClientRect(); out.right = Math.max(out.right, Math.round(fr.right - r.left + 8)); } });
+    ["settingsPanel", "commentsPanel", "ritualWrap"].forEach((id) => { const p = $(id); if (p && p.classList.contains("on") && (id !== "ritualWrap" || p.classList.contains("as-card"))) { const r = p.getBoundingClientRect(); out.right = Math.max(out.right, Math.round(fr.right - r.left + 8)); } });
     const t = $("trayPanel"); if (t && t.classList.contains("on")) { const r = t.getBoundingClientRect(); out.left = Math.max(out.left, Math.round(r.right + 8 - fr.left)); }
   } catch (_) {}
   return out;
@@ -12907,7 +13521,7 @@ function dcInjectCanvas(doc, main, live) {
       bar.appendChild(grip);
       bar.appendChild(mkBtn("Edit", "Edit this section", () => eeEditBlock(bi), { icon: "pencil" }));
       bar.appendChild(mkBtn("Duplicate", "Duplicate this section", () => dcDuplicate(bi), { icon: "copy" }));
-      bar.appendChild(mkBtn("Style", "Style this section — its look and layout live in its editor for now", () => eeEditBlock(bi), { icon: "spark" }));
+      bar.appendChild(mkBtn("Style", "Style this section — its colours, type and layout", () => eeEditBlock(bi, "style"), { icon: "spark" }));
       bar.appendChild(mkBtn("Delete", "Delete this section", () => dcDelete(bi), { cls: "dc-danger", icon: "x" }));
       // the rest behind More: copy, cut, hide, and a Columns section's column count
       more.appendChild(mkItem("Copy", "Copy this section — paste it anywhere", () => dcCopyBlock(bi), { icon: "clipboard" }));
