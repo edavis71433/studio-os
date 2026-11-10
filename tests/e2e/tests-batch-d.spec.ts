@@ -15,13 +15,14 @@ test.describe('batch D — CSV the way Excel saves it', () => {
     expect(rows).toEqual([['Name', 'Note'], ['Ana "Ani" Ruiz', 'line one\nline two'], ['Bo', '']]);
   });
 
-  test('Contacts\' own import finds its Name column behind a byte-order mark', async ({ page }) => {
+  // item 97: Contacts imports through the shared importer now (its own copy is gone)
+  test('Contacts\' import finds its Name column behind a byte-order mark', async ({ page }) => {
     await installApp(page, { api: { '/sales/contacts': { data: [] } } });
     await page.goto('/contacts.html');
     await page.locator('#importCsv').click();
-    await page.locator('#csvFile').setInputFiles({ name: 'contacts.csv', mimeType: 'text/csv', buffer: Buffer.from('﻿Name,Phone\r\nAna Ruiz,555 0100\r\nBo Lee,\r\n', 'utf8') });
-    await expect(page.locator('#csvPrev')).toContainText('2 contacts found');
-    await expect(page.locator('#csvPrev')).not.toContainText('couldn’t find a name or email column');
+    await page.locator('#csvZone input[type=file]').setInputFiles({ name: 'contacts.csv', mimeType: 'text/csv', buffer: Buffer.from('﻿Name,Phone\r\nAna Ruiz,555 0100\r\nBo Lee,\r\n', 'utf8') });
+    await expect(page.locator('#csvZone')).toContainText('2 contacts found');
+    await expect(page.locator('#csvZone')).not.toContainText('couldn’t find a name or email column');
   });
 });
 

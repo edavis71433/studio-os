@@ -48,6 +48,7 @@ const { handleSalesStages } = await import(`${P}/routes/sales.ts`);
 const { handleCalendarLink } = await import(`${P}/routes/calendar.ts`);
 const { handleEmailLogAddress } = await import(`${P}/routes/email_log.ts`);
 const { handleEstimateDelete } = await import(`${P}/routes/estimates.ts`);   // sales review item 47
+const { handleProspect } = await import(`${P}/routes/prospects.ts`);   // sales review item 112
 const { handleRecurringAction } = await import(`${P}/routes/recurring_invoices.ts`);
 const { handleReportPut, handleReportPreview } = await import(`${P}/ops/monthly_report.ts`);   // builder list item 58
 
@@ -139,6 +140,7 @@ const DECIDED = {
     'DELETE /sales/proposals/:id', 'DELETE /sales/templates/:id', 'POST /comments/:id/delete',
     'POST /sales/deals/:id/retainer/cancel', 'POST /sales/invoices/:id/void', 'DELETE /broadcasts/lists/:id',
     'DELETE /sales/estimates/:id', 'POST /sales/recurring/:id/stop',   // sales review item 47
+    'DELETE /sales/prospects/:id',   // sales review item 112: taking a prospect off the list
   ],
   configure: [
     'DELETE /foundations/domain', 'POST /foundations/domain', 'POST /foundations/prepare',
@@ -204,6 +206,9 @@ const DECIDED = {
     // sales review item 47: estimates and recurring invoices (stopping one is delete, above)
     'POST /sales/deals/:id/estimates', 'POST /sales/estimates/:id/send', 'POST /sales/estimates/:id/proposal', 'POST /sales/estimates/:id/invoice',
     'POST /sales/deals/:id/recurring', 'PATCH /sales/recurring/:id', 'POST /sales/recurring/:id/pause', 'POST /sales/recurring/:id/resume', 'POST /sales/recurring/:id/skip',
+    // sales review item 112: prospecting — find, save, move along, start the deal; the draft only returns words
+    'POST /sales/prospects', 'POST /sales/prospects/discover', 'PATCH /sales/prospects/:id',
+    'POST /sales/prospects/:id/convert', 'POST /sales/prospects/:id/draft',
   ],
   open: [
     'DELETE /crm/notes/:id', 'POST /client/notifications/read', 'POST /concierge/ask', 'POST /crm/notes',
@@ -294,6 +299,7 @@ const CHANGED = [
   { name: 'DELETE /broadcasts/lists/:id', fx: { only: ['presence_sales_templates'], rows: { presence_sales_templates: { body: JSON.stringify([{ id: ROW, name: 'Picked', people: [{ email: 'a@example.com' }], created_at: '2026-01-01T00:00:00Z' }]) } } }, run: (r, p) => handleBroadcastListDelete(A, p, ROW, cors) },
   { name: 'POST /sales/deals/:id/retainer/cancel', fx: { rows: { presence_deals: { retainer: { status: 'pending' } } } }, run: (r, p) => handleSalesRetainerCancel(r, A, p, ROW, cors) },
   { name: 'DELETE /sales/estimates/:id', run: (r, p) => handleEstimateDelete(A, p, ROW, cors) },     // sales review item 47
+  { name: 'DELETE /sales/prospects/:id', run: (r, p) => handleProspect(r, A, p, ROW, cors) },     // sales review item 112
   { name: 'POST /sales/recurring/:id/stop', run: (r, p) => handleRecurringAction(r, A, p, ROW, 'stop', cors) },
   { name: 'POST /foundations/domain', body: { domain: 'beta.example' }, run: (r, p) => handleDomain(r, 'POST', A, p, cors) },
   { name: 'DELETE /foundations/domain', run: (r, p) => handleDomain(r, 'DELETE', A, p, cors) },
@@ -306,7 +312,7 @@ const CHANGED = [
   { name: 'DELETE /calendar/link', run: (r, p) => handleCalendarLink(r, A, p, cors) },
   { name: 'POST /email/log-address', run: (r, p) => handleEmailLogAddress(r, A, p, cors) },     // sales review item 69
   { name: 'DELETE /email/log-address', run: (r, p) => handleEmailLogAddress(r, A, p, cors) },
-  { name: 'PUT /report/monthly', body: { enabled: true }, run: (r, p) => handleReportPut(r, A, p, cors) },     // builder list item 58
+  { name: 'PUT /report/monthly', body: { note: 'A line for the client' }, run: (r, p) => handleReportPut(r, A, p, cors) },     // builder list item 58 (a line, not the switch: this stub answers every read with a row, which reads as a do-not-send entry)
   { name: 'POST /report/monthly/preview', fx: { only: ['clients'] }, run: (r, p) => handleReportPreview(A, p, cors) },   // with every read answering a row the address reads as suppressed; the send is the write
   { name: 'POST /site/offline', run: (r, p) => handleTakeOffline(A, p, cors) },
   { name: 'POST /site/online', fx: { site: { offline_at: '2026-01-01T00:00:00Z' } }, run: (r, p) => handleBackOnline(A, p, cors) },
@@ -439,6 +445,8 @@ const WRITE_HANDLERS = [
   // sales review item 47: estimates and recurring invoices (see DECIDED.edit and .delete)
   'handleEstimateCreate', 'handleEstimateSend', 'handleEstimateToProposal', 'handleEstimateToInvoice', 'handleEstimateDelete',
   'handleRecurringStart', 'handleRecurringChange', 'handleRecurringAction',
+  // sales review item 112: prospects (DELETE and PATCH /sales/prospects/:id share handleProspect)
+  'handleProspects', 'handleProspect', 'handleProspectDiscover', 'handleProspectConvert', 'handleProspectDraft',
   'handleStudioRequests',   // final pass S1: POST /portal/studio-requests/:id/(accept|decline) are open; the route answers the owner only
   'handleScheduleCancel', 'handleScheduleCreate', 'handleSettings', 'handleShareSet', 'handleStockImport',
   'handleSupport', 'handleSupportMessage', 'handleSupportOne', 'handleSurveyRespond', 'handleTakeOffline',

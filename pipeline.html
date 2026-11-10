@@ -1653,7 +1653,7 @@ function renderFilters(){
 async function renderSummary(gen){
   const host=$('summary'); if(!host) return;
   let s;
-  try{ const r=await api('/sales/summary?today='+localYmd()); s=r&&r.data; }   // item 65: the Outstanding tile's overdue on the local day
+  try{ const r=await api('/sales/summary?today='+localYmd()+'&tzo='+new Date().getTimezoneOffset()); s=r&&r.data; }   // item 65: the Outstanding tile's overdue on the local day; item 104: "Won this month" by the local month (tzo: minutes behind UTC)
   catch(_){ if(gen===undefined||gen===REQ_SEQ)host.innerHTML=''; return; }   // never let the summary sink the page
   if(gen!==undefined&&gen!==REQ_SEQ)return;           // a newer roster read started — this strip is stale
   if(!s||!s.total){ host.innerHTML=''; return; }        // empty pipeline → the list's own empty state says it
@@ -2158,11 +2158,14 @@ const STAGE_WORDS=[[/won|closed ?won/,'won'],[/lost|not a fit|closed ?lost|dead/
 // "1.200,50" (Excel set to European numbers) or "1 200,50". The LAST separator followed by
 // one or two digits is the decimal point; any other separators group thousands. Keeping only
 // digits and dots turned "1.200,50" into 1.2005 — 120 cents. Never negative.
+// item 97 (B20): a trailing k is thousands — "5k" is $5,000 and "1.5k" $1,500. The letters were
+// thrown away before the number was read, so "5k" was saved as $5 without a word.
 function amountCents(raw){
-  const t=String(raw==null?'':raw).replace(/[^0-9.,]/g,'');if(!t)return 0;
+  const s=String(raw==null?'':raw).trim(),k=/\d\s*k$/i.test(s);
+  const t=s.replace(/[^0-9.,]/g,'');if(!t)return 0;
   const m=/[.,](\d{1,2})$/.exec(t);
   const whole=(m?t.slice(0,m.index):t).replace(/[.,]/g,'');
-  const v=parseInt(whole||'0',10)*100+(m?parseInt(m[1].length===1?m[1]+'0':m[1],10):0);
+  const v=(parseInt(whole||'0',10)*100+(m?parseInt(m[1].length===1?m[1]+'0':m[1],10):0))*(k?1000:1);
   return Number.isFinite(v)&&v>0?v:0;
 }
 function importDeals(){
@@ -2171,11 +2174,14 @@ function importDeals(){
     title:'Import deals from a CSV',
     help:'One row per deal: a deal name (or the company), and if you have them the value, stage, contact name and email, and close date. Won and not-a-fit deals are skipped; a contact already in your list (by email) is reused. Nobody is emailed.',
     noun:'deal',
+    // item 97: "first"/"last" are names only beside "name" — any heading with "last" in it was read
+    // as a surname, so a "Last activity date" column was glued onto the contact's name — and an
+    // account's street, phone or owner is never its name (the Contacts rules)
     mapHeader:(h)=>{h=String(h).toLowerCase().trim();
       if(/e-?mail/.test(h))return'email';if(/stage|status/.test(h))return'stage';if(/close|due/.test(h))return'close';
-      if(/value|amount|price|budget|revenue|\$/.test(h))return'value';if(/company|business|organi[sz]ation|account/.test(h))return'company';
+      if(/value|amount|price|budget|revenue|\$/.test(h))return'value';if(/company|business|organi[sz]ation|account/.test(h)&&!/\b(street|city|state|postal|zip|country|region|address|fax|phone|web|page|po box|department|title|location|symbol|description|owner|number|id)\b/.test(h))return'company';
       if(/^(deal|deal name|opportunity|opportunity name|title|project)$/.test(h))return'title';
-      if(/first/.test(h))return'first';if(/last|surname/.test(h))return'last';if(/^(name|full ?name|contact|contact name)$/.test(h))return'name';return null;},
+      if(/\b(first|given)[ _-]?name\b|^first$/.test(h))return'first';if(/\b(last|family)[ _-]?name\b|\bsurname\b|^last$/.test(h))return'last';if(/^(name|full[ _-]?name|contact|contact name)$/.test(h))return'name';return null;},
     ready:(keys)=>(keys.includes('title')||keys.includes('company')||keys.includes('name'))?'':'We couldn’t find a deal name. Check the first row has a header like “Deal”, “Company” or “Name”.',
     toItem:(o)=>{
       const who=o.name||[o.first,o.last].filter(Boolean).join(' ');
@@ -2311,9 +2317,11 @@ function boardCard(d,today){
 // same rule over the deals in hand until then) with a way to the won deals; Not
 // a fit is a drop zone (a drop there is the tap menu's "Mark as not a fit").
 let WON_MONTH=null;
+// item 104 (B14): this month and the month each deal was won are both the LOCAL month — the UTC
+// one turned over at 4pm in Los Angeles on the last day (the summary asks the same, with ?tzo=)
 function wonThisMonthLocal(){
-  const mk=new Date().toISOString().slice(0,7);
-  const ws=DEALS.filter(d=>(d.converted_client_id||d.stage==='won')&&String(d.converted_at||d.updated_at||'').slice(0,7)===mk);
+  const mk=localYmd().slice(0,7),wonMonth=(d)=>{const t=Date.parse(String(d.converted_at||d.updated_at||''));return Number.isFinite(t)?localYmd(t).slice(0,7):'';};
+  const ws=DEALS.filter(d=>(d.converted_client_id||d.stage==='won')&&wonMonth(d)===mk);
   return{count:ws.length,value_cents:ws.reduce((a,d)=>a+(Number(d.expected_value_cents)||0),0)};
 }
 function wonColInner(){
@@ -2350,10 +2358,12 @@ function renderBoard(){
   if(!CONTACT_NAME&&!BOARD_NAMES_ASKED){BOARD_NAMES_ASKED=true;ensureContactNames().then(paintWho);}
   const wm=WON_MONTH||wonThisMonthLocal();
   const stabs=`<div class="stabs" role="group" aria-label="Stage">${BOARD_STAGES.map(stg=>{const n=open.filter(d=>d.stage===stg).length;return `<button type="button" class="stab" data-stab="${stg}" aria-pressed="${PSTAGE===stg?'true':'false'}">${esc(stageLabel(stg))} <span class="n">${n}</span></button>`;}).join('')}<button type="button" class="stab" data-stab="won" aria-pressed="${PSTAGE==='won'?'true':'false'}">Won <span class="n">${Number(wm.count)||0}</span></button></div>`;
+  const qa=quickAddNow(host);   // B19: a half-typed "+ Add a deal" is put back after the redraw
   host.innerHTML=bchipsHtml()+stabs+`<div class="board-scroll"><div class="board with-out">${cols}${outcomeColsHtml()}</div></div>`
     +(open.length?'':`<div class="mut" style="margin-top:12px">${all.length?'Nothing here — try “All open”.':'No open deals yet. Add one to start the pipeline.'}</div>`)
     +(terminal>0?`<div class="mut board-foot">${terminal} won or not-a-fit deal${terminal===1?'':'s'} — see them in List view.</div>`:'');
   wireBoard();
+  if(qa)openQuickAdd(qa.stg,qa);
   const sw=$('seeWon');if(sw)sw.addEventListener('click',()=>{FILTER='won';history.replaceState(null,'',listUrl());renderFilters();setView('list');});
 }
 // ── Bold redesign — Pipeline: a card opens the deal beside the board ────────
@@ -2461,35 +2471,60 @@ document.addEventListener('keydown',(e)=>{
   e.preventDefault();closeDealPreview();
 });
 
-// "+ Add a deal" in a column: a name and a value, Enter adds it to that stage (POST /sales/deals), Esc puts the button back
-function openQuickAdd(stg){
+// "+ Add a deal" in a column: a name and a value, Enter adds it to that stage (POST /sales/deals), Esc puts the button back.
+// keep (B19): what a redraw found typed in the form — the board redraws itself whole (a search
+// keystroke, a chip, a move, + Create), and the form and its text went with it.
+function openQuickAdd(stg,keep){
   const box=document.querySelector(`[data-add="${stg}"]`);if(!box)return;
   box.innerHTML=`<form class="qadd" novalidate><input class="qa-t" maxlength="200" autocomplete="off" placeholder="Deal name or business" aria-label="New deal in ${esc(stageLabel(stg))}: name"><div class="qa-row"><span class="qa-v"><span aria-hidden="true">$</span><input class="qa-amt" inputmode="decimal" autocomplete="off" placeholder="Value" aria-label="Value (optional)"></span><button type="submit" class="qa-go">Add</button></div><p class="qa-hint mut">Enter adds it · Esc cancels</p><p class="qa-err" role="alert" hidden></p></form>`;
   const f=box.querySelector('form'),t=f.querySelector('.qa-t'),a=f.querySelector('.qa-amt'),err=f.querySelector('.qa-err');
-  const back=()=>{box.innerHTML=`<button type="button" class="col-addbtn" data-addbtn="${stg}">+ Add a deal</button>`;const b=box.querySelector('button');b.addEventListener('click',()=>openQuickAdd(stg));b.focus();};
+  // the column's form as it is NOW: a redraw while a deal is on its way swaps in a copy of this one
+  const cur=()=>document.querySelector(`[data-add="${stg}"] .qadd`);
+  const shut=()=>{const bx=document.querySelector(`[data-add="${stg}"]`)||box;bx.innerHTML=`<button type="button" class="col-addbtn" data-addbtn="${stg}">+ Add a deal</button>`;const b=bx.querySelector('button');b.addEventListener('click',()=>openQuickAdd(stg));return b;};
+  const back=()=>{shut().focus();};
   f.addEventListener('keydown',(e)=>{if(e.key==='Escape'){e.preventDefault();e.stopPropagation();back();}});
   f.addEventListener('submit',async(e)=>{
     e.preventDefault();
     const title=t.value.trim();if(!title){err.textContent='Give the deal a name.';err.hidden=false;t.focus();return;}
     const raw=a.value.trim(),cents=raw?amountCents(raw):0;
     if(raw&&!(cents>0)){err.textContent='That value doesn’t look like an amount.';err.hidden=false;a.focus();return;}
-    const go=f.querySelector('.qa-go');go.disabled=true;err.hidden=true;
+    const go=f.querySelector('.qa-go');go.disabled=true;err.hidden=true;f.dataset.busy='1';
     try{
       await api('/sales/deals','POST',cents?{title,stage:stg,expected_value_cents:cents}:{title,stage:stg});
       toast('Added to '+stageLabel(stg));
+      const c=cur();if(c&&c.dataset.busy)shut();   // it went in: the reload below must not carry the sent text back
       await load(true);
       const nb=document.querySelector(`[data-addbtn="${stg}"]`);if(nb)nb.focus();
-    }catch(x){go.disabled=false;err.textContent=nice(x);err.hidden=false;}
+    }catch(x){const c=cur()||f;delete c.dataset.busy;c.querySelector('.qa-go').disabled=false;const ce=c.querySelector('.qa-err');ce.textContent=nice(x);ce.hidden=false;}
   });
+  if(keep){t.value=keep.t;a.value=keep.a;if(keep.busy){f.dataset.busy='1';f.querySelector('.qa-go').disabled=true;}
+    const el=keep.focus==='a'?a:keep.focus==='t'?t:null;if(el){el.focus({preventScroll:true});try{el.setSelectionRange(keep.at,keep.at);}catch(_){}}return;}
   t.focus();
 }
+// the open "+ Add a deal" form, read just before the board redraws (openQuickAdd's keep)
+function quickAddNow(host){
+  const f=host&&host.querySelector('.col-add .qadd');if(!f)return null;
+  const t=f.querySelector('.qa-t'),a=f.querySelector('.qa-amt'),ae=document.activeElement;
+  const focus=ae===t?'t':ae===a?'a':'';
+  return{stg:f.closest('[data-add]').getAttribute('data-add'),t:t.value,a:a.value,busy:!!f.dataset.busy,focus,at:focus?ae.selectionStart:0};
+}
+const BOARD_MOVING=new Set();   // deals with a stage change on its way (wireBoard's move)
 function wireBoard(){
   const host=$('board');
   host.querySelectorAll('[data-bchip]').forEach(b=>b.addEventListener('click',()=>{BCHIP=b.getAttribute('data-bchip');renderBoard();renderMeta();const nb=host.querySelector(`[data-bchip="${BCHIP}"]`);if(nb)nb.focus();}));
   host.querySelectorAll('[data-addbtn]').forEach(b=>b.addEventListener('click',()=>openQuickAdd(b.getAttribute('data-addbtn'))));
   host.querySelectorAll('[data-stab]').forEach(b=>b.addEventListener('click',()=>{PSTAGE=b.getAttribute('data-stab');PSTAGE_PICKED=true;host.querySelectorAll('[data-stab]').forEach(x=>x.setAttribute('aria-pressed',x===b?'true':'false'));host.querySelectorAll('.col[data-col]').forEach(c=>c.classList.toggle('on',c.getAttribute('data-col')===PSTAGE));}));
   dpMark();
-  const move=async(id,to)=>{try{await api('/sales/deals/'+id+'/stage','POST',{to});PENDING_BACK='';toast('Moved to '+stageLabel(to));load();if(!$('detailWrap').hidden&&CURRENT_DEAL===id)openDeal(id);}catch(e){toast(nice(e),true);}};   // any pending back-confirm is against the OLD stage — drop it (mirrors crm.html moveStage)
+  // any pending back-confirm is against the OLD stage — drop it (mirrors crm.html moveStage).
+  // B21: one move per deal at a time (a double click sent two, and the second was refused); B13:
+  // the open preview of the same deal repaints, or it kept the old stage and its old "Move to";
+  // the board reloads in place, so a half-typed "+ Add a deal" in another column survives (B19)
+  const move=async(id,to)=>{if(BOARD_MOVING.has(id))return;BOARD_MOVING.add(id);
+    try{await api('/sales/deals/'+id+'/stage','POST',{to});PENDING_BACK='';toast('Moved to '+stageLabel(to));await load(true);
+      if(!$('detailWrap').hidden&&CURRENT_DEAL===id)openDeal(id);
+      if(DP&&DP.id===String(id)){dpPaint();dpActivity();}}
+    catch(e){toast(nice(e),true);}
+    finally{BOARD_MOVING.delete(id);}};
   host.querySelectorAll('.bcard').forEach(c=>{
     const isCtrl=(e)=>e&&e.target&&e.target.closest&&e.target.closest('.bc-move,.bc-menu');
     c.onclick=(e)=>{if(!isCtrl(e))openDealPreview(c.dataset.id,c);};
@@ -2553,7 +2588,10 @@ function wireBoard(){
 }
 
 // ── new deal: an accessible in-dialog form (no prompt) ──
-function openNewDeal(){ $('f-title').value=''; $('f-email').value=''; $('f-name').value=''; $('f-phone').value=''; $('formDlg').showModal(); setTimeout(()=>$('f-title').focus(),20); }
+// ND_CONTACT: the contact this dialog already made, kept for a retry. The contact goes in first;
+// when the deal then failed, pressing Add again made a second name-only contact beside the first.
+let ND_CONTACT=null;
+function openNewDeal(){ ND_CONTACT=null; $('f-title').value=''; $('f-email').value=''; $('f-name').value=''; $('f-phone').value=''; $('formDlg').showModal(); setTimeout(()=>$('f-title').focus(),20); }
 // Scoped into a client, POST /sales/deals writes site_id = the CLIENT's site —
 // but deals only ever live on the studio's own site, so the deal would vanish
 // from the pipeline the moment you left the client. Hide the action.
@@ -2584,11 +2622,15 @@ $('dealForm').onsubmit=async(e)=>{
   const btn=e.submitter; if(btn)btn.disabled=true;
   try{
     let contactId=null, cnote='';
+    const who=[email,cname,cphone].join('\n');
     // capture a real name/phone if given (no more "jane.doe" contacts from the email)
-    if(email||cname){ const c=await api('/sales/contacts','POST',{email:email||undefined,name:cname||(email?email.split('@')[0]:'New contact'),phone:cphone||undefined}); contactId=c.data&&c.data.id;
+    if(ND_CONTACT&&ND_CONTACT.who===who){ contactId=ND_CONTACT.id; cnote=ND_CONTACT.note; }   // a retry after the deal failed: the same person, not a second contact
+    else if(email||cname){ const c=await api('/sales/contacts','POST',{email:email||undefined,name:cname||(email?email.split('@')[0]:'New contact'),phone:cphone||undefined}); contactId=c.data&&c.data.id;
       if(c&&c.deduped)cnote=dedupeNote(c.data,cname,email);   // an existing contact was linked, not a new one — say so
+      if(contactId)ND_CONTACT={who,id:contactId,note:cnote};
       CONTACT_NAME=null;CONTACT_TEXT=null;CONTACT_FAILED=false; }   // BOTH contact caches are stale now — the Table's name join AND the search index (visibleDeals gates its refetch on !CONTACT_TEXT); refetch on the next render
     const created=await api('/sales/deals','POST',{title,contact_id:contactId});
+    ND_CONTACT=null;
     $('formDlg').close(); toast(cnote?'Deal added. '+cnote:'Deal added'); load();
     if(created&&created.data&&created.data.id) openDeal(created.data.id);   // straight into the deal — no hunting the list
   }catch(err){ toast(nice(err),true); } finally{ if(btn)btn.disabled=false; }
@@ -3278,7 +3320,11 @@ async function openDeal(id){
       if(pf&&pf.items&&pf.items.length){const rowsEls=host.querySelectorAll('.prop-line');pf.items.forEach((it,i)=>{const r=rowsEls[i];if(!r)return;r.querySelector('.pl-label').value=it.label||'';r.querySelector('.pl-price').value=((it.unit_cents||0)/100);const q=r.querySelector('.pl-qty');if(q)q.value=Math.max(1,Math.trunc(it.qty)||1);});
         if(pf.discount){$('plDiscMode').value=pf.discount.mode;$('plDiscVal').style.display='';$('plDiscVal').value=pf.discount.mode==='percent'?pf.discount.value:((pf.discount.value||0)/100);}
         if(pf.tax_pct!=null)$('plTaxPct').value=pf.tax_pct;
-      } else { const l1=host.querySelector('.pl-label'), p1=host.querySelector('.pl-price'); if(l1&&!l1.value&&d.title){ l1.value=d.title; if(p1&&!p1.value&&d.expected_value_cents)p1.value=(d.expected_value_cents/100); } }
+      } else { const l1=host.querySelector('.pl-label'), p1=host.querySelector('.pl-price'); if(l1&&!l1.value&&d.title){ l1.value=d.title; if(p1&&!p1.value&&d.expected_value_cents)p1.value=(d.expected_value_cents/100);
+        // item 98 (B8): this line only saves typing — the first service chip takes its place while it's
+        // untouched. Chips only filled an EMPTY line, so they added below it: a $3,000 deal plus two
+        // chips worth $3,000 totalled $6,000, and a deal with no value sent a "$0" line named after itself.
+        const r1=l1.closest('.prop-line');r1.dataset.seeded='1';r1.querySelectorAll('.pl-pick,.pl-label,.pl-price,.pl-qty').forEach(el=>el.addEventListener('input',()=>{delete r1.dataset.seeded;},{once:true})); } }
       revealFilled();
       $('plDiscMode').onchange=()=>{$('plDiscVal').style.display=$('plDiscMode').value?'':'none';recalc();};
       $('plDiscVal').addEventListener('input',recalc); $('plTaxPct').addEventListener('input',recalc);
@@ -3301,7 +3347,8 @@ async function openDeal(id){
           if(rows.length>1)has.remove();else{const sel=has.querySelector('.pl-pick');if(sel){sel.value='';sel.onchange();}else{has.querySelector('.pl-label').value='';has.querySelector('.pl-price').value='';}}
           recalc();b.focus();return;
         }
-        let row=rows.find(r=>!r.querySelector('.pl-label').value.trim()&&!r.querySelector('.pl-price').value);
+        let row=rows.find(r=>r.dataset.seeded)||rows.find(r=>!r.querySelector('.pl-label').value.trim()&&!r.querySelector('.pl-price').value);
+        if(row)delete row.dataset.seeded;   // the deal's own line, still as it was seeded, is replaced (B8)
         if(!row){$('plMore').click();const all=host.querySelectorAll('.prop-line');row=all[all.length-1];}
         const sel=row.querySelector('.pl-pick');
         if(sel){sel.value=i;sel.onchange();}else{row.querySelector('.pl-label').value=sv.name;row.querySelector('.pl-price').value=sv.price_cents/100;recalc();}
@@ -3314,7 +3361,10 @@ async function openDeal(id){
       const savePropProposal=async()=>{const items=collectItems();if(!items.length){toast('Add at least one line item.',true);return null;}const pr=collectPricing();const body={line_items:items,discount:pr.discount,tax_pct:pr.tax_pct};const path=est?('/sales/deals/'+id+'/estimates'):rev?('/sales/proposals/'+rev+'/revise'):('/sales/deals/'+id+'/proposals');const r=await api(path,'POST',body);clearPropDrafts();return r.data&&r.data.id;};
       const busyProp=(x)=>{$('plSave').disabled=x;$('plSaveSend').disabled=x;};
       $('plSave').onclick=async()=>{busyProp(true);try{const pid=await savePropProposal();if(!pid){busyProp(false);return;}toast(est?'Estimate saved as a draft — send it when you’re ready.':rev?'Revision saved as a draft — send it when you’re ready.':'Proposal saved as a draft — send it when you’re ready.');openDeal(id);}catch(e){toast(nice(e),true);busyProp(false);}};
-      $('plSaveSend').onclick=async()=>{busyProp(true);try{const pid=await savePropProposal();if(!pid){busyProp(false);return;}await (est?sendEstimateById(pid):sendProposalById(pid));}catch(e){toast(nice(e),true);busyProp(false);}};
+      // item 95 (B7): when the save worked and only the email failed, the draft is on the deal now with
+      // its own Send — open the deal on it. Staying here made the next press save a second copy.
+      $('plSaveSend').onclick=async()=>{busyProp(true);let pid=null;try{pid=await savePropProposal();if(!pid){busyProp(false);return;}await (est?sendEstimateById(pid):sendProposalById(pid));}
+        catch(e){if(pid){toast((est?'Estimate':rev?'Revision':'Proposal')+' saved as a draft, but it wasn’t sent: '+nice(e)+' Send it from the deal when you’re ready.',true);openDeal(id);return;}toast(nice(e),true);busyProp(false);}};
       recalc();
       const f=host.querySelector('.pl-label'); if(f) f.focus();
     };
