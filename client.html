@@ -716,6 +716,15 @@ function showTab(tab){
   return renderHome();
 }
 function goHome(){showTab('home');}
+// a project's "← Back to home": Home redraws #main (synchronously), which drops
+// focus to <body> — hand it to the card the project opened from, or to Home's
+// h1 when that card isn't there (a failed projects read, a project that left)
+function backHome(id){
+  goHome();
+  const card=[...document.querySelectorAll('#main [data-proj]')].find(c=>c.getAttribute('data-proj')===String(id));
+  if(card)return card.focus();
+  const h=$('main').querySelector('h1');if(h){h.setAttribute('tabindex','-1');h.focus();}
+}
 // small shared building blocks for the tab views
 function portalHeader(title,sub){return `<header><h1>${esc(title)}</h1>${sub?`<p class="sub">${esc(sub)}</p>`:''}</header>`;}
 function emptyCard(msg,icon){return `<div class="empty">${icon?`<span class="ei" aria-hidden="true">${icon}</span>`:''}<p>${esc(msg)}</p></div>`;}
@@ -2300,7 +2309,7 @@ async function openProject(id,focusSection){
     if(view!==VIEW_SEQ)return;   // the user moved on mid-fetch — never paint over the newer view
     $('main').innerHTML=`<p><a class="link" href="/client.html" id="projBack">← Back to home</a></p>`+
       emptyCard('We couldn’t load this project just now — please try again in a moment.','📁');
-    const pb=$('projBack');if(pb)pb.addEventListener('click',(e)=>{e.preventDefault();goHome();});
+    const pb=$('projBack');if(pb)pb.addEventListener('click',(e)=>{e.preventDefault();backHome(id);});
     return;
   }
   if(view!==VIEW_SEQ)return;   // the user moved on mid-fetch — never paint over the newer view
@@ -2422,7 +2431,7 @@ async function openProject(id,focusSection){
   wireShareCard({pid:id,ondone:()=>openProject(id,'sec-files')});
   wireDownloads(document);
   document.querySelectorAll('[data-survey]').forEach(a=>a.addEventListener('click',(e)=>{e.preventDefault();openSurvey(a.getAttribute('data-survey'),id,a);}));
-  const pb=$('projBack');if(pb)pb.addEventListener('click',(e)=>{e.preventDefault();goHome();});
+  const pb=$('projBack');if(pb)pb.addEventListener('click',(e)=>{e.preventDefault();backHome(id);});
   $('newSupport').addEventListener('click',()=>openSupport(id));
   $('send').addEventListener('click',async()=>{const b=$('send');const v=$('msg').value.trim();if(!v)return;b.disabled=true;const r=await api('/client/projects/'+id+'/messages','POST',{body:v});if(r.ok){$('msg').value='';PROJ_MSGS=[sentMessage(r,v)].concat(PROJ_MSGS);renderProjTimeline();loadThread(id);}else toast('That didn’t send.');b.disabled=false;});   // the sent message shows at once; loadThread confirms it (experience review #44)
 }
