@@ -131,7 +131,10 @@ test.describe('one editor per section', () => {
     await mount(page, '/presence.html#design');
     await expect(page.frameLocator('#designPreview').locator('#main > section').first()).toBeVisible();
     await openSection(page);
-    await expect(page.locator('#settingsTitle')).toHaveText('Text box');
+    // the inspector card: the section's own heading on top, its kind and page under it (part two)
+    await expect(page.locator('#settingsTitle')).toHaveText('Our story');
+    await expect(page.locator('#settingsSub')).toHaveText('Text box · on Home');
+    await expect(page.locator('#inspectorSeg [data-itab="content"]')).toHaveAttribute('aria-selected', 'true');
     await expect(page.locator('#blkSub-1 input').first()).toBeVisible();
     await expect(page.locator('#blkSub-0')).toHaveCount(0);
     await expect(page.locator('#blocksCard').getByText('Add a section', { exact: true })).toHaveCount(0);
@@ -441,7 +444,9 @@ test.describe('what a real site showed', () => {
     await mount(page, '/presence.html#design', TEMPLATES);
     await expect(page.locator('html')).toHaveClass(/dc-edit/);
     await page.locator('#btnSettingsOpen').click();
+    await page.locator('#stylesSeg [data-stab="colours"]').click();   // the brand kit is on the Colours tab
     await expect(page.locator('#brandKitCard')).toBeInViewport();
+    await page.locator('#stylesSeg [data-stab="looks"]').click();     // the template row is on Looks
     const fold = page.locator('#designGallery .tg-fold');
     await expect(fold).toContainText('Business Classic');
     await expect(page.locator('#designGallery .tg-card').first()).toBeHidden();

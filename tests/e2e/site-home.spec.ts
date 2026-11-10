@@ -1260,7 +1260,8 @@ test.describe('Styles show on the page at once, and save behind', () => {
     await page.route('**/functions/v1/presence/preview**', (route: Route) => { log.push('drawing'); return route.fallback(); });
     await page.locator('#btnSettingsOpen').click();
     await expect(page.locator('#designCard')).toBeVisible();
-    const pick = (name: string) => page.locator('#designCard').getByRole('button', { name, exact: true }).click();
+    // the Styles card has tabs (part two of the floating studio): a row is clicked on its own tab
+    const pick = async (name: string, tab = 'colours') => { await page.locator(`#stylesSeg [data-stab="${tab}"]`).click(); await page.locator('#designCard').getByRole('button', { name, exact: true }).click(); };
     const cssVar = (name: string) => frame.locator('html').evaluate((h, n) => getComputedStyle(h).getPropertyValue(n).trim(), name);
     const saves = () => writes.filter((w) => w.path === '/dev/customization').map((w) => w.body.theme_tokens);
     return { writes, log, pick, cssVar, saves };
@@ -1281,7 +1282,7 @@ test.describe('Styles show on the page at once, and save behind', () => {
   test('two quick picks keep both', async ({ page }) => {
     const { pick, cssVar, saves } = await styles(page);
     await pick('Evergreen');
-    await pick('Understated mono');
+    await pick('Understated mono', 'fonts');
     await expect.poll(() => cssVar('--font-display')).toContain('Courier New');
     expect(await cssVar('--accent')).toBe('#23635a');
     await expect.poll(() => saves().length).toBe(2);
@@ -1300,7 +1301,7 @@ test.describe('Styles show on the page at once, and save behind', () => {
     const { pick, cssVar, saves } = await styles(page);
     await pick('Evergreen');
     await expect.poll(saves).toHaveLength(1);
-    await page.locator('#designCard').getByRole('button', { name: 'Original', exact: true }).first().click();   // the Colors row's Original
+    await page.locator('#designCard .ins-swatches').getByRole('button', { name: 'Original', exact: true }).click();   // the Colors row's Original
     await expect.poll(() => cssVar('--accent')).toBe('');
     await expect.poll(() => saves().length).toBe(2);
     expect(saves()[1]).toEqual({});
@@ -1312,6 +1313,7 @@ test.describe('Styles show on the page at once, and save behind', () => {
       { id: 'inter', family: 'Inter', css: 'Inter', kind: 'sans', weights: [400, 700], fallback: 'system-ui, sans-serif' },
     ];
     const { pick, saves } = await styles(page, { '/dev/customization': { data: { theme_tokens: { accent: '#111111' }, custom_css: '', custom_html: '', allowed_tokens: [], can_edit_css: false, font_library: LIB } } });
+    await page.locator('#stylesSeg [data-stab="fonts"]').click();
     await page.locator('#designCard summary', { hasText: 'More fonts' }).click();
     const headings = page.locator('#designCard [aria-label="Headings font"]');
     const pf = headings.getByRole('button', { name: 'Playfair Display' });
@@ -1332,6 +1334,7 @@ test.describe('Styles show on the page at once, and save behind', () => {
     await styles(page, { '/site': { data: { site: { id: 's1', edition: 'presence', status: 'ready', template_slug: 'slate', template_version: 1 }, identity: { business_name: 'Marlow’s Kitchen', description: 'Hello' }, location: { city: 'Burbank' } } } });
     await expect(page.locator('#designCard')).toContainText('keeps its own dark colors');
     await expect(page.locator('#designCard').getByRole('button', { name: 'Evergreen', exact: true })).toHaveCount(0);
+    await page.locator('#stylesSeg [data-stab="fonts"]').click();
     await expect(page.locator('#designCard').getByRole('button', { name: 'Understated mono', exact: true })).toBeVisible();
   });
 });
@@ -1343,9 +1346,11 @@ test.describe('the Styles panel sets type and corners in one place (item 94)', (
     const writes = await mount(page, '/presence.html#design', { '/dev/brand-kit': { data: { brand_kit: kit } } });
     await page.frameLocator('#designPreview').locator('#a h2').waitFor();
     await page.evaluate(() => (window as any).openSettingsPanel('styles'));
+    await page.locator('#stylesSeg [data-stab="colours"]').click();   // the brand kit lives on the Colours tab
     await expect(page.locator('#brandKitCard')).toBeVisible();
     return writes;
   };
+  const tab = (page: Page, name: string) => page.locator(`#stylesSeg [data-stab="${name}"]`).click();
   const kitPuts = (writes: Write[]) => writes.filter((w) => w.path === '/dev/brand-kit' && w.method === 'PUT').map((w) => w.body.brand_kit);
   test('the brand kit has no second Type or Corners, and builds with the ones set below', async ({ page }) => {
     const writes = await openStyles(page, null);
@@ -1354,14 +1359,18 @@ test.describe('the Styles panel sets type and corners in one place (item 94)', (
     await expect(kit).not.toContainText('Corners');
     await expect(colors).toContainText('Type');
     await expect(colors).toContainText('Corners');
+    await tab(page, 'looks');
     await colors.getByRole('button', { name: /^Round/ }).click();
     await expect(colors.getByRole('button', { name: /^Round/ })).toHaveText(/✓/);
+    await tab(page, 'colours');
     await kit.getByRole('button', { name: 'Build & apply brand kit' }).click();
     await expect.poll(() => kitPuts(writes).map((k) => k.corner)).toEqual(['18px']);
   });
   test('re-applying a saved kit keeps the corners chosen since, instead of bringing back its own', async ({ page }) => {
     const writes = await openStyles(page, { primary: '#2f5d8a', corner: '2px' });
+    await tab(page, 'looks');
     await page.locator('#designCard').getByRole('button', { name: /^Round/ }).click();
+    await tab(page, 'colours');
     await page.locator('#brandKitCard').getByRole('button', { name: 'Apply my brand' }).click();
     await expect.poll(() => kitPuts(writes).map((k) => k.corner)).toEqual(['18px']);
     await expect.poll(() => writes.filter((w) => w.path === '/dev/brand-kit/apply').length).toBe(1);
@@ -1746,6 +1755,7 @@ test.describe('the section panel’s arrows keep the canvas pointing at the righ
     await editOn('#a');
     expect(await page.evaluate('BLOCKS_WORK[BLOCK_SOLO].type')).toBe('title');
     await page.waitForLoadState('networkidle');           // Edit's own redraw (item 85) has landed
+    await page.locator('#inspectorSeg [data-itab="layout"]').click();   // the inspector keeps the arrows on its Layout tab (part two)
     await page.locator('#blkSub-0 button', { hasText: '↓' }).click();
     expect(await page.evaluate('BLOCKS_WORK.map((b) => b.type).join()')).toBe('richtext,title');
     await editOn('#a');                                   // the canvas still draws the title first
