@@ -243,6 +243,30 @@ test.describe('Settings page', () => {
     await expect(page.locator('[data-card="menu"]')).toHaveCount(0);
   });
 
+  // builder list item 59 (Nov 2026): what clients see of this studio, on the Studio profile card
+  test('item 59 — the Studio profile shows the name and logo clients see, and where to change the logo; never inside a client', async ({ page }) => {
+    await installApp(page, { api: { ...API, '/portal/context': AGENCY_CTX, '/brand/studio': { data: { name: 'Marlow & Co', logo_url: 'https://store.example/sign/logo.png', accent: '#8c3b2e', is_default: false } } } });
+    await page.route('https://store.example/**', (r) => r.fulfill({ status: 200, contentType: 'image/png', body: Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=', 'base64') }));
+    await page.goto('/settings.html');
+    const look = page.locator('#studioLook');
+    await expect(look).toBeVisible();
+    await expect(look.locator('#studioLookName')).toHaveText('Marlow & Co');
+    await expect(look.locator('#studioLookLogo')).toHaveAttribute('src', 'https://store.example/sign/logo.png');
+    await expect(look.locator('#studioLookMark')).toBeHidden();
+    await expect(look).toContainText('To change the logo, open Files');
+    // no logo yet: the initial on the studio's colour, and how to add one
+    await installApp(page, { api: { ...API, '/portal/context': AGENCY_CTX, '/brand/studio': { data: { name: 'Harbor Dental', logo_url: null, accent: '#2f5d8a', is_default: false } } } });
+    await page.goto('/settings.html');
+    await expect(look.locator('#studioLookMark')).toHaveText('H');
+    await expect(look.locator('#studioLookLogo')).toBeHidden();
+    await expect(look).toContainText('Add a logo in Files');
+    // inside a client the studio's own look is not shown
+    await installApp(page, { api: { ...API, '/portal/context': SCOPED_CTX, '/brand/studio': { data: { name: 'X', logo_url: null, accent: '', is_default: false } } } });
+    await page.goto(`/settings.html?client=${CLIENT}`);
+    await expect(page.locator('#cards .setcard').first()).toBeVisible();
+    await expect(page.locator('#studioLook')).toBeHidden();
+  });
+
   // builder list item 58 (Nov 2026): the monthly report email to a client, set once per client
   test('item 58 — Monthly report: inside a client only; the switch saves as it flips; the line saves; a preview goes to you; a failed save flips back', async ({ page }) => {
     const puts: unknown[] = []; let previews = 0; let fail = false;

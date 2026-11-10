@@ -51,7 +51,7 @@ ok('a to-do\'s status in words', /const TASK_WORD=\{todo:'To do',in_progress:'In
 ok('to-dos are called to-dos; approvals need your OK', /to-do\$\{s\.todos\.length===1\?'':'s'\} for you/.test(cl) && /need\$\{na===1\?'s':''\} your OK/.test(cl));
 ok('a paid invoice says when', /Paid\$\{paidOn\?' '\+esc\(paidOn\):''\} — thank you\./.test(cl));
 ok('no booking times → Ask for a call, prefilled', /openSupport\(null,'requests',\{subject:'A call',body:'I’d like to book a call\. Times that work for me: '\}\)/.test(cl));
-ok('each tab names itself', /document\.title=\(\{home:'Home',messages:'Messages',files:'Files',invoices:'Invoices',requests:'Requests',help:'Help'\}\[tab\]\|\|'Home'\)\+' — Your studio'/.test(cl));
+ok('each tab names itself', /document\.title=\(\{home:'Home',messages:'Messages',files:'Files',invoices:'Invoices',requests:'Requests',help:'Help'\}\[tab\]\|\|'Home'\)\+' — '\+studioBrand\(\)/.test(cl));   // builder list item 59: the studio's own name when there is one
 ok('phones: an odd last tile fills its row; mid widths fit all six tabs', /\.glance \.gt:last-child:nth-child\(odd\)\{grid-column:1\/-1\}/.test(cl) && /@media \(min-width:720px\) and \(max-width:920px\)\{\.tab \.ti\{display:none\}/.test(cl));
 
 console.log(`\n${pass} passed, ${fail} failed`);

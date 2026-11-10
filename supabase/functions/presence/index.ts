@@ -253,6 +253,12 @@ async function route_(req: Request, cors: Record<string, string>): Promise<Respo
     if (m && method === 'GET') return handlePublicPreview(req, m[1], cors);
     if (m && method === 'POST') return handlePublicPreviewOpen(req, m[1], cors);   // the viewer's call (item 74)
   }
+  // ── Builder list item 59: the studio's name and logo for the client sign-in page,
+  //    PUBLIC, pre-auth, keyed by the studio's site id (routes/studio_brand.ts). ──
+  {
+    const m = route.match(/^\/public\/studio\/([0-9a-f-]{36})\/brand$/);
+    if (m && method === 'GET') return (await import('./routes/studio_brand.ts')).handlePublicStudioBrand(m[1], cors);
+  }
 
   // ── L5.5: Industry Pack Marketplace — OPERATOR management. Infrastructure,
   //    not client-scoped: reachable by staff or system (service-role/cron), and
@@ -1071,6 +1077,7 @@ async function route_(req: Request, cors: Record<string, string>): Promise<Respo
   if (route === '/review/run' && method === 'POST') return handleReviewRun(req, site, cors);
   // ── M9.5D: the Brand Guardian (protects identity; findings only) ──
   if (route === '/brand/profile' && method === 'GET') return handleBrandProfileGet(db, site, cors);
+  if (route === '/brand/studio' && method === 'GET') return (await import('./routes/studio_brand.ts')).handleStudioBrandGet(site, cors);   // builder list item 59: what clients see of this studio
   if (route === '/brand/profile' && method === 'PUT') return handleBrandProfilePut(req, db, site, principal, cors);
   if (route === '/brand/review' && method === 'POST') return handleBrandReviewRun(req, site, cors);
   if (route === '/brand/reports' && method === 'GET') return handleBrandReportList(db, site, cors);

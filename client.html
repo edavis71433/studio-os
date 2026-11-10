@@ -120,6 +120,7 @@
     .cb-brand{display:flex;align-items:center;gap:9px;flex:0 0 auto;padding:8px 8px 8px 0}
     .cb-mark{width:26px;height:26px;border-radius:8px;background:var(--p);color:var(--on-p);display:grid;place-items:center;font-size:13px;flex:0 0 auto}
     .cb-name{font-family:var(--serif);font-size:15.5px;font-weight:500;color:var(--ink);white-space:nowrap}
+    .cb-logo{height:26px;width:auto;max-width:120px;border-radius:6px;flex:0 0 auto;display:block}   /* builder list item 59: the studio's logo */
     .cb-tabs{flex:0 1 auto;justify-content:flex-start;gap:2px;overflow-x:auto;scrollbar-width:none}
     .cb-tabs::-webkit-scrollbar{display:none}
     .tab{flex:0 0 auto;flex-direction:row;gap:7px;font-size:13.5px;padding:13px 14px;min-height:0;border-bottom:2.5px solid transparent}
@@ -431,7 +432,7 @@
 <nav id="tabnav" class="tabnav" aria-label="Portal sections" hidden></nav>
 <div class="wrap">
   <div id="main"><div class="spin" role="status" aria-label="Loading"></div></div>
-  <footer>by Davis Digital Studio — you see only what your studio shares with you.<br><a class="link" href="#" id="signout" style="font-size:12.5px">Sign out</a></footer>
+  <footer><span id="footby">by your studio</span> — you see only what your studio shares with you.<br><a class="link" href="#" id="signout" style="font-size:12.5px">Sign out</a></footer>
 </div>
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
@@ -665,17 +666,20 @@ let CURRENT_TAB='home';
 // clobber a newer view (a CURRENT_TAB check alone misses the drill-ins).
 let VIEW_SEQ=0;
 const TABS=[['home',si('home'),'Home'],['messages',si('message'),'Messages'],['files',si('folder'),'Files'],['invoices',si('receipt'),'Invoices'],['requests',si('sparkles'),'Requests'],['help',si('help'),'Help']];
-// The context bar's "app name" is the studio/business identity. The portal's own
-// reads (/portal/context|feed + /client/*) expose no agency branding today — the
-// only name in context is the operator drill-in's scope.name, which is the
-// CUSTOMER's name, not the studio's — so this degrades honestly to the generic.
-function studioBrand(){return 'Your studio';}
+// The context bar's "app name" is the studio's identity. Builder list item 59:
+// /portal/context carries `studio` ({ name, logo_url, accent }) for a managed
+// client, read from the studio's own site (its name, colour and Files › Set as
+// logo). A reviewer, or a read without it, still gets the honest generic.
+function studioBrand(){const s=PORTAL.ctx&&PORTAL.ctx.studio;return (s&&s.name&&String(s.name).trim())||'Your studio';}
+function studioLogo(){const s=PORTAL.ctx&&PORTAL.ctx.studio;return (s&&typeof s.logo_url==='string'&&/^https:\/\//.test(s.logo_url))?s.logo_url:'';}
+// the sign-in page shows the same name and logo next time (portal.html reads this)
+function rememberStudio(){try{const s=PORTAL.ctx&&PORTAL.ctx.studio;if(s&&s.name)localStorage.setItem('dds-studio-brand',JSON.stringify({name:s.name,logo_url:studioLogo()||null,accent:s.accent||''}));}catch(_){}}
 function showNav(){
   const nav=$('tabnav');if(!nav)return;
   const acct=(((firstName(USER)||((USER&&USER.email)||''))||'').charAt(0)||'•').toUpperCase();
   const badge=PORTAL.unread?`<span class="badge on" aria-hidden="true">${PORTAL.unread>9?'9+':PORTAL.unread}</span>`:'<span class="badge" aria-hidden="true"></span>';
   nav.innerHTML=`<div class="tabnav-inner">`+
-    `<span class="cb-brand"><span class="cb-mark" aria-hidden="true">✦</span><span class="cb-name">${esc(studioBrand())}</span></span>`+
+    `<span class="cb-brand">${studioLogo()?`<img class="cb-logo" src="${esc(studioLogo())}" alt="">`:`<span class="cb-mark" aria-hidden="true">✦</span>`}<span class="cb-name">${esc(studioBrand())}</span></span>`+
     `<div class="cb-tabs">`+TABS.map(t=>`<button class="tab" type="button" data-tab="${t[0]}"><span class="ti" aria-hidden="true">${t[1]}</span><span class="tl">${t[2]}</span></button>`).join('')+`</div>`+
     `<span class="cb-right">`+
       `<button id="navbell" class="bell cb-bell" aria-label="What’s new${PORTAL.unread?` — ${PORTAL.unread} new`:''}" aria-expanded="false" aria-haspopup="true">${si('bell')}${badge}</button>`+
@@ -707,7 +711,7 @@ function setWide(on){try{document.body.classList.toggle('wide',!!on);document.bo
 function showTab(tab){
   VIEW_SEQ++;   // this tab owns #main now — invalidate any in-flight view render
   CURRENT_TAB=tab;setActiveTab(tab);setWide(false);try{window.scrollTo(0,0);}catch(_){}
-  try{document.title=({home:'Home',messages:'Messages',files:'Files',invoices:'Invoices',requests:'Requests',help:'Help'}[tab]||'Home')+' — Your studio';}catch(_){}   // the walk found "Your updates" on every tab
+  try{document.title=({home:'Home',messages:'Messages',files:'Files',invoices:'Invoices',requests:'Requests',help:'Help'}[tab]||'Home')+' — '+studioBrand();}catch(_){}   // the walk found "Your updates" on every tab
   if(tab==='messages')return renderMessages();
   if(tab==='files')return renderFiles();
   if(tab==='invoices')return renderInvoices();
@@ -2665,6 +2669,8 @@ async function load(){
   // with or without a project yet) OR an invited reviewer (feed only). Both get the
   // persistent tab nav + the cross-project Home; tabs degrade to calm empty states.
   PORTAL.ctx=c;
+  rememberStudio();
+  try{const fb=$('footby');if(fb)fb.textContent='by '+((c.studio&&c.studio.name)?studioBrand():'your studio');}catch(_){}
   PORTAL.persona=(projects.length||c.is_managed_client)?'client':'reviewer';
   PORTAL.projects=projects;
   // A FAILED /client/projects read must never masquerade as the zero-project

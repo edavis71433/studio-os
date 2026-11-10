@@ -156,6 +156,17 @@
       <div><label for="f-email">Email</label><input id="f-email" type="email" maxlength="160" autocomplete="email"></div>
       <div><label for="f-phone">Phone</label><input id="f-phone" type="tel" maxlength="40" placeholder="Optional" autocomplete="tel"></div>
       <div class="full"><label for="f-area">Where you work from</label><input id="f-area" maxlength="160" placeholder="e.g. Burbank, CA"></div>
+      <!-- builder list item 59: what clients see of this studio (GET /brand/studio). The logo is the
+           site's own, set in Files with Set as logo; this only shows it and says where to change it. -->
+      <div class="full" id="studioLook" hidden>
+        <label>What your clients see</label>
+        <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-top:6px">
+          <span id="studioLookMark" aria-hidden="true" style="display:grid;place-items:center;width:40px;height:40px;border-radius:10px;background:var(--p);color:#fff;font-weight:700"></span>
+          <img id="studioLookLogo" alt="" hidden style="height:40px;width:auto;max-width:200px;border-radius:6px;display:block">
+          <b id="studioLookName" style="font-family:var(--serif);font-size:17px"></b>
+        </div>
+        <div class="how" id="studioLookHow" style="margin-top:6px"></div>
+      </div>
       <div class="note" id="profileNote">The kind of business drives the nudges on Today and the wording across the app. The rest is what your clients see on documents and emails.</div>
     </form>
   </section>
@@ -615,7 +626,25 @@ async function loadPlan() {
 // ── the studio profile, inline: GET /identity + the industry from /settings;
 //    Save = PUT /identity (the builder's own route, same validation) + PUT /settings. ──
 let IDENT = null, SETTINGS = null;
+// builder list item 59: the name and logo clients see on their sign-in page, their portal and every email
+async function loadStudioLook() {
+  if (SCOPE) return;
+  const r = await api('/brand/studio', 'GET');
+  if (!r.ok || !r.body || !r.body.data) return;
+  const d = r.body.data;
+  if (!d.name) return;   // nothing to show until the studio has a name
+  $('studioLookName').textContent = d.name;
+  const hasLogo = typeof d.logo_url === 'string' && /^https:\/\//.test(d.logo_url);
+  $('studioLookLogo').hidden = !hasLogo; if (hasLogo) $('studioLookLogo').src = d.logo_url;
+  $('studioLookMark').style.display = hasLogo ? 'none' : 'grid'; $('studioLookMark').textContent = d.name.charAt(0).toUpperCase();
+  if (d.accent) $('studioLookMark').style.background = d.accent;
+  $('studioLookHow').innerHTML = hasLogo
+    ? 'Your logo and name go on your clients’ sign-in page, their portal and every email. To change the logo, open <a href="/files.html">Files</a>, pick the new one and choose Set as logo.'
+    : 'Your name goes on your clients’ sign-in page, their portal and every email. Add a logo in <a href="/files.html">Files</a>: upload it, then choose Set as logo.';
+  $('studioLook').hidden = false;
+}
 async function loadProfile() {
+  loadStudioLook().catch(() => {});
   const [i, s] = await Promise.all([api('/identity'), api('/settings')]);
   IDENT = (i.ok && i.body && i.body.data) || null;
   SETTINGS = (s.ok && s.body && s.body.data) || null;
