@@ -1577,8 +1577,9 @@ test.describe('the website editor reads what it shows, when it shows it (item 84
     expect(asked).toEqual(expect.arrayContaining(['/preview', '/health', '/changes']));
     for (const p of Object.values(EXTRAS).flat()) expect(reads, p).not.toContain(p);
     expect(reads.filter((p) => p === '/preview')).toHaveLength(1);
-    // The shell reads the account context; the page takes its copy instead of a second read.
-    expect(reads.filter((p) => p === '/portal/context')).toHaveLength(1);
+    // The shell read the account context on the first load and kept it for the visit:
+    // this second load asks for it not at all, and the page takes the shell's copy.
+    expect(reads.filter((p) => p === '/portal/context')).toHaveLength(0);
   });
 
   test('each tab reads its own extras the first time it opens, and not again', async ({ page }) => {

@@ -172,7 +172,10 @@ const SOURCE = Object.fromEntries(PAGES.map((p) => [p, read(p)]));
   const shell = SOURCE['shell.js'];
   const css = read('shell.css');
   ok('shell: owners, a studio scoped in and platform staff lack nothing, and neither does a context with no list', shell.includes(`if (ctx.site_role === 'business_owner' || ctx.scope || ctx.is_operator || !Array.isArray(caps)) return;`));
-  ok('shell: it marks limits from the context it just read, before drawing', shell.includes('CTX = r.body.data; markRoleLimits(CTX); render();'));
+  // Nov 10 2026 (speed): the context is read once per visit and kept; the read one, the kept one and
+  // one read again behind the page all go through the same two places, each marking limits before drawing
+  ok('shell: it marks limits from the context it just read or kept, before drawing', /CTX = data; [^\n]*markRoleLimits\(CTX\); render\(\);/.test(shell) && shell.includes('useContext(r.body.data, uid, 0);') && shell.includes('useContext(kept.data, uid, kept.at);'));
+  ok('shell: a context read again behind the page marks limits again before redrawing', shell.includes('CTX = next; markRoleLimits(CTX); render();'));
   for (const need of ['delete', 'configure', 'owner']) ok(`css: data-needs="${need}" goes away when it is lacking`, css.includes(`html[data-dds-lacks~="${need}"] [data-needs="${need}"]`));
   ok('css: it beats a page that shows the control itself', /\[data-needs="owner"\]\{display:none!important\}/.test(css));
   ok('css: a note beats the builder\'s [hidden] rule only for someone lacking it', css.includes('html[data-dds-lacks~="configure"] [data-if-lacks="configure"][hidden]{display:block!important}'));

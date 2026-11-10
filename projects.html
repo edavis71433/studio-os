@@ -814,9 +814,10 @@ async function load(soft){
     LOADED_AT=Date.now();
     // the board places a card by its stage, so it waits for the facts — briefly:
     // past ~1.2s it draws with what it has and the late answer fills it in
-    if(soft)for(const k of Object.keys(REPORTS))delete REPORTS[k];   // a refresh re-reads where each project stands
+    // a refresh re-reads where each project stands. The facts in hand stay until the new ones
+    // land (finding C18): throwing them away first drew every card in one column, then again in place
     let settled=false;
-    const enrich=Promise.all([ensureCustomers(),ensureReports()]).then((v)=>{settled=true;return v;});
+    const enrich=Promise.all([ensureCustomers(),ensureReports(!!soft)]).then((v)=>{settled=true;return v;});
     await Promise.race([enrich,new Promise((r)=>setTimeout(r,1200))]);
     renderRoster();
     // one project for this client and nothing else asked for → open it straight away
@@ -852,8 +853,8 @@ async function ensureCustomers(){
 // (/projects/progress); it used to be one /projects/:id/report per row, up to 60. While the
 // server hasn't that route yet (pages go live before the functions deploy) the per-project
 // reads still fill it in.
-async function ensureReports(){
-  const ids=visRows().map(p=>p.id).filter(id=>id&&!REPORTS[id]).slice(0,60);
+async function ensureReports(again){   // again: a refresh, so ask for the ones already in hand too
+  const ids=visRows().map(p=>p.id).filter(id=>id&&(again||!REPORTS[id])).slice(0,60);
   if(!ids.length)return false;
   let changed=false;
   try{

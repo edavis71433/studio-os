@@ -532,7 +532,7 @@ function folderNames(){
   if(S.col==='folder'&&S.folder&&!FIXED_FOLDERS.has(S.folder))all.add(S.folder);   // the open one, even mid-rename
   return [...all].sort((a,b)=>folderLabel(a).localeCompare(folderLabel(b)));
 }
-function openFolder(name){S.col='folder';S.folder=name;S.q='';S.selected.clear();S.selectMode=false;return load();}
+function openFolder(name){S.col='folder';S.folder=name;S.q='';S.selected.clear();S.selectMode=false;return load(false,true);}
 async function newFolder(){
   const n=S.selected.size;
   const raw=await askPrompt('New folder',n?`The ${n} selected file${n===1?'':'s'} go into it.`:'Add files to it once it’s made — it keeps once a file is in it.','Create','e.g. Menu photos');
@@ -632,6 +632,8 @@ function askPrompt(title, body, okLabel, placeholder, value){
 
 async function loadContext(){
   // PERF: reuse the shell's /portal/context (window.ddsContext) — fall back to our own read.
+  // shell.js is deferred, so it is not there yet when this runs: wait for it rather than ask twice.
+  if(document.readyState==='loading')await new Promise((r)=>document.addEventListener('DOMContentLoaded',r,{once:true}));
   const c=await (window.ddsContext?window.ddsContext().then((d)=>({ok:true,body:{data:d}})):Promise.reject()).catch(()=>api('/portal/context'));
   if(c.ok&&c.body.data){
     S.caps=c.body.data.capabilities||[];
@@ -677,15 +679,22 @@ function applyFilters(){
 }
 // soft=true (the ↻ refresh): any failure keeps the current list and toasts —
 // leads.html's soft-fail contract; the in-place trouble state is for hard loads.
-async function load(soft){
+// browse=true (finding D5): a search, a kind or a folder click changes neither the folder
+// counts nor the needs-attention list, so only the list is asked for and the two answers
+// already in hand are used again. First load, Refresh and anything that changes a file ask for all three.
+let KEPT_SIDE=null, CTX_READY=Promise.resolve();
+async function load(soft,browse){
   // FD-T10: stock has its own surface. Entering it BUMPS the generation too, so an
   // in-flight roster read can never paint over stock; a leftover 'loading' state is
   // an orphan (its request was invalidated by that bump) — re-fetch, don't hang.
   if(S.col==='stock'){ REQ_SEQ++; if(S.stockState==null||S.stockState==='loading') return loadStock(); return renderStock(); }
   const gen=++REQ_SEQ;
   let a,col,h;
-  try{[a,col,h]=await Promise.all([api('/assets?'+qstr()),api('/assets/collections'),api('/assets/health')]);}
+  const side=browse&&KEPT_SIDE&&KEPT_SIDE.col.ok?KEPT_SIDE:null;
+  try{[a,col,h]=await Promise.all([api('/assets?'+qstr()),side?side.col:api('/assets/collections'),side?side.h:api('/assets/health')]);}
   catch(_){a={ok:false,status:0,body:{}};col={ok:false};h={ok:false};}
+  if(!side)KEPT_SIDE={col,h};
+  await CTX_READY;   // the first load starts with the who-am-I read, and draws once both are in
   if(gen!==REQ_SEQ)return;   // a newer request started — this response is stale, never paint it
   if(!a.ok){
     if(soft&&S.loadedOnce){toast('Couldn’t refresh just now.');return;}
@@ -794,7 +803,7 @@ function clientRailHtml(){
 // the page already in hand, so it re-filters in place. Clicking the active one clears it.
 function wireRail(){
   // a main kind (or Archive) tidies More filters away; one of its own keeps it open
-  document.querySelectorAll('#filters [data-col]').forEach(b=>b.onclick=()=>{S.col=b.dataset.col;if(!MORE_COLS.includes(S.col))MORE_OPEN=false;S.folder='';S.q='';S.selected.clear();load();});
+  document.querySelectorAll('#filters [data-col]').forEach(b=>b.onclick=()=>{S.col=b.dataset.col;if(!MORE_COLS.includes(S.col))MORE_OPEN=false;S.folder='';S.q='';S.selected.clear();load(false,true);});
   document.querySelectorAll('#rail [data-folder]').forEach(b=>b.onclick=()=>{MORE_OPEN=false;openFolder(b.dataset.folder);});
   const nf=$('newFolder');if(nf)nf.onclick=()=>newFolder();
   document.querySelectorAll('#rail [data-client]').forEach(b=>b.onclick=()=>{
@@ -1070,7 +1079,7 @@ function wire(){
   const selb=$('selbtn');if(selb)selb.onclick=()=>{S.selectMode=!S.selectMode;S.selected.clear();render();const nb=$('selbtn');if(nb)nb.focus();};
   // search stays a SERVER ?q= query (debounced); the re-render preserves the
   // input + caret (render()'s contract) and REQ_SEQ drops stale responses
-  const q=$('q');if(q){let t;q.oninput=()=>{clearTimeout(t);t=setTimeout(()=>{S.q=q.value;load();},280);};}
+  const q=$('q');if(q){let t;q.oninput=()=>{clearTimeout(t);t=setTimeout(()=>{S.q=q.value;load(false,true);},280);};}
   // ↻ refresh: soft — a failure toasts and keeps the list (leads.html contract);
   // these re-renders also restore focus to their control (the rosters' pattern)
   const rf=$('refreshBtn');if(rf)rf.onclick=()=>load(true).then(()=>{const nr=$('refreshBtn');if(nr)nr.focus();}).catch(()=>toast('Couldn’t refresh just now.'));
@@ -1087,7 +1096,7 @@ function wire(){
   const add=$('add');if(add)add.onclick=()=>$('picker').click();
   const fr=$('fRename');if(fr)fr.onclick=()=>renameFolder();
   const fx=$('fRemove');if(fx)fx.onclick=()=>removeFolder();
-  const tidy=$('tidy');if(tidy)tidy.onclick=()=>{S.q='';S.col='all';SORT={key:'added',dir:-1};load();};
+  const tidy=$('tidy');if(tidy)tidy.onclick=()=>{S.q='';S.col='all';SORT={key:'added',dir:-1};load(false,true);};
 }
 function togglePick(id){ if(S.selected.has(id))S.selected.delete(id); else S.selected.add(id); render();
   const nb=document.querySelector('[data-pick="'+id+'"]'); if(nb)nb.focus(); }   // focus survives the re-render
@@ -1674,7 +1683,7 @@ function signedOut(){$('root').innerHTML=`<div class="empty"><h2>Sign in to see 
   try{
     const {data}=await sb.auth.getSession();TOKEN=(data&&data.session&&data.session.access_token)||"";
     if(!TOKEN){signedOut();return;}
-    await loadContext();await load();
+    CTX_READY=loadContext().catch(()=>{});await load();   // together, not one after the other
     const fid=focusParam();if(fid)openDetail(fid);
   }catch(_){renderTrouble({ok:false,status:0,body:{}});}   // honest trouble + Try-again, never a dead end
 })();

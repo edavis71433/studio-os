@@ -196,6 +196,15 @@ export async function installApp(page: Page, opts: AppOptions = {}): Promise<voi
   const session = opts.session === undefined ? OWNER_SESSION : opts.session;
   const fixtures = { ...defaults(), ...(opts.api || {}) };
 
+  // the shell keeps the who-am-I answer for the visit (sessionStorage 'dds-ctx:…').
+  // A second installApp on a page that has already loaded stands for a different
+  // sign-in, so drop the kept copy; the next goto asks the new fixtures.
+  if (!/^about:/.test(page.url())) {
+    await page.evaluate(() => {
+      try { for (const k of Object.keys(sessionStorage)) if (k.startsWith('dds-ctx:')) sessionStorage.removeItem(k); } catch { /* storage may be denied */ }
+    }).catch(() => { /* the page is mid-navigation or closed */ });
+  }
+
   // seed the session before any page script runs
   await page.addInitScript((s) => { (window as unknown as { __E2E_SESSION: unknown }).__E2E_SESSION = s; }, session);
 
