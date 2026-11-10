@@ -41,6 +41,13 @@ async function mount(page: Page, url: string, api: Record<string, unknown> = {})
   return writes;
 }
 const isPhone = (page: Page) => page.viewportSize()!.width <= 760;
+// The floating studio (Nov 2026): the page tabs live in a card that opens from the bar's
+// page switcher, so a test that clicks a page opens the card first.
+const openPages = async (page: Page) => {
+  const sw = page.locator('#dcPageSwitch');
+  if ((await sw.getAttribute('aria-expanded')) !== 'true') await sw.click();
+  await expect(page.locator('#pagesCard')).toBeVisible();
+};
 
 test.describe('full-screen Edit mode', () => {
   test('the canvas takes the screen, and Exit goes back where you came from', async ({ page }) => {
@@ -74,13 +81,23 @@ test.describe('full-screen Edit mode', () => {
     await expect(page.locator('#ritualWrap')).toHaveClass(/\bon\b/);
   });
 
-  test('no purple left in the editor chrome: the client’s site is the only color', async ({ page }) => {
+  test('the chrome is plum now; the client’s site keeps its own colours inside the frame', async ({ page }) => {
     await mount(page, '/presence.html#design');
-    const neutral = await page.locator('#dcBtnPublish').evaluate((n) => { const [r, g, b] = getComputedStyle(n).backgroundColor.match(/\d+/g)!.map(Number); return Math.abs(r - b) < 16 && Math.abs(r - g) < 16; });
-    expect(neutral).toBe(true);
-    await expect(page.frameLocator('#designPreview').locator('#main > section').first()).toBeVisible();
-    const css = await page.frameLocator('#designPreview').locator('#dds-dc-style').evaluate((n) => n.textContent);
-    expect(css).not.toMatch(/5b3fa0|91,63,160/);
+    await expect(page.locator('#dcBtnPublish')).toHaveClass(/inked/);
+    const plum = await page.locator('#dcBtnPublish').evaluate(async (n) => { await Promise.allSettled(n.getAnimations().map((a) => a.finished)); const [r, g, b] = getComputedStyle(n).backgroundColor.match(/\d+/g)!.map(Number); return b - r > 40 && b - g > 60; });
+    expect(plum).toBe(true);                                                           // Publish is the plum gradient button
+    const bar = page.locator('.dc-bar');
+    expect(await bar.evaluate((n) => getComputedStyle(n).borderTopLeftRadius)).toBe('999px');   // one floating pill
+    await expect(page.locator('#dcDock')).toBeVisible();
+    const frame = page.frameLocator('#designPreview');
+    await expect(frame.locator('#main > section').first()).toBeVisible();
+    // the editor's tools inside the frame are drawn from the shell's tokens; the site's own
+    // words and backgrounds are untouched (the fixture has no styles: black on nothing)
+    expect(await frame.locator('#main h1').first().evaluate((n) => getComputedStyle(n).color)).toBe('rgb(0, 0, 0)');
+    expect(await frame.locator('#main > section').first().evaluate((n) => getComputedStyle(n).backgroundColor)).toBe('rgba(0, 0, 0, 0)');
+    const css = await frame.locator('#dds-dc-style').evaluate((n) => n.textContent || '');
+    expect(css).not.toMatch(/(^|[}+,])\s*(section|h1|h2|p|body|main)\s*\{/);                 // no bare element rules
+    expect(await frame.locator('#dds-dc-tokens').evaluate((n) => n.textContent || '')).toMatch(/--ddsdc-p:#/);   // the plum comes in as a token
   });
 
   test('a watch plan keeps the normal page: there is nothing to edit full screen', async ({ page }) => {
@@ -286,12 +303,20 @@ test.describe('the Edit bar and the panels', () => {
       const many = ['About', 'Our menu', 'Private events', 'Catering', 'Gift cards', 'Contact us'].map((t, i) => ({ slug: 'p' + i, title: t, blocks: [{ type: 'title' }] }));
       await mount(page, '/presence.html#design', { '/settings': { data: { blocks: BLOCKS, section_meta: META, pages: many } } });
       await expect(page.locator('html')).toHaveClass(/dc-edit/);
-      await expect(page.locator('#pagesBar .page-pill').first()).toBeVisible();
+      await expect(page.locator('#dcPageName')).toHaveText('Home');
+      await expect(page.locator('#dcPageCount')).toHaveText('7 pages');   // the pages fold into the switcher
       const m = await metrics(page);
-      expect(m.barH).toBeLessThanOrEqual(52);
+      expect(m.barH).toBeLessThanOrEqual(56);
       expect(m.barScroll).toBeLessThanOrEqual(m.barClient);          // nothing pushed off the end
-      expect(m.pubR).toBeGreaterThan(w - 40);                        // Publish sits at the far right
-      for (const sel of ['#btnEditExit', '#btnTrayOpen', '#btnNavEdit', '#btnSettingsOpen', '#btnUndo', '#btnRedo']) await expect(page.locator(sel)).toBeInViewport();
+      const bar = (await page.locator('.dc-bar').boundingBox())!;
+      expect(m.pubR).toBeGreaterThan(bar.x + bar.width - 12);        // Publish is the bar's last word
+      expect(Math.abs(bar.x + bar.width / 2 - w / 2)).toBeLessThan(2);   // the pill floats at the top centre
+      const dock = (await page.locator('#dcDock').boundingBox())!;
+      expect(dock.x + dock.width).toBeLessThan(bar.x);               // and never touches the dock
+      for (const sel of ['#btnEditExit', '#btnTrayOpen', '#dkPages', '#btnSettingsOpen', '#dkPhotos', '#btnComments', '#dkFind', '#btnUndo', '#btnRedo']) await expect(page.locator(sel)).toBeInViewport();
+      await openPages(page);
+      await expect(page.locator('#pagesBar .page-pill').first()).toBeVisible();
+      await expect(page.locator('#btnNavEdit')).toBeInViewport();
     });
   }
   test('the canvas runs to the very bottom and the very left of the screen', async ({ page }) => {
@@ -310,7 +335,7 @@ test.describe('the Edit bar and the panels', () => {
     // for the fade to finish: this measures the colors the button rests at, not a frame.
     await expect(page.locator('#dcBtnPublish')).toHaveClass(/inked/);
     const lum = (rgb: string) => { const [r, g, b] = rgb.match(/\d+/g)!.map(Number); return 0.2126 * r + 0.7152 * g + 0.0722 * b; };
-    for (const sel of ['#btnTrayOpen', '#btnNavEdit', '#btnSettingsOpen', '#btnEditExit', '#dcBtnPublish']) {
+    for (const sel of ['#btnTrayOpen', '#btnSettingsOpen', '#dkPages', '#dkPhotos', '#btnComments', '#btnEditExit', '#dcBtnPreview', '#dcPageSwitch', '#dcBtnPublish']) {
       const c = await page.locator(sel).evaluate(async (n) => {
         await Promise.allSettled(n.getAnimations().map((a) => a.finished));
         const s = getComputedStyle(n); return [s.color, s.backgroundColor];
@@ -318,15 +343,18 @@ test.describe('the Edit bar and the panels', () => {
       expect(Math.abs(lum(c[0]) - lum(c[1])), sel).toBeGreaterThan(100);
     }
   });
-  test('a phone keeps the floating Add section button; a bigger screen has it in the bar', async ({ page }) => {
+  test('Add lives in the dock on every screen; the old floating Add section button is gone', async ({ page }) => {
     await mount(page, '/presence.html#design');
     await expect(page.locator('html')).toHaveClass(/dc-edit/);
     await page.frameLocator('#designPreview').locator('[data-dds-sid="richtext"]').waitFor();
+    await expect(page.locator('#btnAddFab')).toBeHidden();
+    await page.locator('#btnTrayOpen').click();
+    await expect(page.locator('#trayPanel')).toHaveClass(/\bon\b/);
+    await expect(page.locator('#tabAdd')).toHaveAttribute('aria-selected', 'true');
     if (isPhone(page)) {
-      await expect(page.locator('#btnAddFab')).toBeVisible();
-      await page.locator('#btnAddFab').click();
-      await expect(page.locator('#trayPanel')).toHaveClass(/\bon\b/);
-    } else await expect(page.locator('#btnAddFab')).toBeHidden();
+      const dock = (await page.locator('#dcDock').boundingBox())!;
+      expect(dock.y).toBeGreaterThan(page.viewportSize()!.height / 2);   // a pill along the bottom
+    }
   });
   test('side panels open under the bar, and Publish stays reachable', async ({ page }) => {
     await mount(page, '/presence.html#design');
@@ -353,14 +381,28 @@ test.describe('the Edit bar and the panels', () => {
     expect((await page.locator('#btnUndo').boundingBox())!.x).toBe(before);
     expect((await page.locator('#dcWhisper').boundingBox())!.y).toBeGreaterThanOrEqual(52);
   });
-  test('the phone and tablet row puts Undo and the page first, then the section tools', async ({ page }) => {
+  test('a phone or tablet bar is Exit, the page, Undo, Redo and Publish, with the tools in the dock', async ({ page }) => {
     test.skip(page.viewportSize()!.width > 1180, 'the wide bar has one fixed order');
     await mount(page, '/presence.html#design');
-    await expect(page.locator('#pagesBar .page-pill').first()).toBeVisible();
-    const xs = await page.evaluate(() => ['#btnEditExit', '#btnUndo', '#pagesBar', '#btnTrayOpen', '#btnPageInfo', '#dcModeSeg'].map((s) => document.querySelector(s)!.getBoundingClientRect().x));
+    await expect(page.locator('#dcPageName')).toHaveText('Home');
+    const xs = await page.evaluate(() => ['#btnEditExit', '#dcPageSwitch', '#btnUndo', '#btnRedo', '#dcBtnPublish'].map((s) => document.querySelector(s)!.getBoundingClientRect().x));
     expect(xs).toEqual([...xs].sort((a, b) => a - b));
-    const barBox = await page.locator('.dc-bar').boundingBox();
-    expect(barBox!.height).toBeLessThanOrEqual(52);
+    const barBox = (await page.locator('.dc-bar').boundingBox())!;
+    expect(barBox.height).toBeLessThanOrEqual(56);
+    expect(await page.locator('.dc-bar').evaluate((n) => n.scrollWidth <= n.clientWidth + 1)).toBe(true);   // nothing scrolls sideways
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+    await expect(page.locator('#dcDock')).toBeVisible();
+    for (const sel of ['#dkPages', '#btnTrayOpen', '#btnSettingsOpen', '#dkPhotos']) await expect(page.locator(sel)).toBeInViewport();
+    if (isPhone(page)) {
+      await expect(page.locator('#dkMore')).toBeVisible();
+      await expect(page.locator('#btnComments')).toBeHidden();          // Notes, Versions, Find and Preview wait behind More
+      await page.locator('#dkMore').click();
+      await expect(page.locator('#btnComments')).toBeVisible();
+      await expect(page.locator('#dkPreview')).toBeVisible();
+    } else {
+      await expect(page.locator('#dkMore')).toBeHidden();
+      await expect(page.locator('#btnComments')).toBeInViewport();
+    }
   });
 });
 

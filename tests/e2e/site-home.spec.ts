@@ -860,6 +860,7 @@ test.describe('Pages: every page and the menu in one place', () => {
     await mount(page, '/presence.html#design', withPages());
     await expect(page.locator('html')).toHaveClass(/dc-edit/);
     if (!isPhone(page)) {
+      await page.locator('#dcPageSwitch').click();   // the pages live in the switcher's card
       await page.locator('#pagesBar .page-pill', { hasText: 'Gallery' }).locator('.pp-menu').click();
       await page.getByRole('button', { name: 'Page settings…' }).click();
       await expect(page.locator('#pageSettings').getByRole('heading', { name: 'Gallery settings' })).toBeVisible();
@@ -1506,7 +1507,8 @@ test.describe('no drawing nobody asked for (item 85)', () => {
     const previewBefore = await page.evaluate(() => (document.getElementById('previewFrame') as HTMLIFrameElement).srcdoc);
     const draws = await drawsAfter(page, async () => {
       await frame.locator('#a').hover();
-      await frame.locator('#dds-dc-bar button[aria-label="Hide this section"]').click();
+      await frame.locator('#dds-dc-bar button[aria-label="More"]').click();   // Hide waits behind the pill's More
+      await frame.locator('#dds-dc-more button[aria-label="Hide this section"]').click();
     });
     expect(draws.length).toBeLessThanOrEqual(1);                        // the canvas's own redraw, no second one
     expect(await page.evaluate(() => (document.getElementById('previewFrame') as HTMLIFrameElement).srcdoc)).toBe(previewBefore);

@@ -569,6 +569,8 @@ test.describe('G13 in-place canvas text editor', () => {
     return { ...mounted, draft };
   }
   const pill = (page: Page, name: string) => page.locator('#pagesBar .page-pill', { hasText: name });
+  // the page tabs live in a card that opens from the bar's page switcher (the floating studio)
+  const openPages = async (page: Page) => { const sw = page.locator('#dcPageSwitch'); if ((await sw.getAttribute('aria-expanded')) !== 'true') await sw.click(); await expect(page.locator('#pagesCard')).toBeVisible(); };
   const onPill = (page: Page) => page.locator('#pagesBar .page-pill.on .pp-name');
   async function typeOver(page: Page, field: Field, text: string) {
     await field.focus();
@@ -578,7 +580,7 @@ test.describe('G13 in-place canvas text editor', () => {
     await page.keyboard.insertText(text);
   }
   async function openAbout(page: Page, frame: Frame, name = 'About') {
-    await pill(page, name).locator('.pp-name').click();
+    await openPages(page); await pill(page, name).locator('.pp-name').click();
     await expect(frame.locator('#about-us')).toBeAttached();
     await expect(frame.locator('#dds-dc-bar')).toBeAttached();
   }
@@ -599,7 +601,7 @@ test.describe('G13 in-place canvas text editor', () => {
     const { frame, puts } = await mountPages(page);
     const { sent, release } = await holdPuts(page);
     await typeOver(page, frame.locator('[data-dds-field="subtitle"]'), 'Kept across pages');
-    await pill(page, 'About').locator('.pp-name').click();         // the click blurs the field, which commits
+    await openPages(page); await pill(page, 'About').locator('.pp-name').click();         // the click blurs the field, which commits
     await expect.poll(() => sent.length, { timeout: 6000 }).toBe(1);
     expect(sent[0].blocks?.[0].subtitle).toBe('Kept across pages');
     await expect(onPill(page)).toHaveText('Home');                 // the list is not replaced while the write is out
@@ -615,7 +617,7 @@ test.describe('G13 in-place canvas text editor', () => {
     await openAbout(page, frame);
     await typeOver(page, frame.locator('#about-us [data-dds-field="subtitle"]'), 'About, edited');
     await page.keyboard.press('Enter');
-    await pill(page, 'Home').locator('.pp-name').click();
+    await openPages(page); await pill(page, 'Home').locator('.pp-name').click();
     await expect.poll(() => puts.length, { timeout: 6000 }).toBe(1);
     const saved = puts[0] as Paged;
     expect(saved.blocks).toBeUndefined();
@@ -632,7 +634,7 @@ test.describe('G13 in-place canvas text editor', () => {
     await typeOver(page, frame.locator('[data-dds-field="subtitle"]'), 'Already leaving');
     await page.keyboard.press('Enter');
     await expect.poll(() => sent.length, { timeout: 6000 }).toBe(1);   // the debounce fired on its own
-    await pill(page, 'About').locator('.pp-name').click();
+    await openPages(page); await pill(page, 'About').locator('.pp-name').click();
     await page.waitForTimeout(300);
     await expect(onPill(page)).toHaveText('Home');                     // its write isn't in the saved draft yet
     release();
@@ -672,12 +674,12 @@ test.describe('G13 in-place canvas text editor', () => {
       return route.fallback();
     });
     await typeOver(page, frame.locator('[data-dds-field="subtitle"]'), 'Not lost');
-    await pill(page, 'About').locator('.pp-name').click();
+    await openPages(page); await pill(page, 'About').locator('.pp-name').click();
     await expect(page.locator('.dds-toast, #toast').filter({ hasText: 'That save was refused.' }).first()).toBeVisible();
     await expect(onPill(page)).toHaveText('Home');
     expect(puts.length).toBe(0);
     refusing = false;
-    await pill(page, 'About').locator('.pp-name').click();
+    await openPages(page); await pill(page, 'About').locator('.pp-name').click();
     await expect.poll(() => puts.length, { timeout: 6000 }).toBe(1);
     expect((puts[0] as Paged).blocks?.[0].subtitle).toBe('Not lost');
     await expect(onPill(page)).toHaveText('About');
@@ -687,9 +689,9 @@ test.describe('G13 in-place canvas text editor', () => {
     const { frame, puts } = await mountPages(page);
     const { sent, release } = await holdPuts(page);
     await typeOver(page, frame.locator('[data-dds-field="subtitle"]'), 'Changed my mind');
-    await pill(page, 'About').locator('.pp-name').click();
+    await openPages(page); await pill(page, 'About').locator('.pp-name').click();
     await expect.poll(() => sent.length, { timeout: 6000 }).toBe(1);
-    await pill(page, 'Home').locator('.pp-name').click();          // back to where they are, before the save lands
+    await openPages(page); await pill(page, 'Home').locator('.pp-name').click();          // back to where they are, before the save lands
     release();
     await expect.poll(() => puts.length, { timeout: 6000 }).toBe(1);
     await page.waitForTimeout(600);                                // past the repaint a switch would ask for
@@ -707,7 +709,7 @@ test.describe('G13 in-place canvas text editor', () => {
       return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: { slug: 'home-copy', title: 'Home copy', pages: [...PAGED.pages, { slug: 'home-copy', title: 'Home copy', blocks: BLOCKS }] } }) });
     });
     await typeOver(page, frame.locator('[data-dds-field="subtitle"]'), 'In the copy');
-    await pill(page, 'Home').locator('.pp-menu').click();
+    await openPages(page); await pill(page, 'Home').locator('.pp-menu').click();
     await page.locator('.pp-pop-item', { hasText: 'Duplicate page' }).click();
     await expect(onPill(page)).toHaveText('Home copy');
     expect(putsAtCopy).toBe(1);
@@ -718,7 +720,7 @@ test.describe('G13 in-place canvas text editor', () => {
     const { frame, puts } = await mountPages(page);
     await openAbout(page, frame);
     await typeOver(page, frame.locator('#about-us [data-dds-field="subtitle"]'), 'Before the new page');
-    await page.locator('#pagesBar .page-add').click();
+    await openPages(page); await page.locator('#pagesBar .page-add').click();
     await page.getByPlaceholder('e.g. Services, Gallery, Pricing').fill('Gallery');
     await page.getByRole('button', { name: 'Next: pick a layout' }).click();
     await page.locator('.dc-layout-card', { hasText: 'Blank page' }).click();
@@ -733,7 +735,7 @@ test.describe('G13 in-place canvas text editor', () => {
     await answerAsks(page);
     await openAbout(page, frame);
     await typeOver(page, frame.locator('#about-us [data-dds-field="subtitle"]'), 'Worth keeping');
-    await pill(page, 'About').locator('.pp-menu').click();
+    await openPages(page); await pill(page, 'About').locator('.pp-menu').click();
     await page.locator('.pp-pop-item', { hasText: 'Delete page' }).click();
     await page.locator('.toast').getByRole('button', { name: 'Undo' }).click();
     await expect(page.locator('.dds-toast, #toast').filter({ hasText: 'restored' }).first()).toBeVisible();
@@ -785,7 +787,7 @@ test.describe('G13 in-place canvas text editor', () => {
     const { frame, puts } = await mountPages(page, FAR_DOWN);
     await typeOver(page, frame.locator('[data-dds-field="subtitle"]'), 'Far down, then away');
     expect(await canvasScrollY(frame)).toBeGreaterThan(1000);
-    await pill(page, 'About').locator('.pp-name').click();
+    await openPages(page); await pill(page, 'About').locator('.pp-name').click();
     await expect(frame.locator('#about-us')).toBeAttached();
     await expect(frame.locator('#dds-dc-bar')).toBeAttached();
     await page.waitForTimeout(600);                                // a restored scroll lands at load
@@ -820,7 +822,7 @@ test.describe('G13 in-place canvas text editor', () => {
     return held;
   }
   const pageMenu = async (page: Page, name: string, item: string) => {
-    await pill(page, name).locator('.pp-menu').click();
+    await openPages(page); await pill(page, name).locator('.pp-menu').click();
     await page.locator('.pp-pop-item', { hasText: item }).click();
   };
   const aboutIn = (put: Paged) => put.pages?.find((p) => p.slug === 'about');
@@ -982,7 +984,7 @@ test.describe('G13 in-place canvas text editor', () => {
     let failing = true;
     await page.route('**/functions/v1/presence/preview**', (route: Route) =>
       failing && new URL(route.request().url()).searchParams.get('page') === '/about/' ? route.abort() : route.fallback());
-    await pill(page, 'About').locator('.pp-name').click();
+    await openPages(page); await pill(page, 'About').locator('.pp-name').click();
     await expect(onPill(page)).toHaveText('About');
     await expect(page.locator('#designPreviewEmpty')).toBeVisible();
     await expect(page.locator('#dpEmptyTitle')).toContainText('couldn’t load');
@@ -998,7 +1000,7 @@ test.describe('G13 in-place canvas text editor', () => {
   test('typing into the old document after a switch reaches no page, and the new page opens for editing', async ({ page }) => {
     const { frame, puts } = await mountPages(page);
     const read = await holdReads(page, (about) => about);
-    await pill(page, 'About').locator('.pp-name').click();
+    await openPages(page); await pill(page, 'About').locator('.pp-name').click();
     await expect(onPill(page)).toHaveText('About');
     const old = frame.locator('section.block-titleonly [data-dds-field="subtitle"]');
     await old.focus();                                             // by keyboard
@@ -1026,7 +1028,7 @@ test.describe('G13 in-place canvas text editor', () => {
     const rows = page.locator('#designTreeList .dc-tree-row.block');
     await expect(rows).toHaveCount(4);
     const read = await holdReads(page, (about) => about);
-    await pill(page, 'About').locator('.pp-name').click();
+    await openPages(page); await pill(page, 'About').locator('.pp-name').click();
     await expect(onPill(page)).toHaveText('About');
     await expect(rows).toHaveCount(0);                             // their buttons act by index on the open page's list
     await frame.locator('section.block-richtext').hover({ force: true });
@@ -1087,7 +1089,7 @@ test.describe('G13 in-place canvas text editor', () => {
   test('a session opened while ＋ Page is on its way saves to its own page, not the new one', async ({ page }) => {
     const { frame, puts } = await mountPages(page);
     const { sent, release } = await holdPuts(page);
-    await page.locator('#pagesBar .page-add').click();
+    await openPages(page); await page.locator('#pagesBar .page-add').click();
     await page.getByPlaceholder('e.g. Services, Gallery, Pricing').fill('Gallery');
     await page.getByRole('button', { name: 'Next: pick a layout' }).click();
     await page.locator('.dc-layout-card', { hasText: 'Blank page' }).click();
@@ -1352,7 +1354,7 @@ test.describe('G13 in-place canvas text editor', () => {
   test('＋ Page while Hide is out keeps the hide', async ({ page }) => {
     const { frame } = await mountPages(page);
     const { sent, release } = await hideOut(page, frame);
-    await page.locator('#pagesBar .page-add').click();
+    await openPages(page); await page.locator('#pagesBar .page-add').click();
     await page.getByPlaceholder('e.g. Services, Gallery, Pricing').fill('Gallery');
     await page.getByRole('button', { name: 'Next: pick a layout' }).click();
     await page.locator('.dc-layout-card', { hasText: 'Blank page' }).click();
@@ -1876,7 +1878,7 @@ test.describe('G13 in-place canvas text editor', () => {
     await page.keyboard.press('Enter');
     await expect.poll(() => puts.length, { timeout: 6000 }).toBe(before + 1);
     expect(pageIn(lastPut(puts), slug)?.blocks[0].subtitle).toBe('Written since');
-    await pill(page, 'Home').locator('.pp-name').click();
+    await openPages(page); await pill(page, 'Home').locator('.pp-name').click();
     await expect(onPill(page)).toHaveText('Home');
   }
   async function renameContact(page: Page) {
@@ -1885,7 +1887,7 @@ test.describe('G13 in-place canvas text editor', () => {
     await page.getByRole('button', { name: 'Next' }).click();
     await page.locator('dialog input').fill('help');
     await page.getByRole('button', { name: 'Save', exact: true }).click();
-    await expect(pill(page, 'Help')).toBeVisible();
+    await openPages(page); await expect(pill(page, 'Help')).toBeVisible();
   }
   const WITH_CONTACT = [...PAGED.pages, CONTACT];
 
@@ -2058,7 +2060,7 @@ test.describe('G13 in-place canvas text editor', () => {
 
   test('the page menu has no Move: a page moves on the Pages tab', async ({ page }) => {
     await mountPages(page, '', WITH_CONTACT);
-    await pill(page, 'About').locator('.pp-menu').click();
+    await openPages(page); await pill(page, 'About').locator('.pp-menu').click();
     await expect(page.locator('.pp-pop-item')).toHaveText(['Page settings…', 'Rename', 'Hide from menu', 'Duplicate page', 'Clear page (start blank)', 'Delete page']);
   });
 
@@ -2069,13 +2071,13 @@ test.describe('G13 in-place canvas text editor', () => {
     await renameContact(page);
     await writeOnAboutAndLeave(page, frame, puts);
     await undo(page);
-    await expect(pill(page, 'Contact')).toBeVisible();
+    await openPages(page); await expect(pill(page, 'Contact')).toBeVisible();
     const undone = lastPut(puts) as Paged & { nav?: Array<{ href: string }> };
     expect(pageIn(undone, 'contact')).toMatchObject({ title: 'Contact', prev_slug: 'help', blocks: CONTACT.blocks });
     expect(undone.nav?.[0].href).toBe('/contact/');
     expect(aboutIn(undone)?.blocks[0].subtitle).toBe('Written since');
     await redo(page);
-    await expect(pill(page, 'Help')).toBeVisible();
+    await openPages(page); await expect(pill(page, 'Help')).toBeVisible();
     const redone = lastPut(puts) as Paged & { nav?: Array<{ href: string }> };
     expect(pageIn(redone, 'help')).toMatchObject({ title: 'Help', prev_slug: 'contact', blocks: CONTACT.blocks });
     expect(redone.nav?.[0].href).toBe('/help/');
@@ -2115,7 +2117,7 @@ test.describe('G13 in-place canvas text editor', () => {
     await expect(pill(page, 'Contact')).toHaveCount(0);
     await writeOnAboutAndLeave(page, frame, puts);
     await undo(page);
-    await expect(pill(page, 'Contact')).toBeVisible();
+    await openPages(page); await expect(pill(page, 'Contact')).toBeVisible();
     expect(lastPut(puts).pages?.map((p) => p.slug)).toEqual(['contact', 'about']);
     expect(pageIn(lastPut(puts), 'contact')?.blocks).toEqual(CONTACT.blocks);
     expect(aboutIn(lastPut(puts))?.blocks[0].subtitle).toBe('Written since');
@@ -2127,7 +2129,7 @@ test.describe('G13 in-place canvas text editor', () => {
 
   // ＋ Page with a blank layout, leaving the person on the new page.
   async function addGallery(page: Page) {
-    await page.locator('#pagesBar .page-add').click();
+    await openPages(page); await page.locator('#pagesBar .page-add').click();
     await page.getByPlaceholder('e.g. Services, Gallery, Pricing').fill('Gallery');
     await page.getByRole('button', { name: 'Next: pick a layout' }).click();
     await page.locator('.dc-layout-card', { hasText: 'Blank page' }).click();
@@ -2144,7 +2146,7 @@ test.describe('G13 in-place canvas text editor', () => {
     expect(lastPut(puts).pages?.map((p) => p.slug)).toEqual(['about']);
     expect(await askedSoFar(page)).toEqual([]);
     await redo(page);
-    await expect(pill(page, 'Gallery')).toBeVisible();
+    await openPages(page); await expect(pill(page, 'Gallery')).toBeVisible();
     expect(lastPut(puts).pages?.map((p) => p.slug)).toEqual(['about', 'gallery']);
   });
 
@@ -2159,7 +2161,7 @@ test.describe('G13 in-place canvas text editor', () => {
     await addGallery(page);
     await page.evaluate(() => (0, eval)('BLOCKS_WORK = [{ type: "title", title: "Gallery", subtitle: "Written on the new page" }]; saveBlocks()'));
     await expect.poll(() => pageIn(lastPut(puts), 'gallery')?.blocks.length).toBe(1);
-    await pill(page, 'Home').locator('.pp-name').click();
+    await openPages(page); await pill(page, 'Home').locator('.pp-name').click();
     await expect(onPill(page)).toHaveText('Home');
     const count = puts.length;
     await undo(page);
@@ -2167,14 +2169,14 @@ test.describe('G13 in-place canvas text editor', () => {
     expect((await askedSoFar(page))[0]).toContain('Gallery');
     await page.waitForTimeout(300);
     expect(puts.length).toBe(count);                               // no: nothing was written
-    await expect(pill(page, 'Gallery')).toBeVisible();
+    await openPages(page); await expect(pill(page, 'Gallery')).toBeVisible();
     await setAsksAnswer(page, true);
     await undo(page);                                              // and the step is still there to take
     await expect(pill(page, 'Gallery')).toHaveCount(0);
     expect((await askedSoFar(page)).length).toBe(2);
     expect(checkpoints).toEqual(['Before removing “Gallery”']);
     await redo(page);
-    await expect(pill(page, 'Gallery')).toBeVisible();
+    await openPages(page); await expect(pill(page, 'Gallery')).toBeVisible();
     expect(pageIn(lastPut(puts), 'gallery')?.blocks[0].subtitle).toBe('Written on the new page');
     expect((await askedSoFar(page)).length).toBe(2);
   });
@@ -2210,7 +2212,7 @@ test.describe('G13 in-place canvas text editor', () => {
     await undo(page);
     await expect(page.locator('.dds-toast, #toast').filter({ hasText: 'Another page uses that address' }).first()).toBeVisible();
     expect(puts.length).toBe(count);
-    await expect(pill(page, 'Help')).toBeVisible();
+    await openPages(page); await expect(pill(page, 'Help')).toBeVisible();
   });
 
   test('words typed while an Undo is on its way are kept, and saved after it', async ({ page }) => {
@@ -2238,7 +2240,7 @@ test.describe('G13 in-place canvas text editor', () => {
     await typeOver(page, frame.locator('#about-us [data-dds-field="subtitle"]'), 'On its way');
     await page.keyboard.press('Enter');
     await expect.poll(() => sent.length, { timeout: 6000 }).toBe(1);
-    await pill(page, 'Home').locator('.pp-name').click();          // the page change waits on that save, and takes the snapshots with it
+    await openPages(page); await pill(page, 'Home').locator('.pp-name').click();          // the page change waits on that save, and takes the snapshots with it
     await page.waitForTimeout(200);
     release();
     await expect(onPill(page)).toHaveText('Home');
@@ -2305,9 +2307,10 @@ test.describe('Comments mode offers no editing (item 99)', () => {
     const first = frame.locator('section.block-richtext');
     // a phone brings the toolbar with a tap, a mouse with a hover
     const phone = (page.viewportSize()?.width || 1200) < 768;
-    const point = (loc: ReturnType<typeof frame.locator>) => (phone ? loc.tap() : loc.hover());
+    const point = (loc: ReturnType<typeof frame.locator>) => (phone ? loc.tap() : loc.hover({ position: { x: 600, y: 56 } }));   // right of the floating Contents card, under the section pill
     await point(first);
     await expect(frame.locator('#dds-dc-bar button', { hasText: 'Delete' })).toBeVisible();   // Edit mode: the toolbar is there
+    if (phone) await page.locator('#dkMore').click();                                         // Notes waits behind More on a phone
     await page.locator('#dcModeSeg [data-dcmode="comments"]').click();
     await expect(page.locator('#dcModeSeg [data-dcmode="comments"]')).toHaveAttribute('aria-pressed', 'true');
     await expect(frame.locator('#dds-dc-bar.on')).toHaveCount(0);                              // the toolbar went away with Edit mode
@@ -2323,9 +2326,9 @@ test.describe('Comments mode offers no editing (item 99)', () => {
     await expect(page.locator('#designTreeList .dc-tree-addpage')).toHaveCount(0);             // no Add a page
     expect(puts.length).toBe(0);
     // back in Edit mode, all of it returns
-    if (phone) await page.getByRole('button', { name: /Collapse/ }).click();
-    await page.locator('#dcModeSeg [data-dcmode="edit"]').click();
-    await expect(page.locator('#dcModeSeg [data-dcmode="edit"]')).toHaveAttribute('aria-pressed', 'true');
+    if (phone) { await page.getByRole('button', { name: /Collapse/ }).click(); await page.locator('#dkMore').click(); }
+    await page.locator('#dcModeSeg [data-dcmode="comments"]').click();                        // Notes again is the way back to Edit
+    await expect(page.locator('#dcModeSeg [data-dcmode="comments"]')).toHaveAttribute('aria-pressed', 'false');
     await expect(page.locator('#designTreeList .dc-tree-acts').first()).toBeAttached();
     await expect(page.locator('#designTreeList .dc-tree-grab').first()).toBeAttached();
     await expect(page.locator('#designTreeList .dc-tree-addpage')).toBeAttached();

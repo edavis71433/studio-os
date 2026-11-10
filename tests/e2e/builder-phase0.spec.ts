@@ -225,7 +225,7 @@ test.describe('the builder’s icons', () => {
     await expect(page.locator('.tray-item .ti-ico svg').first()).toBeAttached();   // drawn, and shown when a section's picture can't load (item 25)
     const text = await page.locator('#designTray').innerText();
     expect(text).not.toMatch(/\p{Extended_Pictographic}/u);
-    await expect(page.locator('#btnComments')).toHaveText('Comments');
+    await expect(page.locator('#btnComments')).toHaveText('Notes');   // the dock's word for comments mode
   });
 });
 
@@ -242,6 +242,7 @@ test.describe('forms on your own pages', () => {
     });
     await page.goto('/presence.html#design');
     await expect(page.locator('#formsCard label').first()).toHaveText('Forms on your home page');
+    await page.locator('#dcPageSwitch').click();   // the pages live in the switcher's card
     await page.locator('#pagesBar .page-pill', { hasText: 'Visit' }).click();
     await expect(page.locator('#formsCard label').first()).toHaveText('Forms on “Visit”');
     await page.evaluate(() => (window as any).openSettingsPanel('forms'));
