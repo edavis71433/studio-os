@@ -216,7 +216,8 @@ const FULL = { x: 0, y: 0, w: 1, h: 1 };
 {
   const files = read('files.html'), ed = read('image-editor.js');
   const acts = files.slice(files.indexOf("${ed?`<div class=\"acts\">"), files.indexOf("`:`<div class=\"acts\"><button class=\"btn\" onclick=\"download("));
-  ok('Edit photo and Remove background are offered only with edit rights, and only for photos', acts.includes("${a.kind==='image'?`<button class=\"btn\" id=\"editPhoto\">Edit photo</button><button class=\"btn\" id=\"cutBg\">Remove background</button>`:''}"));
+  // bold redesign, Files part 2: Edit photo leads the panel (beside Use in an update); Remove background stays with the actions
+  ok('Edit photo and Remove background are offered only with edit rights, and only for photos', files.includes("${ed&&a.kind==='image'?`<div class=\"pacts\"><button class=\"btn primary\" id=\"editPhoto\">Edit photo</button>") && (files.match(/id="editPhoto"/g) || []).length === 1 && acts.includes("${a.kind==='image'?`<button class=\"btn\" id=\"cutBg\">Remove background</button>`:''}"));
   ok('Remove background opens the editor on its Background tab, already on', files.includes("cb.onclick=()=>editPhoto('background')") && files.includes("removeBackground:tab==='background'"));
   const editFn = files.slice(files.indexOf('async function editPhoto('), files.indexOf('const editedName='));
   ok('the editor opens the ORIGINAL (the untransformed file), never the small thumbnail', editFn.includes('const src=d.thumb_fallback||d.download_url;') && !/\ba\.thumb\b/.test(editFn));
