@@ -1,5 +1,6 @@
-import { test, expect, type Page } from '@playwright/test';
+import { test, expect, type Page, type Locator } from '@playwright/test';
 import { installApp } from './helpers/app';
+import { installIosFocusSemantics } from './helpers/ios-focus';
 
 // Nov 10 bug hunt, Pipeline (B7 · B8 · B13 · B14 · B19 · B20 and the small ones):
 //   B20 "5k" is $5,000 (it was saved as $5)
@@ -33,8 +34,14 @@ const col = (page: Page, stage: string) => page.locator('#board .col').filter({ 
 const narrow = (page: Page) => (page.viewportSize()?.width || 0) <= 760;
 const showStage = async (page: Page, stage: string) => { if (narrow(page)) await page.locator(`[data-stab="${stage}"]`).click(); };
 const toastWith = (page: Page, text: string) => page.locator('.dds-toast').filter({ hasText: text });
-// a board whose deals move when the stage route says so (each move answers after a moment)
-async function liveDeals(page: Page) {
+// the board's Move menu on a touch screen is tapped, with iOS's focus on a tap (pipeline.spec's
+// touch test, helpers/ios-focus.ts): a plain click there closes the menu before the option lands
+const touch = () => test.info().project.name !== 'desktop-chromium';
+const press = (loc: Locator) => (touch() ? loc.tap() : loc.click());
+const touchReady = async (page: Page) => { if (touch()) await installIosFocusSemantics(page); };
+// a board whose deals move when the stage route says so (each move answers after a moment, or —
+// given a gate — only once the gate opens, so a second press lands while the first is on its way)
+async function liveDeals(page: Page, gate?: Promise<void>) {
   const deals = JSON.parse(JSON.stringify(DEALS));
   const moved: Array<{ id: string; to: string }> = [];
   await page.route(/\/functions\/v1\/presence\/sales\/deals(\?.*)?$/, (route) => route.request().method() === 'GET'
@@ -42,7 +49,7 @@ async function liveDeals(page: Page) {
   await page.route(/\/functions\/v1\/presence\/sales\/deals\/[^/]+\/stage$/, async (route) => {
     const id = new URL(route.request().url()).pathname.split('/').slice(-2)[0], to = (route.request().postDataJSON() || {}).to;
     moved.push({ id, to });
-    await new Promise((r) => setTimeout(r, 300));
+    await (gate || new Promise((r) => setTimeout(r, 300)));
     const d = deals.find((x: { id: string }) => x.id === id);
     if (!d || d.stage === to) return route.fulfill({ status: 409, contentType: 'application/json', body: JSON.stringify({ error: 'bad_transition', message: 'That deal has already moved.' }) });
     d.stage = to;
@@ -77,6 +84,7 @@ test.describe('the board redraws without losing what you typed (B19)', () => {
   test('a half-typed "+ Add a deal" survives a search keystroke, a chip and a move', async ({ page }) => {
     await installApp(page, { api: API });
     await liveDeals(page);
+    await touchReady(page);
     await page.goto('/pipeline.html');
     await showStage(page, 'lead');
     await col(page, 'lead').locator('[data-addbtn]').click();
@@ -91,8 +99,8 @@ test.describe('the board redraws without losing what you typed (B19)', () => {
     await page.locator('[data-bchip="all"]').click();                              // a chip redraws it too
     await expect(form.getByLabel('New deal in New lead: name')).toHaveValue('Sunrise Yoga');
     if (narrow(page)) return;                                                      // a phone shows one column: no other card to move
-    await col(page, 'qualified').locator(`.bcard[data-id="${D2}"] .bc-move`).click();
-    await page.locator('#board .bc-menu').getByRole('menuitem', { name: 'Move to Proposal sent' }).click();
+    await press(col(page, 'qualified').locator(`.bcard[data-id="${D2}"] .bc-move`));
+    await press(page.locator('#board .bc-menu').getByRole('menuitem', { name: 'Move to Proposal sent' }));
     await expect(toastWith(page, 'Moved to Proposal sent')).toBeVisible();
     await expect(col(page, 'proposal').locator(`.bcard[data-id="${D2}"]`)).toBeVisible();
     await expect(form.getByLabel('New deal in New lead: name')).toHaveValue('Sunrise Yoga');
@@ -112,13 +120,18 @@ test.describe('the board redraws without losing what you typed (B19)', () => {
 });
 
 test.describe('board moves (B13, B21)', () => {
-  test('a double click on a Move option sends one stage change', async ({ page }) => {
+  test('a double click (or a double tap) on a Move option sends one stage change', async ({ page }) => {
     await installApp(page, { api: API });
-    const moved = await liveDeals(page);
+    let land!: () => void;
+    const moved = await liveDeals(page, new Promise<void>((r) => { land = r; }));   // the first move waits for both presses
+    await touchReady(page);
     await page.goto('/pipeline.html');
     await showStage(page, 'qualified');
-    await col(page, 'qualified').locator(`.bcard[data-id="${D2}"] .bc-move`).click();
-    await page.locator('#board .bc-menu').getByRole('menuitem', { name: 'Move to Proposal sent' }).dblclick();
+    await press(col(page, 'qualified').locator(`.bcard[data-id="${D2}"] .bc-move`));
+    const option = page.locator('#board .bc-menu').getByRole('menuitem', { name: 'Move to Proposal sent' });
+    if (touch()) { await option.tap(); await option.tap(); } else await option.dblclick();
+    await expect.poll(() => moved.length).toBeGreaterThan(0);
+    land();
     await expect(toastWith(page, 'Moved to Proposal sent')).toBeVisible();
     await page.waitForTimeout(700);
     expect(moved).toEqual([{ id: D2, to: 'proposal' }]);
