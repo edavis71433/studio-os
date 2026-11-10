@@ -175,6 +175,7 @@
   .lock{display:inline-flex;align-items:center;gap:var(--dds-s1,4px);font-size:11.5px;font-weight:500;color:var(--warn);background:var(--warn-soft);border-radius:999px;padding:1px var(--dds-s2,8px);margin-left:6px;white-space:nowrap;vertical-align:middle}
   .tile .badge.lock{margin-left:0;background:var(--warn-soft);color:var(--warn)}
   .switch{display:inline-flex;align-items:center;gap:var(--dds-s2,8px);font-size:13.5px;cursor:pointer;font-weight:500;position:relative}
+  .field label.switch{display:inline-flex;font-size:13.5px;color:var(--ink);margin-bottom:0}   /* .field label (a block, faint and small) was winning: the toggle sat flush against its words */
   .switch input{position:absolute;opacity:0;width:1px;height:1px;margin:0}
   .switch i{width:34px;height:20px;border-radius:999px;background:var(--p);position:relative;display:inline-block;transition:var(--dds-t-fast,120ms) var(--dds-ease,ease-out);flex:0 0 auto}
   .switch i:after{content:"";position:absolute;top:2px;right:2px;width:16px;height:16px;border-radius:50%;background:#fff}
@@ -225,6 +226,34 @@
   .panel{position:fixed;top:0;right:0;bottom:0;width:min(440px,100%);background:var(--bg);border-left:1px solid var(--line);transform:translateX(100%);transition:transform var(--dds-t-base,200ms) var(--dds-ease,ease-out);z-index:41;overflow-y:auto;padding:var(--dds-s5,20px) var(--dds-s6,24px) 60px}
   @media (max-width:760px){.panel{padding-bottom:calc(96px + env(safe-area-inset-bottom,0px))}}  /* keep the last controls clear of the shell's bottom bar */
   .panel.on{transform:translateX(0)}
+  /* bold redesign, part 2 (Figma "11 · Files"): on a computer the open file sits in a
+     card beside the grid — not over it — the page makes room and the file's card is
+     marked; on a phone it comes up as a sheet from the bottom; in between, the
+     slide-over stays. The panel leads with the photo, its name and the two things
+     people do next: Edit photo, Use in an update. */
+  .panel .ptitle{font-family:var(--serif);font-weight:600;font-size:20px;line-height:1.25;letter-spacing:-.01em;margin:2px 0 0;padding-right:28px;overflow-wrap:anywhere}
+  .panel .pacts{display:flex;gap:8px;flex-wrap:wrap;margin:6px 0 4px}
+  .panel .pacts .btn{flex:1 1 140px;justify-content:center;text-decoration:none}
+  .tile.cur{border-color:var(--p);box-shadow:0 0 0 2px var(--p) inset,var(--shadow)}
+  .tscroll tbody tr.cur{background:var(--p-soft);box-shadow:inset 3px 0 0 var(--p)}   /* the table's open file, as the grid's card is outlined */
+  @media (min-width:1180px){
+    html.files-docked .wrap{padding-right:calc(380px + 40px)}
+    html.files-docked .panel{top:16px;right:16px;bottom:16px;width:380px;border:1px solid var(--line);border-radius:var(--dds-r-xl,20px);background:var(--card);box-shadow:0 24px 60px -24px rgba(23,21,34,.35)}
+    html.files-docked .scrim{display:none}
+    /* the header beside the panel wraps rather than squeezing a button, and below
+       1,320px (under ~600px of room; the whole row needs ~585) Make an image takes
+       the second line, as on a narrow screen */
+    html.files-docked .lrow1{flex-wrap:wrap}
+  }
+  @media (min-width:1180px) and (max-width:1319.98px){html.files-docked a.lmake{order:9;margin-left:auto}}
+  @media (max-width:760px){
+    .panel{top:auto;left:0;right:0;bottom:0;width:100%;max-height:88dvh;border-left:0;border-top:1px solid var(--line);border-radius:20px 20px 0 0;background:var(--card);transform:translateY(100%)}   /* the card the computer's panel is, so its edge shows in dark too */
+    .panel.on{transform:none}
+    .panel::before{content:"";display:block;flex:none;width:40px;height:4px;border-radius:2px;background:var(--dds-line-strong,var(--line));margin:0 auto 4px}
+    /* a sheet covers the shell's tab bar (and dims it), but never a toast */
+    .scrim{z-index:2147483100}
+    .panel{z-index:2147483101;padding-bottom:calc(24px + env(safe-area-inset-bottom,0px))}
+  }
   .panel .x{position:absolute;top:16px;right:18px;background:none;border:none;font-size:22px;color:var(--soft);cursor:pointer;line-height:1}
   .pv{border-radius:var(--dds-r-lg,10px);overflow:hidden;background:var(--p-soft);aspect-ratio:4/3;display:flex;align-items:center;justify-content:center;margin:var(--dds-s4,16px) 0 var(--dds-s4,16px)}
   .pv img{width:100%;height:100%;object-fit:contain}
@@ -253,6 +282,7 @@
   .btn.warn{color:var(--danger);border-color:transparent;background:none;padding-left:var(--dds-s1,4px)}
   .btn.warn:hover{text-decoration:underline;border-color:transparent}
   .tags{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+  .tags .chip{min-height:0}   /* labels to read, not buttons: the shell's 44px touch floor made them tall ovals on a phone */
   .chip{font-size:12px;background:var(--p-soft);color:var(--p);padding:var(--dds-s1,4px) var(--dds-s2,8px);border-radius:999px}
   .toast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%) translateY(20px);background:var(--ink);color:var(--bg);padding:var(--dds-s3,12px) var(--dds-s5,20px);border-radius:var(--dds-r,8px);font-size:13.5px;font-weight:600;opacity:0;pointer-events:none;transition:all var(--dds-t-base,200ms) var(--dds-ease,ease-out);z-index:50}
   .toast.on{opacity:1;transform:translateX(-50%) translateY(0)}
@@ -778,6 +808,7 @@ function wireRail(){
   const ul=$('useLens');if(ul)ul.onclick=()=>{S.use=!S.use;if(!S.loadedOnce)return load();applyFilters();render();const nb=$('useLens');if(nb)nb.focus();};
   // More filters opens and closes in place: no re-read, no re-render
   const mf=$('moreFilters');if(mf)mf.onclick=()=>{const row=$('moreRow');if(!row)return;const open=row.hidden;if(!open&&MORE_COLS.includes(S.col))return;row.hidden=!open;MORE_OPEN=open;mf.setAttribute('aria-expanded',open?'true':'false');};
+  keepPickInView();
 }
 function stockTile(im){
   return `<figure class="tile" style="margin:0"><img src="${esc(im.thumb)}" alt="${esc(im.alt)}" loading="lazy" style="width:100%;aspect-ratio:4/3;object-fit:cover;border-radius:10px;display:block">`+
@@ -943,7 +974,8 @@ function tableHtml(rows){
     const st=a.state||'approved';
     const stateLbl={live:'Live',pending:'Pending',approved:'Approved',draft:'Draft',archived:'Archived'}[st]||st;
     const ckTd=S.canEdit?`<td class="ck"><input type="checkbox" data-pick="${esc(a.id)}" aria-label="Select ${esc(a.name)}"${S.selected.has(a.id)?' checked':''}></td>`:'';
-    return `<tr data-open="${esc(a.id)}" tabindex="0" aria-label="Open ${esc(a.name)}">
+    const cur=S.current&&S.current.asset&&S.current.asset.id===a.id;
+    return `<tr data-open="${esc(a.id)}" tabindex="0" aria-label="Open ${esc(a.name)}"${cur?' class="cur" aria-current="true"':''}>
       ${ckTd}
       <td><span class="ncell"><span class="mthumb"${t}>${inner}</span><span class="nm2" title="${esc(a.name)}">${esc(a.name)}</span>${a.client_private?`<span class="lock" title="Private to this client — not in the shared library or the site picker">🔒 Private${a.client_name?' to '+esc(a.client_name):''}</span>`:''}</span></td>
       ${RAILC.length?(()=>{const cl=clientLabel(a);return `<td class="cli" title="${esc(cl)}">${esc(cl)}</td>`;})():''}
@@ -1007,7 +1039,8 @@ function tile(a){
     </div>`;
   }
   const star=S.canEdit?`<button class="star" data-fav="${a.id}" title="Favorite">${svg(a.favorite?IC.star:IC.starO)}</button>`:'';
-  return `<div class="tile" data-open="${a.id}" role="button" tabindex="0" aria-label="Open ${esc(a.name)}">
+  const cur=S.current&&S.current.asset&&S.current.asset.id===a.id;
+  return `<div class="tile${cur?' cur':''}" data-open="${a.id}" role="button" tabindex="0" aria-label="Open ${esc(a.name)}"${cur?' aria-current="true"':''}>
     <div class="thumb" ${t}>${inner}</div>${badge}${star}
     ${meta}
   </div>`;
@@ -1017,12 +1050,14 @@ function wire(){
   wireThumbs($('root'));   // a thumbnail that can't load falls back to its icon, never a blank cell
   // grid tiles open on click/Enter/Space; table rows do too, but never from a
   // click on the row's own controls (checkbox / future buttons)
-  document.querySelectorAll('.tile[data-open]').forEach(b=>{b.onclick=()=>openDetail(b.dataset.open);b.onkeydown=(e)=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();openDetail(b.dataset.open);}};});
+  // (a tile is role=button, so shell.js's Enter/Space helper would click it a second
+  // time: the file opened twice and lost its way back, and a pick undid itself)
+  document.querySelectorAll('.tile[data-open]').forEach(b=>{b.onclick=()=>openDetail(b.dataset.open);b.onkeydown=(e)=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();e.stopPropagation();openDetail(b.dataset.open);}};});
   document.querySelectorAll('tr[data-open]').forEach(tr=>{
     tr.onclick=(e)=>{if(e.target.closest('input,button,a'))return;openDetail(tr.dataset.open);};
     tr.onkeydown=(e)=>{if((e.key==='Enter'||e.key===' ')&&!e.target.closest('input,button,a')){e.preventDefault();openDetail(tr.dataset.open);}};
   });
-  document.querySelectorAll('.tile[data-pick]').forEach(b=>{const pick=()=>togglePick(b.dataset.pick);b.onclick=pick;b.onkeydown=(e)=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();pick();}};});
+  document.querySelectorAll('.tile[data-pick]').forEach(b=>{const pick=()=>togglePick(b.dataset.pick);b.onclick=pick;b.onkeydown=(e)=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();e.stopPropagation();pick();}};});
   document.querySelectorAll('input[data-pick]').forEach(b=>{b.onchange=()=>togglePick(b.dataset.pick);});
   const ckAll=$('ckAll');if(ckAll)ckAll.onchange=()=>{
     const rows=sortRows(S.assets);
@@ -1137,12 +1172,37 @@ function wireThumbs(root){
 
 /* ── detail panel ── */
 let detailOpener=null;   // a11y: where focus returns when the slide-over closes
+const DOCK=window.matchMedia?window.matchMedia('(min-width:1180px)'):null;
+function setPanelMode(){
+  const p=$('panel'),open=p.classList.contains('on'),docked=open&&!!(DOCK&&DOCK.matches);
+  document.documentElement.classList.toggle('files-docked',docked);
+  // the shell traps Tab inside any visible dialog — a card beside the grid is not one
+  if(docked){p.setAttribute('role','region');p.removeAttribute('aria-modal');$('scrim').classList.remove('on');}
+  else{p.setAttribute('role','dialog');p.setAttribute('aria-modal','true');$('scrim').classList.toggle('on',open);}
+  keepPickInView();
+}
+// The strip of folders and clients scrolls sideways, and it narrows when the page
+// makes room for the panel (and starts over when it's re-drawn): keep the picked
+// folder or client in sight. It scrolls the strip only, never the page.
+function keepPickInView(){
+  const r=$('rail'),c=r&&r.querySelector('[data-folder][aria-current="true"],[data-client]:not([data-client=""])[aria-current="true"]');
+  if(!c)return;
+  const rb=r.getBoundingClientRect(),cb=c.getBoundingClientRect();
+  if(cb.right-rb.left+r.scrollLeft<=r.clientWidth){r.scrollLeft=0;return;}   // it fits from the start: show the start too
+  if(cb.left<rb.left||cb.right>rb.right)r.scrollLeft+=cb.left-rb.left-Math.max(0,(rb.width-cb.width)/2);
+}
+function markCurrent(id){
+  document.querySelectorAll('.tile.cur,tr.cur').forEach(t=>{t.classList.remove('cur');t.removeAttribute('aria-current');});
+  const q='[data-open="'+(id?CSS.escape(id):'')+'"]';
+  const t=id&&document.querySelector('.tile'+q+',tr'+q);if(t){t.classList.add('cur');t.setAttribute('aria-current','true');}
+}
+if(DOCK){const onDock=()=>setPanelMode();if(DOCK.addEventListener)DOCK.addEventListener('change',onDock);else if(DOCK.addListener)DOCK.addListener(onDock);}
 function focusPanel(){const x=$('panel').querySelector('.x');if(x)x.focus();}
 async function openDetail(id){
   const scrim=$('scrim'),panel=$('panel');
   detailOpener=document.activeElement;
   panel.innerHTML=`<button class="x" onclick="closeDetail()" aria-label="Close file details">×</button><div class="spin"></div>`;
-  scrim.classList.add('on');panel.classList.add('on');
+  scrim.classList.add('on');panel.classList.add('on');setPanelMode();markCurrent(id);
   focusPanel();   // move focus INTO the dialog (Escape already closes it)
   const r=await api('/assets/'+id);
   if(!r.ok){panel.innerHTML=`<button class="x" onclick="closeDetail()" aria-label="Close file details">×</button><div class="empty"><h2>Couldn’t open that file.</h2></div>`;focusPanel();return;}
@@ -1151,7 +1211,7 @@ async function openDetail(id){
 }
 function closeDetail(){
   const wasOpen=$('panel').classList.contains('on');
-  $('scrim').classList.remove('on');$('panel').classList.remove('on');S.current=null;
+  $('scrim').classList.remove('on');$('panel').classList.remove('on');S.current=null;setPanelMode();markCurrent('');
   if(wasOpen&&detailOpener&&detailOpener.focus&&document.contains(detailOpener))detailOpener.focus();   // return focus to the opener
   detailOpener=null;
   // a11y: empty the closed dialog. The panel is only translated off-screen, so it
@@ -1205,29 +1265,31 @@ function renderDetail(){
   $('panel').innerHTML=`
     <button class="x" onclick="closeDetail()" aria-label="Close file details">×</button>
     <div class="pv" data-pvhost>${pv}</div>
+    <h2 class="ptitle">${esc(a.name)}</h2>
+    <div style="font-size:12.5px;color:var(--faint)">${esc(a.kind==='document'?'PDF document':'Photo')} · ${bytes(a.bytes)}${a.width?` · ${a.width}×${a.height}`:''}${a.client_id?` · ${esc(clientLabel(a))}’s work`:''}${a.collection?' · In '+esc(folderLabel(a.collection)):''}</div>
     <div>${stateBadge}</div>${approvedLine}${approveCtrls}
-    <div style="font-size:12.5px;color:var(--faint)">${esc(a.kind==='document'?'PDF document':'Photo')} · ${bytes(a.bytes)}${a.width?` · ${a.width}×${a.height}`:''}${a.client_id?` · ${esc(clientLabel(a))}’s work`:''}</div>
     ${edited}
+    ${ed&&a.kind==='image'?`<div class="pacts"><button class="btn primary" id="editPhoto">Edit photo</button>${a.client_private||a.asset_status==='archived'?'':`<a class="btn" id="useUpdate" href="/broadcasts.html?photo=${esc(a.id)}">Use in an update</a>`}</div>`:''}
+    <div class="where" id="whereUsed"><div class="hl">Where it’s used</div>${usage}${usageNote}<div style="font-size:12.5px;color:var(--faint);margin-top:8px">${esc((d.summary&&d.summary.headline)||'')}</div>${inProject&&ed?'<div class="amuted">Delivered in a project, so it stays the version that was sent. Upload a new version to the project instead of replacing it here.</div>':''}</div>
+    ${a.kind==='image'?`<div class="field"><label for="f-alt">Description (alt text)</label><textarea id="f-alt" ${ed?'':'disabled'} placeholder="What’s in this photo? Helps search & screen readers."${altLooksLikeName?' aria-describedby="f-alt-hint"':''}>${esc(a.alt_text||'')}</textarea>${altLooksLikeName?`<div class="althint" id="f-alt-hint">This is still the file name. Say what’s in the photo — screen readers read it out, and search engines use it.</div>`:''}</div>`:''}
     ${a.client_id?`<div class="field privfield"><label class="switch${a.client_private?'':' off'}" for="f-private"><input type="checkbox" id="f-private"${a.client_private?' checked':''}${ed?'':' disabled'}><i aria-hidden="true"></i>Private to this client</label><div class="amuted" id="f-private-note">${a.client_private?`Only shows under ${esc(clientLabel(a))} and on their record. Never offered when you pick images for a site.`:'In the shared library and the site picker like any other file.'}</div></div>`:''}
     <div class="field"><label for="f-name">Name</label><input id="f-name" value="${esc(a.name)}" ${ed?'':'disabled'}></div>
-    ${repeats}
-    ${a.kind==='image'?`<div class="field"><label for="f-alt">Description (alt text)</label><textarea id="f-alt" ${ed?'':'disabled'} placeholder="What’s in this photo? Helps search & screen readers."${altLooksLikeName?' aria-describedby="f-alt-hint"':''}>${esc(a.alt_text||'')}</textarea>${altLooksLikeName?`<div class="althint" id="f-alt-hint">This is still the file name. Say what’s in the photo — screen readers read it out, and search engines use it.</div>`:''}</div>`:''}
     <div class="field"><label for="f-cap">Caption</label><input id="f-cap" value="${esc(meta.caption||'')}" ${ed?'':'disabled'}></div>
     <div class="field"><label for="f-col">Folder</label><input id="f-col" list="f-col-list" value="${esc(a.collection||'')}" placeholder="No folder — type or pick one" ${ed?'':'disabled'}><datalist id="f-col-list">${[...new Set([...folderNames(),...FIXED_FOLDERS])].map(n=>`<option value="${esc(n)}">`).join('')}</datalist></div>
     <div class="field"><label for="f-tags">Tags (comma-separated)</label><input id="f-tags" value="${esc((a.tags||[]).join(', '))}" ${ed?'':'disabled'}>${tags?`<div class="tags">${tags}</div>`:''}</div>
-    <div class="where" id="whereUsed"><div class="hl">Where it’s used</div>${usage}${usageNote}<div style="font-size:12.5px;color:var(--faint);margin-top:8px">${esc((d.summary&&d.summary.headline)||'')}</div>${inProject&&ed?'<div class="amuted">Delivered in a project, so it stays the version that was sent. Upload a new version to the project instead of replacing it here.</div>':''}</div>
-    ${a.kind==='image'?`<div class="social" id="social-slot"><div class="hl">Social sizes</div><div style="font-size:12.5px;color:var(--faint)">Preparing crops…</div></div>`:''}
-    ${a.kind==='image'?`<div class="social" id="cards-slot"><div class="hl">Branded cards</div><div style="font-size:12.5px;color:var(--faint)">Preparing cards…</div></div>`:''}
-    ${ver}
+    ${repeats}
     ${ed?`<div class="acts">
       <button class="btn" onclick="saveDetail()">Save details</button>
-      ${a.kind==='image'?`<button class="btn" id="editPhoto">Edit photo</button><button class="btn" id="cutBg">Remove background</button>`:''}
+      ${a.kind==='image'?`<button class="btn" id="cutBg">Remove background</button>`:''}
       ${inProject?'':`<button class="btn" onclick="$('replacer').click()">Replace…</button>`}
       <button class="btn" onclick="duplicate('${a.id}')">Duplicate</button>
       <button class="btn" onclick="download('${a.id}')">Download</button>
       ${a.asset_status==='archived'?`<button class="btn" onclick="setAssetStatus('${a.id}','restore')">Restore</button>`:`<button class="btn" onclick="setAssetStatus('${a.id}','archive')">Archive</button>`}
       <button class="btn warn" data-needs="delete" onclick="del('${a.id}')">Delete</button>
-    </div>`:`<div class="acts"><button class="btn" onclick="download('${a.id}')">Download</button></div>`}`;
+    </div>`:`<div class="acts"><button class="btn" onclick="download('${a.id}')">Download</button></div>`}
+    ${a.kind==='image'?`<div class="social" id="social-slot"><div class="hl">Social sizes</div><div style="font-size:12.5px;color:var(--faint)">Preparing crops…</div></div>`:''}
+    ${a.kind==='image'?`<div class="social" id="cards-slot"><div class="hl">Branded cards</div><div style="font-size:12.5px;color:var(--faint)">Preparing cards…</div></div>`:''}
+    ${ver}`;
   wirePreviews($('panel'));
   const pv2=$('f-private'); if(pv2)pv2.onchange=()=>setPrivate(a.id,pv2.checked,pv2);
   $('panel').querySelectorAll('[data-repeat]').forEach(b=>b.onclick=()=>openDetail(b.dataset.repeat));
