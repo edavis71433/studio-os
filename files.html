@@ -168,6 +168,7 @@
   .star svg{width:15px;height:15px}
   .badge{position:absolute;top:8px;left:8px;font-size:12px;font-weight:500;padding:2px var(--dds-s2,8px);border-radius:999px;background:var(--good-soft);color:var(--good);text-transform:capitalize}
   .badge.doc{background:var(--p-soft);color:var(--p)}
+  .tile[data-pick] .badge{left:40px}   /* Select mode: the tick takes the corner, the label steps aside */
   .badge.pend{background:var(--warn-soft);color:var(--warn)}
   /* Oct 2026 review: client-private files — the 🔒 chip on a row/tile, and the
      "Private to this client" switch in the detail panel (the mock's .switch). */
@@ -764,7 +765,7 @@ function clientRailHtml(){
 function wireRail(){
   // a main kind (or Archive) tidies More filters away; one of its own keeps it open
   document.querySelectorAll('#filters [data-col]').forEach(b=>b.onclick=()=>{S.col=b.dataset.col;if(!MORE_COLS.includes(S.col))MORE_OPEN=false;S.folder='';S.q='';S.selected.clear();load();});
-  document.querySelectorAll('#rail [data-folder]').forEach(b=>b.onclick=()=>openFolder(b.dataset.folder));
+  document.querySelectorAll('#rail [data-folder]').forEach(b=>b.onclick=()=>{MORE_OPEN=false;openFolder(b.dataset.folder);});
   const nf=$('newFolder');if(nf)nf.onclick=()=>newFolder();
   document.querySelectorAll('#rail [data-client]').forEach(b=>b.onclick=()=>{
     const v=b.dataset.client;
