@@ -1,6 +1,6 @@
 import { test, expect, Page, Route } from '@playwright/test';
 import { installApp, STUDIO_NAV, ALL_FEATURES, answerAsks, setAsksAnswer, askedSoFar } from './helpers/app';
-import { ABOUT_BLOCKS, ABOUT_SECTION, aboutField, aboutIn, aboutSaveOut, addGallery, ANSWER_HEADERS, API, backToCanvas, BLOCKS, blocksIn, canvasReplaced, canvasScrollY, CONTACT, draftReads, draftVersion, duplicate, editAndWaitOut, editHome, FAR_DOWN, Field, FORM, FormBlocks, formSaveOut, Frame, GALLERY, hasTheirs, hideOut, holdPuts, holdReads, homeLine, lastPut, lastTwo, markCanvas, menuRows, META, mountCanvas, Mounted, mountPages, moveThenWrite, NORM_BLOCKS, NORM_META, NORM_SECTIONS, nudge, onPill, openAbout, openBusiness, OWN_MENU, OWN_PAGES, PAGE_HTML, Paged, PAGED, pageIn, pageMenu, panelEdit, pill, pillNames, previewHtml, redo, refusal, renameContact, SECTIONS, selectInBody, SETTINGS, slugs, stored, STORY, storyIn, STRIP, THEIRS, theirSection, typeDetail, typeOver, undo, WITH_CONTACT, WITH_FORM, writeOnAboutAndLeave } from './helpers/editor';
+import { ABOUT_BLOCKS, ABOUT_SECTION, aboutField, aboutIn, aboutSaveOut, addGallery, ANSWER_HEADERS, API, backToCanvas, BLOCKS, blocksIn, canvasReplaced, canvasScrollY, CONTACT, draftReads, draftVersion, duplicate, editAndWaitOut, editHome, FAR_DOWN, Field, FORM, FormBlocks, formSaveOut, Frame, GALLERY, hasTheirs, hideOut, holdPuts, holdReads, homeLine, lastPut, lastTwo, markCanvas, menuRows, META, mountCanvas, Mounted, mountPages, moveThenWrite, NORM_BLOCKS, NORM_META, NORM_SECTIONS, nudge, onPill, openAbout, openBusiness, OWN_MENU, OWN_PAGES, PAGE_HTML, Paged, PAGED, pageIn, pageMenu, panelEdit, pill, pillNames, previewHtml, redo, refusal, renameContact, SECTIONS, selectInBody, SETTINGS, slugs, stored, STORY, storyIn, STRIP, THEIRS, theirSection, typeDetail, typeOver, undo, WITH_CONTACT, WITH_FORM, writeOnAboutAndLeave, openPages } from './helpers/editor';
 
 // ── G13 in-place canvas text editor — Undo and Redo of page-menu steps keep the words typed since ──
 // Split from g13-editor.spec.ts (builder list item 109, Nov 2026): the fixtures and
@@ -158,7 +158,7 @@ test.describe('G13 in-place canvas text editor — Undo and Redo of page-menu st
 
   test('the page menu has no Move: a page moves on the Pages tab', async ({ page }) => {
     await mountPages(page, '', WITH_CONTACT);
-    await pill(page, 'About').locator('.pp-menu').click();
+    await openPages(page); await pill(page, 'About').locator('.pp-menu').click();
     await expect(page.locator('.pp-pop-item')).toHaveText(['Page settings…', 'Rename', 'Hide from menu', 'Duplicate page', 'Clear page (start blank)', 'Delete page']);
   });
 
@@ -169,13 +169,13 @@ test.describe('G13 in-place canvas text editor — Undo and Redo of page-menu st
     await renameContact(page);
     await writeOnAboutAndLeave(page, frame, puts);
     await undo(page);
-    await expect(pill(page, 'Contact')).toBeVisible();
+    await openPages(page); await expect(pill(page, 'Contact')).toBeVisible();
     const undone = lastPut(puts) as Paged & { nav?: Array<{ href: string }> };
     expect(pageIn(undone, 'contact')).toMatchObject({ title: 'Contact', prev_slug: 'help', blocks: CONTACT.blocks });
     expect(undone.nav?.[0].href).toBe('/contact/');
     expect(aboutIn(undone)?.blocks[0].subtitle).toBe('Written since');
     await redo(page);
-    await expect(pill(page, 'Help')).toBeVisible();
+    await openPages(page); await expect(pill(page, 'Help')).toBeVisible();
     const redone = lastPut(puts) as Paged & { nav?: Array<{ href: string }> };
     expect(pageIn(redone, 'help')).toMatchObject({ title: 'Help', prev_slug: 'contact', blocks: CONTACT.blocks });
     expect(redone.nav?.[0].href).toBe('/help/');
@@ -215,7 +215,7 @@ test.describe('G13 in-place canvas text editor — Undo and Redo of page-menu st
     await expect(pill(page, 'Contact')).toHaveCount(0);
     await writeOnAboutAndLeave(page, frame, puts);
     await undo(page);
-    await expect(pill(page, 'Contact')).toBeVisible();
+    await openPages(page); await expect(pill(page, 'Contact')).toBeVisible();
     expect(lastPut(puts).pages?.map((p) => p.slug)).toEqual(['contact', 'about']);
     expect(pageIn(lastPut(puts), 'contact')?.blocks).toEqual(CONTACT.blocks);
     expect(aboutIn(lastPut(puts))?.blocks[0].subtitle).toBe('Written since');
@@ -235,7 +235,7 @@ test.describe('G13 in-place canvas text editor — Undo and Redo of page-menu st
     expect(lastPut(puts).pages?.map((p) => p.slug)).toEqual(['about']);
     expect(await askedSoFar(page)).toEqual([]);
     await redo(page);
-    await expect(pill(page, 'Gallery')).toBeVisible();
+    await openPages(page); await expect(pill(page, 'Gallery')).toBeVisible();
     expect(lastPut(puts).pages?.map((p) => p.slug)).toEqual(['about', 'gallery']);
   });
 
@@ -250,7 +250,7 @@ test.describe('G13 in-place canvas text editor — Undo and Redo of page-menu st
     await addGallery(page);
     await page.evaluate(() => (0, eval)('BLOCKS_WORK = [{ type: "title", title: "Gallery", subtitle: "Written on the new page" }]; saveBlocks()'));
     await expect.poll(() => pageIn(lastPut(puts), 'gallery')?.blocks.length).toBe(1);
-    await pill(page, 'Home').locator('.pp-name').click();
+    await openPages(page); await pill(page, 'Home').locator('.pp-name').click();
     await expect(onPill(page)).toHaveText('Home');
     const count = puts.length;
     await undo(page);
@@ -258,14 +258,14 @@ test.describe('G13 in-place canvas text editor — Undo and Redo of page-menu st
     expect((await askedSoFar(page))[0]).toContain('Gallery');
     await page.waitForTimeout(300);
     expect(puts.length).toBe(count);                               // no: nothing was written
-    await expect(pill(page, 'Gallery')).toBeVisible();
+    await openPages(page); await expect(pill(page, 'Gallery')).toBeVisible();
     await setAsksAnswer(page, true);
     await undo(page);                                              // and the step is still there to take
     await expect(pill(page, 'Gallery')).toHaveCount(0);
     expect((await askedSoFar(page)).length).toBe(2);
     expect(checkpoints).toEqual(['Before removing “Gallery”']);
     await redo(page);
-    await expect(pill(page, 'Gallery')).toBeVisible();
+    await openPages(page); await expect(pill(page, 'Gallery')).toBeVisible();
     expect(pageIn(lastPut(puts), 'gallery')?.blocks[0].subtitle).toBe('Written on the new page');
     expect((await askedSoFar(page)).length).toBe(2);
   });
@@ -301,7 +301,7 @@ test.describe('G13 in-place canvas text editor — Undo and Redo of page-menu st
     await undo(page);
     await expect(page.locator('.dds-toast, #toast').filter({ hasText: 'Another page uses that address' }).first()).toBeVisible();
     expect(puts.length).toBe(count);
-    await expect(pill(page, 'Help')).toBeVisible();
+    await openPages(page); await expect(pill(page, 'Help')).toBeVisible();
   });
 
   test('words typed while an Undo is on its way are kept, and saved after it', async ({ page }) => {
@@ -329,7 +329,7 @@ test.describe('G13 in-place canvas text editor — Undo and Redo of page-menu st
     await typeOver(page, frame.locator('#about-us [data-dds-field="subtitle"]'), 'On its way');
     await page.keyboard.press('Enter');
     await expect.poll(() => sent.length, { timeout: 6000 }).toBe(1);
-    await pill(page, 'Home').locator('.pp-name').click();          // the page change waits on that save, and takes the snapshots with it
+    await openPages(page); await pill(page, 'Home').locator('.pp-name').click();          // the page change waits on that save, and takes the snapshots with it
     await page.waitForTimeout(200);
     release();
     await expect(onPill(page)).toHaveText('Home');
@@ -396,9 +396,10 @@ test.describe('Comments mode offers no editing (item 99)', () => {
     const first = frame.locator('section.block-richtext');
     // a phone brings the toolbar with a tap, a mouse with a hover
     const phone = (page.viewportSize()?.width || 1200) < 768;
-    const point = (loc: ReturnType<typeof frame.locator>) => (phone ? loc.tap() : loc.hover());
+    const point = (loc: ReturnType<typeof frame.locator>) => (phone ? loc.tap() : loc.hover({ position: { x: 600, y: 56 } }));   // right of the floating Contents card, under the section pill
     await point(first);
     await expect(frame.locator('#dds-dc-bar button', { hasText: 'Delete' })).toBeVisible();   // Edit mode: the toolbar is there
+    if (phone) await page.locator('#dkMore').click();                                         // Notes waits behind More on a phone
     await page.locator('#dcModeSeg [data-dcmode="comments"]').click();
     await expect(page.locator('#dcModeSeg [data-dcmode="comments"]')).toHaveAttribute('aria-pressed', 'true');
     await expect(frame.locator('#dds-dc-bar.on')).toHaveCount(0);                              // the toolbar went away with Edit mode
@@ -414,9 +415,9 @@ test.describe('Comments mode offers no editing (item 99)', () => {
     await expect(page.locator('#designTreeList .dc-tree-addpage')).toHaveCount(0);             // no Add a page
     expect(puts.length).toBe(0);
     // back in Edit mode, all of it returns
-    if (phone) await page.getByRole('button', { name: /Collapse/ }).click();
-    await page.locator('#dcModeSeg [data-dcmode="edit"]').click();
-    await expect(page.locator('#dcModeSeg [data-dcmode="edit"]')).toHaveAttribute('aria-pressed', 'true');
+    if (phone) { await page.getByRole('button', { name: /Collapse/ }).click(); await page.locator('#dkMore').click(); }
+    await page.locator('#dcModeSeg [data-dcmode="comments"]').click();                        // Notes again is the way back to Edit
+    await expect(page.locator('#dcModeSeg [data-dcmode="comments"]')).toHaveAttribute('aria-pressed', 'false');
     await expect(page.locator('#designTreeList .dc-tree-acts').first()).toBeAttached();
     await expect(page.locator('#designTreeList .dc-tree-grab').first()).toBeAttached();
     await expect(page.locator('#designTreeList .dc-tree-addpage')).toBeAttached();

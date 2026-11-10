@@ -1,6 +1,6 @@
 import { test, expect, Page, Route } from '@playwright/test';
 import { installApp, STUDIO_NAV, ALL_FEATURES, answerAsks, setAsksAnswer, askedSoFar } from './helpers/app';
-import { ABOUT_BLOCKS, ABOUT_SECTION, aboutField, aboutIn, aboutSaveOut, addGallery, ANSWER_HEADERS, API, backToCanvas, BLOCKS, blocksIn, canvasReplaced, canvasScrollY, CONTACT, draftReads, draftVersion, duplicate, editAndWaitOut, editHome, FAR_DOWN, Field, FORM, FormBlocks, formSaveOut, Frame, GALLERY, hasTheirs, hideOut, holdPuts, holdReads, homeLine, lastPut, lastTwo, markCanvas, menuRows, META, mountCanvas, Mounted, mountPages, moveThenWrite, NORM_BLOCKS, NORM_META, NORM_SECTIONS, nudge, onPill, openAbout, openBusiness, OWN_MENU, OWN_PAGES, PAGE_HTML, Paged, PAGED, pageIn, pageMenu, panelEdit, pill, pillNames, previewHtml, redo, refusal, renameContact, SECTIONS, selectInBody, SETTINGS, slugs, stored, STORY, storyIn, STRIP, THEIRS, theirSection, typeDetail, typeOver, undo, WITH_CONTACT, WITH_FORM, writeOnAboutAndLeave } from './helpers/editor';
+import { ABOUT_BLOCKS, ABOUT_SECTION, aboutField, aboutIn, aboutSaveOut, addGallery, ANSWER_HEADERS, API, backToCanvas, BLOCKS, blocksIn, canvasReplaced, canvasScrollY, CONTACT, draftReads, draftVersion, duplicate, editAndWaitOut, editHome, FAR_DOWN, Field, FORM, FormBlocks, formSaveOut, Frame, GALLERY, hasTheirs, hideOut, holdPuts, holdReads, homeLine, lastPut, lastTwo, markCanvas, menuRows, META, mountCanvas, Mounted, mountPages, moveThenWrite, NORM_BLOCKS, NORM_META, NORM_SECTIONS, nudge, onPill, openAbout, openBusiness, OWN_MENU, OWN_PAGES, PAGE_HTML, Paged, PAGED, pageIn, pageMenu, panelEdit, pill, pillNames, previewHtml, redo, refusal, renameContact, SECTIONS, selectInBody, SETTINGS, slugs, stored, STORY, storyIn, STRIP, THEIRS, theirSection, typeDetail, typeOver, undo, WITH_CONTACT, WITH_FORM, writeOnAboutAndLeave, openPages } from './helpers/editor';
 
 // ── G13 in-place canvas text editor — changing page with an edit open or on its way ──
 // Split from g13-editor.spec.ts (builder list item 109, Nov 2026): the fixtures and
@@ -11,7 +11,7 @@ test.describe('G13 in-place canvas text editor — changing page with an edit op
     const { frame, puts } = await mountPages(page);
     const { sent, release } = await holdPuts(page);
     await typeOver(page, frame.locator('[data-dds-field="subtitle"]'), 'Kept across pages');
-    await pill(page, 'About').locator('.pp-name').click();         // the click blurs the field, which commits
+    await openPages(page); await pill(page, 'About').locator('.pp-name').click();         // the click blurs the field, which commits
     await expect.poll(() => sent.length, { timeout: 6000 }).toBe(1);
     expect(sent[0].blocks?.[0].subtitle).toBe('Kept across pages');
     await expect(onPill(page)).toHaveText('Home');                 // the list is not replaced while the write is out
@@ -27,7 +27,7 @@ test.describe('G13 in-place canvas text editor — changing page with an edit op
     await openAbout(page, frame);
     await typeOver(page, frame.locator('#about-us [data-dds-field="subtitle"]'), 'About, edited');
     await page.keyboard.press('Enter');
-    await pill(page, 'Home').locator('.pp-name').click();
+    await openPages(page); await pill(page, 'Home').locator('.pp-name').click();
     await expect.poll(() => puts.length, { timeout: 6000 }).toBe(1);
     const saved = puts[0] as Paged;
     expect(saved.blocks).toBeUndefined();
@@ -44,7 +44,7 @@ test.describe('G13 in-place canvas text editor — changing page with an edit op
     await typeOver(page, frame.locator('[data-dds-field="subtitle"]'), 'Already leaving');
     await page.keyboard.press('Enter');
     await expect.poll(() => sent.length, { timeout: 6000 }).toBe(1);   // the debounce fired on its own
-    await pill(page, 'About').locator('.pp-name').click();
+    await openPages(page); await pill(page, 'About').locator('.pp-name').click();
     await page.waitForTimeout(300);
     await expect(onPill(page)).toHaveText('Home');                     // its write isn't in the saved draft yet
     release();
@@ -84,12 +84,12 @@ test.describe('G13 in-place canvas text editor — changing page with an edit op
       return route.fallback();
     });
     await typeOver(page, frame.locator('[data-dds-field="subtitle"]'), 'Not lost');
-    await pill(page, 'About').locator('.pp-name').click();
+    await openPages(page); await pill(page, 'About').locator('.pp-name').click();
     await expect(page.locator('.dds-toast, #toast').filter({ hasText: 'That save was refused.' }).first()).toBeVisible();
     await expect(onPill(page)).toHaveText('Home');
     expect(puts.length).toBe(0);
     refusing = false;
-    await pill(page, 'About').locator('.pp-name').click();
+    await openPages(page); await pill(page, 'About').locator('.pp-name').click();
     await expect.poll(() => puts.length, { timeout: 6000 }).toBe(1);
     expect((puts[0] as Paged).blocks?.[0].subtitle).toBe('Not lost');
     await expect(onPill(page)).toHaveText('About');
@@ -99,9 +99,9 @@ test.describe('G13 in-place canvas text editor — changing page with an edit op
     const { frame, puts } = await mountPages(page);
     const { sent, release } = await holdPuts(page);
     await typeOver(page, frame.locator('[data-dds-field="subtitle"]'), 'Changed my mind');
-    await pill(page, 'About').locator('.pp-name').click();
+    await openPages(page); await pill(page, 'About').locator('.pp-name').click();
     await expect.poll(() => sent.length, { timeout: 6000 }).toBe(1);
-    await pill(page, 'Home').locator('.pp-name').click();          // back to where they are, before the save lands
+    await openPages(page); await pill(page, 'Home').locator('.pp-name').click();          // back to where they are, before the save lands
     release();
     await expect.poll(() => puts.length, { timeout: 6000 }).toBe(1);
     await page.waitForTimeout(600);                                // past the repaint a switch would ask for
@@ -119,7 +119,7 @@ test.describe('G13 in-place canvas text editor — changing page with an edit op
       return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: { slug: 'home-copy', title: 'Home copy', pages: [...PAGED.pages, { slug: 'home-copy', title: 'Home copy', blocks: BLOCKS }] } }) });
     });
     await typeOver(page, frame.locator('[data-dds-field="subtitle"]'), 'In the copy');
-    await pill(page, 'Home').locator('.pp-menu').click();
+    await openPages(page); await pill(page, 'Home').locator('.pp-menu').click();
     await page.locator('.pp-pop-item', { hasText: 'Duplicate page' }).click();
     await expect(onPill(page)).toHaveText('Home copy');
     expect(putsAtCopy).toBe(1);
@@ -130,7 +130,7 @@ test.describe('G13 in-place canvas text editor — changing page with an edit op
     const { frame, puts } = await mountPages(page);
     await openAbout(page, frame);
     await typeOver(page, frame.locator('#about-us [data-dds-field="subtitle"]'), 'Before the new page');
-    await page.locator('#pagesBar .page-add').click();
+    await openPages(page); await page.locator('#pagesBar .page-add').click();
     await page.getByPlaceholder('e.g. Services, Gallery, Pricing').fill('Gallery');
     await page.getByRole('button', { name: 'Next: pick a layout' }).click();
     await page.locator('.dc-layout-card', { hasText: 'Blank page' }).click();
@@ -145,7 +145,7 @@ test.describe('G13 in-place canvas text editor — changing page with an edit op
     await answerAsks(page);
     await openAbout(page, frame);
     await typeOver(page, frame.locator('#about-us [data-dds-field="subtitle"]'), 'Worth keeping');
-    await pill(page, 'About').locator('.pp-menu').click();
+    await openPages(page); await pill(page, 'About').locator('.pp-menu').click();
     await page.locator('.pp-pop-item', { hasText: 'Delete page' }).click();
     await page.locator('.toast').getByRole('button', { name: 'Undo' }).click();
     await expect(page.locator('.dds-toast, #toast').filter({ hasText: 'restored' }).first()).toBeVisible();
@@ -197,7 +197,7 @@ test.describe('G13 in-place canvas text editor — changing page with an edit op
     const { frame, puts } = await mountPages(page, FAR_DOWN);
     await typeOver(page, frame.locator('[data-dds-field="subtitle"]'), 'Far down, then away');
     expect(await canvasScrollY(frame)).toBeGreaterThan(1000);
-    await pill(page, 'About').locator('.pp-name').click();
+    await openPages(page); await pill(page, 'About').locator('.pp-name').click();
     await expect(frame.locator('#about-us')).toBeAttached();
     await expect(frame.locator('#dds-dc-bar')).toBeAttached();
     await page.waitForTimeout(600);                                // a restored scroll lands at load

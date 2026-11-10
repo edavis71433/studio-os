@@ -398,6 +398,7 @@ test.describe('The builder', () => {
 
     test(`${p.who}: taking the site offline, from the Page menu`, async ({ page }) => {
       await openBuilder(page, p, '#design');
+      await page.locator('#dcPageSwitch').click();   // the Page menu lives in the pages card
       await page.locator('#btnPageInfo').click();
       const off = page.locator('#piOffline');
       await expect(off).toBeAttached();

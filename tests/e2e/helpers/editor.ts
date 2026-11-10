@@ -171,6 +171,9 @@ export async function mountPages(page: Page, spacer = '', pages: unknown[] = PAG
   return { ...mounted, draft };
 }
 export const pill = (page: Page, name: string) => page.locator('#pagesBar .page-pill', { hasText: name });
+// The floating studio (Nov 2026): the page tabs live in a card that opens from the bar's page
+// switcher, so a test that clicks a page opens the card first.
+export const openPages = async (page: Page) => { const sw = page.locator('#dcPageSwitch'); if ((await sw.getAttribute('aria-expanded')) !== 'true') await sw.click(); await expect(page.locator('#pagesCard')).toBeVisible(); };
 export const onPill = (page: Page) => page.locator('#pagesBar .page-pill.on .pp-name');
 export async function typeOver(page: Page, field: Field, text: string) {
   await field.focus();
@@ -180,7 +183,7 @@ export async function typeOver(page: Page, field: Field, text: string) {
   await page.keyboard.insertText(text);
 }
 export async function openAbout(page: Page, frame: Frame, name = 'About') {
-  await pill(page, name).locator('.pp-name').click();
+  await openPages(page); await pill(page, name).locator('.pp-name').click();
   await expect(frame.locator('#about-us')).toBeAttached();
   await expect(frame.locator('#dds-dc-bar')).toBeAttached();
 }
@@ -224,7 +227,7 @@ export async function aboutSaveOut(page: Page, frame: Frame, name = 'About') {
   return held;
 }
 export const pageMenu = async (page: Page, name: string, item: string) => {
-  await pill(page, name).locator('.pp-menu').click();
+  await openPages(page); await pill(page, name).locator('.pp-menu').click();
   await page.locator('.pp-pop-item', { hasText: item }).click();
 };
 export const aboutIn = (put: Paged) => put.pages?.find((p) => p.slug === 'about');
@@ -394,7 +397,7 @@ export async function writeOnAboutAndLeave(page: Page, frame: Frame, puts: Mount
   await page.keyboard.press('Enter');
   await expect.poll(() => puts.length, { timeout: 6000 }).toBe(before + 1);
   expect(pageIn(lastPut(puts), slug)?.blocks[0].subtitle).toBe('Written since');
-  await pill(page, 'Home').locator('.pp-name').click();
+  await openPages(page); await pill(page, 'Home').locator('.pp-name').click();
   await expect(onPill(page)).toHaveText('Home');
 }
 export async function renameContact(page: Page) {
@@ -403,7 +406,7 @@ export async function renameContact(page: Page) {
   await page.getByRole('button', { name: 'Next' }).click();
   await page.locator('dialog input').fill('help');
   await page.getByRole('button', { name: 'Save', exact: true }).click();
-  await expect(pill(page, 'Help')).toBeVisible();
+  await openPages(page); await expect(pill(page, 'Help')).toBeVisible();
 }
 export const WITH_CONTACT = [...PAGED.pages, CONTACT];
 
@@ -427,7 +430,7 @@ export async function moveThenWrite(page: Page, frame: Frame, puts: Mounted['put
 
 // ＋ Page with a blank layout, leaving the person on the new page.
 export async function addGallery(page: Page) {
-  await page.locator('#pagesBar .page-add').click();
+  await openPages(page); await page.locator('#pagesBar .page-add').click();
   await page.getByPlaceholder('e.g. Services, Gallery, Pricing').fill('Gallery');
   await page.getByRole('button', { name: 'Next: pick a layout' }).click();
   await page.locator('.dc-layout-card', { hasText: 'Blank page' }).click();

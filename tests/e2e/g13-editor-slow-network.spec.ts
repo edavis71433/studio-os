@@ -1,6 +1,6 @@
 import { test, expect, Page, Route } from '@playwright/test';
 import { installApp, STUDIO_NAV, ALL_FEATURES, answerAsks, setAsksAnswer, askedSoFar } from './helpers/app';
-import { ABOUT_BLOCKS, ABOUT_SECTION, aboutField, aboutIn, aboutSaveOut, addGallery, ANSWER_HEADERS, API, backToCanvas, BLOCKS, blocksIn, canvasReplaced, canvasScrollY, CONTACT, draftReads, draftVersion, duplicate, editAndWaitOut, editHome, FAR_DOWN, Field, FORM, FormBlocks, formSaveOut, Frame, GALLERY, hasTheirs, hideOut, holdPuts, holdReads, homeLine, lastPut, lastTwo, markCanvas, menuRows, META, mountCanvas, Mounted, mountPages, moveThenWrite, NORM_BLOCKS, NORM_META, NORM_SECTIONS, nudge, onPill, openAbout, openBusiness, OWN_MENU, OWN_PAGES, PAGE_HTML, Paged, PAGED, pageIn, pageMenu, panelEdit, pill, pillNames, previewHtml, redo, refusal, renameContact, SECTIONS, selectInBody, SETTINGS, slugs, stored, STORY, storyIn, STRIP, THEIRS, theirSection, typeDetail, typeOver, undo, WITH_CONTACT, WITH_FORM, writeOnAboutAndLeave } from './helpers/editor';
+import { ABOUT_BLOCKS, ABOUT_SECTION, aboutField, aboutIn, aboutSaveOut, addGallery, ANSWER_HEADERS, API, backToCanvas, BLOCKS, blocksIn, canvasReplaced, canvasScrollY, CONTACT, draftReads, draftVersion, duplicate, editAndWaitOut, editHome, FAR_DOWN, Field, FORM, FormBlocks, formSaveOut, Frame, GALLERY, hasTheirs, hideOut, holdPuts, holdReads, homeLine, lastPut, lastTwo, markCanvas, menuRows, META, mountCanvas, Mounted, mountPages, moveThenWrite, NORM_BLOCKS, NORM_META, NORM_SECTIONS, nudge, onPill, openAbout, openBusiness, OWN_MENU, OWN_PAGES, PAGE_HTML, Paged, PAGED, pageIn, pageMenu, panelEdit, pill, pillNames, previewHtml, redo, refusal, renameContact, SECTIONS, selectInBody, SETTINGS, slugs, stored, STORY, storyIn, STRIP, THEIRS, theirSection, typeDetail, typeOver, undo, WITH_CONTACT, WITH_FORM, writeOnAboutAndLeave, openPages } from './helpers/editor';
 
 // ── G13 in-place canvas text editor — the same page changes on a slow connection ──
 // Split from g13-editor.spec.ts (builder list item 109, Nov 2026): the fixtures and
@@ -145,7 +145,7 @@ test.describe('G13 in-place canvas text editor — the same page changes on a sl
     let failing = true;
     await page.route('**/functions/v1/presence/preview**', (route: Route) =>
       failing && new URL(route.request().url()).searchParams.get('page') === '/about/' ? route.abort() : route.fallback());
-    await pill(page, 'About').locator('.pp-name').click();
+    await openPages(page); await pill(page, 'About').locator('.pp-name').click();
     await expect(onPill(page)).toHaveText('About');
     await expect(page.locator('#designPreviewEmpty')).toBeVisible();
     await expect(page.locator('#dpEmptyTitle')).toContainText('couldn’t load');
@@ -161,7 +161,7 @@ test.describe('G13 in-place canvas text editor — the same page changes on a sl
   test('typing into the old document after a switch reaches no page, and the new page opens for editing', async ({ page }) => {
     const { frame, puts } = await mountPages(page);
     const read = await holdReads(page, (about) => about);
-    await pill(page, 'About').locator('.pp-name').click();
+    await openPages(page); await pill(page, 'About').locator('.pp-name').click();
     await expect(onPill(page)).toHaveText('About');
     const old = frame.locator('section.block-titleonly [data-dds-field="subtitle"]');
     await old.focus();                                             // by keyboard
@@ -189,7 +189,7 @@ test.describe('G13 in-place canvas text editor — the same page changes on a sl
     const rows = page.locator('#designTreeList .dc-tree-row.block');
     await expect(rows).toHaveCount(4);
     const read = await holdReads(page, (about) => about);
-    await pill(page, 'About').locator('.pp-name').click();
+    await openPages(page); await pill(page, 'About').locator('.pp-name').click();
     await expect(onPill(page)).toHaveText('About');
     await expect(rows).toHaveCount(0);                             // their buttons act by index on the open page's list
     await frame.locator('section.block-richtext').hover({ force: true });
@@ -250,7 +250,7 @@ test.describe('G13 in-place canvas text editor — the same page changes on a sl
   test('a session opened while ＋ Page is on its way saves to its own page, not the new one', async ({ page }) => {
     const { frame, puts } = await mountPages(page);
     const { sent, release } = await holdPuts(page);
-    await page.locator('#pagesBar .page-add').click();
+    await openPages(page); await page.locator('#pagesBar .page-add').click();
     await page.getByPlaceholder('e.g. Services, Gallery, Pricing').fill('Gallery');
     await page.getByRole('button', { name: 'Next: pick a layout' }).click();
     await page.locator('.dc-layout-card', { hasText: 'Blank page' }).click();

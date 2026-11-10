@@ -322,93 +322,159 @@ h5.rune .whisper.ok{color:var(--sage)}
 .aihint{font-size:12px;color:var(--ink-2);font-style:normal;font-family:var(--sans)}
 .aimark{color:var(--plum);font-style:normal}
 
-/* ══ Edit mode: the canvas is the screen ═════════════════════════════════════
+/* ══ Edit mode: the floating studio (direction A, Nov 2026) ═══════════════════
    go("design") sets html.dc-edit. The shell, the page header and the tabs step
-   aside and one bar runs across the top. A watch plan can't edit, so it keeps the
-   normal page (hence :not(.plan-watch) throughout). */
+   aside; the client's page fills the whole screen and every tool floats over it as
+   a white card drawn from the shell's tokens: card, raised, ink, soft, line, plum,
+   the pop shadow, radius 16/20, pill buttons. A watch plan can't edit, so it keeps
+   the normal page (hence :not(.plan-watch) throughout). Dark mode comes with the
+   tokens; the site inside the frame keeps its own colours. */
 html.dc-edit:not(.plan-watch) #dds-shell,html.dc-edit:not(.plan-watch) #dds-ctxbar,html.dc-edit:not(.plan-watch) #dds-mbar,
 html.dc-edit:not(.plan-watch) .topbar,html.dc-edit:not(.plan-watch) #nav,html.dc-edit:not(.plan-watch) #dock,
 html.dc-edit:not(.plan-watch) #view-design>h1.doc,html.dc-edit:not(.plan-watch) #view-design>.docsub,html.dc-edit:not(.plan-watch) #view-design>.tabhelp,
-html.dc-edit:not(.plan-watch) #designPreviewWrap>.hint{display:none !important}
-@media(min-width:761px){html.dc-edit:not(.plan-watch) .dc-fab{display:none !important}}
+html.dc-edit:not(.plan-watch) #designPreviewWrap>.hint,html.dc-edit:not(.plan-watch) .dc-fab{display:none !important}
 html.dc-edit:not(.plan-watch).dds-side body{padding-left:0}
 html.dc-edit:not(.plan-watch).dds-has-shell body,html.dc-edit:not(.plan-watch).dds-has-shell.dds-has-ctxbar body{padding-top:0}
 html.dc-edit:not(.plan-watch) body{overflow:hidden}
 html.dc-edit:not(.plan-watch) .content{padding:0;max-width:none}
 html.dc-edit:not(.plan-watch) .stage{top:0 !important;left:0 !important;bottom:0 !important}  /* the shell is hidden in Edit mode, so the preview takes its room too */
-html.dc-edit:not(.plan-watch) #view-design.on{display:flex;flex-direction:column;height:100vh;height:100dvh;animation:none}
-html.dc-edit:not(.plan-watch){--dc-bar-h:52px}
-html.dc-edit:not(.plan-watch) .dc-bar{flex:none;flex-wrap:nowrap;box-sizing:border-box;height:var(--dc-bar-h);gap:var(--dds-s3,12px);margin:0;padding:0 var(--dds-s3,12px);background:var(--sheet);border-bottom:1px solid var(--hair);position:relative;z-index:60}
-html.dc-edit:not(.plan-watch) .designstudio{flex:1 1 auto;min-height:0;gap:0}
+html.dc-edit:not(.plan-watch) #view-design.on{display:block;position:relative;height:100vh;height:100dvh;animation:none}
+html.dc-edit:not(.plan-watch){--dc-bar-h:54px;--dc-bar-top:16px;--dc-card-top:88px;--dc-dock-w:72px;--dc-raised:var(--dds-up,var(--paper))}
+/* the canvas: edge to edge, under everything */
+/* the page starts just under the bar, so nothing on it is ever covered (the drawing had the bar over the site's header) */
+html.dc-edit:not(.plan-watch) .designstudio{height:100%;display:block;box-sizing:border-box;padding-top:calc(var(--dc-bar-top) + var(--dc-bar-h) + 8px)}
 html.dc-edit:not(.plan-watch) #designCanvas{display:flex;flex-direction:column;height:100%;min-height:0}
 html.dc-edit:not(.plan-watch) #designPreviewWrap{flex:1 1 auto;min-height:0;display:flex;flex-direction:column}
 html.dc-edit:not(.plan-watch) .dp-stage{flex:1 1 auto;min-height:0}
 html.dc-edit:not(.plan-watch) .dp-frame{height:100%;min-height:0;max-height:none;resize:none;padding:0;border-radius:0;border-width:0;box-shadow:none}
 html.dc-edit:not(.plan-watch) .dp-frame iframe{border-radius:0}
 html.dc-edit:not(.plan-watch) .dp-stage.dev-tablet .dp-frame,html.dc-edit:not(.plan-watch) .dp-stage.dev-phone .dp-frame{border-width:0 1px}
-html.dc-edit:not(.plan-watch) #trayPanel.dc-left{max-height:none;border-radius:0;border-width:0 1px 0 0;margin-right:0}
-html.dc-edit:not(.plan-watch) #trayPanel.dc-left:not(.on){margin-right:0;border-width:0}
-.dc-bar-start{display:flex;align-items:center;gap:var(--dds-s2,8px);flex-wrap:wrap;min-width:0}
-.dc-bar-start .pages-bar{margin:0}
-/* One row at every width. When room runs short the page pills give way first: they scroll in their own strip. */
-html.dc-edit:not(.plan-watch) .dc-bar-start{flex:1 1 auto;flex-wrap:nowrap}
-html.dc-edit:not(.plan-watch) .dc-bar-start>*{flex:none}
-html.dc-edit:not(.plan-watch) .dc-bar .pages-bar{flex:0 1 auto;flex-wrap:nowrap;min-width:72px;margin:0 -12px 0 0;padding:4px 20px 4px 2px;overflow-x:auto;scrollbar-width:none;-webkit-mask-image:linear-gradient(to right,#000 calc(100% - 20px),transparent);mask-image:linear-gradient(to right,#000 calc(100% - 20px),transparent)}
-html.dc-edit:not(.plan-watch) .dc-bar .pages-bar::-webkit-scrollbar{display:none}
-html.dc-edit:not(.plan-watch) .dc-bar .pages-bar>*{flex:none}
-html.dc-edit:not(.plan-watch) .dc-bar-left,html.dc-edit:not(.plan-watch) .dc-bar-acts{flex:none;flex-wrap:nowrap;gap:var(--dds-s2,8px)}
-html.dc-edit:not(.plan-watch) .dc-bar .dpdevseg{display:inline-flex;flex-wrap:nowrap;width:auto;max-width:none}
-html.dc-edit:not(.plan-watch) .dc-bar .dpdevseg button{flex:none;padding:6px 10px;font-size:13px}
-#dpDevSeg button{display:inline-flex;align-items:center}
+/* ── the floating bar: one white pill at the top centre ── */
+html.dc-edit:not(.plan-watch) .dc-bar{position:absolute;top:var(--dc-bar-top);left:0;right:0;z-index:90;width:fit-content;max-width:calc(100vw - 32px);height:var(--dc-bar-h);margin:0 auto;padding:8px;display:flex;flex-wrap:nowrap;align-items:center;gap:var(--dds-s2,8px);box-sizing:border-box;background:var(--sheet);border:1px solid color-mix(in srgb,var(--hair) 55%,transparent);border-radius:999px;box-shadow:var(--dds-shadow-pop)}
+.dc-bar>*{flex:none}
+.dc-sep{width:1px;height:22px;background:var(--hair)}
+.dc-bar .dc-actbtn{height:36px;padding:0 14px;border:1px solid transparent;border-radius:999px;background:transparent;color:var(--ink);font-size:13px;font-weight:600;gap:6px}
+.dc-bar .dc-actbtn svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.dc-bar .dc-actbtn.dc-icon{width:auto}
+.dc-bar #dcBtnPreview{border-color:var(--hair-2);background:var(--sheet)}
+.dc-bar #dcBtnPreview:hover{border-color:var(--plum);color:var(--plum)}
+.dc-ghost{background:var(--plum-soft) !important;color:var(--plum) !important}
+.dc-ghost:hover{background:color-mix(in srgb,var(--plum) 16%,var(--sheet)) !important}
+.dc-ghost:disabled{opacity:.45}
+/* the page switcher pill and its card */
+.dc-pages{position:relative}
+.dc-switch{display:inline-flex;align-items:center;gap:var(--dds-s2,8px);height:38px;padding:0 10px 0 12px;border-radius:999px;border:0;background:var(--dc-raised);color:var(--ink);font:inherit;font-size:13px;font-weight:600;cursor:pointer;max-width:min(340px,42vw)}
+.dc-switch:hover{background:color-mix(in srgb,var(--ink) 8%,var(--dc-raised))}
+.dc-switch[aria-expanded="true"]{background:var(--plum-soft);color:var(--plum)}
+.dc-switch svg{width:16px;height:16px;flex:none;fill:none;stroke:currentColor;stroke-width:1.75;stroke-linecap:round;stroke-linejoin:round}
+.dc-switch .dc-switch-chev{width:14px;height:14px;opacity:.8}
+.dc-switch-name{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.dc-chip{display:inline-flex;align-items:center;height:24px;padding:0 10px;border-radius:999px;background:var(--sheet);color:var(--ink-2);font-size:12px;font-weight:600;white-space:nowrap;line-height:1}
+.dc-chip.good{background:var(--sage-soft);color:var(--sage)}
+.dc-switch:focus-visible,.dc-dk:focus-visible,.dc-rowbtn:focus-visible{outline:2px solid var(--plum);outline-offset:2px}
+.dc-card{background:var(--sheet);border:1px solid color-mix(in srgb,var(--hair) 55%,transparent);border-radius:var(--dds-r-xl,20px);box-shadow:var(--dds-shadow-pop)}
+.dc-card-h{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:6px 6px 8px 12px}
+.dc-card-t{font-weight:600;font-size:14px}
+.dc-pagescard{position:absolute;top:calc(100% + 10px);left:0;z-index:95;width:320px;max-width:calc(100vw - 32px);max-height:min(72vh,600px);display:flex;flex-direction:column;padding:8px;text-align:left}
+.dc-pagescard[hidden]{display:none}
+.dc-pagescard .pages-bar{display:flex;flex-direction:column;align-items:stretch;gap:2px;margin:0;padding:0 0 6px;overflow:auto;min-height:0}
+.dc-pagescard .page-pill{height:38px;padding:0 6px 0 12px;border:0;border-radius:var(--dds-r,12px);background:transparent;color:var(--ink);font-weight:500;justify-content:space-between;text-align:left}
+.dc-pagescard .page-pill:hover{background:var(--dc-raised)}
+.dc-pagescard .page-pill.on{background:var(--plum-soft);color:var(--plum);font-weight:600}
+.dc-pagescard .page-pill .pp-name{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.dc-pagescard .page-pill .pp-menu{width:28px;height:28px;display:inline-flex;align-items:center;justify-content:center;border-radius:8px;padding:0;font-size:16px}
+.dc-pagescard .page-add{height:36px;margin-top:4px;border:1px dashed var(--plum);border-radius:var(--dds-r,12px);background:transparent;color:var(--plum);font-weight:600}
+.dc-pagescard .page-add:hover{background:var(--plum-soft)}
+.dc-pagescard-acts{display:flex;flex-direction:column;gap:2px;padding-top:8px;border-top:1px solid var(--hair)}
+.dc-rowbtn{display:flex;align-items:center;flex-wrap:wrap;gap:0 10px;min-height:40px;padding:6px 10px;border:0;border-radius:var(--dds-r,12px);background:transparent;color:var(--ink);font:inherit;font-size:13px;font-weight:500;text-align:left;cursor:pointer}
+.dc-rowbtn:hover{background:var(--dc-raised)}
+.dc-rowbtn svg{width:16px;height:16px;flex:none;fill:none;stroke:currentColor;stroke-width:1.75;stroke-linecap:round;stroke-linejoin:round;color:var(--ink-2)}
+.dc-rowbtn .dc-rowbtn-sub{flex:0 0 100%;padding-left:26px;font-size:11.5px;font-weight:400;color:var(--ink-3);line-height:1.3}
+/* the saved whisper: a green dot and three words */
+.dc-saved{display:inline-flex;align-items:center;gap:6px;font-size:12.5px;font-weight:500;color:var(--ink-2);white-space:nowrap;padding:0 6px}
+.dc-saved::before{content:"";width:8px;height:8px;border-radius:50%;background:var(--sage);flex:none}
+.dc-saved.bad{color:var(--clay)}.dc-saved.bad::before{background:var(--clay)}
+.dc-saved:not(.ok):not(.idle):not(.bad)::before{background:var(--amber)}
+/* the device switch: a raised pill of three round buttons */
+html.dc-edit:not(.plan-watch) .dc-bar .dpdevseg{display:inline-flex;flex-wrap:nowrap;width:auto;max-width:none;gap:2px;padding:3px;border-radius:999px;background:var(--dc-raised)}
+html.dc-edit:not(.plan-watch) .dc-bar .dpdevseg button{flex:none;width:30px;height:26px;padding:0;border-radius:999px;display:inline-flex;align-items:center;justify-content:center;color:var(--ink-2)}
+html.dc-edit:not(.plan-watch) .dc-bar .dpdevseg button.on{background:var(--seg-chip,var(--sheet));color:var(--ink);box-shadow:var(--seg-ring,var(--dds-shadow))}
 #dpDevSeg svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
-@media(max-width:1399px){.dc-wide{display:none}.dc-saved.idle{display:none}}
-.dc-actbtn.dc-icon{width:32px;padding:0;justify-content:center}
-.dc-actbtn.dc-icon svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
-.dc-saved{font-size:12px;color:var(--ink-3);white-space:nowrap;padding:0 var(--dds-s1,4px)}
-.dc-saved.ok{color:var(--sage)}
-/* Neutral chrome: ink, paper and hairlines, so the client's site is the only color
-   on screen. Everything in the builder paints through these variables. */
-html.dc-edit:not(.plan-watch){--plum:var(--ink);--dds-p:var(--ink);--plum-soft:var(--paper);--dds-p-soft:var(--paper);--plum-deep:var(--ink);--plum-tint:var(--paper);--plum-line:var(--hair);--wash:var(--paper)}
-html.dc-edit:not(.plan-watch) #view-design .dc-actbtn.primary{border-color:var(--hair-2);background:var(--sheet);color:var(--ink) !important}   /* shell.css forces a dark ink on button.primary in dark mode: right for a filled button, unreadable on an outlined one */
+/* Publish: the one plum gradient button on the screen; outlined when there is nothing to publish */
+.dc-bar .pillbtn{height:36px;padding:0 14px;border-radius:999px;border:1px solid var(--hair-2);background:var(--sheet);color:var(--ink);font-size:13px;font-weight:600}
+.dc-bar .pillbtn.inked{border-color:transparent;background:var(--plum) var(--dds-grad-btn,linear-gradient(135deg,#6d3fd4 0%,#7a4bdd 100%));color:var(--dds-on-p,var(--fill-ink));box-shadow:0 6px 16px -8px color-mix(in srgb,var(--plum) 70%,transparent)}
+.dc-bar .pillbtn.inked:hover{filter:brightness(1.06)}
+/* ── the dock: a white card on the left, one icon and one word per tool ── */
+.dc-dock{position:absolute;left:16px;top:50%;transform:translateY(-50%);z-index:85;display:flex;flex-direction:column;align-items:center;gap:4px;padding:8px;background:var(--sheet);border:1px solid color-mix(in srgb,var(--hair) 55%,transparent);border-radius:18px;box-shadow:var(--dds-shadow-pop)}
+.dc-dk{width:56px;height:54px;padding:0;border:0;border-radius:var(--dds-r,12px);background:transparent;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;color:var(--ink-2);font:600 10px/1 var(--sans);cursor:pointer;white-space:nowrap}
+.dc-dk svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:1.75;stroke-linecap:round;stroke-linejoin:round}
+.dc-dk:hover{background:var(--dc-raised);color:var(--ink)}
+.dc-dk.on,.dc-dk[aria-expanded="true"]{background:var(--plum-soft);color:var(--plum)}
+.dc-dkgrp,.dc-dock-more{display:contents}
+.dc-dk-phone{display:none}
+/* ── the cards that open from the bar and the dock: Add (left, beside the dock),
+   Styles and Comments (right). Floating, radius 20, the pop shadow. Parked
+   invisible when closed (visibility:hidden keeps them out of the tab order). ── */
+html.dc-edit:not(.plan-watch) .dc-slideover{position:fixed;top:var(--dc-card-top);bottom:16px;z-index:82;width:360px;max-width:calc(100vw - 32px);background:var(--sheet);border:1px solid color-mix(in srgb,var(--hair) 55%,transparent);border-radius:var(--dds-r-xl,20px);box-shadow:var(--dds-shadow-pop);display:flex;flex-direction:column;overflow:hidden;visibility:hidden;opacity:0;transform:translateY(8px);transition:opacity var(--dur,200ms) var(--ease,ease-out),transform var(--dur,200ms) var(--ease,ease-out),visibility 0s linear var(--dur,200ms)}
+html.dc-edit:not(.plan-watch) .dc-slideover.on{visibility:visible;opacity:1;transform:none;transition:opacity var(--dur,200ms) var(--ease,ease-out),transform var(--dur,200ms) var(--ease,ease-out),visibility 0s}
+html.dc-edit:not(.plan-watch) .dc-left{left:calc(16px + var(--dc-dock-w) + 16px)}
+html.dc-edit:not(.plan-watch) .dc-right{right:16px}
+html.dc-edit:not(.plan-watch) .dc-slideover .dc-panel-head{padding:14px 12px 12px 18px}
+html.dc-edit:not(.plan-watch) .dc-slideover .dc-panel-t{font-family:var(--serif);font-weight:500;font-size:19px;letter-spacing:-.01em}
+html.dc-edit:not(.plan-watch) .dc-close{min-width:32px;height:32px;padding:0 10px;border-radius:999px;border:1px solid var(--hair-2);background:var(--sheet);color:var(--ink);font-weight:600;display:inline-flex;align-items:center;justify-content:center}
+html.dc-edit:not(.plan-watch) .dc-close:hover{border-color:var(--plum);color:var(--plum)}
+/* the past-dates bar floats under the toolbar */
+html.dc-edit:not(.plan-watch) .dc-twbar{position:absolute;top:calc(var(--dc-bar-top) + var(--dc-bar-h) + 10px);left:0;right:0;z-index:70;width:fit-content;max-width:calc(100vw - 32px);margin:0 auto;padding:8px 8px 8px 16px;border:1px solid color-mix(in srgb,var(--hair) 55%,transparent);border-radius:999px;background:var(--sheet);box-shadow:var(--dds-shadow-pop)}
+html.dc-edit:not(.plan-watch) .dc-twbar[hidden]{display:none}
 /* the settings panel does one job at a time (openSettingsPanel) */
 #settingsPanel[data-mode="styles"] #blocksCard,#settingsPanel[data-mode="styles"] #formsCard{display:none}
 #settingsPanel:not([data-mode="styles"]) #designGallery,#settingsPanel:not([data-mode="styles"]) #stylesAsk{display:none !important}
 #settingsPanel[data-mode="section"] #designHost>*:not(#blocksCard),#settingsPanel[data-mode="sections"] #designHost>*:not(#blocksCard),#settingsPanel[data-mode="forms"] #designHost>*:not(#formsCard){display:none}
 #settingsPanel[data-mode="section"] #blocksCard{margin-top:0 !important;border:0;padding:0;background:transparent}
 .tray-more{display:flex;flex-direction:column;align-items:flex-start;gap:var(--dds-s2,8px);padding:var(--dds-s4,16px);margin-top:var(--dds-s2,8px);border-top:1px solid var(--hair)}
-/* a small laptop, tablet or phone: everything on one scrolling row, Exit and Publish
-   always in reach. The ring in the bar's own color stops the row showing around them. */
+/* a laptop or a tablet: the words on Exit, Undo and Redo go, the saved whisper
+   steps aside and floats under the bar while a save is on its way */
 @media(max-width:1180px){
-  html.dc-edit:not(.plan-watch) .dc-bar{overflow-x:auto;scrollbar-width:none;justify-content:flex-start}
-  html.dc-edit:not(.plan-watch) .dc-bar::-webkit-scrollbar{display:none}
-  html.dc-edit:not(.plan-watch) .dc-bar>div{display:contents}
-  html.dc-edit:not(.plan-watch) .dc-bar .pages-bar{display:flex;flex:none;min-width:0;max-width:min(42vw,340px);order:2}
-  html.dc-edit:not(.plan-watch) .dc-bar .dpdevseg{flex:none;order:5}
-  html.dc-edit:not(.plan-watch) #btnUndo,html.dc-edit:not(.plan-watch) #btnRedo{order:1}
-  html.dc-edit:not(.plan-watch) #btnTrayOpen,html.dc-edit:not(.plan-watch) #btnNavEdit,html.dc-edit:not(.plan-watch) #btnSettingsOpen{order:3}
-  html.dc-edit:not(.plan-watch) #btnPageInfo{order:4}
-  /* the save status floats just under the bar, so it never shoves the row sideways */
-  html.dc-edit:not(.plan-watch) #dcWhisper{position:fixed;top:calc(var(--dc-bar-h) + 6px);left:var(--dds-s3,12px);z-index:61;padding:2px 10px;background:var(--sheet);border:1px solid var(--hair);border-radius:999px}
-  html.dc-edit:not(.plan-watch) .dc-bar button{flex:none}
-  html.dc-edit:not(.plan-watch) #btnEditExit{position:sticky;left:0;z-index:3;box-shadow:0 0 0 12px var(--sheet)}
-  html.dc-edit:not(.plan-watch) #dcBtnPublish{position:sticky;right:0;z-index:3;order:6;box-shadow:0 0 0 12px var(--sheet)}
+  html.dc-edit:not(.plan-watch) .dc-bar .dc-actbtn .dc-lbl,html.dc-edit:not(.plan-watch) .dc-wideonly{display:none}
+  html.dc-edit:not(.plan-watch) .dc-bar .dc-actbtn.dc-ghost{width:36px;padding:0}
+  html.dc-edit:not(.plan-watch) #dcWhisper{position:fixed;top:calc(var(--dc-bar-top) + var(--dc-bar-h) + 6px);left:0;right:0;width:fit-content;margin:0 auto;z-index:61;padding:4px 12px;background:var(--sheet);border:1px solid var(--hair);border-radius:999px;box-shadow:var(--dds-shadow)}
+  html.dc-edit:not(.plan-watch) #dcWhisper.idle{display:none}
 }
 /* the tip sits above the message area, so neither ever covers the other */
-html.dc-edit:not(.plan-watch) .dds-hint{bottom:88px !important}
+html.dc-edit:not(.plan-watch) .dds-hint{bottom:88px !important;z-index:80 !important}
 @media(max-width:760px){
-  html.dc-edit:not(.plan-watch) .toasts{bottom:72px}   /* no dock here; clear of the floating Add section */
-  html.dc-edit:not(.plan-watch) .dds-hint{bottom:150px !important}
+  .topbar #btnEditSite,.topbar #btnUndoTop,.topbar #btnRedoTop{display:inline-flex}
+  html.dc-edit:not(.plan-watch) .toasts{bottom:92px}   /* clear of the dock */
+  html.dc-edit:not(.plan-watch) .dds-hint{bottom:172px !important}   /* above the dock and the messages */
 }
-/* side panels open under the bar, so Exit, Undo and Publish stay in reach */
-@media(min-width:761px){html.dc-edit:not(.plan-watch) .dc-slideover{top:var(--dc-bar-h)}}
 /* more tabs than room: fade the edge so the rest read as there */
 @media(max-width:1280px){.hb-tabs{padding-right:32px;-webkit-mask-image:linear-gradient(to right,#000 calc(100% - 32px),transparent);mask-image:linear-gradient(to right,#000 calc(100% - 32px),transparent)}}
+/* ── a phone: the bar is Exit, the page, Undo, Redo and Publish; the dock is a pill
+   along the bottom with Pages, Add, Styles, Photos and More; the cards are sheets ── */
 @media(max-width:760px){
-  html.dc-edit:not(.plan-watch) .dc-bar #dpDevSeg{display:none}   /* a phone is already a phone */
-  .topbar #btnEditSite,.topbar #btnUndoTop,.topbar #btnRedoTop{display:inline-flex}
+  html.dc-edit:not(.plan-watch){--dc-bar-top:10px;--dc-bar-h:50px}
+  html.dc-edit:not(.plan-watch) .dc-bar{left:10px;right:10px;width:auto;max-width:none;padding:6px;gap:4px;justify-content:space-between}
+  html.dc-edit:not(.plan-watch) .dc-bar .dc-sep,html.dc-edit:not(.plan-watch) .dc-bar #dpDevSeg,html.dc-edit:not(.plan-watch) .dc-bar #dcLiveChip,html.dc-edit:not(.plan-watch) .dc-bar #dcBtnPreview,html.dc-edit:not(.plan-watch) .dc-bar #dcPageCount{display:none}   /* a phone is already a phone; Live and Preview live in the cards */
+  html.dc-edit:not(.plan-watch) .dc-pages{flex:1 1 auto;min-width:0}
+  html.dc-edit:not(.plan-watch) .dc-switch{max-width:100%;height:36px;padding:0 8px 0 10px;gap:6px}
+  html.dc-edit:not(.plan-watch) .dc-bar .pillbtn{padding:0 12px}
+  html.dc-edit:not(.plan-watch) .dc-pagescard{position:fixed;top:auto;left:0;right:0;bottom:0;width:100%;max-width:100%;max-height:78vh;border-radius:var(--dds-r-xl,20px) var(--dds-r-xl,20px) 0 0;padding:10px 10px calc(14px + env(safe-area-inset-bottom,0px))}
+  html.dc-edit:not(.plan-watch) .dc-pagescard .page-pill{height:44px;font-size:14px}
+  html.dc-edit:not(.plan-watch) .dc-pagescard .page-add{height:44px}
+  html.dc-edit:not(.plan-watch) .dc-rowbtn{min-height:44px}
+  .dc-dock{top:auto;left:12px;right:12px;bottom:calc(12px + env(safe-area-inset-bottom,0px));transform:none;flex-direction:row;justify-content:space-around;border-radius:999px;padding:6px}
+  .dc-dk{flex:1 1 0;width:auto;min-width:0;height:50px;border-radius:999px}
+  .dc-dk-phone{display:flex}
+  .dc-dock-more{display:none;position:absolute;right:0;bottom:calc(100% + 8px);flex-direction:column;align-items:stretch;gap:2px;width:200px;padding:8px;background:var(--sheet);border:1px solid color-mix(in srgb,var(--hair) 55%,transparent);border-radius:18px;box-shadow:var(--dds-shadow-pop)}
+  .dc-dock.more-open .dc-dock-more{display:flex}
+  .dc-dock-more .dc-dk{flex:none;width:auto;height:44px;flex-direction:row;justify-content:flex-start;gap:12px;padding:0 12px;border-radius:var(--dds-r,12px);font-size:13px;font-weight:500}
+  .dc-dock-more .dc-dk svg{width:18px;height:18px}
+  html.dc-edit:not(.plan-watch) .dc-slideover{top:auto;left:0;right:0;bottom:0;width:100%;max-width:100%;height:78vh;border-radius:var(--dds-r-xl,20px) var(--dds-r-xl,20px) 0 0;box-shadow:0 -8px 44px color-mix(in srgb,var(--scrim-ink) 30%,transparent);opacity:1;transform:translateY(103%);transition:transform var(--dur,200ms) var(--ease,ease-out),visibility 0s linear var(--dur,200ms)}
+  html.dc-edit:not(.plan-watch) .dc-slideover.on{transform:translateY(0);transition:transform var(--dur,200ms) var(--ease,ease-out),visibility 0s}
+  html.dc-edit:not(.plan-watch) .dc-twbar{left:10px;right:10px;width:auto;max-width:none;border-radius:var(--dds-r-xl,20px)}
 }
 /* a watch plan observes: no building tools, no publish queue */
-html.plan-watch .ss-bar,html.plan-watch [data-grp="Content"],html.plan-watch .navitem[data-view="pages"],html.plan-watch .navitem[data-link="styles"],html.plan-watch .navitem[data-view="offerings"],html.plan-watch .navitem[data-view="faqs"],html.plan-watch .navitem[data-view="testimonials"],html.plan-watch .navitem[data-view="updates"],html.plan-watch .navitem[data-view="bookings"],html.plan-watch .navitem[data-view="reviews"],html.plan-watch .navitem[data-view="history"],html.plan-watch #pagesBar,html.plan-watch .dc-bar,html.plan-watch #btnAddFab,html.plan-watch #btnEditSite,html.plan-watch #trayPanel,html.plan-watch #designPreviewWrap>.hint,html.plan-watch #statWaiting,html.plan-watch #recentWrap,html.plan-watch #designPreview,html.plan-watch #view-design .docsub{display:none !important}
+html.plan-watch .ss-bar,html.plan-watch [data-grp="Content"],html.plan-watch .navitem[data-view="pages"],html.plan-watch .navitem[data-link="styles"],html.plan-watch .navitem[data-view="offerings"],html.plan-watch .navitem[data-view="faqs"],html.plan-watch .navitem[data-view="testimonials"],html.plan-watch .navitem[data-view="updates"],html.plan-watch .navitem[data-view="bookings"],html.plan-watch .navitem[data-view="reviews"],html.plan-watch .navitem[data-view="history"],html.plan-watch #pagesBar,html.plan-watch .dc-bar,html.plan-watch #dcDock,html.plan-watch #btnAddFab,html.plan-watch #btnEditSite,html.plan-watch #trayPanel,html.plan-watch #designPreviewWrap>.hint,html.plan-watch #statWaiting,html.plan-watch #recentWrap,html.plan-watch #designPreview,html.plan-watch #view-design .docsub{display:none !important}
 #designPreviewEmpty.plan .ea{display:none}
 /* the builder's one icon set */
 .ti-ico svg,.dc-tree-ico svg,.pd-ico svg,.dc-tree-acts svg,.cm-badge svg{display:block}
@@ -793,25 +859,22 @@ html.dds-has-shell.dds-has-ctxbar .stage{top:calc(var(--dds-shell-h) + var(--dds
 .tg-start{font:inherit;font-size:13px;font-weight:500;padding:var(--dds-s2,8px) var(--dds-s4,16px);border-radius:var(--r);border:1px solid var(--plum,#5b3fa0);background:var(--plum,#5b3fa0);color:var(--fill-ink,#fff);cursor:pointer}
 .tg-start.current{background:transparent;color:var(--plum,#5b3fa0);cursor:default}
 
-/* #2 — CANVAS-DOMINANT workspace: the canvas is full width; tray + settings are
-   on-demand slide-over panels, not permanent rails. */
+/* the editor's base rules (Edit mode's layout is the floating studio block above) */
 .designstudio{position:relative;display:block}
 #designCanvas{min-width:0}
-/* the canvas toolbar: device toggle on the left, on-demand panel launchers right */
-.dc-bar{display:flex;align-items:center;justify-content:space-between;gap:var(--dds-s3,12px);flex-wrap:wrap;margin-bottom:10px}
-.dc-bar-acts{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
-.dc-actbtn{font:inherit;font-size:13px;font-weight:500;padding:0 var(--dds-s3,12px);height:32px;border-radius:var(--r);border:1px solid var(--line,#ddd);background:var(--sheet,#fff);color:var(--ink,#1b1525);cursor:pointer;display:inline-flex;align-items:center;gap:6px}
+.dc-bar{display:flex;align-items:center;gap:var(--dds-s3,12px)}
+.dc-actbtn{font:inherit;font-size:13px;font-weight:500;padding:0 var(--dds-s3,12px);height:32px;border-radius:999px;border:1px solid var(--line,#ddd);background:var(--sheet,#fff);color:var(--ink,#1b1525);cursor:pointer;display:inline-flex;align-items:center;gap:6px}
 .dc-actbtn:hover{border-color:var(--plum,#5b3fa0)}
 .dc-actbtn:disabled{opacity:.4;cursor:default;border-color:var(--line,#ddd)}
-/* Multi-page: the Pages bar — Home + custom pages as tabs, click to author each */
-.pages-bar{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-bottom:var(--dds-s4,16px)}
-.page-pill{display:inline-flex;align-items:center;gap:var(--dds-s2,8px);font:inherit;font-size:13px;font-weight:500;padding:0 var(--dds-s3,12px);height:30px;border-radius:var(--r);border:1px solid var(--line,#ddd);background:var(--sheet,#fff);color:var(--ink-2,#8a8172);cursor:pointer}
+/* Multi-page: the pages list inside the page switcher's card — click a page to author it */
+.pages-bar{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.page-pill{display:inline-flex;align-items:center;gap:var(--dds-s2,8px);font:inherit;font-size:13px;font-weight:500;padding:0 var(--dds-s3,12px);height:30px;border-radius:999px;border:1px solid var(--line,#ddd);background:var(--sheet,#fff);color:var(--ink-2,#8a8172);cursor:pointer}
 .page-pill:hover{border-color:var(--plum,#5b3fa0)}
-.page-pill.on{background:var(--wash,#f0eafb);color:var(--plum,#5b3fa0);border-color:var(--plum,#5b3fa0)}   /* a selector reads pressed, not filled — Publish is the page's one filled button (experience review #3) */
+.page-pill.on{background:var(--wash,#f0eafb);color:var(--plum,#5b3fa0);border-color:var(--plum,#5b3fa0)}
 .page-pill .pp-menu{opacity:.75;font-weight:700;line-height:1;padding:0 var(--dds-s1,4px);border-radius:var(--dds-r-sm,6px)}
 .page-pill .pp-menu:hover{opacity:1;background:rgba(120,120,120,.18)}
 .page-pill.on .pp-menu:hover{background:rgba(91,63,160,.14)}
-.page-add{font:inherit;font-size:13px;font-weight:500;padding:0 var(--dds-s3,12px);height:30px;border-radius:var(--r);border:1px dashed var(--plum,#5b3fa0);background:transparent;color:var(--plum,#5b3fa0);cursor:pointer}
+.page-add{font:inherit;font-size:13px;font-weight:500;padding:0 var(--dds-s3,12px);height:30px;border-radius:999px;border:1px dashed var(--plum,#5b3fa0);background:transparent;color:var(--plum,#5b3fa0);cursor:pointer}
 .page-add:hover{background:var(--wash,#f4f0fb)}
 .pp-pop-item{font:inherit;font-size:13px;text-align:left;padding:var(--dds-s2,8px) var(--dds-s3,12px);border:none;background:none;cursor:pointer;border-radius:var(--dds-r,8px);color:var(--ink,#1b1525)}
 .pp-pop-item:hover{background:var(--wash,#f4f0fb)}
@@ -820,7 +883,6 @@ html.dds-has-shell.dds-has-ctxbar .stage{top:calc(var(--dds-shell-h) + var(--dds
 .pp-pop-item:focus-visible{outline:2px solid var(--plum,#5b3fa0);outline-offset:-2px}
 /* Slice B — the Page Information menu (#btnPageInfo → .pi-pop). Same pp-pop item
    idiom; ≤760px it presents as the bottom sheet the slide-over panels use. */
-.dc-bar-left{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
 .pi-pop{position:fixed;z-index:300;background:var(--sheet,#fff);border:1px solid var(--line,#ddd);border-radius:var(--dds-r-xl,14px);box-shadow:0 12px 34px color-mix(in srgb,var(--scrim-ink) 24%,transparent);padding:6px;display:flex;flex-direction:column;min-width:260px;max-width:92vw;max-height:min(72vh,600px);overflow:auto}
 .pi-pop .pi-prov{font-size:11.5px;color:var(--ink-2,#8a8172);line-height:1.5;padding:var(--dds-s2,8px) var(--dds-s3,12px);border-bottom:1px solid var(--hair,#eee);margin-bottom:var(--dds-s1,4px)}
 .pi-pop .pi-grp{display:flex;flex-direction:column}
@@ -842,27 +904,23 @@ html.dds-has-shell.dds-has-ctxbar .stage{top:calc(var(--dds-shell-h) + var(--dds
 .dc-modal-cancel{margin-top:var(--dds-s4,16px);font:inherit;font-size:13px;font-weight:500;padding:var(--dds-s2,8px) var(--dds-s4,16px);border-radius:var(--r);border:1px solid var(--line,#ddd);background:transparent;cursor:pointer}
 @media(max-width:560px){.dc-layout-grid{grid-template-columns:1fr}}
 .dc-actbtn:focus-visible{outline:2px solid var(--plum,#5b3fa0);outline-offset:2px}
-.dc-actbtn.primary{border-color:var(--plum,#5b3fa0);background:var(--sheet,#fff);color:var(--plum,#5b3fa0);font-weight:600}   /* outlined: Publish stays the one filled button (experience review #3) */
 /* the prominent floating "add section" affordance over the canvas */
 .dc-fab{position:absolute;right:20px;bottom:22px;z-index:40;font:inherit;font-size:13.5px;font-weight:600;padding:10px var(--dds-s4,16px);border-radius:var(--r);border:1px solid var(--plum,#5b3fa0);background:var(--sheet,#fff);color:var(--plum,#5b3fa0);cursor:pointer;box-shadow:0 6px 20px rgba(91,63,160,.18);display:inline-flex;align-items:center;gap:var(--dds-s2,8px)}
 .dc-fab:hover{filter:brightness(1.06)}
 .dc-fab:focus-visible{outline:2px solid var(--plum,#5b3fa0);outline-offset:2px}
 
-/* on-demand slide-over panels (tray = left, settings = right). Kept in the DOM but
-   parked off-screen when closed (visibility:hidden removes them from the tab order). */
+/* the on-demand panels (Add = left, Styles and Comments = right). Kept in the DOM and
+   parked invisible when closed (visibility:hidden removes them from the tab order).
+   Edit mode draws them as floating cards (the floating studio block above). */
 .dc-slideover{position:fixed;top:0;bottom:0;z-index:82;width:360px;max-width:88vw;background:var(--sheet,#fff);display:flex;flex-direction:column;visibility:hidden;box-shadow:0 0 44px color-mix(in srgb,var(--scrim-ink) 30%,transparent);transition:transform var(--dur,200ms) var(--ease,ease-out),visibility 0s linear var(--dur,200ms)}
 .dc-slideover.on{visibility:visible;transition:transform var(--dur,200ms) var(--ease,ease-out),visibility 0s}
 .dc-left{left:0;border-right:1px solid var(--hair);transform:translateX(-102%)}
 .dc-right{right:0;border-left:1px solid var(--hair);transform:translateX(102%)}
 .dc-slideover.on{transform:translateX(0)}
-/* Desktop: the LEFT rail (Contents / Add) DOCKS in the layout and PUSHES the canvas
-   over — it never floats on top of it. Collapsing it (✕) gives the canvas full width.
-   The right Design-settings panel stays a contextual overlay. */
-@media(min-width:761px){
-  .designstudio{display:flex;align-items:stretch;gap:var(--dds-s5,20px)}
-  #designCanvas{flex:1 1 auto;min-width:0;order:2}
-  #trayPanel.dc-left{position:relative;order:1;top:auto;bottom:auto;left:auto;z-index:1;flex:0 0 auto;width:min(320px,30vw);transform:none;visibility:visible;box-shadow:none;border:1px solid var(--hair);border-radius:var(--r-lg);overflow:hidden;align-self:stretch;max-height:calc(100vh - 150px);transition:width var(--dur,200ms) var(--ease,ease-out),margin var(--dur,200ms) var(--ease,ease-out),opacity var(--dur,200ms)}
-  #trayPanel.dc-left:not(.on){width:0;border-width:0;margin-right:calc(-1 * var(--dds-s5,20px));opacity:0;pointer-events:none}
+/* a phone: the panel is a sheet from the bottom (the website home's Your site panel uses this too) */
+@media(max-width:760px){
+  .dc-slideover{top:auto;left:0;right:0;width:100%;max-width:100%;height:82vh;border-radius:var(--dds-r-xl,14px) var(--dds-r-xl,14px) 0 0;border:none;box-shadow:0 -8px 44px color-mix(in srgb,var(--scrim-ink) 30%,transparent);transform:translateY(103%)}
+  .dc-slideover.on{transform:translateY(0)}
 }
 .dc-panel-head{position:sticky;top:0;z-index:2;background:var(--sheet,#fff);display:flex;align-items:center;justify-content:space-between;gap:10px;padding:var(--dds-s4,16px) var(--dds-s4,16px);border-bottom:1px solid var(--hair);flex:0 0 auto}
 .dc-panel-head .dc-panel-t{font-weight:600;font-size:14px}
@@ -996,11 +1054,6 @@ body.pd-dragging *{cursor:grabbing !important}
 .dpdevseg button{font:inherit;font-size:13px;font-weight:500;padding:6px var(--dds-s4,16px);border-radius:var(--r-sm);border:none;background:transparent;color:var(--ink-2,#8a8172);cursor:pointer}
 .dpdevseg button.on{background:var(--seg-chip,var(--sheet,#fff));color:var(--ink,#1b1525);box-shadow:var(--seg-ring,0 1px 4px rgba(0,0,0,.12))}
 .dpdevseg button:focus-visible{outline:2px solid var(--plum,#5b3fa0);outline-offset:2px}
-/* Slice D (AC-4): the modes bar — Edit · Preview · Comments · Timewarp. The SAME
-   segment idiom as the device toggle (.dpdevseg + a sibling class, so #dpDevSeg's
-   own rules never change); the two stay orthogonal — device = viewport emulation
-   of the frame, mode = what interaction the canvas offers. Session state only. */
-.dcmodeseg button{padding:var(--dds-s2,8px) var(--dds-s4,16px)}
 /* Preview / Timewarp: the same frame with ALL editing chrome withheld — the
    injector is never called, the FAB hides, and the page scrolls like a visitor's
    (link/submit navigation is guarded inside the document, dcGuardViewNav). */
@@ -1011,12 +1064,11 @@ body.pd-dragging *{cursor:grabbing !important}
    must not leave buttons that mutate the draft with zero visible feedback.
    Page ▾ stays — publishing/sharing after a read-through is a viewing act. */
 #view-design.dc-mode-view #btnTrayOpen,#view-design.dc-mode-view #btnNavEdit,#view-design.dc-mode-view #btnSettingsOpen{display:none}
-/* Timewarp's compact inline bar above the canvas: date → the EXISTING
-   GET /publishes/timewarp machinery; the banner + "Back to today" live here */
-.dc-twbar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:0 0 10px;padding:var(--dds-s2,8px) var(--dds-s4,16px);border:1px solid var(--line,#ddd);border-radius:var(--dds-r-xl,14px);background:var(--wash,#f4f0fb)}
+/* the past-dates bar: a date → the EXISTING GET /publishes/timewarp machinery; the banner and "Back to today" live here */
+.dc-twbar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:0 0 10px;padding:var(--dds-s2,8px) var(--dds-s4,16px);border:1px solid var(--line,#ddd);border-radius:var(--dds-r-xl,14px);background:var(--sheet,#fff)}
 .dc-twbar[hidden]{display:none}   /* the flex rule must never beat the hidden attribute (same guard as #designFilesWrap) */
 .dc-twbar label{font-size:12.5px;font-weight:600;color:var(--ink,#1b1525)}
-.dc-twbar input[type="date"]{font:inherit;font-size:12.5px;padding:6px var(--dds-s2,8px);border:1px solid var(--line,#ddd);border-radius:var(--dds-r,8px);background:var(--sheet,#fff);color:var(--ink,#1b1525)}
+.dc-twbar input[type="date"]{font:inherit;font-size:12.5px;padding:6px var(--dds-s2,8px);border:1px solid var(--line,#ddd);border-radius:999px;background:var(--sheet,#fff);color:var(--ink,#1b1525)}
 .dc-twbar input[type="date"]:focus-visible{outline:2px solid var(--plum,#5b3fa0);outline-offset:2px}
 .dc-twmsg{font-size:12.5px;font-weight:600;color:var(--plum,#5b3fa0)}
 .dc-twbar .dc-actbtn{margin-left:auto}
@@ -1046,7 +1098,6 @@ body.pd-dragging *{cursor:grabbing !important}
   .dp-frame{height:calc(100vh - 240px)}
   /* beside the shell's sidebar + the docked tray the canvas column is narrow:
      the mode and device segments wrap instead of pushing the page sideways */
-  .dc-bar-left{min-width:0;max-width:100%}
   .dpdevseg{display:flex;flex-wrap:wrap;max-width:100%}
   .dpdevseg button{flex:1 1 auto;padding:var(--dds-s2,8px) 10px;font-size:12.5px}
 }
@@ -1061,13 +1112,7 @@ body.pd-dragging *{cursor:grabbing !important}
   .deskprivacy{display:none}
   }
 @media(max-width:760px){
-  .dc-slideover{top:auto;left:0;right:0;width:100%;max-width:100%;height:82vh;border-radius:var(--dds-r-xl,14px) var(--dds-r-xl,14px) 0 0;border:none;box-shadow:0 -8px 44px color-mix(in srgb,var(--scrim-ink) 30%,transparent);transform:translateY(103%)}
-  .dc-slideover.on{transform:translateY(0)}
   .dc-fab{right:14px;bottom:14px;padding:11px 18px;font-size:13px}
-  /* Slice D: the mode segment mirrors #dpDevSeg's mobile presentation — a compact
-     full-width segment row above the canvas (the dc-bar already wraps) */
-  .dcmodeseg{display:flex;width:100%}
-  .dcmodeseg button{flex:1 1 auto;padding:8px 4px;font-size:12px}
 }
 
 /* ── mobile: the dock ── */
@@ -1411,44 +1456,64 @@ body.pd-dragging *{cursor:grabbing !important}
       <section class="view" id="view-design">
         <h1 class="doc" role="heading" aria-level="2">Edit site</h1>
         <p class="docsub">Change your site’s words, sections and styles. Nothing goes live until you publish.</p>
-        <!-- Edit mode: one bar across the top of the screen; the canvas takes the rest. -->
-        <div class="dc-bar">
-          <div class="dc-bar-start">
-            <button type="button" class="dc-actbtn" id="btnEditExit" title="Leave Edit mode. Everything is saved.">← Exit</button>
-            <!-- Multi-page: pick a page to author (Home + your own pages), or add one -->
-            <div id="pagesBar" class="pages-bar" role="tablist" aria-label="Website pages"></div>
-                  <!-- Slice B (AC-5): the Page Information menu — one place for everything
-                       about this page/site. Every entry deep-links to existing machinery. -->
-                  <button type="button" class="dc-actbtn" id="btnPageInfo" title="Everything about this page — publish, share a draft, properties, search appearance" aria-haspopup="menu" aria-expanded="false">Page ▾</button>
-            <button type="button" class="dc-actbtn dc-icon" id="btnUndo" title="Undo (Ctrl/⌘+Z)" aria-label="Undo" disabled><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 14L4 9l5-5"/><path d="M4 9h10a6 6 0 0 1 0 12h-3"/></svg></button>
-            <button type="button" class="dc-actbtn dc-icon" id="btnRedo" title="Redo (Ctrl/⌘+Shift+Z)" aria-label="Redo" disabled><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 14l5-5-5-5"/><path d="M20 9H10a6 6 0 0 0 0 12h3"/></svg></button>
-            <span class="whisper dc-saved idle" id="dcWhisper" aria-live="polite">Everything saved</span>
+        <!-- Edit mode, direction A "Floating studio" (Nov 2026): the page fills the whole
+             screen and every tool floats over it as a white card. One pill bar at the top
+             centre, a dock of tools on the left, and cards that open from either. Ids are the
+             ones the specs and the rest of this file know. -->
+        <div class="dc-bar" role="toolbar" aria-label="Editor">
+          <button type="button" class="dc-actbtn dc-ghost" id="btnEditExit" title="Leave Edit mode. Everything is saved."><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19 12H5"/><path d="M11 18l-6-6 6-6"/></svg><span class="dc-lbl">Exit</span></button>
+          <span class="dc-sep" aria-hidden="true"></span>
+          <!-- the page switcher: the page being edited, how many there are, and a card with
+               all of them (the old pages tabs, ＋ Page, the Page menu and the menu editor) -->
+          <div class="dc-pages">
+            <button type="button" class="dc-switch" id="dcPageSwitch" aria-haspopup="dialog" aria-expanded="false" aria-controls="pagesCard" title="Your pages: switch, add one, or open this page’s menu">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3h8l5 5v13H6z"/><path d="M14 3v5h5"/></svg>
+              <span class="dc-switch-name" id="dcPageName">Home</span>
+              <span class="dc-chip" id="dcPageCount">1 page</span>
+              <svg class="dc-switch-chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
+            </button>
+            <div id="pagesCard" class="dc-card dc-pagescard" role="dialog" aria-label="Pages" aria-hidden="true" hidden>
+              <div class="dc-card-h"><span class="dc-card-t">Pages</span><button type="button" class="dc-close" id="btnPagesClose" aria-label="Close">✕</button></div>
+              <div id="pagesBar" class="pages-bar" role="tablist" aria-label="Website pages"></div>
+              <div class="dc-pagescard-acts">
+                <!-- Slice B (AC-5): the Page Information menu — one place for everything
+                     about this page/site. Every entry deep-links to existing machinery. -->
+                <button type="button" class="dc-rowbtn" id="btnPageInfo" title="Everything about this page — publish, share a draft, properties, search appearance" aria-haspopup="menu" aria-expanded="false"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 11v5"/><path d="M12 8h.01"/></svg>This page<span class="dc-rowbtn-sub">Publish, share a draft, properties, search</span></button>
+                <button type="button" class="dc-rowbtn" id="btnNavEdit" title="Your pages and the top menu"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h10"/></svg>Menu and page settings</button>
+              </div>
+            </div>
           </div>
-          <div class="dc-bar-left">
-                  <!-- Slice D (AC-4): the modes bar. Edit = today's canvas; Preview =
-                       the same frame, all editing chrome withheld; Comments = the G11
-                       toggle RE-HOMED (same #btnComments id, exact cmToggle machinery);
-                       Timewarp = History's GET /publishes/timewarp, in-canvas, read-only.
-                       Orthogonal to the device segment below (device = viewport). -->
-                  <div id="dcModeSeg" class="dpdevseg dcmodeseg" role="group" aria-label="Canvas mode">
-                    <button type="button" data-dcmode="edit" class="on" aria-pressed="true" title="Build this page — edit, arrange and add sections">Edit</button>
-                    <button type="button" data-dcmode="comments" id="btnComments" aria-pressed="false" title="Feedback on this draft — notes from you and your client, section by section">Comments</button>
-                    <button type="button" data-dcmode="timewarp" aria-pressed="false" title="See your site as it looked in any earlier version, on any past date">Versions</button>
-                  </div>
-                  <div id="dpDevSeg" class="dpdevseg" role="group" aria-label="Preview at different screen sizes">
-                    <button type="button" data-dpdev="desktop" class="on" aria-pressed="true" aria-label="Desktop" title="See your page on a desktop"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4"/></svg></button>
-                    <button type="button" data-dpdev="tablet" aria-pressed="false" aria-label="Tablet" title="See your page on a tablet"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="3" width="14" height="18" rx="2"/><path d="M11 18h2"/></svg></button>
-                    <button type="button" data-dpdev="phone" aria-pressed="false" aria-label="Phone" title="See your page on a phone"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="7" y="3" width="10" height="18" rx="2"/><path d="M11 18h2"/></svg></button>
-                  </div>
+          <button type="button" class="dc-actbtn dc-ghost dc-icon" id="btnUndo" title="Undo (Ctrl/⌘+Z)" aria-label="Undo" disabled><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 14L4 9l5-5"/><path d="M4 9h10a6 6 0 0 1 0 12h-3"/></svg><span class="dc-lbl">Undo</span></button>
+          <button type="button" class="dc-actbtn dc-ghost dc-icon" id="btnRedo" title="Redo (Ctrl/⌘+Shift+Z)" aria-label="Redo" disabled><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 14l5-5-5-5"/><path d="M20 9H10a6 6 0 0 0 0 12h3"/></svg><span class="dc-lbl">Redo</span></button>
+          <span class="whisper dc-saved idle" id="dcWhisper" aria-live="polite">Everything saved</span>
+          <span class="dc-sep dc-wideonly" aria-hidden="true"></span>
+          <div id="dpDevSeg" class="dpdevseg" role="group" aria-label="Preview at different screen sizes">
+            <button type="button" data-dpdev="desktop" class="on" aria-pressed="true" aria-label="Desktop" title="See your page on a desktop"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4"/></svg></button>
+            <button type="button" data-dpdev="tablet" aria-pressed="false" aria-label="Tablet" title="See your page on a tablet"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="3" width="14" height="18" rx="2"/><path d="M11 18h2"/></svg></button>
+            <button type="button" data-dpdev="phone" aria-pressed="false" aria-label="Phone" title="See your page on a phone"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="7" y="3" width="10" height="18" rx="2"/><path d="M11 18h2"/></svg></button>
           </div>
-          <div class="dc-bar-acts">
-            <button type="button" class="dc-actbtn primary" id="btnTrayOpen" aria-label="Add section" aria-haspopup="dialog" aria-controls="trayPanel"><span>＋ Add<span class="dc-wide"> section</span></span></button>
-            <button type="button" class="dc-actbtn" id="btnNavEdit" title="Your pages and the top menu">Pages</button>
-            <button type="button" class="dc-actbtn" id="btnSettingsOpen" data-needs="configure" aria-haspopup="dialog" aria-controls="settingsPanel">Styles</button>
-            <button type="button" class="dc-actbtn" id="dcBtnPreview" title="See this page the way a visitor will">Preview</button>
-            <button type="button" class="pillbtn" id="dcBtnPublish">Publish</button>
-          </div>
+          <span class="dc-chip good" id="dcLiveChip" title="Your site is live. Changes reach it when you publish." hidden>Live</span>
+          <button type="button" class="dc-actbtn" id="dcBtnPreview" title="See this page the way a visitor will">Preview</button>
+          <button type="button" class="pillbtn" id="dcBtnPublish">Publish</button>
         </div>
+        <!-- the dock: the editor's tools, one icon and one word each. Notes and Versions are
+             the canvas modes (#dcModeSeg: the same dcSetMode machinery as before). On a phone
+             it is a pill along the bottom, with the rest behind More. -->
+        <nav id="dcDock" class="dc-dock" aria-label="Editor tools">
+          <button type="button" class="dc-dk" id="dkPages" data-ico="page" aria-haspopup="dialog" aria-controls="pagesCard" aria-expanded="false" title="Your pages"><span class="dc-dk-l">Pages</span></button>
+          <button type="button" class="dc-dk" id="btnTrayOpen" data-ico="plus" aria-label="Add section" aria-haspopup="dialog" aria-controls="trayPanel" title="Add a section to this page"><span class="dc-dk-l">Add</span></button>
+          <button type="button" class="dc-dk" id="btnSettingsOpen" data-needs="configure" data-ico="spark" aria-haspopup="dialog" aria-controls="settingsPanel" title="Styles: how the whole site looks"><span class="dc-dk-l">Styles</span></button>
+          <button type="button" class="dc-dk" id="dkPhotos" data-ico="image" aria-haspopup="dialog" aria-controls="trayPanel" title="Your photos and files"><span class="dc-dk-l">Photos</span></button>
+          <div class="dc-dock-more" id="dcDockMore">
+            <div id="dcModeSeg" class="dc-dkgrp" role="group" aria-label="Canvas mode">
+              <button type="button" class="dc-dk" data-dcmode="comments" id="btnComments" data-ico="message" aria-pressed="false" title="Notes on this draft, from you and your client, section by section"><span class="dc-dk-l">Notes</span></button>
+              <button type="button" class="dc-dk" data-dcmode="timewarp" data-ico="clock" aria-pressed="false" title="See your site as it looked on any past date"><span class="dc-dk-l">Versions</span></button>
+            </div>
+            <button type="button" class="dc-dk" id="dkFind" data-ico="search" title="Find a section to add"><span class="dc-dk-l">Find</span></button>
+            <button type="button" class="dc-dk dc-dk-phone" id="dkPreview" data-ico="eye" title="See this page the way a visitor will"><span class="dc-dk-l">Preview</span></button>
+          </div>
+          <button type="button" class="dc-dk dc-dk-phone" id="dkMore" data-ico="more" aria-expanded="false" aria-controls="dcDockMore" title="More tools"><span class="dc-dk-l">More</span></button>
+        </nav>
         <!-- #2 CANVAS-DOMINANT workspace: the live canvas fills the screen; the add
              tray and the styles open ON DEMAND (slide-over panels below). -->
         <div class="designstudio">
@@ -1460,7 +1525,7 @@ body.pd-dragging *{cursor:grabbing !important}
               <label for="dcTwDate">Your site as it looked on…</label>
               <input type="date" id="dcTwDate" aria-label="Date to look back to">
               <span class="dc-twmsg" id="dcTwMsg" role="status"></span>
-              <button type="button" class="dc-actbtn" id="dcTwBack">Back to today</button>
+              <button type="button" class="dc-actbtn dc-ghost" id="dcTwBack">Back to today</button>
             </div>
             <div id="designPreviewWrap">
               <div class="dp-stage" id="dpStage">
@@ -1486,7 +1551,7 @@ body.pd-dragging *{cursor:grabbing !important}
                catalog, #designTray) · Files (NEW — a compact asset browser) · Content
                tree (the page tree, #designTreeList). Mount ids are unchanged. -->
           <aside id="trayPanel" class="dc-slideover dc-left" role="dialog" aria-modal="false" aria-label="Blocks, files and content tree" aria-hidden="true">
-            <div class="dc-panel-head"><span class="dc-panel-t">Your website</span><button type="button" class="dc-close" id="btnTrayClose" aria-label="Collapse this panel" title="Collapse (gives the canvas full width)">◀ Collapse</button></div>
+            <div class="dc-panel-head"><span class="dc-panel-t">Your website</span><button type="button" class="dc-close" id="btnTrayClose" aria-label="Collapse this panel" title="Close (gives the canvas the whole screen)">✕</button></div>
             <div class="dc-tabs" role="tablist" aria-label="Page rail">
               <button type="button" class="dc-tab" id="tabAdd" role="tab" aria-selected="false" data-tab="add">Blocks</button>
               <button type="button" class="dc-tab" id="tabFiles" role="tab" aria-selected="false" data-tab="files">Files</button>
@@ -2048,7 +2113,7 @@ function go(view, early) {
   if (view !== "design") EDIT_RETURN = view;
   syncSiteHome(view);
   document.documentElement.classList.toggle("dc-edit", view === "design");
-  if (view === "design") pagesBarReveal();
+  if (view === "design") { pagesBarReveal(); dcSyncPageSwitch(); dcSyncLiveChip(); }
   // Design is the builder — let it use the FULL width (canvas stretches right); every
   // other view keeps the comfortable reading measure.
   const contentEl = document.querySelector(".content");
@@ -5102,6 +5167,7 @@ function renderStageStatus() {
   const n = c.count || 0;
   st.textContent = live ? (n ? `Live · ${n} change${n === 1 ? "" : "s"} waiting` : "Live") : "Not live yet";
   st.classList.toggle("live", !!live);
+  dcSyncLiveChip();
 }
 // One line for what's left before the site can go live. Nothing to finish, no line.
 let SETUP_LEFT = 0, SETUP_TOTAL = 0;
@@ -5252,6 +5318,7 @@ function renderPublishButton() {
     barPub.textContent = tight ? `Publish·${c.count}` : label; barPub.setAttribute("aria-label", label);
     barPub.classList.toggle("inked", $("btnPublish").classList.contains("inked"));
   }
+  dcSyncLiveChip();
 }
 // A read names the version the draft had when it got there, someone else's changes and
 // all. The page holds the version its own state is built on: the one it loaded with,
@@ -6081,13 +6148,13 @@ function cmSyncButton() {
   const n = CM_ON ? cmTotalOpen() : 0;
   // The label (and its open-note count) only — the segment button's on/aria-pressed
   // state has exactly ONE writer, dcModeSync, so the two can never disagree.
-  b.textContent = "Comments" + (CM_ON && n ? " (" + n + ")" : "");
+  (b.querySelector(".dc-dk-l") || b).textContent = "Notes" + (CM_ON && n ? " (" + n + ")" : "");
 }
 function cmToggle() {
   if (CM_BUSY) return CM_PENDING;   // a load is already in flight — join it, never a silent no-op
   if (CM_ON) { CM_ON = false; CM_THREADS = null; cmSyncButton(); closeCommentsPanel(); dcRefreshTree(); return; }
   CM_BUSY = true;
-  const b = $("btnComments"); if (b) b.textContent = "Loading…";
+  const b = $("btnComments"); if (b) (b.querySelector(".dc-dk-l") || b).textContent = "Loading…";
   CM_PENDING = (async () => {
     try {
       await cmLoad(); CM_ON = true;
@@ -7941,6 +8008,7 @@ function renderPagesBar() {
   add.addEventListener("click", dcAddPage);
   host.appendChild(add);
   pagesBarReveal();
+  dcSyncPageSwitch();
 }
 function pagesBarReveal() {
   const host = $("pagesBar"), cur = host && host.querySelector(".page-pill.on"); if (!cur) return;
@@ -8107,6 +8175,10 @@ function dcPageMenu(slug, anchor) {
   document.body.appendChild(m);
   const r = anchor.getBoundingClientRect();
   m.style.cssText = "position:fixed;z-index:300;top:" + (r.bottom + 4) + "px;left:" + Math.max(8, r.left - 70) + "px;background:var(--sheet,#fff);border:1px solid var(--line,#ddd);border-radius:10px;box-shadow:0 12px 34px rgba(0,0,0,.18);padding:6px;display:flex;flex-direction:column;min-width:150px";
+  // the pages card can sit low on the screen (a phone's sheet): open upward when there is no room below, and never past the right edge
+  { const mh = m.offsetHeight || 0, mw = m.offsetWidth || 0;
+    if (r.bottom + 4 + mh > window.innerHeight - 8) m.style.top = Math.max(8, r.top - 4 - mh) + "px";
+    m.style.left = Math.max(8, Math.min(parseFloat(m.style.left) || 8, window.innerWidth - mw - 8)) + "px"; }
   const off = (e) => { if (!m.contains(e.target)) { m.remove(); document.removeEventListener("mousedown", off, true); } };
   setTimeout(() => document.addEventListener("mousedown", off, true), 0);
 }
@@ -10615,6 +10687,50 @@ function openSettingsPanel(mode, title) {
     (m === "section" && p.querySelector("#blocksCard input, #blocksCard textarea") || cl).focus();
   } catch (_) {} }, 40);
 }
+// ── the floating studio: the page switcher's card, the Live chip, the phone's More ──
+// The pages card holds what the old bar spread out: the page tabs (#pagesBar, the
+// same renderPagesBar rows), ＋ Page, the Page menu (#btnPageInfo) and the way to the
+// menu editor (#btnNavEdit). It opens from the bar's page switcher and from the dock.
+let PAGES_OPEN = false, PAGES_DOWN = null, PAGES_FROM = null;
+function dcSyncPageSwitch() {
+  const list = typeof dcPageList === "function" ? dcPageList() : [];
+  const cur = list.find((p) => p.slug === DC_PAGE) || list[0];
+  const nm = $("dcPageName"); if (nm) nm.textContent = cur ? cur.title : "Home";
+  const ct = $("dcPageCount"); if (ct) ct.textContent = list.length + (list.length === 1 ? " page" : " pages");
+}
+function dcSyncLiveChip() { const c = $("dcLiveChip"); if (c) c.hidden = !(typeof siteLiveUrl === "function" && siteLiveUrl()); }
+function openPagesCard(fromId) {
+  const c = $("pagesCard"); if (!c) return;
+  closeTrayPanel(); closeSettingsPanel(); closeCommentsPanel(); dcDockMore(false);
+  PAGES_FROM = fromId || "dcPageSwitch"; PAGES_OPEN = true;
+  c.hidden = false; c.setAttribute("aria-hidden", "false");
+  ["dcPageSwitch", "dkPages"].forEach((id) => { const b = $(id); if (b) b.setAttribute("aria-expanded", "true"); });
+  pagesBarReveal();
+  try { (c.querySelector(".page-pill.on") || c.querySelector(".page-pill") || $("btnPagesClose")).focus({ preventScroll: true }); } catch (_) {}
+  // a press anywhere else puts it away; the page menu and the dialogs it opens don't count
+  PAGES_DOWN = (e) => {
+    if (c.contains(e.target)) return;
+    if (e.target.closest && e.target.closest("#dcPageSwitch,#dkPages,.pp-pop,.pi-pop,.dc-modal-scrim,.dc-modal,.ask,.scrim,#pageSettings")) return;
+    closePagesCard(false);
+  };
+  document.addEventListener("mousedown", PAGES_DOWN, true);
+}
+function closePagesCard(refocus) {
+  const c = $("pagesCard"); if (!c || !PAGES_OPEN) return;
+  PAGES_OPEN = false;
+  c.hidden = true; c.setAttribute("aria-hidden", "true");
+  ["dcPageSwitch", "dkPages"].forEach((id) => { const b = $(id); if (b) b.setAttribute("aria-expanded", "false"); });
+  if (PAGES_DOWN) { document.removeEventListener("mousedown", PAGES_DOWN, true); PAGES_DOWN = null; }
+  if (refocus) { const b = $(PAGES_FROM || "dcPageSwitch"); if (b) { try { b.focus(); } catch (_) {} } }
+}
+function togglePagesCard(fromId) { if (PAGES_OPEN) closePagesCard(true); else openPagesCard(fromId); }
+// a phone's dock keeps Notes, Versions, Find and Preview behind More
+function dcDockMore(open) {
+  const d = $("dcDock"), b = $("dkMore"); if (!d) return;
+  const on = open === undefined ? !d.classList.contains("more-open") : !!open;
+  d.classList.toggle("more-open", on);
+  if (b) b.setAttribute("aria-expanded", String(on));
+}
 function exitEditMode() {
   if (IPE) ipeCommit();   // bank in-place text before the canvas goes away
   if (document.activeElement && document.activeElement.blur) document.activeElement.blur();   // a focused field commits on blur
@@ -10623,7 +10739,7 @@ function exitEditMode() {
   if (DC_MODE !== "edit") dcSetMode("edit");
   go(EDIT_RETURN);
 }
-function closeDesignPanels() { closeTrayPanel(); closeSettingsPanel(); closeCommentsPanel(); if (PANEL_LASTFOCUS && PANEL_LASTFOCUS.focus) { try { PANEL_LASTFOCUS.focus(); } catch (_) {} PANEL_LASTFOCUS = null; } }
+function closeDesignPanels() { closePagesCard(false); dcDockMore(false); closeTrayPanel(); closeSettingsPanel(); closeCommentsPanel(); if (PANEL_LASTFOCUS && PANEL_LASTFOCUS.focus) { try { PANEL_LASTFOCUS.focus(); } catch (_) {} PANEL_LASTFOCUS = null; } }
 (function initDesignPanels() {
   const on = (id, fn) => { const b = $(id); if (b) b.addEventListener("click", fn); };
   on("btnUndo", dcUndo); on("btnRedo", dcRedo);
@@ -10643,13 +10759,20 @@ function closeDesignPanels() { closeTrayPanel(); closeSettingsPanel(); closeComm
   on("btnTrayOpen", () => toggleTray("add")); on("btnAddFab", () => openTrayPanel("add")); on("btnTrayClose", closeDesignPanels);
   on("tabContents", () => dcRailTab("contents")); on("tabAdd", () => dcRailTab("add")); on("tabFiles", () => dcRailTab("files"));
   on("btnSettingsOpen", () => openSettingsPanel("styles")); on("btnSettingsClose", closeDesignPanels);
-  on("btnNavEdit", () => go("pages"));
+  on("btnNavEdit", () => { closePagesCard(false); go("pages"); });
+  // the floating studio: the page switcher and the dock
+  on("dcPageSwitch", () => togglePagesCard("dcPageSwitch")); on("dkPages", () => togglePagesCard("dkPages")); on("btnPagesClose", () => closePagesCard(true));
+  on("dkPhotos", () => toggleTray("files"));
+  on("dkFind", () => openTrayPanel("add"));   // opens the library with its search box focused
+  on("dkPreview", () => { dcDockMore(false); dcOpenPreview(); });
+  on("dkMore", () => dcDockMore());
+  const pbar = $("pagesBar"); if (pbar) pbar.addEventListener("click", (e) => { if (e.target.closest(".page-pill") && !e.target.closest(".pp-menu")) closePagesCard(false); });
   on("dcBtnPreview", dcOpenPreview);
   on("btnPageInfo", togglePageInfoMenu);   // slice B: the Page Information menu (Share draft lives inside it now)
   // Slice D: the modes bar. #btnComments now lives INSIDE the segment (G11
   // re-homed — same id, same cmToggle machinery, driven through dcSetMode).
   const modeSeg = $("dcModeSeg");
-  if (modeSeg) modeSeg.addEventListener("click", (e) => { const b = e.target.closest("button"); if (b && b.dataset.dcmode) dcSetMode(b.dataset.dcmode); });
+  if (modeSeg) modeSeg.addEventListener("click", (e) => { const b = e.target.closest("button"); if (b && b.dataset.dcmode) { dcDockMore(false); dcSetMode(b.dataset.dcmode); } });
   on("dcTwBack", () => dcSetMode("edit"));
   const twd = $("dcTwDate");
   if (twd) {
@@ -10661,6 +10784,8 @@ function closeDesignPanels() { closeTrayPanel(); closeSettingsPanel(); closeComm
   const sc = $("dcScrim"); if (sc) sc.addEventListener("click", closeDesignPanels);
   document.addEventListener("keydown", (e) => {
     if (e.key !== "Escape") return;
+    if (PAGES_OPEN) { e.stopPropagation(); closePagesCard(true); return; }
+    const dk = $("dcDock"); if (dk && dk.classList.contains("more-open")) { e.stopPropagation(); dcDockMore(false); return; }
     const t = $("trayPanel"), s = $("settingsPanel"), cm = $("commentsPanel");
     if ((t && t.classList.contains("on")) || (s && s.classList.contains("on")) || (cm && cm.classList.contains("on"))) { e.stopPropagation(); closeDesignPanels(); }
   }, true);
@@ -10861,11 +10986,25 @@ const BI_PATHS = {
   trash: '<path d="M4 7h16"/><path d="M9 7V4h6v3"/><path d="M6 7l1 14h10l1-14"/>',
   eyeoff: '<path d="M3 3l18 18"/><path d="M10.6 6.2A9.6 9.6 0 0 1 22 12a15 15 0 0 1-3.2 4"/><path d="M6.6 6.6A15 15 0 0 0 2 12s3.5 6 10 6a9.6 9.6 0 0 0 4.4-1"/>',
   message: '<path d="M21 12a8 8 0 0 1-8 8H8l-5 3 1.5-4.5A8 8 0 1 1 21 12z"/>',
+  // the floating studio (Nov 2026): the dock, the section pill and its menu
+  plus: '<path d="M12 5v14M5 12h14"/>',
+  search: '<circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/>',
+  clock: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
+  eye: '<path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6S2 12 2 12z"/><circle cx="12" cy="12" r="3"/>',
+  more: '<circle cx="5" cy="12" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="19" cy="12" r="1.4"/>',
+  grip: '<circle cx="9" cy="6" r="1.3"/><circle cx="15" cy="6" r="1.3"/><circle cx="9" cy="12" r="1.3"/><circle cx="15" cy="12" r="1.3"/><circle cx="9" cy="18" r="1.3"/><circle cx="15" cy="18" r="1.3"/>',
+  pencil: '<path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/>',
+  copy: '<rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>',
+  scissors: '<circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M20 4L8.1 15.9M14.5 14.5L20 20M8.1 8.1L12 12"/>',
+  x: '<path d="M18 6L6 18M6 6l12 12"/>',
+  up: '<path d="M12 19V5"/><path d="M5 12l7-7 7 7"/>',
+  down: '<path d="M12 5v14"/><path d="M19 12l-7 7-7-7"/>',
 };
 function uiIcon(name, size) {
   const s = size || 16;
   return `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${BI_PATHS[name] || BI_PATHS.section}</svg>`;
 }
+document.querySelectorAll("#dcDock .dc-dk[data-ico]").forEach((b) => { b.insertAdjacentHTML("afterbegin", uiIcon(b.dataset.ico, 20)); });
 const TRAY_GROUP_ICON = { "Show your work": "image", "Build trust": "star", "Get customers to act": "steps", "Text & layout": "text", "Info & updates": "list" };
 const TRAY_TYPE_ICON_NAME = {
   gallery: "gallery", before_after: "compare", image: "image", image_text: "imagetext", video: "video", team: "people", partners: "tag",
@@ -12378,7 +12517,7 @@ function ipeShowBar(doc, el2) {
   }
   const win = doc.defaultView, r = el2.getBoundingClientRect();
   bar.style.top = Math.max(2, r.top + win.scrollY - 36) + 'px';
-  bar.style.left = Math.max(2, r.left + win.scrollX) + 'px';
+  bar.style.left = Math.max(2, win.scrollX + DC_CHROME_INSET, r.left + win.scrollX) + 'px';   // never under the dock
   bar.classList.add('on');
 }
 function ipeHideBar(doc) { try { const b = doc.getElementById('dds-ipe-bar'); if (b) b.classList.remove('on'); } catch (_) {} }
@@ -12556,94 +12695,166 @@ function ideRelease() {   // the redraw a session or its save held off
 // live: one section was swapped in place by the live redraw (dcLiveNow). Its neighbours, the
 // add-section lines between them and the Contents list still stand, so only the new section
 // is wired (item 85); a full redraw rebuilds all of it.
+// The editor's colours, read off the shell's tokens and handed into the frame as
+// variables (--ddsdc-*). The tools inside the frame follow the shell's light and dark
+// modes through them; the site itself is never touched.
+let DC_CHROME_INSET = 0;   // px from the frame's left edge that the dock covers (0 on a phone, where the dock is along the bottom)
+// What the floating chrome covers of the frame right now: the dock and the Add card on the
+// left, the Styles or Comments card on the right. The section pill and its chip keep clear.
+function dcChromeInsets() {
+  const out = { left: DC_CHROME_INSET, right: 0 };
+  try {
+    if (window.innerWidth <= 760) return out;   // a phone's cards are sheets, under the pill's row
+    const fr = $("designPreview").getBoundingClientRect();
+    ["settingsPanel", "commentsPanel"].forEach((id) => { const p = $(id); if (p && p.classList.contains("on")) { const r = p.getBoundingClientRect(); out.right = Math.max(out.right, Math.round(fr.right - r.left + 8)); } });
+    const t = $("trayPanel"); if (t && t.classList.contains("on")) { const r = t.getBoundingClientRect(); out.left = Math.max(out.left, Math.round(r.right + 8 - fr.left)); }
+  } catch (_) {}
+  return out;
+}
+function dcChromeTokens() {
+  try {
+    const dk = $("dcDock"), fr = $("designPreview"); DC_CHROME_INSET = 0;
+    if (dk && fr && window.innerWidth > 760) { const a = dk.getBoundingClientRect(), b = fr.getBoundingClientRect(); if (a.width && a.height) DC_CHROME_INSET = Math.max(0, Math.round(a.right + 8 - b.left)); }
+  } catch (_) {}
+  const cs = getComputedStyle(document.documentElement);
+  const v = (n, d) => { const x = (cs.getPropertyValue(n) || "").trim(); return x || d; };
+  const p = v("--dds-p", "#6d3fd4");
+  const m = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.exec(p);
+  let rgb = "109,63,212";
+  if (m) { let h = m[1]; if (h.length === 3) h = h.split("").map((c) => c + c).join(""); rgb = [0, 2, 4].map((i) => parseInt(h.slice(i, i + 2), 16)).join(","); }
+  return ":root{--ddsdc-card:" + v("--dds-card", "#fff") + ";--ddsdc-ink:" + v("--dds-ink", "#171522") + ";--ddsdc-soft:" + v("--dds-soft", "#55526a")
+    + ";--ddsdc-line:" + v("--dds-line", "#e7e6ef") + ";--ddsdc-line2:" + v("--dds-line-strong", "#d6d4e2") + ";--ddsdc-up:" + v("--dds-up", "#f7f6fb")
+    + ";--ddsdc-p:" + p + ";--ddsdc-p-rgb:" + rgb + ";--ddsdc-p-soft:" + v("--dds-p-soft", "#f0ebfd") + ";--ddsdc-on-p:" + v("--dds-on-p", "#fff")
+    + ";--ddsdc-grad:" + v("--dds-grad-btn", "linear-gradient(135deg,#6d3fd4 0%,#7a4bdd 100%)")
+    + ";--ddsdc-bad:" + v("--dds-bad", "#bf3535") + ";--ddsdc-bad-soft:" + v("--dds-bad-soft", "#fdeaea")
+    + ";--ddsdc-shadow:" + v("--dds-shadow-pop", "0 20px 48px -12px rgba(23,21,34,.24),0 2px 6px rgba(23,21,34,.06)")
+    + ";--ddsdc-sans:" + v("--dds-sans", "Inter,-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif") + "}";
+}
 function dcInjectCanvas(doc, main, live) {
   const win = doc.defaultView;
   if (!doc.getElementById("dds-dc-style")) {
     const st = doc.createElement("style"); st.id = "dds-dc-style";
     st.textContent =
-      ".dc-hot{outline:2px solid #2a6fb5!important;outline-offset:-2px}" +
-      "[data-dds-field]:hover{outline:1px dashed rgba(42,111,181,.75);outline-offset:3px;cursor:text}" +   // says "you can type here" before anyone double-clicks
-      Object.keys(IDE_FIELDS).map((p) => '[data-pr="' + p + '"]:hover').join(",") + "{outline:1px dashed rgba(42,111,181,.75);outline-offset:3px;cursor:text}" +
+      // The floating studio (Nov 2026): every colour here is one of the shell's tokens,
+      // handed in by dcChromeTokens (#dds-dc-tokens), so the tools follow the editor's
+      // light and dark modes while the page underneath keeps its own colours.
+      ".dc-hot{outline:2px solid var(--ddsdc-p)!important;outline-offset:-2px}" +
+      "[data-dds-field]:hover{outline:1px dashed rgba(var(--ddsdc-p-rgb),.6);outline-offset:3px;cursor:text}" +   // says "you can type here" before anyone double-clicks
+      Object.keys(IDE_FIELDS).map((p) => '[data-pr="' + p + '"]:hover').join(",") + "{outline:1px dashed rgba(var(--ddsdc-p-rgb),.6);outline-offset:3px;cursor:text}" +
+      // the section pill: a white card of icons inside the selected section's top-right corner
       "#dds-dc-bar .dc-grip{touch-action:none;user-select:none}" +
-      "#dds-dc-bar{position:absolute;z-index:2147483000;display:none;gap:4px;flex-wrap:wrap;max-width:calc(100vw - 24px);background:#15141a;border-radius:9px;padding:4px;box-shadow:0 6px 22px rgba(0,0,0,.34);font-family:system-ui,-apple-system,sans-serif}" +
+      "#dds-dc-bar{position:absolute;z-index:2147483000;display:none;align-items:center;gap:2px;padding:4px;background:var(--ddsdc-card);border:1px solid rgba(var(--ddsdc-p-rgb),.08);border-radius:999px;box-shadow:var(--ddsdc-shadow);font-family:var(--ddsdc-sans)}" +
       "#dds-dc-bar.on{display:flex}" +
-      "#dds-dc-bar .dc-b{font:inherit;font-size:12px;line-height:1;color:#fff;background:rgba(255,255,255,.16);border:1px solid rgba(255,255,255,.3);border-radius:6px;padding:6px 9px;cursor:pointer;white-space:nowrap}" +
-      "#dds-dc-bar .dc-b:hover{background:rgba(255,255,255,.34)}" +
+      "#dds-dc-bar .dc-b{position:relative;width:32px;height:32px;padding:0;border:0;border-radius:10px;background:transparent;color:var(--ddsdc-soft);display:inline-flex;align-items:center;justify-content:center;cursor:pointer;font:inherit}" +
+      "#dds-dc-bar .dc-b svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.75;stroke-linecap:round;stroke-linejoin:round;display:block}" +
+      "#dds-dc-bar .dc-b:hover{background:var(--ddsdc-up);color:var(--ddsdc-ink)}" +
+      "#dds-dc-bar .dc-b.dc-on,#dds-dc-bar .dc-b[aria-expanded=\"true\"]{background:var(--ddsdc-p-soft);color:var(--ddsdc-p)}" +
       "#dds-dc-bar .dc-grip{cursor:grab}#dds-dc-bar .dc-grip:active{cursor:grabbing}" +
-      "#dds-dc-bar .dc-on{background:#fff;color:#15141a;font-weight:700}" +
-      "#dds-dc-bar .dc-danger:hover{background:#c0392b;border-color:#c0392b}" +
-      "#dds-dc-bar .dc-b:focus-visible{outline:2px solid #fff;outline-offset:1px}" +
-      "[data-dc]:focus-visible{outline:2px solid #2a6fb5;outline-offset:-2px}" +
-      // ── AEM-style insertion targets: a hoverable "＋ Add section" bar between
-      // every section (and top/bottom), plus a big placeholder on an empty page.
-      // Clicking one opens the section picker AT that spot; it's also the drop
-      // target the drag ghost snaps to. Purely an editing overlay — never served.
+      "#dds-dc-bar .dc-danger:hover{background:var(--ddsdc-bad-soft);color:var(--ddsdc-bad)}" +
+      "#dds-dc-bar .dc-b:focus-visible{outline:2px solid var(--ddsdc-p);outline-offset:1px}" +
+      "#dds-dc-bar .dc-off,#dds-dc-more .dc-off{opacity:.4;pointer-events:none}" +
+      ".dc-sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);clip-path:inset(50%);white-space:nowrap}" +
+      // the name chip at the section's top left: what it is and what kind
+      "#dds-dc-chip{position:absolute;z-index:2147483000;display:none;align-items:center;height:24px;max-width:min(60vw,360px);padding:0 10px;border-radius:999px;background:var(--ddsdc-p-soft);color:var(--ddsdc-p);font:600 12px/1 var(--ddsdc-sans);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;pointer-events:none}" +
+      "#dds-dc-chip.on{display:inline-flex}" +
+      "#dds-dc-chip .dc-chip-type{font-weight:500;opacity:.8;margin-left:5px}" +
+      "#dds-dc-chip.compact .dc-chip-type{display:none}" +
+      // the More menu under the pill: copy, cut, hide, columns
+      "#dds-dc-more{position:absolute;z-index:2147483001;display:none;flex-direction:column;min-width:200px;padding:6px;background:var(--ddsdc-card);border:1px solid rgba(var(--ddsdc-p-rgb),.08);border-radius:14px;box-shadow:var(--ddsdc-shadow);font-family:var(--ddsdc-sans)}" +
+      "#dds-dc-more.on{display:flex}" +
+      "#dds-dc-more .dc-mi{display:flex;align-items:center;gap:10px;height:36px;padding:0 10px;border:0;border-radius:10px;background:transparent;color:var(--ddsdc-ink);font:500 13px/1 var(--ddsdc-sans);text-align:left;white-space:nowrap;cursor:pointer}" +
+      "#dds-dc-more .dc-mi svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.75;stroke-linecap:round;stroke-linejoin:round;color:var(--ddsdc-soft)}" +
+      "#dds-dc-more .dc-mi:hover{background:var(--ddsdc-up)}" +
+      "#dds-dc-more .dc-danger:hover{background:var(--ddsdc-bad-soft);color:var(--ddsdc-bad)}" +
+      "#dds-dc-more .dc-mi:focus-visible{outline:2px solid var(--ddsdc-p);outline-offset:-2px}" +
+      "[data-dc]:focus-visible{outline:2px solid var(--ddsdc-p);outline-offset:-2px}" +
+      // ── insertion targets: a line between every section (and top/bottom) with a plum
+      // "Add section" pill on it. Clicking one opens the section picker AT that spot; it's
+      // also the drop target the drag ghost snaps to. Purely an editing overlay — never served.
       "#presence-preview-badge{display:none!important}" +
-      ".dc-ins{position:relative;height:16px;margin:0;display:flex;align-items:center;justify-content:center;cursor:pointer;font-family:system-ui,-apple-system,sans-serif}" +
-      ".dc-ins::before{content:'';position:absolute;left:18px;right:18px;top:50%;height:0;border-top:2px dashed rgba(42,111,181,.28);transform:translateY(-50%);transition:border-color var(--dds-t-fast,120ms) var(--dds-ease,ease-out)}" +
-      ".dc-ins:hover::before,.dc-ins:focus-within::before{border-top-color:#2a6fb5}" +
+      ".dc-ins{position:relative;height:16px;margin:0;display:flex;align-items:center;justify-content:center;cursor:pointer;font-family:var(--ddsdc-sans)}" +
+      ".dc-ins::before{content:'';position:absolute;left:0;right:0;top:50%;height:0;border-top:2px solid rgba(var(--ddsdc-p-rgb),.35);transform:translateY(-50%);transition:border-color var(--dds-t-fast,120ms) var(--dds-ease,ease-out)}" +
+      ".dc-ins:hover::before,.dc-ins:focus-within::before{border-top-color:var(--ddsdc-p)}" +
       "@media(hover:hover){.dc-ins:not(:hover):not(:focus-within):not(.dc-drop-active)::before{border-top-color:transparent}}" +
-      ".dc-ins .dc-ins-pill{opacity:0;transition:opacity var(--dds-t-fast,120ms) var(--dds-ease,ease-out);position:relative;z-index:1;font:700 12px system-ui,-apple-system,sans-serif;color:#fff;background:#15141a;border:none;border-radius:999px;padding:5px 13px;cursor:pointer;box-shadow:0 3px 10px rgba(42,111,181,.42);white-space:nowrap}" +
+      ".dc-ins .dc-ins-pill{opacity:0;transition:opacity var(--dds-t-fast,120ms) var(--dds-ease,ease-out);position:relative;z-index:1;display:inline-flex;align-items:center;gap:6px;font:600 12px/1 var(--ddsdc-sans);color:var(--ddsdc-on-p);background:var(--ddsdc-p) var(--ddsdc-grad);border:none;border-radius:999px;padding:7px 14px 7px 11px;cursor:pointer;box-shadow:0 6px 16px -8px rgba(var(--ddsdc-p-rgb),.8);white-space:nowrap}" +
+      ".dc-ins .dc-ins-pill svg{width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}" +
       ".dc-ins:hover .dc-ins-pill,.dc-ins:focus-within .dc-ins-pill{opacity:1}" +
       ".dc-ins.dc-drop-active{height:22px}" +
-      ".dc-ins.dc-drop-active::before{border-top:4px solid #2a6fb5}" +
+      ".dc-ins.dc-drop-active::before{border-top:4px solid var(--ddsdc-p)}" +
       ".dc-ins.dc-drop-active .dc-ins-pill{opacity:1}" +
-      ".dc-emptyzone{margin:26px 18px;padding:44px 24px;border:2px dashed #c9c9d1;border-radius:16px;text-align:center;background:rgba(42,111,181,.045);cursor:pointer;font-family:system-ui,-apple-system,sans-serif;transition:border-color var(--dds-t-fast,120ms) var(--dds-ease,ease-out),background var(--dds-t-fast,120ms) var(--dds-ease,ease-out)}" +
-      ".dc-emptyzone:hover,.dc-emptyzone.dc-drop-active{border-color:#2a6fb5;background:rgba(42,111,181,.09)}" +
-      ".dc-emptyzone .dc-ez-t{font:700 18px system-ui,-apple-system,sans-serif;color:#15141a;margin:0 0 6px}" +
-      ".dc-emptyzone .dc-ez-s{font:400 13px system-ui,-apple-system,sans-serif;color:#5c5a66;max-width:34ch;margin:0 auto}" +
+      ".dc-emptyzone{margin:26px 18px;padding:44px 24px;border:2px dashed var(--ddsdc-line2);border-radius:20px;text-align:center;background:rgba(var(--ddsdc-p-rgb),.04);cursor:pointer;font-family:var(--ddsdc-sans);transition:border-color var(--dds-t-fast,120ms) var(--dds-ease,ease-out),background var(--dds-t-fast,120ms) var(--dds-ease,ease-out)}" +
+      ".dc-emptyzone:hover,.dc-emptyzone.dc-drop-active{border-color:var(--ddsdc-p);background:rgba(var(--ddsdc-p-rgb),.08)}" +
+      ".dc-emptyzone .dc-ez-t{font:700 18px var(--ddsdc-sans);color:#171522;margin:0 0 6px}" +
+      ".dc-emptyzone .dc-ez-s{font:400 13px var(--ddsdc-sans);color:#55526a;max-width:34ch;margin:0 auto}" +
       ".dc-emptyzone .dc-ez-acts{margin-top:16px;display:flex;gap:10px;flex-wrap:wrap;justify-content:center}" +
-      ".dc-emptyzone .dc-ez-btn{font:700 13.5px system-ui,-apple-system,sans-serif;color:#fff;background:#15141a;border:none;border-radius:999px;padding:11px 22px;cursor:pointer;box-shadow:0 4px 14px rgba(21,20,26,.28)}" +
-      ".dc-emptyzone .dc-ez-btn2{font:600 13.5px system-ui,-apple-system,sans-serif;color:#15141a;background:#fff;border:1px solid #c9c9d1;border-radius:999px;padding:11px 20px;cursor:pointer}" +
-      ".dc-emptyzone .dc-ez-btn:hover{filter:brightness(1.06)}.dc-emptyzone .dc-ez-btn2:hover{border-color:#2a6fb5}" +
-      // Layout Mode: the drag-to-resize divider between two columns (Adobe's blue
-      // dots) + the 12-unit grid guide shown while resizing.
+      ".dc-emptyzone .dc-ez-btn{font:600 13.5px var(--ddsdc-sans);color:var(--ddsdc-on-p);background:var(--ddsdc-p) var(--ddsdc-grad);border:none;border-radius:999px;padding:11px 22px;cursor:pointer;box-shadow:0 6px 16px -8px rgba(var(--ddsdc-p-rgb),.8)}" +
+      ".dc-emptyzone .dc-ez-btn2{font:600 13.5px var(--ddsdc-sans);color:#171522;background:#fff;border:1px solid var(--ddsdc-line2);border-radius:999px;padding:11px 20px;cursor:pointer}" +
+      ".dc-emptyzone .dc-ez-btn:hover{filter:brightness(1.06)}.dc-emptyzone .dc-ez-btn2:hover{border-color:var(--ddsdc-p)}" +
+      // Layout Mode: the drag-to-resize divider between two columns + the 12-unit grid guide shown while resizing.
       ".block-columns .col{position:relative}" +
       ".dc-colh{position:absolute;top:0;bottom:0;right:-13px;width:20px;cursor:col-resize;z-index:6;display:flex;align-items:center;justify-content:center;touch-action:none}" +
-      ".dc-colh::before{content:'';width:5px;height:46px;max-height:60%;background:#15141a;border-radius:4px;box-shadow:0 0 0 3px rgba(42,111,181,.18);opacity:.5;transition:opacity var(--dds-t-fast,120ms) var(--dds-ease,ease-out)}" +
+      ".dc-colh::before{content:'';width:5px;height:46px;max-height:60%;background:var(--ddsdc-p);border-radius:4px;box-shadow:0 0 0 3px rgba(var(--ddsdc-p-rgb),.18);opacity:.5;transition:opacity var(--dds-t-fast,120ms) var(--dds-ease,ease-out)}" +
       ".dc-colh:hover::before,.dc-colh:active::before{opacity:1}" +
-      ".block-columns .cols.dc-grid-show{background-image:repeating-linear-gradient(90deg,rgba(42,111,181,.09) 0,rgba(42,111,181,.09) 1px,transparent 1px,transparent 8.3333%);background-position:0 0}" +
-      "#dds-dc-bar .dc-off{opacity:.4;pointer-events:none}" +
+      ".block-columns .cols.dc-grid-show{background-image:repeating-linear-gradient(90deg,rgba(var(--ddsdc-p-rgb),.09) 0,rgba(var(--ddsdc-p-rgb),.09) 1px,transparent 1px,transparent 8.3333%);background-position:0 0}" +
       // a just-added section pulses so a drop is never invisible
-      "@keyframes dcJustAdded{0%{box-shadow:0 0 0 3px rgba(42,111,181,.55),0 0 0 9px rgba(42,111,181,.22)}100%{box-shadow:0 0 0 3px rgba(42,111,181,0),0 0 0 9px rgba(42,111,181,0)}}" +
+      "@keyframes dcJustAdded{0%{box-shadow:0 0 0 3px rgba(var(--ddsdc-p-rgb),.55),0 0 0 9px rgba(var(--ddsdc-p-rgb),.22)}100%{box-shadow:0 0 0 3px rgba(var(--ddsdc-p-rgb),0),0 0 0 9px rgba(var(--ddsdc-p-rgb),0)}}" +
       ".dc-justadded{animation:dcJustAdded 1.5s ease-out;border-radius:6px}" +
-      "@media (prefers-reduced-motion:reduce){.dc-justadded{animation:none;outline:3px solid rgba(42,111,181,.5);outline-offset:-3px}}" +
+      "@media (prefers-reduced-motion:reduce){.dc-justadded{animation:none;outline:3px solid rgba(var(--ddsdc-p-rgb),.5);outline-offset:-3px}}" +
       // ── G13 slice 2: the in-place text session + its md mini-bar + a11y bits ──
-      ".ipe-on{outline:2px solid #2a6fb5!important;outline-offset:2px;box-shadow:0 0 0 6px rgba(42,111,181,.14);border-radius:4px;cursor:text;caret-color:#2a6fb5}" +
-      "[data-ipe]:focus-visible{outline:2px dashed #2a6fb5;outline-offset:2px}" +
-      "#dds-ipe-bar{position:absolute;z-index:2147483001;display:none;gap:4px;background:#15141a;border-radius:9px;padding:4px;box-shadow:0 4px 16px rgba(0,0,0,.3);font-family:system-ui,-apple-system,sans-serif}" +
+      ".ipe-on{outline:2px solid var(--ddsdc-p)!important;outline-offset:2px;box-shadow:0 0 0 6px rgba(var(--ddsdc-p-rgb),.14);border-radius:4px;cursor:text;caret-color:var(--ddsdc-p)}" +
+      "[data-ipe]:focus-visible{outline:2px dashed var(--ddsdc-p);outline-offset:2px}" +
+      "#dds-ipe-bar{position:absolute;z-index:2147483001;display:none;gap:2px;background:var(--ddsdc-card);border:1px solid rgba(var(--ddsdc-p-rgb),.08);border-radius:999px;padding:4px;box-shadow:var(--ddsdc-shadow);font-family:var(--ddsdc-sans)}" +
       "#dds-ipe-bar.on{display:flex}" +
-      "#dds-ipe-bar button{font:inherit;font-size:12px;line-height:1;color:#fff;background:rgba(255,255,255,.16);border:1px solid rgba(255,255,255,.3);border-radius:6px;padding:6px 10px;cursor:pointer;min-width:30px}" +
-      "#dds-ipe-bar button:hover{background:rgba(255,255,255,.32)}" +
-      "#dds-ipe-bar button:focus-visible{outline:2px solid #fff;outline-offset:1px}" +
+      "#dds-ipe-bar button{font:600 12px/1 var(--ddsdc-sans);color:var(--ddsdc-ink);background:transparent;border:0;border-radius:999px;padding:0 10px;height:30px;min-width:30px;cursor:pointer}" +
+      "#dds-ipe-bar button:hover{background:var(--ddsdc-up)}" +
+      "#dds-ipe-bar button:focus-visible{outline:2px solid var(--ddsdc-p);outline-offset:1px}" +
       ".ipe-sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);clip-path:inset(50%);white-space:nowrap}";
     (doc.head || doc.documentElement).appendChild(st);
   }
+  // the shell's colours, refreshed on every injection so a theme change follows into the frame
+  let tk = doc.getElementById("dds-dc-tokens");
+  if (!tk) { tk = doc.createElement("style"); tk.id = "dds-dc-tokens"; (doc.head || doc.documentElement).appendChild(tk); }
+  tk.textContent = dcChromeTokens();
   let bar = doc.getElementById("dds-dc-bar");
   if (!bar) { bar = doc.createElement("div"); bar.id = "dds-dc-bar"; bar.setAttribute("role", "toolbar"); bar.setAttribute("aria-label", "Edit this section"); doc.body.appendChild(bar); }
+  // the name chip and the More menu ride along with the pill
+  let chip = doc.getElementById("dds-dc-chip");
+  if (!chip) { chip = doc.createElement("div"); chip.id = "dds-dc-chip"; chip.setAttribute("aria-hidden", "true"); doc.body.appendChild(chip); }
+  let more = doc.getElementById("dds-dc-more");
+  if (!more) { more = doc.createElement("div"); more.id = "dds-dc-more"; more.setAttribute("role", "menu"); more.setAttribute("aria-label", "More for this section"); doc.body.appendChild(more); }
   // Item 82: what the bar points at and its hide timer live on the document. A live redraw
   // runs this again on the same document while older sections keep their first listeners;
   // with a copy per run, leaving a redrawn section for an older one hid the bar under the
   // pointer. The bar's own two listeners go on once.
   const ds = doc.__dcBarState || (doc.__dcBarState = { current: null, hideT: null });
-  // The toolbar sits on the section's top edge, OUTSIDE its text. Placed inside
-  // the padding it wrapped to two rows on a narrow canvas (an iPad's 250px
-  // frame) and covered the heading — nothing under it could be double-clicked
-  // to edit. When the top edge is scrolled out of view the bar takes the
-  // bottom edge instead; only a section taller than the window keeps the old
-  // inside placement, pinned to the visible top.
+  // The pill sits INSIDE the selected section's top-right corner, the name chip at its
+  // top left (direction A). Once the section's top edge has scrolled away the pill rides
+  // the visible top, and it never leaves the section. On a narrow section the chip keeps
+  // the name only; if it would still touch the pill it drops under it.
+  const placeMore = () => {
+    const mb = bar.querySelector('[aria-haspopup="menu"]'); if (!mb) return;
+    const br = bar.getBoundingClientRect(), mw = more.offsetWidth || 200;
+    more.style.top = (br.bottom + win.scrollY + 6) + "px";
+    more.style.left = Math.max(win.scrollX + 8, br.right + win.scrollX - mw) + "px";
+  };
   const place = (el2) => {
     const r = el2.getBoundingClientRect();
-    const top = r.top + win.scrollY, left = r.left + win.scrollX, sy = win.scrollY;
-    bar.style.left = Math.max(2, left + 6) + "px";   // width (and so wrapping) settles before the height is read
-    const h = bar.offsetHeight || 0;
-    let y;
-    if (top - h >= Math.max(2, sy)) y = top - h;
-    else if (top + r.height + h <= sy + win.innerHeight) y = top + r.height;
-    else y = Math.max(top + 6, sy + 2);
-    bar.style.top = y + "px";
+    const top = r.top + win.scrollY, left = r.left + win.scrollX, sy = win.scrollY, sx = win.scrollX;
+    const vw = doc.documentElement.clientWidth;
+    const w = bar.offsetWidth || 0, h = bar.offsetHeight || 0, ins = dcChromeInsets();
+    let y = Math.max(top + 8, Math.min(sy + 8, top + r.height - h - 8));
+    // a short section (a heading alone) would have its words under the pill: the pill
+    // sits just above it instead, or just below when the top edge is off the screen
+    if (r.height < h + 28) y = top - h - 6 >= sy + 4 ? top - h - 6 : top + r.height + 6;
+    const x = Math.max(sx + 8 + ins.left, Math.min(left + r.width - w - 8, sx + vw - ins.right - w - 8));
+    bar.style.left = x + "px"; bar.style.top = y + "px";
+    chip.classList.toggle("compact", r.width < 560);
+    const ch = chip.offsetHeight || 24, cw = chip.offsetWidth || 0, cx = Math.max(left + 8, sx + 8 + ins.left);
+    chip.style.left = cx + "px";
+    chip.style.top = (cx + cw + 8 > x ? y + h + 6 : y + (h - ch) / 2) + "px";
+    if (more.classList.contains("on")) placeMore();
   };
-  const hideBar = () => { bar.classList.remove("on"); doc.__dcSel = null; if (ds.current) { ds.current.classList.remove("dc-hot"); ds.current = null; } };
+  const hideBar = () => { bar.classList.remove("on"); chip.classList.remove("on"); more.classList.remove("on"); doc.__dcSel = null; if (ds.current) { ds.current.classList.remove("dc-hot"); ds.current = null; } };
   const scheduleHide = () => { clearTimeout(ds.hideT); ds.hideT = setTimeout(hideBar, 170); };
   // List item 31: a finger has no hover. A tap selects a section and its toolbar
   // stays until another tap selects something else or lands off every section; a
@@ -12657,11 +12868,23 @@ function dcInjectCanvas(doc, main, live) {
     bar.__dcWired = true;
     bar.addEventListener("mouseenter", () => clearTimeout(ds.hideT));
     bar.addEventListener("mouseleave", scheduleHide);
+    more.addEventListener("mouseenter", () => clearTimeout(ds.hideT));
+    more.addEventListener("mouseleave", scheduleHide);
   }
   const mkBtn = (label, aria, fn, opts) => {
     const b = doc.createElement("button"); b.type = "button"; b.className = "dc-b" + ((opts && opts.cls) ? " " + opts.cls : "");
-    b.textContent = label; b.setAttribute("aria-label", aria); b.title = aria;
+    b.innerHTML = (opts && opts.icon ? uiIcon(opts.icon, 18) : "") + '<span class="dc-sr"></span>';
+    b.lastChild.textContent = label;
+    b.setAttribute("aria-label", aria); b.title = aria;
     b.addEventListener("click", (e) => { e.preventDefault(); e.stopPropagation(); if (fn) fn(); });
+    return b;
+  };
+  const mkItem = (label, aria, fn, opts) => {
+    const b = doc.createElement("button"); b.type = "button"; b.className = "dc-mi" + ((opts && opts.cls) ? " " + opts.cls : ""); b.setAttribute("role", "menuitem");
+    b.innerHTML = (opts && opts.icon ? uiIcon(opts.icon, 16) : "") + "<span></span>";
+    b.lastChild.textContent = label;
+    b.setAttribute("aria-label", aria); b.title = aria;
+    b.addEventListener("click", (e) => { e.preventDefault(); e.stopPropagation(); more.classList.remove("on"); if (fn) fn(); });
     return b;
   };
   const showBar = (el2) => {
@@ -12669,37 +12892,50 @@ function dcInjectCanvas(doc, main, live) {
     clearTimeout(ds.hideT);
     if (ds.current && ds.current !== el2) ds.current.classList.remove("dc-hot");
     ds.current = el2; el2.classList.add("dc-hot");
-    const c = eeClassify(el2); bar.textContent = "";
+    const c = eeClassify(el2); bar.textContent = ""; more.textContent = ""; more.classList.remove("on");
+    const heading = ((el2.querySelector("h1,h2,h3") || {}).textContent || "").trim().slice(0, 40);
+    let chipName = "", chipType = "";
     if (c.kind === "block") {
       const bi = c.bi, b = BLOCKS_WORK[bi] || {};
-      const grip = mkBtn("⠿ Move", "Drag to move this section (or use the editor’s up/down arrows)", null, { cls: "dc-grip" });
+      const def = BLOCK_DEFS.find((x) => x.type === b.type) || {};
+      chipType = def.name || b.type || "Section"; chipName = heading || chipType; if (chipName === chipType) chipType = "";
+      const grip = mkBtn("Move", "Drag to move this section (or use the editor’s up/down arrows)", null, { cls: "dc-grip", icon: "grip" });
       // pointer-drag reorder — same engine as the tray. The grip lives INSIDE the
       // iframe, so its coords are iframe-local (iframeLocal:true translates them to
       // the parent for the ghost + drop-line). Resolves to one list index via dcMove.
       grip.addEventListener("pointerdown", (e) => { e.preventDefault(); e.stopPropagation(); pdStart(e, { kind: "move", from: bi, iframeLocal: true, label: (BLOCKS_WORK[bi] && (BLOCK_DEFS.find((x) => x.type === BLOCKS_WORK[bi].type) || {}).name) || "Section", icon: "⠿" }, grip); });
       bar.appendChild(grip);
-      bar.appendChild(mkBtn("Edit", "Edit this section", () => eeEditBlock(bi)));
+      bar.appendChild(mkBtn("Edit", "Edit this section", () => eeEditBlock(bi), { icon: "pencil" }));
+      bar.appendChild(mkBtn("Duplicate", "Duplicate this section", () => dcDuplicate(bi), { icon: "copy" }));
+      bar.appendChild(mkBtn("Style", "Style this section — its look and layout live in its editor for now", () => eeEditBlock(bi), { icon: "spark" }));
+      bar.appendChild(mkBtn("Delete", "Delete this section", () => dcDelete(bi), { cls: "dc-danger", icon: "x" }));
+      // the rest behind More: copy, cut, hide, and a Columns section's column count
+      more.appendChild(mkItem("Copy", "Copy this section — paste it anywhere", () => dcCopyBlock(bi), { icon: "clipboard" }));
+      more.appendChild(mkItem("Cut", "Cut this section — paste it anywhere", () => dcCutBlock(bi), { icon: "scissors" }));
+      more.appendChild(mkItem("Hide", "Hide this section", () => eeHideKey(el2.getAttribute("data-dds-key") || ddsKeyFor(bi)), { icon: "eyeoff" }));
       if (b.type === "columns") {   // Layout Container: 1–6 columns; drag dividers to resize
         const nc = Array.isArray(b.columns) ? b.columns.length : 2;
-        bar.appendChild(mkBtn("－", "Remove a column", () => dcSetColumns(bi, nc - 1), { cls: nc <= 1 ? "dc-off" : "" }));
-        bar.appendChild(mkBtn(nc + (nc === 1 ? " column" : " columns"), "Columns — drag the dividers on the page to resize their widths", () => eeEditBlock(bi)));
-        bar.appendChild(mkBtn("＋", "Add a column", () => dcSetColumns(bi, nc + 1), { cls: nc >= 6 ? "dc-off" : "" }));
+        more.appendChild(mkItem(nc + (nc === 1 ? " column" : " columns"), "Columns — drag the dividers on the page to resize their widths", () => eeEditBlock(bi), { icon: "columns" }));
+        more.appendChild(mkItem("Add a column", "Add a column", () => dcSetColumns(bi, nc + 1), { cls: nc >= 6 ? "dc-off" : "", icon: "plus" }));
+        more.appendChild(mkItem("Remove a column", "Remove a column", () => dcSetColumns(bi, nc - 1), { cls: nc <= 1 ? "dc-off" : "", icon: "x" }));
       }
-      bar.appendChild(mkBtn("Duplicate", "Duplicate this section", () => dcDuplicate(bi)));
-      bar.appendChild(mkBtn("Copy", "Copy this section — paste it anywhere", () => dcCopyBlock(bi)));
-      bar.appendChild(mkBtn("Cut", "Cut this section — paste it anywhere", () => dcCutBlock(bi)));
-      bar.appendChild(mkBtn("Hide", "Hide this section", () => eeHideKey(el2.getAttribute("data-dds-key") || ddsKeyFor(bi))));
-      bar.appendChild(mkBtn("Delete", "Delete this section", () => dcDelete(bi), { cls: "dc-danger" }));
+      const mb = mkBtn("More", "More", null, { icon: "more" });
+      mb.setAttribute("aria-haspopup", "menu"); mb.setAttribute("aria-expanded", "false");
+      mb.addEventListener("click", () => { const on = !more.classList.contains("on"); more.classList.toggle("on", on); mb.setAttribute("aria-expanded", String(on)); if (on) { placeMore(); const f = more.querySelector(".dc-mi"); if (f) { try { f.focus({ preventScroll: true }); } catch (_) {} } } });
+      bar.appendChild(mb);
     } else {
-      bar.appendChild(mkBtn("Edit", "Edit this section", () => eeEditCore(c.view)));
+      chipName = heading || DC_CORE_NAME[c.view] || "Section"; chipType = "Built-in section";
+      bar.appendChild(mkBtn("Edit", "Edit this section", () => eeEditCore(c.view), { icon: "pencil" }));
       const keys = dcCoreKeys(main), at = c.key ? keys.indexOf(c.key) : -1;
       if (at >= 0) {
-        bar.appendChild(mkBtn("↑", "Move this section up", () => dcMoveCore(c.key, -1), { cls: at <= 0 ? "dc-off" : "" }));
-        bar.appendChild(mkBtn("↓", "Move this section down", () => dcMoveCore(c.key, 1), { cls: at >= keys.length - 1 ? "dc-off" : "" }));
+        bar.appendChild(mkBtn("Move up", "Move this section up", () => dcMoveCore(c.key, -1), { cls: at <= 0 ? "dc-off" : "", icon: "up" }));
+        bar.appendChild(mkBtn("Move down", "Move this section down", () => dcMoveCore(c.key, 1), { cls: at >= keys.length - 1 ? "dc-off" : "", icon: "down" }));
       }
-      if (c.key) bar.appendChild(mkBtn("Remove", "Remove this section from the page (bring it back in Styles → Your home page)", () => eeHideKey(c.key), { cls: "dc-danger" }));
+      if (c.key) bar.appendChild(mkBtn("Remove", "Remove this section from the page (bring it back in Styles → Your home page)", () => eeHideKey(c.key), { cls: "dc-danger", icon: "x" }));
     }
-    bar.classList.add("on"); place(el2);
+    chip.textContent = chipName;
+    if (chipType) { const t = doc.createElement("span"); t.className = "dc-chip-type"; t.textContent = "· " + chipType; chip.appendChild(t); }
+    bar.classList.add("on"); chip.classList.add("on"); place(el2);
   };
   // G13: refresh the sid→index lookup from the server sidecar, then wire every
   // top-level section's hover toolbar (identity read straight off the stamps).
@@ -12743,7 +12979,7 @@ function dcInjectCanvas(doc, main, live) {
       const from = doc.__dcTapFrom; doc.__dcTapFrom = null;
       if (!from || Math.abs(e.clientX - from.x) > 10 || Math.abs(e.clientY - from.y) > 10 || Date.now() - from.at > 600) return;
       if (!doc.__dcSel) return;
-      if (e.target.closest && e.target.closest("main > section, main > nav.block-toc, #dds-dc-bar, #dds-ipe-bar, .dc-ins, .dc-colh, .dc-emptyzone")) return;
+      if (e.target.closest && e.target.closest("main > section, main > nav.block-toc, #dds-dc-bar, #dds-dc-more, #dds-ipe-bar, .dc-ins, .dc-colh, .dc-emptyzone")) return;
       hideBar();
     }, true);
   }
@@ -12755,7 +12991,7 @@ function dcInjectCanvas(doc, main, live) {
       el2.addEventListener("mouseleave", () => { if (!byTouch()) scheduleHide(); });
       el2.addEventListener("click", (e) => {
         if (!byTouch()) return;   // a mouse click keeps its meaning: hover shows the bar, a double-click edits
-        if (e.target.closest && e.target.closest(".dc-ins,#dds-dc-bar,#dds-ipe-bar,.dc-colh,.dc-emptyzone")) return;
+        if (e.target.closest && e.target.closest(".dc-ins,#dds-dc-bar,#dds-dc-more,#dds-ipe-bar,.dc-colh,.dc-emptyzone")) return;
         if (IPE && IPE.el && IPE.el.contains(e.target)) return;   // typing in it already
         if (IDE && IDE.el.contains(e.target)) return;
         if (doc.__dcSel !== el2 || !bar.classList.contains("on")) {   // first tap: select it
@@ -12774,7 +13010,7 @@ function dcInjectCanvas(doc, main, live) {
       // the panel exactly as a single click would: never a dead double-click.
       el2.addEventListener("dblclick", (e) => {
         if (DC_MODE !== "edit") return;
-        if (e.target.closest && e.target.closest(".dc-ins,#dds-dc-bar,#dds-ipe-bar,.dc-colh,.dc-emptyzone")) return;
+        if (e.target.closest && e.target.closest(".dc-ins,#dds-dc-bar,#dds-dc-more,#dds-ipe-bar,.dc-colh,.dc-emptyzone")) return;
         if (IPE && IPE.el && IPE.el.contains(e.target)) return;   // inside the live session = word-select
         if (IDE && IDE.el.contains(e.target)) return;
         const f = e.target.closest ? e.target.closest("[data-dds-field]") : null;
@@ -12850,7 +13086,7 @@ function dcBlockSections(main) {
 function dcInsBar(doc, gap, label) {
   const bar = doc.createElement("div"); bar.className = "dc-ins"; bar.setAttribute("data-gap", String(gap));
   bar.setAttribute("role", "button"); bar.setAttribute("tabindex", "0"); bar.setAttribute("aria-label", label || "Add a section here");
-  const pill = doc.createElement("span"); pill.className = "dc-ins-pill"; pill.textContent = "＋ Add section";
+  const pill = doc.createElement("span"); pill.className = "dc-ins-pill"; pill.innerHTML = uiIcon("plus", 14) + "<span>Add section</span>";
   bar.appendChild(pill);
   const open = (e) => { e.preventDefault(); e.stopPropagation(); dcOpenInsertFromCanvas(gap, bar); };
   bar.addEventListener("click", open);
