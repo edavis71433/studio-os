@@ -26,8 +26,9 @@ async function countReads(page: Page) {
   });
 }
 /** how many times the page asked for this API path — `tail` is matched against the end of the URL */
+// a read of that path, with or without a query of its own (the project reads carry ?today=)
 const reads = (page: Page, tail: string) => page.evaluate((t) =>
-  (window as unknown as { __reads: string[] }).__reads.filter((u) => u.endsWith('/functions/v1/presence' + t)).length, tail);
+  (window as unknown as { __reads: string[] }).__reads.filter((u) => u.endsWith('/functions/v1/presence' + t) || u.includes('/functions/v1/presence' + t + '?')).length, tail);
 
 const DAY = 86_400_000;
 const ago = (d: number) => new Date(Date.now() - d * DAY).toISOString();
