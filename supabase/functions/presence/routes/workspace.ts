@@ -177,6 +177,9 @@ export async function handlePortalContext(jwt: string, site: SiteRow, principal:
   // The lookup rides the wave above so the attention block below reuses it (no 2nd query).
   const customerLinks: any[] | null = isAgency ? null : linksQ;
   const isManagedClient = !!(customerLinks && customerLinks.length > 0);
+  // builder list item 59: a managed client's pages carry their studio's name and logo (routes/studio_brand.ts)
+  const studioSiteId = isManagedClient ? String(customerLinks![0]?.agency_site_id || '') : '';
+  const studio = studioSiteId ? await import('./studio_brand.ts').then((m) => m.studioBrandOf(studioSiteId)).catch(() => null) : null;
 
   // Phase D: resolve the FEATURE edition from the licensed plan (falls back to
   // the site edition when no entitlement plan is recorded). Navigation adapts to
@@ -274,6 +277,7 @@ export async function handlePortalContext(jwt: string, site: SiteRow, principal:
   return json({ data: {
     site_role: role,
     capabilities: caps,
+    studio,                              // builder list item 59: { name, logo_url, accent } for a managed client, else null
     edition: site.edition,               // 'monitor' | 'presence' (site hosting dimension)
     site_live: !!siteLive,               // sales review item 24: the client Overview's Website tile (hosted elsewhere · live · not live yet)
     edition_key: editionKey,             // Phase D: the FEATURE edition (cms_only … enterprise)

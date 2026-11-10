@@ -11,7 +11,63 @@ const REVIEWER_CTX = { data: {
   landing: '/client.html', attention_count: 1, nav: [{ key: 'client', label: 'Your updates', items: [{ key: 'feed', label: 'Updates', href: '/client.html' }] }],
 } };
 
+// builder list item 59: a managed client's pages carry their studio's name and logo
+const STUDIO = { name: 'Marlow & Co', logo_url: 'https://store.example/sign/logo.png', accent: '#8c3b2e', is_default: false };
+const MANAGED_CTX = { data: { ...REVIEWER_CTX.data, site_role: 'business_owner', is_managed_client: true, sees_full_workspace: false, capabilities: ['edit'], studio: STUDIO } };
+
 test.describe('Client portal', () => {
+  test('item 59 — the studio’s name and logo sit in the bar, the title and the footer; a reviewer without one sees the generic', async ({ page }) => {
+    await installApp(page, { api: { '/portal/context': MANAGED_CTX, '/client/projects': { data: [] }, '/portal/feed': { data: { role: 'business_owner', moments: [], pending_approvals: [], last_published: null } } } });
+    await page.route('https://store.example/**', (r) => r.fulfill({ status: 200, contentType: 'image/png', body: Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=', 'base64') }));
+    await page.goto('/client.html');
+    await expect(page.locator('#main h1').first()).toBeVisible();
+    await expect(page.locator('#footby')).toHaveText('by Marlow & Co');
+    await expect(page).toHaveTitle(/— Marlow & Co$/);
+    const logo = page.locator('.cb-logo');
+    if (await logo.count()) {   // the bar's brand shows on wider screens only
+      await expect(logo).toHaveAttribute('src', STUDIO.logo_url);
+      await expect(page.locator('.cb-name')).toHaveText('Marlow & Co');
+    }
+    expect(await page.evaluate(() => JSON.parse(localStorage.getItem('dds-studio-brand') || 'null'))).toEqual({ name: 'Marlow & Co', logo_url: STUDIO.logo_url, accent: '#8c3b2e' });
+    // a reviewer, with no studio in context, keeps the honest generic
+    await installApp(page, { api: { '/portal/context': REVIEWER_CTX, '/portal/feed': { data: { role: 'client_reviewer', moments: [], pending_approvals: [], last_published: null } } } });
+    await page.evaluate(() => localStorage.removeItem('dds-studio-brand'));
+    await page.goto('/client.html');
+    await expect(page.locator('#main h1').first()).toBeVisible();
+    await expect(page.locator('#footby')).toHaveText('by your studio');
+    await expect(page).toHaveTitle(/— Your studio$/);
+    await expect(page.locator('.cb-logo')).toHaveCount(0);
+  });
+
+  test('item 59 — the sign-in page shows the studio from a link’s ?studio=, remembers it, and stays Studio OS otherwise', async ({ page }) => {
+    const SITE = 'aaaaaaaa-1111-4111-8111-aaaaaaaaaaaa';
+    let reads = 0;
+    await installApp(page, { session: null, api: {} });   // the sign-in page, signed out
+    await page.route(/\/functions\/v1\/presence\/public\/studio\/[0-9a-f-]{36}\/brand$/, (r) => { reads++; return r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: STUDIO }) }); });
+    await page.route('https://store.example/**', (r) => r.fulfill({ status: 200, contentType: 'image/png', body: Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=', 'base64') }));
+    await page.goto('/portal.html');
+    await expect(page.locator('#brand .word')).toHaveText('Studio OS');
+    expect(reads).toBe(0);
+    await page.goto(`/portal.html?studio=${SITE}`);
+    await expect(page.locator('#brand img.logo')).toHaveAttribute('alt', 'Marlow & Co');
+    await expect(page).toHaveTitle('Marlow & Co — Client sign in');
+    expect(reads).toBe(1);
+    // next time, no link needed: the page remembers
+    await page.goto('/portal.html');
+    await expect(page.locator('#brand img.logo')).toHaveAttribute('alt', 'Marlow & Co');
+    expect(reads).toBe(1);
+    // a studio with no logo yet gets its initial and name on its colour
+    await page.evaluate(() => localStorage.setItem('dds-studio-brand', JSON.stringify({ name: 'Harbor Dental', logo_url: null, accent: '#2f5d8a' })));
+    await page.goto('/portal.html');
+    await expect(page.locator('#brand .word')).toHaveText('Harbor Dental');
+    await expect(page.locator('#brand .mark')).toHaveText('H');
+    // a bad id is ignored
+    await page.evaluate(() => localStorage.removeItem('dds-studio-brand'));
+    await page.goto('/portal.html?studio=not-a-site');
+    await expect(page.locator('#brand .word')).toHaveText('Studio OS');
+    expect(reads).toBe(1);
+  });
+
   test('Home mirrors "needs you": approval card with actions + recent updates', async ({ page }) => {
     await installApp(page, { api: {
       '/portal/context': REVIEWER_CTX,

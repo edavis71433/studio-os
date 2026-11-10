@@ -23,6 +23,8 @@
   .mark{display:inline-flex;width:34px;height:34px;border-radius:9px;background:var(--p);color:#fff;font-weight:700;
     align-items:center;justify-content:center;font-size:17px;flex:0 0 auto}
   .word{font-family:var(--serif);font-size:21px;font-weight:500;letter-spacing:-.2px}
+  .logo{height:40px;width:auto;max-width:200px;display:block}   /* builder list item 59: the studio's own logo */
+  .brand .studio-by{display:block;font-size:12px;color:var(--muted,#6b6478);margin-top:2px}
   .eyebrow{font-size:11px;font-weight:600;letter-spacing:2px;color:var(--p);text-transform:uppercase;margin-bottom:8px}
   h1{font-family:var(--serif);font-weight:500;font-size:28px;line-height:1.15;margin-bottom:6px;letter-spacing:-.3px}
   .sub{color:var(--soft);font-size:14px;margin-bottom:22px}
@@ -55,7 +57,7 @@
 </head>
 <body>
 <div class="card">
-  <div class="brand"><span class="mark" aria-hidden="true">S</span><span class="word">Studio OS</span></div>
+  <div class="brand" id="brand"><span class="mark" aria-hidden="true">S</span><span class="word">Studio OS</span></div>
 
   <!-- SIGN IN · PASSWORDLESS (primary) -->
   <div id="emailPanel">
@@ -158,6 +160,41 @@ function clearErr(boxId){ var e=$(boxId); if(e){ e.style.display='none'; } }
 function withTimeout(p, ms){ return Promise.race([p, new Promise(function(_,rej){ setTimeout(function(){ rej(new Error('timeout')); }, ms); })]); }
 
 var sb = null;
+
+// ── Builder list item 59: the studio's own name and logo above the form. ──
+// A link from the studio's emails carries ?studio=<their site id>, and a client
+// who has signed in before left the same name and logo in localStorage (client.html
+// writes 'dds-studio-brand'). Either way the page reads ONE public, cached answer
+// (/public/studio/<id>/brand) that gives away only what the studio's website shows.
+// Nothing here changes who can sign in; it only changes whose name is at the top.
+function paintStudioBrand(b){
+  if (!b || !b.name) return;
+  var box = $('brand'); if (!box) return;
+  var safe = String(b.name).slice(0, 80);
+  box.textContent = '';
+  if (typeof b.logo_url === 'string' && /^https:\/\//.test(b.logo_url)) {
+    var img = document.createElement('img'); img.className = 'logo'; img.src = b.logo_url; img.alt = safe; box.appendChild(img);
+  } else {
+    var mark = document.createElement('span'); mark.className = 'mark'; mark.setAttribute('aria-hidden', 'true'); mark.textContent = safe.charAt(0).toUpperCase() || 'S';
+    if (b.accent && /^#[0-9a-f]{6}$/i.test(b.accent)) mark.style.background = b.accent;
+    var word = document.createElement('span'); word.className = 'word'; word.textContent = safe;
+    box.appendChild(mark); box.appendChild(word);
+  }
+  try { document.title = safe + ' — Client sign in'; } catch(e){}
+}
+(function studioBrandBoot(){
+  var id = '';
+  try { id = String(new URLSearchParams(location.search).get('studio') || ''); } catch(e){}
+  if (!/^[0-9a-f-]{36}$/.test(id)) id = '';
+  var remembered = null;
+  try { remembered = JSON.parse(localStorage.getItem('dds-studio-brand') || 'null'); } catch(e){}
+  if (!id && remembered) { paintStudioBrand(remembered); return; }
+  if (!id) return;
+  withTimeout(fetch(FN + '/presence/public/studio/' + id + '/brand', { headers: { apikey: SUPABASE_KEY } }), 6000)
+    .then(function(r){ return r.ok ? r.json() : null; })
+    .then(function(j){ var b = j && j.data; if (b && b.name && !b.is_default) { paintStudioBrand(b); try { localStorage.setItem('dds-studio-brand', JSON.stringify({ name: b.name, logo_url: b.logo_url || null, accent: b.accent || '' })); } catch(e){} } })
+    .catch(function(){});
+})();
 if (typeof supabase !== "undefined") {
   sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY, { auth: { storageKey: 'dds-client-auth', persistSession: true, autoRefreshToken: true } });
 } else {

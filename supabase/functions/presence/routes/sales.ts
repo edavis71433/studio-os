@@ -2645,7 +2645,7 @@ async function sendCustomerInvite(siteId: string, email: string, _isNewLogin: bo
     ? `<p class="cta"><a href="${magic}" style="${btnStyle}">Sign in to your client portal →</a></p><p style="font-size:13px;color:#6b6478">No password to set — this link signs you straight in. Want a password for next time? Use “Forgot your password?” on the sign-in page any time.</p>`
     : link
     ? `<p class="cta"><a href="${link}" style="${btnStyle}">Create your password &amp; sign in →</a></p>`
-    : `<p class="cta"><a href="${base}/portal.html" style="${btnStyle}">Sign in at your portal →</a></p><p style="font-size:13px;color:#6b6478">No password needed — we’ll email you a one-time code.</p>`;
+    : `<p class="cta"><a href="${base}/portal.html?studio=${siteId}" style="${btnStyle}">Sign in at your portal →</a></p><p style="font-size:13px;color:#6b6478">No password needed — we’ll email you a one-time code.</p>`;
   sendEmail(email, `Your client portal is ready${studioName ? ` — ${studioName}` : ''}`,
     `<p>Welcome — your client portal is ready. It’s the one place where we work together from here:</p>` +
     `<ul style="margin:8px 0;padding-left:20px">` +
@@ -2655,7 +2655,7 @@ async function sendCustomerInvite(siteId: string, email: string, _isNewLogin: bo
     `<li>see every invoice and payment in one place</li>` +
     `</ul>` +
     cta +
-    `<p style="font-size:13px;color:#6b6478">You can sign in any time at <a href="${base}/portal.html">your portal</a>. If anything looks off, just reply and tell me.</p>`,
+    `<p style="font-size:13px;color:#6b6478">You can sign in any time at <a href="${base}/portal.html?studio=${siteId}">your portal</a>. If anything looks off, just reply and tell me.</p>`,   // builder list item 59: the sign-in page shows the studio's name and logo
   brand, { critical: true, siteId }).catch(() => {});   // login access = transactional; "message me directly" — their answer lands in the Inbox
   return true;
 }
@@ -2757,7 +2757,7 @@ export async function handleSalesAddCustomer(req: Request, site: SiteRow, princi
   if (!email || !validEmail(email)) return json({ error: 'validation', message: 'Enter the customer’s email — that’s where their sign-in invitation goes.' }, 422, cors);
   const businessName = businessNameIn || name || (email.split('@')[0] || 'New customer');
   const mode = b.mode === 'connect' ? 'connect' : 'provision';
-  const portalUrl = `${siteUrl()}/portal.html`;
+  const portalUrl = `${siteUrl()}/portal.html?studio=${site.id}`;   // builder list item 59: the sign-in page shows this studio's name and logo
 
   // ── B) CONNECT BY EMAIL — record intent; provision NOTHING ──────────────────
   if (mode === 'connect') {

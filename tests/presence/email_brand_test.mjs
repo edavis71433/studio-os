@@ -23,6 +23,17 @@ ok('no kit / no name → the Studio OS default', brandFromKit(null, '').name ===
   ok('uses a table layout + inline styles (email-client-safe, no external assets)', shell.includes('role="presentation"') && shell.includes('style=') && !/https?:\/\//.test(shell));
 }
 
+// builder list item 59: the studio's logo in place of its name, when it set one
+{
+  const brand = { ...brandFromKit({ primary: '#8c3b2e' }, 'Marlow & Co'), logoUrl: 'https://store.example/sign/logo.png?token=abc' };
+  const shell = brandEmailShell('<p>hi</p>', brand);
+  ok('a logo is drawn as an image with the name as its alt text', /<img src="https:\/\/store\.example\/sign\/logo\.png\?token=abc" alt="Marlow &amp; Co"/.test(shell));
+  ok('the logo stands in for the name line (the footer still names the studio)', !/font-size:19px[^>]*>Marlow &amp; Co</.test(shell) && /Sent by Marlow &amp; Co on Studio OS/.test(shell));
+  ok('a logo that is not https is ignored', !/<img/.test(brandEmailShell('<p>hi</p>', { ...brand, logoUrl: 'http://x/logo.png' })) && !/<img/.test(brandEmailShell('<p>hi</p>', { ...brand, logoUrl: 'javascript:alert(1)' })));
+  ok('without a logo the name is drawn as before', /font-size:19px[^>]*>Marlow &amp; Co</.test(brandEmailShell('<p>hi</p>', { ...brand, logoUrl: null })));
+  ok('a hostile logo URL is escaped', !/"><script/.test(brandEmailShell('<p>hi</p>', { ...brand, logoUrl: 'https://x/a.png"><script>1</script>' })));
+}
+
 const passed = results.filter((r) => r.p).length;
 console.log(`\n════ EMAIL BRAND: ${passed}/${results.length} ${passed === results.length ? 'PASSED' : 'FAILED'} ════`);
 if (passed !== results.length) Deno.exit(1);
