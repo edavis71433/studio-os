@@ -343,7 +343,9 @@
       for (var i = 0; i < text.length; i++) {
         var ch = text[i];
         if (inQ) { if (ch === '"') { if (text[i + 1] === '"') { cell += '"'; i++; } else inQ = false; } else cell += ch; }
-        else if (ch === '"') inQ = true;
+        // a quote opens a quoted cell only as its first character: `6" sub` mid-cell is an inch mark,
+        // and reading it as an opening quote swallowed every row after it into that one cell
+        else if (ch === '"' && cell === '') inQ = true;
         else if (ch === ',') { row.push(cell); cell = ''; }
         else if (ch === '\n' || ch === '\r') { if (ch === '\r' && text[i + 1] === '\n') i++; row.push(cell); cell = ''; if (row.some(function (c) { return c.trim() !== ''; })) rows.push(row); row = []; }
         else cell += ch;
@@ -351,36 +353,71 @@
       if (cell !== '' || row.length) { row.push(cell); if (row.some(function (c) { return c.trim() !== ''; })) rows.push(row); }
       return rows;
     }
+    // Google and Outlook exports put a label, type or display-name column beside each value
+    // ("E-mail 1 - Label" · "E-mail 1 - Value", "E-mail Type", "Phonetic First Name", "Surname Yomi").
+    // None of those is ever what a key means, so none is read as one.
+    function csvSideColumn(h) { return /\b(label|labels|type|display name|yomi|phonetic)\b/i.test(String(h || '')); }
+    // One row under the keys. When several columns mean the same key, the first one with a value
+    // wins: the last one used to, even when it was empty or held "Home", so a Google or Outlook
+    // file came in without its emails, phones and names.
+    function csvObject(keys, r) {
+      var obj = {};
+      keys.forEach(function (k, i) { if (!k) return; var v = String(r[i] || '').trim(); if (v && !obj[k]) obj[k] = v; });
+      return obj;
+    }
+    var IMPORT_MAX = 500;   // one run's worth; the rest of a bigger file is named, never dropped in silence
     // host: an element to fill. o: {title, help, mapHeader(h)→key|null, ready(keys)→'' or a message, toItem(obj)→item|null,
     // label(item)→string, noun, send(item)→Promise<'added'|'existed'|'skipped'|'failed'>, summary(counts)→string, done()}
     function importPanel(host, o) {
+      // One run per panel: Import CSV again while rows are going in leaves the running panel as it is
+      // (a second run of the same file doubled everyone without an email, who can't be matched)
+      if (host.__ddsImport && host.__ddsImport.running) return;
+      var run = host.__ddsImport = { running: false, stop: false };
       host.innerHTML = '<div class="card" style="margin:10px 0;padding:14px 16px"><p style="font-weight:600;margin:0 0 4px"></p><p class="muted" style="margin-top:0"></p>'
         + '<input type="file" accept=".csv,text/csv" aria-label="Choose a CSV file"><div class="dds-csvprev"></div><p class="muted" style="margin:10px 0 0"><button type="button" class="linkbtn dds-csvx" style="font:inherit;color:var(--p,#5b3fa0);background:none;border:none;padding:0;cursor:pointer">Close</button></p></div>';
       host.querySelector('p').textContent = o.title; host.querySelectorAll('p')[1].textContent = o.help;
-      var prev = host.querySelector('.dds-csvprev');
+      var prev = host.querySelector('.dds-csvprev'), file = host.querySelector('input[type=file]'), closer = host.querySelector('.dds-csvx');
       var opener = pickBack(o.back, document.activeElement);   // batch C: closing the panel gives focus back (it was left on <body>)
-      host.querySelector('.dds-csvx').addEventListener('click', function () {
+      closer.addEventListener('click', function () {
+        // Close (Stop, while it runs) ends the run before its next rows: closing only hid the panel
+        // and every row still went in. What already went in stays, and the summary says how far it got.
+        run.stop = true; if (host.__ddsImport === run) host.__ddsImport = null;
         host.innerHTML = '';
         if (opener && opener.isConnected && opener.focus) try { opener.focus(); } catch (_) { /* */ }
       });
-      host.querySelector('input[type=file]').addEventListener('change', function (e) {
-        var f = e.target.files && e.target.files[0]; if (!f) return;
+      file.addEventListener('change', function (e) {
+        var f = e.target.files && e.target.files[0]; if (!f || run.running) return;
         f.text().then(function (text) {
+          if (run.stop || run.running) return;   // closed, or started, while the file was read
           var rows = parseCsv(text);
           if (rows.length < 2) { prev.innerHTML = '<p class="muted">That file looks empty (or has only a header row).</p>'; return; }
-          var keys = rows[0].map(o.mapHeader);
+          var keys = rows[0].map(function (h) { return csvSideColumn(h) ? null : o.mapHeader(h); });
           var why = o.ready(keys); if (why) { prev.innerHTML = '<p class="muted"></p>'; prev.firstChild.textContent = why; return; }
-          var items = rows.slice(1).map(function (r) { var obj = {}; keys.forEach(function (k, i) { if (k) obj[k] = String(r[i] || '').trim(); }); return o.toItem(obj); }).filter(Boolean).slice(0, 500);
+          // counted before the cut: an 800-row file said "500 found", finished "500 imported" and never named the other 300
+          var all = rows.slice(1).map(function (r) { return o.toItem(csvObject(keys, r)); }).filter(Boolean);
+          var items = all.slice(0, IMPORT_MAX), left = all.length - items.length;
           if (!items.length) { prev.innerHTML = '<p class="muted">None of the rows had what an import needs.</p>'; return; }
+          var many = function (n) { return n + ' ' + o.noun + (n === 1 ? '' : 's'); };
           prev.innerHTML = '<p class="muted" style="margin:10px 0 6px"></p><button type="button" class="btn dds-csvgo"></button> <span class="muted dds-csvlive" role="status" aria-live="polite"></span>';
-          prev.querySelector('p').textContent = items.length + ' ' + o.noun + (items.length === 1 ? '' : 's') + ' found — first few: ' + items.slice(0, 3).map(o.label).join(', ') + (items.length > 3 ? '…' : '');
+          prev.querySelector('p').textContent = (left ? many(all.length) + ' in the file — this imports the first ' + IMPORT_MAX + '. Put the other ' + left + ' in a second file and import that. First few: ' : many(items.length) + ' found — first few: ')
+            + items.slice(0, 3).map(o.label).join(', ') + (items.length > 3 ? '…' : '');
           var go = prev.querySelector('.dds-csvgo'), live = prev.querySelector('.dds-csvlive');
           go.textContent = 'Import ' + items.length;
           go.addEventListener('click', function () {
-            go.disabled = true;
+            if (run.running || run.stop) return;
+            run.running = true; go.disabled = true; file.disabled = true; closer.textContent = 'Stop';   // no second file under a running one
             var counts = { added: 0, existed: 0, skipped: 0, failed: 0 }, done = 0, i = 0;
+            function finish(stopped) {
+              run.running = false;
+              if (host.__ddsImport === run) { host.__ddsImport = null; host.innerHTML = ''; }
+              var msg = (stopped ? 'Stopped after ' + done + ' of ' + items.length + ' — ' : '') + o.summary(counts)
+                + (left && !stopped ? ' ' + left + ' more in the file weren’t imported — put them in a second file.' : '');
+              if (window.ddsToast) window.ddsToast(msg, counts.failed ? 'err' : 'ok');
+              if (o.done) o.done(counts);
+            }
             (function next() {
-              if (i >= items.length) { host.innerHTML = ''; if (window.ddsToast) window.ddsToast(o.summary(counts), counts.failed ? 'err' : 'ok'); if (o.done) o.done(counts); return; }
+              if (run.stop) { finish(true); return; }
+              if (i >= items.length) { finish(false); return; }
               var chunk = items.slice(i, i + 5); i += 5;
               Promise.all(chunk.map(function (it) { return Promise.resolve().then(function () { return o.send(it); }).catch(function () { return 'failed'; }).then(function (k) { counts[k in counts ? k : 'failed']++; done++; }); }))
                 .then(function () { go.textContent = 'Importing ' + Math.min(done, items.length) + '/' + items.length + '…'; live.textContent = 'Imported ' + done + ' of ' + items.length; next(); });

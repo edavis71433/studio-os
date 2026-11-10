@@ -828,63 +828,34 @@ $('custForm').onsubmit=async(e)=>{
   load().catch(()=>toast('We couldn’t refresh the list just now — Refresh will catch it up.'));
 };
 // ── CSV IMPORT: bring an existing contact list in one go. Pure frontend — the
-// server already dedupes per email and validates every row, so this simply
-// parses, previews, and POSTs. Handles quoted fields; maps common headers. ──
-function parseCsv(text){
-  const rows=[];let row=[],cell='',inQ=false;
-  text=String(text||'');if(text.charCodeAt(0)===0xFEFF)text=text.slice(1);   // final pass, batch D: drop Excel's byte-order mark (the header match trims it; the cell kept it)
-  for(let i=0;i<text.length;i++){const ch=text[i];
-    if(inQ){if(ch==='"'){if(text[i+1]==='"'){cell+='"';i++;}else inQ=false;}else cell+=ch;}
-    else if(ch==='"')inQ=true;
-    else if(ch===','){row.push(cell);cell='';}
-    else if(ch==='\n'||ch==='\r'){if(ch==='\r'&&text[i+1]==='\n')i++;row.push(cell);cell='';if(row.some(c=>c.trim()!==''))rows.push(row);row=[];}
-    else cell+=ch;}
-  if(cell!==''||row.length){row.push(cell);if(row.some(c=>c.trim()!==''))rows.push(row);}
-  return rows;
-}
-function mapHeader(h){h=h.toLowerCase().trim();
-  if(/^(full ?name|name|contact)$/.test(h))return'name';
-  if(/first/.test(h))return'first';if(/last|surname/.test(h))return'last';
-  if(/e-?mail/.test(h))return'email';if(/phone|mobile|tel/.test(h))return'phone';
-  if(/company|business|organi[sz]ation/.test(h))return'company';return null;}
+// server already dedupes per email and validates every row, so this maps the
+// columns and hands the rows to the shared importer (shell.js importPanel), the
+// one Customers and Pipeline use. Contacts kept its own copy until item 97; the
+// copy had every import bug twice (Google and Outlook columns, the silent stop
+// at 500, a Cancel that didn't stop, a stray quote swallowing rows). ──
+// a heading that names where the business is, or how to reach it, is never its name
+// ("Business Street", "Business Phone", "Organization Title" all said "business" or "organization")
+const NOT_COMPANY=/\b(street|city|state|postal|zip|country|region|address|fax|phone|web|page|po box|department|title|location|symbol|description)\b/;
+function mapHeader(h){h=String(h).toLowerCase().trim();
+  if(/^(full[ _-]?name|name|contact|contact name)$/.test(h))return'name';
+  // "first"/"last" alone are names only as whole words with "name": "Last activity" was glued onto names
+  if(/\b(first|given)[ _-]?name\b|^first$/.test(h))return'first';if(/\b(last|family)[ _-]?name\b|\bsurname\b|^last$/.test(h))return'last';
+  if(/e-?mail/.test(h))return'email';if(/phone|mobile|\btel\b|telephone|\bcell\b/.test(h))return'phone';   // "tel" caught Outlook's "Telex"
+  if(/company|business|organi[sz]ation/.test(h)&&!NOT_COMPANY.test(h))return'company';return null;}
 function openImport(){
-  const z=$('csvZone');
-  z.innerHTML=`<div class="card" style="margin:10px 0;padding:14px 16px"><p style="font-weight:600;margin-bottom:4px">Import contacts from a CSV</p>
-    <p class="muted" style="margin-top:0">Export from anywhere (Google Contacts, a spreadsheet, another tool) — we look for name, email, phone, and company columns. Anyone already in your contacts (matched by email) is skipped automatically.</p>
-    <input type="file" id="csvFile" accept=".csv,text/csv" aria-label="Choose a CSV file"><div id="csvPrev"></div></div>`;
-  $('csvFile').addEventListener('change',async(e)=>{
-    const f=e.target.files&&e.target.files[0];if(!f)return;
-    const text=await f.text();const rows=parseCsv(text);
-    if(rows.length<2){$('csvPrev').innerHTML='<p class="muted">That file looks empty (or has only a header row).</p>';return;}
-    const cols=rows[0].map(mapHeader);
-    if(!cols.includes('email')&&!cols.includes('name')&&!cols.includes('first')){$('csvPrev').innerHTML='<p class="muted">We couldn’t find a name or email column. Check the first row has headers like “Name” and “Email”.</p>';return;}
-    const items=rows.slice(1).map(r=>{const o={};cols.forEach((c,i)=>{if(c)o[c]=(r[i]||'').trim();});
-      const name=o.name||[o.first,o.last].filter(Boolean).join(' ');
-      return{name:name||undefined,email:(o.email||'').toLowerCase()||undefined,phone:o.phone||undefined,company:o.company||undefined};
-    }).filter(x=>x.name||x.email).slice(0,500);
-    $('csvPrev').innerHTML=`<p class="muted" style="margin:10px 0 6px">${items.length} contact${items.length===1?'':'s'} found — first few: ${esc(items.slice(0,3).map(i=>i.name||i.email).join(', '))}${items.length>3?'…':''}</p>
-      <button class="btn" id="csvGo">Import ${items.length}</button> <button class="btn" id="csvCancel" style="border-color:transparent">Cancel</button>`;
-    $('csvCancel').onclick=()=>{z.innerHTML='';const ic=$('importCsv');if(ic)ic.focus();};   // final pass, batch C: focus back to Import, not <body>
-    $('csvGo').onclick=async()=>{
-      const btn=$('csvGo');btn.disabled=true;let added=0,existed=0,failed=0,done=0;
-      // status region so screen readers hear progress (the button text alone isn't announced)
-      let live=document.getElementById('csvLive');
-      if(!live){live=document.createElement('p');live.id='csvLive';live.className='muted';live.setAttribute('role','status');live.setAttribute('aria-live','polite');$('csvPrev').appendChild(live);}
-      // 5-wide chunks: 500 serial POSTs took minutes; parallel-5 keeps it polite AND fast
-      for(let i=0;i<items.length;i+=5){
-        const chunk=items.slice(i,i+5);
-        await Promise.all(chunk.map(async(it)=>{
-          try{const r=await api('/sales/contacts','POST',it);
-            if(r.ok){if(r.body&&r.body.deduped)existed++;else added++;}else failed++;
-          }catch(_){failed++;}
-          done++;
-        }));
-        btn.textContent=`Importing ${Math.min(done,items.length)}/${items.length}…`;
-        live.textContent=`Imported ${done} of ${items.length}`;
-      }
-      z.innerHTML='';toast(`${added} added${existed?`, ${existed} already existed`:''}${failed?`, ${failed} couldn’t be imported`:''}.`);
-      await load();
-    };
+  const k=KIT(),z=$('csvZone');if(!k||!z)return;
+  k.importPanel(z,{back:'#importCsv',
+    title:'Import contacts from a CSV',
+    help:'Export from anywhere (Google Contacts, Outlook, a spreadsheet, another tool) — we look for name, email, phone, and company columns. Anyone already in your contacts (matched by email) is skipped automatically.',
+    noun:'contact',
+    mapHeader,
+    ready:(keys)=>(keys.includes('email')||keys.includes('name')||keys.includes('first'))?'':'We couldn’t find a name or email column. Check the first row has headers like “Name” and “Email”.',
+    toItem:(o)=>{const name=o.name||[o.first,o.last].filter(Boolean).join(' ');const email=String(o.email||'').toLowerCase();
+      if(!name&&!email)return null;return{name:name||undefined,email:email||undefined,phone:o.phone||undefined,company:o.company||undefined};},
+    label:(it)=>it.name||it.email,
+    send:async(it)=>{const r=await api('/sales/contacts','POST',it);if(!r.ok)return'failed';return r.body&&r.body.deduped?'existed':'added';},
+    summary:(c)=>`${c.added} added${c.existed?`, ${c.existed} already existed`:''}${c.failed?`, ${c.failed} couldn’t be imported`:''}.`,
+    done:()=>load().catch(()=>{}),
   });
 }
 
@@ -905,7 +876,9 @@ async function newDeal(cid){
 // ── CONTACT open + custom fields (a contact opens the unified Client Record;
 //    the field-definitions editor lives here, off the toolbar's Manage fields) ──
 let FIELD_DEFS=[];       // owner-defined custom fields (loaded lazily)
-function relWhen(iso){if(!iso)return '';const then=Date.parse(iso);if(!isFinite(then))return '';const days=Math.floor((Date.now()-then)/86400000);if(days<=0)return 'today';if(days===1)return 'yesterday';if(days<7)return days+' days ago';if(days<14)return 'last week';if(days<60)return Math.floor(days/7)+' weeks ago';return Math.floor(days/30)+' months ago';}
+// calendar days on the local clock (the record's when()): 24-hour blocks called last night's edit "today"
+const dayNo=(t)=>{const d=new Date(t);return Date.UTC(d.getFullYear(),d.getMonth(),d.getDate())/86400000;};
+function relWhen(iso){if(!iso)return '';const then=Date.parse(iso);if(!isFinite(then))return '';const days=dayNo(Date.now())-dayNo(then);if(days<=0)return 'today';if(days===1)return 'yesterday';if(days<7)return days+' days ago';if(days<14)return 'last week';if(days<60)return Math.floor(days/7)+' weeks ago';return Math.floor(days/30)+' months ago';}
 async function loadFieldDefs(force){if(FIELD_DEFS.length&&!force)return FIELD_DEFS;try{const r=await api('/sales/contacts/fields');if(r.ok)FIELD_DEFS=(r.body&&r.body.data)||[];}catch(_){}return FIELD_DEFS;}
 // Opening a contact goes to their unified CLIENT RECORD (Details tab) — the whole
 // relationship in one place — rather than a here-only modal with no shareable URL.

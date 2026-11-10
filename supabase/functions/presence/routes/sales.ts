@@ -35,7 +35,7 @@ import {
   buildPaymentSchedule, depositBalanceStages, equalInstallmentStages, type StageInput,
   summarizePipeline, ALL_TIME_WINDOW_DAYS, nextStepStaleAfter,
   splitLineItems, packLineItems, normalizeProposalMeta, proposalTotals, type ProposalMeta,
-  currentProposal, flowSignGate, stageAfterSignature, callerToday,
+  currentProposal, flowSignGate, stageAfterSignature, callerToday, callerOffsetMinutes,
 } from '../lib/sales_lifecycle.ts';
 import {
   isDealActivityKind, activityNeedsBody, cleanActivityBody, normalizeOccurredAt,
@@ -617,7 +617,8 @@ export async function handleSalesSummary(req: Request, site: SiteRow, principal:
   const ar = { outstanding_cents: b.upcoming.cents + b.overdue.cents, count: b.upcoming.count + b.overdue.count, overdue_cents: b.overdue.cents, overdue_count: b.overdue.count, processing_cents: b.processing.cents, processing_count: b.processing.count };
   // Phase 3: the win rate counts every closed deal (all time), not a rolling 90
   // days — three won deals read "100% (1 of 1)" under the old window.
-  const sum = summarizePipeline(deals, nowIso(), ALL_TIME_WINDOW_DAYS);
+  // item 104: "Won this month" on the caller's month and clock (?today= and ?tzo=), the UTC one without them
+  const sum = summarizePipeline(deals, nowIso(), ALL_TIME_WINDOW_DAYS, { today, offsetMinutes: callerOffsetMinutes(new URL(req.url).searchParams.get('tzo')) });
   const names = await namesP;   // item 38: the studio's own stage names
   if (names) sum.by_stage = sum.by_stage.map((s) => ({ ...s, label: names[s.stage] || s.label }));
   // item 69: "Expected" = each open deal's value times its stage's percent
