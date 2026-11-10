@@ -2586,16 +2586,16 @@ async function openSupportThread(rid,pid){
   setWide(false);
   $('main').innerHTML=skeleton();
   let r;
-  try{r=await api('/client/support/'+rid);}catch(_){
-    // the thread read THREW (network down mid-read) — a calm couldn't-load card
-    // with a way back, never a skeleton stuck forever (openProject's contract)
-    if(view!==VIEW_SEQ)return;
+  try{r=await api('/client/support/'+rid);}catch(_){r=null;}
+  if(view!==VIEW_SEQ)return;   // the user moved on mid-fetch — never paint over the newer view
+  if(!r||r.offline){
+    // no answer (network down mid-read) — a calm couldn't-load card with a way
+    // back, never a skeleton stuck forever (openProject's contract)
     $('main').innerHTML=`<p><a class="link" href="#" id="back">← Back</a></p>`+
       emptyCard('We couldn’t load this request just now — please try again in a moment.','💬');
     const bb=$('back');if(bb)bb.addEventListener('click',(e)=>{e.preventDefault();pid?openProject(pid):goHome();});
     return;
   }
-  if(view!==VIEW_SEQ)return;   // the user moved on mid-fetch — never paint over the newer view
   if(!r.ok){toast('That request isn’t available.');return pid?openProject(pid):goHome();}
   const d=(r.body&&r.body.data)||{};const rq=d.request||{};const msgs=d.messages||[];
   pid=pid||rq.project_id;
