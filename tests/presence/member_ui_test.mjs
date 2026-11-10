@@ -124,7 +124,8 @@ const SOURCE = Object.fromEntries(PAGES.map((p) => [p, read(p)]));
     const fresh = sent(page).filter((call) => !known(page).includes(call));
     ok(`${page}: every DELETE it sends is decided`, fresh.length === 0, fresh.join(' | '));
   }
-  ok('tripwire: the DELETE scan found the calls it is meant to find', sent('pipeline.html').length === 5 && sent('presence.html').length === 12 && sent('contacts.html').length === 2 && sent('crm.html').length === 4 && sent('files.html').length === 1);
+  // crm.html: 3 — the record's two note removals are one removeNote since item 98 (it asks first now)
+  ok('tripwire: the DELETE scan found the calls it is meant to find', sent('pipeline.html').length === 5 && sent('presence.html').length === 12 && sent('contacts.html').length === 2 && sent('crm.html').length === 3 && sent('files.html').length === 1);
 
   const CONFIG = /\/(?:foundations\/(?:domain|prepare)|preview\/settings|site\/(?:offline|online)|bookings\/settings|sales\/contacts\/fields)\b/;
   const writes = new RegExp(`(?:api\\(\\s*["'](?:POST|PUT|DELETE)["']\\s*,\\s*["'\`]|act\\(["']|siteSetState\\(["'])${CONFIG.source}|api\\(["'\`]${CONFIG.source}["'\`]\\s*,\\s*["'](?:POST|PUT|DELETE)["']`, 'g');

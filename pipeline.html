@@ -3324,7 +3324,7 @@ async function openDeal(id){
         // item 98 (B8): this line only saves typing — the first service chip takes its place while it's
         // untouched. Chips only filled an EMPTY line, so they added below it: a $3,000 deal plus two
         // chips worth $3,000 totalled $6,000, and a deal with no value sent a "$0" line named after itself.
-        const r1=l1.closest('.prop-line');r1.dataset.seeded='1';r1.querySelectorAll('.pl-label,.pl-price,.pl-qty').forEach(el=>el.addEventListener('input',()=>{delete r1.dataset.seeded;},{once:true})); } }
+        const r1=l1.closest('.prop-line');r1.dataset.seeded='1';r1.querySelectorAll('.pl-pick,.pl-label,.pl-price,.pl-qty').forEach(el=>el.addEventListener('input',()=>{delete r1.dataset.seeded;},{once:true})); } }
       revealFilled();
       $('plDiscMode').onchange=()=>{$('plDiscVal').style.display=$('plDiscMode').value?'':'none';recalc();};
       $('plDiscVal').addEventListener('input',recalc); $('plTaxPct').addEventListener('input',recalc);

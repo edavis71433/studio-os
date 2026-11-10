@@ -19,13 +19,14 @@ const openContactsImport = async (page: Page) => {
   await page.locator('#importCsv').click();
   await expect(page.locator('#csvZone input[type=file]')).toBeVisible();
 };
-// POST /sales/contacts → a new contact each time (deduped:false), or a hold so a run can be caught mid-way
-const contactPosts = async (page: Page, delayMs = 0) => {
+// POST /sales/contacts → a new contact each time (deduped:false). With a gate, every answer waits
+// until the gate opens, so a run can be caught mid-way however fast or slow the machine is.
+const contactPosts = async (page: Page, gate?: Promise<void>) => {
   const sent: Array<Record<string, unknown>> = [];
   await page.route('**/functions/v1/presence/sales/contacts', async (route) => {
     if (route.request().method() !== 'POST') return route.fallback();
     sent.push(route.request().postDataJSON());
-    if (delayMs) await new Promise((r) => setTimeout(r, delayMs));
+    if (gate) await gate;
     return route.fulfill({ status: 201, contentType: 'application/json', body: JSON.stringify({ data: { id: 'ct-' + sent.length } }) });
   });
   return sent;
@@ -102,18 +103,20 @@ test.describe('item 97 — past 500 rows it says so (B5)', () => {
 test.describe('item 97 — Close stops a running import (B6)', () => {
   test('Stop mid-run: the rows after it never go in, and the summary says how far it got', async ({ page }) => {
     await installApp(page, { api: { '/sales/contacts': { data: [] } } });
-    const sent = await contactPosts(page, 1500);   // each row takes a moment, so the run can be caught
+    let open!: () => void;
+    const sent = await contactPosts(page, new Promise<void>((r) => { open = r; }));   // the first five wait for us
     await openContactsImport(page);
     const rows = Array.from({ length: 40 }, (_, i) => `Person ${i + 1},`).join('\n');   // names only: these can't be matched, so a second run would double them
     await page.locator('#csvZone input[type=file]').setInputFiles(csvFile('people.csv', 'Name,Email\n' + rows + '\n'));
     await page.locator('#csvZone').getByRole('button', { name: 'Import 40' }).click();
-    await expect.poll(() => sent.length).toBeGreaterThan(0);
+    await expect.poll(() => sent.length).toBe(5);                                                // five at a time, all five on their way
     await expect(page.locator('#csvZone input[type=file]')).toBeDisabled();                     // no second file under a running one
     await page.locator('#importCsv').click();                                                    // Import CSV again: the running panel stays
     await expect(page.locator('#csvZone .dds-csvgo')).toBeDisabled();
     await page.locator('#csvZone').getByRole('button', { name: 'Stop' }).click();
     await expect(page.locator('#csvZone input[type=file]')).toHaveCount(0);
     await expect(page.locator('#importCsv')).toBeFocused();
+    open();                                                                                      // the five on their way land
     await expect(toastWith(page, 'Stopped after 5 of 40 — 5 added.')).toBeVisible();
     await page.waitForTimeout(600);                                                              // a running import would have sent its next five by now
     expect(sent.length).toBe(5);

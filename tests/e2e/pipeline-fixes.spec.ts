@@ -206,6 +206,14 @@ test.describe('item 98 — the proposal editor (B8, B7)', () => {
     await expect(page.locator('#plPreview .pb-total')).toContainText('$3,400');
   });
 
+  test('a service picked into the pre-filled line from its own list is yours too', async ({ page }) => {
+    await installApp(page, { api: PROP_API(300000) });
+    await openEditor(page);
+    await page.locator('#propForm .pl-pick').first().selectOption('1');   // Logo refresh
+    await page.locator('#propForm [data-svc="0"]').click();
+    expect(await labels(page)).toEqual(['Logo refresh', 'Website build']);
+  });
+
   test('the email failed after the save: one draft, and the deal opens on it — no second copy on the next press', async ({ page }) => {
     await installApp(page, { api: PROP_API(300000) });
     let saves = 0;

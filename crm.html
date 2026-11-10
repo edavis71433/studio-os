@@ -1696,7 +1696,7 @@ async function logActivity(){
   const r=await apiAg('/sales/deals/'+encodeURIComponent(deal)+'/activity','POST',{kind:LOGKIND,body,occurred_at:recDayAtNoon($('logDate')&&$('logDate').value)});
   if(r.ok){clearDraft('logBody');clearDraft('logDate');toast('Logged.');
     // B4: "Last talked" moves at once (the server answers with the day just logged; an older day doesn't win)
-    const at=r.body&&r.body.data&&r.body.data.last_contacted_at;if(at&&DEAL&&!DEAL.error&&!(DEAL.last_contacted_at&&DEAL.last_contacted_at>at)){DEAL.last_contacted_at=at;renderHighlights();if(TAB==='deal')showTab(TAB,true);}
+    const at=r.body&&r.body.data&&r.body.data.last_contacted_at;if(at&&DEAL&&!DEAL.error&&!(Date.parse(DEAL.last_contacted_at)>Date.parse(at))){DEAL.last_contacted_at=at;renderHighlights();if(TAB==='deal')showTab(TAB,true);}
     await loadActivity();}
   else{toast((r.body&&r.body.message)||'That didn’t save.');btn.disabled=false;}
 }
