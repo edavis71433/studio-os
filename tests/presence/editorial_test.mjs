@@ -32,7 +32,7 @@ const cssOf = (f) => f[Object.keys(f).find((k) => k.startsWith('assets/site-') &
 
 // ═══ 2. the full production file set ═══
 {
-  const f = render('plumber');
+  const f = await render('plumber');
   const need = ['index.html', 'services/index.html', 'about/index.html', 'faq/index.html', 'contact/index.html', 'thanks/index.html', 'privacy/index.html', 'accessibility/index.html', 'updates/index.html', '404.html', 'sitemap.xml', 'robots.txt', 'favicon.svg'];
   ok('emits the complete file set', need.every((k) => k in f), need.filter((k) => !(k in f)).join(','));
   ok('emits exactly one hashed CSS asset', Object.keys(f).filter((k) => k.startsWith('assets/site-') && k.endsWith('.css')).length === 1);
@@ -40,7 +40,7 @@ const cssOf = (f) => f[Object.keys(f).find((k) => k.startsWith('assets/site-') &
 
 // ═══ 3. a GENUINELY different design language (not Business Classic) ═══
 {
-  const f = render('plumber');
+  const f = await render('plumber');
   const css = cssOf(f);
   ok('serif, print-inspired: serif stack + a double-ruled masthead + uppercase labels', /Iowan Old Style|Palatino|Georgia/.test(css) && css.includes('3px double') && css.includes('text-transform:uppercase'));
   ok('restrained oxblood accent (#6d232a), not the Business-Classic teal (#23635a)', css.includes('#6d232a') && !css.includes('#23635a'));
@@ -51,16 +51,16 @@ const cssOf = (f) => f[Object.keys(f).find((k) => k.startsWith('assets/site-') &
 
 // ═══ 4. the SAME engine underneath — industry realization is reused, not forked ═══
 {
-  const plumber = render('plumber');
+  const plumber = await render('plumber');
   ok('plumber: /services/ (not /menu/), nav says Services', 'services/index.html' in plumber && !('menu/index.html' in plumber) && plumber['index.html'].includes('>Services</a>'));
   ok('plumber: @type Plumber, ItemList of Service, no Menu/Restaurant', plumber['index.html'].includes('"@type":"Plumber"') && plumber['services/index.html'].includes('"@type":"Service"') && !plumber['index.html'].includes('"@type":"Restaurant"'));
-  const rest = render('restaurant');
+  const rest = await render('restaurant');
   ok('restaurant on Editorial: still Menu + @type Restaurant', 'menu/index.html' in rest && rest['index.html'].includes('"@type":"Restaurant"'));
 }
 
 // ═══ 5. production laws hold (a11y / form / SEO / provenance) ═══
 {
-  const f = render('plumber');
+  const f = await render('plumber');
   const home = f['index.html'];
   ok('accessibility: lang, skip link, exactly one <h1> on the home page', /<html lang="/.test(home) && home.includes('class="skip"') && (home.match(/<h1[ >]/g) || []).length === 1);
   ok('every <img> carries an alt attribute', [...home.matchAll(/<img\b[^>]*>/g)].every((m) => /\balt=/.test(m[0])));
@@ -80,9 +80,9 @@ const cssOf = (f) => f[Object.keys(f).find((k) => k.startsWith('assets/site-') &
   hostile.template_slug = 'editorial';
   hostile.content.identity.business_name = '<script>alert(1)</script>';
   hostile.content.identity.tagline = '"><img src=x onerror=alert(1)>';
-  const h = renderSnapshot(hostile, SITE)['index.html'];
+  const h = (await renderSnapshot(hostile, SITE))['index.html'];
   ok('hostile input is escaped, never executed', !h.includes('<script>alert(1)</script>') && !h.includes('<img src=x onerror') && h.includes('&lt;script&gt;'));
-  const a = render('plumber'), b = render('plumber');
+  const a = await render('plumber'), b = await render('plumber');
   ok('deterministic: identical snapshot → identical bytes', Object.keys(a).length === Object.keys(b).length && Object.keys(a).every((k) => a[k] === b[k]));
 }
 

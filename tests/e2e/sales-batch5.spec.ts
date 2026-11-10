@@ -47,7 +47,7 @@ test.describe('item 29 — My tasks on Home', () => {
     await page.goto('/agency.html');
     // item 70: My tasks is a tab of Home's one list; the tab carries the count
     const tab = page.locator('#qt-tasks');
-    await expect(tab).toHaveText('My tasks 4');
+    await expect(tab).toHaveText('My to-dos 4');
     await tab.click();
     const card = page.locator('#my-tasks');
     await expect(card.locator('.trow')).toHaveCount(4);
@@ -58,12 +58,12 @@ test.describe('item 29 — My tasks on Home', () => {
     await expect(card.locator('.trow').nth(3).getByRole('button', { name: /^Done/ })).toHaveCount(0);
     await expect(page.locator('#this-week')).toHaveCount(0);                                   // My tasks replaces This week
     await card.getByRole('button', { name: 'Done: Price the add-ons' }).click();
-    await expect(tab).toHaveText('My tasks 3');
+    await expect(tab).toHaveText('My to-dos 3');
     await expect(card).not.toContainText('Price the add-ons');
     await card.getByRole('button', { name: 'Done: Build the pages' }).click();
     await expect(card).not.toContainText('Build the pages');
     await card.getByRole('button', { name: 'Done: Follow up call' }).click();
-    await expect(tab).toHaveText('My tasks 1');
+    await expect(tab).toHaveText('My to-dos 1');
     expect(writes).toEqual([
       ['PATCH', `/sales/deal-tasks/${DT}`, { status: 'done' }],
       ['PATCH', `/projects/${PROJ}/tasks/${PT}`, { status: 'done' }],
@@ -79,7 +79,7 @@ test.describe('item 29 — My tasks on Home', () => {
     const card = page.locator('#my-tasks');
     await card.getByRole('button', { name: 'Done: Price the add-ons' }).click();
     await expect(card.getByRole('button', { name: 'Done: Price the add-ons' })).toBeEnabled();
-    await expect(page.locator('#qt-tasks')).toHaveText('My tasks 4');
+    await expect(page.locator('#qt-tasks')).toHaveText('My to-dos 4');
   });
 
   test('more than six: the rest open with Show all', async ({ page }) => {

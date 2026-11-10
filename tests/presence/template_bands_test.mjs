@@ -41,7 +41,7 @@ const subject = (sel) => { let bare = '', d = 0; for (const c of sel.split(/[\s>
 const sides = (v) => { const p = parts(v); return p.length === 1 ? [p[0], p[0]] : p.length === 4 ? [p[1], p[3]] : [p[1], p[1]]; };   // [right, left]
 
 for (const slug of TEMPLATES) {
-  const drawn = [renderSnapshot(fixture(slug), SITE), renderSnapshot(fullFixture(slug), SITE)];
+  const drawn = [await renderSnapshot(fixture(slug), SITE), await renderSnapshot(fullFixture(slug), SITE)];
   const pages = drawn.flatMap((f) => Object.entries(f).filter(([k]) => k.endsWith('.html')).map(([, v]) => String(v)));
   // every class set an element carries alongside `wrap`
   const wraps = pages.flatMap((h) => [...h.matchAll(/\sclass="([^"]*)"/g)].map((m) => new Set(m[1].split(/\s+/)))).filter((c) => c.has('wrap'));

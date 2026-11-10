@@ -16,7 +16,8 @@ import type { Principal } from '../../_shared/auth.ts';
 import { capabilitiesOf, contentWriteNeeds, memberWriteNeeds, siteCan } from '../lib/site_roles.ts';
 import { leadIdOfNoticePeriod } from '../lib/commercial.ts';
 import type { SiteRole } from '../lib/site_roles.ts';
-import { buildNav, landingFor } from '../lib/navigation.ts';
+import { buildNav, landingFor, normalizeHidden } from '../lib/navigation.ts';
+import { readReservedJson, RESERVED_NAMES } from '../lib/reserved_store.ts';
 import { editionFromPlan, editionFromSite, featuresOf, editionFlags, featureDelta, EDITION_DEFS, type EditionKey } from '../commerce/editions.ts';
 import { nextPlanUp } from '../commerce/catalog.ts';
 import { resolveAgencyMember } from '../agency/auth.ts';
@@ -266,7 +267,10 @@ export async function handlePortalContext(jwt: string, site: SiteRow, principal:
   // site row already in hand says so (deploy_reconcile stamps status 'live' +
   // last_published_at on the first successful publish).
   const siteLive = site.status === 'live' || !!site.last_published_at;
-  const navCtx = { role, edition: site.edition, capabilities: caps, isAgency, isOperator, editionKey, isManagedClient, scoped: !!scopedName, siteLive };
+  // Item 54: at studio level, the areas this studio took out of its menu (a reserved row on
+  // its own site, which is the site in hand when nothing is scoped). A failed read hides nothing.
+  const hiddenSections = (isAgency && !scopedName) ? normalizeHidden(await readReservedJson(site.id, RESERVED_NAMES.navHidden)) : [];
+  const navCtx = { role, edition: site.edition, capabilities: caps, isAgency, isOperator, editionKey, isManagedClient, scoped: !!scopedName, siteLive, hiddenSections };
   return json({ data: {
     site_role: role,
     capabilities: caps,

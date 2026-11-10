@@ -9,7 +9,8 @@
 // Each name stands in for the handler with its own parameters: it loads the file
 // and calls the real export, so the router's calls read exactly as before. Keep
 // the specifier a string literal inside import(): that is what puts the file in
-// the deploy bundle and in `deno check`.
+// the deploy bundle and in `deno check`. lib/render.ts uses the same stand-in for
+// the eight templates' drawing code.
 
 type Lazy<M> = {
   [K in keyof M]: M[K] extends (...args: infer A) => infer R ? (...args: A) => Promise<Awaited<R>> : never;

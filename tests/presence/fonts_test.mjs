@@ -42,7 +42,7 @@ ok('a style without library fonts loads none', !devLayerFragments({ theme_tokens
 {
   const fx = JSON.parse(Deno.readTextFileSync(new URL('supabase/functions/presence/templates/meadow/1.0.0/fixture.json', ROOT)));
   fx.dev_customization = { theme_tokens: picks, custom_css: '', custom_html: '' };
-  const out = renderSnapshot(fx, { baseUrl: 'https://example.com' });
+  const out = await renderSnapshot(fx, { baseUrl: 'https://example.com' });
   const htmlPages = Object.entries(out).filter(([k]) => k.endsWith('.html'));
   ok('every page of a rendered site loads the picked fonts', htmlPages.length > 0 && htmlPages.every(([, v]) => String(v).includes("@font-face{font-family:'Playfair Display'")));
 }
@@ -51,7 +51,7 @@ ok('a style without library fonts loads none', !devLayerFragments({ theme_tokens
   const dm = FONT_LIBRARY.find((f) => f.id === 'dm-sans');
   const fx = JSON.parse(Deno.readTextFileSync(new URL('supabase/functions/presence/templates/meadow/1.0.0/fixture.json', ROOT)));
   fx.dev_customization = { theme_tokens: { font_body: fontStack(dm) }, custom_css: '', custom_html: '' };
-  const out = renderSnapshot(fx, { baseUrl: 'https://example.com' });
+  const out = await renderSnapshot(fx, { baseUrl: 'https://example.com' });
   const layers = Object.entries(out).filter(([k]) => k.endsWith('.html')).map(([, v]) => (String(v).match(/<style id="presence-dev">[\s\S]*?<\/style>/) || [''])[0]);
   const css = String(out[Object.keys(out).find((k) => k.startsWith('assets/') && k.endsWith('.css'))] || '');
   ok('a body font picked on its own: every page sets it as the body font, and the stylesheet’s body uses it',

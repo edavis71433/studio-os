@@ -13,6 +13,7 @@ export const RESERVED_NAMES = {
   stageChances: '__stage_chances__',      // sales review item 69: the chance each open stage closes
   emailLog: '__email_log__',              // sales review item 69: the private "log this email" address
   calendarFeed: '__calendar_feed__',      // sales review item 46: the private calendar link
+  navHidden: '__nav_hidden__',            // builder list item 54: the menu areas the studio hides (agency/routes.ts, routes/workspace.ts)
 } as const;
 
 const rowsOf = (r: { json?: unknown }) => (Array.isArray((r as any).json) ? (r as any).json : []) as any[];

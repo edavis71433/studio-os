@@ -178,7 +178,7 @@ test.describe('item 31 — Pipeline: views and pick-and-act in the Table', () =>
     await bar.getByRole('button', { name: 'Yes, mark them' }).click();   // final pass, batch C: it asks first
     await expect(page.getByRole('region', { name: 'Selected deals' })).toHaveCount(0);   // the picks clear the moment it starts
     await expect.poll(() => moved).toEqual([OPEN]);
-    await expect(page.locator('#table tbody tr').filter({ hasText: 'Acme website' })).toContainText('Lost');   // the reload has painted the move
+    await expect(page.locator('#table tbody tr').filter({ hasText: 'Acme website' })).toContainText('Not a fit');   // the reload has painted the move (one word: Not a fit, never Lost)
     await page.getByLabel('Select Acme website').check();
     await page.getByLabel('Select Maple Street Studio').check();
     await page.getByRole('region', { name: 'Selected deals' }).getByRole('button', { name: 'Send an update' }).click();

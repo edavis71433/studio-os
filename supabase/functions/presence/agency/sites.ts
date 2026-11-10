@@ -367,7 +367,7 @@ export async function renderThumb(site: SiteRow): Promise<{ html: string; versio
   }
   const key = previewCacheKey(site.id, 'draft', await computeDraftHash(snapshot));
   const hit = previewCache.get(key);
-  const fileMap = hit ? hit.fileMap : renderForBuilder(snapshot);
+  const fileMap = hit ? hit.fileMap : await renderForBuilder(snapshot);
   if (!hit) previewCache.set(key, { fileMap, mediaManifest, blockers, warnings });
   let html = fileMap['index.html'] as string | undefined;
   if (typeof html !== 'string') return null;

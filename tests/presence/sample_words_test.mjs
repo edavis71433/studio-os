@@ -24,14 +24,14 @@ for (const slug of TEMPLATES) {
   const before = JSON.stringify(empty);
   const shown = withSampleWords(empty);
   ok(`[${slug}] the input snapshot is left as it was`, JSON.stringify(empty) === before);
-  const home = renderSnapshot(shown, { baseUrl: 'https://x.test' })['index.html'];
+  const home = (await renderSnapshot(shown, { baseUrl: 'https://x.test' }))['index.html'];
   ok(`[${slug}] an empty draft's home page reads with the sample name`, home.includes(SAMPLE_WORDS.business_name));
   ok(`[${slug}] and the sample description under About`, home.includes(SAMPLE_WORDS.description));
-  const plain = renderSnapshot(empty, { baseUrl: 'https://x.test' })['index.html'];
+  const plain = (await renderSnapshot(empty, { baseUrl: 'https://x.test' }))['index.html'];
   ok(`[${slug}] the render a publish uses has no sample words`, !plain.includes(SAMPLE_WORDS.business_name) && !plain.includes('This is sample text'));
   ok(`[${slug}] with no address or phone there is no empty strip under the welcome`, !plain.includes('class="strip"'));
   ok(`[${slug}] with no description there is no bare "About us" heading`, !plain.includes('data-dds-core="about"'));
-  const full = renderSnapshot(fx, { baseUrl: 'https://x.test' })['index.html'];
+  const full = (await renderSnapshot(fx, { baseUrl: 'https://x.test' }))['index.html'];
   ok(`[${slug}] a site with an address keeps its strip and its About`, full.includes('class="strip"') && full.includes('data-dds-core="about"'));
 }
 

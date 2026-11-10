@@ -449,7 +449,9 @@ test.describe('Context bar (slice 7)', () => {
     await expect(pop.locator('.list a.row').nth(1)).toHaveAttribute('href', '/today.html?client=bbbbbbbb-2222-4222-8222-bbbbbbbbbbbb');   // a site’s own home, as the Sites page opens it
     await expect(pop.locator('.list a.row').nth(2)).toContainText('No address yet · Not live yet');
     await expect(pop.locator('a.row.all')).toHaveAttribute('href', '/sites.html');
-    expect(scopes).toEqual(['']);                                           // the list is the studio’s, read at studio level
+    // the list is the studio’s, read at studio level; the client’s Overview reads the same
+    // route for its website panel (PR 226), so count by level, not by number
+    expect(scopes.length).toBeGreaterThan(0); expect(new Set(scopes)).toEqual(new Set(['']));
     await pop.locator('#dds-sites-q').fill('bist');
     await expect(pop.locator('.list a.row')).toHaveCount(1);
     await expect(pop.locator('.list a.row')).toContainText('Bistro Nine');
@@ -459,10 +461,11 @@ test.describe('Context bar (slice 7)', () => {
     await expect(pop).toHaveCount(0);
     await expect(sw).toBeFocused();
     await expect(sw).toHaveAttribute('aria-expanded', 'false');
-    // a second open reuses the list: still one read
+    // a second open reuses the list: no new read
+    const readsBefore = scopes.length;
     await sw.click();
     await expect(page.locator('#dds-sites-pop .list a.row')).toHaveCount(3);
-    expect(scopes).toEqual(['']);
+    expect(scopes.length).toBe(readsBefore);
     await page.locator('body').click({ position: { x: 5, y: 5 } });
     await expect(page.locator('#dds-sites-pop')).toHaveCount(0);
     // the account menu: All sites, one click

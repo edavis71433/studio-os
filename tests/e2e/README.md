@@ -31,7 +31,7 @@ VISUAL=1 npm run test:e2e                     # enforce
 | Area | Specs |
 |---|---|
 | Shell, Today, Home, help | `shell`, `today`, `one-needs-list`, `home-words`, `help`, `onboarding`, `settings` |
-| Website builder | `site-home`, `g13-editor`, `builder-phase0`, `builder-phase1`, `builder-backoffice`, `cms`, `schedule`, `developer-mode`, `files`, `files-basics`, `visual-studio` |
+| Website builder | `site-home`, `g13-editor-*` (seven files by feature, sharing `helpers/editor.ts`), `builder-phase0`, `builder-phase1`, `builder-backoffice`, `cms`, `schedule`, `developer-mode`, `files`, `files-basics`, `visual-studio` |
 | Customers, deals and money | `contacts`, `crm`, `customer-names`, `rosters`, `pipeline`, `inbox`, `inbound-rough-edges`, `broadcasts`, `calendar-link`, `estimates-recurring`, `sign`, `doc`, `sales-batch3` to `sales-batch11`, `sales-extras-1` to `-3`, `sales-review-fixes` |
 | Projects and the client portal | `projects`, `portal`, `sharing` |
 | Studios, scope and roles | `agency`, `studio-sites`, `scope`, `scoped-empty`, `member-roles`, `admin-health` |

@@ -13,7 +13,7 @@ const ratio = (a, b) => { const [x, y] = [lum(a), lum(b)].sort((p, q) => q - p);
 
 for (const { slug } of listTemplates()) {
   const fx = JSON.parse(Deno.readTextFileSync(new URL(`../../supabase/functions/presence/templates/${slug}/1.0.0/fixture.json`, import.meta.url)));
-  const files = renderSnapshot(fx, { baseUrl: 'https://example.com' });
+  const files = await renderSnapshot(fx, { baseUrl: 'https://example.com' });
   const css = String(files[Object.keys(files).find((k) => k.startsWith('assets/') && k.endsWith('.css'))]);
   const root = /:root\{([^}]*)\}/.exec(css)?.[1] || '';
   const v = (name) => /#[0-9a-fA-F]{3,6}/.exec((new RegExp(`--${name}:([^;]+)`).exec(root) || [])[1] || '')?.[0];

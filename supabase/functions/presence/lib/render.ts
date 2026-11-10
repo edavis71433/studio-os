@@ -1,48 +1,53 @@
 // ── Template registry + render invocation ────────────────────────────────────
-// Templates are versioned folders statically imported here. Shipping a template
-// version = deploying the function (deliberately boring, per blueprint §2).
-// Old versions are never deleted while any site pins them.
+// Templates are versioned folders registered here. Shipping a template version =
+// deploying the function (deliberately boring, per blueprint §2). Old versions
+// are never deleted while any site pins them.
 import { fontFaceCss, libraryFontsIn } from './fonts.ts';
 import type { RenderFn, Snapshot, SnapshotContent, SiteConfig, TemplateManifest, FileMap } from './render_types.ts';
-import { render as restaurantClassic_1_0_0 } from '../templates/restaurant-classic/1.0.0/render.ts';
+import { lazyRoutes } from './lazy.ts';
 import manifest_rc_1_0_0 from '../templates/restaurant-classic/1.0.0/manifest.json' with { type: 'json' };
-import { render as businessClassic_1_0_0 } from '../templates/business-classic/1.0.0/render.ts';
 import manifest_bc_1_0_0 from '../templates/business-classic/1.0.0/manifest.json' with { type: 'json' };
-import { render as editorial_1_0_0 } from '../templates/editorial/1.0.0/render.ts';
 import manifest_ed_1_0_0 from '../templates/editorial/1.0.0/manifest.json' with { type: 'json' };
-import { render as aurora_1_0_0 } from '../templates/aurora/1.0.0/render.ts';
 import manifest_au_1_0_0 from '../templates/aurora/1.0.0/manifest.json' with { type: 'json' };
-import { render as slate_1_0_0 } from '../templates/slate/1.0.0/render.ts';
 import manifest_sl_1_0_0 from '../templates/slate/1.0.0/manifest.json' with { type: 'json' };
-import { render as meadow_1_0_0 } from '../templates/meadow/1.0.0/render.ts';
 import manifest_me_1_0_0 from '../templates/meadow/1.0.0/manifest.json' with { type: 'json' };
-import { render as atelier_1_0_0 } from '../templates/atelier/1.0.0/render.ts';
 import manifest_at_1_0_0 from '../templates/atelier/1.0.0/manifest.json' with { type: 'json' };
-import { render as harbor_1_0_0 } from '../templates/harbor/1.0.0/render.ts';
 import manifest_ha_1_0_0 from '../templates/harbor/1.0.0/manifest.json' with { type: 'json' };
 import { trackerScript } from './visits.ts';
 import { sanitizeDevHtml, sanitizeDevCss } from './devmode.ts';
 import { BLOCK_CSS, sectionStyles, pageClasses } from './site_blocks.ts';
 
-// ── FD-T2: indexed, lazy-ready template registry ─────────────────────────────
-// slug → version → LOADER. Render resolution goes through this ONE boundary and is
-// memoized, so: (a) the catalog/index is metadata-first, (b) integrity is guardable
-// at scale, and (c) a future switch to per-version code-splitting is a change to the
-// loaders ALONE. Static imports are kept (blueprint §2: shipping a version = deploying
-// the function), so getTemplate stays SYNCHRONOUS — the frozen render contract and the
-// sync renderSnapshot path (publish/preview) are untouched. Enabling true dynamic-import
-// code-splitting is FD-T2.1 (staged: it would make renderSnapshot async and needs a
-// live-publish bundling validation).
-interface TemplateEntry { render: RenderFn; manifest: TemplateManifest }
-const LOADERS: Record<string, Record<string, () => TemplateEntry>> = {
-  'restaurant-classic': { '1.0.0': () => ({ render: restaurantClassic_1_0_0, manifest: manifest_rc_1_0_0 as unknown as TemplateManifest }) },
-  'business-classic': { '1.0.0': () => ({ render: businessClassic_1_0_0, manifest: manifest_bc_1_0_0 as unknown as TemplateManifest }) },  // Phase T3 production default
-  'editorial': { '1.0.0': () => ({ render: editorial_1_0_0, manifest: manifest_ed_1_0_0 as unknown as TemplateManifest }) },               // Phase PT premium family
-  'aurora': { '1.0.0': () => ({ render: aurora_1_0_0, manifest: manifest_au_1_0_0 as unknown as TemplateManifest }) },                     // #183 modern family
-  'slate': { '1.0.0': () => ({ render: slate_1_0_0, manifest: manifest_sl_1_0_0 as unknown as TemplateManifest }) },                       // #183 bold dark professional
-  'meadow': { '1.0.0': () => ({ render: meadow_1_0_0, manifest: manifest_me_1_0_0 as unknown as TemplateManifest }) },                     // #183 warm organic wellness
-  'atelier': { '1.0.0': () => ({ render: atelier_1_0_0, manifest: manifest_at_1_0_0 as unknown as TemplateManifest }) },                   // #183 boutique luxury serif
-  'harbor': { '1.0.0': () => ({ render: harbor_1_0_0, manifest: manifest_ha_1_0_0 as unknown as TemplateManifest }) },                     // #183 structured navy trust
+// ── FD-T2: indexed template registry; each template's code loads on first use ──
+// slug → version → { manifest, code loader }. Render resolution goes through this
+// ONE boundary and is memoized. The manifests are small and load with the function,
+// so getTemplate stays SYNCHRONOUS for everything that only reads a manifest (the
+// catalog, media limits, contract checks). A template's drawing code (render.ts,
+// about 50 KB each) loads the first time something draws with it and stays loaded
+// for the life of the worker (builder list item 107; lib/lazy.ts is the same
+// stand-in the router uses for its rarely used route groups). Drawing is therefore
+// async: renderSnapshot and renderForBuilder return a promise. Keep each import()
+// specifier a string literal: that is what puts the file in the deploy bundle and
+// in `deno check`.
+interface TemplateEntry { render: (...args: Parameters<RenderFn>) => Promise<FileMap>; manifest: TemplateManifest }
+const MANIFESTS: Record<string, Record<string, TemplateManifest>> = {
+  'restaurant-classic': { '1.0.0': manifest_rc_1_0_0 as unknown as TemplateManifest },
+  'business-classic': { '1.0.0': manifest_bc_1_0_0 as unknown as TemplateManifest },  // Phase T3 production default
+  'editorial': { '1.0.0': manifest_ed_1_0_0 as unknown as TemplateManifest },         // Phase PT premium family
+  'aurora': { '1.0.0': manifest_au_1_0_0 as unknown as TemplateManifest },            // #183 modern family
+  'slate': { '1.0.0': manifest_sl_1_0_0 as unknown as TemplateManifest },             // #183 bold dark professional
+  'meadow': { '1.0.0': manifest_me_1_0_0 as unknown as TemplateManifest },            // #183 warm organic wellness
+  'atelier': { '1.0.0': manifest_at_1_0_0 as unknown as TemplateManifest },           // #183 boutique luxury serif
+  'harbor': { '1.0.0': manifest_ha_1_0_0 as unknown as TemplateManifest },            // #183 structured navy trust
+};
+const CODE: Record<string, Record<string, () => Promise<{ render: RenderFn }>>> = {
+  'restaurant-classic': { '1.0.0': () => import('../templates/restaurant-classic/1.0.0/render.ts') },
+  'business-classic': { '1.0.0': () => import('../templates/business-classic/1.0.0/render.ts') },
+  'editorial': { '1.0.0': () => import('../templates/editorial/1.0.0/render.ts') },
+  'aurora': { '1.0.0': () => import('../templates/aurora/1.0.0/render.ts') },
+  'slate': { '1.0.0': () => import('../templates/slate/1.0.0/render.ts') },
+  'meadow': { '1.0.0': () => import('../templates/meadow/1.0.0/render.ts') },
+  'atelier': { '1.0.0': () => import('../templates/atelier/1.0.0/render.ts') },
+  'harbor': { '1.0.0': () => import('../templates/harbor/1.0.0/render.ts') },
 };
 const _entryCache = new Map<string, TemplateEntry>();
 
@@ -50,11 +55,22 @@ export function getTemplate(slug: string, version: string): TemplateEntry | null
   const key = `${slug}@${version}`;
   const cached = _entryCache.get(key);
   if (cached) return cached;
-  const loader = LOADERS[slug]?.[version];
-  if (!loader) return null;
-  const entry = loader();
+  const manifest = MANIFESTS[slug]?.[version];
+  const load = CODE[slug]?.[version];
+  if (!manifest || !load) return null;
+  const entry: TemplateEntry = { render: lazyRoutes(load).render, manifest };
   _entryCache.set(key, entry);
   return entry;
+}
+
+/** Loads a template's drawing code now instead of on its first draw. False for an
+ *  unknown template or a file that fails to load or has no render function. The
+ *  registry test runs it for every entry, so a template whose code can't load
+ *  can't ship. */
+export async function templateCodeLoads(slug: string, version: string): Promise<boolean> {
+  const load = CODE[slug]?.[version];
+  if (!load) return false;
+  try { return typeof (await load()).render === 'function'; } catch { return false; }
 }
 
 export interface TemplateIndexEntry { slug: string; name: string; versions: string[]; latest: string; content_contract_version: number }
@@ -62,7 +78,7 @@ let _index: TemplateIndexEntry[] | null = null;
 /** The template catalog — computed once, metadata-first (no repeated scanning). */
 export function templateIndex(): TemplateIndexEntry[] {
   if (_index) return _index;
-  _index = Object.entries(LOADERS).map(([slug, vs]) => {
+  _index = Object.entries(MANIFESTS).map(([slug, vs]) => {
     const versions = Object.keys(vs).sort();
     const latest = versions[versions.length - 1];
     const m = getTemplate(slug, latest)!.manifest;
@@ -85,7 +101,7 @@ export function listTemplates(): Array<{ slug: string; name: string; version: st
  *  the guard test runs this so a mis-keyed template can't ship silently at scale. */
 export function registryIntegrity(): { ok: boolean; problems: string[] } {
   const problems: string[] = [];
-  for (const [slug, vs] of Object.entries(LOADERS)) {
+  for (const [slug, vs] of Object.entries(MANIFESTS)) {
     for (const version of Object.keys(vs)) {
       const t = getTemplate(slug, version);
       if (!t) { problems.push(`${slug}@${version}: not loadable`); continue; }
@@ -93,6 +109,9 @@ export function registryIntegrity(): { ok: boolean; problems: string[] } {
       if (t.manifest.version !== version) problems.push(`${slug}@${version}: manifest.version=${t.manifest.version}`);
       if (typeof t.manifest.content_contract_version !== 'number') problems.push(`${slug}@${version}: missing content_contract_version`);
     }
+  }
+  for (const [slug, vs] of Object.entries(CODE)) {
+    for (const version of Object.keys(vs)) if (!MANIFESTS[slug]?.[version]) problems.push(`${slug}@${version}: code but no manifest`);
   }
   return { ok: problems.length === 0, problems };
 }
@@ -164,7 +183,7 @@ export function injectDevLayer(fileMap: FileMap, dev: Snapshot['dev_customizatio
  *  template/version or contract-version mismatch — never on content.
  *  `allSectionStyles` keeps every section style in the stylesheet (the builder's
  *  canvas, renderForBuilder); without it the site ships only the ones it uses. */
-export function renderSnapshot(snapshot: Snapshot, site: SiteConfig, opts: { allSectionStyles?: boolean } = {}): FileMap {
+export async function renderSnapshot(snapshot: Snapshot, site: SiteConfig, opts: { allSectionStyles?: boolean } = {}): Promise<FileMap> {
   const t = getTemplate(snapshot.template_slug, snapshot.template_version);
   if (!t) throw new Error(`unknown template ${snapshot.template_slug}@${snapshot.template_version}`);
   if (t.manifest.content_contract_version !== snapshot.content_contract_version) {
@@ -172,7 +191,7 @@ export function renderSnapshot(snapshot: Snapshot, site: SiteConfig, opts: { all
   }
   // Item 61: the owner's switch decides the counter; the privacy page reads the same switch.
   const counting = (snapshot.content as SnapshotContent)?.settings?.visit_counter !== false;
-  const drawn = tintFavicon(t.render(snapshot, t.manifest, site), snapshot.dev_customization?.theme_tokens?.accent, snapshot.template_slug);
+  const drawn = tintFavicon(await t.render(snapshot, t.manifest, site), snapshot.dev_customization?.theme_tokens?.accent, snapshot.template_slug);
   const dressed = injectDevLayer(drawn, snapshot.dev_customization);
   return injectCsp(injectAnalytics(opts.allSectionStyles ? dressed : trimSectionStyles(dressed), counting ? site.siteId : undefined));
 }
@@ -182,7 +201,7 @@ export function renderSnapshot(snapshot: Snapshot, site: SiteConfig, opts: { all
  *  alike. Every section style stays: the canvas swaps in a section drawn on its own
  *  (POST /preview/section) before the save's full redraw, and that section may use a
  *  rule nothing else on the page does yet, like the dark band just picked for it. */
-export function renderForBuilder(snapshot: Snapshot): FileMap {
+export function renderForBuilder(snapshot: Snapshot): Promise<FileMap> {
   return renderSnapshot(snapshot, { baseUrl: 'https://preview.invalid' }, { allSectionStyles: true });
 }
 

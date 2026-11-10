@@ -212,6 +212,14 @@
        sentence it sends; each saves the moment it is flipped (PUT /settings,
        the same row the industry lives on — migration 0134, all off by default).
        Item 13's per-stage "stale after" lives here too. -->
+  <!-- builder list item 54 (Nov 2026): the menu areas a studio hides. Agency members at
+       studio level only; saved once per studio (GET/PUT /agency/nav), so everyone on the
+       team sees the same menu. Each switch saves as you flip it. -->
+  <section class="card" id="menu" aria-labelledby="menuHead" hidden>
+    <div class="card-h"><h2 id="menuHead" tabindex="-1">Your menu</h2><span class="hint">Turn off an area your studio doesn’t use. It stays one search away, and its page keeps working.</span></div>
+    <div id="menuRows"></div>
+    <div class="how" id="menuNote" style="margin-top:10px">Home and Settings always stay. The menu changes the next time a page opens.</div>
+  </section>
   <section class="card" id="automations" aria-labelledby="autoHead" hidden data-needs="configure">
     <div class="card-h"><h2 id="autoHead" tabindex="-1">Automations</h2><span class="hint">Four switches. Each saves as you flip it.</span></div>
     <div class="swrow">
@@ -331,6 +339,8 @@ const CARDS = [
   { key: 'auto', href: '#automations', title: 'Automations', desc: 'Four switches: acknowledge enquiries, remind unpaid invoices, nudge quiet deals, ask for a review when a project is done. Each shows the sentence it sends.', studioOnly: true, needs: 'configure' },
   // the agency's own team: seats and roles (agency members at studio level only — never a client's settings)
   { key: 'agency_team', href: '#team', title: 'Team', desc: 'Who is on your studio’s team, their roles, and the seats your plan covers.', agencyOnly: true },
+  // builder list item 54 (Nov 2026): a studio hides the menu areas it doesn't use
+  { key: 'menu', icon: 'studio', href: '#menu', title: 'Your menu', desc: 'Hide the areas your studio doesn’t use. A hidden area keeps its page and stays one search away.', agencyOnly: true, cap: 'configure' },
   { key: 'billing', href: '#billing', title: 'Plan & billing', desc: 'Your plan, how to change it, and closing your account.', ownerOnly: true, needs: 'owner' },
   { key: 'money', href: '/pipeline.html?services=1', title: 'Invoices & agreements', desc: 'Your services and prices (they fill proposals), the agreement every deal starts from, deposits.', feature: 'relationship' },
   // Bold redesign (Nov 2026): the private calendar link (sales review item 46) has its own row — it lives on Connections
@@ -381,6 +391,8 @@ function renderCards() {
   if (ac) ac.addEventListener('click', (e) => { e.preventDefault(); reveal('automations', 'autoHead'); });
   const tc = $('cards').querySelector('[data-card="agency_team"]');
   if (tc) tc.addEventListener('click', (e) => { e.preventDefault(); reveal('team', 'teamHead'); });
+  const mc = $('cards').querySelector('[data-card="menu"]');
+  if (mc) mc.addEventListener('click', (e) => { e.preventDefault(); reveal('menu', 'menuHead'); });
   const gc = $('cards').querySelector('[data-card="stages"]');
   if (gc) gc.addEventListener('click', (e) => { e.preventDefault(); reveal('stages', 'stagesHead'); });
   markCurrent(CURRENT);
@@ -398,7 +410,7 @@ function spySections() {
     const on = entries.filter((e) => e.isIntersecting).sort((x, y) => x.boundingClientRect.top - y.boundingClientRect.top)[0];
     if (on) markCurrent(on.target.id);
   }, { rootMargin: '-15% 0px -70% 0px' });
-  for (const id of ['studio', 'stages', 'automations', 'team', 'billing']) { const sec = $(id); if (sec) io.observe(sec); }
+  for (const id of ['studio', 'stages', 'menu', 'automations', 'team', 'billing']) { const sec = $(id); if (sec) io.observe(sec); }
 }
 
 // ── the team, inline: GET /agency/members, POST to invite, PATCH to change a role
@@ -639,6 +651,39 @@ function paintAutomations() {
   $('automations').hidden = false;
   $('stages').hidden = false;
   loadStageNames();
+  loadMenu();
+}
+// ── item 54: the menu areas this studio hides (GET/PUT /agency/nav) ──
+let MENU = null;   // { hidden: [...], choices: [{key,label,what}] }
+async function loadMenu() {
+  const agency = !!(CTX && CTX.is_agency) && !SCOPE;
+  if (!agency || !hasCap('configure')) return;
+  const r = await api('/agency/nav', 'GET');
+  if (!r.ok || !r.body || !r.body.data) return;   // without the answer the card stays away: never a switch that lies
+  MENU = r.body.data;
+  paintMenu();
+  $('menu').hidden = false;
+}
+function paintMenu() {
+  const hidden = new Set((MENU && MENU.hidden) || []);
+  $('menuRows').innerHTML = ((MENU && MENU.choices) || []).map((c) => `<div class="swrow">
+      <button type="button" class="sw" role="switch" id="sw-menu-${esc(c.key)}" data-menu-key="${esc(c.key)}" aria-checked="${hidden.has(c.key) ? 'false' : 'true'}" aria-labelledby="sw-menu-${esc(c.key)}-l"></button>
+      <div class="t"><b id="sw-menu-${esc(c.key)}-l">${esc(c.label)}</b><div class="how">${esc(c.what)}${hidden.has(c.key) ? ' <span class="muted">Hidden from the menu.</span>' : ''}</div></div>
+    </div>`).join('');
+  $('menuRows').querySelectorAll('[data-menu-key]').forEach((b) => b.addEventListener('click', () => toggleMenu(b.getAttribute('data-menu-key'))));
+}
+let MENU_BUSY = false;
+async function toggleMenu(key) {
+  if (MENU_BUSY || !MENU) return;
+  MENU_BUSY = true;
+  const before = (MENU.hidden || []).slice();
+  const hidden = before.includes(key) ? before.filter((k) => k !== key) : before.concat([key]);
+  MENU = { ...MENU, hidden }; paintMenu();
+  const r = await api('/agency/nav', 'PUT', { hidden });
+  MENU_BUSY = false;
+  if (!r.ok) { MENU = { ...MENU, hidden: before }; paintMenu(); toast(nice(r.body, 'That didn’t save — the menu is as it was.'), true); return; }
+  MENU = r.body.data || MENU; paintMenu();
+  toast(hidden.includes(key) ? 'Hidden. The menu changes the next time a page opens.' : 'Back in the menu from the next page on.');
 }
 async function saveAutomation(patch, undo) {
   const r = await api('/settings', 'PUT', patch);
