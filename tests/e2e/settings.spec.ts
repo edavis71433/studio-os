@@ -270,7 +270,7 @@ test.describe('Settings page', () => {
   // builder list item 58 (Nov 2026): the monthly report email to a client, set once per client
   test('item 58 — Monthly report: inside a client only; the switch saves as it flips; the line saves; a preview goes to you; a failed save flips back', async ({ page }) => {
     const puts: unknown[] = []; let previews = 0; let fail = false;
-    let state = { enabled: false, note: '', last_month: null as string | null, updated_by: null, updated_at: null, note_max: 600, next_month: '2026-11' };
+    let state: Record<string, unknown> = { enabled: false, note: '', last_month: null as string | null, last_result: null, tries: null, blocked: null, updated_by: null, updated_at: null, note_max: 600, next_month: '2026-11' };
     await installApp(page, { api: { ...API, '/portal/context': SCOPED_CTX } });
     await page.route(/\/functions\/v1\/presence\/report\/monthly(\/preview)?$/, (route) => {
       const m = route.request().method();
@@ -278,6 +278,7 @@ test.describe('Settings page', () => {
       if (m === 'PUT') {
         const body = route.request().postDataJSON(); puts.push(body);
         if (fail) return route.fulfill({ status: 502, contentType: 'application/json', body: JSON.stringify({ error: 'write_failed', message: 'That didn’t save.' }) });
+        if (body.enabled === true && state.blocked) return route.fulfill({ status: 409, contentType: 'application/json', body: JSON.stringify({ error: 'cannot_send', blocked: state.blocked, message: 'It can’t go out: there’s no email on their record. Add their email on their record, then switch it on.' }) });
         state = { ...state, ...body }; return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: state }) });
       }
       return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: state }) });
@@ -305,10 +306,24 @@ test.describe('Settings page', () => {
     await sec.locator('#sw-report').click();
     await expect(page.locator('.dds-toast').last()).toContainText('That didn’t save.');
     await expect(sec.locator('#sw-report')).toHaveAttribute('aria-checked', 'true');          // flipped back
-    // a month already sent is named
-    fail = false; state = { ...state, last_month: '2026-10' };
+    // a month already sent is named, from what happened, not the bare mark
+    fail = false; state = { ...state, last_month: '2026-10', last_result: { month: '2026-10', status: 'sent', reason: null, at: '2026-11-01T00:15:00Z' } };
     await page.goto(`/settings.html?client=${CLIENT}`);
     await expect(page.locator('#reportLast')).toContainText('Last sent: the October 2026 report.');
+    await expect(page.locator('#reportWarn')).toBeHidden();
+    // Nov 10 review: a month skipped says why
+    state = { ...state, last_result: { month: '2026-10', status: 'skipped', reason: 'unsubscribed', at: '2026-11-01T00:15:00Z' } };
+    await page.goto(`/settings.html?client=${CLIENT}`);
+    await expect(page.locator('#reportLast')).toHaveText('The October 2026 report wasn’t sent: they unsubscribed from emails.');
+    // a client with no email: the card warns, and switching on is refused and flips back
+    state = { ...state, enabled: false, last_result: null, blocked: 'no_email' };
+    await page.goto(`/settings.html?client=${CLIENT}`);
+    await expect(page.locator('#reportWarn')).toBeVisible();
+    await expect(page.locator('#reportWarn')).toHaveText('This client can’t get the report: there’s no email on their record. Add their email on their record.');
+    await page.locator('#sw-report').click();
+    await expect(page.locator('.dds-toast').last()).toContainText('It can’t go out: there’s no email on their record.');
+    await expect(page.locator('#sw-report')).toHaveAttribute('aria-checked', 'false');
+    state = { ...state, blocked: null };
     // at the studio level there is no such card
     await installApp(page, { api: { ...API, '/portal/context': AGENCY_CTX } });
     await page.goto('/settings.html');
