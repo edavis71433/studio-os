@@ -24,6 +24,7 @@ import { detectPageRenames, duplicatePageInSettings, pageRefs, PAGE_SLUG_RE, typ
 import { OPEN_STAGES } from '../lib/sales_lifecycle.ts';
 import type { SiteRow } from '../lib/site.ts';
 import type { Principal } from '../../_shared/auth.ts';
+import { UUID_LOWER_RE as UUID_RE } from '../lib/uuid.ts';
 
 /** FD-T4 / T-STARTER: everything the block library needs to lead with the RIGHT
  *  choices for this site's industry, plus one-click pre-arranged starter layouts —
@@ -57,7 +58,6 @@ export async function handleBlockSuggestions(site: SiteRow, cors: Record<string,
   } }, 200, cors);
 }
 
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 const SLUG_RE = /^[a-z0-9]+(-[a-z0-9]+)*$/;
 
 // strip control chars except newline

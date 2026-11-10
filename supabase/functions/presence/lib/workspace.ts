@@ -8,7 +8,7 @@ import { svc } from './db.ts';
 import { authUser } from '../../_shared/auth.ts';
 import type { SiteRole } from './site_roles.ts';
 import { isSiteRole, seesFullWorkspace } from './site_roles.ts';
-import type { SiteRow } from './site.ts';
+import { SITE_COLS, type SiteRow } from './site.ts';
 import type { Surface, ShareOverride } from './visibility.ts';
 import type { EmailBrand } from './email_brand.ts';
 
@@ -46,7 +46,7 @@ export async function resolveMemberSite(principal: { userId: string | null; emai
   const m = await svc(`presence_site_members?status=eq.active&${or}&select=site_id,role&order=created_at.asc&limit=1`);
   const seat = Array.isArray(m.json) ? (m.json as any[])[0] : null;
   if (!seat?.site_id) return null;
-  const s = await svc(`presence_sites?id=eq.${seat.site_id}&select=id,client_id,status,last_published_at,template_slug,template_version,custom_domain,netlify_site_id,edition&limit=1`);
+  const s = await svc(`presence_sites?id=eq.${seat.site_id}&select=${SITE_COLS}&limit=1`);
   const site = Array.isArray(s.json) ? (s.json as any[])[0] : null;
   if (!site) return null;
   return { site: site as SiteRow, member: isSiteRole(seat.role) ? { site_id: site.id, role: seat.role } : null };

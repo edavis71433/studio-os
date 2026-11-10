@@ -36,6 +36,7 @@
  *  raises all four pre-dismissed (lib/service_bridge.ts) — a silent ledger that
  *  is only ever the throttle key, exactly as described above. This set stays as
  *  the belt-and-braces guard for rows raised before that change. */
+import { UUID_RE } from './uuid.ts';
 export const CLIENT_ACTIVITY_NOTICE_KINDS: ReadonlySet<string> = new Set([
   'client_message', 'client_upload', 'client_request', 'client_approval',
 ]);
@@ -306,7 +307,6 @@ export function shapeClientConversations(events: ConversationEvent[]): Map<strin
 // under-count on a read failure). `stale` is what the caller may clear so the
 // bell count self-heals on the next load.
 export const INVOICE_REMINDER_PREFIX = 'invremind:';
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 /** The invoice id inside a reminder period — the legacy once-ever
  *  `invremind:<id>` and the Oct 2026 three-leg `invremind:<id>:<slot>` alike. */
 export function invoiceIdOfPeriod(period: string): string {

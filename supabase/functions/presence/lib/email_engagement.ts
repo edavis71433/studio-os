@@ -17,8 +17,8 @@
 // fails quietly and the reads fall back, so nothing else changes.
 import { svc } from './db.ts';
 import { openToken } from '../../_shared/email_infra.ts';
+import { UUID_RE } from './uuid.ts';
 
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /** The classic 43-byte transparent GIF. */
 export const OPEN_PIXEL = new Uint8Array([

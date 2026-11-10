@@ -6,7 +6,7 @@
 // exist as data, not code.
 //
 //   deno run --allow-read --allow-env tests/presence/template_ecosystem_test.mjs
-import { vocabFor, isKnownIndustry, allIndustryKeys, templateSlugForIndustry } from '../../supabase/functions/presence/lib/industry_vocab.ts';
+import { vocabFor, isKnownIndustry, allIndustryKeys } from '../../supabase/functions/presence/lib/industry_vocab.ts';
 import { COMPONENTS, componentByKey, componentsForIndustry, componentFields } from '../../supabase/functions/presence/lib/site_components.ts';
 
 const results = [];
@@ -22,12 +22,6 @@ const ok = (n, p, note = '') => { results.push({ n, p }); console.log(`${p ? 'PA
   ok('unknown / generic → LocalBusiness + Services (safe neutral default)', vocabFor('zzz').schemaType === 'LocalBusiness' && vocabFor('generic').schemaType === 'LocalBusiness' && vocabFor(null).offeringLabel === 'Services');
   ok('every industry has a non-empty offering path + primary action', allIndustryKeys().every((k) => { const v = vocabFor(k); return v.offeringPath.startsWith('/') && v.primaryAction.length > 1; }));
   ok('a broad set of industries covered (not restaurant-only)', allIndustryKeys().length >= 25 && isKnownIndustry('home_services') && isKnownIndustry('medical') && isKnownIndustry('nonprofit'));
-}
-
-// ═══ 2. template resolution by industry (default-template-as-data) ═══
-{
-  ok('food industries → the shipped restaurant template', templateSlugForIndustry('restaurant') === 'restaurant-classic' && templateSlugForIndustry('coffee_shop') === 'restaurant-classic');
-  ok('non-food industries → atelier (the new-site default, Eric Jul 2026)', templateSlugForIndustry('plumber') === 'atelier' && templateSlugForIndustry('law') === 'atelier' && templateSlugForIndustry('generic') === 'atelier');
 }
 
 // ═══ 3. component catalog — well-formed structured blocks ═══

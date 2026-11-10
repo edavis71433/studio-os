@@ -33,17 +33,17 @@ import { describeEngine } from '../optimization/engine.ts';
 import { computeHealthCenter } from './system.ts';
 import { inventory as connInventory, inventorySummary as connInventorySummary } from '../connected/inventory.ts';
 import type { SiteRow } from '../lib/site.ts';
-import { hostedName } from '../lib/site.ts';
+import { hostedName, SITE_COLS as SITE_ROW_COLS } from '../lib/site.ts';
 import type { Principal } from '../../_shared/auth.ts';
 import type { Snapshot } from '../lib/render_types.ts';
+import { UUID_LOWER_RE as UUID_RE } from '../lib/uuid.ts';
 
 const SB_URL = Deno.env.get('SUPABASE_URL') || '';
 const SB_SERVICE = Deno.env.get('SERVICE_ROLE_KEY') || Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
 
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 const HOSTNAME_RE = /^(?=.{4,253}$)([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,}$/;
 
-const SITE_COLS = 'id,client_id,status,last_published_at,template_slug,template_version,custom_domain,netlify_site_id,edition,created_at,updated_at';
+const SITE_COLS = `${SITE_ROW_COLS},created_at,updated_at`;
 
 async function loadSite(siteId: string): Promise<SiteRow & { created_at: string; updated_at: string } | null> {
   if (!UUID_RE.test(siteId)) return null;

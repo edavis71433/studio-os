@@ -21,7 +21,7 @@
 // DKIM/SPF in Resend so it stamps a structured verdict" step — see
 // docs/presence/INBOUND-EMAIL-SETUP.md.
 
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+import { UUID_RE } from './uuid.ts';
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 /** Control-char strip (keeps \t and \n) + length cap — the platform clean() idiom. */

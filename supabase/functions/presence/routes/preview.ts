@@ -20,8 +20,8 @@ import { injectPreviewBadge, signPreviewImages } from '../lib/preview_env.ts';
 import { withSampleWords } from '../lib/sample_words.ts';
 import type { Snapshot } from '../lib/render_types.ts';
 import type { SiteRow } from '../lib/site.ts';
+import { UUID_LOWER_RE as UUID_RE } from '../lib/uuid.ts';
 
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 
 async function loadSnapshotFor(site: SiteRow, version: string, publishId: string | null, launchId: string | null):
   Promise<{ snapshot: Snapshot; mediaManifest: any[] } | { error: string; message: string; status: number } | null> {

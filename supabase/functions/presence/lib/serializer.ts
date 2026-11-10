@@ -16,6 +16,7 @@ import { linkedRefIds, resolveLinkedBlocksTracked } from './linked_sections.ts';
 import { RESERVED_PAGE_SLUGS } from './page_ops.ts';
 import { aggregateApproved, shapeReviewsForDisplay } from './reviews.ts';
 import { normalizeTags } from './search_index.ts';
+import { UUID_RE as SHARE_UUID_RE, UUID_PATTERN } from './uuid.ts';
 
 export const CONTENT_CONTRACT_VERSION = 1;
 
@@ -132,7 +133,6 @@ export function composeBlocks(
 // manifest and gets variants like every other image). A page_seo with no
 // share_image passes through UNTOUCHED — byte-identical snapshots for every
 // existing site. An unknown/deleted media id is dropped (never a broken og:).
-const SHARE_UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 type PageSeoMap = NonNullable<NonNullable<SnapshotContent['settings']>['page_seo']>;
 function resolvePageSeoShare(rawPageSeo: unknown, ref: (id: string | null | undefined) => MediaRef | null): PageSeoMap {
   const raw = (rawPageSeo && typeof rawPageSeo === 'object' && !Array.isArray(rawPageSeo)) ? rawPageSeo as Record<string, unknown> : {};
@@ -372,7 +372,7 @@ export function buildSnapshot(rows: DraftRows, manifest: TemplateManifest, opts:
 // reviews) over the page's list as the builder holds it, then only the section renderer, not
 // the whole site. The list is needed whole: a section's id and render key depend on its
 // neighbours. Reads only what the list needs.
-const UUID_G = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi;
+const UUID_G = new RegExp(UUID_PATTERN, 'gi');
 export async function draftSectionHtml(siteId: string, manifest: TemplateManifest, rawBlocks: unknown[], index: number, now: string): Promise<{ html: string; mediaManifest: MediaManifestEntry[] }> {
   const q = (p: string) => svc(p).then((r) => (Array.isArray(r.json) ? r.json : []));
   // A linked saved section keeps its photos (and a reviews wall) in its library item, not

@@ -26,6 +26,7 @@ import { svc } from '../lib/db.ts';
 import { linksForCustomer, healUnstampedSupport } from '../lib/service_bridge.ts';
 import { resolveSite } from '../lib/site.ts';
 import { resolveMemberSite } from '../lib/workspace.ts';
+import { UUID_RE } from '../lib/uuid.ts';
 
 /** W3: resolve this customer's Pipeline deal + linked project so the studio can
  *  open them in context from the CRM (studio-side only; additive, best-effort).
@@ -54,7 +55,6 @@ async function isStudioSide(jwt: string, principal: Principal): Promise<boolean>
   try { return !!(await resolveAgencyMember(jwt)); } catch { return false; }
 }
 
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const one = (r: { json?: unknown }) => (Array.isArray((r as any).json) ? (r as any).json[0] : null) as any;
 const arr = (r: { json?: unknown }) => (Array.isArray((r as any).json) ? (r as any).json : []) as any[];
 const isClientKind = (k: unknown) => k === 'client' || k === 'customer';

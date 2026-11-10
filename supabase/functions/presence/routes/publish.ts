@@ -35,8 +35,8 @@ import type { SnapshotContent } from '../lib/render_types.ts';
 import type { SiteRow } from '../lib/site.ts';
 import { siteOrigin } from '../lib/site.ts';
 import type { Principal } from '../../_shared/auth.ts';
+import { UUID_LOWER_RE as UUID_RE } from '../lib/uuid.ts';
 
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 
 export const CALM = 'We hit a snag updating your site and we’re on it — nothing changed on your live site.';
 

@@ -34,8 +34,8 @@ import { updateReservedJson, RESERVED_NAMES } from '../lib/reserved_store.ts';
 import { rateAllow, tooMany } from '../lib/ratelimit.ts';
 import type { SiteRow } from '../lib/site.ts';
 import type { Principal } from '../../_shared/auth.ts';
+import { UUID_RE } from '../lib/uuid.ts';
 
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const rows = (r: { json?: unknown }) => (Array.isArray((r as any).json) ? (r as any).json : []) as any[];
 const nowIso = () => new Date().toISOString();
 // Send-now dispatches INLINE (immediate). Above this size we queue it for the

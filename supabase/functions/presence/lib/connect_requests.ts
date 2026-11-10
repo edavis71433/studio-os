@@ -14,8 +14,8 @@
 //   pendingRequestsFor   — the requests waiting on one owner's emails
 import { svc } from './db.ts';
 import { pgrstQuoted, validEmail } from '../commerce/account.ts';
+import { UUID_RE } from './uuid.ts';
 
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const rows = (r: { json?: unknown }) => (Array.isArray((r as any)?.json) ? (r as any).json : []) as any[];
 
 /** True when this account is already this studio's customer: the one primary

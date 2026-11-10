@@ -32,8 +32,8 @@ import { dealEvent, loadDeal, emailInvoice } from './sales.ts';
 import { tableMissing } from './estimates.ts';
 import type { SiteRow } from '../lib/site.ts';
 import type { Principal } from '../../_shared/auth.ts';
+import { UUID_RE } from '../lib/uuid.ts';
 
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const rows = (r: { json?: unknown }) => (Array.isArray((r as any).json) ? (r as any).json : []) as any[];
 const nowIso = () => new Date().toISOString();
 const COLS = 'id,site_id,deal_id,title,amount_cents,currency,every,anchor_day,next_on,due_days,times,sent_count,status,paused_reason,resumed_at,created_at,updated_at';

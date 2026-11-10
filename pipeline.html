@@ -178,10 +178,6 @@ html.dds-embed #detailWrap{padding-top:0}
   /* the calm "your numbers" strip — plain numbers, tabular, no chart */
   .summary{margin-bottom:var(--dds-s5,20px)}
   .summary:empty{display:none}
-  .sum-line{background:var(--card);border:1px solid var(--line);border-radius:var(--dds-r-lg,10px);padding:var(--dds-s3,12px) var(--dds-s4,16px);font-size:13.5px;color:var(--soft);font-variant-numeric:tabular-nums;line-height:1.75}
-  .sum-line strong{color:var(--ink);font-weight:600}
-  .sum-line .dot{color:var(--line);margin:0 var(--dds-s1,4px)}
-  .sum-line .mut{color:var(--faint);font-size:12.5px}
   /* visual refresh: the summary is four icon stat tiles in one bordered strip */
   .stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));border:1px solid var(--line);border-radius:var(--dds-r-lg,10px);background:var(--card);overflow:hidden}
   .stats .st{display:flex;align-items:center;gap:var(--dds-s3,12px);padding:var(--dds-s3,12px) var(--dds-s4,16px);border-left:1px solid var(--line);min-width:0}
@@ -211,7 +207,6 @@ html.dds-embed #detailWrap{padding-top:0}
   .viewtog .chip.on{background:var(--card);color:var(--ink);box-shadow:inset 0 0 0 1px var(--line);font-weight:600}
   .btn{font:inherit;font-size:13.5px;font-weight:500;border:none;border-radius:var(--dds-r,8px);padding:var(--dds-s2,8px) var(--dds-s4,16px);background:var(--p);color:#fff;cursor:pointer}
   .btn.ghost{background:transparent;border:1px solid var(--line);color:var(--ink)}
-  .btn.danger{background:var(--warn)}
   .btn:disabled{opacity:.5;pointer-events:none}
   .spacer{flex:1}
   .card{background:var(--card);border:1px solid var(--line);border-radius:var(--dds-r-lg,10px);padding:var(--dds-s4,16px) var(--dds-s4,16px);margin-bottom:10px;cursor:pointer;display:flex;justify-content:space-between;gap:var(--dds-s3,12px);align-items:center}
@@ -242,14 +237,10 @@ html.dds-embed #detailWrap{padding-top:0}
   .more-menu .btn{border:none;background:transparent;color:var(--ink);text-align:left;border-radius:var(--dds-r-sm,6px);width:100%}
   .more-menu .btn:hover{background:var(--bg)}
   form.mini{display:flex;flex-direction:column;gap:var(--dds-s2,8px);margin-top:10px;padding:var(--dds-s3,12px);border:1px solid var(--line);border-radius:var(--dds-r-lg,10px);background:var(--bg)}
-  form.mini .grid{display:flex;gap:var(--dds-s2,8px);flex-wrap:wrap}
   input,textarea,select{font:inherit;font-size:16px;color:var(--ink);background:var(--card);border:1px solid var(--line);border-radius:var(--dds-r,8px);padding:var(--dds-s2,8px) var(--dds-s3,12px);width:100%}
   textarea{min-height:90px;resize:vertical}
   label{font-size:12.5px;color:var(--soft);display:block;margin:2px 0 var(--dds-s1,4px)}
   .mut{color:var(--soft);font-size:13px}
-  .hrow{display:flex;justify-content:space-between;gap:10px;font-size:13px;color:var(--soft);padding:var(--dds-s1,4px) 0;border-bottom:1px solid var(--line)}
-  .hrow:last-child{border-bottom:none}
-  .hrow .hd{white-space:nowrap;color:var(--faint);font-variant-numeric:tabular-nums}
   /* activity quick-log + merged timeline */
   .qlog{border:1px solid var(--line);border-radius:var(--dds-r-lg,10px);padding:var(--dds-s3,12px);background:var(--bg);margin-bottom:var(--dds-s3,12px)}
   #list .card .m.conv,#table .conv{color:var(--p);font-weight:500}
@@ -310,7 +301,6 @@ html.dds-embed #detailWrap{padding-top:0}
   #table td.num{font-variant-numeric:tabular-nums}
   #table td .over{color:var(--bad);font-weight:600}
   #table td .due-today{color:var(--warn);font-weight:600}
-  .tmeta{font-size:12px;color:var(--faint);margin:0 0 var(--dds-s2,8px)}
   .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
   /* Kanban board — columns = open stages, cards = deals, tap/drag to move */
   .board-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch;margin:0 calc(-1 * var(--dds-s5,20px));padding:2px var(--dds-s5,20px) 6px}
@@ -457,7 +447,7 @@ html.dds-embed #detailWrap{padding-top:0}
     #filters .chip{flex:0 0 auto;white-space:nowrap}
   }
   @media (max-width:360px){.stats{grid-auto-flow:row;grid-template-columns:repeat(2,minmax(0,1fr))}}   /* batch C: too narrow for four in a row */
-  @media (max-width:767px){#seeWon,.linkbtn.big{min-height:44px}}   /* batch C: 44px on a phone */
+  @media (max-width:767px){#seeWon{min-height:44px}}   /* batch C: 44px on a phone */
   @media (max-width:640px){.path{overflow-x:auto;-webkit-overflow-scrolling:touch;padding-bottom:2px}.path .pstep,.path button.pstep{flex:0 0 auto;min-width:96px}}
   #detailInner .tabs{display:flex;gap:2px;border-bottom:1px solid var(--line);margin:0 0 var(--dds-s4,16px);overflow-x:auto;-webkit-overflow-scrolling:touch}
   #detailInner .tabs button{border:none;background:transparent;box-shadow:none;font-family:inherit;font-size:13.5px;font-weight:500;color:var(--soft);padding:var(--dds-s2,8px) var(--dds-s3,12px);cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px;border-radius:0;white-space:nowrap;transition:var(--dds-t-fast,120ms) var(--dds-ease,ease-out)}
@@ -480,7 +470,6 @@ html.dds-embed #detailWrap{padding-top:0}
      tokens and the shared anatomy come from shell.css. ══ */
   .btn{background:var(--dds-grad-btn);color:var(--dds-on-p,#fff);border-radius:999px;font-weight:600;box-shadow:0 6px 16px -8px color-mix(in srgb,var(--p) 70%,transparent)}
   .btn.ghost{background:var(--card);border:1px solid var(--dds-line-strong,#d6d4e2);color:var(--ink);box-shadow:none}
-  .btn.danger{background:var(--warn);box-shadow:none}
   /* the numbers: each its own card, as on Home */
   .stats{gap:var(--dds-s3,12px);border:0;background:transparent;overflow:visible;box-shadow:none}
   .stats .st{background:var(--card);border:1px solid var(--line);border-radius:var(--dds-r-lg,16px);box-shadow:var(--shadow)}

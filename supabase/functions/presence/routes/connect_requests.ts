@@ -16,8 +16,8 @@ import { svc } from '../lib/db.ts';
 import { writeChangeEvent } from '../lib/provenance.ts';
 import { pendingRequestsFor, studioNames, ownerEmails, claimPortfolioSite, releasePortfolioSite } from '../lib/connect_requests.ts';
 import { bridgeCustomerToStudio } from './sales.ts';
+import { UUID_RE } from '../lib/uuid.ts';
 
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const rows = (r: { json?: unknown }) => (Array.isArray((r as any)?.json) ? (r as any).json : []) as any[];
 const ownerOnly = (principal: Principal) => principal.kind === 'client' && !(principal as any).member && !principal.scope;
 const notOwner = (cors: Record<string, string>) => json({ error: 'forbidden', message: 'Only the owner of this website can answer a studio’s request.' }, 403, cors);

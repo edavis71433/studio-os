@@ -49,8 +49,8 @@ import { missingInsertColumns } from '../lib/inbound_email.ts';
 import { summarizeAttachments, attachmentWarning, duplicateHints, listSentence } from '../crm/contact_links.ts';
 import type { SiteRow } from '../lib/site.ts';
 import type { Principal } from '../../_shared/auth.ts';
+import { UUID_RE } from '../lib/uuid.ts';
 
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;                       // expected_close: ISO date only
 const CONVERT_PLANS = new Set(['presence', 'cms_only', 'business_os_only', 'presence_monitor', 'presence_managed']);
 const pickPlan = (p: unknown): PlanKey => (typeof p === 'string' && CONVERT_PLANS.has(p) ? p : 'presence') as PlanKey;

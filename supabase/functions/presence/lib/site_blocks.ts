@@ -35,6 +35,7 @@ import { normalizeFormDefinition, renderForm, type FormDefinition } from './form
 import { brandTint } from './palettes.ts';
 import { parseWindow, isVisibleNow } from './content_window.ts';
 import { normHex, darken, contrastRatio } from './brand_kit.ts';
+import { UUID_RE } from './uuid.ts';
 
 /** The block types this engine realizes (⊆ the site_components catalog keys). */
 export const REALIZED_BLOCK_TYPES: readonly SiteBlockType[] = [
@@ -97,7 +98,6 @@ const s = (x: unknown, max: number): string => String(x ?? '').replace(/\s+/g, '
 const ml = (x: unknown, max: number): string => String(x ?? '')
   .replace(/\r\n?/g, '\n').replace(/[^\S\n]+/g, ' ').replace(/\n{3,}/g, '\n\n').trim().slice(0, max);
 const arr = (x: unknown): any[] => (Array.isArray(x) ? x : []);
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const uid = (x: unknown): string => { const v = String(x ?? '').trim(); return UUID_RE.test(v) ? v : ''; };
 // A human-ish, storage-safe id for the multi-instance blocks (form/columns/cards) —
 // mirrors lib/forms.ts slug(): lowercase, non-alphanumerics → '_', trimmed, capped.

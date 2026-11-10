@@ -13,7 +13,7 @@ import { clearNotice } from '../lib/notice.ts';
 import { healSupportOwners, supportActivity } from '../lib/service_bridge.ts';
 import { buildPortalFeed } from '../routes/workspace.ts';
 import { loadReceivables } from '../routes/sales.ts';
-import { resolveSite } from '../lib/site.ts';
+import { resolveSite, SITE_COLS } from '../lib/site.ts';
 import type { AgencyMember } from './auth.ts';
 import type { PortfolioInput } from './portfolio.ts';
 import type { KitPayload } from '../lib/kits.ts';
@@ -44,13 +44,13 @@ import type { PendingPlan } from './orchestrate.ts';
 import { resolveIndustryKey } from '../industry/registry.ts';
 import { loadCustomerNames } from '../lib/customer_names.ts';
 import { isCustomerOfStudio, claimPortfolioSite } from '../lib/connect_requests.ts';
+import { UUID_LOWER_RE as UUID_RE } from '../lib/uuid.ts';
 
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 const forbid = (cors: Record<string, string>) => json({ error: 'forbidden', message: 'Your role doesn’t include this.' }, 403, cors);
 
 async function loadSites(ids: string[]): Promise<SiteRow[]> {
   if (!ids.length) return [];
-  const r = await svc(`presence_sites?id=in.(${ids.join(',')})&select=id,client_id,status,last_published_at,template_slug,template_version,custom_domain,netlify_site_id,edition`);
+  const r = await svc(`presence_sites?id=in.(${ids.join(',')})&select=${SITE_COLS}`);
   return r.json ?? [];
 }
 
