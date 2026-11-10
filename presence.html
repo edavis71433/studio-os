@@ -11486,6 +11486,7 @@ function closePagesCard(refocus) {
   const c = $("pagesCard"); if (!c || !PAGES_OPEN) return;
   if (PC_PANE) PC_PANE.close(false);
   PAGES_OPEN = false;
+  const f = $("pcFind"); if (f && f.value) { f.value = ""; pcFilter(); }   // it opens next time on every page
   c.classList.remove("on"); c.setAttribute("aria-hidden", "true");
   ["dcPageSwitch", "dkPages"].forEach((id) => { const b = $(id); if (b) b.setAttribute("aria-expanded", "false"); });
   if (PAGES_DOWN) { document.removeEventListener("mousedown", PAGES_DOWN, true); PAGES_DOWN = null; }

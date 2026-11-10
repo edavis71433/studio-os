@@ -219,6 +219,13 @@ test.describe('the Pages card (the floating studio, part three)', () => {
     await expect(card(page)).toBeVisible();
     await page.keyboard.press('Escape');
     await expect(card(page)).toBeHidden();
+    // words left in the box when the card closes don't follow it to the next opening
+    await openCard(page);
+    await page.locator('#pcFind').fill('gal');
+    await page.locator('#btnPagesClose').click();
+    await openCard(page);
+    await expect(page.locator('#pcFind')).toHaveValue('');
+    await expect.poll(async () => (await rowNames(page, 'pcMenu')).length).toBe(7);
   });
 
   test('Header and footer: the arrangement saves; the footer’s words are the business details', async ({ page }) => {
@@ -321,6 +328,7 @@ test.describe('the phone pass (the floating studio, part three)', () => {
     ['Publish', (p) => p.locator('#dcBtnPublish').click(), '#ritualWrap'],
   ];
   test('every card ends above the dock, or beside it, never over it', async ({ page }) => {
+    test.slow();   // six cards opened and closed in turn
     await mount(page);
     for (const [name, open, sel] of CARDS) {
       await open(page);
