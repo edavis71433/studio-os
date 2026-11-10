@@ -480,7 +480,7 @@ test.describe('Client portal — Home greeting + glance strip (slice 10)', () =>
     await expect(strip.locator('#glance-msgs .gn')).toHaveText('0');     // a real zero, not a fake
     await expect(strip.locator('#glance-due .gn')).toHaveText('$500');   // the unpaid Deposit
     await expect(strip.locator('#glance-due .gl')).toHaveText('to pay');
-    await expect(strip.locator('#glance-proj .gn')).toHaveText('active');
+    await expect(strip.locator('#glance-proj .gn')).toHaveText('In progress');   // in words, never the raw "active" (Nov 10 walk)
     await expect(strip.locator('#glance-proj .gl')).toHaveText('Website redesign');
     // and the strip sits ABOVE the Needs-you queue (the website-card adjacency is untouched)
     await expect(page.locator('#home-glance + #home-needs')).toBeVisible();
@@ -3462,9 +3462,11 @@ test.describe('PS6 — project-record cohesion (B3)', () => {
     // no button, no handler hook — not merely a disabled or hidden one
     await expect(page.getByRole('button', { name: 'Mark done' })).toHaveCount(0);
     await expect(page.locator('[data-taskdone]')).toHaveCount(0);
-    // and never a dead card: each one says who marks it off
+    // and never a dead card: each one says who marks it off (and, since the Nov 10
+    // walk, points at where it's done — portal-bugs-nov10.spec.ts walks those buttons)
     await expect(page.locator('#sec-todos .tdnote')).toHaveCount(3);
-    await expect(page.locator('#sec-todos .tdnote').first()).toHaveText('Your studio marks this one off once it arrives.');
+    for (const note of await page.locator('#sec-todos .tdnote').all()) await expect(note).toContainText('marks this one off');
+    await expect(page.locator('#sec-todos .tdnote').nth(1)).toHaveText('Your studio marks this one off once it arrives.');
     // they still count as waiting on the client — the ask has not gone away
     await expect(page.locator('.hl', { hasText: 'Waiting on you' }).locator('.hl-v')).toHaveText('4');   // 3 to-dos + 1 pending approval
   });
@@ -3632,7 +3634,7 @@ test.describe('PS6 — project-record cohesion (B3)', () => {
     await page.goto(`/client.html?project=${PID}`);
     await expect(page.getByRole('heading', { name: 'Website redesign' })).toBeVisible();
     await page.locator('[data-survey]').click();
-    await expect(page.locator('#toast')).toContainText('That survey isn’t available.');
+    await expect(page.locator('#toast')).toContainText('We couldn’t reach your studio — check your connection and try again.');   // G3: the connection, not the survey
     await expect(page.getByRole('heading', { name: 'Website redesign' })).toBeVisible();   // a failed read never collapses the record
     await expect(page.locator('[data-survey]')).toHaveText('Open survey →');   // busy control restored — never a dead "Opening…"
   });
