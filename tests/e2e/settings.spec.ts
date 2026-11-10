@@ -243,6 +243,55 @@ test.describe('Settings page', () => {
     await expect(page.locator('[data-card="menu"]')).toHaveCount(0);
   });
 
+  // builder list item 58 (Nov 2026): the monthly report email to a client, set once per client
+  test('item 58 — Monthly report: inside a client only; the switch saves as it flips; the line saves; a preview goes to you; a failed save flips back', async ({ page }) => {
+    const puts: unknown[] = []; let previews = 0; let fail = false;
+    let state = { enabled: false, note: '', last_month: null as string | null, updated_by: null, updated_at: null, note_max: 600, next_month: '2026-11' };
+    await installApp(page, { api: { ...API, '/portal/context': SCOPED_CTX } });
+    await page.route(/\/functions\/v1\/presence\/report\/monthly(\/preview)?$/, (route) => {
+      const m = route.request().method();
+      if (m === 'POST') { previews++; return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: { sent_to: 'eric@example.com' } }) }); }
+      if (m === 'PUT') {
+        const body = route.request().postDataJSON(); puts.push(body);
+        if (fail) return route.fulfill({ status: 502, contentType: 'application/json', body: JSON.stringify({ error: 'write_failed', message: 'That didn’t save.' }) });
+        state = { ...state, ...body }; return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: state }) });
+      }
+      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: state }) });
+    });
+    await page.goto(`/settings.html?client=${CLIENT}`);
+    await expect(page.locator('[data-card="report"]')).toHaveAttribute('href', '#report');
+    await page.locator('[data-card="report"]').click();
+    const sec = page.locator('#report');
+    await expect(sec).toBeVisible();
+    await expect(sec.locator('#sw-report')).toHaveAttribute('aria-checked', 'false');
+    await expect(sec.locator('#reportLast')).toHaveText('');
+    await sec.locator('#sw-report').click();
+    await expect(sec.locator('#sw-report')).toHaveAttribute('aria-checked', 'true');
+    await expect(page.locator('.dds-toast').last()).toContainText('On. The first report goes out in the first days of next month.');
+    await expect(sec.locator('#reportLast')).toContainText('Nothing sent yet');
+    expect(puts).toEqual([{ enabled: true }]);
+    await sec.locator('#report-note').fill('Thanks for a great month.');
+    await sec.locator('#reportSave').click();
+    await expect(sec.locator('#reportMsg')).toHaveText('Saved.');
+    expect(puts[1]).toEqual({ note: 'Thanks for a great month.' });
+    await sec.locator('#reportPreview').click();
+    await expect(sec.locator('#reportMsg')).toContainText('Sent to eric@example.com');
+    expect(previews).toBe(1);
+    fail = true;
+    await sec.locator('#sw-report').click();
+    await expect(page.locator('.dds-toast').last()).toContainText('That didn’t save.');
+    await expect(sec.locator('#sw-report')).toHaveAttribute('aria-checked', 'true');          // flipped back
+    // a month already sent is named
+    fail = false; state = { ...state, last_month: '2026-10' };
+    await page.goto(`/settings.html?client=${CLIENT}`);
+    await expect(page.locator('#reportLast')).toContainText('Last sent: the October 2026 report.');
+    // at the studio level there is no such card
+    await installApp(page, { api: { ...API, '/portal/context': AGENCY_CTX } });
+    await page.goto('/settings.html');
+    await expect(page.locator('#cards .setcard').first()).toBeVisible();
+    await expect(page.locator('[data-card="report"]')).toHaveCount(0);
+  });
+
   test('cards a plan or role does not include are left out; the billing card is owner-only', async ({ page }) => {
     const ctx = { data: {
       site_role: 'business_owner', edition: 'presence', edition_key: 'cms_only', edition_name: 'CMS', edition_features: ['website', 'forms'],

@@ -212,6 +212,24 @@
        sentence it sends; each saves the moment it is flipped (PUT /settings,
        the same row the industry lives on — migration 0134, all off by default).
        Item 13's per-stage "stale after" lives here too. -->
+  <!-- builder list item 58 (Nov 2026): the monthly report email to this client. Inside a client
+       only; kept once per client (GET/PUT /report/monthly). The switch saves as it flips; the line
+       saves with its button; Send me a preview emails last month's report to you, now. -->
+  <section class="card" id="report" aria-labelledby="reportHead" hidden data-needs="configure">
+    <div class="card-h"><h2 id="reportHead" tabindex="-1">Monthly report</h2><span class="hint" id="reportHint">Once a month, how their website did, on your brand.</span></div>
+    <div class="swrow">
+      <button type="button" class="sw" role="switch" id="sw-report" aria-checked="false" aria-labelledby="sw-report-l"></button>
+      <div class="t"><b id="sw-report-l">Send this client a monthly report</b>
+        <div class="how">In the first days of each month: visitors and pages viewed, enquiries, the pages people read most, and what changed. Sent to the email on their record, from your studio, with a reply address that reaches you.</div>
+        <div class="how" id="reportLast"></div></div>
+    </div>
+    <div class="swrow" style="display:block">
+      <b style="font-weight:600">A line from you</b>
+      <div class="how">Goes at the top of every report, in your words. Written once; change it any time.</div>
+      <textarea id="report-note" maxlength="600" rows="3" placeholder="e.g. Thanks for a great month. The new photos are bringing people to the Services page." style="width:100%;margin-top:8px;font:inherit;font-size:14px;border:1px solid var(--line);background:var(--bg);color:var(--ink);border-radius:var(--dds-r,8px);padding:8px 12px;resize:vertical"></textarea>
+      <div style="margin-top:10px;display:flex;align-items:center;gap:10px;flex-wrap:wrap"><button type="button" class="btn" id="reportSave">Save the line</button><button type="button" class="btn ghost" id="reportPreview">Send me a preview</button><span class="how" id="reportMsg" role="status"></span></div>
+    </div>
+  </section>
   <!-- builder list item 54 (Nov 2026): the menu areas a studio hides. Agency members at
        studio level only; saved once per studio (GET/PUT /agency/nav), so everyone on the
        team sees the same menu. Each switch saves as you flip it. -->
@@ -339,6 +357,8 @@ const CARDS = [
   { key: 'auto', href: '#automations', title: 'Automations', desc: 'Four switches: acknowledge enquiries, remind unpaid invoices, nudge quiet deals, ask for a review when a project is done. Each shows the sentence it sends.', studioOnly: true, needs: 'configure' },
   // the agency's own team: seats and roles (agency members at studio level only — never a client's settings)
   { key: 'agency_team', href: '#team', title: 'Team', desc: 'Who is on your studio’s team, their roles, and the seats your plan covers.', agencyOnly: true },
+  // builder list item 58 (Nov 2026): the client's monthly report email, set once per client (inside a client only)
+  { key: 'report', icon: 'studio', href: '#report', title: 'Monthly report', desc: 'Once a month, this client gets how their website did, on your brand, with a line from you.', scopedOnly: true, feature: 'website', cap: 'configure' },
   // builder list item 54 (Nov 2026): a studio hides the menu areas it doesn't use
   { key: 'menu', icon: 'studio', href: '#menu', title: 'Your menu', desc: 'Hide the areas your studio doesn’t use. A hidden area keeps its page and stays one search away.', agencyOnly: true, cap: 'configure' },
   { key: 'billing', href: '#billing', title: 'Plan & billing', desc: 'Your plan, how to change it, and closing your account.', ownerOnly: true, needs: 'owner' },
@@ -381,7 +401,7 @@ function cardHtml(c, status) {
 const STATUSES = {};   // the quick card statuses, kept so a repaint (dds:context) does not lose them
 function reveal(id, focusId) { const f = $(id); if (!f) return; f.hidden = false; f.scrollIntoView({ behavior: 'smooth', block: 'start' }); const n = focusId && $(focusId); if (n) n.focus({ preventScroll: true }); }
 function renderCards() {
-  const show = CARDS.filter((c) => (!c.feature || hasFeature(c.feature)) && (!c.cap || hasCap(c.cap)) && !(c.ownerOnly && SCOPE) && !(c.studioOnly && SCOPE) && !(c.agencyOnly && !(CTX && CTX.is_agency && !SCOPE)) && !(c.operatorOnly && (SCOPE || !(CTX && CTX.is_operator))));
+  const show = CARDS.filter((c) => (!c.feature || hasFeature(c.feature)) && (!c.cap || hasCap(c.cap)) && !(c.ownerOnly && SCOPE) && !(c.studioOnly && SCOPE) && !(c.scopedOnly && !SCOPE) && !(c.agencyOnly && !(CTX && CTX.is_agency && !SCOPE)) && !(c.operatorOnly && (SCOPE || !(CTX && CTX.is_operator))));
   $('cards').innerHTML = show.map((c) => cardHtml(c, STATUSES[c.key])).join('');
   const sc = $('cards').querySelector('[data-card="studio"]');
   if (sc) sc.addEventListener('click', (e) => { e.preventDefault(); reveal('studio', 'f-name'); });
@@ -391,6 +411,8 @@ function renderCards() {
   if (ac) ac.addEventListener('click', (e) => { e.preventDefault(); reveal('automations', 'autoHead'); });
   const tc = $('cards').querySelector('[data-card="agency_team"]');
   if (tc) tc.addEventListener('click', (e) => { e.preventDefault(); reveal('team', 'teamHead'); });
+  const rc = $('cards').querySelector('[data-card="report"]');
+  if (rc) rc.addEventListener('click', (e) => { e.preventDefault(); reveal('report', 'reportHead'); });
   const mc = $('cards').querySelector('[data-card="menu"]');
   if (mc) mc.addEventListener('click', (e) => { e.preventDefault(); reveal('menu', 'menuHead'); });
   const gc = $('cards').querySelector('[data-card="stages"]');
@@ -653,6 +675,45 @@ function paintAutomations() {
   loadStageNames();
   loadMenu();
 }
+// ── item 58: this client's monthly report (GET/PUT /report/monthly, POST /report/monthly/preview) ──
+let REPORT = null, REPORT_BUSY = false;
+async function loadReport() {
+  if (!SCOPE || !hasFeature('website') || !hasCap('configure')) return;
+  const r = await api('/report/monthly', 'GET');
+  if (!r.ok || !r.body || !r.body.data) return;   // without the answer the card stays away
+  REPORT = r.body.data; paintReport(); $('report').hidden = false;
+}
+function paintReport() {
+  const d = REPORT || {};
+  $('sw-report').setAttribute('aria-checked', d.enabled ? 'true' : 'false');
+  if (document.activeElement !== $('report-note')) $('report-note').value = d.note || '';
+  const last = d.last_month ? 'Last sent: the ' + monthWords(d.last_month) + ' report.' : (d.enabled ? 'Nothing sent yet; the first report goes out in the first days of next month.' : '');
+  $('reportLast').textContent = last;
+}
+function monthWords(ym) { const m = /^(\d{4})-(\d{2})$/.exec(String(ym || '')); if (!m) return ym; return new Date(Date.UTC(+m[1], +m[2] - 1, 1)).toLocaleDateString('en-US', { month: 'long', year: 'numeric', timeZone: 'UTC' }); }
+async function saveReport(patch, undo) {
+  if (REPORT_BUSY) return; REPORT_BUSY = true;
+  const r = await api('/report/monthly', 'PUT', patch);
+  REPORT_BUSY = false;
+  if (!r.ok) { if (undo) undo(); toast(nice(r.body, 'That didn’t save — nothing was changed.'), true); return false; }
+  REPORT = r.body.data || { ...(REPORT || {}), ...patch }; paintReport();
+  return true;
+}
+function wireReport() {
+  $('sw-report').addEventListener('click', async () => {
+    const was = REPORT && REPORT.enabled === true, next = !was;
+    $('sw-report').setAttribute('aria-checked', next ? 'true' : 'false');
+    if (await saveReport({ enabled: next }, () => $('sw-report').setAttribute('aria-checked', was ? 'true' : 'false'))) toast(next ? 'On. The first report goes out in the first days of next month.' : 'Off. No more reports to this client.');
+  });
+  $('reportSave').addEventListener('click', async () => { if (await saveReport({ note: $('report-note').value })) { $('reportMsg').textContent = 'Saved.'; setTimeout(() => { $('reportMsg').textContent = ''; }, 2500); } });
+  $('reportPreview').addEventListener('click', async () => {
+    const b = $('reportPreview'); b.disabled = true; $('reportMsg').textContent = 'Sending…';
+    const r = await api('/report/monthly/preview', 'POST', {});
+    b.disabled = false;
+    if (!r.ok) { $('reportMsg').textContent = ''; toast(nice(r.body, 'The preview didn’t send.'), true); return; }
+    $('reportMsg').textContent = 'Sent to ' + ((r.body.data && r.body.data.sent_to) || 'you') + '. Last month’s numbers, marked [Preview].';
+  });
+}
 // ── item 54: the menu areas this studio hides (GET/PUT /agency/nav) ──
 let MENU = null;   // { hidden: [...], choices: [{key,label,what}] }
 async function loadMenu() {
@@ -787,6 +848,7 @@ function signedOut() {
     await loadProfile().catch(() => { $('studio').hidden = false; toast('Couldn’t load your studio details just now.', true); });
     renderSubline();
     if (!SCOPE) { wireAutomations(); paintAutomations(); }
+    else { wireReport(); loadReport(); }
     // small, honest statuses on the cards that can answer quickly — never a blocker
     // GET /connections answers { data: { groups: { <category>: [ { connection: { status, health } } ] } } }
     // (routes/connections.ts) — the same rows connections.html paints its chips from.

@@ -1148,6 +1148,10 @@ async function route_(req: Request, cors: Record<string, string>): Promise<Respo
       if (m[2] === '/disconnect' && method === 'POST') return handleConnectionDisconnect(site, m[1], principal, cors);
     }
   }
+  // ── Builder list item 58: the monthly report email to this client (ops/monthly_report.ts) ──
+  if (route === '/report/monthly' && method === 'GET') return (await import('./ops/monthly_report.ts')).handleReportGet(site, cors);
+  if (route === '/report/monthly' && method === 'PUT') return (await import('./ops/monthly_report.ts')).handleReportPut(req, site, principal, cors);
+  if (route === '/report/monthly/preview' && method === 'POST') return (await import('./ops/monthly_report.ts')).handleReportPreview(site, principal, cors);
   // ── AN-1: Analytics — plain-English understanding composed from stored signals
   //    (no new engine, no new AI, no fabricated numbers). Site-scoped surfaces.
   if (route === '/analytics' && method === 'GET') return handleAnalyticsHome(req, site, cors);
