@@ -27,6 +27,7 @@ import { loadEmailBrand, type EmailBrand } from './email_brand.ts';
 import { isSuppressed } from '../routes/email_infra.ts';
 import { normalizeLists } from './saved_views.ts';
 import { readReservedJson, RESERVED_NAMES } from './reserved_store.ts';
+import { BOOKING_TOKEN_RE, BOOKING_LINE_RE, IMAGE_LINE_RE, bookingHref, bookingButton, imageBlock, loadUpdateExtras, type UpdateExtras } from './update_media.ts';
 
 const rows = (r: { json?: unknown }) => (Array.isArray((r as any).json) ? (r as any).json : []) as any[];
 
@@ -71,7 +72,9 @@ export async function loadPickedLists(siteId: string) { return normalizeLists(aw
 // HTML, so a value can never inject markup. We ALSO strip markdown-structural and
 // control characters from the value so a stray "**" in a name can't reflow the
 // email's formatting. Missing values fall back to a warm, generic word.
-export interface MergeTokens { firstName?: string; businessName?: string }
+// The bold redesign adds {{booking_link}} and photos; buildEmailHtml places them
+// (lib/update_media.ts), and a subject line never carries either.
+export interface MergeTokens { firstName?: string; businessName?: string; bookingUrl?: string }
 
 function cleanMergeValue(v: unknown): string {
   return String(v ?? '')
@@ -98,13 +101,31 @@ export function renderMergeTokens(text: unknown, tokens: MergeTokens): string {
 
 /** The email SUBJECT line: merge tokens, then flatten to a single plain line. Pure. */
 export function renderSubject(subject: unknown, tokens: MergeTokens): string {
-  return renderMergeTokens(subject, tokens).replace(/[\r\n]+/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 200);
+  return renderMergeTokens(subject, tokens).replace(BOOKING_TOKEN_RE, '').replace(/[\r\n]+/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 200);
 }
 
 /** The email BODY HTML fragment (sendEmail wraps it in the branded shell): merge
- *  tokens then render markdown (escape-first ⇒ XSS-safe). Pure. */
-export function buildEmailHtml(bodyMarkdown: unknown, tokens: MergeTokens): string {
-  return renderMarkdown(renderMergeTokens(bodyMarkdown, tokens));
+ *  tokens then render markdown (escape-first ⇒ XSS-safe). A line that is only
+ *  {{booking_link}} becomes the "Book a time" button and a photo line its image
+ *  (lib/update_media.ts); every other line renders exactly as before, and the
+ *  booking link inside a sentence reads "book a time". With no booking link saved,
+ *  or a photo that isn't the site's own, that part renders nothing. Pure. */
+export function buildEmailHtml(bodyMarkdown: unknown, tokens: MergeTokens, extras: { images?: Record<string, string>; accent?: string } = {}): string {
+  const booking = bookingHref(tokens.bookingUrl);
+  const inlineBooking = booking ? `[book a time](${booking.replace(/\(/g, '%28').replace(/\)/g, '%29')})` : '';
+  const images = extras.images || {};
+  const out: string[] = [];
+  let chunk: string[] = [];
+  const flush = () => { if (chunk.length) { const h = renderMarkdown(chunk.join('\n')); if (h) out.push(h); chunk = []; } };
+  for (const line of renderMergeTokens(bodyMarkdown, tokens).split('\n')) {
+    const t = line.trim();
+    if (BOOKING_LINE_RE.test(t)) { flush(); if (booking) out.push(bookingButton(booking, extras.accent || '')); continue; }
+    const im = t.match(IMAGE_LINE_RE);
+    if (im) { flush(); const src = images[im[2].toLowerCase()]; if (src) out.push(imageBlock(src, im[1])); continue; }
+    chunk.push(line.replace(BOOKING_TOKEN_RE, inlineBooking));
+  }
+  flush();
+  return out.join('\n');
 }
 
 // ── Recipient normalization: distinct, valid, lower-cased. Pure. ─────────────
@@ -294,6 +315,8 @@ export interface DispatchDeps extends SendableDeps {
   resolveFn?: (siteId: string, key: AudienceKey) => Promise<{ recipients: Recipient[]; suppressed: number; audience: number }>;
   sentInLastDayFn?: (siteId: string, notId: string) => Promise<number>;
   dailyCap?: number;
+  // the booking link and photo links the message needs (lib/update_media.ts)
+  extrasFn?: (siteId: string, body: unknown) => Promise<UpdateExtras>;
 }
 
 export type Claim = 'inserted' | { id: string } | 'duplicate' | 'error';
@@ -336,6 +359,7 @@ export async function dispatchBroadcast(b: BroadcastRow, deps: DispatchDeps = {}
 
   const brand = await loadBrand(b.site_id);
   const businessName = brand?.name || 'us';
+  const extras = await (deps.extrasFn || loadUpdateExtras)(b.site_id, b.body).catch(() => ({ bookingUrl: '', images: {} }));
   const { recipients, suppressed } = await resolve(b.site_id, b.audience);
   // S4: the daily cap, checked right before anything goes out (the callers check it
   // earlier for a clear message; this catches two sends racing). Not a failure: the
@@ -349,14 +373,14 @@ export async function dispatchBroadcast(b: BroadcastRow, deps: DispatchDeps = {}
     const c = await claim(b.id, b.site_id, r.email);
     if (c === 'duplicate') { already++; continue; }   // send-once guard: already mailed
     if (c === 'error') { failed++; continue; }
-    const tokens: MergeTokens = { firstName: r.firstName, businessName };
+    const tokens: MergeTokens = { firstName: r.firstName, businessName, bookingUrl: extras.bookingUrl };
     // Item 69: the open counter — a 1×1 image naming this send's row (lib/email_engagement.ts).
     const pixel = typeof c === 'object' ? openPixelTag(await (deps.pixelFn || openPixelUrl)(c.id).catch(() => '')) : '';
     // sendEmail is the ONE send point: it re-checks suppression and attaches the
     // RFC-8058 one-click List-Unsubscribe header — inherited, never re-implemented.
     // R1: pass the broadcast's own site so a recipient's REPLY lands on that
     // site's inbound address (<siteId>@<inbound-domain>) → /email/inbound.
-    const ok = await send(r.email, renderSubject(b.subject, tokens), buildEmailHtml(b.body, tokens) + pixel, brand, { siteId: b.site_id });
+    const ok = await send(r.email, renderSubject(b.subject, tokens), buildEmailHtml(b.body, tokens, { images: extras.images, accent: brand?.accent }) + pixel, brand, { siteId: b.site_id });
     if (ok) sent++;
     else { failed++; await markFailed(b.id, r.email).catch(() => {}); }
   }
@@ -370,12 +394,13 @@ export async function dispatchBroadcast(b: BroadcastRow, deps: DispatchDeps = {}
  *  the subject marked [Test], the fill-ins as the preview shows them ("there").
  *  Nothing is claimed, counted or recorded: a test never touches the send-once
  *  guard, the daily cap, the open counter or the history. */
-export async function sendBroadcastTest(b: BroadcastRow, to: string, deps: Pick<DispatchDeps, 'loadBrand' | 'sendFn'> = {}): Promise<boolean> {
+export async function sendBroadcastTest(b: BroadcastRow, to: string, deps: Pick<DispatchDeps, 'loadBrand' | 'sendFn' | 'extrasFn'> = {}): Promise<boolean> {
   const loadBrand = deps.loadBrand || loadEmailBrand;
   const send = deps.sendFn || sendEmail;
   const brand = await loadBrand(b.site_id);
-  const tokens: MergeTokens = { firstName: 'there', businessName: brand?.name || 'us' };
-  return send(to, '[Test] ' + renderSubject(b.subject, tokens), buildEmailHtml(b.body, tokens), brand, { siteId: b.site_id });
+  const extras = await (deps.extrasFn || loadUpdateExtras)(b.site_id, b.body).catch(() => ({ bookingUrl: '', images: {} }));
+  const tokens: MergeTokens = { firstName: 'there', businessName: brand?.name || 'us', bookingUrl: extras.bookingUrl };
+  return send(to, '[Test] ' + renderSubject(b.subject, tokens), buildEmailHtml(b.body, tokens, { images: extras.images, accent: brand?.accent }), brand, { siteId: b.site_id });
 }
 
 /** Atomically CLAIM a scheduled broadcast for dispatch: flip scheduled→sending and

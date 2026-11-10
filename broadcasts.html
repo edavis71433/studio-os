@@ -142,6 +142,31 @@
   .vars{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px}
   .var{font:inherit;font-size:12.5px;font-weight:600;color:var(--p);background:var(--p-soft);border:0;border-radius:999px;padding:5px 11px;cursor:pointer}
   .var:hover{background:color-mix(in srgb,var(--p) 18%,transparent)}
+  /* bold redesign: + Booking link and + Image (Figma section 10) */
+  .varnote{font-size:12.5px;color:var(--soft);margin:8px 2px 0;line-height:1.45}
+  .varnote a{color:var(--p);font-weight:600}
+  .mail-cta{margin:2px 0 10px}
+  .mail-cta span{display:inline-block;background:var(--p);color:var(--dds-on-p,#fff);padding:7px 15px;border-radius:999px;font-weight:600;font-size:12.5px}
+  .mail-img{margin:2px 0 10px}
+  .mail-img img{display:block;width:100%;height:auto;border-radius:10px}
+  .mail-img .ph{display:grid;place-items:center;aspect-ratio:16/9;border-radius:10px;background:var(--p-soft);color:var(--p);font-size:12px;font-weight:600;padding:8px;text-align:center}
+  dialog.imgdlg{border:0;padding:0;margin:auto;inset:0;width:min(640px,calc(100vw - 32px));max-height:min(80vh,720px);border-radius:var(--dds-r-xl,20px);background:var(--card);color:var(--ink);box-shadow:0 24px 60px -20px rgba(23,21,34,.45);overflow:auto}
+  dialog.imgdlg::backdrop{background:rgba(23,21,34,.45)}
+  .imgdlg-h{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:16px 18px 6px}
+  .imgdlg-h h2{margin:0;font-size:17px}
+  .imgdlg-x{font:inherit;font-size:22px;line-height:1;width:36px;height:36px;border:0;border-radius:999px;background:transparent;color:var(--soft);cursor:pointer}
+  .imgdlg-x:hover{background:var(--p-soft);color:var(--p)}
+  .imgdlg-b{padding:8px 18px 4px}
+  .imgdlg-f{font-size:12px;color:var(--faint);margin:6px 18px 16px}
+  .imgdlg-empty{color:var(--soft);font-size:13.5px;margin:6px 0 12px}
+  ul.picks{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(auto-fill,minmax(132px,1fr));gap:10px}
+  .pick{font:inherit;display:flex;flex-direction:column;width:100%;padding:0;border:1px solid var(--line);border-radius:12px;background:var(--bg);color:var(--ink);overflow:hidden;cursor:pointer;text-align:left}
+  .pick img{display:block;width:100%;aspect-ratio:4/3;object-fit:cover;background:var(--p-soft)}
+  .pick span{font-size:12px;padding:6px 8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .pick:hover{border-color:var(--p)}
+  .pick:focus-visible,.imgdlg-x:focus-visible{outline:2px solid var(--p);outline-offset:2px}
+  @media (max-width:760px){dialog.imgdlg{width:100%;max-width:none;margin:auto 0 0;border-radius:20px 20px 0 0;max-height:85dvh}ul.picks{grid-template-columns:repeat(2,minmax(0,1fr))}}
+  @media (pointer:coarse){.imgdlg-x{width:44px;height:44px}}
   .up-acts{margin-top:var(--dds-s4,16px)}
   .up-links{display:flex;gap:6px 18px;flex-wrap:wrap;align-items:center;margin-top:10px}
   .up-links .linkish{margin-top:0}
@@ -306,7 +331,8 @@ function render(){
         <span class="sp" aria-hidden="true"></span>
         <button type="button" data-fmt="link" aria-label="Link" title="Link">${IC.link}</button>
       </div>
-      <div class="vars" role="group" aria-label="Fill in for each person"><button type="button" class="var" data-var="{{first_name}}">+ First name</button><button type="button" class="var" data-var="{{business_name}}">+ Business name</button></div>
+      <div class="vars" role="group" aria-label="Add to your message"><button type="button" class="var" data-var="{{first_name}}">+ First name</button><button type="button" class="var" data-var="{{business_name}}">+ Business</button><button type="button" class="var" id="varBook">+ Booking link</button><button type="button" class="var" id="varImg" aria-haspopup="dialog">+ Image</button></div>
+      <p class="varnote" id="varNote" role="status" hidden></p>
       <div class="up-links"><button class="linkish" id="assist" type="button" title="Ask for a first draft you can edit">${IC.spark}Help me write it</button><button class="linkish" id="sendTest" type="button" title="Email this to yourself first — only you get it">${IC.mail}Send me a test</button></div>
       <div class="row up-acts">
         <button class="ghost" id="preview" type="button">Preview</button>
@@ -347,6 +373,11 @@ function lastLine(){
 // as the server previews them ({{first_name}} → "there"). The exact branded email
 // still shows in Preview & send before anything goes out.
 let BIZ='';   // the name the email signs with (GET /identity, best-effort)
+let BOOK_URL='';   // Business details' booking link (https only), the "Book a time" button's address
+let PHOTOS=null,THUMBS={},PHOTOS_TRIED=false;   // the studio's shared photos (GET /assets) and their thumbnails
+// a line of its own: {{booking_link}} is the "Book a time" button, ![words](media:<id>) a photo
+// from Files (lib/update_media.ts renders both the same way in the email)
+const BOOK_LINE=/^\{\{\s*booking_link\s*\}\}$/i,IMG_LINE=/^!\[([^\]\n]{0,200})\]\(media:([0-9a-f-]{36})\)$/i;
 const fillTokens=(t)=>String(t||'').replace(/\{\{\s*first_name\s*\}\}/g,'there').replace(/\{\{\s*business_name\s*\}\}/g,BIZ||'your business');
 function mdLite(src){
   const inline=(t)=>esc(t).replace(/\*\*([^*]+)\*\*/g,'<b>$1</b>').replace(/\*([^*]+)\*/g,'<i>$1</i>').replace(/\[([^\]]+)\]\(([^)\s]+)\)/g,'<u>$1</u>');
@@ -356,12 +387,31 @@ function mdLite(src){
     return '<p>'+lines.map(inline).join('<br>')+'</p>';
   }).join('');
 }
+function liveBody(src){
+  const out=[];let chunk=[],missing=false;
+  const flush=()=>{if(chunk.length){out.push(mdLite(chunk.join('\n')));chunk=[];}};
+  for(const line of String(src||'').replace(/\r/g,'').split('\n')){
+    const t=line.trim();
+    if(BOOK_LINE.test(t)){flush();if(BOOK_URL)out.push('<p class="mail-cta"><span>Book a time</span></p>');continue;}
+    const m=t.match(IMG_LINE);
+    if(m){
+      flush();const th=THUMBS[m[2].toLowerCase()];
+      if(th)out.push(`<p class="mail-img"><img src="${esc(th)}" alt="${esc(m[1])}"></p>`);
+      else if(!PHOTOS){missing=true;out.push(`<p class="mail-img"><span class="ph">${esc(m[1]||'Photo')}</span></p>`);}   // not read yet; a photo that isn't yours renders nothing, as in the email
+      continue;
+    }
+    chunk.push(line.replace(/\{\{\s*booking_link\s*\}\}/gi,BOOK_URL?'[book a time](https://)':''));
+  }
+  flush();
+  if(missing&&!PHOTOS_TRIED){PHOTOS_TRIED=true;loadPhotos().then(()=>paintLive()).catch(()=>{});}
+  return out.join('');
+}
 function paintLive(){
   const host=$('livePv');if(!host)return;
   const subj=(($('subj')&&$('subj').value)||'').trim(),body=(($('bodytx')&&$('bodytx').value)||'').trim();
   host.innerHTML=`<div class="mail-from"><span class="mail-mark" aria-hidden="true"></span>${esc(BIZ||'Your business')}</div>
     <div class="mail-subj">${subj?esc(fillTokens(subj)):'<span class="mail-ph">Your subject</span>'}</div>
-    <div class="mail-body">${body?mdLite(fillTokens(body)):'<p class="mail-ph">Your message shows here as you write it.</p>'}</div>
+    <div class="mail-body">${body?liveBody(fillTokens(body)):'<p class="mail-ph">Your message shows here as you write it.</p>'}</div>
     <div class="mail-foot">You’re getting this from ${esc(BIZ||'your business')} · <u>Unsubscribe</u></div>`;
 }
 // audience picker — or its honest failure notice when the segments read failed
@@ -413,6 +463,9 @@ function wire(){
   const su=$('sendUpdate');if(su)su.addEventListener('click',()=>doPreview().then(()=>{const b=$('send');if(b)b.focus();}));   // bold redesign: it reads "Send to N people →"; the road is the same
   document.querySelectorAll('[data-fmt]').forEach(b=>b.addEventListener('click',()=>applyFormat(b.getAttribute('data-fmt'))));
   document.querySelectorAll('[data-var]').forEach(b=>{b.addEventListener('mousedown',(e)=>e.preventDefault());b.addEventListener('click',()=>insertAtCaret(b.getAttribute('data-var')));});
+  const vb=$('varBook');if(vb){vb.addEventListener('mousedown',(e)=>e.preventDefault());vb.addEventListener('click',addBooking);}
+  const vi=$('varImg');if(vi)vi.addEventListener('click',openPhotos);
+  const bt=$('bodytx');if(bt)bt.addEventListener('focus',()=>{bt.dataset.caret='1';});
   const sc=$('schedule');if(sc)sc.addEventListener('click',()=>doPreview({scheduleFirst:true}).then(()=>{const w=$('when');if(w)w.focus();}));
   const tt=$('sendTest');if(tt)tt.addEventListener('click',doTest);
   paintLive();
@@ -510,6 +563,62 @@ function insertAtCaret(text){
   t.value=t.value.slice(0,a)+text+t.value.slice(b);
   t.focus();t.selectionStart=t.selectionEnd=a+text.length;
   t.dispatchEvent(new Event('input',{bubbles:true}));
+}
+function insertLine(text){
+  const t=$('bodytx');if(!t)return;
+  const used=t.dataset.caret==='1';
+  const a=used?(t.selectionStart||0):t.value.length,b=used?(t.selectionEnd||0):t.value.length;
+  const before=t.value.slice(0,a),after=t.value.slice(b);
+  const pre=before&&!before.endsWith('\n')?'\n':'',post=after.startsWith('\n')?'':'\n';
+  t.value=before+pre+text+post+after;
+  t.focus();t.selectionStart=t.selectionEnd=(before+pre+text+post).length;
+  t.dispatchEvent(new Event('input',{bubbles:true}));
+}
+// + Booking link: the button's address is Business details' booking link; without one
+// the chip says where it's set instead of adding a button that would show nothing
+let ID_READY=Promise.resolve();
+async function addBooking(){
+  await ID_READY;
+  const note=$('varNote');
+  if(!BOOK_URL){
+    if(note){note.innerHTML='Add your booking link first: it’s the <b>Reservation link</b> in <a href="/presence.html#business">Your website › Business</a>. Then the email gets a “Book a time” button.';note.hidden=false;}
+    return;
+  }
+  if(note)note.hidden=true;
+  insertLine('{{booking_link}}');
+}
+// + Image: a photo from Files (shared, live images only); it goes in on a line of its own
+async function loadPhotos(){
+  const r=await api('/assets');
+  if(!r.ok||!r.body||!r.body.data)throw new Error('photos');
+  PHOTOS=(r.body.data.assets||[]).filter(a=>a&&a.kind==='image'&&a.asset_status!=='archived'&&!a.client_private&&a.thumb);
+  PHOTOS.forEach(a=>{THUMBS[String(a.id).toLowerCase()]=a.thumb;});
+  return PHOTOS;
+}
+const photoWords=(a)=>String(a.alt_text||a.name||'Photo').replace(/[\[\]\r\n]/g,' ').replace(/\s+/g,' ').trim().slice(0,120)||'Photo';
+async function openPhotos(){
+  let d=$('imgDlg');
+  if(!d){
+    d=document.createElement('dialog');d.id='imgDlg';d.className='imgdlg';d.setAttribute('aria-labelledby','imgDlgH');document.body.appendChild(d);
+    d.addEventListener('click',(e)=>{if(e.target===d)d.close();});   // a tap outside the sheet closes it
+    d.addEventListener('close',()=>{const t=$('bodytx');if(t)t.focus();});
+  }
+  const paint=(inner)=>{
+    d.innerHTML=`<div class="imgdlg-h"><h2 id="imgDlgH">Add a photo</h2><button type="button" class="imgdlg-x" aria-label="Close" data-x>×</button></div><div class="imgdlg-b">${inner}</div><p class="imgdlg-f">From your Files. Only the photos you add here go out in the email.</p>`;
+    const x=d.querySelector('[data-x]');if(x)x.addEventListener('click',()=>d.close());
+  };
+  paint('<div class="spin" role="status" aria-label="Loading your photos"></div>');
+  if(!d.open)d.showModal();
+  let list;
+  try{list=await loadPhotos();}
+  catch(_){paint('<p class="imgdlg-empty">Your photos couldn’t load just now.</p><button type="button" class="ghost" id="imgRetry">Try again</button>');const rt=$('imgRetry');if(rt){rt.addEventListener('click',openPhotos);rt.focus();}return;}
+  if(!list.length){paint('<p class="imgdlg-empty">No photos yet. Add some in Files, then come back.</p><a class="btn ghost" id="imgFiles" href="/files.html">Open Files →</a>');const f=$('imgFiles');if(f)f.focus();return;}
+  paint(`<ul class="picks">${list.slice(0,60).map(a=>`<li><button type="button" class="pick" data-pick="${esc(a.id)}" aria-label="Add ${esc(photoWords(a))}"><img src="${esc(a.thumb)}" alt="" loading="lazy"><span>${esc(photoWords(a))}</span></button></li>`).join('')}</ul>`);
+  d.querySelectorAll('[data-pick]').forEach(b=>b.addEventListener('click',()=>{
+    const a=list.find(x=>String(x.id)===b.getAttribute('data-pick'));if(!a)return;
+    d.close();insertLine('!['+photoWords(a)+'](media:'+String(a.id).toLowerCase()+')');
+  }));
+  const first=d.querySelector('[data-pick]');if(first)first.focus();
 }
 function applyFormat(kind){
   const t=$('bodytx');if(!t)return;
@@ -699,7 +808,7 @@ async function load(soft){
   render();
 }
 (async function(){try{const{data}=await sb.auth.getSession();TOKEN=(data&&data.session&&data.session.access_token)||"";if(!TOKEN){signedOut();return;}
-  api('/identity').then((r)=>{const n=r&&r.ok&&r.body&&r.body.data&&r.body.data.business_name;if(n){BIZ=String(n);paintLive();}}).catch(()=>{});   // best-effort: the live preview signs with it
+  ID_READY=api('/identity').then((r)=>{const d=r&&r.ok&&r.body&&r.body.data;if(!d)return;if(d.business_name)BIZ=String(d.business_name);const u=String(d.booking_url||'').trim();BOOK_URL=/^https:\/\/\S+$/i.test(u)?u:'';paintLive();}).catch(()=>{});   // best-effort: the live preview signs with it
   await load();}catch(_){trouble();}})();
 </script>
 </body>

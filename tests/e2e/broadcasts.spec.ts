@@ -421,7 +421,7 @@ test.describe('SS4 — broadcasts console', () => {
     // bold redesign: the send button says how many it goes to; the fill-ins are chips
     await expect(page.locator('#sendUpdate')).toHaveText('Send to 12 people');
     await expect(page.getByRole('toolbar', { name: 'Formatting' }).getByRole('button')).toHaveCount(4);
-    await expect(page.getByRole('group', { name: 'Fill in for each person' }).getByRole('button')).toHaveText(['+ First name', '+ Business name']);
+    await expect(page.getByRole('group', { name: 'Add to your message' }).getByRole('button')).toHaveText(['+ First name', '+ Business', '+ Booking link', '+ Image']);
     expect(errors).toEqual([]);
   });
 
@@ -467,7 +467,7 @@ test.describe('SS4 — broadcasts console', () => {
     await expect(body).toHaveValue('- first\n- second');
     await body.fill('our menu');
     await body.evaluate((el) => { const t = el as HTMLTextAreaElement; t.setSelectionRange(0, t.value.length); });
-    await page.getByRole('button', { name: 'Link' }).click();
+    await page.getByRole('button', { name: 'Link', exact: true }).click();   // exact: “+ Booking link” is a chip now
     await expect(body).toHaveValue('[our menu](https://)');
     // the toolbar edits reach the draft state the ✨/preview paths read (an input event fires)
     await page.locator('[data-seg="enquiries"]').click();          // a re-render reads DRAFT back into the form

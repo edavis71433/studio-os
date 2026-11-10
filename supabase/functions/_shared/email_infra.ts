@@ -33,6 +33,13 @@ export async function openToken(sendId: string): Promise<string> {
   return await hmacB64url(`open:${sendId.trim().toLowerCase()}`);
 }
 
+/** Token for a photo in an emailed update (presence lib/update_media.ts): the image
+ *  link names the library photo and this signature, so the private library stays
+ *  private and only a photo an update names can be fetched. */
+export async function imageToken(mediaId: string): Promise<string> {
+  return await hmacB64url(`img:${mediaId.trim().toLowerCase()}`);
+}
+
 /** The absolute one-click unsubscribe URL for a recipient: the List-Unsubscribe header's
  *  target, which mail clients POST to (RFC 8058). Not for a link a person clicks. */
 export async function unsubscribeUrl(email: string): Promise<string> {

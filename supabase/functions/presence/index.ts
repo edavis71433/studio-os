@@ -330,6 +330,15 @@ async function route_(req: Request, cors: Record<string, string>): Promise<Respo
     const { handleEmailOpen, PIXEL_HEADERS } = await import('./lib/email_engagement.ts');
     return method === 'HEAD' ? new Response(null, { status: 200, headers: PIXEL_HEADERS }) : await handleEmailOpen(openPx[1], openPx[2]);
   }
+  // Bold redesign: a photo in an emailed update. Public by design: the signature in
+  // the path is the key; a good one answers a short-lived link to the photo, anything
+  // else a blank pixel (lib/update_media.ts).
+  const updImg = route.match(/^\/email\/img\/([0-9a-f-]{36})\.([A-Za-z0-9_-]{32})$/i);
+  if (updImg && (method === 'GET' || method === 'HEAD')) {
+    const { handleEmailImage } = await import('./lib/update_media.ts');
+    const res = await handleEmailImage(updImg[1], updImg[2]);
+    return method === 'HEAD' ? new Response(null, { status: res.status, headers: res.headers }) : res;
+  }
   // Sales review item 46: the private calendar link Google Calendar (or Apple,
   // Outlook) reads on its own schedule — no session; the 160-bit token in the
   // path is the key, and turning the link off or making a new one retires it.

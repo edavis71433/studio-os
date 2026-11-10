@@ -20,6 +20,7 @@
 import { json } from '../../_shared/http.ts';
 import { svc } from '../lib/db.ts';
 import { loadEmailBrand, brandEmailShell } from '../lib/email_brand.ts';
+import { loadUpdateExtras } from '../lib/update_media.ts';
 import { anthropicModel } from '../writer/model.ts';
 import {
   SEGMENTS, isSegmentKey, segmentLabel, validSubject, cleanSubject, cleanBody,
@@ -152,8 +153,9 @@ export async function handleBroadcastGet(site: SiteRow, id: string, cors: Record
   // owner sees before they approve. Rendered with a representative first name.
   const brand = await loadEmailBrand(site.id);
   const sendable = await resolveSendable(site.id, b.audience as AudienceKey).catch(() => ({ recipients: [], suppressed: 0, audience: 0 }));
-  const tokens = { firstName: 'there', businessName: brand.name };
-  const preview_html = brandEmailShell(buildEmailHtml(b.body, tokens), brand);
+  const extras = await loadUpdateExtras(site.id, b.body).catch(() => ({ bookingUrl: '', images: {} as Record<string, string> }));
+  const tokens = { firstName: 'there', businessName: brand.name, bookingUrl: extras.bookingUrl };
+  const preview_html = brandEmailShell(buildEmailHtml(b.body, tokens, { images: extras.images, accent: brand.accent }), brand);
   const preview_subject = renderSubject(b.subject, tokens);
   // Item 69: who opened a sent update (null before APPLY-0144, or when the read fails).
   const engagement = b.status === 'sent' ? await loadEngagement(site.id, id) : null;
