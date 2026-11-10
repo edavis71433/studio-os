@@ -431,6 +431,7 @@ html.dc-edit:not(.plan-watch) #pcBody{padding:0 20px 20px}
 .pc-pane-body .dc-modal-h{font-family:var(--serif);font-size:20px;font-weight:600;letter-spacing:-.01em}
 .pc-pane-body input[type=text],.pc-pane-body select{width:100%;box-sizing:border-box}
 .pc-note{margin:0 0 12px;font-size:13px;line-height:1.5;color:var(--ink-2)}
+.pc-pane-body .hint{font-size:12.5px;line-height:1.5;color:var(--ink-2)}
 .pc-acts{display:flex;flex-wrap:wrap;gap:8px;margin:4px 0 4px}
 .pc-acts .dc-modal-cancel{margin-top:0}
 .pc-seo{display:flex;flex-direction:column;gap:6px}
@@ -5070,7 +5071,7 @@ function renderPagesCard(m, ctx) {
   m.menu.forEach((e) => add(menu, e));
   const opens = new Map(); m.unlinked.forEach((pg) => opens.set(pg.path, pg));   // the page an address opens is the last named (pgModel's byHref)
   m.unlinked.forEach((pg) => { if (opens.get(pg.path) === pg) add(off, { it: null, pg, parent: null }); });
-  if (!m.unlinked.length) off.appendChild(el("div", "pc-empty", "Drag a page here to take it off the menu. It stays live."));
+  if (!m.unlinked.length) off.appendChild(el("div", "pc-empty", "Drag a page here to take it off the menu. It stays live.")).setAttribute("role", "listitem");
   const auto = $("btnPcAuto"); if (auto) auto.hidden = !pgHasCustomNav();
   const n = hbPageRows().length, links = m.menu.filter((e) => !e.pg).length;
   const sub = $("pagesSub"); if (sub) { sub.textContent = n + " pages" + (links ? " · " + links + (links === 1 ? " link" : " links") : ""); sub.hidden = false; }

@@ -271,15 +271,18 @@ test.describe('the Pages card (the floating studio, part three)', () => {
 
   test('the card clears the other cards: Add, Styles and a section close it, and it closes them', async ({ page }) => {
     await mount(page);
-    await openCard(page);
-    await page.locator('#btnTrayOpen').click();
-    await expect(page.locator('#trayPanel')).toHaveClass(/\bon\b/);
-    await expect(card(page)).toBeHidden();
-    await openCard(page);
-    await expect(page.locator('#trayPanel')).not.toHaveClass(/\bon\b/);
-    await page.evaluate(() => (window as any).eeEditBlock(1));
-    await expect(page.locator('#settingsPanel')).toHaveClass(/\bon\b/);
-    await expect(card(page)).toBeHidden();
+    // opened by script: on a tablet the dock steps aside while the card is open
+    for (const open of ['openTrayPanel("add")', 'openSettingsPanel("styles")', 'eeEditBlock(1)']) {
+      await openCard(page);
+      await page.evaluate((js) => (0, eval)(js), open);
+      await expect(card(page), open).toBeHidden();
+      await expect(page.locator(open.startsWith('openTray') ? '#trayPanel' : '#settingsPanel')).toHaveClass(/\bon\b/);
+      await openCard(page);   // and the card puts the other one away
+      await expect(page.locator('#trayPanel')).not.toHaveClass(/\bon\b/);
+      await expect(page.locator('#settingsPanel')).not.toHaveClass(/\bon\b/);
+      await page.keyboard.press('Escape');
+      await expect(card(page)).toBeHidden();
+    }
   });
 
   test.describe('with a finger', () => {
@@ -326,7 +329,10 @@ test.describe('the phone pass (the floating studio, part three)', () => {
       const dock = page.locator('#dcDock');
       // the card has finished sliding in when its box stops moving
       await expect.poll(async () => { const a = await c.boundingBox(); await page.waitForTimeout(60); const b = await c.boundingBox(); return !!a && !!b && a.y === b.y; }, { message: name }).toBe(true);
-      const cb = await rect(c), db = await dock.boundingBox();
+      // on a tablet the dock steps aside for Pages, Add and Photos (and comes back for the rest)
+      if (isTablet(page) && sel !== '#settingsPanel' && sel !== '#ritualWrap') await expect(dock, name).toBeHidden();
+      else await expect(dock, name).toBeVisible();
+      const cb = await rect(c), db = (await dock.isVisible()) ? await dock.boundingBox() : null;   // a hidden dock still has a box
       if (isPhone(page)) {
         expect(db, 'the phone keeps its dock').toBeTruthy();
         expect(cb.y + cb.height, `${name} ends above the dock`).toBeLessThanOrEqual(db!.y + 1);
