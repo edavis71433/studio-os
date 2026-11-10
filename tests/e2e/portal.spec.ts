@@ -337,6 +337,65 @@ test.describe('Client portal — Home queue + project record page', () => {
   });
 });
 
+// ── Keyboard: "← Back to home" hands focus back (Nov 2026) ────────────────────
+// Back redraws Home, and focus used to drop to the page itself — a keyboard user
+// started again from the top. It lands on the card the project was opened from
+// now, or on Home's heading when that card isn't there. Keys only.
+test.describe('Client portal — Back to home hands focus back', () => {
+  const PID2 = '44444444-4444-4444-8444-444444444444';
+  const TWO_API = {
+    ...CLIENT_API,
+    '/client/projects': { data: [
+      { id: PID2, name: 'Logo refresh', status: 'active', target_date: null },
+      { id: PID, name: 'Website redesign', status: 'active', target_date: '2026-08-01' },
+    ] },
+    [`/client/projects/${PID2}`]: { data: {
+      project: { id: PID2, name: 'Logo refresh', status: 'active', target_date: null },
+      milestones: [], tasks: [], events: [], deliverables: [], approvals: [], surveys: [], progress: { total: 0, done: 0, pct: 0 },
+    } },
+  };
+
+  test('Enter or Space opens a project, and Enter on Back lands on that project’s card — not the first one', async ({ page }) => {
+    await installApp(page, { api: TWO_API });
+    await page.goto('/client.html');
+    await expect(page.locator('[data-proj]')).toHaveCount(2);
+    const card = page.locator(`[data-proj="${PID}"]`);
+    for (const key of ['Enter', ' ']) {
+      await card.focus();
+      await page.keyboard.press(key);
+      await expect(page.getByRole('heading', { name: 'Website redesign', level: 1 })).toBeFocused();
+      await page.locator('#projBack').focus();
+      await page.keyboard.press('Enter');
+      await expect(card).toBeFocused();
+    }
+  });
+
+  test('Back from the couldn’t-load card lands on the project’s card too', async ({ page }) => {
+    await installApp(page, { api: CLIENT_API });
+    await page.route(`**/functions/v1/presence/client/projects/${PID}`, (route) =>
+      route.request().method() === 'GET' ? route.abort() : route.fallback());
+    await page.goto('/client.html');
+    const card = page.locator(`[data-proj="${PID}"]`);
+    await card.focus();
+    await page.keyboard.press('Enter');
+    await expect(page.getByText('We couldn’t load this project just now', { exact: false })).toBeVisible();
+    await page.locator('#projBack').focus();
+    await page.keyboard.press('Enter');
+    await expect(card).toBeFocused();
+  });
+
+  test('a project Home doesn’t list: Back lands on Home’s heading', async ({ page }) => {
+    await installApp(page, { api: { ...CLIENT_API, '/client/projects': { data: [] } } });
+    await page.goto(`/client.html?project=${PID}`);
+    await expect(page.getByRole('heading', { name: 'Website redesign', level: 1 })).toBeFocused();
+    await page.locator('#projBack').focus();
+    await page.keyboard.press('Enter');
+    await expect(page.getByRole('heading', { name: 'Your projects' })).toBeVisible();
+    await expect(page.locator('[data-proj]')).toHaveCount(0);
+    await expect(page.locator('#main header h1')).toBeFocused();
+  });
+});
+
 // ── slice 10: the Home greeting + at-a-glance strip + action-feed rows ───────
 // A time-of-day greeting headline over the unchanged sub line; a strip of mini
 // tiles (needs your OK · new messages · to pay · project status) built ONLY

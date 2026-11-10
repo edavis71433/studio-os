@@ -648,10 +648,11 @@ function wireList(){
   document.querySelectorAll('[data-edit]').forEach(b=>b.addEventListener('click',(e)=>{e.stopPropagation();openEdit(b.getAttribute('data-edit'));}));
   document.querySelectorAll('[data-del]').forEach(b=>b.addEventListener('click',(e)=>{e.stopPropagation();askDelete(b.getAttribute('data-del'));}));
   // Tap a contact card / table row → the unified Client Record (Details tab).
-  // Clicks on action buttons/links inside don't open it.
+  // Links and buttons inside do their own thing and don't open it — the card's
+  // email and phone links too, by click or by Enter (the rows' rule).
   document.querySelectorAll('.c[data-open]').forEach(card=>{
-    card.addEventListener('click',(e)=>{if(e.target.closest('.acts'))return;openDetail(card.getAttribute('data-open'));});
-    card.addEventListener('keydown',(e)=>{if((e.key==='Enter'||e.key===' ')&&!e.target.closest('.acts')){e.preventDefault();openDetail(card.getAttribute('data-open'));}});
+    card.addEventListener('click',(e)=>{if(e.target.closest('a,button,input,.acts'))return;openDetail(card.getAttribute('data-open'));});
+    card.addEventListener('keydown',(e)=>{if((e.key==='Enter'||e.key===' ')&&!e.target.closest('a,button,input')){e.preventDefault();openDetail(card.getAttribute('data-open'));}});
   });
   document.querySelectorAll('tr[data-open]').forEach(tr=>{
     tr.addEventListener('click',(e)=>{if(e.target.closest('a,button,input,td.pick'))return;openDetail(tr.getAttribute('data-open'));});
