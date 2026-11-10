@@ -2117,7 +2117,7 @@ function accountSectionHtml(canMessage){
 function wireAccountSection(){
   const email=(USER&&USER.email)?USER.email:'';
   const ap=$('appearance');if(ap)ap.addEventListener('click',()=>{cycleClientTheme();ap.textContent=themeLabel();});
-  const cp=$('chgpw');if(cp)cp.addEventListener('click',async()=>{cp.disabled=true;try{await sb.auth.resetPasswordForEmail(email,{redirectTo:location.origin+'/set-password.html'});toast('Check your email for a link to set a new password.');}catch(_){toast('Couldn’t send that just now.');cp.disabled=false;}});
+  const cp=$('chgpw');if(cp)cp.addEventListener('click',async()=>{cp.disabled=true;try{await sb.auth.resetPasswordForEmail(email,{redirectTo:location.origin+'/set-password.html?next=/portal.html'});toast('Check your email for a link to set a new password.');}catch(_){toast('Couldn’t send that just now.');cp.disabled=false;}});
   const so=$('signout2');if(so)so.addEventListener('click',doSignOut);
 }
 // The starter answers: how this portal works, true for every studio. Same markup as

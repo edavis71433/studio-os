@@ -1318,6 +1318,7 @@ async function sendMoney(body,host){
   const r=await apiAg('/sales/deals/'+d.id+'/invoice','POST',body);
   if(r.ok){
     const b=r.body||{}; const url=b.url||'';
+    if(b.warning==='link_failed'){toast(b.message||'Invoice saved, but the payment link didn’t generate — tap Send again.');if(host)host.innerHTML='';reloadDeal();return;}
     if(url&&navigator.clipboard)navigator.clipboard.writeText(url).catch(()=>{});
     toast(b.emailed?label+(b.reused?' re-sent':' sent')+' — emailed to the client':(url?label+' prepared — payment link copied, nothing was emailed':label+' sent'));
     if(host)host.innerHTML='';
@@ -1326,8 +1327,11 @@ async function sendMoney(body,host){
   if(r.status===409&&r.body&&r.body.error==='amount_mismatch'&&host){
     const open=r.body.open_invoice||{};
     host.innerHTML=`<div class="bform" role="alert"><p style="font-size:13.5px;margin:0 0 10px">${esc(r.body.message||'An open invoice already exists at a different amount.')} If you send another, both links stay payable until one is paid.</p><div class="bacts"><button type="button" id="bf-resend">Resend the ${esc(fmtC(open.amount_cents))} link</button><button type="button" class="primary" id="bf-force">Send another for the new amount</button></div></div>`;
-    $('bf-resend').addEventListener('click',()=>sendMoney({purpose:body.purpose,amount_cents:Number(open.amount_cents)||undefined,title:open.title||undefined},host));
-    $('bf-force').addEventListener('click',()=>sendMoney({...body,force:true},host));
+    // Both buttons guard the double-click (Pipeline's copy already did): a second
+    // click while the first is on its way would bill the client twice.
+    const arm=(bid,fn)=>{$(bid).addEventListener('click',()=>{$('bf-resend').disabled=true;$('bf-force').disabled=true;fn();});};
+    arm('bf-resend',()=>sendMoney({purpose:body.purpose,amount_cents:Number(open.amount_cents)||undefined,title:open.title||undefined},host));
+    arm('bf-force',()=>sendMoney({...body,force:true},host));
     return;
   }
   toast((r.body&&r.body.message)||'That didn’t go through.');
