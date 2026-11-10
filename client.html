@@ -450,7 +450,12 @@ const esc=(s)=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;
 let TOKEN="";
 sb.auth.onAuthStateChange(function(_e,s){if(s&&s.access_token)TOKEN=s.access_token;}); // keep token fresh (auto-refresh)
 const H=()=>({'Content-Type':'application/json','Authorization':'Bearer '+SUPABASE_KEY,'x-dds-user-jwt':TOKEN,'x-dds-scope-site':(new URLSearchParams(location.search).get('client')||'')});
-async function api(path,method,body){const r=await fetch(FN+path,{method:method||'GET',headers:H(),body:body?JSON.stringify(body):undefined});return{ok:r.ok,status:r.status,body:await r.json().catch(()=>({}))};}
+// Nov 10 review (G3): no answer at all (no signal, aeroplane mode) used to THROW out
+// of here, so a button switched off before the call stayed grey for good and nothing
+// was said. No answer is now an ordinary failure (status 0, offline, a plain message),
+// so every caller's own "that didn't go through — try again" path runs.
+const OFFLINE_MSG='We couldn’t reach your studio — check your connection and try again.';
+async function api(path,method,body){let r;try{r=await fetch(FN+path,{method:method||'GET',headers:H(),body:body?JSON.stringify(body):undefined});}catch(_){return{ok:false,status:0,offline:true,body:{message:OFFLINE_MSG}};}return{ok:r.ok,status:r.status,body:await r.json().catch(()=>({}))};}
 function toast(m){if(window.ddsToast)return void ddsToast(m);const t=$('toast');t.textContent=m;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2800);}
 // relative "when" — calm, human, no clock precision
 function rel(iso){const t=Date.parse(iso);if(!isFinite(t))return'';const s=Math.floor((Date.now()-t)/1000);if(s<60)return'just now';const m=Math.floor(s/60);if(m<60)return m+(m===1?' min ago':' mins ago');const h=Math.floor(m/60);if(h<24)return h+(h===1?' hour ago':' hours ago');const d=Math.floor(h/24);if(d<7)return d+(d===1?' day ago':' days ago');return new Date(t).toLocaleDateString('en-US',{month:'short',day:'numeric'});}
@@ -473,8 +478,10 @@ function notifBucket(iso,nowMs){const t=Date.parse(iso);if(!isFinite(t))return'E
 function groupNotifs(items,nowMs){const order=['Today','This week','Earlier'];const map={};for(const it of(items||[])){const b=notifBucket(it&&it.created_at,nowMs);(map[b]=map[b]||[]).push(it);}return order.filter(b=>map[b]&&map[b].length).map(b=>({bucket:b,items:map[b]}));}
 // Map a notification's anchor (#approvals, #task-…, #support-…) to a chip section id.
 function sectionForAnchor(a){a=String(a||'').replace(/^#/,'');if(a.indexOf('approval')===0)return'sec-approvals';if(a.indexOf('file')===0||a.indexOf('deliverable')===0)return'sec-files';if(a.indexOf('message')===0)return'sec-messages';if(a.indexOf('support')===0)return'sec-support';if(a.indexOf('survey')===0)return'sec-surveys';if(a.indexOf('milestone')===0)return'sec-milestones';if(a.indexOf('task')===0)return'sec-todos';return'sec-overview';}
-// A friendly first name from the session user, or '' — never guessy.
-function firstName(u){if(!u)return'';const m=(u.user_metadata||{});const n=(m.name||m.full_name||'').trim();if(n)return n.split(/\s+/)[0];const e=(u.email||'').split('@')[0];if(e&&/^[a-z]+([._-][a-z]+)?$/i.test(e)){const p=e.split(/[._-]/)[0];return p.charAt(0).toUpperCase()+p.slice(1);}return'';}
+// A friendly first name from the session user, or '' — never guessy. One letter is
+// an initial, not a name (the Nov 10 walk read "Good morning, j."), so it falls
+// through to the email; an all-lowercase name gets its capital.
+function firstName(u){if(!u)return'';const cap=(p)=>p.charAt(0).toUpperCase()+p.slice(1);const m=(u.user_metadata||{});const n=String(m.name||m.full_name||'').trim().split(/\s+/)[0].replace(/[.,]+$/,'');if(n.length>1)return n===n.toLowerCase()?cap(n):n;const e=(u.email||'').split('@')[0];if(e&&/^[a-z]+([._-][a-z]+)?$/i.test(e)){const p=e.split(/[._-]/)[0];if(p.length>1)return cap(p);}return'';}
 
 // ── slice 10: Home greeting + at-a-glance strip — pure helpers (mirrored 1:1
 // in tests/presence/today_home_test.mjs; keep both copies in sync). ──
@@ -495,6 +502,9 @@ function snapWaiting(s){return((s&&s.approvals)||[]).length+((s&&s.todos)||[]).l
 function clientMayTick(t){return String((t&&t.source)||'').indexOf('checklist:')!==0;}
 // a to-do's status in words (the walk found the raw "todo" on the card)
 const TASK_WORD={todo:'To do',in_progress:'In progress',blocked:'Waiting on something',done:'Done'};
+// a project's status in words (the Nov 10 walk found the raw "active" on a Home tile,
+// the project card and the record's chip); mirrored in tests/presence/today_home_test.mjs
+function projectWord(s){s=String(s||'');return({active:'In progress',on_hold:'On hold',complete:'Done',archived:'Closed'})[s]||s.replace(/_/g,' ');}
 // PS2: the ONE portal money formatter — the glance tile, the Needs-you invoice
 // row, the Invoices rows and the tab's unpaid-total line all render the same
 // cents the same way ($1,200, $1,234.50 — never a bare $1200 drifting from the
@@ -519,7 +529,7 @@ function glanceData(feed,snaps,notifs,billing,projects,failed){
   // failed read's dueTotal happened to compute 0 (a fake $0 is still a lie)
   const dueTotal=failed.billing?0:unpaidInvoices(billing).reduce((a,i)=>a+(Number(i&&i.amount)||0),0);
   const p=(projects||[]).find(x=>x&&x.status==='active')||(projects||[])[0]||null;
-  return{needsOk,newMsgs,due:dueTotal>0?fmtMoney(dueTotal):'',project:p?{status:String(p.status||'').replace(/_/g,' '),name:p.name||'Your project'}:null};
+  return{needsOk,newMsgs,due:dueTotal>0?fmtMoney(dueTotal):'',project:p?{status:projectWord(p.status),name:p.name||'Your project'}:null};
 }
 // A tile exists only when its datum does: counts are always real (0 included;
 // null = the read failed → hidden); "to pay" only when something actually is;
@@ -564,6 +574,11 @@ function bellSinceLabel(unread){unread=Math.max(0,unread|0);return unread+' upda
 const SI={home:'<path d="M3 11l9-8 9 8v9a2 2 0 0 1-2 2h-4v-7H9v7H5a2 2 0 0 1-2-2z"/>',message:'<path d="M21 12a8 8 0 0 1-8 8H8l-5 3 1.5-4.5A8 8 0 1 1 21 12z"/>',folder:'<path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>',receipt:'<path d="M5 3h14v18l-3-2-3 2-3-2-3 2z"/><path d="M9 8h6M9 12h6"/>',sparkles:'<path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8z"/><path d="M19 17l.7 2 2 .7-2 .7-.7 2-.7-2-2-.7 2-.7z"/>',help:'<circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.7.3-1 .8-1 1.5"/><path d="M12 17h.01"/>',bell:'<path d="M6 16V11a6 6 0 0 1 12 0v5l2 2H4z"/><path d="M10 20a2 2 0 0 0 4 0"/>',thumbsup:'<path d="M7 11v10H3V11z"/><path d="M7 11l4-8a2.5 2.5 0 0 1 2.5 2.5V9h5a2 2 0 0 1 2 2.3l-1.2 7A2 2 0 0 1 17.3 20H7"/>',link:'<path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1"/><path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/>',check:'<path d="M5 12l5 5 9-10"/>',clipboard:'<rect x="6" y="4" width="12" height="17" rx="2"/><path d="M9 4V2.5h6V4"/><path d="M9 10h6M9 14h6"/>',pencil:'<path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/>',file:'<path d="M6 3h8l5 5v13H6z"/><path d="M14 3v5h5"/>',image:'<rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="1.5"/><path d="M21 16l-5-5-8 8"/>',upload:'<path d="M12 16V4"/><path d="M6 10l6-6 6 6"/><path d="M4 20h16"/>',calendar:'<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/>',paperclip:'<path d="M21 11.5l-9 9a5.5 5.5 0 0 1-7.8-7.8l9-9a3.5 3.5 0 0 1 5 5l-9 9a1.5 1.5 0 0 1-2.1-2.1l8.5-8.5"/>',cog:'<circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1L7 17M17 7l2.1-2.1"/>'};
 const si=(k)=>`<svg class="si" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">${SI[k]||SI.dot}</svg>`;
 function momentIcon(t){return({good_news:'🎉',celebration:'🎉',needs_attention:'⚠️',reminder:'⏰',opportunity:'💡',seasonal:'🍂',business_health:'📈',learning:'📚'})[String(t||'')]||'✨';}
+// Nov 10 walk: the website coach writes its asks for whoever runs the site ("…then
+// publish. It's one button", "Add … in Business details"). The portal has no editor
+// and the studio does that work, so Recent updates keeps only what asks nothing of
+// the reader: good news, celebrations, and anything without a type.
+function portalMoment(m){return !!m&&['needs_attention','reminder','opportunity'].indexOf(String(m.moment_type||''))<0;}
 
 // ── slice 8b: the "Your website" card — pure helpers (mirrored 1:1 in
 // tests/presence/client_website_test.mjs; keep both copies in sync). ──
@@ -828,7 +843,7 @@ async function decideFeed(path,decision,btn){btn.disabled=true;const r=await api
 function projectCardsHtml(projects){
   if(!projects.length)return emptyCard('When your studio starts a project, it’ll appear here with your tasks, files, and approvals.','🚀');
   let h='';
-  for(const p of projects){h+=`<div class="card" role="button" tabindex="0" data-proj="${esc(p.id)}"><h3>${esc(p.name)}</h3><p>Status: ${esc((p.status||'').replace(/_/g,' '))}${p.target_date?` · target ${esc(niceDay(p.target_date))}`:''}</p><div id="mp-${esc(p.id)}"></div><p class="muted" id="glance-${esc(p.id)}" style="margin-top:4px"></p></div>`;}
+  for(const p of projects){h+=`<div class="card" role="button" tabindex="0" data-proj="${esc(p.id)}"><h3>${esc(p.name)}</h3><p>Status: ${esc(projectWord(p.status))}${p.target_date?` · target ${esc(niceDay(p.target_date))}`:''}</p><div id="mp-${esc(p.id)}"></div><p class="muted" id="glance-${esc(p.id)}" style="margin-top:4px"></p></div>`;}
   return h;
 }
 // Which Home queue rows deserve an unread dot — derived purely from the EXISTING
@@ -870,7 +885,7 @@ function renderHome(){
   html+=`<section id="home-needs"><h2>Needs you</h2><div id="needs-body"><div class="skel"><div class="l w60"></div><div class="l w40"></div></div></div></section>`;
   // Oct 2026 audit change 4: what your studio just did sits right under what needs you
   html+=`<section id="home-updates"><h2>Recent updates</h2>`;
-  const moments=(feed.moments||[]);
+  const moments=(feed.moments||[]).filter(portalMoment);
   // a FAILED feed read says so — "Nothing new to share" is a claim only a
   // successful read may make
   if(P.feedFailed)html+=`<p class="muted fload">We couldn’t load recent updates just now — please try again in a moment.</p>`;
@@ -906,7 +921,8 @@ async function buildNeedsYou(){
   const [snaps,billing]=await Promise.all([ensureSnaps(),ensureBilling()]);
   for(const s of snaps){
     const el=document.getElementById('glance-'+s.id);
-    if(el){const bits=[];const waiting=snapWaiting(s);if(s.pct!=null&&s.total>0)bits.push(s.pct+'% along');if(waiting>0){const na=((s.approvals)||[]).length,nt=waiting-na;   // approvals need your OK; to-dos are to-dos (the walk read "3 things need your OK" for three to-dos)
+    // never "0% along" (Nov 10 walk): a project at nought is just getting started
+    if(el){const bits=[];const waiting=snapWaiting(s);if(s.pct!=null&&s.total>0)bits.push(s.pct>0?s.pct+'% along':'Just getting started');if(waiting>0){const na=((s.approvals)||[]).length,nt=waiting-na;   // approvals need your OK; to-dos are to-dos (the walk read "3 things need your OK" for three to-dos)
       if(na>0)bits.push(`<strong style="color:var(--warn)">${na} need${na===1?'s':''} your OK</strong>`);
       if(nt>0)bits.push(`<strong style="color:var(--warn)">${nt} to-do${nt===1?'':'s'} for you</strong>`);}el.innerHTML=bits.join(' · ');}
     const mp=document.getElementById('mp-'+s.id);
@@ -965,7 +981,7 @@ async function buildNeedsYou(){
     const stWord=(MONEY_WORD[moneyState(i,nyToday,PAID_PENDING)]||'').toLowerCase();
     const nyPay=i.pay_url&&/^https:\/\//.test(i.pay_url)?i.pay_url:null;   // https-only (invoiceRowHtml's rule)
     return row('Invoice','invoice',false,esc(i.name||'Invoice'),`${i.amount?esc(fmtMoney(i.amount))+' · ':''}${esc(stWord)}${i.due_date?` · due ${esc(invDueLabel(i.due_date)||i.due_date)}`:''}`,
-      nyPay?`<a class="${top||'link'}" data-pay href="${esc(nyPay)}" target="_blank" rel="noopener" aria-label="View &amp; pay — ${esc(i.name||'Invoice')}">View &amp; pay</a>`:`<button class="${top}" data-tab-go="invoices" aria-label="View invoice — ${esc(i.name||'Invoice')}">View invoice</button>`);
+      nyPay?`<a class="${top||'link'}" data-pay href="${esc(nyPay)}" aria-label="View &amp; pay — ${esc(i.name||'Invoice')}">View &amp; pay</a>`:`<button class="${top}" data-tab-go="invoices" aria-label="View invoice — ${esc(i.name||'Invoice')}">View invoice</button>`);
   });
   // Per-source failure honesty (the glance strip's rule, on the queue itself):
   // any failed source keeps its OWN calm line under the surviving rows, and
@@ -1739,7 +1755,8 @@ function invState(i){return moneyState(i,portalTodayYmd(),PAID_PENDING);}
 // money surface by invoice name) + "amount · due <date>" meta + status chip +
 // the row action. Chip: Paid (green) / Overdue (derived, warn) / the server's
 // own word (sent, open …) — never an invented state. Action: an unpaid invoice
-// with a pay link gets Pay (new tab, rel=noopener); a paid one says thank you;
+// with a pay link gets Pay, in THIS tab (Nov 10 review, G9: a new tab left this
+// one saying Pay after Stripe came back in a second copy); a paid one says thank you;
 // an unpaid one without a link says the studio will send payment details;
 // void/canceled rows get no action at all (there is nothing to do or await).
 function invoiceRowHtml(i,todayYmd){
@@ -1758,7 +1775,7 @@ function invoiceRowHtml(i,todayYmd){
   const act=st==='paid'?`<span class="finote">Paid${paidOn?' '+esc(paidOn):''} — thank you.</span>`
     :dead?''
     :st==='processing'?paidConfirmNote(i)
-    :pay?`<a class="fbtn pay" href="${esc(pay)}" target="_blank" rel="noopener" aria-label="Pay — ${esc(i.name||'Invoice')}">Pay →</a>`
+    :pay?`<a class="fbtn pay" href="${esc(pay)}" aria-label="Pay — ${esc(i.name||'Invoice')}">Pay →</a>`
     :`<span class="finote">Your studio will send payment details.</span>`;
   return `<div class="frow inv" role="listitem"><span class="fico" aria-hidden="true">${si('receipt')}</span>`+
     `<div class="fmain"><h3 class="fname">${esc(i.name||'Invoice')}</h3>`+
@@ -1807,6 +1824,10 @@ async function paidPoll(){
   if(waited>=PAID_POLL_LIMIT_MS&&!PAID_STALE){PAID_STALE=true;paidRepaint();}
   PAID_TIMER=setTimeout(paidPoll,PAID_STALE?PAID_SLOW_POLL_MS:PAID_POLL_MS);
 }
+// G9: a payment finished in another copy of the portal (a Pay link opened in a new
+// tab by hand) reaches this one through the shared ten-minute note, so this tab
+// stops offering Pay too
+window.addEventListener('storage',(e)=>{if(e.key!=='dds-paid-pending'||!PORTAL.ready)return;const v=paidStored();if(v&&PAID_PENDING.indexOf(String(v.id))<0){paidBegin(v.id,+v.at||Date.now());paidRepaint();}});
 async function renderInvoices(){
   const view=++VIEW_SEQ;   // this render owns #main until something newer bumps the token (renderMessages' contract)
   if(PORTAL.persona!=='client'){ // reviewer: /client/billing is 403 server-side — the calm read-only state, ZERO fetches, in the account-owner voice (never the client-shaped "No invoices yet")
@@ -2099,6 +2120,16 @@ function wireAccountSection(){
   const cp=$('chgpw');if(cp)cp.addEventListener('click',async()=>{cp.disabled=true;try{await sb.auth.resetPasswordForEmail(email,{redirectTo:location.origin+'/set-password.html'});toast('Check your email for a link to set a new password.');}catch(_){toast('Couldn’t send that just now.');cp.disabled=false;}});
   const so=$('signout2');if(so)so.addEventListener('click',doSignOut);
 }
+// The starter answers: how this portal works, true for every studio. Same markup as
+// the studio's own articles (lib/faq.ts renderFaq), so the search covers them too.
+const STARTER_FAQ=[
+  ['How do I send my studio a file?','Open Files and press Choose a file. Photos (JPEG, PNG or WebP) up to 10MB and PDFs up to 25MB go straight to your studio.'],
+  ['How do I approve something?','Anything waiting for your OK is at the top of Home, under Needs you, and in your project. Press Approve, or Request changes to say what you’d like different. Nothing changes until you approve.'],
+  ['How do I pay an invoice?','Open Invoices and press Pay. You pay on Stripe’s secure page and come straight back here, where the invoice shows Processing and then Paid.'],
+  ['How do I ask for something new?','Open Requests to book a call, ask for one of your studio’s services, or press Something else? and say what you need. Nothing is charged until your studio replies.'],
+  ['How do I change my password?','Under Your account, further down this page, press Change password and we’ll email you a link to set a new one.'],
+];
+function starterFaqHtml(){return `<section class="faq">${STARTER_FAQ.map(([q,a])=>`<details class="faq-item"><summary>${esc(q)}</summary><div class="faq-answer"><p>${esc(a)}</p></div></details>`).join('')}</section>`;}
 async function renderHelp(){
   const view=++VIEW_SEQ;   // this render owns #main until something newer bumps the token (renderMessages' contract)
   const canMessage=PORTAL.persona==='client';
@@ -2118,10 +2149,11 @@ async function renderHelp(){
   // failed ≠ empty: a failed read says so calmly (nothing was cached, so coming
   // back to the tab retries) — only a genuine ok-empty earns the no-articles copy
   if(faqFailed)html+=`<div class="card"><p class="muted">We couldn’t load help articles just now — please try again in a moment.</p></div>`;
-  else if(!faqHtml)html+=emptyCard('Your studio hasn’t added any help articles yet — but you can always ask them a question below.','❓');
   else{
     html+=`<div class="card" style="padding:12px 14px"><input id="faqSearch" type="search" placeholder="Search help…" aria-label="Search help" style="width:100%;font:inherit;border:1px solid var(--line);border-radius:10px;padding:9px;background:var(--card);color:var(--ink)"></div>`;
-    html+=`<div id="faqBody">${faqHtml}</div>`;
+    // Nov 10 walk: no articles used to mean an empty box with a red question mark.
+    // Until the studio writes its own, the basics of this portal answer instead.
+    html+=`<div id="faqBody">${faqHtml||`<p class="faq-intro" id="faqStarter">Your studio hasn’t added its own help articles yet, so here are the basics.</p>${starterFaqHtml()}`}</div>`;
     html+=`<p id="faqNone" class="muted" hidden style="padding:4px 2px">No answers match that. Try fewer words, or message your studio below.</p>`;
   }
   html+=`<div class="card"><h3>Still need help?</h3><p class="muted">Can’t find what you’re looking for? Send your studio a message and they’ll get back to you.</p><div class="row"><button class="approve" id="helpMsg">Message your studio</button></div></div>`;
@@ -2289,6 +2321,24 @@ function wireBellAt(bellId,panelId){
 // LEFT the things a client acts on (approvals · decided · to-dos · files ·
 // survey · support), RIGHT the project activity timeline + message composer.
 // Below 1000px it stacks to one column with the timeline LAST — actions first.
+// Nov 10 walk: the studio's three asks ("Send back your project questionnaire",
+// "Send your content and photos", "Review the design draft") only said the studio
+// ticks them, with nothing to press. Each now points at where it's done on the
+// record page — the file box, the questionnaire, the draft waiting for an OK — or
+// says plainly that the studio hasn't sent it yet. The tick stays the studio's.
+function todoAskHtml(t,data,aps){
+  const key=String((t&&t.source)||'').replace(/^checklist:/,'');
+  const tick='<p class="muted tdnote">Your studio marks this one off once it arrives.</p>';
+  const go=(to,label)=>`<div class="row"><button data-todo-go="${to}">${label}</button></div>`;
+  if(key==='content_received')return go('share','Share a file')+tick;
+  if(key==='questionnaire_returned'){
+    const sv=((data&&data.surveys)||[]).find(s=>s&&/questionnaire|intake|brief/i.test(String(s.title||'')));
+    return sv?`<div class="row"><button data-survey="${esc(sv.id)}">Open the questionnaire</button></div>${tick}`
+      :`<p class="muted tdnote">Your studio sends the questionnaire by email. Filled it in already? Share it with the file box below, and your studio marks this one off.</p>${go('share','Share a file')}`;
+  }
+  if(key==='client_review')return (aps||[]).length?go('review','Review it')+tick:'<p class="muted tdnote">Your studio will share the draft here for your OK. Nothing to do until then.</p>';
+  return tick;
+}
 let PROJ_EVENTS=[],PROJ_MSGS=[];   // the open project's timeline inputs
 let PROJ_MSGS_FAILED=false;   // PS6: a failed messages read renders ITS calm line in the rail — never the "say hello" empty copy
 async function openProject(id,focusSection){
@@ -2300,6 +2350,13 @@ async function openProject(id,focusSection){
   setWide(false);
   $('main').innerHTML=skeleton();
   let d,rep,supRes,msgRes;
+  // network down mid-read — a calm couldn't-load card with a way back, never a
+  // skeleton stuck forever, and never "isn't available" for a project that is
+  const cantLoad=()=>{
+    $('main').innerHTML=`<p><a class="link" href="/client.html" id="projBack">← Back to home</a></p>`+
+      emptyCard('We couldn’t load this project just now — please try again in a moment.','📁');
+    const pb=$('projBack');if(pb)pb.addEventListener('click',(e)=>{e.preventDefault();backHome(id);});
+  };
   try{
     [d,rep,supRes,msgRes]=await Promise.all([
       api('/client/projects/'+id),
@@ -2308,15 +2365,11 @@ async function openProject(id,focusSection){
       api('/client/projects/'+id+'/messages').catch(()=>null),
     ]);
   }catch(_){
-    // the bundle read THREW (network down mid-read) — a calm couldn't-load card
-    // with a way back, never a skeleton stuck forever
     if(view!==VIEW_SEQ)return;   // the user moved on mid-fetch — never paint over the newer view
-    $('main').innerHTML=`<p><a class="link" href="/client.html" id="projBack">← Back to home</a></p>`+
-      emptyCard('We couldn’t load this project just now — please try again in a moment.','📁');
-    const pb=$('projBack');if(pb)pb.addEventListener('click',(e)=>{e.preventDefault();backHome(id);});
-    return;
+    return cantLoad();
   }
   if(view!==VIEW_SEQ)return;   // the user moved on mid-fetch — never paint over the newer view
+  if(!d.ok&&d.offline)return cantLoad();   // G3: no answer at all is the connection, not the project
   if(!d.ok){toast('That project isn’t available.');return goHome();}
   setWide(true);
   const data=d.body.data||{}; const p=data.project||{}; const s=(rep&&rep.body&&rep.body.data&&rep.body.data.summary);
@@ -2328,7 +2381,7 @@ async function openProject(id,focusSection){
   const AKIND={deliverable:'File',task:'Task',project:'Project',custom:'Request'};
   const aps=(data.approvals||[]).filter(a=>a.status==='pending');
   const acts=(data.tasks||[]).filter(t=>t.client_action_required);
-  let html=`<p><a class="link" href="/client.html" id="projBack">← Back to home</a></p><header><div class="phead"><h1>${esc(p.name)}</h1><span class="statuschip">${esc((p.status||'').replace('_',' '))}</span></div></header>`;
+  let html=`<p><a class="link" href="/client.html" id="projBack">← Back to home</a></p><header><div class="phead"><h1>${esc(p.name)}</h1><span class="statuschip">${esc(projectWord(p.status))}</span></div></header>`;
   // slim sticky chip bar — anchors within this one screen (no new pages); only
   // sections that actually have content get a chip.
   const chips=chipsFor({hasOverview,approvals:data.approvals,deliverables:data.deliverables,hasMessages:true,hasSupport:true});
@@ -2359,7 +2412,7 @@ async function openProject(id,focusSection){
   // your tasks
   // A to-do the studio settles gets NO Mark done button — and says so, so the
   // card reads as "we're watching for it", never as a broken/inert control.
-  if(acts.length){html+=`<section id="sec-todos"><h2>Your to-dos</h2>`;for(const t of acts){const done=t.status==='done';const mine=clientMayTick(t);html+=`<div class="card"><h3>${esc(t.title)}</h3><p>${done?'✓ Done':(t.derived&&t.derived.overdue?'Overdue · ':'')+esc(TASK_WORD[t.status]||String(t.status||'').replace(/_/g,' '))}</p>${done?'':(mine?`<div class="row"><button class="approve" data-taskdone="${esc(t.id)}">Mark done</button></div>`:`<p class="muted tdnote">Your studio marks this one off once it arrives.</p>`)}</div>`;}html+=`</section>`;}
+  if(acts.length){html+=`<section id="sec-todos"><h2>Your to-dos</h2>`;for(const t of acts){const done=t.status==='done';const mine=clientMayTick(t);html+=`<div class="card"><h3>${esc(t.title)}</h3><p>${done?'✓ Done':(t.derived&&t.derived.overdue?'Overdue · ':'')+esc(TASK_WORD[t.status]||String(t.status||'').replace(/_/g,' '))}</p>${done?'':(mine?`<div class="row"><button class="approve" data-taskdone="${esc(t.id)}">Mark done</button></div>`:todoAskHtml(t,data,aps))}</div>`;}html+=`</section>`;}
   // files — the Files tab's exact list anatomy (fileRowHtml .frow rows with
   // You-shared chips and honest meta — never the raw server note as body copy),
   // then the slice-12 share card preselected to THIS project (preflight,
@@ -2435,6 +2488,8 @@ async function openProject(id,focusSection){
   wireShareCard({pid:id,ondone:()=>openProject(id,'sec-files')});
   wireDownloads(document);
   document.querySelectorAll('[data-survey]').forEach(a=>a.addEventListener('click',(e)=>{e.preventDefault();openSurvey(a.getAttribute('data-survey'),id,a);}));
+  // a to-do's "Share a file" / "Review it" jump to the place on this page where it's done
+  document.querySelectorAll('[data-todo-go]').forEach(b=>b.addEventListener('click',()=>{const share=b.getAttribute('data-todo-go')==='share';scrollToSection(share?'sec-files':'sec-approvals');const t=share?$('fchoose'):document.querySelector('#sec-approvals [data-adec]');if(t)t.focus({preventScroll:true});}));
   const pb=$('projBack');if(pb)pb.addEventListener('click',(e)=>{e.preventDefault();backHome(id);});
   $('newSupport').addEventListener('click',()=>openSupport(id));
   $('send').addEventListener('click',async()=>{const b=$('send');const v=$('msg').value.trim();if(!v)return;b.disabled=true;const r=await api('/client/projects/'+id+'/messages','POST',{body:v});if(r.ok){$('msg').value='';PROJ_MSGS=[sentMessage(r,v)].concat(PROJ_MSGS);renderProjTimeline();loadThread(id);}else toast('That didn’t send.');b.disabled=false;});   // the sent message shows at once; loadThread confirms it (experience review #44)
@@ -2590,7 +2645,7 @@ async function openSurvey(sid,pid,ctrl){
   busy(true);
   let r;try{r=await api('/client/surveys/'+sid);}catch(_){r=null;}   // a throw surfaces honestly — the toast-and-stay path below
   if(view!==VIEW_SEQ){busy(false);return;}   // the user moved on mid-fetch — never paint over the newer view (and un-busy the control)
-  if(!r||!r.ok){toast('That survey isn’t available.');busy(false);return;}   // the current view stays intact
+  if(!r||!r.ok){toast(r&&r.offline?OFFLINE_MSG:'That survey isn’t available.');busy(false);return;}   // the current view stays intact
   busy(false);
   setWide(false);   // only collapse the wide layout once the survey actually renders
   const sv=r.body.data.survey||{}; const done=r.body.data.my_response&&r.body.data.my_response.status==='submitted';
@@ -2636,6 +2691,33 @@ async function openSupport(pid,ret,prefill){
   $('sup-send').addEventListener('click',async()=>{const b=$('sup-send');const subject=$('sup-subj').value.trim();if(!subject){toast('Add a subject.');return;}b.disabled=true;const r=await api('/client/support','POST',{subject,body:$('sup-body').value.trim(),project_id:pid,new_request:true});if(r.ok){toast('Sent — your studio will get back to you.');backTo();}else{toast('That didn’t send.');b.disabled=false;}});
 }
 
+// Nov 10 review (G2): an email button ("Open your project", a reply to a request)
+// that lands here signed out used to lose where it was going: after the sign-in the
+// client got Home. The boot keeps the destination (a project, a request, a tab
+// named in the address) for half an hour, the length of a sign-in by code or link,
+// and the first load after the sign-in opens it once.
+const RETURN_KEY='dds-portal-return', RETURN_TTL_MS=30*60000;
+const TAB_IDS=TABS.map(t=>t[0]);
+function keepReturn(q){
+  try{
+    const v={},id=(k)=>{const x=q.get(k)||'';return /^[0-9a-zA-Z-]{1,64}$/.test(x)?x:'';};
+    if(id('project'))v.project=id('project');
+    if(id('support'))v.support=id('support');
+    const t=String(location.hash||'').slice(1);if(TAB_IDS.indexOf(t)>=0)v.tab=t;
+    if(!Object.keys(v).length)return;
+    v.at=Date.now();localStorage.setItem(RETURN_KEY,JSON.stringify(v));
+  }catch(_){}
+}
+function takeReturn(){try{const v=JSON.parse(localStorage.getItem(RETURN_KEY)||'null');localStorage.removeItem(RETURN_KEY);if(v&&Date.now()-(+v.at||0)<RETURN_TTL_MS)return v;}catch(_){}return null;}
+// Nov 10 review (G12): a reviewer has no projects of their own, so /client/projects
+// is refused every visit, and it goes out with the first reads before the page knows
+// who is asking. The answer is remembered per person signed in; a remembered
+// reviewer skips the read, and the context answer is checked before trusting it:
+// anyone who has since become more than a reviewer gets the read after all.
+function personaKey(){return 'dds-portal-persona:'+((USER&&USER.id)||'');}
+function rememberedReviewer(){try{return !!(USER&&USER.id)&&localStorage.getItem(personaKey())==='reviewer';}catch(_){return false;}}
+function rememberPersona(c){try{if(!(USER&&USER.id))return;if(PORTAL.persona==='reviewer'&&c.site_role==='client_reviewer')localStorage.setItem(personaKey(),'reviewer');else localStorage.removeItem(personaKey());}catch(_){}}
+let LOADED_ONCE=false;   // the address's #tab and a kept destination are honoured by the first load only (later loads follow an action)
 function signedOut(){$('main').innerHTML=`<div class="center"><h2>Sign in to see your updates.</h2><p style="margin-top:20px"><a class="link" href="/portal.html">Sign in →</a></p></div>`;}
 function trouble(){$('main').innerHTML=`<div class="center"><h2>We couldn’t load your updates just now.</h2><p class="muted">Please refresh in a moment.</p></div>`;}
 function ownerNote(){$('main').innerHTML=`<div class="center"><div class="rolebadge">● Full access</div><h2 style="margin-top:14px">This is the client view.</h2><p class="muted">You have the full workspace.</p><p style="margin-top:20px"><a class="link" href="/presence.html">Open your workspace →</a></p></div>`;}
@@ -2643,8 +2725,15 @@ function ownerNote(){$('main').innerHTML=`<div class="center"><div class="roleba
 async function load(){
   setWide(false);
   PORTAL.snaps=null;PORTAL.billing=null;PORTAL.billingFailed=false;PORTAL.wstats=undefined;PORTAL.wstatsFetch=null;   // fresh per-load caches (a re-load = fresh data)
+  const first=!LOADED_ONCE;LOADED_ONCE=true;
   const params=new URLSearchParams(location.search);
-  const dsup=params.get('support'); const deep=params.get('project');
+  // G2: the destination kept through a sign-in; an address that names its own wins
+  const kept=first?takeReturn():null;
+  const fromUrl=!!(params.get('support')||params.get('project'));
+  const dsup=fromUrl?params.get('support'):((kept&&kept.support)||''); const deep=fromUrl?params.get('project'):((kept&&kept.project)||'');
+  // a tab named in the address (#invoices: the cancelled-payment page's way back), first load only
+  const hashTab=first&&TAB_IDS.indexOf(String(location.hash||'').slice(1))>=0?String(location.hash).slice(1):'';
+  const wantTab=hashTab||(kept&&kept.tab)||'';
   // studio audit change 9: the studio's "connect your Google" email lands here with
   // ?connect=<signed token>; a sign-in on the way stashes it (see the boot below)
   const askTok=params.get('connect')||localStorage.getItem('dds-connect-ask')||'';
@@ -2654,13 +2743,16 @@ async function load(){
   if(paidId)paidStore(paidId);
   // honor a deep link once, then drop it from the URL so any later re-load
   // (e.g. after approving something) lands on Home instead of re-opening it.
-  if(dsup||deep||paidId||params.get('connect')){try{history.replaceState(null,'','/client.html'+(paidId?'#invoices':location.hash));}catch(_){}}
+  if(fromUrl||paidId||params.get('connect')){try{history.replaceState(null,'','/client.html'+(paidId?'#invoices':location.hash));}catch(_){}}
   // Item 86: the context, the projects and the feed go out together, then a client's
   // notifications and Google ask together. Each used to wait for the one before: five round
   // trips before Home could paint, on a phone connection too.
-  const [ctx,proj,feed]=await Promise.all([api('/portal/context'),api('/client/projects').catch(()=>null),api('/portal/feed')]);
+  const skipProj=rememberedReviewer();   // G12: a reviewer's projects read is refused every time
+  const [ctx,proj0,feed]=await Promise.all([api('/portal/context'),skipProj?Promise.resolve(null):api('/client/projects').catch(()=>null),api('/portal/feed')]);
   if(!ctx.ok){hideNav();trouble();return;}
   const c=ctx.body.data||{};
+  // …unless the answer says they are more than a reviewer now: then the read happens after all
+  const proj=(skipProj&&(c.is_managed_client||c.site_role!=='client_reviewer'))?await api('/client/projects').catch(()=>null):proj0;
   const projects=(proj&&proj.ok&&proj.body.data)||[];
   // A plain OWNER (full workspace, NOT a managed client, no delivery) — the full
   // workspace lives elsewhere. No client tabs.
@@ -2672,6 +2764,7 @@ async function load(){
   rememberStudio();
   try{const fb=$('footby');if(fb)fb.textContent='by '+((c.studio&&c.studio.name)?studioBrand():'your studio');}catch(_){}
   PORTAL.persona=(projects.length||c.is_managed_client)?'client':'reviewer';
+  rememberPersona(c);   // G12
   PORTAL.projects=projects;
   // A FAILED /client/projects read must never masquerade as the zero-project
   // first-run: Home renders the couldn't-load line instead of the 🚀 card and
@@ -2706,6 +2799,7 @@ async function load(){
   const remembered=paidId?null:paidStored();
   if(paidId){paidBegin(paidId,Date.now());showTab('invoices');toast('Thank you — we’re confirming your payment.');return;}
   if(remembered)paidBegin(remembered.id,+remembered.at||Date.now());
+  if(wantTab){if(hashTab){try{history.replaceState(null,'','/client.html'+location.search);}catch(_){}}showTab(wantTab);return;}
   showTab(CURRENT_TAB||'home');
 }
 // Always-available client sign-out (the shell's profile menu is owner-shaped;
@@ -2725,6 +2819,7 @@ async function doSignOut(e){if(e&&e.preventDefault)e.preventDefault();try{await 
       // studio audit change 9: keep the studio's "connect your Google" link through the sign-in
       const ct=new URLSearchParams(location.search).get('connect')||'';
       if(ct&&ct.length<2048){try{localStorage.setItem('dds-connect-ask',ct);}catch(_){}}
+      keepReturn(new URLSearchParams(location.search));   // G2: the project or request an email button was opening
       signedOut();return;
     }
     await load();

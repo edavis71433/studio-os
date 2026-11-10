@@ -232,7 +232,7 @@ test.describe('Client portal — Home queue + project record page', () => {
     await installApp(page, { api: CLIENT_API });
     await page.goto(`/client.html?project=${PID}`);
     await expect(page.getByRole('heading', { name: 'Website redesign' })).toBeVisible();
-    await expect(page.locator('.statuschip')).toHaveText('active');
+    await expect(page.locator('.statuschip')).toHaveText('In progress');   // in words, not the raw "active" (Nov 10 walk)
     const tiles = page.locator('#sec-overview');
     await expect(tiles.locator('.hl-k', { hasText: 'Progress' })).toBeVisible();
     await expect(tiles.locator('.hl-v', { hasText: '25%' })).toBeVisible();
@@ -2324,15 +2324,15 @@ test.describe('PS2 — Invoices tab (B1)', () => {
     await expect(page.locator('#main .frow .fmeta').first()).not.toContainText(/\d{4}-\d{2}-\d{2}/);
   });
 
-  test('the Pay action is the pay_url in a new tab with rel=noopener, named for its invoice', async ({ page }) => {
+  test('the Pay action is the pay_url in this same tab, named for its invoice', async ({ page }) => {
     await installApp(page, { api: INV_API });
     await page.goto('/client.html');
     await openInvoices(page);
     const pay = page.getByRole('link', { name: 'Pay — Design phase' });
     await expect(pay).toBeVisible();
     await expect(pay).toHaveAttribute('href', 'https://pay.example/v2');
-    await expect(pay).toHaveAttribute('target', '_blank');
-    await expect(pay).toHaveAttribute('rel', 'noopener');
+    // Nov 10 review (G9): a new tab left this one still saying Pay after Stripe came back to a second copy
+    expect(await pay.getAttribute('target')).toBeNull();
     // paid + no-link rows offer no Pay anywhere else
     await expect(page.locator('#main a.fbtn')).toHaveCount(1);
   });
@@ -2861,11 +2861,12 @@ test.describe('PS4 — Help tab (B2)', () => {
     expect(calls).toBeGreaterThanOrEqual(2);
   });
 
-  test('client ok-empty still earns the no-articles copy (the failure copy stays distinct)', async ({ page }) => {
+  test('client ok-empty earns the starter answers and says why (the failure copy stays distinct)', async ({ page }) => {
     await installApp(page, { api: { ...CLIENT_API, '/client/faq': { data: { html: '', faq: { items: [] } } } } });
     await page.goto('/client.html');
     await openHelpTab(page);
-    await expect(page.getByText('Your studio hasn’t added any help articles yet', { exact: false })).toBeVisible();
+    await expect(page.getByText('Your studio hasn’t added its own help articles yet', { exact: false })).toBeVisible();
+    await expect(page.locator('#faqBody .faq-item')).toHaveCount(5);   // Nov 10 walk: never an empty box
     await expect(page.getByText('We couldn’t load help articles', { exact: false })).toHaveCount(0);
   });
 

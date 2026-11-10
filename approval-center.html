@@ -9,7 +9,8 @@
   RETIRED (Oct 2026 workflow audit, docs/design/WORKFLOW-AUDIT-2026-10.md).
   Every approval already shows in the Inbox and on Today.
   This page now forwards to the Inbox’s “Needs your OK” view, keeping ?client= and any other query, so
-  bookmarks, emails and old notices still land in the right place. The clean
+  bookmarks, emails and old notices still land in the right place. A client signed in only at
+  the client door goes to their portal instead (Nov 10 review, G12). The clean
   URL pair in _redirects is unchanged (it serves this stub).
 
   ROLLBACK: the full former page is in git history —
@@ -20,7 +21,13 @@
   a{color:#5b3fa0;font-weight:600}
 </style>
 <script>
-  location.replace('/inbox.html' + location.search + '#ok');
+  // Nov 10 review (G12): an old approval link dropped a CLIENT at the studio's Inbox,
+  // a staff page they can't open. Someone signed in only at the client door goes to
+  // their portal (approvals wait there under Needs you); everyone else keeps the Inbox.
+  (function () {
+    var has = function (k) { try { return !!localStorage.getItem(k); } catch (e) { return false; } };
+    location.replace(has('dds-client-auth') && !has('dds-portal-auth') ? '/client.html' : '/inbox.html' + location.search + '#ok');
+  })();
 </script>
 </head>
 <body>

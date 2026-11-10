@@ -16,7 +16,7 @@
 // line-item math reuses lib/sales_lifecycle.ts so the document can never disagree
 // with the proposal it renders. Escaping reuses lib/markdown.ts `esc`.
 import { esc } from './markdown.ts';
-import { splitLineItems, computeProposalTotals, type LineItem } from './sales_lifecycle.ts';
+import { splitLineItems, computeProposalTotals, subtotalOf, type LineItem } from './sales_lifecycle.ts';
 import { hmacHex, timingSafeEqual } from '../../_shared/hmac.ts';
 import { UUID_RE } from './uuid.ts';
 
@@ -164,8 +164,10 @@ function renderLineItemsDocument(p: any, brandIn: Partial<DocBrand> | null | und
   const { items, meta } = splitLineItems(p?.line_items);
   const currency = String(p?.currency || 'usd');
   const t = computeProposalTotals(items, meta);
+  // Nov 10 review (G11): a line's amount by the total's own rule (subtotalOf), so a
+  // quantity-0 line reads "× 0" and $0.00 instead of a price the total never counted.
   const rows = items.length
-    ? items.map((i) => `<tr><td>${esc(i.label)}${i.qty > 1 ? ` <span style="color:var(--soft)">× ${i.qty}</span>` : ''}</td><td>${esc(money(i.unit_cents * Math.max(1, i.qty), currency))}</td></tr>`).join('')
+    ? items.map((i) => `<tr><td>${esc(i.label)}${i.qty !== 1 ? ` <span style="color:var(--soft)">× ${i.qty}</span>` : ''}</td><td>${esc(money(subtotalOf([i]), currency))}</td></tr>`).join('')
     : `<tr><td colspan="2" style="color:var(--soft)">No line items.</td></tr>`;
   // Show the breakdown ONLY when a discount or tax applies; otherwise the total
   // is the subtotal and one clean Total line is all that's honest to print.
