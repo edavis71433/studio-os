@@ -117,7 +117,8 @@ ok('degrade: operator → staff (still the studio\'s hand); everything else unto
   // every notice kind the code raises must be in the migration's list
   const kinds = new Set(); const re = /raiseNotice(?:Detailed)?\(\{[\s\S]{0,400}?kind: '([a-z_]+)'/g; let m;
   for (const f of ['routes/publish.ts']) { const src = read('supabase/functions/presence/' + f); while ((m = re.exec(src)) !== null) kinds.add(m[1]); }
-  ok('0133: every kind publish.ts raises is in the CHECK list', [...kinds].every((k) => mig.includes(`'${k}'`)), [...kinds].join(','));
+  const newest = read('supabase/migrations/0147_site_notices.sql');   // item 47 widened the check; the newest list is the one that holds
+  ok('0133: every kind publish.ts raises is in the CHECK list', [...kinds].every((k) => mig.includes(`'${k}'`) || newest.includes(`'${k}'`)), [...kinds].join(','));
 }
 
 // ═══ 8. the pages ═══

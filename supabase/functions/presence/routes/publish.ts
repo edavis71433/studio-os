@@ -229,6 +229,16 @@ export async function runPipeline(site: SiteRow, principal: Principal, kind: 'pu
         : 'Your studio published a change to your website. Nothing is needed from you — open your website to see what changed.';
     await raiseNotice({ siteId: site.id, clientId: site.client_id, kind: 'studio_published', period: `pub:${pubId}`, headline: 'Your studio published a change', body }).catch(() => false);
   }
+  // Builder list item 47: every finished publish is an UPDATE row on the site (any actor,
+  // a scheduled one too), so the studio's bell can say "Bacchus Kitchen published 3 changes"
+  // and the owner sees a publish they didn't sit through. One row per publish (pub:<id>),
+  // no push: it reports, it never asks. Best-effort; never fails a publish.
+  if (live && site.client_id) {
+    const n = opts?.changeCount;
+    const what = kind === 'restore' ? 'An earlier version is back online' : typeof n === 'number' && n > 0 ? `Published ${n} change${n === 1 ? '' : 's'}` : 'Published';
+    await raiseNotice({ siteId: site.id, clientId: site.client_id, kind: 'site_published', period: `pub:${pubId}`, headline: what,
+      body: kind === 'restore' ? 'The website was restored to an earlier version and is live.' : 'The website is live with the latest changes. Open it to see them.', push: false }).catch(() => false);
+  }
   // "Site live" is step 9 of the studio's delivery checklist, and a live deploy
   // of the customer's site IS that step — so it ticks itself rather than waiting
   // for someone to remember. Resolved through the ACTIVE service link

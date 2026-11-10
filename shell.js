@@ -1177,7 +1177,12 @@
       return { id: 'need:' + String(n.key || ''), href: n.href || '/agency.html', title: (n.name ? n.name + ' — ' : '') + (n.what || ''), sub: n.when || '', tier: 'needs_you', priority: n.kind === 'money', clearable: false };
     });
     var news = shapeBellRows({ notices: (d.notices || []).filter(function (n) { return n.tier === 'update'; }) }, false);
-    return needs.concat(news);
+    // builder list item 47: news per client site, each naming the site and opening the right
+    // place inside it ("Bacchus Kitchen — Published 3 changes"); the server carries ?client=
+    var perSite = (ny.news || []).map(function (n) {
+      return { id: 'news:' + String(n.id || n.site_id + ':' + n.kind), href: n.href || ('/today.html?client=' + encodeURIComponent(n.site_id)), title: (n.name ? n.name + ' — ' : '') + (n.headline || ''), sub: n.body || '', tier: 'update', priority: false, clearable: false };
+    });
+    return needs.concat(perSite).concat(news);
   }
   function bellRowHtml(r, seen) {
     return '<a class="row' + (r.priority ? ' pri' : '') + (seen ? ' seen' : '') + '" data-tier="' + r.tier + '" href="' + esc(r.href) + '"><b>' + esc(r.title) + '</b>' + (r.sub ? '<div class="sub">' + esc(r.sub) + '</div>' : '') + '</a>';

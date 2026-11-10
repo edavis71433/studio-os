@@ -6,12 +6,13 @@
 // plans still wait on the client; publishing runs the one frozen pipeline).
 import { json } from '../../_shared/http.ts';
 import { svc } from '../lib/db.ts';
+import { noticeTier } from '../lib/inbox_feed.ts';
 import { can, agencySiteIds } from './auth.ts';
 import { buildPortfolio, filterPortfolio, buildQueues, buildPatterns } from './portfolio.ts';
 import { needsYouPayload, dealNoticeIds, staleDealNotices, snoozeUntil, SNOOZE_KEY_RE, SNOOZE_MAX_DAYS } from './needs_you.ts';
 import { clearNotice } from '../lib/notice.ts';
 import { healSupportOwners, supportActivity } from '../lib/service_bridge.ts';
-import { buildPortalFeed } from '../routes/workspace.ts';
+import { buildPortalFeed, noticeHrefFor } from '../routes/workspace.ts';
 import { loadReceivables } from '../routes/sales.ts';
 import { resolveSite, SITE_COLS } from '../lib/site.ts';
 import type { AgencyMember } from './auth.ts';
@@ -79,7 +80,7 @@ export async function gather(agencyId: string, nowIso: string): Promise<Portfoli
     svc(`presence_change_events?${IN}&select=site_id,created_at&order=created_at.desc&limit=1000`),
     svc(`presence_evidence_runs?${IN}&finished_at=not.is.null&error_text=is.null&select=id,site_id,started_at&order=started_at.desc&limit=500`),
     svc(`presence_form_submissions?${IN}&status=eq.new&spam=is.false&select=id,site_id,name,email,form_kind,created_at&limit=2000`),   // Section 3: leads waiting (+ who/when for Needs you)
-    svc(`presence_plan_notices?${IN}&status=eq.active&select=site_id,kind&limit=2000`),             // Section 3: attention + billing
+    svc(`presence_plan_notices?${IN}&status=eq.active&select=id,site_id,kind,period,headline,body,created_at&limit=2000`),   // Section 3: attention + billing; item 47: the words too, for the bell's news per site
     svc(`presence_media?${IN}&asset_status=eq.pending&deleted_at=is.null&select=site_id,metadata&limit=2000`), // DAM-2: files awaiting approval
     svc(`presence_service_links?customer_site_id=in.(${ids.join(',')})&status=eq.active&select=agency_site_id,customer_site_id,customer_client_id&limit=1000`).catch(() => ({ ok: false, json: [] as unknown[] })),   // item 49: whose customer each site is
   ]);
@@ -135,7 +136,7 @@ export async function gather(agencyId: string, nowIso: string): Promise<Portfoli
     connections: connQ.json ?? [], reviewReports: revQ.json ?? [], brandReports: brandQ.json ?? [],
     leads: ((leadsQ.json ?? []) as Array<{ site_id: string }>).map((l) => ({ site_id: l.site_id })),
     enquiries: (leadsQ.json ?? []) as PortfolioInput['enquiries'],
-    notices: (noticesQ.json ?? []) as Array<{ site_id: string; kind: string }>,
+    notices: (noticesQ.json ?? []) as Array<{ id?: string; site_id: string; kind: string; period?: string; headline?: string; body?: string; created_at?: string }>,
     filesPending,
     billingBySite,
     lastChange, nowIso,
@@ -742,8 +743,26 @@ async function runStudioNeeds(member: AgencyMember, principal: Principal, jwt: s
     // batch B: the bell's Updates tab — the same feed rows /portal/feed would
     // have sent, so opening the bell is one call, not two feeds
     const update_notices = ownFeed ? (ownFeed.notices || []).filter((n: { tier?: string }) => n && n.tier === 'update') : [];
-    return { ...payload, partial, own_site: !!own, update_notices, snooze_ready: !!snQ.ok };
+    // builder list item 47: news per client site for the bell's Updates tab, each naming the
+    // site and opening the right place inside it (?client= carries the scope)
+    const news = siteNews(input.notices || [], input.clientNames, now);
+    return { ...payload, partial, own_site: !!own, update_notices, news, snooze_ready: !!snQ.ok };
 }
+
+/** Item 47 (pure): the update-tier notices across client sites from the last fourteen days,
+ *  newest first, at most twelve, each with the site's name and a link that carries the
+ *  client's scope: "Bacchus Kitchen — Published 3 changes · View". */
+export const SITE_NEWS_KINDS: ReadonlySet<string> = new Set(['site_published', 'traffic_spike', 'domain_expiry', 'new_review', 'new_booking']);
+export function siteNews(notices: Array<{ id?: string; site_id: string; kind: string; period?: string; headline?: string; body?: string; created_at?: string }>, names: Record<string, string>, nowIso: string, cap = 12) {
+  const since = new Date(Date.parse(nowIso) - 14 * 86_400_000).toISOString();
+  return notices
+    .filter((n) => SITE_NEWS_KINDS.has(String(n.kind)) && String(n.created_at || '') >= since && names[n.site_id])
+    .sort((a, b) => String(b.created_at || '').localeCompare(String(a.created_at || '')))
+    .slice(0, cap)
+    .map((n) => ({ id: n.id || null, site_id: n.site_id, name: names[n.site_id], kind: n.kind, headline: String(n.headline || ''), body: String(n.body || ''), at: n.created_at || null,
+      href: withClient(noticeHrefFor({ kind: String(n.kind), period: n.period }), n.site_id), tier: noticeTier(n.kind) }));
+}
+const withClient = (href: string, siteId: string) => { const [p, h] = href.split('#'); return p + (p.includes('?') ? '&' : '?') + 'client=' + encodeURIComponent(siteId) + (h ? '#' + h : ''); };
 
 async function ownSiteOf(jwt: string, principal: Principal): Promise<SiteRow | null> {
   if (!jwt) return null;

@@ -376,6 +376,7 @@ export function buildNeedsYou(i: NeedsInput): NeedsRow[] {
 // website_enquiry), the invoice (an invremind deal_followup) — and counting
 // them as well is how the bell reached 25 for eleven things.
 export const NEEDS_WEBSITE_KINDS: ReadonlySet<string> = new Set([
+  'site_published', 'traffic_spike',   // builder list item 47: a site's own news stays on its Website page at studio level
   'search_setup', 'domain_expiry', 'publish_failed', 'connection_expired', 'site_down', 'email_auth', 'apex_drift', 'new_review', 'missing_required', 'client_feedback',
 ]);
 export const NEEDS_NUDGE_KINDS: ReadonlySet<string> = new Set(['support_aging', 'lead_followup', 'website_enquiry', 'client_updates']);

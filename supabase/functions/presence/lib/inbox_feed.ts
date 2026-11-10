@@ -140,6 +140,7 @@ export type FeedTier = 'needs_you' | 'update';
 export const UPDATE_NOTICE_KINDS: ReadonlySet<string> = new Set([
   'invoice_paid', 'studio_published', 'welcome_back', 'win_back', 'approval_decided', 'booking_reminder',
   'invoice_upcoming',   // item 47: "Goes out Dec 1: …" — a recurring invoice sends itself in three days
+  'site_published', 'traffic_spike',   // builder list item 47: a publish finished; a busy day of visitors (per site, the studio bell names the site)
 ]);
 /** Money kinds — the ones a studio can least afford to scroll past. */
 export const MONEY_NOTICE_KINDS: ReadonlySet<string> = new Set([
