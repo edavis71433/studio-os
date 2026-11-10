@@ -85,6 +85,22 @@ export async function svcAll(path: string, orderCol: string, pageSize = 1000, ma
   return out;
 }
 
+/** svcAll, but honest about failure: every page or nothing. Null when any page
+ *  fails (a partial count must never pass as the whole), `truncated` when the
+ *  bound was reached. Nov 2026 review (server finding 5): the monthly report and
+ *  the busy-day check asked for more rows than one read may return. */
+export async function svcPages(path: string, orderCol: string, pageSize = 1000, maxPages = 50): Promise<{ rows: any[]; truncated: boolean } | null> {
+  const rows: any[] = [];
+  for (let p = 0; p < maxPages; p++) {
+    const sep = path.includes('?') ? '&' : '?';
+    const r = await svc(`${path}${sep}order=${orderCol}.asc&limit=${pageSize}&offset=${p * pageSize}`).catch(() => null);
+    if (!r || !r.ok || !Array.isArray(r.json)) return null;
+    rows.push(...r.json);
+    if (r.json.length < pageSize) return { rows, truncated: false };
+  }
+  return { rows, truncated: true };
+}
+
 export async function asUser(jwt: string, path: string, init: RequestInit = {}) {
   noteWrite(path, init);
   const r = await fetch(`${REST}/${path}`, {
