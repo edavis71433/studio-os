@@ -136,7 +136,9 @@ async function route(token){
       // operator-capable account signing in HERE must land in the operator
       // workspace, not bounce to the client portal. Only a pure (non-operator)
       // client follows a '/client.html' landing from the studio door.
-      var operatorCapable = d.sees_full_workspace === true || d.is_agency || d.is_operator;
+      // A managed client owns their own site record, so the server says they "see the
+      // full workspace" — that is not staff. Only an agency member or staff overrides.
+      var operatorCapable = d.is_agency || d.is_operator || (d.sees_full_workspace === true && !d.is_managed_client);
       if (d.landing === '/client.html' && operatorCapable) {
         location.href = d.is_agency ? '/agency.html' : '/today.html'; return;
       }

@@ -103,7 +103,7 @@ export async function sendRecurringNow(s: any, ctx: { localYmd: string; clientId
     return { result: 'paused', reason };
   };
   if (!stripeConfigured()) return pause('no_stripe');
-  const { email } = await contactOf(s.site_id, deal);
+  const { email, who } = await contactOf(s.site_id, deal);
   if (!email) return pause('no_email');
 
   // 2. the invoice for this date (a retry finds the one already made)
@@ -123,7 +123,7 @@ export async function sendRecurringNow(s: any, ctx: { localYmd: string; clientId
   }
 
   // 3. its pay link and the email, exactly once
-  let emailed = false;
+  let emailed = false, emailFailed = false;
   if (!inv.stripe_url && inv.status === 'open') {
     let link: { url: string; id: string };
     try {
@@ -134,7 +134,15 @@ export async function sendRecurringNow(s: any, ctx: { localYmd: string; clientId
       const kind = s.every === 'year' ? 'yearly' : s.every === 'quarter' ? 'quarterly' : 'monthly';
       const due = inv.due_date ? ` It’s due ${dayLabel(String(inv.due_date))}.` : '';
       emailed = await emailInvoice(s.site_id, s.deal_id, String(inv.title), link.url, Number(inv.amount_cents), inv.id, `This is your ${kind} invoice for ${s.title}.${due}`);
-      await dealEvent(s.site_id, s.deal_id, 'invoice_sent', SYS, { detail: { invoice_id: inv.id, amount_cents: Number(inv.amount_cents), purpose: 'service', recurring_id: s.id, period: monthLabel(s.next_on) } });
+      // "invoice sent" is written only when the email went. When it didn't, the
+      // schedule still moves on (the invoice and its link exist), but the studio is
+      // told, on the deal and in Needs you, so they can send it again by hand.
+      if (emailed) await dealEvent(s.site_id, s.deal_id, 'invoice_sent', SYS, { detail: { invoice_id: inv.id, amount_cents: Number(inv.amount_cents), purpose: 'service', recurring_id: s.id, period: monthLabel(s.next_on) } });
+      else {
+        emailFailed = true;
+        await dealEvent(s.site_id, s.deal_id, 'recurring_invoice', SYS, { detail: { action: 'email_failed', recurring_id: s.id, invoice_id: inv.id, title: s.title } });
+        if (ctx.clientId) await raiseNotice({ siteId: s.site_id, clientId: ctx.clientId, kind: 'deal_followup', period: `recuremail:${s.deal_id}:${s.id}:${s.next_on}`, headline: `${inv.title} didn’t reach ${who || 'the client'}`, body: 'The invoice was made, but the email didn’t go out. Open the deal and send it again.' });
+      }
     }
   }
 
@@ -145,7 +153,7 @@ export async function sendRecurringNow(s: any, ctx: { localYmd: string; clientId
     await clearHeadsUp(ctx.clientId, s);
     if (next.status === 'finished') await dealEvent(s.site_id, s.deal_id, 'recurring_invoice', SYS, { detail: { action: 'finished', recurring_id: s.id, title: s.title } });
   }
-  return { result: 'sent', invoice_id: inv.id, emailed };
+  return { result: emailFailed ? 'failed' : 'sent', invoice_id: inv.id, emailed };
 }
 
 // ═══ THE SWEEP (routes/system.ts, every tick) ═══

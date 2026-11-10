@@ -791,6 +791,15 @@ export async function handleAssetStatus(req: Request, site: SiteRow, principal: 
   if (role === 'client_reviewer' && !['approve', 'reject'].includes(action)) {
     return json({ error: 'forbidden', message: 'A reviewer can approve or ask for changes — nothing else.' }, 403, cors);
   }
+  // Nov 2026 review (client portal finding 5): a reviewer is tied to a site, not to a
+  // project, so on a studio's shared site they could decide any client's file. There
+  // the studio decides; a reviewer's seat belongs on the client's own site.
+  if (role === 'client_reviewer') {
+    const { isSharedStudioSite } = await import('../lib/workspace.ts');
+    if ((await isSharedStudioSite(site.id)) !== false) {
+      return json({ error: 'forbidden', message: 'Files on your studio’s shared site are approved by the studio. Ask them to share this one with you on your own site.' }, 403, cors);
+    }
+  }
   const cur = await svc(`presence_media?id=eq.${id}&site_id=eq.${site.id}&deleted_at=is.null&select=asset_status,metadata&limit=1`);
   const row = arr(cur)[0];
   if (!row) return json({ error: 'not_found', message: 'That file isn’t here.' }, 404, cors);

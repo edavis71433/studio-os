@@ -224,7 +224,10 @@ export async function handleEstimateToProposal(_req: Request, site: SiteRow, _pr
       subtotal_cents: Number(e.subtotal_cents) || 0, currency: e.currency || 'usd', terms: String(e.terms || ''), status: 'draft' }) });
   const prop = rows(ins)[0];
   if (!ins.ok || !prop) return json({ error: 'write_failed', message: 'The proposal didn’t save — please try again.' }, 502, cors);
-  const claim = await svc(`presence_estimates?id=eq.${id}&site_id=eq.${site.id}&proposal_id=is.null&select=id`, { method: 'PATCH', headers: { Prefer: 'return=representation' }, body: JSON.stringify({ proposal_id: prop.id }) });
+  // The claim also wins when the estimate still points at a proposal that was since
+  // deleted: otherwise the new one is taken back down and "created" answers with nothing.
+  const stalePid = UUID_RE.test(String(e.proposal_id || '')) ? `proposal_id=eq.${e.proposal_id}` : 'proposal_id=is.null';
+  const claim = await svc(`presence_estimates?id=eq.${id}&site_id=eq.${site.id}&${stalePid}&select=id`, { method: 'PATCH', headers: { Prefer: 'return=representation' }, body: JSON.stringify({ proposal_id: prop.id }) });
   if (claim.ok && !rows(claim)[0]) {
     // a second press got there first: keep its proposal, take this draft back down
     await svc(`presence_proposals?id=eq.${prop.id}&site_id=eq.${site.id}&status=eq.draft`, { method: 'PATCH', body: JSON.stringify({ deleted_at: nowIso() }) }).catch(() => {});
@@ -256,7 +259,8 @@ export async function handleEstimateToInvoice(_req: Request, site: SiteRow, prin
       title, description: `${title} — ${deal?.title || 'project'}`, amount_cents: total, currency: 'usd', purpose: 'service', status: 'open', due_date: null, created_by: principal.email || principal.userId || 'system' }) });
   const inv = rows(ins)[0];
   if (!ins.ok || !inv) return json({ error: 'write_failed', message: 'The invoice didn’t save — please try again.' }, 502, cors);
-  const claim = await svc(`presence_estimates?id=eq.${id}&site_id=eq.${site.id}&invoice_id=is.null&select=id`, { method: 'PATCH', headers: { Prefer: 'return=representation' }, body: JSON.stringify({ invoice_id: inv.id }) });
+  const staleIid = UUID_RE.test(String(e.invoice_id || '')) ? `invoice_id=eq.${e.invoice_id}` : 'invoice_id=is.null';   // same as the proposal: a voided or deleted first invoice must not block the second
+  const claim = await svc(`presence_estimates?id=eq.${id}&site_id=eq.${site.id}&${staleIid}&select=id`, { method: 'PATCH', headers: { Prefer: 'return=representation' }, body: JSON.stringify({ invoice_id: inv.id }) });
   if (claim.ok && !rows(claim)[0]) {
     // a second press got there first: this one was never sent, so it simply goes
     await svc(`presence_invoices?id=eq.${inv.id}&site_id=eq.${site.id}&stripe_url=is.null`, { method: 'PATCH', body: JSON.stringify({ deleted_at: nowIso() }) }).catch(() => {});

@@ -752,7 +752,7 @@ function evtLabel(e){
   if(e.kind==='estimate_decided')return d.decision==='approved'?'Estimate approved'+(d.total_cents?' — '+money(d.total_cents):''):'They passed on the estimate (Not now)';
   if(e.kind==='estimate_deleted')return 'Draft estimate removed';
   if(e.kind==='recurring_invoice'){const w=d.every==='quarter'?'every 3 months':d.every==='year'?'every year':'every month';const on=d.on?niceDay(d.on):'';const why={unpaid:'the last two invoices are still unpaid',no_email:'there’s no client email on this deal',no_stripe:'Stripe isn’t connected'}[d.reason];
-    return d.action==='started'?'Recurring invoice started'+(d.title?' — '+d.title:'')+(d.amount_cents?', '+money(d.amount_cents)+' '+w:'')+(on?' from '+on:''):d.action==='changed'?'Recurring invoice changed'+(d.amount_cents?' — '+money(d.amount_cents):'')+(on?(d.amount_cents?',':' —')+' next on '+on:''):d.action==='skipped'?'Recurring invoice: skipped '+(on||'one'):d.action==='paused'?'Recurring invoice paused'+(why?' — '+why:''):d.action==='resumed'?'Recurring invoice resumed'+(on?' — next on '+on:''):d.action==='stopped'?'Recurring invoice stopped':d.action==='finished'?'Recurring invoice finished — the last one went out':'Recurring invoice';}
+    return d.action==='started'?'Recurring invoice started'+(d.title?' — '+d.title:'')+(d.amount_cents?', '+money(d.amount_cents)+' '+w:'')+(on?' from '+on:''):d.action==='changed'?'Recurring invoice changed'+(d.amount_cents?' — '+money(d.amount_cents):'')+(on?(d.amount_cents?',':' —')+' next on '+on:''):d.action==='skipped'?'Recurring invoice: skipped '+(on||'one'):d.action==='paused'?'Recurring invoice paused'+(why?' — '+why:''):d.action==='resumed'?'Recurring invoice resumed'+(on?' — next on '+on:''):d.action==='stopped'?'Recurring invoice stopped':d.action==='finished'?'Recurring invoice finished — the last one went out':d.action==='email_failed'?'Recurring invoice made, but the email didn’t go out — send it again':'Recurring invoice';}
   return EVT_LABEL[e.kind]||String(e.kind||'').replace(/_/g,' ');
 }
 const evtDateTime=(iso)=>{const t=new Date(iso);if(isNaN(t))return'';return evtDate(iso)+', '+t.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'});};
@@ -3472,6 +3472,7 @@ async function openDeal(id){
       try{
         const r=await api('/sales/deals/'+id+'/invoice','POST',body);
         const label=body.purpose==='deposit'?'Deposit request':'Invoice';
+        if(r.warning==='link_failed'){toast(r.message||label+' saved, but the payment link didn’t generate — tap Send again.',true);openDeal(id);return;}
         toast(r.emailed?((r.reused?label+' re-sent ('+money(r.amount_cents)+')':label+' sent')+' — emailed to the client')
           :(NO_EMAIL&&r.url?noEmailWhy(label,'payment link')
           :((r.reused?label+' re-sent ('+money(r.amount_cents)+')':label+' sent')+(r.url?' — link copied':''))));
