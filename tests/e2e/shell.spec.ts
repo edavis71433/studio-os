@@ -1189,3 +1189,45 @@ test.describe('Sidebar — inline sections (visual refresh)', () => {
     await page.waitForURL(/\/broadcasts\.html/, { timeout: 7_000 });
   });
 });
+
+// The shared a11y enhancer (the foot of shell.js) turns Enter/Space on a
+// role="button" element, or a clickable <div onclick>, into a click — for the
+// ones with no keyboard support of their own. A card that handles its own
+// Enter/Space calls preventDefault and has already acted; the shell clicked it
+// anyway, so one press opened Pipeline, Contacts, Projects and Files cards twice
+// (Nov 2026). Each page's own check is in keyboard-opens-once.spec.ts.
+test.describe('A11y enhancer — Enter and Space', () => {
+  test('an element that handles its own Enter/Space acts once; one without still gets the shell’s click', async ({ page }) => {
+    await installApp(page);
+    await page.goto('/today.html');
+    await page.waitForFunction(() => (window as unknown as { __ddsA11y?: boolean }).__ddsA11y === true);
+    await page.evaluate(() => {
+      const w = window as unknown as { __hits: Record<string, number> };
+      w.__hits = { own: 0, plain: 0, attr: 0 };
+      const add = (id: string) => { const d = document.createElement('div'); d.id = id; d.textContent = id; document.body.appendChild(d); return d; };
+      const own = add('kb-own');
+      own.setAttribute('role', 'button'); own.tabIndex = 0;
+      own.addEventListener('click', () => { w.__hits.own++; });
+      own.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); w.__hits.own++; } });
+      const plain = add('kb-plain');
+      plain.setAttribute('role', 'button'); plain.tabIndex = 0;
+      plain.addEventListener('click', () => { w.__hits.plain++; });
+      add('kb-attr').setAttribute('onclick', 'window.__hits.attr++');   // the enhancer gives it role and tabindex
+    });
+    const hits = () => page.evaluate(() => (window as unknown as { __hits: Record<string, number> }).__hits);
+    await page.locator('#kb-own').focus();
+    await page.keyboard.press('Enter');
+    await page.keyboard.press(' ');
+    expect((await hits()).own).toBe(2);   // one per press, not two
+    await page.locator('#kb-plain').focus();
+    await page.keyboard.press('Enter');
+    await page.keyboard.press(' ');
+    expect((await hits()).plain).toBe(2);
+    const attr = page.locator('#kb-attr');
+    await expect(attr).toHaveAttribute('role', 'button');
+    await expect(attr).toHaveAttribute('tabindex', '0');
+    await attr.focus();
+    await page.keyboard.press('Enter');
+    expect((await hits()).attr).toBe(1);
+  });
+});
