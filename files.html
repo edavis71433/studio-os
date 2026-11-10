@@ -28,25 +28,52 @@
   .wrap{max-width:var(--dds-w-data,1600px);margin:0 auto;padding:var(--dds-s7,32px) var(--dds-s5,20px) 90px}
   /* minmax(0,1fr): the wide table must scroll INSIDE .tscroll, never blow the
      column (and the .lhead row) open past the viewport */
-  .layout{display:grid;grid-template-columns:210px minmax(0,1fr);gap:var(--dds-s7,32px)}
-  @media (max-width:720px){.layout{grid-template-columns:minmax(0,1fr);gap:16px}}
-
-  /* collections rail */
-  .rail{display:flex;flex-direction:column;gap:2px;position:sticky;top:64px;align-self:start}
-  @media (max-width:720px){.rail{position:static;flex-direction:row;overflow-x:auto;gap:8px;padding-bottom:4px;-webkit-overflow-scrolling:touch}}
-  .col{display:flex;align-items:center;gap:10px;padding:var(--dds-s2,8px) var(--dds-s3,12px);border-radius:var(--dds-r,8px);color:var(--soft);text-decoration:none;font-size:14.5px;font-weight:500;border:1px solid transparent;cursor:pointer;white-space:nowrap;background:none;text-align:left;width:100%;font-family:inherit}
-  .col:hover{background:var(--p-soft);color:var(--ink)}
-  .col.on{background:var(--p-soft);color:var(--p);border-color:var(--line);font-weight:600}
-  .col .ic{width:17px;height:17px;flex:none;opacity:.85}
-  .col .n{margin-left:auto;font-size:12px;color:var(--faint);font-variant-numeric:tabular-nums}
+  /* bold redesign (Figma "11 · Files"): no second column. The kinds of file sit in
+     one row beside the search, and folders and clients become a strip of cards
+     under it. The hooks stay what they were: [data-col] · [data-folder] ·
+     [data-client] · .n counts · aria-current on the one that's on. */
+  .layout{display:block}
+  .filters{display:flex;flex-direction:column;gap:12px;margin-bottom:var(--dds-s4,16px)}
+  .filters .bar{margin-bottom:0}
+  .filters .bar .search{flex:0 1 300px}
+  .kinds{display:flex;align-items:center;gap:8px;flex-wrap:wrap;min-width:0}
+  .ktrack{display:inline-flex;gap:2px;padding:3px;border-radius:999px;background:color-mix(in srgb,var(--ink) 6%,transparent)}
+  .col{display:inline-flex;align-items:center;gap:6px;font:inherit;font-size:13px;font-weight:500;color:var(--soft);background:transparent;border:0;border-radius:999px;padding:6px 12px;cursor:pointer;white-space:nowrap}
+  .col:hover{color:var(--ink)}
+  .col .n{font-size:12px;color:var(--faint);font-variant-numeric:tabular-nums}
+  .ktrack .col.on{background:var(--card);color:var(--ink);font-weight:600;box-shadow:0 1px 2px rgba(23,21,34,.1),0 1px 1px rgba(23,21,34,.04)}
   .col.on .n{color:var(--p)}
-  /* the Clients rail — a second dimension over the same list, not a second rail */
-  .railsec{display:flex;flex-direction:column;gap:2px;margin-top:var(--dds-s4,16px);border-top:1px solid var(--line);padding-top:var(--dds-s3,12px)}
-  @media (max-width:720px){.railsec{flex-direction:row;align-items:center;margin-top:0;border-top:none;border-left:1px solid var(--line);padding:0 0 0 12px}}
-  .railhead{font-size:12px;font-weight:500;color:var(--faint);padding:0 var(--dds-s3,12px) var(--dds-s1,4px);white-space:nowrap}
-  @media (max-width:720px){.railhead{padding:0 4px 0 0}}
-  .railmore{background:none;border:none;font:inherit;font-size:12.5px;color:var(--p);cursor:pointer;text-align:left;padding:var(--dds-s1,4px) var(--dds-s3,12px);border-radius:var(--dds-r,8px);white-space:nowrap}
-  .railmore:hover{background:var(--p-soft)}
+  .fchip{display:inline-flex;align-items:center;gap:6px;font:inherit;font-size:12.5px;font-weight:600;color:var(--soft);background:var(--card);border:1px solid var(--line);border-radius:999px;padding:6px 12px;cursor:pointer;white-space:nowrap}
+  .fchip:hover{border-color:var(--p);color:var(--ink)}
+  .fchip.on,.fchip[aria-pressed="true"],.fchip[aria-expanded="true"]{background:var(--p-soft);color:var(--p);border-color:transparent}
+  .fchip .ic{width:15px;height:15px;flex:none;opacity:.85}
+  .fchip .n{font-weight:500;opacity:.85;font-variant-numeric:tabular-nums}
+  .morerow{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+  .morerow[hidden]{display:none}
+  .grow{flex:1 1 auto}
+  /* folders, then clients: a strip of cards that scrolls sideways when it runs out of room */
+  .rail{display:flex;gap:12px;align-items:center;overflow-x:auto;padding:2px 2px 6px;margin:0 -2px;-webkit-overflow-scrolling:touch;scrollbar-width:thin}
+  .railsec{display:flex;gap:10px;align-items:center;flex:0 0 auto}
+  .railhead{font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--faint);white-space:nowrap;padding:0 2px}
+  .fcard{display:inline-flex;align-items:center;gap:10px;font:inherit;color:var(--ink);background:var(--card);border:1px solid var(--line);border-radius:var(--dds-r-lg,14px);padding:7px 14px 7px 7px;cursor:pointer;white-space:nowrap;box-shadow:0 1px 2px rgba(23,21,34,.04);text-align:left}
+  .fcard:hover{border-color:var(--p)}
+  .fcard[aria-current="true"]{border-color:var(--p);background:var(--p-soft)}
+  .fcard .fi{width:32px;height:32px;border-radius:10px;background:var(--p-soft);color:var(--p);display:grid;place-items:center;flex:none}
+  .fcard[aria-current="true"] .fi{background:var(--card)}
+  .fcard .fi svg{width:17px;height:17px}
+  .av{width:30px;height:30px;border-radius:50%;background:var(--dds-grad-brand,var(--p));color:#fff;display:grid;place-items:center;font-size:11.5px;font-weight:700;font-style:normal;flex:none;letter-spacing:.02em}
+  .fcard .ft{display:flex;flex-direction:column;line-height:1.25}
+  .fcard .ft b{font-size:13.5px;font-weight:600}
+  .fcard .ft small{font-size:12px;color:var(--faint)}
+  .fcard.all{padding:7px 14px;min-height:46px}
+  .railmore{font:inherit;font-size:12.5px;font-weight:600;color:var(--p);background:transparent;border:1.5px dashed var(--dds-line-strong,var(--line));border-radius:var(--dds-r-lg,14px);padding:12px 16px;cursor:pointer;white-space:nowrap}
+  .railmore:hover{background:var(--p-soft);border-color:var(--p)}
+  @media (max-width:720px){
+    .filters .bar .search{flex:1 1 100%}
+    .kinds{flex-wrap:nowrap;overflow-x:auto;width:100%;-webkit-overflow-scrolling:touch;scrollbar-width:none;padding-bottom:2px}
+    .kinds::-webkit-scrollbar{display:none}
+  }
+  @media (pointer:coarse){.col,.fchip,.fcard,.railmore{min-height:44px}}
 
   /* toolbar */
   .bar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:var(--dds-s4,16px)}
@@ -125,7 +152,13 @@
   .tile .thumb svg{width:34px;height:34px;opacity:.6}
   .tile .meta{padding:10px var(--dds-s3,12px) var(--dds-s3,12px)}
   .tile .nm{font-size:13.5px;font-weight:600;line-height:1.3;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-  .tile .use{font-size:11.5px;color:var(--faint);margin-top:var(--dds-s1,4px);display:flex;align-items:center;gap:var(--dds-s1,4px)}
+  .tile .use{font-size:11.5px;color:var(--faint);margin-top:6px;display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+  .pill{display:inline-flex;align-items:center;font-size:11.5px;font-weight:600;border-radius:999px;padding:2px 8px;white-space:nowrap}
+  .pill.good{background:var(--good-soft);color:var(--good)}
+  .pill.brand{background:var(--p-soft);color:var(--p)}
+  .tile .who{display:flex;align-items:center;gap:6px;margin-top:6px;font-size:12px;color:var(--soft);min-width:0}
+  .tile .who .av{width:22px;height:22px;font-size:9.5px}
+  .tile .who span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .dot{width:6px;height:6px;border-radius:50%;flex:none}
   .dot.live{background:var(--good)} .dot.used{background:var(--p)} .dot.un{background:var(--faint)}
   .star{position:absolute;top:8px;right:8px;width:26px;height:26px;border-radius:50%;background:rgba(255,255,255,.86);border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;color:var(--warn)}
@@ -311,7 +344,7 @@ const COLS=[
   {key:'private',label:'Client-private',ic:'lock',f:{},priv:true},   // Oct 2026 review: files private to one client (0131)
   {key:'archive',label:'Archive',ic:'arch',f:{status:'archived'}},
 ];
-let S={col:'all',q:'',client:'',caps:[],policy:'immediate',assets:[],full:[],counts:{},countsOk:false,health:[],canEdit:true,loadedOnce:false,current:null,cards:[],   // countsOk stays false until a collections read SUCCEEDS — unknown never paints as 0
+let S={col:'all',q:'',client:'',use:false,caps:[],policy:'immediate',assets:[],full:[],counts:{},countsOk:false,health:[],canEdit:true,loadedOnce:false,current:null,cards:[],   // countsOk stays false until a collections read SUCCEEDS — unknown never paints as 0
   folder:'',newFolders:[],storage:null,   // item 56: the open folder (col 'folder'), folders made here and still empty; the meter
   selectMode:false,selected:new Set(),   // multi-select bulk actions
   stockResults:[],stockQ:'',stockState:null,stockProvider:'',stockLicense:'',stockError:''};   // FD-T10 stock library state
@@ -342,6 +375,8 @@ const TCOLS=[
 // hop returned). The distinction that matters is not "do we have a name" but "is
 // there a client at all": a file with a client_id belongs to that client whether or
 // not we can name them. Only a file with NO client is the studio's own.
+// a client card's initials, as an avatar draws them: first and last word
+function initialsOf(name){const w=String(name||'').trim().split(/\s+/).filter(Boolean).filter((x,i,a)=>!(i>0&&i===a.length-1&&/^(co|inc|llc|ltd|corp)\.?$/i.test(x)));return w.length?((w[0][0]||'')+(w.length>1?(w[w.length-1][0]||''):'')).toUpperCase():'?';}
 function clientLabel(a){
   const nm=String((a&&a.client_name)||'').trim();
   if(nm)return nm;
@@ -378,6 +413,7 @@ function deriveRailCounts(rows,total){
   RAILN.photos=shared.filter(r=>r.kind==='image').length;
   RAILN.documents=shared.filter(r=>r.kind==='document').length;
   RAILN.brand=shared.filter(r=>r.brand).length;
+  RAILN.live=shared.filter(r=>r.in_use).length;   // bold redesign: the On your site lens
   // /assets `total` counts every non-deleted row INCLUDING archived; the list
   // excludes archived — the difference is the Archive count. Exact only while
   // the library fits the read limit; beyond that stay honest and omit it.
@@ -601,6 +637,7 @@ function applyFilters(){
   else if(!S.client)rows=rows.filter(r=>!r.client_private);
   if(S.client==='studio')rows=rows.filter(r=>!r.client_id);
   else if(S.client)rows=rows.filter(r=>String(r.client_id||'')===S.client);
+  if(S.use)rows=rows.filter(r=>r.in_use);   // bold redesign: a lens like the client's, over the list in hand
   S.assets=rows;
   // any change to the row set prunes selections that are no longer visible —
   // bulk actions only ever act on rows the user can SEE, and the bulkbar count
@@ -645,9 +682,9 @@ function renderTrouble(a){
   const inner=a.status===403
     ?`<div class="empty"><h2>${/plan|includ/i.test((a.body&&a.body.message)||"")?"Not part of your plan yet.":"Files live in your full workspace."}</h2><p>${esc((a.body&&a.body.message)||"")||"Your client view shows what you’ve chosen to share."}</p></div>`
     :`<div class="empty"><h2>We couldn’t load your files just now.</h2><p>A brief hiccup — it usually passes.</p><p style="margin-top:16px"><button class="btn primary" id="retry">Try again</button></p></div>`;
-  $('root').innerHTML=`<div class="layout"><nav class="rail" id="rail" aria-label="Collections">${railHtml()}</nav><div>
+  $('root').innerHTML=`<div class="layout"><div>
     <header class="lhead"><div class="lrow1"><span class="obj-ic" aria-hidden="true">🗂</span><h1 id="pagehead" tabindex="-1">Files</h1><button class="lbtn" id="refreshBtn" aria-label="Refresh" title="Refresh">↻</button></div>
-    <div class="lmeta">Couldn’t load just now</div></header>${inner}</div></div>`;
+    <div class="lmeta">Couldn’t load just now</div></header>${filtersHtml('','')}${inner}</div></div>`;
   wireRail();
   const rt=$('retry');if(rt)rt.addEventListener('click',()=>load());
   const rf=$('refreshBtn');if(rf)rf.addEventListener('click',()=>load());
@@ -660,49 +697,73 @@ function buildCounts(collections){
 // ONE rail for every surface (roster, stock, trouble): counts where truth is
 // available (railN → undefined renders count-less), aria-current marks the
 // active collection for assistive tech.
-function railHtml(){
-  return COLS.map(c=>{
-    const n=railN(c.key);
-    return `<button class="col ${S.col===c.key?'on':''}" data-col="${c.key}"${S.col===c.key?' aria-current="true"':''}>${svg(IC[c.ic],'ic')}<span>${c.label}</span>${n!==undefined?`<span class="n">${n}</span>`:''}</button>`;
-  }).join('')+folderRailHtml()+clientRailHtml();
+// Bold redesign (Figma "11 · Files"): the kinds people use most sit in one segmented
+// track beside the search; Archive and the On your site lens are chips; the rest
+// (Brand, Templates, Downloads, Client-private, Stock Library) wait behind More
+// filters, and stay open while one of them is the one shown.
+const MAIN_COLS=['all','photos','documents','fav'];
+const MORE_COLS=['brand','templates','downloads','private','stock'];
+let MORE_OPEN=false;
+function colBtn(c,cls,icon){
+  const n=railN(c.key);const on=S.col===c.key;
+  return `<button class="${cls}${on?' on':''}" data-col="${c.key}"${on?' aria-current="true"':''}>${icon?svg(IC[c.ic],'ic'):''}<span>${c.label}</span>${n!==undefined?`<span class="n">${n}</span>`:''}</button>`;
+}
+function kindsHtml(){
+  const main=MAIN_COLS.map(k=>colBtn(COLS.find(c=>c.key===k),'col')).join('');
+  const live=RAILN.live;
+  const lens=S.col==='stock'?'':`<button class="fchip" id="useLens" aria-pressed="${S.use?'true':'false'}">On your site${live!==undefined?` <span class="n">${live}</span>`:''}</button>`;
+  const open=MORE_OPEN||MORE_COLS.includes(S.col);
+  return `<div class="kinds" role="group" aria-label="Show"><div class="ktrack">${main}</div>${lens}${colBtn(COLS.find(c=>c.key==='archive'),'fchip')}<button class="fchip" id="moreFilters" aria-expanded="${open?'true':'false'}" aria-controls="moreRow">More filters</button></div>`;
+}
+function moreHtml(){
+  const open=MORE_OPEN||MORE_COLS.includes(S.col);
+  return `<div class="morerow" id="moreRow" role="group" aria-label="More filters"${open?'':' hidden'}>${MORE_COLS.map(k=>colBtn(COLS.find(c=>c.key===k),'fchip',true)).join('')}</div>`;
+}
+// ONE filter block for every surface (roster, stock, trouble): counts where truth is
+// available (railN → undefined renders count-less), aria-current marks what's shown.
+function filtersHtml(search,right){
+  const strip=folderRailHtml()+clientRailHtml();
+  return `<div class="filters" id="filters"><div class="bar">${search||''}${kindsHtml()}<span class="grow"></span>${right||''}</div>${moreHtml()}${strip?`<nav class="rail" id="rail" aria-label="Folders and clients">${strip}</nav>`:''}</div>`;
 }
 // Item 56: the owner's own folders, each with what opening it shows. Counts
-// follow the same rule as every rail count: none until a collections read works.
+// follow the same rule as every count here: none until a collections read works.
 function folderRailHtml(){
   const names=folderNames();
   if(!names.length&&!S.canEdit)return'';
-  const row=(n)=>{
+  const card=(n)=>{
     const on=S.col==='folder'&&S.folder===n;
     const c=S.countsOk?(S.counts[n]||0):undefined;
-    return `<button class="col ${on?'on':''}" data-folder="${esc(n)}"${on?' aria-current="true"':''}>${svg(IC.folder,'ic')}<span>${esc(folderLabel(n))}</span>${c!==undefined?`<span class="n">${c}</span>`:''}</button>`;
+    return `<button class="fcard" data-folder="${esc(n)}"${on?' aria-current="true"':''}><span class="fi">${svg(IC.folder)}</span><span class="ft"><b>${esc(folderLabel(n))}</b>${c!==undefined?`<small><span class="n">${c}</span> file${c===1?'':'s'}</small>`:''}</span></button>`;
   };
-  return `<div class="railsec" role="group" aria-label="Folders"><div class="railhead">Folders</div>`+
-    names.map(row).join('')+
+  return `<div class="railsec" role="group" aria-label="Folders"><span class="railhead">Folders</span>`+
+    names.map(card).join('')+
     (S.canEdit?`<button class="railmore" id="newFolder">＋ New folder</button>`:'')+`</div>`;
 }
-// The Clients section of the same rail. It appears only once files actually
-// belong to clients — an empty "Clients" heading is scaffolding, not a feature.
+// The Clients cards. They appear only once files actually belong to clients —
+// an empty "Clients" heading is scaffolding, not a feature.
 function clientRailHtml(){
   if(!RAILC.length)return'';
-  const row=(key,label,ic,n)=>{
+  const card=(key,label,n,studio)=>{
     const on=S.client===key;
-    return `<button class="col ${on?'on':''}" data-client="${esc(key)}"${on?' aria-current="true"':''}>${svg(IC[ic],'ic')}<span>${esc(label)}</span>${n===undefined?'':`<span class="n">${n}</span>`}</button>`;
+    const lead=studio?`<span class="fi">${svg(IC.studio)}</span>`:`<i class="av" aria-hidden="true">${esc(initialsOf(label))}</i>`;
+    return `<button class="fcard" data-client="${esc(key)}"${on?' aria-current="true"':''}>${lead}<span class="ft"><b>${esc(label)}</b>${n===undefined?'':`<small><span class="n">${n}</span> file${n===1?'':'s'}</small>`}</span></button>`;
   };
   const shown=CLIENTS_OPEN?RAILC:RAILC.slice(0,CLIENT_CAP);
   const rest=RAILC.length-shown.length;
   const more=rest>0||CLIENTS_OPEN
     ? `<button class="railmore" id="clientsMore" aria-expanded="${CLIENTS_OPEN?'true':'false'}">${CLIENTS_OPEN?'Show fewer':`${rest} more…`}</button>`:'';
-  return `<div class="railsec" role="group" aria-label="Clients"><div class="railhead">Clients</div>`+
-    row('','All clients','people',undefined)+
-    shown.map(c=>row(c.id,c.name,'person',c.n)).join('')+
-    (RAILC_STUDIO?row('studio','Studio','studio',RAILC_STUDIO):'')+
+  return `<div class="railsec" role="group" aria-label="Clients"><span class="railhead">Clients</span>`+
+    `<button class="fcard all" data-client=""${S.client===''?' aria-current="true"':''}><span class="ft"><b>All clients</b></span></button>`+
+    shown.map(c=>card(c.id,c.name,c.n,false)).join('')+
+    (RAILC_STUDIO?card('studio','Studio',RAILC_STUDIO,true):'')+
     more+`</div>`;
 }
-// One rail, three surfaces (roster, stock, trouble) — so its wiring lives once.
-// A collection re-reads the server; a client is a lens over the page already in
-// hand, so it re-filters in place. Clicking the active client clears it.
+// One filter block, three surfaces (roster, stock, trouble) — so its wiring lives once.
+// A collection re-reads the server; a client or the On your site lens is a lens over
+// the page already in hand, so it re-filters in place. Clicking the active one clears it.
 function wireRail(){
-  document.querySelectorAll('#rail [data-col]').forEach(b=>b.onclick=()=>{S.col=b.dataset.col;S.folder='';S.q='';S.selected.clear();load();});
+  // a main kind (or Archive) tidies More filters away; one of its own keeps it open
+  document.querySelectorAll('#filters [data-col]').forEach(b=>b.onclick=()=>{S.col=b.dataset.col;if(!MORE_COLS.includes(S.col))MORE_OPEN=false;S.folder='';S.q='';S.selected.clear();load();});
   document.querySelectorAll('#rail [data-folder]').forEach(b=>b.onclick=()=>openFolder(b.dataset.folder));
   const nf=$('newFolder');if(nf)nf.onclick=()=>newFolder();
   document.querySelectorAll('#rail [data-client]').forEach(b=>b.onclick=()=>{
@@ -713,6 +774,9 @@ function wireRail(){
     const nb=document.querySelector('#rail [data-client="'+CSS.escape(S.client)+'"]');if(nb)nb.focus();
   });
   const cm=$('clientsMore');if(cm)cm.onclick=()=>{CLIENTS_OPEN=!CLIENTS_OPEN;render();const nb=$('clientsMore');if(nb)nb.focus();};
+  const ul=$('useLens');if(ul)ul.onclick=()=>{S.use=!S.use;if(!S.loadedOnce)return load();applyFilters();render();const nb=$('useLens');if(nb)nb.focus();};
+  // More filters opens and closes in place: no re-read, no re-render
+  const mf=$('moreFilters');if(mf)mf.onclick=()=>{const row=$('moreRow');if(!row)return;const open=row.hidden;if(!open&&MORE_COLS.includes(S.col))return;row.hidden=!open;MORE_OPEN=open;mf.setAttribute('aria-expanded',open?'true':'false');};
 }
 function stockTile(im){
   return `<figure class="tile" style="margin:0"><img src="${esc(im.thumb)}" alt="${esc(im.alt)}" loading="lazy" style="width:100%;aspect-ratio:4/3;object-fit:cover;border-radius:10px;display:block">`+
@@ -727,10 +791,10 @@ function renderStock(){
     : (S.stockResults||[]).length ? S.stockResults.map(stockTile).join('')
     : `<div class="empty" style="grid-column:1/-1"><h2>${S.stockQ?'No photos match that search.':'Find a professional photo.'}</h2><p>Try “office”, “coffee”, “construction”, “salon”…</p></div>`;
   const note = S.stockLicense ? `Royalty-free from ${esc(S.stockProvider)} · ${esc(S.stockLicense)} · added to your Files and hosted on your own site.` : 'Professional royalty-free photos, added straight to your Files.';
-  $('root').innerHTML=`<div class="layout"><nav class="rail" id="rail" aria-label="Collections">${railHtml()}</nav><div>
+  $('root').innerHTML=`<div class="layout"><div>
     <header class="lhead"><div class="lrow1"><span class="obj-ic" aria-hidden="true">🗂</span><h1 id="pagehead" tabindex="-1">Files</h1><button class="lbtn" id="refreshBtn" aria-label="Refresh" title="Refresh">↻</button></div>
     <div class="lmeta">Stock Library — professional royalty-free photos</div></header>
-    <div class="bar"><div class="search">${svg(IC.search)}<input id="sq" type="search" aria-label="Search stock photos" placeholder="Search stock photos — try “office”" value="${esc(S.stockQ||'')}" autocomplete="off"></div></div>
+    ${filtersHtml(`<div class="search">${svg(IC.search)}<input id="sq" type="search" aria-label="Search stock photos" placeholder="Search stock photos — try “office”" value="${esc(S.stockQ||'')}" autocomplete="off"></div>`,'')}
     <p style="margin:2px 0 12px;color:var(--faint);font-size:12.5px">${note}</p>
     <div class="grid">${grid}</div></div></div>`;
   wireRail();
@@ -785,12 +849,11 @@ function lheadHtml(shown){
     <div class="lrow1">
       <span class="obj-ic" aria-hidden="true">🗂</span>
       <h1 id="pagehead" tabindex="-1">Files</h1>
-      <div class="seg" role="group" aria-label="Display as">
-        <button id="dispTable" aria-pressed="${DISPLAY==='table'?'true':'false'}">Table</button>
-        <button id="dispGrid" aria-pressed="${DISPLAY==='grid'?'true':'false'}">Grid</button>
-      </div>
+      <div class="seg" role="group" aria-label="Display as"><button id="dispTable" aria-pressed="${DISPLAY==='table'?'true':'false'}">Table</button><button id="dispGrid" aria-pressed="${DISPLAY==='grid'?'true':'false'}">Grid</button></div>
       <a class="lmake" id="makeImage" href="/visual-studio.html" title="Make an image with Visual Studio">Make an image</a>
       <button class="lbtn" id="refreshBtn" aria-label="Refresh" title="Refresh">↻</button>
+      ${S.canEdit&&DISPLAY==='grid'&&S.assets.length?`<button class="btn" id="selbtn">${S.selectMode?'Done':'Select'}</button>`:''}
+      ${S.canEdit?`<button class="btn primary" id="add">＋ Add files</button>`:''}
     </div>
     <div class="lmeta">${shown} file${shown===1?'':'s'}${(()=>{const n=(S.full||[]).filter(r=>r.client_private).length;return n?` · ${n} private to a client`:'';})()} · ${esc(updatedLabel())}${DISPLAY==='table'?` · Sorted by ${esc(sortCol[1])} — ${SORT.dir>0?'ascending':'descending'}`:''}</div>
     ${storageHtml()}
@@ -830,16 +893,11 @@ function render(){
   const qv=wasQ?act.value:null;const qp=wasQ?act.selectionStart:0;
   $('root').innerHTML=`
     <div class="layout">
-      <nav class="rail" id="rail" aria-label="Collections">${railHtml()}</nav>
       <div>
         ${lheadHtml(rows.length)}
         ${notice}
+        ${filtersHtml(`<div class="search">${svg(IC.search)}<input id="q" type="search" aria-label="${inFolder?'Search this folder':'Search files'}" placeholder="${inFolder?'Search this folder':'Search files — try “logo”'}" value="${esc(S.q)}" autocomplete="off"></div>`,'')}
         ${fbar}
-        <div class="bar">
-          <div class="search">${svg(IC.search)}<input id="q" type="search" aria-label="${inFolder?'Search this folder':'Search files'}" placeholder="${inFolder?'Search this folder':'Search files — try “logo”'}" value="${esc(S.q)}" autocomplete="off"></div>
-          ${S.canEdit&&DISPLAY==='grid'&&S.assets.length?`<button class="btn" id="selbtn">${S.selectMode?'Done':'Select'}</button>`:''}
-          ${S.canEdit?`<button class="btn primary" id="add">＋ Add files</button>`:''}
-        </div>
         <div class="drop" id="drop">Drop to upload</div>
         ${bulkBar()}
         ${nudge}
@@ -932,7 +990,9 @@ function tile(a){
   const ic=svg(a.kind==='document'?IC.doc:IC.photo);
   const t=a.thumb?`data-thumb="${esc(a.thumb)}" data-ic="${esc(ic)}" style="background-image:url('${esc(a.thumb)}')"`:'';
   const inner=a.thumb?'':ic;
-  const dotCls=a.in_use?'used':'un';const useTxt=a.in_use?'On your site':'Not on your site';
+  // bold redesign: a pill when it's on the site, the plain words when not (they say what was measured)
+  const who=a.client_id?`<div class="who"><i class="av" aria-hidden="true">${esc(initialsOf(clientLabel(a)))}</i><span>${esc(clientLabel(a))}</span></div>`:'';
+  const meta=`<div class="meta"><div class="nm" title="${esc(a.name)}">${esc(a.name)}</div><div class="use">${a.in_use?'<span class="pill good">On your site</span>':'Not on your site'}${a.brand?'<span class="pill brand">Brand</span>':''}</div>${who}</div>`;
   // the Pending badge obeys the SAME honesty rule as the table's Status column
   // (stateShown) — otherwise Grid and Table would contradict each other about
   // the same file the moment a 'pending' row existed
@@ -942,13 +1002,13 @@ function tile(a){
     return `<div class="tile ${sel?'sel':''}" data-pick="${a.id}" role="button" tabindex="0" aria-pressed="${sel?'true':'false'}" aria-label="${sel?'Deselect':'Select'} ${esc(a.name)}">
       <div class="check">${sel?svg(IC.check):''}</div>
       <div class="thumb" ${t}>${inner}</div>${badge}
-      <div class="meta"><div class="nm" title="${esc(a.name)}">${esc(a.name)}</div><div class="use"><span class="dot ${dotCls}"></span>${useTxt}</div></div>
+      ${meta}
     </div>`;
   }
   const star=S.canEdit?`<button class="star" data-fav="${a.id}" title="Favorite">${svg(a.favorite?IC.star:IC.starO)}</button>`:'';
   return `<div class="tile" data-open="${a.id}" role="button" tabindex="0" aria-label="Open ${esc(a.name)}">
     <div class="thumb" ${t}>${inner}</div>${badge}${star}
-    <div class="meta"><div class="nm" title="${esc(a.name)}">${esc(a.name)}</div><div class="use"><span class="dot ${dotCls}"></span>${useTxt}</div></div>
+    ${meta}
   </div>`;
 }
 function wire(){

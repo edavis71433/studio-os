@@ -59,8 +59,9 @@ test.describe('Files (the DAM, customer-facing)', () => {
     await expect(page.getByRole('heading', { level: 1, name: 'Files' })).toBeVisible();
     await expect(page.locator('.lhead .lmeta')).toContainText('2 files · Updated just now');
     await expect(page.locator('#refreshBtn')).toBeVisible();
-    await expect(page.locator('.rail')).toContainText('All files');
-    await expect(page.locator('.rail')).toContainText('Documents');
+    // bold redesign: the kinds sit in one row beside the search (#filters), folders and clients in the strip (.rail)
+    await expect(page.locator('#filters')).toContainText('All files');
+    await expect(page.locator('#filters')).toContainText('Documents');
     await expect(page.locator('#root')).toContainText('Logo');
     expect(errors).toEqual([]);
   });
@@ -233,7 +234,7 @@ test.describe('Files (the DAM, customer-facing)', () => {
     await expect(rail.locator('[data-client="c2222222-2222-4222-8222-c22222222222"] .n')).toHaveText('1');
     await expect(rail.locator('[data-client="studio"] .n')).toHaveText('2');   // LOGO + CONTRACT: never delivered on a linked project
     // sorted by count, descending — the busiest client first
-    const labels = await rail.locator('[data-client]:not([data-client=""]):not([data-client="studio"]) span:not(.n)').allInnerTexts();
+    const labels = await rail.locator('[data-client]:not([data-client=""]):not([data-client="studio"]) .ft b').allInnerTexts();
     expect(labels).toEqual(['Rivera Builders', 'Poole Dental']);
   });
 
@@ -457,6 +458,7 @@ test.describe('Files (the DAM, customer-facing)', () => {
     });
     await page.goto('/files.html');
     await expect(page.locator('#root')).toContainText('Logo');
+    await page.locator('#moreFilters').click();            // bold redesign: Stock Library waits behind More filters
     await page.locator('[data-col="stock"]').click();     // the stock read departs (slow)
     await page.locator('[data-col="all"]').click();       // the user changes their mind
     await expect(page.locator('#root')).toContainText('Logo');
@@ -476,7 +478,7 @@ test.describe('Files (the DAM, customer-facing)', () => {
     await page.goto('/files.html');
     await expect(page.locator('#root')).toContainText('We couldn’t load your files just now.');
     await expect(page.locator('#root')).not.toContainText('Nothing here yet');   // failure ≠ empty
-    await expect(page.locator('.rail')).toContainText('All files');              // the rail stays
+    await expect(page.locator('#filters')).toContainText('All files');           // the filters stay
     await page.getByRole('button', { name: 'Try again' }).click();
     await expect(page.locator('#root')).toContainText('Logo');
     expect(listCalls).toBe(2);   // Try-again really refetched
@@ -500,8 +502,8 @@ test.describe('Files (the DAM, customer-facing)', () => {
       route.fulfill({ status: 502, contentType: 'application/json', body: JSON.stringify({ error: 'down' }) }));
     await page.goto('/files.html');
     await expect(page.locator('#root')).toContainText('We couldn’t load your files just now.');
-    await expect(page.locator('.rail')).toContainText('Templates');   // the rail itself stays
-    await expect(page.locator('#rail .n')).toHaveCount(0);            // but not a single count — zero would be a lie
+    await expect(page.locator('#filters')).toContainText('Templates');   // the filters themselves stay
+    await expect(page.locator('#filters .n')).toHaveCount(0);            // but not a single count — zero would be a lie
   });
 
   test('↻ refresh soft-fails: a failed refresh keeps the list (leads.html contract)', async ({ page }) => {
@@ -819,10 +821,11 @@ test.describe('Files — client-private files (0131)', () => {
     await expect(body.locator('tr')).toHaveCount(5);
     await expect(body).not.toContainText('Login credentials');
     await expect(page.locator('.lmeta')).toContainText('1 private to a client');
-    const rail = page.locator('.rail');
-    await expect(rail.locator('[data-col="all"] .n')).toHaveText('5');
-    await expect(rail.locator('[data-col="photos"] .n')).toHaveText('4');
-    await expect(rail.locator('[data-col="private"] .n')).toHaveText('1');
+    const filters = page.locator('#filters');
+    await expect(filters.locator('[data-col="all"] .n')).toHaveText('5');
+    await expect(filters.locator('[data-col="photos"] .n')).toHaveText('4');
+    await expect(filters.locator('[data-col="private"] .n')).toHaveText('1');
+    await page.locator('#moreFilters').click();   // bold redesign: Client-private waits behind More filters
     await page.locator('[data-col="private"]').click();
     await expect(body.locator('tr')).toHaveCount(1);
     await expect(body).toContainText('Login credentials');

@@ -15,6 +15,7 @@ test('a refused stock search says why, never "No photos match"', async ({ page }
   const said = 'The stock library’s key for Pexels isn’t being accepted, so no photos came back. Your studio can renew it.';
   await page.route('**/functions/v1/presence/stock/search**', (route) => route.fulfill({ status: 502, contentType: 'application/json', body: JSON.stringify({ error: 'provider_failed', provider: 'Pexels', message: said }) }));
   await page.goto('/files.html');
+  await page.getByRole('button', { name: 'More filters' }).click();   // bold redesign: Stock Library waits behind More filters
   await page.getByRole('button', { name: 'Stock Library' }).click();
   await expect(page.getByRole('status').filter({ hasText: said })).toBeVisible();
   await expect(page.getByText('No photos match that search.')).toHaveCount(0);
@@ -23,6 +24,7 @@ test('a refused stock search says why, never "No photos match"', async ({ page }
 test('…and a search that finds nothing still says so', async ({ page }) => {
   await installApp(page, { api: { ...API, '/stock/search': { data: { provider: 'Pexels', license: { name: 'Pexels License' }, images: [] } } } });
   await page.goto('/files.html');
+  await page.getByRole('button', { name: 'More filters' }).click();   // bold redesign: Stock Library waits behind More filters
   await page.getByRole('button', { name: 'Stock Library' }).click();
   await page.getByRole('searchbox', { name: 'Search stock photos' }).fill('zzzz');
   await page.keyboard.press('Enter');
