@@ -182,6 +182,8 @@ export function buildNav(c: NavContext): NavSection[] {
     if (f.hasWebsite) sections.push({ key: 'sites', label: 'Sites', items: [
       { key: 'sites', label: 'Sites', href: '/sites.html', desc: 'Every client’s website as a card: a live picture, its address, when it renews and who can edit.' },
       hid('domains', 'Domains', '/domains.html', 'Every domain your clients use: its status, where it’s registered, and when it expires.'),
+      // item 135: ⌘K "new site" opens the New site box (sites.html opens it on #new)
+      hid('new_site', 'New site', '/sites.html#new', 'Make a site from a business name and, if you like, a starter kit. Nobody is emailed until you invite the owner.'),
     ] });
   } else if (f.hasBusinessOS) {
     single('today', 'Today', '/today.html');
