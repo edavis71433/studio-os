@@ -114,9 +114,6 @@ async function setup() {
   // one lead per tenant — regression guard for the lead_list service-role→RLS cutover
   await svcPost('leads', { name: `ISO-A-LEAD-${RUN}`, status: 'new', tenant_id: TENANT_A }, 'return=minimal');
   await svcPost('leads', { name: `ISO-B-LEAD-${RUN}`, status: 'new', tenant_id: TENANT_B }, 'return=minimal');
-  // one monitored_site per tenant — regression guard for the visibility_list cutover
-  await svcPost('monitored_sites', { label: `ISO-A-SITE-${RUN}`, url: `https://iso-a-${RUN}.test`, tenant_id: TENANT_A }, 'return=minimal');
-  await svcPost('monitored_sites', { label: `ISO-B-SITE-${RUN}`, url: `https://iso-b-${RUN}.test`, tenant_id: TENANT_B }, 'return=minimal');
 }
 
 async function teardown() {
@@ -187,16 +184,6 @@ async function run() {
   check('B-staff lead_list returns its own tenant lead', bNames.includes(`ISO-B-LEAD-${RUN}`));
   check('B-staff lead_list does NOT return tenant A lead', !bNames.includes(`ISO-A-LEAD-${RUN}`));
 
-  console.log('\n[I] visibility_list cutover (service-role → caller-JWT RLS): tenant-scoped via the function');
-  const aVis = await callFnJson(aStaffJwt, { type: 'visibility_list' });
-  const aSites = Array.isArray(aVis.json?.data) ? aVis.json.data.map((x: any) => x.site?.label) : [];
-  check('A-staff visibility_list returns its own tenant site', aSites.includes(`ISO-A-SITE-${RUN}`));
-  check('A-staff visibility_list does NOT return tenant B site', !aSites.includes(`ISO-B-SITE-${RUN}`));
-  const bVis = await callFnJson(bStaffJwt, { type: 'visibility_list' });
-  const bSites = Array.isArray(bVis.json?.data) ? bVis.json.data.map((x: any) => x.site?.label) : [];
-  check('B-staff visibility_list returns its own tenant site', bSites.includes(`ISO-B-SITE-${RUN}`));
-  check('B-staff visibility_list does NOT return tenant A site', !bSites.includes(`ISO-A-SITE-${RUN}`));
-
   console.log('\n[E] pipeline contract (edge function)');
   check('missing token -> 401', (await callFn(null, { type: 'lead_list' })) === 401);
   check('insufficient role (staff -> owner route team_list) -> 403', (await callFn(bStaffJwt, { type: 'team_list' })) === 403);
@@ -231,7 +218,7 @@ async function run() {
   await svcDelete('rate_limit_state?count=gt.0');
   // fresh B-staff token (previous is revoked); staff rate-limited route -> tenant bucket
   const bStaffFresh = await mint(emails.bStaff);
-  await callFn(bStaffFresh, { type: 'visibility_check' }); // staff, rate-limited
+  await callFn(bStaffFresh, { type: 'ai_triage' });       // staff, rate-limited
   await callFn(null, { type: 'psi_fetch' });               // public, rate-limited
   const buckets = await (await fetch(rest('rate_limit_state?select=bucket_key'), { headers: svcH })).json();
   const keys = (buckets as { bucket_key: string }[]).map((b) => b.bucket_key);

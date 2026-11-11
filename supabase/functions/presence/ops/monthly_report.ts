@@ -174,7 +174,7 @@ const VISITS_PAGE = 1000, VISITS_PAGES = 50;   // every page or none (lib/db.ts 
 export async function loadReportData(site: SiteRow, win: { month: string; startIso: string; endIso: string; label: string }): Promise<ReportData> {
   const safe = async <T>(p: Promise<T>): Promise<T | null> => { try { return await p; } catch { return null; } };
   const [vq, enq, pq] = await Promise.all([
-    safe(svcPages(`presence_visits?site_id=eq.${site.id}&ts=gte.${win.startIso}&ts=lt.${win.endIso}&select=ts,kind,path,ref_host,utm_source,device,country,visitor_hash`, 'ts', VISITS_PAGE, VISITS_PAGES)),
+    safe(svcPages(`presence_visits?site_id=eq.${site.id}&ts=gte.${win.startIso}&ts=lt.${win.endIso}&kind=not.in.(button,leave)&select=ts,kind,path,ref_host,utm_source,device,country,visitor_hash`, 'ts', VISITS_PAGE, VISITS_PAGES)),
     safe(svcCount(`presence_form_submissions?site_id=eq.${site.id}&spam=is.false&created_at=gte.${win.startIso}&created_at=lt.${win.endIso}`)),
     safe(svc(`presence_publishes?site_id=eq.${site.id}&status=eq.live&created_at=gte.${win.startIso}&created_at=lt.${win.endIso}&select=created_at&limit=500`)),
   ]);

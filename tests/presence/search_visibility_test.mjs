@@ -170,6 +170,21 @@ const stubScan = () => {
   ok('check: a site that blocks the checker says so, nothing saved', status === 422 && j.error === 'blocked' && !w.inserted.length);
 }
 
+// list item 153: who the assistants named instead, and the websites the answers drew on
+{
+  const base = 'https://tools.example';
+  const tables = [
+    { title: 'Answers by AI', columns: [], rows: [['Claude', '1 of 5', '2 of 2', '–']] },
+    { title: 'Who AI recommends instead', columns: ['Business', 'Times named', 'Named by', 'Ranked above you'], rows: [['Rival Bistro', 4, 'Claude', 'Yes'], ['Corner Cafe', 2, 'Claude', 'No'], ['Third Spot', 1, 'Claude', 'No'], ['Fourth Place', 1, 'Claude', 'No']] },
+    { title: 'Sources AI used', columns: ['Source', 'Cited', 'Seen in search', 'Note'], rows: [['Yelp', 4, 6, 'Directory or review site'], ['marlow.example', 2, 3, 'Your website'], ['Tripadvisor', 1, 2, 'Directory or review site'], ['Eater', 1, 1, ''], ['Local Paper', 1, 1, ''], ['Never Used', 0, 3, '']] },
+  ];
+  const a = aiSummary({ id: 'a2', created_at: '2026-11-01', input: { business_name: 'Marlow', city: 'Pasadena' }, scores: { overall: 40, label: 'Fix now', pillars: [] }, findings: { tables } }, base);
+  ok('ai 153: the three most-named rivals, with how often', JSON.stringify(a.competitors) === JSON.stringify([{ name: 'Rival Bistro', times: 4 }, { name: 'Corner Cafe', times: 2 }, { name: 'Third Spot', times: 1 }]), JSON.stringify(a.competitors));
+  ok('ai 153: the four most-cited sources, the site\'s own marked, a source only seen in search left out', JSON.stringify(a.sources) === JSON.stringify([{ name: 'Yelp', cited: 4, own: false }, { name: 'marlow.example', cited: 2, own: true }, { name: 'Tripadvisor', cited: 1, own: false }, { name: 'Eater', cited: 1, own: false }]), JSON.stringify(a.sources));
+  const bare = aiSummary({ id: 'a3', created_at: '2026-11-01', input: {}, scores: { overall: 70 } }, base);
+  ok('ai 153: an older report without the tables → empty lists, the card still draws', Array.isArray(bare.competitors) && bare.competitors.length === 0 && bare.sources.length === 0 && bare.overall === 70);
+}
+
 const passed = results.filter((r) => r.p).length;
 console.log(`\n════ SEARCH TAB: ${passed}/${results.length} ${passed === results.length ? 'PASSED' : 'FAILED'} ════`);
 if (passed !== results.length) Deno.exit(1);
