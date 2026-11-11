@@ -3466,9 +3466,13 @@ function renderFoundations(f, plans, launch, dom) {
   const removeBtn = (label) => { const rm = el("button", "textact", label); rm.dataset.needs = "configure"; rm.style.opacity = "0.7"; rm.addEventListener("click", async () => { if (!(await askYes("Remove " + dstat.custom_domain + "? Your site goes back to its temporary address.", { ok: "Remove domain", danger: true }))) return; try { await api("DELETE", "/foundations/domain"); toast("Domain removed."); openFoundationsDesk(); } catch (err) { toast(nice(err), true); } }); return rm; };
 
   if (dstat && dstat.health === "ok") {
-    const p = el("p", "aihint", "✓ " + dstat.custom_domain + " is live and secure."); p.style.marginTop = "6px"; p.style.fontWeight = "600"; domCard.appendChild(p);
-    const apexD = String(dstat.custom_domain).replace(/^www\./, "");
-    const w = stepLine("Visitors reach you at both " + apexD + " and www." + apexD + " — either way works, and it’s always on https."); w.style.color = "var(--soft,#6b6478)"; domCard.appendChild(w);
+    // item 134 (Nov 2026 review, domains findings 3 and 5): "live and secure" only when every
+    // check passes (both names point here, nothing old left over, the padlock covers both, and
+    // the domain shows THIS site); otherwise say what's left. No checklist, no claim.
+    const lines = Array.isArray(dstat.checklist) ? dstat.checklist : null;
+    const allOk = !lines || dstat.all_ok === true;
+    const p = el("p", "aihint", allOk ? "✓ " + dstat.custom_domain + " is live and secure." : dstat.custom_domain + " is connected, with something left to finish:"); p.style.marginTop = "6px"; p.style.fontWeight = "600"; domCard.appendChild(p);
+    if (lines) lines.forEach((c) => { const l = stepLine((c.ok ? "✓ " : "• ") + String(c.words || "")); l.dataset.check = c.ok ? "ok" : "todo"; if (c.ok) l.style.color = "var(--soft,#6b6478)"; domCard.appendChild(l); });
     const rm = removeBtn("Remove this domain"); rm.style.marginTop = "8px"; domCard.appendChild(rm);
   } else if (dstat) {
     // Attached — walk them through the two records; it goes live on its own after.
@@ -5437,8 +5441,10 @@ function renderDomainCard() {
     card.appendChild(askOwner("note", "Ask the account owner to connect it."));
     btn.dataset.needs = "configure"; btn.textContent = "Connect your domain"; btn.addEventListener("click", () => openFoundationsDesk({ domain: true }));
   } else if (d.health === "ok") {
-    card.appendChild(el("div", "note", "✓ " + d.custom_domain + " is live and secure."));
-    btn.textContent = "Domain & email"; btn.addEventListener("click", () => openFoundationsDesk());
+    // item 134: the same rule as the desk — "live and secure" only when every check passes
+    const left = Array.isArray(d.checklist) ? d.checklist.filter((c) => c && !c.ok) : [];
+    card.appendChild(el("div", "note", left.length ? d.custom_domain + " is connected. Still to finish: " + left.map((c) => String(c.words || "")).join("; ") + "." : "✓ " + d.custom_domain + " is live and secure."));
+    btn.textContent = left.length ? "See what’s left" : "Domain & email"; btn.addEventListener("click", () => openFoundationsDesk());
   } else {
     card.appendChild(el("div", "note", d.health === "ssl_pending"
       ? d.custom_domain + " is connected — the security certificate is switching on. Nothing for you to do."
