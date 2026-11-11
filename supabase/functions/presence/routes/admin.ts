@@ -28,7 +28,7 @@ import {
 } from '../lib/netlify.ts';
 import { computeReadiness } from './monitor.ts';
 import { applyPlan } from './foundations.ts';
-import { NETLIFY_APEX_IP } from '../platform/dns.ts';
+import { domainHealth } from '../lib/domain_health.ts';
 import { describeEngine } from '../optimization/engine.ts';
 import { computeHealthCenter } from './system.ts';
 import { inventory as connInventory, inventorySummary as connInventorySummary } from '../connected/inventory.ts';
@@ -180,53 +180,19 @@ async function handleList(cors: Record<string, string>) {
 }
 
 // ═══ 3. DOMAIN OPERATIONS ═════════════════════════════════════════════════════
-// DNS is checked via DNS-over-HTTPS (Google resolver): a CNAME to the site's
-// netlify.app hostname, or the Netlify apex load-balancer A record.
-// Sourced from the ONE authoritative constant (platform/dns.ts) — never a second
-// literal, so an apex-IP change is a one-line edit in exactly one place.
-const NETLIFY_APEX_IPS = new Set([NETLIFY_APEX_IP]);
-
-async function dnsLookup(name: string, type: 'A' | 'CNAME'): Promise<string[]> {
-  try {
-    const r = await fetch(`https://dns.google/resolve?name=${encodeURIComponent(name)}&type=${type}`, { headers: { Accept: 'application/json' } });
-    if (!r.ok) return [];
-    const j = await r.json();
-    return Array.isArray(j.Answer) ? j.Answer.map((a: any) => String(a.data || '').replace(/\.$/, '').toLowerCase()) : [];
-  } catch { return []; }
-}
-
-async function domainStatus(site: { custom_domain: string | null; netlify_site_id: string | null }) {
-  if (!site.custom_domain) {
-    const nf = site.netlify_site_id ? await getSite(site.netlify_site_id) : { ok: false as const, site: undefined };
-    return {
-      custom_domain: null, health: 'no_domain',
-      message: 'No custom domain attached — the site serves from its netlify.app address.',
-      netlify_subdomain: nf.ok && nf.site ? nf.site.default_domain : null,
-      dns: null, ssl: null,
-    };
-  }
-  const nf = site.netlify_site_id ? await getSite(site.netlify_site_id) : { ok: false as const, site: undefined };
-  const target = nf.ok && nf.site ? nf.site.default_domain.toLowerCase() : null;
-  const cnames = await dnsLookup(site.custom_domain, 'CNAME');
-  const aRecords = await dnsLookup(site.custom_domain, 'A');
-  const dnsOk = (target !== null && cnames.includes(target)) || aRecords.some((ip) => NETLIFY_APEX_IPS.has(ip));
-  const ssl = site.netlify_site_id ? await sslStatus(site.netlify_site_id) : { ok: false, state: 'unknown', expires_at: null };
-  const sslOk = ssl.state === 'issued' || ssl.state === 'renewed';
-  const health = !dnsOk ? 'dns_pending' : !sslOk ? 'ssl_pending' : 'ok';
-  const message =
-    health === 'ok' ? 'Domain is healthy: DNS points at the site and the certificate is active.'
-    : health === 'ssl_pending' ? 'DNS is correct; the HTTPS certificate is still being issued (usually minutes, up to an hour).'
-    : `DNS does not point at the site yet. Set a CNAME for ${site.custom_domain} to ${target ?? '<site>.netlify.app'}${aRecords.length ? ` (currently resolves to ${aRecords.join(', ')})` : ' (currently no record found)'}.`;
-  return {
-    custom_domain: site.custom_domain, health, message,
-    netlify_subdomain: target,
-    dns: { ok: dnsOk, cname: cnames, a: aRecords, expected_cname: target, expected_apex_ip: [...NETLIFY_APEX_IPS] },
-    ssl: { state: ssl.state, expires_at: ssl.expires_at },
-  };
-}
+// DNS and the padlock are checked by lib/domain_health.ts, shared with the daily
+// domain watch (commerce/lifecycle.ts) since the Nov 2026 review (item 134).
+const domainStatus = domainHealth;
 
 export async function handleDomain(req: Request, method: string, site: SiteRow, principal: Principal, cors: Record<string, string>) {
-  if (method === 'GET') return json({ data: await domainStatus(site) }, 200, cors);
+  if (method === 'GET') {
+    const st = await domainStatus(site);
+    // review finding 4 (item 134): the padlock used to be asked for once, when the domain was
+    // attached and before the client had changed anything. "Check if it's ready" asks again
+    // whenever the records are right and the padlock still isn't on (Netlify: safe to repeat).
+    if (st.health === 'ssl_pending' && site.netlify_site_id) await provisionSsl(site.netlify_site_id).catch(() => null);
+    return json({ data: st }, 200, cors);
+  }
   if (!site.netlify_site_id) return json({ error: 'not_provisioned', message: 'Provision hosting for this site before managing domains.' }, 409, cors);
 
   if (method === 'POST') {

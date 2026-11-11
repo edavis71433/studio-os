@@ -352,10 +352,10 @@ test.describe('Sites (builder list items 43 and 45)', () => {
 // ── Domains (item 52) ──
 const DOMAINS = { data: {
   domains: [
-    { domain: 'gone.example', site_id: 's9', name: 'Gone Deli', own: false, status: 'expired', status_words: 'Expired 2 days ago', tone: 'bad', days_left: -2, provider: 'Registrar A', expires_at: '2026-11-06T00:00:00Z', checked_at: '2026-11-08T00:00:00Z', hosted: true },
-    { domain: 'bistro.example', site_id: 's1', name: 'Bistro Nine', own: false, status: 'expiring', status_words: 'Expires in 12 days', tone: 'warn', days_left: 12, provider: 'Registrar B', expires_at: '2026-11-20T00:00:00Z', checked_at: '2026-11-08T00:00:00Z', hosted: true },
-    { domain: 'garage.example', site_id: 's2', name: 'Garage Ten', own: false, status: 'elsewhere', status_words: 'On their own host', tone: 'quiet', days_left: null, provider: '', expires_at: null, checked_at: null, hosted: false },
-    { domain: 'mystudio.example', site_id: 'own', name: 'Bright Studio', own: true, status: 'connected', status_words: 'Connected', tone: 'good', days_left: 200, provider: 'Registrar C', expires_at: '2027-05-27T00:00:00Z', checked_at: '2026-11-08T00:00:00Z', hosted: true },
+    { domain: 'gone.example', site_id: 's9', name: 'Gone Deli', own: false, status: 'expired', status_words: 'Expired 2 days ago', tone: 'bad', days_left: -2, provider: 'Registrar A', expires_at: '2026-11-06T00:00:00Z', checked_at: '2026-11-08T00:00:00Z', record: 'ok', padlock_until: null, hosted: true },
+    { domain: 'bistro.example', site_id: 's1', name: 'Bistro Nine', own: false, status: 'expiring', status_words: 'Expires in 12 days', tone: 'warn', days_left: 12, provider: 'Registrar B', expires_at: '2026-11-20T00:00:00Z', checked_at: '2026-11-08T00:00:00Z', record: 'ok', padlock_until: '2027-01-15T00:00:00Z', hosted: true },
+    { domain: 'garage.example', site_id: 's2', name: 'Garage Ten', own: false, status: 'elsewhere', status_words: 'On their own host', tone: 'quiet', days_left: null, provider: '', expires_at: null, checked_at: null, record: 'ok', padlock_until: null, hosted: false },
+    { domain: 'mystudio.example', site_id: 'own', name: 'Bright Studio', own: true, status: 'connected', status_words: 'Connected', tone: 'good', days_left: 200, provider: 'Registrar C', expires_at: '2027-05-27T00:00:00Z', checked_at: '2026-11-08T00:00:00Z', record: 'ok', padlock_until: '2027-03-01T00:00:00Z', hosted: true },
   ],
   builtin: [{ address: 'presence-cccccccccccc.netlify.app', site_id: 's3', name: 'Cafe Eleven', own: false }],
 }, partial: false };
@@ -445,5 +445,25 @@ test.describe('Sites: the bug hunt fixes (A1, A10)', () => {
     await expect(done).toContainText('Site duplicated');
     await expect(done.locator('#dup-again')).toHaveCount(0);
     expect(t.writes.map((w) => `${w.method} ${w.path}`)).toEqual(['POST /sales/customers', 'POST /agency/sites/s1/duplicate']);   // the customer once; the copy that got through once
+  });
+});
+
+// ── Nov 10 review, builder list items 132 and 134: the Domains page tells the truth ──
+test.describe('Domains: the padlock and an unreadable record (items 132, 134)', () => {
+  test('a Padlock until column, a stuck padlock in the status, and "couldn’t read this domain’s record" instead of "Not known yet"', async ({ page }) => {
+    const data = JSON.parse(JSON.stringify(DOMAINS)) as typeof DOMAINS;
+    data.data.domains.push({ domain: 'www.oldhost.example', site_id: 's7', name: 'Old Host Bakery', own: false, status: 'padlock', status_words: 'Padlock not on yet', tone: 'warn', days_left: null, provider: '', expires_at: null, checked_at: '2026-11-08T00:00:00Z', record: 'unreadable', padlock_until: null, hosted: true } as never);
+    await installApp(page, { api: { '/portal/context': studioContext, '/agency/domains': data } });
+    await page.goto('/domains.html');
+    const table = page.locator('table[aria-label="Domains"]');
+    await expect(table.locator('thead th')).toHaveText(['Domain', 'Site', 'Status', 'Provider', 'Expires', 'Padlock until', ''].map((t) => new RegExp('^' + t)));
+    const row = (d: string) => table.locator(`tbody tr[data-domain="${d}"]`);
+    await expect(row('bistro.example').locator('td').nth(5)).toContainText('Jan 15, 2027');
+    await expect(row('garage.example').locator('td').nth(5)).toHaveText('Their host’s');
+    await expect(row('www.oldhost.example').locator('.pill')).toHaveText('Padlock not on yet');
+    await expect(row('www.oldhost.example').locator('td').nth(3)).toHaveText('Couldn’t read it');
+    await expect(row('www.oldhost.example').locator('td').nth(4)).toContainText('Couldn’t read this domain’s record');
+    await expect(page.locator('.how')).toContainText('at 30, 15, 7 and 1 days and the day after it expires');
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true);
   });
 });
