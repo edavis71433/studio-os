@@ -47,6 +47,7 @@ const { handleBroadcastListDelete } = await import(`${P}/routes/broadcasts.ts`);
 const { handleSalesStages } = await import(`${P}/routes/sales.ts`);
 const { handleCalendarLink } = await import(`${P}/routes/calendar.ts`);
 const { handleEmailLogAddress } = await import(`${P}/routes/email_log.ts`);
+const { handleReviewGoogleLink } = await import(`${P}/routes/reviews.ts`);   // sales review item 115
 const { handleEstimateDelete } = await import(`${P}/routes/estimates.ts`);   // sales review item 47
 const { handleProspect } = await import(`${P}/routes/prospects.ts`);   // sales review item 112
 const { handleRecurringAction } = await import(`${P}/routes/recurring_invoices.ts`);
@@ -148,6 +149,7 @@ const DECIDED = {
     'PUT /sales/contacts/fields', 'PUT /sales/stages', 'POST /calendar/link', 'DELETE /calendar/link',
     'POST /email/log-address', 'DELETE /email/log-address',
     'PUT /report/monthly', 'POST /report/monthly/preview',   // builder list item 58
+    'POST /reviews/google-link',   // sales review item 115: where Google review requests send people is a setting
   ],
   approve: [
     'POST /approvals/:id/decide', 'POST /assets/:id/status', 'POST /client/approvals/:id/decide',
@@ -236,7 +238,7 @@ const ALL = Object.entries(DECIDED).flatMap(([need, names]) => names.map((name) 
   ok('decided: removing a draft estimate is delete; sending one and turning it into a draft proposal or invoice is edit', has('delete', 'DELETE /sales/estimates/:id') && has('edit', 'POST /sales/estimates/:id/send', 'POST /sales/estimates/:id/proposal', 'POST /sales/estimates/:id/invoice'));
   ok('decided: staff can still send what they can\'t withdraw', has('edit', 'POST /sales/deals/:id/invoice', 'POST /sales/invoices/:id/send') && has('publish', 'POST /broadcasts/:id/send'));
 
-  const CONTENT = [['PUT', '/identity'], ['PUT', '/location'], ['PUT', '/settings'], ['PUT', '/brand/profile'], ['POST', '/pages/duplicate'], ['POST', '/offerings'], ['PUT', `/posts/${ROW}`], ['DELETE', `/faqs/${ROW}`]];
+  const CONTENT = [['PUT', '/identity'], ['PUT', '/location'], ['PUT', '/settings'], ['PUT', '/brand/profile'], ['POST', '/pages/duplicate'], ['POST', `/pages/deleted/${ROW}/restore`], ['POST', '/offerings'], ['PUT', `/posts/${ROW}`], ['DELETE', `/faqs/${ROW}`]];
   ok('list: the content routes answer from contentWriteNeeds, and only there', CONTENT.every(([m, r]) => contentWriteNeeds(r, m) !== null && memberWriteNeeds(r, m) === null));
   ok('list: nothing here is on the content path', ALL.every(({ name }) => contentWriteNeeds(pathOf(name), methodOf(name)) === null));
   ok('list: a read is not its business', memberWriteNeeds('/media', 'GET') === null && memberWriteNeeds('/export', 'GET') === null);
@@ -315,6 +317,7 @@ const CHANGED = [
   { name: 'DELETE /calendar/link', run: (r, p) => handleCalendarLink(r, A, p, cors) },
   { name: 'POST /email/log-address', run: (r, p) => handleEmailLogAddress(r, A, p, cors) },     // sales review item 69
   { name: 'DELETE /email/log-address', run: (r, p) => handleEmailLogAddress(r, A, p, cors) },
+  { name: 'POST /reviews/google-link', body: { place_id: 'ChIJTestPlace_1234' }, run: (r, p) => handleReviewGoogleLink(r, A, p, cors) },     // sales review item 115
   { name: 'PUT /report/monthly', body: { note: 'A line for the client' }, run: (r, p) => handleReportPut(r, A, p, cors) },     // builder list item 58 (a line, not the switch: this stub answers every read with a row, which reads as a do-not-send entry)
   { name: 'POST /report/monthly/preview', fx: { only: ['clients'] }, run: (r, p) => handleReportPreview(A, p, cors) },   // with every read answering a row the address reads as suppressed; the send is the write
   { name: 'POST /site/offline', run: (r, p) => handleTakeOffline(A, p, cors) },
@@ -431,7 +434,7 @@ const WRITE_HANDLERS = [
   'handleMediaUpdate', 'handleMediaUpload', 'handleMemberAdd', 'handleMemberRevoke', 'handleMessages',
   'handleMilestone', 'handleMilestonesCreate', 'handleMomentDismiss', 'handleMonitorConnect',
   'handleMonitorDisconnect', 'handleMonitorVerify', 'handleNoteResolve', 'handleNotificationsRead',
-  'handlePageDuplicate', 'handlePageLockCreate', 'handlePreviewPromote', 'handlePreviewPublish', 'handlePreviewSection', 'handlePreviewSettings',
+  'handlePageDuplicate', 'handleDeletedPageRestore', 'handlePageLockCreate', 'handlePreviewPromote', 'handlePreviewPublish', 'handlePreviewSection', 'handlePreviewSettings',   // item 154: putting a deleted page back is an edit (contentWriteNeeds)
   'handlePreviewShareLink', 'handleProject', 'handleProjectChecklist', 'handleProjectStatus', 'handleProjectSurveys',
   'handleProjects', 'handlePublish', 'handlePutIdentity', 'handlePutTemplate', 'handleRedirectCreate',
   'handleRedirectDelete', 'handleRestore', 'handleRestoreToDraft', 'handleReviewApprove', 'handleReviewDismiss',
@@ -446,6 +449,7 @@ const WRITE_HANDLERS = [
   'handleCalendarLink',   // sales review item 46: POST and DELETE /calendar/link need configure
   'handleEmailLogAddress',   // sales review item 69: POST and DELETE /email/log-address need configure
   'handleReportPut', 'handleReportPreview',   // builder list item 58: PUT /report/monthly and its preview need configure
+  'handleReviewGoogleLink',   // sales review item 115: POST /reviews/google-link needs configure
   // sales review item 47: estimates and recurring invoices (see DECIDED.edit and .delete)
   'handleEstimateCreate', 'handleEstimateSend', 'handleEstimateToProposal', 'handleEstimateToInvoice', 'handleEstimateDelete',
   'handleRecurringStart', 'handleRecurringChange', 'handleRecurringAction',

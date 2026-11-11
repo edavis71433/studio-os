@@ -27,6 +27,7 @@ import { readGsc, readSearchTerms } from './analytics.ts';
 import { aggregateVisits, type VisitRow } from '../lib/visits.ts';
 import { dashRange, weeklyVisitors, sourceShares, DASH_WEEKS } from '../lib/analytics_dashboard.ts';
 import type { SiteRow } from '../lib/site.ts';
+import { siteOrigin } from '../lib/site.ts';
 import type { Principal } from '../../_shared/auth.ts';
 import { UUID_RE } from '../lib/uuid.ts';
 import { quotedTo, peopleOf, offeredTo } from '../lib/portal_services.ts';
@@ -880,7 +881,33 @@ export async function handleClientWebsiteStats(_req: Request, site: SiteRow, _pr
       top_terms: (terms?.queries || []).map((q: any) => ({ term: String(q.key || ''), clicks: Number(q.clicks) || 0, impressions: Number(q.impressions) || 0 })),   // ≤5
     };
   }
-  return json({ data: { published: true, month, search } }, 200, cors);
+  // item 179: the card leads Home now, so it also carries the site's own facts —
+  // the live address (siteOrigin: the custom domain, else the hosted name) and
+  // when it last went live. Nothing here is a stat; a failed stats read above
+  // still leaves the portal an honest picture-and-link card.
+  return json({ data: { published: true, month, search, site: { url: siteOrigin(site) || null, last_published_at: site.last_published_at || null } } }, 200, cors);
+}
+
+// ═══ WEBSITE PICTURE (item 179) — the portal Home card's picture of the site ═══
+// The client's OWN site drawn by the one renderer publish uses (agency/sites.ts
+// renderThumb — the same picture the studio's Sites card shows), never a
+// third-party screenshot service: published sites refuse to be framed, and a
+// screenshot service would be handed the client's address. Same scope story as
+// website-stats above: the subject is the caller's own site, no bridge link
+// needed. The import is dynamic so the client route group stays light — the
+// renderer pulls in the template machinery, which only this route needs here.
+export async function handleClientWebsiteThumb(_req: Request, site: SiteRow, _principal: Principal, cors: Record<string, string>): Promise<Response> {
+  if (site.edition === 'monitor') return json({ error: 'hosted_elsewhere', message: 'This site lives on its own host.' }, 404, cors);
+  try {
+    const { renderThumb, THUMB_MAX_CHARS } = await import('../agency/sites.ts');
+    const t = await renderThumb(site);
+    if (!t) return json({ error: 'nothing_to_draw', message: 'There’s nothing to draw yet.' }, 404, cors);
+    if (t.html.length > THUMB_MAX_CHARS) return json({ error: 'too_big', message: 'This page is too big to draw small.' }, 422, cors);
+    return json({ data: t }, 200, { ...cors, 'Cache-Control': 'no-store' });   // the photo links expire in ten minutes
+  } catch (e) {
+    console.error('portal website thumb failed:', (e as Error)?.message);
+    return json({ error: 'render_failed', message: 'We couldn’t draw your site just now.' }, 500, cors);
+  }
 }
 
 // ═══ STUDIO ROSTER (operator side): THIS studio's customers ═══
