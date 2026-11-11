@@ -9,7 +9,7 @@
 //   db.writes('presence_sales_templates')      // what it wrote
 //
 // It understands the filters the presence function uses: eq / neq / is /
-// in.(…) / like / ilike / gte / lte / gt / lt, not.<op>, or=(…) with quoted
+// in.(…) / like / ilike / gte / lte / gt / lt / cs.{…} (array contains), not.<op>, or=(…) with quoted
 // values, and a jsonb path column (detail->>key); select is ignored (whole rows
 // come back); order (every key, in turn), offset and limit apply. POST honours on_conflict + Prefer resolution=ignore|merge-
 // duplicates, and the `unique` keys (with an optional row predicate, for a
@@ -34,7 +34,7 @@ export function installFakePostgrest(opts = {}) {
   // and a backslash makes the next character itself ("jane\\_doe" is a literal underscore)
   const likeRe = (p, flags) => { let re = ''; const t = String(p); for (let i = 0; i < t.length; i++) { const ch = t[i]; if (ch === '\\' && i + 1 < t.length) { re += t[++i].replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); continue; } if (ch === '%' || ch === '*') re += '.*'; else if (ch === '_') re += '.'; else re += ch.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); } return new RegExp('^' + re + '$', flags); };
   const test = (row, col, expr) => {
-    const m = /^(not\.)?(eq|neq|is|in|like|ilike|gte|lte|gt|lt)\.(.*)$/s.exec(expr);
+    const m = /^(not\.)?(eq|neq|is|in|like|ilike|gte|lte|gt|lt|cs)\.(.*)$/s.exec(expr);
     if (!m) return true;
     // a JSON path (detail->>message_id) reads inside a jsonb column, as text, like PostgREST
     const [, not, op, raw] = m; const jp = /^(\w+)->>(\w+)$/.exec(col); const v = jp ? (row[jp[1]] && typeof row[jp[1]] === 'object' && row[jp[1]][jp[2]] != null ? String(row[jp[1]][jp[2]]) : null) : row[col]; let r;
@@ -44,6 +44,8 @@ export function installFakePostgrest(opts = {}) {
     else if (op === 'in') r = splitTop(raw.replace(/^\(|\)$/g, '')).map(unq).includes(String(v));
     else if (op === 'like') r = v != null && likeRe(unq(raw), 's').test(String(v));
     else if (op === 'ilike') r = v != null && likeRe(unq(raw), 'is').test(String(v));
+    // cs.{a,"b c"}: an array column holding every one of those values (tags @> '{a,b c}')
+    else if (op === 'cs') { const want = splitTop(raw.replace(/^\{|\}$/g, '')).map(unq).filter((x) => x !== ''); r = Array.isArray(v) && want.every((w) => v.map(String).includes(w)); }
     else if (op === 'gte') r = String(v ?? '') >= unq(raw); else if (op === 'lte') r = String(v ?? '') <= unq(raw);
     else if (op === 'gt') r = String(v ?? '') > unq(raw); else r = String(v ?? '') < unq(raw);
     return not ? !r : r;

@@ -120,6 +120,9 @@ test.describe('Contacts — editing a contact from the row', () => {
     expect(patched).toEqual({
       name: 'Marigold Smyth', email: 'marigold@example.com', phone: '(310) 555-0134', company: 'Smyth & Co',
       custom: { referred_by: 'Referral from Jordan' },
+      // item 89: the job title, second phone, address and tags save with the rest (empty here), and
+      // "How did they find you?" too, once the record's own read has said what it is
+      phone2: '', job_title: '', address: { street: '', city: '', state: '', zip: '' }, tags: [], found_via: '',
     });
     // it PERSISTS: the roster reloads and reads back the saved name
     await expect(page.locator('tbody')).toContainText('Marigold Smyth');
