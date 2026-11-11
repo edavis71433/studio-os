@@ -43,14 +43,14 @@ import { handleProjects, handleProject, handleProjectReport, handleProjectsProgr
 import { handleDeliverableUploadUrl, handleDeliverablesCreate, handleDeliverable, handleDeliverableDownload, handleApprovalsCreate, handleApprovalDecide } from './routes/project_delivery.ts';
 import { handleMessages, handleNotifications, handleNotificationsRead, handleProjectClientMessages, handleThreadRead } from './routes/project_comms.ts';
 import { handleProjectSurveys, handleSurvey, handleSurveyRespond, handleSupport, handleSupportOne, handleSupportMessage } from './routes/service_intake.ts';
-import { handleClientProjects, handleClientProject, handleClientReport, handleClientMessages, handleClientDeliverableDownload, handleClientApprovalDecide, handleClientSurvey, handleClientSurveyRespond, handleClientNotifications, handleClientNotificationsRead, handleClientSupport, handleClientSupportOne, handleClientSupportMessage, handleClientBilling, handleClientDocuments, handleClientBook, handleClientTaskDone, handleClientUploadUrl, handleClientUploadCreate, handleClientServices, handleClientWebsiteStats, handleStudioCustomers } from './routes/client_delivery.ts';
+import { handleClientProjects, handleClientProject, handleClientReport, handleClientMessages, handleClientDeliverableDownload, handleClientApprovalDecide, handleClientSurvey, handleClientSurveyRespond, handleClientNotifications, handleClientNotificationsRead, handleClientSupport, handleClientSupportOne, handleClientSupportMessage, handleClientBilling, handleClientDocuments, handleClientBook, handleClientTaskDone, handleClientUploadUrl, handleClientUploadCreate, handleClientServices, handleClientWebsiteStats, handleClientWebsiteThumb, handleStudioCustomers } from './routes/client_delivery.ts';
 import { handleSavedReplies, handleFaqAdmin, handleClientFaq } from './routes/service_edges.ts';
 import { handlePublish, handleRestore, handlePublishHistory, handleVersionLabel, handleCompareVersions, handleTimewarp, handleCheckpointList, handleCheckpointSave, handleCheckpointRestore, handleCheckpointDelete, handleTakeOffline, handleBackOnline } from './routes/publish.ts';
 const { handleLaunchList, handleLaunchCreate, handleLaunchGet, handleLaunchRecapture, handleLaunchDecide, handleLaunchSchedule, handleLaunchPromote, handleLaunchRollback, handleLaunchCancel } = lazyRoutes(() => import('./routes/launches.ts'));
 import { handleMediaUpload, handleMediaUpdate, handleMediaDelete } from './routes/media.ts';
 import { handleAssetsList, handleAssetsCollections, handleAssetsHealth, handleAssetsBulk, handleAssetsMatch, handleAssetsFolderMove, handleAssetUpdate, handleAssetStatus, handleAssetDelete, handleAssetDetail, handleAssetDownload, handleAssetReplace, handleAssetRollback, handleAssetDuplicate, handleAssetSuggest, handleAssetSocial, handleAssetCards, handleAssetRemoveBackground, handleAssetCutout, handleCutoutJob } from './routes/assets.ts';
 const { handleVisualKinds, handleVisualGenerate, handleVisualList, handleVisualGet, handleVisualVary, handleVisualEdit, handleVisualDecide } = lazyRoutes(() => import('./routes/visual.ts'));
-const { handleAdmin, handleDomain } = lazyRoutes(() => import('./routes/admin.ts'));
+const { handleAdmin, handleDomain, handleDomainLookup } = lazyRoutes(() => import('./routes/admin.ts'));
 import { handleCollection, handleLocation, handleSettings, handleBlockSuggestions, handlePageDuplicate, handlePageRefs, SPECS } from './routes/content.ts';
 import { handleDeletedPages, handleDeletedPageRestore } from './routes/deleted_pages.ts';
 import { handlePageLockCreate, handlePageLockList } from './routes/page_locks.ts';
@@ -72,7 +72,7 @@ import { handleEmailLogAddress } from './routes/email_log.ts';   // sales review
 const { handleBroadcastsList, handleBroadcastCreate, handleBroadcastListCreate, handleBroadcastListDelete, handleBroadcastSegments, handleBroadcastGet, handleBroadcastUpdate, handleBroadcastSend, handleBroadcastCancel, handleBroadcastDraftAssist, handleBroadcastTest } = lazyRoutes(() => import('./routes/broadcasts.ts'));
 import { handleScheduleCreate, handleScheduleList, handleScheduleCancel, handleFormSubmit, handleFormInbox, handleFormStatus, handleFormReply, handleApproveSend, handleApproveGet, handleApprovePost } from './routes/commercial.ts';
 const { handleBookingTypes, handleBookingSlots, handleBookingCreate, handleBookingSettingsGet, handleBookingSettingsPut, handleBookingTypesList, handleBookingTypeCreate, handleBookingTypeUpdate, handleBookingTypeDelete, handleBookingAppointments, handleBookingConfirm, handleBookingCancel, handleBookingMark } = lazyRoutes(() => import('./routes/booking.ts'));
-const { handleReviewPage, handleReviewSubmit, handleReviewsList, handleReviewApprove, handleReviewHide, handleReviewReply, handleReviewRequest } = lazyRoutes(() => import('./routes/reviews.ts'));
+const { handleReviewPage, handleReviewSubmit, handleReviewsList, handleReviewApprove, handleReviewHide, handleReviewReply, handleReviewRequest, handleReviewGoogleLink } = lazyRoutes(() => import('./routes/reviews.ts'));
 const { handleCommentsList, handleCommentCreate, handleCommentResolve, handleCommentDelete, handleTokenSections, handleTokenComment } = lazyRoutes(() => import('./routes/comments.ts'));
 import { resolveMemberSite, resolveSiteRoleCached } from './lib/workspace.ts';
 const { handleConciergeAsk } = lazyRoutes(() => import('./routes/concierge.ts'));
@@ -762,6 +762,16 @@ async function route_(req: Request, cors: Record<string, string>): Promise<Respo
     pm = route.match(/^\/sales\/prospects\/([0-9a-f-]{36})\/pack$/);   // item 113: build the next piece of the pitch pack
     if (pm && method === 'POST') return (await import('./routes/pitch_pack.ts')).handleProspectPack(req, site, principal, pm[1], cors);
   }
+  // ── Free-tool leads (sales item 114): Site Review / AI Visibility requests on the Prospects page.
+  //    Staff-only inside each handler — audit_leads is platform-level, never a client site's. ──
+  if (route.startsWith('/sales/tool-leads')) {
+    const px = await import('./routes/prospects.ts');
+    if (route === '/sales/tool-leads' && method === 'GET') return px.handleToolLeads(site, principal, cors);
+    let tl = route.match(/^\/sales\/tool-leads\/([0-9a-f-]{36})$/);
+    if (tl && method === 'PATCH') return px.handleToolLead(req, site, principal, tl[1], cors);
+    tl = route.match(/^\/sales\/tool-leads\/([0-9a-f-]{36})\/convert$/);
+    if (tl && method === 'POST') return px.handleToolLeadConvert(req, site, principal, tl[1], cors);
+  }
   if (route === '/email/log-address' && (method === 'GET' || method === 'POST' || method === 'DELETE')) return handleEmailLogAddress(req, site, principal, cors);   // sales review item 69: BCC to log   // sales review item 69: which address mail goes out from, and is it verified
   if (route === '/calendar/link' && (method === 'GET' || method === 'POST' || method === 'DELETE')) {   // sales review item 46: your calendar in Google Calendar
     const { handleCalendarLink } = await import('./routes/calendar.ts');
@@ -947,6 +957,7 @@ async function route_(req: Request, cors: Record<string, string>): Promise<Respo
   if (route === '/client/notifications/read' && method === 'POST') return handleClientNotificationsRead(req, site, principal, cors);
   if (route === '/client/services' && method === 'GET') return handleClientServices(req, site, principal, cors);   // R2: the studio's service catalog
   if (route === '/client/website-stats' && method === 'GET') return handleClientWebsiteStats(req, site, principal, cors);   // slice 8b: the portal Home's "Your website" card
+  if (route === '/client/website-thumb' && method === 'GET') return handleClientWebsiteThumb(req, site, principal, cors);   // item 179: the card's picture of the site itself
   if (route === '/client/support' && (method === 'GET' || method === 'POST')) return handleClientSupport(req, site, principal, cors);
   if (route === '/client/faq' && method === 'GET') return handleClientFaq(req, site, principal, cors);   // service edge #5: the studio's FAQ in the portal
   {
@@ -1074,6 +1085,7 @@ async function route_(req: Request, cors: Record<string, string>): Promise<Respo
   //    pre-auth above; these word-pathed owner routes never collide with them.
   if (route === '/reviews' && method === 'GET') return handleReviewsList(req, site, cors);
   if (route === '/reviews/request' && method === 'POST') return handleReviewRequest(req, site, principal, cors);
+  if (route === '/reviews/google-link' && method === 'POST') return handleReviewGoogleLink(req, site, principal, cors);   // item 115: the paste-once Google place id
   {
     const m = route.match(/^\/reviews\/([0-9a-f-]{36})\/(approve|hide|reply)$/);
     if (m && method === 'POST') {
@@ -1117,6 +1129,7 @@ async function route_(req: Request, cors: Record<string, string>): Promise<Respo
   // Self-serve custom domain (the caller's OWN site) — reuses the complete domain
   // core (attach → SSL → live DNS status). Reviewer boundary above already blocks
   // client_reviewers; a site owner or an operator scoped into the client reaches it.
+  if (route === '/foundations/domain/lookup' && method === 'GET') return handleDomainLookup(req, site, cors);   // item 162: steps for their provider as they type
   if (route === '/foundations/domain' && (method === 'GET' || method === 'POST' || method === 'DELETE')) {
     const r = await handleDomain(req, method, site, principal, cors);
     return r || json({ error: 'method_not_allowed' }, 405, cors);

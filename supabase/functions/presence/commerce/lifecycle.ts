@@ -24,7 +24,7 @@ import { svc, svcCount } from '../lib/db.ts';
 import { rateAllow } from '../lib/ratelimit.ts';
 import { deleteSite } from '../lib/netlify.ts';
 import { getSite } from '../lib/netlify.ts';
-import { rdapLookupDetailed, daysUntil, expiryRung, expiryWords } from '../lib/rdap.ts';
+import { rdapLookupDetailed, daysUntil, expiryRung, expiryWords, lookupPatch } from '../lib/rdap.ts';
 import { domainHealth, padlockAfterCheck, domainTruth } from '../lib/domain_health.ts';
 import { provisionSsl } from '../lib/netlify.ts';
 import { verifyApex, dkimPresent, NETLIFY_APEX_IP } from '../platform/dns.ts';
@@ -371,64 +371,77 @@ export const domainExpiryPeriod = (domain: string, expiresAt: string, rung: stri
 //     it again (it used to be asked once, before the client had set anything up),
 //     and keep when that started; keep its end date. Home asks the studio when it
 //     has been stuck a day or ends within 14 days (agency/needs_you.ts).
+/** The site fields one domain check reads. */
+export interface DomainCheckSite { id: string; client_id: string; custom_domain: string; netlify_site_id?: string | null; edition?: string | null; cert_pending_since?: string | null }
+
+/** One domain's whole daily check, also run on demand by the Domains page's
+ *  "Check now" (item 162): the registration record, the padlock, what the domain
+ *  shows, then the expiry ladder. Says whether a reminder went out and whether the
+ *  padlock was asked for again. */
+export async function checkOneDomain(site: DomainCheckSite, nowIso = new Date().toISOString()): Promise<{ warned: boolean; reasked: boolean; lookup: string }> {
+  const out = { warned: false, reasked: false, lookup: 'failed' };
+  const look = await rdapLookupDetailed(site.custom_domain);
+  out.lookup = look.status;
+  const info = look.status === 'ok' ? look.info : null;
+  // the padlock, for a site we host (a watched site's padlock is its own host's business)
+  let padlock: ReturnType<typeof padlockAfterCheck> | null = null;
+  let truth: Awaited<ReturnType<typeof domainTruth>> | null = null;
+  if (site.netlify_site_id && site.edition !== 'monitor') {
+    const h = await domainHealth({ custom_domain: site.custom_domain, netlify_site_id: site.netlify_site_id }).catch(() => null);
+    if (h && h.ssl && h.ssl.state !== 'unknown') {
+      padlock = padlockAfterCheck(h, site.cert_pending_since ?? null, nowIso);
+      if (padlock.reask) { await provisionSsl(site.netlify_site_id).catch(() => null); out.reasked = true; }
+    }
+    // item 134 (review findings 3 and 5): what the domain really shows, and both names
+    truth = await domainTruth({ custom_domain: site.custom_domain, netlify_site_id: site.netlify_site_id }, look.status === 'ok' ? look.name : null).catch(() => null);
+  }
+  await svc(`presence_sites?id=eq.${site.id}`, { method: 'PATCH', body: JSON.stringify({
+    domain_checked_at: nowIso,
+    ...lookupPatch(look),   // the lookup's status, and on success the registrar, expiry, registered name, lock, DNS company, status words, registration date
+    ...(padlock ? { cert_state: padlock.cert_state, cert_expires_at: padlock.cert_expires_at, cert_pending_since: padlock.cert_pending_since, cert_checked_at: nowIso } : {}),
+    ...(truth ? { domain_serving: truth.serving, domain_checks: truth.checklist, domain_serving_checked_at: nowIso } : {}),
+  }) });
+  const days = info ? daysUntil(info.expires_at, nowIso) : null;
+  const rung = expiryRung(days);
+  if (!rung || !info || !info.expires_at || days === null) return out;
+  const words = expiryWords(site.custom_domain, days, info.registrar);
+  const period = domainExpiryPeriod(site.custom_domain, info.expires_at, rung);
+  const fresh = await raiseNotice({ siteId: site.id, clientId: site.client_id, kind: 'domain_expiry', period: domainExpiryPeriod(site.custom_domain, info.expires_at, rung), headline: words.headline, body: words.body });
+  if (!fresh) return out;
+  out.warned = true;
+  // the rung before is answered by this one: one current reminder per domain on the bell
+  await svc(`presence_plan_notices?client_id=eq.${encodeURIComponent(site.client_id)}&kind=eq.domain_expiry&status=eq.active&period=like.${encodeURIComponent(`exp:${site.custom_domain}:%`)}&period=neq.${encodeURIComponent(period)}`, { method: 'PATCH', body: JSON.stringify({ status: 'dismissed' }) }).catch(() => null);
+  // …and so is a reminder from before the ladder, keyed by month (YYYY-MM)
+  await svc(`presence_plan_notices?client_id=eq.${encodeURIComponent(site.client_id)}&kind=eq.domain_expiry&status=eq.active&period=not.like.${encodeURIComponent('exp:%')}`, { method: 'PATCH', body: JSON.stringify({ status: 'dismissed' }) }).catch(() => null);
+  const esc = (x: unknown) => String(x ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c] as string));
+  const html = `<p><strong>${esc(site.custom_domain)}</strong> ${esc(words.when)}${info.registrar ? ` at <strong>${esc(info.registrar)}</strong>` : ''}.</p><p>${esc(words.after)}</p>`;
+  const cl = await svc(`clients?id=eq.${encodeURIComponent(site.client_id)}&select=email,name&limit=1`).catch(() => ({ json: [] as unknown[] }));
+  const clientEmail = (Array.isArray(cl.json) && (cl.json[0] as { email?: string } | undefined)?.email) || '';
+  if (clientEmail) {
+    const brand = await loadEmailBrand(site.id);   // BR-1: the customer's domain notice, on their brand
+    await sendEmail(clientEmail, `Your domain ${site.custom_domain} ${words.when}`, html, brand).catch(() => false);
+  }
+  // the studio that looks after this client gets a copy of every rung (it used to be told only inside 7 days, and only the platform)
+  const link = await svc(`presence_service_links?customer_site_id=eq.${site.id}&status=eq.active&select=agency_site_id&order=created_at.desc&limit=1`).catch(() => ({ json: [] as unknown[] }));
+  const studioSite = Array.isArray(link.json) && (link.json[0] as { agency_site_id?: string } | undefined)?.agency_site_id;
+  if (studioSite) await emailOperator(String(studioSite), `${site.custom_domain} ${words.when}`, `${html}<p>${clientEmail ? 'Your client has been sent the same reminder.' : 'Your client has no email on their record, so they haven’t been told.'}</p>`, 'domain-expiry');
+  if (rung === '7' || rung === '1' || rung === 'expired') {
+    // OPERATIONAL, to the platform operator (critical:true — an opt-out must not silence it; a bounce/complaint still does).
+    const ops = Deno.env.get('OPS_ALERT_EMAIL') || '';
+    if (ops) sendEmail(ops, `[Studio OS ops] Domain ${words.when}: ${site.custom_domain}`, `<p>Customer domain ${esc(site.custom_domain)} ${esc(words.when)}. They have been notified.</p>`, undefined, { critical: true }).catch(() => {});
+  }
+
+  return out;
+}
+
 export async function runDomainWatch(limit = 10): Promise<{ checked: number; warned: number; reasked: number }> {
   const nowIso = new Date().toISOString();
   const staleBefore = new Date(Date.now() - 24 * 3600_000).toISOString();
   const q = await svc(`presence_sites?custom_domain=not.is.null&or=(domain_checked_at.is.null,domain_checked_at.lt.${encodeURIComponent(staleBefore)})&select=id,client_id,custom_domain,netlify_site_id,edition,cert_pending_since&limit=${limit}`);
   let checked = 0, warned = 0, reasked = 0;
-  for (const site of (Array.isArray(q.json) ? q.json : []) as Array<{ id: string; client_id: string; custom_domain: string; netlify_site_id?: string | null; edition?: string | null; cert_pending_since?: string | null }>) {
-    const look = await rdapLookupDetailed(site.custom_domain);
-    const info = look.status === 'ok' ? look.info : null;
-    checked++;
-    // the padlock, for a site we host (a watched site's padlock is its own host's business)
-    let padlock: ReturnType<typeof padlockAfterCheck> | null = null;
-    let truth: Awaited<ReturnType<typeof domainTruth>> | null = null;
-    if (site.netlify_site_id && site.edition !== 'monitor') {
-      const h = await domainHealth({ custom_domain: site.custom_domain, netlify_site_id: site.netlify_site_id }).catch(() => null);
-      if (h && h.ssl && h.ssl.state !== 'unknown') {
-        padlock = padlockAfterCheck(h, site.cert_pending_since ?? null, nowIso);
-        if (padlock.reask) { await provisionSsl(site.netlify_site_id).catch(() => null); reasked++; }
-      }
-      // item 134 (review findings 3 and 5): what the domain really shows, and both names
-      truth = await domainTruth({ custom_domain: site.custom_domain, netlify_site_id: site.netlify_site_id }, look.status === 'ok' ? look.name : null).catch(() => null);
-    }
-    await svc(`presence_sites?id=eq.${site.id}`, { method: 'PATCH', body: JSON.stringify({
-      domain_checked_at: nowIso,
-      domain_lookup_status: look.status,
-      ...(look.status === 'ok' ? { domain_registered_name: look.name } : {}),   // item 134: tells a "www." twin from a sub-name
-      ...(info ? { domain_registrar: info.registrar, domain_expires_at: info.expires_at } : {}),
-      ...(padlock ? { cert_state: padlock.cert_state, cert_expires_at: padlock.cert_expires_at, cert_pending_since: padlock.cert_pending_since, cert_checked_at: nowIso } : {}),
-      ...(truth ? { domain_serving: truth.serving, domain_checks: truth.checklist, domain_serving_checked_at: nowIso } : {}),
-    }) });
-    const days = info ? daysUntil(info.expires_at, nowIso) : null;
-    const rung = expiryRung(days);
-    if (!rung || !info || !info.expires_at || days === null) continue;
-    const words = expiryWords(site.custom_domain, days, info.registrar);
-    const period = domainExpiryPeriod(site.custom_domain, info.expires_at, rung);
-    const fresh = await raiseNotice({ siteId: site.id, clientId: site.client_id, kind: 'domain_expiry', period: domainExpiryPeriod(site.custom_domain, info.expires_at, rung), headline: words.headline, body: words.body });
-    if (!fresh) continue;
-    warned++;
-    // the rung before is answered by this one: one current reminder per domain on the bell
-    await svc(`presence_plan_notices?client_id=eq.${encodeURIComponent(site.client_id)}&kind=eq.domain_expiry&status=eq.active&period=like.${encodeURIComponent(`exp:${site.custom_domain}:%`)}&period=neq.${encodeURIComponent(period)}`, { method: 'PATCH', body: JSON.stringify({ status: 'dismissed' }) }).catch(() => null);
-    // …and so is a reminder from before the ladder, keyed by month (YYYY-MM)
-    await svc(`presence_plan_notices?client_id=eq.${encodeURIComponent(site.client_id)}&kind=eq.domain_expiry&status=eq.active&period=not.like.${encodeURIComponent('exp:%')}`, { method: 'PATCH', body: JSON.stringify({ status: 'dismissed' }) }).catch(() => null);
-    const esc = (x: unknown) => String(x ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c] as string));
-    const html = `<p><strong>${esc(site.custom_domain)}</strong> ${esc(words.when)}${info.registrar ? ` at <strong>${esc(info.registrar)}</strong>` : ''}.</p><p>${esc(words.after)}</p>`;
-    const cl = await svc(`clients?id=eq.${encodeURIComponent(site.client_id)}&select=email,name&limit=1`).catch(() => ({ json: [] as unknown[] }));
-    const clientEmail = (Array.isArray(cl.json) && (cl.json[0] as { email?: string } | undefined)?.email) || '';
-    if (clientEmail) {
-      const brand = await loadEmailBrand(site.id);   // BR-1: the customer's domain notice, on their brand
-      await sendEmail(clientEmail, `Your domain ${site.custom_domain} ${words.when}`, html, brand).catch(() => false);
-    }
-    // the studio that looks after this client gets a copy of every rung (it used to be told only inside 7 days, and only the platform)
-    const link = await svc(`presence_service_links?customer_site_id=eq.${site.id}&status=eq.active&select=agency_site_id&order=created_at.desc&limit=1`).catch(() => ({ json: [] as unknown[] }));
-    const studioSite = Array.isArray(link.json) && (link.json[0] as { agency_site_id?: string } | undefined)?.agency_site_id;
-    if (studioSite) await emailOperator(String(studioSite), `${site.custom_domain} ${words.when}`, `${html}<p>${clientEmail ? 'Your client has been sent the same reminder.' : 'Your client has no email on their record, so they haven’t been told.'}</p>`, 'domain-expiry');
-    if (rung === '7' || rung === '1' || rung === 'expired') {
-      // OPERATIONAL, to the platform operator (critical:true — an opt-out must not silence it; a bounce/complaint still does).
-      const ops = Deno.env.get('OPS_ALERT_EMAIL') || '';
-      if (ops) sendEmail(ops, `[Studio OS ops] Domain ${words.when}: ${site.custom_domain}`, `<p>Customer domain ${esc(site.custom_domain)} ${esc(words.when)}. They have been notified.</p>`, undefined, { critical: true }).catch(() => {});
-    }
+  for (const site of (Array.isArray(q.json) ? q.json : []) as DomainCheckSite[]) {
+    const r = await checkOneDomain(site, nowIso);
+    checked++; if (r.warned) warned++; if (r.reasked) reasked++;
   }
   return { checked, warned, reasked };
 }
