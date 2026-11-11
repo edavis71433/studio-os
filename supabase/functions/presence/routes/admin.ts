@@ -28,7 +28,7 @@ import {
 } from '../lib/netlify.ts';
 import { computeReadiness } from './monitor.ts';
 import { applyPlan } from './foundations.ts';
-import { domainHealth } from '../lib/domain_health.ts';
+import { domainHealth, domainTruth } from '../lib/domain_health.ts';
 import { describeEngine } from '../optimization/engine.ts';
 import { computeHealthCenter } from './system.ts';
 import { inventory as connInventory, inventorySummary as connInventorySummary } from '../connected/inventory.ts';
@@ -191,6 +191,14 @@ export async function handleDomain(req: Request, method: string, site: SiteRow, 
     // attached and before the client had changed anything. "Check if it's ready" asks again
     // whenever the records are right and the padlock still isn't on (Netlify: safe to repeat).
     if (st.health === 'ssl_pending' && site.netlify_site_id) await provisionSsl(site.netlify_site_id).catch(() => null);
+    // item 134 (review findings 3 and 5): "live and secure" only when both names point here,
+    // nothing old is left over, the padlock covers both, and the domain shows OUR latest site
+    if (st.health === 'ok' && site.custom_domain && site.netlify_site_id) {
+      // the registered name the daily watch found tells "www." twins from sub-names (shop.example.com has none)
+      const reg = await svc(`presence_sites?id=eq.${site.id}&select=domain_registered_name&limit=1`).then((r) => (Array.isArray(r.json) && (r.json[0] as { domain_registered_name?: string } | undefined)?.domain_registered_name) || null).catch(() => null);
+      const truth = await domainTruth({ custom_domain: site.custom_domain, netlify_site_id: site.netlify_site_id }, reg).catch(() => null);
+      if (truth) return json({ data: { ...st, serving: truth.serving, checklist: truth.checklist, all_ok: truth.all_ok } }, 200, cors);
+    }
     return json({ data: st }, 200, cors);
   }
   if (!site.netlify_site_id) return json({ error: 'not_provisioned', message: 'Provision hosting for this site before managing domains.' }, 409, cors);
