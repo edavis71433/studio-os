@@ -1,6 +1,6 @@
 // ── Phase AN-2: Analytics Foundation — pure visit parsing + aggregation ───────
 //   deno run --allow-read --allow-env tests/presence/visits_test.mjs
-import { parseUA, refHost, sourceLabel, cleanPath, cleanUtms, visitorDayHash, aggregateVisits, trackerScript, isVisitKind } from '../../supabase/functions/presence/lib/visits.ts';
+import { parseUA, refHost, sourceLabel, cleanPath, cleanUtms, visitorDayHash, aggregateVisits, trackerScript, isVisitKind, aiAssistantOf, AI_SOURCE } from '../../supabase/functions/presence/lib/visits.ts';
 
 const results = [];
 const ok = (n, p) => { results.push({ n, p }); console.log(`${p ? 'PASS' : 'FAIL'}  ${n}`); };
@@ -117,9 +117,26 @@ ok('isVisitKind: guards the kind enum', isVisitKind('pageview') && isVisitKind('
 {
   const collectSrc = await Deno.readTextFile(new URL('../../supabase/functions/presence/routes/collect.ts', import.meta.url));
   const visitsSrc = await Deno.readTextFile(new URL('../../supabase/functions/presence/lib/visits.ts', import.meta.url));
-  const banned = /(writer\/model|anthropic|openai|concierge)/;
+  // a model call is an import of the model code or a request to a model's API; naming the
+  // assistants a visit comes from (chat.openai.com, item 153) is not one
+  const banned = /(writer\/model|api\.anthropic\.com|api\.openai\.com|from ['"][^'"]*(anthropic|openai)|concierge)/;
   ok('AN-2.10: collector uses no AI', !banned.test(collectSrc));
   ok('AN-2.10: visits lib uses no AI (pure/deterministic)', !banned.test(visitsSrc));
+}
+
+// ── list item 153: AI assistants are a source of visits, one row, named underneath ──
+{
+  const cases = [['chatgpt.com', '', 'ChatGPT'], ['chat.openai.com', '', 'ChatGPT'], ['', 'chatgpt.com', 'ChatGPT'], ['perplexity.ai', '', 'Perplexity'], ['www.perplexity.ai', '', 'Perplexity'],
+    ['gemini.google.com', '', 'Gemini'], ['copilot.microsoft.com', '', 'Copilot'], ['claude.ai', '', 'Claude'], ['', 'perplexity', 'Perplexity']];
+  for (const [host, utm, name] of cases) ok(`153: ${host || 'utm ' + utm} → ${name}, in the AI assistants row`, aiAssistantOf(host, utm) === name && sourceLabel(host, utm) === AI_SOURCE);
+  ok('153: Gemini is not counted as Google search; Google itself still is', sourceLabel('gemini.google.com', '') === AI_SOURCE && sourceLabel('google.com', '') === 'Google');
+  ok('153: ordinary sources are untouched', sourceLabel('facebook.com', '') === 'Facebook' && sourceLabel('', 'newsletter') === 'newsletter' && sourceLabel('', '') === 'Direct' && aiAssistantOf('openaiish.example', '') === '');
+  const now = Date.parse('2026-11-10T12:00:00Z');
+  const v = (hash, ref, utm = '') => ({ ts: '2026-11-09T10:00:00Z', kind: 'pageview', path: '/', ref_host: ref, utm_source: utm, device: 'Mobile', country: 'US', visitor_hash: hash });
+  const agg = aggregateVisits([v('a', 'chatgpt.com'), v('a', 'chatgpt.com'), v('b', '', 'chatgpt.com'), v('c', 'perplexity.ai'), v('d', 'google.com'), v('e', '')], now, 30);
+  ok('153: one AI assistants row, counted in people', agg.topSources.some((s) => s.source === AI_SOURCE && s.visits === 3));
+  ok('153: and which assistants, largest first', JSON.stringify(agg.aiAssistants) === JSON.stringify([{ name: 'ChatGPT', visits: 2 }, { name: 'Perplexity', visits: 1 }]), JSON.stringify(agg.aiAssistants));
+  ok('153: no AI visits → no breakdown', aggregateVisits([v('d', 'google.com')], now, 30).aiAssistants.length === 0);
 }
 
 const passed = results.filter((r) => r.p).length;

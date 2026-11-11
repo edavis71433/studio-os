@@ -42,8 +42,36 @@ export function refHost(referrer: string, siteHost?: string): string {
   } catch { return ''; }
 }
 
+// List item 153: the AI assistants a visit can come from, known by the address their links
+// come from or the tag they put on them (ChatGPT adds utm_source=chatgpt.com). In the
+// sources list they share one row, "AI assistants"; aiAssistantOf says which one it was.
+// Google's AI answers arrive from google.com like any search, so they count as Google.
+const AI_ASSISTANTS: Array<[RegExp, string]> = [
+  [/(^|\.)(chatgpt\.com|chat\.openai\.com)$|^(chatgpt|openai)$/, 'ChatGPT'],
+  [/(^|\.)perplexity\.ai$|^perplexity$/, 'Perplexity'],
+  [/(^|\.)(gemini|bard)\.google\.com$|^gemini$/, 'Gemini'],
+  [/(^|\.)copilot\.microsoft\.com$|^copilot$/, 'Copilot'],
+  [/(^|\.)claude\.ai$|^claude$/, 'Claude'],
+  [/(^|\.)chat\.deepseek\.com$|^deepseek$/, 'DeepSeek'],
+  [/(^|\.)meta\.ai$/, 'Meta AI'],
+  [/(^|\.)chat\.mistral\.ai$/, 'Mistral'],
+  [/(^|\.)grok\.com$/, 'Grok'],
+  [/(^|\.)you\.com$/, 'You.com'],
+  [/(^|\.)poe\.com$/, 'Poe'],
+];
+export const AI_SOURCE = 'AI assistants';
+/** Which AI assistant a visit came from, by its referrer host or utm_source; '' for none. */
+export function aiAssistantOf(refHostName: string, utmSource: string): string {
+  for (const v of [refHostName, utmSource]) {
+    const h = String(v || '').trim().toLowerCase().replace(/^www\./, '');
+    if (h) for (const [re, name] of AI_ASSISTANTS) if (re.test(h)) return name;
+  }
+  return '';
+}
+
 /** A friendly source label from referrer host + UTM. Deterministic. */
 export function sourceLabel(refHostName: string, utmSource: string): string {
+  if (aiAssistantOf(refHostName, utmSource)) return AI_SOURCE;
   if (utmSource) return utmSource.slice(0, 60);
   if (!refHostName) return 'Direct';
   if (/google\./.test(refHostName)) return 'Google';
@@ -85,6 +113,8 @@ export interface VisitAgg {
   topPages: Array<{ path: string; views: number }>;
   pages: Array<{ path: string; views: number; visitors: number }>;   // the per-page table: more rows, and people as well as views
   topSources: Array<{ source: string; visits: number }>;
+  /** Item 153: the "AI assistants" row, by assistant (visitors each), largest first. */
+  aiAssistants: Array<{ name: string; visits: number }>;
   devices: Array<{ device: string; share: number }>;
   countries: Array<{ country: string; visits: number }>;
   events: { phone: number; email: number; cta: number; download: number };
@@ -102,6 +132,7 @@ export function aggregateVisits(rows: VisitRow[], nowMs: number, windowDays: num
   const curVisitors = new Set<string>(), priorVisitors = new Set<string>();
   const pages = new Map<string, number>(), sources = new Map<string, number>(), devices = new Map<string, number>(), countries = new Map<string, number>();
   const srcSeen = new Map<string, Set<string>>(); // source → distinct visitor set
+  const aiSeen = new Map<string, Set<string>>(); // AI assistant → distinct visitor set
   const pageSeen = new Map<string, Set<string>>(); // path → distinct visitor set
   const events = { phone: 0, email: 0, cta: 0, download: 0 };
   let pageviews = 0;
@@ -122,6 +153,8 @@ export function aggregateVisits(rows: VisitRow[], nowMs: number, windowDays: num
       }
       const src = sourceLabel(r.ref_host, r.utm_source);
       const set = srcSeen.get(src) || new Set<string>(); set.add(r.visitor_hash || String(ms)); srcSeen.set(src, set);
+      const ai = src === AI_SOURCE ? aiAssistantOf(r.ref_host, r.utm_source) : '';
+      if (ai) { const seen = aiSeen.get(ai) || new Set<string>(); seen.add(r.visitor_hash || String(ms)); aiSeen.set(ai, seen); }
       if (r.device) devices.set(r.device, (devices.get(r.device) || 0) + 1);
       if (r.country) countries.set(r.country, (countries.get(r.country) || 0) + 1);
     } else if (r.kind in events) {
@@ -135,6 +168,7 @@ export function aggregateVisits(rows: VisitRow[], nowMs: number, windowDays: num
     topPages: topN(pages, 5).map(([path, views]) => ({ path, views })),
     pages: topN(pages, 10).map(([path, views]) => ({ path, views, visitors: pageSeen.get(path)?.size || 0 })),
     topSources: topN(sources, 5).map(([source, visits]) => ({ source, visits })),
+    aiAssistants: topN(new Map([...aiSeen].map(([name, set]) => [name, set.size])), 5).map(([name, visits]) => ({ name, visits })),
     devices: topN(devices, 3).map(([device, n]) => ({ device, share: Math.round((n / devTotal) * 100) })),
     countries: topN(countries, 5).map(([country, visits]) => ({ country, visits })),
     events,

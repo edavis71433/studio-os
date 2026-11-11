@@ -536,6 +536,7 @@ export async function handleAnalyticsDashboard(req: Request, site: SiteRow, cors
       top_pages: agg.topPages,
       pages: agg.pages,
       top_sources: sourceShares(agg.topSources, agg.visitors),
+      ai_sources: agg.aiAssistants,   // list item 153: who the "AI assistants" row is
       weekly: weeklyVisitors(visits, nowMs),
       has_data: agg.hasData,
       truncated: visits.length >= 5000,
