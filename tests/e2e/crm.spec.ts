@@ -494,7 +494,7 @@ test.describe('Relationship view', () => {
     await page.locator('#bf-go').click();                               // 2: Send invoice
     expect(JSON.parse((await posted).postData() || '{}')).toEqual({ purpose: 'service', amount_cents: 160000 });
   });
-  test('P1 — Billing lists invoices with Resend · Copy link · Void · View / print, and a won deal demotes the unsent draft', async ({ page }) => {
+  test('P1 — Billing lists invoices with Record payment · Resend · Copy link · Void · PDF, and a won deal demotes the unsent draft', async ({ page }) => {
     await installApp(page, { api: { '/crm/record': HUB_RECORD, [`/sales/deals/${DEAL}`]: HUB_DEAL, '/crm/activity': activityFx(), [`/projects/${PROJECT}`]: { data: { project: { id: PROJECT, name: 'Marlow’s Kitchen', status: 'active' }, milestones: [], tasks: [], deliverables: [] } } } });
     await page.goto(`/crm.html?client=${CLIENT}&tab=billing`);
     // Oct 2026 (item 2): the chip is the money state word — an open, undated
@@ -504,7 +504,9 @@ test.describe('Relationship view', () => {
     await expect(page.locator('[data-copy="https://pay.test/b"]')).toBeVisible();
     await expect(page.locator('[data-void-inv="i-2"]')).toBeVisible();
     await expect(page.locator('[data-void-inv="i-1"]')).toHaveCount(0);   // a paid invoice cannot be voided
-    await expect(page.locator('[data-doc="invoices:i-1"]')).toBeVisible();
+    await expect(page.locator('[data-pdf="invoices:i-1"]')).toBeVisible();   // sales item 82: the PDF (was View / print)
+    await expect(page.locator('[data-pay-inv="i-2"]')).toBeVisible();          // sales item 77: Record payment on a waiting one
+    await expect(page.locator('[data-pay-inv="i-1"]')).toHaveCount(0);        // never on a paid one
     // stage-aware: the won deal's action bar does NOT headline the unsent draft proposal
     await expect(page.locator('#act-proposal')).toHaveCount(0);
     await expect(page.locator('#act-invoice')).toBeVisible();
@@ -632,8 +634,8 @@ test.describe('Relationship view', () => {
     await expect(row('Invoice').locator('[data-send-inv="i-2"]')).toHaveText('Resend');
     await expect(row('Photos').locator('.schip.info')).toHaveText('Processing');
     await expect(row('Photos')).toContainText('Payment on its way');
-    await expect(row('Photos').locator('[data-send-inv], [data-void-inv], [data-copy]')).toHaveCount(0);
-    await expect(row('Photos').locator('[data-doc="invoices:i-3"]')).toBeVisible();
+    await expect(row('Photos').locator('[data-send-inv], [data-void-inv], [data-copy], [data-pay-inv]')).toHaveCount(0);   // item 77: nor Record payment — it is already settling
+    await expect(row('Photos').locator('[data-pdf="invoices:i-3"]')).toBeVisible();
     await expect(row('Launch').locator('.schip.bad')).toHaveText('Overdue');
     await expect(row('Launch')).toContainText('Not sent yet');
     await expect(row('Launch').locator('[data-send-inv="i-4"]')).toHaveText('Send');

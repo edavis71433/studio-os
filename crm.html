@@ -71,6 +71,21 @@
   .brow2 input,.brow2 select{font-family:inherit;font-size:14px;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:var(--dds-r,8px);padding:var(--dds-s2,8px) 10px;width:100%}
   .brow2 input:focus,.brow2 select:focus{outline:none;border-color:var(--p)}
   .bacts{display:flex;gap:var(--dds-s2,8px);justify-content:flex-end;margin-top:var(--dds-s3,12px)}
+  /* sales item 77: Record a payment — opens under its invoice */
+  .payform{margin:6px 0 4px;border-color:var(--p)}
+  .payform .pf-h{font-weight:600;font-size:14px;margin:0 0 10px;color:var(--ink)}
+  .pf-how{border:0;padding:0;margin:12px 0 0;display:flex;flex-wrap:wrap;gap:6px;min-width:0}
+  .pf-how legend{font-size:12.5px;color:var(--faint);font-weight:600;padding:0;margin-bottom:6px;float:left;width:100%}
+  .pf-chip{position:relative;display:inline-flex}
+  .pf-chip input{position:absolute;opacity:0;width:1px;height:1px;margin:0}
+  .pf-chip span{display:inline-flex;align-items:center;min-height:40px;padding:6px 14px;border-radius:999px;border:1px solid var(--line);font-size:13.5px;cursor:pointer;background:var(--bg);color:var(--ink)}
+  .pf-chip input:checked+span{background:var(--p-soft);border-color:var(--p);color:var(--p);font-weight:600}
+  .pf-chip input:focus-visible+span{outline:2px solid var(--p);outline-offset:2px}
+  .pf-rcpt{display:flex;align-items:center;gap:8px;margin-top:12px;font-size:13.5px;color:var(--ink);white-space:normal}
+  .pf-rcpt input{width:18px;height:18px;accent-color:var(--p)}
+  .pf-what{font-size:12.5px;margin:10px 0 0;white-space:normal}
+  .btable tr.paying td{background:var(--p-soft)}
+  @media (max-width:640px){.pf-chip span{min-height:44px}}
 
   /* ── Path (Lightning chevrons, dds skin) ── */
   .pathcard{margin-top:var(--dds-s4,16px);background:var(--card);border:1px solid var(--line);border-radius:var(--dds-r-lg,10px);box-shadow:var(--shadow);padding:var(--dds-s3,12px) var(--dds-s4,16px)}
@@ -289,11 +304,11 @@
   .btable td.amt,.btable th.amt{text-align:right;font-variant-numeric:tabular-nums;font-weight:600;white-space:nowrap}
   .btable td .rt{display:block;min-width:0} .btable td .rt .s{display:block;color:var(--faint);font-size:12.5px}
   .btable td.due{color:var(--bad);font-weight:500;white-space:nowrap}
-  .btable td.racts{text-align:right;white-space:nowrap}
-  .btable .racts{justify-content:flex-end;flex-wrap:nowrap;gap:2px}
+  .btable td.racts{text-align:right;white-space:normal}
+  .btable .racts{justify-content:flex-end;flex-wrap:wrap;gap:2px}   /* item 77: five verbs wrap rather than widen the table past the screen */
   .btable .racts .rbtn{font-size:12px;padding:var(--dds-s1,4px) var(--dds-s2,8px)}
   .btable td .rt{white-space:nowrap}
-  .card.tcard{overflow-x:auto}
+  .card.tcard{overflow-x:auto;position:relative}   /* item 77: its hidden "Actions" header label stays inside the scroll (it widened the page on a tablet) */
   .btable{min-width:540px}
   .rbtn{border-color:transparent;color:var(--soft);padding:var(--dds-s1,4px) var(--dds-s2,8px)}
   .rbtn:hover{border-color:var(--line);background:var(--bg);color:var(--ink)}
@@ -1266,25 +1281,35 @@ function renderBillingTab(host){
   // invoices + the new-invoice / deposit forms
   html+=`<section><h2>Invoices <span class="sec-acts" style="display:flex;gap:6px">${both?'':'<button type="button" class="rbtn" data-bform="deposit">Request deposit</button>'}<a class="rbtn" href="${esc(link)}#schedule" style="text-decoration:none">Payment schedule</a><button type="button" class="rbtn${both?'':' primary'}" data-bform="invoice">+ Invoice</button></span></h2>
     <div id="bform"></div>`;
+  // item 81: who the invoices are billed to, and the address they print — one line, Edit beside it
+  if(inv.length||!noEmail){const bt=billedToLine();html+=`<p class="muted" id="billedTo" style="margin:0 0 10px;font-size:13px">${bt.text}${bt.can?` <button type="button" class="link-btn" data-edit-address>${bt.has?'Edit':'Add their address'}</button>`:''}</p>`;}
   html+=inv.length?`<div class="card tcard"><table class="btable"><thead><tr><th>Invoice</th><th>Status</th><th class="amt">Amount</th><th>Due</th><th><span class="sr-only">Actions</span></th></tr></thead><tbody>`+inv.map(v=>{
-    const name=esc(v.title||(v.purpose==='deposit'?'Deposit':'Invoice'));
+    // item 81: the studio's running number leads the name; a part payment names the invoice it paid toward
+    const no=invNo(v.number), parent=v.payment_for?inv.find(x=>x.id===v.payment_for):null;
+    const name=v.payment_for?esc('Part payment'+(parent&&invNo(parent.number)?' · '+invNo(parent.number):'')):(no?esc(no)+' · ':'')+esc(v.title||(v.purpose==='deposit'?'Deposit':'Invoice'));
     // Oct 2026 (item 2): the chip is the money state word — Paid · Processing ·
     // Upcoming · Overdue — in its one colour; sent-ness moves to the sub-line.
     const st=invState(v);
-    let sub=esc(v.purpose==='deposit'?'Initial deposit':(v.description||v.purpose||''));
+    let sub=esc(v.payment_for?(parent?parent.title||'':''):v.purpose==='deposit'?'Initial deposit':(v.description||v.purpose||''));
     let state, acts='', due='', dueCls='';
-    if(st==='paid'){state=`<span class="schip good">Paid</span>`;due=v.paid_at?esc(atLabel(v.paid_at)):'';}
+    // item 77: a payment recorded by hand says how it came in, and can be undone (it changes the books, so delete)
+    if(st==='paid'){state=`<span class="schip good">Paid</span>`;due=v.paid_at?esc(atLabel(v.paid_at)):'';
+      sub=(sub?sub+' · ':'')+esc(PAY_WORDS[v.paid_method]||'Paid online')+(v.paid_note?' · '+esc(v.paid_note):'');
+      if(v.paid_method)acts+=act(`data-undo-pay="${esc(v.id)}" data-needs="delete"`,'Undo','Recorded by mistake? The invoice goes back to unpaid');}
     else if(!st){state=`<span class="schip" style="background:var(--bg);color:var(--faint)">Voided</span>`;}
     else if(st==='processing'){state=`<span class="schip info">Processing</span>`;sub=(sub?sub+' · ':'')+'Payment on its way';due=v.due_date?esc(dueLabel(v.due_date)):'';}   // the client paid — nothing to resend or void
     else{state=`<span class="schip ${MONEY_TONE[st]}">${MONEY_WORD[st]}</span>`;
-      if(!v.stripe_url)sub=(sub?sub+' · ':'')+'Not sent yet';
+      const parts=inv.filter(x=>x.payment_for===v.id&&x.status==='paid');   // item 77: part payments already came off it
+      if(parts.length)sub=(sub?sub+' · ':'')+esc(fmtC(parts.reduce((a,b)=>a+(b.amount_cents||0),0)))+' paid so far';
+      if(!v.stripe_url)sub=(sub?sub+' · ':'')+(parts.length?'Send it for a link for what’s left':'Not sent yet');
       due=v.due_date?esc(dueLabel(v.due_date)):'Due now'; dueCls=st==='overdue'?'due':'';
+      acts+=act(`data-pay-inv="${esc(v.id)}"`,'Record payment','Paid by check, cash, bank transfer or Zelle? Mark it paid here');
       acts+=act(`data-send-inv="${esc(v.id)}"`,v.stripe_url?'Resend':'Send');
       if(v.stripe_url)acts+=act(`data-copy="${esc(v.stripe_url)}"`,'Copy link');
       acts+=act(`data-void-inv="${esc(v.id)}" data-needs="delete"`,'Void','Withdraw this invoice — the payment link stops working');}
-    acts+=act(`data-doc="invoices:${esc(v.id)}"`,'View','Open a branded, printable copy (save as PDF)');
-    return `<tr class="brow"><td><span class="rt">${name}${sub?`<span class="s">${sub}</span>`:''}</span></td><td>${state}</td><td class="amt">${esc(fmtC(v.amount_cents))}</td><td class="${dueCls}">${due}</td><td class="racts"><span class="racts">${acts}</span></td></tr>`;
-  }).join('')+`</tbody></table></div>`:`<div class="card"><p class="muted" style="font-size:13.5px">No invoices yet. Send one, or request a deposit.</p></div>`;
+    acts+=act(`data-pdf="invoices:${esc(v.id)}"`,'PDF','Download it as a PDF — the same copy the client gets');   // item 82
+    return `<tr class="brow" data-inv-row="${esc(v.id)}"><td><span class="rt">${name}${sub?`<span class="s">${sub}</span>`:''}</span></td><td>${state}</td><td class="amt">${esc(fmtC(v.amount_cents))}</td><td class="${dueCls}">${due}</td><td class="racts"><span class="racts">${acts}</span></td></tr>`;
+  }).join('')+`</tbody></table></div><div id="payhost"></div>`:`<div class="card"><p class="muted" style="font-size:13.5px">No invoices yet. Send one, or request a deposit.</p></div>`;
   html+=`</section>`;
   // item 108 (J6): estimates — a price before anything is agreed (drafted on the deal page;
   // sent, copied, turned into a proposal or billed from here, by the same routes)
@@ -1416,6 +1441,16 @@ function wireBilling(host,d){
   host.querySelectorAll('[data-bform]').forEach(b=>b.addEventListener('click',()=>billingForm(b.getAttribute('data-bform'))));
   host.querySelectorAll('[data-copy]').forEach(b=>b.addEventListener('click',()=>{const u=b.getAttribute('data-copy');if(navigator.clipboard)navigator.clipboard.writeText(u).then(()=>toast('Link copied')).catch(()=>toast('Couldn’t copy on this device.'));}));
   host.querySelectorAll('[data-doc]').forEach(b=>b.addEventListener('click',async()=>{const [t,id]=b.getAttribute('data-doc').split(':');b.disabled=true;const r=await apiAg('/sales/'+t+'/'+id+'/document');b.disabled=false;if(r.ok&&r.body.url)window.open(r.body.url,'_blank','noopener');else toast('Couldn’t open the document just now.');}));
+  host.querySelectorAll('[data-pdf]').forEach(b=>b.addEventListener('click',()=>downloadPdf(b)));   // item 82
+  // item 77: Record a payment opens under its row; Undo takes back one recorded by mistake
+  host.querySelectorAll('[data-pay-inv]').forEach(b=>b.addEventListener('click',()=>{const v=((DEAL&&DEAL.invoices)||[]).find(x=>x.id===b.getAttribute('data-pay-inv'));const row=b.closest('tr');if(v&&row)payForm(row,v);}));
+  host.querySelectorAll('[data-undo-pay]').forEach(b=>b.addEventListener('click',async()=>{
+    const id=b.getAttribute('data-undo-pay'); const v=((DEAL&&DEAL.invoices)||[]).find(x=>x.id===id)||{}; const no=invNo(v.number)||'the invoice';
+    if(!confirm(v.payment_for?`Undo this ${fmtC(v.amount_cents)} part payment? Its amount goes back on the invoice as due.`:`Undo this payment? ${no} goes back to unpaid (${fmtC(v.amount_cents)} due) and its reminders can start again. Use this only for a payment recorded by mistake.`))return;
+    b.disabled=true; const r=await apiAg('/sales/invoices/'+encodeURIComponent(id)+'/payment/undo','POST',{});
+    if(r.ok){toast(v.payment_for?'Part payment undone. Its amount is due again.':`Payment undone. ${no} is open again; send it again for a fresh payment link.`);reloadDeal();}
+    else{toast((r.body&&r.body.message)||'Couldn’t undo it.');b.disabled=false;}}));
+  const ea=host.querySelector('[data-edit-address]'); if(ea)ea.addEventListener('click',()=>{WANT_EDIT='ec-address';showTab('details');});   // item 81
   host.querySelectorAll('[data-send-inv]').forEach(b=>b.addEventListener('click',async()=>{b.disabled=true;const r=await billingSend('/sales/invoices/'+b.getAttribute('data-send-inv')+'/send',(b.textContent==='Resend'?'Invoice re-sent':'Invoice sent'));if(r)reloadDeal();else b.disabled=false;}));
   // item 107 (J1): Stripe may not have switched the link off (link_deactivated:false) — then the
   // client can still pay the withdrawn amount, and "Invoice voided" alone would say otherwise
@@ -1462,6 +1497,81 @@ function leftOfProposal(){
   const total=acc.total_cents!=null?Number(acc.total_cents)||0:Number(acc.subtotal_cents)||0;
   const billed=((DEAL&&DEAL.invoices)||[]).filter(v=>(v.status==='open'||v.status==='paid')&&!v.recurring_id).reduce((a,b)=>a+(Number(b.amount_cents)||0),0);
   return {total,billed,left:Math.max(0,total-billed)};
+}
+// item 81: the studio's running invoice number — "#0013"; '' before the number exists (APPLY-0167)
+const invNo=(n)=>{const v=Math.trunc(Number(n));return v>0?'#'+String(v).padStart(4,'0'):'';};
+// item 77: how a payment came in; '' is a payment Stripe took (card or bank, online)
+const PAY_WORDS={check:'Paid by check',cash:'Paid in cash',bank_transfer:'Paid by bank transfer',zelle:'Paid by Zelle',other:'Paid'};
+// item 81: who the invoices are billed to and where — the deal's person and their address
+// The address is the contact's own (sales item 89: { street, city, state, zip, country }); before
+// that column exists the deal read has no address at all, and nothing is offered.
+const addrText=(a)=>{if(!a)return'';if(typeof a==='string')return a.trim();if(typeof a!=='object')return'';const st=[a.state,a.zip].map(x=>String(x||'').trim()).filter(Boolean).join(' ');return [a.street,[String(a.city||'').trim(),st].filter(Boolean).join(', '),a.country].map(x=>String(x||'').trim()).filter(Boolean).join('\n');};
+function billedToLine(){
+  const c=(DEAL&&DEAL.contact)||{}; const who=[c.name,c.company].map(x=>String(x||'').trim()).filter(Boolean);
+  const addr=addrText(c.address);
+  const name=who.length?esc(who.join(', ')):'this client';
+  const end=(t)=>/[.!?]$/.test(t)?t:t+'.';   // "Juniper Floral Co." needs no second full stop
+  if(!('address' in c))return {has:false,can:false,text:end(`Invoices are billed to ${name}`)};   // before contacts hold an address (item 89)
+  return addr?{has:true,can:true,text:end(`Invoices are billed to ${name}, ${esc(addr.replace(/\n+/g,', '))}`)}:{has:false,can:true,text:end(`Invoices are billed to ${name}`)+' No postal address yet, so none prints on them.'};
+}
+// item 82: a document as its PDF, saved under its own name (the same copy the client gets)
+async function downloadPdf(b){
+  const [t,id]=b.getAttribute('data-pdf').split(':'); b.disabled=true;
+  try{
+    const r=await apiAg('/sales/'+t+'/'+id+'/document'); const u=r.ok&&r.body&&r.body.pdf_url;
+    if(!u){toast('Couldn’t make the PDF just now.');return;}
+    const f=await fetch(u); if(!f.ok)throw new Error(String(f.status));
+    const blob=new Blob([await f.arrayBuffer()],{type:'application/pdf'});
+    const v=t==='invoices'?((DEAL&&DEAL.invoices)||[]).find(x=>x.id===id):null;
+    const name=v?((v.status==='paid'?'Receipt':v.purpose==='deposit'?'Deposit-request':'Invoice')+'-'+(invNo(v.number).slice(1)||'copy')+'.pdf'):(t==='contracts'?'Agreement':t==='estimates'?'Estimate':'Proposal')+'.pdf';
+    const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=name; document.body.appendChild(a); a.click();
+    setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove();},5000);
+  }catch(_){toast('Couldn’t download the PDF just now.');}
+  finally{b.disabled=false;}
+}
+// item 77: Record a payment — opens under its invoice. All of it marks it paid; less is a part
+// payment (the rest stays due). The server checks it all again.
+function payForm(row,v){
+  const host=$('payhost'); if(!host)return;
+  const open=host.querySelector('.payform');
+  const clear=()=>{host.innerHTML='';document.querySelectorAll('#tabbody tr.paying').forEach(r=>r.classList.remove('paying'));};
+  if(open){const same=open.getAttribute('data-for')===v.id; clear(); if(same)return;}
+  const today=recTodayYmd(); const c=(DEAL&&DEAL.contact)||{}; const first=(String(c.name||'').trim().split(/\s+/)[0])||'';
+  const due=Number(v.amount_cents)||0; const no=invNo(v.number)||'this invoice';
+  row.classList.add('paying');
+  host.innerHTML=`<div class="bform payform" role="group" aria-labelledby="pf-h" data-for="${esc(v.id)}"><p class="pf-h" id="pf-h">Record a payment for ${esc(no)}${v.title?' · '+esc(v.title):''}</p>
+    <div class="brow2"><label>Amount received (USD)<input type="number" id="pf-amt" inputmode="decimal" step="0.01" min="0.01" max="${(due/100).toFixed(2)}" value="${(due/100).toFixed(2)}"></label><label>Paid on<input type="date" id="pf-on" max="${today}" value="${today}"></label><label>Note (optional)<input type="text" id="pf-note" maxlength="120" placeholder="e.g. Check #1042"></label></div>
+    <fieldset class="pf-how"><legend>How they paid</legend>${[['check','Check'],['cash','Cash'],['bank_transfer','Bank transfer'],['zelle','Zelle'],['other','Other']].map(([k,l],i)=>`<label class="pf-chip"><input type="radio" name="pf-how" value="${k}"${i===0?' checked':''}><span>${l}</span></label>`).join('')}</fieldset>
+    ${c.email?`<label class="pf-rcpt"><input type="checkbox" id="pf-rcpt" checked> Email ${esc(first||'them')} a receipt (the PDF is attached)</label>`:''}
+    <p class="muted pf-what" id="pf-what" aria-live="polite"></p>
+    <div class="bacts"><button type="button" id="pf-cancel">Cancel</button><button type="button" class="primary" id="pf-go">Mark paid</button></div></div>`;
+  const box=host.firstElementChild;
+  const amt=$('pf-amt'), go=$('pf-go');
+  const cents=()=>Math.round((parseFloat(amt.value)||0)*100);
+  const say=()=>{const a=cents();
+    if(a>0&&a<due){go.textContent='Record '+fmtC(a)+' part payment';$('pf-what').textContent=`${fmtC(due-a)} stays due on ${no}. Its card link is switched off, and the next Send makes one for what’s left.`;}
+    else{go.textContent='Mark '+(invNo(v.number)||'it')+' paid';$('pf-what').textContent=`This marks ${no} paid, stops its reminders and switches its card link off, so it can’t be paid twice. It counts in Paid and in your money reports.`;}};
+  say(); amt.addEventListener('input',say);
+  $('pf-cancel').addEventListener('click',()=>{clear();row.querySelector('[data-pay-inv]')&&row.querySelector('[data-pay-inv]').focus();});
+  setTimeout(()=>{amt.focus({preventScroll:true});amt.select();},50);
+  box.scrollIntoView({block:'nearest',behavior:'smooth'});
+  go.addEventListener('click',async()=>{
+    const a=cents(); const on=$('pf-on').value; const how=(box.querySelector('input[name="pf-how"]:checked')||{}).value||'';
+    if(!(a>0)){toast('Enter the amount you received.');amt.focus();return;}
+    if(a>due){toast('That’s more than the '+fmtC(due)+' due. Record what’s due here.');amt.focus();return;}
+    if(!on){toast('Enter the day you were paid.');$('pf-on').focus();return;}
+    if(on>today){toast('The day you were paid can’t be in the future.');$('pf-on').focus();return;}
+    go.disabled=true;
+    const rc=$('pf-rcpt');
+    const r=await apiAg('/sales/invoices/'+encodeURIComponent(v.id)+'/payment?today='+today,'POST',{amount_cents:a,paid_on:on,method:how,note:$('pf-note').value.trim(),email_receipt:!!(rc&&rc.checked)});
+    if(!r.ok){toast((r.body&&r.body.message)||'That didn’t go through.');go.disabled=false;return;}
+    const x=(r.body&&r.body.data)||{}; const live=x.link_deactivated===false;
+    let m=x.part?`Recorded a ${fmtC(a)} part payment. ${fmtC(x.left_cents)} is still due on ${no}.`:`Marked ${no} paid, ${(PAY_WORDS[how]||'paid').replace(/^Paid /,'')}.`;
+    if(x.receipt_emailed)m+=` Receipt emailed to ${first||'them'}.`;
+    if(live)m+=' Its card link may still be live, so switch it off in Stripe.';
+    toast(m,live?'err':undefined);
+    reloadDeal();
+  });
 }
 // item 108 (J4): the retainer's payments, which the deal read totals beside the deal (a retainer
 // charge settles in Stripe and writes no invoice). Zero when the read couldn't count them.
