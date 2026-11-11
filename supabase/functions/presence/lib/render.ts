@@ -196,9 +196,9 @@ export async function renderSnapshot(snapshot: Snapshot, site: SiteConfig, opts:
   }
   // Item 61: the owner's switch decides the counter; the privacy page reads the same switch.
   const counting = (snapshot.content as SnapshotContent)?.settings?.visit_counter !== false;
+  // List item 175: switched off, AI assistants are asked to stay out in robots.txt.
   // items 48 and 120: an own page can leave out the site's header or footer, everywhere it is drawn
   const pages = (snapshot.content as SnapshotContent)?.settings?.pages;
-  // List item 175: switched off, AI assistants are asked to stay out in robots.txt.
   const drawn = withAiCrawlerChoice(tintFavicon(applyPageChrome(await t.render(snapshot, t.manifest, site), pages), snapshot.dev_customization?.theme_tokens?.accent, snapshot.template_slug), (snapshot.content as SnapshotContent)?.settings);
   // item 148: the pop-up and any form a "#form-<id>" link opens (lib/popup.ts), then item 131:
   // pages with the site's forms send them from the page (lib/site_send.ts)

@@ -207,7 +207,13 @@ const pinned = (c, site) => c.query.includes(`site_id=eq.${site}`) || c.body?.si
   const statements = migrations.flatMap((f) => read(`supabase/migrations/${f}`).split(';'));
   const policies = statements.filter((s) => /create\s+policy/i.test(s));
   ok('policy: no migration writes a policy that mentions a member', policies.length > 0 && !policies.some((s) => /site_members/.test(s)));
-  ok('policy: no migration redefines either function', statements.filter((s) => /create\s+(or\s+replace\s+)?function\s+"?(public"?\.)?"?(my_client_ids|my_presence_site_ids)/i.test(s)).length === 2);
+  // Item 135 (0152): my_client_ids is defined once more, to never match an empty address —
+  // the `u.email &&` this suite's model below has always had. Its other ways in are unchanged.
+  const defs = statements.filter((s) => /create\s+(or\s+replace\s+)?function\s+"?(public"?\.)?"?(my_client_ids|my_presence_site_ids)/i.test(s));
+  const latest = read('supabase/migrations/0152_site_without_owner.sql');
+  const redefined = latest.slice(latest.indexOf('create or replace function public.my_client_ids()'), latest.indexOf('$$;'));
+  ok('policy: no other migration redefines either function (the baseline, 0015 and 0152)', defs.length === 3 && defs.filter((s) => /my_client_ids"?\(\)\s+returns/i.test(s)).length === 2);
+  ok('policy: 0152\'s my_client_ids is this model — the contact, or a NON-EMPTY address on either email column, never a member', /co\.auth_user_id = auth\.uid\(\)/.test(redefined) && /cl\.email/.test(redefined) && /cl\.contact_email/.test(redefined) && /coalesce\(auth\.jwt\(\) ->> 'email', ''\) <> ''/.test(redefined) && !/site_members/.test(redefined));
   ok('policy: an invite writes a member row and no client or contact', !/\bclients\b|\bcontacts\b/.test(read('supabase/functions/presence/lib/workspace.ts').split('export async function addSiteMember')[1].split('export async function revokeSiteMember')[0]));
 
   reset();
