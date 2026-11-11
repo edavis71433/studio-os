@@ -26,8 +26,9 @@ type FileMap = Record<string, string | Uint8Array>;
 /** The parts of a site's content and address this file reads (lib/render_types.ts has the rest). */
 interface ReachContent { identity?: { phone?: string; email?: string }; locations?: Array<{ phone?: string }> }
 interface SendSite { formEndpoint?: string; bookEndpoint?: string }
-// the same escaping as lib/markdown.ts attr(), which the templates put the addresses through
-const attr = (s: unknown): string => String(s ?? '').replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('"', '&quot;').replaceAll("'", '&#39;');
+// the same escaping as lib/markdown.ts esc() and attr(), which the templates use
+const esc = (s: unknown): string => String(s ?? '').replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('"', '&quot;').replaceAll("'", '&#39;');
+const attr = esc;
 
 /** The routes a client's site calls from its visitors' browsers: the form send,
  *  booking, and (item 140) the time ticket for either. index.ts answers them with
@@ -150,6 +151,21 @@ f.addEventListener('submit',function(ev){ev.preventDefault();err.textContent='';
 function done(m){clr();var d=el('div','bk-done');d.appendChild(el('p','bk-done-ic','✓'));d.appendChild(el('p','bk-done-msg',m||'Thanks — your booking request was received.'));stage.appendChild(d);}
 })();`;
   return `<script>${js.replace(/<\//g, '<\\/')}</script>`;
+}
+
+// ── Builder list item 146: the "Join our list" box ───────────────────────────
+/** What a visitor agrees to with the box; the contact keeps it as the record of their yes. */
+export const SIGNUP_CONSENT = 'Yes, send me updates by email. I can unsubscribe at any time.';
+/** The box's form (the Newsletter section draws its heading and words around it). It posts
+ *  to the site's form address with form_kind=signup, so the sender above sends it in the
+ *  page with its time ticket; with no address (the builder's canvas) it has no action.
+ *  `buttonAttrs` carries the in-place editor's stamp for the button's words. */
+export function signupForm(id: string, endpoint: string | undefined, button: string, buttonAttrs = ''): string {
+  const action = endpoint ? ` action="${attr(endpoint)}"` : '';
+  return `<form class="card nl-form" method="post"${action}><input type="hidden" name="form_kind" value="signup"><input type="hidden" name="source_page" value="/">` +
+    `<p class="hp" aria-hidden="true"><label for="${attr(id)}-hp">Leave this field empty</label><input id="${attr(id)}-hp" name="_hp" tabindex="-1" autocomplete="off"></p>` +
+    `<div class="nl-row"><label class="nl-label" for="${attr(id)}-email">Your email</label><input type="email" id="${attr(id)}-email" name="email" required maxlength="254" autocomplete="email" placeholder="you@example.com"><button class="btn" type="submit"${buttonAttrs}>${esc(button)}</button></div>` +
+    `<p class="nl-consent"><label><input type="checkbox" name="consent" value="yes" required> ${esc(SIGNUP_CONSENT)}</label></p></form>`;
 }
 
 /** Item 131: each page that holds a site form gets the sender, and each page with a

@@ -7,8 +7,9 @@
 // first-party visit counter (lib/visits.ts trackerScript, routes/collect.ts), which
 // the owner can switch off (item 61; the page reads the same switch the publish
 // step does), and, only on a site that has them, online booking (routes/booking.ts)
-// and the reviews it shows (routes/reviews.ts), list item 138. Deterministic: the
-// effective date is the snapshot date (the only clock a renderer may read).
+// and the reviews it shows (routes/reviews.ts), list item 138, and the "Join our list"
+// box (builder list item 146). Deterministic: the effective date is the snapshot date
+// (the only clock a renderer may read).
 //
 // Terms of Service are deliberately NOT auto-generated in V1: terms make
 // business-specific legal promises (refunds, liability, jurisdiction) that a
@@ -32,9 +33,10 @@ function contactLine(c: SnapshotContent): string {
 /** Whether a section of this type is anywhere on the site: the home page, an added page, or
  *  inside a column. The serializer has already dropped what won't draw (a reviews wall with
  *  nothing approved yet), so a section here is one a visitor can use. */
-function siteHas(c: SnapshotContent, type: string): boolean {
+function siteHas(c: SnapshotContent, type: string, also: (b: any) => boolean = () => true): boolean {
   const lists = [c.settings?.blocks || [], ...(c.settings?.pages || []).map((p) => p.blocks || [])];
-  return lists.some((list) => list.some((b) => b?.type === type || (b?.type === 'columns' && b.columns.some((col) => col.block?.type === type))));
+  const is = (b: any) => b?.type === type && also(b);
+  return lists.some((list) => list.some((b) => is(b) || (b?.type === 'columns' && b.columns.some((col) => is(col.block)))));
 }
 
 /** List item 152: what a site with ad tags says about cookies, with the button that brings the
@@ -53,6 +55,8 @@ export function privacyBody(c: SnapshotContent, effectiveDate: string, site: Pic
   const name = esc(c.identity.business_name);
   const hasForm = !!site.formEndpoint;
   const booking = !!site.bookEndpoint && siteHas(c, 'booking'), reviews = siteHas(c, 'reviews_wall');
+  // item 146: a Newsletter box set to collect sends through the site's form address
+  const joins = hasForm && siteHas(c, 'newsletter', (b) => b.collect === true);
   return `<section class="block wrap"><h1>Privacy policy</h1>
 <p class="post-meta">Effective ${esc(effectiveDate)}</p>
 <h2>Who we are</h2>
@@ -61,7 +65,11 @@ export function privacyBody(c: SnapshotContent, effectiveDate: string, site: Pic
 ${hasForm
     ? `<p>If you send us a message through the contact form, we receive what you type — your name, an email address or phone number, and your message. We use it for one thing: getting back to you. We don’t sell it, share it for marketing, or add you to lists you didn’t ask for.</p>`
     : `<p>This website has no forms and collects nothing you type.</p>`}
-${booking
+${joins
+    ? `<h2>Our email list</h2>
+<p>If you join our email list, we keep your email address, when you joined, and that you said yes. We use it only to send you our updates. To stop them, use the unsubscribe button in your email app or reply and ask, and we’ll take you off the list. We don’t sell your address or share it for marketing.</p>
+`
+    : ''}${booking
     ? `<h2>Booking an appointment</h2>
 <p>If you book an appointment on this website, we receive what you enter: your name, an email address or phone number, the service and time you picked, and any note you add. We use it to keep your appointment: we email you a confirmation and a reminder before it, and contact you if something changes. We don’t sell it, share it for marketing, or add you to lists you didn’t ask for.</p>
 `

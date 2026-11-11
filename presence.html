@@ -486,6 +486,8 @@ html.dc-edit:not(.plan-watch) #pcBody{padding:0 20px 20px}
 .pc-pane-body .dc-modal-h{font-family:var(--serif);font-size:20px;font-weight:600;letter-spacing:-.01em}
 .pc-pane-body input[type=text],.pc-pane-body select{width:100%;box-sizing:border-box}
 .pc-note{margin:0 0 12px;font-size:13px;line-height:1.5;color:var(--ink-2)}
+/* item 146: the sign-up box's "where sign-ups go" choice, drawn like the card's text boxes */
+.nl-mode{width:100%;padding:8px;border:1px solid var(--line);border-radius:8px;font:inherit;font-size:13px;margin-bottom:6px;box-sizing:border-box}
 /* item 121: the not-found choice (Ready-made or One of my pages), and the password page's words */
 .pc-nf-seg{margin:0 0 10px}
 .pc-nf-seg button[aria-pressed="true"]{background:var(--sheet);color:var(--ink);font-weight:600;box-shadow:var(--dds-shadow)}
@@ -9842,7 +9844,7 @@ function emptyBlock(def) {
   if (def.reviewsWallSimple) { b.max = 12; return b; }   // approved reviews injected at publish
   if (def.apptSimple) { b.url = ""; return b; }
   if (def.bookingSimple) { b.intro = ""; return b; }
-  if (def.newsletterSimple) { b.url = ""; return b; }
+  if (def.newsletterSimple) { b.url = ""; b.collect = true; return b; }   // item 146: a new box collects into your own list
   if (def.mapSimple) { b.address = ""; return b; }
   if (def.mediaKind === "gallery") { b.image_ids = []; return b; }
   if (def.mediaKind === "video") { b.url = ""; return b; }
@@ -10746,15 +10748,21 @@ function renderBlocksCard() {
       sub.appendChild(go);
       sub.appendChild(el("div", "hint", "This section shows a calm, mobile-friendly booking widget on your site. Your services, hours, and appointments live in the Bookings tab — first-party, no external calendar."));
     } else if (def.newsletterSimple) {
-      const t = el("input"), bt = el("input"), u = el("input");
+      // Builder list item 146: the box collects emails into your own list (Send an update writes
+      // to them), or the button sends visitors to another company's sign-up page.
+      const t = el("input"), bt = el("input"), u = el("input"), mode = el("select", "nl-mode"), why = el("div", "hint");
+      mode.setAttribute("aria-label", "Where sign-ups go");
+      mode.innerHTML = '<option value="collect">Collect emails here, into your own list</option><option value="link">Send people to another sign-up page</option>';
+      mode.value = blk.url && !blk.collect ? "link" : "collect";
       t.placeholder = "A short line (optional) — e.g. Get updates from us."; t.value = blk.text || "";
       bt.placeholder = "Button label (e.g. Sign up)"; bt.value = blk.button || "";
       u.placeholder = "Your sign-up link (e.g. your Mailchimp or newsletter page)"; u.value = blk.url || "";
       [t, bt, u].forEach((inp) => { inp.type = "text"; inp.style.cssText = inputCss; });
-      const commit = () => { BLOCKS_WORK[idx] = wLook(idx, { type: "newsletter", title: ti.value.trim(), text: t.value.trim(), button: bt.value.trim(), url: u.value.trim() }); };
+      const show = () => { const link = mode.value === "link"; u.hidden = !link; why.textContent = link ? "Visitors tap the button and land on your sign-up page — nothing external loads on your site." : "Visitors type their email and tick yes. They join your list, and you write to them from Send an update; every email has an unsubscribe link."; };
+      const commit = () => { const link = mode.value === "link"; BLOCKS_WORK[idx] = wLook(idx, { type: "newsletter", title: ti.value.trim(), text: t.value.trim(), button: bt.value.trim(), url: link ? u.value.trim() : "", collect: !link }); };
       [t, bt, u].forEach((inp) => inp.addEventListener("change", commit));
-      sub.append(t, aiField(t, { field: "banner text" }), bt, u);
-      sub.appendChild(el("div", "hint", "Visitors tap the button and land on your sign-up page — nothing external loads on your site."));
+      mode.addEventListener("change", () => { show(); commit(); });
+      sub.append(mode, t, aiField(t, { field: "banner text" }), bt, u, why); show();
     } else if (def.mapSimple) {
       const ad = el("input"), du = el("input");
       ad.placeholder = "Your address (shown as text)"; ad.value = blk.address || "";

@@ -196,7 +196,9 @@ export interface SiteBlockAppointment { type: 'appointment'; title?: string; tex
 // itself carries only an optional heading + intro.
 export interface SiteBlockBooking { type: 'booking'; title?: string; intro?: string }
 // Growth blocks (T-BLOCKS r2) — link-out only, zero external origins on the page.
-export interface SiteBlockNewsletter { type: 'newsletter'; title?: string; text?: string; button?: string; url: string }
+// Item 146: `collect` — the box takes the email itself, into the site's own list (Send an
+// update's "People who joined your list"); otherwise `url` links out to another company's page.
+export interface SiteBlockNewsletter { type: 'newsletter'; title?: string; text?: string; button?: string; url?: string; collect?: boolean }
 export interface SiteBlockSocial { type: 'social'; title?: string; links: Array<{ network: string; url: string }> }
 export interface SiteBlockEvents { type: 'events'; title?: string; items: Array<{ name: string; date: string; time?: string; detail?: string; url?: string }> }
 export interface SiteBlockMap { type: 'map'; title?: string; image?: MediaRef | null; address?: string; directions_url?: string }

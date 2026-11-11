@@ -36,7 +36,7 @@ import { brandTint } from './palettes.ts';
 import { parseWindow, isVisibleNow } from './content_window.ts';
 import { normHex, darken, contrastRatio } from './brand_kit.ts';
 import { UUID_RE } from './uuid.ts';
-import { bookingScript } from './site_send.ts';
+import { bookingScript, signupForm } from './site_send.ts';
 
 /** The block types this engine realizes (⊆ the site_components catalog keys). */
 export const REALIZED_BLOCK_TYPES: readonly SiteBlockType[] = [
@@ -452,10 +452,13 @@ function validateBlocksTracked(raw: unknown): { blocks: StoredBlock[]; src: numb
         block = { type: 'booking', title, intro: s((b as any).intro, 400) || undefined } as SiteBlockBooking;
         break;
       }
-      case 'newsletter': {   // ESP sign-up button — same link-out posture as appointment
-        const url = s((b as any).url, 300);
-        if (/^https?:\/\//i.test(url)) block = { type: 'newsletter', title, url, text: s((b as any).text, 200) || undefined, button: s((b as any).button, 40) || undefined } as SiteBlockNewsletter;
-        break;
+      case 'newsletter': {   // item 146: the email collected here, into the site's own list (the
+        // default), or an ESP sign-up button — the same link-out posture as appointment
+        const url = s((b as any).url, 300), collect = (b as any).collect === true;
+        const text = s((b as any).text, 200) || undefined, button = s((b as any).button, 40) || undefined;
+        if (/^https?:\/\//i.test(url) && !collect) block = { type: 'newsletter', title, url, text, button } as SiteBlockNewsletter;
+        else if (!url || collect) block = { type: 'newsletter', title, collect: true, text, button } as SiteBlockNewsletter;
+        break;   // a link that isn't one, with no choice made: nothing, as before
       }
       case 'social': {   // profile icon strip — links out only, never an embedded feed
         const links = arr((b as any).links)
@@ -1302,6 +1305,14 @@ export function renderSiteBlocks(blocks: SiteBlock[] | undefined, ctx: BlockRend
   // inside a columns cell re-enters renderSiteBlocks and restarts the counter, so a
   // page mixing a TOP-LEVEL zoom gallery with a NESTED one could collide ids.)
   let zoomSeq = 0;
+  // item 146: per-page counter → each "Join our list" box gets its own field ids
+  let signupSeq = 0;
+  // Item 146: the box posts to the site's form address with form_kind=signup, so the page's
+  // sender (lib/site_send.ts) sends it in the page with its time ticket, and a plain post
+  // works with scripts off. Without the address (the builder's canvas) it has no action.
+  const signupHtml = (b: SiteBlockNewsletter, n: number): string =>
+    `<section class="block wrap block-newsletter">${h2(b.title, 'Get updates from us', 'title')}${b.text ? `<p class="nl-text"${dds('text')}>${esc(b.text)}</p>` : ''}` +
+    `${signupForm(`nl-${n}`, ctx.formEndpoint, b.button || 'Sign up', dds('button'))}</section>`;
 
   const list = blocks || [];
   for (let bi = 0; bi < list.length; bi++) {
@@ -1425,8 +1436,9 @@ export function renderSiteBlocks(blocks: SiteBlock[] | undefined, ctx: BlockRend
         }
         break;
       }
-      case 'newsletter': {   // calm ESP link-out — mirrors the appointment button
-        const href = safeHref(b.url);
+      case 'newsletter': {   // item 146: the "Join our list" box, else the calm ESP link-out
+        if (b.collect) { html = signupHtml(b, ++signupSeq); break; }
+        const href = safeHref(b.url || '');
         html = href ? `<section class="block wrap block-newsletter">${h2(b.title, 'Get updates from us', 'title')}${b.text ? `<p class="nl-text"${dds('text')}>${esc(b.text)}</p>` : ''}<p class="nl-cta"><a class="btn" href="${attr(href)}" rel="noopener"${dds('button')}>${esc(b.button || 'Sign up')}</a></p></section>` : '';
         break;
       }
@@ -1896,6 +1908,13 @@ ul.areas li{background:var(--wash);color:var(--ink);padding:5px 12px;border-radi
 .block-newsletter{text-align:center}
 .nl-text{color:var(--soft);max-width:56ch;margin:8px auto 0}
 .nl-cta{margin-top:14px}
+.nl-form{max-width:480px;margin:16px auto 0;text-align:left}
+.nl-row{display:flex;flex-wrap:wrap;gap:8px;align-items:flex-end}
+.nl-label{flex:1 0 100%;font-weight:600;font-size:.95rem}
+.nl-form .nl-row input{flex:1 1 220px;width:auto;min-width:0;margin-top:0}
+.nl-consent{margin:12px 0 0;font-size:.9rem}
+.nl-form .nl-consent label{display:flex;align-items:flex-start;gap:8px;font-weight:400;margin:0}
+.nl-form .nl-consent input{width:auto;margin:3px 0 0;flex:none}
 ul.social{list-style:none;margin:14px 0 0;padding:0;display:flex;flex-wrap:wrap;gap:12px}
 ul.social a{display:flex;align-items:center;justify-content:center;width:44px;height:44px;border-radius:50%;border:2px solid var(--accent);color:var(--accent-dark,var(--accent))}
 ul.social svg{display:block}
