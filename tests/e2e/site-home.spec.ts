@@ -381,6 +381,27 @@ test.describe('editing with a mouse is unchanged', () => {
   });
 });
 
+// list item 175: one switch for AI assistants, in Search
+test.describe('Search: the AI assistants switch', () => {
+  test('on by default; off saves as a setting and says what it costs', async ({ page }) => {
+    const writes = await mount(page, '/presence.html#search');
+    const sw = page.locator('#aiCrawlSwitch');
+    await expect(sw).toBeChecked();
+    await expect(page.locator('#aiCrawlWrap')).toHaveAttribute('data-needs', 'configure');
+    await expect(page.locator('#aiCrawlHint')).toContainText('can read your site, so they can mention and recommend you');
+    await sw.uncheck();
+    await expect.poll(() => writes.filter((w) => w.path === '/settings').length).toBe(1);
+    expect(writes.find((w) => w.path === '/settings')!.body).toEqual({ ai_crawlers: false });
+    await expect(page.locator('#aiCrawlHint')).toContainText('Google and Bing search are not affected');
+  });
+
+  test('a site saved with AI assistants off shows the switch off', async ({ page }) => {
+    await mount(page, '/presence.html#search', { '/settings': { data: { ai_crawlers: false } } });
+    await expect(page.locator('#aiCrawlSwitch')).not.toBeChecked();
+    await expect(page.locator('#aiCrawlHint')).toContainText('asked not to read your site');
+  });
+});
+
 test.describe('a watch-plan site', () => {
   const WATCH = { '/site': { data: { site: { id: 's1', edition: 'monitor', status: 'ready', template_slug: 'business-classic', template_version: 1 }, identity: { business_name: 'Sample Bakery', description: 'Hello' }, location: {} } } };
   const open = async (page: Page) => {

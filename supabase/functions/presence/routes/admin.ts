@@ -29,6 +29,8 @@ import {
 import { computeReadiness } from './monitor.ts';
 import { applyPlan } from './foundations.ts';
 import { domainHealth, domainTruth } from '../lib/domain_health.ts';
+import { rdapLookupDetailed, lookupPatch, whereToGo } from '../lib/rdap.ts';
+import { rateAllow } from '../lib/ratelimit.ts';
 import { describeEngine } from '../optimization/engine.ts';
 import { computeHealthCenter } from './system.ts';
 import { inventory as connInventory, inventorySummary as connInventorySummary } from '../connected/inventory.ts';
@@ -184,9 +186,36 @@ async function handleList(cors: Record<string, string>) {
 // domain watch (commerce/lifecycle.ts) since the Nov 2026 review (item 134).
 const domainStatus = domainHealth;
 
+/** Item 162 (review domains findings 6 and 7): where the client goes to add records (the
+ *  company that runs the DNS) and to renew (the seller), by name, with each one's sign-in
+ *  page. A domain never looked up is looked up now, while the client reads the steps,
+ *  instead of after the next daily check. */
+async function domainFacts(site: SiteRow) {
+  const r = await svc(`presence_sites?id=eq.${site.id}&select=domain_registered_name,domain_registrar,domain_dns_host,domain_lookup_status&limit=1`).catch(() => ({ json: [] as unknown[] }));
+  let row = ((Array.isArray(r.json) && r.json[0]) || {}) as { domain_registered_name?: string | null; domain_registrar?: string | null; domain_dns_host?: string | null; domain_lookup_status?: string | null };
+  if (site.custom_domain && !row.domain_lookup_status) {
+    const patch = lookupPatch(await rdapLookupDetailed(site.custom_domain));
+    await svc(`presence_sites?id=eq.${site.id}`, { method: 'PATCH', body: JSON.stringify(patch) }).catch(() => null);
+    row = { ...row, ...(patch as typeof row) };
+  }
+  return { registered: row.domain_registered_name || null, provider: whereToGo(row.domain_registrar, row.domain_dns_host) };
+}
+
+/** GET /foundations/domain/lookup?name= — the client typed a domain: who sold it, who runs
+ *  its records, and each one's steps, before anything is attached (finding 7). */
+export async function handleDomainLookup(req: Request, site: SiteRow, cors: Record<string, string>) {
+  const name = String(new URL(req.url).searchParams.get('name') || '').trim().toLowerCase().replace(/^https?:\/\//, '').replace(/[/?#].*$/, '').replace(/\.$/, '');
+  if (!HOSTNAME_RE.test(name)) return json({ error: 'bad_request', message: 'That doesn’t look like a domain name yet.' }, 400, cors);
+  if (!(await rateAllow(`domlookup:${site.id}`, 40, 600))) return json({ error: 'rate_limited', message: 'Too many lookups just now. Try again in a few minutes.' }, 429, cors);
+  const look = await rdapLookupDetailed(name);
+  if (look.status !== 'ok') return json({ data: { name, found: look.status === 'not_found' ? false : null } }, 200, cors);
+  return json({ data: { name, found: true, registered_name: look.name, ...whereToGo(look.info.registrar, look.facts.dns_host) } }, 200, { ...cors, 'Cache-Control': 'no-store' });
+}
+
 export async function handleDomain(req: Request, method: string, site: SiteRow, principal: Principal, cors: Record<string, string>) {
   if (method === 'GET') {
     const st = await domainStatus(site);
+    const facts = site.custom_domain ? await domainFacts(site) : { registered: null, provider: null };
     // review finding 4 (item 134): the padlock used to be asked for once, when the domain was
     // attached and before the client had changed anything. "Check if it's ready" asks again
     // whenever the records are right and the padlock still isn't on (Netlify: safe to repeat).
@@ -194,12 +223,11 @@ export async function handleDomain(req: Request, method: string, site: SiteRow, 
     // item 134 (review findings 3 and 5): "live and secure" only when both names point here,
     // nothing old is left over, the padlock covers both, and the domain shows OUR latest site
     if (st.health === 'ok' && site.custom_domain && site.netlify_site_id) {
-      // the registered name the daily watch found tells "www." twins from sub-names (shop.example.com has none)
-      const reg = await svc(`presence_sites?id=eq.${site.id}&select=domain_registered_name&limit=1`).then((r) => (Array.isArray(r.json) && (r.json[0] as { domain_registered_name?: string } | undefined)?.domain_registered_name) || null).catch(() => null);
-      const truth = await domainTruth({ custom_domain: site.custom_domain, netlify_site_id: site.netlify_site_id }, reg).catch(() => null);
-      if (truth) return json({ data: { ...st, serving: truth.serving, checklist: truth.checklist, all_ok: truth.all_ok } }, 200, cors);
+      // the registered name the lookup found tells "www." twins from sub-names (shop.example.com has none)
+      const truth = await domainTruth({ custom_domain: site.custom_domain, netlify_site_id: site.netlify_site_id }, facts.registered).catch(() => null);
+      if (truth) return json({ data: { ...st, provider: facts.provider, serving: truth.serving, checklist: truth.checklist, all_ok: truth.all_ok } }, 200, cors);
     }
-    return json({ data: st }, 200, cors);
+    return json({ data: { ...st, provider: facts.provider } }, 200, cors);
   }
   if (!site.netlify_site_id) return json({ error: 'not_provisioned', message: 'Provision hosting for this site before managing domains.' }, 409, cors);
 

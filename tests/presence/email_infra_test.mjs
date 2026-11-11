@@ -84,7 +84,9 @@ const core = await import('../../supabase/functions/_shared/email_infra.ts');
   ok('wiring: presence sendEmail gates on maySend + masks logs', /maySend\(to, opts\)/.test(acct) && /maskEmail\(to\)/.test(acct));
   ok('wiring: presence sendEmail supports critical transactional sends', /critical\?: boolean/.test(acct));
   ok('wiring: clever-api imports the SHARED core (_shared, not presence routes)', /_shared\/email_infra\.ts/.test(clever) && !/presence\/routes\/email_infra/.test(clever));
-  ok('wiring: clever-api outreach carries a VISIBLE opt-out + postal address (CAN-SPAM)', /Burbank, California/.test(clever) && /unsubscribe<\/a>/.test(clever));
+  // item 186: the old outreach route (the one clever-api email that needed a CAN-SPAM footer) is gone;
+  // cold outreach is written on the Prospects page and sent by Eric himself, never by the server
+  ok('wiring: clever-api sends no cold outreach any more', !/prospect_email_send|Outreach send/.test(clever));
   ok('wiring: the branded shell footer carries the postal address', /Burbank, California/.test(read('supabase/functions/presence/lib/email_brand.ts')));
 }
 

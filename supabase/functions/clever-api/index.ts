@@ -141,9 +141,6 @@ const ROUTE_MIN_ROLE: Record<string, keyof typeof ROLE_RANK> = {
   lead_reply:         'staff',
   lead_status:        'staff',
   lead_ai_draft:      'staff',
-  prospect_email_draft: 'staff', // Pipeline: AI-or-template outreach draft
-  prospect_email_send:  'staff', // Pipeline: send outreach via Resend (eric@, reply-to eric@)
-  lead_brief:           'staff', // Lead Intelligence Agent: one prospect -> full brief + draft
   home_snapshot:      'staff',
   home_brief:         'staff',
   revenue_vitals:     'staff',
@@ -151,8 +148,6 @@ const ROUTE_MIN_ROLE: Record<string, keyof typeof ROLE_RANK> = {
   universal_inbox:    'staff',
   conversation_summary: 'staff',
   lead_convert:       'staff',
-  prospect_discover:  'staff',
-  prospect_insights:  'staff',
   quote_ai_build:     'staff',
   quote_save:         'staff',
   quote_list:         'staff',
@@ -171,11 +166,6 @@ const ROUTE_MIN_ROLE: Record<string, keyof typeof ROLE_RANK> = {
   task_breakdown:     'staff',
   ai_draft_reply:     'staff',
   ai_triage:          'staff',
-  visibility_list:    'staff',
-  visibility_check:   'staff',
-  visibility_add:     'staff',
-  visibility_remove:  'staff',
-  visibility_sync_clients: 'staff',
 
   // ── Growth Partnership (staff manage; owner for destructive) ──
   partnership_list:        'staff',
@@ -199,8 +189,6 @@ const ROUTE_MIN_ROLE: Record<string, keyof typeof ROLE_RANK> = {
   content_list:            'staff',
   content_upsert:          'staff',
   content_delete:          'staff',
-  review_list:             'staff',
-  review_get:              'staff',
   review_upsert:           'staff',
   review_draft:            'staff',
   review_publish:          'staff',
@@ -223,7 +211,7 @@ const ROUTE_MIN_ROLE: Record<string, keyof typeof ROLE_RANK> = {
 // ═══ AI MODEL — single source of configuration. When Anthropic deprecates a
 // model, this is the ONE line to change (21 call sites reference it).
 const AI_MODEL = 'claude-haiku-4-5-20251001';
-const DDS_BUILD = '2026-07-04.11'; // bump on every deploy that renames/removes a route
+const DDS_BUILD = '2026-11-11.1'; // bump on every deploy that renames/removes a route
 
 // ════════════════════════════════════════════════════════════════════════════
 //  AI GATEWAY  (ai-architecture.md, Layer A) — the ONE door to the model.
@@ -571,7 +559,7 @@ function _isOverdue(inv: any, nowMs?: number): boolean {
 // now as part of step 2.) NOTE: this limiter is in-memory per instance — a
 // durable, table-backed, per-tenant limiter is the step-2 pipeline's job; this
 // is the interim floor.
-const RATE_LIMITED_TYPES = new Set(['psi_fetch', 'deep_audit', 'ai_critique', 'ai_critique_email', 'concierge', 'reset_password', 'ai_draft_reply', 'ai_triage', 'ai_project_help', 'lead_ai_draft', 'prospect_email_draft', 'visibility_check', 'rec_generate', 'review_draft', 'lead_intake', 'discovery_intake', 'audit_lead', 'report_card', 'survey_response']);
+const RATE_LIMITED_TYPES = new Set(['psi_fetch', 'deep_audit', 'ai_critique', 'ai_critique_email', 'concierge', 'reset_password', 'ai_draft_reply', 'ai_triage', 'ai_project_help', 'lead_ai_draft', 'rec_generate', 'review_draft', 'lead_intake', 'discovery_intake', 'audit_lead', 'report_card', 'survey_response']);
 const RATE_MAX = 12;
 const RATE_WINDOW_MS = 60_000;
 const rateHits = new Map<string, { count: number; resetAt: number }>();
@@ -1340,69 +1328,6 @@ async function analyzeWebsite(opts: {
   });
   if (!r.ok) return { ok: false, error: r.error || 'analysis_failed' };
   return { ok: true, data: _stripEmDashesDeep(r.data) };
-}
-
-// ════════════════════════════════════════════════════════════════════════════
-//  LEAD INTELLIGENCE — deterministic scoring (ai-architecture.md, roster).
-//  Scoring is DETERMINISTIC and explainable (never AI): every point is tied to a
-//  real driver with cited evidence, following the platform's core pattern
-//  (business logic deterministic + auditable; AI only explains/drafts). Inputs
-//  are the prospect record + the Website Analysis Agent's evidence-cited
-//  findings. No invented facts, no invented value — the $ estimate is anchored
-//  to Eric's real paid-invoice history, exactly like prospect_insights.
-// ════════════════════════════════════════════════════════════════════════════
-interface LeadScoreDriver { factor: 'opportunity' | 'fit' | 'urgency'; points: number; note: string; evidence: string; }
-function scoreLead(prospect: any, analysis: any | null, medProject: number, medRetainer: number): {
-  score: number; tier: 'high' | 'medium' | 'low'; drivers: LeadScoreDriver[];
-  value_estimate: { low: number; high: number; basis: string };
-} {
-  const drivers: LeadScoreDriver[] = [];
-  let score = 0;
-  const siteStatus = String(prospect.site_status || '').toLowerCase();
-  const blocks: any[] = (analysis && Array.isArray(analysis.blocks)) ? analysis.blocks : [];
-  const fixes = blocks.filter((b) => b.type === 'fix');
-
-  // ── OPPORTUNITY: real, measured problems there is work to fix ──
-  if (fixes.length) {
-    const pts = Math.min(fixes.length * 8, 40);
-    score += pts;
-    drivers.push({ factor: 'opportunity', points: pts, note: `${fixes.length} concrete problem${fixes.length > 1 ? 's' : ''} found on their site to fix`, evidence: fixes[0].evidence || fixes[0].title });
-  } else if (siteStatus.includes('no website') || siteStatus.includes('facebook')) {
-    score += 40;
-    drivers.push({ factor: 'opportunity', points: 40, note: 'No real website yet, so this is a full build opportunity', evidence: `Prospect record: site_status = "${prospect.site_status}"` });
-  } else if (!analysis) {
-    drivers.push({ factor: 'opportunity', points: 0, note: 'No website analyzed yet, so the opportunity size is unknown', evidence: 'No website on the prospect record to analyze' });
-  } else {
-    drivers.push({ factor: 'opportunity', points: 0, note: 'Their site looks solid, so the play is ongoing care or SEO, not a rebuild', evidence: 'Website analysis found no major fixes' });
-  }
-
-  // ── FIT: can Eric actually reach and win them (ICP = reachable local SMB) ──
-  if (prospect.email) { score += 20; drivers.push({ factor: 'fit', points: 20, note: 'You have a direct email, so this is actionable now', evidence: 'Prospect record: email present' }); }
-  else if (prospect.phone) { score += 10; drivers.push({ factor: 'fit', points: 10, note: 'You have a phone number but no email, so a call is the path in', evidence: 'Prospect record: phone present, email missing' }); }
-  else { drivers.push({ factor: 'fit', points: 0, note: 'No contact info on file, so find an email or phone before pursuing', evidence: 'Prospect record: no email or phone' }); }
-  if (prospect.industry || prospect.location) { score += 8; drivers.push({ factor: 'fit', points: 8, note: `A ${prospect.industry || 'local'} business${prospect.location ? ' in ' + prospect.location : ''} is squarely in your market`, evidence: `Prospect record: industry = "${prospect.industry || ''}", location = "${prospect.location || ''}"` }); }
-
-  // ── URGENCY: warmth (status/cadence) + customer-losing problems right now ──
-  const status = String(prospect.status || 'New');
-  if (status === 'Replied') { score += 25; drivers.push({ factor: 'urgency', points: 25, note: 'They replied, which is the warmest a lead gets. Move now', evidence: 'Prospect record: status = Replied' }); }
-  else if (status === 'New' && prospect.email) { score += 12; drivers.push({ factor: 'urgency', points: 12, note: 'New and not yet contacted, with a channel to reach them', evidence: 'Prospect record: status = New, email present' }); }
-  // measured problems that lose customers today raise urgency
-  const severe = blocks.find((b) => b.type === 'fix' && /https|not secure|no phone|no way to (order|contact|buy)|contact/i.test((b.title || '') + ' ' + (b.evidence || '')));
-  if (severe) { score += 10; drivers.push({ factor: 'urgency', points: 10, note: 'A problem that is costing them customers right now gives you a real reason to reach out today', evidence: severe.evidence || severe.title }); }
-
-  score = Math.max(0, Math.min(100, score));
-  const tier: 'high' | 'medium' | 'low' = score >= 65 ? 'high' : score >= 40 ? 'medium' : 'low';
-
-  // ── VALUE ESTIMATE: anchored to real revenue history, never invented ──
-  const rnd = (n: number) => Math.round(n / 50) * 50;
-  let low = 0, high = 0, basis = '';
-  if (medProject > 0) {
-    if (siteStatus.includes('no website') || siteStatus.includes('facebook')) { low = rnd(medProject * 0.9); high = rnd(medProject * 1.4); basis = `New build, anchored to your median paid project ($${Math.round(medProject).toLocaleString()})`; }
-    else if (fixes.length >= 3 || siteStatus.includes('outdated')) { low = rnd(medProject * 0.6); high = rnd(medProject * 1.1); basis = `Redesign, anchored to your median paid project ($${Math.round(medProject).toLocaleString()})`; }
-    else { basis = medRetainer > 0 ? `Site is solid, so the play is a care/SEO plan around your median retainer ($${Math.round(medRetainer).toLocaleString()}/mo)` : 'Site is solid, so the play is a monthly care/SEO plan'; }
-  } else { basis = 'No paid invoice history yet to anchor an estimate'; }
-
-  return { score, tier, drivers, value_estimate: { low, high, basis } };
 }
 
 const GOOGLE_REVIEW_LINK = Deno.env.get('GOOGLE_REVIEW_LINK') || '';
@@ -6979,175 +6904,6 @@ serveWithRequestCors(async (req) => {
       return json({ ok: true, childFailures: failed }, 200, reqCors);
     }
 
-    // ════════════════════════════════════════════════════════════════════
-    //  PIPELINE OUTREACH — draft + send (gate: staff)
-    //  Two narrow routes so the panel never touches Resend/Anthropic keys.
-    //   • prospect_email_draft  → returns { subject, body, generator } where
-    //     generator is 'ai' | 'template'. AI is tried first; on any failure
-    //     (key missing, timeout, parse error) we fall back to a real template
-    //     so the compose window is NEVER empty. Caller can't tell which ran.
-    //   • prospect_email_send   → sends via Resend from eric@ with reply-to
-    //     eric@ so replies land in Eric's inbox. Returns { ok, id }. It does
-    //     NOT write history; the panel logs ONLY on a 2xx, so a failed send
-    //     can never create a false "sent" event.
-    // ════════════════════════════════════════════════════════════════════
-
-    // Shared: build a grounded, human outreach template from real prospect
-    // fields. Used as the AI prompt's source material AND as the deterministic
-    // fallback, so both paths reference the same true facts (no invention).
-    function buildOutreachTemplate(p: any) {
-      const biz = (p.business || p.business_name || 'your business').toString().trim();
-      const ownerFull = (p.owner || '').toString().trim();
-      const ownerFirst = ownerFull ? ownerFull.split(/\s+/)[0] : '';
-      const industryRaw = (p.industry || '').toString().trim();
-      const industry = industryRaw ? industryRaw.toLowerCase() : 'local business';
-      const location = (p.location || '').toString().trim();
-      const website = (p.website || '').toString().trim();
-      const notes: string[] = Array.isArray(p.research)
-        ? p.research.map((r: any) => (r && r.body ? String(r.body).trim() : '')).filter(Boolean)
-        : [];
-      const firstNote = notes[0] || '';
-
-      const greeting = ownerFirst ? `Hi ${ownerFirst},` : `Hi there,`;
-      const foundLine = location
-        ? `I came across ${biz} while looking at ${industry}s around ${location},`
-        : `I came across ${biz} while looking at ${industry}s in the area,`;
-
-      let observation: string;
-      if (firstNote) {
-        observation = `${foundLine} and one thing stood out: ${firstNote.replace(/\u2014/g, ', ')}.`;
-      } else if (website) {
-        observation = `${foundLine} and took a quick look at ${website}. A couple of small things on there could be quietly sending customers to competitors who rank above you.`;
-      } else {
-        observation = `${foundLine} and couldn't find a website for you. For a ${industry}, that usually means people searching right now are landing on a competitor instead.`;
-      }
-
-      const value = `I run a small studio here in LA and help ${industry}s get found and turn more of those visits into calls and bookings. Not a sales pitch, I just tend to notice this stuff.`;
-      const cta = website
-        ? `Want me to send over a short, honest list of what I'd change first? No cost, no obligation.`
-        : `Happy to put together a quick, no cost plan for getting you showing up in local search. Worth a look?`;
-
-      const subject = website
-        ? `A quick thought on ${biz}'s site`
-        : `Helping ${biz} show up in local search`;
-      const body = `${greeting}\n\n${observation}\n\n${value}\n\n${cta}\n\nEric\nDavis Digital Studio`;
-      return { subject, body };
-    }
-
-    if (type === 'prospect_email_draft') {
-      const p = (body && typeof body.prospect === 'object' && body.prospect) ? body.prospect : body || {};
-      // Deterministic fallback is always available.
-      const tmpl = buildOutreachTemplate(p);
-      let subject = tmpl.subject;
-      let draft = tmpl.body;
-      let generator: 'ai' | 'template' = 'template';
-
-      if (ANTHROPIC_KEY) {
-        try {
-          const biz = (p.business || p.business_name || 'the business').toString().trim();
-          const facts = [
-            `Business: ${biz}`,
-            p.industry ? `Industry: ${p.industry}` : '',
-            p.location ? `Location: ${p.location}` : '',
-            p.website ? `Website: ${p.website}` : `Website: none found`,
-            p.owner ? `Owner/contact: ${p.owner}` : '',
-            Array.isArray(p.research) && p.research.length
-              ? `Things Eric noticed (use ONLY these, do not invent): ${p.research.map((r: any) => (r && r.body ? String(r.body) : '')).filter(Boolean).slice(0, 4).join('; ')}`
-              : '',
-          ].filter(Boolean).join('\n');
-
-          const sys = `You write cold outreach emails for Eric Davis, who runs Davis Digital Studio, a one person web design and SEO studio in Los Angeles. Eric is emailing a local business he has never spoken to, to offer help.
-
-Write like a real person, not marketing. Rules:
-- Open with ONE specific, true observation about THIS business or its website, drawn only from the facts given. Never invent metrics, rankings, dates, or problems.
-- Lead with helping, not selling. No hype, no buzzwords, no "I hope this email finds you well", no "boost/skyrocket/unlock/leverage/game-changing".
-- Short. The length a busy owner actually reads (about 70 to 110 words of body).
-- Warm, plain, direct. First name only if an owner name is given. No em dashes anywhere, use commas instead.
-- End with a low pressure CTA offering a free, honest look. No hard ask.
-- Sign as "Eric" then "Davis Digital Studio" on the next line.
-- The subject must be specific and quiet, not clickbait. Under 6 words.
-Respond as JSON only, nothing else: {"subject":"...","body":"..."}`;
-
-          const aiRes = await fetch('https://api.anthropic.com/v1/messages', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'x-api-key': ANTHROPIC_KEY, 'anthropic-version': '2023-06-01' },
-            body: JSON.stringify({ model: AI_MODEL, max_tokens: 500, system: sys, messages: [{ role: 'user', content: facts }] }),
-            signal: AbortSignal.timeout(9000),
-          });
-          if (aiRes.ok) {
-            const aiData = await aiRes.json();
-            const raw = Array.isArray(aiData?.content) ? aiData.content.filter((b: any) => b.type === 'text').map((b: any) => b.text).join('') : '';
-            const cleaned = raw.replace(/```json|```/g, '').trim();
-            const parsed = JSON.parse(cleaned);
-            if (parsed && typeof parsed.body === 'string' && parsed.body.trim().length > 20 && typeof parsed.subject === 'string' && parsed.subject.trim().length > 2) {
-              draft = parsed.body.replace(/\u2014/g, ', ').trim();
-              subject = parsed.subject.replace(/\u2014/g, ', ').trim();
-              generator = 'ai';
-            }
-          }
-        } catch (_) { /* keep deterministic template */ }
-      }
-
-      return json({ data: { subject, body: draft, generator } }, 200, reqCors);
-    }
-
-    if (type === 'prospect_email_send') {
-      const to = (body.to || '').toString().trim();
-      const subject = (body.subject || '').toString().trim();
-      const text = (body.body || '').toString();
-      // Validate before doing anything that could be mistaken for a send.
-      const emailOk = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(to);
-      if (!emailOk) return json({ error: 'bad_recipient', detail: 'A valid prospect email is required.' }, 200, reqCors);
-      if (!subject) return json({ error: 'missing_subject', detail: 'Subject is required.' }, 200, reqCors);
-      if (text.trim().length < 5) return json({ error: 'empty_body', detail: 'Email body is empty.' }, 200, reqCors);
-      if (!RESEND_KEY) return json({ error: 'email_not_configured', detail: 'Email service is not configured.' }, 200, reqCors);
-
-      // Plain-text outreach renders as simple HTML (preserve line breaks).
-      const safe = text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-      const html = `<div style="font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;font-size:15px;line-height:1.6;color:#1a1523;white-space:pre-wrap;">${safe}</div>`;
-
-      try {
-        // Outreach is the send that MOST needs suppression + unsubscribe: it's
-        // 1:1 prospecting — commercial mail — so a bounced/opted-out address must
-        // never be re-mailed, and CAN-SPAM wants a VISIBLE opt-out + postal
-        // address in the body, not just headers.
-        const { isSuppressed, unsubscribeUrl, unsubscribePageUrl } = await import('../_shared/email_infra.ts');
-        if (await isSuppressed(to)) return json({ error: 'recipient_suppressed', detail: 'This address unsubscribed or bounced previously. Nothing was sent.' }, 200, reqCors);
-        const unsub = await unsubscribeUrl(to);            // the List-Unsubscribe header (one-click POST)
-        const unsubPage = await unsubscribePageUrl(to);    // the link a person clicks (a page that works)
-        const footer = `<p style="font-size:12px;color:#8a8198;margin-top:22px;border-top:1px solid #eee9e0;padding-top:12px;">Davis Digital Studio LLC · Burbank, California · <a href="${unsubPage}" style="color:#8a8198;">unsubscribe</a></p>`;
-        const textFooter = `\n\n—\nDavis Digital Studio LLC · Burbank, California\nUnsubscribe: ${unsubPage}`;
-        const r = await fetch('https://api.resend.com/emails', {
-          method: 'POST',
-          headers: { 'Authorization': `Bearer ${RESEND_KEY}`, 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            from: `Eric Davis <${ERIC}>`,
-            to: [to],
-            reply_to: ERIC,
-            subject,
-            html: html + footer,
-            text: text + textFooter,
-            headers: {
-              'List-Unsubscribe': `<${unsub}>, <mailto:support@davisdigitalstudio.com?subject=unsubscribe>`,
-              'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click',
-            },
-          }),
-        });
-        if (!r.ok) {
-          let detail = '';
-          try { detail = await r.text(); } catch (_) { /* ignore */ }
-          console.error('Outreach send failed', r.status, 'to', maskAddr(to), detail);
-          return json({ error: 'send_failed', status: r.status, detail: 'The email service rejected the send. Nothing was sent.' }, 200, reqCors);
-        }
-        let id = '';
-        try { const j = await r.json(); id = j && j.id ? String(j.id) : ''; } catch (_) { /* id optional */ }
-        return json({ data: { ok: true, id } }, 200, reqCors);
-      } catch (e) {
-        console.error('Outreach send threw to', maskAddr(to), String(e));
-        return json({ error: 'send_threw', detail: 'Could not reach the email service. Nothing was sent.' }, 200, reqCors);
-      }
-    }
-
     // ── ADMIN_WRITE ── (gate: staff) — Part 2c named mutations
     // Body: { type:'admin_write', table, op:'insert'|'update'|'delete',
     //         payload?, match?:{column:value} }
@@ -8299,277 +8055,6 @@ Respond as JSON only, nothing else: {"subject":"...","body":"..."}`;
       } catch (_) { warnings.push('lead_status_update_failed'); }
 
       return json({ data: { client_id: clientId, invited: true, warnings } }, 200, reqCors);
-    }
-
-    // ===== PROSPECT DISCOVERY ===== (gate: staff)
-    // Finds real local businesses from Google Places (Text Search v1) and adds
-    // them to the prospects table, deduped by name + website against what's
-    // already there. Body: { query: "dentists in Pasadena", limit? }.
-    // Requires the PLACES_KEY edge secret (falls back to PSI_KEY, since both
-    // are Google API keys — the Places API just needs enabling on the project).
-    if (type === 'prospect_discover') {
-      if (!(await verifyAdminJwt(req))) return json({ error: 'unauthorized' }, 401, reqCors);
-      if (!SB_SERVICE) return json({ error: 'no service key' }, 500, reqCors);
-      const PLACES_KEY = Deno.env.get('PLACES_KEY') || PSI_KEY || '';
-      if (!PLACES_KEY) return json({ error: 'places_not_configured', detail: 'Add a PLACES_KEY edge function secret (a Google API key with Places API enabled).' }, 200, reqCors);
-      const query = String(body.query || '').trim();
-      if (query.length < 3) return json({ error: 'query required', detail: 'Describe what to find, e.g. "dentists in Pasadena".' }, 400, reqCors);
-      const limit = Math.min(Math.max(Number(body.limit) || 10, 1), 20);
-
-      let places: any[] = [];
-      try {
-        const r = await fetch('https://places.googleapis.com/v1/places:searchText', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'X-Goog-Api-Key': PLACES_KEY,
-            'X-Goog-FieldMask': 'places.displayName,places.websiteUri,places.nationalPhoneNumber,places.formattedAddress,places.primaryTypeDisplayName',
-          },
-          body: JSON.stringify({ textQuery: query, maxResultCount: limit }),
-          signal: AbortSignal.timeout(15000),
-        });
-        const d = await r.json();
-        if (!r.ok) return json({ error: 'places_error', detail: (d && d.error && d.error.message) || `Places API ${r.status}. Is the Places API (New) enabled for this key?` }, 200, reqCors);
-        places = Array.isArray(d.places) ? d.places : [];
-      } catch (e) { return json({ error: 'places_failed', message: String(e) }, 200, reqCors); }
-      if (!places.length) return json({ data: { found: 0, added: 0, skipped: 0, prospects: [] } }, 200, reqCors);
-
-      // Dedupe against existing prospects by normalized name and by website host.
-      const svcH = { 'Content-Type': 'application/json', 'apikey': SB_SERVICE, 'Authorization': `Bearer ${SB_SERVICE}` };
-      let existing: any[] = [];
-      try {
-        const r = await fetch(`${SB_URL}/rest/v1/prospects?select=business_name,website&limit=1000`, { headers: svcH });
-        if (r.ok) { const d = await r.json(); existing = Array.isArray(d) ? d : []; }
-      } catch (_) { /* dedupe degrades gracefully */ }
-      const norm = (s: any) => String(s || '').toLowerCase().replace(/[^a-z0-9]/g, '');
-      const host = (u: any) => { try { return new URL(String(u)).hostname.replace(/^www\./, ''); } catch (_) { return ''; } };
-      const seenNames = new Set(existing.map((p: any) => norm(p.business_name)));
-      const seenHosts = new Set(existing.map((p: any) => host(p.website)).filter(Boolean));
-
-      const added: any[] = [];
-      let skipped = 0;
-      for (const pl of places) {
-        const name = (pl.displayName && pl.displayName.text) ? String(pl.displayName.text) : '';
-        if (!name) { skipped++; continue; }
-        const site = pl.websiteUri ? String(pl.websiteUri) : '';
-        if (seenNames.has(norm(name)) || (site && seenHosts.has(host(site)))) { skipped++; continue; }
-        const row = {
-          business_name: name.slice(0, 200),
-          phone: pl.nationalPhoneNumber ? String(pl.nationalPhoneNumber).slice(0, 40) : null,
-          website: site ? site.slice(0, 300) : null,
-          site_status: site ? 'Decent site' : 'No website',
-          source: 'Google Maps',
-          priority: site ? 'Medium' : 'High', // no website = the warmest gap for a web studio
-          status: 'New',
-          notes: JSON.stringify({ v: 1, info: {
-            location: pl.formattedAddress ? String(pl.formattedAddress).slice(0, 200) : '',
-            industry: (pl.primaryTypeDisplayName && pl.primaryTypeDisplayName.text) ? String(pl.primaryTypeDisplayName.text).slice(0, 80) : '',
-          }, research: [{ t: new Date().toISOString(), cat: 'Note', body: `Discovered via Places search: "${query.slice(0, 120)}"` }] }),
-        };
-        try {
-          const r = await fetch(`${SB_URL}/rest/v1/prospects`, { method: 'POST', headers: { ...svcH, 'Prefer': 'return=representation' }, body: JSON.stringify(row) });
-          if (r.ok) { const d = await r.json(); if (Array.isArray(d) && d.length) { added.push(d[0]); seenNames.add(norm(name)); if (site) seenHosts.add(host(site)); continue; } }
-          skipped++;
-        } catch (_) { skipped++; }
-      }
-      return json({ data: { found: places.length, added: added.length, skipped, prospects: added.map((p: any) => ({ id: p.id, business_name: p.business_name, website: p.website })) } }, 200, reqCors);
-    }
-
-    // ===== PROSPECT INSIGHTS ===== (gate: staff)
-    // For one prospect: conversion likelihood, an estimated contract value
-    // band, and a suggested follow-up time. Deliberately deterministic and
-    // grounded: likelihood comes from real signals (status, email, site gap,
-    // contact history), and the value band is anchored to Eric's OWN invoice
-    // history (median project + median retainer), never an invented number.
-    if (type === 'prospect_insights') {
-      if (!(await verifyAdminJwt(req))) return json({ error: 'unauthorized' }, 401, reqCors);
-      if (!SB_SERVICE) return json({ error: 'no service key' }, 500, reqCors);
-      const pid = String(body.id || '');
-      if (!pid) return json({ error: 'id required' }, 400, reqCors);
-      const svcH = { 'apikey': SB_SERVICE, 'Authorization': `Bearer ${SB_SERVICE}` };
-      const rd = async (path: string) => {
-        try { const r = await fetch(`${SB_URL}/rest/v1/${path}`, { headers: svcH }); if (!r.ok) return []; const d = await r.json(); return Array.isArray(d) ? d : []; }
-        catch (_) { return []; }
-      };
-      const [pRows, invRows, partRows] = await Promise.all([
-        rd(`prospects?id=eq.${encodeURIComponent(pid)}&select=*&limit=1`),
-        svcReadAll(`invoices?deleted_at=is.null&status=eq.paid&select=amount`),
-        rd(`partnerships?deleted_at=is.null&select=monthly_amount&limit=200`),
-      ]);
-      const p = pRows.length ? pRows[0] : null;
-      if (!p) return json({ error: 'not_found' }, 404, reqCors);
-
-      // ── value anchors from Eric's real revenue history ──
-      const toNum = (v: any) => { const n = parseFloat(String(v == null ? '' : v).replace(/[^0-9.]/g, '')); return isFinite(n) && n > 0 ? n : 0; };
-      const paidAmts = invRows.map((i: any) => toNum(i.amount)).filter((n: number) => n > 0).sort((a: number, b: number) => a - b);
-      const median = (a: number[]) => a.length ? a[Math.floor(a.length / 2)] : 0;
-      const medProject = median(paidAmts);
-      const retainers = partRows.map((x: any) => toNum(x.monthly_amount)).filter((n: number) => n > 0).sort((a: number, b: number) => a - b);
-      const medRetainer = median(retainers);
-      const rnd = (n: number) => Math.round(n / 50) * 50;
-
-      const siteStatus = String(p.site_status || '').toLowerCase();
-      let valueLow = 0, valueHigh = 0, valueBasis = '';
-      if (medProject > 0) {
-        if (siteStatus.includes('no website') || siteStatus.includes('facebook')) {
-          valueLow = rnd(medProject * 0.9); valueHigh = rnd(medProject * 1.4);
-          valueBasis = `New build, anchored to your median paid project ($${Math.round(medProject).toLocaleString()})`;
-        } else if (siteStatus.includes('outdated')) {
-          valueLow = rnd(medProject * 0.6); valueHigh = rnd(medProject * 1.1);
-          valueBasis = `Redesign, anchored to your median paid project ($${Math.round(medProject).toLocaleString()})`;
-        } else {
-          valueLow = 0; valueHigh = 0;
-          valueBasis = medRetainer > 0
-            ? `Site is fine — the play is a care/SEO plan around your median retainer ($${Math.round(medRetainer).toLocaleString()}/mo)`
-            : 'Site is fine — the play is a monthly care/SEO plan';
-        }
-      } else {
-        valueBasis = 'No paid invoice history yet to anchor an estimate — this will populate as invoices are paid.';
-      }
-
-      // ── likelihood from real signals ──
-      let cf: any = {}; try { cf = p.notes && String(p.notes).trim().startsWith('{') ? JSON.parse(p.notes) : {}; } catch (_) { cf = {}; }
-      const logArr = Array.isArray(cf.log) ? cf.log : [];
-      const lastTouch = logArr.length ? logArr[logArr.length - 1] : null;
-      const daysSinceTouch = (lastTouch && lastTouch.t) ? Math.floor((Date.now() - new Date(lastTouch.t).getTime()) / 86400000) : null;
-      const status = String(p.status || 'New');
-      let likelihood = 'low', why = '';
-      if (status === 'Replied') { likelihood = 'high'; why = 'They replied — an open conversation is the strongest signal there is.'; }
-      else if (status === 'Emailed' && daysSinceTouch !== null && daysSinceTouch <= 7) { likelihood = 'medium'; why = `Outreach is fresh (${daysSinceTouch}d ago) and still warm.`; }
-      else if (status === 'Emailed') { likelihood = 'low'; why = `Emailed ${daysSinceTouch !== null ? daysSinceTouch + 'd ago' : 'a while back'} with no reply — cooling.`; }
-      else if (p.email && (siteStatus.includes('no website') || siteStatus.includes('outdated') || siteStatus.includes('facebook'))) {
-        likelihood = 'medium'; why = 'You have a direct email and their site has a real gap you can name.';
-      } else if (!p.email) { likelihood = 'low'; why = 'No email on file yet — find a contact before this can move.'; }
-      else { why = 'No contact yet and no obvious site gap — needs research to find the angle.'; }
-      if (status === 'Client') { likelihood = 'won'; why = 'Already a client.'; }
-      if (status === 'Dead') { likelihood = 'dead'; why = 'Marked dead.'; }
-
-      // ── follow-up timing from status + cadence ──
-      let followup = '';
-      if (status === 'Replied') followup = 'Reply within 24 hours — momentum dies fast after a reply.';
-      else if (status === 'Emailed' && daysSinceTouch !== null && daysSinceTouch >= 4) followup = 'Follow up now — one polite bump 4 to 7 days after a cold email is the highest-response window.';
-      else if (status === 'Emailed' && daysSinceTouch !== null) followup = `Wait ${Math.max(1, 4 - daysSinceTouch)} more day${(4 - daysSinceTouch) === 1 ? '' : 's'}, then send one polite bump.`;
-      else if (status === 'New' && p.email) followup = 'No contact yet — the best time for the first email is now.';
-      else if (status === 'New') followup = 'Find an email or call — no outreach channel is on file yet.';
-
-      return json({ data: {
-        likelihood, likelihood_why: why,
-        value_low: valueLow, value_high: valueHigh, value_basis: valueBasis,
-        followup,
-        last_touch_days: daysSinceTouch,
-      } }, 200, reqCors);
-    }
-
-    // ═══════════════════════════════════════════════════════════════════════
-    //  LEAD INTELLIGENCE AGENT — one prospect -> full lead brief + outreach draft
-    //  (gate: staff). Composes the three roster agents end to end, smallest
-    //  useful version:
-    //    1. LOAD the existing prospect (manual-add source; no discovery here).
-    //    2. ENRICH from ONLY their own public website (deepAudit fetches the
-    //       public page — no platform scraping, no data behind logins).
-    //    3. ANALYZE via the Website Analysis Agent (evidence-cited findings).
-    //    4. SCORE deterministically (scoreLead) — fit/urgency/opportunity, every
-    //       point tied to cited evidence; value anchored to real revenue.
-    //    5. NEXT BEST ACTION (deterministic, from status/cadence).
-    //    6. DRAFT outreach via the Drafting Agent, grounded in a TRUE observation
-    //       from the findings. Never sends. Human approves and sends manually.
-    //  Never invents contact info, pricing, guarantees, or claims. Read-only:
-    //  does not change the prospect's status or send anything.
-    // ═══════════════════════════════════════════════════════════════════════
-    if (type === 'lead_brief') {
-      if (!SB_SERVICE) return json({ error: 'no service key' }, 500, reqCors);
-      const pid = String(body.id || body.prospectId || '');
-      if (!pid) return json({ error: 'id required' }, 400, reqCors);
-      const svcH = { 'apikey': SB_SERVICE, 'Authorization': `Bearer ${SB_SERVICE}` };
-      const rd = async (path: string) => { try { const r = await fetch(`${SB_URL}/rest/v1/${path}`, { headers: svcH }); if (!r.ok) return []; const d = await r.json(); return Array.isArray(d) ? d : []; } catch { return []; } };
-
-      // 1. LOAD prospect + revenue anchors (deterministic)
-      const [pRows, invRows, partRows] = await Promise.all([
-        rd(`prospects?id=eq.${encodeURIComponent(pid)}&select=*&limit=1`),
-        svcReadAll(`invoices?deleted_at=is.null&status=eq.paid&select=amount`),
-        rd(`partnerships?deleted_at=is.null&select=monthly_amount&limit=200`),
-      ]);
-      const p = pRows.length ? pRows[0] : null;
-      if (!p) return json({ error: 'not_found' }, 404, reqCors);
-      const toN = (v: any) => { const n = parseFloat(String(v == null ? '' : v).replace(/[^0-9.]/g, '')); return isFinite(n) && n > 0 ? n : 0; };
-      const med = (a: number[]) => { const s = a.filter((n) => n > 0).sort((x, y) => x - y); return s.length ? s[Math.floor(s.length / 2)] : 0; };
-      const medProject = med((invRows as any[]).map((i) => toN(i.amount)));
-      const medRetainer = med((partRows as any[]).map((x) => toN(x.monthly_amount)));
-
-      // 2 + 3. ENRICH from the prospect's own public website, then ANALYZE.
-      let analysis: any = null; let analyzed_url: string | null = null; let analysis_note = '';
-      const website = String(p.website || '').trim();
-      if (website) {
-        try {
-          const audit = await deepAudit(website);            // deterministic public-page measurement
-          analyzed_url = audit.url || website;
-          if (!audit.fetchedHtml) { analysis_note = 'Could not reach their website to analyze it.'; }
-          else {
-            const op = audit.onPage || {}, lc = audit.local || {}, sc = audit.schema || {}, dc = audit.discoverability || {};
-            const facts = [
-              `Domain: ${audit.domain}`, `HTTPS (secure): ${audit.https ? 'yes' : 'NO, not secure'}`,
-              `Page title: ${op.title ? `"${op.title}" (${op.titleLength} chars)` : 'MISSING'}`,
-              `Meta description: ${op.metaDescription ? `present (${op.metaDescriptionLength} chars)` : 'MISSING'}`,
-              `Main headline H1: ${op.h1Text ? `"${op.h1Text}"` : 'MISSING'} (count ${op.h1Count})`,
-              `Visible word count: ${op.wordCount}`, `Images: ${op.imageCount} total, ${op.imagesWithAlt} with alt text`,
-              `Internal links: ${op.internalLinks}`, `Open Graph share preview: title ${op.ogTitle ? 'yes' : 'no'}, image ${op.ogImage ? 'yes' : 'no'}`,
-              `Phone on page: ${lc.phoneOnPage ? 'yes' : 'NO'}`, `Address/ZIP on page: ${lc.zipOnPage ? 'yes' : 'no'}`, `Google Map embedded: ${lc.googleMapsEmbed ? 'yes' : 'no'}`, `Hours listed: ${lc.hoursMentioned ? 'yes' : 'no'}`,
-              `Structured data: ${sc.blocks} block(s); LocalBusiness ${sc.hasLocalBusiness ? 'yes' : 'no'}`,
-              `robots.txt: ${dc.robotsTxt ? (dc.robotsTxtBlocksAll ? 'present but BLOCKS Google' : 'present') : 'missing'}`, `Sitemap: ${dc.sitemapXml ? 'yes' : 'not found'}`,
-            ].join('\n');
-            const ctx = `This is a prospect Eric is evaluating, not a client. Business type: ${p.industry || 'small business'}${p.location ? ' in ' + p.location : ''}. Assume their goal is getting more customers from their site. Write the analysis as JSON only.`;
-            const ar = await analyzeWebsite({ task: 'lead_audit', evidenceFacts: facts, context: ctx, maxTokens: 2000 });
-            if (ar.ok) analysis = ar.data; else analysis_note = 'Website analysis was unavailable just now.';
-          }
-        } catch (_) { analysis_note = 'Could not analyze their website.'; }
-      } else {
-        analysis_note = 'No website on file for this prospect.';
-      }
-
-      // 4. SCORE (deterministic + explainable)
-      const scored = scoreLead(p, analysis, medProject, medRetainer);
-
-      // 5. NEXT BEST ACTION (deterministic, from status/contactability)
-      const status = String(p.status || 'New');
-      let next_action = '';
-      if (!p.email && !p.phone) next_action = 'Find a contact (email or phone) before anything else. There is no way to reach them yet.';
-      else if (status === 'Replied') next_action = 'They replied. Respond within 24 hours while it is warm.';
-      else if (status === 'Emailed') next_action = 'Already emailed. Send one polite follow-up if it has been 4 to 7 days, then leave it.';
-      else if (p.email) next_action = 'Send the outreach draft below (after your review). Email is the fastest path in.';
-      else next_action = 'Call them, since you have a phone number but no email.';
-
-      // 6. DRAFT outreach via the Drafting Agent, grounded in a TRUE observation.
-      // Only draft when there is a channel and it is a first-touch situation.
-      let outreach: any = null;
-      const canDraft = !!p.email && (status === 'New' || status === '' || status === 'Emailed');
-      if (canDraft) {
-        const topFix = (analysis && Array.isArray(analysis.blocks)) ? analysis.blocks.find((b: any) => b.type === 'fix') : null;
-        const observation = topFix ? `${topFix.title} (${topFix.evidence})` : (website ? 'their website could do more to turn visitors into customers' : 'you could not find a website for them');
-        const dctx = [
-          `Recipient: ${p.contact_name || p.business_name || 'the owner'} at ${p.business_name || 'their business'}${p.location ? ' in ' + p.location : ''}.`,
-          `Business type: ${p.industry || 'small local business'}.`,
-          `One TRUE observation about their site to open with (use ONLY this, do not add other specifics): ${observation}.`,
-          analysis && analysis.blocks ? `Other measured findings you may reference honestly: ${analysis.blocks.filter((b: any) => b.type === 'fix').slice(0, 3).map((b: any) => b.title).join('; ')}.` : '',
-        ].filter(Boolean).join('\n');
-        const instruction = `Draft a short, warm cold-outreach email from Eric to this prospect. Open with the one true observation about their website. Then say in a sentence that Eric helps small businesses get found and turn more visitors into calls or customers. Offer a free, honest short list of what he would improve first. Keep it low pressure and genuinely helpful, not a hard sell. Do not quote any price. Do not promise or guarantee any result or ranking. Do not invent any detail not given. Sign as Eric.`;
-        const dr = await draftInVoice({ task: 'lead_outreach', instruction, context: dctx, maxTokens: 500 });
-        outreach = dr.ok
-          ? { channel: 'email', to: p.email, subject: null, body: dr.text, is_ai: true, approved: false, note: 'Draft only. Review and send manually. Nothing was sent.' }
-          : { error: 'draft_unavailable', note: 'Outreach draft could not be generated right now.' };
-      }
-
-      // ASSEMBLE the brief (read-only; status unchanged, nothing sent)
-      return json({ data: {
-        prospect: { id: p.id, business_name: p.business_name, contact_name: p.contact_name || null, email: p.email || null, phone: p.phone || null, website: website || null, industry: p.industry || null, location: p.location || null, status },
-        analysis: analysis ? { headline: analysis.headline, blocks: analysis.blocks, next_steps: analysis.next_steps || [], analyzed_url } : null,
-        analysis_note: analysis_note || null,
-        score: { value: scored.score, tier: scored.tier, drivers: scored.drivers },
-        value_estimate: scored.value_estimate,
-        why_pursue: scored.drivers.filter((d) => d.points > 0).map((d) => d.note),
-        next_action,
-        outreach,        // null when no email / not a first-touch situation; never auto-sent
-        human_approval_required: true,
-      } }, 200, reqCors);
     }
 
     // ===== QUOTES — AI BUILD ===== (gate: staff)
@@ -9922,191 +9407,6 @@ Rules: at most 5 items. "go" and "kind" must match the source. "refId" must be a
       }
     }
     // ===== END AI MANAGER — HOME BRIEFING =====
-
-    // ===== VISIBILITY — SITE HEALTH MONITORING ===== (gate: staff)
-    if (type === 'visibility_list' || type === 'visibility_check' ||
-        type === 'visibility_add' || type === 'visibility_remove' || type === 'visibility_sync_clients') {
-      if (!(await verifyAdminJwt(req))) return json({ error: 'unauthorized' }, 401, reqCors);
-      if (!SB_SERVICE) return json({ error: 'no service key' }, 500, reqCors);
-
-      const visSvc = { 'apikey': SB_SERVICE, 'Authorization': `Bearer ${SB_SERVICE}`, 'Content-Type': 'application/json' };
-      const visDb = async (path: string, method = 'GET', payload: any = null) => {
-        try {
-          const opts: any = { method, headers: { ...visSvc, 'Prefer': 'return=representation' } };
-          if (payload) opts.body = JSON.stringify(payload);
-          const r = await fetch(`${SB_URL}/rest/v1/${path}`, opts);
-          const d = await r.json().catch(() => null);
-          return { ok: r.ok, status: r.status, data: d, detail: r.ok ? null : d };
-        } catch (e) { return { ok: false, status: 0, data: null, detail: String(e) }; }
-      };
-
-      // ── LIST: every monitored site with its latest two checks (for trend) ──
-      if (type === 'visibility_list') {
-        // SERVICE-ROLE → CALLER-JWT CUTOVER (module 2, read-only). Both reads run
-        // under the caller's JWT so RLS enforces tenant scope via
-        // monitored_sites_staff and site_checks_staff (tenant_id IN
-        // current_tenant_ids()). Same rows for the single-tenant DDS staff, now
-        // tenant-safe. The shared service-role visDb helper is unchanged for the
-        // WRITE routes in this block (visibility_check/add/remove/sync_clients),
-        // which are later increments. Pipeline (gate authz + revocation + rate
-        // limit + 'action' audit) is unchanged.
-        const jwt = req.headers.get('x-dds-user-jwt') || (principal && principal.jwt) || '';
-        if (!SB_ANON || !jwt) return json({ error: 'no anon key or token' }, 500, reqCors);
-        const asUser = { apikey: SB_ANON, Authorization: `Bearer ${jwt}` };
-        const readAs = async (path: string) => {
-          const r = await fetch(`${SB_URL}/rest/v1/${path}`, { headers: asUser });
-          return { ok: r.ok, data: r.ok ? await r.json().catch(() => []) : [], detail: r.ok ? null : await r.text().catch(() => '') };
-        };
-        const sr = await readAs(`monitored_sites?select=*&order=created_at.asc`);
-        if (!sr.ok) return json({ error: 'sites_read_failed', detail: sr.detail }, 200, reqCors);
-        const sites = Array.isArray(sr.data) ? sr.data : [];
-        const out: any[] = [];
-        for (const s of sites) {
-          const cr = await readAs(`site_checks?site_id=eq.${s.id}&select=overall,performance,mobile,visibility,local,https,ok,error,checked_at&order=checked_at.desc&limit=2`);
-          const checks = (cr.ok && Array.isArray(cr.data)) ? cr.data : [];
-          out.push({ site: s, latest: checks[0] || null, previous: checks[1] || null });
-        }
-        return json({ data: out }, 200, reqCors);
-      }
-
-      // ── ADD: a site to the watchlist (manual) ──
-      if (type === 'visibility_add') {
-        let url = String(body.url || '').trim();
-        const label = String(body.label || '').trim();
-        if (!url) return json({ error: 'url required' }, 400, reqCors);
-        if (!/^https?:\/\//i.test(url)) url = 'https://' + url.replace(/^\/+/, '');
-        const row = { label: label || url.replace(/^https?:\/\//, '').replace(/\/.*$/, ''), url, source: body.source === 'self' ? 'self' : 'manual', client_id: body.client_id || null };
-        const ir = await visDb(`monitored_sites`, 'POST', row);
-        if (!ir.ok) {
-          const dup = ir.detail && JSON.stringify(ir.detail).includes('duplicate');
-          return json({ error: dup ? 'already_watching' : 'add_failed', detail: ir.detail }, 200, reqCors);
-        }
-        return json({ data: Array.isArray(ir.data) ? ir.data[0] : ir.data }, 200, reqCors);
-      }
-
-      // ── REMOVE: drop a site (cascade removes its checks) ──
-      if (type === 'visibility_remove') {
-        const id = String(body.id || '');
-        if (!id) return json({ error: 'id required' }, 400, reqCors);
-        const dr = await visDb(`monitored_sites?id=eq.${encodeURIComponent(id)}`, 'DELETE');
-        if (!dr.ok) return json({ error: 'remove_failed', detail: dr.detail }, 200, reqCors);
-        return json({ ok: true }, 200, reqCors);
-      }
-
-      // ── SYNC CLIENTS: ensure every client with a site is on the watchlist ──
-      if (type === 'visibility_sync_clients') {
-        const cr = await fetch(`${SB_URL}/rest/v1/clients?select=id,name,website&deleted_at=is.null&limit=500`, { headers: visSvc });
-        const clients = cr.ok ? (await cr.json().catch(() => [])) : [];
-        const existing = await visDb(`monitored_sites?select=url,client_id`);
-        const have = new Set((existing.ok && Array.isArray(existing.data) ? existing.data : []).map((x: any) => String(x.url || '').toLowerCase()));
-        let added = 0;
-        for (const c of (Array.isArray(clients) ? clients : [])) {
-          let u = c.website || c.url || c.site_url || c.domain || '';
-          if (!u) continue;
-          u = String(u).trim();
-          if (!/^https?:\/\//i.test(u)) u = 'https://' + u.replace(/^\/+/, '');
-          if (have.has(u.toLowerCase())) continue;
-          const ir = await visDb(`monitored_sites`, 'POST', { label: c.name || u, url: u, source: 'client', client_id: c.id });
-          if (ir.ok) { added++; have.add(u.toLowerCase()); }
-        }
-        return json({ data: { added } }, 200, reqCors);
-      }
-
-      // ── CHECK: run a real health audit on one site, store the result ──
-      if (type === 'visibility_check') {
-        const id = String(body.id || '');
-        if (!id) return json({ error: 'id required' }, 400, reqCors);
-        const sr = await visDb(`monitored_sites?id=eq.${encodeURIComponent(id)}&select=*&limit=1`);
-        const site = (sr.ok && Array.isArray(sr.data) && sr.data[0]) ? sr.data[0] : null;
-        if (!site) return json({ error: 'site_not_found' }, 200, reqCors);
-        const url = site.url;
-
-        let perfScore: number | null = null, seoScore: number | null = null, a11yScore: number | null = null;
-        let lcp: string | null = null, cls: string | null = null;
-        if (PSI_KEY) {
-          try {
-            const psiUrl = `https://www.googleapis.com/pagespeedonline/v5/runPagespeed?url=${encodeURIComponent(url)}&strategy=mobile&category=performance&category=seo&category=accessibility&key=${PSI_KEY}`;
-            const pr = await fetch(psiUrl, { signal: AbortSignal.timeout(90000) });
-            const pd = await pr.json();
-            if (!pd.error && pd.lighthouseResult) {
-              const cats = pd.lighthouseResult.categories || {};
-              perfScore = cats.performance ? Math.round(cats.performance.score * 100) : null;
-              seoScore = cats.seo ? Math.round(cats.seo.score * 100) : null;
-              a11yScore = cats.accessibility ? Math.round(cats.accessibility.score * 100) : null;
-              const audits = pd.lighthouseResult.audits || {};
-              lcp = audits['largest-contentful-paint'] ? audits['largest-contentful-paint'].displayValue : null;
-              cls = audits['cumulative-layout-shift'] ? audits['cumulative-layout-shift'].displayValue : null;
-            }
-          } catch (_) { /* PSI may time out; pillars below still compute from deepAudit */ }
-        }
-
-        let audit: any = null;
-        try { audit = await deepAudit(url); } catch (_) { audit = null; }
-
-        if (perfScore === null && !audit) {
-          const fail = { site_id: id, ok: false, error: 'Could not reach site or score it (PSI + fetch both failed).' };
-          await visDb(`site_checks`, 'POST', fail);
-          await visDb(`monitored_sites?id=eq.${encodeURIComponent(id)}`, 'PATCH', { updated_at: new Date().toISOString() });
-          return json({ data: { ok: false, error: fail.error } }, 200, reqCors);
-        }
-
-        const op = (audit && audit.onPage) || {};
-        const sc = (audit && audit.schema) || {};
-        const lc = (audit && audit.local) || {};
-        const dc = (audit && audit.discoverability) || {};
-        const https = audit ? !!audit.https : null;
-
-        const performance = perfScore;
-        const mobile = a11yScore;
-
-        const onPageSignals = [
-          op.titleLength >= 25 && op.titleLength <= 65,
-          op.metaDescriptionLength >= 80 && op.metaDescriptionLength <= 170,
-          op.h1Count === 1,
-          !!op.canonical,
-          (op.wordCount || 0) >= 200,
-          !!(op.ogTitle && op.ogDescription && op.ogImage),
-          !!dc.sitemapXml,
-          !!dc.robotsTxt && !dc.robotsTxtBlocksAll,
-        ];
-        const onPagePct = Math.round((onPageSignals.filter(Boolean).length / onPageSignals.length) * 100);
-        const visibility = (seoScore !== null) ? Math.round(seoScore * 0.6 + onPagePct * 0.4) : onPagePct;
-
-        const localSignals = [
-          !!lc.phoneOnPage,
-          !!lc.zipOnPage,
-          !!lc.hoursMentioned,
-          !!lc.googleMapsEmbed,
-          (lc.socialLinks || []).length >= 2,
-          !!sc.hasLocalBusiness,
-          !!https,
-        ];
-        const local = Math.round((localSignals.filter(Boolean).length / localSignals.length) * 100);
-
-        const present = [performance, mobile, visibility, local].filter((x) => typeof x === 'number') as number[];
-        const overall = present.length ? Math.round(present.reduce((a, b) => a + b, 0) / present.length) : null;
-
-        const findings: any[] = [];
-        if (performance !== null && performance < 50) findings.push({ sev: 'high', title: 'Slow page load on mobile' });
-        if (https === false) findings.push({ sev: 'high', title: 'Not served over HTTPS' });
-        if (op.h1Count !== 1) findings.push({ sev: 'medium', title: `H1 count is ${op.h1Count || 0} (should be 1)` });
-        if (!op.canonical) findings.push({ sev: 'low', title: 'Missing canonical tag' });
-        if (!sc.hasLocalBusiness) findings.push({ sev: 'medium', title: 'No LocalBusiness schema' });
-        if (!dc.sitemapXml) findings.push({ sev: 'low', title: 'No sitemap.xml found' });
-
-        const checkRow = {
-          site_id: id, overall, performance, mobile, visibility, local, https,
-          findings: findings.slice(0, 8),
-          raw: { psi: { perfScore, seoScore, a11yScore, lcp, cls }, onPagePct },
-          ok: true, error: null,
-        };
-        const ins = await visDb(`site_checks`, 'POST', checkRow);
-        if (!ins.ok) return json({ error: 'check_store_failed', detail: ins.detail }, 200, reqCors);
-        await visDb(`monitored_sites?id=eq.${encodeURIComponent(id)}`, 'PATCH', { updated_at: new Date().toISOString() });
-        return json({ data: { ok: true, overall, performance, mobile, visibility, local, https, findings: checkRow.findings } }, 200, reqCors);
-      }
-    }
-    // ===== END VISIBILITY — SITE HEALTH MONITORING =====
 
     // ════════════════════════════════════════════════════════════════════
     //  PORTED PRODUCTION ROUTES — recovered from the deployed function's
@@ -11661,22 +10961,9 @@ Respond with ONLY a JSON array, no markdown, no preamble:
 
 
 // ════════════════════════════════════════════════════════════════════════════
-//  MONTHLY REVIEWS  (list / get / upsert / AI-draft / publish)
+//  MONTHLY REVIEWS  (upsert / AI-draft / publish: the Growth page, admin-growth.html)
 // ════════════════════════════════════════════════════════════════════════════
 
-if (type === 'review_list') {
-  const pid = String(body.partnership_id || '');
-  if (!pid) return json({ error: 'partnership_id required' }, 400, reqCors);
-  const r = await gpDb(`monthly_reviews?partnership_id=eq.${pid}&select=*&order=period.desc`);
-  return r.ok ? json({ data: r.data }, 200, reqCors) : json({ error: 'failed', detail: r.detail }, 200, reqCors);
-}
-if (type === 'review_get') {
-  const id = String(body.id || '');
-  if (!id) return json({ error: 'id required' }, 400, reqCors);
-  const r = await gpDb(`monthly_reviews?id=eq.${id}&select=*&limit=1`);
-  if (!r.ok || !Array.isArray(r.data) || !r.data.length) return json({ error: 'not_found' }, 404, reqCors);
-  return json({ data: r.data[0] }, 200, reqCors);
-}
 if (type === 'review_upsert') {
   if (body.period === undefined) body.period = period();
   // upsert by (partnership_id, period)

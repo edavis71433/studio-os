@@ -155,6 +155,7 @@ article.post p{margin-bottom:16px}
 footer.site{background:var(--ink);color:#dfe0ea;padding:52px 0 34px;margin-top:72px}
 footer.site a{color:#c7c4f5}
 footer.site h2{font-size:1.1rem}
+footer.site table.hours th{color:#b4b5c6}
 .cols{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:30px}
 .credit{margin-top:30px;padding-top:18px;border-top:1px solid rgba(255,255,255,.14);font-size:.88rem;color:#9a9bb0;display:flex;gap:14px;flex-wrap:wrap}
 :focus-visible{outline:2px solid var(--accent);outline-offset:2px}
@@ -536,7 +537,7 @@ export const render: RenderFn = (snapshot: Snapshot, _manifest, site: SiteConfig
   page('/not-sent/', { title: `Not sent — ${i.business_name}`, description: `Your message to ${i.business_name} didn’t send.`, ld: [], active: 'contact', body: `<section class="hero wrap">${notSentInner()}</section>` });
   files['not-sent/index.html'] = (files['not-sent/index.html'] as string).replace('</title>', '</title>\n<meta name="robots" content="noindex">');
   // Phase Q (FD-M3): the generated legal foundation — facts-true, the owner never writes legal HTML
-  page('/privacy/', { title: `Privacy — ${i.business_name}`, description: `How ${i.business_name} handles your information.`, ld: [], active: '', body: privacyBody(c, snapshot.created_at.slice(0, 10), !!site.formEndpoint) });
+  page('/privacy/', { title: `Privacy — ${i.business_name}`, description: `How ${i.business_name} handles your information.`, ld: [], active: '', body: privacyBody(c, snapshot.created_at.slice(0, 10), site) });
   page('/accessibility/', { title: `Accessibility — ${i.business_name}`, description: `${i.business_name}’s accessibility commitment.`, ld: [], active: '', body: accessibilityBody(c) });
   page('/updates/', { ...seoOv('updates', `Updates — ${i.business_name}`, `News and updates from ${i.business_name}.`), ld: [], active: 'updates', body: postIndexBody(c) });
   if (noidx.has('updates')) markNoindex('updates/index.html');
