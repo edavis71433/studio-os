@@ -36,6 +36,7 @@ import { brandTint } from './palettes.ts';
 import { parseWindow, isVisibleNow } from './content_window.ts';
 import { normHex, darken, contrastRatio } from './brand_kit.ts';
 import { UUID_RE } from './uuid.ts';
+import { bookingScript } from './site_send.ts';
 
 /** The block types this engine realizes (⊆ the site_components catalog keys). */
 export const REALIZED_BLOCK_TYPES: readonly SiteBlockType[] = [
@@ -1174,39 +1175,8 @@ const ffPct = (n: number): string => {
   return Number.isInteger(v) ? String(v) : v.toFixed(1);
 };
 
-// ── Phase BK: the booking widget's first-party enhancer ──────────────────────
-// A minimal, self-contained IIFE (same posture as the form block's inline enhancer:
-// scoped to the widget on the page, ZERO external origins). It calls the site's own
-// /book/:siteId endpoints (/types, /slots, POST) — read from data-book. All dynamic
-// UI is built with createElement + textContent, so owner/customer data is never
-// interpolated into HTML. Deterministic string (no clock/random), so goldens stay
-// stable. The only HTML-parser hazard in an inline script is the literal "</" that
-// could close the tag early — guarded below (the script contains none, but we escape
-// defensively). Comparison operators (< >) are safe inside a <script> raw-text element.
-function bookingScript(): string {
-  const js = `(function(){
-var W=document.querySelector('.booking-widget[data-book]');if(!W)return;
-var EP=W.getAttribute('data-book');var stage=W.querySelector('.bk-stage');
-var S={types:[],type:null,date:'',slot:'',cfg:{}};
-var MO=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-function el(t,c,x){var e=document.createElement(t);if(c)e.className=c;if(x!=null)e.textContent=x;return e;}
-function clr(){while(stage.firstChild)stage.removeChild(stage.firstChild);}
-function msg(t){clr();stage.appendChild(el('p','bk-msg',t));}
-function getj(u){return fetch(u,{headers:{accept:'application/json'}}).then(function(r){return r.json();});}
-function ftime(hm){var p=hm.split(':');var h=+p[0],m=p[1];var ap=h<12?'AM':'PM';var h12=(h%12===0)?12:(h%12);return h12+':'+m+' '+ap;}
-function fdate(d){var p=d.split('-');return MO[(+p[1])-1]+' '+(+p[2]);}
-function back(fn){var b=el('button','bk-back','← Back');b.type='button';b.addEventListener('click',fn);return b;}
-msg('Loading…');
-getj(EP+'/types').then(function(res){var d=(res&&res.data)||{};if(!d.enabled||!d.types||!d.types.length){msg('Online booking isn’t available right now.');return;}S.types=d.types;S.cfg=d;services();}).catch(function(){msg('We couldn’t load booking just now. Please try again later.');});
-function services(){clr();stage.appendChild(el('p','bk-step','1. Choose a service'));var list=el('div','bk-services');S.types.forEach(function(t){var b=el('button','bk-service');b.type='button';b.appendChild(el('span','bk-svc-name',t.name));b.appendChild(el('span','bk-svc-meta',t.duration_min+' min'+(t.price_text?(' · '+t.price_text):'')));if(t.description)b.appendChild(el('span','bk-svc-desc',t.description));b.addEventListener('click',function(){S.type=t;pickDate();});list.appendChild(b);});stage.appendChild(list);}
-function pickDate(){clr();stage.appendChild(back(services));stage.appendChild(el('p','bk-step','2. Pick a day for '+S.type.name));var inp=el('input','bk-date');inp.type='date';var now=new Date();inp.min=now.toISOString().slice(0,10);if(S.cfg.max_days_ahead){inp.max=new Date(now.getTime()+S.cfg.max_days_ahead*86400000).toISOString().slice(0,10);}inp.addEventListener('change',function(){S.date=inp.value;if(S.date)slots();});stage.appendChild(inp);}
-function slots(){clr();stage.appendChild(back(pickDate));stage.appendChild(el('p','bk-step','3. Choose a time'));var load=el('p','bk-msg','Finding open times…');stage.appendChild(load);getj(EP+'/slots?type='+encodeURIComponent(S.type.id)+'&date='+encodeURIComponent(S.date)).then(function(res){var sl=((res&&res.data)||{}).slots||[];if(load.parentNode)stage.removeChild(load);if(!sl.length){stage.appendChild(el('p','bk-msg','No open times that day — try another.'));return;}var grid=el('div','bk-slots');sl.forEach(function(s){var b=el('button','bk-slot',ftime(s.split('T')[1]));b.type='button';b.addEventListener('click',function(){S.slot=s;details();});grid.appendChild(b);});stage.appendChild(grid);}).catch(function(){if(load.parentNode)stage.removeChild(load);stage.appendChild(el('p','bk-msg','Couldn’t load times. Please try again.'));});}
-function field(lb,nm,ty,req){var w=el('label','bk-field');w.appendChild(el('span',null,lb+(req?' *':'')));var i=el(ty==='textarea'?'textarea':'input');if(ty!=='textarea')i.type=ty;i.name=nm;if(req)i.required=true;w.appendChild(i);return {w:w,i:i};}
-function details(){clr();stage.appendChild(back(slots));stage.appendChild(el('p','bk-step','4. Your details'));var f=el('form','bk-form');var nm=field('Your name','name','text',true),em=field('Email','email','email',false),ph=field('Phone','phone','tel',false),nt=field('Anything we should know?','note','textarea',false);f.appendChild(nm.w);f.appendChild(em.w);f.appendChild(ph.w);f.appendChild(nt.w);var hp=el('div','bk-hp');var hpi=el('input');hpi.name='_hp';hpi.tabIndex=-1;hpi.setAttribute('autocomplete','off');hp.appendChild(hpi);f.appendChild(hp);f.appendChild(el('p','bk-summary',S.type.name+' — '+fdate(S.date)+' at '+ftime(S.slot.split('T')[1])));var btn=el('button','bk-submit btn','Confirm booking');btn.type='submit';f.appendChild(btn);var err=el('p','bk-err');f.appendChild(err);f.addEventListener('submit',function(ev){ev.preventDefault();err.textContent='';if(!nm.i.value.trim()){err.textContent='Please add your name.';return;}if(!em.i.value.trim()&&!ph.i.value.trim()){err.textContent='Leave an email or phone so they can confirm.';return;}btn.disabled=true;btn.textContent='Booking…';fetch(EP,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({type_id:S.type.id,slot_start:S.slot,name:nm.i.value,email:em.i.value,phone:ph.i.value,note:nt.i.value,_hp:hpi.value})}).then(function(r){return r.json().then(function(j){return {s:r.status,j:j};});}).then(function(o){if(o.s>=200&&o.s<300&&o.j&&o.j.data&&o.j.data.ok){done(o.j.data.message);}else{btn.disabled=false;btn.textContent='Confirm booking';err.textContent=(o.j&&o.j.message)||'That didn’t go through — please try again.';if(o.s===409){setTimeout(function(){S.slot='';slots();},1800);}}}).catch(function(){btn.disabled=false;btn.textContent='Confirm booking';err.textContent='Something went wrong — please try again.';});});stage.appendChild(f);}
-function done(m){clr();var d=el('div','bk-done');d.appendChild(el('p','bk-done-ic','✓'));d.appendChild(el('p','bk-done-msg',m||'Thanks — your booking request was received.'));stage.appendChild(d);}
-})();`;
-  return `<script>${js.replace(/<\//g, '<\\/')}</script>`;
-}
+// Phase BK: the booking widget's first-party enhancer lives in lib/site_send.ts (bookingScript),
+// beside the forms' sender, since item 131: a browser test drives both there.
 
 /** Render validated blocks to deterministic HTML sections + optional JSON-LD.
  *  One section each, stable `block_<type>` key (for section order/visibility;

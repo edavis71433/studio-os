@@ -14,6 +14,7 @@ import manifest_me_1_0_0 from '../templates/meadow/1.0.0/manifest.json' with { t
 import manifest_at_1_0_0 from '../templates/atelier/1.0.0/manifest.json' with { type: 'json' };
 import manifest_ha_1_0_0 from '../templates/harbor/1.0.0/manifest.json' with { type: 'json' };
 import { trackerScript } from './visits.ts';
+import { injectSender } from './site_send.ts';
 import { sanitizeDevHtml, sanitizeDevCss } from './devmode.ts';
 import { BLOCK_CSS, sectionStyles, pageClasses } from './site_blocks.ts';
 
@@ -192,7 +193,8 @@ export async function renderSnapshot(snapshot: Snapshot, site: SiteConfig, opts:
   // Item 61: the owner's switch decides the counter; the privacy page reads the same switch.
   const counting = (snapshot.content as SnapshotContent)?.settings?.visit_counter !== false;
   const drawn = tintFavicon(await t.render(snapshot, t.manifest, site), snapshot.dev_customization?.theme_tokens?.accent, snapshot.template_slug);
-  const dressed = injectDevLayer(drawn, snapshot.dev_customization);
+  // item 131: pages with the site's forms send them from the page (lib/site_send.ts)
+  const dressed = injectSender(injectDevLayer(drawn, snapshot.dev_customization), snapshot.content as SnapshotContent, site);
   return injectCsp(injectAnalytics(opts.allSectionStyles ? dressed : trimSectionStyles(dressed), counting ? site.siteId : undefined));
 }
 

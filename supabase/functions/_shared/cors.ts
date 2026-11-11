@@ -36,6 +36,21 @@ export function corsFor(req: Request) {
   };
 }
 
+// Builder list item 131: a client's published site lives at its own address (its
+// domain, or its netlify.app name), so the routes its visitors call from the page (a
+// form, booking) answer any origin. On the list above, every one of those calls was
+// refused by the browser: booking couldn't load on any client site. These routes
+// answer to anyone already (a plain form post needs no permission), carry no sign-in,
+// and say nothing a stranger couldn't learn by posting, so "*" opens nothing new.
+export function visitorCors(): Record<string, string> {
+  return {
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Headers': 'content-type, accept',
+    'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+    'Access-Control-Max-Age': PREFLIGHT_MAX_AGE,
+  };
+}
+
 // Kept for the email/notification helpers that reference `cors` directly.
 // Uses the canonical origin; per-request CORS is applied at the response layer.
 export const cors = {

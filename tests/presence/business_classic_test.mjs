@@ -8,6 +8,7 @@
 //   deno run --allow-read --allow-env tests/presence/business_classic_test.mjs
 import { getTemplate, renderSnapshot, listTemplates } from '../../supabase/functions/presence/lib/render.ts';
 import { NOT_SENT_REASONS, notSentReason } from '../../supabase/functions/presence/lib/legal_pages.ts';
+import { senderTag } from '../../supabase/functions/presence/lib/site_send.ts';
 
 const results = [];
 const ok = (n, p, note = '') => { results.push({ n, p }); console.log(`${p ? 'PASS' : 'FAIL'}  ${n}${note ? ' — ' + note : ''}`); };
@@ -68,7 +69,11 @@ const render = (industry, extra) => renderSnapshot(snapFor(industry, extra), SIT
   // item 99: the Open now line, its hours data and its first-party script, rides on the home page only
   const noOpenNow = (h) => String(h).replace(/<script id="hours-data" type="application\/json">[\s\S]*?<\/script>\n<script>\(function\(\)\{var el=document\.getElementById\('open-now'\)[\s\S]*?<\/script>/, '');
   const scriptPages = pages.filter(([k]) => k !== 'search/index.html' && k !== 'updates/index.html');
-  ok('zero JavaScript emitted, except the first-party search, tag filter and Open now', scriptPages.length > 0 && scriptPages.every(([, h]) => !/<script(?! type="application\/ld\+json")/.test(noOpenNow(h))));
+  // item 131: a page holding the site's form also carries the page's sender (lib/site_send.ts), and no other page does
+  const sender = senderTag(SITE.formEndpoint);
+  const noSender = (h) => String(h).replace(sender, '');
+  ok('zero JavaScript emitted, except the first-party search, tag filter, Open now and the form’s sender', scriptPages.length > 0 && scriptPages.every(([, h]) => !/<script(?! type="application\/ld\+json")/.test(noOpenNow(noSender(h)))));
+  ok('the form’s sender rides only on the pages that hold the form', scriptPages.some(([, h]) => h.includes(sender)) && scriptPages.every(([, h]) => h.includes(sender) === h.includes(`action="${SITE.formEndpoint}"`)));
   ok('the Open now script is on the home page only', pages.filter(([, h]) => String(h).includes("getElementById('open-now')")).map(([k]) => k).join() === 'index.html');
 }
 
