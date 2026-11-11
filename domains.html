@@ -164,7 +164,7 @@ function render(){
   const list=ordered(),bl=BUILTIN.filter(matches);
   let h=`<header class="lhead"><div class="lrow1"><span class="obj-ic" aria-hidden="true">🔗</span><h1 id="pagehead" tabindex="-1">Domains</h1><button type="button" class="lbtn" id="refreshBtn" aria-label="Refresh" title="Refresh">↻</button></div>
     <div class="lmeta">${esc(lmetaText(list.length))}</div>
-    <nav class="tabs" aria-label="Sites and domains"><a href="/sites.html">Sites</a><a href="/domains.html" aria-current="page">Domains</a></nav></header>`;
+    <nav class="tabs" aria-label="Sites, domains and templates"><a href="/sites.html">Sites</a><a href="/domains.html" aria-current="page">Domains</a><a href="/templates.html">Templates</a></nav></header>`;
   h+=`<label class="sr-only" for="search">Search domains</label><input class="search" id="search" type="search" placeholder="Search by domain, site or provider…" value="${esc(Q)}">`;
   if(PARTIAL)h+=`<div class="notice">Some details wouldn’t load just now — refresh to try again.</div>`;
   if(!DOMAINS.length&&!BUILTIN.length)h+=`<div class="center"><p class="muted">No domains yet. A client’s domain shows here once it’s connected to their site.</p></div>`;
