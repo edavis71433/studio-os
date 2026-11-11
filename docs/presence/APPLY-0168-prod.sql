@@ -26,14 +26,18 @@ create table if not exists public.presence_contact_import_rows (
 );
 create index if not exists presence_contact_import_rows_import_idx
   on public.presence_contact_import_rows (import_id);
+-- an index for each of its other two links, as 0164 gave every link (Supabase's adviser)
+create index if not exists presence_contact_import_rows_site_id_idx on public.presence_contact_import_rows (site_id);
+create index if not exists presence_contact_import_rows_contact_id_idx on public.presence_contact_import_rows (contact_id);
 alter table public.presence_contact_import_rows enable row level security;
 
 alter table public.presence_contacts add column if not exists merged_into uuid;
 alter table public.presence_contacts add column if not exists merge_record jsonb;
 
--- Check: two tables with row level security on, then the two new columns.
+-- Check: two tables with row level security on, the import rows' four indexes, then the two new columns.
 select relname, relrowsecurity from pg_class
 where relname in ('presence_contact_imports', 'presence_contact_import_rows') order by relname;
+select indexname from pg_indexes where schemaname = 'public' and tablename = 'presence_contact_import_rows' order by indexname;
 select column_name, data_type from information_schema.columns
 where table_schema = 'public' and table_name = 'presence_contacts' and column_name in ('merged_into', 'merge_record')
 order by column_name;

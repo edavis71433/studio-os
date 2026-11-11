@@ -35,6 +35,9 @@ create table if not exists public.presence_contact_import_rows (
 );
 create index if not exists presence_contact_import_rows_import_idx
   on public.presence_contact_import_rows (import_id);
+-- an index for each of its other two links, as 0164 gave every link (Supabase's adviser)
+create index if not exists presence_contact_import_rows_site_id_idx on public.presence_contact_import_rows (site_id);
+create index if not exists presence_contact_import_rows_contact_id_idx on public.presence_contact_import_rows (contact_id);
 alter table public.presence_contact_import_rows enable row level security;   -- deny-all; function-mediated
 
 -- the record a merge folded away: who it went into, and what it takes to undo it
