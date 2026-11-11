@@ -77,6 +77,7 @@ const items = [
   ok('route: today’s problems come from the run behind the newest kept day, this site only', /presence_evidence\?run_id=eq\.\$\{runId\}&site_id=eq\.\$\{site\.id\}&severity=in\.\(critical,warning\)/.test(src));
   ok('route: the PDF is on the studio’s brand, downloaded, never cached', /presence_service_links\?customer_site_id=eq\.\$\{site\.id\}/.test(src) && /'Content-Type': 'application\/pdf'/.test(src) && /'Cache-Control': 'no-store'/.test(src));
   ok('route: wired', /route === '\/website-health\/pdf' && method === 'GET'\) return handleWebsiteHealthPdf\(site, cors\)/.test(read(`${P}/index.ts`)));
+  ok('route: the page on the app’s host can read the file’s name', read(`${P}/routes/health_page.ts`).includes(`'Access-Control-Expose-Headers': 'Content-Disposition'`));
   const days2 = [{ day: '2026-11-11', critical: 0, warning: 1, fingerprints: ['s|seo.title_missing|/'], run_id: 'run-1' }];
   let missing = false;
   globalThis.fetch = async (url) => {

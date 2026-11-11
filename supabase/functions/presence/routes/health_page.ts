@@ -82,7 +82,8 @@ export async function handleWebsiteHealthPdf(site: SiteRow, cors: Record<string,
   const memory = data.memory || buildHealthMemory({ days: [], items: [], live: true, todayIso: nowIso });
   const bytes = healthPdf(memory, { studio: { name: brand.name, accent: (brand as { accent?: string }).accent }, site: name, address: siteOrigin(site), facts: healthFacts(data), todayIso: nowIso });
   const file = `${name.replace(/[^A-Za-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'Website'}-health-${nowIso.slice(0, 10)}.pdf`;
-  return new Response(bytes, { status: 200, headers: { ...cors, 'Content-Type': 'application/pdf', 'Content-Disposition': `attachment; filename="${file}"`, 'Cache-Control': 'no-store' } });
+  // Expose-Headers: the page is on another host, and can't read the file's name otherwise
+  return new Response(bytes, { status: 200, headers: { ...cors, 'Content-Type': 'application/pdf', 'Content-Disposition': `attachment; filename="${file}"`, 'Access-Control-Expose-Headers': 'Content-Disposition', 'Cache-Control': 'no-store' } });
 }
 
 /** The Health check's two figures an owner asks first (item 151): how much it's been
