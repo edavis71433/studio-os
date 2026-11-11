@@ -28,7 +28,7 @@ const CONTROLS = [
   ['DELETE /content-library/:id', 'presence.html', `api("DELETE", "/content-library/" + it.id)`, ['icoBtn("x", "Remove from library", null, 14); del.dataset.needs = "delete"']],
   ['DELETE /knowledge/docs/:id', 'presence.html', 'api("DELETE", `/knowledge/docs/${d.id}`)', ['el("button", "quietact", "Remove"); del.dataset.needs = "delete"']],
   ['DELETE /media/:id', 'presence.html', 'api("DELETE", `/media/${m.id}`)', ['icoBtn("x", "Remove photograph: " + (m.alt_text || ""), "del", 14); del.dataset.needs = "delete"']],
-  ['DELETE /publishes/checkpoints/:id', 'presence.html', 'api("DELETE", `/publishes/checkpoints/${c.id}`)', ['acts.lastChild.dataset.needs = "delete"']],
+  ['DELETE /publishes/checkpoints/:id', 'presence.html', 'api("DELETE", `/publishes/checkpoints/${c.id}`)', ['el("button", "quietact", "Remove"); rm.dataset.needs = "delete"']],
   ['DELETE /redirects/:id', 'presence.html', `api("DELETE", "/redirects/" + row.id)`, ['x.dataset.needs = "delete"']],
   ['POST /comments/:id/delete', 'presence.html', `"/comments/" + c.id + "/delete"`, ['d.dataset.needs = "delete"']],
   ['DELETE /sales/contacts/:id', 'contacts.html', `api('/sales/contacts/'+encodeURIComponent(id),'DELETE')`, ['class="rowact danger" data-needs="delete" data-del=', 'class="danger" data-needs="delete" data-del=']],
@@ -46,6 +46,9 @@ const CONTROLS = [
   ['DELETE /sales/estimates/:id', 'pipeline.html', `api('/sales/estimates/'+b.dataset.delEst,'DELETE')`, ['data-needs="delete" data-del-est=']],   // sales review item 47
   ['DELETE /sales/prospects/:id', 'prospects.html', `api('/sales/prospects/'+b.dataset.remove,'DELETE')`, ['data-needs="delete" data-remove=']],   // sales review item 112
   ['POST /sales/recurring/:id/stop', 'pipeline.html', `api('/sales/recurring/'+sid+'/'+act,'POST',{})`, ['data-needs="delete" data-rec-stop=']],
+  // sales item 108: the record's Billing tab carries the estimates and the recurring invoice too
+  ['DELETE /sales/estimates/:id', 'crm.html', `apiAg('/sales/estimates/'+b.getAttribute('data-del-est'),'DELETE')`, ['data-del-est="${esc(e.id)}" data-needs="delete"']],
+  ['POST /sales/recurring/:id/stop', 'crm.html', `apiAg('/sales/recurring/'+id+'/'+verb,'POST',{})`, ['data-rec-stop="${esc(s.id)}" data-needs="delete"']],
   // the content path answers from contentWriteNeeds
   ['DELETE /offerings/:id', 'presence.html', 'api("DELETE", `/offerings/${o.id}`)', ['data-act="del" data-needs="delete"']],
   ['DELETE /faqs/:id', 'presence.html', 'api("DELETE", `/${collection}/${entity.id}`)', ['data-act="del" data-needs="delete"']],
@@ -57,10 +60,12 @@ const CONTROLS = [
   ['POST /foundations/domain', 'presence.html', `api("POST", "/foundations/domain", { domain })`, ['choose.dataset.needs = "configure"', 'havePanel.dataset.needs = "configure"', 'needPanel.dataset.needs = "configure"', 'btn.dataset.needs = "configure"; btn.textContent = "Connect your domain"']],
   ['DELETE /foundations/domain', 'presence.html', `api("DELETE", "/foundations/domain")`, ['rm.dataset.needs = "configure"']],
   ['POST /foundations/prepare', 'presence.html', `api("POST", "/foundations/prepare", { goal: "email_auth" })`, ['acts.dataset.needs = "configure"', 'after.dataset.needs = "configure"']],
+  ['POST /foundations/prepare', 'presence.html', `api("POST", "/foundations/prepare", { goal })`, ['mh.dataset.needs = "configure"']],   // builder list item 162, part two: the domain sheet's "More help" guides
   ['POST /preview/settings', 'presence.html', `act("/preview/settings", "Preview access updated"`, ['"Preview access updated", { password: pw }); });\n    acts.lastChild.dataset.needs = "configure";']],
   ['POST /preview/settings', 'presence.html', `act("/preview/settings", "Preview link reset"`, ['"Preview link reset", { regenerate_token: true }); });\n    acts.lastChild.dataset.needs = "configure";']],
   ['POST /site/offline', 'presence.html', `siteSetState("/site/offline"`, ['offBtn.dataset.needs = "configure"']],
   ['POST /site/online', 'presence.html', `siteSetState("/site/online"`, ['offBtn.dataset.needs = "configure"']],
+  ['POST /site/password', 'presence.html', `api("POST", "/site/password", { password: pw })`, ['pw.dataset.needs = "configure"']],   // list item 175
   ['PUT /bookings/settings', 'presence.html', `api("PUT", "/bookings/settings", payload)`, ['c1.dataset.needs = "configure"', 'c2.dataset.needs = "configure"']],
   ['PUT /sales/contacts/fields', 'contacts.html', `api('/sales/contacts/fields','PUT',{fields})`, ['id="manageFields" data-needs="configure"']],
   ['PUT /sales/stages', 'settings.html', `api('/sales/stages', 'PUT', { names })`, ['id="automations" aria-labelledby="autoHead" hidden data-needs="configure"']],
@@ -73,6 +78,7 @@ const CONTROLS = [
   ['POST /email/log-address', 'connections.html', `make(mk, 'POST', 'Your log address is ready.')`, ['id="logMake" data-needs="configure"']],   // sales review item 69
   ['POST /email/log-address', 'connections.html', `make(nw, 'POST', 'Your new log address is ready.')`, ['id="logNew" data-needs="configure"']],
   ['DELETE /email/log-address', 'connections.html', `make(off, 'DELETE', 'Your log address is off.')`, ['id="logOff" data-needs="configure"']],
+  ['POST /reviews/google-link', 'presence.html', `api("POST", "/reviews/google-link"`, ['el("button", null, "Save Google link"); sv.dataset.needs = "configure"']],   // sales review item 115
 ];
 // nothing in a page calls these: they answer scripts and the operator's tools
 const NO_CONTROL = {
@@ -101,7 +107,7 @@ const SOURCE = Object.fromEntries(PAGES.map((p) => [p, read(p)]));
   const decided = read('tests/presence/member_capability_test.mjs');
   const listed = (name) => [...decided.split('const DECIDED = {')[1].split(`\n  ${name}: [`)[1].split('\n  ],')[0].matchAll(/'((?:DELETE|POST|PUT|PATCH) [^']+)'/g)].map((m) => m[1]);
   const routes = [...listed('delete'), ...listed('configure')];
-  ok('the decided delete and configure lists were read', routes.length === 35, String(routes.length));   // item 47 added two; item 104 took away the seven DNS document and zone writes; item 58 added two; item 112 added the prospect delete
+  ok('the decided delete and configure lists were read', routes.length === 37, String(routes.length));   // item 47 added two; item 104 took away the seven DNS document and zone writes; item 58 added two; item 112 added the prospect delete; item 115 added the Google review link; item 175 the visitor password
   const covered = new Set(CONTROLS.map(([r]) => r));
   const open = routes.filter((r) => !covered.has(r) && !NO_CONTROL[r]);
   ok('every decided delete and configure route is accounted for here', open.length === 0, open.join(', '));
@@ -125,8 +131,8 @@ const SOURCE = Object.fromEntries(PAGES.map((p) => [p, read(p)]));
     const fresh = sent(page).filter((call) => !known(page).includes(call));
     ok(`${page}: every DELETE it sends is decided`, fresh.length === 0, fresh.join(' | '));
   }
-  // crm.html: 3 — the record's two note removals are one removeNote since item 98 (it asks first now)
-  ok('tripwire: the DELETE scan found the calls it is meant to find', sent('pipeline.html').length === 5 && sent('presence.html').length === 12 && sent('contacts.html').length === 2 && sent('crm.html').length === 3 && sent('files.html').length === 1);
+  // crm.html: 4 — the record's two note removals are one removeNote since item 98 (it asks first now); item 108 added the draft estimate's
+  ok('tripwire: the DELETE scan found the calls it is meant to find', sent('pipeline.html').length === 5 && sent('presence.html').length === 12 && sent('contacts.html').length === 2 && sent('crm.html').length === 4 && sent('files.html').length === 1);
 
   const CONFIG = /\/(?:foundations\/(?:domain|prepare)|preview\/settings|site\/(?:offline|online)|bookings\/settings|sales\/contacts\/fields)\b/;
   const writes = new RegExp(`(?:api\\(\\s*["'](?:POST|PUT|DELETE)["']\\s*,\\s*["'\`]|act\\(["']|siteSetState\\(["'])${CONFIG.source}|api\\(["'\`]${CONFIG.source}["'\`]\\s*,\\s*["'](?:POST|PUT|DELETE)["']`, 'g');
@@ -137,7 +143,7 @@ const SOURCE = Object.fromEntries(PAGES.map((p) => [p, read(p)]));
       if (!known(page).some((k) => k.includes(call))) ok(`${page}: this configure write is listed`, false, call);
     }
   }
-  ok('tripwire: the configure scan found every call in the table', seen === 9, String(seen));
+  ok('tripwire: the configure scan found every call in the table', seen === 10, String(seen));   // item 162, part two: the domain sheet's "More help" guides
 }
 
 // ═══ 4. settings: one row, two kinds of field ═══

@@ -47,6 +47,13 @@ export interface WebsiteHealthInput {
   // when absent (no custom domain / lookup failed) the secure-connection check stays
   // exactly as before. Netlify auto-renews, so this is reassurance + early warning.
   ssl_expires_at?: string | null;
+  // List item 151, all optional (absent before migration 0160, or with too little data):
+  // the last 30 days of uptime checks; how fast pages show for real visitors; and, for a
+  // new site, the before-you-go-live facts the platform can check for itself.
+  uptime_30d?: { days: number; checks: number; ok_checks: number } | null;
+  speed?: { verdict: 'fast' | 'a_little_slow' | 'slow' | null; sentence: string | null; phones_ms: number | null; computers_ms: number | null; samples: number } | null;
+  speed_check_href?: string | null;
+  golive?: { first_published_at: string | null; has_phone: boolean; has_share_picture: boolean; contact_url: string | null } | null;
 }
 
 export type CheckState = 'ok' | 'attention' | 'coming' | 'off';
@@ -114,6 +121,14 @@ export function buildWebsiteHealth(i: WebsiteHealthInput): WebsiteHealth {
         ? check('Your website is online', 'Visitors can reach your site right now.', 'ok')
         : check('Your website isn’t published yet', 'It won’t be visible to visitors until you publish it.', 'attention', { label: 'Review & publish', href: '/presence.html#history' }));
     }
+    // List item 151: how much of the month it was up, from the same checks
+    const up = i.uptime_30d;
+    if (up && up.checks >= 20) {
+      const pct = (up.ok_checks / up.checks) * 100;
+      const shown = pct >= 99.95 ? '100' : pct >= 99 ? pct.toFixed(1) : pct.toFixed(0);
+      c.push(check(`Online ${shown}% of the last ${up.days} days`, `${up.ok_checks} of our ${up.checks} checks found it answering.`, pct >= 99 ? 'ok' : 'attention',
+        pct >= 99 ? undefined : { label: 'Ask your studio', href: '/inbox.html' }));
+    }
     if (i.domain) c.push(check('Your domain is connected', `Your site answers at ${i.domain}.`, 'ok'));
     else c.push(check('No custom domain yet', 'Your site is live on its Studio address — you can connect your own domain whenever you’re ready.', 'off', { label: 'Connect a domain', href: '/presence.html#foundations' }));
     if (i.contact_form_working) c.push(check('Your contact form is working', 'You’ve received messages through it, so visitors can reach you.', 'ok'));
@@ -124,6 +139,47 @@ export function buildWebsiteHealth(i: WebsiteHealthInput): WebsiteHealth {
         'Its pages live on a global network, not one server — so visitors can reach you even while you’re making changes behind the scenes.', 'ok'));
     }
     push('website_status', 'Website status', c);
+  }
+
+  // ── Speed (list item 151) ──────────────────────────────────────────────────
+  // Real visitors' speed, only once there are enough visits to say; never a guess.
+  {
+    const c: HealthCheck[] = [];
+    const sp = i.speed;
+    if (sp && sp.verdict && sp.sentence) {
+      const on = (ms: number | null, who: string) => (ms ? `${who} ${(Math.round(ms / 100) / 10).toFixed(1)} s` : '');
+      const facts = [on(sp.phones_ms, 'on phones'), on(sp.computers_ms, 'on computers')].filter(Boolean).join(', ');
+      const why = `For three visitors in four, the main content showed within ${facts}. Google calls under 2.5 s good. Measured from ${sp.samples} recent visits; Safari doesn't report this, so iPhone visitors aren't in it.`;
+      c.push(sp.verdict === 'fast'
+        ? check(sp.sentence.replace(/\.$/, ''), why, 'ok')
+        : check(sp.sentence.replace(/\.$/, ''), `${why} Big photos are the usual cause.`, 'attention', i.speed_check_href ? { label: 'Find what slows it', href: i.speed_check_href } : undefined));
+    }
+    push('speed', 'Speed', c);
+  }
+
+  // ── Before you go live (list item 151) ─────────────────────────────────────
+  // For a new site: the things that lose customers, as far as the platform can check
+  // them itself. Shown until the site has been live a month, or everything is done.
+  {
+    const g = i.golive;
+    const young = !!g && (!g.first_published_at || Date.parse(i.now) - Date.parse(g.first_published_at) < 30 * 86_400_000);
+    if (g && young) {
+      const live = i.site_status !== 'never_published';
+      const c: HealthCheck[] = [
+        i.contact_form_working
+          ? check('A message from your contact form reached you', 'So you know visitors’ messages arrive.', 'ok')
+          : live
+            ? check('Send yourself a test message', 'Fill in your own contact form once, so you know visitors’ messages reach you. It lands in your Inbox.', 'attention', g.contact_url ? { label: 'Open your contact page', href: g.contact_url } : undefined)
+            : check('Once it’s live, send yourself a test message', 'Fill in your own contact form once, so you know visitors’ messages reach you.', 'off'),
+        g.has_phone
+          ? check('Your phone number taps to call', 'Visitors on a phone can call you in one tap.', 'ok')
+          : check('Add your phone number', 'Most visitors on a phone want to call. Without a number they can’t.', 'attention', { label: 'Add it', href: '/presence.html#business' }),
+        g.has_share_picture
+          ? check('Your sharing picture is set', 'When someone shares your site, this picture shows with it.', 'ok')
+          : check('Choose your sharing picture', 'When someone shares your site in a message or on Facebook, a picture shows with it. Pick yours, or it may show nothing.', 'attention', { label: 'Choose one', href: '/presence.html#search' }),
+      ];
+      if (c.some((x) => x.state !== 'ok')) push('golive', 'Before you go live', c);
+    }
   }
 
   // ── Content ────────────────────────────────────────────────────────────────

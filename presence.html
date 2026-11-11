@@ -242,6 +242,8 @@ button:disabled{opacity:.55;cursor:default}
 .hb-checks li{font-size:12.5px;line-height:1.45}
 .hb-checks li b{display:block;font-weight:600;font-size:13px}
 .hb-checks li a{color:var(--plum)}
+.hb-facts{font-weight:600;color:var(--ink-2)}
+.hb-golive li[data-done="1"] b{color:var(--sage)}   /* list item 151 */
 .hb-card .hb-act{margin-top:10px}
 .hb-row.act .ic{font-size:15px}
 .hb-progress{height:6px;border-radius:3px;background:var(--hair);overflow:hidden;margin-top:10px}
@@ -288,6 +290,8 @@ h1.doc{font-family:var(--serif);font-weight:500;font-size:24px;letter-spacing:-.
 .pg-check{display:flex;align-items:center;gap:var(--dds-s2,8px);font-size:13.5px;margin-bottom:var(--dds-s3,12px);cursor:pointer}
 .pg-check input{accent-color:var(--plum)}
 .pg-foot{display:flex;flex-wrap:wrap;gap:var(--dds-s2,8px);margin-top:var(--dds-s4,16px);align-items:center}
+/* item 125: every page setting in the Pages card waits for publish, and says so once, under the pane */
+.pc-pane-when{margin:var(--dds-s3,12px) 0 0;font-size:12px;line-height:1.45;color:var(--ink-3)}
 .pg-foot .dc-modal-cancel{margin-top:0}
 .pg-foot .danger{color:var(--clay)}
 .pg-foot .pg-done{margin-left:auto;background:var(--plum);border-color:var(--plum);color:var(--fill-ink,#fff)}
@@ -327,6 +331,19 @@ html:not(.is-studio) #dcModeSeg [data-dcmode="timewarp"]{display:none}
 .ver-live{display:inline-block;margin-left:var(--dds-s2,8px);padding:1px 8px;border-radius:999px;background:var(--hair);color:var(--ink-2);font-size:12px;font-weight:600;vertical-align:1px}
 .hcompare{flex-basis:100%;margin-top:var(--dds-s2,8px)}
 .ver-more{margin-top:var(--dds-s6,24px);border-top:1px solid var(--hair);padding-top:var(--dds-s4,16px)}
+/* item 125: a publish wears a filled dot, a saved checkpoint (never live) a hollow one */
+.ver-top{display:flex;align-items:center;justify-content:space-between;gap:var(--dds-s3,12px);flex-wrap:wrap;margin:calc(-1 * var(--dds-s2,8px)) 0 var(--dds-s2,8px)}
+.ver-legend{display:flex;gap:var(--dds-s5,20px);margin:0}
+.ver-kind{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:600;color:var(--sage);white-space:nowrap}
+.ver-kind::before{content:"";flex:none;width:8px;height:8px;border-radius:50%;background:currentColor}
+.ver-kind.save{color:var(--ink-3)}
+.ver-kind.save::before,.ver-kind.fail::before{background:transparent;box-shadow:inset 0 0 0 1.5px currentColor}
+.ver-kind.fail{color:var(--clay)}
+.ver-legend .ver-kind{font-weight:500}
+.hdate .ver-kind{display:flex;margin-bottom:3px}
+.ver-note{display:flex;gap:10px;margin:var(--dds-s4,16px) 0 0;padding:var(--dds-s3,12px) 14px;border-radius:12px;background:var(--info-soft);color:var(--ink);font-size:12.5px;line-height:1.5}
+.ver-note>span:first-child{color:var(--info);font-weight:600}
+.ver-sheet-note{margin:10px 0 0;font-size:13.5px;line-height:1.6;color:var(--ink)}
 .ver-more>summary{cursor:pointer;font-size:13.5px;font-weight:600;color:var(--ink-2);margin-bottom:var(--dds-s4,16px)}
 h5.rune{font-size:14px;letter-spacing:0;text-transform:none;color:var(--ink);font-weight:600;margin:36px 0 var(--dds-s4,16px);display:flex;align-items:center;gap:var(--dds-s4,16px)}
 h5.rune::after{content:"";flex:1;height:1px;background:var(--hair)}
@@ -396,6 +413,10 @@ html.dc-edit:not(.plan-watch) .dc-bar{position:absolute;top:var(--dc-bar-top);le
 .dc-switch-name{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .dc-chip{display:inline-flex;align-items:center;height:24px;padding:0 10px;border-radius:999px;background:var(--sheet);color:var(--ink-2);font-size:12px;font-weight:600;white-space:nowrap;line-height:1}
 .dc-chip.good{background:var(--sage-soft);color:var(--sage)}
+/* item 125: the page's status word beside its name in the bar (Live, 2 changes, Not live yet) */
+.dc-chip.warn{background:var(--amber-soft);color:var(--amber)}
+.dc-chip.bad{background:var(--clay-soft);color:var(--clay)}
+#dcPageCount::before{content:"";flex:none;width:6px;height:6px;margin-right:6px;border-radius:50%;background:currentColor}
 .dc-switch:focus-visible,.dc-dk:focus-visible{outline:2px solid var(--plum);outline-offset:2px}
 /* ── the Pages card (part three, Figma 66:339): the menu in its order, then the pages off it,
    then the header and footer, the not-found page and search. A row is a page: a grip, its
@@ -541,6 +562,9 @@ html.dc-edit:not(.plan-watch) .dc-twbar[hidden]{display:none}
 #hfCard .pg-sw input:focus-visible{outline:2px solid var(--plum);outline-offset:2px}
 @media (prefers-reduced-motion:reduce){#hfCard .pg-sw input,#hfCard .pg-sw input::after{transition:none}}
 .hf-row{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--ink)}
+/* item 122: the phone bar's Off, Light and Dark, the card's own segmented control */
+#hfCard .hf-seg{margin:0}
+#hfCard .hf-seg button[aria-pressed="true"]{background:var(--sheet);color:var(--ink);font-weight:600;box-shadow:var(--dds-shadow)}
 .hf-row span{flex:1}
 #settingsPanel:not([data-mode="styles"]) #designGallery,#settingsPanel:not([data-mode="styles"]) #stylesAsk{display:none !important}
 #settingsPanel[data-mode="section"] #designHost>*:not(#blocksCard),#settingsPanel[data-mode="sections"] #designHost>*:not(#blocksCard),#settingsPanel[data-mode="forms"] #designHost>*:not(#formsCard){display:none}
@@ -570,6 +594,19 @@ html.dc-edit:not(.plan-watch) .dc-close{height:36px;padding:0 14px;font-size:13p
 .ins-field{display:flex;flex-direction:column;gap:6px}
 .ins-lbl{display:block;font-size:12.5px;font-weight:500;color:var(--ink-2);margin:0}
 .ins-note{font-size:12.5px;color:var(--ink-3);line-height:1.5}
+/* item 155: a locked section's card leads with why, in the client's blue or the studio's plum */
+.ins-lock{display:flex;flex-wrap:wrap;align-items:flex-start;gap:8px 10px;margin:0 0 14px;padding:12px 14px;border-radius:12px;background:var(--info-soft);color:var(--ink)}
+.ins-lock>svg{flex:none;margin-top:1px;color:var(--info)}
+.ins-lock>p{flex:1 1 200px;margin:0;font-size:12.5px;line-height:1.5}
+.ins-lock.studio{background:var(--plum-soft,#f0ebfd)}
+.ins-lock.studio>svg{color:var(--plum)}
+.ins-lock .ins-lock-sw{flex:1 1 100%;display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:40px;margin:0;font-size:13.5px;color:var(--ink);cursor:pointer}
+.ins-lock .ins-lock-sw input{flex:none;-webkit-appearance:none;appearance:none;position:relative;width:40px;height:24px;margin:0;border-radius:999px;background:var(--hair-2);cursor:pointer;transition:background var(--dur) var(--ease)}
+.ins-lock .ins-lock-sw input::after{content:"";position:absolute;top:3px;left:3px;width:18px;height:18px;border-radius:50%;background:var(--sheet);box-shadow:0 1px 2px rgba(0,0,0,.2);transition:transform var(--dur) var(--ease)}
+.ins-lock .ins-lock-sw input:checked{background:var(--plum)}
+.ins-lock .ins-lock-sw input:checked::after{transform:translateX(16px)}
+.ins-lock .ins-lock-sw input:focus-visible{outline:2px solid var(--plum);outline-offset:2px}
+@media (prefers-reduced-motion:reduce){.ins-lock .ins-lock-sw input,.ins-lock .ins-lock-sw input::after{transition:none}}
 .ins-row{display:flex;align-items:center;justify-content:space-between;gap:10px;font-size:12.5px;color:var(--ink-3)}
 #settingsPanel[data-mode="section"] #blocksCard input:not([type=checkbox]):not([type=color]):not([type=date]):not([type=number]):not([type=range]),#settingsPanel[data-mode="section"] #blocksCard textarea,#settingsPanel[data-mode="section"] #blocksCard select{background:var(--dc-raised,var(--paper)) !important;border:1px solid var(--hair) !important;border-radius:12px !important;padding:11px 12px !important;font-size:14px !important;line-height:1.5 !important;color:var(--ink) !important;margin-bottom:10px !important}
 #settingsPanel[data-mode="section"] #blocksCard .ins-field input{margin-bottom:0 !important}
@@ -819,7 +856,9 @@ html.dc-edit:not(.plan-watch) .dds-hint{bottom:88px !important;z-index:80 !impor
 @media(max-width:760px){
   html.dc-edit:not(.plan-watch){--dc-bar-top:10px;--dc-bar-h:50px}
   html.dc-edit:not(.plan-watch) .dc-bar{left:10px;right:10px;width:auto;max-width:none;padding:6px;gap:4px;justify-content:space-between}
-  html.dc-edit:not(.plan-watch) .dc-bar .dc-sep,html.dc-edit:not(.plan-watch) .dc-bar #dpDevSeg,html.dc-edit:not(.plan-watch) .dc-bar #dcLiveChip,html.dc-edit:not(.plan-watch) .dc-bar #dcBtnPreview,html.dc-edit:not(.plan-watch) .dc-bar #dcPageCount{display:none}   /* a phone is already a phone; Live and Preview live in the cards */
+  html.dc-edit:not(.plan-watch) .dc-bar .dc-sep,html.dc-edit:not(.plan-watch) .dc-bar #dpDevSeg,html.dc-edit:not(.plan-watch) .dc-bar #dcLiveChip,html.dc-edit:not(.plan-watch) .dc-bar #dcBtnPreview{display:none}   /* a phone is already a phone; Live and Preview live in the cards */
+  html.dc-edit:not(.plan-watch) .dc-bar #dcPageCount{width:10px;height:10px;padding:0;font-size:0;background:transparent}   /* the page's status: its dot alone (the words stay for screen readers) */
+  html.dc-edit:not(.plan-watch) .dc-bar #dcPageCount::before{width:8px;height:8px;margin:0}
   html.dc-edit:not(.plan-watch) .dc-pages{flex:1 1 auto;min-width:0}
   html.dc-edit:not(.plan-watch) .dc-switch{max-width:100%;height:36px;padding:0 8px 0 10px;gap:6px}
   html.dc-edit:not(.plan-watch) .dc-bar .pillbtn{padding:0 12px}
@@ -920,6 +959,7 @@ html.plan-watch .ss-bar,html.plan-watch [data-grp="Content"],html.plan-watch .na
 .sv-pri.now{background:var(--clay-soft);color:var(--ink)}
 .sv-pri.soon{background:var(--amber-soft);color:var(--ink)}
 .sv-nums{display:flex;gap:var(--dds-s5,20px);flex-wrap:wrap;margin-bottom:var(--dds-s2,8px)}
+.sv-ai-list{font-size:13px;margin:var(--dds-s2,8px) 0 0;max-width:560px}   /* list item 153 */
 .sv-nums div{min-width:64px}
 .sv-nums b{display:block;font-size:22px;font-weight:600;font-variant-numeric:tabular-nums;line-height:1.2}
 .sv-nums span{font-size:12px;color:var(--ink-3)}
@@ -1145,6 +1185,9 @@ html.dds-has-shell.dds-has-ctxbar .stage{top:calc(var(--dds-shell-h) + var(--dds
 /* ── overlays as letters ── */
 .scrim{position:fixed;inset:0;background:color-mix(in srgb,var(--scrim-ink) 42%,transparent);z-index:80;display:none;align-items:flex-end;justify-content:center}
 .scrim.on{display:flex}
+/* item 171 (E1, E2): in the editor a sheet, the photo picker and the rest, opens above the bar, the dock and
+   the cards, so its own buttons take the press and nothing behind the dimmed screen does */
+html.dc-edit:not(.plan-watch) .scrim{z-index:96}
 @media(min-width:761px){.scrim{align-items:center}}
 .sheetcard{background:var(--sheet);border:1px solid var(--hair);border-radius:var(--r-lg) var(--r-lg) 0 0;width:100%;max-width:520px;max-height:88vh;overflow:auto;padding:var(--dds-s7,32px) var(--dds-s7,32px) var(--dds-s6,24px);box-shadow:var(--dds-shadow-pop,0 8px 28px rgba(21,20,26,.12))}
 @media(min-width:761px){.sheetcard{border-radius:var(--r-lg)}}
@@ -1485,7 +1528,7 @@ body.pd-dragging *{cursor:grabbing !important}
   h1.doc{font-size:24px}
   .hdate{width:84px}
   .hentry{flex-wrap:wrap}
-  .hacts{padding-left:106px}
+  .hacts{padding-left:106px;flex-wrap:wrap;gap:var(--dds-s2,8px) 14px}   /* four actions fit a phone's width, or wrap, never off the edge */
   .deskprivacy{display:none}
   .pagewords{display:none} /* pages travel by tapping links inside the proof */
 }
@@ -1682,7 +1725,7 @@ body.pd-dragging *{cursor:grabbing !important}
           <section class="sv-card" aria-labelledby="svFixH" id="svFixCard" hidden><h3 id="svFixH">What to fix first</h3><div id="svFix"></div></section>
           <section class="sv-card" aria-labelledby="svConsoleH" id="svConsoleCard" hidden><h3 id="svConsoleH">On Google Search</h3><div id="svConsole"></div></section>
           <section class="sv-card" aria-labelledby="svListingH" id="svListingCard" hidden><h3 id="svListingH">Your Google listing</h3><div id="svListing"></div></section>
-          <section class="sv-card" aria-labelledby="svAiH"><h3 id="svAiH">In AI answers</h3><div id="svAi"><p class="hint">Checking…</p></div></section>
+          <section class="sv-card" aria-labelledby="svAiH"><h3 id="svAiH">In AI answers</h3><div id="svAi"><p class="hint">Checking…</p></div><div id="aiCrawlWrap" data-needs="configure" hidden><label class="closedrow" style="margin-top:var(--dds-s3,12px)"><input type="checkbox" id="aiCrawlSwitch" aria-describedby="aiCrawlHint"> Let AI assistants read this site</label><div class="hint" id="aiCrawlHint"></div></div></section>
         </div>
         <div id="svWords">
           <h2 class="hb-sub-h">Your wording</h2>
@@ -1826,7 +1869,7 @@ body.pd-dragging *{cursor:grabbing !important}
             <button type="button" class="dc-switch" id="dcPageSwitch" aria-haspopup="dialog" aria-expanded="false" aria-controls="pagesCard" title="Your pages: switch, add one, change the menu">
               <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3h8l5 5v13H6z"/><path d="M14 3v5h5"/></svg>
               <span class="dc-switch-name" id="dcPageName">Home</span>
-              <span class="dc-chip" id="dcPageCount">1 page</span>
+              <span class="dc-chip" id="dcPageCount"></span>
               <svg class="dc-switch-chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
             </button>
           </div>
@@ -1922,7 +1965,7 @@ body.pd-dragging *{cursor:grabbing !important}
                   <button type="button" class="pc-mrow" id="btnPageInfo" title="Everything about this page — publish, share a draft, properties, search appearance" aria-haspopup="menu" aria-expanded="false"><span class="ic"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 11v5"/><path d="M12 8h.01"/></svg></span><span class="t"><b>This page</b><span>Publish, share a draft, take offline</span></span><svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></button>
                 </div>
               </div>
-              <div id="pcPane" hidden><button type="button" class="pc-back" id="pcBack"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg>All pages</button><div class="pc-pane-body pg-settings"></div></div>
+              <div id="pcPane" hidden><button type="button" class="pc-back" id="pcBack"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg>All pages</button><div class="pc-pane-body pg-settings"></div><p class="pc-pane-when" id="pcPaneWhen">Changes here save as you go and reach your live site when you publish.</p></div>
             </div>
           </aside>
           <!-- on-demand three-tab side panel (left slide-over, no scrim so the canvas
@@ -1983,17 +2026,19 @@ body.pd-dragging *{cursor:grabbing !important}
       <!-- HISTORY -->
       <section class="view" id="view-history">
         <h1 class="doc" role="heading" aria-level="2">Versions</h1>
-        <p class="docsub">Every version you publish is saved here. View one, compare it, or restore it to your draft. Your live site changes only when you publish.</p>
+        <p class="docsub">Every version you publish, and every checkpoint you save, newest first. View one, compare it, or bring it back into your draft. Your live site changes only when you publish.</p>
+        <!-- item 125: saves and publishes in one list, marked apart -->
+        <div class="ver-top"><p class="ver-legend"><span class="ver-kind pub">Published</span><span class="ver-kind save">Saved, never live</span></p><button type="button" class="pillbtn sm" id="btnSaveCheckpoint" title="Save a named copy of your draft before a big edit, to look at or come back to. Your live site isn’t touched." hidden>Save a checkpoint</button></div>
         <div id="pubList"></div>
+        <p class="ver-note" id="verNote"><span aria-hidden="true">ⓘ</span><span>Restoring a version brings back its business details, services, reviews, questions, updates, colours and fonts, and leaves your sections, pages, menu, bookings, enquiries, contacts and files as they are now.</span></p>
         <!-- what happened to the site, newest first (was its own page: timeline.html) -->
         <section class="hb-sec" id="activitySec" aria-labelledby="activityH" tabindex="-1" hidden>
           <div class="hb-sec-h"><h2 id="activityH">Recent activity</h2><button type="button" class="quietact" id="activityMore" hidden>See all</button></div>
           <div class="hb-list" id="activityList"></div>
         </section>
         <details class="ver-more" id="versionMore">
-          <summary>More tools: private preview, checkpoints, compare, launches</summary>
+          <summary>More tools: private preview, compare, launches</summary>
           <div id="previewBox"></div>
-          <div id="checkpointBox"></div>
           <div id="versionToolsBox"></div>
           <div id="launchBox"></div>
         </details>
@@ -2029,7 +2074,7 @@ body.pd-dragging *{cursor:grabbing !important}
   <div class="sheetcard" role="dialog" aria-modal="true" aria-labelledby="resSheetTitle">
     <h2 id="resSheetTitle">Restore this version?</h2>
     <p class="sub" id="resSheetSub"></p>
-    <div class="body"><p style="font-size:13.5px;color:var(--ink-2);font-family:var(--serif);font-style:italic;line-height:1.7">That version goes into your draft so you can check it. Today’s draft is kept as a safety copy, and your live site doesn’t change until you publish.</p></div>
+    <div class="body"><p style="font-size:13.5px;color:var(--ink-2);font-family:var(--serif);font-style:italic;line-height:1.7">That version goes into your draft so you can check it. Today’s draft is kept as a safety copy, and your live site doesn’t change until you publish.</p><p class="ver-sheet-note" id="resSheetKeeps">It brings back business details, services, reviews, questions, updates, colours and fonts, and leaves your sections, pages, menu, bookings, enquiries, contacts and files as they are now.</p></div>
     <div class="foot">
       <button class="quietact" data-close>Cancel</button>
       <button class="pillbtn inked" id="btnRestoreGo">Restore to my draft</button>
@@ -2911,6 +2956,27 @@ $("visitSwitch").addEventListener("change", async () => {
     toast(nice(err), true);
   }
 });
+// List item 175: one switch for AI assistants. Off, the next publish asks the known AI
+// crawlers to stay out in robots.txt; Google and Bing search are not affected.
+function renderAiCrawlSwitch() {
+  $("aiCrawlWrap").hidden = !!(S.site && S.site.edition === "monitor");   // a watched website's robots file isn't ours
+  const on = !(S.settings && S.settings.ai_crawlers === false);
+  $("aiCrawlSwitch").checked = on;
+  $("aiCrawlHint").textContent = on
+    ? "ChatGPT, Claude, Perplexity, Gemini and other AI assistants can read your site, so they can mention and recommend you. Changes go live when you publish."
+    : "AI assistants are asked not to read your site, so they’re less likely to mention or recommend you. The big ones honour this, but it isn’t a lock. Google and Bing search are not affected. Changes go live when you publish.";
+}
+$("aiCrawlSwitch").addEventListener("change", async () => {
+  const now = $("aiCrawlSwitch").checked;
+  whisper("topWhisper", "saving");
+  try {
+    await settingsPut({ ai_crawlers: now });
+    whisper("topWhisper", "saved"); renderAiCrawlSwitch(); scheduleChangesRefresh();
+  } catch (err) {
+    whisper("topWhisper", "failed"); $("aiCrawlSwitch").checked = !now;
+    toast(nice(err), true);
+  }
+});
 $("f-closednote").addEventListener("input", () => {
   debounce("closednote", async () => {
     try { await api("PUT", "/location", { temporarily_closed_note: $("f-closednote").value }); whisper("save-hours", "saved"); scheduleChangesRefresh(); }
@@ -3603,10 +3669,17 @@ function renderFoundations(f, plans, launch, dom) {
     if (dstat.health === "ssl_pending") {
       const p = el("p", "aihint", dstat.custom_domain + " — DNS is set. We’re switching on the security certificate now — usually a few minutes. Nothing for you to do."); p.style.marginTop = "6px"; p.style.fontWeight = "600"; domCard.appendChild(p);
     } else {
-      const p = el("p", "aihint", dstat.custom_domain + " — almost there. Two quick steps where you bought your domain:"); p.style.marginTop = "6px"; p.style.fontWeight = "600"; domCard.appendChild(p);
+      // item 162, part two (review domains findings 6 and 7): the company that runs this domain's
+      // records, by name, with its sign-in page; the steps used to guess "GoDaddy, Namecheap"
+      const recAt = dstat.provider && dstat.provider.records_at;
+      const p = el("p", "aihint", dstat.custom_domain + " — almost there. Two quick steps " + (recAt ? "at " + recAt.company : "where you bought your domain") + ":"); p.style.marginTop = "6px"; p.style.fontWeight = "600"; domCard.appendChild(p);
       const apex = (dstat.dns && dstat.dns.expected_apex_ip && dstat.dns.expected_apex_ip[0]) || "75.2.60.5";
       const cname = (dstat.dns && dstat.dns.expected_cname) || "your site’s .netlify.app address";
-      domCard.appendChild(stepLine("1. Open your domain’s DNS settings (at GoDaddy, Namecheap — wherever you bought it)."));
+      if (recAt) {
+        const s1 = stepLine("1. Sign in to " + recAt.company + (recAt.path ? ", then open " + recAt.path : "") + ". "); s1.dataset.step = "provider";
+        if (recAt.sign_in) { const a = el("a", null, "Sign in to " + recAt.company + " ↗"); a.href = recAt.sign_in; a.target = "_blank"; a.rel = "noopener"; a.style.cssText = "color:var(--plum,#5b3fa0);font-weight:600;white-space:nowrap;text-decoration:underline"; s1.appendChild(a); }
+        domCard.appendChild(s1);
+      } else domCard.appendChild(stepLine("1. Open your domain’s DNS settings (at GoDaddy, Namecheap — wherever you bought it)."));
       domCard.appendChild(stepLine("2. Add these two records exactly — tap Copy so there are no typos:"));
       [["A", "@", apex], ["CNAME", "www", cname]].forEach(([type, name, val]) => {
         const r = el("div"); r.style.cssText = "display:flex;gap:8px;align-items:center;margin:5px 0 0 14px;flex-wrap:wrap";
@@ -3641,7 +3714,31 @@ function renderFoundations(f, plans, launch, dom) {
       try { await api("POST", "/foundations/domain", { domain }); toast("Connected — here are your two records."); openFoundationsDesk(); }
       catch (err) { toast(nice(err), true); connectBtn.disabled = false; }
     });
-    row.appendChild(inp); row.appendChild(connectBtn); havePanel.appendChild(row); domCard.appendChild(havePanel);
+    row.appendChild(inp); row.appendChild(connectBtn); havePanel.appendChild(row);
+    // item 162, part two (review domains finding 7): as they type, who sold the domain and who runs
+    // its records, so the steps can name the company before anything is attached
+    const look = stepLine(""); look.dataset.look = "provider"; look.hidden = true; look.setAttribute("role", "status"); havePanel.appendChild(look);
+    let lookT = 0, lookSeq = 0;
+    inp.addEventListener("input", () => {
+      clearTimeout(lookT);
+      const v = (inp.value || "").trim().toLowerCase().replace(/^https?:\/\//, "").replace(/[\/?#].*$/, "");
+      const seq = ++lookSeq;
+      if (!/^([a-z0-9]([a-z0-9-]*[a-z0-9])?\.)+[a-z]{2,}$/.test(v)) { look.hidden = true; return; }
+      lookT = setTimeout(async () => {
+        let r = null; try { r = await api("GET", "/foundations/domain/lookup?name=" + encodeURIComponent(v)); } catch (_) { /* the line just stays away */ }
+        if (seq !== lookSeq) return;
+        const d = r && r.data; look.textContent = "";
+        if (!d || d.found === null || d.found === undefined) { look.hidden = true; return; }
+        if (d.found === false) { look.textContent = v + " isn’t registered to anyone yet. Buy it at a domain company first, then come back and connect it."; look.hidden = false; return; }
+        const rec = d.records_at, ren = d.renew_at;
+        const where = rec && ren && rec.company !== ren.company ? "It’s registered at " + ren.company + ", and its records are kept at " + rec.company + ". That’s where you’ll add two records."
+          : rec ? "It’s at " + rec.company + ". That’s where you’ll add two records." : "";
+        look.appendChild(document.createTextNode("Found it. " + where + " "));
+        if (rec && rec.sign_in) { const a = el("a", null, "Sign in to " + rec.company + " ↗"); a.href = rec.sign_in; a.target = "_blank"; a.rel = "noopener"; a.style.cssText = "color:var(--plum,#5b3fa0);font-weight:600;white-space:nowrap;text-decoration:underline"; look.appendChild(a); }
+        look.hidden = false;
+      }, 600);
+    });
+    domCard.appendChild(havePanel);
 
     if (DESK_DOMAIN_INTENT) { DESK_DOMAIN_INTENT = false; setTimeout(() => { haveBtn.click(); inp.focus(); }, 0); }
     const needPanel = el("div"); needPanel.dataset.needs = "configure"; needPanel.style.cssText = "display:none;margin-top:10px";
@@ -3654,13 +3751,38 @@ function renderFoundations(f, plans, launch, dom) {
     haveBtn.addEventListener("click", () => { havePanel.style.display = "block"; needPanel.style.display = "none"; setTimeout(() => inp.focus(), 20); });
     needBtn.addEventListener("click", () => { needPanel.style.display = "block"; havePanel.style.display = "none"; });
   }
+  // item 162, part two (review domains finding 8): the ready-made guides had no button anywhere.
+  // Each press prepares the plan; it lands at the bottom, under "Waiting for your OK".
+  if (dstat) {
+    const mh = el("div"); mh.dataset.needs = "configure"; mh.dataset.help = "more"; mh.style.marginTop = "12px";
+    const h = stepLine("More help with this domain"); h.style.fontWeight = "600"; mh.appendChild(h);
+    const acts = el("div", "doa"); acts.style.cssText = "gap:8px;flex-wrap:wrap;margin-top:4px";
+    [["registrar_care", "Make sure it renews by itself"], ["connect_domain", "The records my site needs"], ["transfer_out", "Move my domain"]].forEach(([goal, label]) => {
+      const b = el("button", "textact", label); b.dataset.goal = goal;
+      b.addEventListener("click", async () => {
+        b.disabled = true;
+        try { await api("POST", "/foundations/prepare", { goal }); toast("Here are the steps. They’re at the bottom, waiting for your OK."); openFoundationsDesk(); }
+        catch (err) { toast(nice(err), true); b.disabled = false; }
+      });
+      acts.appendChild(b);
+    });
+    mh.appendChild(acts); domCard.appendChild(mh);
+  }
   wrap.appendChild(domCard);
 
   const dnsCard = section("your domain’s records", f.dns.sentence);
   if (f.dns.records.length) {
-    const list = el("p", "aihint", f.dns.records.slice(0, 6).map((r) => `${r.type} — ${r.plain}`).join(" · "));
+    const words = (rs) => rs.map((r) => `${r.type} — ${r.plain}`).join(" · ");
+    const list = el("p", "aihint", words(f.dns.records.slice(0, 6)));
     list.style.marginTop = "4px";
     dnsCard.appendChild(list);
+    // item 162, part two (review domains finding 24): the card stopped at six, so mail and
+    // verification records hid behind it
+    if (f.dns.records.length > 6) {
+      const all = el("button", "textact", "Show all (" + f.dns.records.length + ")"); all.dataset.records = "all";
+      all.addEventListener("click", () => { list.textContent = words(f.dns.records); all.remove(); });
+      dnsCard.appendChild(all);
+    }
   }
   section("security — the padlock in the browser", f.ssl.sentence);
   // ── Email — the same step-by-step treatment as the domain wizard. Four states,
@@ -4386,9 +4508,24 @@ function rvStars(n) {
 }
 function renderReviews(wrap, data) {
   const reviews = data.reviews || [], counts = data.counts || {}, agg = data.aggregate || { count: 0, average: 0 };
+  const g = data.google || {};
 
-  // ── 1. Ask for a review ─────────────────────────────────────────────────────
-  const c1 = rvCard("Ask for a review", "Send a happy customer a friendly, branded link to leave a review. They write it; you approve it before it ever shows. (Nothing is posted on their behalf.)");
+  // ── 1. Ask for a review (item 115: it can point at the Google review box) ───
+  const c1 = rvCard("Ask for a review", "Send a happy customer a friendly, branded link to leave a review. They write it — nothing is posted on their behalf.");
+
+  // Where the request sends them: your site's review page, or the Google review box.
+  const destWrap = el("div"); destWrap.style.cssText = "display:flex;gap:16px;flex-wrap:wrap;margin:0 0 12px";
+  const mkDest = (value, label, disabled) => {
+    const lab = el("label"); lab.style.cssText = "display:flex;align-items:center;gap:6px;font-size:13.5px" + (disabled ? ";color:var(--soft,#888)" : "");
+    const rb = el("input"); rb.type = "radio"; rb.name = "rv-dest"; rb.value = value; rb.disabled = !!disabled; if (value === "site") rb.checked = true;
+    lab.append(rb, el("span", null, label)); return lab;
+  };
+  destWrap.appendChild(el("span", null, "Send them to:")).style.cssText = "font-size:13px;font-weight:600";
+  destWrap.appendChild(mkDest("site", "Your website’s review page", false));
+  destWrap.appendChild(mkDest("google", "Your Google review box", !g.link));
+  c1.appendChild(destWrap);
+  const rvDest = () => { const r = wrap.querySelector('input[name="rv-dest"]:checked'); return r && r.value === "google" ? "google" : "site"; };
+
   const rowA = el("div"); rowA.style.cssText = "display:grid;grid-template-columns:1fr 1fr auto;gap:10px;align-items:end;flex-wrap:wrap";
   const em = el("input"); em.type = "email"; em.placeholder = "Customer email"; em.style.cssText = RV_ICSS;
   const nm = el("input"); nm.type = "text"; nm.placeholder = "Their name (optional)"; nm.style.cssText = RV_ICSS;
@@ -4397,7 +4534,7 @@ function renderReviews(wrap, data) {
     const email = em.value.trim(); if (!email) { toast("Add the customer's email", true); return; }
     ask.disabled = true;
     try {
-      const r = await api("POST", "/reviews/request", { email, name: nm.value.trim() });
+      const r = await api("POST", "/reviews/request", { email, name: nm.value.trim(), destination: rvDest() });
       toast(r.data && r.data.sent === false ? "That address has opted out — nothing sent." : "Review request sent");
       em.value = ""; nm.value = "";
     } catch (err) { toast(nice(err), true); } finally { ask.disabled = false; }
@@ -4405,8 +4542,87 @@ function renderReviews(wrap, data) {
   const fA = (label, node) => { const w = el("label"); w.style.cssText = "display:flex;flex-direction:column;gap:4px;font-size:13px;font-weight:600"; w.appendChild(el("span", null, label)); w.appendChild(node); return w; };
   rowA.append(fA("Email", em), fA("Name", nm), ask);
   c1.appendChild(rowA);
+
+  // The Google link's state, in plain words — and the paste-once place id.
+  const gState = el("div"); gState.style.cssText = "margin-top:12px;padding:10px 12px;border:1px dashed var(--line,#ddd);border-radius:10px;font-size:13px";
+  if (g.link && g.source === "google") {
+    gState.appendChild(el("p", null, "Google requests use the review link from your Google listing.")).style.margin = "0";
+  } else {
+    if (g.link) gState.appendChild(el("p", null, "Google requests use the place id you pasted.")).style.cssText = "margin:0 0 8px";
+    else if (g.connected) gState.appendChild(el("p", null, "Your Google listing is connected, but Google hasn’t approved the listing connection yet, so it hasn’t handed back your review link. Paste your place id below to send Google requests now.")).style.cssText = "margin:0 0 8px";
+    else gState.appendChild(el("p", null, "To send people to your Google review box, paste your Google place id — or the full “write a review” link from Google.")).style.cssText = "margin:0 0 8px";
+    if (g.can_save_place_id === false) {
+      gState.appendChild(el("p", "hint", "Saving a place id needs a one-time database update by your studio first.")).style.margin = "0";
+    } else {
+      const rowG = el("div"); rowG.style.cssText = "display:flex;gap:8px;flex-wrap:wrap";
+      const pid = el("input"); pid.type = "text"; pid.placeholder = "Google place id or “write a review” link"; pid.value = g.place_id || ""; pid.style.cssText = RV_ICSS + ";flex:1;min-width:220px";
+      const sv = el("button", null, "Save Google link"); sv.dataset.needs = "configure"; sv.style.cssText = BK_BTN + ";border-color:var(--plum,#5b3fa0);color:var(--plum,#5b3fa0)";
+      sv.addEventListener("click", async () => {
+        sv.disabled = true;
+        try {
+          const r = await api("POST", "/reviews/google-link", { place_id: pid.value.trim() });
+          toast(r.data && r.data.link ? "Saved — Google requests are ready" : "Cleared — requests use your website’s page");
+          loadReviews();
+        } catch (err) { toast(nice(err), true); sv.disabled = false; }
+      });
+      rowG.append(pid, sv); gState.appendChild(rowG);
+    }
+  }
+  c1.appendChild(gState);
   c1.appendChild(el("div", "hint", "Tip: the best time to ask is right after a completed job, appointment, or sale.")).style.cssText = "margin-top:10px;font-size:12.5px";
   wrap.appendChild(c1);
+
+  // ── 1b. Just paid you (item 115): the ticked list — an offer, never automatic ─
+  const paid = data.recently_paid || [];
+  if (paid.length) {
+    const cp = rvCard("Just paid you", "Customers whose invoice was paid recently — the best moment to ask. Tick who to ask; each person is asked at most once a month.");
+    const boxes = [];
+    paid.forEach((p) => {
+      const row = el("label"); row.style.cssText = "display:flex;align-items:center;gap:10px;padding:8px 10px;border:1px solid var(--line,#eee);border-radius:10px;margin-bottom:6px;font-size:13.5px;cursor:pointer";
+      const cb = el("input"); cb.type = "checkbox"; cb.value = p.contact_id; boxes.push(cb);
+      const who = el("span", null, p.name || p.email); who.style.fontWeight = "600";
+      const what = el("span", "hint", (p.purpose === "deposit" ? "Deposit" : "Paid") + (p.title ? " — " + p.title : "") + (p.paid_at ? " · " + bkWhenLabel(String(p.paid_at).slice(0, 10)) : ""));
+      what.style.cssText = "font-size:12.5px";
+      row.append(cb, who, what); cp.appendChild(row);
+    });
+    const go = el("button", "pillbtn", "Ask the ticked customers"); go.style.cssText = "height:36px;padding:0 16px;font-size:13.5px;margin-top:6px";
+    go.addEventListener("click", async () => {
+      const ids = boxes.filter((b) => b.checked).map((b) => b.value);
+      if (!ids.length) { toast("Tick at least one customer", true); return; }
+      go.disabled = true;
+      try {
+        const r = await api("POST", "/reviews/request", { contact_ids: ids, destination: rvDest() });
+        const d = (r && r.data) || {};
+        const skipped = (d.skipped || []).length;
+        toast("Asked " + (d.sent || 0) + (skipped ? " — " + skipped + " skipped (asked recently, opted out, or no email)" : ""));
+      } catch (err) { toast(nice(err), true); } finally { go.disabled = false; }
+    });
+    cp.appendChild(go);
+    wrap.appendChild(cp);
+  }
+
+  // ── 1c. Your Google reviews (item 115): pulled in once Google approves ──────
+  const cg = rvCard("Your Google reviews", null);
+  if (g.listing && (g.listing.rating || g.listing.review_count)) {
+    const line = el("div"); line.style.cssText = "display:flex;align-items:center;gap:10px;flex-wrap:wrap";
+    line.appendChild(rvStars(g.listing.rating));
+    line.appendChild(el("span", null, (g.listing.rating || "—") + " from " + (g.listing.review_count || 0) + " Google reviews")).style.fontWeight = "600";
+    cg.appendChild(line);
+    const bits = [];
+    if (g.listing.new_reviews) bits.push(g.listing.new_reviews + " new in the last month");
+    if (g.listing.unreplied) bits.push(g.listing.unreplied + " without a reply");
+    if (bits.length) cg.appendChild(el("p", "hint", bits.join(" · "))).style.cssText = "margin:8px 0 0;font-size:12.5px";
+    if (g.listing.maps_uri) {
+      const a = el("a", null, "Open your listing on Google →"); a.href = g.listing.maps_uri; a.target = "_blank"; a.rel = "noopener";
+      a.style.cssText = "display:inline-block;margin-top:10px;font-size:13px"; cg.appendChild(a);
+    }
+    cg.appendChild(el("p", "hint", "Google reviews are read here, not managed here — reply to them on Google.")).style.cssText = "margin:8px 0 0;font-size:12px";
+  } else {
+    cg.appendChild(el("p", "hint", g.connected
+      ? "Google hasn’t approved the listing connection yet. Your Google reviews will show here once it does — nothing for you to do."
+      : "Not connected. Once Google approves the listing connection, connect your Google Business Profile and your Google reviews will show here."));
+  }
+  wrap.appendChild(cg);
 
   // ── 2. Waiting for you (pending) ────────────────────────────────────────────
   const pending = reviews.filter((r) => r.status === "pending");
@@ -5762,7 +5978,7 @@ function hbTreePage(pg) {
 function hbLoadBoardExtras(view) {
   if (view === "pages" && !HB_ASKED.tree) {
     HB_ASKED.tree = true;
-    api("GET", "/content-tree").then((r) => { HB_TREE = r.data || null; renderPagesList(); }).catch(() => {});
+    api("GET", "/content-tree").then((r) => { HB_TREE = r.data || null; renderPagesList(); dcSyncPageSwitch(); }).catch(() => {});
   }
   if (view === "search" && !HB_ASKED.health) {
     HB_ASKED.health = true;
@@ -5820,8 +6036,25 @@ function renderHealthCard() {
   chip.appendChild(document.createTextNode(h.overall === "healthy" ? "All good" : h.overall === "attention" ? (h.attention_count + " to look at") : "Getting started"));
   head.appendChild(chip); card.appendChild(head);
   card.appendChild(el("div", "note", h.summary || h.headline || ""));
+  // list item 151: the two figures an owner asks first, how much it's been up and how fast
+  // it loads, shown whether or not they need a look; and a new site's go-live list
+  const facts = [];
+  h.categories.forEach((c) => (c.checks || []).forEach((k) => { if (c.key === "speed" || /^Online \d/.test(k.title)) facts.push(k.title); }));
+  if (facts.length) card.appendChild(el("div", "note hb-facts", facts.join(" · ")));
+  const golive = h.categories.find((c) => c.key === "golive");
+  if (golive) {
+    card.appendChild(el("h3", "hb-sub-h", "Before you go live"));
+    const ul = el("ul", "hb-checks hb-golive");
+    golive.checks.forEach((k) => {
+      const li = el("li"); li.dataset.done = k.state === "ok" ? "1" : "0";
+      li.appendChild(el("b", null, (k.state === "ok" ? "✓ " : "") + k.title)); li.appendChild(document.createTextNode(k.why || ""));
+      if (k.state !== "ok" && k.action_label && k.action_href) { li.appendChild(document.createTextNode(" ")); const a = el("a", null, k.action_label); a.href = k.action_href; li.appendChild(a); }
+      ul.appendChild(li);
+    });
+    card.appendChild(ul);
+  }
   const needs = [];
-  h.categories.forEach((c) => (c.checks || []).forEach((k) => { if (k.state === "attention") needs.push(k); }));
+  h.categories.forEach((c) => { if (c.key !== "golive") (c.checks || []).forEach((k) => { if (k.state === "attention") needs.push(k); }); });
   if (needs.length) {
     const ul = el("ul", "hb-checks");
     needs.slice(0, 3).forEach((k) => {
@@ -5885,7 +6118,7 @@ async function loadToday(first) {
     const [h, c] = await (first || Promise.all([api("GET", "/health"), readChanges()]));   // M9: seed the optimistic-lock version
     S.health = h.data; S.changes = c.data; TODAY_READ_AT = at;
     renderFactsProse();
-    renderPublishButton(); renderBizWaiting(); renderTodoLine(); renderStageStatus();
+    renderPublishButton(); renderBizWaiting(); renderTodoLine(); renderStageStatus(); dcSyncPageSwitch();
   } catch (err) { toast(nice(err), true); }
 }
 // ── The Overview is the site ─────────────────────────────────────────────────
@@ -6106,7 +6339,7 @@ async function readChanges() {
 }
 function scheduleChangesRefresh() {
   debounce("changes", async () => {
-    try { const c = await readChanges(); S.changes = c.data; renderPublishButton(); renderBizWaiting(); renderTodoLine(); renderStageStatus();
+    try { const c = await readChanges(); S.changes = c.data; renderPublishButton(); renderBizWaiting(); renderTodoLine(); renderStageStatus(); dcSyncPageSwitch();
       if ($("view-pages").classList.contains("on")) { renderRecent(); renderPagesList(); } }
     catch { /* quiet */ }
   }, 1200);
@@ -7240,49 +7473,68 @@ async function siteBringOnline() {
 // Reuses the named-snapshot substrate (checkpoints are stored like launches);
 // preview reuses the launch-preview door, "bring into draft" reuses the shared
 // restore-to-draft engine. The live site is never touched.
-async function renderCheckpoints() {
-  const box = $("checkpointBox"); if (!box) return;
-  let cps = [];
-  try { cps = (await api("GET", "/publishes/checkpoints")).data || []; } catch (_) { box.innerHTML = ""; return; }
+// ── Recently deleted pages (builder list item 154) ──────────────────────────
+// Restoring a version or a checkpoint never brings a page back (the draft writer
+// leaves pages alone), so every deleted page is kept 30 days on the server, exactly
+// as it was. Put back adds that one page to the draft; nothing else changes, and the
+// live site waits for a publish. Shown only when there is something to put back.
+async function renderDeletedPages() {
+  // its own box, just above "More tools", so it never touches the view's static markup
+  let box = $("deletedPagesBox");
+  if (!box) {
+    const more = $("versionMore"); if (!more || !more.parentNode) return;
+    box = document.createElement("div"); box.id = "deletedPagesBox";
+    more.parentNode.insertBefore(box, more);
+  }
+  let rows = [];
+  try { const d = (await api("GET", "/pages/deleted")).data; rows = Array.isArray(d) ? d : []; } catch (_) { box.innerHTML = ""; return; }
   box.innerHTML = "";
-  const card = el("div", "field"); card.style.marginBottom = "18px";
-  card.appendChild(el("label", null, "Checkpoints"));
-  card.appendChild(el("div", "hint", "Before a big edit or a publish, save a named checkpoint of your current draft — a safety point you can look at or return to anytime. Your live site is never affected."));
-  const save = el("button", null, "Save a checkpoint"); save.type = "button";
-  save.style.cssText = "font:inherit;font-size:12.5px;margin:8px 0;padding:7px 14px;border-radius:999px;border:1px solid var(--line,#ddd);background:transparent;cursor:pointer";
-  save.addEventListener("click", async () => {
+  if (!rows.length) return;
+  const card = el("div", "field"); card.style.margin = "18px 0";
+  card.appendChild(el("label", null, "Recently deleted pages"));
+  card.appendChild(el("div", "hint", "Kept for 30 days. Putting one back adds it to your pages as it was; nothing else changes, and your live site waits until you publish."));
+  rows.forEach((p) => {
+    const row = el("div"); row.style.cssText = "display:flex;align-items:center;gap:10px;flex-wrap:wrap;border-top:1px solid var(--line,#e5e5e5);padding:10px 0;margin-top:8px";
+    const words = el("div"); words.style.cssText = "flex:1;min-width:0";
+    words.appendChild(Object.assign(el("strong", null, p.title || p.slug), { style: "display:block;font-size:13.5px" }));
+    const d = new Date(p.deleted_at);
+    const left = p.days_left === 1 ? "1 day left" : (p.days_left || 0) + " days left";
+    words.appendChild(Object.assign(el("span", null, "Deleted " + d.toLocaleDateString("en-US", { month: "short", day: "numeric" }) + " · " + (p.sections === 1 ? "1 section" : (p.sections || 0) + " sections") + " · " + left), { style: "font-size:12px;color:var(--soft,#666)" }));
+    row.appendChild(words);
+    const back = el("button", null, "Put back"); back.type = "button";
+    back.setAttribute("aria-label", "Put back the page " + (p.title || p.slug));
+    back.style.cssText = "font:inherit;font-size:12px;padding:6px 14px;border-radius:999px;border:1px solid var(--line,#ddd);background:transparent;cursor:pointer;min-height:36px";
+    back.addEventListener("click", async () => {
+      if (back.disabled) return;
+      back.disabled = true; back.textContent = "Putting back…";
+      try {
+        const r = (await api("POST", `/pages/deleted/${p.id}/restore`, {})).data || {};
+        toast("“" + (r.title || p.title) + "” is back in your pages" + (r.moved ? " as /" + r.slug + "/" : ""));
+        await refreshAll(); renderDeletedPages();
+      } catch (err) { toast(nice(err), true); back.disabled = false; back.textContent = "Put back"; }
+    });
+    row.appendChild(back);
+    card.appendChild(row);
+  });
+  box.appendChild(card);
+}
+// Saved checkpoints: named copies of the draft that were never live. Item 125 puts them in the
+// Versions list with the publishes, newest first, a hollow dot against a publish's filled one;
+// the studio's Save a checkpoint sits at the list's top (a client's list just shows them).
+async function renderCheckpoints() {
+  try { S.checkpoints = (await api("GET", "/publishes/checkpoints")).data || []; } catch (_) { S.checkpoints = []; }
+  const b = $("btnSaveCheckpoint"); if (b) b.hidden = !S.isStudio;
+  if (S.publishesRead) renderVersionList();
+}
+(function initSaveCheckpoint() {
+  const b = $("btnSaveCheckpoint"); if (!b) return;
+  b.addEventListener("click", async () => {
     const name = await askText("Name this checkpoint", { placeholder: "e.g. Before spring redesign", ok: "Save" });
     if (name === null) return;
     try { await api("POST", "/publishes/checkpoints", { name }); toast("Checkpoint saved"); renderCheckpoints(); }
     catch (err) { toast(nice(err), true); }
   });
-  card.appendChild(save);
-  cps.forEach((c) => {
-    const row = el("div"); row.style.cssText = "border:1px solid var(--line,#e5e5e5);border-radius:10px;padding:10px 12px;margin-top:8px";
-    const top = el("div"); top.style.cssText = "display:flex;align-items:center;gap:8px;flex-wrap:wrap";
-    top.appendChild(Object.assign(el("strong", null, c.name), { style: "font-size:13.5px" }));
-    const d = new Date(c.at);
-    top.appendChild(Object.assign(el("span", null, "saved " + d.toLocaleDateString("en-US", { month: "short", day: "numeric" }) + " " + d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" }).replace(" ", "")), { style: "font-size:12px;color:var(--soft,#666)" }));
-    row.appendChild(top);
-    const acts = el("div"); acts.style.cssText = "display:flex;gap:8px;flex-wrap:wrap;margin-top:8px";
-    const mk = (label, fn, primary) => { const b = el("button", null, label); b.type = "button"; b.style.cssText = "font:inherit;font-size:12px;padding:5px 12px;border-radius:999px;cursor:pointer;border:" + (primary ? "2px solid var(--plum,#5b3fa0);background:var(--plum-tint,#faf7ff);color:var(--plum-deep,#3a2470)" : "1px solid var(--line,#ddd);background:transparent"); b.addEventListener("click", fn); acts.appendChild(b); };
-    mk("View", () => openLaunchPreview(c.id));
-    mk("Restore to draft", async () => {
-      if (!(await askYes("Restore checkpoint “" + c.name + "” to your draft? Today’s draft is kept as a safety copy.", { ok: "Restore" }))) return;
-      try { const r = await api("POST", `/publishes/checkpoints/${c.id}/restore`, {}); toast(r.data.message); await refreshAll(); go("today"); }
-      catch (err) { toast(nice(err), true); }
-    }, true);
-    mk("Remove", async () => {
-      if (!(await askYes("Remove checkpoint “" + c.name + "”? This can’t be undone.", { ok: "Remove", danger: true }))) return;
-      try { await api("DELETE", `/publishes/checkpoints/${c.id}`); toast("Checkpoint removed"); renderCheckpoints(); }
-      catch (err) { toast(nice(err), true); }
-    });
-    acts.lastChild.dataset.needs = "delete";
-    row.appendChild(acts);
-    card.appendChild(row);
-  });
-  box.appendChild(card);
-}
+})();
 // ── Compare any two versions + Timewarp ──────────────────────────────────────
 // Compare feeds two kept versions to the SAME plain-language change engine the
 // publish sheet uses; Timewarp resolves a date to the version that was live then
@@ -7370,16 +7622,19 @@ async function loadHistory() {
   renderPreviewPanel();   // FD-T20/T21: Draft → Preview → Live sits at the top
   renderCheckpoints();    // named draft safety points
   renderLaunches();   // FD-T7: staged launches sit above the version journal
+  renderDeletedPages();   // item 154: pages deleted in the last 30 days, one at a time back
   const more = $("versionMore");
   if (more && !more.dataset.set) { more.dataset.set = "1"; more.open = !!S.isStudio; }
   const list = $("pubList");
   list.innerHTML = `<div class="loadline"><div class="lq">Loading versions…</div><div class="shimmer"></div></div>`;
+  S.publishesRead = false;
   try {
     const pubs = (await api("GET", "/publishes")).data;
-    S.publishes = pubs;
+    S.publishes = pubs; S.versionsErr = null;
     renderVersionTools();   // compare any two versions + Timewarp (needs S.publishes)
-    renderVersionList();
-  } catch (err) { list.innerHTML = `<div class="estate"><div class="eq">Your versions couldn’t load just now.</div><div class="eh">${esc(nice(err))}</div></div>`; }
+  } catch (err) { S.publishes = null; S.versionsErr = nice(err); }
+  S.publishesRead = true;   // saved checkpoints may land before or after: whichever is last draws the list
+  renderVersionList();
 }
 // Who published it, in the words of whoever is reading: a studio working inside a
 // client's site and the client see the same row from opposite sides.
@@ -7390,17 +7645,22 @@ function versionWho(p) {
   return "";
 }
 const VERSIONS_SHOWN = 10;
+const verWhen = (at) => { const d = new Date(at); return d.toLocaleDateString("en-US", { month: "short", day: "numeric" }) + " · " + d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" }); };
+// the date cell leads with what the row is: Published (a filled dot), Saved (a hollow one, never live)
+function verDate(kind, word, at) { const w = el("span", "hdate"); w.appendChild(el("span", "ver-kind " + kind, word)); w.appendChild(document.createTextNode(verWhen(at))); return w; }
 function renderVersionList() {
   const list = $("pubList"); if (!list) return;
   const pubs = S.publishes || [];
+  const all = [...pubs, ...(S.checkpoints || []).map((c) => ({ ...c, saved: true, at: c.at || c.created_at }))].sort((a, b) => new Date(b.at) - new Date(a.at));
   list.innerHTML = "";
-  if (!pubs.length) { list.innerHTML = `<div class="estate"><div class="eq">No versions yet.</div><div class="eh">Each time you publish, a version is saved here. You can look at any of them or restore one.</div></div>`; return; }
+  if (S.versionsErr) list.insertAdjacentHTML("beforeend", `<div class="estate"><div class="eq">Your versions couldn’t load just now.</div><div class="eh">${esc(S.versionsErr)}</div></div>`);
+  if (!all.length) { if (!S.versionsErr) list.innerHTML = `<div class="estate"><div class="eq">No versions yet.</div><div class="eh">Each time you publish, a version is saved here. You can look at any of them or restore one.</div></div>`; return; }
   const liveId = (pubs.find((p) => p.status === "live") || {}).id;
-  const shown = S.versionsAll ? pubs : pubs.slice(0, VERSIONS_SHOWN);
+  const shown = S.versionsAll ? all : all.slice(0, VERSIONS_SHOWN);
   shown.forEach((p) => {
+    if (p.saved) { list.appendChild(versionSavedRow(p)); return; }
     const row = el("div", "hentry" + (p.status === "failed" ? " hfail" : ""));
-    const d = new Date(p.at);
-    row.appendChild(el("span", "hdate", d.toLocaleDateString("en-US", { month: "short", day: "numeric" }) + " · " + d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })));
+    row.appendChild(p.status === "failed" ? verDate("fail", "Not published", p.at) : verDate("pub", "Published", p.at));
     const body = el("div", "hbody");
     const sum = el("div", "hsum");
     if (p.status === "failed") { const h = el("span", "hollow"); h.innerHTML = uiIcon("x", 13); sum.appendChild(h); }
@@ -7463,18 +7723,42 @@ function renderVersionList() {
     }
     list.appendChild(row);
   });
-  if (shown.length < pubs.length) {
-    const older = el("button", "addline", `Show ${pubs.length - shown.length} older version${pubs.length - shown.length === 1 ? "" : "s"}`);
+  if (shown.length < all.length) {
+    const older = el("button", "addline", `Show ${all.length - shown.length} older version${all.length - shown.length === 1 ? "" : "s"}`);
     older.addEventListener("click", () => { S.versionsAll = true; renderVersionList(); });
     list.appendChild(older);
   }
+}
+// A saved checkpoint in the list: View, Restore (the same sheet as a publish) and, with the
+// right to delete, Remove.
+function versionSavedRow(c) {
+  const row = el("div", "hentry ver-saved");
+  row.appendChild(verDate("save", "Saved", c.at));
+  const body = el("div", "hbody");
+  body.appendChild(el("div", "hsum", "“" + c.name + "”"));
+  body.appendChild(el("div", "hmeta", "A checkpoint of your draft. It was never on your live site."));
+  row.appendChild(body);
+  const acts = el("div", "hacts");
+  const view = el("button", "quietact", "View"); view.addEventListener("click", () => openLaunchPreview(c.id)); acts.appendChild(view);
+  const res = el("button", "textact", "Restore");
+  res.addEventListener("click", () => { S.restoreTarget = c; $("resSheetSub").textContent = `“${c.name}”, saved ${fmtDate(c.at)}.`; openSheet("restoreScrim"); });
+  acts.appendChild(res);
+  const rm = el("button", "quietact", "Remove"); rm.dataset.needs = "delete";
+  rm.addEventListener("click", async () => {
+    if (!(await askYes("Remove checkpoint “" + c.name + "”? This can’t be undone.", { ok: "Remove", danger: true }))) return;
+    try { await api("DELETE", `/publishes/checkpoints/${c.id}`); toast("Checkpoint removed"); renderCheckpoints(); }
+    catch (err) { toast(nice(err), true); }
+  });
+  acts.appendChild(rm);
+  row.appendChild(acts);
+  return row;
 }
 $("btnRestoreGo").addEventListener("click", async () => {
   const p = S.restoreTarget; if (!p) return;
   const btn = $("btnRestoreGo");
   btn.disabled = true; btn.textContent = "Restoring…";
   try {
-    const r = await api("POST", "/restore-to-draft", { publish_id: p.id });
+    const r = p.saved ? await api("POST", `/publishes/checkpoints/${p.id}/restore`, {}) : await api("POST", "/restore-to-draft", { publish_id: p.id });
     closeSheet("restoreScrim");
     toast(r.data.message);
     btn.disabled = false; btn.textContent = "Restore to my draft";
@@ -7496,6 +7780,7 @@ function fillSingles() {
   if ($("f-gsv")) $("f-gsv").value = (S.settings && S.settings.google_site_verification) || "";
   if ($("f-bsv")) $("f-bsv").value = (S.settings && S.settings.bing_site_verification) || "";
   renderVisitSwitch();
+  renderAiCrawlSwitch();
   const l = S.location || {};
   [["f-address_line1","address_line1"],["f-city","city"],["f-region","region"],["f-postal_code","postal_code"],["f-locphone","phone"]]
     .forEach(([id, k]) => { $(id).value = l[k] || ""; });
@@ -8078,6 +8363,15 @@ function renderSvAi() {
         grid.append(el("span", null, p.name), bar, el("span", "sv-pn", p.score === null ? "Not measured" : String(p.score)));
       });
       host.appendChild(grid);
+    }
+    // list item 153: who the assistants named instead, and the websites their answers drew on
+    if ((a.competitors || []).length) {
+      const p = el("p", "sv-ai-list"); p.append(el("b", null, "Named instead of you: "), a.competitors.map((c) => `${c.name} (${c.times} time${c.times === 1 ? "" : "s"})`).join(", "));
+      host.appendChild(p);
+    }
+    if ((a.sources || []).length) {
+      const p = el("p", "sv-ai-list"); p.append(el("b", null, "Websites the answers drew on: "), a.sources.map((x) => `${x.own ? "your website" : x.name} (${x.cited})`).join(", "));
+      host.appendChild(p);
     }
     host.appendChild(el("p", "hint", `Checked ${svWhen(a.checked_at)}${a.business_name ? ` for ${a.business_name}${a.city ? ` in ${a.city}` : ""}` : ""}.`));
   } else {
@@ -8915,9 +9209,9 @@ function renderLinkedChip(blk, idx, card) {
   [up, dn, rm].forEach((b) => { b.type = "button"; b.style.cssText = miniBtn; });
   up.disabled = idx === 0; dn.disabled = idx === BLOCKS_WORK.length - 1;
   if (up.disabled) up.style.opacity = ".35"; if (dn.disabled) dn.style.opacity = ".35";
-  up.addEventListener("click", () => { if (idx === 0) return; panelSwap(idx, idx - 1); renderBlocksCard(); });
-  dn.addEventListener("click", () => { if (idx === BLOCKS_WORK.length - 1) return; panelSwap(idx, idx + 1); renderBlocksCard(); });
-  rm.addEventListener("click", () => { panelRemove(idx); renderBlocksCard(); });
+  up.addEventListener("click", () => { if (idx === 0 || lockStop(idx)) return; panelSwap(idx, idx - 1); renderBlocksCard(); });
+  dn.addEventListener("click", () => { if (idx === BLOCKS_WORK.length - 1 || lockStop(idx)) return; panelSwap(idx, idx + 1); renderBlocksCard(); });
+  rm.addEventListener("click", () => { if (lockStop(idx)) return; panelRemove(idx); renderBlocksCard(); });
   head.append(nm, up, dn, rm); sub.appendChild(head);
   if (!item && CL_ITEMS !== null) {
     sub.appendChild(el("div", "hint", "The saved section this links to was removed, so this spot simply won’t appear on your site. Remove it here to tidy up."));
@@ -10147,9 +10441,9 @@ function renderBlocksCard() {
     [up, dn, rm].forEach((b) => { b.type = "button"; b.style.cssText = miniBtn; });
     up.disabled = idx === 0; dn.disabled = idx === BLOCKS_WORK.length - 1;
     if (up.disabled) up.style.opacity = ".35"; if (dn.disabled) dn.style.opacity = ".35";
-    up.addEventListener("click", () => { if (idx === 0) return; panelSwap(idx, idx - 1); if (BLOCK_SOLO === idx) BLOCK_SOLO = idx - 1; renderBlocksCard(); });
-    dn.addEventListener("click", () => { if (idx === BLOCKS_WORK.length - 1) return; panelSwap(idx, idx + 1); if (BLOCK_SOLO === idx) BLOCK_SOLO = idx + 1; renderBlocksCard(); });
-    rm.addEventListener("click", () => { const wasSolo = solo !== null; panelRemove(idx); if (wasSolo) closeSettingsPanel(); renderBlocksCard(); });
+    up.addEventListener("click", () => { if (idx === 0 || lockStop(idx)) return; panelSwap(idx, idx - 1); if (BLOCK_SOLO === idx) BLOCK_SOLO = idx - 1; renderBlocksCard(); });
+    dn.addEventListener("click", () => { if (idx === BLOCKS_WORK.length - 1 || lockStop(idx)) return; panelSwap(idx, idx + 1); if (BLOCK_SOLO === idx) BLOCK_SOLO = idx + 1; renderBlocksCard(); });
+    rm.addEventListener("click", () => { if (lockStop(idx)) return; const wasSolo = solo !== null; panelRemove(idx); if (wasSolo) closeSettingsPanel(); renderBlocksCard(); });
     const sv = el("button", null, "Save for reuse"); sv.type = "button"; sv.title = "Save this section to your content library"; sv.style.cssText = miniBtn;
     sv.addEventListener("click", () => clSave(idx));   // CL-1
     head.append(nm, sv, up, dn, rm); box.appendChild(head);
@@ -10405,7 +10699,7 @@ function renderBlocksCard() {
     // Phase EXP: the shared "Show this only for a while" window — same set of sections
     // (a spacer/auto TOC has nothing to schedule).
     if (!def.dividerSimple && !def.tocSimple) blockWindowRow(idx, blk, panes ? panes.when : sub, !!panes);
-    if (panes) insFinish(panes, idx, blk, def);
+    if (panes) { insFinish(panes, idx, blk, def); insLockNote(box, panes, idx, blk); }
     card.appendChild(box);
     // FD-T-LIB: a just-added section scrolls into view and takes focus, so it's
     // never "added but invisible" below the fold.
@@ -11782,16 +12076,63 @@ function renderHFCard(which) {
     });
     host.appendChild(row);
   });
+  if (DESIGN_DEV) pbPart(host);
   host.appendChild(el("p", "hf-says", "Your address, phone and email come from your business details. Links to your privacy and accessibility pages are added for you."));
   const biz = el("button", "dc-modal-cancel", "Change the business details"); biz.type = "button";
   biz.addEventListener("click", () => { closeSettingsPanel(); exitEditMode("business"); });
   const a = el("div", "hf-row"); a.appendChild(biz); host.appendChild(a);
 }
+// ── Item 122: the phone bar, Call, Directions, Hours and Email along the bottom of every page
+// on a phone. One choice, Off, Light or Dark, is the style setting phone_bar (lib/phone_bar.ts
+// on the server, which draws it); Off removes the setting. A button shows only when the
+// business details have something behind it, worked out here the same way, so the card says
+// which ones the bar will have and what's missing.
+function pbNow() { const t = DESIGN_TOKENS && DESIGN_TOKENS.phone_bar; return t === "light" || t === "dark" ? t : ""; }
+function pbButtons() {
+  const i = S.identity || {}, loc = S.location || {}, out = [];
+  const tel = String(loc.phone || i.phone || "").trim().replace(/\s*(?:ext\.?|extension|x|#)\s*\d+\s*$/i, "").replace(/\D/g, "");
+  if (tel.length >= 7) out.push("Call");
+  if (String(loc.address_line1 || "").trim()) out.push("Directions");
+  if (loc.temporarily_closed || (loc.hours || []).some((d) => d && !d.closed && (d.intervals || []).length)) out.push("Hours");
+  if (/^[^\s@<>"']+@[^\s@<>"']+\.[^\s@<>"']+$/.test(String(i.email || "").trim())) out.push("Email");
+  return out;
+}
+function pbPart(host) {
+  host.appendChild(el("div", "ins-lbl", "Phone bar · phones only"));
+  const now = pbNow();
+  const seg = el("div", "dc-seg hf-seg"); seg.id = "pbSeg"; seg.setAttribute("role", "group"); seg.setAttribute("aria-label", "Phone bar");
+  [["", "Off"], ["light", "Light"], ["dark", "Dark"]].forEach(([v, name]) => {
+    const b = el("button", null, name); b.type = "button"; b.dataset.v = v || "off"; b.setAttribute("aria-pressed", String(now === v));
+    b.addEventListener("click", async () => {
+      if (v === pbNow()) return;
+      await saveTokens({ phone_bar: v }, "Phone bar: " + name.toLowerCase());
+      refreshDesignPreview();   // the canvas draws it (at a phone's width)
+      if (PANEL_MODE === "footer") renderHFCard("footer");
+    });
+    seg.appendChild(b);
+  });
+  host.appendChild(seg);
+  const NEEDS = { Call: "a phone number", Directions: "an address", Hours: "opening hours", Email: "an email" };
+  const and = (xs) => xs.join(", ").replace(/, ([^,]*)$/, " and $1");
+  const has = pbButtons(), missing = Object.keys(NEEDS).filter((x) => has.indexOf(x) < 0);
+  const says = !has.length ? "Add a phone number, an address, opening hours or an email to your business details, and the bar can show them."
+    : !now ? "Call, Directions, Hours and Email along the bottom of every page on a phone, from your business details."
+    : "On a phone, every page with the footer shows " + and(has) + " along the bottom."
+      + (missing.length ? " Add " + and(missing.map((x) => NEEDS[x])) + " to your business details to show " + and(missing) + " too." : "");
+  const p = el("p", "hf-says", says); p.id = "pbSays"; host.appendChild(p);
+  // on a computer the canvas is wide, where the bar isn't shown: one press shows the page as a phone does
+  const ph = $("dpDevSeg") && $("dpDevSeg").querySelector('[data-dpdev="phone"]');
+  if (now && has.length && ph && ph.offsetParent && ph.getAttribute("aria-pressed") !== "true") {
+    const r = el("div", "hf-row"), b = el("button", "dc-modal-cancel", "See it on a phone"); b.type = "button"; b.id = "pbSee";
+    b.addEventListener("click", () => { ph.click(); b.parentNode.remove(); });
+    r.appendChild(b); host.appendChild(r);
+  }
+}
 // The header or footer whose card is open stays outlined on the canvas, its name showing.
 function dcHFMark(which) {
   try {
     const doc = $("designPreview").contentDocument;
-    doc.querySelectorAll("header.site,footer.site").forEach((n) => n.classList.toggle("dc-hf-on", !!which && n.matches(which === "header" ? "header.site" : "footer.site")));
+    doc.querySelectorAll("header.site,footer.site,.dds-phonebar").forEach((n) => n.classList.toggle("dc-hf-on", !!which && n.matches(which === "header" ? "header.site" : "footer.site,.dds-phonebar")));
   } catch (_) {}
 }
 const PANEL_TITLES = { styles: "Styles", sections: "All sections", forms: "Forms", header: "Header", footer: "Footer" };
@@ -11815,7 +12156,7 @@ function openSettingsPanel(mode, title) {
   const modal = ["section", "styles", "header", "footer"].indexOf(m) < 0;   // a section, a style, the header or footer: keep the page in view, undimmed
   p.setAttribute("aria-modal", String(modal));
   const cl = $("btnSettingsClose");
-  if (cl) { if (modal) cl.innerHTML = uiIcon("x", 16); else cl.textContent = "Done"; cl.setAttribute("aria-label", modal ? "Close" : "Done"); }
+  if (cl) { if (modal) cl.innerHTML = uiIcon("x", 16); else cl.textContent = "Done"; cl.setAttribute("aria-label", modal ? "Close" : "Done"); cl.title = (modal ? "Close" : "Done") + " (Esc)"; }
   if (sc) {
     if (modal) { sc.hidden = false; requestAnimationFrame(() => sc.classList.add("on")); }
     else { sc.classList.remove("on"); sc.hidden = true; }
@@ -12047,6 +12388,35 @@ function lookSet(idx, key, value) {
   dcLiveFromPanel();
 }
 // the footer under every tab: who can see this section, and the quiet tools
+// Item 155: a locked section's card says so at its top. The studio gets the switch for the
+// client's words and Unlock; the client gets only the Content tab, its words open or shut, and
+// nothing else to press. Run for every section's card, so an unlocked one gets its tabs back.
+function insLockNote(box, panes, idx, blk) {
+  const lock = blkLock(blk), mine = lockedForMe(blk), seg = $("inspectorSeg");
+  if (seg) seg.querySelectorAll("[data-itab]").forEach((b) => { b.hidden = mine && b.dataset.itab !== "content"; });
+  if (!lock) return;
+  const note = el("div", "ins-lock" + (mine ? "" : " studio")); note.id = "insLock";
+  note.insertAdjacentHTML("afterbegin", uiIcon("lock", 16));
+  note.appendChild(el("p", null, mine
+    ? LOCK_SAY + (lock.words ? " You can change its words; ask your studio for anything else." : " Ask your studio if it needs to change.")
+    : "Locked for your client. They see a padlock and can’t move, restyle or delete it."));
+  box.insertBefore(note, box.firstChild);
+  if (!mine) {
+    const row = el("label", "pg-sw ins-lock-sw"); const t = el("span", null, "Client can change its words"); const cb = el("input"); cb.type = "checkbox"; cb.checked = !!lock.words;
+    cb.addEventListener("change", () => dcLockBlock(idx, true, cb.checked));
+    row.append(t, cb); note.appendChild(row);
+    const un = el("button", "dc-modal-cancel", "Unlock"); un.type = "button"; un.addEventListener("click", () => dcLockBlock(idx, false));
+    note.appendChild(un);
+    return;
+  }
+  if (INS_TAB !== "content") insTab("content");
+  // what isn't words: picking photos, adding or removing items, choices and switches
+  box.querySelectorAll("button, select, input[type=checkbox], input[type=radio], input[type=file], input[type=range], input[type=color], input[type=number], input[type=date]").forEach((n) => {
+    if (n.closest(".ins-lock") || (lock.words && n.closest(".ai-wrap"))) return;   // Write with AI writes words
+    n.disabled = true;
+  });
+  if (!lock.words) box.querySelectorAll("input, textarea").forEach((n) => { if (!n.closest(".ins-lock")) n.readOnly = true; });
+}
 function insFinish(panes, idx, blk, def) {
   const box = panes.content.parentNode;
   const notes = { style: "This section keeps your site’s style.", layout: "Nothing to lay out here.", when: "This section always shows." };
@@ -12081,7 +12451,28 @@ function dcSyncPageSwitch() {
   const list = typeof dcPageList === "function" ? dcPageList() : [];
   const cur = list.find((p) => p.slug === DC_PAGE) || list[0];
   const nm = $("dcPageName"); if (nm) nm.textContent = cur ? cur.title : "Home";
-  const ct = $("dcPageCount"); if (ct) ct.textContent = list.length + (list.length === 1 ? " page" : " pages");
+  const ct = $("dcPageCount"); if (ct) dcPageStatus(ct);
+}
+// Item 125: the page being edited says where it stands, beside its name, in the Pages card's
+// words: Live (nothing on it is waiting), 2 changes (waiting to go live), Not live yet (the
+// site has never been published), or what its check found (Needs a look).
+function dcPageStatus(chip) {
+  const ctx = pgStatusCtx(), m = typeof pgModel === "function" ? pgModel() : { menu: [], unlinked: [] };
+  const pg = [...m.menu.map((e) => e.pg), ...m.unlinked].find((p) => p && p.view === "design" && (p.slug || "") === DC_PAGE);
+  let word = "Live", tone = "good", says = "Nothing on this page is waiting: your live site shows it as it is here";
+  const tp = pg ? hbTreePage(pg) : null;
+  if (tp && HB_TREE_FLAG[tp.status]) { word = tp.status_label; tone = HB_TREE_FLAG[tp.status]; says = tp.status_label; }
+  else if (!ctx.siteLive || ctx.firstPublish) { word = "Not live yet"; tone = ""; says = "Your site goes live the first time you publish"; }
+  else {
+    const n = pg ? ctx.changes.filter((ch) => pcChangeOn(ch, pg)).length : 0;
+    if (n) { word = n + (n === 1 ? " change" : " changes"); tone = "warn"; says = n + (n === 1 ? " change on this page is" : " changes on this page are") + " waiting to go live"; }
+  }
+  chip.textContent = word; chip.className = "dc-chip" + (tone ? " " + tone : ""); chip.title = says;
+}
+// What a page's status is read from: is the site live, and what's waiting to publish.
+function pgStatusCtx() {
+  const live = !!(S.health && S.health.facts && S.health.facts.website.state !== "none");
+  return { live, siteLive: live || !!(typeof siteLiveUrl === "function" && siteLiveUrl()), changes: (S.changes && S.changes.changes) || [], firstPublish: !!(S.changes && S.changes.first_publish) };
 }
 function dcSyncLiveChip() { const c = $("dcLiveChip"); if (c) c.hidden = !(typeof siteLiveUrl === "function" && siteLiveUrl()); }
 // a tablet's left card takes the dock's place while it's open (the CSS reads this class)
@@ -12222,10 +12613,19 @@ function exitEditMode(to) {   // to: the tab to land on (the Pages card's "Chang
   if (document.activeElement && document.activeElement.blur) document.activeElement.blur();   // a focused field commits on blur
   blocksSaveNow(); formsSaveNow();
   closeDesignPanels();
+  document.querySelectorAll(".scrim.on").forEach((sh) => closeSheet(sh.id));   // item 171 (E2): a sheet goes with the editor
   if (DC_MODE !== "edit") dcSetMode("edit");
   go(to || EDIT_RETURN);
 }
 function closeDesignPanels() { closePagesCard(false); dcDockMore(false); closeTrayPanel(); closeSettingsPanel(); closeCommentsPanel(); if (PANEL_LASTFOCUS && PANEL_LASTFOCUS.focus) { try { PANEL_LASTFOCUS.focus(); } catch (_) {} PANEL_LASTFOCUS = null; } }
+// Item 125: tooltips name their keys, in this computer's words (⌘ on a Mac or an iPad, Ctrl elsewhere).
+const KEY_MAC = /Mac|iPhone|iPad|iPod/.test(navigator.platform || navigator.userAgent || "");
+(function keyTitles() {
+  const k = (mac, pc) => (KEY_MAC ? mac : pc);
+  ["btnUndo", "btnUndoTop"].forEach((id) => { const b = $(id); if (b) b.title = "Undo (" + k("⌘Z", "Ctrl+Z") + ")"; });
+  ["btnRedo", "btnRedoTop"].forEach((id) => { const b = $(id); if (b) b.title = "Redo (" + k("⇧⌘Z", "Ctrl+Shift+Z") + ")"; });
+  [["btnPagesClose", "Done (Esc)"], ["btnTrayClose", "Done (Esc): the page gets the whole screen"], ["btnCommentsClose", "Close (Esc)"]].forEach(([id, t]) => { const b = $(id); if (b) b.title = t; });
+})();
 (function initDesignPanels() {
   const on = (id, fn) => { const b = $(id); if (b) b.addEventListener("click", fn); };
   on("btnUndo", dcUndo); on("btnRedo", dcRedo);
@@ -12235,6 +12635,7 @@ function closeDesignPanels() { closePagesCard(false); dcDockMore(false); closeTr
   document.addEventListener("keydown", (e) => {
     if (!(e.ctrlKey || e.metaKey)) return;
     if ($("stage").classList.contains("on") || $("ritualWrap").classList.contains("on")) return;   // nothing to undo behind these
+    if (document.querySelector("dialog[open], .scrim.on")) return;   // item 171 (E6): not while a question or a sheet is up
     const dv = $("view-design");
     if (dv && dv.classList.contains("on") && DC_MODE === "timewarp") return;   // view modes are read-only — no blind undo
     const t = e.target; if (t && /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName || "")) return;   // don't hijack field editing
@@ -12269,6 +12670,10 @@ function closeDesignPanels() { closePagesCard(false); dcDockMore(false); closeTr
   on("dkFind", () => { dcDockMore(false); openTrayPanel("add", true); });   // opens the library with its search box focused
   on("dkPreview", () => { dcDockMore(false); dcOpenPreview(); });
   on("dkMore", () => dcDockMore());
+  // item 171 (E4): on a phone More closes by itself: on a press anywhere outside it, and once any other
+  // dock button is used (a press on the page closes it too, in dcInjectCanvas)
+  document.addEventListener("pointerdown", (e) => { const d = $("dcDock"); if (d && d.classList.contains("more-open") && !d.contains(e.target)) dcDockMore(false); }, true);
+  const dk = $("dcDock"); if (dk) dk.addEventListener("click", (e) => { const b = e.target.closest && e.target.closest("button"); if (b && b.id !== "dkMore") dcDockMore(false); });
   on("dcBtnPreview", dcOpenPreview);
   on("btnPageInfo", togglePageInfoMenu);   // slice B: the Page Information menu (Share draft lives inside it now)
   // Slice D: the modes bar. #btnComments now lives INSIDE the segment (G11
@@ -12286,6 +12691,7 @@ function closeDesignPanels() { closePagesCard(false); dcDockMore(false); closeTr
   const sc = $("dcScrim"); if (sc) sc.addEventListener("click", closeDesignPanels);
   document.addEventListener("keydown", (e) => {
     if (e.key !== "Escape") return;
+    if (document.querySelector("dialog[open]")) return;   // item 171 (E7): a question (or the photo editor) answers its own Escape
     if (PAGES_OPEN) {
       if (PI_OPEN) return;   // the Page menu closes itself first
       const pop = document.querySelector(".pp-pop:not(.pi-pop)"); if (pop) { e.stopPropagation(); pop.remove(); return; }   // so does a page's ⋯ menu
@@ -12506,6 +12912,7 @@ const BI_PATHS = {
   more: '<circle cx="5" cy="12" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="19" cy="12" r="1.4"/>',
   grip: '<circle cx="9" cy="6" r="1.3"/><circle cx="15" cy="6" r="1.3"/><circle cx="9" cy="12" r="1.3"/><circle cx="15" cy="12" r="1.3"/><circle cx="9" cy="18" r="1.3"/><circle cx="15" cy="18" r="1.3"/>',
   pencil: '<path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/>',
+  unlock: '<rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 7.6-1.7"/>',
   copy: '<rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>',
   scissors: '<circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M20 4L8.1 15.9M14.5 14.5L20 20M8.1 8.1L12 12"/>',
   x: '<path d="M18 6L6 18M6 6l12 12"/>',
@@ -12904,6 +13311,7 @@ function addBlockAt(d, at) {
   return i;   // the index it ACTUALLY used — callers stamp the new block via this, never a re-derived clamp
 }
 function moveBlockTo(from, gap) {
+  if (lockStop(from)) return false;   // item 155
   if (!spliceMove(BLOCKS_WORK, from, gap)) return false;
   renderBlocksCard();
   return true;
@@ -13408,18 +13816,39 @@ function dcMoveCol(bi, from, gap) {
   saveBlocks();
   return true;
 }
+// ── Item 155: locked sections ──
+// The studio locks a section from its More menu so the client can't move, restyle, copy or
+// delete it by accident: the section carries lock: { id, words } (lib/section_lock.ts on the
+// server refuses a client's save that would break it). With words open the client can still
+// change its words. The client sees a padlock in its name and fewer tools; only the studio
+// unlocks, and the studio is never held by its own lock. A copy is never locked.
+const blkLock = (b) => (b && b.lock && typeof b.lock.id === "string" ? b.lock : null);
+const lockedForMe = (b) => !!blkLock(b) && !S.isStudio;
+const LOCK_SAY = "Your studio locked this section so it stays as designed.";
+// Every way to move, copy, cut or delete a section asks this first (the tools are hidden too).
+function lockStop(bi) { if (!lockedForMe(BLOCKS_WORK[bi])) return false; toast(LOCK_SAY + " Ask them if it needs to change.", true); return true; }
+function dcLockBlock(bi, on, words) {
+  const b = BLOCKS_WORK[bi]; if (!b) return;
+  if (on) {
+    const id = blkLock(b) ? b.lock.id : "lk-" + ((crypto.randomUUID && crypto.randomUUID().replace(/-/g, "").slice(0, 12)) || Date.now().toString(36));
+    b.lock = { id, words: words === undefined ? (blkLock(b) ? b.lock.words : true) : !!words };
+  } else delete b.lock;
+  renderBlocksCard(); saveBlocks();
+  toast(!on ? "Unlocked: your client can change this section again"
+    : words === undefined ? "Locked: your client can change its words, nothing else" : (b.lock.words ? "Your client can change its words" : "Your client can’t change its words either"));
+}
 function dcDuplicate(bi) {
   dcSoloEnd();
-  const b = BLOCKS_WORK[bi]; if (!b) return;
+  const b = BLOCKS_WORK[bi]; if (!b || lockStop(bi)) return;
   const def = BLOCK_DEFS.find((x) => x.type === b.type);
-  const copy = JSON.parse(JSON.stringify(b)); delete copy._clEdit;
+  const copy = JSON.parse(JSON.stringify(b)); delete copy._clEdit; delete copy.lock;
   if (def && def.multi) copy.id = uniqueBlockId(b.type);   // multi-instance blocks get a fresh render key
   // G13 fix (review finding 1): compose the insertion shift BEFORE the splice.
   dcCaptureScroll(); dcComposeSrcMap(BLOCKS_WORK.length, (v) => dcShiftIndex(v, bi + 1, 1)); BLOCKS_WORK.splice(bi + 1, 0, copy); BLOCK_FOCUS = bi + 1; DC_FOCUS_BI = bi + 1; renderBlocksCard(); saveBlocks();
 }
 async function dcDelete(bi) {
   dcSoloEnd();
-  const b = BLOCKS_WORK[bi]; if (!b) return;
+  const b = BLOCKS_WORK[bi]; if (!b || lockStop(bi)) return;
   const def = BLOCK_DEFS.find((x) => x.type === b.type);
   if (!(await askYes("Delete this " + (((def && def.name) || "section").toLowerCase()) + "? Your live site is unchanged until you publish.", { ok: "Delete", danger: true }))) return;
   bi = BLOCKS_WORK.indexOf(b); if (bi < 0) return;   // read again: the list can move while the question is up
@@ -13437,14 +13866,14 @@ function dcClipGet() { try { return JSON.parse(sessionStorage.getItem(DC_CLIP_KE
 function dcClipSet(b) { try { sessionStorage.setItem(DC_CLIP_KEY, JSON.stringify(b)); } catch (_) {} }
 function dcCopyBlock(bi) {
   const b = BLOCKS_WORK[bi]; if (!b) return;
-  const copy = JSON.parse(JSON.stringify(b)); delete copy._clEdit;
+  const copy = JSON.parse(JSON.stringify(b)); delete copy._clEdit; delete copy.lock;   // item 155: a copy is never locked
   dcClipSet(copy);
   const def = BLOCK_DEFS.find((x) => x.type === b.type);
   toast("Copied “" + ((def && def.name) || "section") + "” — use the ＋ points to paste it");
 }
 function dcCutBlock(bi) {
   dcSoloEnd();
-  const b = BLOCKS_WORK[bi]; if (!b) return;
+  const b = BLOCKS_WORK[bi]; if (!b || lockStop(bi)) return;
   dcCopyBlock(bi);
   // G13 fix (review finding 1): same removal shift as dcDelete, pre-splice.
   dcCaptureScroll(); dcComposeSrcMap(BLOCKS_WORK.length, (v) => dcShiftIndex(v, bi, -1)); BLOCKS_WORK.splice(bi, 1); renderBlocksCard(); saveBlocks();
@@ -13453,7 +13882,7 @@ function dcCutBlock(bi) {
 function dcPasteAt(gap) {
   dcSoloEnd();
   const clip = dcClipGet(); if (!clip) { toast("Nothing copied yet"); return; }
-  const blk = JSON.parse(JSON.stringify(clip)); delete blk._clEdit;
+  const blk = JSON.parse(JSON.stringify(clip)); delete blk._clEdit; delete blk.lock;
   if (blk.id) blk.id = uniqueBlockId(blk.type + "_" + blk.id);   // MULTI blocks get a fresh render key
   const at = Math.max(0, Math.min(gap == null ? BLOCKS_WORK.length : gap, BLOCKS_WORK.length));
   // G13 fix (review finding 1): compose the insertion shift BEFORE the splice.
@@ -13918,6 +14347,8 @@ function ipeStart(doc, fieldEl, secEl) {
   const c = eeClassify(secEl);
   const path = fieldEl.getAttribute && fieldEl.getAttribute('data-dds-field');
   if (!ipeGate(DC_MODE, path, c) || !(BLOCKS_WORK || [])[c.bi]) { eeDoubleClickTarget(secEl); return; }   // never a dead double-click
+  const lk = BLOCKS_WORK[c.bi];
+  if (lockedForMe(lk) && !lk.lock.words) { eeEditBlock(c.bi); return; }   // item 155: locked with its words shut: the card says why
   const md = fieldEl.hasAttribute('data-dds-md');
   const prev = {};
   ['contenteditable', 'role', 'aria-label', 'aria-multiline', 'spellcheck'].forEach((a) => { prev[a] = fieldEl.getAttribute(a); });
@@ -14299,9 +14730,11 @@ function dcChromeInsets() {
   return out;
 }
 function dcChromeTokens() {
+  let foot = 0;   // on a phone the dock runs along the bottom, over the frame's last strip
   try {
     const dk = $("dcDock"), fr = $("designPreview"); DC_CHROME_INSET = 0;
     if (dk && fr && window.innerWidth > 760) { const a = dk.getBoundingClientRect(), b = fr.getBoundingClientRect(); if (a.width && a.height) DC_CHROME_INSET = Math.max(0, Math.round(a.right + 8 - b.left)); }
+    else if (dk && fr) { const a = dk.getBoundingClientRect(), b = fr.getBoundingClientRect(); if (a.width && a.height) foot = Math.max(0, Math.round(b.bottom - a.top + 8)); }
   } catch (_) {}
   const cs = getComputedStyle(document.documentElement);
   const v = (n, d) => { const x = (cs.getPropertyValue(n) || "").trim(); return x || d; };
@@ -14315,7 +14748,7 @@ function dcChromeTokens() {
     + ";--ddsdc-grad:" + v("--dds-grad-btn", "linear-gradient(135deg,#6d3fd4 0%,#7a4bdd 100%)")
     + ";--ddsdc-bad:" + v("--dds-bad", "#bf3535") + ";--ddsdc-bad-soft:" + v("--dds-bad-soft", "#fdeaea")
     + ";--ddsdc-shadow:" + v("--dds-shadow-pop", "0 20px 48px -12px rgba(23,21,34,.24),0 2px 6px rgba(23,21,34,.06)")
-    + ";--ddsdc-sans:" + v("--dds-sans", "Inter,-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif") + "}";
+    + ";--ddsdc-sans:" + v("--dds-sans", "Inter,-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif") + ";--ddsdc-foot:" + foot + "px}";
 }
 function dcInjectCanvas(doc, main, live) {
   const win = doc.defaultView;
@@ -14346,6 +14779,10 @@ function dcInjectCanvas(doc, main, live) {
       "#dds-dc-chip.on{display:inline-flex}" +
       // items 41, 50 and 123: the header and footer are picked like a section, and say they're on every page
       "header.site[data-dc-hf]:hover,footer.site[data-dc-hf]:hover,header.site.dc-hf-on,footer.site.dc-hf-on{outline:2px solid var(--ddsdc-p);outline-offset:-2px;cursor:pointer}" +
+      ".dds-phonebar[data-dc-pb]:hover,.dds-phonebar.dc-hf-on{outline:2px solid var(--ddsdc-p);outline-offset:-2px;cursor:pointer}" +   // item 122: the phone bar belongs to the footer
+      // on a phone the editor's dock covers the frame's foot: the bar sits just above it, and the page's end above both
+      ".dds-phonebar{bottom:var(--ddsdc-foot,0px)!important}" +
+      "html body{padding-bottom:var(--ddsdc-foot,0px)}" +   // item 171 (E5): the page's end scrolls clear of the phone's dock
       // the chip stays in the tab order (a keyboard's way in), seen only on hover, focus or while its card is open
       // it hangs off the edge (under the header, over the footer), so the name and menu stay clear to click
       ".dc-hf-chip{position:absolute;left:12px;top:calc(100% - 12px);z-index:30;display:inline-flex;align-items:center;height:24px;padding:0 10px;border:0;border-radius:999px;background:var(--ddsdc-p-soft);color:var(--ddsdc-p);font:600 12px/1 var(--ddsdc-sans);white-space:nowrap;cursor:pointer;opacity:0;pointer-events:none}" +
@@ -14357,6 +14794,8 @@ function dcInjectCanvas(doc, main, live) {
       ".dds-theme-tag{position:absolute;display:inline-flex;align-items:center;gap:6px;height:24px;padding:0 10px 0 6px;border-radius:999px;background:var(--ddsdc-card);border:1px solid var(--ddsdc-line);box-shadow:0 2px 8px rgba(0,0,0,.12);color:var(--ddsdc-ink);font:600 12px/1 var(--ddsdc-sans);white-space:nowrap}" +
       ".dds-theme-tag i{width:12px;height:12px;border-radius:50%;border:1px solid var(--ddsdc-line2)}" +
       "#dds-dc-chip .dc-chip-type{font-weight:500;opacity:.8;margin-left:5px}" +
+      "#dds-dc-chip.locked>svg{flex:none;width:12px;height:12px;margin-right:5px;vertical-align:-1px}" +   // item 155: a locked section's padlock
+      "#dds-dc-bar .dc-b.dc-locked{color:var(--ddsdc-p)}" +
       "#dds-dc-chip.compact .dc-chip-type{display:none}" +
       // the More menu under the pill: copy, cut, hide, columns
       "#dds-dc-more{position:absolute;z-index:2147483001;display:none;flex-direction:column;min-width:200px;padding:6px;background:var(--ddsdc-card);border:1px solid rgba(var(--ddsdc-p-rgb),.08);border-radius:14px;box-shadow:var(--ddsdc-shadow);font-family:var(--ddsdc-sans)}" +
@@ -14432,10 +14871,16 @@ function dcInjectCanvas(doc, main, live) {
   // the name only; if it would still touch the pill it sits just above the section (item 51:
   // in the phone frame it dropped under the pill, onto the section's heading), or under the
   // pill when the section's top is off the screen.
+  // The menu opens under the pill, or above it when the screen's end (on a phone, the dock
+  // floating over the frame's last --ddsdc-foot pixels) leaves no room below: it moves with the
+  // pill as the page scrolls, so its last item (Lock this section, item 155) could never be reached.
   const placeMore = () => {
     const mb = bar.querySelector('[aria-haspopup="menu"]'); if (!mb) return;
-    const br = bar.getBoundingClientRect(), mw = more.offsetWidth || 200;
-    more.style.top = (br.bottom + win.scrollY + 6) + "px";
+    const br = bar.getBoundingClientRect(), mw = more.offsetWidth || 200, mh = more.offsetHeight || 0;
+    const foot = parseFloat(win.getComputedStyle(doc.documentElement).getPropertyValue("--ddsdc-foot")) || 0;
+    const below = win.innerHeight - foot - br.bottom - 6, above = br.top - 6;
+    const up = mh > below && above > below;
+    more.style.top = (up ? Math.max(win.scrollY + 4, br.top + win.scrollY - 6 - mh) : br.bottom + win.scrollY + 6) + "px";
     more.style.left = Math.max(win.scrollX + 8, br.right + win.scrollX - mw) + "px";
   };
   const place = (el2) => {
@@ -14500,30 +14945,38 @@ function dcInjectCanvas(doc, main, live) {
       const bi = c.bi, b = BLOCKS_WORK[bi] || {};
       const def = BLOCK_DEFS.find((x) => x.type === b.type) || {};
       chipType = def.name || b.type || "Section"; chipName = heading || chipType; if (chipName === chipType) chipType = "";
-      const grip = mkBtn("Move", "Drag to move this section (or use the editor’s up/down arrows)", null, { cls: "dc-grip", icon: "grip" });
-      // pointer-drag reorder — same engine as the tray. The grip lives INSIDE the
-      // iframe, so its coords are iframe-local (iframeLocal:true translates them to
-      // the parent for the ghost + drop-line). Resolves to one list index via dcMove.
-      grip.addEventListener("pointerdown", (e) => { e.preventDefault(); e.stopPropagation(); pdStart(e, { kind: "move", from: bi, iframeLocal: true, label: (BLOCKS_WORK[bi] && (BLOCK_DEFS.find((x) => x.type === BLOCKS_WORK[bi].type) || {}).name) || "Section", icon: "⠿" }, grip); });
-      bar.appendChild(grip);
-      bar.appendChild(mkBtn("Edit", "Edit this section", () => eeEditBlock(bi), { icon: "pencil" }));
-      bar.appendChild(mkBtn("Duplicate", "Duplicate this section", () => dcDuplicate(bi), { icon: "copy" }));
-      bar.appendChild(mkBtn("Style", "Style this section — its colours, type and layout", () => eeEditBlock(bi, "style"), { icon: "spark" }));
-      bar.appendChild(mkBtn("Delete", "Delete this section", () => dcDelete(bi), { cls: "dc-danger", icon: "x" }));
-      // the rest behind More: copy, cut, hide, and a Columns section's column count
-      more.appendChild(mkItem("Copy", "Copy this section — paste it anywhere", () => dcCopyBlock(bi), { icon: "clipboard" }));
-      more.appendChild(mkItem("Cut", "Cut this section — paste it anywhere", () => dcCutBlock(bi), { icon: "scissors" }));
-      more.appendChild(mkItem("Hide", "Hide this section", () => eeHideKey(el2.getAttribute("data-dds-key") || ddsKeyFor(bi)), { icon: "eyeoff" }));
-      if (b.type === "columns") {   // Layout Container: 1–6 columns; drag dividers to resize
-        const nc = Array.isArray(b.columns) ? b.columns.length : 2;
-        more.appendChild(mkItem(nc + (nc === 1 ? " column" : " columns"), "Columns — drag the dividers on the page to resize their widths", () => eeEditBlock(bi), { icon: "columns" }));
-        more.appendChild(mkItem("Add a column", "Add a column", () => dcSetColumns(bi, nc + 1), { cls: nc >= 6 ? "dc-off" : "", icon: "plus" }));
-        more.appendChild(mkItem("Remove a column", "Remove a column", () => dcSetColumns(bi, nc - 1), { cls: nc <= 1 ? "dc-off" : "", icon: "x" }));
+      if (lockedForMe(b)) {   // item 155: the studio locked it — its words at most, and a padlock that opens the card saying why
+        if (b.lock.words) bar.appendChild(mkBtn("Edit words", "Change this section’s words", () => eeEditBlock(bi), { icon: "pencil" }));
+        bar.appendChild(mkBtn("Locked", "Your studio locked this section so it stays as designed", () => eeEditBlock(bi), { cls: "dc-locked", icon: "lock" }));
+      } else {
+        const grip = mkBtn("Move", "Drag to move this section (or use the editor’s up/down arrows)", null, { cls: "dc-grip", icon: "grip" });
+        // pointer-drag reorder — same engine as the tray. The grip lives INSIDE the
+        // iframe, so its coords are iframe-local (iframeLocal:true translates them to
+        // the parent for the ghost + drop-line). Resolves to one list index via dcMove.
+        grip.addEventListener("pointerdown", (e) => { e.preventDefault(); e.stopPropagation(); pdStart(e, { kind: "move", from: bi, iframeLocal: true, label: (BLOCKS_WORK[bi] && (BLOCK_DEFS.find((x) => x.type === BLOCKS_WORK[bi].type) || {}).name) || "Section", icon: "⠿" }, grip); });
+        bar.appendChild(grip);
+        bar.appendChild(mkBtn("Edit", "Edit this section", () => eeEditBlock(bi), { icon: "pencil" }));
+        bar.appendChild(mkBtn("Duplicate", "Duplicate this section", () => dcDuplicate(bi), { icon: "copy" }));
+        bar.appendChild(mkBtn("Style", "Style this section — its colours, type and layout", () => eeEditBlock(bi, "style"), { icon: "spark" }));
+        bar.appendChild(mkBtn("Delete", "Delete this section", () => dcDelete(bi), { cls: "dc-danger", icon: "x" }));
+        // the rest behind More: copy, cut, hide, and a Columns section's column count
+        more.appendChild(mkItem("Copy", "Copy this section — paste it anywhere", () => dcCopyBlock(bi), { icon: "clipboard" }));
+        more.appendChild(mkItem("Cut", "Cut this section — paste it anywhere", () => dcCutBlock(bi), { icon: "scissors" }));
+        more.appendChild(mkItem("Hide", "Hide this section", () => eeHideKey(el2.getAttribute("data-dds-key") || ddsKeyFor(bi)), { icon: "eyeoff" }));
+        if (b.type === "columns") {   // Layout Container: 1–6 columns; drag dividers to resize
+          const nc = Array.isArray(b.columns) ? b.columns.length : 2;
+          more.appendChild(mkItem(nc + (nc === 1 ? " column" : " columns"), "Columns — drag the dividers on the page to resize their widths", () => eeEditBlock(bi), { icon: "columns" }));
+          more.appendChild(mkItem("Add a column", "Add a column", () => dcSetColumns(bi, nc + 1), { cls: nc >= 6 ? "dc-off" : "", icon: "plus" }));
+          more.appendChild(mkItem("Remove a column", "Remove a column", () => dcSetColumns(bi, nc - 1), { cls: nc <= 1 ? "dc-off" : "", icon: "x" }));
+        }
+        if (S.isStudio) more.appendChild(blkLock(b)   // item 155: only the studio locks and unlocks
+          ? mkItem("Unlock", "Unlock this section: your client can change it again", () => dcLockBlock(bi, false), { icon: "unlock" })
+          : mkItem("Lock this section", "Lock this section: your client can’t move, restyle or delete it", () => dcLockBlock(bi, true), { icon: "lock" }));
+        const mb = mkBtn("More", "More", null, { icon: "more" });
+        mb.setAttribute("aria-haspopup", "menu"); mb.setAttribute("aria-expanded", "false");
+        mb.addEventListener("click", () => { const on = !more.classList.contains("on"); more.classList.toggle("on", on); mb.setAttribute("aria-expanded", String(on)); if (on) { placeMore(); const f = more.querySelector(".dc-mi"); if (f) { try { f.focus({ preventScroll: true }); } catch (_) {} } } });
+        bar.appendChild(mb);
       }
-      const mb = mkBtn("More", "More", null, { icon: "more" });
-      mb.setAttribute("aria-haspopup", "menu"); mb.setAttribute("aria-expanded", "false");
-      mb.addEventListener("click", () => { const on = !more.classList.contains("on"); more.classList.toggle("on", on); mb.setAttribute("aria-expanded", String(on)); if (on) { placeMore(); const f = more.querySelector(".dc-mi"); if (f) { try { f.focus({ preventScroll: true }); } catch (_) {} } } });
-      bar.appendChild(mb);
     } else {
       chipName = heading || DC_CORE_NAME[c.view] || "Section"; chipType = "Built-in section";
       bar.appendChild(mkBtn("Edit", "Edit this section", () => eeEditCore(c.view), { icon: "pencil" }));
@@ -14536,6 +14989,9 @@ function dcInjectCanvas(doc, main, live) {
     }
     chip.textContent = chipName;
     if (chipType) { const t = doc.createElement("span"); t.className = "dc-chip-type"; t.textContent = "· " + chipType; chip.appendChild(t); }
+    const locked = c.kind === "block" && !!blkLock(BLOCKS_WORK[c.bi]);   // item 155: a locked section wears a padlock in its name, for both sides
+    chip.classList.toggle("locked", locked);
+    if (locked) chip.insertAdjacentHTML("afterbegin", uiIcon("lock", 12));
     bar.classList.add("on"); chip.classList.add("on"); place(el2);
   };
   // G13: refresh the sid→index lookup from the server sidecar, then wire every
@@ -14648,6 +15104,8 @@ function dcInjectCanvas(doc, main, live) {
   if (!doc.body.hasAttribute("data-dc-hintguard")) {
     doc.body.setAttribute("data-dc-hintguard", "1");
     ["pointerdown", "keydown"].forEach((t) => doc.addEventListener(t, dcDismissShellHint, true));
+    // item 171 (E3): a press on the page closes the Pages card, as a press anywhere else in the editor does
+    doc.addEventListener("pointerdown", () => { if (PAGES_OPEN) closePagesCard(false); dcDockMore(false); }, true);   // and the phone's More (E4)
   }
   // expose a selector so the content-tree rows can flash + select a section on click
   DC_SHOWBAR = (elx) => { try { showBar(elx); } catch (_) {} };
@@ -14675,6 +15133,20 @@ function dcInjectCanvas(doc, main, live) {
       });
     });
     if ($("settingsPanel") && $("settingsPanel").classList.contains("on")) dcHFMark(PANEL_MODE === "header" || PANEL_MODE === "footer" ? PANEL_MODE : null);
+  } catch (_) {}
+  // Item 122: the phone bar (drawn at a phone's width) is the footer's, so a press on it opens the
+  // Footer card, where its switch is. Its links don't leave the canvas; Hours still opens the week.
+  try {
+    const pb = doc.querySelector(".dds-phonebar");
+    if (pb && !pb.hasAttribute("data-dc-pb")) {
+      pb.setAttribute("data-dc-pb", "1");
+      pb.addEventListener("click", (e) => {
+        if (e.target.closest && e.target.closest("a")) e.preventDefault();
+        if (DC_MODE !== "edit" || IPE) return;
+        if (PANEL_MODE !== "footer" || !$("settingsPanel").classList.contains("on")) openSettingsPanel("footer");
+      }, true);
+      if (PANEL_MODE === "footer" && $("settingsPanel") && $("settingsPanel").classList.contains("on")) pb.classList.add("dc-hf-on");
+    }
   } catch (_) {}
   // Click the header menu on the canvas → open the menu editor (edit labels, links,
   // dropdowns). The header/footer are global, so this edits the menu on every page.
@@ -14909,10 +15381,11 @@ function dcTreeRow(el2, c) {
     return btn;
   };
   if (isBlock) {
-    acts.appendChild(mkA(uiIcon("up", 14), "Move up", () => dcMove(c.bi, c.bi - 1), c.bi <= 0));
-    acts.appendChild(mkA(uiIcon("down", 14), "Move down", () => dcMove(c.bi, c.bi + 2), c.bi >= (BLOCKS_WORK.length - 1)));
+    const held = lockedForMe(BLOCKS_WORK[c.bi]);   // item 155: a section the studio locked stays where it is
+    acts.appendChild(mkA(uiIcon("up", 14), held ? LOCK_SAY : "Move up", () => dcMove(c.bi, c.bi - 1), held || c.bi <= 0));
+    acts.appendChild(mkA(uiIcon("down", 14), held ? LOCK_SAY : "Move down", () => dcMove(c.bi, c.bi + 2), held || c.bi >= (BLOCKS_WORK.length - 1)));
     acts.appendChild(mkA(uiIcon("cog", 14), "Settings for this section", () => eeEditBlock(c.bi)));
-    acts.appendChild(mkA(uiIcon("trash", 14), "Remove this section", () => dcDelete(c.bi)));
+    acts.appendChild(mkA(uiIcon("trash", 14), held ? LOCK_SAY : "Remove this section", () => dcDelete(c.bi), held));
   } else {
     const keys = c.key ? dcCoreKeys(el2.parentNode) : [], at = keys.indexOf(c.key);
     if (at >= 0) {
@@ -15239,10 +15712,11 @@ function renderSiteStatus() {
   const live = S.previewStatus && S.previewStatus.live;
   const published = !!((live && live.published) || S.site.last_published_at);
   const offline = !!(published && live && live.offline_since);
+  const locked = !!(published && !offline && live && live.password_since);   // list item 175: a visitor password
   const url = siteLiveUrl();
   box.textContent = ""; box.hidden = false;
   const row = el("div", "ts-row");
-  const badge = el("span", "ts-badge " + (offline ? "off" : published ? "public" : "private"), offline ? "Offline" : published ? "Public" : "Private");
+  const badge = el("span", "ts-badge " + (offline ? "off" : locked ? "pw" : published ? "public" : "private"), offline ? "Offline" : locked ? "Password" : published ? "Public" : "Private");
   badge.id = "siteStatusBadge";
   row.appendChild(badge);
   if (published && !offline && url) {
@@ -15252,6 +15726,7 @@ function renderSiteStatus() {
   box.appendChild(row);
   box.appendChild(el("div", "note", offline
     ? "Visitors see a short “temporarily offline” page. Nothing was deleted."
+    : locked ? "Visitors type the password before they see any page."
     : published ? "Anyone can visit your site." : "Only you can see it. It goes public when you publish."));
   let btn;
   if (!published) {
@@ -15266,6 +15741,21 @@ function renderSiteStatus() {
   }
   btn.type = "button"; btn.id = "siteStatusBtn";
   box.appendChild(btn);
+  if (published && !offline) {
+    const pw = el("button", "pillbtn ghost", locked ? "Change or remove password…" : "Add a visitor password…");
+    pw.type = "button"; pw.id = "sitePasswordBtn"; pw.dataset.needs = "configure";
+    pw.addEventListener("click", async () => { if (await siteSetPassword(locked)) refreshSiteStatus(true); });
+    box.appendChild(pw);
+  }
+}
+// List item 175: a password on the whole live site. The server puts it on only once the
+// site itself asks strangers for it, and says so plainly when it doesn't.
+async function siteSetPassword(locked) {
+  const pw = await askText(locked ? "Change the visitor password" : "Add a visitor password", { password: true, ok: "Save",
+    hint: locked ? "Leave it blank to take the password off, so anyone can visit again." : "Visitors type this before they see any page of your site. Share it with the people you want to let in." });
+  if (pw === null || (!locked && !pw.trim())) return false;
+  try { const r = await api("POST", "/site/password", { password: pw }); toast((r.data && r.data.message) || "Saved"); return true; }
+  catch (err) { toast(nice(err), true); return false; }
 }
 // Whether the live site is offline comes from the same read the Page menu uses;
 // a site never published has nothing to ask about.
