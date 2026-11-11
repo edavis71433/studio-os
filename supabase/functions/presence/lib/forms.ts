@@ -17,23 +17,28 @@
 // honeypot + rate-limit + IP-hash + spam on top; submissions still land in
 // presence_form_submissions and flow to the leads inbox + CRM + follow-up nudge.
 //
-// DEFERRED (reserved, NOT half-built): `file` upload (public upload needs a
-// dedicated safe path), multi-step forms, prefill, and a PDF-of-record. The
-// `file` type name is reserved below so a later phase can add it without a
-// schema shift; it is intentionally rejected today.
+// DEFERRED (reserved, NOT half-built): a PDF-of-record. Multi-step forms and
+// prefill came with FB-2; `file` (a photo or a PDF) with builder list item 147, through
+// its own safe path (lib/form_files.ts checks each file's bytes and keeps it privately).
 
 import { esc, attr, safeHref } from './markdown.ts';
 
 // ── field types ──────────────────────────────────────────────────────────────
 export type FormFieldType =
   | 'text' | 'textarea' | 'email' | 'phone' | 'number'
-  | 'select' | 'radio' | 'checkbox' | 'date' | 'consent' | 'rating';
+  | 'select' | 'radio' | 'checkbox' | 'date' | 'consent' | 'rating' | 'file';
 export const FORM_FIELD_TYPES: readonly FormFieldType[] = [
   'text', 'textarea', 'email', 'phone', 'number',
-  'select', 'radio', 'checkbox', 'date', 'consent', 'rating',
+  'select', 'radio', 'checkbox', 'date', 'consent', 'rating', 'file',
 ];
-// Reserved for a future dedicated safe-upload path — NOT accepted today.
-export const RESERVED_FIELD_TYPES: readonly string[] = ['file'];
+// Names held back for a later field type (none now: `file` arrived with item 147).
+export const RESERVED_FIELD_TYPES: readonly string[] = [];
+/** Item 147: what a "Photo or file" field takes. lib/form_files.ts holds the same limits
+ *  (the media library's kinds and size) and checks each file's bytes when it is kept. */
+export const FILE_FIELD = { perField: 3, mb: 10, accept: 'image/jpeg,image/png,image/webp,application/pdf' } as const;
+const FILE_HELP = `Photos or PDFs: up to ${FILE_FIELD.perField}, ${FILE_FIELD.mb} MB each.`;
+/** A file as the route hands it to validateFormValues: its name, size and the kind the browser said. */
+export interface SentFile { name: string; size: number; type: string }
 const CHOICE_TYPES: readonly FormFieldType[] = ['select', 'radio', 'checkbox'];
 
 export interface FormField {
@@ -145,7 +150,7 @@ export function normalizeFormDefinition(raw: unknown):
     if (st !== undefined && st >= 1) field.step = Math.min(MAX_STEPS, Math.trunc(st));
     // FB-2 prefill: opt-in whitelist (consent is never prefillable — a checkbox that
     // legally records agreement must be a deliberate act, never pre-ticked by a link).
-    if (f.prefill && type !== 'consent') field.prefill = true;
+    if (f.prefill && type !== 'consent' && type !== 'file') field.prefill = true;   // nor a file box (item 147): a page can't choose a visitor's files
 
     if (CHOICE_TYPES.includes(type)) {
       const choices = arr(f.choices).map((c) => s(c, CAP.choice)).filter(Boolean).slice(0, MAX_CHOICES);
@@ -268,7 +273,7 @@ export interface CleanFormSubmission {
   values: Record<string, string>;
   name: string; email: string; phone: string; message: string;
 }
-export function validateFormValues(def: FormDefinition, raw: FormValues):
+export function validateFormValues(def: FormDefinition, raw: FormValues, files: Record<string, SentFile[]> = {}):
   { ok: true; sub: CleanFormSubmission } | { ok: false; error: string; field?: string } {
   const byKey = new Map(def.fields.map((f) => [f.key, f]));
   const { visible, required } = evaluateRules(def, raw);
@@ -285,6 +290,18 @@ export function validateFormValues(def: FormDefinition, raw: FormValues):
       const chosen = picked.filter((p) => allowed.has(p));
       if (req && chosen.length === 0) return { ok: false, error: `Please choose ${field.label}.`, field: field.key };
       if (chosen.length) out[field.key] = chosen.join(', ');
+      continue;
+    }
+    if (field.type === 'file') {   // item 147: the count, size and kind; lib/form_files.ts checks the bytes
+      const got = (files[field.key] || []).filter((x) => x && x.size > 0);
+      if (req && !got.length) return { ok: false, error: `Please add ${field.label}.`, field: field.key };
+      if (got.length > FILE_FIELD.perField) return { ok: false, error: `${field.label}: up to ${FILE_FIELD.perField} files, please.`, field: field.key };
+      for (const x of got) {
+        const nm = String(x.name || 'That file').split(/[\\/]/).pop()!.slice(0, 80);
+        if (x.size > FILE_FIELD.mb * 1024 * 1024) return { ok: false, error: `“${nm}” is bigger than ${FILE_FIELD.mb} MB. Try a smaller one.`, field: field.key };
+        if (!FILE_FIELD.accept.split(',').includes(String(x.type || ''))) return { ok: false, error: `“${nm}” isn’t a photo or a PDF.`, field: field.key };
+      }
+      if (got.length) out[field.key] = got.map((x) => String(x.name || 'file').split(/[\\/]/).pop()!.slice(0, 120)).join(', ');
       continue;
     }
     if (field.type === 'consent') {
@@ -377,9 +394,10 @@ export function renderForm(def: FormDefinition, ctx?: FormRenderCtx): string {
     const id = fid(f.key);
     const reqAttr = f.required ? ' required aria-required="true"' : '';
     const reqMark = f.required ? ` <span class="ff-req" aria-hidden="true">*</span>` : '';
-    const helpId = f.help ? `${id}-help` : '';
-    const describe = f.help ? ` aria-describedby="${A(helpId)}"` : '';
-    const help = f.help ? `<span class="ff-help" id="${A(helpId)}">${E(f.help)}</span>` : '';
+    const helpText = f.help || (f.type === 'file' ? FILE_HELP : '');
+    const helpId = helpText ? `${id}-help` : '';
+    const describe = helpText ? ` aria-describedby="${A(helpId)}"` : '';
+    const help = helpText ? `<span class="ff-help" id="${A(helpId)}">${E(helpText)}</span>` : '';
     const ph = f.placeholder ? ` placeholder="${A(f.placeholder)}"` : '';
     const labelTop = `<label for="${A(id)}">${E(f.label)}${reqMark}</label>`;
     let control = '';
@@ -414,6 +432,9 @@ export function renderForm(def: FormDefinition, ctx?: FormRenderCtx): string {
       }
       case 'email':
         control = `${labelTop}<input type="email" id="${A(id)}" name="${A(f.key)}" maxlength="200" autocomplete="email"${reqAttr}${describe}${ph}>`;
+        break;
+      case 'file':   // item 147: photos or PDFs, sent with the form and kept privately
+        control = `${labelTop}<input type="file" id="${A(id)}" name="${A(f.key)}" accept="${A(FILE_FIELD.accept)}" multiple${reqAttr}${describe}>`;
         break;
       case 'phone':
         control = `${labelTop}<input type="tel" id="${A(id)}" name="${A(f.key)}" maxlength="40" autocomplete="tel"${reqAttr}${describe}${ph}>`;
@@ -456,10 +477,12 @@ export function renderForm(def: FormDefinition, ctx?: FormRenderCtx): string {
   }
 
   const action = ctx?.formEndpoint ? ` action="${A(ctx.formEndpoint)}"` : '';
+  // item 147: a form with a file field posts its files too, scripts or not
+  const enctype = def.fields.some((f) => f.type === 'file') ? ' enctype="multipart/form-data"' : '';
   const submit = E(def.submit_label || 'Send');
   const body =
     FORM_CSS +
-    `<form id="${A(dom)}" class="card presence-form" method="post"${action} novalidate>` +
+    `<form id="${A(dom)}" class="card presence-form" method="post"${action}${enctype} novalidate>` +
     `<input type="hidden" name="form_id" value="${A(def.id)}">` +
     `<input type="hidden" name="form_kind" value="${A(def.kind)}">` +
     `<input type="hidden" name="source_page" value="${A(ctx?.sourcePage || '/')}">` +

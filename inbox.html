@@ -1059,6 +1059,22 @@ async function loadSpam(){
   SPAM=(list||[]).map(l=>({kind:'lead',queue:true,spam:true,id:'spam:'+l.id,lead_id:String(l.id||''),name:l.name||l.email||l.phone||'Someone',who:l.name||l.email||'Someone',when:String(l.created_at||''),preview:l.message||'',chip:KIND[l.form_kind]||'Message',chipCls:'lead',unread:false,needs:false,lead:l}));
   ITEMS=ITEMS.filter(x=>!x.spam).concat(SPAM);
 }
+// item 147: the photos and PDFs sent with an enquiry. Each opens through a link that lasts
+// ten minutes, asked for when it's tapped (the window opens first, so no blocker stops it).
+const fileSize=(b)=>b>=1048576?(b/1048576).toFixed(1)+' MB':Math.max(1,Math.round(b/1024))+' KB';
+function leadFilesHtml(l){
+  const files=Array.isArray(l.files)?l.files:[];
+  if(!files.length)return '';
+  return `<div class="lfiles" style="margin-top:10px;font-size:13.5px"><span class="muted">Sent with it:</span> ${files.map(f=>`<button type="button" class="link" data-lfile="${esc(String(f.n))}" style="background:none;border:0;padding:0;font:inherit;text-decoration:underline;cursor:pointer">${esc(f.name)}</button> <span class="muted">(${esc(fileSize(f.size||0))})</span>`).join(' · ')}</div>`;
+}
+document.addEventListener('click',async(e)=>{
+  const b=e.target&&e.target.closest?e.target.closest('[data-lfile]'):null;if(!b)return;
+  const it=ITEMS.find(x=>x.id===SEL);if(!it||!it.lead_id)return;
+  const w=window.open('about:blank','_blank');if(w)w.opener=null;
+  const r=await api('/forms/inbox/'+encodeURIComponent(it.lead_id)+'/files/'+encodeURIComponent(b.getAttribute('data-lfile')));
+  if(!r.ok||!r.body.data||!r.body.data.url){if(w)w.close();toast((r.body&&r.body.message)||'That file couldn’t be opened just now.');return;}
+  if(w)w.location.href=r.body.data.url;else location.href=r.body.data.url;
+});
 function paneSpam(host,it){
   const l=it.lead||{};
   const contact=[l.email?esc(l.email):'',l.phone?esc(l.phone):''].filter(Boolean).join(' · ');
@@ -1466,6 +1482,7 @@ function paneLead(host,it){
     `<div class="pbody"><div class="card">
       ${contact?`<div style="font-size:13.5px;color:var(--soft)">${contact}</div>`:''}
       ${l.message?`<div class="body">${esc(l.message)}${l.message_cut?'…':''}</div>${l.message_cut?'<p class="muted" style="font-size:12.5px;margin:6px 0 0">This is the start of a longer message. Refresh to see all of it.</p>':''}`:'<div class="body muted">No message — they just left their details.</div>'}
+      ${leadFilesHtml(l)}
       ${visitHtml(l)}
       ${sent.map(r=>`<div class="lreply"><div class="muted" style="font-size:12.5px">You replied${r.at?' · '+esc(when(r.at)):''}</div><div class="body">${esc(r.body)}</div></div>`).join('')}
       ${foundHtml(l,settled)}

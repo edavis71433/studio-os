@@ -21,7 +21,7 @@ ok('normalize: empty field list refused', !normalizeFormDefinition({ title: 'x',
 ok('normalize: capped at 30 fields', !normalizeFormDefinition({ title: 'x', fields: Array.from({ length: 31 }, (_, i) => ({ label: `f${i}`, type: 'text' })) }).ok);
 ok('normalize: a labelless field refused', !normalizeFormDefinition({ title: 'x', fields: [{ type: 'text' }] }).ok);
 ok('normalize: unknown field type REJECTED (whitelist)', !normalizeFormDefinition({ title: 'x', fields: [{ label: 'Hack', type: 'script' }] }).ok);
-ok('normalize: reserved file type rejected (deferred)', !normalizeFormDefinition({ title: 'x', fields: [{ label: 'CV', type: 'file' }] }).ok);
+ok('normalize: a “Photo or file” field is a field type now (item 147, tests/presence/form_files_test.mjs)', normalizeFormDefinition({ title: 'x', fields: [{ label: 'CV', type: 'file' }] }).ok);
 ok('normalize: choice type without choices refused', !normalizeFormDefinition({ title: 'x', fields: [{ label: 'Pick', type: 'select' }] }).ok
   && normalizeFormDefinition({ title: 'x', fields: [{ label: 'Pick', type: 'select', choices: ['a', 'b'] }] }).ok);
 const dup = normalizeFormDefinition({ title: 'x', fields: [{ key: 'k', label: 'A', type: 'text' }, { key: 'k', label: 'B', type: 'text' }] });
@@ -37,7 +37,7 @@ const rule = normalizeFormDefinition({
           { when: { field: 'ghost', op: 'equals', value: 'y' }, then: { action: 'show', target: 'detail' } }],     // unknown field dropped
 });
 ok('normalize: only whitelisted rules referencing real keys survive', rule.ok && rule.form.rules.length === 1);
-ok('normalize: FORM_FIELD_TYPES has all 11 types', FORM_FIELD_TYPES.length === 11);
+ok('normalize: FORM_FIELD_TYPES has all 12 types', FORM_FIELD_TYPES.length === 12 && FORM_FIELD_TYPES.includes('file'));
 
 // ═══ evaluateRules — pure conditional logic (each op) ═══
 const defR = normalizeFormDefinition({
