@@ -24,11 +24,13 @@ import { runRecommendation } from '../recommendation/engine.ts';
 import { runMoments } from '../moments/engine.ts';
 import {
   netlifyConfigured, createSite, getSite, deleteSite, listDeploys,
-  setCustomDomain, sslStatus, provisionSsl, restoreDeploy, deployState,
+  setCustomDomain, sslStatus, provisionSsl, restoreDeploy, deployState, setDomainAliases,
 } from '../lib/netlify.ts';
 import { computeReadiness } from './monitor.ts';
 import { applyPlan } from './foundations.ts';
-import { domainHealth, domainTruth } from '../lib/domain_health.ts';
+import { domainHealth, domainTruth, twinName, dnsRecordsSure } from '../lib/domain_health.ts';
+import { byWhom, domainChangeEmail, tellOwnerAndStudio, afterResponse, escHtml, announceLiveOnce, forwardsOf } from '../lib/domain_notify.ts';
+import { writeReservedJson, RESERVED_NAMES } from '../lib/reserved_store.ts';
 import { rdapLookupDetailed, lookupPatch, whereToGo } from '../lib/rdap.ts';
 import { rateAllow } from '../lib/ratelimit.ts';
 import { describeEngine } from '../optimization/engine.ts';
@@ -212,10 +214,70 @@ export async function handleDomainLookup(req: Request, site: SiteRow, cors: Reco
   return json({ data: { name, found: true, registered_name: look.name, ...whereToGo(look.info.registrar, look.facts.dns_host) } }, 200, { ...cors, 'Cache-Control': 'no-store' });
 }
 
+/** Pure: the last few domain changes in the owner's words (item 163, review domains finding 11:
+ *  the history was written and never shown), newest first. */
+export function domainChanges(events: Array<{ summary?: string; actor_kind?: string; created_at?: string }>): Array<{ at: string; words: string }> {
+  const who = (k?: string) => k === 'system' ? 'automatically' : k === 'operator' || k === 'staff' ? 'by your studio' : 'by someone on your account';
+  return (events || []).filter((e) => e && e.created_at && e.summary).slice(0, 3).map((e) => ({ at: String(e.created_at), words: `${e.summary}, ${who(e.actor_kind)}` }));
+}
+/** Item 163 (finding 14): the domain's email records as they are when it's attached, so the
+ *  daily check can say so if they vanish. The registered name isn't known yet: www. is dropped. */
+async function saveMailBaseline(siteId: string, domain: string, nowIso: string) {
+  const bare = domain.startsWith('www.') ? domain.slice(4) : domain;
+  const mx = await dnsRecordsSure(bare, 'MX');
+  if (mx === null) return;   // couldn't ask: the daily check takes the first picture instead
+  await writeReservedJson(siteId, RESERVED_NAMES.domainMail, { domain: bare, mx: [...new Set(mx)].sort(), saved_at: nowIso, gone_alerted_at: null }, 'system');
+}
+
+/** POST | DELETE /foundations/domain/forward {domain} — item 174 (Namecheap's and Squarespace's
+ *  plain redirect form): another domain the client owns sends its visitors to this site's main
+ *  name, page for page, from the next publish (the rules item 163 writes at publish). It's kept
+ *  on the site as an extra name. The site's current list is read first; when it can't be read,
+ *  nothing is written, so a hiccup never wipes the forwards already there. */
+export async function handleDomainForward(req: Request, method: string, site: SiteRow, principal: Principal, cors: Record<string, string>) {
+  if (!site.netlify_site_id) return json({ error: 'not_provisioned', message: 'This site isn’t set up for hosting yet.' }, 409, cors);
+  if (!site.custom_domain) return json({ error: 'no_domain', message: 'Connect the main domain first: forwarding sends visitors to it.' }, 409, cors);
+  const body = await readBody(req);
+  const domain = String(body?.domain || '').trim().toLowerCase().replace(/^https?:\/\//, '').replace(/[/?#].*$/, '').replace(/\.$/, '');
+  if (!HOSTNAME_RE.test(domain)) return json({ error: 'bad_request', message: 'That doesn’t look like a domain name, like oldname.com.' }, 400, cors);
+  const main = site.custom_domain.toLowerCase();
+  if (forwardsOf([domain], main).length === 0) return json({ error: 'is_main', message: 'That’s already this site’s main name.' }, 409, cors);
+  const names = [...new Set([domain, twinName(domain, null)].filter(Boolean) as string[])];
+  const nf = await getSite(site.netlify_site_id).catch(() => null);
+  if (!nf || !nf.ok || !nf.site) return json({ error: 'read_failed', message: 'We couldn’t read this site’s domains just now. Try again in a minute.' }, 502, cors);
+  const before = (nf.site.domain_aliases || []).map((a) => a.toLowerCase());
+  const who = { id: site.id, client_id: (site as { client_id?: string | null }).client_id || null };
+  if (method === 'POST') {
+    const taken = await svc(`presence_sites?custom_domain=in.(${names.map(encodeURIComponent).join(',')})&id=neq.${site.id}&select=id,custom_domain&limit=5`)
+      .then((r) => (Array.isArray(r.json) ? r.json as Array<{ id?: string; custom_domain?: string | null }> : []).some((x) => x.id !== site.id && names.includes(String(x.custom_domain || '').toLowerCase()))).catch(() => false);
+    if (taken) return json({ error: 'taken_here', message: 'That domain is the main name of another website here. Remove it there first.' }, 409, cors);
+    const next = [...new Set([...before, ...names])];
+    const set = await setDomainAliases(site.netlify_site_id, next);
+    if (!set.ok) { console.warn(`[domain] forward add refused for site ${site.id}: ${set.error || 'unknown'}`); return json({ error: 'domain_failed', message: 'That domain couldn’t be added. It may still be connected to a website somewhere else: remove it there first, or ask your studio.' }, 502, cors); }
+    await provisionSsl(site.netlify_site_id).catch(() => null);   // the padlock covers the new name too
+    await writeChangeEvent({ siteId: site.id, entityType: 'domain', entityId: null, action: 'create', summary: `Added ${domain}, which forwards to ${main}`, principal, provenance: 'human' });
+    await afterResponse(tellOwnerAndStudio(who, domainChangeEmail('forward_added', { domain, old: main, by: byWhom(principal) }), 'domain-forward'));
+    return json({ data: { forwards: forwardsOf(next, main) } }, 200, cors);
+  }
+  if (!before.some((a) => names.includes(a))) return json({ error: 'not_found', message: 'That domain doesn’t forward here.' }, 404, cors);
+  const next = before.filter((a) => !names.includes(a));
+  const set = await setDomainAliases(site.netlify_site_id, next);
+  if (!set.ok) { console.warn(`[domain] forward remove failed for site ${site.id}: ${set.error || 'unknown'}`); return json({ error: 'domain_failed', message: 'That didn’t go through just now. Try again in a minute.' }, 502, cors); }
+  await writeChangeEvent({ siteId: site.id, entityType: 'domain', entityId: null, action: 'delete', summary: `Stopped ${domain} forwarding to ${main}`, principal, provenance: 'human' });
+  await afterResponse(tellOwnerAndStudio(who, domainChangeEmail('forward_stopped', { domain, old: main, by: byWhom(principal) }), 'domain-forward'));
+  return json({ data: { forwards: forwardsOf(next, main) } }, 200, cors);
+}
+
 export async function handleDomain(req: Request, method: string, site: SiteRow, principal: Principal, cors: Record<string, string>) {
   if (method === 'GET') {
-    const st = await domainStatus(site);
-    const facts = site.custom_domain ? await domainFacts(site) : { registered: null, provider: null };
+    const [st, facts, changes, nfs] = await Promise.all([
+      domainStatus(site),
+      site.custom_domain ? domainFacts(site) : Promise.resolve({ registered: null, provider: null }),
+      svc(`presence_change_events?site_id=eq.${site.id}&entity_type=eq.domain&select=summary,actor_kind,created_at&order=created_at.desc&limit=3`).then((r) => domainChanges(Array.isArray(r.json) ? r.json : [])).catch(() => []),
+      site.custom_domain && site.netlify_site_id ? getSite(site.netlify_site_id).catch(() => null) : Promise.resolve(null),
+    ]);
+    // item 174: the other domains that send visitors here (kept on the site as extra names)
+    const forwards = forwardsOf(nfs && nfs.ok && nfs.site ? nfs.site.domain_aliases || [] : [], site.custom_domain);
     // review finding 4 (item 134): the padlock used to be asked for once, when the domain was
     // attached and before the client had changed anything. "Check if it's ready" asks again
     // whenever the records are right and the padlock still isn't on (Netlify: safe to repeat).
@@ -225,9 +287,11 @@ export async function handleDomain(req: Request, method: string, site: SiteRow, 
     if (st.health === 'ok' && site.custom_domain && site.netlify_site_id) {
       // the registered name the lookup found tells "www." twins from sub-names (shop.example.com has none)
       const truth = await domainTruth({ custom_domain: site.custom_domain, netlify_site_id: site.netlify_site_id }, facts.registered).catch(() => null);
-      if (truth) return json({ data: { ...st, provider: facts.provider, serving: truth.serving, checklist: truth.checklist, all_ok: truth.all_ok } }, 200, cors);
+      // item 164 (finding 13): the first time every check passes, the owner and the studio hear it's live
+      if (truth && truth.all_ok) await afterResponse(announceLiveOnce({ id: site.id, client_id: (site as { client_id?: string | null }).client_id || null }, site.custom_domain, new Date().toISOString()));
+      if (truth) return json({ data: { ...st, provider: facts.provider, changes, forwards, serving: truth.serving, checklist: truth.checklist, all_ok: truth.all_ok } }, 200, cors);
     }
-    return json({ data: { ...st, provider: facts.provider } }, 200, cors);
+    return json({ data: { ...st, provider: facts.provider, changes, forwards } }, 200, cors);
   }
   if (!site.netlify_site_id) return json({ error: 'not_provisioned', message: 'Provision hosting for this site before managing domains.' }, 409, cors);
 
@@ -235,21 +299,58 @@ export async function handleDomain(req: Request, method: string, site: SiteRow, 
     const body = await readBody(req);
     const domain = String(body?.domain || '').trim().toLowerCase();
     if (!HOSTNAME_RE.test(domain)) return json({ error: 'bad_request', message: 'That doesn’t look like a valid domain name (e.g. www.restaurant.com).' }, 400, cors);
+    const who = { id: site.id, client_id: (site as { client_id?: string | null }).client_id || null };
+    // item 163 (review domains finding 21): a name already on another of our sites is said plainly
+    // (it used to fail later with the hosting company's words), and the studio is told
+    const names = [...new Set([domain, twinName(domain, null)].filter(Boolean) as string[])];
+    const taken = await svc(`presence_sites?custom_domain=in.(${names.map(encodeURIComponent).join(',')})&id=neq.${site.id}&select=id,custom_domain&limit=5`)
+      .then((r) => (Array.isArray(r.json) ? r.json as Array<{ id?: string; custom_domain?: string | null }> : []).some((x) => x.id !== site.id && names.includes(String(x.custom_domain || '').toLowerCase()))).catch(() => false);
+    if (taken) {
+      await afterResponse(tellOwnerAndStudio(who, { subject: `${domain} is already connected to another website`,
+        html: `<p>Someone tried to connect <strong>${escHtml(domain)}</strong> to a website you look after, but it is already connected to another of your websites.</p><p>If it belongs on the new one, remove it from the other site first.</p>` }, 'domain-taken', { studioOnly: true }));
+      return json({ error: 'taken_here', message: 'That domain is already connected to another website here. Your studio has been told, and can move it if it belongs on this one.' }, 409, cors);
+    }
+    // item 163 (finding 12): changing the domain can keep the old name working, sent on to the new one
+    const old = site.custom_domain && site.custom_domain.toLowerCase() !== domain ? site.custom_domain.toLowerCase() : null;
+    // item 174 (Squarespace's "Use www"): the main name's own twin is a switch, not a change; the
+    // host sends the other one to it by itself, so nothing is kept or forwarded
+    const mainSwitch = !!old && twinName(old, null) === domain;
+    const keepOld = !!old && !mainSwitch && body?.keep_old === true;
     const set = await setCustomDomain(site.netlify_site_id, domain);
-    if (!set.ok) return json({ error: 'domain_failed', message: 'The hosting provider rejected that domain — it may be attached to another account. Detail (operator): ' + (set.error || 'unknown') }, 502, cors);
+    // item 164 (review domains finding 18): the hosting company's own words stay in the log, not on the client's screen
+    if (!set.ok) { console.warn(`[domain] attach refused for site ${site.id}: ${set.error || 'unknown'}`); return json({ error: 'domain_failed', message: 'That domain couldn’t be connected. It may still be connected to a website somewhere else: remove it there first, or ask your studio.' }, 502, cors); }
+    if (old || (set.site?.domain_aliases || []).length) {
+      const before = (set.site?.domain_aliases || []).map((a) => a.toLowerCase());
+      const isNew = new Set(names);   // the new name (and its www. twin) is the main one now, never also an extra
+      const kept = before.filter((a) => !isNew.has(a));
+      const next = keepOld ? [...new Set([...kept, old!, ...(twinName(old!, null) ? [twinName(old!, null)!] : [])])] : kept;
+      if (next.join('|') !== before.join('|')) await setDomainAliases(site.netlify_site_id, next).catch(() => null);
+    }
     await svc(`presence_sites?id=eq.${site.id}`, { method: 'PATCH', body: JSON.stringify({ custom_domain: domain }) });
     await provisionSsl(site.netlify_site_id); // kick cert issuance; DNS may still be pending — safe to repeat
-    await writeChangeEvent({ siteId: site.id, entityType: 'domain', entityId: null, action: 'create', summary: `Attached domain ${domain}`, principal, provenance: 'human' });
-    return json({ data: await domainStatus({ custom_domain: domain, netlify_site_id: site.netlify_site_id }) }, 200, cors);
+    await writeChangeEvent({ siteId: site.id, entityType: 'domain', entityId: null, action: old ? 'update' : 'create',
+      summary: mainSwitch ? `Made ${domain} the main name (${old} sends visitors there)` : old ? `Changed domain from ${old} to ${domain}${keepOld ? ` (${old} forwards)` : ''}` : `Attached domain ${domain}`, principal, provenance: 'human' });
+    await saveMailBaseline(site.id, domain, new Date().toISOString()).catch(() => null);   // finding 14
+    // finding 11: the owner and the studio hear about every attach and change
+    await afterResponse(tellOwnerAndStudio(who, domainChangeEmail(mainSwitch ? 'main' : old ? 'changed' : 'attached', { domain, old, forwarded: keepOld, by: byWhom(principal) }), mainSwitch ? 'domain-main' : old ? 'domain-changed' : 'domain-attached'));
+    return json({ data: { ...(await domainStatus({ custom_domain: domain, netlify_site_id: site.netlify_site_id })), forwarding: keepOld ? old : null } }, 200, cors);
   }
 
   if (method === 'DELETE') {
     if (!site.custom_domain) return json({ error: 'not_found', message: 'This site has no custom domain to remove.' }, 404, cors);
+    // item 163 (review domains finding 11): taking a live site off its address was one plain yes
+    // away; now the name is typed back, here as well as on the page
+    const body = await readBody(req);
+    const typed = String(body?.confirm || '').trim().toLowerCase().replace(/^https?:\/\//, '').replace(/[/?#].*$/, '').replace(/\.$/, '');
+    if (typed !== site.custom_domain.toLowerCase()) return json({ error: 'confirm_needed', message: `To remove it, type ${site.custom_domain} exactly.` }, 400, cors);
     const removed = await setCustomDomain(site.netlify_site_id, null);
-    if (!removed.ok) return json({ error: 'domain_failed', message: 'Could not detach the domain — try again. Detail (operator): ' + (removed.error || 'unknown') }, 502, cors);
+    if (!removed.ok) { console.warn(`[domain] remove failed for site ${site.id}: ${removed.error || 'unknown'}`); return json({ error: 'domain_failed', message: 'The domain couldn’t be removed just now. Try again in a minute.' }, 502, cors); }
+    if ((removed.site?.domain_aliases || []).length) await setDomainAliases(site.netlify_site_id, []).catch(() => null);   // nothing left to send them on to
     await svc(`presence_sites?id=eq.${site.id}`, { method: 'PATCH', body: JSON.stringify({ custom_domain: null }) });
     await writeChangeEvent({ siteId: site.id, entityType: 'domain', entityId: null, action: 'delete', summary: `Removed domain ${site.custom_domain}`, principal, provenance: 'human' });
-    return json({ data: { ok: true, message: 'Domain removed — the site still serves from its netlify.app address.' } }, 200, cors);
+    await afterResponse(tellOwnerAndStudio({ id: site.id, client_id: (site as { client_id?: string | null }).client_id || null },
+      domainChangeEmail('removed', { domain: site.custom_domain, by: byWhom(principal), builtIn: removed.site?.default_domain || null }), 'domain-removed'));
+    return json({ data: { ok: true, message: 'Domain removed. Your site is still online at its built-in address.' } }, 200, cors);
   }
   return null;
 }

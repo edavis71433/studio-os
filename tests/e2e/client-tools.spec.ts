@@ -177,6 +177,9 @@ test.describe('Sites: the content form and the hand-over kit (item 176)', () => 
     await page.goto(`/sites.html#answers=${S1}`);
     await expect(page.locator('#answersDlg')).toBeVisible();
     await expect(page.locator('#answersDlg')).toContainText('Family florist since 2009.');
+    // Chrome delivers the Close above a frame late; landing after the link opened it again, it emptied the box
+    await page.locator('#answersDlg').evaluate((d) => d.dispatchEvent(new Event('close')));
+    await expect(page.locator('#answersDlg')).toContainText('Family florist since 2009.');
   });
 
   test('Hand-over kit: the facts fill in; who to call, a video and a file; switched on and saved', async ({ page }) => {
