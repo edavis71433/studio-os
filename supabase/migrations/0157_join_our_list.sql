@@ -1,4 +1,4 @@
--- 0154 — "Join our list" on a client's site (builder list item 146, Nov 2026 review)
+-- 0157 — "Join our list" on a client's site (builder list item 146, Nov 2026 review)
 -- The Newsletter section collects an email address itself (with a consent tick) instead
 -- of only linking out to another company's sign-up page. Whoever joins is a contact of
 -- the site with two new facts:
