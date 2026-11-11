@@ -65,6 +65,11 @@
   .calsteps{margin:10px 0 0;padding-left:20px;font-size:13.5px;color:var(--ink)}
   .calsteps li{margin:2px 0}
   .calacts{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+  /* list item 152: the ad tags card */
+  .adrow{display:grid;grid-template-columns:minmax(120px,160px) minmax(0,1fr);gap:8px 12px;align-items:center;margin-top:10px;max-width:520px}
+  .adrow label{font-size:13px;font-weight:600}
+  .adrow input{height:32px;padding:0 10px;border:1px solid var(--line);border-radius:var(--dds-r,8px);background:var(--bg);color:var(--ink);font:inherit;font-size:13px;min-width:0}
+  @media (max-width:560px){.adrow{grid-template-columns:minmax(0,1fr)}}
   .btn:disabled{opacity:.55;cursor:default}
   .actions{display:flex;gap:var(--dds-s2,8px);align-items:center;flex-wrap:wrap}
 
@@ -463,12 +468,46 @@ function render(surface){
   }
   html += `<section class="sec" id="calSec" hidden></section>`;   // sales review item 46
   html += `<section class="sec" id="logSec" hidden></section>`;   // sales review item 69: the log-this-email address
+  html += `<section class="sec" id="adSec" hidden></section>`;   // list item 152: ad tags
   html += `</div><aside class="col-rail">${railWhat(entries)}${railActivity(entries)}${railAsk()}</aside></div>`;
   $('main').innerHTML = html;
   wire();
   paintAskClient(entries);
   paintCalendar();
   paintEmailLog();
+  paintAdTags();
+}
+
+// ── List item 152: ad tags. The Google tag and the Meta Pixel for an owner who
+// advertises. The site then asks visitors about cookies first and loads the tags
+// only for those who say yes; the privacy page says so. The site's own setting, so
+// a studio drilled into a client sets the client's. Saving is a setting (configure).
+async function paintAdTags(){
+  const host = $('adSec'); if(!host) return;
+  const ctx = await shellContext();
+  if(ctx && Array.isArray(ctx.edition_features) && !ctx.edition_features.includes('website')) return;   // a plan that doesn't publish a website
+  let s = null;
+  try { s = ((await apiGet('/settings')) || {}).data; } catch(_e){ return; }   // no website here: no card
+  if(!s || typeof s !== 'object' || !('google_tag_id' in s)) return;   // a database without the 0155 columns: no card yet
+  host.innerHTML = `<div class="sec-h"><h2>Ad tags</h2></div><div class="list"><div class="calbox"><div class="calt">Google tag and Meta Pixel</div>
+    <p class="calp">If you advertise on Google, Facebook or Instagram, paste the ID each one gives you so they can measure what the ads bring in. Your website then asks visitors about cookies first: the tags load only for people who say yes, and your privacy page says so. Changes go live when you publish.</p>
+    <div class="adrow"><label for="adGoogle">Google tag ID</label><input id="adGoogle" type="text" placeholder="G-XXXXXXXXXX or AW-XXXXXXXXX" autocomplete="off" autocapitalize="characters" spellcheck="false" maxlength="24" value="${esc(s.google_tag_id || '')}"></div>
+    <div class="adrow"><label for="adMeta">Meta Pixel ID</label><input id="adMeta" type="text" inputmode="numeric" placeholder="The digits from Meta Events Manager" autocomplete="off" spellcheck="false" maxlength="24" value="${esc(s.meta_pixel_id || '')}"></div>
+    <div class="calacts"><button type="button" class="btn" id="adSave" data-needs="configure">Save</button></div>
+    <p class="calp quiet">Leave a box empty to turn that tag off.</p></div></div>`;
+  host.hidden = false;
+  const save = $('adSave');
+  save.addEventListener('click', async () => {
+    save.disabled = true;
+    let r;
+    try { const res = await fetch(FN+'/settings', { method:'PUT', headers:H(), body:JSON.stringify({ google_tag_id: $('adGoogle').value.trim(), meta_pixel_id: $('adMeta').value.trim() }) }); r = { ok:res.ok, status:res.status, body: await res.json().catch(()=>({})) }; }
+    catch(_e){ r = { ok:false, status:0, body:{} }; }
+    save.disabled = false;
+    if(!r.ok){ toast(serverMsg(r, 'That didn’t save — please try again.')); return; }
+    const d = (r.body && r.body.data) || {};
+    $('adGoogle').value = d.google_tag_id || ''; $('adMeta').value = d.meta_pixel_id || '';
+    toast(d.google_tag_id || d.meta_pixel_id ? 'Saved. Publish your website to put the tags and the cookie notice on it.' : 'Saved. Publish your website to take the tags off.');
+  });
 }
 
 // ── Sales review item 46: your bookings and dated tasks in Google Calendar ────

@@ -15,6 +15,7 @@
 // owner-approved terms). Both templates render these bodies through their own
 // shell, so look-and-feel stays per-template while the words stay one source.
 import { esc } from './markdown.ts';
+import { adTagsOf, adTagNames, adCompanies } from './ad_tags.ts';
 import type { SnapshotContent } from './render_types.ts';
 
 function contactLine(c: SnapshotContent): string {
@@ -25,6 +26,16 @@ function contactLine(c: SnapshotContent): string {
     i.email,
   ].filter(Boolean).map((x) => esc(String(x)));
   return bits.join(' · ');
+}
+
+/** List item 152: what a site with ad tags says about cookies, with the button that brings the
+ *  cookie notice back. Empty for a site without them, which sets no cookies at all. */
+function adCookieParagraphs(c: SnapshotContent): string {
+  const tags = adTagsOf(c.settings);
+  if (!tags) return '';
+  const both = !!(tags.google && tags.meta);
+  return `<p>This website asks before it uses any cookies. If you say yes, it loads ${adTagNames(tags)}, which ${both ? 'set' : 'sets'} cookies to measure our advertising: ${adCompanies(tags)} can see which pages you open here and whether you came from one of our ads, and use that under ${both ? 'their own privacy policies' : 'its own privacy policy'}. If you say no, or don’t answer, none of it loads. Your answer is kept in your browser, so you aren’t asked on every page.</p>
+<p><button type="button" id="presence-consent-change">Change your cookie choice</button></p>`;
 }
 
 /** The Privacy Policy body (inside <main>): facts-true, plain words. */
@@ -40,9 +51,10 @@ ${hasForm
     : `<p>This website has no forms and collects nothing you type.</p>`}
 ${c.settings?.visit_counter === false
     ? `<h2>Cookies and visit counts</h2>
-<p>This website sets <strong>no cookies</strong>, stores nothing on your device, and does not count or track visits. There is nothing to consent to, which is why there is no cookie banner.</p>`
+${adCookieParagraphs(c) ? `${adCookieParagraphs(c)}
+<p>Apart from that, this website does not count or track visits.</p>` : `<p>This website sets <strong>no cookies</strong>, stores nothing on your device, and does not count or track visits. There is nothing to consent to, which is why there is no cookie banner.</p>`}`
     : `<h2>Cookies and visit counts</h2>
-<p>This website sets <strong>no cookies</strong> and stores nothing on your device, which is why there is no cookie banner.</p>
+${adCookieParagraphs(c) || `<p>This website sets <strong>no cookies</strong> and stores nothing on your device, which is why there is no cookie banner.</p>`}
 <p>It counts its own visits, without any outside analytics or advertising company. When a page opens, it notes which page, the name of the website you came from, any campaign tag in the link, and your kind of device, browser and country. When you tap a phone number, an email address, a download or a link to another website, it notes which kind of link it was. It never keeps your IP address; it keeps a scrambled code made from it that changes every day, so a visit can be counted once without saying who you are. If your browser asks websites not to track you, nothing is counted. Only ${name} and the studio that runs this website see these counts, and they are never sold or shared for advertising.</p>`}
 <h2>Hosting</h2>
 <p>The site is served as static pages by our hosting provider, which may keep standard, short-lived server logs (such as IP addresses) for security and reliability.</p>

@@ -14,6 +14,7 @@ import manifest_me_1_0_0 from '../templates/meadow/1.0.0/manifest.json' with { t
 import manifest_at_1_0_0 from '../templates/atelier/1.0.0/manifest.json' with { type: 'json' };
 import manifest_ha_1_0_0 from '../templates/harbor/1.0.0/manifest.json' with { type: 'json' };
 import { trackerScript } from './visits.ts';
+import { injectAdTags } from './ad_tags.ts';
 import { sanitizeDevHtml, sanitizeDevCss } from './devmode.ts';
 import { BLOCK_CSS, sectionStyles, pageClasses } from './site_blocks.ts';
 
@@ -193,7 +194,9 @@ export async function renderSnapshot(snapshot: Snapshot, site: SiteConfig, opts:
   const counting = (snapshot.content as SnapshotContent)?.settings?.visit_counter !== false;
   const drawn = tintFavicon(await t.render(snapshot, t.manifest, site), snapshot.dev_customization?.theme_tokens?.accent, snapshot.template_slug);
   const dressed = injectDevLayer(drawn, snapshot.dev_customization);
-  return injectCsp(injectAnalytics(opts.allSectionStyles ? dressed : trimSectionStyles(dressed), counting ? site.siteId : undefined));
+  // List item 152: the Google tag and the Meta Pixel, behind a cookie notice, on a site that has them.
+  const tagged = injectAdTags(opts.allSectionStyles ? dressed : trimSectionStyles(dressed), (snapshot.content as SnapshotContent)?.settings);
+  return injectCsp(injectAnalytics(tagged, counting ? site.siteId : undefined));
 }
 
 /** What the builder's canvas and the studio's site cards draw (routes/preview.ts,
