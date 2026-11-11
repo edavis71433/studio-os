@@ -51,6 +51,7 @@ const rootFiles = [...Deno.readDirSync(ROOT)].filter((e) => e.isFile && /\.(html
 {
   const google = rootFiles.filter((f) => /fonts\.(googleapis|gstatic)\.com/.test(read(f)));
   ok('no page, script or style sheet asks Google for fonts', google.length === 0, google.join(', '));
+  ok('so the privacy page no longer lists Google Fonts among our providers', !/Google Fonts/.test(read('privacy.html')));
 }
 const brand = read('fonts/brand.css');
 {
