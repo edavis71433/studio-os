@@ -8,6 +8,8 @@ import { fetchLibraryFonts, libraryFontsIn } from '../lib/fonts.ts';
 import { json } from '../../_shared/http.ts';
 import { svc } from '../lib/db.ts';
 import { getTemplate, renderSnapshot } from '../lib/render.ts';
+import { liveContent, lockIdsIn, lockPages } from '../lib/page_access.ts';
+import { readPageLocks } from './page_locks.ts';
 import { serializeDraft } from '../lib/serializer.ts';
 import { validateSnapshot } from '../lib/manifest_validate.ts';
 import { fetchVariants } from '../lib/media.ts';
@@ -170,7 +172,16 @@ export async function runPipeline(site: SiteRow, principal: Principal, kind: 'pu
     ...(fnBase ? { bookEndpoint: `${fnBase}/functions/v1/presence/book/${site.id}` } : {}),
   };
   let fileMap: Record<string, string | Uint8Array>;
-  try { fileMap = await renderSnapshot(snapshotArg.snapshot, siteCfg); } catch (e) { return await fail('render', String(e).slice(0, 300)); }
+  // Items 48 and 120: a private page stays off the live site and a password page goes up
+  // sealed (lib/page_access.ts). The snapshot Versions keeps is the draft as it was; only what
+  // is drawn for the live site changes. A password page whose key can't be read stays off too.
+  const locks = await readPageLocks(site.id, lockIdsIn(snapshotArg.snapshot.content));
+  const { content: liveC, sealed } = liveContent(snapshotArg.snapshot.content, new Set(locks.keys()));
+  const liveSnap = liveC === snapshotArg.snapshot.content ? snapshotArg.snapshot : { ...snapshotArg.snapshot, content: liveC };
+  try {
+    fileMap = await renderSnapshot(liveSnap, siteCfg);
+    fileMap = await lockPages(fileMap, sealed.map((p) => ({ ...p, ...locks.get(p.lock)! })));
+  } catch (e) { return await fail('render', String(e).slice(0, 300)); }
   at('render');
   const { files: images, failed } = await fetchVariants(snapshotArg.mediaManifest);
   if (failed.length) return await fail('images', `variant generation failed for: ${failed.join('; ')}`);

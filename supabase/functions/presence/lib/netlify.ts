@@ -185,12 +185,14 @@ export async function setSitePassword(netlifySiteId: string, password: string): 
 }
 
 /** Certificate state. 200 with empty body = no cert yet (valid pre-DNS state). */
-export async function sslStatus(netlifySiteId: string): Promise<{ ok: boolean; state: string; expires_at: string | null }> {
+export async function sslStatus(netlifySiteId: string): Promise<{ ok: boolean; state: string; expires_at: string | null; domains?: string[] }> {
   if (!NETLIFY_TOKEN) return { ok: false, state: 'unknown', expires_at: null };
   const r = await nf(`/sites/${encodeURIComponent(netlifySiteId)}/ssl`);
   if (!r.ok) return { ok: false, state: 'unknown', expires_at: null };
-  if (!r.json) return { ok: true, state: 'none', expires_at: null };
-  return { ok: true, state: String(r.json.state || 'unknown'), expires_at: r.json.expires_at ? String(r.json.expires_at) : null };
+  if (!r.json) return { ok: true, state: 'none', expires_at: null, domains: [] };
+  // `domains`: the names the certificate covers (item 134: "the padlock covers both names")
+  const domains = Array.isArray(r.json.domains) ? r.json.domains.map((d: unknown) => String(d).toLowerCase()) : [];
+  return { ok: true, state: String(r.json.state || 'unknown'), expires_at: r.json.expires_at ? String(r.json.expires_at) : null, domains };
 }
 
 /** Ask Netlify to (re)provision the certificate — safe to call repeatedly. */

@@ -18,6 +18,7 @@ import { withAiCrawlerChoice } from './ai_crawlers.ts';
 import { injectAdTags } from './ad_tags.ts';
 import { sanitizeDevHtml, sanitizeDevCss } from './devmode.ts';
 import { BLOCK_CSS, sectionStyles, pageClasses } from './site_blocks.ts';
+import { applyPageChrome } from './page_access.ts';
 
 // ── FD-T2: indexed template registry; each template's code loads on first use ──
 // slug → version → { manifest, code loader }. Render resolution goes through this
@@ -194,7 +195,9 @@ export async function renderSnapshot(snapshot: Snapshot, site: SiteConfig, opts:
   // Item 61: the owner's switch decides the counter; the privacy page reads the same switch.
   const counting = (snapshot.content as SnapshotContent)?.settings?.visit_counter !== false;
   // List item 175: switched off, AI assistants are asked to stay out in robots.txt.
-  const drawn = withAiCrawlerChoice(tintFavicon(await t.render(snapshot, t.manifest, site), snapshot.dev_customization?.theme_tokens?.accent, snapshot.template_slug), (snapshot.content as SnapshotContent)?.settings);
+  // items 48 and 120: an own page can leave out the site's header or footer, everywhere it is drawn
+  const pages = (snapshot.content as SnapshotContent)?.settings?.pages;
+  const drawn = withAiCrawlerChoice(tintFavicon(applyPageChrome(await t.render(snapshot, t.manifest, site), pages), snapshot.dev_customization?.theme_tokens?.accent, snapshot.template_slug), (snapshot.content as SnapshotContent)?.settings);
   const dressed = injectDevLayer(drawn, snapshot.dev_customization);
   // List item 152: the Google tag and the Meta Pixel, behind a cookie notice, on a site that has them.
   const tagged = injectAdTags(opts.allSectionStyles ? dressed : trimSectionStyles(dressed), (snapshot.content as SnapshotContent)?.settings);
