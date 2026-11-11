@@ -451,6 +451,10 @@ const WRITE_HANDLERS = [
   'handleRecurringStart', 'handleRecurringChange', 'handleRecurringAction',
   // sales review item 112: prospects (DELETE and PATCH /sales/prospects/:id share handleProspect)
   'handleProspects', 'handleProspect', 'handleProspectDiscover', 'handleProspectConvert', 'handleProspectDraft', 'handleProspectPack',
+  // sales review item 114: free-tool leads are the PLATFORM's own enquiries. Deliberately on
+  // no member list (an unlisted write refuses every seat — asserted above), and the handlers
+  // themselves refuse anyone who isn't platform staff (tool_leads_routes_test.mjs proves it).
+  'handleToolLead', 'handleToolLeadConvert',
   'handleStudioRequests',   // final pass S1: POST /portal/studio-requests/:id/(accept|decline) are open; the route answers the owner only
   'handleSitePassword',   // builder list item 175: POST /site/password needs configure
   'handleScheduleCancel', 'handleScheduleCreate', 'handleSettings', 'handleShareSet', 'handleStockImport',
