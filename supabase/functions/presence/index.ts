@@ -71,7 +71,7 @@ import { handleEmailLogAddress } from './routes/email_log.ts';   // sales review
 const { handleBroadcastsList, handleBroadcastCreate, handleBroadcastListCreate, handleBroadcastListDelete, handleBroadcastSegments, handleBroadcastGet, handleBroadcastUpdate, handleBroadcastSend, handleBroadcastCancel, handleBroadcastDraftAssist, handleBroadcastTest } = lazyRoutes(() => import('./routes/broadcasts.ts'));
 import { handleScheduleCreate, handleScheduleList, handleScheduleCancel, handleFormSubmit, handleFormInbox, handleFormStatus, handleFormReply, handleApproveSend, handleApproveGet, handleApprovePost } from './routes/commercial.ts';
 const { handleBookingTypes, handleBookingSlots, handleBookingCreate, handleBookingSettingsGet, handleBookingSettingsPut, handleBookingTypesList, handleBookingTypeCreate, handleBookingTypeUpdate, handleBookingTypeDelete, handleBookingAppointments, handleBookingConfirm, handleBookingCancel, handleBookingMark } = lazyRoutes(() => import('./routes/booking.ts'));
-const { handleReviewPage, handleReviewSubmit, handleReviewsList, handleReviewApprove, handleReviewHide, handleReviewReply, handleReviewRequest } = lazyRoutes(() => import('./routes/reviews.ts'));
+const { handleReviewPage, handleReviewSubmit, handleReviewsList, handleReviewApprove, handleReviewHide, handleReviewReply, handleReviewRequest, handleReviewGoogleLink } = lazyRoutes(() => import('./routes/reviews.ts'));
 const { handleCommentsList, handleCommentCreate, handleCommentResolve, handleCommentDelete, handleTokenSections, handleTokenComment } = lazyRoutes(() => import('./routes/comments.ts'));
 import { resolveMemberSite, resolveSiteRoleCached } from './lib/workspace.ts';
 const { handleConciergeAsk } = lazyRoutes(() => import('./routes/concierge.ts'));
@@ -1083,6 +1083,7 @@ async function route_(req: Request, cors: Record<string, string>): Promise<Respo
   //    pre-auth above; these word-pathed owner routes never collide with them.
   if (route === '/reviews' && method === 'GET') return handleReviewsList(req, site, cors);
   if (route === '/reviews/request' && method === 'POST') return handleReviewRequest(req, site, principal, cors);
+  if (route === '/reviews/google-link' && method === 'POST') return handleReviewGoogleLink(req, site, principal, cors);   // item 115: the paste-once Google place id
   {
     const m = route.match(/^\/reviews\/([0-9a-f-]{36})\/(approve|hide|reply)$/);
     if (m && method === 'POST') {
