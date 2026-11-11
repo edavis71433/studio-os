@@ -186,7 +186,7 @@ function wire(){
   const add=$('add');if(add)add.addEventListener('click',invite);
   const em=$('email');if(em)em.addEventListener('keydown',(e)=>{if(e.key==='Enter'){e.preventDefault();invite();}});
   document.querySelectorAll('[data-revoke]').forEach(b=>b.addEventListener('click',()=>revoke(b.getAttribute('data-revoke'))));
-  document.querySelectorAll('[data-resend]').forEach(b=>b.addEventListener('click',async()=>{b.disabled=true;const r=await api('/portal/members','POST',{email:b.getAttribute('data-resend'),role:b.getAttribute('data-role')||'client_reviewer'});toast((r.ok&&r.body.data&&r.body.data.message)||'Invite re-sent.');b.disabled=false;}));
+  document.querySelectorAll('[data-resend]').forEach(b=>b.addEventListener('click',async()=>{b.disabled=true;const r=await api('/portal/members','POST',{email:b.getAttribute('data-resend'),resend:true});toast(r.ok?((r.body.data&&r.body.data.message)||'Sent again.'):((r.body&&r.body.message)||'That didn’t send. Try again.'));b.disabled=false;}));   // builder item 53: an invite to someone already here is refused, so resending is its own step
   document.querySelectorAll('[data-surface]').forEach(b=>b.addEventListener('click',()=>toggle(b)));
 }
 async function invite(){const e=($('email').value||'').trim();if(!e){toast('Enter their email.');return;}

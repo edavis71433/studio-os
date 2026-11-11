@@ -24,7 +24,7 @@ import { resolveAgencyMember } from '../agency/auth.ts';
 import { filterForRole, visibleTo } from '../lib/visibility.ts';
 import { svc, svcCount } from '../lib/db.ts';
 import { displayName } from '../lib/dam.ts';
-import { resolveSiteRoleCached, listSiteMembers, addSiteMember, changeSiteMemberRole, revokeSiteMember, loadShares, overrideFor, setShare, isSharedStudioSite } from '../lib/workspace.ts';
+import { resolveSiteRoleCached, listSiteMembers, addSiteMember, changeSiteMemberRole, resendSiteInvite, revokeSiteMember, loadShares, overrideFor, setShare, isSharedStudioSite } from '../lib/workspace.ts';
 import { loadThreadMarks, newestClientMessageAt, threadUnread } from '../lib/thread_reads.ts';
 import { shapeClientConversations, studioBellCount, noticeDismissible, NOTICE_ACCOUNT_KINDS, freshEnquiries, invoiceReminderIds, renderableNotices, noticeTier, noticePriority } from '../lib/inbox_feed.ts';
 import { clearNotice } from '../lib/notice.ts';
@@ -776,6 +776,12 @@ const ADD_WORDS: Record<string, [number, string]> = {
 export async function handleMemberAdd(req: Request, jwt: string, site: SiteRow, principal: Principal, cors: Record<string, string>) {
   const g = await requireManager(jwt, site, principal, cors); if (g instanceof Response) return g;
   let body: any = {}; try { body = await req.json(); } catch { /* */ }
+  if (body?.resend === true) {
+    // "Send it again": the same seat, the same role, a fresh sign-in email; nothing else changes
+    const again = await resendSiteInvite(site.id, String(body?.email || ''));
+    if (!again.ok) return again.error === 'not_found' ? json({ error: 'not_found', message: 'They aren’t on this site any more.' }, 404, cors) : json({ error: 'check_failed', message: ADD_WORDS.check_failed[1] }, 502, cors);
+    return json({ data: { ok: true, emailed: !!again.emailed, member: again.member, message: again.emailed ? `Sent ${again.member?.email || 'them'} a new sign-in link.` : 'The email didn’t send. Try again in a moment.' } }, again.emailed ? 200 : 502, cors);
+  }
   const { ownerFacts, ownerEmailsOf } = await import('../lib/site_transfer.ts');
   const ownerEmails = ownerEmailsOf(await ownerFacts(site.id).catch(() => null));
   const res = await addSiteMember(site.id, String(body?.email || ''), body?.role, principal.userId || 'owner', { restore: body?.restore === true, ownerEmails });

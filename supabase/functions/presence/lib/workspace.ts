@@ -193,6 +193,18 @@ export async function addSiteMember(siteId: string, email: string, role: SiteRol
   return { ok: true, emailed, restored: !!seat, member: row };
 }
 
+/** Send a seat's sign-in email again (builder item 53: an invite to someone already
+ *  here is refused, so "Send it again" is its own step). Only for a seat still here. */
+export async function resendSiteInvite(siteId: string, email: string): Promise<{ ok: boolean; error?: 'not_found' | 'check_failed'; emailed?: boolean; member?: SeatRow }> {
+  const clean = String(email || '').trim().toLowerCase();
+  const ex = await svc(`presence_site_members?site_id=eq.${siteId}&email=eq.${encodeURIComponent(clean)}&status=neq.revoked&select=id,email,role,status&limit=1`);
+  if (!ex.ok || !Array.isArray(ex.json)) return { ok: false, error: 'check_failed' };
+  const seat = (ex.json as SeatRow[])[0];
+  if (!seat || !isSiteRole(seat.role)) return { ok: false, error: 'not_found' };
+  const emailed = await sendSiteInvite(clean, siteId, seat.role as SiteRole).catch(() => false);
+  return { ok: true, emailed, member: seat };
+}
+
 /** Change a seat's role (builder item 53). Never touches a removed seat. */
 export async function changeSiteMemberRole(siteId: string, memberId: string, role: SiteRole): Promise<{ ok: boolean; error?: 'bad_role' | 'shared_site' | 'check_failed' | 'not_found' | 'write_failed'; member?: SeatRow }> {
   if (!isSiteRole(role)) return { ok: false, error: 'bad_role' };
