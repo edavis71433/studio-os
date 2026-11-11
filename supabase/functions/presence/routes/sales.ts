@@ -25,17 +25,19 @@ import { normalizeViews, normalizeViewList, isViewList } from '../lib/saved_view
 import { readReservedJsonOrThrow, writeReservedJson, updateReservedJson, RESERVED_NAMES } from '../lib/reserved_store.ts';
 import { normalizeStageNames, stageLabels, loadStageLabels, forgetStageLabels, renameMovedTo, DEFAULT_STAGE_LABEL, normalizeStageChances, stageChances, loadStageChances, forgetStageChances, expectedValue, DEFAULT_STAGE_CHANCE } from '../lib/stage_names.ts';
 import { validateRetainerInput, mergeRetainerState, type RetainerState } from '../commerce/retainers.ts';
-import { leftToBill, reuseDecision, retainerPaid } from '../lib/invoice_billing.ts';   // sales items 107, 108
+import { leftToBill, reuseDecision, retainerPaid, linesFromProposal } from '../lib/invoice_billing.ts';   // sales items 107, 108, 81
 import { editionFor } from '../commerce/catalog.ts';
 import type { PlanKey } from '../commerce/catalog.ts';
 import { hmacHex, timingSafeEqual } from '../../_shared/hmac.ts';
-import { signDocToken, verifyDocToken, renderDocument, type DocKind } from '../lib/documents.ts';
+import { signDocToken, verifyDocToken, renderDocument, invoiceNo, dayLabel, type DocKind } from '../lib/documents.ts';
+import { documentPdf, pdfFileName } from '../lib/doc_pdf.ts';   // sales item 82: the same documents as real PDFs
+import { docContextFor } from '../lib/doc_context.ts';   // sales item 81: from, billed to, dates, part payments
 import {
   canTransition, isStage, normalizeLineItems, canDecideProposal, contractHash,
   canSignContract, convertOutcome, clampLimit, type Stage,
   buildPaymentSchedule, depositBalanceStages, equalInstallmentStages, type StageInput,
   summarizePipeline, ALL_TIME_WINDOW_DAYS, nextStepStaleAfter,
-  splitLineItems, packLineItems, normalizeProposalMeta, proposalTotals, type ProposalMeta,
+  splitLineItems, packLineItems, normalizeProposalMeta, proposalTotals, computeProposalTotals, type ProposalMeta,
   currentProposal, flowSignGate, stageAfterSignature, callerToday, callerOffsetMinutes,
 } from '../lib/sales_lifecycle.ts';
 import {
@@ -166,6 +168,8 @@ async function docLink(kind: DocKind, id: string, siteId: string): Promise<strin
   const token = await signDocToken({ t: 'doc', k: kind, id, site_id: siteId, exp: Math.floor(Date.now() / 1000) + 90 * 86400, e: 1 }, secret);
   return docViewerUrl(token);
 }
+/** The same emailed-copy link, for the receipt a recorded payment sends (routes/invoice_payments.ts). */
+export const docLinkFor = docLink;
 
 // ── deal events (sales audit) + provenance mirror ──
 export async function dealEvent(siteId: string, dealId: string, kind: string, principal: Principal, extra: Record<string, unknown> = {}) {
@@ -688,9 +692,12 @@ export async function loadReceivables(site: SiteRow, todayYmd?: string) {
   // item 110 (K6): every open invoice, a page at a time. One read of 300 left a studio past
   // that with customers who "owe nothing" and an "Owes you" that undercounted without a word.
   // id breaks ties so pages never repeat or skip one.
+  // sales item 81: the invoice's number rides along (APPLY-0167), so Who owes you can name it.
+  // Each older shape is tried in turn, and the pages after the first keep the shape that worked.
   const page = (sel: string, off: number) => svc(`presence_invoices?site_id=eq.${site.id}&deleted_at=is.null&status=eq.open&select=${sel}&order=due_date.asc.nullslast,created_at.asc,id.asc&limit=${RECEIVABLES_PAGE}&offset=${off}`);
-  let sel = `${SEL},processing_since`;
+  let sel = `${SEL},processing_since,number`;
   let invR = await page(sel, 0);
+  if (!invR.ok) { sel = `${SEL},processing_since`; invR = await page(sel, 0); }
   if (!invR.ok) { sel = SEL; invR = await page(sel, 0); }
   // final pass (Nov 8, batch D): open invoices that couldn't be read are a failure, never an
   // empty book — Who owes you said "all paid up", the overdue report $0 and Home's Needs you
@@ -723,7 +730,7 @@ export async function loadReceivables(site: SiteRow, todayYmd?: string) {
   // page's local day when it sent ?today= (item 65), else the server's UTC day.
   // `overdue` stays for older page builds. Today re-runs the same mirrored formula
   // against the studio's local day, so its chips and the record's agree.
-  const items = invs.map((i: any) => ({ id: i.id, title: String(i.title || 'Invoice'), amount_cents: Number(i.amount_cents) || 0, due_date: i.due_date, status: 'open', processing_since: i.processing_since || null, state: moneyState(i, today), overdue: moneyState(i, today) === 'overdue', deal_id: i.deal_id || null, deal: i.deal_id ? (dealById[String(i.deal_id)] || '') : '', stripe_url: i.stripe_url || null, client_id: customerOf(i.deal_id).client_id, customer_site_id: customerOf(i.deal_id).site_id }));
+  const items = invs.map((i: any) => ({ id: i.id, number: i.number ?? null, title: String(i.title || 'Invoice'), amount_cents: Number(i.amount_cents) || 0, due_date: i.due_date, status: 'open', processing_since: i.processing_since || null, state: moneyState(i, today), overdue: moneyState(i, today) === 'overdue', deal_id: i.deal_id || null, deal: i.deal_id ? (dealById[String(i.deal_id)] || '') : '', stripe_url: i.stripe_url || null, client_id: customerOf(i.deal_id).client_id, customer_site_id: customerOf(i.deal_id).site_id }));
   const paid = paidRows.map((i: any) => ({ id: i.id, title: String(i.title || 'Invoice'), amount_cents: Number(i.amount_cents) || 0, status: 'paid', state: 'paid', paid_at: i.paid_at, deal_id: i.deal_id || null, deal: i.deal_id ? (dealById[String(i.deal_id)] || '') : '' }));
   const buckets = moneyBuckets([...items, ...paid], today);
   // total_cents = what is still WAITING on a client (upcoming + overdue) — a
@@ -975,7 +982,8 @@ export async function handleSalesDeal(req: Request, site: SiteRow, principal: Pr
   if (req.method === 'GET') {
     const stageNamesP = loadStageLabels(site.id).catch(() => null);   // item 38 names; batch B: read with the others, not after
     const [contact, proposals, contracts, events, invoices, estimates, recurring, paidEvents] = await Promise.all([
-      deal.contact_id ? svc(`presence_contacts?id=eq.${deal.contact_id}&site_id=eq.${site.id}&select=id,name,email,phone,company,notes&limit=1`) : Promise.resolve({ json: [] }),
+      // sales item 81: the address their invoices print — the contact's own (item 89's column), when it is there
+      deal.contact_id ? svc(`presence_contacts?id=eq.${deal.contact_id}&site_id=eq.${site.id}&select=id,name,email,phone,company,notes,address&limit=1`).then((r) => r.ok ? r : svc(`presence_contacts?id=eq.${deal.contact_id}&site_id=eq.${site.id}&select=id,name,email,phone,company,notes&limit=1`)) : Promise.resolve({ json: [] }),
       // first_viewed_at/expires_at land with migration 0107 — tolerant fetch so the
       // proposals list never disappears if a deploy is ahead of the migration.
       (async () => { let r = await svc(`presence_proposals?deal_id=eq.${id}&site_id=eq.${site.id}&deleted_at=is.null&select=id,title,line_items,subtotal_cents,currency,status,version,sent_at,decided_at,first_viewed_at,expires_at&order=created_at.desc`); if (!r.ok) r = await svc(`presence_proposals?deal_id=eq.${id}&site_id=eq.${site.id}&deleted_at=is.null&select=id,title,line_items,subtotal_cents,currency,status,version,sent_at,decided_at&order=created_at.desc`); return r; })(),
@@ -989,7 +997,8 @@ export async function handleSalesDeal(req: Request, site: SiteRow, principal: Pr
       // processing_since lands with migration 0132 — tolerant fetch (same posture
       // as the proposals read above) so the record's Billing tab never blanks.
       // item 107: recurring_id rides along (0145) so the record can tell what's left of the proposal
-      (async () => { let r = await svc(`presence_invoices?deal_id=eq.${id}&site_id=eq.${site.id}&deleted_at=is.null&select=id,title,amount_cents,purpose,status,stripe_url,due_date,paid_at,created_at,processing_since,recurring_id&order=due_date.asc.nullsfirst,created_at.asc`); if (!r.ok) r = await svc(`presence_invoices?deal_id=eq.${id}&site_id=eq.${site.id}&deleted_at=is.null&select=id,title,amount_cents,purpose,status,stripe_url,due_date,paid_at,created_at,processing_since&order=due_date.asc.nullsfirst,created_at.asc`); if (!r.ok) r = await svc(`presence_invoices?deal_id=eq.${id}&site_id=eq.${site.id}&deleted_at=is.null&select=id,title,amount_cents,purpose,status,stripe_url,due_date,paid_at,created_at&order=due_date.asc.nullsfirst,created_at.asc`); return r; })(),
+      // sales items 77 and 81: the invoice's number and how a recorded payment came in (APPLY-0167)
+      (async () => { let r = await svc(`presence_invoices?deal_id=eq.${id}&site_id=eq.${site.id}&deleted_at=is.null&select=id,title,amount_cents,purpose,status,stripe_url,due_date,paid_at,created_at,processing_since,recurring_id,number,paid_method,paid_note,payment_for&order=due_date.asc.nullsfirst,created_at.asc`); if (!r.ok) r = await svc(`presence_invoices?deal_id=eq.${id}&site_id=eq.${site.id}&deleted_at=is.null&select=id,title,amount_cents,purpose,status,stripe_url,due_date,paid_at,created_at,processing_since,recurring_id&order=due_date.asc.nullsfirst,created_at.asc`); if (!r.ok) r = await svc(`presence_invoices?deal_id=eq.${id}&site_id=eq.${site.id}&deleted_at=is.null&select=id,title,amount_cents,purpose,status,stripe_url,due_date,paid_at,created_at,processing_since&order=due_date.asc.nullsfirst,created_at.asc`); if (!r.ok) r = await svc(`presence_invoices?deal_id=eq.${id}&site_id=eq.${site.id}&deleted_at=is.null&select=id,title,amount_cents,purpose,status,stripe_url,due_date,paid_at,created_at&order=due_date.asc.nullsfirst,created_at.asc`); return r; })(),
       // item 47: the deal's estimates and recurring invoices — both [] before APPLY-0145
       import('./estimates.ts').then((m) => m.estimatesForDeal(site.id, id)).catch(() => []),
       import('./recurring_invoices.ts').then((m) => m.recurringForDeal(site.id, id)).catch(() => []),
@@ -1383,24 +1392,42 @@ async function emailSalesFlow(siteId: string, dealId: string, url: string | null
 
 /** Email the customer their invoice/deposit pay link, on the studio's brand. Best-effort.
  *  `note` (item 47) is one plain sentence under the first line — a recurring
- *  invoice says which one it is and when it's due. */
+ *  invoice says which one it is and when it's due.
+ *  Sales item 81: it greets the person by their first name, gives the invoice its
+ *  number and says when it's due; item 82: the invoice goes with it as a PDF. */
 export async function emailInvoice(siteId: string, dealId: string, title: string, url: string, amountCents: number, invoiceId?: string, note?: string): Promise<boolean> {
   try {
     const deal = rows(await svc(`presence_deals?id=eq.${dealId}&site_id=eq.${siteId}&select=contact_id&limit=1`))[0];
-    const email = deal?.contact_id ? rows(await svc(`presence_contacts?id=eq.${deal.contact_id}&site_id=eq.${siteId}&select=email&limit=1`))[0]?.email : '';
+    const contact = deal?.contact_id ? rows(await svc(`presence_contacts?id=eq.${deal.contact_id}&site_id=eq.${siteId}&select=name,email&limit=1`))[0] : null;
+    const email = contact?.email || '';
     if (!email) return false;
     const brand = await loadEmailBrand(siteId);
-    const amount = '$' + (amountCents / 100).toLocaleString('en-US', { minimumFractionDigits: 2 });
+    const amount = '$' + (amountCents / 100).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    const escH = (t: string) => t.replace(/[&<>"]/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[ch] as string));
     const btn = `<a href="${url}" style="display:inline-block;margin-top:6px;background:${brand.accent};color:#fff;padding:9px 16px;border-radius:999px;text-decoration:none">Pay ${amount} securely →</a>`;
-    // Operator-typed title → escape it (it lands inside HTML) and mind the article.
-    const safeTitle = title.replace(/[&<>"]/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[ch] as string));
-    const article = /^[aeiou]/i.test(title) ? 'an' : 'a';
+    // the invoice as its page prints it: number, due date, lines, both addresses
+    const row = invoiceId ? await docRow('invoice', invoiceId, siteId).catch(() => null) : null;
+    const no = invoiceNo(row?.number);
+    const ctx = row ? await docContextFor(siteId, 'invoice', row).catch(() => null) : null;
+    const due = row?.due_date ? `due ${dayLabel(row.due_date, ctx?.tz)}` : 'due on receipt';
+    const isDeposit = row?.purpose === 'deposit' || /^deposit/i.test(title);
+    const who = brand.name && brand.name !== EMAIL_BRAND_DEFAULT.name ? escH(brand.name) : 'Your studio';
+    const first = firstNameOf(contact?.name);
+    const what = (isDeposit ? `a deposit request${no ? ' ' + no : ''}` : (no ? `invoice ${no}` : 'an invoice')) + (title && !/^(invoice|deposit)$/i.test(title.trim()) ? ` (${escH(title)})` : '');
     // A branded, printable copy of the invoice (a keepable record alongside the pay link).
     const doc = invoiceId ? await docLink('invoice', invoiceId, siteId) : null;
-    const docLine = doc ? `<p style="margin-top:6px"><a href="${doc}" style="color:${brand.accentDark}">View / print your copy →</a></p>` : '';
-    const noteLine = note ? `<p>${note.replace(/[&<>"]/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[ch] as string))}</p>` : '';
-    return await sendEmail(String(email), `${title} — ${amount}`, `<p>Your studio has sent you ${article} ${safeTitle.replace(/^[^—]*/, (w) => w.toLowerCase())} for <strong>${amount}</strong>. You can pay securely here — nothing else needed.</p>${noteLine}<p class="cta">${btn}</p>${docLine}`, brand, { critical: true, siteId });   // a payment link = transactional; their answer lands in the Inbox
+    const docLine = doc ? `<p style="margin-top:6px">The ${isDeposit ? 'request' : 'invoice'} is attached as a PDF. <a href="${doc}" style="color:${brand.accentDark}">View it online →</a></p>` : '';
+    const noteLine = note ? `<p>${escH(note)}</p>` : '';
+    const pdf = row ? (() => { try { const { deal_id: _d, ...data } = row; return documentPdf('invoice', data, brand, ctx); } catch { return null; } })() : null;
+    return await sendEmail(String(email), `${title}${no ? ' ' + no : ''} — ${amount}`,
+      `<p>${first ? `Hi ${escH(first)},` : 'Hi there,'}</p><p>${who} has sent you ${what} for <strong>${amount}</strong>, ${due}. You can pay securely here — nothing else needed.</p>${noteLine}<p class="cta">${btn}</p>${docLine}`,
+      brand, { critical: true, siteId, ...(pdf ? { attachments: [{ filename: pdfFileName('invoice', row), content: pdf }] } : {}) });   // a payment link = transactional; their answer lands in the Inbox
   } catch { return false; }
+}
+/** The first name a greeting uses: the first word of the name, if it reads as one. Pure. */
+export function firstNameOf(name: unknown): string {
+  const w = String(name || '').trim().split(/\s+/)[0] || '';
+  return /^[\p{L}][\p{L}'’.-]{0,30}$/u.test(w) ? w : '';
 }
 
 /** Turn a deal (its accepted proposal, or an explicit amount) into a payable invoice
@@ -1421,16 +1448,30 @@ export async function handleSalesInvoice(req: Request, site: SiteRow, principal:
   // on the deal, a deposit included, comes off first. It used to bill the whole
   // total again, or quietly re-send an older open invoice instead.
   let fromProposal: { total_cents: number; billed_cents: number; left_cents: number } | null = null;
+  let lines: Array<{ label: string; qty: number; amount_cents: number }> | null = null;   // sales item 81
   if (amountCents === null && !typed) {
     const prop = rows(await svc(`presence_proposals?deal_id=eq.${dealId}&site_id=eq.${site.id}&status=eq.accepted&deleted_at=is.null&select=line_items,subtotal_cents&order=decided_at.desc&limit=1`))[0];
     if (prop) {
-      const billedQ = (cols: string) => svc(`presence_invoices?deal_id=eq.${dealId}&site_id=eq.${site.id}&deleted_at=is.null&status=in.(open,paid)&select=${cols}&limit=500`);
-      let ir = await billedQ('amount_cents,status,recurring_id');
+      const billedQ = (cols: string) => svc(`presence_invoices?deal_id=eq.${dealId}&site_id=eq.${site.id}&deleted_at=is.null&status=in.(open,paid)&select=${cols}&order=created_at.asc&limit=500`);
+      let ir = await billedQ('id,amount_cents,status,recurring_id,title,purpose,number,payment_for');
+      if (!ir.ok) ir = await billedQ('id,amount_cents,status,recurring_id,title,purpose');   // before APPLY-0167
       if (!ir.ok) ir = await billedQ('amount_cents,status');   // before APPLY-0145
       if (!ir.ok) return json({ error: 'read_failed', message: 'We couldn’t check what’s already billed on this deal, so nothing was sent. Try again.' }, 502, cors);
       fromProposal = leftToBill(proposalTotals(prop.line_items).total_cents, rows(ir));
       if (fromProposal.billed_cents > 0 && fromProposal.left_cents < 50) return json({ error: 'fully_billed', message: `The accepted proposal (${usd2(fromProposal.total_cents)}) is already billed in full. Enter an amount to bill something else.` }, 422, cors);
       amountCents = fromProposal.left_cents;
+      // sales item 81: the invoice carries the proposal's lines, and what was billed before
+      // comes off by name ("Less deposit #0012"); a part payment counts with its invoice
+      const before = rows(ir).filter((i: any) => !i.recurring_id);
+      const part = new Map<string, number>();
+      for (const i of before) if (i.payment_for) part.set(String(i.payment_for), (part.get(String(i.payment_for)) || 0) + (Number(i.amount_cents) || 0));
+      const billed = before.filter((i: any) => !i.payment_for || !before.some((x: any) => String(x.id) === String(i.payment_for))).map((i: any) => ({
+        label: `${i.purpose === 'deposit' ? 'deposit' : 'invoice'}${i.number ? ' ' + invoiceNo(i.number) : ''}${i.title && !/^(deposit|invoice)$/i.test(String(i.title).trim()) && !i.payment_for ? ` (${String(i.title).slice(0, 60)})` : ''}`,
+        amount_cents: (Number(i.amount_cents) || 0) + (part.get(String(i.id)) || 0),
+      }));
+      const { items, meta } = splitLineItems(prop.line_items);
+      lines = linesFromProposal(items, computeProposalTotals(items, meta), meta, billed);
+      if (lines.reduce((n, l) => n + l.amount_cents, 0) !== amountCents) lines = null;   // never lines that disagree with the amount
     }
   }
   if (!amountCents || amountCents < 50) return json({ error: 'validation', message: 'Enter an amount to invoice (or accept a proposal first).' }, 422, cors);
@@ -1465,8 +1506,13 @@ export async function handleSalesInvoice(req: Request, site: SiteRow, principal:
     if (decision === 'ask') return json({ error: 'already_open', open_invoice: inv, amount_cents: amountCents, message: `There's already an open ${what} for ${usd2(inv.amount_cents)} on this deal, and it was sent. Resend that one, or send another.` }, 409, cors);
   }
   if (!inv) {
-    const ins = await svc('presence_invoices', { method: 'POST', headers: { Prefer: 'return=representation' },
-      body: JSON.stringify({ site_id: site.id, deal_id: dealId, customer_client_id: deal.converted_client_id || null, customer_site_id: deal.converted_site_id || null, title, description, amount_cents: amountCents, currency: 'usd', purpose, status: 'open', due_date: dueDate, created_by: principal.email || principal.userId || 'system' }) });
+    const newRow: Record<string, unknown> = { site_id: site.id, deal_id: dealId, customer_client_id: deal.converted_client_id || null, customer_site_id: deal.converted_site_id || null, title, description, amount_cents: amountCents, currency: 'usd', purpose, status: 'open', due_date: dueDate, created_by: principal.email || principal.userId || 'system' };
+    if (lines && lines.length > 1) newRow.lines = lines;
+    let ins = await svc('presence_invoices', { method: 'POST', headers: { Prefer: 'return=representation' }, body: JSON.stringify(newRow) });
+    if (!ins.ok && 'lines' in newRow && missingInsertColumns(ins.json, ins.text, ['lines']).length) {   // before APPLY-0167: the invoice, without its lines
+      delete newRow.lines;
+      ins = await svc('presence_invoices', { method: 'POST', headers: { Prefer: 'return=representation' }, body: JSON.stringify(newRow) });
+    }
     inv = rows(ins)[0];
     if (!inv) return json({ error: 'write_failed', message: 'That invoice didn’t save — please try again.' }, 502, cors);
   }
@@ -2269,6 +2315,12 @@ export async function handleSalesContractSign(req: Request, id: string, cors: Re
       // content_hash + evidence, rendered as a certificate) they can save as PDF.
       const doc = await docLink('contract', id, tok.site_id);
       const docLine = doc ? `<p style="margin:12px 0 0"><a href="${doc}" style="color:${brand.accentDark}">View / print your copy →</a></p>` : '';
+      // sales item 82: the signed agreement goes with it as a PDF, a copy that outlives any link
+      let signedPdf: { filename: string; content: Uint8Array } | null = null;
+      try {
+        const row = await docRow('contract', id, tok.site_id);
+        if (row && row.status === 'signed') { const ctx = await docContextFor(tok.site_id, 'contract', row); const { deal_id: _d, ...data } = row; signedPdf = { filename: pdfFileName('contract', row), content: documentPdf('contract', data, brand, ctx) }; }
+      } catch { signedPdf = null; }
       // Signature certificate: name · timestamp (UTC) · document fingerprint —
       // only facts this request already holds; deliberately no IP or device data.
       copyEmailed = await sendEmail(to, `Your signed copy — ${c.title || 'Service agreement'}`,
@@ -2279,8 +2331,8 @@ export async function handleSalesContractSign(req: Request, id: string, cors: Re
         `Signed by: <strong>${escHtml(signerName)}</strong><br>` +
         `Signed at: ${signedAt.slice(0, 19).replace('T', ' ')} UTC<br>` +
         `Document fingerprint: <span style="font-family:ui-monospace,Menlo,Consolas,monospace;overflow-wrap:anywhere">${String(c.content_hash || '')}</span></div>` +
-        docLine,
-        brand, { critical: true, siteId: tok.site_id }).catch(() => false);   // their signed legal record = transactional; their answer lands in the Inbox
+        docLine + (signedPdf ? `<p style="font-size:13px;color:#6b6478;margin:8px 0 0">The signed agreement is attached as a PDF.</p>` : ''),
+        brand, { critical: true, siteId: tok.site_id, ...(signedPdf ? { attachments: [signedPdf] } : {}) }).catch(() => false);   // their signed legal record = transactional; their answer lands in the Inbox
     }
   } catch { /* the signature stands; the copy email is best-effort */ }
 
@@ -2372,34 +2424,43 @@ export async function handleSalesPublicView(req: Request, token: string, cors: R
 export async function handleSalesDocument(req: Request, token: string, cors: Record<string, string>): Promise<Response> {
   const htmlResp = (body: string, status = 200) => new Response(body, { status, headers: { ...cors, 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store', 'X-Robots-Tag': 'noindex, nofollow', 'Referrer-Policy': 'no-referrer' } });
   const errPage = (msg: string) => `<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Document unavailable</title><div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;max-width:520px;margin:80px auto;padding:0 20px;color:#1b1525;text-align:center"><h1 style="font-weight:500">This document link isn’t working</h1><p style="color:#6b6478">${msg}</p></div>`;
-  if (!(await rateAllow(`sales_doc:${clientIp(req)}`, 60, 60))) return htmlResp(errPage('Too many requests — try again in a moment.'), 429);
+  // Sales item 82: ?format=pdf answers the same document as a real PDF file
+  const asPdf = new URL(req.url).searchParams.get('format') === 'pdf';
+  const errResp = (msg: string, status: number) => asPdf ? json({ error: 'unavailable', message: msg }, status, cors) : htmlResp(errPage(msg), status);
+  if (!(await rateAllow(`sales_doc:${clientIp(req)}`, 60, 60))) return errResp('Too many requests — try again in a moment.', 429);
   const secret = linkSecret();
-  if (!secret) return htmlResp(errPage('This link isn’t available right now.'), 503);
+  if (!secret) return errResp('This link isn’t available right now.', 503);
   const tok = await verifyDocToken(token, secret, Math.floor(Date.now() / 1000));
-  if (!tok) return htmlResp(errPage('It may have expired — ask your studio for a fresh copy. Nothing is lost.'), 403);
+  if (!tok) return errResp('It may have expired — ask your studio for a fresh copy. Nothing is lost.', 403);
   let brand: { name: string; accent: string; accentDark: string } | undefined;
   try { brand = await loadEmailBrand(tok.site_id); } catch { /* neutral default in the renderer */ }
-  if (tok.k === 'proposal') {
-    const p = rows(await svc(`presence_proposals?id=eq.${tok.id}&site_id=eq.${tok.site_id}&deleted_at=is.null&select=id,title,line_items,subtotal_cents,currency,terms,status,sent_at,decided_at&limit=1`))[0];
-    if (!p) return htmlResp(errPage('This proposal is no longer available.'), 404);
-    return htmlResp(renderDocument('proposal', p, brand));
+  const row = await docRow(tok.k, tok.id, tok.site_id);
+  if (!row) return errResp(`This ${tok.k === 'contract' ? 'agreement' : tok.k} is no longer available.`, 404);
+  // Item 69: the copy linked from the invoice EMAIL (e: 1) counts as the client opening
+  // it; the drawer's own Open/print link never does, nor does fetching its PDF.
+  if (tok.k === 'invoice' && tok.e === 1 && !asPdf) await firstOpen('presence_invoices', tok.id, tok.site_id, row.deal_id, row.purpose === 'deposit' ? 'deposit' : 'invoice');
+  const pdfName = pdfFileName(tok.k, row);
+  const ctx = await docContextFor(tok.site_id, tok.k, row, { pdfUrl: `${fnBase()}/functions/v1/presence/sales/doc/${encodeURIComponent(token)}?format=pdf`, pdfName });
+  const { deal_id: _deal, ...data } = row;
+  if (asPdf) {
+    return new Response(documentPdf(tok.k, data, brand, ctx), { status: 200, headers: { ...cors, 'Content-Type': 'application/pdf', 'Content-Disposition': `attachment; filename="${pdfName}"`, 'Cache-Control': 'no-store', 'X-Robots-Tag': 'noindex, nofollow' } });
   }
-  if (tok.k === 'estimate') {   // item 47
-    const e = rows(await svc(`presence_estimates?id=eq.${tok.id}&site_id=eq.${tok.site_id}&deleted_at=is.null&select=id,title,line_items,subtotal_cents,currency,terms,status,sent_at,expires_at,decided_at&limit=1`))[0];
-    if (!e) return htmlResp(errPage('This estimate is no longer available.'), 404);
-    return htmlResp(renderDocument('estimate', e, brand));
+  return htmlResp(renderDocument(tok.k, data, brand, ctx));
+}
+
+/** One document's row, site-scoped, with the columns its page prints. Sales item 81's
+ *  columns (number, how it was paid, its lines) first; before APPLY-0167 the old shape. */
+export async function docRow(kind: DocKind, id: string, siteId: string): Promise<any | null> {
+  if (!UUID_RE.test(id)) return null;
+  const one = async (path: string) => { const r = await svc(path); return r.ok ? (rows(r)[0] || null) : undefined; };
+  if (kind === 'proposal') return (await one(`presence_proposals?id=eq.${id}&site_id=eq.${siteId}&deleted_at=is.null&select=id,deal_id,title,line_items,subtotal_cents,currency,terms,status,sent_at,decided_at&limit=1`)) || null;
+  if (kind === 'estimate') return (await one(`presence_estimates?id=eq.${id}&site_id=eq.${siteId}&deleted_at=is.null&select=id,deal_id,title,line_items,subtotal_cents,currency,terms,status,sent_at,expires_at,decided_at&limit=1`)) || null;
+  if (kind === 'invoice') {
+    const base = 'id,deal_id,title,description,amount_cents,currency,purpose,status,stripe_url,due_date,paid_at,created_at';
+    const full = await one(`presence_invoices?id=eq.${id}&site_id=eq.${siteId}&deleted_at=is.null&select=${base},number,paid_method,paid_note,payment_for,lines&limit=1`);
+    return full !== undefined ? full : ((await one(`presence_invoices?id=eq.${id}&site_id=eq.${siteId}&deleted_at=is.null&select=${base}&limit=1`)) || null);
   }
-  if (tok.k === 'invoice') {
-    const { deal_id: invDeal, ...v } = rows(await svc(`presence_invoices?id=eq.${tok.id}&site_id=eq.${tok.site_id}&deleted_at=is.null&select=id,deal_id,title,description,amount_cents,currency,purpose,status,stripe_url,due_date,paid_at,created_at&limit=1`))[0] || {} as any;
-    if (!v.id) return htmlResp(errPage('This invoice is no longer available.'), 404);
-    // Item 69: the copy linked from the invoice EMAIL (e: 1) counts as the client opening
-    // it; the drawer's own Open/print link never does.
-    if (tok.e === 1) await firstOpen('presence_invoices', tok.id, tok.site_id, invDeal, v.purpose === 'deposit' ? 'deposit' : 'invoice');
-    return htmlResp(renderDocument('invoice', v, brand));
-  }
-  const c = rows(await svc(`presence_contracts?id=eq.${tok.id}&site_id=eq.${tok.site_id}&deleted_at=is.null&select=id,title,body,content_hash,status,signer_name,signer_email,signed_at,signed_evidence,sent_at,created_at&limit=1`))[0];
-  if (!c) return htmlResp(errPage('This agreement is no longer available.'), 404);
-  return htmlResp(renderDocument('contract', c, brand));
+  return (await one(`presence_contracts?id=eq.${id}&site_id=eq.${siteId}&deleted_at=is.null&select=id,deal_id,title,body,content_hash,status,signer_name,signer_email,signed_at,signed_evidence,sent_at,created_at&limit=1`)) || null;
 }
 
 // ═══ DOCUMENT LINK (authed) — mint the printable document URL for the CRM ════
@@ -2415,7 +2476,8 @@ export async function handleSalesDocumentLink(site: SiteRow, kind: DocKind, id: 
   const exists = rows(await svc(`${DOC_TABLE[kind]}?id=eq.${id}&site_id=eq.${site.id}&deleted_at=is.null&select=id&limit=1`))[0];
   if (!exists) return json({ error: 'not_found', message: 'That document isn’t here.' }, 404, cors);
   const token = await signDocToken({ t: 'doc', k: kind, id, site_id: site.id, exp: Math.floor(Date.now() / 1000) + 30 * 86400 }, secret);
-  return json({ url: docViewerUrl(token) }, 200, cors);
+  // sales item 82: the same document as a PDF (the record's PDF button downloads it)
+  return json({ url: docViewerUrl(token), pdf_url: `${fnBase()}/functions/v1/presence/sales/doc/${encodeURIComponent(token)}?format=pdf` }, 200, cors);
 }
 
 // ═══ CONVERT TO CUSTOMER (idempotent) ═══

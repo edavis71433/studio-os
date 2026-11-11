@@ -116,7 +116,7 @@ const change = (id, body) => RI.handleRecurringChange(req('PATCH', `/sales/recur
   ok('2: its own pay link, for this invoice', v.stripe_url === `https://pay.example.test/${v.id}` && stripe.filter((x) => x.path === '/v1/payment_links').length === 1 && stripe.find((x) => x.path === '/v1/payment_links').idem === `plink-${v.id}`);
   const m = mail[0];
   ok('2: one email to the client, the usual invoice email', mail.length === 1 && m.to === 'riley@example.org' && m.subject === `${v.title} — $500.00` && /Pay \$500\.00 securely/.test(m.html) && m.html.includes(`https://pay.example.test/${v.id}`));
-  ok('2: the first line keeps the month\'s capital ("a website care — December 2026")', m.html.includes(`sent you a ${v.title.replace(/^[^—]*/, (w) => w.toLowerCase())} for`) && /— [A-Z][a-z]+ \d{4} for/.test(m.html), m.html.slice(0, 300));
+  ok('2: the first line keeps the month\'s capital ("an invoice (Website care — December 2026)", sales item 81)', m.html.includes(`(${v.title}) for`) && /— [A-Z][a-z]+ \d{4}\) for/.test(m.html), m.html.slice(0, 300));
   ok('2: it says which invoice it is and when it\'s due', m.html.includes(`This is your monthly invoice for Website care. It’s due ${R.dayLabel(day(14))}.`), m.html.slice(0, 400));
   ok('2: their reply comes back to the Inbox', m.reply_to === `${SITE}@reply.example.com`);
   const sent = events('invoice_sent')[0];
