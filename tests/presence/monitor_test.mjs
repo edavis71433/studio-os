@@ -250,6 +250,10 @@ if (SB && SR && ANON) {
   ok('guard: loopback, private and local addresses are refused', await refused('http://127.0.0.1/') && await refused('http://10.0.0.5/') && await refused('http://192.168.1.1/') && await refused('http://printer.local/') && await refused('http://[::1]/'));
   seen.length = 0;
   ok('guard: a public site redirecting to a private address is refused at the hop', await refused('https://example.com/jump') && seen.length === 1);
+  ok('guard: the metadata and loopback addresses written as IPv6 are refused', await refused('http://[::ffff:169.254.169.254]/latest/meta-data/') && await refused('http://[::ffff:7f00:1]/') && await refused('http://[64:ff9b::a9fe:a9fe]/'));
+  seen.length = 0;
+  const hop6 = (u) => { seen.push(u); return Promise.resolve(new Response(null, { status: 302, headers: { location: 'http://[::ffff:a9fe:a9fe]/latest/meta-data/' } })); };
+  ok('guard: a redirect to the metadata address written as IPv6 is refused at the hop', await (async () => { try { await fetchPublicPage('https://example.com/', {}, noDns, hop6); return false; } catch { return true; } })() && seen.length === 1);
   ok('guard: a public site is fetched', (await (await fetchPublicPage('https://example.com/', {}, noDns, fake)).text()) === '<html>ok</html>');
   const routes = Deno.readTextFileSync(new URL('../../supabase/functions/presence/routes/monitor.ts', import.meta.url));
   ok('connect: the address is checked before any fetch, and only the homepage is read', routes.indexOf('await assertPublicHttpUrl(clean)') > 0 && routes.indexOf('await assertPublicHttpUrl(clean)') < routes.indexOf('fetchExternalSite(clean, { homeOnly: true })'));
