@@ -7,6 +7,9 @@
 // menu. Item 135 (Nov 10): + New site makes a site from a business name and,
 // if picked, a starter kit, with nobody emailed; Invite the owner is the later
 // step that gives the owner a login and makes them a customer.
+// Item 154 (Nov 10): Move to trash takes a site offline and into the Trash
+// at the foot of the page for 90 days (lib/site_trash.ts), where one press
+// restores it; ops/site_trash.ts deletes it for good after that.
 //
 // Where each fact comes from. Nothing new is stored but the pins:
 //   • the rows, names, tags and last changes: the portfolio gather (routes.ts), so
@@ -30,7 +33,7 @@ import type { Principal } from '../../_shared/auth.ts';
 import { buildPortfolio, filterPortfolio } from './portfolio.ts';
 import type { PortfolioInput } from './portfolio.ts';
 import { daysBetween, DOMAIN_SOON_DAYS, PADLOCK_SOON_DAYS, PADLOCK_STUCK_HOURS } from './needs_you.ts';
-import { registryWarnings, sameCompany } from '../lib/rdap.ts';
+import { registryWarnings, sameCompany, whereToGo } from '../lib/rdap.ts';
 import { DOWN_THRESHOLD } from '../monitor/heartbeat.ts';
 import { readReservedJson, updateReservedJson, writeReservedJson, RESERVED_NAMES } from '../lib/reserved_store.ts';
 import { siteOrigin, hostedName, SITE_COLS } from '../lib/site.ts';
@@ -49,6 +52,9 @@ import { writeChangeEvent } from '../lib/provenance.ts';
 import { kitFromSite, applyKitTo, layoutFromSite } from './kit_io.ts';
 import type { KitPayload } from '../lib/kits.ts';
 import { UUID_LOWER_RE as UUID_RE } from '../lib/uuid.ts';
+import { buildTrash, TRASH_DAYS, goesAt } from '../lib/site_trash.ts';
+import type { TrashLink } from '../lib/site_trash.ts';
+import { takeSiteOffline } from '../routes/publish.ts';
 import { normalizeCopied } from '../lib/site_layout.ts';
 import { keepCopied } from '../lib/copied_record.ts';
 import { claimPortfolioSite } from '../lib/connect_requests.ts';
@@ -460,11 +466,33 @@ export function normalizeDomainNotes(raw: unknown): DomainNotes {
   };
 }
 const RECORD_TYPES = ['A', 'AAAA', 'CNAME', 'MX', 'TXT'] as const;   // the order the panel lists them in
+
+/** Pure: mail on the domain in one line (review domains finding 23), from its MX and TXT
+ *  records and the _dmarc name's TXT. */
+export function mailHealth(mx: string[], txt: string[], dmarcTxt: string[]) {
+  const spf = txt.some((v) => /^v=spf1\b/i.test(v)), dmarc = dmarcTxt.some((v) => /^v=dmarc1\b/i.test(v));
+  const missing = [!spf && 'no SPF record', !dmarc && 'no DMARC record'].filter(Boolean) as string[];
+  return { has_mail: mx.length > 0, spf, dmarc,
+    words: !mx.length ? 'No email runs on this domain.' : !missing.length ? 'Email runs here and is protected: SPF and DMARC are both set.' : `Email runs here but isn’t fully protected: ${missing.join(' and ')}.` };
+}
+const RUNG_WORDS: Record<string, string> = { '30': '30-day', '15': '15-day', '7': '7-day', '1': '1-day', expired: 'After-expiry' };
+/** Pure: the domain's story, newest first (finding 23): attached, changed, removed and by
+ *  whom, and each expiry reminder that went out. */
+export function domainHistory(events: Array<{ action?: string; summary?: string; actor_kind?: string; created_at?: string }>, reminders: Array<{ period?: string; created_at?: string }>, own: boolean) {
+  const who = (k?: string) => k === 'system' ? 'automatically' : k === 'operator' ? 'by your studio' : k === 'staff' ? 'by Studio OS' : own ? 'by your studio' : 'by the client';
+  const out: Array<{ at: string; words: string }> = [];
+  for (const e of events) if (e.created_at && e.summary) out.push({ at: e.created_at, words: `${e.summary}, ${who(e.actor_kind)}` });
+  for (const n of reminders) {
+    const rung = String(n.period || '').split(':').pop() || '';
+    if (n.created_at && RUNG_WORDS[rung]) out.push({ at: n.created_at, words: `${RUNG_WORDS[rung]} reminder sent${own ? '' : ' to the client and you'}` });
+  }
+  return out.sort((a, b) => (a.at < b.at ? 1 : a.at > b.at ? -1 : 0)).slice(0, 8);
+}
 /** Everything the side panel shows for one domain: the row, the registry's facts, the
  *  checklist, every record live (finding 24: the client's card stops at six), and the notes. */
 async function domainDetail(siteId: string, nowIso: string) {
   const row = rowsOf<DomainIn & { id: string; domain_registered_name?: string | null; netlify_site_id?: string | null }>(
-    await svc(`presence_sites?id=eq.${siteId}&select=${DOMAIN_COLS},edition,status,last_published_at,custom_domain,domain_registrar,domain_expires_at,domain_registered_name&limit=1`).catch(() => ({ ok: false, json: [] })))[0];
+    await svc(`presence_sites?id=eq.${siteId}&select=${DOMAIN_COLS},edition,status,last_published_at,custom_domain,domain_registrar,domain_expires_at,domain_registered_name&limit=1`).catch(() => ({ ok: false, json: [] })))[0];   // client_id comes with EXTRA_COLS
   if (!row || !row.custom_domain) return null;
   const ident = rowsOf<{ business_name?: string }>(await svc(`presence_identity?site_id=eq.${siteId}&select=business_name&limit=1`).catch(() => ({ ok: false, json: [] })))[0];
   const built = buildDomains([{ ...row, site_id: siteId, name: String(ident?.business_name || 'This site') }], nowIso).domains[0];
@@ -474,9 +502,20 @@ async function domainDetail(siteId: string, nowIso: string) {
   await Promise.all(names.flatMap((n) => RECORD_TYPES.map(async (t) => { for (const v of await dnsRecords(n, t)) records.push({ name: n, type: t, value: v }); })));
   records.sort((a, b) => a.name.localeCompare(b.name) || RECORD_TYPES.indexOf(a.type as typeof RECORD_TYPES[number]) - RECORD_TYPES.indexOf(b.type as typeof RECORD_TYPES[number]) || a.value.localeCompare(b.value));
   const statuses = Array.isArray(row.domain_statuses) ? row.domain_statuses : [];
+  // item 162 (finding 23): mail on the registered name, and the domain's story
+  const bare = row.domain_registered_name || (row.custom_domain.startsWith('www.') ? row.custom_domain.slice(4) : row.custom_domain);
+  const clientId = (row as { client_id?: string | null }).client_id || null;
+  const [mx, txt, dmarcTxt, evQ, ntQ] = await Promise.all([
+    dnsRecords(bare, 'MX'), dnsRecords(bare, 'TXT'), dnsRecords(`_dmarc.${bare}`, 'TXT'),
+    svc(`presence_change_events?site_id=eq.${siteId}&entity_type=eq.domain&select=action,summary,actor_kind,created_at&order=created_at.desc&limit=6`).catch(() => ({ ok: false, json: [] })),
+    clientId ? svc(`presence_plan_notices?client_id=eq.${encodeURIComponent(clientId)}&kind=eq.domain_expiry&period=like.${encodeURIComponent(`exp:${row.custom_domain}:%`)}&select=period,created_at&order=created_at.desc&limit=6`).catch(() => ({ ok: false, json: [] })) : Promise.resolve({ ok: true, json: [] }),
+  ]);
   return {
     ...built,
     dns_host_full: row.domain_dns_host || '',   // the row's dns_host is blank when it's the seller; the panel names it either way
+    where: whereToGo(row.domain_registrar, row.domain_dns_host),   // findings 6 and 7: records at the DNS company, renewal at the seller (not `provider`: the row's seller name)
+    mail: mailHealth(mx, txt, dmarcTxt),
+    history: domainHistory(rowsOf(evQ), rowsOf(ntQ), built.own === true),
     statuses, all_checks: Array.isArray(row.domain_checks) ? row.domain_checks : [],
     records, notes: normalizeDomainNotes(await readReservedJson(siteId, RESERVED_NAMES.domainNotes)),
   };
@@ -525,12 +564,15 @@ export async function handleAgencySites(req: Request, route: string, method: str
       pins: pins.pins.filter((id) => ids.includes(id)), nowIso: now, copied,
     });
     const partial = [extraQ, planQ, seatQ, ownerQ, linkQ, studioQ, openQ, copiedQ].some((q) => (q as { ok?: boolean }).ok === false) || !pins.ok;
+    // item 154: the Trash (before migration 0154 there's no such state, so it's simply empty)
+    const trashQ = await svc(`presence_agency_clients?agency_id=eq.${member.agency_id}&status=eq.trashed&select=site_id,trashed_at,trashed_by,trashed_was_live&order=trashed_at.desc&limit=200`).catch(soft);
+    const trash = buildTrash(rowsOf<TrashLink>(trashQ), input.clientNames || {}, now);
     // a studio seat that can't open a client (lib/scope.ts asks bulk_publish) gets no doors into one,
     // and not the client's own people by name
     const canOpen = can(member.role, 'bulk_publish');
     if (!canOpen) for (const r of rows) r.team = r.team.map((t) => (t.side === 'client' ? { ...t, who: 'Someone on their side', email: '' } : t));
     const manage = can(member.role, 'manage_clients');
-    return json({ data: rows, partial, can_open: canOpen, can_pin: pins.own, can_duplicate: manage, can_create: manage }, 200, cors);
+    return json({ data: rows, partial, can_open: canOpen, can_pin: pins.own, can_duplicate: manage, can_create: manage, can_trash: manage, trash, trash_days: TRASH_DAYS }, 200, cors);
   }
 
   // ── + New site (item 135): a site from a business name and, if picked, one of
@@ -627,7 +669,7 @@ export async function handleAgencySites(req: Request, route: string, method: str
     }
   }
 
-    const m = route.match(/^\/agency\/sites\/([0-9a-f-]{36})\/(thumb|pin|duplicate|copied|invite)$/);
+  const m = route.match(/^\/agency\/sites\/([0-9a-f-]{36})\/(thumb|pin|duplicate|copied|invite|trash|restore)$/);
   if (!m) return null;
   const siteId = m[1], what = m[2];
 
@@ -750,6 +792,57 @@ export async function handleAgencySites(req: Request, route: string, method: str
     const invited = await sendCustomerInvite(own.id, email, true).catch(() => false);
     await writeChangeEvent({ siteId: own.id, entityType: 'client', entityId: client.id, action: 'invite', summary: `Invited the owner of ${label}`, principal, provenance: 'human' }).catch(() => {});
     return json({ data: { site_id: siteId, email, invited } }, 200, cors);
+  }
+
+  // ── Move to trash (item 154): the site goes offline (the short "temporarily
+  //    offline" page; nothing is deleted) and out of every list, into the Trash at
+  //    the foot of Sites. For TRASH_DAYS one press restores it; then the daily job
+  //    deletes it for good (ops/site_trash.ts). The state is written first, so a
+  //    database without migration 0154 refuses before anything goes offline. ──
+  if (what === 'trash' && method === 'POST') {
+    if (!can(member.role, 'manage_clients')) return forbid(cors);
+    if (!(await agencySiteIds(member.agency_id)).includes(siteId)) return notYours(cors);
+    const site = rowsOf<SiteRow & { offline_at?: string | null }>(await svc(`presence_sites?id=eq.${siteId}&select=${SITE_COLS}&limit=1`))[0];
+    if (!site) return notYours(cors);
+    const wasLive = site.edition !== 'monitor' && !!(site.status === 'live' || site.last_published_at);
+    const at = new Date().toISOString();
+    const w = await svc(`presence_agency_clients?site_id=eq.${siteId}&agency_id=eq.${member.agency_id}&status=eq.active&select=site_id`, {
+      method: 'PATCH', headers: { Prefer: 'return=representation' },
+      body: JSON.stringify({ status: 'trashed', trashed_at: at, trashed_by: member.email, trashed_was_live: wasLive }),
+    });
+    if (!w.ok) {
+      const missing = w.status === 400 || /trashed|status_check/.test(String(w.text || ''));
+      return json({ error: missing ? 'unavailable' : 'write_failed', message: missing ? 'The trash needs one database step first.' : 'That didn’t save — please try again.' }, missing ? 503 : 502, cors);
+    }
+    if (!rowsOf(w).length) return notYours(cors);
+    let offline = false;
+    if (wasLive) {
+      const off = await takeSiteOffline(site, principal);
+      offline = off.ok || off.error === 'already_offline' || off.error === 'not_live';
+      if (!off.ok && !offline) {
+        // it stays where it was: back in the list, live, and the answer says why
+        await svc(`presence_agency_clients?site_id=eq.${siteId}&agency_id=eq.${member.agency_id}`, { method: 'PATCH', body: JSON.stringify({ status: 'active', trashed_at: null, trashed_by: null, trashed_was_live: false }) }).catch(() => null);
+        return json({ error: 'offline_failed', message: `It couldn’t be taken offline (${off.message}), so it stays where it was.` }, 502, cors);
+      }
+    }
+    const own = await deps.ownSite().catch(() => null);
+    if (own) await writeChangeEvent({ siteId: own.id, entityType: 'site', entityId: siteId, action: 'update', summary: `Moved a client site to the trash${wasLive ? ' and took it offline' : ''}`, principal, provenance: 'human' }).catch(() => {});
+    return json({ data: { site_id: siteId, trashed_at: at, goes_at: goesAt(at, TRASH_DAYS), was_live: wasLive, offline } }, 200, cors);
+  }
+
+  // ── Restore from the trash (item 154): back in every list. A site that was
+  //    taken offline stays offline until it is published or brought back online. ──
+  if (what === 'restore' && method === 'POST') {
+    if (!can(member.role, 'manage_clients')) return forbid(cors);
+    const w = await svc(`presence_agency_clients?site_id=eq.${siteId}&agency_id=eq.${member.agency_id}&status=eq.trashed&select=site_id,trashed_was_live`, {
+      method: 'PATCH', headers: { Prefer: 'return=representation' },
+      body: JSON.stringify({ status: 'active', trashed_at: null, trashed_by: null, trashed_was_live: false }),
+    });
+    const row = rowsOf<{ site_id: string; trashed_was_live?: boolean }>(w)[0];
+    if (!w.ok || !row) return json({ error: 'not_found', message: 'That site isn’t in your trash.' }, 404, cors);
+    const own = await deps.ownSite().catch(() => null);
+    if (own) await writeChangeEvent({ siteId: own.id, entityType: 'site', entityId: siteId, action: 'update', summary: 'Restored a client site from the trash', principal, provenance: 'human' }).catch(() => {});
+    return json({ data: { site_id: siteId, restored: true } }, 200, cors);
   }
   return null;
 }
