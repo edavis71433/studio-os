@@ -8,64 +8,109 @@
 <meta name="theme-color" content="#5b3fa0">
 <link rel="stylesheet" href="/fonts/brand.css">
 <style>
-  :root{--bg:#faf8f5;--card:#fff;--ink:#1b1525;--soft:#6b6478;--line:#eee9e0;--p:#5b3fa0;--p-deep:#2a1b4a;
+  /* ── builder list item 188 (Nov 11 2026): the sign-in pages in the new look, drawn in Figma first
+     (file HSP7ScFSz2mg1xGzHRrEZi, page "Sign-in pages — new look"), matching the client portal's
+     direction A: the studio's colours and name in a dark band, a cream sheet, one clear way in.
+     On a phone the band sits on top; from 900px it is the left half of a split screen. ── */
+  :root{--bg:#faf8f5;--card:#fff;--ink:#1b1525;--soft:#6b6478;--line:#e4ddd1;--p:#5b3fa0;--p-deep:#2a1b4a;
+    --band:#241d38;--band-soft:#d9cdeb;--band-accent:#b79ceb;
     --serif:'Fraunces',"Iowan Old Style",Georgia,serif;--sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif}
   @media (prefers-color-scheme:dark){:root{--bg:#171320;--card:#1f1a2b;--ink:#efeaf7;--soft:#a79ebc;--line:#2a2338;--p:#b79ceb}}
   *{box-sizing:border-box;margin:0}
-  body{background:var(--bg);color:var(--ink);font-family:var(--sans);line-height:1.6;-webkit-font-smoothing:antialiased;
-    min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px}
-  .card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:40px 36px;width:100%;max-width:420px;
-    box-shadow:0 1px 2px rgba(27,21,37,.04),0 14px 40px rgba(27,21,37,.08)}
-  /* ── one door design, shared with portal.html (experience review #40): the same
-     mark + wordmark, an eyebrow naming the door, one sentence, the app's 8px corners ── */
-  .brand{display:flex;align-items:center;gap:10px;margin-bottom:22px}
+  body{background:var(--band);color:var(--ink);font-family:var(--sans);line-height:1.6;-webkit-font-smoothing:antialiased;min-height:100vh}
+  .door{min-height:100vh;display:flex;flex-direction:column}
+  .side{color:#fff;padding:max(52px,calc(env(safe-area-inset-top) + 28px)) 24px 26px;display:flex;flex-direction:column;gap:12px}
+  .sheet{flex:1;background:var(--bg);border-radius:28px 28px 0 0;padding:30px 24px 36px;display:flex;justify-content:center}
+  .card{width:100%;max-width:400px}
+  .brand{display:flex;align-items:center;gap:10px;margin-bottom:6px}
   .mark{display:inline-flex;width:34px;height:34px;border-radius:9px;background:var(--p);color:#fff;font-weight:700;
     align-items:center;justify-content:center;font-size:17px;flex:0 0 auto}
+  .side .mark{background:#5b3fa0;color:#fff}
   .word{font-family:var(--serif);font-size:21px;font-weight:500;letter-spacing:-.2px}
+  .side .word{color:#fff}
   .eyebrow{font-size:11px;font-weight:600;letter-spacing:2px;color:var(--p);text-transform:uppercase;margin-bottom:8px}
-  h1{font-family:var(--serif);font-weight:500;font-size:28px;line-height:1.15;margin-bottom:6px;letter-spacing:-.3px}
-  .sub{color:var(--soft);font-size:14px;margin-bottom:22px}
-  label{display:block;font-size:13px;font-weight:600;color:var(--soft);margin:14px 0 5px}
-  input{width:100%;font:inherit;font-size:16px;border:1px solid var(--line);background:var(--bg);color:var(--ink);
-    border-radius:8px;padding:11px 13px;outline:none}
+  .side .eyebrow{color:var(--band-accent);margin:4px 0 0}
+  .lede{font-family:var(--serif);font-weight:300;font-size:34px;line-height:1.1;letter-spacing:-.4px;color:#fff}
+  .more{color:var(--band-soft);font-size:15px;line-height:1.5;max-width:34em}
+  /* a glimpse of the studio, drawn (no one's data): only where there's room */
+  .glimpse{display:none}
+  .gcard{background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.14);border-radius:16px;padding:16px 18px;display:flex;flex-direction:column;gap:10px;flex:1}
+  .gt{font-size:13px;font-weight:600;color:#fff}
+  .gl{display:block;height:8px;border-radius:4px;background:rgba(217,205,235,.38)}
+  .grow{display:flex;gap:12px}
+  h1{font-family:var(--serif);font-weight:400;font-size:30px;line-height:1.15;margin-bottom:6px;letter-spacing:-.3px}
+  .sub{color:var(--soft);font-size:14.5px;margin-bottom:18px}
+  label{display:block;font-size:13px;font-weight:600;color:var(--ink);margin:14px 0 6px}
+  input{width:100%;font:inherit;font-size:16px;border:1px solid var(--line);background:var(--card);color:var(--ink);
+    border-radius:12px;padding:13px 15px;outline:none}
   input:focus{border-color:var(--p)}
-  button{font-family:inherit;font-size:15px;font-weight:600;border-radius:8px;border:1px solid var(--p);
-    background:var(--p);color:#fff;padding:12px 22px;cursor:pointer;width:100%;margin-top:20px}
+  .pwbox{position:relative}
+  .pwbox input{padding-right:70px}
+  .pwbox .show{all:unset;position:absolute;right:10px;top:50%;transform:translateY(-50%);font-size:13px;font-weight:600;color:var(--p);cursor:pointer;padding:6px 8px;border-radius:8px}
+  .pwbox .show:focus-visible{outline:2px solid var(--p);outline-offset:1px}
+  button{font-family:inherit;font-size:15px;font-weight:600;border-radius:999px;border:1px solid var(--p);
+    background:var(--p);color:#fff;padding:14px 22px;cursor:pointer;width:100%;margin-top:22px}
   button:disabled{opacity:.55;cursor:default}
-  .err{background:#fbeaea;color:#8a2f2f;border-radius:10px;padding:11px 14px;font-size:13.5px;margin-top:14px;display:none}
+  .err{background:#fbeaea;color:#8a2f2f;border-radius:12px;padding:11px 14px;font-size:13.5px;margin-top:14px;display:none}
   @media (prefers-color-scheme:dark){.err{background:#3a2026;color:#f2b8b8}}
-  @media (prefers-color-scheme:dark){button{color:#171320} .mark{color:#171320}}   /* --p lifts to #b79ceb in the dark: dark ink on it */
+  @media (prefers-color-scheme:dark){button{color:#171320} .card .mark{color:#171320}}   /* --p lifts to #b79ceb in the dark: dark ink on it */
   .muted{color:var(--soft);font-size:13px;margin-top:16px;text-align:center}
   .muted a{color:var(--p);text-decoration:underline;text-underline-offset:2px;cursor:pointer}   /* told apart by more than colour (list item 137) */
-  button.linky{all:unset;color:var(--p);cursor:pointer;font-size:13px}
+  button.linky{all:unset;color:var(--p);cursor:pointer;font-size:13.5px;font-weight:600}
   button.linky:focus-visible{outline:2px solid var(--p);outline-offset:2px;border-radius:4px}
   input:focus-visible,button:focus-visible{outline:2px solid var(--p);outline-offset:2px}
+  .rule{height:1px;background:var(--line);margin:20px 0 4px}
   .panel{display:none}
-  .panel h2{font-family:var(--serif);font-weight:500;font-size:21px;margin-bottom:6px}
+  .panel h2{font-family:var(--serif);font-weight:400;font-size:26px;margin-bottom:6px}
   .panel p{color:var(--soft);font-size:14px;margin-bottom:6px}
+  .mailbtns{display:flex;gap:10px;margin:16px 0 4px}
+  .qbtn{flex:1;text-align:center;font-size:14px;font-weight:600;color:var(--ink);text-decoration:none;background:var(--card);border:1px solid var(--line);border-radius:999px;padding:11px 12px}
+  .qbtn:focus-visible{outline:2px solid var(--p);outline-offset:2px}
   .spin{width:22px;height:22px;border:2.5px solid var(--line);border-top-color:var(--p);border-radius:50%;animation:sp .8s linear infinite;margin:8px auto}
   @keyframes sp{to{transform:rotate(360deg)}}
   @media (prefers-reduced-motion:reduce){.spin{animation:none}}
+  @media (min-width:900px){
+    .door{flex-direction:row}
+    .side{width:54%;max-width:780px;padding:64px clamp(40px,6vw,88px);justify-content:center;gap:16px}
+    .lede{font-size:clamp(44px,4.6vw,60px);line-height:1.05}
+    .more{font-size:17px}
+    .glimpse{display:flex;flex-direction:column;gap:12px;margin-top:18px;max-width:520px}
+    .sheet{border-radius:0;align-items:center;padding:48px}
+    .card{max-width:380px}
+  }
 </style>
 </head>
 <body>
-<div class="card">
-  <div class="brand"><span class="mark" aria-hidden="true">S</span><span class="word">Studio OS</span></div>
-
+<div class="door">
+  <aside class="side" aria-label="Studio OS">
+    <div class="brand"><span class="mark" aria-hidden="true">S</span><span class="word">Studio OS</span></div>
+    <div class="eyebrow">Studio sign-in</div>
+    <p class="lede">Run your studio.</p>
+    <p class="more">Every client site, every deal and every invoice, in one place.</p>
+    <div class="glimpse" aria-hidden="true">
+      <div class="gcard"><div class="gt">Needs you</div><span class="gl" style="width:78%"></span><span class="gl" style="width:62%"></span><span class="gl" style="width:48%"></span></div>
+      <div class="grow">
+        <div class="gcard"><div class="gt">Live sites</div><span class="gl" style="width:56%"></span></div>
+        <div class="gcard"><div class="gt">Paid this week</div><span class="gl" style="width:68%"></span></div>
+      </div>
+    </div>
+  </aside>
+  <main class="sheet">
+  <div class="card">
   <!-- SIGN IN -->
   <div id="loginPanel">
-    <div class="eyebrow">Studio sign-in</div>
-    <h1>Run your studio</h1>
-    <p class="sub">Sign in to your website, customers and projects.</p>
+    <h1>Welcome back.</h1>
+    <p class="sub">Sign in to your studio.</p>
     <form id="f" novalidate>
       <label for="em">Email</label>
       <input id="em" type="email" autocomplete="email" placeholder="you@yourstudio.com" required>
       <label for="pw">Password</label>
-      <input id="pw" type="password" autocomplete="current-password" placeholder="Your password" required>
+      <div class="pwbox"><input id="pw" type="password" autocomplete="current-password" placeholder="Your password" required><button class="show" type="button" aria-label="Show password" aria-pressed="false">Show</button></div>
       <button id="go" type="submit">Sign in</button>
     </form>
     <div class="err" id="err" role="alert"></div>
     <p class="muted"><button class="linky" id="forgot" type="button">Forgot your password?</button></p>
+    <div class="rule" aria-hidden="true"></div>
     <p class="muted">A client of the studio? <a href="/portal.html">Your sign-in is here</a>.</p>
   </div>
 
@@ -89,8 +134,11 @@
   <div id="resetSent" class="panel">
     <h2>Check your email</h2>
     <p>If that address has an account, a reset link is on its way. It lands you on a page to choose a new password.</p>
+    <div class="mailbtns"><a class="qbtn" href="https://mail.google.com/mail/u/0/#inbox" target="_blank" rel="noopener">Open Gmail</a><a class="qbtn" href="https://outlook.live.com/mail/0/" target="_blank" rel="noopener">Open Outlook</a></div>
     <p class="muted"><button class="linky" id="backToLogin" type="button">Back to sign in</button></p>
   </div>
+</div>
+  </main>
 </div>
 
 <script src="/vendor/supabase-js-2.45.4.js"></script>
@@ -216,6 +264,10 @@ $('signout1').addEventListener('click', async function(){ if (sb) { try{ await s
     if (t) route(t);
   } catch (e) { /* stay on the login form */ }
 })();
+</script>
+<script>
+// item 188: Show / Hide on the password field
+document.querySelectorAll('.pwbox .show').forEach(function(b){ b.addEventListener('click', function(){ var i=b.parentNode.querySelector('input'); var on=i.type==='password'; i.type=on?'text':'password'; b.textContent=on?'Hide':'Show'; b.setAttribute('aria-pressed', on?'true':'false'); b.setAttribute('aria-label', on?'Hide password':'Show password'); i.focus(); }); });
 </script>
 </body>
 </html>
