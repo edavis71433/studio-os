@@ -481,6 +481,11 @@ html.dc-edit:not(.plan-watch) #pcBody{padding:0 20px 20px}
 .pc-pane-body .dc-modal-h{font-family:var(--serif);font-size:20px;font-weight:600;letter-spacing:-.01em}
 .pc-pane-body input[type=text],.pc-pane-body select{width:100%;box-sizing:border-box}
 .pc-note{margin:0 0 12px;font-size:13px;line-height:1.5;color:var(--ink-2)}
+/* item 121: the not-found choice (Ready-made or One of my pages), and the password page's words */
+.pc-nf-seg{margin:0 0 10px}
+.pc-nf-seg button[aria-pressed="true"]{background:var(--sheet);color:var(--ink);font-weight:600;box-shadow:var(--dds-shadow)}
+.pc-nf-seg button:disabled{opacity:.45;cursor:default}
+.pg-h.pg-h-sub{border-top:0;padding-top:0;margin-top:var(--dds-s4,16px)}
 .pc-pane-body .hint{font-size:12.5px;line-height:1.5;color:var(--ink-2)}
 .pc-acts{display:flex;flex-wrap:wrap;gap:8px;margin:4px 0 4px}
 .pc-acts .dc-modal-cancel{margin-top:0}
@@ -5689,6 +5694,19 @@ function pgSwitch(label, on) {
   row.append(t, cb); return row;
 }
 // One own page's stored settings, changed in one write (undefined takes a setting off).
+// Item 121: the page a broken link shows: one of the owner's own pages (slug), or none (""), the
+// ready-made page. One save marks that page and clears the mark from every other.
+function pgSetNotFound(slug) {
+  return pgTurn(async () => {
+    if (!(await dcSavePendingEdits())) return false;
+    const build = () => ({ pages: dcPagesArr().map((x) => { const nx = { ...x }; if (slug && x.slug === slug) nx.notFound = true; else delete nx.notFound; return nx; }) });
+    try {
+      await settingsPut(build); renderPagesBar(); scheduleChangesRefresh();
+      toast(slug ? "Broken links will show “" + ((dcPageObj(slug) || {}).title || slug) + "”. Publish to apply." : "Broken links will show the ready-made page. Publish to apply.");
+      return true;
+    } catch (err) { toast(nice(err), true); return false; }
+  });
+}
 function pgSetPage(slug, patch, okMsg) {
   return pgTurn(async () => {
     if (!(await dcSavePendingEdits())) return false;
@@ -5731,6 +5749,19 @@ function pgAccessGroup(slug) {
       const change = el("button", "dc-modal-cancel", "Change password"); change.type = "button";
       change.addEventListener("click", () => { asking = true; msg = ""; draw("pw"); });
       saved.append(chip, change); g.appendChild(saved);
+      // item 121: what the password box says: the owner's own heading and message, or its own words
+      g.appendChild(el("h4", "pg-h pg-h-sub", "What the password page says"));
+      const words = [["lockTitle", "Heading", 80, "This page needs a password", ""], ["lockNote", "Message", 300, "Type the password you were given to see " + (page.title || "this page") + ".", "Your logo and header show above it, as on every page."]];
+      words.forEach(([field, label, max, ph, hint]) => {
+        const inp = field === "lockNote" ? el("textarea") : el("input"); if (field !== "lockNote") inp.type = "text";
+        inp.maxLength = max; inp.placeholder = ph; inp.value = page[field] || ""; inp.id = "pgLock-" + field; if (field === "lockNote") inp.rows = 2;
+        inp.addEventListener("change", () => {
+          const v = inp.value.replace(/\s+/g, " ").trim(), was = (dcPageObj(slug) || {})[field] || "";   // the page as it is now, not as the card opened
+          if (v === was) return;
+          pgSetPage(slug, { [field]: v || undefined }, "Password page: " + label.toLowerCase() + (v ? " saved" : " back to its own words") + ". Publish to apply.");
+        });
+        g.appendChild(pgField(label, inp, hint));
+      });
     }
     if (asking) {
       const box = el("div", "pg-pw");
@@ -12557,7 +12588,28 @@ function pcHeadFoot() {
 function pcNotFound() {
   const { box, close } = pcPane("pcNotFoundPane", "Not found page");
   box.appendChild(el("h3", "dc-modal-h", "Not found page"));
-  box.appendChild(el("p", "dc-modal-sub", "When someone follows a broken or old link, your site shows a short “That page isn’t here” page with a way back to Home."));
+  box.appendChild(el("p", "dc-modal-sub", "What someone sees after following a broken or old link."));
+  // item 121: the ready-made page, or one of the owner's own (open to everyone: a password or
+  // private page never answers a broken link)
+  const pick = el("div", "pc-nf"); box.appendChild(pick);
+  const paint = () => {
+    pick.textContent = "";
+    const own = dcPagesArr().filter((p) => p && p.slug && !p.access), cur = (own.find((p) => p.notFound) || {}).slug || "";
+    const seg = el("div", "dc-seg pc-nf-seg"); seg.setAttribute("role", "group"); seg.setAttribute("aria-label", "Not found page");
+    [["", "Ready-made"], ["own", "One of my pages"]].forEach(([v, name]) => {
+      const b = el("button", null, name); b.type = "button"; b.dataset.v = v || "ready"; b.setAttribute("aria-pressed", String((cur ? "own" : "") === v));
+      if (v && !own.length) { b.disabled = true; b.title = "Add a page of your own first"; }
+      b.addEventListener("click", async () => { if ((cur ? "own" : "") === v) return; if (await pgSetNotFound(v ? own[0].slug : "")) paint(); });
+      seg.appendChild(b);
+    });
+    pick.appendChild(seg);
+    if (!cur) { pick.appendChild(el("p", "pc-note", own.length ? "Your site shows a short “That page isn’t here” page with a way back to Home." : "Your site shows a short “That page isn’t here” page with a way back to Home. Add a page of your own to use it instead.")); return; }
+    const sel = el("select"); sel.id = "pcNotFoundPick";
+    own.forEach((p) => { const o = el("option", null, p.title || p.slug); o.value = p.slug; o.selected = p.slug === cur; sel.appendChild(o); });
+    sel.addEventListener("change", async () => { if (await pgSetNotFound(sel.value)) paint(); });
+    pick.appendChild(pgField("Show this page", sel, "Its own address still works. The copy that answers broken links is kept out of Google."));
+  };
+  paint();
   box.appendChild(el("h4", "pg-h", "Forward old addresses"));
   box.appendChild(el("p", "pc-note", "Moved from an old website, or changed a page’s address? Send the old address to the page it lives on now."));
   box.appendChild(redirectsManager());
