@@ -202,7 +202,7 @@ test.describe('Sites (builder list items 43 and 45)', () => {
     const t = await openSites(page);
     await page.locator('.scard[data-site="s3"] [data-menu]').click();
     const menu = page.locator('#rowMenuHost [role="menu"]');
-    await expect(menu.locator('[role="menuitem"]')).toHaveText(['Pin to top', 'Duplicate site', 'Open record']);
+    await expect(menu.locator('[role="menuitem"]')).toHaveText(['Pin to top', 'Duplicate site', 'Ask for their content', 'Hand-over kit', 'Open record']);   // item 176 adds the middle two
     await menu.getByRole('menuitem', { name: 'Pin to top' }).click();
     await expect.poll(() => t.writes.find((w) => w.path === '/agency/sites/s3/pin')?.body).toEqual({ pinned: true });
     await expect(page.locator('.scard[data-site="s3"] .tpin')).toHaveText('Pinned');
@@ -217,7 +217,7 @@ test.describe('Sites (builder list items 43 and 45)', () => {
   test('a watch plan has no Duplicate, and no studio site means no Pin', async ({ page }) => {
     await openSites(page, [BISTRO, GARAGE], { body: { can_pin: false } });
     await page.locator('.scard[data-site="s2"] [data-menu]').click();
-    await expect(page.locator('#rowMenuHost [role="menuitem"]')).toHaveText(['View live site', 'Open record']);
+    await expect(page.locator('#rowMenuHost [role="menuitem"]')).toHaveText(['View live site', 'Ask for their content', 'Hand-over kit', 'Open record']);
   });
 
   test('a seat that can’t open a client (view only, designer…) gets the live site, never a door that says no', async ({ page }) => {

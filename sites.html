@@ -207,6 +207,7 @@
 </dialog>
 
 <script src="/vendor/supabase-js-2.45.4.js"></script>
+<script src="/sites-tools.js?v=176a"></script>
 <script>
 // ── Sites (builder list items 43 and 45, Nov 2026) ───────────────────────────
 // Every client's website, the way Squarespace's dashboard and Wix's Sites table
@@ -293,6 +294,7 @@ function cardHtml(s,i){
       <div class="shead"><h2 class="sname">${META.can_open?`<a href="${esc(homeOf(s))}">${esc(s.name||'(unnamed)')}</a>`:esc(s.name||'(unnamed)')}</h2>${menuBtnHtml(s)}</div>
       <div class="saddr">${addr}</div>
       <div class="sline warn" data-why="${esc(s.site_id)}"${st.why?'':' hidden'}>${st.why?`<a href="${esc(st.href)}">Needs you: ${esc(st.why)}</a>`:''}</div>
+      <div class="sline" data-tools="${esc(s.site_id)}" hidden></div>
       ${s.state==='not_live'?`<div class="launch"><b>Not published yet</b>${s.unpublished_changes?'There is work on it. Open Website to finish and publish.':'Open Website to build and publish it.'}</div>`:''}
       ${s.unpublished_changes&&s.state!=='not_live'?'<div class="sline warn">Changes waiting to be published</div>':''}
       ${s.billing_issue?'<div class="sline warn">Their billing needs a look</div>':''}
@@ -367,6 +369,7 @@ function headHtml(shown){
         <button type="button" id="dispCards" aria-pressed="${DISPLAY==='cards'?'true':'false'}">Cards</button>
         <button type="button" id="dispTable" aria-pressed="${DISPLAY==='table'?'true':'false'}">Table</button>
       </div>
+      <a class="sbtn" id="weekBtn" href="/week.html">Plan my week</a>
       <button type="button" class="lbtn" id="refreshBtn" aria-label="Refresh" title="Refresh">↻</button>
       <a class="btn" id="newSiteBtn" href="/agency.html#add" style="text-decoration:none;display:inline-flex;align-items:center;margin-left:auto">+ New site</a>
     </div>
@@ -529,6 +532,7 @@ function menuHtml(s){
     ${META.can_pin?`<button type="button" role="menuitem" data-pin="${esc(s.site_id)}">${s.pinned?'Unpin':'Pin to top'}</button>`:''}
     ${META.can_duplicate&&s.thumb?`<button type="button" role="menuitem" data-dup="${esc(s.site_id)}">Duplicate site</button>`:''}
     ${live?`<a role="menuitem" href="${esc(s.address)}" target="_blank" rel="noopener">View live site</a>`:''}
+    ${window.ClientTools?ClientTools.menuHtml(s):''}
     ${META.can_open?`<a role="menuitem" href="${esc(scoped('/crm.html',s.site_id))}">Open record</a>`:''}
   </div>`;
 }
@@ -545,6 +549,7 @@ function paintMenu(){
   m.style.left=Math.max(8,Math.min(window.innerWidth-m.offsetWidth-8,r.right-m.offsetWidth))+'px';
   m.addEventListener('click',(e)=>e.stopPropagation());
   m.addEventListener('keydown',(e)=>{if(e.key==='Escape'){e.stopPropagation();const id=MENU_OPEN;MENU_OPEN=null;paintMenu();const b=visibleMenuBtn(id);if(b)b.focus();}});
+  if(window.ClientTools)ClientTools.wireMenu(m,s,()=>{MENU_OPEN=null;paintMenu();});   // item 176: Ask for their content · Hand-over kit (sites-tools.js)
   const pb=m.querySelector('[data-pin]');if(pb)pb.addEventListener('click',()=>togglePin(s.site_id));
   const db=m.querySelector('[data-dup]');if(db)db.addEventListener('click',()=>{MENU_OPEN=null;paintMenu();openDuplicate(s.site_id);});
 }
@@ -668,6 +673,7 @@ async function load(soft){
   META={can_open:r.body.can_open!==false,can_pin:!!r.body.can_pin,can_duplicate:!!r.body.can_duplicate,partial:!!r.body.partial};
   LOADED_AT=Date.now();MENU_OPEN=null;
   render();
+  if(window.ClientTools)ClientTools.mount();   // item 176: each card's content form and kit line
 }
 async function boot(){
   try{const{data}=await sb.auth.getSession();TOKEN=(data&&data.session&&data.session.access_token)||"";

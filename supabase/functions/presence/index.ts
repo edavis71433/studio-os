@@ -267,6 +267,13 @@ async function route_(req: Request, cors: Record<string, string>): Promise<Respo
     if (m && method === 'GET') return (await import('./routes/pitch_pack.ts')).handlePackPublic(m[1], cors);
   }
 
+  // ── Builder list item 176: the content form a studio sends a client — PUBLIC,
+  //    pre-auth, authorized by the link's own secret (routes/intake_public.ts). ──
+  {
+    const m = route.match(/^\/intake\/([0-9a-f]{72})(\/files(?:\/[0-9a-f-]{36})?)?$/);
+    if (m) return (await import('./routes/intake_public.ts')).handleIntakePublic(req, m[1], m[2] || '', method, cors);
+  }
+
   // ── L5.5: Industry Pack Marketplace — OPERATOR management. Infrastructure,
   //    not client-scoped: reachable by staff or system (service-role/cron), and
   //    handled BEFORE the caller-site resolution (operators own no site). Every
@@ -947,6 +954,7 @@ async function route_(req: Request, cors: Record<string, string>): Promise<Respo
   if (route === '/client/website-stats' && method === 'GET') return handleClientWebsiteStats(req, site, principal, cors);   // slice 8b: the portal Home's "Your website" card
   if (route === '/client/support' && (method === 'GET' || method === 'POST')) return handleClientSupport(req, site, principal, cors);
   if (route === '/client/faq' && method === 'GET') return handleClientFaq(req, site, principal, cors);   // service edge #5: the studio's FAQ in the portal
+  if (route === '/client/kit' && method === 'GET') return (await import('./routes/client_kit.ts')).handleClientKit(req, site, principal, cors);   // builder list item 176: the hand-over kit under Help
   {
     let m = route.match(/^\/client\/projects\/([0-9a-f-]{36})$/);
     if (m && method === 'GET') return handleClientProject(req, site, principal, m[1], cors);

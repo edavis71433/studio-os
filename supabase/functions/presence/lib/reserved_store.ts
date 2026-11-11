@@ -6,6 +6,9 @@
 import { svc } from './db.ts';
 
 export const RESERVED_NAMES = {
+  intakeForm: '__intake_form__',          // builder list item 176: a client site's content form and its link (lib/intake_form.ts)
+  intakeAnswers: '__intake_answers__',    // builder list item 176: what the client wrote on it, and their files
+  handoverKit: '__handover_kit__',        // builder list item 176: the client's hand-over kit (lib/handover_kit.ts)
   savedViews: '__saved_views__',          // sales review item 31
   sitePins: '__site_pins__',              // builder list item 45: each member's pinned sites (agency/sites.ts)
   broadcastLists: '__broadcast_lists__',  // sales review items 31 + 39
