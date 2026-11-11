@@ -7,8 +7,9 @@
 // first-party visit counter (lib/visits.ts trackerScript, routes/collect.ts), which
 // the owner can switch off (item 61; the page reads the same switch the publish
 // step does), and, only on a site that has them, online booking (routes/booking.ts)
-// and the reviews it shows (routes/reviews.ts), list item 138, and the "Join our list"
-// box (builder list item 146). Deterministic: the effective date is the snapshot date
+// and the reviews it shows (routes/reviews.ts), list item 138, the "Join our list"
+// box (builder list item 146), and the note a pop-up keeps in the visitor's browser
+// (builder list item 148). Deterministic: the effective date is the snapshot date
 // (the only clock a renderer may read).
 //
 // Terms of Service are deliberately NOT auto-generated in V1: terms make
@@ -18,6 +19,7 @@
 // shell, so look-and-feel stays per-template while the words stay one source.
 import { esc } from './markdown.ts';
 import { adTagsOf, adTagNames, adCompanies } from './ad_tags.ts';
+import { normalizePopup } from './popup.ts';
 import type { SiteConfig, SnapshotContent } from './render_types.ts';
 
 function contactLine(c: SnapshotContent): string {
@@ -55,8 +57,11 @@ export function privacyBody(c: SnapshotContent, effectiveDate: string, site: Pic
   const name = esc(c.identity.business_name);
   const hasForm = !!site.formEndpoint;
   const booking = !!site.bookEndpoint && siteHas(c, 'booking'), reviews = siteHas(c, 'reviews_wall');
-  // item 146: a Newsletter box set to collect sends through the site's form address
-  const joins = hasForm && siteHas(c, 'newsletter', (b) => b.collect === true);
+  // item 148: a pop-up remembers on the visitor's device that it was seen, closed or joined
+  const popup = normalizePopup(c.settings?.popup);
+  const kept = popup ? 'If this website shows you a pop-up, your browser keeps a small note that you’ve seen it, so it doesn’t come back too soon. The note stays on your device: it isn’t a cookie, and it’s never sent to us.' : '';
+  // item 146: a Newsletter box set to collect, or the pop-up's, sends through the site's form address
+  const joins = hasForm && (siteHas(c, 'newsletter', (b) => b.collect === true) || popup?.action === 'signup');
   return `<section class="block wrap"><h1>Privacy policy</h1>
 <p class="post-meta">Effective ${esc(effectiveDate)}</p>
 <h2>Who we are</h2>
@@ -80,9 +85,14 @@ ${joins
     : ''}${c.settings?.visit_counter === false
     ? `<h2>Cookies and visit counts</h2>
 ${adCookieParagraphs(c) ? `${adCookieParagraphs(c)}
-<p>Apart from that, this website does not count or track visits.</p>` : `<p>This website sets <strong>no cookies</strong>, stores nothing on your device, and does not count or track visits. There is nothing to consent to, which is why there is no cookie banner.</p>`}`
+<p>Apart from that, this website does not count or track visits.${kept ? ` ${kept}` : ''}</p>` : kept
+      ? `<p>This website sets <strong>no cookies</strong> and does not count or track visits. ${kept} There is nothing to consent to, which is why there is no cookie banner.</p>`
+      : `<p>This website sets <strong>no cookies</strong>, stores nothing on your device, and does not count or track visits. There is nothing to consent to, which is why there is no cookie banner.</p>`}`
     : `<h2>Cookies and visit counts</h2>
-${adCookieParagraphs(c) || `<p>This website sets <strong>no cookies</strong> and stores nothing on your device, which is why there is no cookie banner.</p>`}
+${adCookieParagraphs(c) ? `${adCookieParagraphs(c)}${kept ? `
+<p>${kept}</p>` : ''}` : kept
+      ? `<p>This website sets <strong>no cookies</strong>, which is why there is no cookie banner. ${kept}</p>`
+      : `<p>This website sets <strong>no cookies</strong> and stores nothing on your device, which is why there is no cookie banner.</p>`}
 <p>It counts its own visits, without any outside analytics or advertising company. When a page opens, it notes which page, the name of the website you came from, any campaign tag in the link, and your kind of device, browser and country. When you tap a phone number, an email address, a button, a download or a link to another website, it notes which kind of link it was and, for a button, a phone number or an email address, the words on it. When you leave a page, it notes how long the page was open and how quickly it showed. It never keeps your IP address; it keeps a scrambled code made from it that changes every day, so a visit can be counted once without saying who you are. If your browser asks websites not to track you, nothing is counted. Only ${name} and the studio that runs this website see these counts, and they are never sold or shared for advertising.</p>`}
 <h2>Hosting</h2>
 <p>The site is served as static pages by our hosting provider, which may keep standard, short-lived server logs (such as IP addresses) for security and reliability.</p>
