@@ -650,10 +650,10 @@ test.describe('Sites: the pages travel (item 145)', () => {
 // ── Domains (item 52) ──
 const DOMAINS = { data: {
   domains: [
-    { domain: 'gone.example', site_id: 's9', name: 'Gone Deli', own: false, status: 'expired', status_words: 'Expired 2 days ago', tone: 'bad', days_left: -2, provider: 'Registrar A', expires_at: '2026-11-06T00:00:00Z', checked_at: '2026-11-08T00:00:00Z', record: 'ok', padlock_until: null, checks: [], dns_host: '', lock: true, warnings: [] as Array<{ key: string; severity: string; words: string }>, registered_at: '2019-04-01T00:00:00Z', hosted: true },
-    { domain: 'bistro.example', site_id: 's1', name: 'Bistro Nine', own: false, status: 'expiring', status_words: 'Expires in 12 days', tone: 'warn', days_left: 12, provider: 'Registrar B', expires_at: '2026-11-20T00:00:00Z', checked_at: '2026-11-08T00:00:00Z', record: 'ok', padlock_until: '2027-01-15T00:00:00Z', checks: [], dns_host: 'Cloudflare', lock: false, warnings: [{ key: 'unlocked', severity: 'warn', words: 'The transfer lock is off: anyone with the account could move it away' }], registered_at: null, hosted: true },
-    { domain: 'garage.example', site_id: 's2', name: 'Garage Ten', own: false, status: 'elsewhere', status_words: 'On their own host', tone: 'quiet', days_left: null, provider: '', expires_at: null, checked_at: null, record: 'ok', padlock_until: null, checks: [], dns_host: '', lock: null, warnings: [] as Array<{ key: string; severity: string; words: string }>, registered_at: null, hosted: false },
-    { domain: 'mystudio.example', site_id: 'own', name: 'Bright Studio', own: true, status: 'connected', status_words: 'Connected', tone: 'good', days_left: 200, provider: 'Registrar C', expires_at: '2027-05-27T00:00:00Z', checked_at: '2026-11-08T00:00:00Z', record: 'ok', padlock_until: '2027-03-01T00:00:00Z', checks: [], dns_host: '', lock: true, warnings: [] as Array<{ key: string; severity: string; words: string }>, registered_at: null, hosted: true },
+    { domain: 'gone.example', site_id: 's9', name: 'Gone Deli', own: false, status: 'expired', status_words: 'Expired 2 days ago', tone: 'bad', days_left: -2, provider: 'Registrar A', expires_at: '2026-11-06T00:00:00Z', checked_at: '2026-11-08T00:00:00Z', record: 'ok', padlock_until: null, checks: [], dns_host: '', lock: true, warnings: [] as Array<{ key: string; severity: string; words: string }>, registered_at: '2019-04-01T00:00:00Z', renews: 'unknown', renews_confirmed_at: null as string | null, hosted: true },
+    { domain: 'bistro.example', site_id: 's1', name: 'Bistro Nine', own: false, status: 'expiring', status_words: 'Expires in 12 days', tone: 'warn', days_left: 12, provider: 'Registrar B', expires_at: '2026-11-20T00:00:00Z', checked_at: '2026-11-08T00:00:00Z', record: 'ok', padlock_until: '2027-01-15T00:00:00Z', checks: [], dns_host: 'Cloudflare', lock: false, warnings: [{ key: 'unlocked', severity: 'warn', words: 'The transfer lock is off: anyone with the account could move it away' }], registered_at: null, renews: 'unknown', renews_confirmed_at: null as string | null, hosted: true },
+    { domain: 'garage.example', site_id: 's2', name: 'Garage Ten', own: false, status: 'elsewhere', status_words: 'On their own host', tone: 'quiet', days_left: null, provider: '', expires_at: null, checked_at: null, record: 'ok', padlock_until: null, checks: [], dns_host: '', lock: null, warnings: [] as Array<{ key: string; severity: string; words: string }>, registered_at: null, renews: 'unknown', renews_confirmed_at: null as string | null, hosted: false },
+    { domain: 'mystudio.example', site_id: 'own', name: 'Bright Studio', own: true, status: 'connected', status_words: 'Connected', tone: 'good', days_left: 200, provider: 'Registrar C', expires_at: '2027-05-27T00:00:00Z', checked_at: '2026-11-08T00:00:00Z', record: 'ok', padlock_until: '2027-03-01T00:00:00Z', checks: [], dns_host: '', lock: true, warnings: [] as Array<{ key: string; severity: string; words: string }>, registered_at: null, renews: 'unknown', renews_confirmed_at: null as string | null, hosted: true },
   ],
   builtin: [{ address: 'presence-cccccccccccc.netlify.app', site_id: 's3', name: 'Cafe Eleven', own: false }],
 }, partial: false };
@@ -891,8 +891,8 @@ test.describe('Domains: the page does things (item 162)', () => {
     expect(dl.suggestedFilename()).toBe('domains.csv');
     const text = await new Promise<string>(async (resolve, reject) => { const s = await dl.createReadStream(); let b = ''; s.on('data', (c) => { b += c; }); s.on('end', () => resolve(b)); s.on('error', reject); });
     const lines = text.split('\n');
-    expect(lines[0]).toBe('"Domain","Site","Status","Provider","DNS at","Expires","Lock","Padlock until","Last checked"');
-    expect(lines[2]).toBe('"bistro.example","Bistro Nine","Expires in 12 days","Registrar B","Cloudflare","2026-11-20","off","2027-01-15","2026-11-08"');
+    expect(lines[0]).toBe('"Domain","Site","Status","Provider","DNS at","Expires","Renews by itself","Lock","Padlock until","Last checked"');   // Renews by itself: item 174
+    expect(lines[2]).toBe('"bistro.example","Bistro Nine","Expires in 12 days","Registrar B","Cloudflare","2026-11-20","","off","2027-01-15","2026-11-08"');   // nobody has said whether it renews by itself yet
     expect(lines).toHaveLength(5);
   });
 
@@ -950,7 +950,7 @@ test.describe('Domains panel, part two: where to go, the guides, mail and histor
     const calls = await trackPrepare(page);
     await page.locator('tr[data-domain="bistro.example"] [data-detail]').click();
     const dlg = page.locator('#dpanel');
-    await expect(dlg.locator('[data-help]')).toHaveText(['Make sure it renews by itself', 'The records this site needs', 'Move the domain']);
+    await expect(dlg.locator('[data-help]')).toHaveText(['Make sure it renews by itself', 'The records this site needs', 'Gmail on this domain', 'Move the domain']);   // Gmail: item 174
     await dlg.getByRole('button', { name: 'Make sure it renews by itself' }).click();
     await expect(dlg.locator('.dp-plan .dp-ptitle')).toHaveText('Keep bistro.example safely yours');
     await expect(dlg.locator('.dp-steps li')).toHaveText(['Sign in to Registrar B and turn on auto-renew for bistro.example.', 'Handled automatically: The platform keeps watching the expiration date']);
@@ -977,7 +977,7 @@ test.describe('Domains panel, part two: where to go, the guides, mail and histor
     const calls = await trackPrepare(page, () => ({ status: 400, body: { error: 'no_domain', message: 'Domain care needs a domain first.' } }));
     await page.locator('tr[data-domain="garage.example"] [data-detail]').click();
     const dlg = page.locator('#dpanel');
-    await expect(dlg.locator('[data-help]')).toHaveText(['Make sure it renews by itself', 'Move the domain']);
+    await expect(dlg.locator('[data-help]')).toHaveText(['Make sure it renews by itself', 'Gmail on this domain', 'Move the domain']);
     await dlg.getByRole('button', { name: 'Move the domain' }).click();
     await expect(dlg.locator('#dpHelpOut')).toHaveText('Domain care needs a domain first.');
     expect(calls).toEqual([{ body: { goal: 'transfer_out', preview: true }, scope: 's2' }]);
@@ -992,5 +992,42 @@ test.describe('Domains panel, part two: where to go, the guides, mail and histor
     await dlg.getByRole('button', { name: 'Make sure it renews by itself' }).click();
     await expect(dlg.locator('.dp-plan')).toBeVisible();
     expect(await page.evaluate(() => { const d = document.getElementById('dpanel')!; return d.scrollWidth <= d.clientWidth + 1 && document.documentElement.scrollWidth <= document.documentElement.clientWidth; })).toBe(true);
+  });
+});
+
+// ── Nov 10 review, builder list item 174: borrowed from Namecheap and Squarespace ──
+test.describe('Domains: borrowed from Namecheap and Squarespace (item 174)', () => {
+  test('each row says whether it renews by itself, and its switch saves it to the domain’s notes', async ({ page }) => {
+    const t = await openDomains(page);
+    const sel = page.locator('tr[data-domain="bistro.example"] select[data-renews]');
+    await expect(sel).toHaveValue('unknown');
+    await sel.selectOption('yes');
+    await expect.poll(() => t.writes.length).toBe(1);
+    expect(t.writes[0].method).toBe('PUT');
+    expect(t.writes[0].path).toBe('/agency/domains/s1/notes');
+    expect(t.writes[0].body.renews).toBe('yes');
+    expect(t.writes[0].body.renews_confirmed_at).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+    await expect(page.locator('[data-renews-conf="s1"]')).toHaveText(/^confirmed [A-Z][a-z]{2} \d+, \d{4}$/);
+  });
+
+  test('a refused save puts the switch back and says so', async ({ page }) => {
+    await openDomains(page);
+    await page.route(/\/functions\/v1\/presence\/agency\/domains\/s1\/notes$/, (route: Route) => route.fulfill(json({ error: 'forbidden', message: 'Your role can’t change that.' }, 403)));
+    const sel = page.locator('tr[data-domain="bistro.example"] select[data-renews]');
+    await sel.selectOption('no');
+    await expect(page.locator('.dds-toast, #toast').filter({ hasText: 'Your role can’t change that.' })).toBeVisible();
+    await expect(sel).toHaveValue('unknown');
+  });
+
+  test('the panel offers Gmail’s records in one pick, and names the other domains that send visitors here', async ({ page }) => {
+    await openDomains(page, { detail: () => detailOf({ ...PART2, forwards: ['old.example', 'www.old.example'] }) });
+    const calls = await trackPrepare(page);
+    await page.locator('tr[data-domain="bistro.example"] [data-detail]').click();
+    const dlg = page.locator('#dpanel');
+    const kv = (k: string) => dlg.locator('dt', { hasText: new RegExp('^' + k + '$') }).locator('xpath=following-sibling::dd[1]');
+    await expect(kv('Also sends visitors here')).toHaveText('old.example, www.old.example');
+    await dlg.getByRole('button', { name: 'Gmail on this domain' }).click();
+    await expect.poll(() => calls.length).toBe(1);
+    expect(calls[0]).toEqual({ body: { goal: 'email_setup', provider: 'google_workspace', preview: true }, scope: 's1' });
   });
 });
