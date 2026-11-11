@@ -1,6 +1,7 @@
 /* Free Site Review form (site-review.html). Verifies the visitor with
-   Turnstile, posts to the site-review function, and drives the loading steps
-   from the function's real progress stream (newline-delimited JSON). When the
+   Turnstile (loaded when they start, not with the page), posts to the
+   site-review function, and drives the loading steps from the function's
+   real progress stream (newline-delimited JSON). When the
    scan is done it opens the hosted report, which shows the teaser and the
    unlock form. GA4: scan_started, scan_completed, scan_failed (with reason). */
 (function () {
@@ -10,6 +11,7 @@
   // Cloudflare's published always-pass test key so the page can be tested.
   var LOCAL = /^(localhost|127\.0\.0\.1)$/.test(location.hostname);
   var SITE_KEY = LOCAL ? '1x00000000000000000000AA' : '0x4AAAAAAFl7hPNwYacRr2Z2';
+  var TURNSTILE_SRC = 'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit';
   var STEPS = ['pages', 'speed', 'search', 'trust', 'writing'];
   var widgetId = null;
   var busy = false;
@@ -23,12 +25,27 @@
       widgetId = window.turnstile.render('#srTurnstile', { sitekey: SITE_KEY, theme: 'light', size: 'flexible', appearance: 'interaction-only', 'error-callback': function () { turnstileDown = true; return true; } });
     } catch (e) { widgetId = null; }
   }
-  // api.js loads async; render as soon as it is there.
-  (function waitForTurnstile(n) {
+  // Render as soon as Cloudflare's script is there; ten seconds without it means it can't load.
+  function waitForTurnstile(n) {
     if (window.turnstile) { renderTurnstile(); return; }
     if (n > 100) { turnstileDown = true; return; }
     setTimeout(function () { waitForTurnstile(n + 1); }, 100);
-  })(0);
+  }
+  // List item 138: Cloudflare's check (about 358 kB) loads when the visitor starts, with a
+  // first tap or keypress in the form, not with the page; until then nothing goes to Cloudflare.
+  var turnstileAsked = false;
+  function loadTurnstile() {
+    if (turnstileAsked) return;
+    turnstileAsked = true;
+    var s = document.createElement('script');
+    s.src = TURNSTILE_SRC;
+    s.async = true;
+    s.onerror = function () { turnstileDown = true; };
+    document.head.appendChild(s);
+    waitForTurnstile(0);
+  }
+  $('srForm').addEventListener('focusin', loadTurnstile);
+  $('srForm').addEventListener('pointerdown', loadTurnstile);
 
   function token() {
     try { return widgetId !== null && window.turnstile ? window.turnstile.getResponse(widgetId) || '' : ''; } catch (e) { return ''; }
@@ -147,7 +164,8 @@
     form.url.setAttribute('aria-invalid', 'false');
     var t = token();
     if (!t) {
-      if (turnstileDown || !window.turnstile) { fail('bot_check', BOT_CHECK_DOWN); return; }
+      if (turnstileDown) { fail('bot_check', BOT_CHECK_DOWN); return; }
+      loadTurnstile();
       renderTurnstile();
       setMsg(window.turnstile && widgetId !== null ? 'Tick “Verify you are human” above, then press the button again.' : 'One moment while we check you’re a person, then press the button again.', 'error');
       return;

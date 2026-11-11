@@ -242,6 +242,8 @@ button:disabled{opacity:.55;cursor:default}
 .hb-checks li{font-size:12.5px;line-height:1.45}
 .hb-checks li b{display:block;font-weight:600;font-size:13px}
 .hb-checks li a{color:var(--plum)}
+.hb-facts{font-weight:600;color:var(--ink-2)}
+.hb-golive li[data-done="1"] b{color:var(--sage)}   /* list item 151 */
 .hb-card .hb-act{margin-top:10px}
 .hb-row.act .ic{font-size:15px}
 .hb-progress{height:6px;border-radius:3px;background:var(--hair);overflow:hidden;margin-top:10px}
@@ -291,7 +293,32 @@ h1.doc{font-family:var(--serif);font-weight:500;font-size:24px;letter-spacing:-.
 .pg-foot .dc-modal-cancel{margin-top:0}
 .pg-foot .danger{color:var(--clay)}
 .pg-foot .pg-done{margin-left:auto;background:var(--plum);border-color:var(--plum);color:var(--fill-ink,#fff)}
+.pg-pw .pg-done{background:var(--plum);border-color:var(--plum);color:var(--fill-ink,#fff)}
 .pg-err{color:var(--clay)}
+/* items 48 and 120: one page's settings in groups — switches, who can see it, counts beside the names */
+.pg-sw{display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:44px;margin:0;font-size:14px;color:var(--ink);cursor:pointer}
+.pg-sw input{flex:none;-webkit-appearance:none;appearance:none;position:relative;width:40px;height:24px;margin:0;border-radius:999px;background:var(--hair-2);cursor:pointer;transition:background var(--dur) var(--ease)}
+.pg-sw input::after{content:"";position:absolute;top:3px;left:3px;width:18px;height:18px;border-radius:50%;background:var(--sheet);box-shadow:0 1px 2px rgba(0,0,0,.2);transition:transform var(--dur) var(--ease)}
+.pg-sw input:checked{background:var(--plum)}
+.pg-sw input:checked::after{transform:translateX(16px)}
+.pg-sw input:focus-visible{outline:2px solid var(--plum);outline-offset:2px}
+@media (prefers-reduced-motion:reduce){.pg-sw input,.pg-sw input::after{transition:none}}
+.pg-access{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin:0 0 10px}
+.pg-acc{display:flex;flex-direction:column;align-items:flex-start;gap:8px;min-height:80px;padding:12px;border:1px solid var(--hair);border-radius:14px;background:var(--dc-raised,var(--paper));color:var(--ink);font:600 13.5px/1.2 var(--sans);text-align:left;cursor:pointer}
+.pg-acc:hover{border-color:var(--hair-2)}
+.pg-acc[aria-pressed=true]{border:2px solid var(--plum);padding:11px;background:var(--plum-soft);color:var(--plum)}
+.pg-acc svg{width:20px;height:20px}
+.pg-acc:focus-visible{outline:2px solid var(--plum);outline-offset:2px}
+.pg-says{margin:0 0 12px;font-size:13px;line-height:1.5;color:var(--ink-2)}
+.pg-pw{display:flex;flex-direction:column;gap:8px;margin:0 0 8px}
+.pg-pw .field{margin:0}
+.pg-pw .pc-acts{margin:0;align-items:center}
+.pg-saved{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:0 0 8px}
+.pg-lrow{display:flex;align-items:baseline;justify-content:space-between;gap:10px;margin-bottom:var(--dds-s1,4px)}
+.pg-lrow label{flex:none;margin:0}
+.pg-lrow .cnt{min-width:0;margin:0;text-align:right}
+.pg-sub{margin:16px 0 8px;font-size:12.5px;font-weight:600;color:var(--ink)}
+.pg-where{margin:-4px 0 4px;font-size:12.5px;color:var(--ink-2);overflow-wrap:anywhere}
 @media(max-width:760px){.pg-row .ic,.pg-row .hb-chip{display:none}.pg-row .t{flex:1 1 120px}.pg-grab{width:36px;height:44px}.pg-gear{width:44px;height:44px}}
 html:not(.is-studio) #dcModeSeg [data-dcmode="timewarp"]{display:none}
 .tg-try{font:inherit;font-size:12.5px;padding:6px 12px;border:1px solid var(--hair);border-radius:var(--r);background:none;color:var(--ink-2);cursor:pointer}
@@ -521,6 +548,55 @@ html.dc-edit:not(.plan-watch) .dc-close{height:36px;padding:0 14px;font-size:13p
 .ins-tile .ins-tile-row{display:flex;gap:4px;width:100%}
 .ins-tile .ins-tile-row i{flex:1 1 0;height:14px;border-radius:3px}
 .ins-tile-l{display:block;margin-top:6px;font-size:12px;font-weight:500;color:var(--ink-2)}
+/* items 49 and 118: a section's colour theme, each tile drawn in the site's own colours */
+.ins-themes{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px}
+.ins-theme{display:flex;flex-direction:column;align-items:center;gap:6px;min-width:0;padding:0;border:0;background:transparent;color:var(--ink-2);font:500 11.5px/1.2 var(--sans);cursor:pointer}
+.ins-theme-pic{display:flex;flex-direction:column;align-items:flex-start;justify-content:center;gap:5px;width:100%;height:60px;box-sizing:border-box;padding:10px 8px;border:1px solid var(--hair);border-radius:12px}
+.ins-theme-pic i{display:block;width:70%;height:5px;border-radius:2px}
+.ins-theme-pic i+i{width:90%;height:3px;opacity:.55}
+.ins-theme-pic b{display:block;width:40%;height:8px;border-radius:4px}
+.ins-theme[aria-pressed=true]{color:var(--plum);font-weight:600}
+.ins-theme[aria-pressed=true] .ins-theme-pic{border:2.5px solid var(--plum);padding:8.5px 6.5px}
+.ins-theme:focus-visible{outline:2px solid var(--plum);outline-offset:2px;border-radius:12px}
+.ins-says{margin:0;font-size:12.5px;line-height:1.45;color:var(--ink-2)}
+.ins-group{margin:4px 0 0;padding-top:14px;border-top:1px solid var(--hair);font-size:13px;font-weight:600;color:var(--ink)}
+/* the Layout tab: each layout drawn as itself (insPic) */
+.ins-tile-pic:has(.ins-pic){padding:8px;justify-content:stretch;align-items:stretch}
+.ins-tile.on .ins-tile-pic:has(.ins-pic){padding:7px}
+.ins-pic{display:grid;gap:3px;width:100%;height:100%}
+.ins-pic i{display:block;width:auto;height:auto;border-radius:2px;background:var(--ink-3);opacity:.5}
+.ins-pic i.h{background:var(--ink);opacity:.8}
+.ins-pic i.k{background:var(--plum);opacity:.8;border-radius:4px}
+.ins-pic[data-pic="gallery:default"],.ins-pic[data-pic="reviews_wall:default"],.ins-pic[data-pic="pricing:default"]{grid-template-columns:repeat(3,1fr)}
+.ins-pic[data-pic="gallery:default"]{grid-template-rows:repeat(2,1fr)}
+.ins-pic[data-pic="gallery:masonry"]{grid-template-columns:repeat(3,1fr);grid-template-rows:repeat(6,1fr);grid-auto-flow:column}
+.ins-pic[data-pic="gallery:masonry"] i:nth-child(1){grid-row:span 4}.ins-pic[data-pic="gallery:masonry"] i:nth-child(2){grid-row:span 2}
+.ins-pic[data-pic="gallery:masonry"] i:nth-child(3){grid-row:span 2}.ins-pic[data-pic="gallery:masonry"] i:nth-child(4){grid-row:span 4}
+.ins-pic[data-pic="gallery:masonry"] i:nth-child(5){grid-row:span 3}.ins-pic[data-pic="gallery:masonry"] i:nth-child(6){grid-row:span 3}
+.ins-pic[data-pic="gallery:filmstrip"]{grid-template-columns:1fr 1fr 1fr .4fr;padding:8px 0}
+.ins-pic[data-pic="reviews_wall:default"] i,.ins-pic[data-pic="pricing:default"] i{border:1px solid var(--ink-3);background:transparent;opacity:.7}
+.ins-pic[data-pic="pricing:default"] i:nth-child(2){border-color:var(--plum);border-width:2px}
+.ins-pic[data-pic="reviews_wall:quotes"]{grid-template-rows:auto 1fr 1fr;justify-items:center;align-content:center}
+.ins-pic[data-pic="reviews_wall:quotes"] i:nth-child(1){width:18px;height:12px;background:none;opacity:.8;border-left:5px solid var(--ink);border-right:5px solid var(--ink);border-radius:0}
+.ins-pic[data-pic="reviews_wall:quotes"] i:nth-child(2){width:80%;height:4px}.ins-pic[data-pic="reviews_wall:quotes"] i:nth-child(3){width:55%;height:4px}
+.ins-pic[data-pic="reviews_wall:strip"]{grid-template-columns:repeat(3,1fr);align-content:center;padding:10px 0;border-block:2px solid var(--hair)}
+.ins-pic[data-pic="reviews_wall:strip"] i{height:8px}
+.ins-pic[data-pic="accordion:default"]{grid-template-rows:repeat(3,1fr)}
+.ins-pic[data-pic="accordion:default"] i{background:transparent;border:1px solid var(--ink-3);opacity:.7}
+.ins-pic[data-pic="accordion:two-column"]{grid-template-columns:1fr 1fr;grid-template-rows:6px 4px 4px 6px 4px;column-gap:8px}
+.ins-pic[data-pic="accordion:two-column"] i:nth-child(4n+1){background:var(--ink);opacity:.8}
+.ins-pic[data-pic="cta:default"]{grid-template-columns:1fr auto;align-items:center;padding:0 4px;background:var(--plum-soft);border-radius:6px}
+.ins-pic[data-pic="cta:default"] i{height:6px}.ins-pic[data-pic="cta:default"] i.k{width:22px;height:10px}
+.ins-pic[data-pic="cta:card"]{justify-items:center;align-content:center;margin:2px 18px;border:1px solid var(--ink-3);border-radius:6px}
+.ins-pic[data-pic="cta:card"] i{width:70%;height:5px}.ins-pic[data-pic="cta:card"] i.k{width:26px;height:9px}
+.ins-pic[data-pic="pricing:list"]{grid-template-rows:repeat(3,1fr);align-content:center}
+.ins-pic[data-pic="pricing:list"] i{height:4px;background:linear-gradient(90deg,var(--ink) 30%,transparent 30% 78%,var(--ink) 78%);opacity:.6}
+.ins-pic[data-pic="width:normal"]{padding:6px 16px}
+.ins-pic[data-pic="width:normal"] i,.ins-pic[data-pic="width:full"] i{background:var(--plum-soft);opacity:1;border:1px solid var(--plum)}
+/* item 118: picking a look shows the whole page, at half size (desktop only) */
+html.dc-zoomout .dp-stage:not(.dev-tablet):not(.dev-phone) .dp-frame iframe{height:200%;transform:translateX(var(--dc-zoom-x,25%)) scale(.5);transform-origin:0 0}
+#dcZoomNote{position:absolute;left:16px;top:12px;z-index:3;display:none;padding:6px 12px;border-radius:999px;background:var(--plum-soft);color:var(--plum);font:600 12px/1.2 var(--sans);pointer-events:none}
+html.dc-zoomout .dp-stage:not(.dev-tablet):not(.dev-phone) #dcZoomNote{display:block}
 .ins-tile.on .ins-tile-l{color:var(--plum);font-weight:600}
 .ins-tile:focus-visible .ins-tile-pic{outline:2px solid var(--plum);outline-offset:2px}
 .ins-swatches{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
@@ -738,7 +814,7 @@ html.plan-watch .ss-bar,html.plan-watch [data-grp="Content"],html.plan-watch .na
 .field{margin-bottom:var(--dds-s6,24px);max-width:560px}
 .field label{display:block;font-size:12.5px;letter-spacing:0;text-transform:none;color:var(--ink-3);font-weight:500;margin-bottom:var(--dds-s1,4px)}
 .field select{width:100%;font-family:var(--sans);font-size:14px;height:36px;background:var(--sheet);border:1px solid var(--hair);padding:0 10px;border-radius:var(--r)}
-.field input[type=text],.field input[type=url],.field input[type=email],.field input[type=tel]{
+.field input[type=text],.field input[type=url],.field input[type=email],.field input[type=tel],.field input[type=password]{
   width:100%;font-family:var(--sans);font-size:14px;height:36px;background:var(--sheet);border:1px solid var(--hair);
   padding:0 10px;caret-color:var(--plum);border-radius:var(--r);transition:border-color var(--dur) var(--ease)}
 .field textarea{width:100%;font-family:var(--sans);font-size:14px;line-height:1.6;background:var(--sheet);border:1px solid var(--hair);padding:var(--dds-s2,8px) var(--dds-s3,12px);min-height:84px;resize:vertical;caret-color:var(--plum);border-radius:var(--r)}
@@ -801,6 +877,7 @@ html.plan-watch .ss-bar,html.plan-watch [data-grp="Content"],html.plan-watch .na
 .sv-pri.now{background:var(--clay-soft);color:var(--ink)}
 .sv-pri.soon{background:var(--amber-soft);color:var(--ink)}
 .sv-nums{display:flex;gap:var(--dds-s5,20px);flex-wrap:wrap;margin-bottom:var(--dds-s2,8px)}
+.sv-ai-list{font-size:13px;margin:var(--dds-s2,8px) 0 0;max-width:560px}   /* list item 153 */
 .sv-nums div{min-width:64px}
 .sv-nums b{display:block;font-size:22px;font-weight:600;font-variant-numeric:tabular-nums;line-height:1.2}
 .sv-nums span{font-size:12px;color:var(--ink-3)}
@@ -1563,7 +1640,7 @@ body.pd-dragging *{cursor:grabbing !important}
           <section class="sv-card" aria-labelledby="svFixH" id="svFixCard" hidden><h3 id="svFixH">What to fix first</h3><div id="svFix"></div></section>
           <section class="sv-card" aria-labelledby="svConsoleH" id="svConsoleCard" hidden><h3 id="svConsoleH">On Google Search</h3><div id="svConsole"></div></section>
           <section class="sv-card" aria-labelledby="svListingH" id="svListingCard" hidden><h3 id="svListingH">Your Google listing</h3><div id="svListing"></div></section>
-          <section class="sv-card" aria-labelledby="svAiH"><h3 id="svAiH">In AI answers</h3><div id="svAi"><p class="hint">Checking…</p></div></section>
+          <section class="sv-card" aria-labelledby="svAiH"><h3 id="svAiH">In AI answers</h3><div id="svAi"><p class="hint">Checking…</p></div><div id="aiCrawlWrap" data-needs="configure" hidden><label class="closedrow" style="margin-top:var(--dds-s3,12px)"><input type="checkbox" id="aiCrawlSwitch" aria-describedby="aiCrawlHint"> Let AI assistants read this site</label><div class="hint" id="aiCrawlHint"></div></div></section>
         </div>
         <div id="svWords">
           <h2 class="hb-sub-h">Your wording</h2>
@@ -1759,6 +1836,7 @@ body.pd-dragging *{cursor:grabbing !important}
               <div class="dp-stage" id="dpStage">
                 <div class="dp-frame">
                   <iframe id="designPreview" title="Live design preview of your draft home page" aria-hidden="true"></iframe>
+                  <div id="dcZoomNote" role="status">The whole page · back to full size when you leave Looks</div>
                   <div id="designPreviewEmpty" hidden>
                     <p class="eq" id="dpEmptyTitle">Your preview appears once your pages have content.</p>
                     <p class="eh" id="dpEmptyBody">Your preview is built from your real content. Start with the basics, or add what you offer.</p>
@@ -2787,6 +2865,27 @@ $("visitSwitch").addEventListener("change", async () => {
     toast(nice(err), true);
   }
 });
+// List item 175: one switch for AI assistants. Off, the next publish asks the known AI
+// crawlers to stay out in robots.txt; Google and Bing search are not affected.
+function renderAiCrawlSwitch() {
+  $("aiCrawlWrap").hidden = !!(S.site && S.site.edition === "monitor");   // a watched website's robots file isn't ours
+  const on = !(S.settings && S.settings.ai_crawlers === false);
+  $("aiCrawlSwitch").checked = on;
+  $("aiCrawlHint").textContent = on
+    ? "ChatGPT, Claude, Perplexity, Gemini and other AI assistants can read your site, so they can mention and recommend you. Changes go live when you publish."
+    : "AI assistants are asked not to read your site, so they’re less likely to mention or recommend you. The big ones honour this, but it isn’t a lock. Google and Bing search are not affected. Changes go live when you publish.";
+}
+$("aiCrawlSwitch").addEventListener("change", async () => {
+  const now = $("aiCrawlSwitch").checked;
+  whisper("topWhisper", "saving");
+  try {
+    await settingsPut({ ai_crawlers: now });
+    whisper("topWhisper", "saved"); renderAiCrawlSwitch(); scheduleChangesRefresh();
+  } catch (err) {
+    whisper("topWhisper", "failed"); $("aiCrawlSwitch").checked = !now;
+    toast(nice(err), true);
+  }
+});
 $("f-closednote").addEventListener("input", () => {
   debounce("closednote", async () => {
     try { await api("PUT", "/location", { temporarily_closed_note: $("f-closednote").value }); whisper("save-hours", "saved"); scheduleChangesRefresh(); }
@@ -3466,9 +3565,13 @@ function renderFoundations(f, plans, launch, dom) {
   const removeBtn = (label) => { const rm = el("button", "textact", label); rm.dataset.needs = "configure"; rm.style.opacity = "0.7"; rm.addEventListener("click", async () => { if (!(await askYes("Remove " + dstat.custom_domain + "? Your site goes back to its temporary address.", { ok: "Remove domain", danger: true }))) return; try { await api("DELETE", "/foundations/domain"); toast("Domain removed."); openFoundationsDesk(); } catch (err) { toast(nice(err), true); } }); return rm; };
 
   if (dstat && dstat.health === "ok") {
-    const p = el("p", "aihint", "✓ " + dstat.custom_domain + " is live and secure."); p.style.marginTop = "6px"; p.style.fontWeight = "600"; domCard.appendChild(p);
-    const apexD = String(dstat.custom_domain).replace(/^www\./, "");
-    const w = stepLine("Visitors reach you at both " + apexD + " and www." + apexD + " — either way works, and it’s always on https."); w.style.color = "var(--soft,#6b6478)"; domCard.appendChild(w);
+    // item 134 (Nov 2026 review, domains findings 3 and 5): "live and secure" only when every
+    // check passes (both names point here, nothing old left over, the padlock covers both, and
+    // the domain shows THIS site); otherwise say what's left. No checklist, no claim.
+    const lines = Array.isArray(dstat.checklist) ? dstat.checklist : null;
+    const allOk = !lines || dstat.all_ok === true;
+    const p = el("p", "aihint", allOk ? "✓ " + dstat.custom_domain + " is live and secure." : dstat.custom_domain + " is connected, with something left to finish:"); p.style.marginTop = "6px"; p.style.fontWeight = "600"; domCard.appendChild(p);
+    if (lines) lines.forEach((c) => { const l = stepLine((c.ok ? "✓ " : "• ") + String(c.words || "")); l.dataset.check = c.ok ? "ok" : "todo"; if (c.ok) l.style.color = "var(--soft,#6b6478)"; domCard.appendChild(l); });
     const rm = removeBtn("Remove this domain"); rm.style.marginTop = "8px"; domCard.appendChild(rm);
   } else if (dstat) {
     // Attached — walk them through the two records; it goes live on its own after.
@@ -5033,11 +5136,20 @@ function pcRow(entry, ctx) {
   const ic = el("span", "ic"); ic.innerHTML = pg ? (HB_ICON[pg.icon] || HB_ICON.page) : PG_LINK; row.appendChild(ic);
   const open = el("button", "pc-open"); open.type = "button";
   open.appendChild(el("span", "pp-name", name));
-  const sub = on ? "Editing now" : !pg ? it.href : canvas && it && it.label !== pg.title ? "In the menu as “" + it.label + "”" : pg.sum;
+  // items 48 and 120: a landing page says what it leaves out
+  const bare = own && (own.noHeader || own.noFooter) ? (own.noHeader && own.noFooter ? "No header or footer" : own.noHeader ? "No header" : "No footer") : "";
+  const sub = on ? "Editing now" : !pg ? it.href : canvas && it && it.label !== pg.title ? "In the menu as “" + it.label + "”" : bare || pg.sum;
   open.appendChild(el("span", "pc-sub", sub));
   if (on) open.setAttribute("aria-current", "page");
   open.title = canvas ? "Edit this page" : pg ? "This page’s settings" : "This link’s settings";
   row.appendChild(open);
+  const acc = own && (own.access === "password" || own.access === "private") ? own.access : "";
+  if (acc) {
+    const a = el("span", "hb-chip pc-access" + (acc === "password" ? " p" : "")); a.dataset.access = acc; a.appendChild(el("i", "d"));
+    a.appendChild(document.createTextNode(acc === "password" ? "Password" : "Private"));
+    a.title = acc === "password" ? "Visitors need a password to open it" : "Kept off your live site";
+    row.appendChild(a);
+  }
   const chip = pg ? pcChip(pg, ctx) : null; if (chip) row.appendChild(chip);
   const gear = el("button", "pc-ico pg-gear"); gear.type = "button"; gear.innerHTML = PG_GEAR; gear.title = "Settings"; gear.setAttribute("aria-label", "Settings for " + name);
   row.appendChild(gear);
@@ -5245,7 +5357,9 @@ function pgOpenSettings(startRef) {
     const pg = e.pg, slug = pg.slug || "", custom = !!slug;
     box.textContent = "";
     box.appendChild(el("h3", "dc-modal-h", pg.title + " settings"));
+    box.appendChild(el("p", "pg-where", seoHost() + pg.path));
     if (custom) {
+      box.appendChild(el("h4", "pg-h", "Page"));
       const name = pgInput(pg.title, 60), addr = pgInput(slug, 40);
       name.addEventListener("change", async () => { if (name.value.trim() && name.value.trim() !== pg.title) { await dcSavePageName(slug, name.value.trim().slice(0, 60), slug); paint(); } });
       addr.addEventListener("change", async () => {
@@ -5255,11 +5369,17 @@ function pgOpenSettings(startRef) {
       });
       box.appendChild(pgField("Page name", name));
       box.appendChild(pgField("Page address", addr, "Its link: yoursite.com/" + slug + "/. If you change it, visitors to the old link are sent to the new one."));
+      // items 48 and 120: who can see it, and the header and footer
+      box.appendChild(pgAccessGroup(slug, paint));
+      box.appendChild(pgChromeGroup(slug));
     } else {
-      box.appendChild(el("p", "dc-modal-sub", "Its address is " + pg.path + "."));
+      box.appendChild(el("p", "dc-modal-sub", pg.key === "home"
+        ? "Your home page is always open to everyone, with your header and footer."
+        : "Its address is " + pg.path + ". It’s built from your business details, so it’s always open to everyone, with your header and footer."));
     }
     box.appendChild(el("h4", "pg-h", "Menu"));
-    const onRow = el("label", "pg-check"); const on = el("input"); on.type = "checkbox"; on.checked = !!e.it; onRow.append(on, document.createTextNode(" Show in the menu"));
+    const onRow = pgSwitch("Show in the menu", !!e.it);
+    const on = onRow.querySelector("input");
     on.addEventListener("change", async () => {
       await pgSetInMenu(ref, on.checked);
       ref = { href: ref.href, parent: null };
@@ -5306,6 +5426,139 @@ function pgOpenSettings(startRef) {
   };
   paint();
   pgFocusFirst(box);
+}
+// ── Items 48 and 120: who can see an own page, and its header and footer ──
+// Who can see it is three cards and one sentence. Password asks for the password first and
+// only then turns on; the server keeps the key made from it, never the password
+// (POST /page-locks), and the publish seals the page with that key (lib/page_access.ts). A
+// password already saved for the page is used again when Password is picked back. The
+// header and footer are two switches, for a landing page; the canvas shows the change at
+// once. All of it is a page setting like the others: it saves now and goes live on publish.
+const PG_ACCESS = [
+  ["everyone", "Everyone", "globe", "Everyone can see this page once you publish."],
+  ["password", "Password", "lock", "Visitors type a password to open this page. It stays off Google and out of your site’s search."],
+  ["private", "Private", "eyeoff", "It stays in your draft: you and your team see it here, but it isn’t on your live site, in its menu or on Google until you pick Everyone."],
+];
+let PG_LOCKS = null;   // this site's saved page passwords (lock ids), read once when first needed
+function pgLocksRead() {
+  if (PG_LOCKS) return Promise.resolve(PG_LOCKS);
+  return api("GET", "/page-locks").then((r) => (PG_LOCKS = new Set(((r && r.data && r.data.ids) || []).map(String)))).catch(() => new Set());
+}
+// A label with a switch: a checkbox drawn as a switch, so it keeps its name and keys.
+function pgSwitch(label, on) {
+  const row = el("label", "pg-sw"); const t = el("span", null, label); const cb = el("input"); cb.type = "checkbox"; cb.checked = !!on;
+  row.append(t, cb); return row;
+}
+// One own page's stored settings, changed in one write (undefined takes a setting off).
+function pgSetPage(slug, patch, okMsg) {
+  return pgTurn(async () => {
+    if (!(await dcSavePendingEdits())) return false;
+    const build = () => {
+      let hit = false;
+      const pages = dcPagesArr().map((x) => {
+        if (x.slug !== slug) return x;
+        hit = true; const nx = { ...x, ...patch };
+        Object.keys(patch).forEach((k) => { if (patch[k] === undefined) delete nx[k]; });
+        return nx;
+      });
+      return hit ? { pages } : null;
+    };
+    try { await settingsPut(build); renderPagesBar(); scheduleChangesRefresh(); if (okMsg) toast(okMsg); return true; }
+    catch (err) { toast(nice(err), true); return false; }
+  });
+}
+function pgAccessGroup(slug) {
+  const g = el("div", "pg-group"); g.dataset.group = "access";
+  let asking = false, msg = "";   // the password field is open; why the last try didn't save
+  const draw = (focusOn) => {
+    const page = dcPageObj(slug); if (!page) return;
+    const now = page.access === "password" || page.access === "private" ? page.access : "everyone";
+    const shown = asking ? "password" : now;
+    g.textContent = "";
+    g.appendChild(el("h4", "pg-h", "Who can see it"));
+    const row = el("div", "pg-access"); row.setAttribute("role", "group"); row.setAttribute("aria-label", "Who can see it");
+    PG_ACCESS.forEach(([key, label, icon]) => {
+      const b = el("button", "pg-acc"); b.type = "button"; b.dataset.access = key;
+      b.setAttribute("aria-pressed", String(shown === key));
+      b.innerHTML = uiIcon(icon, 20); b.appendChild(el("span", null, label));
+      b.addEventListener("click", () => pick(key));
+      row.appendChild(b);
+    });
+    g.appendChild(row);
+    g.appendChild(el("p", "pg-says", PG_ACCESS.find((a) => a[0] === shown)[3]));
+    if (shown === "password" && !asking) {
+      const saved = el("div", "pg-saved");
+      const chip = el("span", "hb-chip good"); chip.appendChild(el("i", "d")); chip.appendChild(document.createTextNode("Password saved"));
+      const change = el("button", "dc-modal-cancel", "Change password"); change.type = "button";
+      change.addEventListener("click", () => { asking = true; msg = ""; draw("pw"); });
+      saved.append(chip, change); g.appendChild(saved);
+    }
+    if (asking) {
+      const box = el("div", "pg-pw");
+      const pw = el("input"); pw.type = "password"; pw.maxLength = 100; pw.autocomplete = "new-password"; pw.placeholder = "At least 4 letters or numbers";
+      box.appendChild(pgField("Password", pw, "Tell it to the people who should see the page. Changing it later asks everyone again."));
+      const err = el("div", "hint pg-err"); err.setAttribute("role", "alert"); err.hidden = !msg; err.textContent = msg; box.appendChild(err);
+      const acts = el("div", "pc-acts");
+      const save = el("button", "dc-modal-cancel pg-done", "Save password"); save.type = "button";
+      const show = el("button", "dc-modal-cancel", "Show"); show.type = "button"; show.setAttribute("aria-pressed", "false");
+      show.addEventListener("click", () => { const on = pw.type === "password"; pw.type = on ? "text" : "password"; show.textContent = on ? "Hide" : "Show"; show.setAttribute("aria-pressed", String(on)); });
+      const cancel = el("button", "dc-modal-cancel", "Cancel"); cancel.type = "button";
+      cancel.addEventListener("click", () => { asking = false; msg = ""; draw("cards"); });
+      const go = () => savePassword(pw.value, save);
+      save.addEventListener("click", go);
+      pw.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); go(); } });
+      acts.append(save, show, cancel); box.appendChild(acts);
+      g.appendChild(box);
+      if (focusOn === "pw") setTimeout(() => { try { pw.focus({ preventScroll: true }); box.scrollIntoView({ block: "nearest" }); } catch (_) {} }, 0);
+    }
+    if (focusOn === "cards") { const b = row.querySelector('[aria-pressed="true"]'); if (b) { try { b.focus({ preventScroll: true }); } catch (_) {} } }
+  };
+  const pick = async (key) => {
+    const page = dcPageObj(slug); if (!page) return;
+    const now = page.access === "password" || page.access === "private" ? page.access : "everyone";
+    if (key === "password") {
+      if (now === "password" || asking) return;
+      // a password this page already had comes back without being typed again
+      if (page.lock && (await pgLocksRead()).has(page.lock)) { await pgSetPage(slug, { access: "password" }, "Password on. Publish to apply."); draw("cards"); return; }
+      asking = true; msg = ""; draw("pw"); return;
+    }
+    asking = false; msg = "";
+    if (key === now) { draw("cards"); return; }
+    await pgSetPage(slug, { access: key === "private" ? "private" : undefined },
+      key === "private" ? "Kept private. Publish to take it off your live site." : "Open to everyone. Publish to apply.");
+    draw("cards");
+  };
+  const savePassword = async (value, btn) => {
+    const pw = String(value || "").trim();
+    if (pw.length < 4) { msg = "Use at least 4 letters or numbers."; draw("pw"); return; }
+    btn.disabled = true;
+    try {
+      const r = await api("POST", "/page-locks", { password: pw });
+      const id = r && r.data && r.data.id; if (!id) throw new Error("That didn’t save. Nothing was changed. Please try again.");
+      (PG_LOCKS || (PG_LOCKS = new Set())).add(String(id));
+      if (await pgSetPage(slug, { access: "password", lock: String(id) }, "Password saved. Publish to apply.")) { asking = false; msg = ""; draw("cards"); }
+      else btn.disabled = false;
+    } catch (err) { msg = nice(err); draw("pw"); }
+  };
+  draw();
+  return g;
+}
+function pgChromeGroup(slug) {
+  const g = el("div", "pg-group"); g.dataset.group = "chrome";
+  g.appendChild(el("h4", "pg-h", "Header and footer"));
+  const page = dcPageObj(slug) || {};
+  [["noHeader", "Show the header"], ["noFooter", "Show the footer"]].forEach(([field, label]) => {
+    const row = pgSwitch(label, !page[field]); const cb = row.querySelector("input");
+    cb.addEventListener("change", async () => {
+      const show = cb.checked;
+      const ok = await pgSetPage(slug, { [field]: show ? undefined : true }, (show ? "Shown again" : "Left out") + " on this page. Publish to apply.");
+      if (!ok) { cb.checked = !show; return; }
+      if (DC_PAGE === slug) refreshDesignPreview();   // the page being edited shows it at once
+    });
+    g.appendChild(row);
+  });
+  g.appendChild(el("p", "pg-says", "Turn both off for a landing page, so nothing on it leads away."));
+  return g;
 }
 // The first field takes the cursor, as it always has (a pane with none: All pages).
 function pgFocusFirst(box) {
@@ -5437,8 +5690,10 @@ function renderDomainCard() {
     card.appendChild(askOwner("note", "Ask the account owner to connect it."));
     btn.dataset.needs = "configure"; btn.textContent = "Connect your domain"; btn.addEventListener("click", () => openFoundationsDesk({ domain: true }));
   } else if (d.health === "ok") {
-    card.appendChild(el("div", "note", "✓ " + d.custom_domain + " is live and secure."));
-    btn.textContent = "Domain & email"; btn.addEventListener("click", () => openFoundationsDesk());
+    // item 134: the same rule as the desk — "live and secure" only when every check passes
+    const left = Array.isArray(d.checklist) ? d.checklist.filter((c) => c && !c.ok) : [];
+    card.appendChild(el("div", "note", left.length ? d.custom_domain + " is connected. Still to finish: " + left.map((c) => String(c.words || "")).join("; ") + "." : "✓ " + d.custom_domain + " is live and secure."));
+    btn.textContent = left.length ? "See what’s left" : "Domain & email"; btn.addEventListener("click", () => openFoundationsDesk());
   } else {
     card.appendChild(el("div", "note", d.health === "ssl_pending"
       ? d.custom_domain + " is connected — the security certificate is switching on. Nothing for you to do."
@@ -5456,8 +5711,25 @@ function renderHealthCard() {
   chip.appendChild(document.createTextNode(h.overall === "healthy" ? "All good" : h.overall === "attention" ? (h.attention_count + " to look at") : "Getting started"));
   head.appendChild(chip); card.appendChild(head);
   card.appendChild(el("div", "note", h.summary || h.headline || ""));
+  // list item 151: the two figures an owner asks first, how much it's been up and how fast
+  // it loads, shown whether or not they need a look; and a new site's go-live list
+  const facts = [];
+  h.categories.forEach((c) => (c.checks || []).forEach((k) => { if (c.key === "speed" || /^Online \d/.test(k.title)) facts.push(k.title); }));
+  if (facts.length) card.appendChild(el("div", "note hb-facts", facts.join(" · ")));
+  const golive = h.categories.find((c) => c.key === "golive");
+  if (golive) {
+    card.appendChild(el("h3", "hb-sub-h", "Before you go live"));
+    const ul = el("ul", "hb-checks hb-golive");
+    golive.checks.forEach((k) => {
+      const li = el("li"); li.dataset.done = k.state === "ok" ? "1" : "0";
+      li.appendChild(el("b", null, (k.state === "ok" ? "✓ " : "") + k.title)); li.appendChild(document.createTextNode(k.why || ""));
+      if (k.state !== "ok" && k.action_label && k.action_href) { li.appendChild(document.createTextNode(" ")); const a = el("a", null, k.action_label); a.href = k.action_href; li.appendChild(a); }
+      ul.appendChild(li);
+    });
+    card.appendChild(ul);
+  }
   const needs = [];
-  h.categories.forEach((c) => (c.checks || []).forEach((k) => { if (k.state === "attention") needs.push(k); }));
+  h.categories.forEach((c) => { if (c.key !== "golive") (c.checks || []).forEach((k) => { if (k.state === "attention") needs.push(k); }); });
   if (needs.length) {
     const ul = el("ul", "hb-checks");
     needs.slice(0, 3).forEach((k) => {
@@ -7131,6 +7403,7 @@ function fillSingles() {
   if ($("f-gsv")) $("f-gsv").value = (S.settings && S.settings.google_site_verification) || "";
   if ($("f-bsv")) $("f-bsv").value = (S.settings && S.settings.bing_site_verification) || "";
   renderVisitSwitch();
+  renderAiCrawlSwitch();
   const l = S.location || {};
   [["f-address_line1","address_line1"],["f-city","city"],["f-region","region"],["f-postal_code","postal_code"],["f-locphone","phone"]]
     .forEach(([id, k]) => { $(id).value = l[k] || ""; });
@@ -7206,35 +7479,34 @@ function remountInPlace(id, mount, force) {   // force: an Undo redraws it even 
 // (built-in pages by name, the owner's own as "page:<slug>"). ──
 // The show-on-Google toggle: one pages_noindex entry (checked = shows).
 function seoNoindexRow(key, pageName, rowLabel) {
-  const rowEl = el("div"); rowEl.style.cssText = "display:flex;align-items:center;gap:8px;padding:3px 0";
-  const cb = el("input"); cb.type = "checkbox"; cb.id = "nx-" + key.replace(/[^a-z0-9_-]/gi, "-");
-  cb.checked = !new Set((S.settings && S.settings.pages_noindex) || []).has(key);
+  const rowEl = pgSwitch(rowLabel || pageName, !new Set((S.settings && S.settings.pages_noindex) || []).has(key));
+  const cb = rowEl.querySelector("input"); cb.id = "nx-" + key.replace(/[^a-z0-9_-]/gi, "-");
   cb.addEventListener("change", async () => {
     const show = cb.checked;
     const noindex = () => { const nh = new Set((S.settings && S.settings.pages_noindex) || []); show ? nh.delete(key) : nh.add(key); return { pages_noindex: [...nh] }; };
     try { await settingsPut(noindex); toast(cb.checked ? pageName + " will show on Google — publish to apply" : pageName + " will be hidden from Google — publish to apply"); scheduleChangesRefresh(); }
     catch (err) { toast(nice(err), true); cb.checked = !cb.checked; }
   });
-  const lb = el("label", null, rowLabel || pageName); lb.setAttribute("for", cb.id); lb.style.cssText = "margin:0;font-weight:400;font-size:13px";
-  rowEl.append(cb, lb); return rowEl;
+  return rowEl;
 }
 // One page's search wording + share appearance (page_seo overrides): search
 // headline/description, share (og/twitter) headline/description, share image.
+// Item 120: each field has its name above it, and the headline and description count
+// their letters beside the name as they're typed.
 function seoFieldsBox(key, label, showLabel) {
   const cur = ((S.settings && S.settings.page_seo) || {})[key] || {};
   const box = el("div"); box.style.cssText = "margin:8px 0 12px";
   if (showLabel !== false) box.appendChild(Object.assign(el("div", null, label), { style: "font-size:12px;font-weight:600;margin-bottom:3px" }));
-  const ti = el("input"); ti.type = "text"; ti.maxLength = 120; ti.placeholder = "Search headline (blank = the good default)"; ti.value = cur.title || "";
-  const di = el("input"); di.type = "text"; di.maxLength = 320; di.placeholder = "Search description (blank = the good default)"; di.value = cur.description || "";
-  const sti = el("input"); sti.type = "text"; sti.maxLength = 60; sti.placeholder = "Share headline — when texted or posted (blank = the search headline)"; sti.value = cur.share_title || "";
-  const sdi = el("input"); sdi.type = "text"; sdi.maxLength = 160; sdi.placeholder = "Share description (blank = the search description)"; sdi.value = cur.share_description || "";
-  const sim = el("select"); sim.style.cssText = "width:100%;margin-top:4px;padding:7px 9px;font:inherit;font-size:12.5px;border:1px solid var(--line,#ddd);border-radius:8px;background:var(--bg,#fff);color:inherit";
-  sim.setAttribute("aria-label", "Share image for " + label);
-  const noneOpt = el("option", null, "Share image: your site’s usual one"); noneOpt.value = ""; sim.appendChild(noneOpt);
-  (S.media || []).filter((m) => m.thumb).forEach((m) => { const o = el("option", null, "Share image: " + (m.alt_text || "photo").slice(0, 60)); o.value = m.id; sim.appendChild(o); });
+  const ti = el("input"); ti.type = "text"; ti.maxLength = 120; ti.placeholder = "Blank shows the good default"; ti.value = cur.title || "";
+  const di = el("input"); di.type = "text"; di.maxLength = 320; di.placeholder = "Blank shows the good default"; di.value = cur.description || "";
+  const sti = el("input"); sti.type = "text"; sti.maxLength = 60; sti.placeholder = "Same as the search headline"; sti.value = cur.share_title || "";
+  const sdi = el("input"); sdi.type = "text"; sdi.maxLength = 160; sdi.placeholder = "Same as the search description"; sdi.value = cur.share_description || "";
+  const sim = el("select");
+  sim.setAttribute("aria-label", "Share picture for " + label);
+  const noneOpt = el("option", null, "Your site’s usual picture"); noneOpt.value = ""; sim.appendChild(noneOpt);
+  (S.media || []).filter((m) => m.thumb).forEach((m) => { const o = el("option", null, (m.alt_text || "photo").slice(0, 60)); o.value = m.id; sim.appendChild(o); });
   sim.value = cur.share_image || "";
   if (sim.value !== (cur.share_image || "")) sim.value = "";   // the stored photo is gone → fall back
-  [ti, di, sti, sdi].forEach((inp) => { inp.style.cssText = "width:100%;margin-top:4px;padding:7px 9px;font:inherit;font-size:12.5px;border:1px solid var(--line,#ddd);border-radius:8px"; });
   ti.setAttribute("aria-label", "Search headline for " + label); di.setAttribute("aria-label", "Search description for " + label);
   // How THIS page reads on Google — blank fields show the default the template
   // renders (seoPageDefault mirrors the templates' seoOv shapes).
@@ -7248,6 +7520,12 @@ function seoFieldsBox(key, label, showLabel) {
     srpFill(prev, { name: w.name, host: seoCrumb(seoHost(), path), hostMuted: !siteLiveUrl(), title: ti.value.trim() || def.title, description: di.value.trim() || def.description });
     seoCounterInto(cntT, "title", ti.value, "Empty — Google shows “" + seoCut(def.title, SEO_TITLE_MAX) + "”");
     seoCounterInto(cntD, "description", di.value, def.description ? "Empty — Google shows “" + seoCut(def.description, 70) + "”" : "Empty — and so is your description, so add one");
+    // a count sits beside the field's name; with nothing typed, the line saying what Google shows instead goes under it
+    [[ti, cntT], [di, cntD]].forEach(([inp, cnt]) => {
+      const row = inp.parentNode && inp.parentNode.querySelector(".pg-lrow"); if (!row) return;
+      if (inp.value) { if (cnt.parentNode !== row) row.appendChild(cnt); }
+      else if (cnt.previousSibling !== inp) inp.after(cnt);
+    });
   };
   [ti, di].forEach((inp) => inp.addEventListener("input", paint));
   const save = async () => {
@@ -7262,7 +7540,16 @@ function seoFieldsBox(key, label, showLabel) {
     catch (err) { toast(nice(err), true); }
   };
   [ti, di, sti, sdi, sim].forEach((inp) => inp.addEventListener("change", save));
-  box.append(ti, cntT, di, cntD, prev.root, sti, sdi, sim); paint(); return box;
+  // a name above each field; the two Google reads count beside theirs
+  const counted = (name, input, cnt) => {
+    const f = el("div", "field"); if (!input.id) input.id = "pgf-" + Math.random().toString(36).slice(2, 8);
+    const row = el("div", "pg-lrow"); const l = el("label", null, name); l.setAttribute("for", input.id);
+    row.appendChild(l); if (cnt) row.appendChild(cnt);
+    f.append(row, input); return f;
+  };
+  box.append(counted("Search headline", ti, cntT), counted("Search description", di, cntD), prev.root,
+    el("div", "pg-sub", "When it’s shared"), counted("Share headline", sti), counted("Share description", sdi), counted("Share picture", sim));
+  paint(); return box;
 }
 // ── Benchmark item 4 (docs/design/BENCHMARK-2026-10.md): how the page reads on
 // Google. The helpers from here to seoPageDefault are PURE (no DOM, no S) and
@@ -7699,6 +7986,15 @@ function renderSvAi() {
         grid.append(el("span", null, p.name), bar, el("span", "sv-pn", p.score === null ? "Not measured" : String(p.score)));
       });
       host.appendChild(grid);
+    }
+    // list item 153: who the assistants named instead, and the websites their answers drew on
+    if ((a.competitors || []).length) {
+      const p = el("p", "sv-ai-list"); p.append(el("b", null, "Named instead of you: "), a.competitors.map((c) => `${c.name} (${c.times} time${c.times === 1 ? "" : "s"})`).join(", "));
+      host.appendChild(p);
+    }
+    if ((a.sources || []).length) {
+      const p = el("p", "sv-ai-list"); p.append(el("b", null, "Websites the answers drew on: "), a.sources.map((x) => `${x.own ? "your website" : x.name} (${x.cited})`).join(", "));
+      host.appendChild(p);
     }
     host.appendChild(el("p", "hint", `Checked ${svWhen(a.checked_at)}${a.business_name ? ` for ${a.business_name}${a.city ? ` in ${a.city}` : ""}` : ""}.`));
   } else {
@@ -8221,9 +8517,13 @@ function mountFontLibrary(card, T) {
     box.appendChild(Object.assign(el("div", null, label), { style: "font-size:12px;font-weight:600;margin:10px 0 6px" }));
     const grid = el("div"); grid.style.cssText = "display:grid;grid-template-columns:repeat(auto-fill,minmax(132px,1fr));gap:6px";
     grid.setAttribute("role", "group"); grid.setAttribute("aria-label", label + " font");
-    DESIGN_FONTS.forEach((f) => {
-      const on = firstOf(T[tok]) === f.css.toLowerCase();
-      const b = el("button", null, f.family + (on ? " ✓" : "")); b.type = "button";
+    // item 119: the fonts the site already uses come first (this one's pick, then the other's),
+    // so reusing one is the easy choice: fewer fonts, faster site
+    const other = firstOf(T[tok === "font_display" ? "font_body" : "font_display"]);
+    const rank = (f) => (firstOf(T[tok]) === f.css.toLowerCase() ? 0 : other === f.css.toLowerCase() ? 1 : 2);
+    DESIGN_FONTS.map((f, i) => [f, i]).sort((a, b) => rank(a[0]) - rank(b[0]) || a[1] - b[1]).map(([f]) => f).forEach((f) => {
+      const on = firstOf(T[tok]) === f.css.toLowerCase(), used = !on && other === f.css.toLowerCase();
+      const b = el("button", null, f.family + (on ? " ✓" : used ? " · in use" : "")); b.type = "button";
       b.setAttribute("aria-pressed", String(on));
       b.style.cssText = "font-family:'" + f.css + "'," + f.fallback + ";font-size:15px;text-align:left;padding:7px 10px;border-radius:10px;cursor:pointer;background:" + (on ? "var(--plum-tint,#faf7ff)" : "transparent") + ";border:2px solid " + (on ? "var(--plum,#5b3fa0)" : "var(--line,#ddd)");
       b.addEventListener("click", () => saveTokens({ [tok]: f.css + ", " + f.fallback }, msg + f.family));
@@ -8256,6 +8556,10 @@ async function mountDesignCard(fresh = true) {
   looksWrap.appendChild(el("div", "hint", "One tap restyles your whole site — colors, type and corners together, always readable. Nothing reaches your live site until you publish."));
   const fixedColors = FIXED_COLOR_TEMPLATES.has((S.site && S.site.template_slug) || "");
   if (fixedColors) card.appendChild(el("div", "hint", "This template keeps its own dark colors, so the color and background choices don't change it. Fonts, text size, corners and spacing do.")).dataset.stab = "colours";
+  // item 118: which colour themes this page's sections wear (the canvas tags each one while this tab is open)
+  const nowRow = el("div", "ins-field"); nowRow.id = "stThemesNow"; nowRow.dataset.stab = "colours";
+  nowRow.append(el("div", "ins-lbl", "Colour themes on this page"), el("p", "ins-says"));
+  card.appendChild(nowRow);
   // colors
   if (!fixedColors) stab(pillRow(card, "Colors", PALETTES, (p) => (p.accent ? String(T.accent || "").toLowerCase() === p.accent : !T.accent),
     (p) => saveTokens(p.key ? { ...p.tokens } : { accent: "", accent_dark: "", ink: "", soft: "" }, p.key ? p.name : "Original colors"), "swatch"), "colours");
@@ -9402,7 +9706,7 @@ function blockVariantRow(idx, blk, sub) {
   const opts = BLOCK_VARIANT_OPTS[blk && blk.type]; if (!opts) return;
   const isOn = (o) => String((BLOCKS_WORK[idx] && BLOCKS_WORK[idx].variant) || "") === o[1];
   const pick = (o) => { const b = { ...BLOCKS_WORK[idx] }; if (o[1]) b.variant = o[1]; else delete b.variant; BLOCKS_WORK[idx] = b; renderBlocksCard(); dcLiveFromPanel(); };
-  if (sub.classList && sub.classList.contains("ins-pane")) { insTiles(sub, "Layout", opts, isOn, pick); return; }   // the inspector: pictures
+  if (sub.classList && sub.classList.contains("ins-pane")) { insTiles(sub, "Layout", opts, isOn, pick, (o) => blk.type + ":" + (o[1] || "default")); return; }   // the inspector: each layout drawn as itself
   pillRow(sub, "Style", opts, isOn, pick);
 }
 // A calm, collapsed "Look of this section" control row — plain words, smart defaults,
@@ -9414,8 +9718,8 @@ function blockLookRow(idx, blk, sub) {
   if (sub && sub.content) {   // the inspector's panes: each choice on the tab it belongs to
     const panes = sub;
     const bands = [["", "Default"], ["tinted", "Tinted"], ["plain", "Plain"], ["accent", "Accent band"], ["dark", "Dark band"]];
-    pillRow(panes.style, "Background band", bands.map(([v, l]) => [l, v]), (o) => (cur.background || "") === o[1], (o) => lookSet(idx, "background", o[1]));
-    insTiles(panes.layout, "Width", [["Normal", ""], ["Full width", "full"]], (o) => (cur.width || "") === o[1], (o) => lookSet(idx, "width", o[1]));
+    insThemes(panes.style, idx, cur, (blk && blk.style) || {});   // items 49 and 118: the band is the section's colour theme
+    insTiles(panes.layout, "Width", [["Normal", ""], ["Full width", "full"]], (o) => (cur.width || "") === o[1], (o) => lookSet(idx, "width", o[1]), (o) => "width:" + (o[1] || "normal"));
     pillRow(panes.layout, "Spacing", [["Tight", "tight"], ["Normal", ""], ["Roomy", "roomy"]], (o) => (cur.spacing || "") === o[1], (o) => lookSet(idx, "spacing", o[1]));
     pillRow(panes.layout, "Text", [["Default", ""], ["Centered", "center"]], (o) => (cur.align || "") === o[1], (o) => lookSet(idx, "align", o[1]));
     pillRow(panes.when, "Show on", [["All screens", ""], ["Desktop only", "mobile"], ["Phones only", "desktop"]], (o) => (cur.hideOn || "") === o[1], (o) => lookSet(idx, "hideOn", o[1]));
@@ -9562,12 +9866,18 @@ function blockStyleRow(idx, blk, sub, flat) {
   };
   // Enumerated picks — pillRows; the FIRST option is the default, stored as ABSENT
   // (the BLOCK_STYLE_FIELDS convention, matching parseStyle exactly).
-  pillRow(det, "Font", [["Default", ""], ["Heading face", "display"], ["Body face", "body"]],
-    (o) => String(st.font || "") === o[1], (o) => setStyle({ font: o[1] }));
-  pillRow(det, "Text size", [["Smaller", "s"], ["Normal", ""], ["Larger", "l"], ["Extra large", "xl"]],
-    (o) => String(st.size || "") === o[1], (o) => setStyle({ size: o[1] }));
-  pillRow(det, "Alignment", [["Default", ""], ["Left", "left"], ["Centered", "center"], ["Right", "right"]],
-    (o) => String(st.align || "") === o[1], (o) => setStyle({ align: o[1] }));
+  // the inspector's Style tab: the colour theme leads (insThemes), then colours, then type
+  const typeRows = () => {
+    if (flat) det.appendChild(el("div", "ins-group", "Type"));
+    pillRow(det, "Font", [["Default", ""], ["Heading face", "display"], ["Body face", "body"]],
+      (o) => String(st.font || "") === o[1], (o) => setStyle({ font: o[1] }));
+    pillRow(det, "Text size", [["Smaller", "s"], ["Normal", ""], ["Larger", "l"], ["Extra large", "xl"]],
+      (o) => String(st.size || "") === o[1], (o) => setStyle({ size: o[1] }));
+    pillRow(det, "Alignment", [["Default", ""], ["Left", "left"], ["Centered", "center"], ["Right", "right"]],
+      (o) => String(st.align || "") === o[1], (o) => setStyle({ align: o[1] }));
+  };
+  if (!flat) typeRows();
+  else det.appendChild(el("div", "ins-group", "Colours · from your site"));
   // Three color wells — curated brand shades first, the Brand-Kit color-input+hex
   // pair behind "Custom…", and a "Default" clear chip each.
   const well = (label, key) => {
@@ -9619,7 +9929,7 @@ function blockStyleRow(idx, blk, sub, flat) {
     det.appendChild(wrap);
   };
   well(flat ? "Text colour" : "Text", "text_color");
-  well(flat ? "Background · from your site colours" : "Background", "bg_color");
+  well(flat ? "Background" : "Background", "bg_color");
   well(flat ? "Buttons" : "Accent", "accent");
   // LIVE CONTRAST (§5) — a chip per governing pair, with the one-tap fix beside a
   // failing one. Recomputed on every redraw (every pick redraws), so it's live.
@@ -9641,6 +9951,7 @@ function blockStyleRow(idx, blk, sub, flat) {
     det.appendChild(crow);
     if (pairs.some((p) => p.siteBg)) det.appendChild(Object.assign(el("div", "hint", "Text is checked against your page background."), { style: "margin-top:4px" }));
   }
+  if (flat) typeRows();
   det.appendChild(el("div", "hint", flat ? "Only this section changes. Everything else keeps your site’s overall design." : "Optional — give just this section its own colors, face, size or alignment. Everything else keeps your site's overall design."));
   sub.appendChild(det);
 }
@@ -11140,7 +11451,10 @@ async function mountLookCard() {
     const dev = b.dataset.dpdev;
     seg.querySelectorAll("button").forEach((x) => { const on = x === b; x.classList.toggle("on", on); x.setAttribute("aria-pressed", String(on)); });
     const stage = $("dpStage"); if (stage) stage.className = "dp-stage" + (dev === "desktop" ? "" : " dev-" + dev);
+    dcZoomSync(); setTimeout(dcThemeTags, 260);   // the frame finishes changing width first
   });
+  let resized = null;
+  window.addEventListener("resize", () => { clearTimeout(resized); resized = setTimeout(dcColourAids, 150); });
 })();
 
 // ── Slice D (AC-4) — the modes bar: Edit · Preview · Comments · Timewarp ─────
@@ -11311,6 +11625,7 @@ function toggleTray(tab) {
 function closeSettingsPanel() {
   const p = $("settingsPanel"), sc = $("dcScrim"); if (!p) return;
   p.classList.remove("on"); p.setAttribute("aria-hidden", "true");
+  dcColourAids();
   if (sc) { sc.classList.remove("on"); sc.hidden = true; }
   if (PANEL_MODE === "section") {   // back to the full list, so a later "All sections" isn't one block
     PANEL_MODE = "styles"; BLOCK_SOLO = null; p.dataset.mode = "styles";
@@ -11352,6 +11667,7 @@ function openSettingsPanel(mode, title) {
   }
   p.classList.add("on"); p.setAttribute("aria-hidden", "false");
   if (m === "sections" && $("blocksCard")) renderBlocksCard();
+  dcColourAids();
   setTimeout(() => { try {
     // already in a field in this panel: leave them there, or the words go nowhere
     const ae = document.activeElement;
@@ -11369,6 +11685,7 @@ function stylesTab(name) {
   const p = $("settingsPanel"); if (p) p.dataset.stab = STYLES_TAB;
   const seg = $("stylesSeg"); if (seg) seg.querySelectorAll("[data-stab]").forEach((b) => b.setAttribute("aria-selected", String(b.dataset.stab === STYLES_TAB)));
   const sc = p && p.querySelector(".dc-panel-scroll"); if (sc) sc.scrollTop = 0;
+  dcColourAids();
 }
 // ── the inspector (the floating studio, part two): one section, four tabs. Content holds the
 // fields; Style its colours and type; Layout its arrangement; When its dates and where it shows.
@@ -11380,6 +11697,7 @@ function insSyncSeg() {
 function insTab(name) {
   INS_TAB = ["content", "style", "layout", "when"].indexOf(name) >= 0 ? name : "content";
   insSyncSeg();
+  setTimeout(dcColourAids, 0);   // the tab's panes swap first
   document.querySelectorAll("#blocksCard .ins-pane").forEach((p) => { p.hidden = p.dataset.pane !== INS_TAB; });
 }
 function insPanes(box) {
@@ -11397,7 +11715,7 @@ function insHead(blk, def) {
   if (p) p.setAttribute("aria-label", name);
 }
 // picture tiles: a small sketch per choice, the chosen one outlined in plum
-function insTiles(host, label, opts, isOn, onPick) {
+function insTiles(host, label, opts, isOn, onPick, picFor) {
   const wrap = el("div", "ins-field");
   wrap.appendChild(el("div", "ins-lbl", label));
   const row = el("div", "ins-tiles");
@@ -11405,7 +11723,9 @@ function insTiles(host, label, opts, isOn, onPick) {
     const on = isOn(o);
     const b = el("button", "ins-tile" + (on ? " on" : "")); b.type = "button"; b.setAttribute("aria-pressed", String(on));
     const pic = el("div", "ins-tile-pic");
-    if (i % 3 === 1) { const r = el("div", "ins-tile-row"); r.append(el("i"), el("i")); pic.appendChild(r); const l = el("i"); l.style.width = "70%"; pic.appendChild(l); }
+    const drawn = picFor ? insPic(picFor(o)) : null;
+    if (drawn) pic.appendChild(drawn);
+    else if (i % 3 === 1) { const r = el("div", "ins-tile-row"); r.append(el("i"), el("i")); pic.appendChild(r); const l = el("i"); l.style.width = "70%"; pic.appendChild(l); }
     else if (i % 3 === 2) { const r = el("div", "ins-tile-row"); r.append(el("i"), el("i"), el("i")); pic.appendChild(r); }
     else { const h = el("i", "h"); h.style.width = "60%"; const a = el("i"); a.style.width = "85%"; const c = el("i"); c.style.width = "85%"; pic.append(h, a, c); }
     b.appendChild(pic);
@@ -11416,6 +11736,132 @@ function insTiles(host, label, opts, isOn, onPick) {
   wrap.appendChild(row); host.appendChild(wrap);
   return row;
 }
+// ── Items 49 and 118: a section's colour theme, drawn in the site's own colours ──
+// The five bands the server draws (lib/site_blocks.ts .block--bg-*) are the section's colour
+// themes. Each tile is a little section in that theme, in this site's colours as the canvas
+// has them, so picking one is picking what you see. A custom background colour (the Colours
+// group below) and a theme are one background at a time, as lookSet already keeps them.
+const INS_THEMES = [
+  ["", "Default", "Follows your template: sections take turns with a soft band."],
+  ["tinted", "Tinted", "A soft wash of your accent colour behind the section."],
+  ["plain", "Plain", "No band: the section sits on the page’s own background."],
+  ["accent", "Accent", "Your accent colour behind light words, with white buttons."],
+  ["dark", "Dark", "Light words on a deep background, buttons in your accent colour."],
+];
+// The site's colours as the canvas draws them (every template names them alike), or quiet
+// stand-ins before the canvas has drawn.
+function dcSiteColours() {
+  const out = { paper: "#f7f7f5", card: "#ffffff", ink: "#1c2430", soft: "#5b6572", accent: "#23635a", accentDark: "", wash: "#eef1ee" };
+  try {
+    const d = $("designPreview") && $("designPreview").contentDocument;
+    const cs = d && d.documentElement && d.defaultView.getComputedStyle(d.documentElement);
+    if (cs) [["paper", "--paper"], ["card", "--card"], ["ink", "--ink"], ["soft", "--soft"], ["accent", "--accent"], ["accentDark", "--accent-dark"], ["wash", "--wash"]].forEach(([k, v]) => {
+      const x = cs.getPropertyValue(v).trim(); if (x && !/^var\(/.test(x)) out[k] = x;
+    });
+  } catch (_) {}
+  if (!out.accentDark) out.accentDark = out.accent;
+  return out;
+}
+// what a theme looks like: its background, words and button
+function insThemeLook(v, c) {
+  if (v === "tinted") return { bg: "color-mix(in srgb," + c.accent + " 8%," + c.paper + ")", ink: c.ink, btn: c.accent };
+  if (v === "plain") return { bg: c.paper, ink: c.ink, btn: c.accent };
+  if (v === "accent") return { bg: c.accentDark, ink: "#ffffff", btn: "#ffffff" };
+  if (v === "dark") return { bg: "#1a1622", ink: "#f2eef8", btn: c.accent };
+  return { bg: "linear-gradient(180deg," + c.card + " 0 55%," + c.wash + " 55%)", ink: c.ink, btn: c.accent };
+}
+function insThemes(host, idx, look, style) {
+  const own = !!(style && style.bg_color);
+  const cur = own ? null : String((look && look.background) || "");
+  const c = dcSiteColours();
+  const wrap = el("div", "ins-field"); wrap.dataset.group = "theme";
+  wrap.appendChild(el("div", "ins-lbl", "Colour theme"));
+  const row = el("div", "ins-themes"); row.setAttribute("role", "group"); row.setAttribute("aria-label", "Colour theme");
+  INS_THEMES.forEach(([v, name]) => {
+    const b = el("button", "ins-theme"); b.type = "button"; b.dataset.theme = v || "default";
+    b.setAttribute("aria-pressed", String(cur === v));
+    const look2 = insThemeLook(v, c), pic = el("span", "ins-theme-pic");
+    pic.style.background = look2.bg;
+    const h = el("i"), l = el("i"), k = el("b"); h.style.background = look2.ink; l.style.background = look2.ink; k.style.background = look2.btn;
+    pic.append(h, l, k);
+    b.append(pic, document.createTextNode(name));
+    b.addEventListener("click", () => lookSet(idx, "background", v));
+    row.appendChild(b);
+  });
+  wrap.appendChild(row);
+  wrap.appendChild(el("p", "ins-says", own ? "A background colour of your own is set under Colours. Pick a theme to use it instead." : INS_THEMES.find((t) => t[0] === cur)[2]));
+  host.appendChild(wrap);
+  return wrap;
+}
+// The Layout tab's pictures: each layout drawn as itself (styles: .ins-pic[data-pic]).
+const INS_PIC_PARTS = {
+  "gallery:default": 6, "gallery:masonry": 6, "gallery:filmstrip": 4,
+  "reviews_wall:default": 3, "reviews_wall:quotes": 3, "reviews_wall:strip": 3,
+  "accordion:default": 3, "accordion:two-column": 10,
+  "cta:default": ["", "k"], "cta:card": ["", "", "k"],
+  "pricing:default": 3, "pricing:list": 3,
+  "width:normal": 1, "width:full": 1,
+};
+function insPic(key) {
+  const parts = INS_PIC_PARTS[key]; if (!parts) return null;
+  const pic = el("span", "ins-pic"); pic.dataset.pic = key; pic.setAttribute("aria-hidden", "true");
+  (Array.isArray(parts) ? parts : Array.from({ length: parts }, () => "")).forEach((cls) => pic.appendChild(el("i", cls || null)));
+  return pic;
+}
+// ── Item 118: the canvas names each section's colour theme while colours are being chosen ──
+// While Styles is on Colours, or one section's card is on Style, every section on the page
+// wears a small tag ("Aa · Dark"), and Styles lists the themes in use. Built-in sections keep
+// the template's own colours. The tags sit in the page's frame, over the sections, and never
+// take a click.
+function dcThemeTagsWanted() {
+  const p = $("settingsPanel");
+  if (!p || !p.classList.contains("on")) return false;
+  return (PANEL_MODE === "styles" && STYLES_TAB === "colours") || (PANEL_MODE === "section" && INS_TAB === "style");
+}
+function dcThemeOf(sec) {
+  if (sec.hasAttribute("data-dds-core")) return "Template";
+  const b = BLOCKS_WORK && BLOCKS_WORK[Number(sec.getAttribute("data-dds-src"))];
+  if (b && b.style && b.style.bg_color) return "Own colour";
+  const v = String((b && b.look && b.look.background) || "");
+  const t = INS_THEMES.find((x) => x[0] === v);
+  return t ? t[1] : "Default";
+}
+function dcThemeTags() {
+  let doc = null; try { doc = $("designPreview").contentDocument; } catch (_) {}
+  const old = doc && doc.getElementById("dds-dc-themes"); if (old) old.remove();
+  const now = $("stThemesNow");
+  if (!doc || !doc.body || !dcThemeTagsWanted()) return;
+  const win = doc.defaultView, layer = doc.createElement("div");
+  layer.id = "dds-dc-themes"; layer.setAttribute("aria-hidden", "true");
+  const counts = new Map();
+  doc.querySelectorAll("main [data-dds-core], main [data-dds-src]").forEach((sec) => {
+    if (sec.parentElement && sec.parentElement.closest("[data-dds-src],[data-dds-core]")) return;   // a section inside a section is part of it
+    const r = sec.getBoundingClientRect(); if (!r.height) return;
+    const name = dcThemeOf(sec); counts.set(name, (counts.get(name) || 0) + 1);
+    const tag = doc.createElement("span"); tag.className = "dds-theme-tag";
+    const dot = doc.createElement("i"); dot.style.background = win.getComputedStyle(sec).backgroundColor;
+    tag.append(dot, doc.createTextNode("Aa · " + name));
+    tag.style.left = Math.round(Math.max(r.left, (DC_CHROME_INSET || 0) - win.scrollX) + win.scrollX + 12) + "px";   // clear of the dock
+    tag.style.top = Math.round(r.top + win.scrollY + (sec.classList.contains("dc-hot") ? 44 : 12)) + "px";   // clear of the picked section's name chip
+    layer.appendChild(tag);
+  });
+  doc.body.appendChild(layer);
+  if (now) { const p = now.querySelector(".ins-says"); if (p) p.textContent = counts.size ? [...counts].map(([n, k]) => k + " " + n).join(" · ") : "Nothing on this page has a colour theme yet."; }
+}
+// ── Item 118: picking a ready-made look shows the whole page at half size (desktop) ──
+function dcZoomSync() {
+  const p = $("settingsPanel"), stage = $("dpStage");
+  const on = !!(p && p.classList.contains("on") && PANEL_MODE === "styles" && STYLES_TAB === "looks" && window.innerWidth > 1180
+    && stage && !stage.classList.contains("dev-tablet") && !stage.classList.contains("dev-phone")) && document.documentElement.classList.contains("dc-edit");
+  document.documentElement.classList.toggle("dc-zoomout", on);
+  if (!on) return;
+  // the page keeps its own width, at half size, in the room between the dock and the Styles card
+  const fr = $("designPreview").closest(".dp-frame"), dk = $("dcDock"); if (!fr) return;
+  const b = fr.getBoundingClientRect(), c = p.getBoundingClientRect(), d = dk ? dk.getBoundingClientRect() : null;
+  const left = d && d.width ? Math.max(0, d.right - b.left + 16) : 0, right = Math.min(b.width, c.left - b.left - 16), w = b.width / 2;
+  fr.style.setProperty("--dc-zoom-x", Math.round(Math.max(0, left + Math.max(0, (right - left - w) / 2))) + "px");
+}
+function dcColourAids() { dcThemeTags(); dcZoomSync(); }
 // round swatches; "" is the slashed circle for the default
 function insSwatches(host, label, opts, cur, onPick) {
   const wrap = el("div", "ins-field");
@@ -11889,6 +12335,8 @@ const BI_PATHS = {
   home: '<path d="M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/>',
   cog: '<circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1L7 17M17 7l2.1-2.1"/>',
   trash: '<path d="M4 7h16"/><path d="M9 7V4h6v3"/><path d="M6 7l1 14h10l1-14"/>',
+  globe: '<circle cx="12" cy="12" r="9"/><path d="M3 12h18"/><path d="M12 3a14 14 0 0 1 0 18a14 14 0 0 1 0-18z"/>',
+  lock: '<rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/>',
   eyeoff: '<path d="M3 3l18 18"/><path d="M10.6 6.2A9.6 9.6 0 0 1 22 12a15 15 0 0 1-3.2 4"/><path d="M6.6 6.6A15 15 0 0 0 2 12s3.5 6 10 6a9.6 9.6 0 0 0 4.4-1"/>',
   message: '<path d="M21 12a8 8 0 0 1-8 8H8l-5 3 1.5-4.5A8 8 0 1 1 21 12z"/>',
   // the floating studio (Nov 2026): the dock, the section pill and its menu
@@ -13737,6 +14185,10 @@ function dcInjectCanvas(doc, main, live) {
       // the name chip at the section's top left: what it is and what kind
       "#dds-dc-chip{position:absolute;z-index:2147483000;display:none;align-items:center;height:24px;max-width:min(60vw,360px);padding:0 10px;border-radius:999px;background:var(--ddsdc-p-soft);color:var(--ddsdc-p);font:600 12px/1 var(--ddsdc-sans);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;pointer-events:none}" +
       "#dds-dc-chip.on{display:inline-flex}" +
+      // item 118: each section's colour theme, while colours are being chosen
+      "#dds-dc-themes{position:absolute;left:0;top:0;width:0;height:0;z-index:2147482990;pointer-events:none}" +
+      ".dds-theme-tag{position:absolute;display:inline-flex;align-items:center;gap:6px;height:24px;padding:0 10px 0 6px;border-radius:999px;background:var(--ddsdc-card);border:1px solid var(--ddsdc-line);box-shadow:0 2px 8px rgba(0,0,0,.12);color:var(--ddsdc-ink);font:600 11.5px/1 var(--ddsdc-sans);white-space:nowrap}" +
+      ".dds-theme-tag i{width:12px;height:12px;border-radius:50%;border:1px solid var(--ddsdc-line2)}" +
       "#dds-dc-chip .dc-chip-type{font-weight:500;opacity:.8;margin-left:5px}" +
       "#dds-dc-chip.compact .dc-chip-type{display:none}" +
       // the More menu under the pill: copy, cut, hide, columns
@@ -14048,6 +14500,7 @@ function dcInjectCanvas(doc, main, live) {
   if (!live) dcBuildInserts(doc, main);   // AEM-style "＋ Add section" targets between sections
   try { dcInjectColControls(doc, main); } catch (_) {}   // Layout Mode column resize
   if (!live) dcBuildTree(main);           // left-rail Content Tree of every component on the page
+  dcThemeTags();                          // item 118: the theme tags follow every redraw
 }
 
 // ── AEM insertion targets: a clickable/droppable "＋ Add section" bar at every gap
@@ -14610,10 +15063,11 @@ function renderSiteStatus() {
   const live = S.previewStatus && S.previewStatus.live;
   const published = !!((live && live.published) || S.site.last_published_at);
   const offline = !!(published && live && live.offline_since);
+  const locked = !!(published && !offline && live && live.password_since);   // list item 175: a visitor password
   const url = siteLiveUrl();
   box.textContent = ""; box.hidden = false;
   const row = el("div", "ts-row");
-  const badge = el("span", "ts-badge " + (offline ? "off" : published ? "public" : "private"), offline ? "Offline" : published ? "Public" : "Private");
+  const badge = el("span", "ts-badge " + (offline ? "off" : locked ? "pw" : published ? "public" : "private"), offline ? "Offline" : locked ? "Password" : published ? "Public" : "Private");
   badge.id = "siteStatusBadge";
   row.appendChild(badge);
   if (published && !offline && url) {
@@ -14623,6 +15077,7 @@ function renderSiteStatus() {
   box.appendChild(row);
   box.appendChild(el("div", "note", offline
     ? "Visitors see a short “temporarily offline” page. Nothing was deleted."
+    : locked ? "Visitors type the password before they see any page."
     : published ? "Anyone can visit your site." : "Only you can see it. It goes public when you publish."));
   let btn;
   if (!published) {
@@ -14637,6 +15092,21 @@ function renderSiteStatus() {
   }
   btn.type = "button"; btn.id = "siteStatusBtn";
   box.appendChild(btn);
+  if (published && !offline) {
+    const pw = el("button", "pillbtn ghost", locked ? "Change or remove password…" : "Add a visitor password…");
+    pw.type = "button"; pw.id = "sitePasswordBtn"; pw.dataset.needs = "configure";
+    pw.addEventListener("click", async () => { if (await siteSetPassword(locked)) refreshSiteStatus(true); });
+    box.appendChild(pw);
+  }
+}
+// List item 175: a password on the whole live site. The server puts it on only once the
+// site itself asks strangers for it, and says so plainly when it doesn't.
+async function siteSetPassword(locked) {
+  const pw = await askText(locked ? "Change the visitor password" : "Add a visitor password", { password: true, ok: "Save",
+    hint: locked ? "Leave it blank to take the password off, so anyone can visit again." : "Visitors type this before they see any page of your site. Share it with the people you want to let in." });
+  if (pw === null || (!locked && !pw.trim())) return false;
+  try { const r = await api("POST", "/site/password", { password: pw }); toast((r.data && r.data.message) || "Saved"); return true; }
+  catch (err) { toast(nice(err), true); return false; }
 }
 // Whether the live site is offline comes from the same read the Page menu uses;
 // a site never published has nothing to ask about.
