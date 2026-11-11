@@ -791,6 +791,8 @@ const MS6_CAPTURE_PAGES = [
 const LEGAL_PAGES = ['privacy.html', 'terms.html', 'accessibility.html', 'ai-disclaimer.html'];
 const MS6_FAMILY = [...MS6_CAPTURE_PAGES, ...LEGAL_PAGES, '404.html'];
 const INTERNAL_PAGES = ['email-signature.html', 'styleguide.html', 'a11y.html', 'provision.html'];   // provision: studio audit change 12
+// List item 139: tools retired in the Free Tools rebuild, and the paid-audit checkout nothing links to
+const RETIRED_PAGES = ['audit.html', 'ai-critique.html', 'report-card.html', 'roi-calculator.html', 'pricing-estimator.html', 'local-visibility.html', 'tools.html', 'buy-audit.html'];
 
 test.describe('MS6 entry & legal sweep (static pins)', () => {
   test.beforeEach(({}, testInfo) => {
@@ -963,6 +965,104 @@ test.describe('MS6 entry & legal sweep (static pins)', () => {
         expect(r?.to, `${from} forced 404 target`).toBe('/404.html');
         expect(r?.code, `${from} forced 404 status`).toBe('404!');
       }
+    }
+    // List item 139: the retired tools are out of the same build, and both spellings forward
+    // off this site (checked here, so the build runs once)
+    for (const page of RETIRED_PAGES) {
+      expect(existsSync(join(ROOT, 'dist', page)), `${page} staged into dist/`).toBe(false);
+      const clean = '/' + page.replace(/\.html$/, '');
+      for (const from of [clean, `/${page}`]) {
+        const r = rules.find((x) => x.from === from);
+        expect(r?.code, `${from} forwards`).toBe('301!');
+        expect(r?.to, `${from} leaves this site`).toMatch(/^https:\/\/(tools\.)?davisdigitalstudio\.com\/[a-z]/);
+      }
+    }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// List item 139 — one copy for search engines. The main site is on Squarespace:
+// the app host forwards its old marketing copy there, the tools host answers only
+// for the tools, and the retired pages are out of the build (pinned above).
+// ---------------------------------------------------------------------------
+const APP_HOST = 'https://app.davisdigitalstudio.com';
+const TOOLS_HOST = 'https://tools.davisdigitalstudio.com';
+const MAIN_SITE = 'https://davisdigitalstudio.com';
+// The main site's own pages, from its sitemap (davisdigitalstudio.com/sitemap.xml, Nov 11 2026)
+const MAIN_SITE_PAGES = ['/', '/services', '/pricing', '/website-audits', '/growth-partnership', '/seo-strategy',
+  '/web-design', '/how-we-work', '/work', '/about', '/contact', '/industries', '/restaurant-web-design',
+  '/salon-web-design', '/retail-web-design', '/home-services-web-design', '/health-wellness-web-design',
+  '/privacy', '/terms', '/accessibility', '/ai-disclaimer', '/los-angeles-web-design', '/free-tools'];
+
+test.describe('one copy for search engines (static pins, list item 139)', () => {
+  test.beforeEach(({}, testInfo) => {
+    test.skip(testInfo.project.name !== 'desktop-chromium', 'filesystem pins run once, on desktop');
+  });
+
+  test('the app host forwards every old marketing page, both spellings, to a page the main site has, ahead of the rule that would serve it', () => {
+    const rules = parseRedirects();
+    const lines = read('_redirects').split('\n').map((l) => l.replace(/#.*$/, '').trim());
+    const at = (from: string) => lines.findIndex((l) => l.split(/\s+/)[0] === from);
+    const copies = PAGES.filter((f) => !LEGAL_PAGES.includes(f) && !RETIRED_PAGES.includes(f) && !['index.html', '404.html'].includes(f));
+    expect(copies.length).toBeGreaterThan(15);
+    for (const f of [...copies, 'index.html']) {
+      const clean = f === 'index.html' ? null : '/' + f.replace(/\.html$/, '');
+      for (const from of [clean && `${APP_HOST}${clean}`, `${APP_HOST}/${f}`].filter(Boolean) as string[]) {
+        const r = rules.find((x) => x.from === from);
+        expect(r?.code, `${from} forwards`).toBe('301!');
+        expect(r!.to.startsWith(`${MAIN_SITE}/`), `${from} goes to the main site`).toBe(true);
+        expect(MAIN_SITE_PAGES, `${from} -> ${r!.to} is a page the main site has`).toContain(r!.to.slice(MAIN_SITE.length));
+      }
+      if (clean && at(clean) >= 0) expect(at(`${APP_HOST}${clean}`), `${clean}: the forward comes before the rule that serves the copy`).toBeLessThan(at(clean));
+    }
+    // the app's own legal pages stay: the app and the free tools link them
+    for (const f of LEGAL_PAGES) expect(rules.find((x) => x.from === `${APP_HOST}/${f.replace(/\.html$/, '')}`), `${f} stays on the app host`).toBeUndefined();
+  });
+
+  test('the bare app address is a door: signed in it opens the app, anyone else gets the main site, and it is never indexed', () => {
+    const rules = parseRedirects();
+    expect(rules.find((r) => r.from === `${APP_HOST}/`)).toEqual({ from: `${APP_HOST}/`, to: '/app-door.html', code: '200!' });
+    const lines = read('_redirects').split('\n').map((l) => l.replace(/#.*$/, '').trim());
+    expect(lines.findIndex((l) => l.startsWith(`${APP_HOST}/ `)), 'the door comes before the old home page rule').toBeLessThan(lines.findIndex((l) => /^\/\s+\/index\.html\s+200$/.test(l)));
+    const door = read('app-door.html');
+    expect(door).toContain('<meta name="robots" content="noindex,nofollow">');
+    expect(door).toContain("has('dds-portal-auth') ? '/studio' : has('dds-client-auth') ? '/portal.html' : 'https://davisdigitalstudio.com/'");
+  });
+
+  test('the tools host serves only the tools, their reports, the privacy pages they link and the files those load; the rest forwards to the app host', () => {
+    const rules = parseRedirects().filter((r) => r.from.startsWith(`${TOOLS_HOST}/`));
+    expect(rules[rules.length - 1], 'the catch-all is the tools host\'s last rule').toEqual({ from: `${TOOLS_HOST}/*`, to: `${APP_HOST}/:splat`, code: '301!' });
+    const served = new Map(rules.filter((r) => r.code === '200!').map((r) => [r.from.slice(TOOLS_HOST.length), r.to]));
+    for (const path of ['/site-review', '/ai-visibility', '/report/*', '/privacy', '/ai-disclaimer']) expect(served.has(path), `${path} is served on the tools host`).toBe(true);
+    for (const to of served.values()) expect(existsSync(join(ROOT, to.replace(/^\//, ''))), `${to} exists`).toBe(true);
+    // every file those pages load from this site, and the share picture they name on the tools host
+    for (const f of ['site-review.html', 'ai-visibility.html', 'report.html', 'privacy.html', 'ai-disclaimer.html']) {
+      const html = read(f);
+      const files = [
+        ...[...html.matchAll(/(?:src|href)="\/?([a-z0-9][^"#?:]*\.(?:js|css|png|webp|jpe?g|svg|ico|json))(?:\?[^"]*)?"/gi)].map((m) => '/' + m[1]),
+        ...[...html.matchAll(/content="https:\/\/tools\.davisdigitalstudio\.com(\/[^"?]+\.(?:png|jpe?g|webp))"/g)].map((m) => m[1]),
+      ];
+      expect(files.length, `${f} loads files`).toBeGreaterThan(0);
+      for (const file of files) expect(served.get(file), `${f} loads ${file}: the tools host must serve it`).toBe(file);
+    }
+  });
+});
+
+test.describe('the app door (live, desktop, list item 139)', () => {
+  test.beforeEach(({}, testInfo) => {
+    test.skip(testInfo.project.name !== 'desktop-chromium', 'desktop behavior');
+  });
+
+  test('signed in at the studio door it opens the studio, at the client door the portal; anyone else goes to the main site', async ({ page }) => {
+    await page.route(`${MAIN_SITE}/**`, (r) => r.fulfill({ status: 200, contentType: 'text/html', body: '<title>Main site</title>' }));
+    await page.route(/\/(studio|portal\.html)$/, (r) => r.fulfill({ status: 200, contentType: 'text/html', body: '<title>A door</title>' }));
+    await page.goto('/app-door.html');
+    await expect(page).toHaveURL(`${MAIN_SITE}/`);
+    for (const [key, path] of [['dds-portal-auth', /\/studio$/], ['dds-client-auth', /\/portal\.html$/]] as const) {
+      await page.goto('/404.html');
+      await page.evaluate((k) => { localStorage.clear(); localStorage.setItem(k, '{"access_token":"x"}'); }, key);
+      await page.goto('/app-door.html');
+      await expect(page, key).toHaveURL(path);
     }
   });
 });
@@ -1175,6 +1275,24 @@ test.describe('MS2 money path (live, mobile)', () => {
     );
     expect(closerCount).toBe(1);
   });
+});
+
+// ---------------------------------------------------------------------------
+// List item 137: the gold text (links, eyebrows) read on every surface they sit
+// on. The token measured 4.35:1 on the warm panels before it was darkened.
+// ---------------------------------------------------------------------------
+test.describe('gold text contrast (live, desktop)', () => {
+  test.beforeEach(({}, testInfo) => {
+    test.skip(testInfo.project.name !== 'desktop-chromium', 'contrast measured once, on desktop');
+  });
+
+  for (const path of ['/index.html', '/web-design.html', '/burbank-web-design.html']) {
+    test(`gold links and eyebrows pass AA on ${path}`, async ({ page }) => {
+      await page.goto(path);
+      expect(await contrastOf(page, '.textlink'), 'gold text links').toBeGreaterThanOrEqual(4.5);
+      expect(await contrastOf(page, '.eyebrow'), 'eyebrows').toBeGreaterThanOrEqual(4.5);
+    });
+  }
 });
 
 // ---------------------------------------------------------------------------

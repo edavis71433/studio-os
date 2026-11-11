@@ -3,8 +3,26 @@
 // lean, privacy-first visit row, and aggregates stored rows into plain-English-
 // ready counts. Everything here is pure (except the sha256 hash) → unit-tested.
 
-export type VisitKind = 'pageview' | 'phone' | 'email' | 'cta' | 'download' | 'outbound';
-export const VISIT_KINDS: VisitKind[] = ['pageview', 'phone', 'email', 'cta', 'download', 'outbound'];
+// List item 157: 'button' is a press on a link drawn as a button (the templates' .btn) that
+// isn't a call, an email or a download, with its words; 'leave' is how long a page stayed
+// open and in view, sent once as the visitor leaves it.
+export type VisitKind = 'pageview' | 'phone' | 'email' | 'cta' | 'download' | 'outbound' | 'button' | 'leave';
+export const VISIT_KINDS: VisitKind[] = ['pageview', 'phone', 'email', 'cta', 'download', 'outbound', 'button', 'leave'];
+
+/** A pressed button's words as the collector keeps them: text only, one line, 60 characters. */
+export function cleanLabel(v: unknown): string {
+  return String(v ?? '').replace(/[\u0000-\u001f\u007f<>]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 60);
+}
+/** List item 151: a page's largest contentful paint, in whole milliseconds, 1 ms to a minute; else null. */
+export function cleanLcp(v: unknown): number | null {
+  const n = Math.round(Number(v));
+  return Number.isFinite(n) && n > 0 && n <= 60_000 ? n : null;
+}
+/** How long a page stayed open, in whole milliseconds: at least a second, at most half an hour; else null. */
+export function cleanMs(v: unknown): number | null {
+  const n = Math.round(Number(v));
+  return Number.isFinite(n) && n >= 1000 ? Math.min(n, 1_800_000) : null;
+}
 export const isVisitKind = (k: unknown): k is VisitKind => typeof k === 'string' && (VISIT_KINDS as string[]).includes(k);
 
 /** Classify a user-agent — device / browser / os / isBot. Deterministic, no lib. */
@@ -42,8 +60,36 @@ export function refHost(referrer: string, siteHost?: string): string {
   } catch { return ''; }
 }
 
+// List item 153: the AI assistants a visit can come from, known by the address their links
+// come from or the tag they put on them (ChatGPT adds utm_source=chatgpt.com). In the
+// sources list they share one row, "AI assistants"; aiAssistantOf says which one it was.
+// Google's AI answers arrive from google.com like any search, so they count as Google.
+const AI_ASSISTANTS: Array<[RegExp, string]> = [
+  [/(^|\.)(chatgpt\.com|chat\.openai\.com)$|^(chatgpt|openai)$/, 'ChatGPT'],
+  [/(^|\.)perplexity\.ai$|^perplexity$/, 'Perplexity'],
+  [/(^|\.)(gemini|bard)\.google\.com$|^gemini$/, 'Gemini'],
+  [/(^|\.)copilot\.microsoft\.com$|^copilot$/, 'Copilot'],
+  [/(^|\.)claude\.ai$|^claude$/, 'Claude'],
+  [/(^|\.)chat\.deepseek\.com$|^deepseek$/, 'DeepSeek'],
+  [/(^|\.)meta\.ai$/, 'Meta AI'],
+  [/(^|\.)chat\.mistral\.ai$/, 'Mistral'],
+  [/(^|\.)grok\.com$/, 'Grok'],
+  [/(^|\.)you\.com$/, 'You.com'],
+  [/(^|\.)poe\.com$/, 'Poe'],
+];
+export const AI_SOURCE = 'AI assistants';
+/** Which AI assistant a visit came from, by its referrer host or utm_source; '' for none. */
+export function aiAssistantOf(refHostName: string, utmSource: string): string {
+  for (const v of [refHostName, utmSource]) {
+    const h = String(v || '').trim().toLowerCase().replace(/^www\./, '');
+    if (h) for (const [re, name] of AI_ASSISTANTS) if (re.test(h)) return name;
+  }
+  return '';
+}
+
 /** A friendly source label from referrer host + UTM. Deterministic. */
 export function sourceLabel(refHostName: string, utmSource: string): string {
+  if (aiAssistantOf(refHostName, utmSource)) return AI_SOURCE;
   if (utmSource) return utmSource.slice(0, 60);
   if (!refHostName) return 'Direct';
   if (/google\./.test(refHostName)) return 'Google';
@@ -85,6 +131,8 @@ export interface VisitAgg {
   topPages: Array<{ path: string; views: number }>;
   pages: Array<{ path: string; views: number; visitors: number }>;   // the per-page table: more rows, and people as well as views
   topSources: Array<{ source: string; visits: number }>;
+  /** Item 153: the "AI assistants" row, by assistant (visitors each), largest first. */
+  aiAssistants: Array<{ name: string; visits: number }>;
   devices: Array<{ device: string; share: number }>;
   countries: Array<{ country: string; visits: number }>;
   events: { phone: number; email: number; cta: number; download: number };
@@ -96,12 +144,106 @@ export interface VisitAgg {
 
 const topN = (m: Map<string, number>, n: number) => [...m.entries()].sort((a, b) => b[1] - a[1]).slice(0, n);
 
+// ── List item 151: how fast pages show for real visitors (pure) ──
+// From the speed each visitor's browser reports as they leave a page (largest contentful
+// paint, the measure Google uses). The figure is the 75th percentile, Google's own way:
+// three visitors in four saw the page at least that fast. Under 2.5 s is good, over 4 s is
+// slow. Too few visits to judge is no verdict at all, never a guess.
+export const SPEED_GOOD_MS = 2500, SPEED_SLOW_MS = 4000;
+const SPEED_MIN_DEVICE = 20, SPEED_MIN_PAGE = 5;
+export interface SpeedRow { path: string; device?: string | null; lcp_ms?: number | null }
+export interface SpeedGroup { p75_ms: number; samples: number }
+export interface Speed {
+  samples: number;
+  phones: SpeedGroup | null; computers: SpeedGroup | null;
+  pages: Array<{ path: string; phones_ms: number | null; computers_ms: number | null; samples: number }>;
+  verdict: 'fast' | 'a_little_slow' | 'slow' | null;
+  sentence: string | null;
+}
+const p75 = (xs: number[]): number => { const s = [...xs].sort((a, b) => a - b); return s[Math.max(0, Math.ceil(s.length * 0.75) - 1)]; };
+/** "the home page", "the menu page": a page's path as an owner says it. */
+export function pageCalled(path: string): string {
+  const bits = String(path || '/').replace(/^\/+|\/+$/g, '').split('/').filter(Boolean);
+  return bits.length ? `the ${bits[bits.length - 1].replace(/[-_]+/g, ' ')} page` : 'the home page';
+}
+const secs = (ms: number): string => `${(Math.round(ms / 100) / 10).toFixed(1)} s`;
+export function speedOf(rows: SpeedRow[]): Speed {
+  const phones: number[] = [], computers: number[] = [];
+  const pages = new Map<string, { phones: number[]; computers: number[] }>();
+  for (const r of rows) {
+    const ms = Number(r.lcp_ms);
+    if (!Number.isFinite(ms) || ms <= 0) continue;
+    const onPhone = r.device === 'mobile';
+    (onPhone ? phones : computers).push(ms);
+    const pg = pages.get(r.path) || { phones: [], computers: [] }; (onPhone ? pg.phones : pg.computers).push(ms); pages.set(r.path, pg);
+  }
+  const group = (xs: number[]): SpeedGroup | null => (xs.length >= SPEED_MIN_DEVICE ? { p75_ms: Math.round(p75(xs)), samples: xs.length } : null);
+  const g = { phones: group(phones), computers: group(computers) };
+  const pageRows = [...pages.entries()].map(([path, v]) => ({
+    path, samples: v.phones.length + v.computers.length,
+    phones_ms: v.phones.length >= SPEED_MIN_PAGE ? Math.round(p75(v.phones)) : null,
+    computers_ms: v.computers.length >= SPEED_MIN_PAGE ? Math.round(p75(v.computers)) : null,
+  })).sort((a, b) => b.samples - a.samples).slice(0, 10);
+  // the verdict follows the slower of the two, and names the slowest page there
+  const judged = (['phones', 'computers'] as const).filter((k) => g[k]).sort((a, b) => g[b]!.p75_ms - g[a]!.p75_ms);
+  let verdict: Speed['verdict'] = null, sentence: string | null = null;
+  if (judged.length) {
+    const worst = judged[0], at = g[worst]!.p75_ms;
+    const slowest = pageRows.map((p) => ({ path: p.path, ms: worst === 'phones' ? p.phones_ms : p.computers_ms })).filter((p) => p.ms !== null).sort((a, b) => b.ms! - a.ms!)[0];
+    const where = slowest && slowest.ms! > SPEED_GOOD_MS ? `: ${pageCalled(slowest.path)} takes ${secs(slowest.ms!)} for most visitors` : '';
+    if (at <= SPEED_GOOD_MS) { verdict = 'fast'; sentence = 'Loads fast for most visitors.'; }
+    else if (at <= SPEED_SLOW_MS) { verdict = 'a_little_slow'; sentence = `A little slow on ${worst}${where}.`; }
+    else { verdict = 'slow'; sentence = `Slow on ${worst}${where}.`; }
+  }
+  return { samples: phones.length + computers.length, ...g, pages: pageRows, verdict, sentence };
+}
+
+// ── List item 157: which buttons get pressed, and how long pages stay open (pure) ──
+export interface EngagementRow { kind: string; path: string; label?: string | null; ms?: number | null; visitor_hash?: string }
+export interface Engagement {
+  buttons: Array<{ label: string; kind: string; path: string; presses: number; people: number }>;
+  time: { median_seconds: number | null; pages: Array<{ path: string; seconds: number; visits: number }> };
+}
+const median = (xs: number[]): number => { const s = [...xs].sort((a, b) => a - b); const m = s.length >> 1; return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2; };
+/** The presses with words (a button, a call, an email), most pressed first, and the middle
+ *  time a page stayed open, per page and for the whole site. The middle, not the average,
+ *  so one tab left open overnight doesn't speak for everyone. */
+export function engagementOf(rows: EngagementRow[]): Engagement {
+  const presses = new Map<string, { label: string; kind: string; path: string; presses: number; seen: Set<string> }>();
+  const times = new Map<string, number[]>();
+  const all: number[] = [];
+  for (const r of rows) {
+    if (r.kind === 'leave') {
+      const ms = Number(r.ms);
+      if (!Number.isFinite(ms) || ms < 1000) continue;
+      const list = times.get(r.path) || []; list.push(ms); times.set(r.path, list); all.push(ms);
+      continue;
+    }
+    const label = String(r.label || '').trim();
+    if (!label) continue;
+    const key = `${r.kind}|${r.path}|${label.toLowerCase()}`;
+    const p = presses.get(key) || { label, kind: r.kind, path: r.path, presses: 0, seen: new Set<string>() };
+    p.presses++; if (r.visitor_hash) p.seen.add(r.visitor_hash);
+    presses.set(key, p);
+  }
+  return {
+    buttons: [...presses.values()].sort((a, b) => b.presses - a.presses || a.label.localeCompare(b.label)).slice(0, 8)
+      .map(({ seen, ...p }) => ({ ...p, people: seen.size })),
+    time: {
+      median_seconds: all.length ? Math.round(median(all) / 1000) : null,
+      pages: [...times.entries()].sort((a, b) => b[1].length - a[1].length).slice(0, 10)
+        .map(([path, list]) => ({ path, seconds: Math.round(median(list) / 1000), visits: list.length })),
+    },
+  };
+}
+
 export function aggregateVisits(rows: VisitRow[], nowMs: number, windowDays: number): VisitAgg {
   const w = windowDays * 86_400_000;
   const curStart = nowMs - w, priorStart = nowMs - 2 * w;
   const curVisitors = new Set<string>(), priorVisitors = new Set<string>();
   const pages = new Map<string, number>(), sources = new Map<string, number>(), devices = new Map<string, number>(), countries = new Map<string, number>();
   const srcSeen = new Map<string, Set<string>>(); // source → distinct visitor set
+  const aiSeen = new Map<string, Set<string>>(); // AI assistant → distinct visitor set
   const pageSeen = new Map<string, Set<string>>(); // path → distinct visitor set
   const events = { phone: 0, email: 0, cta: 0, download: 0 };
   let pageviews = 0;
@@ -122,6 +264,8 @@ export function aggregateVisits(rows: VisitRow[], nowMs: number, windowDays: num
       }
       const src = sourceLabel(r.ref_host, r.utm_source);
       const set = srcSeen.get(src) || new Set<string>(); set.add(r.visitor_hash || String(ms)); srcSeen.set(src, set);
+      const ai = src === AI_SOURCE ? aiAssistantOf(r.ref_host, r.utm_source) : '';
+      if (ai) { const seen = aiSeen.get(ai) || new Set<string>(); seen.add(r.visitor_hash || String(ms)); aiSeen.set(ai, seen); }
       if (r.device) devices.set(r.device, (devices.get(r.device) || 0) + 1);
       if (r.country) countries.set(r.country, (countries.get(r.country) || 0) + 1);
     } else if (r.kind in events) {
@@ -135,6 +279,7 @@ export function aggregateVisits(rows: VisitRow[], nowMs: number, windowDays: num
     topPages: topN(pages, 5).map(([path, views]) => ({ path, views })),
     pages: topN(pages, 10).map(([path, views]) => ({ path, views, visitors: pageSeen.get(path)?.size || 0 })),
     topSources: topN(sources, 5).map(([source, visits]) => ({ source, visits })),
+    aiAssistants: topN(new Map([...aiSeen].map(([name, set]) => [name, set.size])), 5).map(([name, visits]) => ({ name, visits })),
     devices: topN(devices, 3).map(([device, n]) => ({ device, share: Math.round((n / devTotal) * 100) })),
     countries: topN(countries, 5).map(([country, visits]) => ({ country, visits })),
     events,
@@ -153,7 +298,17 @@ export function trackerScript(siteId: string, collectBase: string): string {
     `function s(o){try{navigator.sendBeacon(U,JSON.stringify(o))}catch(e){}}` +
     `s({k:'pageview',p:location.pathname,r:document.referrer,u:{s:q('source'),m:q('medium'),c:q('campaign')}});` +
     `document.addEventListener('click',function(e){var a=e.target.closest&&e.target.closest('a');if(!a)return;var h=(a.getAttribute('href')||'');` +
-    `var k=a.hasAttribute('download')||/\\.(pdf|zip|docx?|xlsx?|csv)$/i.test(h)?'download':/^tel:/i.test(h)?'phone':/^mailto:/i.test(h)?'email':a.hasAttribute('data-cta')?'cta':(/^https?:/i.test(h)&&h.indexOf(location.host)<0)?'outbound':'';` +
-    `if(k)s({k:k,p:location.pathname})},true)}catch(e){}})();`;
+    `var b=/(^|\\s)btn(\\s|$)/.test(a.className||'');` +
+    `var k=a.hasAttribute('download')||/\\.(pdf|zip|docx?|xlsx?|csv)$/i.test(h)?'download':/^tel:/i.test(h)?'phone':/^mailto:/i.test(h)?'email':a.hasAttribute('data-cta')?'cta':b?'button':(/^https?:/i.test(h)&&h.indexOf(location.host)<0)?'outbound':'';` +
+    // list item 157: a button's own words, and a phone or email link's, so Analytics can say which ones get pressed
+    `var l=b||k==='cta'||k==='phone'||k==='email'?(a.getAttribute('aria-label')||a.textContent||'').replace(/\\s+/g,' ').trim().slice(0,60):'';` +
+    `if(k)s({k:k,p:location.pathname,l:l})},true);` +
+    // list item 157: how long the page was open and in view, sent once as the visitor leaves it
+    `var t0=document.visibilityState==='visible'?Date.now():0,seen=0,gone=0,lcp=0;` +
+    // list item 151: how long the page's main content took to show, the measure Google uses (Safari doesn't report it)
+    `try{new PerformanceObserver(function(l){var e=l.getEntries();if(e.length)lcp=e[e.length-1].startTime}).observe({type:'largest-contentful-paint',buffered:true})}catch(e){}` +
+    `function leave(){if(t0){seen+=Date.now()-t0;t0=0}if(!gone&&seen>=1000){gone=1;s({k:'leave',p:location.pathname,ms:Math.min(seen,1800000),lcp:Math.round(lcp)})}}` +
+    `document.addEventListener('visibilitychange',function(){if(document.visibilityState==='hidden')leave();else if(!gone)t0=Date.now()});` +
+    `addEventListener('pagehide',leave)}catch(e){}})();`;
   return `<script id="presence-analytics" data-site="${siteId}">${js}</script>`;
 }
