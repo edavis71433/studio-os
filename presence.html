@@ -1160,8 +1160,17 @@ html.plan-watch #svWords{display:none}
    same 72px + safe-area the shell reserves). */
 html.dds-has-shell .stage{top:var(--dds-shell-h)}
 html.dds-has-shell.dds-has-ctxbar .stage{top:calc(var(--dds-shell-h) + var(--dds-ctxbar-h))}
-@media (min-width:761px){html.dds-side.dds-has-shell .stage,html.dds-side.dds-has-shell.dds-has-ctxbar .stage{top:0;left:var(--dds-side-w)}}
+@media (min-width:761px){html.dds-side.dds-has-shell .stage,html.dds-side.dds-has-shell.dds-has-ctxbar .stage{top:0;left:var(--page-left)}}
 @media (max-width:760.98px){html.dds-has-shell .stage{bottom:calc(72px + env(safe-area-inset-bottom,0px))}}
+/* ≥761px the sidebar floats: its card and a gap either side are --page-left, and the page
+   starts past them. Everything that covers the page starts there too, because the shell sits
+   above all of it: the stage, the sheets, the publish ritual, page settings and the action
+   toasts. They used the whole screen, so on a tablet the sidebar hid their left edge ("ure it
+   renews by itself") and took the presses meant for it, as it once did to shell.css's own
+   toasts. Edit mode hides the shell, so there they keep the whole screen. */
+@media (min-width:761px){html.dds-side.dds-has-shell{--page-left:calc(var(--dds-side-w) + var(--dds-side-gap) * 2)}}
+html.dc-edit:not(.plan-watch).dds-side{--page-left:0px}
+html.dds-side .scrim,html.dds-side .ritualwrap,html.dds-side .dc-modal-scrim,html.dds-side .toasts{left:var(--page-left,0px)}
 .stagebar{flex:none;display:flex;align-items:flex-end;gap:var(--dds-s6,24px);padding:var(--dds-s4,16px) var(--dds-s7,32px) 0;color:rgba(239,234,247,.7)}
 .stagebar .back{font-size:13px;color:rgba(239,234,247,.75);padding-bottom:10px}
 .stagebar .back:hover{color:#efeaf7}
@@ -1193,7 +1202,7 @@ html.dds-has-shell.dds-has-ctxbar .stage{top:calc(var(--dds-shell-h) + var(--dds
 /* item 171 (E1, E2): in the editor a sheet, the photo picker and the rest, opens above the bar, the dock and
    the cards, so its own buttons take the press and nothing behind the dimmed screen does */
 html.dc-edit:not(.plan-watch) .scrim{z-index:96}
-@media(min-width:761px){.scrim{align-items:center}}
+@media(min-width:761px){.scrim{align-items:center;padding:0 var(--dds-s4,16px)}}   /* a gutter beside the sidebar on the narrowest tablets */
 .sheetcard{background:var(--sheet);border:1px solid var(--hair);border-radius:var(--r-lg) var(--r-lg) 0 0;width:100%;max-width:520px;max-height:88vh;overflow:auto;padding:var(--dds-s7,32px) var(--dds-s7,32px) var(--dds-s6,24px);box-shadow:var(--dds-shadow-pop,0 8px 28px rgba(21,20,26,.12))}
 @media(min-width:761px){.sheetcard{border-radius:var(--r-lg)}}
 .sheetcard h2{font-family:var(--serif);font-weight:500;font-size:21px;margin-bottom:6px}
