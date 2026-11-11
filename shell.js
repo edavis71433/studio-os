@@ -582,7 +582,75 @@
       // what is still being typed counts too, so Save never drops it
       return { get: function () { if (inp.value.trim()) { add(inp.value); inp.value = ''; } return tags.slice(); }, set: function (list) { tags = []; add((list || []).join(',')); }, input: inp };
     }
-    return { use: function (fn) { REQ = fn; }, views: views, saveViews: saveViews, ask: ask, columnsMenu: columnsMenu, sendTo: sendTo, parseCsv: parseCsv, importPanel: importPanel, style: style, fit: fit, confirmIn: confirmIn, announce: announce, tagInput: tagInput, cleanTag: cleanTag };
+    // ── charts on a list, and a printable list (sales item 105) ──────────────
+    // charts(panels, foot) returns a chart card's insides, one plain bar list per
+    // panel: panels = [{ title, rows: [{ label, n, extra, none }], unit: ['deal',
+    // 'deals'], extra: true, empty }]. A bar is as long as its count against the
+    // panel's longest row; the count is written beside it (then `extra`, a stage's
+    // value), so no figure rests on a bar alone. Rows of nothing are left out; a
+    // `none` row ("Not recorded") is grey. shell.css styles it (.dds-charts).
+    function charts(panels, foot) {
+      var h = '<h2 class="dc-h">Charts</h2><div class="dc-grid">';
+      (panels || []).forEach(function (p) {
+        var rows = (p.rows || []).filter(function (r) { return r && r.n > 0; });
+        var max = 0, all = 0; rows.forEach(function (r) { max = Math.max(max, r.n); all += r.n; });
+        var unit = p.unit || ['', ''];
+        h += '<div class="dc-panel"><h3>' + esc2(p.title) + '</h3>';
+        if (!rows.length) { h += '<p class="dc-none">' + esc2(p.empty || 'Nothing to count in this view.') + '</p></div>'; return; }
+        h += '<ul class="dc-bars' + (p.extra ? ' has-v' : '') + '">' + rows.map(function (r) {
+          var word = r.n === 1 ? unit[0] : unit[1];
+          var tip = r.label + ': ' + r.n + (word ? ' ' + word : '') + (r.extra ? ', ' + r.extra : '') + ' · ' + Math.round(r.n / all * 100) + '% of this view';
+          return '<li class="dc-row' + (r.none ? ' none' : '') + '" data-tip="' + esc2(tip) + '"><span class="dc-l">' + esc2(r.label) + '</span>'
+            + '<span class="dc-track" aria-hidden="true"><span class="dc-fill" style="width:' + Math.max(2, Math.round(r.n / max * 100)) + '%"></span></span>'
+            + '<span class="dc-n">' + r.n + (word ? '<span class="sr-only"> ' + esc2(word) + '</span>' : '') + '</span>'
+            + (p.extra ? '<span class="dc-v">' + esc2(r.extra || '') + '</span>' : '') + '</li>';
+        }).join('') + '</ul></div>';
+      });
+      return h + '</div>' + (foot ? '<p class="dc-foot">' + esc2(foot) + '</p>' : '');
+    }
+    // pointing at a row (or touching it) shows its count and its share of the view
+    var TIP = null;
+    function chartTips(host) {
+      if (!host || host.__ddsTips) return; host.__ddsTips = true;
+      function hide() { if (TIP) TIP.hidden = true; }
+      host.addEventListener('pointerover', function (e) {
+        var row = e.target && e.target.closest ? e.target.closest('.dc-row[data-tip]') : null;
+        if (!row) { hide(); return; }
+        if (!TIP) { TIP = document.createElement('div'); TIP.className = 'dc-tip'; TIP.setAttribute('aria-hidden', 'true'); document.body.appendChild(TIP); }
+        var bar = (row.querySelector('.dc-fill') || row).getBoundingClientRect(), r = row.getBoundingClientRect();
+        TIP.textContent = row.getAttribute('data-tip'); TIP.hidden = false;
+        var half = TIP.offsetWidth / 2 + 8, above = r.top > TIP.offsetHeight + 16;
+        TIP.style.left = Math.min(Math.max(bar.right, half), window.innerWidth - half) + 'px';
+        TIP.style.top = (above ? r.top : r.bottom + TIP.offsetHeight + 16) + 'px';   // under the row when it sits at the top of the screen
+      });
+      host.addEventListener('pointerleave', hide);
+      window.addEventListener('scroll', hide, { passive: true });
+    }
+    // printList(o) prints exactly the rows in view as a plain table:
+    // o = { title, sub, cols: [{ label, num }], rows: [[cell, …]] }. While it prints,
+    // shell.css shows only #ddsPrint (body[data-print=list]); then the page is back.
+    function printList(o) {
+      var old = document.getElementById('ddsPrint'); if (old) old.remove();
+      var cols = o.cols || [], d = document.createElement('div'); d.id = 'ddsPrint';
+      var num = function (i) { return cols[i] && cols[i].num ? ' class="num"' : ''; };
+      d.innerHTML = '<h1>' + esc2(o.title) + '</h1>' + (o.sub ? '<p class="pl-sub">' + esc2(o.sub) + '</p>' : '')
+        + '<table><thead><tr>' + cols.map(function (c, i) { return '<th scope="col"' + num(i) + '>' + esc2(c.label) + '</th>'; }).join('') + '</tr></thead><tbody>'
+        + (o.rows || []).map(function (r) { return '<tr>' + r.map(function (v, i) { return '<td' + num(i) + '>' + esc2(v) + '</td>'; }).join('') + '</tr>'; }).join('')
+        + '</tbody></table><p class="pl-foot">Printed from Studio OS</p>';
+      document.body.appendChild(d);
+      document.body.setAttribute('data-print', 'list');
+      var done = false;
+      function back() {
+        if (done) return; done = true;
+        document.body.removeAttribute('data-print'); d.remove();
+        window.removeEventListener('afterprint', back); document.removeEventListener('pointerdown', back, true); document.removeEventListener('keydown', back, true);
+      }
+      window.addEventListener('afterprint', back);
+      window.print();
+      // a browser that never says the print is done gets the page back on the next tap or key
+      setTimeout(function () { if (!done) { document.addEventListener('pointerdown', back, true); document.addEventListener('keydown', back, true); } }, 0);
+    }
+    return { use: function (fn) { REQ = fn; }, views: views, saveViews: saveViews, ask: ask, columnsMenu: columnsMenu, sendTo: sendTo, parseCsv: parseCsv, importPanel: importPanel, style: style, fit: fit, confirmIn: confirmIn, announce: announce, tagInput: tagInput, cleanTag: cleanTag, charts: charts, chartTips: chartTips, printList: printList };
   })();
 
   // ── DOM ──

@@ -217,7 +217,7 @@ test.describe('batch C — the phone', () => {
     await expect(page.locator('#mngServicesTop')).toBeHidden();
     await page.locator('#moreBtn').click();
     const menu = page.getByRole('menu', { name: 'More' });
-    await expect(menu.getByRole('menuitem')).toHaveText(['Manage services', 'Import CSV', 'Columns']);
+    await expect(menu.getByRole('menuitem')).toHaveText(['Manage services', 'Import CSV', 'Columns', 'Show charts', 'Print this list']);   // item 105 adds Charts and Print
     const r = (await menu.boundingBox())!;
     expect(r.x).toBeGreaterThanOrEqual(0);
     expect(r.x + r.width).toBeLessThanOrEqual(page.viewportSize()!.width);   // on screen
