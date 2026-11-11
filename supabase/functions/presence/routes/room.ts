@@ -26,6 +26,7 @@ import type { SiteRow } from '../lib/site.ts';
 import type { Principal } from '../../_shared/auth.ts';
 import { lastPublishDetail } from '../lib/actor_kind.ts';
 import { UUID_LOWER_RE as UUID_RE } from '../lib/uuid.ts';
+import { copiedBlockerFor } from '../lib/copied_record.ts';
 
 
 interface RoomState {
@@ -48,7 +49,7 @@ async function roomState(site: SiteRow): Promise<RoomState | null> {
   if (!t) return null;
   const now = new Date().toISOString();
 
-  const [{ snapshot }, lastLiveQ, lastAnyQ] = await Promise.all([
+  const [{ snapshot, mediaManifest }, lastLiveQ, lastAnyQ] = await Promise.all([
     serializeDraft(site.id, t.manifest, { templateSlug: site.template_slug, templateVersion: site.template_version, now }),
     svc(`presence_publishes?site_id=eq.${site.id}&status=eq.live&select=id,snapshot_id,created_at,completed_at,actor_kind&order=created_at.desc&limit=1`),
     svc(`presence_publishes?site_id=eq.${site.id}&select=status&order=created_at.desc&limit=1`),
@@ -63,6 +64,9 @@ async function roomState(site: SiteRow): Promise<RoomState | null> {
   }
 
   const v = validateSnapshot(snapshot, t.manifest);
+  // item 145: words and photos still exactly as Duplicate or a template copied them in
+  const copied = await copiedBlockerFor(site.id, snapshot.content, mediaManifest);
+  if (copied) { v.blockers.push(copied); v.ok = false; }
   const changes = describeChanges(snapshot.content, liveContent);
   const draftHash = await computeDraftHash(snapshot); // M9: reuse THIS serialize (no extra work)
 

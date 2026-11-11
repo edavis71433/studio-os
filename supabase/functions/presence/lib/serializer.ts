@@ -280,10 +280,15 @@ export function buildSnapshot(rows: DraftRows, manifest: TemplateManifest, opts:
   };
   const rawNav: any[] = Array.isArray(settings.nav) ? settings.nav : [];
   const customNav = rawNav.slice(0, 12).map((it: any) => {
-    const top = navItem(it); if (!top) return null;
     const kids = (Array.isArray(it?.children) ? it.children : []).slice(0, 8).map(navItem).filter(Boolean) as Array<{ label: string; href: string }>;
+    // Builder list item 48: a folder is a heading with no page; it's drawn only with something in it
+    if (it?.folder === true) {
+      const label = String(it?.label ?? '').replace(/\s+/g, ' ').trim().slice(0, 40);
+      return label && kids.length ? { label, href: '', folder: true as const, children: kids } : null;
+    }
+    const top = navItem(it); if (!top) return null;
     return kids.length ? { ...top, children: kids } : top;
-  }).filter(Boolean) as Array<{ label: string; href: string; children?: Array<{ label: string; href: string }> }>;
+  }).filter(Boolean) as Array<{ label: string; href: string; folder?: true; children?: Array<{ label: string; href: string }> }>;
 
   const content: SnapshotContent = {
     identity: {
