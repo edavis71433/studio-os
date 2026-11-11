@@ -147,7 +147,7 @@ const SETTINGS_FIELDS: Record<string, FieldRule> = {
   deal_nudges: { kind: 'bool' }, deal_nudge_days: { kind: 'int', min: 1, max: 90 },
   review_requests: { kind: 'bool' }, review_request_after_days: { kind: 'int', min: 1, max: 90 },   // list item 29 (0137)
   visit_counter: { kind: 'bool' },   // list item 61 (0139): the published site's visit counter, on unless switched off
-  ai_crawlers: { kind: 'bool' },     // list item 175 (0154): let AI assistants read the published site, on unless switched off
+  ai_crawlers: { kind: 'bool' },     // list item 175 (0159): let AI assistants read the published site, on unless switched off
   stage_stale_days: { kind: 'stage_days' },   // { lead?: 1–365, qualified?: …, proposal?: …, contract?: … } — a shaped map, not free json
   google_site_verification: { max: 100 }, bing_site_verification: { max: 100 },   // Phase Z: Search Console / Bing ownership
   // Phase CP-2 Design Studio: structured layout choices (never raw CSS)
@@ -327,7 +327,7 @@ async function singleton(req: Request, db: SiteDb, site: SiteRow, principal: Pri
   const method = req.method.toUpperCase();
   if (method === 'GET') {
     let r = await db(`${cfg.table}?site_id=eq.${site.id}&select=${cfg.select}&limit=1`);
-    for (const select of selectSteps(cfg.select).slice(1)) {   // pre-0154, pre-0139, pre-0137, pre-0134
+    for (const select of selectSteps(cfg.select).slice(1)) {   // pre-0159, pre-0139, pre-0137, pre-0134
       if (r.ok || r.status !== 400) break;
       r = await db(`${cfg.table}?site_id=eq.${site.id}&select=${select}&limit=1`);
     }
@@ -385,7 +385,7 @@ const AUTOMATION_SETTINGS_COLS = 'auto_ack_enquiries,invoice_reminders,invoice_r
 const REVIEW_SETTINGS_COLS = 'review_requests,review_request_after_days';
 // The 0139 column (list item 61's switch).
 const VISIT_SETTINGS_COLS = 'visit_counter';
-// The 0154 column (list item 175's AI crawler switch).
+// The 0159 column (list item 175's AI crawler switch).
 const CRAWLER_SETTINGS_COLS = 'ai_crawlers';
 // Newest apply pack first. A database without a pack's columns 400s the widened select,
 // so a read or a save steps down one pack at a time; Settings never goes dark ahead of one.

@@ -53,15 +53,15 @@ const read = (p) => Deno.readTextFileSync(new URL(`../../${p}`, import.meta.url)
   const content = read('supabase/functions/presence/routes/content.ts');
   const serializer = read('supabase/functions/presence/lib/serializer.ts');
   ok('settings: /settings takes ai_crawlers as a yes/no', /ai_crawlers: \{ kind: 'bool' \}/.test(content));
-  ok('settings: the read and save step down without the 0154 column, newest pack first', /CRAWLER_SETTINGS_COLS = 'ai_crawlers'/.test(content) && /OPTIONAL_SETTINGS_COLS = \[CRAWLER_SETTINGS_COLS, VISIT_SETTINGS_COLS,/.test(content) && /\+ ',' \+ CRAWLER_SETTINGS_COLS,/.test(content));
+  ok('settings: the read and save step down without the 0159 column, ahead of the older packs', /CRAWLER_SETTINGS_COLS = 'ai_crawlers'/.test(content) && /OPTIONAL_SETTINGS_COLS = \[(?:[A-Z_]+_SETTINGS_COLS, )*CRAWLER_SETTINGS_COLS, (?:[A-Z_]+_SETTINGS_COLS, )*VISIT_SETTINGS_COLS,/.test(content) && /\+ ',' \+ CRAWLER_SETTINGS_COLS\b/.test(content));
   ok('snapshot: only an off switch reaches the snapshot, so an allowed site\'s snapshot is unchanged', /\.\.\.\(settings\.ai_crawlers === false \? \{ ai_crawlers: false \} : \{\}\)/.test(serializer));
 }
 
 // ═══ 2. the migration and its apply pack ═══
 {
-  const mig = read('supabase/migrations/0154_site_availability_ai_crawlers.sql');
-  const pack = read('docs/presence/APPLY-0154-prod.sql');
-  for (const [name, src] of [['migration 0154', mig], ['apply pack 0154', pack]]) {
+  const mig = read('supabase/migrations/0159_site_availability_ai_crawlers.sql');
+  const pack = read('docs/presence/APPLY-0159-prod.sql');
+  for (const [name, src] of [['migration 0159', mig], ['apply pack 0159', pack]]) {
     ok(`${name}: adds the visitor password time, empty`, /alter table public\.presence_sites\s+add column if not exists visitor_password_at timestamptz;/.test(src));
     ok(`${name}: adds the AI switch, on by default`, /alter table public\.presence_settings\s+add column if not exists ai_crawlers boolean not null default true;/.test(src));
     ok(`${name}: never a column for the password itself`, !/add column if not exists \w*password(?!_at)\w*/.test(src));
@@ -134,7 +134,7 @@ const quiet = async (fn) => { const l = console.log; console.log = () => {}; try
   r = await quiet(() => run({ password: 'open sesame' }, { live: false }));
   ok('check: a site never published has nothing to protect yet', r.status === 409 && r.body.error === 'not_live' && world.netlify.length === 0);
   r = await quiet(() => run({ password: 'open sesame' }, { column: false }));
-  ok('check: before the 0154 apply pack, it says it isn\'t available and sends nothing', r.status === 503 && r.body.error === 'unavailable' && world.netlify.length === 0);
+  ok('check: before the 0159 apply pack, it says it isn\'t available and sends nothing', r.status === 503 && r.body.error === 'unavailable' && world.netlify.length === 0);
 
   const st = shapePreviewStatus({ draftChanges: 0, preview: null, live: { last_published_at: '2026-01-01T00:00:00Z', summary: null }, baseUrl: 'https://app.example', passwordAt: '2026-11-11T00:00:00Z' });
   ok('status: the site\'s status says since when it has a password', st.live.password_since === '2026-11-11T00:00:00Z' && shapePreviewStatus({ draftChanges: 0, preview: null, live: null, baseUrl: 'x' }).live.password_since === null);

@@ -49,7 +49,7 @@ export async function handlePreviewStatus(site: SiteRow, cors: Record<string, st
     // G10: the offline marker — read separately + best-effort so a database
     // without 0111 applied still serves the status untouched (offline = null).
     svc(`presence_sites?id=eq.${site.id}&select=offline_at&limit=1`).catch(() => ({ ok: false, json: null } as any)),
-    // List item 175: the visitor password, the same way (0154).
+    // List item 175: the visitor password, the same way (0159).
     svc(`presence_sites?id=eq.${site.id}&select=visitor_password_at&limit=1`).catch(() => ({ ok: false, json: null } as any)),
   ]);
   const offlineAt = (off.ok && off.json?.[0]?.offline_at) || null;

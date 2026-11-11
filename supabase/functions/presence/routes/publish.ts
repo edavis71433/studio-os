@@ -637,7 +637,7 @@ export async function handleBackOnline(site: SiteRow, principal: Principal, cors
 // ── List item 175 · Site availability: public, a visitor password, or offline ───
 // Offline is the holding page above. The password is Netlify's site-wide password:
 // Netlify keeps it and asks for it before any page of the site, the holding page
-// included; we keep only when it was put on (presence_sites.visitor_password_at, 0154).
+// included; we keep only when it was put on (presence_sites.visitor_password_at, 0159).
 // Before telling the owner the site asks for a password, the server asks the site
 // itself, the way a stranger would: a protected site answers 401. If it doesn't, the
 // password comes straight back off and nothing is claimed, so an owner is never told a

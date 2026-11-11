@@ -321,7 +321,7 @@ export function buildSnapshot(rows: DraftRows, manifest: TemplateManifest, opts:
       footer: { hours: settings.footer_hours !== false, social: settings.footer_social !== false },
       // Item 61 (0139): only present when the owner turned counting off, so an on site's snapshot is unchanged.
       ...(settings.visit_counter === false ? { visit_counter: false } : {}),
-      // List item 175 (0154): only present when AI assistants are switched off, the same way.
+      // List item 175 (0159): only present when AI assistants are switched off, the same way.
       ...(settings.ai_crawlers === false ? { ai_crawlers: false } : {}),
       // Phase SD: per-page search visibility + overrides
       // cap must cover the worst case: 5 built-in pages + up to 20 builder pages

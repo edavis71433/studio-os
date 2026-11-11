@@ -1,5 +1,5 @@
 -- ===========================================================================
---  APPLY PACK - migration 0154  (owner-apply, prod)
+--  APPLY PACK - migration 0159  (owner-apply, prod)
 -- ===========================================================================
 --  Run this ONCE (Supabase -> SQL Editor), BEFORE or WITH the deploy.yml run
 --  that ships the site controls. ADDITIVE and IDEMPOTENT ("add column if not
@@ -19,7 +19,7 @@
 --    alter table public.presence_sites drop column if exists visitor_password_at;
 --    alter table public.presence_settings drop column if exists ai_crawlers;
 --
---  Covers: supabase/migrations/0154_site_availability_ai_crawlers.sql
+--  Covers: supabase/migrations/0159_site_availability_ai_crawlers.sql
 -- ===========================================================================
 
 alter table public.presence_sites
