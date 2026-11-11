@@ -2204,6 +2204,38 @@ function askText(title, opts) {
     dlg.showModal(); setTimeout(() => inp.focus(), 20);
   });
 }
+// Item 163 (review domains finding 12): changing the domain asks for the new name and whether the
+// old one keeps working, on by default (a business that changes names keeps its old links).
+function askDomainChange(old) {
+  return new Promise((resolve) => {
+    const dlg = el("dialog", "ask-domain"); dlg.style.cssText = "border:none;border-radius:14px;padding:0;max-width:420px;width:92%;box-shadow:0 20px 60px rgba(30,19,56,.28);background:var(--card,#fff);color:var(--ink,#1b1525)";
+    const form = el("form"); form.style.cssText = "padding:20px";
+    const h = el("div", null, "Change " + old + " to a different domain"); h.id = "askDomainTitle"; h.style.cssText = "font-weight:600;margin-bottom:6px"; form.appendChild(h);
+    dlg.setAttribute("aria-labelledby", h.id);
+    const hint = el("div", null, "Type the new domain. You’ll get its two records to add, the same as before."); hint.style.cssText = "font-size:13px;color:var(--soft,#6b6478);margin-bottom:10px"; form.appendChild(hint);
+    const inp = el("input"); inp.type = "text"; inp.placeholder = "newname.com"; inp.setAttribute("aria-label", "The new domain"); inp.setAttribute("autocomplete", "off");
+    inp.style.cssText = "width:100%;font:inherit;font-size:16px;padding:9px 12px;border:1px solid var(--line,#ddd);border-radius:9px;outline:none;box-sizing:border-box"; form.appendChild(inp);
+    const keep = el("label"); keep.style.cssText = "display:flex;gap:8px;align-items:flex-start;margin-top:12px;font-size:14px;line-height:1.4";
+    const cb = el("input"); cb.type = "checkbox"; cb.checked = true; cb.style.marginTop = "3px";
+    keep.appendChild(cb); keep.appendChild(el("span", null, "Keep " + old + " working: its visitors are sent on to the new domain, to the same page")); form.appendChild(keep);
+    const err = el("div", null, ""); err.setAttribute("role", "alert"); err.style.cssText = "font-size:13px;color:#b42318;margin-top:8px"; form.appendChild(err);
+    const row = el("div"); row.style.cssText = "display:flex;gap:8px;justify-content:flex-end;margin-top:14px";
+    const cancel = el("button", null, "Cancel"); cancel.type = "button"; cancel.style.cssText = "font:inherit;font-size:13px;font-weight:600;border:1px solid var(--line,#ddd);background:transparent;color:var(--ink,#1b1525);border-radius:999px;padding:8px 16px;cursor:pointer";
+    const ok = el("button", null, "Change domain"); ok.type = "submit"; ok.style.cssText = "font:inherit;font-size:13px;font-weight:600;border:1px solid var(--plum,#5b3fa0);background:var(--plum,#5b3fa0);color:#fff;border-radius:999px;padding:8px 16px;cursor:pointer";
+    row.appendChild(cancel); row.appendChild(ok); form.appendChild(row); dlg.appendChild(form); document.body.appendChild(dlg);
+    let done = false; const finish = (v) => { if (done) return; done = true; try { dlg.close(); } catch (e) {} dlg.remove(); resolve(v); };
+    cancel.addEventListener("click", () => finish(null));
+    form.addEventListener("submit", (e) => {
+      e.preventDefault();
+      const d = String(inp.value || "").trim().toLowerCase().replace(/^https?:\/\//, "").replace(/[\/?#].*$/, "");
+      if (!/^([a-z0-9]([a-z0-9-]*[a-z0-9])?\.)+[a-z]{2,}$/.test(d)) { err.textContent = "That doesn’t look like a domain yet, like newname.com."; inp.focus(); return; }
+      if (d === String(old).toLowerCase()) { err.textContent = "That’s the domain it has now."; inp.focus(); return; }
+      finish({ domain: d, keepOld: cb.checked });
+    });
+    dlg.addEventListener("cancel", (e) => { e.preventDefault(); finish(null); });
+    dlg.showModal(); setTimeout(() => inp.focus(), 20);
+  });
+}
 // A styled yes/no question in place of the browser's confirm() (item 33). The browser's box
 // can't be styled, reads like a system warning, and on a phone shows the site's address over
 // the question. Resolves true for the main button, false for Cancel or Escape. A question about
@@ -3649,7 +3681,20 @@ function renderFoundations(f, plans, launch, dom) {
   domCard.appendChild(el("div", "dol", "your domain"));
   const dstat = (dom && dom.custom_domain) ? dom : null;
   const stepLine = (t) => { const p = el("p", "aihint", t); p.style.marginTop = "5px"; return p; };
-  const removeBtn = (label) => { const rm = el("button", "textact", label); rm.dataset.needs = "configure"; rm.style.opacity = "0.7"; rm.addEventListener("click", async () => { if (!(await askYes("Remove " + dstat.custom_domain + "? Your site goes back to its temporary address.", { ok: "Remove domain", danger: true }))) return; try { await api("DELETE", "/foundations/domain"); toast("Domain removed."); openFoundationsDesk(); } catch (err) { toast(nice(err), true); } }); return rm; };
+  // item 163 (review domains finding 11): taking the site off its address asks for the name typed
+  // back, not one yes (the server checks it too); the owner and the studio are emailed
+  const removeBtn = (label) => { const rm = el("button", "textact", label); rm.dataset.needs = "configure"; rm.style.opacity = "0.7"; rm.addEventListener("click", async () => {
+    const typed = await askText("Remove " + dstat.custom_domain + "?", { hint: "Your site goes back to its built-in address, and anyone who types " + dstat.custom_domain + " stops reaching it. To remove it, type the domain here.", placeholder: dstat.custom_domain, ok: "Remove domain" });
+    if (typed === null) return;
+    if (String(typed).trim().toLowerCase() !== String(dstat.custom_domain).toLowerCase()) { toast("That doesn’t match " + dstat.custom_domain + ", so nothing was removed.", true); return; }
+    const confirm = String(typed).trim();
+    try { await api("DELETE", "/foundations/domain", { confirm }); toast("Domain removed."); openFoundationsDesk(); } catch (err) { toast(nice(err), true); } }); return rm; };
+  // item 163 (finding 12): a new domain can keep the old one working, sending its visitors on
+  const changeBtn = () => { const b = el("button", "textact", "Change to a different domain"); b.dataset.needs = "configure"; b.dataset.change = "domain"; b.addEventListener("click", async () => {
+    const ans = await askDomainChange(dstat.custom_domain);
+    if (!ans) return;
+    try { await api("POST", "/foundations/domain", { domain: ans.domain, keep_old: ans.keepOld }); toast(ans.keepOld ? "Changed. " + dstat.custom_domain + " sends visitors on to " + ans.domain + " from your next publish." : "Changed to " + ans.domain + "."); openFoundationsDesk(); }
+    catch (err) { toast(nice(err), true); } }); return b; };
 
   if (dstat && dstat.health === "ok") {
     // item 134 (Nov 2026 review, domains findings 3 and 5): "live and secure" only when every
@@ -3659,7 +3704,7 @@ function renderFoundations(f, plans, launch, dom) {
     const allOk = !lines || dstat.all_ok === true;
     const p = el("p", "aihint", allOk ? "✓ " + dstat.custom_domain + " is live and secure." : dstat.custom_domain + " is connected, with something left to finish:"); p.style.marginTop = "6px"; p.style.fontWeight = "600"; domCard.appendChild(p);
     if (lines) lines.forEach((c) => { const l = stepLine((c.ok ? "✓ " : "• ") + String(c.words || "")); l.dataset.check = c.ok ? "ok" : "todo"; if (c.ok) l.style.color = "var(--soft,#6b6478)"; domCard.appendChild(l); });
-    const rm = removeBtn("Remove this domain"); rm.style.marginTop = "8px"; domCard.appendChild(rm);
+    const live = el("div", "doa"); live.style.cssText = "gap:8px;flex-wrap:wrap;margin-top:8px"; live.appendChild(changeBtn()); live.appendChild(removeBtn("Remove this domain")); domCard.appendChild(live);
   } else if (dstat) {
     // Attached — walk them through the two records; it goes live on its own after.
     if (dstat.health === "ssl_pending") {
@@ -3683,11 +3728,13 @@ function renderFoundations(f, plans, launch, dom) {
         const cp = el("button", "textact", "Copy"); cp.addEventListener("click", () => { if (navigator.clipboard) navigator.clipboard.writeText(String(val)).then(() => toast("Copied " + val)).catch(() => {}); });
         r.appendChild(code); r.appendChild(cp); domCard.appendChild(r);
       });
+      // item 163 (review domains finding 14): the records marked MX are the client's email
+      const mxLine = stepLine("Leave anything marked MX or Mail alone: that’s your email."); mxLine.dataset.step = "mail"; domCard.appendChild(mxLine);
       const s3 = stepLine("That’s everything. We check on our own — your site appears here the moment it’s ready, usually within an hour."); s3.style.color = "var(--soft,#6b6478)"; s3.style.marginTop = "8px"; domCard.appendChild(s3);
     }
     const acts = el("div", "doa"); acts.style.marginTop = "8px"; acts.style.gap = "8px";
     const chk = el("button", "textact", "Check if it’s ready"); chk.addEventListener("click", () => openFoundationsDesk()); acts.appendChild(chk);
-    acts.appendChild(removeBtn("Remove")); domCard.appendChild(acts);
+    acts.appendChild(changeBtn()); acts.appendChild(removeBtn("Remove")); domCard.appendChild(acts);
   } else {
     // No domain yet — the branching intro, plain language, two clear choices.
     domCard.appendChild(stepLine("Right now your site is at a temporary address. Want it on your own domain (like yourbusiness.com)?"));
@@ -3763,6 +3810,14 @@ function renderFoundations(f, plans, launch, dom) {
       acts.appendChild(b);
     });
     mh.appendChild(acts); domCard.appendChild(mh);
+  }
+  // item 163 (review domains finding 11): the domain's history was written and never shown
+  const changes = dom && Array.isArray(dom.changes) ? dom.changes : [];
+  if (changes.length) {
+    const ch = el("div"); ch.dataset.changes = "domain"; ch.style.marginTop = "12px";
+    const h = stepLine("Recent changes"); h.style.fontWeight = "600"; ch.appendChild(h);
+    changes.forEach((c) => { const d = new Date(c.at); const l = stepLine((isNaN(d) ? "" : d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) + " · ") + String(c.words || "")); l.style.color = "var(--soft,#6b6478)"; ch.appendChild(l); });
+    domCard.appendChild(ch);
   }
   wrap.appendChild(domCard);
 

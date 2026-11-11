@@ -14,7 +14,8 @@ import { readPageLocks } from './page_locks.ts';
 import { serializeDraft } from '../lib/serializer.ts';
 import { validateSnapshot } from '../lib/manifest_validate.ts';
 import { fetchVariants } from '../lib/media.ts';
-import { deployFileMap, netlifyConfigured, setSitePassword } from '../lib/netlify.ts';
+import { deployFileMap, netlifyConfigured, setSitePassword, getSite } from '../lib/netlify.ts';
+import { withForwarding } from '../lib/domain_notify.ts';
 import { mergeSecurityHeaders, mergeAssetCaching } from '../lib/security_headers.ts';
 import { writeChangeEvent } from '../lib/provenance.ts';
 import type { Snapshot } from '../lib/render_types.ts';
@@ -209,6 +210,14 @@ export async function runPipeline(site: SiteRow, principal: Principal, kind: 'pu
   // the template's asset-cache `_headers`. One source of truth: lib/security_headers.ts.
   // Item 144: the CSP is the one this site's own pages need (publishedCspFor, above).
   fileMap['_headers'] = mergeSecurityHeaders(mergeAssetCaching(typeof fileMap['_headers'] === 'string' ? fileMap['_headers'] as string : undefined), csp);
+  // Item 163 (review domains finding 12): an old domain kept on the site when the domain changed
+  // forwards to the current one, path and all. Netlify serves an extra name as-is; only a rule at
+  // the top of _redirects makes it a permanent move. Netlify's own list of names is the record.
+  if (site.custom_domain && site.netlify_site_id) {
+    const nfs = await getSite(site.netlify_site_id).catch(() => null);
+    const aliases = nfs && nfs.ok && nfs.site ? nfs.site.domain_aliases || [] : [];
+    if (aliases.length) fileMap['_redirects'] = withForwarding(typeof fileMap['_redirects'] === 'string' ? fileMap['_redirects'] as string : '', aliases, site.custom_domain);
+  }
 
   await svc(`presence_publishes?id=eq.${pubId}`, { method: 'PATCH', body: JSON.stringify({ status: 'deploying' }) });
   const dep = await deployFileMap(site.netlify_site_id, fileMap, { title: `${kind} ${pubId}` });

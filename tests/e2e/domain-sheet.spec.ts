@@ -130,3 +130,74 @@ test.describe('Domain & email sheet: their provider, the guides, every record (i
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true);
   });
 });
+
+// ── Nov 10 review, builder list item 163: safer domain changes (findings 11, 12 and 14) ──
+const LIVE = { data: { custom_domain: 'bistro.example', health: 'ok', provider: WHERE, all_ok: true, serving: 'latest', changes: [],
+  checklist: [{ key: 'points:bistro.example', ok: true, words: 'bistro.example points here' }, { key: 'padlock', ok: true, words: 'The padlock is on' }] } };
+async function trackDomainWrites(page: import('@playwright/test').Page) {
+  const sent: Array<{ method: string; body: unknown }> = [];
+  await page.route(/\/functions\/v1\/presence\/foundations\/domain$/, (route: Route) => {
+    const method = route.request().method();
+    if (method === 'GET') return route.fallback();
+    sent.push({ method, body: route.request().postDataJSON() });
+    return route.fulfill(json(method === 'DELETE' ? { data: { ok: true } } : { data: { custom_domain: 'new.example', health: 'dns_pending' } }));
+  });
+  return sent;
+}
+
+test.describe('Domain & email sheet: safer changes (item 163)', () => {
+  test('removing asks for the domain typed back, and a different name removes nothing', async ({ page }) => {
+    await installApp(page, { api: { ...BASE, '/foundations/domain': LIVE } });
+    const sent = await trackDomainWrites(page);
+    await page.goto('/presence.html#domain');
+    await page.getByRole('button', { name: 'Remove this domain' }).click();
+    const dlg = page.locator('dialog[open]');
+    await expect(dlg).toContainText('Remove bistro.example?');
+    await expect(dlg).toContainText('To remove it, type the domain here.');
+    await dlg.locator('input').fill('bistro.exampel');
+    await dlg.getByRole('button', { name: 'Remove domain' }).click();
+    await expect(page.locator('.dds-toast, .toast').filter({ hasText: 'That doesn’t match bistro.example, so nothing was removed.' })).toBeVisible();
+    expect(sent).toEqual([]);
+    await page.getByRole('button', { name: 'Remove this domain' }).click();
+    await page.locator('dialog[open] input').fill('bistro.example');
+    await page.locator('dialog[open]').getByRole('button', { name: 'Remove domain' }).click();
+    await expect.poll(() => sent.length).toBe(1);
+    expect(sent[0]).toEqual({ method: 'DELETE', body: { confirm: 'bistro.example' } });
+  });
+
+  test('changing the domain keeps the old one working unless it is unticked', async ({ page }) => {
+    await installApp(page, { api: { ...BASE, '/foundations/domain': LIVE } });
+    const sent = await trackDomainWrites(page);
+    await page.goto('/presence.html#domain');
+    await page.getByRole('button', { name: 'Change to a different domain' }).click();
+    const dlg = page.locator('dialog[open]');
+    await expect(dlg).toContainText('Change bistro.example to a different domain');
+    const keep = dlg.getByRole('checkbox', { name: /Keep bistro\.example working/ });
+    await expect(keep).toBeChecked();
+    await dlg.getByRole('textbox', { name: 'The new domain' }).fill('new');
+    await dlg.getByRole('button', { name: 'Change domain' }).click();
+    await expect(dlg.getByRole('alert')).toHaveText('That doesn’t look like a domain yet, like newname.com.');
+    expect(sent).toEqual([]);
+    await dlg.getByRole('textbox', { name: 'The new domain' }).fill('https://New.Example/');
+    await dlg.getByRole('button', { name: 'Change domain' }).click();
+    await expect.poll(() => sent.length).toBe(1);
+    expect(sent[0]).toEqual({ method: 'POST', body: { domain: 'new.example', keep_old: true } });
+    await expect(page.locator('.dds-toast, .toast').filter({ hasText: 'Changed. bistro.example sends visitors on to new.example from your next publish.' })).toBeVisible();
+    await page.getByRole('button', { name: 'Change to a different domain' }).click();
+    await page.locator('dialog[open]').getByRole('textbox', { name: 'The new domain' }).fill('other.example');
+    await page.locator('dialog[open]').getByRole('checkbox').uncheck();
+    await page.locator('dialog[open]').getByRole('button', { name: 'Change domain' }).click();
+    await expect.poll(() => sent.length).toBe(2);
+    expect(sent[1]).toEqual({ method: 'POST', body: { domain: 'other.example', keep_old: false } });
+  });
+
+  test('the steps say to leave the email records alone, and the card shows recent changes', async ({ page }) => {
+    await installApp(page, { api: { ...BASE, '/foundations/domain': { data: { ...ATTACHED.data, changes: [{ at: '2026-11-10T12:00:00Z', words: 'Changed domain from old.example to bistro.example (old.example forwards), by your studio' }] } } } });
+    await page.goto('/presence.html#domain');
+    await expect(page.locator('[data-step="mail"]')).toHaveText('Leave anything marked MX or Mail alone: that’s your email.');
+    const changes = page.locator('[data-changes="domain"]');
+    await expect(changes).toContainText('Recent changes');
+    await expect(changes).toContainText('Nov 10, 2026 · Changed domain from old.example to bistro.example (old.example forwards), by your studio');
+    await expect(page.getByRole('button', { name: 'Change to a different domain' })).toBeVisible();   // a typo can be fixed before it goes live
+  });
+});
