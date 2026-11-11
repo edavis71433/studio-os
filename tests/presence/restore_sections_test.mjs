@@ -12,6 +12,8 @@
 //   · a version kept before 0169 (and a database without the column) still brings them back
 //   · accepting a writing proposal doesn't touch them
 //   · every photo-carrying section survives the trip from the render back to storage
+//   · the client's restore keeps the sections their studio locked (item 155): an unchanged one
+//     keeps its lock, one it would remove or change refuses it with nothing written
 //   deno run --allow-read --allow-env --allow-net tests/presence/restore_sections_test.mjs
 import { installFakePostgrest } from './fake_pgrst.mjs';
 const uuid = (c) => `${c.repeat(8)}-${c.repeat(4)}-4${c.repeat(3)}-8${c.repeat(3)}-${c.repeat(12)}`;
@@ -42,6 +44,7 @@ const { getTemplate } = await import('../../supabase/functions/presence/lib/rend
 const { validateBlocks, unresolveBlockMedia } = await import('../../supabase/functions/presence/lib/site_blocks.ts');
 const { SETTINGS_CONTENT_FIELDS } = await import('../../supabase/functions/presence/lib/site_roles.ts');
 const { svc } = await import('../../supabase/functions/presence/lib/db.ts');
+const { restoreUnderLocks, lockedRestoreMessage } = await import('../../supabase/functions/presence/lib/section_lock.ts');
 
 let pass = 0, fail = 0;
 const ok = (n, c, note = '') => { if (c) { pass++; console.log('PASS ', n); } else { fail++; console.log('FAIL ', n, note); } };
@@ -289,6 +292,92 @@ const websiteNow = () => Object.fromEntries(SETTINGS_CONTENT_FIELDS ? [...SETTIN
 {
   const d = draftSettingsOf(null);
   ok('no settings row: every website field at its column default', same(d, { category_order: [], cover_media_id: null, logo_media_id: null, og_media_id: null, announcement_text: '', announcement_url: '', announcement_expires_at: null, hero_layout: '', nav_style: '', sections_hidden: [], sections_order: [], footer_hours: true, footer_social: true, pages_noindex: [], page_seo: {}, blocks: [], pages: [], nav: [] }), canon(d));
+}
+
+// ═══ 9. the client's restore keeps the sections their studio locked (item 155) ═══
+{
+  const L = (words) => ({ id: 'lock-welcome', words });
+  const studio = { ...owner, scope: { site_id: SITE, name: 'Sample Cafe' } };   // the studio, scoped into this client
+  const staff = { kind: 'staff', userId: uuid('5'), email: 'ops@example.com', jwt: 'jwt-staff', requestId: 't' };
+  const restoreAs = async (who, cp) => res(await P.handleCheckpointRestore(req(`/publishes/checkpoints/${cp.body.data.id}/restore`), site, who, cp.body.data.id, cors));
+  const written = () => canon({ settings: settings(), snapshots: db.tables.presence_snapshots.length, events: db.tables.presence_change_events.length, identity: db.tables.presence_identity });
+
+  // locked after the checkpoint, as it was then: the restore goes ahead and the lock stays
+  world();
+  let cp = await saveCheckpoint('Before the lock');
+  editSince();
+  settings().blocks[0] = { ...HOME[0], lock: L(false) };
+  let back = await restoreAs(owner, cp);
+  ok('lock: a locked section the version has as it is now doesn’t stop the restore', back.status === 200, JSON.stringify(back.body));
+  ok('lock: …it keeps its lock, and the rest comes back', same(settings().blocks[0], { ...HOME[0], lock: L(false) }) && settings().blocks.some((b) => b.type === 'gallery') && same(settings().pages, PAGES), canon(settings().blocks));
+
+  // words open: the version's words come back under the same lock
+  world();
+  cp = await saveCheckpoint('Before new words');
+  settings().blocks[0] = { ...HOME[0], body: 'New words since.', lock: L(true) };
+  back = await restoreAs(owner, cp);
+  ok('lock: with its words open, the version’s words come back and the lock stays', back.status === 200 && same(settings().blocks[0], { ...HOME[0], lock: L(true) }), canon(settings().blocks[0]));
+
+  // words closed and changed since: refused, and nothing at all is written
+  world();
+  cp = await saveCheckpoint('Before new words');
+  editSince();
+  settings().blocks[0] = { ...HOME[0], body: 'New words since.', lock: L(false) };
+  let was = written();
+  back = await restoreAs(owner, cp);
+  ok('lock: a restore that would change a locked section is refused (403) with the sentence',
+    back.status === 403 && back.body?.error === 'section_locked' && back.body?.message === 'Your studio locked “Welcome”, and that checkpoint changes it. Ask them to restore it. Nothing was changed.'
+    && same(back.body?.sections, [{ name: 'Welcome', what: 'removed' }]), JSON.stringify(back.body));
+  ok('lock: …and nothing was written: no safety copy, no event, the draft as it was', written() === was);
+
+  // the studio and platform staff are never stopped; their restore is exact
+  back = await restoreAs(studio, cp);
+  ok('lock: the studio’s own restore goes ahead, exactly as the version had it', back.status === 200 && same(settings().blocks[0], HOME[0]), JSON.stringify(back.body).slice(0, 200));
+  settings().blocks[0] = { ...HOME[0], body: 'New words since.', lock: L(false) };
+  back = await restoreAs(staff, cp);
+  ok('lock: so does platform staff’s', back.status === 200 && same(settings().blocks[0], HOME[0]));
+
+  // restyled since under the same lock: refused
+  world();
+  settings().blocks[0] = { ...HOME[0], style: 'dark', lock: L(true) };
+  cp = await saveCheckpoint('While dark');
+  settings().blocks[0] = { ...HOME[0], style: 'light', lock: L(true) };
+  back = await restoreAs(owner, cp);
+  ok('lock: a version with the locked section in another style is refused', back.status === 403 && same(back.body?.sections, [{ name: 'Welcome', what: 'changed' }]) && settings().blocks[0].style === 'light', JSON.stringify(back.body));
+
+  // a lock the version brings back is the studio's own: it comes back
+  world();
+  settings().blocks[0] = { ...HOME[0], lock: L(false) };
+  cp = await saveCheckpoint('While locked');
+  settings().blocks[0] = { ...HOME[0] };   // the studio unlocked it since
+  back = await restoreAs(owner, cp);
+  ok('lock: a lock the version had comes back with it', back.status === 200 && same(settings().blocks[0], { ...HOME[0], lock: L(false) }), JSON.stringify(back.body));
+
+  // a locked section on a page the version hasn't got: the version's restore says so in its words
+  world();
+  cp = await saveCheckpoint('Before the prices page');
+  db.tables.presence_publishes.push({ id: PUB, site_id: SITE, snapshot_id: cp.snap.id, status: 'live', kind: 'publish', created_at: '2026-11-01T00:00:00Z' });
+  settings().pages = [...settings().pages, { slug: 'prices', title: 'Prices', blocks: [{ type: 'richtext', title: 'Our prices', body: 'From ten dollars.', lock: { id: 'lock-prices', words: true } }] }];
+  was = written();
+  back = await res(await R.handleRestoreToDraft(req('/restore-to-draft', { publish_id: PUB }), site, owner, cors));
+  ok('lock: a version without the page a locked section is on is refused, in the version’s words',
+    back.status === 403 && back.body?.message === 'Your studio locked “Our prices”, and that version changes it. Ask them to restore it. Nothing was changed.' && written() === was, JSON.stringify(back.body));
+
+  // the rule itself
+  const home = [{ type: 'richtext', title: 'A', body: 'a' }, { type: 'richtext', title: 'B', body: 'b', lock: { id: 'lock-b', words: false } }];
+  const restoring = { blocks: [{ type: 'richtext', title: 'B', body: 'b' }, { type: 'richtext', title: 'B', body: 'b' }, { type: 'richtext', title: 'C', body: 'c' }], pages: [] };
+  const copy = structuredClone(restoring);
+  const k = restoreUnderLocks({ blocks: home, pages: [] }, restoring);
+  ok('rule: the lock goes onto the version’s first copy, wherever it sits on the page, and only one',
+    k.edits.length === 0 && same(k.blocks[0].lock, { id: 'lock-b', words: false }) && !('lock' in k.blocks[1]) && !('lock' in k.blocks[2]), canon(k));
+  ok('rule: what it was given is left as it was', same(restoring, copy));
+  ok('rule: a section locked on Home doesn’t take the lock of a copy on a page', restoreUnderLocks({ blocks: home, pages: [] }, { blocks: [], pages: [{ slug: 'p', title: 'P', blocks: [{ type: 'richtext', title: 'B', body: 'b' }] }] }).edits.length === 1);
+
+  // the sentence: under the 160 characters the editor shows as they are (presence.html nice())
+  const html = await Deno.readTextFile(new URL('../../presence.html', import.meta.url));
+  const nice = new Function(`${html.match(/function nice\(e\) \{[\s\S]*?\n\}/)[0]}; return nice;`)();
+  const longest = lockedRestoreMessage([{ name: 'x'.repeat(60), what: 'changed' }], 'that checkpoint');
+  ok('sentence: with the longest name it reaches the editor as it is', nice(new Error(longest)) === longest && longest.length < 160, String(longest.length));
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);
