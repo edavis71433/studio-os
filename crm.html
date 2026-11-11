@@ -1280,10 +1280,10 @@ function renderBillingTab(host){
     else if(!st){state=`<span class="schip" style="background:var(--bg);color:var(--faint)">Voided</span>`;}
     else if(st==='processing'){state=`<span class="schip info">Processing</span>`;sub=(sub?sub+' · ':'')+'Payment on its way';due=v.due_date?esc(dueLabel(v.due_date)):'';}   // the client paid — nothing to resend or void
     else{state=`<span class="schip ${MONEY_TONE[st]}">${MONEY_WORD[st]}</span>`;
-      if(!v.stripe_url)sub=(sub?sub+' · ':'')+'Not sent yet';
-      due=v.due_date?esc(dueLabel(v.due_date)):'Due now'; dueCls=st==='overdue'?'due':'';
       const parts=inv.filter(x=>x.payment_for===v.id&&x.status==='paid');   // item 77: part payments already came off it
       if(parts.length)sub=(sub?sub+' · ':'')+esc(fmtC(parts.reduce((a,b)=>a+(b.amount_cents||0),0)))+' paid so far';
+      if(!v.stripe_url)sub=(sub?sub+' · ':'')+(parts.length?'Send it for a link for what’s left':'Not sent yet');
+      due=v.due_date?esc(dueLabel(v.due_date)):'Due now'; dueCls=st==='overdue'?'due':'';
       acts+=act(`data-pay-inv="${esc(v.id)}"`,'Record payment','Paid by check, cash, bank transfer or Zelle? Mark it paid here');
       acts+=act(`data-send-inv="${esc(v.id)}"`,v.stripe_url?'Resend':'Send');
       if(v.stripe_url)acts+=act(`data-copy="${esc(v.stripe_url)}"`,'Copy link');
