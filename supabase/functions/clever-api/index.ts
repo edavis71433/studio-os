@@ -10597,11 +10597,12 @@ Rules: at most 5 items. "go" and "kind" must match the source. "refId" must be a
     }
 
     // ── PROJECT SURVEY (project-survey.html) ──
-    // Sends the survey responses to Eric. Returns a truthful { emailed } flag.
+    // Sends the survey responses to Eric. Returns truthful { saved, emailed } flags:
+    // the page says "saved" only when the row really landed (Nov 10 review, G6).
     if (type === 'survey_response') {
       // Public + now rate-limited; hard caps so an anonymous caller can't stuff
       // megabytes into the sentiment table or the owner's inbox.
-      const name = String(body.clientName || '').trim().slice(0, 200);
+      let name = String(body.clientName || '').trim().slice(0, 200);
       const email = String(body.clientEmail || '').trim().slice(0, 200);
       const subject = String(body.subject || '').trim().slice(0, 200);
       const message = String(body.message || '').trim().slice(0, 4000);
@@ -10610,24 +10611,33 @@ Rules: at most 5 items. "go" and "kind" must match the source. "refId" must be a
 
       // PERSIST first (email is a channel, not a store): survey_responses is the
       // table the sentiment/referral features read — responses that only landed
-      // in an inbox were starving them. Best-effort; the email still goes out.
+      // in an inbox were starving them. The email still goes out if this fails.
+      let saved = false;
       try {
         if (SB_SERVICE) {
           const meta = (body.meta && typeof body.meta === 'object') ? body.meta : {};
           const clientId = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(meta.client_id || '')) ? String(meta.client_id) : null;
-          await fetch(`${SB_URL}/rest/v1/survey_responses`, {
+          // G6: survey links carry the client's id only (the name used to ride in the
+          // web address, into browser history and logs), so the name comes from the record
+          if (!name && clientId) {
+            const cr = await fetch(`${SB_URL}/rest/v1/clients?id=eq.${clientId}&select=name&limit=1`, { headers: { apikey: SB_SERVICE, Authorization: `Bearer ${SB_SERVICE}` } });
+            const cj = cr.ok ? await cr.json().catch(() => []) : [];
+            name = String((Array.isArray(cj) && cj[0] && cj[0].name) || '').trim().slice(0, 200);
+          }
+          const ins = await fetch(`${SB_URL}/rest/v1/survey_responses`, {
             method: 'POST',
             headers: { apikey: SB_SERVICE, Authorization: `Bearer ${SB_SERVICE}`, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
             body: JSON.stringify({ client_id: clientId, client_name: name || String((meta as any).client_name || '') || null, client_email: email || null, message: message || null }),
           });
+          saved = ins.ok;
         }
-      } catch (_e) { /* best-effort */ }
+      } catch (_e) { saved = false; }
 
       let ericEmailed = false;
       try {
         ericEmailed = await emailOk(
           ERIC,
-          subject || `New project survey response${name ? ': ' + name : ''}`,
+          subject ? (name && !subject.includes(name) ? `${subject} from ${name}` : subject) : `New project survey response${name ? ': ' + name : ''}`,
           notifyShell(
             'New project survey response',
             [
@@ -10639,7 +10649,7 @@ Rules: at most 5 items. "go" and "kind" must match the source. "refId" must be a
         );
       } catch (_e) { /* ignore */ }
 
-      return json({ ok: true, emailed: ericEmailed });
+      return json({ ok: true, saved, emailed: ericEmailed });
     }
 
     // ── AI: DRAFT A REPLY (admin panel) ── (gate: staff)
@@ -10772,7 +10782,10 @@ ${JSON.stringify(ctx).slice(0, 6000)}`;
           if (c.launched_at && !c.survey_sent_at) {
             const launchedMs = new Date(c.launched_at).getTime();
             if (!isNaN(launchedMs) && now - launchedMs >= SURVEY_DELAY_DAYS * DAY) {
-              const surveyUrl = `https://davisdigitalstudio.com/project-survey?c=${encodeURIComponent(c.id)}&n=${encodeURIComponent(name)}`;
+              // the client's id only — never their name in a web address — and on the app's
+              // own address: the main domain's redirect drops everything after the "?", which
+              // lost the id on every survey since the move (Nov 10 review, G6)
+              const surveyUrl = `${(Deno.env.get('APP_URL') || 'https://app.davisdigitalstudio.com').replace(/\/$/, '')}/project-survey?c=${encodeURIComponent(c.id)}`;
               const lines = [
                 `Hope you're enjoying the new site. As a growing studio, a few honest words from someone I actually built for means more than anything I could say about myself.`,
                 `Would you take one minute to tell me how it went? The survey is short, I promise.`,

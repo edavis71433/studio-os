@@ -91,6 +91,7 @@ const SECRET_GROUPS: Record<string, SecretDef[]> = {
   ],
   photos: [
     { name: 'PEXELS_API_KEY', required: false, enables: 'the stock photo search (Pexels; without it the search is off)' },
+    { name: 'PLACES_KEY', required: false, enables: 'the Prospects page’s business search (Google Places; without it, finding businesses says it isn’t switched on)' },
   ],
   push: [
     { name: 'VAPID_PUBLIC_KEY', required: false, enables: 'device notifications (Web Push), paired with VAPID_PRIVATE_KEY (without both: push is cleanly off)' },

@@ -450,7 +450,8 @@ function applyView(){
 }
 function wireFrame(){
   const s=$('search');if(s)s.addEventListener('input',()=>{Q=s.value;MENU_OPEN=null;applyView();});
-  $('main').addEventListener('click',(e)=>{const f=e.target.closest('[data-filter]');if(f){setFilter(f.getAttribute('data-filter'));}});
+  // bug hunt A1: #main outlives every render, so its listener is added ONCE; one per load piled up and a click toggled the filter on and straight off
+  const mn=$('main');if(mn&&!mn.dataset.filterWired){mn.dataset.filterWired='1';mn.addEventListener('click',(e)=>{const f=e.target.closest('[data-filter]');if(f){setFilter(f.getAttribute('data-filter'));}});}
   const dc=$('dispCards'),dt=$('dispTable');
   const setD=(v)=>{if(DISPLAY===v)return;DISPLAY=v;try{localStorage.setItem(DISPLAY_KEY,v);}catch(_){/* */}
     $('dispCards').setAttribute('aria-pressed',v==='cards'?'true':'false');$('dispTable').setAttribute('aria-pressed',v==='table'?'true':'false');
@@ -574,10 +575,10 @@ async function togglePin(id){
 
 // ── Duplicate site (item 45): set up the customer (POST /sales/customers, the Add a
 //    customer flow), then start their new site from this one. One submit handler. ──
-let DUP_SITE=null,DUP_BUSY=false;
+let DUP_SITE=null,DUP_BUSY=false,DUP_MADE=null;   // bug hunt A10: what the customer step made, so a retry only copies
 function openDuplicate(id){
   const s=SITES.find(x=>x.site_id===id);if(!s)return;
-  DUP_SITE=id;$('dupHead').textContent='Duplicate '+(s.name||'this site');
+  DUP_SITE=id;DUP_MADE=null;$('dupHead').textContent='Duplicate '+(s.name||'this site');
   $('dupFrom').textContent='A new customer’s site, started from '+(s.name||'this site')+'.';
   ['dup-biz','dup-name','dup-email'].forEach(k=>{$(k).value='';});
   $('dup-fields').style.display='';$('dup-done').style.display='none';$('dup-done').innerHTML='';
@@ -585,6 +586,25 @@ function openDuplicate(id){
   $('dupDlg').showModal();setTimeout(()=>$('dup-biz').focus(),20);
 }
 $('dup-cancel').onclick=()=>$('dupDlg').close();
+// The copy step on its own. A dropped connection here is a failed COPY, never a failed
+// set-up: the customer already exists, so the answer says so and offers the copy again.
+async function dupCopy(src,made){
+  let k=null;try{k=await apiSend('POST','/agency/sites/'+encodeURIComponent(src.site_id)+'/duplicate',{site_id:made.site_id});}catch(_){k=null;}
+  const invite=made.invited===false?'The invitation email to '+esc(made.email)+' didn’t go out — share their sign-in page instead.':'Invitation sent to '+esc(made.email)+'.';
+  if(k&&k.ok){const a=(k.body&&k.body.data)||{};const got=[a.look?'the '+a.look+' look':'',a.applied&&a.applied.offerings?a.applied.offerings+' service'+(a.applied.offerings===1?'':'s'):'',a.applied&&a.applied.faqs?a.applied.faqs+' FAQ'+(a.applied.faqs===1?'':'s'):'',a.applied&&a.applied.voice?'the voice':'',a.applied&&a.applied.colors?'the colors':''].filter(Boolean);
+    return{copied:true,heading:'Site duplicated',line:esc(made.business_name)+'’s site starts with '+esc(got.length?got.join(', '):'this site’s setup')+'. '+invite};}
+  const why=k&&k.body&&k.body.message?esc(k.body.message):(k?'Copying the setup didn’t go through.':'We lost the connection while copying the setup.');
+  return{copied:false,heading:'Set up, but nothing was copied',line:why+' Their account is ready. '+invite};
+}
+function paintDupDone(src,res){
+  $('dup-fields').style.display='none';
+  const done=$('dup-done');
+  done.innerHTML='<div class="done"><div class="tick" aria-hidden="true">✓</div><h3 style="margin:0 0 4px">'+esc(res.heading)+'</h3><p>'+res.line+'</p></div><div class="row2">'+(res.retry?'<button type="button" class="btn ghost" id="dup-again">Try copying again</button>':'')+'<button type="button" class="btn" id="dup-close">Done</button></div>';
+  done.style.display='';
+  const cl=$('dup-close');if(cl){cl.focus();cl.onclick=()=>$('dupDlg').close();}
+  const ag=$('dup-again');if(ag)ag.onclick=async()=>{if(DUP_BUSY||!DUP_MADE)return;DUP_BUSY=true;ag.disabled=true;ag.textContent='Copying…';
+    const again=await dupCopy(src,DUP_MADE);DUP_BUSY=false;paintDupDone(src,{...again,retry:!again.copied});if(again.copied)load(true);else toast('The copy didn’t go through this time either.',true);};
+}
 $('dupForm').onsubmit=async(e)=>{
   e.preventDefault();if(DUP_BUSY)return;
   const src=SITES.find(x=>x.site_id===DUP_SITE);if(!src)return;
@@ -592,28 +612,19 @@ $('dupForm').onsubmit=async(e)=>{
   if(!business_name){toast('Name the new business.',true);$('dup-biz').focus();return;}
   if(!email){toast('Enter their email — that’s where the sign-in invitation goes.',true);$('dup-email').focus();return;}
   DUP_BUSY=true;const btn=$('dup-submit');btn.disabled=true;btn.textContent='Setting up…';
-  let heading='',line='',ok=false;
+  let res=null;
   try{
-    const r=await apiSend('POST','/sales/customers',{mode:'provision',name:name||undefined,business_name,email,edition:'presence'});
+    let r;
+    try{r=await apiSend('POST','/sales/customers',{mode:'provision',name:name||undefined,business_name,email,edition:'presence'});}
+    catch(_){toast('We lost the connection, so we can’t tell whether they were set up. Look for them on Customers before trying again.',true);return;}
     const d=(r.body&&r.body.data)||{};
     if(!r.ok){toast((r.body&&r.body.message)||'We couldn’t set them up just now.',true);return;}
-    if(d.requested||d.already_exists){heading='Nothing was copied';line=esc(business_name)+' already has a Studio OS account, so their site isn’t new. Duplicate only starts a new site.';ok=true;}
-    else if(!d.site_id){heading='Set up, but nothing was copied';line='Their account is ready, but their new site didn’t come back to us. Open it from Customers and use a starter kit instead.';ok=true;}
-    else{
-      const k=await apiSend('POST','/agency/sites/'+encodeURIComponent(src.site_id)+'/duplicate',{site_id:d.site_id});
-      ok=true;
-      if(k.ok){const a=(k.body&&k.body.data)||{};const got=[a.look?'the '+a.look+' look':'',a.applied&&a.applied.offerings?a.applied.offerings+' service'+(a.applied.offerings===1?'':'s'):'',a.applied&&a.applied.faqs?a.applied.faqs+' FAQ'+(a.applied.faqs===1?'':'s'):'',a.applied&&a.applied.voice?'the voice':'',a.applied&&a.applied.colors?'the colors':''].filter(Boolean);
-        heading='Site duplicated';line=esc(business_name)+'’s site starts with '+esc(got.length?got.join(', '):'this site’s setup')+'. '+(d.invited===false?'The invitation email to '+esc(email)+' didn’t go out — share their sign-in page instead.':'Invitation sent to '+esc(email)+'.');}
-      else{heading='Set up, but nothing was copied';line=esc((k.body&&k.body.message)||'Copying the setup didn’t go through.')+' Their account is ready — try a starter kit from Home.';}
-    }
-  }catch(_){toast('We couldn’t set them up just now.',true);}
-  finally{DUP_BUSY=false;if(!ok){btn.disabled=false;btn.textContent='Duplicate + invite';}}
-  if(!ok)return;
-  $('dup-fields').style.display='none';
-  const done=$('dup-done');
-  done.innerHTML='<div class="done"><div class="tick" aria-hidden="true">✓</div><h3 style="margin:0 0 4px">'+esc(heading)+'</h3><p>'+line+'</p></div><div class="row2"><button type="button" class="btn" id="dup-close">Done</button></div>';
-  done.style.display='';
-  const cl=$('dup-close');if(cl){cl.focus();cl.onclick=()=>$('dupDlg').close();}
+    if(d.requested||d.already_exists)res={heading:'Nothing was copied',line:esc(business_name)+' already has a Studio OS account, so their site isn’t new. Duplicate only starts a new site.'};
+    else if(!d.site_id)res={heading:'Set up, but nothing was copied',line:'Their account is ready, but their new site didn’t come back to us, so there was nothing to copy onto. Nothing else went wrong.'};
+    else{DUP_MADE={site_id:d.site_id,business_name,email,invited:d.invited};const c=await dupCopy(src,DUP_MADE);res={...c,retry:!c.copied};}
+  }finally{DUP_BUSY=false;if(!res){btn.disabled=false;btn.textContent='Duplicate + invite';}}
+  if(!res)return;
+  paintDupDone(src,res);
   load(true);
 };
 

@@ -109,7 +109,8 @@ ok('a failed load says so (and the next press retries)', /sc\.onerror = function
 const bar = (shell.match(/if \(pipe && custs\) \{[\s\S]*?\n    \}/) || [''])[0];
 const order = ['homeA', 'inboxA', 'dds-mbar-create', 'pipe.href', 'custs.href'].map((k) => bar.indexOf(k));
 ok('the phone bar: Home · Inbox · + · Pipeline · Customers', order.every((x, i) => x > 0 && (i === 0 || x > order[i - 1])));
-ok('…and everyone else keeps Home · Inbox · Menu', /bar\.innerHTML = homeA \+ inboxA \+\s*'<button type="button" id="dds-mbar-menu"/.test(shell));
+// bug hunt A3 (Nov 10): a studio that hid Pipeline or Customers still may create, so its bar is Home · Inbox · + · Menu
+ok('…and everyone else keeps Home · Inbox · Menu, with the + when they may create', /bar\.innerHTML = homeA \+ inboxA \+\s*\(plusHere \? '<button type="button" id="dds-mbar-create"[^\n]*: ''\) \+\s*'<button type="button" id="dds-mbar-menu"/.test(shell) && /var plusHere = canCreate\(\);/.test(shell));
 ok('"c" opens it, never while typing or under a modal', /else if \(e\.key === 'c' && !e\.shiftKey && canCreate\(\)\) \{ if \(modalOpen\(\)\) return;/.test(shell) && /tour \|\| \(window\.ddsCreate && window\.ddsCreate\.isOpen\(\)\)\); \}/.test(shell));
 ok('⌘K lists the five, last, and opens them in place (no hash for a page to trip on)', /if \(canCreate\(\)\) DESTS = DESTS\.concat\(CREATE_DESTS\);/.test(shell) && /closest\('a\.res\[data-create\]'\)/.test(shell) && /sel\.hasAttribute\('data-create'\)\) \{ e\.preventDefault\(\); openCreate\(/.test(shell));
 ok('"#create:<kind>" opens it once and clears itself', /var CREATE_HASH = \/\^#create\(\?::\(call\|deal\|invoice\|proposal\|todo\|customer\|update\)\)\?\$\/;/.test(shell) && /history\.replaceState\(history\.state, '', location\.pathname \+ location\.search\)/.test(shell));

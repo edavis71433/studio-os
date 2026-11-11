@@ -437,7 +437,7 @@ export interface DealForSummary {
 export interface StageBreakdown { stage: Stage; label: string; count: number; value_cents: number; }
 export interface PipelineSummary {
   open: { count: number; value_cents: number };            // non-won, non-lost
-  won_month: { count: number; value_cents: number };       // won in the current calendar month (UTC)
+  won_month: { count: number; value_cents: number };       // won in the current calendar month (the caller's when given, else UTC)
   win_rate: { won: number; lost: number; pct: number | null; window_days: number }; // pct null = no closed deals yet
   by_stage: StageBreakdown[];                              // the OPEN stages, in ladder order
   total: number;                                          // deals considered
@@ -465,10 +465,23 @@ function summaryClosedAt(d: DealForSummary): string {
 
 /** Roll a site's deals into the calm pipeline summary. Pure & deterministic.
  *  `nowIso` fixes "this month" (calendar month, UTC) and the win-rate window, so
- *  the whole result is testable. No probability weighting; no fabricated numbers. */
-export function summarizePipeline(deals: unknown, nowIso: string, windowDays = WIN_RATE_WINDOW_DAYS): PipelineSummary {
+ *  the whole result is testable. No probability weighting; no fabricated numbers.
+ *  `local` (item 104): the caller's clock (callerOffsetMinutes) and day (callerToday).
+ *  With the clock, "this month" is the caller's month now and a deal counts in the month
+ *  it was won on the caller's clock; with only the day, the month is the day's. Both were
+ *  cut from the UTC time, so at 4pm in Los Angeles on the last day "Won this month"
+ *  dropped to zero, and a deal won that evening was counted in the next month. Without
+ *  either, the UTC month, as before. */
+export function summarizePipeline(deals: unknown, nowIso: string, windowDays = WIN_RATE_WINDOW_DAYS, local: { today?: string; offsetMinutes?: number | null } = {}): PipelineSummary {
   const list: DealForSummary[] = Array.isArray(deals) ? deals as DealForSummary[] : [];
-  const monthKey = String(nowIso).slice(0, 7);                       // 'YYYY-MM' (UTC)
+  const off = typeof local.offsetMinutes === 'number' && Number.isFinite(local.offsetMinutes) ? local.offsetMinutes : null;
+  const monthOf = (at: string): string => {                           // 'YYYY-MM' on the caller's clock, else UTC
+    if (off === null) return at.slice(0, 7);
+    const t = Date.parse(at);
+    return Number.isFinite(t) ? new Date(t - off * 60_000).toISOString().slice(0, 7) : at.slice(0, 7);
+  };
+  const day = typeof local.today === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(local.today) ? local.today : '';
+  const monthKey = off !== null ? monthOf(String(nowIso)) : (day || String(nowIso)).slice(0, 7);
   const windowStart = Date.parse(nowIso) - Math.max(0, windowDays) * 86400_000;
 
   let openCount = 0, openValue = 0, wonMonthCount = 0, wonMonthValue = 0, wonInWindow = 0, lostInWindow = 0;
@@ -480,7 +493,7 @@ export function summarizePipeline(deals: unknown, nowIso: string, windowDays = W
     const value = summaryCents(d.expected_value_cents);
     if (summaryIsWon(d)) {
       const at = summaryClosedAt(d);
-      if (at.slice(0, 7) === monthKey) { wonMonthCount++; wonMonthValue += value; }
+      if (monthOf(at) === monthKey) { wonMonthCount++; wonMonthValue += value; }
       const t = Date.parse(at);
       if (Number.isFinite(t) && t >= windowStart) wonInWindow++;
     } else if (d.stage === 'lost') {
@@ -520,6 +533,16 @@ export function callerToday(raw: unknown, nowIso: string): string {
   const u = Date.parse(utc + 'T00:00:00Z');
   if (!Number.isFinite(u) || Math.abs(t - u) > 86400_000) return utc;
   return s;
+}
+/** item 104: the caller's clock, as the browser's getTimezoneOffset() gives it — minutes
+ *  BEHIND UTC (480 in Los Angeles in winter, -60 in Paris), sent as ?tzo=. Only a whole
+ *  number some time zone uses (UTC−12 to UTC+14) is believed; anything else is null, and
+ *  the reader keeps the UTC clock, as an older page gets. */
+export function callerOffsetMinutes(raw: unknown): number | null {
+  const s = typeof raw === 'string' ? raw.trim() : '';
+  if (!/^-?\d{1,3}$/.test(s)) return null;
+  const n = Number(s);
+  return n >= -840 && n <= 720 ? n : null;
 }
 
 // ── pagination (bounded list queries — no unbounded scans) ──

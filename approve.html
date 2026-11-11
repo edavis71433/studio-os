@@ -68,26 +68,42 @@ function render(d){
   $('approve').addEventListener('click',()=>decide('approve'));
   $('reject').addEventListener('click',()=>decide('reject'));
 }
+// Nov 10 review (G7): every failure used to read as a dead link ("This link isn't
+// usable") and took the buttons away, so a client who lost signal for a moment
+// thought the approval was gone. Only the server saying the link is bad (400) is a
+// dead link now; "already handled" (409) says so; no answer, a busy server (5xx) or
+// too many tries (429) keep the buttons with a line to try again.
+const RETRY_MSG='We couldn’t reach your studio — check your connection and try again. Nothing was changed.';
+function handled(){$('box').innerHTML=`${brand()}<div class="center"><p class="big">Already handled.</p><p class="muted">This was already reviewed — nothing more to do.</p><p style="margin-top:18px"><a class="link" href="/client.html">Open your workspace →</a></p></div>`;}
+function cantLoad(){$('box').innerHTML=`${brand()}<div class="center"><p class="big">We couldn’t load this just now.</p><p class="muted">Check your connection, then try again. The link is still good.</p><div class="row" style="justify-content:center"><button class="approve" id="retry">Try again</button></div></div>`;$('retry').addEventListener('click',()=>{$('box').innerHTML='<div class="spin" role="status" aria-label="Loading"></div>';loadApproval();});}
+function retryLater(msg){
+  document.querySelectorAll('button').forEach(b=>b.disabled=false);
+  if($('approve'))$('approve').textContent='Approve';
+  let n=$('err');if(!n){n=document.createElement('p');n.id='err';n.className='note';n.style.color='var(--ink)';n.setAttribute('role','alert');const row=document.querySelector('.row');if(row)row.insertAdjacentElement('afterend',n);}
+  n.textContent=msg||RETRY_MSG;
+}
 async function decide(decision){
   document.querySelectorAll('button').forEach(b=>b.disabled=true);
   if($('approve'))$('approve').textContent=decision==='approve'?'Approving…':'Approve';
-  try{
-    const r=await fetch(FN+'/approve',{method:'POST',headers:H,body:JSON.stringify({token,decision})});
-    const b=await r.json().catch(()=>({}));
-    if(r.ok){done(b.data&&b.data.decision||(decision==='approve'?'approved':'set_aside'));}
-    else{trouble(b.message);}
-  }catch(_){trouble('Something went wrong — please try again.');}
+  let r,b={};
+  try{r=await fetch(FN+'/approve',{method:'POST',headers:H,body:JSON.stringify({token,decision})});b=await r.json().catch(()=>({}));}
+  catch(_){return retryLater();}
+  if(r.ok)return done(b.data&&b.data.decision||(decision==='approve'?'approved':'set_aside'));
+  if(r.status===409)return handled();
+  if(r.status===400)return trouble(b.message);
+  retryLater(r.status===429?'Too many tries in a row — wait a minute, then try again. Nothing was changed.':null);
 }
-(async function(){
+async function loadApproval(){
   if(!token){trouble('This link is missing its code.');return;}
-  try{
-    const r=await fetch(FN+'/approve?token='+encodeURIComponent(token),{headers:H});
-    const b=await r.json().catch(()=>({}));
-    if(r.ok){render(b.data||{});}
-    else if(r.status===409){$('box').innerHTML=`${brand()}<div class="center"><p class="big">Already handled.</p><p class="muted">This was already reviewed — nothing more to do.</p><p style="margin-top:18px"><a class="link" href="/client.html">Open your workspace →</a></p></div>`;}
-    else{trouble(b.message);}
-  }catch(_){trouble('We couldn’t load this just now.');}
-})();
+  let r,b={};
+  try{r=await fetch(FN+'/approve?token='+encodeURIComponent(token),{headers:H});b=await r.json().catch(()=>({}));}
+  catch(_){return cantLoad();}
+  if(r.ok)render(b.data||{});
+  else if(r.status===409)handled();
+  else if(r.status===400)trouble(b.message);
+  else cantLoad();
+}
+loadApproval();
 </script>
 </body>
 </html>

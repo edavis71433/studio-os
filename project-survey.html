@@ -36,6 +36,8 @@
   .btn{background:var(--p);color:#fff;border:none;padding:14px 28px;border-radius:100px;
     font-size:14px;font-weight:600;cursor:pointer;font-family:var(--sans);width:100%;}
   .btn:hover{background:#4a3284;}
+  .btn:disabled{opacity:.6;cursor:default;}
+  .sendErr{font-size:13.5px;color:#a3423a;margin:12px 0 0;text-align:center;}
   .consent{display:flex;gap:10px;align-items:flex-start;font-size:13px;color:var(--muted);margin-bottom:22px;}
   .consent input{width:auto;margin-top:3px;}
   .hidden{display:none;}
@@ -89,7 +91,8 @@
         <label for="consent">You can use my response as a testimonial on your website and marketing.</label>
       </div>
 
-      <button class="btn" onclick="submitSurvey()">Send feedback →</button>
+      <button class="btn" id="sendBtn" onclick="submitSurvey()">Send feedback →</button>
+      <p class="sendErr hidden" id="sendErr" role="alert"></p>
     </div>
 
     <!-- POSITIVE: REVIEW PROMPT -->
@@ -124,10 +127,14 @@
   var SB_URL = "https://qksstlqzbhesadrrofgn.supabase.co";
   var SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFrc3N0bHF6Ymhlc2FkcnJvZmduIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE5NzMwMDMsImV4cCI6MjA5NzU0OTAwM30.4V94Ua7z5cntPWtvtqN24TUnfY5A6K6-zCxY0iEcgYo";
 
-  // Pull client id/name from URL (?c=CLIENT_ID&n=NAME) so the email link ties the response to a client
+  // The email link carries the client's id (?c=CLIENT_ID) so the response is tied to
+  // them; the server looks their name up. Links sent before Nov 10 2026 also carried
+  // the name (?n=), which lands in browser history and logs: it is still read, then
+  // wiped from the address bar (Nov 10 review, G6).
   var params = new URLSearchParams(location.search);
   var clientId = params.get("c") || "";
   var clientName = params.get("n") || "";
+  if (params.has("n")) { try { params.delete("n"); history.replaceState(null, "", location.pathname + (params.toString() ? "?" + params.toString() : "")); } catch (e) {} }
 
   var rating = 0;
   var starEls = document.querySelectorAll(".star");
@@ -138,8 +145,22 @@
     });
   });
 
+  // Nov 10 review (G6): a double tap used to send twice (two rows, two emails), and the
+  // page said "saved" without looking. One send at a time now, and the thank-you shows
+  // only once the studio's server says the answers arrived (saved, or emailed to me);
+  // otherwise the form stays, with a line to try again.
+  var sending = false;
+  function sendFailed(msg){
+    sending = false;
+    var b = document.getElementById("sendBtn"); b.disabled = false; b.textContent = "Send feedback →";
+    var e = document.getElementById("sendErr"); e.textContent = msg; e.classList.remove("hidden");
+  }
   async function submitSurvey(){
+    if (sending) return;
     if(rating === 0){ alert("Please tap a star rating first."); return; }
+    sending = true;
+    var btn = document.getElementById("sendBtn"); btn.disabled = true; btn.textContent = "Sending…";
+    document.getElementById("sendErr").classList.add("hidden");
     var payload = {
       client_id: clientId,
       client_name: clientName,
@@ -151,22 +172,8 @@
       created_at: new Date().toISOString()
     };
 
-    // Save to Supabase (table: project_surveys). Fails quietly so the user still gets the thank-you.
-    try {
-      await fetch(SB_URL + "/rest/v1/project_surveys", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "apikey": SB_KEY,
-          "Authorization": "Bearer " + SB_KEY,
-          "Prefer": "return=minimal"
-        },
-        body: JSON.stringify(payload)
-      });
-    } catch { /* save is best-effort; the survey still submits */ }
-
-    // Notify Eric by email via the existing Edge Function.
-    var notifyOk = false;
+    // One request: the server saves the answers (survey_responses) and emails them on.
+    var jr = null, reached = false;
     try {
       var resp = await fetch(SB_URL + "/functions/v1/clever-api", {
         method: "POST",
@@ -175,16 +182,22 @@
           type: "survey_response",
           clientName: clientName,
           clientEmail: "",
-          subject: "New project survey: " + rating + "★ from " + (clientName || "a client"),
+          subject: "New project survey: " + rating + "★",
           message: "Rating: " + rating + "/5\n\nWhat worked: " + payload.what_worked +
                    "\n\nImprove: " + payload.improve + "\n\nQuote: " + payload.quote +
                    "\n\nTestimonial consent: " + (payload.testimonial_consent ? "YES" : "no"),
           meta: payload
         })
       });
-      var jr = {}; try { jr = await resp.json(); } catch(e){}
-      notifyOk = !!(resp.ok && jr && jr.ok && jr.emailed !== false);
-    } catch { notifyOk = false; }
+      try { jr = await resp.json(); } catch(e){}
+      reached = !!(resp.ok && jr && jr.ok && (jr.saved === true || jr.emailed === true));
+    } catch (e) { reached = false; }
+    if (!reached) {
+      sendFailed(resp && resp.status === 429
+        ? "Too many tries in a row — wait a minute, then send again. Nothing is lost."
+        : "That didn’t send — check your connection and try again. Nothing is lost.");
+      return;
+    }
 
     // Branch the experience on rating
     document.getElementById("surveyForm").classList.add("hidden");
@@ -197,14 +210,13 @@
     } else {
       document.getElementById("plainThanks").classList.remove("hidden");
     }
-    // If the response didn't reach Eric, the survey was still saved to the
-    // database. Add a calm, non-alarming note rather than a false clean success.
-    if (!notifyOk) {
+    // Saved but the email to me didn't go: say so calmly, never a false clean success.
+    if (jr.saved === true && jr.emailed !== true) {
       var active = rating >= 4 ? document.getElementById("reviewPrompt") : document.getElementById("plainThanks");
       if (active) {
         var note = document.createElement("p");
         note.style.cssText = "margin-top:14px;font-size:13px;opacity:0.7;";
-        note.innerHTML = "Your feedback is saved. If anything didn't go through, you can always reach me at <a href=\"mailto:eric@davisdigitalstudio.com\">eric@davisdigitalstudio.com</a>.";
+        note.innerHTML = "Your feedback is saved. If you’d like a reply, you can always reach me at <a href=\"mailto:eric@davisdigitalstudio.com\">eric@davisdigitalstudio.com</a>.";
         active.appendChild(note);
       }
     }

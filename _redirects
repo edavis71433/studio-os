@@ -146,6 +146,8 @@ https://tools.davisdigitalstudio.com/robots.txt    /tools-robots.txt    200!
 /pipeline                    /pipeline.html        200
 /contacts.html                /contacts            301!
 /contacts                    /contacts.html        200
+/prospects.html               /prospects           301!
+/prospects                   /prospects.html       200
 /connections.html             /connections         301!
 /connections                 /connections.html     200
 /developer.html               /developer           301!

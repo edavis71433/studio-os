@@ -738,6 +738,19 @@ async function route_(req: Request, cors: Record<string, string>): Promise<Respo
   if (route === '/sales/stages' && (method === 'GET' || method === 'PUT')) return handleSalesStages(req, site, principal, cors);   // sales review item 38: rename the open stages
   if (route === '/email/sending' && method === 'GET') return handleEmailSending(cors);
   if (route === '/sales/export' && method === 'GET') return handleSalesExport(site, principal, cors);   // sales review item 69: one zip of CSVs
+  // ── Prospects — the lead list (Semrush review, sales item 112). Lazy: most days nobody prospects. ──
+  if (route.startsWith('/sales/prospects')) {
+    const px = await import('./routes/prospects.ts');
+    if (route === '/sales/prospects/discover' && method === 'POST') return px.handleProspectDiscover(req, site, principal, cors);
+    if (route === '/sales/prospects/export' && method === 'GET') return px.handleProspectsExport(site, principal, cors);
+    if (route === '/sales/prospects') return px.handleProspects(req, site, principal, cors);
+    let pm = route.match(/^\/sales\/prospects\/([0-9a-f-]{36})$/);
+    if (pm && (method === 'PATCH' || method === 'DELETE')) return px.handleProspect(req, site, principal, pm[1], cors);
+    pm = route.match(/^\/sales\/prospects\/([0-9a-f-]{36})\/convert$/);
+    if (pm && method === 'POST') return px.handleProspectConvert(req, site, principal, pm[1], cors);
+    pm = route.match(/^\/sales\/prospects\/([0-9a-f-]{36})\/draft$/);
+    if (pm && method === 'POST') return px.handleProspectDraft(req, site, principal, pm[1], cors);
+  }
   if (route === '/email/log-address' && (method === 'GET' || method === 'POST' || method === 'DELETE')) return handleEmailLogAddress(req, site, principal, cors);   // sales review item 69: BCC to log   // sales review item 69: which address mail goes out from, and is it verified
   if (route === '/calendar/link' && (method === 'GET' || method === 'POST' || method === 'DELETE')) {   // sales review item 46: your calendar in Google Calendar
     const { handleCalendarLink } = await import('./routes/calendar.ts');

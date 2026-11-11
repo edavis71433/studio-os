@@ -29,6 +29,7 @@ import { dashRange, weeklyVisitors, sourceShares, DASH_WEEKS } from '../lib/anal
 import type { SiteRow } from '../lib/site.ts';
 import type { Principal } from '../../_shared/auth.ts';
 import { UUID_RE } from '../lib/uuid.ts';
+import { quotedTo, peopleOf, offeredTo } from '../lib/portal_services.ts';
 
 const fnBase = () => (Deno.env.get('SUPABASE_URL') || '').replace(/\/$/, '');
 
@@ -185,9 +186,18 @@ export async function handleClientUploadUrl(req: Request, site: SiteRow, princip
   // title the studio's Files roster had nothing durable to name the file by and
   // fell back to the kind label — every client upload reading "Photo".
   const upTitle = clean(b?.title, 200);
-  await svc(`presence_media?id=eq.${(res as { media_id: string }).media_id}&site_id=eq.${link.agency_site_id}`, {
+  // Nov 10 review (G8): the stamp also says WHO started this upload and for WHICH
+  // project. The record step below accepts only an upload stamped for this client
+  // and this project, so a hand-made request can't attach some other file on the
+  // studio's site. That makes the stamp required: when it can't be written the
+  // upload stops here, before any bytes travel, and the empty row is thrown away.
+  const stamp = await svc(`presence_media?id=eq.${(res as { media_id: string }).media_id}&site_id=eq.${link.agency_site_id}`, {
     method: 'PATCH', headers: { Prefer: 'return=minimal' },
-    body: JSON.stringify({ metadata: { client_upload: true, note: 'Uploaded by the client.', ...(upTitle ? { title: upTitle } : {}) } }) }).catch(() => {});
+    body: JSON.stringify({ metadata: { client_upload: true, note: 'Uploaded by the client.', ...(upTitle ? { title: upTitle } : {}), upload_customer: me, upload_project: projectId } }) }).catch(() => ({ ok: false }));
+  if (!stamp.ok) {
+    await svc(`presence_media?id=eq.${(res as { media_id: string }).media_id}&site_id=eq.${link.agency_site_id}`, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ deleted_at: nowIso() }) }).catch(() => {});
+    return json({ error: 'upload_url_failed', message: 'We couldn’t start that upload — please try again.' }, 502, cors);
+  }
   return json({ data: res }, 200, cors); // { media_id, upload_url, storage_path }
 }
 // ── Post-verification of a client upload (the declared-bytes bypass) ─────────
@@ -255,8 +265,19 @@ export async function handleClientUploadCreate(req: Request, site: SiteRow, prin
   let b: any = {}; try { b = await req.json(); } catch { return json({ error: 'bad_json' }, 400, cors); }
   const mediaId = UUID_RE.test(b.media_id || '') ? b.media_id : null;
   if (!mediaId) return json({ error: 'validation', message: 'Pick a file to upload.' }, 422, cors);
-  const media = rows(await svc(`presence_media?id=eq.${mediaId}&site_id=eq.${s}&deleted_at=is.null&select=id,alt_text,mime,storage_path&limit=1`))[0];
+  const media = rows(await svc(`presence_media?id=eq.${mediaId}&site_id=eq.${s}&deleted_at=is.null&select=id,alt_text,mime,storage_path,metadata&limit=1`))[0];
   if (!media) return json({ error: 'bad_media', message: 'That file isn’t here.' }, 422, cors);
+  // Nov 10 review (G8): only an upload THIS client started for THIS project (the
+  // upload-url step's stamp). Checked before the stored-bytes check, whose mismatch
+  // path throws the file away: a hand-made request can neither attach nor delete
+  // any other file on the studio's site.
+  const meta = (media.metadata && typeof media.metadata === 'object') ? media.metadata : {};
+  if (meta.client_upload !== true || String(meta.upload_customer || '') !== String(me) || String(meta.upload_project || '') !== projectId) {
+    return json({ error: 'bad_media', message: 'That file isn’t here.' }, 422, cors);
+  }
+  // …and once: a record step repeated after a lost answer gets the row it already made, never a second listing
+  const prior = rows(await svc(`presence_deliverables?site_id=eq.${s}&media_id=eq.${mediaId}&deleted_at=is.null&select=*&limit=1`))[0];
+  if (prior) return prior.project_id === projectId ? json({ data: prior }, 200, cors) : json({ error: 'already_shared', message: 'That file is already shared.' }, 422, cors);
   const verdict = await verifyStoredUpload(String(media.storage_path || ''), String(media.mime || ''));
   if (!verdict.ok) {
     await discardRejectedUpload(s, mediaId, String(media.storage_path || ''));
@@ -548,6 +569,8 @@ export async function handleClientNotificationsRead(_req: Request, site: SiteRow
 // linked agency site (SAME resolution as handleClientSupport). Only VISIBLE, non-
 // deleted offerings. Empty array when the studio has listed none (or the caller has
 // no active service-link, e.g. a reviewer) → the portal shows a calm empty state.
+// Nov 10 walk: only the general offers and the caller's own — a service the studio
+// has quoted to exactly one OTHER client was written for them (lib/portal_services.ts).
 export async function handleClientServices(_req: Request, site: SiteRow, _principal: Principal, cors: Record<string, string>): Promise<Response> {
   const me = customerOf(site);
   if (!me) return json({ data: [] }, 200, cors);
@@ -560,16 +583,28 @@ export async function handleClientServices(_req: Request, site: SiteRow, _princi
   // client sees the studio's services wherever they were listed, then ALWAYS add a
   // "Custom" option. Any id that isn't a real offering UUID degrades in POST
   // /client/support to a plain named request — nothing is charged either way.
-  const [offR, salesR] = await Promise.all([
+  const [offR, salesR, dealR, propR, estR] = await Promise.all([
     svc(`presence_offerings?site_id=eq.${s}&deleted_at=is.null&is_visible=is.true&select=id,name,category,description,price_text&order=sort_order.asc,created_at.asc&limit=200`),
     svc(`presence_sales_templates?site_id=eq.${s}&kind=eq.proposal&name=eq.${encodeURIComponent('__services_catalog__')}&deleted_at=is.null&select=line_items&limit=1`),
+    // who each service was quoted to: every deal on the studio's site, and the line items of its proposals and estimates
+    svc(`presence_deals?site_id=eq.${s}&deleted_at=is.null&select=id,contact_id,converted_client_id&limit=1000`),
+    svc(`presence_proposals?site_id=eq.${s}&deleted_at=is.null&select=deal_id,line_items&limit=1000`),
+    svc(`presence_estimates?site_id=eq.${s}&deleted_at=is.null&select=deal_id,line_items&limit=1000`),
   ]);
   if (!offR.ok) return json({ error: 'read_failed' }, 502, cors);
+  // privacy before a longer list: without the quote history one client's services can't be
+  // told from everyone's, so a failed read fails closed (the portal says it couldn't load).
+  // A database without estimates yet (404, before 0145) simply has none.
+  if (!dealR.ok || !propR.ok || (!estR.ok && estR.status !== 404)) return json({ error: 'read_failed' }, 502, cors);
+  const deals = rows(dealR);
+  const quoted = quotedTo(deals, [...rows(propR), ...(estR.ok ? rows(estR) : [])]);
+  const mine = peopleOf(me, deals);
   const list: Array<{ id: string; name: string; category: string; description: string; price: string }> = [];
   const seen = new Set<string>();
   for (const o of rows(offR)) {
     const name = clean(o.name, 120); if (!name) continue;
     seen.add(name.toLowerCase());
+    if (!offeredTo(name, quoted, mine)) continue;   // written for another client
     list.push({ id: o.id, name, category: clean(o.category, 60), description: clean(o.description, 500), price: clean(o.price_text, 40) });
   }
   const salesItems = rows(salesR)[0]?.line_items;
@@ -578,6 +613,7 @@ export async function handleClientServices(_req: Request, site: SiteRow, _princi
       const name = clean(it?.label, 120);
       if (!name || seen.has(name.toLowerCase())) return;
       seen.add(name.toLowerCase());
+      if (!offeredTo(name, quoted, mine)) return;   // written for another client (the id keeps its catalog index)
       const cents = Math.max(0, Math.trunc(Number(it?.unit_cents)) || 0);
       const price = cents > 0 ? '$' + (cents / 100).toFixed(2).replace(/\.00$/, '') : '';
       list.push({ id: `svc:${i}`, name, category: '', description: '', price });

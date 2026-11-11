@@ -1,0 +1,299 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1, viewport-fit=cover">
+<title>Prospects — Studio OS</title>
+<meta name="robots" content="noindex, nofollow">
+<meta name="description" content="Find local businesses to pitch — scored by how much they need a website.">
+<link rel="stylesheet" href="/fonts/brand.css">
+<!-- ═══════════════════════════════════════════════════════════════════════════
+  Prospects — the lead list (Semrush review, sales item 112, Nov 2026).
+  Type a trade and a town; the server asks Google Places and gives each find a
+  quick look at its website — no website scores highest. Tick to save; a saved
+  row can become a deal ("→ Deal", once) or a first-email DRAFT to copy.
+  NOTHING on this page sends email — the server has no send route here at all.
+═══════════════════════════════════════════════════════════════════════════ -->
+<style>
+  :root{
+    --bg:var(--dds-bg,#faf8f5);--card:var(--dds-card,#fff);--ink:var(--dds-ink,#1b1525);--soft:var(--dds-soft,#6b6478);--faint:var(--dds-faint,#746b8a);--line:var(--dds-line,#eee9e0);
+    --p:var(--dds-p,#5b3fa0);--p-deep:var(--dds-p-deep,#2a1b4a);--p-soft:var(--dds-p-soft,#efeafa);
+    --good:var(--dds-good,#33664b);--good-soft:var(--dds-good-soft,#e7f1ea);--bad:var(--dds-bad,#9a4242);
+    --shadow:var(--dds-shadow,0 1px 2px rgba(27,21,37,.04),0 8px 24px rgba(27,21,37,.06));
+    --serif:'Fraunces',"Iowan Old Style",Georgia,serif;
+    --sans:'Inter',-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  }
+  @media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .btn:not(.ghost){color:#171320}}
+  :root[data-theme="dark"] .btn:not(.ghost){color:#171320}
+  *{box-sizing:border-box;margin:0}
+  body{background:var(--bg);color:var(--ink);font-family:var(--sans);line-height:1.55;-webkit-font-smoothing:antialiased}
+  .wrap{max-width:var(--dds-w-data,1600px);margin:0 auto;padding:var(--dds-s7,32px) var(--dds-s5,20px) 90px}
+  .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+  .lhead{background:var(--card);border:1px solid var(--line);border-radius:var(--dds-r-lg,10px);box-shadow:var(--shadow);padding:var(--dds-s3,12px) var(--dds-s4,16px);margin-bottom:var(--dds-s4,16px)}
+  .lrow1{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+  .obj-ic{width:34px;height:34px;border-radius:var(--dds-r,8px);background:var(--p);color:#fff;display:grid;place-items:center;font-size:16px;flex:0 0 auto}
+  h1.t{font-family:var(--sans);font-weight:500;font-size:20px}
+  .lmeta{margin-top:6px;font-size:12.5px;color:var(--faint)}
+  .spacer{flex:1}
+  .btn{font:inherit;font-size:14px;font-weight:600;border:none;border-radius:999px;padding:9px 18px;cursor:pointer;background:var(--dds-grad-btn,var(--p));color:var(--dds-on-p,#fff);box-shadow:0 6px 16px -8px color-mix(in srgb,var(--p) 70%,transparent)}
+  .btn.ghost{background:var(--card);border:1px solid var(--dds-line-strong,#d6d4e2);color:var(--ink);box-shadow:none}
+  .btn[disabled]{opacity:.55;cursor:default}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:var(--dds-r-lg,10px);box-shadow:var(--shadow);padding:var(--dds-s5,20px);margin-bottom:var(--dds-s4,16px)}
+  .card h2{font-family:var(--serif);font-weight:500;font-size:19px;margin-bottom:4px}
+  .hint{font-size:13.5px;color:var(--soft)}
+  form.find{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;margin-top:14px}
+  .fld{display:flex;flex-direction:column;gap:5px;flex:1 1 180px;max-width:280px}
+  .fld label{font-size:13px;font-weight:600;color:var(--soft)}
+  .fld input{font:inherit;font-size:15px;padding:9px 12px;border:1px solid var(--dds-line-strong,#d6d4e2);border-radius:var(--dds-r,8px);background:var(--card);color:var(--ink);width:100%}
+  .fld input:focus{outline:2px solid var(--p);outline-offset:1px}
+  /* one row per business — a grid that stacks on a phone */
+  .rows{display:flex;flex-direction:column;gap:10px;margin-top:14px}
+  .row{display:grid;grid-template-columns:auto 1fr auto;gap:6px 14px;align-items:center;border:1px solid var(--line);border-radius:var(--dds-r-lg,10px);padding:12px 14px;background:var(--card)}
+  .row.saved-row{grid-template-columns:1fr auto}
+  .who .nm{font-weight:600;font-size:15.5px}
+  .who .ind{font-size:12.5px;color:var(--faint)}
+  .facts{grid-column:2;font-size:13.5px;color:var(--soft);display:flex;flex-wrap:wrap;gap:4px 16px}
+  .saved-row .facts{grid-column:1}
+  .facts a{color:var(--p);text-decoration:none}
+  .facts a:hover{text-decoration:underline}
+  .pick input{width:20px;height:20px;cursor:pointer}
+  .badge{display:inline-flex;align-items:center;gap:6px;font-size:12.5px;font-weight:600;border-radius:999px;padding:3px 10px;background:var(--p-soft);color:var(--p-deep);white-space:nowrap}
+  .badge.hot{background:#fdecec;color:#8a3030}
+  .badge.warm{background:#fdf3e4;color:#7a5417}
+  .badge.cool{background:var(--good-soft);color:var(--good)}
+  @media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .badge.hot{background:#4a2330;color:#f3b9b9}:root:not([data-theme="light"]) .badge.warm{background:#473a1f;color:#ecd39a}}
+  :root[data-theme="dark"] .badge.hot{background:#4a2330;color:#f3b9b9}
+  :root[data-theme="dark"] .badge.warm{background:#473a1f;color:#ecd39a}
+  .acts{display:flex;gap:8px;flex-wrap:wrap;align-items:center;justify-self:end}
+  .acts button,.acts a.abtn,.acts select{font:inherit;font-size:13px;font-weight:600;border-radius:999px;padding:6px 13px;min-height:32px;border:1px solid var(--dds-line-strong,#d6d4e2);background:var(--card);color:var(--ink);cursor:pointer;text-decoration:none;display:inline-flex;align-items:center}
+  .acts button:hover,.acts a.abtn:hover{background:var(--p-soft)}
+  .acts .main{background:var(--dds-grad-btn,var(--p));border-color:transparent;color:var(--dds-on-p,#fff)}
+  @media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .acts .main{color:#171320}}
+  :root[data-theme="dark"] .acts .main{color:#171320}
+  .already{font-size:12.5px;color:var(--faint);font-weight:600}
+  .note{font-size:13px;color:var(--faint)}
+  .center{text-align:center;padding:48px 12px}
+  .center h2{font-family:var(--serif);font-weight:500;font-size:22px;margin-bottom:8px}
+  .muted{color:var(--soft);font-size:14.5px}
+  .link{color:var(--p);font-weight:600}
+  .spin{width:28px;height:28px;border:3px solid var(--line);border-top-color:var(--p);border-radius:50%;margin:60px auto;animation:sp 1s linear infinite}
+  @keyframes sp{to{transform:rotate(360deg)}}
+  dialog{border:none;border-radius:14px;padding:0;width:min(560px,calc(100% - 32px));background:var(--card);color:var(--ink);box-shadow:0 20px 60px rgba(0,0,0,.3)}
+  dialog::backdrop{background:rgba(27,21,37,.4)}
+  .dbody{padding:22px}
+  .dbody h3{font-family:var(--serif);font-weight:500;font-size:19px;margin-bottom:10px}
+  .dbody label{display:block;font-size:13px;font-weight:600;color:var(--soft);margin:12px 0 5px}
+  .dbody input,.dbody textarea{width:100%;font:inherit;font-size:14.5px;padding:9px 12px;border:1px solid var(--dds-line-strong,#d6d4e2);border-radius:var(--dds-r,8px);background:var(--card);color:var(--ink)}
+  .dbody textarea{min-height:230px;resize:vertical;line-height:1.5}
+  .row2{display:flex;justify-content:flex-end;gap:10px;margin-top:16px;flex-wrap:wrap}
+  .toast{position:fixed;left:50%;bottom:26px;transform:translateX(-50%) translateY(20px);background:var(--p-deep);color:#fff;font-size:14px;padding:10px 18px;border-radius:999px;opacity:0;pointer-events:none;transition:var(--dds-t-base,200ms) var(--dds-ease,ease-out)}
+  .toast.show{opacity:1;transform:translateX(-50%)}
+  footer{margin-top:40px;font-size:12.5px;color:var(--faint);text-align:center}
+  @media (max-width:767px){
+    .row{grid-template-columns:auto 1fr}
+    .acts{grid-column:1 / -1;justify-self:start}
+    .facts{grid-column:1 / -1}
+    .saved-row .acts{order:2}   /* facts (phone · address) read before the buttons on a phone */
+    .btn,.acts button,.acts a.abtn,.acts select{min-height:44px}
+    .pick input{width:22px;height:22px}
+    .fld{max-width:none}
+  }
+</style>
+<link rel="stylesheet" href="/shell.css"><script src="/shell.js" defer></script>
+</head>
+<body>
+<div class="wrap">
+  <div id="main"><div class="spin" role="status" aria-label="Loading"></div></div>
+  <footer>Studio OS · Prospects — businesses worth a hello. Nothing is emailed from here.</footer>
+</div>
+<dialog id="draftDlg" aria-label="First email draft">
+  <form class="dbody" method="dialog">
+    <h3>A first email — yours to copy</h3>
+    <p class="note">Studio OS doesn’t send this. Copy it into your own email, change what you like, and send it yourself.</p>
+    <label for="d-subject">Subject</label>
+    <input id="d-subject" readonly>
+    <label for="d-body">Email</label>
+    <textarea id="d-body" readonly></textarea>
+    <div class="row2">
+      <button type="button" class="btn ghost" id="d-close">Close</button>
+      <button type="button" class="btn" id="d-copy">Copy the email</button>
+    </div>
+  </form>
+</dialog>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+<script src="/vendor/supabase-js-2.45.4.js"></script>
+<script>
+const SUPABASE_URL="https://qksstlqzbhesadrrofgn.supabase.co";
+const SUPABASE_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFrc3N0bHF6Ymhlc2FkcnJvZmduIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE5NzMwMDMsImV4cCI6MjA5NzU0OTAwM30.4V94Ua7z5cntPWtvtqN24TUnfY5A6K6-zCxY0iEcgYo";
+const FN=SUPABASE_URL+"/functions/v1/presence";
+const sb=supabase.createClient(SUPABASE_URL,SUPABASE_KEY,{auth:{storageKey:'dds-portal-auth',persistSession:true,autoRefreshToken:true}});
+const $=(id)=>document.getElementById(id);
+const esc=(s)=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+let TOKEN="",SAVED=[],FINDS=null,QUERYRAN="",BUSY=false;
+const scope=()=>new URLSearchParams(location.search).get('client')||'';
+const H=()=>({'Content-Type':'application/json','Authorization':'Bearer '+SUPABASE_KEY,'x-dds-user-jwt':TOKEN,'x-dds-scope-site':scope()});
+async function api(path,method,body){const r=await fetch(FN+path,{method:method||'GET',headers:H(),body:body?JSON.stringify(body):undefined});return{ok:r.ok,status:r.status,body:await r.json().catch(()=>({}))};}
+function toast(m){if(window.ddsToast)return void ddsToast(m);const t=$('toast');t.textContent=m;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2600);}
+
+// warmth: the server's score, read as a word the page colors by
+const heat=(p)=>p.site_health==='no_website'||p.site_health==='unreachable'?'hot':p.site_health==='dated'?'warm':'cool';
+const badge=(p)=>`<span class="badge ${heat(p)}">${esc(p.health_word||'Not checked')}${Number.isFinite(Number(p.score))?' · '+esc(p.score):''}</span>`;
+const factsHtml=(p)=>{
+  const bits=[];
+  if(p.phone)bits.push(`<span>${esc(p.phone)}</span>`);
+  if(p.website)bits.push(`<a href="${esc(p.website)}" target="_blank" rel="noopener noreferrer">${esc(String(p.website).replace(/^https?:\/\//,'').replace(/\/$/,''))}</a>`);
+  else bits.push('<span>No website found</span>');
+  if(p.address)bits.push(`<span>${esc(p.address)}</span>`);
+  return bits.join('');
+};
+
+function render(){
+  const m=$('main');
+  const finds=FINDS?`
+    <section class="card" id="findsCard" aria-label="What the search found">
+      <h2>What “${esc(QUERYRAN)}” found</h2>
+      <p class="hint">${FINDS.length?'Warmest first — a business with no website, or a broken one, needs you most. Tick the ones worth keeping.':'Nothing came back for that search. Try another trade or the next town over.'}</p>
+      <div class="rows">
+        ${FINDS.map((f,i)=>f.already_saved?`
+          <div class="row saved-row">
+            <div class="who"><div class="nm">${esc(f.business_name)} ${badge(f)}</div>${f.industry?`<div class="ind">${esc(f.industry)}</div>`:''}</div>
+            <span class="already">Already on your list</span>
+            <div class="facts">${factsHtml(f)}</div>
+          </div>`:`
+          <div class="row">
+            <span class="pick"><input type="checkbox" data-find="${i}" aria-label="Keep ${esc(f.business_name)}"></span>
+            <div class="who"><div class="nm">${esc(f.business_name)} ${badge(f)}</div>${f.industry?`<div class="ind">${esc(f.industry)}</div>`:''}</div>
+            <span></span>
+            <div class="facts">${factsHtml(f)}</div>
+          </div>`).join('')}
+      </div>
+      ${FINDS.length?`<div class="row2" style="justify-content:flex-start"><button class="btn" id="saveTicked">Save the ticked ones</button></div>`:''}
+    </section>`:'';
+  const saved=SAVED.length?`
+    <section class="card" aria-label="Your prospects">
+      <h2>Your list</h2>
+      <p class="hint">${SAVED.length} prospect${SAVED.length===1?'':'s'}, warmest first. “→ Deal” puts one in your pipeline; the email draft is only ever words to copy.</p>
+      <div class="rows">
+        ${SAVED.map(p=>`
+          <div class="row saved-row" data-id="${esc(p.id)}">
+            <div class="who"><div class="nm">${esc(p.business_name)} ${badge(p)}</div>${p.industry?`<div class="ind">${esc(p.industry)}</div>`:''}</div>
+            <div class="acts">
+              <select data-status="${esc(p.id)}" aria-label="Status of ${esc(p.business_name)}" ${p.deal_id?'disabled':''}>
+                ${['New','Contacted','In pipeline','Not a fit'].map(s=>`<option ${s===p.status?'selected':''} ${s==='In pipeline'&&!p.deal_id?'disabled':''}>${s}</option>`).join('')}
+              </select>
+              <button data-draft="${esc(p.id)}">Draft a first email</button>
+              ${p.deal_id?`<a class="abtn" href="/pipeline.html?deal=${esc(p.deal_id)}">Open the deal</a>`:`<button class="main" data-deal="${esc(p.id)}">→ Deal</button>`}
+              <button data-needs="delete" data-remove="${esc(p.id)}" aria-label="Remove ${esc(p.business_name)}">Remove</button>
+            </div>
+            <div class="facts">${factsHtml(p)}</div>
+          </div>`).join('')}
+      </div>
+    </section>`:`
+    <section class="card center" aria-label="Your prospects">
+      <h2>No prospects yet</h2>
+      <p class="muted">Search above, tick the businesses worth a hello, and they’ll keep here.</p>
+    </section>`;
+  m.innerHTML=`
+    <h1 class="sr-only">Prospects</h1>
+    <div class="lhead">
+      <div class="lrow1">
+        <span class="obj-ic" aria-hidden="true">🔭</span>
+        <h1 class="t">Prospects</h1>
+        <span class="spacer"></span>
+        <button class="btn ghost" id="exportBtn" ${SAVED.length?'':'disabled'}>Download CSV</button>
+      </div>
+      <div class="lmeta">The businesses you might pitch next. Studio OS never emails them — drafts are yours to copy and send yourself.</div>
+    </div>
+    <section class="card" aria-label="Find businesses">
+      <h2>Find businesses</h2>
+      <p class="hint">Say a trade and a town; Google’s listings answer with phone, website and address — and each gets a quick website check.</p>
+      <form class="find" id="findForm">
+        <div class="fld"><label for="f-trade">What kind of business</label><input id="f-trade" maxlength="60" placeholder="plumbers" autocomplete="off"></div>
+        <div class="fld"><label for="f-town">Where</label><input id="f-town" maxlength="80" placeholder="Burbank" autocomplete="off"></div>
+        <button type="submit" class="btn" id="findBtn">Find businesses</button>
+      </form>
+      <p class="note" id="findNote" style="margin-top:10px"></p>
+    </section>
+    ${finds}
+    ${saved}`;
+  wire();
+}
+
+function wire(){
+  $('findForm').addEventListener('submit',async(e)=>{
+    e.preventDefault();
+    if(BUSY)return;
+    const trade=$('f-trade').value.trim(),town=$('f-town').value.trim();
+    if(trade.length<2||town.length<2){$('findNote').textContent='Say what kind of business and where — like “plumbers” in “Burbank”.';return;}
+    BUSY=true;$('findBtn').disabled=true;$('findNote').textContent='Searching, and taking a quick look at each website…';
+    const r=await api('/sales/prospects/discover','POST',{trade,town});
+    BUSY=false;
+    if(r.body&&r.body.error==='places_not_configured'){FINDS=null;render();$('findNote').textContent=r.body.message||'Finding businesses isn’t switched on yet.';$('f-trade').value=trade;$('f-town').value=town;return;}
+    if(!r.ok||!r.body||!r.body.data){render();$('findNote').textContent=(r.body&&r.body.message)||'That search didn’t work — try again in a minute.';$('f-trade').value=trade;$('f-town').value=town;return;}
+    FINDS=r.body.data.finds;QUERYRAN=r.body.data.query;render();
+    $('f-trade').value=trade;$('f-town').value=town;
+    const fc=$('findsCard');if(fc)fc.scrollIntoView({behavior:'smooth',block:'start'});
+  });
+  const st=$('saveTicked');
+  if(st)st.addEventListener('click',async()=>{
+    const picked=[...document.querySelectorAll('input[data-find]:checked')].map(x=>FINDS[Number(x.dataset.find)]);
+    if(!picked.length)return toast('Tick at least one business first.');
+    st.disabled=true;
+    const r=await api('/sales/prospects','POST',{query:QUERYRAN,prospects:picked});
+    if(!r.ok){st.disabled=false;return toast((r.body&&r.body.message)||'That didn’t save — try again.');}
+    toast(`Saved ${r.body.data.saved.length}${r.body.data.skipped?` · ${r.body.data.skipped} already kept`:''}`);
+    FINDS=null;QUERYRAN="";await load();
+  });
+  $('exportBtn').addEventListener('click',async()=>{
+    const r=await fetch(FN+'/sales/prospects/export',{headers:H()});
+    if(!r.ok)return toast('The download didn’t start — try again.');
+    const a=document.createElement('a');a.href=URL.createObjectURL(await r.blob());a.download='prospects.csv';a.click();URL.revokeObjectURL(a.href);
+  });
+  document.querySelectorAll('[data-deal]').forEach(b=>b.addEventListener('click',async()=>{
+    b.disabled=true;
+    const r=await api('/sales/prospects/'+b.dataset.deal+'/convert','POST',{});
+    if(!r.ok&&!(r.body&&r.body.already_converted)){b.disabled=false;return toast((r.body&&r.body.message)||'That didn’t work — try again.');}
+    toast(r.body.already_converted?'Already in your pipeline.':'Deal started.');
+    await load();
+  }));
+  document.querySelectorAll('[data-draft]').forEach(b=>b.addEventListener('click',async()=>{
+    b.disabled=true;
+    const r=await api('/sales/prospects/'+b.dataset.draft+'/draft','POST',{});
+    b.disabled=false;
+    if(!r.ok)return toast((r.body&&r.body.message)||'The draft didn’t come — try again.');
+    $('d-subject').value=r.body.data.subject;$('d-body').value=r.body.data.body;
+    $('draftDlg').showModal();
+  }));
+  document.querySelectorAll('[data-remove]').forEach(b=>b.addEventListener('click',async()=>{
+    if(b.dataset.armed!=='1'){b.dataset.armed='1';b.textContent='Remove — sure?';setTimeout(()=>{b.dataset.armed='';b.textContent='Remove';},3000);return;}
+    const r=await api('/sales/prospects/'+b.dataset.remove,'DELETE');
+    if(!r.ok)return toast('That didn’t work — try again.');
+    toast('Off the list.');await load();
+  }));
+  document.querySelectorAll('select[data-status]').forEach(s=>s.addEventListener('change',async()=>{
+    const r=await api('/sales/prospects/'+s.dataset.status,'PATCH',{status:s.value});
+    if(!r.ok){toast('That didn’t save — try again.');await load();return;}
+    const row=SAVED.find(p=>p.id===s.dataset.status);if(row)row.status=s.value;
+  }));
+  $('d-close').addEventListener('click',()=>$('draftDlg').close());
+  $('d-copy').addEventListener('click',async()=>{
+    try{await navigator.clipboard.writeText('Subject: '+$('d-subject').value+'\n\n'+$('d-body').value);toast('Copied — paste it into your own email.');}
+    catch(_){$('d-body').select();document.execCommand('copy');toast('Copied — paste it into your own email.');}
+  });
+}
+
+async function load(){
+  const r=await api('/sales/prospects');
+  if(!r.ok){
+    if(r.status===503&&r.body&&r.body.message){$('main').innerHTML=`<div class="center"><h2>One quick setup step</h2><p class="muted">${esc(r.body.message)}</p></div>`;return;}
+    trouble();return;
+  }
+  SAVED=r.body.data||[];
+  render();
+}
+function signedOut(){$('main').innerHTML=`<div class="center"><h2>Sign in to see your prospects.</h2><p style="margin-top:18px"><a class="link" href="/studio.html">Sign in →</a></p></div>`;}
+function trouble(){$('main').innerHTML=`<div class="center"><h2>We couldn’t load your prospects just now.</h2><p class="muted" style="margin-bottom:16px">A brief hiccup — try again.</p><button id="retry" class="btn">Try again</button></div>`;const rt=$('retry');if(rt)rt.addEventListener('click',load);}
+(async function(){try{const{data}=await sb.auth.getSession();TOKEN=(data&&data.session&&data.session.access_token)||"";if(!TOKEN){signedOut();return;}await load();}catch(_){trouble();}})();
+</script>
+</body>
+</html>

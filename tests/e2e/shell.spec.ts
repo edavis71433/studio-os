@@ -1231,3 +1231,33 @@ test.describe('A11y enhancer — Enter and Space', () => {
     expect((await hits()).attr).toBe(1);
   });
 });
+
+// ── Nov 10 review, bug hunt group A ──
+test.describe('App shell: the bug hunt fixes (A7, A11)', () => {
+  test('A7 — the phone bar’s Inbox number follows the bell, up and down', async ({ page }) => {
+    test.skip((page.viewportSize()?.width || 0) >= 761, 'the phone bar');
+    await installApp(page);
+    await page.goto('/settings.html');
+    const dot = page.locator('#dds-mbar a[data-mbar="inbox"] .mdot');
+    await expect(page.locator('#dds-mbar a[data-mbar="inbox"]')).toBeVisible();
+    await page.evaluate(() => (window as unknown as { ddsBellSet: (n: number) => void }).ddsBellSet(4));
+    await expect(dot).toHaveText('4');
+    await page.evaluate(() => (window as unknown as { ddsBellSet: (n: number) => void }).ddsBellSet(12));
+    await expect(dot).toHaveText('9+');
+    await page.evaluate(() => (window as unknown as { ddsBellSet: (n: number) => void }).ddsBellSet(0));
+    await expect(dot).toHaveCount(0);
+  });
+
+  test('A11 — opening the bell closes Switch site; the two never stack', async ({ page }) => {
+    const CLIENT = 'aaaaaaaa-1111-4111-8111-aaaaaaaaaaaa';
+    const rows = [{ site_id: CLIENT, name: 'Joe’s Plumbing', address: 'https://joes.example', domain: 'joes.example', state: 'live', state_words: 'Live', tags: [] }];
+    await installApp(page, { api: { '/portal/context': { data: { ...crmCtx().data, is_agency: true, scope: { site_id: CLIENT, name: 'Joe’s Plumbing' } } } } });
+    await page.route(/\/functions\/v1\/presence\/agency\/sites$/, (route) => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: { sites: rows } }) }));
+    await page.goto(`/today.html?client=${CLIENT}`);
+    await page.locator('#dds-site-switch').click();
+    await expect(page.locator('#dds-sites-pop')).toBeVisible();
+    await page.locator('#dds-bell').click();
+    await expect(page.locator('#dds-sites-pop')).toHaveCount(0);
+    await expect(page.locator('#dds-site-switch')).toHaveAttribute('aria-expanded', 'false');
+  });
+});

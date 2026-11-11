@@ -276,7 +276,7 @@ async function handleAgencyInner(req: Request, route: string, method: string, me
     const r = wake
       ? await svc(`presence_needs_snoozes?agency_id=eq.${member.agency_id}&row_key=eq.${encodeURIComponent(key)}`, { method: 'DELETE' })
       : await svc('presence_needs_snoozes?on_conflict=agency_id,row_key', { method: 'POST', headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },
-        body: JSON.stringify({ agency_id: member.agency_id, row_key: key, until, created_by: principal.email || principal.userId || null }) });
+        body: JSON.stringify({ agency_id: member.agency_id, row_key: key, until, created_by: principal.email || principal.userId || null, created_at: now }) });   // a re-snooze restarts "since when" (bug hunt A2)
     if (!r.ok) {
       const missing = r.status === 404 || /presence_needs_snoozes/.test(String(r.text || ''));
       return json({ error: missing ? 'unavailable' : 'write_failed', message: missing ? 'Snooze isn’t switched on yet — it needs one database step.' : 'That didn’t save — please try again.' }, missing ? 503 : 502, cors);
@@ -691,7 +691,7 @@ async function runStudioNeeds(member: AgencyMember, principal: Principal, jwt: s
       ids.length ? svc(`presence_connections?${IN}&status=in.(expired,error,revoked)&select=site_id,provider_key,status&limit=500`).catch(swallow) : none,
       own ? svc(`presence_plan_notices?site_id=eq.${own.id}&kind=eq.deal_followup&period=like.invremind:*&created_at=gte.${todayStart}&select=period,created_at&limit=500`).catch(swallow) : none,
       // item 70: what's snoozed (APPLY-0146); before the table exists the read fails and nothing is held back
-      svc(`presence_needs_snoozes?agency_id=eq.${member.agency_id}&until=gt.${encodeURIComponent(now)}&select=row_key,until&limit=500`).catch(swallow),
+      svc(`presence_needs_snoozes?agency_id=eq.${member.agency_id}&until=gt.${encodeURIComponent(now)}&select=row_key,until,created_at&limit=500`).catch(swallow),
     ]);
     const rowsOf = <T,>(q: { ok: boolean; json: unknown }): T[] => (q.ok && Array.isArray(q.json) ? (q.json as T[]) : []);
     // Sales review B2: a request with no stamp and no project names its customer
@@ -741,6 +741,7 @@ async function runStudioNeeds(member: AgencyMember, principal: Principal, jwt: s
       publishes: rowsOf(pubQ), connections: rowsOf(connQ), evidence: input.evidence, plans: input.plans, lastChange: input.lastChange,
       own: ownFeed ? { site_id: own?.id || null, enquiries: ownFeed.enquiries || [], messages: ownFeed.client_messages || [], notices: ownFeed.notices || [], deals: ownDeals } : undefined,
       snoozed: Object.fromEntries(rowsOf<{ row_key: string; until: string }>(snQ).map((x) => [String(x.row_key), String(x.until)])),
+      snoozedAt: Object.fromEntries(rowsOf<{ row_key: string; created_at?: string | null }>(snQ).filter((x) => x.created_at).map((x) => [String(x.row_key), String(x.created_at)])),   // bug hunt A2: news after the snooze wakes the row
     });
     // partial = a slot could not be read (the list may be missing rows, never wrong ones); own_site=false = no studio site to read money/support/deals from
     const partial = !own || !recv || !ownFeed || [supQ, slinkQ, dealsQ, pubQ, connQ, remQ].some((q) => !q.ok);

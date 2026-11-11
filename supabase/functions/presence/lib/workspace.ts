@@ -131,7 +131,13 @@ async function sendSiteInvite(email: string, siteId: string, role: SiteRole): Pr
   const bn = await svc(`presence_identity?site_id=eq.${siteId}&select=business_name&limit=1`);
   const name = String(bn.json?.[0]?.business_name || 'a business');   // never "Studio OS" — this reaches a client
   const brand = await loadEmailBrand(siteId);   // BR-1: a client's first touch, on the business brand (never the platform name)
-  return sendInviteLink(email, { subject: `You’ve been invited to help run ${name}`, intro: `You’ve been invited to help run <strong>${name}</strong>.`, brand, next: seesFullWorkspace(role) ? '/studio.html' : '/portal.html' });
+  const safe = name.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c] as string));   // the name is the owner's own text, and this is HTML
+  // Nov 10 review (G10): "help run" is wrong for a reviewer, who can only look and
+  // approve, and an invitation that oversells reads as a mistake or a scam.
+  const words = role === 'client_reviewer'
+    ? { subject: `${name} has shared work for you to review`, intro: `<strong>${safe}</strong> has shared work for you to look over and approve.` }
+    : { subject: `You’ve been invited to help run ${name}`, intro: `You’ve been invited to help run <strong>${safe}</strong>.` };
+  return sendInviteLink(email, { ...words, brand, next: seesFullWorkspace(role) ? '/studio.html' : '/portal.html' });
 }
 
 /** Nov 2026 review (client portal finding 5): is this a studio's own site, the one

@@ -102,6 +102,7 @@ const MEMBER_WRITES: Array<[MemberWriteNeed, string[]]> = [
   ['delete', [
     `DELETE /(media|assets|redirects|content-library|publishes/checkpoints|bookings/types|knowledge/docs)/${ID}`,
     `DELETE /sales/(contacts|deals|proposals|contracts|templates|estimates)/${ID}`,
+    `DELETE /sales/prospects/${ID}`,   // sales review item 112: taking a prospect off the list
     `DELETE /projects/${ID}/deliverables/${ID}`,
     `POST /comments/${ID}/delete`,
     `POST /sales/invoices/${ID}/void`,
@@ -181,6 +182,9 @@ const MEMBER_WRITES: Array<[MemberWriteNeed, string[]]> = [
     `POST /broadcasts/${ID}/cancel`,
     `POST /broadcasts/${ID}/test`,   // bold redesign: "Send me a test" — only ever to the member's own address, so edit, not publish
     'POST /sales/(contacts|customers|deals|templates)',
+    'POST /sales/prospects(/discover)?',   // sales review item 112: find businesses, save the ticked ones
+    `POST /sales/prospects/${ID}/(convert|draft)`,   // item 112: start the deal; a draft only returns words — nothing sends
+    `PATCH /sales/prospects/${ID}`,
     `PATCH /sales/(contacts|deals|deal-tasks)/${ID}`,
     `POST /sales/contacts/${ID}/restore`,
     'PUT /sales/services',

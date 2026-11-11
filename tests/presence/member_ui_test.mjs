@@ -44,6 +44,7 @@ const CONTROLS = [
   ['POST /sales/deals/:id/retainer/cancel', 'pipeline.html', `api('/sales/deals/'+id+'/retainer/cancel','POST',{})`, ['id="cancelRetainer" data-needs="delete"']],
   ['POST /sales/deals/:id/retainer/cancel', 'crm.html', `apiAg('/sales/deals/'+d.id+'/retainer/cancel','POST',{})`, [`data-ret-cancel="1" data-needs="delete"`]],
   ['DELETE /sales/estimates/:id', 'pipeline.html', `api('/sales/estimates/'+b.dataset.delEst,'DELETE')`, ['data-needs="delete" data-del-est=']],   // sales review item 47
+  ['DELETE /sales/prospects/:id', 'prospects.html', `api('/sales/prospects/'+b.dataset.remove,'DELETE')`, ['data-needs="delete" data-remove=']],   // sales review item 112
   ['POST /sales/recurring/:id/stop', 'pipeline.html', `api('/sales/recurring/'+sid+'/'+act,'POST',{})`, ['data-needs="delete" data-rec-stop=']],
   // the content path answers from contentWriteNeeds
   ['DELETE /offerings/:id', 'presence.html', 'api("DELETE", `/offerings/${o.id}`)', ['data-act="del" data-needs="delete"']],
@@ -100,7 +101,7 @@ const SOURCE = Object.fromEntries(PAGES.map((p) => [p, read(p)]));
   const decided = read('tests/presence/member_capability_test.mjs');
   const listed = (name) => [...decided.split('const DECIDED = {')[1].split(`\n  ${name}: [`)[1].split('\n  ],')[0].matchAll(/'((?:DELETE|POST|PUT|PATCH) [^']+)'/g)].map((m) => m[1]);
   const routes = [...listed('delete'), ...listed('configure')];
-  ok('the decided delete and configure lists were read', routes.length === 34, String(routes.length));   // item 47 added two; item 104 took away the seven DNS document and zone writes; item 58 added two
+  ok('the decided delete and configure lists were read', routes.length === 35, String(routes.length));   // item 47 added two; item 104 took away the seven DNS document and zone writes; item 58 added two; item 112 added the prospect delete
   const covered = new Set(CONTROLS.map(([r]) => r));
   const open = routes.filter((r) => !covered.has(r) && !NO_CONTROL[r]);
   ok('every decided delete and configure route is accounted for here', open.length === 0, open.join(', '));
@@ -124,7 +125,8 @@ const SOURCE = Object.fromEntries(PAGES.map((p) => [p, read(p)]));
     const fresh = sent(page).filter((call) => !known(page).includes(call));
     ok(`${page}: every DELETE it sends is decided`, fresh.length === 0, fresh.join(' | '));
   }
-  ok('tripwire: the DELETE scan found the calls it is meant to find', sent('pipeline.html').length === 5 && sent('presence.html').length === 12 && sent('contacts.html').length === 2 && sent('crm.html').length === 4 && sent('files.html').length === 1);
+  // crm.html: 3 — the record's two note removals are one removeNote since item 98 (it asks first now)
+  ok('tripwire: the DELETE scan found the calls it is meant to find', sent('pipeline.html').length === 5 && sent('presence.html').length === 12 && sent('contacts.html').length === 2 && sent('crm.html').length === 3 && sent('files.html').length === 1);
 
   const CONFIG = /\/(?:foundations\/(?:domain|prepare)|preview\/settings|site\/(?:offline|online)|bookings\/settings|sales\/contacts\/fields)\b/;
   const writes = new RegExp(`(?:api\\(\\s*["'](?:POST|PUT|DELETE)["']\\s*,\\s*["'\`]|act\\(["']|siteSetState\\(["'])${CONFIG.source}|api\\(["'\`]${CONFIG.source}["'\`]\\s*,\\s*["'](?:POST|PUT|DELETE)["']`, 'g');
@@ -178,7 +180,7 @@ const SOURCE = Object.fromEntries(PAGES.map((p) => [p, read(p)]));
   ok('css: a note beats the builder\'s [hidden] rule only for someone lacking it', css.includes('html[data-dds-lacks~="configure"] [data-if-lacks="configure"][hidden]{display:block!important}'));
   ok('builder: a note starts hidden, so nobody else ever sees it', SOURCE['presence.html'].includes('n.hidden = true; n.dataset.ifLacks = "configure"'));
   const marked = PAGES.filter((p) => /data-needs|dataset\.needs|needs: '/.test(SOURCE[p]) && p !== 'shell.js');
-  ok('the eight pages with marked controls are the ones expected', JSON.stringify(marked.sort()) === JSON.stringify(['broadcasts.html', 'connections.html', 'contacts.html', 'crm.html', 'files.html', 'pipeline.html', 'presence.html', 'settings.html']), marked.join(', '));   // connections.html: the calendar link (sales review item 46)   // broadcasts.html: Remove this list (sales review items 31 + 39)
+  ok('the nine pages with marked controls are the ones expected', JSON.stringify(marked.sort()) === JSON.stringify(['broadcasts.html', 'connections.html', 'contacts.html', 'crm.html', 'files.html', 'pipeline.html', 'presence.html', 'prospects.html', 'settings.html']), marked.join(', '));   // prospects.html: Remove (sales review item 112)   // connections.html: the calendar link (sales review item 46)   // broadcasts.html: Remove this list (sales review items 31 + 39)
   for (const p of marked) ok(`${p} loads the shell script and its stylesheet`, SOURCE[p].includes('src="/shell.js"') && SOURCE[p].includes('href="/shell.css"'));
 }
 

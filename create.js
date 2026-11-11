@@ -308,8 +308,8 @@
     var first = f.querySelector(kind === 'deal' ? '#cr-title' : '#cr-who');
     setTimeout(function () { if (first) first.focus(); }, 0);
     if (WHO_LABEL[kind] || kind === 'deal') {
-      paintWho();
-      load().then(function () { paintWho(); }, function (why) { paintWho(why === 'plan' ? 'Deals are part of your plan’s business tools — an upgrade adds them.' : 'We couldn’t load your people and deals just now. Close this and try again.'); });
+      if (DATA) paintWho(); else loadWho();
+      load().then(function () { paintWho(); }, function () { /* loadWho says it */ });
     }
     note();
     if (preset && preset.deal_id && WHO_LABEL[kind]) presetPick(String(preset.deal_id));
@@ -435,10 +435,27 @@
     }
     return all;
   }
+  // bug hunt A8: a failed read used to be painted once and then overwritten with
+  // "Loading your people and deals…" by the next keystroke, for ever. The failure is
+  // kept until a read works, and comes with Try again.
+  var WHO_ERR = '';
+  function loadWho() {
+    WHO_ERR = ''; paintWho();
+    load(true).then(function () { WHO_ERR = ''; paintWho(); }, function (why) {
+      WHO_ERR = why === 'plan' ? 'Deals are part of your plan’s business tools — an upgrade adds them.' : 'We couldn’t load your people and deals just now.';
+      paintWho();
+    });
+  }
   function paintWho(err) {
     var list = dlg && dlg.querySelector('#cr-who-list'); if (!list || !S) return;
     var hint = dlg.querySelector('#cr-who-hint');
     if (err) { hint.textContent = err; list.innerHTML = ''; return; }
+    if (!DATA && WHO_ERR) {
+      hint.innerHTML = esc(WHO_ERR) + (/plan/.test(WHO_ERR) ? '' : ' <button type="button" class="cr-retry">Try again</button>');
+      list.innerHTML = '';
+      var rb = hint.querySelector('.cr-retry'); if (rb) rb.addEventListener('click', function () { loadWho(); });
+      return;
+    }
     if (!DATA) { hint.textContent = 'Loading your people and deals…'; list.innerHTML = ''; return; }
     var q = S.q.trim();
     var all = pool();
@@ -517,7 +534,7 @@
     else if (S.kind === 'deal') t = 'Starts as a new lead';
     n.textContent = t;
   }
-  function fail(msg) {
+  function failForm(msg) {
     var e = dlg && dlg.querySelector('.cr-err'); if (!e) { toast(msg, 'err'); return; }
     e.textContent = msg; e.hidden = false;
     // an open invoice for a different amount: say so, and offer a second one beside it
@@ -561,7 +578,7 @@
       });
     });
   }
-  function done(text, href, kind) {
+  function finishDone(text, href, kind) {
     var detail = { kind: S.kind };
     close();
     toast(text, kind || 'ok', href ? { label: 'Open', onClick: function () { location.assign(href); } } : null);
@@ -569,6 +586,17 @@
   }
   function submit(force) {
     if (!S || S.busy) return;
+    // bug hunt A9: a save answers the form that SENT it. If that form was closed and
+    // another opened while it worked, the result is a toast only: it never closes,
+    // fills or unlocks the form now open.
+    var mine = S;
+    var stillMine = function () { return S === mine && dlg && dlg.open; };
+    var done = function (text, href, kind) {
+      if (stillMine()) return finishDone(text, href, kind);
+      toast(text, kind || 'ok', href ? { label: 'Open', onClick: function () { location.assign(href); } } : null);
+      try { window.dispatchEvent(new CustomEvent('dds:created', { detail: { kind: mine.kind } })); } catch (_) { /* */ }
+    };
+    var fail = function (m) { if (stillMine()) return failForm(m); toast(m, 'err'); };
     S.force = force === true;   // only "Send a second invoice" sends one beside an open one
     var f = dlg.querySelector('form'); var err = dlg.querySelector('.cr-err'); if (err) err.hidden = true;
     var go = dlg.querySelector('.cr-go');

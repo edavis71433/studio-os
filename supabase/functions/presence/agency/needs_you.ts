@@ -38,6 +38,11 @@ export interface NeedsRow {
   href: string;
   /** item 96: when the wait began, for the "older than a month" count */
   at?: string | null;
+  /** Nov 2026 review (bug hunt A2): when the newest thing behind this row happened
+   *  (the latest message, the failed publish, the last change, the step's due date,
+   *  the request's last message). A snooze made before it no longer holds: the row
+   *  key names the conversation, site or deal, so news under the same key wakes it. */
+  since?: string | null;
   /** item 96: how "Clear" puts it away: an enquiry is marked read, a support request closed */
   clear?: { kind: 'enquiry' | 'support'; site_id: string | null; ids: string[] };
 }
@@ -89,6 +94,8 @@ export interface NeedsInput {
    *  A row asleep at nowIso leaves the list, the total (the bell) and the
    *  roster's Next, and travels under `snoozed` instead. */
   snoozed?: Record<string, string>;
+  /** row key → when it was snoozed (ISO); a row whose `since` is later is awake (A2) */
+  snoozedAt?: Record<string, string>;
   // accepted and deliberately IGNORED — the point of this list
   moments?: unknown[]; opportunities?: unknown[]; reviewReports?: unknown[]; brandReports?: unknown[];
 }
@@ -235,7 +242,7 @@ export function buildNeedsYou(i: NeedsInput): NeedsRow[] {
         what: subject ? `support request: ${subject}` : 'has an open support request',
         when: `Opened ${ago(s.created_at || s.updated_at, today) || 'recently'}`,
         verb: 'Reply', href: `/inbox.html#support?sel=sup:${encodeURIComponent(s.id)}`,
-        at: s.last_activity_at ?? null, clear: { kind: 'support', site_id: null, ids: [String(s.id)] } });   // old = no message for a month (routes.ts reads it); unknown = never old
+        at: s.last_activity_at ?? null, since: s.last_activity_at ?? null, clear: { kind: 'support', site_id: null, ids: [String(s.id)] } });   // old = no message for a month (routes.ts reads it); unknown = never old
     }
   }
 
@@ -247,7 +254,7 @@ export function buildNeedsYou(i: NeedsInput): NeedsRow[] {
       name: String(m.client || '').trim() || nameOf(null, m.client_id || null, String(m.project || '').trim() || 'A customer'),
       what: n > 1 ? `${n} messages are waiting for your reply` : 'is waiting for your reply',
       when: ago(m.created_at, today).replace(/^\w/, (c) => c.toUpperCase()),
-      verb: 'Reply', href: String(m.href || '/inbox.html') });
+      verb: 'Reply', href: String(m.href || '/inbox.html'), since: m.created_at || null });
   }
 
   // ── d. deals whose next step is past its date (most late first) ──
@@ -266,7 +273,7 @@ export function buildNeedsYou(i: NeedsInput): NeedsRow[] {
       push({ key: `deal:${d.id}`, kind: 'deal', site_id: siteId, client_id: d.converted_client_id || null, name,
         what: `next step “${String(d.next_step).trim()}” is ${plural(days as number, 'day')} late`,
         when: `On the deal${d.title ? ' ' + d.title : ''} · due ${shortDate(d.next_step_at)}`,
-        verb: 'Open deal', href: `/crm.html?deal=${encodeURIComponent(d.id)}` });
+        verb: 'Open deal', href: `/crm.html?deal=${encodeURIComponent(d.id)}`, since: d.next_step_at || null });
     }
   }
 
@@ -308,7 +315,7 @@ export function buildNeedsYou(i: NeedsInput): NeedsRow[] {
         const err = String(p.error_text || '').replace(/\s+/g, ' ').trim();
         push({ key: `broken:publish:${s.id}`, kind: 'broken', site_id: s.id, client_id: null, name: nameOf(s.id, null),
           what: 'the last publish failed', when: [ago(p.created_at, today) ? `Failed ${ago(p.created_at, today)}` : 'Failed', err ? err.slice(0, 80) : ''].filter(Boolean).join(' · '),
-          verb: 'Fix', href: `/presence.html${sc(s.id)}#publish` });
+          verb: 'Fix', href: `/presence.html${sc(s.id)}#publish`, since: p.created_at || null });
       }
       const de = daysBetween(today, s.domain_expires_at);
       if (de !== null && de <= DOMAIN_SOON_DAYS) {
@@ -349,7 +356,7 @@ export function buildNeedsYou(i: NeedsInput): NeedsRow[] {
     const lc = (i.lastChange || {})[s.id];
     if (!lc || (s.last_published_at && lc <= s.last_published_at)) continue;
     push({ key: `publish:${s.id}`, kind: 'publish', site_id: s.id, client_id: null, name: nameOf(s.id, null),
-      what: 'changes are sitting unpublished', when: `Last change ${ago(lc, today) || shortDate(lc)}`, verb: 'Review', href: `/presence.html${sc(s.id)}#publish` });
+      what: 'changes are sitting unpublished', when: `Last change ${ago(lc, today) || shortDate(lc)}`, verb: 'Review', href: `/presence.html${sc(s.id)}#publish`, since: lc });
   }
 
   // ── h. the studio's own account, then anything else that asks for the studio ──
@@ -466,7 +473,10 @@ export function emptyLine(i: NeedsInput): string {
 // A row keeps its key ('<kind>:<id>') for as long as it needs you, so a snooze
 // is just that key and the day it wakes. It is studio-wide: one person snoozes,
 // the whole studio's list and bell agree. When the thing itself is dealt with,
-// the row goes and the snooze is never seen again.
+// the row goes and the snooze is never seen again. Nov 2026 review (A2): a key
+// names a conversation, site or deal, so a NEW message, failure or step under the
+// same key would be born asleep; a row whose `since` is later than the snooze
+// is awake (`stillAsleep`).
 export const SNOOZE_MAX_DAYS = 30;
 export const SNOOZE_KEY_RE = /^[a-z_]+:\S{1,300}$/;
 /** The keys still asleep at `nowIso`; a wake time that has passed or can't be read wakes the row. */
@@ -474,6 +484,16 @@ export function asleepKeys(snoozed: Record<string, string> | undefined, nowIso: 
   const now = Date.parse(nowIso), out = new Set<string>();
   for (const [k, until] of Object.entries(snoozed || {})) { const t = Date.parse(String(until)); if (Number.isFinite(t) && t > now) out.add(k); }
   return out;
+}
+/** Pure: is this row still asleep? Asleep by its key, and nothing newer has happened
+ *  behind it since the snooze (a row without `since`, or a snooze without a time, keeps
+ *  the key's answer). */
+export function stillAsleep(row: Pick<NeedsRow, 'key' | 'since'>, asleep: Set<string>, snoozedAt?: Record<string, string>): boolean {
+  if (!asleep.has(row.key)) return false;
+  const at = snoozedAt?.[row.key], news = row.since;
+  if (!at || !news) return true;
+  const a = Date.parse(at), n = Date.parse(news);
+  return !(Number.isFinite(a) && Number.isFinite(n) && n > a);
 }
 /** When a snooze of `days` (1–30, whole days) wakes: that many days on, at the same time. Null when out of range. */
 export function snoozeUntil(nowIso: string, days: unknown): string | null {
@@ -486,9 +506,10 @@ export function snoozeUntil(nowIso: string, days: unknown): string | null {
 export function needsYouPayload(i: NeedsInput, cap = NEEDS_YOU_CAP) {
   const every = buildNeedsYou(i);
   const asleep = asleepKeys(i.snoozed, i.nowIso);
-  const all = asleep.size ? every.filter((r) => !asleep.has(r.key)) : every;
+  const sleeping = (r: NeedsRow) => stillAsleep(r, asleep, i.snoozedAt);
+  const all = asleep.size ? every.filter((r) => !sleeping(r)) : every;
   // what's asleep, soonest to wake first, each with its wake time
-  const snoozed = every.filter((r) => asleep.has(r.key)).map((r) => ({ ...r, until: String(i.snoozed![r.key]) }))
+  const snoozed = every.filter(sleeping).map((r) => ({ ...r, until: String(i.snoozed![r.key]) }))
     .sort((a, b) => a.until.localeCompare(b.until));
   const { rows, more, rest } = capNeedsYou(all, cap);
   // item 96: the waiting enquiries and support requests more than a month old, across
