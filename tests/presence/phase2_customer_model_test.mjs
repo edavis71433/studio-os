@@ -28,8 +28,9 @@ ok('sales: an enquiry converted this way is marked converted', /async function m
 ok('sales: contacts read selects client_id and retries narrow on 400', /company,client_id,updated_at/.test(sales) && /r\.status === 400\) r = await svc\(mkPath\('id,name,email,phone,company,updated_at'\)\)/.test(sales));
 
 // search across everything
-ok('search: customers come from the bridge links + clients', /presence_service_links\?agency_site_id=eq\.\$\{site\.id\}&status=eq\.active&select=customer_client_id,customer_site_id/.test(crmRoute) && /clients\?id=in\./.test(crmRoute));
-ok('search: invoices are searched by title or amount', /presence_invoices\?site_id=eq\.\$\{site\.id\}&deleted_at=is\.null&or=\(title\.ilike/.test(crmRoute));
+// item 84: the search reads every place through one site constant (S = site.id) and one pattern (like = ilike.*q*)
+ok('search: customers come from the bridge links + clients', /presence_service_links\?agency_site_id=eq\.\$\{S\}&status=eq\.active&select=customer_client_id,customer_site_id/.test(crmRoute) && /clients\?id=in\./.test(crmRoute) && /const S = site\.id/.test(crmRoute));
+ok('search: invoices are searched by title or amount', /presence_invoices\?site_id=eq\.\$\{S\}&deleted_at=is\.null&or=\(title\.\$\{like\}/.test(crmRoute) && /like = `ilike\.\*\$\{eq\}\*`/.test(crmRoute));
 ok('search: a money word lists open invoices', /moneyWord/.test(crmRoute) && /status=eq\.open&select=id,title,amount_cents/.test(crmRoute));
 ok('search: actions land on the record with ?act=', /tab=billing&act=invoice/.test(crmRoute) && /tab=details&act=message/.test(crmRoute));
 ok('search: every result carries a kind', /kind: 'customer'/.test(crmRoute) && /kind: 'invoice'/.test(crmRoute) && /kind: 'action'/.test(crmRoute));

@@ -111,7 +111,7 @@ test.describe('Versions: saves and publishes marked apart (builder item 125)', (
     expect(fills[1]).toBe('rgba(0, 0, 0, 0)');       // hollow
     await expect(page.locator('.ver-legend')).toContainText('Published');
     await expect(page.locator('.ver-legend')).toContainText('Saved, never live');
-    await expect(page.locator('#verNote')).toContainText('Restoring a version brings back its business details, services, reviews, questions, updates, colours and fonts, and leaves your sections, pages, menu, bookings, enquiries, contacts and files as they are now.');
+    await expect(page.locator('#verNote')).toContainText('Restoring a version brings back its business details, services, reviews, questions, updates, sections, pages, menu, header and footer, colours and fonts, and leaves your bookings, enquiries, contacts and files as they are now.');
     await expect(page.locator('#versionMore summary')).toHaveText('More tools: private preview, compare, launches');
     // every action stays on the screen, a phone's too
     const w = page.viewportSize()!.width;
@@ -130,7 +130,7 @@ test.describe('Versions: saves and publishes marked apart (builder item 125)', (
     await rows(page).nth(1).getByRole('button', { name: 'Restore', exact: true }).click();
     await expect(page.locator('#resSheetTitle')).toHaveText('Restore this version?');
     await expect(page.locator('#resSheetSub')).toContainText('“Before the spring menu”, saved Nov 9');
-    await expect(page.locator('#resSheetKeeps')).toHaveText('It brings back business details, services, reviews, questions, updates, colours and fonts, and leaves your sections, pages, menu, bookings, enquiries, contacts and files as they are now.');
+    await expect(page.locator('#resSheetKeeps')).toHaveText('It brings back business details, services, reviews, questions, updates, sections, pages, menu, header and footer, colours and fonts, and leaves your bookings, enquiries, contacts and files as they are now. A page it doesn’t have is kept 30 days in Recently deleted pages.');
     await page.locator('#btnRestoreGo').click();
     await expect.poll(() => m.writes.map((w) => w.method + ' ' + w.path)).toContain('POST /publishes/checkpoints/cp1/restore');
     expect(m.writes.some((w) => w.path === '/restore-to-draft')).toBe(false);
@@ -152,6 +152,51 @@ test.describe('Versions: saves and publishes marked apart (builder item 125)', (
     await page.getByPlaceholder('e.g. Before spring redesign').fill('Before the new photos');
     await page.getByRole('button', { name: 'Save', exact: true }).click();
     await expect.poll(() => m.writes.find((w) => w.path === '/publishes/checkpoints')?.body).toEqual({ name: 'Before the new photos' });
+  });
+});
+
+// A restore brings back the sections, pages and menu too (builder item 187), so the editor
+// mustn't keep working from the copy it held: an edit waiting to save goes first, and after
+// the restore the next save sends what came back, with no Undo step from before it.
+test.describe('a restore brings back sections, pages and the menu (builder item 187)', () => {
+  const rows = (page: Page) => page.locator('#pubList .hentry');
+  const js = (page: Page, code: string) => page.evaluate((c) => (0, eval)(c), code);
+  const puts = (m: { writes: Write[] }) => m.writes.filter((w) => w.method === 'PUT' && w.path === '/settings');
+  const RESTORED = [{ type: 'title', title: 'Back from the checkpoint', subtitle: 'As it was' }, { type: 'richtext', title: 'Hours', body: 'Open every day.' }];
+  async function restoreCheckpoint(page: Page, m: { writes: Write[] }) {
+    await js(page, 'go("history")');
+    await rows(page).nth(1).getByRole('button', { name: 'Restore', exact: true }).click();
+    await page.locator('#btnRestoreGo').click();
+    await expect.poll(() => m.writes.map((w) => w.method + ' ' + w.path)).toContain('POST /publishes/checkpoints/cp1/restore');
+  }
+
+  test('after a restore the editor works from what came back: the next save sends it, and Undo has nothing from before', async ({ page }) => {
+    const m = await editor(page);
+    await js(page, 'BLOCKS_WORK = [{ type: "title", title: "Changed before the restore" }]; saveBlocks()');
+    await expect.poll(() => puts(m).length).toBe(1);
+    await expect.poll(() => js(page, 'DC_UNDO.length')).toBeGreaterThan(0);
+    // from here the server holds the checkpoint's sections
+    await page.route('**/functions/v1/presence/settings', (route: Route) => (route.request().method() === 'GET'
+      ? route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: { blocks: RESTORED, section_meta: META } }) })
+      : route.fallback()));
+    await restoreCheckpoint(page, m);
+    await expect.poll(() => js(page, 'JSON.stringify(BLOCKS_WORK)')).toBe(JSON.stringify(RESTORED));
+    expect(await js(page, 'DC_UNDO.length + DC_REDO.length')).toBe(0);
+    await js(page, 'BLOCKS_WORK[1].body = "Open every day, and late on Fridays."; saveBlocks()');
+    await expect.poll(() => puts(m).length).toBe(2);
+    expect(puts(m)[1].body.blocks.map((b: { title: string }) => b.title)).toEqual(['Back from the checkpoint', 'Hours']);
+  });
+
+  test('an edit still waiting to save goes before the restore, never after it', async ({ page }) => {
+    const m = await editor(page);
+    await js(page, 'BLOCKS_WORK = [{ type: "title", title: "Typed just before" }]');   // not saved yet
+    await restoreCheckpoint(page, m);
+    const order = m.writes.map((w) => w.method + ' ' + w.path);
+    expect(order.indexOf('PUT /settings')).toBeGreaterThan(-1);
+    expect(order.indexOf('PUT /settings')).toBeLessThan(order.indexOf('POST /publishes/checkpoints/cp1/restore'));
+    expect(puts(m)[0].body.blocks[0].title).toBe('Typed just before');
+    await page.waitForTimeout(400);
+    expect(puts(m)).toHaveLength(1);   // and nothing of it is saved again after
   });
 });
 
