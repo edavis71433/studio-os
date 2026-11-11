@@ -348,7 +348,7 @@ test.describe('The builder', () => {
       ]);
       await expect(page.locator(`${hist} button:has-text("Publish this preview")`)).toBeVisible();
       await expect(page.locator(`${hist} button:has-text("Update preview from draft")`)).toBeVisible();
-      await expect(page.locator(`${hist} button:has-text("Restore to draft")`)).toBeVisible();
+      await expect(page.locator(`${hist} .ver-saved button:text-is("Restore")`)).toBeVisible();   // a saved checkpoint, in the Versions list (item 125)
     });
   }
 
