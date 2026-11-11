@@ -636,7 +636,7 @@ export async function handleClientSupport(req: Request, site: SiteRow, principal
     const u = new URL(req.url);
     const limit = clampLimit(u.searchParams.get('limit')), offset = clampOffset(u.searchParams.get('offset'));
     const byActivity = offset + limit <= SUPPORT_POOL;   // past the pool, pages stay in updated_at order
-    const r = await svc(`presence_support_requests?site_id=eq.${s}&requester=eq.${encodeURIComponent(readerKey(principal))}&deleted_at=is.null&select=id,subject,status,priority,project_id,resolved_at,created_at,updated_at,requester&order=updated_at.desc&limit=${byActivity ? SUPPORT_POOL : limit}&offset=${byActivity ? 0 : offset}`);
+    const r = await svc(`presence_support_requests?site_id=eq.${s}&requester=eq.${encodeURIComponent(readerKey(principal))}&deleted_at=is.null&select=id,subject,status,priority,project_id,resolved_at,created_at,updated_at,requester,body&order=updated_at.desc&limit=${byActivity ? SUPPORT_POOL : limit}&offset=${byActivity ? 0 : offset}`);
     if (!r.ok) return json({ error: 'read_failed' }, 502, cors);
     let list = rows(r);
     // Additive `last_activity_at` = max(updated_at, the newest reply's created_at):
@@ -660,6 +660,10 @@ export async function handleClientSupport(req: Request, site: SiteRow, principal
         }
       } catch { /* omit the field — callers fall back to updated_at */ }
     }
+    // Builder list item 179, part three: a request nobody has replied to yet reads
+    // as its own first words ("You: …"), never as "A conversation with your studio"
+    // (the Nov 10 walk). The opening text is the client's own; only one line leaves.
+    for (const row of list) { if (!row.last_message) { const ll = lastLine({ at: String(row.created_at || ''), body: String(row.body || ''), mine: true, studioAt: '' }); if (ll) row.last_message = ll; } delete row.body; }
     if (byActivity) {
       const at = (x: any) => String(x.last_activity_at || x.updated_at || '');
       list = list.sort((a: any, b: any) => at(b).localeCompare(at(a)) || String(b.id).localeCompare(String(a.id))).slice(offset, offset + limit);
