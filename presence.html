@@ -2035,7 +2035,7 @@ body.pd-dragging *{cursor:grabbing !important}
         <!-- item 125: saves and publishes in one list, marked apart -->
         <div class="ver-top"><p class="ver-legend"><span class="ver-kind pub">Published</span><span class="ver-kind save">Saved, never live</span></p><button type="button" class="pillbtn sm" id="btnSaveCheckpoint" title="Save a named copy of your draft before a big edit, to look at or come back to. Your live site isn’t touched." hidden>Save a checkpoint</button></div>
         <div id="pubList"></div>
-        <p class="ver-note" id="verNote"><span aria-hidden="true">ⓘ</span><span>Restoring a version brings back its business details, services, reviews, questions, updates, colours and fonts, and leaves your sections, pages, menu, bookings, enquiries, contacts and files as they are now.</span></p>
+        <p class="ver-note" id="verNote"><span aria-hidden="true">ⓘ</span><span>Restoring a version brings back its business details, services, reviews, questions, updates, sections, pages, menu, header and footer, colours and fonts, and leaves your bookings, enquiries, contacts and files as they are now.</span></p>
         <!-- what happened to the site, newest first (was its own page: timeline.html) -->
         <section class="hb-sec" id="activitySec" aria-labelledby="activityH" tabindex="-1" hidden>
           <div class="hb-sec-h"><h2 id="activityH">Recent activity</h2><button type="button" class="quietact" id="activityMore" hidden>See all</button></div>
@@ -2079,7 +2079,7 @@ body.pd-dragging *{cursor:grabbing !important}
   <div class="sheetcard" role="dialog" aria-modal="true" aria-labelledby="resSheetTitle">
     <h2 id="resSheetTitle">Restore this version?</h2>
     <p class="sub" id="resSheetSub"></p>
-    <div class="body"><p style="font-size:13.5px;color:var(--ink-2);font-family:var(--serif);font-style:italic;line-height:1.7">That version goes into your draft so you can check it. Today’s draft is kept as a safety copy, and your live site doesn’t change until you publish.</p><p class="ver-sheet-note" id="resSheetKeeps">It brings back business details, services, reviews, questions, updates, colours and fonts, and leaves your sections, pages, menu, bookings, enquiries, contacts and files as they are now.</p></div>
+    <div class="body"><p style="font-size:13.5px;color:var(--ink-2);font-family:var(--serif);font-style:italic;line-height:1.7">That version goes into your draft so you can check it. Today’s draft is kept as a safety copy, and your live site doesn’t change until you publish.</p><p class="ver-sheet-note" id="resSheetKeeps">It brings back business details, services, reviews, questions, updates, sections, pages, menu, header and footer, colours and fonts, and leaves your bookings, enquiries, contacts and files as they are now. A page it doesn’t have is kept 30 days in Recently deleted pages.</p></div>
     <div class="foot">
       <button class="quietact" data-close>Cancel</button>
       <button class="pillbtn inked" id="btnRestoreGo">Restore to my draft</button>
@@ -7799,16 +7799,29 @@ function versionSavedRow(c) {
   row.appendChild(acts);
   return row;
 }
+// A restore brings back the sections, pages and menu too (item 187), so the editor works from
+// what just loaded: the page it was on if that version has it, Home if not, and no Undo steps,
+// which were all of the draft the restore set aside. A save from the copy it held, or an Undo,
+// would put the old sections back.
+function workFromRestored() {
+  if (DC_PAGE && !dcPageObj(DC_PAGE)) dcOpenPage("");
+  DC_UNDO = []; DC_REDO = [];
+  BLOCKS_WORK = currentBlocks(); DC_HIST_LAST = histSnap(); BLOCK_FOCUS = null; updateUndoButtons();
+  renderBlocksCard(); renderPagesBar(); refreshDesignPreview();
+}
 $("btnRestoreGo").addEventListener("click", async () => {
   const p = S.restoreTarget; if (!p) return;
   const btn = $("btnRestoreGo");
   btn.disabled = true; btn.textContent = "Restoring…";
   try {
+    // an edit still waiting to save would land after the restore, over what it brings back
+    if (!(await dcSavePendingEdits())) { btn.disabled = false; btn.textContent = "Restore to my draft"; return; }
     const r = p.saved ? await api("POST", `/publishes/checkpoints/${p.id}/restore`, {}) : await api("POST", "/restore-to-draft", { publish_id: p.id });
     closeSheet("restoreScrim");
     toast(r.data.message);
     btn.disabled = false; btn.textContent = "Restore to my draft";
     await refreshAll();
+    workFromRestored();
     go("today");
   } catch (err) {
     btn.disabled = false; btn.textContent = "Restore to my draft";
