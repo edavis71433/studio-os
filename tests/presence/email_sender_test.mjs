@@ -187,6 +187,7 @@ const biz = (c) => /asBusiness: true/.test(c);
 ok('item 74: the new enquiry alert always arrives', crit(callAfter(src('routes/commercial.ts'), 'async function notifyOwnerOfLead')));
 ok('item 74: the new booking alert always arrives', crit(callAfter(src('routes/booking.ts'), "await sendEmail(String(to), `New booking")));
 ok('item 74: the new review alert always arrives', crit(callAfter(src('routes/reviews.ts'), "await sendEmail(String(to), `New review")));
+ok('item 74: a booking the customer moved or canceled always reaches the owner (item 149’s alert)', crit(callAfter(src('routes/booking.ts'), 'like a new booking, a moved or canceled one')));
 ok('item 74: invoice reminders always arrive', crit(callAfter(src('commerce/lifecycle.ts'), 'const copy = invoiceReminderCopy(slot')));
 ok('item 74: domain warnings always arrive (expiry, and a removed domain or lost email records)', crit(callAfter(src('commerce/lifecycle.ts'), 'BR-1: the customer\'s domain notice')) && crit(callAfter(src('lib/domain_notify.ts'), 'out.client =')));
 ok('item 74: the alerts stay the platform’s (no business sender on mail to the owner)', !biz(callAfter(src('routes/booking.ts'), "await sendEmail(String(to), `New booking")) && !biz(callAfter(src('routes/commercial.ts'), 'async function notifyOwnerOfLead')));
