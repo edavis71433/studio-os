@@ -27,7 +27,7 @@ import type { AgencyMember, AgencyRole } from './auth.ts';
 import type { Principal } from '../../_shared/auth.ts';
 import { buildPortfolio, filterPortfolio } from './portfolio.ts';
 import type { PortfolioInput } from './portfolio.ts';
-import { daysBetween, DOMAIN_SOON_DAYS } from './needs_you.ts';
+import { daysBetween, DOMAIN_SOON_DAYS, PADLOCK_SOON_DAYS, PADLOCK_STUCK_HOURS } from './needs_you.ts';
 import { DOWN_THRESHOLD } from '../monitor/heartbeat.ts';
 import { readReservedJson, updateReservedJson, RESERVED_NAMES } from '../lib/reserved_store.ts';
 import { siteOrigin, hostedName, SITE_COLS } from '../lib/site.ts';
@@ -227,6 +227,10 @@ export interface DomainIn {
   custom_domain?: string | null; domain_registrar?: string | null; domain_expires_at?: string | null; domain_checked_at?: string | null;
   netlify_site_id?: string | null; uptime_ok?: boolean | null; uptime_fail_streak?: number | null; offline_at?: string | null;
   own?: boolean;
+  /** item 132: how the last registration lookup went (ok · not_found · failed) */
+  domain_lookup_status?: string | null;
+  /** item 134: the padlock's end date, and since when the records were right with no padlock on */
+  cert_expires_at?: string | null; cert_pending_since?: string | null;
 }
 export type DomainTone = 'good' | 'warn' | 'bad' | 'quiet';
 /** One domain's status in a few words. Expiry first, on the same 30-day line as
@@ -240,6 +244,11 @@ export function domainStatus(d: DomainIn, nowIso: string): { key: string; words:
   if (d.edition === 'monitor') return is('elsewhere', 'On their own host', 'quiet');
   if (!(d.status === 'live' || d.last_published_at)) return is('not_live', 'Site not live yet', 'quiet');
   if (d.offline_at) return is('offline', 'Site offline', 'warn');
+  // item 134: the padlock, on the same lines as Home's Needs you (needs_you.ts)
+  const stuckH = d.cert_pending_since ? (Date.parse(nowIso) - Date.parse(d.cert_pending_since)) / 3600_000 : null;
+  if (d.edition !== 'monitor' && stuckH !== null && Number.isFinite(stuckH) && stuckH >= PADLOCK_STUCK_HOURS) return is('padlock', 'Padlock not on yet', 'warn');
+  const pe = d.edition !== 'monitor' ? daysBetween(nowIso, d.cert_expires_at) : null;
+  if (pe !== null && pe <= PADLOCK_SOON_DAYS) return is('padlock', pe < 0 ? 'Padlock ended' : pe === 0 ? 'Padlock ends today' : `Padlock ends in ${plural(pe)}`, 'warn');
   if ((Number(d.uptime_fail_streak) || 0) >= DOWN_THRESHOLD) return is('down', 'Not answering', 'bad');
   if (d.uptime_ok === true) return is('connected', 'Connected', 'good');
   return is('checking', 'Not checked yet', 'quiet');
@@ -247,7 +256,7 @@ export function domainStatus(d: DomainIn, nowIso: string): { key: string; words:
 /** Every custom domain with its status, provider and expiry, the most urgent
  *  first; and the hosted sites still on their built-in address. Pure. */
 export function buildDomains(rows: DomainIn[], nowIso: string) {
-  const RANK: Record<string, number> = { expired: 0, down: 1, expiring: 2, offline: 3, checking: 4, not_live: 5, elsewhere: 6, connected: 7 };
+  const RANK: Record<string, number> = { expired: 0, down: 1, expiring: 2, padlock: 3, offline: 4, checking: 5, not_live: 6, elsewhere: 7, connected: 8 };
   const domains = rows.filter((r) => r.custom_domain).map((r) => {
     const st = domainStatus(r, nowIso);
     return {
@@ -256,6 +265,9 @@ export function buildDomains(rows: DomainIn[], nowIso: string) {
       provider: String(r.domain_registrar || ''),
       expires_at: r.domain_expires_at || null,
       checked_at: r.domain_checked_at || null,
+      // item 132: a lookup that failed or found no record is said, never a quiet "Not known yet"
+      record: r.domain_lookup_status === 'failed' || r.domain_lookup_status === 'not_found' ? 'unreadable' : r.domain_lookup_status === 'ok' ? 'ok' : 'unknown',
+      padlock_until: r.edition !== 'monitor' ? (r.cert_expires_at || null) : null,   // item 134
       hosted: r.edition !== 'monitor',
     };
   });
@@ -386,6 +398,8 @@ export interface SitesDeps {
 const forbid = (cors: Record<string, string>) => json({ error: 'forbidden', message: 'Your role doesn’t include this.' }, 403, cors);
 const notYours = (cors: Record<string, string>) => json({ error: 'not_found', message: 'Not one of your clients.' }, 404, cors);
 const EXTRA_COLS = 'id,client_id,netlify_site_id,offline_at,uptime_ok,uptime_fail_streak,domain_checked_at,template_slug,created_at';
+/** the Domains page also reads the lookup's result and the padlock (items 132 and 134, migration 0149) */
+const DOMAIN_COLS = `${EXTRA_COLS},domain_lookup_status,cert_expires_at,cert_pending_since`;
 
 /** The Sites and Domains routes, or null when the route is someone else's. */
 export async function handleAgencySites(req: Request, route: string, method: string, member: AgencyMember, principal: Principal, cors: Record<string, string>, deps: SitesDeps): Promise<Response | null> {
@@ -438,13 +452,13 @@ export async function handleAgencySites(req: Request, route: string, method: str
     const ids = portfolio.map((r) => r.site_id);
     const soft = () => ({ ok: false, json: null as unknown });
     const [extraQ, own] = await Promise.all([
-      ids.length ? svc(`presence_sites?id=in.(${ids.join(',')})&select=${EXTRA_COLS}&limit=1000`).catch(soft) : Promise.resolve({ ok: true, json: [] as unknown[] }),
+      ids.length ? svc(`presence_sites?id=in.(${ids.join(',')})&select=${DOMAIN_COLS}&limit=1000`).catch(soft) : Promise.resolve({ ok: true, json: [] as unknown[] }),
       deps.ownSite().catch(() => null),
     ]);
     const extra = new Map(rowsOf<SiteExtra>(extraQ).map((x) => [x.id, x]));
     const list: DomainIn[] = portfolio.map((p) => ({ ...(extra.get(p.site_id) || {}), site_id: p.site_id, name: p.name, edition: p.edition, status: p.status, last_published_at: p.last_published_at, custom_domain: p.domain, domain_registrar: p.domain_registrar, domain_expires_at: p.domain_expires_at }));
     if (own && !ids.includes(own.id)) {
-      const ownQ = await svc(`presence_sites?id=eq.${own.id}&select=${EXTRA_COLS},domain_registrar,domain_expires_at&limit=1`).catch(soft);
+      const ownQ = await svc(`presence_sites?id=eq.${own.id}&select=${DOMAIN_COLS},domain_registrar,domain_expires_at&limit=1`).catch(soft);
       const x = rowsOf<SiteExtra & { domain_registrar?: string; domain_expires_at?: string }>(ownQ)[0] || {};
       list.push({ ...x, site_id: own.id, name: String(member.branding?.display_name || member.agency_name || 'Your studio'), edition: own.edition, status: own.status, last_published_at: own.last_published_at, custom_domain: own.custom_domain, own: true });
     }

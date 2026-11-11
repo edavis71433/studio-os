@@ -319,7 +319,7 @@ test.describe('the Edit bar and the panels', () => {
       for (const sel of ['#btnEditExit', '#btnTrayOpen', '#dkPages', '#btnSettingsOpen', '#dkPhotos', '#btnComments', '#dkFind', '#btnUndo', '#btnRedo']) await expect(page.locator(sel)).toBeInViewport();
       await openPages(page);
       await expect(page.locator('#pagesBar .page-pill').first()).toBeVisible();
-      await expect(page.locator('#btnNavEdit')).toBeInViewport();
+      for (const sel of ['#btnPageAdd', '#btnPagesClose', '#pcFind']) await expect(page.locator(sel)).toBeInViewport();
     });
   }
   test('the canvas runs to the very bottom and the very left of the screen', async ({ page }) => {
@@ -431,6 +431,17 @@ test.describe('what a real site showed', () => {
     });
     await page.locator('#btnTrayOpen').click();
     const search = page.locator('#designTray .tray-search');
+    if (isPhone(page)) {
+      // a phone's keyboard would cover the tiles: Add starts on Done with the search box in view,
+      // and Find, behind More, is the way straight into the search
+      await expect(page.locator('#btnTrayClose')).toBeFocused();
+      await expect(search).toBeInViewport();
+      expect(await page.locator('#designTray').evaluate((n) => n.scrollTop)).toBe(0);
+      await page.locator('#btnTrayClose').click();
+      await page.locator('#dkMore').click();
+      await page.locator('#dkFind').click();
+      await expect(page.locator('#dcDock')).not.toHaveClass(/more-open/);
+    }
     await expect(search).toBeFocused();
     expect(await page.evaluate(() => (window as any).__traySeen)).toEqual([0]);
     await page.waitForTimeout(400);

@@ -23,7 +23,7 @@ test.describe('Settings — the list beside the sections (bold redesign)', () =>
     await page.goto('/settings.html');
     const card = page.locator('[data-card="stages"]');
     await expect(card).toHaveAttribute('href', '#stages');
-    await expect(card.locator('.st')).toHaveText('4 stages · 1 renamed · chances set');
+    await expect(card.locator('.st')).toHaveText('4 stages · 1 renamed');   // bug hunt C16: every percent is its usual one, so no "chances set"
     const sec = page.locator('#stages');
     await expect(sec).toBeVisible();
     await expect(sec.getByRole('heading', { level: 2, name: 'Deal stages' })).toBeVisible();

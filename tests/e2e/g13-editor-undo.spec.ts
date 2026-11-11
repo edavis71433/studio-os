@@ -11,14 +11,14 @@ test.describe('G13 in-place canvas text editor — Undo and Redo of page-menu st
     const { frame, puts } = await mountPages(page, '', WITH_CONTACT);
     await openAbout(page, frame);
     await pageMenu(page, 'Contact', 'Hide from menu');
-    await expect(pill(page, 'Contact')).toContainText('(hidden)');
+    await expect(pill(page, 'Contact')).toHaveAttribute('data-nav', 'hidden');
     await writeOnAboutAndLeave(page, frame, puts);
     await undo(page);
-    await expect(pill(page, 'Contact')).not.toContainText('(hidden)');
+    await expect(pill(page, 'Contact')).not.toHaveAttribute('data-nav', 'hidden');
     expect(aboutIn(lastPut(puts))?.blocks[0].subtitle).toBe('Written since');
     expect(pageIn(lastPut(puts), 'contact')?.hideNav).toBeUndefined();
     await redo(page);
-    await expect(pill(page, 'Contact')).toContainText('(hidden)');
+    await expect(pill(page, 'Contact')).toHaveAttribute('data-nav', 'hidden');
     expect(aboutIn(lastPut(puts))?.blocks[0].subtitle).toBe('Written since');
     expect(pageIn(lastPut(puts), 'contact')?.hideNav).toBe(true);
   });
@@ -119,13 +119,13 @@ test.describe('G13 in-place canvas text editor — Undo and Redo of page-menu st
     expect(lastPut(puts).pages?.find((p) => p.slug === 'gallery')?.hideNav).toBeUndefined();
     expect(lastPut(puts)).not.toHaveProperty('nav');
     expect(storyIn(lastPut(puts))?.blocks[0].subtitle).toBe('Written since');
-    await expect(pill(page, 'Gallery')).not.toContainText('(hidden)');
+    await expect(pill(page, 'Gallery')).not.toHaveAttribute('data-nav', 'hidden');
     await redo(page);
     await expect.poll(() => puts.length).toBe(count + 2);
     expect(lastPut(puts).pages?.find((p) => p.slug === 'gallery')?.hideNav).toBe(true);
     expect(lastPut(puts)).not.toHaveProperty('nav');
     expect(storyIn(lastPut(puts))?.blocks[0].subtitle).toBe('Written since');
-    await expect(pill(page, 'Gallery')).toContainText('(hidden)');
+    await expect(pill(page, 'Gallery')).toHaveAttribute('data-nav', 'hidden');
   });
 
   test('Undo walks back through the words and then the move, and Redo walks forward again', async ({ page }) => {
@@ -278,11 +278,11 @@ test.describe('G13 in-place canvas text editor — Undo and Redo of page-menu st
     });
     await openAbout(page, frame);
     await pageMenu(page, 'Contact', 'Hide from menu');
-    await expect(pill(page, 'Contact')).toContainText('(hidden)');
+    await expect(pill(page, 'Contact')).toHaveAttribute('data-nav', 'hidden');
     await pageMenu(page, 'About', 'Duplicate page');
     await expect(onPill(page)).toHaveText('About copy');
     await undo(page);
-    await expect(pill(page, 'Contact')).not.toContainText('(hidden)');
+    await expect(pill(page, 'Contact')).not.toHaveAttribute('data-nav', 'hidden');
     expect(lastPut(puts).pages?.map((p) => p.slug)).toEqual(['about', 'about-copy', 'contact']);
     await expect(onPill(page)).toHaveText('About copy');
   });
@@ -308,7 +308,7 @@ test.describe('G13 in-place canvas text editor — Undo and Redo of page-menu st
     const { frame } = await mountPages(page, '', WITH_CONTACT);
     await openAbout(page, frame);
     await pageMenu(page, 'Contact', 'Hide from menu');
-    await expect(pill(page, 'Contact')).toContainText('(hidden)');
+    await expect(pill(page, 'Contact')).toHaveAttribute('data-nav', 'hidden');
     const { sent, release } = await holdPuts(page);
     await undo(page);
     await expect.poll(() => sent.length).toBe(1);
@@ -324,7 +324,7 @@ test.describe('G13 in-place canvas text editor — Undo and Redo of page-menu st
     const { frame } = await mountPages(page, '', WITH_CONTACT);
     await openAbout(page, frame);
     await pageMenu(page, 'Contact', 'Hide from menu');
-    await expect(pill(page, 'Contact')).toContainText('(hidden)');
+    await expect(pill(page, 'Contact')).toHaveAttribute('data-nav', 'hidden');
     const { sent, release } = await holdPuts(page);
     await typeOver(page, frame.locator('#about-us [data-dds-field="subtitle"]'), 'On its way');
     await page.keyboard.press('Enter');
@@ -343,7 +343,7 @@ test.describe('G13 in-place canvas text editor — Undo and Redo of page-menu st
     const { frame } = await mountPages(page, '', WITH_CONTACT);
     await openAbout(page, frame);
     await pageMenu(page, 'Contact', 'Hide from menu');
-    await expect(pill(page, 'Contact')).toContainText('(hidden)');
+    await expect(pill(page, 'Contact')).toHaveAttribute('data-nav', 'hidden');
     const { sent, release } = await holdPuts(page);
     await pageMenu(page, 'About', 'Hide from menu');
     await expect.poll(() => sent.length, { timeout: 6000 }).toBe(1);
@@ -354,8 +354,8 @@ test.describe('G13 in-place canvas text editor — Undo and Redo of page-menu st
     await expect.poll(() => sent.length, { timeout: 6000 }).toBe(2);
     expect(aboutIn(sent[1])?.hideNav).toBe(true);
     expect(pageIn(sent[1], 'contact')?.hideNav).toBeUndefined();
-    await expect(pill(page, 'About')).toContainText('(hidden)');
-    await expect(pill(page, 'Contact')).not.toContainText('(hidden)');
+    await expect(pill(page, 'About')).toHaveAttribute('data-nav', 'hidden');
+    await expect(pill(page, 'Contact')).not.toHaveAttribute('data-nav', 'hidden');
   });
 
   test('a form save is a section edit: its Undo takes back the form, and leaving the page leaves later words safe', async ({ page }) => {

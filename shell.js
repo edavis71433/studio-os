@@ -829,16 +829,19 @@
     // client the first item is the client's (Overview) and the second is their
     // Messages; at studio level / for an owner it is Home (the landing) · Inbox.
     var scopedNow = !!(CTX && CTX.scope && CTX.scope.name && CTX.is_agency);
-    var firstPrimary = null, inboxItem = null;
+    var firstPrimary = null, inboxItem = null, inboxHidden = false;
     (nav || []).forEach(function (s) {
       var vis = visibleItems(s);
       if (!s.utility && !firstPrimary && vis.length) firstPrimary = vis[0];
       vis.forEach(function (i) { if (!inboxItem && (i.key === 'inbox' || i.key === 'messages')) inboxItem = i; });
+      // bug hunt C17: the studio hid Inbox in Settings › Your menu (its items come ⌘K-only)
+      ((s && s.items) || []).forEach(function (i) { if (i && i.hidden && i.key === 'inbox' && s.key === 'inbox') inboxHidden = true; });
     });
     var home = isReviewer ? { href: '/client.html', label: 'Updates' }
       : (scopedNow && firstPrimary) ? { href: firstPrimary.href, label: firstPrimary.label }
       : { href: (CTX && CTX.landing) || '/today.html', label: 'Home' };
-    var inbox = isReviewer ? null : inboxItem ? { href: inboxItem.href, label: inboxItem.label } : { href: '/inbox.html', label: 'Inbox' };
+    // the fallback stands in for a menu that names no Inbox at all, never for one the studio hid
+    var inbox = isReviewer ? null : inboxItem ? { href: inboxItem.href, label: inboxItem.label } : inboxHidden ? null : { href: '/inbox.html', label: 'Inbox' };
     var herePath = normalizePath(location.pathname);
     var cur = function (href) { return normalizePath(href) === herePath ? ' aria-current="page"' : ''; };
     // Look refresh E: an icon over each word (the words stay the names)

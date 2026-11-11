@@ -238,10 +238,14 @@ let LOADED_AT=Date.now();
 let SEG_OK=true,LIST_OK=true;   // per-read health — one read failing degrades ITS section, never the whole page
 let OPEN=null;      // the drilled-in broadcast id (accordion)
 const DETAILS={};   // per-id detail cache (GET /broadcasts/:id)
+let PV=null;        // C1: the composer's open Preview & send card — its draft id and the words it was built from
 const updatedLabel=()=>{const m=Math.floor((Date.now()-LOADED_AT)/60000);return m<1?'Updated just now':'Updated '+m+' min ago';};
 sb.auth.onAuthStateChange(function(_e,s){if(s&&s.access_token)TOKEN=s.access_token;});
 const H=()=>({'Content-Type':'application/json','Authorization':'Bearer '+SUPABASE_KEY,'x-dds-user-jwt':TOKEN,'x-dds-scope-site':(new URLSearchParams(location.search).get('client')||'')});
-async function api(path,method,body){const r=await fetch(FN+path,{method:method||'GET',headers:H(),body:body?JSON.stringify(body):undefined});return{ok:r.ok,status:r.status,body:await r.json().catch(()=>({}))};}
+// a dropped connection answers like a refusal (status 0) instead of throwing, so every
+// button that greyed or set BUSY gets it back and says why (bug hunt C6)
+const NET_MSG='That didn’t go through — check your connection and try again.';
+async function api(path,method,body){let r;try{r=await fetch(FN+path,{method:method||'GET',headers:H(),body:body?JSON.stringify(body):undefined});}catch(_){return{ok:false,status:0,body:{message:NET_MSG}};}return{ok:r.ok,status:r.status,body:await r.json().catch(()=>({}))};}
 function toast(m){if(window.ddsToast)return void ddsToast(m);const t=$('toast');t.textContent=m;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2600);}
 // Small styled confirm — replaces native confirm(), matching the app's surfaces
 // (same pattern as files.html / connections.html / visual-studio.html). Resolves true/false.
@@ -353,7 +357,7 @@ function render(){
       ${histMeta()}
       ${histBody()}
     </div>`;
-  $('main').innerHTML=h;wire();
+  $('main').innerHTML=h;PV=null;wire();   // the stage is rebuilt empty
 }
 // Bold redesign (Nov 2026): the send button says how many it goes to, and the
 // last update sent sits under the lists (from the history this page reads).
@@ -478,7 +482,7 @@ function wire(){
   // failure of the OTHER section tear down its last-good render (the ↻ contract)
   const sr=$('segRetry');if(sr)sr.addEventListener('click',()=>load(true));
   const br=$('bcRetry');if(br)br.addEventListener('click',()=>load(true));
-  const s=$('subj'),t=$('bodytx');if(s)s.addEventListener('input',()=>{if(DRAFT)DRAFT.subject=s.value;paintLive();});if(t)t.addEventListener('input',()=>{if(DRAFT)DRAFT.body=t.value;paintLive();});
+  const s=$('subj'),t=$('bodytx');if(s)s.addEventListener('input',()=>{if(DRAFT)DRAFT.subject=s.value;paintLive();checkPreview();});if(t)t.addEventListener('input',()=>{if(DRAFT)DRAFT.body=t.value;paintLive();checkPreview();});
   // repaint the drilled-open row; if a list refresh just dropped the DETAILS
   // cache, RE-READ it — the open panel gets fresh counts, never a blank
   if(OPEN){const box=$('d-'+OPEN);if(box){if(DETAILS[OPEN])paintDetail(box,OPEN);else loadDetail(OPEN);}}
@@ -683,7 +687,7 @@ async function ensureDraft(){
     return DRAFT.id;
   }
   const r=await api('/broadcasts','POST',{subject,body,audience:SEL});
-  if(!r.ok||!r.body.data||!r.body.data.id){toast('Couldn’t save the draft.');return null;}
+  if(!r.ok||!r.body.data||!r.body.data.id){toast(r.status===0?NET_MSG:'Couldn’t save the draft.');return null;}
   DRAFT=r.body.data;return DRAFT.id;
 }
 
@@ -704,15 +708,44 @@ async function doTest(){
 }
 async function doPreview(opts){
   if(BUSY)return;BUSY=true;
+  const words=formWords();   // what this preview is of (ensureDraft saves the same trimmed words)
   const id=await ensureDraft();BUSY=false;if(!id)return;
   const r=await api('/broadcasts/'+id);
-  if(!r.ok){toast('Couldn’t build the preview.');return;}
-  stageFor(id,r.body.data,(opts&&opts.scheduleFirst)?{scheduleFirst:true}:{});
+  if(!r.ok){toast(r.status===0?NET_MSG:'Couldn’t build the preview.');return;}
+  const later=!!(opts&&opts.scheduleFirst);
+  stageFor(id,r.body.data,later?{scheduleFirst:true}:{});
+  PV={id,subject:words.subject,body:words.body,later,stale:false};
+  checkPreview();   // typed while it was being built: out of date at once
+}
+// C1: "Send now" sends the SAVED draft, so it may only ever be pressed under a
+// preview of what is in the boxes. Once the subject or message differs from the
+// words the card was built from, the card says it is out of date and offers
+// Preview again in place of Send (typing, + Booking link, + Image and the
+// formatting bar all arrive here through the boxes' input event).
+const formWords=()=>({subject:(($('subj')&&$('subj').value)||'').trim(),body:(($('bodytx')&&$('bodytx').value)||'').trim()});
+function checkPreview(){
+  if(!PV||PV.stale)return;
+  const w=formWords();
+  if(w.subject===PV.subject&&w.body===PV.body)return;
+  PV.stale=true;
+  const st=$('stage');if(!st)return;
+  st.innerHTML=`<div class="card" id="pvStale">
+    <div class="card-h"><span class="cic" aria-hidden="true">${IC.mail}</span><h2>Preview & send</h2></div>
+    <p class="hint">You changed the message after this preview, so it’s out of date. Preview it again before it goes out.</p>
+    <div class="row">
+      <button class="primary" id="pvAgain" type="button">Preview again</button>
+      <button class="ghost" id="pvClose" type="button">Close</button>
+    </div>
+  </div>`;
+  const later=PV.later;
+  $('pvAgain').addEventListener('click',()=>doPreview(later?{scheduleFirst:true}:{}));
+  $('pvClose').addEventListener('click',()=>{$('stage').innerHTML='';PV=null;const s=$('subj');if(s)s.focus();});
 }
 // The ONE preview-and-approve stage — used by the composer's Preview and by
 // Reschedule on a scheduled row (schedule mode preselected, time prefilled).
 function stageFor(id,d,opts){
   opts=opts||{};
+  PV=null;   // a Reschedule card is not the composer's (doPreview sets its own after this)
   const cnt=d.recipient_count||0;
   const skip=d.suppressed_count?` <span class="sub">· ${d.suppressed_count} unsubscribed and left out</span>`:'';
   const later=!!opts.scheduleFirst;
@@ -741,7 +774,7 @@ function stageFor(id,d,opts){
   $('stage').scrollIntoView({behavior:'smooth',block:'start'});
   document.querySelectorAll('[name=whenmode]').forEach(r=>r.addEventListener('change',()=>{const l=document.querySelector('[name=whenmode]:checked').value==='later';$('when').style.display=l?'inline-block':'none';$('send').textContent=l?laterLabel:'Send now';}));
   $('send').addEventListener('click',()=>doSend(id));
-  $('reedit').addEventListener('click',()=>{$('stage').innerHTML='';const s=$('subj');if(s)s.focus();});
+  $('reedit').addEventListener('click',()=>{$('stage').innerHTML='';PV=null;const s=$('subj');if(s)s.focus();});
 }
 
 async function doSend(id){
@@ -754,7 +787,8 @@ async function doSend(id){
   BUSY=true;sendBtn.disabled=true;sendBtn.textContent=later?'Scheduling…':'Sending…';
   const r=await api('/broadcasts/'+id+'/send','POST',scheduled_at?{scheduled_at}:{});
   BUSY=false;
-  if(!r.ok){toast(r.body&&r.body.message||'That didn’t send.');sendBtn.disabled=false;sendBtn.textContent=sendLabel;return;}
+  // a dropped connection can't say whether the server got it (a repeat press is refused if it did)
+  if(!r.ok){toast(r.status===0?'We lost the connection before hearing back, so we can’t tell whether it went. Check Recent updates before you try again.':(r.body&&r.body.message||'That didn’t send.'));sendBtn.disabled=false;sendBtn.textContent=sendLabel;return;}
   const d=r.body.data||{};
   if(d.status==='scheduled')toast('Scheduled. It’ll go out then — you can cancel any time before.');
   else if(d.status==='queued')toast('Sending now — it goes out over the next few minutes.');
@@ -770,7 +804,7 @@ async function doSend(id){
     const t=$('bodytx');if(t)t.value='';
   }
   delete DETAILS[id];if(OPEN===id)OPEN=null;   // mirror cancelBc — a drilled-open row must not re-render as a visible empty panel
-  $('stage').innerHTML='';
+  $('stage').innerHTML='';PV=null;
   await load();
 }
 

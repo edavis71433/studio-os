@@ -371,25 +371,71 @@ html.dc-edit:not(.plan-watch) .dc-bar{position:absolute;top:var(--dc-bar-top);le
 .dc-switch-name{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .dc-chip{display:inline-flex;align-items:center;height:24px;padding:0 10px;border-radius:999px;background:var(--sheet);color:var(--ink-2);font-size:12px;font-weight:600;white-space:nowrap;line-height:1}
 .dc-chip.good{background:var(--sage-soft);color:var(--sage)}
-.dc-switch:focus-visible,.dc-dk:focus-visible,.dc-rowbtn:focus-visible{outline:2px solid var(--plum);outline-offset:2px}
-.dc-card{background:var(--sheet);border:1px solid color-mix(in srgb,var(--hair) 55%,transparent);border-radius:var(--dds-r-xl,20px);box-shadow:var(--dds-shadow-pop)}
-.dc-card-h{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:6px 6px 8px 12px}
-.dc-card-t{font-weight:600;font-size:14px}
-.dc-pagescard{position:absolute;top:calc(100% + 10px);left:0;z-index:95;width:320px;max-width:calc(100vw - 32px);max-height:min(72vh,600px);display:flex;flex-direction:column;padding:8px;text-align:left}
-.dc-pagescard[hidden]{display:none}
-.dc-pagescard .pages-bar{display:flex;flex-direction:column;align-items:stretch;gap:2px;margin:0;padding:0 0 6px;overflow:auto;min-height:0}
-.dc-pagescard .page-pill{height:38px;padding:0 6px 0 12px;border:0;border-radius:var(--dds-r,12px);background:transparent;color:var(--ink);font-weight:500;justify-content:space-between;text-align:left}
-.dc-pagescard .page-pill:hover{background:var(--dc-raised)}
-.dc-pagescard .page-pill.on{background:var(--plum-soft);color:var(--plum);font-weight:600}
-.dc-pagescard .page-pill .pp-name{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.dc-pagescard .page-pill .pp-menu{width:28px;height:28px;display:inline-flex;align-items:center;justify-content:center;border-radius:8px;padding:0;font-size:16px}
-.dc-pagescard .page-add{height:36px;margin-top:4px;border:1px dashed var(--plum);border-radius:var(--dds-r,12px);background:transparent;color:var(--plum);font-weight:600}
-.dc-pagescard .page-add:hover{background:var(--plum-soft)}
-.dc-pagescard-acts{display:flex;flex-direction:column;gap:2px;padding-top:8px;border-top:1px solid var(--hair)}
-.dc-rowbtn{display:flex;align-items:center;flex-wrap:wrap;gap:0 10px;min-height:40px;padding:6px 10px;border:0;border-radius:var(--dds-r,12px);background:transparent;color:var(--ink);font:inherit;font-size:13px;font-weight:500;text-align:left;cursor:pointer}
-.dc-rowbtn:hover{background:var(--dc-raised)}
-.dc-rowbtn svg{width:16px;height:16px;flex:none;fill:none;stroke:currentColor;stroke-width:1.75;stroke-linecap:round;stroke-linejoin:round;color:var(--ink-2)}
-.dc-rowbtn .dc-rowbtn-sub{flex:0 0 100%;padding-left:26px;font-size:11.5px;font-weight:400;color:var(--ink-3);line-height:1.3}
+.dc-switch:focus-visible,.dc-dk:focus-visible{outline:2px solid var(--plum);outline-offset:2px}
+/* ── the Pages card (part three, Figma 66:339): the menu in its order, then the pages off it,
+   then the header and footer, the not-found page and search. A row is a page: a grip, its
+   icon, its name, what is waiting on it, a gear. A page drawn on the canvas also has ⋯. ── */
+.pc-add{flex:none;height:36px;margin-left:auto;padding:0 14px;border:0;border-radius:999px;background:var(--plum) var(--dds-grad-btn,linear-gradient(135deg,#6d3fd4 0%,#7a4bdd 100%));color:var(--dds-on-p,var(--fill-ink));font:600 13px/1 var(--sans);white-space:nowrap;cursor:pointer}
+.pc-add:hover{filter:brightness(1.06)}
+.pc-add:focus-visible,.pc-open:focus-visible,.pc-ico:focus-visible,.pc-mrow:focus-visible,.pc-back:focus-visible,.pc-link:focus-visible,.pc-quiet:focus-visible,.pc-row .pg-grab:focus-visible{outline:2px solid var(--plum);outline-offset:2px}
+html.dc-edit:not(.plan-watch) #pcBody{padding:0 20px 20px}
+.pc-findwrap{margin:2px 0 16px}
+.pc-findwrap svg{fill:none;stroke:currentColor;stroke-width:1.75;stroke-linecap:round}
+.pc-find{width:100%;box-sizing:border-box;height:44px;margin:0;padding:0 14px 0 42px;border-radius:999px;border:1px solid var(--hair);background:var(--dc-raised,var(--paper));color:var(--ink);font:inherit;font-size:14px;-webkit-appearance:none;appearance:none}
+.pc-find:focus-visible{outline:2px solid var(--plum);outline-offset:0}
+.pc-h{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:0 0 10px;font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-3)}
+.pc-h[hidden]{display:none}
+.pc-link{padding:4px 8px;margin:-4px -8px -4px 0;border:0;border-radius:8px;background:none;color:var(--plum);font:600 12px/1.2 var(--sans);letter-spacing:0;text-transform:none;cursor:pointer}
+.pc-link:hover{background:var(--plum-soft)}
+.pc-list{display:flex;flex-direction:column;gap:8px;margin:0 0 18px}
+.pc-list[hidden]{display:none}
+.pc-row{position:relative;display:flex;align-items:center;gap:4px;min-height:56px;box-sizing:border-box;padding:6px 4px 6px 2px;border:1px solid var(--hair);border-radius:14px;background:var(--sheet);cursor:pointer}
+.pc-row[hidden]{display:none}
+.pc-row:hover{border-color:var(--hair-2)}
+.pc-row.on{background:var(--plum-soft);border-color:transparent}
+.pc-row.child{margin-left:24px}
+.pc-row.pg-dragging{z-index:5;box-shadow:var(--dds-shadow-pop);opacity:.96}
+.pc-row .pg-grab{width:20px;height:36px}
+.pc-row .ic{flex:none;display:grid;place-items:center;width:30px;height:30px;margin-right:4px;border-radius:9px;background:var(--dc-raised,var(--paper));color:var(--ink-2)}
+.pc-row.on .ic{background:var(--sheet);color:var(--plum)}
+.pc-row .ic svg,.pc-mrow .ic svg,.pc-back svg,.pc-mrow .chev{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.75;stroke-linecap:round;stroke-linejoin:round}
+.pc-open{flex:1 1 auto;min-width:0;display:flex;flex-direction:column;align-items:flex-start;gap:2px;padding:4px 2px 4px 4px;border:0;border-radius:8px;background:none;color:var(--ink);font:inherit;text-align:left;cursor:pointer}
+.pc-open .pp-name{max-width:100%;font-size:14px;font-weight:600;line-height:1.25;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pc-sub{max-width:100%;font-size:12px;line-height:1.3;color:var(--ink-2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pc-row.on .pc-sub{color:var(--plum)}
+.pc-row .hb-chip{flex:none;gap:5px;margin-right:2px;padding:2px 8px;font-size:11.5px;font-weight:600}
+.pc-ico{flex:none;display:grid;place-items:center;width:28px;height:30px;padding:0;border:0;border-radius:999px;background:transparent;color:var(--ink-2);font:700 15px/1 var(--sans);cursor:pointer}
+.pc-ico:hover{background:var(--dc-raised,var(--paper));color:var(--ink)}
+.pc-row.on .pc-ico:hover{background:var(--sheet)}
+.pc-ico svg{width:16px;height:16px}
+.pc-empty{padding:18px 20px;border:1.5px dashed var(--hair-2);border-radius:14px;text-align:center;font-size:12.5px;line-height:1.45;color:var(--ink-3)}
+.pc-drop.pc-over .pc-empty,.pc-drop.pc-over{border-color:var(--plum)}
+.pc-drop.pc-over{border-radius:14px;outline:1.5px dashed var(--plum);outline-offset:4px;background:var(--plum-soft)}
+.pc-quiet{display:block;margin:-8px 0 18px;padding:4px 0;border:0;background:none;color:var(--ink-2);font:500 12.5px/1.3 var(--sans);text-decoration:underline;text-underline-offset:3px;cursor:pointer}
+.pc-quiet[hidden]{display:none}
+.pc-quiet:hover{color:var(--ink)}
+.pc-none{margin:0 0 18px;font-size:13px;color:var(--ink-2)}
+.pc-none[hidden]{display:none}
+.pc-more{display:flex;flex-direction:column;gap:4px;padding-top:12px;border-top:1px solid var(--hair)}
+.pc-mrow{display:flex;align-items:center;gap:12px;width:100%;min-height:54px;padding:6px 8px;border:0;border-radius:12px;background:transparent;color:var(--ink);font:inherit;text-align:left;cursor:pointer}
+.pc-mrow:hover{background:var(--dc-raised,var(--paper))}
+.pc-mrow .ic{flex:none;display:grid;place-items:center;width:32px;height:32px;border-radius:10px;background:var(--dc-raised,var(--paper));color:var(--ink-2)}
+.pc-mrow:hover .ic{background:var(--sheet)}
+.pc-mrow .t{flex:1 1 auto;min-width:0;display:flex;flex-direction:column;gap:2px}
+.pc-mrow .t b{font-size:14px;font-weight:600;line-height:1.25}
+.pc-mrow .t span{font-size:12px;color:var(--ink-2);line-height:1.3;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pc-mrow .chev{flex:none;color:var(--ink-3)}
+#pcPane[hidden],#pcList[hidden]{display:none}
+.pc-back{display:inline-flex;align-items:center;gap:4px;margin:0 0 12px -6px;padding:6px 10px 6px 6px;border:0;border-radius:999px;background:none;color:var(--plum);font:600 13px/1 var(--sans);cursor:pointer}
+.pc-back:hover{background:var(--plum-soft)}
+.pc-pane-body .dc-modal-h{font-family:var(--serif);font-size:20px;font-weight:600;letter-spacing:-.01em}
+.pc-pane-body input[type=text],.pc-pane-body select{width:100%;box-sizing:border-box}
+.pc-note{margin:0 0 12px;font-size:13px;line-height:1.5;color:var(--ink-2)}
+.pc-pane-body .hint{font-size:12.5px;line-height:1.5;color:var(--ink-2)}
+.pc-acts{display:flex;flex-wrap:wrap;gap:8px;margin:4px 0 4px}
+.pc-acts .dc-modal-cancel{margin-top:0}
+.pc-seo{display:flex;flex-direction:column;gap:6px}
+.pc-seo .pc-mrow .t span{white-space:normal;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
 /* the saved whisper: a green dot and three words */
 .dc-saved{display:inline-flex;align-items:center;gap:6px;font-size:12.5px;font-weight:500;color:var(--ink-2);white-space:nowrap;padding:0 6px}
 .dc-saved::before{content:"";width:8px;height:8px;border-radius:50%;background:var(--sage);flex:none}
@@ -436,7 +482,7 @@ html.dc-edit:not(.plan-watch) .dc-twbar[hidden]{display:none}
 html.dc-edit:not(.plan-watch) .dc-slideover .dc-panel-head{align-items:flex-start;padding:18px 16px 10px 20px;border-bottom:0}
 html.dc-edit:not(.plan-watch) .dc-slideover .dc-panel-tt{display:flex;flex-direction:column;gap:2px;min-width:0}
 html.dc-edit:not(.plan-watch) .dc-slideover .dc-panel-t{font-size:22px;font-weight:600;line-height:1.15;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-html.dc-edit:not(.plan-watch) .dc-slideover .dc-panel-sub{display:block;font-size:12.5px;color:var(--ink-2);line-height:1.3}
+html.dc-edit:not(.plan-watch) .dc-slideover .dc-panel-sub{display:block;font-size:12.5px;color:var(--ink-2);line-height:1.3;text-wrap:pretty}
 .dc-panel-sub{display:none}
 .dc-panel-sub[hidden]{display:none !important}
 html.dc-edit:not(.plan-watch) .dc-close{height:36px;padding:0 14px;font-size:13px;flex:none}
@@ -607,10 +653,27 @@ html.dc-edit:not(.plan-watch) .ritualwrap.as-card .ritual{max-width:none;margin:
 .ritualwrap.as-card #ritActions a{margin-top:14px !important}
 .ritualwrap.as-card .pipe{margin-top:14px}
 @media(max-width:760px){
-  /* a phone's sheets keep their last rows above the dock, which floats over their bottom edge */
-  html.dc-edit:not(.plan-watch) .dc-slideover{padding-bottom:calc(80px + env(safe-area-inset-bottom,0px))}
-  html.dc-edit:not(.plan-watch) .ritualwrap.as-card .ritual{padding-bottom:calc(96px + env(safe-area-inset-bottom,0px))}
-  html.dc-edit:not(.plan-watch) .ritualwrap.as-card{top:auto;left:0;right:0;bottom:0;width:100%;max-width:100%;height:86vh;border-radius:var(--dds-r-xl,20px) var(--dds-r-xl,20px) 0 0;box-shadow:0 -8px 44px color-mix(in srgb,var(--scrim-ink) 30%,transparent)}
+  /* a phone's cards float between the bar and the dock (Figma 65:382): they end above the dock
+     instead of running under it, so their last rows are never covered. --dc-sheet-b is the
+     dock's bottom gap, its 64px and 8px of air; --dc-sheet-room is all the height there is. */
+  html.dc-edit:not(.plan-watch){--dc-sheet-b:calc(84px + env(safe-area-inset-bottom,0px));--dc-sheet-room:calc(100vh - var(--dc-bar-top) - var(--dc-bar-h) - 8px - var(--dc-sheet-b))}
+  @supports (height:100dvh){html.dc-edit:not(.plan-watch){--dc-sheet-room:calc(100dvh - var(--dc-bar-top) - var(--dc-bar-h) - 8px - var(--dc-sheet-b))}}
+  html.dc-edit:not(.plan-watch) .ritualwrap.as-card{top:auto;left:8px;right:8px;bottom:var(--dc-sheet-b);width:auto;max-width:none;height:min(80vh,var(--dc-sheet-room));border-radius:var(--dds-r-xl,20px);box-shadow:0 -4px 40px color-mix(in srgb,var(--scrim-ink) 26%,transparent)}
+  /* Add a section: the purpose chips are one row that scrolls sideways, so the tiles start higher */
+  html.dc-edit:not(.plan-watch) .tray-chips{flex-wrap:nowrap;overflow-x:auto;margin-right:-20px;padding-right:20px;scrollbar-width:none}
+  html.dc-edit:not(.plan-watch) .tray-chips::-webkit-scrollbar{display:none}
+  html.dc-edit:not(.plan-watch) .tray-chip{flex:none}
+  /* Photos: a narrow tile keeps its pencil at the top and "On your site" at the bottom, never one on the other */
+  html.dc-edit:not(.plan-watch) #panelFilesGrid .mcell .badge{top:auto;bottom:6px}
+}
+/* a tablet or a small laptop: a card on the left takes the dock's place while it is open, so
+   Add covers a third of the page instead of half. Done puts the dock back. */
+@media(min-width:761px) and (max-width:1180px){
+  html.dc-edit:not(.plan-watch) .dc-left{width:300px}
+  html.dc-edit:not(.plan-watch) #pagesCard,html.dc-edit:not(.plan-watch) #trayPanel:not([data-tab="contents"]){left:16px}
+  html.dc-edit:not(.plan-watch) .dc-dock{transition:opacity var(--dur,200ms) var(--ease,ease-out),visibility 0s}
+  html.dc-edit.dc-lefton:not(.plan-watch) .dc-dock{opacity:0;visibility:hidden;transition:opacity var(--dur,200ms) var(--ease,ease-out),visibility 0s linear var(--dur,200ms)}
+  html.dc-edit:not(.plan-watch) .pc-row .ic{display:none}
 }
 /* pill rows (pillRow) inside the inspector read as chips */
 #settingsPanel[data-mode="section"] #blocksCard .ins-pane>div>div>button{border-width:1px !important}
@@ -641,10 +704,6 @@ html.dc-edit:not(.plan-watch) .dds-hint{bottom:88px !important;z-index:80 !impor
   html.dc-edit:not(.plan-watch) .dc-pages{flex:1 1 auto;min-width:0}
   html.dc-edit:not(.plan-watch) .dc-switch{max-width:100%;height:36px;padding:0 8px 0 10px;gap:6px}
   html.dc-edit:not(.plan-watch) .dc-bar .pillbtn{padding:0 12px}
-  html.dc-edit:not(.plan-watch) .dc-pagescard{position:fixed;top:auto;left:0;right:0;bottom:0;width:100%;max-width:100%;max-height:78vh;border-radius:var(--dds-r-xl,20px) var(--dds-r-xl,20px) 0 0;padding:10px 10px calc(14px + env(safe-area-inset-bottom,0px))}
-  html.dc-edit:not(.plan-watch) .dc-pagescard .page-pill{height:44px;font-size:14px}
-  html.dc-edit:not(.plan-watch) .dc-pagescard .page-add{height:44px}
-  html.dc-edit:not(.plan-watch) .dc-rowbtn{min-height:44px}
   .dc-dock{top:auto;left:12px;right:12px;bottom:calc(12px + env(safe-area-inset-bottom,0px));transform:none;flex-direction:row;justify-content:space-around;border-radius:999px;padding:6px}
   .dc-dk{flex:1 1 0;width:auto;min-width:0;height:50px;border-radius:999px}
   .dc-dk-phone{display:flex}
@@ -652,8 +711,14 @@ html.dc-edit:not(.plan-watch) .dds-hint{bottom:88px !important;z-index:80 !impor
   .dc-dock.more-open .dc-dock-more{display:flex}
   .dc-dock-more .dc-dk{flex:none;width:auto;height:44px;flex-direction:row;justify-content:flex-start;gap:12px;padding:0 12px;border-radius:var(--dds-r,12px);font-size:13px;font-weight:500}
   .dc-dock-more .dc-dk svg{width:18px;height:18px}
-  html.dc-edit:not(.plan-watch) .dc-slideover{top:auto;left:0;right:0;bottom:0;width:100%;max-width:100%;height:78vh;border-radius:var(--dds-r-xl,20px) var(--dds-r-xl,20px) 0 0;box-shadow:0 -8px 44px color-mix(in srgb,var(--scrim-ink) 30%,transparent);opacity:1;transform:translateY(103%);transition:transform var(--dur,200ms) var(--ease,ease-out),visibility 0s linear var(--dur,200ms)}
+  html.dc-edit:not(.plan-watch) .dc-slideover{top:auto;left:8px;right:8px;bottom:var(--dc-sheet-b);width:auto;max-width:none;height:min(74vh,var(--dc-sheet-room));border-radius:var(--dds-r-xl,20px);box-shadow:0 -4px 40px color-mix(in srgb,var(--scrim-ink) 26%,transparent);opacity:1;transform:translateY(calc(100% + var(--dc-sheet-b)));transition:transform var(--dur,200ms) var(--ease,ease-out),visibility 0s linear var(--dur,200ms)}
   html.dc-edit:not(.plan-watch) .dc-slideover.on{transform:translateY(0);transition:transform var(--dur,200ms) var(--ease,ease-out),visibility 0s}
+  /* one section's card is half a screen, so the section it edits stays in view above it */
+  html.dc-edit:not(.plan-watch) #settingsPanel[data-mode="section"]{height:min(56vh,var(--dc-sheet-room))}
+  html.dc-edit:not(.plan-watch) #pcBody{padding:0 16px 16px}
+  html.dc-edit:not(.plan-watch) .pc-row .ic{display:none}
+  html.dc-edit:not(.plan-watch) .pc-row .pg-grab{width:30px;height:44px}
+  html.dc-edit:not(.plan-watch) .pc-ico{width:40px;height:44px;border-radius:12px}
   html.dc-edit:not(.plan-watch) .dc-twbar{left:10px;right:10px;width:auto;max-width:none;border-radius:var(--dds-r-xl,20px)}
 }
 /* a watch plan observes: no building tools, no publish queue */
@@ -1049,16 +1114,7 @@ html.dds-has-shell.dds-has-ctxbar .stage{top:calc(var(--dds-shell-h) + var(--dds
 .dc-actbtn{font:inherit;font-size:13px;font-weight:500;padding:0 var(--dds-s3,12px);height:32px;border-radius:999px;border:1px solid var(--line,#ddd);background:var(--sheet,#fff);color:var(--ink,#1b1525);cursor:pointer;display:inline-flex;align-items:center;gap:6px}
 .dc-actbtn:hover{border-color:var(--plum,#5b3fa0)}
 .dc-actbtn:disabled{opacity:.4;cursor:default;border-color:var(--line,#ddd)}
-/* Multi-page: the pages list inside the page switcher's card — click a page to author it */
-.pages-bar{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
-.page-pill{display:inline-flex;align-items:center;gap:var(--dds-s2,8px);font:inherit;font-size:13px;font-weight:500;padding:0 var(--dds-s3,12px);height:30px;border-radius:999px;border:1px solid var(--line,#ddd);background:var(--sheet,#fff);color:var(--ink-2,#8a8172);cursor:pointer}
-.page-pill:hover{border-color:var(--plum,#5b3fa0)}
-.page-pill.on{background:var(--wash,#f0eafb);color:var(--plum,#5b3fa0);border-color:var(--plum,#5b3fa0)}
-.page-pill .pp-menu{opacity:.75;font-weight:700;line-height:1;padding:0 var(--dds-s1,4px);border-radius:var(--dds-r-sm,6px)}
-.page-pill .pp-menu:hover{opacity:1;background:rgba(120,120,120,.18)}
-.page-pill.on .pp-menu:hover{background:rgba(91,63,160,.14)}
-.page-add{font:inherit;font-size:13px;font-weight:500;padding:0 var(--dds-s3,12px);height:30px;border-radius:999px;border:1px dashed var(--plum,#5b3fa0);background:transparent;color:var(--plum,#5b3fa0);cursor:pointer}
-.page-add:hover{background:var(--wash,#f4f0fb)}
+/* the page menus (⋯ on a page in the Pages card, and Page ▾) */
 .pp-pop-item{font:inherit;font-size:13px;text-align:left;padding:var(--dds-s2,8px) var(--dds-s3,12px);border:none;background:none;cursor:pointer;border-radius:var(--dds-r,8px);color:var(--ink,#1b1525)}
 .pp-pop-item:hover{background:var(--wash,#f4f0fb)}
 .pp-pop-item.danger{color:var(--clay,#c0392b)}
@@ -1073,7 +1129,6 @@ html.dds-has-shell.dds-has-ctxbar .stage{top:calc(var(--dds-shell-h) + var(--dds
 .pi-pop.sheet{top:auto;left:0;right:0;bottom:0;width:100%;max-width:100%;border-radius:var(--dds-r-xl,14px) var(--dds-r-xl,14px) 0 0;border:none;box-shadow:0 -8px 44px color-mix(in srgb,var(--scrim-ink) 30%,transparent);padding:10px 10px calc(14px + env(safe-area-inset-bottom,0px));max-height:82vh}
 .pi-pop.sheet .pp-pop-item{padding:var(--dds-s3,12px) var(--dds-s4,16px);font-size:14px}
 .pi-pop.sheet .pi-grp .pp-pop-item{padding-left:var(--dds-s7,32px)}
-.page-pill.hidden-nav .pp-name{opacity:.6}
 /* new-page layout wizard (AEM Create Page) */
 .dc-modal-scrim{position:fixed;inset:0;z-index:400;background:color-mix(in srgb,var(--scrim-ink) 44%,transparent);display:flex;align-items:center;justify-content:center;padding:var(--dds-s5,20px)}
 .dc-modal{background:var(--sheet,#fff);border-radius:var(--dds-r-xl,14px);max-width:600px;width:100%;max-height:86vh;overflow:auto;padding:var(--dds-s6,24px);box-shadow:0 24px 60px rgba(0,0,0,.3)}
@@ -1646,25 +1701,15 @@ body.pd-dragging *{cursor:grabbing !important}
         <div class="dc-bar" role="toolbar" aria-label="Editor">
           <button type="button" class="dc-actbtn dc-ghost" id="btnEditExit" title="Leave Edit mode. Everything is saved."><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19 12H5"/><path d="M11 18l-6-6 6-6"/></svg><span class="dc-lbl">Exit</span></button>
           <span class="dc-sep" aria-hidden="true"></span>
-          <!-- the page switcher: the page being edited, how many there are, and a card with
-               all of them (the old pages tabs, ＋ Page, the Page menu and the menu editor) -->
+          <!-- the page switcher: the page being edited and how many there are. It opens the
+               Pages card (#pagesCard, beside the dock) -->
           <div class="dc-pages">
-            <button type="button" class="dc-switch" id="dcPageSwitch" aria-haspopup="dialog" aria-expanded="false" aria-controls="pagesCard" title="Your pages: switch, add one, or open this page’s menu">
+            <button type="button" class="dc-switch" id="dcPageSwitch" aria-haspopup="dialog" aria-expanded="false" aria-controls="pagesCard" title="Your pages: switch, add one, change the menu">
               <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3h8l5 5v13H6z"/><path d="M14 3v5h5"/></svg>
               <span class="dc-switch-name" id="dcPageName">Home</span>
               <span class="dc-chip" id="dcPageCount">1 page</span>
               <svg class="dc-switch-chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
             </button>
-            <div id="pagesCard" class="dc-card dc-pagescard" role="dialog" aria-label="Pages" aria-hidden="true" hidden>
-              <div class="dc-card-h"><span class="dc-card-t">Pages</span><button type="button" class="dc-close" id="btnPagesClose" aria-label="Close">✕</button></div>
-              <div id="pagesBar" class="pages-bar" role="tablist" aria-label="Website pages"></div>
-              <div class="dc-pagescard-acts">
-                <!-- Slice B (AC-5): the Page Information menu — one place for everything
-                     about this page/site. Every entry deep-links to existing machinery. -->
-                <button type="button" class="dc-rowbtn" id="btnPageInfo" title="Everything about this page — publish, share a draft, properties, search appearance" aria-haspopup="menu" aria-expanded="false"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 11v5"/><path d="M12 8h.01"/></svg>This page<span class="dc-rowbtn-sub">Publish, share a draft, properties, search</span></button>
-                <button type="button" class="dc-rowbtn" id="btnNavEdit" title="Your pages and the top menu"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h10"/></svg>Menu and page settings</button>
-              </div>
-            </div>
           </div>
           <button type="button" class="dc-actbtn dc-ghost dc-icon" id="btnUndo" title="Undo (Ctrl/⌘+Z)" aria-label="Undo" disabled><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 14L4 9l5-5"/><path d="M4 9h10a6 6 0 0 1 0 12h-3"/></svg><span class="dc-lbl">Undo</span></button>
           <button type="button" class="dc-actbtn dc-ghost dc-icon" id="btnRedo" title="Redo (Ctrl/⌘+Shift+Z)" aria-label="Redo" disabled><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 14l5-5-5-5"/><path d="M20 9H10a6 6 0 0 0 0 12h3"/></svg><span class="dc-lbl">Redo</span></button>
@@ -1729,6 +1774,37 @@ body.pd-dragging *{cursor:grabbing !important}
               <div class="hint" style="margin-top:8px">✓ Your website adapts to phones automatically — every section stays readable and in the right order on any screen. A live proof of your draft; drag the frame’s bottom-right corner to make it taller.</div>
             </div>
           </div>
+          <!-- the Pages card (the floating studio, part three; Figma 66:339): every page in the
+               order of the site's menu, dragged to reorder, each with what is waiting on it and a
+               gear that opens its settings here. The rows, the drag and every save are the Pages
+               tab's own (pgModel, pgMove, pgOpenSettings), so "Menu and page settings" no longer
+               leaves Edit mode. Below them: the header and footer, the not-found page, and how
+               each page shows on Google. -->
+          <aside id="pagesCard" class="dc-slideover dc-left dc-pagescard" role="dialog" aria-modal="false" aria-labelledby="pagesTitle" aria-hidden="true">
+            <div class="dc-panel-head"><div class="dc-panel-tt"><span class="dc-panel-t" id="pagesTitle">Pages</span><span class="dc-panel-sub" id="pagesSub"></span></div><button type="button" class="pc-add page-add" id="btnPageAdd" title="Add a new page to your website">＋ Add page</button><button type="button" class="dc-close" id="btnPagesClose" aria-label="Done">Done</button></div>
+            <div class="dc-panel-scroll" id="pcBody">
+              <div id="pcList">
+                <div class="tray-searchwrap pc-findwrap"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg><input type="search" id="pcFind" class="pc-find" placeholder="Find a page" aria-label="Find a page" autocomplete="off"></div>
+                <div id="pagesBar" class="pc-lists">
+                  <div class="pc-h"><span id="pcMenuH">Main menu · drag to reorder</span><button type="button" class="pc-link" id="btnPcLink" title="Add a link to another website, an email address or a phone number">＋ Link</button></div>
+                  <div class="pc-list" id="pcMenu" role="list" aria-labelledby="pcMenuH"></div>
+                  <div class="pc-h" id="pcOffH">Not in the menu</div>
+                  <div class="pc-list pc-drop" id="pcOff" role="list" aria-labelledby="pcOffH"></div>
+                  <button type="button" class="pc-quiet" id="btnPcAuto" hidden>Use the automatic menu again</button>
+                </div>
+                <p class="pc-none" id="pcNone" role="status" hidden></p>
+                <div class="pc-more">
+                  <button type="button" class="pc-mrow" id="pcHeadFoot"><span class="ic"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h10"/></svg></span><span class="t"><b>Header and footer</b><span>On every page</span></span><svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></button>
+                  <button type="button" class="pc-mrow" id="pcNotFound"><span class="ic"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 5h18l-7 8v6l-4-2v-4z"/></svg></span><span class="t"><b>Not found page</b><span>Sends visitors back to Home</span></span><svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></button>
+                  <button type="button" class="pc-mrow" id="pcSearchLook"><span class="ic"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg></span><span class="t"><b>Search appearance</b><span>Titles and descriptions</span></span><svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></button>
+                  <!-- Slice B (AC-5): the Page Information menu — one place for everything
+                       about this page/site. Every entry deep-links to existing machinery. -->
+                  <button type="button" class="pc-mrow" id="btnPageInfo" title="Everything about this page — publish, share a draft, properties, search appearance" aria-haspopup="menu" aria-expanded="false"><span class="ic"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 11v5"/><path d="M12 8h.01"/></svg></span><span class="t"><b>This page</b><span>Publish, share a draft, take offline</span></span><svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></button>
+                </div>
+              </div>
+              <div id="pcPane" hidden><button type="button" class="pc-back" id="pcBack"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg>All pages</button><div class="pc-pane-body pg-settings"></div></div>
+            </div>
+          </aside>
           <!-- on-demand three-tab side panel (left slide-over, no scrim so the canvas
                stays a drop target). Slice C (AC-1/AC-2): Blocks (the add-section
                catalog, #designTray) · Files (NEW — a compact asset browser) · Content
@@ -4762,6 +4838,7 @@ function hbOpenPage(pg) {
 // A row is named by { href, parent }, never held across a wait, since the lists are rebuilt
 // from the saved settings once any pending edit has landed.
 const PG_NAV_MAX = 12, PG_KIDS_MAX = 8;
+async function pgResetNav() { if (await askYes("Remove your custom menu and let the site build it automatically from your pages?", { ok: "Use the automatic menu", danger: true })) { await dcSaveNav(null); renderPagesBar(); } }
 function pgHasCustomNav() { return Array.isArray(S.settings && S.settings.nav) && S.settings.nav.length > 0; }
 function pgAutoNav() {
   const v = (typeof VOCAB === "object" && VOCAB) || {};
@@ -4832,7 +4909,7 @@ async function pgWriteMenu(nav, okMsg, focusRef) {
   } catch (err) { toast(nice(err), true); renderPagesList(); return false; }
 }
 function pgFocusGrab(ref) {
-  const row = [...document.querySelectorAll("#view-pages .pg-row")].find((r) => r.dataset.href === ref.href && (r.dataset.parent || null) === (ref.parent || null));
+  const row = [...document.querySelectorAll(PAGES_OPEN ? "#pagesCard .pc-row" : "#view-pages .pg-row")].find((r) => r.dataset.href === ref.href && (r.dataset.parent || null) === (ref.parent || null));
   const g = row && row.querySelector(".pg-grab"); if (g) g.focus();
 }
 // One menu decision at a time: each reads the menu the last one left, so two quick presses
@@ -4897,8 +4974,8 @@ function pgRow(entry, ctx) {
   acts.appendChild(gear); row.appendChild(acts);
   return row;
 }
+// The Pages tab's two lists, and the same model drawn into the editor's Pages card.
 function renderPagesList() {
-  const list = $("pagesList"), off = $("pagesUnlinked"); if (!list || !off) return;
   if (PG_DRAG) { PG_DRAG.stale = true; return; }   // a refresh waits for the drop, so it can't pull the row out of someone's hand
   const ctx = {
     live: !!(S.health && S.health.facts && S.health.facts.website.state !== "none"),
@@ -4906,11 +4983,113 @@ function renderPagesList() {
     firstPublish: !!(S.changes && S.changes.first_publish),
   };
   const m = pgModel();
+  renderPagesCard(m, ctx);
+  const list = $("pagesList"), off = $("pagesUnlinked"); if (!list || !off) return;
   list.innerHTML = ""; off.innerHTML = "";
   m.menu.forEach((e) => list.appendChild(pgRow(e, ctx)));
   m.unlinked.forEach((pg) => off.appendChild(pgRow({ it: null, pg, parent: null }, ctx)));
   if (!m.unlinked.length) off.appendChild(el("div", "pg-empty", "Drag a page here to take it off the menu. It stays live on your site."));
   const auto = $("btnNavAuto"); if (auto) auto.hidden = !pgHasCustomNav();
+}
+// ── the editor's Pages card (the floating studio, part three) ──
+// The rows above, drawn again inside Edit mode with the same model and the same writes. A page
+// drawn on the canvas (Home and the owner's own pages) is a .page-pill: a press opens it here.
+// The template's own pages and the menu's links open their settings, since their words live
+// on other tabs.
+function pcChangeOn(ch, pg) {
+  if (pg.sections.indexOf(ch.section) >= 0) return true;
+  // what changed in a page's sections is told per page (lib/diff.ts blockDelta): "… on your home page." or "… on “Title”."
+  const s = String(ch.sentence || "");
+  if (pg.key === "home") return / on your home page\.$/.test(s);
+  if (!pg.slug) return false;
+  const t = String(pg.title || ""), q = "“" + (t.length > 48 ? t.slice(0, 47) + "…" : t) + "”";
+  return s.slice(-(q.length + 5)) === " on " + q + ".";
+}
+function pcChip(pg, ctx) {
+  const chip = el("span", "hb-chip"); chip.appendChild(el("i", "d"));
+  const tp = hbTreePage(pg);
+  if (tp && HB_TREE_FLAG[tp.status]) { chip.classList.add(HB_TREE_FLAG[tp.status]); chip.appendChild(document.createTextNode(tp.status_label)); return chip; }
+  if (!ctx.siteLive || ctx.firstPublish) { chip.appendChild(document.createTextNode("Not live yet")); chip.title = "Your site goes live the first time you publish"; return chip; }
+  const n = ctx.changes.filter((ch) => pcChangeOn(ch, pg)).length;
+  if (!n) return null;   // live and nothing waiting: nothing to say
+  chip.classList.add("warn"); chip.appendChild(document.createTextNode(n + (n === 1 ? " change" : " changes")));
+  chip.title = n + (n === 1 ? " change is" : " changes are") + " waiting to go live";
+  return chip;
+}
+function pcRow(entry, ctx) {
+  const pg = entry.pg, it = entry.it;
+  const ref = { href: it ? it.href : pg.path, parent: entry.parent ? entry.parent.href : null };
+  const canvas = !!pg && pg.view === "design", slug = canvas ? (pg.slug || "") : null, on = canvas && slug === DC_PAGE;
+  const name = canvas ? pg.title : it ? it.label : pg.title;   // a page on the canvas goes by its own name, as the old tabs did
+  const row = el("div", "pc-row" + (canvas ? " page-pill" : "") + (on ? " on" : "") + (entry.parent ? " child" : ""));
+  row.setAttribute("role", "listitem"); row.dataset.href = ref.href; row.dataset.page = pg ? pg.key : "link";
+  if (ref.parent) row.dataset.parent = ref.parent;
+  const own = slug ? dcPageObj(slug) : null; if (own && own.hideNav) row.dataset.nav = "hidden";
+  const grab = el("button", "pg-grab"); grab.type = "button"; grab.innerHTML = PG_GRIP; grab.title = "Drag to move";
+  grab.setAttribute("aria-label", "Move " + name + ". Use the up and down arrow keys.");
+  grab.addEventListener("pointerdown", (e) => pgDragStart(e, row, ref, !pg || (it && (it.children || []).length > 0)));
+  grab.addEventListener("keydown", (e) => { if (e.key === "ArrowUp" || e.key === "ArrowDown") { e.preventDefault(); pgNudge(ref, e.key === "ArrowUp" ? -1 : 1); } });
+  row.appendChild(grab);
+  const ic = el("span", "ic"); ic.innerHTML = pg ? (HB_ICON[pg.icon] || HB_ICON.page) : PG_LINK; row.appendChild(ic);
+  const open = el("button", "pc-open"); open.type = "button";
+  open.appendChild(el("span", "pp-name", name));
+  const sub = on ? "Editing now" : !pg ? it.href : canvas && it && it.label !== pg.title ? "In the menu as “" + it.label + "”" : pg.sum;
+  open.appendChild(el("span", "pc-sub", sub));
+  if (on) open.setAttribute("aria-current", "page");
+  open.title = canvas ? "Edit this page" : pg ? "This page’s settings" : "This link’s settings";
+  row.appendChild(open);
+  const chip = pg ? pcChip(pg, ctx) : null; if (chip) row.appendChild(chip);
+  const gear = el("button", "pc-ico pg-gear"); gear.type = "button"; gear.innerHTML = PG_GEAR; gear.title = "Settings"; gear.setAttribute("aria-label", "Settings for " + name);
+  row.appendChild(gear);
+  if (canvas) {
+    const mn = el("button", "pc-ico pp-menu", "⋯"); mn.type = "button"; mn.setAttribute("aria-label", "More for " + name);
+    mn.title = slug ? "Rename, duplicate, clear or delete this page" : "Duplicate or clear this page";
+    mn.addEventListener("click", () => dcPageMenu(slug, mn));
+    row.appendChild(mn);
+  }
+  // the whole row is the target, as the old tab was: a press anywhere but its own buttons opens it
+  row.addEventListener("click", (e) => {
+    if (e.target.closest(".pg-grab,.pp-menu")) return;
+    if (e.target.closest(".pg-gear") || !canvas) { if (pg) pgOpenSettings(ref); else pgOpenLink(ref); return; }
+    closePagesCard(false); dcSwitchPage(slug);
+  });
+  return row;
+}
+function renderPagesCard(m, ctx) {
+  const menu = $("pcMenu"), off = $("pcOff"); if (!menu || !off) return;
+  const c = { ...ctx, siteLive: ctx.live || !!siteLiveUrl() };
+  menu.textContent = ""; off.textContent = "";
+  // One row per place in the menu, and one .page-pill per page: an automatic menu can name an
+  // address twice (an own page on a built-in address), and both name the same entry.
+  const seen = new Set(), tabs = new Set();
+  const add = (host, e) => {
+    const k = (e.it ? e.it.href : e.pg.path) + "|" + (e.parent ? e.parent.href : ""); if (seen.has(k)) return; seen.add(k);
+    const r = pcRow(e, c);
+    if (r.classList.contains("page-pill")) { if (tabs.has(e.pg.key)) r.classList.remove("page-pill", "on"); tabs.add(e.pg.key); }
+    host.appendChild(r);
+  };
+  m.menu.forEach((e) => add(menu, e));
+  const opens = new Map(); m.unlinked.forEach((pg) => opens.set(pg.path, pg));   // the page an address opens is the last named (pgModel's byHref)
+  m.unlinked.forEach((pg) => { if (opens.get(pg.path) === pg) add(off, { it: null, pg, parent: null }); });
+  if (!m.unlinked.length) off.appendChild(el("div", "pc-empty", "Drag a page here to take it off the menu. It stays live.")).setAttribute("role", "listitem");
+  const auto = $("btnPcAuto"); if (auto) auto.hidden = !pgHasCustomNav();
+  const n = hbPageRows().length, links = m.menu.filter((e) => !e.pg).length;
+  const sub = $("pagesSub"); if (sub) { sub.textContent = n + " pages" + (links ? " · " + links + (links === 1 ? " link" : " links") : ""); sub.hidden = false; }
+  pcFilter();
+}
+// Find a page: rows whose name has the words stay; a heading with none under it goes
+function pcFilter() {
+  const f = $("pcFind"), q = f ? f.value.trim().toLowerCase() : "";
+  let shown = 0;
+  [["pcMenu", null], ["pcOff", "pcOffH"]].forEach(([id, h]) => {
+    const host = $(id); if (!host) return;
+    let here = 0;
+    host.querySelectorAll(".pc-row").forEach((r) => { const hit = !q || r.querySelector(".pp-name").textContent.toLowerCase().indexOf(q) >= 0; r.hidden = !hit; if (hit) here++; });
+    const empty = host.querySelector(".pc-empty"); if (empty) empty.hidden = !!q;
+    if (h && $(h)) { $(h).hidden = !!q && !here; host.hidden = !!q && !here; }
+    shown += here;
+  });
+  const none = $("pcNone"); if (none) { none.hidden = !q || shown > 0; none.textContent = q && !shown ? "No page has “" + f.value.trim() + "” in its name." : ""; }
 }
 // Dragging is pointer events on the handle, so a finger works the same as a mouse. The
 // row follows the pointer; a line shows where it will land; nothing is written until the drop.
@@ -4922,7 +5101,11 @@ function pgDragStart(e, row, ref, menuOnly) {
   for (let n = row.nextElementSibling; n && !row.classList.contains("child") && n.classList.contains("child"); n = n.nextElementSibling) group.push(n);
   const h = e.currentTarget;
   try { h.setPointerCapture(e.pointerId); } catch (_) {}
-  const d = PG_DRAG = { ref, row, group, h, menuOnly, y0: e.clientY, moved: false, zone: "menu", next: null, line: el("div", "pg-dropline") };
+  // the Pages tab's lists, or the same rows in the editor's Pages card (which scrolls on its own)
+  const where = row.closest("#pagesCard")
+    ? { menu: "pcMenu", off: "pcOff", edge: () => $("pcOffH"), rows: ".pc-row", scroller: $("pcBody") }
+    : { menu: "pagesList", off: "pagesUnlinked", edge: () => $("pagesOffSec").querySelector(".hb-sec-h"), rows: ".pg-row", scroller: null };
+  const d = PG_DRAG = { ref, row, group, h, menuOnly, where, y0: e.clientY, top0: where.scroller ? where.scroller.scrollTop : 0, moved: false, zone: "menu", next: null, line: el("div", "pg-dropline") };
   d.onMove = (ev) => pgDragMove(ev);
   d.onUp = () => pgDragEnd(null, false);
   d.onCancel = () => pgDragEnd(null, true);
@@ -4934,17 +5117,19 @@ function pgDragStart(e, row, ref, menuOnly) {
 }
 function pgDragMove(e) {
   const d = PG_DRAG; if (!d) return;
-  const dy = e.clientY - d.y0;
+  const W = d.where, sc = W.scroller;
+  const dy = e.clientY - d.y0 + (sc ? sc.scrollTop - d.top0 : 0);
   if (!d.moved && Math.abs(dy) < 4) return;
   if (!d.moved) { d.moved = true; document.body.classList.add("pd-dragging"); d.group.forEach((r) => r.classList.add("pg-dragging")); }
   d.group.forEach((r) => { r.style.transform = "translateY(" + dy + "px)"; });
-  const offSec = $("pagesOffSec"), offH = offSec.querySelector(".hb-sec-h");
-  const zone = !d.menuOnly && e.clientY >= offH.getBoundingClientRect().top ? "off" : "menu";
-  const host = $(zone === "off" ? "pagesUnlinked" : "pagesList");
-  const next = [...host.querySelectorAll(".pg-row")].filter((r) => d.group.indexOf(r) < 0).find((r) => { const b = r.getBoundingClientRect(); return e.clientY < b.top + b.height / 2; }) || null;
+  const zone = !d.menuOnly && e.clientY >= W.edge().getBoundingClientRect().top ? "off" : "menu";
+  const host = $(zone === "off" ? W.off : W.menu);
+  const next = [...host.querySelectorAll(W.rows)].filter((r) => d.group.indexOf(r) < 0 && !r.hidden).find((r) => { const b = r.getBoundingClientRect(); return e.clientY < b.top + b.height / 2; }) || null;
   d.zone = zone; d.next = next;
   host.insertBefore(d.line, next);
-  if (e.clientY < 60) window.scrollBy(0, -12); else if (e.clientY > innerHeight - 60) window.scrollBy(0, 12);
+  $(W.off).classList.toggle("pc-over", zone === "off" && !!sc);
+  if (sc) { const b = sc.getBoundingClientRect(); if (e.clientY < b.top + 40) sc.scrollTop -= 10; else if (e.clientY > b.bottom - 40) sc.scrollTop += 10; }
+  else if (e.clientY < 60) window.scrollBy(0, -12); else if (e.clientY > innerHeight - 60) window.scrollBy(0, 12);
 }
 function pgDragEnd(_, cancel) {
   const d = PG_DRAG; if (!d) return;
@@ -4955,7 +5140,7 @@ function pgDragEnd(_, cancel) {
   document.removeEventListener("keydown", d.onKey, true);
   document.body.classList.remove("pd-dragging");
   d.group.forEach((r) => { r.classList.remove("pg-dragging"); r.style.transform = ""; });
-  d.line.remove();
+  d.line.remove(); $(d.where.off).classList.remove("pc-over");
   if (cancel || !d.moved) { if (d.stale) renderPagesList(); return; }
   const beforeRef = d.zone === "menu" && d.next ? { href: d.next.dataset.href, parent: d.next.dataset.parent || null } : null;
   pgMove(d.ref, d.zone, beforeRef);
@@ -5048,9 +5233,12 @@ async function pgSetInMenuNow(ref, on) {
   (item.children || []).forEach((k) => m.nav.push(k));
   await pgWriteMenu(m.nav, "Off the menu. It stays live on your site. Publish to apply.");
 }
+// Where a page's or a link's settings open: inside the Pages card while it's open, else over the page.
+function pgHost(id, title) { return PAGES_OPEN ? pcPane(id, title) : pgModal(id, title); }
 function pgOpenSettings(startRef) {
   const start = pgEntry(pgModel(), startRef); if (!start || !start.pg) return;
-  const { box, close } = pgModal("pageSettings", (start.pg.title || "Page") + " settings");
+  const inCard = PAGES_OPEN;
+  const { box, close } = pgHost("pageSettings", (start.pg.title || "Page") + " settings");
   let ref = { href: startRef.href, parent: startRef.parent || null };
   const paint = () => {
     const m = pgModel(), e = pgEntry(m, ref); if (!e || !e.pg) { close(); return; }
@@ -5088,9 +5276,17 @@ function pgOpenSettings(startRef) {
         box.appendChild(pgField("Show under", under, "Pick a menu item to make this a link in its dropdown."));
       }
     }
+    if (inCard && pg.view !== "design") {   // the template's own page: its words are kept on another tab
+      box.appendChild(el("h4", "pg-h", "What’s on it"));
+      const from = { business: "your business details", offerings: "the items on your " + (VOCAB.label || "Menu") + " tab", faqs: "your questions and answers", updates: "your updates" }[pg.view] || "your details";
+      box.appendChild(el("p", "pc-note", "This page is built from " + from + ", so its words are changed there."));
+      const go2 = el("button", "dc-modal-cancel", "Change what’s on it"); go2.type = "button"; go2.addEventListener("click", () => pcLeaveTo(pg.view));
+      const acts = el("div", "pc-acts"); acts.appendChild(go2); box.appendChild(acts);
+    }
     box.appendChild(el("h4", "pg-h", "On Google"));
     if (pg.key === "home") {
       box.appendChild(el("p", "dc-modal-sub", "Your home page uses the search headline and description on the Search tab. It always shows on Google."));
+      if (inCard) { const go2 = el("button", "dc-modal-cancel", "Open the Search tab"); go2.type = "button"; go2.addEventListener("click", () => pcLeaveTo("search")); const acts = el("div", "pc-acts"); acts.appendChild(go2); box.appendChild(acts); }
     } else {
       const key = custom ? "page:" + slug : PG_SEO_KEY[pg.key];
       box.appendChild(seoNoindexRow(key, pg.title, "Show this page on Google"));
@@ -5101,7 +5297,7 @@ function pgOpenSettings(startRef) {
     const action = (label, fn, danger) => { const b = el("button", "dc-modal-cancel" + (danger ? " danger" : ""), label); b.type = "button"; b.addEventListener("click", () => { close(); fn(); }); foot.appendChild(b); };
     if (pg.view === "design") {
       action("Duplicate page", async () => { await dcDuplicatePage(slug); if ($("view-pages").classList.contains("on")) go("design"); });
-      action("Clear page", () => { go("design"); dcClearPage(slug); });
+      action("Clear page", () => { if (!inCard) go("design"); dcClearPage(slug); });
     }
     if (custom) action("Delete page", () => dcDeletePage(slug), true);
     const done = el("button", "dc-modal-cancel pg-done", "Done"); done.type = "button"; done.addEventListener("click", close);
@@ -5109,7 +5305,14 @@ function pgOpenSettings(startRef) {
     box.appendChild(foot);
   };
   paint();
-  setTimeout(() => { const f = box.querySelector("input,select"); if (f) { try { f.focus(); } catch (_) {} } }, 30);
+  pgFocusFirst(box);
+}
+// The first field takes the cursor, as it always has (a pane with none: All pages).
+function pgFocusFirst(box) {
+  setTimeout(() => {
+    const f = box.querySelector("input,select") || (PAGES_OPEN && $("pcBack"));
+    if (f) { try { f.focus({ preventScroll: true }); } catch (_) {} }
+  }, 30);
 }
 // What the server accepts in a menu link (lib/serializer.ts navHref), or null. Someone typing
 // a bare domain or an email address means the obvious thing, so it's completed for them.
@@ -5122,7 +5325,7 @@ function pgHref(raw) {
 }
 // A link in the menu that isn't one of the site's pages. Adding one asks first; after that it saves as it changes.
 function pgOpenLink(startRef) {
-  const { box, close } = pgModal("linkSettings", startRef ? "Link settings" : "Add a link");
+  const { box, close } = pgHost("linkSettings", startRef ? "Link settings" : "Add a link");
   let ref = startRef ? { href: startRef.href, parent: startRef.parent || null } : null;
   const paint = () => {
     const m = pgModel(), e = ref ? pgEntry(m, ref) : null;
@@ -5177,7 +5380,7 @@ function pgOpenLink(startRef) {
     box.appendChild(foot);
   };
   paint();
-  setTimeout(() => { const f = box.querySelector("input"); if (f) { try { f.focus(); } catch (_) {} } }, 30);
+  pgFocusFirst(box);
 }
 // ── Oct 2026 workflow audit, change 2: the overview is the site's one home ──
 // Health (website-health.html), the page map (content-tree.html) and the site's
@@ -5415,7 +5618,7 @@ function closeTodoPanel() { const p = $("todoPanel"); if (p && p.classList.conta
   const tc = $("btnTodoClose"); if (tc) tc.addEventListener("click", closeTodoPanel);
   const add = $("btnPagesAdd"); if (add) add.addEventListener("click", () => { go("design"); setTimeout(() => dcAddPage(), 300); });
   const addLink = $("btnPagesAddLink"); if (addLink) addLink.addEventListener("click", () => pgOpenLink(null));
-  const auto = $("btnNavAuto"); if (auto) auto.addEventListener("click", async () => { if (await askYes("Remove your custom menu and let the site build it automatically from your pages?", { ok: "Use the automatic menu", danger: true })) { await dcSaveNav(null); renderPagesBar(); } });
+  const auto = $("btnNavAuto"); if (auto) auto.addEventListener("click", pgResetNav);
   document.addEventListener("keydown", (e) => { if (e.key === "Escape") closeTodoPanel(); });
   const frame = $("siteFrame");
   if (frame) frame.addEventListener("load", () => {
@@ -5767,6 +5970,21 @@ function eeEditBlock(bi, tab) {                  // open this one section's edit
   INS_TAB = (tab === "style" || tab === "layout" || tab === "when") ? tab : "content";
   openSettingsPanel("section", (def && def.name) || "Section");
   BLOCK_FOCUS = bi; renderBlocksCard();          // consumes BLOCK_FOCUS → scroll + focus
+  dcRevealAbove(bi);
+}
+// A phone's section card is half a screen (Figma 65:382): the section it edits is scrolled to
+// just under the bar, so it stays in view above the card.
+function dcRevealAbove(bi) {
+  if (window.innerWidth > 760) return;
+  try {
+    const doc = dcFrameDoc(), main = doc && doc.getElementById("main"); if (!main) return;
+    const hit = dcBlockSections(main).find((x) => x.bi === bi); if (!hit) return;
+    const frame = $("designPreview").getBoundingClientRect(), card = $("settingsPanel");
+    const room = card.offsetTop - frame.top;   // where the card's top rests (its layout box, not the sliding one), in the frame's terms
+    const top = hit.el.getBoundingClientRect().top;
+    if (top >= 8 && top <= room - 96) return;   // its top is already in view, with some of it showing
+    doc.defaultView.scrollBy({ top: top - 12, behavior: pdReducedMotion() ? "auto" : "smooth" });
+  } catch (_) {}
 }
 function eeEditCore(view) {                      // open the core-section tab
   closePreview(); go(view || "design");
@@ -6332,8 +6550,8 @@ function togglePageInfoMenu() {
   if (window.matchMedia && window.matchMedia("(max-width:760px)").matches) {
     m.classList.add("sheet");
   } else {
-    const r = btn.getBoundingClientRect();
-    m.style.top = (r.bottom + 6) + "px";
+    const r = btn.getBoundingClientRect(), mh = m.offsetHeight || 0;
+    m.style.top = (r.bottom + 6 + mh > window.innerHeight - 8 ? Math.max(8, r.top - 6 - mh) : r.bottom + 6) + "px";   // the button sits low in the Pages card: open upward
     m.style.left = Math.max(8, Math.min(r.left, window.innerWidth - m.offsetWidth - 12)) + "px";
   }
   btn.setAttribute("aria-expanded", "true");
@@ -6414,7 +6632,7 @@ function closeCommentsPanel() {
 }
 function openCommentsThread(slug, bid, name) {
   const p = $("commentsPanel"); if (!p) return;
-  closeSettingsPanel();
+  closeSettingsPanel(); closePagesCard(false);
   PANEL_LASTFOCUS = document.activeElement;
   const tt = $("cmPanelTitle"); if (tt) tt.textContent = name;
   cmRenderThread(slug, bid, name);
@@ -7549,15 +7767,22 @@ async function mountSearchCard() {
   // 4. redirects manager (moved a page? send visitors to the new spot)
   const rd = el("details"); rd.style.cssText = "margin-top:8px";
   rd.appendChild(Object.assign(el("summary", null, "Moved from an old website? Forward old page addresses"), { style: "cursor:pointer;font-size:12.5px;font-weight:600" }));
-  const list = el("div", "hint", "Loading…"); rd.appendChild(list);
+  rd.appendChild(redirectsManager());
+  card.appendChild(rd);
+}
+// Forwards: an old address that sends visitors to a page on this site. The Search card has it,
+// and so does the Pages card's Not found page.
+function redirectsManager() {
+  const box = el("div");
+  const list = el("div", "hint", "Loading…"); box.appendChild(list);
   const form = el("div"); form.style.cssText = "display:flex;gap:6px;flex-wrap:wrap;margin-top:6px";
   const fi = el("input"); fi.placeholder = "/old-page/"; const tiR = el("input"); tiR.placeholder = "/services/ or https://…";
+  fi.setAttribute("aria-label", "Old address"); tiR.setAttribute("aria-label", "Where it goes now");
   [fi, tiR].forEach((inp) => { inp.type = "text"; inp.style.cssText = "flex:1;min-width:120px;padding:7px 9px;font:inherit;font-size:12.5px;border:1px solid var(--line,#ddd);border-radius:8px"; });
   const add = el("button", null, "Forward it"); add.type = "button";
   add.style.cssText = "font:inherit;font-size:12px;padding:6px 12px;border-radius:999px;border:1px solid var(--line,#ddd);background:transparent;cursor:pointer";
-  form.append(fi, tiR, add); rd.appendChild(form);
-  rd.appendChild(el("div", "hint", "Anyone visiting the old address lands on the new one — and Google follows along. Applies when you publish."));
-  card.appendChild(rd);
+  form.append(fi, tiR, add); box.appendChild(form);
+  box.appendChild(el("div", "hint", "Anyone visiting the old address lands on the new one — and Google follows along. Applies when you publish."));
   async function loadRedirects() {
     try {
       const r = await api("GET", "/redirects"); const rows = r.data || [];
@@ -7577,6 +7802,7 @@ async function mountSearchCard() {
     catch (err) { toast(nice(err), true); }
   });
   loadRedirects();
+  return box;
 }
 // ── Phase UX (FD-R2): the workspace speaks the business's language ──
 // A plumber's SITE says "Services" (T3 vocabulary) — the workspace must too.
@@ -7709,6 +7935,12 @@ async function saveTokens(change, msg) {
 }
 // the tab a Styles row belongs to (the floating studio's Styles card hides the others)
 function stab(rowEl, tab) { const w = rowEl && (rowEl.classList && rowEl.classList.contains("ins-field") ? rowEl : rowEl.parentNode); if (w && w.dataset) w.dataset.stab = tab; return rowEl; }
+// The header's two arrangements. Styles has the row, and so does the Pages card's Header and footer;
+// `after` lets the second redraw its own row once the pick has landed.
+function navStyleRow(host, after, label) {
+  return pillRow(host, label || "Header", [["Standard", ""], ["Centered", "centered"]], (o) => String((S.settings && S.settings.nav_style) || "") === o[1],
+    async (o) => { try { await settingsPut({ nav_style: o[1] }); const c2 = $("designCard"); if (c2) c2.remove(); mountDesignCard(); toast("Header: " + o[0] + " — publish to apply"); scheduleChangesRefresh(); refreshDesignPreview(); if (after) after(); } catch (err) { toast(nice(err), true); } });
+}
 function pillRow(host, label, opts, isOn, onPick, style) {
   const wrapEl = el("div"); wrapEl.style.cssText = "margin-top:12px";
   wrapEl.appendChild(Object.assign(el("div", null, label), { style: "font-size:12px;font-weight:600;margin-bottom:6px" }));
@@ -8042,9 +8274,7 @@ async function mountDesignCard(fresh = true) {
   const heroRow = [["Classic", ""], ["Photo beside text", "split"]];
   stab(pillRow(card, "Front-page layout", heroRow, (o) => String((S.settings && S.settings.hero_layout) || "") === o[1],
     async (o) => { try { await settingsPut({ hero_layout: o[1] }); const c2 = $("designCard"); if (c2) c2.remove(); mountDesignCard(); toast("Layout: " + o[0] + " — publish to apply"); scheduleChangesRefresh(); refreshDesignPreview(); } catch (err) { toast(nice(err), true); } }), "looks");
-  const navRow = [["Standard", ""], ["Centered", "centered"]];
-  stab(pillRow(card, "Header", navRow, (o) => String((S.settings && S.settings.nav_style) || "") === o[1],
-    async (o) => { try { await settingsPut({ nav_style: o[1] }); const c2 = $("designCard"); if (c2) c2.remove(); mountDesignCard(); toast("Header: " + o[0] + " — publish to apply"); scheduleChangesRefresh(); refreshDesignPreview(); } catch (err) { toast(nice(err), true); } }), "looks");
+  stab(navStyleRow(card), "looks");
   // DS-8: suggest for my business (deterministic; owner approves by clicking Apply)
   const ik = (S.settings && S.settings.industry_key) || "generic";
   const sug = SUGGEST[ik];
@@ -8338,29 +8568,17 @@ function currentBlocks() {
 const DC_PAGE_RESERVED = new Set(["", "index", "home", "404", "about", "contact", "faq", "faqs", "services", "service", "menu", "products", "classes", "updates", "blog", "news", "post", "posts", "thanks", "thank-you", "privacy", "accessibility", "search", "sitemap", "robots", "assets", "img"]);
 // Section snapshots belong to the page they were taken on; the other steps don't.
 function dcResetHistory() { DC_UNDO = DC_UNDO.filter((x) => typeof x !== "string"); DC_REDO = DC_REDO.filter((x) => typeof x !== "string"); DC_HIST_LAST = null; if (typeof updateUndoButtons === "function") updateUndoButtons(); }
+// The page tabs live in the Pages card now (renderPagesCard, drawn with the Pages tab's lists).
 function renderPagesBar() {
   if (typeof renderPagesList === "function") renderPagesList();
   formsFollowPage();
-  const host = $("pagesBar"); if (!host) return;
-  host.textContent = "";
-  dcPageList().forEach((pg) => {
-    const on = pg.slug === DC_PAGE;
-    const hidden = pg.slug && dcPageObj(pg.slug) && dcPageObj(pg.slug).hideNav;
-    const pill = el("button", "page-pill" + (on ? " on" : "") + (hidden ? " hidden-nav" : "")); pill.type = "button"; pill.setAttribute("role", "tab"); pill.setAttribute("aria-selected", String(on));
-    pill.appendChild(el("span", "pp-name", pg.title + (hidden ? " (hidden)" : "")));
-    pill.addEventListener("click", () => dcSwitchPage(pg.slug));
-    const mn = el("span", "pp-menu", "⋯"); mn.title = pg.slug ? "Rename, duplicate, clear or delete this page" : "Duplicate or clear this page"; mn.addEventListener("click", (e) => { e.stopPropagation(); dcPageMenu(pg.slug, mn); }); pill.appendChild(mn);
-    host.appendChild(pill);
-  });
-  const add = el("button", "page-add", "＋ Page"); add.type = "button"; add.title = "Add a new page to your website";
-  add.addEventListener("click", dcAddPage);
-  host.appendChild(add);
-  pagesBarReveal();
   dcSyncPageSwitch();
 }
+// the page on the canvas, scrolled into the card's view
 function pagesBarReveal() {
-  const host = $("pagesBar"), cur = host && host.querySelector(".page-pill.on"); if (!cur) return;
-  host.scrollLeft += cur.getBoundingClientRect().left - host.getBoundingClientRect().left - 4;
+  const sc = $("pcBody"), cur = sc && sc.querySelector(".pc-row.on"); if (!cur) return;
+  const a = sc.getBoundingClientRect(), b = cur.getBoundingClientRect();
+  if (b.top < a.top || b.bottom > a.bottom) sc.scrollTop += b.top - a.top - 60;
 }
 // G13: a page change replaces BLOCKS_WORK or reads the stored draft, so what this page
 // still holds is written first, while DC_PAGE still says whose it is: an open in-place
@@ -9798,10 +10016,17 @@ function renderBlocksCard() {
     // Item 77: someone already typing in this section's fields keeps the caret; on a busy
     // phone the timer can fire late, and the next words went into the heading.
     if (idx === focusIdx) setTimeout(() => { try {
-      if (panes && INS_TAB !== "content") return;   // opened on Style, Layout or When: the tab keeps the focus
+      const ae = document.activeElement, typing = ae && ae !== ti && box.contains(ae) && /^(INPUT|TEXTAREA|SELECT)$/.test(ae.tagName);
+      if (panes) {
+        // One section's card opens at its top, the first field in view. Centring it put the
+        // Heading under the tabs whenever the fields ran taller than the card (a phone, always).
+        const sc = box.closest(".dc-panel-scroll"); if (sc && !typing) sc.scrollTop = 0;
+        if (INS_TAB !== "content") return;   // opened on Style, Layout or When: the tab keeps the focus
+        if (!typing) ti.focus({ preventScroll: true });   // the caret in the heading, and nothing scrolls to put it there
+        return;
+      }
       box.scrollIntoView({ behavior: "smooth", block: "center" });
-      const ae = document.activeElement;
-      if (!(ae && ae !== ti && box.contains(ae) && /^(INPUT|TEXTAREA|SELECT)$/.test(ae.tagName))) ti.focus();
+      if (!typing) ti.focus();
     } catch (_) {} }, 40);
   });
   if (solo === null) card.appendChild(blkGap(BLOCKS_WORK.length));   // #3/#4 — trailing "+" insert point / drop-line target
@@ -11007,6 +11232,7 @@ function dcSoloEnd() { if (PANEL_MODE === "section") closeSettingsPanel(); }
 function closeTrayPanel() {
   const p = $("trayPanel"); if (!p) return;
   p.classList.remove("on"); p.setAttribute("aria-hidden", "true");
+  dcLeftSync();
 }
 // Slice C: the left rail has THREE tabs — Blocks (the add-section palette),
 // Files (a compact asset browser) and Content tree (the page's component tree) —
@@ -11019,7 +11245,8 @@ function dcRailTab(name) {
   const w = TRAY_WORDS[DC_RAIL_TAB], tt = $("trayTitle"), ts = $("traySub"), tp = $("trayPanel");
   if (tt) tt.textContent = w[0];
   if (ts) { ts.textContent = w[1]; ts.hidden = false; }
-  if (tp) tp.setAttribute("aria-label", w[0]);
+  if (tp) { tp.setAttribute("aria-label", w[0]); tp.dataset.tab = DC_RAIL_TAB; }
+  dcLeftSync();
   [["add", $("tabAdd"), $("designTray")],
    ["files", $("tabFiles"), $("designFilesWrap")],
    ["contents", $("tabContents"), $("designTreeWrap")]].forEach(([key, tab, panel]) => {
@@ -11031,20 +11258,24 @@ function dcRailTab(name) {
   else if (DC_RAIL_TAB === "files") mountPanelFiles();
   else dcRefreshTree();
 }
-function openTrayPanel(tab) {
+function openTrayPanel(tab, find) {   // find: the dock's Find, which wants the search box even on a phone
   const p = $("trayPanel"); if (!p) return;
-  closeSettingsPanel();
+  closeSettingsPanel(); closePagesCard(false);
   PANEL_LASTFOCUS = document.activeElement;
   p.classList.add("on"); p.setAttribute("aria-hidden", "false");
+  dcLeftSync();
   const want = dcRailTabName(tab);
   dcRailTab(want);
   const tray = $("designTray"); if (tray) tray.scrollTop = 0;
   // preventScroll: this lands while the panel is still opening, about 1px wide, where
   // the intro text is hundreds of pixels tall. A plain focus scrolled the list past
   // its own search box and left it there once the panel had widened.
+  // A phone's keyboard would come up over the tiles, so there Add and Photos start on Done
+  // and the search box waits for a tap; Find still starts in it.
+  const typeNow = find || window.innerWidth > 760;
   setTimeout(() => { try {
-    (want === "add" ? (p.querySelector("#designTray .tray-search") || $("tabAdd"))
-      : want === "files" ? ($("pfSearch") || $("tabFiles"))
+    (want === "add" ? (typeNow && p.querySelector("#designTray .tray-search") || $("btnTrayClose"))
+      : want === "files" ? (typeNow && $("pfSearch") || $("btnTrayClose"))
       : $("tabContents")).focus({ preventScroll: true });
   } catch (_) {} }, 40);
 }
@@ -11076,7 +11307,7 @@ function openSettingsPanel(mode, title) {
   const p = $("settingsPanel"), sc = $("dcScrim"); if (!p) return;
   const m = PANEL_TITLES[mode] || mode === "section" ? mode : "styles";
   if (PANEL_MODE === "section" && m !== "section") BLOCK_SOLO = null;
-  closeTrayPanel(); closeCommentsPanel();
+  closeTrayPanel(); closeCommentsPanel(); closePagesCard(false);
   PANEL_LASTFOCUS = document.activeElement;
   PANEL_MODE = m; p.dataset.mode = m;
   const name = title || PANEL_TITLES[m] || "Styles";
@@ -11085,7 +11316,7 @@ function openSettingsPanel(mode, title) {
   const iseg = $("inspectorSeg"); if (iseg) iseg.hidden = m !== "section";
   const sseg = $("stylesSeg"); if (sseg) sseg.hidden = m !== "styles";
   const sfoot = $("stylesFoot"); if (sfoot) sfoot.hidden = m !== "styles";
-  if (m === "section") insSyncSeg();
+  if (m === "section") { insSyncSeg(); const sc = p.querySelector(".dc-panel-scroll"); if (sc) sc.scrollTop = 0; }
   if (m === "styles") stylesTab(STYLES_TAB);
   p.setAttribute("aria-label", name);
   const modal = m !== "section" && m !== "styles";   // a section or a style change: keep the page in view, undimmed
@@ -11102,8 +11333,9 @@ function openSettingsPanel(mode, title) {
     // already in a field in this panel: leave them there, or the words go nowhere
     const ae = document.activeElement;
     if (ae && ae !== p && ae !== document.body && p.contains(ae)) return;
+    // nothing scrolls to make room for the focus: the card has just been put at its top
     (m === "section" && INS_TAB === "content" && p.querySelector("#blocksCard input, #blocksCard textarea")
-      || m === "section" && p.querySelector('#inspectorSeg [aria-selected="true"]') || cl).focus();
+      || m === "section" && p.querySelector('#inspectorSeg [aria-selected="true"]') || cl).focus({ preventScroll: true });
   } catch (_) {} }, 40);
 }
 // ── Styles (the floating studio, part two): Looks, Fonts, Colours and Text. Each card and
@@ -11213,10 +11445,11 @@ function insFinish(panes, idx, blk, def) {
   }
   box.appendChild(foot);
 }
-// ── the floating studio: the page switcher's card, the Live chip, the phone's More ──
-// The pages card holds what the old bar spread out: the page tabs (#pagesBar, the
-// same renderPagesBar rows), ＋ Page, the Page menu (#btnPageInfo) and the way to the
-// menu editor (#btnNavEdit). It opens from the bar's page switcher and from the dock.
+// ── the floating studio: the Pages card, the Live chip, the phone's More ──
+// The Pages card (part three) is a card beside the dock, like Add: every page in the order of
+// the menu (renderPagesCard), the page settings behind each gear (pcPane), and the header and
+// footer, the not-found page and search below. It opens from the bar's page switcher, the
+// dock's Pages and a press on the site's menu on the canvas.
 let PAGES_OPEN = false, PAGES_DOWN = null, PAGES_FROM = null;
 function dcSyncPageSwitch() {
   const list = typeof dcPageList === "function" ? dcPageList() : [];
@@ -11225,31 +11458,130 @@ function dcSyncPageSwitch() {
   const ct = $("dcPageCount"); if (ct) ct.textContent = list.length + (list.length === 1 ? " page" : " pages");
 }
 function dcSyncLiveChip() { const c = $("dcLiveChip"); if (c) c.hidden = !(typeof siteLiveUrl === "function" && siteLiveUrl()); }
+// a tablet's left card takes the dock's place while it's open (the CSS reads this class)
+// (Add, Photos and Pages; the page outline is Notes mode's own list, so it keeps the dock and its way back to Edit)
+function dcLeftSync() { const t = $("trayPanel"); document.documentElement.classList.toggle("dc-lefton", !!(PAGES_OPEN || (t && t.classList.contains("on") && DC_RAIL_TAB !== "contents"))); }
 function openPagesCard(fromId) {
   const c = $("pagesCard"); if (!c) return;
   closeTrayPanel(); closeSettingsPanel(); closeCommentsPanel(); dcDockMore(false);
+  if (PC_PANE) PC_PANE.close(false);
   PAGES_FROM = fromId || "dcPageSwitch"; PAGES_OPEN = true;
-  c.hidden = false; c.setAttribute("aria-hidden", "false");
+  renderPagesList();   // the rows and their chips as things stand now
+  c.classList.add("on"); c.setAttribute("aria-hidden", "false");
   ["dcPageSwitch", "dkPages"].forEach((id) => { const b = $(id); if (b) b.setAttribute("aria-expanded", "true"); });
+  dcLeftSync();
+  hbLoadBoardExtras("pages");   // the website map's markers, read once
+  const sc = $("pcBody"); if (sc) sc.scrollTop = 0;
   pagesBarReveal();
-  try { (c.querySelector(".page-pill.on") || c.querySelector(".page-pill") || $("btnPagesClose")).focus({ preventScroll: true }); } catch (_) {}
-  // a press anywhere else puts it away; the page menu and the dialogs it opens don't count
+  try { (c.querySelector(".pc-row.on .pc-open") || c.querySelector(".pc-open") || $("btnPagesClose")).focus({ preventScroll: true }); } catch (_) {}
+  // a press anywhere else puts it away; its menus and the dialogs they open don't count
   PAGES_DOWN = (e) => {
     if (c.contains(e.target)) return;
-    if (e.target.closest && e.target.closest("#dcPageSwitch,#dkPages,.pp-pop,.pi-pop,.dc-modal-scrim,.dc-modal,.ask,.scrim,#pageSettings")) return;
+    if (e.target.closest && e.target.closest("#dcPageSwitch,#dkPages,.pp-pop,.pi-pop,.dc-modal-scrim,.dc-modal,.ask,.scrim,dialog,#pageSettings,#linkSettings")) return;
     closePagesCard(false);
   };
   document.addEventListener("mousedown", PAGES_DOWN, true);
 }
 function closePagesCard(refocus) {
   const c = $("pagesCard"); if (!c || !PAGES_OPEN) return;
+  if (PC_PANE) PC_PANE.close(false);
   PAGES_OPEN = false;
-  c.hidden = true; c.setAttribute("aria-hidden", "true");
+  const f = $("pcFind"); if (f && f.value) { f.value = ""; pcFilter(); }   // it opens next time on every page
+  c.classList.remove("on"); c.setAttribute("aria-hidden", "true");
   ["dcPageSwitch", "dkPages"].forEach((id) => { const b = $(id); if (b) b.setAttribute("aria-expanded", "false"); });
   if (PAGES_DOWN) { document.removeEventListener("mousedown", PAGES_DOWN, true); PAGES_DOWN = null; }
+  dcLeftSync();
   if (refocus) { const b = $(PAGES_FROM || "dcPageSwitch"); if (b) { try { b.focus(); } catch (_) {} } }
 }
 function togglePagesCard(fromId) { if (PAGES_OPEN) closePagesCard(true); else openPagesCard(fromId); }
+// One page's settings, or one of the rows under the list, shown inside the card in place of
+// the list; "All pages" comes back. It answers like pgModal: { box, close }.
+let PC_PANE = null;
+function pcPane(id, label) {
+  if (PC_PANE) PC_PANE.close(false);
+  const list = $("pcList"), wrap = $("pcPane"), box = wrap.querySelector(".pc-pane-body");
+  const opener = document.activeElement;
+  box.textContent = ""; box.id = id; box.setAttribute("role", "group"); box.setAttribute("aria-label", label);
+  list.hidden = true; wrap.hidden = false;
+  const sc = $("pcBody"); if (sc) sc.scrollTop = 0;
+  const me = { box };
+  me.close = (refocus) => {
+    if (PC_PANE !== me) return;
+    if (document.activeElement && box.contains(document.activeElement)) document.activeElement.blur();   // a field saves on change, and blur is what fires it
+    PC_PANE = null;
+    box.textContent = ""; box.removeAttribute("id"); box.removeAttribute("aria-label");
+    wrap.hidden = true; list.hidden = false;
+    if (refocus !== false) {
+      const back = opener && opener.isConnected && list.contains(opener) ? opener : list.querySelector(".pc-row.on .pc-open");
+      try { if (back) back.focus({ preventScroll: true }); } catch (_) {}
+    }
+  };
+  PC_PANE = me;
+  return me;
+}
+const pcDone = (close) => { const f = el("div", "pg-foot"); const d = el("button", "dc-modal-cancel pg-done", "Done"); d.type = "button"; d.addEventListener("click", () => close()); f.appendChild(d); return f; };
+// Out of Edit mode to another tab, everything saved first, as Exit does.
+function pcLeaveTo(view) { closePagesCard(false); exitEditMode(view); }
+// Header and footer: the same on every page. The header's arrangement is chosen here; the
+// logo is in Styles and the footer's words are the business details.
+function pcHeadFoot() {
+  const { box, close } = pcPane("pcHeadFootPane", "Header and footer");
+  const paint = () => {
+    box.textContent = "";
+    box.appendChild(el("h3", "dc-modal-h", "Header and footer"));
+    box.appendChild(el("p", "dc-modal-sub", "The same on every page. Changes go live when you publish."));
+    box.appendChild(el("h4", "pg-h", "Header"));
+    box.appendChild(el("p", "pc-note", "Your name or logo, then the menu from this card."));
+    const look = el("div"); look.dataset.needs = "configure"; navStyleRow(look, () => { if (PC_PANE && PC_PANE.box === box) paint(); }, "How it’s arranged"); box.appendChild(look);
+    const logo = el("button", "dc-modal-cancel", "Change the logo"); logo.type = "button"; logo.dataset.needs = "configure";
+    logo.addEventListener("click", () => { closePagesCard(false); openSettingsPanel("styles"); stylesTab("colours"); });
+    const a1 = el("div", "pc-acts"); a1.style.marginTop = "12px"; a1.appendChild(logo); box.appendChild(a1);
+    box.appendChild(el("h4", "pg-h", "Footer"));
+    box.appendChild(el("p", "pc-note", "Your address, phone, email, opening hours and social links, from your business details, with links to your privacy and accessibility pages."));
+    const biz = el("button", "dc-modal-cancel", "Change the business details"); biz.type = "button"; biz.addEventListener("click", () => pcLeaveTo("business"));
+    const a2 = el("div", "pc-acts"); a2.appendChild(biz); box.appendChild(a2);
+    box.appendChild(pcDone(close));
+  };
+  paint();
+  pgFocusFirst(box);
+}
+// The not-found page: what a visitor sees after an old or broken link, and the forwards that
+// send old addresses to the right page (the Search card's own tool).
+function pcNotFound() {
+  const { box, close } = pcPane("pcNotFoundPane", "Not found page");
+  box.appendChild(el("h3", "dc-modal-h", "Not found page"));
+  box.appendChild(el("p", "dc-modal-sub", "When someone follows a broken or old link, your site shows a short “That page isn’t here” page with a way back to Home."));
+  box.appendChild(el("h4", "pg-h", "Forward old addresses"));
+  box.appendChild(el("p", "pc-note", "Moved from an old website, or changed a page’s address? Send the old address to the page it lives on now."));
+  box.appendChild(redirectsManager());
+  box.appendChild(pcDone(close));
+  pgFocusFirst(box);
+}
+// Search appearance: how every page reads on Google, one row each; a row opens that page's
+// settings, where its headline and description are changed.
+function pcSearchLook() {
+  const { box, close } = pcPane("pcSearchPane", "Search appearance");
+  box.appendChild(el("h3", "dc-modal-h", "Search appearance"));
+  box.appendChild(el("p", "dc-modal-sub", "How each page shows on Google. Pick one to change its headline and description."));
+  const list = el("div", "pc-seo");
+  const hidden = new Set((S.settings && S.settings.pages_noindex) || []), seo = (S.settings && S.settings.page_seo) || {}, w = seoHomeWords();
+  hbPageRows().forEach((pg) => {
+    const key = pg.key === "home" ? null : pg.slug ? "page:" + pg.slug : PG_SEO_KEY[pg.key];
+    let line;
+    if (!key) line = w.title;
+    else if (hidden.has(key)) line = "Hidden from Google";
+    else line = (seo[key] && seo[key].title) || seoPageDefault(key, { name: w.name, siteDescription: w.description, offeringLabel: VOCAB.label, pageTitle: pg.title }).title;
+    const b = el("button", "pc-mrow"); b.type = "button";
+    const ic = el("span", "ic"); ic.innerHTML = HB_ICON[pg.icon] || HB_ICON.page; b.appendChild(ic);
+    const t = el("span", "t"); t.appendChild(el("b", null, pg.title)); t.appendChild(el("span", null, line || "")); b.appendChild(t);
+    b.insertAdjacentHTML("beforeend", '<svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>');
+    b.addEventListener("click", () => pgOpenSettings({ href: pg.path }));
+    list.appendChild(b);
+  });
+  box.appendChild(list);
+  box.appendChild(pcDone(close));
+  pgFocusFirst(box);
+}
 // a phone's dock keeps Notes, Versions, Find and Preview behind More
 function dcDockMore(open) {
   const d = $("dcDock"), b = $("dkMore"); if (!d) return;
@@ -11257,20 +11589,20 @@ function dcDockMore(open) {
   d.classList.toggle("more-open", on);
   if (b) b.setAttribute("aria-expanded", String(on));
 }
-function exitEditMode() {
+function exitEditMode(to) {   // to: the tab to land on (the Pages card's "Change what's on it"); else where Edit mode was opened from
   if (IPE) ipeCommit();   // bank in-place text before the canvas goes away
   if (document.activeElement && document.activeElement.blur) document.activeElement.blur();   // a focused field commits on blur
   blocksSaveNow(); formsSaveNow();
   closeDesignPanels();
   if (DC_MODE !== "edit") dcSetMode("edit");
-  go(EDIT_RETURN);
+  go(to || EDIT_RETURN);
 }
 function closeDesignPanels() { closePagesCard(false); dcDockMore(false); closeTrayPanel(); closeSettingsPanel(); closeCommentsPanel(); if (PANEL_LASTFOCUS && PANEL_LASTFOCUS.focus) { try { PANEL_LASTFOCUS.focus(); } catch (_) {} PANEL_LASTFOCUS = null; } }
 (function initDesignPanels() {
   const on = (id, fn) => { const b = $(id); if (b) b.addEventListener("click", fn); };
   on("btnUndo", dcUndo); on("btnRedo", dcRedo);
   on("btnUndoTop", dcUndo); on("btnRedoTop", dcRedo);
-  on("btnEditExit", exitEditMode); on("dcBtnPublish", () => openRitual({ card: true }));   // the floating studio: a card at the right, the page stays in view
+  on("btnEditExit", () => exitEditMode()); on("dcBtnPublish", () => openRitual({ card: true }));   // the floating studio: a card at the right, the page stays in view
   // Ctrl/⌘+Z = undo, Ctrl/⌘+Shift+Z (or Ctrl+Y) = redo — only while editing the design
   document.addEventListener("keydown", (e) => {
     if (!(e.ctrlKey || e.metaKey)) return;
@@ -11298,14 +11630,17 @@ function closeDesignPanels() { closePagesCard(false); dcDockMore(false); closeTr
   segKeys($("inspectorSeg"), "data-itab", insTab);
   segKeys($("stylesSeg"), "data-stab", stylesTab);
   const dg = $("designGallery"); if (dg) dg.dataset.stab = "looks";   // the template row belongs to Looks (member_ui_test pins the markup)
-  on("btnNavEdit", () => { closePagesCard(false); go("pages"); });
-  // the floating studio: the page switcher and the dock
+  // the floating studio: the page switcher, the dock, and the Pages card's own buttons
   on("dcPageSwitch", () => togglePagesCard("dcPageSwitch")); on("dkPages", () => togglePagesCard("dkPages")); on("btnPagesClose", () => closePagesCard(true));
+  on("btnPageAdd", () => { closePagesCard(false); dcAddPage(); });   // the name and layout dialogs take over; the new page opens on the canvas
+  on("btnPcLink", () => pgOpenLink(null)); on("btnPcAuto", pgResetNav);
+  on("pcBack", () => { if (PC_PANE) PC_PANE.close(); });
+  on("pcHeadFoot", pcHeadFoot); on("pcNotFound", pcNotFound); on("pcSearchLook", pcSearchLook);
+  const find = $("pcFind"); if (find) find.addEventListener("input", pcFilter);
   on("dkPhotos", () => toggleTray("files"));
-  on("dkFind", () => openTrayPanel("add"));   // opens the library with its search box focused
+  on("dkFind", () => { dcDockMore(false); openTrayPanel("add", true); });   // opens the library with its search box focused
   on("dkPreview", () => { dcDockMore(false); dcOpenPreview(); });
   on("dkMore", () => dcDockMore());
-  const pbar = $("pagesBar"); if (pbar) pbar.addEventListener("click", (e) => { if (e.target.closest(".page-pill") && !e.target.closest(".pp-menu")) closePagesCard(false); });
   on("dcBtnPreview", dcOpenPreview);
   on("btnPageInfo", togglePageInfoMenu);   // slice B: the Page Information menu (Share draft lives inside it now)
   // Slice D: the modes bar. #btnComments now lives INSIDE the segment (G11
@@ -11323,7 +11658,15 @@ function closeDesignPanels() { closePagesCard(false); dcDockMore(false); closeTr
   const sc = $("dcScrim"); if (sc) sc.addEventListener("click", closeDesignPanels);
   document.addEventListener("keydown", (e) => {
     if (e.key !== "Escape") return;
-    if (PAGES_OPEN) { e.stopPropagation(); closePagesCard(true); return; }
+    if (PAGES_OPEN) {
+      if (PI_OPEN) return;   // the Page menu closes itself first
+      const pop = document.querySelector(".pp-pop:not(.pi-pop)"); if (pop) { e.stopPropagation(); pop.remove(); return; }   // so does a page's ⋯ menu
+      e.stopPropagation();
+      const f = $("pcFind");
+      if (document.activeElement === f && f.value) { f.value = ""; pcFilter(); return; }   // first the words being looked for, then the card
+      if (PC_PANE) PC_PANE.close(); else closePagesCard(true);
+      return;
+    }
     const dk = $("dcDock"); if (dk && dk.classList.contains("more-open")) { e.stopPropagation(); dcDockMore(false); return; }
     const t = $("trayPanel"), s = $("settingsPanel"), cm = $("commentsPanel");
     if ((t && t.classList.contains("on")) || (s && s.classList.contains("on")) || (cm && cm.classList.contains("on"))) { e.stopPropagation(); closeDesignPanels(); }
@@ -13313,15 +13656,15 @@ function ideRelease() {   // the redraw a session or its save held off
 // variables (--ddsdc-*). The tools inside the frame follow the shell's light and dark
 // modes through them; the site itself is never touched.
 let DC_CHROME_INSET = 0;   // px from the frame's left edge that the dock covers (0 on a phone, where the dock is along the bottom)
-// What the floating chrome covers of the frame right now: the dock and the Add card on the
-// left, the Styles or Comments card on the right. The section pill and its chip keep clear.
+// What the floating chrome covers of the frame right now: the dock and the Add or Pages card
+// on the left, the Styles or Comments card on the right. The section pill and its chip keep clear.
 function dcChromeInsets() {
   const out = { left: DC_CHROME_INSET, right: 0 };
   try {
     if (window.innerWidth <= 760) return out;   // a phone's cards are sheets, under the pill's row
     const fr = $("designPreview").getBoundingClientRect();
     ["settingsPanel", "commentsPanel", "ritualWrap"].forEach((id) => { const p = $(id); if (p && p.classList.contains("on") && (id !== "ritualWrap" || p.classList.contains("as-card"))) { const r = p.getBoundingClientRect(); out.right = Math.max(out.right, Math.round(fr.right - r.left + 8)); } });
-    const t = $("trayPanel"); if (t && t.classList.contains("on")) { const r = t.getBoundingClientRect(); out.left = Math.max(out.left, Math.round(r.right + 8 - fr.left)); }
+    ["trayPanel", "pagesCard"].forEach((id) => { const t = $(id); if (t && t.classList.contains("on")) { const r = t.getBoundingClientRect(); out.left = Math.max(out.left, Math.round(r.right + 8 - fr.left)); } });
   } catch (_) {}
   return out;
 }
@@ -13672,7 +14015,7 @@ function dcInjectCanvas(doc, main, live) {
     if (navEl && !navEl.hasAttribute("data-navedit")) {
       navEl.setAttribute("data-navedit", "1");
       navEl.style.cursor = "pointer"; navEl.title = "Click to edit your menu (shown on every page)";
-      navEl.addEventListener("click", (e) => { e.preventDefault(); e.stopPropagation(); go("pages"); }, true);
+      navEl.addEventListener("click", (e) => { e.preventDefault(); e.stopPropagation(); openPagesCard("dcPageSwitch"); }, true);   // the Pages card, beside the page
     }
   } catch (_) {}
   if (!DC_PAGE) {

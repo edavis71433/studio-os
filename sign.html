@@ -94,7 +94,22 @@ const $=(id)=>document.getElementById(id);
 const esc=(s)=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const money=(c)=>'$'+((Number(c)||0)/100).toLocaleString('en-US',{minimumFractionDigits:2});
 const TOKEN=new URLSearchParams(location.search).get('t')||'';
-async function api(path,method,body){const r=await fetch(FN+path,{method:method||'GET',headers:{'Content-Type':'application/json','Authorization':'Bearer '+KEY,'apikey':KEY},body:body?JSON.stringify(body):undefined});return{ok:r.ok,body:await r.json().catch(()=>({}))};}
+// Nov 10 review (G3): no answer at all (no signal) used to THROW out of here: Accept,
+// Sign, Approve and Not now stayed grey with nothing said, and a link opened with no
+// signal waited forever. No answer is now an ordinary failure with a plain message
+// (worded so softFail never takes it for a version change), and a read that hangs
+// gives up after 20 seconds. A send is never cut short: it may still be landing.
+const OFFLINE_MSG='We couldn’t reach your studio — check your connection and try again.';
+async function api(path,method,body){
+  const read=!method||method==='GET';
+  const ac=read&&typeof AbortController!=='undefined'?new AbortController():null;
+  const t=ac?setTimeout(()=>ac.abort(),20000):0;
+  try{const r=await fetch(FN+path,{method:method||'GET',headers:{'Content-Type':'application/json','Authorization':'Bearer '+KEY,'apikey':KEY},body:body?JSON.stringify(body):undefined,signal:ac?ac.signal:undefined});return{ok:r.ok,status:r.status,body:await r.json().catch(()=>({}))};}
+  catch(_){return{ok:false,status:0,offline:true,body:{message:OFFLINE_MSG}};}
+  finally{if(t)clearTimeout(t);}
+}
+// the first read had no answer: the link may be fine, so say so and offer a retry
+function offline(){$('main').innerHTML=`<div class="center"><h1>We couldn’t load this just now</h1><p class="sub">${esc(OFFLINE_MSG)} Nothing is lost.</p><div class="row" style="justify-content:center"><button id="retryLoad">Try again</button></div></div>`;const b=$('retryLoad');if(b)b.onclick=()=>{$('main').innerHTML='<div class="spin" role="status" aria-label="Loading"></div>';load();};}
 function fail(msg){$('main').innerHTML=`<div class="center"><h1>This link isn’t working</h1><p class="sub">${esc(msg||'It may have expired (links last 30 days). Ask your studio to send a fresh one — nothing is lost.')}</p><p class="muted">Stuck? Just reply to the email this link came from.</p></div>`;}
 // A RECOVERABLE problem (version changed, too many tries) keeps the page — the
 // person shouldn't lose the document they just read over a retryable hiccup.
@@ -129,6 +144,7 @@ async function load(after){
     // say what happened rather than "this link isn't working".
     if(after&&after.kind==='accepted'){thanks('Accepted — thank you!','Your studio has been told and will take it from here. Next up: the agreement to sign — reload this page to open it.');return;}
     if(after&&after.kind==='signed'){thanks('Signed — welcome aboard! 🎉','Your studio has been told. Reload this page for your deposit link and your signature certificate.');return;}
+    if(r.offline){offline();return;}   // G3: no answer is the connection, not a dead link
     fail(r.body&&r.body.message);return;
   }
   const d=r.body.data;
@@ -167,7 +183,7 @@ function renderFlow(d,after){
   // ── 1 · Choose ──
   if(p){
     k++;
-    const items=T.items.map(i=>`<tr><td>${esc(i.label)}${i.qty>1?' × '+i.qty:''}</td><td>${money((i.unit_cents||0)*(i.qty||1))}</td></tr>`).join('');
+    const items=lineRowsHtml(T.items);
     const hasB=T.discount>0||T.tax>0;
     const dLbl=(T.meta.discount&&T.meta.discount.mode==='percent')?`Discount (${+T.meta.discount.value}%)`:'Discount';
     const tLbl=(T.meta.tax_pct!=null)?`Tax (${+T.meta.tax_pct}%)`:'Tax';
@@ -258,10 +274,15 @@ function preparedBy(){return window.__brandName?`<p class="muted" style="margin-
 // (see lib/sales_lifecycle.ts). Split it out, then mirror computeProposalTotals so
 // the client sees the exact same honest breakdown the studio and the document do.
 function splitProposalLI(raw){const a=Array.isArray(raw)?raw:[];const M='__meta__';const items=a.filter(el=>!(el&&typeof el==='object'&&M in el));const me=a.find(el=>el&&typeof el==='object'&&M in el);return{items,meta:(me&&me[M])||{}};}
-function proposalTotals(raw){const {items,meta}=splitProposalLI(raw);const sub=items.reduce((n,i)=>n+Math.max(0,Math.trunc(i.qty)||0)*Math.max(0,Math.trunc(i.unit_cents)||0),0);let disc=0;if(meta.discount){disc=meta.discount.mode==='percent'?Math.round(sub*Math.min(100,Math.max(0,meta.discount.value))/100):Math.trunc(meta.discount.value);}disc=Math.max(0,Math.min(disc,sub));const post=sub-disc;const tp=(meta.tax_pct!=null&&isFinite(+meta.tax_pct))?Math.min(100,Math.max(0,+meta.tax_pct)):0;const tax=Math.round(post*tp/100);return{items,meta,subtotal:sub,discount:disc,tax:tax,total:Math.max(0,post+tax)};}
+// Nov 10 review (G11): each line's amount by the SAME rule as the total (quantity ×
+// unit price, whole numbers, never below zero). A quantity-0 line used to show its
+// unit price while the total counted nothing for it; it now reads "× 0" and $0.00.
+const lineCents=(i)=>Math.max(0,Math.trunc(i.qty)||0)*Math.max(0,Math.trunc(i.unit_cents)||0);
+function lineRowsHtml(items){return items.map(i=>{const q=Math.max(0,Math.trunc(i.qty)||0);return`<tr><td>${esc(i.label)}${q!==1?' × '+q:''}</td><td>${money(lineCents(i))}</td></tr>`;}).join('');}
+function proposalTotals(raw){const {items,meta}=splitProposalLI(raw);const sub=items.reduce((n,i)=>n+lineCents(i),0);let disc=0;if(meta.discount){disc=meta.discount.mode==='percent'?Math.round(sub*Math.min(100,Math.max(0,meta.discount.value))/100):Math.trunc(meta.discount.value);}disc=Math.max(0,Math.min(disc,sub));const post=sub-disc;const tp=(meta.tax_pct!=null&&isFinite(+meta.tax_pct))?Math.min(100,Math.max(0,+meta.tax_pct)):0;const tax=Math.round(post*tp/100);return{items,meta,subtotal:sub,discount:disc,tax:tax,total:Math.max(0,post+tax)};}
 function renderProposal(p){
   const T=proposalTotals(p.line_items);
-  const items=T.items.map(i=>`<tr><td>${esc(i.label)}${i.qty>1?' × '+i.qty:''}</td><td>${money((i.unit_cents||0)*(i.qty||1))}</td></tr>`).join('');
+  const items=lineRowsHtml(T.items);
   const hasB=T.discount>0||T.tax>0;
   const dLbl=(T.meta.discount&&T.meta.discount.mode==='percent')?`Discount (${+T.meta.discount.value}%)`:'Discount';
   const tLbl=(T.meta.tax_pct!=null)?`Tax (${+T.meta.tax_pct}%)`:'Tax';
@@ -289,7 +310,7 @@ function renderProposal(p){
 function renderEstimate(e){
   if(window.__brandName)document.title=`Your estimate — ${window.__brandName}`;
   const T=proposalTotals(e.line_items);
-  const items=T.items.map(i=>`<tr><td>${esc(i.label)}${i.qty>1?' × '+i.qty:''}</td><td>${money((i.unit_cents||0)*(i.qty||1))}</td></tr>`).join('');
+  const items=lineRowsHtml(T.items);
   const hasB=T.discount>0||T.tax>0;
   const dLbl=(T.meta.discount&&T.meta.discount.mode==='percent')?`Discount (${+T.meta.discount.value}%)`:'Discount';
   const tLbl=(T.meta.tax_pct!=null)?`Tax (${+T.meta.tax_pct}%)`:'Tax';

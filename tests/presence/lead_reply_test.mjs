@@ -28,7 +28,7 @@ ok('a failed send says nothing went out (503) and records nothing', /if \(!sent\
 ok('marks Replied (only from new/read — never un-converts) and resolves the follow-up nudge', /if \(sub\.status === 'new' \|\| sub\.status === 'read'\) patch\.status = 'replied'/.test(route) && /leadFollowupNoticeKey\(id\)/.test(route.slice(route.indexOf('handleFormReply'))));
 ok('a deal from this enquiry gets the reply as an email activity (record timeline)', /source_submission_id=eq\.\$\{id\}[\s\S]{0,400}buildActivityDetail\('email', body, at\)/.test(route));
 ok('replies are capped (newest kept) and bodies bounded', /\.slice\(-LEAD_REPLIES_KEPT\)/.test(route) && /LEAD_REPLY_MAX = 4000/.test(route));
-ok('the inbox read returns replies, never the raw form fields', /rows\.map\(\(\{ fields, \.\.\.s \}: any\) => \(\{ \.\.\.s, replies: leadReplies\(fields\)/.test(route));
+ok('the inbox read returns replies, never the raw form fields', /rows\.map\(\(\{ fields, \.\.\.s \}: any\) => \{[\s\S]*?return \{ \.\.\.s, replies: leadReplies\(fields\)/.test(route));
 
 // ── the two surfaces ──
 ok('inbox.html: the enquiry pane composes and POSTs …/reply; mailto is only the quiet fallback', /\/reply','POST',\{body\}/.test(inbox) && /id="leadMailto"[^>]*>Use your email app instead/.test(inbox) && !/id="leadReply"/.test(inbox));

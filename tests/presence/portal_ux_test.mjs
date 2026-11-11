@@ -19,7 +19,7 @@ function chipsFor(d){
 function notifBucket(iso,nowMs){const t=Date.parse(iso);if(!isFinite(t))return'Earlier';const days=Math.floor((nowMs-t)/86400000);if(days<=0)return'Today';if(days<7)return'This week';return'Earlier';}
 function groupNotifs(items,nowMs){const order=['Today','This week','Earlier'];const map={};for(const it of(items||[])){const b=notifBucket(it&&it.created_at,nowMs);(map[b]=map[b]||[]).push(it);}return order.filter(b=>map[b]&&map[b].length).map(b=>({bucket:b,items:map[b]}));}
 function sectionForAnchor(a){a=String(a||'').replace(/^#/,'');if(a.indexOf('approval')===0)return'sec-approvals';if(a.indexOf('file')===0||a.indexOf('deliverable')===0)return'sec-files';if(a.indexOf('message')===0)return'sec-messages';if(a.indexOf('support')===0)return'sec-support';if(a.indexOf('survey')===0)return'sec-surveys';if(a.indexOf('milestone')===0)return'sec-milestones';if(a.indexOf('task')===0)return'sec-todos';return'sec-overview';}
-function firstName(u){if(!u)return'';const m=(u.user_metadata||{});const n=(m.name||m.full_name||'').trim();if(n)return n.split(/\s+/)[0];const e=(u.email||'').split('@')[0];if(e&&/^[a-z]+([._-][a-z]+)?$/i.test(e)){const p=e.split(/[._-]/)[0];return p.charAt(0).toUpperCase()+p.slice(1);}return'';}
+function firstName(u){if(!u)return'';const cap=(p)=>p.charAt(0).toUpperCase()+p.slice(1);const m=(u.user_metadata||{});const n=String(m.name||m.full_name||'').trim().split(/\s+/)[0].replace(/[.,]+$/,'');if(n.length>1)return n===n.toLowerCase()?cap(n):n;const e=(u.email||'').split('@')[0];if(e&&/^[a-z]+([._-][a-z]+)?$/i.test(e)){const p=e.split(/[._-]/)[0];if(p.length>1)return cap(p);}return'';}
 const esc=(s)=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 function rel(iso){const t=Date.parse(iso);if(!isFinite(t))return'';const s=Math.floor((Date.now()-t)/1000);if(s<60)return'just now';const m=Math.floor(s/60);if(m<60)return m+(m===1?' min ago':' mins ago');const h=Math.floor(m/60);if(h<24)return h+(h===1?' hour ago':' hours ago');const d=Math.floor(h/24);if(d<7)return d+(d===1?' day ago':' days ago');return new Date(t).toLocaleDateString('en-US',{month:'short',day:'numeric'});}
 function notifPanelHtml(notifs,failed){
@@ -231,6 +231,11 @@ ok('name: clean email local-part is capitalized', firstName({email:'maria@shop.c
 ok('name: dotted email uses first token', firstName({email:'john.doe@shop.com'})==='John');
 ok('name: numeric/opaque email → empty (no guessing)', firstName({email:'a1b2c3@shop.com'})==='');
 ok('name: no user → empty', firstName(null)==='' && firstName(undefined)==='');
+// Nov 10 walk: the greeting read "Good morning, j." — one letter is an initial, not a name
+ok('name: a one-letter metadata name falls through to the email', firstName({user_metadata:{name:'j'},email:'maria@shop.com'})==='Maria');
+ok('name: an initial with a dot falls through too, and a one-letter email part is no name', firstName({user_metadata:{name:'J.'},email:'j.doe@shop.com'})==='');
+ok('name: an all-lowercase name gets its capital; a cased one is left alone', firstName({user_metadata:{name:'ada lovelace'}})==='Ada' && firstName({user_metadata:{name:'McKenzie'}})==='McKenzie');
+ok('mirror: client.html defines firstName verbatim', Deno.readTextFileSync(new URL('../../client.html', import.meta.url)).includes(String(firstName)));
 
 // ═══ pathSteps — done / current (first open) / upcoming ═══
 const MS=[

@@ -445,6 +445,10 @@ async function api(path,method,body){
 
 // ── roster state: items · per-project report cache · customer-name map ───────
 let ITEMS=[],LOADED_AT=0,Q="";
+// C14: the roster reads every project a page of 100 at a time (the server's cap), up to
+// PROJECT_PAGES pages; LIST_CUT is how many it read when there may be more
+const PROJECT_PAGES=5,PROGRESS_BATCH=60;   // PROGRESS_BATCH: routes/projects.ts PROGRESS_BATCH_MAX
+let LIST_CUT=0;
 // SS6 shared ~150ms debounce — kept in sync by hand with inbox.html/contacts.html/customers.html
 const debounce=(fn,ms)=>{let t;return function(){clearTimeout(t);t=setTimeout(fn,ms||150);};};
 const REPORTS={};          // project id → report summary (progress/approvals), fetched lazily
@@ -580,6 +584,7 @@ function metaText(list){
   if(late)parts.push(`${late} late`);
   if(hold)parts.push(`${hold} on hold`);
   if(VIEW!=='all'||Q.trim())parts.push(`showing ${list.length} project${list.length===1?'':'s'}`);
+  if(LIST_CUT)parts.push(`only the ${LIST_CUT} most recently changed are listed`);
   parts.push(updatedLabel());
   if(DISPLAY==='table')parts.push(`Sorted by ${sortCol[1]} — ${SORT.dir>0?'ascending':'descending'}`);
   return parts.join(' · ');
@@ -802,14 +807,19 @@ async function load(soft){
   try{
     if(scope()&&!AG_MODE){const sc=await resolveScopedClient();if(sc){AG_MODE=true;SCOPED_CLIENT=sc;}}
     // Bold redesign: one read of every project (the chips filter in place, with
-    // true counts) — the server's page cap, not its default 25
+    // true counts) — the server's page cap, not its default 25. C14: past 100 it
+    // reads on, a page at a time, instead of stopping silently
     const res=await api('/projects?limit=100');
+    let all=res.data||[],last=all;
+    for(let pg=1;pg<PROJECT_PAGES&&last.length===100;pg++){last=(await api('/projects?limit=100&offset='+(pg*100))).data||[];all=all.concat(last);}
+    const seen=new Set();all=all.filter((p)=>p&&!seen.has(p.id)&&seen.add(p.id));   // a project changed mid-read can show on two pages
+    LIST_CUT=last.length===100?all.length:0;
     // Scoped into a client, POST /projects would file the project on the CLIENT's
     // site — projects live on the agency site (service_bridge ensureProjectForDeal
     // takes agencySiteId), so it would land where nothing else can see it. Hide
     // the action rather than offer a button that does the wrong thing quietly.
     STUDIO=res.is_studio_view!==false; NEW_OK=STUDIO&&!scope();
-    ITEMS=res.data||[];
+    ITEMS=all;
     if(SCOPED_CLIENT)ITEMS=ITEMS.filter(p=>String(p.client_id||'')===SCOPED_CLIENT.client_id);   // this client's work only
     LOADED_AT=Date.now();
     // the board places a card by its stage, so it waits for the facts — briefly:
@@ -854,18 +864,22 @@ async function ensureCustomers(){
 // server hasn't that route yet (pages go live before the functions deploy) the per-project
 // reads still fill it in.
 async function ensureReports(again){   // again: a refresh, so ask for the ones already in hand too
-  const ids=visRows().map(p=>p.id).filter(id=>id&&(again||!REPORTS[id])).slice(0,60);
+  // C14: every project the roster shows, PROGRESS_BATCH to a read (it stopped at the first 60)
+  const ids=visRows().map(p=>p.id).filter(id=>id&&(again||!REPORTS[id]));
   if(!ids.length)return false;
-  let changed=false;
-  try{
-    const r=await api('/projects/progress?ids='+ids.join(','));
-    const got=r&&r.data;
-    if(got&&typeof got==='object'&&!Array.isArray(got)){
-      ids.forEach(id=>{if(got[id]){REPORTS[id]=got[id];changed=true;}});
-      return changed;
-    }
-  }catch(e){if(!(e&&e.status===404))return changed;}
-  await Promise.allSettled(ids.map(id=>api('/projects/'+id+'/report').then(r=>{const s=r&&r.data&&r.data.summary;if(s){REPORTS[id]=s;changed=true;}}).catch(()=>{})));
+  const today=todayYmd();   // C11: a step due today is overdue only once the studio's own day is over
+  const parts=[];for(let i=0;i<ids.length;i+=PROGRESS_BATCH)parts.push(ids.slice(i,i+PROGRESS_BATCH));
+  let changed=false,legacy=false;
+  await Promise.all(parts.map(async(part)=>{
+    try{
+      const r=await api('/projects/progress?ids='+part.join(',')+'&today='+today);
+      const got=r&&r.data;
+      if(got&&typeof got==='object'&&!Array.isArray(got)){part.forEach(id=>{if(got[id]){REPORTS[id]=got[id];changed=true;}});return;}
+      legacy=true;
+    }catch(e){if(e&&e.status===404)legacy=true;}
+  }));
+  if(!legacy)return changed;
+  await Promise.allSettled(ids.slice(0,60).map(id=>api('/projects/'+id+'/report?today='+today).then(r=>{const s=r&&r.data&&r.data.summary;if(s){REPORTS[id]=s;changed=true;}}).catch(()=>{})));
   return changed;
 }
 
@@ -983,6 +997,7 @@ function hideDetail(){ const l=$('listWrap'),d=$('detailWrap'); if(d)d.hidden=tr
 function closeProjectDetail(){
   const was=new URLSearchParams(location.search).get('project');
   PROJ_SEQ++; hideDetail(); history.replaceState(null,'','projects.html'+(scope()?'?client='+scope():''));
+  if(LOADED_AT)renderRoster();   // C7: a status change or rename moved its card (openProject kept the list entry current)
   const c=(was&&document.querySelector('#list [data-id="'+was+'"]'))||document.querySelector('#list [data-id]')||$('pagehead'); if(c)c.focus();
   // bold redesign: the project just closed may have moved on (a ticked step, an
   // approval asked) — re-read where it stands so its card tells the truth
@@ -1029,9 +1044,13 @@ async function openProject(id){
   const wasOpen=!$('detailWrap').hidden;
   $('detailInner').innerHTML='<div class="rsec"><div class="dds-skeleton" style="height:16px;width:60%"></div></div>'; showDetail();
   try{
-    const [{data},rep]=await Promise.all([api('/projects/'+id),api('/projects/'+id+'/report').catch(()=>null)]);
+    const td='?today='+todayYmd();   // C11: overdue on the studio's own day, not the server's UTC one
+    const [{data},rep]=await Promise.all([api('/projects/'+id+td),api('/projects/'+id+'/report'+td).catch(()=>null)]);
     if(seq!==PROJ_SEQ)return;   // a newer record (or the roster) took over mid-flight
     const p=data.project; STUDIO=data.is_studio_view!==false;
+    // C7: the board's copy of this project follows what the record just read — after a
+    // status change or a rename its card is where it now belongs when you go back
+    const li=ITEMS.find((x)=>x.id===p.id); if(li)for(const k of Object.keys(li))if(k in p)li[k]=p[k];
     const rp=rep&&rep.data&&rep.data.summary; if(rp)REPORTS[id]=Object.assign({},REPORTS[id]||{},rp);   // keep the board's stage/next/waiting beside the report's counts
     if(STUDIO)await ensureCustomers();   // the Customer highlight tile (cached after the first record)
     if(seq!==PROJ_SEQ)return;

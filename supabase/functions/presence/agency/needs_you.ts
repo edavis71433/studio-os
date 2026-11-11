@@ -55,7 +55,9 @@ export interface NeedsInput {
   clientNames: Record<string, string>;
   /** client_id → name, for customers the portfolio does not know by site */
   namesByClient?: Record<string, string>;
-  sites?: Array<{ id: string; edition?: string; status?: string; last_published_at?: string | null; custom_domain?: string | null; domain_registrar?: string | null; domain_expires_at?: string | null }>;
+  sites?: Array<{ id: string; edition?: string; status?: string; last_published_at?: string | null; custom_domain?: string | null; domain_registrar?: string | null; domain_expires_at?: string | null;
+    /** item 134: the padlock's end date, and since when the records have been right with no padlock on */
+    cert_expires_at?: string | null; cert_pending_since?: string | null }>;
   /** /sales/receivables items — the SAME rows the roster's Outstanding column and Pipeline's tile use */
   invoices?: Array<{ id: string; title?: string; amount_cents?: number; due_date?: string | null; status?: string; state?: string; processing_since?: string | null; deal_id?: string | null; deal?: string; client_id?: string | null; customer_site_id?: string | null; created_at?: string | null }>;
   /** invoice reminders that went out: period 'invremind:<invoice id>[:slot]' + when */
@@ -104,6 +106,8 @@ export const NEEDS_YOU_CAP = 8;
 /** rows beyond the cap still travel (for "+N more") up to this many */
 export const NEEDS_YOU_REST = 40;
 export const DOMAIN_SOON_DAYS = 30;
+/** item 134: Home asks when a padlock ends within this, or has been stuck this long (lib/domain_health.ts) */
+export const PADLOCK_SOON_DAYS = 14, PADLOCK_STUCK_HOURS = 24;
 export const MONEY_SOON_DAYS = 7;
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -316,6 +320,20 @@ export function buildNeedsYou(i: NeedsInput): NeedsRow[] {
         push({ key: `broken:publish:${s.id}`, kind: 'broken', site_id: s.id, client_id: null, name: nameOf(s.id, null),
           what: 'the last publish failed', when: [ago(p.created_at, today) ? `Failed ${ago(p.created_at, today)}` : 'Failed', err ? err.slice(0, 80) : ''].filter(Boolean).join(' · '),
           verb: 'Fix', href: `/presence.html${sc(s.id)}#publish`, since: p.created_at || null });
+      }
+      // item 134 (review findings 4 and 20): the padlock stuck for a day with the records right,
+      // or ending within two weeks without renewing (what happens when records drift)
+      const stuckH = s.cert_pending_since ? (Date.parse(i.nowIso) - Date.parse(s.cert_pending_since)) / 3600_000 : null;
+      const pe = daysBetween(today, s.cert_expires_at);
+      if (s.custom_domain && stuckH !== null && Number.isFinite(stuckH) && stuckH >= PADLOCK_STUCK_HOURS) {
+        push({ key: `broken:padlock:${s.id}`, kind: 'broken', site_id: s.id, client_id: null, name: nameOf(s.id, null),
+          what: `the padlock for ${s.custom_domain} hasn’t come on`, when: `Records right since ${shortDate(s.cert_pending_since)} · asked again each day`,
+          verb: 'Fix', href: `/presence.html${sc(s.id)}#domain`, since: s.cert_pending_since || null });
+      } else if (s.custom_domain && pe !== null && pe <= PADLOCK_SOON_DAYS) {
+        push({ key: `broken:padlock:${s.id}`, kind: 'broken', site_id: s.id, client_id: null, name: nameOf(s.id, null),
+          what: pe < 0 ? `the padlock for ${s.custom_domain} has ended` : `the padlock for ${s.custom_domain} ends ${pe === 0 ? 'today' : `in ${plural(pe, 'day')}`}`,
+          when: 'It renews by itself while the domain points here; a renewal that hasn’t happened usually means the records changed',
+          verb: 'Fix', href: `/presence.html${sc(s.id)}#domain`, since: s.cert_expires_at || null });
       }
       const de = daysBetween(today, s.domain_expires_at);
       if (de !== null && de <= DOMAIN_SOON_DAYS) {

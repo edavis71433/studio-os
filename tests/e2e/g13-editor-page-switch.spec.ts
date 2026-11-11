@@ -130,7 +130,7 @@ test.describe('G13 in-place canvas text editor — changing page with an edit op
     const { frame, puts } = await mountPages(page);
     await openAbout(page, frame);
     await typeOver(page, frame.locator('#about-us [data-dds-field="subtitle"]'), 'Before the new page');
-    await openPages(page); await page.locator('#pagesBar .page-add').click();
+    await openPages(page); await page.locator('#pagesCard .page-add').click();
     await page.getByPlaceholder('e.g. Services, Gallery, Pricing').fill('Gallery');
     await page.getByRole('button', { name: 'Next: pick a layout' }).click();
     await page.locator('.dc-layout-card', { hasText: 'Blank page' }).click();

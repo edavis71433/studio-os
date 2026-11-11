@@ -430,7 +430,7 @@ export async function moveThenWrite(page: Page, frame: Frame, puts: Mounted['put
 
 // ＋ Page with a blank layout, leaving the person on the new page.
 export async function addGallery(page: Page) {
-  await openPages(page); await page.locator('#pagesBar .page-add').click();
+  await openPages(page); await page.locator('#pagesCard .page-add').click();
   await page.getByPlaceholder('e.g. Services, Gallery, Pricing').fill('Gallery');
   await page.getByRole('button', { name: 'Next: pick a layout' }).click();
   await page.locator('.dc-layout-card', { hasText: 'Blank page' }).click();
