@@ -129,7 +129,8 @@ const render = (industry, extra) => renderSnapshot(snapFor(industry, extra), SIT
   ok('not-sent: no script and no click handler (CSS :target picks the reason)', !/<script(?! type="application\/ld\+json")/.test(ns) && !/<[a-z][a-z0-9]*\b[^>]*\son\w+\s*=/i.test(ns));
   ok('reasons: a known code keeps its line, anything else gets the general one', notSentReason('bad_email') === 'bad_email' && notSentReason('need_contact') === 'need_contact' && notSentReason('weird') === 'check');
   const route = await Deno.readTextFile(new URL('supabase/functions/presence/routes/commercial.ts', ROOT));
-  ok('route: every failed browser submission goes to the page; the contact page is only the old-site fallback and the gone-form case', (route.match(/await notSent\(/g) || []).length === 4 && (route.match(/redirectTo\('\/contact\/'\)/g) || []).length === 2);
+  // six: the contact form's two, a custom form's three (item 147: its files couldn't be kept), and item 146's "Join our list" box
+  ok('route: every failed browser submission goes to the page; the contact page is only the old-site fallback and the gone-form case', (route.match(/await notSent\(/g) || []).length === 6 && (route.match(/redirectTo\('\/contact\/'\)/g) || []).length === 2);
   const slugs = listTemplates().map((t) => t.slug);
   const each = await Promise.all(slugs.map(async (slug) => { const sn = snapFor('plumber'); sn.template_slug = slug; const g = await renderSnapshot(sn, SITE); const h = String(g['not-sent/index.html'] || ''); return [slug, h.includes('Your message didn’t send.') && h.includes('content="noindex"') && (h.match(/<h1[\s>]/g) || []).length === 1 && h.includes('aria-current="page"')]; }));
   ok('not-sent: all eight templates draw it, noindex, one heading, Contact marked in the menu', slugs.length === 8 && each.every(([, good]) => good), each.filter(([, g]) => !g).map(([s]) => s).join(','));

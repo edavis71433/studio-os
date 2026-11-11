@@ -546,9 +546,23 @@ nav.primary a{display:inline-block;padding:8px 12px;text-decoration:none;color:#
 <section id="stay-in-the-loop" data-dds-sid="newsletter" data-dds-key="block_newsletter" data-dds-src="13" class="block wrap block-newsletter">
 <h2 data-dds-field="title">Stay in the loop</h2>
 <p class="nl-text" data-dds-field="text">News and offers, once a month.</p>
-<p class="nl-cta">
-<a class="btn" href="https://example.com/subscribe" rel="noopener" data-dds-field="button">Sign up</a>
+<form class="card nl-form" method="post">
+<input type="hidden" name="form_kind" value="signup">
+<input type="hidden" name="source_page" value="/">
+<p class="hp" aria-hidden="true">
+<label for="nl-1-hp">Leave this field empty</label>
+<input id="nl-1-hp" name="_hp" tabindex="-1" autocomplete="off">
 </p>
+<div class="nl-row">
+<label class="nl-label" for="nl-1-email">Your email</label>
+<input type="email" id="nl-1-email" name="email" required maxlength="254" autocomplete="email" placeholder="you@example.com">
+<button class="btn" type="submit" data-dds-field="button">Sign up</button>
+</div>
+<p class="nl-consent">
+<label>
+<input type="checkbox" name="consent" value="yes" required> Yes, send me updates by email. I can unsubscribe at any time.</label>
+</p>
+</form>
 </section>
 <section id="follow-along" data-dds-sid="social" data-dds-key="block_social" data-dds-src="14" class="block wrap block-social">
 <h2 data-dds-field="title">Follow along</h2>

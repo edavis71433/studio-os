@@ -56,6 +56,7 @@ import { UUID_RE } from '../lib/uuid.ts';
 import { reopenEnquiry } from '../lib/enquiry_state.ts';
 import { normEmail, emailMatch, isUniqueViolation } from '../lib/contact_email.ts';   // item 110 (K1): one person, one email, whatever its capitals
 import { contactMoreFrom, cleanTag, CONTACT_MORE_COLS } from '../lib/contact_fields.ts';   // item 89: address, job title, second phone, tags
+import { liveImport, importUpdate, noteImportRow } from './contacts_more.ts';   // item 86: imports that update and can be undone
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;                       // expected_close: ISO date only
 const CONVERT_PLANS = new Set(['presence', 'cms_only', 'business_os_only', 'presence_monitor', 'presence_managed']);
@@ -277,8 +278,11 @@ export async function handleSalesContacts(req: Request, site: SiteRow, principal
     // read, so every page costs the same two reads at any roster size). The pages
     // that list people ask for it to say "Showing 100 of N"; nobody else pays.
     const totalP = u.searchParams.get('total') === '1' ? svcCount(`presence_contacts?site_id=eq.${site.id}${more}`).catch(() => null) : Promise.resolve(undefined);
-    // item 89: the row shows a job title and tags, and a second phone to call; before APPLY-0166 the older select
-    let r = await svc(mkPath(`id,name,email,phone,company,client_id,updated_at,${CONTACT_MORE_COLS.join(',')}`));
+    // item 89: the row shows a job title and tags, and a second phone to call; before APPLY-0166 the older select.
+    // item 105: found_via rides along for the list's "How they found you" chart (APPLY-0143; without it, every
+    // contact counts as not recorded).
+    let r = await svc(mkPath(`id,name,email,phone,company,client_id,updated_at,found_via,${CONTACT_MORE_COLS.join(',')}`));
+    if (!r.ok && r.status === 400) r = await svc(mkPath('id,name,email,phone,company,client_id,updated_at,found_via'));
     if (!r.ok && r.status === 400) r = await svc(mkPath('id,name,email,phone,company,client_id,updated_at'));
     if (!r.ok && r.status === 400) r = await svc(mkPath('id,name,email,phone,company,updated_at'));
     if (!r.ok) return json({ error: 'read_failed', message: 'We couldn’t load your contacts just now.' }, 502, cors);
@@ -303,9 +307,20 @@ export async function handleSalesContacts(req: Request, site: SiteRow, principal
     // duplicate protection: reuse an existing contact for this (site, email) — matched the
     // way the database's rule matches, whatever the capitals (item 110, K1)
     const sameEmail = () => svc(`presence_contacts?site_id=eq.${site.id}&${emailMatch(email)}&deleted_at=is.null&select=id,name,email,phone,company&limit=1`);
+    // item 86: a row of an import carries its import's id; the import says whether someone
+    // already here is updated with what the file has, and notes each row for its Undo
+    const imp = b.import_id ? await liveImport(site.id, b.import_id) : null;
+    // your own fields (item 86: an import can fill them), checked against their definitions
+    const custom = b.custom && typeof b.custom === 'object' ? applyFieldValues(await loadContactFieldDefs(site.id), {}, b.custom) : null;
     if (email) {
       const existing = await sameEmail();
-      if (existing.ok && rows(existing)[0]) return json({ data: rows(existing)[0], deduped: true }, 200, cors);
+      if (existing.ok && rows(existing)[0]) {
+        if (imp && imp.on_existing === 'update') {
+          const u = await importUpdate(site.id, imp.id, rows(existing)[0], { name, phone, company: clean(b.company, 120), notes: clean(b.notes, 2000), found_via: normalizeFoundVia(b.found_via), ...contactMoreFrom(b), ...(custom ? { custom } : {}) });
+          if (u) return json({ data: u.row, deduped: true, updated: u.updated }, 200, cors);
+        }
+        return json({ data: rows(existing)[0], deduped: true }, 200, cors);
+      }
     }
     // FUZZY near-duplicate: past the exact-email check, a typo'd re-entry
     // ("Jayne" for "Jane") or an alt format ("Doe, Jane") with the same phone
@@ -322,7 +337,7 @@ export async function handleSalesContacts(req: Request, site: SiteRow, principal
     }
     const foundVia = normalizeFoundVia(b.found_via);   // item 69: "How did they find you?" ('' = not recorded)
     const moreFields = contactMoreFrom(b);              // item 89: address, job title, second phone, tags
-    const ins = await insertWithFoundVia('presence_contacts', { site_id: site.id, name, email, phone, company: clean(b.company, 120), notes: clean(b.notes, 2000), ...(foundVia ? { found_via: foundVia } : {}), ...moreFields });
+    const ins = await insertWithFoundVia('presence_contacts', { site_id: site.id, name, email, phone, company: clean(b.company, 120), notes: clean(b.notes, 2000), ...(foundVia ? { found_via: foundVia } : {}), ...moreFields, ...(custom && Object.keys(custom).length ? { custom } : {}) });
     // K6: two adds of one new person at once (two rows of one import file, two tabs) both pass
     // the check above; the database refuses the second, and that is the same person, not a failure
     if (!ins.ok && email && isUniqueViolation(ins)) {
@@ -330,6 +345,7 @@ export async function handleSalesContacts(req: Request, site: SiteRow, principal
       if (again.ok && rows(again)[0]) return json({ data: rows(again)[0], deduped: true }, 200, cors);
     }
     if (!ins.ok || !rows(ins)[0]) return json({ error: 'write_failed', message: 'That contact didn’t save — please try again.' }, 502, cors);
+    if (imp) await noteImportRow(site.id, imp.id, rows(ins)[0].id, 'added');   // item 86: Undo takes them off again
     // item 89: before APPLY-0166 the contact saves without its new fields, and the answer says so
     if (ins.dropped.some((c) => (CONTACT_MORE_COLS as readonly string[]).includes(c))) return json({ data: rows(ins)[0], warning: 'fields_unavailable', message: 'Saved — the address, job title, second phone and tags need a quick database update before they stick.' }, 201, cors);
     return json({ data: rows(ins)[0] }, 201, cors);
@@ -341,7 +357,7 @@ export async function handleSalesContacts(req: Request, site: SiteRow, principal
  *  optional columns yet (found_via before APPLY-0143; job_title, phone2, address,
  *  tags before APPLY-0166), retry once without the ones it names — never silently
  *  dropping anything else. `dropped` says which were left out. */
-const OPTIONAL_INSERT_COLS = ['found_via', ...CONTACT_MORE_COLS];
+const OPTIONAL_INSERT_COLS = ['found_via', 'custom', ...CONTACT_MORE_COLS];
 /** The newer optional columns arrive in groups (one migration each): one of a group
  *  missing means the whole group is. */
 export function missingGroups(missing: string[]): string[] {
@@ -909,7 +925,9 @@ export async function handleSalesDeals(req: Request, site: SiteRow, principal: P
     // the pipeline list.
     const baseCols = 'id,title,stage,source,expected_value_cents,expected_close,contact_id,converted_client_id,updated_at';
     const filters = `${stage && isStage(stage) ? `&stage=eq.${stage}` : ''}${q ? `&title.ilike.*${encodeURIComponent(q)}*` : ''}`;
-    let r = await svc(`presence_deals?site_id=eq.${site.id}&deleted_at=is.null&select=${baseCols},next_step,next_step_at&order=updated_at.desc&limit=${limit}&offset=${offset}${filters}`);
+    // item 105: found_via (APPLY-0143) rides along for the list's "Where they came from" chart, then the same read without it.
+    let r = await svc(`presence_deals?site_id=eq.${site.id}&deleted_at=is.null&select=${baseCols},next_step,next_step_at,found_via&order=updated_at.desc&limit=${limit}&offset=${offset}${filters}`);
+    if (!r.ok) r = await svc(`presence_deals?site_id=eq.${site.id}&deleted_at=is.null&select=${baseCols},next_step,next_step_at&order=updated_at.desc&limit=${limit}&offset=${offset}${filters}`);
     if (!r.ok) r = await svc(`presence_deals?site_id=eq.${site.id}&deleted_at=is.null&select=${baseCols}&order=updated_at.desc&limit=${limit}&offset=${offset}${filters}`);
     if (!r.ok) return json({ error: 'read_failed', message: 'We couldn’t load your pipeline just now.' }, 502, cors);
     const deals = rows(r);

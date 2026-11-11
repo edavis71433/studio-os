@@ -41,6 +41,7 @@ import {
 } from '../lib/booking.ts';
 import { UUID_RE } from '../lib/uuid.ts';
 import { normEmail, emailMatch } from '../lib/contact_email.ts';
+import { ticketsOn, siteChecksSends, readTicket } from '../lib/form_check.ts';
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 const rows = (r: { json?: unknown }) => (Array.isArray((r as any).json) ? (r as any).json : []) as any[];
@@ -176,6 +177,13 @@ export async function handleBookingCreate(req: Request, siteId: string, cors: Re
   const spam = !!String(b?._hp ?? '').slice(0, 100).trim();
   const calmOk = (msg: string, extra: Record<string, unknown> = {}) => json({ data: { ok: true, message: msg, ...extra } }, 200, cors);
   if (spam) return calmOk('Thanks — your booking request was received.');
+  // Item 140: once the site's pages ask for a time ticket, a booking without a good one
+  // didn't come from a person on the page, and no robot may hold a time. Refused out
+  // loud: the widget asks for a fresh ticket and tries once more on its own.
+  if (ticketsOn() && await siteChecksSends(siteId).catch(() => false)) {
+    const t = await readTicket(b?._tk, siteId, Math.floor(Date.now() / 1000));
+    if (t !== 'ok') return json({ error: 'check', message: 'That didn’t go through. Please try again.' }, 400, cors);
+  }
 
   const v = validateBookingInput(b);
   if (!v.ok) {

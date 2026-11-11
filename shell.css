@@ -29,7 +29,7 @@
   --dds-info:#245fa0; --dds-info-soft:#e6effa;
   --dds-shadow:0 1px 2px rgba(23,21,34,.05),0 8px 24px -8px rgba(23,21,34,.10);
   --dds-shadow-pop:0 20px 48px -12px rgba(23,21,34,.24),0 2px 6px rgba(23,21,34,.06);
-  --dds-up:#f7f6fb;
+  --dds-up:#f7f6fb; --dds-chart:#6d3fd4; --dds-chart-none:#86829a; --dds-chart-track:#f0eef6;   /* item 105: list charts */
   --dds-grad:linear-gradient(135deg,#4a2c8c 0%,#6436c4 55%,#7d3fb8 100%);
   --dds-grad-brand:linear-gradient(135deg,#6d3fd4 0%,#a63f86 100%);
   --dds-grad-btn:linear-gradient(135deg,#6d3fd4 0%,#7a4bdd 100%); --dds-on-p:#fff;
@@ -72,7 +72,7 @@
   --dds-info:#8ab8e8; --dds-info-soft:#1c2633;
   --dds-shadow:0 1px 2px rgba(0,0,0,.35),0 8px 24px -10px rgba(0,0,0,.55);
   --dds-shadow-pop:0 20px 48px -12px rgba(0,0,0,.65),0 2px 6px rgba(0,0,0,.4);
-  --dds-up:#262239;
+  --dds-up:#262239; --dds-chart:#9677ee; --dds-chart-none:#77728f; --dds-chart-track:#2d2944;
   --dds-grad:linear-gradient(135deg,#3c2378 0%,#56309f 55%,#6f3aa6 100%);
   --dds-grad-brand:linear-gradient(135deg,#6d3fd4 0%,#a63f86 100%);
   --dds-grad-btn:linear-gradient(135deg,#c4b0fa 0%,#dcb4f0 100%); --dds-on-p:#171320;
@@ -81,8 +81,8 @@
    both explicit-toggle blocks, or a user whose toggle disagrees with the OS
    scheme gets mixed palettes (crm.html aliases --dds-good/--dds-warn for its
    timeline accents, plus --dds-*-soft and --dds-shadow). */
-:root[data-theme="light"]{--dds-bg:#f3f3f8;--dds-card:#fff;--dds-ink:#171522;--dds-soft:#55526a;--dds-faint:#69667d;--dds-line:#e7e6ef;--dds-line-strong:#d6d4e2;--dds-p:#6d3fd4;--dds-p-deep:#3d2185;--dds-p-soft:#f0ebfd;--dds-bad:#bf3535;--dds-bad-soft:#fdeaea;--dds-good:#11744a;--dds-good-soft:#e2f4ea;--dds-warn:#94530a;--dds-warn-soft:#fcefdb;--dds-info:#245fa0;--dds-info-soft:#e6effa;--dds-shadow:0 1px 2px rgba(23,21,34,.05),0 8px 24px -8px rgba(23,21,34,.10);--dds-shadow-pop:0 20px 48px -12px rgba(23,21,34,.24),0 2px 6px rgba(23,21,34,.06);--dds-up:#f7f6fb;--dds-grad:linear-gradient(135deg,#4a2c8c 0%,#6436c4 55%,#7d3fb8 100%);--dds-grad-brand:linear-gradient(135deg,#6d3fd4 0%,#a63f86 100%);--dds-grad-btn:linear-gradient(135deg,#6d3fd4 0%,#7a4bdd 100%);--dds-on-p:#fff}
-:root[data-theme="dark"]{--dds-bg:#131120;--dds-card:#1d1a2e;--dds-ink:#edeaf7;--dds-soft:#b3aecb;--dds-faint:#9792b0;--dds-line:#2d2944;--dds-line-strong:#403a5e;--dds-p:#b79cf5;--dds-p-deep:#d7c8fb;--dds-p-soft:#2c2347;--dds-bad:#f09a92;--dds-bad-soft:#35201f;--dds-good:#7fd3a5;--dds-good-soft:#1c2f26;--dds-warn:#e3b06b;--dds-warn-soft:#2f2514;--dds-info:#8ab8e8;--dds-info-soft:#1c2633;--dds-shadow:0 1px 2px rgba(0,0,0,.35),0 8px 24px -10px rgba(0,0,0,.55);--dds-shadow-pop:0 20px 48px -12px rgba(0,0,0,.65),0 2px 6px rgba(0,0,0,.4);--dds-up:#262239;--dds-grad:linear-gradient(135deg,#3c2378 0%,#56309f 55%,#6f3aa6 100%);--dds-grad-brand:linear-gradient(135deg,#6d3fd4 0%,#a63f86 100%);--dds-grad-btn:linear-gradient(135deg,#c4b0fa 0%,#dcb4f0 100%);--dds-on-p:#171320}
+:root[data-theme="light"]{--dds-bg:#f3f3f8;--dds-card:#fff;--dds-ink:#171522;--dds-soft:#55526a;--dds-faint:#69667d;--dds-line:#e7e6ef;--dds-line-strong:#d6d4e2;--dds-p:#6d3fd4;--dds-p-deep:#3d2185;--dds-p-soft:#f0ebfd;--dds-bad:#bf3535;--dds-bad-soft:#fdeaea;--dds-good:#11744a;--dds-good-soft:#e2f4ea;--dds-warn:#94530a;--dds-warn-soft:#fcefdb;--dds-info:#245fa0;--dds-info-soft:#e6effa;--dds-shadow:0 1px 2px rgba(23,21,34,.05),0 8px 24px -8px rgba(23,21,34,.10);--dds-shadow-pop:0 20px 48px -12px rgba(23,21,34,.24),0 2px 6px rgba(23,21,34,.06);--dds-up:#f7f6fb;--dds-chart:#6d3fd4;--dds-chart-none:#86829a;--dds-chart-track:#f0eef6;--dds-grad:linear-gradient(135deg,#4a2c8c 0%,#6436c4 55%,#7d3fb8 100%);--dds-grad-brand:linear-gradient(135deg,#6d3fd4 0%,#a63f86 100%);--dds-grad-btn:linear-gradient(135deg,#6d3fd4 0%,#7a4bdd 100%);--dds-on-p:#fff}
+:root[data-theme="dark"]{--dds-bg:#131120;--dds-card:#1d1a2e;--dds-ink:#edeaf7;--dds-soft:#b3aecb;--dds-faint:#9792b0;--dds-line:#2d2944;--dds-line-strong:#403a5e;--dds-p:#b79cf5;--dds-p-deep:#d7c8fb;--dds-p-soft:#2c2347;--dds-bad:#f09a92;--dds-bad-soft:#35201f;--dds-good:#7fd3a5;--dds-good-soft:#1c2f26;--dds-warn:#e3b06b;--dds-warn-soft:#2f2514;--dds-info:#8ab8e8;--dds-info-soft:#1c2633;--dds-shadow:0 1px 2px rgba(0,0,0,.35),0 8px 24px -10px rgba(0,0,0,.55);--dds-shadow-pop:0 20px 48px -12px rgba(0,0,0,.65),0 2px 6px rgba(0,0,0,.4);--dds-up:#262239;--dds-chart:#9677ee;--dds-chart-none:#77728f;--dds-chart-track:#2d2944;--dds-grad:linear-gradient(135deg,#3c2378 0%,#56309f 55%,#6f3aa6 100%);--dds-grad-brand:linear-gradient(135deg,#6d3fd4 0%,#a63f86 100%);--dds-grad-btn:linear-gradient(135deg,#c4b0fa 0%,#dcb4f0 100%);--dds-on-p:#171320}
 
 /* One keyboard-focus ring for every shelled page (audit E3: 17 pages had none). */
 html.dds-has-shell :focus-visible{outline:2px solid var(--dds-p);outline-offset:2px}
@@ -885,6 +885,57 @@ html.dds-cr-on body{overflow:hidden}
 .dds-cr .cr-menu.tiles .cr-tx b{font-size:13px;line-height:1.25}
 @media (pointer:coarse){.dds-cr .cr-chip,.dds-cr .cr-change{min-height:44px}}
 @media (prefers-reduced-motion:reduce){.dds-cr.form,.dds-cr.sheet{animation:none}}
+/* ── Charts on a list, and a printable list (sales item 105, Nov 2026) ─────────
+   ddsListKit.charts() draws plain bar lists: a label, a bar as long as its count
+   (the longest row fills the track), the count written beside it, and sometimes a
+   second figure (a stage's value). One colour; "Not recorded" is grey. The chart
+   tokens live in the four theme blocks above (--dds-chart, -none, -track). */
+.dds-charts{container-type:inline-size;background:var(--dds-card);border:1px solid var(--dds-line);border-radius:var(--dds-r-lg,16px);box-shadow:var(--dds-shadow);padding:16px 20px 14px;margin:0 0 14px;color:var(--dds-ink)}
+.dds-charts[hidden]{display:none}
+.dds-charts .dc-h{margin:0 0 12px;font-size:15px;font-weight:650;line-height:1.3}
+.dds-charts .dc-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px 0}
+.dds-charts .dc-panel{min-width:0}
+.dds-charts .dc-panel+.dc-panel{border-left:1px solid var(--dds-line);margin-left:28px;padding-left:28px}
+.dds-charts h3{margin:0 0 6px;font-size:13.5px;font-weight:600;line-height:1.3}
+.dds-charts .dc-bars{list-style:none;margin:0;padding:0}
+.dds-charts .dc-row{display:grid;grid-template-columns:minmax(72px,8.5em) minmax(32px,1fr) 3.5ch;align-items:center;gap:12px;min-height:30px;font-size:13.5px}
+.dds-charts .dc-bars.has-v .dc-row{grid-template-columns:minmax(72px,8.5em) minmax(32px,1fr) 3.5ch minmax(6ch,auto)}
+.dds-charts .dc-l{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.dds-charts .dc-row.none .dc-l{color:var(--dds-soft)}
+.dds-charts .dc-track{height:8px;border-radius:4px;background:var(--dds-chart-track);overflow:hidden}
+.dds-charts .dc-fill{display:block;height:100%;border-radius:0 4px 4px 0;background:var(--dds-chart)}
+.dds-charts .dc-row.none .dc-fill{background:var(--dds-chart-none)}
+.dds-charts .dc-n{text-align:right;font-weight:600;font-variant-numeric:tabular-nums}
+.dds-charts .dc-v{text-align:right;color:var(--dds-soft);font-variant-numeric:tabular-nums}
+.dds-charts .dc-none{margin:4px 0 0;font-size:13px;color:var(--dds-soft)}
+.dds-charts .dc-foot{margin:12px 0 0;font-size:12.5px;color:var(--dds-faint)}
+.dds-charts .sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.dc-tip{position:fixed;z-index:60;pointer-events:none;white-space:nowrap;padding:6px 10px;border-radius:8px;background:var(--dds-ink);color:var(--dds-card);font-size:12.5px;line-height:1.35;box-shadow:var(--dds-shadow-pop);transform:translate(-50%,calc(-100% - 8px))}
+.dc-tip[hidden]{display:none}
+@media (max-width:760.98px){.dds-charts{padding:14px 16px 12px}}
+/* a narrow card (a phone, or an iPad beside the sidebar) stacks the two charts */
+@container (max-width:620px){
+  .dds-charts .dc-grid{grid-template-columns:minmax(0,1fr)}
+  .dds-charts .dc-panel+.dc-panel{border-left:0;margin:6px 0 0;padding:12px 0 0;border-top:1px solid var(--dds-line)}
+}
+/* ddsListKit.printList(): while it prints, the page shows only #ddsPrint, a plain
+   table of the rows in view, in ink on white whatever the theme. */
+#ddsPrint{display:none}
+@media print{
+  body[data-print="list"]>*:not(#ddsPrint){display:none!important}
+  body[data-print="list"]{margin:0!important;padding:0!important;background:#fff!important}
+  body[data-print="list"] #ddsPrint{display:block;color:#171522;font:10pt/1.4 var(--dds-sans)}
+  #ddsPrint h1{margin:0 0 3pt;font:600 16pt/1.25 var(--dds-sans);color:#171522}
+  #ddsPrint .pl-sub{margin:0 0 14pt;font-size:9.5pt;color:#55526a}
+  #ddsPrint table{width:100%;border-collapse:collapse}
+  #ddsPrint thead{display:table-header-group}
+  #ddsPrint th{padding:0 10pt 6pt 0;border-bottom:1px solid #b9b6c8;text-align:left;font-size:9pt;font-weight:600;color:#171522}
+  #ddsPrint td{padding:6pt 10pt 6pt 0;border-bottom:1px solid #e7e6ef;vertical-align:top;color:#55526a;overflow-wrap:anywhere}
+  #ddsPrint td:first-child{color:#171522}
+  #ddsPrint .num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+  #ddsPrint tr{break-inside:avoid}
+  #ddsPrint .pl-foot{margin:16pt 0 0;font-size:8.5pt;color:#69667d;text-align:center}
+}
 
 /* ══ ⌘K across everything (sales item 84, Nov 2026): results in groups under small
    headings, an icon per kind, the typed words in bold, what it is on the right, "Open

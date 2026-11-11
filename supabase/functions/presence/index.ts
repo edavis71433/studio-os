@@ -72,7 +72,7 @@ import { handleRecurringStart, handleRecurringChange, handleRecurringAction } fr
 import { handleInvoicePayment, handleInvoicePaymentUndo } from './routes/invoice_payments.ts';   // sales review item 77
 import { handleEmailLogAddress } from './routes/email_log.ts';   // sales review item 69: the log-this-email address   // sales review item 69: the sending-domain line
 const { handleBroadcastsList, handleBroadcastCreate, handleBroadcastListCreate, handleBroadcastListDelete, handleBroadcastSegments, handleBroadcastGet, handleBroadcastUpdate, handleBroadcastSend, handleBroadcastCancel, handleBroadcastDraftAssist, handleBroadcastTest } = lazyRoutes(() => import('./routes/broadcasts.ts'));
-import { handleScheduleCreate, handleScheduleList, handleScheduleCancel, handleFormSubmit, handleFormInbox, handleFormStatus, handleFormReply, handleApproveSend, handleApproveGet, handleApprovePost } from './routes/commercial.ts';
+import { handleScheduleCreate, handleScheduleList, handleScheduleCancel, handleFormSubmit, handleFormInbox, handleFormStatus, handleFormReply, handleApproveSend, handleApproveGet, handleApprovePost, handleSendTicket, handleSpamLinkGet, handleSpamLinkPost, handleFormFile, handleFormAnswers } from './routes/commercial.ts';
 const { handleBookingTypes, handleBookingSlots, handleBookingCreate, handleBookingSettingsGet, handleBookingSettingsPut, handleBookingTypesList, handleBookingTypeCreate, handleBookingTypeUpdate, handleBookingTypeDelete, handleBookingAppointments, handleBookingConfirm, handleBookingCancel, handleBookingMark } = lazyRoutes(() => import('./routes/booking.ts'));
 const { handleReviewPage, handleReviewSubmit, handleReviewsList, handleReviewApprove, handleReviewHide, handleReviewReply, handleReviewRequest, handleReviewGoogleLink } = lazyRoutes(() => import('./routes/reviews.ts'));
 const { handleCommentsList, handleCommentCreate, handleCommentResolve, handleCommentDelete, handleTokenSections, handleTokenComment } = lazyRoutes(() => import('./routes/comments.ts'));
@@ -190,6 +190,12 @@ async function route_(req: Request, cors: Record<string, string>): Promise<Respo
     const m = route.match(/^\/forms\/([0-9a-f-]{36})\/submit$/);
     // item 89: once the visitor has their answer, the enquiry notes where their visit began
     if (m && method === 'POST') { const sentAt = Date.now(), res = await handleFormSubmit(req, m[1], cors); runAfterResponse(noteVisitSource(req, m[1], sentAt).catch(() => false)); return res; }
+    // item 140: the time ticket a site's page sends with a form or a booking
+    const t = route.match(/^\/(?:forms|book)\/([0-9a-f-]{36})\/ticket$/);
+    if (t && method === 'GET') return handleSendTicket(req, t[1], cors);
+    // item 140: the "This was spam" link in the owner's alert email (spam.html asks, then marks)
+    if (route === '/forms/spam' && method === 'GET') return handleSpamLinkGet(req, cors);
+    if (route === '/forms/spam' && method === 'POST') return handleSpamLinkPost(req, cors);
   }
   // ── Phase BK: PUBLIC native booking — a website visitor lists services, reads
   //    open slots, and books an appointment. No session; authorized by the site id
@@ -733,6 +739,14 @@ async function route_(req: Request, cors: Record<string, string>): Promise<Respo
   // Owner-defined contact custom-field DEFINITIONS (≤5 labeled fields). Literal
   // path — matched before the :id route below (a uuid can't be "fields"). Studio-gated.
   if (route === '/sales/contacts/fields' && (method === 'GET' || method === 'PUT')) return handleSalesContactFields(req, site, principal, cors);
+  // items 86 + 105: an import is a record you can undo for a day; two records for one person merge (and unmerge)
+  if (route === '/sales/contacts/imports' && (method === 'GET' || method === 'POST')) return (await import('./routes/contacts_more.ts')).handleContactImports(req, site, principal, cors);
+  {
+    const mi = route.match(/^\/sales\/contacts\/imports\/([0-9a-f-]{36})\/undo$/);
+    if (mi && method === 'POST') return (await import('./routes/contacts_more.ts')).handleContactImportUndo(req, site, principal, mi[1], cors);
+    const mm = route.match(/^\/sales\/contacts\/([0-9a-f-]{36})\/(merge|unmerge)$/);
+    if (mm && method === 'POST') { const cm = await import('./routes/contacts_more.ts'); return mm[2] === 'merge' ? cm.handleContactMerge(req, site, principal, mm[1], cors) : cm.handleContactUnmerge(req, site, principal, mm[1], cors); }
+  }
   {
     // Contact DETAIL: tap a contact → their deals + recent activity + last-spoke
     // + custom-field values (GET); edit info + field values (PATCH); remove them
@@ -1062,7 +1076,13 @@ async function route_(req: Request, cors: Record<string, string>): Promise<Respo
     const m = route.match(/^\/schedule\/([0-9a-f-]{36})\/cancel$/);
     if (m && method === 'POST') return handleScheduleCancel(site, m[1], principal, cors);
   }
-  if (route === '/forms/inbox' && method === 'GET') return handleFormInbox(site, cors);
+  if (route === '/forms/inbox' && method === 'GET') return handleFormInbox(site, cors, req);
+  // item 147: one enquiry's attached file (a ten-minute link), and one form's own table of answers
+  {
+    const m = route.match(/^\/forms\/inbox\/([0-9a-f-]{36})\/files\/(\d{1,2})$/);
+    if (m && method === 'GET') return handleFormFile(site, m[1], Number(m[2]), cors);
+  }
+  if (route === '/forms/answers' && method === 'GET') return handleFormAnswers(req, site, cors);
   {
     const m = route.match(/^\/forms\/inbox\/([0-9a-f-]{36})$/);
     if (m && method === 'POST') return handleFormStatus(req, site, m[1], cors);

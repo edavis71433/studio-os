@@ -36,7 +36,7 @@ const rows = (r: { json?: unknown }) => (Array.isArray((r as any).json) ? (r as 
 // deliberately excluded — they are studio/platform-global (no per-site key), so
 // including them could leak another tenant's audience. Everything here is scoped
 // by site_id, so a broadcast can only ever reach the sender's own people.
-export type SegmentKey = 'customers' | 'contacts' | 'enquiries' | 'enquiries_30d';
+export type SegmentKey = 'customers' | 'subscribers' | 'contacts' | 'enquiries' | 'enquiries_30d';
 
 export interface SegmentDef { key: SegmentKey; label: string; description: string }
 
@@ -45,6 +45,8 @@ export const SEGMENTS: SegmentDef[] = [
   // to pick them on Customers first. Only a studio has customers; the route hides
   // this list when it would reach no one.
   { key: 'customers',     label: 'Your customers',            description: 'Everyone you work for — each customer on your Customers page.' },
+  // Builder list item 146: the people who joined with the "Join our list" box on the website.
+  { key: 'subscribers',   label: 'People who joined your list', description: 'Everyone who signed up with the “Join our list” box on your website.' },
   { key: 'contacts',      label: 'All contacts',              description: 'Everyone saved in your contacts.' },
   { key: 'enquiries',     label: 'All website enquiries',     description: 'Everyone who has messaged you through your website.' },
   { key: 'enquiries_30d', label: 'Recent enquiries (30 days)', description: 'People who enquired through your website in the last month.' },
@@ -241,6 +243,9 @@ export async function fetchAudienceRows(siteId: string, key: AudienceKey, opts: 
   }
   if (key === 'contacts') {
     return await need(`presence_contacts?site_id=eq.${siteId}&deleted_at=is.null&select=email,name&limit=${RECIPIENT_CAP}`);
+  }
+  if (key === 'subscribers') {   // item 146: contacts who joined the list (migration 0157)
+    return await need(`presence_contacts?site_id=eq.${siteId}&deleted_at=is.null&subscribed_at=not.is.null&select=email,name&limit=${RECIPIENT_CAP}`);
   }
   const base = `presence_form_submissions?site_id=eq.${siteId}&spam=is.false&select=email,name,created_at`;
   if (key === 'enquiries_30d') {

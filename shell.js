@@ -265,7 +265,21 @@
         + '.dds-tags .chip,.dds-tag{display:inline-flex;align-items:center;gap:4px;font-size:12.5px;font-weight:600;line-height:1.3;color:var(--p,#5b3fa0);background:var(--p-soft,#efe9fa);border-radius:999px;padding:3px 10px;white-space:nowrap}'
         + '.dds-tags .chip button{font:inherit;font-size:11px;line-height:1;color:inherit;background:none;border:0;padding:2px;margin-right:-4px;cursor:pointer;min-width:20px;min-height:20px}'
         + 'button.dds-tag{border:0;cursor:pointer;font-family:inherit}button.dds-tag:hover{text-decoration:underline}'
-        + '@media (pointer:coarse){.dds-tags .chip button{min-width:32px;min-height:32px}}';
+        + '@media (pointer:coarse){.dds-tags .chip button{min-width:32px;min-height:32px}}'
+        // item 86: the import's matching step
+        + '.dds-csvfile{margin:10px 0 8px;font-size:13px;color:var(--soft,#5c5468)}'
+        + '.dds-csvmap{border:1px solid var(--line,#e6e1ee);border-radius:12px;overflow:auto;max-height:min(52vh,520px)}'
+        + '.dds-csvmap table{width:100%;border-collapse:collapse;font-size:13.5px;min-width:520px}'
+        + '.dds-csvmap thead th{position:sticky;top:0;background:var(--card,#fff);text-align:left;font-size:12px;font-weight:600;color:var(--faint,#6b6478);padding:9px 12px;border-bottom:1px solid var(--line,#e6e1ee)}'
+        + '.dds-csvmap tbody th,.dds-csvmap td{text-align:left;font-weight:500;padding:7px 12px;border-bottom:1px solid var(--line,#e6e1ee);vertical-align:middle}'
+        + '.dds-csvmap td:nth-child(2){color:var(--soft,#5c5468);max-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}'
+        + '.dds-csvmap tr:last-child th,.dds-csvmap tr:last-child td{border-bottom:0}.dds-csvmap tr.off th,.dds-csvmap tr.off td:nth-child(2){color:var(--faint,#6b6478);opacity:.75}'
+        + '.dds-csvmap select{font:inherit;font-size:13.5px;min-height:36px;width:100%;max-width:220px;border:1px solid var(--line,#e6e1ee);border-radius:8px;background:var(--card,#fff);color:inherit;padding:4px 8px}'
+        + '.dds-csvexist{border:0;margin:14px 0 0;padding:0;display:flex;flex-wrap:wrap;gap:6px 18px;font-size:14px}.dds-csvexist legend{font-weight:600;margin-bottom:6px;padding:0}'
+        + '.dds-csvexist label{display:inline-flex;align-items:center;gap:8px;min-height:32px;cursor:pointer}.dds-csvexist input{width:17px;height:17px;accent-color:var(--p,#5b3fa0)}'
+        + '.dds-csvmax{display:inline-block;margin:12px 0 0;font-size:12.5px;color:var(--p,#5b3fa0);background:var(--p-soft,#efe9fa);border-radius:999px;padding:4px 12px}'
+        + '.dds-csvact{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-top:12px}'
+        + '@media (pointer:coarse){.dds-csvmap select,.dds-csvexist label{min-height:44px}}';
       document.head.appendChild(st);
     }
     // ── saved views: GET/PUT /sales/views (one read per page) ──
@@ -365,7 +379,8 @@
     // Google and Outlook exports put a label, type or display-name column beside each value
     // ("E-mail 1 - Label" · "E-mail 1 - Value", "E-mail Type", "Phonetic First Name", "Surname Yomi").
     // None of those is ever what a key means, so none is read as one.
-    function csvSideColumn(h) { return /\b(label|labels|type|display name|yomi|phonetic)\b/i.test(String(h || '')); }
+    // (a heading that is only "Labels" or "Categories" is the person's groups, not a side column: item 86 reads it as tags)
+    function csvSideColumn(h) { var t = String(h || '').trim(); if (/^(labels|categories)$/i.test(t)) return false; return /\b(label|labels|type|display name|yomi|phonetic)\b/i.test(t); }
     // One row under the keys. When several columns mean the same key, the first one with a value
     // wins: the last one used to, even when it was empty or held "Home", so a Google or Outlook
     // file came in without its emails, phones and names.
@@ -400,7 +415,41 @@
           if (run.stop || run.running) return;   // closed, or started, while the file was read
           var rows = parseCsv(text);
           if (rows.length < 2) { prev.innerHTML = '<p class="muted">That file looks empty (or has only a header row).</p>'; return; }
-          var keys = rows[0].map(function (h) { return csvSideColumn(h) ? null : o.mapHeader(h); });
+          var guess = rows[0].map(function (h) { return csvSideColumn(h) ? null : o.mapHeader(h); });
+          if (o.targets) { matchStep(rows, guess, f.name || ''); return; }   // item 86: a page that names its fields lets you match each column
+          preview(rows, guess, {});
+        });
+      });
+      // ── item 86: match the columns. One row per column of the file: its heading, its first
+      //    value, and where it goes (the guess first; label and type columns start at "Don't
+      //    bring in"). Then, for a page that can update, what to do with people already there.
+      function matchStep(rows, guess, fileName) {
+        var n = rows.length - 1;
+        var first = function (i) { for (var r = 1; r < rows.length && r < 50; r++) { var v = String(rows[r][i] || '').trim(); if (v) return v; } return ''; };
+        var opts = o.targets.concat([['', 'Don’t bring in']]);
+        var trs = rows[0].map(function (h, i) {
+          var g = guess[i] || '';
+          var sel = '<select data-col="' + i + '" aria-label="Where ' + esc2(h || ('column ' + (i + 1))) + ' goes">' + opts.map(function (t) { return '<option value="' + esc2(t[0]) + '"' + (t[0] === g ? ' selected' : '') + '>' + esc2(t[1]) + '</option>'; }).join('') + '</select>';
+          return '<tr' + (g ? '' : ' class="off"') + '><th scope="row">' + esc2(h || ('Column ' + (i + 1))) + '</th><td>' + esc2(first(i)) + '</td><td>' + sel + '</td></tr>';
+        }).join('');
+        var left = Math.max(0, n - IMPORT_MAX);
+        prev.innerHTML = '<p class="dds-csvfile">' + esc2(fileName ? fileName + ' · ' : '') + n + ' ' + o.noun + (n === 1 ? '' : 's') + ' in the file</p>'
+          + '<div class="dds-csvmap"><table><thead><tr><th scope="col">In your file</th><th scope="col">First row</th><th scope="col">Goes to</th></tr></thead><tbody>' + trs + '</tbody></table></div>'
+          + (o.existing ? '<fieldset class="dds-csvexist"><legend>' + esc2(o.existing.legend) + '</legend>'
+            + '<label><input type="radio" name="dds-csvex" value="update" checked> ' + esc2(o.existing.update) + '</label>'
+            + '<label><input type="radio" name="dds-csvex" value="skip"> ' + esc2(o.existing.skip) + '</label></fieldset>' : '')
+          + (left ? '<p class="dds-csvmax">' + n + ' in the file. This brings in the first ' + IMPORT_MAX + ' now; run it again for the other ' + left + '.</p>' : '')
+          + '<div class="dds-csvact"><button type="button" class="btn dds-csvmatch">Import ' + Math.min(n, IMPORT_MAX) + '</button><span class="muted dds-csvwhy" role="status" aria-live="polite"></span></div>';
+        prev.querySelectorAll('select[data-col]').forEach(function (s) { s.addEventListener('change', function () { s.closest('tr').classList.toggle('off', !s.value); }); });
+        prev.querySelector('.dds-csvmatch').addEventListener('click', function () {
+          var keys = rows[0].map(function (_, i) { var s = prev.querySelector('select[data-col="' + i + '"]'); return s && s.value ? s.value : null; });
+          var why = o.ready(keys); if (why) { prev.querySelector('.dds-csvwhy').textContent = why; return; }
+          var ex = prev.querySelector('input[name="dds-csvex"]:checked');
+          preview(rows, keys, { onExisting: ex ? ex.value : 'skip', fileName: fileName, go: true });
+        });
+        var fs = prev.querySelector('select[data-col]'); if (fs) fs.focus();
+      }
+      function preview(rows, keys, how) {
           var why = o.ready(keys); if (why) { prev.innerHTML = '<p class="muted"></p>'; prev.firstChild.textContent = why; return; }
           // counted before the cut: an 800-row file said "500 found", finished "500 imported" and never named the other 300
           var all = rows.slice(1).map(function (r) { return o.toItem(csvObject(keys, r)); }).filter(Boolean);
@@ -415,25 +464,27 @@
           go.addEventListener('click', function () {
             if (run.running || run.stop) return;
             run.running = true; go.disabled = true; file.disabled = true; closer.textContent = 'Stop';   // no second file under a running one
-            var counts = { added: 0, existed: 0, skipped: 0, failed: 0 }, done = 0, i = 0;
+            var counts = { added: 0, updated: 0, existed: 0, skipped: 0, failed: 0 }, done = 0, i = 0, ctx = { onExisting: how.onExisting || 'skip', importId: null };
             function finish(stopped) {
               run.running = false;
               if (host.__ddsImport === run) { host.__ddsImport = null; host.innerHTML = ''; }
               var msg = (stopped ? 'Stopped after ' + done + ' of ' + items.length + ' — ' : '') + o.summary(counts)
                 + (left && !stopped ? ' ' + left + ' more in the file weren’t imported — put them in a second file.' : '');
               if (window.ddsToast) window.ddsToast(msg, counts.failed ? 'err' : 'ok');
-              if (o.done) o.done(counts);
+              if (o.done) o.done(counts, ctx);
             }
-            (function next() {
+            function next() {
               if (run.stop) { finish(true); return; }
               if (i >= items.length) { finish(false); return; }
               var chunk = items.slice(i, i + 5); i += 5;
-              Promise.all(chunk.map(function (it) { return Promise.resolve().then(function () { return o.send(it); }).catch(function () { return 'failed'; }).then(function (k) { counts[k in counts ? k : 'failed']++; done++; }); }))
+              Promise.all(chunk.map(function (it) { return Promise.resolve().then(function () { return o.send(it, ctx); }).catch(function () { return 'failed'; }).then(function (k) { counts[k in counts ? k : 'failed']++; done++; }); }))
                 .then(function () { go.textContent = 'Importing ' + Math.min(done, items.length) + '/' + items.length + '…'; live.textContent = 'Imported ' + done + ' of ' + items.length; next(); });
-            })();
+            }
+            // item 86: a page that keeps imports starts one first (its id rides on every row, for Undo)
+            Promise.resolve(o.start ? o.start({ onExisting: ctx.onExisting, fileName: how.fileName || '' }) : null).then(function (id) { ctx.importId = id || null; }, function () { ctx.importId = null; }).then(next);
           });
-        });
-      });
+          if (how.go) go.click();   // the matching step's Import button already said go
+      }
     }
     // ── batch C (final pass, Nov 8) ──
     // where focus goes back to: the button a page names (shown on screen), else whatever had focus —
@@ -531,7 +582,75 @@
       // what is still being typed counts too, so Save never drops it
       return { get: function () { if (inp.value.trim()) { add(inp.value); inp.value = ''; } return tags.slice(); }, set: function (list) { tags = []; add((list || []).join(',')); }, input: inp };
     }
-    return { use: function (fn) { REQ = fn; }, views: views, saveViews: saveViews, ask: ask, columnsMenu: columnsMenu, sendTo: sendTo, parseCsv: parseCsv, importPanel: importPanel, style: style, fit: fit, confirmIn: confirmIn, announce: announce, tagInput: tagInput, cleanTag: cleanTag };
+    // ── charts on a list, and a printable list (sales item 105) ──────────────
+    // charts(panels, foot) returns a chart card's insides, one plain bar list per
+    // panel: panels = [{ title, rows: [{ label, n, extra, none }], unit: ['deal',
+    // 'deals'], extra: true, empty }]. A bar is as long as its count against the
+    // panel's longest row; the count is written beside it (then `extra`, a stage's
+    // value), so no figure rests on a bar alone. Rows of nothing are left out; a
+    // `none` row ("Not recorded") is grey. shell.css styles it (.dds-charts).
+    function charts(panels, foot) {
+      var h = '<h2 class="dc-h">Charts</h2><div class="dc-grid">';
+      (panels || []).forEach(function (p) {
+        var rows = (p.rows || []).filter(function (r) { return r && r.n > 0; });
+        var max = 0, all = 0; rows.forEach(function (r) { max = Math.max(max, r.n); all += r.n; });
+        var unit = p.unit || ['', ''];
+        h += '<div class="dc-panel"><h3>' + esc2(p.title) + '</h3>';
+        if (!rows.length) { h += '<p class="dc-none">' + esc2(p.empty || 'Nothing to count in this view.') + '</p></div>'; return; }
+        h += '<ul class="dc-bars' + (p.extra ? ' has-v' : '') + '">' + rows.map(function (r) {
+          var word = r.n === 1 ? unit[0] : unit[1];
+          var tip = r.label + ': ' + r.n + (word ? ' ' + word : '') + (r.extra ? ', ' + r.extra : '') + ' · ' + Math.round(r.n / all * 100) + '% of this view';
+          return '<li class="dc-row' + (r.none ? ' none' : '') + '" data-tip="' + esc2(tip) + '"><span class="dc-l">' + esc2(r.label) + '</span>'
+            + '<span class="dc-track" aria-hidden="true"><span class="dc-fill" style="width:' + Math.max(2, Math.round(r.n / max * 100)) + '%"></span></span>'
+            + '<span class="dc-n">' + r.n + (word ? '<span class="sr-only"> ' + esc2(word) + '</span>' : '') + '</span>'
+            + (p.extra ? '<span class="dc-v">' + esc2(r.extra || '') + '</span>' : '') + '</li>';
+        }).join('') + '</ul></div>';
+      });
+      return h + '</div>' + (foot ? '<p class="dc-foot">' + esc2(foot) + '</p>' : '');
+    }
+    // pointing at a row (or touching it) shows its count and its share of the view
+    var TIP = null;
+    function chartTips(host) {
+      if (!host || host.__ddsTips) return; host.__ddsTips = true;
+      function hide() { if (TIP) TIP.hidden = true; }
+      host.addEventListener('pointerover', function (e) {
+        var row = e.target && e.target.closest ? e.target.closest('.dc-row[data-tip]') : null;
+        if (!row) { hide(); return; }
+        if (!TIP) { TIP = document.createElement('div'); TIP.className = 'dc-tip'; TIP.setAttribute('aria-hidden', 'true'); document.body.appendChild(TIP); }
+        var bar = (row.querySelector('.dc-fill') || row).getBoundingClientRect(), r = row.getBoundingClientRect();
+        TIP.textContent = row.getAttribute('data-tip'); TIP.hidden = false;
+        var half = TIP.offsetWidth / 2 + 8, above = r.top > TIP.offsetHeight + 16;
+        TIP.style.left = Math.min(Math.max(bar.right, half), window.innerWidth - half) + 'px';
+        TIP.style.top = (above ? r.top : r.bottom + TIP.offsetHeight + 16) + 'px';   // under the row when it sits at the top of the screen
+      });
+      host.addEventListener('pointerleave', hide);
+      window.addEventListener('scroll', hide, { passive: true });
+    }
+    // printList(o) prints exactly the rows in view as a plain table:
+    // o = { title, sub, cols: [{ label, num }], rows: [[cell, …]] }. While it prints,
+    // shell.css shows only #ddsPrint (body[data-print=list]); then the page is back.
+    function printList(o) {
+      var old = document.getElementById('ddsPrint'); if (old) old.remove();
+      var cols = o.cols || [], d = document.createElement('div'); d.id = 'ddsPrint';
+      var num = function (i) { return cols[i] && cols[i].num ? ' class="num"' : ''; };
+      d.innerHTML = '<h1>' + esc2(o.title) + '</h1>' + (o.sub ? '<p class="pl-sub">' + esc2(o.sub) + '</p>' : '')
+        + '<table><thead><tr>' + cols.map(function (c, i) { return '<th scope="col"' + num(i) + '>' + esc2(c.label) + '</th>'; }).join('') + '</tr></thead><tbody>'
+        + (o.rows || []).map(function (r) { return '<tr>' + r.map(function (v, i) { return '<td' + num(i) + '>' + esc2(v) + '</td>'; }).join('') + '</tr>'; }).join('')
+        + '</tbody></table><p class="pl-foot">Printed from Studio OS</p>';
+      document.body.appendChild(d);
+      document.body.setAttribute('data-print', 'list');
+      var done = false;
+      function back() {
+        if (done) return; done = true;
+        document.body.removeAttribute('data-print'); d.remove();
+        window.removeEventListener('afterprint', back); document.removeEventListener('pointerdown', back, true); document.removeEventListener('keydown', back, true);
+      }
+      window.addEventListener('afterprint', back);
+      window.print();
+      // a browser that never says the print is done gets the page back on the next tap or key
+      setTimeout(function () { if (!done) { document.addEventListener('pointerdown', back, true); document.addEventListener('keydown', back, true); } }, 0);
+    }
+    return { use: function (fn) { REQ = fn; }, views: views, saveViews: saveViews, ask: ask, columnsMenu: columnsMenu, sendTo: sendTo, parseCsv: parseCsv, importPanel: importPanel, style: style, fit: fit, confirmIn: confirmIn, announce: announce, tagInput: tagInput, cleanTag: cleanTag, charts: charts, chartTips: chartTips, printList: printList };
   })();
 
   // ── DOM ──
