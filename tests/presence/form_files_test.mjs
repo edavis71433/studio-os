@@ -175,7 +175,7 @@ const GOOD = { name: 'Ana', email: 'ana@customer.example', details: 'The gutter 
   ok('…named for the form and the day', /^request-a-quote-answers-\d{4}-\d{2}-\d{2}\.csv$/.test(fileName('Request a quote')));
   ok('seen and sent, in words', seenLine({ seen: 214, sent: 9 }) === 'In the last 30 days about 214 visitors saw it and 9 sent it (4.2%).' && /couldn’t be counted/.test(seenLine({ seen: null, sent: 2 })) && /No visits to its page were counted/.test(seenLine({ seen: 0, sent: 0 })));
   const ed = read('presence.html');
-  ok('editor: “Photo or file” is a field type, and each form has Answers', ed.includes('["file", "Photo or file"]') && ed.includes('const ans = el("button", null, "Answers");') && ed.includes('s.src = "/form-answers.js?v=1"') && ed.includes('get: (route) => api("GET", route)'));
+  ok('editor: “Photo or file” is a field type, and each form has Answers', ed.includes('["file", "Photo or file"]') && ed.includes('const ans = el("button", "ff-btn", "Answers");') && ed.includes('s.src = "/form-answers.js?v=1"') && ed.includes('get: (route) => api("GET", route)'));
   const ib = read('inbox.html');
   ok('Inbox: an enquiry’s files, each opened by its own ten-minute link', ib.includes('${leadFilesHtml(l)}') && ib.includes("api('/forms/inbox/'+encodeURIComponent(it.lead_id)+'/files/'+encodeURIComponent(b.getAttribute('data-lfile')))") && ib.includes('Sent with it:'));
   const idx = read('supabase/functions/presence/index.ts');
