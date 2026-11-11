@@ -8,12 +8,13 @@ import { fetchLibraryFonts, libraryFontsIn } from '../lib/fonts.ts';
 import { json } from '../../_shared/http.ts';
 import { svc } from '../lib/db.ts';
 import { getTemplate, renderSnapshot } from '../lib/render.ts';
+import { publishedCspFor, siteHomes } from '../lib/site_csp.ts';
 import { liveContent, lockIdsIn, lockPages } from '../lib/page_access.ts';
 import { readPageLocks } from './page_locks.ts';
 import { serializeDraft } from '../lib/serializer.ts';
 import { validateSnapshot } from '../lib/manifest_validate.ts';
 import { fetchVariants } from '../lib/media.ts';
-import { deployFileMap, netlifyConfigured } from '../lib/netlify.ts';
+import { deployFileMap, netlifyConfigured, setSitePassword } from '../lib/netlify.ts';
 import { mergeSecurityHeaders, mergeAssetCaching } from '../lib/security_headers.ts';
 import { writeChangeEvent } from '../lib/provenance.ts';
 import type { Snapshot } from '../lib/render_types.ts';
@@ -35,7 +36,7 @@ import { loadEmailBrand } from '../lib/email_brand.ts';
 import { snapshotContentUsable } from '../lib/render_types.ts';
 import type { SnapshotContent } from '../lib/render_types.ts';
 import type { SiteRow } from '../lib/site.ts';
-import { siteOrigin } from '../lib/site.ts';
+import { siteOrigin, hostedName } from '../lib/site.ts';
 import type { Principal } from '../../_shared/auth.ts';
 import { UUID_LOWER_RE as UUID_RE } from '../lib/uuid.ts';
 import { copiedBlockerFor } from '../lib/copied_record.ts';
@@ -173,6 +174,7 @@ export async function runPipeline(site: SiteRow, principal: Principal, kind: 'pu
     ...(fnBase ? { bookEndpoint: `${fnBase}/functions/v1/presence/book/${site.id}` } : {}),
   };
   let fileMap: Record<string, string | Uint8Array>;
+  let csp = '';
   // Items 48 and 120: a private page stays off the live site and a password page goes up
   // sealed (lib/page_access.ts). The snapshot Versions keeps is the draft as it was; only what
   // is drawn for the live site changes. A password page whose key can't be read stays off too.
@@ -181,7 +183,9 @@ export async function runPipeline(site: SiteRow, principal: Principal, kind: 'pu
   const liveSnap = liveC === snapshotArg.snapshot.content ? snapshotArg.snapshot : { ...snapshotArg.snapshot, content: liveC };
   try {
     fileMap = await renderSnapshot(liveSnap, siteCfg);
+    const drawn = fileMap;   // item 144: a sealed page's scripts run once it is opened, so they are named from here
     fileMap = await lockPages(fileMap, sealed.map((p) => ({ ...p, ...locks.get(p.lock)! })));
+    csp = await publishedCspFor([drawn, fileMap], fnBase ? new URL(fnBase).origin : '', siteHomes(site));
   } catch (e) { return await fail('render', String(e).slice(0, 300)); }
   at('render');
   const { files: images, failed } = await fetchVariants(snapshotArg.mediaManifest);
@@ -203,7 +207,8 @@ export async function runPipeline(site: SiteRow, principal: Principal, kind: 'pu
   // clickjacking (X-Frame-Options DENY + CSP frame-ancestors 'none'), MIME-sniff,
   // referrer, permissions, and a real CSP header. Merged into (never clobbering)
   // the template's asset-cache `_headers`. One source of truth: lib/security_headers.ts.
-  fileMap['_headers'] = mergeSecurityHeaders(mergeAssetCaching(typeof fileMap['_headers'] === 'string' ? fileMap['_headers'] as string : undefined));
+  // Item 144: the CSP is the one this site's own pages need (publishedCspFor, above).
+  fileMap['_headers'] = mergeSecurityHeaders(mergeAssetCaching(typeof fileMap['_headers'] === 'string' ? fileMap['_headers'] as string : undefined), csp);
 
   await svc(`presence_publishes?id=eq.${pubId}`, { method: 'PATCH', body: JSON.stringify({ status: 'deploying' }) });
   const dep = await deployFileMap(site.netlify_site_id, fileMap, { title: `${kind} ${pubId}` });
@@ -647,6 +652,77 @@ export async function handleBackOnline(site: SiteRow, principal: Principal, cors
   const snapshot: Snapshot = { content: s.content, content_contract_version: s.content_contract_version, template_slug: s.template_slug, template_version: s.template_version, created_at: s.created_at, dev_customization: s.dev_customization ?? null };
   // runPipeline clears offline_at the moment the deploy goes live — one invariant, one place.
   return runPipeline(site, principal, 'restore', { snapshot, snapshotId: row.snapshot_id, mediaManifest: s.media_manifest || [] }, 'Brought the website back online', cors);
+}
+
+// ── List item 175 · Site availability: public, a visitor password, or offline ───
+// Offline is the holding page above. The password is Netlify's site-wide password:
+// Netlify keeps it and asks for it before any page of the site, the holding page
+// included; we keep only when it was put on (presence_sites.visitor_password_at, 0159).
+// Before telling the owner the site asks for a password, the server asks the site
+// itself, the way a stranger would: a protected site answers 401. If it doesn't, the
+// password comes straight back off and nothing is claimed, so an owner is never told a
+// site is hidden when it isn't.
+export const VISITOR_PASSWORD_MIN = 4;
+export const VISITOR_PASSWORD_MAX = 64;
+
+/** What a stranger gets from the live site, asked a few times while Netlify applies a
+ *  change, until `settled` holds. The last status seen (0 when it couldn't be reached). */
+export async function strangerStatus(url: string, settled: (status: number) => boolean, tries = 5, waitMs = 1500): Promise<number> {
+  let status = 0;
+  for (let i = 0; i < tries; i++) {
+    if (i) await new Promise((r) => setTimeout(r, waitMs));
+    try {
+      const r = await fetch(url, { method: 'GET', redirect: 'manual', headers: { 'cache-control': 'no-cache' } });
+      status = r.status;
+      await r.body?.cancel().catch(() => {});
+    } catch { status = 0; }
+    if (settled(status)) return status;
+  }
+  return status;
+}
+
+/** POST /site/password { password } — put a visitor password on the live site, or take
+ *  it off with an empty one. */
+export async function handleSitePassword(req: Request, site: SiteRow, principal: Principal, cors: Record<string, string>) {
+  let body: { password?: unknown } = {};
+  try { body = await req.json(); } catch { return json({ error: 'bad_json', message: 'The request body wasn’t valid JSON.' }, 400, cors); }
+  const password = typeof body.password === 'string' ? body.password.trim() : '';
+  if (password && (password.length < VISITOR_PASSWORD_MIN || password.length > VISITOR_PASSWORD_MAX)) {
+    return json({ error: 'bad_password', message: `Use ${VISITOR_PASSWORD_MIN} to ${VISITOR_PASSWORD_MAX} letters, numbers or symbols.` }, 422, cors);
+  }
+  if (PUBLISH_BLOCKED_STATES.includes(site.status)) return json({ error: 'lifecycle_blocked', message: 'This site is archived and can’t be changed. Contact your studio to reactivate it.' }, 409, cors);
+  if (!site.netlify_site_id || !netlifyConfigured()) return json({ error: 'config', message: 'Hosting isn’t connected for this site yet.' }, 409, cors);
+  const lastLive = await svc(`presence_publishes?site_id=eq.${site.id}&status=eq.live&select=id&order=created_at.desc&limit=1`);
+  if (!lastLive.json?.[0]) return json({ error: 'not_live', message: 'Your site isn’t live yet, so only you can see it. A password can go on once it’s published.' }, 409, cors);
+  const cur = await svc(`presence_sites?id=eq.${site.id}&select=visitor_password_at&limit=1`).catch(() => ({ ok: false, json: null } as any));
+  if (!cur.ok) return json({ error: 'unavailable', message: 'A visitor password isn’t available on this environment yet.' }, 503, cors);
+  const had = !!cur.json?.[0]?.visitor_password_at;
+  if (!password && !had) return json({ error: 'no_password', message: 'Your site has no visitor password.' }, 409, cors);
+
+  const set = await setSitePassword(site.netlify_site_id, password);
+  if (!set.ok) {
+    console.log(JSON.stringify({ evt: 'site_password_refused', site_id: site.id, error: set.error }));
+    return json({ error: 'host_refused', message: password ? 'Your hosting didn’t accept the password, so your site is unchanged.' : 'The password couldn’t be taken off just now. Please try again.' }, 502, cors);
+  }
+  const home = `https://${hostedName(site.id)}.netlify.app/`;
+  const seen = await strangerStatus(home, password ? (st) => st === 401 : (st) => st !== 401 && st !== 0);
+  if (password && seen !== 401) {
+    await setSitePassword(site.netlify_site_id, had ? password : '');   // never leave a password the site doesn't show
+    console.log(JSON.stringify({ evt: 'site_password_not_shown', site_id: site.id, status: seen }));
+    return json({ error: 'not_protected', message: had ? 'Your site didn’t confirm the new password. Give it a minute, then try again.' : 'Your site didn’t start asking for the password, so it wasn’t put on. Your site is unchanged.' }, 502, cors);
+  }
+  if (!password && seen === 401) {
+    return json({ error: 'still_protected', message: 'Your site is still asking for the password. Give it a minute, then try again.' }, 502, cors);
+  }
+  const mark = await svc(`presence_sites?id=eq.${site.id}`, { method: 'PATCH', body: JSON.stringify({ visitor_password_at: password ? new Date().toISOString() : null }) });
+  if (!mark.ok) console.log(JSON.stringify({ evt: 'site_password_mark_failed', site_id: site.id }));
+  await writeChangeEvent({
+    siteId: site.id, entityType: 'site', entityId: null, action: 'update', principal, provenance: 'human', fields: ['visitor_password_at'],
+    summary: password ? (had ? 'Changed the website’s visitor password.' : 'Put a visitor password on the website: visitors type it before they see any page.') : 'Took the visitor password off the website: anyone can visit again.',
+  });
+  return json({ data: { ok: true, password: !!password, message: password
+    ? 'Done. Visitors now type the password before they see any page. Share it with the people you want to let in.'
+    : 'Done. Anyone can visit your site again.' } }, 200, cors);
 }
 
 /** DELETE /publishes/checkpoints/:id — remove a saved checkpoint (its snapshot is

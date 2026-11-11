@@ -74,6 +74,7 @@ export const SETTINGS_CONTENT_FIELDS: ReadonlySet<string> = new Set([
 export function contentWriteNeeds(route: string, method: string, settingsFields: string[] = []): SiteCapability | null {
   if (method === 'PUT' && (route === '/identity' || route === '/location' || route === '/brand/profile')) return 'edit';
   if (method === 'POST' && route === '/pages/duplicate') return 'edit';
+  if (method === 'POST' && /^\/pages\/deleted\/[0-9a-f-]{36}\/restore$/.test(route)) return 'edit';   // item 154: putting a deleted page back is an edit of the pages
   if (method === 'PUT' && route === '/settings') return settingsFields.every((f) => SETTINGS_CONTENT_FIELDS.has(f)) ? 'edit' : 'configure';
   const m = route.match(/^\/(?:offerings|testimonials|faqs|posts)(\/[0-9a-f-]{36})?$/);
   if (!m) return null;
@@ -116,11 +117,12 @@ const MEMBER_WRITES: Array<[MemberWriteNeed, string[]]> = [
     'PUT /sales/stages',   // sales review item 38: renaming the studio's deal stages is a setting
     '(POST|DELETE) /calendar/link',   // sales review item 46: making or turning off the private calendar link is a setting
     '(POST|DELETE) /email/log-address',   // sales review item 69: the private log-this-email address is a setting too
+    'POST /reviews/google-link',   // sales review item 115: where Google review requests send people is a setting
     'PUT /report/monthly', 'POST /report/monthly/preview',   // builder list item 58: the client's monthly report is a setting; its preview emails the caller
     '(POST|DELETE) /foundations/domain',
     'POST /foundations/prepare',
     'POST /preview/settings',
-    'POST /site/(offline|online)',
+    'POST /site/(offline|online|password)',   // list item 175: a visitor password is a setting, like taking the site offline
     'PUT /bookings/settings',
     'PUT /sales/contacts/fields',
   ]],

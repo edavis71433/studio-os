@@ -1,5 +1,5 @@
 /* AI Visibility Check form (ai-visibility.html). Same flow as site-review.js:
-   Turnstile, POST to the ai-visibility function, loading steps driven by the
+   Turnstile (loaded when the visitor starts), POST to the ai-visibility function, loading steps driven by the
    real progress stream, then the hosted report (teaser + unlock). An
    ambiguous business name comes back as needs_detail: the street or
    neighborhood field appears and the visitor submits again.
@@ -9,6 +9,7 @@
   var $ = function (id) { return document.getElementById(id); };
   var LOCAL = /^(localhost|127\.0\.0\.1)$/.test(location.hostname);
   var SITE_KEY = LOCAL ? '1x00000000000000000000AA' : '0x4AAAAAAFl7hPNwYacRr2Z2';
+  var TURNSTILE_SRC = 'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit';
   var STEPS = ['asking', 'website', 'reading', 'writing'];
   var widgetId = null;
   var busy = false;
@@ -20,11 +21,26 @@
     if (widgetId !== null || !window.turnstile) return;
     try { widgetId = window.turnstile.render('#srTurnstile', { sitekey: SITE_KEY, theme: 'light', size: 'flexible', appearance: 'interaction-only', 'error-callback': function () { turnstileDown = true; return true; } }); } catch (e) { widgetId = null; }
   }
-  (function waitForTurnstile(n) {
+  function waitForTurnstile(n) {
     if (window.turnstile) { renderTurnstile(); return; }
     if (n > 100) { turnstileDown = true; return; }
     setTimeout(function () { waitForTurnstile(n + 1); }, 100);
-  })(0);
+  }
+  // List item 138: Cloudflare's check loads when the visitor starts (a first tap or keypress
+  // in the form), not with the page, the same as site-review.js.
+  var turnstileAsked = false;
+  function loadTurnstile() {
+    if (turnstileAsked) return;
+    turnstileAsked = true;
+    var s = document.createElement('script');
+    s.src = TURNSTILE_SRC;
+    s.async = true;
+    s.onerror = function () { turnstileDown = true; };
+    document.head.appendChild(s);
+    waitForTurnstile(0);
+  }
+  $('srForm').addEventListener('focusin', loadTurnstile);
+  $('srForm').addEventListener('pointerdown', loadTurnstile);
   function token() { try { return widgetId !== null && window.turnstile ? window.turnstile.getResponse(widgetId) || '' : ''; } catch (e) { return ''; } }
   function resetTurnstile() { try { if (widgetId !== null && window.turnstile) window.turnstile.reset(widgetId); } catch (e) {} }
 
@@ -141,8 +157,8 @@
     if (url && !/^(https?:\/\/)?[^\s\/]+\.[^\s]{2,}/i.test(url)) { setMsg('That website doesn’t look right. Try yourbusiness.com, or leave it blank.', 'error'); f.url.focus(); return; }
     var t = token();
     if (!t) {
-      if (turnstileDown || !window.turnstile) { fail('bot_check', BOT_CHECK_DOWN); return; }
-      renderTurnstile(); setMsg(window.turnstile && widgetId !== null ? 'Tick “Verify you are human” above, then press the button again.' : 'One moment while we check you’re a person, then press the button again.', 'error'); return;
+      if (turnstileDown) { fail('bot_check', BOT_CHECK_DOWN); return; }
+      loadTurnstile(); renderTurnstile(); setMsg(window.turnstile && widgetId !== null ? 'Tick “Verify you are human” above, then press the button again.' : 'One moment while we check you’re a person, then press the button again.', 'error'); return;
     }
     busy = true;
     hasUrl = !!url;

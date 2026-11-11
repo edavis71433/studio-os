@@ -406,9 +406,10 @@ export function findRepeats(rows: Asset[], p: RepeatProbe, excludeId = ''): Arra
 // smaller of the template's file cap (routes/media.ts) and the site quota
 // (media_guard.ts). `level` warns before a refusal, not after one. Pure.
 export interface StorageSummary { used_bytes: number; files: number; max_bytes: number; max_files: number; level: 'ok' | 'low' | 'full' }
-export function storageSummary(rows: Array<{ bytes?: number | null }>, limits: { maxBytes: number; maxFiles: number }): StorageSummary {
-  const files = (rows || []).length;
-  const used = (rows || []).reduce((n, r) => n + (Number(r?.bytes) || 0), 0);
+export function storageSummary(rows: Array<{ bytes?: number | null }>, limits: { maxBytes: number; maxFiles: number }, totals?: { files: number; bytes: number } | null): StorageSummary {
+  // item 144: the database's own totals when the list is only the first page of the files
+  const files = totals ? totals.files : (rows || []).length;
+  const used = totals ? totals.bytes : (rows || []).reduce((n, r) => n + (Number(r?.bytes) || 0), 0);
   const maxB = Math.max(0, Number(limits.maxBytes) || 0), maxF = Math.max(0, Number(limits.maxFiles) || 0);
   const full = (maxB > 0 && used >= maxB) || (maxF > 0 && files >= maxF);
   const low = (maxB > 0 && used >= maxB * 0.85) || (maxF > 0 && files >= maxF * 0.9);
