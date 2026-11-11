@@ -245,6 +245,36 @@ button:disabled{opacity:.55;cursor:default}
 .hb-checks li a{color:var(--plum)}
 .hb-facts{font-weight:600;color:var(--ink-2)}
 .hb-golive li[data-done="1"] b{color:var(--sage)}   /* list item 151 */
+/* item 183: Website health with a memory: the count, the weekly line, fixed and new, the headings */
+#healthCard.hm-wide{flex:1 1 100%}
+.hm-hacts{display:flex;align-items:center;gap:var(--dds-s2,8px);flex-wrap:wrap;justify-content:flex-end}
+.hm-row{display:grid;grid-template-columns:150px minmax(0,1fr) minmax(0,300px);gap:var(--dds-s5,20px);margin-top:var(--dds-s4,16px);align-items:start}
+.hm-count b{display:block;font-size:40px;line-height:1;font-weight:700;color:var(--ink);font-variant-numeric:tabular-nums}
+.hm-count span{display:block;font-size:13px;font-weight:600;color:var(--ink);margin-top:6px}
+.hm-count .hm-chg{display:inline-block;margin-top:8px;font-size:12px;font-weight:600;border-radius:999px;padding:2px 8px;background:var(--paper);color:var(--ink-3)}
+.hm-chg.up{background:var(--sage-soft);color:var(--sage)} .hm-chg.down{background:var(--clay-soft);color:var(--clay)}
+.hm-line{width:100%;height:auto;display:block}
+.hm-line .gr{stroke:var(--hair);stroke-width:1}
+.hm-line .ln{fill:none;stroke:var(--amber);stroke-width:2.5;stroke-linejoin:round;stroke-linecap:round}
+.hm-line .pt{fill:var(--sheet);stroke:var(--amber);stroke-width:2}
+.hm-line text{font-size:10.5px;fill:var(--ink-3)} .hm-line text.v{font-weight:700;fill:var(--ink)}
+.hm-cap{font-size:12px;color:var(--ink-3);margin:4px 0 0}
+.hm-since{background:var(--paper);border-radius:var(--dds-r-xl,14px);padding:12px 14px;font-size:12.5px;line-height:1.45}
+.hm-since h3{margin:0 0 4px;font-size:13px}
+.hm-since .k{display:block;font-size:11.5px;font-weight:700;letter-spacing:.04em;margin-top:6px}
+.hm-since .k.fixed{color:var(--sage)} .hm-since .k.new{color:var(--clay)}
+.hm-since ul{list-style:none;margin:2px 0 0;padding:0}
+.hm-tiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;margin-top:var(--dds-s4,16px)}
+.hm-tile{border:1px solid var(--hair);border-radius:12px;padding:10px 12px;background:var(--sheet);min-width:0}
+.hm-tile b{display:block;font-size:13px}
+.hm-tile .s{display:block;font-size:12px;font-weight:600;margin-top:3px;color:var(--sage)}
+.hm-tile.look{border-color:var(--amber-soft)} .hm-tile.look .s{color:var(--amber-text)}
+.hm-tile .f{display:block;font-size:11.5px;color:var(--ink-3);margin-top:2px;overflow-wrap:anywhere}
+.hm-list{margin-top:var(--dds-s4,16px)}
+.hm-list h3{margin:0;font-size:13.5px}
+.hm-tag{display:inline-block;font-size:11px;font-weight:600;border-radius:999px;padding:1px 7px;background:var(--paper);color:var(--ink-3);margin-right:6px;vertical-align:1px}
+.hm-list .hm-crit b{color:var(--clay)}
+@media (max-width:760px){.hm-row{grid-template-columns:1fr}.hm-count b{font-size:34px}}
 .hb-card .hb-act{margin-top:10px}
 .hb-row.act .ic{font-size:15px}
 .hb-progress{height:6px;border-radius:3px;background:var(--hair);overflow:hidden;margin-top:10px}
@@ -6250,20 +6280,105 @@ function renderDomainCard() {
   }
   card.appendChild(btn);
 }
+// item 183: Website health with a memory. The Health check's own problems (what is wrong right now)
+// and the daily check's (lib/health_score.ts, kept by day since migration 0170) share one count,
+// one list and seven plain headings; the line and "since last week" are the daily check's memory.
+// A client reads this card, so it says how many things there are to look at, never a score (Law 13).
+const HM_HEADINGS = [["reach", "Can people reach it"], ["speed", "Speed"], ["google", "Google can read it"], ["everyone", "Everyone can use it"], ["words", "Words and pictures"], ["links", "Links"], ["business", "Business details"]];
+const HM_CAT = { website_status: "reach", security: "reach", publishing: "reach", speed: "speed", visibility: "google", content: "words", connections: "business" };
+// where each kind of problem is fixed
+function hmFix(type) {
+  if (/^(seo|links)\./.test(type)) return ["Open Pages", "#pages"];
+  if (/^(accessibility\.img_alt|media\.|performance\.image)/.test(type)) return ["Open Files", "#media"];
+  if (/^(business_info|local_presence|knowledge)\.|^trust\.(contact|hours)/.test(type)) return ["Business details", "#business"];
+  if (/^(infrastructure|website)\.|^trust\.ssl/.test(type)) return ["Domain & email", "#domain"];
+  return null;
+}
+const hmDay = (d) => { const t = new Date(String(d || "").slice(0, 10) + "T00:00:00Z"); return isNaN(t) ? "" : t.toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" }); };
+// the weekly line: one point a week, the count above each point, the day under it
+function hmLine(points) {
+  const W = 360, H = 130, L = 26, R = 22, T = 18, B = 22, max = Math.max(4, ...points.map((p) => Number(p.n) || 0));
+  const x = (i) => L + (points.length < 2 ? 0 : i * (W - L - R) / (points.length - 1)), y = (n) => T + (1 - n / max) * (H - T - B);
+  const grid = [0, 0.5, 1].map((f) => { const yy = (T + f * (H - T - B)).toFixed(1); return `<line class="gr" x1="${L}" x2="${W - R}" y1="${yy}" y2="${yy}"/><text x="0" y="${(Number(yy) + 3.5).toFixed(1)}">${Math.round(max * (1 - f))}</text>`; }).join("");
+  const pts = points.map((p, i) => `${x(i).toFixed(1)},${y(Number(p.n) || 0).toFixed(1)}`).join(" ");
+  const dots = points.map((p, i) => `<circle class="pt" cx="${x(i).toFixed(1)}" cy="${y(Number(p.n) || 0).toFixed(1)}" r="3.5"/><text class="v" x="${x(i).toFixed(1)}" y="${(y(Number(p.n) || 0) - 8).toFixed(1)}" text-anchor="middle">${Number(p.n) || 0}</text><text x="${x(i).toFixed(1)}" y="${H - 6}" text-anchor="middle">${esc(hmDay(p.day))}</text>`).join("");
+  const label = "Things to look at, by week: " + points.map((p) => `${hmDay(p.day)} ${Number(p.n) || 0}`).join(", ");
+  return `<svg class="hm-line" viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(label)}">${grid}${points.length > 1 ? `<polyline class="ln" points="${pts}"/>` : ""}${dots}</svg>`;
+}
+function hmSince(m) {
+  const box = el("div", "hm-since");
+  box.appendChild(el("h3", null, "Since " + hmDay(m.since.day)));
+  const fixed = m.since.fixed || [], added = m.since.added || [];
+  if (!fixed.length && !added.length) box.appendChild(el("div", null, "Nothing fixed and nothing new."));
+  const part = (cls, word, list) => {
+    if (!list.length) return;
+    box.appendChild(el("span", "k " + cls, list.reduce((a, c) => a + (Number(c.n) || 1), 0) + " " + word));
+    const ul = el("ul");
+    list.slice(0, 4).forEach((c) => ul.appendChild(el("li", null, (cls === "fixed" ? "✓ " : "! ") + c.title + (c.resources && c.resources.length ? " · " + c.resources.slice(0, 2).join(", ") : ""))));
+    box.appendChild(ul);
+  };
+  part("fixed", "FIXED", fixed); part("new", "NEW", added);
+  return box;
+}
+async function hmPdf(btn) {
+  btn.disabled = true;
+  try {
+    const { data } = await sb.auth.getSession();
+    const r = await fetch(FN + "/website-health/pdf", { headers: { "Authorization": "Bearer " + ENV.anon, "x-dds-user-jwt": data?.session?.access_token || "", "x-dds-scope-site": (new URLSearchParams(location.search).get("client") || "") } });
+    if (!r.ok) throw new Error("bad");
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(await r.blob());
+    a.download = (/filename="([^"]+)"/.exec(r.headers.get("content-disposition") || "") || [])[1] || ("website-health-" + new Date().toISOString().slice(0, 10) + ".pdf");
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+  } catch (_) { toast("The PDF didn’t come through. Try again in a moment.", true); }
+  finally { btn.disabled = false; }
+}
 function renderHealthCard() {
   const card = $("healthCard"); if (!card) return;
   const h = HB_HEALTH; if (!h || !Array.isArray(h.categories)) { card.hidden = true; return; }
   card.innerHTML = ""; card.hidden = false;
-  const head = el("div", "hb-card-h"); head.appendChild(el("h2", null, "Health check"));
-  const chip = el("span", "hb-chip " + (h.overall === "healthy" ? "good" : h.overall === "attention" ? "warn" : "")); chip.appendChild(el("i", "d"));
-  chip.appendChild(document.createTextNode(h.overall === "healthy" ? "All good" : h.overall === "attention" ? (h.attention_count + " to look at") : "Getting started"));
-  head.appendChild(chip); card.appendChild(head);
+  const m = h.memory && typeof h.memory === "object" ? h.memory : null;
+  // what is wrong right now (the go-live list is its own), then what the daily check found
+  const needs = [];
+  h.categories.forEach((c) => { if (c.key !== "golive") (c.checks || []).forEach((k) => { if (k.state === "attention") needs.push({ ...k, heading: HM_CAT[c.key] || "reach" }); }); });
+  const found = m && Array.isArray(m.issues) ? m.issues : [];
+  const total = needs.length + found.length;
+  card.classList.toggle("hm-wide", !!m);
+  const head = el("div", "hb-card-h"); head.appendChild(el("h2", null, "Website health"));
+  const acts = el("div", "hm-hacts");
+  const chip = el("span", "hb-chip " + (total ? "warn" : h.overall === "new" ? "" : "good")); chip.appendChild(el("i", "d"));
+  chip.appendChild(document.createTextNode(total ? (total + " to look at") : h.overall === "new" ? "Getting started" : "All good"));
+  acts.appendChild(chip);
+  if (m) { const pdf = el("button", "pillbtn sm", "Download PDF"); pdf.type = "button"; pdf.addEventListener("click", () => hmPdf(pdf)); acts.appendChild(pdf); }
+  head.appendChild(acts); card.appendChild(head);
   card.appendChild(el("div", "note", h.summary || h.headline || ""));
   // list item 151: the two figures an owner asks first, how much it's been up and how fast
   // it loads, shown whether or not they need a look; and a new site's go-live list
-  const facts = [];
-  h.categories.forEach((c) => (c.checks || []).forEach((k) => { if (c.key === "speed" || /^Online \d/.test(k.title)) facts.push(k.title); }));
+  const facts = [], factBy = {};
+  h.categories.forEach((c) => (c.checks || []).forEach((k) => { if (c.key === "speed" || /^Online \d/.test(k.title)) { facts.push(k.title); factBy[c.key === "speed" ? "speed" : "reach"] = k.title; } }));
   if (facts.length) card.appendChild(el("div", "note hb-facts", facts.join(" · ")));
+  if (m && m.kept && m.now) {
+    const row = el("div", "hm-row");
+    const count = el("div", "hm-count");
+    count.appendChild(el("b", null, String(total)));
+    count.appendChild(el("span", null, total === 1 ? "thing to look at" : "things to look at"));
+    if (m.then) {
+      const d = (Number(m.now.n) || 0) - (Number(m.then.n) || 0), when = hmDay(m.then.day);
+      count.appendChild(el("span", "hm-chg " + (d < 0 ? "up" : d > 0 ? "down" : ""), d === 0 ? "The same as " + when : d < 0 ? (-d) + " fewer than " + when : d + " more than " + when));
+    }
+    row.appendChild(count);
+    const line = el("div");
+    if (Array.isArray(m.points) && m.points.length > 1) {
+      line.innerHTML = hmLine(m.points);
+      line.appendChild(el("p", "hm-cap", "Found by the daily check, one point a week"));
+    } else line.appendChild(el("p", "hm-cap", "The line fills in week by week."));
+    row.appendChild(line);
+    if (m.since) row.appendChild(hmSince(m));
+    card.appendChild(row);
+  } else if (m && !m.kept) {
+    card.appendChild(el("div", "note", "Each day’s check is kept from today, so the line fills in week by week."));
+  }
   const golive = h.categories.find((c) => c.key === "golive");
   if (golive) {
     card.appendChild(el("h3", "hb-sub-h", "Before you go live"));
@@ -6276,16 +6391,37 @@ function renderHealthCard() {
     });
     card.appendChild(ul);
   }
-  const needs = [];
-  h.categories.forEach((c) => { if (c.key !== "golive") (c.checks || []).forEach((k) => { if (k.state === "attention") needs.push(k); }); });
-  if (needs.length) {
+  if (m) {
+    const tiles = el("div", "hm-tiles");
+    HM_HEADINGS.forEach(([key, title]) => {
+      const n = found.filter((x) => x.heading === key).length + needs.filter((x) => x.heading === key).length;
+      const t = el("div", "hm-tile" + (n ? " look" : "")); t.dataset.heading = key;
+      t.appendChild(el("b", null, title));
+      t.appendChild(el("span", "s", n ? n + " to look at" : "✓ All good"));
+      if (factBy[key]) t.appendChild(el("span", "f", factBy[key]));
+      tiles.appendChild(t);
+    });
+    card.appendChild(tiles);
+  }
+  if (total) {
+    const wrap = el("div", m ? "hm-list" : null);
+    if (m) wrap.appendChild(el("h3", null, "To look at"));
     const ul = el("ul", "hb-checks");
-    needs.slice(0, 3).forEach((k) => {
+    needs.forEach((k) => {
       const li = el("li"); li.appendChild(el("b", null, k.title)); li.appendChild(document.createTextNode(k.why || ""));
       if (k.action_label && k.action_href) { li.appendChild(document.createTextNode(" ")); const a = el("a", null, k.action_label); a.href = k.action_href; li.appendChild(a); }
       ul.appendChild(li);
     });
-    card.appendChild(ul);
+    found.forEach((x) => {
+      const li = el("li", x.severity === "critical" ? "hm-crit" : null);
+      const b = el("b"); b.appendChild(el("span", "hm-tag", (HM_HEADINGS.find((hh) => hh[0] === x.heading) || [, "Website"])[1])); b.appendChild(document.createTextNode(x.title + (x.n > 1 ? " · " + x.n + " places" : "")));
+      li.appendChild(b);
+      li.appendChild(document.createTextNode([x.resources && x.resources.length ? x.resources.slice(0, 3).join(", ") + "." : "", x.next_action || ""].filter(Boolean).join(" ")));
+      const fx = hmFix(x.type);
+      if (fx) { li.appendChild(document.createTextNode(" ")); const a = el("a", null, fx[0]); a.href = fx[1]; li.appendChild(a); }
+      ul.appendChild(li);
+    });
+    wrap.appendChild(ul); card.appendChild(wrap);
   } else if (h.ok_count) {
     card.appendChild(el("div", "note", `✓ ${h.ok_count} check${h.ok_count === 1 ? "" : "s"} pass.`));
   }
