@@ -31,7 +31,7 @@ import { readIfMatch, preconditionOutcome, staleConflictBody, draftAsFound } fro
 import { describeVersionDiff, resolveTimewarpTarget, normalizeTimewarpDate, cleanCheckpointName, type TimewarpVersion } from '../lib/preview_env.ts';
 import { captureDraftSnapshot } from '../lib/staging.ts';
 import { applySnapshotToDraft, snapshotForRestore, leftOffSentence } from '../lib/draft_writer.ts';
-import { insertSnapshot, type DraftSettings } from '../lib/draft_settings.ts';
+import { insertSnapshot as insertSnapshotRow, type DraftSettings } from '../lib/draft_settings.ts';
 import { renderOfflinePage, offlineFileMap } from '../lib/offline_page.ts';
 import { loadEmailBrand } from '../lib/email_brand.ts';
 import { snapshotContentUsable } from '../lib/render_types.ts';
@@ -92,17 +92,17 @@ export async function runPipeline(site: SiteRow, principal: Principal, kind: 'pu
 
   // persist snapshot (publish only; restore reuses the retained one)
   if (!snapshotId) {
-    const insertKept = (byKind: string) => insertSnapshot({
+    const insertSnapshot = (byKind: string) => insertSnapshotRow({
       site_id: site.id, content: snapshotArg.snapshot.content, media_manifest: snapshotArg.mediaManifest,
       content_contract_version: snapshotArg.snapshot.content_contract_version,
       template_slug: snapshotArg.snapshot.template_slug, template_version: snapshotArg.snapshot.template_version,
       dev_customization: snapshotArg.snapshot.dev_customization ?? null,  // Phase B1: capture the dev layer with the snapshot
       created_by: principal.userId, created_by_kind: byKind,
     }, snapshotArg.draftSettings);   // the sections, pages and menu as stored, for a restore
-    let ins = await insertKept(actorKind);
+    let ins = await insertSnapshot(actorKind);
     // a database that predates migration 0133 rejects 'operator' (23514) — degrade
     // to 'staff' for the WHOLE pipeline (snapshot + publish record agree), never 502
-    if (!ins.ok && actorKind === 'operator' && actorKindCheckViolation(ins.json, ins.text)) { actorKind = legacyActorKind(actorKind); ins = await insertKept(actorKind); }
+    if (!ins.ok && actorKind === 'operator' && actorKindCheckViolation(ins.json, ins.text)) { actorKind = legacyActorKind(actorKind); ins = await insertSnapshot(actorKind); }
     if (!ins.ok || !ins.json?.[0]?.id) return json({ error: 'snapshot_failed', message: CALM }, 502, cors);
     snapshotId = ins.json[0].id as string;
   }
