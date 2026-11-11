@@ -11,6 +11,9 @@
   :root{
     --bg:#faf8f5;--card:#fff;--ink:#1b1525;--soft:#6b6478;--faint:#6f677d;--line:#eee9e0;
     --p:#5b3fa0;--p-deep:#432e78;--p-soft:#efeafa;--on-p:#fff;--good:#33664b;--good-soft:#e7f1ea;--warn:#775d31;--warn-soft:#f3ead9;
+    /* item 179 (direction A): the studio-coloured chrome — the phone hero and the
+       ≥720px context bar wear the deep plum in BOTH themes (brand, not surface). */
+    --chrome:#241d38;--on-chrome:#efeaf7;--on-chrome-soft:#b4a9cc;--chrome-accent:#cdb6f2;
     --shadow:0 1px 2px rgba(27,21,37,.04),0 8px 24px rgba(27,21,37,.06);
     --shadow-lift:0 2px 4px rgba(27,21,37,.05),0 14px 34px rgba(27,21,37,.10);
     --serif:'Fraunces',"Iowan Old Style","Palatino Linotype",Palatino,Georgia,serif;
@@ -20,9 +23,9 @@
        already flip (--p/--warn/--good/--faint); only these two are fixed per theme. */
     --act-file:#31708e;--act-note:#8a5a83;
   }
-  @media (prefers-color-scheme:dark){:root{--bg:#171320;--card:#1f1a2b;--ink:#efeaf7;--soft:#a79ebc;--faint:#948bad;--line:#2a2338;--p:#b79ceb;--p-deep:#cdb6f2;--p-soft:#241d38;--on-p:#171320;--good:#8bbf9f;--good-soft:#1f2a24;--warn:#d3ac6e;--warn-soft:#2a2316;--act-file:#85b7cf;--act-note:#c9a3c2;--shadow:0 1px 2px rgba(0,0,0,.2),0 8px 24px rgba(0,0,0,.28);--shadow-lift:0 2px 4px rgba(0,0,0,.24),0 14px 34px rgba(0,0,0,.34)}}
-  :root[data-theme="light"]{--bg:#faf8f5;--card:#fff;--ink:#1b1525;--soft:#6b6478;--faint:#6f677d;--line:#eee9e0;--p:#5b3fa0;--p-deep:#432e78;--p-soft:#efeafa;--on-p:#fff;--good:#33664b;--good-soft:#e7f1ea;--warn:#775d31;--warn-soft:#f3ead9;--act-file:#31708e;--act-note:#8a5a83}
-  :root[data-theme="dark"]{--bg:#171320;--card:#1f1a2b;--ink:#efeaf7;--soft:#a79ebc;--faint:#948bad;--line:#2a2338;--p:#b79ceb;--p-deep:#cdb6f2;--p-soft:#241d38;--on-p:#171320;--good:#8bbf9f;--good-soft:#1f2a24;--warn:#d3ac6e;--warn-soft:#2a2316;--act-file:#85b7cf;--act-note:#c9a3c2}
+  @media (prefers-color-scheme:dark){:root{--bg:#171320;--card:#1f1a2b;--ink:#efeaf7;--soft:#a79ebc;--faint:#948bad;--line:#2a2338;--p:#b79ceb;--p-deep:#cdb6f2;--p-soft:#241d38;--on-p:#171320;--good:#8bbf9f;--good-soft:#1f2a24;--warn:#d3ac6e;--warn-soft:#2a2316;--act-file:#85b7cf;--act-note:#c9a3c2;--chrome:#120e1b;--on-chrome:#efeaf7;--on-chrome-soft:#b4a9cc;--chrome-accent:#cdb6f2;--shadow:0 1px 2px rgba(0,0,0,.2),0 8px 24px rgba(0,0,0,.28);--shadow-lift:0 2px 4px rgba(0,0,0,.24),0 14px 34px rgba(0,0,0,.34)}}
+  :root[data-theme="light"]{--bg:#faf8f5;--card:#fff;--ink:#1b1525;--soft:#6b6478;--faint:#6f677d;--line:#eee9e0;--p:#5b3fa0;--p-deep:#432e78;--p-soft:#efeafa;--on-p:#fff;--good:#33664b;--good-soft:#e7f1ea;--warn:#775d31;--warn-soft:#f3ead9;--act-file:#31708e;--act-note:#8a5a83;--chrome:#241d38;--on-chrome:#efeaf7;--on-chrome-soft:#b4a9cc;--chrome-accent:#cdb6f2}
+  :root[data-theme="dark"]{--bg:#171320;--card:#1f1a2b;--ink:#efeaf7;--soft:#a79ebc;--faint:#948bad;--line:#2a2338;--p:#b79ceb;--p-deep:#cdb6f2;--p-soft:#241d38;--on-p:#171320;--good:#8bbf9f;--good-soft:#1f2a24;--warn:#d3ac6e;--warn-soft:#2a2316;--act-file:#85b7cf;--act-note:#c9a3c2;--chrome:#120e1b;--on-chrome:#efeaf7;--on-chrome-soft:#b4a9cc;--chrome-accent:#cdb6f2}
   *{box-sizing:border-box;margin:0}
   body{background:var(--bg);color:var(--ink);font-family:var(--sans);line-height:1.55;-webkit-font-smoothing:antialiased}
   .wrap{max-width:660px;margin:0 auto;padding:40px 20px 90px}
@@ -237,18 +240,7 @@
   .qico{flex:0 0 auto;width:32px;height:32px;border-radius:9px;background:var(--p-soft);display:grid;place-items:center;font-size:14px;align-self:flex-start;margin-top:3px}
   .qico.todo{background:var(--warn-soft)} .qico.invoice{background:var(--good-soft)}
   .qwhen{flex:0 0 auto;font-size:11.5px;color:var(--faint);padding-top:6px}   /* PS3: a row's own recency (Recent updates) */
-  /* slice 10: the at-a-glance strip (Lightning Home highlights, portal skin) */
-  .glance{display:grid;grid-template-columns:repeat(auto-fit,minmax(128px,1fr));gap:1px;background:var(--line);border:1px solid var(--line);border-radius:14px;overflow:hidden;box-shadow:var(--shadow);margin-bottom:22px}
-  .glance[hidden]{display:none}
-  @media (max-width:719px){.glance .gt:last-child:nth-child(odd){grid-column:1/-1}}   /* the walk found an empty grey cell beside three tiles */
   @media (min-width:720px) and (max-width:920px){.tab .ti{display:none}.tab{padding-left:10px;padding-right:10px}}   /* all six tabs fit, no clipped "Hel" */
-  .glance .gt{background:var(--card);padding:12px 14px;min-width:0}
-  /* PS3 (D1a): the needs-you tile is a REAL button pointing at the list it counts */
-  .glance button.gt{display:block;width:100%;border:0;border-radius:0;text-align:left;font:inherit;font-weight:400;cursor:pointer}
-  .glance button.gt:hover{background:var(--p-soft);color:inherit;border-color:transparent}
-  .glance button.gt .gn,.glance button.gt .gl{display:block}
-  .glance .gn{font-family:var(--serif);font-size:18.5px;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-  .glance .gl{font-size:10.5px;letter-spacing:.05em;text-transform:uppercase;color:var(--faint);font-weight:600;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .qmain{flex:1 1 220px;min-width:0}
   .qmain h3{font-family:var(--serif);font-weight:500;font-size:16.5px;margin:4px 0 2px;line-height:1.25;letter-spacing:-.01em}
   .qmain p{margin:0;color:var(--soft);font-size:13.5px}
@@ -393,6 +385,66 @@
   .wslist .wsrow{display:flex;justify-content:space-between;align-items:baseline;gap:12px;font-size:13.5px;padding:7px 0;border-top:1px solid var(--line);color:var(--ink)}
   .wslist .wsrow:first-child{border-top:0}
   .wslist .wsrow .wsnum{flex:0 0 auto;color:var(--soft);font-variant-numeric:tabular-nums;white-space:nowrap}
+  /* ── item 179 (direction A): the studio-coloured hero that opens Home ──
+     On phones it's a full-bleed plum band: brand row (the bar's brand is a ≥720px
+     affordance), greeting, sub. ≥720px the dark context bar carries the brand, so
+     the hero quiets down to the plain page header on cream. */
+  .phero{background:var(--chrome);color:var(--on-chrome);margin:-40px -20px 0;padding:18px 20px 26px;border-radius:0 0 22px 22px}
+  .phero .ph-brand{display:flex;align-items:center;gap:9px;margin-bottom:16px;padding-right:52px}   /* clears the fixed bell */
+  .phero .ph-mark{width:28px;height:28px;border-radius:8px;background:#5b3fa0;color:#fff;display:grid;place-items:center;font-size:13px;font-weight:700;flex:0 0 auto}   /* the mark keeps the brand purple in both themes */
+  .phero .ph-logo{height:28px;width:auto;max-width:132px;border-radius:6px;display:block}
+  .phero .ph-name{font-family:var(--serif);font-size:15.5px;color:var(--on-chrome);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .phero h1{font-family:var(--serif);font-weight:500;font-size:clamp(28px,5vw,38px);margin:12px 0 .15em;letter-spacing:-.02em;line-height:1.08;color:var(--on-chrome)}
+  .phero .sub{color:var(--on-chrome-soft);font-size:15px;margin:0}
+  .phero .rolebadge{background:rgba(255,255,255,.13);color:var(--on-chrome)}
+  @media (min-width:720px){
+    .phero{background:transparent;color:var(--ink);margin:0;padding:0;border-radius:0}
+    .phero .ph-brand{display:none}
+    .phero h1{color:var(--ink);margin-top:16px}
+    .phero .sub{color:var(--soft)}
+    .phero .rolebadge{background:var(--p-soft);color:var(--p)}
+  }
+  /* the ≥720px context bar wears the chrome too (the studio's colours up top) */
+  @media (min-width:720px){
+    .tabnav{background:var(--chrome);border-bottom:0}
+    .cb-name{color:var(--on-chrome)}
+    .cb-mark{background:#5b3fa0;color:#fff}
+    .tab{color:var(--on-chrome-soft)}
+    .tab:hover{color:var(--on-chrome)}
+    .tab[aria-current="page"]{color:var(--on-chrome);border-bottom-color:var(--chrome-accent)}
+    .tab[aria-current="page"] .ti{color:var(--chrome-accent)}
+    .cb-bell{background:transparent;border-color:rgba(255,255,255,.22);color:var(--on-chrome)}
+    .cb-bell:hover{border-color:var(--chrome-accent);color:var(--on-chrome)}
+    .bell .badge{border-color:var(--chrome)}
+    .cb-acct{background:rgba(255,255,255,.13);color:var(--on-chrome);border-color:transparent}
+    .cb-acct:hover{border-color:var(--chrome-accent);color:var(--on-chrome)}
+  }
+  /* the website card's picture: the site's own home page, drawn by the server and
+     shown scaled in a sandboxed frame with scripts off (sites.html's trick) */
+  .wscard{padding:0;overflow:hidden}
+  .wscard .wsin{padding:16px 20px 18px}
+  .wspic{position:relative;aspect-ratio:16/9;overflow:hidden;background:var(--p-soft);border-bottom:1px solid var(--line)}
+  .wspic iframe{position:absolute;top:0;left:0;width:1280px;height:720px;border:0;transform-origin:0 0;transform:scale(var(--wsk,.25));pointer-events:none;background:#fff;opacity:0;transition:opacity var(--dds-t-slow,320ms) ease-out}
+  .wspic iframe.on{opacity:1}
+  .wspic .wsini{position:absolute;inset:0;display:grid;place-items:center;font-family:var(--serif);font-size:42px;color:var(--p)}
+  .wsbar{display:flex;align-items:center;gap:6px 10px;flex-wrap:wrap;margin:2px 0 6px}
+  .wsbar .wsdomain{font-weight:600;font-size:14.5px;color:var(--p);text-decoration:none}
+  .wsbar .wsdomain:hover{text-decoration:underline}
+  .wsbar .wswhen{color:var(--faint);font-size:12.5px}
+  .pill-live{display:inline-flex;align-items:center;font-size:10px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;background:var(--good-soft);color:var(--good);border-radius:999px;padding:3px 9px}
+  a.btn.wssee{background:var(--p);border-color:var(--p);color:var(--on-p)}
+  a.btn.wssee:hover{background:var(--p-deep);border-color:var(--p-deep);color:var(--on-p)}
+  /* ≥1000px Home sits in two columns: the website + projects left, the queue +
+     updates right (direction A's desktop). Everything else spans both. */
+  @media (min-width:1000px){
+    body.homeview .wrap{max-width:1100px}
+    body.homeview #main{display:grid;grid-template-columns:minmax(0,3fr) minmax(0,2fr);gap:0 22px;align-items:start}
+    body.homeview #main>*{grid-column:1/-1;min-width:0}
+    body.homeview #main>#home-website{grid-column:1;grid-row:span 2}
+    body.homeview #main>#home-needs{grid-column:2}
+    body.homeview #main>#home-updates{grid-column:2}
+    body.homeview #main>#home-projects{grid-column:1}
+  }
   /* ── slice 11: the Requests tab — quick-action tiles · service card grid ·
      the "Your requests" list view with Open/All filter chips ── */
   .acttiles{display:grid;grid-template-columns:1fr 1fr;gap:14px}
@@ -494,14 +546,13 @@ function sectionForAnchor(a){a=String(a||'').replace(/^#/,'');if(a.indexOf('appr
 // through to the email; an all-lowercase name gets its capital.
 function firstName(u){if(!u)return'';const cap=(p)=>p.charAt(0).toUpperCase()+p.slice(1);const m=(u.user_metadata||{});const n=String(m.name||m.full_name||'').trim().split(/\s+/)[0].replace(/[.,]+$/,'');if(n.length>1)return n===n.toLowerCase()?cap(n):n;const e=(u.email||'').split('@')[0];if(e&&/^[a-z]+([._-][a-z]+)?$/i.test(e)){const p=e.split(/[._-]/)[0];if(p.length>1)return cap(p);}return'';}
 
-// ── slice 10: Home greeting + at-a-glance strip — pure helpers (mirrored 1:1
-// in tests/presence/today_home_test.mjs; keep both copies in sync). ──
+// ── slice 10: Home greeting pure helpers (mirrored 1:1 in
+// tests/presence/today_home_test.mjs; keep both copies in sync). ──
 // Time-of-day greeting, with the client's first name when we truly know it.
 function portalGreeting(h,name){const g=h<12?'Good morning':h<18?'Good afternoon':'Good evening';return g+(name?', '+name:'')+'.';}
 // ONE definition of "needs your OK" per project snapshot — pending approvals +
-// to-dos flagged for the client. The glance tile and each project card's
-// "N things need your OK" line both use it, so Home can never show two
-// contradictory counts on the same render.
+// to-dos flagged for the client. Each project card's "N things need your OK"
+// line uses it, so Home can never show two contradictory counts on one render.
 function snapWaiting(s){return((s&&s.approvals)||[]).length+((s&&s.todos)||[]).length;}
 // ── who ticks a to-do off ────────────────────────────────────────────────────
 // Three of the studio's ten delivery-checklist steps are addressed to YOU
@@ -516,46 +567,14 @@ const TASK_WORD={todo:'To do',in_progress:'In progress',blocked:'Waiting on some
 // a project's status in words (the Nov 10 walk found the raw "active" on a Home tile,
 // the project card and the record's chip); mirrored in tests/presence/today_home_test.mjs
 function projectWord(s){s=String(s||'');return({active:'In progress',on_hold:'On hold',complete:'Done',archived:'Closed'})[s]||s.replace(/_/g,' ');}
-// PS2: the ONE portal money formatter — the glance tile, the Needs-you invoice
-// row, the Invoices rows and the tab's unpaid-total line all render the same
-// cents the same way ($1,200, $1,234.50 — never a bare $1200 drifting from the
-// glance's $1,200). Server amounts are dollars (amount_cents/100), so a
-// fractional amount keeps its two cent digits; whole dollars stay clean.
+// PS2: the ONE portal money formatter — the Needs-you invoice row, the Invoices
+// rows and the tab's unpaid-total line all render the same cents the same way
+// ($1,200, $1,234.50 — never a bare $1200 drifting between surfaces). Server
+// amounts are dollars (amount_cents/100), so a fractional amount keeps its two
+// cent digits; whole dollars stay clean.
 function fmtMoney(n){n=Number(n)||0;return'$'+n.toLocaleString('en-US',{minimumFractionDigits:Number.isInteger(n)?0:2,maximumFractionDigits:2});}
-// The strip's inputs, from data Home ALREADY loads (feed + snaps + notifs +
-// billing + projects — zero new reads). due/project are '' /null when their
-// datum is absent so their tiles hide — no fake zeros for missing data.
-// `failed` marks sources whose READ failed (feed/snaps/notifs): a count built
-// on a failed read is null — its tile hides rather than asserting a zero that
-// was never measured (a real, successful zero still renders as 0).
-// "new messages" counts ONLY kind==='message' — a genuine studio message (the
-// server already drops the client's own sends). 'support_message' rows derive
-// from support updated_at, which moves on the client's own filing and on
-// status changes — counting them faked "new messages" that never were.
-function glanceData(feed,snaps,notifs,billing,projects,failed){
-  failed=failed||{};
-  const needsOk=(failed.feed||failed.snaps)?null:needsYouItems(feed,snaps,failed.billing?null:billing).length;
-  const newMsgs=failed.notifs?null:(notifs||[]).filter(n=>n&&!n.read&&n.kind==='message').length;
-  // a FAILED billing read hides the to-pay tile BY CONTRACT — never because a
-  // failed read's dueTotal happened to compute 0 (a fake $0 is still a lie)
-  const dueTotal=failed.billing?0:unpaidInvoices(billing).reduce((a,i)=>a+(Number(i&&i.amount)||0),0);
-  const p=(projects||[]).find(x=>x&&x.status==='active')||(projects||[])[0]||null;
-  return{needsOk,newMsgs,due:dueTotal>0?fmtMoney(dueTotal):'',project:p?{status:projectWord(p.status),name:p.name||'Your project'}:null};
-}
-// A tile exists only when its datum does: counts are always real (0 included;
-// null = the read failed → hidden); "to pay" only when something actually is;
-// the project tile only with a project. No REAL count at all (both count
-// sources failed) → no strip — due/project alone can't carry an honest glance.
-function glanceTiles(g){
-  g=g||{};const t=[];
-  if(g.needsOk!=null)t.push({id:'glance-ok',n:String(g.needsOk),l:'in “Needs you”'});
-  if(g.newMsgs!=null)t.push({id:'glance-msgs',n:String(g.newMsgs),l:g.newMsgs===1?'new message':'new messages'});
-  if(g.due)t.push({id:'glance-due',n:g.due,l:'to pay'});
-  if(g.project)t.push({id:'glance-proj',n:g.project.status,l:g.project.name});
-  return(g.needsOk!=null||g.newMsgs!=null)?t:[];
-}
 // PS3 (D1a): ONE definition of the "Needs you" list. Home's queue renders
-// exactly these rows (in this order) and the glance tile shows THIS array's
+// exactly these rows (in this order) and the heading's count is THIS array's
 // length — the two adjacent numbers agree BY CONSTRUCTION. A failed billing
 // read passes billing=null (no invoice rows — matching the queue, which
 // renders none and carries its own couldn't-check line instead). The third
@@ -596,7 +615,8 @@ function portalMoment(m){return !!m&&['needs_attention','reminder','opportunity'
 // hidden = no data / route missing / site not published / FAILED month read (a
 // transient DB failure must never masquerade as the "ready to be found" story);
 // empty = a SUCCESSFUL read with no visitors yet (gentle — never "0 people").
-function wsCardState(d){if(!d||d.published!==true)return'hidden';const m=d.month;if(!m)return'hidden';if(m.has_data===false||!(m.visitors>0))return'empty';return'stats';}
+function wsCardState(d){if(!d||d.published!==true)return'hidden';const m=d.month;if(!m)return'bare';if(m.has_data===false||!(m.visitors>0))return'empty';return'stats';}
+function wsSiteInfo(d){const s=(d&&d.site)||{};const url=typeof s.url==='string'&&/^https:\/\//.test(s.url)?s.url:'';return{url,host:url.replace(/^https:\/\//,''),published_at:(typeof s.last_published_at==='string'&&s.last_published_at)||''};}
 function wsPeople(n){n=Math.max(0,n|0);return n===1?'1 person':n+' people';}
 // The lead sentence, from real numbers: bolded counts, sensible degradation —
 // zero actions drops the brought-in clause; no source drops the arrival clause;
@@ -683,7 +703,7 @@ function anchorTarget(a){const ex=String(a||'').replace(/^#/,'');return(ex&&docu
 // reachable from every view because it lives OUTSIDE #main (innerHTML rewrites
 // never touch it). Home aggregates ACROSS projects; the other tabs are top-level
 // destinations over the SAME existing /client/* + /portal/* reads — no new backend.
-const PORTAL={ready:false,persona:'',ctx:{},projects:[],projectsFailed:false,feed:{},feedFailed:false,unread:0,notifs:[],notifsFailed:false,billing:null,billingFailed:false,snaps:null,wstatsFetch:null};
+const PORTAL={ready:false,persona:'',ctx:{},projects:[],projectsFailed:false,feed:{},feedFailed:false,unread:0,notifs:[],notifsFailed:false,billing:null,billingFailed:false,snaps:null,wstatsFetch:null,wsthumbFetch:null};
 let CURRENT_TAB='home';
 // A monotonically increasing VIEW token: every function that owns a fresh paint
 // of #main bumps it (showTab AND every drill-in open — openProject, support
@@ -733,7 +753,7 @@ function setActiveTab(tab){const nav=$('tabnav');if(!nav)return;nav.querySelecto
 // the project record page widens the wrap (two-region body); every other view is
 // narrow. Every view transition passes through here, so it also drops the Messages
 // console's own wrap class (renderMessages re-adds it for the split view).
-function setWide(on){try{document.body.classList.toggle('wide',!!on);document.body.classList.remove('msgsview');}catch(_){}}
+function setWide(on){try{document.body.classList.toggle('wide',!!on);document.body.classList.remove('msgsview');document.body.classList.remove('homeview');}catch(_){}}
 function showTab(tab){
   VIEW_SEQ++;   // this tab owns #main now — invalidate any in-flight view render
   CURRENT_TAB=tab;setActiveTab(tab);setWide(false);try{window.scrollTo(0,0);}catch(_){}
@@ -789,7 +809,7 @@ async function ensureSnaps(){
         approvals:(d.approvals||[]).filter(a=>a&&a.status==='pending'),
         todos:(d.tasks||[]).filter(t=>t&&t.client_action_required&&t.status!=='done'),
         surveys:(d.surveys||[]),deliverables:(d.deliverables||[])};
-    // failed:true so the glance strip can tell "couldn't read" from "genuinely
+    // failed:true so the queue can tell "couldn't read" from "genuinely
     // empty" — its empty arrays keep every other consumer degrading as before
     }catch(_){return {id:p.id,name:p.name,failed:true,milestones:[],approvals:[],todos:[],surveys:[],deliverables:[]};}
   };
@@ -884,18 +904,26 @@ function unreadKeysFrom(notifs){
 }
 function renderHome(){
   const P=PORTAL,projects=P.projects,feed=P.feed||{};
-  // PS3 (D3a): Home no longer renders its own bell — the ONE persistent bell
-  // (#navbell, outside #main) serves every tab on every viewport.
-  let html=`<div class="topbar"><div class="rolebadge">● ${P.persona==='client'?'Your workspace':'Client view'}</div></div>`+   // persona, not projects.length — a failed projects read must not demote a client's badge
-    `<header><h1>${esc(portalGreeting(new Date().getHours(),firstName(USER)))}</h1><p class="sub">Everything your studio is doing with you, in one place.</p></header>`;
+  try{document.body.classList.add('homeview');}catch(_){}   // ≥1000px: the two-column Home (setWide drops it on every other view)
+  // item 179 (direction A): Home opens with the studio-coloured hero — the
+  // studio's logo and name (the bar's brand is a ≥720px affordance, so phones
+  // carry it here), then the greeting. PS3 (D3a): still no bell of its own —
+  // the ONE persistent bell (#navbell, outside #main) serves every viewport.
+  const logo=studioLogo();
+  let html=`<header class="phero" id="home-hero">`+
+    `<div class="ph-brand">${logo?`<img class="ph-logo" src="${esc(logo)}" alt="">`:`<span class="ph-mark" aria-hidden="true">${esc((studioBrand().charAt(0)||'✦').toUpperCase())}</span>`}<span class="ph-name">${esc(studioBrand())}</span></div>`+
+    `<div class="rolebadge">● ${P.persona==='client'?'Your workspace':'Client view'}</div>`+   // persona, not projects.length — a failed projects read must not demote a client's badge
+    `<h1>${esc(portalGreeting(new Date().getHours(),firstName(USER)))}</h1>`+
+    `<p class="sub">${P.persona==='client'?'Here’s where your website and projects stand.':'Everything your studio shares with you, in one place.'}</p>`+
+  `</header>`;
   html+=welcomeCardHtml();
   html+=connectAskHtml();
-  // slice 10: the at-a-glance strip — filled by buildNeedsYou from data Home
-  // already loads; it stays hidden until at least one tile has a real datum.
-  html+=`<div class="glance" id="home-glance" hidden></div>`;
-  html+=`<section id="home-needs"><h2>Needs you</h2><div id="needs-body"><div class="skel"><div class="l w60"></div><div class="l w40"></div></div></div></section>`;
+  // item 179: the "Your website" card leads Home — the thing they pay for,
+  // first. Filled by loadWebsiteCard (hidden for a reviewer / unpublished site).
+  html+=`<section id="home-website" hidden></section>`;
+  html+=`<section id="home-needs"><h2 id="needs-h">Needs you</h2><div id="needs-body"><div class="skel"><div class="l w60"></div><div class="l w40"></div></div></div></section>`;
   // Oct 2026 audit change 4: what your studio just did sits right under what needs you
-  html+=`<section id="home-updates"><h2>Recent updates</h2>`;
+  html+=`<section id="home-updates"><h2>From your studio</h2>`;
   const moments=(feed.moments||[]).filter(portalMoment);
   // a FAILED feed read says so — "Nothing new to share" is a claim only a
   // successful read may make
@@ -905,14 +933,11 @@ function renderHome(){
   // a neutral "Update" kind chip, and the row's own recency (rel created_at).
   else html+=`<div class="card qcard">${moments.map(m=>`<div class="qrow"><span class="qico" aria-hidden="true">${momentIcon(m.moment_type)}</span><div class="qmain"><span class="kchip">Update</span><h3>${esc(m.headline)}</h3><p>${esc(m.summary)}</p></div>${m.created_at?`<span class="qwhen">${esc(rel(m.created_at))}</span>`:''}</div>`).join('')}</div>`;
   html+=`</section>`;
-  // slice 8b: the "Your website" slot — filled by loadWebsiteCard() only when
-  // there are real stats to show (unpublished / 404 / reviewer → stays hidden).
-  html+=`<section id="home-website" hidden></section>`;
   // a FAILED projects read says so — never the 🚀 first-run card (which would
   // tell a client with active projects that none exist yet). The section keeps
   // the SHORT line; the Needs-you queue is the failure ledger and carries the
   // one try-again phrasing — the same sentence never renders twice on Home.
-  html+=`<section><h2>Your projects</h2>${P.projectsFailed
+  html+=`<section id="home-projects"><h2>Your projects</h2>${P.projectsFailed
     ?`<p class="muted fload">We couldn’t load your projects just now.</p>`
     :projectCardsHtml(projects)}</section>`;
   $('main').innerHTML=html;
@@ -939,25 +964,6 @@ async function buildNeedsYou(){
     const mp=document.getElementById('mp-'+s.id);
     if(mp)mp.innerHTML=miniPathHtml(s.milestones);
   }
-  // slice 10: the at-a-glance strip — from the same data this queue is built on.
-  // Per-source failure honesty: a tile whose read failed HIDES (never a fake 0).
-  const gl=document.getElementById('home-glance');
-  if(gl){
-    const failed={feed:!!PORTAL.feedFailed,notifs:!!PORTAL.notifsFailed,snaps:snaps.some(s=>s&&s.failed)||!!PORTAL.projectsFailed,billing:!!PORTAL.billingFailed};
-    const tiles=glanceTiles(glanceData(PORTAL.feed,snaps,PORTAL.notifs,billing,PORTAL.projects,failed));
-    // PS3 (D1a): the needs-you tile counts the queue below, so it IS a button
-    // to that queue — labeled for the list it counts.
-    if(tiles.length){gl.innerHTML=tiles.map(t=>t.id==='glance-due'
-      ?`<button type="button" class="gt" id="glance-due" aria-label="${esc(t.n)} to pay — jump to it"><span class="gn">${esc(t.n)}</span><span class="gl">${esc(t.l)}</span></button>`
-      :t.id==='glance-ok'
-      ?`<button type="button" class="gt" id="${esc(t.id)}" aria-label="${esc(t.n)} in the “Needs you” list — jump to it"><span class="gn">${esc(t.n)}</span><span class="gl">${esc(t.l)}</span></button>`
-      :`<div class="gt" id="${esc(t.id)}"><div class="gn">${esc(t.n)}</div><div class="gl">${esc(t.l)}</div></div>`).join('');gl.hidden=false;
-      const okT=document.getElementById('glance-ok');
-      if(okT&&okT.tagName==='BUTTON')okT.addEventListener('click',()=>scrollToSection('home-needs'));
-      const dueT=document.getElementById('glance-due');
-      if(dueT)dueT.addEventListener('click',()=>{const pay=document.querySelector('#needs-body [data-pay]');if(pay){pay.scrollIntoView({block:'center'});pay.focus();}else showTab('invoices');});}
-    else gl.hidden=true;
-  }
   const body=document.getElementById('needs-body');if(!body)return;
   const seen=unreadKeysFrom(PORTAL.notifs);
   // unread rows carry an sr-only "New — " prefix (the dot is a bare pseudo-element);
@@ -967,7 +973,7 @@ async function buildNeedsYou(){
   const QICO={Approval:si('thumbsup'),Connected:si('link'),'To-do':si('check'),Survey:si('clipboard'),Invoice:si('receipt')};
   const row=(kind,cls,unread,title,sub,acts)=>`<div class="qrow${unread?' unread':''}"><span class="qico${cls?' '+cls:''}" aria-hidden="true">${QICO[kind]||si('bell')}</span><div class="qmain"><span class="kchip${cls?' '+cls:''}">${kind}</span><h3>${unread?'<span class="sr-only sr-new">New — </span>':''}${title}</h3>${sub?`<p>${sub}</p>`:''}</div><div class="qact">${acts}</div></div>`;
   // PS3 (D1a): the rows come from needsYouItems — the SAME array whose length
-  // the glance tile shows, so the two numbers agree by construction.
+  // the "Needs you · N" heading shows, so the two numbers agree by construction.
   const nyToday=portalTodayYmd();
   // Oct 2026 audit change 4: one filled button on Home — the top row's own action
   // (Approve, or Pay); every other row's actions are outlined.
@@ -994,7 +1000,10 @@ async function buildNeedsYou(){
     return row('Invoice','invoice',false,esc(i.name||'Invoice'),`${i.amount?esc(fmtMoney(i.amount))+' · ':''}${esc(stWord)}${i.due_date?` · due ${esc(invDueLabel(i.due_date)||i.due_date)}`:''}`,
       nyPay?`<a class="${top||'link'}" data-pay href="${esc(nyPay)}" aria-label="View &amp; pay — ${esc(i.name||'Invoice')}">View &amp; pay</a>`:`<button class="${top}" data-tab-go="invoices" aria-label="View invoice — ${esc(i.name||'Invoice')}">View invoice</button>`);
   });
-  // Per-source failure honesty (the glance strip's rule, on the queue itself):
+  // item 179: the heading carries the queue's count — the SAME array whose rows
+  // render below it, so the two can never disagree (the old strip's D1a rule).
+  const nh=document.getElementById('needs-h');if(nh)nh.textContent='Needs you'+(items.length?' · '+items.length:'');
+  // Per-source failure honesty (the old glance strip's rule, on the queue itself):
   // any failed source keeps its OWN calm line under the surviving rows, and
   // ONLY an all-sources-ok-and-empty queue may claim "You're all caught up."
   // — a bad morning must never read as a clear one.
@@ -1044,19 +1053,28 @@ function wsCardHtml(d){
   const state=wsCardState(d);
   if(state==='hidden')return'';
   const priv='<span class="wspriv">Counted privately — no cookies, no tracking of individual people.</span>';
-  if(state==='empty')return'<div class="card wscard"><span class="tag">Your website</span><h3>Your website is ready to be found.</h3>'
-    +'<p class="wslead">Stats will appear here as people visit — check back soon.</p>'
-    +'<div class="wsfoot">'+priv+'</div></div>';
+  const site=wsSiteInfo(d);
+  const pic='<div class="wspic" id="wspic"><div class="wsini" aria-hidden="true">✦</div></div>';
+  const bar='<div class="wsbar"><span class="pill-live">Live</span>'+(site.url?'<a class="wsdomain" href="'+esc(site.url)+'" target="_blank" rel="noopener">'+esc(site.host)+' ↗</a>':'')+(site.published_at?'<span class="wswhen">Published '+esc(rel(site.published_at))+'</span>':'')+'</div>';
+  const see=site.url?'<a class="btn wssee" href="'+esc(site.url)+'" target="_blank" rel="noopener">See your site</a>':'';
+  // 'bare' = the stats read inside the route failed (month:null) — the picture
+  // and the live link still work, and the card says the numbers couldn't be
+  // checked rather than pretending there are none (the A4 honesty rule).
+  if(state!=='stats')return '<div class="card wscard">'+pic+'<div class="wsin"><span class="tag">Your website</span>'+bar
+    +'<h3>'+(state==='empty'?'Your website is ready to be found.':'Your website, at a glance.')+'</h3>'
+    +'<p class="wslead">'+(state==='empty'?'Stats will appear here as people visit — check back soon.':'We couldn’t check your visitor numbers just now — your site itself is fine.')+'</p>'
+    +'<div class="wsfoot">'+see+priv+'</div></div></div>';
   const m=d.month,search=d.search;
   const wk=(m.weekly||[]).map(n=>Math.max(0,n|0));
   const pts=wsSparkPoints(wk,520,54,6);
   const full=wsFullHtml(m,search);
-  return '<div class="card wscard"><span class="tag">Your website</span><h3>People are finding you.</h3>'
+  return '<div class="card wscard">'+pic+'<div class="wsin"><span class="tag">Your website</span>'+bar
+    +'<h3>People are finding you.</h3>'
     +'<p class="wslead">'+wsLeadHtml(m)+(m.truncated?' <span class="muted" style="font-size:12px">· based on recent activity</span>':'')+'</p>'
     +(pts?'<svg class="wsspark" viewBox="0 0 520 54" preserveAspectRatio="none" aria-hidden="true" focusable="false"><polyline fill="none" stroke="var(--p)" stroke-width="2.5" opacity=".85" points="'+pts+'"/></svg><span class="sr-only">'+esc('Visitors per week, oldest to newest: '+wk.join(', ')+'.')+'</span>':'')
     +'<div class="wsmini">'+wsTiles(m,search).map(t=>'<div class="m"><p class="n">'+esc(t[0])+'</p><p class="l">'+esc(t[1])+'</p></div>').join('')+'</div>'
     +(full?'<div id="wsfull" hidden>'+full+'</div>':'')
-    +'<div class="wsfoot">'+(full?'<button type="button" id="wsmore" class="wsmore" aria-expanded="false" aria-controls="wsfull">See the full picture →</button>':'')+priv+'</div></div>';
+    +'<div class="wsfoot">'+see+(full?'<button type="button" id="wsmore" class="wsmore" aria-expanded="false" aria-controls="wsfull">See the full picture →</button>':'')+priv+'</div></div></div>';
 }
 // Deploy-order tolerant: any non-OK read (a 404 from an older function build
 // included) leaves the slot hidden — no error card, no fake zeros. Cached per
@@ -1080,6 +1098,7 @@ async function loadWebsiteCard(){
   const h=wsCardHtml(PORTAL.wstats);
   if(!h)return;   // hidden state — the slot stays empty
   host.innerHTML=h;host.hidden=false;
+  loadWebsiteThumb();   // item 179: the card leads with a picture of the site itself
   const btn=document.getElementById('wsmore');
   // the disclosure contract (slice 2): the SAME card grows in place; the button
   // carries aria-expanded/aria-controls and keeps focus across the toggle
@@ -1094,6 +1113,32 @@ async function loadWebsiteCard(){
     // focusable ancestor instead), so keep the disclosure's focus explicitly
     btn.focus();
   });
+}
+// item 179: the card's picture — the site's own home page, drawn by the server
+// (GET /client/website-thumb, the renderer publish uses) and shown scaled in a
+// sandboxed frame with scripts off, sites.html's trick: the live address refuses
+// to be framed and a screenshot service would hand the client's address to a
+// third party. One fetch per load (the in-flight promise is cached); a failed
+// draw keeps the quiet placeholder — the picture is never worth an error.
+async function loadWebsiteThumb(){
+  if(PORTAL.persona!=='client')return;
+  if(PORTAL.wsthumb===undefined){
+    if(!PORTAL.wsthumbFetch)PORTAL.wsthumbFetch=api('/client/website-thumb').then(r=>(r.ok&&r.body&&r.body.data&&typeof r.body.data.html==='string')?r.body.data.html:null).catch(()=>null);
+    PORTAL.wsthumb=await PORTAL.wsthumbFetch;
+    PORTAL.wsthumbFetch=null;
+  }
+  const box=document.getElementById('wspic');
+  if(!box||!PORTAL.wsthumb||box.querySelector('iframe'))return;   // moved on, nothing to draw, or already drawn
+  const f=document.createElement('iframe');
+  // scripts stay off (no allow-scripts): the picture can't run code, count a visit or send a form
+  f.setAttribute('sandbox','allow-same-origin');f.setAttribute('tabindex','-1');f.setAttribute('aria-hidden','true');
+  f.setAttribute('referrerpolicy','no-referrer');f.title='Picture of your website’s home page';
+  f.addEventListener('load',()=>f.classList.add('on'),{once:true});
+  f.srcdoc=PORTAL.wsthumb;box.appendChild(f);
+  // drawn at 1280px wide, scaled to the card (and re-scaled when the card resizes)
+  const fit=()=>{if(box.clientWidth)box.style.setProperty('--wsk',String(box.clientWidth/1280));};
+  if('ResizeObserver' in window)new ResizeObserver(fit).observe(box);else window.addEventListener('resize',fit);
+  fit();
 }
 // ── MESSAGES — the split-view console (redesign slice 5; inbox.html's contract
 // in this page's own idiom). LEFT: one listbox row per conversation — each
@@ -1856,8 +1901,8 @@ async function renderInvoices(){
   if(b&&b.failed){html+=`<div class="card"><p class="muted">We couldn’t load your invoices just now — please try again in a moment.</p></div>`;$('main').innerHTML=html;return;}
   if(!inv.length){html+=emptyCard('No invoices yet. When your studio bills you for project or service work, it’ll show up here. (Your website subscription is billed separately.)','🧾');$('main').innerHTML=html;return;}
   const today=portalTodayYmd();
-  // glanceData's OWN formula over the same unpaidInvoices — the tab's total and
-  // Home's to-pay tile can never disagree (one formula, one formatter)…
+  // the ONE formula over the same unpaidInvoices Home's queue counts — the
+  // tab's total and Home can never disagree (one formula, one formatter)…
   const total=unpaidInvoices(b).reduce((a,i)=>a+(Number(i&&i.amount)||0),0);
   html+=`<p class="muted" style="margin:0 0 14px">Your website subscription is billed separately.</p>`;   // 0-top: the legacy -14px was tuned for a sub-less header and overlapped the sub line
   // …and the line only exists when something truly is unpaid — never a fake $0
@@ -2326,11 +2371,6 @@ function wireBellAt(bellId,panelId){
     document.querySelectorAll('.qrow.unread').forEach(el=>el.classList.remove('unread'));   // live Home queue dots
     document.querySelectorAll('.mrow.unread').forEach(el=>el.classList.remove('unread'));   // live conversation-list dots
     document.querySelectorAll('.sr-new').forEach(el=>el.remove());                          // …and their sr-only "New —" text
-    // …and the glance strip's messages tile — re-rendered WHOLE from state so
-    // the number and its pluralized label stay consistent ("0 new messages",
-    // never a frozen "0 new message")
-    const gt=document.getElementById('glance-msgs');
-    if(gt){const z=glanceTiles({newMsgs:0})[0];gt.innerHTML='<div class="gn">'+esc(z.n)+'</div><div class="gl">'+esc(z.l)+'</div>';}
     api('/client/notifications/read','POST',{}).catch(()=>{});
   };
   bell.addEventListener('click',()=>{panel.hidden?open():close();});
@@ -2752,7 +2792,7 @@ function ownerNote(){$('main').innerHTML=`<div class="center"><div class="roleba
 
 async function load(){
   setWide(false);
-  PORTAL.snaps=null;PORTAL.billing=null;PORTAL.billingFailed=false;PORTAL.wstats=undefined;PORTAL.wstatsFetch=null;   // fresh per-load caches (a re-load = fresh data)
+  PORTAL.snaps=null;PORTAL.billing=null;PORTAL.billingFailed=false;PORTAL.wstats=undefined;PORTAL.wstatsFetch=null;PORTAL.wsthumb=undefined;PORTAL.wsthumbFetch=null;   // fresh per-load caches (a re-load = fresh data)
   const first=!LOADED_ONCE;LOADED_ONCE=true;
   const params=new URLSearchParams(location.search);
   // G2: the destination kept through a sign-in; an address that names its own wins
@@ -2796,7 +2836,7 @@ async function load(){
   PORTAL.projects=projects;
   // A FAILED /client/projects read must never masquerade as the zero-project
   // first-run: Home renders the couldn't-load line instead of the 🚀 card and
-  // the glance/needs-you queue treat it as a failed source. A reviewer's 403
+  // the needs-you queue treats it as a failed source. A reviewer's 403
   // here is the CONTRACT (no projects of their own), not a failure — calm.
   PORTAL.projectsFailed=PORTAL.persona==='client'&&!(proj&&proj.ok);
   PORTAL.feed=(feed.ok&&feed.body.data)||{};
