@@ -16,6 +16,7 @@ import manifest_ha_1_0_0 from '../templates/harbor/1.0.0/manifest.json' with { t
 import { trackerScript } from './visits.ts';
 import { sanitizeDevHtml, sanitizeDevCss } from './devmode.ts';
 import { BLOCK_CSS, sectionStyles, pageClasses } from './site_blocks.ts';
+import { applyPageChrome } from './page_access.ts';
 
 // ── FD-T2: indexed template registry; each template's code loads on first use ──
 // slug → version → { manifest, code loader }. Render resolution goes through this
@@ -191,7 +192,9 @@ export async function renderSnapshot(snapshot: Snapshot, site: SiteConfig, opts:
   }
   // Item 61: the owner's switch decides the counter; the privacy page reads the same switch.
   const counting = (snapshot.content as SnapshotContent)?.settings?.visit_counter !== false;
-  const drawn = tintFavicon(await t.render(snapshot, t.manifest, site), snapshot.dev_customization?.theme_tokens?.accent, snapshot.template_slug);
+  // items 48 and 120: an own page can leave out the site's header or footer, everywhere it is drawn
+  const pages = (snapshot.content as SnapshotContent)?.settings?.pages;
+  const drawn = tintFavicon(applyPageChrome(await t.render(snapshot, t.manifest, site), pages), snapshot.dev_customization?.theme_tokens?.accent, snapshot.template_slug);
   const dressed = injectDevLayer(drawn, snapshot.dev_customization);
   return injectCsp(injectAnalytics(opts.allSectionStyles ? dressed : trimSectionStyles(dressed), counting ? site.siteId : undefined));
 }
