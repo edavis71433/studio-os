@@ -239,6 +239,26 @@ test.describe('Analytics (Business dashboard)', () => {
     await expect(seg(page).locator('[data-period="last_30"]')).toHaveAttribute('aria-pressed', 'false');
   });
 
+  // list item 153: AI assistants are one source row, named underneath
+  test('visits from AI assistants: one row in Where visitors come from, and which assistants under it', async ({ page }) => {
+    const D = JSON.parse(JSON.stringify(DASH));
+    D.data.website.traffic.top_sources = [{ source: 'Google', visits: 88, share: 41 }, { source: 'AI assistants', visits: 12, share: 6 }];
+    D.data.website.traffic.ai_sources = [{ name: 'ChatGPT', visits: 9 }, { name: 'Perplexity', visits: 3 }];
+    await installApp(page, { api: { '/analytics/dashboard': D } });
+    await page.goto('/analytics.html');
+    const card = page.locator('section.card', { has: page.getByRole('heading', { name: 'Where visitors come from' }) });
+    await expect(card.locator('.srcs')).toContainText('AI assistants');
+    await expect(card.locator('.srcai')).toHaveText('From AI assistants: ChatGPT 9 · Perplexity 3');
+  });
+
+  test('no visits from AI assistants: no line for them', async ({ page }) => {
+    await installApp(page, { api: { '/analytics/dashboard': DASH } });
+    await page.goto('/analytics.html');
+    const card = page.locator('section.card', { has: page.getByRole('heading', { name: 'Where visitors come from' }) });
+    await expect(card.locator('.srcs')).toContainText('Google');
+    await expect(card.locator('.srcai')).toHaveCount(0);
+  });
+
   test('traffic has_data:false → "Not measured yet" empty states, never zero KPIs', async ({ page }) => {
     const D = JSON.parse(JSON.stringify(DASH));
     D.data.website.traffic = { visitors: 0, pageviews: 0, actions: 0, top_pages: [], top_sources: [], weekly: [0,0,0,0,0,0,0,0,0,0,0,0], has_data: false };

@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Studio OS — Client sign in</title>
+<meta name="description" content="Sign in to see your project, approve work, and message your studio.">
 <meta name="theme-color" content="#5b3fa0">
 <link rel="manifest" href="/manifest.json">
 <link rel="stylesheet" href="/fonts/brand.css">
@@ -45,7 +46,7 @@
   .ok{background:#eef4ef;color:#2e6a44;border-radius:10px;padding:11px 14px;font-size:13.5px;margin-top:14px}
   @media (prefers-color-scheme:dark){.ok{background:#1f2a24;color:#8bbf9f}}
   .muted{color:var(--muted);font-size:13px;margin-top:16px;text-align:center}
-  .muted a{color:var(--p);text-decoration:none}
+  .muted a{color:var(--p);text-decoration:underline;text-underline-offset:2px}   /* told apart by more than colour (list item 137) */
   .muted button.linky{all:unset;color:var(--p);cursor:pointer;font-size:13px}
   .muted button.linky:focus-visible{outline:2px solid var(--p);outline-offset:2px;border-radius:4px}
   .muted button.linky:disabled{color:var(--muted);cursor:default}

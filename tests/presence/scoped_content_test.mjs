@@ -526,7 +526,8 @@ for (const w of WRITES) {
   ok('index: …and before the first route', at(BUILD) < at("if (route === '/site' && method === 'GET')"));
 
   const handed = [...idx.matchAll(/\b(handle\w+)\((?:req, )?db,/g)].map((m) => m[1]).sort();
-  const EXPECTED = ['handleBrandProfileGet', 'handleBrandProfilePut', 'handleBrandReportGet', 'handleBrandReportList', 'handleCoachList', 'handleCollection', 'handleFoundationsPlans', 'handleGetIdentity', 'handleGetSite', 'handleKnowledgeList', 'handleLocation', 'handleMomentsList', 'handlePageDuplicate', 'handlePutIdentity', 'handleReviewGet', 'handleReviewList', 'handleScopedCommerce', 'handleSettings', 'handleWriterGet', 'handleWriterList'].sort();
+  // item 154: handleDeletedPageRestore writes the pages through this path, as handlePageDuplicate does
+  const EXPECTED = ['handleBrandProfileGet', 'handleBrandProfilePut', 'handleBrandReportGet', 'handleBrandReportList', 'handleCoachList', 'handleCollection', 'handleDeletedPageRestore', 'handleFoundationsPlans', 'handleGetIdentity', 'handleGetSite', 'handleKnowledgeList', 'handleLocation', 'handleMomentsList', 'handlePageDuplicate', 'handlePutIdentity', 'handleReviewGet', 'handleReviewList', 'handleScopedCommerce', 'handleSettings', 'handleWriterGet', 'handleWriterList'].sort();
   ok('index: the handlers on this path are exactly the audited list', JSON.stringify(handed) === JSON.stringify(EXPECTED), handed.join(','));
 
   const reviewerRoutes = idx.split('\n').filter((l) => /'\/portal\/(context|feed)'|\/decide\$\/|\/status\$\/|\/foundations\/plans\/\[|\/launches\/\[/.test(l) || /handle(PortalContext|PortalFeed|FoundationsDecide|WriteDecide|AssetStatus|LaunchDecide)\(/.test(l));
