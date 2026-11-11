@@ -119,6 +119,14 @@ for (const slug of TEMPLATES) {
   const own = String((await renderSnapshot(withTok({ phone_bar: 'light', accent: '#5b3fa0' }), SITE))[pages[0]]);
   ok(`[${slug}] light: the owner's own accent wins`, own.includes('stroke:#5b3fa0;'));
 }
+// a page that hides the site's footer (page settings, items 48 and 120) has no bar either
+{
+  const fx = JSON.parse(read('supabase/functions/presence/templates/business-classic/1.0.0/fixture.json'));
+  fx.content.settings = { ...(fx.content.settings || {}), pages: [{ slug: 'offers', title: 'Offers', blocks: [{ type: 'richtext', title: 'This week', body: 'Fresh rye' }], noFooter: true }, { slug: 'visit', title: 'Visit', blocks: [{ type: 'richtext', title: 'Find us', body: 'Burbank' }] }] };
+  const out = await renderSnapshot({ ...fx, dev_customization: { theme_tokens: { phone_bar: 'dark' }, custom_css: '', custom_html: '' } }, SITE);
+  const off = String(out['offers/index.html'] || ''), on = String(out['visit/index.html'] || '');
+  ok('a page that hides its footer has no bar; the page beside it has one', off.length > 0 && !off.includes('<footer class="site"') && !off.includes('dds-phonebar') && on.includes('<nav class="dds-phonebar"'));
+}
 ok('a dark template’s light accent gives way to the ink', String((await renderSnapshot({ ...JSON.parse(read('supabase/functions/presence/templates/slate/1.0.0/fixture.json')), dev_customization: { theme_tokens: { phone_bar: 'light' }, custom_css: '', custom_html: '' } }, SITE))['index.html']).includes('stroke:#1d1b19;'));
 
 const done = fail === 0;
