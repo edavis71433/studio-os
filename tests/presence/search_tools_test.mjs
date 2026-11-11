@@ -60,6 +60,8 @@ const read = (p) => Deno.readTextFileSync(new URL(p, import.meta.url));
   ok('tasks: each open task says where to go', open.every((x) => x.go));
   const watch = T.searchTasks({ ...base, edition: 'monitor', customDomain: false });
   ok('tasks: a site we only watch is never told to publish or move its domain', !watch.some((x) => x.key === 'publish' || x.key === 'domain'));
+  const lost = T.searchTasks({ ...base, edition: 'monitor', live: false });
+  eq('tasks: a watched site with no address is asked for it first', [lost[0].key, lost[0].priority, lost[0].go], ['address', 'critical', 'monitor']);
   const hidden = T.searchTasks({ ...base, hidden: true, issues: [{ type: 'seo.noindex', severity: 'warning', n: 9 }] });
   ok('tasks: hidden on purpose is one Critical task, not nine noindex warnings', hidden[0].key === 'hidden' && !hidden.some((x) => x.key === 'health:seo.noindex'));
 }

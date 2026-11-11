@@ -87,6 +87,7 @@ export function searchTasks(f: SearchFacts): SearchTask[] {
   const add = (key: string, priority: Priority, done: boolean, title: string, sub: string, go: string | null) => t.push({ key, priority, done, title, sub, go });
   const hosted = f.edition !== 'monitor';
   if (hosted) add('publish', 'critical', f.live, f.live ? 'Your site is published' : 'Publish your site so Google can find it', f.live ? '' : 'Nothing is on Google until the site is live.', f.live ? null : 'publish');
+  else if (!f.live) add('address', 'critical', false, 'Tell us your website’s address', 'Search Console and the checks need to know where it lives.', 'monitor');
   if (f.hidden) add('hidden', 'critical', false, 'Let search engines list this site', 'It is hidden from search on purpose. Switch it back on when you’re ready to be found.', 'tool:hide');
   for (const i of f.issues || []) {
     if (i.severity !== 'critical' || !['google', 'reach', 'links'].includes(headingOf(i.type))) continue;

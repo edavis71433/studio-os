@@ -984,6 +984,104 @@ html.plan-watch .ss-bar,html.plan-watch [data-grp="Content"],html.plan-watch .na
 .sv-status{font-size:13px;color:var(--ink-2);margin-top:var(--dds-s2,8px)}
 .sv-why{font-size:13px;color:var(--amber-text);margin:0 0 var(--dds-s2,8px)}
 .sv-problem{font-size:13px;color:var(--clay);margin-top:var(--dds-s2,8px);overflow-wrap:anywhere}
+/* items 124 and 181: the tools row, this month's numbers, the ranked to-do list, the pages that
+   moved most, the searches followed, and the tools' sheets */
+.sv-tools{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px;margin:var(--dds-s4,16px) 0 0}
+.sv-tool{display:flex;gap:10px;align-items:center;text-align:left;font:inherit;border:1px solid var(--hair);border-radius:14px;background:var(--sheet);padding:10px 12px;cursor:pointer;min-width:0;color:var(--ink)}
+.sv-tool:hover{border-color:var(--plum)} .sv-tool:disabled{cursor:default;opacity:.65}
+.sv-tool .ic{flex:0 0 30px;height:30px;border-radius:9px;background:var(--plum-soft);color:var(--plum);display:grid;place-items:center;font-weight:700}
+.sv-tool .tx{min-width:0} .sv-tool b{display:block;font-size:13.5px;font-weight:600}
+.sv-tool small{display:block;font-size:11.5px;color:var(--ink-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sv-tool.warn .ic{background:var(--amber-soft);color:var(--amber-text)}
+.sv-sum{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px;margin-top:var(--dds-s4,16px)}
+.sv-stat{border:1px solid var(--hair);border-radius:16px;background:var(--sheet);padding:14px 16px;min-width:0}
+.sv-stat .l{display:block;font-size:12.5px;font-weight:500;color:var(--ink-2)}
+.sv-stat .v{display:flex;align-items:center;gap:8px;margin:4px 0 2px;flex-wrap:wrap}
+.sv-stat .v b{font-size:26px;font-weight:700;line-height:1.15;font-variant-numeric:tabular-nums}
+.sv-stat .s{display:block;font-size:12px;color:var(--ink-3)}
+.sv-chg{display:inline-flex;align-items:center;font-size:11.5px;font-weight:600;border-radius:999px;padding:1px 7px;white-space:nowrap;background:var(--paper);color:var(--ink-2)}
+.sv-chg.up{background:var(--sage-soft);color:var(--sage)} .sv-chg.down{background:var(--clay-soft);color:var(--clay)}
+.sv-top .sv-card:first-child{min-width:0}
+.sv-todo-h{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:-2px 0 6px}
+.sv-todo-n{font-size:12.5px;color:var(--ink-2);margin-right:auto}
+.sv-todo-f{display:flex;gap:6px;flex-wrap:wrap}
+.sv-fchip{font:inherit;font-size:12px;font-weight:600;border:0;border-radius:999px;padding:4px 10px;background:var(--paper);color:var(--ink-2);cursor:pointer}
+.sv-fchip[aria-pressed="true"]{background:var(--ink);color:var(--sheet)}
+.sv-linkbtn{font:inherit;font-size:12.5px;font-weight:600;border:0;background:none;color:var(--plum);cursor:pointer;padding:4px 0}
+.sv-todo{list-style:none;margin:0;padding:0}
+.sv-todo li{display:flex;align-items:center;gap:10px;padding:10px 0;border-top:1px solid var(--hair)}
+.sv-todo li:first-child{border-top:0}
+.sv-dot{flex:0 0 14px;height:14px;border-radius:50%;border:1.5px solid var(--hair-2);background:var(--sheet);position:relative}
+.sv-dot.done{background:var(--sage);border-color:var(--sage)}
+.sv-dot.done::after{content:"";position:absolute;left:4px;top:1.5px;width:3px;height:6px;border:solid var(--sheet);border-width:0 1.6px 1.6px 0;transform:rotate(45deg)}
+.sv-dot.crit{background:var(--clay);border-color:var(--clay)}
+.sv-todo-t{flex:1;min-width:0}
+.sv-todo-t b{display:block;font-size:13.5px;font-weight:500}
+.sv-todo li.done .sv-todo-t b{color:var(--ink-2);font-weight:400}
+.sv-todo-t span{display:block;font-size:12px;color:var(--ink-3)}
+.sv-pri.critical{background:var(--clay-soft);color:var(--clay)} .sv-pri.high{background:var(--amber-soft);color:var(--amber-text)} .sv-pri.medium{background:var(--paper);color:var(--ink-2)}
+.sv-pri.critical,.sv-pri.high,.sv-pri.medium{font-size:10.5px;font-weight:700;letter-spacing:.04em;text-transform:uppercase}
+.sv-go{font:inherit;font-size:12.5px;font-weight:600;border:0;background:none;color:var(--plum);cursor:pointer;padding:4px 0;white-space:nowrap}
+.sv-mv{list-style:none;margin:0;padding:0}
+.sv-mv li{padding:9px 0;border-top:1px solid var(--hair)} .sv-mv li:first-child{border-top:0}
+.sv-mv .r{display:flex;align-items:center;gap:8px}
+.sv-mv .p{flex:1;min-width:0;font-size:13.5px;font-weight:500;overflow-wrap:anywhere}
+.sv-mv .c{font-size:12px;color:var(--ink-2);white-space:nowrap}
+.sv-mv .bar{display:block;width:100%;height:5px;border-radius:3px;background:var(--paper);margin-top:6px}
+.sv-mv .bar rect.up{fill:var(--sage)} .sv-mv .bar rect.down{fill:var(--clay)}
+.sv-wide{margin-top:var(--dds-s4,16px)}
+.sv-head{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:var(--dds-s2,8px)}
+.sv-head h3{margin:0}
+.sv-headn{font-size:12.5px;color:var(--ink-2);margin-right:auto}
+.sv-fol{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,440px);gap:var(--dds-s5,20px);align-items:start}
+.sv-fol table{width:100%;border-collapse:collapse;font-size:13.5px}
+.sv-fol th{text-align:left;font-size:12px;font-weight:600;color:var(--ink-2);padding:6px 8px;white-space:nowrap}
+.sv-fol td{padding:9px 8px;border-top:1px solid var(--hair);vertical-align:middle}
+.sv-fol tr.on td{background:var(--plum-soft)}
+.sv-fol td .row{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.sv-fol td b{font-variant-numeric:tabular-nums}
+.sv-fol .term{font:inherit;font-weight:500;border:0;background:none;padding:0;cursor:pointer;color:var(--ink);text-align:left}
+.sv-fol .x{font:inherit;border:0;background:none;color:var(--ink-3);cursor:pointer;padding:2px 6px;border-radius:6px}
+.sv-fol .x:hover{color:var(--clay)}
+.sv-spark{display:block}
+.sv-spark polyline,.sv-fchart .ln{fill:none;stroke:var(--plum);stroke-linejoin:round;stroke-linecap:round}
+.sv-spark polyline{stroke-width:1.8}
+.sv-fchart{width:100%;height:auto;display:block}
+.sv-fchart .gr{stroke:var(--hair);stroke-width:1}
+.sv-fchart .ln{stroke-width:2.5}
+.sv-fchart .pt{fill:var(--sheet);stroke:var(--plum);stroke-width:2}
+.sv-fchart .bar{fill:var(--plum-soft)}
+.sv-fchart text{font-size:10.5px;fill:var(--ink-3)} .sv-fchart text.v{font-weight:700;fill:var(--ink)}
+.sv-sugs{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:10px;font-size:12.5px;color:var(--ink-2)}
+.sv-sug{font:inherit;font-size:12px;font-weight:600;border:0;border-radius:999px;padding:4px 9px;background:var(--paper);color:var(--plum);cursor:pointer}
+.sv-dlg{border:0;border-radius:20px;padding:0;width:min(560px,94vw);max-height:88vh;background:var(--sheet);color:var(--ink);box-shadow:var(--dds-shadow-lg,var(--shadow))}
+.sv-dlg::backdrop{background:color-mix(in srgb,var(--ink) 35%,transparent)}
+.sv-dlg-in{padding:20px 22px;display:flex;flex-direction:column;gap:12px;max-height:88vh;overflow:auto}
+.sv-dlg-h{display:flex;gap:10px;align-items:flex-start}
+.sv-dlg-h h2{margin:0;font-family:var(--serif,inherit);font-size:21px;line-height:1.25;flex:1}
+.sv-dlg-h p{margin:4px 0 0;font-size:13px;color:var(--ink-2)}
+.sv-dlg-x{font:inherit;font-size:18px;line-height:1;border:0;background:none;color:var(--ink-3);cursor:pointer;padding:4px 6px}
+.sv-dlg textarea{width:100%;min-height:240px;font:13px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;border:1px solid var(--hair);border-radius:12px;padding:12px;background:var(--paper);color:var(--ink);resize:vertical}
+.sv-dlg .acts{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.sv-dlg .hint{font-size:12px;color:var(--ink-2)}
+.sv-dlg input[type=text]{width:100%;font:inherit;font-size:14px;height:40px;border:1.5px solid var(--hair);border-radius:12px;padding:0 12px;background:var(--sheet);color:var(--ink)}
+.sv-dlg input[type=text]:focus{outline:none;border-color:var(--plum)}
+.sv-dlg .sv-mv li{display:flex;align-items:center;gap:8px}
+.sv-switch{display:flex;gap:10px;align-items:flex-start;font-size:14px;font-weight:500}
+.sv-switch input{margin-top:3px}
+@media (max-width:1180px){.sv-fol{grid-template-columns:1fr}}
+@media (max-width:1100px){.sv-tools{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media (max-width:760px){
+  .sv-tools{display:flex;overflow-x:auto;gap:8px;padding-bottom:4px;scrollbar-width:none}
+  .sv-tools::-webkit-scrollbar{display:none}
+  .sv-tool{flex:0 0 auto;max-width:240px}
+  .sv-tool b{white-space:nowrap}
+  .sv-sum{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .sv-stat{padding:12px}
+  .sv-stat .v b{font-size:21px}
+  .sv-fol{grid-template-columns:1fr}
+  .sv-fol th.mo,.sv-fol td.mo{display:none}
+}
 .sv-check{list-style:none;margin:0;padding:0}
 .sv-check li{display:flex;gap:var(--dds-s2,8px);align-items:baseline;padding:5px 0;font-size:13.5px}
 .sv-check li::before{content:"\25CB";color:var(--ink-3);font-weight:700;flex:0 0 auto}
@@ -1764,13 +1862,19 @@ body.pd-dragging *{cursor:grabbing !important}
       <section class="view" id="view-search">
         <h1 class="doc" role="heading" aria-level="2">Search</h1>
         <p class="docsub">How people find you on Google and in AI answers, and what would help. Checking and connecting never change your website.</p>
+        <div class="sv-tools" id="svTools" role="group" aria-label="Search tools" hidden></div>
+        <div class="sv-sum" id="svNums" hidden></div>
+        <div class="sv-grid sv-top">
+          <section class="sv-card" aria-labelledby="svChecklistH"><h3 id="svChecklistH">Your checklist</h3><div id="seoTasks"></div></section>
+          <section class="sv-card" aria-labelledby="svMoversH" id="svMoversCard" hidden><h3 id="svMoversH">Pages that moved most in Google</h3><div id="svMovers"></div></section>
+        </div>
         <div class="hb-cols hb-site-status">
           <div class="hb-card" id="healthCard" tabindex="-1" hidden></div>
           <div class="hb-card" id="domainCard" hidden></div>
         </div>
+        <section class="sv-card sv-wide" aria-labelledby="svFollowH" id="svFollowCard" hidden><div class="sv-head"><h3 id="svFollowH">Searches you follow</h3><span class="sv-headn" id="svFollowN"></span><button type="button" class="pillbtn sm inked" id="btnSvFollow">+ Follow a search</button></div><div id="svFollow"></div></section>
         <div id="svScore" class="sv-card sv-score-card"><div class="loadline"><div class="lq">Checking how you show up…</div><div class="shimmer"></div></div></div>
         <div class="sv-grid">
-          <section class="sv-card" aria-labelledby="svChecklistH"><h3 id="svChecklistH">Your checklist</h3><div id="seoTasks"></div></section>
           <section class="sv-card" aria-labelledby="svFixH" id="svFixCard" hidden><h3 id="svFixH">What to fix first</h3><div id="svFix"></div></section>
           <section class="sv-card" aria-labelledby="svConsoleH" id="svConsoleCard" hidden><h3 id="svConsoleH">On Google Search</h3><div id="svConsole"></div></section>
           <section class="sv-card" aria-labelledby="svListingH" id="svListingCard" hidden><h3 id="svListingH">Your Google listing</h3><div id="svListing"></div></section>
@@ -8514,6 +8618,7 @@ function seoTaskRows() {
   return rows;
 }
 function renderSeoTasks() {
+  if (SV && Array.isArray(SV.tasks)) { renderSvTodo(); return; }   // item 124: the server's ranked list
   const host = $("seoTasks"); if (!host) return;
   host.innerHTML = "";
   const rows = seoTaskRows();
@@ -8641,7 +8746,7 @@ async function svRunCheck(btn) {
 function renderSvFix() {
   const card = $("svFixCard"), host = $("svFix"); if (!card || !host) return;
   const s = SV && SV.score;
-  card.hidden = !(s && s.issues.length);
+  card.hidden = !(s && s.issues.length) || !!(SV && Array.isArray(SV.tasks));   // item 124: they're in the to-do list
   if (card.hidden) return;
   host.innerHTML = "";
   s.issues.forEach((f) => {
@@ -8764,6 +8869,8 @@ async function loadSearch() {
   } catch (_) { SV = null; }
   if (!$("view-search").classList.contains("on")) return;
   renderSvScore(); renderSvFix(); renderSvConsole(); renderSvListing(); renderSvAi(); renderSeoTasks();
+  renderSvTools(); renderSvNums(); renderSvMovers();   // item 124
+  if (SV && SV.follow && SV.console && SV.console.status === "connected") loadSvFollow(); else { SV_FOLLOW = null; renderSvFollow(); }   // item 181
 }
 (function wireSeoPreview() {
   ["f-seo_title", "f-seo_description", "f-business_name", "f-description"].forEach((id) => { const n = $(id); if (n) n.addEventListener("input", renderSearchPreview); });
@@ -8849,6 +8956,306 @@ function redirectsManager() {
   });
   loadRedirects();
   return box;
+}
+// ── items 124 and 181 (Nov 2026): the Search tab's tools row, this month's numbers, the ranked
+// to-do list, the pages that moved most, and the searches a client follows. GET /visibility
+// brings tools, tasks and movers (routes/search_tab.ts); GET/PUT /visibility/follow the searches.
+// A server without them (before the deploy) leaves the old checklist and cards as they were.
+// a change on the month before: "▲ 18%" in green, "▼ 12%" in red; places on Google go up when the number falls
+function svChg(now, before, kind) {
+  if (now == null || before == null) return "";
+  let d, txt, sr;
+  if (kind === "place") {
+    d = Math.round(before) - Math.round(now);
+    if (!d) return `<span class="sv-chg">Same</span>`;
+    txt = (d > 0 ? "▲ " : "▼ ") + Math.abs(d); sr = (d > 0 ? "up " : "down ") + Math.abs(d) + " place" + (Math.abs(d) === 1 ? "" : "s");
+  } else {
+    if (!before) return now ? `<span class="sv-chg">New</span>` : "";
+    d = Math.round(((now - before) / before) * 100);
+    if (!d) return `<span class="sv-chg">Same</span>`;
+    txt = (d > 0 ? "▲ " : "▼ ") + Math.abs(d) + (kind === "pct" ? "%" : ""); sr = (d > 0 ? "up " : "down ") + Math.abs(d) + (kind === "pct" ? "%" : "");
+  }
+  return `<span class="sv-chg ${d > 0 ? "up" : "down"}"><span aria-hidden="true">${txt}</span><span class="sr-only">${esc(sr)}</span></span>`;
+}
+// a sheet for one tool: a heading, a line under it, the body and a close button
+function svDialog(title, sub, onClose) {
+  const dlg = el("dialog", "sv-dlg"); const inner = el("div", "sv-dlg-in");
+  const head = el("div", "sv-dlg-h"); const hx = el("div"); const h = el("h2", null, title); h.id = "svDlgT" + Date.now(); hx.appendChild(h);
+  if (sub) hx.appendChild(el("p", null, sub));
+  const x = el("button", "sv-dlg-x", "✕"); x.type = "button"; x.setAttribute("aria-label", "Close");
+  head.append(hx, x); inner.appendChild(head);
+  const body = el("div"); inner.appendChild(body); dlg.appendChild(inner); dlg.setAttribute("aria-labelledby", h.id);
+  document.body.appendChild(dlg);
+  let done = false;
+  const close = () => { if (done) return; done = true; try { dlg.close(); } catch (_) {} if (onClose) onClose(); dlg.remove(); };
+  x.addEventListener("click", close);
+  dlg.addEventListener("cancel", (e) => { e.preventDefault(); close(); });
+  dlg.addEventListener("click", (e) => { if (e.target === dlg) close(); });
+  dlg.showModal();
+  return { dlg, body, close };
+}
+const SV_TOOLS = [["redirects", "Old addresses", "↪"], ["verification", "Verification", "✓"], ["sitemap", "Sitemap", "#"], ["llms", "llms.txt", "✎"], ["hide", "Hide from search", "◐"]];
+function renderSvTools() {
+  const host = $("svTools"); if (!host) return;
+  const t = SV && SV.tools; host.hidden = !t;
+  if (!t) return;
+  const ready = t.ready !== false, hidden = ready && t.hidden === true;
+  const words = {
+    redirects: t.redirects == null ? "Forwards" : t.redirects ? `${t.redirects} forwarded` : "None yet",
+    verification: t.verification && t.verification.google ? (t.verification.bing ? "Google and Bing saved" : "Google code saved") : t.verification && t.verification.bing ? "Bing code saved" : "None added",
+    sitemap: t.sitemap ? "Made for you" : "After you publish",
+    llms: !ready ? "Coming soon" : t.llms && t.llms.set ? "Written for AI tools" : "Not written yet",
+    hide: !ready ? "Coming soon" : hidden ? "On: hidden from search" : "Off: Google can list it",
+  };
+  host.innerHTML = "";
+  SV_TOOLS.forEach(([k, label, ic]) => {
+    const b = el("button", "sv-tool" + (k === "hide" && hidden ? " warn" : "")); b.type = "button"; b.dataset.tool = k;
+    const i = el("span", "ic", ic); i.setAttribute("aria-hidden", "true"); b.appendChild(i);
+    const tx = el("span", "tx"); tx.appendChild(el("b", null, label)); tx.appendChild(el("small", null, words[k])); b.appendChild(tx);
+    if (!ready && (k === "llms" || k === "hide")) b.disabled = true;
+    b.addEventListener("click", () => svOpenTool(k));
+    host.appendChild(b);
+  });
+}
+function svOpenTool(k) {
+  const t = (SV && SV.tools) || {};
+  if (k === "redirects") {
+    const d = svDialog("Old page addresses", "When a page moves, or an old website used other addresses, send visitors and Google to the new place.", () => loadSearch());
+    d.body.appendChild(redirectsManager());
+    return;
+  }
+  if (k === "verification") {
+    // the codes' own fields, moved into the sheet and put back after (their saving is wired where they live)
+    const det = $("f-gsv") && $("f-gsv").closest("details"); if (!det) return;
+    const mark = document.createComment("verification codes");
+    det.before(mark);
+    const d = svDialog("Verification", "Codes that prove to Google and Bing that this site is yours. Optional: connecting Search Console proves it for you.", () => { mark.replaceWith(det); det.open = false; loadSearch(); });
+    d.body.appendChild(det); det.open = true;
+    return;
+  }
+  if (k === "sitemap") {
+    const d = svDialog("Sitemap", "A list of every page Google can show, made for you each time you publish.");
+    if (t.sitemap) {
+      const p = el("p"); const a = el("a", null, "Open the sitemap"); a.href = t.sitemap; a.target = "_blank"; a.rel = "noopener"; p.append(a, document.createTextNode(" · " + t.sitemap.replace(/^https?:\/\//, ""))); d.body.appendChild(p);
+      d.body.appendChild(el("p", "hint", "Pages you hide from Google (each page’s settings on the Pages tab) are left out of it. Google finds it on its own; Search Console shows when it last read it."));
+    } else d.body.appendChild(el("p", "hint", "Your sitemap is made when you publish. Publish the site and it will be here."));
+    return;
+  }
+  if (k === "llms") {
+    const d = svDialog("llms.txt", "A short file AI tools read to understand your business. Change anything; it goes live when you publish.");
+    const ta = el("textarea"); ta.id = "svLlms"; ta.maxLength = (t.llms && t.llms.max) || 4000; ta.setAttribute("aria-label", "Your llms.txt"); ta.spellcheck = false;
+    const cnt = el("div", "hint"); const paint = () => { cnt.textContent = `${(t.llms && t.llms.url) ? "Live at " + t.llms.url.replace(/^https?:\/\//, "") + " after you publish · " : ""}${svNum(ta.value.length)} of ${svNum(ta.maxLength)} characters`; };
+    ta.addEventListener("input", paint);
+    d.body.append(ta, cnt);
+    const acts = el("div", "acts");
+    const save = el("button", "pillbtn sm inked", "Save"); save.type = "button"; save.dataset.needs = "configure";
+    const again = el("button", "pillbtn sm", "Start again from my details"); again.type = "button"; again.dataset.needs = "configure";
+    acts.append(save, again);
+    if (S.settings && S.settings.llms_txt) { const off = el("button", "pillbtn sm", "Take it down"); off.type = "button"; off.dataset.needs = "configure"; off.addEventListener("click", async () => { try { await settingsPut({ llms_txt: null }); toast("Taken down. It leaves the site when you publish."); scheduleChangesRefresh(); d.close(); loadSearch(); } catch (err) { toast(nice(err), true); } }); acts.appendChild(off); }
+    d.body.appendChild(acts);
+    const draft = async () => { try { const r = await api("GET", "/visibility/llms-draft"); ta.value = (r.data && r.data.text) || ""; paint(); } catch (err) { toast(nice(err), true); } };
+    again.addEventListener("click", draft);
+    save.addEventListener("click", async () => {
+      save.disabled = true;
+      try { await settingsPut({ llms_txt: ta.value.trim() || null }); toast("Saved. It goes live when you publish."); scheduleChangesRefresh(); d.close(); loadSearch(); }
+      catch (err) { toast(nice(err), true); } finally { save.disabled = false; }
+    });
+    if (S.settings && S.settings.llms_txt) { ta.value = S.settings.llms_txt; paint(); } else draft();
+    setTimeout(() => ta.focus(), 30);
+    return;
+  }
+  if (k === "hide") {
+    const d = svDialog("Hide from search", "Asks Google, Bing and other search engines not to list any page of this site. Anyone with the address can still open it.");
+    const lab = el("label", "sv-switch"); lab.dataset.needs = "configure";
+    const cb = el("input"); cb.type = "checkbox"; cb.id = "svHideSwitch"; cb.checked = !!(S.settings && S.settings.search_hidden);
+    lab.append(cb, document.createTextNode(" Hide this site from search engines"));
+    d.body.appendChild(lab);
+    d.body.appendChild(el("p", "hint", "It takes effect when you publish. To hide one page only, use that page’s settings on the Pages tab."));
+    cb.addEventListener("change", async () => {
+      const now = cb.checked;
+      try { await settingsPut({ search_hidden: now }); toast(now ? "Hidden from search when you publish." : "Search engines can list it again when you publish."); scheduleChangesRefresh(); loadSearch(); }
+      catch (err) { cb.checked = !now; toast(nice(err), true); }
+    });
+  }
+}
+function renderSvNums() {
+  const host = $("svNums"); if (!host) return;
+  const c = SV && SV.console;
+  const tiles = [];
+  if (c && c.has_data) {
+    const m = svMonth(c.period).slice(0, 3);
+    tiles.push(`<div class="sv-stat"><span class="l">Google clicks · ${esc(m)}</span><span class="v"><b>${svNum(c.clicks)}</b>${svChg(c.clicks, c.prior_clicks, "pct")}</span><span class="s">against the month before</span></div>`);
+    tiles.push(`<div class="sv-stat"><span class="l">Times seen on Google</span><span class="v"><b>${svNum(c.impressions)}</b>${svChg(c.impressions, c.prior_impressions, "pct")}</span><span class="s">against the month before</span></div>`);
+  }
+  if (SV && SV.follow && c && c.status === "connected") {
+    const best = SV_FOLLOW && SV_FOLLOW.terms ? SV_FOLLOW.terms.filter((t) => t.now && t.now.position != null).sort((a, b) => a.now.position - b.now.position)[0] : null;
+    tiles.push(`<div class="sv-stat"><span class="l">Searches you follow</span><span class="v"><b>${SV.follow.count}</b></span><span class="s">${best ? `best: #${Math.round(best.now.position)} for “${esc(best.term)}”` : `up to ${SV.follow.max}`}</span></div>`);
+  }
+  host.hidden = !tiles.length;
+  host.innerHTML = tiles.join("");
+}
+const SV_GO_WORD = { publish: "Publish", "tool:hide": "Open", health: "See it", "connect:console": "Connect", domain: "Connect", wording: "Write", pages: "Open Pages", review: "Read it", "connect:listing": "Connect", files: "Open Files", "tool:llms": "Write", follow: "Follow", monitor: "Add it" };
+function svTodoGo(t) {
+  const g = String(t.go || "");
+  const toCard = (id) => { const n = $(id); if (n) { n.hidden = false; n.scrollIntoView({ behavior: "smooth", block: "center" }); } };
+  if (g === "publish") return openRitual();
+  if (g === "domain") return openFoundationsDesk({ domain: true });
+  if (g === "monitor") { location.hash = "monitor"; return; }
+  if (g === "wording") { const n = $(t.key === "description" ? "f-seo_description" : "f-seo_title"); if (n) { n.scrollIntoView({ behavior: "smooth", block: "center" }); n.focus({ preventScroll: true }); } return; }
+  if (g === "pages") return go("pages");
+  if (g === "files") return go("media");
+  if (g === "health") return hbScrollTo("healthCard");
+  if (g === "review") return toCard("svScore");
+  if (g === "connect:console") return toCard("svConsoleCard");
+  if (g === "connect:listing") return toCard("svListingCard");
+  if (g === "follow") return svOpenFollow();
+  if (g.startsWith("tool:")) return svOpenTool(g.slice(5));
+}
+const SV_TODO = { show: "all", done: false };
+const SV_PRI_WORD = { critical: "Critical", high: "High", medium: "Medium" };
+function renderSvTodo() {
+  const host = $("seoTasks"); if (!host) return;
+  const h = $("svChecklistH"); if (h) h.textContent = "To do";
+  // the home page's wording is read as it's typed, so the list follows the fields below
+  const w = seoHomeWords();
+  const tasks = SV.tasks.map((t) => (t.key === "title" ? { ...t, done: !!w.titleOwn } : t.key === "description" ? { ...t, done: !!w.descOwn } : t));
+  const open = tasks.filter((t) => !t.done), done = tasks.filter((t) => t.done);
+  if (SV_TODO.show !== "all" && !open.some((t) => t.priority === SV_TODO.show)) SV_TODO.show = "all";
+  host.innerHTML = "";
+  const top = el("div", "sv-todo-h");
+  top.appendChild(el("span", "sv-todo-n", `${open.length} open · ${done.length} done`));
+  const chips = el("div", "sv-todo-f"); chips.setAttribute("role", "group"); chips.setAttribute("aria-label", "Show");
+  [["all", "All"], ["critical", "Critical"], ["high", "High"], ["medium", "Medium"]].forEach(([k, label]) => {
+    const n = k === "all" ? open.length : open.filter((t) => t.priority === k).length;
+    if (k !== "all" && !n) return;
+    const b = el("button", "sv-fchip", `${label} · ${n}`); b.type = "button"; b.dataset.show = k; b.setAttribute("aria-pressed", SV_TODO.show === k ? "true" : "false");
+    b.addEventListener("click", () => { SV_TODO.show = k; renderSvTodo(); const nb = host.querySelector(`[data-show="${k}"]`); if (nb) nb.focus(); });
+    chips.appendChild(b);
+  });
+  top.appendChild(chips);
+  if (done.length) {
+    const tg = el("button", "sv-linkbtn", SV_TODO.done ? "Hide done" : "Show done"); tg.type = "button"; tg.setAttribute("aria-expanded", SV_TODO.done ? "true" : "false");
+    tg.addEventListener("click", () => { SV_TODO.done = !SV_TODO.done; renderSvTodo(); const nb = host.querySelector(".sv-linkbtn"); if (nb) nb.focus(); });
+    top.appendChild(tg);
+  }
+  host.appendChild(top);
+  if (!open.length) host.appendChild(el("p", "hint", "Everything here is done. Google has what it needs."));
+  const ul = el("ul", "sv-todo");
+  open.filter((t) => SV_TODO.show === "all" || t.priority === SV_TODO.show).concat(SV_TODO.done ? done : []).forEach((t) => {
+    const li = el("li", t.done ? "done" : ""); li.dataset.task = t.key;
+    const dot = el("span", "sv-dot " + (t.done ? "done" : t.priority === "critical" ? "crit" : "open")); dot.setAttribute("aria-hidden", "true"); li.appendChild(dot);
+    const tx = el("div", "sv-todo-t");
+    const b = el("b"); b.appendChild(el("span", "sr-only", t.done ? "Done: " : "To do: ")); b.appendChild(document.createTextNode(t.title)); tx.appendChild(b);
+    if (t.sub && !t.done) tx.appendChild(el("span", null, t.sub));
+    li.appendChild(tx);
+    li.appendChild(el("span", "sv-pri " + t.priority, SV_PRI_WORD[t.priority] || t.priority));
+    if (!t.done && t.go) { const go2 = el("button", "sv-go", (SV_GO_WORD[t.go] || "Open") + " ›"); go2.type = "button"; go2.setAttribute("aria-label", `${SV_GO_WORD[t.go] || "Open"}: ${t.title}`); go2.addEventListener("click", () => svTodoGo(t)); li.appendChild(go2); }
+    ul.appendChild(li);
+  });
+  host.appendChild(ul);
+}
+function renderSvMovers() {
+  const card = $("svMoversCard"), host = $("svMovers"); if (!card || !host) return;
+  const m = SV && SV.movers;
+  const rows = m ? [...(m.up || []), ...(m.down || [])] : [];
+  card.hidden = !rows.length;
+  if (!rows.length) return;
+  const max = Math.max(1, ...rows.map((r) => Math.abs(Number(r.delta) || 0)));
+  host.innerHTML = `<p class="hint">Clicks from Google, ${esc(svMonth(m.period))} against ${esc(svMonth(m.prior_period))}</p><ul class="sv-mv">${rows.map((r) => {
+    const d = Number(r.delta) || 0;
+    return `<li><div class="r"><span class="p">${esc(r.path)}</span><span class="c">${svNum(r.clicks)} click${r.clicks === 1 ? "" : "s"}</span><span class="sv-chg ${d > 0 ? "up" : "down"}"><span aria-hidden="true">${d > 0 ? "▲" : "▼"} ${Math.abs(d)}</span><span class="sr-only">${d > 0 ? "up" : "down"} ${Math.abs(d)} on the month before</span></span></div><svg class="bar" viewBox="0 0 100 5" preserveAspectRatio="none" aria-hidden="true"><rect class="${d < 0 ? "down" : "up"}" width="${Math.max(2, Math.round(Math.abs(d) / max * 100))}" height="5" rx="2.5"/></svg></li>`;
+  }).join("")}</ul>`;
+}
+// ── item 181: searches to follow ──
+let SV_FOLLOW = null, SV_FOL_PICK = 0;
+async function loadSvFollow() {
+  try { SV_FOLLOW = (await api("GET", "/visibility/follow")).data; } catch (_) { SV_FOLLOW = null; }
+  renderSvFollow(); renderSvNums();
+}
+const svFolMonth = (p) => svMonth(p).slice(0, 3);
+function svSpark(months) {
+  const pts = months.filter((m) => m.position != null);
+  if (pts.length < 2) return "";
+  const W = 84, H = 24, mx = Math.max(...pts.map((m) => m.position)), mn = Math.min(...pts.map((m) => m.position));
+  const xy = pts.map((m, i) => `${(2 + i * (W - 4) / (pts.length - 1)).toFixed(1)},${(3 + (m.position - mn) / Math.max(1, mx - mn) * (H - 6)).toFixed(1)}`).join(" ");
+  return `<svg class="sv-spark" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" aria-hidden="true"><polyline points="${xy}"/></svg>`;
+}
+function svFollowChart(t) {
+  const months = t.months || [];
+  if (!months.length) return `<p class="hint">Google hasn’t shown the site for “${esc(t.term)}” in a whole month yet. Its line starts the first month it does.</p>`;
+  const W = 440, H = 210, L = 30, R = 14, T = 22, B = 26;
+  const pos = months.map((m) => m.position).filter((v) => v != null);
+  const worst = Math.max(10, ...pos), clicksMax = Math.max(1, ...months.map((m) => m.clicks || 0));
+  const x = (i) => L + (months.length < 2 ? (W - L - R) / 2 : i * (W - L - R) / (months.length - 1));
+  const y = (p) => T + (p - 1) / Math.max(1, worst - 1) * (H - T - B - 40);
+  const grid = [1, Math.round((1 + worst) / 2), worst].map((p) => `<line class="gr" x1="${L}" x2="${W - R}" y1="${y(p).toFixed(1)}" y2="${y(p).toFixed(1)}"/><text x="0" y="${(y(p) + 3.5).toFixed(1)}">#${p}</text>`).join("");
+  const bars = months.map((m, i) => { const h = (m.clicks || 0) / clicksMax * 36; return `<rect class="bar" x="${(x(i) - 7).toFixed(1)}" y="${(H - B - h).toFixed(1)}" width="14" height="${h.toFixed(1)}" rx="3"/>`; }).join("");
+  const withPos = months.map((m, i) => ({ m, i })).filter((o) => o.m.position != null);
+  const line = withPos.length > 1 ? `<polyline class="ln" points="${withPos.map((o) => `${x(o.i).toFixed(1)},${y(o.m.position).toFixed(1)}`).join(" ")}"/>` : "";
+  const dots = withPos.map((o) => `<circle class="pt" cx="${x(o.i).toFixed(1)}" cy="${y(o.m.position).toFixed(1)}" r="4"/><text class="v" x="${x(o.i).toFixed(1)}" y="${(y(o.m.position) - 9).toFixed(1)}" text-anchor="middle">${Math.round(o.m.position)}</text>`).join("");
+  const labels = months.map((m, i) => `<text x="${x(i).toFixed(1)}" y="${H - 6}" text-anchor="middle">${esc(svFolMonth(m.period))}</text>`).join("");
+  const aria = `“${t.term}”, place on Google by month: ` + months.map((m) => `${svFolMonth(m.period)} ${m.position == null ? "not seen" : "#" + Math.round(m.position)}, ${m.clicks} click${m.clicks === 1 ? "" : "s"}`).join("; ");
+  return `<svg class="sv-fchart" viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(aria)}">${grid}${bars}${line}${dots}${labels}</svg>`;
+}
+function renderSvFollow() {
+  const card = $("svFollowCard"), host = $("svFollow"); if (!card || !host) return;
+  const f = SV_FOLLOW;
+  card.hidden = !(f && f.connected);
+  if (card.hidden) return;
+  const n = $("svFollowN"); if (n) n.textContent = `${f.terms.length} of ${f.max}`;
+  const btn = $("btnSvFollow"); if (btn) { btn.disabled = f.terms.length >= f.max; btn.onclick = svOpenFollow; }
+  host.innerHTML = "";
+  if (!f.terms.length) {
+    host.appendChild(el("p", "hint", "Pick up to ten searches that matter to this business. Each month you’ll see where the site showed up on Google for them, and how many clicked."));
+  } else {
+    if (SV_FOL_PICK >= f.terms.length) SV_FOL_PICK = 0;
+    const wrap = el("div", "sv-fol");
+    const mo = svFolMonth(f.month || "");
+    wrap.innerHTML = `<div><table><caption class="sr-only">Searches you follow</caption><thead><tr><th scope="col">Search</th><th scope="col">Place${mo ? " · " + esc(mo) : ""}</th><th scope="col">Clicks${mo ? " · " + esc(mo) : ""}</th><th scope="col" class="mo">Six months</th><th scope="col"><span class="sr-only">Stop following</span></th></tr></thead><tbody>${f.terms.map((t, i) => `<tr class="${i === SV_FOL_PICK ? "on" : ""}" data-i="${i}"><td><button type="button" class="term" data-pick="${i}" aria-pressed="${i === SV_FOL_PICK}">${esc(t.term)}</button></td><td><span class="row">${t.now && t.now.position != null ? `<b>#${Math.round(t.now.position)}</b>${svChg(t.now.position, t.prior && t.prior.position, "place")}` : `<span class="hint">Not seen</span>`}</span></td><td><span class="row"><b>${svNum(t.now ? t.now.clicks : 0)}</b>${t.now && t.prior ? svChg(t.now.clicks, t.prior.clicks, "num") : ""}</span></td><td class="mo">${svSpark(t.months || []) || `<span class="hint">From ${esc(svFolMonth(String(t.added_at || "").slice(0, 7)) || "now")}</span>`}</td><td><button type="button" class="x" data-unfollow="${i}" aria-label="Stop following ${esc(t.term)}">✕</button></td></tr>`).join("")}</tbody></table></div>`;
+    const chart = el("div");
+    chart.innerHTML = `<p class="hint">“${esc(f.terms[SV_FOL_PICK].term)}”: its place on Google by month (higher up is better), and clicks as bars. From Search Console, a whole month at a time.</p>${svFollowChart(f.terms[SV_FOL_PICK])}`;
+    wrap.appendChild(chart);
+    host.appendChild(wrap);
+    host.querySelectorAll("[data-pick]").forEach((b) => b.addEventListener("click", () => { SV_FOL_PICK = Number(b.dataset.pick); renderSvFollow(); const nb = host.querySelector(`[data-pick="${SV_FOL_PICK}"]`); if (nb) nb.focus(); }));
+    host.querySelectorAll("[data-unfollow]").forEach((b) => b.addEventListener("click", () => { const i = Number(b.dataset.unfollow); svFollowSave(f.terms.filter((_, j) => j !== i).map((t) => t.term), "Stopped following “" + f.terms[i].term + "”."); }));
+  }
+  if (f.suggestions && f.suggestions.length && f.terms.length < f.max) {
+    const sug = el("div", "sv-sugs"); sug.appendChild(el("span", null, "People also found you with:"));
+    f.suggestions.slice(0, 4).forEach((s) => { const b = el("button", "sv-sug", "+ " + s.term); b.type = "button"; b.addEventListener("click", () => svFollowSave(f.terms.map((t) => t.term).concat(s.term), "Following “" + s.term + "”.")); sug.appendChild(b); });
+    host.appendChild(sug);
+  }
+}
+async function svFollowSave(terms, said) {
+  try {
+    const r = await api("PUT", "/visibility/follow", { terms });
+    SV_FOLLOW = r.data; if (SV && SV.follow) SV.follow.count = (r.data.terms || []).length;
+    renderSvFollow(); renderSvNums(); toast(said || "Saved.");
+    if (r.data && r.data.added && r.data.added.length) setTimeout(loadSvFollow, 6000);   // a new search's past months arrive after the answer
+    return true;
+  } catch (err) { toast(nice(err), true); return false; }
+}
+function svOpenFollow() {
+  const f = SV_FOLLOW || { terms: [], suggestions: [], max: 10 };
+  const d = svDialog("Follow a search", `Up to ${f.max}. Each month we read where the site showed up on Google for it, and how many clicked.`);
+  const inp = el("input"); inp.type = "text"; inp.maxLength = 100; inp.placeholder = "realtor near me"; inp.setAttribute("aria-label", "A search to follow");
+  d.body.appendChild(inp);
+  if (f.suggestions && f.suggestions.length) {
+    d.body.appendChild(el("p", "hint", "From what people searched last month"));
+    const ul = el("ul", "sv-mv");
+    f.suggestions.forEach((s) => {
+      const li = el("li"); li.appendChild(el("span", "p", s.term)); li.appendChild(el("span", "c", `${svNum(s.impressions)} times seen · ${svNum(s.clicks)} click${s.clicks === 1 ? "" : "s"}`));
+      const b = el("button", "sv-go", "Follow"); b.type = "button"; b.setAttribute("aria-label", "Follow " + s.term);
+      b.addEventListener("click", async () => { if (await svFollowSave(f.terms.map((t) => t.term).concat(s.term), "Following “" + s.term + "”.")) d.close(); });
+      li.appendChild(b); ul.appendChild(li);
+    });
+    d.body.appendChild(ul);
+  }
+  d.body.appendChild(el("p", "hint", "A search nobody has used yet shows from the month it first appears. Google gives an average place for the month, not a daily rank."));
+  const acts = el("div", "acts"); const go2 = el("button", "pillbtn sm inked", "Follow it"); go2.type = "submit"; acts.appendChild(go2); d.body.appendChild(acts);
+  const follow = async () => { const v = inp.value.trim(); if (!v) { inp.focus(); return; } if (await svFollowSave(f.terms.map((t) => t.term).concat(v), "Following “" + v.toLowerCase() + "”.")) d.close(); };
+  go2.addEventListener("click", follow);
+  inp.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); follow(); } });
+  setTimeout(() => inp.focus(), 30);
 }
 // ── Phase UX (FD-R2): the workspace speaks the business's language ──
 // A plumber's SITE says "Services" (T3 vocabulary) — the workspace must too.
