@@ -111,7 +111,7 @@ test.describe('Versions: saves and publishes marked apart (builder item 125)', (
     expect(fills[1]).toBe('rgba(0, 0, 0, 0)');       // hollow
     await expect(page.locator('.ver-legend')).toContainText('Published');
     await expect(page.locator('.ver-legend')).toContainText('Saved, never live');
-    await expect(page.locator('#verNote')).toContainText('Restoring a version brings back its pages, words, business details and look. Your bookings, enquiries, contacts and files stay as they are.');
+    await expect(page.locator('#verNote')).toContainText('Restoring a version brings back its business details, services, reviews, questions, updates, colours and fonts, and leaves your sections, pages, menu, bookings, enquiries, contacts and files as they are now.');
     await expect(page.locator('#versionMore summary')).toHaveText('More tools: private preview, compare, launches');
     // every action stays on the screen, a phone's too
     const w = page.viewportSize()!.width;
@@ -130,7 +130,7 @@ test.describe('Versions: saves and publishes marked apart (builder item 125)', (
     await rows(page).nth(1).getByRole('button', { name: 'Restore', exact: true }).click();
     await expect(page.locator('#resSheetTitle')).toHaveText('Restore this version?');
     await expect(page.locator('#resSheetSub')).toContainText('“Before the spring menu”, saved Nov 9');
-    await expect(page.locator('#resSheetKeeps')).toHaveText('It brings back pages, words, business details and look. Your bookings, enquiries, contacts and files stay as they are.');
+    await expect(page.locator('#resSheetKeeps')).toHaveText('It brings back business details, services, reviews, questions, updates, colours and fonts, and leaves your sections, pages, menu, bookings, enquiries, contacts and files as they are now.');
     await page.locator('#btnRestoreGo').click();
     await expect.poll(() => m.writes.map((w) => w.method + ' ' + w.path)).toContain('POST /publishes/checkpoints/cp1/restore');
     expect(m.writes.some((w) => w.path === '/restore-to-draft')).toBe(false);
