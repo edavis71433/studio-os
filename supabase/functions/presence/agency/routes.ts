@@ -18,7 +18,8 @@ import { resolveSite, SITE_COLS } from '../lib/site.ts';
 import type { AgencyMember } from './auth.ts';
 import type { PortfolioInput } from './portfolio.ts';
 import type { KitPayload } from '../lib/kits.ts';
-import { kitFromSite, applyKitTo } from './kit_io.ts';
+import { kitFromSite, applyKitTo, layoutFromSite } from './kit_io.ts';
+import { layoutCounts } from '../lib/site_layout.ts';
 import { handleAgencySites } from './sites.ts';
 import { HIDEABLE_SECTIONS, normalizeHidden } from '../lib/navigation.ts';
 import { readReservedJsonOrThrow, writeReservedJson, RESERVED_NAMES } from '../lib/reserved_store.ts';
@@ -362,8 +363,13 @@ async function handleAgencyInner(req: Request, route: string, method: string, me
   //    overwrites). Fenced to the agency's own linked sites, both directions.
   if (route === '/agency/kits' && method === 'GET') {
     if (!can(member.role, 'read')) return forbid(cors);
-    const r = await svc(`presence_starter_kits?agency_id=eq.${member.agency_id}&select=id,name,industry_key,created_from_site,created_by,created_at&order=created_at.desc&limit=100`);
-    return json({ data: r.json ?? [] }, 200, cors);
+    // item 145: a kit saved with its pages is a template; its summary says how much it carries
+    const r = await svc(`presence_starter_kits?agency_id=eq.${member.agency_id}&select=id,name,industry_key,created_from_site,created_by,created_at,summary:payload->layout_summary&order=created_at.desc&limit=100`);
+    const kits = (Array.isArray(r.json) ? r.json : []).map((k: Record<string, unknown>) => {
+      const row = { id: k.id, name: k.name, industry_key: k.industry_key, created_from_site: k.created_from_site, created_by: k.created_by, created_at: k.created_at };
+      return k.summary && typeof k.summary === 'object' ? { ...row, kind: 'template', summary: k.summary } : { ...row, kind: 'kit' };
+    });
+    return json({ data: kits }, 200, cors);
   }
   if (route === '/agency/kits' && method === 'POST') {
     if (!can(member.role, 'manage_clients')) return forbid(cors);
@@ -373,12 +379,19 @@ async function handleAgencyInner(req: Request, route: string, method: string, me
     const ids = await agencySiteIds(member.agency_id, true);
     if (!ids.includes(siteId)) return json({ error: 'not_found', message: 'Not one of your clients.' }, 404, cors);
     const payload = await kitFromSite(siteId);
+    // item 145: "Save as a template" keeps the site's pages too, with copies of their
+    // photos in the studio's own template folder, so the template outlives the site
+    if (b?.with_pages === true) {
+      payload.layout = await layoutFromSite(siteId, { label: `your “${name}” template`, keepPhotosIn: `templates/${member.agency_id}` });
+      const c = layoutCounts(payload.layout.settings);
+      payload.layout_summary = { pages: c.pages, sections: c.sections, photos: payload.layout.media.length };
+    }
     const w = await svc('presence_starter_kits', {
       method: 'POST', headers: { Prefer: 'return=representation' },
       body: JSON.stringify({ agency_id: member.agency_id, name, industry_key: payload.industry_key, payload, created_from_site: siteId, created_by: member.email }),
     });
     if (!w.ok || !w.json?.[0]) return json({ error: 'write_failed', message: 'That didn’t save.' }, 502, cors);
-    return json({ data: { id: w.json[0].id, name, offerings: payload.offerings.length, faqs: payload.faqs.length } }, 200, cors);
+    return json({ data: { id: w.json[0].id, name, offerings: payload.offerings.length, faqs: payload.faqs.length, ...(payload.layout_summary ? { kind: 'template', summary: payload.layout_summary } : { kind: 'kit' }) } }, 200, cors);
   }
   {
     const km = route.match(/^\/agency\/kits\/([0-9a-f-]{36})$/);
@@ -399,7 +412,8 @@ async function handleAgencyInner(req: Request, route: string, method: string, me
       const kq = await svc(`presence_starter_kits?id=eq.${am[1]}&agency_id=eq.${member.agency_id}&select=payload,name&limit=1`);
       if (!kq.json?.[0]) return json({ error: 'not_found', message: 'Not one of your kits.' }, 404, cors);
       const kit = kq.json[0].payload as KitPayload;
-      return json({ data: await applyKitTo(kit, siteId, principal, `Applied the “${kq.json[0].name}” starter kit`) }, 200, cors);
+      const kitName = String(kq.json[0].name || '');
+      return json({ data: await applyKitTo(kit, siteId, principal, `Applied the “${kitName}” ${kit.layout ? 'template' : 'starter kit'}`, { label: `your “${kitName}” template` }) }, 200, cors);
     }
   }
 
