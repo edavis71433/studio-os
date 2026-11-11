@@ -163,6 +163,10 @@
   .dbody .three{display:grid;grid-template-columns:2fr 1fr 1fr;gap:8px;margin-top:8px}
   @media (max-width:520px){.dbody .two{grid-template-columns:1fr}.dbody .three{grid-template-columns:1fr 1fr}.dbody .three input:first-child{grid-column:1 / -1}}
   .dbody .dds-tags{background:var(--bg)}
+  /* the two contact forms are long now: their buttons stay pinned to the dialog's foot while the
+     fields scroll under them, so Save is in reach on a phone without hunting for it */
+  #newForm,#editForm{padding-bottom:0}
+  #newDlg .row2,#editDlg .row2{position:sticky;bottom:0;z-index:1;margin:var(--dds-s4,16px) calc(-1 * var(--dds-s6,24px)) 0;padding:var(--dds-s3,12px) var(--dds-s6,24px) var(--dds-s5,20px);background:var(--card);border-top:1px solid var(--line)}
   /* item 89: a job title under the name, tags on the row (a tag filters the list) */
   .c .ttl,tbody td .ttl{display:block;font-size:12.5px;font-weight:400;color:var(--faint);margin-top:1px}
   .tagrow{display:flex;flex-wrap:wrap;gap:4px}
@@ -275,8 +279,8 @@
     <div id="c-tagbox"></div>
     <label for="c-found">How did they find you?</label>
     <select id="c-found"><option value="">Not recorded</option><option>Google</option><option>Referral</option><option>Word of mouth</option><option>Social</option><option>Repeat client</option><option>Website</option><option>Other</option></select>
+    <p class="note">Save &amp; New saves this one and clears the form for the next person.</p>
     <div class="row2"><button type="button" class="btn ghost" id="c-cancel">Cancel</button><button type="submit" class="btn ghost" id="c-again" value="again">Save &amp; New</button><button type="submit" class="btn" id="c-add">Add contact</button></div>
-    <p class="note" style="text-align:right">Save &amp; New saves this one and clears the form for the next person.</p>
   </form>
 </dialog>
 <dialog id="custDlg" aria-label="Add a customer">
