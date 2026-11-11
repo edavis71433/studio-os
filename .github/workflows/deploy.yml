@@ -204,7 +204,10 @@ jobs:
       # visitor actually loads are up and still carry what the scan needs.
       - name: Smoke test — Free Tools pages on the static host
         run: |
-          curl -s --fail https://tools.davisdigitalstudio.com/site-review | grep -q 'challenges.cloudflare.com/turnstile' || { echo "site-review page smoke FAILED (no Turnstile script)"; exit 1; }
+          # Since builder item 138 (PR 264) the page loads Cloudflare's check only when a visitor starts a
+          # review, so the script's address lives in site-review.js, not in the page's own HTML.
+          curl -s --fail https://tools.davisdigitalstudio.com/site-review | grep -q 'id="srForm"' || { echo "site-review page smoke FAILED (no form)"; exit 1; }
+          curl -s --fail https://tools.davisdigitalstudio.com/site-review.js | grep -q 'challenges.cloudflare.com/turnstile' || { echo "site-review script smoke FAILED (no Turnstile loader)"; exit 1; }
           curl -s --fail https://tools.davisdigitalstudio.com/ai-visibility | grep -q 'id="srForm"' || { echo "ai-visibility page smoke FAILED (no form)"; exit 1; }
           curl -s --fail https://tools.davisdigitalstudio.com/report/00000000-0000-4000-8000-000000000000 | grep -q 'id="trReport"' || { echo "report page smoke FAILED"; exit 1; }
           echo "Free Tools pages smoke passed (site-review, ai-visibility, report shell)."

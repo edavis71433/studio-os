@@ -117,6 +117,7 @@ export interface NetlifySiteInfo {
   custom_domain: string | null;
   state: string;
   ssl_url: string | null;
+  domain_aliases?: string[];    // item 163: extra names on the site (an old domain kept forwarding)
 }
 
 function toSiteInfo(j: any): NetlifySiteInfo {
@@ -125,6 +126,7 @@ function toSiteInfo(j: any): NetlifySiteInfo {
     default_domain: String(j.default_domain || `${j.name}.netlify.app`),
     custom_domain: j.custom_domain ? String(j.custom_domain) : null,
     state: String(j.state || 'unknown'), ssl_url: j.ssl_url ? String(j.ssl_url) : null,
+    domain_aliases: Array.isArray(j.domain_aliases) ? j.domain_aliases.map((a: unknown) => String(a)) : [],
   };
 }
 
@@ -182,6 +184,14 @@ export async function setSitePassword(netlifySiteId: string, password: string): 
   const r = await nf(`/sites/${encodeURIComponent(netlifySiteId)}`, { method: 'PATCH', body: JSON.stringify({ password }) });
   if (!r.ok) return { ok: false, error: `password update failed: ${r.status} ${r.text.slice(0, 200)}` };
   return { ok: true };
+}
+
+/** Item 163: set the extra names the site answers on (an old domain kept forwarding). An
+ *  empty list clears them. They share the site's certificate. */
+export async function setDomainAliases(netlifySiteId: string, aliases: string[]): Promise<{ ok: boolean; error?: string }> {
+  if (!NETLIFY_TOKEN) return { ok: false, error: 'NETLIFY_AUTH_TOKEN not configured' };
+  const r = await nf(`/sites/${encodeURIComponent(netlifySiteId)}`, { method: 'PATCH', body: JSON.stringify({ domain_aliases: aliases }) });
+  return r.ok ? { ok: true } : { ok: false, error: `alias update failed: ${r.status} ${r.text.slice(0, 200)}` };
 }
 
 /** Certificate state. 200 with empty body = no cert yet (valid pre-DNS state). */

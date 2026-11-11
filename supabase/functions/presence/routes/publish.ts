@@ -14,7 +14,8 @@ import { readPageLocks } from './page_locks.ts';
 import { serializeDraft } from '../lib/serializer.ts';
 import { validateSnapshot } from '../lib/manifest_validate.ts';
 import { fetchVariants } from '../lib/media.ts';
-import { deployFileMap, netlifyConfigured, setSitePassword } from '../lib/netlify.ts';
+import { deployFileMap, netlifyConfigured, setSitePassword, getSite } from '../lib/netlify.ts';
+import { withForwarding } from '../lib/domain_notify.ts';
 import { mergeSecurityHeaders, mergeAssetCaching } from '../lib/security_headers.ts';
 import { writeChangeEvent } from '../lib/provenance.ts';
 import type { Snapshot } from '../lib/render_types.ts';
@@ -31,6 +32,7 @@ import { readIfMatch, preconditionOutcome, staleConflictBody, draftAsFound } fro
 import { describeVersionDiff, resolveTimewarpTarget, normalizeTimewarpDate, cleanCheckpointName, type TimewarpVersion } from '../lib/preview_env.ts';
 import { captureDraftSnapshot } from '../lib/staging.ts';
 import { applySnapshotToDraft, snapshotForRestore, leftOffSentence } from '../lib/draft_writer.ts';
+import { lockedRestoreMessage } from '../lib/section_lock.ts';
 import { insertSnapshot as insertSnapshotRow, type DraftSettings } from '../lib/draft_settings.ts';
 import { renderOfflinePage, offlineFileMap } from '../lib/offline_page.ts';
 import { loadEmailBrand } from '../lib/email_brand.ts';
@@ -207,6 +209,14 @@ export async function runPipeline(site: SiteRow, principal: Principal, kind: 'pu
   // the template's asset-cache `_headers`. One source of truth: lib/security_headers.ts.
   // Item 144: the CSP is the one this site's own pages need (publishedCspFor, above).
   fileMap['_headers'] = mergeSecurityHeaders(mergeAssetCaching(typeof fileMap['_headers'] === 'string' ? fileMap['_headers'] as string : undefined), csp);
+  // Item 163 (review domains finding 12): an old domain kept on the site when the domain changed
+  // forwards to the current one, path and all. Netlify serves an extra name as-is; only a rule at
+  // the top of _redirects makes it a permanent move. Netlify's own list of names is the record.
+  if (site.custom_domain && site.netlify_site_id) {
+    const nfs = await getSite(site.netlify_site_id).catch(() => null);
+    const aliases = nfs && nfs.ok && nfs.site ? nfs.site.domain_aliases || [] : [];
+    if (aliases.length) fileMap['_redirects'] = withForwarding(typeof fileMap['_redirects'] === 'string' ? fileMap['_redirects'] as string : '', aliases, site.custom_domain);
+  }
 
   await svc(`presence_publishes?id=eq.${pubId}`, { method: 'PATCH', body: JSON.stringify({ status: 'deploying' }) });
   const dep = await deployFileMap(site.netlify_site_id, fileMap, { title: `${kind} ${pubId}` });
@@ -574,6 +584,7 @@ export async function handleCheckpointRestore(req: Request, site: SiteRow, princ
   const snap = await snapshotForRestore(site.id, row.snapshot_id);
   if (!snap) return json({ error: 'not_restorable', message: 'That checkpoint is no longer available.' }, 410, cors);
   const res = await applySnapshotToDraft(site, snap, principal, `Returned to checkpoint “${row.name}”`, await draftAsFound(req), { settings: true });
+  if (res.error === 'section_locked') return json({ error: 'section_locked', message: lockedRestoreMessage(res.locked || [], 'that checkpoint'), sections: res.locked }, 403, cors);
   if (!res.ok) return json({ error: 'restore_failed', message: 'That didn’t work — your draft is unchanged and nothing was lost.' }, 502, cors);
   return json({ data: { ok: true, message: `Checkpoint “${row.name}” is now in your draft.${leftOffSentence(res.applied?.dropped_media ?? 0, 'that checkpoint')} Your previous draft was set aside as a safety copy — nothing was lost.`, applied: res.applied } }, 200, cors);
 }
