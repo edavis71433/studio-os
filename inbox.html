@@ -344,6 +344,11 @@
   #paneActs #leadSpam{order:-1}
   #paneActs #leadDeal{border-radius:999px;font-weight:600}
   .deal-explain{margin:10px 16px 0;padding:10px 14px;border-radius:var(--dds-r,12px);background:var(--p-soft);color:var(--p);font-size:13px;line-height:1.45}
+  /* item 89: where the visitor's visit began, and "How did they find you?" filled in from it */
+  .lvisit{display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px;margin-top:10px;font-size:12.5px}
+  .pchip.src{background:var(--dds-info-soft,#e6effa);color:var(--dds-info,#245fa0);font-weight:600}
+  .lfound{display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;margin-top:12px;font-size:13px;color:var(--soft)}
+  .lfound .dds-pick{min-width:160px}
   .deal-explain b{font-weight:700}
   #leadSendDeal{border-radius:999px;font-weight:600}
   .lead-hint{font-size:12px;color:var(--faint);margin:6px 2px 0}
@@ -1391,6 +1396,20 @@ function paneApproval(host,it){
 // Bold redesign (Nov 2026): the deal an enquiry becomes, named the way createDeal names it
 const leadDealTitle=(l)=>(l.name||l.email||'New enquiry')+((l.form_kind&&l.form_kind!=='contact')?(' — '+l.form_kind):'');
 function leadGreeting(l){return (l.name?`Hi ${String(l.name).split(' ')[0]},`:'Hi,')+'\n\nThanks for reaching out. ';}
+// item 89: where the visitor's visit began, noted when they sent the form (routes/visit_source.ts)
+const FOUND_PICKS=['Google','Referral','Word of mouth','Social','Repeat client','Website','Other'];   // lib/found_via.ts
+const foundOf=(l)=>l.found_pick!==undefined?l.found_pick:((l.visit&&FOUND_PICKS.includes(l.visit.found_via))?l.visit.found_via:'');
+function visitHtml(l){
+  const v=l.visit;if(!v)return'';
+  const t=Date.parse(v.at||''),day=isFinite(t)?new Date(t).toLocaleDateString('en-US',{month:'short',day:'numeric'}):'';
+  const came=v.from&&v.from!=='straight to the site'?'Came from '+v.from:'Came straight to the site';
+  return `<div class="lvisit"><span class="pchip src">${esc(came)}</span><span class="muted">first page: ${esc(v.landing||'/')}${day?' · '+esc(day):''}</span></div>`;
+}
+function foundHtml(l,settled){
+  if(settled)return'';
+  const pick=foundOf(l),fromVisit=!!(l.visit&&pick&&pick===l.visit.found_via);
+  return `<div class="lfound"><label for="leadFound">How did they find you?</label><select id="leadFound" class="dds-pick"><option value="">Not recorded</option>${FOUND_PICKS.map(x=>`<option${x===pick?' selected':''}>${esc(x)}</option>`).join('')}</select>${fromVisit?'<span class="muted" id="leadFoundNote">filled in from their visit</span>':''}</div>`;
+}
 function paneLead(host,it){
   const l=it.lead||{};
   const sent=Array.isArray(l.replies)?l.replies:[];
@@ -1406,7 +1425,9 @@ function paneLead(host,it){
     `<div class="pbody"><div class="card">
       ${contact?`<div style="font-size:13.5px;color:var(--soft)">${contact}</div>`:''}
       ${l.message?`<div class="body">${esc(l.message)}${l.message_cut?'…':''}</div>${l.message_cut?'<p class="muted" style="font-size:12.5px;margin:6px 0 0">This is the start of a longer message. Refresh to see all of it.</p>':''}`:'<div class="body muted">No message — they just left their details.</div>'}
+      ${visitHtml(l)}
       ${sent.map(r=>`<div class="lreply"><div class="muted" style="font-size:12.5px">You replied${r.at?' · '+esc(when(r.at)):''}</div><div class="body">${esc(r.body)}</div></div>`).join('')}
+      ${foundHtml(l,settled)}
       <div class="lnote"><label for="leadNote">Your note <span class="muted">— never sent to them</span></label>
         <textarea id="leadNote" maxlength="1000" placeholder="e.g. Called back — wants a quote in March">${esc(note?note.body:'')}</textarea>
         <div class="crow"><span class="muted" id="leadNoteAt" style="font-size:12px">${note&&note.at?'Saved '+esc(when(note.at)):''}</span><span class="spacer"></span><button type="button" id="leadNoteSave">Save note</button></div></div>
@@ -1467,6 +1488,7 @@ function paneLead(host,it){
   // Phase 4 (triage): Not a fit and Spam both leave the queue and stop counting
   const nf=$('leadNotFit');if(nf)nf.addEventListener('click',()=>setLeadStatus(it,'not_a_fit',nf));
   const sp=$('leadSpam');if(sp)sp.addEventListener('click',()=>markSpam(it,sp));
+  const fpk=$('leadFound');if(fpk)fpk.addEventListener('change',()=>{l.found_pick=fpk.value;const n=$('leadFoundNote');if(n)n.hidden=!(l.visit&&fpk.value===l.visit.found_via);});   // item 89
   const dl=$('leadDeal');if(dl)dl.addEventListener('click',()=>createDeal(it,dl));
   const cv=$('leadConvert');if(cv)cv.addEventListener('click',()=>openConvert(it));
 }
@@ -1544,8 +1566,9 @@ function openConvert(it){
       let dealId=null;
       if($('conv-deal').checked){
         let contactId=null;
-        const c=await api('/sales/contacts','POST',{name:l.name||'',email,phone:l.phone||''}); if(c.ok)contactId=c.body&&c.body.data&&c.body.data.id;
-        const dd=await api('/sales/deals','POST',{title:biz||l.name||email,contact_id:contactId,source:'website_form',source_submission_id:id});
+        const fv=foundOf(l),found=fv?{found_via:fv}:{};   // item 89
+        const c=await api('/sales/contacts','POST',{name:l.name||'',email,phone:l.phone||'',...found}); if(c.ok)contactId=c.body&&c.body.data&&c.body.data.id;
+        const dd=await api('/sales/deals','POST',{title:biz||l.name||email,contact_id:contactId,source:'website_form',source_submission_id:id,...found});
         if(dd.ok)dealId=dd.body&&dd.body.data&&dd.body.data.id;
       }
       l.status='converted'; if(dealId){l.converted=true;l.deal_id=dealId;}else l.customer=true;   // C5: no deal → a customer, not "In pipeline"
@@ -1601,8 +1624,9 @@ async function createDeal(it,btn){
   const title=(l.name||l.email||'New enquiry')+((l.form_kind&&l.form_kind!=='contact')?(' — '+l.form_kind):'');
   try{
     let contactId=null;
-    if(l.email){const c=await api('/sales/contacts','POST',{name:l.name||'',email:l.email,phone:l.phone||''});if(c.ok)contactId=c.body&&c.body.data&&c.body.data.id;}
-    const d=await api('/sales/deals','POST',{title,contact_id:contactId,source:'website_form',source_submission_id:id});
+    const fv=foundOf(l),found=fv?{found_via:fv}:{};   // item 89: "How did they find you?", from their visit or picked
+    if(l.email){const c=await api('/sales/contacts','POST',{name:l.name||'',email:l.email,phone:l.phone||'',...found});if(c.ok)contactId=c.body&&c.body.data&&c.body.data.id;}
+    const d=await api('/sales/deals','POST',{title,contact_id:contactId,source:'website_form',source_submission_id:id,...found});
     if(!d.ok){toast(d.status===403?'The pipeline is part of your plan’s business tools — an upgrade adds it.':((d.body&&d.body.message)||'Couldn’t start that deal.'));btn.disabled=false;return;}
     const dealId=d.body&&d.body.data&&d.body.data.id;
     // reflect converted state locally + suppress navigation on already_converted
