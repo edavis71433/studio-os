@@ -209,6 +209,7 @@ const DECIDED = {
     // sales review item 112: prospecting — find, save, move along, start the deal; the draft only returns words
     'POST /sales/prospects', 'POST /sales/prospects/discover', 'PATCH /sales/prospects/:id',
     'POST /sales/prospects/:id/convert', 'POST /sales/prospects/:id/draft',
+    'POST /sales/prospects/:id/pack',   // sales review item 113: the pitch pack build
   ],
   open: [
     'DELETE /crm/notes/:id', 'POST /client/notifications/read', 'POST /concierge/ask', 'POST /crm/notes',
@@ -446,7 +447,7 @@ const WRITE_HANDLERS = [
   'handleEstimateCreate', 'handleEstimateSend', 'handleEstimateToProposal', 'handleEstimateToInvoice', 'handleEstimateDelete',
   'handleRecurringStart', 'handleRecurringChange', 'handleRecurringAction',
   // sales review item 112: prospects (DELETE and PATCH /sales/prospects/:id share handleProspect)
-  'handleProspects', 'handleProspect', 'handleProspectDiscover', 'handleProspectConvert', 'handleProspectDraft',
+  'handleProspects', 'handleProspect', 'handleProspectDiscover', 'handleProspectConvert', 'handleProspectDraft', 'handleProspectPack',
   'handleStudioRequests',   // final pass S1: POST /portal/studio-requests/:id/(accept|decline) are open; the route answers the owner only
   'handleScheduleCancel', 'handleScheduleCreate', 'handleSettings', 'handleShareSet', 'handleStockImport',
   'handleSupport', 'handleSupportMessage', 'handleSupportOne', 'handleSurveyRespond', 'handleTakeOffline',
