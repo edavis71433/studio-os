@@ -20,7 +20,7 @@ ok('auth: sends a signed-out visitor to the STUDIO door (owner surface)', /studi
 // Oct 2026 review: the scope header is CONDITIONAL — once a ?client= scope resolves to a
 // bridged customer (AG_MODE), the page reads the agency site, where projects live.
 ok('config: single supabase config (prod ref), scope header for agency drill-in', /qksstlqzbhesadrrofgn/.test(h) && /x-dds-scope-site':AG_MODE\?'':scope\(\)/.test(h));
-ok('wires: list + detail + report endpoints', /api\('\/projects'/.test(h) && /\/projects\/'\+id\)/.test(h) && /\/report'/.test(h));
+ok('wires: list + detail + report endpoints', /api\('\/projects'/.test(h) && /\/projects\/'\+id(\+td)?\)/.test(h) && /\/report'/.test(h));
 ok('wires: task + milestone + status mutations', /\/tasks\/'\+/.test(h) && /\/milestones\/'\+/.test(h) && /\/status','POST'/.test(h));
 ok('wires: deliverable upload (reuses the media store) + download', /\/deliverables\/upload-url','POST'/.test(h) && /\/deliverables\/'\+.*\/download/.test(h));
 ok('wires: approvals decide + messages thread', /\/approvals\/'\+.*\/decide','POST'/.test(h) && /\/messages','POST'/.test(h));

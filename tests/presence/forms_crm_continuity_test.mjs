@@ -24,12 +24,12 @@ ok('convert: the originating enquiry is marked converted (system status)', /pres
 ok('convert: the created event carries the source submission (deep-link provenance)', /dealEvent\(site\.id, deal\.id, 'created', principal, \{ to_stage: startStage, detail: \{ source_submission_id: srcSub/.test(sales) && /const startStage = \(!srcSub &&/.test(sales));
 
 // inbox: link each enquiry to its deal, tenant-scoped, bounded
-ok('inbox: links each enquiry to its CRM deal (converted + deal_id)', /deal_id: dealMap\.get\(String\(s\.id\)\) \|\| null, converted: s\.status === 'converted' \|\| dealMap\.has/.test(commercial));
+ok('inbox: links each enquiry to its CRM deal (converted + deal_id)', /const dealId = dealMap\.get\(String\(s\.id\)\) \|\| null;[\s\S]*?deal_id: dealId, \.\.\.enquiryState\(s\.status, dealId,/.test(commercial));
 ok('inbox: the deal lookup is site-scoped + bounded to the shown ids', /presence_deals\?site_id=eq\.\$\{site\.id\}&deleted_at=is\.null&source_submission_id=in\.\(\$\{ids\.join\(','\)\}\)/.test(commercial));
 
 // frontend: converted state + deep link + no re-convert
-ok('Inbox enquiry pane: converted enquiry shows "in pipeline — view deal" deep link (opens the Client Record)', /l\.converted\?`<a class="btnlink" href="\/crm\.html\?deal=\$\{esc\(l\.deal_id\|\|''\)\}&tab=deal"[^>]*>✓ In pipeline — view deal<\/a>`/.test(inbox));
-ok('Inbox enquiry pane: the "→ Deal" button is hidden once converted (no re-convert)', /l\.converted\?[\s\S]*?:`<button id="leadDeal"/.test(inbox));
+ok('Inbox enquiry pane: an enquiry with a live deal shows "in pipeline — view deal" deep link (opens the Client Record; bug hunt C5)', /inPipe\?`<a class="btnlink" href="\/crm\.html\?deal=\$\{esc\(l\.deal_id\)\}&tab=deal"[^>]*>✓ In pipeline — view deal<\/a>`/.test(inbox));
+ok('Inbox enquiry pane: the "→ Deal" button is hidden once converted (no re-convert)', /inPipe\?[\s\S]*?:`<button id="leadDeal"/.test(inbox));
 ok('Inbox enquiry pane: reflects idempotent server response ("already in your pipeline")', /already_converted\?'This enquiry is already in your pipeline\.'/.test(inbox));
 ok('wording: "Website enquiry" terminology used consistently', /website enquiry/i.test(inbox) && /website enquiry/i.test(commercial));
 

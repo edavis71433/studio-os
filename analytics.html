@@ -312,6 +312,9 @@ const $=(id)=>document.getElementById(id);
 const esc=(s)=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const scope=()=>new URLSearchParams(location.search).get('client')||'';
 let TOKEN="", PERIOD='this_month', CTX=null, DASH=null;
+// C8: the sign-in pass is renewed about every hour; keep the renewed one, as the other
+// pages do, or Refresh after an hour is refused and reads as "Sign in"
+sb.auth.onAuthStateChange(function(_e,s){if(s&&s.access_token)TOKEN=s.access_token;});
 // ?view=website: the builder's Analytics tab. The website band on its own, since a
 // site tab isn't where someone comes for the studio's pipeline.
 const WEBSITE_VIEW=new URLSearchParams(location.search).get('view')==='website';
@@ -722,6 +725,9 @@ function headRow(title,subline,withPeriod,extra){
 // studio's own sales: hidden inside a client (?client=), where deals don't live. ──
 const REPORTS=[['revenue','Revenue by month'],['pipeline','Deals by stage'],['outcomes','Won and not a fit'],['enquiries','Enquiries by page'],['overdue','Overdue invoices']];
 let REP=null,REP_ON=(function(){try{const v=localStorage.getItem('dds-report');return REPORTS.some(r=>r[0]===v)?v:'revenue';}catch(_){return 'revenue';}})();
+// C13: Refresh marks the reports for a fresh read instead of throwing them away first —
+// a refresh that fails keeps the last good numbers, so the tabs and report buttons still work
+let REP_STALE=false;
 // final pass (Nov 8, batch B): the studio's total can land after the page — the
 // shell refreshes it behind the page and says so with 'dds:attention'
 function quietStudio(v){const n=Number(v)||0;const el=document.getElementById('allQuietStudio');if(!el||!n)return;
@@ -730,10 +736,11 @@ document.addEventListener('dds:attention',e=>quietStudio(e.detail));
 const reportsShell=()=>scope()?'':`<section class="reports" id="reports" aria-labelledby="reportsH"><h2 class="band" id="reportsH">Reports</h2><div id="reportsBody"><p class="muted">Reading your reports…</p></div></section>`;
 async function loadReports(force){
   if(!$('reportsBody'))return;
-  if(!REP||force){let r;try{r=await api('/sales/reports');}catch(_){r={ok:false};}
+  if(!REP||force||REP_STALE){let r;try{r=await api('/sales/reports');}catch(_){r={ok:false};}
     const host=$('reportsBody');if(!host)return;
+    if(!r.ok&&REP){paintReports();paintGlance(REP);return;}   // C13: the last good numbers stay (their "as of" says when)
     if(!r.ok){host.innerHTML='<p class="muted">Your reports couldn’t load just now — Refresh tries again. The numbers above are unaffected.</p>';paintGlance(null);return;}
-    REP=(r.body&&r.body.data)||{};}
+    REP=(r.body&&r.body.data)||{};REP_STALE=false;}
   paintReports();
   paintGlance(REP);
 }
@@ -945,7 +952,7 @@ async function loadInsights(){
   if(location.hash==='#insights'){const s=$('insights');if(s){s.scrollIntoView({block:'start'});}}
 }
 function wireDash(){
-  $('refreshBtn').addEventListener('click',()=>{REP=null;loadDash(true).then(()=>{const b=$('refreshBtn');if(b)b.focus();});});
+  $('refreshBtn').addEventListener('click',()=>{REP_STALE=true;loadDash(true).then(()=>{const b=$('refreshBtn');if(b)b.focus();});});
   // PERIOD is committed only on a successful render (loadDash) — a failed
   // switch leaves the control and state exactly as they were. The segmented
   // control is plain buttons: no popup, so nothing to close and no focus to guard.
@@ -1074,7 +1081,7 @@ function renderPortfolio(d,roster){
   h+=reportsShell();
   $('main').innerHTML=h;
   loadReports();
-  const rb=$('refreshBtn');if(rb)rb.addEventListener('click',()=>{REP=null;loadPortfolio(true).then(()=>{const b=$('refreshBtn');if(b)b.focus();});});
+  const rb=$('refreshBtn');if(rb)rb.addEventListener('click',()=>{REP_STALE=true;loadPortfolio(true).then(()=>{const b=$('refreshBtn');if(b)b.focus();});});
   const pr=$('printRep');if(pr)pr.addEventListener('click',()=>{if($('repPrint'))printReport();else toast('Your reports are still loading — try again in a moment.');});
   // row click drills into the client's scoped Business dashboard; the name link
   // inside carries the keyboard/AT path, so plain rows stay non-focusable

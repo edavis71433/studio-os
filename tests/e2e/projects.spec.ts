@@ -125,9 +125,10 @@ const CHECKLIST_STEPS = [
 ] as Array<[string, string, boolean, string | null]>;
 
 // register AFTER installApp (later routes match first): serve a genuine 404 for
-// p3's report so the degradation path under test is the real error path
+// p3's report so the degradation path under test is the real error path. The
+// project reads carry ?today= (bug hunt C11), so these match on the path alone.
 const routeP3Report404 = (page: import('@playwright/test').Page) =>
-  page.route('**/functions/v1/presence/projects/p3/report', (route) =>
+  page.route((u) => u.pathname.endsWith('/presence/projects/p3/report'), (route) =>
     route.fulfill({ status: 404, contentType: 'application/json', body: JSON.stringify({ message: 'Report not found.' }) }));
 
 // Pin the display so every project (desktop/tablet/mobile) exercises the table —
@@ -462,7 +463,7 @@ test.describe('Project record page', () => {
     // the round-trip is REAL: the PATCH flips the fixture, the refetch serves
     // the flipped detail, and the row renders done (checked + struck)
     const detail = JSON.parse(JSON.stringify(P1_DETAIL));
-    await page.route('**/functions/v1/presence/projects/p1', (route) =>
+    await page.route((u) => u.pathname.endsWith('/presence/projects/p1'), (route) =>
       route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(detail) }));
     await page.route('**/functions/v1/presence/projects/p1/tasks/t1', (route) => {
       detail.data.tasks[0].status = JSON.parse(route.request().postData() || '{}').status;
@@ -570,7 +571,7 @@ test.describe('Project record page', () => {
     // ONE TRUE MUTATION ROUND-TRIP: the POST flips the fixture and the refetch
     // serves it, so the pill VISIBLY reads on hold (not just a request assert)
     const detail = JSON.parse(JSON.stringify(P1_DETAIL));
-    await page.route('**/functions/v1/presence/projects/p1', (route) =>
+    await page.route((u) => u.pathname.endsWith('/presence/projects/p1'), (route) =>
       route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(detail) }));
     await page.route('**/functions/v1/presence/projects/p1/status', (route) => {
       detail.data.project.status = JSON.parse(route.request().postData() || '{}').to;
@@ -1136,7 +1137,7 @@ test.describe('Project record — approval per deliverable (audit change 8)', ()
     const row = page.locator('#dlList .item').filter({ hasText: 'Homepage mock' });
     await expect(row.locator('.tag.ap.approved')).toHaveText('Approved');
     await expect(row.locator('[data-ask="d1"]')).toBeVisible();
-    await page.route('**/functions/v1/presence/projects/p1', (route) =>
+    await page.route((u) => u.pathname.endsWith('/presence/projects/p1'), (route) =>
       route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(withApproval('changes_requested')) }));
     await page.reload();
     await expect(row.locator('.tag.ap.changes')).toHaveText('Changes requested');
@@ -1155,7 +1156,7 @@ test.describe('Project record — approval per deliverable (audit change 8)', ()
     await expect(card).toContainText(`due ${PAST_LABEL}`);
     await expect(page.locator('#apList .item').filter({ hasText: 'Homepage design' }).locator('.tag.overdue')).toHaveCount(0);   // undated → never overdue
     // the same date on an APPROVED one is history, not a late answer
-    await page.route('**/functions/v1/presence/projects/p1', (route) =>
+    await page.route((u) => u.pathname.endsWith('/presence/projects/p1'), (route) =>
       route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(withApproval('approved', PAST)) }));
     await page.reload();
     await expect(row.locator('.tag.ap.approved')).toHaveText('Approved');

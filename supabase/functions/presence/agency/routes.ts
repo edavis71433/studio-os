@@ -21,7 +21,7 @@ import type { KitPayload } from '../lib/kits.ts';
 import { kitFromSite, applyKitTo } from './kit_io.ts';
 import { handleAgencySites } from './sites.ts';
 import { HIDEABLE_SECTIONS, normalizeHidden } from '../lib/navigation.ts';
-import { readReservedJson, writeReservedJson, RESERVED_NAMES } from '../lib/reserved_store.ts';
+import { readReservedJsonOrThrow, writeReservedJson, RESERVED_NAMES } from '../lib/reserved_store.ts';
 import { sendInviteLink } from '../lib/workspace.ts';
 import { brandFromKit } from '../lib/email_brand.ts';
 import { runEvidence } from '../evidence/engine.ts';
@@ -69,7 +69,7 @@ export async function gather(agencyId: string, nowIso: string): Promise<Portfoli
   // wave, and the three reads that wait on it (the latest runs' evidence, the
   // client names, their billing) go side by side — six waits became four.
   const [sitesQ, momQ, oppQ, planQ, draftQ, connQ, revQ, brandQ, evtQ, runQ, leadsQ, noticesQ, filesQ, slQ] = await Promise.all([
-    svc(`presence_sites?id=in.(${ids.join(',')})&select=id,client_id,edition,status,last_published_at,custom_domain,domain_registrar,domain_expires_at&limit=1000`),
+    svc(`presence_sites?id=in.(${ids.join(',')})&select=id,client_id,edition,status,last_published_at,custom_domain,domain_registrar,domain_expires_at,cert_expires_at,cert_pending_since&limit=1000`),   // cert_*: item 134 (0149)
     svc(`presence_moments?${IN}&status=eq.active&select=site_id,moment_key,moment_type,headline&limit=1000`),
     svc(`presence_growth_opportunities?${IN}&status=eq.open&select=site_id,area,opportunity,timing_ends,created_at&limit=1000`),
     svc(`presence_infra_plans?${IN}&status=in.(proposed,approved)&select=site_id,kind,title,status&limit=1000`),
@@ -197,10 +197,15 @@ async function handleAgencyInner(req: Request, route: string, method: string, me
       if (!Array.isArray(b.hidden)) return json({ error: 'bad_request', message: 'Say which areas to hide, as a list.' }, 400, cors);
       const hidden = normalizeHidden(b.hidden);
       if (!(await writeReservedJson(own.id, RESERVED_NAMES.navHidden, { hidden }, member.email))) return json({ error: 'write_failed', message: 'That didn’t save.' }, 502, cors);
-      return json({ data: { hidden, choices: HIDEABLE_SECTIONS } }, 200, cors);
+      return json({ data: { hidden, choices: HIDEABLE_SECTIONS, can_edit: true } }, 200, cors);
     }
-    const hidden = normalizeHidden(await readReservedJson(own.id, RESERVED_NAMES.navHidden));
-    return json({ data: { hidden, choices: HIDEABLE_SECTIONS } }, 200, cors);
+    // bug hunt C4: a failed read is not "nothing hidden" — Settings showed every area on,
+    // and the next switch saved that over the real list. The page leaves the card away.
+    let stored: unknown;
+    try { stored = await readReservedJsonOrThrow(own.id, RESERVED_NAMES.navHidden); }
+    catch { return json({ error: 'read_failed', message: 'Your menu couldn’t load just now.' }, 502, cors); }
+    // C16: the page shows the switches by the same rule this PUT keeps (manage_clients)
+    return json({ data: { hidden: normalizeHidden(stored), choices: HIDEABLE_SECTIONS, can_edit: can(member.role, 'manage_clients') } }, 200, cors);
   }
 
   // ── the Sites and Domains pages, Pin and Duplicate (builder list items 43, 45, 52) ──
