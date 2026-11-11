@@ -74,7 +74,8 @@
   function dialog(id){
     let d=document.getElementById(id);
     if(!d){d=document.createElement('dialog');d.id=id;d.className='ct';d.setAttribute('aria-labelledby',id+'-h');d.innerHTML='<div class="dbody" id="'+id+'-body"></div>';document.body.appendChild(d);
-      d.addEventListener('close',()=>{const b=document.getElementById(id+'-body');if(b)b.innerHTML='';});}
+      // Chrome fires close a frame late: a dialog that was opened again in between keeps what it shows now
+      d.addEventListener('close',()=>{if(d.open)return;const b=document.getElementById(id+'-body');if(b)b.innerHTML='';});}
     return d;
   }
   function show(id,html,focusSel){
