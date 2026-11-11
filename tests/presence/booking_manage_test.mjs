@@ -95,7 +95,8 @@ const get = (path) => new Request(`${FN}${path}`, { headers: ip });
 const post = (path, b) => new Request(`${FN}${path}`, { method: 'POST', headers: { ...ip, 'content-type': 'application/json' }, body: JSON.stringify(b) });
 const put = (b) => new Request(`${FN}/bookings/settings`, { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify(b) });
 const out = async (r) => { try { return await r.json(); } catch { return null; } };
-const settle = async (check, ms = 3000) => { const end = Date.now() + ms; while (Date.now() < end) { if (check()) return true; await new Promise((r) => setTimeout(r, 15)); } return check(); };
+// the emails and notes go out after the answer; a busy machine can take seconds, so the cap is generous
+const settle = async (check, ms = 10_000) => { const end = Date.now() + ms; while (Date.now() < end) { if (check()) return true; await new Promise((r) => setTimeout(r, 15)); } return check(); };
 const sentTo = (addr) => emails.filter((e) => e.to === addr || (Array.isArray(e.to) && e.to.includes(addr)));
 const unb64 = (s) => new TextDecoder().decode(Uint8Array.from(atob(s), (c) => c.charCodeAt(0)));
 const SITE = { id: SID, client_id: CLIENT };
