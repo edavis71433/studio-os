@@ -96,7 +96,7 @@ const extras = R.foldExtras({
 
 // ── 3. the email carries the PDF; the download route; the Do next route ──
 {
-  let sends = [], decided = null, oppPatched = null;
+  let sends = [], decided = null, oppPatched = null, monthAsks = [];
   const reply = (b, s = 200, h = {}) => new Response(b === null ? null : JSON.stringify(b), { status: s, headers: { 'Content-Type': 'application/json', ...h } });
   globalThis.fetch = async (url, init = {}) => {
     const u = new URL(String(url)); const m = (init.method || 'GET').toUpperCase();
@@ -114,6 +114,7 @@ const extras = R.foldExtras({
     if (table === 'presence_health_days') return reply([{ day: '2026-11-11', issues: [{ type: 'links.internal_broken', severity: 'critical', n: 1 }], critical: 1, warning: 0, fingerprints: [] }]);
     if (table === 'presence_growth_opportunities') { if (m === 'PATCH') { oppPatched = JSON.parse(init.body); return reply([{}]); } return reply([{ id: 'aaaaaaaa-0000-4000-8000-000000000001', opportunity: 'Post the open house', suggested_next_step: 'Write it', timing_phrase: 'This week', handoff: {} }]); }
     if (table === 'presence_reviews') return reply([{ id: 'r1' }]);
+    if (table === 'rpc/presence_month_visitors') { monthAsks.push(JSON.parse(init.body)); return reply([]); }
     return reply([]);
   };
   const site = { id: SITE, client_id: 'c1', status: 'live', last_published_at: '2026-06-01T00:00:00Z', template_slug: 'x', template_version: '1', custom_domain: 'maple.example', netlify_site_id: 'n', edition: 'presence' };
@@ -121,6 +122,8 @@ const extras = R.foldExtras({
   ok('email: the PDF goes with it, named for the client and month', sent && sends[0].attachments?.[0]?.filename === 'Maple-and-Main-Realty-October-2026.pdf' && atob(sends[0].attachments[0].content).startsWith('%PDF-1.4'));
   await R.sendReport(site, R.lastMonth(NOW), R.normalizeReportSetting({ enabled: true, pdf: false }), 'owner@client.example');
   ok('email: switched off, no attachment and no line about one', !sends[1].attachments && !/is attached/.test(sends[1].html));
+  const la = await R.loadReportData(site, R.lastMonth(NOW, 'America/Los_Angeles'), 'America/Los_Angeles');
+  eq('the month before is counted on the site’s clock too (bug hunt D7)', [monthAsks.at(-1), la.priorLabel], [{ p_site_ids: [SITE], p_since: '2026-09-01T07:00:00.000Z', p_tz: 'America/Los_Angeles' }, 'September']);
   const dl = await R.handleReportPdf(site, {});
   ok('download: last month’s PDF, as a file, never cached', dl.status === 200 && dl.headers.get('Content-Type') === 'application/pdf' && /filename="Maple-and-Main-Realty-October-2026\.pdf"/.test(dl.headers.get('Content-Disposition')) && dl.headers.get('Cache-Control') === 'no-store');
   ok('download: the page on the app’s host can read the file’s name', dl.headers.get('Access-Control-Expose-Headers') === 'Content-Disposition');

@@ -334,12 +334,13 @@ export async function loadReportData(site: SiteRow, win: { month: string; startI
   const visits = vq ? (vq.rows as VisitRow[]) : null;
   const base = foldReport({ month: win.month, label: win.label, startMs: Date.parse(win.startIso), endMs: Date.parse(win.endIso), visits, enquiries: typeof enq === 'number' ? enq : null, publishes: rows<{ created_at: string }>(pq), address: siteOrigin(site), visitsCap: vq?.truncated ? (visits || []).length : Number.MAX_SAFE_INTEGER, timeZone });
   // builder list item 184: Google, the searches followed, AI answers, reviews and health, each best-effort
-  const priorStart = new Date(Date.UTC(Number(win.month.slice(0, 4)), Number(win.month.slice(5, 7)) - 2, 1));
-  const prior = priorStart.toISOString().slice(0, 7);
+  // the month before, on the same clock as the report's (bug hunt D7), so the change compares like with like
+  const zone = reportZone(timeZone, 'UTC');
+  const priorWin = lastMonth(win.startIso, zone), prior = priorWin.month;
   const cid = encodeURIComponent(String(site.client_id || ''));
   const [identQ, pvQ, sigQ, folRaw, aiQ, gbpQ, ownQ, hQ] = await Promise.all([
     safe(svc(`presence_identity?site_id=eq.${site.id}&select=business_name&limit=1`)),
-    safe(svc('rpc/presence_month_visitors', { method: 'POST', body: JSON.stringify({ p_site_ids: [site.id], p_since: priorStart.toISOString() }) })),
+    safe(svc('rpc/presence_month_visitors', { method: 'POST', body: JSON.stringify({ p_site_ids: [site.id], p_since: priorWin.startIso, p_tz: zone }) })),
     site.client_id ? safe(svc(`signals?client_id=eq.${cid}&source=eq.gsc&metric=in.(search_clicks,search_impressions)&period=in.(${win.month},${prior})&select=metric,period,value&limit=20`)) : Promise.resolve(null),
     safe(readReservedJson(site.id, RESERVED_NAMES.followedSearches)),
     safe(svc(`presence_ai_checks?site_id=eq.${site.id}&select=month,asked,named,engines,results&order=month.desc&limit=2`)),
@@ -357,7 +358,7 @@ export async function loadReportData(site: SiteRow, win: { month: string; startI
     health: rows<{ day: string; critical: number; warning: number; fingerprints?: string[] }>(hQ),
   });
   const siteName = String(rows<{ business_name?: string }>(identQ)?.[0]?.business_name || '').trim();
-  return { ...base, ...extras, siteName, priorLabel: priorStart.toLocaleDateString('en-US', { month: 'long', timeZone: 'UTC' }) };
+  return { ...base, ...extras, siteName, priorLabel: priorWin.label.replace(/ \d{4}$/, '') };
 }
 
 /** The studio that looks after this client site (the active service link): its brand,
