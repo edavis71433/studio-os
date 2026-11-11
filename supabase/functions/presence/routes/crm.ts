@@ -27,6 +27,7 @@ import { linksForCustomer, healUnstampedSupport } from '../lib/service_bridge.ts
 import { resolveSite } from '../lib/site.ts';
 import { resolveMemberSite } from '../lib/workspace.ts';
 import { UUID_RE } from '../lib/uuid.ts';
+import { CONTACT_MORE_COLS, addressLine } from '../lib/contact_fields.ts';
 
 /** W3: resolve this customer's Pipeline deal + linked project so the studio can
  *  open them in context from the CRM (studio-side only; additive, best-effort).
@@ -486,8 +487,10 @@ export async function handleCrmRecord(req: Request, jwt: string, site: SiteRow, 
       // the contact is read beside the client and used only when the client gives no name
       const [c, ct] = await Promise.all([
         clientId ? svc(`clients?id=eq.${clientId}&select=name,email,contact_email&limit=1`).then(one) : Promise.resolve(null),
-        // item 69: found_via rides along; before APPLY-0143 the same read without it
-        contactId ? svc(`presence_contacts?id=eq.${contactId}&site_id=eq.${AS}&select=name,company,email,phone,found_via&limit=1`)
+        // item 69: found_via rides along; before APPLY-0143 the same read without it.
+        // item 89: and the job title, second phone, address and tags (APPLY-0165) before both
+        contactId ? svc(`presence_contacts?id=eq.${contactId}&site_id=eq.${AS}&select=name,company,email,phone,found_via,${CONTACT_MORE_COLS.join(',')}&limit=1`)
+          .then((r) => r.ok ? r : svc(`presence_contacts?id=eq.${contactId}&site_id=eq.${AS}&select=name,company,email,phone,found_via&limit=1`))
           .then((r) => r.ok ? r : svc(`presence_contacts?id=eq.${contactId}&site_id=eq.${AS}&select=name,company,email,phone&limit=1`)).then(one) : Promise.resolve(null),
       ]);
       if (c) header = { name: c.name || c.email || 'Client', company: '', email: c.email || c.contact_email || '', phone: '', status: 'customer' };
@@ -501,6 +504,16 @@ export async function handleCrmRecord(req: Request, jwt: string, site: SiteRow, 
       }
       if (contactId && !header.name && ct) header = { name: ct.name || ct.email || 'Contact', company: ct.company || '', email: ct.email || '', phone: ct.phone || '', status: 'contact' };
       if (ct && ct.found_via) header = { ...header, found_via: String(ct.found_via) };   // item 69: "How did they find you?"
+      // item 89: what the person's contact holds beside name, email and phone
+      if (ct) {
+        const more: Record<string, unknown> = {};
+        if (ct.job_title) more.job_title = String(ct.job_title);
+        if (ct.phone2) more.phone2 = String(ct.phone2);
+        if (!header.phone && ct.phone) more.phone = String(ct.phone);
+        const line = addressLine(ct.address); if (line) more.address = line;
+        if (Array.isArray(ct.tags) && ct.tags.length) more.tags = ct.tags.map(String);
+        header = { ...header, ...more };
+      }
       return header;
     })();
 
