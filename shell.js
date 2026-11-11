@@ -256,7 +256,16 @@
         + '@media (max-width:767px){td.pick,th.pick{width:44px;min-width:44px}td.pick input,th.pick input{width:22px;height:22px}.dds-bulk button,.dds-bulk select,.dds-confirm button{min-height:44px}.dds-colmenu label{min-height:44px}}'
         // Safari draws a native drop-down at its own height whatever min-height says — the bulk bar's is drawn here, arrow included
         + '.dds-bulk select{-webkit-appearance:none;appearance:none;padding-right:28px;background-image:url("data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 width=%2710%27 height=%276%27 viewBox=%270 0 10 6%27%3E%3Cpath d=%27M1 1l4 4 4-4%27 fill=%27none%27 stroke=%27%236b6478%27 stroke-width=%271.6%27/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 11px center;background-size:10px 6px}'
-        + '.dds-sr{position:absolute!important;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}';
+        + '.dds-sr{position:absolute!important;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}'
+        // item 89: a tag box and the tag chips a list shows
+        + '.dds-tags{display:flex;flex-wrap:wrap;align-items:center;gap:6px;min-height:42px;box-sizing:border-box;border:1px solid var(--line,#e6e1ee);border-radius:10px;background:var(--bg,#fff);padding:5px 8px;cursor:text}'
+        + '.dds-tags:focus-within{border-color:var(--p,#5b3fa0)}.dds-tags .chips{display:contents}'
+        + '.dds-tags input{flex:1 1 120px;min-width:100px;border:0!important;outline:none;background:none!important;padding:4px 2px!important;font:inherit;font-size:15px;color:inherit;width:auto!important}'
+        + '.dds-tags input:focus,.dds-tags input:focus-visible{outline:none!important;box-shadow:none!important}'   // the box shows the focus, once
+        + '.dds-tags .chip,.dds-tag{display:inline-flex;align-items:center;gap:4px;font-size:12.5px;font-weight:600;line-height:1.3;color:var(--p,#5b3fa0);background:var(--p-soft,#efe9fa);border-radius:999px;padding:3px 10px;white-space:nowrap}'
+        + '.dds-tags .chip button{font:inherit;font-size:11px;line-height:1;color:inherit;background:none;border:0;padding:2px;margin-right:-4px;cursor:pointer;min-width:20px;min-height:20px}'
+        + 'button.dds-tag{border:0;cursor:pointer;font-family:inherit}button.dds-tag:hover{text-decoration:underline}'
+        + '@media (pointer:coarse){.dds-tags .chip button{min-width:32px;min-height:32px}}';
       document.head.appendChild(st);
     }
     // ── saved views: GET/PUT /sales/views (one read per page) ──
@@ -487,7 +496,42 @@
       var t = e.target; if (!t || !t.matches || !t.matches('td.pick input[type=checkbox],th.pick input[type=checkbox]')) return;
       setTimeout(function () { var b = document.querySelector('.dds-bulk b'); announce(b ? b.textContent : 'None selected'); }, 60);
     });
-    return { use: function (fn) { REQ = fn; }, views: views, saveViews: saveViews, ask: ask, columnsMenu: columnsMenu, sendTo: sendTo, parseCsv: parseCsv, importPanel: importPanel, style: style, fit: fit, confirmIn: confirmIn, announce: announce };
+    // ── tags (sales item 89): a box that turns what you type into chips. Enter or a comma adds
+    //    one, ✕ or Backspace in an empty box takes one off. Lower-case words, each once, at
+    //    most twelve (lib/contact_fields.ts normalizeTags is the server's copy of the rule).
+    function cleanTag(t) { return String(t == null ? '' : t).replace(/[,;#]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 30).toLowerCase(); }
+    function tagInput(host, initial, o) {
+      style(); o = o || {};
+      var tags = [];
+      host.classList.add('dds-tags');
+      host.innerHTML = '<span class="chips"></span><input type="text" autocomplete="off" maxlength="60">';
+      var box = host.querySelector('.chips'), inp = host.querySelector('input');
+      if (o.id) inp.id = o.id;
+      inp.placeholder = o.placeholder || 'Add a tag…';
+      if (o.label) inp.setAttribute('aria-label', o.label);
+      function paint() {
+        box.innerHTML = tags.map(function (t, i) { return '<span class="chip">' + esc2(t) + '<button type="button" data-i="' + i + '" aria-label="Remove the tag ' + esc2(t) + '">✕</button></span>'; }).join('');
+      }
+      function add(v) {
+        String(v || '').split(/[,;\n]/).forEach(function (p) { var t = cleanTag(p); if (t && tags.indexOf(t) < 0 && tags.length < 12) tags.push(t); });
+        paint();
+      }
+      inp.addEventListener('keydown', function (e) {
+        if (e.key === 'Enter' || e.key === ',') { if (inp.value.trim()) { e.preventDefault(); add(inp.value); inp.value = ''; } else if (e.key === ',') e.preventDefault(); }
+        else if (e.key === 'Backspace' && !inp.value && tags.length) { tags.pop(); paint(); }
+      });
+      // no chip on blur: the box would grow under a finger on its way to Save, and the tap would miss.
+      // What is still typed is taken when the form saves (get, below).
+      host.addEventListener('click', function (e) {
+        var b = e.target && e.target.closest ? e.target.closest('button[data-i]') : null;
+        if (b) { tags.splice(Number(b.getAttribute('data-i')), 1); paint(); inp.focus(); return; }
+        if (e.target === host || e.target === box) inp.focus();
+      });
+      add((initial || []).join(','));
+      // what is still being typed counts too, so Save never drops it
+      return { get: function () { if (inp.value.trim()) { add(inp.value); inp.value = ''; } return tags.slice(); }, set: function (list) { tags = []; add((list || []).join(',')); }, input: inp };
+    }
+    return { use: function (fn) { REQ = fn; }, views: views, saveViews: saveViews, ask: ask, columnsMenu: columnsMenu, sendTo: sendTo, parseCsv: parseCsv, importPanel: importPanel, style: style, fit: fit, confirmIn: confirmIn, announce: announce, tagInput: tagInput, cleanTag: cleanTag };
   })();
 
   // ── DOM ──
@@ -610,6 +654,29 @@
     return true;
   }
   window.ddsOpenCreate = openCreate;
+  // ── Tap to call, then log it (sales item 89, Nov 2026) ──────────────────────
+  // A phone number on a deal (data-call-deal) is a call link. The tap is kept for half
+  // an hour; coming back to the page (a phone returns from its dialler) offers to log
+  // that call on the deal in one tap, through + Create's Log a call. Nothing is logged
+  // by itself, and a tap that never left the page (a computer with no phone app) asks nothing.
+  var CALL_KEY = 'dds-call-tap';
+  document.addEventListener('click', function (e) {
+    var a = e.target && e.target.closest ? e.target.closest('a[href^="tel:"][data-call-deal]') : null;
+    if (!a || !a.getAttribute('data-call-deal')) return;
+    try { sessionStorage.setItem(CALL_KEY, JSON.stringify({ deal: a.getAttribute('data-call-deal'), who: a.getAttribute('data-call-who') || '', at: Date.now(), left: false })); } catch (_) { /* storage may be denied */ }
+  }, true);
+  function callTap() { try { return JSON.parse(sessionStorage.getItem(CALL_KEY) || 'null'); } catch (_) { return null; } }
+  document.addEventListener('visibilitychange', function () {
+    var t = callTap(); if (!t) return;
+    if (document.visibilityState === 'hidden') { t.left = true; try { sessionStorage.setItem(CALL_KEY, JSON.stringify(t)); } catch (_) { /* */ } return; }
+    try { sessionStorage.removeItem(CALL_KEY); } catch (_) { /* */ }
+    if (!t.left || Date.now() - t.at > 30 * 60000 || !canCreate() || !window.ddsToast) return;
+    var ask = window.ddsToast('Back from your call' + (t.who ? ' with ' + t.who : '') + '?', 'ok', { label: 'Log it', onClick: function () { openCreate('call', null, false, { deal_id: t.deal }); } });
+    // an open sheet (a modal dialog, like the deal's preview on a phone) blocks taps on everything
+    // outside it, so the question goes inside the sheet
+    var sheet = null; try { sheet = document.querySelector('dialog:modal'); } catch (_) { /* an older browser: no :modal */ }
+    if (sheet && ask && ask.parentNode !== sheet) sheet.appendChild(ask);
+  });
   // ⌘K finds them by what you'd type ("log a call", "invoice"); listed last so
   // a page's own name still comes first
   var CREATE_DESTS = [

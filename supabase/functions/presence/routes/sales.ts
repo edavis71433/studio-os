@@ -272,7 +272,7 @@ export async function handleSalesContacts(req: Request, site: SiteRow, principal
     // read, so every page costs the same two reads at any roster size). The pages
     // that list people ask for it to say "Showing 100 of N"; nobody else pays.
     const totalP = u.searchParams.get('total') === '1' ? svcCount(`presence_contacts?site_id=eq.${site.id}${more}`).catch(() => null) : Promise.resolve(undefined);
-    // item 89: the row shows a job title and tags, and a second phone to call; before APPLY-0165 the older select
+    // item 89: the row shows a job title and tags, and a second phone to call; before APPLY-0166 the older select
     let r = await svc(mkPath(`id,name,email,phone,company,client_id,updated_at,${CONTACT_MORE_COLS.join(',')}`));
     if (!r.ok && r.status === 400) r = await svc(mkPath('id,name,email,phone,company,client_id,updated_at'));
     if (!r.ok && r.status === 400) r = await svc(mkPath('id,name,email,phone,company,updated_at'));
@@ -325,7 +325,7 @@ export async function handleSalesContacts(req: Request, site: SiteRow, principal
       if (again.ok && rows(again)[0]) return json({ data: rows(again)[0], deduped: true }, 200, cors);
     }
     if (!ins.ok || !rows(ins)[0]) return json({ error: 'write_failed', message: 'That contact didn’t save — please try again.' }, 502, cors);
-    // item 89: before APPLY-0165 the contact saves without its new fields, and the answer says so
+    // item 89: before APPLY-0166 the contact saves without its new fields, and the answer says so
     if (ins.dropped.some((c) => (CONTACT_MORE_COLS as readonly string[]).includes(c))) return json({ data: rows(ins)[0], warning: 'fields_unavailable', message: 'Saved — the address, job title, second phone and tags need a quick database update before they stick.' }, 201, cors);
     return json({ data: rows(ins)[0] }, 201, cors);
   }
@@ -334,17 +334,28 @@ export async function handleSalesContacts(req: Request, site: SiteRow, principal
 
 /** Item 69 (and 89): insert a row; when the database doesn't have one of the newer
  *  optional columns yet (found_via before APPLY-0143; job_title, phone2, address,
- *  tags before APPLY-0165), retry once without the ones it names — never silently
+ *  tags before APPLY-0166), retry once without the ones it names — never silently
  *  dropping anything else. `dropped` says which were left out. */
 const OPTIONAL_INSERT_COLS = ['found_via', ...CONTACT_MORE_COLS];
+/** The newer optional columns arrive in groups (one migration each): one of a group
+ *  missing means the whole group is. */
+export function missingGroups(missing: string[]): string[] {
+  const more = CONTACT_MORE_COLS as readonly string[];
+  return [...new Set(missing.flatMap((c) => more.includes(c) ? [...more] : [c]))];
+}
 async function insertWithFoundVia(table: string, row: Record<string, unknown>) {
   const post = (body: unknown) => svc(table, { method: 'POST', headers: { Prefer: 'return=representation' }, body: JSON.stringify(body) });
-  const r = await post(row);
-  const optional = OPTIONAL_INSERT_COLS.filter((c) => c in row);
-  const missing = r.ok || !optional.length ? [] : missingInsertColumns(r.json, r.text, optional);
-  if (!missing.length) return { ...r, dropped: [] as string[] };
-  const rest = { ...row }; for (const c of missing) delete rest[c];
-  return { ...(await post(rest)), dropped: missing };
+  let rest = { ...row }, r = await post(rest);
+  const dropped: string[] = [];
+  // each try drops what the database said it doesn't have yet, a group at a time (at most three tries)
+  for (let n = 0; n < 3 && !r.ok; n++) {
+    const optional = OPTIONAL_INSERT_COLS.filter((c) => c in rest);
+    const missing = optional.length ? missingGroups(missingInsertColumns(r.json, r.text, optional)).filter((c) => c in rest) : [];
+    if (!missing.length) break;
+    for (const c of missing) { delete rest[c]; dropped.push(c); }
+    r = await post(rest);
+  }
+  return { ...r, dropped };
 }
 
 // ═══ CONTACT CUSTOM FIELD DEFINITIONS (site-level, ≤5, no migration) ══════════
@@ -451,7 +462,7 @@ async function loadContact(siteId: string, id: string) {
   // select, fall back to the pre-0097 shape so a deploy ahead of the migration
   // never breaks the contacts surface (same posture as the deals next_step cols).
   // item 69: found_via (APPLY-0143) first, then without it, then the pre-0097 shape;
-  // item 89: the address, job title, second phone and tags (APPLY-0165) before all of them
+  // item 89: the address, job title, second phone and tags (APPLY-0166) before all of them
   let r = await svc(`presence_contacts?id=eq.${id}&site_id=eq.${siteId}&deleted_at=is.null&select=id,name,email,phone,company,notes,created_at,updated_at,custom,found_via,${CONTACT_MORE_COLS.join(',')}&limit=1`);
   if (!r.ok) r = await svc(`presence_contacts?id=eq.${id}&site_id=eq.${siteId}&deleted_at=is.null&select=id,name,email,phone,company,notes,created_at,updated_at,custom,found_via&limit=1`);
   if (!r.ok) r = await svc(`presence_contacts?id=eq.${id}&site_id=eq.${siteId}&deleted_at=is.null&select=id,name,email,phone,company,notes,created_at,updated_at,custom&limit=1`);
@@ -570,12 +581,12 @@ export async function handleSalesContact(req: Request, site: SiteRow, principal:
     }
     if (!Object.keys(patch).length) return json({ error: 'empty_update' }, 400, cors);
     let up = await svc(`presence_contacts?id=eq.${id}&site_id=eq.${site.id}&select=id,name,email,phone,company,notes,updated_at,custom`, { method: 'PATCH', headers: { Prefer: 'return=representation' }, body: JSON.stringify(patch) });
-    // item 89, deploy-order tolerance: before APPLY-0165 the new fields can't be saved — the
+    // item 89, deploy-order tolerance: before APPLY-0166 the new fields can't be saved — the
     // rest of the save still goes through, and the answer says what didn't stick
     let moreLate: string[] = [];
     const morePresent = (CONTACT_MORE_COLS as readonly string[]).filter((c) => c in patch);
     if (!up.ok && morePresent.length) {
-      moreLate = missingInsertColumns(up.json, up.text, morePresent);
+      moreLate = missingInsertColumns(up.json, up.text, morePresent).length ? morePresent : [];   // they arrive together (APPLY-0166)
       if (moreLate.length) {
         for (const c of moreLate) delete patch[c];
         if (!Object.keys(patch).length) return json({ error: 'fields_unavailable', message: 'The address, job title, second phone and tags need a quick database update before they can be saved.' }, 409, cors);

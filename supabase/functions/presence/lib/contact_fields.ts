@@ -2,7 +2,7 @@
 // Beside name, email, phone, company and five fields of your own, a contact now
 // keeps a job title, a second phone, an address (it goes on invoices and into
 // local search work) and tags ("restaurant", "past client", "referral partner")
-// that the list can filter by. Migration 0165 adds the columns. These pure
+// that the list can filter by. Migration 0166 adds the columns. These pure
 // helpers clean what is typed or imported, so every door (the add form, Edit,
 // the record, an import, a merge) stores the same shapes.
 

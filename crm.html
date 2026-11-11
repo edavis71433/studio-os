@@ -693,6 +693,10 @@ const SVG={
   phone:'<path d="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2"/>',
   company:'<path d="M3 21h18"/><path d="M5 21V7l7-4 7 4v14"/><path d="M9 21v-6h6v6"/>',
   found:'<circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/>',
+  // item 89: a job title, an address, tags
+  person:'<circle cx="12" cy="8" r="3.5"/><path d="M5 20a7 7 0 0 1 14 0"/>',
+  pin:'<path d="M12 21s-7-6.2-7-11a7 7 0 0 1 14 0c0 4.8-7 11-7 11z"/><circle cx="12" cy="10" r="2.5"/>',
+  tag:'<path d="M3 12V4h8l10 10-8 8z"/><circle cx="7.5" cy="8.5" r="1.5"/>',
 };
 const svg=(k)=>`<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">${SVG[k]||''}</svg>`;
 // ── Bold redesign, part B: the rail's summary cards — the money, the project
@@ -741,11 +745,20 @@ function renderDetailsCard(){
   if(!(s.overview||s.details)){host.innerHTML='';return;}
   const rows=[];
   if(hd.email)rows.push([svg('mail'),`<a href="mailto:${esc(hd.email)}">${esc(hd.email)}</a>`]);
-  if(hd.phone)rows.push([svg('phone'),`<a href="tel:${esc(hd.phone)}">${esc(hd.phone)}</a>`]);
+  // item 89: both numbers are a tap to call (from a deal, coming back offers to log the call), the job title,
+  // the address and the tags beside them
+  const dealId=(REC&&REC.identity&&REC.identity.deal_id)||'';
+  const call=(p)=>{const t=String(p||'').trim().replace(/[^\d+]/g,'').replace(/(?!^)\+/g,'');return `<a href="tel:${esc(t)}"${dealId?` data-call-deal="${esc(dealId)}" data-call-who="${esc(hd.person||hd.name||'')}"`:''}>${esc(p)}</a>`;};
+  if(hd.phone)rows.push([svg('phone'),call(hd.phone)]);
+  if(hd.phone2)rows.push([svg('phone'),call(hd.phone2)+' <span class="muted">· second phone</span>']);
+  if(hd.job_title)rows.push([svg('person'),esc(hd.job_title)]);
   if(hd.company)rows.push([svg('company'),esc(hd.company)]);
   // item 49: a customer with no business name on file gets one line asking for it —
   // it saves as their contact's company, and Customers then leads with it
   else if(hd.status==='customer'&&s.details&&REC.identity&&REC.identity.contact_id)rows.push([svg('company'),'<button type="button" class="link-btn" data-add-biz>Add their business name</button>']);
+  if(Array.isArray(hd.tags)&&hd.tags.length&&window.ddsListKit)window.ddsListKit.style();   // the tag chips' look
+  if(hd.address)rows.push([svg('pin'),esc(hd.address)]);
+  if(Array.isArray(hd.tags)&&hd.tags.length)rows.push([svg('tag'),hd.tags.map(t=>`<span class="dds-tag">${esc(t)}</span>`).join(' ')]);
   if(hd.found_via)rows.push([svg('found'),'Found you through '+esc(hd.found_via)]);   // item 69
   if(p)rows.push([svg('site'),'Website: '+esc(siteWord(p).toLowerCase())]);
   if(p&&p.health)rows.push([svg('health'),'Health: '+esc(p.health==='attention'?'needs attention':p.health==='new'?'getting set up':p.health)]);
@@ -1092,21 +1105,27 @@ function editContact(host){
     return lab(id,esc(f.label||f.key))+inp(id,v,f.type==='number'?'number':(f.type==='date'?'date':'text'),` data-cf="${esc(f.key)}"`);
   };
   host.innerHTML=`<section><h2>Edit contact</h2><div class="card">
-    ${field('ec-name','Name',c.name)}${field('ec-company','Business name',c.company)}${field('ec-email','Email',c.email,'email')}${field('ec-phone','Phone',c.phone,'tel')}
+    ${field('ec-name','Name',c.name)}${field('ec-company','Business name',c.company)}${field('ec-title','Job title',c.job_title)}${field('ec-email','Email',c.email,'email')}${field('ec-phone','Phone',c.phone,'tel')}${field('ec-phone2','Second phone',c.phone2,'tel')}
+    ${lab('ec-address','Address')}${inp('ec-address',(c.address||{}).street,'text',' placeholder="Street" autocomplete="off"')}
+    <div style="display:grid;grid-template-columns:2fr 1fr 1fr;gap:8px;margin-top:8px">${inp('ec-city',(c.address||{}).city,'text',' placeholder="City" aria-label="City" autocomplete="off"')}${inp('ec-state',(c.address||{}).state,'text',' placeholder="State" aria-label="State" autocomplete="off"')}${inp('ec-zip',(c.address||{}).zip,'text',' placeholder="ZIP" aria-label="ZIP" autocomplete="off"')}</div>
+    ${lab('ec-tags','Tags')}<div id="ec-tagbox"></div>
     ${lab('ec-found','How did they find you?')}<select id="ec-found" class="dds-pick">${['','Google','Referral','Word of mouth','Social','Repeat client','Website','Other'].map(o=>`<option value="${esc(o)}"${(c.found_via||'')===o?' selected':''}>${esc(o||'Not recorded')}</option>`).join('')}</select>
     ${defs.map(cfField).join('')}
     <div style="display:flex;gap:9px;justify-content:flex-end;margin-top:14px"><button id="ec-cancel">Cancel</button><button class="primary" id="ec-save">Save</button></div></div></section>
     <section><div class="card"><p class="muted" style="margin:0 0 10px;font-size:13.5px">Removing a contact takes them off your contact list. Their deals, agreements, invoices and projects are never deleted with them.</p>
     <button id="ec-del" data-needs="delete" style="border-color:transparent;color:var(--bad)">Delete this contact</button></div></section>`;
+  const ecTags=window.ddsListKit?window.ddsListKit.tagInput($('ec-tagbox'),Array.isArray(c.tags)?c.tags:[],{id:'ec-tags',label:'Tags'}):null;   // item 89
   $('ec-cancel').onclick=()=>loadDetails(host);
   $('ec-save').onclick=async()=>{
-    const body={name:$('ec-name').value.trim(),company:$('ec-company').value.trim(),email:$('ec-email').value.trim(),phone:$('ec-phone').value.trim(),found_via:$('ec-found').value};   // item 69
+    const body={name:$('ec-name').value.trim(),company:$('ec-company').value.trim(),email:$('ec-email').value.trim(),phone:$('ec-phone').value.trim(),found_via:$('ec-found').value,   // item 69
+      job_title:$('ec-title').value.trim(),phone2:$('ec-phone2').value.trim(),   // item 89
+      address:{street:$('ec-address').value.trim(),city:$('ec-city').value.trim(),state:$('ec-state').value.trim(),zip:$('ec-zip').value.trim()},tags:ecTags?ecTags.get():undefined};
     if(defs.length){const custom={};host.querySelectorAll('[data-cf]').forEach(el=>{custom[el.getAttribute('data-cf')]=el.value;});body.custom=custom;}
     const btn=$('ec-save'); btn.disabled=true;
     const r=await apiAg('/sales/contacts/'+cid,'PATCH',body);
     // Every failure names itself — a 409 (two contacts, one address) is the one
     // an operator can act on, so it keeps the server's own wording.
-    if(r.ok){CONTACT_CACHE=null;toast(r.body&&(r.body.warning==='custom_unavailable'||r.body.warning==='found_via_unavailable')?((r.body.message)||'Saved.'):'Saved.');loadDetails(host);refreshWho();}
+    if(r.ok){CONTACT_CACHE=null;toast(r.body&&(r.body.warning==='custom_unavailable'||r.body.warning==='found_via_unavailable'||r.body.warning==='fields_unavailable')?((r.body.message)||'Saved.'):'Saved.');loadDetails(host);refreshWho();}
     else{toast((r.body&&r.body.message)||(r.status?('Couldn’t save — the server answered '+r.status+'.'):'Couldn’t save — we couldn’t reach the server.'));btn.disabled=false;}
   };
   // Two-step delete, same contract as contacts.html: the unconfirmed DELETE is a
