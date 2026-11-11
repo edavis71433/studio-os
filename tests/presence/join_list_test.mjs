@@ -149,6 +149,17 @@ const body = async (r) => { try { return await r.json(); } catch { return null; 
   ok('…so a bad one draws no page, and a good one still forwards', !('old/index.html' in out) && String(out['menu-old/index.html']).includes('content="0;url=/menu/"'));
 }
 
+// ═══ E · the privacy page says what joining keeps (after list item 138's rewrite) ═══
+{
+  const { privacyBody } = await import('../../supabase/functions/presence/lib/legal_pages.ts');
+  const facts = (blocks, pages = []) => ({ identity: { business_name: 'Marlow Salon', email: 'hello@salon.example' }, locations: [], settings: { blocks, pages } });
+  const page = (c, site = { formEndpoint: EP }) => privacyBody(c, '2026-11-11', site);
+  const says = (html) => html.includes('<h2>Our email list</h2>') && html.includes('we keep your email address, when you joined, and that you said yes') && html.includes('use the unsubscribe button in your email app or reply and ask');
+  ok('privacy: a box that collects here is described, with how to stop the updates', says(page(facts([{ type: 'newsletter', collect: true }]))));
+  ok('privacy: so is one on another page, or inside a column', says(page(facts([], [{ slug: 'news', blocks: [{ type: 'newsletter', collect: true }] }]))) && says(page(facts([{ type: 'columns', columns: [{ block: { type: 'newsletter', collect: true } }] }]))));
+  ok('privacy: a box that links out to another sign-up page, none at all, or a site that can’t take forms: not a word', !page(facts([{ type: 'newsletter', url: 'https://example.com/join' }])).includes('Our email list') && !page(facts([])).includes('Our email list') && !page(facts([{ type: 'newsletter', collect: true }]), {}).includes('Our email list'));
+}
+
 const passed = results.filter(Boolean).length;
 console.log(`\n════ JOIN OUR LIST (item 146): ${passed}/${results.length} ${passed === results.length ? 'PASSED' : 'FAILED'} ════`);
 if (passed !== results.length) Deno.exit(1);
