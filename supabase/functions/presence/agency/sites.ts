@@ -231,6 +231,8 @@ export interface DomainIn {
   domain_lookup_status?: string | null;
   /** item 134: the padlock's end date, and since when the records were right with no padlock on */
   cert_expires_at?: string | null; cert_pending_since?: string | null;
+  /** item 134 (findings 3, 5): what the domain shows (latest · old_copy · other · unreachable), and the checklist */
+  domain_serving?: string | null; domain_checks?: Array<{ key: string; ok: boolean; words: string }> | null;
 }
 export type DomainTone = 'good' | 'warn' | 'bad' | 'quiet';
 /** One domain's status in a few words. Expiry first, on the same 30-day line as
@@ -250,13 +252,18 @@ export function domainStatus(d: DomainIn, nowIso: string): { key: string; words:
   const pe = d.edition !== 'monitor' ? daysBetween(nowIso, d.cert_expires_at) : null;
   if (pe !== null && pe <= PADLOCK_SOON_DAYS) return is('padlock', pe < 0 ? 'Padlock ended' : pe === 0 ? 'Padlock ends today' : `Padlock ends in ${plural(pe)}`, 'warn');
   if ((Number(d.uptime_fail_streak) || 0) >= DOWN_THRESHOLD) return is('down', 'Not answering', 'bad');
+  // item 134 (review findings 3 and 5): "Connected" needs the domain to show OUR latest site
+  if (d.edition !== 'monitor' && d.domain_serving === 'old_copy') return is('old_copy', 'Showing an old copy', 'bad');
+  if (d.edition !== 'monitor' && d.domain_serving === 'other') return is('other_site', 'Showing something else', 'bad');
+  if (d.edition !== 'monitor' && Array.isArray(d.domain_checks) && d.domain_checks.some((c) => c && c.ok === false && c.key !== 'serving')) return is('partly', 'Not fully set up', 'warn');
+  if (d.domain_serving === 'latest') return is('connected', 'Connected', 'good');
   if (d.uptime_ok === true) return is('connected', 'Connected', 'good');
   return is('checking', 'Not checked yet', 'quiet');
 }
 /** Every custom domain with its status, provider and expiry, the most urgent
  *  first; and the hosted sites still on their built-in address. Pure. */
 export function buildDomains(rows: DomainIn[], nowIso: string) {
-  const RANK: Record<string, number> = { expired: 0, down: 1, expiring: 2, padlock: 3, offline: 4, checking: 5, not_live: 6, elsewhere: 7, connected: 8 };
+  const RANK: Record<string, number> = { expired: 0, down: 1, old_copy: 2, other_site: 3, expiring: 4, padlock: 5, partly: 6, offline: 7, checking: 8, not_live: 9, elsewhere: 10, connected: 11 };
   const domains = rows.filter((r) => r.custom_domain).map((r) => {
     const st = domainStatus(r, nowIso);
     return {
@@ -268,6 +275,7 @@ export function buildDomains(rows: DomainIn[], nowIso: string) {
       // item 132: a lookup that failed or found no record is said, never a quiet "Not known yet"
       record: r.domain_lookup_status === 'failed' || r.domain_lookup_status === 'not_found' ? 'unreadable' : r.domain_lookup_status === 'ok' ? 'ok' : 'unknown',
       padlock_until: r.edition !== 'monitor' ? (r.cert_expires_at || null) : null,   // item 134
+      checks: r.edition !== 'monitor' && Array.isArray(r.domain_checks) ? r.domain_checks.filter((c) => c && typeof c.words === 'string').map((c) => ({ ok: c.ok === true, words: c.words })) : [],   // item 134: what was checked, for the row
       hosted: r.edition !== 'monitor',
     };
   });
@@ -399,7 +407,7 @@ const forbid = (cors: Record<string, string>) => json({ error: 'forbidden', mess
 const notYours = (cors: Record<string, string>) => json({ error: 'not_found', message: 'Not one of your clients.' }, 404, cors);
 const EXTRA_COLS = 'id,client_id,netlify_site_id,offline_at,uptime_ok,uptime_fail_streak,domain_checked_at,template_slug,created_at';
 /** the Domains page also reads the lookup's result and the padlock (items 132 and 134, migration 0149) */
-const DOMAIN_COLS = `${EXTRA_COLS},domain_lookup_status,cert_expires_at,cert_pending_since`;
+const DOMAIN_COLS = `${EXTRA_COLS},domain_lookup_status,cert_expires_at,cert_pending_since,domain_serving,domain_checks`;   // domain_serving, domain_checks: 0153
 
 /** The Sites and Domains routes, or null when the route is someone else's. */
 export async function handleAgencySites(req: Request, route: string, method: string, member: AgencyMember, principal: Principal, cors: Record<string, string>, deps: SitesDeps): Promise<Response | null> {
