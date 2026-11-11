@@ -134,10 +134,11 @@ const ctx = { esc, attr, safeHref };
 
 // ═══ 6. growth blocks (r2) — newsletter, social, events, map ═══
 {
-  // newsletter — same link-out posture as appointment
-  ok('newsletter requires an http(s) url', validateBlocks([{ type: 'newsletter', text: 'hi' }]).length === 0
+  // newsletter — a link out needs an http(s) url; with none the box collects here (item 146,
+  // tests/presence/join_list_test.mjs), and a link that isn't one, with no choice made, is dropped
+  ok('newsletter: an http(s) link links out; none collects here; a bad one is dropped', validateBlocks([{ type: 'newsletter', text: 'hi' }])[0]?.collect === true
     && validateBlocks([{ type: 'newsletter', url: 'javascript:alert(1)' }]).length === 0
-    && validateBlocks([{ type: 'newsletter', url: 'https://esp.example/signup' }]).length === 1);
+    && validateBlocks([{ type: 'newsletter', url: 'https://esp.example/signup' }])[0]?.url === 'https://esp.example/signup');
   const nl = renderSiteBlocks(validateBlocks([{ type: 'newsletter', url: 'https://esp.example/signup', text: 'Monthly news, no spam.' }]), ctx)[0];
   ok('newsletter renders calm default copy + a link-out button', nl.html.includes('Get updates from us') && nl.html.includes('href="https://esp.example/signup"') && nl.html.includes('rel="noopener"') && nl.html.includes('Sign up') && nl.html.includes('Monthly news, no spam.'));
   ok('newsletter emits no schema + never a form/iframe', !nl.ld && !/<form|<iframe|<input/i.test(nl.html));

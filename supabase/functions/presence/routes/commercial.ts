@@ -23,6 +23,7 @@ import {
   leadFollowupResolvesOn, leadFollowupNoticeKey, enquiryAckCopy,
 } from '../lib/commercial.ts';
 import { validateBlocks } from '../lib/site_blocks.ts';
+import { SIGNUP_CONSENT } from '../lib/site_send.ts';
 import { validateFormValues, type FormDefinition } from '../lib/forms.ts';
 import { notSentReason } from '../lib/legal_pages.ts';
 import { enquiryState, customerEmails } from '../lib/enquiry_state.ts';
@@ -154,6 +155,13 @@ export async function handleFormSubmit(req: Request, siteId: string, cors: Recor
   //    blocks — no new table), validate the typed values against it (re-running
   //    the whitelisted rules so hidden-field values can't be smuggled), then feed
   //    the SAME inbox + CRM + follow-up flow. The fixed contact form is untouched.
+  // Item 146: the "Join our list" box posts here too, with form_kind=signup
+  if (String((rawMap as any)?.form_kind ?? '') === 'signup') {
+    const r = await joinList(siteId, rawMap as Record<string, unknown>);
+    if (toPage && siteOrigin) return r.ok ? redirectTo('/thanks/') : await notSent(r.error);
+    return r.ok ? ok200(JOINED) : json({ error: r.error, field: r.field, message: r.message }, r.error === 'write_failed' ? 502 : 400, cors);
+  }
+
   const formId = String((rawMap as any)?.form_id ?? b?.form_id ?? '').trim();
   if (formId) {
     // A form can sit on the home page or on any of the owner's own pages.
@@ -217,6 +225,43 @@ export async function handleFormSubmit(req: Request, siteId: string, cors: Recor
   if (!why) { notifyOwnerOfLead(siteId, { ...v.sub, id: String(ins.json?.[0]?.id || '') }).catch(() => {}); acknowledgeEnquiry(siteId, v.sub).catch(() => {}); } // best-effort, non-blocking
   if (toPage && siteOrigin) return redirectTo('/thanks/');       // spam included — bots see success
   return ok200(FORM_THANKS);
+}
+
+// ═══ Builder list item 146 · "Join our list" ═══
+// The Newsletter section's box: an email and a consent tick, sent like a form (the time
+// ticket and the spam checks of item 140 included). Whoever joins becomes a contact of
+// the site with subscribed_at and a note of what they agreed to and where (migration
+// 0154); Send an update's "People who joined your list" writes to them, and the
+// unsubscribe link every update carries is how they leave. A robot is thanked and
+// nothing is kept. Joining twice changes nothing, and a sign-up never lifts an
+// unsubscribe: the one suppression list still decides who gets mail.
+export const JOINED = 'You’re on the list. Thank you!';
+async function joinList(siteId: string, raw: Record<string, unknown>): Promise<{ ok: true } | { ok: false; error: string; field?: string; message: string }> {
+  const typed = String(raw.email ?? '').trim().slice(0, 254);
+  const email = typed.toLowerCase();
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return { ok: false, error: 'bad_email', field: 'email', message: 'That email doesn’t look right.' };
+  if (String(raw.consent ?? '') !== 'yes') return { ok: false, error: 'consent', field: 'consent', message: 'Tick the box to say yes to emails.' };
+  const trap = !!String(raw._hp ?? '').slice(0, 100).trim();
+  if (await judgeSend(siteId, { trap, ticket: raw._tk, email, name: '', message: '' })) return { ok: true };
+  const page = String(raw.source_page ?? '').replace(/[^\w\-./]/g, '').slice(0, 200) || '/';
+  const patch = { subscribed_at: new Date().toISOString(), subscribed_note: `Joined on ${page}: “${SIGNUP_CONSENT}”` };
+  // the contact, in either spelling the address may have been saved in
+  const forms = [...new Set([email, typed])].map((e) => `email.eq."${e.replace(/"/g, '')}"`).join(',');
+  const found = await svc(`presence_contacts?site_id=eq.${siteId}&deleted_at=is.null&or=(${encodeURIComponent(forms)})&select=id,subscribed_at&limit=1`);
+  if (!found.ok) return { ok: false, error: 'write_failed', message: 'That didn’t go through. Please try again in a minute.' };
+  let row = Array.isArray(found.json) ? found.json[0] : null;
+  if (!row) {
+    const ins = await svc('presence_contacts', { method: 'POST', headers: { Prefer: 'return=representation' }, body: JSON.stringify({ site_id: siteId, email, name: '', ...patch }) });
+    if (ins.ok && ins.json?.[0]) return { ok: true };
+    if (ins.status !== 409) return { ok: false, error: 'write_failed', message: 'That didn’t go through. Please try again in a minute.' };
+    // saved already in another mix of capitals: the unique index matched it, so find it the long way
+    const all = await svc(`presence_contacts?site_id=eq.${siteId}&deleted_at=is.null&select=id,email,subscribed_at&limit=5000`);
+    row = (Array.isArray(all.json) ? all.json : []).find((c: any) => String(c.email || '').toLowerCase() === email) || null;
+    if (!row) return { ok: false, error: 'write_failed', message: 'That didn’t go through. Please try again in a minute.' };
+  }
+  if (row.subscribed_at) return { ok: true };   // on the list already
+  const w = await svc(`presence_contacts?id=eq.${row.id}&site_id=eq.${siteId}`, { method: 'PATCH', body: JSON.stringify(patch) });
+  return w.ok ? { ok: true } : { ok: false, error: 'write_failed', message: 'That didn’t go through. Please try again in a minute.' };
 }
 
 /** What the page's sender shows where the contact form was (the thank-you page's words). */

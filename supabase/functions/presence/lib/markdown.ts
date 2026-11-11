@@ -14,6 +14,14 @@ export function esc(s: unknown): string {
 
 export function attr(s: unknown): string { return esc(s); }
 
+/** A forward's target (a redirect stub page): a path on the site, one leading slash, or an
+ *  https link; anything else → null. lib/manifest_validate.ts refuses the rest at publish;
+ *  this keeps the drawing safe on its own (found by render_test's hostile pass, Nov 2026). */
+export function safeRedirectTo(path: unknown): string | null {
+  const u = String(path ?? '').trim();
+  return /^\/(?!\/)\S*$/.test(u) || /^https:\/\/\S+$/i.test(u) ? u : null;
+}
+
 /** https/mailto/tel URLs only; everything else (javascript:, data:, relative tricks) → null */
 export function safeHref(url: string): string | null {
   const u = String(url ?? '').trim();

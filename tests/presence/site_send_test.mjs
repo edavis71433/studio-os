@@ -63,11 +63,12 @@ const parses = (code) => { try { new Function(code); return true; } catch { retu
     const files = await renderSnapshot(fx, SITE);
     const reach = siteReach(fx.content);
     const onBody = (h) => (reach.tel ? h.includes(`data-reach-tel="${attr(reach.tel)}"`) : !h.includes('data-reach-tel')) && (reach.mail ? h.includes(`data-reach-mail="${attr(reach.mail)}"`) : !h.includes('data-reach-mail'));
-    const contact = String(files['contact/index.html']), own = String(files[`${PAGE.slug}/index.html`]), home = String(files['index.html']);
+    // the home page holds the Newsletter section's "Join our list" box (item 146), a form too; About holds none
+    const contact = String(files['contact/index.html']), own = String(files[`${PAGE.slug}/index.html`]), home = String(files['about/index.html']);
     if (!(contact.split(TAG).length === 2 && contact.indexOf(TAG) < contact.lastIndexOf('</body>'))) bad.push(`${slug}: contact page sender`);
     if (!(own.split(TAG).length === 2 && own.includes(`data-book="${attr(SITE.bookEndpoint)}"`))) bad.push(`${slug}: owner’s page (form and booking) sender`);
     if (!onBody(contact) || !onBody(own)) bad.push(`${slug}: phone and email on <body>`);
-    if (home.includes(TAG) || home.includes('data-reach-')) bad.push(`${slug}: home page (no form) changed`);
+    if (home.includes(TAG) || home.includes('data-reach-')) bad.push(`${slug}: About (no form) changed`);
     if (!reach.tel && !reach.mail) bad.push(`${slug}: its sample has no phone or email`);
     for (const [k, v] of Object.entries(files)) if (k.endsWith('.html')) for (const js of scriptsOf(v)) if (!parses(js)) badJs.push(`${slug} ${k}`);
     const canvas = await renderSnapshot(fx, { baseUrl: 'https://preview.invalid' });

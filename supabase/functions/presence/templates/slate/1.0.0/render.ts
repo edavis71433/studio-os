@@ -10,7 +10,7 @@
 // JavaScript emitted beyond the shared search/tag-filter scripts.
 // Accessibility/SEO/performance are properties of this file, never author
 // responsibilities. Only the visual design language differs from Aurora.
-import { esc, attr, safeHref, renderMarkdown } from '../../../lib/markdown.ts';
+import { esc, attr, safeHref, safeRedirectTo, renderMarkdown } from '../../../lib/markdown.ts';
 import { normalizeSnapshotContent } from '../../../lib/render_types.ts';
 import { vocabFor } from '../../../lib/industry_vocab.ts';
 import { renderSiteBlocks, reviewsSchema, BLOCK_CSS, type RenderedBlock } from '../../../lib/site_blocks.ts';
@@ -613,7 +613,8 @@ export const render: RenderFn = (snapshot: Snapshot, _manifest, site: SiteConfig
   const _redir = (c.redirects || []).map((r) => `${r.from_path}  ${r.to_path}  301`).join('\n');
   files['_redirects'] = _redir ? _redir + '\n' : '';
   // meta-refresh pages remain as a fallback for any host without _redirects support
-  for (const r of c.redirects) files[`${r.from_path.replace(/^\/|\/$/g, '')}/index.html`] = `<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta http-equiv="refresh" content="0;url=${attr(r.to_path)}"><link rel="canonical" href="${attr(site.baseUrl + r.to_path)}"><title>Moved</title></head><body><p>Moved to <a href="${attr(r.to_path)}">${esc(r.to_path)}</a>.</p></body></html>`;
+  // a forward's target is a path on the site or an https link, else no page (publish refuses it too)
+  for (const r of c.redirects) { const to = safeRedirectTo(r.to_path); if (to) files[`${r.from_path.replace(/^\/|\/$/g, '')}/index.html`] = `<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta http-equiv="refresh" content="0;url=${attr(to)}"><link rel="canonical" href="${attr(site.baseUrl + to)}"><title>Moved</title></head><body><p>Moved to <a href="${attr(to)}">${esc(to)}</a>.</p></body></html>`; }
 
   return files;
 };
