@@ -2500,7 +2500,7 @@ interface CustomerAccountResult {
  *  Reuses an existing account by email — NEVER duplicates a customer. Rolls back
  *  ONLY what it created if provisioning fails, so a partial run never lingers.
  *  Shared by convert and the direct add-customer route (no second provisioner). */
-async function provisionCustomerAccount(opts: {
+export async function provisionCustomerAccount(opts: {
   email: string; businessName: string; plan: PlanKey; actorEmail?: string | null;
   // S1: the studio asking. An account that already exists is only reused when it
   // is this studio's own (or the studio itself); otherwise → needs_acceptance,
@@ -2538,9 +2538,13 @@ async function provisionCustomerAccount(opts: {
       } else { return fail('auth_failed', 'We couldn’t set up the customer’s login — please try again.'); }
     }
   } else {
-    // no email → a studio-managed workspace (no self-serve login yet; invite later)
+    // no email → a studio-managed workspace (no self-serve login yet; invite later).
+    // Builder list item 135: "+ New site" on Sites makes exactly this, and Invite
+    // the owner (agency/sites.ts) gives it a login later. Until migration 0152 lets
+    // clients.email be empty, the database refuses the row: say so plainly.
     const ci = await svc('clients', { method: 'POST', headers: { Prefer: 'return=representation' }, body: JSON.stringify({ name: businessName, status: 'active' }) });
     clientId = rows(ci)[0]?.id || null; if (clientId) createdClient = true;
+    if (!clientId && /23502|not-null/i.test(String(ci.text || ''))) return fail('needs_database_step', 'Making a site before its owner is invited needs one database step first.', 503);
   }
   if (!clientId) return fail('client_failed', 'We couldn’t create the customer account — please try again.');
 
@@ -2630,7 +2634,7 @@ async function linkAgencyPortfolio(principal: Principal, siteId: string | undefi
  *  emailSalesDoc documents ("never the platform name"). `siteId` is the
  *  STUDIO's site (every caller holds it), so loadEmailBrand resolves the same
  *  name + accent the proposal/contract/invoice emails already wear. */
-async function sendCustomerInvite(siteId: string, email: string, _isNewLogin: boolean): Promise<boolean> {
+export async function sendCustomerInvite(siteId: string, email: string, _isNewLogin: boolean): Promise<boolean> {
   if (!email) return false;
   // App pages (set-password/get-started/portal) ARE served on the primary site —
   // build-public.sh copies every root .html into dist/ and _redirects blocks only
@@ -2706,7 +2710,7 @@ export async function bridgeCustomerToStudio(opts: {
 // presence_contacts.client_id (migration 0130) is set here on deal convert and
 // on "Add a customer"; best-effort — a database without the column just keeps
 // the two unlinked (the roster then shows company text, no record link).
-async function linkContactToCustomer(siteId: string, contactId: string | null | undefined, clientId: string | null | undefined): Promise<void> {
+export async function linkContactToCustomer(siteId: string, contactId: string | null | undefined, clientId: string | null | undefined): Promise<void> {
   if (!contactId || !clientId || !UUID_RE.test(String(contactId)) || !UUID_RE.test(String(clientId))) return;
   try { await svc(`presence_contacts?id=eq.${contactId}&site_id=eq.${siteId}`, { method: 'PATCH', body: JSON.stringify({ client_id: clientId }) }); } catch { /* best-effort */ }
 }
@@ -2718,7 +2722,7 @@ async function markSubmissionConverted(siteId: string, submissionId: unknown): P
   try { await svc(`presence_form_submissions?id=eq.${id}&site_id=eq.${siteId}`, { method: 'PATCH', body: JSON.stringify({ status: 'converted' }) }); } catch { /* best-effort */ }
 }
 
-async function ensureConnectContact(siteId: string, email: string, name: string, mark: boolean) {
+export async function ensureConnectContact(siteId: string, email: string, name: string, mark: boolean) {
   const existing = rows(await svc(`presence_contacts?site_id=eq.${siteId}&email=eq.${encodeURIComponent(email)}&deleted_at=is.null&select=id,notes&limit=1`))[0];
   if (existing) {
     if (mark && !String(existing.notes || '').includes(CONNECT_INTENT_TAG)) {
