@@ -50,7 +50,7 @@ const { handleLaunchList, handleLaunchCreate, handleLaunchGet, handleLaunchRecap
 import { handleMediaUpload, handleMediaUpdate, handleMediaDelete } from './routes/media.ts';
 import { handleAssetsList, handleAssetsCollections, handleAssetsHealth, handleAssetsBulk, handleAssetsMatch, handleAssetsFolderMove, handleAssetUpdate, handleAssetStatus, handleAssetDelete, handleAssetDetail, handleAssetDownload, handleAssetReplace, handleAssetRollback, handleAssetDuplicate, handleAssetSuggest, handleAssetSocial, handleAssetCards, handleAssetRemoveBackground, handleAssetCutout, handleCutoutJob } from './routes/assets.ts';
 const { handleVisualKinds, handleVisualGenerate, handleVisualList, handleVisualGet, handleVisualVary, handleVisualEdit, handleVisualDecide } = lazyRoutes(() => import('./routes/visual.ts'));
-const { handleAdmin, handleDomain, handleDomainLookup } = lazyRoutes(() => import('./routes/admin.ts'));
+const { handleAdmin, handleDomain, handleDomainLookup, handleDomainForward } = lazyRoutes(() => import('./routes/admin.ts'));
 import { handleCollection, handleLocation, handleSettings, handleBlockSuggestions, handlePageDuplicate, handlePageRefs, SPECS } from './routes/content.ts';
 import { handleDeletedPages, handleDeletedPageRestore } from './routes/deleted_pages.ts';
 import { handlePageLockCreate, handlePageLockList } from './routes/page_locks.ts';
@@ -1147,6 +1147,7 @@ async function route_(req: Request, cors: Record<string, string>): Promise<Respo
   // core (attach → SSL → live DNS status). Reviewer boundary above already blocks
   // client_reviewers; a site owner or an operator scoped into the client reaches it.
   if (route === '/foundations/domain/lookup' && method === 'GET') return handleDomainLookup(req, site, cors);   // item 162: steps for their provider as they type
+  if (route === '/foundations/domain/forward' && (method === 'POST' || method === 'DELETE')) return handleDomainForward(req, method, site, principal, cors);   // item 174: another domain sends visitors here
   if (route === '/foundations/domain' && (method === 'GET' || method === 'POST' || method === 'DELETE')) {
     const r = await handleDomain(req, method, site, principal, cors);
     return r || json({ error: 'method_not_allowed' }, 405, cors);

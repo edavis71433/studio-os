@@ -42,6 +42,18 @@ export async function dnsRecords(name: string, type: RecordType): Promise<string
   } catch { return []; }
 }
 
+/** Item 163: like dnsRecords, but null when the answer couldn't be had. [] only when the
+ *  resolver said there are none, so a passing blip never reads as "the email records are gone". */
+export async function dnsRecordsSure(name: string, type: RecordType): Promise<string[] | null> {
+  try {
+    const r = await fetch(`https://dns.google/resolve?name=${encodeURIComponent(name)}&type=${type}`, { headers: { Accept: 'application/json' }, signal: AbortSignal.timeout(5000) });
+    if (!r.ok) { await r.body?.cancel().catch(() => {}); return null; }
+    const j = await r.json();
+    if (j.Status !== 0 && j.Status !== 3) return null;   // 0: answered; 3: no such name; anything else is a failure
+    return recordsFromAnswer(name, type, j.Answer);
+  } catch { return null; }
+}
+
 /** The padlock is on (Netlify's words for a live certificate). */
 export const certIsOn = (state: string | null | undefined) => state === 'issued' || state === 'renewed';
 
