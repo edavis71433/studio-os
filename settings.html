@@ -265,7 +265,7 @@
         <div class="how" id="aiCost"></div>
         <div class="how" id="aiLast"></div></div>
     </div>
-    <div class="swrow rp-in"><span class="lbl" id="reportInL">In the report:</span><ul id="reportIn" aria-labelledby="reportInL"></ul></div>
+    <div class="swrow rp-in" id="reportInRow"><span class="lbl" id="reportInL">In the report:</span><ul id="reportIn" aria-labelledby="reportInL"></ul></div>
     <div class="swrow" style="display:block" id="reportLineRow">
       <b style="font-weight:600">A line from you</b>
       <div class="how">Goes at the top of every report, in your words. Written once; change it any time.</div>
@@ -796,7 +796,7 @@ const UNREAD = {
   studio: { rows: ['profileForm'], off: ['profileSave'], words: 'Your details couldn’t load just now. Saving is off until they do, so nothing you had is written over.' },
   automations: { rows: [], words: 'Your automations couldn’t load just now. They can’t be changed until they do; nothing is switched on or off meanwhile.' },
   stages: { rows: ['staleRow'], words: 'When a deal counts as stalled couldn’t load just now. It can’t be changed until it does.' },
-  report: { rows: ['reportSwRow', 'reportAiRow', 'reportLineRow'], words: 'This client’s monthly report couldn’t load just now. It can’t be changed until it does, so nothing saved is written over.', retry: () => retryReport() },
+  report: { rows: ['reportSwRow', 'reportPdfRow', 'reportAiRow', 'reportInRow', 'reportLineRow'], words: 'This client’s monthly report couldn’t load just now. It can’t be changed until it does, so nothing saved is written over.', retry: () => retryReport() },
 };
 function holdUnread() {
   const held = { studio: !IDENT_READ || !SETTINGS_READ, automations: !SETTINGS_READ, stages: !SETTINGS_READ, report: REPORT_TRIED && !REPORT_READ };
@@ -918,7 +918,7 @@ function paintReport() {
   const warn = d.blocked ? 'This client can’t get the report: ' + (REPORT_BLOCK_WORDS[d.blocked] || 'they can’t be emailed') + '.' + (d.blocked === 'no_email' ? ' Add their email on their record.' : '') : '';
   $('reportWarn').textContent = warn; $('reportWarn').hidden = !warn;
 }
-const REPORT_PARTS = [['visits', 'Visitors'], ['enquiries', 'Enquiries'], ['google', 'On Google'], ['ai', 'AI answers'], ['reviews', 'Reviews'], ['health', 'Website health'], ['changes', 'What changed']];
+const REPORT_PARTS = [['visits', 'Visits'], ['enquiries', 'Enquiries'], ['google', 'On Google'], ['ai', 'AI answers'], ['reviews', 'Reviews'], ['health', 'Website health'], ['changes', 'What changed']];
 const REPORT_BLOCK_WORDS = { no_email: 'there’s no email on their record', unsubscribed: 'they unsubscribed from emails', bounced: 'emails to them bounce' };
 // what happened last, in words: sent, skipped (why) or failed; `last_month` alone only means "handled"
 function reportStatusLine(d) {
@@ -942,7 +942,7 @@ function monthWords(ym) { const m = /^(\d{4})-(\d{2})$/.exec(String(ym || '')); 
 // "Save the line" is off, the way Your menu does it. A second press used to show the switch
 // flipped while nothing was sent, and a line saved during a switch save was dropped unsaid.
 function paintReportBusy() {
-  for (const id of ['sw-report', 'sw-ai']) { const sw = $(id); if (REPORT_BUSY) sw.setAttribute('aria-disabled', 'true'); else sw.removeAttribute('aria-disabled'); }   // item 182: the AI switch waits its turn too
+  for (const id of ['sw-report', 'sw-pdf', 'sw-ai']) { const sw = $(id); if (REPORT_BUSY) sw.setAttribute('aria-disabled', 'true'); else sw.removeAttribute('aria-disabled'); }   // items 182 and 184: the AI and PDF switches wait their turn too
   $('reportSave').disabled = REPORT_BUSY;
 }
 async function saveReport(patch) {
@@ -972,9 +972,10 @@ function wireReport() {
     if (await saveReport({ ai_checks: next })) toast(next ? 'On. The first check runs soon, then on the 1st of each month.' : 'Off. No more AI checks for this client.');
   });
   $('sw-pdf').addEventListener('click', async () => {
-    const was = !(REPORT && REPORT.pdf === false), next = !was;
+    if (REPORT_BUSY || !REPORT_READ) return;   // one save at a time, like the report switch (item 101)
+    const next = !!(REPORT && REPORT.pdf === false);
     $('sw-pdf').setAttribute('aria-checked', next ? 'true' : 'false');
-    if (await saveReport({ pdf: next }, () => $('sw-pdf').setAttribute('aria-checked', was ? 'true' : 'false'))) toast(next ? 'On. The report goes with a PDF copy.' : 'Off. The report goes without a PDF.');
+    if (await saveReport({ pdf: next })) toast(next ? 'On. The report goes with a PDF copy.' : 'Off. The report goes without a PDF.');
   });
   // GET /report/monthly/pdf: last month's report as a file (a fetch with the sign-in, saved as a download)
   $('reportPdf').addEventListener('click', async () => {

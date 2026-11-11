@@ -38,7 +38,7 @@ test.describe('Settings › Monthly report: what it holds, the PDF copy (builder
     await openReport(page, okPdf);
     const sec = page.locator('#report');
     await expect(sec.locator('#reportInL')).toHaveText('In the report:');
-    await expect(sec.locator('#reportIn li')).toHaveText(['Visitors', 'Enquiries', 'On Google', 'AI answers, off', 'Reviews', 'Website health', 'What changed']);
+    await expect(sec.locator('#reportIn li')).toHaveText(['Visits', 'Enquiries', 'On Google', 'AI answers, off', 'Reviews', 'Website health', 'What changed']);
     await expect(sec.locator('#reportIn li').nth(3)).toHaveClass(/off/);
     await expect(sec).toContainText('how their website did, each part when there’s something to say');
     // as drawn: the report's switch, the PDF copy, then the AI check, then what the report holds
@@ -57,6 +57,38 @@ test.describe('Settings › Monthly report: what it holds, the PDF copy (builder
     await expect(sec.locator('#sw-pdf')).toHaveAttribute('aria-checked', 'false');
     expect(puts).toEqual([{ pdf: false }]);
     await expect(page.locator('.dds-toast').last()).toContainText('Off. The report goes without a PDF.');
+  });
+
+  test('the PDF switch waits its turn (item 101); a report that could not be read hides the new rows too (I4)', async ({ page }) => {
+    const puts: unknown[] = [];
+    let release: () => void = () => {};
+    const held = new Promise<void>((r) => { release = r; });
+    let fail = false;
+    let state: Record<string, unknown> = { ...STATE };
+    await installApp(page, { api: { '/identity': { data: { site_id: 's1', business_name: 'Studio', email: 'hello@example.com' } }, '/settings': { data: { industry_key: 'generic' } }, '/portal/context': CTX } as never });
+    await page.route(/\/functions\/v1\/presence\/report\/monthly$/, async (route) => {
+      if (route.request().method() === 'PUT') { const b = route.request().postDataJSON(); puts.push(b); await held; state = { ...state, ...b }; }
+      else if (fail) return route.fulfill(json({ error: 'read_failed' }, 502));
+      return route.fulfill(json({ data: state }));
+    });
+    await page.goto(`/settings.html?client=${CLIENT}#report`);
+    const pdf = page.locator('#sw-pdf'), ai = page.locator('#sw-ai');
+    await expect(pdf).toHaveAttribute('aria-checked', 'true');
+    await pdf.click();
+    await expect(pdf).toHaveAttribute('aria-checked', 'false');
+    await expect(pdf).toHaveAttribute('aria-disabled', 'true');     // greyed while it saves…
+    await expect(ai).toHaveAttribute('aria-disabled', 'true');      // …and the AI switch waits too
+    await ai.click({ force: true });
+    await expect(ai).toHaveAttribute('aria-checked', 'false');      // the press showed nothing
+    expect(puts).toEqual([{ pdf: false }]);                         // and sent nothing
+    release();
+    await expect(pdf).not.toHaveAttribute('aria-disabled', 'true');
+    await expect(page.locator('.dds-toast', { hasText: 'Off. The report goes without a PDF.' })).toBeVisible();
+    fail = true;
+    await page.reload();
+    await expect(page.locator('#report .unread')).toContainText('This client’s monthly report couldn’t load just now.');
+    for (const id of ['#sw-pdf', '#sw-ai', '#reportIn', '#reportPdf']) await expect(page.locator(id)).toBeHidden();
+    expect(puts).toEqual([{ pdf: false }]);
   });
 
   test('Download October’s PDF saves the file under its own name', async ({ page }) => {

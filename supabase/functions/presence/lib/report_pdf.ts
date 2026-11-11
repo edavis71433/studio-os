@@ -42,7 +42,7 @@ export function reportPdf(d: ReportData, o: { studioName: string; accent?: strin
   // the numbers, in boxes
   const prior = d.priorLabel || 'the month before';
   const boxes: Array<[string, string, string]> = [];
-  if (d.visitors !== null) boxes.push(['Visitors', n1(d.visitors), changeOn(d.visitors, d.priorVisitors, prior)]);
+  if (d.visitors !== null) boxes.push(['Visits', n1(d.visitors), changeOn(d.visitors, d.priorVisitors, prior)]);
   if (d.enquiries !== null) boxes.push(['Enquiries', n1(d.enquiries), '']);
   if (d.search) boxes.push(['Google clicks', n1(d.search.clicks), changeOn(d.search.clicks, d.search.priorClicks, prior)]);
   if (d.ai) boxes.push(['AI answers', `${d.ai.named} of ${d.ai.asked}`, d.ai.priorNamed === null ? '' : d.ai.named === d.ai.priorNamed ? 'the same as before' : `${d.ai.named > d.ai.priorNamed ? 'up' : 'down'} ${Math.abs(d.ai.named - d.ai.priorNamed)}`]);

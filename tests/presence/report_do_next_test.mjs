@@ -87,7 +87,7 @@ const extras = R.foldExtras({
   ok('email: no score anywhere (Law 13)', !/score|out of 100/i.test(html));
   const pdf = new TextDecoder().decode(PDF.reportPdf(d, { studioName: 'Brightline Studio', accent: '#6d3fd4', clientName: 'Sam', siteName: 'Maple & Main Realty' }));
   const enc = (t) => t.replace(/[()\\]/g, '\\$&').replace(/·/g, '\\267').replace(/’/g, '\\222').replace(/“/g, '\\223').replace(/”/g, '\\224');
-  for (const s of ['%PDF-1.4', 'Brightline Studio', 'Your website in October', 'Visitors', 'Google clicks', 'AI answers', '6 of 10', 'On Google', '“burbank realtor”: 4th on Google, up 2 places · 18 clicks', 'In AI answers', 'Reviews', 'Website health', 'What people read most', 'What changed', '1 of 1']) ok(`pdf: says ${s}`, pdf.includes(enc(s)), s);
+  for (const s of ['%PDF-1.4', 'Brightline Studio', 'Your website in October', 'Visits', 'Google clicks', 'AI answers', '6 of 10', 'On Google', '“burbank realtor”: 4th on Google, up 2 places · 18 clicks', 'In AI answers', 'Reviews', 'Website health', 'What people read most', 'What changed', '1 of 1']) ok(`pdf: says ${s}`, pdf.includes(enc(s)), s);
   eq('pdf: the file name', PDF.reportFileName('Maple & Main Realty', 'October 2026'), 'Maple-and-Main-Realty-October-2026.pdf');
   eq('words: the change on a month', [PDF.changeOn(812, 688, 'September'), PDF.changeOn(389, 659, 'September'), PDF.changeOn(5, 5, 'September'), PDF.changeOn(40, 0, 'September'), PDF.changeOn(null, 5, 'x')], ['up 18% on September', 'down 41% on September', 'the same as September', 'new since September', '']);
   const s0 = R.normalizeReportSetting({});
