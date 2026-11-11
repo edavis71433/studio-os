@@ -69,6 +69,7 @@ const { handleEmailSending } = lazyRoutes(() => import('./routes/email_sending.t
 import { handleSalesExport } from './routes/sales_export.ts';   // sales review item 69: Download my data
 import { handleEstimateCreate, handleEstimateSend, handleEstimateDecide, handleEstimateDelete, handleEstimateToProposal, handleEstimateToInvoice } from './routes/estimates.ts';   // sales review item 47
 import { handleRecurringStart, handleRecurringChange, handleRecurringAction } from './routes/recurring_invoices.ts';   // sales review item 47
+import { handleInvoicePayment, handleInvoicePaymentUndo } from './routes/invoice_payments.ts';   // sales review item 77
 import { handleEmailLogAddress } from './routes/email_log.ts';   // sales review item 69: the log-this-email address   // sales review item 69: the sending-domain line
 const { handleBroadcastsList, handleBroadcastCreate, handleBroadcastListCreate, handleBroadcastListDelete, handleBroadcastSegments, handleBroadcastGet, handleBroadcastUpdate, handleBroadcastSend, handleBroadcastCancel, handleBroadcastDraftAssist, handleBroadcastTest } = lazyRoutes(() => import('./routes/broadcasts.ts'));
 import { handleScheduleCreate, handleScheduleList, handleScheduleCancel, handleFormSubmit, handleFormInbox, handleFormStatus, handleFormReply, handleApproveSend, handleApproveGet, handleApprovePost, handleSendTicket, handleSpamLinkGet, handleSpamLinkPost, handleFormFile, handleFormAnswers } from './routes/commercial.ts';
@@ -275,6 +276,13 @@ async function route_(req: Request, cors: Record<string, string>): Promise<Respo
   {
     const m = route.match(/^\/sales\/pack\/([0-9a-f]{24,64})$/);
     if (m && method === 'GET') return (await import('./routes/pitch_pack.ts')).handlePackPublic(m[1], cors);
+  }
+
+  // ── Builder list item 176: the content form a studio sends a client — PUBLIC,
+  //    pre-auth, authorized by the link's own secret (routes/intake_public.ts). ──
+  {
+    const m = route.match(/^\/intake\/([0-9a-f]{72})(\/files(?:\/[0-9a-f-]{36})?)?$/);
+    if (m) return (await import('./routes/intake_public.ts')).handleIntakePublic(req, m[1], m[2] || '', method, cors);
   }
 
   // ── L5.5: Industry Pack Marketplace — OPERATOR management. Infrastructure,
@@ -828,6 +836,10 @@ async function route_(req: Request, cors: Record<string, string>): Promise<Respo
     // Studio-gated & site-scoped like every authed /sales/* route.
     m = route.match(/^\/sales\/invoices\/([0-9a-f-]{36})\/void$/);
     if (m && method === 'POST') return handleSalesInvoiceVoid(site, principal, m[1], cors);
+    // Sales item 77: a payment that came in outside Stripe (check, cash, bank transfer,
+    // Zelle): all of the invoice or part of it, and Undo for one recorded by mistake.
+    m = route.match(/^\/sales\/invoices\/([0-9a-f-]{36})\/payment(\/undo)?$/);
+    if (m && method === 'POST') return m[2] ? handleInvoicePaymentUndo(req, site, principal, m[1], cors) : handleInvoicePayment(req, site, principal, m[1], cors);
     // Retainer (recurring SERVICE billing) — set up / cancel a "$X every month/
     // year" on a deal. A separate service-purpose Stripe subscription, distinct
     // from the SaaS subscription (frozen billing boundary). Studio-gated & site-scoped.
@@ -969,6 +981,7 @@ async function route_(req: Request, cors: Record<string, string>): Promise<Respo
   if (route === '/client/website-thumb' && method === 'GET') return handleClientWebsiteThumb(req, site, principal, cors);   // item 179: the card's picture of the site itself
   if (route === '/client/support' && (method === 'GET' || method === 'POST')) return handleClientSupport(req, site, principal, cors);
   if (route === '/client/faq' && method === 'GET') return handleClientFaq(req, site, principal, cors);   // service edge #5: the studio's FAQ in the portal
+  if (route === '/client/kit' && method === 'GET') return (await import('./routes/client_kit.ts')).handleClientKit(req, site, principal, cors);   // builder list item 176: the hand-over kit under Help
   {
     let m = route.match(/^\/client\/projects\/([0-9a-f-]{36})$/);
     if (m && method === 'GET') return handleClientProject(req, site, principal, m[1], cors);

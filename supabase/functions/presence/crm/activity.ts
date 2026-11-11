@@ -15,7 +15,7 @@
 // a read-time merge, no new tables ("one log, derived views"). Tested in
 // isolation (tests/presence/crm_activity_test.mjs).
 import type { TimelineItem } from './contract.ts';
-import { describeSystemEvent, isActivityRow } from './deal_activity.ts';
+import { describeSystemEvent, isActivityRow, usd } from './deal_activity.ts';
 import { moneyState } from '../lib/money_state.ts';
 
 // The six timeline types — each drives one icon + one connector color on the
@@ -52,7 +52,30 @@ const orNull = (s: string) => (s ? s : null);
 // The sent-document stamps (proposal_sent/contract_sent/invoice_sent) return
 // null here — the deal event ledger renders them with richer labels/amounts.
 const SENT_STAMPS = ['proposal_sent', 'contract_sent', 'invoice_sent'];
-export function mapConversationItem(m: any): ActivityItem | null {
+// Item 107 (J8): who logged it. A teammate's call no longer reads "You logged a
+// call" on the owner's record. The ledger's actor is the person's sign-in email
+// (routes/sales.ts actorOf); the team has no other name on file, so a personal
+// address reads as the name in it ("jamie.lee@…" → "Jamie Lee") and a shared one
+// ("hello@…") as itself.
+const SHARED_MAILBOX = /^(hello|hi|info|admin|team|office|contact|support|sales|studio|mail|billing|accounts|enquiries|inquiries|help|noreply|no-reply)$/i;
+export function actorName(actor: unknown): string {
+  const a = str(actor).trim();
+  const m = /^([^@\s]+)@[^@\s]+$/.exec(a);
+  if (!m) return 'A teammate';
+  const local = m[1];
+  if (SHARED_MAILBOX.test(local) || !/[a-z]/i.test(local)) return a;
+  const words = local.replace(/[0-9+]+/g, ' ').split(/[._-]+|\s+/).filter(Boolean);
+  return words.length ? words.map(cap).join(' ') : a;
+}
+/** Is `actor` the person reading the record? Same address, any capitals; no
+ *  actor at all (rows logged before the actor rode along) counts as the viewer,
+ *  as every such row has always read. */
+export function isViewer(actor: unknown, viewer: unknown): boolean {
+  const a = str(actor).trim().toLowerCase();
+  if (!a) return true;
+  return a === str(viewer).trim().toLowerCase();
+}
+export function mapConversationItem(m: any, viewer = ''): ActivityItem | null {
   if (!m || !m.created_at) return null;
   const at = str(m.created_at);
   const id = `conv:${str(m.kind)}:${str(m.id)}`;
@@ -79,13 +102,14 @@ export function mapConversationItem(m: any): ActivityItem | null {
     case 'activity': {
       const ak = str(m.activity_kind);
       if (SENT_STAMPS.includes(ak)) return null;   // the deal ledger covers these
+      const who = isViewer(m.actor, viewer) ? 'You' : actorName(m.actor);
       const map: Record<string, { type: ActivityType; title: string; meta: string }> = {
-        call: { type: 'call', title: 'You logged a call', meta: 'Logged call' },
-        email: { type: 'email', title: 'You logged an email', meta: 'Logged email' },
-        meeting: { type: 'call', title: 'You logged a meeting', meta: 'Meeting' },
-        note: { type: 'note', title: 'You added a note', meta: 'Note' },
+        call: { type: 'call', title: `${who} logged a call`, meta: 'Logged call' },
+        email: { type: 'email', title: `${who} logged an email`, meta: 'Logged email' },
+        meeting: { type: 'call', title: `${who} logged a meeting`, meta: 'Meeting' },
+        note: { type: 'note', title: `${who} added a note`, meta: 'Note' },
       };
-      const t = map[ak] || { type: 'note' as ActivityType, title: 'You logged an activity', meta: 'Activity' };
+      const t = map[ak] || { type: 'note' as ActivityType, title: `${who} logged an activity`, meta: 'Activity' };
       return { id, kind: 'activity', type: t.type, title: t.title, body, at, meta: t.meta, href: null };
     }
     default:
@@ -179,11 +203,10 @@ export function buildUpcoming(
     const st = iv ? moneyState(iv, today) : '';
     if (st !== 'upcoming' && st !== 'overdue') continue;
     const due = iv.due_date ? str(iv.due_date) : null;
-    const amt = Number(iv.amount_cents) || 0;
-    const usd = amt ? '$' + Math.round(amt / 100).toLocaleString('en-US') : '';
+    const amt = usd(iv.amount_cents);   // item 107 (J7): "$1,250.50", never rounded to "$1,251"
     out.push({
       kind: 'invoice', id: null,
-      title: `Unpaid invoice${iv.title ? ` — ${str(iv.title)}` : ''}${usd ? ` (${usd})` : ''}`,
+      title: `Unpaid invoice${iv.title ? ` — ${str(iv.title)}` : ''}${amt ? ` (${amt})` : ''}`,
       due, overdue: st === 'overdue',
       href: iv.deal_id ? `/pipeline.html?deal=${str(iv.deal_id)}` : dealHref,
     });

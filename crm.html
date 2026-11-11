@@ -71,6 +71,21 @@
   .brow2 input,.brow2 select{font-family:inherit;font-size:14px;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:var(--dds-r,8px);padding:var(--dds-s2,8px) 10px;width:100%}
   .brow2 input:focus,.brow2 select:focus{outline:none;border-color:var(--p)}
   .bacts{display:flex;gap:var(--dds-s2,8px);justify-content:flex-end;margin-top:var(--dds-s3,12px)}
+  /* sales item 77: Record a payment — opens under its invoice */
+  .payform{margin:6px 0 4px;border-color:var(--p)}
+  .payform .pf-h{font-weight:600;font-size:14px;margin:0 0 10px;color:var(--ink)}
+  .pf-how{border:0;padding:0;margin:12px 0 0;display:flex;flex-wrap:wrap;gap:6px;min-width:0}
+  .pf-how legend{font-size:12.5px;color:var(--faint);font-weight:600;padding:0;margin-bottom:6px;float:left;width:100%}
+  .pf-chip{position:relative;display:inline-flex}
+  .pf-chip input{position:absolute;opacity:0;width:1px;height:1px;margin:0}
+  .pf-chip span{display:inline-flex;align-items:center;min-height:40px;padding:6px 14px;border-radius:999px;border:1px solid var(--line);font-size:13.5px;cursor:pointer;background:var(--bg);color:var(--ink)}
+  .pf-chip input:checked+span{background:var(--p-soft);border-color:var(--p);color:var(--p);font-weight:600}
+  .pf-chip input:focus-visible+span{outline:2px solid var(--p);outline-offset:2px}
+  .pf-rcpt{display:flex;align-items:center;gap:8px;margin-top:12px;font-size:13.5px;color:var(--ink);white-space:normal}
+  .pf-rcpt input{width:18px;height:18px;accent-color:var(--p)}
+  .pf-what{font-size:12.5px;margin:10px 0 0;white-space:normal}
+  .btable tr.paying td{background:var(--p-soft)}
+  @media (max-width:640px){.pf-chip span{min-height:44px}}
 
   /* ── Path (Lightning chevrons, dds skin) ── */
   .pathcard{margin-top:var(--dds-s4,16px);background:var(--card);border:1px solid var(--line);border-radius:var(--dds-r-lg,10px);box-shadow:var(--shadow);padding:var(--dds-s3,12px) var(--dds-s4,16px)}
@@ -289,11 +304,11 @@
   .btable td.amt,.btable th.amt{text-align:right;font-variant-numeric:tabular-nums;font-weight:600;white-space:nowrap}
   .btable td .rt{display:block;min-width:0} .btable td .rt .s{display:block;color:var(--faint);font-size:12.5px}
   .btable td.due{color:var(--bad);font-weight:500;white-space:nowrap}
-  .btable td.racts{text-align:right;white-space:nowrap}
-  .btable .racts{justify-content:flex-end;flex-wrap:nowrap;gap:2px}
+  .btable td.racts{text-align:right;white-space:normal}
+  .btable .racts{justify-content:flex-end;flex-wrap:wrap;gap:2px}   /* item 77: five verbs wrap rather than widen the table past the screen */
   .btable .racts .rbtn{font-size:12px;padding:var(--dds-s1,4px) var(--dds-s2,8px)}
   .btable td .rt{white-space:nowrap}
-  .card.tcard{overflow-x:auto}
+  .card.tcard{overflow-x:auto;position:relative}   /* item 77: its hidden "Actions" header label stays inside the scroll (it widened the page on a tablet) */
   .btable{min-width:540px}
   .rbtn{border-color:transparent;color:var(--soft);padding:var(--dds-s1,4px) var(--dds-s2,8px)}
   .rbtn:hover{border-color:var(--line);background:var(--bg);color:var(--ink)}
@@ -440,7 +455,7 @@ const agHref=(page,params)=>'/'+page+'?'+params+'&client=';
 // pin any pipeline/projects target the same way agHref does at RENDER time, so
 // carryScopeGlobally can't rewrite it onto the customer's own site.
 const pinHref=(h)=>{h=String(h||'');return (/^\/(pipeline|projects)\.html/.test(h)&&h.indexOf('client=')<0)?h+(h.indexOf('?')>=0?'&':'?')+'client=':h;};
-function toast(m){if(window.ddsToast)return void ddsToast(m);const t=$('toast');t.textContent=m;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2800);}
+function toast(m,k){if(window.ddsToast)return void ddsToast(m,k);const t=$('toast');t.textContent=m;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2800);}
 // item 65: "today" / "yesterday" are local calendar days, not 24-hour spans (a call
 // at 10pm read "today" until 10pm the next day)
 function when(iso){if(!iso)return'';const t=Date.parse(iso);if(!isFinite(t))return'';const d=Math.round((Date.parse(recTodayYmd()+'T00:00:00Z')-Date.parse(recTodayYmd(t)+'T00:00:00Z'))/86400000);if(d<=0)return'today';if(d===1)return'yesterday';if(d<7)return d+' days ago';if(d<14)return'last week';if(d<60)return Math.floor(d/7)+' weeks ago';return Math.floor(d/30)+' months ago';}
@@ -507,7 +522,25 @@ const guidanceFor=(s)=>PIPELINE_GUIDANCE[s]||PIPELINE_GUIDANCE.lead;
 // deal's next step with no date or a past date is history, not what's next.
 // item 51: what the record calls the website — the same words as Home and Analytics
 const siteWord=(p)=>p.live?'Live':(p.edition==='monitor'?'Hosted elsewhere':(p.last_published_at?'Offline':'Not yet'));
+// item 107 (J3): a decline or an expiry changes the PROPOSAL, not the stage — so everything that
+// read the stage said "Your proposal is with them" after they said no. The newest proposal still
+// in play (not replaced by a revision) decides: declined, or sent and past its 30 days.
+const propReplaced=(p)=>Array.isArray(p&&p.line_items)&&p.line_items.some(el=>el&&typeof el==='object'&&el.__meta__&&el.__meta__.superseded_by);
+const propExpired=(p)=>!!(p&&p.status==='sent'&&p.expires_at&&Date.parse(p.expires_at)<Date.now());
+function proposalOutcome(){
+  const p=((DEAL&&DEAL.proposals)||[]).filter(x=>!propReplaced(x))[0];   // the deal read sends the newest first
+  if(!p)return null;
+  if(p.status==='declined')return {state:'declined',p};
+  if(propExpired(p))return {state:'expired',p};
+  return null;
+}
+// one word and one colour per proposal, the same on Billing, Deal and Files
+function propWord(p){if(propReplaced(p))return['Replaced',''];if(p.status==='accepted')return['Accepted','good'];if(p.status==='declined')return['Declined','bad'];if(propExpired(p))return['Expired',''];if(p.status==='sent')return['Sent',''];return['Draft','warn'];}
 function guideNow(stage){
+  const out=(stage!=='won'&&stage!=='lost')?proposalOutcome():null;
+  if(out)return out.state==='declined'
+    ?{tip:'They declined your proposal.',action:'Revise it and send it again, or mark the deal not a fit',todos:['Ask what would work for them','Revise the proposal','Send it again']}
+    :{tip:'Your proposal expired before they answered.',action:'Revise it and send it again',todos:['Check in with them','Revise the proposal','Send it again']};
   if(stage!=='won')return guidanceFor(stage);
   const proj=(PROJ&&PROJ.project)||null; const pct=Number(PROJ&&PROJ.progress&&PROJ.progress.pct)||0;
   if(proj&&proj.status==='complete')return {...PIPELINE_GUIDANCE.won,tip:'Their project is done.',action:'Check in with them, or ask for a review'};
@@ -708,10 +741,12 @@ function renderSummaryCards(){
     // through to "Due"/"Open"; and the deal read sends them oldest first, so the card showed the
     // four oldest. Billing still lists every one, voided included.
     const live=inv.filter(v=>invState(v)).sort((a,b)=>String(b.created_at||'').localeCompare(String(a.created_at||'')));
-    const rows=live.slice(0,4).map(v=>{const st=invState(v);
+    const rp=retainerPaidNow();   // item 108 (J4): the retainer's payments are money on the record too
+    const rows=live.slice(0,rp.cents?3:4).map(v=>{const st=invState(v);
       const chip=st==='paid'?'<span class="sc-chip good">Paid</span>':st==='overdue'?'<span class="sc-chip bad">Overdue</span>':st==='processing'?'<span class="sc-chip">On its way</span>':v.due_date?`<span class="sc-chip warn">Due ${esc(dueLabel(v.due_date))}</span>`:'<span class="sc-chip">Open</span>';
-      return `<li><span class="sc-t">${esc(v.title||'Invoice')}</span><b>${esc(fmtC(v.amount_cents))}</b>${chip}</li>`;}).join('');
-    out.push(`<section class="card sc" aria-labelledby="sc-money"><div class="sc-h"><h2 id="sc-money">Money</h2><button type="button" class="sc-link" data-sc="invoice">Send invoice →</button></div>${rows?`<ul class="sc-list">${rows}</ul>`:`<p class="muted sc-none">${inv.length?'Nothing open or paid.':'No invoices yet.'}</p>`}${inv.length>Math.min(live.length,4)?`<button type="button" class="sc-link" data-sc="billing">All ${inv.length} on Billing →</button>`:''}</section>`);
+      return `<li><span class="sc-t">${esc(v.title||'Invoice')}</span><b>${esc(fmtC(v.amount_cents))}</b>${chip}</li>`;}).join('')
+      +(rp.cents?`<li><span class="sc-t">Retainer · ${rp.count} payment${rp.count===1?'':'s'}</span><b>${esc(fmtC(rp.cents))}</b><span class="sc-chip good">Paid</span></li>`:'');
+    out.push(`<section class="card sc" aria-labelledby="sc-money"><div class="sc-h"><h2 id="sc-money">Money</h2><button type="button" class="sc-link" data-sc="invoice">Send invoice →</button></div>${rows?`<ul class="sc-list">${rows}</ul>`:`<p class="muted sc-none">${inv.length?'Nothing open or paid.':'No invoices yet.'}</p>`}${inv.length>Math.min(live.length,rp.cents?3:4)?`<button type="button" class="sc-link" data-sc="billing">All ${inv.length} on Billing →</button>`:''}</section>`);
   }
   if(pj){
     // B21: the Project tab's own percent (its tasks) when the project read has one — counting
@@ -872,8 +907,11 @@ function renderHighlights(){
   // the four states, one formula (item 2): the tile's sub-line names them
   const mb=moneyBuckets(inv,recTodayYmd());
   const value=d.expected_value_cents||hl.value_cents; if(value)tiles.push({k:'Deal value',v:esc(fmtC(value)),ico:'value',tone:'',s:esc(d.stage?stageLabel(d.stage)+((STAGE_CHANCE[d.stage]!=null&&d.stage!=='won'&&d.stage!=='lost')?' · '+STAGE_CHANCE[d.stage]+'% chance':''):(d.title&&d.title!==((REC.header||{}).name||'')?d.title:''))});   // bold redesign: where it is and its chance (the title is the path's and the Deal tab's)
-  if(d.id){const last=paid.slice().sort((a,b)=>String(b.paid_at||'').localeCompare(String(a.paid_at||'')))[0];
-    tiles.push({k:'Paid',v:esc(fmtC(got)),ico:'paid',tone:'good',s:last?esc((last.title||'Payment')+(last.paid_at?' · '+atLabel(last.paid_at):'')):'Nothing yet'});}
+  // item 108 (J4): retainer payments are paid money too — counted, and named in the sub-line
+  if(d.id){const last=paid.slice().sort((a,b)=>String(b.paid_at||'').localeCompare(String(a.paid_at||'')))[0]; const rp=retainerPaidNow();
+    const lastSub=last?(last.title||'Payment')+(last.paid_at?' · '+atLabel(last.paid_at):''):'';
+    const sub=rp.cents?(got?'Incl. '+fmtC(rp.cents)+' retainer':'Retainer')+(rp.last_at?' · '+atLabel(rp.last_at):''):lastSub;
+    tiles.push({k:'Paid',v:esc(fmtC(got+rp.cents)),ico:'paid',tone:'good',s:sub?esc(sub):'Nothing yet'});}
   const owedSub=owed?[mb.upcoming.count?mb.upcoming.count+' upcoming':'',mb.overdue.count?mb.overdue.count+' overdue':'',mb.processing.count?fmtC(mb.processing.cents)+' processing':''].filter(Boolean).join(' · ')||'1 invoice':(mb.processing.count?fmtC(mb.processing.cents)+' processing':'All paid up');
   if(d.id||owed)tiles.push({k:'Outstanding',v:esc(fmtC(owed)),ico:'owed',tone:owed?'warn':(mb.processing.count?'info':''),s:esc(owedSub)});
   const ns=(d.id?liveNextStep(d):hl.next_step)||'';
@@ -912,6 +950,7 @@ function pathHasAction(d){
   if(!d||!d.stage)return false;
   const stage=String(d.stage);
   if(stage==='won'||stage==='lost')return false;
+  if(proposalOutcome())return true;   // item 107 (J3): "Revise the proposal" is the path's filled button
   const signed=(DEAL.contracts||[]).some(c=>c.status==='signed');
   if(stage==='contract'&&signed)return true;
   const fwd=(BOARD_NEXT[stage]||[])[0];
@@ -955,8 +994,11 @@ function renderPath(){
   const fwd=(BOARD_NEXT[stage]||[])[0];
   const fwdOk=fwd&&fwd!=='lost'&&PATH_STEPS.indexOf(fwd)>curIdx;
   let side='';
+  const outcome=proposalOutcome();
   if(stage==='won')side='';   // the lifecycle bar already shows Won — no second badge
   else if(stage==='lost')side=`<span class="terminal-chip lost">Not a fit</span>`;
+  // item 107 (J3): after a decline or an expiry, moving forward is the wrong advice — revising is the next step
+  else if(outcome)side=`<a class="btnlink primary" href="${esc(agHref('pipeline.html','deal='+encodeURIComponent(d.id)))}">Revise the proposal →</a>`;
   else if(stage==='contract'&&signed)side=`<a class="btnlink primary" href="${esc(agHref('pipeline.html','deal='+encodeURIComponent(d.id)))}">Convert to customer →</a>`;
   else if(fwdOk)side=`<button class="primary" id="markComplete">Move to ${esc(stageLabel(fwd))} →</button>`;   // bold redesign: names the next stage (was "Mark stage complete")
   else side=`<span class="muted" style="font-size:13px">Get the agreement signed to convert</span>`;
@@ -1150,10 +1192,17 @@ function renderDealTab(host){
   const inv=DEAL.invoices||[]; const open=invWaiting(inv); const paid=inv.filter(v=>invState(v)==='paid');
   const owed=open.reduce((a,b)=>a+(b.amount_cents||0),0);
   const signed=(DEAL.contracts||[]).some(c=>c.status==='signed');
+  const ret=retainerPaidNow();   // item 108 (J4): retainer payments are paid money too
+  const outcome=proposalOutcome();
   let now='';
   if(d.stage==='won'){
-    now=owed?`${fmtC(owed)} is awaiting payment across ${open.length} invoice${open.length===1?'':'s'}.`:(paid.length?`All ${fmtC(paid.reduce((a,b)=>a+(b.amount_cents||0),0))} paid so far. Send the next invoice when a milestone lands.`:'Nothing invoiced yet.');
+    const allPaid=paid.reduce((a,b)=>a+(b.amount_cents||0),0)+ret.cents;
+    now=owed?`${fmtC(owed)} is awaiting payment across ${open.length} invoice${open.length===1?'':'s'}.`:(allPaid?`All ${fmtC(allPaid)} paid so far${ret.cents?`, ${fmtC(ret.cents)} of it from the retainer`:''}. Send the next invoice when a milestone lands.`:'Nothing invoiced yet.');
     now+=` <button class="link-btn" data-go="billing">Open Billing →</button>`;
+  }else if(outcome){
+    // item 107 (J3): a declined or expired proposal is not "with them"
+    const p=outcome.p; const day=outcome.state==='declined'?(p.decided_at?' on '+atLabel(p.decided_at):''):(p.expires_at?' on '+atLabel(p.expires_at):'');
+    now=(outcome.state==='declined'?`They declined your proposal${esc(day)}.`:`Your proposal expired${esc(day)} before they answered, so its link no longer opens.`)+` Revise it and send it again. <a class="link" href="${esc(link)}">Revise in pipeline →</a>`;
   }else if(d.stage==='contract'){
     now=signed?'Agreement signed. Request the deposit, then convert them to a customer.':'The agreement is out for signature.';
     now+=` <button class="link-btn" data-go="billing">Open Billing →</button>`;
@@ -1161,10 +1210,15 @@ function renderDealTab(host){
   else if(d.stage==='lost'){ now='Marked not a fit. The record stays so you can pick it back up.'; }
   if(now)html+=`<section><h2>What now</h2><div class="card"><p style="font-size:14.5px;margin:0">${now}</p></div></section>`;
   const sum=(label,n,extra)=>`<div class="rrow"><span class="rt">${label}<span class="s">${extra}</span></span><button class="link-btn" data-go="billing">Billing →</button></div>`;
+  // item 107 (J9): the total leaves voided invoices out, as the Money card does
+  const live=inv.filter(v=>v.status==='open'||v.status==='paid');
+  const ests=DEAL.estimates||[]; const recs=(DEAL.recurring||[]).filter(s=>s.status==='active'||s.status==='paused');
   html+=`<section><h2>Documents</h2><div class="card">`
-    +sum('Proposals',0,(DEAL.proposals||[]).length?(DEAL.proposals||[]).map(p=>esc(p.title||'Proposal')+' · '+esc(p.status||'draft')).join(' · '):'None yet')
+    +(ests.length?sum('Estimates',0,ests.map(e=>esc(e.title||'Estimate')+' · '+esc(estWord(e)[0].toLowerCase())).join(' · ')):'')   // item 108 (J6)
+    +sum('Proposals',0,(DEAL.proposals||[]).length?(DEAL.proposals||[]).map(p=>esc(p.title||'Proposal')+' · '+esc(propWord(p)[0].toLowerCase())).join(' · '):'None yet')
     +sum('Agreement',0,(DEAL.contracts||[]).length?(DEAL.contracts||[]).map(c=>esc(c.title||'Agreement')+' · '+esc(c.status||'draft')).join(' · '):'None yet')
-    +sum('Invoices',0,inv.length?`${inv.length} · ${fmtC(inv.reduce((a,b)=>a+(b.amount_cents||0),0))} total${owed?' · '+fmtC(owed)+' open':''}`:'None yet')
+    +sum('Invoices',0,inv.length?`${live.length} · ${fmtC(live.reduce((a,b)=>a+(b.amount_cents||0),0))} total${owed?' · '+fmtC(owed)+' open':''}${inv.length>live.length?' · '+(inv.length-live.length)+' voided':''}`:'None yet')
+    +(recs.length?sum('Recurring invoice',0,recs.map(s=>esc(s.title||'Invoice')+' · '+esc(fmtC(s.amount_cents))+' '+esc(everyWord(s.every))+(s.status==='paused'?' · paused':'')).join(' · ')):'')
     +`</div></section>`;
   // Sales review item 26: a repeat customer's deals as a list when there is more than one.
   const relD=(REC&&Array.isArray(REC.related_deals))?REC.related_deals:[];
@@ -1208,26 +1262,58 @@ function renderBillingTab(host){
   // invoices + the new-invoice / deposit forms
   html+=`<section><h2>Invoices <span class="sec-acts" style="display:flex;gap:6px">${both?'':'<button type="button" class="rbtn" data-bform="deposit">Request deposit</button>'}<a class="rbtn" href="${esc(link)}#schedule" style="text-decoration:none">Payment schedule</a><button type="button" class="rbtn${both?'':' primary'}" data-bform="invoice">+ Invoice</button></span></h2>
     <div id="bform"></div>`;
+  // item 81: who the invoices are billed to, and the address they print — one line, Edit beside it
+  if(inv.length||!noEmail){const bt=billedToLine();html+=`<p class="muted" id="billedTo" style="margin:0 0 10px;font-size:13px">${bt.text}${bt.can?` <button type="button" class="link-btn" data-edit-address>${bt.has?'Edit':'Add their address'}</button>`:''}</p>`;}
   html+=inv.length?`<div class="card tcard"><table class="btable"><thead><tr><th>Invoice</th><th>Status</th><th class="amt">Amount</th><th>Due</th><th><span class="sr-only">Actions</span></th></tr></thead><tbody>`+inv.map(v=>{
-    const name=esc(v.title||(v.purpose==='deposit'?'Deposit':'Invoice'));
+    // item 81: the studio's running number leads the name; a part payment names the invoice it paid toward
+    const no=invNo(v.number), parent=v.payment_for?inv.find(x=>x.id===v.payment_for):null;
+    const name=v.payment_for?esc('Part payment'+(parent&&invNo(parent.number)?' · '+invNo(parent.number):'')):(no?esc(no)+' · ':'')+esc(v.title||(v.purpose==='deposit'?'Deposit':'Invoice'));
     // Oct 2026 (item 2): the chip is the money state word — Paid · Processing ·
     // Upcoming · Overdue — in its one colour; sent-ness moves to the sub-line.
     const st=invState(v);
-    let sub=esc(v.purpose==='deposit'?'Initial deposit':(v.description||v.purpose||''));
+    let sub=esc(v.payment_for?(parent?parent.title||'':''):v.purpose==='deposit'?'Initial deposit':(v.description||v.purpose||''));
     let state, acts='', due='', dueCls='';
-    if(st==='paid'){state=`<span class="schip good">Paid</span>`;due=v.paid_at?esc(atLabel(v.paid_at)):'';}
+    // item 77: a payment recorded by hand says how it came in, and can be undone (it changes the books, so delete)
+    if(st==='paid'){state=`<span class="schip good">Paid</span>`;due=v.paid_at?esc(atLabel(v.paid_at)):'';
+      sub=(sub?sub+' · ':'')+esc(PAY_WORDS[v.paid_method]||'Paid online')+(v.paid_note?' · '+esc(v.paid_note):'');
+      if(v.paid_method)acts+=act(`data-undo-pay="${esc(v.id)}" data-needs="delete"`,'Undo','Recorded by mistake? The invoice goes back to unpaid');}
     else if(!st){state=`<span class="schip" style="background:var(--bg);color:var(--faint)">Voided</span>`;}
     else if(st==='processing'){state=`<span class="schip info">Processing</span>`;sub=(sub?sub+' · ':'')+'Payment on its way';due=v.due_date?esc(dueLabel(v.due_date)):'';}   // the client paid — nothing to resend or void
     else{state=`<span class="schip ${MONEY_TONE[st]}">${MONEY_WORD[st]}</span>`;
-      if(!v.stripe_url)sub=(sub?sub+' · ':'')+'Not sent yet';
+      const parts=inv.filter(x=>x.payment_for===v.id&&x.status==='paid');   // item 77: part payments already came off it
+      if(parts.length)sub=(sub?sub+' · ':'')+esc(fmtC(parts.reduce((a,b)=>a+(b.amount_cents||0),0)))+' paid so far';
+      if(!v.stripe_url)sub=(sub?sub+' · ':'')+(parts.length?'Send it for a link for what’s left':'Not sent yet');
       due=v.due_date?esc(dueLabel(v.due_date)):'Due now'; dueCls=st==='overdue'?'due':'';
+      acts+=act(`data-pay-inv="${esc(v.id)}"`,'Record payment','Paid by check, cash, bank transfer or Zelle? Mark it paid here');
       acts+=act(`data-send-inv="${esc(v.id)}"`,v.stripe_url?'Resend':'Send');
       if(v.stripe_url)acts+=act(`data-copy="${esc(v.stripe_url)}"`,'Copy link');
       acts+=act(`data-void-inv="${esc(v.id)}" data-needs="delete"`,'Void','Withdraw this invoice — the payment link stops working');}
-    acts+=act(`data-doc="invoices:${esc(v.id)}"`,'View','Open a branded, printable copy (save as PDF)');
-    return `<tr class="brow"><td><span class="rt">${name}${sub?`<span class="s">${sub}</span>`:''}</span></td><td>${state}</td><td class="amt">${esc(fmtC(v.amount_cents))}</td><td class="${dueCls}">${due}</td><td class="racts"><span class="racts">${acts}</span></td></tr>`;
-  }).join('')+`</tbody></table></div>`:`<div class="card"><p class="muted" style="font-size:13.5px">No invoices yet. Send one, or request a deposit.</p></div>`;
+    acts+=act(`data-pdf="invoices:${esc(v.id)}"`,'PDF','Download it as a PDF — the same copy the client gets');   // item 82
+    return `<tr class="brow" data-inv-row="${esc(v.id)}"><td><span class="rt">${name}${sub?`<span class="s">${sub}</span>`:''}</span></td><td>${state}</td><td class="amt">${esc(fmtC(v.amount_cents))}</td><td class="${dueCls}">${due}</td><td class="racts"><span class="racts">${acts}</span></td></tr>`;
+  }).join('')+`</tbody></table></div><div id="payhost"></div>`:`<div class="card"><p class="muted" style="font-size:13.5px">No invoices yet. Send one, or request a deposit.</p></div>`;
   html+=`</section>`;
+  // item 108 (J6): estimates — a price before anything is agreed (drafted on the deal page;
+  // sent, copied, turned into a proposal or billed from here, by the same routes)
+  const ests=DEAL.estimates||[];
+  if(Array.isArray(DEAL.estimates)&&ests.length){
+    html+=`<section id="bEstimates"><h2>Estimates <a class="rbtn" href="${esc(link)}" style="text-decoration:none">+ Estimate (in pipeline)</a></h2><div class="card">`+ests.map(e=>{
+      const [w,tone]=estWord(e); let acts='';
+      if(e.status==='draft'&&!noEmail)acts+=act(`data-send-est="${esc(e.id)}"`,'Send to client','Emails the estimate with an Approve button');
+      else if(e.status==='draft')acts+=act(`data-send-est="${esc(e.id)}"`,'Get the link');
+      else if(e.status==='sent'&&!estExpired(e))acts+=act(`data-link-est="${esc(e.id)}"`,'Copy link');
+      if(e.status!=='draft'&&!e.proposal_id&&!e.invoice_id)acts+=act(`data-est-prop="${esc(e.id)}"`,'Turn into a proposal','Drafts a proposal from these lines — nothing is sent')+act(`data-est-inv="${esc(e.id)}"`,'Bill it','Drafts an invoice for this total — press Send on it when you’re ready');
+      acts+=act(`data-doc="estimates:${esc(e.id)}"`,'View');
+      if(e.status==='draft')acts+=act(`data-del-est="${esc(e.id)}" data-needs="delete"`,'Delete','Remove this draft — it was never sent');
+      const bits=[];
+      if(e.status==='approved'&&e.decided_at)bits.push('Approved '+atLabel(e.decided_at));
+      else if(e.status==='declined')bits.push('Not now'+(e.decided_at?' · '+atLabel(e.decided_at):''));
+      else if(estExpired(e))bits.push('Expired '+atLabel(e.expires_at)+', so the link no longer opens');
+      else if(e.status==='sent'&&e.expires_at)bits.push('Good until '+atLabel(e.expires_at));
+      if(e.decided_note)bits.push('Their note: “'+e.decided_note+'”');
+      if(e.proposal_id)bits.push('Turned into a proposal');else if(e.invoice_id)bits.push('Billed as an invoice');
+      return `<div class="rrow brow"><span class="rt">${esc(e.title||'Estimate')}<span class="s">${esc([fmtC(e.total_cents!=null?e.total_cents:e.subtotal_cents)].concat(bits).join(' · '))}</span></span><span class="racts"><span class="schip ${tone}">${esc(w)}</span>${acts}</span></div>`;
+    }).join('')+`</div></section>`;
+  }
   // proposals
   html+=`<section><h2>Proposals <a class="rbtn" href="${esc(link)}" style="text-decoration:none">+ Proposal (in pipeline)</a></h2><div class="card">`;
   const props=DEAL.proposals||[];
@@ -1235,10 +1321,17 @@ function renderBillingTab(host){
     let acts='';
     // Phase 3 (stage-aware): a won or lost deal never pushes an unsent draft
     const closed=d.stage==='won'||d.stage==='lost'||!!d.converted_client_id;
+    // item 107 (J3): an expired proposal's link no longer opens — no Copy link; a declined or
+    // expired one (not yet revised) points at the revise, which lives on the deal page
+    const expired=propExpired(p), replaced=propReplaced(p), [w,tone]=propWord(p);
     if(p.status==='draft'&&!closed&&!both)acts+=act(`data-send-prop="${esc(p.id)}"`,'Send to client','Emails the proposal with an accept link');
-    else if(p.status==='sent')acts+=act(`data-send-prop="${esc(p.id)}" data-resend="1"`,'Copy link');
+    else if(p.status==='sent'&&!expired&&!replaced)acts+=act(`data-send-prop="${esc(p.id)}" data-resend="1"`,'Copy link');
+    if((p.status==='declined'||expired)&&!replaced&&!closed)acts+=`<a class="rbtn" href="${esc(link)}" style="text-decoration:none">Revise in pipeline</a>`;
     acts+=act(`data-doc="proposals:${esc(p.id)}"`,'View / print');
-    return `<div class="rrow brow"><span class="rt">${esc(p.title||'Proposal')}${p.version>1?' · v'+esc(p.version):''}<span class="s">${(p.total_cents!=null||p.subtotal_cents)?esc(fmtC(p.total_cents!=null?p.total_cents:p.subtotal_cents)):''}</span></span><span class="racts"><span class="schip ${propChip(p.status)}">${esc(p.status||'draft')}</span>${acts}</span></div>`;
+    const sub=[(p.total_cents!=null||p.subtotal_cents)?fmtC(p.total_cents!=null?p.total_cents:p.subtotal_cents):''];
+    if(p.status==='declined'&&!replaced)sub.push('They declined'+(p.decided_at?' on '+atLabel(p.decided_at):''));
+    else if(expired&&!replaced)sub.push('Expired'+(p.expires_at?' '+atLabel(p.expires_at):'')+', so the link no longer opens');
+    return `<div class="rrow brow"><span class="rt">${esc(p.title||'Proposal')}${p.version>1?' · v'+esc(p.version):''}<span class="s">${esc(sub.filter(Boolean).join(' · '))}</span></span><span class="racts"><span class="schip ${tone}">${esc(w)}</span>${acts}</span></div>`;
   }).join(''):`<p class="muted" style="font-size:13.5px">No proposals yet — draft one in the pipeline.</p>`;
   html+=`</div></section>`;
   // agreement
@@ -1253,15 +1346,36 @@ function renderBillingTab(host){
   }).join(''):`<p class="muted" style="font-size:13.5px">No agreement yet.</p>`;
   html+=`</div></section>`;
   // retainer
-  const r=d.retainer;
+  const r=d.retainer; const rp=retainerPaidNow();
+  // item 108 (J4): what the retainer has brought in — its charges are payments, counted in Paid above
+  const rpLine=rp.cents?`Paid so far: ${fmtC(rp.cents)} · ${rp.count} payment${rp.count===1?'':'s'}${rp.last_at?', the last on '+atLabel(rp.last_at):''}`:'';
   html+=`<section><h2>Retainer</h2><div class="card">`;
   if(r&&r.status&&r.status!=='canceled'){
     const st=r.status==='active'?'<span class="schip good">Active</span>':r.status==='past_due'?'<span class="schip bad">Payment overdue</span>':'<span class="schip warn">Awaiting authorization</span>';
-    html+=`<div class="rrow brow"><span class="rt"><strong>${esc(fmtC(r.amount_cents))}</strong> every ${r.interval==='year'?'year':'month'}</span><span class="racts">${st}${(r.status==='pending'&&r.checkout_url)?act(`data-copy="${esc(r.checkout_url)}"`,'Copy authorization link'):''}${act('data-ret-cancel="1" data-needs="delete"','Cancel retainer')}</span></div>`;
+    html+=`<div class="rrow brow"><span class="rt"><strong>${esc(fmtC(r.amount_cents))}</strong> every ${r.interval==='year'?'year':'month'}${rpLine?`<span class="s">${esc(rpLine)}</span>`:''}</span><span class="racts">${st}${(r.status==='pending'&&r.checkout_url)?act(`data-copy="${esc(r.checkout_url)}"`,'Copy authorization link'):''}${act('data-ret-cancel="1" data-needs="delete"','Cancel retainer')}</span></div>`;
   }else{
+    if(rpLine)html+=`<p style="font-size:13.5px;margin:0 0 10px"><strong>Earlier retainer.</strong> <span class="muted">${esc(rpLine)}</span></p>`;
     html+=`<p class="muted" style="font-size:13.5px;margin-bottom:10px">Bill this client the same amount every month or year. They authorize it once with Stripe; nothing is charged until they do.</p><button type="button" class="rbtn" data-bform="retainer">Set up a retainer</button><div id="rform"></div>`;
   }
   html+=`</div></section>`;
+  // item 108 (J6): the recurring invoice — a fresh bill on a schedule that they pay themselves.
+  // Skip · Pause · Resume · Stop from here; setting one up and Change stay on the deal page's form.
+  if(Array.isArray(DEAL.recurring)){
+    const recs=DEAL.recurring;
+    html+=`<section id="bRecurring"><h2>Recurring invoice <a class="rbtn" href="${esc(link)}#recSec" style="text-decoration:none">${recs.some(s=>s.status==='active'||s.status==='paused')?'Change (in pipeline)':'Set one up (in pipeline)'}</a></h2><div class="card">`;
+    html+=recs.length?recs.map(s=>{
+      const live=s.status==='active'||s.status==='paused';
+      const chip=s.status==='active'?'<span class="schip good">Active</span>':s.status==='paused'?'<span class="schip warn">Paused</span>':s.status==='finished'?'<span class="schip">Finished</span>':'<span class="schip">Stopped</span>';
+      const count=s.times?`${s.sent_count||0} of ${s.times} sent`:(s.sent_count?`${s.sent_count} sent`:'');
+      const state=s.status==='active'?(s.next_on?'Next one goes out '+dueLabel(s.next_on):''):s.status==='paused'?'Paused: '+pauseWhy(s.paused_reason):s.status==='finished'?'The last one went out':'Stopped';
+      let acts='';
+      if(s.status==='active')acts+=act(`data-rec-skip="${esc(s.id)}"`,'Skip this one')+act(`data-rec-pause="${esc(s.id)}"`,'Pause');
+      else if(s.status==='paused')acts+=act(`data-rec-resume="${esc(s.id)}"`,'Resume');
+      if(live)acts+=act(`data-rec-stop="${esc(s.id)}" data-needs="delete"`,'Stop');
+      return `<div class="rrow brow"><span class="rt">${esc(s.title||'Invoice')} · ${esc(fmtC(s.amount_cents))} ${esc(everyWord(s.every))}<span class="s">${esc([state,count].filter(Boolean).join(' · '))}</span></span><span class="racts">${chip}${acts}</span></div>`;
+    }).join(''):`<p class="muted" style="font-size:13.5px">Send them a fresh invoice on a schedule. They pay each one themselves; nothing is charged automatically.</p>`;
+    html+=`</div></section>`;
+  }
   host.innerHTML=html;
   wireBilling(host,d);
   if(BILLING_OPEN){const w=BILLING_OPEN;BILLING_OPEN='';
@@ -1280,7 +1394,12 @@ async function billingSend(path,okLabel,body){
   if(!r.ok){toast((r.body&&r.body.message)||'That didn’t go through.');return null;}
   const b=r.body||{}; const url=b.url||(b.data&&b.data.url)||'';
   if(url&&navigator.clipboard)navigator.clipboard.writeText(url).catch(()=>{});
-  toast(b.emailed?okLabel+' — emailed to the client':(url?okLabel.replace('sent','prepared')+' — link copied, nothing was emailed':okLabel));
+  // item 107 (J5): sending an agreement can add the deposit request it promises — say so, as the deal page does
+  const dep=b.deposit||(b.data&&b.data.deposit)||null;
+  const depNote=dep&&dep.minted?' A '+fmtC(dep.amount_cents)+' deposit request is ready — they can pay the moment they sign.':(dep&&dep.warning==='no_value'?' The agreement mentions a deposit, but this deal has no value yet, so no deposit request was added.':'');
+  // a resend inside two minutes of the last one is held back by the server (no second email)
+  const msg=b.emailed?okLabel+' — emailed to the client':(b.double_tap?'Already sent a moment ago — link copied':(/copied$/.test(okLabel)?okLabel:(url?okLabel.replace('sent','prepared')+' — link copied, nothing was emailed':okLabel)));
+  toast(msg+depNote);
   return b;
 }
 async function reloadDeal(){
@@ -1303,8 +1422,20 @@ function wireBilling(host,d){
   host.querySelectorAll('[data-bform]').forEach(b=>b.addEventListener('click',()=>billingForm(b.getAttribute('data-bform'))));
   host.querySelectorAll('[data-copy]').forEach(b=>b.addEventListener('click',()=>{const u=b.getAttribute('data-copy');if(navigator.clipboard)navigator.clipboard.writeText(u).then(()=>toast('Link copied')).catch(()=>toast('Couldn’t copy on this device.'));}));
   host.querySelectorAll('[data-doc]').forEach(b=>b.addEventListener('click',async()=>{const [t,id]=b.getAttribute('data-doc').split(':');b.disabled=true;const r=await apiAg('/sales/'+t+'/'+id+'/document');b.disabled=false;if(r.ok&&r.body.url)window.open(r.body.url,'_blank','noopener');else toast('Couldn’t open the document just now.');}));
+  host.querySelectorAll('[data-pdf]').forEach(b=>b.addEventListener('click',()=>downloadPdf(b)));   // item 82
+  // item 77: Record a payment opens under its row; Undo takes back one recorded by mistake
+  host.querySelectorAll('[data-pay-inv]').forEach(b=>b.addEventListener('click',()=>{const v=((DEAL&&DEAL.invoices)||[]).find(x=>x.id===b.getAttribute('data-pay-inv'));const row=b.closest('tr');if(v&&row)payForm(row,v);}));
+  host.querySelectorAll('[data-undo-pay]').forEach(b=>b.addEventListener('click',async()=>{
+    const id=b.getAttribute('data-undo-pay'); const v=((DEAL&&DEAL.invoices)||[]).find(x=>x.id===id)||{}; const no=invNo(v.number)||'the invoice';
+    if(!confirm(v.payment_for?`Undo this ${fmtC(v.amount_cents)} part payment? Its amount goes back on the invoice as due.`:`Undo this payment? ${no} goes back to unpaid (${fmtC(v.amount_cents)} due) and its reminders can start again. Use this only for a payment recorded by mistake.`))return;
+    b.disabled=true; const r=await apiAg('/sales/invoices/'+encodeURIComponent(id)+'/payment/undo','POST',{});
+    if(r.ok){toast(v.payment_for?'Part payment undone. Its amount is due again.':`Payment undone. ${no} is open again; send it again for a fresh payment link.`);reloadDeal();}
+    else{toast((r.body&&r.body.message)||'Couldn’t undo it.');b.disabled=false;}}));
+  const ea=host.querySelector('[data-edit-address]'); if(ea)ea.addEventListener('click',()=>{WANT_EDIT='ec-address';showTab('details');});   // item 81
   host.querySelectorAll('[data-send-inv]').forEach(b=>b.addEventListener('click',async()=>{b.disabled=true;const r=await billingSend('/sales/invoices/'+b.getAttribute('data-send-inv')+'/send',(b.textContent==='Resend'?'Invoice re-sent':'Invoice sent'));if(r)reloadDeal();else b.disabled=false;}));
-  host.querySelectorAll('[data-void-inv]').forEach(b=>b.addEventListener('click',async()=>{if(!confirm('Void this invoice? It stops being payable and the unpaid reminder clears. It stays on the record, marked Voided.'))return;b.disabled=true;const r=await apiAg('/sales/invoices/'+b.getAttribute('data-void-inv')+'/void','POST',{});if(r.ok){toast(r.body.already?'Already voided':'Invoice voided');reloadDeal();}else{toast((r.body&&r.body.message)||'Couldn’t void it.');b.disabled=false;}}));
+  // item 107 (J1): Stripe may not have switched the link off (link_deactivated:false) — then the
+  // client can still pay the withdrawn amount, and "Invoice voided" alone would say otherwise
+  host.querySelectorAll('[data-void-inv]').forEach(b=>b.addEventListener('click',async()=>{if(!confirm('Void this invoice? It stops being payable and the unpaid reminder clears. It stays on the record, marked Voided.'))return;b.disabled=true;const r=await apiAg('/sales/invoices/'+b.getAttribute('data-void-inv')+'/void','POST',{});if(r.ok){const linkLive=!r.body.already&&!!r.body.data&&r.body.data.link_deactivated===false;toast(linkLive?'Invoice voided, but its payment link may still be live. Open the invoice in Stripe and switch the link off there.':r.body.already?'Already voided':'Invoice voided',linkLive?'err':undefined);reloadDeal();}else{toast((r.body&&r.body.message)||'Couldn’t void it.');b.disabled=false;}}));
   host.querySelectorAll('[data-send-prop]').forEach(b=>b.addEventListener('click',async()=>{b.disabled=true;const r=await billingSend('/sales/proposals/'+b.getAttribute('data-send-prop')+'/send',b.hasAttribute('data-resend')?'Proposal link copied':'Proposal sent');if(r)reloadDeal();else b.disabled=false;}));
   host.querySelectorAll('[data-send-con]').forEach(b=>b.addEventListener('click',async()=>{
     const k=(DEAL.contracts||[]).find(x=>x.id===b.getAttribute('data-send-con'));
@@ -1324,7 +1455,113 @@ function wireBilling(host,d){
     window.__sendMoreClose=close;document.addEventListener('click',close);
     menu.addEventListener('keydown',(e)=>{if(e.key==='Escape'){close();sm.focus();}});}
   const rc=host.querySelector('[data-ret-cancel]'); if(rc)rc.addEventListener('click',async()=>{if(!confirm('Cancel this retainer? Future charges stop. Past payments are unaffected.'))return;rc.disabled=true;const r=await apiAg('/sales/deals/'+d.id+'/retainer/cancel','POST',{});if(r.ok){toast('Retainer canceled');reloadDeal();}else{toast((r.body&&r.body.message)||'Couldn’t cancel it.');rc.disabled=false;}});
+  // item 108 (J6): estimates and the recurring invoice — the same routes and words as the deal page
+  const run=(sel,fn)=>host.querySelectorAll(sel).forEach(b=>b.addEventListener('click',async()=>{b.disabled=true;try{if(await fn(b)===false)b.disabled=false;}catch(_){b.disabled=false;}}));
+  run('[data-send-est]',async(b)=>{const r=await billingSend('/sales/estimates/'+b.getAttribute('data-send-est')+'/send','Estimate sent');if(!r)return false;reloadDeal();});
+  run('[data-link-est]',async(b)=>{const r=await apiAg('/sales/estimates/'+b.getAttribute('data-link-est')+'/send','POST',{});const url=r.ok&&r.body&&r.body.url;b.disabled=false;if(!url){toast((r.body&&r.body.message)||'No link is available just now.');return;}if(navigator.clipboard)navigator.clipboard.writeText(url).then(()=>toast('Link copied'),()=>toast('Couldn’t copy on this device.'));});
+  run('[data-est-prop]',async(b)=>{const r=await apiAg('/sales/estimates/'+b.getAttribute('data-est-prop')+'/proposal','POST',{});if(!r.ok){toast((r.body&&r.body.message)||'That didn’t go through.');return false;}toast('Proposal drafted from the estimate — check it, then send it the usual way.');reloadDeal();});
+  run('[data-est-inv]',async(b)=>{const r=await apiAg('/sales/estimates/'+b.getAttribute('data-est-inv')+'/invoice','POST',{});if(!r.ok){toast((r.body&&r.body.message)||'That didn’t go through.');return false;}toast('Invoice ready under Invoices — press Send on it when you’re ready.');reloadDeal();});
+  run('[data-del-est]',async(b)=>{if(!confirm('Remove this draft estimate? It was never sent, so nothing the client saw changes.'))return false;const r=await apiAg('/sales/estimates/'+b.getAttribute('data-del-est'),'DELETE');if(!r.ok){toast((r.body&&r.body.message)||'Couldn’t remove it.');return false;}toast('Draft removed');reloadDeal();});
+  const recOf=(id)=>((DEAL&&DEAL.recurring)||[]).find(s=>s.id===id)||{};
+  const recAct=(attr,verb,ask,done)=>run('['+attr+']',async(b)=>{const id=b.getAttribute(attr);const s=recOf(id);const q=ask&&ask(s);if(q&&!confirm(q))return false;const r=await apiAg('/sales/recurring/'+id+'/'+verb,'POST',{});if(!r.ok){toast((r.body&&r.body.message)||'That didn’t go through.');return false;}toast(done(s,(r.body&&r.body.data)||{}));reloadDeal();});
+  recAct('data-rec-skip','skip',(s)=>s.next_on?`Skip the ${dueLabel(s.next_on)} invoice? Nothing goes out that day — the one after goes out as usual.`:'',(s,x)=>x.next_on?'Skipped — the next one goes out '+dueLabel(x.next_on):'Skipped');
+  recAct('data-rec-pause','pause',null,()=>'Paused — nothing goes out until you resume it.');
+  recAct('data-rec-resume','resume',(s)=>'Resume this recurring invoice? The next one goes out '+(s.next_on&&s.next_on>=recTodayYmd()?dueLabel(s.next_on):'today')+'.',(s,x)=>'Resumed — the next one goes out '+(x.next_on?dueLabel(x.next_on):'on its usual day'));
+  recAct('data-rec-stop','stop',()=>'Stop this recurring invoice? No more invoices go out. The ones already sent stay as they are.',()=>'Stopped — no more invoices will go out.');
 }
+// item 107 (J2): what the accepted proposal still has to bill — its total less every invoice
+// already raised on the deal (open or paid, a deposit included; recurring ones are their own
+// bill). Mirrors lib/invoice_billing.ts leftToBill, which the server bills from. Null: none accepted.
+function leftOfProposal(){
+  const acc=((DEAL&&DEAL.proposals)||[]).filter(p=>p.status==='accepted').sort((a,b)=>String(b.decided_at||'').localeCompare(String(a.decided_at||'')))[0];
+  if(!acc)return null;
+  const total=acc.total_cents!=null?Number(acc.total_cents)||0:Number(acc.subtotal_cents)||0;
+  const billed=((DEAL&&DEAL.invoices)||[]).filter(v=>(v.status==='open'||v.status==='paid')&&!v.recurring_id).reduce((a,b)=>a+(Number(b.amount_cents)||0),0);
+  return {total,billed,left:Math.max(0,total-billed)};
+}
+// item 81: the studio's running invoice number — "#0013"; '' before the number exists (APPLY-0167)
+const invNo=(n)=>{const v=Math.trunc(Number(n));return v>0?'#'+String(v).padStart(4,'0'):'';};
+// item 77: how a payment came in; '' is a payment Stripe took (card or bank, online)
+const PAY_WORDS={check:'Paid by check',cash:'Paid in cash',bank_transfer:'Paid by bank transfer',zelle:'Paid by Zelle',other:'Paid'};
+// item 81: who the invoices are billed to and where — the deal's person and their address
+// The address is the contact's own (sales item 89: { street, city, state, zip, country }); before
+// that column exists the deal read has no address at all, and nothing is offered.
+const addrText=(a)=>{if(!a)return'';if(typeof a==='string')return a.trim();if(typeof a!=='object')return'';const st=[a.state,a.zip].map(x=>String(x||'').trim()).filter(Boolean).join(' ');return [a.street,[String(a.city||'').trim(),st].filter(Boolean).join(', '),a.country].map(x=>String(x||'').trim()).filter(Boolean).join('\n');};
+function billedToLine(){
+  const c=(DEAL&&DEAL.contact)||{}; const who=[c.name,c.company].map(x=>String(x||'').trim()).filter(Boolean);
+  const addr=addrText(c.address);
+  const name=who.length?esc(who.join(', ')):'this client';
+  const end=(t)=>/[.!?]$/.test(t)?t:t+'.';   // "Juniper Floral Co." needs no second full stop
+  if(!('address' in c))return {has:false,can:false,text:end(`Invoices are billed to ${name}`)};   // before contacts hold an address (item 89)
+  return addr?{has:true,can:true,text:end(`Invoices are billed to ${name}, ${esc(addr.replace(/\n+/g,', '))}`)}:{has:false,can:true,text:end(`Invoices are billed to ${name}`)+' No postal address yet, so none prints on them.'};
+}
+// item 82: a document as its PDF, saved under its own name (the same copy the client gets)
+async function downloadPdf(b){
+  const [t,id]=b.getAttribute('data-pdf').split(':'); b.disabled=true;
+  try{
+    const r=await apiAg('/sales/'+t+'/'+id+'/document'); const u=r.ok&&r.body&&r.body.pdf_url;
+    if(!u){toast('Couldn’t make the PDF just now.');return;}
+    const f=await fetch(u); if(!f.ok)throw new Error(String(f.status));
+    const blob=new Blob([await f.arrayBuffer()],{type:'application/pdf'});
+    const v=t==='invoices'?((DEAL&&DEAL.invoices)||[]).find(x=>x.id===id):null;
+    const name=v?((v.status==='paid'?'Receipt':v.purpose==='deposit'?'Deposit-request':'Invoice')+'-'+(invNo(v.number).slice(1)||'copy')+'.pdf'):(t==='contracts'?'Agreement':t==='estimates'?'Estimate':'Proposal')+'.pdf';
+    const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=name; document.body.appendChild(a); a.click();
+    setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove();},5000);
+  }catch(_){toast('Couldn’t download the PDF just now.');}
+  finally{b.disabled=false;}
+}
+// item 77: Record a payment — opens under its invoice. All of it marks it paid; less is a part
+// payment (the rest stays due). The server checks it all again.
+function payForm(row,v){
+  const host=$('payhost'); if(!host)return;
+  const open=host.querySelector('.payform');
+  const clear=()=>{host.innerHTML='';document.querySelectorAll('#tabbody tr.paying').forEach(r=>r.classList.remove('paying'));};
+  if(open){const same=open.getAttribute('data-for')===v.id; clear(); if(same)return;}
+  const today=recTodayYmd(); const c=(DEAL&&DEAL.contact)||{}; const first=(String(c.name||'').trim().split(/\s+/)[0])||'';
+  const due=Number(v.amount_cents)||0; const no=invNo(v.number)||'this invoice';
+  row.classList.add('paying');
+  host.innerHTML=`<div class="bform payform" role="group" aria-labelledby="pf-h" data-for="${esc(v.id)}"><p class="pf-h" id="pf-h">Record a payment for ${esc(no)}${v.title?' · '+esc(v.title):''}</p>
+    <div class="brow2"><label>Amount received (USD)<input type="number" id="pf-amt" inputmode="decimal" step="0.01" min="0.01" max="${(due/100).toFixed(2)}" value="${(due/100).toFixed(2)}"></label><label>Paid on<input type="date" id="pf-on" max="${today}" value="${today}"></label><label>Note (optional)<input type="text" id="pf-note" maxlength="120" placeholder="e.g. Check #1042"></label></div>
+    <fieldset class="pf-how"><legend>How they paid</legend>${[['check','Check'],['cash','Cash'],['bank_transfer','Bank transfer'],['zelle','Zelle'],['other','Other']].map(([k,l],i)=>`<label class="pf-chip"><input type="radio" name="pf-how" value="${k}"${i===0?' checked':''}><span>${l}</span></label>`).join('')}</fieldset>
+    ${c.email?`<label class="pf-rcpt"><input type="checkbox" id="pf-rcpt" checked> Email ${esc(first||'them')} a receipt (the PDF is attached)</label>`:''}
+    <p class="muted pf-what" id="pf-what" aria-live="polite"></p>
+    <div class="bacts"><button type="button" id="pf-cancel">Cancel</button><button type="button" class="primary" id="pf-go">Mark paid</button></div></div>`;
+  const box=host.firstElementChild;
+  const amt=$('pf-amt'), go=$('pf-go');
+  const cents=()=>Math.round((parseFloat(amt.value)||0)*100);
+  const say=()=>{const a=cents();
+    if(a>0&&a<due){go.textContent='Record '+fmtC(a)+' part payment';$('pf-what').textContent=`${fmtC(due-a)} stays due on ${no}. Its card link is switched off, and the next Send makes one for what’s left.`;}
+    else{go.textContent='Mark '+(invNo(v.number)||'it')+' paid';$('pf-what').textContent=`This marks ${no} paid, stops its reminders and switches its card link off, so it can’t be paid twice. It counts in Paid and in your money reports.`;}};
+  say(); amt.addEventListener('input',say);
+  $('pf-cancel').addEventListener('click',()=>{clear();row.querySelector('[data-pay-inv]')&&row.querySelector('[data-pay-inv]').focus();});
+  setTimeout(()=>{amt.focus({preventScroll:true});amt.select();},50);
+  box.scrollIntoView({block:'nearest',behavior:'smooth'});
+  go.addEventListener('click',async()=>{
+    const a=cents(); const on=$('pf-on').value; const how=(box.querySelector('input[name="pf-how"]:checked')||{}).value||'';
+    if(!(a>0)){toast('Enter the amount you received.');amt.focus();return;}
+    if(a>due){toast('That’s more than the '+fmtC(due)+' due. Record what’s due here.');amt.focus();return;}
+    if(!on){toast('Enter the day you were paid.');$('pf-on').focus();return;}
+    if(on>today){toast('The day you were paid can’t be in the future.');$('pf-on').focus();return;}
+    go.disabled=true;
+    const rc=$('pf-rcpt');
+    const r=await apiAg('/sales/invoices/'+encodeURIComponent(v.id)+'/payment?today='+today,'POST',{amount_cents:a,paid_on:on,method:how,note:$('pf-note').value.trim(),email_receipt:!!(rc&&rc.checked)});
+    if(!r.ok){toast((r.body&&r.body.message)||'That didn’t go through.');go.disabled=false;return;}
+    const x=(r.body&&r.body.data)||{}; const live=x.link_deactivated===false;
+    let m=x.part?`Recorded a ${fmtC(a)} part payment. ${fmtC(x.left_cents)} is still due on ${no}.`:`Marked ${no} paid, ${(PAY_WORDS[how]||'paid').replace(/^Paid /,'')}.`;
+    if(x.receipt_emailed)m+=` Receipt emailed to ${first||'them'}.`;
+    if(live)m+=' Its card link may still be live, so switch it off in Stripe.';
+    toast(m,live?'err':undefined);
+    reloadDeal();
+  });
+}
+// item 108 (J4): the retainer's payments, which the deal read totals beside the deal (a retainer
+// charge settles in Stripe and writes no invoice). Zero when the read couldn't count them.
+function retainerPaidNow(){const r=DEAL&&DEAL.retainer_paid;return r&&typeof r==='object'?{cents:Number(r.cents)||0,count:Number(r.count)||0,last_at:r.last_at||null}:{cents:0,count:0,last_at:null};}
+// item 108 (J6): estimates and recurring invoices on the record, in the deal page's words
+const estExpired=(e)=>!!(e&&e.status==='sent'&&e.expires_at&&Date.parse(e.expires_at)<Date.now());
+function estWord(e){if(e.status==='approved')return['Approved','good'];if(e.status==='declined')return['Not now','bad'];if(estExpired(e))return['Expired',''];if(e.status==='sent')return['Sent',''];return['Draft','warn'];}
+const everyWord=(e)=>e==='quarter'?'every 3 months':e==='year'?'every year':'every month';
+const pauseWhy=(r)=>r==='unpaid'?'the last two invoices are still unpaid':r==='no_email'?'there’s no client email on this deal':r==='no_stripe'?'Stripe isn’t connected':'you paused it';
 // the small inline forms: invoice · deposit · retainer
 function billingForm(kind){
   const d=(DEAL&&DEAL.deal)||{}; const host=kind==='retainer'?$('rform'):$('bform'); if(!host)return;
@@ -1333,7 +1570,10 @@ function billingForm(kind){
     host.innerHTML=`<div class="bform"><div class="brow2"><label>Amount (USD)<input type="number" id="bf-amt" step="0.01" min="1" placeholder="500"></label><label>Every<select id="bf-int"><option value="month">month</option><option value="year">year</option></select></label></div><div class="bacts"><button type="button" id="bf-cancel">Cancel</button><button type="button" class="primary" id="bf-go">Start retainer</button></div></div>`;
   }else{
     const dep=kind==='deposit';
-    const html=`<div class="bform"><div class="brow2"><label>${dep?'Deposit amount (USD)':'Amount (USD)'}<input type="number" id="bf-amt" step="0.01" min="1" placeholder="${dep?'500':'2500'}"${dep?'':' aria-describedby="bf-hint"'}></label><label>Label<input type="text" id="bf-title" maxlength="80" placeholder="${dep?'Deposit':'e.g. Balance at launch'}"></label><label>Due<input type="date" id="bf-due" min="${today}"></label></div>${dep?'':'<p class="muted" id="bf-hint" style="font-size:12.5px;margin-top:6px">Leave the amount blank to invoice the accepted proposal.</p>'}<div class="bacts"><button type="button" id="bf-cancel">Cancel</button><button type="button" class="primary" id="bf-go">${dep?'Request deposit':'Send invoice'}</button></div></div>`;
+    // item 107 (J2): blank bills what's LEFT of the accepted proposal — the hint says how much
+    const lp=leftOfProposal();
+    const hint=!lp?'Enter the amount to bill.':lp.left<50?`The accepted proposal (${fmtC(lp.total)}) is billed in full. Enter an amount to bill something else.`:lp.billed?`Leave the amount blank to bill what’s left of the accepted proposal: ${fmtC(lp.left)} of ${fmtC(lp.total)}.`:`Leave the amount blank to bill the accepted proposal (${fmtC(lp.left)}).`;
+    const html=`<div class="bform"><div class="brow2"><label>${dep?'Deposit amount (USD)':'Amount (USD)'}<input type="number" id="bf-amt" step="0.01" min="1" placeholder="${dep?'500':(lp&&lp.left>=50?esc(String(lp.left/100)):'2500')}"${dep?'':' aria-describedby="bf-hint"'}></label><label>Label<input type="text" id="bf-title" maxlength="80" placeholder="${dep?'Deposit':'e.g. Balance at launch'}"></label><label>Due<input type="date" id="bf-due" min="${today}"></label></div>${dep?'':`<p class="muted" id="bf-hint" style="font-size:12.5px;margin-top:6px">${esc(hint)}</p>`}<div class="bacts"><button type="button" id="bf-cancel">Cancel</button><button type="button" class="primary" id="bf-go">${dep?'Request deposit':'Send invoice'}</button></div></div>`;
     host.innerHTML=html;
   }
   host.scrollIntoView({block:'center',behavior:'smooth'});
@@ -1370,18 +1610,22 @@ async function sendMoney(body,host){
     const b=r.body||{}; const url=b.url||'';
     if(b.warning==='link_failed'){toast(b.message||'Invoice saved, but the payment link didn’t generate — tap Send again.');if(host)host.innerHTML='';reloadDeal();return;}
     if(url&&navigator.clipboard)navigator.clipboard.writeText(url).catch(()=>{});
-    toast(b.emailed?label+(b.reused?' re-sent':' sent')+' — emailed to the client':(url?label+' prepared — payment link copied, nothing was emailed':label+' sent'));
+    toast(b.double_tap?label+' already sent a moment ago'+(url?' — link copied':''):b.emailed?label+(b.reused?' re-sent':' sent')+' — emailed to the client':(url?label+' prepared — payment link copied, nothing was emailed':label+' sent'));
     if(host)host.innerHTML='';
     reloadDeal(); return;
   }
-  if(r.status===409&&r.body&&r.body.error==='amount_mismatch'&&host){
-    const open=r.body.open_invoice||{};
-    host.innerHTML=`<div class="bform" role="alert"><p style="font-size:13.5px;margin:0 0 10px">${esc(r.body.message||'An open invoice already exists at a different amount.')} If you send another, both links stay payable until one is paid.</p><div class="bacts"><button type="button" id="bf-resend">Resend the ${esc(fmtC(open.amount_cents))} link</button><button type="button" class="primary" id="bf-force">Send another for the new amount</button></div></div>`;
+  // item 107 (J2): an open one exists — at a different amount (amount_mismatch), or the same one,
+  // already sent (already_open). Nothing goes out until the operator picks: resend THAT invoice
+  // (its own send route, which never makes a new one) or send another.
+  const why=r.status===409&&r.body&&r.body.error;
+  if((why==='amount_mismatch'||why==='already_open')&&host){
+    const open=r.body.open_invoice||{}; const want=Number(r.body.amount_cents)||body.amount_cents||0;
+    host.innerHTML=`<div class="bform" role="alert"><p style="font-size:13.5px;margin:0 0 10px">${esc(r.body.message||'An open invoice already exists on this deal.')} If you send another, both links stay payable until one is paid.</p><div class="bacts"><button type="button" id="bf-resend">Resend the ${esc(fmtC(open.amount_cents))} ${body.purpose==='deposit'?'deposit request':'invoice'}</button><button type="button" class="primary" id="bf-force">${why==='already_open'?'Send another':`Send another for ${esc(fmtC(want))}`}</button></div></div>`;
     // Both buttons guard the double-click (Pipeline's copy already did): a second
     // click while the first is on its way would bill the client twice.
     const arm=(bid,fn)=>{$(bid).addEventListener('click',()=>{$('bf-resend').disabled=true;$('bf-force').disabled=true;fn();});};
-    arm('bf-resend',()=>sendMoney({purpose:body.purpose,amount_cents:Number(open.amount_cents)||undefined,title:open.title||undefined},host));
-    arm('bf-force',()=>sendMoney({...body,force:true},host));
+    arm('bf-resend',async()=>{const x=await billingSend('/sales/invoices/'+encodeURIComponent(open.id)+'/send',body.purpose==='deposit'?'Deposit request re-sent':'Invoice re-sent');if(x){host.innerHTML='';reloadDeal();}else{$('bf-resend').disabled=false;$('bf-force').disabled=false;}});
+    arm('bf-force',()=>sendMoney({...body,...(want&&!body.amount_cents?{amount_cents:want}:{}),force:true},host));
     return;
   }
   toast((r.body&&r.body.message)||'That didn’t go through.');
@@ -1436,7 +1680,9 @@ function renderFilesTab(host){
     html+=`<section><h2>Deliverables</h2><div class="card">`+dl.map(x=>`<div class="rrow"><span class="rt">${esc(x.title||'File')}${x.note?`<span class="s">${esc(x.note)}</span>`:''}</span><button data-dl="${esc(x.id)}" style="font-size:12.5px;padding:5px 12px">Download</button></div>`).join('')+`</div></section>`;
   }
   const docs=[];
-  for(const pr of (DEAL&&DEAL.proposals)||[])docs.push({kind:'proposals',id:pr.id,label:(pr.title||'Proposal')+(pr.version>1?' · v'+pr.version:''),status:pr.status,chip:pr.status==='accepted'?'good':pr.status==='declined'?'bad':''});
+  // item 108 (J6): estimates are documents of the deal too; item 107 (J3): the proposal's word says expired
+  for(const es of (DEAL&&DEAL.estimates)||[]){const [w,tone]=estWord(es);docs.push({kind:'estimates',id:es.id,label:(es.title||'Estimate')+' · estimate',status:w,chip:tone});}
+  for(const pr of (DEAL&&DEAL.proposals)||[]){const [w,tone]=propWord(pr);docs.push({kind:'proposals',id:pr.id,label:(pr.title||'Proposal')+(pr.version>1?' · v'+pr.version:''),status:w,chip:tone==='warn'?'':tone});}
   for(const cn of (DEAL&&DEAL.contracts)||[])docs.push({kind:'contracts',id:cn.id,label:cn.title||'Agreement',status:cn.status,chip:cn.status==='signed'?'good':''});
   if(docs.length){
     html+=`<section><h2>Documents</h2><div class="card">`+docs.map(x=>`<div class="rrow"><span class="rt">${esc(x.label)}</span><span style="display:flex;gap:8px;align-items:center"><span class="schip ${x.chip}">${esc(x.status||'draft')}</span><button data-doc="${esc(x.kind)}:${esc(x.id)}" style="font-size:12.5px;padding:5px 12px">View</button></span></div>`).join('')+`</div></section>`;

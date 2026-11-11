@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="robots" content="noindex, nofollow">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>DDS OS · Accessibility Check</title>
+<title>Accessibility check — Studio OS</title>
 <style>
   :root{ --p:#5b3fa0; --ink:#291942; --muted:#6a5d7e; --cream:#faf7f2; --line:rgba(41,25,66,.1); }
   *{ margin:0; padding:0; box-sizing:border-box; font-family:'Inter',system-ui,sans-serif; }
@@ -24,7 +24,7 @@
 </style>
 </head>
 <body>
-  <h1>DDS OS · Accessibility Check</h1>
+  <h1>Accessibility check</h1>
   <div class="sub">Fetches a deployed page and runs accessibility checks against its markup — contrast, labels, alt text, headings, landmarks, focusable controls. Uses <b>axe-core</b> if reachable; otherwise a built-in checker covering the same high-value rules. No terminal needed.</div>
 
   <div class="card">
@@ -149,7 +149,7 @@ function render(){
   const s = document.getElementById('summary');
   s.textContent = P+' pass · '+F+' fail · '+W+' warn';
   s.style.color = F? '#c0392b' : W? '#9a7a1a' : '#1a7e49';
-  let rep = 'DDS OS ACCESSIBILITY REPORT\n'+new Date().toISOString()+'\n'+P+' pass, '+F+' fail, '+W+' warn\n\n';
+  let rep = 'STUDIO OS ACCESSIBILITY REPORT\n'+new Date().toISOString()+'\n'+P+' pass, '+F+' fail, '+W+' warn\n\n';
   out.forEach(r => rep += r.badge+' ['+r.group+'] '+r.name+(r.detail?' — '+r.detail:'')+'\n');
   document.getElementById('report').textContent = rep;
 }

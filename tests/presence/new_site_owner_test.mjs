@@ -131,7 +131,9 @@ async function call(member, method, route, body, { jwt = 'jwt-studio' } = {}) {
   const res = await handleAgency(req, route.split('?')[0], method, member, PRINCIPAL, {});
   return { status: res.status, body: await res.json() };
 }
-const settle = () => new Promise((r) => setTimeout(r, 30));   // the invitation email is sent without waiting on it
+// the invitation email is sent without waiting on it: wait until what's expected has arrived (at most 2s),
+// not a fixed 30ms, so a busy machine can't count the mail before it lands
+const settle = async (arrived = () => true) => { await new Promise((r) => setTimeout(r, 30)); for (let i = 0; i < 100 && !arrived(); i++) await new Promise((r) => setTimeout(r, 20)); };
 
 // ── POST /agency/sites: the refusals make nothing ──
 {
@@ -223,7 +225,7 @@ let MADE;
   const made = (await call(asMember(), 'POST', '/agency/sites', { business_name: 'Juniper Floral Co.' })).body.data;
   writes = []; outside = [];
   const r = await call(asMember(), 'POST', `/agency/sites/${made.site_id}/invite`, { email: ' June@Juniper.example ', name: 'June Park' });
-  await settle();
+  await settle(() => outside.some((o) => o.to === 'resend'));
   ok('invite: 200, with the address it went to', r.status === 200 && r.body.data.email === 'june@juniper.example' && r.body.data.invited === true);
   const user = outside.find((o) => o.to === 'auth' && o.path === '/auth/v1/admin/users' && o.method === 'POST');
   ok('invite: one sign-in is made for that address', !!user && user.body.email === 'june@juniper.example');

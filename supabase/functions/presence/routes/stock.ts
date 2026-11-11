@@ -5,7 +5,7 @@
 // references the provider (Part 4: the image is self-hosted the moment it's
 // imported). Provider is swappable behind the registry; owner-gated on the API key.
 import { json } from '../../_shared/http.ts';
-import { svc } from '../lib/db.ts';
+import { svcCount } from '../lib/db.ts';
 import { importImage } from '../lib/media.ts';
 import { stockProvider } from '../lib/stock/registry.ts';
 import { StockProviderError, stockFailWords } from '../lib/stock/contract.ts';
@@ -42,8 +42,9 @@ export async function handleStockImport(req: Request, site: SiteRow, principal: 
   // reuse the same per-site media cap as ordinary uploads
   const t = getTemplate(site.template_slug, site.template_version);
   const cap = t?.manifest.entities.media?.max ?? 100;
-  const cnt = await svc(`presence_media?site_id=eq.${site.id}&deleted_at=is.null&select=id`);
-  if (Array.isArray(cnt.json) && cnt.json.length >= cap) {
+  // counted by the database (item 144), not by fetching every id
+  const cnt = await svcCount(`presence_media?site_id=eq.${site.id}&deleted_at=is.null`);
+  if (cnt !== null && cnt >= cap) {
     return json({ error: 'media_cap', message: `Your library holds up to ${cap} images — remove some you’re not using first.` }, 422, cors);
   }
 
