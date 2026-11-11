@@ -290,6 +290,8 @@ h1.doc{font-family:var(--serif);font-weight:500;font-size:24px;letter-spacing:-.
 .pg-check{display:flex;align-items:center;gap:var(--dds-s2,8px);font-size:13.5px;margin-bottom:var(--dds-s3,12px);cursor:pointer}
 .pg-check input{accent-color:var(--plum)}
 .pg-foot{display:flex;flex-wrap:wrap;gap:var(--dds-s2,8px);margin-top:var(--dds-s4,16px);align-items:center}
+/* item 125: every page setting in the Pages card waits for publish, and says so once, under the pane */
+.pc-pane-when{margin:var(--dds-s3,12px) 0 0;font-size:12px;line-height:1.45;color:var(--ink-3)}
 .pg-foot .dc-modal-cancel{margin-top:0}
 .pg-foot .danger{color:var(--clay)}
 .pg-foot .pg-done{margin-left:auto;background:var(--plum);border-color:var(--plum);color:var(--fill-ink,#fff)}
@@ -329,6 +331,19 @@ html:not(.is-studio) #dcModeSeg [data-dcmode="timewarp"]{display:none}
 .ver-live{display:inline-block;margin-left:var(--dds-s2,8px);padding:1px 8px;border-radius:999px;background:var(--hair);color:var(--ink-2);font-size:11px;font-weight:600;vertical-align:1px}
 .hcompare{flex-basis:100%;margin-top:var(--dds-s2,8px)}
 .ver-more{margin-top:var(--dds-s6,24px);border-top:1px solid var(--hair);padding-top:var(--dds-s4,16px)}
+/* item 125: a publish wears a filled dot, a saved checkpoint (never live) a hollow one */
+.ver-top{display:flex;align-items:center;justify-content:space-between;gap:var(--dds-s3,12px);flex-wrap:wrap;margin:calc(-1 * var(--dds-s2,8px)) 0 var(--dds-s2,8px)}
+.ver-legend{display:flex;gap:var(--dds-s5,20px);margin:0}
+.ver-kind{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:600;color:var(--sage);white-space:nowrap}
+.ver-kind::before{content:"";flex:none;width:8px;height:8px;border-radius:50%;background:currentColor}
+.ver-kind.save{color:var(--ink-3)}
+.ver-kind.save::before,.ver-kind.fail::before{background:transparent;box-shadow:inset 0 0 0 1.5px currentColor}
+.ver-kind.fail{color:var(--clay)}
+.ver-legend .ver-kind{font-weight:500}
+.hdate .ver-kind{display:flex;margin-bottom:3px}
+.ver-note{display:flex;gap:10px;margin:var(--dds-s4,16px) 0 0;padding:var(--dds-s3,12px) 14px;border-radius:12px;background:var(--info-soft);color:var(--ink);font-size:12.5px;line-height:1.5}
+.ver-note>span:first-child{color:var(--info);font-weight:600}
+.ver-sheet-note{margin:10px 0 0;font-size:13.5px;line-height:1.6;color:var(--ink)}
 .ver-more>summary{cursor:pointer;font-size:13.5px;font-weight:600;color:var(--ink-2);margin-bottom:var(--dds-s4,16px)}
 h5.rune{font-size:14px;letter-spacing:0;text-transform:none;color:var(--ink);font-weight:600;margin:36px 0 var(--dds-s4,16px);display:flex;align-items:center;gap:var(--dds-s4,16px)}
 h5.rune::after{content:"";flex:1;height:1px;background:var(--hair)}
@@ -398,6 +413,10 @@ html.dc-edit:not(.plan-watch) .dc-bar{position:absolute;top:var(--dc-bar-top);le
 .dc-switch-name{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .dc-chip{display:inline-flex;align-items:center;height:24px;padding:0 10px;border-radius:999px;background:var(--sheet);color:var(--ink-2);font-size:12px;font-weight:600;white-space:nowrap;line-height:1}
 .dc-chip.good{background:var(--sage-soft);color:var(--sage)}
+/* item 125: the page's status word beside its name in the bar (Live, 2 changes, Not live yet) */
+.dc-chip.warn{background:var(--amber-soft);color:var(--amber)}
+.dc-chip.bad{background:var(--clay-soft);color:var(--clay)}
+#dcPageCount::before{content:"";flex:none;width:6px;height:6px;margin-right:6px;border-radius:50%;background:currentColor}
 .dc-switch:focus-visible,.dc-dk:focus-visible{outline:2px solid var(--plum);outline-offset:2px}
 /* ── the Pages card (part three, Figma 66:339): the menu in its order, then the pages off it,
    then the header and footer, the not-found page and search. A row is a page: a grip, its
@@ -831,7 +850,9 @@ html.dc-edit:not(.plan-watch) .dds-hint{bottom:88px !important;z-index:80 !impor
 @media(max-width:760px){
   html.dc-edit:not(.plan-watch){--dc-bar-top:10px;--dc-bar-h:50px}
   html.dc-edit:not(.plan-watch) .dc-bar{left:10px;right:10px;width:auto;max-width:none;padding:6px;gap:4px;justify-content:space-between}
-  html.dc-edit:not(.plan-watch) .dc-bar .dc-sep,html.dc-edit:not(.plan-watch) .dc-bar #dpDevSeg,html.dc-edit:not(.plan-watch) .dc-bar #dcLiveChip,html.dc-edit:not(.plan-watch) .dc-bar #dcBtnPreview,html.dc-edit:not(.plan-watch) .dc-bar #dcPageCount{display:none}   /* a phone is already a phone; Live and Preview live in the cards */
+  html.dc-edit:not(.plan-watch) .dc-bar .dc-sep,html.dc-edit:not(.plan-watch) .dc-bar #dpDevSeg,html.dc-edit:not(.plan-watch) .dc-bar #dcLiveChip,html.dc-edit:not(.plan-watch) .dc-bar #dcBtnPreview{display:none}   /* a phone is already a phone; Live and Preview live in the cards */
+  html.dc-edit:not(.plan-watch) .dc-bar #dcPageCount{width:10px;height:10px;padding:0;font-size:0;background:transparent}   /* the page's status: its dot alone (the words stay for screen readers) */
+  html.dc-edit:not(.plan-watch) .dc-bar #dcPageCount::before{width:8px;height:8px;margin:0}
   html.dc-edit:not(.plan-watch) .dc-pages{flex:1 1 auto;min-width:0}
   html.dc-edit:not(.plan-watch) .dc-switch{max-width:100%;height:36px;padding:0 8px 0 10px;gap:6px}
   html.dc-edit:not(.plan-watch) .dc-bar .pillbtn{padding:0 12px}
@@ -1501,7 +1522,7 @@ body.pd-dragging *{cursor:grabbing !important}
   h1.doc{font-size:24px}
   .hdate{width:84px}
   .hentry{flex-wrap:wrap}
-  .hacts{padding-left:106px}
+  .hacts{padding-left:106px;flex-wrap:wrap;gap:var(--dds-s2,8px) 14px}   /* four actions fit a phone's width, or wrap, never off the edge */
   .deskprivacy{display:none}
   .pagewords{display:none} /* pages travel by tapping links inside the proof */
 }
@@ -1842,7 +1863,7 @@ body.pd-dragging *{cursor:grabbing !important}
             <button type="button" class="dc-switch" id="dcPageSwitch" aria-haspopup="dialog" aria-expanded="false" aria-controls="pagesCard" title="Your pages: switch, add one, change the menu">
               <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3h8l5 5v13H6z"/><path d="M14 3v5h5"/></svg>
               <span class="dc-switch-name" id="dcPageName">Home</span>
-              <span class="dc-chip" id="dcPageCount">1 page</span>
+              <span class="dc-chip" id="dcPageCount"></span>
               <svg class="dc-switch-chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
             </button>
           </div>
@@ -1938,7 +1959,7 @@ body.pd-dragging *{cursor:grabbing !important}
                   <button type="button" class="pc-mrow" id="btnPageInfo" title="Everything about this page — publish, share a draft, properties, search appearance" aria-haspopup="menu" aria-expanded="false"><span class="ic"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 11v5"/><path d="M12 8h.01"/></svg></span><span class="t"><b>This page</b><span>Publish, share a draft, take offline</span></span><svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></button>
                 </div>
               </div>
-              <div id="pcPane" hidden><button type="button" class="pc-back" id="pcBack"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg>All pages</button><div class="pc-pane-body pg-settings"></div></div>
+              <div id="pcPane" hidden><button type="button" class="pc-back" id="pcBack"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg>All pages</button><div class="pc-pane-body pg-settings"></div><p class="pc-pane-when" id="pcPaneWhen">Changes here save as you go and reach your live site when you publish.</p></div>
             </div>
           </aside>
           <!-- on-demand three-tab side panel (left slide-over, no scrim so the canvas
@@ -1999,17 +2020,19 @@ body.pd-dragging *{cursor:grabbing !important}
       <!-- HISTORY -->
       <section class="view" id="view-history">
         <h1 class="doc" role="heading" aria-level="2">Versions</h1>
-        <p class="docsub">Every version you publish is saved here. View one, compare it, or restore it to your draft. Your live site changes only when you publish.</p>
+        <p class="docsub">Every version you publish, and every checkpoint you save, newest first. View one, compare it, or bring it back into your draft. Your live site changes only when you publish.</p>
+        <!-- item 125: saves and publishes in one list, marked apart -->
+        <div class="ver-top"><p class="ver-legend"><span class="ver-kind pub">Published</span><span class="ver-kind save">Saved, never live</span></p><button type="button" class="pillbtn sm" id="btnSaveCheckpoint" title="Save a named copy of your draft before a big edit, to look at or come back to. Your live site isn’t touched." hidden>Save a checkpoint</button></div>
         <div id="pubList"></div>
+        <p class="ver-note" id="verNote"><span aria-hidden="true">ⓘ</span><span>Restoring a version brings back its business details, services, reviews, questions, updates, colours and fonts, and leaves your sections, pages, menu, bookings, enquiries, contacts and files as they are now.</span></p>
         <!-- what happened to the site, newest first (was its own page: timeline.html) -->
         <section class="hb-sec" id="activitySec" aria-labelledby="activityH" tabindex="-1" hidden>
           <div class="hb-sec-h"><h2 id="activityH">Recent activity</h2><button type="button" class="quietact" id="activityMore" hidden>See all</button></div>
           <div class="hb-list" id="activityList"></div>
         </section>
         <details class="ver-more" id="versionMore">
-          <summary>More tools: private preview, checkpoints, compare, launches</summary>
+          <summary>More tools: private preview, compare, launches</summary>
           <div id="previewBox"></div>
-          <div id="checkpointBox"></div>
           <div id="versionToolsBox"></div>
           <div id="launchBox"></div>
         </details>
@@ -2045,7 +2068,7 @@ body.pd-dragging *{cursor:grabbing !important}
   <div class="sheetcard" role="dialog" aria-modal="true" aria-labelledby="resSheetTitle">
     <h2 id="resSheetTitle">Restore this version?</h2>
     <p class="sub" id="resSheetSub"></p>
-    <div class="body"><p style="font-size:13.5px;color:var(--ink-2);font-family:var(--serif);font-style:italic;line-height:1.7">That version goes into your draft so you can check it. Today’s draft is kept as a safety copy, and your live site doesn’t change until you publish.</p></div>
+    <div class="body"><p style="font-size:13.5px;color:var(--ink-2);font-family:var(--serif);font-style:italic;line-height:1.7">That version goes into your draft so you can check it. Today’s draft is kept as a safety copy, and your live site doesn’t change until you publish.</p><p class="ver-sheet-note" id="resSheetKeeps">It brings back business details, services, reviews, questions, updates, colours and fonts, and leaves your sections, pages, menu, bookings, enquiries, contacts and files as they are now.</p></div>
     <div class="foot">
       <button class="quietact" data-close>Cancel</button>
       <button class="pillbtn inked" id="btnRestoreGo">Restore to my draft</button>
@@ -5946,7 +5969,7 @@ function hbTreePage(pg) {
 function hbLoadBoardExtras(view) {
   if (view === "pages" && !HB_ASKED.tree) {
     HB_ASKED.tree = true;
-    api("GET", "/content-tree").then((r) => { HB_TREE = r.data || null; renderPagesList(); }).catch(() => {});
+    api("GET", "/content-tree").then((r) => { HB_TREE = r.data || null; renderPagesList(); dcSyncPageSwitch(); }).catch(() => {});
   }
   if (view === "search" && !HB_ASKED.health) {
     HB_ASKED.health = true;
@@ -6086,7 +6109,7 @@ async function loadToday(first) {
     const [h, c] = await (first || Promise.all([api("GET", "/health"), readChanges()]));   // M9: seed the optimistic-lock version
     S.health = h.data; S.changes = c.data; TODAY_READ_AT = at;
     renderFactsProse();
-    renderPublishButton(); renderBizWaiting(); renderTodoLine(); renderStageStatus();
+    renderPublishButton(); renderBizWaiting(); renderTodoLine(); renderStageStatus(); dcSyncPageSwitch();
   } catch (err) { toast(nice(err), true); }
 }
 // ── The Overview is the site ─────────────────────────────────────────────────
@@ -6307,7 +6330,7 @@ async function readChanges() {
 }
 function scheduleChangesRefresh() {
   debounce("changes", async () => {
-    try { const c = await readChanges(); S.changes = c.data; renderPublishButton(); renderBizWaiting(); renderTodoLine(); renderStageStatus();
+    try { const c = await readChanges(); S.changes = c.data; renderPublishButton(); renderBizWaiting(); renderTodoLine(); renderStageStatus(); dcSyncPageSwitch();
       if ($("view-pages").classList.contains("on")) { renderRecent(); renderPagesList(); } }
     catch { /* quiet */ }
   }, 1200);
@@ -7486,49 +7509,23 @@ async function renderDeletedPages() {
   });
   box.appendChild(card);
 }
+// Saved checkpoints: named copies of the draft that were never live. Item 125 puts them in the
+// Versions list with the publishes, newest first, a hollow dot against a publish's filled one;
+// the studio's Save a checkpoint sits at the list's top (a client's list just shows them).
 async function renderCheckpoints() {
-  const box = $("checkpointBox"); if (!box) return;
-  let cps = [];
-  try { cps = (await api("GET", "/publishes/checkpoints")).data || []; } catch (_) { box.innerHTML = ""; return; }
-  box.innerHTML = "";
-  const card = el("div", "field"); card.style.marginBottom = "18px";
-  card.appendChild(el("label", null, "Checkpoints"));
-  card.appendChild(el("div", "hint", "Before a big edit or a publish, save a named checkpoint of your current draft — a safety point you can look at or return to anytime. Your live site is never affected."));
-  const save = el("button", null, "Save a checkpoint"); save.type = "button";
-  save.style.cssText = "font:inherit;font-size:12.5px;margin:8px 0;padding:7px 14px;border-radius:999px;border:1px solid var(--line,#ddd);background:transparent;cursor:pointer";
-  save.addEventListener("click", async () => {
+  try { S.checkpoints = (await api("GET", "/publishes/checkpoints")).data || []; } catch (_) { S.checkpoints = []; }
+  const b = $("btnSaveCheckpoint"); if (b) b.hidden = !S.isStudio;
+  if (S.publishesRead) renderVersionList();
+}
+(function initSaveCheckpoint() {
+  const b = $("btnSaveCheckpoint"); if (!b) return;
+  b.addEventListener("click", async () => {
     const name = await askText("Name this checkpoint", { placeholder: "e.g. Before spring redesign", ok: "Save" });
     if (name === null) return;
     try { await api("POST", "/publishes/checkpoints", { name }); toast("Checkpoint saved"); renderCheckpoints(); }
     catch (err) { toast(nice(err), true); }
   });
-  card.appendChild(save);
-  cps.forEach((c) => {
-    const row = el("div"); row.style.cssText = "border:1px solid var(--line,#e5e5e5);border-radius:10px;padding:10px 12px;margin-top:8px";
-    const top = el("div"); top.style.cssText = "display:flex;align-items:center;gap:8px;flex-wrap:wrap";
-    top.appendChild(Object.assign(el("strong", null, c.name), { style: "font-size:13.5px" }));
-    const d = new Date(c.at);
-    top.appendChild(Object.assign(el("span", null, "saved " + d.toLocaleDateString("en-US", { month: "short", day: "numeric" }) + " " + d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" }).replace(" ", "")), { style: "font-size:12px;color:var(--soft,#666)" }));
-    row.appendChild(top);
-    const acts = el("div"); acts.style.cssText = "display:flex;gap:8px;flex-wrap:wrap;margin-top:8px";
-    const mk = (label, fn, primary) => { const b = el("button", null, label); b.type = "button"; b.style.cssText = "font:inherit;font-size:12px;padding:5px 12px;border-radius:999px;cursor:pointer;border:" + (primary ? "2px solid var(--plum,#5b3fa0);background:var(--plum-tint,#faf7ff);color:var(--plum-deep,#3a2470)" : "1px solid var(--line,#ddd);background:transparent"); b.addEventListener("click", fn); acts.appendChild(b); };
-    mk("View", () => openLaunchPreview(c.id));
-    mk("Restore to draft", async () => {
-      if (!(await askYes("Restore checkpoint “" + c.name + "” to your draft? Today’s draft is kept as a safety copy.", { ok: "Restore" }))) return;
-      try { const r = await api("POST", `/publishes/checkpoints/${c.id}/restore`, {}); toast(r.data.message); await refreshAll(); go("today"); }
-      catch (err) { toast(nice(err), true); }
-    }, true);
-    mk("Remove", async () => {
-      if (!(await askYes("Remove checkpoint “" + c.name + "”? This can’t be undone.", { ok: "Remove", danger: true }))) return;
-      try { await api("DELETE", `/publishes/checkpoints/${c.id}`); toast("Checkpoint removed"); renderCheckpoints(); }
-      catch (err) { toast(nice(err), true); }
-    });
-    acts.lastChild.dataset.needs = "delete";
-    row.appendChild(acts);
-    card.appendChild(row);
-  });
-  box.appendChild(card);
-}
+})();
 // ── Compare any two versions + Timewarp ──────────────────────────────────────
 // Compare feeds two kept versions to the SAME plain-language change engine the
 // publish sheet uses; Timewarp resolves a date to the version that was live then
@@ -7621,12 +7618,14 @@ async function loadHistory() {
   if (more && !more.dataset.set) { more.dataset.set = "1"; more.open = !!S.isStudio; }
   const list = $("pubList");
   list.innerHTML = `<div class="loadline"><div class="lq">Loading versions…</div><div class="shimmer"></div></div>`;
+  S.publishesRead = false;
   try {
     const pubs = (await api("GET", "/publishes")).data;
-    S.publishes = pubs;
+    S.publishes = pubs; S.versionsErr = null;
     renderVersionTools();   // compare any two versions + Timewarp (needs S.publishes)
-    renderVersionList();
-  } catch (err) { list.innerHTML = `<div class="estate"><div class="eq">Your versions couldn’t load just now.</div><div class="eh">${esc(nice(err))}</div></div>`; }
+  } catch (err) { S.publishes = null; S.versionsErr = nice(err); }
+  S.publishesRead = true;   // saved checkpoints may land before or after: whichever is last draws the list
+  renderVersionList();
 }
 // Who published it, in the words of whoever is reading: a studio working inside a
 // client's site and the client see the same row from opposite sides.
@@ -7637,17 +7636,22 @@ function versionWho(p) {
   return "";
 }
 const VERSIONS_SHOWN = 10;
+const verWhen = (at) => { const d = new Date(at); return d.toLocaleDateString("en-US", { month: "short", day: "numeric" }) + " · " + d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" }); };
+// the date cell leads with what the row is: Published (a filled dot), Saved (a hollow one, never live)
+function verDate(kind, word, at) { const w = el("span", "hdate"); w.appendChild(el("span", "ver-kind " + kind, word)); w.appendChild(document.createTextNode(verWhen(at))); return w; }
 function renderVersionList() {
   const list = $("pubList"); if (!list) return;
   const pubs = S.publishes || [];
+  const all = [...pubs, ...(S.checkpoints || []).map((c) => ({ ...c, saved: true, at: c.at || c.created_at }))].sort((a, b) => new Date(b.at) - new Date(a.at));
   list.innerHTML = "";
-  if (!pubs.length) { list.innerHTML = `<div class="estate"><div class="eq">No versions yet.</div><div class="eh">Each time you publish, a version is saved here. You can look at any of them or restore one.</div></div>`; return; }
+  if (S.versionsErr) list.insertAdjacentHTML("beforeend", `<div class="estate"><div class="eq">Your versions couldn’t load just now.</div><div class="eh">${esc(S.versionsErr)}</div></div>`);
+  if (!all.length) { if (!S.versionsErr) list.innerHTML = `<div class="estate"><div class="eq">No versions yet.</div><div class="eh">Each time you publish, a version is saved here. You can look at any of them or restore one.</div></div>`; return; }
   const liveId = (pubs.find((p) => p.status === "live") || {}).id;
-  const shown = S.versionsAll ? pubs : pubs.slice(0, VERSIONS_SHOWN);
+  const shown = S.versionsAll ? all : all.slice(0, VERSIONS_SHOWN);
   shown.forEach((p) => {
+    if (p.saved) { list.appendChild(versionSavedRow(p)); return; }
     const row = el("div", "hentry" + (p.status === "failed" ? " hfail" : ""));
-    const d = new Date(p.at);
-    row.appendChild(el("span", "hdate", d.toLocaleDateString("en-US", { month: "short", day: "numeric" }) + " · " + d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })));
+    row.appendChild(p.status === "failed" ? verDate("fail", "Not published", p.at) : verDate("pub", "Published", p.at));
     const body = el("div", "hbody");
     const sum = el("div", "hsum");
     if (p.status === "failed") sum.appendChild(el("span", "hollow", "◌"));
@@ -7710,18 +7714,42 @@ function renderVersionList() {
     }
     list.appendChild(row);
   });
-  if (shown.length < pubs.length) {
-    const older = el("button", "addline", `Show ${pubs.length - shown.length} older version${pubs.length - shown.length === 1 ? "" : "s"}`);
+  if (shown.length < all.length) {
+    const older = el("button", "addline", `Show ${all.length - shown.length} older version${all.length - shown.length === 1 ? "" : "s"}`);
     older.addEventListener("click", () => { S.versionsAll = true; renderVersionList(); });
     list.appendChild(older);
   }
+}
+// A saved checkpoint in the list: View, Restore (the same sheet as a publish) and, with the
+// right to delete, Remove.
+function versionSavedRow(c) {
+  const row = el("div", "hentry ver-saved");
+  row.appendChild(verDate("save", "Saved", c.at));
+  const body = el("div", "hbody");
+  body.appendChild(el("div", "hsum", "“" + c.name + "”"));
+  body.appendChild(el("div", "hmeta", "A checkpoint of your draft. It was never on your live site."));
+  row.appendChild(body);
+  const acts = el("div", "hacts");
+  const view = el("button", "quietact", "View"); view.addEventListener("click", () => openLaunchPreview(c.id)); acts.appendChild(view);
+  const res = el("button", "textact", "Restore");
+  res.addEventListener("click", () => { S.restoreTarget = c; $("resSheetSub").textContent = `“${c.name}”, saved ${fmtDate(c.at)}.`; openSheet("restoreScrim"); });
+  acts.appendChild(res);
+  const rm = el("button", "quietact", "Remove"); rm.dataset.needs = "delete";
+  rm.addEventListener("click", async () => {
+    if (!(await askYes("Remove checkpoint “" + c.name + "”? This can’t be undone.", { ok: "Remove", danger: true }))) return;
+    try { await api("DELETE", `/publishes/checkpoints/${c.id}`); toast("Checkpoint removed"); renderCheckpoints(); }
+    catch (err) { toast(nice(err), true); }
+  });
+  acts.appendChild(rm);
+  row.appendChild(acts);
+  return row;
 }
 $("btnRestoreGo").addEventListener("click", async () => {
   const p = S.restoreTarget; if (!p) return;
   const btn = $("btnRestoreGo");
   btn.disabled = true; btn.textContent = "Restoring…";
   try {
-    const r = await api("POST", "/restore-to-draft", { publish_id: p.id });
+    const r = p.saved ? await api("POST", `/publishes/checkpoints/${p.id}/restore`, {}) : await api("POST", "/restore-to-draft", { publish_id: p.id });
     closeSheet("restoreScrim");
     toast(r.data.message);
     btn.disabled = false; btn.textContent = "Restore to my draft";
@@ -12118,7 +12146,7 @@ function openSettingsPanel(mode, title) {
   const modal = ["section", "styles", "header", "footer"].indexOf(m) < 0;   // a section, a style, the header or footer: keep the page in view, undimmed
   p.setAttribute("aria-modal", String(modal));
   const cl = $("btnSettingsClose");
-  if (cl) { cl.textContent = modal ? "✕" : "Done"; cl.setAttribute("aria-label", modal ? "Close" : "Done"); }
+  if (cl) { cl.textContent = modal ? "✕" : "Done"; cl.setAttribute("aria-label", modal ? "Close" : "Done"); cl.title = (modal ? "Close" : "Done") + " (Esc)"; }
   if (sc) {
     if (modal) { sc.hidden = false; requestAnimationFrame(() => sc.classList.add("on")); }
     else { sc.classList.remove("on"); sc.hidden = true; }
@@ -12413,7 +12441,28 @@ function dcSyncPageSwitch() {
   const list = typeof dcPageList === "function" ? dcPageList() : [];
   const cur = list.find((p) => p.slug === DC_PAGE) || list[0];
   const nm = $("dcPageName"); if (nm) nm.textContent = cur ? cur.title : "Home";
-  const ct = $("dcPageCount"); if (ct) ct.textContent = list.length + (list.length === 1 ? " page" : " pages");
+  const ct = $("dcPageCount"); if (ct) dcPageStatus(ct);
+}
+// Item 125: the page being edited says where it stands, beside its name, in the Pages card's
+// words: Live (nothing on it is waiting), 2 changes (waiting to go live), Not live yet (the
+// site has never been published), or what its check found (Needs a look).
+function dcPageStatus(chip) {
+  const ctx = pgStatusCtx(), m = typeof pgModel === "function" ? pgModel() : { menu: [], unlinked: [] };
+  const pg = [...m.menu.map((e) => e.pg), ...m.unlinked].find((p) => p && p.view === "design" && (p.slug || "") === DC_PAGE);
+  let word = "Live", tone = "good", says = "Nothing on this page is waiting: your live site shows it as it is here";
+  const tp = pg ? hbTreePage(pg) : null;
+  if (tp && HB_TREE_FLAG[tp.status]) { word = tp.status_label; tone = HB_TREE_FLAG[tp.status]; says = tp.status_label; }
+  else if (!ctx.siteLive || ctx.firstPublish) { word = "Not live yet"; tone = ""; says = "Your site goes live the first time you publish"; }
+  else {
+    const n = pg ? ctx.changes.filter((ch) => pcChangeOn(ch, pg)).length : 0;
+    if (n) { word = n + (n === 1 ? " change" : " changes"); tone = "warn"; says = n + (n === 1 ? " change on this page is" : " changes on this page are") + " waiting to go live"; }
+  }
+  chip.textContent = word; chip.className = "dc-chip" + (tone ? " " + tone : ""); chip.title = says;
+}
+// What a page's status is read from: is the site live, and what's waiting to publish.
+function pgStatusCtx() {
+  const live = !!(S.health && S.health.facts && S.health.facts.website.state !== "none");
+  return { live, siteLive: live || !!(typeof siteLiveUrl === "function" && siteLiveUrl()), changes: (S.changes && S.changes.changes) || [], firstPublish: !!(S.changes && S.changes.first_publish) };
 }
 function dcSyncLiveChip() { const c = $("dcLiveChip"); if (c) c.hidden = !(typeof siteLiveUrl === "function" && siteLiveUrl()); }
 // a tablet's left card takes the dock's place while it's open (the CSS reads this class)
@@ -12557,6 +12606,14 @@ function exitEditMode(to) {   // to: the tab to land on (the Pages card's "Chang
   go(to || EDIT_RETURN);
 }
 function closeDesignPanels() { closePagesCard(false); dcDockMore(false); closeTrayPanel(); closeSettingsPanel(); closeCommentsPanel(); if (PANEL_LASTFOCUS && PANEL_LASTFOCUS.focus) { try { PANEL_LASTFOCUS.focus(); } catch (_) {} PANEL_LASTFOCUS = null; } }
+// Item 125: tooltips name their keys, in this computer's words (⌘ on a Mac or an iPad, Ctrl elsewhere).
+const KEY_MAC = /Mac|iPhone|iPad|iPod/.test(navigator.platform || navigator.userAgent || "");
+(function keyTitles() {
+  const k = (mac, pc) => (KEY_MAC ? mac : pc);
+  ["btnUndo", "btnUndoTop"].forEach((id) => { const b = $(id); if (b) b.title = "Undo (" + k("⌘Z", "Ctrl+Z") + ")"; });
+  ["btnRedo", "btnRedoTop"].forEach((id) => { const b = $(id); if (b) b.title = "Redo (" + k("⇧⌘Z", "Ctrl+Shift+Z") + ")"; });
+  [["btnPagesClose", "Done (Esc)"], ["btnTrayClose", "Done (Esc): the page gets the whole screen"], ["btnCommentsClose", "Close (Esc)"]].forEach(([id, t]) => { const b = $(id); if (b) b.title = t; });
+})();
 (function initDesignPanels() {
   const on = (id, fn) => { const b = $(id); if (b) b.addEventListener("click", fn); };
   on("btnUndo", dcUndo); on("btnRedo", dcRedo);

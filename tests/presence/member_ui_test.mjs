@@ -28,7 +28,7 @@ const CONTROLS = [
   ['DELETE /content-library/:id', 'presence.html', `api("DELETE", "/content-library/" + it.id)`, ['el("button", null, "×"); del.dataset.needs = "delete"']],
   ['DELETE /knowledge/docs/:id', 'presence.html', 'api("DELETE", `/knowledge/docs/${d.id}`)', ['el("button", "quietact", "Remove"); del.dataset.needs = "delete"']],
   ['DELETE /media/:id', 'presence.html', 'api("DELETE", `/media/${m.id}`)', ['el("button", "del", "✕"); del.dataset.needs = "delete"']],
-  ['DELETE /publishes/checkpoints/:id', 'presence.html', 'api("DELETE", `/publishes/checkpoints/${c.id}`)', ['acts.lastChild.dataset.needs = "delete"']],
+  ['DELETE /publishes/checkpoints/:id', 'presence.html', 'api("DELETE", `/publishes/checkpoints/${c.id}`)', ['el("button", "quietact", "Remove"); rm.dataset.needs = "delete"']],
   ['DELETE /redirects/:id', 'presence.html', `api("DELETE", "/redirects/" + row.id)`, ['x.dataset.needs = "delete"']],
   ['POST /comments/:id/delete', 'presence.html', `"/comments/" + c.id + "/delete"`, ['d.dataset.needs = "delete"']],
   ['DELETE /sales/contacts/:id', 'contacts.html', `api('/sales/contacts/'+encodeURIComponent(id),'DELETE')`, ['class="rowact danger" data-needs="delete" data-del=', 'class="danger" data-needs="delete" data-del=']],
