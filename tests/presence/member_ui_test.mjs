@@ -57,6 +57,7 @@ const CONTROLS = [
   ['POST /foundations/domain', 'presence.html', `api("POST", "/foundations/domain", { domain })`, ['choose.dataset.needs = "configure"', 'havePanel.dataset.needs = "configure"', 'needPanel.dataset.needs = "configure"', 'btn.dataset.needs = "configure"; btn.textContent = "Connect your domain"']],
   ['DELETE /foundations/domain', 'presence.html', `api("DELETE", "/foundations/domain")`, ['rm.dataset.needs = "configure"']],
   ['POST /foundations/prepare', 'presence.html', `api("POST", "/foundations/prepare", { goal: "email_auth" })`, ['acts.dataset.needs = "configure"', 'after.dataset.needs = "configure"']],
+  ['POST /foundations/prepare', 'presence.html', `api("POST", "/foundations/prepare", { goal })`, ['mh.dataset.needs = "configure"']],   // builder list item 162, part two: the domain sheet's "More help" guides
   ['POST /preview/settings', 'presence.html', `act("/preview/settings", "Preview access updated"`, ['"Preview access updated", { password: pw }); });\n    acts.lastChild.dataset.needs = "configure";']],
   ['POST /preview/settings', 'presence.html', `act("/preview/settings", "Preview link reset"`, ['"Preview link reset", { regenerate_token: true }); });\n    acts.lastChild.dataset.needs = "configure";']],
   ['POST /site/offline', 'presence.html', `siteSetState("/site/offline"`, ['offBtn.dataset.needs = "configure"']],
@@ -138,7 +139,7 @@ const SOURCE = Object.fromEntries(PAGES.map((p) => [p, read(p)]));
       if (!known(page).some((k) => k.includes(call))) ok(`${page}: this configure write is listed`, false, call);
     }
   }
-  ok('tripwire: the configure scan found every call in the table', seen === 9, String(seen));
+  ok('tripwire: the configure scan found every call in the table', seen === 10, String(seen));   // item 162, part two: the domain sheet's "More help" guides
 }
 
 // ═══ 4. settings: one row, two kinds of field ═══

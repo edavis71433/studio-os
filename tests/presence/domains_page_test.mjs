@@ -115,11 +115,16 @@ globalThis.fetch = async (url, init = {}) => {
   const u = new URL(String(url)); const method = (init.method || 'GET').toUpperCase();
   if (u.hostname === 'dns.google') { const n = u.searchParams.get('name'), t = u.searchParams.get('type'); const v = n === 'bistro.example' && t === 'A' ? [NETLIFY_APEX_IP] : n === 'www.bistro.example' && t === 'CNAME' ? ['bistro.netlify.app'] : []; return reply({ Answer: v.map((d) => ({ name: n + '.', type: t === 'A' ? 1 : 5, data: d + '.' })) }); }
   if (u.hostname === 'api.netlify.com') { if (u.pathname.endsWith('/ssl')) return method === 'POST' ? reply({}) : reply({ state: 'issued', domains: ['bistro.example', 'www.bistro.example'], expires_at: '2027-02-01T00:00:00Z' }); return reply({ id: 'nf1', name: 'bistro', default_domain: 'bistro.netlify.app', url: 'https://bistro.netlify.app' }); }
-  if (u.hostname === 'rdap.org') return w.rdap ? reply(w.rdap) : reply({ error: 'busy' }, 503);
+  if (u.hostname === 'rdap.org') return w.rdap ? reply(w.rdap) : w.rdap404 ? reply({}, 404) : reply({ error: 'busy' }, 503);
   if (u.hostname === 'bistro.example' || u.hostname === 'bistro.netlify.app') return reply('<h1>Bistro</h1>', 200, { Server: 'Netlify' });
   if (u.hostname !== 'stub.local') return reply({}, 404);
   const table = u.pathname.replace('/rest/v1/', '');
   if (table === 'presence_sites' && method === 'PATCH') { w.patches.push(JSON.parse(init.body)); return reply([]); }
+  // part two: the rate limiter, the sheet's facts, the seller for "make sure it renews", a saved plan
+  if (table === 'rpc/rate_hit') return reply(w.rateOk === false ? false : true);
+  if (table === 'presence_sites' && method === 'GET' && u.search.includes('domain_lookup_status')) return reply(w.facts ? [w.facts] : []);
+  if (table === 'presence_sites' && method === 'GET' && u.search.includes('select=domain_registrar&')) return reply(w.sold ? [{ domain_registrar: w.sold }] : []);
+  if (table === 'presence_infra_plans' && method === 'POST') { const b = JSON.parse(init.body); (w.plans = w.plans || []).push(b); return reply([{ id: 'plan1', status: 'proposed', ...b }]); }
   return reply([]);
 };
 const quiet = async (fn) => { const e = console.error, x = console.warn; console.error = () => {}; console.warn = () => {}; try { return await fn(); } finally { console.error = e; console.warn = x; } };
@@ -161,6 +166,97 @@ const SITE = { id: 'site1', client_id: 'c1', custom_domain: 'bistro.example', ne
   const page = read('domains.html');
   ok('the page has the filters, the side panel, Download and the Last checked column', ['attention:', 'expiring:', 'waiting:', 'nodomain:'].every((k) => page.includes(k)) && /<dialog class="dpanel" id="dpanel"/.test(page) && /id="dlBtn"/.test(page) && /\['checked','Last checked'/.test(page));
   ok('the panel calls the three routes', /api\('\/agency\/domains\/'\+encodeURIComponent\(siteId\)\)/.test(page) && /apiSend\('POST','\/agency\/domains\/'\+encodeURIComponent\(d\.site_id\)\+'\/check'\)/.test(page) && /apiSend\('PUT','\/agency\/domains\/'\+encodeURIComponent\(d\.site_id\)\+'\/notes',body\)/.test(page));
+}
+
+
+// ═══ part two: where to go, the lookup as they type, the guides, mail and history (findings 6, 7, 8, 10, 23) ═══
+const { providerGuide, whereToGo, lookupPatch, registrarTip, expiryWords } = await import(`${P}/lib/rdap.ts`);
+const { mailHealth, domainHistory } = await import(`${P}/agency/sites.ts`);
+{
+  ok('one table names each company: by its registrar name, its DNS name or a nameserver', providerGuide('GoDaddy.com, LLC')?.company === 'GoDaddy' && providerGuide('NAMECHEAP INC')?.company === 'Namecheap' && providerGuide('Cloudflare')?.company === 'Cloudflare' && providerGuide('Google Domains (now Squarespace)')?.company === 'Squarespace Domains' && providerGuide('ns-123.awsdns-15.com')?.company === 'Amazon Route 53');
+  ok('…unknown or blank is no guide', providerGuide('Weird Registrar GmbH') === null && providerGuide('') === null && providerGuide(null) === null);
+  ok('every guide has a sign-in page, a path to the records and one to renewal', ['godaddy', 'namecheap', 'cloudflare', 'squarespace', 'porkbun', 'wix', 'network solutions', 'ionos', 'route 53', 'hover', 'dnsimple', 'digitalocean'].every((n) => { const g = providerGuide(n); return g && /^https:\/\//.test(g.sign_in) && g.records && g.renewal; }));
+  ok('the old tips read from the same table, word for word', registrarTip('GoDaddy.com, LLC') === 'At GoDaddy: My Products → your domain → Manage DNS (renewal lives under Billing).' && registrarTip('Weird Registrar GmbH').includes('Weird Registrar GmbH') && registrarTip('') === '');
+  const w1 = whereToGo('NameCheap, Inc.', 'Cloudflare');
+  ok('records at the company that runs the DNS, renewal at the seller', w1.records_at.company === 'Cloudflare' && w1.records_at.sign_in === 'https://dash.cloudflare.com/' && w1.renew_at.company === 'Namecheap' && /Auto-Renew/.test(w1.renew_at.path));
+  const w2 = whereToGo('GoDaddy.com, LLC', '');
+  ok('DNS company not known yet: the seller, for both', w2.records_at.company === 'GoDaddy' && w2.renew_at.company === 'GoDaddy');
+  const w3 = whereToGo('Weird Registrar GmbH', 'example-dns.net');
+  ok('companies we have no guide for are still named, with no made-up link', w3.records_at.company === 'example-dns.net' && w3.records_at.sign_in === '' && w3.renew_at.company === 'Weird Registrar GmbH' && w3.renew_at.sign_in === '');
+  const w4 = whereToGo('', '');
+  ok('nothing known, nothing claimed', w4.records_at === null && w4.renew_at === null);
+}
+{
+  const p = lookupPatch({ status: 'ok', name: 'bistro.example', info: { registrar: 'GoDaddy.com, LLC', expires_at: '2027-03-02T10:00:00.000Z' }, facts: parseRdapFacts(RDAP) });
+  ok('one lookup writes the registrar, expiry, name, lock, DNS company, words and date', p.domain_lookup_status === 'ok' && p.domain_registered_name === 'bistro.example' && p.domain_registrar === 'GoDaddy.com, LLC' && p.domain_expires_at === '2027-03-02T10:00:00.000Z' && p.domain_lock === true && p.domain_dns_host === 'GoDaddy' && Array.isArray(p.domain_statuses) && p.domain_registered_at === '2014-03-02T10:00:00.000Z', JSON.stringify(p));
+  ok('a failed or empty lookup writes only its status', JSON.stringify(lookupPatch({ status: 'failed' })) === '{"domain_lookup_status":"failed"}' && JSON.stringify(lookupPatch({ status: 'not_found' })) === '{"domain_lookup_status":"not_found"}');
+}
+{
+  ok('mail: none, protected, or what is missing', mailHealth([], [], []).words === 'No email runs on this domain.' && mailHealth(['10 mx.example'], ['v=spf1 include:mx.example ~all'], ['v=DMARC1; p=none']).words === 'Email runs here and is protected: SPF and DMARC are both set.' && mailHealth(['10 mx.example'], ['v=spf1 -all'], []).words === 'Email runs here but isn’t fully protected: no DMARC record.' && mailHealth(['10 mx.example'], ['google-site-verification=x'], []).words === 'Email runs here but isn’t fully protected: no SPF record and no DMARC record.');
+  ok('mail: a near miss is not an SPF record', mailHealth(['10 mx.example'], ['v=spf10 nope'], ['v=DMARC1']).spf === false);
+  const ev = [{ action: 'create', summary: 'Attached domain bistro.example', actor_kind: 'operator', created_at: '2026-10-01T09:00:00Z' }, { action: 'delete', summary: 'Removed domain old.example', actor_kind: 'client', created_at: '2026-09-01T09:00:00Z' }, { summary: 'Something', actor_kind: 'system', created_at: '2026-08-01T09:00:00Z' }];
+  const nt = [{ period: 'exp:bistro.example:2026-11-18:30', created_at: '2026-10-19T00:00:00Z' }, { period: 'exp:bistro.example:2026-11-18:weird', created_at: '2026-10-20T00:00:00Z' }];
+  const h = domainHistory(ev, nt, false);
+  ok('history: newest first, with who did it and each reminder that went out', h.map((x) => x.words).join(' | ') === '30-day reminder sent to the client and you | Attached domain bistro.example, by your studio | Removed domain old.example, by the client | Something, automatically', JSON.stringify(h));
+  ok('history: on the studio’s own domain, the studio did it and the reminder went to it', domainHistory(ev.slice(1, 2), nt.slice(0, 1), true).map((x) => x.words).join(' | ') === '30-day reminder sent | Removed domain old.example, by your studio');
+  ok('history: eight at most', domainHistory(Array.from({ length: 12 }, (_, i) => ({ summary: 'E' + i, actor_kind: 'operator', created_at: `2026-10-${String(i + 1).padStart(2, '0')}T00:00:00Z` })), [], false).length === 8);
+}
+{
+  ok('the first reminder asks whether it renews by itself, and how to give access safely', /Is it set to renew by itself\? A quick look at GoDaddy settles it\./.test(expiryWords('a.com', 30, 'GoDaddy').after) && /add them as a user there rather than sharing your password/.test(expiryWords('a.com', 30, 'GoDaddy').body));
+  ok('…with no seller known, it still reads right', /A quick look at the company it’s registered with settles it/.test(expiryWords('a.com', 30, '').after));
+  ok('…and the later, urgent ones stay short', !/renew by itself\?/.test(expiryWords('a.com', 15, 'GoDaddy').after) && !/renew by itself\?/.test(expiryWords('a.com', 7, 'GoDaddy').after) && !/renew by itself\?/.test(expiryWords('a.com', -1, 'GoDaddy').after));
+}
+// the routes: the lookup as they type, the sheet's facts the first time, a guide's preview
+{
+  const { handleDomainLookup, handleDomain } = await import(`${P}/routes/admin.ts`);
+  const { handleFoundationsPrepare } = await import(`${P}/routes/foundations.ts`);
+  const HOSTED = { id: 'site1', client_id: 'c1', custom_domain: 'bistro.example', netlify_site_id: 'nf1', edition: 'presence', status: 'live' };
+  const get = (path) => new Request('http://stub.local/functions/v1/presence' + path);
+  const post = (path, body) => new Request('http://stub.local/functions/v1/presence' + path, { method: 'POST', body: JSON.stringify(body), headers: { 'Content-Type': 'application/json' } });
+  const jsonOf = async (res) => ({ status: res.status, body: await res.json() });
+  const PRIN = { kind: 'client', userId: 'u1', email: 'owner@bistro.example' };
+  const SOLD_AT_NAMECHEAP = { ...RDAP, entities: [{ roles: ['registrar'], vcardArray: ['vcard', [['fn', {}, 'text', 'NameCheap, Inc.']]] }], nameservers: [{ ldhName: 'kate.ns.cloudflare.com' }] };
+
+  w = { rdap: SOLD_AT_NAMECHEAP, patches: [] };
+  const l1 = await jsonOf(await quiet(() => handleDomainLookup(get('/foundations/domain/lookup?name=' + encodeURIComponent('https://Bistro.Example/menu')), HOSTED, {})));
+  ok('lookup: a typed address is tidied, and names who sold it and who keeps its records', l1.status === 200 && l1.body.data.name === 'bistro.example' && l1.body.data.found === true && l1.body.data.renew_at.company === 'Namecheap' && l1.body.data.records_at.company === 'Cloudflare' && l1.body.data.records_at.sign_in === 'https://dash.cloudflare.com/', JSON.stringify(l1.body));
+  ok('lookup: nothing is written while they type', w.patches.length === 0);
+  w = { rdap: null, rdap404: true, patches: [] };
+  ok('lookup: a name nobody owns says so', (await jsonOf(await quiet(() => handleDomainLookup(get('/foundations/domain/lookup?name=free-name.example'), HOSTED, {})))).body.data.found === false);
+  w = { rdap: null, patches: [] };
+  ok('lookup: a registry that didn’t answer is "couldn’t check", not "free"', (await jsonOf(await quiet(() => handleDomainLookup(get('/foundations/domain/lookup?name=bistro.example'), HOSTED, {})))).body.data.found === null);
+  ok('lookup: half a name is refused politely', (await jsonOf(await quiet(() => handleDomainLookup(get('/foundations/domain/lookup?name=bistro'), HOSTED, {})))).status === 400);
+  w = { rdap: RDAP, patches: [], rateOk: false };
+  ok('lookup: too many in ten minutes waits', (await jsonOf(await quiet(() => handleDomainLookup(get('/foundations/domain/lookup?name=bistro.example'), HOSTED, {})))).status === 429);
+
+  w = { rdap: RDAP, patches: [], facts: { domain_registered_name: null, domain_registrar: null, domain_dns_host: null, domain_lookup_status: null } };
+  const s1 = await jsonOf(await quiet(() => handleDomain(get('/foundations/domain'), 'GET', HOSTED, PRIN, {})));
+  ok('the client’s sheet: a domain never looked up is looked up on the spot and saved', w.patches.some((p) => p.domain_lookup_status === 'ok' && p.domain_dns_host === 'GoDaddy') && s1.body.data.provider && s1.body.data.provider.records_at.company === 'GoDaddy', JSON.stringify(s1.body.data && s1.body.data.provider));
+  w = { rdap: RDAP, patches: [], facts: { domain_registered_name: 'bistro.example', domain_registrar: 'NameCheap, Inc.', domain_dns_host: 'Cloudflare', domain_lookup_status: 'ok' } };
+  const s2 = await jsonOf(await quiet(() => handleDomain(get('/foundations/domain'), 'GET', HOSTED, PRIN, {})));
+  ok('…and once known, it isn’t asked again', w.patches.length === 0 && s2.body.data.provider.records_at.company === 'Cloudflare' && s2.body.data.provider.renew_at.company === 'Namecheap');
+
+  w = { rdap: RDAP, patches: [], plans: [], sold: 'NameCheap, Inc.' };
+  const pv = await jsonOf(await quiet(() => handleFoundationsPrepare(post('/foundations/prepare', { goal: 'registrar_care', preview: true }), HOSTED, PRIN, {})));
+  ok('a guide’s preview saves nothing', pv.status === 200 && pv.body.data.preview === true && w.plans.length === 0, JSON.stringify(pv.body).slice(0, 200));
+  ok('"make sure it renews" names the seller, its sign-in page and where the switch is', /^Sign in to Namecheap \(https:\/\/ap\.www\.namecheap\.com\/domains\/list\/\) and turn on auto-renew for bistro\.example: it’s under the Auto-Renew switch/.test(String(pv.body.data && pv.body.data.steps && pv.body.data.steps[0].what)), JSON.stringify(pv.body.data && pv.body.data.steps && pv.body.data.steps[0]));
+  const sent = await jsonOf(await quiet(() => handleFoundationsPrepare(post('/foundations/prepare', { goal: 'registrar_care' }), HOSTED, PRIN, {})));
+  ok('…and without preview it is saved for the client’s OK', sent.status === 200 && w.plans.length === 1 && w.plans[0].kind === 'registrar_care', JSON.stringify(sent.body).slice(0, 200));
+  w = { rdap: RDAP, patches: [], plans: [] };
+  const cd = await jsonOf(await quiet(() => handleFoundationsPrepare(post('/foundations/prepare', { goal: 'connect_domain', preview: true }), HOSTED, PRIN, {})));
+  ok('"the records this site needs" points www at the site’s real address, not a placeholder', JSON.stringify(cd.body.data && cd.body.data.steps).includes('bistro.netlify.app'), JSON.stringify(cd.body).slice(0, 300));
+}
+// the wiring for part two
+{
+  const idx = read('supabase/functions/presence/index.ts');
+  ok('the lookup route is wired before the domain route', idx.indexOf("route === '/foundations/domain/lookup'") > 0 && idx.indexOf("route === '/foundations/domain/lookup'") < idx.indexOf("route === '/foundations/domain' &&"));
+  const fd = read('supabase/functions/presence/routes/foundations.ts');
+  ok('a preview answers before anything is saved', fd.indexOf('if (body.preview === true) return') > 0 && fd.indexOf('if (body.preview === true) return') < fd.indexOf('presence_infra_plans?select='));
+  ok('the daily check and the sheet write a lookup the same way', /\.\.\.lookupPatch\(look\)/.test(read('supabase/functions/presence/commerce/lifecycle.ts')) && /lookupPatch\(await rdapLookupDetailed\(site\.custom_domain\)\)/.test(read('supabase/functions/presence/routes/admin.ts')));
+  const dp = read('domains.html');
+  ok('the studio panel reads a guide first, inside the client’s site, then puts it on their page', /apiSend\('POST','\/foundations\/prepare',\{goal,preview:true\},scopeFor\(d\)\)/.test(dp) && /apiSend\('POST','\/foundations\/prepare',\{goal\},scopeFor\(d\)\)/.test(dp) && /'x-dds-scope-site':d\.site_id/.test(dp));
+  const pr = read('presence.html');
+  ok('the client’s sheet looks the typed domain up, names the company in step 1, offers the guides and shows every record', /"\/foundations\/domain\/lookup\?name=" \+ encodeURIComponent\(v\)/.test(pr) && /s1\.dataset\.step = "provider"/.test(pr) && /\["registrar_care", "Make sure it renews by itself"\]/.test(pr) && /all\.dataset\.records = "all"/.test(pr));
 }
 
 const passed = results.filter((r) => r.p).length;

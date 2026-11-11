@@ -33,7 +33,7 @@ import type { Principal } from '../../_shared/auth.ts';
 import { buildPortfolio, filterPortfolio } from './portfolio.ts';
 import type { PortfolioInput } from './portfolio.ts';
 import { daysBetween, DOMAIN_SOON_DAYS, PADLOCK_SOON_DAYS, PADLOCK_STUCK_HOURS } from './needs_you.ts';
-import { registryWarnings, sameCompany } from '../lib/rdap.ts';
+import { registryWarnings, sameCompany, whereToGo } from '../lib/rdap.ts';
 import { DOWN_THRESHOLD } from '../monitor/heartbeat.ts';
 import { readReservedJson, updateReservedJson, writeReservedJson, RESERVED_NAMES } from '../lib/reserved_store.ts';
 import { siteOrigin, hostedName, SITE_COLS } from '../lib/site.ts';
@@ -466,11 +466,33 @@ export function normalizeDomainNotes(raw: unknown): DomainNotes {
   };
 }
 const RECORD_TYPES = ['A', 'AAAA', 'CNAME', 'MX', 'TXT'] as const;   // the order the panel lists them in
+
+/** Pure: mail on the domain in one line (review domains finding 23), from its MX and TXT
+ *  records and the _dmarc name's TXT. */
+export function mailHealth(mx: string[], txt: string[], dmarcTxt: string[]) {
+  const spf = txt.some((v) => /^v=spf1\b/i.test(v)), dmarc = dmarcTxt.some((v) => /^v=dmarc1\b/i.test(v));
+  const missing = [!spf && 'no SPF record', !dmarc && 'no DMARC record'].filter(Boolean) as string[];
+  return { has_mail: mx.length > 0, spf, dmarc,
+    words: !mx.length ? 'No email runs on this domain.' : !missing.length ? 'Email runs here and is protected: SPF and DMARC are both set.' : `Email runs here but isn’t fully protected: ${missing.join(' and ')}.` };
+}
+const RUNG_WORDS: Record<string, string> = { '30': '30-day', '15': '15-day', '7': '7-day', '1': '1-day', expired: 'After-expiry' };
+/** Pure: the domain's story, newest first (finding 23): attached, changed, removed and by
+ *  whom, and each expiry reminder that went out. */
+export function domainHistory(events: Array<{ action?: string; summary?: string; actor_kind?: string; created_at?: string }>, reminders: Array<{ period?: string; created_at?: string }>, own: boolean) {
+  const who = (k?: string) => k === 'system' ? 'automatically' : k === 'operator' ? 'by your studio' : k === 'staff' ? 'by Studio OS' : own ? 'by your studio' : 'by the client';
+  const out: Array<{ at: string; words: string }> = [];
+  for (const e of events) if (e.created_at && e.summary) out.push({ at: e.created_at, words: `${e.summary}, ${who(e.actor_kind)}` });
+  for (const n of reminders) {
+    const rung = String(n.period || '').split(':').pop() || '';
+    if (n.created_at && RUNG_WORDS[rung]) out.push({ at: n.created_at, words: `${RUNG_WORDS[rung]} reminder sent${own ? '' : ' to the client and you'}` });
+  }
+  return out.sort((a, b) => (a.at < b.at ? 1 : a.at > b.at ? -1 : 0)).slice(0, 8);
+}
 /** Everything the side panel shows for one domain: the row, the registry's facts, the
  *  checklist, every record live (finding 24: the client's card stops at six), and the notes. */
 async function domainDetail(siteId: string, nowIso: string) {
   const row = rowsOf<DomainIn & { id: string; domain_registered_name?: string | null; netlify_site_id?: string | null }>(
-    await svc(`presence_sites?id=eq.${siteId}&select=${DOMAIN_COLS},edition,status,last_published_at,custom_domain,domain_registrar,domain_expires_at,domain_registered_name&limit=1`).catch(() => ({ ok: false, json: [] })))[0];
+    await svc(`presence_sites?id=eq.${siteId}&select=${DOMAIN_COLS},edition,status,last_published_at,custom_domain,domain_registrar,domain_expires_at,domain_registered_name&limit=1`).catch(() => ({ ok: false, json: [] })))[0];   // client_id comes with EXTRA_COLS
   if (!row || !row.custom_domain) return null;
   const ident = rowsOf<{ business_name?: string }>(await svc(`presence_identity?site_id=eq.${siteId}&select=business_name&limit=1`).catch(() => ({ ok: false, json: [] })))[0];
   const built = buildDomains([{ ...row, site_id: siteId, name: String(ident?.business_name || 'This site') }], nowIso).domains[0];
@@ -480,9 +502,20 @@ async function domainDetail(siteId: string, nowIso: string) {
   await Promise.all(names.flatMap((n) => RECORD_TYPES.map(async (t) => { for (const v of await dnsRecords(n, t)) records.push({ name: n, type: t, value: v }); })));
   records.sort((a, b) => a.name.localeCompare(b.name) || RECORD_TYPES.indexOf(a.type as typeof RECORD_TYPES[number]) - RECORD_TYPES.indexOf(b.type as typeof RECORD_TYPES[number]) || a.value.localeCompare(b.value));
   const statuses = Array.isArray(row.domain_statuses) ? row.domain_statuses : [];
+  // item 162 (finding 23): mail on the registered name, and the domain's story
+  const bare = row.domain_registered_name || (row.custom_domain.startsWith('www.') ? row.custom_domain.slice(4) : row.custom_domain);
+  const clientId = (row as { client_id?: string | null }).client_id || null;
+  const [mx, txt, dmarcTxt, evQ, ntQ] = await Promise.all([
+    dnsRecords(bare, 'MX'), dnsRecords(bare, 'TXT'), dnsRecords(`_dmarc.${bare}`, 'TXT'),
+    svc(`presence_change_events?site_id=eq.${siteId}&entity_type=eq.domain&select=action,summary,actor_kind,created_at&order=created_at.desc&limit=6`).catch(() => ({ ok: false, json: [] })),
+    clientId ? svc(`presence_plan_notices?client_id=eq.${encodeURIComponent(clientId)}&kind=eq.domain_expiry&period=like.${encodeURIComponent(`exp:${row.custom_domain}:%`)}&select=period,created_at&order=created_at.desc&limit=6`).catch(() => ({ ok: false, json: [] })) : Promise.resolve({ ok: true, json: [] }),
+  ]);
   return {
     ...built,
     dns_host_full: row.domain_dns_host || '',   // the row's dns_host is blank when it's the seller; the panel names it either way
+    where: whereToGo(row.domain_registrar, row.domain_dns_host),   // findings 6 and 7: records at the DNS company, renewal at the seller (not `provider`: the row's seller name)
+    mail: mailHealth(mx, txt, dmarcTxt),
+    history: domainHistory(rowsOf(evQ), rowsOf(ntQ), built.own === true),
     statuses, all_checks: Array.isArray(row.domain_checks) ? row.domain_checks : [],
     records, notes: normalizeDomainNotes(await readReservedJson(siteId, RESERVED_NAMES.domainNotes)),
   };
