@@ -845,7 +845,7 @@ export async function handleClientWebsiteStats(_req: Request, site: SiteRow, _pr
   const visitStartIso = new Date(Math.min(startMs, nowMs - DASH_WEEKS * 7 * 86_400_000)).toISOString();
   const safe = async <T>(p: Promise<T>): Promise<T | null> => { try { return await p; } catch { return null; } };
   const [visitsR, gsc] = await Promise.all([
-    safe(svc(`presence_visits?site_id=eq.${site.id}&ts=gte.${visitStartIso}&select=ts,kind,path,ref_host,utm_source,device,country,visitor_hash&order=ts.desc&limit=5000`)),
+    safe(svc(`presence_visits?site_id=eq.${site.id}&ts=gte.${visitStartIso}&kind=not.in.(button,leave)&select=ts,kind,path,ref_host,utm_source,device,country,visitor_hash&order=ts.desc&limit=5000`)),
     safe(readGsc(site.client_id)),
   ]);
   let month: unknown = null;
