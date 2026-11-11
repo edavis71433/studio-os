@@ -108,6 +108,16 @@ ok('nothing can pass on its own failure', !WORKFLOW.includes('continue-on-error'
 const reporting = DEVICE_STEPS.filter((st) => /^ {8}if:/m.test(st));
 ok('every device step runs, apart from the two that report', reporting.length === 2 && reporting.every((st) => st.includes('if: ${{ !cancelled() }}') && /e2e-summary\.mjs|upload-artifact/.test(st)));
 
+// ── Who is stopped (Nov 11 2026) ─────────────────────────────────────────────
+// A pull request pushed again stops its older run. A push to main never is: deploy.yml
+// waits for the run on its exact commit, so a cancelled one would fail that deploy.
+const stop = WORKFLOW.match(/^concurrency:\n {2}group: (.+)\n {2}cancel-in-progress: (.+)$/m);
+ok('the stop rule is set for the whole run, ahead of the jobs', !!stop && WORKFLOW.indexOf('\nconcurrency:') < WORKFLOW.indexOf('\njobs:'), stop?.[0]);
+ok('only a pull request is cancelled by a newer push', stop?.[2] === "${{ github.event_name == 'pull_request' }}", stop?.[2]);
+ok('a pull request\'s runs share one group, named by its number', !!stop?.[1].includes("github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number)"), stop?.[1]);
+ok('a push to main or a manual run has a group of its own, so it never waits behind another', /^e2e-\$\{\{ .* \|\| github\.run_id \}\}$/.test(stop?.[1] || ''), stop?.[1]);
+ok('no job sets a stop rule of its own', !/^ {4}concurrency:/m.test(WORKFLOW));
+
 // ── The devices ──────────────────────────────────────────────────────────────
 const CONFIG = Deno.readTextFileSync(new URL('playwright.config.ts', ROOT));
 const projects = [...CONFIG.matchAll(/\{ name: '([\w-]+)'/g)].map((m) => m[1]);
@@ -119,6 +129,11 @@ const pw = lock.packages?.['node_modules/@playwright/test']?.version;
 const image = JOBS.devices?.match(/^ {6}image: (\S+)$/m)?.[1] || '';
 ok('the devices run in Playwright\'s own image, at the version package-lock.json installs', !!pw && image === `mcr.microsoft.com/playwright:v${pw}-noble`, `${image} for ${pw}`);
 ok('Playwright\'s two packages are on the same version', lock.packages?.['node_modules/playwright-core']?.version === pw);
+// A device stopped by its cap leaves no `browser` pass, and deploy.yml waits its time out for nothing.
+const cap = Number(JOBS.devices?.match(/^ {4}timeout-minutes: (\d+)$/m)?.[1]);
+ok('a device may take 75 minutes (main\'s full tablet run took up to 45 with the machines busy)', cap === 75, String(cap));
+const gateWait = Number(Deno.readTextFileSync(new URL('.github/workflows/deploy.yml', ROOT)).match(/\$\{WAIT_MINUTES:-(\d+)\}/)?.[1]);
+ok('a device\'s cap stays under the time deploy.yml waits for the check', cap > 0 && gateWait > cap, `${cap} < ${gateWait}`);
 
 // The device step's real script, with a stand-in npx that prints what it was asked to run.
 const RUN_DEVICE = script('name: Run the browser suite on this device\\n {8}env:\\n[\\s\\S]*?EVENT: .*');

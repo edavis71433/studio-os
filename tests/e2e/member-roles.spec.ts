@@ -131,6 +131,13 @@ test.describe('Contacts', () => {
       await pin(page, 'dds-display:contacts', 'table');
       await installApp(page, { api: { ...CONTACTS_API, '/portal/context': p.ctx } });
       await page.goto(withScope('/contacts.html', p));
+      if (p.scoped) {
+        // item 110 (K3): inside a client, adds, imports and field definitions would be filed on the
+        // client's site, out of the studio's list, so those buttons aren't drawn; the rows keep their role's controls
+        await expectControls(page, p, [['[data-del="ct-1"]', 'delete']]);
+        for (const sel of ['#manageFields', '#new', '#importCsv', '#addCust']) await expect(page.locator(sel)).toHaveCount(0);
+        return;
+      }
       await expectControls(page, p, [['[data-del="ct-1"]', 'delete'], ['#manageFields', 'configure']]);
       await expect(page.locator('#new')).toBeVisible();
     });
