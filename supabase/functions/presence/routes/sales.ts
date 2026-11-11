@@ -25,6 +25,7 @@ import { normalizeViews, normalizeViewList, isViewList } from '../lib/saved_view
 import { readReservedJsonOrThrow, writeReservedJson, updateReservedJson, RESERVED_NAMES } from '../lib/reserved_store.ts';
 import { normalizeStageNames, stageLabels, loadStageLabels, forgetStageLabels, renameMovedTo, DEFAULT_STAGE_LABEL, normalizeStageChances, stageChances, loadStageChances, forgetStageChances, expectedValue, DEFAULT_STAGE_CHANCE } from '../lib/stage_names.ts';
 import { validateRetainerInput, mergeRetainerState, type RetainerState } from '../commerce/retainers.ts';
+import { leftToBill, reuseDecision, retainerPaid } from '../lib/invoice_billing.ts';   // sales items 107, 108
 import { editionFor } from '../commerce/catalog.ts';
 import type { PlanKey } from '../commerce/catalog.ts';
 import { hmacHex, timingSafeEqual } from '../../_shared/hmac.ts';
@@ -1027,7 +1028,7 @@ export async function handleSalesDeal(req: Request, site: SiteRow, principal: Pr
   if (!deal) return json({ error: 'not_found', message: 'That deal is no longer here.' }, 404, cors);
   if (req.method === 'GET') {
     const stageNamesP = loadStageLabels(site.id).catch(() => null);   // item 38 names; batch B: read with the others, not after
-    const [contact, proposals, contracts, events, invoices, estimates, recurring] = await Promise.all([
+    const [contact, proposals, contracts, events, invoices, estimates, recurring, paidEvents] = await Promise.all([
       deal.contact_id ? svc(`presence_contacts?id=eq.${deal.contact_id}&site_id=eq.${site.id}&select=id,name,email,phone,company,notes&limit=1`) : Promise.resolve({ json: [] }),
       // first_viewed_at/expires_at land with migration 0107 — tolerant fetch so the
       // proposals list never disappears if a deploy is ahead of the migration.
@@ -1041,10 +1042,14 @@ export async function handleSalesDeal(req: Request, site: SiteRow, principal: Pr
       svc(`presence_deal_events?deal_id=eq.${id}&site_id=eq.${site.id}&select=id,kind,from_stage,to_stage,detail,actor,created_at&order=created_at.desc&limit=80`),
       // processing_since lands with migration 0132 — tolerant fetch (same posture
       // as the proposals read above) so the record's Billing tab never blanks.
-      (async () => { let r = await svc(`presence_invoices?deal_id=eq.${id}&site_id=eq.${site.id}&deleted_at=is.null&select=id,title,amount_cents,purpose,status,stripe_url,due_date,paid_at,created_at,processing_since&order=due_date.asc.nullsfirst,created_at.asc`); if (!r.ok) r = await svc(`presence_invoices?deal_id=eq.${id}&site_id=eq.${site.id}&deleted_at=is.null&select=id,title,amount_cents,purpose,status,stripe_url,due_date,paid_at,created_at&order=due_date.asc.nullsfirst,created_at.asc`); return r; })(),
+      // item 107: recurring_id rides along (0145) so the record can tell what's left of the proposal
+      (async () => { let r = await svc(`presence_invoices?deal_id=eq.${id}&site_id=eq.${site.id}&deleted_at=is.null&select=id,title,amount_cents,purpose,status,stripe_url,due_date,paid_at,created_at,processing_since,recurring_id&order=due_date.asc.nullsfirst,created_at.asc`); if (!r.ok) r = await svc(`presence_invoices?deal_id=eq.${id}&site_id=eq.${site.id}&deleted_at=is.null&select=id,title,amount_cents,purpose,status,stripe_url,due_date,paid_at,created_at,processing_since&order=due_date.asc.nullsfirst,created_at.asc`); if (!r.ok) r = await svc(`presence_invoices?deal_id=eq.${id}&site_id=eq.${site.id}&deleted_at=is.null&select=id,title,amount_cents,purpose,status,stripe_url,due_date,paid_at,created_at&order=due_date.asc.nullsfirst,created_at.asc`); return r; })(),
       // item 47: the deal's estimates and recurring invoices — both [] before APPLY-0145
       import('./estimates.ts').then((m) => m.estimatesForDeal(site.id, id)).catch(() => []),
       import('./recurring_invoices.ts').then((m) => m.recurringForDeal(site.id, id)).catch(() => []),
+      // item 108 (J4): every payment on the deal, beyond the 80 newest events above —
+      // a retainer charge is only ever an event, so this is where it is counted
+      svc(`presence_deal_events?deal_id=eq.${id}&site_id=eq.${site.id}&kind=eq.invoice_paid&select=kind,detail,created_at&order=created_at.desc&limit=1000`).catch(() => ({ ok: false, json: [] })),
     ]);
     const eventRows = rows(events);
     // Oct 2026 benchmark (item 2): every invoice row carries its money state from
@@ -1062,7 +1067,9 @@ export async function handleSalesDeal(req: Request, site: SiteRow, principal: Pr
     // record showed the stored pre-discount subtotal while the deal page added
     // up the lines ($0 after a full discount) for the same draft.
     const proposalRows = rows(proposals).map((p: any) => ({ ...p, total_cents: proposalTotals(p.line_items).total_cents }));
-    return json({ data: { deal, contact: rows(contact)[0] || null, proposals: proposalRows, contracts: rows(contracts), events: eventRows, timeline, last_contacted_at: lastContactedAt(eventRows), invoices: invoiceRows, estimates, recurring } }, 200, cors);
+    // item 108 (J4): the retainer's payments, for Paid. null = couldn't read them (never a false $0)
+    const retainer_paid = (paidEvents as any)?.ok ? retainerPaid(rows(paidEvents as any)) : null;
+    return json({ data: { deal, contact: rows(contact)[0] || null, proposals: proposalRows, contracts: rows(contracts), events: eventRows, timeline, last_contacted_at: lastContactedAt(eventRows), invoices: invoiceRows, estimates, recurring, retainer_paid } }, 200, cors);
   }
   if (req.method === 'PATCH') {
     let b: any = {}; try { b = await req.json(); } catch { return json({ error: 'bad_json' }, 400, cors); }
@@ -1460,15 +1467,31 @@ export async function handleSalesInvoice(req: Request, site: SiteRow, principal:
   const deal = await loadDeal(site.id, dealId);
   if (!deal) return json({ error: 'not_found' }, 404, cors);
   let b: any = {}; try { b = await req.json(); } catch { /* body optional */ }
-  let amountCents: number | null = Number.isFinite(Number(b.amount_cents)) ? Math.trunc(Number(b.amount_cents)) : null;
-  if (amountCents === null) {   // default to the accepted proposal's FINAL total (post discount + tax)
+  const typed = b.amount_cents !== undefined && b.amount_cents !== null && b.amount_cents !== '';
+  let amountCents: number | null = typed && Number.isFinite(Number(b.amount_cents)) ? Math.trunc(Number(b.amount_cents)) : null;
+  const usd2 = (c: unknown) => '$' + ((Number(c) || 0) / 100).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  // Item 107 (J2): left blank, "+ Invoice" bills what is LEFT of the accepted
+  // proposal's final total (after discount and tax): every invoice already raised
+  // on the deal, a deposit included, comes off first. It used to bill the whole
+  // total again, or quietly re-send an older open invoice instead.
+  let fromProposal: { total_cents: number; billed_cents: number; left_cents: number } | null = null;
+  if (amountCents === null && !typed) {
     const prop = rows(await svc(`presence_proposals?deal_id=eq.${dealId}&site_id=eq.${site.id}&status=eq.accepted&deleted_at=is.null&select=line_items,subtotal_cents&order=decided_at.desc&limit=1`))[0];
-    amountCents = prop ? proposalTotals(prop.line_items).total_cents : null;
+    if (prop) {
+      const billedQ = (cols: string) => svc(`presence_invoices?deal_id=eq.${dealId}&site_id=eq.${site.id}&deleted_at=is.null&status=in.(open,paid)&select=${cols}&limit=500`);
+      let ir = await billedQ('amount_cents,status,recurring_id');
+      if (!ir.ok) ir = await billedQ('amount_cents,status');   // before APPLY-0145
+      if (!ir.ok) return json({ error: 'read_failed', message: 'We couldn’t check what’s already billed on this deal, so nothing was sent. Try again.' }, 502, cors);
+      fromProposal = leftToBill(proposalTotals(prop.line_items).total_cents, rows(ir));
+      if (fromProposal.billed_cents > 0 && fromProposal.left_cents < 50) return json({ error: 'fully_billed', message: `The accepted proposal (${usd2(fromProposal.total_cents)}) is already billed in full. Enter an amount to bill something else.` }, 422, cors);
+      amountCents = fromProposal.left_cents;
+    }
   }
   if (!amountCents || amountCents < 50) return json({ error: 'validation', message: 'Enter an amount to invoice (or accept a proposal first).' }, 422, cors);
   if (amountCents > 100000000) return json({ error: 'validation', message: 'That amount is over $1,000,000 — double-check it and try again.' }, 422, cors);
   const purpose = b.purpose === 'deposit' ? 'deposit' : 'service';
-  const title = clean(b.title, 200) || (purpose === 'deposit' ? 'Deposit' : 'Invoice');
+  // what's left after a deposit reads as the balance it is
+  const title = clean(b.title, 200) || (purpose === 'deposit' ? 'Deposit' : (fromProposal && fromProposal.billed_cents > 0 ? 'Balance' : 'Invoice'));
   const description = clean(b.description, 1000) || `${title} — ${deal.title || 'project'}`;
   const dueDate = (typeof b.due_date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(b.due_date)) ? b.due_date : null;
 
@@ -1482,11 +1505,18 @@ export async function handleSalesInvoice(req: Request, site: SiteRow, principal:
   let inv = rows(await svc(`presence_invoices?deal_id=eq.${dealId}&site_id=eq.${site.id}&purpose=eq.${purpose}&status=eq.open&deleted_at=is.null&select=*&order=created_at.desc&limit=1`))[0];
   let reused = !!inv;
   if (inv && b.force === true) { reused = false; inv = null; }   // explicit "yes, another one"
-  // HONESTY GUARD: an open invoice exists and the operator typed a DIFFERENT
-  // amount — never silently send the old amount. Tell them, let them choose.
-  if (inv && b.amount_cents !== undefined && Number(inv.amount_cents) !== amountCents) {
-    const openAmt = '$' + ((Number(inv.amount_cents) || 0) / 100).toLocaleString('en-US', { minimumFractionDigits: 2 });
-    return json({ error: 'amount_mismatch', open_invoice: inv, message: `There's already an open ${purpose === 'deposit' ? 'deposit request' : 'invoice'} for ${openAmt} on this deal. Resend that one, or send another for the new amount.` }, 409, cors);
+  // HONESTY GUARD: an open invoice exists and the amount asked for — typed, or
+  // what's left of the proposal — is DIFFERENT: never silently send the old
+  // amount. And one already sent is re-sent only when the operator asks for it
+  // (its own Resend), never as a side effect of "+ Invoice" (item 107, J2).
+  if (inv) {
+    const what = purpose === 'deposit' ? 'deposit request' : 'invoice';
+    const decision = reuseDecision(inv, amountCents, Date.now());
+    if (decision === 'mismatch') {
+      const wanted = fromProposal ? ` What’s left of the accepted proposal is ${usd2(amountCents)}.` : '';
+      return json({ error: 'amount_mismatch', open_invoice: inv, amount_cents: amountCents, message: `There's already an open ${what} for ${usd2(inv.amount_cents)} on this deal.${wanted} Resend that one, or send another for ${fromProposal ? usd2(amountCents) : 'the new amount'}.` }, 409, cors);
+    }
+    if (decision === 'ask') return json({ error: 'already_open', open_invoice: inv, amount_cents: amountCents, message: `There's already an open ${what} for ${usd2(inv.amount_cents)} on this deal, and it was sent. Resend that one, or send another.` }, 409, cors);
   }
   if (!inv) {
     const ins = await svc('presence_invoices', { method: 'POST', headers: { Prefer: 'return=representation' },
@@ -1516,7 +1546,8 @@ export async function handleSalesInvoice(req: Request, site: SiteRow, principal:
   // `repaired` = the FIRST attempt's link failed before its event could be
   // recorded — the retry that completes it must write the history line.
   if (!reused || repaired) await dealEvent(site.id, dealId, 'invoice_sent', principal, { detail: { invoice_id: inv.id, amount_cents: Number(inv.amount_cents), purpose } });
-  return json({ data: { ...inv, stripe_url: payUrl }, url: payUrl, emailed, reused, amount_cents: Number(inv.amount_cents) }, reused ? 200 : 201, cors);
+  // double_tap: the server held the email back (sent under two minutes ago), so the page can say so (item 107)
+  return json({ data: { ...inv, stripe_url: payUrl }, url: payUrl, emailed, reused, double_tap: doubleTap, amount_cents: Number(inv.amount_cents) }, reused ? 200 : 201, cors);
 }
 
 /** PAYMENT SCHEDULE — turn a deal total into an ordered set of STAGED invoices
@@ -1623,7 +1654,7 @@ export async function handleSalesInvoiceSend(req: Request, site: SiteRow, princi
   if (!doubleTap) await svc(`presence_invoices?id=eq.${inv.id}&site_id=eq.${site.id}`, { method: 'PATCH', body: JSON.stringify({ updated_at: nowIso() }) }).catch(() => {});
   // First real send (or a link repair) writes the history line; a plain resend doesn't spam it.
   if ((!hadLink || repaired) && inv.deal_id) await dealEvent(site.id, inv.deal_id, 'invoice_sent', principal, { detail: { invoice_id: inv.id, amount_cents: Number(inv.amount_cents), purpose: inv.purpose } });
-  return json({ data: { ...inv, stripe_url: payUrl }, url: payUrl, emailed, resent: hadLink && !repaired }, 200, cors);
+  return json({ data: { ...inv, stripe_url: payUrl }, url: payUrl, emailed, resent: hadLink && !repaired, double_tap: doubleTap }, 200, cors);
 }
 
 /** WITHDRAW an invoice that should never have been raised.
