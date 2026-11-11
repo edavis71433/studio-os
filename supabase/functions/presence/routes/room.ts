@@ -16,7 +16,7 @@ import { describeChanges } from '../lib/diff.ts';
 import { computeDraftHash } from '../lib/draft_hash.ts';
 import { deriveHealth } from '../lib/health.ts';
 import { ensureAndListNotes, resolveNote } from '../lib/notes.ts';
-import { applySnapshotToDraft } from '../lib/draft_writer.ts';
+import { applySnapshotToDraft, snapshotForRestore, leftOffSentence } from '../lib/draft_writer.ts';
 import { draftAsFound } from '../lib/optimistic_lock.ts';
 import { getSite as netlifyGetSite, netlifyConfigured } from '../lib/netlify.ts';
 import { normalizeSnapshotContent, snapshotContentUsable } from '../lib/render_types.ts';
@@ -239,20 +239,18 @@ export async function handleRestoreToDraft(req: Request, site: SiteRow, principa
   if (!rec) return json({ error: 'not_found', message: 'We couldn’t find that version.' }, 404, cors);
   if (!rec.snapshot_id) return json({ error: 'not_restorable', message: 'That version is no longer restorable (older versions are kept for a limited time).' }, 410, cors);
 
-  const s = await svc(`presence_snapshots?id=eq.${rec.snapshot_id}&site_id=eq.${site.id}&select=content,media_manifest,content_contract_version,template_slug,template_version,dev_customization&limit=1`);
-  const snap = s.json?.[0];
+  const snap = await snapshotForRestore(site.id, rec.snapshot_id);
   if (!snap) return json({ error: 'not_restorable', message: 'That version is no longer restorable.' }, 410, cors);
   if (!snapshotContentUsable(snap.content)) return json({ error: 'not_restorable', message: 'That version predates the current site format and can’t be restored.' }, 410, cors);
 
   const when = new Date(rec.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-  const res = await applySnapshotToDraft(site, snap, principal, `Brought the version from ${when} into the draft`, await draftAsFound(req));
+  const res = await applySnapshotToDraft(site, snap, principal, `Brought the version from ${when} into the draft`, await draftAsFound(req), { settings: true });
   if (!res.ok) return json({ error: 'restore_failed', message: 'That didn’t work — your draft is unchanged except where noted, and nothing was lost.', }, 502, cors);
 
-  const dropped = res.applied?.dropped_media ?? 0;
   return json({
     data: {
       ok: true,
-      message: `The version from ${when} is now in your draft. Look it over, then publish when you’re happy.` + (dropped ? ` ${dropped} photo${dropped > 1 ? 's' : ''} from that version ${dropped > 1 ? 'are' : 'is'} no longer in your library and ${dropped > 1 ? 'were' : 'was'} left off.` : ''),
+      message: `The version from ${when} is now in your draft. Look it over, then publish when you’re happy.` + leftOffSentence(res.applied?.dropped_media ?? 0, 'that version'),
       set_aside: 'Your previous draft was set aside as a safety copy — nothing was lost.',
       applied: res.applied,
     },

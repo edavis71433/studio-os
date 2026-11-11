@@ -10,6 +10,7 @@ import { siteOrigin as siteAddress } from '../lib/site.ts';
 import type { Principal } from '../../_shared/auth.ts';
 import { getTemplate } from '../lib/render.ts';
 import { serializeDraft } from '../lib/serializer.ts';
+import { insertSnapshot } from '../lib/draft_settings.ts';
 import { sendEmail } from '../commerce/account.ts';
 import { loadEmailBrand } from '../lib/email_brand.ts';
 import { ownerReplyTo } from '../lib/service_bridge.ts';
@@ -27,6 +28,7 @@ import { validateFormValues, type FormDefinition } from '../lib/forms.ts';
 import { notSentReason } from '../lib/legal_pages.ts';
 import { enquiryState, customerEmails } from '../lib/enquiry_state.ts';
 import { normEmail, emailMatch } from '../lib/contact_email.ts';
+import { leadVisit } from '../lib/visit_source.ts';   // item 89
 
 const SB_URL = Deno.env.get('SUPABASE_URL') || '';
 const APPROVAL_SECRET = Deno.env.get('APPROVAL_SECRET') || Deno.env.get('SCHEDULER_SECRET') || '';
@@ -58,11 +60,8 @@ export async function handleScheduleCreate(req: Request, site: SiteRow, principa
     // publish: freeze the CURRENT draft into a snapshot now (WYSIWYG at schedule time)
     const t = getTemplate(site.template_slug, site.template_version);
     if (!t) return json({ error: 'template_missing', message: 'This site’s template isn’t available.' }, 500, cors);
-    const { snapshot, mediaManifest } = await serializeDraft(site.id, t.manifest, { templateSlug: site.template_slug, templateVersion: site.template_version, now });
-    const ins = await svc('presence_snapshots', {
-      method: 'POST', headers: { Prefer: 'return=representation' },
-      body: JSON.stringify({ site_id: site.id, content: snapshot.content, media_manifest: mediaManifest, content_contract_version: snapshot.content_contract_version, template_slug: snapshot.template_slug, template_version: snapshot.template_version, dev_customization: snapshot.dev_customization ?? null, created_by: principal.userId, created_by_kind: 'client' }),
-    });
+    const { snapshot, mediaManifest, draftSettings } = await serializeDraft(site.id, t.manifest, { templateSlug: site.template_slug, templateVersion: site.template_version, now });
+    const ins = await insertSnapshot({ site_id: site.id, content: snapshot.content, media_manifest: mediaManifest, content_contract_version: snapshot.content_contract_version, template_slug: snapshot.template_slug, template_version: snapshot.template_version, dev_customization: snapshot.dev_customization ?? null, created_by: principal.userId, created_by_kind: 'client' }, draftSettings);
     snapshotId = ins.json?.[0]?.id;
     if (!snapshotId) return json({ error: 'snapshot_failed', message: 'We couldn’t prepare that — please try again.' }, 502, cors);
     summary = String(b?.note || 'Scheduled publish');
@@ -216,12 +215,15 @@ export async function handleFormInbox(site: SiteRow, cors: Record<string, string
   // Customer when the person became one (a contact linked to a client), else just seen
   const noDeal = rows.filter((s: any) => s.status === 'converted' && !dealMap.has(String(s.id)) && s.email);
   const customers = noDeal.length ? (await customerEmails(site.id, noDeal.map((s: any) => String(s.email)))) || new Set<string>() : new Set<string>();
+  // item 89: where each enquiry's visitor came from, noted after they sent it (routes/visit_source.ts)
+  const visits = new Map(rows.map((s: any) => [String(s.id), leadVisit(s.fields)]));
   // `fields` is read only for the studio's replies (fields.__studio_replies) — the raw
   // form values stay server-side as before; each row carries `replies` instead.
   const submissions = rows.map(({ fields, ...s }: any) => {
     const dealId = dealMap.get(String(s.id)) || null;
     return { ...s, replies: leadReplies(fields), note: leadNote(fields), deal_id: dealId, ...enquiryState(s.status, dealId, customers.has(String(s.email || '').trim().toLowerCase())) };
   });
+  for (const s of submissions as any[]) s.visit = visits.get(String(s.id)) || null;
   return json({ data: { submissions, unread: submissions.filter((s: any) => s.status === 'new').length, more } }, 200, cors);
 }
 
@@ -341,7 +343,8 @@ export async function handleFormStatus(req: Request, site: SiteRow, id: string, 
   return json({ data: { ok: true } }, 200, cors);
 }
 
-async function hashIp(req: Request): Promise<string> {
+// the IP hash an enquiry keeps; routes/visit_source.ts finds the enquiry a visitor just sent by it (item 89)
+export async function hashIp(req: Request): Promise<string> {
   const ip = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || '';
   if (!ip) return '';
   // salt fallback chain: never a guessable literal (an unset APPROVAL_SECRET
