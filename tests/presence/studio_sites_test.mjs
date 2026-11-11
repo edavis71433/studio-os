@@ -429,6 +429,19 @@ async function call(member, method, route, body, { jwt = 'jwt-studio', principal
   ok('panel: this domain’s history only, newest first, saying who', (d.history || []).map((h) => h.words).join(' | ') === '30-day reminder sent to the client and you | Attached domain bistro.example, by your studio', JSON.stringify(d.history));
 }
 
+// ═══ 11. item 174: the notes save merges what it's sent; every row says whether it renews by itself ═══
+{
+  reset();
+  const quietly = async (fn) => { const e = console.error, w = console.warn; console.error = () => {}; console.warn = () => {}; try { return await fn(); } finally { console.error = e; console.warn = w; } };
+  await call(asMember(), 'PUT', `/agency/domains/${S1}/notes`, { account: 'The client’s own account', note: 'Card ends 2027', renews: 'unknown' });
+  const r = await call(asMember(), 'PUT', `/agency/domains/${S1}/notes`, { renews: 'yes', renews_confirmed_at: '2026-11-11' });
+  ok('notes: a one-field save (the row’s switch) keeps the account and the note', r.status === 200 && r.body.data.renews === 'yes' && r.body.data.renews_confirmed_at === '2026-11-11' && r.body.data.account === 'The client’s own account' && r.body.data.note === 'Card ends 2027', JSON.stringify(r.body));
+  const list = await quietly(() => call(asMember(), 'GET', '/agency/domains'));
+  const row = (list.body.data.domains || []).find((d) => d.site_id === S1);
+  const other = (list.body.data.domains || []).find((d) => d.site_id === S2);
+  ok('the list carries it on the row, and "don’t know" where nobody said', row && row.renews === 'yes' && row.renews_confirmed_at === '2026-11-11' && other && other.renews === 'unknown', JSON.stringify(row));
+}
+
 const passed = results.filter((r) => r.p).length;
 console.log(`\n${passed}/${results.length} passed`);
 if (passed !== results.length) { console.error('FAILURES'); Deno.exit(1); }

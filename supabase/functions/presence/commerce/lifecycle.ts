@@ -25,7 +25,10 @@ import { rateAllow } from '../lib/ratelimit.ts';
 import { deleteSite } from '../lib/netlify.ts';
 import { getSite } from '../lib/netlify.ts';
 import { rdapLookupDetailed, daysUntil, expiryRung, expiryWords, lookupPatch } from '../lib/rdap.ts';
-import { domainHealth, padlockAfterCheck, domainTruth } from '../lib/domain_health.ts';
+import { domainHealth, padlockAfterCheck, domainTruth, dnsRecordsSure } from '../lib/domain_health.ts';
+import { mailWatch, domainChangeEmail, tellOwnerAndStudio, announceLiveOnce } from '../lib/domain_notify.ts';
+import type { DomainMail } from '../lib/domain_notify.ts';
+import { whereToGo } from '../lib/rdap.ts';
 import { provisionSsl } from '../lib/netlify.ts';
 import { verifyApex, dkimPresent, NETLIFY_APEX_IP } from '../platform/dns.ts';
 import { leadFollowupDue, leadFollowupCopy, renewalReminderWindow, renewalNoticePeriod, renewalReminderCopy } from '../lib/commercial.ts';
@@ -394,6 +397,8 @@ export async function checkOneDomain(site: DomainCheckSite, nowIso = new Date().
     }
     // item 134 (review findings 3 and 5): what the domain really shows, and both names
     truth = await domainTruth({ custom_domain: site.custom_domain, netlify_site_id: site.netlify_site_id }, look.status === 'ok' ? look.name : null).catch(() => null);
+    // item 164 (review domains finding 13): the first day every check passes, "your website is live"
+    if (truth && truth.all_ok) await announceLiveOnce({ id: site.id, client_id: site.client_id }, site.custom_domain, nowIso);
   }
   await svc(`presence_sites?id=eq.${site.id}`, { method: 'PATCH', body: JSON.stringify({
     domain_checked_at: nowIso,
@@ -401,6 +406,10 @@ export async function checkOneDomain(site: DomainCheckSite, nowIso = new Date().
     ...(padlock ? { cert_state: padlock.cert_state, cert_expires_at: padlock.cert_expires_at, cert_pending_since: padlock.cert_pending_since, cert_checked_at: nowIso } : {}),
     ...(truth ? { domain_serving: truth.serving, domain_checks: truth.checklist, domain_serving_checked_at: nowIso } : {}),
   }) });
+  // item 163 (review domains finding 14): the email records saved when the domain was attached
+  // (or on the first check after) are compared each day; vanished ones are told once, with the
+  // old values to put back
+  await watchDomainMail(site, look.status === 'ok' ? look.name : null, look.status === 'ok' ? whereToGo(look.info.registrar, look.facts.dns_host).records_at?.company || null : null, nowIso).catch(() => null);
   const days = info ? daysUntil(info.expires_at, nowIso) : null;
   const rung = expiryRung(days);
   if (!rung || !info || !info.expires_at || days === null) return out;
@@ -432,6 +441,17 @@ export async function checkOneDomain(site: DomainCheckSite, nowIso = new Date().
   }
 
   return out;
+}
+
+async function watchDomainMail(site: DomainCheckSite, registered: string | null, recordsAt: string | null, nowIso: string) {
+  const bare = registered || (site.custom_domain.startsWith('www.') ? site.custom_domain.slice(4) : site.custom_domain);
+  const mx = await dnsRecordsSure(bare, 'MX');
+  if (mx === null) return;   // couldn't ask today: never alarm on a blip
+  const { readReservedJson, writeReservedJson, RESERVED_NAMES } = await import('../lib/reserved_store.ts');
+  const saved = await readReservedJson(site.id, RESERVED_NAMES.domainMail) as DomainMail | null;
+  const w = mailWatch(saved && Array.isArray(saved.mx) ? saved : null, bare, mx, nowIso);
+  if (w.next) await writeReservedJson(site.id, RESERVED_NAMES.domainMail, w.next, 'system');
+  if (w.alert && saved) await tellOwnerAndStudio({ id: site.id, client_id: site.client_id }, domainChangeEmail('mail_gone', { domain: bare, mx: saved.mx, recordsAt }), 'domain-mail-gone');
 }
 
 export async function runDomainWatch(limit = 10): Promise<{ checked: number; warned: number; reasked: number }> {

@@ -356,13 +356,13 @@ test.describe('The builder', () => {
     test(`${p.who}: the domain card and desk`, async ({ page }) => {
       await openBuilder(page, p, '#search');
       const card = page.locator('#domainCard');
-      await expect(card).toContainText('temporary address');
+      await expect(card).toContainText('built-in address');
       await expectControls(page, p, [['#domainCard button:has-text("Connect your domain")', 'configure']]);
       const cardNote = card.getByText('Ask the account owner to connect it.');
       if (p.lacks.includes('configure')) await expect(cardNote).toBeVisible(); else await expect(cardNote).toBeHidden();
 
       await page.goto('/presence.html#domain');
-      await expect(page.getByText('Right now your site is at a temporary address.')).toBeVisible();
+      await expect(page.getByText('Right now your site is at its built-in address.')).toBeVisible();
       await expectControls(page, p, [['button:has-text("I already have a domain")', 'configure']]);
       await expect(page.getByText('Ask the account owner to connect it.').last()).toBeVisible({ visible: p.lacks.includes('configure') });
     });

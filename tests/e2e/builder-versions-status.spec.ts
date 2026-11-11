@@ -198,6 +198,24 @@ test.describe('a restore brings back sections, pages and the menu (builder item 
     await page.waitForTimeout(400);
     expect(puts(m)).toHaveLength(1);   // and nothing of it is saved again after
   });
+
+  // The client's restore that would remove or change a section their studio locked is refused
+  // by the server (item 155): the sentence shows as it is, the sheet stays, nothing reloads.
+  test('a restore the studio’s locks refuse says why, and the editor stays as it was', async ({ page }) => {
+    const SAYS = 'Your studio locked “Fresh bread, every morning”, and that checkpoint changes it. Ask them to restore it. Nothing was changed.';
+    await editor(page);
+    await page.route('**/functions/v1/presence/publishes/checkpoints/cp1/restore', (route: Route) => route.fulfill({ status: 403, contentType: 'application/json',
+      body: JSON.stringify({ error: 'section_locked', message: SAYS, sections: [{ name: 'Fresh bread, every morning', what: 'changed' }] }) }));
+    const before = await js(page, 'JSON.stringify(BLOCKS_WORK)');
+    await js(page, 'go("history")');
+    await rows(page).nth(1).getByRole('button', { name: 'Restore', exact: true }).click();
+    await page.locator('#btnRestoreGo').click();
+    await expect(page.locator('.dds-toast, .toast').filter({ hasText: 'Your studio locked' })).toContainText(SAYS);
+    await expect(page.locator('#restoreScrim')).toHaveClass(/\bon\b/);
+    await expect(page.locator('#btnRestoreGo')).toBeEnabled();
+    await expect(page.locator('#btnRestoreGo')).toHaveText('Restore to my draft');
+    expect(await js(page, 'JSON.stringify(BLOCKS_WORK)')).toBe(before);
+  });
 });
 
 test.describe('settings that wait for publish say so (builder item 125)', () => {
