@@ -1158,6 +1158,9 @@ html.dds-has-shell.dds-has-ctxbar .stage{top:calc(var(--dds-shell-h) + var(--dds
 /* ── overlays as letters ── */
 .scrim{position:fixed;inset:0;background:color-mix(in srgb,var(--scrim-ink) 42%,transparent);z-index:80;display:none;align-items:flex-end;justify-content:center}
 .scrim.on{display:flex}
+/* item 171 (E1, E2): in the editor a sheet, the photo picker and the rest, opens above the bar, the dock and
+   the cards, so its own buttons take the press and nothing behind the dimmed screen does */
+html.dc-edit:not(.plan-watch) .scrim{z-index:96}
 @media(min-width:761px){.scrim{align-items:center}}
 .sheetcard{background:var(--sheet);border:1px solid var(--hair);border-radius:var(--r-lg) var(--r-lg) 0 0;width:100%;max-width:520px;max-height:88vh;overflow:auto;padding:var(--dds-s7,32px) var(--dds-s7,32px) var(--dds-s6,24px);box-shadow:var(--dds-shadow-pop,0 8px 28px rgba(21,20,26,.12))}
 @media(min-width:761px){.sheetcard{border-radius:var(--r-lg)}}
@@ -12549,6 +12552,7 @@ function exitEditMode(to) {   // to: the tab to land on (the Pages card's "Chang
   if (document.activeElement && document.activeElement.blur) document.activeElement.blur();   // a focused field commits on blur
   blocksSaveNow(); formsSaveNow();
   closeDesignPanels();
+  document.querySelectorAll(".scrim.on").forEach((sh) => closeSheet(sh.id));   // item 171 (E2): a sheet goes with the editor
   if (DC_MODE !== "edit") dcSetMode("edit");
   go(to || EDIT_RETURN);
 }
@@ -12562,6 +12566,7 @@ function closeDesignPanels() { closePagesCard(false); dcDockMore(false); closeTr
   document.addEventListener("keydown", (e) => {
     if (!(e.ctrlKey || e.metaKey)) return;
     if ($("stage").classList.contains("on") || $("ritualWrap").classList.contains("on")) return;   // nothing to undo behind these
+    if (document.querySelector("dialog[open], .scrim.on")) return;   // item 171 (E6): not while a question or a sheet is up
     const dv = $("view-design");
     if (dv && dv.classList.contains("on") && DC_MODE === "timewarp") return;   // view modes are read-only — no blind undo
     const t = e.target; if (t && /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName || "")) return;   // don't hijack field editing
@@ -12596,6 +12601,10 @@ function closeDesignPanels() { closePagesCard(false); dcDockMore(false); closeTr
   on("dkFind", () => { dcDockMore(false); openTrayPanel("add", true); });   // opens the library with its search box focused
   on("dkPreview", () => { dcDockMore(false); dcOpenPreview(); });
   on("dkMore", () => dcDockMore());
+  // item 171 (E4): on a phone More closes by itself: on a press anywhere outside it, and once any other
+  // dock button is used (a press on the page closes it too, in dcInjectCanvas)
+  document.addEventListener("pointerdown", (e) => { const d = $("dcDock"); if (d && d.classList.contains("more-open") && !d.contains(e.target)) dcDockMore(false); }, true);
+  const dk = $("dcDock"); if (dk) dk.addEventListener("click", (e) => { const b = e.target.closest && e.target.closest("button"); if (b && b.id !== "dkMore") dcDockMore(false); });
   on("dcBtnPreview", dcOpenPreview);
   on("btnPageInfo", togglePageInfoMenu);   // slice B: the Page Information menu (Share draft lives inside it now)
   // Slice D: the modes bar. #btnComments now lives INSIDE the segment (G11
@@ -12613,6 +12622,7 @@ function closeDesignPanels() { closePagesCard(false); dcDockMore(false); closeTr
   const sc = $("dcScrim"); if (sc) sc.addEventListener("click", closeDesignPanels);
   document.addEventListener("keydown", (e) => {
     if (e.key !== "Escape") return;
+    if (document.querySelector("dialog[open]")) return;   // item 171 (E7): a question (or the photo editor) answers its own Escape
     if (PAGES_OPEN) {
       if (PI_OPEN) return;   // the Page menu closes itself first
       const pop = document.querySelector(".pp-pop:not(.pi-pop)"); if (pop) { e.stopPropagation(); pop.remove(); return; }   // so does a page's ⋯ menu
@@ -14702,7 +14712,8 @@ function dcInjectCanvas(doc, main, live) {
       "header.site[data-dc-hf]:hover,footer.site[data-dc-hf]:hover,header.site.dc-hf-on,footer.site.dc-hf-on{outline:2px solid var(--ddsdc-p);outline-offset:-2px;cursor:pointer}" +
       ".dds-phonebar[data-dc-pb]:hover,.dds-phonebar.dc-hf-on{outline:2px solid var(--ddsdc-p);outline-offset:-2px;cursor:pointer}" +   // item 122: the phone bar belongs to the footer
       // on a phone the editor's dock covers the frame's foot: the bar sits just above it, and the page's end above both
-      ".dds-phonebar{bottom:var(--ddsdc-foot,0px)!important}.dds-pb-gap{height:calc(64px + var(--ddsdc-foot,0px))!important}" +
+      ".dds-phonebar{bottom:var(--ddsdc-foot,0px)!important}" +
+      "html body{padding-bottom:var(--ddsdc-foot,0px)}" +   // item 171 (E5): the page's end scrolls clear of the phone's dock
       // the chip stays in the tab order (a keyboard's way in), seen only on hover, focus or while its card is open
       // it hangs off the edge (under the header, over the footer), so the name and menu stay clear to click
       ".dc-hf-chip{position:absolute;left:12px;top:calc(100% - 12px);z-index:30;display:inline-flex;align-items:center;height:24px;padding:0 10px;border:0;border-radius:999px;background:var(--ddsdc-p-soft);color:var(--ddsdc-p);font:600 12px/1 var(--ddsdc-sans);white-space:nowrap;cursor:pointer;opacity:0;pointer-events:none}" +
@@ -15024,6 +15035,8 @@ function dcInjectCanvas(doc, main, live) {
   if (!doc.body.hasAttribute("data-dc-hintguard")) {
     doc.body.setAttribute("data-dc-hintguard", "1");
     ["pointerdown", "keydown"].forEach((t) => doc.addEventListener(t, dcDismissShellHint, true));
+    // item 171 (E3): a press on the page closes the Pages card, as a press anywhere else in the editor does
+    doc.addEventListener("pointerdown", () => { if (PAGES_OPEN) closePagesCard(false); dcDockMore(false); }, true);   // and the phone's More (E4)
   }
   // expose a selector so the content-tree rows can flash + select a section on click
   DC_SHOWBAR = (elx) => { try { showBar(elx); } catch (_) {} };
