@@ -57,6 +57,8 @@
   Cache-Control: no-cache, must-revalidate
 /domains
   Cache-Control: no-cache, must-revalidate
+/templates
+  Cache-Control: no-cache, must-revalidate
 /today
   Cache-Control: no-cache, must-revalidate
 /inbox

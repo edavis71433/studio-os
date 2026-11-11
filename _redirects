@@ -245,6 +245,8 @@ https://app.davisdigitalstudio.com/report.html           https://tools.davisdigi
 /sites                       /sites.html           200
 /domains.html                 /domains             301!
 /domains                     /domains.html         200
+/templates.html               /templates           301!
+/templates                   /templates.html       200
 /snapshot-history.html        /snapshot-history    301!
 /snapshot-history            /snapshot-history.html   200
 /timeline.html                /timeline            301!

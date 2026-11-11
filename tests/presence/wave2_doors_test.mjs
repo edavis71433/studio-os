@@ -46,7 +46,7 @@ ok('⌘K "billing" (scoped) → the record’s Billing tab', hits(scoped, 'billi
 ok('⌘K "plan" → Settings’ Plan & billing (owner first; a studio sees Plan my week, then it)', hits(owner, 'plan')[0]?.href === '/settings.html#billing' && hits(studio, 'plan')[0]?.href === '/week.html' && hits(studio, 'plan').some((h) => h.href === '/settings.html#billing'));
 ok('⌘K "week" → Plan my week, for a studio only', hits(studio, 'week')[0]?.href === '/week.html' && !hits(owner, 'week').some((h) => h.href === '/week.html'));
 ok('⌘K "team" → Settings’ Team (studio) / Sharing & access (owner)', hits(studio, 'team')[0]?.href === '/settings.html#team' && hits(owner, 'team')[0]?.href === '/sharing.html');
-ok('⌘K "kit" → Starter kits on the studio home', hits(studio, 'kit')[0]?.href === '/agency.html#kits');
+ok('⌘K "kit" (and "template") → the Templates tab on Sites (item 166)', hits(studio, 'kit')[0]?.href === '/templates.html' && hits(studio, 'template')[0]?.href === '/templates.html');
 ok('⌘K "client" → Customers (studio + owner)', hits(studio, 'client').some((h) => h.href === '/customers.html') && hits(owner, 'client')[0]?.href === '/customers.html');
 ok('⌘K "health" → the Health Center for platform staff only', hits(staff, 'health').some((h) => h.href === '/admin-health.html') && !hits(studio, 'health').some((h) => h.href === '/admin-health.html'));
 ok('every new entry is ⌘K-only (hidden) — the menu did not grow', ['billing', 'plan', 'team', 'kits', 'health'].every((k) => { const e = flatten(staff).filter((i) => i.key === k); return e.length > 0 && e.every((i) => i.hidden); }));

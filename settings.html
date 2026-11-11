@@ -295,7 +295,7 @@
     <p class="rolehelp" id="roleHelp"></p>
   </section>
   <section class="card" id="billing" aria-labelledby="billingHead" hidden data-needs="owner">
-    <div class="card-h"><h2 id="billingHead" tabindex="-1">Plan &amp; billing</h2><span class="hint">Your Studio OS plan — not the invoices you send clients.</span></div>
+    <div class="card-h"><h2 id="billingHead" tabindex="-1">Your plan</h2><span class="hint">Your Studio OS plan — not the invoices you send clients.</span></div>
     <div class="plan" id="plan" aria-live="polite"></div>
     <!-- sales review item 69: walk out with everything — one zip of spreadsheets (GET /sales/export) -->
     <div class="dlrow" id="dlRow">
@@ -385,7 +385,7 @@ const CARDS = [
   { key: 'report', icon: 'studio', href: '#report', title: 'Monthly report', desc: 'Once a month, this client gets how their website did, on your brand, with a line from you.', words: 'email client monthly report visitors', scopedOnly: true, feature: 'website', cap: 'configure' },
   // builder list item 54 (Nov 2026): a studio hides the menu areas it doesn't use
   { key: 'menu', icon: 'studio', href: '#menu', title: 'Your menu', desc: 'Hide the areas your studio doesn’t use. A hidden area keeps its page and stays one search away.', words: 'hide areas navigation sidebar', agencyOnly: true, cap: 'configure' },
-  { key: 'billing', href: '#billing', title: 'Plan & billing', desc: 'Your plan, how to change it, and closing your account.', words: 'plan subscription payment card cancel close delete account export download data', ownerOnly: true, needs: 'owner' },
+  { key: 'billing', href: '#billing', title: 'Your plan', desc: 'Your Studio OS plan, how to change it, and closing your account.', words: 'plan billing subscription payment card cancel close delete account export download data', ownerOnly: true, needs: 'owner' },   // item 166: "Plan" alone for the studio's own subscription (billing stays a search word)
   { key: 'money', href: '/pipeline.html?services=1', title: 'Invoices & agreements', desc: 'Your services and prices (they fill proposals), the agreement every deal starts from, deposits.', words: 'services prices proposals deposits contracts tax', feature: 'relationship' },
   // Bold redesign (Nov 2026): the private calendar link (sales review item 46) has its own row — it lives on Connections
   { key: 'calendar', href: '/connections.html#calSec', title: 'Calendar', desc: 'Your bookings and dated tasks in Google Calendar, Apple Calendar or Outlook, through a private link.', words: 'ical google outlook apple bookings', feature: 'connected', studioOnly: true },
@@ -648,7 +648,9 @@ async function loadPlan() {
   if (s.can_manage_billing) {
     html += `<button class="btn primary" type="button" id="manageBilling">${(s.status === 'paused' || s.status === 'lapsed') ? 'Update payment' : 'Manage billing'}</button>`;
   } else {
-    html += `<p class="team" id="planTeam">Changes to your ${esc(planName)} plan go through our team. <a href="${SUPPORT}?subject=${encodeURIComponent('Changing my ' + planName + ' plan')}">Write to us →</a></p>`;
+    // item 166: with no plan name on file this read "Changes to your Your plan plan"
+    const planWords = s.plan_name || s.plan ? esc(planName) + ' plan' : 'plan';
+    html += `<p class="team" id="planTeam">Changes to your ${planWords} go through our team. <a href="${SUPPORT}?subject=${encodeURIComponent('Changing my ' + (s.plan_name || s.plan ? planName + ' plan' : 'Studio OS plan'))}">Write to us →</a></p>`;
   }
   if (s.has_service_billing) html += `<p class="aside">Invoices for project work from your studio are billed separately.</p>`;
   host.innerHTML = html;

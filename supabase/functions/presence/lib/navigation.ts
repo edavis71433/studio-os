@@ -144,13 +144,14 @@ export function buildNav(c: NavContext): NavSection[] {
     // Record — deal · billing · details (the shell carries ?client=<site> onto every href)
     if (f.hasRelationship) sections.push({ key: 'record', label: 'Record', items: [
       { key: 'record', label: 'Record', href: '/crm.html', desc: 'This client’s record — their deal, invoices, details and activity on one page.' },
-      // Oct 2026 audit bug 10: ⌘K "billing" lands on money (the record's Billing tab), never on Customers
-      hid('billing', 'Billing', '/crm.html?tab=billing', 'This client’s billing — invoices, deposits and the payment schedule.'),
+      // Oct 2026 audit bug 10: ⌘K "billing" lands on money (the record's Invoices tab), never on Customers.
+      // Item 166: money owed to the studio is called Invoices or Who owes you; "billing" stays in the words so search finds it.
+      hid('billing', 'Invoices', '/crm.html?tab=billing', 'This client’s invoices, deposits and payment schedule (their billing).'),
     ] });
     // Project — the work you do for them (projects.html opens the single project directly)
     if (f.hasRelationship) single('project', 'Project', '/projects.html', 'The work you’re doing for this client — tasks, milestones, approvals.');
-    // Messages — their conversations
-    single('messages', 'Inbox', '/inbox.html', 'Everything this client has sent or is waiting on — messages, approvals, requests.');
+    // Messages — their conversations (item 166: "Inbox" here read like the studio-wide Inbox, so mail seemed missing)
+    single('messages', 'Messages', '/inbox.html', 'Everything this client has sent or is waiting on — messages, approvals, requests.');
     // Files — theirs, including their private files (Visual Studio stays a ⌘K entry + a button on Files)
     if (f.hasWebsite) sections.push({ key: 'files', label: 'Files', items: [{ key: 'files_all', label: 'Files', href: '/files.html', desc: 'This client’s photos, brand and documents — including the files private to them.' }, ...(canDraft(c) ? [hid('files_visual', 'Visual Studio', '/visual-studio.html', 'Make an image for their site.')] : [])] });
     // the studio-wide places are one search away while scoped (never drawn)
@@ -173,8 +174,6 @@ export function buildNav(c: NavContext): NavSection[] {
   // the Numbers section, so Analytics is a ⌘K entry under it ("See all numbers").
   if (studioLevel) {
     const home: NavItem[] = [{ key: 'home', label: 'Home', href: '/agency.html', desc: 'Your studio’s home — every client, what needs you today, your money and your numbers.' }];
-    // Oct 2026 audit bug 10: ⌘K "kit" finds the starter kits (a card on Home; agency.html scrolls to #kits)
-    home.push(hid('kits', 'Starter kits', '/agency.html#kits', 'Save one client’s setup as a kit and start the next client from it.'));
     sections.push({ key: 'home', label: 'Home', items: home });
     // Builder list item 176: ⌘K "week" opens Plan my week (Home's greeting card and the Sites header carry the button)
     home.push(hid('week', 'Plan my week', '/week.html', 'Every client in the order they need you over the next seven days: what’s late, what’s due and what’s coming.'));
@@ -184,8 +183,10 @@ export function buildNav(c: NavContext): NavSection[] {
     if (f.hasWebsite) sections.push({ key: 'sites', label: 'Sites', items: [
       { key: 'sites', label: 'Sites', href: '/sites.html', desc: 'Every client’s website as a card: a live picture, its address, when it renews and who can edit.' },
       hid('domains', 'Domains', '/domains.html', 'Every domain your clients use: its status, where it’s registered, and when it expires.'),
+      // Oct 2026 audit bug 10: ⌘K "kit" finds the starter kits. Item 166: they live on Sites' Templates tab now, with the templates (before New site, whose words say "kit" too)
+      hid('kits', 'Templates and starter kits', '/templates.html', 'Every template and starter kit you saved: what each brings and where it came from. Rename or remove them.'),
       // item 135: ⌘K "new site" opens the New site box (sites.html opens it on #new)
-      hid('new_site', 'New site', '/sites.html#new', 'Make a site from a business name and, if you like, a starter kit. Nobody is emailed until you invite the owner.'),
+      hid('new_site', 'New site', '/sites.html#new', 'Make a site from a business name and, if you like, a template or starter kit. Nobody is emailed until you invite the owner.'),
     ] });
   } else if (f.hasBusinessOS) {
     single('today', 'Today', '/today.html');
@@ -221,7 +222,7 @@ export function buildNav(c: NavContext): NavSection[] {
   if (f.hasRelationship) sections.push({ key: 'pipeline', label: 'Pipeline', items: [
     { key: 'pipeline', label: 'Pipeline', href: '/pipeline.html', desc: 'Deals by stage — proposals, agreements and payments move through here.' },
     // Oct 2026 audit bug 10: ⌘K "billing" lands on money — Pipeline's Outstanding ("who owes you"), never on Customers
-    hid('billing', 'Billing', '/pipeline.html#outstanding', 'Who owes you — outstanding invoices, deposits and payment schedules.'),
+    hid('billing', 'Who owes you', '/pipeline.html#outstanding', 'Invoices not paid yet, deposits and payment schedules: money owed to you (billing).'),
   ] });
 
   // Prospects — the step before the pipeline (Semrush review item 112). Its own
@@ -274,7 +275,7 @@ export function buildNav(c: NavContext): NavSection[] {
   const settings: NavItem[] = [{ key: 'settings', label: 'Settings', href: '/settings.html' }];
   // Oct 2026 audit bug 10: ⌘K "plan" and "team" each find their card on Settings
   // (Plan & billing is the owner's / the studio's own; Team is the studio's seats).
-  settings.push(hid('plan', 'Plan & billing', '/settings.html#billing', 'Your plan, when it renews, and how to change it.'));
+  settings.push(hid('plan', 'Your plan', '/settings.html#billing', 'Your Studio OS plan, when it renews, and how to change it — not the invoices you send.'));
   if (studioLevel) settings.push(hid('team', 'Team', '/settings.html#team', 'Who is on your studio’s team, their roles, and the seats your plan covers.'));
   if (f.hasClientPortal && has(c, 'invite')) settings.push(hid('sharing', 'Sharing & access', '/sharing.html', 'Who can sign in — your team, what clients can see, reviewer links.'));
   if (f.hasDeveloper && has(c, 'use_developer_mode')) settings.push(hid('developer', 'Developer Mode', '/developer.html'));
