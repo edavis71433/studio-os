@@ -51,6 +51,7 @@ const { handleEstimateDelete } = await import(`${P}/routes/estimates.ts`);   // 
 const { handleProspect } = await import(`${P}/routes/prospects.ts`);   // sales review item 112
 const { handleRecurringAction } = await import(`${P}/routes/recurring_invoices.ts`);
 const { handleReportPut, handleReportPreview } = await import(`${P}/ops/monthly_report.ts`);   // builder list item 58
+const { handleContactImportUndo, handleContactMerge, handleContactUnmerge } = await import(`${P}/routes/contacts_more.ts`);   // sales review items 86 + 105
 
 const ROOT = new URL('../../', import.meta.url);
 const read = (p) => Deno.readTextFileSync(new URL(p, ROOT));
@@ -141,6 +142,8 @@ const DECIDED = {
     'POST /sales/deals/:id/retainer/cancel', 'POST /sales/invoices/:id/void', 'DELETE /broadcasts/lists/:id',
     'DELETE /sales/estimates/:id', 'POST /sales/recurring/:id/stop',   // sales review item 47
     'DELETE /sales/prospects/:id',   // sales review item 112: taking a prospect off the list
+    // sales review items 86 + 105: undoing an import takes people off; a merge folds a record away (and back)
+    'POST /sales/contacts/imports/:id/undo', 'POST /sales/contacts/:id/merge', 'POST /sales/contacts/:id/unmerge',
   ],
   configure: [
     'DELETE /foundations/domain', 'POST /foundations/domain', 'POST /foundations/prepare',
@@ -211,6 +214,7 @@ const DECIDED = {
     'POST /sales/prospects', 'POST /sales/prospects/discover', 'PATCH /sales/prospects/:id',
     'POST /sales/prospects/:id/convert', 'POST /sales/prospects/:id/draft',
     'POST /sales/prospects/:id/pack',   // sales review item 113: the pitch pack build
+    'POST /sales/contacts/imports',   // sales review item 86: starting an import (each row is a POST /sales/contacts)
   ],
   open: [
     'DELETE /crm/notes/:id', 'POST /client/notifications/read', 'POST /concierge/ask', 'POST /crm/notes',
@@ -303,6 +307,10 @@ const CHANGED = [
   { name: 'DELETE /sales/estimates/:id', run: (r, p) => handleEstimateDelete(A, p, ROW, cors) },     // sales review item 47
   { name: 'DELETE /sales/prospects/:id', run: (r, p) => handleProspect(r, A, p, ROW, cors) },     // sales review item 112
   { name: 'POST /sales/recurring/:id/stop', run: (r, p) => handleRecurringAction(r, A, p, ROW, 'stop', cors) },
+  // sales review items 86 + 105
+  { name: 'POST /sales/contacts/imports/:id/undo', fx: { rows: { presence_contact_imports: { created_at: new Date().toISOString(), undone_at: null } } }, run: (r, p) => handleContactImportUndo(r, A, p, ROW, cors) },
+  { name: 'POST /sales/contacts/:id/merge', body: { from: ROW2, confirm: true }, fx: { rows: { presence_contacts: { client_id: null, deleted_at: null } } }, run: (r, p) => handleContactMerge(r, A, p, ROW, cors) },
+  { name: 'POST /sales/contacts/:id/unmerge', fx: { rows: { presence_contacts: { merged_into: ROW2, merge_record: { at: new Date().toISOString(), into: ROW2, moved: { deals: [], appointments: [], reviews: [] }, keep_before: {}, keep_after: {} } } } }, run: (r, p) => handleContactUnmerge(r, A, p, ROW, cors) },
   { name: 'POST /foundations/domain', body: { domain: 'beta.example' }, run: (r, p) => handleDomain(r, 'POST', A, p, cors) },
   { name: 'DELETE /foundations/domain', run: (r, p) => handleDomain(r, 'DELETE', A, p, cors) },
   { name: 'POST /foundations/prepare', body: { goal: 'email_auth' }, run: (r, p) => handleFoundationsPrepare(r, A, p, cors) },
@@ -449,6 +457,8 @@ const WRITE_HANDLERS = [
   'handleRecurringStart', 'handleRecurringChange', 'handleRecurringAction',
   // sales review item 112: prospects (DELETE and PATCH /sales/prospects/:id share handleProspect)
   'handleProspects', 'handleProspect', 'handleProspectDiscover', 'handleProspectConvert', 'handleProspectDraft', 'handleProspectPack',
+  // sales review items 86 + 105: imports (POST edit; undo delete) and merging two records (delete)
+  'handleContactImports', 'handleContactImportUndo', 'handleContactMerge', 'handleContactUnmerge',
   // sales review item 114: free-tool leads are the PLATFORM's own enquiries. Deliberately on
   // no member list (an unlisted write refuses every seat — asserted above), and the handlers
   // themselves refuse anyone who isn't platform staff (tool_leads_routes_test.mjs proves it).
