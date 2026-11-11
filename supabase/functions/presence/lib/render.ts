@@ -205,7 +205,7 @@ export async function renderSnapshot(snapshot: Snapshot, site: SiteConfig, opts:
   const content = snapshot.content as SnapshotContent;
   const dressed = injectSender(injectPopup(injectDevLayer(drawn, snapshot.dev_customization), content, site), content, site);
   // List item 152: the Google tag and the Meta Pixel, behind a cookie notice, on a site that has them.
-  const tagged = injectAdTags(opts.allSectionStyles ? dressed : trimSectionStyles(dressed), content?.settings);
+  const tagged = injectAdTags(opts.allSectionStyles ? dressed : trimSectionStyles(dressed), (snapshot.content as SnapshotContent)?.settings);
   return injectCsp(injectAnalytics(tagged, counting ? site.siteId : undefined));
 }
 
