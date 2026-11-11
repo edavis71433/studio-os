@@ -18,6 +18,7 @@ import { sanitizeDevHtml, sanitizeDevCss } from './devmode.ts';
 import { BLOCK_CSS, sectionStyles, pageClasses } from './site_blocks.ts';
 import { applyPageChrome } from './page_access.ts';
 import { applyHeaderScroll } from './site_header.ts';
+import { applyPhoneBar } from './phone_bar.ts';
 
 // ── FD-T2: indexed template registry; each template's code loads on first use ──
 // slug → version → { manifest, code loader }. Render resolution goes through this
@@ -198,7 +199,10 @@ export async function renderSnapshot(snapshot: Snapshot, site: SiteConfig, opts:
   const pages = (snapshot.content as SnapshotContent)?.settings?.pages;
   // items 50 and 123: the header scrolls away, stays on top, hides or fades, as the owner chose
   const drawn = applyHeaderScroll(tintFavicon(applyPageChrome(await t.render(snapshot, t.manifest, site), pages), tokens?.accent, snapshot.template_slug), tokens?.header_scroll);
-  const dressed = injectDevLayer(drawn, snapshot.dev_customization);
+  // item 122: Call, Directions, Hours and Email along the bottom of every page on a phone, when turned on
+  // (after the page's own header and footer choice, so a page that hides its footer has no bar either)
+  const barred = applyPhoneBar(drawn, tokens?.phone_bar, snapshot.content as SnapshotContent, tokens?.accent);
+  const dressed = injectDevLayer(barred, snapshot.dev_customization);
   return injectCsp(injectAnalytics(opts.allSectionStyles ? dressed : trimSectionStyles(dressed), counting ? site.siteId : undefined));
 }
 
