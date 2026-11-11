@@ -37,6 +37,9 @@ export const VISITOR_ROUTE = /^\/(?:forms\/[0-9a-f-]{36}\/(?:submit|ticket)|book
 
 /** How long the page waits for an answer before it says the message didn't send. */
 export const SEND_WAIT_MS = 15000;
+/** Item 147: a "Photo or file" field's limit per file (lib/forms.ts FILE_FIELD.mb), checked
+ *  in the page so nobody waits for a big upload the server would refuse. */
+export const FILE_MAX_MB = 10;
 /** Item 140: a send waits until its time ticket is this old (the server wants three
  *  seconds; the half second covers its rounding), and asks for a new one after 11 hours. */
 export const TICKET_SETTLE_MS = 3500;
@@ -73,6 +76,7 @@ function note(f){var p=f.querySelector('.ps-note');if(!p){p=el('p','ps-note');p.
 function btnOf(f){return f.querySelector('button[type=submit],input[type=submit]');}
 function busy(f,on){var b=btnOf(f);if(on){f.setAttribute('data-sending','1');f.setAttribute('aria-busy','true');if(b){b.setAttribute('data-label',b.tagName==='INPUT'?b.value:b.textContent);b.disabled=true;if(b.tagName==='INPUT')b.value='Sending…';else b.textContent='Sending…';}}
 else{f.removeAttribute('data-sending');f.removeAttribute('aria-busy');if(b){var l=b.getAttribute('data-label');if(l!=null){if(b.tagName==='INPUT')b.value=l;else b.textContent=l;}b.disabled=false;}}}
+function tooBig(f){var ins=f.querySelectorAll('input[type=file]');for(var i=0;i<ins.length;i++){var fs=ins[i].files||[];for(var j=0;j<fs.length;j++)if(fs[j].size>${FILE_MAX_MB}*1048576)return {input:ins[i],name:fs[j].name};}return null;}
 function firstBad(f){var es=f.elements;for(var i=0;i<es.length;i++){var e=es[i];if(!e.willValidate||e.disabled)continue;
 var w=e.closest?e.closest('[data-field]'):null;if(w&&w.hidden)continue;var s=e.closest?e.closest('.ff-step'):null;if(s&&s.hidden)continue;
 if(e.checkValidity&&!e.checkValidity())return e;}return null;}
@@ -82,6 +86,7 @@ function sent(f,msg){var box=el('div','ps-sent');box.setAttribute('role','status
 f.parentNode.insertBefore(box,f);f.style.display='none';try{box.focus();}catch(_){}}
 function send(f,ev){ev.preventDefault();if(f.getAttribute('data-sending'))return;
 var bad=firstBad(f);if(bad){if(bad.reportValidity)bad.reportValidity();else if(bad.focus)bad.focus();return;}
+var big=tooBig(f);if(big){fail(f,'check','“'+big.name+'” is bigger than ${FILE_MAX_MB} MB. Try a smaller one.');try{big.input.focus();}catch(_){}return;}
 var sp=f.querySelector('input[name=source_page]');if(sp)sp.value=location.pathname.slice(0,300);
 var p=note(f);p.className='ps-note';p.textContent='';busy(f,true);
 var ac=window.AbortController?new AbortController():null,over=false;

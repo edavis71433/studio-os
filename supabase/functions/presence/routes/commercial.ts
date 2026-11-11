@@ -28,6 +28,7 @@ import { validateFormValues, type FormDefinition } from '../lib/forms.ts';
 import { notSentReason } from '../lib/legal_pages.ts';
 import { enquiryState, customerEmails } from '../lib/enquiry_state.ts';
 import { judgeSend, issueTicket, TICKET_MIN_AGE_S, markSender, spamLinkToken, readSpamLinkToken, SPAM_REASONS } from '../lib/form_check.ts';
+import { storeFormFiles, cleanFileName, filesOf, filePath, fileLink, type StoredFile } from '../lib/form_files.ts';
 
 const SB_URL = Deno.env.get('SUPABASE_URL') || '';
 const APPROVAL_SECRET = Deno.env.get('APPROVAL_SECRET') || Deno.env.get('SCHEDULER_SECRET') || '';
@@ -124,10 +125,17 @@ export async function handleFormSubmit(req: Request, siteId: string, cors: Recor
   }
   let b: any = {};
   let rawMap: Record<string, string | string[]> = {};   // FB: full field map (keeps multi-value checkboxes)
+  const sentFiles: Record<string, File[]> = {};          // item 147: a "Photo or file" field's files, by field
   if (isFormPost) {
     try {
       const fd = await req.formData();
-      for (const key of new Set(fd.keys())) { const all = fd.getAll(key).filter((x) => typeof x === 'string') as string[]; rawMap[key] = all.length > 1 ? all : (all[0] ?? ''); }
+      for (const key of new Set(fd.keys())) {
+        const all = fd.getAll(key);
+        const words = all.filter((x) => typeof x === 'string') as string[];
+        const got = all.filter((x) => typeof x !== 'string' && (x as File).size > 0) as File[];
+        if (got.length) sentFiles[key] = got;
+        rawMap[key] = words.length > 1 ? words : (words[0] ?? '');
+      }
       b = formParamsToSubmission((k) => { const x = rawMap[k]; return typeof x === 'string' ? x : (Array.isArray(x) ? x[0] : null); });
     } catch { /* */ }
   } else {
@@ -178,7 +186,12 @@ export async function handleFormSubmit(req: Request, siteId: string, cors: Recor
       return json({ error: 'not_found', message: 'That form is no longer available.' }, 404, cors);
     }
     const trap = !!String((rawMap as any)?._hp ?? b?._hp ?? '').slice(0, 100).trim();
-    const fv = validateFormValues(def, rawMap as any);
+    // item 147: only a file field's own files count; anything else sent as a file is ignored
+    const fileFields = def.fields.filter((f) => f.type === 'file').map((f) => f.key);
+    const asSent = Object.fromEntries(fileFields.map((k) => [k, (sentFiles[k] || []).map((f) => ({ name: f.name, size: f.size, type: f.type }))]));
+    // a show-or-hide rule on a file box reads its files' names, as the page's rules do
+    for (const k of fileFields) if (sentFiles[k]?.length) (rawMap as any)[k] = sentFiles[k].map((f) => f.name).join(', ');
+    const fv = validateFormValues(def, rawMap as any, asSent);
     if (!fv.ok) {
       if (toPage && siteOrigin) return await notSent(fv.error);
       return json({ error: fv.error, field: fv.field, message: fv.error === 'need_contact' ? 'Leave an email or phone so they can reply.' : (fv.error === 'empty' ? 'Please fill in the form.' : fv.error) }, 400, cors);
@@ -190,15 +203,33 @@ export async function handleFormSubmit(req: Request, siteId: string, cors: Recor
     const src = String((rawMap as any)?.source_page ?? '').slice(0, 300);
     // item 131: a send that already arrived (a retry after no answer, a double tap) isn't stored twice
     if (!spam && await alreadyArrived(siteId, fv.sub)) return toPage && siteOrigin ? redirectTo(def.redirect_url || '/thanks/') : ok200(def.confirmation_text || FORM_THANKS, def.redirect_url ? { redirect: def.redirect_url } : {});
+    // item 147: a person's photos and PDFs are kept privately; a send judged spam keeps none
+    const entries = spam ? [] : fileFields.flatMap((k) => (fv.sub.values[k] ? (sentFiles[k] || []) : []).map((file) => ({ key: k, file })));
+    let keptFiles: StoredFile[] = [];
+    if (entries.length) {
+      const kept = await storeFormFiles(siteId, entries);
+      if (!kept.ok) {
+        if (toPage && siteOrigin) return await notSent('try_again');
+        const field = entries.find((e) => cleanFileName(e.file.name) === kept.name)?.key;
+        return kept.error === 'write_failed'
+          ? json({ error: 'write_failed', field, message: 'Your files didn’t send. Please try again in a minute.' }, 502, cors)
+          : json({ error: kept.error, field, message: kept.error === 'not_allowed' ? `“${kept.name}” isn’t a photo or a PDF.` : (kept.name ? `“${kept.name}” is too big. Try a smaller one.` : 'Those files are too big together. Send fewer, or smaller ones.') }, 400, cors);
+      }
+      keptFiles = kept.files;
+    }
+    // the answer remembers its form (item 147: each form's own table of answers)
+    const keep: Record<string, unknown> = { ...fv.sub.values, __form: def.id };
+    if (keptFiles.length) keep.__files = keptFiles;
+    if (why2) keep.__spam = { reason: why2 };
     const ins2 = await svc('presence_form_submissions?select=id', {
       method: 'POST', headers: { Prefer: 'return=representation' },
-      body: JSON.stringify({ site_id: siteId, form_kind: def.kind, name: fv.sub.name, email: fv.sub.email, phone: fv.sub.phone, message: fv.sub.message, fields: why2 ? { ...fv.sub.values, __spam: { reason: why2 } } : fv.sub.values, source_page: src, spam, ip_hash: ipHash2 }),
+      body: JSON.stringify({ site_id: siteId, form_kind: def.kind, name: fv.sub.name, email: fv.sub.email, phone: fv.sub.phone, message: fv.sub.message, fields: keep, source_page: src, spam, ip_hash: ipHash2 }),
     });
     if (!ins2.ok) {
       if (toPage && siteOrigin) return await notSent('try_again');
       return json({ error: 'write_failed', message: 'That didn’t send — please try again.' }, 502, cors);
     }
-    if (!spam) { notifyOwnerOfLead(siteId, { id: String(ins2.json?.[0]?.id || ''), form_kind: def.kind, name: fv.sub.name, email: fv.sub.email, phone: fv.sub.phone, message: fv.sub.message }).catch(() => {}); acknowledgeEnquiry(siteId, { name: fv.sub.name, email: fv.sub.email }).catch(() => {}); }
+    if (!spam) { notifyOwnerOfLead(siteId, { id: String(ins2.json?.[0]?.id || ''), form_kind: def.kind, name: fv.sub.name, email: fv.sub.email, phone: fv.sub.phone, message: fv.sub.message, files: keptFiles.length }).catch(() => {}); acknowledgeEnquiry(siteId, { name: fv.sub.name, email: fv.sub.email }).catch(() => {}); }
     if (toPage && siteOrigin) return redirectTo(def.redirect_url || '/thanks/');
     // the page's sender goes on to the owner's own thank-you address when the form has one
     return ok200(def.confirmation_text || FORM_THANKS, def.redirect_url ? { redirect: def.redirect_url } : {});
@@ -305,9 +336,65 @@ export async function handleFormInbox(site: SiteRow, cors: Record<string, string
   // form values stay server-side as before; each row carries `replies` instead.
   const submissions = rows.map(({ fields, ...s }: any) => {
     const dealId = dealMap.get(String(s.id)) || null;
-    return { ...s, replies: leadReplies(fields), note: leadNote(fields), deal_id: dealId, ...enquiryState(s.status, dealId, customers.has(String(s.email || '').trim().toLowerCase())) };
+    // item 147: its files (names, never where they're kept) and the form it came from
+    return { ...s, replies: leadReplies(fields), note: leadNote(fields), files: filesOf(fields), form_id: typeof fields?.__form === 'string' ? fields.__form : null, deal_id: dealId, ...enquiryState(s.status, dealId, customers.has(String(s.email || '').trim().toLowerCase())) };
   });
   return json({ data: { submissions, unread: submissions.filter((s: any) => s.status === 'new').length, more } }, 200, cors);
+}
+
+// ═══ Builder list item 147 · a form's files, and its own table of answers ═══
+/** A ten-minute link to file `n` of one enquiry (the Inbox's attachment buttons). */
+export async function handleFormFile(site: SiteRow, id: string, n: number, cors: Record<string, string>) {
+  const r = await svc(`presence_form_submissions?id=eq.${id}&site_id=eq.${site.id}&select=fields&limit=1`);
+  const row = Array.isArray(r.json) ? r.json[0] : null;
+  const path = row ? filePath(row.fields, n) : null;
+  const meta = row ? filesOf(row.fields).find((f) => f.n === n) : null;
+  if (!path || !meta) return json({ error: 'not_found', message: 'That file isn’t there any more.' }, 404, cors);
+  const url = await fileLink(path, meta.name, meta.type);
+  return url ? json({ data: { url, name: meta.name, type: meta.type } }, 200, cors) : json({ error: 'unavailable', message: 'That file couldn’t be opened just now. Try again in a moment.' }, 502, cors);
+}
+
+/** GET /forms/answers?form=<id>[&page=<slug>] — one form's answers as a table: its fields
+ *  as columns, the newest FORM_ANSWERS_MAX answers as rows (each with its files), how many
+ *  are new, and, over the last 30 days, how many visitors saw a page the form is on
+ *  against how many sent it. An answer knows its form from item 147 on (fields.__form). */
+export const FORM_ANSWERS_MAX = 500;
+export async function handleFormAnswers(req: Request, site: SiteRow, cors: Record<string, string>) {
+  const u = new URL(req.url);
+  const formId = String(u.searchParams.get('form') || '').trim();
+  const page = String(u.searchParams.get('page') || '').trim();
+  if (!/^[a-z0-9_]{1,40}$/.test(formId)) return json({ error: 'bad_request', message: 'Pick a form first.' }, 400, cors);
+  const st = await svc(`presence_settings?site_id=eq.${site.id}&select=blocks,pages&limit=1`);
+  const row = Array.isArray(st.json) ? st.json[0] : null;
+  const where: Array<{ path: string; blocks: unknown }> = [{ path: '/', blocks: row?.blocks }, ...(Array.isArray(row?.pages) ? row.pages : []).map((p: any) => ({ path: `/${String(p?.slug || '')}/`, blocks: p?.blocks }))];
+  let def: FormDefinition | undefined;
+  const paths: string[] = [];
+  for (const w of where) {
+    const d = validateBlocks(w.blocks).find((bl: any) => bl.type === 'form' && bl.id === formId) as FormDefinition | undefined;
+    if (!d) continue;
+    paths.push(w.path);
+    if (!def || (page ? w.path === `/${page}/` : w.path === '/')) def = d;
+  }
+  if (!def) return json({ error: 'not_found', message: 'That form isn’t on your site any more.' }, 404, cors);
+  const since = new Date(Date.now() - 30 * 86400_000).toISOString();
+  const pathList = paths.flatMap((p) => (p === '/' ? ['/'] : [p, p.slice(0, -1)])).map((p) => `"${p.replace(/"/g, '')}"`).join(',');
+  const [ans, views] = await Promise.all([
+    svc(`presence_form_submissions?site_id=eq.${site.id}&spam=eq.false&fields->>__form=eq.${encodeURIComponent(formId)}&select=id,created_at,status,name,email,phone,fields&order=created_at.desc&limit=${FORM_ANSWERS_MAX + 1}`),
+    svc(`presence_visits?site_id=eq.${site.id}&kind=eq.pageview&ts=gte.${encodeURIComponent(since)}&path=in.(${encodeURIComponent(pathList)})&select=visitor_hash&limit=20000`),
+  ]);
+  if (!ans.ok) return json({ error: 'read_failed', message: 'The answers couldn’t load just now. Try again in a moment.' }, 502, cors);
+  const all = Array.isArray(ans.json) ? ans.json : [];
+  const rows = all.slice(0, FORM_ANSWERS_MAX).map(({ fields, ...r }: any) => ({
+    ...r,
+    values: Object.fromEntries(def!.fields.map((f) => [f.key, typeof fields?.[f.key] === 'string' ? fields[f.key] : ''])),
+    files: filesOf(fields),
+  }));
+  const seen = views.ok && Array.isArray(views.json) ? new Set(views.json.map((v: any) => String(v.visitor_hash || '')).filter(Boolean)).size : null;
+  return json({ data: {
+    form: { id: def.id, title: def.title, kind: def.kind, fields: def.fields.map((f) => ({ key: f.key, label: f.label, type: f.type })) },
+    rows, more: all.length > FORM_ANSWERS_MAX, new: rows.filter((r: any) => r.status === 'new').length,
+    last30: { seen, sent: rows.filter((r: any) => String(r.created_at || '') >= since).length },
+  } }, 200, cors);
 }
 
 // ═══ Builder list item 140 · what the spam checks kept back, and why ═══
@@ -529,7 +616,7 @@ async function acknowledgeEnquiry(siteId: string, sub: { name: string; email: st
   return await sendEmail(sub.email, copy.subject, `<p>${esc(copy.sentence)}</p>${copy.footer ? `<p style="color:#6b6478;font-size:13px">${esc(copy.footer)}</p>` : ''}`, brand, { critical: true, siteId, replyTo });   // they wrote in; this is the reply they are waiting for
 }
 
-async function notifyOwnerOfLead(siteId: string, sub: { id?: string; form_kind: string; name: string; email: string; phone: string; message: string }) {
+async function notifyOwnerOfLead(siteId: string, sub: { id?: string; form_kind: string; name: string; email: string; phone: string; message: string; files?: number }) {
   const ident = await svc(`presence_identity?site_id=eq.${siteId}&select=business_name,email&limit=1`);
   const to = ident.json?.[0]?.email;
   if (!to) return;
@@ -537,9 +624,11 @@ async function notifyOwnerOfLead(siteId: string, sub: { id?: string; form_kind: 
   const brand = await loadEmailBrand(siteId);   // BR-1: on the owner's brand
   // item 140: one tap from the email files it as spam, and more from that address goes there too
   const tok = sub.id ? await spamLinkToken(siteId, sub.id) : '';
+  // item 147: files are opened from the Inbox (they never travel by email)
+  const filesLine = sub.files ? `<p>${sub.files === 1 ? 'A file came' : `${sub.files} files came`} with it. Open ${sub.files === 1 ? 'it' : 'them'} from your Inbox.</p>` : '';
   const spamLine = tok ? `<p style="margin-top:14px;color:#6b6478;font-size:13px">Not a real customer? <a href="${appBase()}/spam.html?t=${encodeURIComponent(tok)}" style="color:#6b6478">This was spam</a>. It moves to Spam, and more from them goes there too.</p>` : '';
   await sendEmail(String(to), `New ${sub.form_kind} from your website`,
-    `<p>Someone reached out through your website.</p><p><b>${esc(who)}</b></p><p>${esc(sub.message)}</p><p class="cta"><a href="${siteBase()}/crm.html" style="display:inline-block;margin-top:6px;background:${brand.accent};color:#fff;padding:9px 16px;border-radius:999px;text-decoration:none">See it in your workspace →</a></p>${spamLine}`, brand);
+    `<p>Someone reached out through your website.</p><p><b>${esc(who)}</b></p><p>${esc(sub.message)}</p>${filesLine}<p class="cta"><a href="${siteBase()}/crm.html" style="display:inline-block;margin-top:6px;background:${brand.accent};color:#fff;padding:9px 16px;border-radius:999px;text-decoration:none">See it in your workspace →</a></p>${spamLine}`, brand);
 }
 
 // ═══ FD-3 · Approval → notify → one-tap approve ══════════════════════════════

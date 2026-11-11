@@ -10712,7 +10712,7 @@ function renderCardsBlockBody(blk, idx, sub, ti) {
 // (lib/forms.ts) is the authoritative safety gate; this UI can only ever produce
 // whitelisted, typed fields — never raw HTML/JS. Saved as you go, mirroring
 // the content-block editor above.
-const FF_TYPES = [["text", "Short text"], ["textarea", "Long text (paragraph)"], ["email", "Email"], ["phone", "Phone"], ["number", "Number"], ["date", "Date"], ["select", "Dropdown (pick one)"], ["radio", "Choose one"], ["checkbox", "Checkboxes (pick many)"], ["consent", "Consent checkbox"], ["rating", "Star rating"]];
+const FF_TYPES = [["text", "Short text"], ["textarea", "Long text (paragraph)"], ["email", "Email"], ["phone", "Phone"], ["number", "Number"], ["date", "Date"], ["select", "Dropdown (pick one)"], ["radio", "Choose one"], ["checkbox", "Checkboxes (pick many)"], ["consent", "Consent checkbox"], ["rating", "Star rating"], ["file", "Photo or file"]];
 const FF_CHOICE = ["select", "radio", "checkbox"];
 const FF_KINDS = [["contact", "Message / contact"], ["quote", "Quote / request"], ["booking", "Booking"]];
 const FF_OPS = [["equals", "equals"], ["notEquals", "does not equal"], ["isEmpty", "is empty"], ["notEmpty", "is not empty"], ["contains", "contains"], ["gt", "greater than"], ["lt", "less than"]];
@@ -10830,6 +10830,18 @@ function mountFormsCard() {
   card.addEventListener("change", () => formsSaveSoon());
   formsLoad();
 }
+// Bump ?v= whenever form-answers.js changes: browsers keep a .js file for a day.
+let FORM_ANSWERS = null;
+function openFormAnswers(form, btn) {
+  if (!FORM_ANSWERS) FORM_ANSWERS = new Promise((res, rej) => {
+    const s = document.createElement("script"); s.src = "/form-answers.js?v=1";
+    s.onload = () => window.DDSFormAnswers ? res(window.DDSFormAnswers) : rej(new Error("missing"));
+    s.onerror = () => rej(new Error("load"));
+    document.head.appendChild(s);
+  }).catch((e) => { FORM_ANSWERS = null; throw e; });   // a failed load can be tried again
+  FORM_ANSWERS.then((m) => m.open({ formId: form.id, page: FORMS_PAGE, title: form.title || "Form", get: (route) => api("GET", route), opener: btn }))
+    .catch(() => toast("The answers couldn’t open just now. Try again in a moment."));
+}
 function renderFormsCard() {
   const card = $("formsCard"); if (!card) return; card.textContent = "";
   const formsPage = FORMS_PAGE ? dcPageObj(FORMS_PAGE) : null;
@@ -10845,7 +10857,10 @@ function renderFormsCard() {
     const nm = el("div", null, form.title || "Form"); nm.style.cssText = "flex:1;font-weight:600;font-size:13px";
     const rm = el("button", null, "Remove form"); rm.type = "button"; rm.style.cssText = FF_BTN;
     rm.addEventListener("click", async () => { const f = FORMS_WORK[fi]; if (await askYes("Remove this form?", { ok: "Remove form", danger: true })) { const at = FORMS_WORK.indexOf(f); if (at >= 0) FORMS_WORK.splice(at, 1); renderFormsCard(); } });
-    head.append(nm, rm); panel.appendChild(head);
+    // Builder list item 147: this form's own table of answers (form-answers.js, loaded on first use)
+    const ans = el("button", null, "Answers"); ans.type = "button"; ans.style.cssText = FF_BTN;
+    ans.addEventListener("click", () => openFormAnswers(form, ans));
+    head.append(nm, ans, rm); panel.appendChild(head);
 
     // form settings
     const ti = el("input"); ti.type = "text"; ti.placeholder = "Form title"; ti.value = form.title || ""; ti.style.cssText = FF_IN;
@@ -10905,7 +10920,7 @@ function renderFormsCard() {
       stepIn.style.cssText = "width:56px;padding:5px 7px;border:1px solid var(--line,#ddd);border-radius:8px;font:inherit;font-size:12px";
       stepIn.addEventListener("change", () => commitField(fi, xi, { step: stepIn.value === "" ? undefined : Math.max(1, Math.min(12, Math.trunc(Number(stepIn.value)) || 1)) }));
       stepWrap.append(document.createTextNode("Page/step"), stepIn); adv.appendChild(stepWrap);
-      if (fld.type !== "consent") {
+      if (fld.type !== "consent" && fld.type !== "file") {   // a link can't choose a visitor's files (item 147)
         const pfL = el("label"); pfL.style.cssText = "font-size:12px;display:inline-flex;align-items:center;gap:6px";
         const pf = el("input"); pf.type = "checkbox"; pf.checked = !!fld.prefill; pf.style.cssText = "width:auto;margin:0";
         pf.addEventListener("change", () => commitField(fi, xi, { prefill: pf.checked }));

@@ -69,7 +69,7 @@ import { handleEstimateCreate, handleEstimateSend, handleEstimateDecide, handleE
 import { handleRecurringStart, handleRecurringChange, handleRecurringAction } from './routes/recurring_invoices.ts';   // sales review item 47
 import { handleEmailLogAddress } from './routes/email_log.ts';   // sales review item 69: the log-this-email address   // sales review item 69: the sending-domain line
 const { handleBroadcastsList, handleBroadcastCreate, handleBroadcastListCreate, handleBroadcastListDelete, handleBroadcastSegments, handleBroadcastGet, handleBroadcastUpdate, handleBroadcastSend, handleBroadcastCancel, handleBroadcastDraftAssist, handleBroadcastTest } = lazyRoutes(() => import('./routes/broadcasts.ts'));
-import { handleScheduleCreate, handleScheduleList, handleScheduleCancel, handleFormSubmit, handleFormInbox, handleFormStatus, handleFormReply, handleApproveSend, handleApproveGet, handleApprovePost, handleSendTicket, handleSpamLinkGet, handleSpamLinkPost } from './routes/commercial.ts';
+import { handleScheduleCreate, handleScheduleList, handleScheduleCancel, handleFormSubmit, handleFormInbox, handleFormStatus, handleFormReply, handleApproveSend, handleApproveGet, handleApprovePost, handleSendTicket, handleSpamLinkGet, handleSpamLinkPost, handleFormFile, handleFormAnswers } from './routes/commercial.ts';
 const { handleBookingTypes, handleBookingSlots, handleBookingCreate, handleBookingSettingsGet, handleBookingSettingsPut, handleBookingTypesList, handleBookingTypeCreate, handleBookingTypeUpdate, handleBookingTypeDelete, handleBookingAppointments, handleBookingConfirm, handleBookingCancel, handleBookingMark } = lazyRoutes(() => import('./routes/booking.ts'));
 const { handleReviewPage, handleReviewSubmit, handleReviewsList, handleReviewApprove, handleReviewHide, handleReviewReply, handleReviewRequest } = lazyRoutes(() => import('./routes/reviews.ts'));
 const { handleCommentsList, handleCommentCreate, handleCommentResolve, handleCommentDelete, handleTokenSections, handleTokenComment } = lazyRoutes(() => import('./routes/comments.ts'));
@@ -1030,6 +1030,12 @@ async function route_(req: Request, cors: Record<string, string>): Promise<Respo
     if (m && method === 'POST') return handleScheduleCancel(site, m[1], principal, cors);
   }
   if (route === '/forms/inbox' && method === 'GET') return handleFormInbox(site, cors, req);
+  // item 147: one enquiry's attached file (a ten-minute link), and one form's own table of answers
+  {
+    const m = route.match(/^\/forms\/inbox\/([0-9a-f-]{36})\/files\/(\d{1,2})$/);
+    if (m && method === 'GET') return handleFormFile(site, m[1], Number(m[2]), cors);
+  }
+  if (route === '/forms/answers' && method === 'GET') return handleFormAnswers(req, site, cors);
   {
     const m = route.match(/^\/forms\/inbox\/([0-9a-f-]{36})$/);
     if (m && method === 'POST') return handleFormStatus(req, site, m[1], cors);
