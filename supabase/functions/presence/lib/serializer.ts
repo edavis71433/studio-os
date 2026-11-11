@@ -6,6 +6,7 @@
 // must EXCLUDE), builds the exact SnapshotContent shape the renderer contract
 // consumes, computes the media manifest (deterministic output paths per
 // variant), and stamps contract/template versions + timestamp.
+import { normalizePopup } from './popup.ts';
 import { svc } from './db.ts';
 import { isImageMime } from './media.ts';
 import type { Snapshot, SnapshotContent, MediaRef, TemplateManifest, SnapshotDevLayer, SiteBlock } from './render_types.ts';
@@ -338,6 +339,8 @@ export function buildSnapshot(rows: DraftRows, manifest: TemplateManifest, opts:
       ...(String(settings.announcement_text || '').trim()
         ? { announcement: { text: String(settings.announcement_text).trim(), url: String(settings.announcement_url || '').trim() || undefined, expires_at: settings.announcement_expires_at || null } }
         : {}),
+      // Builder list item 148 (0161): the pop-up, only when switched on (absent = byte-identical)
+      ...(normalizePopup(settings.popup) ? { popup: normalizePopup(settings.popup)! } : {}),
     },
     offerings: offerings.map((o: any) => ({ id: o.id, name: o.name, category: o.category, description: o.description || '', price_text: o.price_text || '', media: ref(o.media_id), sort_order: o.sort_order })),
     testimonials: testimonials.map((t: any) => ({ id: t.id, quote: t.quote, author: t.author, source: t.source || '', quote_date: t.quote_date || undefined, sort_order: t.sort_order })),

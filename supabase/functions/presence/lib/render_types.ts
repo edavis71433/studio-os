@@ -62,6 +62,8 @@ export interface SnapshotContent {
     og_image?: MediaRef | null;
     cover?: MediaRef | null;   // owner-chosen hero image (preferred over the auto-pick)
     announcement?: { text: string; url?: string; expires_at?: string | null };
+    /** Builder list item 148 (0161): the site's one pop-up, only present when switched on (lib/popup.ts). */
+    popup?: PopupSettings;
     /** Phase CP-2 Design Studio: structured layout choices (all optional/additive). */
     hero_layout?: string;
     nav_style?: string;
@@ -255,6 +257,7 @@ export interface SiteBlockSpotlight { type: 'spotlight'; title: string; eyebrow?
 // stored FormDefinition. Multiple forms per site are allowed (unlike other block
 // types), each keyed by its own id. See lib/forms.ts for the normalization gate.
 export type { FormDefinition as SiteBlockForm } from './forms.ts';
+import type { PopupSettings } from './popup.ts';
 import type { FormDefinition } from './forms.ts';
 // ── Phase T-STYLE: curated per-section style options (owner picks from an enumerated
 // set; never raw CSS). Optional + orthogonal to a block's content, so a block with no

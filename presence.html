@@ -10861,6 +10861,8 @@ function renderFormsCard() {
     const ans = el("button", null, "Answers"); ans.type = "button"; ans.style.cssText = FF_BTN;
     ans.addEventListener("click", () => openFormAnswers(form, ans));
     head.append(nm, ans, rm); panel.appendChild(head);
+    // Item 148: a button anywhere on the site opens this form in a pop-up with this link
+    panel.appendChild(el("div", "hint", "To open this form from any button or banner, give it the link #form-" + form.id + " (it opens over the page)."));
 
     // form settings
     const ti = el("input"); ti.type = "text"; ti.placeholder = "Form title"; ti.value = form.title || ""; ti.style.cssText = FF_IN;
@@ -14413,6 +14415,23 @@ function mountAnnouncementCard() {
     catch (err) { whisper("topWhisper", "failed"); toast(nice(err), true); }
   };
   ["ann-text", "ann-url", "ann-until"].forEach((id) => $(id).addEventListener("change", annSave));
+  // Builder list item 148: the pop-up's card sits under this one (popup-card.js, loaded on first use),
+  // drawn again from what's loaded like this one, never while someone types in it
+  const oldPop = $("popCard"); if (oldPop && oldPop.contains(document.activeElement)) return; if (oldPop) oldPop.remove();
+  loadPopupCard().then((m) => m.mount(host, { popup: S.settings.popup || null, pages: dcPageList().filter((p) => p.slug), offeringLabel: VOCAB.label,
+    save: (popup) => settingsPut({ popup }), whisper: (st) => whisper("topWhisper", st), toast, changed: scheduleChangesRefresh })).catch(() => {});
+}
+// Bump ?v= whenever popup-card.js changes: browsers keep a .js file for a day.
+let POPUP_CARD = null;
+function loadPopupCard() {
+  if (window.DDSPopupCard) return Promise.resolve(window.DDSPopupCard);
+  if (!POPUP_CARD) POPUP_CARD = new Promise((res, rej) => {
+    const s = document.createElement("script"); s.src = "/popup-card.js?v=1";
+    s.onload = () => window.DDSPopupCard ? res(window.DDSPopupCard) : rej(new Error("missing"));
+    s.onerror = () => rej(new Error("load"));
+    document.head.appendChild(s);
+  }).catch((e) => { POPUP_CARD = null; throw e; });
+  return POPUP_CARD;
 }
 // ── L2: the commercial capacity notice — one calm card, never a number ──
 // P2-F G3 — every notice kind gets a home. Website-attention items (publish

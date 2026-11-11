@@ -140,6 +140,7 @@ const SETTINGS_FIELDS: Record<string, FieldRule> = {
   // Phase V no-code essentials: logo (FD-N2), share image (FD-N3), announcement bar (FD-N4)
   logo_media_id: { kind: 'uuid' }, og_media_id: { kind: 'uuid' },
   announcement_text: { max: 140 }, announcement_url: { max: 300 }, announcement_expires_at: { kind: 'date' },
+  popup: { kind: 'json', json: { bytes: 8 * KB, shape: 'object' } },   // builder list item 148 (0161): made safe at publish (lib/popup.ts)
   industry_key: { max: 40 },   // Phase T3: drives template vocabulary + schema
   // Three switches, not a workflow builder (benchmark 2026-10, item 6) + the
   // per-stage stale threshold (item 13). Migration 0134; every switch default off.
@@ -384,9 +385,11 @@ const AUTOMATION_SETTINGS_COLS = 'auto_ack_enquiries,invoice_reminders,invoice_r
 const REVIEW_SETTINGS_COLS = 'review_requests,review_request_after_days';
 // The 0139 column (list item 61's switch).
 const VISIT_SETTINGS_COLS = 'visit_counter';
+// The 0161 column (builder list item 148's pop-up).
+const POPUP_SETTINGS_COLS = 'popup';
 // Newest apply pack first. A database without a pack's columns 400s the widened select,
 // so a read or a save steps down one pack at a time; Settings never goes dark ahead of one.
-const OPTIONAL_SETTINGS_COLS = [VISIT_SETTINGS_COLS, REVIEW_SETTINGS_COLS, AUTOMATION_SETTINGS_COLS];
+const OPTIONAL_SETTINGS_COLS = [POPUP_SETTINGS_COLS, VISIT_SETTINGS_COLS, REVIEW_SETTINGS_COLS, AUTOMATION_SETTINGS_COLS];
 function selectSteps(select: string): string[] {
   const out = [select];
   let s = select;
@@ -400,7 +403,7 @@ function selectSteps(select: string): string[] {
 const SETTINGS_CFG = {
   table: 'presence_settings', entityType: 'settings', noun: 'site settings', fields: SETTINGS_FIELDS,
   select: 'site_id,category_order,cover_media_id,logo_media_id,og_media_id,announcement_text,announcement_url,announcement_expires_at,industry_key,google_site_verification,bing_site_verification,hero_layout,nav_style,sections_hidden,sections_order,footer_hours,footer_social,pages_noindex,page_seo,blocks,pages,nav,updated_at'
-    + ',' + AUTOMATION_SETTINGS_COLS + ',' + REVIEW_SETTINGS_COLS + ',' + VISIT_SETTINGS_COLS,
+    + ',' + AUTOMATION_SETTINGS_COLS + ',' + REVIEW_SETTINGS_COLS + ',' + VISIT_SETTINGS_COLS + ',' + POPUP_SETTINGS_COLS,
   conflict: 'site_id', summary: 'Updated site settings',
 } as const;
 

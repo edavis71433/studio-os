@@ -65,6 +65,7 @@ export function seesFullWorkspace(role: SiteRole): boolean {
 export const SETTINGS_CONTENT_FIELDS: ReadonlySet<string> = new Set([
   'category_order', 'cover_media_id', 'logo_media_id', 'og_media_id',
   'announcement_text', 'announcement_url', 'announcement_expires_at',
+  'popup',   // builder list item 148: the site's pop-up is content, like the announcement bar
   'hero_layout', 'nav_style', 'sections_hidden', 'sections_order', 'footer_hours', 'footer_social',
   'pages_noindex', 'page_seo', 'blocks', 'pages', 'nav',
 ]);
