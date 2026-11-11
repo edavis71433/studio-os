@@ -67,6 +67,7 @@ const { handleEmailSending } = lazyRoutes(() => import('./routes/email_sending.t
 import { handleSalesExport } from './routes/sales_export.ts';   // sales review item 69: Download my data
 import { handleEstimateCreate, handleEstimateSend, handleEstimateDecide, handleEstimateDelete, handleEstimateToProposal, handleEstimateToInvoice } from './routes/estimates.ts';   // sales review item 47
 import { handleRecurringStart, handleRecurringChange, handleRecurringAction } from './routes/recurring_invoices.ts';   // sales review item 47
+import { handleInvoicePayment, handleInvoicePaymentUndo } from './routes/invoice_payments.ts';   // sales review item 77
 import { handleEmailLogAddress } from './routes/email_log.ts';   // sales review item 69: the log-this-email address   // sales review item 69: the sending-domain line
 const { handleBroadcastsList, handleBroadcastCreate, handleBroadcastListCreate, handleBroadcastListDelete, handleBroadcastSegments, handleBroadcastGet, handleBroadcastUpdate, handleBroadcastSend, handleBroadcastCancel, handleBroadcastDraftAssist, handleBroadcastTest } = lazyRoutes(() => import('./routes/broadcasts.ts'));
 import { handleScheduleCreate, handleScheduleList, handleScheduleCancel, handleFormSubmit, handleFormInbox, handleFormStatus, handleFormReply, handleApproveSend, handleApproveGet, handleApprovePost } from './routes/commercial.ts';
@@ -818,6 +819,10 @@ async function route_(req: Request, cors: Record<string, string>): Promise<Respo
     // Studio-gated & site-scoped like every authed /sales/* route.
     m = route.match(/^\/sales\/invoices\/([0-9a-f-]{36})\/void$/);
     if (m && method === 'POST') return handleSalesInvoiceVoid(site, principal, m[1], cors);
+    // Sales item 77: a payment that came in outside Stripe (check, cash, bank transfer,
+    // Zelle): all of the invoice or part of it, and Undo for one recorded by mistake.
+    m = route.match(/^\/sales\/invoices\/([0-9a-f-]{36})\/payment(\/undo)?$/);
+    if (m && method === 'POST') return m[2] ? handleInvoicePaymentUndo(req, site, principal, m[1], cors) : handleInvoicePayment(req, site, principal, m[1], cors);
     // Retainer (recurring SERVICE billing) — set up / cancel a "$X every month/
     // year" on a deal. A separate service-purpose Stripe subscription, distinct
     // from the SaaS subscription (frozen billing boundary). Studio-gated & site-scoped.

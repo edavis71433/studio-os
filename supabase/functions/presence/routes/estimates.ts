@@ -22,7 +22,9 @@ import { sendEmail } from '../commerce/account.ts';
 import { loadEmailBrand } from '../lib/email_brand.ts';
 import { raiseNotice, clearNotice } from '../lib/notice.ts';
 import { rateAllow, clientIp, tooMany } from '../lib/ratelimit.ts';
-import { normalizeLineItems, normalizeProposalMeta, splitLineItems, packLineItems, proposalTotals, type ProposalMeta } from '../lib/sales_lifecycle.ts';
+import { normalizeLineItems, normalizeProposalMeta, splitLineItems, packLineItems, proposalTotals, computeProposalTotals, type ProposalMeta } from '../lib/sales_lifecycle.ts';
+import { linesFromProposal } from '../lib/invoice_billing.ts';   // sales item 81
+import { missingInsertColumns } from '../lib/inbound_email.ts';
 import { canDecideEstimate, isEstimateDecision, estimateExpired, estimateExpiresAt, ESTIMATE_DEFAULT_TITLE, ESTIMATE_TTL_DAYS } from '../lib/estimates.ts';
 import { linkSecret, signSalesToken, verifySalesToken, dealEvent, loadDeal, firstOpen } from './sales.ts';
 import type { SiteRow } from '../lib/site.ts';
@@ -254,9 +256,17 @@ export async function handleEstimateToInvoice(_req: Request, site: SiteRow, prin
   if (total > 100000000) return json({ error: 'validation', message: 'That total is over $1,000,000 — double-check the estimate and try again.' }, 422, cors);
   const deal = await loadDeal(site.id, e.deal_id);
   const title = e.title && e.title !== ESTIMATE_DEFAULT_TITLE ? String(e.title).slice(0, 200) : 'Invoice';
-  const ins = await svc('presence_invoices', { method: 'POST', headers: { Prefer: 'return=representation' },
-    body: JSON.stringify({ site_id: site.id, deal_id: e.deal_id, customer_client_id: deal?.converted_client_id || null, customer_site_id: deal?.converted_site_id || null,
-      title, description: `${title} — ${deal?.title || 'project'}`, amount_cents: total, currency: 'usd', purpose: 'service', status: 'open', due_date: null, created_by: principal.email || principal.userId || 'system' }) });
+  const newRow: Record<string, unknown> = { site_id: site.id, deal_id: e.deal_id, customer_client_id: deal?.converted_client_id || null, customer_site_id: deal?.converted_site_id || null,
+    title, description: `${title} — ${deal?.title || 'project'}`, amount_cents: total, currency: 'usd', purpose: 'service', status: 'open', due_date: null, created_by: principal.email || principal.userId || 'system' };
+  // sales item 81: the invoice carries the estimate's lines, its discount and tax (when they add up)
+  const { items, meta } = splitLineItems(e.line_items);
+  const lines = linesFromProposal(items, computeProposalTotals(items, meta), meta, []);
+  if (lines.length > 1 && lines.reduce((n, l) => n + l.amount_cents, 0) === total) newRow.lines = lines;
+  let ins = await svc('presence_invoices', { method: 'POST', headers: { Prefer: 'return=representation' }, body: JSON.stringify(newRow) });
+  if (!ins.ok && 'lines' in newRow && missingInsertColumns(ins.json, ins.text, ['lines']).length) {   // before APPLY-0163
+    delete newRow.lines;
+    ins = await svc('presence_invoices', { method: 'POST', headers: { Prefer: 'return=representation' }, body: JSON.stringify(newRow) });
+  }
   const inv = rows(ins)[0];
   if (!ins.ok || !inv) return json({ error: 'write_failed', message: 'The invoice didn’t save — please try again.' }, 502, cors);
   const staleIid = UUID_RE.test(String(e.invoice_id || '')) ? `invoice_id=eq.${e.invoice_id}` : 'invoice_id=is.null';   // same as the proposal: a voided or deleted first invoice must not block the second
