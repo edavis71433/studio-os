@@ -3,7 +3,9 @@
 // (settings.pages). All PURE: the impure reads/writes live in routes/content.ts,
 // mirroring how linked_sections.ts keeps resolution pure while the serializer
 // does the one DB read. Nothing here invents a second content model — a page is
-// exactly the { slug, title, blocks, hideNav? } shape the serializer validates.
+// exactly the { slug, title, blocks, hideNav? } shape the serializer validates,
+// with who can see it and its header and footer (lib/page_access.ts) beside them.
+import { pageShowFields } from './page_access.ts';
 
 /** The ONE page-slug shape (matches routes/content.ts SLUG_RE + the serializer's
  *  pageSlug sanitizer): lowercase segments joined by single dashes. */
@@ -82,6 +84,9 @@ export function duplicatePageInSettings(settings: { blocks?: unknown; pages?: un
   const title = `${sourceTitle} copy`.slice(0, 60);
   const copy: RawPage = { slug: newSlug, title, blocks: regenerateBlockIds(source.blocks, taken) };
   if (source.hideNav === true) copy.hideNav = true;
+  // items 48 and 120: a copy of a password or private page is never public by surprise. It
+  // keeps the same password (the same lock), and the same header and footer choice.
+  Object.assign(copy, pageShowFields(source));
   const out = pages.slice();
   out.splice(isHome ? 0 : at + 1, 0, copy);
   return { pages: out, slug: newSlug, title, sourceTitle };

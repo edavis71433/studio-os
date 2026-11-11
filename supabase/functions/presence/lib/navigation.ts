@@ -181,8 +181,10 @@ export function buildNav(c: NavContext): NavSection[] {
     if (f.hasWebsite) sections.push({ key: 'sites', label: 'Sites', items: [
       { key: 'sites', label: 'Sites', href: '/sites.html', desc: 'Every client’s website as a card: a live picture, its address, when it renews and who can edit.' },
       hid('domains', 'Domains', '/domains.html', 'Every domain your clients use: its status, where it’s registered, and when it expires.'),
-      // Oct 2026 audit bug 10: ⌘K "kit" finds the starter kits. Item 166: they live on Sites' Templates tab now, with the templates
+      // Oct 2026 audit bug 10: ⌘K "kit" finds the starter kits. Item 166: they live on Sites' Templates tab now, with the templates (before New site, whose words say "kit" too)
       hid('kits', 'Templates and starter kits', '/templates.html', 'Every template and starter kit you saved: what each brings and where it came from. Rename or remove them.'),
+      // item 135: ⌘K "new site" opens the New site box (sites.html opens it on #new)
+      hid('new_site', 'New site', '/sites.html#new', 'Make a site from a business name and, if you like, a template or starter kit. Nobody is emailed until you invite the owner.'),
     ] });
   } else if (f.hasBusinessOS) {
     single('today', 'Today', '/today.html');

@@ -105,6 +105,12 @@
   .copied{background:var(--warn-soft);border-radius:var(--dds-r,10px);padding:10px 12px;font-size:12.5px;color:var(--warn);line-height:1.4}
   .copied b{display:block;font-weight:600}
   .copied .sbtn{margin-top:8px;background:var(--card)}
+  /* item 135: a site made with + New site has no owner until you invite them */
+  .owner{display:flex;align-items:center;gap:10px;border:1px dashed var(--line);border-radius:var(--dds-r,10px);padding:8px 10px 8px 12px}
+  .owner .q{width:28px;height:28px;border-radius:50%;flex:0 0 auto;display:grid;place-items:center;font-size:12px;font-weight:700;color:var(--faint);background:var(--bg);border:1px solid var(--line)}
+  .owner .ow{flex:1;min-width:0;font-size:12px;color:var(--soft);line-height:1.35}
+  .owner .ow b{display:block;font-size:12.5px;font-weight:600;color:var(--ink)}
+  .owner .sbtn{flex:0 0 auto}
   .sbody{padding:var(--dds-s3,12px) var(--dds-s4,16px) var(--dds-s4,16px);display:flex;flex-direction:column;gap:6px;flex:1}
   .shead{display:flex;align-items:flex-start;gap:var(--dds-s2,8px)}
   .sname{font-size:15.5px;font-weight:600;line-height:1.3;flex:1;min-width:0;overflow-wrap:anywhere}
@@ -168,6 +174,14 @@
   .dbody input{width:100%;font-family:inherit;font-size:16px;border:1px solid var(--line);background:var(--bg);color:var(--ink);border-radius:var(--dds-r,8px);padding:var(--dds-s2,8px) var(--dds-s3,12px);outline:none}
   .dbody input:focus{border-color:var(--p)}
   .dbody .note{font-size:12.5px;color:var(--faint);margin:var(--dds-s3,12px) 0 0;line-height:1.5}
+  /* New site's "Start from": one answer among a few (agency.html's .modeopt) */
+  .dbody .lab{display:block;font-size:13px;font-weight:600;color:var(--soft);margin:12px 0 var(--dds-s1,4px)}
+  .opts{display:grid;gap:var(--dds-s2,8px)}
+  .dbody .opt{display:flex;align-items:flex-start;gap:var(--dds-s2,8px);border:1px solid var(--line);border-radius:var(--dds-r,8px);padding:10px var(--dds-s3,12px);margin:0;cursor:pointer;font-size:14px;font-weight:400;color:var(--ink)}
+  .dbody .opt:has(input:checked){border-color:var(--p);background:var(--p-soft)}
+  .dbody .opt input{width:auto;margin-top:var(--dds-s1,4px);accent-color:var(--p);flex:0 0 auto}
+  .dbody .opt strong{display:block;font-weight:600;font-size:13.5px}
+  .dbody .opt .hint{display:block;font-size:12px;color:var(--faint);margin-top:2px;line-height:1.45}
   .dbody .done{text-align:center;padding:var(--dds-s2,8px) 0 var(--dds-s1,4px)}
   .dbody .done .tick{width:44px;height:44px;border-radius:50%;background:var(--good-soft);color:var(--good);display:flex;align-items:center;justify-content:center;font-size:22px;margin:0 auto var(--dds-s3,12px)}
   .dbody .done p{color:var(--soft);font-size:14px;margin:6px 0 0}
@@ -176,6 +190,21 @@
   .btn.ghost{background:transparent;border:1px solid var(--line);color:var(--ink)}
   .btn:disabled{opacity:.6;cursor:default}
   a.link{color:var(--p);text-decoration:none;font-weight:500}a.link:hover{text-decoration:underline}
+  /* item 154: Move to trash asks first; the Trash sits at the foot of the page */
+  .btn.danger{background:var(--bad);color:#fff}
+  .rowmenu .danger{color:var(--bad)}
+  .dbody ul.points{margin:4px 0 0;padding-left:18px;font-size:13.5px;color:var(--soft);line-height:1.5}
+  .dbody ul.points li{margin:6px 0}
+  .trash{margin-top:var(--dds-s7,32px)}
+  .trash .nhead span.hint{font-size:12.5px;color:var(--faint)}
+  .tlist{background:var(--card);border:1px solid var(--line);border-radius:var(--dds-r-lg,14px);box-shadow:var(--shadow);overflow:hidden}
+  .trow{display:flex;align-items:center;gap:12px;padding:12px 16px;border-top:1px solid var(--line)}
+  .trow:first-child{border-top:none}
+  .trow .ti{width:34px;height:34px;border-radius:var(--dds-r,10px);background:var(--bg);color:var(--faint);display:grid;place-items:center;font-weight:700;flex:0 0 auto}
+  .trow .tw{flex:1;min-width:0;font-size:12.5px;color:var(--soft);line-height:1.4}
+  .trow .tw b{display:block;font-size:14px;font-weight:600;color:var(--ink)}
+  .trow .tw .soon{color:var(--warn)}
+  @media (max-width:520px){.trow{flex-wrap:wrap}.trow .ti{display:none}.trow .sbtn{margin-left:0}}
   .center{text-align:center;padding:52px var(--dds-s5,20px)}.center h2{font-family:var(--serif);font-weight:500;font-size:22px;margin:0 0 var(--dds-s2,8px)}
   .muted{color:var(--soft);font-size:14px}
   .spin{width:22px;height:22px;border:2.5px solid var(--line);border-top-color:var(--p);border-radius:50%;animation:sp .8s linear infinite;margin:var(--dds-s8,40px) auto}
@@ -210,6 +239,14 @@
   </form>
 </dialog>
 
+<!-- Move to trash (item 154): asks first, says what happens (POST /agency/sites/:id/trash) -->
+<dialog id="trashDlg" aria-labelledby="trashHead">
+  <form id="trashForm" class="dbody">
+    <h3 id="trashHead">Move this site to the trash?</h3>
+    <ul class="points" id="trashPoints"></ul>
+    <div class="row2"><button type="button" class="btn ghost" id="trash-cancel">Cancel</button><button type="submit" class="btn danger" id="trash-go">Move to trash</button></div>
+  </form>
+</dialog>
 <!-- Save as a template (item 145): a site's pages, sections, menu and photos kept as
      a starting point for new sites (POST /agency/kits with_pages) -->
 <dialog id="tplDlg" aria-labelledby="tplHead">
@@ -223,6 +260,42 @@
       <div class="row2"><button type="button" class="btn ghost" id="tpl-cancel">Cancel</button><button type="submit" class="btn" id="tpl-save">Save template</button></div>
     </div>
     <div id="tpl-done" style="display:none"></div>
+  </form>
+</dialog>
+<!-- + New site (item 135): a business name and, if you like, a starter kit. Nobody
+     is emailed; the card then offers Invite the owner (POST /agency/sites) -->
+<dialog id="newDlg" aria-labelledby="newHead">
+  <form id="newForm" class="dbody">
+    <div id="new-fields">
+      <h3 id="newHead">New site</h3>
+      <p class="note" style="margin-top:0">Build it in private. Nobody is emailed until you invite the owner.</p>
+      <label for="new-biz">Business name</label>
+      <input id="new-biz" maxlength="120" placeholder="Acme Bakery" autocomplete="off">
+      <div id="new-from-wrap" hidden>
+        <span class="lab" id="new-from-l">Start from</span>
+        <div class="opts" id="new-from" role="radiogroup" aria-labelledby="new-from-l"></div>
+        <p class="note">A template brings a saved site’s pages, sections, photos, menu and look; a starter kit brings services, FAQs, the voice and colors. Business details and reviews are never copied: those are theirs to fill in.</p>
+      </div>
+      <div class="row2"><button type="button" class="btn ghost" id="new-cancel">Cancel</button><button type="submit" class="btn" id="new-submit">Create site</button></div>
+    </div>
+    <div id="new-done" style="display:none"></div>
+  </form>
+</dialog>
+<!-- Invite the owner (item 135): the later, separate step for a site with no owner
+     yet. Their sign-in email goes out from the studio (POST /agency/sites/:id/invite) -->
+<dialog id="invDlg" aria-labelledby="invHead">
+  <form id="invForm" class="dbody">
+    <div id="inv-fields">
+      <h3 id="invHead">Invite the owner</h3>
+      <p class="note" id="invFor" style="margin-top:0"></p>
+      <label for="inv-name">Their name</label>
+      <input id="inv-name" maxlength="120" placeholder="Jane Doe" autocomplete="off">
+      <label for="inv-email">Their email</label>
+      <input id="inv-email" type="email" maxlength="160" placeholder="jane@acmebakery.com" autocomplete="off">
+      <p class="note">We email them a sign-in link to their client portal, from your studio. They’ll see their site, its draft and your messages, and they become one of your customers. Inviting them publishes nothing.</p>
+      <div class="row2"><button type="button" class="btn ghost" id="inv-cancel">Cancel</button><button type="submit" class="btn" id="inv-submit">Send invitation</button></div>
+    </div>
+    <div id="inv-done" style="display:none"></div>
   </form>
 </dialog>
 
@@ -261,7 +334,8 @@ const day=(iso)=>{if(!iso)return'';const d=new Date(iso);return isNaN(d)?'':d.to
 const hostOf=(u)=>String(u||'').replace(/^https?:\/\//,'').replace(/\/.*$/,'');
 const scoped=(path,id)=>path+'?client='+encodeURIComponent(id);
 
-let SITES=[],META={can_open:false,can_pin:false,can_duplicate:false,partial:false},LOADED_AT=0,Q='',REQ_SEQ=0;
+let SITES=[],META={can_open:false,can_pin:false,can_duplicate:false,can_create:false,can_trash:false,partial:false},LOADED_AT=0,Q='',REQ_SEQ=0;
+let TRASH=[],TRASH_DAYS=90;   // item 154: the Trash at the foot of the page
 let NEXT={},NEEDS_ROWS=[];   // Home's Needs you: by site (next_by_site) and its rows (for the strip up top)
 let FILTER='all';            // all · needs · live · notlive · elsewhere · changes · domains
 const DISPLAY_KEY='dds-display:sites';
@@ -317,6 +391,7 @@ function cardHtml(s,i){
       ${s.unpublished_changes&&s.state!=='not_live'?'<div class="sline warn">Changes waiting to be published</div>':''}
       ${s.billing_issue?'<div class="sline warn">Their billing needs a look</div>':''}
       ${copiedHtml(s)}
+      ${ownerRowHtml(s)}
       <div class="sstats">
         <div class="sst"><span class="l">Plan</span><div class="sline">${planLine(s.plan)}</div></div>
         <div class="sst"><span class="l">Domain</span>${dom||`<div class="sline">${s.domain?esc(s.domain):'None connected'}</div>`}</div>
@@ -331,12 +406,17 @@ function copiedHtml(s){
   if(!s.copied||s.copied.kept||s.state!=='not_live')return'';
   return `<div class="copied" data-copied="${esc(s.site_id)}"><b>Started from ${esc(s.copied.from)}’s pages</b>Change what belongs to them before you publish. Publishing lists what’s still as copied.${META.can_duplicate?`<br><button type="button" class="sbtn" data-keep="${esc(s.site_id)}">Keep them as they are</button>`:''}</div>`;
 }
+// item 135: made with + New site and nobody invited yet — the next step, on the card
+function ownerRowHtml(s){
+  if(!s.no_owner)return'';
+  return `<div class="owner"><span class="q" aria-hidden="true">?</span><span class="ow"><b>No owner yet</b>Nobody has been emailed.</span>${META.can_create?`<button type="button" class="sbtn" data-invite="${esc(s.site_id)}">Invite the owner</button>`:''}</div>`;
+}
 // the three doors into the client; a seat that can't open a client (the server says) gets the live site only
 function doorsHtml(s){
   if(!META.can_open)return s.address&&s.state!=='not_live'?`<a class="sbtn" href="${esc(s.address)}" target="_blank" rel="noopener">View live site</a>`:'';
   return `<a class="sbtn main" href="${esc(scoped('/presence.html',s.site_id))}">Website</a><a class="sbtn" href="${esc(scoped('/analytics.html',s.site_id))}">Analytics</a><a class="sbtn" href="${esc(scoped('/settings.html',s.site_id))}">Settings</a>`;
 }
-function menuBtnHtml(s){return `<button type="button" class="more" data-menu="${esc(s.site_id)}" aria-haspopup="menu" aria-expanded="false" aria-label="More for ${esc(s.name||'this site')}" title="Pin, duplicate, save as a template, open">⋯</button>`;}
+function menuBtnHtml(s){return `<button type="button" class="more" data-menu="${esc(s.site_id)}" aria-haspopup="menu" aria-expanded="false" aria-label="More for ${esc(s.name||'this site')}" title="Pin, duplicate, save as a template, invite, open">⋯</button>`;}
 
 // ── the table: columns that sort; re-rendered freely (it has no pictures) ──
 const COLS=[
@@ -354,7 +434,7 @@ function avatars(team){
 function tableHtml(list){
   const ths=COLS.map(([k,label])=>{const on=SORT&&SORT.key===k;return `<th scope="col"${on?` aria-sort="${SORT.dir>0?'ascending':'descending'}"`:''}><button type="button" class="thb" data-sort="${k}">${esc(label)}${on?`<span class="arrow" aria-hidden="true">${SORT.dir>0?'▲':'▼'}</span>`:''}</button></th>`;}).join('')+'<th scope="col" class="acts"><span class="sr-only">Actions</span></th>';
   const trs=list.map(s=>{const st=statusOf(s);return `<tr${META.can_open?` data-row="${esc(s.site_id)}" tabindex="0" aria-label="Open ${esc(s.name||'(unnamed)')}’s website"`:''}>
-    <td><span class="n">${s.pinned?'<span aria-label="Pinned" title="Pinned">📌 </span>':''}${esc(s.name||'(unnamed)')}</span><div class="sub">${esc(s.domain||hostOf(s.address)||'No address yet')} · <span class="pill ${st.cls}">${esc(st.w)}</span></div></td>
+    <td><span class="n">${s.pinned?'<span aria-label="Pinned" title="Pinned">📌 </span>':''}${esc(s.name||'(unnamed)')}</span><div class="sub">${esc(s.domain||hostOf(s.address)||'No address yet')} · <span class="pill ${st.cls}">${esc(st.w)}</span>${s.no_owner?' · No owner yet':''}</div></td>
     <td>${avatars(s.team)}</td>
     <td>${esc((s.plan&&s.plan.words)||'')}</td>
     <td class="when">${s.published_at?esc(day(s.published_at)):'<span class="muted">Not yet</span>'}</td>
@@ -394,7 +474,7 @@ function headHtml(shown){
         <button type="button" id="dispTable" aria-pressed="${DISPLAY==='table'?'true':'false'}">Table</button>
       </div>
       <button type="button" class="lbtn" id="refreshBtn" aria-label="Refresh" title="Refresh">↻</button>
-      <a class="btn" id="newSiteBtn" href="/agency.html#add" style="text-decoration:none;display:inline-flex;align-items:center;margin-left:auto">+ New site</a>
+      ${META.can_create?'<button type="button" class="btn" id="newSiteBtn" style="margin-left:auto">+ New site</button>':''}
     </div>
     <div class="lmeta" id="lmeta">${lmetaText(shown)}</div>
     <nav class="tabs" aria-label="Sites, domains and templates"><a href="/sites.html" aria-current="page">Sites</a><a href="/domains.html">Domains</a><a href="/templates.html">Templates</a></nav>
@@ -447,7 +527,7 @@ function render(){
   if(!SITES.length)h+=searchHtml;
   if(META.partial)h+=`<div class="notice">Some details wouldn’t load just now — refresh to try again.</div>`;
   if(!SITES.length){
-    h+=`<div class="center"><p class="muted">No client sites yet.</p><p style="margin-top:14px"><a class="btn" href="/agency.html#add" style="text-decoration:none;display:inline-flex;align-items:center">+ Add a customer</a></p></div>`;
+    h+=`<div class="center"><p class="muted">No client sites yet.</p>${META.can_create?'<p style="margin-top:14px"><button type="button" class="btn" id="newSiteEmpty">+ New site</button></p><p class="muted" style="margin-top:10px;font-size:13px">Build it in private, then invite the owner when it’s ready.</p>':''}</div>`;
   }else{
     h+=bandHtml();
     h+=`<div id="needsHost">${needsHtml()}</div>`;
@@ -456,6 +536,7 @@ function render(){
     h+=`<div id="tableHost"${DISPLAY==='table'?'':' hidden'}></div>`;
     h+=`<div class="center" id="noMatch" hidden><p class="muted">No sites match that.</p></div>`;
   }
+  h+=`<div id="trashHost">${trashHtml()}</div>`;
   $('main').innerHTML=h;
   wireFrame();
   applyView();
@@ -485,10 +566,13 @@ function wireFrame(){
   if(dc)dc.addEventListener('click',()=>setD('cards'));
   if(dt)dt.addEventListener('click',()=>setD('table'));
   const rf=$('refreshBtn');if(rf)rf.addEventListener('click',()=>{load(true).then(()=>{const nr=$('refreshBtn');if(nr)nr.focus();});mountNeeds();});
+  const th2=$('trashHost');if(th2)th2.addEventListener('click',(e)=>{const rb=e.target.closest('[data-restore]');if(rb)restoreSite(rb);});
+  ['newSiteBtn','newSiteEmpty'].forEach(id=>{const b=$(id);if(b)b.addEventListener('click',openNewSite);});
   const grid=$('grid');
   if(grid){
     grid.addEventListener('click',(e)=>{const mb=e.target.closest('[data-menu]');if(mb){e.stopPropagation();toggleMenu(mb.getAttribute('data-menu'));return;}
-      const kb=e.target.closest('[data-keep]');if(kb){e.stopPropagation();keepCopied(kb);}});
+      const kb=e.target.closest('[data-keep]');if(kb){e.stopPropagation();keepCopied(kb);return;}
+      const ib=e.target.closest('[data-invite]');if(ib){e.stopPropagation();openInvite(ib.getAttribute('data-invite'));}});
     sizeThumbs(grid);
   }
 }
@@ -556,8 +640,10 @@ function menuHtml(s){
     ${META.can_pin?`<button type="button" role="menuitem" data-pin="${esc(s.site_id)}">${s.pinned?'Unpin':'Pin to top'}</button>`:''}
     ${META.can_duplicate&&s.thumb?`<button type="button" role="menuitem" data-dup="${esc(s.site_id)}">Duplicate site</button>`:''}
     ${META.can_duplicate&&s.thumb?`<button type="button" role="menuitem" data-tpl="${esc(s.site_id)}">Save as a template</button>`:''}
+    ${META.can_create&&s.no_owner?`<button type="button" role="menuitem" data-invite="${esc(s.site_id)}">Invite the owner</button>`:''}
     ${live?`<a role="menuitem" href="${esc(s.address)}" target="_blank" rel="noopener">View live site</a>`:''}
     ${META.can_open?`<a role="menuitem" href="${esc(scoped('/crm.html',s.site_id))}">Open record</a>`:''}
+    ${META.can_trash?`<button type="button" role="menuitem" class="danger" data-trash="${esc(s.site_id)}">Move to trash</button>`:''}
   </div>`;
 }
 function paintMenu(){
@@ -576,6 +662,8 @@ function paintMenu(){
   const pb=m.querySelector('[data-pin]');if(pb)pb.addEventListener('click',()=>togglePin(s.site_id));
   const db=m.querySelector('[data-dup]');if(db)db.addEventListener('click',()=>{MENU_OPEN=null;paintMenu();openDuplicate(s.site_id);});
   const tb=m.querySelector('[data-tpl]');if(tb)tb.addEventListener('click',()=>{MENU_OPEN=null;paintMenu();openTemplate(s.site_id);});
+  const ib=m.querySelector('[data-invite]');if(ib)ib.addEventListener('click',()=>{MENU_OPEN=null;paintMenu();openInvite(s.site_id);});
+  const trb=m.querySelector('[data-trash]');if(trb)trb.addEventListener('click',()=>{MENU_OPEN=null;paintMenu();openTrash(s.site_id);});
 }
 const isShown=(el)=>!!(el&&el.offsetParent!==null);
 function visibleMenuBtn(id){return [...document.querySelectorAll('[data-menu="'+CSS.escape(id)+'"]')].find(isShown)||null;}
@@ -660,6 +748,51 @@ $('dupForm').onsubmit=async(e)=>{
   load(true);
 };
 
+// ── Move to trash (item 154): offline at once, out of every list, back with one press for
+//    90 days, then deleted for good (POST /agency/sites/:id/trash; ops/site_trash.ts). ──
+let TRASH_SITE=null,TRASH_BUSY=false;
+const longDay=(d)=>d.toLocaleDateString('en-US',{month:'short',day:'numeric',year:d.getFullYear()===new Date().getFullYear()?undefined:'numeric'});
+function openTrash(id){
+  const s=SITES.find(x=>x.site_id===id);if(!s)return;
+  TRASH_SITE=id;$('trashHead').textContent='Move '+(s.name||'this site')+' to the trash?';
+  const goes=longDay(new Date(Date.now()+TRASH_DAYS*86400000)),live=s.state!=='not_live'&&s.state!=='elsewhere';
+  $('trashPoints').innerHTML=[
+    live?'It goes offline now: visitors see a short “temporarily offline” page.':'Nothing is online to take down: it was never published.',
+    'It leaves Sites and Home. For '+TRASH_DAYS+' days you can restore it from the Trash at the foot of this page.',
+    'On '+esc(goes)+' it’s deleted for good: its website comes down. If its owner signs in, they keep their sign-in, files and invoices.',
+    s.domain?'Its domain, '+esc(s.domain)+', isn’t cancelled. It stays wherever it was bought; point it elsewhere if the business still needs it.':'',
+  ].filter(Boolean).map(t=>'<li>'+t+'</li>').join('');
+  const b=$('trash-go');b.disabled=false;b.textContent='Move to trash';
+  $('trashDlg').showModal();$('trash-cancel').focus();
+}
+$('trash-cancel').onclick=()=>$('trashDlg').close();
+$('trashForm').onsubmit=async(e)=>{
+  e.preventDefault();if(TRASH_BUSY)return;
+  const s=SITES.find(x=>x.site_id===TRASH_SITE);if(!s)return;
+  TRASH_BUSY=true;const b=$('trash-go');b.disabled=true;b.textContent='Moving…';
+  let r=null;try{r=await apiSend('POST','/agency/sites/'+encodeURIComponent(s.site_id)+'/trash');}catch(_){r=null;}
+  TRASH_BUSY=false;
+  if(!r||!r.ok){toast((r&&r.body&&r.body.message)||'We lost the connection, so we can’t tell whether it moved. Refresh to see.',true);b.disabled=false;b.textContent='Move to trash';return;}
+  $('trashDlg').close();
+  toast((s.name||'The site')+' is in the trash'+(r.body.data&&r.body.data.offline?' and offline':'')+'. Restore it from the foot of the page within '+TRASH_DAYS+' days.');
+  load(true);
+};
+// the Trash at the foot of the page: newest first, with the day each goes for good
+function trashHtml(){
+  if(!TRASH.length)return'';
+  const left=(t)=>t.days_left==null?'':t.days_left===0?'Deleted for good today':'Deleted for good '+longDay(new Date(t.goes_at))+' · '+t.days_left+' day'+(t.days_left===1?'':'s')+' left';
+  return `<section class="trash" aria-labelledby="trashH"><div class="nhead"><h2 id="trashH">Trash</h2><span class="count">${TRASH.length}</span><span class="hint">Deleted for good ${TRASH_DAYS} days after they were moved here</span></div>
+    <div class="tlist">${TRASH.map(t=>`<div class="trow" data-trashrow="${esc(t.site_id)}"><span class="ti" aria-hidden="true">${esc(initial(t.name))}</span><span class="tw"><b>${esc(t.name||'(unnamed)')}</b>Moved ${esc(day(t.trashed_at))}${t.was_live?' · offline since then':''}<br><span class="${t.days_left!=null&&t.days_left<=14?'soon':''}">${esc(left(t))}</span></span>${META.can_trash?`<button type="button" class="sbtn" data-restore="${esc(t.site_id)}" aria-label="Restore ${esc(t.name||'this site')}">Restore</button>`:''}</div>`).join('')}</div></section>`;
+}
+async function restoreSite(b){
+  const id=b.getAttribute('data-restore');const t=TRASH.find(x=>x.site_id===id);if(!t||b.disabled)return;
+  b.disabled=true;b.textContent='Restoring…';
+  let r=null;try{r=await apiSend('POST','/agency/sites/'+encodeURIComponent(id)+'/restore');}catch(_){r=null;}
+  if(!r||!r.ok){toast((r&&r.body&&r.body.message)||'That didn’t go through.',true);b.disabled=false;b.textContent='Restore';return;}
+  toast('Restored '+(t.name||'the site')+'.'+(t.was_live?' It stays offline until you publish it or bring it back online.':''));
+  load(true);
+}
+
 // ── Save as a template (item 145): this site's pages, sections, menu and photos kept as a
 //    starting point (POST /agency/kits with_pages); new sites pick it under "Start from". ──
 let TPL_SITE=null,TPL_BUSY=false;
@@ -704,6 +837,118 @@ async function keepCopied(b){
   toast('Kept. '+(s.name||'The site')+' can publish with what was copied.');
 }
 
+// ── + New site (item 135): a site from a business name and, if picked, one of your
+//    starter kits (GET /agency/kits). POST /agency/sites makes it with nobody emailed;
+//    the card then says "No owner yet" and offers Invite the owner. ──
+let NEW_BUSY=false,NEW_MADE=null,KITS=[];
+// a template (item 145) also brings a saved site's pages, sections, photos, menu and look
+const kitHintOf=(k)=>k&&k.kind==='template'
+  ?'Template: '+(k.summary&&k.summary.pages?k.summary.pages+' page'+(k.summary.pages===1?'':'s')+' with their sections and photos':'its pages, sections and photos')+', the menu and the look, plus services, FAQs, voice and colors.'
+  :'Starter kit: the services, FAQs, voice and colors it was saved with.';
+async function openNewSite(){
+  if(!META.can_create||$('newDlg').open)return;
+  NEW_MADE=null;$('new-biz').value='';
+  $('new-fields').style.display='';$('new-done').style.display='none';$('new-done').innerHTML='';
+  const b=$('new-submit');b.disabled=false;b.textContent='Create site';
+  $('new-from-wrap').hidden=true;$('new-from').innerHTML='';
+  $('newDlg').showModal();$('new-biz').focus();   // at once: a later focus could catch typing already under way
+  // the kits are a nicety: none (or a failed read) leaves just the business name
+  let kits=[];try{const r=await api('/agency/kits');kits=(r.ok&&r.body&&Array.isArray(r.body.data))?r.body.data:[];}catch(_){kits=[];}
+  KITS=kits;
+  if(!kits.length||!$('newDlg').open||NEW_MADE)return;
+  $('new-from').innerHTML=`<label class="opt"><input type="radio" name="newfrom" value="" checked><span><strong>A blank site</strong><span class="hint">The look’s pages, with sample words to write over.</span></span></label>`
+    +kits.map(k=>`<label class="opt"><input type="radio" name="newfrom" value="${esc(k.id)}"><span><strong>${esc(k.name)}</strong><span class="hint">${esc(kitHintOf(k))}</span></span></label>`).join('');
+  $('new-from-wrap').hidden=false;
+}
+$('new-cancel').onclick=()=>$('newDlg').close();
+function newKitLine(k){
+  if(!k)return'';
+  const tpl=(KITS.find(x=>x.id===k.id)||{}).kind==='template';
+  if(k.failed)return'The '+esc(k.name)+(tpl?' template':' kit')+' didn’t apply. The site is ready without it.';
+  const a=k.applied||{},pg=k.layout&&k.layout.applied?k.layout:null,n=(c,w)=>c+' '+w+(c===1?'':'s');
+  const got=[pg?(pg.pages?n(pg.pages,'page')+' and ':'')+n(pg.sections,'section'):'',pg&&pg.photos?n(pg.photos,'photo'):'',a.offerings?n(a.offerings,'service'):'',a.faqs?n(a.faqs,'FAQ'):'',a.voice?'the voice':'',a.colors?'the colors':''].filter(Boolean);
+  return 'It starts from the '+esc(k.name)+(got.length?': '+esc(got.join(', ')):'')+'.';
+}
+function paintNewDone(d,name){
+  $('new-fields').style.display='none';
+  const done=$('new-done'),kit=d.kit||null;
+  const open=META.can_open?`<a class="btn" id="new-open" href="${esc(scoped('/presence.html',d.site_id))}" style="text-decoration:none;display:inline-flex;align-items:center">Open the editor</a>`:'';
+  done.innerHTML=`<div class="done"><div class="tick" aria-hidden="true">✓</div><h3 style="margin:0 0 4px">${esc(name)}’s site is ready</h3>${kit?`<p id="new-kit-line">${newKitLine(kit)}</p>`:''}<p>Nobody has been emailed. Invite the owner from its card when you’re ready to show them.</p></div>`
+    +`<div class="row2">${kit&&kit.failed?'<button type="button" class="btn ghost" id="new-kit-again">Try the kit again</button>':''}<button type="button" class="btn${open?' ghost':''}" id="new-close">Done</button>${open}</div>`;
+  done.style.display='';
+  const cl=$('new-close');cl.onclick=()=>$('newDlg').close();
+  (($('new-open'))||cl).focus();
+  // bug hunt A4's rule: a kit that didn't apply gets a real retry, on the site just made
+  const ka=$('new-kit-again');if(ka)ka.onclick=async()=>{
+    if(NEW_BUSY)return;NEW_BUSY=true;ka.disabled=true;ka.textContent='Applying…';
+    let r=null;try{r=await apiSend('POST','/agency/kits/'+encodeURIComponent(kit.id)+'/apply',{site_id:d.site_id});}catch(_){r=null;}
+    NEW_BUSY=false;
+    if(r&&r.ok){const a=(r.body&&r.body.data)||{};$('new-kit-line').innerHTML=newKitLine({name:kit.name,applied:a.applied});ka.remove();toast(kit.name+' applied.');}
+    else{ka.disabled=false;ka.textContent='Try the kit again';toast('The kit didn’t apply this time either.',true);}
+  };
+}
+$('newForm').onsubmit=async(e)=>{
+  e.preventDefault();if(NEW_BUSY||NEW_MADE)return;
+  const business_name=$('new-biz').value.trim();
+  if(!business_name){toast('Name the business.',true);$('new-biz').focus();return;}
+  const pick=document.querySelector('#new-from input[name="newfrom"]:checked'),kit_id=pick?pick.value:'';
+  NEW_BUSY=true;const btn=$('new-submit');btn.disabled=true;btn.textContent='Making the site…';
+  let r=null;
+  try{r=await apiSend('POST','/agency/sites',{business_name,kit_id:kit_id||undefined});}
+  catch(_){toast('We lost the connection, so we can’t tell whether the site was made. Refresh Sites before trying again.',true);}
+  finally{NEW_BUSY=false;}
+  if(!r||!r.ok){if(r)toast((r.body&&r.body.message)||'We couldn’t make the site just now.',true);btn.disabled=false;btn.textContent='Create site';return;}
+  NEW_MADE=(r.body&&r.body.data)||{};
+  paintNewDone(NEW_MADE,NEW_MADE.name||business_name);
+  load(true);
+};
+// ⌘K "New site" lands here as /sites.html#new: open the box once the page knows who you are
+function openNewFromHash(){
+  if(location.hash!=='#new')return;
+  try{history.replaceState(null,'',location.pathname+location.search);}catch(_){/* */}
+  if(META.can_create)openNewSite();
+}
+window.addEventListener('hashchange',openNewFromHash);
+
+// ── Invite the owner (item 135): the later, separate step. Their sign-in email goes
+//    out from your studio and they become one of your customers; the site doesn't change. ──
+let INV_SITE=null,INV_BUSY=false;
+function openInvite(id){
+  const s=SITES.find(x=>x.site_id===id);if(!s||!s.no_owner||!META.can_create)return;
+  INV_SITE=id;$('invFor').textContent=(s.name||'This site')+' · the site stays exactly as it is.';
+  ['inv-name','inv-email'].forEach(k=>{$(k).value='';});
+  $('inv-fields').style.display='';$('inv-done').style.display='none';$('inv-done').innerHTML='';
+  const b=$('inv-submit');b.disabled=false;b.textContent='Send invitation';
+  $('invDlg').showModal();$('inv-name').focus();
+}
+$('inv-cancel').onclick=()=>$('invDlg').close();
+$('invForm').onsubmit=async(e)=>{
+  e.preventDefault();if(INV_BUSY)return;
+  const s=SITES.find(x=>x.site_id===INV_SITE);if(!s)return;
+  const name=$('inv-name').value.trim(),email=$('inv-email').value.trim();
+  if(!email){toast('Enter their email — that’s where the sign-in link goes.',true);$('inv-email').focus();return;}
+  INV_BUSY=true;const btn=$('inv-submit');btn.disabled=true;btn.textContent='Sending…';
+  let r=null;
+  try{r=await apiSend('POST','/agency/sites/'+encodeURIComponent(s.site_id)+'/invite',{email,name:name||undefined});}
+  catch(_){toast('We lost the connection, so we can’t tell whether the invitation went out. Refresh Sites: if the card no longer says “No owner yet”, it did.',true);}
+  finally{INV_BUSY=false;}
+  if(!r||!r.ok){
+    if(r)toast((r.body&&r.body.message)||'We couldn’t send the invitation just now.',true);
+    btn.disabled=false;btn.textContent='Send invitation';
+    if(r&&r.body&&r.body.error==='has_owner'){$('invDlg').close();load(true);}   // someone invited them meanwhile: the card catches up
+    return;
+  }
+  const d=(r.body&&r.body.data)||{},who=name||email;
+  $('inv-fields').style.display='none';
+  const done=$('inv-done');
+  done.innerHTML=`<div class="done"><div class="tick" aria-hidden="true">✓</div><h3 style="margin:0 0 4px">${d.invited===false?'Their sign-in is ready':'Invitation sent'}</h3>`
+    +`<p>${d.invited===false?'Our email to '+esc(email)+' didn’t go out. Share their sign-in page with them instead.':esc(who)+' will get an email at '+esc(email)+' with a sign-in link to their client portal.'}</p><p>${esc(s.name||'This business')} is now one of your customers.</p></div>`
+    +'<div class="row2"><button type="button" class="btn" id="inv-close">Done</button></div>';
+  done.style.display='';
+  const cl=$('inv-close');cl.focus();cl.onclick=()=>$('invDlg').close();
+  load(true);
+};
+
 // ── Home's Needs you, laid over the status words (the same list, so the two never disagree) ──
 let NSEQ=0;
 async function mountNeeds(){
@@ -741,9 +986,11 @@ async function load(soft){
     trouble();return;
   }
   SITES=Array.isArray(r.body.data)?r.body.data:[];
-  META={can_open:r.body.can_open!==false,can_pin:!!r.body.can_pin,can_duplicate:!!r.body.can_duplicate,partial:!!r.body.partial};
+  META={can_open:r.body.can_open!==false,can_pin:!!r.body.can_pin,can_duplicate:!!r.body.can_duplicate,can_create:!!r.body.can_create,can_trash:!!r.body.can_trash,partial:!!r.body.partial};
+  TRASH=Array.isArray(r.body.trash)?r.body.trash:[];TRASH_DAYS=Number(r.body.trash_days)||90;
   LOADED_AT=Date.now();MENU_OPEN=null;
   render();
+  openNewFromHash();
 }
 async function boot(){
   try{const{data}=await sb.auth.getSession();TOKEN=(data&&data.session&&data.session.access_token)||"";

@@ -106,7 +106,7 @@ const day=(iso)=>{if(!iso)return'';const d=new Date(iso);return isNaN(d)?'':d.to
 
 let DOMAINS=[],BUILTIN=[],PARTIAL=false,LOADED_AT=0,Q='',REQ_SEQ=0;
 let SORT=null;   // null = most urgent first (the server's order)
-const RANK={expired:0,down:1,expiring:2,padlock:3,offline:4,checking:5,not_live:6,elsewhere:7,connected:8};   // the server's order (agency/sites.ts buildDomains)
+const RANK={expired:0,down:1,old_copy:2,other_site:3,expiring:4,padlock:5,partly:6,offline:7,checking:8,not_live:9,elsewhere:10,connected:11};   // the server's order (agency/sites.ts buildDomains)
 const COLS=[
   ['domain','Domain',(d)=>d.domain],
   ['site','Site',(d)=>String(d.name||'').toLowerCase()],
@@ -130,6 +130,8 @@ function expiresCell(d){
   const sub=n==null?'':n<0?`${-n} day${n===-1?'':'s'} ago`:n===0?'Today':`In ${n} day${n===1?'':'s'}`;
   return `${esc(day(d.expires_at))}${sub?`<div class="sub">${esc(sub)}</div>`:''}`;
 }
+// item 134: under the status, what still needs doing (the first two lines that aren't fine)
+function checksSub(d){const bad=(d.checks||[]).filter(c=>!c.ok).slice(0,2);return bad.length?`<div class="sub">${bad.map(c=>esc(c.words)).join('<br>')}</div>`:'';}
 function padlockCell(d){
   if(!d.hosted)return'<span class="muted">Their host’s</span>';
   if(!d.padlock_until)return d.status==='padlock'?'<span class="muted">Not on yet</span>':'<span class="muted">Not known yet</span>';
@@ -142,7 +144,7 @@ function tableHtml(list){
   const trs=list.map(d=>`<tr data-domain="${esc(d.domain)}">
     <td><a class="dom" href="https://${esc(d.domain)}" target="_blank" rel="noopener" aria-label="${esc(d.domain)} (opens the site)">${esc(d.domain)}</a>${d.own?'<span class="own">Your studio</span>':''}</td>
     <td><a class="site" href="${esc(where(d,''))}">${esc(d.name||'(unnamed)')}</a></td>
-    <td><span class="pill ${esc(d.tone)}">${esc(d.status_words)}</span></td>
+    <td><span class="pill ${esc(d.tone)}">${esc(d.status_words)}</span>${checksSub(d)}</td>
     <td>${d.provider?esc(d.provider):d.record==='unreadable'?'<span class="muted">Couldn’t read it</span>':'<span class="muted">Not known yet</span>'}</td>
     <td class="when">${expiresCell(d)}</td>
     <td class="when">${padlockCell(d)}</td>
