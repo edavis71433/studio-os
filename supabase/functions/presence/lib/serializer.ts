@@ -323,6 +323,10 @@ export function buildSnapshot(rows: DraftRows, manifest: TemplateManifest, opts:
       footer: { hours: settings.footer_hours !== false, social: settings.footer_social !== false },
       // Item 61 (0139): only present when the owner turned counting off, so an on site's snapshot is unchanged.
       ...(settings.visit_counter === false ? { visit_counter: false } : {}),
+      // List item 175 (0159): only present when AI assistants are switched off, the same way.
+      ...(settings.ai_crawlers === false ? { ai_crawlers: false } : {}),
+      // List item 152 (0155): only present when an ad tag is set, so a site without one is unchanged.
+      ...(settings.google_tag_id || settings.meta_pixel_id ? { ad_tags: { ...(settings.google_tag_id ? { google: String(settings.google_tag_id) } : {}), ...(settings.meta_pixel_id ? { meta: String(settings.meta_pixel_id) } : {}) } } : {}),
       // Phase SD: per-page search visibility + overrides
       // cap must cover the worst case: 5 built-in pages + up to 20 builder pages
       // ("page:<slug>" keys, writable per-page since slice B) — a 12-entry slice

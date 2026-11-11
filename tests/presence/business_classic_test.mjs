@@ -101,6 +101,22 @@ const render = (industry, extra) => renderSnapshot(snapFor(industry, extra), SIT
   ok('sitemap includes the legal pages', f['sitemap.xml'].includes('/privacy/') && f['sitemap.xml'].includes('/accessibility/'));
   const noForm = await renderSnapshot(snapFor('plumber'), { baseUrl: 'https://example.com' });
   ok('no form endpoint → privacy honestly says nothing is collected', noForm['privacy/index.html'].includes('no forms and collects nothing'));
+
+  // list item 138: a booking widget and a reviews wall each get a paragraph, only on a site that has one
+  const withBlocks = (blocks, pages) => { const s = snapFor('plumber'); s.content.settings.blocks = blocks; if (pages) s.content.settings.pages = pages; return s; };
+  const BOOK = { type: 'booking', title: 'Book a visit' };
+  const WALL = { type: 'reviews_wall', title: 'What people say', reviews: [{ author: 'Sam', rating: 5, body: 'Quick and tidy work.', date: '2026-10-01' }], aggregate: { count: 1, average: 5 } };
+  const LIVE = { ...SITE, bookEndpoint: 'https://fn.example.com/book/x' };
+  const pvOf = async (snap, site = LIVE) => (await renderSnapshot(snap, site))['privacy/index.html'];
+  const plain = await pvOf(withBlocks([]));
+  ok('privacy: a site with no booking and no reviews has neither paragraph', !plain.includes('<h2>Booking an appointment</h2>') && !plain.includes('<h2>Reviews</h2>') && plain.includes('If you’ve sent us a message and would like'));
+  const booked = await pvOf(withBlocks([BOOK]));
+  ok('privacy: a booking widget adds what a booking keeps and the emails it brings', booked.includes('<h2>Booking an appointment</h2>') && booked.includes('the service and time you picked') && booked.includes('a confirmation and a reminder before it') && booked.includes('sent us a message or booked with us and'));
+  ok('privacy: a site that can’t take bookings yet (no booking address) doesn’t describe them', !(await pvOf(withBlocks([BOOK]), SITE)).includes('Booking an appointment'));
+  const reviewed = await pvOf(withBlocks([WALL]));
+  ok('privacy: a reviews wall says what a review keeps, that it shows only once approved, and that the email never shows', reviewed.includes('<h2>Reviews</h2>') && reviewed.includes('until we have read it and said yes') && reviewed.includes('Your email address is never shown') && reviewed.includes('sent us a message or left a review and'));
+  const both = await pvOf(withBlocks([], [{ slug: 'book-online', title: 'Book online', blocks: [{ type: 'columns', id: 'c1', columns: [{ body: 'Pick a time.', block: BOOK }, { body: 'Or call us.' }] }, WALL] }]));
+  ok('privacy: a booking inside a column and reviews on an added page count too', both.includes('<h2>Booking an appointment</h2>') && both.includes('<h2>Reviews</h2>') && both.includes('sent us a message, booked with us or left a review and'));
 }
 
 // ═══ 5b+. item 62: a message that didn't send says why, and goes back with the words kept ═══

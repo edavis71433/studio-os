@@ -286,6 +286,15 @@ test.describe('Search tab', () => {
     await expect(a.getByRole('link', { name: 'Run it again' })).toHaveAttribute('href', 'https://tools.example.com/ai-visibility');
   });
 
+  // list item 153: who the assistants named instead, and the websites their answers drew on
+  test('AI answers: who was named instead, and the websites the answers drew on', async ({ page }) => {
+    await openSearch(page, VISIBILITY({ ai: { overall: 40, label: 'Fix now', pillars: [], business_name: 'Marlow’s Kitchen', city: 'Burbank', checked_at: '2026-10-26T00:00:00Z', report_url: 'https://tools.example.com/report/a1',
+      competitors: [{ name: 'Rival Bistro', times: 4 }, { name: 'Corner Cafe', times: 1 }], sources: [{ name: 'Yelp', cited: 4, own: false }, { name: 'marlows.example', cited: 2, own: true }] } }));
+    const a = page.locator('#svAi');
+    await expect(a).toContainText('Named instead of you: Rival Bistro (4 times), Corner Cafe (1 time)');
+    await expect(a).toContainText('Websites the answers drew on: Yelp (4), your website (2)');
+  });
+
   test('AI answers, never run: a door to the free check, and how to make it show up here', async ({ page }) => {
     await openSearch(page, VISIBILITY());
     await expect(page.locator('#svAi').getByRole('link', { name: 'Run the free check' })).toHaveAttribute('target', '_blank');
