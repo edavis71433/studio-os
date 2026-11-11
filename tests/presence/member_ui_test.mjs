@@ -46,6 +46,9 @@ const CONTROLS = [
   ['DELETE /sales/estimates/:id', 'pipeline.html', `api('/sales/estimates/'+b.dataset.delEst,'DELETE')`, ['data-needs="delete" data-del-est=']],   // sales review item 47
   ['DELETE /sales/prospects/:id', 'prospects.html', `api('/sales/prospects/'+b.dataset.remove,'DELETE')`, ['data-needs="delete" data-remove=']],   // sales review item 112
   ['POST /sales/recurring/:id/stop', 'pipeline.html', `api('/sales/recurring/'+sid+'/'+act,'POST',{})`, ['data-needs="delete" data-rec-stop=']],
+  // sales item 108: the record's Billing tab carries the estimates and the recurring invoice too
+  ['DELETE /sales/estimates/:id', 'crm.html', `apiAg('/sales/estimates/'+b.getAttribute('data-del-est'),'DELETE')`, ['data-del-est="${esc(e.id)}" data-needs="delete"']],
+  ['POST /sales/recurring/:id/stop', 'crm.html', `apiAg('/sales/recurring/'+id+'/'+verb,'POST',{})`, ['data-rec-stop="${esc(s.id)}" data-needs="delete"']],
   // the content path answers from contentWriteNeeds
   ['DELETE /offerings/:id', 'presence.html', 'api("DELETE", `/offerings/${o.id}`)', ['data-act="del" data-needs="delete"']],
   ['DELETE /faqs/:id', 'presence.html', 'api("DELETE", `/${collection}/${entity.id}`)', ['data-act="del" data-needs="delete"']],
@@ -128,8 +131,8 @@ const SOURCE = Object.fromEntries(PAGES.map((p) => [p, read(p)]));
     const fresh = sent(page).filter((call) => !known(page).includes(call));
     ok(`${page}: every DELETE it sends is decided`, fresh.length === 0, fresh.join(' | '));
   }
-  // crm.html: 3 — the record's two note removals are one removeNote since item 98 (it asks first now)
-  ok('tripwire: the DELETE scan found the calls it is meant to find', sent('pipeline.html').length === 5 && sent('presence.html').length === 12 && sent('contacts.html').length === 2 && sent('crm.html').length === 3 && sent('files.html').length === 1);
+  // crm.html: 4 — the record's two note removals are one removeNote since item 98 (it asks first now); item 108 added the draft estimate's
+  ok('tripwire: the DELETE scan found the calls it is meant to find', sent('pipeline.html').length === 5 && sent('presence.html').length === 12 && sent('contacts.html').length === 2 && sent('crm.html').length === 4 && sent('files.html').length === 1);
 
   const CONFIG = /\/(?:foundations\/(?:domain|prepare)|preview\/settings|site\/(?:offline|online)|bookings\/settings|sales\/contacts\/fields)\b/;
   const writes = new RegExp(`(?:api\\(\\s*["'](?:POST|PUT|DELETE)["']\\s*,\\s*["'\`]|act\\(["']|siteSetState\\(["'])${CONFIG.source}|api\\(["'\`]${CONFIG.source}["'\`]\\s*,\\s*["'](?:POST|PUT|DELETE)["']`, 'g');
