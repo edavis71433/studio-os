@@ -161,12 +161,13 @@ async function notifyOwnerOfReview(siteId: string, review: any): Promise<void> {
   const to = ident?.email;
   if (!to) return;
   const brand = await loadEmailBrand(siteId);
+  // Sales item 74: the owner hears about every review, unsubscribed or not (critical)
   await sendEmail(String(to), `New review from ${who}`,
     `<p>You have a new review from your website — it’s waiting for your OK before it shows.</p>` +
     `<p style="font-size:1.3rem;letter-spacing:2px;color:${brand.accent};margin:6px 0">${starString(Number(review.rating) || 0)}</p>` +
     `<blockquote style="margin:8px 0;padding:8px 14px;border-left:3px solid ${brand.accent};color:#444">“${esc(String(review.body || '').slice(0, 500))}”</blockquote>` +
     `<p style="color:#666">— ${esc(who)}</p>` +
-    `<p class="cta"><a href="${siteBase()}/presence.html#reviews" style="display:inline-block;margin-top:6px;background:${brand.accent};color:#fff;padding:9px 16px;border-radius:999px;text-decoration:none">Approve, reply, or hide it →</a></p>`, brand);
+    `<p class="cta"><a href="${siteBase()}/presence.html#reviews" style="display:inline-block;margin-top:6px;background:${brand.accent};color:#fff;padding:9px 16px;border-radius:999px;text-decoration:none">Approve, reply, or hide it →</a></p>`, brand, { critical: true });
 }
 
 // ═══════════════════════════ OWNER (authed) endpoints ════════════════════════
@@ -439,7 +440,7 @@ export async function sendReviewAsk(siteId: string, email: string, name: string,
     `<p class="cta"><a href="${esc(link)}" style="display:inline-block;margin-top:6px;background:${brand.accent};color:#fff;padding:11px 20px;border-radius:999px;text-decoration:none;font-weight:600">${googleLink ? 'Review us on Google →' : 'Leave a review →'}</a></p>` +
     (googleLink
       ? `<p style="color:#888;font-size:.85rem;margin-top:14px">It only takes a minute, and your review goes straight onto our Google listing.</p>`
-      : `<p style="color:#888;font-size:.85rem;margin-top:14px">It only takes a minute, and your words appear on our site once we’ve seen them.</p>`), brand, { replyTo: ownerAddress });
+      : `<p style="color:#888;font-size:.85rem;margin-top:14px">It only takes a minute, and your words appear on our site once we’ve seen them.</p>`), brand, { asBusiness: true, replyTo: ownerAddress });
 }
 
 // ═════════ the public review page HTML (self-contained, zero external origins) ═════════

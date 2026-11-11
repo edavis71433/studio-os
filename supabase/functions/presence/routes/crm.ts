@@ -615,6 +615,13 @@ export async function handleCrmRecord(req: Request, jwt: string, site: SiteRow, 
         if (Array.isArray(ct.tags) && ct.tags.length) more.tags = ct.tags.map(String);
         header = { ...header, ...more };
       }
+      // sales item 74: the record says when this person unsubscribed, or that their address bounces
+      const em = String(header.email || '').trim();
+      if (em) {
+        const { suppressionDetail } = await import('./email_infra.ts');
+        const sup = await suppressionDetail(em).catch(() => null);
+        if (sup) header = { ...header, email_status: { reason: sup.reason, since: sup.since } };
+      }
       return header;
     })();
 

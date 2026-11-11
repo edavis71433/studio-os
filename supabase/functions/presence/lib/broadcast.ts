@@ -304,7 +304,7 @@ export interface BroadcastRow { id: string; site_id: string; subject: string; bo
 
 export interface DispatchDeps extends SendableDeps {
   loadBrand?: (siteId: string) => Promise<EmailBrand>;
-  sendFn?: (to: string, subject: string, html: string, brand?: EmailBrand, opts?: { critical?: boolean; siteId?: string; headers?: Record<string, string> }) => Promise<boolean>;
+  sendFn?: (to: string, subject: string, html: string, brand?: EmailBrand, opts?: { critical?: boolean; asBusiness?: boolean; siteId?: string; headers?: Record<string, string> }) => Promise<boolean>;
   // claim a per-recipient send slot: 'inserted' (or { id } — the new row, item 69's
   // open counter needs it) = go ahead, 'duplicate' = already sent (skip — the
   // send-once guard), 'error' = infra failure.
@@ -380,7 +380,8 @@ export async function dispatchBroadcast(b: BroadcastRow, deps: DispatchDeps = {}
     // RFC-8058 one-click List-Unsubscribe header — inherited, never re-implemented.
     // R1: pass the broadcast's own site so a recipient's REPLY lands on that
     // site's inbound address (<siteId>@<inbound-domain>) → /email/inbound.
-    const ok = await send(r.email, renderSubject(b.subject, tokens), buildEmailHtml(b.body, tokens, { images: extras.images, accent: brand?.accent }) + pixel, brand, { siteId: b.site_id });
+    // Sales item 78: an update comes from the business that wrote it (its name as the sender, its footer)
+    const ok = await send(r.email, renderSubject(b.subject, tokens), buildEmailHtml(b.body, tokens, { images: extras.images, accent: brand?.accent }) + pixel, brand, { siteId: b.site_id, asBusiness: true });
     if (ok) sent++;
     else { failed++; await markFailed(b.id, r.email).catch(() => {}); }
   }
@@ -400,7 +401,7 @@ export async function sendBroadcastTest(b: BroadcastRow, to: string, deps: Pick<
   const brand = await loadBrand(b.site_id);
   const extras = await (deps.extrasFn || loadUpdateExtras)(b.site_id, b.body).catch(() => ({ bookingUrl: '', images: {} }));
   const tokens: MergeTokens = { firstName: 'there', businessName: brand?.name || 'us', bookingUrl: extras.bookingUrl };
-  return send(to, '[Test] ' + renderSubject(b.subject, tokens), buildEmailHtml(b.body, tokens, { images: extras.images, accent: brand?.accent }), brand, { siteId: b.site_id });
+  return send(to, '[Test] ' + renderSubject(b.subject, tokens), buildEmailHtml(b.body, tokens, { images: extras.images, accent: brand?.accent }), brand, { siteId: b.site_id, asBusiness: true });
 }
 
 /** Atomically CLAIM a scheduled broadcast for dispatch: flip scheduled→sending and

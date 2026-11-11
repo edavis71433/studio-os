@@ -8,9 +8,38 @@
 import { normHex, readableOnWhiteText, darken } from './brand_kit.ts';
 import { esc } from './markdown.ts';
 import { svc } from './db.ts';
+import { addressOf } from './doc_context.ts';
 
-export interface EmailBrand { name: string; accent: string; accentDark: string; logoUrl?: string | null }   // builder list item 59: the logo, a signed https URL when the studio set one
+// builder list item 59: the logo, a signed https URL when the studio set one.
+// Sales item 78: the business's address on one line, for the footer of the mail it sends.
+export interface EmailBrand { name: string; accent: string; accentDark: string; logoUrl?: string | null; address?: string | null }
 export const EMAIL_BRAND_DEFAULT: EmailBrand = { name: 'Studio OS', accent: '#5b3fa0', accentDark: '#3a2470' };
+/** Who runs the platform, with its postal address: the footer of the platform's own mail, and of a
+ *  business's optional mail when the business has no address on file (an email people can unsubscribe
+ *  from should carry one). */
+export const PLATFORM_POSTAL = 'Davis Digital Studio LLC · Burbank, California';
+
+/** What the footer says beyond the brand (sales items 75 and 78). `unsubscribeUrl` is set only on mail
+ *  an unsubscribe really stops, and draws a plain Unsubscribe link; `asBusiness` means the brand's
+ *  business is the sender, so the footer is that business's name and address, not the platform's. */
+export interface EmailShellOpts { unsubscribeUrl?: string | null; asBusiness?: boolean }
+
+/** The footer's lines, as HTML. Pure. */
+export function emailFooterHtml(brand: EmailBrand, opts: EmailShellOpts = {}): string {
+  const name = esc(brand.name);
+  const unsub = typeof opts.unsubscribeUrl === 'string' && /^https:\/\//.test(opts.unsubscribeUrl) ? opts.unsubscribeUrl : '';
+  const lines: string[] = [];
+  if (opts.asBusiness && brand.name !== EMAIL_BRAND_DEFAULT.name) {
+    const address = String(brand.address || '').trim();
+    lines.push(`<strong style="color:#6b6478;font-weight:600">${name}</strong>${address ? ` · ${esc(address)}` : ''}`);
+    if (unsub && !address) lines.push(`Sent through ${PLATFORM_POSTAL}`);
+  } else {
+    lines.push(brand.name === EMAIL_BRAND_DEFAULT.name ? 'Sent by Studio OS.' : `Sent by ${name} on Studio OS.`);
+    lines.push(PLATFORM_POSTAL);
+  }
+  if (unsub) lines.push(`Don’t want these emails? <a href="${esc(unsub)}" style="color:#6b6478;text-decoration:underline">Unsubscribe</a>`);
+  return lines.join('<br>');
+}
 
 /** Derive an email brand from a stored Brand Kit + the business name. Pure.
  *  Accent is contrast-safe (white text on it stays readable), reusing brand_kit. */
@@ -22,7 +51,7 @@ export function brandFromKit(kit: { primary?: string } | null | undefined, busin
 
 /** Wrap a body HTML fragment in the branded shell. Pure. Idempotent (a body that's
  *  already a full document is returned untouched, so nothing double-wraps). */
-export function brandEmailShell(bodyHtml: string, brand: EmailBrand = EMAIL_BRAND_DEFAULT): string {
+export function brandEmailShell(bodyHtml: string, brand: EmailBrand = EMAIL_BRAND_DEFAULT, opts: EmailShellOpts = {}): string {
   const b = String(bodyHtml || '');
   if (/^\s*<!doctype|<html[\s>]/i.test(b)) return b;
   const name = esc(brand.name);
@@ -36,7 +65,7 @@ export function brandEmailShell(bodyHtml: string, brand: EmailBrand = EMAIL_BRAN
 <tr><td style="height:6px;background:${brand.accent};font-size:0;line-height:0">&nbsp;</td></tr>
 <tr><td style="padding:22px 30px 6px">${logo || `<div style="font-family:'Iowan Old Style',Palatino,Georgia,serif;font-weight:600;font-size:19px;color:${brand.accentDark};letter-spacing:-.01em">${name}</div>`}</td></tr>
 <tr><td style="padding:6px 30px 26px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;font-size:15px;line-height:1.6;color:#1b1525">${b}</td></tr>
-<tr><td style="padding:16px 30px;border-top:1px solid #eee9e0;font-family:-apple-system,'Segoe UI',sans-serif;font-size:12px;line-height:1.5;color:#938ba3">${brand.name === EMAIL_BRAND_DEFAULT.name ? 'Sent by Studio OS.' : `Sent by ${name} on Studio OS.`} You’re receiving this because you used a Davis Digital Studio service or asked to hear from us. To stop these, use the unsubscribe link in your email app or reply and let us know.<br>Davis Digital Studio LLC · Burbank, California</td></tr>
+<tr><td style="padding:16px 30px;border-top:1px solid #eee9e0;font-family:-apple-system,'Segoe UI',sans-serif;font-size:12px;line-height:1.5;color:#938ba3">${emailFooterHtml(brand, opts)}</td></tr>
 </table></td></tr></table></body></html>`;
 }
 
@@ -47,14 +76,18 @@ export function brandEmailShell(bodyHtml: string, brand: EmailBrand = EMAIL_BRAN
 export const EMAIL_LOGO_TTL = 400 * 24 * 60 * 60;   // an email is read for a long time
 export async function loadEmailBrand(siteId: string, opts: { logoTtl?: number } = {}): Promise<EmailBrand> {
   try {
-    const [s, i] = await Promise.all([
+    const [s, i, l] = await Promise.all([
       svc(`presence_settings?site_id=eq.${siteId}&select=brand_kit,logo_media_id&limit=1`),
       svc(`presence_identity?site_id=eq.${siteId}&select=business_name&limit=1`),
+      // sales item 78: the address on the site's Business details, for the footer of mail the business sends
+      svc(`presence_locations?site_id=eq.${siteId}&select=address_line1,address_line2,city,region,postal_code&limit=1`).catch(() => null),
     ]);
     const row = (s.ok && Array.isArray(s.json) && s.json[0]) || null;
     const kit = row?.brand_kit || null;
     const name = (i.ok && Array.isArray(i.json) && i.json[0]?.business_name) || '';
-    const brand = brandFromKit(kit, name);
+    const brand: EmailBrand = brandFromKit(kit, name);
+    const address = addressOf((l?.ok && Array.isArray(l.json) && l.json[0]) || null).split('\n').filter(Boolean).join(', ');
+    if (address) brand.address = address;
     const logoId = String(row?.logo_media_id || kit?.logo_media_id || '');
     const logoUrl = logoId ? await studioLogoUrl(siteId, logoId, opts.logoTtl ?? EMAIL_LOGO_TTL) : null;
     return logoUrl ? { ...brand, logoUrl } : brand;

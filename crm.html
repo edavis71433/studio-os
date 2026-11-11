@@ -771,6 +771,16 @@ function renderSummaryCards(){
     if(!availTabs().includes(k))return;
     showTab(k);const tb=$('tabbody');if(tb)tb.scrollIntoView({behavior:'smooth',block:'start'});const t=$('tab-'+k);if(t)t.focus({preventScroll:true});}));
 }
+// sales item 74: a person's email standing in words, from the record header's email_status
+// ({reason, since}); '' when emails reach them. Invoices, receipts and documents still arrive after an unsubscribe.
+function emailStatusWords(s){
+  if(!s||!s.reason)return'';
+  const t=s.since?new Date(s.since):null;
+  const on=t&&!isNaN(t)?' on '+t.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}):'';
+  if(s.reason==='opt_out')return 'Unsubscribed from emails'+on+'. Invoices, receipts and documents still reach them.';
+  if(s.reason==='complaint')return 'Marked an email as spam'+on+', so no emails go to them.';
+  return 'Emails to this address bounce'+(on?' (since'+on.slice(3)+')':'')+', so no emails go to them.';
+}
 // The "Customer details" card in the rail: the contact facts always in view,
 // so the operator never leaves Billing to find a phone number. Edit opens the
 // Details tab, where the full form lives.
@@ -780,6 +790,9 @@ function renderDetailsCard(){
   if(!(s.overview||s.details)){host.innerHTML='';return;}
   const rows=[];
   if(hd.email)rows.push([svg('mail'),`<a href="mailto:${esc(hd.email)}">${esc(hd.email)}</a>`]);
+  // sales item 74: when they unsubscribed (or their address stopped taking email), under the address
+  const es=emailStatusWords(hd.email_status);
+  if(hd.email&&es)rows.push(['<span></span>',`<span class="muted" data-email-status>${esc(es)}</span>`]);
   // item 89: both numbers are a tap to call (from a deal, coming back offers to log the call), the job title,
   // the address and the tags beside them
   const dealId=(REC&&REC.identity&&REC.identity.deal_id)||'';

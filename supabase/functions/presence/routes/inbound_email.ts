@@ -262,7 +262,7 @@ async function ackSender(siteId: string, toEmail: string): Promise<void> {
     const brand = await loadEmailBrand(siteId);
     await sendEmail(toEmail, 'We’ve got your message',
       `<p>Thanks — we’ve got your email and added it to your conversation with us. Nothing more is needed right now; we’ll follow up here.</p>`,
-      brand, { critical: true, siteId, headers: { 'Auto-Submitted': 'auto-replied' } });
+      brand, { critical: true, asBusiness: true, siteId, headers: { 'Auto-Submitted': 'auto-replied' } });
   } catch { /* an ack must never block or throw */ }
 }
 

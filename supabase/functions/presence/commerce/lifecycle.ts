@@ -428,7 +428,8 @@ export async function checkOneDomain(site: DomainCheckSite, nowIso = new Date().
   const clientEmail = (Array.isArray(cl.json) && (cl.json[0] as { email?: string } | undefined)?.email) || '';
   if (clientEmail) {
     const brand = await loadEmailBrand(site.id);   // BR-1: the customer's domain notice, on their brand
-    await sendEmail(clientEmail, `Your domain ${site.custom_domain} ${words.when}`, html, brand).catch(() => false);
+    // Sales item 74: a lapsing domain takes the website down, so the warning always arrives (critical)
+    await sendEmail(clientEmail, `Your domain ${site.custom_domain} ${words.when}`, html, brand, { critical: true }).catch(() => false);
   }
   // the studio that looks after this client gets a copy of every rung (it used to be told only inside 7 days, and only the platform)
   const link = await svc(`presence_service_links?customer_site_id=eq.${site.id}&status=eq.active&select=agency_site_id&order=created_at.desc&limit=1`).catch(() => ({ json: [] as unknown[] }));
@@ -873,7 +874,8 @@ export async function runInvoiceReminders(limit = 20): Promise<{ reminded: numbe
         const brand = await loadEmailBrand(inv.site_id);
         const copy = invoiceReminderCopy(slot, what, amount, String(inv.title || ''));
         const btn = `<a href="${inv.stripe_url}" style="display:inline-block;margin-top:6px;background:${brand.accent};color:#fff;padding:9px 16px;border-radius:999px;text-decoration:none">Pay ${amount} securely →</a>`;
-        sendEmail(email, copy.subject, `<p>${copy.line}</p><p class="cta">${btn}</p>`, brand, { siteId: inv.site_id }).catch(() => {});   // their answer lands in the Inbox
+        // Sales item 74: money they owe always reaches them (critical, so no unsubscribe on it); their answer lands in the Inbox
+        sendEmail(email, copy.subject, `<p>${copy.line}</p><p class="cta">${btn}</p>`, brand, { critical: true, siteId: inv.site_id }).catch(() => {});
       } catch { /* the owner notice already carries it */ }
     }
   }
@@ -1151,7 +1153,8 @@ export async function runBookingReminders(limit = 50): Promise<{ reminded: numbe
       // Transactional (the customer's own booking) → critical:true; suppression is
       // enforced inside sendEmail (opt-out survived, bounce/complaint respected).
       // "Just reply" reaches the business, not the platform (item 72).
-      await sendEmail(to, `Reminder — ${a.type_name} ${when ? `(${when})` : ''}`.trim(), body, brand, { critical: true, replyTo: await ownerAddress });
+      // sales item 78: the reminder comes from the business the customer booked with
+      await sendEmail(to, `Reminder — ${a.type_name} ${when ? `(${when})` : ''}`.trim(), body, brand, { critical: true, asBusiness: true, replyTo: await ownerAddress });
       reminded++;
     } catch { /* the ledger row already marks this band sent — never re-send */ }
   }

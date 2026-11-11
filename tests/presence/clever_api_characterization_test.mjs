@@ -28,6 +28,9 @@ ok('operator console routes are NOT in the public gate', !/PUBLIC_ROUTES[\s\S]{0
 ok('sender: suppression checked via the SHARED core', /_shared\/email_infra\.ts/.test(src) && /maySend\(to/.test(src));
 // item 186 took out the outreach route's own Resend call: the core sender is the one send point left
 ok('sender: one-click List-Unsubscribe on every send', /List-Unsubscribe-Post/.test(src) && (src.match(/List-Unsubscribe-Post/g) || []).length === (src.match(/api\.resend\.com\/emails/g) || []).length);
+// sales items 74 + 75: …on every send an unsubscribe can stop, with a plain Unsubscribe link at its foot; none on a critical send
+ok('sender: the header and the footer link ride only on mail an unsubscribe stops', /const optional = !\(opts && opts\.critical\);/.test(src) && /headers: optional \? \{/.test(src) && /html: optional \? withUnsubscribeLink\(html, pageUrl\) : html/.test(src));
+ok('sender: a receipt, an invoice reminder, a quote and the portal sign-in always arrive', (src.match(/\{ \.\.\.CLIENT_OPTS, critical: true \}/g) || []).length === 4);
 ok('sender: plain-text alternative on the core sender', /text,\s*\n?\s*headers/.test(src) || /subject, html, text/.test(src));
 ok('sender: recipients masked in logs', /maskAddr\(to\)/.test(src));
 ok('sender: a suppressed address is refused with an honest message', /recipient_suppressed/.test(src));
