@@ -1,4 +1,4 @@
--- 0150_tool_lead_deal.sql
+-- 0151_tool_lead_deal.sql
 -- rollback: alter table public.audit_leads drop column deal_id;
 --           drop index if exists audit_leads_created_idx;
 --

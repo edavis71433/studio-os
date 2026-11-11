@@ -1,4 +1,4 @@
--- APPLY 0150 (production) — Free-tool leads land on the Prospects page (sales review item 114).
+-- APPLY 0151 (production) — Free-tool leads land on the Prospects page (sales review item 114).
 -- Safe to run more than once. Adds one column and one index to audit_leads; no rows change.
 -- Paste into Supabase → SQL Editor → Run. The deploy is tolerant either way: before this
 -- runs, the page still lists the leads and converts them — it just can't remember which
