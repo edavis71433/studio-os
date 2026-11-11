@@ -4,7 +4,7 @@
 // counts + draft status via service role (fast; and draft compares against
 // publishes, which clients can't read directly).
 import { json } from '../../_shared/http.ts';
-import { svc, type SiteDb } from '../lib/db.ts';
+import { svc, svcCount, type SiteDb } from '../lib/db.ts';
 import type { SiteRow } from '../lib/site.ts';
 import { listTemplates, latestTemplateVersion, getTemplate } from '../lib/render.ts';
 import { draftHashForSite } from '../lib/draft_hash.ts';
@@ -36,11 +36,11 @@ export async function handlePutTemplate(req: Request, jwt: string, site: SiteRow
   return json({ data: { ok: true, slug, version, name: t.manifest.name } }, 200, cors);
 }
 
-// Count via row length under the service role. Pilot-scale (manifest caps keep
-// collections tiny); revisit with count=exact headers if it ever matters.
+// Counted by the database under the service role (item 144): fetching the ids to count
+// them came back in pages of 1,000 rows, so a long-running site's posts or photos would
+// have stopped at 1,000.
 async function count(table: string, siteId: string, extra = ''): Promise<number> {
-  const r = await svc(`${table}?site_id=eq.${siteId}&select=id${extra}`);
-  return Array.isArray(r.json) ? r.json.length : 0;
+  return (await svcCount(`${table}?site_id=eq.${siteId}${extra}`)) ?? 0;
 }
 
 export async function handleGetSite(db: SiteDb, site: SiteRow, cors: Record<string, string>) {

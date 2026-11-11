@@ -662,7 +662,7 @@ export async function loadReceivables(site: SiteRow, todayYmd?: string) {
   // processing_since lands with migration 0132 — deploy-order tolerant (full
   // select first, pre-0132 shape second) so Today's money band never blanks.
   const SEL = 'id,title,amount_cents,due_date,deal_id,created_at,stripe_url';
-  // sales item 81: the invoice's number rides along (APPLY-0163), so Who owes you can name it
+  // sales item 81: the invoice's number rides along (APPLY-0167), so Who owes you can name it
   let invR = await svc(`presence_invoices?site_id=eq.${site.id}&deleted_at=is.null&status=eq.open&select=${SEL},processing_since,number&order=due_date.asc.nullslast,created_at.asc&limit=300`);
   if (!invR.ok) invR = await svc(`presence_invoices?site_id=eq.${site.id}&deleted_at=is.null&status=eq.open&select=${SEL},processing_since&order=due_date.asc.nullslast,created_at.asc&limit=300`);
   if (!invR.ok) invR = await svc(`presence_invoices?site_id=eq.${site.id}&deleted_at=is.null&status=eq.open&select=${SEL}&order=due_date.asc.nullslast,created_at.asc&limit=300`);
@@ -959,7 +959,7 @@ export async function handleSalesDeal(req: Request, site: SiteRow, principal: Pr
       // processing_since lands with migration 0132 — tolerant fetch (same posture
       // as the proposals read above) so the record's Billing tab never blanks.
       // item 107: recurring_id rides along (0145) so the record can tell what's left of the proposal
-      // sales items 77 and 81: the invoice's number and how a recorded payment came in (APPLY-0163)
+      // sales items 77 and 81: the invoice's number and how a recorded payment came in (APPLY-0167)
       (async () => { let r = await svc(`presence_invoices?deal_id=eq.${id}&site_id=eq.${site.id}&deleted_at=is.null&select=id,title,amount_cents,purpose,status,stripe_url,due_date,paid_at,created_at,processing_since,recurring_id,number,paid_method,paid_note,payment_for&order=due_date.asc.nullsfirst,created_at.asc`); if (!r.ok) r = await svc(`presence_invoices?deal_id=eq.${id}&site_id=eq.${site.id}&deleted_at=is.null&select=id,title,amount_cents,purpose,status,stripe_url,due_date,paid_at,created_at,processing_since,recurring_id&order=due_date.asc.nullsfirst,created_at.asc`); if (!r.ok) r = await svc(`presence_invoices?deal_id=eq.${id}&site_id=eq.${site.id}&deleted_at=is.null&select=id,title,amount_cents,purpose,status,stripe_url,due_date,paid_at,created_at,processing_since&order=due_date.asc.nullsfirst,created_at.asc`); if (!r.ok) r = await svc(`presence_invoices?deal_id=eq.${id}&site_id=eq.${site.id}&deleted_at=is.null&select=id,title,amount_cents,purpose,status,stripe_url,due_date,paid_at,created_at&order=due_date.asc.nullsfirst,created_at.asc`); return r; })(),
       // item 47: the deal's estimates and recurring invoices — both [] before APPLY-0145
       import('./estimates.ts').then((m) => m.estimatesForDeal(site.id, id)).catch(() => []),
@@ -1416,7 +1416,7 @@ export async function handleSalesInvoice(req: Request, site: SiteRow, principal:
     if (prop) {
       const billedQ = (cols: string) => svc(`presence_invoices?deal_id=eq.${dealId}&site_id=eq.${site.id}&deleted_at=is.null&status=in.(open,paid)&select=${cols}&order=created_at.asc&limit=500`);
       let ir = await billedQ('id,amount_cents,status,recurring_id,title,purpose,number,payment_for');
-      if (!ir.ok) ir = await billedQ('id,amount_cents,status,recurring_id,title,purpose');   // before APPLY-0163
+      if (!ir.ok) ir = await billedQ('id,amount_cents,status,recurring_id,title,purpose');   // before APPLY-0167
       if (!ir.ok) ir = await billedQ('amount_cents,status');   // before APPLY-0145
       if (!ir.ok) return json({ error: 'read_failed', message: 'We couldn’t check what’s already billed on this deal, so nothing was sent. Try again.' }, 502, cors);
       fromProposal = leftToBill(proposalTotals(prop.line_items).total_cents, rows(ir));
@@ -1471,7 +1471,7 @@ export async function handleSalesInvoice(req: Request, site: SiteRow, principal:
     const newRow: Record<string, unknown> = { site_id: site.id, deal_id: dealId, customer_client_id: deal.converted_client_id || null, customer_site_id: deal.converted_site_id || null, title, description, amount_cents: amountCents, currency: 'usd', purpose, status: 'open', due_date: dueDate, created_by: principal.email || principal.userId || 'system' };
     if (lines && lines.length > 1) newRow.lines = lines;
     let ins = await svc('presence_invoices', { method: 'POST', headers: { Prefer: 'return=representation' }, body: JSON.stringify(newRow) });
-    if (!ins.ok && 'lines' in newRow && missingInsertColumns(ins.json, ins.text, ['lines']).length) {   // before APPLY-0163: the invoice, without its lines
+    if (!ins.ok && 'lines' in newRow && missingInsertColumns(ins.json, ins.text, ['lines']).length) {   // before APPLY-0167: the invoice, without its lines
       delete newRow.lines;
       ins = await svc('presence_invoices', { method: 'POST', headers: { Prefer: 'return=representation' }, body: JSON.stringify(newRow) });
     }
@@ -2411,7 +2411,7 @@ export async function handleSalesDocument(req: Request, token: string, cors: Rec
 }
 
 /** One document's row, site-scoped, with the columns its page prints. Sales item 81's
- *  columns (number, how it was paid, its lines) first; before APPLY-0163 the old shape. */
+ *  columns (number, how it was paid, its lines) first; before APPLY-0167 the old shape. */
 export async function docRow(kind: DocKind, id: string, siteId: string): Promise<any | null> {
   if (!UUID_RE.test(id)) return null;
   const one = async (path: string) => { const r = await svc(path); return r.ok ? (rows(r)[0] || null) : undefined; };

@@ -263,7 +263,7 @@ export async function handleEstimateToInvoice(_req: Request, site: SiteRow, prin
   const lines = linesFromProposal(items, computeProposalTotals(items, meta), meta, []);
   if (lines.length > 1 && lines.reduce((n, l) => n + l.amount_cents, 0) === total) newRow.lines = lines;
   let ins = await svc('presence_invoices', { method: 'POST', headers: { Prefer: 'return=representation' }, body: JSON.stringify(newRow) });
-  if (!ins.ok && 'lines' in newRow && missingInsertColumns(ins.json, ins.text, ['lines']).length) {   // before APPLY-0163
+  if (!ins.ok && 'lines' in newRow && missingInsertColumns(ins.json, ins.text, ['lines']).length) {   // before APPLY-0167
     delete newRow.lines;
     ins = await svc('presence_invoices', { method: 'POST', headers: { Prefer: 'return=representation' }, body: JSON.stringify(newRow) });
   }

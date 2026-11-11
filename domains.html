@@ -101,6 +101,13 @@
   .dp-form label{display:block;font-size:12.5px;color:var(--soft);margin:10px 0 4px}
   .dp-form input,.dp-form select,.dp-form textarea{width:100%;font:inherit;font-size:14px;border:1px solid var(--line);border-radius:var(--dds-r,8px);padding:8px 10px;background:var(--bg);color:var(--ink)}
   .dp-acts{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:12px}
+  /* item 162, part two: where to go, mail, history, and the ready-made guides */
+  .dp-link{font-weight:600;color:var(--p);white-space:nowrap}
+  .dp-mail{font-size:13px;margin:8px 0 0;color:var(--soft)}
+  .dp-hist{list-style:none;padding:0;margin:0;display:grid;gap:6px;font-size:13.5px}.dp-hist .when{color:var(--soft);display:inline-block;min-width:98px;margin-right:6px}
+  .dp-plan{margin-top:12px;border:1px solid var(--line);border-radius:var(--dds-r,8px);padding:12px}
+  .dp-ptitle{font-weight:600;margin:0 0 4px}
+  .dp-steps{margin:8px 0 0;padding-left:18px;display:grid;gap:8px;font-size:13.5px}.dp-steps .dp-rec{margin-top:6px}
 </style>
 <link rel="stylesheet" href="/shell.css"><script src="/shell.js" defer></script>
 </head>
@@ -143,7 +150,7 @@ const FILTERS={
   nodomain:{label:'No domain yet',test:()=>false},
 };
 const ago=(iso)=>{if(!iso)return'';const t=Date.parse(iso);if(!isFinite(t))return'';const m=Math.round((Date.now()-t)/60000);if(m<2)return'Just now';if(m<60)return m+' min ago';const h=Math.round(m/60);if(h<24)return h+' hour'+(h===1?'':'s')+' ago';const d=Math.round(h/24);return d+' day'+(d===1?'':'s')+' ago';};
-async function apiSend(method,path,body){const r=await fetch(FN+path,{method,headers:H(),body:body?JSON.stringify(body):undefined});return{ok:r.ok,status:r.status,body:await r.json().catch(()=>({}))};}
+async function apiSend(method,path,body,extra){const r=await fetch(FN+path,{method,headers:{...H(),...(extra||{})},body:body?JSON.stringify(body):undefined});return{ok:r.ok,status:r.status,body:await r.json().catch(()=>({}))};}
 const RANK={registry:0,expired:1,down:2,old_copy:3,other_site:4,expiring:5,padlock:6,partly:7,offline:8,checking:9,not_live:10,elsewhere:11,connected:12};   // the server's order (agency/sites.ts buildDomains)
 const COLS=[
   ['domain','Domain',(d)=>d.domain],
@@ -264,16 +271,23 @@ function paintPanel(){
   const d=PANEL;if(!d)return;
   const checks=(d.all_checks||[]).map(c=>`<li class="${c.ok?'ok':'todo'}">${esc(c.words)}</li>`).concat((d.warnings||[]).map(w=>`<li class="${w.severity==='bad'?'todo':'warn'}">${esc(w.words)}</li>`));
   const n=d.days_left;const exp=d.expires_at?esc(day(d.expires_at))+(n==null?'':n<0?` (${-n} day${n===-1?'':'s'} ago)`:` (in ${n} day${n===1?'':'s'})`):(d.record==='unreadable'?'Couldn’t read the record':'Not known yet');
+  // item 162, part two (review domains findings 6 and 7): records are edited at the company that
+  // runs the DNS, renewal happens at the seller; each named, with its sign-in page
+  const wr=d.where||{};
+  const signIn=(g)=>g&&g.sign_in?` <a class="dp-link" href="${esc(g.sign_in)}" target="_blank" rel="noopener">Sign in to ${esc(g.company)} ↗</a>`:'';
+  const atLine=(g)=>g?`At ${esc(g.company)}${g.path?`: ${esc(g.path)}`:''}.${signIn(g)}`:'';
   const kv=[
     ['Provider',d.provider||'Not known yet'],
-    ['DNS at',d.dns_host_full?(d.dns_host?d.dns_host_full:d.dns_host_full+', where it was bought'):'Not known yet'],
-    ['Expires',exp],
+    ['Records',atLine(wr.records_at)||(d.dns_host_full?esc(d.dns_host_full):'Not known yet'),true],
+    ['Renewal',atLine(wr.renew_at)||'Not known yet',true],
+    ['Expires',exp,true],
     ['Transfer lock',d.lock===true?'On':d.lock===false?'Off':'Not known yet'],
     ['Registry says',(d.statuses||[]).length?(d.statuses||[]).join(', '):'Nothing unusual'],
     ['Registered',d.registered_at?day(d.registered_at):'Not known yet'],
     ['Padlock until',d.padlock_until?day(d.padlock_until):'Not known yet'],
     ['Last checked',d.checked_at?ago(d.checked_at):'Not yet'],
-  ].map(([k,v])=>`<dt>${esc(k)}</dt><dd>${k==='Expires'?v:esc(v)}</dd>`).join('');
+  ].map(([k,v,html])=>`<dt>${esc(k)}</dt><dd>${html?v:esc(v)}</dd>`).join('');
+  const hist=(d.history||[]).length?`<ul class="dp-hist">${d.history.map(h=>`<li><span class="when">${esc(day(h.at))}</span>${esc(h.words)}</li>`).join('')}</ul>`:'<p class="muted">Nothing recorded for this domain yet.</p>';
   const recs=(d.records||[]).length?`<table class="dp-rec" aria-label="Records"><tbody>${d.records.map(x=>`<tr><td>${esc(x.name)}</td><td class="t">${esc(x.type)}</td><td>${esc(x.value)}</td></tr>`).join('')}</tbody></table>`:'<p class="muted">No records answered just now.</p>';
   const nt=d.notes||{};
   const sel=(v)=>['yes','no','unknown'].map(o=>`<option value="${o}"${(nt.renews||'unknown')===o?' selected':''}>${o==='yes'?'Yes':o==='no'?'No':'Don’t know'}</option>`).join('');
@@ -281,8 +295,10 @@ function paintPanel(){
     <p class="muted" id="dpMsg" role="status" style="margin:6px 0 0;font-size:13px"></p>
     <section class="dp-sec" aria-labelledby="dpChecksH"><h3 id="dpChecksH">What we checked</h3>${checks.length?`<ul class="dp-list">${checks.join('')}</ul>`:'<p class="muted">Checked once a day. Press Check now to look again.</p>'}
       <div class="dp-acts">${d.hosted?`<a class="rowact" href="${esc(where(d,'#domain'))}">Open the client’s domain steps</a>`:''}<a class="rowact" href="${esc(where(d,''))}">Open ${esc(d.name||'the site')}</a><a class="rowact" href="https://${esc(d.domain)}" target="_blank" rel="noopener">Visit ${esc(d.domain)} ↗</a></div></section>
+    ${helpHtml(d)}
     <section class="dp-sec" aria-labelledby="dpRegH"><h3 id="dpRegH">Registration</h3><dl class="dp-kv">${kv}</dl></section>
-    <section class="dp-sec" aria-labelledby="dpRecH"><h3 id="dpRecH">Records, all of them</h3>${recs}</section>
+    <section class="dp-sec" aria-labelledby="dpRecH"><h3 id="dpRecH">Records, all of them</h3>${recs}${d.mail&&d.mail.words?`<p class="dp-mail" id="dpMail">${esc(d.mail.words)}</p>`:''}</section>
+    <section class="dp-sec" aria-labelledby="dpHistH"><h3 id="dpHistH">History</h3>${hist}</section>
     <section class="dp-sec" aria-labelledby="dpNotesH"><h3 id="dpNotesH">Your notes</h3><form class="dp-form" id="dpNotes">
       <label for="dpAcct">The account is in whose name</label><input id="dpAcct" maxlength="120" value="${esc(nt.account||'')}" placeholder="e.g. the client’s own GoDaddy account">
       <label for="dpRenew">Renews by itself</label><select id="dpRenew">${sel()}</select>
@@ -293,6 +309,39 @@ function paintPanel(){
   $('dpClose').addEventListener('click',closePanel);
   $('dpCheck').addEventListener('click',checkNow);
   $('dpNotes').addEventListener('submit',saveNotes);
+  document.querySelectorAll('#dpBody [data-help]').forEach(b=>b.addEventListener('click',()=>helpPreview(b.getAttribute('data-help'),b)));
+}
+// ── item 162, part two (review domains finding 8): the server's ready-made guides had no button.
+//    Read the steps here first (a preview saves nothing), then put them on the client's
+//    Domain & email page, where they wait for the client's OK like every other plan. ──
+const HELPS=[['registrar_care','Make sure it renews by itself'],['connect_domain','The records this site needs'],['transfer_out','Move the domain']];
+const scopeFor=(d)=>d.own?{}:{'x-dds-scope-site':d.site_id};   // the studio acts inside the client's site
+function helpHtml(d){
+  const list=HELPS.filter(([g])=>g!=='connect_domain'||d.hosted);   // a site on its own host gets its records from that host
+  return `<section class="dp-sec" aria-labelledby="dpHelpH"><h3 id="dpHelpH">Help with this domain</h3><div class="dp-acts" style="margin-top:0">${list.map(([g,l])=>`<button type="button" class="rowact" data-help="${g}" aria-pressed="false">${esc(l)}</button>`).join('')}</div><div id="dpHelpOut"></div></section>`;
+}
+let HELP_SEQ=0;
+async function helpPreview(goal,btn){
+  const d=PANEL;if(!d)return;const out=$('dpHelpOut');const gen=++HELP_SEQ;
+  document.querySelectorAll('#dpBody [data-help]').forEach(b=>b.setAttribute('aria-pressed',b===btn?'true':'false'));
+  out.innerHTML='<p class="muted" style="margin-top:10px" role="status">Getting the steps…</p>';
+  let r;try{r=await apiSend('POST','/foundations/prepare',{goal,preview:true},scopeFor(d));}catch(_){r={ok:false,body:{}};}
+  if(gen!==HELP_SEQ||!PANEL||PANEL.site_id!==d.site_id)return;
+  if(!r.ok||!r.body||!r.body.data){out.innerHTML=`<p class="muted" style="margin-top:10px" role="status">${esc((r.body&&r.body.message)||'Those steps didn’t load just now.')}</p>`;return;}
+  const p=r.body.data;
+  const recRows=(s)=>(s.records||[]).length?`<table class="dp-rec" aria-label="Records to add"><tbody>${s.records.map(x=>`<tr><td>${esc(x.name)}</td><td class="t">${esc(x.type)}</td><td>${esc(x.value)}</td></tr>`).join('')}</tbody></table>`:'';
+  out.innerHTML=`<div class="dp-plan"><p class="dp-ptitle">${esc(p.title)}</p><p class="muted" style="font-size:13px;margin:0">${esc(p.summary)}</p>
+    <ol class="dp-steps">${(p.steps||[]).map(s=>`<li>${s.automated?'<span class="muted">Handled automatically: </span>':''}${esc(s.what)}${recRows(s)}</li>`).join('')}</ol>
+    <div class="dp-acts"><button type="button" class="btn" id="dpSend">${d.own?'Put it on your Domain & email page':'Put it on the client’s page'}</button><span class="muted" id="dpSent" role="status"></span></div></div>`;
+  $('dpSend').addEventListener('click',()=>helpSend(goal));
+}
+async function helpSend(goal){
+  const d=PANEL;if(!d)return;const b=$('dpSend');if(!b)return;b.disabled=true;
+  let r;try{r=await apiSend('POST','/foundations/prepare',{goal},scopeFor(d));}catch(_){r={ok:false,body:{}};}
+  if(!PANEL||PANEL.site_id!==d.site_id)return;
+  const sv=$('dpSent');
+  if(!r.ok){b.disabled=false;if(sv)sv.textContent=(r.body&&r.body.message)||'That didn’t go through just now.';return;}
+  if(sv)sv.textContent=d.own?'Done. It’s on your Domain & email page.':'Done. It’s on their Domain & email page, waiting for their OK.';
 }
 async function checkNow(){
   const d=PANEL;if(!d)return;const b=$('dpCheck');b.disabled=true;b.textContent='Checking…';

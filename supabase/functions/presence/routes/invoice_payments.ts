@@ -62,7 +62,7 @@ export async function handleInvoicePayment(req: Request, site: SiteRow, principa
   if (!UUID_RE.test(id)) return json({ error: 'bad_request' }, 400, cors);
   let b: any = {}; try { b = await req.json(); } catch { return json({ error: 'bad_json' }, 400, cors); }
   const got = await loadInvoice(site.id, id);
-  if (!got.ok) return unavailable(cors);   // before APPLY-0163 the columns aren't there
+  if (!got.ok) return unavailable(cors);   // before APPLY-0167 the columns aren't there
   const inv = got.row;
   // the caller's own day (the page sends ?today=), so this evening in Los Angeles is "today"
   const today = callerToday(new URL(req.url).searchParams.get('today'), nowIso());

@@ -21,7 +21,7 @@
 import { json } from '../../_shared/http.ts';
 import { svc } from '../lib/db.ts';
 import { writeChangeEvent } from '../lib/provenance.ts';
-import { deleteMedia, signThumb, signDownload, signOriginalImage, copyObject, isImageMime, signSocialCrop, signCutoutSource } from '../lib/media.ts';
+import { deleteMedia, signThumb, signDownload, signOriginalImage, copyObject, isImageMime, signSocialCrop, signCutoutSource, mediaUsage } from '../lib/media.ts';
 import { cutoutConfigured, startCutout, checkCutout, jobFor, idFromJob, isPng, cutoutFailWords, CUTOUT_MODEL, CUTOUT_MAX_SIDE, CUTOUT_MAX_BYTES, type CutoutState } from '../lib/cutout.ts';
 import { rateAllow, tooMany } from '../lib/ratelimit.ts';
 import type { SiteRow } from '../lib/site.ts';
@@ -78,8 +78,9 @@ async function readMedia(pathFor: (cols: string) => string) {
   if (!r.ok && missingColumnSignal(r.json, r.text, 'client_private')) r = await svc(pathFor(ASSET_COLS_BASE));
   return r;
 }
+const ASSET_PAGE = 1000;
 async function loadAssets(siteId: string): Promise<Asset[]> {
-  const r = await readMedia((cols) => `presence_media?site_id=eq.${siteId}&deleted_at=is.null&select=${cols}&order=created_at.desc&limit=1000`);
+  const r = await readMedia((cols) => `presence_media?site_id=eq.${siteId}&deleted_at=is.null&select=${cols}&order=created_at.desc&limit=${ASSET_PAGE}`);
   return arr(r) as Asset[];
 }
 async function loadAsset(siteId: string, id: string, includeDeleted = false): Promise<Asset | null> {
@@ -301,17 +302,20 @@ export async function handleAssetsList(req: Request, site: SiteRow, cors: Record
     total: assets.length, shown: page.length,
     live_count: [...live].length,
     policy: await policyFor(site),
-    storage: storageFor(site, assets),
+    storage: await storageFor(site, assets),
   } }, 200, cors);
 }
 
 // Items 56 + 115: the storage meter reads the rows and the limits the upload
 // door refuses on — the template's file cap (routes/media.ts) and the site quota
-// (createUpload). loadAssets is every live row, archived and private included.
-function storageFor(site: SiteRow, assets: Asset[]): StorageSummary {
+// (createUpload). loadAssets is every live row, archived and private included, up to
+// its 1,000-row page; a full page may not be all of them, so then the database counts
+// and sums them (item 144), the way the upload door does.
+async function storageFor(site: SiteRow, assets: Asset[]): Promise<StorageSummary> {
   const q = mediaQuota();
   const cap = getTemplate(site.template_slug, site.template_version)?.manifest.entities.media?.max ?? 100;
-  return storageSummary(assets, { maxBytes: q.maxBytes, maxFiles: Math.min(cap, q.maxFiles) });
+  const totals = assets.length >= ASSET_PAGE ? await mediaUsage(site.id) : null;
+  return storageSummary(assets, { maxBytes: q.maxBytes, maxFiles: Math.min(cap, q.maxFiles) }, totals);
 }
 
 export async function handleAssetsCollections(site: SiteRow, cors: Record<string, string>) {

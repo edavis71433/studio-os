@@ -1479,7 +1479,7 @@ function leftOfProposal(){
   const billed=((DEAL&&DEAL.invoices)||[]).filter(v=>(v.status==='open'||v.status==='paid')&&!v.recurring_id).reduce((a,b)=>a+(Number(b.amount_cents)||0),0);
   return {total,billed,left:Math.max(0,total-billed)};
 }
-// item 81: the studio's running invoice number — "#0013"; '' before the number exists (APPLY-0163)
+// item 81: the studio's running invoice number — "#0013"; '' before the number exists (APPLY-0167)
 const invNo=(n)=>{const v=Math.trunc(Number(n));return v>0?'#'+String(v).padStart(4,'0'):'';};
 // item 77: how a payment came in; '' is a payment Stripe took (card or bank, online)
 const PAY_WORDS={check:'Paid by check',cash:'Paid in cash',bank_transfer:'Paid by bank transfer',zelle:'Paid by Zelle',other:'Paid'};

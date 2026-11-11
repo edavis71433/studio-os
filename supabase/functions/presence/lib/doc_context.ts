@@ -4,7 +4,7 @@
 // address, or their own site's address once they're a customer), the studio's
 // time zone for the dates, and the part payments recorded toward an invoice.
 // Every read is best-effort and site-scoped: a document still renders, with less
-// on it, when one fails or a column isn't there yet (before APPLY-0163).
+// on it, when one fails or a column isn't there yet (before APPLY-0167).
 import { svc } from './db.ts';
 import { UUID_RE } from './uuid.ts';
 import type { DocContext, DocParty, DocPayment } from './documents.ts';

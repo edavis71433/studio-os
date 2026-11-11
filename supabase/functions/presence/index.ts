@@ -45,13 +45,14 @@ import { handleMessages, handleNotifications, handleNotificationsRead, handlePro
 import { handleProjectSurveys, handleSurvey, handleSurveyRespond, handleSupport, handleSupportOne, handleSupportMessage } from './routes/service_intake.ts';
 import { handleClientProjects, handleClientProject, handleClientReport, handleClientMessages, handleClientDeliverableDownload, handleClientApprovalDecide, handleClientSurvey, handleClientSurveyRespond, handleClientNotifications, handleClientNotificationsRead, handleClientSupport, handleClientSupportOne, handleClientSupportMessage, handleClientBilling, handleClientDocuments, handleClientBook, handleClientTaskDone, handleClientUploadUrl, handleClientUploadCreate, handleClientServices, handleClientWebsiteStats, handleClientWebsiteThumb, handleStudioCustomers } from './routes/client_delivery.ts';
 import { handleSavedReplies, handleFaqAdmin, handleClientFaq } from './routes/service_edges.ts';
-import { handlePublish, handleRestore, handlePublishHistory, handleVersionLabel, handleCompareVersions, handleTimewarp, handleCheckpointList, handleCheckpointSave, handleCheckpointRestore, handleCheckpointDelete, handleTakeOffline, handleBackOnline } from './routes/publish.ts';
+import { handlePublish, handleRestore, handlePublishHistory, handleVersionLabel, handleCompareVersions, handleTimewarp, handleCheckpointList, handleCheckpointSave, handleCheckpointRestore, handleCheckpointDelete, handleTakeOffline, handleBackOnline, handleSitePassword } from './routes/publish.ts';
 const { handleLaunchList, handleLaunchCreate, handleLaunchGet, handleLaunchRecapture, handleLaunchDecide, handleLaunchSchedule, handleLaunchPromote, handleLaunchRollback, handleLaunchCancel } = lazyRoutes(() => import('./routes/launches.ts'));
 import { handleMediaUpload, handleMediaUpdate, handleMediaDelete } from './routes/media.ts';
 import { handleAssetsList, handleAssetsCollections, handleAssetsHealth, handleAssetsBulk, handleAssetsMatch, handleAssetsFolderMove, handleAssetUpdate, handleAssetStatus, handleAssetDelete, handleAssetDetail, handleAssetDownload, handleAssetReplace, handleAssetRollback, handleAssetDuplicate, handleAssetSuggest, handleAssetSocial, handleAssetCards, handleAssetRemoveBackground, handleAssetCutout, handleCutoutJob } from './routes/assets.ts';
 const { handleVisualKinds, handleVisualGenerate, handleVisualList, handleVisualGet, handleVisualVary, handleVisualEdit, handleVisualDecide } = lazyRoutes(() => import('./routes/visual.ts'));
-const { handleAdmin, handleDomain } = lazyRoutes(() => import('./routes/admin.ts'));
+const { handleAdmin, handleDomain, handleDomainLookup } = lazyRoutes(() => import('./routes/admin.ts'));
 import { handleCollection, handleLocation, handleSettings, handleBlockSuggestions, handlePageDuplicate, handlePageRefs, SPECS } from './routes/content.ts';
+import { handleDeletedPages, handleDeletedPageRestore } from './routes/deleted_pages.ts';
 import { handlePageLockCreate, handlePageLockList } from './routes/page_locks.ts';
 import { handleHealth, handleChanges, handleContentTree, handleNotesList, handleNoteResolve, handleRestoreToDraft, handleMediaList } from './routes/room.ts';
 const { handleWebsiteTimeline } = lazyRoutes(() => import('./routes/timeline.ts'));
@@ -555,6 +556,7 @@ async function route_(req: Request, cors: Record<string, string>): Promise<Respo
   //    online restores the last live version through the ONE pipeline. ──
   if (route === '/site/offline' && method === 'POST') return handleTakeOffline(site, principal, cors);
   if (route === '/site/online' && method === 'POST') return handleBackOnline(site, principal, cors);
+  if (route === '/site/password' && method === 'POST') return handleSitePassword(req, site, principal, cors);   // list item 175
   if (route === '/publishes' && method === 'GET') return handlePublishHistory(site, cors);
   // ── Version tools: compare any two versions · Timewarp · draft checkpoints ──
   // (all under /publishes/* so featureForRoute maps them to the 'website' area).
@@ -1133,6 +1135,7 @@ async function route_(req: Request, cors: Record<string, string>): Promise<Respo
   // Self-serve custom domain (the caller's OWN site) — reuses the complete domain
   // core (attach → SSL → live DNS status). Reviewer boundary above already blocks
   // client_reviewers; a site owner or an operator scoped into the client reaches it.
+  if (route === '/foundations/domain/lookup' && method === 'GET') return handleDomainLookup(req, site, cors);   // item 162: steps for their provider as they type
   if (route === '/foundations/domain' && (method === 'GET' || method === 'POST' || method === 'DELETE')) {
     const r = await handleDomain(req, method, site, principal, cors);
     return r || json({ error: 'method_not_allowed' }, 405, cors);
@@ -1234,6 +1237,8 @@ async function route_(req: Request, cors: Record<string, string>): Promise<Respo
   //    create-with-source over the ONE pages store; refs = delete-awareness) ──
   if (route === '/pages/duplicate' && method === 'POST') return handlePageDuplicate(req, db, site, principal, cors);
   if (route === '/pages/refs' && method === 'GET') return handlePageRefs(req, site, cors);
+  if (route === '/pages/deleted' && method === 'GET') return handleDeletedPages(site, cors);   // item 154: pages deleted in the last 30 days
+  { const dm = route.match(/^\/pages\/deleted\/([0-9a-f-]{36})\/restore$/); if (dm && method === 'POST') return handleDeletedPageRestore(req, db, site, principal, dm[1], cors); }
   // items 48 and 120: a page's password (only the key made from it is kept)
   if (route === '/page-locks' && method === 'POST') return handlePageLockCreate(req, site, principal, cors);
   if (route === '/page-locks' && method === 'GET') return handlePageLockList(site, cors);

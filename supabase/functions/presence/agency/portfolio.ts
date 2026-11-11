@@ -64,6 +64,7 @@ export function buildPortfolio(i: PortfolioInput) {
       name: i.clientNames[s.id] || '(unnamed)',
       edition: s.edition, status: s.status,
       archived: l?.status === 'archived',
+      trashed: l?.status === 'trashed',   // item 154: in the Trash at the foot of Sites, and in no list
       tags: l?.tags || [], owner: l?.owner_email || '', assigned: l?.assigned || [],
       has_notes: !!(l?.notes || '').trim(),
       notes: String(l?.notes || ''),   // the row's internal note (the route strips it for roles without the notes cap)
@@ -94,6 +95,7 @@ export function buildPortfolio(i: PortfolioInput) {
 /* ── directory filtering (search / tags / status) — pure ── */
 export function filterPortfolio(rows: ReturnType<typeof buildPortfolio>, q: { search?: string; tag?: string; archived?: boolean }) {
   return rows.filter((r) => {
+    if (r.trashed) return false;                              // item 154: the Trash is its own list (Sites), never Home's
     if (r.archived !== (q.archived === true)) return false;   // archived hidden unless asked for
     if (q.tag && !r.tags.includes(q.tag)) return false;
     if (q.search) {
