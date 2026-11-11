@@ -38,7 +38,7 @@ const { handleKnowledgeDelete } = await import(`${P}/routes/knowledge.ts`);
 const { handleCommentDelete } = await import(`${P}/routes/comments.ts`);
 const { handleSalesContact, handleSalesContactFields, handleSalesDeal, handleSalesProposalDelete, handleSalesContractDelete, handleSalesTemplateDelete, handleSalesInvoiceVoid, handleSalesRetainerCancel } = await import(`${P}/routes/sales.ts`);
 const { handleDeliverable } = await import(`${P}/routes/project_delivery.ts`);
-const { handleDomain } = await import(`${P}/routes/admin.ts`);
+const { handleDomain, handleDomainForward } = await import(`${P}/routes/admin.ts`);
 const { handleFoundationsPrepare } = await import(`${P}/routes/foundations.ts`);
 const { handlePreviewSettings } = await import(`${P}/routes/preview_env.ts`);
 const { handlePutTemplate } = await import(`${P}/routes/site.ts`);
@@ -150,6 +150,7 @@ const DECIDED = {
   ],
   configure: [
     'DELETE /foundations/domain', 'POST /foundations/domain', 'POST /foundations/prepare',
+    'POST /foundations/domain/forward', 'DELETE /foundations/domain/forward',   // builder list item 174
     'POST /preview/settings', 'POST /site/offline', 'POST /site/online', 'POST /site/password', 'PUT /bookings/settings',
     'PUT /sales/contacts/fields', 'PUT /sales/stages', 'POST /calendar/link', 'DELETE /calendar/link',
     'POST /email/log-address', 'DELETE /email/log-address',
@@ -319,7 +320,9 @@ const CHANGED = [
   { name: 'POST /sales/contacts/:id/unmerge', fx: { rows: { presence_contacts: { merged_into: ROW2, merge_record: { at: new Date().toISOString(), into: ROW2, moved: { deals: [], appointments: [], reviews: [] }, keep_before: {}, keep_after: {} } } } }, run: (r, p) => handleContactUnmerge(r, A, p, ROW, cors) },
   { name: 'POST /sales/invoices/:id/payment/undo', fx: { rows: { presence_invoices: { status: 'paid', paid_method: 'check', payment_for: null } } }, run: (r, p) => handleInvoicePaymentUndo(r, A, p, ROW, cors) },   // sales review item 77
   { name: 'POST /foundations/domain', body: { domain: 'beta.example' }, run: (r, p) => handleDomain(r, 'POST', A, p, cors) },
-  { name: 'DELETE /foundations/domain', run: (r, p) => handleDomain(r, 'DELETE', A, p, cors) },
+  { name: 'DELETE /foundations/domain', body: { confirm: 'alpha.example' }, run: (r, p) => handleDomain(r, 'DELETE', A, p, cors) },   // item 163: removing needs the name typed back
+  { name: 'POST /foundations/domain/forward', body: { domain: 'gamma.example' }, run: (r, p) => handleDomainForward(r, 'POST', A, p, cors) },   // item 174
+  { name: 'DELETE /foundations/domain/forward', body: { domain: 'gamma.example' }, run: (r, p) => handleDomainForward(r, 'DELETE', A, p, cors) },
   { name: 'POST /foundations/prepare', body: { goal: 'email_auth' }, run: (r, p) => handleFoundationsPrepare(r, A, p, cors) },
   { name: 'POST /preview/settings', body: {}, run: (r, p) => handlePreviewSettings(r, A, p, cors) },
   { name: 'PUT /bookings/settings', body: { enabled: true }, run: (r, p) => handleBookingSettingsPut(r, A, p, cors) },
@@ -439,7 +442,7 @@ const WRITE_HANDLERS = [
   'handleConnectionRefresh', 'handleContentLibraryDelete', 'handleContentLibrarySave', 'handleContentLibraryUpdate',
   'handleCrmNoteAdd', 'handleCrmNoteDelete', 'handleCrmNotePin', 'handleDealTaskCreate', 'handleDealTaskUpdate',
   'handleDeliverable', 'handleDeliverableUploadUrl', 'handleDeliverablesCreate', 'handleDevCustomizationPut',
-  'handleDomain', 'handleEditorImprove', 'handleFaqAdmin', 'handleFormReply',
+  'handleDomain', 'handleDomainForward', 'handleEditorImprove', 'handleFaqAdmin', 'handleFormReply',
   'handleFormStatus', 'handleFoundationsDecide', 'handleFoundationsPrepare', 'handleKnowledgeDelete',
   'handleKnowledgeImport', 'handleLaunchCancel', 'handleLaunchCreate', 'handleLaunchDecide', 'handleLaunchPromote',
   'handleLaunchRecapture', 'handleLaunchRollback', 'handleLaunchSchedule', 'handleLocation', 'handleMediaDelete',

@@ -526,10 +526,10 @@ test.describe('MS2 money path (static pins)', () => {
     expect(upsell, 'audit: the Health Check upsell may not promise the Competitive tier\'s work').not.toMatch(/competitor/i);
   });
 
-  test('monthly-retainer font loading matches index (preload + async swap + noscript)', () => {
+  test('monthly-retainer loads fonts the index way: our own copies, nothing from Google (list item 143)', () => {
     const html = read('monthly-retainer.html');
-    expect(html).toMatch(/<link rel="preload" href="https:\/\/fonts\.googleapis\.com\/css2[^"]*" as="style" onload=/);
-    expect(html).toContain('<noscript><link href="https://fonts.googleapis.com/css2');
+    expect(html).toContain('<link rel="stylesheet" href="/fonts/brand.css">');
+    expect(html).not.toMatch(/fonts\.(googleapis|gstatic)\.com/);
   });
 });
 
@@ -914,13 +914,11 @@ test.describe('MS6 entry & legal sweep (static pins)', () => {
     expect(main, 'privacy link kept').toContain('href="/privacy"');
   });
 
-  test('entry pages load fonts the index way: preload + async swap + noscript (404 was blocking; ai-disclaimer nested its noscript)', () => {
+  test('entry pages load fonts the index way: our own copies, nothing from Google (list item 143)', () => {
     for (const f of ['404.html', 'ai-disclaimer.html']) {
       const html = read(f);
-      expect(html, `${f}: font preload`).toMatch(
-        /<link rel="preload" href="https:\/\/fonts\.googleapis\.com\/css2[^"]*" as="style" onload=/
-      );
-      expect(html, `${f}: noscript fallback`).toContain('<noscript><link href="https://fonts.googleapis.com/css2');
+      expect(html, `${f}: the brand fonts`).toContain('<link rel="stylesheet" href="/fonts/brand.css">');
+      expect(html, `${f}: nothing from Google`).not.toMatch(/fonts\.(googleapis|gstatic)\.com/);
       expect(html, `${f}: nested noscript`).not.toMatch(/<noscript>[^<]*<link rel="preload"/);
     }
   });

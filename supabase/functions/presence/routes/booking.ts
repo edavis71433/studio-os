@@ -202,6 +202,8 @@ export async function handleBookingCreate(req: Request, siteId: string, cors: Re
   const booked = await bookedOnDate(siteId, dateOfSlot);
   const open = generateSlots({ date: dateOfSlot, config: settings.config, duration_min: type.duration_min, now_local: nowLocal(settings.config.timezone), booked });
   if (!open.includes(v.booking.slot_start)) {
+    const mine = await sameBookingAgain(siteId, v.booking);
+    if (mine) return calmOk(bookedMessage(mine.status, type.name, v.booking.slot_start), { status: mine.status, when: humanSlot(v.booking.slot_start) || v.booking.slot_start, service: type.name });
     return json({ error: 'slot_taken', message: 'Sorry — that time was just taken. Please pick another.' }, 409, cors);
   }
 
@@ -240,7 +242,11 @@ export async function handleBookingCreate(req: Request, siteId: string, cors: Re
   });
   // The atomic no-double-book guard: a concurrent identical slot hits the unique
   // index (presence_appointments_slot_uq) → 409, turned into a calm message.
-  if (ins.status === 409) return json({ error: 'slot_taken', message: 'Sorry — that time was just taken. Please pick another.' }, 409, cors);
+  if (ins.status === 409) {
+    const mine = await sameBookingAgain(siteId, v.booking);
+    if (mine) return calmOk(bookedMessage(mine.status, type.name, v.booking.slot_start), { status: mine.status, when: humanSlot(v.booking.slot_start) || v.booking.slot_start, service: type.name });
+    return json({ error: 'slot_taken', message: 'Sorry — that time was just taken. Please pick another.' }, 409, cors);
+  }
   if (!ins.ok || !rows(ins)[0]) return json({ error: 'write_failed', message: 'That didn’t go through — please try again.' }, 502, cors);
   const appt = rows(ins)[0];
 
@@ -250,10 +256,27 @@ export async function handleBookingCreate(req: Request, siteId: string, cors: Re
   notifyOwnerOfBooking(siteId, appt, status).catch(() => {});
 
   const when = humanSlot(v.booking.slot_start) || v.booking.slot_start;
-  const msg = status === 'confirmed'
-    ? `You’re booked for ${type.name} — ${when}. A confirmation is on its way.`
-    : `Thanks — your ${type.name} request for ${when} was received. You’ll get a note once it’s confirmed.`;
-  return calmOk(msg, { status, when, service: type.name });
+  return calmOk(bookedMessage(status, type.name, v.booking.slot_start), { status, when, service: type.name });
+}
+
+function bookedMessage(status: string, service: string, slotLocal: string): string {
+  const when = humanSlot(slotLocal) || slotLocal;
+  return status === 'confirmed'
+    ? `You’re booked for ${service} — ${when}. A confirmation is on its way.`
+    : `Thanks — your ${service} request for ${when} was received. You’ll get a note once it’s confirmed.`;
+}
+
+/** Item 131: the widget gives up after 15 seconds with no answer and invites another try,
+ *  and a slow answer may still have booked the first. The same person (email or phone) on
+ *  the same service and time in the last ten minutes is that booking, so they hear it went
+ *  through, not that their own time "was just taken". Nothing is sent twice. */
+export const REBOOK_WINDOW_MIN = 10;
+async function sameBookingAgain(siteId: string, b: { type_id: string; slot_start: string; email: string; phone: string }): Promise<{ status: string } | null> {
+  const since = new Date(Date.now() - REBOOK_WINDOW_MIN * 60_000).toISOString();
+  const digits = (x: unknown) => String(x ?? '').replace(/\D/g, '');
+  const found = rows(await svc(`presence_appointments?site_id=eq.${siteId}&slot_start_local=eq.${encodeURIComponent(b.slot_start)}&type_id=eq.${b.type_id}&status=in.(pending,confirmed)&created_at=gte.${since}&select=status,customer_email,customer_phone&limit=5`));
+  const hit = found.find((a) => (b.email && String(a.customer_email || '').toLowerCase() === b.email) || (b.phone && digits(b.phone).length >= 7 && digits(a.customer_phone) === digits(b.phone)));
+  return hit ? { status: String(hit.status) } : null;
 }
 
 async function notifyCustomer(siteId: string, appt: any, status: string): Promise<void> {

@@ -20,7 +20,8 @@
 // The route groups most requests never reach load on first use (lib/lazy.ts):
 // a cold start evaluates the boundary and the everyday routes, not every file.
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
-import { corsFor } from '../_shared/cors.ts';
+import { corsFor, visitorCors } from '../_shared/cors.ts';
+import { VISITOR_ROUTE } from './lib/site_send.ts';
 import { json } from '../_shared/http.ts';
 import { noteDraftBefore, withDraftVersion } from './lib/optimistic_lock.ts';
 import { resolvePrincipal } from '../_shared/auth.ts';
@@ -50,7 +51,7 @@ const { handleLaunchList, handleLaunchCreate, handleLaunchGet, handleLaunchRecap
 import { handleMediaUpload, handleMediaUpdate, handleMediaDelete } from './routes/media.ts';
 import { handleAssetsList, handleAssetsCollections, handleAssetsHealth, handleAssetsBulk, handleAssetsMatch, handleAssetsFolderMove, handleAssetUpdate, handleAssetStatus, handleAssetDelete, handleAssetDetail, handleAssetDownload, handleAssetReplace, handleAssetRollback, handleAssetDuplicate, handleAssetSuggest, handleAssetSocial, handleAssetCards, handleAssetRemoveBackground, handleAssetCutout, handleCutoutJob } from './routes/assets.ts';
 const { handleVisualKinds, handleVisualGenerate, handleVisualList, handleVisualGet, handleVisualVary, handleVisualEdit, handleVisualDecide } = lazyRoutes(() => import('./routes/visual.ts'));
-const { handleAdmin, handleDomain, handleDomainLookup } = lazyRoutes(() => import('./routes/admin.ts'));
+const { handleAdmin, handleDomain, handleDomainLookup, handleDomainForward } = lazyRoutes(() => import('./routes/admin.ts'));
 import { handleCollection, handleLocation, handleSettings, handleBlockSuggestions, handlePageDuplicate, handlePageRefs, SPECS } from './routes/content.ts';
 import { handleDeletedPages, handleDeletedPageRestore } from './routes/deleted_pages.ts';
 import { handlePageLockCreate, handlePageLockList } from './routes/page_locks.ts';
@@ -110,7 +111,8 @@ function routeOf(url: string): string {
 }
 
 serve(async (req) => {
-  const cors = corsFor(req);
+  // item 131: a client's site calls its routes from its own address (see visitorCors)
+  const cors = VISITOR_ROUTE.test(routeOf(req.url)) ? visitorCors() : corsFor(req);
   if (req.method === 'OPTIONS') return new Response('ok', { headers: cors });
   try {
     return await withDraftVersion(req, await route_(req, cors));   // a write that moves the draft names the version it left
@@ -1155,6 +1157,7 @@ async function route_(req: Request, cors: Record<string, string>): Promise<Respo
   // core (attach → SSL → live DNS status). Reviewer boundary above already blocks
   // client_reviewers; a site owner or an operator scoped into the client reaches it.
   if (route === '/foundations/domain/lookup' && method === 'GET') return handleDomainLookup(req, site, cors);   // item 162: steps for their provider as they type
+  if (route === '/foundations/domain/forward' && (method === 'POST' || method === 'DELETE')) return handleDomainForward(req, method, site, principal, cors);   // item 174: another domain sends visitors here
   if (route === '/foundations/domain' && (method === 'GET' || method === 'POST' || method === 'DELETE')) {
     const r = await handleDomain(req, method, site, principal, cors);
     return r || json({ error: 'method_not_allowed' }, 405, cors);

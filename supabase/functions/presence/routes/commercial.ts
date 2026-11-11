@@ -92,19 +92,32 @@ export async function handleScheduleCancel(site: SiteRow, id: string, principal:
 /** PUBLIC — a visitor on the customer's published site submits a form. Handled
  *  before the auth gate; resolves the site by id. Honeypot marks spam silently. */
 export async function handleFormSubmit(req: Request, siteId: string, cors: Record<string, string>) {
-  const ok200 = (msg: string) => json({ data: { ok: true, message: msg } }, 200, cors); // always 200 to bots
+  const ok200 = (msg: string, extra: Record<string, unknown> = {}) => json({ data: { ok: true, message: msg, ...extra } }, 200, cors); // always 200 to bots
   if (!/^[0-9a-f-]{36}$/.test(siteId)) return json({ error: 'not_found' }, 404, cors);
-
-  // Phase S / FD-M2: throttle the public submit — per-IP and per-site fixed windows.
-  // A bot that ignores the honeypot is still capped; a real visitor is nowhere near it.
-  const rlIp = clientIp(req);
-  if (!(await rateAllow(`forms:ip:${rlIp}`, 10, 60)) || !(await rateAllow(`forms:site:${siteId}`, 60, 60))) return tooMany(cors);
 
   // Phase V FD-N1: the published template posts a plain HTML form (urlencoded).
   // Accept both encodings; browser form posts get a 303 redirect to the site's
   // rendered thank-you page (works with no JS) instead of raw JSON.
+  // Item 131: the page's own sender (lib/site_send.ts) posts the same form but asks
+  // for an answer it can show in the page (Accept: application/json), so only a
+  // plain post, with scripts off, is sent on to a page.
   const ctype = (req.headers.get('content-type') || '').toLowerCase();
   const isFormPost = ctype.includes('application/x-www-form-urlencoded') || ctype.includes('multipart/form-data');
+  const toPage = isFormPost && !(req.headers.get('accept') || '').toLowerCase().includes('application/json');
+
+  // Phase S / FD-M2: throttle the public submit — per-IP and per-site fixed windows.
+  // A bot that ignores the honeypot is still capped; a real visitor is nowhere near it.
+  // Item 131: a plain post over the limit lands on the site's "didn't send" page, not
+  // on the server's raw answer at its own address.
+  const rlIp = clientIp(req);
+  if (!(await rateAllow(`forms:ip:${rlIp}`, 10, 60)) || !(await rateAllow(`forms:site:${siteId}`, 60, 60))) {
+    if (toPage) {
+      const s = await svc(`presence_sites?id=eq.${siteId}&select=id,client_id,custom_domain,netlify_site_id&limit=1`);
+      const origin = s.json?.[0] ? siteAddress(s.json[0]) : '';
+      if (origin) return new Response(null, { status: 303, headers: { ...cors, Location: `${origin}/not-sent/#ns-try_again` } });
+    }
+    return tooMany(cors);
+  }
   let b: any = {};
   let rawMap: Record<string, string | string[]> = {};   // FB: full field map (keeps multi-value checkboxes)
   if (isFormPost) {
@@ -150,48 +163,67 @@ export async function handleFormSubmit(req: Request, siteId: string, cors: Recor
       if (def) break;
     }
     if (!def) {   // unknown form — treat as a plain contact fallback (never leak internals)
-      if (isFormPost && siteOrigin) return redirectTo('/contact/');
+      if (toPage && siteOrigin) return redirectTo('/contact/');
       return json({ error: 'not_found', message: 'That form is no longer available.' }, 404, cors);
     }
     const spam = !!String((rawMap as any)?._hp ?? b?._hp ?? '').slice(0, 100).trim();
     const fv = validateFormValues(def, rawMap as any);
     if (!fv.ok) {
-      if (isFormPost && siteOrigin) return await notSent(fv.error);
+      if (toPage && siteOrigin) return await notSent(fv.error);
       return json({ error: fv.error, field: fv.field, message: fv.error === 'need_contact' ? 'Leave an email or phone so they can reply.' : (fv.error === 'empty' ? 'Please fill in the form.' : fv.error) }, 400, cors);
     }
     const ipHash2 = await hashIp(req);
     const src = String((rawMap as any)?.source_page ?? '').slice(0, 300);
+    // item 131: a send that already arrived (a retry after no answer, a double tap) isn't stored twice
+    if (!spam && await alreadyArrived(siteId, fv.sub)) return toPage && siteOrigin ? redirectTo(def.redirect_url || '/thanks/') : ok200(def.confirmation_text || FORM_THANKS, def.redirect_url ? { redirect: def.redirect_url } : {});
     const ins2 = await svc('presence_form_submissions', {
       method: 'POST', headers: { Prefer: 'return=minimal' },
       body: JSON.stringify({ site_id: siteId, form_kind: def.kind, name: fv.sub.name, email: fv.sub.email, phone: fv.sub.phone, message: fv.sub.message, fields: fv.sub.values, source_page: src, spam, ip_hash: ipHash2 }),
     });
     if (!ins2.ok) {
-      if (isFormPost && siteOrigin) return await notSent('try_again');
+      if (toPage && siteOrigin) return await notSent('try_again');
       return json({ error: 'write_failed', message: 'That didn’t send — please try again.' }, 502, cors);
     }
     if (!spam) { notifyOwnerOfLead(siteId, { form_kind: def.kind, name: fv.sub.name, email: fv.sub.email, phone: fv.sub.phone, message: fv.sub.message }).catch(() => {}); acknowledgeEnquiry(siteId, { name: fv.sub.name, email: fv.sub.email }).catch(() => {}); }
-    if (isFormPost && siteOrigin) return redirectTo(def.redirect_url || '/thanks/');
-    return ok200(def.confirmation_text || 'Thanks — your message was sent.');
+    if (toPage && siteOrigin) return redirectTo(def.redirect_url || '/thanks/');
+    // the page's sender goes on to the owner's own thank-you address when the form has one
+    return ok200(def.confirmation_text || FORM_THANKS, def.redirect_url ? { redirect: def.redirect_url } : {});
   }
 
   const v = validateSubmission(b);
   if (!v.ok) {
-    if (isFormPost && siteOrigin) return await notSent(v.error);   // browser `required` makes this rare
+    if (toPage && siteOrigin) return await notSent(v.error);   // browser `required` makes this rare
     return json({ error: v.error, message: v.error === 'bad_email' ? 'That email doesn’t look right.' : v.error === 'need_contact' ? 'Leave an email or phone so they can reply.' : 'Add a short message.' }, 400, cors);
   }
   const ipHash = await hashIp(req);
 
+  if (!v.spam && await alreadyArrived(siteId, v.sub)) return toPage && siteOrigin ? redirectTo('/thanks/') : ok200(FORM_THANKS);
   const ins = await svc('presence_form_submissions', {
     method: 'POST', headers: { Prefer: 'return=minimal' },
     body: JSON.stringify({ site_id: siteId, form_kind: v.sub.form_kind, name: v.sub.name, email: v.sub.email, phone: v.sub.phone, message: v.sub.message, fields: v.sub.fields, source_page: v.sub.source_page, spam: v.spam, ip_hash: ipHash }),
   });
   if (!ins.ok) {
-    if (isFormPost && siteOrigin) return await notSent('try_again');
+    if (toPage && siteOrigin) return await notSent('try_again');
     return json({ error: 'write_failed', message: 'That didn’t send — please try again.' }, 502, cors);
   }
   if (!v.spam) { notifyOwnerOfLead(siteId, v.sub).catch(() => {}); acknowledgeEnquiry(siteId, v.sub).catch(() => {}); } // best-effort, non-blocking
-  if (isFormPost && siteOrigin) return redirectTo('/thanks/');       // spam included — bots see success
-  return ok200('Thanks — your message was sent.');
+  if (toPage && siteOrigin) return redirectTo('/thanks/');       // spam included — bots see success
+  return ok200(FORM_THANKS);
+}
+
+/** What the page's sender shows where the contact form was (the thank-you page's words). */
+export const FORM_THANKS = 'Thank you, your message was sent. We’ll get back to you soon.';
+
+/** Item 131: the same words from the same person to the same site in the last ten
+ *  minutes already arrived. The page's sender gives up after 15 seconds with no answer
+ *  and invites a second try, and a slow answer may still have stored the first. */
+export const RESEND_WINDOW_MIN = 10;
+async function alreadyArrived(siteId: string, sub: { email: string; phone: string; message: string }): Promise<boolean> {
+  const who = sub.email ? `email=eq.${encodeURIComponent(sub.email)}` : (sub.phone ? `phone=eq.${encodeURIComponent(sub.phone)}` : '');
+  if (!who || !sub.message) return false;
+  const since = new Date(Date.now() - RESEND_WINDOW_MIN * 60_000).toISOString();
+  const r = await svc(`presence_form_submissions?site_id=eq.${siteId}&${who}&created_at=gte.${since}&select=message&order=created_at.desc&limit=5`);
+  return Array.isArray(r.json) && r.json.some((row: any) => String(row?.message ?? '') === sub.message);
 }
 
 /** The Enquiries queue answers the newest FORM_INBOX_PAGE; `more` says it was cut (bug hunt C15). */
