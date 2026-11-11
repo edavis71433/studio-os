@@ -28,7 +28,7 @@ import { SIGNUP_CONSENT } from '../lib/site_send.ts';
 import { validateFormValues, type FormDefinition } from '../lib/forms.ts';
 import { notSentReason } from '../lib/legal_pages.ts';
 import { enquiryState, customerEmails } from '../lib/enquiry_state.ts';
-import { normEmail, emailMatch } from '../lib/contact_email.ts';
+import { normEmail, emailMatch, isUniqueViolation } from '../lib/contact_email.ts';
 import { leadVisit } from '../lib/visit_source.ts';   // item 89
 import { judgeSend, issueTicket, TICKET_MIN_AGE_S, markSender, spamLinkToken, readSpamLinkToken, SPAM_REASONS } from '../lib/form_check.ts';
 
@@ -237,26 +237,26 @@ export async function handleFormSubmit(req: Request, siteId: string, cors: Recor
 // unsubscribe: the one suppression list still decides who gets mail.
 export const JOINED = 'You’re on the list. Thank you!';
 async function joinList(siteId: string, raw: Record<string, unknown>): Promise<{ ok: true } | { ok: false; error: string; field?: string; message: string }> {
-  const typed = String(raw.email ?? '').trim().slice(0, 254);
-  const email = typed.toLowerCase();
+  const email = normEmail(raw.email).slice(0, 254);
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return { ok: false, error: 'bad_email', field: 'email', message: 'That email doesn’t look right.' };
   if (String(raw.consent ?? '') !== 'yes') return { ok: false, error: 'consent', field: 'consent', message: 'Tick the box to say yes to emails.' };
   const trap = !!String(raw._hp ?? '').slice(0, 100).trim();
   if (await judgeSend(siteId, { trap, ticket: raw._tk, email, name: '', message: '' })) return { ok: true };
   const page = String(raw.source_page ?? '').replace(/[^\w\-./]/g, '').slice(0, 200) || '/';
   const patch = { subscribed_at: new Date().toISOString(), subscribed_note: `Joined on ${page}: “${SIGNUP_CONSENT}”` };
-  // the contact, in either spelling the address may have been saved in
-  const forms = [...new Set([email, typed])].map((e) => `email.eq."${e.replace(/"/g, '')}"`).join(',');
-  const found = await svc(`presence_contacts?site_id=eq.${siteId}&deleted_at=is.null&or=(${encodeURIComponent(forms)})&select=id,subscribed_at&limit=1`);
+  // the contact whatever capitals it was saved with, matched the way the database's
+  // one-contact-per-email rule matches (sales item 110, lib/contact_email.ts)
+  const lookup = `presence_contacts?site_id=eq.${siteId}&deleted_at=is.null&${emailMatch(email)}&select=id,subscribed_at&limit=1`;
+  const found = await svc(lookup);
   if (!found.ok) return { ok: false, error: 'write_failed', message: 'That didn’t go through. Please try again in a minute.' };
   let row = Array.isArray(found.json) ? found.json[0] : null;
   if (!row) {
     const ins = await svc('presence_contacts', { method: 'POST', headers: { Prefer: 'return=representation' }, body: JSON.stringify({ site_id: siteId, email, name: '', ...patch }) });
     if (ins.ok && ins.json?.[0]) return { ok: true };
-    if (ins.status !== 409) return { ok: false, error: 'write_failed', message: 'That didn’t go through. Please try again in a minute.' };
-    // saved already in another mix of capitals: the unique index matched it, so find it the long way
-    const all = await svc(`presence_contacts?site_id=eq.${siteId}&deleted_at=is.null&select=id,email,subscribed_at&limit=5000`);
-    row = (Array.isArray(all.json) ? all.json : []).find((c: any) => String(c.email || '').toLowerCase() === email) || null;
+    if (!isUniqueViolation(ins)) return { ok: false, error: 'write_failed', message: 'That didn’t go through. Please try again in a minute.' };
+    // the same person joined from another tab a moment before: theirs is the row to mark
+    const again = await svc(lookup);
+    row = Array.isArray(again.json) ? again.json[0] : null;
     if (!row) return { ok: false, error: 'write_failed', message: 'That didn’t go through. Please try again in a minute.' };
   }
   if (row.subscribed_at) return { ok: true };   // on the list already

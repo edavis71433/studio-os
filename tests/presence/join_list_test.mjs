@@ -17,11 +17,14 @@ const OTHER = '5e000000-0000-4000-8000-000000000002';
 Deno.env.set('APPROVAL_SECRET', 'test-approval-secret');
 const db = installFakePostgrest();
 const fake = globalThis.fetch;
-let clashWith = null;   // the database's unique rule on lower(email), which the fake can't express
+let otherTab = null;   // the same person's other tab saves them just before this insert; the database's unique rule refuses it
 globalThis.fetch = async (url, init = {}) => {
   const u = String(url);
   if (u.includes('/rest/v1/rpc/rate_hit')) return new Response('true', { status: 200, headers: { 'Content-Type': 'application/json' } });
-  if (clashWith && (init.method || 'GET') === 'POST' && u.includes('/rest/v1/presence_contacts') && JSON.parse(String(init.body)).email === clashWith) return new Response(JSON.stringify({ code: '23505' }), { status: 409, headers: { 'Content-Type': 'application/json' } });
+  if (otherTab && (init.method || 'GET') === 'POST' && u.includes('/rest/v1/presence_contacts') && JSON.parse(String(init.body)).email === otherTab.email) {
+    db.tables.presence_contacts.push(otherTab); otherTab = null;
+    return new Response(JSON.stringify({ code: '23505' }), { status: 409, headers: { 'Content-Type': 'application/json' } });
+  }
   return fake(url, init);
 };
 
@@ -89,10 +92,12 @@ const body = async (r) => { try { return await r.json(); } catch { return null; 
   await join({ email: 'pat@customer.example', consent: 'yes' });
   ok('someone already in the contacts joins the list, keeping their name', contacts().length === 1 && contacts()[0].name === 'Pat Lee' && !!contacts()[0].subscribed_at);
   seed([{ id: 'c-2', site_id: SID, name: 'Dana', email: 'Dana@Customer.Example', phone: '', subscribed_at: null, subscribed_note: '', deleted_at: null }]);
-  clashWith = 'dana@customer.example';
   const r = await body(await join({ email: 'dana@customer.example', consent: 'yes' }));
-  clashWith = null;
-  ok('…saved with other capitals: found the long way, and marked', r?.data?.ok === true && contacts().length === 1 && !!contacts()[0].subscribed_at && contacts()[0].name === 'Dana');
+  ok('…saved with other capitals: found all the same (sales item 110’s match), and marked', r?.data?.ok === true && contacts().length === 1 && !!contacts()[0].subscribed_at && contacts()[0].name === 'Dana');
+  seed();
+  otherTab = { id: 'c-3', site_id: SID, name: '', email: 'lee@customer.example', phone: '', subscribed_at: null, subscribed_note: '', deleted_at: null };
+  const r2 = await body(await join({ email: 'lee@customer.example', consent: 'yes' }));
+  ok('…joining from two tabs at once: the row the other tab saved is the one marked', r2?.data?.ok === true && otherTab === null && contacts().length === 1 && contacts()[0].id === 'c-3' && !!contacts()[0].subscribed_at, JSON.stringify(contacts()));
 }
 {
   seed();
