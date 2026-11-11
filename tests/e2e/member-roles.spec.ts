@@ -330,6 +330,8 @@ test.describe('The builder', () => {
       await expectControls(page, p, [
         ['#view-bookings .bk-enabled', 'configure'],
         ['#view-bookings .bk-closed', 'configure'],
+        ['#view-bookings #bkCalUrl', 'configure'],        // builder list item 149: the owner's own calendar
+        ['#view-bookings #bkSelfManage', 'configure'],    // …and whether customers change or cancel themselves
         ['#view-bookings button:has-text("Remove")', 'delete'],
       ]);
       await expect(page.locator('#view-bookings button:has-text("Edit")').first()).toBeVisible();

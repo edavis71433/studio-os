@@ -17,6 +17,8 @@ export const RESERVED_NAMES = {
   monthlyReport: '__monthly_report__',    // builder list item 58: the client's monthly report email (on, the studio's line, last month sent) (ops/monthly_report.ts)
   formCheck: '__form_check__',           // builder list item 140: since when the site's pages ask for a time ticket (lib/form_check.ts)
   spamSenders: '__spam_senders__',        // builder list item 140: hashes of the addresses the owner marked as spam (lib/form_check.ts)
+  bookingOptions: '__booking_options__',  // builder list item 149: customers may change or cancel; the owner's own calendar's private address (lib/booking_links.ts)
+  bookingBusy: '__booking_busy__',        // builder list item 149: the busy times last read from that calendar, and how the last read went (routes/booking.ts)
 } as const;
 
 const rowsOf = (r: { json?: unknown }) => (Array.isArray((r as any).json) ? (r as any).json : []) as any[];

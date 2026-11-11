@@ -39,6 +39,7 @@ import { raiseNotice, clearNotice, dealFollowupPeriod, leadFollowupPeriod, notic
 import { summarizePipeline } from '../lib/sales_lifecycle.ts';
 import { agreementRenewalWindow, agreementRenewalPeriod, agreementRenewalCopy } from './retainers.ts';
 import { planReminder, noShowNudgeDue, humanSlot, priceText, REMINDER_DAY_HRS } from '../lib/booking.ts';
+import { bookingMail, bookingBits } from '../lib/booking_links.ts';
 
 export type LifecycleKind = 'trial_ending' | 'trial_ended' | 'payment_trouble' | 'account_lapsed' | 'search_setup' | 'winddown_reminder' | 'win_back' | 'welcome_back';
 
@@ -1048,9 +1049,9 @@ export async function runBookingReminders(limit = 50): Promise<{ reminded: numbe
   const now = Date.now();
   const nowIso = new Date(now).toISOString();
   const horizon = new Date(now + REMINDER_DAY_HRS * 3600_000).toISOString();
-  const q = await svc(`presence_appointments?status=eq.confirmed&slot_start=gt.${encodeURIComponent(nowIso)}&slot_start=lte.${encodeURIComponent(horizon)}&select=id,site_id,type_name,slot_start,slot_start_local,price_cents,customer_name,customer_email&order=slot_start.asc&limit=${limit}`);
+  const q = await svc(`presence_appointments?status=eq.confirmed&slot_start=gt.${encodeURIComponent(nowIso)}&slot_start=lte.${encodeURIComponent(horizon)}&select=id,site_id,type_name,slot_start,slot_end,slot_start_local,duration_min,status,updated_at,price_cents,customer_name,customer_email&order=slot_start.asc&limit=${limit}`);
   if (!q.ok) return { reminded: 0 };                          // pre-0099 → clean no-op
-  const appts = (Array.isArray(q.json) ? q.json : []) as Array<{ id: string; site_id: string; type_name?: string; slot_start: string; slot_start_local?: string; price_cents?: number | null; customer_name?: string; customer_email?: string }>;
+  const appts = (Array.isArray(q.json) ? q.json : []) as Array<{ id: string; site_id: string; type_name?: string; slot_start: string; slot_end?: string; slot_start_local?: string; duration_min?: number; status?: string; updated_at?: string; price_cents?: number | null; customer_name?: string; customer_email?: string }>;
   if (!appts.length) return { reminded: 0 };
   // Pre-fetch which bands are already sent (the notice ledger), like invoiceReminders.
   const periods = appts.flatMap((a) => [`"remind:${a.id}:day_before"`, `"remind:${a.id}:same_day"`]).join(',');
@@ -1058,6 +1059,7 @@ export async function runBookingReminders(limit = 50): Promise<{ reminded: numbe
   const done = new Set(((seen.json as Array<{ period: string }>) || []).map((r) => r.period));
   const clientCache = new Map<string, string>();
   const replyToCache = new Map<string, Promise<string>>();   // item 72: the owner's address, read once per site
+  const bitsCache = new Map<string, ReturnType<typeof bookingBits>>();   // item 149: the business's name, address and choices, once per site too
   const esc = (s: unknown) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c] as string));
   let reminded = 0;
   for (const a of appts) {
@@ -1095,8 +1097,11 @@ export async function runBookingReminders(limit = 50): Promise<{ reminded: numbe
     try {
       let ownerAddress = replyToCache.get(a.site_id);   // started here, read alongside the two below
       if (!ownerAddress) { ownerAddress = ownerReplyTo(a.site_id); replyToCache.set(a.site_id, ownerAddress); }
-      const ident = (await svc(`presence_identity?site_id=eq.${a.site_id}&select=business_name&limit=1`)).json?.[0];
-      const biz = ident?.business_name || 'the team';
+      // item 149: the calendar links, the change-or-cancel link while it's still allowed, and the file
+      let bits = bitsCache.get(a.site_id);
+      if (!bits) { bits = bookingBits(a.site_id); bitsCache.set(a.site_id, bits); }
+      const mail = await bookingMail(a, now, bits);
+      const biz = mail.biz.name || 'the team';
       const brand = await loadEmailBrand(a.site_id);
       const when = humanSlot(String(a.slot_start_local || '')) || String(a.slot_start_local || '');
       const price = priceText(a.price_cents);
@@ -1109,11 +1114,11 @@ export async function runBookingReminders(limit = 50): Promise<{ reminded: numbe
         `<tr><td style="padding:2px 12px 2px 0;color:#666">When</td><td><b>${esc(when)}</b></td></tr>` +
         (price ? `<tr><td style="padding:2px 12px 2px 0;color:#666">Price</td><td>${esc(price)}</td></tr>` : '') +
         `</table>` +
-        `<p style="color:#666;font-size:.9rem">Need to change or cancel? Just reply to this email.</p>`;
+        mail.html;
       // Transactional (the customer's own booking) → critical:true; suppression is
       // enforced inside sendEmail (opt-out survived, bounce/complaint respected).
       // "Just reply" reaches the business, not the platform (item 72).
-      await sendEmail(to, `Reminder — ${a.type_name} ${when ? `(${when})` : ''}`.trim(), body, brand, { critical: true, replyTo: await ownerAddress });
+      await sendEmail(to, `Reminder — ${a.type_name} ${when ? `(${when})` : ''}`.trim(), body, brand, { critical: true, replyTo: await ownerAddress, attachments: mail.attachments });
       reminded++;
     } catch { /* the ledger row already marks this band sent — never re-send */ }
   }

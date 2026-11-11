@@ -189,7 +189,7 @@ export function htmlToPlainText(html: string | null | undefined): string {
     .trim();
 }
 
-export async function sendEmail(to: string, subject: string, html: string, brand?: EmailBrand, opts?: { critical?: boolean; siteId?: string; replyTo?: string; headers?: Record<string, string> }): Promise<boolean> {
+export async function sendEmail(to: string, subject: string, html: string, brand?: EmailBrand, opts?: { critical?: boolean; siteId?: string; replyTo?: string; headers?: Record<string, string>; attachments?: Array<{ filename: string; content: string }> }): Promise<boolean> {
   if (!RESEND_KEY) { console.warn('[commerce] RESEND_KEY unset — skipping email'); return false; }
   try {
     // Honor the suppression list at the ONE send point. critical:true =
@@ -230,6 +230,8 @@ export async function sendEmail(to: string, subject: string, html: string, brand
           'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click',
           ...(opts?.headers || {}),
         },
+        // builder list item 149: a booking's calendar file (base64), the one attachment sent
+        ...(opts?.attachments?.length ? { attachments: opts.attachments } : {}),
       }),
     });
     // Log failures (mirrors clever-api) so a Resend outage isn't invisible.

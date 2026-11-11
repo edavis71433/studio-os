@@ -4125,6 +4125,9 @@ function renderBookings(wrap, appts) {
   acWrap.append(ac, el("span", null, "Confirm bookings automatically (otherwise they wait for your OK)"));
   c2.appendChild(acWrap);
   c2.dataset.needs = "configure"; wrap.appendChild(c2);
+  // Builder list item 149: your own calendar's busy times, and customers changing or canceling (booking-extras.js)
+  loadBookingExtras().then((m) => m.mount(c2, { settings: s, save: (body) => api("PUT", "/bookings/settings", body), card: bkCard, toast, nice })
+    .forEach((c) => { c.dataset.needs = "configure"; })).catch(() => {});
   // Saved as you go, like everything else: the two settings cards, not the services below.
   let bkSaved = JSON.stringify(bkGatherSettings(wrap));
   const bkSave = () => debounce("bk-settings", async () => {
@@ -4152,6 +4155,18 @@ function renderBookings(wrap, appts) {
   appts.forEach((a) => alist.appendChild(bkApptRow(a)));
   c4.appendChild(alist);
   wrap.appendChild(c4);
+}
+// Bump ?v= whenever booking-extras.js changes: browsers keep a .js file for a day.
+let BOOKING_EXTRAS = null;
+function loadBookingExtras() {
+  if (window.DDSBookingExtras) return Promise.resolve(window.DDSBookingExtras);
+  if (!BOOKING_EXTRAS) BOOKING_EXTRAS = new Promise((res, rej) => {
+    const s = document.createElement("script"); s.src = "/booking-extras.js?v=1";
+    s.onload = () => window.DDSBookingExtras ? res(window.DDSBookingExtras) : rej(new Error("missing"));
+    s.onerror = () => rej(new Error("load"));
+    document.head.appendChild(s);
+  }).catch((e) => { BOOKING_EXTRAS = null; throw e; });
+  return BOOKING_EXTRAS;
 }
 function bkServiceRow(t) {
   const row = el("div"); row.style.cssText = "display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:10px 12px;border:1px solid var(--line,#eee);border-radius:10px" + (t.active === false ? ";opacity:.55" : "");

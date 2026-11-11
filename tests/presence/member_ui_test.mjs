@@ -137,7 +137,8 @@ const SOURCE = Object.fromEntries(PAGES.map((p) => [p, read(p)]));
       if (!known(page).some((k) => k.includes(call))) ok(`${page}: this configure write is listed`, false, call);
     }
   }
-  ok('tripwire: the configure scan found every call in the table', seen === 9, String(seen));
+  // builder list item 149: the Bookings view's own-calendar and change-or-cancel cards save through PUT /bookings/settings too
+  ok('tripwire: the configure scan found every call in the table', seen === 10, String(seen));
 }
 
 // ═══ 4. settings: one row, two kinds of field ═══
