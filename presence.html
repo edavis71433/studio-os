@@ -281,7 +281,7 @@ h1.doc{font-family:var(--serif);font-weight:500;font-size:24px;letter-spacing:-.
 .pg-gear:hover{color:var(--ink);border-color:var(--ink-3)}
 .pg-dropline{height:2px;margin:-1px var(--dds-s3,12px);background:var(--plum);border-radius:2px;position:relative;z-index:6}
 .pg-empty{padding:var(--dds-s4,16px);color:var(--ink-3);font-size:13px}
-#pageSettings,#linkSettings{z-index:2147483200}  /* the Pages tab keeps the shell on screen, so these sit over it */
+#pageSettings,#linkSettings,#folderSettings{z-index:2147483200}  /* the Pages tab keeps the shell on screen, so these sit over it */
 .pg-settings .field{margin-bottom:var(--dds-s4,16px)}
 .pg-settings>.hint{font-size:12px;color:var(--ink-2);margin-bottom:var(--dds-s2,8px)}
 .pg-h{font-size:13px;font-weight:600;margin:var(--dds-s5,20px) 0 var(--dds-s2,8px);padding-top:var(--dds-s4,16px);border-top:1px solid var(--hair)}
@@ -387,6 +387,10 @@ html.dc-edit:not(.plan-watch) #pcBody{padding:0 20px 20px}
 .pc-h[hidden]{display:none}
 .pc-link{padding:4px 8px;margin:-4px -8px -4px 0;border:0;border-radius:8px;background:none;color:var(--plum);font:600 12px/1.2 var(--sans);letter-spacing:0;text-transform:none;cursor:pointer}
 .pc-link:hover{background:var(--plum-soft)}
+.pc-hacts{display:flex;align-items:center;gap:2px}
+.pc-row[data-page="folder"] .ic{background:var(--plum-soft);color:var(--plum)}
+.pc-row.pg-slot,.pg-row.pg-slot{justify-content:center;min-height:44px;padding:8px 12px;border:1.5px dashed var(--hair-2);background:transparent;color:var(--ink-3);cursor:default}
+.pg-slot .pp-name{font-size:12.5px;font-weight:500;line-height:1.35;text-align:center;white-space:normal}
 .pc-list{display:flex;flex-direction:column;gap:8px;margin:0 0 18px}
 .pc-list[hidden]{display:none}
 .pc-row{position:relative;display:flex;align-items:center;gap:4px;min-height:56px;box-sizing:border-box;padding:6px 4px 6px 2px;border:1px solid var(--hair);border-radius:14px;background:var(--sheet);cursor:pointer}
@@ -1479,7 +1483,7 @@ body.pd-dragging *{cursor:grabbing !important}
         <h1 class="doc" role="heading" aria-level="2">Pages</h1>
         <p class="docsub">Drag a page to change its place in your site’s top menu. Pages under Not linked stay live, but aren’t in the menu.</p>
         <section class="hb-sec" id="pagesSec" aria-labelledby="pagesH" tabindex="-1">
-          <div class="hb-sec-h"><h2 id="pagesH">Main navigation</h2><span class="pg-adds"><button type="button" class="quietact" id="btnPagesAddLink">＋ Add a link</button><button type="button" class="quietact" id="btnPagesAdd">＋ Add a page</button></span></div>
+          <div class="hb-sec-h"><h2 id="pagesH">Main navigation</h2><span class="pg-adds"><button type="button" class="quietact" id="btnPagesAddFolder">＋ Add a folder</button><button type="button" class="quietact" id="btnPagesAddLink">＋ Add a link</button><button type="button" class="quietact" id="btnPagesAdd">＋ Add a page</button></span></div>
           <div class="hb-list pg-list" id="pagesList"></div>
         </section>
         <section class="hb-sec" id="pagesOffSec" aria-labelledby="pagesOffH">
@@ -1786,7 +1790,7 @@ body.pd-dragging *{cursor:grabbing !important}
               <div id="pcList">
                 <div class="tray-searchwrap pc-findwrap"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg><input type="search" id="pcFind" class="pc-find" placeholder="Find a page" aria-label="Find a page" autocomplete="off"></div>
                 <div id="pagesBar" class="pc-lists">
-                  <div class="pc-h"><span id="pcMenuH">Main menu · drag to reorder</span><button type="button" class="pc-link" id="btnPcLink" title="Add a link to another website, an email address or a phone number">＋ Link</button></div>
+                  <div class="pc-h"><span id="pcMenuH">Main menu · drag to reorder</span><span class="pc-hacts"><button type="button" class="pc-link" id="btnPcFolder" title="Add a menu heading that opens a list of pages">＋ Folder</button><button type="button" class="pc-link" id="btnPcLink" title="Add a link to another website, an email address or a phone number">＋ Link</button></span></div>
                   <div class="pc-list" id="pcMenu" role="list" aria-labelledby="pcMenuH"></div>
                   <div class="pc-h" id="pcOffH">Not in the menu</div>
                   <div class="pc-list pc-drop" id="pcOff" role="list" aria-labelledby="pcOffH"></div>
@@ -4874,7 +4878,7 @@ function pgLift(m, e) {
 // and an item with its own dropdown stays on the top level.
 function pgLand(m, item, before) {
   if (before && before.parent) {
-    if ((item.children || []).length) { m.nav.splice(m.nav.indexOf(before.parent) + 1, 0, item); return true; }
+    if ((item.children || []).length || item.folder) { m.nav.splice(m.nav.indexOf(before.parent) + 1, 0, item); return true; }
     if (before.parent.children.length >= PG_KIDS_MAX) { toast("A dropdown holds " + PG_KIDS_MAX + " links.", true); return false; }
     before.parent.children.splice(before.parent.children.indexOf(before.it), 0, item); return true;
   }
@@ -4925,6 +4929,12 @@ async function pgMoveNow(ref, zone, beforeRef, focus) {
   if (zone === "off" && !e.it) { renderPagesList(); return; }   // it's already off the menu
   const was = JSON.stringify(m.nav), before = beforeRef ? pgEntry(m, beforeRef) : null;
   const item = pgLift(m, e);
+  // item 48: dropped on an empty folder's "Drag a page here" row
+  const into = beforeRef && beforeRef.href === PG_SLOT ? m.nav.find((x) => x.folder && x.href === beforeRef.parent) : null;
+  if (zone !== "off" && into && !item.folder && !(item.children || []).length) {
+    into.children = (into.children || []).concat([item]);
+    return pgWriteMenu(m.nav, "In the “" + into.label + "” folder now. Publish to apply.", focus ? { href: ref.href, parent: into.href } : null);
+  }
   if (zone === "off") {
     (item.children || []).forEach((k) => m.nav.push(k));
     return pgWriteMenu(m.nav, "Off the menu. It stays live on your site. Publish to apply.", focus ? ref : null);
@@ -4949,19 +4959,20 @@ function pgNudge(ref, dir) {
 }
 const PG_GRIP = '<svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" fill="currentColor"><circle cx="9" cy="6" r="1.6"/><circle cx="15" cy="6" r="1.6"/><circle cx="9" cy="12" r="1.6"/><circle cx="15" cy="12" r="1.6"/><circle cx="9" cy="18" r="1.6"/><circle cx="15" cy="18" r="1.6"/></svg>';
 const PG_GEAR = '<svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h10M18 7h2M4 17h2M10 17h10"/><circle cx="16" cy="7" r="2"/><circle cx="8" cy="17" r="2"/></svg>';
+const PG_FOLDER = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>';
 const PG_LINK = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 14a4 4 0 0 0 6 .4l3-3a4 4 0 0 0-5.7-5.7l-1.1 1.1"/><path d="M14 10a4 4 0 0 0-6-.4l-3 3a4 4 0 0 0 5.7 5.7l1.1-1.1"/></svg>';
 function pgRow(entry, ctx) {
-  const pg = entry.pg, it = entry.it, name = it ? it.label : pg.title;
+  const pg = entry.pg, it = entry.it, name = it ? it.label : pg.title, folder = !pg && !!(it && it.folder);
   const ref = { href: it ? it.href : pg.path, parent: entry.parent ? entry.parent.href : null };
-  const row = el("div", "hb-row pg-row" + (entry.parent ? " child" : "")); row.dataset.page = pg ? pg.key : "link"; row.dataset.href = ref.href;
+  const row = el("div", "hb-row pg-row" + (entry.parent ? " child" : "")); row.dataset.page = pg ? pg.key : folder ? "folder" : "link"; row.dataset.href = ref.href;
   if (ref.parent) row.dataset.parent = ref.parent;
   const grab = el("button", "pg-grab"); grab.type = "button"; grab.innerHTML = PG_GRIP; grab.title = "Drag to move";
   grab.setAttribute("aria-label", "Move " + name + ". Use the up and down arrow keys.");
   grab.addEventListener("pointerdown", (e) => pgDragStart(e, row, ref, !pg || (it && (it.children || []).length > 0)));
   grab.addEventListener("keydown", (e) => { if (e.key === "ArrowUp" || e.key === "ArrowDown") { e.preventDefault(); pgNudge(ref, e.key === "ArrowUp" ? -1 : 1); } });
   row.appendChild(grab);
-  const ic = el("span", "ic"); ic.innerHTML = pg ? (HB_ICON[pg.icon] || HB_ICON.page) : PG_LINK; row.appendChild(ic);
-  const t = el("div", "t"); t.appendChild(el("b", null, name)); t.appendChild(el("span", null, pg ? pg.sum : it.href)); row.appendChild(t);
+  const ic = el("span", "ic"); ic.innerHTML = pg ? (HB_ICON[pg.icon] || HB_ICON.page) : folder ? PG_FOLDER : PG_LINK; row.appendChild(ic);
+  const t = el("div", "t"); t.appendChild(el("b", null, name)); t.appendChild(el("span", null, pg ? pg.sum : folder ? pgFolderSub(it) : it.href)); row.appendChild(t);
   if (pg) row.appendChild(hbPageChip(pg, ctx.changes, ctx.live, ctx.firstPublish));
   const acts = el("div", "acts");
   if (pg) {
@@ -4970,7 +4981,7 @@ function pgRow(entry, ctx) {
     acts.appendChild(edit);
   }
   const gear = el("button", "pg-gear"); gear.type = "button"; gear.innerHTML = PG_GEAR; gear.title = "Settings"; gear.setAttribute("aria-label", "Settings for " + name);
-  gear.addEventListener("click", () => { if (pg) pgOpenSettings(ref); else pgOpenLink(ref); });
+  gear.addEventListener("click", () => { if (pg) pgOpenSettings(ref); else if (folder) pgOpenFolder(ref); else pgOpenLink(ref); });
   acts.appendChild(gear); row.appendChild(acts);
   return row;
 }
@@ -4986,7 +4997,7 @@ function renderPagesList() {
   renderPagesCard(m, ctx);
   const list = $("pagesList"), off = $("pagesUnlinked"); if (!list || !off) return;
   list.innerHTML = ""; off.innerHTML = "";
-  m.menu.forEach((e) => list.appendChild(pgRow(e, ctx)));
+  m.menu.forEach((e) => { list.appendChild(pgRow(e, ctx)); if (pgFolderEmpty(e)) list.appendChild(pgSlot(e.it, "hb-row pg-row")); });
   m.unlinked.forEach((pg) => off.appendChild(pgRow({ it: null, pg, parent: null }, ctx)));
   if (!m.unlinked.length) off.appendChild(el("div", "pg-empty", "Drag a page here to take it off the menu. It stays live on your site."));
   const auto = $("btnNavAuto"); if (auto) auto.hidden = !pgHasCustomNav();
@@ -5017,12 +5028,12 @@ function pcChip(pg, ctx) {
   return chip;
 }
 function pcRow(entry, ctx) {
-  const pg = entry.pg, it = entry.it;
+  const pg = entry.pg, it = entry.it, folder = !pg && !!(it && it.folder);
   const ref = { href: it ? it.href : pg.path, parent: entry.parent ? entry.parent.href : null };
   const canvas = !!pg && pg.view === "design", slug = canvas ? (pg.slug || "") : null, on = canvas && slug === DC_PAGE;
   const name = canvas ? pg.title : it ? it.label : pg.title;   // a page on the canvas goes by its own name, as the old tabs did
   const row = el("div", "pc-row" + (canvas ? " page-pill" : "") + (on ? " on" : "") + (entry.parent ? " child" : ""));
-  row.setAttribute("role", "listitem"); row.dataset.href = ref.href; row.dataset.page = pg ? pg.key : "link";
+  row.setAttribute("role", "listitem"); row.dataset.href = ref.href; row.dataset.page = pg ? pg.key : folder ? "folder" : "link";
   if (ref.parent) row.dataset.parent = ref.parent;
   const own = slug ? dcPageObj(slug) : null; if (own && own.hideNav) row.dataset.nav = "hidden";
   const grab = el("button", "pg-grab"); grab.type = "button"; grab.innerHTML = PG_GRIP; grab.title = "Drag to move";
@@ -5030,13 +5041,13 @@ function pcRow(entry, ctx) {
   grab.addEventListener("pointerdown", (e) => pgDragStart(e, row, ref, !pg || (it && (it.children || []).length > 0)));
   grab.addEventListener("keydown", (e) => { if (e.key === "ArrowUp" || e.key === "ArrowDown") { e.preventDefault(); pgNudge(ref, e.key === "ArrowUp" ? -1 : 1); } });
   row.appendChild(grab);
-  const ic = el("span", "ic"); ic.innerHTML = pg ? (HB_ICON[pg.icon] || HB_ICON.page) : PG_LINK; row.appendChild(ic);
+  const ic = el("span", "ic"); ic.innerHTML = pg ? (HB_ICON[pg.icon] || HB_ICON.page) : folder ? PG_FOLDER : PG_LINK; row.appendChild(ic);
   const open = el("button", "pc-open"); open.type = "button";
   open.appendChild(el("span", "pp-name", name));
-  const sub = on ? "Editing now" : !pg ? it.href : canvas && it && it.label !== pg.title ? "In the menu as “" + it.label + "”" : pg.sum;
+  const sub = on ? "Editing now" : folder ? pgFolderSub(it) : !pg ? it.href : canvas && it && it.label !== pg.title ? "In the menu as “" + it.label + "”" : pg.sum;
   open.appendChild(el("span", "pc-sub", sub));
   if (on) open.setAttribute("aria-current", "page");
-  open.title = canvas ? "Edit this page" : pg ? "This page’s settings" : "This link’s settings";
+  open.title = canvas ? "Edit this page" : pg ? "This page’s settings" : folder ? "This folder’s settings" : "This link’s settings";
   row.appendChild(open);
   const chip = pg ? pcChip(pg, ctx) : null; if (chip) row.appendChild(chip);
   const gear = el("button", "pc-ico pg-gear"); gear.type = "button"; gear.innerHTML = PG_GEAR; gear.title = "Settings"; gear.setAttribute("aria-label", "Settings for " + name);
@@ -5050,7 +5061,7 @@ function pcRow(entry, ctx) {
   // the whole row is the target, as the old tab was: a press anywhere but its own buttons opens it
   row.addEventListener("click", (e) => {
     if (e.target.closest(".pg-grab,.pp-menu")) return;
-    if (e.target.closest(".pg-gear") || !canvas) { if (pg) pgOpenSettings(ref); else pgOpenLink(ref); return; }
+    if (e.target.closest(".pg-gear") || !canvas) { if (pg) pgOpenSettings(ref); else if (folder) pgOpenFolder(ref); else pgOpenLink(ref); return; }
     closePagesCard(false); dcSwitchPage(slug);
   });
   return row;
@@ -5068,13 +5079,13 @@ function renderPagesCard(m, ctx) {
     if (r.classList.contains("page-pill")) { if (tabs.has(e.pg.key)) r.classList.remove("page-pill", "on"); tabs.add(e.pg.key); }
     host.appendChild(r);
   };
-  m.menu.forEach((e) => add(menu, e));
+  m.menu.forEach((e) => { add(menu, e); if (pgFolderEmpty(e)) menu.appendChild(pgSlot(e.it, "pc-row")); });
   const opens = new Map(); m.unlinked.forEach((pg) => opens.set(pg.path, pg));   // the page an address opens is the last named (pgModel's byHref)
   m.unlinked.forEach((pg) => { if (opens.get(pg.path) === pg) add(off, { it: null, pg, parent: null }); });
   if (!m.unlinked.length) off.appendChild(el("div", "pc-empty", "Drag a page here to take it off the menu. It stays live.")).setAttribute("role", "listitem");
   const auto = $("btnPcAuto"); if (auto) auto.hidden = !pgHasCustomNav();
-  const n = hbPageRows().length, links = m.menu.filter((e) => !e.pg).length;
-  const sub = $("pagesSub"); if (sub) { sub.textContent = n + " pages" + (links ? " · " + links + (links === 1 ? " link" : " links") : ""); sub.hidden = false; }
+  const n = hbPageRows().length, links = m.menu.filter((e) => !e.pg && !e.it.folder).length, folders = m.menu.filter((e) => e.it && e.it.folder).length;
+  const sub = $("pagesSub"); if (sub) { sub.textContent = n + " pages" + (folders ? " · " + folders + (folders === 1 ? " folder" : " folders") : "") + (links ? " · " + links + (links === 1 ? " link" : " links") : ""); sub.hidden = false; }
   pcFilter();
 }
 // Find a page: rows whose name has the words stay; a heading with none under it goes
@@ -5273,7 +5284,7 @@ function pgOpenSettings(startRef) {
       if (!(e.it.children || []).length) {
         const under = pgUnderSelect(m, e);
         under.addEventListener("change", async () => { const to = await pgSetUnder(ref, under.value); if (to) ref = to; paint(); });
-        box.appendChild(pgField("Show under", under, "Pick a menu item to make this a link in its dropdown."));
+        box.appendChild(pgField("Show under", under, "Pick a menu item or folder to put this page in its dropdown."));
       }
     }
     if (inCard && pg.view !== "design") {   // the template's own page: its words are kept on another tab
@@ -5376,6 +5387,83 @@ function pgOpenLink(startRef) {
       rm.addEventListener("click", async () => { close(); await pgSetInMenu(ref, false); });
       const done = el("button", "dc-modal-cancel pg-done", "Done"); done.type = "button"; done.addEventListener("click", close);
       foot.append(rm, done);
+    }
+    box.appendChild(foot);
+  };
+  paint();
+  pgFocusFirst(box);
+}
+// ── Item 48, second half: folders in the menu ──
+// A folder is a menu heading with no page of its own; its dropdown lists the pages put in it.
+// It lives in the custom menu as { label, href: "#f-…", folder: true, children }: the href only
+// names it here, and the server draws a folder from its pages and leaves an empty one out. It
+// stays on the top level, never inside another dropdown. Removing one keeps its pages: they
+// take its place at the top of the menu.
+const PG_SLOT = "#end";   // the "Drag a page here" row under an empty folder
+function pgFolderEmpty(e) { return !!(e.it && e.it.folder && !e.parent && !(e.it.children || []).length); }
+function pgFolderSub(it) { const n = (it.children || []).length; return n ? "Folder · " + n + (n === 1 ? " page" : " pages") : "Empty folder"; }
+function pgSlot(it, cls) {
+  const r = el("div", cls + " child pg-slot"); r.setAttribute("role", "listitem");
+  r.dataset.href = PG_SLOT; r.dataset.parent = it.href;
+  r.appendChild(el("span", "pp-name", "Drag a page here, or pick “" + it.label + "” under Show under in a page’s settings"));
+  return r;
+}
+function pgOpenFolder(startRef) {
+  const { box, close } = pgHost("folderSettings", startRef ? "Folder settings" : "Add a folder");
+  const ref = startRef ? { href: startRef.href, parent: null } : null;
+  const paint = () => {
+    const m = pgModel(), e = ref ? pgEntry(m, ref) : null;
+    if (ref && (!e || !e.it || !e.it.folder)) { close(); return; }
+    box.textContent = "";
+    box.appendChild(el("h3", "dc-modal-h", e ? e.it.label + " folder" : "Add a folder"));
+    if (!e) box.appendChild(el("p", "dc-modal-sub", "A menu heading that opens a list of pages. It has no page of its own."));
+    const lab = pgInput(e ? e.it.label : "", 40, "e.g. Services");
+    box.appendChild(pgField("Name in the menu", lab, e ? null : "Then drag pages into it, or pick it under Show under in a page’s settings."));
+    const msg = el("div", "hint pg-err"); msg.hidden = true; msg.setAttribute("role", "alert"); box.appendChild(msg);
+    const bad = (t) => { msg.textContent = t; msg.hidden = false; };
+    const foot = el("div", "pg-foot");
+    if (!e) {
+      const add = el("button", "dc-modal-cancel pg-done", "Add to the menu"); add.type = "button";
+      const go = () => {
+        const label = lab.value.trim().slice(0, 40);
+        if (!label) return bad("Give it a name for the menu.");
+        pgTurn(async () => {
+          if (!(await dcSavePendingEdits())) return;
+          const fresh = pgModel();
+          if (fresh.nav.length >= PG_NAV_MAX) return bad("The menu holds " + PG_NAV_MAX + " items. Take one off first.");
+          fresh.nav.push({ label, href: "#f-" + Math.random().toString(36).slice(2, 8), folder: true });
+          if (await pgWriteMenu(fresh.nav, "Folder added. Drag pages into it.")) close();
+        });
+      };
+      add.addEventListener("click", go);
+      lab.addEventListener("keydown", (ev) => { if (ev.key === "Enter") { ev.preventDefault(); go(); } });
+      const cancel = el("button", "dc-modal-cancel", "Cancel"); cancel.type = "button"; cancel.addEventListener("click", close);
+      foot.append(cancel, add);
+    } else {
+      const kids = e.it.children || [];
+      const names = kids.map((k) => k.label);
+      box.appendChild(el("p", "pc-note", names.length ? seoList(names) + (names.length === 1 ? " is" : " are") + " in it." : "Nothing is in it yet. Drag pages into it, or pick it under Show under in a page’s settings."));
+      lab.addEventListener("change", () => {
+        const label = lab.value.trim().slice(0, 40); if (!label) { lab.value = e.it.label; return; }
+        pgTurn(async () => {
+          if (!(await dcSavePendingEdits())) return;
+          const fresh = pgModel(), cur = pgEntry(fresh, ref); if (!cur || cur.it.label === label) return;
+          cur.it.label = label;
+          if (await pgWriteMenu(fresh.nav, "Saved. Publish to apply.")) paint();
+        });
+      });
+      const rm = el("button", "dc-modal-cancel danger", "Remove folder"); rm.type = "button";
+      rm.addEventListener("click", () => {
+        pgTurn(async () => {
+          if (!(await dcSavePendingEdits())) return;
+          const fresh = pgModel(), cur = pgEntry(fresh, ref); if (!cur) return;
+          fresh.nav.splice(fresh.nav.indexOf(cur.it), 1, ...(cur.it.children || []));
+          if (await pgWriteMenu(fresh.nav, kids.length ? "Folder removed. Its pages are at the top of the menu now." : "Folder removed.")) close();
+        });
+      });
+      const done = el("button", "dc-modal-cancel pg-done", "Done"); done.type = "button"; done.addEventListener("click", close);
+      foot.append(rm, done);
+      box.appendChild(el("p", "hint", "Removing it keeps its pages: they move to the top of the menu."));
     }
     box.appendChild(foot);
   };
@@ -5618,6 +5706,7 @@ function closeTodoPanel() { const p = $("todoPanel"); if (p && p.classList.conta
   const tc = $("btnTodoClose"); if (tc) tc.addEventListener("click", closeTodoPanel);
   const add = $("btnPagesAdd"); if (add) add.addEventListener("click", () => { go("design"); setTimeout(() => dcAddPage(), 300); });
   const addLink = $("btnPagesAddLink"); if (addLink) addLink.addEventListener("click", () => pgOpenLink(null));
+  const addFolder = $("btnPagesAddFolder"); if (addFolder) addFolder.addEventListener("click", () => pgOpenFolder(null));
   const auto = $("btnNavAuto"); if (auto) auto.addEventListener("click", pgResetNav);
   document.addEventListener("keydown", (e) => { if (e.key === "Escape") closeTodoPanel(); });
   const frame = $("siteFrame");
@@ -8697,7 +8786,8 @@ async function dcChoosePageLayout(title) {
 function dcCleanNav(nav) {
   return Array.isArray(nav) ? nav.map((it) => {
     const o = { label: String(it.label || "").trim().slice(0, 40), href: String(it.href || "").trim() };
-    const kids = (Array.isArray(it.children) ? it.children : []).map((k) => ({ label: String(k.label || "").trim().slice(0, 40), href: String(k.href || "").trim() })).filter((k) => k.label && k.href).slice(0, 8);
+    if (it.folder === true) o.folder = true;   // item 48: a heading with no page; its href only names it here
+    const kids = (Array.isArray(it.children) ? it.children : []).map((k) => ({ label: String(k.label || "").trim().slice(0, 40), href: String(k.href || "").trim() })).filter((k) => k.label && k.href && !k.folder).slice(0, 8);
     if (kids.length) o.children = kids;
     return o;
   }).filter((it) => it.label && it.href).slice(0, 12) : [];
@@ -11477,7 +11567,7 @@ function openPagesCard(fromId) {
   // a press anywhere else puts it away; its menus and the dialogs they open don't count
   PAGES_DOWN = (e) => {
     if (c.contains(e.target)) return;
-    if (e.target.closest && e.target.closest("#dcPageSwitch,#dkPages,.pp-pop,.pi-pop,.dc-modal-scrim,.dc-modal,.ask,.scrim,dialog,#pageSettings,#linkSettings")) return;
+    if (e.target.closest && e.target.closest("#dcPageSwitch,#dkPages,.pp-pop,.pi-pop,.dc-modal-scrim,.dc-modal,.ask,.scrim,dialog,#pageSettings,#linkSettings,#folderSettings")) return;
     closePagesCard(false);
   };
   document.addEventListener("mousedown", PAGES_DOWN, true);
@@ -11633,7 +11723,7 @@ function closeDesignPanels() { closePagesCard(false); dcDockMore(false); closeTr
   // the floating studio: the page switcher, the dock, and the Pages card's own buttons
   on("dcPageSwitch", () => togglePagesCard("dcPageSwitch")); on("dkPages", () => togglePagesCard("dkPages")); on("btnPagesClose", () => closePagesCard(true));
   on("btnPageAdd", () => { closePagesCard(false); dcAddPage(); });   // the name and layout dialogs take over; the new page opens on the canvas
-  on("btnPcLink", () => pgOpenLink(null)); on("btnPcAuto", pgResetNav);
+  on("btnPcLink", () => pgOpenLink(null)); on("btnPcFolder", () => pgOpenFolder(null)); on("btnPcAuto", pgResetNav);
   on("pcBack", () => { if (PC_PANE) PC_PANE.close(); });
   on("pcHeadFoot", pcHeadFoot); on("pcNotFound", pcNotFound); on("pcSearchLook", pcSearchLook);
   const find = $("pcFind"); if (find) find.addEventListener("input", pcFilter);

@@ -23,8 +23,10 @@ export interface SiteConfig {
 
 /** One editable navigation entry. `href` is an internal path ("/", "/about/", a
  *  "/{slug}/" page) or a safe external URL; `children` (optional) is a single-level
- *  dropdown. Labels/hrefs are validated + capped by the serializer. */
-export interface NavItem { label: string; href: string; children?: Array<{ label: string; href: string }> }
+ *  dropdown. Labels/hrefs are validated + capped by the serializer. A `folder` (builder
+ *  list item 48) is a heading with no page of its own: its href is empty and it always
+ *  has children, which its dropdown lists. */
+export interface NavItem { label: string; href: string; folder?: true; children?: Array<{ label: string; href: string }> }
 
 export interface HoursInterval { open: string; close: string }
 export interface HoursDay { day: string; closed: boolean; intervals: HoursInterval[] }
