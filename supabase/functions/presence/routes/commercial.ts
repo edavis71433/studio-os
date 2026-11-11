@@ -10,6 +10,7 @@ import { siteOrigin as siteAddress } from '../lib/site.ts';
 import type { Principal } from '../../_shared/auth.ts';
 import { getTemplate } from '../lib/render.ts';
 import { serializeDraft } from '../lib/serializer.ts';
+import { insertSnapshot } from '../lib/draft_settings.ts';
 import { sendEmail } from '../commerce/account.ts';
 import { loadEmailBrand } from '../lib/email_brand.ts';
 import { ownerReplyTo } from '../lib/service_bridge.ts';
@@ -57,11 +58,8 @@ export async function handleScheduleCreate(req: Request, site: SiteRow, principa
     // publish: freeze the CURRENT draft into a snapshot now (WYSIWYG at schedule time)
     const t = getTemplate(site.template_slug, site.template_version);
     if (!t) return json({ error: 'template_missing', message: 'This site’s template isn’t available.' }, 500, cors);
-    const { snapshot, mediaManifest } = await serializeDraft(site.id, t.manifest, { templateSlug: site.template_slug, templateVersion: site.template_version, now });
-    const ins = await svc('presence_snapshots', {
-      method: 'POST', headers: { Prefer: 'return=representation' },
-      body: JSON.stringify({ site_id: site.id, content: snapshot.content, media_manifest: mediaManifest, content_contract_version: snapshot.content_contract_version, template_slug: snapshot.template_slug, template_version: snapshot.template_version, dev_customization: snapshot.dev_customization ?? null, created_by: principal.userId, created_by_kind: 'client' }),
-    });
+    const { snapshot, mediaManifest, draftSettings } = await serializeDraft(site.id, t.manifest, { templateSlug: site.template_slug, templateVersion: site.template_version, now });
+    const ins = await insertSnapshot({ site_id: site.id, content: snapshot.content, media_manifest: mediaManifest, content_contract_version: snapshot.content_contract_version, template_slug: snapshot.template_slug, template_version: snapshot.template_version, dev_customization: snapshot.dev_customization ?? null, created_by: principal.userId, created_by_kind: 'client' }, draftSettings);
     snapshotId = ins.json?.[0]?.id;
     if (!snapshotId) return json({ error: 'snapshot_failed', message: 'We couldn’t prepare that — please try again.' }, 502, cors);
     summary = String(b?.note || 'Scheduled publish');
