@@ -87,7 +87,7 @@ a{color:var(--plum);text-decoration:none}
 .findresults{position:absolute;top:calc(100% + 6px);left:0;right:0;min-width:300px;background:var(--sheet);border:1px solid var(--hair);border-radius:var(--r-lg);box-shadow:var(--dds-shadow-pop,0 8px 28px rgba(21,20,26,.12));max-height:60vh;overflow:auto;z-index:60;padding:6px}
 .findhit{display:block;width:100%;text-align:left;padding:var(--dds-s2,8px) var(--dds-s3,12px);border-radius:var(--r);background:none;border:0;cursor:pointer}
 .findhit:hover{background:var(--paper)}
-.findhit .fk{font-size:11px;color:var(--plum);font-weight:600;margin-right:var(--dds-s2,8px)}
+.findhit .fk{font-size:12px;color:var(--plum);font-weight:600;margin-right:var(--dds-s2,8px)}
 .findhit .ft{font-weight:600;color:var(--ink);font-size:13.5px}
 .findhit .fs{display:block;color:var(--ink-2);font-size:12px;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .findempty{padding:var(--dds-s3,12px);color:var(--ink-2);font-size:13px}
@@ -183,7 +183,7 @@ html.dds-side .dds-nav{flex:1 1 auto;min-height:0;overflow-y:auto;overflow-x:hid
 @media(min-width:761px){html.dds-side #dds-waffle{display:none}}
 html.dds-side .dds-nav .sec.has-site-menu > .it .car{display:none}
 .site-menu:not(.hb-tabs) .navitem{border-bottom:0}
-#sectionsNav .grp{font-size:10.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-3);padding:14px 0 2px}
+#sectionsNav .grp{font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-3);padding:14px 0 2px}
 #sectionsNav .navitem{text-align:left}
 /* the sub-view tab strip (#nav): the fallback when there is no sidebar to join */
 .hb-tabs{display:flex;gap:2px;border-bottom:1px solid var(--hair);margin:var(--dds-s5,20px) var(--dds-s7,32px) 0;max-width:var(--dds-w-app,1280px);overflow-x:auto;scrollbar-width:none}
@@ -251,7 +251,7 @@ button:disabled{opacity:.55;cursor:default}
 .hb-tasks{margin-top:var(--dds-s3,12px);display:flex;flex-direction:column}
 .hb-task{display:flex;align-items:flex-start;gap:var(--dds-s3,12px);padding:var(--dds-s2,8px) 0;border-top:1px solid var(--hair);text-align:left;width:100%;font:inherit;color:inherit}
 .hb-task:first-child{border-top:none}
-.hb-task .cb{width:16px;height:16px;border:1.5px solid var(--hair-2);border-radius:4px;flex:0 0 auto;background:var(--sheet);margin-top:2px;display:grid;place-items:center;color:var(--fill-ink);font-size:10px;line-height:1}
+.hb-task .cb{width:16px;height:16px;border:1.5px solid var(--hair-2);border-radius:4px;flex:0 0 auto;background:var(--sheet);margin-top:2px;display:grid;place-items:center;color:var(--fill-ink);font-size:12px;line-height:1}
 .hb-task.done .cb{background:var(--sage);border-color:var(--sage)}
 .hb-task .t{min-width:0}
 .hb-task .t b{font-weight:600;display:block}
@@ -328,7 +328,7 @@ html:not(.is-studio) #dcModeSeg [data-dcmode="timewarp"]{display:none}
 .biz-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(340px,100%),1fr));column-gap:var(--dds-s8,48px);align-items:start;max-width:1100px}
 .biz-col{min-width:0}
 .biz-col>h5.rune:first-child{margin-top:var(--dds-s2,8px)}
-.ver-live{display:inline-block;margin-left:var(--dds-s2,8px);padding:1px 8px;border-radius:999px;background:var(--hair);color:var(--ink-2);font-size:11px;font-weight:600;vertical-align:1px}
+.ver-live{display:inline-block;margin-left:var(--dds-s2,8px);padding:1px 8px;border-radius:999px;background:var(--hair);color:var(--ink-2);font-size:12px;font-weight:600;vertical-align:1px}
 .hcompare{flex-basis:100%;margin-top:var(--dds-s2,8px)}
 .ver-more{margin-top:var(--dds-s6,24px);border-top:1px solid var(--hair);padding-top:var(--dds-s4,16px)}
 /* item 125: a publish wears a filled dot, a saved checkpoint (never live) a hollow one */
@@ -353,7 +353,7 @@ h5.rune .whisper.ok{color:var(--sage)}
 .textact:hover{text-decoration:underline}
 .quietact{font-size:12.5px;color:var(--ink-2)}
 .quietact:hover{color:var(--ink)}
-.smalltag{font-size:11.5px;letter-spacing:0;text-transform:none;color:var(--amber-text);font-weight:600}
+.smalltag{font-size:12px;letter-spacing:0;text-transform:none;color:var(--amber-text);font-weight:600}
 
 /* the writing desk (M9.5A) — ✦ marks drafted words, per the AI language freeze */
 .deskopt{border:1px solid var(--hair);border-radius:var(--r-lg);background:var(--paper);padding:var(--dds-s4,16px) var(--dds-s4,16px);margin-bottom:10px}
@@ -423,17 +423,21 @@ html.dc-edit:not(.plan-watch) .dc-bar{position:absolute;top:var(--dc-bar-top);le
    icon, its name, what is waiting on it, a gear. A page drawn on the canvas also has ⋯. ── */
 .pc-add{flex:none;height:36px;margin-left:auto;padding:0 14px;border:0;border-radius:999px;background:var(--plum) var(--dds-grad-btn,linear-gradient(135deg,#6d3fd4 0%,#7a4bdd 100%));color:var(--dds-on-p,var(--fill-ink));font:600 13px/1 var(--sans);white-space:nowrap;cursor:pointer}
 .pc-add:hover{filter:brightness(1.06)}
+/* item 34: one main button at a time. With a page's settings (or any pane) open, its Done is the
+   main button, so + Add page steps back to a quiet one */
+#pagesCard.pane-open .pc-add{background:var(--dc-raised,var(--paper));color:var(--ink);box-shadow:none}
 .pc-add:focus-visible,.pc-open:focus-visible,.pc-ico:focus-visible,.pc-mrow:focus-visible,.pc-back:focus-visible,.pc-link:focus-visible,.pc-quiet:focus-visible,.pc-row .pg-grab:focus-visible{outline:2px solid var(--plum);outline-offset:2px}
 html.dc-edit:not(.plan-watch) #pcBody{padding:0 20px 20px}
 .pc-findwrap{margin:2px 0 16px}
 .pc-findwrap svg{fill:none;stroke:currentColor;stroke-width:1.75;stroke-linecap:round}
 .pc-find{width:100%;box-sizing:border-box;height:44px;margin:0;padding:0 14px 0 42px;border-radius:999px;border:1px solid var(--hair);background:var(--dc-raised,var(--paper));color:var(--ink);font:inherit;font-size:14px;-webkit-appearance:none;appearance:none}
 .pc-find:focus-visible{outline:2px solid var(--plum);outline-offset:0}
-.pc-h{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:0 0 10px;font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-3)}
+.pc-h{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:0 0 10px;font-size:12px;font-weight:600;letter-spacing:.02em;text-transform:uppercase;color:var(--ink-3)}
+.pc-hacts .pc-link{white-space:nowrap}   /* item 34: at 12px each button keeps its words on one line */
 .pc-h[hidden]{display:none}
 .pc-link{padding:4px 8px;margin:-4px -8px -4px 0;border:0;border-radius:8px;background:none;color:var(--plum);font:600 12px/1.2 var(--sans);letter-spacing:0;text-transform:none;cursor:pointer}
 .pc-link:hover{background:var(--plum-soft)}
-.pc-hacts{display:flex;align-items:center;gap:2px}
+.pc-hacts{display:flex;flex:none;align-items:center;gap:2px}
 .pc-row[data-page="folder"] .ic{background:var(--plum-soft);color:var(--plum)}
 .pc-row.pg-slot,.pg-row.pg-slot{justify-content:center;min-height:44px;padding:8px 12px;border:1.5px dashed var(--hair-2);background:transparent;color:var(--ink-3);cursor:default}
 .pg-slot .pp-name{font-size:12.5px;font-weight:500;line-height:1.35;text-align:center;white-space:normal}
@@ -453,7 +457,7 @@ html.dc-edit:not(.plan-watch) #pcBody{padding:0 20px 20px}
 .pc-open .pp-name{max-width:100%;font-size:14px;font-weight:600;line-height:1.25;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .pc-sub{max-width:100%;font-size:12px;line-height:1.3;color:var(--ink-2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .pc-row.on .pc-sub{color:var(--plum)}
-.pc-row .hb-chip{flex:none;gap:5px;margin-right:2px;padding:2px 8px;font-size:11.5px;font-weight:600}
+.pc-row .hb-chip{flex:none;gap:5px;margin-right:2px;padding:2px 8px;font-size:12px;font-weight:600}
 .pc-ico{flex:none;display:grid;place-items:center;width:28px;height:30px;padding:0;border:0;border-radius:999px;background:transparent;color:var(--ink-2);font:700 15px/1 var(--sans);cursor:pointer}
 .pc-ico:hover{background:var(--dc-raised,var(--paper));color:var(--ink)}
 .pc-row.on .pc-ico:hover{background:var(--sheet)}
@@ -507,7 +511,7 @@ html.dc-edit:not(.plan-watch) .dc-bar .dpdevseg button.on{background:var(--seg-c
 .dc-bar .pillbtn.inked:hover{filter:brightness(1.06)}
 /* ── the dock: a white card on the left, one icon and one word per tool ── */
 .dc-dock{position:absolute;left:16px;top:50%;transform:translateY(-50%);z-index:85;display:flex;flex-direction:column;align-items:center;gap:4px;padding:8px;background:var(--sheet);border:1px solid color-mix(in srgb,var(--hair) 55%,transparent);border-radius:18px;box-shadow:var(--dds-shadow-pop)}
-.dc-dk{width:56px;height:54px;padding:0;border:0;border-radius:var(--dds-r,12px);background:transparent;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;color:var(--ink-2);font:600 10px/1 var(--sans);cursor:pointer;white-space:nowrap}
+.dc-dk{width:56px;height:54px;padding:0;border:0;border-radius:var(--dds-r,12px);background:transparent;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;color:var(--ink-2);font:600 12px/1 var(--sans);cursor:pointer;white-space:nowrap}
 .dc-dk svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:1.75;stroke-linecap:round;stroke-linejoin:round}
 .dc-dk:hover{background:var(--dc-raised);color:var(--ink)}
 .dc-dk.on,.dc-dk[aria-expanded="true"]{background:var(--plum-soft);color:var(--plum)}
@@ -538,7 +542,7 @@ html.dc-edit:not(.plan-watch) .dc-twbar[hidden]{display:none}
 .hf-logo .lg{flex:none;width:44px;height:44px;box-sizing:border-box;border:1px solid var(--hair);border-radius:10px;background:var(--dc-raised,var(--paper)) center/cover no-repeat}
 .hf-logo p,.hf-says{flex:1;margin:0;font-size:12.5px;line-height:1.45;color:var(--ink-2)}
 .hf-tiles{display:grid;grid-template-columns:repeat(var(--n,2),minmax(0,1fr));gap:8px}
-.hf-tile{display:flex;flex-direction:column;align-items:center;gap:6px;min-width:0;padding:0;border:0;background:transparent;color:var(--ink-2);font:500 11.5px/1.25 var(--sans);text-align:center;cursor:pointer}
+.hf-tile{display:flex;flex-direction:column;align-items:center;gap:6px;min-width:0;padding:0;border:0;background:transparent;color:var(--ink-2);font:500 12px/1.25 var(--sans);text-align:center;cursor:pointer}
 .hf-pic{position:relative;display:block;width:100%;height:58px;box-sizing:border-box;border:1px solid var(--hair);border-radius:10px;background:var(--dc-raised,var(--paper));overflow:hidden}
 .hf-pic i{position:absolute;display:block;height:4px;border-radius:2px;background:var(--ink-3);opacity:.6}
 .hf-tile[aria-pressed=true]{color:var(--plum);font-weight:600}
@@ -629,7 +633,7 @@ html.dc-edit:not(.plan-watch) .dc-close{height:36px;padding:0 14px;font-size:13p
 .ins-tile-l{display:block;margin-top:6px;font-size:12px;font-weight:500;color:var(--ink-2)}
 /* items 49 and 118: a section's colour theme, each tile drawn in the site's own colours */
 .ins-themes{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px}
-.ins-theme{display:flex;flex-direction:column;align-items:center;gap:6px;min-width:0;padding:0;border:0;background:transparent;color:var(--ink-2);font:500 11.5px/1.2 var(--sans);cursor:pointer}
+.ins-theme{display:flex;flex-direction:column;align-items:center;gap:6px;min-width:0;padding:0;border:0;background:transparent;color:var(--ink-2);font:500 12px/1.2 var(--sans);cursor:pointer}
 .ins-theme-pic{display:flex;flex-direction:column;align-items:flex-start;justify-content:center;gap:5px;width:100%;height:60px;box-sizing:border-box;padding:10px 8px;border:1px solid var(--hair);border-radius:12px}
 .ins-theme-pic i{display:block;width:70%;height:5px;border-radius:2px}
 .ins-theme-pic i+i{width:90%;height:3px;opacity:.55}
@@ -731,9 +735,11 @@ html.dc-edit:not(.plan-watch) .pf-search{padding:0 20px 12px}
 html.dc-edit:not(.plan-watch) .pf-body{padding:0 20px 16px}
 html.dc-edit:not(.plan-watch) #panelFilesGrid{grid-template-columns:repeat(3,1fr);gap:8px;margin-top:0}
 html.dc-edit:not(.plan-watch) #panelFilesGrid .mcell{border:0;border-radius:10px;background:var(--dc-raised,var(--paper))}
-html.dc-edit:not(.plan-watch) #panelFilesGrid .mcell .alt{opacity:0;transition:opacity var(--dur) var(--ease);padding:16px 6px 6px;font-size:10px}
+html.dc-edit:not(.plan-watch) #panelFilesGrid .mcell .alt{opacity:0;transition:opacity var(--dur) var(--ease);padding:16px 6px 6px;font-size:12px}
 html.dc-edit:not(.plan-watch) #panelFilesGrid .mcell:hover .alt,html.dc-edit:not(.plan-watch) #panelFilesGrid .mcell:focus-visible .alt{opacity:1}
-html.dc-edit:not(.plan-watch) #panelFilesGrid .mcell .badge{left:6px;top:6px;background:var(--sage-soft);color:var(--sage);font-size:10.5px;font-weight:600;letter-spacing:0;text-transform:none;padding:3px 8px}
+html.dc-edit:not(.plan-watch) #panelFilesGrid .mcell .badge{left:6px;top:6px;background:var(--sage-soft);color:var(--sage);font-size:12px;font-weight:600;letter-spacing:0;text-transform:none;padding:3px 8px;transition:opacity var(--dur) var(--ease)}
+/* item 34: at 12px a photo's caption, which also says where it's at work, would run into the badge, so it takes the badge's place */
+html.dc-edit:not(.plan-watch) #panelFilesGrid .mcell:hover .badge,html.dc-edit:not(.plan-watch) #panelFilesGrid .mcell:focus-visible .badge{opacity:0}
 html.dc-edit:not(.plan-watch) #panelFilesGrid .medit{right:6px;top:6px;min-height:28px;min-width:28px;width:28px;padding:0;border-radius:999px;background:var(--sheet);color:var(--ink);box-shadow:var(--dds-shadow);display:inline-flex;align-items:center;justify-content:center;opacity:0}
 html.dc-edit:not(.plan-watch) #panelFilesGrid .mwrap:hover .medit,html.dc-edit:not(.plan-watch) #panelFilesGrid .medit:focus-visible{opacity:1}
 @media (pointer:coarse){html.dc-edit:not(.plan-watch) #panelFilesGrid .medit{opacity:1;min-height:32px;min-width:32px;width:32px}}
@@ -756,7 +762,7 @@ html.dc-edit:not(.plan-watch) #designTray .tray-item.has-shot{padding:0;border:0
 html.dc-edit:not(.plan-watch) #designTray .tray-item .ti-shot{border:1px solid var(--hair);border-radius:10px;background:var(--dc-raised,var(--paper));aspect-ratio:155/86}
 html.dc-edit:not(.plan-watch) #designTray .tray-item:hover .ti-shot{border-color:var(--plum)}
 html.dc-edit:not(.plan-watch) #designTray .tray-item .ti-name{font-size:12.5px;font-weight:600;color:var(--ink)}
-html.dc-edit:not(.plan-watch) #designTray .tray-item .ti-alias{font-size:11px;color:var(--ink-3)}
+html.dc-edit:not(.plan-watch) #designTray .tray-item .ti-alias{font-size:12px;color:var(--ink-3)}
 html.dc-edit:not(.plan-watch) #designTray .tray-item:not(.has-shot){padding:8px 10px;border:1px solid var(--hair);border-radius:10px}
 .tray-saved{display:flex;align-items:center;gap:8px;width:100%;margin-top:16px;padding:10px 12px;border:0;border-radius:12px;background:var(--plum-soft);color:var(--plum);font:600 13px/1.3 var(--sans);cursor:pointer;text-align:left}
 .tray-saved svg{width:16px;height:16px;flex:none}
@@ -768,7 +774,7 @@ html.dc-edit:not(.plan-watch) .ritualwrap.as-card{inset:auto;top:var(--dc-card-t
 html.dc-edit:not(.plan-watch) .ritualwrap.as-card .ritual{max-width:none;margin:0;padding:18px 20px 20px;position:relative}
 .ritualwrap.as-card .backline{margin:0;position:absolute;top:16px;right:16px}
 .ritualwrap.as-card #btnRitualBack{width:32px;height:32px;border-radius:999px;background:var(--dc-raised,var(--paper));color:var(--ink);font-size:0;display:inline-flex;align-items:center;justify-content:center}
-.ritualwrap.as-card #btnRitualBack::before{content:"✕";font-size:14px;line-height:1}
+.ritualwrap.as-card #btnRitualBack::before{content:"";width:16px;height:16px;background:currentColor;-webkit-mask:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round'><path d='M18 6L6 18M6 6l12 12'/></svg>") center/contain no-repeat;mask:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round'><path d='M18 6L6 18M6 6l12 12'/></svg>") center/contain no-repeat}   /* item 34: the editor's own x, not a typed one */
 .ritualwrap.as-card #btnRitualBack:hover{color:var(--plum)}
 .ritualwrap.as-card h1{font-size:22px;font-weight:600;margin:0 44px 2px 0;line-height:1.15}
 .ritualwrap.as-card .rsub{font-size:12.5px;margin-bottom:14px;max-width:none}
@@ -954,7 +960,7 @@ html.plan-watch .ss-bar,html.plan-watch [data-grp="Content"],html.plan-watch .na
 .sv-issue summary{cursor:pointer;font-size:13.5px;font-weight:500;display:flex;gap:var(--dds-s2,8px);align-items:baseline;justify-content:space-between}
 .sv-issue p{font-size:13px;color:var(--ink-2);margin:6px 0 0}
 .sv-issue p b{color:var(--ink);font-weight:600}
-.sv-pri{flex:0 0 auto;font-size:11.5px;font-weight:600;border-radius:999px;padding:1px var(--dds-s2,8px);background:var(--hair);color:var(--ink-2)}
+.sv-pri{flex:0 0 auto;font-size:12px;font-weight:600;border-radius:999px;padding:1px var(--dds-s2,8px);background:var(--hair);color:var(--ink-2)}
 .sv-pri.now{background:var(--clay-soft);color:var(--ink)}
 .sv-pri.soon{background:var(--amber-soft);color:var(--ink)}
 .sv-nums{display:flex;gap:var(--dds-s5,20px);flex-wrap:wrap;margin-bottom:var(--dds-s2,8px)}
@@ -980,7 +986,7 @@ html.plan-watch #svWords{display:none}
 .rtbtn:hover{background:var(--plum-soft);color:var(--plum);border-color:var(--plum-soft)}
 .rtbtn:active{background:var(--plum);color:var(--fill-ink,#fff);border-color:var(--plum)}
 .rtbtn .i{font-style:italic}.rtbtn .b{font-weight:800}
-.rthint{font-size:11.5px;color:var(--ink-2);margin:-2px 0 var(--dds-s2,8px)}
+.rthint{font-size:12px;color:var(--ink-2);margin:-2px 0 var(--dds-s2,8px)}
 .field input.mono{font-family:var(--mono);font-size:13.5px}
 
 /* hours */
@@ -1001,7 +1007,7 @@ html.plan-watch #svWords{display:none}
 .menuhead{display:flex;align-items:baseline;gap:var(--dds-s4,16px);margin:var(--dds-s8,40px) 0 var(--dds-s1,4px)}
 .menuhead:first-of-type{margin-top:var(--dds-s2,8px)}
 .menuhead h6{font-family:var(--serif);font-weight:500;font-size:18px}
-.menuhead .mv{font-size:11px;color:var(--ink-2)}
+.menuhead .mv{font-size:12px;color:var(--ink-2)}
 .menuhead .ctl{margin-left:auto;display:flex;gap:2px}
 .menuhead .ctl button{padding:1px var(--dds-s2,8px);color:var(--ink-2);border-radius:4px;font-size:13px}
 .menuhead .ctl button:hover:not(:disabled){background:var(--plum-soft);color:var(--ink)}
@@ -1047,11 +1053,11 @@ html.plan-watch #svWords{display:none}
 .mcell img{width:100%;height:100%;object-fit:cover;display:block}
 /* photo overlays sit ON photographs — they stay literal dark with literal light
    text, theme-independent (the §1.2 exception) */
-.mcell .badge{position:absolute;left:8px;top:8px;background:rgba(33,29,25,.82);color:#fff;font-size:9px;letter-spacing:.1em;text-transform:uppercase;font-weight:600;padding:var(--dds-s1,4px) var(--dds-s2,8px);border-radius:100px}
+.mcell .badge{position:absolute;left:8px;top:8px;background:rgba(33,29,25,.82);color:#fff;font-size:12px;letter-spacing:.1em;text-transform:uppercase;font-weight:600;padding:var(--dds-s1,4px) var(--dds-s2,8px);border-radius:100px}
 .mcell .del{position:absolute;right:8px;top:8px;background:rgba(33,29,25,.65);color:#fff;border-radius:50%;width:26px;height:26px;display:grid;place-items:center;opacity:0;transition:opacity var(--dur) var(--ease);font-size:12px}
 .mcell:hover .del,.mcell:focus-within .del{opacity:1}
-.mcell .alt{position:absolute;left:0;right:0;bottom:0;padding:var(--dds-s6,24px) var(--dds-s2,8px) var(--dds-s2,8px);font-size:11px;color:#fff;background:linear-gradient(transparent,rgba(33,29,25,.75))}
-.mcell .alt .usedline{display:block;font-size:9.5px;opacity:.8;font-style:italic}
+.mcell .alt{position:absolute;left:0;right:0;bottom:0;padding:var(--dds-s6,24px) var(--dds-s2,8px) var(--dds-s2,8px);font-size:12px;color:#fff;background:linear-gradient(transparent,rgba(33,29,25,.75))}
+.mcell .alt .usedline{display:block;font-size:12px;opacity:.8;font-style:italic}
 /* The picker's Edit (items 39 + 117): its own button beside the photo's, never inside
    it (a button can't hold another), over the photo's top right like .del */
 .mwrap{position:relative}
@@ -1067,7 +1073,7 @@ html.plan-watch #svWords{display:none}
 .flchip{font-size:12px;font-weight:550;padding:var(--dds-s1,4px) var(--dds-s3,12px);border-radius:100px;border:1px solid var(--hair);background:var(--sheet);color:var(--ink-2);transition:color var(--dur) var(--ease)}
 .flchip:hover{color:var(--ink)}
 .flchip.on{background:var(--plum-soft);border-color:var(--plum);color:var(--plum);font-weight:600}
-.flchip .n{margin-left:var(--dds-s1,4px);font-size:10.5px;opacity:.75;font-variant-numeric:tabular-nums}
+.flchip .n{margin-left:var(--dds-s1,4px);font-size:12px;opacity:.75;font-variant-numeric:tabular-nums}
 .flrow{display:flex;gap:var(--dds-s2,8px);align-items:center}
 .flrow input{flex:1;min-width:160px;padding:var(--dds-s2,8px) var(--dds-s3,12px);font:inherit;font-size:13px;border:1px solid var(--hair-2);border-radius:var(--dds-r,8px);background:var(--sheet);color:var(--ink)}
 .flrow select{padding:var(--dds-s2,8px) 10px;font:inherit;font-size:13px;border:1px solid var(--hair-2);border-radius:var(--dds-r,8px);background:var(--sheet);color:var(--ink);cursor:pointer}
@@ -1099,7 +1105,7 @@ html.plan-watch #svWords{display:none}
 /* the ritual's change journal (also the version tools) */
 .journal .jrow{display:flex;gap:var(--dds-s5,20px);padding:10px 0;border-bottom:1px solid var(--hair);font-size:13.5px}
 .journal .jrow:last-child{border-bottom:0}
-.journal .jsec{flex:none;width:92px;font-size:11.5px;color:var(--ink-3);font-weight:500;padding-top:2px}
+.journal .jsec{flex:none;width:92px;font-size:12px;color:var(--ink-3);font-weight:500;padding-top:2px}
 .journal .more{padding:var(--dds-s3,12px) 0 0;font-size:12.5px;color:var(--ink-2)}
 /* ── the publish ritual (full page overlay) ── */
 .ritualwrap{position:fixed;inset:0;background:var(--paper);z-index:90;display:none;overflow:auto}
@@ -1243,13 +1249,13 @@ html.dc-edit:not(.plan-watch) .scrim{z-index:96}
 .tg-shot{position:relative;height:300px;overflow:hidden;background:#f6f4fa;border-bottom:1px solid var(--hair)}
 .tg-shot .tg-pic{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:top;display:block}
 .tg-shot:has(.tg-pic){height:auto;aspect-ratio:640/440}   /* the picture's own shape: nothing cut off the side */
-.tg-shot .tg-badge{position:absolute;top:12px;left:12px;z-index:3;background:var(--plum,#5b3fa0);color:var(--fill-ink,#fff);font-size:11px;font-weight:600;padding:var(--dds-s1,4px) var(--dds-s3,12px);border-radius:999px;box-shadow:0 2px 8px rgba(0,0,0,.18)}
+.tg-shot .tg-badge{position:absolute;top:12px;left:12px;z-index:3;background:var(--plum,#5b3fa0);color:var(--fill-ink,#fff);font-size:12px;font-weight:600;padding:var(--dds-s1,4px) var(--dds-s3,12px);border-radius:999px;box-shadow:0 2px 8px rgba(0,0,0,.18)}
 /* on-brand DEMO silhouette — shown when the draft is still empty (a cold start has
    nothing real to render), so the card always shows a designed page, never a name
    on white. A representative sample only; switching template keeps your real words. */
 .tg-demo{position:absolute;inset:0;overflow:hidden;display:flex;flex-direction:column}
 .tg-demo .tgd-nav{display:flex;align-items:center;justify-content:space-between;padding:var(--dds-s4,16px) var(--dds-s6,24px);font-size:15px;font-weight:700}
-.tg-demo .tgd-nav .tgd-links{display:flex;gap:var(--dds-s3,12px);font-size:11px;font-weight:500;opacity:.7}
+.tg-demo .tgd-nav .tgd-links{display:flex;gap:var(--dds-s3,12px);font-size:12px;font-weight:500;opacity:.7}
 .tg-demo .tgd-hero{padding:var(--dds-s8,40px) var(--dds-s7,32px) 44px;display:flex;flex-direction:column;gap:var(--dds-s3,12px)}
 .tg-demo .tgd-h1{font-size:30px;font-weight:700;line-height:1.1;max-width:16ch}
 .tg-demo .tgd-line{height:8px;border-radius:var(--dds-r-sm,6px);opacity:.28;background:currentColor}
@@ -1260,7 +1266,7 @@ html.dc-edit:not(.plan-watch) .scrim{z-index:96}
 .tg-demo .tgd-split{display:grid;grid-template-columns:1fr 1fr;gap:var(--dds-s4,16px);padding:0 var(--dds-s7,32px) var(--dds-s7,32px);align-items:center}
 .tg-demo .tgd-img{border-radius:var(--dds-r-xl,14px);min-height:120px;background:rgba(0,0,0,.08)}
 .tg-demo .tgd-txt{display:flex;flex-direction:column;gap:var(--dds-s2,8px)}
-.tg-demo .tgd-foot{margin-top:auto;padding:var(--dds-s5,20px) var(--dds-s7,32px);font-size:11px;opacity:.6}
+.tg-demo .tgd-foot{margin-top:auto;padding:var(--dds-s5,20px) var(--dds-s7,32px);font-size:12px;opacity:.6}
 .tg-body{padding:var(--dds-s4,16px) var(--dds-s4,16px) var(--dds-s4,16px);display:flex;flex-direction:column;gap:var(--dds-s1,4px);flex:1}
 .tg-name{font-weight:600;font-size:16px}
 .tg-tag{font-size:12px;color:var(--ink-2,#8a8172)}
@@ -1284,7 +1290,7 @@ html.dc-edit:not(.plan-watch) .scrim{z-index:96}
 /* Slice B — the Page Information menu (#btnPageInfo → .pi-pop). Same pp-pop item
    idiom; ≤760px it presents as the bottom sheet the slide-over panels use. */
 .pi-pop{position:fixed;z-index:300;background:var(--sheet,#fff);border:1px solid var(--line,#ddd);border-radius:var(--dds-r-xl,14px);box-shadow:0 12px 34px color-mix(in srgb,var(--scrim-ink) 24%,transparent);padding:6px;display:flex;flex-direction:column;min-width:260px;max-width:92vw;max-height:min(72vh,600px);overflow:auto}
-.pi-pop .pi-prov{font-size:11.5px;color:var(--ink-2,#8a8172);line-height:1.5;padding:var(--dds-s2,8px) var(--dds-s3,12px);border-bottom:1px solid var(--hair,#eee);margin-bottom:var(--dds-s1,4px)}
+.pi-pop .pi-prov{font-size:12px;color:var(--ink-2,#8a8172);line-height:1.5;padding:var(--dds-s2,8px) var(--dds-s3,12px);border-bottom:1px solid var(--hair,#eee);margin-bottom:var(--dds-s1,4px)}
 .pi-pop .pi-grp{display:flex;flex-direction:column}
 .pi-pop .pi-grp .pp-pop-item{padding-left:var(--dds-s7,32px)}
 .pi-pop.sheet{top:auto;left:0;right:0;bottom:0;width:100%;max-width:100%;border-radius:var(--dds-r-xl,14px) var(--dds-r-xl,14px) 0 0;border:none;box-shadow:0 -8px 44px color-mix(in srgb,var(--scrim-ink) 30%,transparent);padding:10px 10px calc(14px + env(safe-area-inset-bottom,0px));max-height:82vh}
@@ -1339,14 +1345,14 @@ html.dc-edit:not(.plan-watch) .scrim{z-index:96}
 .tray-h{font-weight:600;font-size:13.5px;margin-bottom:var(--dds-s1,4px)}
 .tray-search{width:100%;box-sizing:border-box;padding:var(--dds-s2,8px) 10px;border:1px solid var(--line,#ddd);border-radius:var(--dds-r,8px);font:inherit;font-size:13px;margin:var(--dds-s2,8px) 0 var(--dds-s1,4px)}
 .tray-grp{margin-top:var(--dds-s3,12px)}
-.tray-grp-h{font-size:11px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--ink-2,#8a8172);margin:0 0 var(--dds-s1,4px)}
+.tray-grp-h{font-size:12px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--ink-2,#8a8172);margin:0 0 var(--dds-s1,4px)}
 .tray-item{display:flex;align-items:center;gap:var(--dds-s2,8px);width:100%;text-align:left;font:inherit;font-size:12.5px;padding:var(--dds-s2,8px) 10px;border-radius:var(--dds-r,8px);border:1px solid transparent;background:transparent;color:inherit;cursor:grab;margin-bottom:2px;touch-action:pan-y}
 .tray-item:hover{background:var(--wash,#faf9fb);border-color:var(--hair,#eee)}
 .tray-item:focus-visible{outline:2px solid var(--plum,#5b3fa0);outline-offset:1px}
 .tray-item .ti-ico{flex:0 0 auto;font-size:15px;width:20px;text-align:center}
 .tray-item .ti-txt{min-width:0}
 .tray-item .ti-name{display:block;font-weight:600;line-height:1.2}
-.tray-item .ti-alias{display:block;margin-top:2px;font-size:10.5px;color:var(--ink-2,#8a8172);line-height:1.2}
+.tray-item .ti-alias{display:block;margin-top:2px;font-size:12px;color:var(--ink-2,#8a8172);line-height:1.2}
 /* item 25: each section as a small picture of what it adds (thumbs/sections, scripts/thumbnails) */
 .tray-grp.shots{display:grid;grid-template-columns:1fr 1fr;gap:var(--dds-s2,8px)}
 .tray-grp.shots>.tray-grp-h{grid-column:1/-1}
@@ -1363,7 +1369,7 @@ html.dc-edit:not(.plan-watch) .scrim{z-index:96}
 .dc-tabpanel{flex:1;min-height:0;overflow:auto}
 /* the content tree — one row per component on the page, in render order */
 #designTreeList{padding:10px var(--dds-s3,12px) var(--dds-s6,24px);display:flex;flex-direction:column;gap:2px}
-.dc-tree-hd{font-size:11px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--ink-2,#8a8172);padding:var(--dds-s2,8px) var(--dds-s2,8px) 2px}
+.dc-tree-hd{font-size:12px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--ink-2,#8a8172);padding:var(--dds-s2,8px) var(--dds-s2,8px) 2px}
 .dc-tree-empty{font-size:12px;color:var(--ink-2);padding:var(--dds-s3,12px) 6px;line-height:1.6}
 .dc-tree-row{display:flex;align-items:center;gap:2px;border-radius:var(--dds-r,8px);padding:1px}
 .dc-tree-row:hover,.dc-tree-row.sel{background:var(--wash,#f4f0fb)}
@@ -1384,7 +1390,7 @@ html.dc-edit:not(.plan-watch) .scrim{z-index:96}
 .dc-tree-row.core .dc-tree-ico{background:var(--dds-warn-soft)}
 .dc-tree-txt{min-width:0}
 .dc-tree-name{display:block;font-weight:600;font-size:13px;line-height:1.25;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.dc-tree-meta{display:block;font-size:10px;color:var(--ink-2,#8a8172);line-height:1.3;text-transform:uppercase;letter-spacing:.03em}
+.dc-tree-meta{display:block;font-size:12px;color:var(--ink-2,#8a8172);line-height:1.3;text-transform:uppercase;letter-spacing:.03em}
 .dc-tree-acts{display:flex;gap:1px;flex:0 0 auto;opacity:0;transition:opacity var(--dds-t-fast,120ms) var(--dds-ease,ease-out)}
 .dc-tree-row:hover .dc-tree-acts,.dc-tree-row:focus-within .dc-tree-acts{opacity:1}
 .dc-tree-acts button{font:inherit;font-size:12px;width:27px;height:27px;border-radius:var(--dds-r,8px);border:1px solid transparent;background:none;color:var(--ink-2,#8a8172);cursor:pointer;display:flex;align-items:center;justify-content:center}
@@ -1395,7 +1401,7 @@ html.dc-edit:not(.plan-watch) .scrim{z-index:96}
 body.pd-dragging .dc-tree-main{cursor:grabbing}
 /* the ⠿ drag handle: touch drags start HERE (touch-action:none, like the canvas
    grip) so the row itself keeps pan-y and the tree still scrolls under a thumb */
-.dc-tree-grab{flex:0 0 auto;border:none;background:none;color:var(--soft,#a39cb2);font:inherit;font-size:11px;line-height:1;padding:var(--dds-s2,8px) 0 var(--dds-s2,8px) var(--dds-s2,8px);cursor:grab;touch-action:none;user-select:none}
+.dc-tree-grab{flex:0 0 auto;border:none;background:none;color:var(--soft,#a39cb2);font:inherit;font-size:12px;line-height:1;padding:var(--dds-s2,8px) 0 var(--dds-s2,8px) var(--dds-s2,8px);cursor:grab;touch-action:none;user-select:none}
 body.pd-dragging .dc-tree-grab{cursor:grabbing}
 
 /* Slice C — the Files tab (#tabFiles): a compact, panel-scoped asset browser.
@@ -1406,24 +1412,24 @@ body.pd-dragging .dc-tree-grab{cursor:grabbing}
 .pf-search{padding:0 var(--dds-s4,16px)}
 .pf-body{flex:1;min-height:0;overflow:auto;padding:0 var(--dds-s4,16px) 10px}
 #panelFilesGrid.mediagrid{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:var(--dds-s3,12px)}
-.pf-note{font-size:11.5px;color:var(--ink-2,#8a8172);line-height:1.5;margin-top:var(--dds-s2,8px)}
+.pf-note{font-size:12px;color:var(--ink-2,#8a8172);line-height:1.5;margin-top:var(--dds-s2,8px)}
 .pf-foot{flex:0 0 auto;border-top:1px solid var(--hair);padding:10px var(--dds-s4,16px);background:var(--sheet,#fff)}
 
 /* G11: per-section review comments — the toggle, the tray badges, the thread panel */
 .dc-actbtn.on{border-color:var(--plum,#5b3fa0);background:var(--wash,#f0eafb);color:var(--plum,#5b3fa0)}
-.cm-badge{flex:0 0 auto;font:inherit;font-size:11px;font-weight:700;min-width:22px;height:20px;padding:0 6px;border-radius:999px;border:1px solid var(--plum,#5b3fa0);background:var(--plum,#5b3fa0);color:var(--fill-ink,#fff);cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:2px}
+.cm-badge{flex:0 0 auto;font:inherit;font-size:12px;font-weight:700;min-width:22px;height:20px;padding:0 6px;border-radius:999px;border:1px solid var(--plum,#5b3fa0);background:var(--plum,#5b3fa0);color:var(--fill-ink,#fff);cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:2px}
 .cm-badge.zero{background:transparent;color:var(--ink-2,#8a8172);border-color:var(--line,#ddd);opacity:0;transition:opacity var(--dds-t-fast,120ms) var(--dds-ease,ease-out)}
 .dc-tree-row:hover .cm-badge.zero,.dc-tree-row:focus-within .cm-badge.zero{opacity:1}
 .cm-badge:hover{border-color:var(--plum,#5b3fa0);color:var(--fill-ink,#fff);background:var(--plum,#5b3fa0)}
 .cm-badge.zero:hover{color:var(--plum,#5b3fa0);background:var(--wash,#f4f0fb)}
 .cm-item{border:1px solid var(--hair,#e7e0f2);border-radius:var(--dds-r-lg,10px);padding:var(--dds-s2,8px) var(--dds-s3,12px);margin-top:var(--dds-s2,8px)}
 .cm-item.resolved{opacity:.62}
-.cm-who{display:flex;align-items:center;gap:var(--dds-s2,8px);font-size:11px;color:var(--ink-2,#8a8172);text-transform:uppercase;letter-spacing:.03em}
+.cm-who{display:flex;align-items:center;gap:var(--dds-s2,8px);font-size:12px;color:var(--ink-2,#8a8172);text-transform:uppercase;letter-spacing:.03em}
 .cm-who .cm-k{font-weight:800}
 .cm-who .cm-k.client{color:var(--plum,#5b3fa0)}
 .cm-body{font-size:13px;line-height:1.55;margin-top:var(--dds-s1,4px);white-space:pre-wrap;overflow-wrap:anywhere}
 .cm-itemacts{display:flex;gap:var(--dds-s2,8px);margin-top:6px}
-.cm-itemacts button{font:inherit;font-size:11.5px;color:var(--ink-2,#8a8172);background:none;border:none;cursor:pointer;padding:2px 0;text-decoration:underline}
+.cm-itemacts button{font:inherit;font-size:12px;color:var(--ink-2,#8a8172);background:none;border:none;cursor:pointer;padding:2px 0;text-decoration:underline}
 .cm-itemacts button:hover{color:var(--plum,#5b3fa0)}
 .cm-reply{width:100%;box-sizing:border-box;font:inherit;font-size:13px;border:1px solid var(--line,#ddd);border-radius:var(--dds-r,8px);padding:var(--dds-s2,8px);min-height:60px;resize:vertical;margin-top:10px}
 .cm-send{font:inherit;font-size:12.5px;font-weight:700;margin-top:6px;padding:var(--dds-s2,8px) var(--dds-s4,16px);border:none;border-radius:999px;background:var(--plum,#5b3fa0);color:var(--fill-ink,#fff);cursor:pointer}
@@ -1987,7 +1993,7 @@ body.pd-dragging *{cursor:grabbing !important}
           <!-- on-demand DESIGN SETTINGS (right slide-over with a scrim); cards mount
                into #designHost, id preserved -->
           <aside id="settingsPanel" class="dc-slideover dc-right" data-mode="styles" role="dialog" aria-modal="true" aria-label="Styles" aria-hidden="true">
-            <div class="dc-panel-head"><div class="dc-panel-tt"><span class="dc-panel-t" id="settingsTitle">Styles</span><span class="dc-panel-sub" id="settingsSub" hidden></span></div><button type="button" class="dc-close" id="btnSettingsClose" aria-label="Close">✕</button></div>
+            <div class="dc-panel-head"><div class="dc-panel-tt"><span class="dc-panel-t" id="settingsTitle">Styles</span><span class="dc-panel-sub" id="settingsSub" hidden></span></div><button type="button" class="dc-close" id="btnSettingsClose" aria-label="Close"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 6L6 18M6 6l12 12"/></svg></button></div>
             <!-- the floating studio, part two: one section's inspector has four tabs, and Styles has four of its own -->
             <div class="dc-seg" id="inspectorSeg" role="tablist" aria-label="What to change in this section" hidden>
               <button type="button" role="tab" data-itab="content" aria-selected="true">Content</button>
@@ -2016,7 +2022,7 @@ body.pd-dragging *{cursor:grabbing !important}
                same idiom as Design settings). Opened from a badge in the Content
                tree while the Comments toggle is on. -->
           <aside id="commentsPanel" class="dc-slideover dc-right" role="dialog" aria-modal="false" aria-label="Draft feedback" aria-hidden="true">
-            <div class="dc-panel-head"><span class="dc-panel-t" id="cmPanelTitle">Comments</span><button type="button" class="dc-close" id="btnCommentsClose" aria-label="Close">✕</button></div>
+            <div class="dc-panel-head"><span class="dc-panel-t" id="cmPanelTitle">Comments</span><button type="button" class="dc-close" id="btnCommentsClose" aria-label="Close"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 6L6 18M6 6l12 12"/></svg></button></div>
             <div class="dc-panel-scroll" id="cmPanelBody"></div>
           </aside>
           <div class="dc-scrim" id="dcScrim" hidden></div>
@@ -2180,6 +2186,9 @@ if (ENV === ENVS.prod) window.__ddsSb = sb;   // shell.js reuses it, so this pag
 /* ── helpers ── */
 const $ = (id) => document.getElementById(id);
 const el = (tag, cls, text) => { const n = document.createElement(tag); if (cls) n.className = cls; if (text !== undefined) n.textContent = text; return n; };
+// Item 34: one icon set. A small button drawn with the editor's own icon (uiIcon), its words kept as
+// its name for screen readers and as its tooltip, instead of a typed ↑, ↓, ✕, × or ⋯.
+const icoBtn = (name, label, cls, size) => { const b = el("button", cls); b.type = "button"; b.innerHTML = uiIcon(name, size || 16); b.setAttribute("aria-label", label); b.title = label; return b; };
 // Says who can, where a role without configure would otherwise find a sentence and nothing to press.
 const askOwner = (cls, text) => { const n = el("div", cls, text); n.hidden = true; n.dataset.ifLacks = "configure"; return n; };
 // A small masked/text dialog — replaces native prompt() (no cleartext passwords, and
@@ -3006,8 +3015,8 @@ function renderOfferings() {
     const n = S.offerings.filter((o) => (o.category || VOCAB.label) === cat).length;
     head.appendChild(el("span", "mv", `${n} ${n === 1 ? VOCAB.one : VOCAB.many}`));
     const ctl = el("div", "ctl");
-    const up = el("button", null, "↑"); up.title = `Move ${cat} earlier`; up.setAttribute("aria-label", `Move ${cat} earlier`);
-    const dn = el("button", null, "↓"); dn.title = `Move ${cat} later`; dn.setAttribute("aria-label", `Move ${cat} later`);
+    const up = icoBtn("up", `Move ${cat} earlier`, null, 14);
+    const dn = icoBtn("down", `Move ${cat} later`, null, 14);
     up.disabled = ci === 0; dn.disabled = ci === cats.length - 1;
     up.addEventListener("click", () => moveCategory(cat, -1));
     dn.addEventListener("click", () => moveCategory(cat, +1));
@@ -4216,7 +4225,7 @@ function FL_openLink(id) {
   const a = el("a", null, "Open in Files");
   a.href = FL_filesHref(id);
   a.title = "Versions, where-used, crops and replace live in Files";
-  a.style.cssText = "font:inherit;font-size:11.5px;padding:3px 9px;border-radius:999px;border:1px solid var(--line, #ddd);color:inherit;text-decoration:none";
+  a.style.cssText = "font:inherit;font-size:12px;padding:3px 9px;border-radius:999px;border:1px solid var(--line, #ddd);color:inherit;text-decoration:none";
   a.addEventListener("click", (e) => e.stopPropagation());
   return a;
 }
@@ -4725,7 +4734,7 @@ function mediaCell(grid, m, manage, onPick) {
       const on = S.settings && S.settings[field] === m.id;
       const b = el("button", null, on ? onLabel + " ✓" : offLabel);
       b.type = "button";
-      b.style.cssText = "font:inherit;font-size:11.5px;padding:3px 9px;border-radius:999px;border:1px solid " + (on ? "var(--plum,#5b3fa0)" : "var(--line, #ddd)") + ";background:" + (on ? "var(--plum,#5b3fa0)" : "transparent") + ";color:" + (on ? "var(--fill-ink,#fff)" : "inherit") + ";cursor:pointer";
+      b.style.cssText = "font:inherit;font-size:12px;padding:3px 9px;border-radius:999px;border:1px solid " + (on ? "var(--plum,#5b3fa0)" : "var(--line, #ddd)") + ";background:" + (on ? "var(--plum,#5b3fa0)" : "transparent") + ";color:" + (on ? "var(--fill-ink,#fff)" : "inherit") + ";cursor:pointer";
       b.addEventListener("click", async (e) => {
         e.stopPropagation();
         try {
@@ -4744,7 +4753,7 @@ function mediaCell(grid, m, manage, onPick) {
     // Phase O: edit the photo description (alt text) after upload — a11y/SEO
     const ed = el("button", null, "Edit description");
     ed.type = "button";
-    ed.style.cssText = "font:inherit;font-size:11.5px;padding:3px 9px;border-radius:999px;border:1px solid var(--line, #ddd);background:transparent;cursor:pointer";
+    ed.style.cssText = "font:inherit;font-size:12px;padding:3px 9px;border-radius:999px;border:1px solid var(--line, #ddd);background:transparent;cursor:pointer";
     ed.addEventListener("click", (e) => {
       e.stopPropagation();
       if (cell.querySelector(".altedit")) return;
@@ -4772,7 +4781,7 @@ function mediaCell(grid, m, manage, onPick) {
     const ai = el("button", null, "✦ Suggest with AI");
     ai.type = "button";
     ai.title = "Let AI propose a description, a few tags, and a caption — you approve or edit before anything saves";
-    ai.style.cssText = "font:inherit;font-size:11.5px;padding:3px 9px;border-radius:999px;border:1px solid var(--plum-line,#cfc2ee);background:color-mix(in srgb,var(--plum,#5b3fa0) 6%,transparent);color:var(--plum,#5b3fa0);cursor:pointer";
+    ai.style.cssText = "font:inherit;font-size:12px;padding:3px 9px;border-radius:999px;border:1px solid var(--plum-line,#cfc2ee);background:color-mix(in srgb,var(--plum,#5b3fa0) 6%,transparent);color:var(--plum,#5b3fa0);cursor:pointer";
     ai.addEventListener("click", async (e) => {
       e.stopPropagation();
       if (cell.querySelector(".aisuggest")) return;
@@ -4787,7 +4796,7 @@ function mediaCell(grid, m, manage, onPick) {
     // Phase CP-2 (DS-5): focus point — 3×3 chooser; used wherever the site crops
     const fp = el("button", null, "Set focus");
     fp.type = "button";
-    fp.style.cssText = "font:inherit;font-size:11.5px;padding:3px 9px;border-radius:999px;border:1px solid var(--line, #ddd);background:transparent;cursor:pointer";
+    fp.style.cssText = "font:inherit;font-size:12px;padding:3px 9px;border-radius:999px;border:1px solid var(--line, #ddd);background:transparent;cursor:pointer";
     fp.addEventListener("click", (e) => {
       e.stopPropagation();
       if (cell.querySelector(".focalgrid")) return;
@@ -4808,9 +4817,9 @@ function mediaCell(grid, m, manage, onPick) {
     });
     row.appendChild(fp);
     cell.appendChild(row);
-    const del = el("button", "del", "✕"); del.dataset.needs = "delete"; del.title = "Remove this photograph"; del.setAttribute("aria-label", "Remove photograph: " + (m.alt_text || ""));
+    const del = icoBtn("x", "Remove photograph: " + (m.alt_text || ""), "del", 14); del.dataset.needs = "delete"; del.title = "Remove this photograph";
     del.addEventListener("click", async () => {
-      if (!del.dataset.armed) { del.dataset.armed = "1"; del.textContent = "?"; del.title = m.used_by?.length ? `It’s at work (${m.used_by.join(", ")}) — remove anyway?` : "Remove for good?"; setTimeout(() => { delete del.dataset.armed; del.textContent = "✕"; }, 3200); return; }
+      if (!del.dataset.armed) { del.dataset.armed = "1"; del.textContent = "?"; del.title = m.used_by?.length ? `It’s at work (${m.used_by.join(", ")}) — remove anyway?` : "Remove for good?"; setTimeout(() => { delete del.dataset.armed; del.innerHTML = uiIcon("x", 14); }, 3200); return; }
       try { await api("DELETE", `/media/${m.id}`); S.media = S.media.filter((x) => x.id !== m.id); renderMediaGrid(grid, true); toast("Removed"); }
       catch (err) { toast(nice(err), true); }
     });
@@ -4829,7 +4838,7 @@ function showSuggest(cell, m, grid, p) {
   note.style.cssText = "color:var(--ink-2);margin-bottom:9px;font-family:var(--serif);font-style:italic";
   panel.appendChild(note);
   const mkField = (labelText, value, max) => {
-    const l = el("label", null, labelText); l.style.cssText = "display:block;font-size:11px;color:var(--ink-2);margin-bottom:2px";
+    const l = el("label", null, labelText); l.style.cssText = "display:block;font-size:12px;color:var(--ink-2);margin-bottom:2px";
     const i = el("input"); i.type = "text"; i.value = value || ""; i.maxLength = max;
     i.style.cssText = "width:100%;margin-bottom:8px;padding:6px 8px;font:inherit;font-size:12px;border:1px solid var(--line,#ddd);border-radius:8px";
     panel.appendChild(l); panel.appendChild(i); return i;
@@ -5398,7 +5407,7 @@ function pcRow(entry, ctx) {
   const gear = el("button", "pc-ico pg-gear"); gear.type = "button"; gear.innerHTML = PG_GEAR; gear.title = "Settings"; gear.setAttribute("aria-label", "Settings for " + name);
   row.appendChild(gear);
   if (canvas) {
-    const mn = el("button", "pc-ico pp-menu", "⋯"); mn.type = "button"; mn.setAttribute("aria-label", "More for " + name);
+    const mn = icoBtn("more", "More for " + name, "pc-ico pp-menu");
     mn.title = slug ? "Rename, duplicate, clear or delete this page" : "Duplicate or clear this page";
     mn.addEventListener("click", () => dcPageMenu(slug, mn));
     row.appendChild(mn);
@@ -6843,7 +6852,7 @@ function pipeHtml(stage) { // stage: 0 sealing, 1 deploying, 2 live, -1 failed a
     ["Live", stage >= 2 ? "done" : "wait"],
   ];
   if (stage === -1) steps[2] = ["The carry didn’t complete — your live site is unchanged", "wait"];
-  return `<div class="pipe">` + steps.map(([t, k]) => `<div class="pstep ${k}"><i>${k === "done" ? "✓" : ""}</i>${t}</div>`).join("") + `</div>`;
+  return `<div class="pipe">` + steps.map(([t, k]) => `<div class="pstep ${k}"><i>${k === "done" ? uiIcon("check", 11) : ""}</i>${t}</div>`).join("") + `</div>`;
 }
 async function runPublish(btn, firstPublish) {
   btn.disabled = true; btn.textContent = "Publishing…";
@@ -6908,7 +6917,7 @@ function showReceipt(firstPublish) {
       : "Every word on your site came from you.<br>This version is kept safe, always.");
   $("ritBody").innerHTML = `
     <div class="receipt">
-      <div class="stamp">✓</div>
+      <div class="stamp">${uiIcon("check", 22)}</div>
       <div class="rp">${stampLine}</div>
       <div class="rd">${now.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })} · ${now.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}${count && !firstPublish ? ` · ${count} change${count > 1 ? "s" : ""}` : ""}</div>
       <div class="rl">${keptLine}</div>
@@ -6953,7 +6962,7 @@ async function renderRitualSchedule(host, publishable, toSchedule) {
   try { pending = ((await api("GET", "/schedule")).data || {}).scheduled || []; } catch (_) { /* keep the ritual calm */ }
   if (pending.length) {
     const box = el("div"); box.style.cssText = "margin:0 auto 14px;max-width:440px;text-align:left";
-    box.appendChild(Object.assign(el("div", null, "Scheduled — will happen on its own"), { style: "font-weight:700;font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--ink-2,#666);margin-bottom:6px" }));
+    box.appendChild(Object.assign(el("div", null, "Scheduled — will happen on its own"), { style: "font-weight:700;font-size:12px;text-transform:uppercase;letter-spacing:.05em;color:var(--ink-2,#666);margin-bottom:6px" }));
     pending.forEach((s) => {
       const row = el("div"); row.style.cssText = "display:flex;align-items:center;gap:10px;border:1px solid var(--line,#e5e5e5);border-radius:10px;padding:8px 12px;margin-top:6px";
       const kindWord = s.kind === "offline" ? "Take the site offline" : s.kind === "revert" ? "Return to an earlier version" : "Publish";
@@ -6988,7 +6997,7 @@ async function renderRitualSchedule(host, publishable, toSchedule) {
   // button at every moment. #schedule / "Publish later" open it armed, with
   // the date field focused.
   const panel = el("div", "sched-panel"); panel.style.cssText = "margin:18px auto 0;max-width:440px;text-align:left;border:1px solid var(--line,#e5e5e5);border-radius:12px;padding:14px 16px";
-  panel.appendChild(Object.assign(el("div", null, "Or publish later"), { style: "font-weight:700;font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--ink-2,#666);margin-bottom:10px" }));
+  panel.appendChild(Object.assign(el("div", null, "Or publish later"), { style: "font-weight:700;font-size:12px;text-transform:uppercase;letter-spacing:.05em;color:var(--ink-2,#666);margin-bottom:10px" }));
   const mkRow = (labelText, defValue, withToggle) => {
     const r = el("div"); r.style.cssText = "margin-top:" + (withToggle ? "12px" : "0");
     const lab = el("label", null, labelText); lab.style.cssText = "display:block;font-size:12px;font-weight:600;margin-bottom:4px";
@@ -6999,7 +7008,7 @@ async function renderRitualSchedule(host, publishable, toSchedule) {
     return { row: r, inp };
   };
   const pub = mkRow("Publish these changes at", dtLocalDefault(24), false);
-  panel.appendChild(Object.assign(el("div", null, "Your draft is frozen the moment you schedule — exactly what you reviewed goes up, even if you keep editing."), { style: "font-size:11.5px;color:var(--ink-2,#666);margin-top:6px;line-height:1.6" }));
+  panel.appendChild(Object.assign(el("div", null, "Your draft is frozen the moment you schedule — exactly what you reviewed goes up, even if you keep editing."), { style: "font-size:12px;color:var(--ink-2,#666);margin-top:6px;line-height:1.6" }));
   // the optional "unpublish at" leg — same table, same cron, kind=offline
   const offWrap = el("div"); offWrap.style.marginTop = "12px";
   const offToggle = el("label"); offToggle.style.cssText = "display:flex;align-items:center;gap:8px;font-size:12.5px;cursor:pointer";
@@ -7010,7 +7019,7 @@ async function renderRitualSchedule(host, publishable, toSchedule) {
   offCb.addEventListener("change", () => {
     if (offCb.checked && !off) {
       off = mkRow("Take the site offline at", dtLocalDefault(24 * 8), true);
-      off.row.appendChild(Object.assign(el("div", null, "Visitors will see a simple “temporarily offline” page from then on. Nothing is deleted — publishing brings everything back."), { style: "font-size:11.5px;color:var(--ink-2,#666);margin-top:4px;line-height:1.6" }));
+      off.row.appendChild(Object.assign(el("div", null, "Visitors will see a simple “temporarily offline” page from then on. Nothing is deleted — publishing brings everything back."), { style: "font-size:12px;color:var(--ink-2,#666);margin-top:4px;line-height:1.6" }));
     } else if (off) { off.row.style.display = offCb.checked ? "" : "none"; }
   });
   // optional note (it was on the retired Scheduled page) — POST /schedule takes it as before
@@ -7427,7 +7436,7 @@ async function renderPreviewPanel() {
   card.appendChild(el("label", null, "Private preview"));
   card.appendChild(el("div", "hint", "Edit your Draft, publish it to a private Preview to review or share, then promote to Live. Your live site never changes until you promote."));
   const grid = el("div"); grid.style.cssText = "display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-top:10px";
-  const stateCard = (title, lines) => { const c = el("div"); c.style.cssText = "border:1px solid var(--line,#e5e5e5);border-radius:10px;padding:10px 12px"; c.appendChild(Object.assign(el("div", null, title), { style: "font-weight:700;font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--soft,#666)" })); lines.filter(Boolean).forEach((l) => c.appendChild(Object.assign(el("div", null, l), { style: "font-size:12.5px;margin-top:4px" }))); return c; };
+  const stateCard = (title, lines) => { const c = el("div"); c.style.cssText = "border:1px solid var(--line,#e5e5e5);border-radius:10px;padding:10px 12px"; c.appendChild(Object.assign(el("div", null, title), { style: "font-weight:700;font-size:12px;text-transform:uppercase;letter-spacing:.05em;color:var(--soft,#666)" })); lines.filter(Boolean).forEach((l) => c.appendChild(Object.assign(el("div", null, l), { style: "font-size:12.5px;margin-top:4px" }))); return c; };
   // the same number the Publish button and the overview show (/changes), not the
   // raw edit count: 14 edits to one new site is one change waiting to go live
   const dc = S.changes && typeof S.changes.count === "number" ? S.changes.count : (st.draft.unpublished_changes || 0);
@@ -7685,7 +7694,7 @@ function renderVersionList() {
     row.appendChild(p.status === "failed" ? verDate("fail", "Not published", p.at) : verDate("pub", "Published", p.at));
     const body = el("div", "hbody");
     const sum = el("div", "hsum");
-    if (p.status === "failed") sum.appendChild(el("span", "hollow", "◌"));
+    if (p.status === "failed") { const h = el("span", "hollow"); h.innerHTML = uiIcon("x", 13); sum.appendChild(h); }
     // Phase AA (FD-7): a named version leads with its name
     if (p.label) { const lb = el("strong", null, "“" + p.label + "” — "); sum.appendChild(lb); }
     sum.appendChild(document.createTextNode(p.status === "failed" ? "A publish didn’t go through." : p.summary));
@@ -8435,7 +8444,8 @@ async function mountSearchCard() {
   // 1. the health sentences
   const line = (ok2, good, fix) => {
     const p = el("div", null, ""); p.style.cssText = "display:flex;gap:8px;align-items:baseline;padding:3px 0;font-size:13px";
-    p.appendChild(Object.assign(el("span", null, ok2 ? "✓" : "•"), { style: "color:" + (ok2 ? "#2e6b46" : "#a05a2c") + ";font-weight:700" }));
+    const mk2 = el("span", null, ok2 ? "" : "•"); if (ok2) mk2.innerHTML = uiIcon("check", 13);
+    p.appendChild(Object.assign(mk2, { style: "color:" + (ok2 ? "#2e6b46" : "#a05a2c") + ";font-weight:700" }));
     p.appendChild(el("span", null, ok2 ? good : fix));
     card.appendChild(p);
   };
@@ -8485,7 +8495,7 @@ function redirectsManager() {
       rows.forEach((row) => {
         const line2 = el("div"); line2.style.cssText = "display:flex;gap:8px;align-items:center;font-size:12.5px;padding:3px 0";
         line2.appendChild(el("span", null, row.from_path + " → " + row.to_path));
-        const x = el("button", null, "✕"); x.dataset.needs = "delete"; x.type = "button"; x.title = "Remove this forward";
+        const x = icoBtn("x", "Remove this forward", null, 14); x.dataset.needs = "delete";
         x.style.cssText = "border:none;background:none;cursor:pointer;color:var(--ink-2,#888)";
         x.addEventListener("click", async () => { try { await api("DELETE", "/redirects/" + row.id); loadRedirects(); toast("Forward removed — publish to apply"); scheduleChangesRefresh(); } catch (err) { toast(nice(err), true); } });
         line2.appendChild(x); list.appendChild(line2);
@@ -9226,7 +9236,7 @@ function renderLinkedChip(blk, idx, card) {
   const sub = el("div"); sub.id = "blkSub-" + idx; sub.className = "blk-sub"; sub.style.cssText = "border:1px solid var(--plum-line,#d9cef0);border-radius:12px;padding:12px 14px;margin-top:10px;background:var(--plum-tint,#faf7ff)";
   const head = el("div"); head.style.cssText = "display:flex;align-items:center;gap:8px;flex-wrap:wrap";
   const nm = el("div", null, "Linked section" + (item ? " · " + item.name : "")); nm.style.cssText = "flex:1;min-width:150px;font-weight:600;font-size:13px;color:var(--plum-deep,#3a2470)";
-  const up = el("button", null, "↑"), dn = el("button", null, "↓"), rm = el("button", null, "Remove");
+  const up = icoBtn("up", "Move this section up", null, 14), dn = icoBtn("down", "Move this section down", null, 14), rm = el("button", null, "Remove");
   [up, dn, rm].forEach((b) => { b.type = "button"; b.style.cssText = miniBtn; });
   up.disabled = idx === 0; dn.disabled = idx === BLOCKS_WORK.length - 1;
   if (up.disabled) up.style.opacity = ".35"; if (dn.disabled) dn.style.opacity = ".35";
@@ -10339,11 +10349,11 @@ function blockStyleRow(idx, blk, sub, flat) {
     pairs.forEach((p) => {
       const pass = p.ratio >= 4.5;
       const chip = el("span", null, p.name + " · Contrast " + p.ratio.toFixed(1) + (pass ? " — passes" : " — hard to read (needs 4.5)"));
-      chip.style.cssText = "font-size:11px;font-weight:600;padding:2px 9px;border-radius:999px;" + (pass ? "background:#eaf7ee;color:#1c6b34" : "background:#fdecea;color:#8a2a20");
+      chip.style.cssText = "font-size:12px;font-weight:600;padding:2px 9px;border-radius:999px;" + (pass ? "background:#eaf7ee;color:#1c6b34" : "background:#fdecea;color:#8a2a20");
       crow.appendChild(chip);
       if (!pass) {
         const fix = el("button", null, "Darken until readable"); fix.type = "button";
-        fix.style.cssText = "font:inherit;font-size:11px;font-weight:600;padding:2px 10px;border-radius:999px;border:1px solid #8a2a20;background:transparent;color:#8a2a20;cursor:pointer";
+        fix.style.cssText = "font:inherit;font-size:12px;font-weight:600;padding:2px 10px;border-radius:999px;border:1px solid #8a2a20;background:transparent;color:#8a2a20;cursor:pointer";
         fix.addEventListener("click", () => setStyle({ [p.key]: ovDarkenUntil(p.color, p.fixAgainst, 4.5) }, true));
         crow.appendChild(fix);
       }
@@ -10378,7 +10388,7 @@ function blockWindowRow(idx, blk, sub, flat) {
   if (!flat) sum.style.cssText = "cursor:pointer;font-size:12px;font-weight:600;color:var(--soft,#6b6478);display:flex;align-items:center;gap:8px;flex-wrap:wrap";
   else sum.style.cssText = "display:flex;align-items:center;gap:8px;flex-wrap:wrap";
   sum.appendChild(document.createTextNode("Show this only for a while" + (set || flat ? "" : "  ·  optional")));
-  if (chip) { const c = el("span", null, chip); c.style.cssText = "font-size:11px;font-weight:600;padding:2px 9px;border-radius:999px;" + chipCss; sum.appendChild(c); }
+  if (chip) { const c = el("span", null, chip); c.style.cssText = "font-size:12px;font-weight:600;padding:2px 9px;border-radius:999px;" + chipCss; sum.appendChild(c); }
   det.appendChild(sum);
   const row = el("div"); row.style.cssText = "display:flex;gap:14px;flex-wrap:wrap;align-items:center;margin-top:8px";
   const mk = (label, val) => {
@@ -10438,9 +10448,9 @@ function renderBlocksCard() {
       const b = el("button"); b.type = "button";
       b.style.cssText = "text-align:left;font:inherit;padding:10px 12px;border-radius:10px;border:" + (isRec ? "2px solid var(--plum,#5b3fa0)" : "1px solid var(--line,#ddd)") + ";background:var(--sheet,#fff);color:inherit;cursor:pointer;display:flex;flex-direction:column;gap:3px;min-width:0";
       b.appendChild(Object.assign(el("div", null, (isRec ? "✦ " : "") + st.name), { style: "font-weight:600;font-size:12.5px" + (isRec ? ";color:var(--plum-deep,#3a2470)" : "") }));
-      b.appendChild(Object.assign(el("div", null, st.description), { style: "font-size:11px;color:var(--soft,#888);line-height:1.4" }));
+      b.appendChild(Object.assign(el("div", null, st.description), { style: "font-size:12px;color:var(--soft,#888);line-height:1.4" }));
       const n = Array.isArray(st.blocks) ? st.blocks.length : 0;
-      b.appendChild(Object.assign(el("div", null, n + " ready-made section" + (n === 1 ? "" : "s") + (isRec ? " · recommended for you" : "")), { style: "font-size:10.5px;color:var(--soft,#a99);margin-top:2px" }));
+      b.appendChild(Object.assign(el("div", null, n + " ready-made section" + (n === 1 ? "" : "s") + (isRec ? " · recommended for you" : "")), { style: "font-size:12px;color:var(--soft,#a99);margin-top:2px" }));
       b.addEventListener("click", () => applyStarterLayout(st));
       grid.appendChild(b);
     });
@@ -10458,7 +10468,7 @@ function renderBlocksCard() {
     const head = el("div"); head.style.cssText = "display:flex;align-items:center;gap:8px;margin-bottom:8px";
     // the panel's title already names this section when it's the only one showing
     const nm = el("div", null, solo !== null ? (blk.mediaNote || "") : def.name + (blk.mediaNote ? "  ·  " + blk.mediaNote : "")); nm.style.cssText = "flex:1;font-weight:600;font-size:13px";
-    const up = el("button", null, "↑"), dn = el("button", null, "↓"), rm = el("button", null, "Remove");
+    const up = icoBtn("up", "Move this section up", null, 14), dn = icoBtn("down", "Move this section down", null, 14), rm = el("button", null, "Remove");
     [up, dn, rm].forEach((b) => { b.type = "button"; b.style.cssText = miniBtn; });
     up.disabled = idx === 0; dn.disabled = idx === BLOCKS_WORK.length - 1;
     if (up.disabled) up.style.opacity = ".35"; if (dn.disabled) dn.style.opacity = ".35";
@@ -10777,7 +10787,7 @@ function renderBlocksCard() {
       const b = el("button"); b.type = "button";
       b.style.cssText = "text-align:left;font:inherit;padding:9px 12px;border-radius:10px;border:1px solid var(--line,#ddd);background:var(--sheet,#fff);color:inherit;cursor:pointer;display:flex;flex-direction:column;gap:2px;min-width:0";
       b.appendChild(Object.assign(el("div", null, "+ " + d.name), { style: "font-weight:600;font-size:12.5px" }));
-      if (SECTION_ALIAS[d.type]) b.appendChild(Object.assign(el("div", null, SECTION_ALIAS[d.type]), { style: "font-size:11px;color:var(--soft,#888)" }));
+      if (SECTION_ALIAS[d.type]) b.appendChild(Object.assign(el("div", null, SECTION_ALIAS[d.type]), { style: "font-size:12px;color:var(--soft,#888)" }));
       b.addEventListener("click", () => { dcCaptureScroll(); BLOCKS_WORK.push(emptyBlock(d)); const at = BLOCKS_WORK.length - 1; BLOCK_FOCUS = at; DC_FOCUS_BI = at; if (MEDIA_FILL_TYPES.has(d.type)) { renderBlocksCard(); eeEditBlock(at); } else { saveBlocks(); } });
       return b;
     };
@@ -10848,21 +10858,21 @@ function renderBlocksCard() {
         // CL-LINK: two ways to reuse a saved section — a Copy (independent) or a Link
         // (edits to the saved section update everywhere it’s linked). Spelled out so
         // the choice is never a guess.
-        libRow.appendChild(Object.assign(el("div", "hint", "Insert a copy = an independent section you edit on its own. Link = it stays tied to this saved section, so editing the saved section updates every linked spot."), { style: "margin-top:6px;font-size:11.5px" }));
+        libRow.appendChild(Object.assign(el("div", "hint", "Insert a copy = an independent section you edit on its own. Link = it stays tied to this saved section, so editing the saved section updates every linked spot."), { style: "margin-top:6px;font-size:12px" }));
         const list = el("div"); list.style.cssText = "margin-top:8px;display:flex;flex-direction:column;gap:6px";
         CL_ITEMS.forEach((it) => {
           const wrap = el("div"); wrap.style.cssText = "border:1px solid var(--line,#eee);border-radius:8px;padding:6px 10px";
           const row = el("div"); row.style.cssText = "display:flex;align-items:center;gap:8px;flex-wrap:wrap";
           row.appendChild(Object.assign(el("span", null, it.name), { style: "flex:1;min-width:120px;font-size:12.5px" }));
-          row.appendChild(Object.assign(el("span", null, (BLOCK_DEFS.find((d) => d.type === (it.block && it.block.type)) || {}).name || (it.block && it.block.type) || ""), { style: "font-size:11px;color:var(--soft,#888)" }));
+          row.appendChild(Object.assign(el("span", null, (BLOCK_DEFS.find((d) => d.type === (it.block && it.block.type)) || {}).name || (it.block && it.block.type) || ""), { style: "font-size:12px;color:var(--soft,#888)" }));
           // G8: where-used — how many pages LIVE-LINK this saved section; expands to name them
           const used = Array.isArray(it.used_on) ? it.used_on : [];
           if (used.length) {
             const uc = el("button", null, "used on " + used.length + " page" + (used.length === 1 ? "" : "s")); uc.type = "button";
             uc.title = "Show which pages link this saved section";
-            uc.style.cssText = "font:inherit;font-size:11px;padding:2px 9px;border-radius:999px;border:1px solid var(--plum-line,#d9cef0);background:var(--plum-tint,#faf7ff);color:var(--plum-deep,#3a2470);cursor:pointer";
+            uc.style.cssText = "font:inherit;font-size:12px;padding:2px 9px;border-radius:999px;border:1px solid var(--plum-line,#d9cef0);background:var(--plum-tint,#faf7ff);color:var(--plum-deep,#3a2470);cursor:pointer";
             const usedLine = el("div", "hint", "Linked on: " + used.map((u) => u.title).join(", ") + " — editing the saved section changes it everywhere it’s linked.");
-            usedLine.style.cssText = "margin-top:5px;font-size:11.5px"; usedLine.hidden = true;
+            usedLine.style.cssText = "margin-top:5px;font-size:12px"; usedLine.hidden = true;
             uc.addEventListener("click", () => { usedLine.hidden = !usedLine.hidden; });
             row.appendChild(uc); wrap.appendChild(row); wrap.appendChild(usedLine);
           } else wrap.appendChild(row);
@@ -10870,7 +10880,7 @@ function renderBlocksCard() {
           ins.addEventListener("click", () => clInsert(it.block));
           const lnk = el("button", null, "Link"); lnk.type = "button"; lnk.title = "Edits to this saved section update everywhere it’s linked"; lnk.style.cssText = "font:inherit;font-size:12px;padding:4px 11px;border-radius:999px;border:2px solid var(--plum,#5b3fa0);background:var(--plum-tint,#faf7ff);color:var(--plum-deep,#3a2470);cursor:pointer";
           lnk.addEventListener("click", () => clInsertLink(it));
-          const del = el("button", null, "×"); del.dataset.needs = "delete"; del.type = "button"; del.title = "Remove from library"; del.style.cssText = "font:inherit;font-size:14px;padding:2px 9px;border-radius:8px;border:1px solid var(--line,#ddd);background:transparent;cursor:pointer";
+          const del = icoBtn("x", "Remove from library", null, 14); del.dataset.needs = "delete"; del.style.cssText = "font:inherit;font-size:14px;padding:2px 9px;border-radius:8px;border:1px solid var(--line,#ddd);background:transparent;cursor:pointer";
           del.addEventListener("click", async () => {
             // G8: deleting a LIVE-LINKED entry first names the pages it appears on
             if (used.length && !(await askYes("“" + it.name + "” appears on: " + used.map((u) => u.title).join(", ") + ". Removing it from the library removes it from " + (used.length === 1 ? "that page" : "those pages") + " at your next publish. Remove anyway?", { ok: "Remove anyway", danger: true }))) return;
@@ -11016,7 +11026,7 @@ function renderMediaBlockBody(def, blk, idx, sub, ti) {
       const cell = el("div"); cell.style.cssText = "display:flex;flex-direction:column;gap:4px;width:96px";
       const chip = el("span"); chip.style.cssText = "position:relative;display:inline-block";
       chip.appendChild(mediaThumb(id));
-      const x = el("button", null, "×"); x.type = "button"; x.title = "Remove";
+      const x = icoBtn("x", "Remove this photo", null, 12);
       x.style.cssText = "position:absolute;top:-6px;right:-6px;width:20px;height:20px;border-radius:50%;border:none;background:var(--clay,#a3423a);color:var(--fill-ink,#fff);cursor:pointer;font-size:13px;line-height:1";
       // captions[] stays INDEX-ALIGNED with image_ids — a removed photo takes its
       // caption with it (the server re-validates the same alignment).
@@ -11025,7 +11035,7 @@ function renderMediaBlockBody(def, blk, idx, sub, ti) {
       if (isGallery) {
         const cap = el("input"); cap.type = "text"; cap.placeholder = "Caption (optional)"; cap.maxLength = 160;
         cap.value = (Array.isArray(blk.captions) && blk.captions[k]) || "";
-        cap.style.cssText = "width:100%;padding:5px 6px;border:1px solid var(--line,#ddd);border-radius:8px;font:inherit;font-size:11.5px;box-sizing:border-box";
+        cap.style.cssText = "width:100%;padding:5px 6px;border:1px solid var(--line,#ddd);border-radius:8px;font:inherit;font-size:12px;box-sizing:border-box";
         cap.addEventListener("change", () => {
           // write through BLOCKS_WORK[idx] (not the render-time blk) — a heading
           // edit replaces the block object, and captions must land on the live one
@@ -11569,7 +11579,7 @@ function renderFormsCard() {
       lab.addEventListener("change", () => commitField(fi, xi, { label: lab.value.trim() }));
       const typeSel = ffSel(FF_TYPES, fld.type || "text", (v) => { commitField(fi, xi, { type: v }); renderFormsCard(); });
       top.append(lab, typeSel);
-      const up = el("button", null, "↑"), dn = el("button", null, "↓"), del = el("button", null, "✕");
+      const up = icoBtn("up", "Move this field up", null, 14), dn = icoBtn("down", "Move this field down", null, 14), del = icoBtn("x", "Remove this field", null, 14);
       [up, dn, del].forEach((b) => { b.type = "button"; b.style.cssText = FF_BTN; });
       up.disabled = xi === 0; dn.disabled = xi === form.fields.length - 1;
       up.addEventListener("click", () => { const fs = FORMS_WORK[fi].fields; [fs[xi - 1], fs[xi]] = [fs[xi], fs[xi - 1]]; renderFormsCard(); });
@@ -11642,7 +11652,7 @@ function renderFormsCard() {
       rr.appendChild(el("span", null, "→"));
       rr.appendChild(ffSel(FF_ACTIONS, rule.then.action || "show", (v) => commitRule({ then: { action: v } })));
       rr.appendChild(ffSel(fieldOpts.length ? fieldOpts : [["", "—"]], rule.then.target || "", (v) => commitRule({ then: { target: v } })));
-      const rdel = el("button", null, "✕"); rdel.type = "button"; rdel.style.cssText = FF_BTN;
+      const rdel = icoBtn("x", "Remove this rule", null, 14); rdel.style.cssText = FF_BTN;
       rdel.addEventListener("click", () => { FORMS_WORK[fi].rules.splice(ri, 1); renderFormsCard(); });
       rr.appendChild(rdel); rulesBox.appendChild(rr);
     });
@@ -11775,8 +11785,8 @@ function mountSectionsCard() {
     cb.addEventListener("change", () => saveSections(() => cardOrderNow(heroPinned), () => { const h = new Set(sectionsHiddenNow()); cb.checked ? h.delete(key) : h.add(key); return [...h]; }));
     const lb = el("label", null, def[1]); lb.setAttribute("for", "sec-" + key); lb.style.cssText = "flex:1;margin:0;font-weight:400";
     const still = heroPinned && key === "hero";
-    const up = el("button", null, "↑"); up.type = "button"; up.disabled = still || idx <= (heroPinned ? 1 : 0); up.title = "Move up";
-    const dn = el("button", null, "↓"); dn.type = "button"; dn.disabled = still || idx === order.length - 1; dn.title = "Move down";
+    const up = icoBtn("up", "Move up", null, 14); up.disabled = still || idx <= (heroPinned ? 1 : 0);
+    const dn = icoBtn("down", "Move down", null, 14); dn.disabled = still || idx === order.length - 1;
     if (still) up.title = dn.title = "This template keeps the welcome section at the top";
     [up, dn].forEach((b) => b.style.cssText = "font:inherit;font-size:12px;padding:2px 9px;border-radius:8px;border:1px solid var(--line,#ddd);background:transparent;cursor:pointer" + (b.disabled ? ";opacity:.35;cursor:default" : ""));
     up.addEventListener("click", () => { if (!up.disabled) saveSections(() => swapInCard(key, -1, heroPinned), sectionsHiddenNow); });
@@ -12177,7 +12187,7 @@ function openSettingsPanel(mode, title) {
   const modal = ["section", "styles", "header", "footer"].indexOf(m) < 0;   // a section, a style, the header or footer: keep the page in view, undimmed
   p.setAttribute("aria-modal", String(modal));
   const cl = $("btnSettingsClose");
-  if (cl) { cl.textContent = modal ? "✕" : "Done"; cl.setAttribute("aria-label", modal ? "Close" : "Done"); cl.title = (modal ? "Close" : "Done") + " (Esc)"; }
+  if (cl) { if (modal) cl.innerHTML = uiIcon("x", 16); else cl.textContent = "Done"; cl.setAttribute("aria-label", modal ? "Close" : "Done"); cl.title = (modal ? "Close" : "Done") + " (Esc)"; }
   if (sc) {
     if (modal) { sc.hidden = false; requestAnimationFrame(() => sc.classList.add("on")); }
     else { sc.classList.remove("on"); sc.hidden = true; }
@@ -12541,6 +12551,7 @@ function pcPane(id, label) {
   const opener = document.activeElement;
   box.textContent = ""; box.id = id; box.setAttribute("role", "group"); box.setAttribute("aria-label", label);
   list.hidden = true; wrap.hidden = false;
+  $("pagesCard").classList.add("pane-open");
   const sc = $("pcBody"); if (sc) sc.scrollTop = 0;
   const me = { box };
   me.close = (refocus) => {
@@ -12549,6 +12560,7 @@ function pcPane(id, label) {
     PC_PANE = null;
     box.textContent = ""; box.removeAttribute("id"); box.removeAttribute("aria-label");
     wrap.hidden = true; list.hidden = false;
+    $("pagesCard").classList.remove("pane-open");
     if (refocus !== false) {
       const back = opener && opener.isConnected && list.contains(opener) ? opener : list.querySelector(".pc-row.on .pc-open");
       try { if (back) back.focus({ preventScroll: true }); } catch (_) {}
@@ -13614,7 +13626,7 @@ function openInsertMenu(atIndex, anchor, rectOverride) {
   // page's listeners, so the menu has its own close button and a tap on the canvas closes it.
   const head = el("div"); head.style.cssText = "display:flex;align-items:center;justify-content:space-between;gap:8px";
   head.appendChild(el("div", "tray-h", "Add a section here"));
-  const x = el("button", null, "×"); x.type = "button"; x.setAttribute("aria-label", "Close"); x.title = "Close";
+  const x = icoBtn("x", "Close");
   x.style.cssText = "font:inherit;font-size:20px;line-height:1;min-width:44px;min-height:44px;margin:-8px -8px 0 0;border:0;background:transparent;color:var(--ink-2,#666);cursor:pointer;border-radius:10px";
   x.addEventListener("click", closeInsertMenu);
   head.appendChild(x); menu.appendChild(head);
@@ -14831,7 +14843,7 @@ function dcInjectCanvas(doc, main, live) {
       ".dc-hf-chip:focus-visible{outline:2px solid var(--ddsdc-p);outline-offset:2px}" +
       // item 118: each section's colour theme, while colours are being chosen
       "#dds-dc-themes{position:absolute;left:0;top:0;width:0;height:0;z-index:2147482990;pointer-events:none}" +
-      ".dds-theme-tag{position:absolute;display:inline-flex;align-items:center;gap:6px;height:24px;padding:0 10px 0 6px;border-radius:999px;background:var(--ddsdc-card);border:1px solid var(--ddsdc-line);box-shadow:0 2px 8px rgba(0,0,0,.12);color:var(--ddsdc-ink);font:600 11.5px/1 var(--ddsdc-sans);white-space:nowrap}" +
+      ".dds-theme-tag{position:absolute;display:inline-flex;align-items:center;gap:6px;height:24px;padding:0 10px 0 6px;border-radius:999px;background:var(--ddsdc-card);border:1px solid var(--ddsdc-line);box-shadow:0 2px 8px rgba(0,0,0,.12);color:var(--ddsdc-ink);font:600 12px/1 var(--ddsdc-sans);white-space:nowrap}" +
       ".dds-theme-tag i{width:12px;height:12px;border-radius:50%;border:1px solid var(--ddsdc-line2)}" +
       "#dds-dc-chip .dc-chip-type{font-weight:500;opacity:.8;margin-left:5px}" +
       "#dds-dc-chip.locked>svg{flex:none;width:12px;height:12px;margin-right:5px;vertical-align:-1px}" +   // item 155: a locked section's padlock
@@ -15307,7 +15319,7 @@ function dcPageTreeRow(pg, cur) {
   // G11: the whole-page feedback thread rides the page row while Comments is on
   if (CM_ON) row.appendChild(cmBadge(pg.slug, "", "Whole page — " + pg.title));
   const acts = el("span", "dc-tree-acts");
-  const m = el("button", null, "⋯"); m.type = "button"; m.title = pg.slug ? "Rename, clear, hide or delete this page" : "Clear this page";
+  const m = icoBtn("more", pg.slug ? "Rename, clear, hide or delete this page" : "Clear this page");
   m.addEventListener("click", (e) => { e.stopPropagation(); dcPageMenu(pg.slug, m); });
   acts.appendChild(m); if (!CM_ON) row.appendChild(acts);   // item 99: the page menu edits, so Comments mode leaves it out
   return row;
@@ -15422,16 +15434,16 @@ function dcTreeRow(el2, c) {
   };
   if (isBlock) {
     const held = lockedForMe(BLOCKS_WORK[c.bi]);   // item 155: a section the studio locked stays where it is
-    acts.appendChild(mkA("↑", held ? LOCK_SAY : "Move up", () => dcMove(c.bi, c.bi - 1), held || c.bi <= 0));
-    acts.appendChild(mkA("↓", held ? LOCK_SAY : "Move down", () => dcMove(c.bi, c.bi + 2), held || c.bi >= (BLOCKS_WORK.length - 1)));
+    acts.appendChild(mkA(uiIcon("up", 14), held ? LOCK_SAY : "Move up", () => dcMove(c.bi, c.bi - 1), held || c.bi <= 0));
+    acts.appendChild(mkA(uiIcon("down", 14), held ? LOCK_SAY : "Move down", () => dcMove(c.bi, c.bi + 2), held || c.bi >= (BLOCKS_WORK.length - 1)));
     acts.appendChild(mkA(uiIcon("cog", 14), "Settings for this section", () => eeEditBlock(c.bi)));
     acts.appendChild(mkA(uiIcon("trash", 14), held ? LOCK_SAY : "Remove this section", () => dcDelete(c.bi), held));
   } else {
     const keys = c.key ? dcCoreKeys(el2.parentNode) : [], at = keys.indexOf(c.key);
     if (at >= 0) {
       row.dataset.core = c.key;
-      acts.appendChild(mkA("↑", "Move up", () => dcMoveCore(c.key, -1, true), at <= 0));
-      acts.appendChild(mkA("↓", "Move down", () => dcMoveCore(c.key, 1, true), at >= keys.length - 1));
+      acts.appendChild(mkA(uiIcon("up", 14), "Move up", () => dcMoveCore(c.key, -1, true), at <= 0));
+      acts.appendChild(mkA(uiIcon("down", 14), "Move down", () => dcMoveCore(c.key, 1, true), at >= keys.length - 1));
     }
     acts.appendChild(mkA(uiIcon("cog", 14), "Edit this section", () => eeEditCore(c.view)));
     if (c.key) acts.appendChild(mkA(uiIcon("eyeoff", 14), "Hide this section", () => eeHideKey(c.key)));
@@ -15719,7 +15731,7 @@ function renderSetup() {
     const row = el(st.done ? "div" : "button", "hb-task" + (st.done ? " done" : "") + (st.done && !seen.has(st.key) ? " just" : ""));
     row.dataset.step = st.key;
     if (!st.done) row.type = "button";
-    row.appendChild(el("span", "cb", st.done ? "✓" : ""));
+    const cb = el("span", "cb"); if (st.done) cb.innerHTML = uiIcon("check", 12); row.appendChild(cb);
     const t = el("span", "t"); t.appendChild(el("b", null, st.title));
     if (!st.done) t.appendChild(el("span", null, st.hint));
     row.appendChild(t);

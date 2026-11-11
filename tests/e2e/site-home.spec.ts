@@ -1736,7 +1736,7 @@ test.describe('words typed in a section’s panel while its save lands are kept 
     await caption.nth(1).focus();
     await expect.poll(() => putsOf(writes).length).toBe(1);
     await page.waitForTimeout(300);
-    await page.locator('#blocksCard button[title="Remove"]').nth(1).click();
+    await page.locator('#blocksCard').getByRole('button', { name: 'Remove this photo' }).nth(1).click();   // item 34: an icon, by its name
     await expect.poll(() => putsOf(writes).length, { timeout: 5000 }).toBe(2);
     expect(putsOf(writes)[1].body.blocks[0]).toMatchObject({ image_ids: ['m1'], captions: ['The bar'] });
   });
@@ -1783,7 +1783,7 @@ test.describe('the section panel’s arrows keep the canvas pointing at the righ
     expect(await page.evaluate('BLOCKS_WORK[BLOCK_SOLO].type')).toBe('title');
     await page.waitForLoadState('networkidle');           // Edit's own redraw (item 85) has landed
     await page.locator('#inspectorSeg [data-itab="layout"]').click();   // the inspector keeps the arrows on its Layout tab (part two)
-    await page.locator('#blkSub-0 button', { hasText: '↓' }).click();
+    await page.locator('#blkSub-0').getByRole('button', { name: /^Move (this section )?down$/ }).click();   // item 34: an icon, by its name
     expect(await page.evaluate('BLOCKS_WORK.map((b) => b.type).join()')).toBe('richtext,title');
     await editOn('#a');                                   // the canvas still draws the title first
     expect(await page.evaluate('BLOCKS_WORK[BLOCK_SOLO].type')).toBe('title');
