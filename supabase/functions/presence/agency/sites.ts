@@ -507,7 +507,7 @@ async function domainDetail(siteId: string, nowIso: string) {
   return {
     ...built,
     dns_host_full: row.domain_dns_host || '',   // the row's dns_host is blank when it's the seller; the panel names it either way
-    provider: whereToGo(row.domain_registrar, row.domain_dns_host),   // findings 6 and 7: records at the DNS company, renewal at the seller
+    where: whereToGo(row.domain_registrar, row.domain_dns_host),   // findings 6 and 7: records at the DNS company, renewal at the seller (not `provider`: the row's seller name)
     mail: mailHealth(mx, txt, dmarcTxt),
     history: domainHistory(rowsOf(evQ), rowsOf(ntQ), built.own === true),
     statuses, all_checks: Array.isArray(row.domain_checks) ? row.domain_checks : [],
