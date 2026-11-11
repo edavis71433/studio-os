@@ -7,6 +7,7 @@ import { svc } from './db.ts';
 import { publishActorKind } from './actor_kind.ts';
 import { getTemplate } from './render.ts';
 import { serializeDraft } from './serializer.ts';
+import { insertSnapshot } from './draft_settings.ts';
 import { validateSnapshot } from './manifest_validate.ts';
 import type { Snapshot } from './render_types.ts';
 import type { SiteRow } from './site.ts';
@@ -21,12 +22,10 @@ export async function captureDraftSnapshot(site: SiteRow, principal: Principal):
   const t = getTemplate(site.template_slug, site.template_version);
   if (!t) return { error: 'template_missing', message: 'This site’s template isn’t available.', status: 500 };
   const now = new Date().toISOString();
-  const { snapshot, mediaManifest } = await serializeDraft(site.id, t.manifest, { templateSlug: site.template_slug, templateVersion: site.template_version, now });
+  const { snapshot, mediaManifest, draftSettings } = await serializeDraft(site.id, t.manifest, { templateSlug: site.template_slug, templateVersion: site.template_version, now });
   const v = validateSnapshot(snapshot, t.manifest);
-  const ins = await svc('presence_snapshots', {
-    method: 'POST', headers: { Prefer: 'return=representation' },
-    body: JSON.stringify({ site_id: site.id, content: snapshot.content, media_manifest: mediaManifest, content_contract_version: snapshot.content_contract_version, template_slug: snapshot.template_slug, template_version: snapshot.template_version, dev_customization: snapshot.dev_customization ?? null, created_by: principal.userId, created_by_kind: actorKind(principal) }),
-  });
+  // the sections, pages and menu as stored ride beside it, so returning to a checkpoint brings them back
+  const ins = await insertSnapshot({ site_id: site.id, content: snapshot.content, media_manifest: mediaManifest, content_contract_version: snapshot.content_contract_version, template_slug: snapshot.template_slug, template_version: snapshot.template_version, dev_customization: snapshot.dev_customization ?? null, created_by: principal.userId, created_by_kind: actorKind(principal) }, draftSettings);
   if (!ins.ok || !ins.json?.[0]?.id) return { error: 'snapshot_failed', message: 'We couldn’t stage that just now — please try again.', status: 502 };
   return { snapshotId: ins.json[0].id as string, blockers: v.blockers, warnings: v.warnings };
 }
