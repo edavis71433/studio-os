@@ -1,5 +1,5 @@
 import { test, expect, Page, Route } from '@playwright/test';
-import { senderTag, bookingScript, SEND_WAIT_MS } from '../../supabase/functions/presence/lib/site_send';
+import { senderTag, bookingScript, SEND_WAIT_MS, TICKET_SETTLE_MS } from '../../supabase/functions/presence/lib/site_send';
 
 // Builder list item 131: a client's site sends its forms and bookings from the page. The page here is
 // a client's contact page on its own address (faked), carrying the very script a publish
@@ -27,7 +27,10 @@ const OWN_FORM = `<form id="presence-form-quote" class="card presence-form" meth
 const pageWith = (form: string) => `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Contact</title></head>
 <body data-reach-tel="(555) 123-4567" data-reach-mail="hello@shop.example"><main id="main"><h1>Contact &amp; hours</h1>${form}</main>${senderTag(EP)}</body></html>`;
 
+// item 140: the page asks for a time ticket before it sends (tests/e2e/form-check.spec.ts covers it)
+const TICKET = { data: { ticket: '1800000000.' + 'a'.repeat(32), wait_s: 3 } };
 async function openSite(page: Page, form = CONTACT_FORM, path = '/contact/') {
+  await page.route(EP.replace(/\/submit$/, '/ticket'), (route) => answer(route, 200, TICKET));
   await page.route(`${SITE}/**`, (route) => route.fulfill({ status: 200, contentType: 'text/html', body: pageWith(form) }));
   await page.goto(`${SITE}${path}`);
 }
@@ -150,6 +153,7 @@ const TYPES = { data: { enabled: true, timezone: 'UTC', max_days_ahead: 60, type
 
 test.describe('booking on a client’s site', () => {
   async function openBooking(page: Page) {
+    await page.route(`${BK}/ticket`, (route) => answer(route, 200, TICKET));
     await page.route(`${SITE}/**`, (route) => route.fulfill({ status: 200, contentType: 'text/html', body: bookingPage }));
     await page.goto(`${SITE}/book/`);
   }
@@ -162,29 +166,44 @@ test.describe('booking on a client’s site', () => {
     await expect(stage.getByRole('link', { name: '(555) 123-4567' })).toHaveAttribute('href', 'tel:5551234567');
   });
 
-  test('a booking that gets no answer says nothing is booked and keeps the details; a second try books it', async ({ page }) => {
-    await page.clock.install();
-    const day = new Date(Date.now() + 3 * 86400_000).toISOString().slice(0, 10);
-    let posts = 0;
-    await page.route(`${BK}/types`, (route) => answer(route, 200, TYPES));
-    await page.route(`${BK}/slots?**`, (route) => answer(route, 200, { data: { date: day, duration_min: 30, slots: [`${day}T10:00`, `${day}T10:30`] } }));
-    await page.route(BK, (route) => {
-      if (route.request().method() === 'OPTIONS') return route.fulfill({ status: 204, headers: { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'content-type, accept', 'Access-Control-Allow-Methods': 'GET, POST, OPTIONS' } });
-      if (++posts === 1) return;   // the first try never answers
-      return answer(route, 200, { data: { ok: true, message: 'You’re booked for Haircut. A confirmation is on its way.' } });
-    });
-    await openBooking(page);
+  async function toDetails(page: Page, day: string) {
     await page.getByRole('button', { name: /Haircut/ }).click();
     await page.locator('.bk-date').fill(day);
     await page.getByRole('button', { name: '10:00 AM' }).click();
     await page.getByLabel('Your name').fill('Sam Rivera');
     await page.getByLabel('Email').fill('sam@customer.example');
+  }
+  const day = new Date(Date.now() + 3 * 86400_000).toISOString().slice(0, 10);
+  const SLOTS = { data: { date: day, duration_min: 30, slots: [`${day}T10:00`, `${day}T10:30`] } };
+  const preflight = (route: Route) => route.fulfill({ status: 204, headers: { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'content-type, accept', 'Access-Control-Allow-Methods': 'GET, POST, OPTIONS' } });
+
+  test('a booking that gets no answer: after 15 seconds it says nothing is booked, and keeps the details', async ({ page }) => {
+    await page.clock.install();
+    await page.route(`${BK}/types`, (route) => answer(route, 200, TYPES));
+    await page.route(`${BK}/slots?**`, (route) => answer(route, 200, SLOTS));
+    await page.route(BK, (route) => (route.request().method() === 'OPTIONS' ? preflight(route) : undefined));   // never answers
+    await openBooking(page);
+    await toDetails(page, day);
     await page.getByRole('button', { name: 'Confirm booking' }).click();
     await expect(page.getByRole('button', { name: 'Booking…' })).toBeDisabled();
-    await page.clock.runFor(SEND_WAIT_MS + 500);
-    const err = page.locator('.bk-err');
-    await expect(err).toContainText('Your booking didn’t go through, so nothing is booked yet. Please try again. You can also call (555) 123-4567 or email hello@shop.example.');
+    await page.clock.runFor(TICKET_SETTLE_MS + SEND_WAIT_MS + 500);
+    await expect(page.locator('.bk-err')).toContainText('Your booking didn’t go through, so nothing is booked yet. Please try again. You can also call (555) 123-4567 or email hello@shop.example.');
+    await expect(page.getByRole('button', { name: 'Confirm booking' })).toBeEnabled();
     await expect(page.getByLabel('Your name')).toHaveValue('Sam Rivera');
+  });
+
+  test('a booking whose connection drops says so, and a second try books it', async ({ page }) => {
+    let posts = 0;
+    await page.route(`${BK}/types`, (route) => answer(route, 200, TYPES));
+    await page.route(`${BK}/slots?**`, (route) => answer(route, 200, SLOTS));
+    await page.route(BK, (route) => {
+      if (route.request().method() === 'OPTIONS') return preflight(route);
+      return ++posts === 1 ? route.abort('connectionreset') : answer(route, 200, { data: { ok: true, message: 'You’re booked for Haircut. A confirmation is on its way.' } });
+    });
+    await openBooking(page);
+    await toDetails(page, day);
+    await page.getByRole('button', { name: 'Confirm booking' }).click();
+    await expect(page.locator('.bk-err')).toContainText('Your booking didn’t go through, so nothing is booked yet.');
     await page.getByRole('button', { name: 'Confirm booking' }).click();
     await expect(page.locator('.bk-done-msg')).toHaveText('You’re booked for Haircut. A confirmation is on its way.');
     expect(posts).toBe(2);

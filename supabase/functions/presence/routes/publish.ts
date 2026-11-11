@@ -34,6 +34,7 @@ import { snapshotContentUsable } from '../lib/render_types.ts';
 import type { SnapshotContent } from '../lib/render_types.ts';
 import type { SiteRow } from '../lib/site.ts';
 import { siteOrigin } from '../lib/site.ts';
+import { startCheckingSends } from '../lib/form_check.ts';
 import type { Principal } from '../../_shared/auth.ts';
 import { UUID_LOWER_RE as UUID_RE } from '../lib/uuid.ts';
 
@@ -197,6 +198,9 @@ export async function runPipeline(site: SiteRow, principal: Principal, kind: 'pu
   const dep = await deployFileMap(site.netlify_site_id, fileMap, { title: `${kind} ${pubId}` });
   if (!dep.ok) return await fail('deploy', dep.error || 'unknown');
   at('deploy');
+  // Item 140: these pages ask for a time ticket before they send, so from now on this
+  // site's form sends and bookings must carry one (lib/form_check.ts). Best-effort.
+  if (siteCfg.formEndpoint) await startCheckingSends(site.id).catch(() => {});
 
   const live = dep.state === 'ready';
   await svc(`presence_publishes?id=eq.${pubId}`, {

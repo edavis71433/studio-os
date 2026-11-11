@@ -26,10 +26,13 @@ import { validateBlocks } from '../lib/site_blocks.ts';
 import { validateFormValues, type FormDefinition } from '../lib/forms.ts';
 import { notSentReason } from '../lib/legal_pages.ts';
 import { enquiryState, customerEmails } from '../lib/enquiry_state.ts';
+import { judgeSend, issueTicket, TICKET_MIN_AGE_S, markSender, spamLinkToken, readSpamLinkToken, SPAM_REASONS } from '../lib/form_check.ts';
 
 const SB_URL = Deno.env.get('SUPABASE_URL') || '';
 const APPROVAL_SECRET = Deno.env.get('APPROVAL_SECRET') || Deno.env.get('SCHEDULER_SECRET') || '';
 const siteBase = () => (Deno.env.get('SITE_URL') || 'https://presence.davisdigitalstudio.com').replace(/\/$/, '');
+// the app's own address, where pages that answer an email's link live (spam.html, like unsubscribe.html)
+const appBase = () => (Deno.env.get('APP_URL') || 'https://app.davisdigitalstudio.com').replace(/\/$/, '');
 
 // ═══ FD-1 · Scheduled publish / revert (content expiry) ══════════════════════
 
@@ -166,25 +169,28 @@ export async function handleFormSubmit(req: Request, siteId: string, cors: Recor
       if (toPage && siteOrigin) return redirectTo('/contact/');
       return json({ error: 'not_found', message: 'That form is no longer available.' }, 404, cors);
     }
-    const spam = !!String((rawMap as any)?._hp ?? b?._hp ?? '').slice(0, 100).trim();
+    const trap = !!String((rawMap as any)?._hp ?? b?._hp ?? '').slice(0, 100).trim();
     const fv = validateFormValues(def, rawMap as any);
     if (!fv.ok) {
       if (toPage && siteOrigin) return await notSent(fv.error);
       return json({ error: fv.error, field: fv.field, message: fv.error === 'need_contact' ? 'Leave an email or phone so they can reply.' : (fv.error === 'empty' ? 'Please fill in the form.' : fv.error) }, 400, cors);
     }
+    // item 140: the time ticket, the words and the owner's marks (lib/form_check.ts)
+    const why2 = await judgeSend(siteId, { trap, ticket: (rawMap as any)?._tk, email: fv.sub.email, name: fv.sub.name, message: fv.sub.message });
+    const spam = !!why2;
     const ipHash2 = await hashIp(req);
     const src = String((rawMap as any)?.source_page ?? '').slice(0, 300);
     // item 131: a send that already arrived (a retry after no answer, a double tap) isn't stored twice
     if (!spam && await alreadyArrived(siteId, fv.sub)) return toPage && siteOrigin ? redirectTo(def.redirect_url || '/thanks/') : ok200(def.confirmation_text || FORM_THANKS, def.redirect_url ? { redirect: def.redirect_url } : {});
-    const ins2 = await svc('presence_form_submissions', {
-      method: 'POST', headers: { Prefer: 'return=minimal' },
-      body: JSON.stringify({ site_id: siteId, form_kind: def.kind, name: fv.sub.name, email: fv.sub.email, phone: fv.sub.phone, message: fv.sub.message, fields: fv.sub.values, source_page: src, spam, ip_hash: ipHash2 }),
+    const ins2 = await svc('presence_form_submissions?select=id', {
+      method: 'POST', headers: { Prefer: 'return=representation' },
+      body: JSON.stringify({ site_id: siteId, form_kind: def.kind, name: fv.sub.name, email: fv.sub.email, phone: fv.sub.phone, message: fv.sub.message, fields: why2 ? { ...fv.sub.values, __spam: { reason: why2 } } : fv.sub.values, source_page: src, spam, ip_hash: ipHash2 }),
     });
     if (!ins2.ok) {
       if (toPage && siteOrigin) return await notSent('try_again');
       return json({ error: 'write_failed', message: 'That didn’t send — please try again.' }, 502, cors);
     }
-    if (!spam) { notifyOwnerOfLead(siteId, { form_kind: def.kind, name: fv.sub.name, email: fv.sub.email, phone: fv.sub.phone, message: fv.sub.message }).catch(() => {}); acknowledgeEnquiry(siteId, { name: fv.sub.name, email: fv.sub.email }).catch(() => {}); }
+    if (!spam) { notifyOwnerOfLead(siteId, { id: String(ins2.json?.[0]?.id || ''), form_kind: def.kind, name: fv.sub.name, email: fv.sub.email, phone: fv.sub.phone, message: fv.sub.message }).catch(() => {}); acknowledgeEnquiry(siteId, { name: fv.sub.name, email: fv.sub.email }).catch(() => {}); }
     if (toPage && siteOrigin) return redirectTo(def.redirect_url || '/thanks/');
     // the page's sender goes on to the owner's own thank-you address when the form has one
     return ok200(def.confirmation_text || FORM_THANKS, def.redirect_url ? { redirect: def.redirect_url } : {});
@@ -196,17 +202,19 @@ export async function handleFormSubmit(req: Request, siteId: string, cors: Recor
     return json({ error: v.error, message: v.error === 'bad_email' ? 'That email doesn’t look right.' : v.error === 'need_contact' ? 'Leave an email or phone so they can reply.' : 'Add a short message.' }, 400, cors);
   }
   const ipHash = await hashIp(req);
+  // item 140: the time ticket, the words and the owner's marks (lib/form_check.ts)
+  const why = await judgeSend(siteId, { trap: v.spam, ticket: (rawMap as any)?._tk, email: v.sub.email, name: v.sub.name, message: v.sub.message });
 
-  if (!v.spam && await alreadyArrived(siteId, v.sub)) return toPage && siteOrigin ? redirectTo('/thanks/') : ok200(FORM_THANKS);
-  const ins = await svc('presence_form_submissions', {
-    method: 'POST', headers: { Prefer: 'return=minimal' },
-    body: JSON.stringify({ site_id: siteId, form_kind: v.sub.form_kind, name: v.sub.name, email: v.sub.email, phone: v.sub.phone, message: v.sub.message, fields: v.sub.fields, source_page: v.sub.source_page, spam: v.spam, ip_hash: ipHash }),
+  if (!why && await alreadyArrived(siteId, v.sub)) return toPage && siteOrigin ? redirectTo('/thanks/') : ok200(FORM_THANKS);
+  const ins = await svc('presence_form_submissions?select=id', {
+    method: 'POST', headers: { Prefer: 'return=representation' },
+    body: JSON.stringify({ site_id: siteId, form_kind: v.sub.form_kind, name: v.sub.name, email: v.sub.email, phone: v.sub.phone, message: v.sub.message, fields: why ? { ...v.sub.fields, __spam: { reason: why } } : v.sub.fields, source_page: v.sub.source_page, spam: !!why, ip_hash: ipHash }),
   });
   if (!ins.ok) {
     if (toPage && siteOrigin) return await notSent('try_again');
     return json({ error: 'write_failed', message: 'That didn’t send — please try again.' }, 502, cors);
   }
-  if (!v.spam) { notifyOwnerOfLead(siteId, v.sub).catch(() => {}); acknowledgeEnquiry(siteId, v.sub).catch(() => {}); } // best-effort, non-blocking
+  if (!why) { notifyOwnerOfLead(siteId, { ...v.sub, id: String(ins.json?.[0]?.id || '') }).catch(() => {}); acknowledgeEnquiry(siteId, v.sub).catch(() => {}); } // best-effort, non-blocking
   if (toPage && siteOrigin) return redirectTo('/thanks/');       // spam included — bots see success
   return ok200(FORM_THANKS);
 }
@@ -228,7 +236,8 @@ async function alreadyArrived(siteId: string, sub: { email: string; phone: strin
 
 /** The Enquiries queue answers the newest FORM_INBOX_PAGE; `more` says it was cut (bug hunt C15). */
 export const FORM_INBOX_PAGE = 100;
-export async function handleFormInbox(site: SiteRow, cors: Record<string, string>) {
+export async function handleFormInbox(site: SiteRow, cors: Record<string, string>, req?: Request) {
+  if (req && new URL(req.url).searchParams.get('spam') === '1') return handleSpamList(site, cors);
   // one past the page, so the queue can say when it stops short of every enquiry
   const r = await svc(`presence_form_submissions?site_id=eq.${site.id}&spam=eq.false&select=id,form_kind,name,email,phone,message,source_page,status,created_at,fields&order=created_at.desc&limit=${FORM_INBOX_PAGE + 1}`);
   const all = Array.isArray(r.json) ? r.json : [];
@@ -254,6 +263,71 @@ export async function handleFormInbox(site: SiteRow, cors: Record<string, string
     return { ...s, replies: leadReplies(fields), note: leadNote(fields), deal_id: dealId, ...enquiryState(s.status, dealId, customers.has(String(s.email || '').trim().toLowerCase())) };
   });
   return json({ data: { submissions, unread: submissions.filter((s: any) => s.status === 'new').length, more } }, 200, cors);
+}
+
+// ═══ Builder list item 140 · what the spam checks kept back, and why ═══
+// The Inbox's enquiries gain a Spam filter: the last SPAM_DAYS of messages filed as
+// spam, each with the reason in plain words and Not spam (POST /forms/inbox/:id
+// { spam: false }), so a stricter check never loses a real customer's message.
+export const SPAM_DAYS = 30;
+export async function handleSpamList(site: SiteRow, cors: Record<string, string>) {
+  const since = new Date(Date.now() - SPAM_DAYS * 86400_000).toISOString();
+  const r = await svc(`presence_form_submissions?site_id=eq.${site.id}&spam=eq.true&created_at=gte.${since}&select=id,form_kind,name,email,phone,message,source_page,status,created_at,fields&order=created_at.desc&limit=${FORM_INBOX_PAGE + 1}`);
+  if (!r.ok) return json({ error: 'read_failed', message: 'Your spam couldn’t load just now. Try again in a moment.' }, 502, cors);
+  const all = Array.isArray(r.json) ? r.json : [];
+  const spam = all.slice(0, FORM_INBOX_PAGE).map(({ fields, ...row }: any) => ({ ...row, spam: true, spam_reason: SPAM_REASONS[String(fields?.__spam?.reason || '')] || SPAM_REASONS.owner }));
+  return json({ data: { spam, days: SPAM_DAYS, more: all.length > FORM_INBOX_PAGE } }, 200, cors);
+}
+
+// ═══ Builder list item 140 · the ticket a site's page sends with a form or a booking ═══
+/** PUBLIC (a visitor route): a signed, timed ticket for this site. Stateless, no read. */
+export async function handleSendTicket(req: Request, siteId: string, cors: Record<string, string>) {
+  if (!/^[0-9a-f-]{36}$/.test(siteId)) return json({ error: 'not_found' }, 404, cors);
+  if (!(await rateAllow(`ticket:ip:${clientIp(req)}`, 30, 60))) return tooMany(cors);
+  return json({ data: { ticket: await issueTicket(siteId, Math.floor(Date.now() / 1000)), wait_s: TICKET_MIN_AGE_S } }, 200, { ...cors, 'Cache-Control': 'no-store' });
+}
+
+// ═══ Builder list item 140 · "This was spam" from the owner's alert email ═══
+// The link opens spam.html on the app's address (a function's own address can't show a
+// page), which shows the message and asks first: mail scanners open links on their own,
+// so the link itself changes nothing. Authorized by its signature alone, like an
+// approval link; it names one message on one site.
+async function spamLinkTarget(req: Request, token: unknown, cors: Record<string, string>): Promise<{ siteId: string; row: any } | Response> {
+  if (!(await rateAllow(`spamlink:ip:${clientIp(req)}`, 30, 60))) return tooMany(cors);
+  const t = await readSpamLinkToken(token);
+  if (t === 'expired') return json({ error: 'expired', message: 'This link has expired. Open your Inbox to mark the message as spam there.' }, 410, cors);
+  if (!t) return json({ error: 'bad_link', message: 'This link isn’t complete. Open your Inbox to mark the message as spam there.' }, 400, cors);
+  const row = (await svc(`presence_form_submissions?id=eq.${t.submissionId}&site_id=eq.${t.siteId}&select=id,name,email,phone,message,spam,fields,created_at&limit=1`)).json?.[0];
+  if (!row) return json({ error: 'not_found', message: 'That message isn’t there any more.' }, 404, cors);
+  return { siteId: t.siteId, row };
+}
+export async function handleSpamLinkGet(req: Request, cors: Record<string, string>) {
+  const hit = await spamLinkTarget(req, new URL(req.url).searchParams.get('t'), cors);
+  if (hit instanceof Response) return hit;
+  const r = hit.row;
+  return json({ data: { who: r.name || r.email || r.phone || 'Someone', preview: String(r.message || '').slice(0, 280), spam: !!r.spam, at: r.created_at } }, 200, cors);
+}
+export async function handleSpamLinkPost(req: Request, cors: Record<string, string>) {
+  let b: any = {}; try { b = await req.json(); } catch { /* */ }
+  const hit = await spamLinkTarget(req, b?.t, cors);
+  if (hit instanceof Response) return hit;
+  const on = b?.undo !== true;
+  const ok = await setSpam(hit.siteId, hit.row, on);
+  if (!ok) return json({ error: 'write_failed', message: 'That didn’t go through. Try again in a moment.' }, 502, cors);
+  return json({ data: { ok: true, spam: on } }, 200, cors);
+}
+/** Mark one message spam (the owner's own call) or not, and teach the site's memory. */
+async function setSpam(siteId: string, row: { id: string; email?: string; fields?: unknown }, on: boolean): Promise<boolean> {
+  const fields = { ...((row.fields && typeof row.fields === 'object') ? row.fields as Record<string, unknown> : {}) };
+  if (on) fields.__spam = { reason: 'owner' }; else delete fields.__spam;
+  const w = await svc(`presence_form_submissions?id=eq.${row.id}&site_id=eq.${siteId}`, { method: 'PATCH', headers: { Prefer: 'return=representation' }, body: JSON.stringify({ spam: on, fields }) });
+  if (!(w.ok && w.json?.[0])) return false;
+  if (row.email) await markSender(siteId, row.email, on).catch(() => {});
+  if (on) {
+    const k = leadFollowupNoticeKey(String(row.id));
+    await svc(`presence_plan_notices?site_id=eq.${siteId}&kind=eq.${k.kind}&period=eq.${k.period}&status=eq.active`, { method: 'PATCH', body: JSON.stringify({ status: 'dismissed' }) }).catch(() => {});
+  }
+  return true;
 }
 
 // ═══ Oct 2026 workflow audit, change 5 · reply to a website enquiry from Studio OS ═══
@@ -345,18 +419,26 @@ export async function handleFormStatus(req: Request, site: SiteRow, id: string, 
   const patch: Record<string, unknown> = {};
   if (status) patch.status = status;
   if (spamFlag !== null) patch.spam = spamFlag;
-  if (typeof b?.note === 'string') {
-    const cur = await svc(`presence_form_submissions?id=eq.${id}&site_id=eq.${site.id}&select=fields&limit=1`);
+  let email = '';
+  if (typeof b?.note === 'string' || spamFlag !== null) {
+    const cur = await svc(`presence_form_submissions?id=eq.${id}&site_id=eq.${site.id}&select=fields,email&limit=1`);
     const row = Array.isArray(cur.json) ? cur.json[0] : null;
     if (!row) return json({ error: 'not_found' }, 404, cors);
-    const body = String(b.note).replace(/\r\n?/g, '\n').trim().slice(0, LEAD_NOTE_MAX);
+    email = String(row.email || '');
     const fields = { ...((row.fields && typeof row.fields === 'object') ? row.fields : {}) } as Record<string, unknown>;
-    if (body) fields.__studio_note = { body, at: new Date().toISOString() }; else delete fields.__studio_note;
+    if (typeof b?.note === 'string') {
+      const body = String(b.note).replace(/\r\n?/g, '\n').trim().slice(0, LEAD_NOTE_MAX);
+      if (body) fields.__studio_note = { body, at: new Date().toISOString() }; else delete fields.__studio_note;
+    }
+    // item 140: the owner's own call says why it's in Spam, and Not spam clears the reason
+    if (spamFlag === true) fields.__spam = { reason: 'owner' }; else if (spamFlag === false) delete fields.__spam;
     patch.fields = fields;
   }
   if (!Object.keys(patch).length) return json({ data: { ok: true } }, 200, cors);
   const r = await svc(`presence_form_submissions?id=eq.${id}&site_id=eq.${site.id}`, { method: 'PATCH', headers: { Prefer: 'return=representation' }, body: JSON.stringify(patch) });
   if (!(r.ok && r.json?.[0])) return json({ error: 'not_found' }, 404, cors);
+  // item 140: more from an address marked as spam goes to Spam; Not spam forgets it
+  if (spamFlag !== null && email) await markSender(site.id, email, spamFlag).catch(() => {});
   // PP-1: acting on the lead resolves its follow-up nudge — so Today's card, the
   // bell, and the attention badge (all reading active notices) drop it at once.
   // Keyed period=lead:<id>, this touches exactly this lead's notice, nothing else.
@@ -402,14 +484,17 @@ async function acknowledgeEnquiry(siteId: string, sub: { name: string; email: st
   return await sendEmail(sub.email, copy.subject, `<p>${esc(copy.sentence)}</p>${copy.footer ? `<p style="color:#6b6478;font-size:13px">${esc(copy.footer)}</p>` : ''}`, brand, { critical: true, siteId, replyTo });   // they wrote in; this is the reply they are waiting for
 }
 
-async function notifyOwnerOfLead(siteId: string, sub: { form_kind: string; name: string; email: string; phone: string; message: string }) {
+async function notifyOwnerOfLead(siteId: string, sub: { id?: string; form_kind: string; name: string; email: string; phone: string; message: string }) {
   const ident = await svc(`presence_identity?site_id=eq.${siteId}&select=business_name,email&limit=1`);
   const to = ident.json?.[0]?.email;
   if (!to) return;
   const who = [sub.name, sub.email, sub.phone].filter(Boolean).join(' · ');
   const brand = await loadEmailBrand(siteId);   // BR-1: on the owner's brand
+  // item 140: one tap from the email files it as spam, and more from that address goes there too
+  const tok = sub.id ? await spamLinkToken(siteId, sub.id) : '';
+  const spamLine = tok ? `<p style="margin-top:14px;color:#6b6478;font-size:13px">Not a real customer? <a href="${appBase()}/spam.html?t=${encodeURIComponent(tok)}" style="color:#6b6478">This was spam</a>. It moves to Spam, and more from them goes there too.</p>` : '';
   await sendEmail(String(to), `New ${sub.form_kind} from your website`,
-    `<p>Someone reached out through your website.</p><p><b>${esc(who)}</b></p><p>${esc(sub.message)}</p><p class="cta"><a href="${siteBase()}/crm.html" style="display:inline-block;margin-top:6px;background:${brand.accent};color:#fff;padding:9px 16px;border-radius:999px;text-decoration:none">See it in your workspace →</a></p>`, brand);
+    `<p>Someone reached out through your website.</p><p><b>${esc(who)}</b></p><p>${esc(sub.message)}</p><p class="cta"><a href="${siteBase()}/crm.html" style="display:inline-block;margin-top:6px;background:${brand.accent};color:#fff;padding:9px 16px;border-radius:999px;text-decoration:none">See it in your workspace →</a></p>${spamLine}`, brand);
 }
 
 // ═══ FD-3 · Approval → notify → one-tap approve ══════════════════════════════

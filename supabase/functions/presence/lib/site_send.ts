@@ -29,12 +29,17 @@ interface SendSite { formEndpoint?: string; bookEndpoint?: string }
 // the same escaping as lib/markdown.ts attr(), which the templates put the addresses through
 const attr = (s: unknown): string => String(s ?? '').replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('"', '&quot;').replaceAll("'", '&#39;');
 
-/** The routes a client's site calls from its visitors' browsers: the form send and
- *  booking. index.ts answers them with visitorCors (the site has its own address). */
-export const VISITOR_ROUTE = /^\/(?:forms\/[0-9a-f-]{36}\/submit|book\/[0-9a-f-]{36}(?:\/types|\/slots)?)$/;
+/** The routes a client's site calls from its visitors' browsers: the form send,
+ *  booking, and (item 140) the time ticket for either. index.ts answers them with
+ *  visitorCors (the site has its own address). */
+export const VISITOR_ROUTE = /^\/(?:forms\/[0-9a-f-]{36}\/(?:submit|ticket)|book\/[0-9a-f-]{36}(?:\/types|\/slots|\/ticket)?)$/;
 
 /** How long the page waits for an answer before it says the message didn't send. */
 export const SEND_WAIT_MS = 15000;
+/** Item 140: a send waits until its time ticket is this old (the server wants three
+ *  seconds; the half second covers its rounding), and asks for a new one after 11 hours. */
+export const TICKET_SETTLE_MS = 3500;
+export const TICKET_FRESH_MS = 11 * 3600_000;
 
 export interface SiteReach { tel: string; mail: string }
 
@@ -53,6 +58,10 @@ export function senderTag(endpoint: string): string {
   const js = `(function(){
 if(!window.fetch||!window.FormData||!document.addEventListener)return;
 var EP=${JSON.stringify(endpoint).replace(/</g, '\\u003c')},WAIT=${SEND_WAIT_MS},B=document.body;
+var TKURL=EP.replace(/\\/submit$/,'/ticket'),TK='',TKAT=0,TKP=null;
+function ticket(){if(TK&&Date.now()-TKAT<${TICKET_FRESH_MS})return Promise.resolve(TK);if(TKP)return TKP;
+TKP=fetch(TKURL,{headers:{accept:'application/json'}}).then(function(r){if(!r.ok)throw new Error('ticket '+r.status);return r.json();}).then(function(j){TK=(j&&j.data&&j.data.ticket)||'';TKAT=Date.now();TKP=null;return TK;},function(e){TKP=null;throw e;});return TKP;}
+function settled(){return new Promise(function(res){setTimeout(res,Math.max(0,TKAT+${TICKET_SETTLE_MS}-Date.now()));});}
 var SAY={gone:'Your message didn’t send. What you wrote is still here, so you can try again in a minute.',busy:'A lot of messages were sent from here just now. Wait a minute, then send it again.',closed:'This form isn’t taking messages right now.'};
 function el(t,c,x){var e=document.createElement(t);if(c)e.className=c;if(x!=null)e.textContent=x;return e;}
 function txt(p,s){p.appendChild(document.createTextNode(s));}
@@ -78,14 +87,16 @@ var ac=window.AbortController?new AbortController():null,over=false;
 var slow=setTimeout(function(){if(!over)p.textContent='Still sending…';},6000);
 function end(){over=true;clearTimeout(slow);clearTimeout(cap);}
 var cap=setTimeout(function(){if(over)return;end();if(ac)ac.abort();fail(f,'gone');},WAIT);
-fetch(EP,{method:'POST',body:new FormData(f),headers:{accept:'application/json'},signal:ac?ac.signal:undefined})
-.then(function(r){return r.json().then(function(j){return {s:r.status,j:j};},function(){return {s:r.status,j:null};});})
-.then(function(o){if(over)return;end();var d=o.j&&o.j.data;
+ticket().then(settled).then(function(){if(over)return null;var fd=new FormData(f);if(TK)fd.append('_tk',TK);
+return fetch(EP,{method:'POST',body:fd,headers:{accept:'application/json'},signal:ac?ac.signal:undefined});})
+.then(function(r){if(!r)return null;return r.json().then(function(j){return {s:r.status,j:j};},function(){return {s:r.status,j:null};});})
+.then(function(o){if(over||!o)return;end();var d=o.j&&o.j.data;
 if(o.s>=200&&o.s<300&&d&&d.ok){if(d.redirect){location.href=d.redirect;return;}busy(f,false);sent(f,d.message);return;}
 if(o.s===400&&o.j&&o.j.message){fail(f,'check',o.j.message,o.j.field);return;}
 fail(f,o.s===429?'busy':(o.s===404?'closed':'gone'));})
 .catch(function(){if(over)return;end();fail(f,'gone');});}
 document.addEventListener('submit',function(ev){var f=ev.target;if(f&&f.getAttribute&&f.getAttribute('action')===EP)send(f,ev);},false);
+document.addEventListener('focusin',function(ev){var f=ev.target&&ev.target.form;if(f&&f.getAttribute('action')===EP)ticket().catch(function(){});},false);
 })();`;
   return `${STYLE}<script>${js.replace(/<\//g, '<\\/')}</script>`;
 }
@@ -109,12 +120,16 @@ var EP=W.getAttribute('data-book');var stage=W.querySelector('.bk-stage');
 var S={types:[],type:null,date:'',slot:'',cfg:{}},WAIT=${SEND_WAIT_MS};
 var MO=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 var NOT_BOOKED='Your booking didn’t go through, so nothing is booked yet. Please try again.';
+var TK='',TKAT=0;
 function el(t,c,x){var e=document.createElement(t);if(c)e.className=c;if(x!=null)e.textContent=x;return e;}
 function clr(){while(stage.firstChild)stage.removeChild(stage.firstChild);}
 function msg(t){clr();var p=el('p','bk-msg',t);stage.appendChild(p);return p;}
 function call(u,o){var ac=window.AbortController?new AbortController():null;if(ac)o.signal=ac.signal;var t=setTimeout(function(){if(ac)ac.abort();},WAIT);
 return fetch(u,o).then(function(r){clearTimeout(t);return r.json().then(function(j){return {s:r.status,j:j};},function(){return {s:r.status,j:null};});},function(e){clearTimeout(t);throw e;});}
 function getj(u){return call(u,{headers:{accept:'application/json'}}).then(function(o){if(o.s<200||o.s>=300)throw new Error('status '+o.s);return o.j;});}
+function ticket(){if(TK&&Date.now()-TKAT<${TICKET_FRESH_MS})return Promise.resolve(TK);return getj(EP+'/ticket').then(function(j){TK=((j&&j.data)||{}).ticket||'';TKAT=Date.now();return TK;});}
+function settled(){return new Promise(function(res){setTimeout(res,Math.max(0,TKAT+${TICKET_SETTLE_MS}-Date.now()));});}
+ticket().catch(function(){});
 function reach(p,lead){var B=document.body,tel=B.getAttribute('data-reach-tel')||'',mail=B.getAttribute('data-reach-mail')||'';if(!tel&&!mail)return p;
 p.appendChild(document.createTextNode(' '+lead+' '));if(tel){p.appendChild(document.createTextNode('call '));var a=el('a',null,tel);a.href='tel:'+tel.replace(/[^0-9+]/g,'');p.appendChild(a);}
 if(tel&&mail)p.appendChild(document.createTextNode(' or '));if(mail){p.appendChild(document.createTextNode('email '));var m=el('a',null,mail);m.href='mailto:'+mail;p.appendChild(m);}
@@ -130,7 +145,8 @@ function slots(){clr();stage.appendChild(back(pickDate));stage.appendChild(el('p
 function field(lb,nm,ty,req){var w=el('label','bk-field');w.appendChild(el('span',null,lb+(req?' *':'')));var i=el(ty==='textarea'?'textarea':'input');if(ty!=='textarea')i.type=ty;i.name=nm;if(req)i.required=true;w.appendChild(i);return {w:w,i:i};}
 function details(){clr();stage.appendChild(back(slots));stage.appendChild(el('p','bk-step','4. Your details'));var f=el('form','bk-form');var nm=field('Your name','name','text',true),em=field('Email','email','email',false),ph=field('Phone','phone','tel',false),nt=field('Anything we should know?','note','textarea',false);f.appendChild(nm.w);f.appendChild(em.w);f.appendChild(ph.w);f.appendChild(nt.w);var hp=el('div','bk-hp');var hpi=el('input');hpi.name='_hp';hpi.tabIndex=-1;hpi.setAttribute('autocomplete','off');hp.appendChild(hpi);f.appendChild(hp);f.appendChild(el('p','bk-summary',S.type.name+' — '+fdate(S.date)+' at '+ftime(S.slot.split('T')[1])));var btn=el('button','bk-submit btn','Confirm booking');btn.type='submit';f.appendChild(btn);var err=el('p','bk-err');f.appendChild(err);
 function again(t,o){btn.disabled=false;btn.textContent='Confirm booking';err.textContent=t;if(!o||o.s>=500)reach(err,'You can also');}
-f.addEventListener('submit',function(ev){ev.preventDefault();err.textContent='';if(!nm.i.value.trim()){err.textContent='Please add your name.';return;}if(!em.i.value.trim()&&!ph.i.value.trim()){err.textContent='Leave an email or phone so they can confirm.';return;}btn.disabled=true;btn.textContent='Booking…';call(EP,{method:'POST',headers:{'content-type':'application/json',accept:'application/json'},body:JSON.stringify({type_id:S.type.id,slot_start:S.slot,name:nm.i.value,email:em.i.value,phone:ph.i.value,note:nt.i.value,_hp:hpi.value})}).then(function(o){if(o.s>=200&&o.s<300&&o.j&&o.j.data&&o.j.data.ok){done(o.j.data.message);}else{again((o.s<500&&o.j&&o.j.message)||NOT_BOOKED,o);if(o.s===409){setTimeout(function(){S.slot='';slots();},1800);}}}).catch(function(){again(NOT_BOOKED,null);});});stage.appendChild(f);}
+function send(second){return ticket().then(settled).then(function(){return call(EP,{method:'POST',headers:{'content-type':'application/json',accept:'application/json'},body:JSON.stringify({type_id:S.type.id,slot_start:S.slot,name:nm.i.value,email:em.i.value,phone:ph.i.value,note:nt.i.value,_hp:hpi.value,_tk:TK})});}).then(function(o){if(o.s===400&&o.j&&o.j.error==='check'&&!second){TK='';return send(true);}return o;});}
+f.addEventListener('submit',function(ev){ev.preventDefault();err.textContent='';if(!nm.i.value.trim()){err.textContent='Please add your name.';return;}if(!em.i.value.trim()&&!ph.i.value.trim()){err.textContent='Leave an email or phone so they can confirm.';return;}btn.disabled=true;btn.textContent='Booking…';send(false).then(function(o){if(o.s>=200&&o.s<300&&o.j&&o.j.data&&o.j.data.ok){done(o.j.data.message);}else{again((o.s<500&&o.j&&o.j.message)||NOT_BOOKED,o);if(o.s===409){setTimeout(function(){S.slot='';slots();},1800);}}}).catch(function(){again(NOT_BOOKED,null);});});stage.appendChild(f);}
 function done(m){clr();var d=el('div','bk-done');d.appendChild(el('p','bk-done-ic','✓'));d.appendChild(el('p','bk-done-msg',m||'Thanks — your booking request was received.'));stage.appendChild(d);}
 })();`;
   return `<script>${js.replace(/<\//g, '<\\/')}</script>`;

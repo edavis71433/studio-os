@@ -69,7 +69,7 @@ import { handleEstimateCreate, handleEstimateSend, handleEstimateDecide, handleE
 import { handleRecurringStart, handleRecurringChange, handleRecurringAction } from './routes/recurring_invoices.ts';   // sales review item 47
 import { handleEmailLogAddress } from './routes/email_log.ts';   // sales review item 69: the log-this-email address   // sales review item 69: the sending-domain line
 const { handleBroadcastsList, handleBroadcastCreate, handleBroadcastListCreate, handleBroadcastListDelete, handleBroadcastSegments, handleBroadcastGet, handleBroadcastUpdate, handleBroadcastSend, handleBroadcastCancel, handleBroadcastDraftAssist, handleBroadcastTest } = lazyRoutes(() => import('./routes/broadcasts.ts'));
-import { handleScheduleCreate, handleScheduleList, handleScheduleCancel, handleFormSubmit, handleFormInbox, handleFormStatus, handleFormReply, handleApproveSend, handleApproveGet, handleApprovePost } from './routes/commercial.ts';
+import { handleScheduleCreate, handleScheduleList, handleScheduleCancel, handleFormSubmit, handleFormInbox, handleFormStatus, handleFormReply, handleApproveSend, handleApproveGet, handleApprovePost, handleSendTicket, handleSpamLinkGet, handleSpamLinkPost } from './routes/commercial.ts';
 const { handleBookingTypes, handleBookingSlots, handleBookingCreate, handleBookingSettingsGet, handleBookingSettingsPut, handleBookingTypesList, handleBookingTypeCreate, handleBookingTypeUpdate, handleBookingTypeDelete, handleBookingAppointments, handleBookingConfirm, handleBookingCancel, handleBookingMark } = lazyRoutes(() => import('./routes/booking.ts'));
 const { handleReviewPage, handleReviewSubmit, handleReviewsList, handleReviewApprove, handleReviewHide, handleReviewReply, handleReviewRequest } = lazyRoutes(() => import('./routes/reviews.ts'));
 const { handleCommentsList, handleCommentCreate, handleCommentResolve, handleCommentDelete, handleTokenSections, handleTokenComment } = lazyRoutes(() => import('./routes/comments.ts'));
@@ -184,6 +184,12 @@ async function route_(req: Request, cors: Record<string, string>): Promise<Respo
   {
     const m = route.match(/^\/forms\/([0-9a-f-]{36})\/submit$/);
     if (m && method === 'POST') return handleFormSubmit(req, m[1], cors);
+    // item 140: the time ticket a site's page sends with a form or a booking
+    const t = route.match(/^\/(?:forms|book)\/([0-9a-f-]{36})\/ticket$/);
+    if (t && method === 'GET') return handleSendTicket(req, t[1], cors);
+    // item 140: the "This was spam" link in the owner's alert email (spam.html asks, then marks)
+    if (route === '/forms/spam' && method === 'GET') return handleSpamLinkGet(req, cors);
+    if (route === '/forms/spam' && method === 'POST') return handleSpamLinkPost(req, cors);
   }
   // ── Phase BK: PUBLIC native booking — a website visitor lists services, reads
   //    open slots, and books an appointment. No session; authorized by the site id
@@ -1023,7 +1029,7 @@ async function route_(req: Request, cors: Record<string, string>): Promise<Respo
     const m = route.match(/^\/schedule\/([0-9a-f-]{36})\/cancel$/);
     if (m && method === 'POST') return handleScheduleCancel(site, m[1], principal, cors);
   }
-  if (route === '/forms/inbox' && method === 'GET') return handleFormInbox(site, cors);
+  if (route === '/forms/inbox' && method === 'GET') return handleFormInbox(site, cors, req);
   {
     const m = route.match(/^\/forms\/inbox\/([0-9a-f-]{36})$/);
     if (m && method === 'POST') return handleFormStatus(req, site, m[1], cors);

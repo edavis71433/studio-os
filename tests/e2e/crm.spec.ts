@@ -325,14 +325,14 @@ test.describe('Website enquiries (the Inbox’s Enquiries view)', () => {
     await expect(rowOf(page, 'Sam Rivera')).toContainText('Not a fit');   // …but All shows it
   });
 
-  test('Spam POSTs spam:true and the enquiry is gone everywhere', async ({ page }) => {
+  test('Spam POSTs spam:true and the enquiry leaves every list but Spam', async ({ page }) => {
     await installApp(page);
     await page.goto(ENQ);
     const pane = await pick(page, 'Dana Lee');
     const req = page.waitForRequest((r) => r.method() === 'POST' && /\/forms\/inbox\/l2$/.test(new URL(r.url()).pathname));
     await pane.locator('button.quiet', { hasText: 'Spam' }).click();
     expect((await req).postDataJSON()).toEqual({ spam: true });
-    await expect(page.locator('.dds-toast')).toContainText('Marked as spam');
+    await expect(page.locator('.dds-toast')).toContainText('Moved to Spam');   // item 140: kept in the Spam filter, not gone for good
     await page.locator('[data-ef="all"]').click();
     await expect(queue(page)).toHaveCount(1);
     await expect(page.locator('#rows')).not.toContainText('Dana Lee');
