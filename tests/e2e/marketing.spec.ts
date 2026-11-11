@@ -1180,6 +1180,24 @@ test.describe('MS2 money path (live, mobile)', () => {
 });
 
 // ---------------------------------------------------------------------------
+// List item 137: the gold text (links, eyebrows) read on every surface they sit
+// on. The token measured 4.35:1 on the warm panels before it was darkened.
+// ---------------------------------------------------------------------------
+test.describe('gold text contrast (live, desktop)', () => {
+  test.beforeEach(({}, testInfo) => {
+    test.skip(testInfo.project.name !== 'desktop-chromium', 'contrast measured once, on desktop');
+  });
+
+  for (const path of ['/index.html', '/web-design.html', '/burbank-web-design.html']) {
+    test(`gold links and eyebrows pass AA on ${path}`, async ({ page }) => {
+      await page.goto(path);
+      expect(await contrastOf(page, '.textlink'), 'gold text links').toBeGreaterThanOrEqual(4.5);
+      expect(await contrastOf(page, '.eyebrow'), 'eyebrows').toBeGreaterThanOrEqual(4.5);
+    });
+  }
+});
+
+// ---------------------------------------------------------------------------
 // Live behavior — mobile drawer
 // ---------------------------------------------------------------------------
 test.describe('marketing nav (live, mobile)', () => {
