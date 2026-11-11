@@ -1105,7 +1105,8 @@ let IMPORT=null,IMPORT_ASKED=false;
 async function loadImportStrip(){
   if(scope())return;
   let r;try{r=await api('/sales/contacts/imports');}catch(_){return;}
-  IMPORT=(r.ok&&r.body&&r.body.data&&!r.body.data.undone_at)?r.body.data:null;
+  const d=r.ok&&r.body&&r.body.data;   // the latest import, or nothing; anything else paints no strip
+  IMPORT=(d&&!Array.isArray(d)&&d.id&&isFinite(Date.parse(d.created_at))&&!d.undone_at)?d:null;
   paintImportStrip();
 }
 function paintImportStrip(){
