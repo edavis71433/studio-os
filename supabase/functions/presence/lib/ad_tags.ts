@@ -7,8 +7,10 @@
 //
 // The IDs are written into a script on the published site, so they are held to
 // their exact shapes here, at save (routes/content.ts) and again at render: letters,
-// digits and one dash, nothing that could carry code. Pure.
-import type { FileMap, SnapshotContent } from './render_types.ts';
+// digits and one dash, nothing that could carry code. Pure, and imports nothing, since a
+// browser test (tests/e2e/ad-tags.spec.ts) runs this very script.
+type FileMap = Record<string, string | Uint8Array>;
+type Settings = { ad_tags?: { google?: unknown; meta?: unknown } } | undefined;
 
 /** A Google tag ID: Google Analytics (G-), Google Ads (AW-), a Google tag (GT-) or
  *  Floodlight (DC-), as Google's own install screens show them. */
@@ -19,7 +21,7 @@ export const META_PIXEL_RE = /^\d{8,20}$/;
 export interface AdTags { google?: string; meta?: string }
 
 /** The site's tags as the snapshot carries them, each one re-checked; null when none. */
-export function adTagsOf(settings: SnapshotContent['settings'] | undefined): AdTags | null {
+export function adTagsOf(settings: Settings): AdTags | null {
   const t = settings?.ad_tags;
   const google = typeof t?.google === 'string' && GOOGLE_TAG_RE.test(t.google) ? t.google : '';
   const meta = typeof t?.meta === 'string' && META_PIXEL_RE.test(t.meta) ? t.meta : '';
@@ -53,7 +55,7 @@ export function adTagsScript(tags: AdTags): string {
 
 /** Add the notice and the loader to every page, before </body>. Unchanged (the same object)
  *  when the site has no ad tags, so such a site draws byte for byte as before. */
-export function injectAdTags(fileMap: FileMap, settings: SnapshotContent['settings'] | undefined): FileMap {
+export function injectAdTags(fileMap: FileMap, settings: Settings): FileMap {
   const tags = adTagsOf(settings);
   if (!tags) return fileMap;
   const tag = adTagsScript(tags);
