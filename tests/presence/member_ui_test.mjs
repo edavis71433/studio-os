@@ -25,9 +25,9 @@ const needOf = (name) => { const [m, r] = name.split(' '); return contentWriteNe
 const CONTROLS = [
   ['DELETE /assets/:id', 'files.html', `api('/assets/'+id,'DELETE')`, ['data-needs="delete" onclick="del(']],
   ['DELETE /bookings/types/:id', 'presence.html', `api("DELETE", "/bookings/types/" + t.id)`, ['el("button", null, "Remove"); del.dataset.needs = "delete"']],
-  ['DELETE /content-library/:id', 'presence.html', `api("DELETE", "/content-library/" + it.id)`, ['el("button", null, "×"); del.dataset.needs = "delete"']],
+  ['DELETE /content-library/:id', 'presence.html', `api("DELETE", "/content-library/" + it.id)`, ['icoBtn("x", "Remove from library", null, 14); del.dataset.needs = "delete"']],
   ['DELETE /knowledge/docs/:id', 'presence.html', 'api("DELETE", `/knowledge/docs/${d.id}`)', ['el("button", "quietact", "Remove"); del.dataset.needs = "delete"']],
-  ['DELETE /media/:id', 'presence.html', 'api("DELETE", `/media/${m.id}`)', ['el("button", "del", "✕"); del.dataset.needs = "delete"']],
+  ['DELETE /media/:id', 'presence.html', 'api("DELETE", `/media/${m.id}`)', ['icoBtn("x", "Remove photograph: " + (m.alt_text || ""), "del", 14); del.dataset.needs = "delete"']],
   ['DELETE /publishes/checkpoints/:id', 'presence.html', 'api("DELETE", `/publishes/checkpoints/${c.id}`)', ['acts.lastChild.dataset.needs = "delete"']],
   ['DELETE /redirects/:id', 'presence.html', `api("DELETE", "/redirects/" + row.id)`, ['x.dataset.needs = "delete"']],
   ['POST /comments/:id/delete', 'presence.html', `"/comments/" + c.id + "/delete"`, ['d.dataset.needs = "delete"']],
