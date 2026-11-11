@@ -273,8 +273,11 @@ export async function handleSalesContacts(req: Request, site: SiteRow, principal
     // read, so every page costs the same two reads at any roster size). The pages
     // that list people ask for it to say "Showing 100 of N"; nobody else pays.
     const totalP = u.searchParams.get('total') === '1' ? svcCount(`presence_contacts?site_id=eq.${site.id}${more}`).catch(() => null) : Promise.resolve(undefined);
-    // item 89: the row shows a job title and tags, and a second phone to call; before APPLY-0166 the older select
-    let r = await svc(mkPath(`id,name,email,phone,company,client_id,updated_at,${CONTACT_MORE_COLS.join(',')}`));
+    // item 89: the row shows a job title and tags, and a second phone to call; before APPLY-0166 the older select.
+    // item 105: found_via rides along for the list's "How they found you" chart (APPLY-0143; without it, every
+    // contact counts as not recorded).
+    let r = await svc(mkPath(`id,name,email,phone,company,client_id,updated_at,found_via,${CONTACT_MORE_COLS.join(',')}`));
+    if (!r.ok && r.status === 400) r = await svc(mkPath('id,name,email,phone,company,client_id,updated_at,found_via'));
     if (!r.ok && r.status === 400) r = await svc(mkPath('id,name,email,phone,company,client_id,updated_at'));
     if (!r.ok && r.status === 400) r = await svc(mkPath('id,name,email,phone,company,updated_at'));
     if (!r.ok) return json({ error: 'read_failed', message: 'We couldn’t load your contacts just now.' }, 502, cors);
@@ -914,7 +917,9 @@ export async function handleSalesDeals(req: Request, site: SiteRow, principal: P
     // the pipeline list.
     const baseCols = 'id,title,stage,source,expected_value_cents,expected_close,contact_id,converted_client_id,updated_at';
     const filters = `${stage && isStage(stage) ? `&stage=eq.${stage}` : ''}${q ? `&title.ilike.*${encodeURIComponent(q)}*` : ''}`;
-    let r = await svc(`presence_deals?site_id=eq.${site.id}&deleted_at=is.null&select=${baseCols},next_step,next_step_at&order=updated_at.desc&limit=${limit}&offset=${offset}${filters}`);
+    // item 105: found_via (APPLY-0143) rides along for the list's "Where they came from" chart, then the same read without it.
+    let r = await svc(`presence_deals?site_id=eq.${site.id}&deleted_at=is.null&select=${baseCols},next_step,next_step_at,found_via&order=updated_at.desc&limit=${limit}&offset=${offset}${filters}`);
+    if (!r.ok) r = await svc(`presence_deals?site_id=eq.${site.id}&deleted_at=is.null&select=${baseCols},next_step,next_step_at&order=updated_at.desc&limit=${limit}&offset=${offset}${filters}`);
     if (!r.ok) r = await svc(`presence_deals?site_id=eq.${site.id}&deleted_at=is.null&select=${baseCols}&order=updated_at.desc&limit=${limit}&offset=${offset}${filters}`);
     if (!r.ok) return json({ error: 'read_failed', message: 'We couldn’t load your pipeline just now.' }, 502, cors);
     const deals = rows(r);

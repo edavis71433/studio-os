@@ -330,7 +330,7 @@ html.dds-embed #detailWrap{padding-top:0}
   /* final pass, batch C: on a phone the toolbar wrapped to three rows. Manage services, Import CSV
      and Columns fold under More, so it's one row of actions above List · Board · Table. */
   .morewrap{display:none;position:relative}
-  @media (max-width:600px){#mngServicesTop,#importDeals,#colsWrap{display:none!important}.morewrap{display:inline-block}}
+  @media (max-width:600px){#mngServicesTop,#importDeals,#colsWrap,#chartsBtn,#printBtn{display:none!important}.morewrap{display:inline-block}}
   .pvmenu{position:absolute;z-index:40;top:calc(100% + 4px);left:0;min-width:240px;background:var(--card);border:1px solid var(--line);border-radius:var(--dds-r-lg,10px);box-shadow:var(--shadow,0 12px 32px rgba(0,0,0,.14));padding:6px}
   .pvmenu button{display:block;width:100%;text-align:left;font:inherit;font-size:14px;border:none;background:none;color:var(--ink);padding:8px 10px;border-radius:var(--dds-r,8px);cursor:pointer}
   .pvmenu button:hover,.pvmenu button:focus-visible{background:var(--p-soft)}
@@ -474,6 +474,7 @@ html.dds-embed #detailWrap{padding-top:0}
      tokens and the shared anatomy come from shell.css. ══ */
   .btn{background:var(--dds-grad-btn);color:var(--dds-on-p,#fff);border-radius:999px;font-weight:600;box-shadow:0 6px 16px -8px color-mix(in srgb,var(--p) 70%,transparent)}
   .btn.ghost{background:var(--card);border:1px solid var(--dds-line-strong,#d6d4e2);color:var(--ink);box-shadow:none}
+  #chartsBtn[aria-pressed="true"]{background:var(--p-soft);border-color:var(--p);color:var(--p)}   /* item 105 */
   /* the numbers: each its own card, as on Home */
   .stats{gap:var(--dds-s3,12px);border:0;background:transparent;overflow:visible;box-shadow:none}
   .stats .st{background:var(--card);border:1px solid var(--line);border-radius:var(--dds-r-lg,16px);box-shadow:var(--shadow)}
@@ -521,7 +522,8 @@ html.dds-embed #detailWrap{padding-top:0}
   <!-- "Manage services" also lives here: it used to be reachable ONLY from
        inside an open deal's Proposals section, so the catalog that unhides the
        proposal line-item dropdown was effectively undiscoverable. -->
-  <div class="bar"><button class="btn" id="newDeal">+ New deal</button><button class="btn ghost" id="mngServicesTop" title="Your services and prices — used to fill proposals fast">Manage services</button><button class="btn ghost" id="importDeals" type="button">Import CSV</button><span class="pvwrap"><button class="btn ghost" id="pvBtn" type="button" aria-haspopup="true" aria-expanded="false">Views ▾</button><div id="pvMenu" class="pvmenu" role="menu" aria-label="Saved views" hidden></div></span><span class="colsdd" id="colsWrap" hidden><button class="btn ghost" id="colsBtn" type="button" aria-haspopup="true" aria-expanded="false">Columns</button></span><span class="morewrap"><button class="btn ghost" id="moreBtn" type="button" aria-haspopup="true" aria-expanded="false" aria-controls="moreMenu">More ▾</button><div id="moreMenu" class="pvmenu" role="menu" aria-label="More" hidden></div></span><span class="spacer"></span><div class="viewtog" role="group" aria-label="Display as"><button class="chip on" id="viewList" aria-pressed="true">List</button><button class="chip" id="viewBoard" aria-pressed="false">Board</button><button class="chip" id="viewTable" aria-pressed="false">Table</button></div></div>
+  <div class="bar"><button class="btn" id="newDeal">+ New deal</button><button class="btn ghost" id="mngServicesTop" title="Your services and prices — used to fill proposals fast">Manage services</button><button class="btn ghost" id="importDeals" type="button">Import CSV</button><span class="pvwrap"><button class="btn ghost" id="pvBtn" type="button" aria-haspopup="true" aria-expanded="false">Views ▾</button><div id="pvMenu" class="pvmenu" role="menu" aria-label="Saved views" hidden></div></span><span class="colsdd" id="colsWrap" hidden><button class="btn ghost" id="colsBtn" type="button" aria-haspopup="true" aria-expanded="false">Columns</button></span><button class="btn ghost" id="chartsBtn" type="button" aria-pressed="false" aria-controls="charts">Charts</button><button class="btn ghost" id="printBtn" type="button">Print</button><span class="morewrap"><button class="btn ghost" id="moreBtn" type="button" aria-haspopup="true" aria-expanded="false" aria-controls="moreMenu">More ▾</button><div id="moreMenu" class="pvmenu" role="menu" aria-label="More" hidden></div></span><span class="spacer"></span><div class="viewtog" role="group" aria-label="Display as"><button class="chip on" id="viewList" aria-pressed="true">List</button><button class="chip" id="viewBoard" aria-pressed="false">Board</button><button class="chip" id="viewTable" aria-pressed="false">Table</button></div></div>
+  <section class="dds-charts" id="charts" aria-label="Charts" hidden></section>
   <div id="csvZone"></div>
   <div id="list" aria-live="polite"></div>
   <div id="board" aria-live="polite" hidden></div>
@@ -1974,7 +1976,59 @@ function renderMeta(){
   }
   if(VIEW==='table'){const col=TCOLS.find(x=>x[0]===TSORT.key)||TCOLS[0];m+=' · Sorted by '+col[1]+' — '+(TSORT.dir>0?'ascending':'descending');}
   el.textContent=m;
+  paintCharts();   // item 105: the charts count the same deals
 }
+// ── Sales review item 105 (Nov 2026): Charts and Print, of exactly the deals in
+// view (the board's open cards; the list's and the table's filtered deals). The
+// pieces live in shell.js (window.ddsListKit.charts, .chartTips, .printList). ──
+const CHARTS_KEY='dds-charts:pipeline';
+let CHARTS=(function(){try{return localStorage.getItem(CHARTS_KEY)==='1';}catch(_){return false;}})();
+const dealsInView=()=>VIEW==='board'?boardVisible():visibleDeals();
+function paintCharts(){
+  const host=$('charts'),b=$('chartsBtn'),k=KIT();
+  if(b)b.setAttribute('aria-pressed',CHARTS?'true':'false');
+  if(!host)return;
+  if(CHARTS&&!k)document.addEventListener('DOMContentLoaded',paintCharts,{once:true});   // shell.js loads after this script
+  host.hidden=!CHARTS||!k||!DEALS.length;
+  if(host.hidden){host.innerHTML='';return;}
+  const list=dealsInView(),n=list.length;
+  const stages=STAGES.map(st=>{const ds=list.filter(d=>d.stage===st);return{label:stageLabel(st),n:ds.length,extra:money0(ds.reduce((a,d)=>a+(d.expected_value_cents||0),0))};});
+  const seen={};list.forEach(d=>{const v=FOUND_VIA.includes(d.found_via)?d.found_via:'';seen[v]=(seen[v]||0)+1;});
+  const from=FOUND_VIA.filter(v=>seen[v]).map(v=>({label:v,n:seen[v]})).sort((a,b)=>b.n-a.n);
+  if(seen[''])from.push({label:'Not recorded',n:seen[''],none:true});
+  const atCap=DEALS.length>=FETCH_LIMIT;
+  host.innerHTML=k.charts([
+    {title:VIEW==='board'?'Open deals by stage':'Deals by stage',rows:stages,unit:['deal','deals'],extra:true},
+    {title:'Where they came from',rows:from,unit:['deal','deals']},
+  ],n?'From the '+n+' deal'+(n===1?'':'s')+' in this view.'+(atCap?' Only your newest '+FETCH_LIMIT+' deals are loaded, so older ones aren’t counted.':''):'');
+  k.chartTips(host);
+}
+// what the printed page is called: the saved view, the board's chip, or the list's stage
+function printName(){
+  const v=SAVED.find(x=>x.id===CURVIEW);if(v)return v.name;
+  if(VIEW==='board'){const c=BCHIPS.find(x=>x[0]===BCHIP);return BCHIP==='all'||!c?'Open deals':c[1];}
+  return FILTER?stageLabel(FILTER):'All deals';
+}
+// the order on paper is the order on screen; the board's columns read left to right
+function printOrder(list){
+  if(VIEW==='table')return tableOrder(list);
+  if(VIEW==='list')return listOrder(list);
+  return [...list].sort((a,b)=>BOARD_STAGES.indexOf(a.stage)-BOARD_STAGES.indexOf(b.stage)||String(a.expected_close||'9999').localeCompare(String(b.expected_close||'9999')));
+}
+async function printDeals(){
+  const k=KIT();if(!k)return;
+  await ensureContactNames().catch(()=>{});   // the Contact column; if the names can't load it prints empty
+  const list=printOrder(dealsInView()),n=list.length,q=Q.trim();
+  const sum=list.reduce((a,d)=>a+(d.expected_value_cents||0),0);
+  k.printList({
+    title:'Pipeline · '+printName(),
+    sub:[n+' deal'+(n===1?'':'s'),money0(sum),q?'matching “'+q+'”':'',DEALS.length>=FETCH_LIMIT?'from your newest '+FETCH_LIMIT:'','printed '+new Date().toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})].filter(Boolean).join(' · '),
+    cols:[{label:'Deal'},{label:'Contact'},{label:'Stage'},{label:'Value',num:true},{label:'Close date'},{label:'Next step'}],
+    rows:list.map(d=>[d.title||'Untitled deal',(CONTACT_NAME&&d.contact_id&&CONTACT_NAME[d.contact_id])||'',stageLabel(d.stage),d.expected_value_cents?money0(d.expected_value_cents):'',d.expected_close?niceDay(d.expected_close):'',shownStep(d)]),
+  });
+}
+$('chartsBtn').onclick=()=>{CHARTS=!CHARTS;try{localStorage.setItem(CHARTS_KEY,CHARTS?'1':'0');}catch(_){/* storage may be denied */}paintCharts();};
+$('printBtn').onclick=()=>{printDeals().catch(()=>toast('That couldn’t print just now.',true));};
 // Roster-empty honesty: a stage-filtered empty says WHICH stage is empty (the
 // won landing gets its own line); only a truly empty pipeline gets the starter.
 function renderRosterEmpty(host){
@@ -2016,6 +2070,9 @@ const isClosed=(d)=>d.stage==='won'||d.stage==='lost';
 // item 22: won (or signed and won) but never made a customer — the row says so and opens at Convert
 const needsConvert=(d)=>d.stage==='won'&&!d.converted_client_id;
 const shownStep=(d)=>(d.next_step&&!(isClosed(d)&&d.next_step_done))?d.next_step:'';
+// the list's order and the table's, each defined once: the displays and Print (item 105) read them
+const listOrder=(l)=>[...l].sort((a,b)=>{const ac=isClosed(a)?1:0,bc=isClosed(b)?1:0;if(ac!==bc)return ac-bc;const ad=a.next_step_at||'9999',bd=b.next_step_at||'9999';return ad<bd?-1:ad>bd?1:0;});
+const tableOrder=(l)=>{const col=TCOLS.find(x=>x[0]===TSORT.key)||TCOLS[0];return [...l].sort((a,b)=>{const av=col[2](a),bv=col[2](b);return av<bv?-TSORT.dir:av>bv?TSORT.dir:0;});};
 function renderList(){
   const host=$('list');
   // Deals with a DUE next step float to the top (overdue first) — the pipeline
@@ -2023,7 +2080,7 @@ function renderList(){
   const today=localYmd();   // item 65: the local day, never the UTC slice
   // A won or lost deal sinks below the open ones, and its next step is never
   // "Due" (sales review B4: a Won deal read "Due: Sign Contract" in red).
-  const list=[...visibleDeals()].sort((a,b)=>{const ac=isClosed(a)?1:0,bc=isClosed(b)?1:0;if(ac!==bc)return ac-bc;const ad=a.next_step_at||'9999',bd=b.next_step_at||'9999';return ad<bd?-1:ad>bd?1:0;});
+  const list=listOrder(visibleDeals());
   host.innerHTML=list.map(d=>{
     const step=shownStep(d);
     const ds=isClosed(d)?'':dueState(d.next_step_at,today);
@@ -2088,7 +2145,9 @@ function openCols(anchor){const k=KIT();if(!k)return;k.columnsMenu(anchor,TCOLS.
 function paintMore(){
   const m=$('moreMenu');if(!m)return;const cols=$('colsWrap')&&!$('colsWrap').hidden;
   const imp=$('importDeals')&&!$('importDeals').hidden;   // not inside a client (the import is the studio's)
-  m.innerHTML='<button type="button" role="menuitem" data-more="services">Manage services</button>'+(imp?'<button type="button" role="menuitem" data-more="import">Import CSV</button>':'')+(cols?'<button type="button" role="menuitem" data-more="cols">Columns</button>':'');
+  const tools=$('chartsBtn')&&!$('chartsBtn').hidden;   // item 105: Charts and Print, at studio level
+  m.innerHTML='<button type="button" role="menuitem" data-more="services">Manage services</button>'+(imp?'<button type="button" role="menuitem" data-more="import">Import CSV</button>':'')+(cols?'<button type="button" role="menuitem" data-more="cols">Columns</button>':'')
+    +(tools?`<button type="button" role="menuitem" data-more="charts">${CHARTS?'Hide charts':'Show charts'}</button><button type="button" role="menuitem" data-more="print">Print this list</button>`:'');
 }
 function closeMore(back){const m=$('moreMenu'),b=$('moreBtn');if(!m||m.hidden)return;m.hidden=true;if(b){b.setAttribute('aria-expanded','false');if(back)b.focus();}}
 function wireMore(){
@@ -2100,6 +2159,7 @@ function wireMore(){
     if(w==='services'){const x=$('mngServicesTop');if(x)x.click();}
     else if(w==='import'){const x=$('importDeals');if(x)x.click();}
     else if(w==='cols')openCols(b);
+    else if(w==='charts'||w==='print'){const x=$(w==='charts'?'chartsBtn':'printBtn');if(x)x.click();}
   });
   m.addEventListener('keydown',(e)=>{
     const opts=[...m.querySelectorAll('button')];const i=opts.indexOf(document.activeElement);
@@ -2239,8 +2299,7 @@ function renderTable(){
     ensureContactNames().then(()=>{if((firstLook||!CONTACT_FAILED)&&VIEW==='table'&&!host.hidden)renderTable();});
   }
   const today=localYmd();   // item 65
-  const col=TCOLS.find(x=>x[0]===TSORT.key)||TCOLS[0];
-  const list=[...visibleDeals()].sort((a,b)=>{const av=col[2](a),bv=col[2](b);return av<bv?-TSORT.dir:av>bv?TSORT.dir:0;});
+  const list=tableOrder(visibleDeals());
   if(KIT())KIT().style();
   const allOn=list.length>0&&list.every(d=>PICKED.has(String(d.id)));
   const ths=`<th scope="col" class="pick"><input type="checkbox" id="pickAll" aria-label="Select all ${list.length} shown"${allOn?' checked':''}></th>`+shownT().map(([k,label])=>{
@@ -3636,7 +3695,7 @@ async function boot(){
     if(urlStage&&STAGES.includes(urlStage)){FILTER=urlStage;if(urlStage==='won'||urlStage==='lost')VIEW='list';}
     renderFilters();
     // item 31/32: saved views, columns and the import are studio-level tools (deals live on the studio's site)
-    if(scope()){['importDeals','pvBtn'].forEach(id=>{const n=$(id);if(n)n.hidden=true;});wireMore();}
+    if(scope()){['importDeals','pvBtn','chartsBtn','printBtn'].forEach(id=>{const n=$(id);if(n)n.hidden=true;});wireMore();}
     else{wireViews();wireMore();loadSavedViews();
       // sales review item 38: the studio's own names for its open stages (Settings → Name your deal stages)
       api('/sales/stages').then(r=>{const l=r&&r.data&&r.data.labels;if(l&&STAGES.some(k=>l[k]&&l[k]!==STAGE_LABEL[k])){Object.assign(STAGE_LABEL,l);renderFilters();if(DEALS_LOADED)renderCurrent();if(CURRENT_DEAL&&!$('detailWrap').hidden)openDeal(CURRENT_DEAL);}}).catch(()=>{});}

@@ -40,6 +40,7 @@
   .lbtn.txt{font-size:13px;font-weight:600;color:var(--p);padding-left:0;padding-right:0}
   @media (max-width:767px){.lbtn.txt{min-height:44px}}   /* final pass, batch C: 44px on a phone */
   .ltools{display:flex;flex-wrap:wrap;align-items:center;gap:2px var(--dds-s4,16px);margin-top:4px}
+  .lbtn.txt[aria-pressed="true"]{text-decoration:underline;text-decoration-thickness:2px;text-underline-offset:5px}   /* item 105: Charts is on */
   .colsdd{position:relative}
   #viewBtn{font:inherit;font-family:var(--sans);font-weight:500;font-size:20px;color:var(--ink);background:none;border:none;border-radius:var(--dds-r,8px);padding:var(--dds-s1,4px) var(--dds-s2,8px);cursor:pointer;display:inline-flex;align-items:center;gap:var(--dds-s2,8px);max-width:100%}
   #viewBtn:hover{background:var(--p-soft)}
@@ -465,6 +466,54 @@ let HIDDEN=(function(){try{return new Set(JSON.parse(localStorage.getItem(COLS_K
 const KIT=()=>window.ddsListKit||null;
 const viewLabel=()=>{const v=SAVED.find(x=>x.id===CURVIEW);return v?v.name:VIEW_LABEL[VIEWNAME];};
 const shownCols=()=>COLS.filter(c=>c[0]==='name'||!HIDDEN.has(c[0]));
+// ── Sales review item 105 (Nov 2026): Charts and Print, of exactly the people in
+// view (its view, tag and search applied). The pieces live in shell.js
+// (window.ddsListKit.charts, .chartTips, .printList). ──
+const CHARTS_KEY='dds-charts:contacts';
+let CHARTS=(function(){try{return localStorage.getItem(CHARTS_KEY)==='1';}catch(_){return false;}})();
+const FOUND_VIA=['Google','Referral','Word of mouth','Social','Repeat client','Website','Other'];   // lib/found_via.ts
+// this view holds more people than are loaded (the "Showing 100 of 240" line's own test)
+const moreToLoad=()=>{const s=srchNow();if(Q.trim()&&!s)return false;return s?s.more:hasMore();};
+function paintCharts(){
+  const host=$('charts'),k=KIT();
+  if(!host)return;
+  if(CHARTS&&!k)document.addEventListener('DOMContentLoaded',paintCharts,{once:true});   // shell.js loads after this script
+  host.hidden=!CHARTS||!k||!ALL.length;
+  if(host.hidden){host.innerHTML='';return;}
+  const rows=sortedRows(),n=rows.length;
+  const seen={};rows.forEach(c=>{const v=FOUND_VIA.includes(c.found_via)?c.found_via:'';seen[v]=(seen[v]||0)+1;});
+  const how=FOUND_VIA.filter(v=>seen[v]).map(v=>({label:v,n:seen[v]})).sort((a,b)=>b.n-a.n);
+  if(seen[''])how.push({label:'Not recorded',n:seen[''],none:true});
+  const tags={};rows.forEach(c=>(Array.isArray(c.tags)?c.tags:[]).forEach(t=>{tags[t]=(tags[t]||0)+1;}));
+  const names=Object.keys(tags),top=names.map(t=>({label:t,n:tags[t]})).sort((a,b)=>b.n-a.n||a.label.localeCompare(b.label)).slice(0,8);
+  const s=srchNow(),total=s?s.total:TOTAL;
+  host.innerHTML=k.charts([
+    {title:'How they found you',rows:how,unit:['contact','contacts']},
+    {title:names.length>8?'Most used tags':'Tags',rows:top,unit:['contact','contacts'],empty:'No one in this view has a tag yet.'},
+  ],n?(moreToLoad()?'From the '+n+' contacts loaded so far'+(total!=null?', out of '+total:'')+'. Show more to count the rest.':'From the '+n+' contact'+(n===1?'':'s')+' in this view.'):'');
+  k.chartTips(host);
+}
+// Print takes the whole view: the rest of it loads first (up to 1,000 people), then it prints
+async function printContacts(){
+  const k=KIT();if(!k||MORE_BUSY)return;
+  if(moreToLoad()){
+    toast('Getting everyone in this view…');
+    MORE_BUSY=true;renderListZone();
+    for(let i=0;i<10&&moreToLoad();i++){
+      const s=srchNow();
+      let r;try{r=await readPage(s?s.rows.length:NEXT_OFF,s?s.q:'');}catch(_){r={ok:false};}
+      if(!r.ok||!takePage(r,s))break;
+    }
+    MORE_BUSY=false;renderListZone();
+  }
+  const rows=sortedRows(),n=rows.length,s=srchNow(),total=s?s.total:TOTAL,q=Q.trim(),part=moreToLoad()&&total!=null;
+  k.printList({
+    title:'Contacts · '+viewLabel()+(TAG?', tagged '+TAG:''),
+    sub:[(part?n+' of '+total:String(n))+' contact'+((part?total:n)===1?'':'s'),q?'matching “'+q+'”':'','printed '+new Date().toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})].filter(Boolean).join(' · '),
+    cols:[{label:'Name'},{label:'Company'},{label:'Email'},{label:'Phone'},{label:'Tags'}],
+    rows:rows.map(c=>[c.name||'',[c.job_title,c.company].filter(Boolean).join(', '),c.email||'',[c.phone,c.phone2].filter(Boolean).join(', '),Array.isArray(c.tags)?c.tags.join(', '):'']),
+  });
+}
 function applySaved(v){
   VIEWNAME=VIEW_LABEL[v.base]?v.base:'all';Q=v.q||'';
   SORT=(v.sort&&COLS.some(c=>c[0]===v.sort.key))?{key:v.sort.key,dir:v.sort.dir<0?-1:1}:{key:'name',dir:1};
@@ -549,7 +598,7 @@ function headerHtml(count){
       <button class="lbtn" id="refreshBtn" aria-label="Refresh" title="Refresh">↻</button>
     </div>
     <div class="lmeta" id="lmeta">${esc(lmetaText(count))}</div>${TAG?`<div class="lmeta"><span class="tagfilter">Tagged <b>${esc(TAG)}</b><button type="button" id="tagOff" aria-label="Show everyone, not only ${esc(TAG)}">✕ Clear</button></span></div>`:''}
-    ${scope()?'':`<div class="ltools"><button class="lbtn txt" id="saveView" type="button">Save view</button>${CURVIEW?'<button class="lbtn txt" id="dropView" type="button">Remove view</button>':''}${DISPLAY==='table'?'<span class="colsdd"><button class="lbtn txt" id="colsBtn" type="button" aria-haspopup="true" aria-expanded="false">Columns</button></span>':''}</div>`}
+    ${scope()?'':`<div class="ltools"><button class="lbtn txt" id="saveView" type="button">Save view</button>${CURVIEW?'<button class="lbtn txt" id="dropView" type="button">Remove view</button>':''}${DISPLAY==='table'?'<span class="colsdd"><button class="lbtn txt" id="colsBtn" type="button" aria-haspopup="true" aria-expanded="false">Columns</button></span>':''}<button class="lbtn txt" id="chartsBtn" type="button" aria-pressed="${CHARTS?'true':'false'}" aria-controls="charts">Charts</button><button class="lbtn txt" id="printBtn" type="button">Print</button></div>`}
   </div>`;
 }
 // The quiet "possible duplicate" note. The server annotates the roster read
@@ -657,6 +706,13 @@ function reorder(focusSel){
   SRCH=null;
   return load().then(back).catch(()=>toast('We couldn’t load your contacts in that order just now.'));
 }
+// one more page of people joins the list (Show more, and Print's "the rest of them")
+function takePage(r,s){
+  const page=(r.body&&r.body.data)||[],tot=(r.body&&typeof r.body.total==='number')?r.body.total:null;
+  if(s){if(SRCH!==s)return false;const have=new Set(s.rows.map(c=>String(c.id)));s.rows=s.rows.concat(page.filter(c=>!have.has(String(c.id))));s.total=tot;s.more=tot!=null?s.rows.length<tot:page.length>=PAGE;}
+  else{const have=new Set(ALL.map(c=>String(c.id)));ALL=ALL.concat(page.filter(c=>!have.has(String(c.id))));NEXT_OFF+=page.length;TOTAL=tot;LAST_FULL=page.length>=PAGE;}
+  return true;
+}
 async function showMore(){
   if(MORE_BUSY)return;
   const s=srchNow();
@@ -664,9 +720,7 @@ async function showMore(){
   let r;try{r=await readPage(s?s.rows.length:NEXT_OFF,s?s.q:'');}catch(_){r={ok:false};}
   MORE_BUSY=false;
   if(!r.ok){renderListZone();toast('We couldn’t load more contacts just now.');return;}
-  const page=(r.body&&r.body.data)||[],tot=(r.body&&typeof r.body.total==='number')?r.body.total:null;
-  if(s){if(SRCH!==s){renderListZone();return;}const have=new Set(s.rows.map(c=>String(c.id)));s.rows=s.rows.concat(page.filter(c=>!have.has(String(c.id))));s.total=tot;s.more=tot!=null?s.rows.length<tot:page.length>=PAGE;}
-  else{const have=new Set(ALL.map(c=>String(c.id)));ALL=ALL.concat(page.filter(c=>!have.has(String(c.id))));NEXT_OFF+=page.length;TOTAL=tot;LAST_FULL=page.length>=PAGE;}
+  if(!takePage(r,s)){renderListZone();return;}
   renderListZone();
   const nb=$('moreBtn');if(nb)nb.focus();else{const z=$('listZone');const last=z&&z.querySelectorAll('[data-open]');if(last&&last.length)last[last.length-1].focus();}
 }
@@ -694,7 +748,7 @@ function render(){
   const rows=sortedRows();
   let h=headerHtml(rows.length)
     +`<div class="bar"><input class="search" id="q" type="search" aria-label="Search contacts" placeholder="Search name, email, or company…" value="${esc(Q)}">${scope()?'':addButtons()}</div><div id="csvZone"></div><div id="importStrip"></div>`
-    +`<div id="listZone">${listHtml(rows)}</div>`;
+    +`<section class="dds-charts" id="charts" aria-label="Charts" hidden></section><div id="listZone">${listHtml(rows)}</div>`;
   // Any re-render (sort, view, display, refresh) must not destroy an open — or
   // in-flight — CSV import panel: carry the LIVE #csvZone node (its handlers,
   // file pick, and progress included) across the innerHTML swap. A finished
@@ -704,6 +758,7 @@ function render(){
   $('main').innerHTML=h;wire();wireList();
   if(zKeep){const z=document.getElementById('csvZone');if(z)z.replaceWith(zPrev);}
   paintImportStrip();
+  paintCharts();
 }
 // C5: keystrokes re-render ONLY the list zone (+ the meta count) — the search
 // input node is never rebuilt, so caret and focus survive without restoration.
@@ -711,6 +766,7 @@ function renderListZone(){
   const rows=sortedRows();
   const lm=$('lmeta');if(lm)lm.textContent=lmetaText(rows.length);
   const z=$('listZone');if(z){z.innerHTML=listHtml(rows);wireList();}
+  paintCharts();
 }
 function wire(){
   const q=$('q');if(q)q.addEventListener('input',debounce(()=>{Q=q.value;renderListZone();searchServer();}));
@@ -735,6 +791,8 @@ function wire(){
     vm.querySelectorAll('[data-saved]').forEach(b=>b.addEventListener('click',()=>{const v=SAVED.find(x=>x.id===b.getAttribute('data-saved'));if(v)applySaved(v);else{const nv=$('viewBtn');if(nv)nv.focus();}}));
   }
   const sv=$('saveView');if(sv)sv.addEventListener('click',saveView);
+  const ch=$('chartsBtn');if(ch)ch.addEventListener('click',()=>{CHARTS=!CHARTS;try{localStorage.setItem(CHARTS_KEY,CHARTS?'1':'0');}catch(_){/* storage may be denied */}ch.setAttribute('aria-pressed',CHARTS?'true':'false');paintCharts();});
+  const pr=$('printBtn');if(pr)pr.addEventListener('click',()=>{printContacts().catch(()=>toast('That couldn’t print just now.'));});
   const dv=$('dropView');if(dv)dv.addEventListener('click',dropView);
   const cb=$('colsBtn');if(cb&&KIT())cb.addEventListener('click',(e)=>{e.stopPropagation();KIT().columnsMenu(cb,COLS.map(c=>[c[0],c[1]]),HIDDEN,(next)=>{HIDDEN=next;try{localStorage.setItem(COLS_KEY,JSON.stringify([...HIDDEN]));}catch(_){/* */}renderListZone();});});
   // Refresh: a rejected load (network hiccup) toasts the page's standard copy —
