@@ -16,6 +16,7 @@ import manifest_ha_1_0_0 from '../templates/harbor/1.0.0/manifest.json' with { t
 import { trackerScript } from './visits.ts';
 import { sanitizeDevHtml, sanitizeDevCss } from './devmode.ts';
 import { BLOCK_CSS, sectionStyles, pageClasses } from './site_blocks.ts';
+import { applyPageChrome } from './page_access.ts';
 import { applyHeaderScroll } from './site_header.ts';
 import { applyPhoneBar } from './phone_bar.ts';
 
@@ -194,9 +195,12 @@ export async function renderSnapshot(snapshot: Snapshot, site: SiteConfig, opts:
   // Item 61: the owner's switch decides the counter; the privacy page reads the same switch.
   const counting = (snapshot.content as SnapshotContent)?.settings?.visit_counter !== false;
   const tokens = snapshot.dev_customization?.theme_tokens;
+  // items 48 and 120: an own page can leave out the site's header or footer, everywhere it is drawn
+  const pages = (snapshot.content as SnapshotContent)?.settings?.pages;
   // items 50 and 123: the header scrolls away, stays on top, hides or fades, as the owner chose
-  const drawn = applyHeaderScroll(tintFavicon(await t.render(snapshot, t.manifest, site), tokens?.accent, snapshot.template_slug), tokens?.header_scroll);
+  const drawn = applyHeaderScroll(tintFavicon(applyPageChrome(await t.render(snapshot, t.manifest, site), pages), tokens?.accent, snapshot.template_slug), tokens?.header_scroll);
   // item 122: Call, Directions, Hours and Email along the bottom of every page on a phone, when turned on
+  // (after the page's own header and footer choice, so a page that hides its footer has no bar either)
   const barred = applyPhoneBar(drawn, tokens?.phone_bar, snapshot.content as SnapshotContent, tokens?.accent);
   const dressed = injectDevLayer(barred, snapshot.dev_customization);
   return injectCsp(injectAnalytics(opts.allSectionStyles ? dressed : trimSectionStyles(dressed), counting ? site.siteId : undefined));

@@ -187,6 +187,23 @@ test.describe('CMS workspace', () => {
     await expect(page.locator('#domainCard').getByRole('button', { name: 'Connect your domain' })).toHaveCount(0);
   });
 
+  // Nov 10 review, builder list item 134: "live and secure" only when every check passes
+  test('item 134 — a connected domain with something left says what, and never claims both names work unchecked', async ({ page }) => {
+    const checklist = [
+      { key: 'points:marlows.example', ok: true, words: 'marlows.example points here' },
+      { key: 'points:www.marlows.example', ok: false, words: 'www.marlows.example doesn’t point here yet' },
+      { key: 'padlock', ok: true, words: 'The padlock is on' },
+      { key: 'serving', ok: true, words: 'Showing your latest site' },
+    ];
+    await installApp(page, { api: { ...BOARD_API, ...EXTRAS, '/foundations/domain': { data: { custom_domain: 'marlows.example', health: 'ok', checklist, all_ok: false, serving: 'latest' } } } });
+    await page.goto('/presence.html#search');
+    const card = page.locator('#domainCard');
+    await expect(card).toContainText('marlows.example is connected. Still to finish: www.marlows.example doesn’t point here yet.');
+    await expect(card).not.toContainText('live and secure');
+    await expect(card.getByRole('button', { name: 'See what’s left' })).toBeVisible();
+    await expect(page.locator('body')).not.toContainText('either way works');
+  });
+
   test('deep links: #domain opens the desk ready to type, #addpage opens the new-page dialog on Design', async ({ page }) => {
     await installApp(page, { api: { ...BOARD_API, ...EXTRAS,
       '/foundations': { data: { dns: { sentence: 'Temporary address.', records: [] }, ssl: { sentence: 'Padlock on.' }, email: { sentence: 'No email yet.', has_mail: false, spf: false, dmarc: false }, hosting: { sentence: 'Hosted.' } } },

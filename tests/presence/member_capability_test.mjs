@@ -47,6 +47,7 @@ const { handleBroadcastListDelete } = await import(`${P}/routes/broadcasts.ts`);
 const { handleSalesStages } = await import(`${P}/routes/sales.ts`);
 const { handleCalendarLink } = await import(`${P}/routes/calendar.ts`);
 const { handleEmailLogAddress } = await import(`${P}/routes/email_log.ts`);
+const { handleReviewGoogleLink } = await import(`${P}/routes/reviews.ts`);   // sales review item 115
 const { handleEstimateDelete } = await import(`${P}/routes/estimates.ts`);   // sales review item 47
 const { handleProspect } = await import(`${P}/routes/prospects.ts`);   // sales review item 112
 const { handleRecurringAction } = await import(`${P}/routes/recurring_invoices.ts`);
@@ -148,6 +149,7 @@ const DECIDED = {
     'PUT /sales/contacts/fields', 'PUT /sales/stages', 'POST /calendar/link', 'DELETE /calendar/link',
     'POST /email/log-address', 'DELETE /email/log-address',
     'PUT /report/monthly', 'POST /report/monthly/preview',   // builder list item 58
+    'POST /reviews/google-link',   // sales review item 115: where Google review requests send people is a setting
   ],
   approve: [
     'POST /approvals/:id/decide', 'POST /assets/:id/status', 'POST /client/approvals/:id/decide',
@@ -190,6 +192,7 @@ const DECIDED = {
     'POST /projects/:id/deliverables', 'POST /projects/:id/deliverables/upload-url', 'POST /projects/:id/milestones',
     'POST /projects/:id/status', 'POST /projects/:id/surveys', 'POST /projects/:id/tasks',
     'POST /publishes/:id/label', 'POST /publishes/checkpoints', 'POST /publishes/checkpoints/:id/restore',
+    'POST /page-locks',   // builder items 48 and 120: a page's password, as editing the page's settings is
     'POST /redirects', 'POST /restore-to-draft', 'POST /review/reports/:id/dismiss', 'POST /review/run',
     'POST /reviews/:id/approve', 'POST /reviews/:id/hide', 'POST /reviews/:id/reply', 'POST /sales/contacts',
     'POST /sales/contacts/:id/restore', 'POST /sales/contracts/:id/send', 'POST /sales/contracts/:id/term',
@@ -313,6 +316,7 @@ const CHANGED = [
   { name: 'DELETE /calendar/link', run: (r, p) => handleCalendarLink(r, A, p, cors) },
   { name: 'POST /email/log-address', run: (r, p) => handleEmailLogAddress(r, A, p, cors) },     // sales review item 69
   { name: 'DELETE /email/log-address', run: (r, p) => handleEmailLogAddress(r, A, p, cors) },
+  { name: 'POST /reviews/google-link', body: { place_id: 'ChIJTestPlace_1234' }, run: (r, p) => handleReviewGoogleLink(r, A, p, cors) },     // sales review item 115
   { name: 'PUT /report/monthly', body: { note: 'A line for the client' }, run: (r, p) => handleReportPut(r, A, p, cors) },     // builder list item 58 (a line, not the switch: this stub answers every read with a row, which reads as a do-not-send entry)
   { name: 'POST /report/monthly/preview', fx: { only: ['clients'] }, run: (r, p) => handleReportPreview(A, p, cors) },   // with every read answering a row the address reads as suppressed; the send is the write
   { name: 'POST /site/offline', run: (r, p) => handleTakeOffline(A, p, cors) },
@@ -428,7 +432,7 @@ const WRITE_HANDLERS = [
   'handleMediaUpdate', 'handleMediaUpload', 'handleMemberAdd', 'handleMemberRevoke', 'handleMessages',
   'handleMilestone', 'handleMilestonesCreate', 'handleMomentDismiss', 'handleMonitorConnect',
   'handleMonitorDisconnect', 'handleMonitorVerify', 'handleNoteResolve', 'handleNotificationsRead',
-  'handlePageDuplicate', 'handlePreviewPromote', 'handlePreviewPublish', 'handlePreviewSection', 'handlePreviewSettings',
+  'handlePageDuplicate', 'handlePageLockCreate', 'handlePreviewPromote', 'handlePreviewPublish', 'handlePreviewSection', 'handlePreviewSettings',
   'handlePreviewShareLink', 'handleProject', 'handleProjectChecklist', 'handleProjectStatus', 'handleProjectSurveys',
   'handleProjects', 'handlePublish', 'handlePutIdentity', 'handlePutTemplate', 'handleRedirectCreate',
   'handleRedirectDelete', 'handleRestore', 'handleRestoreToDraft', 'handleReviewApprove', 'handleReviewDismiss',
@@ -443,11 +447,16 @@ const WRITE_HANDLERS = [
   'handleCalendarLink',   // sales review item 46: POST and DELETE /calendar/link need configure
   'handleEmailLogAddress',   // sales review item 69: POST and DELETE /email/log-address need configure
   'handleReportPut', 'handleReportPreview',   // builder list item 58: PUT /report/monthly and its preview need configure
+  'handleReviewGoogleLink',   // sales review item 115: POST /reviews/google-link needs configure
   // sales review item 47: estimates and recurring invoices (see DECIDED.edit and .delete)
   'handleEstimateCreate', 'handleEstimateSend', 'handleEstimateToProposal', 'handleEstimateToInvoice', 'handleEstimateDelete',
   'handleRecurringStart', 'handleRecurringChange', 'handleRecurringAction',
   // sales review item 112: prospects (DELETE and PATCH /sales/prospects/:id share handleProspect)
   'handleProspects', 'handleProspect', 'handleProspectDiscover', 'handleProspectConvert', 'handleProspectDraft', 'handleProspectPack',
+  // sales review item 114: free-tool leads are the PLATFORM's own enquiries. Deliberately on
+  // no member list (an unlisted write refuses every seat — asserted above), and the handlers
+  // themselves refuse anyone who isn't platform staff (tool_leads_routes_test.mjs proves it).
+  'handleToolLead', 'handleToolLeadConvert',
   'handleStudioRequests',   // final pass S1: POST /portal/studio-requests/:id/(accept|decline) are open; the route answers the owner only
   'handleScheduleCancel', 'handleScheduleCreate', 'handleSettings', 'handleShareSet', 'handleStockImport',
   'handleSupport', 'handleSupportMessage', 'handleSupportOne', 'handleSurveyRespond', 'handleTakeOffline',

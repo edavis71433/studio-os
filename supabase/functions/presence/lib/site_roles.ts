@@ -114,6 +114,7 @@ const MEMBER_WRITES: Array<[MemberWriteNeed, string[]]> = [
     'PUT /sales/stages',   // sales review item 38: renaming the studio's deal stages is a setting
     '(POST|DELETE) /calendar/link',   // sales review item 46: making or turning off the private calendar link is a setting
     '(POST|DELETE) /email/log-address',   // sales review item 69: the private log-this-email address is a setting too
+    'POST /reviews/google-link',   // sales review item 115: where Google review requests send people is a setting
     'PUT /report/monthly', 'POST /report/monthly/preview',   // builder list item 58: the client's monthly report is a setting; its preview emails the caller
     '(POST|DELETE) /foundations/domain',
     'POST /foundations/prepare',
@@ -156,6 +157,7 @@ const MEMBER_WRITES: Array<[MemberWriteNeed, string[]]> = [
     'POST /visibility/check',
     'POST /preview/(publish|share-link|section)',   // section: draws one unsaved section for the canvas, stores nothing
     'POST /publishes/checkpoints',
+    'POST /page-locks',   // builder items 48 and 120: a page's password, as editing the page's settings is
     `POST /publishes/checkpoints/${ID}/restore`,
     `POST /publishes/${ID}/label`,
     'POST /restore-to-draft',

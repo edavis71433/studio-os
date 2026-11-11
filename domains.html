@@ -41,7 +41,7 @@
 
   /* the table scrolls in its own box (agency.html's .tscroll) — the page never overflows sideways */
   .tscroll{position:relative;overflow-x:auto;-webkit-overflow-scrolling:touch;background:var(--card);border:1px solid var(--line);border-radius:var(--dds-r-lg,10px);box-shadow:var(--shadow)}
-  .tscroll table{width:100%;border-collapse:collapse;font-size:14px;min-width:820px}   /* a sixth column since item 134 */
+  .tscroll table{width:100%;border-collapse:collapse;font-size:14px;min-width:900px}   /* a sixth column since item 134, a seventh (Last checked) since 162; the domain name opens its panel, so no action column */
   .tscroll thead th{text-align:left;font-size:12px;color:var(--faint);font-weight:500;border-bottom:1px solid var(--line);padding:0;white-space:nowrap}
   .tscroll thead th .thb{font:inherit;color:inherit;background:none;border:none;padding:var(--dds-s3,12px) var(--dds-s4,16px);width:100%;text-align:left;cursor:pointer;display:flex;align-items:center;gap:var(--dds-s1,4px)}
   .tscroll thead th .thb:hover{color:var(--p)}
@@ -49,8 +49,11 @@
   .tscroll thead th.plain{padding:var(--dds-s3,12px) var(--dds-s4,16px)}
   .tscroll tbody td{padding:var(--dds-s3,12px) var(--dds-s4,16px);border-bottom:1px solid var(--line);vertical-align:middle}
   .tscroll tbody tr:last-child td{border-bottom:none}
-  .tscroll td .dom{font-weight:600;color:var(--ink);text-decoration:none;overflow-wrap:anywhere}
+  .tscroll td .dom{font-weight:600;color:var(--ink);text-decoration:none;overflow-wrap:break-word}   /* item 162: a whole name; the table scrolls inside its card */
   .tscroll td .dom:hover{color:var(--p);text-decoration:underline}
+  .tscroll td button.dom{font:inherit;font-weight:600;background:none;border:0;padding:0;cursor:pointer;text-align:left}
+  .tscroll td button.dom:focus-visible{outline:2px solid var(--p);outline-offset:2px;border-radius:4px}
+  .tscroll td .own{display:inline-block;margin:3px 0 0}
   .tscroll td .sub{font-size:12px;color:var(--faint);margin-top:1px}
   .tscroll td a.site{color:var(--ink);text-decoration:none}
   .tscroll td a.site:hover{color:var(--p);text-decoration:underline}
@@ -75,6 +78,29 @@
   @keyframes sp{to{transform:rotate(360deg)}}
   @media (prefers-reduced-motion:reduce){.spin{animation:none}}
   :focus-visible{outline:2px solid var(--p);outline-offset:2px}
+  /* item 162: quick filters, the Details panel (a side panel on a computer, a sheet on a phone) */
+  .chips{display:flex;gap:var(--dds-s2,8px);flex-wrap:wrap;margin:0 0 var(--dds-s3,12px)}
+  .chip{font:inherit;font-size:13px;font-weight:600;border:1px solid var(--line);background:var(--card);color:var(--soft);border-radius:999px;padding:6px 12px;cursor:pointer;min-height:36px}
+  .chip .n{font-weight:700;margin-left:5px;color:var(--ink)}
+  .chip[aria-pressed="true"]{background:var(--p-soft);border-color:var(--p);color:var(--p)}
+  .chip[aria-pressed="true"] .n{color:var(--p)}
+  @media (max-width:767px){.chip{min-height:44px}}
+  dialog.dpanel{position:fixed;inset:0 0 0 auto;margin:0;height:100%;max-height:100%;width:min(540px,100vw);border:none;border-left:1px solid var(--line);background:var(--card);color:var(--ink);padding:0;box-shadow:var(--shadow);overflow:auto}
+  dialog.dpanel::backdrop{background:rgba(27,21,37,.32)}
+  @media (max-width:767px){dialog.dpanel{inset:auto 0 0 0;width:100vw;max-width:100vw;height:auto;max-height:88vh;border-left:none;border-top:1px solid var(--line);border-radius:14px 14px 0 0}}
+  .dp-h{position:sticky;top:0;z-index:1;background:var(--card);display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:14px 16px;border-bottom:1px solid var(--line)}
+  .dp-h h2{font-size:17px;margin:0;flex:1 1 200px;min-width:0;overflow-wrap:anywhere}
+  .dp-sec{padding:14px 16px;border-bottom:1px solid var(--line)}
+  .dp-sec h3{font-size:12px;letter-spacing:.04em;text-transform:uppercase;color:var(--faint);margin:0 0 8px;font-weight:600}
+  .dp-list{list-style:none;padding:0;margin:0;display:grid;gap:6px;font-size:14px}
+  .dp-list li.ok::before{content:'✓ ';color:var(--good);font-weight:700}
+  .dp-list li.todo::before{content:'• ';color:var(--bad);font-weight:700}
+  .dp-list li.warn::before{content:'• ';color:var(--warn);font-weight:700}
+  .dp-kv{display:grid;grid-template-columns:auto 1fr;gap:5px 14px;font-size:14px;margin:0}.dp-kv dt{color:var(--soft)}.dp-kv dd{margin:0;overflow-wrap:anywhere}
+  .dp-rec{width:100%;border-collapse:collapse;font-size:12.5px;table-layout:fixed}.dp-rec td{padding:5px 6px;border-bottom:1px solid var(--line);overflow-wrap:anywhere;vertical-align:top}.dp-rec td.t{width:64px;color:var(--soft);font-weight:600;overflow-wrap:normal;white-space:nowrap}
+  .dp-form label{display:block;font-size:12.5px;color:var(--soft);margin:10px 0 4px}
+  .dp-form input,.dp-form select,.dp-form textarea{width:100%;font:inherit;font-size:14px;border:1px solid var(--line);border-radius:var(--dds-r,8px);padding:8px 10px;background:var(--bg);color:var(--ink)}
+  .dp-acts{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:12px}
 </style>
 <link rel="stylesheet" href="/shell.css"><script src="/shell.js" defer></script>
 </head>
@@ -82,6 +108,7 @@
 <div class="wrap">
   <div id="main"><div class="spin" role="status" aria-label="Loading"></div></div>
 </div>
+<dialog class="dpanel" id="dpanel" aria-labelledby="dpTitle"><div id="dpBody"></div></dialog>
 <script src="/vendor/supabase-js-2.45.4.js"></script>
 <script>
 // ── Domains (builder list item 52, Nov 2026) ─────────────────────────────────
@@ -106,7 +133,18 @@ const day=(iso)=>{if(!iso)return'';const d=new Date(iso);return isNaN(d)?'':d.to
 
 let DOMAINS=[],BUILTIN=[],PARTIAL=false,LOADED_AT=0,Q='',REQ_SEQ=0;
 let SORT=null;   // null = most urgent first (the server's order)
-const RANK={expired:0,down:1,expiring:2,padlock:3,offline:4,checking:5,not_live:6,elsewhere:7,connected:8};   // the server's order (agency/sites.ts buildDomains)
+// item 162 (review domains finding 9): quick filters with counts, the way the review drew the page
+let FILTER='all';
+const FILTERS={
+  all:{label:'All',test:()=>true},
+  attention:{label:'Needs attention',test:(d)=>d.tone==='bad'||d.tone==='warn'||(d.warnings||[]).length>0},
+  expiring:{label:'Expiring',test:(d)=>d.status==='expiring'||d.status==='expired'||d.status==='registry'},
+  waiting:{label:'Waiting on records',test:(d)=>d.status==='partly'||d.status==='padlock'||d.status==='checking'},
+  nodomain:{label:'No domain yet',test:()=>false},
+};
+const ago=(iso)=>{if(!iso)return'';const t=Date.parse(iso);if(!isFinite(t))return'';const m=Math.round((Date.now()-t)/60000);if(m<2)return'Just now';if(m<60)return m+' min ago';const h=Math.round(m/60);if(h<24)return h+' hour'+(h===1?'':'s')+' ago';const d=Math.round(h/24);return d+' day'+(d===1?'':'s')+' ago';};
+async function apiSend(method,path,body){const r=await fetch(FN+path,{method,headers:H(),body:body?JSON.stringify(body):undefined});return{ok:r.ok,status:r.status,body:await r.json().catch(()=>({}))};}
+const RANK={registry:0,expired:1,down:2,old_copy:3,other_site:4,expiring:5,padlock:6,partly:7,offline:8,checking:9,not_live:10,elsewhere:11,connected:12};   // the server's order (agency/sites.ts buildDomains)
 const COLS=[
   ['domain','Domain',(d)=>d.domain],
   ['site','Site',(d)=>String(d.name||'').toLowerCase()],
@@ -114,11 +152,12 @@ const COLS=[
   ['provider','Provider',(d)=>String(d.provider||'~').toLowerCase()],
   ['expires','Expires',(d)=>d.expires_at||'9999'],
   ['padlock','Padlock until',(d)=>d.padlock_until||'9999'],   // item 134: the security certificate's end date
+  ['checked','Last checked',(d)=>d.checked_at||''],            // item 162: the server sent it; the page didn't show it
 ];
 const where=(d,hash)=>d.own?'/presence.html'+hash:'/presence.html?client='+encodeURIComponent(d.site_id)+hash;
 const matches=(d)=>{const q=Q.trim().toLowerCase();return !q||[d.domain||d.address,d.name,d.provider].some(x=>String(x||'').toLowerCase().includes(q));};
 function ordered(){
-  const list=DOMAINS.filter(matches);
+  const list=DOMAINS.filter(matches).filter((d)=>(FILTERS[FILTER]||FILTERS.all).test(d));
   if(SORT){const col=COLS.find(c=>c[0]===SORT.key)||COLS[0];list.sort((a,b)=>{const av=col[2](a),bv=col[2](b);return av<bv?-SORT.dir:av>bv?SORT.dir:0;});}
   return list;
 }
@@ -130,6 +169,8 @@ function expiresCell(d){
   const sub=n==null?'':n<0?`${-n} day${n===-1?'':'s'} ago`:n===0?'Today':`In ${n} day${n===1?'':'s'}`;
   return `${esc(day(d.expires_at))}${sub?`<div class="sub">${esc(sub)}</div>`:''}`;
 }
+// item 134: under the status, what still needs doing (the first two lines that aren't fine)
+function checksSub(d){const bad=(d.checks||[]).filter(c=>!c.ok).slice(0,2);return bad.length?`<div class="sub">${bad.map(c=>esc(c.words)).join('<br>')}</div>`:'';}
 function padlockCell(d){
   if(!d.hosted)return'<span class="muted">Their host’s</span>';
   if(!d.padlock_until)return d.status==='padlock'?'<span class="muted">Not on yet</span>':'<span class="muted">Not known yet</span>';
@@ -138,15 +179,15 @@ function padlockCell(d){
   return `${esc(day(d.padlock_until))}${sub?`<div class="sub">${esc(sub)}</div>`:''}`;
 }
 function tableHtml(list){
-  const ths=COLS.map(([k,label])=>{const on=SORT&&SORT.key===k;return `<th scope="col"${on?` aria-sort="${SORT.dir>0?'ascending':'descending'}"`:''}><button type="button" class="thb" data-sort="${k}">${esc(label)}${on?`<span class="arrow" aria-hidden="true">${SORT.dir>0?'▲':'▼'}</span>`:''}</button></th>`;}).join('')+'<th scope="col" class="acts"><span class="sr-only">Actions</span></th>';
+  const ths=COLS.map(([k,label])=>{const on=SORT&&SORT.key===k;return `<th scope="col"${on?` aria-sort="${SORT.dir>0?'ascending':'descending'}"`:''}><button type="button" class="thb" data-sort="${k}">${esc(label)}${on?`<span class="arrow" aria-hidden="true">${SORT.dir>0?'▲':'▼'}</span>`:''}</button></th>`;}).join('');
   const trs=list.map(d=>`<tr data-domain="${esc(d.domain)}">
-    <td><a class="dom" href="https://${esc(d.domain)}" target="_blank" rel="noopener" aria-label="${esc(d.domain)} (opens the site)">${esc(d.domain)}</a>${d.own?'<span class="own">Your studio</span>':''}</td>
+    <td><button type="button" class="dom" data-detail="${esc(d.site_id)}" aria-haspopup="dialog" aria-label="Details for ${esc(d.domain)}">${esc(d.domain)}</button>${d.own?'<br><span class="own">Your studio</span>':''}</td>
     <td><a class="site" href="${esc(where(d,''))}">${esc(d.name||'(unnamed)')}</a></td>
-    <td><span class="pill ${esc(d.tone)}">${esc(d.status_words)}</span></td>
-    <td>${d.provider?esc(d.provider):d.record==='unreadable'?'<span class="muted">Couldn’t read it</span>':'<span class="muted">Not known yet</span>'}</td>
+    <td><span class="pill ${esc(d.tone)}">${esc(d.status_words)}</span>${checksSub(d)}</td>
+    <td>${d.provider?esc(d.provider):d.record==='unreadable'?'<span class="muted">Couldn’t read it</span>':'<span class="muted">Not known yet</span>'}${d.dns_host?`<div class="sub">DNS at ${esc(d.dns_host)}</div>`:''}${d.lock===false?'<div class="sub">Lock: off</div>':''}</td>
     <td class="when">${expiresCell(d)}</td>
     <td class="when">${padlockCell(d)}</td>
-    <td class="acts">${d.hosted?`<a class="rowact" href="${esc(where(d,'#domain'))}" aria-label="Domain settings for ${esc(d.domain)}">Domain settings</a>`:`<a class="rowact" href="${esc(where(d,''))}" aria-label="Open ${esc(d.name||'the site')}">Open site</a>`}</td>
+    <td class="when">${d.checked_at?esc(ago(d.checked_at)):'<span class="muted">Not yet</span>'}</td>
   </tr>`).join('');
   return `<div class="tscroll"><table aria-label="Domains"><thead><tr>${ths}</tr></thead><tbody>${trs}</tbody></table></div>`;
 }
@@ -155,6 +196,18 @@ function builtinHtml(list){
   const trs=list.map(b=>`<tr data-builtin="${esc(b.site_id)}"><td><span class="dom">${esc(b.address)}</span></td><td><a class="site" href="${esc(where(b,''))}">${esc(b.name||'(unnamed)')}</a>${b.own?'<span class="own">Your studio</span>':''}</td><td class="acts"><a class="rowact" href="${esc(where(b,'#domain'))}" aria-label="Connect a domain to ${esc(b.name||'this site')}">Connect a domain</a></td></tr>`).join('');
   return `<h2 class="qhead" id="builtinHead">On their built-in address · ${list.length}</h2><div class="tscroll"><table aria-labelledby="builtinHead" style="min-width:520px"><thead><tr><th scope="col" class="plain">Address</th><th scope="col" class="plain">Site</th><th scope="col" class="acts"><span class="sr-only">Actions</span></th></tr></thead><tbody>${trs}</tbody></table></div>`;
 }
+function chipsHtml(){
+  if(!DOMAINS.length&&!BUILTIN.length)return'';
+  const n=(k)=>k==='nodomain'?BUILTIN.length:DOMAINS.filter(FILTERS[k].test).length;
+  return `<div class="chips" role="group" aria-label="Show">${Object.keys(FILTERS).map(k=>`<button type="button" class="chip" data-filter="${k}" aria-pressed="${FILTER===k?'true':'false'}">${esc(FILTERS[k].label)}${k==='all'?'':`<span class="n">${n(k)}</span>`}</button>`).join('')}</div>`;
+}
+// item 162: the list as a spreadsheet (what's on screen, in its order)
+function downloadCsv(){
+  const q=(v)=>'"'+String(v==null?'':v).replace(/"/g,'""')+'"';
+  const rows=[['Domain','Site','Status','Provider','DNS at','Expires','Lock','Padlock until','Last checked']].concat(ordered().map(d=>[d.domain,d.name,d.status_words,d.provider,d.dns_host||'',d.expires_at?String(d.expires_at).slice(0,10):'',d.lock===true?'on':d.lock===false?'off':'',d.padlock_until?String(d.padlock_until).slice(0,10):'',d.checked_at?String(d.checked_at).slice(0,10):'']));
+  const blob=new Blob([rows.map(r=>r.map(q).join(',')).join('\n')],{type:'text/csv'});
+  const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='domains.csv';document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove();},0);
+}
 function lmetaText(n){
   const soon=DOMAINS.filter(d=>d.status==='expiring'||d.status==='expired').length;
   const m=Math.floor((Date.now()-LOADED_AT)/60000);
@@ -162,16 +215,17 @@ function lmetaText(n){
 }
 function render(){
   const list=ordered(),bl=BUILTIN.filter(matches);
-  let h=`<header class="lhead"><div class="lrow1"><span class="obj-ic" aria-hidden="true">🔗</span><h1 id="pagehead" tabindex="-1">Domains</h1><button type="button" class="lbtn" id="refreshBtn" aria-label="Refresh" title="Refresh">↻</button></div>
+  let h=`<header class="lhead"><div class="lrow1"><span class="obj-ic" aria-hidden="true">🔗</span><h1 id="pagehead" tabindex="-1">Domains</h1><button type="button" class="lbtn" id="dlBtn" title="Download this list as a spreadsheet">Download</button><button type="button" class="lbtn" id="refreshBtn" aria-label="Refresh" title="Refresh">↻</button></div>
     <div class="lmeta">${esc(lmetaText(list.length))}</div>
     <nav class="tabs" aria-label="Sites and domains"><a href="/sites.html">Sites</a><a href="/domains.html" aria-current="page">Domains</a></nav></header>`;
   h+=`<label class="sr-only" for="search">Search domains</label><input class="search" id="search" type="search" placeholder="Search by domain, site or provider…" value="${esc(Q)}">`;
+  h+=chipsHtml();
   if(PARTIAL)h+=`<div class="notice">Some details wouldn’t load just now — refresh to try again.</div>`;
   if(!DOMAINS.length&&!BUILTIN.length)h+=`<div class="center"><p class="muted">No domains yet. A client’s domain shows here once it’s connected to their site.</p></div>`;
   else if(!list.length&&!bl.length)h+=`<div class="center"><p class="muted">No domains match that.</p></div>`;
   else{
-    h+=list.length?tableHtml(list):(DOMAINS.length?'':`<p class="muted">None of your clients has their own domain connected yet.</p>`);
-    h+=builtinHtml(bl);
+    if(FILTER!=='nodomain')h+=list.length?tableHtml(list):(DOMAINS.length?(FILTER==='all'?'':`<p class="muted">Nothing under “${esc(FILTERS[FILTER].label)}”.</p>`):`<p class="muted">None of your clients has their own domain connected yet.</p>`);
+    if(FILTER==='all'||FILTER==='nodomain')h+=builtinHtml(bl);
   }
   h+=`<p class="how">Expiry dates and providers come from each domain’s public registration record, checked once a day. Reminders go to the client, with a copy to you, at 30, 15, 7 and 1 days and the day after it expires. A domain expiring within 30 days, or a padlock that ends within 14 days or hasn’t come on after a day, is also on Home’s Needs you list. Renewing happens at the provider; the padlock renews by itself while the domain points here.</p>`;
   const act=document.activeElement;const wasQ=!!(act&&act.id==='search');const qp=wasQ?act.selectionStart:0;
@@ -182,10 +236,81 @@ function render(){
 function wire(){
   const s=$('search');if(s)s.addEventListener('input',()=>{Q=s.value;render();});
   const rf=$('refreshBtn');if(rf)rf.addEventListener('click',()=>load(true).then(()=>{const nr=$('refreshBtn');if(nr)nr.focus();}));
+  const dl=$('dlBtn');if(dl)dl.addEventListener('click',downloadCsv);
+  document.querySelectorAll('[data-filter]').forEach(b=>b.addEventListener('click',()=>{const k=b.getAttribute('data-filter');FILTER=FILTER===k&&k!=='all'?'all':k;render();const nb=document.querySelector('[data-filter="'+FILTER+'"]');if(nb)nb.focus();}));
+  document.querySelectorAll('[data-detail]').forEach(b=>b.addEventListener('click',()=>openPanel(b.getAttribute('data-detail'),b)));
   document.querySelectorAll('[data-sort]').forEach(b=>b.addEventListener('click',()=>{
     const k=b.getAttribute('data-sort');SORT=SORT&&SORT.key===k?{key:k,dir:-SORT.dir}:{key:k,dir:1};
     render();const nb=document.querySelector('[data-sort="'+k+'"]');if(nb)nb.focus();
   }));
+}
+// ── item 162 (review domains findings 10, 23, 24): one domain's whole story in a side panel —
+//    the checklist, the registration, every record live, the studio's notes, Check now ──
+let PANEL=null,PANEL_OPENER=null,PANEL_SITE='',PANEL_SEQ=0;
+function closePanel(){const dlg=$('dpanel');if(dlg&&dlg.open)dlg.close();}
+(function(){const dlg=$('dpanel');if(!dlg)return;dlg.addEventListener('close',()=>{PANEL=null;   // back to the row's Details button, or the redrawn one after Check now refreshed the list
+  const back=PANEL_OPENER&&document.contains(PANEL_OPENER)?PANEL_OPENER:[...document.querySelectorAll('[data-detail]')].find(b=>b.getAttribute('data-detail')===PANEL_SITE);if(back)back.focus();});dlg.addEventListener('click',(e)=>{if(e.target===dlg)closePanel();});})();
+async function openPanel(siteId,opener){
+  const dlg=$('dpanel');if(!dlg)return;PANEL_OPENER=opener||null;PANEL_SITE=siteId;const gen=++PANEL_SEQ;
+  $('dpBody').innerHTML=`<div class="dp-h"><h2 id="dpTitle">Domain</h2><button type="button" class="rowact" id="dpClose">Close</button></div><div class="spin" role="status" aria-label="Loading"></div>`;
+  $('dpClose').addEventListener('click',closePanel);
+  if(!dlg.open)dlg.showModal();
+  let r;try{r=await api('/agency/domains/'+encodeURIComponent(siteId));}catch(_){r={ok:false};}
+  if(gen!==PANEL_SEQ)return;
+  if(!r.ok||!r.body||!r.body.data){$('dpBody').innerHTML=`<div class="dp-h"><h2 id="dpTitle">Domain</h2><button type="button" class="rowact" id="dpClose">Close</button></div><div class="dp-sec"><p class="muted">This domain’s details wouldn’t load just now. Close and try again.</p></div>`;$('dpClose').addEventListener('click',closePanel);return;}
+  PANEL=r.body.data;paintPanel();
+}
+function paintPanel(){
+  const d=PANEL;if(!d)return;
+  const checks=(d.all_checks||[]).map(c=>`<li class="${c.ok?'ok':'todo'}">${esc(c.words)}</li>`).concat((d.warnings||[]).map(w=>`<li class="${w.severity==='bad'?'todo':'warn'}">${esc(w.words)}</li>`));
+  const n=d.days_left;const exp=d.expires_at?esc(day(d.expires_at))+(n==null?'':n<0?` (${-n} day${n===-1?'':'s'} ago)`:` (in ${n} day${n===1?'':'s'})`):(d.record==='unreadable'?'Couldn’t read the record':'Not known yet');
+  const kv=[
+    ['Provider',d.provider||'Not known yet'],
+    ['DNS at',d.dns_host_full?(d.dns_host?d.dns_host_full:d.dns_host_full+', where it was bought'):'Not known yet'],
+    ['Expires',exp],
+    ['Transfer lock',d.lock===true?'On':d.lock===false?'Off':'Not known yet'],
+    ['Registry says',(d.statuses||[]).length?(d.statuses||[]).join(', '):'Nothing unusual'],
+    ['Registered',d.registered_at?day(d.registered_at):'Not known yet'],
+    ['Padlock until',d.padlock_until?day(d.padlock_until):'Not known yet'],
+    ['Last checked',d.checked_at?ago(d.checked_at):'Not yet'],
+  ].map(([k,v])=>`<dt>${esc(k)}</dt><dd>${k==='Expires'?v:esc(v)}</dd>`).join('');
+  const recs=(d.records||[]).length?`<table class="dp-rec" aria-label="Records"><tbody>${d.records.map(x=>`<tr><td>${esc(x.name)}</td><td class="t">${esc(x.type)}</td><td>${esc(x.value)}</td></tr>`).join('')}</tbody></table>`:'<p class="muted">No records answered just now.</p>';
+  const nt=d.notes||{};
+  const sel=(v)=>['yes','no','unknown'].map(o=>`<option value="${o}"${(nt.renews||'unknown')===o?' selected':''}>${o==='yes'?'Yes':o==='no'?'No':'Don’t know'}</option>`).join('');
+  $('dpBody').innerHTML=`<div class="dp-h"><h2 id="dpTitle">${esc(d.domain)}</h2><span class="pill ${esc(d.tone)}">${esc(d.status_words)}</span><button type="button" class="rowact" id="dpCheck">Check now</button><button type="button" class="rowact" id="dpClose">Close</button></div>
+    <p class="muted" id="dpMsg" role="status" style="margin:6px 0 0;font-size:13px"></p>
+    <section class="dp-sec" aria-labelledby="dpChecksH"><h3 id="dpChecksH">What we checked</h3>${checks.length?`<ul class="dp-list">${checks.join('')}</ul>`:'<p class="muted">Checked once a day. Press Check now to look again.</p>'}
+      <div class="dp-acts">${d.hosted?`<a class="rowact" href="${esc(where(d,'#domain'))}">Open the client’s domain steps</a>`:''}<a class="rowact" href="${esc(where(d,''))}">Open ${esc(d.name||'the site')}</a><a class="rowact" href="https://${esc(d.domain)}" target="_blank" rel="noopener">Visit ${esc(d.domain)} ↗</a></div></section>
+    <section class="dp-sec" aria-labelledby="dpRegH"><h3 id="dpRegH">Registration</h3><dl class="dp-kv">${kv}</dl></section>
+    <section class="dp-sec" aria-labelledby="dpRecH"><h3 id="dpRecH">Records, all of them</h3>${recs}</section>
+    <section class="dp-sec" aria-labelledby="dpNotesH"><h3 id="dpNotesH">Your notes</h3><form class="dp-form" id="dpNotes">
+      <label for="dpAcct">The account is in whose name</label><input id="dpAcct" maxlength="120" value="${esc(nt.account||'')}" placeholder="e.g. the client’s own GoDaddy account">
+      <label for="dpRenew">Renews by itself</label><select id="dpRenew">${sel()}</select>
+      <label for="dpConf">Confirmed on</label><input id="dpConf" type="date" value="${esc(nt.renews_confirmed_at||'')}">
+      <label for="dpNote">A note</label><textarea id="dpNote" rows="3" maxlength="600" placeholder="Anything the next person should know">${esc(nt.note||'')}</textarea>
+      <div class="dp-acts"><button type="submit" class="btn">Save notes</button><span class="muted" id="dpSaved" role="status"></span></div></form>
+      ${nt.updated_at?`<p class="muted" style="font-size:12px;margin-top:8px">Last saved ${esc(ago(nt.updated_at))}${nt.updated_by?' by '+esc(nt.updated_by):''}.</p>`:''}</section>`;
+  $('dpClose').addEventListener('click',closePanel);
+  $('dpCheck').addEventListener('click',checkNow);
+  $('dpNotes').addEventListener('submit',saveNotes);
+}
+async function checkNow(){
+  const d=PANEL;if(!d)return;const b=$('dpCheck');b.disabled=true;b.textContent='Checking…';
+  let r;try{r=await apiSend('POST','/agency/domains/'+encodeURIComponent(d.site_id)+'/check');}catch(_){r={ok:false,body:{}};}
+  if(!PANEL||PANEL.site_id!==d.site_id)return;
+  if(!r.ok){b.disabled=false;b.textContent='Check now';$('dpMsg').textContent=(r.body&&r.body.message)||'That check didn’t go through just now.';return;}   // in the panel: a toast sits under the modal's backdrop
+  PANEL=r.body.data;paintPanel();$('dpMsg').textContent='Checked just now.';
+  const i=DOMAINS.findIndex(x=>x.site_id===PANEL.site_id);if(i>=0){DOMAINS[i]={...DOMAINS[i],...PANEL};render();}
+  const nb=$('dpCheck');if(nb)nb.focus();
+}
+async function saveNotes(e){
+  e.preventDefault();const d=PANEL;if(!d)return;
+  const body={account:$('dpAcct').value,renews:$('dpRenew').value,renews_confirmed_at:$('dpConf').value||null,note:$('dpNote').value};
+  const btn=e.target.querySelector('button[type="submit"]');btn.disabled=true;
+  let r;try{r=await apiSend('PUT','/agency/domains/'+encodeURIComponent(d.site_id)+'/notes',body);}catch(_){r={ok:false,body:{}};}
+  btn.disabled=false;
+  if(!r.ok){const sv=$('dpSaved');if(sv)sv.textContent=(r.body&&r.body.message)||'Your notes didn’t save.';return;}
+  PANEL={...PANEL,notes:r.body.data};const sv=$('dpSaved');if(sv)sv.textContent='Saved.';
 }
 function notAgency(){$('main').innerHTML=`<div class="center"><h2>This isn’t an agency account.</h2><p class="muted">Domains lists the domains a studio looks after for its clients.</p><p style="margin-top:20px"><a class="link" href="/presence.html#domain">Your domain →</a></p></div>`;}
 function signedOut(){$('main').innerHTML=`<div class="center"><h2>Sign in to your studio.</h2><p style="margin-top:20px"><a class="link" href="/studio.html">Sign in →</a></p></div>`;}

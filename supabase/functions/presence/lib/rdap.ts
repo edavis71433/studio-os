@@ -66,7 +66,77 @@ export function registrableCandidates(domain: string): string[] {
   return out;
 }
 
-export type RdapResult = { status: 'ok'; name: string; info: RdapInfo } | { status: 'not_found' } | { status: 'failed' };
+// ── what else the public record says (item 162, review domains finding 6) ──
+// The same answer carries whether the transfer lock is on, which company runs the
+// DNS (the nameservers, which is where the client must add records, often not the
+// company the domain was bought from), status words such as "redemption period",
+// the registration date and the DNSSEC switch. We used to keep only the expiry.
+export interface RdapFacts { lock: boolean | null; dns_host: string; nameservers: string[]; statuses: string[]; registered_at: string | null; dnssec: boolean | null }
+
+const NS_HOSTS: Array<[RegExp, string]> = [
+  [/domaincontrol\.com$/, 'GoDaddy'], [/registrar-servers\.com$/, 'Namecheap'], [/cloudflare\.com$/, 'Cloudflare'],
+  [/(squarespacedns|squarespace)\.com$/, 'Squarespace'], [/googledomains\.com$/, 'Google Domains (now Squarespace)'], [/wixdns\.net$/, 'Wix'],
+  [/awsdns-[0-9]+\.(com|net|org|co\.uk)$/, 'Amazon Route 53'], [/nsone\.net$/, 'NS1 (Netlify DNS runs on it)'], [/porkbun\.com$/, 'Porkbun'],
+  [/name-services\.com$/, 'Enom'], [/worldnic\.com$/, 'Network Solutions'], [/ui-dns\.(com|de|org|biz)$/, 'IONOS'], [/hostgator\.com$/, 'HostGator'],
+  [/bluehost\.com$/, 'Bluehost'], [/dreamhost\.com$/, 'DreamHost'], [/hover\.com$/, 'Hover'], [/dnsimple\.com$/, 'DNSimple'], [/digitalocean\.com$/, 'DigitalOcean'],
+];
+/** Pure: the company that runs a domain's DNS, from its nameservers. */
+export function dnsHostOf(nameservers: string[]): string {
+  const ns = nameservers.map((n) => String(n || '').toLowerCase().replace(/\.$/, '')).filter(Boolean);
+  if (!ns.length) return '';
+  for (const [re, name] of NS_HOSTS) if (ns.some((n) => re.test(n))) return name;
+  const parts = ns[0].split('.');   // unknown: the nameserver's own domain says who it is
+  return parts.length >= 2 ? parts.slice(-2).join('.') : ns[0];
+}
+
+/** Pure: does this domain's registry say "transfer prohibited" when it's locked? Every generic
+ *  ending does (.com, .net, .org, .shop…), and .us and .co. Many country endings (.uk, .de) have
+ *  no such word, so silence there means "not known", never "off". */
+export function lockIsReported(name: string): boolean {
+  const tld = String(name || '').toLowerCase().replace(/\.$/, '').split('.').pop() || '';
+  return tld.length >= 3 || tld === 'us' || tld === 'co';
+}
+
+/** Pure: is the company running the DNS the one the domain was bought from? Loosely, by name:
+ *  "GoDaddy" and "GoDaddy.com, LLC" are one company; "Cloudflare" and "NameCheap, Inc." aren't. */
+export function sameCompany(dnsHost: string | null | undefined, registrar: string | null | undefined): boolean {
+  const flat = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, '');
+  const first = String(dnsHost || '').toLowerCase().split(/[^a-z0-9]+/).find((w) => w.length >= 3) || '';
+  return !!first && !!registrar && flat(String(registrar)).includes(first);
+}
+
+/** Pure: the lock, the DNS company, the status words, the registration date and DNSSEC. */
+export function parseRdapFacts(j: unknown): RdapFacts {
+  const doc = (j ?? {}) as Record<string, unknown>;
+  const statuses = (Array.isArray(doc.status) ? doc.status : []).map((x) => String(x).toLowerCase().trim()).filter(Boolean);
+  const nameservers = (Array.isArray(doc.nameservers) ? doc.nameservers : []).map((n) => String((n as Record<string, unknown>)?.ldhName || '').toLowerCase()).filter(Boolean);
+  let registered: string | null = null;
+  for (const ev of (Array.isArray(doc.events) ? doc.events : []) as Array<Record<string, unknown>>) {
+    if (String(ev.eventAction || '').toLowerCase() === 'registration' && ev.eventDate) { const t = Date.parse(String(ev.eventDate)); if (Number.isFinite(t)) registered = new Date(t).toISOString(); }
+  }
+  const sd = doc.secureDNS as Record<string, unknown> | undefined;
+  return {
+    lock: statuses.includes('client transfer prohibited') || statuses.includes('server transfer prohibited') ? true : lockIsReported(String(doc.ldhName || '')) ? false : null,
+    dns_host: dnsHostOf(nameservers), nameservers, statuses, registered_at: registered,
+    dnssec: sd && typeof sd.delegationSigned === 'boolean' ? sd.delegationSigned : null,
+  };
+}
+
+/** Pure: what the status words mean for the studio, worst first. `severity` 'bad' is
+ *  the domain itself in trouble; 'warn' is a door left open. */
+export function registryWarnings(f: Pick<RdapFacts, 'lock' | 'statuses'> | null): Array<{ key: string; severity: 'bad' | 'warn'; words: string }> {
+  if (!f) return [];
+  const has = (w: string) => f.statuses.includes(w);
+  const out: Array<{ key: string; severity: 'bad' | 'warn'; words: string }> = [];
+  if (has('pending delete')) out.push({ key: 'pending_delete', severity: 'bad', words: 'About to be deleted at the registry: renew it today or it can be lost' });
+  if (has('redemption period')) out.push({ key: 'redemption', severity: 'bad', words: 'In the redemption period: it lapsed, and buying it back costs more than renewing' });
+  if (has('client hold') || has('server hold')) out.push({ key: 'hold', severity: 'bad', words: 'On hold at the registry, so it isn’t answering: the provider has to lift it' });
+  if (has('auto renew period') || has('renew period')) out.push({ key: 'grace', severity: 'warn', words: 'Just renewed or in its grace period: check it renewed on purpose' });
+  if (f.lock === false && f.statuses.length) out.push({ key: 'unlocked', severity: 'warn', words: 'The transfer lock is off: anyone with the account could move it away' });
+  return out;
+}
+
+export type RdapResult = { status: 'ok'; name: string; info: RdapInfo; facts: RdapFacts } | { status: 'not_found' } | { status: 'failed' };
 
 /** Fenced RDAP lookup that says what happened: found (and under which name), not
  *  found under any name, or the lookup itself failed. Never throws, 6s cap a try. */
@@ -78,7 +148,8 @@ export async function rdapLookupDetailed(domain: string): Promise<RdapResult> {
       const r = await fetch(`https://rdap.org/domain/${encodeURIComponent(name)}`, { redirect: 'follow', signal: AbortSignal.timeout(6000), headers: { Accept: 'application/rdap+json, application/json' } });
       if (r.status === 404) { await r.body?.cancel().catch(() => {}); continue; }   // not a registered name: try the shorter one
       if (!r.ok) { await r.body?.cancel().catch(() => {}); return { status: 'failed' }; }
-      return { status: 'ok', name, info: parseRdap(await r.json()) };
+      const j = await r.json();
+      return { status: 'ok', name, info: parseRdap(j), facts: parseRdapFacts(j) };
     } catch { return { status: 'failed' }; }
   }
   return { status: 'not_found' };
