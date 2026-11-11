@@ -54,6 +54,8 @@ import type { SiteRow } from '../lib/site.ts';
 import type { Principal } from '../../_shared/auth.ts';
 import { UUID_RE } from '../lib/uuid.ts';
 import { reopenEnquiry } from '../lib/enquiry_state.ts';
+import { normEmail, emailMatch, isUniqueViolation } from '../lib/contact_email.ts';   // item 110 (K1): one person, one email, whatever its capitals
+import { contactMoreFrom, cleanTag, CONTACT_MORE_COLS } from '../lib/contact_fields.ts';   // item 89: address, job title, second phone, tags
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;                       // expected_close: ISO date only
 const CONVERT_PLANS = new Set(['presence', 'cms_only', 'business_os_only', 'presence_monitor', 'presence_managed']);
@@ -228,6 +230,14 @@ async function advanceStage(siteId: string, dealId: string, to: Stage, from: Sta
 }
 
 // ═══ CONTACTS ═══
+/** The order a contacts page is read in (item 110, K4): one of the roster's columns, then id,
+ *  so offset pages never repeat or skip a person. No sort = newest edits first, as before. */
+const CONTACT_SORTS = new Set(['name', 'company', 'email', 'phone', 'updated_at']);
+export function contactsOrder(sort: unknown, dir: unknown): string {
+  const k = String(sort ?? '');
+  if (!CONTACT_SORTS.has(k)) return 'updated_at.desc,id.desc';
+  return `${k}.${dir === 'desc' ? 'desc' : 'asc'},id.desc`;
+}
 export async function handleSalesContacts(req: Request, site: SiteRow, principal: Principal, cors: Record<string, string>): Promise<Response> {
   if (req.method === 'GET') {
     const u = new URL(req.url);
@@ -250,13 +260,26 @@ export async function handleSalesContacts(req: Request, site: SiteRow, principal
     let more = withDeleted ? '' : '&deleted_at=is.null';
     if (q) more += `&or=(name.ilike.*${encodeURIComponent(q)}*,email.ilike.*${encodeURIComponent(q)}*,company.ilike.*${encodeURIComponent(q)}*)`;
     if (ids.length) more += `&id=in.(${ids.join(',')})`;
+    // item 110 (K4): past 100 people the page can't sort or filter what it hasn't loaded, so
+    // it asks here: since= (an ISO time) is "Recently updated", customer=yes|no is People's
+    // Customers / Not yet, and sort= + dir= order every page, so page one is the real top
+    const since = String(u.searchParams.get('since') || '');
+    if (/^\d{4}-\d{2}-\d{2}(T[\d:.]+Z?)?$/.test(since) && Number.isFinite(Date.parse(since))) more += `&updated_at=gte.${encodeURIComponent(since)}`;
+    const cust = u.searchParams.get('customer');
+    if (cust === 'yes') more += '&client_id=not.is.null'; else if (cust === 'no') more += '&client_id=is.null';
+    // item 89: tag=restaurant lists everyone with that tag (tags @> '{restaurant}', presence_contacts_tags_idx)
+    const tag = cleanTag(u.searchParams.get('tag'));
+    if (tag) more += `&tags=cs.${encodeURIComponent(`{"${tag.replace(/["\\]/g, '')}"}`)}`;
+    const order = contactsOrder(u.searchParams.get('sort'), u.searchParams.get('dir'));
     // item 66: id breaks ties in the order, so offset pages never repeat or skip a person
-    const mkPath = (cols: string) => `presence_contacts?site_id=eq.${site.id}${more}&select=${cols}${withDeleted ? ',deleted_at' : ''}&order=updated_at.desc,id.desc&limit=${limit}&offset=${offset}`;
+    const mkPath = (cols: string) => `presence_contacts?site_id=eq.${site.id}${more}&select=${cols}${withDeleted ? ',deleted_at' : ''}&order=${order}&limit=${limit}&offset=${offset}`;
     // item 66: total=1 asks how many match in all (one HEAD count beside the page
     // read, so every page costs the same two reads at any roster size). The pages
     // that list people ask for it to say "Showing 100 of N"; nobody else pays.
     const totalP = u.searchParams.get('total') === '1' ? svcCount(`presence_contacts?site_id=eq.${site.id}${more}`).catch(() => null) : Promise.resolve(undefined);
-    let r = await svc(mkPath('id,name,email,phone,company,client_id,updated_at'));
+    // item 89: the row shows a job title and tags, and a second phone to call; before APPLY-0166 the older select
+    let r = await svc(mkPath(`id,name,email,phone,company,client_id,updated_at,${CONTACT_MORE_COLS.join(',')}`));
+    if (!r.ok && r.status === 400) r = await svc(mkPath('id,name,email,phone,company,client_id,updated_at'));
     if (!r.ok && r.status === 400) r = await svc(mkPath('id,name,email,phone,company,updated_at'));
     if (!r.ok) return json({ error: 'read_failed', message: 'We couldn’t load your contacts just now.' }, 502, cors);
     const list = rows(r);
@@ -277,9 +300,11 @@ export async function handleSalesContacts(req: Request, site: SiteRow, principal
     const name = clean(b.name, 120);
     if (!name && !email) return json({ error: 'validation', message: 'A contact needs a name or an email.' }, 422, cors);
     const phone = clean(b.phone, 40);
-    // duplicate protection: reuse an existing contact for this (site, email)
+    // duplicate protection: reuse an existing contact for this (site, email) — matched the
+    // way the database's rule matches, whatever the capitals (item 110, K1)
+    const sameEmail = () => svc(`presence_contacts?site_id=eq.${site.id}&${emailMatch(email)}&deleted_at=is.null&select=id,name,email,phone,company&limit=1`);
     if (email) {
-      const existing = await svc(`presence_contacts?site_id=eq.${site.id}&email=eq.${encodeURIComponent(email)}&deleted_at=is.null&select=id,name,email,phone,company&limit=1`);
+      const existing = await sameEmail();
       if (existing.ok && rows(existing)[0]) return json({ data: rows(existing)[0], deduped: true }, 200, cors);
     }
     // FUZZY near-duplicate: past the exact-email check, a typo'd re-entry
@@ -296,22 +321,46 @@ export async function handleSalesContacts(req: Request, site: SiteRow, principal
       if (matches.length) return json({ error: 'possible_duplicate', matches, message: `This looks like someone you already have. Is it the same person?` }, 409, cors);
     }
     const foundVia = normalizeFoundVia(b.found_via);   // item 69: "How did they find you?" ('' = not recorded)
-    const ins = await insertWithFoundVia('presence_contacts', { site_id: site.id, name, email, phone, company: clean(b.company, 120), notes: clean(b.notes, 2000), ...(foundVia ? { found_via: foundVia } : {}) });
+    const moreFields = contactMoreFrom(b);              // item 89: address, job title, second phone, tags
+    const ins = await insertWithFoundVia('presence_contacts', { site_id: site.id, name, email, phone, company: clean(b.company, 120), notes: clean(b.notes, 2000), ...(foundVia ? { found_via: foundVia } : {}), ...moreFields });
+    // K6: two adds of one new person at once (two rows of one import file, two tabs) both pass
+    // the check above; the database refuses the second, and that is the same person, not a failure
+    if (!ins.ok && email && isUniqueViolation(ins)) {
+      const again = await sameEmail();
+      if (again.ok && rows(again)[0]) return json({ data: rows(again)[0], deduped: true }, 200, cors);
+    }
     if (!ins.ok || !rows(ins)[0]) return json({ error: 'write_failed', message: 'That contact didn’t save — please try again.' }, 502, cors);
+    // item 89: before APPLY-0166 the contact saves without its new fields, and the answer says so
+    if (ins.dropped.some((c) => (CONTACT_MORE_COLS as readonly string[]).includes(c))) return json({ data: rows(ins)[0], warning: 'fields_unavailable', message: 'Saved — the address, job title, second phone and tags need a quick database update before they stick.' }, 201, cors);
     return json({ data: rows(ins)[0] }, 201, cors);
   }
   return json({ error: 'method_not_allowed' }, 405, cors);
 }
 
-/** Item 69: insert a row; when the database doesn't have `found_via` yet
- *  (APPLY-0143 not run), say so precisely and retry once without it — never
- *  silently dropping anything else. */
+/** Item 69 (and 89): insert a row; when the database doesn't have one of the newer
+ *  optional columns yet (found_via before APPLY-0143; job_title, phone2, address,
+ *  tags before APPLY-0166), retry once without the ones it names — never silently
+ *  dropping anything else. `dropped` says which were left out. */
+const OPTIONAL_INSERT_COLS = ['found_via', ...CONTACT_MORE_COLS];
+/** The newer optional columns arrive in groups (one migration each): one of a group
+ *  missing means the whole group is. */
+export function missingGroups(missing: string[]): string[] {
+  const more = CONTACT_MORE_COLS as readonly string[];
+  return [...new Set(missing.flatMap((c) => more.includes(c) ? [...more] : [c]))];
+}
 async function insertWithFoundVia(table: string, row: Record<string, unknown>) {
   const post = (body: unknown) => svc(table, { method: 'POST', headers: { Prefer: 'return=representation' }, body: JSON.stringify(body) });
-  const r = await post(row);
-  if (r.ok || !('found_via' in row) || !missingInsertColumns(r.json, r.text, ['found_via']).length) return r;
-  const { found_via: _fv, ...rest } = row;
-  return post(rest);
+  let rest = { ...row }, r = await post(rest);
+  const dropped: string[] = [];
+  // each try drops what the database said it doesn't have yet, a group at a time (at most three tries)
+  for (let n = 0; n < 3 && !r.ok; n++) {
+    const optional = OPTIONAL_INSERT_COLS.filter((c) => c in rest);
+    const missing = optional.length ? missingGroups(missingInsertColumns(r.json, r.text, optional)).filter((c) => c in rest) : [];
+    if (!missing.length) break;
+    for (const c of missing) { delete rest[c]; dropped.push(c); }
+    r = await post(rest);
+  }
+  return { ...r, dropped };
 }
 
 // ═══ CONTACT CUSTOM FIELD DEFINITIONS (site-level, ≤5, no migration) ══════════
@@ -417,8 +466,10 @@ async function loadContact(siteId: string, id: string) {
   // deploy-order tolerant: `custom` lands with migration 0097 — try the full
   // select, fall back to the pre-0097 shape so a deploy ahead of the migration
   // never breaks the contacts surface (same posture as the deals next_step cols).
-  // item 69: found_via (APPLY-0143) first, then without it, then the pre-0097 shape
-  let r = await svc(`presence_contacts?id=eq.${id}&site_id=eq.${siteId}&deleted_at=is.null&select=id,name,email,phone,company,notes,created_at,updated_at,custom,found_via&limit=1`);
+  // item 69: found_via (APPLY-0143) first, then without it, then the pre-0097 shape;
+  // item 89: the address, job title, second phone and tags (APPLY-0166) before all of them
+  let r = await svc(`presence_contacts?id=eq.${id}&site_id=eq.${siteId}&deleted_at=is.null&select=id,name,email,phone,company,notes,created_at,updated_at,custom,found_via,${CONTACT_MORE_COLS.join(',')}&limit=1`);
+  if (!r.ok) r = await svc(`presence_contacts?id=eq.${id}&site_id=eq.${siteId}&deleted_at=is.null&select=id,name,email,phone,company,notes,created_at,updated_at,custom,found_via&limit=1`);
   if (!r.ok) r = await svc(`presence_contacts?id=eq.${id}&site_id=eq.${siteId}&deleted_at=is.null&select=id,name,email,phone,company,notes,created_at,updated_at,custom&limit=1`);
   if (!r.ok) r = await svc(`presence_contacts?id=eq.${id}&site_id=eq.${siteId}&deleted_at=is.null&select=id,name,email,phone,company,notes,created_at,updated_at&limit=1`);
   return rows(r)[0] || null;
@@ -500,7 +551,8 @@ export async function handleSalesContact(req: Request, site: SiteRow, principal:
     const composed = composeContactDetail(deals, events, { timelineLimit: 30 });
     const custom = normalizeFieldValues(defs, contact.custom);
     return json({ data: {
-      contact: { id: contact.id, name: contact.name, email: contact.email, phone: contact.phone, company: contact.company, notes: contact.notes, created_at: contact.created_at, updated_at: contact.updated_at, custom },
+      contact: { id: contact.id, name: contact.name, email: contact.email, phone: contact.phone, company: contact.company, notes: contact.notes, created_at: contact.created_at, updated_at: contact.updated_at, custom,
+        found_via: contact.found_via || '', job_title: contact.job_title || '', phone2: contact.phone2 || '', address: contact.address || {}, tags: Array.isArray(contact.tags) ? contact.tags : [] },   // item 89
       deals: composed.deals, timeline: composed.timeline, last_contacted_at: composed.last_contacted_at,
       custom_fields: defs,
     } }, 200, cors);
@@ -514,11 +566,12 @@ export async function handleSalesContact(req: Request, site: SiteRow, principal:
     if (b.company !== undefined) patch.company = clean(b.company, 120);
     if (b.notes !== undefined) patch.notes = clean(b.notes, 2000);
     if (b.found_via !== undefined) patch.found_via = normalizeFoundVia(b.found_via);   // item 69
+    Object.assign(patch, contactMoreFrom(b));   // item 89: address, job title, second phone, tags
     if (b.email !== undefined) {
       const email = clean(b.email, 160).toLowerCase();
       if (email && email !== String(contact.email || '').toLowerCase()) {
         // keep the (site, email) uniqueness honest with a plain-language 409
-        const dup = rows(await svc(`presence_contacts?site_id=eq.${site.id}&email=eq.${encodeURIComponent(email)}&id=neq.${id}&deleted_at=is.null&select=id&limit=1`))[0];
+        const dup = rows(await svc(`presence_contacts?site_id=eq.${site.id}&${emailMatch(email)}&id=neq.${id}&deleted_at=is.null&select=id&limit=1`))[0];
         if (dup) return json({ error: 'email_taken', message: 'Another contact already uses that email.' }, 409, cors);
       }
       patch.email = email;
@@ -533,6 +586,19 @@ export async function handleSalesContact(req: Request, site: SiteRow, principal:
     }
     if (!Object.keys(patch).length) return json({ error: 'empty_update' }, 400, cors);
     let up = await svc(`presence_contacts?id=eq.${id}&site_id=eq.${site.id}&select=id,name,email,phone,company,notes,updated_at,custom`, { method: 'PATCH', headers: { Prefer: 'return=representation' }, body: JSON.stringify(patch) });
+    // item 89, deploy-order tolerance: before APPLY-0166 the new fields can't be saved — the
+    // rest of the save still goes through, and the answer says what didn't stick
+    let moreLate: string[] = [];
+    const morePresent = (CONTACT_MORE_COLS as readonly string[]).filter((c) => c in patch);
+    if (!up.ok && morePresent.length) {
+      moreLate = missingInsertColumns(up.json, up.text, morePresent).length ? morePresent : [];   // they arrive together (APPLY-0166)
+      if (moreLate.length) {
+        for (const c of moreLate) delete patch[c];
+        if (!Object.keys(patch).length) return json({ error: 'fields_unavailable', message: 'The address, job title, second phone and tags need a quick database update before they can be saved.' }, 409, cors);
+        up = await svc(`presence_contacts?id=eq.${id}&site_id=eq.${site.id}&select=id,name,email,phone,company,notes,updated_at,custom`, { method: 'PATCH', headers: { Prefer: 'return=representation' }, body: JSON.stringify(patch) });
+      }
+    }
+    if (up.ok && rows(up)[0] && moreLate.length) return json({ data: rows(up)[0], warning: 'fields_unavailable', message: 'Saved — the address, job title, second phone and tags need a quick database update before they stick.' }, 200, cors);
     // item 69, deploy-order tolerance: before APPLY-0143 there is no found_via column —
     // the rest of the save still goes through, and the answer says what didn't stick.
     let foundViaLate = false;
@@ -646,6 +712,8 @@ export async function handleSalesSummary(req: Request, site: SiteRow, principal:
 // ═══ RECEIVABLES — the "who owes me money" list behind the AR strip ═══
 /** How far back the receivables payload's Paid bucket looks. */
 const PAID_WINDOW_DAYS = 30;
+/** Open invoices are read this many at a time, up to this many pages (5,000 open invoices). */
+export const RECEIVABLES_PAGE = 500, RECEIVABLES_MAX_PAGES = 10;
 export async function handleSalesReceivables(req: Request, site: SiteRow, _principal: Principal, cors: Record<string, string>): Promise<Response> {
   // item 65: the page sends its local day as ?today= (older pages and the reports: UTC)
   try { return json({ data: await loadReceivables(site, callerToday(new URL(req.url).searchParams.get('today'), nowIso())) }, 200, cors); }
@@ -662,15 +730,26 @@ export async function loadReceivables(site: SiteRow, todayYmd?: string) {
   // processing_since lands with migration 0132 — deploy-order tolerant (full
   // select first, pre-0132 shape second) so Today's money band never blanks.
   const SEL = 'id,title,amount_cents,due_date,deal_id,created_at,stripe_url';
-  // sales item 81: the invoice's number rides along (APPLY-0167), so Who owes you can name it
-  let invR = await svc(`presence_invoices?site_id=eq.${site.id}&deleted_at=is.null&status=eq.open&select=${SEL},processing_since,number&order=due_date.asc.nullslast,created_at.asc&limit=300`);
-  if (!invR.ok) invR = await svc(`presence_invoices?site_id=eq.${site.id}&deleted_at=is.null&status=eq.open&select=${SEL},processing_since&order=due_date.asc.nullslast,created_at.asc&limit=300`);
-  if (!invR.ok) invR = await svc(`presence_invoices?site_id=eq.${site.id}&deleted_at=is.null&status=eq.open&select=${SEL}&order=due_date.asc.nullslast,created_at.asc&limit=300`);
+  // item 110 (K6): every open invoice, a page at a time. One read of 300 left a studio past
+  // that with customers who "owe nothing" and an "Owes you" that undercounted without a word.
+  // id breaks ties so pages never repeat or skip one.
+  // sales item 81: the invoice's number rides along (APPLY-0167), so Who owes you can name it.
+  // Each older shape is tried in turn, and the pages after the first keep the shape that worked.
+  const page = (sel: string, off: number) => svc(`presence_invoices?site_id=eq.${site.id}&deleted_at=is.null&status=eq.open&select=${sel}&order=due_date.asc.nullslast,created_at.asc,id.asc&limit=${RECEIVABLES_PAGE}&offset=${off}`);
+  let sel = `${SEL},processing_since,number`;
+  let invR = await page(sel, 0);
+  if (!invR.ok) { sel = `${SEL},processing_since`; invR = await page(sel, 0); }
+  if (!invR.ok) { sel = SEL; invR = await page(sel, 0); }
   // final pass (Nov 8, batch D): open invoices that couldn't be read are a failure, never an
   // empty book — Who owes you said "all paid up", the overdue report $0 and Home's Needs you
   // left the money out without saying it was partial. Every caller has its honest path.
   if (!invR.ok) throw new Error('receivables_read_failed');
   const invs = rows(invR);
+  for (let n = 1; n < RECEIVABLES_MAX_PAGES && rows(invR).length >= RECEIVABLES_PAGE; n++) {
+    invR = await page(sel, n * RECEIVABLES_PAGE);
+    if (!invR.ok) throw new Error('receivables_read_failed');   // part of the book is not the book
+    invs.push(...rows(invR));
+  }
   // Oct 2026 benchmark (item 2): the Paid bucket — what landed in the last 30
   // days — rides along so the band can show all four states from ONE list.
   // Best-effort: a failed read here drops the Paid bucket, never the band.
@@ -2510,7 +2589,10 @@ export async function handleSalesConvert(req: Request, site: SiteRow, principal:
   if (!up.ok || !rows(up)[0]) {
     // stamp failed (e.g. this customer is already linked to another deal). Roll back
     // ONLY what WE created (never a reused existing customer); release the claim.
-    if (createdClient) { await svc(`clients?id=eq.${clientId}`, { method: 'DELETE' }).catch(() => {}); if (createdAuthId) await deleteAuthUser(createdAuthId); }
+    if (createdClient) { await svc(`clients?id=eq.${clientId}`, { method: 'DELETE' }).catch(() => {}); if (createdAuthId) await deleteAuthUser(createdAuthId);
+      // K6: the contact was linked to that customer a moment ago; a link to a customer that
+      // no longer exists showed "Customer ↗" on People and opened nothing
+      await svc(`presence_contacts?site_id=eq.${site.id}&client_id=eq.${clientId}`, { method: 'PATCH', body: JSON.stringify({ client_id: null }) }).catch(() => {}); }
     await unclaim();
     const fresh = await loadDeal(site.id, dealId);
     if (fresh?.converted_client_id) return json({ data: { converted: true, client_id: fresh.converted_client_id, site_id: fresh.converted_site_id, idempotent: true } }, 200, cors);
@@ -2814,8 +2896,9 @@ async function markSubmissionConverted(siteId: string, submissionId: unknown): P
   try { await svc(`presence_form_submissions?id=eq.${id}&site_id=eq.${siteId}`, { method: 'PATCH', body: JSON.stringify({ status: 'converted' }) }); } catch { /* best-effort */ }
 }
 
-export async function ensureConnectContact(siteId: string, email: string, name: string, mark: boolean) {
-  const existing = rows(await svc(`presence_contacts?site_id=eq.${siteId}&email=eq.${encodeURIComponent(email)}&deleted_at=is.null&select=id,notes&limit=1`))[0];
+export async function ensureConnectContact(siteId: string, emailIn: string, name: string, mark: boolean) {
+  const email = normEmail(emailIn);   // K1: an enquiry's Jane@Example.com is the contact jane@example.com
+  const existing = rows(await svc(`presence_contacts?site_id=eq.${siteId}&${emailMatch(email)}&deleted_at=is.null&select=id,notes&limit=1`))[0];
   if (existing) {
     if (mark && !String(existing.notes || '').includes(CONNECT_INTENT_TAG)) {
       const notes = (String(existing.notes || '').trim() ? existing.notes.trim() + ' ' : '') + CONNECT_INTENT_TAG;
@@ -2825,6 +2908,8 @@ export async function ensureConnectContact(siteId: string, email: string, name: 
   }
   const ins = await svc('presence_contacts', { method: 'POST', headers: { Prefer: 'return=representation' },
     body: JSON.stringify({ site_id: siteId, name: name || '', email, notes: mark ? CONNECT_INTENT_TAG : '' }) });
+  // K6: an import adding the same new person twice at once — the second is them, not a failure
+  if (!ins.ok && isUniqueViolation(ins)) return rows(await svc(`presence_contacts?site_id=eq.${siteId}&${emailMatch(email)}&deleted_at=is.null&select=id,notes&limit=1`))[0] || null;
   return rows(ins)[0] || null;
 }
 
