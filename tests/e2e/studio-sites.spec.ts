@@ -891,8 +891,8 @@ test.describe('Domains: the page does things (item 162)', () => {
     expect(dl.suggestedFilename()).toBe('domains.csv');
     const text = await new Promise<string>(async (resolve, reject) => { const s = await dl.createReadStream(); let b = ''; s.on('data', (c) => { b += c; }); s.on('end', () => resolve(b)); s.on('error', reject); });
     const lines = text.split('\n');
-    expect(lines[0]).toBe('"Domain","Site","Status","Provider","DNS at","Expires","Lock","Padlock until","Last checked"');
-    expect(lines[2]).toBe('"bistro.example","Bistro Nine","Expires in 12 days","Registrar B","Cloudflare","2026-11-20","off","2027-01-15","2026-11-08"');
+    expect(lines[0]).toBe('"Domain","Site","Status","Provider","DNS at","Expires","Renews by itself","Lock","Padlock until","Last checked"');   // Renews by itself: item 174
+    expect(lines[2]).toBe('"bistro.example","Bistro Nine","Expires in 12 days","Registrar B","Cloudflare","2026-11-20","","off","2027-01-15","2026-11-08"');   // nobody has said whether it renews by itself yet
     expect(lines).toHaveLength(5);
   });
 
