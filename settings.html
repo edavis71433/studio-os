@@ -782,7 +782,7 @@ const UNREAD = {
   studio: { rows: ['profileForm'], off: ['profileSave'], words: 'Your details couldn’t load just now. Saving is off until they do, so nothing you had is written over.' },
   automations: { rows: [], words: 'Your automations couldn’t load just now. They can’t be changed until they do; nothing is switched on or off meanwhile.' },
   stages: { rows: ['staleRow'], words: 'When a deal counts as stalled couldn’t load just now. It can’t be changed until it does.' },
-  report: { rows: ['reportSwRow', 'reportLineRow'], words: 'This client’s monthly report couldn’t load just now. It can’t be changed until it does, so nothing saved is written over.', retry: () => retryReport() },
+  report: { rows: ['reportSwRow', 'reportAiRow', 'reportLineRow'], words: 'This client’s monthly report couldn’t load just now. It can’t be changed until it does, so nothing saved is written over.', retry: () => retryReport() },
 };
 function holdUnread() {
   const held = { studio: !IDENT_READ || !SETTINGS_READ, automations: !SETTINGS_READ, stages: !SETTINGS_READ, report: REPORT_TRIED && !REPORT_READ };
@@ -918,7 +918,7 @@ function monthWords(ym) { const m = /^(\d{4})-(\d{2})$/.exec(String(ym || '')); 
 // "Save the line" is off, the way Your menu does it. A second press used to show the switch
 // flipped while nothing was sent, and a line saved during a switch save was dropped unsaid.
 function paintReportBusy() {
-  const sw = $('sw-report'); if (REPORT_BUSY) sw.setAttribute('aria-disabled', 'true'); else sw.removeAttribute('aria-disabled');
+  for (const id of ['sw-report', 'sw-ai']) { const sw = $(id); if (REPORT_BUSY) sw.setAttribute('aria-disabled', 'true'); else sw.removeAttribute('aria-disabled'); }   // item 182: the AI switch waits its turn too
   $('reportSave').disabled = REPORT_BUSY;
 }
 async function saveReport(patch) {
@@ -942,9 +942,10 @@ function wireReport() {
     if (await saveReport({ enabled: next })) toast(next ? 'On. The first report goes out in the first days of next month.' : 'Off. No more reports to this client.');
   });
   $('sw-ai').addEventListener('click', async () => {
-    const was = REPORT && REPORT.ai_checks === true, next = !was;
+    if (REPORT_BUSY || !REPORT_READ) return;   // one save at a time, like the report switch (item 101)
+    const next = !(REPORT && REPORT.ai_checks === true);
     $('sw-ai').setAttribute('aria-checked', next ? 'true' : 'false');
-    if (await saveReport({ ai_checks: next }, () => $('sw-ai').setAttribute('aria-checked', was ? 'true' : 'false'))) toast(next ? 'On. The first check runs soon, then on the 1st of each month.' : 'Off. No more AI checks for this client.');
+    if (await saveReport({ ai_checks: next })) toast(next ? 'On. The first check runs soon, then on the 1st of each month.' : 'Off. No more AI checks for this client.');
   });
   $('reportSave').addEventListener('click', async () => { if (await saveReport({ note: $('report-note').value })) { $('reportMsg').textContent = 'Saved.'; setTimeout(() => { $('reportMsg').textContent = ''; }, 2500); } });
   $('reportPreview').addEventListener('click', async () => {

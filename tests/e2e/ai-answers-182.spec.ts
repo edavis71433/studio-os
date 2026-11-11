@@ -209,4 +209,35 @@ test.describe('Settings › Monthly report: the AI switch (builder list item 182
     await expect(sec.locator('#aiLast')).toHaveText('The first check runs soon, then on the 1st of each month.');
     await expect(page.locator('.dds-toast').last()).toContainText('On. The first check runs soon');
   });
+  test('one save at a time, like the report switch (item 101); a report that could not be read hides it (I4)', async ({ page }) => {
+    const puts: any[] = [];
+    let release: () => void = () => {};
+    const held = new Promise<void>((r) => { release = r; });
+    let fail = false;
+    let state: Record<string, unknown> = { enabled: true, note: '', last_month: null, last_result: null, tries: null, blocked: null, updated_by: null, updated_at: null, note_max: 600, next_month: '2026-11', pdf: true, ai_checks: false, ai_month: null, ai_result: null, ai_tries: null, ai_questions: 7, ai_cost: 'About 42 cents a month for 7 questions' };
+    await installApp(page, { api: { '/identity': { data: { site_id: 's1', business_name: 'Studio', email: 'hello@example.com' } }, '/settings': { data: { industry_key: 'generic' } }, '/portal/context': CTX } as never });
+    await page.route(/\/functions\/v1\/presence\/report\/monthly$/, async (route) => {
+      if (route.request().method() === 'PUT') { const b = route.request().postDataJSON(); puts.push(b); await held; state = { ...state, ...b }; }
+      else if (fail) return route.fulfill({ status: 502, contentType: 'application/json', body: JSON.stringify({ error: 'read_failed' }) });
+      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: state }) });
+    });
+    await page.goto(`/settings.html?client=${CLIENT}#report`);
+    const ai = page.locator('#sw-ai'), rep = page.locator('#sw-report');
+    await expect(ai).toHaveAttribute('aria-checked', 'false');
+    await ai.click();
+    await expect(ai).toHaveAttribute('aria-checked', 'true');
+    await expect(ai).toHaveAttribute('aria-disabled', 'true');      // greyed while it saves…
+    await expect(rep).toHaveAttribute('aria-disabled', 'true');     // …and so is the report switch
+    await rep.click({ force: true });
+    await expect(rep).toHaveAttribute('aria-checked', 'true');      // the press showed nothing
+    expect(puts).toEqual([{ ai_checks: true }]);                    // and sent nothing
+    release();
+    await expect(ai).not.toHaveAttribute('aria-disabled', 'true');
+    await expect(page.locator('.dds-toast', { hasText: 'On. The first check runs soon' })).toBeVisible();
+    fail = true;
+    await page.reload();
+    await expect(page.locator('#report .unread')).toContainText('This client’s monthly report couldn’t load just now.');
+    await expect(ai).toBeHidden();                                  // no switch that lies
+    expect(puts).toEqual([{ ai_checks: true }]);
+  });
 });
