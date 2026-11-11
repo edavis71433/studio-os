@@ -488,6 +488,8 @@ html.dc-edit:not(.plan-watch) #pcBody{padding:0 20px 20px}
 .pc-note{margin:0 0 12px;font-size:13px;line-height:1.5;color:var(--ink-2)}
 /* item 146: the sign-up box's "where sign-ups go" choice, drawn like the card's text boxes */
 .nl-mode{width:100%;padding:8px;border:1px solid var(--line);border-radius:8px;font:inherit;font-size:13px;margin-bottom:6px;box-sizing:border-box}
+/* item 147: a form's Answers button, drawn like its Remove form button */
+.ff-btn{font:inherit;font-size:12px;padding:2px 9px;border-radius:8px;border:1px solid var(--line);background:transparent;cursor:pointer}
 /* item 121: the not-found choice (Ready-made or One of my pages), and the password page's words */
 .pc-nf-seg{margin:0 0 10px}
 .pc-nf-seg button[aria-pressed="true"]{background:var(--sheet);color:var(--ink);font-weight:600;box-shadow:var(--dds-shadow)}
@@ -11767,7 +11769,7 @@ function renderFormsCard() {
     const rm = el("button", null, "Remove form"); rm.type = "button"; rm.style.cssText = FF_BTN;
     rm.addEventListener("click", async () => { const f = FORMS_WORK[fi]; if (await askYes("Remove this form?", { ok: "Remove form", danger: true })) { const at = FORMS_WORK.indexOf(f); if (at >= 0) FORMS_WORK.splice(at, 1); renderFormsCard(); } });
     // Builder list item 147: this form's own table of answers (form-answers.js, loaded on first use)
-    const ans = el("button", null, "Answers"); ans.type = "button"; ans.style.cssText = FF_BTN;
+    const ans = el("button", "ff-btn", "Answers"); ans.type = "button";
     ans.addEventListener("click", () => openFormAnswers(form, ans));
     head.append(nm, ans, rm); panel.appendChild(head);
 
