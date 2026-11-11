@@ -21,7 +21,9 @@ test.describe('batch D — CSV the way Excel saves it', () => {
     await page.goto('/contacts.html');
     await page.locator('#importCsv').click();
     await page.locator('#csvZone input[type=file]').setInputFiles({ name: 'contacts.csv', mimeType: 'text/csv', buffer: Buffer.from('﻿Name,Phone\r\nAna Ruiz,555 0100\r\nBo Lee,\r\n', 'utf8') });
-    await expect(page.locator('#csvZone')).toContainText('2 contacts found');
+    // item 86: Contacts matches the columns first; the Name column is found behind the mark
+    await expect(page.locator('#csvZone')).toContainText('2 contacts in the file');
+    await expect(page.locator('#csvZone .dds-csvmap select[data-col="0"]')).toHaveValue('name');
     await expect(page.locator('#csvZone')).not.toContainText('couldn’t find a name or email column');
   });
 });
