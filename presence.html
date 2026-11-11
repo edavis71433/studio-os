@@ -1864,8 +1864,6 @@ body.pd-dragging *{cursor:grabbing !important}
         <h1 class="doc" role="heading" aria-level="2">Versions</h1>
         <p class="docsub">Every version you publish is saved here. View one, compare it, or restore it to your draft. Your live site changes only when you publish.</p>
         <div id="pubList"></div>
-        <!-- item 154: pages deleted in the last 30 days, each with Put back (routes/deleted_pages.ts) -->
-        <div id="deletedPagesBox"></div>
         <!-- what happened to the site, newest first (was its own page: timeline.html) -->
         <section class="hb-sec" id="activitySec" aria-labelledby="activityH" tabindex="-1" hidden>
           <div class="hb-sec-h"><h2 id="activityH">Recent activity</h2><button type="button" class="quietact" id="activityMore" hidden>See all</button></div>
@@ -6883,7 +6881,13 @@ async function siteBringOnline() {
 // as it was. Put back adds that one page to the draft; nothing else changes, and the
 // live site waits for a publish. Shown only when there is something to put back.
 async function renderDeletedPages() {
-  const box = $("deletedPagesBox"); if (!box) return;
+  // its own box, just above "More tools", so it never touches the view's static markup
+  let box = $("deletedPagesBox");
+  if (!box) {
+    const more = $("versionMore"); if (!more || !more.parentNode) return;
+    box = document.createElement("div"); box.id = "deletedPagesBox";
+    more.parentNode.insertBefore(box, more);
+  }
   let rows = [];
   try { const d = (await api("GET", "/pages/deleted")).data; rows = Array.isArray(d) ? d : []; } catch (_) { box.innerHTML = ""; return; }
   box.innerHTML = "";
@@ -7045,8 +7049,8 @@ function renderVersionTools() {
 async function loadHistory() {
   renderPreviewPanel();   // FD-T20/T21: Draft → Preview → Live sits at the top
   renderCheckpoints();    // named draft safety points
-  renderDeletedPages();   // item 154: pages deleted in the last 30 days, one at a time back
   renderLaunches();   // FD-T7: staged launches sit above the version journal
+  renderDeletedPages();   // item 154: pages deleted in the last 30 days, one at a time back
   const more = $("versionMore");
   if (more && !more.dataset.set) { more.dataset.set = "1"; more.open = !!S.isStudio; }
   const list = $("pubList");
