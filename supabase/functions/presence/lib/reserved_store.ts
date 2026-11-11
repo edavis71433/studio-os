@@ -20,6 +20,7 @@ export const RESERVED_NAMES = {
   monthlyReport: '__monthly_report__',    // builder list item 58: the client's monthly report email (on, the studio's line, last month sent) (ops/monthly_report.ts)
   followedSearches: '__followed_searches__',   // builder list item 181: the searches a client follows on Google, ten at most (lib/search_tools.ts)
   aiQuestions: '__ai_questions__',        // builder list item 182: the questions a client's monthly AI check asks, ten at most (lib/ai_watch.ts)
+  doNext: '__do_next__',                  // builder list item 184: what the studio marked Done or Not relevant on a client's Do next list (lib/do_next.ts)
   copiedFrom: '__copied_from__',          // builder list item 145: what Duplicate or a template copied onto a new site, until changed or kept (lib/site_layout.ts)
   domainNotes: '__domain_notes__',        // builder list item 162: the studio's notes on a client's domain (whose account, renews by itself, a note) (agency/sites.ts)
   domainMail: '__domain_mail__',          // builder list item 163: the domain's email records as they were, to say so if they vanish (lib/domain_notify.ts)

@@ -27,6 +27,8 @@ import { sendEmail } from '../commerce/account.ts';
 import { readReservedJson, updateReservedJson, RESERVED_NAMES } from '../lib/reserved_store.ts';
 import { siteOrigin } from '../lib/site.ts';
 import { normalizeQuestions, costWords } from '../lib/ai_watch.ts';
+import { normalizeFollowed } from '../lib/search_tools.ts';
+import { reportPdf, reportFileName, changeOn } from '../lib/report_pdf.ts';
 import type { SiteRow } from '../lib/site.ts';
 import { json } from '../../_shared/http.ts';
 
@@ -45,6 +47,8 @@ export interface ReportSetting {
   /** Builder list item 182: the monthly AI check for this client (it costs money, so off
    *  until the studio switches it on), the month it last handled, how that went, and
    *  its tries this month (ops/ai_checks.ts). */
+  /** Builder list item 184: attach the report as a PDF (on unless switched off). */
+  pdf: boolean;
   ai_checks: boolean; ai_month: string | null;
   ai_result: { month: string; status: 'checked' | 'failed'; reason: string | null; at: string } | null;
   ai_tries: { month: string; count: number } | null;
@@ -64,6 +68,16 @@ export interface ReportData {
   publishes: number | null; lastPublishedAt: string | null;
   address: string;               // the site's address, or ''
   timeZone?: string;             // D7: the site's clock, for the date of the last publish (UTC when absent)
+  // ── builder list item 184: the fuller report. Each part is null (left out) when it
+  //    couldn't be read or doesn't apply, never a zero. ──
+  siteName: string;              // the business, for the PDF and its file name
+  priorLabel: string;            // "September"
+  priorVisitors: number | null;
+  search: { clicks: number; impressions: number; priorClicks: number | null; priorImpressions: number | null } | null;
+  followed: Array<{ term: string; position: number | null; priorPosition: number | null; clicks: number }>;
+  ai: { month: string; asked: number; named: number; priorNamed: number | null; engines: string; questions: Array<{ q: string; named: boolean | null }>; newlyNamed: string | null } | null;
+  reviews: { rating: number | null; count: number | null; newGoogle: number | null; unreplied: number | null; ownNew: number | null } | null;
+  health: { n: number; then: number | null; fixed: number } | null;
 }
 
 const esc = (s: unknown) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c] as string));
@@ -79,6 +93,7 @@ export function normalizeReportSetting(raw: unknown): ReportSetting {
     tries: r.tries && typeof r.tries === 'object' && typeof (r.tries as any).month === 'string' && Number.isFinite((r.tries as any).count) ? { month: String((r.tries as any).month), count: Math.max(0, Math.floor(Number((r.tries as any).count))) } : null,
     updated_by: typeof r.updated_by === 'string' ? r.updated_by : null,
     updated_at: typeof r.updated_at === 'string' ? r.updated_at : null,
+    pdf: r.pdf !== false,
     ai_checks: r.ai_checks === true,
     ai_month: typeof r.ai_month === 'string' && /^\d{4}-\d{2}$/.test(r.ai_month) ? r.ai_month : null,
     ai_result: normalizeAiResult(r.ai_result),
@@ -103,11 +118,12 @@ function normalizeResult(raw: unknown): ReportResult | null {
 /** Pure: the setting after the studio flips the switch or edits the line. Switching
  *  ON marks last month as handled, so nothing goes out until next month's first
  *  days, which is what the card promises (review finding 4). */
-export function applyReportChange(cur: ReportSetting, b: { enabled?: unknown; note?: unknown; ai_checks?: unknown }, who: string | null, nowIso: string, tz = 'UTC'): ReportSetting {
+export function applyReportChange(cur: ReportSetting, b: { enabled?: unknown; note?: unknown; ai_checks?: unknown; pdf?: unknown }, who: string | null, nowIso: string, tz = 'UTC'): ReportSetting {
   const next: ReportSetting = { ...cur, updated_by: who || cur.updated_by, updated_at: nowIso };
   if (typeof b.note === 'string') next.note = b.note.slice(0, REPORT_NOTE_MAX);
   // item 182: switching the AI check on runs the first one soon (this month isn't handled yet)
   if (typeof b.ai_checks === 'boolean') next.ai_checks = b.ai_checks;
+  if (typeof b.pdf === 'boolean') next.pdf = b.pdf;   // item 184
   if (typeof b.enabled === 'boolean') {
     if (b.enabled && !cur.enabled) {
       const prev = lastMonth(nowIso, tz).month;   // D7: last month on the site's clock, the one the job will look for
@@ -202,15 +218,54 @@ export function foldReport(i: { month: string; label: string; startMs: number; e
   }
   const pubs = i.publishes ? i.publishes.filter((p) => inMonth(p.created_at)) : null;
   const lastPublishedAt = pubs && pubs.length ? pubs.map((p) => p.created_at).sort().slice(-1)[0] : null;
-  return { month: i.month, monthLabel: i.label, visitors, pageviews, truncated, enquiries: i.enquiries, topPages, publishes: pubs ? pubs.length : null, lastPublishedAt, address: i.address, ...(i.timeZone ? { timeZone: i.timeZone } : {}) };
+  return { month: i.month, monthLabel: i.label, visitors, pageviews, truncated, enquiries: i.enquiries, topPages, publishes: pubs ? pubs.length : null, lastPublishedAt, address: i.address, ...(i.timeZone ? { timeZone: i.timeZone } : {}),
+    siteName: '', priorLabel: '', priorVisitors: null, search: null, followed: [], ai: null, reviews: null, health: null };
+}
+
+/** Builder list item 184: the fuller report's parts from their reads (null = not read). Pure. */
+export function foldExtras(i: {
+  month: string; prior: string;
+  priorVisitors: Array<{ month: string; visitors: number }> | null;
+  signals: Array<{ metric: string; period: string; value: number }> | null;
+  followed: string[]; terms: Array<{ key: string; period: string; clicks: number; position: number | null }> | null;
+  ai: Array<{ month: string; asked: number; named: number; engines?: string[] | null; results?: Array<{ q: string; answers?: Array<{ named: boolean | null; name?: string }> }> }> | null;
+  gbp: { rating?: unknown; review_count?: unknown; new_reviews?: unknown; unreplied_reviews?: unknown } | null; ownNew: number | null;
+  health: Array<{ day: string; critical: number; warning: number; fingerprints?: string[] | null }> | null;
+}): Pick<ReportData, 'priorVisitors' | 'search' | 'followed' | 'ai' | 'reviews' | 'health'> {
+  const sig = (metric: string, period: string) => { const r = (i.signals || []).find((x) => x.metric === metric && x.period === period); return r ? Number(r.value) || 0 : null; };
+  const clicks = sig('search_clicks', i.month);
+  const search = i.signals && clicks !== null ? { clicks, impressions: sig('search_impressions', i.month) || 0, priorClicks: sig('search_clicks', i.prior), priorImpressions: sig('search_impressions', i.prior) } : null;
+  const term = (k: string, p: string) => (i.terms || []).find((t) => t.key === k && t.period === p) || null;
+  const followed = i.terms ? i.followed.map((k) => ({ term: k, position: term(k, i.month)?.position ?? null, priorPosition: term(k, i.prior)?.position ?? null, clicks: Number(term(k, i.month)?.clicks) || 0 })) : [];
+  const checks = (i.ai || []).slice().sort((a, b) => b.month.localeCompare(a.month));
+  const latest = checks[0] || null, before = checks[1] || null;
+  const ai = latest ? {
+    month: latest.month, asked: Number(latest.asked) || 0, named: Number(latest.named) || 0, priorNamed: before ? Number(before.named) || 0 : null,
+    engines: [...new Set((latest.results || []).flatMap((r) => (r.answers || []).map((a) => a.name || '')).filter(Boolean))].join(' and ') || 'Claude',
+    questions: (latest.results || []).map((r) => ({ q: String(r.q || ''), named: (r.answers || []).some((a) => a.named === true) ? true : (r.answers || []).some((a) => a.named === false) ? false : null })),
+    newlyNamed: (() => {
+      const was = new Set((before?.results || []).filter((r) => (r.answers || []).some((a) => a.named === true)).map((r) => r.q));
+      return (latest.results || []).find((r) => (r.answers || []).some((a) => a.named === true) && before && !was.has(r.q))?.q || null;
+    })(),
+  } : null;
+  const num = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) ? v : null);
+  const reviews = i.gbp || i.ownNew ? { rating: num(i.gbp?.rating), count: num(i.gbp?.review_count), newGoogle: num(i.gbp?.new_reviews), unreplied: num(i.gbp?.unreplied_reviews), ownNew: i.ownNew } : null;
+  const days = (i.health || []).slice().sort((a, b) => b.day.localeCompare(a.day));
+  const now = days[0] || null;
+  const then = now ? days.find((d) => Date.parse(now.day) - Date.parse(d.day) >= 28 * 86_400_000) || null : null;
+  const n = (d: { critical: number; warning: number }) => (Number(d.critical) || 0) + (Number(d.warning) || 0);
+  const health = now ? { n: n(now), then: then ? n(then) : null, fixed: then && Array.isArray(then.fingerprints) && Array.isArray(now.fingerprints) ? new Set(then.fingerprints.filter((f) => !now.fingerprints!.includes(f)).map((f) => f.split('|')[1])).size : 0 } : null;
+  const pv = (i.priorVisitors || []).find((r) => r.month === i.prior);
+  return { priorVisitors: i.priorVisitors ? (pv ? Number(pv.visitors) || 0 : 0) : null, search, followed, ai, reviews, health };
 }
 
 const n1 = (n: number) => n.toLocaleString('en-US');
+const ordinalOf = (n: number) => { const t = n % 100; return t >= 11 && t <= 13 ? 'th' : ({ 1: 'st', 2: 'nd', 3: 'rd' } as Record<number, string>)[n % 10] || 'th'; };
 const pageName = (p: string) => p === '/' || p === '' ? 'Home page' : p.replace(/^\//, '').replace(/\/$/, '').replace(/[-_]/g, ' ').replace(/\//g, ' › ');
 
 /** The email body (inside the branded shell). Pure. Every line is a sentence; a part
  *  that couldn't be read is said so, never shown as zero. */
-export function reportHtml(d: ReportData, o: { studioName: string; note: string; clientName?: string | null }): { subject: string; html: string } {
+export function reportHtml(d: ReportData, o: { studioName: string; note: string; clientName?: string | null; pdf?: string | null }): { subject: string; html: string } {
   const who = (o.clientName || '').trim();
   const parts: string[] = [];
   parts.push(`<p style="margin:0 0 6px;font-size:13px;letter-spacing:.06em;text-transform:uppercase;color:#6b6478">Your website in ${esc(d.monthLabel)}</p>`);
@@ -220,10 +275,39 @@ export function reportHtml(d: ReportData, o: { studioName: string; note: string;
   const tiles: string[] = [];
   // bug hunt H5: the counter knows a person for one day only, so a month's count is visits
   if (d.visitors === null) tiles.push(tile('Visits', '—', 'We couldn’t read the visit counts this time.'));
-  else tiles.push(tile('Visits', n1(d.visitors), `${n1(d.pageviews || 0)} page${(d.pageviews || 0) === 1 ? '' : 's'} viewed${d.truncated ? ', from recent activity' : ''}`));
+  else tiles.push(tile('Visits', n1(d.visitors), `${n1(d.pageviews || 0)} page${(d.pageviews || 0) === 1 ? '' : 's'} viewed${d.truncated ? ', from recent activity' : ''}${changeOn(d.visitors, d.priorVisitors, d.priorLabel) ? `, ${changeOn(d.visitors, d.priorVisitors, d.priorLabel)}` : ''}`));
   if (d.enquiries === null) tiles.push(tile('Enquiries', '—', 'We couldn’t read the enquiries this time.'));
   else tiles.push(tile('Enquiries', n1(d.enquiries), d.enquiries === 0 ? 'No one wrote in through the site' : `${d.enquiries === 1 ? 'Someone' : 'People'} wrote in through your site`));
   parts.push(`<table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>${tiles.join('')}</tr></table>`);
+  // ── builder list item 184: Google, AI answers, reviews and health ──
+  const up = (c: string) => `<span style="color:${/^down/.test(c) ? '#bf3535' : '#11744a'}">${esc(c)}</span>`;
+  if (d.search) {
+    const c = changeOn(d.search.clicks, d.search.priorClicks, d.priorLabel);
+    parts.push(`<p style="margin:14px 0 6px"><strong>On Google</strong></p><p style="margin:0 0 8px">${n1(d.search.clicks)} click${d.search.clicks === 1 ? '' : 's'} to your site and ${n1(d.search.impressions)} times seen${c ? `, ${up(c)}` : ''}.</p>`);
+    if (d.followed.length) {
+      parts.push(`<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 10px;font-size:14px">${d.followed.map((f) => {
+        const move = f.position !== null && f.priorPosition !== null ? Math.round(f.priorPosition) - Math.round(f.position) : null;
+        const where = f.position === null ? '<span style="color:#6b6478">not seen this month</span>' : `<strong>${Math.round(f.position)}${ordinalOf(Math.round(f.position))}</strong> on Google${move ? ` ${up(`${move > 0 ? 'up' : 'down'} ${Math.abs(move)} place${Math.abs(move) === 1 ? '' : 's'}`)}` : ''}`;
+        return `<tr><td style="padding:6px 0;border-top:1px solid #eee9e0">${esc(f.term)}</td><td style="padding:6px 0;border-top:1px solid #eee9e0;text-align:right">${where}</td></tr>`;
+      }).join('')}</table>`);
+    }
+  }
+  if (d.ai) {
+    const was = d.ai.priorNamed;
+    parts.push(`<p style="margin:14px 0 6px"><strong>In AI answers</strong></p><p style="margin:0 0 8px">${esc(d.ai.engines)} named ${esc(d.siteName || 'you')} for ${d.ai.named} of the ${d.ai.asked} questions we ask it each month${was === null ? '' : was === d.ai.named ? ', the same as the month before' : `, ${d.ai.named > was ? 'up' : 'down'} from ${was}`}.${d.ai.newlyNamed ? ` New this month: “${esc(d.ai.newlyNamed)}”.` : ''}</p>`);
+  }
+  if (d.reviews && (d.reviews.count !== null || d.reviews.ownNew)) {
+    const r = d.reviews, bits: string[] = [];
+    if (r.rating !== null && r.count !== null) bits.push(`${r.rating.toFixed(1)} stars from ${n1(r.count)} Google review${r.count === 1 ? '' : 's'}`);
+    if (r.newGoogle) bits.push(`${r.newGoogle} new in the last 30 days`);
+    if (r.unreplied) bits.push(`${r.unreplied} waiting for your reply`);
+    if (r.ownNew) bits.push(`${r.ownNew} new on your site`);
+    parts.push(`<p style="margin:14px 0 6px"><strong>Reviews</strong></p><p style="margin:0 0 8px">${esc(bits.join('. '))}.</p>`);
+  }
+  if (d.health) {
+    const h = d.health;
+    parts.push(`<p style="margin:14px 0 6px"><strong>Website health</strong></p><p style="margin:0 0 8px">${h.n === 0 ? 'Nothing to look at' : `${h.n} thing${h.n === 1 ? '' : 's'} to look at`}${h.then !== null ? (h.then === h.n ? ', the same as a month ago' : `, ${Math.abs(h.then - h.n)} ${h.then > h.n ? 'fewer' : 'more'} than a month ago`) : ''}${h.fixed ? `. ${h.fixed} fixed this month` : ''}.</p>`);
+  }
   if (d.topPages.length) {
     parts.push(`<p style="margin:10px 0 6px"><strong>What people read most</strong></p><ol style="margin:0 0 14px;padding-left:20px">${d.topPages.map((p) => `<li>${esc(pageName(p.path))} <span style="color:#6b6478">· ${n1(p.views)} view${p.views === 1 ? '' : 's'}</span></li>`).join('')}</ol>`);
   } else if (d.visitors !== null && d.visitors === 0) {
@@ -232,14 +316,15 @@ export function reportHtml(d: ReportData, o: { studioName: string; note: string;
   if (d.publishes === null) parts.push(`<p style="margin:10px 0 14px"><strong>What changed:</strong> we couldn’t read the publish history this time.</p>`);
   else if (d.publishes === 0) parts.push(`<p style="margin:10px 0 14px"><strong>What changed:</strong> nothing was published this month. Your site stayed as it was.</p>`);
   else parts.push(`<p style="margin:10px 0 14px"><strong>What changed:</strong> ${d.publishes === 1 ? 'one update went live' : `${n1(d.publishes)} updates went live`}${d.lastPublishedAt ? `, the last on ${new Date(d.lastPublishedAt).toLocaleDateString('en-US', { month: 'long', day: 'numeric', timeZone: reportZone(d.timeZone, 'UTC') })}` : ''}.</p>`);
+  if (o.pdf) parts.push(`<p style="margin:14px 0 0;padding:10px 12px;border:1px solid #eee9e0;border-radius:10px;font-size:13px"><strong>A copy to keep:</strong> ${esc(o.pdf)} is attached.</p>`);
   parts.push(`<p style="margin:16px 0 0;font-size:13px;color:#6b6478">Sent once a month by ${esc(o.studioName)}. Reply to this email to reach us.</p>`);
   return { subject: `Your website in ${d.monthLabel}`, html: parts.join('') };
 }
 
+const safe = async <T>(p: Promise<T>): Promise<T | null> => { try { return await p; } catch { return null; } };
 const VISITS_PAGE = 1000, VISITS_PAGES = 50;   // every page or none (lib/db.ts svcPages); 50,000 visits a month at most
 /** The month's reads for one site. Each part is best-effort on its own. */
 export async function loadReportData(site: SiteRow, win: { month: string; startIso: string; endIso: string; label: string }, timeZone?: string): Promise<ReportData> {
-  const safe = async <T>(p: Promise<T>): Promise<T | null> => { try { return await p; } catch { return null; } };
   const [vq, enq, pq] = await Promise.all([
     safe(svcPages(`presence_visits?site_id=eq.${site.id}&ts=gte.${win.startIso}&ts=lt.${win.endIso}&kind=not.in.(button,leave)&select=ts,kind,path,ref_host,utm_source,device,country,visitor_hash`, 'ts', VISITS_PAGE, VISITS_PAGES)),
     safe(svcCount(`presence_form_submissions?site_id=eq.${site.id}&spam=is.false&created_at=gte.${win.startIso}&created_at=lt.${win.endIso}`)),
@@ -247,7 +332,32 @@ export async function loadReportData(site: SiteRow, win: { month: string; startI
   ]);
   const rows = <T,>(q: unknown): T[] | null => (q && (q as { ok?: boolean }).ok && Array.isArray((q as { json?: unknown }).json)) ? (q as { json: T[] }).json : null;
   const visits = vq ? (vq.rows as VisitRow[]) : null;
-  return foldReport({ month: win.month, label: win.label, startMs: Date.parse(win.startIso), endMs: Date.parse(win.endIso), visits, enquiries: typeof enq === 'number' ? enq : null, publishes: rows<{ created_at: string }>(pq), address: siteOrigin(site), visitsCap: vq?.truncated ? (visits || []).length : Number.MAX_SAFE_INTEGER, timeZone });
+  const base = foldReport({ month: win.month, label: win.label, startMs: Date.parse(win.startIso), endMs: Date.parse(win.endIso), visits, enquiries: typeof enq === 'number' ? enq : null, publishes: rows<{ created_at: string }>(pq), address: siteOrigin(site), visitsCap: vq?.truncated ? (visits || []).length : Number.MAX_SAFE_INTEGER, timeZone });
+  // builder list item 184: Google, the searches followed, AI answers, reviews and health, each best-effort
+  const priorStart = new Date(Date.UTC(Number(win.month.slice(0, 4)), Number(win.month.slice(5, 7)) - 2, 1));
+  const prior = priorStart.toISOString().slice(0, 7);
+  const cid = encodeURIComponent(String(site.client_id || ''));
+  const [identQ, pvQ, sigQ, folRaw, aiQ, gbpQ, ownQ, hQ] = await Promise.all([
+    safe(svc(`presence_identity?site_id=eq.${site.id}&select=business_name&limit=1`)),
+    safe(svc('rpc/presence_month_visitors', { method: 'POST', body: JSON.stringify({ p_site_ids: [site.id], p_since: priorStart.toISOString() }) })),
+    site.client_id ? safe(svc(`signals?client_id=eq.${cid}&source=eq.gsc&metric=in.(search_clicks,search_impressions)&period=in.(${win.month},${prior})&select=metric,period,value&limit=20`)) : Promise.resolve(null),
+    safe(readReservedJson(site.id, RESERVED_NAMES.followedSearches)),
+    safe(svc(`presence_ai_checks?site_id=eq.${site.id}&select=month,asked,named,engines,results&order=month.desc&limit=2`)),
+    safe(svc(`presence_connected_data?site_id=eq.${site.id}&provider_key=eq.google_business_profile&select=data&limit=1`)),
+    safe(svcCount(`presence_reviews?site_id=eq.${site.id}&status=eq.approved&created_at=gte.${win.startIso}&created_at=lt.${win.endIso}`)),
+    safe(svc(`presence_health_days?site_id=eq.${site.id}&day=gte.${new Date(Date.parse(win.endIso) - 40 * 86_400_000).toISOString().slice(0, 10)}&day=lt.${win.endIso.slice(0, 10)}&select=day,critical,warning,fingerprints&order=day.desc&limit=45`)),
+  ]);
+  const followed = normalizeFollowed(folRaw).terms.map((t) => t.term);
+  const termsQ = followed.length && site.client_id ? await safe(svc(`presence_search_terms?client_id=eq.${cid}&dimension=eq.query&key=in.(${followed.map((t) => encodeURIComponent(`"${t.replace(/"/g, '')}"`)).join(',')})&period=in.(${win.month},${prior})&select=key,period,clicks,position&limit=40`)) : null;
+  const extras = foldExtras({
+    month: win.month, prior,
+    priorVisitors: rows<{ month: string; visitors: number }>(pvQ), signals: rows<{ metric: string; period: string; value: number }>(sigQ),
+    followed, terms: followed.length ? rows<{ key: string; period: string; clicks: number; position: number | null }>(termsQ) : [],
+    ai: rows<any>(aiQ), gbp: rows<{ data: Record<string, unknown> }>(gbpQ)?.[0]?.data || null, ownNew: typeof ownQ === 'number' ? ownQ : null,
+    health: rows<{ day: string; critical: number; warning: number; fingerprints?: string[] }>(hQ),
+  });
+  const siteName = String(rows<{ business_name?: string }>(identQ)?.[0]?.business_name || '').trim();
+  return { ...base, ...extras, siteName, priorLabel: priorStart.toLocaleDateString('en-US', { month: 'long', timeZone: 'UTC' }) };
 }
 
 /** The studio that looks after this client site (the active service link): its brand,
@@ -297,8 +407,11 @@ export async function readReportSetting(siteId: string): Promise<ReportSetting> 
 export async function sendReport(site: SiteRow, win: ReturnType<typeof lastMonth>, setting: ReportSetting, to: string, opts: { preview?: boolean; clientName?: string | null; timeZone?: string } = {}): Promise<boolean> {
   const studio = await studioSiteOf(site.id);
   const [data, brand] = await Promise.all([loadReportData(site, win, opts.timeZone), studio ? loadEmailBrand(studio) : Promise.resolve(EMAIL_BRAND_DEFAULT)]);
-  const { subject, html } = reportHtml(data, { studioName: brand.name, note: setting.note, clientName: opts.clientName ?? null });
-  return await sendEmail(to, opts.preview ? `[Preview] ${subject}` : subject, html, brand, { siteId: studio || site.id, asBusiness: true });   // sales item 92: from the studio, in its name
+  // item 184: a PDF copy to keep, attached unless the studio switched it off
+  const file = setting.pdf !== false ? reportFileName(data.siteName, data.monthLabel) : null;
+  const { subject, html } = reportHtml(data, { studioName: brand.name, note: setting.note, clientName: opts.clientName ?? null, pdf: file });
+  const attachments = file ? [{ filename: file, content: reportPdf(data, { studioName: brand.name, accent: brand.accent, clientName: opts.clientName ?? null, siteName: data.siteName || 'Your website' }) }] : undefined;
+  return await sendEmail(to, opts.preview ? `[Preview] ${subject}` : subject, html, brand, { siteId: studio || site.id, asBusiness: true, ...(attachments ? { attachments } : {}) });   // sales item 92: from the studio, in its name
 }
 
 /** Thrown inside a claim when the month is no longer due, so nothing is written. */
@@ -367,8 +480,8 @@ export async function handleReportGet(site: SiteRow, cors: Record<string, string
   return json({ data: { ...s, note_max: REPORT_NOTE_MAX, next_month: monthNow(new Date().toISOString(), tz), blocked: reach ? reach.blocked : null, ai_questions: n, ai_cost: costWords(n) } }, 200, cors);   // this month's report goes out in the first days of next month
 }
 export async function handleReportPut(req: Request, site: SiteRow, principal: { email?: string | null }, cors: Record<string, string>) {
-  let b: { enabled?: unknown; note?: unknown; ai_checks?: unknown } = {}; try { b = await req.json(); } catch { /* answered below */ }
-  if (typeof b.enabled !== 'boolean' && typeof b.note !== 'string' && typeof b.ai_checks !== 'boolean') return json({ error: 'bad_request', message: 'Say whether the report is on, or give the line to send with it.' }, 400, cors);
+  let b: { enabled?: unknown; note?: unknown; ai_checks?: unknown; pdf?: unknown } = {}; try { b = await req.json(); } catch { /* answered below */ }
+  if (typeof b.enabled !== 'boolean' && typeof b.note !== 'string' && typeof b.ai_checks !== 'boolean' && typeof b.pdf !== 'boolean') return json({ error: 'bad_request', message: 'Say whether the report is on, or give the line to send with it.' }, 400, cors);
   // switching on for a client who can't be emailed would promise a report that never goes (review finding 2)
   if (b.enabled === true) {
     const reach = await reachOf(site).catch(() => null);
@@ -380,6 +493,16 @@ export async function handleReportPut(req: Request, site: SiteRow, principal: { 
   if (!next) return json({ error: 'write_failed', message: 'That didn’t save.' }, 502, cors);
   return json({ data: next }, 200, cors);
 }
+/** GET /report/monthly/pdf (item 184): last month's report as a PDF, to download. */
+export async function handleReportPdf(site: SiteRow, cors: Record<string, string>) {
+  const [studio, tz] = await Promise.all([studioSiteOf(site.id), zoneOfSite(site.id)]);
+  const win = lastMonth(new Date().toISOString(), tz);   // D7: last month on the site's clock, as the email has it
+  const [data, brand, client] = await Promise.all([loadReportData(site, win, tz), studio ? loadEmailBrand(studio, { logoTtl: 600 }) : Promise.resolve(EMAIL_BRAND_DEFAULT), clientOf(site).catch(() => ({ email: null, name: null }))]);
+  const file = reportFileName(data.siteName, data.monthLabel);
+  const bytes = reportPdf(data, { studioName: brand.name, accent: brand.accent, clientName: client.name, siteName: data.siteName || 'Your website' });
+  return new Response(bytes, { status: 200, headers: { ...cors, 'Content-Type': 'application/pdf', 'Content-Disposition': `attachment; filename="${file}"`, 'Cache-Control': 'no-store' } });
+}
+
 /** A preview of last month's report to the caller, now. */
 export async function handleReportPreview(site: SiteRow, principal: { email?: string | null }, cors: Record<string, string>) {
   if (!principal.email) return json({ error: 'bad_request', message: 'Your sign-in has no email to send the preview to.' }, 400, cors);

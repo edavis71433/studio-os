@@ -1252,6 +1252,7 @@ async function route_(req: Request, cors: Record<string, string>): Promise<Respo
   if (route === '/report/monthly' && method === 'GET') return (await import('./ops/monthly_report.ts')).handleReportGet(site, cors);
   if (route === '/report/monthly' && method === 'PUT') return (await import('./ops/monthly_report.ts')).handleReportPut(req, site, principal, cors);
   if (route === '/report/monthly/preview' && method === 'POST') return (await import('./ops/monthly_report.ts')).handleReportPreview(site, principal, cors);
+  if (route === '/report/monthly/pdf' && method === 'GET') return (await import('./ops/monthly_report.ts')).handleReportPdf(site, cors);   // item 184
   // ── AN-1: Analytics — plain-English understanding composed from stored signals
   //    (no new engine, no new AI, no fabricated numbers). Site-scoped surfaces.
   // Slice 8: the Business dashboard summary (analytics.html's two-band board)
