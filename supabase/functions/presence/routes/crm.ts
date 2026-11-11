@@ -488,7 +488,7 @@ export async function handleCrmRecord(req: Request, jwt: string, site: SiteRow, 
       const [c, ct] = await Promise.all([
         clientId ? svc(`clients?id=eq.${clientId}&select=name,email,contact_email&limit=1`).then(one) : Promise.resolve(null),
         // item 69: found_via rides along; before APPLY-0143 the same read without it.
-        // item 89: and the job title, second phone, address and tags (APPLY-0165) before both
+        // item 89: and the job title, second phone, address and tags (APPLY-0166) before both
         contactId ? svc(`presence_contacts?id=eq.${contactId}&site_id=eq.${AS}&select=name,company,email,phone,found_via,${CONTACT_MORE_COLS.join(',')}&limit=1`)
           .then((r) => r.ok ? r : svc(`presence_contacts?id=eq.${contactId}&site_id=eq.${AS}&select=name,company,email,phone,found_via&limit=1`))
           .then((r) => r.ok ? r : svc(`presence_contacts?id=eq.${contactId}&site_id=eq.${AS}&select=name,company,email,phone&limit=1`)).then(one) : Promise.resolve(null),

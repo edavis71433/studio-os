@@ -1,4 +1,4 @@
--- APPLY 0165 (production) — a contact holds a job title, a second phone, an address and tags.
+-- APPLY 0166 (production) — a contact holds a job title, a second phone, an address and tags.
 -- Safe to run more than once. Four new columns on presence_contacts, all empty by
 -- default, and one index for filtering by a tag; nothing existing changes.
 -- Paste into Supabase → SQL Editor → Run.

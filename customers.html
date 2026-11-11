@@ -383,6 +383,8 @@ const scope=()=>new URLSearchParams(location.search).get('client')||'';
 // NOT sent here; scope() survives only for outbound links (scoped()).
 const H=()=>({'Content-Type':'application/json','Authorization':'Bearer '+SUPABASE_KEY,'x-dds-user-jwt':TOKEN});
 async function api(path,method,body){const r=await fetch(FN+path,{method:method||'GET',headers:H(),body:body?JSON.stringify(body):undefined});return{ok:r.ok,status:r.status,body:await r.json().catch(()=>({}))};}
+// item 89: a phone number is a tap to call (People showed it as text)
+const telOf=(p)=>{const d=String(p||'').trim().replace(/[^\d+]/g,'').replace(/(?!^)\+/g,'');return d.replace(/\D/g,'').length>=3?'tel:'+d:'';};
 const initial=(s)=>{const ch=Array.from(String(s||'?').trim())[0]||'?';const up=ch.toUpperCase();return up.length===1?up:ch;};
 // keep any agency drill-in scope on internal links
 function scoped(href){const c=scope();if(!c||!href||href.charAt(0)!=='/')return href;return href+(href.indexOf('?')>=0?'&':'?')+'client='+encodeURIComponent(c);}
@@ -745,7 +747,7 @@ function peopleHtml(){
     const cust=c.client_id?byClient[String(c.client_id)]:null;
     const rec=c.client_id?(cust&&cust.customer_site_id?`/crm.html?client=${esc(cust.customer_site_id)}`:`/crm.html?client_id=${esc(c.client_id)}`):`/crm.html?contact=${esc(c.id)}&tab=details`;
     const nm=c.name||c.email||'Someone';
-    return `<tr data-person="${esc(c.id)}" tabindex="0" aria-label="Preview ${esc(nm)}"><td data-col="name"><span class="nm"><span class="av sm" aria-hidden="true">${esc(ini2(nm))}</span><span><a href="${rec}" data-noscope="1">${esc(nm)}</a>${c.company?`<span class="pn">${esc(c.company)}</span>`:''}</span></span></td><td data-col="email">${c.email?`<a href="mailto:${esc(c.email)}">${esc(c.email)}</a>`:'—'}</td><td data-col="phone">${esc(c.phone||'—')}</td><td data-col="customer">${c.client_id?`<a href="${rec}" data-noscope="1">${esc((cust&&cust.name)||c.company||'Customer')} ↗</a>`:'<span class="pill lead">Not yet</span>'}</td><td class="acts"><a class="rowact" href="${rec}" data-noscope="1">Open record</a></td></tr>`;
+    return `<tr data-person="${esc(c.id)}" tabindex="0" aria-label="Preview ${esc(nm)}"><td data-col="name"><span class="nm"><span class="av sm" aria-hidden="true">${esc(ini2(nm))}</span><span><a href="${rec}" data-noscope="1">${esc(nm)}</a>${c.company?`<span class="pn">${esc(c.company)}</span>`:''}</span></span></td><td data-col="email">${c.email?`<a href="mailto:${esc(c.email)}">${esc(c.email)}</a>`:'—'}</td><td data-col="phone">${c.phone&&telOf(c.phone)?`<a href="${esc(telOf(c.phone))}">${esc(c.phone)}</a>`:esc(c.phone||'—')}</td><td data-col="customer">${c.client_id?`<a href="${rec}" data-noscope="1">${esc((cust&&cust.name)||c.company||'Customer')} ↗</a>`:'<span class="pill lead">Not yet</span>'}</td><td class="acts"><a class="rowact" href="${rec}" data-noscope="1">Open record</a></td></tr>`;
   }).join('');
   return `<div class="tscroll people"><table aria-label="People"><thead><tr><th scope="col">Name</th><th scope="col">Email</th><th scope="col">Phone</th><th scope="col">Customer</th><th scope="col" class="acts"><span class="sr-only">Actions</span></th></tr></thead><tbody>${trs}</tbody></table></div>`+pMoreHtml();
 }

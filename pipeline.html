@@ -88,6 +88,10 @@ html.dds-embed #detailWrap{padding-top:0}
   .dp-acts{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
   .dp-acts button{font:inherit;font-size:12.5px;font-weight:600;padding:10px 6px;border-radius:var(--dds-r,12px);background:var(--card);color:var(--ink);border:1px solid var(--dds-line-strong,var(--line));cursor:pointer}
   .dp-acts button:hover{border-color:var(--p);color:var(--p)}
+  /* item 89: tap to call from the preview (a phone opens its dialler; back here, shell.js offers to log it) */
+  .dp-call{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;box-sizing:border-box;margin-top:10px;font-size:14px;font-weight:600;text-decoration:none;color:var(--p);background:var(--card);border:1px solid var(--dds-line-strong,var(--line));border-radius:999px;padding:10px 16px}
+  .dp-call svg{width:16px;height:16px;flex:0 0 auto}
+  .dp-call:hover{border-color:var(--p)}
   .dp-latest{list-style:none;padding:0;margin:0}
   .dp-latest li{display:flex;gap:12px;justify-content:space-between;font-size:13px;padding:7px 0;border-bottom:1px solid var(--line)}
   .dp-latest li:last-child{border-bottom:0}
@@ -116,7 +120,7 @@ html.dds-embed #detailWrap{padding-top:0}
     .bchips{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none}
     .bchips::-webkit-scrollbar{display:none}
   }
-  @media (pointer:coarse){.dp-x{width:44px;height:44px}.dp-acts button,.dp-open,.dp-next{min-height:44px}}
+  @media (pointer:coarse){.dp-x{width:44px;height:44px}.dp-acts button,.dp-open,.dp-next,.dp-call{min-height:44px}}
   @media (prefers-reduced-motion:reduce){dialog.dprev{animation:none}}
 
   /* ══ Bold redesign — the one-screen proposal: services as chips, the lines,
@@ -545,7 +549,8 @@ html.dds-embed #detailWrap{padding-top:0}
     <input id="f-name" maxlength="120" placeholder="Jane Doe" autocomplete="off">
     <label for="f-phone" style="margin-top:10px">Phone <span class="mut">(optional)</span></label>
     <input id="f-phone" maxlength="40" placeholder="(555) 123-4567" autocomplete="off">
-    <div class="row2" style="margin-top:14px;justify-content:flex-end"><button type="button" class="btn ghost" id="f-cancel">Cancel</button><button type="submit" class="btn">Create deal</button></div>
+    <div class="row2" style="margin-top:14px;justify-content:flex-end"><button type="button" class="btn ghost" id="f-cancel">Cancel</button><button type="submit" class="btn ghost" id="f-again">Save &amp; New</button><button type="submit" class="btn" id="f-go">Create deal</button></div>
+    <p class="mut" style="margin:8px 0 0;font-size:12.5px;text-align:right">Save &amp; New saves this one and clears the form for the next deal.</p>
   </form>
 </dialog>
 
@@ -1851,7 +1856,7 @@ async function load(soft){
 // nothing edits inline. Contact names aren't in the deals LIST response (only
 // contact_id), so the Contact column joins them client-side from the EXISTING
 // GET /sales/contacts read — fetched once, cached, degrading to “—”. ──
-let CONTACT_NAME=null,CONTACT_TEXT=null,CONTACT_LOADING=null,CONTACT_FAILED=false;
+let CONTACT_NAME=null,CONTACT_TEXT=null,CONTACT_LOADING=null,CONTACT_FAILED=false,CONTACT_PHONE={};
 function ensureContactNames(){
   if(CONTACT_NAME&&!CONTACT_FAILED)return Promise.resolve();
   if(CONTACT_LOADING)return CONTACT_LOADING;
@@ -1872,7 +1877,10 @@ function ensureContactNames(){
     .finally(()=>{CONTACT_LOADING=null;});
   return CONTACT_LOADING;
 }
-function nameOf(c){if(!c||!c.id||!CONTACT_NAME)return;CONTACT_NAME[c.id]=c.name||c.email||'';CONTACT_TEXT[c.id]=[c.name,c.email,c.company].filter(Boolean).join(' ').toLowerCase();}
+function nameOf(c){if(!c||!c.id||!CONTACT_NAME)return;CONTACT_NAME[c.id]=c.name||c.email||'';CONTACT_TEXT[c.id]=[c.name,c.email,c.company].filter(Boolean).join(' ').toLowerCase();CONTACT_PHONE[c.id]=c.phone||c.phone2||'';}
+// item 89: a phone number is a tap to call; a tap from a deal offers to log that call on the way back (shell.js)
+const telOf=(p)=>{const d=String(p||'').trim().replace(/[^\d+]/g,'').replace(/(?!^)\+/g,'');return d.replace(/\D/g,'').length>=3?'tel:'+d:'';};
+function callLink(phone,dealId,who,cls){const h=telOf(phone);return h?`<a class="${cls||''}" href="${esc(h)}" data-call-deal="${esc(dealId||'')}" data-call-who="${esc(who||'')}" aria-label="Call ${esc(who||phone)} on ${esc(phone)}">${cls?svgi('phone')+' Call ':''}${esc(phone)}</a>`:'';}
 // item 66: names for the loaded deals' contacts the first read didn't cover, asked
 // for by id (?ids=, up to 100 a read, removed contacts included: this only labels
 // deals that exist). Resolves true when it learned a name, so the caller repaints.
@@ -2449,6 +2457,7 @@ function dpPaint(){
       <p class="dp-stage"><b>${esc(stageLabel(d.stage))}</b>${at>=0&&d.stage!=='won'?` · step ${at+1} of ${DP_PATH.length}`:''}</p>
       <div class="dp-path" aria-hidden="true">${DP_PATH.map((s2,k)=>`<span class="${at>=0&&k<=at?'on':''}"></span>`).join('')}</div>
       ${nextBtn}${step}
+      ${(()=>{const ph=d.contact_id&&CONTACT_PHONE[d.contact_id];return ph?callLink(ph,d.id,who,'dp-call'):'';})()}
       <h3 class="dp-l">Quick actions</h3>
       <div class="dp-acts" role="group" aria-label="Quick actions"><button type="button" data-dp="call" data-k="call">Log a call</button><button type="button" data-dp="proposal" data-k="proposal">Proposal</button><button type="button" data-dp="invoice" data-k="invoice">Invoice</button></div>
       <h3 class="dp-l">Latest</h3>
@@ -2622,7 +2631,9 @@ $('dealForm').onsubmit=async(e)=>{
   const title=$('f-title').value.trim(); if(!title){toast('A deal needs a title.',true);return;}
   const email=$('f-email').value.trim();
   const cname=$('f-name').value.trim(); const cphone=$('f-phone').value.trim();
-  const btn=e.submitter; if(btn)btn.disabled=true;
+  // sales item 105: Save & New keeps the dialog open, empty, for the next deal
+  const again=!!(e.submitter&&e.submitter.id==='f-again');
+  const btns=[$('f-again'),$('f-go')]; btns.forEach(b=>{if(b)b.disabled=true;});
   try{
     let contactId=null, cnote='';
     const who=[email,cname,cphone].join('\n');
@@ -2634,9 +2645,15 @@ $('dealForm').onsubmit=async(e)=>{
       CONTACT_NAME=null;CONTACT_TEXT=null;CONTACT_FAILED=false; }   // BOTH contact caches are stale now — the Table's name join AND the search index (visibleDeals gates its refetch on !CONTACT_TEXT); refetch on the next render
     const created=await api('/sales/deals','POST',{title,contact_id:contactId});
     ND_CONTACT=null;
+    if(again){
+      $('f-title').value=''; $('f-email').value=''; $('f-name').value=''; $('f-phone').value='';
+      toast((cnote?'Deal added. '+cnote:`“${title}” added`)+' — ready for the next one.'); load();
+      setTimeout(()=>$('f-title').focus(),20);
+      return;
+    }
     $('formDlg').close(); toast(cnote?'Deal added. '+cnote:'Deal added'); load();
     if(created&&created.data&&created.data.id) openDeal(created.data.id);   // straight into the deal — no hunting the list
-  }catch(err){ toast(nice(err),true); } finally{ if(btn)btn.disabled=false; }
+  }catch(err){ toast(nice(err),true); } finally{ btns.forEach(b=>{if(b)b.disabled=false;}); }
 };
 
 // ── an inline mini-form helper (replaces prompt) ──
@@ -2929,7 +2946,7 @@ async function openDeal(id){
         <div class="dh-ic" aria-hidden="true">${svgi('pipeline')}</div>
         <div style="min-width:0;flex:1"><div id="dtitle" tabindex="-1">${esc(d.title||'Deal')}</div>
           <div class="dh-sub">${stageBadge(d.stage,signedNow)}
-            <span>${c?(c.name?esc(c.name):(c.email?`<a href="mailto:${esc(c.email)}">${esc(c.email)}</a>`:'Contact')):'No contact'}${(c&&c.name&&c.email)?` · <a href="mailto:${esc(c.email)}">${esc(c.email)}</a>`:''}</span>
+            <span>${c?(c.name?esc(c.name):(c.email?`<a href="mailto:${esc(c.email)}">${esc(c.email)}</a>`:'Contact')):'No contact'}${(c&&c.name&&c.email)?` · <a href="mailto:${esc(c.email)}">${esc(c.email)}</a>`:''}${c&&c.phone?' · '+callLink(c.phone,id,c.name||c.email||''):''}${c&&c.phone2?' · '+callLink(c.phone2,id,c.name||c.email||''):''}</span>
             ${d.expected_value_cents?`<span class="fact"><strong>${money(d.expected_value_cents)}</strong> value</span>`:''}
             ${d.expected_close&&d.stage!=='won'&&d.stage!=='lost'?`<span class="fact">Closes <strong>${esc(niceDay(d.expected_close))}</strong></span>`:''}
             ${(()=>{const open=(data.invoices||[]).find(v=>v.status==='open');const paid=(data.invoices||[]).find(v=>v.status==='paid');return open?`<span style="color:var(--warn,#775d31);font-weight:600">${money(open.amount_cents)} ${open.purpose==='deposit'?'deposit':'invoice'} awaiting payment</span>`:paid?`<span style="color:var(--good,#33664b);font-weight:600">${money(paid.amount_cents)} paid ✓</span>`:'';})()}
