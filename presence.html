@@ -8540,9 +8540,9 @@ function renderLinkedChip(blk, idx, card) {
   [up, dn, rm].forEach((b) => { b.type = "button"; b.style.cssText = miniBtn; });
   up.disabled = idx === 0; dn.disabled = idx === BLOCKS_WORK.length - 1;
   if (up.disabled) up.style.opacity = ".35"; if (dn.disabled) dn.style.opacity = ".35";
-  up.addEventListener("click", () => { if (idx === 0) return; panelSwap(idx, idx - 1); renderBlocksCard(); });
-  dn.addEventListener("click", () => { if (idx === BLOCKS_WORK.length - 1) return; panelSwap(idx, idx + 1); renderBlocksCard(); });
-  rm.addEventListener("click", () => { panelRemove(idx); renderBlocksCard(); });
+  up.addEventListener("click", () => { if (idx === 0 || lockStop(idx)) return; panelSwap(idx, idx - 1); renderBlocksCard(); });
+  dn.addEventListener("click", () => { if (idx === BLOCKS_WORK.length - 1 || lockStop(idx)) return; panelSwap(idx, idx + 1); renderBlocksCard(); });
+  rm.addEventListener("click", () => { if (lockStop(idx)) return; panelRemove(idx); renderBlocksCard(); });
   head.append(nm, up, dn, rm); sub.appendChild(head);
   if (!item && CL_ITEMS !== null) {
     sub.appendChild(el("div", "hint", "The saved section this links to was removed, so this spot simply won’t appear on your site. Remove it here to tidy up."));
@@ -9764,9 +9764,9 @@ function renderBlocksCard() {
     [up, dn, rm].forEach((b) => { b.type = "button"; b.style.cssText = miniBtn; });
     up.disabled = idx === 0; dn.disabled = idx === BLOCKS_WORK.length - 1;
     if (up.disabled) up.style.opacity = ".35"; if (dn.disabled) dn.style.opacity = ".35";
-    up.addEventListener("click", () => { if (idx === 0) return; panelSwap(idx, idx - 1); if (BLOCK_SOLO === idx) BLOCK_SOLO = idx - 1; renderBlocksCard(); });
-    dn.addEventListener("click", () => { if (idx === BLOCKS_WORK.length - 1) return; panelSwap(idx, idx + 1); if (BLOCK_SOLO === idx) BLOCK_SOLO = idx + 1; renderBlocksCard(); });
-    rm.addEventListener("click", () => { const wasSolo = solo !== null; panelRemove(idx); if (wasSolo) closeSettingsPanel(); renderBlocksCard(); });
+    up.addEventListener("click", () => { if (idx === 0 || lockStop(idx)) return; panelSwap(idx, idx - 1); if (BLOCK_SOLO === idx) BLOCK_SOLO = idx - 1; renderBlocksCard(); });
+    dn.addEventListener("click", () => { if (idx === BLOCKS_WORK.length - 1 || lockStop(idx)) return; panelSwap(idx, idx + 1); if (BLOCK_SOLO === idx) BLOCK_SOLO = idx + 1; renderBlocksCard(); });
+    rm.addEventListener("click", () => { if (lockStop(idx)) return; const wasSolo = solo !== null; panelRemove(idx); if (wasSolo) closeSettingsPanel(); renderBlocksCard(); });
     const sv = el("button", null, "Save for reuse"); sv.type = "button"; sv.title = "Save this section to your content library"; sv.style.cssText = miniBtn;
     sv.addEventListener("click", () => clSave(idx));   // CL-1
     head.append(nm, sv, up, dn, rm); box.appendChild(head);
@@ -14321,10 +14321,11 @@ function dcTreeRow(el2, c) {
     return btn;
   };
   if (isBlock) {
-    acts.appendChild(mkA("↑", "Move up", () => dcMove(c.bi, c.bi - 1), c.bi <= 0));
-    acts.appendChild(mkA("↓", "Move down", () => dcMove(c.bi, c.bi + 2), c.bi >= (BLOCKS_WORK.length - 1)));
+    const held = lockedForMe(BLOCKS_WORK[c.bi]);   // item 155: a section the studio locked stays where it is
+    acts.appendChild(mkA("↑", held ? LOCK_SAY : "Move up", () => dcMove(c.bi, c.bi - 1), held || c.bi <= 0));
+    acts.appendChild(mkA("↓", held ? LOCK_SAY : "Move down", () => dcMove(c.bi, c.bi + 2), held || c.bi >= (BLOCKS_WORK.length - 1)));
     acts.appendChild(mkA(uiIcon("cog", 14), "Settings for this section", () => eeEditBlock(c.bi)));
-    acts.appendChild(mkA(uiIcon("trash", 14), "Remove this section", () => dcDelete(c.bi)));
+    acts.appendChild(mkA(uiIcon("trash", 14), held ? LOCK_SAY : "Remove this section", () => dcDelete(c.bi), held));
   } else {
     const keys = c.key ? dcCoreKeys(el2.parentNode) : [], at = keys.indexOf(c.key);
     if (at >= 0) {
