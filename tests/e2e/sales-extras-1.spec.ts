@@ -50,13 +50,13 @@ test.describe('Settings — the chance each stage closes (item 69)', () => {
   test('the Domain & email card says where your emails go out from, and that it is verified', async ({ page }) => {
     await installApp(page, { api: SETTINGS_API });
     await page.goto('/settings.html');
-    await expect(page.locator('[data-card="domains"] .st')).toHaveText('Emails go out from hello@example.com · verified');
+    await expect(page.locator('[data-card="domains"] .st')).toHaveText('Verified · emails go out from hello@example.com');
   });
 
   test('…and warns when it isn\'t verified', async ({ page }) => {
     await installApp(page, { api: { ...SETTINGS_API, '/email/sending': { data: { from: 'hello@example.com', domain: 'example.com', sending: 'not_verified', replies: 'mailbox', reply_domain: null, receiving: null } } } });
     await page.goto('/settings.html');
-    await expect(page.locator('[data-card="domains"] .st.warn')).toHaveText('Emails go out from hello@example.com · not verified, so they may land in spam');
+    await expect(page.locator('[data-card="domains"] .st.warn')).toHaveText('Not verified, so emails may land in spam · from hello@example.com');
   });
 });
 
