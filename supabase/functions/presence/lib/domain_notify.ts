@@ -25,11 +25,24 @@ export function byWhom(p: { scope?: unknown; kind?: string; email?: string | nul
   return p.email ? String(p.email) : 'someone on your account';
 }
 
-export type DomainChange = 'attached' | 'changed' | 'removed' | 'mail_gone' | 'live';
+export type DomainChange = 'attached' | 'changed' | 'removed' | 'mail_gone' | 'live' | 'main' | 'forward_added' | 'forward_stopped';
 /** Pure: the email for one change, plain words, no hosting company's name. */
 export function domainChangeEmail(kind: DomainChange, o: { domain: string; old?: string | null; forwarded?: boolean; by?: string; builtIn?: string | null; mx?: string[]; recordsAt?: string | null }): { subject: string; html: string } {
   const d = escHtml(o.domain), by = escHtml(o.by || 'someone on your account');
   const unexpected = '<p>If this wasn’t expected, reply to this email.</p>';
+  // item 174: the www. switch, and another domain forwarding here
+  if (kind === 'main') return {
+    subject: `Your website’s main address is now ${o.domain}`,
+    html: `<p>Your website’s main address is now <strong>${d}</strong>, by ${by}. <strong>${escHtml(o.old)}</strong> still works: it sends visitors there.</p>${unexpected}`,
+  };
+  if (kind === 'forward_added') return {
+    subject: `${o.domain} now sends visitors to your website`,
+    html: `<p><strong>${d}</strong> was added by ${by}. From the next publish it sends its visitors to ${escHtml(o.old)}, to the same page, once its two records point at your website too.</p>${unexpected}`,
+  };
+  if (kind === 'forward_stopped') return {
+    subject: `${o.domain} no longer sends visitors to your website`,
+    html: `<p><strong>${d}</strong> was taken off your website by ${by}, so it no longer sends visitors to ${escHtml(o.old)}.</p>${unexpected}`,
+  };
   // item 164 (review domains finding 13): the moment it's live, said once
   if (kind === 'live') {
     const bare = o.domain.startsWith('www.') ? o.domain.slice(4) : o.domain;
@@ -113,6 +126,13 @@ export async function announceLiveOnce(site: { id: string; client_id?: string | 
     await tickChecklistForCustomerSite(site.id, 'domain_connected', 'domain-live', 'system').catch(() => false);
     return true;
   } catch { return false; }
+}
+
+/** Pure: the extra names on the site, without the main name and its www. twin (item 174). */
+export function forwardsOf(aliases: string[], main: string | null): string[] {
+  const m = String(main || '').toLowerCase();
+  const own = new Set([m, m.startsWith('www.') ? m.slice(4) : `www.${m}`]);
+  return [...new Set((aliases || []).map((a) => String(a || '').toLowerCase()).filter((a) => a && !own.has(a)))].sort();
 }
 
 // ── forwarding an old name (finding 12) ──

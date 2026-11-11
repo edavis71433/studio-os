@@ -103,6 +103,9 @@
   .dp-acts{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:12px}
   /* item 162, part two: where to go, mail, history, and the ready-made guides */
   .dp-link{font-weight:600;color:var(--p);white-space:nowrap}
+  /* item 174: "renews by itself" set right in the row */
+  .renews{white-space:nowrap}.renews select{font:inherit;font-size:12px;border:1px solid var(--line);border-radius:6px;padding:1px 4px;background:var(--card);color:var(--ink);margin-left:4px}
+  @media (max-width:767px){.renews select{min-height:32px}}
   .dp-mail{font-size:13px;margin:8px 0 0;color:var(--soft)}
   .dp-hist{list-style:none;padding:0;margin:0;display:grid;gap:6px;font-size:13.5px}.dp-hist .when{color:var(--soft);display:inline-block;min-width:98px;margin-right:6px}
   .dp-plan{margin-top:12px;border:1px solid var(--line);border-radius:var(--dds-r,8px);padding:12px}
@@ -178,6 +181,25 @@ function expiresCell(d){
 }
 // item 134: under the status, what still needs doing (the first two lines that aren't fine)
 function checksSub(d){const bad=(d.checks||[]).filter(c=>!c.ok).slice(0,2);return bad.length?`<div class="sub">${bad.map(c=>esc(c.words)).join('<br>')}</div>`:'';}
+// item 174 (Namecheap's auto-renew in every row): the studio's answer to "does it renew by itself?",
+// set right here. It's kept in the domain's notes (the panel shows the same), merged, so the
+// account name and the note stay as they were. We can't read it from outside: it's what was confirmed.
+const RENEWS=[['unknown','Don’t know'],['yes','Yes'],['no','No']];
+const confWords=(d)=>d&&d.renews!=='unknown'&&d.renews_confirmed_at?'confirmed '+day(d.renews_confirmed_at+'T12:00:00Z'):'';
+function renewsSwitch(d){
+  const v=d.renews||'unknown';
+  return `<div class="sub renews"><label>Renews by itself<select data-renews="${esc(d.site_id)}" aria-label="Renews by itself, ${esc(d.domain)}">${RENEWS.map(([k,l])=>`<option value="${k}"${v===k?' selected':''}>${l}</option>`).join('')}</select></label> <span data-renews-conf="${esc(d.site_id)}">${esc(confWords(d))}</span></div>`;
+}
+async function saveRenews(sel){
+  const id=sel.getAttribute('data-renews');const v=sel.value;const i=DOMAINS.findIndex(x=>x.site_id===id);const before=i>=0?DOMAINS[i].renews||'unknown':'unknown';
+  sel.disabled=true;
+  let r;try{r=await apiSend('PUT','/agency/domains/'+encodeURIComponent(id)+'/notes',{renews:v,renews_confirmed_at:v==='unknown'?null:new Date().toISOString().slice(0,10)});}catch(_){r={ok:false,body:{}};}
+  sel.disabled=false;
+  if(!r.ok||!r.body||!r.body.data){sel.value=before;toast((r.body&&r.body.message)||'That didn’t save.',true);return;}
+  if(i>=0)DOMAINS[i]={...DOMAINS[i],renews:r.body.data.renews,renews_confirmed_at:r.body.data.renews_confirmed_at};
+  const c=document.querySelector('[data-renews-conf="'+id+'"]');if(c&&i>=0)c.textContent=confWords(DOMAINS[i]);
+  toast('Saved.');
+}
 function padlockCell(d){
   if(!d.hosted)return'<span class="muted">Their host’s</span>';
   if(!d.padlock_until)return d.status==='padlock'?'<span class="muted">Not on yet</span>':'<span class="muted">Not known yet</span>';
@@ -192,7 +214,7 @@ function tableHtml(list){
     <td><a class="site" href="${esc(where(d,''))}">${esc(d.name||'(unnamed)')}</a></td>
     <td><span class="pill ${esc(d.tone)}">${esc(d.status_words)}</span>${checksSub(d)}</td>
     <td>${d.provider?esc(d.provider):d.record==='unreadable'?'<span class="muted">Couldn’t read it</span>':'<span class="muted">Not known yet</span>'}${d.dns_host?`<div class="sub">DNS at ${esc(d.dns_host)}</div>`:''}${d.lock===false?'<div class="sub">Lock: off</div>':''}</td>
-    <td class="when">${expiresCell(d)}</td>
+    <td class="when">${expiresCell(d)}${renewsSwitch(d)}</td>
     <td class="when">${padlockCell(d)}</td>
     <td class="when">${d.checked_at?esc(ago(d.checked_at)):'<span class="muted">Not yet</span>'}</td>
   </tr>`).join('');
@@ -211,7 +233,7 @@ function chipsHtml(){
 // item 162: the list as a spreadsheet (what's on screen, in its order)
 function downloadCsv(){
   const q=(v)=>'"'+String(v==null?'':v).replace(/"/g,'""')+'"';
-  const rows=[['Domain','Site','Status','Provider','DNS at','Expires','Lock','Padlock until','Last checked']].concat(ordered().map(d=>[d.domain,d.name,d.status_words,d.provider,d.dns_host||'',d.expires_at?String(d.expires_at).slice(0,10):'',d.lock===true?'on':d.lock===false?'off':'',d.padlock_until?String(d.padlock_until).slice(0,10):'',d.checked_at?String(d.checked_at).slice(0,10):'']));
+  const rows=[['Domain','Site','Status','Provider','DNS at','Expires','Renews by itself','Lock','Padlock until','Last checked']].concat(ordered().map(d=>[d.domain,d.name,d.status_words,d.provider,d.dns_host||'',d.expires_at?String(d.expires_at).slice(0,10):'',d.renews==='yes'?'yes':d.renews==='no'?'no':'',d.lock===true?'on':d.lock===false?'off':'',d.padlock_until?String(d.padlock_until).slice(0,10):'',d.checked_at?String(d.checked_at).slice(0,10):'']));
   const blob=new Blob([rows.map(r=>r.map(q).join(',')).join('\n')],{type:'text/csv'});
   const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='domains.csv';document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove();},0);
 }
@@ -246,6 +268,7 @@ function wire(){
   const dl=$('dlBtn');if(dl)dl.addEventListener('click',downloadCsv);
   document.querySelectorAll('[data-filter]').forEach(b=>b.addEventListener('click',()=>{const k=b.getAttribute('data-filter');FILTER=FILTER===k&&k!=='all'?'all':k;render();const nb=document.querySelector('[data-filter="'+FILTER+'"]');if(nb)nb.focus();}));
   document.querySelectorAll('[data-detail]').forEach(b=>b.addEventListener('click',()=>openPanel(b.getAttribute('data-detail'),b)));
+  document.querySelectorAll('[data-renews]').forEach(s=>s.addEventListener('change',()=>saveRenews(s)));
   document.querySelectorAll('[data-sort]').forEach(b=>b.addEventListener('click',()=>{
     const k=b.getAttribute('data-sort');SORT=SORT&&SORT.key===k?{key:k,dir:-SORT.dir}:{key:k,dir:1};
     render();const nb=document.querySelector('[data-sort="'+k+'"]');if(nb)nb.focus();
@@ -280,6 +303,7 @@ function paintPanel(){
     ['Provider',d.provider||'Not known yet'],
     ['Records',atLine(wr.records_at)||(d.dns_host_full?esc(d.dns_host_full):'Not known yet'),true],
     ['Renewal',atLine(wr.renew_at)||'Not known yet',true],
+    ...((d.forwards||[]).length?[['Also sends visitors here',(d.forwards||[]).join(', ')]]:[]),   // item 174
     ['Expires',exp,true],
     ['Transfer lock',d.lock===true?'On':d.lock===false?'Off':'Not known yet'],
     ['Registry says',(d.statuses||[]).length?(d.statuses||[]).join(', '):'Nothing unusual'],
@@ -314,7 +338,8 @@ function paintPanel(){
 // ── item 162, part two (review domains finding 8): the server's ready-made guides had no button.
 //    Read the steps here first (a preview saves nothing), then put them on the client's
 //    Domain & email page, where they wait for the client's OK like every other plan. ──
-const HELPS=[['registrar_care','Make sure it renews by itself'],['connect_domain','The records this site needs'],['transfer_out','Move the domain']];
+const HELPS=[['registrar_care','Make sure it renews by itself'],['connect_domain','The records this site needs'],['email_setup','Gmail on this domain'],['transfer_out','Move the domain']];   // email_setup: item 174, Gmail's records in one pick
+const helpBody=(goal)=>goal==='email_setup'?{goal,provider:'google_workspace'}:{goal};
 const scopeFor=(d)=>d.own?{}:{'x-dds-scope-site':d.site_id};   // the studio acts inside the client's site
 function helpHtml(d){
   const list=HELPS.filter(([g])=>g!=='connect_domain'||d.hosted);   // a site on its own host gets its records from that host
@@ -325,7 +350,7 @@ async function helpPreview(goal,btn){
   const d=PANEL;if(!d)return;const out=$('dpHelpOut');const gen=++HELP_SEQ;
   document.querySelectorAll('#dpBody [data-help]').forEach(b=>b.setAttribute('aria-pressed',b===btn?'true':'false'));
   out.innerHTML='<p class="muted" style="margin-top:10px" role="status">Getting the steps…</p>';
-  let r;try{r=await apiSend('POST','/foundations/prepare',{goal,preview:true},scopeFor(d));}catch(_){r={ok:false,body:{}};}
+  let r;try{r=await apiSend('POST','/foundations/prepare',{...helpBody(goal),preview:true},scopeFor(d));}catch(_){r={ok:false,body:{}};}
   if(gen!==HELP_SEQ||!PANEL||PANEL.site_id!==d.site_id)return;
   if(!r.ok||!r.body||!r.body.data){out.innerHTML=`<p class="muted" style="margin-top:10px" role="status">${esc((r.body&&r.body.message)||'Those steps didn’t load just now.')}</p>`;return;}
   const p=r.body.data;
@@ -337,7 +362,7 @@ async function helpPreview(goal,btn){
 }
 async function helpSend(goal){
   const d=PANEL;if(!d)return;const b=$('dpSend');if(!b)return;b.disabled=true;
-  let r;try{r=await apiSend('POST','/foundations/prepare',{goal},scopeFor(d));}catch(_){r={ok:false,body:{}};}
+  let r;try{r=await apiSend('POST','/foundations/prepare',helpBody(goal),scopeFor(d));}catch(_){r={ok:false,body:{}};}
   if(!PANEL||PANEL.site_id!==d.site_id)return;
   const sv=$('dpSent');
   if(!r.ok){b.disabled=false;if(sv)sv.textContent=(r.body&&r.body.message)||'That didn’t go through just now.';return;}
@@ -360,6 +385,7 @@ async function saveNotes(e){
   btn.disabled=false;
   if(!r.ok){const sv=$('dpSaved');if(sv)sv.textContent=(r.body&&r.body.message)||'Your notes didn’t save.';return;}
   PANEL={...PANEL,notes:r.body.data};const sv=$('dpSaved');if(sv)sv.textContent='Saved.';
+  const li=DOMAINS.findIndex(x=>x.site_id===PANEL.site_id);if(li>=0){DOMAINS[li]={...DOMAINS[li],renews:r.body.data.renews,renews_confirmed_at:r.body.data.renews_confirmed_at};render();}   // item 174: the row's switch shows the same
 }
 function notAgency(){$('main').innerHTML=`<div class="center"><h2>This isn’t an agency account.</h2><p class="muted">Domains lists the domains a studio looks after for its clients.</p><p style="margin-top:20px"><a class="link" href="/presence.html#domain">Your domain →</a></p></div>`;}
 function signedOut(){$('main').innerHTML=`<div class="center"><h2>Sign in to your studio.</h2><p style="margin-top:20px"><a class="link" href="/studio.html">Sign in →</a></p></div>`;}

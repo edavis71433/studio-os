@@ -119,6 +119,7 @@ const MEMBER_WRITES: Array<[MemberWriteNeed, string[]]> = [
     'POST /reviews/google-link',   // sales review item 115: where Google review requests send people is a setting
     'PUT /report/monthly', 'POST /report/monthly/preview',   // builder list item 58: the client's monthly report is a setting; its preview emails the caller
     '(POST|DELETE) /foundations/domain',
+    '(POST|DELETE) /foundations/domain/forward',   // builder list item 174: another domain forwarding here is a domain setting
     'POST /foundations/prepare',
     'POST /preview/settings',
     'POST /site/(offline|online|password)',   // list item 175: a visitor password is a setting, like taking the site offline

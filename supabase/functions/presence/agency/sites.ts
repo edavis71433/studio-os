@@ -35,7 +35,7 @@ import type { PortfolioInput } from './portfolio.ts';
 import { daysBetween, DOMAIN_SOON_DAYS, PADLOCK_SOON_DAYS, PADLOCK_STUCK_HOURS } from './needs_you.ts';
 import { registryWarnings, sameCompany, whereToGo } from '../lib/rdap.ts';
 import { DOWN_THRESHOLD } from '../monitor/heartbeat.ts';
-import { readReservedJson, updateReservedJson, writeReservedJson, RESERVED_NAMES } from '../lib/reserved_store.ts';
+import { readReservedJson, updateReservedJson, RESERVED_NAMES } from '../lib/reserved_store.ts';
 import { siteOrigin, hostedName, SITE_COLS } from '../lib/site.ts';
 import type { SiteRow } from '../lib/site.ts';
 import { getTemplate, renderForBuilder, latestTemplateVersion } from '../lib/render.ts';
@@ -262,6 +262,8 @@ export interface DomainIn {
   domain_serving?: string | null; domain_checks?: Array<{ key: string; ok: boolean; words: string }> | null;
   /** item 162 (0162): the transfer lock, who runs the DNS, the registry's status words, since when */
   domain_lock?: boolean | null; domain_dns_host?: string | null; domain_statuses?: string[] | null; domain_registered_at?: string | null;
+  /** item 174: from the studio's notes, whether it renews by itself (yes · no · unknown) and when that was confirmed */
+  domain_renews?: string | null; domain_renews_confirmed_at?: string | null;
 }
 export type DomainTone = 'good' | 'warn' | 'bad' | 'quiet';
 /** One domain's status in a few words. Expiry first, on the same 30-day line as
@@ -315,6 +317,9 @@ export function buildDomains(rows: DomainIn[], nowIso: string) {
       lock: typeof r.domain_lock === 'boolean' ? r.domain_lock : null,
       warnings: registryWarnings(Array.isArray(r.domain_statuses) ? { lock: typeof r.domain_lock === 'boolean' ? r.domain_lock : null, statuses: r.domain_statuses } : null),   // { key, severity, words }
       registered_at: r.domain_registered_at || null,
+      // item 174 (Namecheap's auto-renew in every row): the one fact we can't read from outside, as the studio noted it
+      renews: r.domain_renews === 'yes' || r.domain_renews === 'no' ? r.domain_renews : 'unknown',
+      renews_confirmed_at: r.domain_renews_confirmed_at || null,
       hosted: r.edition !== 'monitor',
     };
   });
@@ -502,6 +507,12 @@ async function domainDetail(siteId: string, nowIso: string) {
   await Promise.all(names.flatMap((n) => RECORD_TYPES.map(async (t) => { for (const v of await dnsRecords(n, t)) records.push({ name: n, type: t, value: v }); })));
   records.sort((a, b) => a.name.localeCompare(b.name) || RECORD_TYPES.indexOf(a.type as typeof RECORD_TYPES[number]) - RECORD_TYPES.indexOf(b.type as typeof RECORD_TYPES[number]) || a.value.localeCompare(b.value));
   const statuses = Array.isArray(row.domain_statuses) ? row.domain_statuses : [];
+  // item 174: the other domains kept on the site that send their visitors to it
+  const forwards = row.netlify_site_id ? await (async () => {
+    const [{ getSite }, { forwardsOf }] = await Promise.all([import('../lib/netlify.ts'), import('../lib/domain_notify.ts')]);
+    const nf = await getSite(String(row.netlify_site_id)).catch(() => null);
+    return nf && nf.ok && nf.site ? forwardsOf(nf.site.domain_aliases || [], row.custom_domain || null) : [];
+  })() : [];
   // item 162 (finding 23): mail on the registered name, and the domain's story
   const bare = row.domain_registered_name || (row.custom_domain.startsWith('www.') ? row.custom_domain.slice(4) : row.custom_domain);
   const clientId = (row as { client_id?: string | null }).client_id || null;
@@ -514,6 +525,7 @@ async function domainDetail(siteId: string, nowIso: string) {
     ...built,
     dns_host_full: row.domain_dns_host || '',   // the row's dns_host is blank when it's the seller; the panel names it either way
     where: whereToGo(row.domain_registrar, row.domain_dns_host),   // findings 6 and 7: records at the DNS company, renewal at the seller (not `provider`: the row's seller name)
+    forwards,   // item 174: other domains that send visitors here
     mail: mailHealth(mx, txt, dmarcTxt),
     history: domainHistory(rowsOf(evQ), rowsOf(ntQ), built.own === true),
     statuses, all_checks: Array.isArray(row.domain_checks) ? row.domain_checks : [],
@@ -630,6 +642,17 @@ export async function handleAgencySites(req: Request, route: string, method: str
       const x = rowsOf<SiteExtra & { domain_registrar?: string; domain_expires_at?: string }>(ownQ)[0] || {};
       list.push({ ...x, site_id: own.id, name: String(member.branding?.display_name || member.agency_name || 'Your studio'), edition: own.edition, status: own.status, last_published_at: own.last_published_at, custom_domain: own.custom_domain, own: true });
     }
+    // item 174: "renews by itself" from the studio's notes, every domain in one read
+    const noteIds = list.filter((d) => d.custom_domain).map((d) => d.site_id);
+    if (noteIds.length) {
+      const nq = await svc(`presence_sales_templates?site_id=in.(${noteIds.join(',')})&kind=eq.proposal&name=eq.${encodeURIComponent(RESERVED_NAMES.domainNotes)}&deleted_at=is.null&select=site_id,body,updated_at&order=updated_at.desc&limit=1000`).catch(soft);
+      const notes = new Map<string, DomainNotes>();
+      for (const row of rowsOf<{ site_id: string; body?: string }>(nq)) {
+        if (notes.has(row.site_id)) continue;   // the newest row wins, like every reserved read
+        try { notes.set(row.site_id, normalizeDomainNotes(JSON.parse(String(row.body || 'null')))); } catch { /* an unreadable note reads as none */ }
+      }
+      for (const d of list) { const n = notes.get(d.site_id); if (n) { d.domain_renews = n.renews; d.domain_renews_confirmed_at = n.renews_confirmed_at; } }
+    }
     return json({ data: buildDomains(list, now), partial: (extraQ as { ok?: boolean }).ok === false }, 200, cors);
   }
 
@@ -646,9 +669,11 @@ export async function handleAgencySites(req: Request, route: string, method: str
         if (!can(member.role, 'manage_clients')) return forbid(cors);
         let b: unknown = null; try { b = await req.json(); } catch { /* answered below */ }
         if (!b || typeof b !== 'object') return json({ error: 'bad_request', message: 'Send the notes to save.' }, 400, cors);
-        const next = { ...normalizeDomainNotes(b), updated_by: member.email || null, updated_at: now };
-        const ok = await writeReservedJson(siteId, RESERVED_NAMES.domainNotes, next, member.email || 'studio');
-        if (!ok) return json({ error: 'write_failed', message: 'That didn’t save.' }, 502, cors);
+        // item 174: only the fields sent change (the list's "renews by itself" switch sends one),
+        // merged compare-and-swap so two people saving at once both land
+        const sent = Object.fromEntries(Object.entries(b as Record<string, unknown>).filter(([k]) => ['account', 'renews', 'renews_confirmed_at', 'note'].includes(k)));
+        const next = await updateReservedJson(siteId, RESERVED_NAMES.domainNotes, (cur) => ({ ...normalizeDomainNotes({ ...normalizeDomainNotes(cur), ...sent }), updated_by: member.email || null, updated_at: now }), member.email || 'studio');
+        if (!next) return json({ error: 'write_failed', message: 'That didn’t save.' }, 502, cors);
         return json({ data: next }, 200, cors);
       }
       if (what === 'check' && method === 'POST') {

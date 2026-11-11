@@ -251,3 +251,44 @@ test.describe('Domain & email sheet: clearer messages (item 164)', () => {
     await expect(need).toContainText('Buy it in your own name and email, and turn on auto-renew.');
   });
 });
+
+// ── Nov 10 review, builder list item 174: borrowed from Namecheap and Squarespace ──
+test.describe('Domain & email sheet: borrowed from Namecheap and Squarespace (item 174)', () => {
+  test('the main name is said, and www. can become it', async ({ page }) => {
+    await installApp(page, { api: { ...BASE, '/foundations/domain': LIVE } });
+    const sent = await trackDomainWrites(page);
+    await page.goto('/presence.html#domain');
+    await expect(page.locator('[data-main="name"]')).toHaveText('Main name: bistro.example. www.bistro.example sends visitors there.');
+    await page.locator('[data-main="switch"]').click();
+    await page.locator('dialog[open]').getByRole('button', { name: 'Make it the main name' }).click();
+    await expect.poll(() => sent.length).toBe(1);
+    expect(sent[0]).toEqual({ method: 'POST', body: { domain: 'www.bistro.example' } });
+  });
+
+  test('another domain can send its visitors here, and stop', async ({ page }) => {
+    const fw: Array<{ method: string; body: unknown }> = [];
+    await installApp(page, { api: { ...BASE, '/foundations/domain': { data: { ...LIVE.data, forwards: ['ancient.example'] } } } });
+    await page.route(/\/functions\/v1\/presence\/foundations\/domain\/forward$/, (route: Route) => { fw.push({ method: route.request().method(), body: route.request().postDataJSON() }); return route.fulfill(json({ data: { forwards: [] } })); });
+    await page.goto('/presence.html#domain');
+    const box = page.locator('[data-forwards="domain"]');
+    await expect(box.locator('[data-forward="ancient.example"]')).toContainText('ancient.example sends visitors to bistro.example');
+    await box.getByRole('textbox', { name: 'A domain to send here' }).fill('https://Old.Example/');
+    await box.getByRole('button', { name: 'Send it here' }).click();
+    await expect.poll(() => fw.length).toBe(1);
+    expect(fw[0]).toEqual({ method: 'POST', body: { domain: 'old.example' } });
+    await page.locator('[data-forward="ancient.example"]').getByRole('button', { name: 'Stop' }).click();
+    await page.locator('dialog[open]').getByRole('button', { name: 'Stop forwarding' }).click();
+    await expect.poll(() => fw.length).toBe(2);
+    expect(fw[1]).toEqual({ method: 'DELETE', body: { domain: 'ancient.example' } });
+  });
+
+  test('the email card fills every Gmail record in one pick', async ({ page }) => {
+    const prepared: unknown[] = [];
+    await installApp(page, { api: { ...BASE, '/foundations/domain': LIVE } });
+    await page.route(/\/functions\/v1\/presence\/foundations\/prepare$/, (route: Route) => { prepared.push(route.request().postDataJSON()); return route.fulfill(json({ data: { id: 'p1' } })); });
+    await page.goto('/presence.html#domain');
+    await page.locator('[data-pick="gmail"]').getByRole('button', { name: 'Set up Gmail on this domain' }).click();
+    await expect.poll(() => prepared.length).toBe(1);
+    expect(prepared[0]).toEqual({ goal: 'email_setup', provider: 'google_workspace' });
+  });
+});

@@ -2204,6 +2204,38 @@ function askText(title, opts) {
     dlg.showModal(); setTimeout(() => inp.focus(), 20);
   });
 }
+// Item 174 (Namecheap's and Squarespace's plain redirect form): another domain the client owns sends
+// its visitors here, page for page, from the next publish. Its records point here too (the same two).
+function forwardsBlock(dstat) {
+  const box = el("div"); box.dataset.forwards = "domain"; box.style.marginTop = "12px";
+  const h = stepLine("Other domains that send visitors here"); h.style.fontWeight = "600"; box.appendChild(h);
+  const list = Array.isArray(dstat.forwards) ? dstat.forwards : [];
+  if (!list.length) { const e = stepLine("None yet. An old name, or a second one you own, can send its visitors to " + dstat.custom_domain + "."); e.style.color = "var(--soft,#6b6478)"; box.appendChild(e); }
+  list.forEach((n) => {
+    const row = el("div", "doa"); row.dataset.forward = n; row.style.cssText = "gap:8px;flex-wrap:wrap;margin-top:4px;align-items:center";
+    row.appendChild(el("span", null, n + " sends visitors to " + dstat.custom_domain));
+    const stop = el("button", "textact", "Stop"); stop.dataset.needs = "configure";
+    stop.addEventListener("click", async () => {
+      if (!(await askYes("Stop " + n + " sending visitors to " + dstat.custom_domain + "?", { ok: "Stop forwarding", danger: true }))) return;
+      try { await api("DELETE", "/foundations/domain/forward", { domain: n }); toast("Stopped."); openFoundationsDesk(); } catch (err) { toast(nice(err), true); }
+    });
+    row.appendChild(stop); box.appendChild(row);
+  });
+  const add = el("div", "doa"); add.dataset.needs = "configure"; add.style.cssText = "gap:8px;flex-wrap:wrap;margin-top:6px";
+  const inp = el("input"); inp.type = "text"; inp.placeholder = "oldname.com"; inp.setAttribute("aria-label", "A domain to send here"); inp.setAttribute("autocomplete", "off");
+  inp.style.cssText = "flex:1;min-width:160px;padding:7px 10px;border:1px solid var(--line,#ddd);border-radius:8px;font:inherit;font-size:16px";
+  const go = el("button", "textact", "Send it here");
+  go.addEventListener("click", async () => {
+    const d = String(inp.value || "").trim().toLowerCase().replace(/^https?:\/\//, "").replace(/[\/?#].*$/, "");
+    if (!/^([a-z0-9]([a-z0-9-]*[a-z0-9])?\.)+[a-z]{2,}$/.test(d)) { toast("Type a domain, like oldname.com.", true); return; }
+    go.disabled = true;
+    try { await api("POST", "/foundations/domain/forward", { domain: d }); toast(d + " sends visitors here from your next publish, once its records point here too."); openFoundationsDesk(); }
+    catch (err) { toast(nice(err), true); go.disabled = false; }
+  });
+  add.appendChild(inp); add.appendChild(go); box.appendChild(add);
+  const note = stepLine("Its records point here too: the same two as for your main domain. It starts sending visitors with your next publish."); note.style.color = "var(--soft,#6b6478)"; box.appendChild(note);
+  return box;
+}
 // Item 164 (review domains finding 13): the wait, in steps with times. When the domain was connected
 // here, whether its records are found, the padlock, and live (when we email). The time is the
 // honest one: usually within an hour of adding the records, sometimes a day or two.
@@ -3723,6 +3755,18 @@ function renderFoundations(f, plans, launch, dom) {
     const allOk = !lines || dstat.all_ok === true;
     const p = el("p", "aihint", allOk ? "✓ " + dstat.custom_domain + " is live and secure." : dstat.custom_domain + " is connected, with something left to finish:"); p.style.marginTop = "6px"; p.style.fontWeight = "600"; domCard.appendChild(p);
     if (lines) lines.forEach((c) => { const l = stepLine((c.ok ? "✓ " : "• ") + String(c.words || "")); l.dataset.check = c.ok ? "ok" : "todo"; if (c.ok) l.style.color = "var(--soft,#6b6478)"; domCard.appendChild(l); });
+    // item 174 (Squarespace's Primary tag and "Use www" switch): which name is the main one, and switching it
+    const bareN = String(dstat.custom_domain).replace(/^www\./, "");
+    if (/^[^.]+\.[^.]+$/.test(bareN)) {
+      const twin = String(dstat.custom_domain).startsWith("www.") ? bareN : "www." + bareN;
+      const pm = stepLine("Main name: " + dstat.custom_domain + ". " + twin + " sends visitors there."); pm.dataset.main = "name"; domCard.appendChild(pm);
+      const sw = el("button", "textact", "Make " + twin + " the main name"); sw.dataset.needs = "configure"; sw.dataset.main = "switch";
+      sw.addEventListener("click", async () => {
+        if (!(await askYes("Make " + twin + " the main name?\n" + dstat.custom_domain + " keeps working and sends visitors there.", { ok: "Make it the main name" }))) return;
+        try { await api("POST", "/foundations/domain", { domain: twin }); toast(twin + " is the main name now."); openFoundationsDesk(); } catch (err) { toast(nice(err), true); }
+      });
+      domCard.appendChild(sw);
+    }
     const live = el("div", "doa"); live.style.cssText = "gap:8px;flex-wrap:wrap;margin-top:8px"; live.appendChild(changeBtn()); live.appendChild(removeBtn("Remove this domain")); domCard.appendChild(live);
   } else if (dstat) {
     // Attached — walk them through the two records; it goes live on its own after.
@@ -3860,6 +3904,7 @@ function renderFoundations(f, plans, launch, dom) {
     });
     mh.appendChild(acts); domCard.appendChild(mh);
   }
+  if (dstat) domCard.appendChild(forwardsBlock(dstat));   // item 174: other domains that send visitors here
   // item 163 (review domains finding 11): the domain's history was written and never shown
   const changes = dom && Array.isArray(dom.changes) ? dom.changes : [];
   if (changes.length) {
@@ -3894,6 +3939,15 @@ function renderFoundations(f, plans, launch, dom) {
     const p = el("p", "aihint", "No email runs on this domain yet. Want an address like you@" + String(dstat.custom_domain).replace(/^www\./, "") + "? Two easy routes:"); p.style.marginTop = "5px"; emailCard.appendChild(p);
     const s1 = el("p", "aihint", "1. The company you bought your domain from usually sells email for a few dollars a month — or Google Workspace works with any domain."); s1.style.marginTop = "4px"; emailCard.appendChild(s1);
     const s2 = el("p", "aihint", "2. Once it’s set up, come back here — we’ll notice it automatically and help you protect it so your mail never lands in spam."); s2.style.marginTop = "4px"; emailCard.appendChild(s2);
+    // item 174 (Squarespace's one pick that fills every record): Gmail's records, all of them, ready to copy
+    const gm = el("div", "doa"); gm.dataset.needs = "configure"; gm.dataset.pick = "gmail"; gm.style.marginTop = "6px";
+    const gb = el("button", "textact", "Set up Gmail on this domain");
+    gb.addEventListener("click", async () => {
+      gb.disabled = true;
+      try { await api("POST", "/foundations/prepare", { goal: "email_setup", provider: "google_workspace" }); toast("Here are Gmail’s records. They’re at the bottom, waiting for your OK."); openFoundationsDesk(); }
+      catch (err) { toast(nice(err), true); gb.disabled = false; }
+    });
+    gm.appendChild(gb); emailCard.appendChild(gm);
   } else if (!(f.email.spf && f.email.dmarc)) {
     const why = el("p", "aihint", "Emails you send from your domain can land in people’s spam. Setting this up adds a few small records that tell inboxes your mail is really from you."); why.style.marginTop = "5px"; emailCard.appendChild(why);
     emailCard.appendChild(askOwner("aihint", "Ask the account owner to set this up."));
