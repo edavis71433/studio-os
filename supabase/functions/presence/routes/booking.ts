@@ -40,6 +40,7 @@ import {
   slotEndLocal, humanSlot, priceText, type BookingConfig, type AppointmentType,
 } from '../lib/booking.ts';
 import { UUID_RE } from '../lib/uuid.ts';
+import { normEmail, emailMatch } from '../lib/contact_email.ts';
 import { ticketsOn, siteChecksSends, readTicket } from '../lib/form_check.ts';
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
@@ -224,11 +225,12 @@ export async function handleBookingCreate(req: Request, siteId: string, cors: Re
   let contactId: string | null = null;
   try {
     if (v.booking.email) {
-      const existing = rows(await svc(`presence_contacts?site_id=eq.${siteId}&email=eq.${encodeURIComponent(v.booking.email)}&deleted_at=is.null&select=id&limit=1`))[0];
+      // item 110 (K1): found whatever the capitals, kept lower-cased like every contact
+      const existing = rows(await svc(`presence_contacts?site_id=eq.${siteId}&${emailMatch(v.booking.email)}&deleted_at=is.null&select=id&limit=1`))[0];
       if (existing) contactId = existing.id;
       else {
         const ins = await svc('presence_contacts', { method: 'POST', headers: { Prefer: 'return=representation' },
-          body: JSON.stringify({ site_id: siteId, name: v.booking.name, email: v.booking.email, phone: v.booking.phone }) });
+          body: JSON.stringify({ site_id: siteId, name: v.booking.name, email: normEmail(v.booking.email), phone: v.booking.phone }) });
         contactId = rows(ins)[0]?.id || null;
       }
     }
