@@ -74,6 +74,7 @@ export const SETTINGS_CONTENT_FIELDS: ReadonlySet<string> = new Set([
 export function contentWriteNeeds(route: string, method: string, settingsFields: string[] = []): SiteCapability | null {
   if (method === 'PUT' && (route === '/identity' || route === '/location' || route === '/brand/profile')) return 'edit';
   if (method === 'POST' && route === '/pages/duplicate') return 'edit';
+  if (method === 'POST' && /^\/pages\/deleted\/[0-9a-f-]{36}\/restore$/.test(route)) return 'edit';   // item 154: putting a deleted page back is an edit of the pages
   if (method === 'PUT' && route === '/settings') return settingsFields.every((f) => SETTINGS_CONTENT_FIELDS.has(f)) ? 'edit' : 'configure';
   const m = route.match(/^\/(?:offerings|testimonials|faqs|posts)(\/[0-9a-f-]{36})?$/);
   if (!m) return null;
@@ -156,6 +157,7 @@ const MEMBER_WRITES: Array<[MemberWriteNeed, string[]]> = [
     'POST /visibility/check',
     'POST /preview/(publish|share-link|section)',   // section: draws one unsaved section for the canvas, stores nothing
     'POST /publishes/checkpoints',
+    'POST /page-locks',   // builder items 48 and 120: a page's password, as editing the page's settings is
     `POST /publishes/checkpoints/${ID}/restore`,
     `POST /publishes/${ID}/label`,
     'POST /restore-to-draft',

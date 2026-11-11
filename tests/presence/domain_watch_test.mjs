@@ -75,12 +75,12 @@ ok('issued and renewed are on; pending and none are not', certIsOn('issued') && 
   ok('a stuck padlock is asked for again each day', /if \(padlock\.reask\) \{ await provisionSsl\(site\.netlify_site_id\)/.test(life));
   const admin = read('supabase/functions/presence/routes/admin.ts');
   ok('"Check if it’s ready" asks for the padlock again', /if \(st\.health === 'ssl_pending' && site\.netlify_site_id\) await provisionSsl\(site\.netlify_site_id\)/.test(admin));
-  ok('one home for the DNS check', /import \{ domainHealth \} from '\.\.\/lib\/domain_health\.ts';/.test(admin) && !/async function dnsLookup/.test(admin));
+  ok('one home for the DNS check', /import \{ domainHealth[^}]*\} from '\.\.\/lib\/domain_health\.ts';/.test(admin) && !/async function dnsLookup/.test(admin));
   const mig = read('supabase/migrations/0149_domain_watch.sql'), pack = read('docs/presence/APPLY-0149-prod.sql');
   const cols = ['domain_lookup_status', 'cert_state', 'cert_expires_at', 'cert_pending_since', 'cert_checked_at'];
   ok('the migration and its production pack add the same five columns', cols.every((c) => mig.includes(`add column if not exists ${c}`) && pack.includes(`add column if not exists ${c}`)));
   ok('both keep the lookup to ok, not_found or failed', [mig, pack].every((x) => /domain_lookup_status in \('ok','not_found','failed'\)/.test(x)));
-  ok('Home and the Domains page read the padlock', /cert_expires_at,cert_pending_since&limit=1000/.test(read('supabase/functions/presence/agency/routes.ts')) && /DOMAIN_COLS = `\$\{EXTRA_COLS\},domain_lookup_status,cert_expires_at,cert_pending_since`/.test(read('supabase/functions/presence/agency/sites.ts')));
+  ok('Home and the Domains page read the padlock', /cert_expires_at,cert_pending_since[,&]/.test(read('supabase/functions/presence/agency/routes.ts')) && /DOMAIN_COLS = `\$\{EXTRA_COLS\},domain_lookup_status,cert_expires_at,cert_pending_since[,`]/.test(read('supabase/functions/presence/agency/sites.ts')));
   const page = read('domains.html');
   ok('the Domains page has a Padlock until column and says when a record couldn’t be read', /\['padlock','Padlock until'/.test(page) && /Couldn’t read this domain’s record/.test(page));
 }

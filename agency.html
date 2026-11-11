@@ -516,7 +516,7 @@
         <div id="cu-kit-wrap" style="display:none">
           <label for="cu-kit">Start from</label>
           <select id="cu-kit"><option value="">No kit — start empty</option></select>
-          <p class="note">A starter kit copies a saved client’s setup — services, FAQs, voice and colors — onto their new site. Their own business details stay theirs to fill in.</p>
+          <p class="note">A starter kit copies a saved client’s setup — services, FAQs, voice and colors — onto their new site; a template brings its pages, sections and photos too. Their own business details stay theirs to fill in.</p>
         </div>
         <div id="cu-website-wrap" style="display:none">
           <label for="cu-website">Their existing website address</label>
@@ -1298,7 +1298,7 @@ async function syncCuKits(){
     const r=await api('/agency/kits');
     const kits=(r.ok&&r.body&&Array.isArray(r.body.data))?r.body.data:[];
     if(!kits.length)return;
-    sel.innerHTML+=kits.map(k=>'<option value="'+esc(k.id)+'">'+esc(k.name)+'</option>').join('');
+    sel.innerHTML+=kits.map(k=>'<option value="'+esc(k.id)+'">'+esc(k.name)+(k.kind==='template'?' — template with its pages':'')+'</option>').join('');   // item 145: a template brings its pages too
     w.style.display='';
   }catch(_){/* kits are a nicety — the field just stays hidden */}
 }
