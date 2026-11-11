@@ -62,6 +62,7 @@ const smallWords = (page: Page) => page.evaluate((sel) => {
       const t = (n.textContent || '').trim(); if (!t) continue;
       const p = n.parentElement!; const r = p.getBoundingClientRect(); if (!r.width || !r.height) continue;
       const st = getComputedStyle(p); if (st.visibility === 'hidden' || st.display === 'none' || st.opacity === '0') continue;
+      if (parseFloat(st.fontSize) === 0) continue;   // words kept for screen readers only (on a phone the page's status is its dot alone)
       if (parseFloat(st.fontSize) < 12) out.push(t.slice(0, 24) + ' @' + st.fontSize);
     }
   });
