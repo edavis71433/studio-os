@@ -4,24 +4,23 @@
 // NO fabricated numbers (traffic/search are honestly marked "not measured yet"
 // until a provider is connected — AN-4). Reuses Health Coach, Customer Journey,
 // Business Moments, leads, publishing, and the agency portfolio rollup.
-//   GET /analytics            — the home (inquiries · website · journey · health · watching · not-measured)
+//   GET /analytics/dashboard  — the business dashboard (sales · your website)
 //   GET /analytics/portfolio  — agency scope: who's growing / needs attention (AN-7)
 import { loadStageLabels } from '../lib/stage_names.ts';
 import { json } from '../../_shared/http.ts';
 import { svc } from '../lib/db.ts';
-import { coachRead } from '../lib/health_coach.ts';
-import { buildTimeline } from '../lib/customer_timeline.ts';
 import { resolveAgencyMember, agencySiteIds, can } from '../agency/auth.ts';
 import { sharedGather } from '../agency/routes.ts';
 import { buildPortfolio, filterPortfolio } from '../agency/portfolio.ts';
 import {
-  inquiriesInsight, publishingInsight, notMeasured, portfolioInsights, websiteRows,
-  trafficInsights, trafficNotice, periodWord, foldPortfolioVisitors, PORTFOLIO_VISITS_CAP,
+  portfolioInsights, websiteRows, foldPortfolioVisitors, PORTFOLIO_VISITS_CAP,
   searchReadinessState, hostingSurface, type Period,
 } from '../analytics/compose.ts';
 import { aggregateVisits, engagementOf, speedOf, type VisitRow, type Engagement } from '../lib/visits.ts';
-import { searchInsights, searchNotice, searchHealth, agencySearchState, type GscMetrics } from '../analytics/search_perf.ts';
-import { summarizePipeline } from '../lib/sales_lifecycle.ts';
+import { agencySearchState, type GscMetrics } from '../analytics/search_perf.ts';
+import { summarizePipeline, callerOffsetMinutes } from '../lib/sales_lifecycle.ts';
+import { readCloseDates } from '../lib/deal_closes.ts';
+import { UUID_RE } from '../lib/uuid.ts';
 import {
   parseDashPeriod, dashRange, priorMonthIso, weeklyBuckets, weeklyVisitors, sourceShares,
   invoiceBuckets, recentWins, oldestAgeDays, priorPeriodVisitors, priorPeriodStart, searchPagePath, DASH_WEEKS,
@@ -106,7 +105,8 @@ const periodDays = (p: Period) => (p === 'week' ? 7 : 30);
  *  TRUTHFULNESS (AN-4): the 5000-row cap, ordered ts.desc, truncates the PRIOR
  *  window first — a busy site would silently show an inflated "up from N" trend
  *  built on an undercounted prior period. At the cap we mark the result
- *  truncated; consumers suppress the trend clause rather than fabricate one. */
+ *  truncated; consumers suppress the trend clause rather than fabricate one.
+ *  (The health and insights pages read it; the old /analytics home did too.) */
 export type VisitRows = VisitRow[] & { truncated?: boolean };
 export async function loadVisits(siteId: string, period: Period, nowMs: number): Promise<VisitRows> {
   const startIso = new Date(nowMs - 2 * periodDays(period) * 86_400_000).toISOString();
@@ -125,7 +125,6 @@ function engagementFrom(r: unknown, startMs: number): { buttons?: Engagement['bu
   const e = engagementOf(arr(r as { json?: unknown }).filter((v) => Date.parse(String(v.ts || '')) >= startMs));
   return { buttons: e.buttons, time_on_page: e.time };
 }
-const periodOf = (req: Request): Period => (new URL(req.url).searchParams.get('period') === 'month' ? 'month' : 'week');
 
 /** Are the traffic/search providers actually connected? (Both are live now —
  *  GSC since AN-3.1, GA4 since the visitor-numbers build; when nothing is
@@ -136,99 +135,11 @@ async function connectionState(siteId: string): Promise<{ ga: boolean; gsc: bool
   return { ga: live.has('google_analytics'), gsc: live.has('google_search_console') };
 }
 
-export async function handleAnalyticsHome(req: Request, site: SiteRow, cors: Record<string, string>) {
-  const period = periodOf(req);
-  const nowIso = new Date().toISOString();
-  const nowMs = Date.parse(nowIso);
-  const visits = await loadVisits(site.id, period, nowMs);
-  const traffic = aggregateVisits(visits, nowMs, periodDays(period));
-  const [subsR, pubsR, lastChangeR, momentsR, firstPubR, firstLeadR, identR, entR, metaR, conn] = await Promise.all([
-    svc(`presence_form_submissions?site_id=eq.${site.id}&spam=is.false&select=created_at,form_kind,status&order=created_at.desc&limit=500`),
-    svc(`presence_publishes?site_id=eq.${site.id}&status=eq.live&select=created_at&order=created_at.desc&limit=200`),
-    svc(`presence_change_events?site_id=eq.${site.id}&select=created_at&order=created_at.desc&limit=1`),
-    svc(`presence_moments?site_id=eq.${site.id}&status=eq.active&select=headline,summary,moment_type,created_at&order=importance.desc&limit=4`),
-    svc(`presence_publishes?site_id=eq.${site.id}&status=eq.live&select=created_at,completed_at&order=created_at.asc&limit=1`),
-    svc(`presence_form_submissions?site_id=eq.${site.id}&spam=is.false&select=created_at&order=created_at.asc&limit=1`),
-    svc(`presence_identity?site_id=eq.${site.id}&select=settings&limit=1`),
-    site.client_id ? svc(`presence_entitlements?client_id=eq.${encodeURIComponent(site.client_id)}&product=eq.presence&select=status,created_at,current_period_end&limit=1`) : Promise.resolve({ json: [] }),
-    svc(`presence_sites?id=eq.${site.id}&select=created_at&limit=1`),
-    connectionState(site.id),
-  ]);
+// Bug hunt H10 (Nov 10): GET /analytics, the old plain-English home, is gone. No page had
+// asked for it since the dashboard (/analytics/dashboard) and the portfolio replaced it, and
+// it made a dozen reads for nobody. readGsc, readSearchTerms and readSearchPages stay: the
+// dashboard and the client portal use them.
 
-  // ── inquiries (the realest customer metric) ──
-  const subs = arr(subsR);
-  const createdAts = subs.map((s) => s.created_at).filter(Boolean);
-  const w = nowMs - (period === 'week' ? 7 : 30) * 86_400_000;
-  const cur = subs.filter((s) => Date.parse(s.created_at) > w);
-  const byKind = { contact: 0, quote: 0, booking: 0 };
-  for (const s of cur) if (s.form_kind in byKind) (byKind as any)[s.form_kind]++;
-  const unread = subs.filter((s) => s.status === 'new').length;
-  const inquiries = inquiriesInsight(createdAts, byKind, unread, nowMs, period);
-
-  // ── publishing (the real "website" signal we DO have) ──
-  const publishing = publishingInsight(arr(pubsR).map((p) => p.created_at).filter(Boolean), site.last_published_at || null, nowMs, period);
-
-  // ── journey (reuse the existing pure timeline) ──
-  const ent = arr(entR)[0] || {};
-  const verification = arr(identR)[0]?.settings?.verification;
-  const firstVisitorAt = [...visits].reverse().find((v) => v.kind === 'pageview')?.ts || null; // earliest in window (approx)
-  const journey = buildTimeline({
-    createdAt: arr(metaR)[0]?.created_at || nowIso,
-    firstPublishedAt: arr(firstPubR)[0]?.completed_at || arr(firstPubR)[0]?.created_at || null,
-    searchVerified: !!(verification && (verification.google || verification.bing)),
-    firstVisitorAt,
-    firstInquiryAt: arr(firstLeadR)[0]?.created_at || null,
-    firstCustomerAt: ent.status === 'active' ? (ent.created_at || null) : null,
-    renewsAt: ent.current_period_end || null,
-  }, nowIso);
-  const milestone = journey.latestCelebration
-    ? { key: 'journey', title: 'A milestone', sentence: journey.latestCelebration.note, tone: 'good' as const }
-    : null;
-
-  // ── health (reuse the Health Coach's pure read) ──
-  // AN-3: real Search Performance (Google) from the shared `signals` table.
-  const gsc = await readGsc(site.client_id);
-  const sh = searchHealth(gsc);
-  const lastChangeAt = arr(lastChangeR)[0]?.created_at || null;
-  const health = coachRead({
-    live: site.status === 'live',
-    lastPublishedAt: site.last_published_at || null,
-    pendingApprovals: 0,
-    connectedNeedingAttention: 0,
-    searchIssues: (sh.impressionsFalling || sh.noVisibility) ? 1 : 0,   // search visibility feeds the coach
-    leadsWaiting: unread,
-    unpublishedChanges: !!lastChangeAt && (!site.last_published_at || lastChangeAt > site.last_published_at),
-    domainExpiringDays: null,
-  }, nowIso);
-
-  // AN-2: real first-party traffic; AN-3: real search performance. Only surfaces
-  // that genuinely have no data stay in "not measured".
-  // Whose website is this? A monitor-edition workspace watches a site the client
-  // already had — no beacon of ours is on it, so the visitor empty state must say
-  // that rather than promise numbers "once your site is published".
-  const homeHosted = site.edition !== 'monitor';
-  const homeExternalDomain = homeHosted ? null
-    : (arr(await svc(`presence_monitor_connections?site_id=eq.${site.id}&select=domain&limit=1`).catch(() => ({})))[0]?.domain || null);
-  const trafficCards = trafficInsights(traffic, period, { hosted: homeHosted, domain: homeExternalDomain });
-  const searchCards = searchInsights(gsc);
-  const notice = trafficNotice(traffic);
-  const sNotice = searchNotice(gsc);
-  const watching = arr(momentsR).map((m) => ({ headline: m.headline, summary: m.summary, moment_type: m.moment_type }));
-  if (sNotice) watching.unshift({ headline: sNotice.headline, summary: sNotice.summary, moment_type: sNotice.tone === 'good' ? 'celebration' : 'needs_attention' });
-  if (notice) watching.unshift({ ...notice, moment_type: 'celebration' });
-
-  const gscConnected = conn.gsc || gsc.hasData;
-  return json({ data: {
-    period,
-    headline: `Here’s how your business is doing this ${periodWord(period)}.`,
-    insights: [...trafficCards, ...searchCards, inquiries, publishing, ...(milestone ? [milestone] : [])],
-    health: { sentence: health.headline, status: health.status, suggestions: (health.suggestions || []).slice(0, 3) },
-    watching,
-    not_measured: gscConnected ? [] : notMeasured(true, false),   // traffic is first-party; search real when connected
-    // Named plainly so the page never has to guess whose website this is.
-    hosting: hostingSurface({ hosted: homeHosted, externalDomain: homeExternalDomain }),
-  } }, 200, cors);
-}
 
 export async function handleAnalyticsPortfolio(jwt: string, cors: Record<string, string>) {
   const member = await resolveAgencyMember(jwt);
@@ -249,14 +160,22 @@ export async function handleAnalyticsPortfolio(jwt: string, cors: Record<string,
   const portfolio = filterPortfolio(buildPortfolio(input), {});
   // AN-2.4: per-client visitor counts (this week) — one bounded query, aggregated
   // in code; reuses the same visits store (no duplicate aggregation).
-  // Cap honesty (AN-4, like loadVisits above): the read is ORDERED ts.desc —
+  // Cap honesty (AN-4): the read is ORDERED ts.desc —
   // past PostgREST's cap an UNORDERED read returns an ARBITRARY subset (lib/
   // db.ts: the correctness cliff), so at worst this is the deterministic
   // "most recent 20k". Even so, a truncated read undercounts unpredictably per
   // site — foldPortfolioVisitors raises `truncated` and the payload carries it
   // (visitors_truncated below) so the page stops presenting the column as exact.
   const sinceIso = new Date(nowMs - 7 * 86_400_000).toISOString();
-  const vr = await svc(`presence_visits?site_id=in.(${siteIds.join(',')})&kind=eq.pageview&ts=gte.${sinceIso}&select=site_id,visitor_hash&order=ts.desc&limit=${PORTFOLIO_VISITS_CAP}`);
+  // Bug hunt H7 (Nov 10): the reads that need only the site ids go together, then the two
+  // that need the client ids. They used to run one after another, six round trips in a row.
+  const [vr, sitesR, gscConnR, extR, failedR] = await Promise.all([
+    svc(`presence_visits?site_id=in.(${siteIds.join(',')})&kind=eq.pageview&ts=gte.${sinceIso}&select=site_id,visitor_hash&order=ts.desc&limit=${PORTFOLIO_VISITS_CAP}`),
+    svc(`presence_sites?id=in.(${siteIds.join(',')})&select=id,client_id,last_published_at,edition`),
+    svc(`presence_connections?site_id=in.(${siteIds.join(',')})&provider_key=eq.google_search_console&select=site_id,status`),
+    svc(`presence_monitor_connections?site_id=in.(${siteIds.join(',')})&select=site_id,domain`),
+    svc(`presence_publishes?site_id=in.(${siteIds.join(',')})&status=eq.failed&completed_at=gte.${sinceIso}&select=site_id&limit=2000`),
+  ]);
   const { visitorsBySite: perSiteVisitors, truncated: visitorsTruncated } = foldPortfolioVisitors(arr(vr));
   const { headline, insights } = portfolioInsights(
     // truncated ⇒ per-site attribution is unknown — visitor-derived insight
@@ -270,9 +189,13 @@ export async function handleAnalyticsPortfolio(jwt: string, cors: Record<string,
   // AN-3 (§Agency): per-client search state from the shared `signals` table — who's
   // growing/falling on Google, and who hasn't connected Search Console. Reuses the
   // portfolio; one site→client map + one signals query (no duplicate dashboard).
-  const sites = arr(await svc(`presence_sites?id=in.(${siteIds.join(',')})&select=id,client_id,last_published_at,edition`));
+  const sites = arr(sitesR);
   const clientIds = sites.map((s) => s.client_id).filter(Boolean);
-  const gscRows = clientIds.length ? arr(await svc(`signals?client_id=in.(${clientIds.join(',')})&source=eq.gsc&metric=eq.search_impressions&select=client_id,value,period&order=period.desc&limit=2000`)) : [];
+  const [gscR, entR] = clientIds.length ? await Promise.all([
+    svc(`signals?client_id=in.(${clientIds.join(',')})&source=eq.gsc&metric=eq.search_impressions&select=client_id,value,period&order=period.desc&limit=2000`),
+    svc(`presence_entitlements?client_id=in.(${clientIds.join(',')})&product=eq.presence&select=client_id,status`),
+  ]) : [{ json: [] }, { json: [] }];
+  const gscRows = arr(gscR);
   const byClient = new Map<string, any[]>();
   for (const r of gscRows) { const a = byClient.get(r.client_id) || []; a.push(r); byClient.set(r.client_id, a); }
   const stateFor = (clientId: string) => {
@@ -307,14 +230,14 @@ export async function handleAnalyticsPortfolio(jwt: string, cors: Record<string,
   //   NOT_CONN. — ready to connect (published-and-hosted, or external with a
   //               known domain), and nothing is connected. The ask is right.
   const gscConnected = new Set(
-    arr(await svc(`presence_connections?site_id=in.(${siteIds.join(',')})&provider_key=eq.google_search_console&select=site_id,status`))
+    arr(gscConnR)
       .filter((c: any) => ['connected', 'verified', 'active'].includes(String(c.status)))
       .map((c: any) => String(c.site_id)),
   );
   // The external addresses, in one batched read — a monitor-edition site's real
   // website lives here, not in custom_domain/netlify_site_id.
   const externalDomains = new Map<string, string>(
-    arr(await svc(`presence_monitor_connections?site_id=in.(${siteIds.join(',')})&select=site_id,domain`))
+    arr(extR)
       .filter((c: any) => c && c.domain)
       .map((c: any) => [String(c.site_id), String(c.domain)] as [string, string]),
   );
@@ -394,8 +317,8 @@ export async function handleAnalyticsPortfolio(jwt: string, cors: Record<string,
   // the agency, at the already-authorized site scope. Two bounded queries; reads
   // live (no customer data duplicated into the agency workspace); billing shown
   // only at the coarse plan-status level (never payment details).
-  const failed7 = new Set(arr(await svc(`presence_publishes?site_id=in.(${siteIds.join(',')})&status=eq.failed&completed_at=gte.${sinceIso}&select=site_id&limit=2000`)).map((r: any) => String(r.site_id)));
-  const entRows = clientIds.length ? arr(await svc(`presence_entitlements?client_id=in.(${clientIds.join(',')})&product=eq.presence&select=client_id,status`)) : [];
+  const failed7 = new Set(arr(failedR).map((r: any) => String(r.site_id)));
+  const entRows = arr(entR);
   const planStatus = new Map(entRows.map((e: any) => [String(e.client_id), String(e.status)]));
   // SS7 seams: rows built by the PURE websiteRows (analytics/compose.ts) so the
   // active-only parity + additive site_id/visitors shape are fixture-pinned.
@@ -429,6 +352,8 @@ export async function handleAnalyticsPortfolio(jwt: string, cors: Record<string,
 // (+ summarizePipeline in lib/sales_lifecycle.ts) so tests can pin it.
 export async function handleAnalyticsDashboard(req: Request, site: SiteRow, cors: Record<string, string>) {
   const period = parseDashPeriod(new URL(req.url).searchParams.get('period'));
+  // bug hunt H1: "won this month" on the caller's clock, as Pipeline counts it (item 104's ?tzo=)
+  const tzo = callerOffsetMinutes(new URL(req.url).searchParams.get('tzo'));
   const nowIso = new Date().toISOString();
   const nowMs = Date.parse(nowIso);
   const { startMs, days } = dashRange(period, nowMs);
@@ -470,17 +395,31 @@ export async function handleAnalyticsDashboard(req: Request, site: SiteRow, cors
   // to the workspace rather than the client record — a superset of the truth,
   // never a guess.
   const dealsQuery = isScoped && clientId
-    ? `presence_deals?or=(converted_client_id.eq.${clientId},converted_site_id.eq.${site.id})&deleted_at=is.null&select=title,stage,expected_value_cents,converted_client_id,converted_at,updated_at&order=updated_at.desc&limit=2000`
-    : `presence_deals?site_id=eq.${site.id}&deleted_at=is.null&select=title,stage,expected_value_cents,converted_client_id,converted_at,updated_at&order=updated_at.desc&limit=2000`;
+    ? `presence_deals?or=(converted_client_id.eq.${clientId},converted_site_id.eq.${site.id})&deleted_at=is.null&select=id,site_id,title,stage,expected_value_cents,converted_client_id,converted_at,updated_at&order=updated_at.desc&limit=2000`
+    : `presence_deals?site_id=eq.${site.id}&deleted_at=is.null&select=id,site_id,title,stage,expected_value_cents,converted_client_id,converted_at,updated_at&order=updated_at.desc&limit=2000`;
   const invoicesQuery = isScoped && clientId
     ? `presence_invoices?or=(customer_client_id.eq.${clientId},customer_site_id.eq.${site.id})&deleted_at=is.null&select=status,amount_cents,due_date,paid_at&order=created_at.desc&limit=1000`
     : `presence_invoices?site_id=eq.${site.id}&deleted_at=is.null&select=status,amount_cents,due_date,paid_at&order=created_at.desc&limit=1000`;
 
-  // TRUTHFULNESS (AN-4, like loadVisits above): every capped read is ORDERED
+  // TRUTHFULNESS (AN-4): every capped read is ORDERED
   // newest-first, so hitting a cap means "the most recent N" — a deterministic,
   // honest subset — and the per-section truncated_* flags below let the page
   // say so instead of presenting a silent undercount as the whole story.
-  const [dealsR, subsR, supR, invR, visitsR, gsc, engageR, speedR] = await Promise.all([
+  // Do WE serve this website? A monitor-edition workspace watches a website the
+  // client already had (0031); everything about what we can measure follows from
+  // this one fact, so it is read, never assumed.
+  const hosted = site.edition !== 'monitor';
+  // The recorded external address matters in TWO shapes, not one: a monitor-
+  // edition workspace (their site lives elsewhere, full stop) AND a hosted-
+  // edition site that has never published — a rebuild-in-progress whose client
+  // is already live at their own domain. For both, presence_monitor_connections
+  // holds the one fact Search Console needs. Once a hosted site HAS published,
+  // its own domain is the property (gscDomainFor puts custom_domain first) and
+  // any stale record is ignored here.
+  const needsExt = !(hosted && site.last_published_at);
+  // Bug hunt H7 (Nov 10): the external address and the connection state ride in this first
+  // batch (they need nothing it returns); they used to be two more round trips after it.
+  const [dealsR, subsR, supR, invR, visitsR, gsc, engageR, speedR, extR, connState] = await Promise.all([
     safe(svc(dealsQuery)),
     safe(svc(`presence_form_submissions?site_id=eq.${site.id}&spam=is.false&select=created_at,status&order=created_at.desc&limit=1000`)),
     safe(svc(`presence_support_requests?site_id=eq.${site.id}&deleted_at=is.null&status=in.(open,in_progress)&select=created_at&order=created_at.asc&limit=500`)),
@@ -493,32 +432,42 @@ export async function handleAnalyticsDashboard(req: Request, site: SiteRow, cors
     safe(svc(`presence_visits?site_id=eq.${site.id}&ts=gte.${new Date(startMs).toISOString()}&kind=in.(button,cta,phone,email,leave)&select=ts,kind,path,label,ms,visitor_hash&order=ts.desc&limit=5000`)),
     // list item 151: how fast pages showed for visitors, on its own read (it fails alone before 0160)
     safe(svc(`presence_visits?site_id=eq.${site.id}&ts=gte.${new Date(startMs).toISOString()}&kind=eq.leave&lcp_ms=not.is.null&select=path,device,lcp_ms&order=ts.desc&limit=5000`)),
+    needsExt ? safe(svc(`presence_monitor_connections?site_id=eq.${site.id}&select=domain,status&limit=1`)) : Promise.resolve(null),
+    safe(connectionState(site.id)),
   ]);
-  // Do WE serve this website? A monitor-edition workspace watches a website the
-  // client already had (0031); everything about what we can measure follows from
-  // this one fact, so it is read, never assumed.
-  const hosted = site.edition !== 'monitor';
-  // The recorded external address matters in TWO shapes, not one: a monitor-
-  // edition workspace (their site lives elsewhere, full stop) AND a hosted-
-  // edition site that has never published — a rebuild-in-progress whose client
-  // is already live at their own domain. For both, presence_monitor_connections
-  // holds the one fact Search Console needs. Once a hosted site HAS published,
-  // its own domain is the property (gscDomainFor puts custom_domain first) and
-  // any stale record is ignored here.
-  const extConn = (hosted && site.last_published_at) ? null
-    : arr(await safe(svc(`presence_monitor_connections?site_id=eq.${site.id}&select=domain,status&limit=1`)) || {})[0] || null;
+  const extConn = needsExt ? (arr(extR || {})[0] || null) : null;
   const externalDomain = extConn?.domain ? String(extConn.domain) : null;
   const okRows = (r: unknown): any[] | null => (r && (r as { ok?: boolean }).ok ? arr(r as { json?: unknown }) : null);
+  const deals = okRows(dealsR);
+  const gscConnected = !!connState?.gsc;
+  const readiness = searchReadinessState({
+    hosted, lastPublishedAt: site.last_published_at || null, externalDomain,
+    gscConnected, hasData: !!gsc?.hasData,
+  });
+
+  // What the first batch's answers lead to, side by side (H7): when each closed deal closed
+  // (H1), the search terms and pages, and the Google Analytics numbers.
+  const dealSites = [...new Set((deals || []).map((d) => String(d.site_id || '')).filter((x) => UUID_RE.test(x)))];
+  const wantTerms = !!gsc && gsc.ok && readiness !== 'no_domain' && readiness !== 'draft' && readiness !== 'waiting' && gsc.hasData;
+  const [closes, termsAndPages, g4] = await Promise.all([
+    deals && dealSites.length
+      ? readCloseDates(deals, `site_id=in.(${dealSites.join(',')})`, async (path) => { const r = await svc(path); return r.ok ? arr(r) : null; })
+      : Promise.resolve({ closedAt: {} as Record<string, string>, partial: false }),
+    wantTerms ? Promise.all([safe(readSearchTerms(site.client_id || '', gsc!.period)), safe(readSearchPages(site.client_id || '', gsc!.period))]) : Promise.resolve(null),
+    connState?.ga ? safe(readGa4Signals(site.client_id)) : Promise.resolve(null),
+  ]);
 
   // ── Sales band ──
-  const deals = okRows(dealsR);
+  // Bug hunt H1 (Nov 10): a win is dated by when it was won — its newest move into Won, the
+  // date the Reports below use — never by its last edit, and its month is the caller's.
   let pipeline: unknown = null, won: unknown = null, recent_wins: unknown[] = [];
   if (deals) {
-    const sum = summarizePipeline(deals, nowIso);
+    const local = { offsetMinutes: tzo };
+    const sum = summarizePipeline(deals, nowIso, undefined, local, closes.closedAt);
     const names = await stageNamesP;   // sales review item 38: the studio's own stage names
     pipeline = { open: sum.open, stages: names ? sum.by_stage.map((s) => ({ ...s, label: names[s.stage] || s.label })) : sum.by_stage };
-    won = { this_month: sum.won_month, last_month: summarizePipeline(deals, priorMonthIso(nowMs)).won_month };
-    recent_wins = recentWins(deals, nowMs);
+    won = { this_month: sum.won_month, last_month: summarizePipeline(deals, priorMonthIso(nowMs, tzo), undefined, local, closes.closedAt).won_month };
+    recent_wins = recentWins(deals, nowMs, 90, 6, closes.closedAt);
   }
   const subs = okRows(subsR);
   const enquiries = subs ? {
@@ -527,7 +476,8 @@ export async function handleAnalyticsDashboard(req: Request, site: SiteRow, cors
     weekly: weeklyBuckets(subs.map((s) => s.created_at), nowMs),
   } : null;
   const sup = okRows(supR);
-  const support = sup ? { open: sup.length, oldest_age_days: oldestAgeDays(sup.map((s) => s.created_at), nowMs) } : null;
+  // H11: the read stops at 500 (oldest first), so 500 means "500 or more", said as such
+  const support = sup ? { open: sup.length, ...(sup.length >= 500 ? { open_capped: true } : {}), oldest_age_days: oldestAgeDays(sup.map((s) => s.created_at), nowMs) } : null;
   const invs = okRows(invR);
   const invoices = invs ? invoiceBuckets(invs, nowIso.slice(0, 10), startMs) : null;
 
@@ -579,12 +529,6 @@ export async function handleAnalyticsDashboard(req: Request, site: SiteRow, cors
   //   null             — ready to connect: either published-and-hosted, or an
   //                      external site whose domain we know.
   //   { clicks, … }    — real numbers.
-  const connState = await safe(connectionState(site.id));
-  const gscConnected = !!connState?.gsc;
-  const readiness = searchReadinessState({
-    hosted, lastPublishedAt: site.last_published_at || null, externalDomain,
-    gscConnected, hasData: !!gsc?.hasData,
-  });
   let search: unknown = null;
   if (!gsc || !gsc.ok) search = { unavailable: true };
   else if (readiness === 'no_domain') {
@@ -598,7 +542,7 @@ export async function handleAnalyticsDashboard(req: Request, site: SiteRow, cors
   } else if (readiness === 'waiting') {
     search = { waiting: true, external: !hosted, domain: externalDomain };
   } else if (gsc.hasData) {
-    const [terms, searchPages] = await Promise.all([safe(readSearchTerms(site.client_id || '', gsc.period)), safe(readSearchPages(site.client_id || '', gsc.period))]);
+    const [terms, searchPages] = termsAndPages || [null, null];
     search = {
       clicks: gsc.clicks, impressions: gsc.impressions, period: gsc.period,
       top_terms: (terms?.queries || []).map((q: any) => ({ term: String(q.key || ''), clicks: Number(q.clicks) || 0, impressions: Number(q.impressions) || 0 })),
@@ -634,9 +578,8 @@ export async function handleAnalyticsDashboard(req: Request, site: SiteRow, cors
     // page shows those with a "via Google Analytics" provenance label. NEVER
     // merged into `traffic`: the first-party beacon and Google's tag measure
     // differently, and a blended count would be a number nobody could trust.
-    website: { traffic, search, ga: await (async () => {
+    website: { traffic, search, ga: (() => {
       if (!connState?.ga) return null;
-      const g4 = await safe(readGa4Signals(site.client_id));
       if (!g4 || !g4.ok) return { connected: true, has_data: false, unavailable: true };
       return g4.hasData
         ? { connected: true, has_data: true, visitors: g4.visitors, sessions: g4.sessions, pageviews: g4.pageviews, period: g4.period, source: 'google_analytics' }

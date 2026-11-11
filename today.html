@@ -1035,11 +1035,14 @@ const SHELL_READY = document.readyState === 'loading' ? new Promise((r)=>documen
     const ctxRead = SHELL_READY.then(()=>window.ddsContext?window.ddsContext().then((d)=>({data:d})):Promise.reject()).catch(()=>apiGet('/portal/context').catch(()=>null));   // PERF: the shell's /portal/context
     const studioHome = (c)=>!!(c && c.is_agency && !(c.scope && c.scope.site_id) && !new URLSearchParams(location.search).get('client'));
     let seenStudio = false; try{ seenStudio = localStorage.getItem('dds-today-studio') === '1'; }catch(_){ /* storage denied */ }
-    if(seenStudio){ const c = await ctxRead; if(studioHome(c && c.data)){ location.replace('/agency.html'); return; } }
+    // bug hunt H11 (Nov 10): the retired "What's coming next" page lands here as #coming-up; a
+    // studio's Home has no Coming up, so that link goes to Your week (what's due in the next seven days)
+    const studioDest = location.hash === '#coming-up' ? '/week.html' : '/agency.html';
+    if(seenStudio){ const c = await ctxRead; if(studioHome(c && c.data)){ location.replace(studioDest); return; } }
     ctxRead.then((c)=>{
       const yes = studioHome(c && c.data);
       try{ localStorage.setItem('dds-today-studio', yes ? '1' : '0'); }catch(_){ /* storage denied */ }
-      if(yes) location.replace('/agency.html');
+      if(yes) location.replace(studioDest);
     });
     let feedFailed = false;
     const [moments, features, ctx, feed, bridged, dash, appts, deals, summary, rcv, customers, example, rec] = await Promise.all([

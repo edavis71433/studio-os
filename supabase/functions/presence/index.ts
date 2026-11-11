@@ -84,7 +84,7 @@ const { handleEditorImprove } = lazyRoutes(() => import('./routes/editor.ts'));
 const { handleReviewRun, handleReviewList, handleReviewGet, handleReviewDismiss } = lazyRoutes(() => import('./routes/review.ts'));
 const { handleBrandProfileGet, handleBrandProfilePut, handleBrandReviewRun, handleBrandReportList, handleBrandReportGet, handleBrandReportDismiss } = lazyRoutes(() => import('./routes/brand.ts'));
 const { handleCoachRun, handleCoachList, handleCoachDecide, handleCoachHealth, handleCoachJourney } = lazyRoutes(() => import('./routes/coach.ts'));
-import { handleAnalyticsHome, handleAnalyticsPortfolio, handleAnalyticsDashboard } from './routes/analytics.ts';
+import { handleAnalyticsPortfolio, handleAnalyticsDashboard } from './routes/analytics.ts';
 import { handleCollect } from './routes/collect.ts';
 import { noteVisitSource } from './routes/visit_source.ts';
 import { runAfterResponse } from './lib/after_response.ts';
@@ -1238,7 +1238,6 @@ async function route_(req: Request, cors: Record<string, string>): Promise<Respo
   if (route === '/report/monthly/preview' && method === 'POST') return (await import('./ops/monthly_report.ts')).handleReportPreview(site, principal, cors);
   // ── AN-1: Analytics — plain-English understanding composed from stored signals
   //    (no new engine, no new AI, no fabricated numbers). Site-scoped surfaces.
-  if (route === '/analytics' && method === 'GET') return handleAnalyticsHome(req, site, cors);
   // Slice 8: the Business dashboard summary (analytics.html's two-band board)
   if (route === '/analytics/dashboard' && method === 'GET') return handleAnalyticsDashboard(req, site, cors);
 

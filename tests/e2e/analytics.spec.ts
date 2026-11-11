@@ -374,7 +374,7 @@ test.describe('Analytics (Business dashboard)', () => {
     await installApp(page, { api: { '/analytics/dashboard': DASH } });
     await page.goto('/analytics.html');
     await expect(page.getByText('$12,400', { exact: true })).toBeVisible();
-    for (const [strip, name] of [['#salesStats', 'New enquiries'], ['#siteStats', 'Visitors'], ['#siteStats', 'Actions taken']] as const) {
+    for (const [strip, name] of [['#salesStats', 'New enquiries'], ['#siteStats', 'Visits'], ['#siteStats', 'Actions taken']] as const) {
       await expect(tileOf(page, strip, name).locator('.s .w')).toHaveText(/This month$/);
     }
     // …and the tiles with a FIXED window (this month's wins, open support) carry none
@@ -728,7 +728,7 @@ test.describe('Analytics (Agency portfolio lens)', () => {
   test('enriched websites[] adds the Visitors column, joined by site_id (null → honest dash)', async ({ page }) => {
     await installApp(page, { api: { ...AGENCY_API, '/analytics/portfolio': ENRICHED } });
     await page.goto('/analytics.html');
-    await expect(page.getByRole('columnheader', { name: 'Visitors (7 days)' })).toBeVisible();
+    await expect(page.getByRole('columnheader', { name: 'Visits (7 days)' })).toBeVisible();
     const rows = page.locator('.tscroll tbody tr');
     await expect(rows.nth(0).locator('td').last()).toHaveText('42');
     // null = the visits read failed server-side — an honest dash, NEVER a fake 0
@@ -753,7 +753,7 @@ test.describe('Analytics (Agency portfolio lens)', () => {
     await installApp(page, { api: { ...AGENCY_API, '/analytics/portfolio': TRUNCATED } });
     await page.goto('/analytics.html');
     // the column still exists (the shape is enriched) …
-    await expect(page.getByRole('columnheader', { name: 'Visitors (7 days)' })).toBeVisible();
+    await expect(page.getByRole('columnheader', { name: 'Visits (7 days)' })).toBeVisible();
     const rows = page.locator('.tscroll tbody tr');
     await expect(rows).toHaveCount(3);
     // … but every value is the honest unknown — including the row that carried 42
@@ -773,7 +773,7 @@ test.describe('Analytics (Agency portfolio lens)', () => {
     await page.goto('/analytics.html');
     await expect(page.locator('.tscroll tbody tr')).toHaveCount(3);
     // no Visitors column, no undefined-render — the four shipped columns only
-    await expect(page.getByRole('columnheader', { name: /Visitors/ })).toHaveCount(0);
+    await expect(page.getByRole('columnheader', { name: /Visit/ })).toHaveCount(0);
     await expect(page.locator('.tscroll thead th')).toHaveCount(4);
     await expect(page.locator('.tscroll tbody tr').nth(0).locator('td')).toHaveCount(4);
   });

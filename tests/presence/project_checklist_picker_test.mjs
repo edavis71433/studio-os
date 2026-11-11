@@ -368,7 +368,7 @@ try {
     ok('add all: the empty-project affordance posts {all:true} and is offered only when NONE are present',
       /chkMissing===CHK\.length/.test(page) && /'\/projects\/'\+id\+'\/checklist','POST',\{all:true\}/.test(page));
     ok('after a write the record re-opens, so the computed percentage repaints without a manual reload',
-      (page.match(/toast\(addedMsg\(r\)\);openProject\(id\)/g) || []).length === 2);
+      (page.match(/toast\(addedMsg\(r\)\);(openProject\(id,\{keepSides:true\}\)|reopen\(\))/g) || []).length === 2);   // H8: the record and its report, the side lists kept
     ok('free text survives: the "+ Add" task form still posts a plain title/due/client-action task',
       /id="addTask"/.test(page) && /\{title:v\.title,due_date:v\.due_date\|\|undefined,client_action_required:!!v\.client_action_required\}/.test(page));
   }

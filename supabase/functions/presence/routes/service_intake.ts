@@ -115,6 +115,10 @@ export async function handleSupport(req: Request, jwt: string, site: SiteRow, pr
     let path = `presence_support_requests?site_id=eq.${site.id}&deleted_at=is.null&select=id,subject,status,priority,project_id,requester,assigned_to,resolved_at,updated_at&order=updated_at.desc&limit=${limit}&offset=${offset}`;
     if (!studio) path += `&requester=eq.${encodeURIComponent(readerKey(principal))}`;   // the client sees only its own
     if (status && isSupportStatus(status)) path += `&status=eq.${status}`;
+    // bug hunt H3 (Nov 10): one project's requests, asked for by the project's Support card. It
+    // read the studio's newest 25 and kept this project's, so an older request dropped off
+    const projectId = u.searchParams.get('project_id') || '';
+    if (UUID_RE.test(projectId)) path += `&project_id=eq.${projectId}`;
     if (q) path += `&subject.ilike.*${encodeURIComponent(q)}*`;
     const r = await svc(path);
     return r.ok ? json({ data: rows(r), limit, offset, is_studio_view: studio }, 200, cors) : json({ error: 'read_failed' }, 502, cors);

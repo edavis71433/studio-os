@@ -941,16 +941,25 @@ function syncCuMode(){
 // kits, offered in provision mode only, applied to the NEW site once the provision
 // POST answers with its site_id. A studio without an agency never sees the field;
 // no kits (or a failed read) hides it too — the dialog never offers what it can't do.
+// Bug hunt K7 (Nov 10): who you are and your kits are read once per page and reused each
+// time the dialog opens; neither changes between opens. A read that failed is asked again.
+let CU_AGENCY=null,CU_KITS=null;
 async function cuIsAgency(){
-  try{const c=window.ddsContext?await window.ddsContext():(await api('/portal/context')).body.data;return !!(c&&c.is_agency);}catch(_){return false;}
+  if(CU_AGENCY===null){try{const c=window.ddsContext?await window.ddsContext():(await api('/portal/context')).body.data;CU_AGENCY=!!(c&&c.is_agency);}catch(_){return false;}}
+  return CU_AGENCY;
+}
+async function cuKits(){
+  if(CU_KITS)return CU_KITS;
+  const r=await api('/agency/kits');
+  if(!(r.ok&&r.body&&Array.isArray(r.body.data)))return [];
+  CU_KITS=r.body.data;return CU_KITS;
 }
 async function syncCuKits(){
   const w=$('cu-kit-wrap'),sel=$('cu-kit');if(!w||!sel)return;
   w.style.display='none';sel.innerHTML='<option value="">No kit — start empty</option>';
   try{
     if(!(await cuIsAgency()))return;
-    const r=await api('/agency/kits');
-    const kits=(r.ok&&r.body&&Array.isArray(r.body.data))?r.body.data:[];
+    const kits=await cuKits();
     if(!kits.length)return;
     sel.innerHTML+=kits.map(k=>'<option value="'+esc(k.id)+'">'+esc(k.name)+'</option>').join('');
     w.style.display='';

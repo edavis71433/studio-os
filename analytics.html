@@ -387,7 +387,7 @@ function tile(o){
   const win=o.window?`<span class="w"> · ${esc(o.window)}</span>`:'';
   const v=o.empty?`<div class="v none">—</div><div class="s">${esc(o.empty[0])}</div><div class="s2">${esc(o.empty[1]||'')}${win}</div>`
     :`<div class="v${o.mod?' '+o.mod:''}">${o.value}</div><div class="s">${o.sub||''}${win}</div>`;
-  return `<div class="stat"${o.id?` id="${o.id}"`:''}>${ico(o.icon,o.tone)}<div class="sb"><div class="k"><span class="kt">${esc(o.title)}</span>${link}</div>${v}</div></div>`;
+  return `<div class="stat"${o.id?` id="${o.id}"`:''}>${ico(o.icon,o.tone)}<div class="sb"><div class="k"><span class="kt"${o.hint?` title="${esc(o.hint)}"`:''}>${esc(o.title)}</span>${link}</div>${v}</div></div>`;
 }
 // a card: title · (subtitle · one link) · body. The link is the card's drill.
 function card(cls,title,sub,body,link){
@@ -510,7 +510,7 @@ function salesBand(d){
       :{empty:['Nothing to count yet','Website enquiries will land here.']})});
   // open support
   h+=tile({icon:'support',tone:'warn',title:'Open support',link:['/inbox.html','View'],
-    ...(s.support?{value:num(s.support.open),mod:s.support.open?'warn':'',sub:s.support.open?(s.support.oldest_age_days>=1?`oldest waiting ${num(s.support.oldest_age_days)} day${s.support.oldest_age_days===1?'':'s'}`:'oldest arrived today'):'nothing waiting'}
+    ...(s.support?{value:num(s.support.open)+(s.support.open_capped?'+':''),mod:s.support.open?'warn':'',sub:s.support.open?(s.support.oldest_age_days>=1?`oldest waiting ${num(s.support.oldest_age_days)} day${s.support.oldest_age_days===1?'':'s'}`:'oldest arrived today'):'nothing waiting'}
       :{empty:['Nothing to count yet','Support requests will show here.']})});
   h+=`</div><div class="grid2">`;
   // pipeline by stage — the open stages plus this month's won, as bars (a null
@@ -553,6 +553,7 @@ function salesBand(d){
 }
 // "↑ 12% vs the period before". Silent when there's no honest comparison: all time,
 // a read that hit its cap, an older function build, or nothing to compare with.
+const VISIT_WORDS='A person counts once a day: someone who comes back on three days is three visits.';   // H5
 function visitorDelta(t){
   const prior=t&&t.prior_visitors;
   if(!prior)return'';
@@ -639,7 +640,10 @@ function websiteBand(d){
   const offSite=(what)=>emptyState('Not measured here',`${what} can’t be counted from here — the studio doesn’t host ${domainName}, so none of its pages carry our counter. Their own analytics (or a connected Google Analytics) holds these numbers.`);
   const win=(flag)=>based(periodLabel(),flag);
   h+=`<div class="stats" id="siteStats">`;
-  h+=tile({icon:'people',title:'Visitors',window:external&&gaOk?'':win(tTrunc),link:external?null:[BI,'View'],
+  // Bug hunt H5 (Nov 10): our counter knows a person for one day only (its visitor id changes
+  // daily, for privacy), so over a week or a month it counts visits: one person on three days
+  // is three. The words say so; "Visitors" stays for Google Analytics' own count of people.
+  h+=tile({icon:'people',title:measuring?'Visits':'Visitors',hint:measuring?VISIT_WORDS:'',window:external&&gaOk?'':win(tTrunc),link:external?null:[BI,'View'],
     ...(measuring?{value:num(t.visitors),sub:`${num(t.pageviews)} page view${t.pageviews===1?'':'s'}${visitorDelta(t)}`}
       // the external-site state 4d2e866 promised: when a connected Google Analytics holds the numbers, show them — labeled with their source
       :external&&gaOk?{value:num(ga.visitors),sub:`${num(ga.pageviews)} page view${ga.pageviews===1?'':'s'} · via Google Analytics${gscQual(ga.period)}`}
@@ -669,8 +673,8 @@ function websiteBand(d){
     h+=card('','Clicks from Google over time','Monthly, from Search Console',
       lineChart(months.map(m=>m.clicks),'var(--c2)','clicks from Google',d&&d.generated_at,{labels:months.map(m=>monthShort(m.period)),note:`${num(last.clicks)} clicks in ${monthShort(last.period)} · ${num(months.reduce((a,m)=>a+m.clicks,0))} across ${months.length} months`}));
   }else{
-    h+=card('','Visitors over time',based('Weekly, last 12 weeks',tTrunc),
-      (measuring&&lineChart(t.weekly,'var(--c2)','visitors',d&&d.generated_at))
+    h+=card('','Visits over time',based('Weekly, last 12 weeks',tTrunc),
+      (measuring&&lineChart(t.weekly,'var(--c2)','visits',d&&d.generated_at))
         ||(external?offSite('Visits over time'):emptyState('No visits yet','Once people start visiting, the trend shows here.')),
       external?null:[BI,'View website insights']);
   }
@@ -681,7 +685,7 @@ function websiteBand(d){
       // list item 153: the "AI assistants" row, by assistant
       if((t.ai_sources||[]).length)body+=`<p class="srcai">From AI assistants: ${t.ai_sources.map(a=>`${esc(a.name)} ${num(a.visits)}`).join(' · ')}</p>`;
     }
-    h+=card('','Where visitors come from',measuring?`${num(t.visitors)} visitors · ${periodLabel()}${tTrunc?' · based on recent activity':''}`:based(periodLabel(),tTrunc),body||(external?offSite('Where visitors come from'):emptyState('No visits yet','Your visitor sources will appear here.')),[BI,'View website insights']);
+    h+=card('','Where visitors come from',measuring?`${num(t.visitors)} visit${t.visitors===1?'':'s'} · ${periodLabel()}${tTrunc?' · based on recent activity':''}`:based(periodLabel(),tTrunc),body||(external?offSite('Where visitors come from'):emptyState('No visits yet','Your visitor sources will appear here.')),[BI,'View website insights']);
   }
   {
     const rows=(measuring&&(t.pages||t.top_pages))||[];
@@ -690,7 +694,7 @@ function websiteBand(d){
     if(rows.length){
       const fromGoogle=new Map(googlePages.map(p=>[p.path,p.clicks]));
       const cols=[{name:'Views',title:'Page views',value:p=>num(p.views)}];
-      if(rows.some(p=>p.visitors!=null))cols.push({name:'People',title:'Different people who opened this page',value:p=>num(p.visitors)});
+      if(rows.some(p=>p.visitors!=null))cols.push({name:'Visits',title:'Visits that opened this page. '+VISIT_WORDS,value:p=>num(p.visitors)});   // H5: was "People", "different people", but it counts a person once a day
       if(googlePages.length)cols.push({name:'Google',title:`Clicks from Google${gscQual(g.period)}`,value:p=>fromGoogle.has(p.path)?num(fromGoogle.get(p.path)):'—'});
       // list item 157: the middle time a page stayed open
       const timed=new Map(((t.time_on_page&&t.time_on_page.pages)||[]).map(p=>[p.path,p.seconds]));
@@ -724,7 +728,7 @@ function websiteBand(d){
     // list item 157: which buttons people press, so the owner can see which ones work
     const kinds={button:'Button',cta:'Button',phone:'Call',email:'Email'};
     const body=t.buttons.length
-      ?`<table class="ptable" id="buttonTable"><thead><tr><th scope="col">Button</th><th scope="col" title="Times pressed">Presses</th><th scope="col" title="Different people who pressed it">People</th></tr></thead><tbody>${t.buttons.map(b=>`<tr><td><b>${esc(b.label)}</b><span>${esc(kinds[b.kind]||'Button')} · ${esc(pageName(b.path))}</span></td><td>${num(b.presses)}</td><td>${num(b.people)}</td></tr>`).join('')}</tbody></table>`
+      ?`<table class="ptable" id="buttonTable"><thead><tr><th scope="col">Button</th><th scope="col" title="Times pressed">Presses</th><th scope="col" title="Visits that pressed it. A person counts once a day.">Visits</th></tr></thead><tbody>${t.buttons.map(b=>`<tr><td><b>${esc(b.label)}</b><span>${esc(kinds[b.kind]||'Button')} · ${esc(pageName(b.path))}</span></td><td>${num(b.presses)}</td><td>${num(b.people)}</td></tr>`).join('')}</tbody></table>`
       :emptyState('No presses yet','When visitors press your buttons, call or email you, the ones they use show here.');
     const mid=t.time_on_page&&t.time_on_page.median_seconds;
     h+=card('span2','Buttons people press',`${periodLabel()}${mid?` · pages usually stay open ${duration(mid)}`:''}`,body,null);
@@ -953,7 +957,9 @@ function renderDash(d){
 }
 // ── Insights: the platform's own evidence-backed observations (GET /business-insights),
 //    read once per visit. A failed read says so in this section only; the board stands.
-let INSIGHTS=null;
+// Bug hunt H6 (Nov 10): Refresh reads them again too (they kept the first answer for as
+// long as the page was open); a refresh that fails keeps the last good ones, like the reports.
+let INSIGHTS=null,INS_STALE=false;
 const scopedHref=(link)=>{if(!link)return null;const c=scope();if(!c||link.charAt(0)!=='/')return link;const [b,h]=String(link).split('#');return b+(b.includes('?')?'&':'?')+'client='+encodeURIComponent(c)+(h?'#'+h:'');};
 function insightsHtml(b){
   const groups=(b&&b.groups)||[];
@@ -966,14 +972,15 @@ function insightsHtml(b){
 }
 async function loadInsights(){
   const host=$('insightsBody');if(!host)return;
-  if(!INSIGHTS){let r;try{r=await api('/business-insights');}catch(_){r={ok:false};}
-    if(!r.ok){const h2=$('insightsBody');if(h2)h2.innerHTML=`<p class="muted">We couldn’t read your insights just now — the numbers above are unaffected.</p>`;return;}
-    INSIGHTS=(r.body&&r.body.data)||{};}
+  if(!INSIGHTS||INS_STALE){let r;try{r=await api('/business-insights');}catch(_){r={ok:false};}
+    if(!r.ok&&INSIGHTS){INS_STALE=false;}   // keep the last good ones
+    else if(!r.ok){const h2=$('insightsBody');if(h2)h2.innerHTML=`<p class="muted">We couldn’t read your insights just now — the numbers above are unaffected.</p>`;return;}
+    else{INSIGHTS=(r.body&&r.body.data)||{};INS_STALE=false;}}
   const h=$('insightsBody');if(!h)return;h.innerHTML=insightsHtml(INSIGHTS);
   if(location.hash==='#insights'){const s=$('insights');if(s){s.scrollIntoView({block:'start'});}}
 }
 function wireDash(){
-  $('refreshBtn').addEventListener('click',()=>{REP_STALE=true;loadDash(true).then(()=>{const b=$('refreshBtn');if(b)b.focus();});});
+  $('refreshBtn').addEventListener('click',()=>{REP_STALE=true;INS_STALE=true;loadDash(true).then(()=>{const b=$('refreshBtn');if(b)b.focus();});});
   // PERIOD is committed only on a successful render (loadDash) — a failed
   // switch leaves the control and state exactly as they were. The segmented
   // control is plain buttons: no popup, so nothing to close and no focus to guard.
@@ -1048,10 +1055,10 @@ function portfolioRollup(roster,ws,vTrunc){
     const vcell=vs?`<td class="r">${(vTrunc||v==null)?'<span class="muted">—</span>':num(Number(v)||0)}</td>`:'';
     return `<tr data-drill="${esc(drill)}"><td><a href="${esc(drill)}">${esc(c.name||'(unnamed)')}</a></td><td>${esc(c.edition||'presence')}${c.status?' · '+esc(c.status):''}</td><td>${att?`<span class="pill wait">${num(att)} waiting</span>`:'<span class="pill ok">all clear</span>'}</td><td class="r">${num(lw)}</td>${vcell}</tr>`;
   }).join('');
-  h+=`<div class="tscroll"><table><caption>Customers — plan, what’s waiting, enquiries${vs?', visitors':''}. Open a row for that customer’s Business dashboard.</caption><thead><tr><th scope="col">Customer</th><th scope="col">Plan</th><th scope="col">Waiting</th><th class="r" scope="col">Enquiries waiting</th>${vs?'<th class="r" scope="col">Visitors (7 days)</th>':''}</tr></thead><tbody>${rows}</tbody></table></div>`;
+  h+=`<div class="tscroll"><table><caption>Customers — plan, what’s waiting, enquiries${vs?', visits':''}. Open a row for that customer’s Business dashboard.</caption><thead><tr><th scope="col">Customer</th><th scope="col">Plan</th><th scope="col">Waiting</th><th class="r" scope="col">Enquiries waiting</th>${vs?'<th class="r" scope="col" title="'+VISIT_WORDS+'">Visits (7 days)</th>':''}</tr></thead><tbody>${rows}</tbody></table></div>`;
   // the one honest line for the — column: a partial count per client would be
   // wrong, so nothing pretends. Everything else in the table is exact.
-  if(vs&&vTrunc)h+=`<p class="rollnote">A busy week — visits crossed what the portfolio can count customer by customer, so visitor numbers are hidden rather than shown short. The other columns are exact.</p>`;
+  if(vs&&vTrunc)h+=`<p class="rollnote">A busy week — visits crossed what the portfolio can count customer by customer, so visit numbers are hidden rather than shown short. The other columns are exact.</p>`;
   return h;
 }
 function renderPortfolio(d,roster){
@@ -1125,7 +1132,8 @@ async function loadDash(soft,nextPeriod){
   const gen=++REQ_SEQ;
   let stencilTimer=null;
   if(!soft)stencilTimer=setTimeout(()=>{if(!DASH)renderStencil();},300);
-  let r; try{r=await api('/analytics/dashboard?period='+encodeURIComponent(period));}catch(_){r={ok:false,status:0};}
+  // bug hunt H1: the browser's clock rides along, so "won this month" is this month here, as on Pipeline
+  let r; try{r=await api('/analytics/dashboard?period='+encodeURIComponent(period)+'&tzo='+new Date().getTimezoneOffset());}catch(_){r={ok:false,status:0};}
   if(stencilTimer)clearTimeout(stencilTimer);
   if(gen!==REQ_SEQ)return;   // a newer request started — this response is stale
   if(!r.ok){

@@ -67,7 +67,7 @@ const page = (p) => Deno.readTextFileSync(new URL(`../../${p}`, import.meta.url)
 {
   const route = src('routes/analytics.ts');
   ok('the scoped board reads presence_monitor_connections for hosted sites too — until they publish',
-    /const extConn = \(hosted && site\.last_published_at\) \? null/.test(route));
+    /const needsExt = !\(hosted && site\.last_published_at\);/.test(route) && /const extConn = needsExt \?/.test(route));   // H7: read in the first batch now
   ok('a published hosted site ignores any stale external record (its own domain is the property)',
     /Once a hosted site HAS published/.test(route));
   ok('the draft payload now carries record_href — the alternative door, not just publish_href',

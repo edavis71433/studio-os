@@ -2,9 +2,9 @@
 //   deno run --allow-read tests/presence/analytics_dashboard_test.mjs
 // Pins the pure math behind GET /analytics/dashboard (period → range, weekly
 // bucketing, source shares, invoice buckets, recent wins, oldest-age) and the
-// structural facts: the route is registered in index.ts AND every pre-slice-8
-// /analytics route is still there (deploy-order tolerance: the new page must
-// not orphan anything an old analytics.html called).
+// structural facts: the route is registered in index.ts; the portfolio stays;
+// the old plain-English home (GET /analytics) is gone, as no page has called it
+// since this dashboard (bug hunt H10, Nov 10).
 import {
   parseDashPeriod, dashRange, priorMonthIso, weeklyBuckets, weeklyVisitors,
   sourceShares, invoiceBuckets, recentWins, oldestAgeDays, priorPeriodStart, priorPeriodVisitors, searchPagePath, DASH_WEEKS,
@@ -145,11 +145,8 @@ eq('oldest: none → null (never a fake 0)', oldestAgeDays([], NOW), null);
   const route = await Deno.readTextFile(new URL('../../supabase/functions/presence/routes/analytics.ts', import.meta.url));
   ok('index.ts registers GET /analytics/dashboard', /route === '\/analytics\/dashboard' && method === 'GET'.*handleAnalyticsDashboard/.test(idx));
   ok('index.ts imports handleAnalyticsDashboard from routes/analytics.ts', /handleAnalyticsDashboard[^]*from '\.\/routes\/analytics\.ts'/.test(idx));
-  for (const old of ['/analytics', '/analytics/portfolio']) {
-    ok(`index.ts still serves the pre-slice-8 route ${old}`, idx.includes(`route === '${old}'`));
-  }
-  ok('routes/analytics.ts still exports the old handlers (deploy-order tolerance)',
-    ['handleAnalyticsHome', 'handleAnalyticsPortfolio'].every((h) => route.includes(`export async function ${h}`)));
+  ok('index.ts still serves the portfolio', idx.includes(`route === '/analytics/portfolio'`) && route.includes('export async function handleAnalyticsPortfolio'));
+  ok('H10: the old home (GET /analytics, no caller) is gone, route and handler', !idx.includes(`route === '/analytics' &&`) && !/handleAnalyticsHome/.test(idx) && !route.includes('function handleAnalyticsHome'));
   ok('routes/analytics.ts exports handleAnalyticsDashboard', route.includes('export async function handleAnalyticsDashboard'));
   ok('dashboard reuses the pure lib (no forked math in the route)', /from '\.\.\/lib\/analytics_dashboard\.ts'/.test(route) && /summarizePipeline/.test(route));
 }

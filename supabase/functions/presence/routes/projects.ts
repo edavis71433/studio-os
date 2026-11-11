@@ -136,8 +136,12 @@ export async function handleProjects(req: Request, jwt: string, site: SiteRow, p
     let customerSiteId: string | null = null;
     if (customerClientId) {
       const owned = rows(await svc(`presence_deals?site_id=eq.${site.id}&converted_client_id=eq.${customerClientId}&deleted_at=is.null&select=converted_site_id&limit=1`))[0];
-      if (!owned) return json({ error: 'bad_customer', message: 'That customer isn’t one of yours yet — convert their deal first.' }, 422, cors);
-      customerSiteId = owned.converted_site_id || null;
+      // bug hunt H2 (Nov 10): + New project offers every customer on the studio's books (its
+      // active service links, /studio/customers), not the deals touched lately; one whose deal
+      // was since deleted is still the studio's customer
+      const linked = owned ? null : rows(await svc(`presence_service_links?agency_site_id=eq.${site.id}&customer_client_id=eq.${customerClientId}&status=eq.active&select=customer_site_id&limit=1`))[0];
+      if (!owned && !linked) return json({ error: 'bad_customer', message: 'That customer isn’t one of yours yet — convert their deal first.' }, 422, cors);
+      customerSiteId = (owned && owned.converted_site_id) || (linked && linked.customer_site_id) || null;
     }
     const clientVisible = b.client_visible === false ? false : true;
 

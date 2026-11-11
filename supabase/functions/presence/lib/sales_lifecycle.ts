@@ -458,9 +458,10 @@ const summaryCents = (v: unknown): number => Math.max(0, Math.trunc(Number(v) ||
 function summaryIsWon(d: DealForSummary): boolean {
   return !!d.converted_client_id || !!d.converted_at || d.stage === 'won' || d.stage === 'converted';
 }
-/** When a deal closed — won → converted_at, otherwise its last move (updated_at). */
-function summaryClosedAt(d: DealForSummary): string {
-  return String(d.converted_at || d.updated_at || '');
+/** When a deal closed — its newest move into Won or Not a fit when known (`closedAt`,
+ *  lib/deal_closes.ts, bug hunt H1), else won → converted_at, else its last move (updated_at). */
+function summaryClosedAt(d: DealForSummary, closedAt: Record<string, string> = {}): string {
+  return String(closedAt[String((d as { id?: unknown }).id || '')] || d.converted_at || d.updated_at || '');
 }
 
 /** Roll a site's deals into the calm pipeline summary. Pure & deterministic.
@@ -472,7 +473,7 @@ function summaryClosedAt(d: DealForSummary): string {
  *  cut from the UTC time, so at 4pm in Los Angeles on the last day "Won this month"
  *  dropped to zero, and a deal won that evening was counted in the next month. Without
  *  either, the UTC month, as before. */
-export function summarizePipeline(deals: unknown, nowIso: string, windowDays = WIN_RATE_WINDOW_DAYS, local: { today?: string; offsetMinutes?: number | null } = {}): PipelineSummary {
+export function summarizePipeline(deals: unknown, nowIso: string, windowDays = WIN_RATE_WINDOW_DAYS, local: { today?: string; offsetMinutes?: number | null } = {}, closedAt: Record<string, string> = {}): PipelineSummary {
   const list: DealForSummary[] = Array.isArray(deals) ? deals as DealForSummary[] : [];
   const off = typeof local.offsetMinutes === 'number' && Number.isFinite(local.offsetMinutes) ? local.offsetMinutes : null;
   const monthOf = (at: string): string => {                           // 'YYYY-MM' on the caller's clock, else UTC
@@ -492,12 +493,12 @@ export function summarizePipeline(deals: unknown, nowIso: string, windowDays = W
     if (!d || typeof d !== 'object') continue;
     const value = summaryCents(d.expected_value_cents);
     if (summaryIsWon(d)) {
-      const at = summaryClosedAt(d);
+      const at = summaryClosedAt(d, closedAt);
       if (monthOf(at) === monthKey) { wonMonthCount++; wonMonthValue += value; }
       const t = Date.parse(at);
       if (Number.isFinite(t) && t >= windowStart) wonInWindow++;
     } else if (d.stage === 'lost') {
-      const t = Date.parse(summaryClosedAt(d));
+      const t = Date.parse(summaryClosedAt(d, closedAt));
       if (Number.isFinite(t) && t >= windowStart) lostInWindow++;
     } else {
       openCount++; openValue += value;                                // open pipeline

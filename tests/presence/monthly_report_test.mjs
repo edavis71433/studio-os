@@ -89,7 +89,7 @@ const full = reportHtml(d, { studioName: 'Davis Digital Studio', note: 'Thanks f
 ok('the subject names the month', full.subject === 'Your website in October 2026');
 ok('the heading names the client and the site', /Marlow’s Kitchen, here’s how your website did at <a href="https:\/\/marlows\.example"[^>]*>marlows\.example<\/a>/.test(full.html));
 ok('the studio’s line sits at the top, line breaks kept, signed', /<blockquote[^>]*>Thanks for a great month\.<br>The new photos are working\.<br>.*Davis Digital Studio/.test(full.html));
-ok('the numbers read as words', /Visitors.*>3<.*5 pages viewed/.test(full.html) && /Enquiries.*>2<.*People wrote in/.test(full.html));
+ok('the numbers read as words', /Visits.*>3<.*5 pages viewed/.test(full.html) && /Enquiries.*>2<.*People wrote in/.test(full.html));
 ok('the top pages are named plainly', /What people read most.*<li>services <span[^>]*>· 3 views<\/span><\/li><li>Home page <span[^>]*>· 2 views/.test(full.html));
 ok('what changed counts the publishes and dates the last', /2 updates went live, the last on October 20\./.test(full.html));
 ok('every line is escaped', !/<script/.test(reportHtml(d, { studioName: '<script>', note: '<b>hi</b>', clientName: null }).html.replace(/&lt;script&gt;/g, '')) && /&lt;b&gt;hi&lt;\/b&gt;/.test(reportHtml(d, { studioName: 'S', note: '<b>hi</b>' }).html));

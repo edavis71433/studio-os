@@ -33,11 +33,13 @@ export function dashRange(period: DashPeriod, nowMs: number): { startMs: number;
   return { startMs, days: Math.max(1, Math.ceil((nowMs - startMs) / DAY)) };
 }
 
-/** An ISO stamp INSIDE the previous calendar month (UTC) — feed it to
- *  summarizePipeline to get last month's won totals with the same math. */
-export function priorMonthIso(nowMs: number): string {
-  const d = new Date(nowMs);
-  return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), 1) - DAY).toISOString();
+/** An ISO stamp INSIDE the previous calendar month — feed it to summarizePipeline
+ *  to get last month's won totals with the same math. On the caller's clock when
+ *  `offsetMinutes` is given (getTimezoneOffset's minutes behind UTC, ?tzo=), else UTC. */
+export function priorMonthIso(nowMs: number, offsetMinutes: number | null = null): string {
+  const off = typeof offsetMinutes === 'number' && Number.isFinite(offsetMinutes) ? offsetMinutes : 0;
+  const d = new Date(nowMs - off * 60_000);   // the caller's wall clock, read with the UTC getters
+  return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), 1) - DAY + off * 60_000).toISOString();
 }
 
 // ── weekly bucketing (the 12-week line charts) ──
@@ -146,17 +148,18 @@ export function invoiceBuckets(invoices: InvoiceRowForDash[], todayIsoDate: stri
 }
 
 // ── recent wins (last 90 days, newest first, ≤6) ──
-export interface DealRowForWins { title?: string | null; stage?: string | null; expected_value_cents?: number | null; converted_client_id?: string | null; converted_at?: string | null; updated_at?: string | null; }
+export interface DealRowForWins { id?: string | null; title?: string | null; stage?: string | null; expected_value_cents?: number | null; converted_client_id?: string | null; converted_at?: string | null; updated_at?: string | null; }
 /** Won = converted OR stage 'won' (mirrors lib/sales_lifecycle.ts summaryIsWon);
- *  closed-at = converted_at, else updated_at (its last move). */
-export function recentWins(deals: DealRowForWins[], nowMs: number, windowDays = 90, max = 6): Array<{ title: string; value_cents: number; closed_at: string }> {
+ *  closed-at = its newest move into Won when known (`closedAt`, lib/deal_closes.ts, bug
+ *  hunt H1), else converted_at, else updated_at (its last move, which any edit moves). */
+export function recentWins(deals: DealRowForWins[], nowMs: number, windowDays = 90, max = 6, closedAt: Record<string, string> = {}): Array<{ title: string; value_cents: number; closed_at: string }> {
   const start = nowMs - windowDays * DAY;
   const wins: Array<{ title: string; value_cents: number; closed_at: string; ms: number }> = [];
   for (const d of deals || []) {
     if (!d || typeof d !== 'object') continue;
     const won = !!d.converted_client_id || !!d.converted_at || d.stage === 'won' || d.stage === 'converted';
     if (!won) continue;
-    const at = String(d.converted_at || d.updated_at || '');
+    const at = String(closedAt[String(d.id || '')] || d.converted_at || d.updated_at || '');
     const ms = Date.parse(at);
     if (!Number.isFinite(ms) || ms < start || ms > nowMs + DAY) continue;
     wins.push({ title: String(d.title || 'Deal'), value_cents: Math.max(0, Math.trunc(Number(d.expected_value_cents) || 0)), closed_at: at, ms });
