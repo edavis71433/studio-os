@@ -40,7 +40,8 @@ test.describe('The one-screen proposal (bold redesign)', () => {
     await expect(page.locator('#propForm .pl-label').last()).toHaveValue('Logo refresh');
     await expect(pv.locator('.pb-row').filter({ hasText: 'Logo refresh' })).toContainText('$600');
     await chips.nth(0).click();
-    await expect(pv.locator('.pb-total')).toContainText('$3,800');   // the deal's own line (Blue Finch — site, $0) + both services
+    await expect(pv.locator('.pb-total')).toContainText('$3,800');   // both services: the first chip took the place of the deal's own line (item 98, B8)
+    await expect(pv).not.toContainText('Blue Finch — site');
     await chips.nth(1).click();                                     // off again
     await expect(chips.nth(1)).toHaveAttribute('aria-pressed', 'false');
     expect(await page.locator('#propForm .pl-label').evaluateAll((els) => els.map((e) => (e as HTMLInputElement).value))).not.toContain('Logo refresh');

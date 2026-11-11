@@ -220,6 +220,13 @@ export function buildNav(c: NavContext): NavSection[] {
     hid('billing', 'Billing', '/pipeline.html#outstanding', 'Who owes you — outstanding invoices, deposits and payment schedules.'),
   ] });
 
+  // Prospects — the step before the pipeline (Semrush review item 112). Its own
+  // section: the bar draws one visible item per section. Studio level only: the
+  // finds are scored, and the draft written, as a web studio's pitch.
+  if (f.hasRelationship && studioLevel) sections.push({ key: 'prospects', label: 'Prospects', items: [
+    { key: 'prospects', label: 'Prospects', href: '/prospects.html', desc: 'Find local businesses to pitch — each scored by how much they need a website. Nothing is emailed from here.' },
+  ] });
+
   // Projects — the service-delivery area (P2-D): the work you do FOR customers.
   if (f.hasRelationship) single('projects', 'Projects', '/projects.html');
 

@@ -748,7 +748,7 @@ test.describe('item 47 — news per client site in the studio bell', () => {
       more: 0, rest: [], total: 1, snoozed: [], old: { count: 0, items: [] }, empty_line: '', partial: false, own_site: true, update_notices: [], snooze_ready: true,
       next_by_site: {}, next_by_client: {},
       news: [
-        { id: 'n2', site_id: 's2', name: 'Harbor Dental', kind: 'traffic_spike', headline: 'A busy day: 48 visitors yesterday', body: 'That’s about 3 times a usual day for harbordental.example. See where they came from on Analytics.', at: '2026-11-10T06:00:00Z', href: '/analytics.html?client=s2', tier: 'update' },
+        { id: 'n2', site_id: 's2', name: 'Harbor Dental', kind: 'traffic_spike', headline: 'A busy day: 48 page views yesterday', body: 'That’s about 3 times a usual day for harbordental.example. See where they came from on Analytics.', at: '2026-11-10T06:00:00Z', href: '/analytics.html?client=s2', tier: 'update' },
         { id: 'n1', site_id: 's1', name: 'Bacchus Kitchen', kind: 'site_published', headline: 'Published 3 changes', body: 'The website is live with the latest changes. Open it to see them.', at: '2026-11-09T20:00:00Z', href: '/presence.html?client=s1', tier: 'update' },
       ],
     } };
@@ -759,7 +759,7 @@ test.describe('item 47 — news per client site in the studio bell', () => {
     await expect(pop).toBeVisible();
     // the ask first (Needs you), then the news per site, each named
     await expect(pop.locator('.row').first()).toContainText('Bacchus Kitchen — an enquiry is waiting for a reply');
-    const spike = pop.locator('.row', { hasText: 'Harbor Dental — A busy day: 48 visitors yesterday' });
+    const spike = pop.locator('.row', { hasText: 'Harbor Dental — A busy day: 48 page views yesterday' });
     await expect(spike).toHaveAttribute('href', '/analytics.html?client=s2');
     await expect(spike).toHaveAttribute('data-tier', 'update');
     await expect(spike).toContainText('3 times a usual day');
@@ -1229,5 +1229,35 @@ test.describe('A11y enhancer — Enter and Space', () => {
     await attr.focus();
     await page.keyboard.press('Enter');
     expect((await hits()).attr).toBe(1);
+  });
+});
+
+// ── Nov 10 review, bug hunt group A ──
+test.describe('App shell: the bug hunt fixes (A7, A11)', () => {
+  test('A7 — the phone bar’s Inbox number follows the bell, up and down', async ({ page }) => {
+    test.skip((page.viewportSize()?.width || 0) >= 761, 'the phone bar');
+    await installApp(page);
+    await page.goto('/settings.html');
+    const dot = page.locator('#dds-mbar a[data-mbar="inbox"] .mdot');
+    await expect(page.locator('#dds-mbar a[data-mbar="inbox"]')).toBeVisible();
+    await page.evaluate(() => (window as unknown as { ddsBellSet: (n: number) => void }).ddsBellSet(4));
+    await expect(dot).toHaveText('4');
+    await page.evaluate(() => (window as unknown as { ddsBellSet: (n: number) => void }).ddsBellSet(12));
+    await expect(dot).toHaveText('9+');
+    await page.evaluate(() => (window as unknown as { ddsBellSet: (n: number) => void }).ddsBellSet(0));
+    await expect(dot).toHaveCount(0);
+  });
+
+  test('A11 — opening the bell closes Switch site; the two never stack', async ({ page }) => {
+    const CLIENT = 'aaaaaaaa-1111-4111-8111-aaaaaaaaaaaa';
+    const rows = [{ site_id: CLIENT, name: 'Joe’s Plumbing', address: 'https://joes.example', domain: 'joes.example', state: 'live', state_words: 'Live', tags: [] }];
+    await installApp(page, { api: { '/portal/context': { data: { ...crmCtx().data, is_agency: true, scope: { site_id: CLIENT, name: 'Joe’s Plumbing' } } } } });
+    await page.route(/\/functions\/v1\/presence\/agency\/sites$/, (route) => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: { sites: rows } }) }));
+    await page.goto(`/today.html?client=${CLIENT}`);
+    await page.locator('#dds-site-switch').click();
+    await expect(page.locator('#dds-sites-pop')).toBeVisible();
+    await page.locator('#dds-bell').click();
+    await expect(page.locator('#dds-sites-pop')).toHaveCount(0);
+    await expect(page.locator('#dds-site-switch')).toHaveAttribute('aria-expanded', 'false');
   });
 });

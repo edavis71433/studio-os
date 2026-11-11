@@ -756,9 +756,17 @@ function render(){
   // (contacts.html's contract) — capture before the innerHTML swap, restore after.
   const act=document.activeElement;const wasQ=!!(act&&act.id==='search');
   const qv=wasQ?act.value:null;const qp=wasQ?act.selectionStart:0;
+  // bug hunt A6: the list redraws on its own (a needs-you re-read, a create, a wake), and an open
+  // "Tags, owner, note, archive" form used to lose what was typed; its fields ride across the swap
+  const hkSel=HK_OPEN?'[data-hkform="'+(window.CSS&&CSS.escape?CSS.escape(HK_OPEN):HK_OPEN)+'"]':'';
+  const hkf=hkSel?document.querySelector(hkSel):null;
+  const hkVals=hkf?Array.from(hkf.elements).filter(el=>el.name).map(el=>[el.name,el.type==='checkbox'?el.checked:el.value]):null;
+  const hkFocus=hkf&&act&&hkf.contains(act)&&act.name?act.name:null;
   $('main').innerHTML=h;
   wire();
   if(wasQ){const nq=$('search');if(nq){if(qv!=null)nq.value=qv;nq.focus();try{nq.setSelectionRange(qp,qp);}catch(_){/* */}}}
+  if(hkVals){const nf=document.querySelector(hkSel);if(nf){hkVals.forEach(([n,v])=>{const el=nf.elements.namedItem(n);if(!el||!('value' in el))return;if(el.type==='checkbox')el.checked=v;else el.value=v;});
+    if(hkFocus){const fe=nf.elements.namedItem(hkFocus);if(fe&&fe.focus)fe.focus();}}}
 }
 function wire(){
   // search — client-side filter, re-rendered live; render() preserves input/caret/focus
@@ -1082,6 +1090,8 @@ function paintToday(){
 //    or forbidden read drops its piece, never fake zeros; nothing at all → hidden. ──
 const OPEN_STAGES=['lead','qualified','proposal','contract'];
 function localYmd(){const d=new Date();return d.getFullYear()+'-'+('0'+(d.getMonth()+1)).slice(-2)+'-'+('0'+d.getDate()).slice(-2);}
+// the local day an instant falls on (YYYY-MM-DD), '' when it can't be read
+function localDayOf(iso){const t=Date.parse(String(iso||''));if(!Number.isFinite(t))return '';const d=new Date(t);return d.getFullYear()+'-'+('0'+(d.getMonth()+1)).slice(-2)+'-'+('0'+d.getDate()).slice(-2);}
 function daysBetween(fromYmd,toYmd){const a=/^(\d{4})-(\d{2})-(\d{2})/.exec(String(fromYmd||'')),b=/^(\d{4})-(\d{2})-(\d{2})/.exec(String(toYmd||''));if(!a||!b)return null;return Math.round((Date.UTC(+b[1],+b[2]-1,+b[3])-Date.UTC(+a[1],+a[2]-1,+a[3]))/86400000);}
 function dueLabel(ymd){const d=daysBetween(localYmd(),ymd);if(d==null)return'No date';const m=/^(\d{4})-(\d{2})-(\d{2})/.exec(String(ymd));const when=new Date(Date.UTC(+m[1],+m[2]-1,+m[3],12)).toLocaleDateString('en-US',{month:'short',day:'numeric'});if(d<0)return'Overdue · '+when;if(d===0)return'Today';if(d===1)return'Tomorrow';return when;}
 function weekTodos(list){
@@ -1236,7 +1246,7 @@ async function mountStudio(){
   const [summary,deals,mine]=await Promise.all([get('/sales/summary'),get('/sales/deals?limit=100'),get('/sales/my-tasks')]);
   if(gen!==SSEQ)return;
   MYTASKS=(mine&&Array.isArray(mine.items))?{items:mine.items,total:Number(mine.total)||mine.items.length,partial:!!mine.partial}:null;
-  DEALS=Array.isArray(deals)?deals:null;STUDIO_DONE=true;
+  DEALS=Array.isArray(deals)?deals:null;DEALS_CUT=Array.isArray(deals)&&deals.length>=100;STUDIO_DONE=true;
   paintNeeds();paintToday();   // item 70: My to-dos and Waiting on them are tabs of the list now
   const tiles=statTiles(summary,deals);const strip=pipelineStripHtml(summary,deals);const todos=MYTASKS?[]:weekTodos(deals);const top=strip?[]:keyDeals(deals);const wins=recentWins(deals);
   if(!tiles.length&&!todos.length&&!top.length&&!wins.length){host.hidden=true;host.innerHTML='';return;}
@@ -1354,22 +1364,26 @@ $('custForm').onsubmit=async(e)=>{
     }
     // the kit, applied to THEIR new site — after the provision succeeded, on its own
     // try/catch: a kit that won't apply must never repaint the set-up as a failure
-    let kitLine='';
+    let kitLine='',kitRetry=null;   // bug hunt A4: a kit that didn't apply gets a real "Try the kit again", not a Home card that's gone
     if(kitId){
       if(d.already_exists||d.requested)kitLine='The '+esc(kitName)+' kit wasn’t applied — they already had a workspace, and a kit only starts a new site.';
-      else if(!d.site_id)kitLine='The '+esc(kitName)+' kit wasn’t applied — their new site didn’t come back to us. Apply it from the Starter kits card on your studio home.';
+      else if(!d.site_id)kitLine='The '+esc(kitName)+' kit wasn’t applied: their new site didn’t come back to us, so there was nothing to apply it to. Their account is ready.';
       else{
-        let k={ok:false};try{k=await apiSend('POST','/agency/kits/'+encodeURIComponent(kitId)+'/apply',{site_id:d.site_id});}catch(_){k={ok:false};}
-        kitLine=k.ok?esc(kitName)+' applied.':'The '+esc(kitName)+' kit didn’t apply — apply it from the Starter kits card on your studio home.';
+        const applyKit=async()=>{let k={ok:false};try{k=await apiSend('POST','/agency/kits/'+encodeURIComponent(kitId)+'/apply',{site_id:d.site_id});}catch(_){k={ok:false};}return !!k.ok;};
+        const kitOk=await applyKit();
+        kitLine=kitOk?esc(kitName)+' applied.':'The '+esc(kitName)+' kit didn’t apply. Their account is ready.';
+        if(!kitOk)kitRetry=applyKit;
       }
     }
     const showLink=d.portal_url&&(mode!=='connect'||d.connected);
     const link=showLink?('<p style="margin-top:12px"><a class="link" href="'+esc(d.portal_url)+'" target="_blank" rel="noopener">Their sign-in page →</a></p>'):'';
     $('cust-fields').style.display='none';
     const done=$('cust-done');
-    done.innerHTML='<div class="done"><div class="tick" aria-hidden="true">✓</div><h3 style="margin:0 0 4px">'+heading+'</h3><p>'+line+'</p>'+(kitLine?'<p id="cu-kit-line">'+kitLine+'</p>':'')+link+'</div><div class="row2"><button type="button" class="btn" id="cu-close">Done</button></div>';
+    done.innerHTML='<div class="done"><div class="tick" aria-hidden="true">✓</div><h3 style="margin:0 0 4px">'+heading+'</h3><p>'+line+'</p>'+(kitLine?'<p id="cu-kit-line">'+kitLine+'</p>':'')+link+'</div><div class="row2">'+(kitRetry?'<button type="button" class="btn ghost" id="cu-kit-again">Try the kit again</button>':'')+'<button type="button" class="btn" id="cu-close">Done</button></div>';
     done.style.display='';
     const cl=$('cu-close');if(cl){cl.focus();cl.onclick=()=>$('custDlg').close();}
+    const ka=$('cu-kit-again');if(ka&&kitRetry)ka.onclick=async()=>{ka.disabled=true;ka.textContent='Applying…';const okNow=await kitRetry();const kl=$('cu-kit-line');
+      if(okNow){if(kl)kl.textContent=kitName+' applied.';ka.remove();toast(kitName+' applied.');}else{ka.disabled=false;ka.textContent='Try the kit again';toast('The kit didn’t apply this time either.',true);}};
   }catch(_){toast(mode==='connect'?'We couldn’t save that just now.':'We couldn’t set them up just now.',true);btn.disabled=false;btn.textContent=label;return;}
   // the creation SUCCEEDED — the roster refresh is best-effort and must never
   // repaint that success as a failure: a soft refresh toasts on its own
@@ -1439,7 +1453,7 @@ function mountAsk(){
 let NSEQ=0,NEEDS=null,NEEDS_EXPANDED=false,NEEDS_FAILED=false;
 // item 70: the tab showing, the hero chip narrowing Needs you to one kind, and the
 // reads the other tabs use (the studio strip's deals and tasks, the roster's invoices)
-let QTAB='needs',QKIND='',DEALS=null,AR_ITEMS=null,STUDIO_DONE=false;
+let QTAB='needs',QKIND='',DEALS=null,DEALS_CUT=false,AR_ITEMS=null,STUDIO_DONE=false;   // DEALS_CUT: the read stopped at its 100 (bug hunt A12)
 const initials=(n)=>String(n||'?').trim().split(/\s+/).filter(w=>/[\p{L}\p{N}\p{Extended_Pictographic}]/u.test(w)).slice(0,2).map(w=>{const ch=Array.from(w)[0]||'';const up=ch.toUpperCase();return up.length===1?up:ch;}).join('')||'?';   // batch C: an emoji or "ß" stays whole; item 70: "&" or "—" is not a word
 const cap1=(t)=>{t=String(t||'');return t?t.charAt(0).toUpperCase()+t.slice(1):t;};
 const KIND_CHIP={money:['Money','bad'],enquiry:['Enquiry','violet'],support:['Support','info'],message:['Message','violet'],deal:['Deal','warn'],broken:['Website','bad'],plan:['Plan','info'],publish:['Website','warn'],account:['Account',''],notice:['Notice','']};
@@ -1476,7 +1490,7 @@ function waitingRows(){
   const today=localYmd(),out=[];
   (DEALS||[]).forEach(d=>{
     if(!d||!d.id||isWonDeal(d)||(d.stage!=='proposal'&&d.stage!=='contract'))return;
-    const days=daysBetween(String(d.updated_at||'').slice(0,10),today);
+    const days=daysBetween(localDayOf(d.updated_at),today);   // the viewer's own day, not the UTC date (bug hunt A12)
     out.push({key:'wait:deal:'+d.id,name:d.title||'A deal',line:(d.stage==='proposal'?'Proposal sent':'Agreement out')+(days!=null&&days>0?' · '+days+(days===1?' day':' days')+' ago':''),href:'/pipeline.html?deal='+encodeURIComponent(d.id),sort:String(d.updated_at||'')});
   });
   (AR_ITEMS||[]).forEach(v=>{
@@ -1501,8 +1515,9 @@ function needsPanelHtml(){
 }
 function waitPanelHtml(){
   const w=waitingRows()||[];
-  if(!w.length)return '<div class="rcard need"><p class="quiet" style="margin:0">Nothing is waiting on a customer.</p></div>';
-  return `<div class="rcard need" id="waitList">${w.map(r=>`<div class="row" data-wait="${esc(r.key)}"><span class="av" aria-hidden="true">${esc(initials(r.name))}</span><div class="t"><span class="nm"><b>${esc(r.name)}</b></span><span class="what">${esc(r.line)}</span></div><div class="ra"><a class="rowact" href="${esc(r.href)}" data-noscope="1">Open</a></div></div>`).join('')}</div>`;
+  const cut=DEALS_CUT?'<p class="pnote">Looked at your 100 most recently changed deals; an older one waiting on a customer shows on Pipeline.</p>':'';
+  if(!w.length)return '<div class="rcard need"><p class="quiet" style="margin:0">'+(DEALS_CUT?'Nothing is waiting on a customer among your 100 most recently changed deals.':'Nothing is waiting on a customer.')+'</p></div>';
+  return cut+`<div class="rcard need" id="waitList">${w.map(r=>`<div class="row" data-wait="${esc(r.key)}"><span class="av" aria-hidden="true">${esc(initials(r.name))}</span><div class="t"><span class="nm"><b>${esc(r.name)}</b></span><span class="what">${esc(r.line)}</span></div><div class="ra"><a class="rowact" href="${esc(r.href)}" data-noscope="1">Open</a></div></div>`).join('')}</div>`;
 }
 function snoozedPanelHtml(){
   const z=(NEEDS&&NEEDS.snoozed)||[];
@@ -1643,8 +1658,11 @@ function paintFocus(){
       <div class="ffoot">${snoozeOk()?`<button type="button" class="fsnooze">Snooze ${SNOOZE_DAYS} days</button>`:''}<button type="button" class="fskip">Skip for now</button>${next?`<button type="button" class="fnext">Next: ${esc(next.name)} — ${esc(next.what)} →</button>`:''}</div>
     </article>${next?`<div class="fpeek" aria-hidden="true">${esc(next.name)} — ${esc(next.what)}</div>`:''}</div>
     <p class="fswipe">Swipe left to skip${done?', right when it’s done':''}</p></div>`;
-  const skip=()=>{F.i++;paintFocus();focusInFocus();};
-  const take=async(fn,btn)=>{if(await fn(r.key,btn)){F.list.splice(F.i,1);F.cleared++;paintFocus();focusInFocus();}};
+  // bug hunt A5: a Snooze or Done removes ITS row by key when the save returns, and Skip (or the
+  // arrow, or a swipe) waits while one is saving; deleting "whatever is here now" lost the next item unseen
+  const skip=()=>{if(F.busy)return;F.i++;paintFocus();focusInFocus();};
+  const take=async(fn,btn)=>{if(F.busy)return;F.busy=true;let ok=false;try{ok=await fn(r.key,btn);}finally{F.busy=false;}
+    if(!ok||FOCUS!==F)return;const at=F.list.findIndex(x=>x.key===r.key);if(at>=0){F.list.splice(at,1);if(at<F.i)F.i--;}F.cleared++;paintFocus();focusInFocus();};
   d.querySelector('.fx').addEventListener('click',closeFocus);
   d.querySelector('.fskip').addEventListener('click',skip);
   const nx=d.querySelector('.fnext');if(nx)nx.addEventListener('click',skip);
@@ -1708,7 +1726,7 @@ async function mountNeeds(fresh){
   const d=r.body.data;
   NEEDS={rows:Array.isArray(d.rows)?d.rows:[],rest:Array.isArray(d.rest)?d.rest:[],more:Number(d.more||0),total:Number(d.total||0),empty_line:String(d.empty_line||''),partial:!!d.partial,next_by_site:d.next_by_site||{},next_by_client:d.next_by_client||{},old:(d.old&&typeof d.old==='object')?d.old:null,
     snoozed:Array.isArray(d.snoozed)?d.snoozed:[],snooze_ready:d.snooze_ready===true};   // old: item 96's over-a-month count and what Clear changes; snoozed: item 70
-  NEEDS_EXPANDED=false;
+  // bug hunt A13: a re-read keeps the list opened out if it was (it used to close it every time)
   // final pass (Nov 8, batch B): the bell's badge is this list's total — hand it over, so the shell doesn't build the list again
   try{if(window.ddsBellSet)window.ddsBellSet(NEEDS.total);}catch(_){}
   applyNext();paintNeeds();

@@ -387,6 +387,9 @@ const initial=(s)=>{const ch=Array.from(String(s||'?').trim())[0]||'?';const up=
 // keep any agency drill-in scope on internal links
 function scoped(href){const c=scope();if(!c||!href||href.charAt(0)!=='/')return href;return href+(href.indexOf('?')>=0?'&':'?')+'client='+encodeURIComponent(c);}
 let TOKEN="",CUSTOMERS=[],LOADED_AT=0;
+// item 99 (B3): the sign-in pass is renewed every hour; pick up the new one as Contacts, Pipeline
+// and the record do. This page kept the first pass and said "sign in" an hour after it opened.
+sb.auth.onAuthStateChange(function(_e,s){if(s&&s.access_token)TOKEN=s.access_token;});
 function toast(m){if(window.ddsToast)ddsToast(m);}
 // SS6 shared ~150ms debounce — kept in sync by hand with inbox.html/contacts.html
 const debounce=(fn,ms)=>{let t;return function(){clearTimeout(t);t=setTimeout(fn,ms||150);};};
@@ -507,7 +510,9 @@ function importCustomers(){
     title:'Import customers from a CSV',
     help:'One row per customer with their email; a name and business name help. Nobody is emailed and no account is made: anyone who already has a Studio OS account gets a request to accept you the next time they sign in, and the rest connect when they sign up.',
     noun:'customer',
-    mapHeader:(h)=>{h=String(h).toLowerCase().trim();if(/e-?mail/.test(h))return'email';if(/company|business|organi[sz]ation/.test(h))return'business';if(/first/.test(h))return'first';if(/last|surname/.test(h))return'last';if(/^(full ?name|name|contact|customer)$/.test(h))return'name';return null;},
+    // item 97: "Business Phone" or "Business Street" is never the business's name, and "first"/"last"
+    // are names only beside "name" ("Last activity" was glued onto names) — the Contacts rules
+    mapHeader:(h)=>{h=String(h).toLowerCase().trim();if(/e-?mail/.test(h))return'email';if(/company|business|organi[sz]ation/.test(h)&&!/\b(street|city|state|postal|zip|country|region|address|fax|phone|web|page|po box|department|title|location|symbol|description)\b/.test(h))return'business';if(/\b(first|given)[ _-]?name\b|^first$/.test(h))return'first';if(/\b(last|family)[ _-]?name\b|\bsurname\b|^last$/.test(h))return'last';if(/^(full[ _-]?name|name|contact|customer)$/.test(h))return'name';return null;},
     ready:(keys)=>keys.includes('email')?'':'We couldn’t find an email column. Check the first row has a header like “Email”.',
     toItem:(o)=>{const email=String(o.email||'').toLowerCase();if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))return null;return{email,name:o.name||[o.first,o.last].filter(Boolean).join(' '),business_name:o.business||''};},
     label:(it)=>it.business_name||it.name||it.email,
@@ -772,9 +777,10 @@ function renderListZone(){
 }
 
 function wire(){
-  // search — debounced (~150ms), list-only re-render (C5)
+  // search — debounced (~150ms), list-only re-render (C5). A search narrows the picks to the rows
+  // it shows, as a view or a chip does: a ticked row the search hid stayed in "Send an update"
   const s=$('search');
-  if(s)s.addEventListener('input',debounce(()=>{Q=s.value;renderListZone();}));
+  if(s)s.addEventListener('input',debounce(()=>{Q=s.value;const shown=new Set(sortedRows().map(c=>String(c.client_id)));for(const id of [...PICKED])if(!shown.has(id))PICKED.delete(id);renderListZone();}));
   const ac=$('addCust');if(ac)ac.addEventListener('click',openAddCustomer);
   // view dropdown (fixed views, D3): listbox popup — opening focuses the first
   // option; arrows move; Escape closes back to the trigger; Enter activates.
@@ -891,7 +897,9 @@ async function pvLoad(s){
   if(id.client_id)q.push('client_id='+encodeURIComponent(id.client_id));
   if(id.deal_id)q.push('deal='+encodeURIComponent(id.deal_id));
   let act=null;
-  if(q.length){const a=await pvGet('/crm/activity?'+q.join('&'),s.site).catch(()=>null);if(a&&a.ok&&a.body&&a.body.data)act=a.body.data;}
+  if(q.length){const a=await pvGet('/crm/activity?'+q.join('&'),s.site).catch(()=>null);if(a&&a.ok&&a.body&&a.body.data)act=a.body.data;
+    // a failed read of the latest is said, and not kept: it was remembered as "Nothing yet" for good
+    else return {rec,act:null,actFailed:true};}
   return (PV_CACHE[s.key]={rec,act});
 }
 function pvStages(){
@@ -916,7 +924,7 @@ function pvFacts(s,d){
 }
 function pvPaint(){
   const box=$('cprev');if(!box||!PV)return;
-  const s=PV.s,d=PV.d,loading=!d,failed=!!(d&&d.failed);
+  const s=PV.s,d=PV.d,loading=!d,failed=!!(d&&(d.failed||d.actFailed));
   const facts=pvFacts(s,d);
   const latest=(d&&d.act&&Array.isArray(d.act.items))?d.act.items.filter(i=>i&&i.title).slice(0,3):[];
   const skel='<div class="cp-skel"></div><div class="cp-skel" style="width:70%"></div><div class="cp-skel" style="width:85%"></div>';
@@ -1120,22 +1128,26 @@ $('custForm').onsubmit=async(e)=>{
     // A portal link only makes sense once they actually have a workspace.
     // the kit, applied to THEIR new site — after the provision succeeded, on its own
     // try/catch: a kit that won't apply must never repaint the set-up as a failure
-    let kitLine='';
+    let kitLine='',kitRetry=null;   // bug hunt A4: a kit that didn't apply gets a real "Try the kit again", not a Home card that's gone
     if(kitId){
       if(d.already_exists||d.requested)kitLine='The '+esc(kitName)+' kit wasn’t applied — they already had a workspace, and a kit only starts a new site.';
-      else if(!d.site_id)kitLine='The '+esc(kitName)+' kit wasn’t applied — their new site didn’t come back to us. Apply it from the Starter kits card on your studio home.';
+      else if(!d.site_id)kitLine='The '+esc(kitName)+' kit wasn’t applied: their new site didn’t come back to us, so there was nothing to apply it to. Their account is ready.';
       else{
-        let k={ok:false};try{k=await api('/agency/kits/'+encodeURIComponent(kitId)+'/apply','POST',{site_id:d.site_id});}catch(_){k={ok:false};}
-        kitLine=k.ok?esc(kitName)+' applied.':'The '+esc(kitName)+' kit didn’t apply — apply it from the Starter kits card on your studio home.';
+        const applyKit=async()=>{let k={ok:false};try{k=await api('/agency/kits/'+encodeURIComponent(kitId)+'/apply','POST',{site_id:d.site_id});}catch(_){k={ok:false};}return !!k.ok;};
+        const kitOk=await applyKit();
+        kitLine=kitOk?esc(kitName)+' applied.':'The '+esc(kitName)+' kit didn’t apply. Their account is ready.';
+        if(!kitOk)kitRetry=applyKit;
       }
     }
     const showLink=d.portal_url&&(mode!=='connect'||d.connected);
     const link=showLink?('<p style="margin-top:12px"><a class="link" href="'+esc(d.portal_url)+'" target="_blank" rel="noopener">Their sign-in page →</a></p>'):'';
     $('cust-fields').style.display='none';
     const done=$('cust-done');
-    done.innerHTML='<div class="done"><div class="tick" aria-hidden="true">✓</div><h3 style="margin:0 0 4px">'+heading+'</h3><p>'+line+'</p>'+(kitLine?'<p id="cu-kit-line">'+kitLine+'</p>':'')+link+'</div><div class="row2"><button type="button" class="btn" id="cu-close">Done</button></div>';
+    done.innerHTML='<div class="done"><div class="tick" aria-hidden="true">✓</div><h3 style="margin:0 0 4px">'+heading+'</h3><p>'+line+'</p>'+(kitLine?'<p id="cu-kit-line">'+kitLine+'</p>':'')+link+'</div><div class="row2">'+(kitRetry?'<button type="button" class="btn ghost" id="cu-kit-again">Try the kit again</button>':'')+'<button type="button" class="btn" id="cu-close">Done</button></div>';
     done.style.display='';
     const cl=$('cu-close');if(cl){cl.focus();cl.onclick=()=>$('custDlg').close();}
+    const ka=$('cu-kit-again');if(ka&&kitRetry)ka.onclick=async()=>{ka.disabled=true;ka.textContent='Applying…';const okNow=await kitRetry();const kl=$('cu-kit-line');
+      if(okNow){if(kl)kl.textContent=kitName+' applied.';ka.remove();toast(kitName+' applied.');}else{ka.disabled=false;ka.textContent='Try the kit again';toast('The kit didn’t apply this time either.',true);}};
   }catch(_){toast(mode==='connect'?'We couldn’t save that just now.':'We couldn’t set them up just now.');btn.disabled=false;btn.textContent=label;return;}
   // The creation SUCCEEDED — the roster refresh is best-effort and must never
   // repaint that success as a failure (SS6): its own failure gets the soft

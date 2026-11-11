@@ -134,10 +134,29 @@ async function sendSiteInvite(email: string, siteId: string, role: SiteRole): Pr
   return sendInviteLink(email, { subject: `You’ve been invited to help run ${name}`, intro: `You’ve been invited to help run <strong>${name}</strong>.`, brand, next: seesFullWorkspace(role) ? '/studio.html' : '/portal.html' });
 }
 
+/** Nov 2026 review (client portal finding 5): is this a studio's own site, the one
+ *  that holds work for its clients (any active service link names it as the studio
+ *  side)? A reviewer seat there would see and decide every client's waiting files,
+ *  because a reviewer is tied to a site, not to a project. True, false, or null when
+ *  the read failed; callers that guard a reviewer treat null as true. */
+export async function isSharedStudioSite(siteId: string): Promise<boolean | null> {
+  try {
+    const r = await svc(`presence_service_links?agency_site_id=eq.${siteId}&status=eq.active&select=id&limit=1`);
+    if (!r.ok || !Array.isArray(r.json)) return null;
+    return r.json.length > 0;
+  } catch { return null; }
+}
+
 export async function addSiteMember(siteId: string, email: string, role: SiteRole, invitedBy: string): Promise<{ ok: boolean; error?: string; emailed?: boolean }> {
   const clean = String(email || '').trim().toLowerCase();
   if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(clean)) return { ok: false, error: 'bad_email' };
   if (!isSiteRole(role)) return { ok: false, error: 'bad_role' };
+  // review finding 5: no reviewer seats on a studio's shared site; invite them on the client's own site
+  if (role === 'client_reviewer') {
+    const shared = await isSharedStudioSite(siteId);
+    if (shared === null) return { ok: false, error: 'check_failed' };
+    if (shared) return { ok: false, error: 'shared_site' };
+  }
   const r = await svc('presence_site_members?on_conflict=site_id,email', {
     method: 'POST', headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },
     body: JSON.stringify({ site_id: siteId, email: clean, role, status: 'active', invited_by: invitedBy }),

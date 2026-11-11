@@ -54,7 +54,7 @@ const rows = [
   const src = read('supabase/functions/presence/agency/routes.ts');
   ok('Home reads it beside the owner stamp, and ages each request by it', /const \[owners, activity\] = await Promise\.all\(\[healSupportOwners\(own\.id, supportRows\), supportActivity\(own\.id, supportRows/.test(src) && /if \(activity\) for \(const r of supportRows\) \(r as \{ last_activity_at\?: string \| null \}\)\.last_activity_at = activity\[r\.id\] \|\| null;/.test(src));
   const ny = read('supabase/functions/presence/agency/needs_you.ts');
-  ok('the list ages a request by that, never by updated_at', /at: s\.last_activity_at \?\? null, clear: \{ kind: 'support'/.test(ny) && !/at: s\.updated_at/.test(ny));
+  ok('the list ages a request by that, never by updated_at', /at: s\.last_activity_at \?\? null, (since: s\.last_activity_at \?\? null, )?clear: \{ kind: 'support'/.test(ny) && !/at: s\.updated_at/.test(ny));
 }
 
 const passed = results.filter(Boolean).length;

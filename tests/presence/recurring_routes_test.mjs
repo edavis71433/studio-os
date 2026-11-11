@@ -23,10 +23,11 @@ const db = installFakePostgrest({ users: { 'jwt-owner': { id: U, email: 'owner@e
 // the outside world: Resend and Stripe answer, and keep what they were given
 const pg = globalThis.fetch;
 const mail = [], stripe = [];
-let stripeDown = false;
+let stripeDown = false, mailDown = false;
 globalThis.fetch = async (url, init = {}) => {
   const u = new URL(String(url));
   const j = (b, status = 200) => new Response(JSON.stringify(b), { status, headers: { 'Content-Type': 'application/json' } });
+  if (u.hostname === 'api.resend.com' && mailDown) return j({ message: 'Resend is having a moment' }, 500);
   if (u.hostname === 'api.resend.com') { mail.push(JSON.parse(String(init.body || '{}'))); return j({ id: `em_${mail.length}` }); }
   if (u.hostname === 'api.stripe.com') {
     const p = Object.fromEntries(new URLSearchParams(String(init.body || '')));
@@ -255,6 +256,22 @@ const change = (id, body) => RI.handleRecurringChange(req('PATCH', `/sales/recur
 
   world({ presence_recurring_invoices: [schedule({ site_id: OTHER })] });
   ok('7: another studio\'s schedule isn\'t here', (await act(S1, 'stop')).status === 404 && (await change(S1, { amount_cents: 1000 })).status === 404 && sched().status === 'active');
+}
+
+// ═══ 8. the email didn't go out (full review Nov 10, F1) ═══
+// The invoice and its link are real, so the schedule moves on; but "invoice sent"
+// is never written, the deal says what happened, and Needs you asks for a resend.
+{
+  world({ presence_recurring_invoices: [schedule()] });
+  mailDown = true;
+  const r = await RI.runRecurringInvoices(20);
+  mailDown = false;
+  const inv = invoices()[0];
+  ok('8: the invoice and its link exist, but it is not written as sent', r.failed === 1 && r.sent === 0 && invoices().length === 1 && !!inv?.stripe_url && events('invoice_sent').length === 0, JSON.stringify(r));
+  ok('8: the deal says the email didn’t go out', events('recurring_invoice').some((e) => e.detail?.action === 'email_failed' && e.detail?.invoice_id === inv?.id), JSON.stringify(events('recurring_invoice')));
+  ok('8: Needs you asks to send it again', (db.tables.presence_plan_notices || []).some((n) => n.kind === 'deal_followup' && /didn’t reach/.test(String(n.headline))), JSON.stringify(db.tables.presence_plan_notices));
+  ok('8: the date moved on, so next month is not billed twice', sched().next_on > TODAY && sched().sent_count === 1, sched().next_on);
+  ok('8: the next tick leaves it alone', (await RI.runRecurringInvoices(20)).sent === 0 && invoices().length === 1 && mail.length === 0);
 }
 
 console.log(`\n════ RECURRING INVOICES (routes + sweep): ${pass}/${pass + fail} ${fail ? 'FAILED' : 'PASSED'} ════`);

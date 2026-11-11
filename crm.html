@@ -354,6 +354,9 @@
   #hlpanel .hl-s{font-size:12px;color:var(--soft);margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   @media (max-width:760px){#hlpanel .hl-panel{grid-template-columns:1fr 1fr}#hlpanel .hl{border-right:0;border-bottom:1px solid var(--line);padding:12px 14px}#hlpanel .hl:nth-child(odd){border-right:1px solid var(--line)}#hlpanel .hl:last-child:nth-child(odd){grid-column:1/-1;border-right:0}#hlpanel .hl:last-child,#hlpanel .hl:nth-last-child(2):nth-child(odd){border-bottom:0}}
   @media (max-width:760px){.rec-head .actbar{flex:1 1 100%;justify-content:flex-start}}
+  /* B21: on a phone the name keeps its place beside the avatar — 56px + the gap + a 300px start
+     was wider than a 375px screen, so the name wrapped under the avatar */
+  @media (max-width:760px){.rec-head .rec-who{flex:1 1 0}}
   .path button.pstep.done::before{content:"✓ ";font-weight:700}
   #markComplete{border-radius:999px;padding:9px 18px;font-weight:600;background:var(--dds-grad-btn,var(--p));color:var(--dds-on-p,#fff);border:0;box-shadow:0 6px 16px -8px color-mix(in srgb,var(--p) 70%,transparent)}
 
@@ -423,8 +426,12 @@ const H=(scoped)=>{const h={'Content-Type':'application/json','Authorization':'B
 // own agency site, so /sales/* + /projects/* must resolve against that site (the
 // same reason the old Deal/Delivery iframes ran unscoped — no ?client=, which
 // would mis-scope them to the customer's own site where the deal doesn't exist).
-async function api(path,method,body){const r=await fetch(FN+path,{method:method||'GET',headers:H(true),body:body?JSON.stringify(body):undefined});return{ok:r.ok,status:r.status,body:await r.json().catch(()=>({}))};}
-async function apiAg(path,method,body){const r=await fetch(FN+path,{method:method||'GET',headers:H(false),body:body?JSON.stringify(body):undefined});return{ok:r.ok,status:r.status,body:await r.json().catch(()=>({}))};}
+// item 99 (B17): no connection is an answer like any other — "not ok", with words — so every
+// caller's own failure path runs: the button comes back and the toast says why. The failed
+// fetch used to throw past them, and a pressed button stayed grey with nothing said.
+const offline=()=>({ok:false,status:0,body:{error:'offline',message:'We couldn’t reach the server — check your connection and try again.'}});
+async function api(path,method,body){let r;try{r=await fetch(FN+path,{method:method||'GET',headers:H(true),body:body?JSON.stringify(body):undefined});}catch(_){return offline();}return{ok:r.ok,status:r.status,body:await r.json().catch(()=>({}))};}
+async function apiAg(path,method,body){let r;try{r=await fetch(FN+path,{method:method||'GET',headers:H(false),body:body?JSON.stringify(body):undefined});}catch(_){return offline();}return{ok:r.ok,status:r.status,body:await r.json().catch(()=>({}))};}
 // Same doctrine for the outbound pipeline/projects links: the trailing `client=`
 // is deliberate — it pins these links UNSCOPED so shell.js's scope-carry
 // (carryScopeGlobally) doesn't rewrite them onto the customer's site.
@@ -462,6 +469,10 @@ function moneyBuckets(list,todayYmd,pending){
 }
 // item 65: EVERY "today" on the record is this one (a moment in ms → its local day)
 function recTodayYmd(ms){const d=ms==null?new Date():new Date(ms);return d.getFullYear()+'-'+('0'+(d.getMonth()+1)).slice(-2)+'-'+('0'+d.getDate()).slice(-2);}
+// item 98 (B15): a MOMENT (paid_at, signed_at) shows on the local day it happened; dueLabel reads
+// the first ten characters as the day, which is right for a plain date (a due date) and gave a
+// payment at 6pm in Los Angeles the next day's date
+const atLabel=(ts)=>{const s=String(ts||''),t=/T\d/.test(s)?Date.parse(s):NaN;return isFinite(t)?dueLabel(recTodayYmd(t)):dueLabel(s);};
 // a picked day sent as local noon, so the server never files it under a neighbouring day
 function recDayAtNoon(ymd){const m=/^(\d{4})-(\d{2})-(\d{2})$/.exec(String(ymd||''));return m?new Date(+m[1],+m[2]-1,+m[3],12).toISOString():undefined;}
 const invState=(v)=>moneyState(v,recTodayYmd());
@@ -569,10 +580,16 @@ async function loadRecord(){
   // scope (x-dds-scope-site) is right for the profile + notes + activity. If we
   // arrived by ?deal=/?contact= but the canonical key is the customer site and it
   // isn't the current scope, reload once to the canonical URL (one hop, no loop).
+  // item 98 (B10): a link that named a deal or a project keeps it (and the project that came with
+  // it) — the short address alone opens the customer's NEWEST deal, so an older deal's link landed
+  // on another deal. ?act= rides along too, or the ⌘K "Send invoice to …" form never opened.
   const canon=REC.canonical||{};
   if(canon.key==='client' && canon.value && QP().get('client')!==canon.value){
-    const t=QP().get('tab')||REC.default_tab||''; const suffix=t?('&tab='+encodeURIComponent(t)):'';
-    location.replace('/crm.html?client='+encodeURIComponent(canon.value)+suffix); return;
+    const q0=QP(), id=REC.identity||{}, to=new URLSearchParams({client:canon.value});
+    if(q0.get('deal')||q0.get('project')){if(id.deal_id)to.set('deal',id.deal_id);if(id.project_id)to.set('project',id.project_id);}
+    const t=q0.get('tab')||REC.default_tab||''; if(t)to.set('tab',t);
+    if(q0.get('act'))to.set('act',q0.get('act'));
+    location.replace('/crm.html?'+to.toString()); return;
   }
   const want=QP().get('tab');
   if(want==='messages')FOCUS_COMPOSER=true;
@@ -587,33 +604,49 @@ async function loadRecord(){
   // deal has loaded; ?act=message brings the composer forward. One hop from
   // "Send invoice to Jordan" in the palette to the amount field.
   const act=QP().get('act');
+  if(act){const q=QP();q.delete('act');history.replaceState(null,'','/crm.html?'+q.toString());}   // once: a reload doesn't open the form again
   if(act==='invoice'||act==='deposit')DEAL_READY.then(()=>{if(idParams().deal)openBilling(act);});
   else if(act==='message'||act==='note'||act==='task')setTimeout(()=>focusComposer(act),300);
 }
 
 // ── the record shell: header + highlights + Path + two-region body ──────────
-function renderShell(){
+// the avatar, the name and the line under it — drawn by renderShell, and again after an edit
+// of the contact (B18: the form showed the new name while the header kept the old one)
+function recWhoHtml(){
   const hd=REC.header||{}; const nm=hd.name||'Client'; const isCust=hd.status==='customer';
   const bits=[];
   if(hd.person)bits.push(esc(hd.person));   // item 22: the business leads, the person beside it
   if(hd.company&&hd.company!==nm)bits.push(esc(hd.company));
   if(hd.email)bits.push(`<a href="mailto:${esc(hd.email)}">${esc(hd.email)}</a>`);
   if(hd.phone)bits.push(`<a href="tel:${esc(hd.phone)}">${esc(hd.phone)}</a>`);
+  // visual refresh: an initials avatar instead of an emoji object tile
+  const initials=String(nm).split(/\s+/).map(w=>Array.from(w).find(ch=>/[\p{L}\p{N}\p{Extended_Pictographic}]/u.test(ch))||'').filter(Boolean).slice(0,2).map(ch=>{const up=ch.toUpperCase();return up.length===1?up:ch;}).join('')||'?';   // batch C: an emoji or "ß" stays whole; a word's first letter, never a bracket
+  return `<div class="obj-ic ${isCust?'customer':''}" aria-hidden="true">${esc(initials)}</div>
+      <div class="rec-who">
+        <h1 id="pagehead" tabindex="-1">${esc(nm)}</h1>
+        <div class="rec-sub"><span class="statuschip ${isCust?'customer':''}">${isCust?'Customer':'Prospect'}</span>${bits.length?' <span>'+bits.join(' <span class="sep">·</span> ')+'</span>':''}</div>
+      </div>`;
+}
+// after a contact edit: the header the server now draws for this record (its name can come from
+// the business), painted in place — the action bar, tabs and the open tab stay as they are
+async function refreshWho(){
+  const r=await api('/crm/record'+recordQuery());
+  if(!r.ok||!r.body||!r.body.data||!r.body.data.header)return;   // a failed read keeps what's shown
+  REC.header=r.body.data.header;
+  const head=document.querySelector('.rec-head');
+  if(head){head.querySelectorAll('.obj-ic,.rec-who').forEach(n=>n.remove());head.insertAdjacentHTML('afterbegin',recWhoHtml());}
+  renderDetailsCard();
+}
+function renderShell(){
   const avail=availTabs();
   const tabsHtml=avail.map(t=>`<button data-tab="${t}"${t===TAB?' class="on"':''} role="tab" id="tab-${t}" aria-selected="${t===TAB?'true':'false'}" tabindex="${t===TAB?'0':'-1'}" aria-controls="tabbody">${TAB_LABEL[t]}</button>`).join('');
   // a customer-scoped record (sections.overview) resolves its identity from the
   // scope alone — the rail works there even with no explicit keys
   const showRail=!!(idParams().project||idParams().deal||(REC.identity&&REC.identity.client_id)||(REC.sections&&REC.sections.overview));
-  // visual refresh: an initials avatar instead of an emoji object tile
-  const initials=String(nm).split(/\s+/).map(w=>Array.from(w).find(ch=>/[\p{L}\p{N}\p{Extended_Pictographic}]/u.test(ch))||'').filter(Boolean).slice(0,2).map(ch=>{const up=ch.toUpperCase();return up.length===1?up:ch;}).join('')||'?';   // batch C: an emoji or "ß" stays whole; a word's first letter, never a bracket
   $('main').innerHTML=`
     <a class="back" href="/customers.html">← Customers</a>
     <div class="rec-head">
-      <div class="obj-ic ${isCust?'customer':''}" aria-hidden="true">${esc(initials)}</div>
-      <div class="rec-who">
-        <h1 id="pagehead" tabindex="-1">${esc(nm)}</h1>
-        <div class="rec-sub"><span class="statuschip ${isCust?'customer':''}">${isCust?'Customer':'Prospect'}</span>${bits.length?' <span>'+bits.join(' <span class="sep">·</span> ')+'</span>':''}</div>
-      </div>
+      ${recWhoHtml()}
       <div id="actbar" class="actbar" role="toolbar" aria-label="Actions for this client"></div>
     </div>
     <div id="hlpanel"></div>
@@ -671,13 +704,20 @@ function renderSummaryCards(){
   const d=DEAL&&!DEAL.error&&DEAL.deal; const inv=(DEAL&&!DEAL.error&&DEAL.invoices)||[]; const pj=PROJ&&!PROJ.error&&PROJ.project;
   const out=[];
   if(d&&d.id){
-    const rows=inv.slice(0,4).map(v=>{const st=invState(v);
+    // item 98 (B11): the live ones, newest first. A voided invoice has no money state, so it fell
+    // through to "Due"/"Open"; and the deal read sends them oldest first, so the card showed the
+    // four oldest. Billing still lists every one, voided included.
+    const live=inv.filter(v=>invState(v)).sort((a,b)=>String(b.created_at||'').localeCompare(String(a.created_at||'')));
+    const rows=live.slice(0,4).map(v=>{const st=invState(v);
       const chip=st==='paid'?'<span class="sc-chip good">Paid</span>':st==='overdue'?'<span class="sc-chip bad">Overdue</span>':st==='processing'?'<span class="sc-chip">On its way</span>':v.due_date?`<span class="sc-chip warn">Due ${esc(dueLabel(v.due_date))}</span>`:'<span class="sc-chip">Open</span>';
       return `<li><span class="sc-t">${esc(v.title||'Invoice')}</span><b>${esc(fmtC(v.amount_cents))}</b>${chip}</li>`;}).join('');
-    out.push(`<section class="card sc" aria-labelledby="sc-money"><div class="sc-h"><h2 id="sc-money">Money</h2><button type="button" class="sc-link" data-sc="invoice">Send invoice →</button></div>${rows?`<ul class="sc-list">${rows}</ul>`:'<p class="muted sc-none">No invoices yet.</p>'}${inv.length>4?`<button type="button" class="sc-link" data-sc="billing">All ${inv.length} on Billing →</button>`:''}</section>`);
+    out.push(`<section class="card sc" aria-labelledby="sc-money"><div class="sc-h"><h2 id="sc-money">Money</h2><button type="button" class="sc-link" data-sc="invoice">Send invoice →</button></div>${rows?`<ul class="sc-list">${rows}</ul>`:`<p class="muted sc-none">${inv.length?'Nothing open or paid.':'No invoices yet.'}</p>`}${inv.length>Math.min(live.length,4)?`<button type="button" class="sc-link" data-sc="billing">All ${inv.length} on Billing →</button>`:''}</section>`);
   }
   if(pj){
-    const ms=(PROJ.milestones||[]),done=ms.filter(m=>/^(done|complete|completed)$/.test(String(m.status||''))).length,pct=ms.length?Math.round(done*100/ms.length):null;
+    // B21: the Project tab's own percent (its tasks) when the project read has one — counting
+    // milestones here gave the same project two different numbers
+    const ms=(PROJ.milestones||[]),done=ms.filter(m=>/^(done|complete|completed)$/.test(String(m.status||''))).length,tpct=PROJ.progress&&PROJ.progress.pct;
+    const pct=(tpct!=null&&isFinite(tpct))?Math.round(Number(tpct)):ms.length?Math.round(done*100/ms.length):null;
     const sub=[SC_STATUS[pj.status]||String(pj.status||'').replace('_',' '),pj.launch_date?'launch '+dueLabel(pj.launch_date):''].filter(Boolean).join(' · ');
     out.push(`<section class="card sc" aria-labelledby="sc-proj"><div class="sc-h"><h2 id="sc-proj">${esc(pj.name||'Project')}</h2>${pct!=null?`<b class="sc-pct">${pct}%</b>`:''}</div>${pct!=null?`<div class="sc-bar" aria-hidden="true"><span style="width:${pct}%"></span></div>`:''}${sub?`<p class="muted sc-sub">${esc(sub)}</p>`:''}<button type="button" class="sc-link" data-sc="delivery">Open the project →</button></section>`);
   }
@@ -767,9 +807,11 @@ function renderActions(){
   const mb=$('act-more');
   if(mb)mb.addEventListener('click',(e)=>{e.stopPropagation();const m=$('act-menu');const open=m.hidden;m.hidden=!open;mb.setAttribute('aria-expanded',open?'true':'false');if(open){const f=m.querySelector('button,a');if(f)f.focus();}});
 }
-function closeMore(){const m=$('act-menu');const b=$('act-more');if(m&&!m.hidden){m.hidden=true;if(b)b.setAttribute('aria-expanded','false');}}
-document.addEventListener('click',closeMore);
-document.addEventListener('keydown',(e)=>{if(e.key==='Escape')closeMore();});
+// back: Escape hands focus to the More button when it was inside the menu (B21: the menu hid
+// around the focused item and a keyboard user was left on nothing)
+function closeMore(back){const m=$('act-menu');const b=$('act-more');if(m&&!m.hidden){const inside=m.contains(document.activeElement);m.hidden=true;if(b){b.setAttribute('aria-expanded','false');if(back===true&&inside)b.focus();}}}
+document.addEventListener('click',()=>closeMore());
+document.addEventListener('keydown',(e)=>{if(e.key==='Escape')closeMore(true);});
 // The pair the one "Send proposal & agreement" button sends: the newest draft
 // proposal (not superseded) AND the newest draft agreement, on an open deal.
 // Null when either is missing — then the per-document sends stand on their own.
@@ -831,7 +873,7 @@ function renderHighlights(){
   const mb=moneyBuckets(inv,recTodayYmd());
   const value=d.expected_value_cents||hl.value_cents; if(value)tiles.push({k:'Deal value',v:esc(fmtC(value)),ico:'value',tone:'',s:esc(d.stage?stageLabel(d.stage)+((STAGE_CHANCE[d.stage]!=null&&d.stage!=='won'&&d.stage!=='lost')?' · '+STAGE_CHANCE[d.stage]+'% chance':''):(d.title&&d.title!==((REC.header||{}).name||'')?d.title:''))});   // bold redesign: where it is and its chance (the title is the path's and the Deal tab's)
   if(d.id){const last=paid.slice().sort((a,b)=>String(b.paid_at||'').localeCompare(String(a.paid_at||'')))[0];
-    tiles.push({k:'Paid',v:esc(fmtC(got)),ico:'paid',tone:'good',s:last?esc((last.title||'Payment')+(last.paid_at?' · '+dueLabel(last.paid_at):'')):'Nothing yet'});}
+    tiles.push({k:'Paid',v:esc(fmtC(got)),ico:'paid',tone:'good',s:last?esc((last.title||'Payment')+(last.paid_at?' · '+atLabel(last.paid_at):'')):'Nothing yet'});}
   const owedSub=owed?[mb.upcoming.count?mb.upcoming.count+' upcoming':'',mb.overdue.count?mb.overdue.count+' overdue':'',mb.processing.count?fmtC(mb.processing.cents)+' processing':''].filter(Boolean).join(' · ')||'1 invoice':(mb.processing.count?fmtC(mb.processing.cents)+' processing':'All paid up');
   if(d.id||owed)tiles.push({k:'Outstanding',v:esc(fmtC(owed)),ico:'owed',tone:owed?'warn':(mb.processing.count?'info':''),s:esc(owedSub)});
   const ns=(d.id?liveNextStep(d):hl.next_step)||'';
@@ -839,8 +881,11 @@ function renderHighlights(){
   // own "do next" (a won deal says "open their project", never a blank dash)
   const suggested=(d.id&&!ns&&d.stage)?guideNow(d.stage).action:'';
   if(d.id||ns)tiles.push({k:'Next step',v:esc(ns||(suggested?'Suggested':'—')),ico:'next',tone:'info',edit:!!d.id,s:(ns&&d.next_step_at)?esc(dueLabel(d.next_step_at)):(ns?'':(suggested?esc(suggested):'Set one'))});   // inline-editable when a real deal field backs it
-  // bold redesign: the fifth fact — when you last spoke (the deal's last contact)
-  if(d.id)tiles.push({k:'Last talked',v:d.last_contacted_at?esc(when(d.last_contacted_at)):'—',ico:'phone',tone:'',s:d.last_contacted_at?'':'Nothing logged yet'});
+  // bold redesign: the fifth fact — when you last spoke (the deal's last contact). item 98 (B4): the
+  // date comes BESIDE the deal in the deal read (as the Deal tab reads it), never inside the deal row,
+  // so looking for it there said "Nothing logged yet" on every record
+  const lastTalk=DEAL&&DEAL.last_contacted_at;
+  if(d.id)tiles.push({k:'Last talked',v:lastTalk?esc(when(lastTalk)):'—',ico:'phone',tone:'',s:lastTalk?'':'Nothing logged yet'});
   if(!d.id&&p&&p.health)tiles.push({k:'Health',v:`<span class="word">${esc(p.health==='attention'?'Needs attention':p.health==='new'?'Getting set up':p.health)}</span>`,ico:'health',tone:p.health==='attention'?'warn':'good',s:''});
   if(!d.id&&p)tiles.push({k:'Website',v:esc(siteWord(p)),ico:'site',tone:'',s:''});
   if(!tiles.length){host.innerHTML='';return;}
@@ -945,7 +990,7 @@ async function moveStage(to,btn){
     DEAL.deal=r.body.data||DEAL.deal;
     PENDING_BACK='';   // any pending back-confirm strip is now against the OLD stage — drop it
     toast('Moved to '+stageLabel(to)+'.');
-    renderHighlights();renderPath();
+    renderHighlights();renderPath();renderSummaryCards();   // B12: the Deal card beside it kept the old stage and chance
     if(TAB==='deal')showTab(TAB,true);   // the Deal pane shows stage/next-step — keep it honest
     loadActivity();
   }
@@ -1061,7 +1106,7 @@ function editContact(host){
     const r=await apiAg('/sales/contacts/'+cid,'PATCH',body);
     // Every failure names itself — a 409 (two contacts, one address) is the one
     // an operator can act on, so it keeps the server's own wording.
-    if(r.ok){CONTACT_CACHE=null;toast(r.body&&(r.body.warning==='custom_unavailable'||r.body.warning==='found_via_unavailable')?((r.body.message)||'Saved.'):'Saved.');loadDetails(host);}
+    if(r.ok){CONTACT_CACHE=null;toast(r.body&&(r.body.warning==='custom_unavailable'||r.body.warning==='found_via_unavailable')?((r.body.message)||'Saved.'):'Saved.');loadDetails(host);refreshWho();}
     else{toast((r.body&&r.body.message)||(r.status?('Couldn’t save — the server answered '+r.status+'.'):'Couldn’t save — we couldn’t reach the server.'));btn.disabled=false;}
   };
   // Two-step delete, same contract as contacts.html: the unconfirmed DELETE is a
@@ -1095,7 +1140,7 @@ function renderDealTab(host){
   const rows=[];
   if(d.expected_value_cents)rows.push(['Value',fmtC(d.expected_value_cents)]);
   if(d.stage)rows.push(['Stage',stageLabel(d.stage)]);
-  if(d.expected_close)rows.push(['Expected close',d.expected_close]);
+  if(d.expected_close)rows.push(['Expected close',dueLabel(d.expected_close)||d.expected_close]);   // B21: "Nov 30", as the Deal card says it — it showed 2026-11-30
   if(d.next_step)rows.push(['Next step',d.next_step+(d.next_step_at?' · '+dueLabel(d.next_step_at):'')]);
   if(DEAL.last_contacted_at)rows.push(['Last contacted',when(DEAL.last_contacted_at)]);
   html+=rows.map(r=>`<div class="k">${esc(r[0])}</div><div>${esc(r[1])}</div>`).join('')||'<div class="muted">No details yet.</div>';
@@ -1170,7 +1215,7 @@ function renderBillingTab(host){
     const st=invState(v);
     let sub=esc(v.purpose==='deposit'?'Initial deposit':(v.description||v.purpose||''));
     let state, acts='', due='', dueCls='';
-    if(st==='paid'){state=`<span class="schip good">Paid</span>`;due=v.paid_at?esc(dueLabel(v.paid_at)):'';}
+    if(st==='paid'){state=`<span class="schip good">Paid</span>`;due=v.paid_at?esc(atLabel(v.paid_at)):'';}
     else if(!st){state=`<span class="schip" style="background:var(--bg);color:var(--faint)">Voided</span>`;}
     else if(st==='processing'){state=`<span class="schip info">Processing</span>`;sub=(sub?sub+' · ':'')+'Payment on its way';due=v.due_date?esc(dueLabel(v.due_date)):'';}   // the client paid — nothing to resend or void
     else{state=`<span class="schip ${MONEY_TONE[st]}">${MONEY_WORD[st]}</span>`;
@@ -1204,7 +1249,7 @@ function renderBillingTab(host){
     if(k.status==='draft'&&!both)acts+=act(`data-send-con="${esc(k.id)}"`,'Send for signature');
     else if(k.status==='sent')acts+=act(`data-send-con="${esc(k.id)}" data-resend="1"`,'Copy signing link');
     acts+=act(`data-doc="contracts:${esc(k.id)}"`,k.status==='signed'?'View signed copy':'View / print');
-    return `<div class="rrow brow"><span class="rt">${esc(k.title||'Agreement')}<span class="s">${k.signer_name?'Signed by '+esc(k.signer_name)+(k.signed_at?' on '+esc(dueLabel(k.signed_at)):''):(k.status==='sent'?'Out for signature':'Draft')}</span></span><span class="racts"><span class="schip ${conChip(k.status)}">${esc(k.status||'draft')}</span>${acts}</span></div>`;
+    return `<div class="rrow brow"><span class="rt">${esc(k.title||'Agreement')}<span class="s">${k.signer_name?'Signed by '+esc(k.signer_name)+(k.signed_at?' on '+esc(atLabel(k.signed_at)):''):(k.status==='sent'?'Out for signature':'Draft')}</span></span><span class="racts"><span class="schip ${conChip(k.status)}">${esc(k.status||'draft')}</span>${acts}</span></div>`;
   }).join(''):`<p class="muted" style="font-size:13.5px">No agreement yet.</p>`;
   html+=`</div></section>`;
   // retainer
@@ -1241,7 +1286,7 @@ async function billingSend(path,okLabel,body){
 async function reloadDeal(){
   const ids=idParams(); if(!ids.deal)return;
   const r=await apiAg('/sales/deals/'+encodeURIComponent(ids.deal)); DEAL=r.ok?(r.body.data||null):{error:true};
-  renderHighlights();renderPath();renderActions();
+  renderHighlights();renderPath();renderActions();renderSummaryCards();   // B12: the Money card missed the invoice just sent
   if(TAB==='billing'||TAB==='deal'||TAB==='files')showTab(TAB,true);
   loadActivity();
 }
@@ -1300,7 +1345,12 @@ function billingForm(kind){
     if(kind==='retainer'){
       if(!amt||amt<1){toast('Enter a retainer amount of at least $1.');go.disabled=false;return;}
       const r=await apiAg('/sales/deals/'+d.id+'/retainer','POST',{amount_cents:Math.round(amt*100),interval:$('bf-int').value||'month'});
-      if(r.ok){const x=r.body.data||{};toast(x.emailed?'Retainer set up — the authorization link was emailed':'Retainer set up — authorization link copied');if(x.url&&!x.emailed&&navigator.clipboard)navigator.clipboard.writeText(x.url).catch(()=>{});reloadDeal();}
+      // B21: "copied" only once the link IS on the clipboard — it said so before trying, and a refused copy stayed quiet
+      if(r.ok){const x=r.body.data||{},noCopy='Retainer set up — copy its authorization link from Billing.';
+        if(x.emailed)toast('Retainer set up — the authorization link was emailed');
+        else if(x.url&&navigator.clipboard)navigator.clipboard.writeText(x.url).then(()=>toast('Retainer set up — authorization link copied'),()=>toast(noCopy));
+        else toast(noCopy);
+        reloadDeal();}
       else{toast((r.body&&r.body.message)||'Couldn’t set that up.');go.disabled=false;}
       return;
     }
@@ -1318,6 +1368,7 @@ async function sendMoney(body,host){
   const r=await apiAg('/sales/deals/'+d.id+'/invoice','POST',body);
   if(r.ok){
     const b=r.body||{}; const url=b.url||'';
+    if(b.warning==='link_failed'){toast(b.message||'Invoice saved, but the payment link didn’t generate — tap Send again.');if(host)host.innerHTML='';reloadDeal();return;}
     if(url&&navigator.clipboard)navigator.clipboard.writeText(url).catch(()=>{});
     toast(b.emailed?label+(b.reused?' re-sent':' sent')+' — emailed to the client':(url?label+' prepared — payment link copied, nothing was emailed':label+' sent'));
     if(host)host.innerHTML='';
@@ -1326,8 +1377,11 @@ async function sendMoney(body,host){
   if(r.status===409&&r.body&&r.body.error==='amount_mismatch'&&host){
     const open=r.body.open_invoice||{};
     host.innerHTML=`<div class="bform" role="alert"><p style="font-size:13.5px;margin:0 0 10px">${esc(r.body.message||'An open invoice already exists at a different amount.')} If you send another, both links stay payable until one is paid.</p><div class="bacts"><button type="button" id="bf-resend">Resend the ${esc(fmtC(open.amount_cents))} link</button><button type="button" class="primary" id="bf-force">Send another for the new amount</button></div></div>`;
-    $('bf-resend').addEventListener('click',()=>sendMoney({purpose:body.purpose,amount_cents:Number(open.amount_cents)||undefined,title:open.title||undefined},host));
-    $('bf-force').addEventListener('click',()=>sendMoney({...body,force:true},host));
+    // Both buttons guard the double-click (Pipeline's copy already did): a second
+    // click while the first is on its way would bill the client twice.
+    const arm=(bid,fn)=>{$(bid).addEventListener('click',()=>{$('bf-resend').disabled=true;$('bf-force').disabled=true;fn();});};
+    arm('bf-resend',()=>sendMoney({purpose:body.purpose,amount_cents:Number(open.amount_cents)||undefined,title:open.title||undefined},host));
+    arm('bf-force',()=>sendMoney({...body,force:true},host));
     return;
   }
   toast((r.body&&r.body.message)||'That didn’t go through.');
@@ -1501,6 +1555,13 @@ const TYPE_ICON={message:si('message'),email:si('mail'),call:si('phone'),task:si
 // persists as module state.) Successful submits clear their field BEFORE the
 // refresh, so a sent draft never resurrects.
 const COMPOSER_FIELDS=['msgBody','logBody','logDate','taskTitle','taskDue','noteBody'];
+// B21: the drafts also survive switching the composer's own tabs (Message → Note → back) and the
+// record's (Activity → Details → back): both redraw the fields, and the snapshot below only covers
+// a rail refresh. What's typed is kept as it's typed and put back whenever the composer draws.
+const DRAFTS={};
+document.addEventListener('input',(e)=>{const id=e.target&&e.target.id;if(COMPOSER_FIELDS.includes(id))DRAFTS[id]=e.target.value;});
+// a sent draft never comes back: the field and its kept copy go together
+function clearDraft(id){delete DRAFTS[id];const el=$(id);if(el)el.value='';}
 function snapComposer(){
   const s={vals:{},focus:''};
   for(const id of COMPOSER_FIELDS){const el=$(id);if(el&&el.value)s.vals[id]=el.value;}
@@ -1538,7 +1599,7 @@ function insertSavedReplies(taId){
     sel.className='sr-pick';sel.setAttribute('aria-label','Insert a saved reply');
     sel.style.cssText='display:block;margin-bottom:6px;max-width:100%;font:inherit;font-size:13px;color:var(--ink);background:var(--card);border:1px solid var(--line);border-radius:9px;padding:6px 9px';
     sel.innerHTML='<option value="">Insert a saved reply…</option>'+replies.map(x=>`<option value="${esc(x.id)}">${esc(x.title)}</option>`).join('');
-    sel.onchange=()=>{const b=map[sel.value];if(b){const v=ta.value;ta.value=v?(v.replace(/\s*$/,'')+'\n\n'+b):b;ta.focus();}sel.value='';};
+    sel.onchange=()=>{const b=map[sel.value];if(b){const v=ta.value;ta.value=v?(v.replace(/\s*$/,'')+'\n\n'+b):b;DRAFTS[taId]=ta.value;ta.focus();}sel.value='';};
     ta.parentNode.insertBefore(sel,ta);
   });
 }
@@ -1591,6 +1652,7 @@ function renderComposer(){
   }
   html+=`</div>`;
   host.innerHTML=html;
+  for(const id of COMPOSER_FIELDS){const el=$(id);if(el&&DRAFTS[id]!=null)el.value=DRAFTS[id];}   // B21: what was typed here before
   host.querySelectorAll('[data-ct]').forEach(b=>b.addEventListener('click',()=>{COMPOSER=b.getAttribute('data-ct');renderComposer();}));
   // E2: the composer tablist honors the arrow-key contract — arrows move focus
   // AND selection (the re-render hands focus back to the moved-to tab);
@@ -1622,7 +1684,7 @@ async function sendMessage(e){
   const btn=e.target.querySelector('button[type=submit]'); btn.disabled=true;
   try{
     const rr=await api(replyPath,'POST',ACT.reply_to?{body,audience:'client'}:{body});
-    if(rr.ok){ta.value='';toast('Sent.');await loadActivity();}
+    if(rr.ok){clearDraft('msgBody');toast('Sent.');await loadActivity();}
     else{toast((rr.body&&rr.body.message)||'Couldn’t send.');btn.disabled=false;}
   }catch(_){toast('Couldn’t send.');btn.disabled=false;}
 }
@@ -1632,7 +1694,10 @@ async function logActivity(){
   if(LOGKIND==='note'&&!body){toast('Write a short note.');return;}
   const btn=$('logGo'); btn.disabled=true;
   const r=await apiAg('/sales/deals/'+encodeURIComponent(deal)+'/activity','POST',{kind:LOGKIND,body,occurred_at:recDayAtNoon($('logDate')&&$('logDate').value)});
-  if(r.ok){if($('logBody'))$('logBody').value='';if($('logDate'))$('logDate').value='';toast('Logged.');await loadActivity();}
+  if(r.ok){clearDraft('logBody');clearDraft('logDate');toast('Logged.');
+    // B4: "Last talked" moves at once (the server answers with the day just logged; an older day doesn't win)
+    const at=r.body&&r.body.data&&r.body.data.last_contacted_at;if(at&&DEAL&&!DEAL.error&&!(Date.parse(DEAL.last_contacted_at)>Date.parse(at))){DEAL.last_contacted_at=at;renderHighlights();if(TAB==='deal')showTab(TAB,true);}
+    await loadActivity();}
   else{toast((r.body&&r.body.message)||'That didn’t save.');btn.disabled=false;}
 }
 async function addTask(){
@@ -1642,7 +1707,7 @@ async function addTask(){
   const btn=$('taskGo'); btn.disabled=true;
   const due=($('taskDue')&&$('taskDue').value)||'';
   const r=await apiAg('/sales/deals/'+encodeURIComponent(deal)+'/tasks','POST',due?{title,due_date:due}:{title});
-  if(r.ok){if($('taskTitle'))$('taskTitle').value='';if($('taskDue'))$('taskDue').value='';toast('Added.');await loadActivity();}
+  if(r.ok){clearDraft('taskTitle');clearDraft('taskDue');toast('Added.');await loadActivity();}
   else{toast((r.body&&r.body.message)||'That didn’t save.');btn.disabled=false;}
 }
 async function addNote(){
@@ -1650,7 +1715,7 @@ async function addNote(){
   if(!body){toast('Write a little something first.');return;}
   const btn=$('noteGo'); btn.disabled=true;
   const r=await api('/crm/notes','POST',{audience:NEWAUD,body});
-  if(r.ok){if($('noteBody'))$('noteBody').value='';toast(r.body.data&&r.body.data.message||'Saved.');await loadActivity();}
+  if(r.ok){clearDraft('noteBody');toast(r.body.data&&r.body.data.message||'Saved.');await loadActivity();}
   else{toast((r.body&&r.body.message)||'That didn’t save.');btn.disabled=false;}
 }
 
@@ -1714,12 +1779,18 @@ async function renderNotesView(host){
     if(pr.ok)renderNotesView(host);   // re-fetch: pinned-first order is the server's
     else{toast('Couldn’t update that note.');b.disabled=false;}
   }));
-  host.querySelectorAll('[data-delnote]').forEach(b=>b.addEventListener('click',async()=>{
-    b.disabled=true;
-    const dr=await api('/crm/notes/'+b.getAttribute('data-delnote'),'DELETE');
-    if(dr.ok){toast('Removed.');await loadActivity();}   // the merged All view changes too
-    else{toast('Couldn’t remove that note.');b.disabled=false;}
-  }));
+  host.querySelectorAll('[data-delnote]').forEach(b=>b.addEventListener('click',()=>removeNote(b)));   // the merged All view changes too
+}
+// B21: removing a note asks first, in place (shell.js confirmIn) — it went with one click, beside
+// Pin, and there's no undo
+async function removeNote(b){
+  const k=window.ddsListKit,q='Remove this note? It can’t be undone.';
+  if(k&&k.confirmIn){if(!(await k.confirmIn(b,{text:q,yes:'Yes, remove it'})))return;}
+  else if(!confirm(q))return;
+  b.disabled=true;
+  const r=await api('/crm/notes/'+b.getAttribute('data-delnote'),'DELETE');
+  if(r.ok){toast('Removed.');await loadActivity();}
+  else{toast('Couldn’t remove that note.');b.disabled=false;}
 }
 // Phase 3 (timeline filters): website system events — publish notices, "changes
 // are waiting", connected-service pings — buried the human events (a payment, a
@@ -1737,7 +1808,7 @@ function renderMergedTimeline(host){
   if(!items.length&&!hidden){host.innerHTML=`<p class="muted" style="margin-top:16px;font-size:13.5px">${(ACT.items||[]).length?'Nothing matches this filter.':'Nothing here yet — messages, calls, and system events will appear as they happen.'}</p>`;return;}
   let html=''; let curMonth='';
   for(const it of items){
-    const mk=String(it.at).slice(0,7);
+    const at=Date.parse(String(it.at)),mk=/T\d/.test(String(it.at))&&isFinite(at)?recTodayYmd(at).slice(0,7):String(it.at).slice(0,7);   // B15: the local month (a call at 6pm on Oct 31 in Los Angeles sat under November)
     if(mk!==curMonth){
       curMonth=mk;
       const dt=new Date(mk+'-15T12:00:00Z');
@@ -1764,12 +1835,7 @@ function renderMergedTimeline(host){
     if(EXPANDED.has(id))EXPANDED.delete(id);else EXPANDED.add(id);
     renderTimeline();
   }));
-  host.querySelectorAll('[data-delnote]').forEach(b=>b.addEventListener('click',async()=>{
-    b.disabled=true;
-    const r=await api('/crm/notes/'+b.getAttribute('data-delnote'),'DELETE');
-    if(r.ok){toast('Removed.');await loadActivity();}
-    else{toast('Couldn’t remove that note.');b.disabled=false;}
-  }));
+  host.querySelectorAll('[data-delnote]').forEach(b=>b.addEventListener('click',()=>removeNote(b)));
 }
 
 function picker(){$('main').innerHTML=`<div class="center"><h2>Open a client to see their record.</h2><p class="muted" style="margin-bottom:18px">Pick a customer, contact, or deal — their whole relationship opens here.</p><p><a class="link" href="/customers.html">Go to Customers →</a></p></div>`;}

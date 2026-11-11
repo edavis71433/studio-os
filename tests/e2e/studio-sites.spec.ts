@@ -411,3 +411,39 @@ test.describe('Domains (builder list item 52)', () => {
     await expect(page.getByText('We couldn’t load your domains just now.')).toBeVisible();
   });
 });
+
+// ── Nov 10 review, bug hunt group A ──
+test.describe('Sites: the bug hunt fixes (A1, A10)', () => {
+  test('A1 — after Refresh, one click on a number or a pill turns its filter on, and one more turns it off', async ({ page }) => {
+    await openSites(page);
+    await expect(page.locator('.scard')).toHaveCount(3);
+    await page.locator('#refreshBtn').click();                     // one reload: two listeners used to cancel each other out
+    await expect(page.locator('.scard')).toHaveCount(3);
+    const band = page.locator('.sband');
+    await band.locator('[data-filter="live"]').click();
+    await expect(band.locator('[data-filter="live"]')).toHaveAttribute('aria-pressed', 'true');
+    await expect(page.locator('.scard:visible')).toHaveCount(1);
+    await page.locator('#fpills [data-filter="live"]').click();
+    await expect(page.locator('.scard:visible')).toHaveCount(3);
+  });
+
+  test('A10 — a dropped connection while copying says they’re set up, and Try copying again copies without setting them up twice', async ({ page }) => {
+    const t = await openSites(page);
+    let drop = true;
+    await page.route(/\/functions\/v1\/presence\/agency\/sites\/[^/]+\/duplicate$/, (route) => { if (drop) { drop = false; return route.abort('connectionreset'); } return route.fallback(); });
+    await page.locator('.scard[data-site="s1"] [data-menu]').click();
+    await page.locator('#rowMenuHost').getByRole('menuitem', { name: 'Duplicate site' }).click();
+    const dlg = page.locator('#dupDlg');
+    await dlg.locator('#dup-biz').fill('Bistro Twelve');
+    await dlg.locator('#dup-email').fill('sam@bistrotwelve.example');
+    await dlg.locator('#dup-submit').click();
+    const done = dlg.locator('#dup-done');
+    await expect(done).toContainText('Set up, but nothing was copied');
+    await expect(done).toContainText('We lost the connection while copying the setup. Their account is ready.');
+    await expect(done).not.toContainText('starter kit');
+    await done.locator('#dup-again').click();
+    await expect(done).toContainText('Site duplicated');
+    await expect(done.locator('#dup-again')).toHaveCount(0);
+    expect(t.writes.map((w) => `${w.method} ${w.path}`)).toEqual(['POST /sales/customers', 'POST /agency/sites/s1/duplicate']);   // the customer once; the copy that got through once
+  });
+});

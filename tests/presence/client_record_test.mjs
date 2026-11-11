@@ -36,7 +36,9 @@ ok('RECORD: old deep links keep working (?tab=messages opens Activity, where the
 ok('RECORD: with NO identity it shows a picker (never /crm/profile as the landing)', /function picker\(\)/.test(crm) && /if\(!rq\)\{ picker\(\); return; \}/.test(crm));
 ok('RECORD: Deal + Delivery are related-list CARDS linking out — no iframes', /pipeline\.html[\s\S]*?Open in pipeline/.test(crm) && /projects\.html[\s\S]*?Open project/.test(crm) && !/<iframe/.test(crm) && !/embed=1/.test(crm));
 ok('RECORD: sales/project reads + links run UNSCOPED (deal rows live on the agency site)', /apiAg/.test(crm) && /UNSCOPED on purpose/.test(crm) && /&client='/.test(crm));
-ok('RECORD: canonical addressing redirects to ?client= for a converted customer', /canon\.key==='client'/.test(crm) && /location\.replace\('\/crm\.html\?client='/.test(crm));
+// item 98 (B10): the short address keeps a deal or project the link named (and ?act=), or an older
+// deal's link opened the customer's newest deal
+ok('RECORD: canonical addressing redirects to ?client= for a converted customer, keeping a named deal and ?act=', /canon\.key==='client'/.test(crm) && /to=new URLSearchParams\(\{client:canon\.value\}\)/.test(crm) && /location\.replace\('\/crm\.html\?'\+to\.toString\(\)\)/.test(crm) && /to\.set\('deal',id\.deal_id\)/.test(crm) && /to\.set\('act',/.test(crm));
 ok('RECORD: highlights panel renders label-over-value tiles', /function renderHighlights/.test(crm) && /hl-panel/.test(crm));
 
 // ═══ Path (the pipeline chevron on the record) ═══
