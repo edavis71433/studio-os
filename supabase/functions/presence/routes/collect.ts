@@ -6,7 +6,7 @@
 // salted-hash pattern from the lead form; adds no new infrastructure.
 import { svc } from '../lib/db.ts';
 import { rateAllow, clientIp } from '../lib/ratelimit.ts';
-import { parseUA, refHost, cleanPath, cleanUtms, visitorDayHash, isVisitKind, cleanLabel, cleanMs } from '../lib/visits.ts';
+import { parseUA, refHost, cleanPath, cleanUtms, visitorDayHash, isVisitKind, cleanLabel, cleanMs, cleanLcp } from '../lib/visits.ts';
 
 const VISITS_SALT = Deno.env.get('VISITS_SALT') || Deno.env.get('APPROVAL_SECRET') || 'presence-visits';
 const noContent = (cors: Record<string, string>) => new Response(null, { status: 204, headers: cors });
@@ -27,6 +27,7 @@ export async function handleCollect(req: Request, siteId: string, cors: Record<s
   const ms = kind === 'leave' ? cleanMs(b?.ms) : null;
   if (kind === 'leave' && ms === null) return noContent(cors);
   const label = kind === 'pageview' || kind === 'leave' ? '' : cleanLabel(b?.l);
+  const lcp = kind === 'leave' ? cleanLcp(b?.lcp) : null;   // list item 151: how fast the page showed
 
   const ua = req.headers.get('user-agent') || '';
   const { device, browser, os, bot } = parseUA(ua);
@@ -49,7 +50,9 @@ export async function handleCollect(req: Request, siteId: string, cors: Record<s
   const extra = { ...(label ? { label } : {}), ...(ms !== null ? { ms } : {}) };
   const write = (body: Record<string, unknown>) => svc('presence_visits', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify(body) }).catch(() => null);
   // fire-and-forget insert; never await-block the response beyond the write
-  const w = await write({ ...row, ...extra });
+  let w = await write({ ...row, ...extra, ...(lcp !== null ? { lcp_ms: lcp } : {}) });
+  // Before migration 0157 a page's time is refused with its speed: keep the time.
+  if (lcp !== null && w && !w.ok && w.status === 400) w = await write({ ...row, ...extra });
   // Before migration 0156 a row naming a button's words is refused: keep the tap as it was
   // always kept. A button press or a page's time is new, so it waits for the migration.
   if (w && !w.ok && w.status === 400 && Object.keys(extra).length && kind !== 'button' && kind !== 'leave') await write(row);

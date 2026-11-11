@@ -13,6 +13,11 @@ export const VISIT_KINDS: VisitKind[] = ['pageview', 'phone', 'email', 'cta', 'd
 export function cleanLabel(v: unknown): string {
   return String(v ?? '').replace(/[\u0000-\u001f\u007f<>]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 60);
 }
+/** List item 151: a page's largest contentful paint, in whole milliseconds, 1 ms to a minute; else null. */
+export function cleanLcp(v: unknown): number | null {
+  const n = Math.round(Number(v));
+  return Number.isFinite(n) && n > 0 && n <= 60_000 ? n : null;
+}
 /** How long a page stayed open, in whole milliseconds: at least a second, at most half an hour; else null. */
 export function cleanMs(v: unknown): number | null {
   const n = Math.round(Number(v));
@@ -108,6 +113,60 @@ export interface VisitAgg {
 }
 
 const topN = (m: Map<string, number>, n: number) => [...m.entries()].sort((a, b) => b[1] - a[1]).slice(0, n);
+
+// ── List item 151: how fast pages show for real visitors (pure) ──
+// From the speed each visitor's browser reports as they leave a page (largest contentful
+// paint, the measure Google uses). The figure is the 75th percentile, Google's own way:
+// three visitors in four saw the page at least that fast. Under 2.5 s is good, over 4 s is
+// slow. Too few visits to judge is no verdict at all, never a guess.
+export const SPEED_GOOD_MS = 2500, SPEED_SLOW_MS = 4000;
+const SPEED_MIN_DEVICE = 20, SPEED_MIN_PAGE = 5;
+export interface SpeedRow { path: string; device?: string | null; lcp_ms?: number | null }
+export interface SpeedGroup { p75_ms: number; samples: number }
+export interface Speed {
+  samples: number;
+  phones: SpeedGroup | null; computers: SpeedGroup | null;
+  pages: Array<{ path: string; phones_ms: number | null; computers_ms: number | null; samples: number }>;
+  verdict: 'fast' | 'a_little_slow' | 'slow' | null;
+  sentence: string | null;
+}
+const p75 = (xs: number[]): number => { const s = [...xs].sort((a, b) => a - b); return s[Math.max(0, Math.ceil(s.length * 0.75) - 1)]; };
+/** "the home page", "the menu page": a page's path as an owner says it. */
+export function pageCalled(path: string): string {
+  const bits = String(path || '/').replace(/^\/+|\/+$/g, '').split('/').filter(Boolean);
+  return bits.length ? `the ${bits[bits.length - 1].replace(/[-_]+/g, ' ')} page` : 'the home page';
+}
+const secs = (ms: number): string => `${(Math.round(ms / 100) / 10).toFixed(1)} s`;
+export function speedOf(rows: SpeedRow[]): Speed {
+  const phones: number[] = [], computers: number[] = [];
+  const pages = new Map<string, { phones: number[]; computers: number[] }>();
+  for (const r of rows) {
+    const ms = Number(r.lcp_ms);
+    if (!Number.isFinite(ms) || ms <= 0) continue;
+    const onPhone = r.device === 'mobile';
+    (onPhone ? phones : computers).push(ms);
+    const pg = pages.get(r.path) || { phones: [], computers: [] }; (onPhone ? pg.phones : pg.computers).push(ms); pages.set(r.path, pg);
+  }
+  const group = (xs: number[]): SpeedGroup | null => (xs.length >= SPEED_MIN_DEVICE ? { p75_ms: Math.round(p75(xs)), samples: xs.length } : null);
+  const g = { phones: group(phones), computers: group(computers) };
+  const pageRows = [...pages.entries()].map(([path, v]) => ({
+    path, samples: v.phones.length + v.computers.length,
+    phones_ms: v.phones.length >= SPEED_MIN_PAGE ? Math.round(p75(v.phones)) : null,
+    computers_ms: v.computers.length >= SPEED_MIN_PAGE ? Math.round(p75(v.computers)) : null,
+  })).sort((a, b) => b.samples - a.samples).slice(0, 10);
+  // the verdict follows the slower of the two, and names the slowest page there
+  const judged = (['phones', 'computers'] as const).filter((k) => g[k]).sort((a, b) => g[b]!.p75_ms - g[a]!.p75_ms);
+  let verdict: Speed['verdict'] = null, sentence: string | null = null;
+  if (judged.length) {
+    const worst = judged[0], at = g[worst]!.p75_ms;
+    const slowest = pageRows.map((p) => ({ path: p.path, ms: worst === 'phones' ? p.phones_ms : p.computers_ms })).filter((p) => p.ms !== null).sort((a, b) => b.ms! - a.ms!)[0];
+    const where = slowest && slowest.ms! > SPEED_GOOD_MS ? `: ${pageCalled(slowest.path)} takes ${secs(slowest.ms!)} for most visitors` : '';
+    if (at <= SPEED_GOOD_MS) { verdict = 'fast'; sentence = 'Loads fast for most visitors.'; }
+    else if (at <= SPEED_SLOW_MS) { verdict = 'a_little_slow'; sentence = `A little slow on ${worst}${where}.`; }
+    else { verdict = 'slow'; sentence = `Slow on ${worst}${where}.`; }
+  }
+  return { samples: phones.length + computers.length, ...g, pages: pageRows, verdict, sentence };
+}
 
 // ── List item 157: which buttons get pressed, and how long pages stay open (pure) ──
 export interface EngagementRow { kind: string; path: string; label?: string | null; ms?: number | null; visitor_hash?: string }
@@ -211,8 +270,10 @@ export function trackerScript(siteId: string, collectBase: string): string {
     `var l=b||k==='cta'||k==='phone'||k==='email'?(a.getAttribute('aria-label')||a.textContent||'').replace(/\\s+/g,' ').trim().slice(0,60):'';` +
     `if(k)s({k:k,p:location.pathname,l:l})},true);` +
     // list item 157: how long the page was open and in view, sent once as the visitor leaves it
-    `var t0=document.visibilityState==='visible'?Date.now():0,seen=0,gone=0;` +
-    `function leave(){if(t0){seen+=Date.now()-t0;t0=0}if(!gone&&seen>=1000){gone=1;s({k:'leave',p:location.pathname,ms:Math.min(seen,1800000)})}}` +
+    `var t0=document.visibilityState==='visible'?Date.now():0,seen=0,gone=0,lcp=0;` +
+    // list item 151: how long the page's main content took to show, the measure Google uses (Safari doesn't report it)
+    `try{new PerformanceObserver(function(l){var e=l.getEntries();if(e.length)lcp=e[e.length-1].startTime}).observe({type:'largest-contentful-paint',buffered:true})}catch(e){}` +
+    `function leave(){if(t0){seen+=Date.now()-t0;t0=0}if(!gone&&seen>=1000){gone=1;s({k:'leave',p:location.pathname,ms:Math.min(seen,1800000),lcp:Math.round(lcp)})}}` +
     `document.addEventListener('visibilitychange',function(){if(document.visibilityState==='hidden')leave();else if(!gone)t0=Date.now()});` +
     `addEventListener('pagehide',leave)}catch(e){}})();`;
   return `<script id="presence-analytics" data-site="${siteId}">${js}</script>`;

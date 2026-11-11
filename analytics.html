@@ -692,6 +692,9 @@ function websiteBand(d){
       // list item 157: the middle time a page stayed open
       const timed=new Map(((t.time_on_page&&t.time_on_page.pages)||[]).map(p=>[p.path,p.seconds]));
       if(timed.size)cols.push({name:'Time',title:'How long the page usually stays open (the middle visit)',value:p=>timed.has(p.path)?duration(timed.get(p.path)):'—'});
+      // list item 151: how fast the page shows for three visitors in four, phones first
+      const fast=new Map(((t.speed&&t.speed.pages)||[]).map(p=>[p.path,p.phones_ms||p.computers_ms]).filter(x=>x[1]));
+      if(fast.size)cols.push({name:'Loads in',title:'How long the main content takes to show for three visitors in four (phones when there are enough)',value:p=>fast.has(p.path)?`${(Math.round(fast.get(p.path)/100)/10).toFixed(1)} s`:'—'});
       body=pageTable(rows,cols);
     }else if(external&&googlePages.length){
       // the same table, from what Google can see of a site we don't host
@@ -700,6 +703,7 @@ function websiteBand(d){
     }else{
       body=external?offSite('Page views'):emptyState('No page views yet','Your most-visited pages will be listed here.');
     }
+    if(rows.length&&t.speed&&t.speed.sentence)sub+=` · ${t.speed.sentence.replace(/\.$/,'')}`;   // list item 151
     h+=card('','Top pages',sub,body,external&&!rows.length?null:[BI,'View website insights']);
   }
   {

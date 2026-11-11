@@ -16,12 +16,28 @@ import { siteContentTree } from './room.ts';
 import { siteLaunchChecklist } from './services.ts';
 import { buildWebsiteHealth, type WebsiteHealthInput } from '../lib/website_health.ts';
 import { loadVisits } from './analytics.ts';
-import { aggregateVisits } from '../lib/visits.ts';
+import { aggregateVisits, speedOf } from '../lib/visits.ts';
+import { siteOrigin } from '../lib/site.ts';
+import { TOOLS_BASE_URL } from '../../_shared/tools/config.ts';
 import { buildContentPerformance } from '../lib/content_performance.ts';
 import { sslStatus } from '../lib/netlify.ts';
 
 const PROVIDER_LABEL: Record<string, string> = Object.fromEntries(CONNECTED_PROVIDERS.map((p: any) => [p.key, p.name]));
 const arr = (r: { json: unknown }): any[] => (Array.isArray(r.json) ? r.json : []);
+const ok = (r: unknown): r is { ok: true; json: unknown } => !!(r && (r as { ok?: boolean }).ok);
+/** List item 151: the last 30 days' uptime checks, summed; null when there are none to sum. */
+function uptimeOf(r: unknown): { days: number; checks: number; ok_checks: number } | null {
+  if (!ok(r)) return null;
+  const rows = arr(r);
+  const checks = rows.reduce((a, x) => a + (Number(x.checks) || 0), 0);
+  return checks ? { days: 30, checks, ok_checks: rows.reduce((a, x) => a + (Number(x.ok_checks) || 0), 0) } : null;
+}
+/** List item 151: real visitors' speed, as the Health check uses it; null with no read. */
+function speedFor(r: unknown) {
+  if (!ok(r)) return null;
+  const sp = speedOf(arr(r));
+  return { verdict: sp.verdict, sentence: sp.sentence, phones_ms: sp.phones?.p75_ms ?? null, computers_ms: sp.computers?.p75_ms ?? null, samples: sp.samples };
+}
 
 export async function handleWebsiteHealth(site: SiteRow, cors: Record<string, string>) {
   const now = new Date().toISOString();
@@ -31,7 +47,8 @@ export async function handleWebsiteHealth(site: SiteRow, cors: Record<string, st
   // evidence reads (contact-form message received, a saved version exists) and
   // the already-collected first-party visits (for the plain-English "what this
   // means" projection — no new tracking, reuses loadVisits + aggregateVisits).
-  const [tree, launch, connQ, formQ, snapQ, visits, upQ, sslQ] = await Promise.all([
+  const monthAgo = new Date(nowMs - 30 * 86_400_000).toISOString();
+  const [tree, launch, connQ, formQ, snapQ, visits, upQ, sslQ, daysQ, speedQ, firstQ, identQ, locQ, setQ] = await Promise.all([
     siteContentTree(site),
     siteLaunchChecklist(site),
     svc(`presence_connections?site_id=eq.${site.id}&select=provider_key,status,health`),
@@ -46,6 +63,14 @@ export async function handleWebsiteHealth(site: SiteRow, cors: Record<string, st
     (site.custom_domain && site.netlify_site_id)
       ? sslStatus(site.netlify_site_id).catch(() => ({ ok: false, expires_at: null as string | null }))
       : Promise.resolve({ ok: false, expires_at: null as string | null }),
+    // List item 151, each best-effort (before migration 0157 the first two 400 and the card
+    // leaves them out): the uptime tally, the visitors' speed, and the go-live facts.
+    svc(`presence_uptime_days?site_id=eq.${site.id}&day=gte.${monthAgo.slice(0, 10)}&select=day,checks,ok_checks`).catch(() => ({ ok: false, json: null as any })),
+    svc(`presence_visits?site_id=eq.${site.id}&kind=eq.leave&lcp_ms=not.is.null&ts=gte.${monthAgo}&select=path,device,lcp_ms&order=ts.desc&limit=5000`).catch(() => ({ ok: false, json: null as any })),
+    svc(`presence_publishes?site_id=eq.${site.id}&status=eq.live&select=created_at&order=created_at.asc&limit=1`).catch(() => ({ ok: false, json: null as any })),
+    svc(`presence_identity?site_id=eq.${site.id}&select=phone&limit=1`).catch(() => ({ ok: false, json: null as any })),
+    svc(`presence_locations?site_id=eq.${site.id}&select=phone&limit=1`).catch(() => ({ ok: false, json: null as any })),
+    svc(`presence_settings?site_id=eq.${site.id}&select=og_media_id,cover_media_id&limit=1`).catch(() => ({ ok: false, json: null as any })),
   ]);
   if (!tree) return json({ error: 'template_missing', message: 'This site’s template isn’t available.' }, 500, cors);
   const upRow = (upQ && (upQ as any).ok) ? arr(upQ)[0] : null;
@@ -83,6 +108,16 @@ export async function handleWebsiteHealth(site: SiteRow, cors: Record<string, st
     // Best-effort custom-domain certificate expiry → "Secure until {date}, renews
     // automatically" (only shown when the secure-connection check is already "done").
     ssl_expires_at: sslExpiresAt,
+    // List item 151
+    uptime_30d: uptimeOf(daysQ),
+    speed: speedFor(speedQ),
+    speed_check_href: siteOrigin(site) ? `${TOOLS_BASE_URL}/site-review?url=${encodeURIComponent(siteOrigin(site))}` : null,
+    golive: {
+      first_published_at: ok(firstQ) ? (arr(firstQ)[0]?.created_at ?? null) : null,
+      has_phone: !!(ok(identQ) && String(arr(identQ)[0]?.phone || '').trim()) || !!(ok(locQ) && String(arr(locQ)[0]?.phone || '').trim()),
+      has_share_picture: !!(ok(setQ) && (arr(setQ)[0]?.og_media_id || arr(setQ)[0]?.cover_media_id)),
+      contact_url: siteOrigin(site) ? `${siteOrigin(site)}/contact/` : null,
+    },
   };
 
   // Plain-English "what this means" over the visits we already collect (30-day
