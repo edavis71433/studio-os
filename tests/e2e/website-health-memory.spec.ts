@@ -12,7 +12,7 @@ const PAGE_API = {
   '/health': { data: { state: 'healthy', sentence: 'Your website is live and up to date.', detail: '', first_run: false, facts: { website: { state: 'live', label: 'Live', detail: '' }, draft: { state: 'clean', label: 'Up to date', detail: '' }, last_publish: { label: 'Sun, Oct 5', detail: 'published by you' }, domain: { label: 'maple.example', state: 'ok', detail: '' } } } },
   '/settings': { data: { blocks: [], section_meta: {}, pages: [] } },
   '/media': { data: [] }, '/offerings': { data: [] }, '/faqs': { data: [] }, '/testimonials': { data: [] }, '/posts': { data: [] },
-  '/site': { data: { site: { id: '00000000-0000-4000-8000-000000000001', client_id: '00000000-0000-4000-8000-000000000002', status: 'live', edition: 'presence', custom_domain: 'maple.example', template_slug: 'bistro', last_published_at: '2026-07-01T00:00:00Z', netlify_site_id: 'n1' }, identity: { business_name: 'Maple & Main Realty' }, location: {}, voice: {}, offerings: [], faqs: [], testimonials: [], posts: [] } },
+  '/site': { data: { site: { id: '00000000-0000-4000-8000-000000000001', status: 'live', edition: 'presence', custom_domain: 'maple.example', template_slug: 'bistro', last_published_at: '2026-07-01T00:00:00Z', netlify_site_id: 'n1' }, identity: { business_name: 'Maple & Main Realty' }, location: {}, voice: {}, offerings: [], faqs: [], testimonials: [], posts: [] } },
   '/foundations/domain': { data: { custom_domain: 'maple.example', health: 'ok' } },
 };
 const day = (back: number) => new Date(Date.UTC(2026, 10, 11) - back * 86_400_000).toISOString().slice(0, 10);
