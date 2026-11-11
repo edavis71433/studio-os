@@ -229,6 +229,10 @@ https://app.davisdigitalstudio.com/report.html           https://tools.davisdigi
 /prospects                   /prospects.html       200
 /pitch.html                   /pitch               301!
 /pitch                       /pitch.html           200
+/intake.html                  /intake              301!
+/intake                      /intake.html          200
+/week.html                    /week                301!
+/week                        /week.html            200
 /connections.html             /connections         301!
 /connections                 /connections.html     200
 /developer.html               /developer           301!

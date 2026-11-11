@@ -21,6 +21,7 @@ import type { KitPayload } from '../lib/kits.ts';
 import { kitFromSite, applyKitTo, layoutFromSite } from './kit_io.ts';
 import { layoutCounts } from '../lib/site_layout.ts';
 import { handleAgencySites } from './sites.ts';
+import { handleClientTools } from './client_tools.ts';
 import { HIDEABLE_SECTIONS, normalizeHidden } from '../lib/navigation.ts';
 import { readReservedJsonOrThrow, writeReservedJson, RESERVED_NAMES } from '../lib/reserved_store.ts';
 import { sendInviteLink } from '../lib/workspace.ts';
@@ -213,6 +214,17 @@ async function handleAgencyInner(req: Request, route: string, method: string, me
   {
     const r = await handleAgencySites(req, route, method, member, principal, cors, {
       gather: sharedGather, ownSite: () => ownSiteOf(req.headers.get('x-dds-user-jwt') || '', principal),
+    });
+    if (r) return r;
+  }
+
+  // ── builder list item 176: the content form, the hand-over kit and Plan my week ──
+  {
+    const jwt = req.headers.get('x-dds-user-jwt') || '';
+    const r = await handleClientTools(req, route, method, member, principal, cors, {
+      ownSite: () => ownSiteOf(jwt, principal),
+      needs: () => computeStudioNeeds(member, principal, jwt, now),
+      gather: sharedGather,
     });
     if (r) return r;
   }

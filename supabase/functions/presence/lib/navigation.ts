@@ -176,6 +176,8 @@ export function buildNav(c: NavContext): NavSection[] {
     // Oct 2026 audit bug 10: ⌘K "kit" finds the starter kits (a card on Home; agency.html scrolls to #kits)
     home.push(hid('kits', 'Starter kits', '/agency.html#kits', 'Save one client’s setup as a kit and start the next client from it.'));
     sections.push({ key: 'home', label: 'Home', items: home });
+    // Builder list item 176: ⌘K "week" opens Plan my week (Home's greeting card and the Sites header carry the button)
+    home.push(hid('week', 'Plan my week', '/week.html', 'Every client in the order they need you over the next seven days: what’s late, what’s due and what’s coming.'));
     // Builder list items 43 and 52 (Nov 2026): every client's website as a card, and
     // every domain in one list (Squarespace's dashboard and its Domains tab). One place
     // in the menu; Domains is a tab on the page and one search away.

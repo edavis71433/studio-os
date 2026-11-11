@@ -1,0 +1,183 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Your week — Studio OS</title>
+<meta name="robots" content="noindex, nofollow">
+<!-- Studio level, never scoped: a stray ?client= is dropped before the shell reads the URL, as on Home. -->
+<script>(function(){try{if(/[?&]client=/.test(location.search)){var u=new URL(location.href);u.searchParams.delete('client');history.replaceState(null,'',u.pathname+(u.search||'')+u.hash);}}catch(_){}})();</script>
+<link rel="stylesheet" href="/fonts/brand.css">
+<style>
+  /* the page skin = the shell's --dds-* tokens, aliased the way agency.html does */
+  :root{
+    --bg:var(--dds-bg,#faf8f5);--card:var(--dds-card,#fff);--ink:var(--dds-ink,#1b1525);--soft:var(--dds-soft,#6b6478);--faint:var(--dds-faint,#746b8a);--line:var(--dds-line,#eee9e0);
+    --p:var(--dds-p,#5b3fa0);--p-soft:var(--dds-p-soft,#efeafa);
+    --good:var(--dds-good,#33664b);--good-soft:var(--dds-good-soft,#e7f1ea);--warn:var(--dds-warn,#775d31);--warn-soft:var(--dds-warn-soft,#f3ead9);--bad:var(--dds-bad,#9a4242);--bad-soft:var(--dds-bad-soft,#f7e3e3);
+    --shadow:var(--dds-shadow,0 1px 2px rgba(27,21,37,.04),0 8px 24px rgba(27,21,37,.06));
+    --serif:'Fraunces',"Iowan Old Style",Georgia,serif;
+    --sans:'Inter',-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  }
+  *{box-sizing:border-box;margin:0}
+  [hidden]{display:none!important}
+  body{background:var(--bg);color:var(--ink);font-family:var(--sans);line-height:1.5;-webkit-font-smoothing:antialiased}
+  .wrap{max-width:var(--dds-w-focus,1000px);margin:0 auto;padding:var(--dds-s7,32px) var(--dds-s5,20px) 90px}
+  .lhead{background:var(--card);border:1px solid var(--line);border-radius:var(--dds-r-lg,10px);box-shadow:var(--shadow);padding:var(--dds-s3,12px) var(--dds-s4,16px);margin-bottom:var(--dds-s4,16px)}
+  .lrow1{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+  .obj-ic{width:34px;height:34px;border-radius:var(--dds-r,8px);background:var(--p);color:#fff;display:grid;place-items:center;font-size:16px;flex:0 0 auto}
+  .lhead h1{font-family:var(--sans);font-weight:600;font-size:20px;margin:0;letter-spacing:-.01em;flex:1;min-width:0}
+  .lmeta{font-size:12.5px;color:var(--faint);margin-top:4px}
+  .lbtn{flex:0 0 auto;font:inherit;border:none;background:none;color:var(--soft);font-size:15px;border-radius:var(--dds-r,8px);padding:4px 8px;cursor:pointer;min-height:36px}
+  .lbtn:hover{color:var(--p);background:var(--p-soft)}
+  .rowact{font:inherit;font-size:12.5px;font-weight:600;border:1px solid var(--line);border-radius:999px;background:transparent;color:var(--ink);padding:6px var(--dds-s3,12px);cursor:pointer;white-space:nowrap;text-decoration:none;display:inline-flex;align-items:center;min-height:36px}
+  .rowact:hover{border-color:var(--p);color:var(--p)}
+  .days{display:grid;grid-template-columns:repeat(8,minmax(0,1fr));gap:8px;margin:0 0 var(--dds-s4,16px)}
+  .day{font:inherit;text-align:left;border:1px solid var(--line);background:var(--card);border-radius:12px;padding:8px 12px;cursor:pointer;color:var(--ink);min-height:56px}
+  .day .d{display:block;font-size:12px;font-weight:600;color:var(--soft)} .day .n{display:block;font-size:18px;font-weight:700;line-height:1.2}
+  .day.zero .n{color:var(--faint)}
+  .day.late{background:var(--bad-soft);border-color:var(--bad)} .day.late .d,.day.late .n{color:var(--bad)}
+  .day.today{background:var(--p-soft);border-color:var(--p)} .day.today .d,.day.today .n{color:var(--p)}
+  .day[aria-pressed="true"]{outline:2px solid var(--p);outline-offset:1px}
+  .day:hover{border-color:var(--p)}
+  .intro{font-size:13px;color:var(--soft);margin:0 0 12px}
+  .ccard{background:var(--card);border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow);padding:16px 18px;margin-bottom:12px}
+  .ccard.first{border:1.5px solid var(--p)}
+  .ctop{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+  .ctop .num{font-size:13px;font-weight:700;color:var(--faint)}
+  .ctop h2{font-size:16px;font-weight:600;margin:0}
+  .ctop .open{margin-left:auto;font-size:12.5px;font-weight:600;color:var(--p);text-decoration:none} .ctop .open:hover{text-decoration:underline}
+  .wchip{font-size:11.5px;font-weight:600;border-radius:999px;padding:2px 10px;background:var(--p-soft);color:var(--p);white-space:nowrap}
+  .why{font-size:13px;color:var(--soft);margin:2px 0 10px}
+  .things{border:1px solid var(--line);border-radius:12px;overflow:hidden}
+  .thing{display:flex;align-items:center;gap:12px;padding:10px 12px;border-top:1px solid var(--line)} .thing:first-child{border-top:none}
+  .thing .when{flex:0 0 104px}
+  .when .wchip{display:inline-block}
+  .when .wchip.late{background:var(--bad-soft);color:var(--bad)} .when .wchip.later{background:var(--bg);color:var(--soft);border:1px solid var(--line)}
+  .thing .what{flex:1 1 auto;min-width:0;font-size:13.5px;overflow-wrap:anywhere}
+  .thing .rowact{flex:0 0 auto}
+  .empty{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:40px 20px;text-align:center}
+  .empty h2{font-family:var(--serif);font-weight:500;font-size:22px;margin:0 0 6px} .empty p{color:var(--soft);font-size:14px}
+  .how{font-size:12.5px;color:var(--faint);margin-top:var(--dds-s4,16px)}
+  .warnline{font-size:13px;color:var(--warn);background:var(--warn-soft);border-radius:10px;padding:8px 12px;margin:0 0 12px}
+  .btn{font:inherit;font-size:13.5px;font-weight:500;border:none;border-radius:var(--dds-r,8px);padding:8px 16px;background:var(--p);color:#fff;cursor:pointer}
+  @media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .btn{color:#171320}}
+  :root[data-theme="dark"] .btn{color:#171320}
+  a.link{color:var(--p);text-decoration:none;font-weight:500}a.link:hover{text-decoration:underline}
+  .center{text-align:center;padding:52px var(--dds-s5,20px)}.center h2{font-family:var(--serif);font-weight:500;font-size:22px;margin:0 0 8px}
+  .muted{color:var(--soft);font-size:14px}
+  .spin{width:22px;height:22px;border:2.5px solid var(--line);border-top-color:var(--p);border-radius:50%;animation:sp .8s linear infinite;margin:var(--dds-s8,40px) auto}
+  @keyframes sp{to{transform:rotate(360deg)}}
+  @media (prefers-reduced-motion:reduce){.spin{animation:none}}
+  :focus-visible{outline:2px solid var(--p);outline-offset:2px}
+  @media (max-width:767px){
+    .days{grid-template-columns:repeat(4,minmax(0,1fr))}
+    .thing{flex-wrap:wrap;gap:6px 10px} .thing .when{flex:0 0 100%} .thing .what{flex:1 1 60%}
+    .rowact,.lbtn,.day{min-height:44px}
+    .ctop .open{margin-left:0;flex:0 0 100%}
+  }
+</style>
+<link rel="stylesheet" href="/shell.css"><script src="/shell.js" defer></script>
+</head>
+<body>
+<div class="wrap">
+  <div id="main"><div class="spin" role="status" aria-label="Loading"></div></div>
+</div>
+<script src="/vendor/supabase-js-2.45.4.js"></script>
+<script>
+// ── Plan my week (builder list item 176, Nov 2026) ───────────────────────────
+// Wix Studio's "Plan your week": every client in the order they need you over
+// the next seven days. Late things first, then today, then by day; each line
+// opens the place that does it. Home's Needs you is the start (the same rows and
+// snoozes), plus what's dated this week: to-dos and project steps, estimates
+// that run out, recurring invoices and monthly reports that go out, content
+// forms that came back. All from GET /agency/week (lib/week_plan.ts). Reached
+// from Home's greeting, the Sites header and ⌘K "week".
+const SUPABASE_URL="https://qksstlqzbhesadrrofgn.supabase.co";
+const SUPABASE_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFrc3N0bHF6Ymhlc2FkcnJvZmduIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE5NzMwMDMsImV4cCI6MjA5NzU0OTAwM30.4V94Ua7z5cntPWtvtqN24TUnfY5A6K6-zCxY0iEcgYo";
+const FN=SUPABASE_URL+"/functions/v1/presence";
+const sb=supabase.createClient(SUPABASE_URL,SUPABASE_KEY,{auth:{storageKey:'dds-portal-auth',persistSession:true,autoRefreshToken:true}});
+const $=(id)=>document.getElementById(id);
+const esc=(s)=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const toast=(m,bad)=>{ if(window.ddsToast) window.ddsToast(m,bad?'err':'ok'); };
+let TOKEN="";
+sb.auth.onAuthStateChange(function(_e,s){if(s&&s.access_token)TOKEN=s.access_token;});
+const H=()=>({'Content-Type':'application/json','Authorization':'Bearer '+SUPABASE_KEY,'x-dds-user-jwt':TOKEN});
+async function api(path){const r=await fetch(FN+path,{headers:H()});return{ok:r.ok,status:r.status,body:await r.json().catch(()=>({}))};}
+function localYmd(){const d=new Date();return d.getFullYear()+'-'+('0'+(d.getMonth()+1)).slice(-2)+'-'+('0'+d.getDate()).slice(-2);}
+const utcOf=(ymd)=>{const m=/^(\d{4})-(\d{2})-(\d{2})$/.exec(String(ymd||''));return m?new Date(Date.UTC(+m[1],+m[2]-1,+m[3],12)):null;};
+const dayWords=(ymd,opts)=>{const d=utcOf(ymd);return d?d.toLocaleDateString('en-US',Object.assign({timeZone:'UTC'},opts)):'';};
+const short=(ymd)=>dayWords(ymd,{weekday:'short'})+' '+(utcOf(ymd)?utcOf(ymd).getUTCDate():'');
+const safeHref=(h)=>/^\/(?!\/)/.test(String(h||''))?String(h):'/agency.html';
+
+let PLAN=null,PICK=null,REQ_SEQ=0,LOADED_AT=0;
+function whenOf(i){
+  if(i.when==='late')return['late','Late · '+i.late_days+' day'+(i.late_days===1?'':'s')];
+  if(i.when==='today')return['','Today'];
+  return['later',short(i.day)];
+}
+const inPick=(i)=>!PICK||(PICK==='late'?i.when==='late':PICK===PLAN.today?i.when==='today':i.day===PICK&&i.when==='day');
+function render(){
+  const p=PLAN;
+  const clients=p.clients.filter(c=>!c.own).length,own=p.clients.some(c=>c.own);
+  const range=dayWords(p.today,{weekday:'short',month:'short',day:'numeric'})+' – '+dayWords(p.end,{weekday:'short',month:'short',day:'numeric'});
+  const meta=p.total?`${range} · ${p.total} thing${p.total===1?'':'s'} across ${clients} client${clients===1?'':'s'}${own?' and your own':''}${p.late?` · ${p.late} late`:''}`:range;
+  let h=`<header class="lhead"><div class="lrow1"><span class="obj-ic" aria-hidden="true">🗓</span><h1 id="pagehead" tabindex="-1">Your week</h1>
+    ${p.total?'<button type="button" class="rowact" id="copyBtn">Copy as a list</button>':''}<button type="button" class="lbtn" id="refreshBtn" aria-label="Refresh" title="Refresh">↻</button></div>
+    <div class="lmeta">${esc(meta)}</div></header>`;
+  if(p.partial)h+=`<p class="warnline" role="status">Some of it couldn’t be read just now, so this may be missing a thing or two. Refresh in a minute.</p>`;
+  if(!p.total){
+    h+=`<div class="empty"><h2>Nothing this week</h2><p>Nothing is due in the next seven days, and nothing is waiting on you. Enjoy it.</p></div>`;
+  }else{
+    h+=`<div class="days" role="group" aria-label="Show one day">${p.days.map(d=>{
+      const isToday=d.day===p.today,late=d.day==='late';
+      const label=late?'Late':isToday?'Today':short(d.day);
+      return `<button type="button" class="day${late&&d.count?' late':''}${isToday?' today':''}${d.count?'':' zero'}" data-day="${esc(d.day)}" aria-pressed="${PICK===d.day?'true':'false'}" aria-label="${esc(label)}: ${d.count} thing${d.count===1?'':'s'}"><span class="d">${esc(label)}</span><span class="n">${d.count}</span></button>`;}).join('')}</div>`;
+    h+=`<p class="intro">${PICK?`Showing ${PICK==='late'?'what’s late':PICK===p.today?'today':esc(dayWords(PICK,{weekday:'long',month:'short',day:'numeric'}))}. <a class="link" href="#" id="allDays">Show the whole week</a>`:'Clients are in the order they need you: late things first, then the soonest. Each line opens the place that does it.'}</p>`;
+    let n=0;
+    for(const c of p.clients){
+      const items=c.items.filter(inPick);
+      if(!items.length)continue;
+      if(!c.own)n++;
+      const open=c.site_id?`<a class="open" href="${esc('/today.html?client='+encodeURIComponent(c.site_id))}">Open their site →</a>`:'';
+      h+=`<section class="ccard${c.first&&!PICK?' first':''}" aria-label="${esc(c.name)}"><div class="ctop">${c.own?'':`<span class="num">${n}</span>`}<h2>${esc(c.name)}</h2>${c.first&&!PICK?'<span class="wchip">Needs you first</span>':''}${open}</div>
+        <p class="why">${esc(c.why)}</p>
+        <div class="things">${items.map(i=>{const [cls,w]=whenOf(i);return `<div class="thing"><span class="when"><span class="wchip ${cls}">${esc(w)}</span></span><span class="what">${esc(i.what)}</span><a class="rowact" href="${esc(safeHref(i.href))}" data-noscope="1">${esc(i.verb||'Open')}</a></div>`;}).join('')}</div></section>`;
+    }
+  }
+  h+=`<p class="how">Days only — nothing here has a time. Something snoozed on Home stays away until it wakes.</p>`;
+  $('main').innerHTML=h;
+  $('refreshBtn').addEventListener('click',()=>load(true));
+  const cb=$('copyBtn');if(cb)cb.addEventListener('click',async()=>{try{await navigator.clipboard.writeText(p.text||'');toast('Copied. Paste it into your notes or calendar.');}catch(_){toast('Your browser didn’t allow copying here.',true);}});
+  document.querySelectorAll('[data-day]').forEach(b=>b.addEventListener('click',()=>{const d=b.getAttribute('data-day');PICK=PICK===d?null:d;render();const again=document.querySelector('[data-day="'+CSS.escape(d)+'"]');if(again)again.focus();}));
+  const all=$('allDays');if(all)all.addEventListener('click',(e)=>{e.preventDefault();PICK=null;render();});
+}
+function notAgency(){$('main').innerHTML=`<div class="center"><h2>This isn’t an agency account.</h2><p class="muted">Plan my week looks across the clients a studio looks after.</p></div>`;}
+function signedOut(){$('main').innerHTML=`<div class="center"><h2>Sign in to your studio.</h2><p style="margin-top:20px"><a class="link" href="/studio.html">Sign in →</a></p></div>`;}
+function trouble(){
+  $('main').innerHTML=`<div class="center"><h2>We couldn’t plan your week just now.</h2><p class="muted" style="margin-bottom:16px">A brief hiccup — it usually passes.</p><button id="retry" class="btn">Try again</button></div>`;
+  const rt=$('retry');if(rt)rt.addEventListener('click',()=>boot());
+}
+async function load(soft){
+  const gen=++REQ_SEQ;
+  let r;try{r=await api('/agency/week?today='+localYmd());}catch(_){r={ok:false,status:0,body:{}};}
+  if(gen!==REQ_SEQ)return;
+  if(!r.ok){
+    if(soft&&LOADED_AT){toast('Couldn’t refresh just now.',true);return;}
+    if(r.status===401){signedOut();return;}
+    if(r.status===403){notAgency();return;}
+    trouble();return;
+  }
+  PLAN=r.body.data;LOADED_AT=Date.now();
+  if(PICK&&!PLAN.days.some(d=>d.day===PICK))PICK=null;
+  render();
+}
+async function boot(){
+  try{const{data}=await sb.auth.getSession();TOKEN=(data&&data.session&&data.session.access_token)||"";
+    if(!TOKEN){signedOut();return;}
+    await load();
+  }catch(_){trouble();}
+}
+boot();
+</script>
+</body>
+</html>

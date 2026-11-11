@@ -69,6 +69,11 @@
   Cache-Control: no-cache, must-revalidate
 /pitch
   Cache-Control: no-cache, must-revalidate
+/intake
+  Cache-Control: no-store, no-cache, must-revalidate
+  X-Robots-Tag: noindex
+/week
+  Cache-Control: no-cache, must-revalidate
 /crm
   Cache-Control: no-cache, must-revalidate
 /pipeline
