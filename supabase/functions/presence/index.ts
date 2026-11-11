@@ -20,7 +20,8 @@
 // The route groups most requests never reach load on first use (lib/lazy.ts):
 // a cold start evaluates the boundary and the everyday routes, not every file.
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
-import { corsFor } from '../_shared/cors.ts';
+import { corsFor, visitorCors } from '../_shared/cors.ts';
+import { VISITOR_ROUTE } from './lib/site_send.ts';
 import { json } from '../_shared/http.ts';
 import { noteDraftBefore, withDraftVersion } from './lib/optimistic_lock.ts';
 import { resolvePrincipal } from '../_shared/auth.ts';
@@ -110,7 +111,8 @@ function routeOf(url: string): string {
 }
 
 serve(async (req) => {
-  const cors = corsFor(req);
+  // item 131: a client's site calls its routes from its own address (see visitorCors)
+  const cors = VISITOR_ROUTE.test(routeOf(req.url)) ? visitorCors() : corsFor(req);
   if (req.method === 'OPTIONS') return new Response('ok', { headers: cors });
   try {
     return await withDraftVersion(req, await route_(req, cors));   // a write that moves the draft names the version it left

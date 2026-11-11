@@ -75,6 +75,8 @@ jobs:
             case "$file" in
               # member-roles.spec.ts imports this, so a change here changes what the specs expect.
               supabase/functions/presence/lib/site_roles.ts) run=true ;;
+              # site-send.spec.ts drives the script this one puts on client sites.
+              supabase/functions/presence/lib/site_send.ts) run=true ;;
               # ad-tags.spec.ts runs the cookie notice and its loader (list item 152).
               supabase/functions/presence/lib/ad_tags.ts) run=true ;;
               # button-presses.spec.ts runs the visit counter's own script (list item 157).

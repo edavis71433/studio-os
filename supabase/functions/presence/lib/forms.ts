@@ -473,6 +473,14 @@ export function renderForm(def: FormDefinition, ctx?: FormRenderCtx): string {
   return body + ruleScript(def, dom) + stepScript(dom, multi) + prefillScript(dom, prefillKeys);
 }
 
+// The owner's words ride into these scripts as JSON, with each "<" written \u003c, so a
+// label like "</script>" can't end the tag early. Item 131 found that the whole script
+// used to go through that replace: every "<" in the code itself (i<n) became \u003c,
+// which is not code, so all three scripts stopped on their first line and a published
+// form's show-or-hide rules, steps and prefill never ran. The code has no "</" of its own.
+const jsData = (x: unknown): string => JSON.stringify(x).replace(/</g, '\\u003c');
+const inlineScript = (js: string): string => `<script>${js.replace(/<\//g, '<\\/')}</script>`;
+
 /** FB-2 multi-step enhancer: PROGRESSIVE — the static HTML shows every step (so with
  *  JS off the whole form is a single scrollable page the server still validates). This
  *  scoped, first-party inline script (same zero-external-origin posture as the rule
@@ -481,7 +489,7 @@ export function renderForm(def: FormDefinition, ctx?: FormRenderCtx): string {
 function stepScript(dom: string, multi: boolean): string {
   if (!multi) return '';
   const js =
-    `(function(){var F=document.getElementById(${JSON.stringify(dom)});if(!F)return;` +
+    `(function(){var F=document.getElementById(${jsData(dom)});if(!F)return;` +
     `var W=F.querySelector('.ff-steps');if(!W)return;` +
     `var steps=[].slice.call(W.querySelectorAll('.ff-step'));var total=steps.length;if(total<2)return;` +
     `var submit=F.querySelector('button[type=submit]');var cur=0;` +
@@ -501,7 +509,7 @@ function stepScript(dom: string, multi: boolean): string {
     `back.addEventListener('click',function(){show(cur-1,true);});` +
     `next.addEventListener('click',function(){if(valid(cur))show(cur+1,true);});` +
     `show(0,false);})();`;
-  return `<script>${js.replace(/</g, '\\u003c')}</script>`;
+  return inlineScript(js);
 }
 
 /** FB-2 prefill enhancer: fills WHITELISTED fields from a matching URL query param
@@ -511,25 +519,25 @@ function stepScript(dom: string, multi: boolean): string {
 function prefillScript(dom: string, keys: string[]): string {
   if (!keys.length) return '';
   const js =
-    `(function(){var F=document.getElementById(${JSON.stringify(dom)});if(!F)return;` +
-    `var K=${JSON.stringify(keys)};var q;try{q=new URLSearchParams(location.search);}catch(_){return;}` +
+    `(function(){var F=document.getElementById(${jsData(dom)});if(!F)return;` +
+    `var K=${jsData(keys)};var q;try{q=new URLSearchParams(location.search);}catch(_){return;}` +
     `for(var i=0;i<K.length;i++){var k=K[i];if(!q.has(k))continue;var v=(q.get(k)||'').slice(0,500);` +
     `var el=F.querySelectorAll('[name=\"'+k+'\"]');` +
     `for(var j=0;j<el.length;j++){var e=el[j];` +
     `if(e.type==='checkbox'||e.type==='radio'){if(e.value===v)e.checked=true;}` +
     `else if(e.tagName==='SELECT'){for(var o=0;o<e.options.length;o++){if(e.options[o].value===v){e.selectedIndex=o;break;}}}` +
     `else{e.value=v;}}}})();`;
-  return `<script>${js.replace(/</g, '\\u003c')}</script>`;
+  return inlineScript(js);
 }
 
 /** The minimal inline enhancer: applies the SAME whitelisted rules client-side.
  *  Zero external origins; scoped to this form; a no-op when there are no rules. */
 function ruleScript(def: FormDefinition, dom: string): string {
   if (!def.rules || def.rules.length === 0) return '';
-  const rules = JSON.stringify(def.rules);
-  const baseReq = JSON.stringify(def.fields.filter((f) => f.required).map((f) => f.key));
+  const rules = jsData(def.rules);
+  const baseReq = jsData(def.fields.filter((f) => f.required).map((f) => f.key));
   const js =
-    `(function(){var F=document.getElementById(${JSON.stringify(dom)});if(!F)return;` +
+    `(function(){var F=document.getElementById(${jsData(dom)});if(!F)return;` +
     `var R=${rules},BR=${baseReq};` +
     `function gv(k){var e=F.querySelectorAll('[name=\"'+k+'\"]');if(!e.length)return '';` +
     `if(e[0].type==='checkbox'){var a=[];for(var i=0;i<e.length;i++)if(e[i].checked)a.push(e[i].value);return e.length>1?a:(a.length?a[0]:'');}` +
@@ -552,7 +560,7 @@ function ruleScript(def: FormDefinition, dom: string): string {
     `wf.hidden=!show;var ins=wf.querySelectorAll('input,select,textarea');` +
     `for(var n=0;n<ins.length;n++){if(!show){ins[n].required=false;}else if(req[key]){if(ins[n].type!=='checkbox'||ins.length===1)ins[n].required=(n===0||ins[n].type!=='radio')?true:ins[n].required;}}}}` +
     `F.addEventListener('input',apply);F.addEventListener('change',apply);apply();})();`;
-  return `<script>${js.replace(/</g, '\\u003c')}</script>`;
+  return inlineScript(js);
 }
 
 // ═════════ starter presets — the owner never faces a blank canvas ═════════
