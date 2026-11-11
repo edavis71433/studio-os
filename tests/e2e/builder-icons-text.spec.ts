@@ -13,6 +13,7 @@ const HTML = '<!doctype html><html><head><meta charset="utf-8"><style>section{pa
   + '<section id="a" data-dds-sid="title" data-dds-key="block_title" data-dds-src="0" class="block"><h2 data-dds-field="title">Your heading</h2></section></main></body></html>';
 const SITE = { id: 's1', edition: 'presence', status: 'ready', template_slug: 'business-classic', template_version: 1, netlify_site_id: 'abc' };
 const LOCK = '11111111-2222-4333-8444-555555555555';
+const PHOTO = 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="120" height="90"><rect width="120" height="90" fill="#c9a27e"/></svg>');
 const API = {
   '/site': { data: { site: SITE, identity: { business_name: 'Marlow’s Kitchen', description: 'Fresh bread every morning in Burbank since 2014.' }, location: { city: 'Burbank' } } },
   '/offerings': { data: [] }, '/faqs': { data: [] }, '/testimonials': { data: [] }, '/posts': { data: [] }, '/media': { data: [] }, '/health': { data: {} }, '/notes': { data: [] }, '/moments': { data: [] },
@@ -76,11 +77,30 @@ const typedIcons = (page: Page) => page.evaluate((sel) => {
   return out;
 }, REGIONS);
 
+// the filled (plum) buttons showing in each card at once: one card, one main button
+const CARDS = ['#pagesCard', '#settingsPanel', '#trayPanel', '#ritualWrap', '#view-history'];
+const filledButtons = (page: Page) => page.evaluate((sels) => {
+  const probe = document.createElement('i'); probe.style.color = 'var(--plum)'; document.body.appendChild(probe);
+  const plum = getComputedStyle(probe).color; probe.remove();
+  const out: string[] = [];
+  for (const sel of sels) {
+    const card = document.querySelector(sel); if (!card) continue;
+    const filled = [...card.querySelectorAll('button')].filter((b) => {
+      if (b.matches('[role=switch], [role=tab], [aria-pressed], [aria-checked]') || !(b.textContent || '').trim()) return false;   // a switch or a picked tile isn't an action
+      const r = b.getBoundingClientRect(); if (!r.width || !r.height) return false;
+      const st = getComputedStyle(b); if (st.visibility === 'hidden') return false;
+      return /gradient/.test(st.backgroundImage) || st.backgroundColor === plum;
+    }).map((b) => (b.textContent || '').trim().slice(0, 24));
+    if (filled.length > 1) out.push(sel + ': ' + filled.join(' + '));
+  }
+  return out;
+}, CARDS);
+
 test.describe('one icon set, readable small text, one main button (builder item 34)', () => {
   test('the bar, the dock and every card: no words under 12 pixels and no typed icons', async ({ page }) => {
     await mount(page);
-    const seen: string[] = [], icons: string[] = [];
-    const look = async () => { seen.push(...await smallWords(page)); icons.push(...await typedIcons(page)); };
+    const seen: string[] = [], icons: string[] = [], mains: string[] = [];
+    const look = async () => { seen.push(...await smallWords(page)); icons.push(...await typedIcons(page)); mains.push(...await filledButtons(page)); };
     await look();
     await run(page, 'openPagesCard', 'dcPageSwitch'); await page.waitForTimeout(200); await look();
     await page.locator('#pagesCard .pg-gear').first().click(); await page.waitForTimeout(200); await look();
@@ -89,9 +109,23 @@ test.describe('one icon set, readable small text, one main button (builder item 
     await run(page, 'eeEditBlock', 0); await page.waitForTimeout(250); await look();
     for (const tab of ['style', 'layout', 'when']) { await run(page, 'insTab', tab); await page.waitForTimeout(150); await look(); }
     await run(page, 'closeDesignPanels');
+    for (const part of ['header', 'footer']) { await run(page, 'openSettingsPanel', part); await page.waitForTimeout(200); await look(); }
+    await run(page, 'closeDesignPanels');
     await run(page, 'openTrayPanel', 'add'); await page.waitForTimeout(250); await look();
     expect(seen).toEqual([]);
     expect(icons).toEqual([]);
+    expect(mains).toEqual([]);
+  });
+
+  test('the Photos card: a photo’s own words, where it’s at work, are 12 pixels too', async ({ page }) => {
+    await mount(page, { api: { '/media': { data: [{ id: 'm1', thumb: PHOTO, alt_text: 'Fresh bread on the counter', used_by: ['Home'] }] } } });
+    await page.locator('#dkPhotos').click();
+    const cell = page.locator('#panelFilesGrid .mcell').first();
+    await expect(cell.locator('.usedline')).toHaveText('at work: Home');
+    await cell.hover();
+    await expect(cell.locator('.badge')).toHaveCSS('opacity', '0');   // the caption takes the badge's place, so the two never overlap
+    expect(await smallWords(page)).toEqual([]);
+    expect(await typedIcons(page)).toEqual([]);
   });
 
   test('the Pages card: with a page’s settings open, Done is its one main button', async ({ page }) => {

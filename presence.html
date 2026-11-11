@@ -516,7 +516,7 @@ html.dc-edit:not(.plan-watch) .dc-twbar[hidden]{display:none}
 .hf-logo .lg{flex:none;width:44px;height:44px;box-sizing:border-box;border:1px solid var(--hair);border-radius:10px;background:var(--dc-raised,var(--paper)) center/cover no-repeat}
 .hf-logo p,.hf-says{flex:1;margin:0;font-size:12.5px;line-height:1.45;color:var(--ink-2)}
 .hf-tiles{display:grid;grid-template-columns:repeat(var(--n,2),minmax(0,1fr));gap:8px}
-.hf-tile{display:flex;flex-direction:column;align-items:center;gap:6px;min-width:0;padding:0;border:0;background:transparent;color:var(--ink-2);font:500 11.5px/1.25 var(--sans);text-align:center;cursor:pointer}
+.hf-tile{display:flex;flex-direction:column;align-items:center;gap:6px;min-width:0;padding:0;border:0;background:transparent;color:var(--ink-2);font:500 12px/1.25 var(--sans);text-align:center;cursor:pointer}
 .hf-pic{position:relative;display:block;width:100%;height:58px;box-sizing:border-box;border:1px solid var(--hair);border-radius:10px;background:var(--dc-raised,var(--paper));overflow:hidden}
 .hf-pic i{position:absolute;display:block;height:4px;border-radius:2px;background:var(--ink-3);opacity:.6}
 .hf-tile[aria-pressed=true]{color:var(--plum);font-weight:600}
@@ -695,7 +695,9 @@ html.dc-edit:not(.plan-watch) #panelFilesGrid{grid-template-columns:repeat(3,1fr
 html.dc-edit:not(.plan-watch) #panelFilesGrid .mcell{border:0;border-radius:10px;background:var(--dc-raised,var(--paper))}
 html.dc-edit:not(.plan-watch) #panelFilesGrid .mcell .alt{opacity:0;transition:opacity var(--dur) var(--ease);padding:16px 6px 6px;font-size:12px}
 html.dc-edit:not(.plan-watch) #panelFilesGrid .mcell:hover .alt,html.dc-edit:not(.plan-watch) #panelFilesGrid .mcell:focus-visible .alt{opacity:1}
-html.dc-edit:not(.plan-watch) #panelFilesGrid .mcell .badge{left:6px;top:6px;background:var(--sage-soft);color:var(--sage);font-size:12px;font-weight:600;letter-spacing:0;text-transform:none;padding:3px 8px}
+html.dc-edit:not(.plan-watch) #panelFilesGrid .mcell .badge{left:6px;top:6px;background:var(--sage-soft);color:var(--sage);font-size:12px;font-weight:600;letter-spacing:0;text-transform:none;padding:3px 8px;transition:opacity var(--dur) var(--ease)}
+/* item 34: at 12px a photo's caption, which also says where it's at work, would run into the badge, so it takes the badge's place */
+html.dc-edit:not(.plan-watch) #panelFilesGrid .mcell:hover .badge,html.dc-edit:not(.plan-watch) #panelFilesGrid .mcell:focus-visible .badge{opacity:0}
 html.dc-edit:not(.plan-watch) #panelFilesGrid .medit{right:6px;top:6px;min-height:28px;min-width:28px;width:28px;padding:0;border-radius:999px;background:var(--sheet);color:var(--ink);box-shadow:var(--dds-shadow);display:inline-flex;align-items:center;justify-content:center;opacity:0}
 html.dc-edit:not(.plan-watch) #panelFilesGrid .mwrap:hover .medit,html.dc-edit:not(.plan-watch) #panelFilesGrid .medit:focus-visible{opacity:1}
 @media (pointer:coarse){html.dc-edit:not(.plan-watch) #panelFilesGrid .medit{opacity:1;min-height:32px;min-width:32px;width:32px}}
@@ -1010,7 +1012,7 @@ html.plan-watch #svWords{display:none}
 .mcell .del{position:absolute;right:8px;top:8px;background:rgba(33,29,25,.65);color:#fff;border-radius:50%;width:26px;height:26px;display:grid;place-items:center;opacity:0;transition:opacity var(--dur) var(--ease);font-size:12px}
 .mcell:hover .del,.mcell:focus-within .del{opacity:1}
 .mcell .alt{position:absolute;left:0;right:0;bottom:0;padding:var(--dds-s6,24px) var(--dds-s2,8px) var(--dds-s2,8px);font-size:12px;color:#fff;background:linear-gradient(transparent,rgba(33,29,25,.75))}
-.mcell .alt .usedline{display:block;font-size:9.5px;opacity:.8;font-style:italic}
+.mcell .alt .usedline{display:block;font-size:12px;opacity:.8;font-style:italic}
 /* The picker's Edit (items 39 + 117): its own button beside the photo's, never inside
    it (a button can't hold another), over the photo's top right like .del */
 .mwrap{position:relative}
