@@ -334,7 +334,7 @@ let TOKEN="",ALL=[],Q="",LOADED_AT=0;
 const PAGE=100;
 let TOTAL=null,NEXT_OFF=0,LAST_FULL=false,MORE_BUSY=false,SRCH=null,SRCH_SEQ=0,SRCH_ERR='';
 const hasMore=()=>TOTAL!=null?NEXT_OFF<TOTAL:LAST_FULL;
-const srchNow=()=>{const q=Q.trim();return(SRCH&&q&&SRCH.q===q)?SRCH:null;};
+const srchNow=()=>{const q=Q.trim();return(SRCH&&q&&SRCH.q===q&&SRCH.key===serverKey())?SRCH:null;};
 // every row this page knows: the loaded pages plus any search matches beyond them
 const knownRows=()=>{const s=SRCH&&SRCH.rows||[];if(!s.length)return ALL;const have=new Set(ALL.map(c=>String(c.id)));return ALL.concat(s.filter(c=>!have.has(String(c.id))));};
 const findRow=(id)=>knownRows().find(x=>x.id===id);
@@ -358,6 +358,16 @@ const VIEWS=[['all','All contacts'],['recent','Recently updated']];
 const VIEW_LABEL=Object.fromEntries(VIEWS);
 let VIEWNAME='all';
 const RECENT_DAYS=30;
+// item 110 (K4): past the first 100 people the page held only the newest edits, so "Sorted by
+// Name" sorted those hundred and "Recently updated" was right only by luck. The sort and the
+// view now go to the server with every page read; a roster that is all here sorts on the page.
+let LOADED_KEY='';
+const serverKey=()=>SORT.key+':'+SORT.dir+':'+(VIEWNAME==='recent'?'recent':'all');
+const wholeRoster=()=>/:all$/.test(LOADED_KEY)&&!hasMore();
+// the loaded pages hold this view in this order (counts from the server describe it)
+const keyLoaded=()=>LOADED_KEY===serverKey();
+// every row this view could show is on the page: a search needs no server
+const haveAll=()=>wholeRoster()||(keyLoaded()&&!hasMore());
 const viewMatch=(c)=>{
   if(VIEWNAME==='recent'){const t=Date.parse(c.updated_at||'');return isFinite(t)&&(Date.now()-t)<=RECENT_DAYS*86400000;}
   return true;
@@ -390,7 +400,9 @@ function applySaved(v){
   VIEWNAME=VIEW_LABEL[v.base]?v.base:'all';Q=v.q||'';
   SORT=(v.sort&&COLS.some(c=>c[0]===v.sort.key))?{key:v.sort.key,dir:v.sort.dir<0?-1:1}:{key:'name',dir:1};
   HIDDEN=(v.cols&&v.cols.length)?new Set(COLS.map(c=>c[0]).filter(k=>k!=='name'&&!v.cols.includes(k))):new Set();
-  CURVIEW=v.id;PICKED.clear();render();
+  CURVIEW=v.id;PICKED.clear();SRCH=null;
+  // item 110 (K4): a saved search looked only through the people loaded; it asks the server like a typed one
+  return reorder('#viewBtn');
 }
 async function saveView(){
   const k=KIT();if(!k)return;
@@ -423,7 +435,9 @@ async function bulkSend(){
   const people=knownRows().filter(c=>PICKED.has(String(c.id))&&c.email).map(c=>({email:c.email,name:c.name||''}));
   if(!people.length){toast('None of the people you picked has an email address.');return;}
   const b=$('bulkSend');if(b)b.disabled=true;
-  if(!(await k.sendTo(people)))if(b)b.disabled=false;
+  // item 110 (K5): a dropped connection left the button grey with no word
+  let ok=false;try{ok=await k.sendTo(people);}catch(_){toast('We couldn’t reach the server — nothing was sent. Try again in a moment.');}
+  if(!ok){const nb=$('bulkSend');if(nb)nb.disabled=false;}
 }
 let VIEWS_ASKED=false;
 function loadSavedViews(){
@@ -447,8 +461,8 @@ function sortedRows(){
 }
 const lmetaText=(count)=>{
   const sortCol=COLS.find(x=>x[0]===SORT.key)||COLS[0];
-  // item 66: never "100 contacts" when the roster holds more
-  const part=!Q.trim()&&VIEWNAME==='all'&&TOTAL!=null&&TOTAL>count, n=part?TOTAL:count;
+  // item 66: never "100 contacts" when the roster holds more (item 110: the count is the view's own when the server read it)
+  const part=!Q.trim()&&keyLoaded()&&TOTAL!=null&&TOTAL>count, n=part?TOTAL:count;
   return `${part?count+' of ':''}${n} contact${n===1?'':'s'} · ${updatedLabel()}${DISPLAY==='table'?` · Sorted by ${sortCol[1]} — ${SORT.dir>0?'ascending':'descending'}`:''}`;
 };
 function headerHtml(count){
@@ -531,7 +545,7 @@ function listHtml(rows){
   // the exit: carryScopeGlobally would otherwise re-scope it straight back in.
   if(!ALL.length&&scope())return `<div class="center"><h2>Contacts live at the studio level.</h2><p class="muted">You’re looking at one client. Your contacts belong to your studio, not to a single client, so there’s nothing here to show — and nothing you could usefully add from inside a client.</p><p style="margin-top:16px"><a class="link" data-noscope href="/contacts.html">Leave this client and open Contacts →</a></p></div>`;
   if(!ALL.length)return `<div class="center"><h2>No contacts yet.</h2><p class="muted">Add someone, or they’ll appear here automatically when a website enquiry or a new deal comes in.</p><p style="margin-top:16px"><a class="link" href="/pipeline.html">Open Pipeline →</a></p></div>`;
-  if(!rows.length)return `<p class="muted" style="text-align:center;padding:30px">${Q?(Q.trim()&&hasMore()&&!srchNow()?(SRCH_ERR===Q.trim()?'We couldn’t search all your contacts just now. These are the ones loaded so far.':'Looking through all your contacts…'):'No contacts match “'+esc(Q)+'”.'):'Nothing in this view — try “All contacts”.'}</p>`+moreHtml();
+  if(!rows.length)return `<p class="muted" style="text-align:center;padding:30px">${Q?(Q.trim()&&!haveAll()&&!srchNow()?(SRCH_ERR===Q.trim()?'We couldn’t search all your contacts just now. These are the ones loaded so far.':'Looking through all your contacts…'):'No contacts match “'+esc(Q)+'”.'):'Nothing in this view — try “All contacts”.'}</p>`+moreHtml();
   return (DISPLAY==='table'?bulkHtml()+tableHtml(rows):cardsHtml(rows))+moreHtml();
 }
 // item 66: "Showing 100 of 240 · Show more" whenever the server holds more than shown
@@ -544,9 +558,18 @@ function moreHtml(){
 }
 // one page of people (100), with the count of all of them
 async function readPage(off,q){
-  const p=new URLSearchParams({limit:String(PAGE),offset:String(off),total:'1'});
+  const p=new URLSearchParams({limit:String(PAGE),offset:String(off),total:'1',sort:SORT.key,dir:SORT.dir>0?'asc':'desc'});
+  if(VIEWNAME==='recent')p.set('since',new Date(Date.now()-RECENT_DAYS*86400000).toISOString());   // item 110 (K4)
   if(q)p.set('q',q);else p.set('dupes','1');
   return api('/sales/contacts?'+p.toString());
+}
+// item 110 (K4): a new sort or view. Everyone loaded → the page sorts and filters what it
+// holds (no read); otherwise the server reads the new order, as many pages as were showing.
+function reorder(focusSel){
+  const back=()=>{if(focusSel){const n=document.querySelector(focusSel);if(n)n.focus();}};
+  if(keyLoaded()||wholeRoster()){render();back();if(Q.trim())searchServer();return;}
+  SRCH=null;
+  return load().then(back).catch(()=>toast('We couldn’t load your contacts in that order just now.'));
 }
 async function showMore(){
   if(MORE_BUSY)return;
@@ -564,21 +587,27 @@ async function showMore(){
 // a search typed while some people are not loaded asks the server (debounced by the input)
 async function searchServer(){
   const q=Q.trim();
-  if(!q||!hasMore()){SRCH=null;return;}
-  if(SRCH&&SRCH.q===q)return;
+  if(!q||haveAll()){SRCH=null;return;}
+  if(SRCH&&SRCH.q===q&&SRCH.key===serverKey())return;
   const seq=++SRCH_SEQ;
   let r;try{r=await readPage(0,q);}catch(_){r={ok:false};}
   if(seq!==SRCH_SEQ||Q.trim()!==q)return;
   if(!r.ok){SRCH=null;SRCH_ERR=q;renderListZone();return;}
   SRCH_ERR='';
   const rows=(r.body&&r.body.data)||[],tot=(r.body&&typeof r.body.total==='number')?r.body.total:null;
-  SRCH={q,rows,total:tot,more:tot!=null?rows.length<tot:rows.length>=PAGE};
+  SRCH={q,key:serverKey(),rows,total:tot,more:tot!=null?rows.length<tot:rows.length>=PAGE};
   renderListZone();
+}
+// item 110 (K3): inside a client the page reads that client's site, where your contacts don't
+// live — an add or an import there was filed under the client and never reached your list.
+// So the add, import and fields buttons only show at the studio level.
+function addButtons(){
+  return `<button class="btn" id="new">+ Add a contact</button><button class="btn ghost" id="addCust" title="Set up an existing customer with their own workspace and a sign-in invitation">+ Add a customer</button><button class="btn ghost" id="importCsv" title="Bring your existing contact list — a CSV export from anywhere">Import CSV</button><button class="btn ghost" id="manageFields" data-needs="configure" title="Define up to 5 of your own fields — they show on every contact’s record">Manage fields</button>`;
 }
 function render(){
   const rows=sortedRows();
   let h=headerHtml(rows.length)
-    +`<div class="bar"><input class="search" id="q" type="search" aria-label="Search contacts" placeholder="Search name, email, or company…" value="${esc(Q)}"><button class="btn" id="new">+ Add a contact</button><button class="btn ghost" id="addCust" title="Set up an existing customer with their own workspace and a sign-in invitation">+ Add a customer</button><button class="btn ghost" id="importCsv" title="Bring your existing contact list — a CSV export from anywhere">Import CSV</button><button class="btn ghost" id="manageFields" data-needs="configure" title="Define up to 5 of your own fields — they show on every contact’s record">Manage fields</button></div><div id="csvZone"></div>`
+    +`<div class="bar"><input class="search" id="q" type="search" aria-label="Search contacts" placeholder="Search name, email, or company…" value="${esc(Q)}">${scope()?'':addButtons()}</div><div id="csvZone"></div>`
     +`<div id="listZone">${listHtml(rows)}</div>`;
   // Any re-render (sort, view, display, refresh) must not destroy an open — or
   // in-flight — CSV import panel: carry the LIVE #csvZone node (its handlers,
@@ -615,8 +644,8 @@ function wire(){
       else if(e.key==='ArrowDown'){e.preventDefault();opts[Math.min(i+1,opts.length-1)].focus();}
       else if(e.key==='ArrowUp'){e.preventDefault();opts[Math.max(i-1,0)].focus();}
     });
-    vm.querySelectorAll('[data-view]').forEach(b=>b.addEventListener('click',()=>{VIEWNAME=b.getAttribute('data-view');CURVIEW='';PICKED.clear();render();const nv=$('viewBtn');if(nv)nv.focus();}));
-    vm.querySelectorAll('[data-saved]').forEach(b=>b.addEventListener('click',()=>{const v=SAVED.find(x=>x.id===b.getAttribute('data-saved'));if(v)applySaved(v);const nv=$('viewBtn');if(nv)nv.focus();}));
+    vm.querySelectorAll('[data-view]').forEach(b=>b.addEventListener('click',()=>{VIEWNAME=b.getAttribute('data-view');CURVIEW='';PICKED.clear();reorder('#viewBtn');}));
+    vm.querySelectorAll('[data-saved]').forEach(b=>b.addEventListener('click',()=>{const v=SAVED.find(x=>x.id===b.getAttribute('data-saved'));if(v)applySaved(v);else{const nv=$('viewBtn');if(nv)nv.focus();}}));
   }
   const sv=$('saveView');if(sv)sv.addEventListener('click',saveView);
   const dv=$('dropView');if(dv)dv.addEventListener('click',dropView);
@@ -641,8 +670,7 @@ function wireList(){
   document.querySelectorAll('[data-sort]').forEach(b=>b.addEventListener('click',()=>{
     const k=b.getAttribute('data-sort');
     if(SORT.key===k)SORT.dir=-SORT.dir; else SORT={key:k,dir:k==='updated_at'?-1:1};   // timestamps read newest-first on first click
-    render();
-    const nbtn=document.querySelector('[data-sort="'+k+'"]'); if(nbtn)nbtn.focus();
+    reorder('[data-sort="'+k+'"]');
   }));
   document.querySelectorAll('[data-deal]').forEach(b=>b.addEventListener('click',(e)=>{e.stopPropagation();newDeal(b.getAttribute('data-deal'));}));
   document.querySelectorAll('[data-edit]').forEach(b=>b.addEventListener('click',(e)=>{e.stopPropagation();openEdit(b.getAttribute('data-edit'));}));
@@ -1051,7 +1079,7 @@ function trouble(){$('main').innerHTML=`<div class="center"><h2>We couldn’t lo
 // response (success OR failure) is allowed to touch the page.
 let REQ_SEQ=0;
 async function load(){
-  const seq=++REQ_SEQ;
+  const seq=++REQ_SEQ,key=serverKey();   // item 110: the order and view these pages are read in
   // item 66: 100 a page (the server's cap; limit=500 silently got 100) with the
   // count of all; a reload after an edit re-reads as many pages as were showing
   const pages=Math.max(1,Math.ceil(NEXT_OFF/PAGE));
@@ -1063,7 +1091,7 @@ async function load(){
   {const seen=new Set();ALL=[];for(const x of rs)for(const c of ((x.body&&x.body.data)||[]))if(!seen.has(String(c.id))){seen.add(String(c.id));ALL.push(c);}}
   const last=rs[rs.length-1].body||{};
   NEXT_OFF=rs.reduce((n,x)=>n+((x.body&&x.body.data)||[]).length,0);TOTAL=typeof last.total==='number'?last.total:null;LAST_FULL=((last.data)||[]).length>=PAGE;
-  SRCH=null;SRCH_ERR='';LOADED_AT=Date.now();
+  SRCH=null;SRCH_ERR='';LOADED_AT=Date.now();LOADED_KEY=key;
   { const live=new Set(ALL.map(c=>String(c.id))); for(const id of [...PICKED])if(!live.has(id))PICKED.delete(id); }
   render();loadSavedViews();
   if(Q.trim())searchServer();   // item 66: a search still in the box looks past the loaded pages again

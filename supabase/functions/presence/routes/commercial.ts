@@ -27,6 +27,7 @@ import { validateBlocks } from '../lib/site_blocks.ts';
 import { validateFormValues, type FormDefinition } from '../lib/forms.ts';
 import { notSentReason } from '../lib/legal_pages.ts';
 import { enquiryState, customerEmails } from '../lib/enquiry_state.ts';
+import { normEmail, emailMatch } from '../lib/contact_email.ts';
 import { leadVisit } from '../lib/visit_source.ts';   // item 89
 
 const SB_URL = Deno.env.get('SUPABASE_URL') || '';
@@ -288,8 +289,11 @@ export function leadReplyHtml(body: string, original: string): string {
   const quoted = original ? `<p style="margin-top:18px;color:#6b6478;font-size:13px">You wrote:</p><blockquote style="margin:0;padding-left:12px;border-left:3px solid #e2dff0;color:#6b6478;font-size:13px">${esc(original).replace(/\n/g, '<br>')}</blockquote>` : '';
   return paras + quoted;
 }
-async function ensureLeadContact(siteId: string, email: string, name: string, phone: string): Promise<void> {
-  const hit = await svc(`presence_contacts?site_id=eq.${siteId}&email=eq.${encodeURIComponent(email)}&deleted_at=is.null&select=id&limit=1`);
+async function ensureLeadContact(siteId: string, emailIn: string, name: string, phone: string): Promise<void> {
+  // item 110 (K1): kept lower-cased and matched whatever the capitals, the way the database's
+  // one-contact-per-email rule matches — Jane@Example.com used to block every later add of her
+  const email = normEmail(emailIn);
+  const hit = await svc(`presence_contacts?site_id=eq.${siteId}&${emailMatch(email)}&deleted_at=is.null&select=id&limit=1`);
   if (Array.isArray(hit.json) && hit.json.length) return;
   await svc('presence_contacts', { method: 'POST', headers: { Prefer: 'return=minimal' },
     body: JSON.stringify({ site_id: siteId, name: name || '', email, phone: phone || '' }) }).catch(() => {});

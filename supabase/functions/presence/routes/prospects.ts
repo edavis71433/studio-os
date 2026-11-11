@@ -27,6 +27,7 @@ import { tableMissing } from './estimates.ts';
 import { dealEvent } from './sales.ts';
 import type { SiteRow } from '../lib/site.ts';
 import type { Principal } from '../../_shared/auth.ts';
+import { emailMatch } from '../lib/contact_email.ts';
 
 const rows = (r: { json?: unknown }) => (Array.isArray((r as any).json) ? (r as any).json : []) as any[];
 const clean = (s: unknown, max = 200) => String(s ?? '').replace(/[\u0000-\u0008\u000B-\u001F\u007F]/g, '').trim().slice(0, max);
@@ -329,7 +330,7 @@ export async function handleToolLeadConvert(_req: Request, site: SiteRow, princi
   const who = clean(lead.business_name, 120) || email || 'Free-tool lead';
   let contact: any = null;
   if (email) {
-    const existing = await svc(`presence_contacts?site_id=eq.${site.id}&email=eq.${encodeURIComponent(email)}&deleted_at=is.null&select=id,name,email&limit=1`).catch(() => null);
+    const existing = await svc(`presence_contacts?site_id=eq.${site.id}&${emailMatch(email)}&deleted_at=is.null&select=id,name,email&limit=1`).catch(() => null);   // item 110 (K1)
     contact = existing && (existing as any).ok ? rows(existing)[0] || null : null;
   }
   if (!contact) {
