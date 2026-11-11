@@ -114,28 +114,6 @@ https://tools.davisdigitalstudio.com/tools-logo.webp     /tools-logo.webp     20
 https://tools.davisdigitalstudio.com/favicon.png         /favicon.png         200!
 https://tools.davisdigitalstudio.com/og-image.jpg        /og-image.jpg        200!
 https://tools.davisdigitalstudio.com/*                   https://app.davisdigitalstudio.com/:splat  301!
-# TEMPORARY (removed before review): the item 139 rules on this preview's own host, to prove them on Netlify
-https://deploy-preview-267--studio-os-dds.netlify.app/                     /app-door.html   200!
-https://deploy-preview-267--studio-os-dds.netlify.app/about                https://davisdigitalstudio.com/about   301!
-https://deploy-preview-267--studio-os-dds.netlify.app/site-review         /site-review.html    200!
-https://deploy-preview-267--studio-os-dds.netlify.app/site-review.html    /site-review         301!
-https://deploy-preview-267--studio-os-dds.netlify.app/ai-visibility       /ai-visibility.html  200!
-https://deploy-preview-267--studio-os-dds.netlify.app/ai-visibility.html  /ai-visibility       301!
-https://deploy-preview-267--studio-os-dds.netlify.app/report/*            /report.html         200!
-https://deploy-preview-267--studio-os-dds.netlify.app/privacy             /privacy.html        200!
-https://deploy-preview-267--studio-os-dds.netlify.app/ai-disclaimer       /ai-disclaimer.html  200!
-https://deploy-preview-267--studio-os-dds.netlify.app/analytics.js        /analytics.js        200!
-https://deploy-preview-267--studio-os-dds.netlify.app/tools-common.js     /tools-common.js     200!
-https://deploy-preview-267--studio-os-dds.netlify.app/site-review.js      /site-review.js      200!
-https://deploy-preview-267--studio-os-dds.netlify.app/ai-visibility.js    /ai-visibility.js    200!
-https://deploy-preview-267--studio-os-dds.netlify.app/tool-report.js      /tool-report.js      200!
-https://deploy-preview-267--studio-os-dds.netlify.app/tool-report.css     /tool-report.css     200!
-https://deploy-preview-267--studio-os-dds.netlify.app/styles.css          /styles.css          200!
-https://deploy-preview-267--studio-os-dds.netlify.app/nav.js              /nav.js              200!
-https://deploy-preview-267--studio-os-dds.netlify.app/tools-logo.webp     /tools-logo.webp     200!
-https://deploy-preview-267--studio-os-dds.netlify.app/favicon.png         /favicon.png         200!
-https://deploy-preview-267--studio-os-dds.netlify.app/og-image.jpg        /og-image.jpg        200!
-https://deploy-preview-267--studio-os-dds.netlify.app/*                   https://app.davisdigitalstudio.com/:splat  301!
 
 # Resources hub — permanent as of V2 (previously retired to /audit; that
 # redirect is removed, this clean-URL rewrite added in its place)
