@@ -26,6 +26,7 @@ import type { EmailBrand } from '../lib/email_brand.ts';
 import { sendEmail } from '../commerce/account.ts';
 import { readReservedJson, updateReservedJson, RESERVED_NAMES } from '../lib/reserved_store.ts';
 import { siteOrigin } from '../lib/site.ts';
+import { normalizeQuestions, costWords } from '../lib/ai_watch.ts';
 import type { SiteRow } from '../lib/site.ts';
 import { json } from '../../_shared/http.ts';
 
@@ -41,6 +42,12 @@ export interface ReportSetting {
   enabled: boolean; note: string; last_month: string | null;
   last_result: ReportResult | null; tries: { month: string; count: number } | null;
   updated_by: string | null; updated_at: string | null;
+  /** Builder list item 182: the monthly AI check for this client (it costs money, so off
+   *  until the studio switches it on), the month it last handled, how that went, and
+   *  its tries this month (ops/ai_checks.ts). */
+  ai_checks: boolean; ai_month: string | null;
+  ai_result: { month: string; status: 'checked' | 'failed'; reason: string | null; at: string } | null;
+  ai_tries: { month: string; count: number } | null;
 }
 /** Why a client can't be emailed, in the words the card uses. */
 export const BLOCK_WORDS: Record<string, string> = {
@@ -72,7 +79,17 @@ export function normalizeReportSetting(raw: unknown): ReportSetting {
     tries: r.tries && typeof r.tries === 'object' && typeof (r.tries as any).month === 'string' && Number.isFinite((r.tries as any).count) ? { month: String((r.tries as any).month), count: Math.max(0, Math.floor(Number((r.tries as any).count))) } : null,
     updated_by: typeof r.updated_by === 'string' ? r.updated_by : null,
     updated_at: typeof r.updated_at === 'string' ? r.updated_at : null,
+    ai_checks: r.ai_checks === true,
+    ai_month: typeof r.ai_month === 'string' && /^\d{4}-\d{2}$/.test(r.ai_month) ? r.ai_month : null,
+    ai_result: normalizeAiResult(r.ai_result),
+    ai_tries: r.ai_tries && typeof r.ai_tries === 'object' && typeof (r.ai_tries as any).month === 'string' && Number.isFinite((r.ai_tries as any).count) ? { month: String((r.ai_tries as any).month), count: Math.max(0, Math.floor(Number((r.ai_tries as any).count))) } : null,
   };
+}
+
+function normalizeAiResult(raw: unknown): ReportSetting['ai_result'] {
+  const r = raw && typeof raw === 'object' ? raw as Record<string, unknown> : null;
+  if (!r || typeof r.month !== 'string' || !/^\d{4}-\d{2}$/.test(r.month) || (r.status !== 'checked' && r.status !== 'failed')) return null;
+  return { month: r.month, status: r.status, reason: typeof r.reason === 'string' ? r.reason : null, at: typeof r.at === 'string' ? r.at : '' };
 }
 
 function normalizeResult(raw: unknown): ReportResult | null {
@@ -86,9 +103,11 @@ function normalizeResult(raw: unknown): ReportResult | null {
 /** Pure: the setting after the studio flips the switch or edits the line. Switching
  *  ON marks last month as handled, so nothing goes out until next month's first
  *  days, which is what the card promises (review finding 4). */
-export function applyReportChange(cur: ReportSetting, b: { enabled?: unknown; note?: unknown }, who: string | null, nowIso: string, tz = 'UTC'): ReportSetting {
+export function applyReportChange(cur: ReportSetting, b: { enabled?: unknown; note?: unknown; ai_checks?: unknown }, who: string | null, nowIso: string, tz = 'UTC'): ReportSetting {
   const next: ReportSetting = { ...cur, updated_by: who || cur.updated_by, updated_at: nowIso };
   if (typeof b.note === 'string') next.note = b.note.slice(0, REPORT_NOTE_MAX);
+  // item 182: switching the AI check on runs the first one soon (this month isn't handled yet)
+  if (typeof b.ai_checks === 'boolean') next.ai_checks = b.ai_checks;
   if (typeof b.enabled === 'boolean') {
     if (b.enabled && !cur.enabled) {
       const prev = lastMonth(nowIso, tz).month;   // D7: last month on the site's clock, the one the job will look for
@@ -342,12 +361,14 @@ export async function runMonthlyReports(limit = 20, nowIso = new Date().toISOStr
 
 // ── the site-scoped routes: GET and PUT /report/monthly, POST /report/monthly/preview ──
 export async function handleReportGet(site: SiteRow, cors: Record<string, string>) {
-  const [s, reach, tz] = await Promise.all([readReportSetting(site.id), reachOf(site).catch(() => null), zoneOfSite(site.id)]);
-  return json({ data: { ...s, note_max: REPORT_NOTE_MAX, next_month: monthNow(new Date().toISOString(), tz), blocked: reach ? reach.blocked : null } }, 200, cors);   // this month's report goes out in the first days of next month
+  const [s, reach, tz, qs] = await Promise.all([readReportSetting(site.id), reachOf(site).catch(() => null), zoneOfSite(site.id), readReservedJson(site.id, RESERVED_NAMES.aiQuestions)]);
+  // item 182: what the monthly AI check would cost, for this client's questions (the AI check's seven until they change them)
+  const n = normalizeQuestions(qs).questions.length || 7;
+  return json({ data: { ...s, note_max: REPORT_NOTE_MAX, next_month: monthNow(new Date().toISOString(), tz), blocked: reach ? reach.blocked : null, ai_questions: n, ai_cost: costWords(n) } }, 200, cors);   // this month's report goes out in the first days of next month
 }
 export async function handleReportPut(req: Request, site: SiteRow, principal: { email?: string | null }, cors: Record<string, string>) {
-  let b: { enabled?: unknown; note?: unknown } = {}; try { b = await req.json(); } catch { /* answered below */ }
-  if (typeof b.enabled !== 'boolean' && typeof b.note !== 'string') return json({ error: 'bad_request', message: 'Say whether the report is on, or give the line to send with it.' }, 400, cors);
+  let b: { enabled?: unknown; note?: unknown; ai_checks?: unknown } = {}; try { b = await req.json(); } catch { /* answered below */ }
+  if (typeof b.enabled !== 'boolean' && typeof b.note !== 'string' && typeof b.ai_checks !== 'boolean') return json({ error: 'bad_request', message: 'Say whether the report is on, or give the line to send with it.' }, 400, cors);
   // switching on for a client who can't be emailed would promise a report that never goes (review finding 2)
   if (b.enabled === true) {
     const reach = await reachOf(site).catch(() => null);

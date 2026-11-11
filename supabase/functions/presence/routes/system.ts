@@ -18,6 +18,7 @@ import { reapSnapshots } from '../lib/snapshot_gc.ts';
 import { runRecurringInvoices } from './recurring_invoices.ts';   // sales review item 47: a fresh invoice on a schedule
 import { runTrafficSpikes } from '../ops/traffic_spikes.ts';
 import { runMonthlyReports } from '../ops/monthly_report.ts';
+import { runAiChecks } from '../ops/ai_checks.ts';
 import { runSiteTrashPurge } from '../ops/site_trash.ts';
 import { runLifecycleSweep, runWeeklyDigest, runDomainWatch, runLeadFollowups, runDealFollowups, runRenewalReminders, runInvoiceReminders, runSalesDocReminders, runReviewRequests, runProspectNurture, runSupportAging, runAgreementRenewalReminders, runBookingReminders, runBookingFollowups, runEmailAuthNudges, runApexDriftWatch, runApprovalReminders } from '../commerce/lifecycle.ts';
 import { runScheduledBroadcasts } from '../lib/broadcast.ts';
@@ -398,6 +399,7 @@ export async function handleSystem(req: Request, route: string, method: string, 
             ['retention', () => runRetentionSweep()],
             ['media_gc', () => reapMedia(100)],
             ['snapshot_gc', () => reapSnapshots(200)],
+            ['ai_checks', () => runAiChecks(1)],   // builder list item 182: one client's monthly AI check at most (it takes up to a minute), last
           ],
         };
         const progress: Record<string, unknown> = { group: task };
@@ -472,6 +474,7 @@ export async function handleSystem(req: Request, route: string, method: string, 
       const retention = await step('retention', () => runRetentionSweep());        // bounded detail tables (visits/terms/ledgers/evidence)
       const media_gc = await step('media_gc', () => reapMedia(100));               // M6: reap soft-deleted + orphan media
       const snapshot_gc = await step('snapshot_gc', () => reapSnapshots(200));     // M7: prune old unreferenced snapshots
+      await step('ai_checks', () => runAiChecks(1));                               // builder list item 182: one client's monthly AI check at most, last (it takes up to a minute)
 
       // Terminal status reflects EVERY sweep, not just the cycle: a persistently
       // failing prune/reminder marks the tick failed → counts toward
