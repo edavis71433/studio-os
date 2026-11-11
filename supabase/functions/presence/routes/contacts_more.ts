@@ -76,7 +76,9 @@ export async function importUpdate(siteId: string, importId: string, existing: R
   const { patch, changes } = importChanges(full, incoming);
   if (!Object.keys(patch).length) return { row: existing, updated: false };
   let up = await svc(`presence_contacts?id=eq.${full.id}&site_id=eq.${siteId}&select=id,name,email,phone,company`, { method: 'PATCH', headers: { Prefer: 'return=representation' }, body: JSON.stringify(patch) });
-  const missing = up.ok ? [] : missingInsertColumns(up.json, up.text, Object.keys(patch));
+  const named = up.ok ? [] : missingInsertColumns(up.json, up.text, Object.keys(patch));
+  // the four newer fields arrive together (APPLY-0166): one missing means all four are
+  const missing = named.some((c) => (CONTACT_MORE_COLS as readonly string[]).includes(c)) ? [...new Set([...named, ...CONTACT_MORE_COLS])].filter((c) => c in patch) : named;
   if (missing.length) {   // before APPLY-0166: the newer fields wait, the rest goes in
     for (const k of missing) { delete patch[k]; delete changes[k]; }
     if (!Object.keys(patch).length) return { row: existing, updated: false };

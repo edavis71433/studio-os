@@ -43,10 +43,13 @@ test.describe('item 97 — Google and Outlook files map the right columns (B2)',
       + 'Ana,,Ruiz,,,* myContacts,* Home,ana@harbor.example,Work,,Mobile,555 0100,Harbor Lane Bakery,Owner\n'
       + 'Bo,,Lee,,,* myContacts,,,Work,bo@northside.example,Home,555 0200,,\n';
     await page.locator('#csvZone input[type=file]').setInputFiles(csvFile('contacts.csv', google));
-    await expect(page.locator('#csvZone')).toContainText('2 contacts found — first few: Ana Ruiz, Bo Lee');
+    // item 86: Contacts matches the columns first; the guesses are what this test pins
+    await expect(page.locator('#csvZone .dds-csvmap select[data-col="7"]')).toHaveValue('email');      // E-mail 1 - Value
+    await expect(page.locator('#csvZone .dds-csvmap select[data-col="6"]')).toHaveValue('');           // E-mail 1 - Label: not brought in
+    await expect(page.locator('#csvZone .dds-csvmap select[data-col="13"]')).toHaveValue('job_title'); // Organization Title
     await page.locator('#csvZone').getByRole('button', { name: 'Import 2' }).click();
     await expect.poll(() => sent.length).toBe(2);
-    expect(sent).toContainEqual({ name: 'Ana Ruiz', email: 'ana@harbor.example', phone: '555 0100', company: 'Harbor Lane Bakery' });
+    expect(sent).toContainEqual({ name: 'Ana Ruiz', email: 'ana@harbor.example', phone: '555 0100', company: 'Harbor Lane Bakery', job_title: 'Owner' });   // "* myContacts" is Google's label, not a tag
     expect(sent).toContainEqual({ name: 'Bo Lee', email: 'bo@northside.example', phone: '555 0200' });   // his only e-mail is the second one
     await expect(toastWith(page, '2 added.')).toBeVisible();
   });
@@ -92,7 +95,7 @@ test.describe('item 97 — past 500 rows it says so (B5)', () => {
     await openContactsImport(page);
     const rows = Array.from({ length: 503 }, (_, i) => `Person ${i + 1},p${i + 1}@example.com`).join('\n');
     await page.locator('#csvZone input[type=file]').setInputFiles(csvFile('big.csv', 'Name,Email\n' + rows + '\n'));
-    await expect(page.locator('#csvZone')).toContainText('503 contacts in the file — this imports the first 500. Put the other 3 in a second file and import that.');
+    await expect(page.locator('#csvZone')).toContainText('503 in the file. This brings in the first 500 now; run it again for the other 3.');   // item 86: said on the matching step
     await page.locator('#csvZone').getByRole('button', { name: 'Import 500' }).click();
     await expect(toastWith(page, '500 added. 3 more in the file weren’t imported — put them in a second file.')).toBeVisible({ timeout: 60_000 });
     expect(sent.length).toBe(500);
