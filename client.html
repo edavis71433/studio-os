@@ -348,6 +348,17 @@
   details.faq-item[open]>summary::after{content:"–"}
   .faq-answer{padding:0 18px 15px;color:var(--soft);font-size:14.5px}
   .faq-answer a{color:var(--p)}
+  /* builder list item 176: the hand-over kit at the top of Help */
+  .kit .kwho{background:var(--p-soft);border-radius:12px;padding:12px 14px}
+  .kit .kwho strong{display:block;font-size:15.5px}
+  .kit .kwho .row{margin-top:10px}
+  .kit a.kb{display:inline-flex;align-items:center;font-weight:600;font-size:13.5px;border-radius:999px;padding:9px 16px;border:1px solid var(--line);background:var(--card);color:var(--ink);text-decoration:none}
+  .kit a.kb.main{background:var(--p);border-color:var(--p);color:var(--on-p)}
+  .kit h3.kh{font-family:var(--sans);font-size:12.5px;font-weight:650;letter-spacing:.06em;text-transform:uppercase;color:var(--faint);margin:16px 0 8px}
+  .kit .kfacts a,.kit ul.kl a{color:var(--p);font-weight:600;text-decoration:none;overflow-wrap:anywhere}
+  .kit .kfacts p{font-size:13.5px;margin-top:2px}
+  .kit ul.kl{list-style:none;padding:0;margin:0} .kit ul.kl li{padding:5px 0}
+  .kit details.faq-item{box-shadow:none}
   /* ── PS4: the account card as a proper profile section ── */
   .acctid{display:flex;align-items:center;gap:12px;padding-bottom:13px}
   .acctav{flex:0 0 auto;width:40px;height:40px;border-radius:50%;background:var(--p-soft);color:var(--p);font-weight:700;font-size:16px;display:flex;align-items:center;justify-content:center}
@@ -2174,6 +2185,23 @@ const STARTER_FAQ=[
   ['How do I ask for something new?','Open Requests to book a call, ask for one of your studio’s services, or press Something else? and say what you need. Nothing is charged until your studio replies.'],
   ['How do I change my password?','Under Your account, further down this page, press Change password and we’ll email you a link to set a new one.'],
 ];
+// Builder list item 176: the hand-over kit the studio wrote for this client (GET
+// /client/kit) — who to call, how-tos, videos, files and the facts of their
+// website. Nothing shows until the studio puts it in the portal; a failed read
+// just leaves it out (the help below still works).
+function kitHtml(kr){
+  const k=kr&&kr.ok&&kr.body&&kr.body.data;if(!k)return'';
+  const c=k.contact||{},w=k.website||{};
+  const tel=String(c.phone||'').replace(/[^\d+]/g,'');
+  const day=(iso)=>{const d=new Date(iso);return isNaN(d)?'':d.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});};
+  const facts=[w.live_since?'Live since '+day(w.live_since):'',w.domain_expires_at?'domain renews '+day(w.domain_expires_at):''].filter(Boolean).join(' · ');
+  const who=(c.name||c.phone||c.email)?`<div class="kwho"><strong>${esc(c.name||studioBrand())}</strong>${c.hours?`<span class="muted">${esc(c.hours)}</span>`:''}<div class="row">${tel?`<a class="kb main" href="tel:${esc(tel)}">Call ${esc(c.phone)}</a>`:''}${c.email?`<a class="kb" href="mailto:${esc(c.email)}">Email</a>`:''}</div></div>`:'';
+  const site=w.address?`<div class="kfacts"><h3 class="kh">Your website</h3><a href="${esc(w.address)}" target="_blank" rel="noopener">${esc(String(w.address).replace(/^https?:\/\//,''))} ↗</a>${facts?`<p class="muted">${esc(facts.charAt(0).toUpperCase()+facts.slice(1))}</p>`:''}</div>`:'';
+  const guides=(k.guides||[]).length?`<h3 class="kh">How to</h3>${k.guides.map(g=>`<details class="faq-item"><summary>${esc(g.title)}</summary><div class="faq-answer"><p>${esc(g.body)}</p></div></details>`).join('')}`:'';
+  const videos=(k.videos||[]).length?`<h3 class="kh">Videos</h3><ul class="kl">${k.videos.map(v=>`<li><a href="${esc(v.url)}" target="_blank" rel="noopener noreferrer">▶ ${esc(v.title)} ↗</a></li>`).join('')}</ul>`:'';
+  const files=(k.files||[]).length?`<h3 class="kh">Files</h3><ul class="kl">${k.files.map(f=>`<li><a href="${esc(f.url)}" target="_blank" rel="noopener">⬇ ${esc(f.name)}</a></li>`).join('')}</ul>`:'';
+  return `<section id="sec-kit" class="kit"><h2>Your website kit · from ${esc(studioBrand())}</h2><div class="card">${who}${site}${guides}${videos}${files}</div></section>`;
+}
 function starterFaqHtml(){return `<section class="faq">${STARTER_FAQ.map(([q,a])=>`<details class="faq-item"><summary>${esc(q)}</summary><div class="faq-answer"><p>${esc(a)}</p></div></details>`).join('')}</section>`;}
 async function renderHelp(){
   const view=++VIEW_SEQ;   // this render owns #main until something newer bumps the token (renderMessages' contract)
@@ -2186,11 +2214,11 @@ async function renderHelp(){
     return;
   }
   $('main').innerHTML=spinnerHtml();
-  let r=null;try{r=await api('/client/faq');}catch(_){}
+  let r=null,kr=null;try{[r,kr]=await Promise.all([api('/client/faq').catch(()=>null),api('/client/kit').catch(()=>null)]);}catch(_){}
   if(view!==VIEW_SEQ)return;   // the user moved on mid-fetch — never paint over the newer view
   const faqFailed=!(r&&r.ok);
   const faqHtml=(!faqFailed&&r.body&&r.body.data&&r.body.data.html)||'';
-  let html=portalHeader('Help','Quick answers from your studio.');
+  let html=portalHeader('Help','Quick answers from your studio.')+kitHtml(kr);
   // failed ≠ empty: a failed read says so calmly (nothing was cached, so coming
   // back to the tab retries) — only a genuine ok-empty earns the no-articles copy
   if(faqFailed)html+=`<div class="card"><p class="muted">We couldn’t load help articles just now — please try again in a moment.</p></div>`;

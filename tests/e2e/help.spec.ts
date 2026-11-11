@@ -7,7 +7,7 @@ import { installApp } from './helpers/app';
 // today.html make); the topic cards point at real pages; the popular answers
 // are the plain answers this page always carried, one row each.
 test.describe('Help (ask in your own words)', () => {
-  test('title · ask box with ONE filled button · suggested questions · six topic cards · answers · rail', async ({ page }) => {
+  test('title · ask box with ONE filled button · suggested questions · seven topic cards · answers · rail', async ({ page }) => {
     await installApp(page);
     await page.goto('/help.html');
     await expect(page.locator('#dds-shell')).toBeAttached();   // the shell mounts (phones keep its nav in the drawer)
@@ -17,14 +17,16 @@ test.describe('Help (ask in your own words)', () => {
     await expect(page.locator('.btn.primary')).toHaveText('Ask');
     await expect(page.locator('#suggest button')).toHaveCount(4);
     const cards = page.locator('.setgrid .setcard');
-    await expect(cards).toHaveCount(6);
-    await expect(cards.locator('b')).toHaveText(['Getting started', 'Your website', 'Customers and deals', 'Invoices and payments', 'Files and sharing', 'Connections']);
+    // item 166: Client sites joins, after Invoices and payments
+    await expect(cards).toHaveCount(7);
+    await expect(cards.locator('b')).toHaveText(['Getting started', 'Your website', 'Customers and deals', 'Invoices and payments', 'Client sites', 'Files and sharing', 'Connections']);
     await expect(cards.nth(1)).toHaveAttribute('href', '/presence.html');
     await expect(cards.nth(2)).toHaveAttribute('href', '/crm.html');
-    await expect(cards.nth(5)).toHaveAttribute('href', '/connections.html');
+    await expect(cards.nth(4)).toHaveAttribute('href', '/sites.html');
+    await expect(cards.nth(6)).toHaveAttribute('href', '/connections.html');
     // the answers: one row each, folded, with the original copy inside
     const answers = page.locator('#answers details');
-    await expect(answers).toHaveCount(7);
+    await expect(answers).toHaveCount(9);   // item 166 adds Running your clients’ sites, and Updates and estimates
     await expect(answers.nth(0)).not.toHaveAttribute('open', '');
     await answers.nth(0).locator('summary').click();
     await expect(answers.nth(0)).toHaveAttribute('open', '');

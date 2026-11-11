@@ -20,7 +20,9 @@ import type { PortfolioInput } from './portfolio.ts';
 import type { KitPayload } from '../lib/kits.ts';
 import { kitFromSite, applyKitTo, layoutFromSite } from './kit_io.ts';
 import { layoutCounts } from '../lib/site_layout.ts';
+import { removeTemplatePhotos } from '../lib/media.ts';
 import { handleAgencySites } from './sites.ts';
+import { handleClientTools } from './client_tools.ts';
 import { HIDEABLE_SECTIONS, normalizeHidden } from '../lib/navigation.ts';
 import { readReservedJsonOrThrow, writeReservedJson, RESERVED_NAMES } from '../lib/reserved_store.ts';
 import { sendInviteLink } from '../lib/workspace.ts';
@@ -217,6 +219,17 @@ async function handleAgencyInner(req: Request, route: string, method: string, me
     if (r) return r;
   }
 
+  // ── builder list item 176: the content form, the hand-over kit and Plan my week ──
+  {
+    const jwt = req.headers.get('x-dds-user-jwt') || '';
+    const r = await handleClientTools(req, route, method, member, principal, cors, {
+      ownSite: () => ownSiteOf(jwt, principal),
+      needs: () => computeStudioNeeds(member, principal, jwt, now),
+      gather: sharedGather,
+    });
+    if (r) return r;
+  }
+
   // ── the portfolio: directory + everything observable from one place ──
   if (route === '/agency/portfolio' && method === 'GET') {
     if (!can(member.role, 'read')) return forbid(cors);
@@ -363,13 +376,23 @@ async function handleAgencyInner(req: Request, route: string, method: string, me
   //    overwrites). Fenced to the agency's own linked sites, both directions.
   if (route === '/agency/kits' && method === 'GET') {
     if (!can(member.role, 'read')) return forbid(cors);
-    // item 145: a kit saved with its pages is a template; its summary says how much it carries
-    const r = await svc(`presence_starter_kits?agency_id=eq.${member.agency_id}&select=id,name,industry_key,created_from_site,created_by,created_at,summary:payload->layout_summary&order=created_at.desc&limit=100`);
-    const kits = (Array.isArray(r.json) ? r.json : []).map((k: Record<string, unknown>) => {
-      const row = { id: k.id, name: k.name, industry_key: k.industry_key, created_from_site: k.created_from_site, created_by: k.created_by, created_at: k.created_at };
+    // item 145: a kit saved with its pages is a template; its summary says how much it carries.
+    // Item 166: and every kit says what it brings and which site it was made from (the Templates tab).
+    const r = await svc(`presence_starter_kits?agency_id=eq.${member.agency_id}&select=id,name,industry_key,created_from_site,created_by,created_at,summary:payload->layout_summary,offerings:payload->offerings,faqs:payload->faqs,voice:payload->voice,colors:payload->theme_tokens&order=created_at.desc&limit=100`);
+    const raw = (Array.isArray(r.json) ? r.json : []) as Array<Record<string, unknown>>;
+    const from = [...new Set(raw.map((k) => String(k.created_from_site || '')).filter((x) => UUID_RE.test(x)))];
+    const names = from.length ? Object.fromEntries(((await svc(`presence_identity?site_id=in.(${from.join(',')})&select=site_id,business_name&limit=200`).catch(() => ({ json: [] }))).json || []).map((x: { site_id: string; business_name?: string }) => [x.site_id, String(x.business_name || '')])) : {};
+    const kits = raw.map((k) => {
+      const voice = (k.voice && typeof k.voice === 'object' ? k.voice : {}) as Record<string, unknown>;
+      const row = {
+        id: k.id, name: k.name, industry_key: k.industry_key, created_from_site: k.created_from_site, created_by: k.created_by, created_at: k.created_at,
+        from_name: names[String(k.created_from_site || '')] || '',
+        brings: { offerings: Array.isArray(k.offerings) ? k.offerings.length : 0, faqs: Array.isArray(k.faqs) ? k.faqs.length : 0,
+          voice: Object.values(voice).some((v) => String(v || '').trim()), colors: !!(k.colors && typeof k.colors === 'object' && Object.keys(k.colors).length) },
+      };
       return k.summary && typeof k.summary === 'object' ? { ...row, kind: 'template', summary: k.summary } : { ...row, kind: 'kit' };
     });
-    return json({ data: kits }, 200, cors);
+    return json({ data: kits, can_manage: can(member.role, 'manage_clients') }, 200, cors);
   }
   if (route === '/agency/kits' && method === 'POST') {
     if (!can(member.role, 'manage_clients')) return forbid(cors);
@@ -395,11 +418,24 @@ async function handleAgencyInner(req: Request, route: string, method: string, me
   }
   {
     const km = route.match(/^\/agency\/kits\/([0-9a-f-]{36})$/);
+    // item 166: rename a template or a starter kit (the Templates tab)
+    if (km && method === 'PATCH') {
+      if (!can(member.role, 'manage_clients')) return forbid(cors);
+      const b = await body();
+      const name = String(b?.name ?? '').replace(/\s+/g, ' ').trim().slice(0, 80);
+      if (!name) return json({ error: 'bad_request', message: 'Give it a name.' }, 400, cors);
+      const w = await svc(`presence_starter_kits?id=eq.${km[1]}&agency_id=eq.${member.agency_id}&select=id,name`, { method: 'PATCH', headers: { Prefer: 'return=representation' }, body: JSON.stringify({ name }) });
+      if (!w.ok || !Array.isArray(w.json) || !w.json.length) return json({ error: 'not_found', message: 'Not one of your kits.' }, 404, cors);
+      return json({ data: { id: km[1], name } }, 200, cors);
+    }
     if (km && method === 'DELETE') {
       if (!can(member.role, 'manage_clients')) return forbid(cors);
+      // item 166: a template's own photo copies go with it (only ever in its template folder)
+      const photos = ((await svc(`presence_starter_kits?id=eq.${km[1]}&agency_id=eq.${member.agency_id}&select=media:payload->layout->media&limit=1`)).json?.[0]?.media || []) as Array<{ storage_path?: string }>;
       const w = await svc(`presence_starter_kits?id=eq.${km[1]}&agency_id=eq.${member.agency_id}`, { method: 'DELETE', headers: { Prefer: 'return=representation' } });
       if (!w.ok || !Array.isArray(w.json) || !w.json.length) return json({ error: 'not_found', message: 'Not one of your kits.' }, 404, cors);
-      return json({ data: { ok: true } }, 200, cors);
+      const removed = Array.isArray(photos) && photos.length ? await removeTemplatePhotos(member.agency_id, photos.map((m) => String(m?.storage_path || ''))) : 0;
+      return json({ data: { ok: true, photos_removed: removed } }, 200, cors);
     }
     const am = route.match(/^\/agency\/kits\/([0-9a-f-]{36})\/apply$/);
     if (am && method === 'POST') {

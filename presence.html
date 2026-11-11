@@ -87,7 +87,7 @@ a{color:var(--plum);text-decoration:none}
 .findresults{position:absolute;top:calc(100% + 6px);left:0;right:0;min-width:300px;background:var(--sheet);border:1px solid var(--hair);border-radius:var(--r-lg);box-shadow:var(--dds-shadow-pop,0 8px 28px rgba(21,20,26,.12));max-height:60vh;overflow:auto;z-index:60;padding:6px}
 .findhit{display:block;width:100%;text-align:left;padding:var(--dds-s2,8px) var(--dds-s3,12px);border-radius:var(--r);background:none;border:0;cursor:pointer}
 .findhit:hover{background:var(--paper)}
-.findhit .fk{font-size:11px;color:var(--plum);font-weight:600;margin-right:var(--dds-s2,8px)}
+.findhit .fk{font-size:12px;color:var(--plum);font-weight:600;margin-right:var(--dds-s2,8px)}
 .findhit .ft{font-weight:600;color:var(--ink);font-size:13.5px}
 .findhit .fs{display:block;color:var(--ink-2);font-size:12px;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .findempty{padding:var(--dds-s3,12px);color:var(--ink-2);font-size:13px}
@@ -183,7 +183,7 @@ html.dds-side .dds-nav{flex:1 1 auto;min-height:0;overflow-y:auto;overflow-x:hid
 @media(min-width:761px){html.dds-side #dds-waffle{display:none}}
 html.dds-side .dds-nav .sec.has-site-menu > .it .car{display:none}
 .site-menu:not(.hb-tabs) .navitem{border-bottom:0}
-#sectionsNav .grp{font-size:10.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-3);padding:14px 0 2px}
+#sectionsNav .grp{font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-3);padding:14px 0 2px}
 #sectionsNav .navitem{text-align:left}
 /* the sub-view tab strip (#nav): the fallback when there is no sidebar to join */
 .hb-tabs{display:flex;gap:2px;border-bottom:1px solid var(--hair);margin:var(--dds-s5,20px) var(--dds-s7,32px) 0;max-width:var(--dds-w-app,1280px);overflow-x:auto;scrollbar-width:none}
@@ -251,7 +251,7 @@ button:disabled{opacity:.55;cursor:default}
 .hb-tasks{margin-top:var(--dds-s3,12px);display:flex;flex-direction:column}
 .hb-task{display:flex;align-items:flex-start;gap:var(--dds-s3,12px);padding:var(--dds-s2,8px) 0;border-top:1px solid var(--hair);text-align:left;width:100%;font:inherit;color:inherit}
 .hb-task:first-child{border-top:none}
-.hb-task .cb{width:16px;height:16px;border:1.5px solid var(--hair-2);border-radius:4px;flex:0 0 auto;background:var(--sheet);margin-top:2px;display:grid;place-items:center;color:var(--fill-ink);font-size:10px;line-height:1}
+.hb-task .cb{width:16px;height:16px;border:1.5px solid var(--hair-2);border-radius:4px;flex:0 0 auto;background:var(--sheet);margin-top:2px;display:grid;place-items:center;color:var(--fill-ink);font-size:12px;line-height:1}
 .hb-task.done .cb{background:var(--sage);border-color:var(--sage)}
 .hb-task .t{min-width:0}
 .hb-task .t b{font-weight:600;display:block}
@@ -290,6 +290,8 @@ h1.doc{font-family:var(--serif);font-weight:500;font-size:24px;letter-spacing:-.
 .pg-check{display:flex;align-items:center;gap:var(--dds-s2,8px);font-size:13.5px;margin-bottom:var(--dds-s3,12px);cursor:pointer}
 .pg-check input{accent-color:var(--plum)}
 .pg-foot{display:flex;flex-wrap:wrap;gap:var(--dds-s2,8px);margin-top:var(--dds-s4,16px);align-items:center}
+/* item 125: every page setting in the Pages card waits for publish, and says so once, under the pane */
+.pc-pane-when{margin:var(--dds-s3,12px) 0 0;font-size:12px;line-height:1.45;color:var(--ink-3)}
 .pg-foot .dc-modal-cancel{margin-top:0}
 .pg-foot .danger{color:var(--clay)}
 .pg-foot .pg-done{margin-left:auto;background:var(--plum);border-color:var(--plum);color:var(--fill-ink,#fff)}
@@ -326,9 +328,22 @@ html:not(.is-studio) #dcModeSeg [data-dcmode="timewarp"]{display:none}
 .biz-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(340px,100%),1fr));column-gap:var(--dds-s8,48px);align-items:start;max-width:1100px}
 .biz-col{min-width:0}
 .biz-col>h5.rune:first-child{margin-top:var(--dds-s2,8px)}
-.ver-live{display:inline-block;margin-left:var(--dds-s2,8px);padding:1px 8px;border-radius:999px;background:var(--hair);color:var(--ink-2);font-size:11px;font-weight:600;vertical-align:1px}
+.ver-live{display:inline-block;margin-left:var(--dds-s2,8px);padding:1px 8px;border-radius:999px;background:var(--hair);color:var(--ink-2);font-size:12px;font-weight:600;vertical-align:1px}
 .hcompare{flex-basis:100%;margin-top:var(--dds-s2,8px)}
 .ver-more{margin-top:var(--dds-s6,24px);border-top:1px solid var(--hair);padding-top:var(--dds-s4,16px)}
+/* item 125: a publish wears a filled dot, a saved checkpoint (never live) a hollow one */
+.ver-top{display:flex;align-items:center;justify-content:space-between;gap:var(--dds-s3,12px);flex-wrap:wrap;margin:calc(-1 * var(--dds-s2,8px)) 0 var(--dds-s2,8px)}
+.ver-legend{display:flex;gap:var(--dds-s5,20px);margin:0}
+.ver-kind{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:600;color:var(--sage);white-space:nowrap}
+.ver-kind::before{content:"";flex:none;width:8px;height:8px;border-radius:50%;background:currentColor}
+.ver-kind.save{color:var(--ink-3)}
+.ver-kind.save::before,.ver-kind.fail::before{background:transparent;box-shadow:inset 0 0 0 1.5px currentColor}
+.ver-kind.fail{color:var(--clay)}
+.ver-legend .ver-kind{font-weight:500}
+.hdate .ver-kind{display:flex;margin-bottom:3px}
+.ver-note{display:flex;gap:10px;margin:var(--dds-s4,16px) 0 0;padding:var(--dds-s3,12px) 14px;border-radius:12px;background:var(--info-soft);color:var(--ink);font-size:12.5px;line-height:1.5}
+.ver-note>span:first-child{color:var(--info);font-weight:600}
+.ver-sheet-note{margin:10px 0 0;font-size:13.5px;line-height:1.6;color:var(--ink)}
 .ver-more>summary{cursor:pointer;font-size:13.5px;font-weight:600;color:var(--ink-2);margin-bottom:var(--dds-s4,16px)}
 h5.rune{font-size:14px;letter-spacing:0;text-transform:none;color:var(--ink);font-weight:600;margin:36px 0 var(--dds-s4,16px);display:flex;align-items:center;gap:var(--dds-s4,16px)}
 h5.rune::after{content:"";flex:1;height:1px;background:var(--hair)}
@@ -338,7 +353,7 @@ h5.rune .whisper.ok{color:var(--sage)}
 .textact:hover{text-decoration:underline}
 .quietact{font-size:12.5px;color:var(--ink-2)}
 .quietact:hover{color:var(--ink)}
-.smalltag{font-size:11.5px;letter-spacing:0;text-transform:none;color:var(--amber-text);font-weight:600}
+.smalltag{font-size:12px;letter-spacing:0;text-transform:none;color:var(--amber-text);font-weight:600}
 
 /* the writing desk (M9.5A) — ✦ marks drafted words, per the AI language freeze */
 .deskopt{border:1px solid var(--hair);border-radius:var(--r-lg);background:var(--paper);padding:var(--dds-s4,16px) var(--dds-s4,16px);margin-bottom:10px}
@@ -398,23 +413,31 @@ html.dc-edit:not(.plan-watch) .dc-bar{position:absolute;top:var(--dc-bar-top);le
 .dc-switch-name{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .dc-chip{display:inline-flex;align-items:center;height:24px;padding:0 10px;border-radius:999px;background:var(--sheet);color:var(--ink-2);font-size:12px;font-weight:600;white-space:nowrap;line-height:1}
 .dc-chip.good{background:var(--sage-soft);color:var(--sage)}
+/* item 125: the page's status word beside its name in the bar (Live, 2 changes, Not live yet) */
+.dc-chip.warn{background:var(--amber-soft);color:var(--amber)}
+.dc-chip.bad{background:var(--clay-soft);color:var(--clay)}
+#dcPageCount::before{content:"";flex:none;width:6px;height:6px;margin-right:6px;border-radius:50%;background:currentColor}
 .dc-switch:focus-visible,.dc-dk:focus-visible{outline:2px solid var(--plum);outline-offset:2px}
 /* ── the Pages card (part three, Figma 66:339): the menu in its order, then the pages off it,
    then the header and footer, the not-found page and search. A row is a page: a grip, its
    icon, its name, what is waiting on it, a gear. A page drawn on the canvas also has ⋯. ── */
 .pc-add{flex:none;height:36px;margin-left:auto;padding:0 14px;border:0;border-radius:999px;background:var(--plum) var(--dds-grad-btn,linear-gradient(135deg,#6d3fd4 0%,#7a4bdd 100%));color:var(--dds-on-p,var(--fill-ink));font:600 13px/1 var(--sans);white-space:nowrap;cursor:pointer}
 .pc-add:hover{filter:brightness(1.06)}
+/* item 34: one main button at a time. With a page's settings (or any pane) open, its Done is the
+   main button, so + Add page steps back to a quiet one */
+#pagesCard.pane-open .pc-add{background:var(--dc-raised,var(--paper));color:var(--ink);box-shadow:none}
 .pc-add:focus-visible,.pc-open:focus-visible,.pc-ico:focus-visible,.pc-mrow:focus-visible,.pc-back:focus-visible,.pc-link:focus-visible,.pc-quiet:focus-visible,.pc-row .pg-grab:focus-visible{outline:2px solid var(--plum);outline-offset:2px}
 html.dc-edit:not(.plan-watch) #pcBody{padding:0 20px 20px}
 .pc-findwrap{margin:2px 0 16px}
 .pc-findwrap svg{fill:none;stroke:currentColor;stroke-width:1.75;stroke-linecap:round}
 .pc-find{width:100%;box-sizing:border-box;height:44px;margin:0;padding:0 14px 0 42px;border-radius:999px;border:1px solid var(--hair);background:var(--dc-raised,var(--paper));color:var(--ink);font:inherit;font-size:14px;-webkit-appearance:none;appearance:none}
 .pc-find:focus-visible{outline:2px solid var(--plum);outline-offset:0}
-.pc-h{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:0 0 10px;font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-3)}
+.pc-h{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:0 0 10px;font-size:12px;font-weight:600;letter-spacing:.02em;text-transform:uppercase;color:var(--ink-3)}
+.pc-hacts .pc-link{white-space:nowrap}   /* item 34: at 12px each button keeps its words on one line */
 .pc-h[hidden]{display:none}
 .pc-link{padding:4px 8px;margin:-4px -8px -4px 0;border:0;border-radius:8px;background:none;color:var(--plum);font:600 12px/1.2 var(--sans);letter-spacing:0;text-transform:none;cursor:pointer}
 .pc-link:hover{background:var(--plum-soft)}
-.pc-hacts{display:flex;align-items:center;gap:2px}
+.pc-hacts{display:flex;flex:none;align-items:center;gap:2px}
 .pc-row[data-page="folder"] .ic{background:var(--plum-soft);color:var(--plum)}
 .pc-row.pg-slot,.pg-row.pg-slot{justify-content:center;min-height:44px;padding:8px 12px;border:1.5px dashed var(--hair-2);background:transparent;color:var(--ink-3);cursor:default}
 .pg-slot .pp-name{font-size:12.5px;font-weight:500;line-height:1.35;text-align:center;white-space:normal}
@@ -434,7 +457,7 @@ html.dc-edit:not(.plan-watch) #pcBody{padding:0 20px 20px}
 .pc-open .pp-name{max-width:100%;font-size:14px;font-weight:600;line-height:1.25;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .pc-sub{max-width:100%;font-size:12px;line-height:1.3;color:var(--ink-2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .pc-row.on .pc-sub{color:var(--plum)}
-.pc-row .hb-chip{flex:none;gap:5px;margin-right:2px;padding:2px 8px;font-size:11.5px;font-weight:600}
+.pc-row .hb-chip{flex:none;gap:5px;margin-right:2px;padding:2px 8px;font-size:12px;font-weight:600}
 .pc-ico{flex:none;display:grid;place-items:center;width:28px;height:30px;padding:0;border:0;border-radius:999px;background:transparent;color:var(--ink-2);font:700 15px/1 var(--sans);cursor:pointer}
 .pc-ico:hover{background:var(--dc-raised,var(--paper));color:var(--ink)}
 .pc-row.on .pc-ico:hover{background:var(--sheet)}
@@ -462,6 +485,11 @@ html.dc-edit:not(.plan-watch) #pcBody{padding:0 20px 20px}
 .pc-pane-body .dc-modal-h{font-family:var(--serif);font-size:20px;font-weight:600;letter-spacing:-.01em}
 .pc-pane-body input[type=text],.pc-pane-body select{width:100%;box-sizing:border-box}
 .pc-note{margin:0 0 12px;font-size:13px;line-height:1.5;color:var(--ink-2)}
+/* item 121: the not-found choice (Ready-made or One of my pages), and the password page's words */
+.pc-nf-seg{margin:0 0 10px}
+.pc-nf-seg button[aria-pressed="true"]{background:var(--sheet);color:var(--ink);font-weight:600;box-shadow:var(--dds-shadow)}
+.pc-nf-seg button:disabled{opacity:.45;cursor:default}
+.pg-h.pg-h-sub{border-top:0;padding-top:0;margin-top:var(--dds-s4,16px)}
 .pc-pane-body .hint{font-size:12.5px;line-height:1.5;color:var(--ink-2)}
 .pc-acts{display:flex;flex-wrap:wrap;gap:8px;margin:4px 0 4px}
 .pc-acts .dc-modal-cancel{margin-top:0}
@@ -483,7 +511,7 @@ html.dc-edit:not(.plan-watch) .dc-bar .dpdevseg button.on{background:var(--seg-c
 .dc-bar .pillbtn.inked:hover{filter:brightness(1.06)}
 /* ── the dock: a white card on the left, one icon and one word per tool ── */
 .dc-dock{position:absolute;left:16px;top:50%;transform:translateY(-50%);z-index:85;display:flex;flex-direction:column;align-items:center;gap:4px;padding:8px;background:var(--sheet);border:1px solid color-mix(in srgb,var(--hair) 55%,transparent);border-radius:18px;box-shadow:var(--dds-shadow-pop)}
-.dc-dk{width:56px;height:54px;padding:0;border:0;border-radius:var(--dds-r,12px);background:transparent;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;color:var(--ink-2);font:600 10px/1 var(--sans);cursor:pointer;white-space:nowrap}
+.dc-dk{width:56px;height:54px;padding:0;border:0;border-radius:var(--dds-r,12px);background:transparent;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;color:var(--ink-2);font:600 12px/1 var(--sans);cursor:pointer;white-space:nowrap}
 .dc-dk svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:1.75;stroke-linecap:round;stroke-linejoin:round}
 .dc-dk:hover{background:var(--dc-raised);color:var(--ink)}
 .dc-dk.on,.dc-dk[aria-expanded="true"]{background:var(--plum-soft);color:var(--plum)}
@@ -514,7 +542,7 @@ html.dc-edit:not(.plan-watch) .dc-twbar[hidden]{display:none}
 .hf-logo .lg{flex:none;width:44px;height:44px;box-sizing:border-box;border:1px solid var(--hair);border-radius:10px;background:var(--dc-raised,var(--paper)) center/cover no-repeat}
 .hf-logo p,.hf-says{flex:1;margin:0;font-size:12.5px;line-height:1.45;color:var(--ink-2)}
 .hf-tiles{display:grid;grid-template-columns:repeat(var(--n,2),minmax(0,1fr));gap:8px}
-.hf-tile{display:flex;flex-direction:column;align-items:center;gap:6px;min-width:0;padding:0;border:0;background:transparent;color:var(--ink-2);font:500 11.5px/1.25 var(--sans);text-align:center;cursor:pointer}
+.hf-tile{display:flex;flex-direction:column;align-items:center;gap:6px;min-width:0;padding:0;border:0;background:transparent;color:var(--ink-2);font:500 12px/1.25 var(--sans);text-align:center;cursor:pointer}
 .hf-pic{position:relative;display:block;width:100%;height:58px;box-sizing:border-box;border:1px solid var(--hair);border-radius:10px;background:var(--dc-raised,var(--paper));overflow:hidden}
 .hf-pic i{position:absolute;display:block;height:4px;border-radius:2px;background:var(--ink-3);opacity:.6}
 .hf-tile[aria-pressed=true]{color:var(--plum);font-weight:600}
@@ -571,6 +599,19 @@ html.dc-edit:not(.plan-watch) .dc-close{height:36px;padding:0 14px;font-size:13p
 .ins-field{display:flex;flex-direction:column;gap:6px}
 .ins-lbl{display:block;font-size:12.5px;font-weight:500;color:var(--ink-2);margin:0}
 .ins-note{font-size:12.5px;color:var(--ink-3);line-height:1.5}
+/* item 155: a locked section's card leads with why, in the client's blue or the studio's plum */
+.ins-lock{display:flex;flex-wrap:wrap;align-items:flex-start;gap:8px 10px;margin:0 0 14px;padding:12px 14px;border-radius:12px;background:var(--info-soft);color:var(--ink)}
+.ins-lock>svg{flex:none;margin-top:1px;color:var(--info)}
+.ins-lock>p{flex:1 1 200px;margin:0;font-size:12.5px;line-height:1.5}
+.ins-lock.studio{background:var(--plum-soft,#f0ebfd)}
+.ins-lock.studio>svg{color:var(--plum)}
+.ins-lock .ins-lock-sw{flex:1 1 100%;display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:40px;margin:0;font-size:13.5px;color:var(--ink);cursor:pointer}
+.ins-lock .ins-lock-sw input{flex:none;-webkit-appearance:none;appearance:none;position:relative;width:40px;height:24px;margin:0;border-radius:999px;background:var(--hair-2);cursor:pointer;transition:background var(--dur) var(--ease)}
+.ins-lock .ins-lock-sw input::after{content:"";position:absolute;top:3px;left:3px;width:18px;height:18px;border-radius:50%;background:var(--sheet);box-shadow:0 1px 2px rgba(0,0,0,.2);transition:transform var(--dur) var(--ease)}
+.ins-lock .ins-lock-sw input:checked{background:var(--plum)}
+.ins-lock .ins-lock-sw input:checked::after{transform:translateX(16px)}
+.ins-lock .ins-lock-sw input:focus-visible{outline:2px solid var(--plum);outline-offset:2px}
+@media (prefers-reduced-motion:reduce){.ins-lock .ins-lock-sw input,.ins-lock .ins-lock-sw input::after{transition:none}}
 .ins-row{display:flex;align-items:center;justify-content:space-between;gap:10px;font-size:12.5px;color:var(--ink-3)}
 #settingsPanel[data-mode="section"] #blocksCard input:not([type=checkbox]):not([type=color]):not([type=date]):not([type=number]):not([type=range]),#settingsPanel[data-mode="section"] #blocksCard textarea,#settingsPanel[data-mode="section"] #blocksCard select{background:var(--dc-raised,var(--paper)) !important;border:1px solid var(--hair) !important;border-radius:12px !important;padding:11px 12px !important;font-size:14px !important;line-height:1.5 !important;color:var(--ink) !important;margin-bottom:10px !important}
 #settingsPanel[data-mode="section"] #blocksCard .ins-field input{margin-bottom:0 !important}
@@ -592,7 +633,7 @@ html.dc-edit:not(.plan-watch) .dc-close{height:36px;padding:0 14px;font-size:13p
 .ins-tile-l{display:block;margin-top:6px;font-size:12px;font-weight:500;color:var(--ink-2)}
 /* items 49 and 118: a section's colour theme, each tile drawn in the site's own colours */
 .ins-themes{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px}
-.ins-theme{display:flex;flex-direction:column;align-items:center;gap:6px;min-width:0;padding:0;border:0;background:transparent;color:var(--ink-2);font:500 11.5px/1.2 var(--sans);cursor:pointer}
+.ins-theme{display:flex;flex-direction:column;align-items:center;gap:6px;min-width:0;padding:0;border:0;background:transparent;color:var(--ink-2);font:500 12px/1.2 var(--sans);cursor:pointer}
 .ins-theme-pic{display:flex;flex-direction:column;align-items:flex-start;justify-content:center;gap:5px;width:100%;height:60px;box-sizing:border-box;padding:10px 8px;border:1px solid var(--hair);border-radius:12px}
 .ins-theme-pic i{display:block;width:70%;height:5px;border-radius:2px}
 .ins-theme-pic i+i{width:90%;height:3px;opacity:.55}
@@ -694,9 +735,11 @@ html.dc-edit:not(.plan-watch) .pf-search{padding:0 20px 12px}
 html.dc-edit:not(.plan-watch) .pf-body{padding:0 20px 16px}
 html.dc-edit:not(.plan-watch) #panelFilesGrid{grid-template-columns:repeat(3,1fr);gap:8px;margin-top:0}
 html.dc-edit:not(.plan-watch) #panelFilesGrid .mcell{border:0;border-radius:10px;background:var(--dc-raised,var(--paper))}
-html.dc-edit:not(.plan-watch) #panelFilesGrid .mcell .alt{opacity:0;transition:opacity var(--dur) var(--ease);padding:16px 6px 6px;font-size:10px}
+html.dc-edit:not(.plan-watch) #panelFilesGrid .mcell .alt{opacity:0;transition:opacity var(--dur) var(--ease);padding:16px 6px 6px;font-size:12px}
 html.dc-edit:not(.plan-watch) #panelFilesGrid .mcell:hover .alt,html.dc-edit:not(.plan-watch) #panelFilesGrid .mcell:focus-visible .alt{opacity:1}
-html.dc-edit:not(.plan-watch) #panelFilesGrid .mcell .badge{left:6px;top:6px;background:var(--sage-soft);color:var(--sage);font-size:10.5px;font-weight:600;letter-spacing:0;text-transform:none;padding:3px 8px}
+html.dc-edit:not(.plan-watch) #panelFilesGrid .mcell .badge{left:6px;top:6px;background:var(--sage-soft);color:var(--sage);font-size:12px;font-weight:600;letter-spacing:0;text-transform:none;padding:3px 8px;transition:opacity var(--dur) var(--ease)}
+/* item 34: at 12px a photo's caption, which also says where it's at work, would run into the badge, so it takes the badge's place */
+html.dc-edit:not(.plan-watch) #panelFilesGrid .mcell:hover .badge,html.dc-edit:not(.plan-watch) #panelFilesGrid .mcell:focus-visible .badge{opacity:0}
 html.dc-edit:not(.plan-watch) #panelFilesGrid .medit{right:6px;top:6px;min-height:28px;min-width:28px;width:28px;padding:0;border-radius:999px;background:var(--sheet);color:var(--ink);box-shadow:var(--dds-shadow);display:inline-flex;align-items:center;justify-content:center;opacity:0}
 html.dc-edit:not(.plan-watch) #panelFilesGrid .mwrap:hover .medit,html.dc-edit:not(.plan-watch) #panelFilesGrid .medit:focus-visible{opacity:1}
 @media (pointer:coarse){html.dc-edit:not(.plan-watch) #panelFilesGrid .medit{opacity:1;min-height:32px;min-width:32px;width:32px}}
@@ -719,7 +762,7 @@ html.dc-edit:not(.plan-watch) #designTray .tray-item.has-shot{padding:0;border:0
 html.dc-edit:not(.plan-watch) #designTray .tray-item .ti-shot{border:1px solid var(--hair);border-radius:10px;background:var(--dc-raised,var(--paper));aspect-ratio:155/86}
 html.dc-edit:not(.plan-watch) #designTray .tray-item:hover .ti-shot{border-color:var(--plum)}
 html.dc-edit:not(.plan-watch) #designTray .tray-item .ti-name{font-size:12.5px;font-weight:600;color:var(--ink)}
-html.dc-edit:not(.plan-watch) #designTray .tray-item .ti-alias{font-size:11px;color:var(--ink-3)}
+html.dc-edit:not(.plan-watch) #designTray .tray-item .ti-alias{font-size:12px;color:var(--ink-3)}
 html.dc-edit:not(.plan-watch) #designTray .tray-item:not(.has-shot){padding:8px 10px;border:1px solid var(--hair);border-radius:10px}
 .tray-saved{display:flex;align-items:center;gap:8px;width:100%;margin-top:16px;padding:10px 12px;border:0;border-radius:12px;background:var(--plum-soft);color:var(--plum);font:600 13px/1.3 var(--sans);cursor:pointer;text-align:left}
 .tray-saved svg{width:16px;height:16px;flex:none}
@@ -731,7 +774,7 @@ html.dc-edit:not(.plan-watch) .ritualwrap.as-card{inset:auto;top:var(--dc-card-t
 html.dc-edit:not(.plan-watch) .ritualwrap.as-card .ritual{max-width:none;margin:0;padding:18px 20px 20px;position:relative}
 .ritualwrap.as-card .backline{margin:0;position:absolute;top:16px;right:16px}
 .ritualwrap.as-card #btnRitualBack{width:32px;height:32px;border-radius:999px;background:var(--dc-raised,var(--paper));color:var(--ink);font-size:0;display:inline-flex;align-items:center;justify-content:center}
-.ritualwrap.as-card #btnRitualBack::before{content:"✕";font-size:14px;line-height:1}
+.ritualwrap.as-card #btnRitualBack::before{content:"";width:16px;height:16px;background:currentColor;-webkit-mask:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round'><path d='M18 6L6 18M6 6l12 12'/></svg>") center/contain no-repeat;mask:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round'><path d='M18 6L6 18M6 6l12 12'/></svg>") center/contain no-repeat}   /* item 34: the editor's own x, not a typed one */
 .ritualwrap.as-card #btnRitualBack:hover{color:var(--plum)}
 .ritualwrap.as-card h1{font-size:22px;font-weight:600;margin:0 44px 2px 0;line-height:1.15}
 .ritualwrap.as-card .rsub{font-size:12.5px;margin-bottom:14px;max-width:none}
@@ -818,7 +861,9 @@ html.dc-edit:not(.plan-watch) .dds-hint{bottom:88px !important;z-index:80 !impor
 @media(max-width:760px){
   html.dc-edit:not(.plan-watch){--dc-bar-top:10px;--dc-bar-h:50px}
   html.dc-edit:not(.plan-watch) .dc-bar{left:10px;right:10px;width:auto;max-width:none;padding:6px;gap:4px;justify-content:space-between}
-  html.dc-edit:not(.plan-watch) .dc-bar .dc-sep,html.dc-edit:not(.plan-watch) .dc-bar #dpDevSeg,html.dc-edit:not(.plan-watch) .dc-bar #dcLiveChip,html.dc-edit:not(.plan-watch) .dc-bar #dcBtnPreview,html.dc-edit:not(.plan-watch) .dc-bar #dcPageCount{display:none}   /* a phone is already a phone; Live and Preview live in the cards */
+  html.dc-edit:not(.plan-watch) .dc-bar .dc-sep,html.dc-edit:not(.plan-watch) .dc-bar #dpDevSeg,html.dc-edit:not(.plan-watch) .dc-bar #dcLiveChip,html.dc-edit:not(.plan-watch) .dc-bar #dcBtnPreview{display:none}   /* a phone is already a phone; Live and Preview live in the cards */
+  html.dc-edit:not(.plan-watch) .dc-bar #dcPageCount{width:10px;height:10px;padding:0;font-size:0;background:transparent}   /* the page's status: its dot alone (the words stay for screen readers) */
+  html.dc-edit:not(.plan-watch) .dc-bar #dcPageCount::before{width:8px;height:8px;margin:0}
   html.dc-edit:not(.plan-watch) .dc-pages{flex:1 1 auto;min-width:0}
   html.dc-edit:not(.plan-watch) .dc-switch{max-width:100%;height:36px;padding:0 8px 0 10px;gap:6px}
   html.dc-edit:not(.plan-watch) .dc-bar .pillbtn{padding:0 12px}
@@ -915,7 +960,7 @@ html.plan-watch .ss-bar,html.plan-watch [data-grp="Content"],html.plan-watch .na
 .sv-issue summary{cursor:pointer;font-size:13.5px;font-weight:500;display:flex;gap:var(--dds-s2,8px);align-items:baseline;justify-content:space-between}
 .sv-issue p{font-size:13px;color:var(--ink-2);margin:6px 0 0}
 .sv-issue p b{color:var(--ink);font-weight:600}
-.sv-pri{flex:0 0 auto;font-size:11.5px;font-weight:600;border-radius:999px;padding:1px var(--dds-s2,8px);background:var(--hair);color:var(--ink-2)}
+.sv-pri{flex:0 0 auto;font-size:12px;font-weight:600;border-radius:999px;padding:1px var(--dds-s2,8px);background:var(--hair);color:var(--ink-2)}
 .sv-pri.now{background:var(--clay-soft);color:var(--ink)}
 .sv-pri.soon{background:var(--amber-soft);color:var(--ink)}
 .sv-nums{display:flex;gap:var(--dds-s5,20px);flex-wrap:wrap;margin-bottom:var(--dds-s2,8px)}
@@ -941,7 +986,7 @@ html.plan-watch #svWords{display:none}
 .rtbtn:hover{background:var(--plum-soft);color:var(--plum);border-color:var(--plum-soft)}
 .rtbtn:active{background:var(--plum);color:var(--fill-ink,#fff);border-color:var(--plum)}
 .rtbtn .i{font-style:italic}.rtbtn .b{font-weight:800}
-.rthint{font-size:11.5px;color:var(--ink-2);margin:-2px 0 var(--dds-s2,8px)}
+.rthint{font-size:12px;color:var(--ink-2);margin:-2px 0 var(--dds-s2,8px)}
 .field input.mono{font-family:var(--mono);font-size:13.5px}
 
 /* hours */
@@ -962,7 +1007,7 @@ html.plan-watch #svWords{display:none}
 .menuhead{display:flex;align-items:baseline;gap:var(--dds-s4,16px);margin:var(--dds-s8,40px) 0 var(--dds-s1,4px)}
 .menuhead:first-of-type{margin-top:var(--dds-s2,8px)}
 .menuhead h6{font-family:var(--serif);font-weight:500;font-size:18px}
-.menuhead .mv{font-size:11px;color:var(--ink-2)}
+.menuhead .mv{font-size:12px;color:var(--ink-2)}
 .menuhead .ctl{margin-left:auto;display:flex;gap:2px}
 .menuhead .ctl button{padding:1px var(--dds-s2,8px);color:var(--ink-2);border-radius:4px;font-size:13px}
 .menuhead .ctl button:hover:not(:disabled){background:var(--plum-soft);color:var(--ink)}
@@ -1008,11 +1053,11 @@ html.plan-watch #svWords{display:none}
 .mcell img{width:100%;height:100%;object-fit:cover;display:block}
 /* photo overlays sit ON photographs — they stay literal dark with literal light
    text, theme-independent (the §1.2 exception) */
-.mcell .badge{position:absolute;left:8px;top:8px;background:rgba(33,29,25,.82);color:#fff;font-size:9px;letter-spacing:.1em;text-transform:uppercase;font-weight:600;padding:var(--dds-s1,4px) var(--dds-s2,8px);border-radius:100px}
+.mcell .badge{position:absolute;left:8px;top:8px;background:rgba(33,29,25,.82);color:#fff;font-size:12px;letter-spacing:.1em;text-transform:uppercase;font-weight:600;padding:var(--dds-s1,4px) var(--dds-s2,8px);border-radius:100px}
 .mcell .del{position:absolute;right:8px;top:8px;background:rgba(33,29,25,.65);color:#fff;border-radius:50%;width:26px;height:26px;display:grid;place-items:center;opacity:0;transition:opacity var(--dur) var(--ease);font-size:12px}
 .mcell:hover .del,.mcell:focus-within .del{opacity:1}
-.mcell .alt{position:absolute;left:0;right:0;bottom:0;padding:var(--dds-s6,24px) var(--dds-s2,8px) var(--dds-s2,8px);font-size:11px;color:#fff;background:linear-gradient(transparent,rgba(33,29,25,.75))}
-.mcell .alt .usedline{display:block;font-size:9.5px;opacity:.8;font-style:italic}
+.mcell .alt{position:absolute;left:0;right:0;bottom:0;padding:var(--dds-s6,24px) var(--dds-s2,8px) var(--dds-s2,8px);font-size:12px;color:#fff;background:linear-gradient(transparent,rgba(33,29,25,.75))}
+.mcell .alt .usedline{display:block;font-size:12px;opacity:.8;font-style:italic}
 /* The picker's Edit (items 39 + 117): its own button beside the photo's, never inside
    it (a button can't hold another), over the photo's top right like .del */
 .mwrap{position:relative}
@@ -1028,7 +1073,7 @@ html.plan-watch #svWords{display:none}
 .flchip{font-size:12px;font-weight:550;padding:var(--dds-s1,4px) var(--dds-s3,12px);border-radius:100px;border:1px solid var(--hair);background:var(--sheet);color:var(--ink-2);transition:color var(--dur) var(--ease)}
 .flchip:hover{color:var(--ink)}
 .flchip.on{background:var(--plum-soft);border-color:var(--plum);color:var(--plum);font-weight:600}
-.flchip .n{margin-left:var(--dds-s1,4px);font-size:10.5px;opacity:.75;font-variant-numeric:tabular-nums}
+.flchip .n{margin-left:var(--dds-s1,4px);font-size:12px;opacity:.75;font-variant-numeric:tabular-nums}
 .flrow{display:flex;gap:var(--dds-s2,8px);align-items:center}
 .flrow input{flex:1;min-width:160px;padding:var(--dds-s2,8px) var(--dds-s3,12px);font:inherit;font-size:13px;border:1px solid var(--hair-2);border-radius:var(--dds-r,8px);background:var(--sheet);color:var(--ink)}
 .flrow select{padding:var(--dds-s2,8px) 10px;font:inherit;font-size:13px;border:1px solid var(--hair-2);border-radius:var(--dds-r,8px);background:var(--sheet);color:var(--ink);cursor:pointer}
@@ -1060,7 +1105,7 @@ html.plan-watch #svWords{display:none}
 /* the ritual's change journal (also the version tools) */
 .journal .jrow{display:flex;gap:var(--dds-s5,20px);padding:10px 0;border-bottom:1px solid var(--hair);font-size:13.5px}
 .journal .jrow:last-child{border-bottom:0}
-.journal .jsec{flex:none;width:92px;font-size:11.5px;color:var(--ink-3);font-weight:500;padding-top:2px}
+.journal .jsec{flex:none;width:92px;font-size:12px;color:var(--ink-3);font-weight:500;padding-top:2px}
 .journal .more{padding:var(--dds-s3,12px) 0 0;font-size:12.5px;color:var(--ink-2)}
 /* ── the publish ritual (full page overlay) ── */
 .ritualwrap{position:fixed;inset:0;background:var(--paper);z-index:90;display:none;overflow:auto}
@@ -1145,6 +1190,9 @@ html.dds-has-shell.dds-has-ctxbar .stage{top:calc(var(--dds-shell-h) + var(--dds
 /* ── overlays as letters ── */
 .scrim{position:fixed;inset:0;background:color-mix(in srgb,var(--scrim-ink) 42%,transparent);z-index:80;display:none;align-items:flex-end;justify-content:center}
 .scrim.on{display:flex}
+/* item 171 (E1, E2): in the editor a sheet, the photo picker and the rest, opens above the bar, the dock and
+   the cards, so its own buttons take the press and nothing behind the dimmed screen does */
+html.dc-edit:not(.plan-watch) .scrim{z-index:96}
 @media(min-width:761px){.scrim{align-items:center}}
 .sheetcard{background:var(--sheet);border:1px solid var(--hair);border-radius:var(--r-lg) var(--r-lg) 0 0;width:100%;max-width:520px;max-height:88vh;overflow:auto;padding:var(--dds-s7,32px) var(--dds-s7,32px) var(--dds-s6,24px);box-shadow:var(--dds-shadow-pop,0 8px 28px rgba(21,20,26,.12))}
 @media(min-width:761px){.sheetcard{border-radius:var(--r-lg)}}
@@ -1201,13 +1249,13 @@ html.dds-has-shell.dds-has-ctxbar .stage{top:calc(var(--dds-shell-h) + var(--dds
 .tg-shot{position:relative;height:300px;overflow:hidden;background:#f6f4fa;border-bottom:1px solid var(--hair)}
 .tg-shot .tg-pic{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:top;display:block}
 .tg-shot:has(.tg-pic){height:auto;aspect-ratio:640/440}   /* the picture's own shape: nothing cut off the side */
-.tg-shot .tg-badge{position:absolute;top:12px;left:12px;z-index:3;background:var(--plum,#5b3fa0);color:var(--fill-ink,#fff);font-size:11px;font-weight:600;padding:var(--dds-s1,4px) var(--dds-s3,12px);border-radius:999px;box-shadow:0 2px 8px rgba(0,0,0,.18)}
+.tg-shot .tg-badge{position:absolute;top:12px;left:12px;z-index:3;background:var(--plum,#5b3fa0);color:var(--fill-ink,#fff);font-size:12px;font-weight:600;padding:var(--dds-s1,4px) var(--dds-s3,12px);border-radius:999px;box-shadow:0 2px 8px rgba(0,0,0,.18)}
 /* on-brand DEMO silhouette — shown when the draft is still empty (a cold start has
    nothing real to render), so the card always shows a designed page, never a name
    on white. A representative sample only; switching template keeps your real words. */
 .tg-demo{position:absolute;inset:0;overflow:hidden;display:flex;flex-direction:column}
 .tg-demo .tgd-nav{display:flex;align-items:center;justify-content:space-between;padding:var(--dds-s4,16px) var(--dds-s6,24px);font-size:15px;font-weight:700}
-.tg-demo .tgd-nav .tgd-links{display:flex;gap:var(--dds-s3,12px);font-size:11px;font-weight:500;opacity:.7}
+.tg-demo .tgd-nav .tgd-links{display:flex;gap:var(--dds-s3,12px);font-size:12px;font-weight:500;opacity:.7}
 .tg-demo .tgd-hero{padding:var(--dds-s8,40px) var(--dds-s7,32px) 44px;display:flex;flex-direction:column;gap:var(--dds-s3,12px)}
 .tg-demo .tgd-h1{font-size:30px;font-weight:700;line-height:1.1;max-width:16ch}
 .tg-demo .tgd-line{height:8px;border-radius:var(--dds-r-sm,6px);opacity:.28;background:currentColor}
@@ -1218,7 +1266,7 @@ html.dds-has-shell.dds-has-ctxbar .stage{top:calc(var(--dds-shell-h) + var(--dds
 .tg-demo .tgd-split{display:grid;grid-template-columns:1fr 1fr;gap:var(--dds-s4,16px);padding:0 var(--dds-s7,32px) var(--dds-s7,32px);align-items:center}
 .tg-demo .tgd-img{border-radius:var(--dds-r-xl,14px);min-height:120px;background:rgba(0,0,0,.08)}
 .tg-demo .tgd-txt{display:flex;flex-direction:column;gap:var(--dds-s2,8px)}
-.tg-demo .tgd-foot{margin-top:auto;padding:var(--dds-s5,20px) var(--dds-s7,32px);font-size:11px;opacity:.6}
+.tg-demo .tgd-foot{margin-top:auto;padding:var(--dds-s5,20px) var(--dds-s7,32px);font-size:12px;opacity:.6}
 .tg-body{padding:var(--dds-s4,16px) var(--dds-s4,16px) var(--dds-s4,16px);display:flex;flex-direction:column;gap:var(--dds-s1,4px);flex:1}
 .tg-name{font-weight:600;font-size:16px}
 .tg-tag{font-size:12px;color:var(--ink-2,#8a8172)}
@@ -1242,7 +1290,7 @@ html.dds-has-shell.dds-has-ctxbar .stage{top:calc(var(--dds-shell-h) + var(--dds
 /* Slice B — the Page Information menu (#btnPageInfo → .pi-pop). Same pp-pop item
    idiom; ≤760px it presents as the bottom sheet the slide-over panels use. */
 .pi-pop{position:fixed;z-index:300;background:var(--sheet,#fff);border:1px solid var(--line,#ddd);border-radius:var(--dds-r-xl,14px);box-shadow:0 12px 34px color-mix(in srgb,var(--scrim-ink) 24%,transparent);padding:6px;display:flex;flex-direction:column;min-width:260px;max-width:92vw;max-height:min(72vh,600px);overflow:auto}
-.pi-pop .pi-prov{font-size:11.5px;color:var(--ink-2,#8a8172);line-height:1.5;padding:var(--dds-s2,8px) var(--dds-s3,12px);border-bottom:1px solid var(--hair,#eee);margin-bottom:var(--dds-s1,4px)}
+.pi-pop .pi-prov{font-size:12px;color:var(--ink-2,#8a8172);line-height:1.5;padding:var(--dds-s2,8px) var(--dds-s3,12px);border-bottom:1px solid var(--hair,#eee);margin-bottom:var(--dds-s1,4px)}
 .pi-pop .pi-grp{display:flex;flex-direction:column}
 .pi-pop .pi-grp .pp-pop-item{padding-left:var(--dds-s7,32px)}
 .pi-pop.sheet{top:auto;left:0;right:0;bottom:0;width:100%;max-width:100%;border-radius:var(--dds-r-xl,14px) var(--dds-r-xl,14px) 0 0;border:none;box-shadow:0 -8px 44px color-mix(in srgb,var(--scrim-ink) 30%,transparent);padding:10px 10px calc(14px + env(safe-area-inset-bottom,0px));max-height:82vh}
@@ -1297,14 +1345,14 @@ html.dds-has-shell.dds-has-ctxbar .stage{top:calc(var(--dds-shell-h) + var(--dds
 .tray-h{font-weight:600;font-size:13.5px;margin-bottom:var(--dds-s1,4px)}
 .tray-search{width:100%;box-sizing:border-box;padding:var(--dds-s2,8px) 10px;border:1px solid var(--line,#ddd);border-radius:var(--dds-r,8px);font:inherit;font-size:13px;margin:var(--dds-s2,8px) 0 var(--dds-s1,4px)}
 .tray-grp{margin-top:var(--dds-s3,12px)}
-.tray-grp-h{font-size:11px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--ink-2,#8a8172);margin:0 0 var(--dds-s1,4px)}
+.tray-grp-h{font-size:12px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--ink-2,#8a8172);margin:0 0 var(--dds-s1,4px)}
 .tray-item{display:flex;align-items:center;gap:var(--dds-s2,8px);width:100%;text-align:left;font:inherit;font-size:12.5px;padding:var(--dds-s2,8px) 10px;border-radius:var(--dds-r,8px);border:1px solid transparent;background:transparent;color:inherit;cursor:grab;margin-bottom:2px;touch-action:pan-y}
 .tray-item:hover{background:var(--wash,#faf9fb);border-color:var(--hair,#eee)}
 .tray-item:focus-visible{outline:2px solid var(--plum,#5b3fa0);outline-offset:1px}
 .tray-item .ti-ico{flex:0 0 auto;font-size:15px;width:20px;text-align:center}
 .tray-item .ti-txt{min-width:0}
 .tray-item .ti-name{display:block;font-weight:600;line-height:1.2}
-.tray-item .ti-alias{display:block;margin-top:2px;font-size:10.5px;color:var(--ink-2,#8a8172);line-height:1.2}
+.tray-item .ti-alias{display:block;margin-top:2px;font-size:12px;color:var(--ink-2,#8a8172);line-height:1.2}
 /* item 25: each section as a small picture of what it adds (thumbs/sections, scripts/thumbnails) */
 .tray-grp.shots{display:grid;grid-template-columns:1fr 1fr;gap:var(--dds-s2,8px)}
 .tray-grp.shots>.tray-grp-h{grid-column:1/-1}
@@ -1321,7 +1369,7 @@ html.dds-has-shell.dds-has-ctxbar .stage{top:calc(var(--dds-shell-h) + var(--dds
 .dc-tabpanel{flex:1;min-height:0;overflow:auto}
 /* the content tree — one row per component on the page, in render order */
 #designTreeList{padding:10px var(--dds-s3,12px) var(--dds-s6,24px);display:flex;flex-direction:column;gap:2px}
-.dc-tree-hd{font-size:11px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--ink-2,#8a8172);padding:var(--dds-s2,8px) var(--dds-s2,8px) 2px}
+.dc-tree-hd{font-size:12px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--ink-2,#8a8172);padding:var(--dds-s2,8px) var(--dds-s2,8px) 2px}
 .dc-tree-empty{font-size:12px;color:var(--ink-2);padding:var(--dds-s3,12px) 6px;line-height:1.6}
 .dc-tree-row{display:flex;align-items:center;gap:2px;border-radius:var(--dds-r,8px);padding:1px}
 .dc-tree-row:hover,.dc-tree-row.sel{background:var(--wash,#f4f0fb)}
@@ -1342,7 +1390,7 @@ html.dds-has-shell.dds-has-ctxbar .stage{top:calc(var(--dds-shell-h) + var(--dds
 .dc-tree-row.core .dc-tree-ico{background:var(--dds-warn-soft)}
 .dc-tree-txt{min-width:0}
 .dc-tree-name{display:block;font-weight:600;font-size:13px;line-height:1.25;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.dc-tree-meta{display:block;font-size:10px;color:var(--ink-2,#8a8172);line-height:1.3;text-transform:uppercase;letter-spacing:.03em}
+.dc-tree-meta{display:block;font-size:12px;color:var(--ink-2,#8a8172);line-height:1.3;text-transform:uppercase;letter-spacing:.03em}
 .dc-tree-acts{display:flex;gap:1px;flex:0 0 auto;opacity:0;transition:opacity var(--dds-t-fast,120ms) var(--dds-ease,ease-out)}
 .dc-tree-row:hover .dc-tree-acts,.dc-tree-row:focus-within .dc-tree-acts{opacity:1}
 .dc-tree-acts button{font:inherit;font-size:12px;width:27px;height:27px;border-radius:var(--dds-r,8px);border:1px solid transparent;background:none;color:var(--ink-2,#8a8172);cursor:pointer;display:flex;align-items:center;justify-content:center}
@@ -1353,7 +1401,7 @@ html.dds-has-shell.dds-has-ctxbar .stage{top:calc(var(--dds-shell-h) + var(--dds
 body.pd-dragging .dc-tree-main{cursor:grabbing}
 /* the ⠿ drag handle: touch drags start HERE (touch-action:none, like the canvas
    grip) so the row itself keeps pan-y and the tree still scrolls under a thumb */
-.dc-tree-grab{flex:0 0 auto;border:none;background:none;color:var(--soft,#a39cb2);font:inherit;font-size:11px;line-height:1;padding:var(--dds-s2,8px) 0 var(--dds-s2,8px) var(--dds-s2,8px);cursor:grab;touch-action:none;user-select:none}
+.dc-tree-grab{flex:0 0 auto;border:none;background:none;color:var(--soft,#a39cb2);font:inherit;font-size:12px;line-height:1;padding:var(--dds-s2,8px) 0 var(--dds-s2,8px) var(--dds-s2,8px);cursor:grab;touch-action:none;user-select:none}
 body.pd-dragging .dc-tree-grab{cursor:grabbing}
 
 /* Slice C — the Files tab (#tabFiles): a compact, panel-scoped asset browser.
@@ -1364,24 +1412,24 @@ body.pd-dragging .dc-tree-grab{cursor:grabbing}
 .pf-search{padding:0 var(--dds-s4,16px)}
 .pf-body{flex:1;min-height:0;overflow:auto;padding:0 var(--dds-s4,16px) 10px}
 #panelFilesGrid.mediagrid{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:var(--dds-s3,12px)}
-.pf-note{font-size:11.5px;color:var(--ink-2,#8a8172);line-height:1.5;margin-top:var(--dds-s2,8px)}
+.pf-note{font-size:12px;color:var(--ink-2,#8a8172);line-height:1.5;margin-top:var(--dds-s2,8px)}
 .pf-foot{flex:0 0 auto;border-top:1px solid var(--hair);padding:10px var(--dds-s4,16px);background:var(--sheet,#fff)}
 
 /* G11: per-section review comments — the toggle, the tray badges, the thread panel */
 .dc-actbtn.on{border-color:var(--plum,#5b3fa0);background:var(--wash,#f0eafb);color:var(--plum,#5b3fa0)}
-.cm-badge{flex:0 0 auto;font:inherit;font-size:11px;font-weight:700;min-width:22px;height:20px;padding:0 6px;border-radius:999px;border:1px solid var(--plum,#5b3fa0);background:var(--plum,#5b3fa0);color:var(--fill-ink,#fff);cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:2px}
+.cm-badge{flex:0 0 auto;font:inherit;font-size:12px;font-weight:700;min-width:22px;height:20px;padding:0 6px;border-radius:999px;border:1px solid var(--plum,#5b3fa0);background:var(--plum,#5b3fa0);color:var(--fill-ink,#fff);cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:2px}
 .cm-badge.zero{background:transparent;color:var(--ink-2,#8a8172);border-color:var(--line,#ddd);opacity:0;transition:opacity var(--dds-t-fast,120ms) var(--dds-ease,ease-out)}
 .dc-tree-row:hover .cm-badge.zero,.dc-tree-row:focus-within .cm-badge.zero{opacity:1}
 .cm-badge:hover{border-color:var(--plum,#5b3fa0);color:var(--fill-ink,#fff);background:var(--plum,#5b3fa0)}
 .cm-badge.zero:hover{color:var(--plum,#5b3fa0);background:var(--wash,#f4f0fb)}
 .cm-item{border:1px solid var(--hair,#e7e0f2);border-radius:var(--dds-r-lg,10px);padding:var(--dds-s2,8px) var(--dds-s3,12px);margin-top:var(--dds-s2,8px)}
 .cm-item.resolved{opacity:.62}
-.cm-who{display:flex;align-items:center;gap:var(--dds-s2,8px);font-size:11px;color:var(--ink-2,#8a8172);text-transform:uppercase;letter-spacing:.03em}
+.cm-who{display:flex;align-items:center;gap:var(--dds-s2,8px);font-size:12px;color:var(--ink-2,#8a8172);text-transform:uppercase;letter-spacing:.03em}
 .cm-who .cm-k{font-weight:800}
 .cm-who .cm-k.client{color:var(--plum,#5b3fa0)}
 .cm-body{font-size:13px;line-height:1.55;margin-top:var(--dds-s1,4px);white-space:pre-wrap;overflow-wrap:anywhere}
 .cm-itemacts{display:flex;gap:var(--dds-s2,8px);margin-top:6px}
-.cm-itemacts button{font:inherit;font-size:11.5px;color:var(--ink-2,#8a8172);background:none;border:none;cursor:pointer;padding:2px 0;text-decoration:underline}
+.cm-itemacts button{font:inherit;font-size:12px;color:var(--ink-2,#8a8172);background:none;border:none;cursor:pointer;padding:2px 0;text-decoration:underline}
 .cm-itemacts button:hover{color:var(--plum,#5b3fa0)}
 .cm-reply{width:100%;box-sizing:border-box;font:inherit;font-size:13px;border:1px solid var(--line,#ddd);border-radius:var(--dds-r,8px);padding:var(--dds-s2,8px);min-height:60px;resize:vertical;margin-top:10px}
 .cm-send{font:inherit;font-size:12.5px;font-weight:700;margin-top:6px;padding:var(--dds-s2,8px) var(--dds-s4,16px);border:none;border-radius:999px;background:var(--plum,#5b3fa0);color:var(--fill-ink,#fff);cursor:pointer}
@@ -1485,7 +1533,7 @@ body.pd-dragging *{cursor:grabbing !important}
   h1.doc{font-size:24px}
   .hdate{width:84px}
   .hentry{flex-wrap:wrap}
-  .hacts{padding-left:106px}
+  .hacts{padding-left:106px;flex-wrap:wrap;gap:var(--dds-s2,8px) 14px}   /* four actions fit a phone's width, or wrap, never off the edge */
   .deskprivacy{display:none}
   .pagewords{display:none} /* pages travel by tapping links inside the proof */
 }
@@ -1826,7 +1874,7 @@ body.pd-dragging *{cursor:grabbing !important}
             <button type="button" class="dc-switch" id="dcPageSwitch" aria-haspopup="dialog" aria-expanded="false" aria-controls="pagesCard" title="Your pages: switch, add one, change the menu">
               <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3h8l5 5v13H6z"/><path d="M14 3v5h5"/></svg>
               <span class="dc-switch-name" id="dcPageName">Home</span>
-              <span class="dc-chip" id="dcPageCount">1 page</span>
+              <span class="dc-chip" id="dcPageCount"></span>
               <svg class="dc-switch-chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
             </button>
           </div>
@@ -1922,7 +1970,7 @@ body.pd-dragging *{cursor:grabbing !important}
                   <button type="button" class="pc-mrow" id="btnPageInfo" title="Everything about this page — publish, share a draft, properties, search appearance" aria-haspopup="menu" aria-expanded="false"><span class="ic"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 11v5"/><path d="M12 8h.01"/></svg></span><span class="t"><b>This page</b><span>Publish, share a draft, take offline</span></span><svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></button>
                 </div>
               </div>
-              <div id="pcPane" hidden><button type="button" class="pc-back" id="pcBack"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg>All pages</button><div class="pc-pane-body pg-settings"></div></div>
+              <div id="pcPane" hidden><button type="button" class="pc-back" id="pcBack"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg>All pages</button><div class="pc-pane-body pg-settings"></div><p class="pc-pane-when" id="pcPaneWhen">Changes here save as you go and reach your live site when you publish.</p></div>
             </div>
           </aside>
           <!-- on-demand three-tab side panel (left slide-over, no scrim so the canvas
@@ -1945,7 +1993,7 @@ body.pd-dragging *{cursor:grabbing !important}
           <!-- on-demand DESIGN SETTINGS (right slide-over with a scrim); cards mount
                into #designHost, id preserved -->
           <aside id="settingsPanel" class="dc-slideover dc-right" data-mode="styles" role="dialog" aria-modal="true" aria-label="Styles" aria-hidden="true">
-            <div class="dc-panel-head"><div class="dc-panel-tt"><span class="dc-panel-t" id="settingsTitle">Styles</span><span class="dc-panel-sub" id="settingsSub" hidden></span></div><button type="button" class="dc-close" id="btnSettingsClose" aria-label="Close">✕</button></div>
+            <div class="dc-panel-head"><div class="dc-panel-tt"><span class="dc-panel-t" id="settingsTitle">Styles</span><span class="dc-panel-sub" id="settingsSub" hidden></span></div><button type="button" class="dc-close" id="btnSettingsClose" aria-label="Close"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 6L6 18M6 6l12 12"/></svg></button></div>
             <!-- the floating studio, part two: one section's inspector has four tabs, and Styles has four of its own -->
             <div class="dc-seg" id="inspectorSeg" role="tablist" aria-label="What to change in this section" hidden>
               <button type="button" role="tab" data-itab="content" aria-selected="true">Content</button>
@@ -1974,7 +2022,7 @@ body.pd-dragging *{cursor:grabbing !important}
                same idiom as Design settings). Opened from a badge in the Content
                tree while the Comments toggle is on. -->
           <aside id="commentsPanel" class="dc-slideover dc-right" role="dialog" aria-modal="false" aria-label="Draft feedback" aria-hidden="true">
-            <div class="dc-panel-head"><span class="dc-panel-t" id="cmPanelTitle">Comments</span><button type="button" class="dc-close" id="btnCommentsClose" aria-label="Close">✕</button></div>
+            <div class="dc-panel-head"><span class="dc-panel-t" id="cmPanelTitle">Comments</span><button type="button" class="dc-close" id="btnCommentsClose" aria-label="Close"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 6L6 18M6 6l12 12"/></svg></button></div>
             <div class="dc-panel-scroll" id="cmPanelBody"></div>
           </aside>
           <div class="dc-scrim" id="dcScrim" hidden></div>
@@ -1983,17 +2031,19 @@ body.pd-dragging *{cursor:grabbing !important}
       <!-- HISTORY -->
       <section class="view" id="view-history">
         <h1 class="doc" role="heading" aria-level="2">Versions</h1>
-        <p class="docsub">Every version you publish is saved here. View one, compare it, or restore it to your draft. Your live site changes only when you publish.</p>
+        <p class="docsub">Every version you publish, and every checkpoint you save, newest first. View one, compare it, or bring it back into your draft. Your live site changes only when you publish.</p>
+        <!-- item 125: saves and publishes in one list, marked apart -->
+        <div class="ver-top"><p class="ver-legend"><span class="ver-kind pub">Published</span><span class="ver-kind save">Saved, never live</span></p><button type="button" class="pillbtn sm" id="btnSaveCheckpoint" title="Save a named copy of your draft before a big edit, to look at or come back to. Your live site isn’t touched." hidden>Save a checkpoint</button></div>
         <div id="pubList"></div>
+        <p class="ver-note" id="verNote"><span aria-hidden="true">ⓘ</span><span>Restoring a version brings back its business details, services, reviews, questions, updates, colours and fonts, and leaves your sections, pages, menu, bookings, enquiries, contacts and files as they are now.</span></p>
         <!-- what happened to the site, newest first (was its own page: timeline.html) -->
         <section class="hb-sec" id="activitySec" aria-labelledby="activityH" tabindex="-1" hidden>
           <div class="hb-sec-h"><h2 id="activityH">Recent activity</h2><button type="button" class="quietact" id="activityMore" hidden>See all</button></div>
           <div class="hb-list" id="activityList"></div>
         </section>
         <details class="ver-more" id="versionMore">
-          <summary>More tools: private preview, checkpoints, compare, launches</summary>
+          <summary>More tools: private preview, compare, launches</summary>
           <div id="previewBox"></div>
-          <div id="checkpointBox"></div>
           <div id="versionToolsBox"></div>
           <div id="launchBox"></div>
         </details>
@@ -2029,7 +2079,7 @@ body.pd-dragging *{cursor:grabbing !important}
   <div class="sheetcard" role="dialog" aria-modal="true" aria-labelledby="resSheetTitle">
     <h2 id="resSheetTitle">Restore this version?</h2>
     <p class="sub" id="resSheetSub"></p>
-    <div class="body"><p style="font-size:13.5px;color:var(--ink-2);font-family:var(--serif);font-style:italic;line-height:1.7">That version goes into your draft so you can check it. Today’s draft is kept as a safety copy, and your live site doesn’t change until you publish.</p></div>
+    <div class="body"><p style="font-size:13.5px;color:var(--ink-2);font-family:var(--serif);font-style:italic;line-height:1.7">That version goes into your draft so you can check it. Today’s draft is kept as a safety copy, and your live site doesn’t change until you publish.</p><p class="ver-sheet-note" id="resSheetKeeps">It brings back business details, services, reviews, questions, updates, colours and fonts, and leaves your sections, pages, menu, bookings, enquiries, contacts and files as they are now.</p></div>
     <div class="foot">
       <button class="quietact" data-close>Cancel</button>
       <button class="pillbtn inked" id="btnRestoreGo">Restore to my draft</button>
@@ -2136,6 +2186,9 @@ if (ENV === ENVS.prod) window.__ddsSb = sb;   // shell.js reuses it, so this pag
 /* ── helpers ── */
 const $ = (id) => document.getElementById(id);
 const el = (tag, cls, text) => { const n = document.createElement(tag); if (cls) n.className = cls; if (text !== undefined) n.textContent = text; return n; };
+// Item 34: one icon set. A small button drawn with the editor's own icon (uiIcon), its words kept as
+// its name for screen readers and as its tooltip, instead of a typed ↑, ↓, ✕, × or ⋯.
+const icoBtn = (name, label, cls, size) => { const b = el("button", cls); b.type = "button"; b.innerHTML = uiIcon(name, size || 16); b.setAttribute("aria-label", label); b.title = label; return b; };
 // Says who can, where a role without configure would otherwise find a sentence and nothing to press.
 const askOwner = (cls, text) => { const n = el("div", cls, text); n.hidden = true; n.dataset.ifLacks = "configure"; return n; };
 // A small masked/text dialog — replaces native prompt() (no cleartext passwords, and
@@ -2962,8 +3015,8 @@ function renderOfferings() {
     const n = S.offerings.filter((o) => (o.category || VOCAB.label) === cat).length;
     head.appendChild(el("span", "mv", `${n} ${n === 1 ? VOCAB.one : VOCAB.many}`));
     const ctl = el("div", "ctl");
-    const up = el("button", null, "↑"); up.title = `Move ${cat} earlier`; up.setAttribute("aria-label", `Move ${cat} earlier`);
-    const dn = el("button", null, "↓"); dn.title = `Move ${cat} later`; dn.setAttribute("aria-label", `Move ${cat} later`);
+    const up = icoBtn("up", `Move ${cat} earlier`, null, 14);
+    const dn = icoBtn("down", `Move ${cat} later`, null, 14);
     up.disabled = ci === 0; dn.disabled = ci === cats.length - 1;
     up.addEventListener("click", () => moveCategory(cat, -1));
     dn.addEventListener("click", () => moveCategory(cat, +1));
@@ -4172,7 +4225,7 @@ function FL_openLink(id) {
   const a = el("a", null, "Open in Files");
   a.href = FL_filesHref(id);
   a.title = "Versions, where-used, crops and replace live in Files";
-  a.style.cssText = "font:inherit;font-size:11.5px;padding:3px 9px;border-radius:999px;border:1px solid var(--line, #ddd);color:inherit;text-decoration:none";
+  a.style.cssText = "font:inherit;font-size:12px;padding:3px 9px;border-radius:999px;border:1px solid var(--line, #ddd);color:inherit;text-decoration:none";
   a.addEventListener("click", (e) => e.stopPropagation());
   return a;
 }
@@ -4681,7 +4734,7 @@ function mediaCell(grid, m, manage, onPick) {
       const on = S.settings && S.settings[field] === m.id;
       const b = el("button", null, on ? onLabel + " ✓" : offLabel);
       b.type = "button";
-      b.style.cssText = "font:inherit;font-size:11.5px;padding:3px 9px;border-radius:999px;border:1px solid " + (on ? "var(--plum,#5b3fa0)" : "var(--line, #ddd)") + ";background:" + (on ? "var(--plum,#5b3fa0)" : "transparent") + ";color:" + (on ? "var(--fill-ink,#fff)" : "inherit") + ";cursor:pointer";
+      b.style.cssText = "font:inherit;font-size:12px;padding:3px 9px;border-radius:999px;border:1px solid " + (on ? "var(--plum,#5b3fa0)" : "var(--line, #ddd)") + ";background:" + (on ? "var(--plum,#5b3fa0)" : "transparent") + ";color:" + (on ? "var(--fill-ink,#fff)" : "inherit") + ";cursor:pointer";
       b.addEventListener("click", async (e) => {
         e.stopPropagation();
         try {
@@ -4700,7 +4753,7 @@ function mediaCell(grid, m, manage, onPick) {
     // Phase O: edit the photo description (alt text) after upload — a11y/SEO
     const ed = el("button", null, "Edit description");
     ed.type = "button";
-    ed.style.cssText = "font:inherit;font-size:11.5px;padding:3px 9px;border-radius:999px;border:1px solid var(--line, #ddd);background:transparent;cursor:pointer";
+    ed.style.cssText = "font:inherit;font-size:12px;padding:3px 9px;border-radius:999px;border:1px solid var(--line, #ddd);background:transparent;cursor:pointer";
     ed.addEventListener("click", (e) => {
       e.stopPropagation();
       if (cell.querySelector(".altedit")) return;
@@ -4728,7 +4781,7 @@ function mediaCell(grid, m, manage, onPick) {
     const ai = el("button", null, "✦ Suggest with AI");
     ai.type = "button";
     ai.title = "Let AI propose a description, a few tags, and a caption — you approve or edit before anything saves";
-    ai.style.cssText = "font:inherit;font-size:11.5px;padding:3px 9px;border-radius:999px;border:1px solid var(--plum-line,#cfc2ee);background:color-mix(in srgb,var(--plum,#5b3fa0) 6%,transparent);color:var(--plum,#5b3fa0);cursor:pointer";
+    ai.style.cssText = "font:inherit;font-size:12px;padding:3px 9px;border-radius:999px;border:1px solid var(--plum-line,#cfc2ee);background:color-mix(in srgb,var(--plum,#5b3fa0) 6%,transparent);color:var(--plum,#5b3fa0);cursor:pointer";
     ai.addEventListener("click", async (e) => {
       e.stopPropagation();
       if (cell.querySelector(".aisuggest")) return;
@@ -4743,7 +4796,7 @@ function mediaCell(grid, m, manage, onPick) {
     // Phase CP-2 (DS-5): focus point — 3×3 chooser; used wherever the site crops
     const fp = el("button", null, "Set focus");
     fp.type = "button";
-    fp.style.cssText = "font:inherit;font-size:11.5px;padding:3px 9px;border-radius:999px;border:1px solid var(--line, #ddd);background:transparent;cursor:pointer";
+    fp.style.cssText = "font:inherit;font-size:12px;padding:3px 9px;border-radius:999px;border:1px solid var(--line, #ddd);background:transparent;cursor:pointer";
     fp.addEventListener("click", (e) => {
       e.stopPropagation();
       if (cell.querySelector(".focalgrid")) return;
@@ -4764,9 +4817,9 @@ function mediaCell(grid, m, manage, onPick) {
     });
     row.appendChild(fp);
     cell.appendChild(row);
-    const del = el("button", "del", "✕"); del.dataset.needs = "delete"; del.title = "Remove this photograph"; del.setAttribute("aria-label", "Remove photograph: " + (m.alt_text || ""));
+    const del = icoBtn("x", "Remove photograph: " + (m.alt_text || ""), "del", 14); del.dataset.needs = "delete"; del.title = "Remove this photograph";
     del.addEventListener("click", async () => {
-      if (!del.dataset.armed) { del.dataset.armed = "1"; del.textContent = "?"; del.title = m.used_by?.length ? `It’s at work (${m.used_by.join(", ")}) — remove anyway?` : "Remove for good?"; setTimeout(() => { delete del.dataset.armed; del.textContent = "✕"; }, 3200); return; }
+      if (!del.dataset.armed) { del.dataset.armed = "1"; del.textContent = "?"; del.title = m.used_by?.length ? `It’s at work (${m.used_by.join(", ")}) — remove anyway?` : "Remove for good?"; setTimeout(() => { delete del.dataset.armed; del.innerHTML = uiIcon("x", 14); }, 3200); return; }
       try { await api("DELETE", `/media/${m.id}`); S.media = S.media.filter((x) => x.id !== m.id); renderMediaGrid(grid, true); toast("Removed"); }
       catch (err) { toast(nice(err), true); }
     });
@@ -4785,7 +4838,7 @@ function showSuggest(cell, m, grid, p) {
   note.style.cssText = "color:var(--ink-2);margin-bottom:9px;font-family:var(--serif);font-style:italic";
   panel.appendChild(note);
   const mkField = (labelText, value, max) => {
-    const l = el("label", null, labelText); l.style.cssText = "display:block;font-size:11px;color:var(--ink-2);margin-bottom:2px";
+    const l = el("label", null, labelText); l.style.cssText = "display:block;font-size:12px;color:var(--ink-2);margin-bottom:2px";
     const i = el("input"); i.type = "text"; i.value = value || ""; i.maxLength = max;
     i.style.cssText = "width:100%;margin-bottom:8px;padding:6px 8px;font:inherit;font-size:12px;border:1px solid var(--line,#ddd);border-radius:8px";
     panel.appendChild(l); panel.appendChild(i); return i;
@@ -5354,7 +5407,7 @@ function pcRow(entry, ctx) {
   const gear = el("button", "pc-ico pg-gear"); gear.type = "button"; gear.innerHTML = PG_GEAR; gear.title = "Settings"; gear.setAttribute("aria-label", "Settings for " + name);
   row.appendChild(gear);
   if (canvas) {
-    const mn = el("button", "pc-ico pp-menu", "⋯"); mn.type = "button"; mn.setAttribute("aria-label", "More for " + name);
+    const mn = icoBtn("more", "More for " + name, "pc-ico pp-menu");
     mn.title = slug ? "Rename, duplicate, clear or delete this page" : "Duplicate or clear this page";
     mn.addEventListener("click", () => dcPageMenu(slug, mn));
     row.appendChild(mn);
@@ -5650,6 +5703,19 @@ function pgSwitch(label, on) {
   row.append(t, cb); return row;
 }
 // One own page's stored settings, changed in one write (undefined takes a setting off).
+// Item 121: the page a broken link shows: one of the owner's own pages (slug), or none (""), the
+// ready-made page. One save marks that page and clears the mark from every other.
+function pgSetNotFound(slug) {
+  return pgTurn(async () => {
+    if (!(await dcSavePendingEdits())) return false;
+    const build = () => ({ pages: dcPagesArr().map((x) => { const nx = { ...x }; if (slug && x.slug === slug) nx.notFound = true; else delete nx.notFound; return nx; }) });
+    try {
+      await settingsPut(build); renderPagesBar(); scheduleChangesRefresh();
+      toast(slug ? "Broken links will show “" + ((dcPageObj(slug) || {}).title || slug) + "”. Publish to apply." : "Broken links will show the ready-made page. Publish to apply.");
+      return true;
+    } catch (err) { toast(nice(err), true); return false; }
+  });
+}
 function pgSetPage(slug, patch, okMsg) {
   return pgTurn(async () => {
     if (!(await dcSavePendingEdits())) return false;
@@ -5692,6 +5758,19 @@ function pgAccessGroup(slug) {
       const change = el("button", "dc-modal-cancel", "Change password"); change.type = "button";
       change.addEventListener("click", () => { asking = true; msg = ""; draw("pw"); });
       saved.append(chip, change); g.appendChild(saved);
+      // item 121: what the password box says: the owner's own heading and message, or its own words
+      g.appendChild(el("h4", "pg-h pg-h-sub", "What the password page says"));
+      const words = [["lockTitle", "Heading", 80, "This page needs a password", ""], ["lockNote", "Message", 300, "Type the password you were given to see " + (page.title || "this page") + ".", "Your logo and header show above it, as on every page."]];
+      words.forEach(([field, label, max, ph, hint]) => {
+        const inp = field === "lockNote" ? el("textarea") : el("input"); if (field !== "lockNote") inp.type = "text";
+        inp.maxLength = max; inp.placeholder = ph; inp.value = page[field] || ""; inp.id = "pgLock-" + field; if (field === "lockNote") inp.rows = 2;
+        inp.addEventListener("change", () => {
+          const v = inp.value.replace(/\s+/g, " ").trim(), was = (dcPageObj(slug) || {})[field] || "";   // the page as it is now, not as the card opened
+          if (v === was) return;
+          pgSetPage(slug, { [field]: v || undefined }, "Password page: " + label.toLowerCase() + (v ? " saved" : " back to its own words") + ". Publish to apply.");
+        });
+        g.appendChild(pgField(label, inp, hint));
+      });
     }
     if (asking) {
       const box = el("div", "pg-pw");
@@ -5930,7 +6009,7 @@ function hbTreePage(pg) {
 function hbLoadBoardExtras(view) {
   if (view === "pages" && !HB_ASKED.tree) {
     HB_ASKED.tree = true;
-    api("GET", "/content-tree").then((r) => { HB_TREE = r.data || null; renderPagesList(); }).catch(() => {});
+    api("GET", "/content-tree").then((r) => { HB_TREE = r.data || null; renderPagesList(); dcSyncPageSwitch(); }).catch(() => {});
   }
   if (view === "search" && !HB_ASKED.health) {
     HB_ASKED.health = true;
@@ -6070,7 +6149,7 @@ async function loadToday(first) {
     const [h, c] = await (first || Promise.all([api("GET", "/health"), readChanges()]));   // M9: seed the optimistic-lock version
     S.health = h.data; S.changes = c.data; TODAY_READ_AT = at;
     renderFactsProse();
-    renderPublishButton(); renderBizWaiting(); renderTodoLine(); renderStageStatus();
+    renderPublishButton(); renderBizWaiting(); renderTodoLine(); renderStageStatus(); dcSyncPageSwitch();
   } catch (err) { toast(nice(err), true); }
 }
 // ── The Overview is the site ─────────────────────────────────────────────────
@@ -6291,7 +6370,7 @@ async function readChanges() {
 }
 function scheduleChangesRefresh() {
   debounce("changes", async () => {
-    try { const c = await readChanges(); S.changes = c.data; renderPublishButton(); renderBizWaiting(); renderTodoLine(); renderStageStatus();
+    try { const c = await readChanges(); S.changes = c.data; renderPublishButton(); renderBizWaiting(); renderTodoLine(); renderStageStatus(); dcSyncPageSwitch();
       if ($("view-pages").classList.contains("on")) { renderRecent(); renderPagesList(); } }
     catch { /* quiet */ }
   }, 1200);
@@ -6773,7 +6852,7 @@ function pipeHtml(stage) { // stage: 0 sealing, 1 deploying, 2 live, -1 failed a
     ["Live", stage >= 2 ? "done" : "wait"],
   ];
   if (stage === -1) steps[2] = ["The carry didn’t complete — your live site is unchanged", "wait"];
-  return `<div class="pipe">` + steps.map(([t, k]) => `<div class="pstep ${k}"><i>${k === "done" ? "✓" : ""}</i>${t}</div>`).join("") + `</div>`;
+  return `<div class="pipe">` + steps.map(([t, k]) => `<div class="pstep ${k}"><i>${k === "done" ? uiIcon("check", 11) : ""}</i>${t}</div>`).join("") + `</div>`;
 }
 async function runPublish(btn, firstPublish) {
   btn.disabled = true; btn.textContent = "Publishing…";
@@ -6838,7 +6917,7 @@ function showReceipt(firstPublish) {
       : "Every word on your site came from you.<br>This version is kept safe, always.");
   $("ritBody").innerHTML = `
     <div class="receipt">
-      <div class="stamp">✓</div>
+      <div class="stamp">${uiIcon("check", 22)}</div>
       <div class="rp">${stampLine}</div>
       <div class="rd">${now.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })} · ${now.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}${count && !firstPublish ? ` · ${count} change${count > 1 ? "s" : ""}` : ""}</div>
       <div class="rl">${keptLine}</div>
@@ -6883,7 +6962,7 @@ async function renderRitualSchedule(host, publishable, toSchedule) {
   try { pending = ((await api("GET", "/schedule")).data || {}).scheduled || []; } catch (_) { /* keep the ritual calm */ }
   if (pending.length) {
     const box = el("div"); box.style.cssText = "margin:0 auto 14px;max-width:440px;text-align:left";
-    box.appendChild(Object.assign(el("div", null, "Scheduled — will happen on its own"), { style: "font-weight:700;font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--ink-2,#666);margin-bottom:6px" }));
+    box.appendChild(Object.assign(el("div", null, "Scheduled — will happen on its own"), { style: "font-weight:700;font-size:12px;text-transform:uppercase;letter-spacing:.05em;color:var(--ink-2,#666);margin-bottom:6px" }));
     pending.forEach((s) => {
       const row = el("div"); row.style.cssText = "display:flex;align-items:center;gap:10px;border:1px solid var(--line,#e5e5e5);border-radius:10px;padding:8px 12px;margin-top:6px";
       const kindWord = s.kind === "offline" ? "Take the site offline" : s.kind === "revert" ? "Return to an earlier version" : "Publish";
@@ -6918,7 +6997,7 @@ async function renderRitualSchedule(host, publishable, toSchedule) {
   // button at every moment. #schedule / "Publish later" open it armed, with
   // the date field focused.
   const panel = el("div", "sched-panel"); panel.style.cssText = "margin:18px auto 0;max-width:440px;text-align:left;border:1px solid var(--line,#e5e5e5);border-radius:12px;padding:14px 16px";
-  panel.appendChild(Object.assign(el("div", null, "Or publish later"), { style: "font-weight:700;font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--ink-2,#666);margin-bottom:10px" }));
+  panel.appendChild(Object.assign(el("div", null, "Or publish later"), { style: "font-weight:700;font-size:12px;text-transform:uppercase;letter-spacing:.05em;color:var(--ink-2,#666);margin-bottom:10px" }));
   const mkRow = (labelText, defValue, withToggle) => {
     const r = el("div"); r.style.cssText = "margin-top:" + (withToggle ? "12px" : "0");
     const lab = el("label", null, labelText); lab.style.cssText = "display:block;font-size:12px;font-weight:600;margin-bottom:4px";
@@ -6929,7 +7008,7 @@ async function renderRitualSchedule(host, publishable, toSchedule) {
     return { row: r, inp };
   };
   const pub = mkRow("Publish these changes at", dtLocalDefault(24), false);
-  panel.appendChild(Object.assign(el("div", null, "Your draft is frozen the moment you schedule — exactly what you reviewed goes up, even if you keep editing."), { style: "font-size:11.5px;color:var(--ink-2,#666);margin-top:6px;line-height:1.6" }));
+  panel.appendChild(Object.assign(el("div", null, "Your draft is frozen the moment you schedule — exactly what you reviewed goes up, even if you keep editing."), { style: "font-size:12px;color:var(--ink-2,#666);margin-top:6px;line-height:1.6" }));
   // the optional "unpublish at" leg — same table, same cron, kind=offline
   const offWrap = el("div"); offWrap.style.marginTop = "12px";
   const offToggle = el("label"); offToggle.style.cssText = "display:flex;align-items:center;gap:8px;font-size:12.5px;cursor:pointer";
@@ -6940,7 +7019,7 @@ async function renderRitualSchedule(host, publishable, toSchedule) {
   offCb.addEventListener("change", () => {
     if (offCb.checked && !off) {
       off = mkRow("Take the site offline at", dtLocalDefault(24 * 8), true);
-      off.row.appendChild(Object.assign(el("div", null, "Visitors will see a simple “temporarily offline” page from then on. Nothing is deleted — publishing brings everything back."), { style: "font-size:11.5px;color:var(--ink-2,#666);margin-top:4px;line-height:1.6" }));
+      off.row.appendChild(Object.assign(el("div", null, "Visitors will see a simple “temporarily offline” page from then on. Nothing is deleted — publishing brings everything back."), { style: "font-size:12px;color:var(--ink-2,#666);margin-top:4px;line-height:1.6" }));
     } else if (off) { off.row.style.display = offCb.checked ? "" : "none"; }
   });
   // optional note (it was on the retired Scheduled page) — POST /schedule takes it as before
@@ -7357,7 +7436,7 @@ async function renderPreviewPanel() {
   card.appendChild(el("label", null, "Private preview"));
   card.appendChild(el("div", "hint", "Edit your Draft, publish it to a private Preview to review or share, then promote to Live. Your live site never changes until you promote."));
   const grid = el("div"); grid.style.cssText = "display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-top:10px";
-  const stateCard = (title, lines) => { const c = el("div"); c.style.cssText = "border:1px solid var(--line,#e5e5e5);border-radius:10px;padding:10px 12px"; c.appendChild(Object.assign(el("div", null, title), { style: "font-weight:700;font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--soft,#666)" })); lines.filter(Boolean).forEach((l) => c.appendChild(Object.assign(el("div", null, l), { style: "font-size:12.5px;margin-top:4px" }))); return c; };
+  const stateCard = (title, lines) => { const c = el("div"); c.style.cssText = "border:1px solid var(--line,#e5e5e5);border-radius:10px;padding:10px 12px"; c.appendChild(Object.assign(el("div", null, title), { style: "font-weight:700;font-size:12px;text-transform:uppercase;letter-spacing:.05em;color:var(--soft,#666)" })); lines.filter(Boolean).forEach((l) => c.appendChild(Object.assign(el("div", null, l), { style: "font-size:12.5px;margin-top:4px" }))); return c; };
   // the same number the Publish button and the overview show (/changes), not the
   // raw edit count: 14 edits to one new site is one change waiting to go live
   const dc = S.changes && typeof S.changes.count === "number" ? S.changes.count : (st.draft.unpublished_changes || 0);
@@ -7470,49 +7549,23 @@ async function renderDeletedPages() {
   });
   box.appendChild(card);
 }
+// Saved checkpoints: named copies of the draft that were never live. Item 125 puts them in the
+// Versions list with the publishes, newest first, a hollow dot against a publish's filled one;
+// the studio's Save a checkpoint sits at the list's top (a client's list just shows them).
 async function renderCheckpoints() {
-  const box = $("checkpointBox"); if (!box) return;
-  let cps = [];
-  try { cps = (await api("GET", "/publishes/checkpoints")).data || []; } catch (_) { box.innerHTML = ""; return; }
-  box.innerHTML = "";
-  const card = el("div", "field"); card.style.marginBottom = "18px";
-  card.appendChild(el("label", null, "Checkpoints"));
-  card.appendChild(el("div", "hint", "Before a big edit or a publish, save a named checkpoint of your current draft — a safety point you can look at or return to anytime. Your live site is never affected."));
-  const save = el("button", null, "Save a checkpoint"); save.type = "button";
-  save.style.cssText = "font:inherit;font-size:12.5px;margin:8px 0;padding:7px 14px;border-radius:999px;border:1px solid var(--line,#ddd);background:transparent;cursor:pointer";
-  save.addEventListener("click", async () => {
+  try { S.checkpoints = (await api("GET", "/publishes/checkpoints")).data || []; } catch (_) { S.checkpoints = []; }
+  const b = $("btnSaveCheckpoint"); if (b) b.hidden = !S.isStudio;
+  if (S.publishesRead) renderVersionList();
+}
+(function initSaveCheckpoint() {
+  const b = $("btnSaveCheckpoint"); if (!b) return;
+  b.addEventListener("click", async () => {
     const name = await askText("Name this checkpoint", { placeholder: "e.g. Before spring redesign", ok: "Save" });
     if (name === null) return;
     try { await api("POST", "/publishes/checkpoints", { name }); toast("Checkpoint saved"); renderCheckpoints(); }
     catch (err) { toast(nice(err), true); }
   });
-  card.appendChild(save);
-  cps.forEach((c) => {
-    const row = el("div"); row.style.cssText = "border:1px solid var(--line,#e5e5e5);border-radius:10px;padding:10px 12px;margin-top:8px";
-    const top = el("div"); top.style.cssText = "display:flex;align-items:center;gap:8px;flex-wrap:wrap";
-    top.appendChild(Object.assign(el("strong", null, c.name), { style: "font-size:13.5px" }));
-    const d = new Date(c.at);
-    top.appendChild(Object.assign(el("span", null, "saved " + d.toLocaleDateString("en-US", { month: "short", day: "numeric" }) + " " + d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" }).replace(" ", "")), { style: "font-size:12px;color:var(--soft,#666)" }));
-    row.appendChild(top);
-    const acts = el("div"); acts.style.cssText = "display:flex;gap:8px;flex-wrap:wrap;margin-top:8px";
-    const mk = (label, fn, primary) => { const b = el("button", null, label); b.type = "button"; b.style.cssText = "font:inherit;font-size:12px;padding:5px 12px;border-radius:999px;cursor:pointer;border:" + (primary ? "2px solid var(--plum,#5b3fa0);background:var(--plum-tint,#faf7ff);color:var(--plum-deep,#3a2470)" : "1px solid var(--line,#ddd);background:transparent"); b.addEventListener("click", fn); acts.appendChild(b); };
-    mk("View", () => openLaunchPreview(c.id));
-    mk("Restore to draft", async () => {
-      if (!(await askYes("Restore checkpoint “" + c.name + "” to your draft? Today’s draft is kept as a safety copy.", { ok: "Restore" }))) return;
-      try { const r = await api("POST", `/publishes/checkpoints/${c.id}/restore`, {}); toast(r.data.message); await refreshAll(); go("today"); }
-      catch (err) { toast(nice(err), true); }
-    }, true);
-    mk("Remove", async () => {
-      if (!(await askYes("Remove checkpoint “" + c.name + "”? This can’t be undone.", { ok: "Remove", danger: true }))) return;
-      try { await api("DELETE", `/publishes/checkpoints/${c.id}`); toast("Checkpoint removed"); renderCheckpoints(); }
-      catch (err) { toast(nice(err), true); }
-    });
-    acts.lastChild.dataset.needs = "delete";
-    row.appendChild(acts);
-    card.appendChild(row);
-  });
-  box.appendChild(card);
-}
+})();
 // ── Compare any two versions + Timewarp ──────────────────────────────────────
 // Compare feeds two kept versions to the SAME plain-language change engine the
 // publish sheet uses; Timewarp resolves a date to the version that was live then
@@ -7605,12 +7658,14 @@ async function loadHistory() {
   if (more && !more.dataset.set) { more.dataset.set = "1"; more.open = !!S.isStudio; }
   const list = $("pubList");
   list.innerHTML = `<div class="loadline"><div class="lq">Loading versions…</div><div class="shimmer"></div></div>`;
+  S.publishesRead = false;
   try {
     const pubs = (await api("GET", "/publishes")).data;
-    S.publishes = pubs;
+    S.publishes = pubs; S.versionsErr = null;
     renderVersionTools();   // compare any two versions + Timewarp (needs S.publishes)
-    renderVersionList();
-  } catch (err) { list.innerHTML = `<div class="estate"><div class="eq">Your versions couldn’t load just now.</div><div class="eh">${esc(nice(err))}</div></div>`; }
+  } catch (err) { S.publishes = null; S.versionsErr = nice(err); }
+  S.publishesRead = true;   // saved checkpoints may land before or after: whichever is last draws the list
+  renderVersionList();
 }
 // Who published it, in the words of whoever is reading: a studio working inside a
 // client's site and the client see the same row from opposite sides.
@@ -7621,20 +7676,25 @@ function versionWho(p) {
   return "";
 }
 const VERSIONS_SHOWN = 10;
+const verWhen = (at) => { const d = new Date(at); return d.toLocaleDateString("en-US", { month: "short", day: "numeric" }) + " · " + d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" }); };
+// the date cell leads with what the row is: Published (a filled dot), Saved (a hollow one, never live)
+function verDate(kind, word, at) { const w = el("span", "hdate"); w.appendChild(el("span", "ver-kind " + kind, word)); w.appendChild(document.createTextNode(verWhen(at))); return w; }
 function renderVersionList() {
   const list = $("pubList"); if (!list) return;
   const pubs = S.publishes || [];
+  const all = [...pubs, ...(S.checkpoints || []).map((c) => ({ ...c, saved: true, at: c.at || c.created_at }))].sort((a, b) => new Date(b.at) - new Date(a.at));
   list.innerHTML = "";
-  if (!pubs.length) { list.innerHTML = `<div class="estate"><div class="eq">No versions yet.</div><div class="eh">Each time you publish, a version is saved here. You can look at any of them or restore one.</div></div>`; return; }
+  if (S.versionsErr) list.insertAdjacentHTML("beforeend", `<div class="estate"><div class="eq">Your versions couldn’t load just now.</div><div class="eh">${esc(S.versionsErr)}</div></div>`);
+  if (!all.length) { if (!S.versionsErr) list.innerHTML = `<div class="estate"><div class="eq">No versions yet.</div><div class="eh">Each time you publish, a version is saved here. You can look at any of them or restore one.</div></div>`; return; }
   const liveId = (pubs.find((p) => p.status === "live") || {}).id;
-  const shown = S.versionsAll ? pubs : pubs.slice(0, VERSIONS_SHOWN);
+  const shown = S.versionsAll ? all : all.slice(0, VERSIONS_SHOWN);
   shown.forEach((p) => {
+    if (p.saved) { list.appendChild(versionSavedRow(p)); return; }
     const row = el("div", "hentry" + (p.status === "failed" ? " hfail" : ""));
-    const d = new Date(p.at);
-    row.appendChild(el("span", "hdate", d.toLocaleDateString("en-US", { month: "short", day: "numeric" }) + " · " + d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })));
+    row.appendChild(p.status === "failed" ? verDate("fail", "Not published", p.at) : verDate("pub", "Published", p.at));
     const body = el("div", "hbody");
     const sum = el("div", "hsum");
-    if (p.status === "failed") sum.appendChild(el("span", "hollow", "◌"));
+    if (p.status === "failed") { const h = el("span", "hollow"); h.innerHTML = uiIcon("x", 13); sum.appendChild(h); }
     // Phase AA (FD-7): a named version leads with its name
     if (p.label) { const lb = el("strong", null, "“" + p.label + "” — "); sum.appendChild(lb); }
     sum.appendChild(document.createTextNode(p.status === "failed" ? "A publish didn’t go through." : p.summary));
@@ -7694,18 +7754,42 @@ function renderVersionList() {
     }
     list.appendChild(row);
   });
-  if (shown.length < pubs.length) {
-    const older = el("button", "addline", `Show ${pubs.length - shown.length} older version${pubs.length - shown.length === 1 ? "" : "s"}`);
+  if (shown.length < all.length) {
+    const older = el("button", "addline", `Show ${all.length - shown.length} older version${all.length - shown.length === 1 ? "" : "s"}`);
     older.addEventListener("click", () => { S.versionsAll = true; renderVersionList(); });
     list.appendChild(older);
   }
+}
+// A saved checkpoint in the list: View, Restore (the same sheet as a publish) and, with the
+// right to delete, Remove.
+function versionSavedRow(c) {
+  const row = el("div", "hentry ver-saved");
+  row.appendChild(verDate("save", "Saved", c.at));
+  const body = el("div", "hbody");
+  body.appendChild(el("div", "hsum", "“" + c.name + "”"));
+  body.appendChild(el("div", "hmeta", "A checkpoint of your draft. It was never on your live site."));
+  row.appendChild(body);
+  const acts = el("div", "hacts");
+  const view = el("button", "quietact", "View"); view.addEventListener("click", () => openLaunchPreview(c.id)); acts.appendChild(view);
+  const res = el("button", "textact", "Restore");
+  res.addEventListener("click", () => { S.restoreTarget = c; $("resSheetSub").textContent = `“${c.name}”, saved ${fmtDate(c.at)}.`; openSheet("restoreScrim"); });
+  acts.appendChild(res);
+  const rm = el("button", "quietact", "Remove"); rm.dataset.needs = "delete";
+  rm.addEventListener("click", async () => {
+    if (!(await askYes("Remove checkpoint “" + c.name + "”? This can’t be undone.", { ok: "Remove", danger: true }))) return;
+    try { await api("DELETE", `/publishes/checkpoints/${c.id}`); toast("Checkpoint removed"); renderCheckpoints(); }
+    catch (err) { toast(nice(err), true); }
+  });
+  acts.appendChild(rm);
+  row.appendChild(acts);
+  return row;
 }
 $("btnRestoreGo").addEventListener("click", async () => {
   const p = S.restoreTarget; if (!p) return;
   const btn = $("btnRestoreGo");
   btn.disabled = true; btn.textContent = "Restoring…";
   try {
-    const r = await api("POST", "/restore-to-draft", { publish_id: p.id });
+    const r = p.saved ? await api("POST", `/publishes/checkpoints/${p.id}/restore`, {}) : await api("POST", "/restore-to-draft", { publish_id: p.id });
     closeSheet("restoreScrim");
     toast(r.data.message);
     btn.disabled = false; btn.textContent = "Restore to my draft";
@@ -8360,7 +8444,8 @@ async function mountSearchCard() {
   // 1. the health sentences
   const line = (ok2, good, fix) => {
     const p = el("div", null, ""); p.style.cssText = "display:flex;gap:8px;align-items:baseline;padding:3px 0;font-size:13px";
-    p.appendChild(Object.assign(el("span", null, ok2 ? "✓" : "•"), { style: "color:" + (ok2 ? "#2e6b46" : "#a05a2c") + ";font-weight:700" }));
+    const mk2 = el("span", null, ok2 ? "" : "•"); if (ok2) mk2.innerHTML = uiIcon("check", 13);
+    p.appendChild(Object.assign(mk2, { style: "color:" + (ok2 ? "#2e6b46" : "#a05a2c") + ";font-weight:700" }));
     p.appendChild(el("span", null, ok2 ? good : fix));
     card.appendChild(p);
   };
@@ -8410,7 +8495,7 @@ function redirectsManager() {
       rows.forEach((row) => {
         const line2 = el("div"); line2.style.cssText = "display:flex;gap:8px;align-items:center;font-size:12.5px;padding:3px 0";
         line2.appendChild(el("span", null, row.from_path + " → " + row.to_path));
-        const x = el("button", null, "✕"); x.dataset.needs = "delete"; x.type = "button"; x.title = "Remove this forward";
+        const x = icoBtn("x", "Remove this forward", null, 14); x.dataset.needs = "delete";
         x.style.cssText = "border:none;background:none;cursor:pointer;color:var(--ink-2,#888)";
         x.addEventListener("click", async () => { try { await api("DELETE", "/redirects/" + row.id); loadRedirects(); toast("Forward removed — publish to apply"); scheduleChangesRefresh(); } catch (err) { toast(nice(err), true); } });
         line2.appendChild(x); list.appendChild(line2);
@@ -9151,13 +9236,13 @@ function renderLinkedChip(blk, idx, card) {
   const sub = el("div"); sub.id = "blkSub-" + idx; sub.className = "blk-sub"; sub.style.cssText = "border:1px solid var(--plum-line,#d9cef0);border-radius:12px;padding:12px 14px;margin-top:10px;background:var(--plum-tint,#faf7ff)";
   const head = el("div"); head.style.cssText = "display:flex;align-items:center;gap:8px;flex-wrap:wrap";
   const nm = el("div", null, "Linked section" + (item ? " · " + item.name : "")); nm.style.cssText = "flex:1;min-width:150px;font-weight:600;font-size:13px;color:var(--plum-deep,#3a2470)";
-  const up = el("button", null, "↑"), dn = el("button", null, "↓"), rm = el("button", null, "Remove");
+  const up = icoBtn("up", "Move this section up", null, 14), dn = icoBtn("down", "Move this section down", null, 14), rm = el("button", null, "Remove");
   [up, dn, rm].forEach((b) => { b.type = "button"; b.style.cssText = miniBtn; });
   up.disabled = idx === 0; dn.disabled = idx === BLOCKS_WORK.length - 1;
   if (up.disabled) up.style.opacity = ".35"; if (dn.disabled) dn.style.opacity = ".35";
-  up.addEventListener("click", () => { if (idx === 0) return; panelSwap(idx, idx - 1); renderBlocksCard(); });
-  dn.addEventListener("click", () => { if (idx === BLOCKS_WORK.length - 1) return; panelSwap(idx, idx + 1); renderBlocksCard(); });
-  rm.addEventListener("click", () => { panelRemove(idx); renderBlocksCard(); });
+  up.addEventListener("click", () => { if (idx === 0 || lockStop(idx)) return; panelSwap(idx, idx - 1); renderBlocksCard(); });
+  dn.addEventListener("click", () => { if (idx === BLOCKS_WORK.length - 1 || lockStop(idx)) return; panelSwap(idx, idx + 1); renderBlocksCard(); });
+  rm.addEventListener("click", () => { if (lockStop(idx)) return; panelRemove(idx); renderBlocksCard(); });
   head.append(nm, up, dn, rm); sub.appendChild(head);
   if (!item && CL_ITEMS !== null) {
     sub.appendChild(el("div", "hint", "The saved section this links to was removed, so this spot simply won’t appear on your site. Remove it here to tidy up."));
@@ -10264,11 +10349,11 @@ function blockStyleRow(idx, blk, sub, flat) {
     pairs.forEach((p) => {
       const pass = p.ratio >= 4.5;
       const chip = el("span", null, p.name + " · Contrast " + p.ratio.toFixed(1) + (pass ? " — passes" : " — hard to read (needs 4.5)"));
-      chip.style.cssText = "font-size:11px;font-weight:600;padding:2px 9px;border-radius:999px;" + (pass ? "background:#eaf7ee;color:#1c6b34" : "background:#fdecea;color:#8a2a20");
+      chip.style.cssText = "font-size:12px;font-weight:600;padding:2px 9px;border-radius:999px;" + (pass ? "background:#eaf7ee;color:#1c6b34" : "background:#fdecea;color:#8a2a20");
       crow.appendChild(chip);
       if (!pass) {
         const fix = el("button", null, "Darken until readable"); fix.type = "button";
-        fix.style.cssText = "font:inherit;font-size:11px;font-weight:600;padding:2px 10px;border-radius:999px;border:1px solid #8a2a20;background:transparent;color:#8a2a20;cursor:pointer";
+        fix.style.cssText = "font:inherit;font-size:12px;font-weight:600;padding:2px 10px;border-radius:999px;border:1px solid #8a2a20;background:transparent;color:#8a2a20;cursor:pointer";
         fix.addEventListener("click", () => setStyle({ [p.key]: ovDarkenUntil(p.color, p.fixAgainst, 4.5) }, true));
         crow.appendChild(fix);
       }
@@ -10303,7 +10388,7 @@ function blockWindowRow(idx, blk, sub, flat) {
   if (!flat) sum.style.cssText = "cursor:pointer;font-size:12px;font-weight:600;color:var(--soft,#6b6478);display:flex;align-items:center;gap:8px;flex-wrap:wrap";
   else sum.style.cssText = "display:flex;align-items:center;gap:8px;flex-wrap:wrap";
   sum.appendChild(document.createTextNode("Show this only for a while" + (set || flat ? "" : "  ·  optional")));
-  if (chip) { const c = el("span", null, chip); c.style.cssText = "font-size:11px;font-weight:600;padding:2px 9px;border-radius:999px;" + chipCss; sum.appendChild(c); }
+  if (chip) { const c = el("span", null, chip); c.style.cssText = "font-size:12px;font-weight:600;padding:2px 9px;border-radius:999px;" + chipCss; sum.appendChild(c); }
   det.appendChild(sum);
   const row = el("div"); row.style.cssText = "display:flex;gap:14px;flex-wrap:wrap;align-items:center;margin-top:8px";
   const mk = (label, val) => {
@@ -10363,9 +10448,9 @@ function renderBlocksCard() {
       const b = el("button"); b.type = "button";
       b.style.cssText = "text-align:left;font:inherit;padding:10px 12px;border-radius:10px;border:" + (isRec ? "2px solid var(--plum,#5b3fa0)" : "1px solid var(--line,#ddd)") + ";background:var(--sheet,#fff);color:inherit;cursor:pointer;display:flex;flex-direction:column;gap:3px;min-width:0";
       b.appendChild(Object.assign(el("div", null, (isRec ? "✦ " : "") + st.name), { style: "font-weight:600;font-size:12.5px" + (isRec ? ";color:var(--plum-deep,#3a2470)" : "") }));
-      b.appendChild(Object.assign(el("div", null, st.description), { style: "font-size:11px;color:var(--soft,#888);line-height:1.4" }));
+      b.appendChild(Object.assign(el("div", null, st.description), { style: "font-size:12px;color:var(--soft,#888);line-height:1.4" }));
       const n = Array.isArray(st.blocks) ? st.blocks.length : 0;
-      b.appendChild(Object.assign(el("div", null, n + " ready-made section" + (n === 1 ? "" : "s") + (isRec ? " · recommended for you" : "")), { style: "font-size:10.5px;color:var(--soft,#a99);margin-top:2px" }));
+      b.appendChild(Object.assign(el("div", null, n + " ready-made section" + (n === 1 ? "" : "s") + (isRec ? " · recommended for you" : "")), { style: "font-size:12px;color:var(--soft,#a99);margin-top:2px" }));
       b.addEventListener("click", () => applyStarterLayout(st));
       grid.appendChild(b);
     });
@@ -10383,13 +10468,13 @@ function renderBlocksCard() {
     const head = el("div"); head.style.cssText = "display:flex;align-items:center;gap:8px;margin-bottom:8px";
     // the panel's title already names this section when it's the only one showing
     const nm = el("div", null, solo !== null ? (blk.mediaNote || "") : def.name + (blk.mediaNote ? "  ·  " + blk.mediaNote : "")); nm.style.cssText = "flex:1;font-weight:600;font-size:13px";
-    const up = el("button", null, "↑"), dn = el("button", null, "↓"), rm = el("button", null, "Remove");
+    const up = icoBtn("up", "Move this section up", null, 14), dn = icoBtn("down", "Move this section down", null, 14), rm = el("button", null, "Remove");
     [up, dn, rm].forEach((b) => { b.type = "button"; b.style.cssText = miniBtn; });
     up.disabled = idx === 0; dn.disabled = idx === BLOCKS_WORK.length - 1;
     if (up.disabled) up.style.opacity = ".35"; if (dn.disabled) dn.style.opacity = ".35";
-    up.addEventListener("click", () => { if (idx === 0) return; panelSwap(idx, idx - 1); if (BLOCK_SOLO === idx) BLOCK_SOLO = idx - 1; renderBlocksCard(); });
-    dn.addEventListener("click", () => { if (idx === BLOCKS_WORK.length - 1) return; panelSwap(idx, idx + 1); if (BLOCK_SOLO === idx) BLOCK_SOLO = idx + 1; renderBlocksCard(); });
-    rm.addEventListener("click", () => { const wasSolo = solo !== null; panelRemove(idx); if (wasSolo) closeSettingsPanel(); renderBlocksCard(); });
+    up.addEventListener("click", () => { if (idx === 0 || lockStop(idx)) return; panelSwap(idx, idx - 1); if (BLOCK_SOLO === idx) BLOCK_SOLO = idx - 1; renderBlocksCard(); });
+    dn.addEventListener("click", () => { if (idx === BLOCKS_WORK.length - 1 || lockStop(idx)) return; panelSwap(idx, idx + 1); if (BLOCK_SOLO === idx) BLOCK_SOLO = idx + 1; renderBlocksCard(); });
+    rm.addEventListener("click", () => { if (lockStop(idx)) return; const wasSolo = solo !== null; panelRemove(idx); if (wasSolo) closeSettingsPanel(); renderBlocksCard(); });
     const sv = el("button", null, "Save for reuse"); sv.type = "button"; sv.title = "Save this section to your content library"; sv.style.cssText = miniBtn;
     sv.addEventListener("click", () => clSave(idx));   // CL-1
     head.append(nm, sv, up, dn, rm); box.appendChild(head);
@@ -10651,7 +10736,7 @@ function renderBlocksCard() {
     // Phase EXP: the shared "Show this only for a while" window — same set of sections
     // (a spacer/auto TOC has nothing to schedule).
     if (!def.dividerSimple && !def.tocSimple) blockWindowRow(idx, blk, panes ? panes.when : sub, !!panes);
-    if (panes) insFinish(panes, idx, blk, def);
+    if (panes) { insFinish(panes, idx, blk, def); insLockNote(box, panes, idx, blk); }
     card.appendChild(box);
     // FD-T-LIB: a just-added section scrolls into view and takes focus, so it's
     // never "added but invisible" below the fold.
@@ -10708,7 +10793,7 @@ function renderBlocksCard() {
       const b = el("button"); b.type = "button";
       b.style.cssText = "text-align:left;font:inherit;padding:9px 12px;border-radius:10px;border:1px solid var(--line,#ddd);background:var(--sheet,#fff);color:inherit;cursor:pointer;display:flex;flex-direction:column;gap:2px;min-width:0";
       b.appendChild(Object.assign(el("div", null, "+ " + d.name), { style: "font-weight:600;font-size:12.5px" }));
-      if (SECTION_ALIAS[d.type]) b.appendChild(Object.assign(el("div", null, SECTION_ALIAS[d.type]), { style: "font-size:11px;color:var(--soft,#888)" }));
+      if (SECTION_ALIAS[d.type]) b.appendChild(Object.assign(el("div", null, SECTION_ALIAS[d.type]), { style: "font-size:12px;color:var(--soft,#888)" }));
       b.addEventListener("click", () => { dcCaptureScroll(); BLOCKS_WORK.push(emptyBlock(d)); const at = BLOCKS_WORK.length - 1; BLOCK_FOCUS = at; DC_FOCUS_BI = at; if (MEDIA_FILL_TYPES.has(d.type)) { renderBlocksCard(); eeEditBlock(at); } else { saveBlocks(); } });
       return b;
     };
@@ -10779,21 +10864,21 @@ function renderBlocksCard() {
         // CL-LINK: two ways to reuse a saved section — a Copy (independent) or a Link
         // (edits to the saved section update everywhere it’s linked). Spelled out so
         // the choice is never a guess.
-        libRow.appendChild(Object.assign(el("div", "hint", "Insert a copy = an independent section you edit on its own. Link = it stays tied to this saved section, so editing the saved section updates every linked spot."), { style: "margin-top:6px;font-size:11.5px" }));
+        libRow.appendChild(Object.assign(el("div", "hint", "Insert a copy = an independent section you edit on its own. Link = it stays tied to this saved section, so editing the saved section updates every linked spot."), { style: "margin-top:6px;font-size:12px" }));
         const list = el("div"); list.style.cssText = "margin-top:8px;display:flex;flex-direction:column;gap:6px";
         CL_ITEMS.forEach((it) => {
           const wrap = el("div"); wrap.style.cssText = "border:1px solid var(--line,#eee);border-radius:8px;padding:6px 10px";
           const row = el("div"); row.style.cssText = "display:flex;align-items:center;gap:8px;flex-wrap:wrap";
           row.appendChild(Object.assign(el("span", null, it.name), { style: "flex:1;min-width:120px;font-size:12.5px" }));
-          row.appendChild(Object.assign(el("span", null, (BLOCK_DEFS.find((d) => d.type === (it.block && it.block.type)) || {}).name || (it.block && it.block.type) || ""), { style: "font-size:11px;color:var(--soft,#888)" }));
+          row.appendChild(Object.assign(el("span", null, (BLOCK_DEFS.find((d) => d.type === (it.block && it.block.type)) || {}).name || (it.block && it.block.type) || ""), { style: "font-size:12px;color:var(--soft,#888)" }));
           // G8: where-used — how many pages LIVE-LINK this saved section; expands to name them
           const used = Array.isArray(it.used_on) ? it.used_on : [];
           if (used.length) {
             const uc = el("button", null, "used on " + used.length + " page" + (used.length === 1 ? "" : "s")); uc.type = "button";
             uc.title = "Show which pages link this saved section";
-            uc.style.cssText = "font:inherit;font-size:11px;padding:2px 9px;border-radius:999px;border:1px solid var(--plum-line,#d9cef0);background:var(--plum-tint,#faf7ff);color:var(--plum-deep,#3a2470);cursor:pointer";
+            uc.style.cssText = "font:inherit;font-size:12px;padding:2px 9px;border-radius:999px;border:1px solid var(--plum-line,#d9cef0);background:var(--plum-tint,#faf7ff);color:var(--plum-deep,#3a2470);cursor:pointer";
             const usedLine = el("div", "hint", "Linked on: " + used.map((u) => u.title).join(", ") + " — editing the saved section changes it everywhere it’s linked.");
-            usedLine.style.cssText = "margin-top:5px;font-size:11.5px"; usedLine.hidden = true;
+            usedLine.style.cssText = "margin-top:5px;font-size:12px"; usedLine.hidden = true;
             uc.addEventListener("click", () => { usedLine.hidden = !usedLine.hidden; });
             row.appendChild(uc); wrap.appendChild(row); wrap.appendChild(usedLine);
           } else wrap.appendChild(row);
@@ -10801,7 +10886,7 @@ function renderBlocksCard() {
           ins.addEventListener("click", () => clInsert(it.block));
           const lnk = el("button", null, "Link"); lnk.type = "button"; lnk.title = "Edits to this saved section update everywhere it’s linked"; lnk.style.cssText = "font:inherit;font-size:12px;padding:4px 11px;border-radius:999px;border:2px solid var(--plum,#5b3fa0);background:var(--plum-tint,#faf7ff);color:var(--plum-deep,#3a2470);cursor:pointer";
           lnk.addEventListener("click", () => clInsertLink(it));
-          const del = el("button", null, "×"); del.dataset.needs = "delete"; del.type = "button"; del.title = "Remove from library"; del.style.cssText = "font:inherit;font-size:14px;padding:2px 9px;border-radius:8px;border:1px solid var(--line,#ddd);background:transparent;cursor:pointer";
+          const del = icoBtn("x", "Remove from library", null, 14); del.dataset.needs = "delete"; del.style.cssText = "font:inherit;font-size:14px;padding:2px 9px;border-radius:8px;border:1px solid var(--line,#ddd);background:transparent;cursor:pointer";
           del.addEventListener("click", async () => {
             // G8: deleting a LIVE-LINKED entry first names the pages it appears on
             if (used.length && !(await askYes("“" + it.name + "” appears on: " + used.map((u) => u.title).join(", ") + ". Removing it from the library removes it from " + (used.length === 1 ? "that page" : "those pages") + " at your next publish. Remove anyway?", { ok: "Remove anyway", danger: true }))) return;
@@ -10947,7 +11032,7 @@ function renderMediaBlockBody(def, blk, idx, sub, ti) {
       const cell = el("div"); cell.style.cssText = "display:flex;flex-direction:column;gap:4px;width:96px";
       const chip = el("span"); chip.style.cssText = "position:relative;display:inline-block";
       chip.appendChild(mediaThumb(id));
-      const x = el("button", null, "×"); x.type = "button"; x.title = "Remove";
+      const x = icoBtn("x", "Remove this photo", null, 12);
       x.style.cssText = "position:absolute;top:-6px;right:-6px;width:20px;height:20px;border-radius:50%;border:none;background:var(--clay,#a3423a);color:var(--fill-ink,#fff);cursor:pointer;font-size:13px;line-height:1";
       // captions[] stays INDEX-ALIGNED with image_ids — a removed photo takes its
       // caption with it (the server re-validates the same alignment).
@@ -10956,7 +11041,7 @@ function renderMediaBlockBody(def, blk, idx, sub, ti) {
       if (isGallery) {
         const cap = el("input"); cap.type = "text"; cap.placeholder = "Caption (optional)"; cap.maxLength = 160;
         cap.value = (Array.isArray(blk.captions) && blk.captions[k]) || "";
-        cap.style.cssText = "width:100%;padding:5px 6px;border:1px solid var(--line,#ddd);border-radius:8px;font:inherit;font-size:11.5px;box-sizing:border-box";
+        cap.style.cssText = "width:100%;padding:5px 6px;border:1px solid var(--line,#ddd);border-radius:8px;font:inherit;font-size:12px;box-sizing:border-box";
         cap.addEventListener("change", () => {
           // write through BLOCKS_WORK[idx] (not the render-time blk) — a heading
           // edit replaces the block object, and captions must land on the live one
@@ -11500,7 +11585,7 @@ function renderFormsCard() {
       lab.addEventListener("change", () => commitField(fi, xi, { label: lab.value.trim() }));
       const typeSel = ffSel(FF_TYPES, fld.type || "text", (v) => { commitField(fi, xi, { type: v }); renderFormsCard(); });
       top.append(lab, typeSel);
-      const up = el("button", null, "↑"), dn = el("button", null, "↓"), del = el("button", null, "✕");
+      const up = icoBtn("up", "Move this field up", null, 14), dn = icoBtn("down", "Move this field down", null, 14), del = icoBtn("x", "Remove this field", null, 14);
       [up, dn, del].forEach((b) => { b.type = "button"; b.style.cssText = FF_BTN; });
       up.disabled = xi === 0; dn.disabled = xi === form.fields.length - 1;
       up.addEventListener("click", () => { const fs = FORMS_WORK[fi].fields; [fs[xi - 1], fs[xi]] = [fs[xi], fs[xi - 1]]; renderFormsCard(); });
@@ -11573,7 +11658,7 @@ function renderFormsCard() {
       rr.appendChild(el("span", null, "→"));
       rr.appendChild(ffSel(FF_ACTIONS, rule.then.action || "show", (v) => commitRule({ then: { action: v } })));
       rr.appendChild(ffSel(fieldOpts.length ? fieldOpts : [["", "—"]], rule.then.target || "", (v) => commitRule({ then: { target: v } })));
-      const rdel = el("button", null, "✕"); rdel.type = "button"; rdel.style.cssText = FF_BTN;
+      const rdel = icoBtn("x", "Remove this rule", null, 14); rdel.style.cssText = FF_BTN;
       rdel.addEventListener("click", () => { FORMS_WORK[fi].rules.splice(ri, 1); renderFormsCard(); });
       rr.appendChild(rdel); rulesBox.appendChild(rr);
     });
@@ -11706,8 +11791,8 @@ function mountSectionsCard() {
     cb.addEventListener("change", () => saveSections(() => cardOrderNow(heroPinned), () => { const h = new Set(sectionsHiddenNow()); cb.checked ? h.delete(key) : h.add(key); return [...h]; }));
     const lb = el("label", null, def[1]); lb.setAttribute("for", "sec-" + key); lb.style.cssText = "flex:1;margin:0;font-weight:400";
     const still = heroPinned && key === "hero";
-    const up = el("button", null, "↑"); up.type = "button"; up.disabled = still || idx <= (heroPinned ? 1 : 0); up.title = "Move up";
-    const dn = el("button", null, "↓"); dn.type = "button"; dn.disabled = still || idx === order.length - 1; dn.title = "Move down";
+    const up = icoBtn("up", "Move up", null, 14); up.disabled = still || idx <= (heroPinned ? 1 : 0);
+    const dn = icoBtn("down", "Move down", null, 14); dn.disabled = still || idx === order.length - 1;
     if (still) up.title = dn.title = "This template keeps the welcome section at the top";
     [up, dn].forEach((b) => b.style.cssText = "font:inherit;font-size:12px;padding:2px 9px;border-radius:8px;border:1px solid var(--line,#ddd);background:transparent;cursor:pointer" + (b.disabled ? ";opacity:.35;cursor:default" : ""));
     up.addEventListener("click", () => { if (!up.disabled) saveSections(() => swapInCard(key, -1, heroPinned), sectionsHiddenNow); });
@@ -12108,7 +12193,7 @@ function openSettingsPanel(mode, title) {
   const modal = ["section", "styles", "header", "footer"].indexOf(m) < 0;   // a section, a style, the header or footer: keep the page in view, undimmed
   p.setAttribute("aria-modal", String(modal));
   const cl = $("btnSettingsClose");
-  if (cl) { cl.textContent = modal ? "✕" : "Done"; cl.setAttribute("aria-label", modal ? "Close" : "Done"); }
+  if (cl) { if (modal) cl.innerHTML = uiIcon("x", 16); else cl.textContent = "Done"; cl.setAttribute("aria-label", modal ? "Close" : "Done"); cl.title = (modal ? "Close" : "Done") + " (Esc)"; }
   if (sc) {
     if (modal) { sc.hidden = false; requestAnimationFrame(() => sc.classList.add("on")); }
     else { sc.classList.remove("on"); sc.hidden = true; }
@@ -12340,6 +12425,35 @@ function lookSet(idx, key, value) {
   dcLiveFromPanel();
 }
 // the footer under every tab: who can see this section, and the quiet tools
+// Item 155: a locked section's card says so at its top. The studio gets the switch for the
+// client's words and Unlock; the client gets only the Content tab, its words open or shut, and
+// nothing else to press. Run for every section's card, so an unlocked one gets its tabs back.
+function insLockNote(box, panes, idx, blk) {
+  const lock = blkLock(blk), mine = lockedForMe(blk), seg = $("inspectorSeg");
+  if (seg) seg.querySelectorAll("[data-itab]").forEach((b) => { b.hidden = mine && b.dataset.itab !== "content"; });
+  if (!lock) return;
+  const note = el("div", "ins-lock" + (mine ? "" : " studio")); note.id = "insLock";
+  note.insertAdjacentHTML("afterbegin", uiIcon("lock", 16));
+  note.appendChild(el("p", null, mine
+    ? LOCK_SAY + (lock.words ? " You can change its words; ask your studio for anything else." : " Ask your studio if it needs to change.")
+    : "Locked for your client. They see a padlock and can’t move, restyle or delete it."));
+  box.insertBefore(note, box.firstChild);
+  if (!mine) {
+    const row = el("label", "pg-sw ins-lock-sw"); const t = el("span", null, "Client can change its words"); const cb = el("input"); cb.type = "checkbox"; cb.checked = !!lock.words;
+    cb.addEventListener("change", () => dcLockBlock(idx, true, cb.checked));
+    row.append(t, cb); note.appendChild(row);
+    const un = el("button", "dc-modal-cancel", "Unlock"); un.type = "button"; un.addEventListener("click", () => dcLockBlock(idx, false));
+    note.appendChild(un);
+    return;
+  }
+  if (INS_TAB !== "content") insTab("content");
+  // what isn't words: picking photos, adding or removing items, choices and switches
+  box.querySelectorAll("button, select, input[type=checkbox], input[type=radio], input[type=file], input[type=range], input[type=color], input[type=number], input[type=date]").forEach((n) => {
+    if (n.closest(".ins-lock") || (lock.words && n.closest(".ai-wrap"))) return;   // Write with AI writes words
+    n.disabled = true;
+  });
+  if (!lock.words) box.querySelectorAll("input, textarea").forEach((n) => { if (!n.closest(".ins-lock")) n.readOnly = true; });
+}
 function insFinish(panes, idx, blk, def) {
   const box = panes.content.parentNode;
   const notes = { style: "This section keeps your site’s style.", layout: "Nothing to lay out here.", when: "This section always shows." };
@@ -12374,7 +12488,28 @@ function dcSyncPageSwitch() {
   const list = typeof dcPageList === "function" ? dcPageList() : [];
   const cur = list.find((p) => p.slug === DC_PAGE) || list[0];
   const nm = $("dcPageName"); if (nm) nm.textContent = cur ? cur.title : "Home";
-  const ct = $("dcPageCount"); if (ct) ct.textContent = list.length + (list.length === 1 ? " page" : " pages");
+  const ct = $("dcPageCount"); if (ct) dcPageStatus(ct);
+}
+// Item 125: the page being edited says where it stands, beside its name, in the Pages card's
+// words: Live (nothing on it is waiting), 2 changes (waiting to go live), Not live yet (the
+// site has never been published), or what its check found (Needs a look).
+function dcPageStatus(chip) {
+  const ctx = pgStatusCtx(), m = typeof pgModel === "function" ? pgModel() : { menu: [], unlinked: [] };
+  const pg = [...m.menu.map((e) => e.pg), ...m.unlinked].find((p) => p && p.view === "design" && (p.slug || "") === DC_PAGE);
+  let word = "Live", tone = "good", says = "Nothing on this page is waiting: your live site shows it as it is here";
+  const tp = pg ? hbTreePage(pg) : null;
+  if (tp && HB_TREE_FLAG[tp.status]) { word = tp.status_label; tone = HB_TREE_FLAG[tp.status]; says = tp.status_label; }
+  else if (!ctx.siteLive || ctx.firstPublish) { word = "Not live yet"; tone = ""; says = "Your site goes live the first time you publish"; }
+  else {
+    const n = pg ? ctx.changes.filter((ch) => pcChangeOn(ch, pg)).length : 0;
+    if (n) { word = n + (n === 1 ? " change" : " changes"); tone = "warn"; says = n + (n === 1 ? " change on this page is" : " changes on this page are") + " waiting to go live"; }
+  }
+  chip.textContent = word; chip.className = "dc-chip" + (tone ? " " + tone : ""); chip.title = says;
+}
+// What a page's status is read from: is the site live, and what's waiting to publish.
+function pgStatusCtx() {
+  const live = !!(S.health && S.health.facts && S.health.facts.website.state !== "none");
+  return { live, siteLive: live || !!(typeof siteLiveUrl === "function" && siteLiveUrl()), changes: (S.changes && S.changes.changes) || [], firstPublish: !!(S.changes && S.changes.first_publish) };
 }
 function dcSyncLiveChip() { const c = $("dcLiveChip"); if (c) c.hidden = !(typeof siteLiveUrl === "function" && siteLiveUrl()); }
 // a tablet's left card takes the dock's place while it's open (the CSS reads this class)
@@ -12422,6 +12557,7 @@ function pcPane(id, label) {
   const opener = document.activeElement;
   box.textContent = ""; box.id = id; box.setAttribute("role", "group"); box.setAttribute("aria-label", label);
   list.hidden = true; wrap.hidden = false;
+  $("pagesCard").classList.add("pane-open");
   const sc = $("pcBody"); if (sc) sc.scrollTop = 0;
   const me = { box };
   me.close = (refocus) => {
@@ -12430,6 +12566,7 @@ function pcPane(id, label) {
     PC_PANE = null;
     box.textContent = ""; box.removeAttribute("id"); box.removeAttribute("aria-label");
     wrap.hidden = true; list.hidden = false;
+    $("pagesCard").classList.remove("pane-open");
     if (refocus !== false) {
       const back = opener && opener.isConnected && list.contains(opener) ? opener : list.querySelector(".pc-row.on .pc-open");
       try { if (back) back.focus({ preventScroll: true }); } catch (_) {}
@@ -12469,7 +12606,28 @@ function pcHeadFoot() {
 function pcNotFound() {
   const { box, close } = pcPane("pcNotFoundPane", "Not found page");
   box.appendChild(el("h3", "dc-modal-h", "Not found page"));
-  box.appendChild(el("p", "dc-modal-sub", "When someone follows a broken or old link, your site shows a short “That page isn’t here” page with a way back to Home."));
+  box.appendChild(el("p", "dc-modal-sub", "What someone sees after following a broken or old link."));
+  // item 121: the ready-made page, or one of the owner's own (open to everyone: a password or
+  // private page never answers a broken link)
+  const pick = el("div", "pc-nf"); box.appendChild(pick);
+  const paint = () => {
+    pick.textContent = "";
+    const own = dcPagesArr().filter((p) => p && p.slug && !p.access), cur = (own.find((p) => p.notFound) || {}).slug || "";
+    const seg = el("div", "dc-seg pc-nf-seg"); seg.setAttribute("role", "group"); seg.setAttribute("aria-label", "Not found page");
+    [["", "Ready-made"], ["own", "One of my pages"]].forEach(([v, name]) => {
+      const b = el("button", null, name); b.type = "button"; b.dataset.v = v || "ready"; b.setAttribute("aria-pressed", String((cur ? "own" : "") === v));
+      if (v && !own.length) { b.disabled = true; b.title = "Add a page of your own first"; }
+      b.addEventListener("click", async () => { if ((cur ? "own" : "") === v) return; if (await pgSetNotFound(v ? own[0].slug : "")) paint(); });
+      seg.appendChild(b);
+    });
+    pick.appendChild(seg);
+    if (!cur) { pick.appendChild(el("p", "pc-note", own.length ? "Your site shows a short “That page isn’t here” page with a way back to Home." : "Your site shows a short “That page isn’t here” page with a way back to Home. Add a page of your own to use it instead.")); return; }
+    const sel = el("select"); sel.id = "pcNotFoundPick";
+    own.forEach((p) => { const o = el("option", null, p.title || p.slug); o.value = p.slug; o.selected = p.slug === cur; sel.appendChild(o); });
+    sel.addEventListener("change", async () => { if (await pgSetNotFound(sel.value)) paint(); });
+    pick.appendChild(pgField("Show this page", sel, "Its own address still works. The copy that answers broken links is kept out of Google."));
+  };
+  paint();
   box.appendChild(el("h4", "pg-h", "Forward old addresses"));
   box.appendChild(el("p", "pc-note", "Moved from an old website, or changed a page’s address? Send the old address to the page it lives on now."));
   box.appendChild(redirectsManager());
@@ -12513,10 +12671,19 @@ function exitEditMode(to) {   // to: the tab to land on (the Pages card's "Chang
   if (document.activeElement && document.activeElement.blur) document.activeElement.blur();   // a focused field commits on blur
   blocksSaveNow(); formsSaveNow();
   closeDesignPanels();
+  document.querySelectorAll(".scrim.on").forEach((sh) => closeSheet(sh.id));   // item 171 (E2): a sheet goes with the editor
   if (DC_MODE !== "edit") dcSetMode("edit");
   go(to || EDIT_RETURN);
 }
 function closeDesignPanels() { closePagesCard(false); dcDockMore(false); closeTrayPanel(); closeSettingsPanel(); closeCommentsPanel(); if (PANEL_LASTFOCUS && PANEL_LASTFOCUS.focus) { try { PANEL_LASTFOCUS.focus(); } catch (_) {} PANEL_LASTFOCUS = null; } }
+// Item 125: tooltips name their keys, in this computer's words (⌘ on a Mac or an iPad, Ctrl elsewhere).
+const KEY_MAC = /Mac|iPhone|iPad|iPod/.test(navigator.platform || navigator.userAgent || "");
+(function keyTitles() {
+  const k = (mac, pc) => (KEY_MAC ? mac : pc);
+  ["btnUndo", "btnUndoTop"].forEach((id) => { const b = $(id); if (b) b.title = "Undo (" + k("⌘Z", "Ctrl+Z") + ")"; });
+  ["btnRedo", "btnRedoTop"].forEach((id) => { const b = $(id); if (b) b.title = "Redo (" + k("⇧⌘Z", "Ctrl+Shift+Z") + ")"; });
+  [["btnPagesClose", "Done (Esc)"], ["btnTrayClose", "Done (Esc): the page gets the whole screen"], ["btnCommentsClose", "Close (Esc)"]].forEach(([id, t]) => { const b = $(id); if (b) b.title = t; });
+})();
 (function initDesignPanels() {
   const on = (id, fn) => { const b = $(id); if (b) b.addEventListener("click", fn); };
   on("btnUndo", dcUndo); on("btnRedo", dcRedo);
@@ -12526,6 +12693,7 @@ function closeDesignPanels() { closePagesCard(false); dcDockMore(false); closeTr
   document.addEventListener("keydown", (e) => {
     if (!(e.ctrlKey || e.metaKey)) return;
     if ($("stage").classList.contains("on") || $("ritualWrap").classList.contains("on")) return;   // nothing to undo behind these
+    if (document.querySelector("dialog[open], .scrim.on")) return;   // item 171 (E6): not while a question or a sheet is up
     const dv = $("view-design");
     if (dv && dv.classList.contains("on") && DC_MODE === "timewarp") return;   // view modes are read-only — no blind undo
     const t = e.target; if (t && /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName || "")) return;   // don't hijack field editing
@@ -12560,6 +12728,10 @@ function closeDesignPanels() { closePagesCard(false); dcDockMore(false); closeTr
   on("dkFind", () => { dcDockMore(false); openTrayPanel("add", true); });   // opens the library with its search box focused
   on("dkPreview", () => { dcDockMore(false); dcOpenPreview(); });
   on("dkMore", () => dcDockMore());
+  // item 171 (E4): on a phone More closes by itself: on a press anywhere outside it, and once any other
+  // dock button is used (a press on the page closes it too, in dcInjectCanvas)
+  document.addEventListener("pointerdown", (e) => { const d = $("dcDock"); if (d && d.classList.contains("more-open") && !d.contains(e.target)) dcDockMore(false); }, true);
+  const dk = $("dcDock"); if (dk) dk.addEventListener("click", (e) => { const b = e.target.closest && e.target.closest("button"); if (b && b.id !== "dkMore") dcDockMore(false); });
   on("dcBtnPreview", dcOpenPreview);
   on("btnPageInfo", togglePageInfoMenu);   // slice B: the Page Information menu (Share draft lives inside it now)
   // Slice D: the modes bar. #btnComments now lives INSIDE the segment (G11
@@ -12577,6 +12749,7 @@ function closeDesignPanels() { closePagesCard(false); dcDockMore(false); closeTr
   const sc = $("dcScrim"); if (sc) sc.addEventListener("click", closeDesignPanels);
   document.addEventListener("keydown", (e) => {
     if (e.key !== "Escape") return;
+    if (document.querySelector("dialog[open]")) return;   // item 171 (E7): a question (or the photo editor) answers its own Escape
     if (PAGES_OPEN) {
       if (PI_OPEN) return;   // the Page menu closes itself first
       const pop = document.querySelector(".pp-pop:not(.pi-pop)"); if (pop) { e.stopPropagation(); pop.remove(); return; }   // so does a page's ⋯ menu
@@ -12797,6 +12970,7 @@ const BI_PATHS = {
   more: '<circle cx="5" cy="12" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="19" cy="12" r="1.4"/>',
   grip: '<circle cx="9" cy="6" r="1.3"/><circle cx="15" cy="6" r="1.3"/><circle cx="9" cy="12" r="1.3"/><circle cx="15" cy="12" r="1.3"/><circle cx="9" cy="18" r="1.3"/><circle cx="15" cy="18" r="1.3"/>',
   pencil: '<path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/>',
+  unlock: '<rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 7.6-1.7"/>',
   copy: '<rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>',
   scissors: '<circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M20 4L8.1 15.9M14.5 14.5L20 20M8.1 8.1L12 12"/>',
   x: '<path d="M18 6L6 18M6 6l12 12"/>',
@@ -13195,6 +13369,7 @@ function addBlockAt(d, at) {
   return i;   // the index it ACTUALLY used — callers stamp the new block via this, never a re-derived clamp
 }
 function moveBlockTo(from, gap) {
+  if (lockStop(from)) return false;   // item 155
   if (!spliceMove(BLOCKS_WORK, from, gap)) return false;
   renderBlocksCard();
   return true;
@@ -13457,7 +13632,7 @@ function openInsertMenu(atIndex, anchor, rectOverride) {
   // page's listeners, so the menu has its own close button and a tap on the canvas closes it.
   const head = el("div"); head.style.cssText = "display:flex;align-items:center;justify-content:space-between;gap:8px";
   head.appendChild(el("div", "tray-h", "Add a section here"));
-  const x = el("button", null, "×"); x.type = "button"; x.setAttribute("aria-label", "Close"); x.title = "Close";
+  const x = icoBtn("x", "Close");
   x.style.cssText = "font:inherit;font-size:20px;line-height:1;min-width:44px;min-height:44px;margin:-8px -8px 0 0;border:0;background:transparent;color:var(--ink-2,#666);cursor:pointer;border-radius:10px";
   x.addEventListener("click", closeInsertMenu);
   head.appendChild(x); menu.appendChild(head);
@@ -13699,18 +13874,39 @@ function dcMoveCol(bi, from, gap) {
   saveBlocks();
   return true;
 }
+// ── Item 155: locked sections ──
+// The studio locks a section from its More menu so the client can't move, restyle, copy or
+// delete it by accident: the section carries lock: { id, words } (lib/section_lock.ts on the
+// server refuses a client's save that would break it). With words open the client can still
+// change its words. The client sees a padlock in its name and fewer tools; only the studio
+// unlocks, and the studio is never held by its own lock. A copy is never locked.
+const blkLock = (b) => (b && b.lock && typeof b.lock.id === "string" ? b.lock : null);
+const lockedForMe = (b) => !!blkLock(b) && !S.isStudio;
+const LOCK_SAY = "Your studio locked this section so it stays as designed.";
+// Every way to move, copy, cut or delete a section asks this first (the tools are hidden too).
+function lockStop(bi) { if (!lockedForMe(BLOCKS_WORK[bi])) return false; toast(LOCK_SAY + " Ask them if it needs to change.", true); return true; }
+function dcLockBlock(bi, on, words) {
+  const b = BLOCKS_WORK[bi]; if (!b) return;
+  if (on) {
+    const id = blkLock(b) ? b.lock.id : "lk-" + ((crypto.randomUUID && crypto.randomUUID().replace(/-/g, "").slice(0, 12)) || Date.now().toString(36));
+    b.lock = { id, words: words === undefined ? (blkLock(b) ? b.lock.words : true) : !!words };
+  } else delete b.lock;
+  renderBlocksCard(); saveBlocks();
+  toast(!on ? "Unlocked: your client can change this section again"
+    : words === undefined ? "Locked: your client can change its words, nothing else" : (b.lock.words ? "Your client can change its words" : "Your client can’t change its words either"));
+}
 function dcDuplicate(bi) {
   dcSoloEnd();
-  const b = BLOCKS_WORK[bi]; if (!b) return;
+  const b = BLOCKS_WORK[bi]; if (!b || lockStop(bi)) return;
   const def = BLOCK_DEFS.find((x) => x.type === b.type);
-  const copy = JSON.parse(JSON.stringify(b)); delete copy._clEdit;
+  const copy = JSON.parse(JSON.stringify(b)); delete copy._clEdit; delete copy.lock;
   if (def && def.multi) copy.id = uniqueBlockId(b.type);   // multi-instance blocks get a fresh render key
   // G13 fix (review finding 1): compose the insertion shift BEFORE the splice.
   dcCaptureScroll(); dcComposeSrcMap(BLOCKS_WORK.length, (v) => dcShiftIndex(v, bi + 1, 1)); BLOCKS_WORK.splice(bi + 1, 0, copy); BLOCK_FOCUS = bi + 1; DC_FOCUS_BI = bi + 1; renderBlocksCard(); saveBlocks();
 }
 async function dcDelete(bi) {
   dcSoloEnd();
-  const b = BLOCKS_WORK[bi]; if (!b) return;
+  const b = BLOCKS_WORK[bi]; if (!b || lockStop(bi)) return;
   const def = BLOCK_DEFS.find((x) => x.type === b.type);
   if (!(await askYes("Delete this " + (((def && def.name) || "section").toLowerCase()) + "? Your live site is unchanged until you publish.", { ok: "Delete", danger: true }))) return;
   bi = BLOCKS_WORK.indexOf(b); if (bi < 0) return;   // read again: the list can move while the question is up
@@ -13728,14 +13924,14 @@ function dcClipGet() { try { return JSON.parse(sessionStorage.getItem(DC_CLIP_KE
 function dcClipSet(b) { try { sessionStorage.setItem(DC_CLIP_KEY, JSON.stringify(b)); } catch (_) {} }
 function dcCopyBlock(bi) {
   const b = BLOCKS_WORK[bi]; if (!b) return;
-  const copy = JSON.parse(JSON.stringify(b)); delete copy._clEdit;
+  const copy = JSON.parse(JSON.stringify(b)); delete copy._clEdit; delete copy.lock;   // item 155: a copy is never locked
   dcClipSet(copy);
   const def = BLOCK_DEFS.find((x) => x.type === b.type);
   toast("Copied “" + ((def && def.name) || "section") + "” — use the ＋ points to paste it");
 }
 function dcCutBlock(bi) {
   dcSoloEnd();
-  const b = BLOCKS_WORK[bi]; if (!b) return;
+  const b = BLOCKS_WORK[bi]; if (!b || lockStop(bi)) return;
   dcCopyBlock(bi);
   // G13 fix (review finding 1): same removal shift as dcDelete, pre-splice.
   dcCaptureScroll(); dcComposeSrcMap(BLOCKS_WORK.length, (v) => dcShiftIndex(v, bi, -1)); BLOCKS_WORK.splice(bi, 1); renderBlocksCard(); saveBlocks();
@@ -13744,7 +13940,7 @@ function dcCutBlock(bi) {
 function dcPasteAt(gap) {
   dcSoloEnd();
   const clip = dcClipGet(); if (!clip) { toast("Nothing copied yet"); return; }
-  const blk = JSON.parse(JSON.stringify(clip)); delete blk._clEdit;
+  const blk = JSON.parse(JSON.stringify(clip)); delete blk._clEdit; delete blk.lock;
   if (blk.id) blk.id = uniqueBlockId(blk.type + "_" + blk.id);   // MULTI blocks get a fresh render key
   const at = Math.max(0, Math.min(gap == null ? BLOCKS_WORK.length : gap, BLOCKS_WORK.length));
   // G13 fix (review finding 1): compose the insertion shift BEFORE the splice.
@@ -14209,6 +14405,8 @@ function ipeStart(doc, fieldEl, secEl) {
   const c = eeClassify(secEl);
   const path = fieldEl.getAttribute && fieldEl.getAttribute('data-dds-field');
   if (!ipeGate(DC_MODE, path, c) || !(BLOCKS_WORK || [])[c.bi]) { eeDoubleClickTarget(secEl); return; }   // never a dead double-click
+  const lk = BLOCKS_WORK[c.bi];
+  if (lockedForMe(lk) && !lk.lock.words) { eeEditBlock(c.bi); return; }   // item 155: locked with its words shut: the card says why
   const md = fieldEl.hasAttribute('data-dds-md');
   const prev = {};
   ['contenteditable', 'role', 'aria-label', 'aria-multiline', 'spellcheck'].forEach((a) => { prev[a] = fieldEl.getAttribute(a); });
@@ -14641,7 +14839,8 @@ function dcInjectCanvas(doc, main, live) {
       "header.site[data-dc-hf]:hover,footer.site[data-dc-hf]:hover,header.site.dc-hf-on,footer.site.dc-hf-on{outline:2px solid var(--ddsdc-p);outline-offset:-2px;cursor:pointer}" +
       ".dds-phonebar[data-dc-pb]:hover,.dds-phonebar.dc-hf-on{outline:2px solid var(--ddsdc-p);outline-offset:-2px;cursor:pointer}" +   // item 122: the phone bar belongs to the footer
       // on a phone the editor's dock covers the frame's foot: the bar sits just above it, and the page's end above both
-      ".dds-phonebar{bottom:var(--ddsdc-foot,0px)!important}.dds-pb-gap{height:calc(64px + var(--ddsdc-foot,0px))!important}" +
+      ".dds-phonebar{bottom:var(--ddsdc-foot,0px)!important}" +
+      "html body{padding-bottom:var(--ddsdc-foot,0px)}" +   // item 171 (E5): the page's end scrolls clear of the phone's dock
       // the chip stays in the tab order (a keyboard's way in), seen only on hover, focus or while its card is open
       // it hangs off the edge (under the header, over the footer), so the name and menu stay clear to click
       ".dc-hf-chip{position:absolute;left:12px;top:calc(100% - 12px);z-index:30;display:inline-flex;align-items:center;height:24px;padding:0 10px;border:0;border-radius:999px;background:var(--ddsdc-p-soft);color:var(--ddsdc-p);font:600 12px/1 var(--ddsdc-sans);white-space:nowrap;cursor:pointer;opacity:0;pointer-events:none}" +
@@ -14650,9 +14849,11 @@ function dcInjectCanvas(doc, main, live) {
       ".dc-hf-chip:focus-visible{outline:2px solid var(--ddsdc-p);outline-offset:2px}" +
       // item 118: each section's colour theme, while colours are being chosen
       "#dds-dc-themes{position:absolute;left:0;top:0;width:0;height:0;z-index:2147482990;pointer-events:none}" +
-      ".dds-theme-tag{position:absolute;display:inline-flex;align-items:center;gap:6px;height:24px;padding:0 10px 0 6px;border-radius:999px;background:var(--ddsdc-card);border:1px solid var(--ddsdc-line);box-shadow:0 2px 8px rgba(0,0,0,.12);color:var(--ddsdc-ink);font:600 11.5px/1 var(--ddsdc-sans);white-space:nowrap}" +
+      ".dds-theme-tag{position:absolute;display:inline-flex;align-items:center;gap:6px;height:24px;padding:0 10px 0 6px;border-radius:999px;background:var(--ddsdc-card);border:1px solid var(--ddsdc-line);box-shadow:0 2px 8px rgba(0,0,0,.12);color:var(--ddsdc-ink);font:600 12px/1 var(--ddsdc-sans);white-space:nowrap}" +
       ".dds-theme-tag i{width:12px;height:12px;border-radius:50%;border:1px solid var(--ddsdc-line2)}" +
       "#dds-dc-chip .dc-chip-type{font-weight:500;opacity:.8;margin-left:5px}" +
+      "#dds-dc-chip.locked>svg{flex:none;width:12px;height:12px;margin-right:5px;vertical-align:-1px}" +   // item 155: a locked section's padlock
+      "#dds-dc-bar .dc-b.dc-locked{color:var(--ddsdc-p)}" +
       "#dds-dc-chip.compact .dc-chip-type{display:none}" +
       // the More menu under the pill: copy, cut, hide, columns
       "#dds-dc-more{position:absolute;z-index:2147483001;display:none;flex-direction:column;min-width:200px;padding:6px;background:var(--ddsdc-card);border:1px solid rgba(var(--ddsdc-p-rgb),.08);border-radius:14px;box-shadow:var(--ddsdc-shadow);font-family:var(--ddsdc-sans)}" +
@@ -14728,10 +14929,16 @@ function dcInjectCanvas(doc, main, live) {
   // the name only; if it would still touch the pill it sits just above the section (item 51:
   // in the phone frame it dropped under the pill, onto the section's heading), or under the
   // pill when the section's top is off the screen.
+  // The menu opens under the pill, or above it when the screen's end (on a phone, the dock
+  // floating over the frame's last --ddsdc-foot pixels) leaves no room below: it moves with the
+  // pill as the page scrolls, so its last item (Lock this section, item 155) could never be reached.
   const placeMore = () => {
     const mb = bar.querySelector('[aria-haspopup="menu"]'); if (!mb) return;
-    const br = bar.getBoundingClientRect(), mw = more.offsetWidth || 200;
-    more.style.top = (br.bottom + win.scrollY + 6) + "px";
+    const br = bar.getBoundingClientRect(), mw = more.offsetWidth || 200, mh = more.offsetHeight || 0;
+    const foot = parseFloat(win.getComputedStyle(doc.documentElement).getPropertyValue("--ddsdc-foot")) || 0;
+    const below = win.innerHeight - foot - br.bottom - 6, above = br.top - 6;
+    const up = mh > below && above > below;
+    more.style.top = (up ? Math.max(win.scrollY + 4, br.top + win.scrollY - 6 - mh) : br.bottom + win.scrollY + 6) + "px";
     more.style.left = Math.max(win.scrollX + 8, br.right + win.scrollX - mw) + "px";
   };
   const place = (el2) => {
@@ -14796,30 +15003,38 @@ function dcInjectCanvas(doc, main, live) {
       const bi = c.bi, b = BLOCKS_WORK[bi] || {};
       const def = BLOCK_DEFS.find((x) => x.type === b.type) || {};
       chipType = def.name || b.type || "Section"; chipName = heading || chipType; if (chipName === chipType) chipType = "";
-      const grip = mkBtn("Move", "Drag to move this section (or use the editor’s up/down arrows)", null, { cls: "dc-grip", icon: "grip" });
-      // pointer-drag reorder — same engine as the tray. The grip lives INSIDE the
-      // iframe, so its coords are iframe-local (iframeLocal:true translates them to
-      // the parent for the ghost + drop-line). Resolves to one list index via dcMove.
-      grip.addEventListener("pointerdown", (e) => { e.preventDefault(); e.stopPropagation(); pdStart(e, { kind: "move", from: bi, iframeLocal: true, label: (BLOCKS_WORK[bi] && (BLOCK_DEFS.find((x) => x.type === BLOCKS_WORK[bi].type) || {}).name) || "Section", icon: "⠿" }, grip); });
-      bar.appendChild(grip);
-      bar.appendChild(mkBtn("Edit", "Edit this section", () => eeEditBlock(bi), { icon: "pencil" }));
-      bar.appendChild(mkBtn("Duplicate", "Duplicate this section", () => dcDuplicate(bi), { icon: "copy" }));
-      bar.appendChild(mkBtn("Style", "Style this section — its colours, type and layout", () => eeEditBlock(bi, "style"), { icon: "spark" }));
-      bar.appendChild(mkBtn("Delete", "Delete this section", () => dcDelete(bi), { cls: "dc-danger", icon: "x" }));
-      // the rest behind More: copy, cut, hide, and a Columns section's column count
-      more.appendChild(mkItem("Copy", "Copy this section — paste it anywhere", () => dcCopyBlock(bi), { icon: "clipboard" }));
-      more.appendChild(mkItem("Cut", "Cut this section — paste it anywhere", () => dcCutBlock(bi), { icon: "scissors" }));
-      more.appendChild(mkItem("Hide", "Hide this section", () => eeHideKey(el2.getAttribute("data-dds-key") || ddsKeyFor(bi)), { icon: "eyeoff" }));
-      if (b.type === "columns") {   // Layout Container: 1–6 columns; drag dividers to resize
-        const nc = Array.isArray(b.columns) ? b.columns.length : 2;
-        more.appendChild(mkItem(nc + (nc === 1 ? " column" : " columns"), "Columns — drag the dividers on the page to resize their widths", () => eeEditBlock(bi), { icon: "columns" }));
-        more.appendChild(mkItem("Add a column", "Add a column", () => dcSetColumns(bi, nc + 1), { cls: nc >= 6 ? "dc-off" : "", icon: "plus" }));
-        more.appendChild(mkItem("Remove a column", "Remove a column", () => dcSetColumns(bi, nc - 1), { cls: nc <= 1 ? "dc-off" : "", icon: "x" }));
+      if (lockedForMe(b)) {   // item 155: the studio locked it — its words at most, and a padlock that opens the card saying why
+        if (b.lock.words) bar.appendChild(mkBtn("Edit words", "Change this section’s words", () => eeEditBlock(bi), { icon: "pencil" }));
+        bar.appendChild(mkBtn("Locked", "Your studio locked this section so it stays as designed", () => eeEditBlock(bi), { cls: "dc-locked", icon: "lock" }));
+      } else {
+        const grip = mkBtn("Move", "Drag to move this section (or use the editor’s up/down arrows)", null, { cls: "dc-grip", icon: "grip" });
+        // pointer-drag reorder — same engine as the tray. The grip lives INSIDE the
+        // iframe, so its coords are iframe-local (iframeLocal:true translates them to
+        // the parent for the ghost + drop-line). Resolves to one list index via dcMove.
+        grip.addEventListener("pointerdown", (e) => { e.preventDefault(); e.stopPropagation(); pdStart(e, { kind: "move", from: bi, iframeLocal: true, label: (BLOCKS_WORK[bi] && (BLOCK_DEFS.find((x) => x.type === BLOCKS_WORK[bi].type) || {}).name) || "Section", icon: "⠿" }, grip); });
+        bar.appendChild(grip);
+        bar.appendChild(mkBtn("Edit", "Edit this section", () => eeEditBlock(bi), { icon: "pencil" }));
+        bar.appendChild(mkBtn("Duplicate", "Duplicate this section", () => dcDuplicate(bi), { icon: "copy" }));
+        bar.appendChild(mkBtn("Style", "Style this section — its colours, type and layout", () => eeEditBlock(bi, "style"), { icon: "spark" }));
+        bar.appendChild(mkBtn("Delete", "Delete this section", () => dcDelete(bi), { cls: "dc-danger", icon: "x" }));
+        // the rest behind More: copy, cut, hide, and a Columns section's column count
+        more.appendChild(mkItem("Copy", "Copy this section — paste it anywhere", () => dcCopyBlock(bi), { icon: "clipboard" }));
+        more.appendChild(mkItem("Cut", "Cut this section — paste it anywhere", () => dcCutBlock(bi), { icon: "scissors" }));
+        more.appendChild(mkItem("Hide", "Hide this section", () => eeHideKey(el2.getAttribute("data-dds-key") || ddsKeyFor(bi)), { icon: "eyeoff" }));
+        if (b.type === "columns") {   // Layout Container: 1–6 columns; drag dividers to resize
+          const nc = Array.isArray(b.columns) ? b.columns.length : 2;
+          more.appendChild(mkItem(nc + (nc === 1 ? " column" : " columns"), "Columns — drag the dividers on the page to resize their widths", () => eeEditBlock(bi), { icon: "columns" }));
+          more.appendChild(mkItem("Add a column", "Add a column", () => dcSetColumns(bi, nc + 1), { cls: nc >= 6 ? "dc-off" : "", icon: "plus" }));
+          more.appendChild(mkItem("Remove a column", "Remove a column", () => dcSetColumns(bi, nc - 1), { cls: nc <= 1 ? "dc-off" : "", icon: "x" }));
+        }
+        if (S.isStudio) more.appendChild(blkLock(b)   // item 155: only the studio locks and unlocks
+          ? mkItem("Unlock", "Unlock this section: your client can change it again", () => dcLockBlock(bi, false), { icon: "unlock" })
+          : mkItem("Lock this section", "Lock this section: your client can’t move, restyle or delete it", () => dcLockBlock(bi, true), { icon: "lock" }));
+        const mb = mkBtn("More", "More", null, { icon: "more" });
+        mb.setAttribute("aria-haspopup", "menu"); mb.setAttribute("aria-expanded", "false");
+        mb.addEventListener("click", () => { const on = !more.classList.contains("on"); more.classList.toggle("on", on); mb.setAttribute("aria-expanded", String(on)); if (on) { placeMore(); const f = more.querySelector(".dc-mi"); if (f) { try { f.focus({ preventScroll: true }); } catch (_) {} } } });
+        bar.appendChild(mb);
       }
-      const mb = mkBtn("More", "More", null, { icon: "more" });
-      mb.setAttribute("aria-haspopup", "menu"); mb.setAttribute("aria-expanded", "false");
-      mb.addEventListener("click", () => { const on = !more.classList.contains("on"); more.classList.toggle("on", on); mb.setAttribute("aria-expanded", String(on)); if (on) { placeMore(); const f = more.querySelector(".dc-mi"); if (f) { try { f.focus({ preventScroll: true }); } catch (_) {} } } });
-      bar.appendChild(mb);
     } else {
       chipName = heading || DC_CORE_NAME[c.view] || "Section"; chipType = "Built-in section";
       bar.appendChild(mkBtn("Edit", "Edit this section", () => eeEditCore(c.view), { icon: "pencil" }));
@@ -14832,6 +15047,9 @@ function dcInjectCanvas(doc, main, live) {
     }
     chip.textContent = chipName;
     if (chipType) { const t = doc.createElement("span"); t.className = "dc-chip-type"; t.textContent = "· " + chipType; chip.appendChild(t); }
+    const locked = c.kind === "block" && !!blkLock(BLOCKS_WORK[c.bi]);   // item 155: a locked section wears a padlock in its name, for both sides
+    chip.classList.toggle("locked", locked);
+    if (locked) chip.insertAdjacentHTML("afterbegin", uiIcon("lock", 12));
     bar.classList.add("on"); chip.classList.add("on"); place(el2);
   };
   // G13: refresh the sid→index lookup from the server sidecar, then wire every
@@ -14944,6 +15162,8 @@ function dcInjectCanvas(doc, main, live) {
   if (!doc.body.hasAttribute("data-dc-hintguard")) {
     doc.body.setAttribute("data-dc-hintguard", "1");
     ["pointerdown", "keydown"].forEach((t) => doc.addEventListener(t, dcDismissShellHint, true));
+    // item 171 (E3): a press on the page closes the Pages card, as a press anywhere else in the editor does
+    doc.addEventListener("pointerdown", () => { if (PAGES_OPEN) closePagesCard(false); dcDockMore(false); }, true);   // and the phone's More (E4)
   }
   // expose a selector so the content-tree rows can flash + select a section on click
   DC_SHOWBAR = (elx) => { try { showBar(elx); } catch (_) {} };
@@ -15105,7 +15325,7 @@ function dcPageTreeRow(pg, cur) {
   // G11: the whole-page feedback thread rides the page row while Comments is on
   if (CM_ON) row.appendChild(cmBadge(pg.slug, "", "Whole page — " + pg.title));
   const acts = el("span", "dc-tree-acts");
-  const m = el("button", null, "⋯"); m.type = "button"; m.title = pg.slug ? "Rename, clear, hide or delete this page" : "Clear this page";
+  const m = icoBtn("more", pg.slug ? "Rename, clear, hide or delete this page" : "Clear this page");
   m.addEventListener("click", (e) => { e.stopPropagation(); dcPageMenu(pg.slug, m); });
   acts.appendChild(m); if (!CM_ON) row.appendChild(acts);   // item 99: the page menu edits, so Comments mode leaves it out
   return row;
@@ -15219,16 +15439,17 @@ function dcTreeRow(el2, c) {
     return btn;
   };
   if (isBlock) {
-    acts.appendChild(mkA("↑", "Move up", () => dcMove(c.bi, c.bi - 1), c.bi <= 0));
-    acts.appendChild(mkA("↓", "Move down", () => dcMove(c.bi, c.bi + 2), c.bi >= (BLOCKS_WORK.length - 1)));
+    const held = lockedForMe(BLOCKS_WORK[c.bi]);   // item 155: a section the studio locked stays where it is
+    acts.appendChild(mkA(uiIcon("up", 14), held ? LOCK_SAY : "Move up", () => dcMove(c.bi, c.bi - 1), held || c.bi <= 0));
+    acts.appendChild(mkA(uiIcon("down", 14), held ? LOCK_SAY : "Move down", () => dcMove(c.bi, c.bi + 2), held || c.bi >= (BLOCKS_WORK.length - 1)));
     acts.appendChild(mkA(uiIcon("cog", 14), "Settings for this section", () => eeEditBlock(c.bi)));
-    acts.appendChild(mkA(uiIcon("trash", 14), "Remove this section", () => dcDelete(c.bi)));
+    acts.appendChild(mkA(uiIcon("trash", 14), held ? LOCK_SAY : "Remove this section", () => dcDelete(c.bi), held));
   } else {
     const keys = c.key ? dcCoreKeys(el2.parentNode) : [], at = keys.indexOf(c.key);
     if (at >= 0) {
       row.dataset.core = c.key;
-      acts.appendChild(mkA("↑", "Move up", () => dcMoveCore(c.key, -1, true), at <= 0));
-      acts.appendChild(mkA("↓", "Move down", () => dcMoveCore(c.key, 1, true), at >= keys.length - 1));
+      acts.appendChild(mkA(uiIcon("up", 14), "Move up", () => dcMoveCore(c.key, -1, true), at <= 0));
+      acts.appendChild(mkA(uiIcon("down", 14), "Move down", () => dcMoveCore(c.key, 1, true), at >= keys.length - 1));
     }
     acts.appendChild(mkA(uiIcon("cog", 14), "Edit this section", () => eeEditCore(c.view)));
     if (c.key) acts.appendChild(mkA(uiIcon("eyeoff", 14), "Hide this section", () => eeHideKey(c.key)));
@@ -15516,7 +15737,7 @@ function renderSetup() {
     const row = el(st.done ? "div" : "button", "hb-task" + (st.done ? " done" : "") + (st.done && !seen.has(st.key) ? " just" : ""));
     row.dataset.step = st.key;
     if (!st.done) row.type = "button";
-    row.appendChild(el("span", "cb", st.done ? "✓" : ""));
+    const cb = el("span", "cb"); if (st.done) cb.innerHTML = uiIcon("check", 12); row.appendChild(cb);
     const t = el("span", "t"); t.appendChild(el("b", null, st.title));
     if (!st.done) t.appendChild(el("span", null, st.hint));
     row.appendChild(t);
