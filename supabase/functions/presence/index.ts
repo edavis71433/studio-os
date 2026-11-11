@@ -76,7 +76,8 @@ import { handleScheduleCreate, handleScheduleList, handleScheduleCancel, handleF
 const { handleBookingTypes, handleBookingSlots, handleBookingCreate, handleManageGet, handleManagePost, handleManageSlots, handleManageIcs, handleBookingSettingsGet, handleBookingSettingsPut, handleBookingTypesList, handleBookingTypeCreate, handleBookingTypeUpdate, handleBookingTypeDelete, handleBookingAppointments, handleBookingConfirm, handleBookingCancel, handleBookingMark } = lazyRoutes(() => import('./routes/booking.ts'));
 const { handleReviewPage, handleReviewSubmit, handleReviewsList, handleReviewApprove, handleReviewHide, handleReviewReply, handleReviewRequest, handleReviewGoogleLink } = lazyRoutes(() => import('./routes/reviews.ts'));
 const { handleCommentsList, handleCommentCreate, handleCommentResolve, handleCommentDelete, handleTokenSections, handleTokenComment } = lazyRoutes(() => import('./routes/comments.ts'));
-import { resolveMemberSite, resolveSiteRoleCached } from './lib/workspace.ts';
+import { resolveMemberSite, resolveHeldBusiness, resolveSiteRoleCached } from './lib/workspace.ts';
+import type { SiteRole } from './lib/site_roles.ts';
 const { handleConciergeAsk } = lazyRoutes(() => import('./routes/concierge.ts'));
 const { handleHelpAsk } = lazyRoutes(() => import('./routes/help.ts'));
 const { handleWriterGenerate, handleWriterRewrite, handleWriterList, handleWriterGet, handleWriterAccept, handleWriterDiscard } = lazyRoutes(() => import('./routes/writer.ts'));
@@ -443,8 +444,11 @@ async function route_(req: Request, cors: Record<string, string>): Promise<Respo
   //    site. Scoped (SC-1): an agency operator drilled into a client — the
   //    x-dds-scope-site header is a REQUEST, re-validated here against agency
   //    authorization and FAIL-CLOSED (never falls back to another tenant).
-  let site: SiteRow | null;
+  let site: SiteRow | null = null;
   let scopedName: string | null = null;
+  // a seat that admits the caller: their oldest when nothing was picked, or (builder
+  // item 83) the business they picked with ?client=. Stamped in ONE place, below.
+  let seated: { site: SiteRow; member: { site_id: string; role: SiteRole } | null } | null = null;
   const scopeReq = req.headers.get('x-dds-scope-site');
   if (scopeReq) {
     // SC-2: pass the operator identity + request metadata so the drill-in is
@@ -454,14 +458,19 @@ async function route_(req: Request, cors: Record<string, string>): Promise<Respo
       operatorUserId: principal.userId, operatorEmail: principal.email,
       route, method, requestId: principal.requestId,
       ip: req.headers.get('x-forwarded-for') || '', userAgent: req.headers.get('user-agent') || '',
-    });
+    }, (id) => resolveHeldBusiness(jwt, principal, id));
     if (!sc.ok) return json({ error: 'scope_denied', message: 'You don’t have access to that client.' }, sc.status, cors);
-    site = sc.site; scopedName = sc.scoped.name;
-    // Studio audit change 2: the principal now KNOWS it is acting for a client,
-    // so every attribution downstream (publishes, snapshots, change events,
-    // connection events — lib/actor_kind.ts) says "the studio" without a second
-    // membership query. Set only here, only after the scope was authorised.
-    principal.scope = { site_id: sc.scoped.site_id, name: sc.scoped.name };
+    if ('held' in sc) {
+      // builder item 83: one of the caller's own businesses, opened as themself, never as a studio
+      seated = sc.held;
+    } else {
+      site = sc.site; scopedName = sc.scoped.name;
+      // Studio audit change 2: the principal now KNOWS it is acting for a client,
+      // so every attribution downstream (publishes, snapshots, change events,
+      // connection events — lib/actor_kind.ts) says "the studio" without a second
+      // membership query. Set only here, only after the scope was authorised.
+      principal.scope = { site_id: sc.scoped.site_id, name: sc.scoped.name };
+    }
   } else {
     site = await resolveSite(jwt);
     // MEMBERSHIP fallback: an invited member (client_reviewer / staff seat) owns
@@ -470,14 +479,12 @@ async function route_(req: Request, cors: Record<string, string>): Promise<Respo
     // + the reviewer boundary below (fail-closed). Only a client caller carries the
     // seat onto the data path: platform staff operate as the owner already.
     if (!site && (principal.userId || principal.email)) {
-      try {
-        const seated = await resolveMemberSite(principal);
-        if (seated) {
-          site = seated.site;
-          if (principal.kind === 'client') principal.member = seated.member;
-        }
-      } catch { /* fail closed to no_site */ }
+      try { seated = await resolveMemberSite(principal); } catch { /* fail closed to no_site */ }
     }
+  }
+  if (seated) {
+    site = seated.site;
+    if (principal.kind === 'client') principal.member = seated.member;
   }
   if (!site) {
     return json({ error: 'no_site', message: 'No Presence site is set up for this account yet.' }, 404, cors);
