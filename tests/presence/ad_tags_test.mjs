@@ -23,7 +23,7 @@ const read = (p) => Deno.readTextFileSync(new URL(`../../${p}`, import.meta.url)
   ok('snapshot: the good half of a pair stays', JSON.stringify(adTagsOf({ ad_tags: { google: 'G-ABC123XYZ9', meta: 'nope' } })) === JSON.stringify({ google: 'G-ABC123XYZ9' }));
   const content = read('supabase/functions/presence/routes/content.ts');
   ok('save: /settings takes both IDs, each held to its own shape', /google_tag_id: \{ kind: 'google_tag' \}, meta_pixel_id: \{ kind: 'meta_pixel' \}/.test(content) && /\(rule\.kind === 'google_tag' \? GOOGLE_TAG_RE : META_PIXEL_RE\)\.test\(id\)/.test(content));
-  ok('save: the settings read and write step down without the 0155 columns, newest pack first', /AD_SETTINGS_COLS = 'google_tag_id,meta_pixel_id'/.test(content) && /OPTIONAL_SETTINGS_COLS = \[AD_SETTINGS_COLS, /.test(content) && /\+ ',' \+ AD_SETTINGS_COLS,/.test(content));
+  ok('save: the settings read and write step down without the 0155 columns, ahead of the older packs', /AD_SETTINGS_COLS = 'google_tag_id,meta_pixel_id'/.test(content) && /OPTIONAL_SETTINGS_COLS = \[(?:[A-Z_]+_SETTINGS_COLS, )*AD_SETTINGS_COLS, (?:[A-Z_]+_SETTINGS_COLS, )*VISIT_SETTINGS_COLS,/.test(content) && /\+ ',' \+ AD_SETTINGS_COLS\b/.test(content));
 }
 
 // ═══ 2. the notice and the loader ═══
