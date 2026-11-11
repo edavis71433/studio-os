@@ -508,18 +508,34 @@ async function handleInvoicePaidEcho(req: Request, cors: Record<string, string>)
           import('../lib/email_brand.ts'),
         ]);
         const brand = await loadEmailBrand(String(inv.site_id)).catch(() => undefined);
+        // Sales items 81 and 82: the receipt names the invoice's number and carries the
+        // receipt as a PDF (best-effort: without it the email goes as before)
+        let no = '';
+        let attachments: Array<{ filename: string; content: Uint8Array }> | undefined;
+        try {
+          const [{ docRow }, { docContextFor }, { documentPdf, pdfFileName }, { invoiceNo }] = await Promise.all([
+            import('./sales.ts'), import('../lib/doc_context.ts'), import('../lib/doc_pdf.ts'), import('../lib/documents.ts'),
+          ]);
+          const row = await docRow('invoice', String(inv.id), String(inv.site_id));
+          if (row) {
+            no = invoiceNo(row.number);
+            const ctx = await docContextFor(String(inv.site_id), 'invoice', row);
+            const { deal_id: _d, ...data } = row;
+            attachments = [{ filename: pdfFileName('invoice', row), content: documentPdf('invoice', data, brand, ctx) }];
+          }
+        } catch { attachments = undefined; }
         // The payer is the deal's own contact, so siteId lands their answer in the Inbox,
         // like the invoice email's (item 72: it used to reach the platform's mailbox,
         // whichever site sent it).
-        receipted = await sendEmail(payerEmail, `Payment received — thank you`,
+        receipted = await sendEmail(payerEmail, `Payment received — thank you${no ? ` (${no})` : ''}`,
           `<p>Your payment went through securely.</p>` +
           `<table style="margin:8px 0;border-collapse:collapse">` +
-          `<tr><td style="padding:2px 12px 2px 0;color:#666">${isDeposit ? 'Deposit' : 'Invoice'}</td><td><b>${esc(what)}</b></td></tr>` +
+          `<tr><td style="padding:2px 12px 2px 0;color:#666">${isDeposit ? 'Deposit' : 'Invoice'}</td><td><b>${esc(what)}${no ? ` ${esc(no)}` : ''}</b></td></tr>` +
           `<tr><td style="padding:2px 12px 2px 0;color:#666">Amount</td><td><b>${esc(amount)}</b></td></tr>` +
           `</table>` +
           `<p>${isDeposit ? 'The deposit is in and the work can begin.' : 'The invoice is settled — nothing else is needed from you.'} Your studio has been notified, and everything updates automatically on their side.</p>` +
-          `<p style="color:#666;font-size:.9rem">Keep this email for your records.</p>`,
-          brand, { critical: true, siteId: String(inv.site_id) });
+          `<p style="color:#666;font-size:.9rem">${attachments ? 'Your receipt is attached as a PDF. ' : ''}Keep this email for your records.</p>`,
+          brand, { critical: true, siteId: String(inv.site_id), ...(attachments ? { attachments } : {}) });
       } else {
         console.warn(`[invoice-paid] no client email resolvable for invoice ${inv.id} (deal ${inv.deal_id || 'none'}) — the payer gets no receipt; add an email to the deal's contact`);
       }

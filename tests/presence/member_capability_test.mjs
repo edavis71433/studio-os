@@ -28,6 +28,7 @@ const { SITE_ROLES, siteCan, contentWriteNeeds, memberWriteNeeds } = await impor
 const { resolveSiteRoleCached } = await import(`${P}/lib/workspace.ts`);
 const { memberWriteGate, reviewerAllowed } = await import(`${P}/routes/workspace.ts`);
 const { handleMediaDelete } = await import(`${P}/routes/media.ts`);
+const { handleInvoicePaymentUndo } = await import(`${P}/routes/invoice_payments.ts`);   // sales review item 77
 const { handleAssetDelete, handleAssetStatus } = await import(`${P}/routes/assets.ts`);
 const { handleRedirectDelete } = await import(`${P}/routes/search.ts`);
 const { handleContentLibraryDelete } = await import(`${P}/routes/content_library.ts`);
@@ -145,6 +146,7 @@ const DECIDED = {
     'DELETE /sales/prospects/:id',   // sales review item 112: taking a prospect off the list
     // sales review items 86 + 105: undoing an import takes people off; a merge folds a record away (and back)
     'POST /sales/contacts/imports/:id/undo', 'POST /sales/contacts/:id/merge', 'POST /sales/contacts/:id/unmerge',
+    'POST /sales/invoices/:id/payment/undo',   // sales review item 77: taking back a recorded payment changes the books, like a void
   ],
   configure: [
     'DELETE /foundations/domain', 'POST /foundations/domain', 'POST /foundations/prepare',
@@ -217,6 +219,7 @@ const DECIDED = {
     'POST /sales/prospects/:id/convert', 'POST /sales/prospects/:id/draft',
     'POST /sales/prospects/:id/pack',   // sales review item 113: the pitch pack build
     'POST /sales/contacts/imports',   // sales review item 86: starting an import (each row is a POST /sales/contacts)
+    'POST /sales/invoices/:id/payment',   // sales review item 77: recording a check, cash, transfer or Zelle payment
   ],
   open: [
     'DELETE /crm/notes/:id', 'POST /client/notifications/read', 'POST /concierge/ask', 'POST /crm/notes',
@@ -314,6 +317,7 @@ const CHANGED = [
   { name: 'POST /sales/contacts/imports/:id/undo', fx: { rows: { presence_contact_imports: { created_at: new Date().toISOString(), undone_at: null } } }, run: (r, p) => handleContactImportUndo(r, A, p, ROW, cors) },
   { name: 'POST /sales/contacts/:id/merge', body: { from: ROW2, confirm: true }, fx: { rows: { presence_contacts: { client_id: null, deleted_at: null } } }, run: (r, p) => handleContactMerge(r, A, p, ROW, cors) },
   { name: 'POST /sales/contacts/:id/unmerge', fx: { rows: { presence_contacts: { merged_into: ROW2, merge_record: { at: new Date().toISOString(), into: ROW2, moved: { deals: [], appointments: [], reviews: [] }, keep_before: {}, keep_after: {} } } } }, run: (r, p) => handleContactUnmerge(r, A, p, ROW, cors) },
+  { name: 'POST /sales/invoices/:id/payment/undo', fx: { rows: { presence_invoices: { status: 'paid', paid_method: 'check', payment_for: null } } }, run: (r, p) => handleInvoicePaymentUndo(r, A, p, ROW, cors) },   // sales review item 77
   { name: 'POST /foundations/domain', body: { domain: 'beta.example' }, run: (r, p) => handleDomain(r, 'POST', A, p, cors) },
   { name: 'DELETE /foundations/domain', run: (r, p) => handleDomain(r, 'DELETE', A, p, cors) },
   { name: 'POST /foundations/prepare', body: { goal: 'email_auth' }, run: (r, p) => handleFoundationsPrepare(r, A, p, cors) },
@@ -461,6 +465,7 @@ const WRITE_HANDLERS = [
   // sales review item 47: estimates and recurring invoices (see DECIDED.edit and .delete)
   'handleEstimateCreate', 'handleEstimateSend', 'handleEstimateToProposal', 'handleEstimateToInvoice', 'handleEstimateDelete',
   'handleRecurringStart', 'handleRecurringChange', 'handleRecurringAction',
+  'handleInvoicePayment', 'handleInvoicePaymentUndo',   // sales review item 77 (see DECIDED.edit and .delete)
   // sales review item 112: prospects (DELETE and PATCH /sales/prospects/:id share handleProspect)
   'handleProspects', 'handleProspect', 'handleProspectDiscover', 'handleProspectConvert', 'handleProspectDraft', 'handleProspectPack',
   // sales review items 86 + 105: imports (POST edit; undo delete) and merging two records (delete)

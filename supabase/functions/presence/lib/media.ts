@@ -318,6 +318,22 @@ export async function copyObject(siteId: string, fromStoragePath: string, mime: 
   } catch { return null; }
 }
 
+/** Builder list item 166: when a studio removes a template, its own photo copies go
+ *  too (item 145 keeps them in templates/<agency id>/). Only that agency's template
+ *  folder is ever touched, so a template can never take a site's photo with it.
+ *  Best-effort; answers how many are gone. */
+export async function removeTemplatePhotos(agencyId: string, storagePaths: string[]): Promise<number> {
+  const folder = `templates/${String(agencyId).toLowerCase()}/`;
+  let gone = 0;
+  for (const p of storagePaths) {
+    const obj = String(p || '').replace(`${BUCKET}/`, '');
+    if (!obj.startsWith(folder) || !/^templates\/[0-9a-f-]{36}\/[0-9a-f-]{36}\.[a-z0-9]{2,5}$/.test(obj)) continue;
+    const r = await fetch(`${SB_URL}/storage/v1/object/${BUCKET}/${obj}`, { method: 'DELETE', headers: { Authorization: `Bearer ${SB_SERVICE}`, apikey: SB_SERVICE } }).catch(() => null);
+    if (r && (r.ok || r.status === 404 || r.status === 400)) gone++;
+  }
+  return gone;
+}
+
 /** PREVIEW: map each deterministic output path to a short-lived signed
  *  transform URL, for substitution into rendered HTML. */
 export async function previewUrlMap(manifest: MediaManifestEntry[]): Promise<Record<string, string>> {
