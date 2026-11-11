@@ -47,8 +47,9 @@ ok('client app: fetches /client/billing (ensureBilling) and renders it through i
   && /const b=await ensureBilling\(\);/.test(clientHtml) && /inv\.map\(i=>invoiceRowHtml\(i,today\)\)/.test(clientHtml));
 ok('client app: states the software subscription is billed separately', /billed separately/i.test(clientHtml));
 // the Pay action exists ONLY past the paid and void/canceled guards, opens the
-// server's pay_url in a new tab with rel=noopener, and is named per invoice
-ok('client app: shows a safe pay link for unpaid invoices only (paid/dead guards first, https-only, noopener)',
+// server's pay_url in THIS tab (Nov 10 review, G9: a new tab left the first one
+// still saying Pay after Stripe returned to a second copy), and is named per invoice
+ok('client app: shows a safe pay link for unpaid invoices only (paid/dead guards first, https-only, same tab)',
   // Oct 2026 (item 2): the guards read the one money formula's state — paid,
   // then void/canceled (dead), then PROCESSING (the client already paid) — and
   // only then the pay link
@@ -56,7 +57,8 @@ ok('client app: shows a safe pay link for unpaid invoices only (paid/dead guards
   // the anchor renders ONLY through the https-allowlisted `pay` value (the
   // scheme gate is the review's defense-in-depth on the money surface)
   && /const pay=st!=='processing'&&i\.pay_url&&\/\^https:\\\/\\\/\/\.test\(i\.pay_url\)\?i\.pay_url:null;/.test(clientHtml)
-  && /:pay\?`<a class="fbtn pay" href="\$\{esc\(pay\)\}" target="_blank" rel="noopener" aria-label="Pay — /.test(clientHtml));
+  && /:pay\?`<a class="fbtn pay" href="\$\{esc\(pay\)\}" aria-label="Pay — /.test(clientHtml)
+  && !/data-pay href="[^"]*" target="_blank"/.test(clientHtml));
 
 const passed = results.filter((r) => r.p).length;
 console.log(`\n════ P2-E W11 BILLING SURFACES (structural): ${passed}/${results.length} ${passed === results.length ? 'PASSED' : 'FAILED'} ════`);

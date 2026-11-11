@@ -64,6 +64,16 @@ const XSS = '<script>alert(1)</script>';
   ok('total is recomputed from line items (ignores a wrong stored subtotal)', prop.includes(`<td>${money(expected)}</td>`) && !prop.includes('$9,999.99'));
   ok('per-line extended price uses unit × qty', prop.includes(money(5000 * 2)) && prop.includes(money(15000)));
 }
+// Nov 10 review (G11): a quantity-0 line used to print its unit price while the total
+// counted nothing for it. One rule now: the line reads "× 0" and $0.00, and the lines add up.
+{
+  const items = [{ label: 'Logo', qty: 0, unit_cents: 40000 }, { label: 'Build', qty: 1, unit_cents: 15000 }];
+  const doc = renderProposalDocument({ title: 'P', line_items: items, currency: 'usd', status: 'sent' }, brand);
+  const logoRow = (doc.match(/<tr><td>Logo[\s\S]*?<\/tr>/) || [''])[0];
+  ok('G11: a quantity-0 line shows × 0 and $0.00, never its unit price', logoRow.includes('× 0') && logoRow.includes(money(0)) && !logoRow.includes(money(40000)));
+  ok('G11: the total counts the same lines the rows show', doc.includes(`<td>${money(15000)}</td>`) && !doc.includes(money(55000)));
+  ok('G11: a quantity of 1 carries no "× 1" note', !/Build <span[^>]*>× 1/.test(doc));
+}
 
 // ── money + utc helpers ──────────────────────────────────────────────────────
 ok('money formats cents to 2dp with symbol', money(25000) === '$250.00' && money(0) === '$0.00' && money(199, 'eur') === '€1.99');

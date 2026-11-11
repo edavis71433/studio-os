@@ -123,6 +123,7 @@ function unpaidInvoices(b){return ((b&&b.invoices)||[]).filter(i=>{const s=invSt
 function portalGreeting(h,name){const g=h<12?'Good morning':h<18?'Good afternoon':'Good evening';return g+(name?', '+name:'')+'.';}
 function snapWaiting(s){return((s&&s.approvals)||[]).length+((s&&s.todos)||[]).length;}
 function fmtMoney(n){n=Number(n)||0;return'$'+n.toLocaleString('en-US',{minimumFractionDigits:Number.isInteger(n)?0:2,maximumFractionDigits:2});}
+function projectWord(s){s=String(s||'');return({active:'In progress',on_hold:'On hold',complete:'Done',archived:'Closed'})[s]||s.replace(/_/g,' ');}
 function glanceData(feed,snaps,notifs,billing,projects,failed){
   failed=failed||{};
   const needsOk=(failed.feed||failed.snaps)?null:needsYouItems(feed,snaps,failed.billing?null:billing).length;
@@ -131,7 +132,7 @@ function glanceData(feed,snaps,notifs,billing,projects,failed){
   // failed read's dueTotal happened to compute 0 (a fake $0 is still a lie)
   const dueTotal=failed.billing?0:unpaidInvoices(billing).reduce((a,i)=>a+(Number(i&&i.amount)||0),0);
   const p=(projects||[]).find(x=>x&&x.status==='active')||(projects||[])[0]||null;
-  return{needsOk,newMsgs,due:dueTotal>0?fmtMoney(dueTotal):'',project:p?{status:String(p.status||'').replace(/_/g,' '),name:p.name||'Your project'}:null};
+  return{needsOk,newMsgs,due:dueTotal>0?fmtMoney(dueTotal):'',project:p?{status:projectWord(p.status),name:p.name||'Your project'}:null};
 }
 function glanceTiles(g){
   g=g||{};const t=[];
@@ -291,9 +292,12 @@ const PROJECTS=[{id:'x',name:'Old thing',status:'complete'},{id:'y',name:'Websit
   ok('glance: new messages count ONLY unread kind==="message" — support_message rows (own-filing updated_at churn) never count',
     g.newMsgs===1);
   ok('glance: the due amount sums unpaid invoices only (paid/void/canceled excluded)',g.due==='$750');
-  ok('glance: the project tile prefers the active project and humanizes its status',
-    g.project.name==='Website redesign' && g.project.status==='active'
-    && glanceData(null,[],[],null,[{id:'z',name:'On hold',status:'on_hold'}]).project.status==='on hold');
+  // Nov 10 walk: the tile showed the raw word "active" — a status is said in words now
+  ok('glance: the project tile prefers the active project and says its status in words',
+    g.project.name==='Website redesign' && g.project.status==='In progress'
+    && glanceData(null,[],[],null,[{id:'z',name:'On hold',status:'on_hold'}]).project.status==='On hold'
+    && glanceData(null,[],[],null,[{id:'z',name:'Old',status:'complete'}]).project.status==='Done'
+    && glanceData(null,[],[],null,[{id:'z',name:'Odd',status:'some_new_state'}]).project.status==='some new state');
   const t=glanceTiles(g);
   ok('glance: four tiles when every datum exists, in strip order',
     t.length===4 && t[0].id==='glance-ok' && t[1].id==='glance-msgs' && t[2].id==='glance-due' && t[3].id==='glance-proj');
@@ -374,8 +378,8 @@ for(const fn of ['greet','dateLine','monthTiles','monthTrend','siteYmd','todaySl
   ok(`mirror: today.html defines ${fn} verbatim`,today.includes(m));
 }
 ok('mirror: today.html defines money verbatim',today.includes(String(money)));
-for(const fn of ['portalGreeting','snapWaiting','fmtMoney','glanceData','glanceTiles','needsYouItems','bellSinceLabel','momentIcon']){
-  const m=String({portalGreeting,snapWaiting,fmtMoney,glanceData,glanceTiles,needsYouItems,bellSinceLabel,momentIcon}[fn]);
+for(const fn of ['portalGreeting','snapWaiting','fmtMoney','projectWord','glanceData','glanceTiles','needsYouItems','bellSinceLabel','momentIcon']){
+  const m=String({portalGreeting,snapWaiting,fmtMoney,projectWord,glanceData,glanceTiles,needsYouItems,bellSinceLabel,momentIcon}[fn]);
   ok(`mirror: client.html defines ${fn} verbatim`,portal.includes(m));
 }
 
