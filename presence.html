@@ -14544,10 +14544,16 @@ function dcInjectCanvas(doc, main, live) {
   // the name only; if it would still touch the pill it sits just above the section (item 51:
   // in the phone frame it dropped under the pill, onto the section's heading), or under the
   // pill when the section's top is off the screen.
+  // The menu opens under the pill, or above it when the screen's end (on a phone, the dock
+  // floating over the frame's last --ddsdc-foot pixels) leaves no room below: it moves with the
+  // pill as the page scrolls, so its last item (Lock this section, item 155) could never be reached.
   const placeMore = () => {
     const mb = bar.querySelector('[aria-haspopup="menu"]'); if (!mb) return;
-    const br = bar.getBoundingClientRect(), mw = more.offsetWidth || 200;
-    more.style.top = (br.bottom + win.scrollY + 6) + "px";
+    const br = bar.getBoundingClientRect(), mw = more.offsetWidth || 200, mh = more.offsetHeight || 0;
+    const foot = parseFloat(win.getComputedStyle(doc.documentElement).getPropertyValue("--ddsdc-foot")) || 0;
+    const below = win.innerHeight - foot - br.bottom - 6, above = br.top - 6;
+    const up = mh > below && above > below;
+    more.style.top = (up ? Math.max(win.scrollY + 4, br.top + win.scrollY - 6 - mh) : br.bottom + win.scrollY + 6) + "px";
     more.style.left = Math.max(win.scrollX + 8, br.right + win.scrollX - mw) + "px";
   };
   const place = (el2) => {

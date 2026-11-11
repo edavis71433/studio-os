@@ -44,6 +44,8 @@ async function mount(page: Page, { studio, lock }: { studio: boolean; lock?: unk
   await expect(page.locator('html')).toHaveClass(/dc-edit/);
   const frame = page.frameLocator('#designPreview');
   await expect(frame.locator('#dds-dc-bar')).toBeAttached();
+  await page.waitForLoadState('networkidle');   // Edit's own redraw (item 85) has landed, so a menu opened next isn't drawn away
+  await expect(frame.locator('#dds-dc-bar')).toBeAttached();
   // after a save the page is drawn again: wait for that, so a tap doesn't land on the page being replaced
   const redrawn = async (before: number) => {
     await expect.poll(() => draws).toBeGreaterThan(before);
@@ -100,6 +102,22 @@ test.describe('the studio locks a section (builder item 155)', () => {
     await expect.poll(() => (lastBlocks() || []).length).toBe(3);
     expect(lastBlocks()![0].lock).toEqual(LOCK(true));
     expect(lastBlocks()![1].lock).toBeUndefined();
+  });
+
+  test('a section low on the screen: More opens where every item can be pressed, above the phone’s dock', async ({ page }) => {
+    const { frame } = await mount(page, { studio: true });
+    await pick(page, frame, '#a');
+    await frame.locator('#dds-dc-bar .dc-b', { hasText: 'More' }).click();
+    const items = frame.locator('#dds-dc-more .dc-mi');
+    await expect(items.filter({ hasText: 'Lock this section' })).toBeVisible();
+    const vp = page.viewportSize()!;
+    const dock = await page.locator('#dcDock').boundingBox();
+    const floor = vp.width < 768 && dock ? dock.y : vp.height;   // on a phone the dock floats over the page's end
+    for (const it of await items.all()) {
+      const r = (await it.boundingBox())!;
+      expect(r.y).toBeGreaterThanOrEqual(0);
+      expect(r.y + r.height).toBeLessThanOrEqual(floor);
+    }
   });
 });
 
