@@ -49,6 +49,9 @@ const CONTROLS = [
   // sales item 108: the record's Billing tab carries the estimates and the recurring invoice too
   ['DELETE /sales/estimates/:id', 'crm.html', `apiAg('/sales/estimates/'+b.getAttribute('data-del-est'),'DELETE')`, ['data-del-est="${esc(e.id)}" data-needs="delete"']],
   ['POST /sales/recurring/:id/stop', 'crm.html', `apiAg('/sales/recurring/'+id+'/'+verb,'POST',{})`, ['data-rec-stop="${esc(s.id)}" data-needs="delete"']],
+  // sales item 77: Undo a payment recorded by mistake changes the books, like a void
+  ['POST /sales/invoices/:id/payment/undo', 'crm.html', `apiAg('/sales/invoices/'+encodeURIComponent(id)+'/payment/undo','POST',{})`, ['data-undo-pay="${esc(v.id)}" data-needs="delete"']],
+  ['POST /sales/invoices/:id/payment/undo', 'pipeline.html', `api('/sales/invoices/'+b.dataset.undoPay+'/payment/undo','POST',{})`, ['data-needs="delete" data-undo-pay="${v.id}"']],
   // the content path answers from contentWriteNeeds
   ['DELETE /offerings/:id', 'presence.html', 'api("DELETE", `/offerings/${o.id}`)', ['data-act="del" data-needs="delete"']],
   ['DELETE /faqs/:id', 'presence.html', 'api("DELETE", `/${collection}/${entity.id}`)', ['data-act="del" data-needs="delete"']],
@@ -98,7 +101,7 @@ const SOURCE = Object.fromEntries(PAGES.map((p) => [p, read(p)]));
   ok('the row delete and the card delete on Contacts both carry the mark', count(SOURCE['contacts.html'], 'data-needs="delete" data-del=') === 2);
   ok('the three builder "Remove for good" buttons all carry the mark', count(SOURCE['presence.html'], 'data-act="del" data-needs="delete"') === 3 && !SOURCE['presence.html'].includes('data-act="del">'));
   ok('both saved-template lists carry the mark', count(SOURCE['pipeline.html'], 'data-needs="delete" data-del-tpl=') === 2);
-  ok('no unmarked Void or template remove is left on the deal page', !/<button class="btn ghost( sm)?" data-(void-inv|del-tpl|del-prop|del-con|del-est|rec-stop)=/.test(SOURCE['pipeline.html']));
+  ok('no unmarked Void or template remove is left on the deal page', !/<button class="btn ghost( sm)?" data-(void-inv|del-tpl|del-prop|del-con|del-est|rec-stop|undo-pay)=/.test(SOURCE['pipeline.html']));
   ok('the recurring invoice\'s Stop is the one marked action in its row (Skip, Change, Pause and Resume are edit)', count(SOURCE['pipeline.html'], 'data-needs="delete" data-rec-stop=') === 1 && !/data-needs="delete" data-rec-(skip|change|pause|resume)=/.test(SOURCE['pipeline.html']));
 }
 
@@ -107,7 +110,7 @@ const SOURCE = Object.fromEntries(PAGES.map((p) => [p, read(p)]));
   const decided = read('tests/presence/member_capability_test.mjs');
   const listed = (name) => [...decided.split('const DECIDED = {')[1].split(`\n  ${name}: [`)[1].split('\n  ],')[0].matchAll(/'((?:DELETE|POST|PUT|PATCH) [^']+)'/g)].map((m) => m[1]);
   const routes = [...listed('delete'), ...listed('configure')];
-  ok('the decided delete and configure lists were read', routes.length === 37, String(routes.length));   // item 47 added two; item 104 took away the seven DNS document and zone writes; item 58 added two; item 112 added the prospect delete; item 115 added the Google review link; item 175 the visitor password
+  ok('the decided delete and configure lists were read', routes.length === 38, String(routes.length));   // item 47 added two; item 104 took away the seven DNS document and zone writes; item 58 added two; item 112 added the prospect delete; item 115 added the Google review link; item 175 the visitor password; item 77 the payment undo
   const covered = new Set(CONTROLS.map(([r]) => r));
   const open = routes.filter((r) => !covered.has(r) && !NO_CONTROL[r]);
   ok('every decided delete and configure route is accounted for here', open.length === 0, open.join(', '));
