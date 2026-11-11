@@ -557,11 +557,16 @@ function submitReportCard() {
       // 1-page report card. No automated report is generated here — the copy
       // above and the email set that expectation honestly ("usually within one
       // business day"). Best-effort; the on-screen confirmation already showed.
-      fetch('https://qksstlqzbhesadrrofgn.supabase.co/functions/v1/clever-api', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ type: 'report_card', name: name, businessType: type, email: email, city: city, url: url, page: location.href, referrer: document.referrer || '' })
-      }).catch(function(){});
+      // Bug hunt H11 (Nov 10): it was sent once and forgotten; a failure left the request
+      // only in the email. It now outlives the page closing (keepalive) and is tried once more.
+      var crm = function () {
+        return fetch('https://qksstlqzbhesadrrofgn.supabase.co/functions/v1/clever-api', {
+          method: 'POST', keepalive: true,
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ type: 'report_card', name: name, businessType: type, email: email, city: city, url: url, page: location.href, referrer: document.referrer || '' })
+        }).then(function (r) { if (!r.ok) throw new Error('crm ' + r.status); });
+      };
+      crm().catch(function () { setTimeout(function () { crm().catch(function () {}); }, 2000); });
 
     } else {
       showRcError('Something went wrong. Please try again or email eric@davisdigitalstudio.com directly.');
@@ -575,6 +580,11 @@ function submitReportCard() {
     btn.textContent = 'Send my free report card →';
   });
 }
+
+// Bug hunt H11: Enter in a field sends the request, as in any form (the fields sit in a plain box, not a <form>)
+document.getElementById('rcForm').addEventListener('keydown', function (e) {
+  if (e.key === 'Enter' && e.target && e.target.tagName === 'INPUT' && !document.getElementById('rcSubmit').disabled) { e.preventDefault(); submitReportCard(); }
+});
 
 function showRcError(msg) {
   var err = document.getElementById('rcError');

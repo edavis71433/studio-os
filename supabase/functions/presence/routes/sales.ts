@@ -53,6 +53,7 @@ import { summarizeAttachments, attachmentWarning, duplicateHints, listSentence }
 import type { SiteRow } from '../lib/site.ts';
 import type { Principal } from '../../_shared/auth.ts';
 import { UUID_RE } from '../lib/uuid.ts';
+import { readCloseDates } from '../lib/deal_closes.ts';
 import { reopenEnquiry } from '../lib/enquiry_state.ts';
 import { normEmail, emailMatch, isUniqueViolation } from '../lib/contact_email.ts';   // item 110 (K1): one person, one email, whatever its capitals
 import { contactMoreFrom, cleanTag, CONTACT_MORE_COLS } from '../lib/contact_fields.ts';   // item 89: address, job title, second phone, tags
@@ -864,15 +865,8 @@ export async function handleSalesReports(_req: Request, site: SiteRow, _principa
   // F5 (final pass): when each closed deal actually closed — its newest move into
   // Won or Not a fit — so a later edit can't pull an old deal into the window.
   // Chunks run side by side; a failed read marks the report partial, never wrong.
-  const outcomeOf = (d: any) => (d.converted_client_id || d.stage === 'won') ? 'won' : (d.stage === 'lost' ? 'lost' : '');
-  const closed = deals.filter((d: any) => outcomeOf(d) && UUID_RE.test(String(d.id)));
-  const closedAt: Record<string, string> = {};
-  const chunks: string[][] = [];
-  for (let i = 0; i < closed.length; i += 100) chunks.push(closed.slice(i, i + 100).map((d: any) => String(d.id)));
-  const outcome = new Map(closed.map((d: any) => [String(d.id), outcomeOf(d)]));
-  for (const ev of await Promise.all(chunks.map((ids) => read('closes', `presence_deal_events?site_id=eq.${site.id}&kind=in.(stage_change,converted)&to_stage=in.(won,lost)&deal_id=in.(${ids.join(',')})&select=deal_id,to_stage,created_at&order=created_at.desc&limit=2000`)))) {
-    for (const e of ev) { const k = String(e.deal_id); if (!closedAt[k] && String(e.to_stage) === outcome.get(k)) closedAt[k] = String(e.created_at); }
-  }
+  // Bug hunt H1: one reader, shared with the dashboard's tiles (lib/deal_closes.ts)
+  const { closedAt } = await readCloseDates(deals, `site_id=eq.${site.id}`, (path) => read('closes', path));
   const becameDeal = new Set<string>(deals.map((d: any) => String(d.source_submission_id || '')).filter(Boolean));
   const dealsOff = failed.has('deals');   // the pipeline and won/lost reports both stand on the deals read
   return json({ data: {

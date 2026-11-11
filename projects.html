@@ -413,6 +413,7 @@ async function resolveScopedClient(){
     const r=await fetch(FN+'/studio/customers',{headers:{...H(),'x-dds-scope-site':''}});
     const b=await r.json().catch(()=>({}));
     const rows=Array.isArray(b&&b.data)?b.data:[];
+    if(r.ok)takeCustomers(rows);   // H9: the same roster names the customers, so it isn't asked for twice
     const hit=rows.find(c=>c&&String(c.customer_site_id||'')===site&&c.client_id);
     return hit?{client_id:String(hit.client_id),name:String(hit.name||'')}:null;
   }catch(_){return null;}
@@ -454,7 +455,12 @@ const debounce=(fn,ms)=>{let t;return function(){clearTimeout(t);t=setTimeout(fn
 const REPORTS={};          // project id → report summary (progress/approvals), fetched lazily
 let CUSTMAP=null;          // client_id → customer name (studio only), fetched once
 let CUSTPERSON={};         // client_id → the person there ("Waiting on Ivy"), from the same read
+let CUSTROWS=[];           // the roster itself: + New project's customer list (bug hunt H2)
 let CUSTTRIED=false;
+function takeCustomers(rows){
+  const map={},person={}; (rows||[]).forEach(c=>{if(c&&c.client_id&&c.name)map[c.client_id]=c.name;if(c&&c.client_id&&c.person_name)person[c.client_id]=String(c.person_name);});
+  CUSTMAP=map; CUSTPERSON=person; CUSTROWS=(rows||[]).filter(c=>c&&c.client_id); CUSTTRIED=true;
+}
 const updatedLabel=()=>{if(!LOADED_AT)return 'Couldn’t load just now';const m=Math.floor((Date.now()-LOADED_AT)/60000);return m<1?'Updated just now':'Updated '+m+' min ago';};
 
 // Board · List · Calendar, persisted. Bold redesign (Nov 2026): the board is the
@@ -775,7 +781,7 @@ function renderRosterKeepFocus(){
 
 function wireRoster(){
   // refresh (soft: a failed refresh toasts and keeps the list) + focus-return
-  const rf=$('refreshBtn'); if(rf)rf.addEventListener('click',()=>load(true).then(()=>{const nr=$('refreshBtn');if(nr)nr.focus();}).catch(()=>toast('Couldn’t refresh just now.',true)));
+  const rf=$('refreshBtn'); if(rf)rf.addEventListener('click',()=>{CUST_STALE=true;return load(true).then(()=>{const nr=$('refreshBtn');if(nr)nr.focus();}).catch(()=>toast('Couldn’t refresh just now.',true));});   // H9: the customer roster is read again too
   [['dispBoard','board'],['dispTable','table'],['dispCal','cal']].forEach(([id,v])=>{const b=$(id);if(b)b.addEventListener('click',()=>{if(DISPLAY!==v){setDisplay(v);const nb=$(id);if(nb)nb.focus();}});});
   const np=$('newProject'); if(np)np.addEventListener('click',openNew);
   // the calendar's month: ‹ › step it, "This month" comes home (focus stays on the arrow pressed)
@@ -849,13 +855,14 @@ async function load(soft){
 
 // customer names come from the existing /studio/customers roster route (studio
 // only) — one cached fetch; a failure degrades to "—", never an error state.
+// CUST_STALE (H9): Refresh asks again; the names in hand stay until the new ones land.
+let CUST_STALE=false;
 async function ensureCustomers(){
-  if(!STUDIO||CUSTMAP||CUSTTRIED)return false;
-  CUSTTRIED=true;
+  if(!STUDIO||(!CUST_STALE&&(CUSTMAP||CUSTTRIED)))return false;
+  CUSTTRIED=true; CUST_STALE=false;
   try{
     const r=await api('/studio/customers');
-    const map={},person={}; (r.data||[]).forEach(c=>{if(c.client_id&&c.name)map[c.client_id]=c.name;if(c.client_id&&c.person_name)person[c.client_id]=String(c.person_name);});
-    CUSTMAP=map; CUSTPERSON=person; return true;
+    takeCustomers(r.data||[]); return true;
   }catch(_){return false;}
 }
 // the Progress + Open approvals columns, for the rows the roster actually SHOWS (search
@@ -883,14 +890,18 @@ async function ensureReports(again){   // again: a refresh, so ask for the ones 
   return changed;
 }
 
+// + New project's customer list (bug hunt H2, H9): every customer on the studio's books, from the
+// roster this page already reads for their names. It was built from the pipeline's list, which
+// stops at the 25 deals touched last, so an older customer couldn't be picked and their project
+// never reached their portal; and it was read once and pinned, so a customer converted while the
+// page was open never showed. Built afresh each time the dialog opens; Refresh reads the roster again.
 async function loadCustomerOptions(){
-  const sel=$('np-customer'); if(!sel||sel.dataset.loaded)return;
-  try{ const r=await api('/sales/deals'); const deals=(r.data||[]).filter(d=>d.converted_client_id);
-    // de-dupe by customer (a customer may have several deals); newest title wins
-    const seen={}; deals.forEach(d=>{ if(!seen[d.converted_client_id]) seen[d.converted_client_id]=d.title||'Customer'; });
-    const opts=Object.keys(seen).map(cid=>`<option value="${esc(cid)}">${esc(seen[cid])}</option>`).join('');
-    sel.innerHTML='<option value="">Just my studio (internal)</option>'+opts; sel.dataset.loaded='1';
-  }catch(_){/* picker is optional — a manual internal project still works */}
+  const sel=$('np-customer'); if(!sel)return;
+  await ensureCustomers();
+  const keep=sel.value;
+  const rows=CUSTROWS.slice().sort((a,b)=>String(a.name||'').localeCompare(String(b.name||'')));
+  sel.innerHTML='<option value="">Just my studio (internal)</option>'+rows.map(c=>`<option value="${esc(c.client_id)}">${esc(c.name||'Customer')}</option>`).join('');
+  if(keep&&rows.some(c=>String(c.client_id)===keep))sel.value=keep;
 }
 function openNew(){ $('np-name').value='';$('np-desc').value='';$('np-target').value='';if($('np-customer'))$('np-customer').value='';if($('np-template'))$('np-template').value=''; $('newDlg').showModal(); loadCustomerOptions(); setTimeout(()=>$('np-name').focus(),20); }
 $('np-cancel').onclick=()=>$('newDlg').close();
@@ -978,8 +989,8 @@ function stepPicker(host,id,steps){
     // A 409 means someone (another tab, or the SQL backfill) added one of these
     // between the page's read and this write. Say what happened and re-open the
     // record so the card shows where the project ACTUALLY stands.
-    try{const r=await api('/projects/'+id+'/checklist','POST',{keys});toast(addedMsg(r));openProject(id);}
-    catch(err){toast(nice(err),true);openProject(id);}
+    try{const r=await api('/projects/'+id+'/checklist','POST',{keys});toast(addedMsg(r));openProject(id,{keepSides:true});}
+    catch(err){toast(nice(err),true);openProject(id,{keepSides:true});}
   };
   setTimeout(()=>{const first=f.querySelector('input[data-step]:not([disabled])')||f.querySelector('button');if(first)first.focus();},20);
 }
@@ -1010,6 +1021,28 @@ function closeProjectDetail(){
 // another record's data into the current one (the real cross-record stale-paint
 // bug this fixes).
 let PROJ_SEQ=0;
+// Bug hunt H8 (Nov 10): an action on the open record (a task ticked or moved, the status, a
+// rename, a milestone, an approval, a file) reads the record and its report again, and only
+// those. The side lists (messages, surveys, support requests, general messages) were read
+// again each time, the studio's support list included: nine reads for one tick. They now stay
+// as they are, with anything typed in them; one that hadn't finished loading is read again.
+const SIDES={messages:['msgList','msgForm'],surveys:['svList'],support:['supList'],general:['genHead','genList']};
+let SIDES_DONE=new Set(),SIDES_FOR='';
+const sideDone=(id,name)=>{if(SIDES_FOR===id)SIDES_DONE.add(name);};
+function takeSides(){
+  const kept={};
+  for(const [name,ids] of Object.entries(SIDES)){
+    if(!SIDES_DONE.has(name))continue;
+    if(ids.some((x)=>{const el=$(x);return !!(el&&el.querySelector('[data-supback]'));}))continue;   // a conversation open in it: read afresh
+    const parts={};
+    for(const x of ids){const el=$(x);if(!el)continue;const f=document.createDocumentFragment();while(el.firstChild)f.appendChild(el.firstChild);parts[x]={f,cls:el.className};}
+    kept[name]=parts;
+  }
+  return kept;
+}
+function putSides(kept){
+  for(const parts of Object.values(kept))for(const [x,p] of Object.entries(parts)){const el=$(x);if(!el)continue;el.textContent='';el.appendChild(p.f);el.className=p.cls;}
+}
 // C2 search wiring — the input is static page skeleton; renderRoster rebuilds
 // only #lhead + #list, so typing never disturbs the input node or its caret.
 const qInput=$('q');
@@ -1036,13 +1069,18 @@ function pathHtml(milestones){
   return `<div class="pathcard"><div class="pathrow"><ol class="path" aria-label="Milestones">${steps}</ol><div class="path-side">${side}</div></div></div>`;
 }
 
-async function openProject(id){
+async function openProject(id,opts){
   const seq=++PROJ_SEQ;   // this record is now the ONLY one allowed to paint
   history.replaceState(null,'','?project='+id+(scope()?'&client='+scope():''));
   // a11y: in-view actions re-open the same project to refresh. Remember whether the
   // record was already showing so we can restore keyboard focus after the re-render.
   const wasOpen=!$('detailWrap').hidden;
-  $('detailInner').innerHTML='<div class="rsec"><div class="dds-skeleton" style="height:16px;width:60%"></div></div>'; showDetail();
+  const again=!!(opts&&opts.keepSides&&wasOpen&&SIDES_FOR===id);   // H8: an action on this record: it stays on screen meanwhile
+  if(!again){$('detailInner').innerHTML='<div class="rsec"><div class="dds-skeleton" style="height:16px;width:60%"></div></div>'; showDetail();}
+  const reopen=()=>openProject(id,{keepSides:true});
+  // H11: a status, task or milestone button stays off while its press is on its way (a second
+  // press used to send again, and its refusal said "didn't go through" after a success)
+  const once=(b,fn)=>async()=>{if(b.disabled)return;b.disabled=true;try{await fn();}catch(e){toast(nice(e),true);if(b.isConnected)b.disabled=false;}};
   try{
     const td='?today='+todayYmd();   // C11: overdue on the studio's own day, not the server's UTC one
     const [{data},rep]=await Promise.all([api('/projects/'+id+td),api('/projects/'+id+'/report'+td).catch(()=>null)]);
@@ -1131,6 +1169,8 @@ async function openProject(id){
     }).join('')||'<div class="empty">No files yet — share the first deliverable.</div>';
     const ap=(data.approvals||[]).map(a=>`<div class="item"><div class="t">${esc(a.title)} <span class="tag">${esc(a.status)}</span>${approvalOverdue(a)?'<span class="tag overdue">overdue</span>':''}${(a.status==='pending'&&a.due_date)?`<span class="s">due ${esc(niceDay(a.due_date))}</span>`:''}</div>${(!STUDIO&&a.status==='pending')?`<div class="row2" style="margin-top:0"><button class="btn sm" data-approve="${a.id}" data-hash="${esc(a.content_hash)}" data-dec="approved">Approve</button><button class="btn ghost sm" data-approve="${a.id}" data-hash="${esc(a.content_hash)}" data-dec="changes_requested">Changes</button></div>`:''}</div>`).join('')||'<div class="empty">Nothing waiting on an approval — request one when work is ready to review.</div>';
 
+    const kept=again?takeSides():null;   // H8: the side lists as they stand, before the record is drawn again
+    if(!kept){SIDES_DONE=new Set();SIDES_FOR=id;}
     $('detailInner').innerHTML=`
       <nav class="crumbs" aria-label="Breadcrumb"><button class="crumb" id="closeDetail">Projects</button><span aria-hidden="true">›</span><span aria-current="page">${esc(p.name)}</span></nav>
       <div class="rhead">
@@ -1183,18 +1223,18 @@ async function openProject(id){
       });
     }
     // status transitions (the bounded P_NEXT ladder, server re-checked)
-    $('detailInner').querySelectorAll('[data-pstatus]').forEach(b=>b.onclick=async()=>{try{await api('/projects/'+id+'/status','POST',{to:b.dataset.pstatus});toast('Status updated');openProject(id);}catch(e){toast(nice(e),true);}});
+    $('detailInner').querySelectorAll('[data-pstatus]').forEach(b=>b.onclick=once(b,async()=>{await api('/projects/'+id+'/status','POST',{to:b.dataset.pstatus});toast('Status updated');reopen();}));
 
     // rename the project (studio only) — wires the existing PATCH /projects/:id
     if(STUDIO&&$('renameProj'))$('renameProj').onclick=()=>{
       const dt=$('dtitle');
       dt.innerHTML=`<input id="renInput" value="${esc(p.name||'')}" aria-label="Project name" style="font:inherit;font-family:var(--serif);font-size:24px;width:100%;box-sizing:border-box;border:1px solid var(--line);border-radius:8px;padding:4px 8px"><div class="row2" style="margin-top:8px"><button class="btn sm" id="renSave">Save</button><button class="btn ghost sm" id="renCancel">Cancel</button></div>`;
       const inp=$('renInput');if(inp)inp.focus();
-      $('renCancel').onclick=()=>openProject(id);
-      $('renSave').onclick=async()=>{const v=($('renInput').value||'').trim();if(!v){toast('Give the project a name.');return;}try{await api('/projects/'+id,'PATCH',{name:v});toast('Renamed');openProject(id);}catch(e){toast(nice(e),true);}};
+      $('renCancel').onclick=()=>reopen();
+      $('renSave').onclick=once($('renSave'),async()=>{const v=($('renInput').value||'').trim();if(!v){toast('Give the project a name.');$('renSave').disabled=false;return;}await api('/projects/'+id,'PATCH',{name:v});toast('Renamed');reopen();});
     };
     // + Task (highlights action) opens the same add form as the Tasks card
-    const taskForm=()=>miniForm($('tsForm'),[{name:'title',label:'Task title'},{name:'due_date',label:'Due date (optional)',type:'date'},{name:'client_action_required',label:'Needs the client to act (shares it with them)',type:'checkbox'}],async v=>{await api('/projects/'+id+'/tasks','POST',{title:v.title,due_date:v.due_date||undefined,client_action_required:!!v.client_action_required});openProject(id);});
+    const taskForm=()=>miniForm($('tsForm'),[{name:'title',label:'Task title'},{name:'due_date',label:'Due date (optional)',type:'date'},{name:'client_action_required',label:'Needs the client to act (shares it with them)',type:'checkbox'}],async v=>{await api('/projects/'+id+'/tasks','POST',{title:v.title,due_date:v.due_date||undefined,client_action_required:!!v.client_action_required});reopen();});
     if($('addTask'))$('addTask').onclick=taskForm;
     if($('quickTask'))$('quickTask').onclick=()=>{taskForm();const f=$('tsForm');if(f)f.scrollIntoView({block:'center'});};
     // + Standard step → the picker, in the SAME host as the free-text form, so
@@ -1203,31 +1243,33 @@ async function openProject(id){
     if($('addStep'))$('addStep').onclick=()=>{stepPicker($('tsForm'),id,CHK);const f=$('tsForm');if(f)f.scrollIntoView({block:'nearest'});};
     if($('addAllSteps'))$('addAllSteps').onclick=async()=>{
       const b=$('addAllSteps'); b.disabled=true;
-      try{const r=await api('/projects/'+id+'/checklist','POST',{all:true});toast(addedMsg(r));openProject(id);}
-      catch(e){toast(nice(e),true);openProject(id);}   // a race → show the truth
+      try{const r=await api('/projects/'+id+'/checklist','POST',{all:true});toast(addedMsg(r));reopen();}
+      catch(e){toast(nice(e),true);reopen();}   // a race → show the truth
     };
     // milestones
-    if($('addMs'))$('addMs').onclick=()=>miniForm($('msForm'),[{name:'title',label:'Milestone title'},{name:'due_date',label:'Due date (optional)',type:'date'}],async v=>{await api('/projects/'+id+'/milestones','POST',{title:v.title,due_date:v.due_date||undefined});openProject(id);});
-    const mdone=async(mid)=>{try{await api('/projects/'+id+'/milestones/'+mid,'PATCH',{status:'complete'});toast('Milestone complete');openProject(id);}catch(e){toast(nice(e),true);}};
-    $('detailInner').querySelectorAll('[data-mdone]').forEach(b=>b.onclick=()=>mdone(b.dataset.mdone));
-    const mc=$('msComplete'); if(mc)mc.onclick=()=>mdone(mc.dataset.ms);   // the Path action = the current milestone
+    if($('addMs'))$('addMs').onclick=()=>miniForm($('msForm'),[{name:'title',label:'Milestone title'},{name:'due_date',label:'Due date (optional)',type:'date'}],async v=>{await api('/projects/'+id+'/milestones','POST',{title:v.title,due_date:v.due_date||undefined});reopen();});
+    const mdone=async(mid)=>{await api('/projects/'+id+'/milestones/'+mid,'PATCH',{status:'complete'});toast('Milestone complete');reopen();};
+    $('detailInner').querySelectorAll('[data-mdone]').forEach(b=>b.onclick=once(b,()=>mdone(b.dataset.mdone)));
+    const mc=$('msComplete'); if(mc)mc.onclick=once(mc,()=>mdone(mc.dataset.ms));   // the Path action = the current milestone
     // tasks: checkbox toggles done ⇄ todo (the ladder's legal moves); the small
     // buttons carry the other transitions (in progress / blocked / back)
-    $('detailInner').querySelectorAll('[data-tdone]').forEach(cb=>cb.onchange=async()=>{cb.disabled=true;try{await api('/projects/'+id+'/tasks/'+cb.dataset.tdone,'PATCH',{status:cb.checked?'done':'todo'});openProject(id);}catch(e){toast(nice(e),true);cb.checked=!cb.checked;cb.disabled=false;}});
-    $('detailInner').querySelectorAll('[data-task]').forEach(b=>b.onclick=async()=>{try{await api('/projects/'+id+'/tasks/'+b.dataset.task,'PATCH',{status:b.dataset.to});openProject(id);}catch(e){toast(nice(e),true);}});
+    $('detailInner').querySelectorAll('[data-tdone]').forEach(cb=>cb.onchange=async()=>{cb.disabled=true;try{await api('/projects/'+id+'/tasks/'+cb.dataset.tdone,'PATCH',{status:cb.checked?'done':'todo'});reopen();}catch(e){toast(nice(e),true);cb.checked=!cb.checked;cb.disabled=false;}});
+    $('detailInner').querySelectorAll('[data-task]').forEach(b=>b.onclick=once(b,async()=>{await api('/projects/'+id+'/tasks/'+b.dataset.task,'PATCH',{status:b.dataset.to});reopen();}));
     // deliverables
     if($('addFile'))$('addFile').onclick=()=>shareFile(id);
     $('detailInner').querySelectorAll('[data-dl]').forEach(b=>b.onclick=async()=>{try{const r=await api('/projects/'+id+'/deliverables/'+b.dataset.dl+'/download');window.open(r.data.url,'_blank','noopener');}catch(e){toast(nice(e),true);}});
     // approvals
-    if($('addAppr'))$('addAppr').onclick=()=>miniForm($('apForm'),[{name:'title',label:'What needs approval?'},{name:'summary',label:'Details (optional)',type:'textarea'},{name:'due_date',label:'Answer by (optional)',type:'date'}],async v=>{await api('/projects/'+id+'/approvals','POST',{subject_type:'project',subject_id:id,title:v.title,summary:v.summary,due_date:v.due_date||undefined});openProject(id);});
+    if($('addAppr'))$('addAppr').onclick=()=>miniForm($('apForm'),[{name:'title',label:'What needs approval?'},{name:'summary',label:'Details (optional)',type:'textarea'},{name:'due_date',label:'Answer by (optional)',type:'date'}],async v=>{await api('/projects/'+id+'/approvals','POST',{subject_type:'project',subject_id:id,title:v.title,summary:v.summary,due_date:v.due_date||undefined});reopen();});
     // audit change 8: ask the client to approve ONE file — subject_type
     // 'deliverable' binds the decision to that file's exact version; the title
     // defaults to the file's; the date is what the reminders chase.
     $('detailInner').querySelectorAll('[data-ask]').forEach(b=>b.onclick=()=>askApproval(id,b.dataset.ask,b.dataset.asktitle||''));
-    $('detailInner').querySelectorAll('[data-approve]').forEach(b=>b.onclick=async()=>{try{await api('/approvals/'+b.dataset.approve+'/decide','POST',{decision:b.dataset.dec,presented_hash:b.dataset.hash});toast('Decision recorded');openProject(id);}catch(e){toast(nice(e),true);}});
+    $('detailInner').querySelectorAll('[data-approve]').forEach(b=>b.onclick=once(b,async()=>{await api('/approvals/'+b.dataset.approve+'/decide','POST',{decision:b.dataset.dec,presented_hash:b.dataset.hash});toast('Decision recorded');reopen();}));
     // surveys + support (studio triage/review)
     if($('addSurvey'))$('addSurvey').onclick=()=>miniForm($('svForm'),[{name:'title',label:'Survey title'},{name:'q',label:'A question to ask'}],async v=>{await api('/projects/'+id+'/surveys','POST',{title:v.title,questions:[{label:v.q||'Your feedback',type:'text'}]});loadSurveys(id);});
-    loadMessages(id); if(STUDIO){loadSurveys(id);loadSupport(id);loadClientGeneral(id);}
+    if(kept)putSides(kept);   // H8: kept as they were; only a list still loading is read again
+    if(!(kept&&kept.messages))loadMessages(id);
+    if(STUDIO){if(!(kept&&kept.surveys))loadSurveys(id);if(!(kept&&kept.support))loadSupport(id);if(!(kept&&kept.general))loadClientGeneral(id);}
     // a11y: the re-render replaced whatever control had focus — land on the title
     if(wasOpen){const t=$('dtitle');if(t)t.focus();}
   }catch(e){ $('detailInner').innerHTML='<div class="rsec"><p class="mut">'+esc(nice(e))+'</p><p style="margin-top:10px"><button class="btn ghost sm" onclick="closeProjectDetail()">← Back to projects</button></p></div>'; }
@@ -1239,7 +1281,7 @@ async function openProject(id){
 // due_date only when given (the reminders key off it).
 function askApproval(id,did,title){
   miniForm($('dlForm'),[{name:'title',label:'What needs approval?',value:title},{name:'summary',label:'A note for them (optional)',type:'textarea'},{name:'due_date',label:'Answer by (optional)',type:'date'}],async v=>{
-    await postDeliverableApproval(id,did,v.title||title,v.summary,v.due_date); toast('Approval requested'); openProject(id); });
+    await postDeliverableApproval(id,did,v.title||title,v.summary,v.due_date); toast('Approval requested'); openProject(id,{keepSides:true}); });
 }
 function postDeliverableApproval(id,did,title,summary,due){
   const body={subject_type:'deliverable',subject_id:did,title:title||undefined,summary:summary||undefined};
@@ -1250,8 +1292,12 @@ async function shareFile(id){
   const host=$('dlForm');
   miniForm(host,[{name:'title',label:'File name'},{name:'file',label:'Choose a file',type:'file'},{name:'ask',label:'Ask them to approve it',type:'checkbox'},{name:'due_date',label:'Answer by (optional — only when asking)',type:'date'}],async()=>{});
   const fileInput=host.querySelector('#mf-file'); const titleInput=host.querySelector('#mf-title'); const askBox=host.querySelector('#mf-ask'); const dueInput=host.querySelector('#mf-due_date');
-  host.querySelector('form').onsubmit=async(e)=>{e.preventDefault();const file=fileInput.files&&fileInput.files[0];if(!file){toast('Pick a file first.',true);return;}
+  // bug hunt H4 (Nov 10): this handler replaces miniForm's, so it keeps Save off while the file
+  // goes up itself; a second press used to upload and share the file twice (and ask twice)
+  const save=host.querySelector('form button[type="submit"]');
+  host.querySelector('form').onsubmit=async(e)=>{e.preventDefault();if(save&&save.disabled)return;const file=fileInput.files&&fileInput.files[0];if(!file){toast('Pick a file first.',true);return;}
     const title=titleInput.value.trim()||file.name;
+    if(save)save.disabled=true;
     try{ const up=await api('/projects/'+id+'/deliverables/upload-url','POST',{mime:file.type,bytes:file.size,title});
       const put=await fetch(up.data.upload_url,{method:'PUT',headers:{'Content-Type':file.type,'x-upsert':'true'},body:file}); if(!put.ok)throw new Error('Upload failed.');
       const made=await api('/projects/'+id+'/deliverables','POST',{media_id:up.data.media_id,title,status:'shared'});
@@ -1261,8 +1307,8 @@ async function shareFile(id){
         try{ await postDeliverableApproval(id,made.data.id,title,'',dueInput?dueInput.value:''); toast('File shared — approval requested'); }
         catch(err){ toast('File shared, but the approval request didn’t go through — ask from the file’s row.',true); }
       } else toast('File shared');
-      openProject(id);
-    }catch(err){ toast(nice(err),true); } };
+      openProject(id,{keepSides:true});
+    }catch(err){ toast(nice(err),true); if(save)save.disabled=false; } };
 }
 
 async function loadMessages(id){
@@ -1277,7 +1323,8 @@ async function loadMessages(id){
     host.innerHTML=`<form class="mini"><label for="mm-body-${id}">Message</label><textarea id="mm-body-${id}" data-dds-draft="1" placeholder="Write a message…"></textarea>${STUDIO?'<label class="chk"><input type="checkbox" id="mm-internal"> Internal note (not shown to the client)</label>':''}<div class="row2" style="justify-content:flex-end"><button class="btn ghost sm" type="submit">Send</button></div></form>`;   // outlined — Mark milestone complete is the record's one filled button (experience review #4)
     const ta=host.querySelector('textarea');
     if(window.ddsDraftRestore)window.ddsDraftRestore(ta);
-    host.querySelector('form').onsubmit=async(e)=>{e.preventDefault();const body=ta.value.trim();if(!body)return;const internal=host.querySelector('#mm-internal');try{await api('/projects/'+id+'/messages','POST',{body,audience:(internal&&internal.checked)?'internal':'client'});if(window.ddsDraftClear)window.ddsDraftClear(ta);loadMessages(id);}catch(err){toast(nice(err),true);}};
+    host.querySelector('form').onsubmit=async(e)=>{e.preventDefault();const body=ta.value.trim();if(!body)return;const internal=e.currentTarget.querySelector('#mm-internal');try{await api('/projects/'+id+'/messages','POST',{body,audience:(internal&&internal.checked)?'internal':'client'});if(window.ddsDraftClear)window.ddsDraftClear(ta);loadMessages(id);}catch(err){toast(nice(err),true);}};
+    sideDone(id,'messages');
   }catch(e){ $('msgList').innerHTML='<div class="empty">Couldn’t load messages.</div>'; }
 }
 async function loadSurveys(id){
@@ -1288,6 +1335,7 @@ async function loadSurveys(id){
     const items=data||[];
     $('svList').innerHTML=items.length?items.map(s=>`<div class="item"><div class="t">${esc(s.title)} <span class="tag">${esc(s.status)}</span></div><button class="btn ghost sm" data-sv="${s.id}">Responses</button></div>`).join(''):'<div class="empty">No surveys yet — <button class="linkbtn" id="emptySurvey">send a check-in →</button></div>';
     const es=$('emptySurvey'); if(es&&$('addSurvey'))es.onclick=()=>$('addSurvey').click();
+    sideDone(id,'surveys');
     $('svList').querySelectorAll('[data-sv]').forEach(b=>b.onclick=async()=>{try{const r=await api('/surveys/'+b.dataset.sv);const resp=(r.data&&r.data.responses)||[];const box=b.closest('.item');const ex=box.querySelector('.resp');if(ex){ex.remove();return;}const d=document.createElement('div');d.className='resp mut';d.style.flexBasis='100%';d.innerHTML=resp.length?resp.map(x=>'<div>'+Object.values(x.answers||{}).map(esc).join(' · ')+'</div>').join(''):'No responses yet.';box.appendChild(d);}catch(e){toast(nice(e),true);}});
   }catch(e){ $('svList').innerHTML='<div class="empty">Couldn’t load surveys.</div>'; }
 }
@@ -1295,12 +1343,15 @@ const when=(iso)=>{const t=Date.parse(iso);if(!isFinite(t))return'';const s=Math
 async function loadSupport(id,focusRid){
   const seq=PROJ_SEQ;   // stale-guard: bail if another record took over meanwhile
   try{
-    const {data}=await api('/support');
+    // bug hunt H3 (Nov 10): this project's requests, asked for by project. The card read the
+    // studio's newest 25 requests and kept this project's, so an older one dropped off the card
+    const {data}=await api('/support?project_id='+encodeURIComponent(id)+'&limit=100');
     if(seq!==PROJ_SEQ)return;
-    const items=(data||[]).filter(r=>r.project_id===id);
+    const items=(data||[]).filter(r=>r.project_id===id);   // an older server ignores project_id
     $('supList').innerHTML=items.length?items.map(r=>`<div class="item"><div class="t">${esc(r.subject)} <span class="tag">${esc(r.status)}</span></div><div class="row2" style="margin-top:0"><button class="btn ghost sm" data-sopen="${r.id}">View &amp; reply</button>${(r.status!=='resolved'&&r.status!=='closed')?`<button class="btn ghost sm" data-res="${r.id}">Resolve</button>`:''}</div></div>`).join(''):'<div class="empty">No support requests for this project.</div>';
     $('supList').querySelectorAll('[data-res]').forEach(b=>b.onclick=async()=>{try{await api('/support/'+b.dataset.res,'PATCH',{status:'resolved'});toast('Resolved');loadSupport(id,b.dataset.res);}catch(e){toast(nice(e),true);}});
     $('supList').querySelectorAll('[data-sopen]').forEach(b=>b.onclick=()=>openStudioSupport(b.dataset.sopen,id));
+    sideDone(id,'support');
     // a11y: the list re-render dropped focus — return it to the same request (its
     // View & reply button survives resolving), or the record title if it's gone.
     if(focusRid){const el=$('supList').querySelector('[data-sopen="'+focusRid+'"]')||$('dtitle');if(el)el.focus();}
@@ -1347,9 +1398,10 @@ async function loadClientGeneral(id,focusRid){
     if(seq!==PROJ_SEQ)return;
     const items=data||[]; const nm=(customer&&customer.name)?customer.name:'';
     const head=$('genHead'); if(head)head.textContent='General messages'+(nm?' from '+nm:'');
+    sideDone(id,'general');
     if(!items.length){host.innerHTML='<div class="empty">'+(nm?('Nothing from '+esc(nm)+' outside this project yet. '):'')+'Anything this client sends that isn’t tied to a project shows up here.</div>';return;}
     host.innerHTML=items.map(r=>`<div class="item"><div class="t">${esc(r.subject||'Message')} <span class="tag">${esc(r.status)}</span></div><div class="row2" style="margin-top:0"><button class="btn ghost sm" data-gopen="${r.id}">View &amp; reply</button>${(r.status!=='resolved'&&r.status!=='closed')?`<button class="btn ghost sm" data-gres="${r.id}">Resolve</button>`:''}</div></div>`).join('');
-    host.querySelectorAll('[data-gopen]').forEach(b=>b.onclick=()=>openStudioSupport(b.dataset.gopen,id,{host,back:()=>loadClientGeneral(id,b.dataset.gopen)}));
+    host.querySelectorAll('[data-gopen]').forEach(b=>b.onclick=()=>openStudioSupport(b.dataset.gopen,id,{host:$('genList'),back:()=>loadClientGeneral(id,b.dataset.gopen)}));   // H8: the list as it is now (a kept list moved)
     host.querySelectorAll('[data-gres]').forEach(b=>b.onclick=async()=>{try{await api('/support/'+b.dataset.gres,'PATCH',{status:'resolved'});toast('Resolved');loadClientGeneral(id,b.dataset.gres);}catch(e){toast(nice(e),true);}});
     if(focusRid){const el=host.querySelector('[data-gopen="'+focusRid+'"]');if(el)el.focus();}
   }catch(e){ host.innerHTML='<div class="empty">Couldn’t load general messages.</div>'; }

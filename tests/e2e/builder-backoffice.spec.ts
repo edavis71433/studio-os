@@ -390,7 +390,7 @@ test.describe('Analytics page, from the Analytics tab', () => {
     await installApp(page, { api: { '/analytics/dashboard': DASH(HOSTED) } as never });
     await page.goto('/analytics.html?view=website');
     const t = page.locator('#pageTable');
-    await expect(t.locator('th')).toHaveText(['Page', 'Views', 'People', 'Google']);
+    await expect(t.locator('th')).toHaveText(['Page', 'Views', 'Visits', 'Google']);
     await expect(t.locator('tbody tr')).toHaveCount(3);
     await expect(t.locator('tbody tr').nth(1).locator('td')).toHaveText([/Menu/, '104', '88', '21']);
     await expect(t.locator('tbody tr').nth(0).locator('td').nth(3)).toHaveText('—');   // unknown, not zero
@@ -429,7 +429,7 @@ test.describe('Analytics page, from the Analytics tab', () => {
     }) } as never });
     await page.goto('/analytics.html?view=website');
     await expect(page.locator('svg.chart')).toHaveCount(0);
-    await expect(page.getByRole('heading', { name: 'Visitors over time' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Visits over time' })).toBeVisible();
   });
 
   test('scope: the view keeps the client on its calls and its way back', async ({ page }) => {
