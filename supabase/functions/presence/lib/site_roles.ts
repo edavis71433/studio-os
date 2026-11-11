@@ -119,7 +119,7 @@ const MEMBER_WRITES: Array<[MemberWriteNeed, string[]]> = [
     '(POST|DELETE) /foundations/domain',
     'POST /foundations/prepare',
     'POST /preview/settings',
-    'POST /site/(offline|online)',
+    'POST /site/(offline|online|password)',   // list item 175: a visitor password is a setting, like taking the site offline
     'PUT /bookings/settings',
     'PUT /sales/contacts/fields',
   ]],
@@ -157,6 +157,7 @@ const MEMBER_WRITES: Array<[MemberWriteNeed, string[]]> = [
     'POST /visibility/check',
     'POST /preview/(publish|share-link|section)',   // section: draws one unsaved section for the canvas, stores nothing
     'POST /publishes/checkpoints',
+    'POST /page-locks',   // builder items 48 and 120: a page's password, as editing the page's settings is
     `POST /publishes/checkpoints/${ID}/restore`,
     `POST /publishes/${ID}/label`,
     'POST /restore-to-draft',
@@ -184,7 +185,7 @@ const MEMBER_WRITES: Array<[MemberWriteNeed, string[]]> = [
     `POST /broadcasts/${ID}/test`,   // bold redesign: "Send me a test" — only ever to the member's own address, so edit, not publish
     'POST /sales/(contacts|customers|deals|templates)',
     'POST /sales/prospects(/discover)?',   // sales review item 112: find businesses, save the ticked ones
-    `POST /sales/prospects/${ID}/(convert|draft)`,   // item 112: start the deal; a draft only returns words — nothing sends
+    `POST /sales/prospects/${ID}/(convert|draft|pack)`,   // item 112: start the deal; a draft only returns words — nothing sends; item 113: pack builds a share link
     `PATCH /sales/prospects/${ID}`,
     `PATCH /sales/(contacts|deals|deal-tasks)/${ID}`,
     `POST /sales/contacts/${ID}/restore`,

@@ -72,7 +72,7 @@ const parses = (code) => { try { new Function(code); return true; } catch { retu
   const k1 = cfg.key, k2 = JSON.parse(popupTags({ ...p, scroll: 30 }, EP).match(/var C=(\{[^\n]*\});/)[1]).key, k3 = JSON.parse(popupTags({ ...p, heading: 'A new offer' }, EP).match(/var C=(\{[^\n]*\});/)[1]).key;
   ok('a closed pop-up stays closed while it says the same; new words show again', k1 === k2 && k1 !== k3);
   ok('a native dialog with a heading for its name and a Close button', tag.startsWith('<dialog id="ps-pop" class="ps-pop" aria-labelledby="ps-pop-h">') && tag.includes('<h2 id="ps-pop-h">10% off your first visit</h2>') && tag.includes('aria-label="Close"'));
-  ok('…it never opens over another dialog, and remembers a close, a button used and a sign-up anywhere on the site', tag.includes("if(document.querySelector('dialog[open]'))return;") && tag.includes("r.closed=Date.now()") && tag.includes("addEventListener('ps-sent'") && senderTag(EP).includes("new CustomEvent('ps-sent',{bubbles:true})"));
+  ok('…it never opens over another dialog or a cookie choice still waiting (list item 152), and remembers a close, a button used and a sign-up anywhere on the site', tag.includes("var cc=document.getElementById('presence-consent');if(document.querySelector('dialog[open]')||(cc&&!cc.hidden))return;") && tag.includes("r.closed=Date.now()") && tag.includes("addEventListener('ps-sent'") && senderTag(EP).includes("new CustomEvent('ps-sent',{bubbles:true})"));
   const hostile = popupTags(normalizePopup({ on: true, heading: '<img src=x onerror=alert(1)>', text: '</dialog><script>alert(1)</script>', action: 'buttons', buttons: [{ label: '"><script>x</script>', url: '/a/' }, { label: 'b', url: 'javascript:alert(1)' }] }), EP);
   ok('hostile words are only words; a hostile link is dropped', !/<img|<script>alert|<script>x/.test(hostile.replace(/<script>\(function[\s\S]*?<\/script>/g, '')) && !hostile.includes('javascript:') && (hostile.match(/class="btn/g) || []).length === 1);
 }
@@ -108,6 +108,23 @@ const parses = (code) => { try { new Function(code); return true; } catch { retu
   ok('editor: each form says the link that opens it from a button', ed.includes('"To open this form from any button or banner, give it the link #form-" + form.id'));
   const mig = read('supabase/migrations/0161_popup.sql'), pack = read('docs/presence/APPLY-0161-prod.sql');
   ok('migration 0161: one column, safe to run twice, the only 0161', [mig, pack].every((s) => s.includes('alter table public.presence_settings add column if not exists popup jsonb;')) && pack.includes('-- Check:') && [...Deno.readDirSync(new URL('supabase/migrations/', ROOT))].filter((e) => e.name.startsWith('0161_')).length === 1);
+}
+
+// ═══ the privacy page says what the pop-up keeps (after list item 138's rewrite) ═══
+{
+  const { privacyBody } = await import('../../supabase/functions/presence/lib/legal_pages.ts');
+  const facts = (settings) => ({ identity: { business_name: 'Marlow Salon', email: 'hello@salon.example' }, locations: [], settings: { blocks: [], pages: [], ...settings } });
+  const POP = { on: true, heading: '10% off', action: 'signup' };
+  const NOTE = 'your browser keeps a small note that you’ve seen it, so it doesn’t come back too soon. The note stays on your device: it isn’t a cookie, and it’s never sent to us.';
+  const on = privacyBody(facts({ popup: POP }), '2026-11-11', { formEndpoint: EP });
+  const offCount = privacyBody(facts({ popup: POP, visit_counter: false }), '2026-11-11', { formEndpoint: EP });
+  ok('privacy: with a pop-up on, the page says what it keeps on the visitor’s device, and no longer that nothing is', on.includes(NOTE) && !on.includes('stores nothing on your device') && offCount.includes(NOTE) && !offCount.includes('stores nothing on your device') && offCount.includes('does not count or track visits'));
+  ok('privacy: a pop-up with the "Join our list" box counts as the email list', on.includes('<h2>Our email list</h2>') && !privacyBody(facts({ popup: { ...POP, action: 'buttons', buttons: [{ label: 'Book', url: '/book/' }] } }), '2026-11-11', { formEndpoint: EP }).includes('<h2>Our email list</h2>'));
+  const none = privacyBody(facts({}), '2026-11-11', { formEndpoint: EP }), switchedOff = privacyBody(facts({ popup: { ...POP, on: false } }), '2026-11-11', { formEndpoint: EP });
+  ok('privacy: with no pop-up (or one switched off), the words are as before', !none.includes('pop-up') && none.includes('stores nothing on your device') && !switchedOff.includes('pop-up'));
+  const tagged = privacyBody(facts({ popup: POP, ad_tags: { google: 'G-ABC1234567' } }), '2026-11-11', { formEndpoint: EP });
+  const taggedOff = privacyBody(facts({ popup: POP, ad_tags: { google: 'G-ABC1234567' }, visit_counter: false }), '2026-11-11', { formEndpoint: EP });
+  ok('privacy: beside the ad tags’ cookie paragraphs (counter on or off), the pop-up’s note is said once', tagged.includes('loads the Google tag') && tagged.split(NOTE).length === 2 && taggedOff.includes('loads the Google tag') && taggedOff.split(NOTE).length === 2);
 }
 
 const passed = results.filter(Boolean).length;

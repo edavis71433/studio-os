@@ -72,6 +72,12 @@ export interface SnapshotContent {
     /** Item 61: false when the owner turned the visit counter off. Absent means on:
      *  the counter is added at publish and the privacy page describes it. */
     visit_counter?: boolean;
+    /** List item 175: false when the owner asked AI assistants not to read the site. Absent
+     *  means allowed: robots.txt then stays exactly as the template draws it. */
+    ai_crawlers?: boolean;
+    /** List item 152: the site's ad tags (lib/ad_tags.ts), only when the owner set one. They
+     *  load behind a cookie notice, and the privacy page describes them. */
+    ad_tags?: { google?: string; meta?: string };
     /** Phase SD: page keys hidden from search (noindex + out of the sitemap). */
     pages_noindex?: string[];
     /** Phase SD: per-page search headline/description overrides, keyed by page.
@@ -103,8 +109,11 @@ export interface SnapshotContent {
      *  as /{slug}/index.html by the template, sharing its header/nav/footer. Absent
      *  or empty = single-page (byte-identical to before). Slugs are safe + unique and
      *  never collide with a template's built-in pages. `blocks_src` is the same G13
-     *  provenance as settings.blocks_src, per page. */
-    pages?: Array<{ slug: string; title: string; blocks: SiteBlock[]; blocks_src?: number[]; hideNav?: boolean }>;
+     *  provenance as settings.blocks_src, per page. Items 48 and 120 (lib/page_access.ts):
+     *  `access` is who can see it on the live site (absent = everyone), `lock` the key a
+     *  password page is sealed with, and noHeader / noFooter leave out the site's header or
+     *  footer on that page. */
+    pages?: Array<{ slug: string; title: string; blocks: SiteBlock[]; blocks_src?: number[]; hideNav?: boolean; access?: 'password' | 'private'; lock?: string; noHeader?: true; noFooter?: true }>;
     /** Editable GLOBAL top navigation. When present + non-empty the template renders
      *  THIS header nav on every page (the header/footer are global — one edit changes
      *  all pages) instead of its built-in default. Each item links to an internal path

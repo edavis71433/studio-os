@@ -1,6 +1,6 @@
 // ── Phase AN-2: Analytics Foundation — pure visit parsing + aggregation ───────
 //   deno run --allow-read --allow-env tests/presence/visits_test.mjs
-import { parseUA, refHost, sourceLabel, cleanPath, cleanUtms, visitorDayHash, aggregateVisits, trackerScript, isVisitKind } from '../../supabase/functions/presence/lib/visits.ts';
+import { parseUA, refHost, sourceLabel, cleanPath, cleanUtms, visitorDayHash, aggregateVisits, trackerScript, isVisitKind, aiAssistantOf, AI_SOURCE } from '../../supabase/functions/presence/lib/visits.ts';
 
 const results = [];
 const ok = (n, p) => { results.push({ n, p }); console.log(`${p ? 'PASS' : 'FAIL'}  ${n}`); };
@@ -65,7 +65,7 @@ ok('cleanUtms: sanitizes + caps', (() => { const u = cleanUtms({ s: 'spring<scri
   ok('tracker: uses sendBeacon (no latency, fire-and-forget)', t.includes('sendBeacon'));
   ok('tracker: sets NO cookie and uses NO localStorage', !/document\.cookie|localStorage/.test(t));
   ok('tracker: posts to the site-scoped collector', t.includes('/px/aaaaaaaa-1111-4111-8111-aaaaaaaaaaaa'));
-  ok('tracker: is lightweight (< 1200 bytes)', t.length < 1200);
+  ok('tracker: is lightweight (< 1800 bytes; item 157 added button words and time on page)', t.length < 1800, String(t.length));
 }
 
 ok('isVisitKind: guards the kind enum', isVisitKind('pageview') && isVisitKind('phone') && !isVisitKind('evil') && !isVisitKind(null));
@@ -107,7 +107,7 @@ ok('isVisitKind: guards the kind enum', isVisitKind('pageview') && isVisitKind('
   ok('switch: no change when both are on', !describeChanges(fx.content, structuredClone(fx.content)).changes.some((c) => /counting visits/.test(c.sentence)));
   const content = await Deno.readTextFile(new URL('../../supabase/functions/presence/routes/content.ts', import.meta.url));
   ok('switch: /settings accepts visit_counter as a yes/no', /visit_counter: \{ kind: 'bool' \}/.test(content));
-  ok('switch: the settings read steps down without the 0139 column (deploy-order tolerant)', /VISIT_SETTINGS_COLS = 'visit_counter'/.test(content) && /OPTIONAL_SETTINGS_COLS = \[(POPUP_SETTINGS_COLS, )?VISIT_SETTINGS_COLS, REVIEW_SETTINGS_COLS, AUTOMATION_SETTINGS_COLS\]/.test(content));   // item 148's 0161 column steps down first
+  ok('switch: the settings read steps down without the 0139 column (deploy-order tolerant)', /VISIT_SETTINGS_COLS = 'visit_counter'/.test(content) && /OPTIONAL_SETTINGS_COLS = \[(?:[A-Z_]+_SETTINGS_COLS, )*VISIT_SETTINGS_COLS, REVIEW_SETTINGS_COLS, AUTOMATION_SETTINGS_COLS\]/.test(content));
   const mig = await Deno.readTextFile(new URL('../../supabase/migrations/0139_visit_counter_switch.sql', import.meta.url));
   const pack = await Deno.readTextFile(new URL('../../docs/presence/APPLY-0139-prod.sql', import.meta.url));
   ok('switch: migration 0139 and its apply pack add the column, on by default', /add column if not exists visit_counter boolean not null default true/.test(mig) && /add column if not exists visit_counter boolean not null default true/.test(pack));
@@ -117,9 +117,26 @@ ok('isVisitKind: guards the kind enum', isVisitKind('pageview') && isVisitKind('
 {
   const collectSrc = await Deno.readTextFile(new URL('../../supabase/functions/presence/routes/collect.ts', import.meta.url));
   const visitsSrc = await Deno.readTextFile(new URL('../../supabase/functions/presence/lib/visits.ts', import.meta.url));
-  const banned = /(writer\/model|anthropic|openai|concierge)/;
+  // a model call is an import of the model code or a request to a model's API; naming the
+  // assistants a visit comes from (chat.openai.com, item 153) is not one
+  const banned = /(writer\/model|api\.anthropic\.com|api\.openai\.com|from ['"][^'"]*(anthropic|openai)|concierge)/;
   ok('AN-2.10: collector uses no AI', !banned.test(collectSrc));
   ok('AN-2.10: visits lib uses no AI (pure/deterministic)', !banned.test(visitsSrc));
+}
+
+// ── list item 153: AI assistants are a source of visits, one row, named underneath ──
+{
+  const cases = [['chatgpt.com', '', 'ChatGPT'], ['chat.openai.com', '', 'ChatGPT'], ['', 'chatgpt.com', 'ChatGPT'], ['perplexity.ai', '', 'Perplexity'], ['www.perplexity.ai', '', 'Perplexity'],
+    ['gemini.google.com', '', 'Gemini'], ['copilot.microsoft.com', '', 'Copilot'], ['claude.ai', '', 'Claude'], ['', 'perplexity', 'Perplexity']];
+  for (const [host, utm, name] of cases) ok(`153: ${host || 'utm ' + utm} → ${name}, in the AI assistants row`, aiAssistantOf(host, utm) === name && sourceLabel(host, utm) === AI_SOURCE);
+  ok('153: Gemini is not counted as Google search; Google itself still is', sourceLabel('gemini.google.com', '') === AI_SOURCE && sourceLabel('google.com', '') === 'Google');
+  ok('153: ordinary sources are untouched', sourceLabel('facebook.com', '') === 'Facebook' && sourceLabel('', 'newsletter') === 'newsletter' && sourceLabel('', '') === 'Direct' && aiAssistantOf('openaiish.example', '') === '');
+  const now = Date.parse('2026-11-10T12:00:00Z');
+  const v = (hash, ref, utm = '') => ({ ts: '2026-11-09T10:00:00Z', kind: 'pageview', path: '/', ref_host: ref, utm_source: utm, device: 'Mobile', country: 'US', visitor_hash: hash });
+  const agg = aggregateVisits([v('a', 'chatgpt.com'), v('a', 'chatgpt.com'), v('b', '', 'chatgpt.com'), v('c', 'perplexity.ai'), v('d', 'google.com'), v('e', '')], now, 30);
+  ok('153: one AI assistants row, counted in people', agg.topSources.some((s) => s.source === AI_SOURCE && s.visits === 3));
+  ok('153: and which assistants, largest first', JSON.stringify(agg.aiAssistants) === JSON.stringify([{ name: 'ChatGPT', visits: 2 }, { name: 'Perplexity', visits: 1 }]), JSON.stringify(agg.aiAssistants));
+  ok('153: no AI visits → no breakdown', aggregateVisits([v('d', 'google.com')], now, 30).aiAssistants.length === 0);
 }
 
 const passed = results.filter((r) => r.p).length;

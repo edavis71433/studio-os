@@ -96,7 +96,7 @@ const post = (body) => handlePublicPreviewOpen(new Request(`https://db.example/f
   ok('the header link stays the function’s; the link a person clicks is the page', (await unsubscribeUrl(e)).startsWith('https://db.example/functions/v1/presence/unsubscribe?') && (await unsubscribePageUrl(e)).startsWith('https://app.example/unsubscribe.html?'));
   const tools = Deno.readTextFileSync(new URL('../../supabase/functions/unlock-report/handler.ts', import.meta.url));
   const clever = Deno.readTextFileSync(new URL('../../supabase/functions/clever-api/index.ts', import.meta.url));
-  ok('the Free Tools report email and outreach footers link the page', /unsubscribeUrl: await unsubscribePageUrl\(email\)/.test(tools) && /<a href="\$\{unsubPage\}"/.test(clever) && /Unsubscribe: \$\{unsubPage\}/.test(clever));
+  ok('the Free Tools report email footer links the page (the old outreach email went with item 186)', /unsubscribeUrl: await unsubscribePageUrl\(email\)/.test(tools) && !/prospect_email_send/.test(clever));
 }
 
 // the three viewer pages exist and only ever ask the function

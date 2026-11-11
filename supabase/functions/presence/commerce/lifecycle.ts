@@ -25,7 +25,7 @@ import { rateAllow } from '../lib/ratelimit.ts';
 import { deleteSite } from '../lib/netlify.ts';
 import { getSite } from '../lib/netlify.ts';
 import { rdapLookupDetailed, daysUntil, expiryRung, expiryWords } from '../lib/rdap.ts';
-import { domainHealth, padlockAfterCheck } from '../lib/domain_health.ts';
+import { domainHealth, padlockAfterCheck, domainTruth } from '../lib/domain_health.ts';
 import { provisionSsl } from '../lib/netlify.ts';
 import { verifyApex, dkimPresent, NETLIFY_APEX_IP } from '../platform/dns.ts';
 import { leadFollowupDue, leadFollowupCopy, renewalReminderWindow, renewalNoticePeriod, renewalReminderCopy } from '../lib/commercial.ts';
@@ -383,18 +383,23 @@ export async function runDomainWatch(limit = 10): Promise<{ checked: number; war
     checked++;
     // the padlock, for a site we host (a watched site's padlock is its own host's business)
     let padlock: ReturnType<typeof padlockAfterCheck> | null = null;
+    let truth: Awaited<ReturnType<typeof domainTruth>> | null = null;
     if (site.netlify_site_id && site.edition !== 'monitor') {
       const h = await domainHealth({ custom_domain: site.custom_domain, netlify_site_id: site.netlify_site_id }).catch(() => null);
       if (h && h.ssl && h.ssl.state !== 'unknown') {
         padlock = padlockAfterCheck(h, site.cert_pending_since ?? null, nowIso);
         if (padlock.reask) { await provisionSsl(site.netlify_site_id).catch(() => null); reasked++; }
       }
+      // item 134 (review findings 3 and 5): what the domain really shows, and both names
+      truth = await domainTruth({ custom_domain: site.custom_domain, netlify_site_id: site.netlify_site_id }, look.status === 'ok' ? look.name : null).catch(() => null);
     }
     await svc(`presence_sites?id=eq.${site.id}`, { method: 'PATCH', body: JSON.stringify({
       domain_checked_at: nowIso,
       domain_lookup_status: look.status,
+      ...(look.status === 'ok' ? { domain_registered_name: look.name } : {}),   // item 134: tells a "www." twin from a sub-name
       ...(info ? { domain_registrar: info.registrar, domain_expires_at: info.expires_at } : {}),
       ...(padlock ? { cert_state: padlock.cert_state, cert_expires_at: padlock.cert_expires_at, cert_pending_since: padlock.cert_pending_since, cert_checked_at: nowIso } : {}),
+      ...(truth ? { domain_serving: truth.serving, domain_checks: truth.checklist, domain_serving_checked_at: nowIso } : {}),
     }) });
     const days = info ? daysUntil(info.expires_at, nowIso) : null;
     const rung = expiryRung(days);

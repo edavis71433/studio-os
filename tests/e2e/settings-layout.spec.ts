@@ -88,6 +88,31 @@ test.describe('Settings — the list beside the sections (bold redesign)', () =>
     await expect(page.locator('#stages')).toBeInViewport();
   });
 
+  // list item 175: search inside Settings
+  test('the search box narrows the list, finds the website settings kept on the website page, and says when nothing matches', async ({ page }) => {
+    await installApp(page, { api: API });
+    await page.goto('/settings.html');
+    const find = page.getByRole('searchbox', { name: 'Search settings' });
+    await expect(page.locator('[data-card="stages"]')).toBeVisible();
+    await expect(page.locator('[data-card="site_access"]')).toHaveCount(0);   // search-only rows wait for a search
+    await find.fill('password');
+    await expect(page.locator('[data-card="site_access"]')).toBeVisible();
+    await expect(page.locator('[data-card="site_access"]')).toHaveAttribute('href', '/presence.html');
+    await expect(page.locator('[data-card="stages"]')).toHaveCount(0);
+    await find.fill('ai');
+    await expect(page.locator('[data-card="ai_crawlers"]')).toHaveAttribute('href', '/presence.html#search');
+    await find.fill('stalled deals');
+    await expect(page.locator('#cards .setcard')).toHaveCount(1);
+    await expect(page.locator('[data-card="stages"]')).toBeVisible();
+    await find.press('Enter');
+    await expect(page.locator('#stages')).toBeInViewport();
+    await find.fill('zzzz');
+    await expect(page.locator('#cards')).toContainText('No setting matches “zzzz”');
+    await find.press('Escape');
+    await expect(find).toHaveValue('');
+    await expect(page.locator('[data-card="stages"]')).toBeVisible();
+  });
+
   test('no serious/critical axe violations', async ({ page }) => {
     await installApp(page, { api: API });
     await page.goto('/settings.html');

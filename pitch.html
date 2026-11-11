@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1, viewport-fit=cover">
+<title>How your website compares</title>
+<meta name="robots" content="noindex, nofollow">
+<meta name="description" content="Your website's score and AI visibility, beside two nearby businesses.">
+<link rel="stylesheet" href="/fonts/brand.css">
+<!-- ═══════════════════════════════════════════════════════════════════════════
+  The pitch pack (Semrush review, sales item 113, Nov 2026) — the page a studio
+  SENDS A PROSPECT: their Site Review score and AI Visibility result beside two
+  nearby rivals, read by the pack's own unguessable token (?t=…). Public and
+  read-only; printing it is the PDF. No sign-in, no shell — the reader is a
+  stranger to Studio OS, and this page is the studio's pitch, not the app.
+═══════════════════════════════════════════════════════════════════════════ -->
+<style>
+  :root{
+    --bg:#faf8f5;--card:#fff;--ink:#1b1525;--soft:#6b6478;--faint:#746b8a;--line:#eee9e0;
+    --p:#5b3fa0;--p-deep:#2a1b4a;--p-soft:#efeafa;--good:#33664b;--bad:#9a4242;
+    --shadow:0 1px 2px rgba(27,21,37,.04),0 8px 24px rgba(27,21,37,.06);
+    --serif:'Fraunces',"Iowan Old Style",Georgia,serif;
+    --sans:'Inter',-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  }
+  @media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#171320;--card:#211b2e;--ink:#f1edf7;--soft:#b4abc6;--faint:#8d82a3;--line:#352c47;--p:#b79ceb;--p-deep:#e7ddf6;--p-soft:#2d2440}}
+  *{box-sizing:border-box;margin:0}
+  body{background:var(--bg);color:var(--ink);font-family:var(--sans);line-height:1.55;-webkit-font-smoothing:antialiased}
+  .wrap{max-width:860px;margin:0 auto;padding:40px 20px 80px}
+  header.brand{display:flex;align-items:center;gap:12px;margin-bottom:28px}
+  header.brand img{height:40px;max-width:200px;object-fit:contain}
+  header.brand .nm{font-weight:700;font-size:16px}
+  h1{font-family:var(--serif);font-weight:500;font-size:clamp(26px,5vw,34px);line-height:1.2;margin-bottom:8px}
+  .sub{color:var(--soft);font-size:15.5px;max-width:56ch}
+  .cols{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin:28px 0 10px}
+  .col{background:var(--card);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);padding:18px 16px;text-align:center}
+  .col.you{border-color:var(--p);border-width:2px}
+  .col .who{font-weight:600;font-size:14.5px;min-height:2.6em;display:flex;align-items:center;justify-content:center}
+  .col .tag{display:block;font-size:11.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--p);margin-bottom:6px}
+  .score{font-family:var(--serif);font-size:44px;font-weight:500;line-height:1;margin:10px 0 2px}
+  .score.na{font-size:20px;color:var(--faint);font-family:var(--sans);font-weight:600;padding:12px 0}
+  .lbl{font-size:12.5px;color:var(--faint)}
+  .colnote{font-size:12.5px;color:var(--soft);margin-top:8px}
+  section.card{background:var(--card);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);padding:22px;margin-top:18px}
+  section.card h2{font-family:var(--serif);font-weight:500;font-size:20px;margin-bottom:6px}
+  ul.iss{list-style:none;padding:0;margin:10px 0 0}
+  ul.iss li{padding:7px 0 7px 22px;position:relative;font-size:14.5px}
+  ul.iss li::before{content:'→';position:absolute;left:0;color:var(--p);font-weight:700}
+  .aiwrap{display:flex;align-items:baseline;gap:14px;flex-wrap:wrap;margin-top:8px}
+  .aiscore{font-family:var(--serif);font-size:34px}
+  .note{font-size:13px;color:var(--faint);margin-top:10px}
+  .cta{margin-top:26px;background:var(--p-soft);border:1px solid var(--line);border-radius:14px;padding:22px;text-align:center}
+  .cta p{font-size:15.5px;max-width:52ch;margin:0 auto}
+  .foot{margin-top:34px;font-size:12.5px;color:var(--faint);text-align:center}
+  .printbtn{position:fixed;right:18px;bottom:18px;font:inherit;font-size:13.5px;font-weight:600;border:1px solid var(--line);border-radius:999px;padding:9px 16px;background:var(--card);color:var(--ink);cursor:pointer;box-shadow:var(--shadow)}
+  .center{text-align:center;padding:80px 12px}
+  .spin{width:28px;height:28px;border:3px solid var(--line);border-top-color:var(--p);border-radius:50%;margin:80px auto;animation:sp 1s linear infinite}
+  @keyframes sp{to{transform:rotate(360deg)}}
+  @media (max-width:640px){.cols{grid-template-columns:1fr}.col.you{order:-1}}
+  @media print{.printbtn{display:none}body{background:#fff}.col,.card,.cta{box-shadow:none}}
+</style>
+</head>
+<body>
+<div class="wrap" id="main"><div class="spin" role="status" aria-label="Loading"></div></div>
+<script>
+const FN="https://qksstlqzbhesadrrofgn.supabase.co/functions/v1/presence";
+const $=(s)=>document.querySelector(s);
+const esc=(s)=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const scoreCol=(who,tag,piece,extra)=>{
+  const s=piece&&piece.summary;
+  return `<div class="col${tag==='you'?' you':''}">
+    ${tag==='you'?'<span class="tag">This is you</span>':'<span class="tag" style="color:var(--faint)">Nearby</span>'}
+    <div class="who">${esc(who)}</div>
+    ${s?`<div class="score">${esc(s.overall)}</div><div class="lbl">out of 100 · ${esc(s.label||'')}</div>`
+       :`<div class="score na">${esc((piece&&piece.note)||'Not checked')}</div>`}
+    ${extra||''}
+  </div>`;
+};
+async function load(){
+  const t=new URLSearchParams(location.search).get('t')||'';
+  let r=null;
+  try{r=await fetch(FN+'/sales/pack/'+encodeURIComponent(t));}catch(_){}
+  if(!r||!r.ok){$('#main').innerHTML='<div class="center"><h1>This link isn’t live</h1><p class="sub" style="margin:10px auto 0">The report you were sent may have been rebuilt — ask for a fresh link.</p></div>';return;}
+  const d=(await r.json()).data;
+  if(d.brand&&d.brand.accent)document.documentElement.style.setProperty('--p',d.brand.accent);
+  const you=d.you||{};
+  const rivals=(d.rivals||[]).slice(0,2);
+  const ai=d.ai, aiS=ai&&ai.summary;
+  const issues=(you.summary&&you.summary.top_issues)||[];
+  document.title='How '+(d.business_name||'your business')+'’s website compares';
+  $('#main').innerHTML=`
+    ${d.brand?`<header class="brand">${d.brand.logo_url?`<img src="${esc(d.brand.logo_url)}" alt="${esc(d.brand.name)}">`:''}<span class="nm">${esc(d.brand.name)}</span></header>`:''}
+    <h1>How ${esc(d.business_name)}’s web presence compares${d.town?` in ${esc(d.town)}`:''}</h1>
+    <p class="sub">The same website check we run for our clients — your score beside two nearby businesses${d.industry?` (${esc(d.industry.toLowerCase())}s and neighbors)`:''}. A score is out of 100; higher means the site works harder for you.</p>
+    <div class="cols">
+      ${scoreCol(d.business_name,'you',you)}
+      ${rivals.map(rv=>scoreCol(rv.name,'rival',rv)).join('')}
+      ${rivals.length===0?`<div class="col"><div class="who">Nearby businesses</div><div class="score na">${esc(d.rivals_note||'None checked yet')}</div></div>`:''}
+    </div>
+    ${issues.length?`<section class="card"><h2>What we’d fix first on your site</h2><ul class="iss">${issues.map(i=>`<li>${esc(i)}</li>`).join('')}</ul></section>`:''}
+    ${!you.summary&&you.note?`<section class="card"><h2>About your website</h2><p class="sub">${esc(you.note)}</p></section>`:''}
+    ${ai!==null&&ai!==undefined?`<section class="card"><h2>When people ask AI for a recommendation</h2>
+      ${aiS?`<div class="aiwrap"><span class="aiscore">${esc(aiS.overall)}<span style="font-size:15px;color:var(--faint)"> / 100</span></span><span class="sub">${esc(aiS.label||'')} — how often AI assistants mention ${esc(d.business_name)} when asked for ${d.industry?esc(d.industry.toLowerCase())+'s':'businesses like yours'}${d.town?` in ${esc(d.town)}`:''}.</span></div>`
+          :`<p class="sub">${esc((ai&&ai.note)||'Not checked this time.')}</p>`}
+    </section>`:''}
+    <div class="cta"><p>This took us a few minutes to run, and it’s yours to keep. If you’d like the fixes handled, reply to the email this came with — a short note back, not a sales call.</p></div>
+    <p class="foot">Prepared by ${esc(d.brand?d.brand.name:'your local web studio')}${d.built_at?` · ${esc(String(d.built_at).slice(0,10))}`:''} · Scores from a standard automated review; details gladly shared.</p>
+    <button class="printbtn" onclick="print()">Print / save as PDF</button>`;
+}
+load();
+</script>
+</body>
+</html>

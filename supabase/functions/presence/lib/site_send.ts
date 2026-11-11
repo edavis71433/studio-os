@@ -230,7 +230,7 @@ document.addEventListener('ps-sent',function(e){var k=e.target&&e.target.querySe
 var m=read();if(m.joined||(m.closed&&Date.now()-m.closed<C.againDays*86400000))return;
 var done=false;
 function off(){window.removeEventListener('scroll',seen);}
-function show(){if(done)return;done=true;off();if(document.querySelector('dialog[open]'))return;try{D.showModal();}catch(_){}}
+function show(){if(done)return;done=true;off();var cc=document.getElementById('presence-consent');if(document.querySelector('dialog[open]')||(cc&&!cc.hidden))return;try{D.showModal();}catch(_){}}
 function seen(){var h=document.documentElement,max=h.scrollHeight-h.clientHeight;if(max>0&&(window.scrollY||h.scrollTop)/max*100>=C.scroll)show();}
 if(C.after==='scroll')window.addEventListener('scroll',seen,{passive:true});else setTimeout(show,C.seconds*1000);
 D.addEventListener('close',function(){var r=read();if(!r.joined){r.closed=Date.now();write(r);}});

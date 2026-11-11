@@ -68,6 +68,19 @@ test.describe('Client portal', () => {
     expect(reads).toBe(1);
   });
 
+  test('item 137 — both sign-in doors underline the link to the other door, and the client door has a search description', async ({ page }) => {
+    await installApp(page, { session: null, api: {} });
+    for (const path of ['/portal.html', '/studio.html']) {
+      await page.goto(path);
+      const link = page.locator('.muted a[href$=".html"]').first();
+      await expect(link).toBeVisible();
+      // told apart from the sentence around it by more than its colour
+      expect(await link.evaluate((a) => getComputedStyle(a).textDecorationLine), path).toContain('underline');
+    }
+    await page.goto('/portal.html');
+    expect((await page.locator('meta[name="description"]').getAttribute('content'))?.length).toBeGreaterThan(40);
+  });
+
   test('Home mirrors "needs you": approval card with actions + recent updates', async ({ page }) => {
     await installApp(page, { api: {
       '/portal/context': REVIEWER_CTX,

@@ -98,6 +98,17 @@ test.describe('the pop-up on a client’s page', () => {
     else await expect(pop(page)).toBeVisible();
   });
 
+  test('a cookie choice still waiting (list item 152) comes first: no pop-up on that page, then on the next', async ({ page }) => {
+    await page.clock.install();
+    await openSite(page, BASE, '<div id="presence-consent" role="region" aria-label="Cookie choice"><p>Can this website use cookies?</p></div>');
+    await page.clock.runFor(9000);
+    await expect(pop(page)).toBeHidden();
+    await page.unroute(`${SITE}/**`);
+    await openSite(page, BASE, '<div id="presence-consent" role="region" aria-label="Cookie choice" hidden><p>Can this website use cookies?</p></div>');
+    await page.clock.runFor(9000);
+    await expect(pop(page)).toBeVisible();
+  });
+
   test('its button can open a form over the page, and the backdrop closes it', async ({ page }) => {
     await page.clock.install();
     await openSite(page, { ...BASE, action: 'buttons', buttons: [{ label: 'Get a quote', url: '#form-quote' }] });
