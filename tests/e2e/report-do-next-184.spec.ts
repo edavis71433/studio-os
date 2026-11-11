@@ -38,15 +38,18 @@ test.describe('Settings › Monthly report: what it holds, the PDF copy (builder
     await openReport(page, okPdf);
     const sec = page.locator('#report');
     await expect(sec.locator('#reportInL')).toHaveText('In the report:');
-    await expect(sec.locator('#reportIn li')).toHaveText(['Visitors', 'Enquiries', 'Google searches', 'AI answers, off', 'Reviews', 'Website health', 'Pages read most', 'What changed', 'PDF copy']);
+    await expect(sec.locator('#reportIn li')).toHaveText(['Visitors', 'Enquiries', 'On Google', 'AI answers, off', 'Reviews', 'Website health', 'What changed']);
     await expect(sec.locator('#reportIn li').nth(3)).toHaveClass(/off/);
-    await expect(sec).toContainText('how they did on Google and in AI answers, their reviews, the website’s health');
+    await expect(sec).toContainText('how their website did, each part when there’s something to say');
+    // as drawn: the report's switch, the PDF copy, then the AI check, then what the report holds
+    const order = await sec.locator('#sw-report, #sw-pdf, #sw-ai, #reportIn').evaluateAll((els) => els.map((e) => e.id));
+    expect(order).toEqual(['sw-report', 'sw-pdf', 'sw-ai', 'reportIn']);
     await sec.locator('#sw-ai').click();
     await expect(sec.locator('#reportIn li').nth(3)).toHaveText('AI answers');
     await expect(sec.locator('#reportIn li').nth(3)).not.toHaveClass(/off/);
   });
 
-  test('Attach a PDF copy: on by default, saves as it flips, and the chip follows', async ({ page }) => {
+  test('Attach a PDF copy: on by default, saves as it flips', async ({ page }) => {
     const puts = await openReport(page, okPdf);
     const sec = page.locator('#report');
     await expect(sec.locator('#sw-pdf')).toHaveAttribute('aria-checked', 'true');
@@ -54,25 +57,24 @@ test.describe('Settings › Monthly report: what it holds, the PDF copy (builder
     await expect(sec.locator('#sw-pdf')).toHaveAttribute('aria-checked', 'false');
     expect(puts).toEqual([{ pdf: false }]);
     await expect(page.locator('.dds-toast').last()).toContainText('Off. The report goes without a PDF.');
-    await expect(sec.locator('#reportIn li').last()).toHaveText('PDF copy, off');
   });
 
-  test('Download last month’s PDF saves the file under its own name', async ({ page }) => {
+  test('Download October’s PDF saves the file under its own name', async ({ page }) => {
     await openReport(page, okPdf);
     const sec = page.locator('#report');
-    const [dl] = await Promise.all([page.waitForEvent('download'), sec.getByRole('button', { name: 'Download last month’s PDF' }).click()]);
+    const [dl] = await Promise.all([page.waitForEvent('download'), sec.getByRole('button', { name: 'Download October’s PDF' }).click()]);
     expect(dl.suggestedFilename()).toBe('Maple-Street-Studio-October-2026.pdf');
     await expect(sec.locator('#reportMsg')).toHaveText('Downloaded Maple-Street-Studio-October-2026.pdf.');
-    await expect(sec.getByRole('button', { name: 'Download last month’s PDF' })).toBeEnabled();
+    await expect(sec.getByRole('button', { name: 'Download October’s PDF' })).toBeEnabled();
   });
 
   test('a PDF that fails says so and changes nothing', async ({ page }) => {
     await openReport(page, (route) => route.fulfill(json({ error: 'failed' }, 502)));
     const sec = page.locator('#report');
-    await sec.getByRole('button', { name: 'Download last month’s PDF' }).click();
+    await sec.getByRole('button', { name: 'Download October’s PDF' }).click();
     await expect(page.locator('.dds-toast').last()).toContainText('The PDF didn’t download.');
     await expect(sec.locator('#reportMsg')).toHaveText('');
-    await expect(sec.getByRole('button', { name: 'Download last month’s PDF' })).toBeEnabled();
+    await expect(sec.getByRole('button', { name: 'Download October’s PDF' })).toBeEnabled();
   });
 
   test('phone width: the chips wrap, nothing wider than the screen', async ({ page }) => {
@@ -139,7 +141,7 @@ test.describe('The client’s Overview: one Do next list (builder list item 184)
     const { scopes } = await openOverview(page, null);
     const card = page.locator('#do-next');
     await expect(card.getByRole('heading', { name: 'Do next' })).toBeVisible();
-    await expect(card.locator('.dn-h .n')).toHaveText('6 to do');
+    await expect(card.locator('.dn-h .n')).toHaveText('6 for Maple Street Studio');
     await expect(card.locator('.dn-list li .dn-tag')).toHaveText(['Needs you', 'Health', 'Search', 'Reviews', 'AI answers', 'Idea']);
     const first = card.locator('.dn-list li').first();
     await expect(first.locator('.dn-t b')).toHaveText('Reply to 2 enquiries');
@@ -161,7 +163,7 @@ test.describe('The client’s Overview: one Do next list (builder list item 184)
     await expect(card.locator('.dn-list li')).toHaveCount(5);
     await card.getByRole('button', { name: 'Not relevant: Claude doesn’t suggest them for “Who is a good florist?”' }).click();
     await expect(page.locator('.dds-toast').last()).toContainText('Off the list for good.');
-    await expect(card.locator('.dn-h .n')).toHaveText('4 to do');
+    await expect(card.locator('.dn-h .n')).toHaveText('4 for Maple Street Studio');
     expect(posts).toEqual([
       { key: 'reviews:google', decision: 'done', title: 'Reply to a Google review' },
       { key: 'ai:who-is-a-good-florist', decision: 'not_relevant', title: 'Claude doesn’t suggest them for “Who is a good florist?”' },

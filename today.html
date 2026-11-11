@@ -520,10 +520,12 @@ function siteDeckHtml(s){
     </div>
   </section>`;
 }
+let DECK_SITE=null;   // the client's row from /agency/sites, once the deck has it (the Do next card names them)
 async function mountSiteDeck(){
   const id=new URLSearchParams(location.search).get('client');if(!id)return;
   let r;try{r=await apiGetStudio('/agency/sites');}catch(_){return;}
   const rows=r&&Array.isArray(r.data)?r.data:[];const s=rows.find(x=>x.site_id===id);if(!s)return;
+  DECK_SITE=s;
   const main=$('main');if(!main||document.getElementById('client-site'))return;
   const host=document.createElement('div');host.innerHTML=siteDeckHtml(s);const deck=host.firstElementChild;
   const facts=document.getElementById('client-facts');
@@ -574,7 +576,7 @@ function paintDoNext(){
   const done=d.decided.filter((x)=>x.state==='done').length,nr=d.decided.length-done;
   const rows=d.items.map((it,i)=>`<li data-key="${esc(it.key)}"><span class="dn-tag ${esc(it.source)}"><span>${esc(DN_TAG[it.source]||'')}</span></span><span class="dn-t"><b>${esc(it.title)}</b>${it.sub?`<span>${esc(it.sub)}</span>`:''}</span><span class="dn-acts">${/^\//.test(String(it.href||''))?`<a class="wbtn main" href="${esc(it.href)}">${esc(it.verb||'Open')}</a>`:''}<button type="button" class="wbtn" data-dn="done" data-i="${i}" aria-label="Done: ${esc(it.title)}">✓ Done</button><button type="button" class="wbtn" data-dn="not_relevant" data-i="${i}" aria-label="Not relevant: ${esc(it.title)}">Not relevant</button></span></li>`).join('');
   const decidedRows=DN_SHOW?d.decided.map((x)=>`<li><span class="dn-tag"><span>${x.state==='done'?'Done':'Not relevant'}</span></span><span class="dn-t"><b>${esc(x.title||x.key)}</b></span><span class="dn-acts"><button type="button" class="wbtn" data-dn="undo" data-key="${esc(x.key)}" aria-label="Undo: ${esc(x.title||x.key)}">Undo</button></span></li>`).join(''):'';
-  card.innerHTML=`<div class="dn-h"><h2 id="dn-h">Do next</h2><span class="n">${d.items.length?`${d.items.length} to do${d.more?`, and ${d.more} more after these`:''}`:'Nothing waiting'}</span></div>
+  card.innerHTML=`<div class="dn-h"><h2 id="dn-h">Do next</h2><span class="n">${d.items.length?`${d.items.length}${DECK_SITE&&DECK_SITE.name?` for ${esc(DECK_SITE.name)}`:' to do'}${d.more?`, and ${d.more} more after these`:''}`:'Nothing waiting'}</span></div>
     <p class="dn-sub">One list from Needs you, the health check, Search, reviews and this week’s ideas. Most tick themselves when the thing is done.</p>
     ${d.items.length?`<ul class="dn-list">${rows}</ul>`:'<p class="dn-sub">Nothing to do for this client right now.</p>'}
     ${d.decided.length?`<button type="button" class="dn-more" aria-expanded="${DN_SHOW}">${done} done and ${nr} not relevant this month · ${DN_SHOW?'Hide them':'Show them'}</button>${DN_SHOW?`<ul class="dn-list dn-done">${decidedRows}</ul>`:''}`:''}`;
