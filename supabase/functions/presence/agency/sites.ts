@@ -43,8 +43,10 @@ import { previewCache, previewCacheKey } from '../lib/preview_cache.ts';
 import { previewUrlMap } from '../lib/media.ts';
 import { withSampleWords } from '../lib/sample_words.ts';
 import { writeChangeEvent } from '../lib/provenance.ts';
-import { kitFromSite, applyKitTo } from './kit_io.ts';
+import { kitFromSite, applyKitTo, layoutFromSite } from './kit_io.ts';
 import { UUID_LOWER_RE as UUID_RE } from '../lib/uuid.ts';
+import { normalizeCopied } from '../lib/site_layout.ts';
+import { keepCopied } from '../lib/copied_record.ts';
 
 const rowsOf = <T,>(q: { ok?: boolean; json?: unknown } | null | undefined): T[] => (q && q.ok !== false && Array.isArray(q.json) ? (q.json as T[]) : []);
 
@@ -173,6 +175,8 @@ export interface SitesInput {
   opened: Record<string, string>;
   pins: string[];
   nowIso: string;
+  /** item 145: the sites started from another site or a template, and whether the studio kept what came across */
+  copied?: Record<string, { from: string; kept: boolean }>;
 }
 export type SiteCard = ReturnType<typeof buildSites>[number];
 
@@ -209,6 +213,7 @@ export function buildSites(i: SitesInput) {
       // what the thumbnail route can draw: the live page, else the draft; a site
       // we only watch lives on someone else's host, so there is nothing of ours to draw
       thumb: hosted ? (state.key === 'not_live' ? 'draft' : 'live') : null,
+      copied: (i.copied && i.copied[p.site_id]) || null,
     };
   });
   rows.sort((a, b) => {
@@ -417,7 +422,7 @@ export async function handleAgencySites(req: Request, route: string, method: str
     const soft = () => ({ ok: false, json: null as unknown });
     const userId = UUID_RE.test(String(principal.userId || '')) ? String(principal.userId) : '';
     // each read is best-effort: a failed one leaves its column empty and `partial` says so
-    const [extraQ, planQ, seatQ, ownerQ, linkQ, studioQ, openQ, pins] = await Promise.all([
+    const [extraQ, planQ, seatQ, ownerQ, linkQ, studioQ, openQ, pins, copiedQ] = await Promise.all([
       ids.length ? svc(`presence_sites?id=${IN}&select=${EXTRA_COLS}&limit=1000`).catch(soft) : none,
       clientIds.length ? svc(`presence_entitlements?client_id=in.(${clientIds.join(',')})&product=eq.presence&select=client_id,plan,status,term,current_period_end,trial_ends_at,cancel_at_period_end&limit=1000`).catch(soft) : none,
       ids.length ? svc(`presence_site_members?site_id=${IN}&status=in.(active,invited)&select=site_id,email,role,status&limit=2000`).catch(soft) : none,
@@ -429,14 +434,21 @@ export async function handleAgencySites(req: Request, route: string, method: str
       // requests, so the thousand rows reach back a thousand pages, not thirty.
       userId && ids.length ? svc(`presence_scoped_access_events?operator_user_id=eq.${userId}&outcome=eq.allowed&route=eq.${encodeURIComponent('/portal/context')}&select=client_site_id,created_at&order=created_at.desc&limit=1000`).catch(soft) : none,
       deps.ownSite().then(async (own) => (own ? { ok: true, own: true, pins: normalizePins(await readReservedJson(own.id, RESERVED_NAMES.sitePins))[member.member_id] || [] } : { ok: true, own: false, pins: [] as string[] })).catch(() => ({ ok: false, own: false, pins: [] as string[] })),
+      // item 145: which sites were started from another site or a template (their copy records)
+      ids.length ? svc(`presence_sales_templates?site_id=${IN}&kind=eq.proposal&name=eq.${encodeURIComponent(RESERVED_NAMES.copiedFrom)}&deleted_at=is.null&select=site_id,body&limit=1000`).catch(soft) : none,
     ]);
+    const copied: Record<string, { from: string; kept: boolean }> = {};
+    for (const r of rowsOf<{ site_id: string; body: string }>(copiedQ)) {
+      let rec = null; try { rec = normalizeCopied(JSON.parse(String(r.body || 'null'))); } catch { rec = null; }
+      if (rec) copied[r.site_id] = { from: rec.from, kept: rec.kept };
+    }
     const rows = buildSites({
       portfolio, extras: rowsOf<SiteExtra>(extraQ), plans: rowsOf<PlanRow>(planQ), seats: rowsOf<SeatRow>(seatQ), owners: rowsOf<OwnerRow>(ownerQ),
       portalSites: rowsOf<{ customer_site_id: string }>(linkQ).map((l) => String(l.customer_site_id)),
       studio: rowsOf<StudioSeat>(studioQ), me: member.email, opened: lastOpenedBySite(rowsOf(openQ)),
-      pins: pins.pins.filter((id) => ids.includes(id)), nowIso: now,
+      pins: pins.pins.filter((id) => ids.includes(id)), nowIso: now, copied,
     });
-    const partial = [extraQ, planQ, seatQ, ownerQ, linkQ, studioQ, openQ].some((q) => (q as { ok?: boolean }).ok === false) || !pins.ok;
+    const partial = [extraQ, planQ, seatQ, ownerQ, linkQ, studioQ, openQ, copiedQ].some((q) => (q as { ok?: boolean }).ok === false) || !pins.ok;
     // a studio seat that can't open a client (lib/scope.ts asks bulk_publish) gets no doors into one,
     // and not the client's own people by name
     const canOpen = can(member.role, 'bulk_publish');
@@ -465,7 +477,7 @@ export async function handleAgencySites(req: Request, route: string, method: str
     return json({ data: buildDomains(list, now), partial: (extraQ as { ok?: boolean }).ok === false }, 200, cors);
   }
 
-  const m = route.match(/^\/agency\/sites\/([0-9a-f-]{36})\/(thumb|pin|duplicate)$/);
+  const m = route.match(/^\/agency\/sites\/([0-9a-f-]{36})\/(thumb|pin|duplicate|copied)$/);
   if (!m) return null;
   const siteId = m[1], what = m[2];
 
@@ -501,12 +513,15 @@ export async function handleAgencySites(req: Request, route: string, method: str
     return json({ data: { site_id: siteId, pinned, pins: stored[member.member_id] || [] } }, 200, cors);
   }
 
-  // ── Duplicate site (item 45): a NEW customer's site starts from this one's
-  //    setup. The page creates the customer first (POST /sales/customers, the Add
-  //    a customer flow) and sends the new site here. Starter kits do the copying
+  // ── Duplicate site (item 45): a NEW customer's site starts from this one. The
+  //    page creates the customer first (POST /sales/customers, the Add a customer
+  //    flow) and sends the new site here. Starter kits do the copying
   //    (agency/kit_io.ts): services, FAQs, voice, colors and industry, fill-only-
-  //    empty; plus the look (the template), which never touches content. Business
-  //    facts, photos, reviews and the pages' own words are never copied. ──
+  //    empty; and since item 145 the pages too: every section with its words and
+  //    copies of its photos, the menu, the look. The old business's name in the
+  //    words becomes the new one, and publishing lists whatever is still exactly
+  //    as copied until it is changed or kept (lib/site_layout.ts). Business
+  //    details, reviews, testimonials, posts and contacts are never copied. ──
   if (what === 'duplicate' && method === 'POST') {
     if (!can(member.role, 'manage_clients')) return forbid(cors);
     let b: { site_id?: unknown } = {}; try { b = await req.json(); } catch { /* answered below */ }
@@ -521,19 +536,38 @@ export async function handleAgencySites(req: Request, route: string, method: str
     const names = rowsOf<{ id: string; name: string }>(await svc(`clients?id=eq.${src.client_id}&select=id,name&limit=1`).catch(() => null));
     const from = String(names[0]?.name || 'another site').trim();
     const kit = await kitFromSite(src.id);
+    kit.layout = await layoutFromSite(src.id, { label: from });
+    // a site with no pages of its own still passes on its look
+    if (!kit.layout.template_slug) kit.layout.template_slug = src.template_slug || null;
     const applied = await applyKitTo(kit, dst.id, principal, `Started from ${from}’s setup`);
-    // the look: the source's template at its latest version, as Styles would set it
-    let look: string | null = null;
-    const version = latestTemplateVersion(src.template_slug);
-    const tpl = version ? getTemplate(src.template_slug, version) : null;
-    if (tpl && src.template_slug !== dst.template_slug) {
-      const w = await svc(`presence_sites?id=eq.${dst.id}`, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ template_slug: src.template_slug, template_version: version }) });
-      if (w.ok) {
-        look = tpl.manifest.name;
-        await writeChangeEvent({ siteId: dst.id, entityType: 'settings', entityId: null, action: 'update', summary: `Changed the site’s look to ${tpl.manifest.name}`, principal, provenance: 'human', fields: ['template_slug'] });
-      } else applied.skipped.push('the look (that didn’t save)');
-    } else if (tpl) look = tpl.manifest.name;
-    return json({ data: { site_id: dst.id, from_site_id: src.id, look, applied: applied.applied, skipped: applied.skipped } }, 200, cors);
+    let look = applied.layout && applied.layout.applied ? applied.layout.look : null;
+    if (!look) {
+      // the look on its own, when no pages came across: the source's template at its latest version, as Styles would set it
+      const version = latestTemplateVersion(src.template_slug);
+      const tpl = version ? getTemplate(src.template_slug, version) : null;
+      if (tpl && src.template_slug !== dst.template_slug) {
+        const w = await svc(`presence_sites?id=eq.${dst.id}`, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ template_slug: src.template_slug, template_version: version }) });
+        if (w.ok) {
+          look = tpl.manifest.name;
+          await writeChangeEvent({ siteId: dst.id, entityType: 'settings', entityId: null, action: 'update', summary: `Changed the site’s look to ${tpl.manifest.name}`, principal, provenance: 'human', fields: ['template_slug'] });
+        } else applied.skipped.push('the look (that didn’t save)');
+      } else if (tpl) look = tpl.manifest.name;
+    }
+    const pages = applied.layout && applied.layout.applied ? { pages: applied.layout.pages, sections: applied.layout.sections, menu: applied.layout.menu, photos: applied.layout.photos, photos_failed: applied.layout.photos_failed } : null;
+    return json({ data: { site_id: dst.id, from_site_id: src.id, look, applied: applied.applied, pages, skipped: applied.skipped } }, 200, cors);
+  }
+
+  // ── Keep them as they are (item 145): the studio has looked at what Duplicate
+  //    or a template copied onto this site, and it may publish as it is. ──
+  if (what === 'copied' && method === 'POST') {
+    if (!can(member.role, 'manage_clients')) return forbid(cors);
+    let b: { keep?: unknown } = {}; try { b = await req.json(); } catch { /* answered below */ }
+    if (b.keep !== true) return json({ error: 'bad_request', message: 'Say keep: true.' }, 400, cors);
+    if (!(await agencySiteIds(member.agency_id)).includes(siteId)) return notYours(cors);
+    const rec = await keepCopied(siteId, member.email);
+    if (!rec) return json({ error: 'not_found', message: 'Nothing was copied onto this site.' }, 404, cors);
+    await writeChangeEvent({ siteId, entityType: 'settings', entityId: null, action: 'update', summary: `Kept the words and photos copied from ${rec.from} as they are`, principal, provenance: 'human' }).catch(() => {});
+    return json({ data: { site_id: siteId, copied: { from: rec.from, kept: rec.kept } } }, 200, cors);
   }
   return null;
 }

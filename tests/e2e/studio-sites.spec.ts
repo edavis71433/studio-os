@@ -14,7 +14,7 @@ const site = (over: Record<string, unknown>) => ({
   plan: { key: 'presence', words: 'Website + tools', status: 'active', term: 'monthly', renews: { kind: 'renews', at: '2026-12-01T00:00:00Z' } },
   team: [{ who: 'owner@studio.example', email: 'owner@studio.example', side: 'studio', role: 'Owner', me: true, invited: false }],
   tags: [], published_at: '2026-10-01T00:00:00Z', updated_at: '2026-10-05T00:00:00Z',
-  unpublished_changes: false, billing_issue: false, opened_at: null, pinned: false, thumb: 'live',
+  unpublished_changes: false, billing_issue: false, opened_at: null, pinned: false, thumb: 'live', copied: null,
   ...over,
 });
 const BISTRO = site({ site_id: 's1', name: 'Bistro Nine', address: 'https://bistro.example', domain: 'bistro.example', domain_expires_at: '2026-11-20T00:00:00Z', tags: ['restaurant'],
@@ -42,7 +42,7 @@ const json = (body: unknown, status = 200) => ({ status, contentType: 'applicati
 
 /** The app plus the Sites routes. The harness matches by prefix, so the routes under
  *  /agency/sites/:id/… get their own handlers (registered after it, so they win). */
-async function openSites(page: Page, rows: unknown[] = [BISTRO, GARAGE, CAFE], opts: { body?: Record<string, unknown>; thumbDelay?: number; needs?: Record<string, unknown>; needsRows?: unknown[] } = {}) {
+async function openSites(page: Page, rows: unknown[] = [BISTRO, GARAGE, CAFE], opts: { body?: Record<string, unknown>; thumbDelay?: number; needs?: Record<string, unknown>; needsRows?: unknown[]; dupPages?: unknown } = {}) {
   const thumbs: string[] = []; let inFlight = 0, maxInFlight = 0;
   const writes: Array<{ method: string; path: string; body: any }> = [];
   await installApp(page, { api: {
@@ -58,13 +58,16 @@ async function openSites(page: Page, rows: unknown[] = [BISTRO, GARAGE, CAFE], o
     const s = (rows as Array<{ site_id: string; name: string }>).find((x) => x.site_id === id);
     await route.fulfill(json({ data: { html: THUMB_HTML(s ? s.name : id), version: 'live' } }));
   });
-  await page.route(/\/functions\/v1\/presence\/(agency\/sites\/[^/]+\/(pin|duplicate)|sales\/customers)/, async (route: Route) => {
+  await page.route(/\/functions\/v1\/presence\/(agency\/sites\/[^/]+\/(pin|duplicate|copied)|sales\/customers|agency\/kits$)/, async (route: Route) => {
     const path = new URL(route.request().url()).pathname.replace(/^.*\/presence/, '');
+    if (path === '/agency/kits' && route.request().method() !== 'POST') return route.fulfill(json({ data: [] }));
     const body = route.request().postDataJSON();
     writes.push({ method: route.request().method(), path, body });
     if (path.endsWith('/pin')) return route.fulfill(json({ data: { site_id: path.split('/')[3], pinned: body.pinned, pins: body.pinned ? [path.split('/')[3]] : [] } }));
     if (path === '/sales/customers') return route.fulfill(json({ data: { created: true, client_id: 'c-new', site_id: 'snew', invited: true } }, 201));
-    return route.fulfill(json({ data: { site_id: 'snew', from_site_id: path.split('/')[3], look: 'Business Classic', applied: { offerings: 4, faqs: 2, voice: true, colors: true, industry: 'restaurant' }, skipped: [] } }));
+    if (path.endsWith('/copied')) return route.fulfill(json({ data: { site_id: path.split('/')[3], copied: { from: 'Bistro Nine', kept: true } } }));
+    if (path === '/agency/kits') return route.fulfill(json({ data: { id: 'k-new', name: body.name, offerings: 4, faqs: 2, kind: 'template', summary: { pages: 1, sections: 5, photos: 2 } } }));
+    return route.fulfill(json({ data: { site_id: 'snew', from_site_id: path.split('/')[3], look: 'Business Classic', applied: { offerings: 4, faqs: 2, voice: true, colors: true, industry: 'restaurant' }, pages: opts.dupPages ?? null, skipped: [] } }));
   });
   await page.goto('/sites.html');
   return { thumbs, writes, maxInFlight: () => maxInFlight };
@@ -202,7 +205,7 @@ test.describe('Sites (builder list items 43 and 45)', () => {
     const t = await openSites(page);
     await page.locator('.scard[data-site="s3"] [data-menu]').click();
     const menu = page.locator('#rowMenuHost [role="menu"]');
-    await expect(menu.locator('[role="menuitem"]')).toHaveText(['Pin to top', 'Duplicate site', 'Open record']);
+    await expect(menu.locator('[role="menuitem"]')).toHaveText(['Pin to top', 'Duplicate site', 'Save as a template', 'Open record']);
     await menu.getByRole('menuitem', { name: 'Pin to top' }).click();
     await expect.poll(() => t.writes.find((w) => w.path === '/agency/sites/s3/pin')?.body).toEqual({ pinned: true });
     await expect(page.locator('.scard[data-site="s3"] .tpin')).toHaveText('Pinned');
@@ -346,6 +349,72 @@ test.describe('Sites (builder list items 43 and 45)', () => {
     await expect(page.locator('.sband .kpi')).toHaveCount(4);   // two by two on a phone
     const ks = await page.locator('.sband .kpi').evaluateAll((els) => els.map((e) => Math.round(e.getBoundingClientRect().left)));
     expect(new Set(ks).size).toBe(2);
+  });
+});
+
+// ── Item 145 (Nov 10 review: file 02 finding 3, file 03 finding 3): Duplicate brings the pages,
+//    a site can be saved as "my template", and what was copied waits to be changed or kept ──
+test.describe('Sites: the pages travel (item 145)', () => {
+  const COPIED = site({ site_id: 's5', name: 'Bistro Twelve', state: 'not_live', state_words: 'Not live yet', address: 'https://bistro-twelve.netlify.app', thumb: 'draft', published_at: null, copied: { from: 'Bistro Nine', kept: false } });
+
+  test('Duplicate says what came across — pages, sections, photos, the menu — and what to do before publishing', async ({ page }) => {
+    const t = await openSites(page, [BISTRO, CAFE], { dupPages: { pages: 1, sections: 5, menu: 2, photos: 2, photos_failed: 0 } });
+    await page.locator('.scard[data-site="s1"] [data-menu]').click();
+    await page.locator('#rowMenuHost').getByRole('menuitem', { name: 'Duplicate site' }).click();
+    const dlg = page.locator('#dupDlg');
+    await expect(dlg).toContainText('this one’s pages and sections, with their words and photos, the menu and the look');
+    await dlg.locator('#dup-biz').fill('Bistro Twelve');
+    await dlg.locator('#dup-email').fill('sam@bistrotwelve.example');
+    await dlg.locator('#dup-submit').click();
+    const done = dlg.locator('#dup-done');
+    await expect(done).toContainText('Bistro Twelve’s site starts with 1 page and 5 sections, 2 photos, the menu, the Business Classic look, 4 services, 2 FAQs, the voice, the colors.');
+    await expect(done).toContainText('Before you publish, change what belongs to Bistro Nine, or keep it from the new site’s card.');
+    expect(t.writes.map((w) => `${w.method} ${w.path}`)).toEqual(['POST /sales/customers', 'POST /agency/sites/s1/duplicate']);
+  });
+
+  test('a site started from another one says so until it is kept — two presses, then the box goes', async ({ page }) => {
+    const t = await openSites(page, [BISTRO, COPIED]);
+    const card = page.locator('.scard[data-site="s5"]');
+    await expect(card.locator('.copied')).toContainText('Started from Bistro Nine’s pages');
+    await expect(card.locator('.copied')).toContainText('Publishing lists what’s still as copied.');
+    await expect(page.locator('.scard[data-site="s1"] .copied')).toHaveCount(0);
+    const keep = card.getByRole('button', { name: 'Keep them as they are' });
+    await keep.click();                                            // the first press only asks
+    await expect(card.locator('[data-keep]')).toHaveText('Keep everything copied from Bistro Nine? Press again');
+    expect(t.writes).toHaveLength(0);
+    await card.locator('[data-keep]').click();
+    await expect(card.locator('.copied')).toHaveCount(0);
+    await expect(page.locator('.dds-toast', { hasText: 'Kept. Bistro Twelve can publish with what was copied.' })).toBeVisible();
+    expect(t.writes.map((w) => `${w.method} ${w.path}`)).toEqual(['POST /agency/sites/s5/copied']);
+    expect(t.writes[0].body).toEqual({ keep: true });
+  });
+
+  test('kept, live, or a seat without the right: no box, or no Keep button', async ({ page }) => {
+    await openSites(page, [site({ ...COPIED, site_id: 's6', copied: { from: 'Bistro Nine', kept: true } }), site({ ...COPIED, site_id: 's7', state: 'live', state_words: 'Live', published_at: '2026-11-01T00:00:00Z', thumb: 'live' })]);
+    await expect(page.locator('.copied')).toHaveCount(0);
+  });
+
+  test('Save as a template: from the ⋯ menu, a name, and what it keeps; the server is asked for its pages too', async ({ page }) => {
+    const t = await openSites(page, [BISTRO, GARAGE]);
+    await page.locator('.scard[data-site="s2"] [data-menu]').click();
+    await expect(page.locator('#rowMenuHost [role="menuitem"]')).not.toContainText(['Save as a template']);   // a site we only watch has no pages of ours
+    await page.keyboard.press('Escape');
+    await page.locator('.scard[data-site="s1"] [data-menu]').click();
+    await expect(page.locator('#rowMenuHost [role="menuitem"]')).toHaveText(['Pin to top', 'Duplicate site', 'Save as a template', 'View live site', 'Open record']);
+    await page.locator('#rowMenuHost').getByRole('menuitem', { name: 'Save as a template' }).click();
+    const dlg = page.locator('#tplDlg');
+    await expect(dlg).toBeVisible();
+    await expect(dlg.locator('#tplFrom')).toHaveText('From Bistro Nine’s site.');
+    await expect(dlg).toContainText('Never its business details, reviews or contacts.');
+    await dlg.locator('#tpl-save').click();                        // no name yet → nothing sent
+    expect(t.writes).toHaveLength(0);
+    await dlg.locator('#tpl-name').fill('Bistro — three pages');
+    await dlg.locator('#tpl-save').click();
+    const done = dlg.locator('#tpl-done');
+    await expect(done).toContainText('Saved “Bistro — three pages”');
+    await expect(done).toContainText('1 page, 5 sections, 2 photos. Pick it under Start from when you make a new site.');
+    expect(t.writes.map((w) => `${w.method} ${w.path}`)).toEqual(['POST /agency/kits']);
+    expect(t.writes[0].body).toEqual({ site_id: 's1', name: 'Bistro — three pages', with_pages: true });
   });
 });
 

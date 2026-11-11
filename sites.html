@@ -101,6 +101,10 @@
   @media (max-width:420px){.sfoot{flex-wrap:wrap}.sfoot .sacts{width:100%}}
   .launch{background:var(--p-soft);border-radius:var(--dds-r,10px);padding:10px 12px;font-size:12.5px;color:var(--p-deep)}
   .launch b{display:block;font-weight:600;color:var(--p-deep)}
+  /* item 145: a site started from another site's pages, until what came across is changed or kept */
+  .copied{background:var(--warn-soft);border-radius:var(--dds-r,10px);padding:10px 12px;font-size:12.5px;color:var(--warn);line-height:1.4}
+  .copied b{display:block;font-weight:600}
+  .copied .sbtn{margin-top:8px;background:var(--card)}
   .sbody{padding:var(--dds-s3,12px) var(--dds-s4,16px) var(--dds-s4,16px);display:flex;flex-direction:column;gap:6px;flex:1}
   .shead{display:flex;align-items:flex-start;gap:var(--dds-s2,8px)}
   .sname{font-size:15.5px;font-weight:600;line-height:1.3;flex:1;min-width:0;overflow-wrap:anywhere}
@@ -199,10 +203,26 @@
       <input id="dup-name" maxlength="120" placeholder="Jane Doe" autocomplete="off">
       <label for="dup-email">Their email</label>
       <input id="dup-email" type="email" maxlength="160" placeholder="jane@acmebakery.com" autocomplete="off">
-      <p class="note">This sets them up as a new customer and emails them a sign-in link, as Add a customer does. Their site starts with this one’s look, services, FAQs, voice and colors. Business details, photos and reviews are never copied, and nothing on this site changes.</p>
+      <p class="note">This sets them up as a new customer and emails them a sign-in link, as Add a customer does. Their site starts with this one’s pages and sections, with their words and photos, the menu and the look, plus its services, FAQs, voice and colors. This business’s name in the words becomes theirs. Business details, reviews, posts and contacts are never copied, and nothing on this site changes.</p>
       <div class="row2"><button type="button" class="btn ghost" id="dup-cancel">Cancel</button><button type="submit" class="btn" id="dup-submit">Duplicate + invite</button></div>
     </div>
     <div id="dup-done" style="display:none"></div>
+  </form>
+</dialog>
+
+<!-- Save as a template (item 145): a site's pages, sections, menu and photos kept as
+     a starting point for new sites (POST /agency/kits with_pages) -->
+<dialog id="tplDlg" aria-labelledby="tplHead">
+  <form id="tplForm" class="dbody">
+    <div id="tpl-fields">
+      <h3 id="tplHead">Save as a template</h3>
+      <p class="note" id="tplFrom" style="margin-top:0"></p>
+      <label for="tpl-name">Template name</label>
+      <input id="tpl-name" maxlength="80" placeholder="Restaurant — three pages" autocomplete="off">
+      <p class="note">Keeps its pages, every section with its words and photos, the menu and the look, plus its services, FAQs, voice and colors. Never its business details, reviews or contacts. A new site made from it lists the words and photos that are still as they were, before it can publish.</p>
+      <div class="row2"><button type="button" class="btn ghost" id="tpl-cancel">Cancel</button><button type="submit" class="btn" id="tpl-save">Save template</button></div>
+    </div>
+    <div id="tpl-done" style="display:none"></div>
   </form>
 </dialog>
 
@@ -296,6 +316,7 @@ function cardHtml(s,i){
       ${s.state==='not_live'?`<div class="launch"><b>Not published yet</b>${s.unpublished_changes?'There is work on it. Open Website to finish and publish.':'Open Website to build and publish it.'}</div>`:''}
       ${s.unpublished_changes&&s.state!=='not_live'?'<div class="sline warn">Changes waiting to be published</div>':''}
       ${s.billing_issue?'<div class="sline warn">Their billing needs a look</div>':''}
+      ${copiedHtml(s)}
       <div class="sstats">
         <div class="sst"><span class="l">Plan</span><div class="sline">${planLine(s.plan)}</div></div>
         <div class="sst"><span class="l">Domain</span>${dom||`<div class="sline">${s.domain?esc(s.domain):'None connected'}</div>`}</div>
@@ -305,12 +326,17 @@ function cardHtml(s,i){
     </div>
   </article>`;
 }
+// item 145: started from another site's pages (or a template) and not live yet: change what's theirs, or keep it
+function copiedHtml(s){
+  if(!s.copied||s.copied.kept||s.state!=='not_live')return'';
+  return `<div class="copied" data-copied="${esc(s.site_id)}"><b>Started from ${esc(s.copied.from)}’s pages</b>Change what belongs to them before you publish. Publishing lists what’s still as copied.${META.can_duplicate?`<br><button type="button" class="sbtn" data-keep="${esc(s.site_id)}">Keep them as they are</button>`:''}</div>`;
+}
 // the three doors into the client; a seat that can't open a client (the server says) gets the live site only
 function doorsHtml(s){
   if(!META.can_open)return s.address&&s.state!=='not_live'?`<a class="sbtn" href="${esc(s.address)}" target="_blank" rel="noopener">View live site</a>`:'';
   return `<a class="sbtn main" href="${esc(scoped('/presence.html',s.site_id))}">Website</a><a class="sbtn" href="${esc(scoped('/analytics.html',s.site_id))}">Analytics</a><a class="sbtn" href="${esc(scoped('/settings.html',s.site_id))}">Settings</a>`;
 }
-function menuBtnHtml(s){return `<button type="button" class="more" data-menu="${esc(s.site_id)}" aria-haspopup="menu" aria-expanded="false" aria-label="More for ${esc(s.name||'this site')}" title="Pin, duplicate, open">⋯</button>`;}
+function menuBtnHtml(s){return `<button type="button" class="more" data-menu="${esc(s.site_id)}" aria-haspopup="menu" aria-expanded="false" aria-label="More for ${esc(s.name||'this site')}" title="Pin, duplicate, save as a template, open">⋯</button>`;}
 
 // ── the table: columns that sort; re-rendered freely (it has no pictures) ──
 const COLS=[
@@ -461,7 +487,8 @@ function wireFrame(){
   const rf=$('refreshBtn');if(rf)rf.addEventListener('click',()=>{load(true).then(()=>{const nr=$('refreshBtn');if(nr)nr.focus();});mountNeeds();});
   const grid=$('grid');
   if(grid){
-    grid.addEventListener('click',(e)=>{const mb=e.target.closest('[data-menu]');if(mb){e.stopPropagation();toggleMenu(mb.getAttribute('data-menu'));}});
+    grid.addEventListener('click',(e)=>{const mb=e.target.closest('[data-menu]');if(mb){e.stopPropagation();toggleMenu(mb.getAttribute('data-menu'));return;}
+      const kb=e.target.closest('[data-keep]');if(kb){e.stopPropagation();keepCopied(kb);}});
     sizeThumbs(grid);
   }
 }
@@ -528,6 +555,7 @@ function menuHtml(s){
   return `<div class="rowmenu" role="menu" data-menufor="${esc(s.site_id)}" aria-label="More for ${esc(s.name||'this site')}">
     ${META.can_pin?`<button type="button" role="menuitem" data-pin="${esc(s.site_id)}">${s.pinned?'Unpin':'Pin to top'}</button>`:''}
     ${META.can_duplicate&&s.thumb?`<button type="button" role="menuitem" data-dup="${esc(s.site_id)}">Duplicate site</button>`:''}
+    ${META.can_duplicate&&s.thumb?`<button type="button" role="menuitem" data-tpl="${esc(s.site_id)}">Save as a template</button>`:''}
     ${live?`<a role="menuitem" href="${esc(s.address)}" target="_blank" rel="noopener">View live site</a>`:''}
     ${META.can_open?`<a role="menuitem" href="${esc(scoped('/crm.html',s.site_id))}">Open record</a>`:''}
   </div>`;
@@ -547,6 +575,7 @@ function paintMenu(){
   m.addEventListener('keydown',(e)=>{if(e.key==='Escape'){e.stopPropagation();const id=MENU_OPEN;MENU_OPEN=null;paintMenu();const b=visibleMenuBtn(id);if(b)b.focus();}});
   const pb=m.querySelector('[data-pin]');if(pb)pb.addEventListener('click',()=>togglePin(s.site_id));
   const db=m.querySelector('[data-dup]');if(db)db.addEventListener('click',()=>{MENU_OPEN=null;paintMenu();openDuplicate(s.site_id);});
+  const tb=m.querySelector('[data-tpl]');if(tb)tb.addEventListener('click',()=>{MENU_OPEN=null;paintMenu();openTemplate(s.site_id);});
 }
 const isShown=(el)=>!!(el&&el.offsetParent!==null);
 function visibleMenuBtn(id){return [...document.querySelectorAll('[data-menu="'+CSS.escape(id)+'"]')].find(isShown)||null;}
@@ -591,8 +620,11 @@ $('dup-cancel').onclick=()=>$('dupDlg').close();
 async function dupCopy(src,made){
   let k=null;try{k=await apiSend('POST','/agency/sites/'+encodeURIComponent(src.site_id)+'/duplicate',{site_id:made.site_id});}catch(_){k=null;}
   const invite=made.invited===false?'The invitation email to '+esc(made.email)+' didn’t go out — share their sign-in page instead.':'Invitation sent to '+esc(made.email)+'.';
-  if(k&&k.ok){const a=(k.body&&k.body.data)||{};const got=[a.look?'the '+a.look+' look':'',a.applied&&a.applied.offerings?a.applied.offerings+' service'+(a.applied.offerings===1?'':'s'):'',a.applied&&a.applied.faqs?a.applied.faqs+' FAQ'+(a.applied.faqs===1?'':'s'):'',a.applied&&a.applied.voice?'the voice':'',a.applied&&a.applied.colors?'the colors':''].filter(Boolean);
-    return{copied:true,heading:'Site duplicated',line:esc(made.business_name)+'’s site starts with '+esc(got.length?got.join(', '):'this site’s setup')+'. '+invite};}
+  if(k&&k.ok){const a=(k.body&&k.body.data)||{},pg=a.pages||null;const n=(c,w)=>c+' '+w+(c===1?'':'s');
+    const got=[pg?(pg.pages?n(pg.pages,'page')+' and ':'')+n(pg.sections,'section'):'',pg&&pg.photos?n(pg.photos,'photo'):'',pg&&pg.menu?'the menu':'',a.look?'the '+a.look+' look':'',a.applied&&a.applied.offerings?n(a.applied.offerings,'service'):'',a.applied&&a.applied.faqs?n(a.applied.faqs,'FAQ'):'',a.applied&&a.applied.voice?'the voice':'',a.applied&&a.applied.colors?'the colors':''].filter(Boolean);
+    // item 145: copied words and photos wait to be changed or kept before the new site can publish
+    const after=pg?' Before you publish, change what belongs to '+esc(src.name||'this site')+', or keep it from the new site’s card.':'';
+    return{copied:true,heading:'Site duplicated',line:esc(made.business_name)+'’s site starts with '+esc(got.length?got.join(', '):'this site’s setup')+'.'+after+' '+invite};}
   const why=k&&k.body&&k.body.message?esc(k.body.message):(k?'Copying the setup didn’t go through.':'We lost the connection while copying the setup.');
   return{copied:false,heading:'Set up, but nothing was copied',line:why+' Their account is ready. '+invite};
 }
@@ -627,6 +659,50 @@ $('dupForm').onsubmit=async(e)=>{
   paintDupDone(src,res);
   load(true);
 };
+
+// ── Save as a template (item 145): this site's pages, sections, menu and photos kept as a
+//    starting point (POST /agency/kits with_pages); new sites pick it under "Start from". ──
+let TPL_SITE=null,TPL_BUSY=false;
+function openTemplate(id){
+  const s=SITES.find(x=>x.site_id===id);if(!s)return;
+  TPL_SITE=id;$('tplFrom').textContent='From '+(s.name||'this site')+'’s site.';$('tpl-name').value='';
+  $('tpl-fields').style.display='';$('tpl-done').style.display='none';$('tpl-done').innerHTML='';
+  const b=$('tpl-save');b.disabled=false;b.textContent='Save template';
+  $('tplDlg').showModal();$('tpl-name').focus();
+}
+$('tpl-cancel').onclick=()=>$('tplDlg').close();
+$('tplForm').onsubmit=async(e)=>{
+  e.preventDefault();if(TPL_BUSY)return;
+  const name=$('tpl-name').value.trim();
+  if(!name){toast('Name the template.',true);$('tpl-name').focus();return;}
+  TPL_BUSY=true;const btn=$('tpl-save');btn.disabled=true;btn.textContent='Saving…';
+  let r=null;
+  try{r=await apiSend('POST','/agency/kits',{site_id:TPL_SITE,name,with_pages:true});}
+  catch(_){toast('We lost the connection, so we can’t tell whether it saved. Look under Start from before saving it again.',true);}
+  finally{TPL_BUSY=false;}
+  if(!r||!r.ok){if(r)toast((r.body&&r.body.message)||'That didn’t save.',true);btn.disabled=false;btn.textContent='Save template';return;}
+  const d=(r.body&&r.body.data)||{},sm=d.summary||{};const n=(c,w)=>(c||0)+' '+w+(c===1?'':'s');
+  $('tpl-fields').style.display='none';
+  const done=$('tpl-done');
+  done.innerHTML=`<div class="done"><div class="tick" aria-hidden="true">✓</div><h3 style="margin:0 0 4px">Saved “${esc(name)}”</h3><p>${esc([sm.pages?n(sm.pages,'page'):'',n(sm.sections,'section'),sm.photos?n(sm.photos,'photo'):''].filter(Boolean).join(', '))}. Pick it under Start from when you make a new site.</p></div><div class="row2"><button type="button" class="btn" id="tpl-close">Done</button></div>`;
+  done.style.display='';
+  const cl=$('tpl-close');cl.focus();cl.onclick=()=>$('tplDlg').close();
+};
+
+// ── Keep them as they are (item 145): a two-press action, as Home's archive is. Copied
+//    words and photos may then publish as they are (POST /agency/sites/:id/copied). ──
+let KEEP_BUSY=false;
+async function keepCopied(b){
+  const id=b.getAttribute('data-keep');const s=SITES.find(x=>x.site_id===id);if(!s||KEEP_BUSY)return;
+  if(!b.dataset.armed){b.dataset.armed='1';b.textContent='Keep everything copied from '+(s.copied&&s.copied.from||'there')+'? Press again';setTimeout(()=>{if(b.isConnected){delete b.dataset.armed;b.textContent='Keep them as they are';}},4000);return;}
+  KEEP_BUSY=true;b.disabled=true;
+  let r=null;try{r=await apiSend('POST','/agency/sites/'+encodeURIComponent(id)+'/copied',{keep:true});}catch(_){r=null;}
+  KEEP_BUSY=false;
+  if(!r||!r.ok){toast((r&&r.body&&r.body.message)||'That didn’t save.',true);b.disabled=false;delete b.dataset.armed;b.textContent='Keep them as they are';return;}
+  s.copied={from:(s.copied&&s.copied.from)||'',kept:true};
+  const box=document.querySelector('[data-copied="'+CSS.escape(id)+'"]');if(box)box.remove();
+  toast('Kept. '+(s.name||'The site')+' can publish with what was copied.');
+}
 
 // ── Home's Needs you, laid over the status words (the same list, so the two never disagree) ──
 let NSEQ=0;
