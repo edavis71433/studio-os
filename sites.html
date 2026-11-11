@@ -172,6 +172,21 @@
   .btn.ghost{background:transparent;border:1px solid var(--line);color:var(--ink)}
   .btn:disabled{opacity:.6;cursor:default}
   a.link{color:var(--p);text-decoration:none;font-weight:500}a.link:hover{text-decoration:underline}
+  /* item 154: Move to trash asks first; the Trash sits at the foot of the page */
+  .btn.danger{background:var(--bad);color:#fff}
+  .rowmenu .danger{color:var(--bad)}
+  .dbody ul.points{margin:4px 0 0;padding-left:18px;font-size:13.5px;color:var(--soft);line-height:1.5}
+  .dbody ul.points li{margin:6px 0}
+  .trash{margin-top:var(--dds-s7,32px)}
+  .trash .nhead span.hint{font-size:12.5px;color:var(--faint)}
+  .tlist{background:var(--card);border:1px solid var(--line);border-radius:var(--dds-r-lg,14px);box-shadow:var(--shadow);overflow:hidden}
+  .trow{display:flex;align-items:center;gap:12px;padding:12px 16px;border-top:1px solid var(--line)}
+  .trow:first-child{border-top:none}
+  .trow .ti{width:34px;height:34px;border-radius:var(--dds-r,10px);background:var(--bg);color:var(--faint);display:grid;place-items:center;font-weight:700;flex:0 0 auto}
+  .trow .tw{flex:1;min-width:0;font-size:12.5px;color:var(--soft);line-height:1.4}
+  .trow .tw b{display:block;font-size:14px;font-weight:600;color:var(--ink)}
+  .trow .tw .soon{color:var(--warn)}
+  @media (max-width:520px){.trow{flex-wrap:wrap}.trow .ti{display:none}.trow .sbtn{margin-left:0}}
   .center{text-align:center;padding:52px var(--dds-s5,20px)}.center h2{font-family:var(--serif);font-weight:500;font-size:22px;margin:0 0 var(--dds-s2,8px)}
   .muted{color:var(--soft);font-size:14px}
   .spin{width:22px;height:22px;border:2.5px solid var(--line);border-top-color:var(--p);border-radius:50%;animation:sp .8s linear infinite;margin:var(--dds-s8,40px) auto}
@@ -203,6 +218,15 @@
       <div class="row2"><button type="button" class="btn ghost" id="dup-cancel">Cancel</button><button type="submit" class="btn" id="dup-submit">Duplicate + invite</button></div>
     </div>
     <div id="dup-done" style="display:none"></div>
+  </form>
+</dialog>
+
+<!-- Move to trash (item 154): asks first, says what happens (POST /agency/sites/:id/trash) -->
+<dialog id="trashDlg" aria-labelledby="trashHead">
+  <form id="trashForm" class="dbody">
+    <h3 id="trashHead">Move this site to the trash?</h3>
+    <ul class="points" id="trashPoints"></ul>
+    <div class="row2"><button type="button" class="btn ghost" id="trash-cancel">Cancel</button><button type="submit" class="btn danger" id="trash-go">Move to trash</button></div>
   </form>
 </dialog>
 
@@ -241,7 +265,8 @@ const day=(iso)=>{if(!iso)return'';const d=new Date(iso);return isNaN(d)?'':d.to
 const hostOf=(u)=>String(u||'').replace(/^https?:\/\//,'').replace(/\/.*$/,'');
 const scoped=(path,id)=>path+'?client='+encodeURIComponent(id);
 
-let SITES=[],META={can_open:false,can_pin:false,can_duplicate:false,partial:false},LOADED_AT=0,Q='',REQ_SEQ=0;
+let SITES=[],META={can_open:false,can_pin:false,can_duplicate:false,can_trash:false,partial:false},LOADED_AT=0,Q='',REQ_SEQ=0;
+let TRASH=[],TRASH_DAYS=90;   // item 154: the Trash at the foot of the page
 let NEXT={},NEEDS_ROWS=[];   // Home's Needs you: by site (next_by_site) and its rows (for the strip up top)
 let FILTER='all';            // all · needs · live · notlive · elsewhere · changes · domains
 const DISPLAY_KEY='dds-display:sites';
@@ -430,6 +455,7 @@ function render(){
     h+=`<div id="tableHost"${DISPLAY==='table'?'':' hidden'}></div>`;
     h+=`<div class="center" id="noMatch" hidden><p class="muted">No sites match that.</p></div>`;
   }
+  h+=`<div id="trashHost">${trashHtml()}</div>`;
   $('main').innerHTML=h;
   wireFrame();
   applyView();
@@ -459,6 +485,7 @@ function wireFrame(){
   if(dc)dc.addEventListener('click',()=>setD('cards'));
   if(dt)dt.addEventListener('click',()=>setD('table'));
   const rf=$('refreshBtn');if(rf)rf.addEventListener('click',()=>{load(true).then(()=>{const nr=$('refreshBtn');if(nr)nr.focus();});mountNeeds();});
+  const th2=$('trashHost');if(th2)th2.addEventListener('click',(e)=>{const rb=e.target.closest('[data-restore]');if(rb)restoreSite(rb);});
   const grid=$('grid');
   if(grid){
     grid.addEventListener('click',(e)=>{const mb=e.target.closest('[data-menu]');if(mb){e.stopPropagation();toggleMenu(mb.getAttribute('data-menu'));}});
@@ -530,6 +557,7 @@ function menuHtml(s){
     ${META.can_duplicate&&s.thumb?`<button type="button" role="menuitem" data-dup="${esc(s.site_id)}">Duplicate site</button>`:''}
     ${live?`<a role="menuitem" href="${esc(s.address)}" target="_blank" rel="noopener">View live site</a>`:''}
     ${META.can_open?`<a role="menuitem" href="${esc(scoped('/crm.html',s.site_id))}">Open record</a>`:''}
+    ${META.can_trash?`<button type="button" role="menuitem" class="danger" data-trash="${esc(s.site_id)}">Move to trash</button>`:''}
   </div>`;
 }
 function paintMenu(){
@@ -547,6 +575,7 @@ function paintMenu(){
   m.addEventListener('keydown',(e)=>{if(e.key==='Escape'){e.stopPropagation();const id=MENU_OPEN;MENU_OPEN=null;paintMenu();const b=visibleMenuBtn(id);if(b)b.focus();}});
   const pb=m.querySelector('[data-pin]');if(pb)pb.addEventListener('click',()=>togglePin(s.site_id));
   const db=m.querySelector('[data-dup]');if(db)db.addEventListener('click',()=>{MENU_OPEN=null;paintMenu();openDuplicate(s.site_id);});
+  const tb=m.querySelector('[data-trash]');if(tb)tb.addEventListener('click',()=>{MENU_OPEN=null;paintMenu();openTrash(s.site_id);});
 }
 const isShown=(el)=>!!(el&&el.offsetParent!==null);
 function visibleMenuBtn(id){return [...document.querySelectorAll('[data-menu="'+CSS.escape(id)+'"]')].find(isShown)||null;}
@@ -628,6 +657,51 @@ $('dupForm').onsubmit=async(e)=>{
   load(true);
 };
 
+// ── Move to trash (item 154): offline at once, out of every list, back with one press for
+//    90 days, then deleted for good (POST /agency/sites/:id/trash; ops/site_trash.ts). ──
+let TRASH_SITE=null,TRASH_BUSY=false;
+const longDay=(d)=>d.toLocaleDateString('en-US',{month:'short',day:'numeric',year:d.getFullYear()===new Date().getFullYear()?undefined:'numeric'});
+function openTrash(id){
+  const s=SITES.find(x=>x.site_id===id);if(!s)return;
+  TRASH_SITE=id;$('trashHead').textContent='Move '+(s.name||'this site')+' to the trash?';
+  const goes=longDay(new Date(Date.now()+TRASH_DAYS*86400000)),live=s.state!=='not_live'&&s.state!=='elsewhere';
+  $('trashPoints').innerHTML=[
+    live?'It goes offline now: visitors see a short “temporarily offline” page.':'Nothing is online to take down: it was never published.',
+    'It leaves Sites and Home. For '+TRASH_DAYS+' days you can restore it from the Trash at the foot of this page.',
+    'On '+esc(goes)+' it’s deleted for good: its website comes down. If its owner signs in, they keep their sign-in, files and invoices.',
+    s.domain?'Its domain, '+esc(s.domain)+', isn’t cancelled. It stays wherever it was bought; point it elsewhere if the business still needs it.':'',
+  ].filter(Boolean).map(t=>'<li>'+t+'</li>').join('');
+  const b=$('trash-go');b.disabled=false;b.textContent='Move to trash';
+  $('trashDlg').showModal();$('trash-cancel').focus();
+}
+$('trash-cancel').onclick=()=>$('trashDlg').close();
+$('trashForm').onsubmit=async(e)=>{
+  e.preventDefault();if(TRASH_BUSY)return;
+  const s=SITES.find(x=>x.site_id===TRASH_SITE);if(!s)return;
+  TRASH_BUSY=true;const b=$('trash-go');b.disabled=true;b.textContent='Moving…';
+  let r=null;try{r=await apiSend('POST','/agency/sites/'+encodeURIComponent(s.site_id)+'/trash');}catch(_){r=null;}
+  TRASH_BUSY=false;
+  if(!r||!r.ok){toast((r&&r.body&&r.body.message)||'We lost the connection, so we can’t tell whether it moved. Refresh to see.',true);b.disabled=false;b.textContent='Move to trash';return;}
+  $('trashDlg').close();
+  toast((s.name||'The site')+' is in the trash'+(r.body.data&&r.body.data.offline?' and offline':'')+'. Restore it from the foot of the page within '+TRASH_DAYS+' days.');
+  load(true);
+};
+// the Trash at the foot of the page: newest first, with the day each goes for good
+function trashHtml(){
+  if(!TRASH.length)return'';
+  const left=(t)=>t.days_left==null?'':t.days_left===0?'Deleted for good today':'Deleted for good '+longDay(new Date(t.goes_at))+' · '+t.days_left+' day'+(t.days_left===1?'':'s')+' left';
+  return `<section class="trash" aria-labelledby="trashH"><div class="nhead"><h2 id="trashH">Trash</h2><span class="count">${TRASH.length}</span><span class="hint">Deleted for good ${TRASH_DAYS} days after they were moved here</span></div>
+    <div class="tlist">${TRASH.map(t=>`<div class="trow" data-trashrow="${esc(t.site_id)}"><span class="ti" aria-hidden="true">${esc(initial(t.name))}</span><span class="tw"><b>${esc(t.name||'(unnamed)')}</b>Moved ${esc(day(t.trashed_at))}${t.was_live?' · offline since then':''}<br><span class="${t.days_left!=null&&t.days_left<=14?'soon':''}">${esc(left(t))}</span></span>${META.can_trash?`<button type="button" class="sbtn" data-restore="${esc(t.site_id)}" aria-label="Restore ${esc(t.name||'this site')}">Restore</button>`:''}</div>`).join('')}</div></section>`;
+}
+async function restoreSite(b){
+  const id=b.getAttribute('data-restore');const t=TRASH.find(x=>x.site_id===id);if(!t||b.disabled)return;
+  b.disabled=true;b.textContent='Restoring…';
+  let r=null;try{r=await apiSend('POST','/agency/sites/'+encodeURIComponent(id)+'/restore');}catch(_){r=null;}
+  if(!r||!r.ok){toast((r&&r.body&&r.body.message)||'That didn’t go through.',true);b.disabled=false;b.textContent='Restore';return;}
+  toast('Restored '+(t.name||'the site')+'.'+(t.was_live?' It stays offline until you publish it or bring it back online.':''));
+  load(true);
+}
+
 // ── Home's Needs you, laid over the status words (the same list, so the two never disagree) ──
 let NSEQ=0;
 async function mountNeeds(){
@@ -665,7 +739,8 @@ async function load(soft){
     trouble();return;
   }
   SITES=Array.isArray(r.body.data)?r.body.data:[];
-  META={can_open:r.body.can_open!==false,can_pin:!!r.body.can_pin,can_duplicate:!!r.body.can_duplicate,partial:!!r.body.partial};
+  META={can_open:r.body.can_open!==false,can_pin:!!r.body.can_pin,can_duplicate:!!r.body.can_duplicate,can_trash:!!r.body.can_trash,partial:!!r.body.partial};
+  TRASH=Array.isArray(r.body.trash)?r.body.trash:[];TRASH_DAYS=Number(r.body.trash_days)||90;
   LOADED_AT=Date.now();MENU_OPEN=null;
   render();
 }

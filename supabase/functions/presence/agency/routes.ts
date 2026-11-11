@@ -232,7 +232,7 @@ async function handleAgencyInner(req: Request, route: string, method: string, me
     // which sites are archived, alongside the list: the roster page folds the
     // bridge list (/studio/customers) into these rows and must NOT give an
     // archived client a fresh bridge-only row in All. Same read, no second gather.
-    const archivedSiteIds = all.filter((r) => r.archived).map((r) => r.site_id);
+    const archivedSiteIds = all.filter((r) => r.archived || r.trashed).map((r) => r.site_id);   // item 154: nor a trashed one
     return json({ data: out, archived_site_ids: archivedSiteIds }, 200, cors);
   }
 

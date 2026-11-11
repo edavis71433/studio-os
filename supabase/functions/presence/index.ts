@@ -52,6 +52,7 @@ import { handleAssetsList, handleAssetsCollections, handleAssetsHealth, handleAs
 const { handleVisualKinds, handleVisualGenerate, handleVisualList, handleVisualGet, handleVisualVary, handleVisualEdit, handleVisualDecide } = lazyRoutes(() => import('./routes/visual.ts'));
 const { handleAdmin, handleDomain } = lazyRoutes(() => import('./routes/admin.ts'));
 import { handleCollection, handleLocation, handleSettings, handleBlockSuggestions, handlePageDuplicate, handlePageRefs, SPECS } from './routes/content.ts';
+import { handleDeletedPages, handleDeletedPageRestore } from './routes/deleted_pages.ts';
 import { handleHealth, handleChanges, handleContentTree, handleNotesList, handleNoteResolve, handleRestoreToDraft, handleMediaList } from './routes/room.ts';
 const { handleWebsiteTimeline } = lazyRoutes(() => import('./routes/timeline.ts'));
 const { handleWebsiteHealth } = lazyRoutes(() => import('./routes/health_page.ts'));
@@ -1216,6 +1217,8 @@ async function route_(req: Request, cors: Record<string, string>): Promise<Respo
   //    create-with-source over the ONE pages store; refs = delete-awareness) ──
   if (route === '/pages/duplicate' && method === 'POST') return handlePageDuplicate(req, db, site, principal, cors);
   if (route === '/pages/refs' && method === 'GET') return handlePageRefs(req, site, cors);
+  if (route === '/pages/deleted' && method === 'GET') return handleDeletedPages(site, cors);   // item 154: pages deleted in the last 30 days
+  { const dm = route.match(/^\/pages\/deleted\/([0-9a-f-]{36})\/restore$/); if (dm && method === 'POST') return handleDeletedPageRestore(req, db, site, principal, dm[1], cors); }
   if (route === '/blocks/suggested' && method === 'GET') return handleBlockSuggestions(site, cors);   // FD-T4 vertical presets
   {
     const m = route.match(/^\/(offerings|testimonials|faqs|posts)(?:\/([0-9a-f-]{36}))?$/);

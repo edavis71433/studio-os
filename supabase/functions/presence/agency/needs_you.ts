@@ -150,7 +150,7 @@ const providerLabel = (k: string) => PROVIDER_LABEL[k] || k.replace(/[_-]+/g, ' 
 export function buildNeedsYou(i: NeedsInput): NeedsRow[] {
   const today = ymdOf(i.nowIso) || '';
   const active = new Set((i.links || []).filter((l) => l.status === 'active').map((l) => l.site_id));
-  const archivedSites = new Set((i.links || []).filter((l) => l.status === 'archived').map((l) => l.site_id));
+  const archivedSites = new Set((i.links || []).filter((l) => l.status === 'archived' || l.status === 'trashed').map((l) => l.site_id));   // item 154: a trashed site asks for nothing
   const names = i.clientNames || {};
   const byClient = i.namesByClient || {};
   const nameOf = (siteId?: string | null, clientId?: string | null, fallback = 'A customer') =>

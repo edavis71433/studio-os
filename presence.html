@@ -1864,6 +1864,8 @@ body.pd-dragging *{cursor:grabbing !important}
         <h1 class="doc" role="heading" aria-level="2">Versions</h1>
         <p class="docsub">Every version you publish is saved here. View one, compare it, or restore it to your draft. Your live site changes only when you publish.</p>
         <div id="pubList"></div>
+        <!-- item 154: pages deleted in the last 30 days, each with Put back (routes/deleted_pages.ts) -->
+        <div id="deletedPagesBox"></div>
         <!-- what happened to the site, newest first (was its own page: timeline.html) -->
         <section class="hb-sec" id="activitySec" aria-labelledby="activityH" tabindex="-1" hidden>
           <div class="hb-sec-h"><h2 id="activityH">Recent activity</h2><button type="button" class="quietact" id="activityMore" hidden>See all</button></div>
@@ -6875,6 +6877,45 @@ async function siteBringOnline() {
 // Reuses the named-snapshot substrate (checkpoints are stored like launches);
 // preview reuses the launch-preview door, "bring into draft" reuses the shared
 // restore-to-draft engine. The live site is never touched.
+// ── Recently deleted pages (builder list item 154) ──────────────────────────
+// Restoring a version or a checkpoint never brings a page back (the draft writer
+// leaves pages alone), so every deleted page is kept 30 days on the server, exactly
+// as it was. Put back adds that one page to the draft; nothing else changes, and the
+// live site waits for a publish. Shown only when there is something to put back.
+async function renderDeletedPages() {
+  const box = $("deletedPagesBox"); if (!box) return;
+  let rows = [];
+  try { const d = (await api("GET", "/pages/deleted")).data; rows = Array.isArray(d) ? d : []; } catch (_) { box.innerHTML = ""; return; }
+  box.innerHTML = "";
+  if (!rows.length) return;
+  const card = el("div", "field"); card.style.margin = "18px 0";
+  card.appendChild(el("label", null, "Recently deleted pages"));
+  card.appendChild(el("div", "hint", "Kept for 30 days. Putting one back adds it to your pages as it was; nothing else changes, and your live site waits until you publish."));
+  rows.forEach((p) => {
+    const row = el("div"); row.style.cssText = "display:flex;align-items:center;gap:10px;flex-wrap:wrap;border-top:1px solid var(--line,#e5e5e5);padding:10px 0;margin-top:8px";
+    const words = el("div"); words.style.cssText = "flex:1;min-width:0";
+    words.appendChild(Object.assign(el("strong", null, p.title || p.slug), { style: "display:block;font-size:13.5px" }));
+    const d = new Date(p.deleted_at);
+    const left = p.days_left === 1 ? "1 day left" : (p.days_left || 0) + " days left";
+    words.appendChild(Object.assign(el("span", null, "Deleted " + d.toLocaleDateString("en-US", { month: "short", day: "numeric" }) + " · " + (p.sections === 1 ? "1 section" : (p.sections || 0) + " sections") + " · " + left), { style: "font-size:12px;color:var(--soft,#666)" }));
+    row.appendChild(words);
+    const back = el("button", null, "Put back"); back.type = "button";
+    back.setAttribute("aria-label", "Put back the page " + (p.title || p.slug));
+    back.style.cssText = "font:inherit;font-size:12px;padding:6px 14px;border-radius:999px;border:1px solid var(--line,#ddd);background:transparent;cursor:pointer;min-height:36px";
+    back.addEventListener("click", async () => {
+      if (back.disabled) return;
+      back.disabled = true; back.textContent = "Putting back…";
+      try {
+        const r = (await api("POST", `/pages/deleted/${p.id}/restore`, {})).data || {};
+        toast("“" + (r.title || p.title) + "” is back in your pages" + (r.moved ? " as /" + r.slug + "/" : ""));
+        await refreshAll(); renderDeletedPages();
+      } catch (err) { toast(nice(err), true); back.disabled = false; back.textContent = "Put back"; }
+    });
+    row.appendChild(back);
+    card.appendChild(row);
+  });
+  box.appendChild(card);
+}
 async function renderCheckpoints() {
   const box = $("checkpointBox"); if (!box) return;
   let cps = [];
@@ -7004,6 +7045,7 @@ function renderVersionTools() {
 async function loadHistory() {
   renderPreviewPanel();   // FD-T20/T21: Draft → Preview → Live sits at the top
   renderCheckpoints();    // named draft safety points
+  renderDeletedPages();   // item 154: pages deleted in the last 30 days, one at a time back
   renderLaunches();   // FD-T7: staged launches sit above the version journal
   const more = $("versionMore");
   if (more && !more.dataset.set) { more.dataset.set = "1"; more.open = !!S.isStudio; }
