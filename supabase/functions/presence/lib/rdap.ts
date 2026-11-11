@@ -37,19 +37,66 @@ export function daysUntil(iso: string | null | undefined, nowIso: string): numbe
   return Math.floor((t - n) / 86400_000);
 }
 
-/** Registrar-aware pointer (FD-INF2-lite): where "manage DNS / renew" lives, in
- *  each registrar's own words. Generic fallback keeps the sentence honest. */
+// ── Where things live at each company (FD-INF2-lite; item 162, review domains findings 6 and 7) ──
+// One table for every sentence that names a company: where its records are edited,
+// where renewal lives, and its sign-in page (each checked to answer, Nov 11 2026).
+// The records live at the company that runs the DNS, which is often not the one the
+// name was bought from, so steps for records use the DNS company and steps for
+// renewal use the seller.
+export interface ProviderGuide { company: string; sign_in: string; records: string; renewal: string; tip: string }
+const GUIDES: Array<[RegExp, ProviderGuide]> = [
+  [/godaddy/, { company: 'GoDaddy', sign_in: 'https://sso.godaddy.com/', records: 'My Products, then your domain, then Manage DNS', renewal: 'Renewals & Billing',
+    tip: 'At GoDaddy: My Products → your domain → Manage DNS (renewal lives under Billing).' }],
+  [/namecheap/, { company: 'Namecheap', sign_in: 'https://ap.www.namecheap.com/domains/list/', records: 'Domain List, then Manage next to your domain, then Advanced DNS', renewal: 'the Auto-Renew switch on the same Domain List',
+    tip: 'At Namecheap: Domain List → Manage → Advanced DNS (renewal is on the same page).' }],
+  [/cloudflare/, { company: 'Cloudflare', sign_in: 'https://dash.cloudflare.com/', records: 'your domain, then DNS, then Records', renewal: 'Domain Registration, then Manage Domains',
+    tip: 'At Cloudflare: the domain’s dashboard → DNS (registrar renewals are under Domain Registration).' }],
+  [/squarespace|google/, { company: 'Squarespace Domains', sign_in: 'https://account.squarespace.com/domains', records: 'Domains, then your domain, then DNS', renewal: 'your domain’s own page, under Auto-renew',
+    tip: 'At Squarespace Domains (Google Domains moved there): Domains → your domain → DNS.' }],
+  [/porkbun/, { company: 'Porkbun', sign_in: 'https://porkbun.com/account/domainsSpeedy', records: 'Domain Management, then DNS under your domain', renewal: 'the Auto Renew switch in Domain Management',
+    tip: 'At Porkbun: Domain Management → the gear icon → DNS records.' }],
+  [/wix/, { company: 'Wix', sign_in: 'https://manage.wix.com/account/domains', records: 'Domains, then your domain, then Manage DNS records', renewal: 'Domains, then your domain, then Auto-renew',
+    tip: 'At Wix: Domains → your domain → Manage DNS records.' }],
+  [/network solutions|networksolutions|worldnic/, { company: 'Network Solutions', sign_in: 'https://www.networksolutions.com/my-account/login', records: 'My Domain Names, then Manage, then DNS', renewal: 'My Domain Names, then Auto-renew',
+    tip: 'At Network Solutions: Account Manager → My Domain Names → Manage → DNS.' }],
+  [/ionos|1&1|1and1/, { company: 'IONOS', sign_in: 'https://my.ionos.com/', records: 'Domains & SSL, then your domain, then DNS', renewal: 'Domains & SSL, then your domain, then Contract',
+    tip: 'At IONOS: Domains & SSL → your domain → DNS.' }],
+  [/amazon|route 53|route53|awsdns/, { company: 'Amazon Route 53', sign_in: 'https://console.aws.amazon.com/route53/', records: 'Hosted zones, then your domain, then Create record', renewal: 'Registered domains, then your domain, then Auto-renew',
+    tip: 'At Amazon Route 53: Hosted zones → your domain → Create record.' }],
+  [/hover/, { company: 'Hover', sign_in: 'https://www.hover.com/signin', records: 'your domain, then the DNS tab', renewal: 'your domain, then Auto-renew',
+    tip: 'At Hover: your domain → the DNS tab.' }],
+  [/dnsimple/, { company: 'DNSimple', sign_in: 'https://dnsimple.com/login', records: 'Domains, then your domain, then DNS', renewal: 'your domain, then Auto-renewal',
+    tip: 'At DNSimple: Domains → your domain → DNS.' }],
+  [/digitalocean/, { company: 'DigitalOcean', sign_in: 'https://cloud.digitalocean.com/login', records: 'Networking, then Domains, then your domain', renewal: 'the company the name was bought from',
+    tip: 'At DigitalOcean: Networking → Domains → your domain.' }],
+];
+/** Pure: the guide for a company, by any of its names (a registrar's "GoDaddy.com, LLC", a
+ *  DNS company from dnsHostOf, a nameserver). Null when we don't know the company. */
+export function providerGuide(name: string | null | undefined): ProviderGuide | null {
+  const n = String(name || '').toLowerCase();
+  if (!n) return null;
+  for (const [re, g] of GUIDES) if (re.test(n)) return g;
+  return null;
+}
+
+/** Registrar-aware pointer: where "manage DNS / renew" lives, in each company's own
+ *  words (from the table above). Generic fallback keeps the sentence honest. */
 export function registrarTip(registrar: string): string {
-  const r = registrar.toLowerCase();
-  if (r.includes('godaddy')) return 'At GoDaddy: My Products → your domain → Manage DNS (renewal lives under Billing).';
-  if (r.includes('namecheap')) return 'At Namecheap: Domain List → Manage → Advanced DNS (renewal is on the same page).';
-  if (r.includes('cloudflare')) return 'At Cloudflare: the domain’s dashboard → DNS (registrar renewals are under Domain Registration).';
-  if (r.includes('squarespace') || r.includes('google')) return 'At Squarespace Domains (Google Domains moved there): Domains → your domain → DNS.';
-  if (r.includes('porkbun')) return 'At Porkbun: Domain Management → the gear icon → DNS records.';
-  if (r.includes('wix')) return 'At Wix: Domains → your domain → Manage DNS records.';
-  if (r.includes('network solutions')) return 'At Network Solutions: Account Manager → My Domain Names → Manage → DNS.';
-  if (r.includes('ionos')) return 'At IONOS: Domains & SSL → your domain → DNS.';
+  const g = providerGuide(registrar);
+  if (g) return g.tip;
   return registrar ? `Your registrar is ${registrar} — their dashboard has a DNS / renewal section.` : '';
+}
+
+/** Pure: where the client goes for each job (findings 6 and 7). Records at the DNS company
+ *  (falling back to the seller when the DNS company isn't known); renewal at the seller. */
+export function whereToGo(registrar: string | null | undefined, dnsHost: string | null | undefined) {
+  const recordsAt = providerGuide(dnsHost) || (dnsHost ? null : providerGuide(registrar));
+  const renewAt = providerGuide(registrar);
+  return {
+    registrar: String(registrar || ''), dns_host: String(dnsHost || ''),
+    records_at: recordsAt ? { company: recordsAt.company, sign_in: recordsAt.sign_in, path: recordsAt.records } : (dnsHost ? { company: String(dnsHost), sign_in: '', path: '' } : null),
+    renew_at: renewAt ? { company: renewAt.company, sign_in: renewAt.sign_in, path: renewAt.renewal } : (registrar ? { company: String(registrar), sign_in: '', path: '' } : null),
+  };
 }
 
 /** Pure: the names to ask the registry about, most specific first. Registration
@@ -138,6 +185,19 @@ export function registryWarnings(f: Pick<RdapFacts, 'lock' | 'statuses'> | null)
 
 export type RdapResult = { status: 'ok'; name: string; info: RdapInfo; facts: RdapFacts } | { status: 'not_found' } | { status: 'failed' };
 
+/** Pure: what one lookup writes onto the site row. The daily watch, Check now and the
+ *  client's sheet (the first time it opens) all write the same fields the same way. A
+ *  failed or empty lookup writes only its status, so yesterday's facts stay. */
+export function lookupPatch(look: RdapResult): Record<string, unknown> {
+  if (look.status !== 'ok') return { domain_lookup_status: look.status };
+  return {
+    domain_lookup_status: 'ok', domain_registered_name: look.name,   // item 134: tells a "www." twin from a sub-name
+    domain_registrar: look.info.registrar, domain_expires_at: look.info.expires_at,
+    // item 162 (review domains finding 6): the lock, who runs the DNS, the status words, since when
+    domain_lock: look.facts.lock, domain_dns_host: look.facts.dns_host || null, domain_statuses: look.facts.statuses, domain_registered_at: look.facts.registered_at,
+  };
+}
+
 /** Fenced RDAP lookup that says what happened: found (and under which name), not
  *  found under any name, or the lookup itself failed. Never throws, 6s cap a try. */
 export async function rdapLookupDetailed(domain: string): Promise<RdapResult> {
@@ -182,6 +242,8 @@ export function expiryWords(domain: string, daysLeft: number, registrar: string)
   const at = registrar ? ` at ${registrar}` : '';
   const after = daysLeft < 0
     ? 'Most registrars hold an expired domain for about 30 days, so it can usually still be renewed at the normal price; after that it can cost much more or be lost. Your website and email stop answering until it is renewed.'
-    : 'Renew it at the registrar (auto-renew is the calm option). If it lapses, the website and email stop answering.';
+    : 'Renew it at the registrar (auto-renew is the calm option). If it lapses, the website and email stop answering.'
+      // item 162 (review domains finding 10): the first reminder asks the one fact we can't see from outside
+      + (daysLeft > 15 ? ` Is it set to renew by itself? A quick look at ${registrar || 'the company it’s registered with'} settles it. If someone looks after it for you, add them as a user there rather than sharing your password.` : '');
   return { when, headline: `Your domain ${when}`, body: `${domain} ${when}${at}. ${after}`, after };
 }
