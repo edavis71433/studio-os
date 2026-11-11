@@ -11,7 +11,7 @@ import type { Principal } from '../../_shared/auth.ts';
 import { getTemplate } from '../lib/render.ts';
 import { serializeDraft } from '../lib/serializer.ts';
 import { insertSnapshot } from '../lib/draft_settings.ts';
-import { sendEmail } from '../commerce/account.ts';
+import { sendEmail, platformSenderName } from '../commerce/account.ts';
 import { loadEmailBrand } from '../lib/email_brand.ts';
 import { ownerReplyTo } from '../lib/service_bridge.ts';
 import { isStudioSide, studioDenied } from './projects.ts';
@@ -32,6 +32,7 @@ import { normEmail, emailMatch, isUniqueViolation } from '../lib/contact_email.t
 import { leadVisit } from '../lib/visit_source.ts';   // item 89
 import { judgeSend, issueTicket, TICKET_MIN_AGE_S, markSender, spamLinkToken, readSpamLinkToken, SPAM_REASONS } from '../lib/form_check.ts';
 import { storeFormFiles, cleanFileName, filesOf, filePath, fileLink, type StoredFile } from '../lib/form_files.ts';
+import { approvalDetail, cleanNote } from '../lib/approval_page.ts';   // sales item 92
 
 const SB_URL = Deno.env.get('SUPABASE_URL') || '';
 const APPROVAL_SECRET = Deno.env.get('APPROVAL_SECRET') || Deno.env.get('SCHEDULER_SECRET') || '';
@@ -520,7 +521,7 @@ export async function handleFormReply(req: Request, jwt: string, site: SiteRow, 
   await ensureLeadContact(site.id, email, String(sub.name || ''), String(sub.phone || '')).catch(() => {});
   const kind = sub.form_kind === 'quote' ? 'quote request' : sub.form_kind === 'booking' ? 'booking request' : 'message';
   const brand = await loadEmailBrand(site.id);
-  const sent = await sendEmail(email, `Re: your ${kind}`, leadReplyHtml(body, String(sub.message || '')), brand, { critical: true, siteId: site.id });
+  const sent = await sendEmail(email, `Re: your ${kind}`, leadReplyHtml(body, String(sub.message || '')), brand, { critical: true, asBusiness: true, siteId: site.id });
   if (!sent) return json({ error: 'not_sent', message: 'We couldn’t send that just now — nothing went out. Try again in a moment, or use your email app.' }, 503, cors);
   const at = new Date().toISOString();
   const fields = sub.fields && typeof sub.fields === 'object' ? sub.fields : {};
@@ -661,18 +662,22 @@ export async function handleApproveSend(site: SiteRow, principal: Principal, cor
   ];
   if (!items.length) return json({ data: { ok: true, sent: 0, message: 'Nothing is waiting for approval.' } }, 200, cors);
 
-  const brand = await loadEmailBrand(site.id);   // BR-1: the approval email carries the studio/business brand
+  // Sales item 92: the request comes from the studio that looks after this site, in its name
+  // (it read "Your studio has…" from the client's own brand); no studio known → the client's brand as before
+  const sender = await approvalSender(site.id);
+  const brand = await loadEmailBrand(sender.siteId || site.id);
   const exp = Math.floor(Date.now() / 1000) + 7 * 86400; // one week
   let rows = '';
   for (const it of items) {
     const tok = await signApprovalToken({ site_id: site.id, kind: it.kind, plan_id: it.id, exp }, APPROVAL_SECRET);
     const link = `${siteBase()}/approve.html?token=${encodeURIComponent(tok)}`;
-    rows += `<div style="margin:14px 0;padding:14px;border:1px solid #eee9e0;border-radius:10px"><b>${esc(it.title || 'A change is ready')}</b><br>${esc(it.summary || '')}<br><span class="cta"><a href="${link}" style="display:inline-block;margin-top:8px;background:${brand.accent};color:#fff;padding:9px 16px;border-radius:999px;text-decoration:none">Review &amp; approve →</a></span></div>`;
+    rows += `<div style="margin:14px 0;padding:14px;border:1px solid #eee9e0;border-radius:10px"><b>${esc(it.title || 'A change is ready')}</b><br>${esc(it.summary || '')}<br><span class="cta"><a href="${link}" style="display:inline-block;margin-top:8px;background:${brand.accent};color:#fff;padding:9px 16px;border-radius:999px;text-decoration:none">See what changes →</a></span></div>`;
   }
   // critical: an approval request is transactional — the client's approval loop must
   // not stall because they unsubscribed from updates (bounces still suppress).
+  const n = `${items.length} ${items.length === 1 ? 'change' : 'changes'}`;
   const sent = await sendEmail(String(to), 'Something is ready for your approval',
-    `<p>Your studio has ${items.length} ${items.length === 1 ? 'change' : 'changes'} ready. Tap to review and approve — nothing happens until you do.</p>${rows}`, brand, { critical: true });
+    `<p>${esc(sender.name)} has ${n} ready for you. Tap one to see exactly what changes, then approve it or say what should change. Nothing happens until you do.</p>${rows}`, brand, { critical: true, asBusiness: !!sender.siteId });
   return json({ data: { ok: true, sent: items.length, delivered: sent, message: sent ? `Sent ${items.length} to ${to}.` : 'Prepared, but the email couldn’t be sent (email may be off in this environment, or that address can’t receive mail right now).' } }, 200, cors);
 }
 
@@ -686,7 +691,9 @@ export async function handleApproveGet(req: Request, cors: Record<string, string
   const p = v.payload;
   const item = await loadPending(p);
   if (!item) return json({ error: 'already_decided', message: 'This was already handled — nothing more to do.' }, 409, cors);
-  return json({ data: { title: item.title, summary: item.summary, kind: p.kind, business_name: item.business_name } }, 200, cors);
+  // Sales item 92: who is asking (the studio, by name and logo) and what exactly changes
+  const sender = await approvalSender(p.site_id);
+  return json({ data: { title: item.title, summary: item.summary, kind: p.kind, business_name: item.business_name, studio: { name: sender.name, logo_url: sender.logoUrl }, ...item.detail } }, 200, cors);
 }
 
 /** PUBLIC — apply the client's decision through the existing approval spine. */
@@ -699,6 +706,9 @@ export async function handleApprovePost(req: Request, cors: Record<string, strin
   if (!decision) return json({ error: 'bad_request', message: 'Choose approve or not yet.' }, 400, cors);
   const p = v.payload;
   const principal: Principal = { kind: 'system', userId: 'client-one-tap', tenantId: null, role: 'client', email: null, jwt: null, requestId: 'approve-token' };
+  // Sales item 92: "Not yet" can say what should change (read before the decision, which ends the pending row)
+  const note = decision === 'abandon' ? cleanNote(b?.note) : '';
+  const pending = decision === 'abandon' ? await loadPending(p).catch(() => null) : null;
 
   if (p.kind === 'connected') {
     const row = await decideWritePlan(p.site_id, p.plan_id, decision as 'approve' | 'abandon');
@@ -711,16 +721,53 @@ export async function handleApprovePost(req: Request, cors: Record<string, strin
     if (!w.ok || !w.json?.[0]) return json({ error: 'already_decided', message: 'This was already handled.' }, 409, cors);
     await writeChangeEvent({ siteId: p.site_id, entityType: 'settings', entityId: null, action: 'update', summary: `${target === 'approved' ? 'Approved' : 'Set aside'} the plan (one-tap): ${w.json[0].title}`, principal, provenance: 'human', fields: ['infra_plan'] });
   }
+  if (decision === 'abandon') await tellStudioNotYet(p, pending, note, principal).catch(() => {});
   return json({ data: { ok: true, decision: decision === 'approve' ? 'approved' : 'set_aside', message: decision === 'approve' ? 'Approved — thank you.' : 'Set aside.' } }, 200, cors);
 }
 
-async function loadPending(p: ApprovalTokenPayload): Promise<{ title: string; summary: string; business_name: string } | null> {
+/** Who sent an approval (sales item 92): the studio that looks after the site (its active
+ *  service link), by its Business details name and logo; no studio known → the name the
+ *  platform's own mail goes out under. siteId is the studio's site, or null. */
+async function approvalSender(siteId: string): Promise<{ siteId: string | null; name: string; logoUrl: string | null }> {
+  try {
+    const link = await svc(`presence_service_links?customer_site_id=eq.${siteId}&status=eq.active&select=agency_site_id&order=created_at.desc&limit=1`);
+    const studio = String((Array.isArray(link.json) && link.json[0]?.agency_site_id) || '');
+    if (studio) {
+      const { studioBrandOf } = await import('./studio_brand.ts');
+      const b = await studioBrandOf(studio);
+      return { siteId: studio, name: b.is_default ? platformSenderName() : b.name, logoUrl: b.logo_url };
+    }
+  } catch { /* the platform's name below */ }
+  return { siteId: null, name: platformSenderName(), logoUrl: null };
+}
+
+/** "Not yet" reaches the studio that asked (sales item 92), with the client's note when
+ *  they left one, and the site's change log keeps it. Mail to the studio is operator mail
+ *  (lib/service_bridge.ts emailOperator: critical, the platform's reply-to); with no studio
+ *  known, the platform's own studio site (AGENCY_SITE_ID) hears it. Best-effort: the
+ *  decision already stands. */
+async function tellStudioNotYet(p: ApprovalTokenPayload, pending: { title: string; business_name: string } | null, note: string, principal: Principal): Promise<void> {
+  const title = pending?.title || 'a change';
+  const biz = pending?.business_name || 'Your client';
+  if (note) await writeChangeEvent({ siteId: p.site_id, entityType: 'settings', entityId: null, action: 'update', summary: `Not yet on “${title}”: ${note}`.slice(0, 300), principal, provenance: 'human', fields: [p.kind === 'connected' ? 'connected_write' : 'infra_plan'] }).catch(() => {});
+  const html = `<p><strong>${esc(biz)}</strong> said not yet to <strong>${esc(title)}</strong>, so nothing was changed.</p>` +
+    (note ? `<p>What they’d like changed:</p><blockquote style="margin:8px 0;padding:8px 14px;border-left:3px solid #ccc">${esc(note).replace(/\n/g, '<br>')}</blockquote>` : '<p>They didn’t leave a note.</p>');
+  const sender = await approvalSender(p.site_id);
+  const studioSite = sender.siteId || Deno.env.get('AGENCY_SITE_ID') || '';
+  if (!studioSite) return;
+  const { emailOperator } = await import('../lib/service_bridge.ts');
+  await emailOperator(studioSite, `Not yet: ${title}`, html, 'approval_not_yet');
+}
+
+async function loadPending(p: ApprovalTokenPayload): Promise<{ title: string; summary: string; business_name: string; detail: ReturnType<typeof approvalDetail> } | null> {
   const ident = await svc(`presence_identity?site_id=eq.${p.site_id}&select=business_name&limit=1`);
   const business_name = ident.json?.[0]?.business_name || 'your business';
   const table = p.kind === 'connected' ? 'presence_connection_writes' : 'presence_infra_plans';
-  const r = await svc(`${table}?id=eq.${p.plan_id}&site_id=eq.${p.site_id}&status=eq.proposed&select=title,summary&limit=1`);
+  // sales item 92: the plain words each kind already keeps about what it does
+  const cols = p.kind === 'connected' ? 'title,summary,workflow,what_changes,what_stays,reversible,rollback,payload' : 'title,summary,kind,steps,reversible,rollback_note';
+  const r = await svc(`${table}?id=eq.${p.plan_id}&site_id=eq.${p.site_id}&status=eq.proposed&select=${cols}&limit=1`);
   const row = r.json?.[0];
-  return row ? { title: row.title || 'A change is ready', summary: row.summary || '', business_name } : null;
+  return row ? { title: row.title || 'A change is ready', summary: row.summary || '', business_name, detail: approvalDetail(p.kind === 'connected' ? 'connected' : 'infrastructure', row) } : null;
 }
 
 const esc = (s: unknown) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c] as string));

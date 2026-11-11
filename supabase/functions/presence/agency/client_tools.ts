@@ -200,7 +200,7 @@ export async function handleClientTools(req: Request, route: string, method: str
         `It’s a short form: ${f.questions.length} question${f.questions.length === 1 ? '' : 's'}. It saves as you go, so you can come back to it any time, and there’s nothing to sign in to.`,
       ], { href: intakeLink(siteId, f.secret), label: 'Open the form' }, ['Questions? Just reply to this email.']);
       const subject = `${studio} asked for your words and photos`;
-      const sent = await sendEmail(to, subject, html, brand || undefined, { replyTo: member.email });
+      const sent = await sendEmail(to, subject, html, brand || undefined, { replyTo: member.email, asBusiness: true });
       if (!sent) return json({ error: 'not_sent', message: 'That email didn’t go — the address may have unsubscribed or bounced before. Copy the link and send it yourself.' }, 502, cors);
       const stored = await updateReservedJson(siteId, RESERVED_NAMES.intakeForm, (cur) => ({ ...(cur as object), emailed_to: to, emailed_at: now }), member.email);
       return json({ data: { form: formForStudio(siteId, normalizeForm(stored) || f) } }, 200, cors);
@@ -260,7 +260,7 @@ export async function handleClientTools(req: Request, route: string, method: str
       'It’s under Help in your portal: who to call, how to do the everyday things, and the details of your website in one place.',
     ], { href: `${APP()}/portal.html${own ? `?studio=${own.id}` : ''}`, label: 'Open your portal' }, ['Questions? Just reply to this email.']);
     const subject = `Your website kit from ${studio}`;
-    const sent = await sendEmail(owner.email, subject, html, brand || undefined, { siteId: own?.id });
+    const sent = await sendEmail(owner.email, subject, html, brand || undefined, { siteId: own?.id, asBusiness: true });
     if (!sent) return json({ error: 'not_sent', message: 'That email didn’t go — their address may have unsubscribed or bounced before.' }, 502, cors);
     const stored = await updateReservedJson(siteId, RESERVED_NAMES.handoverKit, (cur) => ({ ...(cur as object), emailed_at: now }), member.email);
     return json({ data: { kit: normalizeKit(stored) || kit } }, 200, cors);

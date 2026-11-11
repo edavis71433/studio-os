@@ -251,18 +251,20 @@ async function emailStudioSupportReply(site: SiteRow, reqRow: any, body: string,
     if (prev && (Date.now() - Date.parse(String(prev.created_at))) < 15 * 60 * 1000) return;   // throttle — one email per request per quarter-hour
     const safe = body.slice(0, 500).replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c] as string));
     const replyHtml = `<p>You have a reply on your support request:</p><blockquote style="margin:8px 0;padding:8px 14px;border-left:3px solid #ccc">${safe}</blockquote><p>Just reply to this email to continue the conversation.</p>`;
+    // sales item 92: "A reply from <the studio>", by its name, on both branches
+    const { loadEmailBrand, EMAIL_BRAND_DEFAULT } = await import('../lib/email_brand.ts');
+    const brand = await loadEmailBrand(site.id);
+    const subject = brand.name !== EMAIL_BRAND_DEFAULT.name ? `A reply from ${brand.name}` : 'A reply to your request';
     if (EMAIL_RE.test(requester)) {   // email-native requester — the existing direct branch, unchanged
       const { sendEmail } = await import('../commerce/account.ts');
-      const { loadEmailBrand } = await import('../lib/email_brand.ts');
-      const brand = await loadEmailBrand(site.id);
-      await sendEmail(requester, 'A reply from your studio', replyHtml, brand, { critical: true, siteId: site.id });
+      await sendEmail(requester, subject, replyHtml, brand, { critical: true, asBusiness: true, siteId: site.id });
       return;
     }
     // auth-uid requester (portal composer) → resolve their inbox via the bridge.
     const { clientIdForRequester, emailCustomerByClient } = await import('../lib/service_bridge.ts');
     const clientId = (reqRow?.client_id && UUID_RE.test(String(reqRow.client_id))) ? String(reqRow.client_id)
       : (UUID_RE.test(requester) ? await clientIdForRequester(site.id, { userId: requester }) : null);
-    const sent = clientId ? await emailCustomerByClient(site.id, clientId, 'A reply from your studio', replyHtml) : false;
+    const sent = clientId ? await emailCustomerByClient(site.id, clientId, subject, replyHtml) : false;
     if (!sent) console.warn(`[support-reply] request ${reqRow?.id} on site ${site.id}: requester ${requester ? '(uid)' : '(empty)'} resolved to no reachable email — the reply exists only in-app (non-fatal)`);
   } catch (e) {
     console.warn(`[support-reply] email for request ${reqRow?.id} on site ${site?.id} failed: ${String((e as Error)?.message || e)} (non-fatal)`);

@@ -26,13 +26,15 @@ const invite = sales.slice(inviteStart, inviteEnd);
 ok('invite: helper exists and takes the studio siteId', inviteStart > 0 && /sendCustomerInvite\(siteId: string, email: string/.test(invite));
 ok('invite: loads the STUDIO email brand (loadEmailBrand on the caller’s site)', /loadEmailBrand\(siteId\)/.test(invite));
 // item 71: the invite also carries the studio's site, so "message me directly" answers land in the Inbox
-ok('invite: the send carries that brand (not the platform default shell)', /\n  brand, \{ critical: true(, siteId)? \}/.test(invite) && !/\n  undefined, \{ critical: true/.test(invite));
+// sales item 92: and comes from the studio (asBusiness)
+ok('invite: the send carries that brand (not the platform default shell)', /\n  brand, \{ critical: true, (asBusiness: true, )?siteId \}/.test(invite) && !/\n  undefined, \{ critical: true/.test(invite));
 ok('invite: subject is studio-voiced — "Your client portal is ready — <studio>"', /`Your client portal is ready\$\{studioName \? ` — \$\{studioName\}` : ''\}`/.test(invite));
 // comments may still NAME the platform (the secrecy-rule explanation does); the
 // sent subject/body must not — so strip comments, then look for the string.
 ok('invite: "Studio OS" appears NOWHERE in the subject or body', !/Studio OS/.test(invite.split('\n').map((l) => l.replace(/^\s*\/\/.*$/, '').replace(/\/\* .*?\*\//g, '')).join('\n').replace(/EMAIL_BRAND_DEFAULT/g, '')));
 ok('invite: an unnamed studio degrades to a BARE subject, never the platform name', /brand\.name !== EMAIL_BRAND_DEFAULT\.name \? brand\.name : ''/.test(invite));
-ok('invite: says what the portal is FOR (progress · messages · files/approvals · invoices)', /progress/.test(invite) && /message me directly/.test(invite) && /share files and approve work/.test(invite) && /invoice/.test(invite));
+// sales item 92: messages go to the studio by name ("message me directly" spoke as Eric for every studio)
+ok('invite: says what the portal is FOR (progress · messages · files/approvals · invoices)', /progress/.test(invite) && /send messages straight to/.test(invite) && /share files and approve work/.test(invite) && /invoice/.test(invite));
 // Oct 2026 studio audit, change 4: the client signs in from the email WITHOUT a
 // password — a GoTrue magic link from the SAME minter the reviewer invite uses
 // (lib/workspace.ts mintSignInLink), landing on the portal door (→ client.html).
@@ -69,9 +71,10 @@ ok('site-live: no operator duplicate — the helper emails the CLIENT only', !/e
 const srStart = intake.indexOf('async function emailStudioSupportReply');
 const srEnd = intake.indexOf('\n}', srStart) + 2;
 const sr = intake.slice(srStart, srEnd);
-ok('support-reply: the literal-email branch is kept (email-native requesters unchanged)', /if \(EMAIL_RE\.test\(requester\)\)/.test(sr) && /sendEmail\(requester, 'A reply from your studio', replyHtml, brand, \{ critical: true, siteId: site\.id \}\)/.test(sr));
+// sales item 92: the subject names the studio ("A reply from <studio>") on both branches
+ok('support-reply: the literal-email branch is kept (email-native requesters unchanged)', /if \(EMAIL_RE\.test\(requester\)\)/.test(sr) && /sendEmail\(requester, subject, replyHtml, brand, \{ critical: true, asBusiness: true, siteId: site\.id \}\)/.test(sr) && /`A reply from \$\{brand\.name\}`/.test(sr));
 ok('support-reply: an auth-uid requester is RESOLVED, not skipped — F3 stamp first, else clientIdForRequester', /reqRow\?\.client_id && UUID_RE\.test\(String\(reqRow\.client_id\)\)/.test(sr) && /clientIdForRequester\(site\.id, \{ userId: requester \}\)/.test(sr));
-ok('support-reply: the resolved client is emailed via the ONE bridge channel', /emailCustomerByClient\(site\.id, clientId, 'A reply from your studio', replyHtml\)/.test(sr));
+ok('support-reply: the resolved client is emailed via the ONE bridge channel', /emailCustomerByClient\(site\.id, clientId, subject, replyHtml\)/.test(sr));
 ok('support-reply: the 15-minute throttle guards BOTH branches (probe precedes them)', (() => {
   const throttle = sr.indexOf('15 * 60 * 1000');
   const emailBranch = sr.indexOf('EMAIL_RE.test(requester))');

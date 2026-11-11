@@ -120,8 +120,9 @@ try {
     const receipt = sent.find((s) => s?.to === 'jordan@client.test');
     ok('A1: the CLIENT gets the promised receipt (branded thank-you with the amount and what it was for)',
       out.data?.receipted === true && !!receipt && /\$500\.00/.test(String(receipt?.html || '')) && /Deposit/.test(String(receipt?.html || '')));
-    ok('A1: the receipt says the studio has been notified (the payment-success promise, kept)',
-      /studio has been notified/i.test(String(receipt?.html || '')));
+    // sales item 92: by the studio's name ("Your studio has been notified" before)
+    ok('A1: the receipt says the studio has been told (the payment-success promise, kept)',
+      /Davis Digital Studio has been told/.test(String(receipt?.html || '')));
     const operator = sent.find((s) => s?.to === 'studio@davisdigitalstudio.com');
     ok('A1: the operator email is CONVERT-AWARE — an unconverted deal says "convert them now"',
       /signed and paid — convert them now/i.test(String(operator?.html || '')) && /pipeline\.html\?deal=/.test(String(operator?.html || '')));

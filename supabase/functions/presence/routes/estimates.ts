@@ -86,7 +86,7 @@ async function emailEstimate(siteId: string, dealId: string, url: string | null,
     const btn = `<a href="${url}" style="display:inline-block;margin-top:6px;background:${brand.accent};color:#fff;padding:9px 16px;border-radius:999px;text-decoration:none">See the estimate →</a>`;
     const html = `<p>${who} has put together an estimate for you${totalCents > 0 ? `: <strong>${usd(totalCents)}</strong>` : ''}. It’s a price before anything is agreed, and nothing is charged. You can approve it, or say not now, on the page.</p><p class="cta">${btn}</p>`;
     // a document they asked for = transactional; their answer lands in the Inbox
-    return await sendEmail(String(email), `Your estimate from ${brand.name}`, html, brand, { critical: true, siteId });
+    return await sendEmail(String(email), `Your estimate from ${brand.name}`, html, brand, { critical: true, asBusiness: true, siteId });
   } catch { return false; }
 }
 

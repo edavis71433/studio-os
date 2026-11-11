@@ -176,7 +176,7 @@ export async function handleConnectionAsk(req: Request, site: SiteRow, principal
     + (toAsk.some((it) => it.key === 'google_business_profile') ? `<p>For your Google listing, Google’s screen will say “manage your business listings”. It’s the only permission Google offers for listings; ${studio} only reads yours.</p>` : '')
     + `<p class="cta"><a href="${url}" style="display:inline-block;margin-top:6px;background:${(brand && brand.accent) || '#5b3fa0'};color:#fff;padding:9px 16px;border-radius:999px;text-decoration:none">Connect your Google →</a></p>`
     + `<p>This link works for a week. If it has expired, ask ${studio} to send a fresh one.</p>`;
-  const emailed = await sendEmail(email, subject, body, brand, { critical: true, siteId: agencySiteId || undefined }).catch(() => false);
+  const emailed = await sendEmail(email, subject, body, brand, { critical: true, asBusiness: true, siteId: agencySiteId || undefined }).catch(() => false);
   await svc('presence_connection_events', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ site_id: site.id, provider_key: toAsk[0].key, action: 'ask', detail: emailed ? 'asked the client to connect' : 'asked the client to connect (email did not send)', actor_kind: connectionActorKind(principal) }) }).catch(() => {});
   const masked = email.replace(/^(.).*(@.*)$/, '$1…$2');
   return json({ data: { asked: toAsk.map((it) => it.key), emailed, to: masked, asked_at: new Date(askedAt).toISOString(),

@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Payment received | Davis Digital Studio</title>
+<title>Payment received</title>
 <meta name="robots" content="noindex, nofollow">
 <link rel="stylesheet" href="/fonts/brand.css">
 <style>
@@ -29,7 +29,7 @@
     <div class="mark">✓</div>
     <h1 id="h">Payment received. Thank you.</h1>
     <p>Your payment went through securely via Stripe, and a receipt is on its way to your email.</p>
-    <p id="sub">On my side, everything updates automatically — your invoice is already marked paid, and your project keeps moving. No login yet? Nothing to do: your workspace invitation arrives by email once your project kicks off.</p>
+    <p id="sub">Everything updates on its own: your invoice is marked paid, and your project keeps moving. No sign-in yet? Nothing to do: your workspace invitation arrives by email once your project starts.</p>
     <a class="btn" id="cta" href="https://davisdigitalstudio.com/portal.html">Sign in to your workspace →</a>
     <a class="plain" id="plain" href="https://davisdigitalstudio.com">davisdigitalstudio.com</a>
   </div>
@@ -39,10 +39,21 @@
     // Oct 2026 (item 1): Stripe now returns service-invoice payers to
     // /client.html?paid=<id>; a payer with no portal sign-in is forwarded HERE
     // with the same ?paid=, so the button names the thing they can do next.
+    // Sales item 92: this page spoke in Eric's own voice for every studio's payer. It
+    // names the studio when this browser knows it (a client who signed in before left its
+    // name in localStorage 'dds-studio-brand', the same one portal.html reads), else no one.
+    function studioName() {
+      try { var b = JSON.parse(localStorage.getItem('dds-studio-brand') || 'null'); return b && typeof b.name === 'string' ? b.name.slice(0, 80) : ''; } catch (e) { return ''; }
+    }
     (function () {
       if (!/^[0-9a-zA-Z-]{1,64}$/.test(new URLSearchParams(location.search).get('paid') || '')) return;
-      document.getElementById('sub').textContent = 'On my side, everything updates automatically — your invoice shows as paid as soon as Stripe confirms it, usually within a minute. If you have a workspace sign-in, your Invoices tab will show it; if not, nothing to do: your invitation arrives by email once your project kicks off.';
+      var who = studioName();
+      if (who) document.title = 'Payment received | ' + who;
+      document.getElementById('sub').textContent = (who ? who + ' is told right away, and your' : 'Your') + ' invoice shows as paid as soon as Stripe confirms it, usually within a minute. If you have a workspace sign-in, your Invoices tab will show it; if not, there’s nothing to do.';
       document.getElementById('cta').textContent = 'Sign in to see your invoice →';
+      // a studio's payer has no business with the platform's own website
+      var plain = document.getElementById('plain');
+      if (plain) plain.style.display = 'none';
     })();
     (function () {
       if (new URLSearchParams(location.search).get('kind') !== 'audit') return;

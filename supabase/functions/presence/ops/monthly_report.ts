@@ -278,7 +278,7 @@ export async function sendReport(site: SiteRow, win: ReturnType<typeof lastMonth
   const studio = await studioSiteOf(site.id);
   const [data, brand] = await Promise.all([loadReportData(site, win, opts.timeZone), studio ? loadEmailBrand(studio) : Promise.resolve(EMAIL_BRAND_DEFAULT)]);
   const { subject, html } = reportHtml(data, { studioName: brand.name, note: setting.note, clientName: opts.clientName ?? null });
-  return await sendEmail(to, opts.preview ? `[Preview] ${subject}` : subject, html, brand, { siteId: studio || site.id });
+  return await sendEmail(to, opts.preview ? `[Preview] ${subject}` : subject, html, brand, { siteId: studio || site.id, asBusiness: true });   // sales item 92: from the studio, in its name
 }
 
 /** Thrown inside a claim when the month is no longer due, so nothing is written. */
