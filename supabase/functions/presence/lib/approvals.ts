@@ -88,15 +88,17 @@ export function approvalReminderDue(
 const escHtml = (s: string) => String(s).replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c] as string));
 
 /** The client's reminder — subject and body. Calm, dated, nothing moves without
- *  them. Pure. */
-export function approvalReminderCopy(title: string, dueDate: string, kind: ApprovalReminderKind): { subject: string; html: string } {
-  const name = (title || '').trim() || 'something your studio shared';
+ *  them. Sales item 92: `studio` is the studio's name, so the reminder asks in it
+ *  ("your studio" stays only when the name isn't known). Pure. */
+export function approvalReminderCopy(title: string, dueDate: string, kind: ApprovalReminderKind, studio = ''): { subject: string; html: string } {
+  const who = escHtml(String(studio || '').trim());
+  const name = (title || '').trim() || (who ? `something ${String(studio).trim()} shared` : 'something your studio shared');
   const when = dueDateText(dueDate);
   const subject = `A reminder — ${name} is waiting for your OK`;
   const lead = kind === 'day_before'
-    ? `Your studio would like your answer on <strong>${escHtml(name)}</strong> by <strong>${when}</strong> — that's tomorrow.`
+    ? `${who || 'Your studio'} would like your answer on <strong>${escHtml(name)}</strong> by <strong>${when}</strong> — that's tomorrow.`
     : `<strong>${escHtml(name)}</strong> was due <strong>${when}</strong> and is still waiting for your OK.`;
-  return { subject, html: `<p>${lead}</p><p>Nothing goes ahead without you — approve it, or tell your studio what to change, when you have a minute.</p>` };
+  return { subject, html: `<p>${lead}</p><p>Nothing goes ahead without you — approve it, or tell ${who || 'your studio'} what to change, when you have a minute. Just reply to this email.</p>` };
 }
 
 /** The studio's one overdue notice per approval (kind 'approval_overdue'). The

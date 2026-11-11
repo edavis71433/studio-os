@@ -184,9 +184,9 @@ async function emailReceipt(siteId: string, paidRow: any, inv: any, leftCents: n
   let pdf: Uint8Array<ArrayBuffer> | null = null;
   try { pdf = documentPdf('invoice', data, brand, ctx); } catch { pdf = null; }
   const html = `<p>${first ? `Hi ${escH(first)},` : 'Hi there,'}</p>`
-    + `<p>Thank you. ${studio === 'your studio' ? 'Your studio has' : studio + ' has'} recorded your payment of <strong>${usd(row.amount_cents)}</strong>${how ? ' ' + how : ''}${day ? ' on ' + day : ''} for ${what}.</p>`
+    + `<p>Thank you. ${studio === 'your studio' ? 'We have' : studio + ' has'} recorded your payment of <strong>${usd(row.amount_cents)}</strong>${how ? ' ' + how : ''}${day ? ' on ' + day : ''} for ${what}.</p>`
     + (leftCents > 0 ? `<p>${usd(leftCents)} is still due on it.</p>` : `<p>${inv.purpose === 'deposit' ? 'Your deposit is in.' : 'The invoice is paid in full.'} Nothing else is needed from you.</p>`)
     + `<p style="margin-top:6px">Your receipt is attached as a PDF.${link ? ` <a href="${link}" style="color:${brand.accentDark}">View it online →</a>` : ''}</p>`;
   return await sendEmail(String(contact.email), `Receipt${no ? ' for ' + no : ''} — ${usd(row.amount_cents)} received, thank you`, html, brand,
-    { critical: true, siteId, ...(pdf ? { attachments: [{ filename: pdfFileName('invoice', row), content: pdf }] } : {}) });   // their own payment = transactional; an answer lands in the Inbox
+    { critical: true, asBusiness: true, siteId, ...(pdf ? { attachments: [{ filename: pdfFileName('invoice', row), content: pdf }] } : {}) });   // their own payment = transactional; an answer lands in the Inbox
 }

@@ -243,6 +243,12 @@ export function fromFor(base: string, name?: string | null): string {
   return `"${clean}" <${addr}>`;
 }
 
+/** The name the platform's own mail goes out under (EMAIL_FROM's display name): who a page
+ *  names when no studio is known (sales item 92). Pure on the environment. */
+export function platformSenderName(): string {
+  return /^\s*"?([^"<]+?)"?\s*</.exec(EMAIL_FROM)?.[1]?.trim() || 'Davis Digital Studio';
+}
+
 /** Can an unsubscribe stop this send? Sales items 74 and 75: mail that always arrives (critical:
  *  receipts, documents, sign-in links, a business's own alerts, payment reminders) carries no
  *  unsubscribe at all, neither the one-click header nor a link, because an unsubscribe would not

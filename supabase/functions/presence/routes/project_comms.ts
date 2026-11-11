@@ -59,8 +59,13 @@ export async function handleMessages(req: Request, jwt: string, site: SiteRow, p
         const recent = prev && prev.author_kind !== 'client' && (Date.now() - Date.parse(String(prev.created_at))) < 15 * 60 * 1000;
         if (!recent) {
           const safe = body.slice(0, 500).replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c] as string));
-          emailBridgedCustomer(site.id, projectId, 'A message from your studio',
-            `<p>Your studio wrote to you about your project:</p><blockquote style="margin:8px 0;padding:8px 14px;border-left:3px solid #ccc">${safe}</blockquote>`).catch(() => {});
+          // sales item 92: the studio by name, not "your studio"
+          const { loadEmailBrand, EMAIL_BRAND_DEFAULT } = await import('../lib/email_brand.ts');
+          const b = await loadEmailBrand(site.id).catch(() => EMAIL_BRAND_DEFAULT);
+          const who = b.name !== EMAIL_BRAND_DEFAULT.name ? b.name : '';
+          const whoHtml = who.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c] as string));
+          emailBridgedCustomer(site.id, projectId, who ? `A message from ${who}` : 'A message about your project',
+            `<p>${whoHtml || 'We'} wrote to you about your project:</p><blockquote style="margin:8px 0;padding:8px 14px;border-left:3px solid #ccc">${safe}</blockquote>`).catch(() => {});
         }
       } catch { /* best-effort */ }
     }

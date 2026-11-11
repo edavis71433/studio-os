@@ -166,7 +166,7 @@ test.describe('G7 — the one-tap approval page tells a dead link from a dropped
     await serveApprove(page, 'abort');
     await page.goto('/approve.html?token=tok');
     await page.getByRole('button', { name: 'Approve' }).click();
-    await expect(page.getByRole('alert')).toContainText('We couldn’t reach your studio');
+    await expect(page.getByRole('alert')).toContainText('That didn’t go through. Check your connection');   // sales item 92: no "your studio"
     await expect(page.getByRole('button', { name: 'Approve' })).toBeEnabled();
     await expect(page.getByRole('button', { name: 'Not yet' })).toBeEnabled();
     await expect(page.getByText('This link isn’t usable.')).toHaveCount(0);

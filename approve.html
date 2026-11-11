@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Review &amp; approve — Davis Digital Studio</title>
+<title>Review &amp; approve</title>
 <meta name="robots" content="noindex, nofollow">
 <link rel="stylesheet" href="/fonts/brand.css">
 <style>
@@ -21,13 +21,21 @@
   body{background:var(--bg);color:var(--ink);font-family:var(--sans);line-height:1.55;-webkit-font-smoothing:antialiased;min-height:100vh;display:grid;place-items:center;padding:24px}
   .box{max-width:460px;width:100%;background:var(--card);border:1px solid var(--line);border-radius:20px;box-shadow:var(--shadow);padding:34px 30px}
   .brand{display:inline-flex;align-items:center;gap:8px;font-weight:600;font-size:14px;color:var(--soft);margin-bottom:18px}
-  .brand .m{width:22px;height:22px;border-radius:7px;background:var(--p);color:#fff;display:grid;place-items:center;font-family:var(--serif);font-size:14px}
+  .brand .m{width:24px;height:24px;border-radius:7px;background:var(--p);color:#fff;display:grid;place-items:center;font-family:var(--serif);font-size:14px}
+  .brand img{display:block;height:28px;width:auto;max-width:180px;border-radius:6px}
   h1{font-family:var(--serif);font-weight:500;font-size:24px;margin:0 0 6px;letter-spacing:-.01em}
   .who{font-size:13px;color:var(--faint);margin-bottom:18px}
   .card{background:var(--bg);border:1px solid var(--line);border-radius:13px;padding:16px 18px;margin-bottom:22px}
   .card h2{font-family:var(--serif);font-weight:500;font-size:18px;margin:0 0 5px}
   .card p{margin:0;color:var(--soft);font-size:14.5px}
   .tag{display:inline-block;font-size:11px;letter-spacing:.05em;text-transform:uppercase;color:var(--p);background:var(--p-soft);border-radius:999px;padding:3px 10px;font-weight:600;margin-bottom:9px}
+  .card h3{font-family:var(--sans);font-size:12px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;color:var(--soft);margin:14px 0 4px}
+  .card ul{margin:0;padding-left:18px;font-size:14px;line-height:1.5}
+  .card li+li{margin-top:2px}
+  .card .quote{margin:0;font-size:14.5px;line-height:1.5;color:var(--ink);white-space:pre-wrap}
+  label.q{display:block;font-weight:600;font-size:14px;margin:0 0 6px}
+  textarea{width:100%;min-height:96px;font:inherit;font-size:15px;color:var(--ink);background:var(--card);border:1.5px solid var(--line);border-radius:12px;padding:10px 12px;resize:vertical;margin-bottom:12px}
+  textarea:focus{outline:none;border-color:var(--p)}
   .row{display:flex;gap:10px}
   button{flex:1;font-family:inherit;font-size:15px;font-weight:600;border-radius:12px;border:1px solid var(--line);background:transparent;color:var(--ink);padding:13px;cursor:pointer;transition:.15s}
   button:hover{border-color:var(--p)} button:disabled{opacity:.55;cursor:default}
@@ -53,42 +61,79 @@ const esc=(s)=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;
 const token=new URLSearchParams(location.search).get('token')||'';
 const H={'Content-Type':'application/json','Authorization':'Bearer '+SUPABASE_KEY};
 
-function brand(){return `<div class="brand"><span class="m">D</span>Davis Digital Studio</div>`;}
+// Sales item 92: who is asking comes from the server (the studio's name and logo); it said
+// "Davis Digital Studio" whoever sent it. Drawn in Figma: page "One-tap approval page — sales item 92".
+let STUDIO=null;
+function studioName(){return (STUDIO&&STUDIO.name)||'';}
+function brand(){
+  if(!STUDIO||!STUDIO.name)return '';
+  const logo=/^https:\/\//.test(STUDIO.logo_url||'')?`<img src="${esc(STUDIO.logo_url)}" alt="${esc(STUDIO.name)}">`:`<span class="m" aria-hidden="true">${esc(Array.from(STUDIO.name)[0]||'')}</span>`;
+  return `<div class="brand">${logo}${/^https:\/\//.test(STUDIO.logo_url||'')?'':esc(STUDIO.name)}</div>`;
+}
 function trouble(msg){$('box').innerHTML=`${brand()}<div class="center"><p class="big">This link isn’t usable.</p><p class="muted">${esc(msg||'Open your workspace to review.')}</p><p style="margin-top:18px"><a class="link" href="/client.html">Open your workspace →</a></p></div>`;}
-function done(kind){const approved=kind==='approved';$('box').innerHTML=`${brand()}<div class="center"><p class="big">${approved?'Approved — thank you.':'Set aside.'}</p><p class="muted">${approved?'Your studio will take it from here. Nothing goes live without your OK — and you just gave it.':'No change was made. Your studio will follow up.'}</p><p style="margin-top:18px"><a class="link" href="/client.html">Open your workspace →</a></p></div>`;}
-
+function done(kind,noted){
+  const approved=kind==='approved', who=studioName();
+  const head=approved?'Approved, thank you.':(who?`Sent to ${who}.`:'Set aside.');
+  const line=approved?`${who||'Your studio'} will take it from here. Nothing goes live without your OK, and you just gave it.`
+    :(noted?'Nothing was changed. They’ll look at your note and come back to you.':`Nothing was changed. ${who?who+' has':'They have'} been told.`);
+  $('box').innerHTML=`${brand()}<div class="center"><p class="big">${esc(head)}</p><p class="muted">${esc(line)}</p><p style="margin-top:18px"><a class="link" href="/client.html">Open your workspace →</a></p></div>`;
+}
+function list(title,items){return items&&items.length?`<h3>${esc(title)}</h3><ul>${items.map(i=>`<li>${esc(i)}</li>`).join('')}</ul>`:'';}
 function render(d){
+  STUDIO=d.studio||null;
+  if(studioName())document.title='Review & approve — '+studioName();
+  const undo=d.undo?`<h3>Can it be undone?</h3><ul><li>${esc((d.undo.reversible?'Yes. ':'No. ')+(d.undo.how||''))}</li></ul>`:'';
   $('box').innerHTML=`${brand()}
     <h1>Ready for your approval</h1>
     <div class="who">for ${esc(d.business_name||'your business')}</div>
-    <div class="card"><span class="tag">${esc(d.kind==='connected'?'Connected change':'Change')}</span>
-      <h2>${esc(d.title||'A change is ready')}</h2>${d.summary?`<p>${esc(d.summary)}</p>`:''}</div>
-    <div class="row"><button id="reject">Not yet</button><button class="approve" id="approve">Approve</button></div>
+    <div class="card"><span class="tag">${esc(d.tag||(d.kind==='connected'?'Connected change':'Change'))}</span>
+      <h2>${esc(d.title||'A change is ready')}</h2>${d.summary?`<p>${esc(d.summary)}</p>`:''}
+      ${d.post?`<h3>The post</h3><p class="quote">“${esc(d.post)}”</p>`:''}
+      ${list('What changes',d.changes)}${list('What stays the same',d.stays)}${undo}</div>
+    <div id="act"></div>`;
+  ask();
+}
+// the two buttons; Not yet opens the note box in their place
+function ask(){
+  $('act').innerHTML=`<div class="row"><button id="reject">Not yet</button><button class="approve" id="approve">Approve</button></div>
     <p class="note">Nothing happens until you choose. This link is just for you.</p>`;
   $('approve').addEventListener('click',()=>decide('approve'));
-  $('reject').addEventListener('click',()=>decide('reject'));
+  $('reject').addEventListener('click',notYet);
+}
+function notYet(){
+  const who=studioName();
+  $('act').innerHTML=`<label class="q" for="noteBox">What should change? (optional)</label>
+    <textarea id="noteBox" maxlength="1000"></textarea>
+    <div class="row"><button id="back">Back</button><button class="approve" id="send">Send note</button></div>
+    <p class="note">Nothing is changed. Your note goes to ${esc(who||'your studio')}.</p>`;
+  $('noteBox').focus();
+  $('back').addEventListener('click',ask);
+  $('send').addEventListener('click',()=>decide('reject'));
 }
 // Nov 10 review (G7): every failure used to read as a dead link ("This link isn't
 // usable") and took the buttons away, so a client who lost signal for a moment
 // thought the approval was gone. Only the server saying the link is bad (400) is a
 // dead link now; "already handled" (409) says so; no answer, a busy server (5xx) or
 // too many tries (429) keep the buttons with a line to try again.
-const RETRY_MSG='We couldn’t reach your studio — check your connection and try again. Nothing was changed.';
+const RETRY_MSG='That didn’t go through. Check your connection and try again. Nothing was changed.';
 function handled(){$('box').innerHTML=`${brand()}<div class="center"><p class="big">Already handled.</p><p class="muted">This was already reviewed — nothing more to do.</p><p style="margin-top:18px"><a class="link" href="/client.html">Open your workspace →</a></p></div>`;}
 function cantLoad(){$('box').innerHTML=`${brand()}<div class="center"><p class="big">We couldn’t load this just now.</p><p class="muted">Check your connection, then try again. The link is still good.</p><div class="row" style="justify-content:center"><button class="approve" id="retry">Try again</button></div></div>`;$('retry').addEventListener('click',()=>{$('box').innerHTML='<div class="spin" role="status" aria-label="Loading"></div>';loadApproval();});}
 function retryLater(msg){
   document.querySelectorAll('button').forEach(b=>b.disabled=false);
   if($('approve'))$('approve').textContent='Approve';
+  if($('send'))$('send').textContent='Send note';
   let n=$('err');if(!n){n=document.createElement('p');n.id='err';n.className='note';n.style.color='var(--ink)';n.setAttribute('role','alert');const row=document.querySelector('.row');if(row)row.insertAdjacentElement('afterend',n);}
   n.textContent=msg||RETRY_MSG;
 }
 async function decide(decision){
+  const note=decision==='reject'&&$('noteBox')?$('noteBox').value.trim():'';
   document.querySelectorAll('button').forEach(b=>b.disabled=true);
   if($('approve'))$('approve').textContent=decision==='approve'?'Approving…':'Approve';
+  if($('send'))$('send').textContent='Sending…';
   let r,b={};
-  try{r=await fetch(FN+'/approve',{method:'POST',headers:H,body:JSON.stringify({token,decision})});b=await r.json().catch(()=>({}));}
+  try{r=await fetch(FN+'/approve',{method:'POST',headers:H,body:JSON.stringify({token,decision,note})});b=await r.json().catch(()=>({}));}
   catch(_){return retryLater();}
-  if(r.ok)return done(b.data&&b.data.decision||(decision==='approve'?'approved':'set_aside'));
+  if(r.ok)return done(b.data&&b.data.decision||(decision==='approve'?'approved':'set_aside'),!!note);
   if(r.status===409)return handled();
   if(r.status===400)return trouble(b.message);
   retryLater(r.status===429?'Too many tries in a row — wait a minute, then try again. Nothing was changed.':null);

@@ -1398,12 +1398,14 @@ async function emailSalesDoc(siteId: string, dealId: string | null, kind: 'propo
     if (!email) return false;
     const brand = await loadEmailBrand(siteId);
     const subject = kind === 'contract' ? 'Your agreement is ready to sign' : 'Your proposal is ready to review';
+    // sales item 92: in the studio's own name, not "your studio"
+    const who = brand.name !== EMAIL_BRAND_DEFAULT.name ? brand.name.replace(/[&<>"]/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[ch] as string)) + ' has' : 'We have';
     const line = kind === 'contract'
-      ? 'Your studio has prepared an agreement for you. Review and sign it here — nothing is final until you do.'
-      : 'Your studio has prepared a proposal for you. Take a look whenever you’re ready — nothing is final until you accept.';
+      ? `${who} prepared an agreement for you. Review and sign it here — nothing is final until you do.`
+      : `${who} prepared a proposal for you. Take a look whenever you’re ready — nothing is final until you accept.`;
     const label = kind === 'contract' ? 'Review &amp; sign →' : 'Review the proposal →';
     const btn = `<a href="${url}" style="display:inline-block;margin-top:6px;background:${brand.accent};color:#fff;padding:9px 16px;border-radius:999px;text-decoration:none">${label}</a>`;
-    return await sendEmail(String(email), subject, `<p>${line}</p><p class="cta">${btn}</p>`, brand, { critical: true, siteId });   // a doc THEY are waiting to sign = transactional; their answer lands in the Inbox
+    return await sendEmail(String(email), subject, `<p>${line}</p><p class="cta">${btn}</p>`, brand, { critical: true, asBusiness: true, siteId });   // a doc THEY are waiting to sign = transactional; their answer lands in the Inbox
   } catch { return false; }
 }
 
@@ -1427,7 +1429,7 @@ async function emailSalesFlow(siteId: string, dealId: string, url: string | null
         : `${who} has prepared your proposal. Take a look whenever you’re ready — nothing is final until you accept.`;
     const label = has.contract ? 'Review &amp; sign →' : 'Review the proposal →';
     const btn = `<a href="${url}" style="display:inline-block;margin-top:6px;background:${brand.accent};color:#fff;padding:9px 16px;border-radius:999px;text-decoration:none">${label}</a>`;
-    return await sendEmail(String(email), `Your ${what} from ${brand.name}`, `<p>${line}</p><p class="cta">${btn}</p>`, brand, { critical: true, siteId });   // a doc THEY are waiting to sign = transactional; their answer lands in the Inbox
+    return await sendEmail(String(email), `Your ${what} from ${brand.name}`, `<p>${line}</p><p class="cta">${btn}</p>`, brand, { critical: true, asBusiness: true, siteId });   // a doc THEY are waiting to sign = transactional; their answer lands in the Inbox
   } catch { return false; }
 }
 
@@ -1452,7 +1454,7 @@ export async function emailInvoice(siteId: string, dealId: string, title: string
     const ctx = row ? await docContextFor(siteId, 'invoice', row).catch(() => null) : null;
     const due = row?.due_date ? `due ${dayLabel(row.due_date, ctx?.tz)}` : 'due on receipt';
     const isDeposit = row?.purpose === 'deposit' || /^deposit/i.test(title);
-    const who = brand.name && brand.name !== EMAIL_BRAND_DEFAULT.name ? escH(brand.name) : 'Your studio';
+    const who = brand.name && brand.name !== EMAIL_BRAND_DEFAULT.name ? escH(brand.name) : '';   // sales item 92: no "Your studio" stand-in
     const first = firstNameOf(contact?.name);
     const what = (isDeposit ? `a deposit request${no ? ' ' + no : ''}` : (no ? `invoice ${no}` : 'an invoice')) + (title && !/^(invoice|deposit)$/i.test(title.trim()) ? ` (${escH(title)})` : '');
     // A branded, printable copy of the invoice (a keepable record alongside the pay link).
@@ -1461,8 +1463,8 @@ export async function emailInvoice(siteId: string, dealId: string, title: string
     const noteLine = note ? `<p>${escH(note)}</p>` : '';
     const pdf = row ? (() => { try { const { deal_id: _d, ...data } = row; return documentPdf('invoice', data, brand, ctx); } catch { return null; } })() : null;
     return await sendEmail(String(email), `${title}${no ? ' ' + no : ''} — ${amount}`,
-      `<p>${first ? `Hi ${escH(first)},` : 'Hi there,'}</p><p>${who} has sent you ${what} for <strong>${amount}</strong>, ${due}. You can pay securely here — nothing else needed.</p>${noteLine}<p class="cta">${btn}</p>${docLine}`,
-      brand, { critical: true, siteId, ...(pdf ? { attachments: [{ filename: pdfFileName('invoice', row), content: pdf }] } : {}) });   // a payment link = transactional; their answer lands in the Inbox
+      `<p>${first ? `Hi ${escH(first)},` : 'Hi there,'}</p><p>${who ? `${who} has sent you` : 'Here is'} ${what} for <strong>${amount}</strong>, ${due}. You can pay securely here — nothing else needed.</p>${noteLine}<p class="cta">${btn}</p>${docLine}`,
+      brand, { critical: true, asBusiness: true, siteId, ...(pdf ? { attachments: [{ filename: pdfFileName('invoice', row), content: pdf }] } : {}) });   // a payment link = transactional; their answer lands in the Inbox
   } catch { return false; }
 }
 /** The first name a greeting uses: the first word of the name, if it reads as one. Pure. */
@@ -1796,8 +1798,8 @@ async function emailRetainerLink(siteId: string, dealId: string, url: string, am
     const per = interval === 'year' ? 'year' : 'month';
     const btn = `<a href="${url}" style="display:inline-block;margin-top:6px;background:${brand.accent};color:#fff;padding:9px 16px;border-radius:999px;text-decoration:none">Set up your ${amount}/${per} retainer →</a>`;
     return await sendEmail(String(email), `Your retainer — ${amount} every ${per}`,
-      `<p>Your studio has set up an ongoing retainer of <strong>${amount} every ${per}</strong>. You authorize it securely through Stripe — you’re always in control, and you can cancel any time.</p><p class="cta">${btn}</p>`,
-      brand, { critical: true, siteId });   // a payment authorization the client is expecting = transactional; their answer lands in the Inbox
+      `<p>${brand.name !== EMAIL_BRAND_DEFAULT.name ? brand.name.replace(/[&<>"]/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[ch] as string)) + ' has' : 'We have'} set up an ongoing retainer of <strong>${amount} every ${per}</strong>. You authorize it securely through Stripe — you’re always in control, and you can cancel any time.</p><p class="cta">${btn}</p>`,
+      brand, { critical: true, asBusiness: true, siteId });   // a payment authorization the client is expecting = transactional; their answer lands in the Inbox
   } catch { return false; }
 }
 
@@ -2373,7 +2375,7 @@ export async function handleSalesContractSign(req: Request, id: string, cors: Re
         `Signed at: ${signedAt.slice(0, 19).replace('T', ' ')} UTC<br>` +
         `Document fingerprint: <span style="font-family:ui-monospace,Menlo,Consolas,monospace;overflow-wrap:anywhere">${String(c.content_hash || '')}</span></div>` +
         docLine + (signedPdf ? `<p style="font-size:13px;color:#6b6478;margin:8px 0 0">The signed agreement is attached as a PDF.</p>` : ''),
-        brand, { critical: true, siteId: tok.site_id, ...(signedPdf ? { attachments: [signedPdf] } : {}) }).catch(() => false);   // their signed legal record = transactional; their answer lands in the Inbox
+        brand, { critical: true, asBusiness: true, siteId: tok.site_id, ...(signedPdf ? { attachments: [signedPdf] } : {}) }).catch(() => false);   // their signed legal record = transactional; their answer lands in the Inbox
     }
   } catch { /* the signature stands; the copy email is best-effort */ }
 
@@ -2842,13 +2844,13 @@ export async function sendCustomerInvite(siteId: string, email: string, _isNewLo
     `<p>Welcome — your client portal is ready. It’s the one place where we work together from here:</p>` +
     `<ul style="margin:8px 0;padding-left:20px">` +
     `<li>watch your project’s progress as it happens</li>` +
-    `<li>message me directly — I read everything</li>` +
+    `<li>send messages straight to ${studioName ? studioName.replace(/[&<>"]/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[ch] as string)) : 'us'}</li>` +
     `<li>share files and approve work</li>` +
     `<li>see every invoice and payment in one place</li>` +
     `</ul>` +
     cta +
-    `<p style="font-size:13px;color:#6b6478">You can sign in any time at <a href="${base}/portal.html?studio=${siteId}">your portal</a>. If anything looks off, just reply and tell me.</p>`,   // builder list item 59: the sign-in page shows the studio's name and logo
-  brand, { critical: true, siteId }).catch(() => {});   // login access = transactional; "message me directly" — their answer lands in the Inbox
+    `<p style="font-size:13px;color:#6b6478">You can sign in any time at <a href="${base}/portal.html?studio=${siteId}">your portal</a>. If anything looks off, just reply to this email.</p>`,   // builder list item 59: the sign-in page shows the studio's name and logo
+  brand, { critical: true, asBusiness: true, siteId }).catch(() => {});   // login access = transactional; a message to the studio — their answer lands in the Inbox
   return true;
 }
 

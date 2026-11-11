@@ -577,6 +577,14 @@ export function invoiceReminderSlot(inv: { due_date?: unknown; created_at?: unkn
   return null;
 }
 export const invoiceReminderPeriod = (invoiceId: string, slot: InvoiceReminderSlot): string => `invremind:${invoiceId}:${slot}`;
+/** Sales item 92: under a reminder's button, the way to answer it. Reminders used to offer
+ *  only "Pay"; someone who paid another way, or has a question, can reply (it lands in the
+ *  Inbox), and an invoice reminder links the invoice itself. Pure. */
+export const REPLY_LINE = '<p style="color:#6b6478;font-size:14px;margin-top:14px">Have a question? Just reply to this email.</p>';
+export function invoiceReminderMore(docUrl: string | null | undefined, linkColor: string): string {
+  const view = typeof docUrl === 'string' && /^https:\/\//.test(docUrl) ? `<p style="margin-top:8px"><a href="${docUrl.replace(/"/g, '&quot;')}" style="color:${linkColor}">View the invoice →</a></p>` : '';
+  return `${view}<p style="color:#6b6478;font-size:14px;margin-top:14px">Paid another way already, or have a question? Just reply to this email.</p>`;
+}
 export function invoiceReminderCopy(slot: InvoiceReminderSlot, what: 'deposit' | 'invoice', amount: string, title: string): { subject: string; line: string } {
   const name = title || what;
   if (slot === 'before') return { subject: `Coming up — ${name} (${amount})`, line: `A quick heads-up: the ${what} for <strong>${amount}</strong> is due in a few days. The same secure link works whenever you're ready — nothing expires.` };
@@ -874,8 +882,12 @@ export async function runInvoiceReminders(limit = 20): Promise<{ reminded: numbe
         const brand = await loadEmailBrand(inv.site_id);
         const copy = invoiceReminderCopy(slot, what, amount, String(inv.title || ''));
         const btn = `<a href="${inv.stripe_url}" style="display:inline-block;margin-top:6px;background:${brand.accent};color:#fff;padding:9px 16px;border-radius:999px;text-decoration:none">Pay ${amount} securely →</a>`;
+        // Sales item 92: a reminder offers more than "pay": the invoice itself, and a reply
+        const { docLinkFor } = await import('../routes/sales.ts');
+        const doc = await docLinkFor('invoice', inv.id, inv.site_id).catch(() => null);
+        const more = invoiceReminderMore(doc, brand.accentDark);
         // Sales item 74: money they owe always reaches them (critical, so no unsubscribe on it); their answer lands in the Inbox
-        sendEmail(email, copy.subject, `<p>${copy.line}</p><p class="cta">${btn}</p>`, brand, { critical: true, siteId: inv.site_id }).catch(() => {});
+        sendEmail(email, copy.subject, `<p>${copy.line}</p><p class="cta">${btn}</p>${more}`, brand, { critical: true, asBusiness: true, siteId: inv.site_id }).catch(() => {});
       } catch { /* the owner notice already carries it */ }
     }
   }
@@ -982,7 +994,9 @@ export async function runApprovalReminders(limit = 50): Promise<{ reminded: numb
     const claim = await svc(`presence_approvals?id=eq.${a.id}&site_id=eq.${a.site_id}&status=eq.pending&last_reminded_at=${prev}&select=id`,
       { method: 'PATCH', headers: { Prefer: 'return=representation' }, body: JSON.stringify({ last_reminded_at: nowIso }) });
     if (!claim.ok || !(Array.isArray(claim.json) && claim.json[0])) continue;   // another tick got it, or it was just decided
-    const copy = approvalReminderCopy(a.title || '', a.due_date, kind);
+    // sales item 92: the studio asks by name
+    const studioName = await loadEmailBrand(a.site_id).then((b) => (b.name === 'Studio OS' ? '' : b.name)).catch(() => '');
+    const copy = approvalReminderCopy(a.title || '', a.due_date, kind, studioName);
     const sent = await emailBridgedCustomer(a.site_id, a.project_id, copy.subject, copy.html);
     if (sent) reminded++; else skipped_no_email++;
     if (kind === 'overdue') {
@@ -1054,7 +1068,8 @@ export async function runSalesDocReminders(limit = 20): Promise<{ reminded: numb
         const line = kind === 'estimate'
           ? 'Just a gentle reminder: your estimate is ready whenever you are. Here’s a fresh link — approve it, or say not now. Nothing is charged.'
           : `Just a gentle reminder: your ${what} is ready whenever you are. Here's a fresh link — take your time, nothing is final until you decide.`;
-        sendEmail(email, `Still there for you — ${doc.title || `your ${what}`}`, `<p>${line}</p><p class="cta">${btn}</p>`, brand, { siteId: doc.site_id }).catch(() => {});
+        // sales item 92: a reminder offers a reply, not only the button
+        sendEmail(email, `Still there for you — ${doc.title || `your ${what}`}`, `<p>${line}</p><p class="cta">${btn}</p>${REPLY_LINE}`, brand, { siteId: doc.site_id, asBusiness: true }).catch(() => {});
         reminded++;
       } catch { /* the owner notice already recorded the attempt */ }
     }

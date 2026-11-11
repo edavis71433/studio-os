@@ -503,11 +503,13 @@ async function handleInvoicePaidEcho(req: Request, cors: Record<string, string>)
     // no resolvable client email → a loud warn, never a quiet skip.
     try {
       if (payerEmail) {
-        const [{ sendEmail }, { loadEmailBrand }] = await Promise.all([
+        const [{ sendEmail }, { loadEmailBrand, EMAIL_BRAND_DEFAULT }] = await Promise.all([
           import('../commerce/account.ts'),
           import('../lib/email_brand.ts'),
         ]);
         const brand = await loadEmailBrand(String(inv.site_id)).catch(() => undefined);
+        // sales item 92: the studio by name, where it used to say only "your studio"
+        const told = brand && brand.name !== EMAIL_BRAND_DEFAULT.name ? `${esc(brand.name)} has been told` : 'We have been told';
         // Sales items 81 and 82: the receipt names the invoice's number and carries the
         // receipt as a PDF (best-effort: without it the email goes as before)
         let no = '';
@@ -533,9 +535,9 @@ async function handleInvoicePaidEcho(req: Request, cors: Record<string, string>)
           `<tr><td style="padding:2px 12px 2px 0;color:#666">${isDeposit ? 'Deposit' : 'Invoice'}</td><td><b>${esc(what)}${no ? ` ${esc(no)}` : ''}</b></td></tr>` +
           `<tr><td style="padding:2px 12px 2px 0;color:#666">Amount</td><td><b>${esc(amount)}</b></td></tr>` +
           `</table>` +
-          `<p>${isDeposit ? 'The deposit is in and the work can begin.' : 'The invoice is settled — nothing else is needed from you.'} Your studio has been notified, and everything updates automatically on their side.</p>` +
+          `<p>${isDeposit ? 'The deposit is in and the work can begin.' : 'The invoice is settled — nothing else is needed from you.'} ${told}, and everything updates on its own.</p>` +
           `<p style="color:#666;font-size:.9rem">${attachments ? 'Your receipt is attached as a PDF. ' : ''}Keep this email for your records.</p>`,
-          brand, { critical: true, siteId: String(inv.site_id), ...(attachments ? { attachments } : {}) });
+          brand, { critical: true, asBusiness: true, siteId: String(inv.site_id), ...(attachments ? { attachments } : {}) });
       } else {
         console.warn(`[invoice-paid] no client email resolvable for invoice ${inv.id} (deal ${inv.deal_id || 'none'}) — the payer gets no receipt; add an email to the deal's contact`);
       }
