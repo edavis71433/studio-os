@@ -557,7 +557,7 @@ test.describe('SS5 honest meta (fetch cap + at-cap wording)', () => {
     await page.locator('#f-title').fill('Gamma site');
     await page.locator('#f-email').fill('pat@newco.com');
     await page.locator('#f-name').fill('Pat Field');
-    await page.locator('#dealForm button[type="submit"]').click();
+    await page.locator('#f-go').click();   // item 105: Save & New is the form's other submit
     await expect(page.locator('#dtitle')).toContainText('Gamma site');   // lands straight in the new deal
     await page.locator('#closeD').click();
     await expect(page.locator('#list .card')).toHaveCount(3);
