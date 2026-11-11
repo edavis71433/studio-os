@@ -201,7 +201,7 @@ const DECIDED = {
     'POST /page-locks',   // builder items 48 and 120: a page's password, as editing the page's settings is
     'POST /redirects', 'POST /restore-to-draft', 'POST /review/reports/:id/dismiss', 'POST /review/run',
     'POST /reviews/:id/approve', 'POST /reviews/:id/hide', 'POST /reviews/:id/reply', 'POST /sales/contacts',
-    'POST /sales/contacts/:id/restore', 'POST /sales/contracts/:id/send', 'POST /sales/contracts/:id/term',
+    'POST /sales/contacts/:id/restore', 'POST /sales/deals/:id/restore', 'POST /sales/contracts/:id/send', 'POST /sales/contracts/:id/term',
     'POST /sales/customers', 'POST /sales/deals', 'POST /sales/deals/:id/activity',
     'POST /sales/deals/:id/contracts', 'POST /sales/deals/:id/convert', 'POST /sales/deals/:id/invoice',
     'POST /sales/deals/:id/proposals', 'POST /sales/deals/:id/resend-invite', 'POST /sales/deals/:id/retainer',
@@ -454,7 +454,7 @@ const WRITE_HANDLERS = [
   'handleProjects', 'handlePublish', 'handlePutIdentity', 'handlePutTemplate', 'handleRedirectCreate',
   'handleRedirectDelete', 'handleRestore', 'handleRestoreToDraft', 'handleReviewApprove', 'handleReviewDismiss',
   'handleReviewHide', 'handleReviewReply', 'handleReviewRequest', 'handleReviewRun', 'handleSalesAddCustomer',
-  'handleSalesContact', 'handleSalesContactFields', 'handleSalesContactRestore', 'handleSalesContacts',
+  'handleSalesContact', 'handleSalesContactFields', 'handleSalesContactRestore', 'handleSalesDealRestore', 'handleSalesContacts',
   'handleSalesContractCreate', 'handleSalesContractDelete', 'handleSalesContractSend', 'handleSalesContractTerm',
   'handleSalesConvert', 'handleSalesDeal', 'handleSalesDealActivity', 'handleSalesDealSend', 'handleSalesDealStage',
   'handleSalesDeals', 'handleSalesInvoice', 'handleSalesInvoiceSend', 'handleSalesInvoiceVoid',

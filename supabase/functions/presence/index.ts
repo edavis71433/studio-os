@@ -38,7 +38,7 @@ import { handleSearchHealth, handleRedirectsList, handleRedirectCreate, handleRe
 import { handleGetIdentity, handlePutIdentity } from './routes/identity.ts';
 import { handlePreview, handlePreviewSection } from './routes/preview.ts';
 import { handlePreviewStatus, handlePreviewPublish, handlePreviewPromote, handlePreviewSettings, handlePublicPreview, handlePublicPreviewOpen, handleSignedPreview, handlePreviewShareLink } from './routes/preview_env.ts';
-import { handleDealTasksList, handleDealTaskCreate, handleDealTaskUpdate } from './routes/sales.ts';
+import { handleDealTasksList, handleDealTaskCreate, handleDealTaskUpdate, handleSalesDeleted, handleSalesDealRestore } from './routes/sales.ts';
 import { handleSalesSummary, handleSalesMyTasks, handleSalesReports, handleSalesViews, handleSalesStages, handleSalesReceivables, handleSalesContacts, handleSalesContact, handleSalesContactRestore, handleSalesContactFields, handleSalesDeals, handleSalesDeal, handleSalesDealStage, handleSalesDealActivity, handleSalesProposalCreate, handleSalesProposalSend, handleSalesDealSend, handleSalesProposalRevise, handleSalesProposalDecide, handleSalesProposalDelete, handleSalesContractCreate, handleSalesContractSend, handleSalesContractSign, handleSalesContractDelete, handleSalesConvert, handleSalesResendInvite, handleSalesAddCustomer, handleSalesInvoice, handleSalesSchedule, handleSalesInvoiceSend, handleSalesInvoiceVoid, handleSalesRetainer, handleSalesRetainerCancel, handleSalesContractTerm, handleSalesTemplates, handleSalesTemplateDelete, handleSalesServices, handleSalesPublicView, handleSalesDocument, handleSalesDocumentLink } from './routes/sales.ts';
 import { handleProjects, handleProject, handleProjectReport, handleProjectsProgress, handleProjectStatus, handleTasksCreate, handleTask, handleProjectChecklist, handleMilestonesCreate, handleMilestone } from './routes/projects.ts';
 import { handleDeliverableUploadUrl, handleDeliverablesCreate, handleDeliverable, handleDeliverableDownload, handleApprovalsCreate, handleApprovalDecide } from './routes/project_delivery.ts';
@@ -815,9 +815,13 @@ async function route_(req: Request, cors: Record<string, string>): Promise<Respo
   }
   if (route === '/sales/receivables' && method === 'GET') return handleSalesReceivables(req, site, principal, cors);
   if (route === '/sales/deals') return handleSalesDeals(req, site, principal, cors);
+  if (route === '/sales/deleted' && method === 'GET') return handleSalesDeleted(site, cors);   // sales item 83: Recently deleted
   {
     let m = route.match(/^\/sales\/deals\/([0-9a-f-]{36})$/);
     if (m) return handleSalesDeal(req, site, principal, m[1], cors);
+    // sales item 83: a deleted deal comes back (Undo, and Recently deleted)
+    m = route.match(/^\/sales\/deals\/([0-9a-f-]{36})\/restore$/);
+    if (m && method === 'POST') return handleSalesDealRestore(site, m[1], cors);
     m = route.match(/^\/sales\/deals\/([0-9a-f-]{36})\/stage$/);
     if (m && method === 'POST') return handleSalesDealStage(req, site, principal, m[1], cors);
     // Log a call / email / meeting / dated note on the deal — the quick-log that

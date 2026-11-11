@@ -3388,7 +3388,17 @@ async function openDeal(id){
     // Lost is gentle but deliberate: an optional one-line reason (stored on the
     // deal via the stage route's `reason` → lost_reason) so "why" survives.
     const markLost=$('markLost'); if(markLost) markLost.onclick=()=>miniForm($('lostForm'),[{name:'reason',label:'Reason (optional) — pick one or write your own',placeholder:'e.g. Price',list:{id:'lostReasons',options:LOST_REASONS}}],async(v)=>{try{await api('/sales/deals/'+id+'/stage','POST',{to:'lost',reason:v.reason||undefined});PENDING_BACK='';toast('Marked as not a fit');openDeal(id);load();}catch(e){toast(nice(e),true);}});
-    const delDeal=$('delDeal'); if(delDeal) delDeal.onclick=async()=>{if(!confirm('Delete this deal? It leaves your pipeline; the history stays in your records. This can’t be undone here.'))return;delDeal.disabled=true;try{await api('/sales/deals/'+id,'DELETE');toast('Deal deleted');closeDealDetail();load();}catch(e){toast(nice(e),true);delDeal.disabled=false;}};
+    // sales item 83: it asks in place, and Undo (or Recently deleted, for 30 days) brings the deal back
+    const delDeal=$('delDeal'); if(delDeal) delDeal.onclick=async()=>{
+      const k=KIT(),q='Delete this deal? It leaves your pipeline. You can bring it back from Recently deleted for 30 days.';
+      if(k&&k.confirmIn){if(!(await k.confirmIn(delDeal,{text:q,yes:'Yes, delete it'})))return;}else if(!confirm(q))return;
+      delDeal.disabled=true;
+      try{
+        await api('/sales/deals/'+id,'DELETE');closeDealDetail();load();
+        const back=async()=>{try{await api('/sales/deals/'+encodeURIComponent(id)+'/restore','POST',{});toast('The deal is back.');load(true);}catch(e){toast(nice(e),true);}};
+        if(k&&k.undoToast)k.undoToast('Deal deleted. It stays in Recently deleted for 30 days.',back);else toast('Deal deleted');
+      }catch(e){toast(nice(e),true);delDeal.disabled=false;}
+    };
     const edNotes=$('ed-notes-'+id); if(edNotes&&window.ddsDraftRestore)window.ddsDraftRestore(edNotes); // an unsaved note survives an accidental Esc
     // Saving Details saves the CONTACT too. An existing contact is patched in
     // place; a contactless deal mints one and links it — the same two-step the
