@@ -4380,9 +4380,24 @@ function rvStars(n) {
 }
 function renderReviews(wrap, data) {
   const reviews = data.reviews || [], counts = data.counts || {}, agg = data.aggregate || { count: 0, average: 0 };
+  const g = data.google || {};
 
-  // ── 1. Ask for a review ─────────────────────────────────────────────────────
-  const c1 = rvCard("Ask for a review", "Send a happy customer a friendly, branded link to leave a review. They write it; you approve it before it ever shows. (Nothing is posted on their behalf.)");
+  // ── 1. Ask for a review (item 115: it can point at the Google review box) ───
+  const c1 = rvCard("Ask for a review", "Send a happy customer a friendly, branded link to leave a review. They write it — nothing is posted on their behalf.");
+
+  // Where the request sends them: your site's review page, or the Google review box.
+  const destWrap = el("div"); destWrap.style.cssText = "display:flex;gap:16px;flex-wrap:wrap;margin:0 0 12px";
+  const mkDest = (value, label, disabled) => {
+    const lab = el("label"); lab.style.cssText = "display:flex;align-items:center;gap:6px;font-size:13.5px" + (disabled ? ";color:var(--soft,#888)" : "");
+    const rb = el("input"); rb.type = "radio"; rb.name = "rv-dest"; rb.value = value; rb.disabled = !!disabled; if (value === "site") rb.checked = true;
+    lab.append(rb, el("span", null, label)); return lab;
+  };
+  destWrap.appendChild(el("span", null, "Send them to:")).style.cssText = "font-size:13px;font-weight:600";
+  destWrap.appendChild(mkDest("site", "Your website’s review page", false));
+  destWrap.appendChild(mkDest("google", "Your Google review box", !g.link));
+  c1.appendChild(destWrap);
+  const rvDest = () => { const r = wrap.querySelector('input[name="rv-dest"]:checked'); return r && r.value === "google" ? "google" : "site"; };
+
   const rowA = el("div"); rowA.style.cssText = "display:grid;grid-template-columns:1fr 1fr auto;gap:10px;align-items:end;flex-wrap:wrap";
   const em = el("input"); em.type = "email"; em.placeholder = "Customer email"; em.style.cssText = RV_ICSS;
   const nm = el("input"); nm.type = "text"; nm.placeholder = "Their name (optional)"; nm.style.cssText = RV_ICSS;
@@ -4391,7 +4406,7 @@ function renderReviews(wrap, data) {
     const email = em.value.trim(); if (!email) { toast("Add the customer's email", true); return; }
     ask.disabled = true;
     try {
-      const r = await api("POST", "/reviews/request", { email, name: nm.value.trim() });
+      const r = await api("POST", "/reviews/request", { email, name: nm.value.trim(), destination: rvDest() });
       toast(r.data && r.data.sent === false ? "That address has opted out — nothing sent." : "Review request sent");
       em.value = ""; nm.value = "";
     } catch (err) { toast(nice(err), true); } finally { ask.disabled = false; }
@@ -4399,8 +4414,87 @@ function renderReviews(wrap, data) {
   const fA = (label, node) => { const w = el("label"); w.style.cssText = "display:flex;flex-direction:column;gap:4px;font-size:13px;font-weight:600"; w.appendChild(el("span", null, label)); w.appendChild(node); return w; };
   rowA.append(fA("Email", em), fA("Name", nm), ask);
   c1.appendChild(rowA);
+
+  // The Google link's state, in plain words — and the paste-once place id.
+  const gState = el("div"); gState.style.cssText = "margin-top:12px;padding:10px 12px;border:1px dashed var(--line,#ddd);border-radius:10px;font-size:13px";
+  if (g.link && g.source === "google") {
+    gState.appendChild(el("p", null, "Google requests use the review link from your Google listing.")).style.margin = "0";
+  } else {
+    if (g.link) gState.appendChild(el("p", null, "Google requests use the place id you pasted.")).style.cssText = "margin:0 0 8px";
+    else if (g.connected) gState.appendChild(el("p", null, "Your Google listing is connected, but Google hasn’t approved the listing connection yet, so it hasn’t handed back your review link. Paste your place id below to send Google requests now.")).style.cssText = "margin:0 0 8px";
+    else gState.appendChild(el("p", null, "To send people to your Google review box, paste your Google place id — or the full “write a review” link from Google.")).style.cssText = "margin:0 0 8px";
+    if (g.can_save_place_id === false) {
+      gState.appendChild(el("p", "hint", "Saving a place id needs a one-time database update by your studio first.")).style.margin = "0";
+    } else {
+      const rowG = el("div"); rowG.style.cssText = "display:flex;gap:8px;flex-wrap:wrap";
+      const pid = el("input"); pid.type = "text"; pid.placeholder = "Google place id or “write a review” link"; pid.value = g.place_id || ""; pid.style.cssText = RV_ICSS + ";flex:1;min-width:220px";
+      const sv = el("button", null, "Save Google link"); sv.dataset.needs = "configure"; sv.style.cssText = BK_BTN + ";border-color:var(--plum,#5b3fa0);color:var(--plum,#5b3fa0)";
+      sv.addEventListener("click", async () => {
+        sv.disabled = true;
+        try {
+          const r = await api("POST", "/reviews/google-link", { place_id: pid.value.trim() });
+          toast(r.data && r.data.link ? "Saved — Google requests are ready" : "Cleared — requests use your website’s page");
+          loadReviews();
+        } catch (err) { toast(nice(err), true); sv.disabled = false; }
+      });
+      rowG.append(pid, sv); gState.appendChild(rowG);
+    }
+  }
+  c1.appendChild(gState);
   c1.appendChild(el("div", "hint", "Tip: the best time to ask is right after a completed job, appointment, or sale.")).style.cssText = "margin-top:10px;font-size:12.5px";
   wrap.appendChild(c1);
+
+  // ── 1b. Just paid you (item 115): the ticked list — an offer, never automatic ─
+  const paid = data.recently_paid || [];
+  if (paid.length) {
+    const cp = rvCard("Just paid you", "Customers whose invoice was paid recently — the best moment to ask. Tick who to ask; each person is asked at most once a month.");
+    const boxes = [];
+    paid.forEach((p) => {
+      const row = el("label"); row.style.cssText = "display:flex;align-items:center;gap:10px;padding:8px 10px;border:1px solid var(--line,#eee);border-radius:10px;margin-bottom:6px;font-size:13.5px;cursor:pointer";
+      const cb = el("input"); cb.type = "checkbox"; cb.value = p.contact_id; boxes.push(cb);
+      const who = el("span", null, p.name || p.email); who.style.fontWeight = "600";
+      const what = el("span", "hint", (p.purpose === "deposit" ? "Deposit" : "Paid") + (p.title ? " — " + p.title : "") + (p.paid_at ? " · " + bkWhenLabel(String(p.paid_at).slice(0, 10)) : ""));
+      what.style.cssText = "font-size:12.5px";
+      row.append(cb, who, what); cp.appendChild(row);
+    });
+    const go = el("button", "pillbtn", "Ask the ticked customers"); go.style.cssText = "height:36px;padding:0 16px;font-size:13.5px;margin-top:6px";
+    go.addEventListener("click", async () => {
+      const ids = boxes.filter((b) => b.checked).map((b) => b.value);
+      if (!ids.length) { toast("Tick at least one customer", true); return; }
+      go.disabled = true;
+      try {
+        const r = await api("POST", "/reviews/request", { contact_ids: ids, destination: rvDest() });
+        const d = (r && r.data) || {};
+        const skipped = (d.skipped || []).length;
+        toast("Asked " + (d.sent || 0) + (skipped ? " — " + skipped + " skipped (asked recently, opted out, or no email)" : ""));
+      } catch (err) { toast(nice(err), true); } finally { go.disabled = false; }
+    });
+    cp.appendChild(go);
+    wrap.appendChild(cp);
+  }
+
+  // ── 1c. Your Google reviews (item 115): pulled in once Google approves ──────
+  const cg = rvCard("Your Google reviews", null);
+  if (g.listing && (g.listing.rating || g.listing.review_count)) {
+    const line = el("div"); line.style.cssText = "display:flex;align-items:center;gap:10px;flex-wrap:wrap";
+    line.appendChild(rvStars(g.listing.rating));
+    line.appendChild(el("span", null, (g.listing.rating || "—") + " from " + (g.listing.review_count || 0) + " Google reviews")).style.fontWeight = "600";
+    cg.appendChild(line);
+    const bits = [];
+    if (g.listing.new_reviews) bits.push(g.listing.new_reviews + " new in the last month");
+    if (g.listing.unreplied) bits.push(g.listing.unreplied + " without a reply");
+    if (bits.length) cg.appendChild(el("p", "hint", bits.join(" · "))).style.cssText = "margin:8px 0 0;font-size:12.5px";
+    if (g.listing.maps_uri) {
+      const a = el("a", null, "Open your listing on Google →"); a.href = g.listing.maps_uri; a.target = "_blank"; a.rel = "noopener";
+      a.style.cssText = "display:inline-block;margin-top:10px;font-size:13px"; cg.appendChild(a);
+    }
+    cg.appendChild(el("p", "hint", "Google reviews are read here, not managed here — reply to them on Google.")).style.cssText = "margin:8px 0 0;font-size:12px";
+  } else {
+    cg.appendChild(el("p", "hint", g.connected
+      ? "Google hasn’t approved the listing connection yet. Your Google reviews will show here once it does — nothing for you to do."
+      : "Not connected. Once Google approves the listing connection, connect your Google Business Profile and your Google reviews will show here."));
+  }
+  wrap.appendChild(cg);
 
   // ── 2. Waiting for you (pending) ────────────────────────────────────────────
   const pending = reviews.filter((r) => r.status === "pending");
