@@ -241,7 +241,14 @@ ok('tools host: the build allowlist publishes both files', /^for f in .*\btools-
 for (const f of ['site-review.js', 'ai-visibility.js']) {
   const js = read(f);
   ok(`${f}: explains a bot check that never loads, resets after the back button, and has a watchdog`, /bot_check/.test(js) && /challenges\.cloudflare\.com and reload/.test(js) && /addEventListener\('pageshow'/.test(js) && /e\.persisted && busy/.test(js) && /150000/.test(js) && /turnstileDown = true/.test(js));
+  // list item 138: the check loads on the visitor's first focus or tap; a press before it's there waits, never fails
+  ok(`${f}: loads Cloudflare's check when the visitor starts, and a quick press waits for it`, /addEventListener\('focusin', loadTurnstile\)/.test(js) && /s\.onerror = function \(\) \{ turnstileDown = true; \}/.test(js) && /if \(turnstileDown\) \{ fail\('bot_check'/.test(js) && !/turnstileDown \|\| !window\.turnstile/.test(js));
 }
+for (const [page, script] of [['site-review.html', 'site-review.js?v=4'], ['ai-visibility.html', 'ai-visibility.js?v=2']]) {
+  const html = read(page);
+  ok(`${page}: loads nothing from Cloudflare up front, asks for the new script (a day-old cached copy would wait for a check that never comes), and links our privacy page`, !html.includes('challenges.cloudflare.com') && html.includes(`<script src="/${script}" defer></script>`) && html.includes('href="/privacy"') && !html.includes('davisdigitalstudio.com/privacy'));
+}
+ok('privacy page: names Cloudflare and when its check loads, and Google\'s speed test', /<strong>Cloudflare<\/strong> \(only on the free Site Review and AI Visibility Check, and only once you start filling in the form/.test(read('privacy.html')) && read('privacy.html').includes('<strong>Google PageSpeed</strong>'));
 const analyticsJs = read('analytics.js');
 ok('consent banner: the page gets bottom room while the banner shows, so it never covers the submit button', /document\.body\.style\.paddingBottom = h \? \(h \+ 16\) \+ 'px' : ''/.test(analyticsJs) && /restoreLauncher\(\) \{\n\s+clearInterval\(launcherWatch\);\n\s+document\.body\.style\.paddingBottom = '';/.test(analyticsJs));
 ok('deploy: the production run smoke-tests the pages on the static host', /Smoke test — Free Tools pages on the static host/.test(deployFile) && /tools\.davisdigitalstudio\.com\/report\/00000000/.test(deployFile) && deployFile.indexOf('Free Tools pages on the static host') > deployFile.indexOf('Deploy ai-visibility (PRODUCTION)'));
