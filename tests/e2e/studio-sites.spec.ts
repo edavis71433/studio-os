@@ -27,7 +27,7 @@ const GARAGE = site({ site_id: 's2', name: 'Garage Ten', edition: 'monitor', sta
   plan: { key: 'presence_monitor', words: 'Watch', status: 'active', term: '', renews: { kind: 'none', at: null } }, published_at: null });
 const CAFE = site({ site_id: 's3', name: 'Cafe Eleven', state: 'not_live', state_words: 'Not live yet', address: '', thumb: 'draft', published_at: null, unpublished_changes: true,
   plan: { key: 'presence', words: 'Website + tools', status: 'active', term: '', renews: { kind: 'trial', at: '2026-11-15T00:00:00Z' } } });
-const sitesBody = (rows: unknown[], over: Record<string, unknown> = {}) => ({ data: rows, partial: false, can_open: true, can_pin: true, can_duplicate: true, can_create: true, ...over });
+const sitesBody = (rows: unknown[], over: Record<string, unknown> = {}) => ({ data: rows, partial: false, can_open: true, can_pin: true, can_duplicate: true, can_create: true, can_trash: true, trash: [], trash_days: 90, ...over });
 
 const SITES_NAV = [STUDIO_LEVEL_NAV[0], { key: 'sites', label: 'Sites', items: [
   { key: 'sites', label: 'Sites', href: '/sites.html' }, { key: 'domains', label: 'Domains', href: '/domains.html', hidden: true },
@@ -59,12 +59,14 @@ async function openSites(page: Page, rows: unknown[] = [BISTRO, GARAGE, CAFE], o
     const s = (rows as Array<{ site_id: string; name: string }>).find((x) => x.site_id === id);
     await route.fulfill(json({ data: { html: THUMB_HTML(s ? s.name : id), version: 'live' } }));
   });
-  await page.route(/\/functions\/v1\/presence\/(agency\/sites\/[^/]+\/(pin|duplicate|copied|invite)|sales\/customers|agency\/kits$|agency\/kits\/[^/]+\/apply)/, async (route: Route) => {
+  await page.route(/\/functions\/v1\/presence\/(agency\/sites\/[^/]+\/(pin|duplicate|copied|invite|trash|restore)|sales\/customers|agency\/kits$|agency\/kits\/[^/]+\/apply)/, async (route: Route) => {
     const path = new URL(route.request().url()).pathname.replace(/^.*\/presence/, '');
     if (path === '/agency/kits' && route.request().method() !== 'POST') return route.fulfill(json(opts.kits ?? { data: [] }));
     const body = route.request().postDataJSON();
     writes.push({ method: route.request().method(), path, body });
     if (path.endsWith('/pin')) return route.fulfill(json({ data: { site_id: path.split('/')[3], pinned: body.pinned, pins: body.pinned ? [path.split('/')[3]] : [] } }));
+    if (path.endsWith('/trash')) return route.fulfill(json({ data: { site_id: path.split('/')[3], trashed_at: '2026-11-10T12:00:00Z', goes_at: '2027-02-08T12:00:00Z', was_live: true, offline: true } }));
+    if (path.endsWith('/restore')) return route.fulfill(json({ data: { site_id: path.split('/')[3], restored: true } }));
     if (path === '/sales/customers') return route.fulfill(json({ data: { created: true, client_id: 'c-new', site_id: 'snew', invited: true } }, 201));
     if (path.endsWith('/copied')) return route.fulfill(json({ data: { site_id: path.split('/')[3], copied: { from: 'Bistro Nine', kept: true } } }));
     if (path === '/agency/kits') return route.fulfill(json({ data: { id: 'k-new', name: body.name, offerings: 4, faqs: 2, kind: 'template', summary: { pages: 1, sections: 5, photos: 2 } } }));
@@ -185,7 +187,7 @@ test.describe('Sites (builder list items 43 and 45)', () => {
     await expect(card.locator('.owner')).toContainText('Nobody has been emailed.');
     await expect(page.locator('.scard[data-site="s1"] .owner')).toHaveCount(0);
     await card.locator('[data-menu]').click();
-    await expect(page.locator('#rowMenuHost [role="menuitem"]')).toHaveText(['Pin to top', 'Duplicate site', 'Save as a template', 'Invite the owner', 'Open record']);
+    await expect(page.locator('#rowMenuHost [role="menuitem"]')).toHaveText(['Pin to top', 'Duplicate site', 'Save as a template', 'Invite the owner', 'Open record', 'Move to trash']);
     await page.keyboard.press('Escape');
     await card.getByRole('button', { name: 'Invite the owner' }).click();
     const dlg = page.locator('#invDlg');
@@ -354,7 +356,7 @@ test.describe('Sites (builder list items 43 and 45)', () => {
     const t = await openSites(page);
     await page.locator('.scard[data-site="s3"] [data-menu]').click();
     const menu = page.locator('#rowMenuHost [role="menu"]');
-    await expect(menu.locator('[role="menuitem"]')).toHaveText(['Pin to top', 'Duplicate site', 'Save as a template', 'Open record']);
+    await expect(menu.locator('[role="menuitem"]')).toHaveText(['Pin to top', 'Duplicate site', 'Save as a template', 'Open record', 'Move to trash']);
     await menu.getByRole('menuitem', { name: 'Pin to top' }).click();
     await expect.poll(() => t.writes.find((w) => w.path === '/agency/sites/s3/pin')?.body).toEqual({ pinned: true });
     await expect(page.locator('.scard[data-site="s3"] .tpin')).toHaveText('Pinned');
@@ -369,11 +371,11 @@ test.describe('Sites (builder list items 43 and 45)', () => {
   test('a watch plan has no Duplicate, and no studio site means no Pin', async ({ page }) => {
     await openSites(page, [BISTRO, GARAGE], { body: { can_pin: false } });
     await page.locator('.scard[data-site="s2"] [data-menu]').click();
-    await expect(page.locator('#rowMenuHost [role="menuitem"]')).toHaveText(['View live site', 'Open record']);
+    await expect(page.locator('#rowMenuHost [role="menuitem"]')).toHaveText(['View live site', 'Open record', 'Move to trash']);
   });
 
   test('a seat that can’t open a client (view only, designer…) gets the live site, never a door that says no', async ({ page }) => {
-    await openSites(page, [BISTRO, CAFE], { body: { can_open: false, can_duplicate: false } });
+    await openSites(page, [BISTRO, CAFE], { body: { can_open: false, can_duplicate: false, can_trash: false } });
     const card = page.locator('.scard[data-site="s1"]');
     await expect(card.locator('.sacts a')).toHaveText(['View live site']);
     await expect(card.locator('.sacts a')).toHaveAttribute('href', 'https://bistro.example');
@@ -503,6 +505,82 @@ test.describe('Sites (builder list items 43 and 45)', () => {
   });
 });
 
+// ── Item 154 (Nov 10 review: file 02 finding 6): a trash for sites, 90 days to restore ──
+test.describe('Sites: the trash (item 154)', () => {
+  const TRASHED = [
+    { site_id: 's8', name: 'Ortiz Photography', trashed_at: '2026-11-10T12:00:00Z', trashed_by: 'owner@studio.example', was_live: true, goes_at: '2027-02-08T12:00:00Z', days_left: 90 },
+    { site_id: 's9', name: 'Maple Street Bakery', trashed_at: '2026-10-02T12:00:00Z', trashed_by: 'owner@studio.example', was_live: false, goes_at: '2026-12-31T12:00:00Z', days_left: 9 },
+  ];
+
+  test('Move to trash asks first and says what happens — offline now, 90 days to restore, the domain stays theirs', async ({ page }) => {
+    const t = await openSites(page);
+    await page.locator('.scard[data-site="s1"] [data-menu]').click();
+    await page.locator('#rowMenuHost').getByRole('menuitem', { name: 'Move to trash' }).click();
+    const dlg = page.locator('#trashDlg');
+    await expect(dlg).toBeVisible();
+    await expect(dlg.locator('h3')).toHaveText('Move Bistro Nine to the trash?');
+    await expect(dlg.locator('li')).toHaveCount(4);
+    await expect(dlg).toContainText('It goes offline now: visitors see a short “temporarily offline” page.');
+    await expect(dlg).toContainText('For 90 days you can restore it from the Trash at the foot of this page.');
+    await expect(dlg).toContainText('it’s deleted for good: its website comes down. If its owner signs in, they keep their sign-in, files and invoices.');
+    await expect(dlg).toContainText('Its domain, bistro.example, isn’t cancelled.');
+    await dlg.locator('#trash-cancel').click();                     // Cancel moves nothing
+    await expect(dlg).toBeHidden();
+    expect(t.writes).toHaveLength(0);
+    await page.locator('.scard[data-site="s1"] [data-menu]').click();
+    await page.locator('#rowMenuHost').getByRole('menuitem', { name: 'Move to trash' }).click();
+    await dlg.locator('#trash-go').click();
+    await expect(dlg).toBeHidden();
+    await expect(page.locator('.dds-toast', { hasText: 'Bistro Nine is in the trash and offline. Restore it from the foot of the page within 90 days.' })).toBeVisible();
+    expect(t.writes.map((w) => `${w.method} ${w.path}`)).toEqual(['POST /agency/sites/s1/trash']);
+  });
+
+  test('a site that was never published has nothing to take down, and no domain line', async ({ page }) => {
+    await openSites(page, [BISTRO, CAFE]);
+    await page.locator('.scard[data-site="s3"] [data-menu]').click();
+    await page.locator('#rowMenuHost').getByRole('menuitem', { name: 'Move to trash' }).click();
+    const dlg = page.locator('#trashDlg');
+    await expect(dlg).toContainText('Nothing is online to take down: it was never published.');
+    await expect(dlg.locator('li')).toHaveCount(3);
+  });
+
+  test('the Trash at the foot of the page: newest first, the day each goes, and Restore', async ({ page }) => {
+    const t = await openSites(page, [BISTRO], { body: { trash: TRASHED } });
+    const trash = page.locator('section.trash');
+    await expect(trash.locator('h2')).toHaveText('Trash');
+    await expect(trash.locator('.count')).toHaveText('2');
+    await expect(trash.locator('.trow')).toHaveCount(2);
+    await expect(trash.locator('.trow').nth(0)).toContainText('Ortiz Photography');
+    await expect(trash.locator('.trow').nth(0)).toContainText('Moved Nov 10 · offline since then');
+    await expect(trash.locator('.trow').nth(0)).toContainText('Deleted for good Feb 8, 2027 · 90 days left');
+    await expect(trash.locator('.trow').nth(1).locator('.soon')).toContainText('9 days left');   // soon is said in the warning colour
+    await expect(page.locator('.scard[data-site="s8"]')).toHaveCount(0);                   // a trashed site has no card
+    await trash.getByRole('button', { name: 'Restore Ortiz Photography' }).click();
+    await expect(page.locator('.dds-toast', { hasText: 'Restored Ortiz Photography. It stays offline until you publish it or bring it back online.' })).toBeVisible();
+    expect(t.writes.map((w) => `${w.method} ${w.path}`)).toEqual(['POST /agency/sites/s8/restore']);
+  });
+
+  test('a seat without the right sees the Trash but no Restore and no Move to trash; none trashed, no Trash at all', async ({ page }) => {
+    await openSites(page, [BISTRO], { body: { trash: TRASHED, can_trash: false } });
+    await expect(page.locator('section.trash .trow')).toHaveCount(2);
+    await expect(page.locator('section.trash [data-restore]')).toHaveCount(0);
+    await page.locator('.scard[data-site="s1"] [data-menu]').click();
+    await expect(page.locator('#rowMenuHost [role="menuitem"]')).not.toContainText(['Move to trash']);
+  });
+
+  test('phone width: the Trash fits, Restore is a full-size tap', async ({ page }) => {
+    await page.setViewportSize({ width: 375, height: 812 });
+    await openSites(page, [BISTRO], { body: { trash: TRASHED } });
+    const row = page.locator('section.trash .trow').first();
+    await row.scrollIntoViewIfNeeded();
+    const box = await row.boundingBox();
+    expect(box && box.x >= 0 && box.x + box.width <= 375).toBe(true);
+    const btn = await row.locator('[data-restore]').boundingBox();
+    expect(btn && btn.height >= 44).toBe(true);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)).toBeLessThanOrEqual(0);
+  });
+});
+
 // ── Item 145 (Nov 10 review: file 02 finding 3, file 03 finding 3): Duplicate brings the pages,
 //    a site can be saved as "my template", and what was copied waits to be changed or kept ──
 test.describe('Sites: the pages travel (item 145)', () => {
@@ -551,7 +629,7 @@ test.describe('Sites: the pages travel (item 145)', () => {
     await expect(page.locator('#rowMenuHost [role="menuitem"]')).not.toContainText(['Save as a template']);   // a site we only watch has no pages of ours
     await page.keyboard.press('Escape');
     await page.locator('.scard[data-site="s1"] [data-menu]').click();
-    await expect(page.locator('#rowMenuHost [role="menuitem"]')).toHaveText(['Pin to top', 'Duplicate site', 'Save as a template', 'View live site', 'Open record']);
+    await expect(page.locator('#rowMenuHost [role="menuitem"]')).toHaveText(['Pin to top', 'Duplicate site', 'Save as a template', 'View live site', 'Open record', 'Move to trash']);
     await page.locator('#rowMenuHost').getByRole('menuitem', { name: 'Save as a template' }).click();
     const dlg = page.locator('#tplDlg');
     await expect(dlg).toBeVisible();
