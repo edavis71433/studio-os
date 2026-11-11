@@ -118,7 +118,7 @@ const MEMBER_WRITES: Array<[MemberWriteNeed, string[]]> = [
     '(POST|DELETE) /foundations/domain',
     'POST /foundations/prepare',
     'POST /preview/settings',
-    'POST /site/(offline|online)',
+    'POST /site/(offline|online|password)',   // list item 175: a visitor password is a setting, like taking the site offline
     'PUT /bookings/settings',
     'PUT /sales/contacts/fields',
   ]],

@@ -46,10 +46,11 @@ export interface ProbeResult { ok: boolean; https: boolean; status: number; erro
 export type FetchLike = (url: string, init?: RequestInit) => Promise<Response>;
 
 /** HEAD (cheap) then GET fallback. "ok" = the site answered 2xx/3xx — reachable
- *  from a visitor's point of view. A thrown fetch (timeout, connection refused,
- *  TLS/cert failure) IS an outage → ok:false, error captured, NEVER re-thrown. */
+ *  from a visitor's point of view — or 401, a site asking for its visitor password
+ *  (list item 175), which is up and answering. A thrown fetch (timeout, connection
+ *  refused, TLS/cert failure) IS an outage → ok:false, error captured, NEVER re-thrown. */
 export async function probeSite(url: string, fetchImpl: FetchLike = fetch): Promise<ProbeResult> {
-  const reachable = (r: Response): ProbeResult => ({ ok: r.status >= 200 && r.status < 400, https: r.url.startsWith('https://'), status: r.status, error: '' });
+  const reachable = (r: Response): ProbeResult => ({ ok: (r.status >= 200 && r.status < 400) || r.status === 401, https: r.url.startsWith('https://'), status: r.status, error: '' });
   try {
     const h = await fetchImpl(url, { method: 'HEAD', redirect: 'follow', signal: timed(10_000) });
     // Some hosts reject HEAD (405/501) — fall back to a GET before believing it's down.

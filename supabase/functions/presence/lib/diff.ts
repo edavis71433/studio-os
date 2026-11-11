@@ -143,6 +143,12 @@ export function describeChanges(draftC: SnapshotContent, liveC: SnapshotContent 
       ? 'Your site stops counting visits, and its privacy page says so.'
       : 'Your site starts counting visits again, and its privacy page says so.' });
   }
+  // ── the AI crawler switch (item 175): robots.txt changes with it ──
+  if ((d.settings?.ai_crawlers !== false) !== (l.settings?.ai_crawlers !== false)) {
+    out.push({ section: 'site', sentence: d.settings?.ai_crawlers === false
+      ? 'AI assistants like ChatGPT, Claude and Perplexity are asked not to read your site. Google and Bing search are not affected.'
+      : 'AI assistants can read your site again.' });
+  }
 
   // ── custom section blocks (home + pages) — without this, two versions that
   //    differ ONLY in blocks reported "identical" (G9 finding). Coarse but

@@ -70,6 +70,9 @@ export interface SnapshotContent {
     /** Item 61: false when the owner turned the visit counter off. Absent means on:
      *  the counter is added at publish and the privacy page describes it. */
     visit_counter?: boolean;
+    /** List item 175: false when the owner asked AI assistants not to read the site. Absent
+     *  means allowed: robots.txt then stays exactly as the template draws it. */
+    ai_crawlers?: boolean;
     /** Phase SD: page keys hidden from search (noindex + out of the sitemap). */
     pages_noindex?: string[];
     /** Phase SD: per-page search headline/description overrides, keyed by page.
