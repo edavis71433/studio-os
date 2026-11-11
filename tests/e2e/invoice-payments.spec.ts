@@ -54,7 +54,8 @@ test.describe('item 77 — record a payment on the record', () => {
     await invRow(page, OPEN).getByRole('button', { name: 'Record payment' }).click();
     const form = page.locator('#payhost .payform');
     await expect(form).toBeVisible();
-    await expect(page.locator('#pf-h')).toHaveText('Record a payment for #0013');
+    await expect(page.locator('#pf-h')).toHaveText('Record a payment for #0013 · Balance at launch');
+    await expect(invRow(page, OPEN)).toHaveClass(/paying/);   // the invoice it is for is marked
     await expect(page.locator('#pf-amt')).toHaveValue('2000.00');
     await expect(page.locator('#pf-on')).toHaveValue(TODAY);
     await expect(form.getByRole('radio', { name: 'Check' })).toBeChecked();

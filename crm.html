@@ -308,7 +308,7 @@
   .btable .racts{justify-content:flex-end;flex-wrap:wrap;gap:2px}   /* item 77: five verbs wrap rather than widen the table past the screen */
   .btable .racts .rbtn{font-size:12px;padding:var(--dds-s1,4px) var(--dds-s2,8px)}
   .btable td .rt{white-space:nowrap}
-  .card.tcard{overflow-x:auto}
+  .card.tcard{overflow-x:auto;position:relative}   /* item 77: its hidden "Actions" header label stays inside the scroll (it widened the page on a tablet) */
   .btable{min-width:540px}
   .rbtn{border-color:transparent;color:var(--soft);padding:var(--dds-s1,4px) var(--dds-s2,8px)}
   .rbtn:hover{border-color:var(--line);background:var(--bg);color:var(--ink)}
@@ -1491,8 +1491,9 @@ function billedToLine(){
   const c=(DEAL&&DEAL.contact)||{}; const who=[c.name,c.company].map(x=>String(x||'').trim()).filter(Boolean);
   const addr=addrText(c.address);
   const name=who.length?esc(who.join(', ')):'this client';
-  if(!('address' in c))return {has:false,can:false,text:`Invoices are billed to ${name}.`};   // before contacts hold an address (item 89)
-  return addr?{has:true,can:true,text:`Invoices are billed to ${name}, ${esc(addr.replace(/\n+/g,', '))}.`}:{has:false,can:true,text:`Invoices are billed to ${name}. No postal address yet, so none prints on them.`};
+  const end=(t)=>/[.!?]$/.test(t)?t:t+'.';   // "Juniper Floral Co." needs no second full stop
+  if(!('address' in c))return {has:false,can:false,text:end(`Invoices are billed to ${name}`)};   // before contacts hold an address (item 89)
+  return addr?{has:true,can:true,text:end(`Invoices are billed to ${name}, ${esc(addr.replace(/\n+/g,', '))}`)}:{has:false,can:true,text:end(`Invoices are billed to ${name}`)+' No postal address yet, so none prints on them.'};
 }
 // item 82: a document as its PDF, saved under its own name (the same copy the client gets)
 async function downloadPdf(b){
