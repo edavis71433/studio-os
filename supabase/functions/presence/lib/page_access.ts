@@ -24,7 +24,7 @@ export { LOCK_ITERATIONS, PASSWORD_MIN, PASSWORD_MAX, gatePage, lockKeyFromPassw
 
 export type PageAccess = 'everyone' | 'password' | 'private';
 type Settings = NonNullable<SnapshotContent['settings']>;
-export interface PageShow { access?: 'password' | 'private'; lock?: string; noHeader?: true; noFooter?: true }
+export interface PageShow { access?: 'password' | 'private'; lock?: string; noHeader?: true; noFooter?: true; notFound?: true; lockTitle?: string; lockNote?: string }
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -37,7 +37,27 @@ export function pageShowFields(p: unknown): PageShow {
   if (typeof x.lock === 'string' && UUID.test(x.lock)) out.lock = x.lock.toLowerCase();
   if (x.noHeader === true) out.noHeader = true;
   if (x.noFooter === true) out.noFooter = true;
+  // item 121: the page a broken link shows, and the words on its password box
+  if (x.notFound === true) out.notFound = true;
+  const words = (v: unknown, max: number) => typeof v === 'string' ? v.replace(/[\u0000-\u001f\u007f]+/g, ' ').replace(/\s+/g, ' ').trim().slice(0, max) : '';
+  const lt = words(x.lockTitle, 80), ln = words(x.lockNote, 300);
+  if (lt) out.lockTitle = lt;
+  if (ln) out.lockNote = ln;
   return out;
+}
+
+/** Item 121: the owner's own page as the "not found" page. The first page that asks, and only
+ *  if it's open to everyone (a password or private page never answers a broken link), becomes
+ *  404.html as drawn, kept out of search engines and pointing at no address of its own. Its own
+ *  address still works. Without one, the template's ready-made page stays. Pure. */
+export function applyNotFoundPage(fileMap: FileMap, pages: Array<{ slug: string; notFound?: true; access?: string }> | undefined): FileMap {
+  const p = (pages || []).find((x) => x && x.notFound && x.slug && !x.access);
+  const html = p ? fileMap[`${p.slug}/index.html`] : undefined;
+  if (typeof html !== 'string') return fileMap;
+  const robots = '<meta name="robots" content="noindex">';
+  let page = html.replace(/<link rel="canonical"[^>]*>\n?/g, '');
+  page = /<meta name="robots"[^>]*>/.test(page) ? page.replace(/<meta name="robots"[^>]*>/, robots) : page.replace('</head>', () => robots + '\n</head>');
+  return { ...fileMap, '404.html': page };
 }
 
 
@@ -74,12 +94,12 @@ export function lockIdsIn(c: SnapshotContent | null | undefined): string[] {
  *  led to a page that left and held a dropdown leaves its dropdown in its place. Password pages
  *  stay in the menu and are kept off Google and the site's search. The draft is not changed:
  *  this is a copy. Pure. */
-export function liveContent(c: SnapshotContent, usableLocks: ReadonlySet<string>): { content: SnapshotContent; sealed: Array<{ slug: string; title: string; lock: string }> } {
+export function liveContent(c: SnapshotContent, usableLocks: ReadonlySet<string>): { content: SnapshotContent; sealed: Array<{ slug: string; title: string; lock: string; heading?: string; note?: string }> } {
   const was: Settings = c.settings || {};
   const pages = was.pages || [];
   const opens = (p: { access?: string; lock?: string }) => p.access !== 'private' && !(p.access === 'password' && !(p.lock && usableLocks.has(p.lock)));
   const gone = new Set(pages.filter((p) => !opens(p)).map((p) => `/${p.slug}/`));
-  const sealed = pages.filter((p) => opens(p) && p.access === 'password').map((p) => ({ slug: p.slug, title: p.title, lock: p.lock as string }));
+  const sealed = pages.filter((p) => opens(p) && p.access === 'password').map((p) => ({ slug: p.slug, title: p.title, lock: p.lock as string, ...(p.lockTitle ? { heading: p.lockTitle } : {}), ...(p.lockNote ? { note: p.lockNote } : {}) }));
   if (!gone.size && !sealed.length) return { content: c, sealed };
   const settings: Settings = { ...was, pages: pages.filter(opens) };
   if (Array.isArray(was.nav)) {

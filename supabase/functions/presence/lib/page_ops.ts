@@ -86,7 +86,8 @@ export function duplicatePageInSettings(settings: { blocks?: unknown; pages?: un
   if (source.hideNav === true) copy.hideNav = true;
   // items 48 and 120: a copy of a password or private page is never public by surprise. It
   // keeps the same password (the same lock), and the same header and footer choice.
-  Object.assign(copy, pageShowFields(source));
+  const { notFound: _nf, ...shows } = pageShowFields(source);   // item 121: a copy is never the not-found page too
+  Object.assign(copy, shows);
   const out = pages.slice();
   out.splice(isHome ? 0 : at + 1, 0, copy);
   return { pages: out, slug: newSlug, title, sourceTitle };
