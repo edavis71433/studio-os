@@ -59,7 +59,9 @@ export interface NeedsInput {
     /** item 134: the padlock's end date, and since when the records have been right with no padlock on */
     cert_expires_at?: string | null; cert_pending_since?: string | null;
     /** item 134 (0153): what the domain shows, compared with the site's own address */
-    domain_serving?: string | null }>;
+    domain_serving?: string | null;
+    /** item 162 (0162): the registry's status words */
+    domain_statuses?: string[] | null }>;
   /** /sales/receivables items — the SAME rows the roster's Outstanding column and Pipeline's tile use */
   invoices?: Array<{ id: string; title?: string; amount_cents?: number; due_date?: string | null; status?: string; state?: string; processing_since?: string | null; deal_id?: string | null; deal?: string; client_id?: string | null; customer_site_id?: string | null; created_at?: string | null }>;
   /** invoice reminders that went out: period 'invremind:<invoice id>[:slot]' + when */
@@ -152,7 +154,7 @@ const providerLabel = (k: string) => PROVIDER_LABEL[k] || k.replace(/[_-]+/g, ' 
 export function buildNeedsYou(i: NeedsInput): NeedsRow[] {
   const today = ymdOf(i.nowIso) || '';
   const active = new Set((i.links || []).filter((l) => l.status === 'active').map((l) => l.site_id));
-  const archivedSites = new Set((i.links || []).filter((l) => l.status === 'archived').map((l) => l.site_id));
+  const archivedSites = new Set((i.links || []).filter((l) => l.status === 'archived' || l.status === 'trashed').map((l) => l.site_id));   // item 154: a trashed site asks for nothing
   const names = i.clientNames || {};
   const byClient = i.namesByClient || {};
   const nameOf = (siteId?: string | null, clientId?: string | null, fallback = 'A customer') =>
@@ -322,6 +324,16 @@ export function buildNeedsYou(i: NeedsInput): NeedsRow[] {
         push({ key: `broken:publish:${s.id}`, kind: 'broken', site_id: s.id, client_id: null, name: nameOf(s.id, null),
           what: 'the last publish failed', when: [ago(p.created_at, today) ? `Failed ${ago(p.created_at, today)}` : 'Failed', err ? err.slice(0, 80) : ''].filter(Boolean).join(' · '),
           verb: 'Fix', href: `/presence.html${sc(s.id)}#publish`, since: p.created_at || null });
+      }
+      // item 162 (review domains finding 6): the registry says the domain itself is in trouble
+      const rs = Array.isArray(s.domain_statuses) ? s.domain_statuses : [];
+      const regWhat = rs.includes('pending delete') ? 'is about to be deleted at the registry'
+        : rs.includes('redemption period') ? 'is in the redemption period: it lapsed'
+        : (rs.includes('client hold') || rs.includes('server hold')) ? 'is on hold at the registry, so it isn’t answering' : '';
+      if (s.custom_domain && regWhat) {
+        push({ key: `broken:registry:${s.id}`, kind: 'broken', site_id: s.id, client_id: null, name: nameOf(s.id, null),
+          what: `${s.custom_domain} ${regWhat}`, when: s.domain_registrar ? `At ${s.domain_registrar}` : 'At the registry',
+          verb: 'Fix', href: `/domains.html` });
       }
       // item 134 (review findings 3): the domain answers, but not with this site
       if (s.custom_domain && s.edition !== 'monitor' && (s.domain_serving === 'old_copy' || s.domain_serving === 'other')) {

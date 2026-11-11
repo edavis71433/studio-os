@@ -85,6 +85,56 @@ test.describe('the Welcome panel’s status', () => {
     await expect(page.locator('#siteStatusBtn')).toHaveText('Bring back online');
   });
 
+  // list item 175: a password on the whole live site
+  test('a visitor password goes on from it and comes off again, and the panel follows', async ({ page }) => {
+    await mount(page, '/presence.html', { ...SHOWN, ...LIVE });
+    let since: string | null = null;
+    const sent: any[] = [];
+    await page.route('**/functions/v1/presence/preview/status', (r) => r.fulfill({ json: { data: { ...status(null), live: { ...status(null).live, password_since: since } } } }));
+    await page.route('**/functions/v1/presence/site/password', (r) => { const b = r.request().postDataJSON(); sent.push(b); since = b.password ? '2026-11-11T12:00:00Z' : null; return r.fulfill({ json: { data: { ok: true, password: !!b.password, message: 'Done.' } } }); });
+    await page.locator('#ssTodo').click();
+    const btn = page.locator('#sitePasswordBtn');
+    await expect(btn).toHaveText('Add a visitor password…');
+    await expect(btn).toHaveAttribute('data-needs', 'configure');
+    await btn.click();
+    await expect(page.locator('dialog')).toContainText('Visitors type this before they see any page');
+    await page.locator('dialog input[type="password"]').fill('open sesame');
+    await page.locator('dialog button[type="submit"]').click();
+    await expect.poll(() => sent.length).toBe(1);
+    expect(sent[0]).toEqual({ password: 'open sesame' });
+    await expect(page.locator('#siteStatusBadge')).toHaveText('Password');
+    await expect(page.locator('#siteStatusCard')).toContainText('Visitors type the password before they see any page.');
+    await expect(page.locator('#siteStatusBtn')).toHaveText('Take offline…');   // offline is still one press away
+    await page.locator('#sitePasswordBtn').click();
+    await expect(page.locator('dialog')).toContainText('Leave it blank to take the password off');
+    await page.locator('dialog button[type="submit"]').click();
+    await expect.poll(() => sent.length).toBe(2);
+    expect(sent[1]).toEqual({ password: '' });
+    await expect(page.locator('#siteStatusBadge')).toHaveText('Public');
+  });
+
+  test('a blank new password, or Cancel, sends nothing', async ({ page }) => {
+    await mount(page, '/presence.html', { ...SHOWN, ...LIVE });
+    let sent = 0;
+    await page.route('**/functions/v1/presence/preview/status', (r) => r.fulfill({ json: { data: status(null) } }));
+    await page.route('**/functions/v1/presence/site/password', (r) => { sent++; return r.fulfill({ json: { data: { ok: true } } }); });
+    await page.locator('#ssTodo').click();
+    await page.locator('#sitePasswordBtn').click();
+    await page.locator('dialog button[type="submit"]').click();
+    await page.locator('#sitePasswordBtn').click();
+    await page.locator('dialog button[type="button"]').click();
+    await page.waitForTimeout(300);
+    expect(sent).toBe(0);
+  });
+
+  test('an offline site offers no password: the holding page is what visitors see', async ({ page }) => {
+    await mount(page, '/presence.html', { ...SHOWN, ...LIVE });
+    await page.route('**/functions/v1/presence/preview/status', (r) => r.fulfill({ json: { data: status('2026-11-08T12:00:00Z') } }));
+    await page.locator('#ssTodo').click();
+    await expect(page.locator('#siteStatusBadge')).toHaveText('Offline');
+    await expect(page.locator('#sitePasswordBtn')).toHaveCount(0);
+  });
+
   test('saying no to the question changes nothing', async ({ page }) => {
     await mount(page, '/presence.html', { ...SHOWN, ...LIVE });
     let sent = 0;

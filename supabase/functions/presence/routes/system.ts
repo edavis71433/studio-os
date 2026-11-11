@@ -18,6 +18,7 @@ import { reapSnapshots } from '../lib/snapshot_gc.ts';
 import { runRecurringInvoices } from './recurring_invoices.ts';   // sales review item 47: a fresh invoice on a schedule
 import { runTrafficSpikes } from '../ops/traffic_spikes.ts';
 import { runMonthlyReports } from '../ops/monthly_report.ts';
+import { runSiteTrashPurge } from '../ops/site_trash.ts';
 import { runLifecycleSweep, runWeeklyDigest, runDomainWatch, runLeadFollowups, runDealFollowups, runRenewalReminders, runInvoiceReminders, runSalesDocReminders, runReviewRequests, runProspectNurture, runSupportAging, runAgreementRenewalReminders, runBookingReminders, runBookingFollowups, runEmailAuthNudges, runApexDriftWatch, runApprovalReminders } from '../commerce/lifecycle.ts';
 import { runScheduledBroadcasts } from '../lib/broadcast.ts';
 import { runDeletionSweep } from '../commerce/deletion.ts';
@@ -391,6 +392,7 @@ export async function handleSystem(req: Request, route: string, method: string, 
             ['domains', () => runDomainWatch(10)],
             ['traffic_spikes', () => runTrafficSpikes(200)],   // builder list item 47: a busy day of visitors, said once per site per day
             ['monthly_reports', () => runMonthlyReports(20)],   // builder list item 58: last month's report to each switched-on client, in the first days of a month
+            ['site_trash', () => runSiteTrashPurge(10)],   // builder list item 154: a site 90 days in a studio's trash is deleted for good
             ['email_auth', () => runEmailAuthNudges(20)],   // DNS #5: escalate persistent SPF/DMARC/DKIM gaps to one owner nudge
             ['apex_drift', () => runApexDriftWatch(10)],    // DNS: verify the apex still points home; surface drift as a finding
             ['retention', () => runRetentionSweep()],
@@ -450,6 +452,7 @@ export async function handleSystem(req: Request, route: string, method: string, 
       const domains = await step('domains', () => runDomainWatch(10));             // INF: RDAP expiry+registrar, 24h dedupe
       await step('traffic_spikes', () => runTrafficSpikes(200));                   // builder list item 47: a busy day of visitors, once per site per day (day:<date> dedupes)
       await step('monthly_reports', () => runMonthlyReports(20));                  // builder list item 58: last month's report to each switched-on client (last_month dedupes)
+      await step('site_trash', () => runSiteTrashPurge(10));                       // builder list item 154: a site 90 days in a studio's trash is deleted for good
       const emailAuth = await step('email_auth', () => runEmailAuthNudges(20));     // DNS #5: escalate persistent SPF/DMARC/DKIM gaps → one owner nudge
       const apexDrift = await step('apex_drift', () => runApexDriftWatch(10));       // DNS: verify the apex still points home; surface drift as a finding
       const leads = await step('leads', () => runLeadFollowups(20));               // CRM: nudge un-replied leads, once per lead

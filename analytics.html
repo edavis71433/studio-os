@@ -106,6 +106,7 @@
   .chartnote{font-size:12px;color:var(--faint);margin-top:6px;font-variant-numeric:tabular-nums}
   .srcs{display:grid;grid-template-columns:minmax(90px,130px) 1fr 48px;gap:10px var(--dds-s3,12px);align-items:center;font-size:13px}
   .srcs .n{text-align:right;font-variant-numeric:tabular-nums;font-weight:600}
+  .srcai{margin:var(--dds-s3,12px) 0 0;font-size:12.5px;color:var(--soft)}   /* list item 153 */
   .progress{height:6px;border-radius:3px;background:var(--line);overflow:hidden}
   .progress i{display:block;height:100%;background:var(--p);border-radius:3px}
   .rows{display:flex;flex-direction:column}
@@ -562,6 +563,8 @@ const monthShort=(p)=>{const m=/^(\d{4})-(\d{2})$/.exec(String(p||''));return m?
 // One row per page. A column only exists when the numbers behind it do, so an older
 // function build (no people per page) or a site with no Search Console data shows a
 // shorter table instead of empty cells.
+// list item 157: seconds in plain words ("45 sec", "2 min 10 sec")
+function duration(sec){ const s=Math.max(0,Math.round(Number(sec)||0)); if(s<60)return `${s} sec`; const m=Math.floor(s/60),r=s%60; return r?`${m} min ${r} sec`:`${m} min`; }
 function pageTable(rows,cols){
   const head=cols.map(c=>`<th scope="col" title="${esc(c.title||c.name)}">${esc(c.name)}</th>`).join('');
   const body=rows.map(p=>`<tr><td title="${esc(p.path)}"><b>${esc(pageName(p.path))}</b><span>${esc(p.path)}</span></td>${cols.map(c=>`<td>${c.value(p)}</td>`).join('')}</tr>`).join('');
@@ -675,6 +678,8 @@ function websiteBand(d){
     let body=null;
     if(measuring&&(t.top_sources||[]).length){
       body=`<div class="srcs">${t.top_sources.map(s=>`<span>${esc(s.source)}</span><div class="progress" aria-hidden="true"><i style="width:${Math.max(0,Math.min(100,Number(s.share)||0))}%"></i></div><span class="n">${num(s.visits)}</span>`).join('')}</div>`;
+      // list item 153: the "AI assistants" row, by assistant
+      if((t.ai_sources||[]).length)body+=`<p class="srcai">From AI assistants: ${t.ai_sources.map(a=>`${esc(a.name)} ${num(a.visits)}`).join(' · ')}</p>`;
     }
     h+=card('','Where visitors come from',measuring?`${num(t.visitors)} visitors · ${periodLabel()}${tTrunc?' · based on recent activity':''}`:based(periodLabel(),tTrunc),body||(external?offSite('Where visitors come from'):emptyState('No visits yet','Your visitor sources will appear here.')),[BI,'View website insights']);
   }
@@ -687,6 +692,12 @@ function websiteBand(d){
       const cols=[{name:'Views',title:'Page views',value:p=>num(p.views)}];
       if(rows.some(p=>p.visitors!=null))cols.push({name:'People',title:'Different people who opened this page',value:p=>num(p.visitors)});
       if(googlePages.length)cols.push({name:'Google',title:`Clicks from Google${gscQual(g.period)}`,value:p=>fromGoogle.has(p.path)?num(fromGoogle.get(p.path)):'—'});
+      // list item 157: the middle time a page stayed open
+      const timed=new Map(((t.time_on_page&&t.time_on_page.pages)||[]).map(p=>[p.path,p.seconds]));
+      if(timed.size)cols.push({name:'Time',title:'How long the page usually stays open (the middle visit)',value:p=>timed.has(p.path)?duration(timed.get(p.path)):'—'});
+      // list item 151: how fast the page shows for three visitors in four, phones first
+      const fast=new Map(((t.speed&&t.speed.pages)||[]).map(p=>[p.path,p.phones_ms||p.computers_ms]).filter(x=>x[1]));
+      if(fast.size)cols.push({name:'Loads in',title:'How long the main content takes to show for three visitors in four (phones when there are enough)',value:p=>fast.has(p.path)?`${(Math.round(fast.get(p.path)/100)/10).toFixed(1)} s`:'—'});
       body=pageTable(rows,cols);
     }else if(external&&googlePages.length){
       // the same table, from what Google can see of a site we don't host
@@ -695,6 +706,7 @@ function websiteBand(d){
     }else{
       body=external?offSite('Page views'):emptyState('No page views yet','Your most-visited pages will be listed here.');
     }
+    if(rows.length&&t.speed&&t.speed.sentence)sub+=` · ${t.speed.sentence.replace(/\.$/,'')}`;   // list item 151
     h+=card('','Top pages',sub,body,external&&!rows.length?null:[BI,'View website insights']);
   }
   {
@@ -707,6 +719,15 @@ function websiteBand(d){
       :searchEmpty('Connect Search Console to see what people search to find you.');
     const cta=searchCta?`<div class="crow"><span class="fine">${gOk||gDown?'What people searched to find you':gNoDom||gDraft?'':'Takes about a minute. Read-only.'}</span><a class="btn sm" href="${esc(withScope(searchCta[0]))}">${esc(searchCta[1])}</a></div>`:'';
     h+=`<section class="card" id="searchCard"><div class="card-h"><h3>Google search</h3><span class="hr">${chip}</span></div><div class="cb">${body}</div>${cta}</section>`;
+  }
+  if(measuring&&Array.isArray(t.buttons)){
+    // list item 157: which buttons people press, so the owner can see which ones work
+    const kinds={button:'Button',cta:'Button',phone:'Call',email:'Email'};
+    const body=t.buttons.length
+      ?`<table class="ptable" id="buttonTable"><thead><tr><th scope="col">Button</th><th scope="col" title="Times pressed">Presses</th><th scope="col" title="Different people who pressed it">People</th></tr></thead><tbody>${t.buttons.map(b=>`<tr><td><b>${esc(b.label)}</b><span>${esc(kinds[b.kind]||'Button')} · ${esc(pageName(b.path))}</span></td><td>${num(b.presses)}</td><td>${num(b.people)}</td></tr>`).join('')}</tbody></table>`
+      :emptyState('No presses yet','When visitors press your buttons, call or email you, the ones they use show here.');
+    const mid=t.time_on_page&&t.time_on_page.median_seconds;
+    h+=card('span2','Buttons people press',`${periodLabel()}${mid?` · pages usually stay open ${duration(mid)}`:''}`,body,null);
   }
   h+=`</div>`;
   return h;

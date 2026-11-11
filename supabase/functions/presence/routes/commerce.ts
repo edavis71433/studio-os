@@ -461,7 +461,9 @@ async function handleInvoicePaidEcho(req: Request, cors: Record<string, string>)
   const outcome = await raiseNoticeDetailed({
     siteId: String(inv.site_id), clientId: String(clientId), kind: 'invoice_paid', period: `paid:${inv.id}`,
     headline,
-    body: isDeposit ? 'The deposit landed. You can start the work.' : 'The payment landed — nothing else to do.',
+    // Item 115: a paid invoice is the best moment to ASK for a review — an offer in
+    // words, never an automatic send (a deposit isn't: the work hasn't happened yet).
+    body: isDeposit ? 'The deposit landed. You can start the work.' : 'The payment landed — nothing else to do. A good moment to ask them for a review, from your Reviews tab.',
   });
   const fresh = outcome === 'created';
 
@@ -487,7 +489,9 @@ async function handleInvoicePaidEcho(req: Request, cors: Record<string, string>)
       (who ? `<tr><td style="padding:2px 12px 2px 0;color:#666">From</td><td>${esc(who)}</td></tr>` : '') +
       `</table>` +
       convertLine +
-      `<p>${isDeposit ? 'The deposit is in — the work can start.' : 'Nothing else to do; the invoice is marked paid.'}</p>`,
+      `<p>${isDeposit ? 'The deposit is in — the work can start.' : 'Nothing else to do; the invoice is marked paid.'}</p>` +
+      // Item 115: the offer, as a link — nothing sends unless the operator presses the button there.
+      (isDeposit ? '' : `<p style="color:#555">A customer who just paid is the best person to ask for a review — <a href="${base}/presence.html#reviews">open Reviews to send the ask</a>${who ? ` to ${esc(who)}` : ''}.</p>`),
       isDeposit ? 'deposit_paid' : 'invoice_paid', { label: unconverted ? 'Convert them in your workspace' : 'Open it in your workspace', href: link });
 
     // ── THE CLIENT'S RECEIPT (audit long-tail) ────────────────────────────────

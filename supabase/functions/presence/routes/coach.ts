@@ -7,7 +7,7 @@
 // the room invokes the EXISTING Writer/Editor flow — proposal, approval,
 // Draft Writer, all unchanged. Ignoring an opportunity is always free.
 import { json } from '../../_shared/http.ts';
-import { svc, type SiteDb } from '../lib/db.ts';
+import { svc, svcCount, type SiteDb } from '../lib/db.ts';
 import { runGrowthCoach, decideOpportunity } from '../coach/engine.ts';
 import { coachRead } from '../lib/health_coach.ts';
 import { buildTimeline } from '../lib/customer_timeline.ts';
@@ -45,11 +45,13 @@ export async function handleCoachList(db: SiteDb, site: SiteRow, cors: Record<st
 // at most three suggestions. Reuses the notices/approvals/leads/domain state.
 export async function handleCoachHealth(site: SiteRow, cors: Record<string, string>) {
   const nowIso = new Date().toISOString();
+  // the three counts are counted by the database (item 144): fetching the ids to count
+  // them came back in pages of 1,000 rows, so a busy site's count stopped at 1,000
   const [infra, writes, conns, leads, lastChange, meta] = await Promise.all([
-    svc(`presence_infra_plans?site_id=eq.${site.id}&status=eq.proposed&select=id`),
-    svc(`presence_connection_writes?site_id=eq.${site.id}&status=eq.proposed&select=id`),
+    svcCount(`presence_infra_plans?site_id=eq.${site.id}&status=eq.proposed`),
+    svcCount(`presence_connection_writes?site_id=eq.${site.id}&status=eq.proposed`),
     svc(`presence_connections?site_id=eq.${site.id}&select=status,health`),
-    svc(`presence_form_submissions?site_id=eq.${site.id}&status=eq.new&spam=is.false&select=id`),
+    svcCount(`presence_form_submissions?site_id=eq.${site.id}&status=eq.new&spam=is.false`),
     svc(`presence_change_events?site_id=eq.${site.id}&select=created_at&order=created_at.desc&limit=1`),
     svc(`presence_sites?id=eq.${site.id}&select=domain_expires_at&limit=1`),
   ]);
@@ -61,10 +63,10 @@ export async function handleCoachHealth(site: SiteRow, cors: Record<string, stri
   const read = coachRead({
     live: site.status === 'live',
     lastPublishedAt: site.last_published_at || null,
-    pendingApprovals: arr(infra).length + arr(writes).length,
+    pendingApprovals: (infra ?? 0) + (writes ?? 0),
     connectedNeedingAttention: connAttn,
     searchIssues: 0,
-    leadsWaiting: arr(leads).length,
+    leadsWaiting: leads ?? 0,
     unpublishedChanges: !!lastChangeAt && (!site.last_published_at || lastChangeAt > site.last_published_at),
     domainExpiringDays: domainDays,
   }, nowIso);
