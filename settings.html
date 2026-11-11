@@ -244,6 +244,14 @@
         <div class="how" id="reportLast"></div>
         <div class="how" id="reportWarn" role="status" hidden style="color:var(--bad,#b3261e)"></div></div>
     </div>
+    <!-- builder list item 182: the monthly AI check, off until switched on because it costs money -->
+    <div class="swrow" id="reportAiRow">
+      <button type="button" class="sw" role="switch" id="sw-ai" aria-checked="false" aria-labelledby="sw-ai-l" aria-describedby="aiHow aiCost"></button>
+      <div class="t"><b id="sw-ai-l">Check AI answers every month</b>
+        <div class="how" id="aiHow">On the 1st of each month, asks Claude this client’s questions with a web search and keeps what it said, for their Search tab and their report. Nothing runs while this is off.</div>
+        <div class="how" id="aiCost"></div>
+        <div class="how" id="aiLast"></div></div>
+    </div>
     <div class="swrow" style="display:block" id="reportLineRow">
       <b style="font-weight:600">A line from you</b>
       <div class="how">Goes at the top of every report, in your words. Written once; change it any time.</div>
@@ -880,6 +888,10 @@ function paintReport() {
   paintReportBusy();
   if (document.activeElement !== $('report-note')) $('report-note').value = d.note || '';
   $('reportLast').textContent = reportStatusLine(d);
+  // item 182: the monthly AI check, its cost in words, and how the last one went
+  $('sw-ai').setAttribute('aria-checked', d.ai_checks ? 'true' : 'false');
+  $('aiCost').textContent = d.ai_cost ? d.ai_cost + '.' : '';
+  $('aiLast').textContent = aiStatusLine(d);
   // Nov 2026 review (finding 2): a client who can't be emailed is said so on the card, never a silent "On"
   const warn = d.blocked ? 'This client can’t get the report: ' + (REPORT_BLOCK_WORDS[d.blocked] || 'they can’t be emailed') + '.' + (d.blocked === 'no_email' ? ' Add their email on their record.' : '') : '';
   $('reportWarn').textContent = warn; $('reportWarn').hidden = !warn;
@@ -895,6 +907,11 @@ function reportStatusLine(d) {
     if (r.status === 'failed') return 'The ' + m + ' report didn’t go out after three tries. The next one goes out as usual.';
   }
   return d.enabled ? 'Nothing sent yet; the first report goes out in the first days of next month.' : '';
+}
+function aiStatusLine(d) {
+  const r = d.ai_result;
+  if (r && r.month) return r.status === 'checked' ? 'Last checked: ' + monthWords(r.month) + '.' : 'The ' + monthWords(r.month) + ' check didn’t finish after three tries. The next one runs as usual.';
+  return d.ai_checks ? 'The first check runs soon, then on the 1st of each month.' : '';
 }
 function monthWords(ym) { const m = /^(\d{4})-(\d{2})$/.exec(String(ym || '')); if (!m) return ym; return new Date(Date.UTC(+m[1], +m[2] - 1, 1)).toLocaleDateString('en-US', { month: 'long', year: 'numeric', timeZone: 'UTC' }); }
 // Item 101 (C16's last line): one save at a time. While one saves, the switch is greyed and
@@ -923,6 +940,11 @@ function wireReport() {
     const next = !(REPORT && REPORT.enabled === true);
     $('sw-report').setAttribute('aria-checked', next ? 'true' : 'false');
     if (await saveReport({ enabled: next })) toast(next ? 'On. The first report goes out in the first days of next month.' : 'Off. No more reports to this client.');
+  });
+  $('sw-ai').addEventListener('click', async () => {
+    const was = REPORT && REPORT.ai_checks === true, next = !was;
+    $('sw-ai').setAttribute('aria-checked', next ? 'true' : 'false');
+    if (await saveReport({ ai_checks: next }, () => $('sw-ai').setAttribute('aria-checked', was ? 'true' : 'false'))) toast(next ? 'On. The first check runs soon, then on the 1st of each month.' : 'Off. No more AI checks for this client.');
   });
   $('reportSave').addEventListener('click', async () => { if (await saveReport({ note: $('report-note').value })) { $('reportMsg').textContent = 'Saved.'; setTimeout(() => { $('reportMsg').textContent = ''; }, 2500); } });
   $('reportPreview').addEventListener('click', async () => {

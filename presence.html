@@ -1069,6 +1069,23 @@ html.plan-watch .ss-bar,html.plan-watch [data-grp="Content"],html.plan-watch .na
 .sv-dlg .sv-mv li{display:flex;align-items:center;gap:8px}
 .sv-switch{display:flex;gap:10px;align-items:flex-start;font-size:14px;font-weight:500}
 .sv-switch input{margin-top:3px}
+/* item 182: AI answers over time */
+.sv-ai{display:grid;grid-template-columns:minmax(0,360px) minmax(0,1fr);gap:var(--dds-s5,20px);align-items:start}
+.sv-ai-big{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.sv-ai-big b{font-size:26px;font-weight:700;font-variant-numeric:tabular-nums}
+.sv-ai-t{width:100%;border-collapse:collapse;font-size:13.5px}
+.sv-ai-t th{text-align:left;font-size:12px;font-weight:600;color:var(--ink-2);padding:6px 8px;white-space:nowrap}
+.sv-ai-t td{padding:9px 8px;border-top:1px solid var(--hair);vertical-align:middle}
+.sv-ai-t .m{text-align:center;width:64px} .sv-ai-t .w{text-align:right;white-space:nowrap}
+.sv-mark{display:inline-grid;place-items:center;width:22px;height:22px;border-radius:50%;font-weight:700;font-size:12px;background:var(--paper);color:var(--ink-3)}
+.sv-mark.yes{background:var(--sage-soft);color:var(--sage)} .sv-mark.no{background:var(--clay-soft);color:var(--clay)}
+.sv-said{background:var(--paper);border-radius:12px;padding:12px 14px}
+.sv-said .who{display:flex;align-items:center;gap:8px;font-size:14px}
+.sv-said .who .yes{color:var(--sage);font-size:12.5px} .sv-said .who .no{color:var(--clay);font-size:12.5px}
+.sv-said p{margin:6px 0 0;font-size:13px;color:var(--ink-2)}
+.sv-fol-x{font:inherit;border:0;background:none;color:var(--ink-3);cursor:pointer;padding:2px 6px;border-radius:6px}
+.sv-fol-x:hover:not(:disabled){color:var(--clay)} .sv-fol-x:disabled{opacity:.4;cursor:default}
+@media (max-width:1180px){.sv-ai{grid-template-columns:1fr}}
 @media (max-width:1180px){.sv-fol{grid-template-columns:1fr}}
 @media (max-width:1100px){.sv-tools{grid-template-columns:repeat(3,minmax(0,1fr))}}
 @media (max-width:760px){
@@ -1873,6 +1890,7 @@ body.pd-dragging *{cursor:grabbing !important}
           <div class="hb-card" id="domainCard" hidden></div>
         </div>
         <section class="sv-card sv-wide" aria-labelledby="svFollowH" id="svFollowCard" hidden><div class="sv-head"><h3 id="svFollowH">Searches you follow</h3><span class="sv-headn" id="svFollowN"></span><button type="button" class="pillbtn sm inked" id="btnSvFollow">+ Follow a search</button></div><div id="svFollow"></div></section>
+        <section class="sv-card sv-wide" aria-labelledby="svAiWH" id="svAiWatch" hidden><div class="sv-head"><h3 id="svAiWH">In AI answers</h3><span class="sv-headn" id="svAiWMeta"></span><button type="button" class="pillbtn sm" id="btnSvAiQ">+ Add a question</button></div><div id="svAiW"></div></section>
         <div id="svScore" class="sv-card sv-score-card"><div class="loadline"><div class="lq">Checking how you show up…</div><div class="shimmer"></div></div></div>
         <div class="sv-grid">
           <section class="sv-card" aria-labelledby="svFixH" id="svFixCard" hidden><h3 id="svFixH">What to fix first</h3><div id="svFix"></div></section>
@@ -8871,6 +8889,7 @@ async function loadSearch() {
   renderSvScore(); renderSvFix(); renderSvConsole(); renderSvListing(); renderSvAi(); renderSeoTasks();
   renderSvTools(); renderSvNums(); renderSvMovers();   // item 124
   if (SV && SV.follow && SV.console && SV.console.status === "connected") loadSvFollow(); else { SV_FOLLOW = null; renderSvFollow(); }   // item 181
+  loadSvAiWatch();   // item 182
 }
 (function wireSeoPreview() {
   ["f-seo_title", "f-seo_description", "f-business_name", "f-description"].forEach((id) => { const n = $(id); if (n) n.addEventListener("input", renderSearchPreview); });
@@ -8965,10 +8984,11 @@ function redirectsManager() {
 function svChg(now, before, kind) {
   if (now == null || before == null) return "";
   let d, txt, sr;
-  if (kind === "place") {
-    d = Math.round(before) - Math.round(now);
+  if (kind === "place" || kind === "count") {
+    // a place on Google goes up when its number falls; a count (questions named) goes up when it grows
+    d = kind === "place" ? Math.round(before) - Math.round(now) : Math.round(now) - Math.round(before);
     if (!d) return `<span class="sv-chg">Same</span>`;
-    txt = (d > 0 ? "▲ " : "▼ ") + Math.abs(d); sr = (d > 0 ? "up " : "down ") + Math.abs(d) + " place" + (Math.abs(d) === 1 ? "" : "s");
+    txt = (d > 0 ? "▲ " : "▼ ") + Math.abs(d); sr = (d > 0 ? "up " : "down ") + Math.abs(d) + (kind === "place" ? " place" + (Math.abs(d) === 1 ? "" : "s") : "");
   } else {
     if (!before) return now ? `<span class="sv-chg">New</span>` : "";
     d = Math.round(((now - before) / before) * 100);
@@ -9086,6 +9106,10 @@ function renderSvNums() {
     const m = svMonth(c.period).slice(0, 3);
     tiles.push(`<div class="sv-stat"><span class="l">Google clicks · ${esc(m)}</span><span class="v"><b>${svNum(c.clicks)}</b>${svChg(c.clicks, c.prior_clicks, "pct")}</span><span class="s">against the month before</span></div>`);
     tiles.push(`<div class="sv-stat"><span class="l">Times seen on Google</span><span class="v"><b>${svNum(c.impressions)}</b>${svChg(c.impressions, c.prior_impressions, "pct")}</span><span class="s">against the month before</span></div>`);
+  }
+  if (SV_AIW && SV_AIW.ready && SV_AIW.latest) {   // item 182
+    const ms = SV_AIW.months || [], now = ms[ms.length - 1], prev = ms.length > 1 ? ms[ms.length - 2] : null;
+    if (now) tiles.push(`<div class="sv-stat"><span class="l">Named in AI answers</span><span class="v"><b>${now.named} of ${now.asked}</b>${prev ? svChg(now.named, prev.named, "count") : ""}</span><span class="s">questions · checked ${esc(svWhen(SV_AIW.latest.checked_at))}</span></div>`);
   }
   if (SV && SV.follow && c && c.status === "connected") {
     const best = SV_FOLLOW && SV_FOLLOW.terms ? SV_FOLLOW.terms.filter((t) => t.now && t.now.position != null).sort((a, b) => a.now.position - b.now.position)[0] : null;
@@ -9211,7 +9235,7 @@ function renderSvFollow() {
     if (SV_FOL_PICK >= f.terms.length) SV_FOL_PICK = 0;
     const wrap = el("div", "sv-fol");
     const mo = svFolMonth(f.month || "");
-    wrap.innerHTML = `<div><table><caption class="sr-only">Searches you follow</caption><thead><tr><th scope="col">Search</th><th scope="col">Place${mo ? " · " + esc(mo) : ""}</th><th scope="col">Clicks${mo ? " · " + esc(mo) : ""}</th><th scope="col" class="mo">Six months</th><th scope="col"><span class="sr-only">Stop following</span></th></tr></thead><tbody>${f.terms.map((t, i) => `<tr class="${i === SV_FOL_PICK ? "on" : ""}" data-i="${i}"><td><button type="button" class="term" data-pick="${i}" aria-pressed="${i === SV_FOL_PICK}">${esc(t.term)}</button></td><td><span class="row">${t.now && t.now.position != null ? `<b>#${Math.round(t.now.position)}</b>${svChg(t.now.position, t.prior && t.prior.position, "place")}` : `<span class="hint">Not seen</span>`}</span></td><td><span class="row"><b>${svNum(t.now ? t.now.clicks : 0)}</b>${t.now && t.prior ? svChg(t.now.clicks, t.prior.clicks, "num") : ""}</span></td><td class="mo">${svSpark(t.months || []) || `<span class="hint">From ${esc(svFolMonth(String(t.added_at || "").slice(0, 7)) || "now")}</span>`}</td><td><button type="button" class="x" data-unfollow="${i}" aria-label="Stop following ${esc(t.term)}">✕</button></td></tr>`).join("")}</tbody></table></div>`;
+    wrap.innerHTML = `<div><table><caption class="sr-only">Searches you follow</caption><thead><tr><th scope="col">Search</th><th scope="col">Place${mo ? " · " + esc(mo) : ""}</th><th scope="col">Clicks${mo ? " · " + esc(mo) : ""}</th><th scope="col" class="mo">Six months</th><th scope="col"><span class="sr-only">Stop following</span></th></tr></thead><tbody>${f.terms.map((t, i) => `<tr class="${i === SV_FOL_PICK ? "on" : ""}" data-i="${i}"><td><button type="button" class="term" data-pick="${i}" aria-pressed="${i === SV_FOL_PICK}">${esc(t.term)}</button></td><td><span class="row">${t.now && t.now.position != null ? `<b>#${Math.round(t.now.position)}</b>${svChg(t.now.position, t.prior && t.prior.position, "place")}` : `<span class="hint">Not seen</span>`}</span></td><td><span class="row"><b>${svNum(t.now ? t.now.clicks : 0)}</b>${t.now && t.prior ? svChg(t.now.clicks, t.prior.clicks, "pct") : ""}</span></td><td class="mo">${svSpark(t.months || []) || `<span class="hint">From ${esc(svFolMonth(String(t.added_at || "").slice(0, 7)) || "now")}</span>`}</td><td><button type="button" class="x" data-unfollow="${i}" aria-label="Stop following ${esc(t.term)}">✕</button></td></tr>`).join("")}</tbody></table></div>`;
     const chart = el("div");
     chart.innerHTML = `<p class="hint">“${esc(f.terms[SV_FOL_PICK].term)}”: its place on Google by month (higher up is better), and clicks as bars. From Search Console, a whole month at a time.</p>${svFollowChart(f.terms[SV_FOL_PICK])}`;
     wrap.appendChild(chart);
@@ -9255,6 +9279,101 @@ function svOpenFollow() {
   const follow = async () => { const v = inp.value.trim(); if (!v) { inp.focus(); return; } if (await svFollowSave(f.terms.map((t) => t.term).concat(v), "Following “" + v.toLowerCase() + "”.")) d.close(); };
   go2.addEventListener("click", follow);
   inp.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); follow(); } });
+  setTimeout(() => inp.focus(), 30);
+}
+// ── item 182: AI answers over time. GET /visibility/ai: the client's questions, the monthly
+// switch (it lives on Settings › Monthly report: it costs money), a point a month, and what
+// Claude said at the latest check. Before migration 0172 (ready: false) the card stays away and
+// the latest free-tool result below speaks as before.
+let SV_AIW = null;
+async function loadSvAiWatch() {
+  try { SV_AIW = (await api("GET", "/visibility/ai")).data; } catch (_) { SV_AIW = null; }
+  renderSvAiWatch(); renderSvNums();
+}
+const svAiMonth = (p) => svMonth(p).slice(0, 3);
+function svAiChart(months) {
+  if (months.length < 2) return "";
+  const W = 380, H = 160, L = 22, R = 14, T = 20, B = 24, max = Math.max(4, ...months.map((m) => m.asked || 0));
+  const x = (i) => L + i * (W - L - R) / (months.length - 1), y = (n) => T + (1 - n / max) * (H - T - B);
+  const grid = [max, Math.round(max / 2), 0].map((n) => `<line class="gr" x1="${L}" x2="${W - R}" y1="${y(n).toFixed(1)}" y2="${y(n).toFixed(1)}"/><text x="0" y="${(y(n) + 3.5).toFixed(1)}">${n}</text>`).join("");
+  const pts = months.map((m, i) => `${x(i).toFixed(1)},${y(m.named || 0).toFixed(1)}`).join(" ");
+  const dots = months.map((m, i) => `<circle class="pt" cx="${x(i).toFixed(1)}" cy="${y(m.named || 0).toFixed(1)}" r="4"/><text class="v" x="${x(i).toFixed(1)}" y="${(y(m.named || 0) - 9).toFixed(1)}" text-anchor="middle">${m.named || 0}</text><text x="${x(i).toFixed(1)}" y="${H - 6}" text-anchor="middle">${esc(svAiMonth(m.month))}</text>`).join("");
+  const aria = "Questions where Claude named you, by month: " + months.map((m) => `${svAiMonth(m.month)} ${m.named} of ${m.asked}`).join(", ");
+  return `<svg class="sv-fchart" viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(aria)}">${grid}<polyline class="ln" points="${pts}"/>${dots}</svg>`;
+}
+function svMark(named) {
+  const k = named === true ? "yes" : named === false ? "no" : "unknown";
+  return `<span class="sv-mark ${k}"><span aria-hidden="true">${named === true ? "✓" : named === false ? "✕" : "–"}</span><span class="sr-only">${named === true ? "named you" : named === false ? "didn’t name you" : "not asked yet"}</span></span>`;
+}
+function renderSvAiWatch() {
+  const card = $("svAiWatch"), host = $("svAiW"); if (!card || !host) return;
+  const a = SV_AIW;
+  card.hidden = !(a && a.ready);
+  const oldH = $("svAiH"); if (oldH) oldH.textContent = card.hidden ? "In AI answers" : "Latest AI check";
+  if (card.hidden) return;
+  const name = (S.identity && S.identity.business_name) || "you";
+  const meta = $("svAiWMeta");
+  if (meta) meta.textContent = a.watch.enabled ? `${a.latest ? "Checked " + svWhen(a.latest.checked_at) + " · " : ""}next check ${a.watch.next} · every month` : "Monthly checks are off";
+  const add = $("btnSvAiQ"); if (add) { add.onclick = svOpenAiQuestions; }
+  const latest = a.latest, months = a.months || [];
+  const prev = months.length > 1 ? months[months.length - 2] : null;
+  const engines = latest && latest.engines.length ? latest.engines : a.engines;
+  const resultOf = (q) => latest ? (latest.results || []).find((r) => String(r.q).toLowerCase() === String(q).toLowerCase()) : null;
+  const scope = new URLSearchParams(location.search).get("client");
+  const settingsHref = "/settings.html" + (scope ? "?client=" + encodeURIComponent(scope) : "") + "#report";
+  const left = latest
+    ? `<div class="sv-ai-big"><b>${latest.results ? latest.results.filter((r) => (r.answers || []).some((x) => x.named === true)).length : 0} of ${(latest.results || []).length}</b>${prev ? svChg(months[months.length - 1].named, prev.named, "count").replace(/<span class="sv-chg/, `<span title="against ${esc(svMonth(prev.month))}" class="sv-chg`) : ""}</div><p class="hint">questions where ${esc(engines.map((e) => e.name).join(" or "))} named ${esc(name)}</p>${svAiChart(months)}`
+    : `<div class="sv-ai-big"><b>—</b></div><p class="hint">${a.watch.enabled ? "The first check runs soon, then on the 1st of each month." : "No monthly check yet."}</p>`;
+  const rows = (a.questions || []).map((q, i) => {
+    const r = resultOf(q.text);
+    return `<tr><td>${esc(q.text)}</td>${engines.map((e) => `<td class="m">${svMark(r ? ((r.answers || []).find((x) => x.engine === e.id) || {}).named ?? null : null)}</td>`).join("")}<td class="w">${r ? `<button type="button" class="sv-go" data-said="${i}" aria-label="What ${esc(engines.map((e) => e.name).join(" and "))} said: ${esc(q.text)}">What they said ›</button>` : ""}</td></tr>`;
+  }).join("");
+  host.innerHTML = `<div class="sv-ai"><div class="sv-ai-l">${left}</div><div class="sv-ai-r"><table class="sv-ai-t"><caption class="sr-only">The questions asked each month</caption><thead><tr><th scope="col">Question</th>${engines.map((e) => `<th scope="col" class="m">${esc(e.name)}</th>`).join("")}<th scope="col"><span class="sr-only">Answers</span></th></tr></thead><tbody>${rows}</tbody></table>
+    <p class="hint">${a.questions.length} question${a.questions.length === 1 ? "" : "s"}${a.defaults ? ", the AI check’s own to start; change them any time" : ""}. Only Claude is asked today; ChatGPT and Gemini join this table once their keys are added, each about the same again.</p></div></div>
+    <p class="hint">${a.watch.enabled ? `Checks run on the 1st of each month. ${esc(a.watch.cost)}.` : `Monthly checks cost money, so they’re off until the studio switches them on. ${esc(a.watch.cost)}.`} <a href="${esc(settingsHref)}" data-needs="configure">Monthly report settings</a></p>`;
+  host.querySelectorAll("[data-said]").forEach((b) => b.addEventListener("click", () => svAiSaid(a.questions[Number(b.dataset.said)].text)));
+}
+function svAiSaid(q) {
+  const a = SV_AIW; const r = a && a.latest ? (a.latest.results || []).find((x) => String(x.q).toLowerCase() === String(q).toLowerCase()) : null;
+  if (!r) return;
+  const d = svDialog(q, `Asked ${svWhen(a.latest.checked_at)}. Each assistant answered with a web search, the way a customer would ask it.`);
+  (r.answers || []).forEach((x) => {
+    const box = el("div", "sv-said");
+    box.innerHTML = `<div class="who">${svMark(x.named)} <b>${esc(x.name)}</b> <span class="${x.named ? "yes" : "no"}">${x.named === true ? "Named you" : x.named === false ? "Didn’t name you" : "Didn’t answer in time"}</span></div>${x.excerpt ? `<p>“${esc(x.excerpt)}”</p>` : ""}${x.others && x.others.length ? `<p class="hint">Named ${x.named ? "beside" : "instead of"} you: ${esc(x.others.join(", "))}</p>` : ""}`;
+    d.body.appendChild(box);
+  });
+}
+function svOpenAiQuestions() {
+  const a = SV_AIW || { questions: [], max: 10 };
+  let list = (a.questions || []).map((q) => q.text);
+  const d = svDialog("Questions to ask each month", `Up to ${a.max}. A question that names the business tests what the assistant knows; the rest test whether it suggests the business.`);
+  const ul = el("ul", "sv-mv"); d.body.appendChild(ul);
+  const msg = el("p", "hint"); msg.setAttribute("role", "status");
+  const inp = el("input"); inp.type = "text"; inp.maxLength = 200; inp.placeholder = "Who is a good realtor in Burbank?"; inp.setAttribute("aria-label", "A question to ask");
+  const acts = el("div", "acts"); const addB = el("button", "pillbtn sm inked", "Add the question"); addB.type = "button"; acts.appendChild(addB);
+  const save = async (next, said) => {
+    try {
+      const r = await api("PUT", "/visibility/ai/questions", { questions: next });
+      list = (r.data && r.data.questions) || next; paint(); msg.textContent = said + " " + ((r.data && r.data.cost) || "");
+      loadSvAiWatch();
+      return true;
+    } catch (err) { toast(nice(err), true); return false; }
+  };
+  const paint = () => {
+    ul.innerHTML = "";
+    list.forEach((q, i) => {
+      const li = el("li"); li.appendChild(el("span", "p", q));
+      const x = el("button", "sv-fol-x", "✕"); x.type = "button"; x.setAttribute("aria-label", "Remove: " + q); x.disabled = list.length <= 1;
+      x.addEventListener("click", () => save(list.filter((_, j) => j !== i), "Removed."));
+      li.appendChild(x); ul.appendChild(li);
+    });
+    addB.disabled = list.length >= a.max; inp.disabled = list.length >= a.max;
+  };
+  paint();
+  d.body.append(inp, acts, msg);
+  const addIt = async () => { const v = inp.value.trim(); if (!v) { inp.focus(); return; } if (await save(list.concat(v), "Added.")) { inp.value = ""; inp.focus(); } };
+  addB.addEventListener("click", addIt);
+  inp.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); addIt(); } });
   setTimeout(() => inp.focus(), 30);
 }
 // ── Phase UX (FD-R2): the workspace speaks the business's language ──

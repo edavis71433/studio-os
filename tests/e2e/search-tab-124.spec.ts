@@ -193,6 +193,7 @@ test.describe('The Search tab (builder list items 124 and 181)', () => {
     await expect(rows.nth(0)).toContainText('#4');
     await expect(rows.nth(0).locator('.sv-chg.up').first()).toContainText('2');        // 6 → 4 is two places up
     await expect(rows.nth(1).locator('.sv-chg.down').first()).toContainText('3');
+    await expect(rows.nth(0).locator('.sv-chg.up').nth(1).locator('[aria-hidden="true"]')).toHaveText('▲ 50%');   // clicks 12 → 18
     await expect(card.locator('svg.sv-fchart')).toHaveAttribute('aria-label', /burbank realtor.*Oct #4, 18 clicks$/);
     await card.getByRole('button', { name: 'homes for sale burbank', exact: true }).click();
     await expect(card.locator('svg.sv-fchart')).toHaveAttribute('aria-label', /homes for sale burbank/);
