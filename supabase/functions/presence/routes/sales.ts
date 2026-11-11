@@ -255,7 +255,7 @@ export async function handleSalesDeleted(site: SiteRow, cors: Record<string, str
 // Sales item 83: a deleted deal comes back, as it was. The website enquiry it came from went back
 // to the queue when it was deleted; it is this deal's again, unless the enquiry has become
 // another deal since (one enquiry, one deal: then this one comes back without the link).
-export async function handleSalesDealRestore(site: SiteRow, id: string, cors: Record<string, string>): Promise<Response> {
+export async function handleSalesRestoreDeal(site: SiteRow, id: string, cors: Record<string, string>): Promise<Response> {
   if (!UUID_RE.test(id)) return json({ error: 'bad_request' }, 400, cors);
   const cur = await svc(`presence_deals?id=eq.${id}&site_id=eq.${site.id}&deleted_at=not.is.null&select=id,source_submission_id&limit=1`);
   if (!cur.ok) return json({ error: 'read_failed', message: 'We couldn’t bring that deal back just now — please try again.' }, 502, cors);

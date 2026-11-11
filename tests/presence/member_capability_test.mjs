@@ -454,7 +454,7 @@ const WRITE_HANDLERS = [
   'handleProjects', 'handlePublish', 'handlePutIdentity', 'handlePutTemplate', 'handleRedirectCreate',
   'handleRedirectDelete', 'handleRestore', 'handleRestoreToDraft', 'handleReviewApprove', 'handleReviewDismiss',
   'handleReviewHide', 'handleReviewReply', 'handleReviewRequest', 'handleReviewRun', 'handleSalesAddCustomer',
-  'handleSalesContact', 'handleSalesContactFields', 'handleSalesContactRestore', 'handleSalesDealRestore', 'handleSalesContacts',
+  'handleSalesContact', 'handleSalesContactFields', 'handleSalesContactRestore', 'handleSalesRestoreDeal', 'handleSalesContacts',
   'handleSalesContractCreate', 'handleSalesContractDelete', 'handleSalesContractSend', 'handleSalesContractTerm',
   'handleSalesConvert', 'handleSalesDeal', 'handleSalesDealActivity', 'handleSalesDealSend', 'handleSalesDealStage',
   'handleSalesDeals', 'handleSalesInvoice', 'handleSalesInvoiceSend', 'handleSalesInvoiceVoid',
