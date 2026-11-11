@@ -1018,6 +1018,11 @@ async function route_(req: Request, cors: Record<string, string>): Promise<Respo
     if (m && method === 'GET') return handleClientDeliverableDownload(req, site, principal, m[1], cors);
     m = route.match(/^\/client\/approvals\/([0-9a-f-]{36})\/decide$/);
     if (m && method === 'POST') return handleClientApprovalDecide(req, site, principal, m[1], cors);
+    // builder list item 179, part two: the website draft sent for an OK, drawn in the portal, and notes on its parts
+    m = route.match(/^\/client\/approvals\/([0-9a-f-]{36})\/draft$/);
+    if (m && method === 'GET') return (await import('./routes/client_drafts.ts')).handleClientDraft(req, site, principal, m[1], cors);
+    m = route.match(/^\/client\/approvals\/([0-9a-f-]{36})\/notes$/);
+    if (m && method === 'POST') return (await import('./routes/client_drafts.ts')).handleClientDraftNote(req, site, principal, m[1], cors);
     m = route.match(/^\/client\/surveys\/([0-9a-f-]{36})$/);
     if (m && method === 'GET') return handleClientSurvey(req, site, principal, m[1], cors);
     m = route.match(/^\/client\/surveys\/([0-9a-f-]{36})\/respond$/);

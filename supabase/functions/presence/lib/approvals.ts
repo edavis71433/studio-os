@@ -6,13 +6,15 @@
 
 export type ApprovalDecision = 'approved' | 'rejected' | 'changes_requested';
 export type ApprovalStatus = 'pending' | 'approved' | 'rejected' | 'changes_requested' | 'superseded';
-export type SubjectType = 'deliverable' | 'task' | 'project' | 'custom';
+// 'website' (builder list item 179, migration 0179): the client's website draft,
+// bound to the exact snapshot the studio sent (routes/client_drafts.ts)
+export type SubjectType = 'deliverable' | 'task' | 'project' | 'custom' | 'website';
 
 export function isDecision(x: unknown): x is ApprovalDecision {
   return x === 'approved' || x === 'rejected' || x === 'changes_requested';
 }
 export function isSubjectType(x: unknown): x is SubjectType {
-  return x === 'deliverable' || x === 'task' || x === 'project' || x === 'custom';
+  return x === 'deliverable' || x === 'task' || x === 'project' || x === 'custom' || x === 'website';
 }
 /** A decision is valid only from 'pending' (idempotent-safe: an already-decided or
  *  superseded approval is refused, so a stale/superseded version can't be decided). */

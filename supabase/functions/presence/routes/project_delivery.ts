@@ -130,20 +130,34 @@ export async function handleApprovalsCreate(req: Request, jwt: string, site: Sit
   const project = await loadProject(site.id, projectId);
   if (!project) return json({ error: 'not_found' }, 404, cors);
   let b: any = {}; try { b = await req.json(); } catch { return json({ error: 'bad_json' }, 400, cors); }
-  if (!isSubjectType(b.subject_type)) return json({ error: 'validation', message: 'Say what’s being approved (deliverable, task, project, or custom).' }, 422, cors);
-  const subjectId = UUID_RE.test(b.subject_id || '') ? b.subject_id : null;
-  const ver = await subjectVersion(site.id, projectId, b.subject_type, subjectId, clean(b.title, 200), clean(b.summary, 2000));
+  if (!isSubjectType(b.subject_type)) return json({ error: 'validation', message: 'Say what’s being approved (deliverable, task, project, custom, or website).' }, 422, cors);
+  // audit change 8: an optional date for the answer (migration 0135). A bad
+  // date is refused outright rather than silently dropped — the studio would
+  // otherwise believe a reminder is coming. Checked first, so a website ask
+  // with a bad date never captures a draft for nothing.
+  if (b.due_date !== undefined && b.due_date !== null && String(b.due_date).trim() !== '' && !cleanDueDate(b.due_date)) return json({ error: 'validation', message: 'The due date needs to be a real date (YYYY-MM-DD).' }, 422, cors);
+  const dueDate = cleanDueDate(b.due_date);
+  const website = b.subject_type === 'website';
+  let subjectId = UUID_RE.test(b.subject_id || '') ? b.subject_id : null;
+  let ver: { ok: true; hash: string; title?: string } | { ok: false };
+  if (website) {
+    // builder list item 179: the client's website draft, captured as it stands
+    // now; the approval binds that exact snapshot (routes/client_drafts.ts)
+    const { captureWebsiteDraft, WEBSITE_DRAFT_TITLE } = await import('./client_drafts.ts');
+    const w = await captureWebsiteDraft(site.id, projectId, principal);
+    if (!w.ok) return json({ error: w.error, message: w.message }, w.status, cors);
+    subjectId = w.snapshotId;
+    ver = { ok: true, hash: w.hash, title: WEBSITE_DRAFT_TITLE };
+  } else ver = await subjectVersion(site.id, projectId, b.subject_type, subjectId, clean(b.title, 200), clean(b.summary, 2000));
   if (!ver.ok) return json({ error: 'bad_subject', message: b.subject_type === 'deliverable' ? 'That file isn’t in this project.' : 'That item isn’t in this workspace.' }, 422, cors);
   // a deliverable approval defaults its title to the file's (the studio rarely has a better name for it)
   const title = clean(b.title, 200) || ver.title || '';
   if (!title) return json({ error: 'validation', message: 'An approval request needs a title.' }, 422, cors);
-  // audit change 8: an optional date for the answer (migration 0135). A bad
-  // date is refused outright rather than silently dropped — the studio would
-  // otherwise believe a reminder is coming.
-  if (b.due_date !== undefined && b.due_date !== null && String(b.due_date).trim() !== '' && !cleanDueDate(b.due_date)) return json({ error: 'validation', message: 'The due date needs to be a real date (YYYY-MM-DD).' }, 422, cors);
-  const dueDate = cleanDueDate(b.due_date);
   // supersede any prior PENDING approval for the same subject → only the latest is decidable
   if (subjectId) await svc(`presence_approvals?site_id=eq.${site.id}&subject_type=eq.${b.subject_type}&subject_id=eq.${subjectId}&status=eq.pending`, { method: 'PATCH', body: JSON.stringify({ status: 'superseded' }) }).catch(() => {});
+  // a website draft has a new snapshot every time, so the ask before it on this
+  // project is superseded by project: one draft waits for the client at a time
+  if (website) await svc(`presence_approvals?site_id=eq.${site.id}&project_id=eq.${projectId}&subject_type=eq.website&status=eq.pending`, { method: 'PATCH', body: JSON.stringify({ status: 'superseded' }) }).catch(() => {});
   const { by, kind } = actor(principal);
   const row: Record<string, unknown> = { site_id: site.id, project_id: projectId, subject_type: b.subject_type, subject_id: subjectId,
       title, summary: clean(b.summary, 2000), content_hash: ver.hash, status: 'pending',
@@ -155,6 +169,8 @@ export async function handleApprovalsCreate(req: Request, jwt: string, site: Sit
     delete row.due_date;
     ins = await svc('presence_approvals', { method: 'POST', headers: { Prefer: 'return=representation' }, body: JSON.stringify(row) });
   }
+  // pre-0179: the database refuses the 'website' kind until its migration runs
+  if (!ins.ok && website && /subject_type/.test(ins.text || '')) return json({ error: 'not_ready', message: 'Sending the website draft for an OK isn’t switched on yet.' }, 503, cors);
   if (!ins.ok || !rows(ins)[0]) return json({ error: 'write_failed', message: 'That request didn’t save — please try again.' }, 502, cors);
   const a = rows(ins)[0];
   await projectEvent(site.id, projectId, 'approval_requested', principal, a.client_visible, { approval_id: a.id, title });
