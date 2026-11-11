@@ -1,5 +1,5 @@
 -- ===========================================================================
---  APPLY PACK - migration 0157  (owner-apply, prod)
+--  APPLY PACK - migration 0160  (owner-apply, prod)
 -- ===========================================================================
 --  Run this ONCE (Supabase -> SQL Editor), BEFORE or WITH the deploy.yml run
 --  that ships Site health, and AFTER APPLY-0156. ADDITIVE and IDEMPOTENT ("if
@@ -19,7 +19,7 @@
 --    drop function if exists public.presence_uptime_tick(uuid, boolean);
 --    drop table if exists public.presence_uptime_days;
 --
---  Covers: supabase/migrations/0157_site_health_speed_uptime.sql
+--  Covers: supabase/migrations/0160_site_health_speed_uptime.sql
 -- ===========================================================================
 
 alter table public.presence_visits

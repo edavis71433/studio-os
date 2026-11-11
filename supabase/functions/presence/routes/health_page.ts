@@ -63,7 +63,7 @@ export async function handleWebsiteHealth(site: SiteRow, cors: Record<string, st
     (site.custom_domain && site.netlify_site_id)
       ? sslStatus(site.netlify_site_id).catch(() => ({ ok: false, expires_at: null as string | null }))
       : Promise.resolve({ ok: false, expires_at: null as string | null }),
-    // List item 151, each best-effort (before migration 0157 the first two 400 and the card
+    // List item 151, each best-effort (before migration 0160 the first two 400 and the card
     // leaves them out): the uptime tally, the visitors' speed, and the go-live facts.
     svc(`presence_uptime_days?site_id=eq.${site.id}&day=gte.${monthAgo.slice(0, 10)}&select=day,checks,ok_checks`).catch(() => ({ ok: false, json: null as any })),
     svc(`presence_visits?site_id=eq.${site.id}&kind=eq.leave&lcp_ms=not.is.null&ts=gte.${monthAgo}&select=path,device,lcp_ms&order=ts.desc&limit=5000`).catch(() => ({ ok: false, json: null as any })),

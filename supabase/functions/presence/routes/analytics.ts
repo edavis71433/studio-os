@@ -491,7 +491,7 @@ export async function handleAnalyticsDashboard(req: Request, site: SiteRow, cors
     // never crowd visits out of the read above. Before migration 0156 this read fails, and
     // the page simply has nothing to say about buttons yet.
     safe(svc(`presence_visits?site_id=eq.${site.id}&ts=gte.${new Date(startMs).toISOString()}&kind=in.(button,cta,phone,email,leave)&select=ts,kind,path,label,ms,visitor_hash&order=ts.desc&limit=5000`)),
-    // list item 151: how fast pages showed for visitors, on its own read (it fails alone before 0157)
+    // list item 151: how fast pages showed for visitors, on its own read (it fails alone before 0160)
     safe(svc(`presence_visits?site_id=eq.${site.id}&ts=gte.${new Date(startMs).toISOString()}&kind=eq.leave&lcp_ms=not.is.null&select=path,device,lcp_ms&order=ts.desc&limit=5000`)),
   ]);
   // Do WE serve this website? A monitor-edition workspace watches a website the

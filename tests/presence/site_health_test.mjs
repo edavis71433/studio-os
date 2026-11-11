@@ -87,7 +87,7 @@ const find = (h, key) => h.categories.find((c) => c.key === key);
   let w = await hit({ k: 'leave', p: '/', ms: 30_000, lcp: 2140 });
   ok('collect: the speed is kept with the page\'s time', w.length === 1 && w[0].lcp_ms === 2140 && w[0].ms === 30_000);
   w = await hit({ k: 'leave', p: '/', ms: 30_000, lcp: 2140 }, (b) => (b.lcp_ms ? 400 : 201));
-  ok('collect: before migration 0157, the page\'s time is kept without its speed', w.length === 2 && w[1].lcp_ms === undefined && w[1].ms === 30_000);
+  ok('collect: before migration 0160, the page\'s time is kept without its speed', w.length === 2 && w[1].lcp_ms === undefined && w[1].ms === 30_000);
   w = await hit({ k: 'button', p: '/', l: 'Book', lcp: 900 });
   ok('collect: only a page\'s time carries a speed', w.length === 1 && w[0].lcp_ms === undefined);
 
@@ -108,9 +108,9 @@ const find = (h, key) => h.categories.find((c) => c.key === key);
 {
   const route = read('supabase/functions/presence/routes/health_page.ts');
   ok('health: reads the 30-day tally, the visitors\' speed and the go-live facts, each on its own', /presence_uptime_days\?site_id=eq\.\$\{site\.id\}&day=gte\./.test(route) && /kind=eq\.leave&lcp_ms=not\.is\.null/.test(route) && /presence_identity\?site_id=eq\.\$\{site\.id\}&select=phone/.test(route) && /select=og_media_id,cover_media_id/.test(route));
-  ok('analytics: a speed read of its own, so it can\'t take the buttons with it before 0157', /kind=eq\.leave&lcp_ms=not\.is\.null&select=path,device,lcp_ms/.test(read('supabase/functions/presence/routes/analytics.ts')));
+  ok('analytics: a speed read of its own, so it can\'t take the buttons with it before 0160', /kind=eq\.leave&lcp_ms=not\.is\.null&select=path,device,lcp_ms/.test(read('supabase/functions/presence/routes/analytics.ts')));
   ok('privacy: the counter\'s description says it notes how quickly a page showed', read('supabase/functions/presence/lib/legal_pages.ts').includes('it notes how long the page was open and how quickly it showed.'));
-  for (const [name, src] of [['migration 0157', read('supabase/migrations/0157_site_health_speed_uptime.sql')], ['apply pack 0157', read('docs/presence/APPLY-0157-prod.sql')]]) {
+  for (const [name, src] of [['migration 0160', read('supabase/migrations/0160_site_health_speed_uptime.sql')], ['apply pack 0160', read('docs/presence/APPLY-0160-prod.sql')]]) {
     ok(`${name}: the speed column, the daily tally with RLS, the one function for the service role only`,
       /add column if not exists lcp_ms integer;/.test(src) && /create table if not exists public\.presence_uptime_days/.test(src) && /alter table public\.presence_uptime_days enable row level security;/.test(src)
       && /revoke all on function public\.presence_uptime_tick\(uuid, boolean\) from public, anon, authenticated;/.test(src) && /grant execute on function public\.presence_uptime_tick\(uuid, boolean\) to service_role;/.test(src));

@@ -51,7 +51,7 @@ export async function handleCollect(req: Request, siteId: string, cors: Record<s
   const write = (body: Record<string, unknown>) => svc('presence_visits', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify(body) }).catch(() => null);
   // fire-and-forget insert; never await-block the response beyond the write
   let w = await write({ ...row, ...extra, ...(lcp !== null ? { lcp_ms: lcp } : {}) });
-  // Before migration 0157 a page's time is refused with its speed: keep the time.
+  // Before migration 0160 a page's time is refused with its speed: keep the time.
   if (lcp !== null && w && !w.ok && w.status === 400) w = await write({ ...row, ...extra });
   // Before migration 0156 a row naming a button's words is refused: keep the tap as it was
   // always kept. A button press or a page's time is new, so it waits for the migration.

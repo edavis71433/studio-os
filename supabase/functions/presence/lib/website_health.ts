@@ -47,7 +47,7 @@ export interface WebsiteHealthInput {
   // when absent (no custom domain / lookup failed) the secure-connection check stays
   // exactly as before. Netlify auto-renews, so this is reassurance + early warning.
   ssl_expires_at?: string | null;
-  // List item 151, all optional (absent before migration 0157, or with too little data):
+  // List item 151, all optional (absent before migration 0160, or with too little data):
   // the last 30 days of uptime checks; how fast pages show for real visitors; and, for a
   // new site, the before-you-go-live facts the platform can check for itself.
   uptime_30d?: { days: number; checks: number; ok_checks: number } | null;
