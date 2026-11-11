@@ -474,6 +474,41 @@ html.dc-edit:not(.plan-watch) .dc-twbar{position:absolute;top:calc(var(--dc-bar-
 html.dc-edit:not(.plan-watch) .dc-twbar[hidden]{display:none}
 /* the settings panel does one job at a time (openSettingsPanel) */
 #settingsPanel[data-mode="styles"] #blocksCard,#settingsPanel[data-mode="styles"] #formsCard{display:none}
+/* items 41, 50 and 123: the header's and footer's own card */
+#settingsPanel:not([data-mode="header"]):not([data-mode="footer"]) #hfCard{display:none}
+#settingsPanel[data-mode="header"] .dc-panel-scroll>:not(#hfCard),#settingsPanel[data-mode="footer"] .dc-panel-scroll>:not(#hfCard){display:none !important}
+#hfCard{display:flex;flex-direction:column;gap:14px;padding:4px 20px 20px}
+#hfCard .ins-lbl{margin-top:4px}
+.hf-logo{display:flex;align-items:center;gap:12px}
+.hf-logo .lg{flex:none;width:44px;height:44px;box-sizing:border-box;border:1px solid var(--hair);border-radius:10px;background:var(--dc-raised,var(--paper)) center/cover no-repeat}
+.hf-logo p,.hf-says{flex:1;margin:0;font-size:12.5px;line-height:1.45;color:var(--ink-2)}
+.hf-tiles{display:grid;grid-template-columns:repeat(var(--n,2),minmax(0,1fr));gap:8px}
+.hf-tile{display:flex;flex-direction:column;align-items:center;gap:6px;min-width:0;padding:0;border:0;background:transparent;color:var(--ink-2);font:500 11.5px/1.25 var(--sans);text-align:center;cursor:pointer}
+.hf-pic{position:relative;display:block;width:100%;height:58px;box-sizing:border-box;border:1px solid var(--hair);border-radius:10px;background:var(--dc-raised,var(--paper));overflow:hidden}
+.hf-pic i{position:absolute;display:block;height:4px;border-radius:2px;background:var(--ink-3);opacity:.6}
+.hf-tile[aria-pressed=true]{color:var(--plum);font-weight:600}
+.hf-tile[aria-pressed=true] .hf-pic{border:2px solid var(--plum)}
+.hf-tile:focus-visible{outline:2px solid var(--plum);outline-offset:2px;border-radius:10px}
+.hf-pic .lg{top:24px;left:10px;width:22px;height:7px;background:var(--ink);opacity:.85}
+.hf-pic .m1{top:25px;right:28px;width:12px}.hf-pic .m2{top:25px;right:10px;width:12px}
+.hf-pic[data-pic="centered"] .lg{top:16px;left:calc(50% - 11px)}
+.hf-pic[data-pic="centered"] .m1{top:32px;right:auto;left:calc(50% - 20px)}.hf-pic[data-pic="centered"] .m2{top:32px;right:auto;left:calc(50% + 6px)}
+.hf-pic .bar{top:0;left:0;right:0;height:12px;border-radius:0;background:var(--plum);opacity:.85}
+.hf-pic .l1{top:22px;left:8px;right:12px}.hf-pic .l2{top:31px;left:8px;right:22px}.hf-pic .l3{top:40px;left:8px;right:16px}
+.hf-pic[data-pic="scroll"] .bar{top:-6px;background:var(--ink-3);opacity:.35}
+.hf-pic[data-pic="hide"] .bar{top:-7px}
+.hf-pic[data-pic="hide"] .up{top:auto;bottom:6px;left:calc(50% - 4px);width:8px;height:8px;border-radius:2px;background:var(--plum);opacity:.8}
+.hf-pic[data-pic="fade"] .bar{opacity:.25}
+/* the footer's switches: a checkbox drawn as a switch (the page settings' .pg-sw, kept to this card) */
+#hfCard .pg-sw{display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:44px;margin:0;font-size:14px;color:var(--ink);cursor:pointer}
+#hfCard .pg-sw input{flex:none;-webkit-appearance:none;appearance:none;position:relative;width:40px;height:24px;margin:0;border-radius:999px;background:var(--hair-2);cursor:pointer;transition:background var(--dur) var(--ease)}
+#hfCard .pg-sw input::after{content:"";position:absolute;top:3px;left:3px;width:18px;height:18px;border-radius:50%;background:var(--sheet);box-shadow:0 1px 2px rgba(0,0,0,.2);transition:transform var(--dur) var(--ease)}
+#hfCard .pg-sw input:checked{background:var(--plum)}
+#hfCard .pg-sw input:checked::after{transform:translateX(16px)}
+#hfCard .pg-sw input:focus-visible{outline:2px solid var(--plum);outline-offset:2px}
+@media (prefers-reduced-motion:reduce){#hfCard .pg-sw input,#hfCard .pg-sw input::after{transition:none}}
+.hf-row{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--ink)}
+.hf-row span{flex:1}
 #settingsPanel:not([data-mode="styles"]) #designGallery,#settingsPanel:not([data-mode="styles"]) #stylesAsk{display:none !important}
 #settingsPanel[data-mode="section"] #designHost>*:not(#blocksCard),#settingsPanel[data-mode="sections"] #designHost>*:not(#blocksCard),#settingsPanel[data-mode="forms"] #designHost>*:not(#formsCard){display:none}
 #settingsPanel[data-mode="section"] #blocksCard{margin-top:0 !important;border:0;padding:0;background:transparent}
@@ -1846,6 +1881,7 @@ body.pd-dragging *{cursor:grabbing !important}
               <div class="hint" id="stylesAsk" hidden data-if-lacks="configure" style="padding:16px 18px">Ask the account owner to change your template, colors or fonts.</div>
               <div id="designGallery" hidden data-needs="owner"></div>
               <div id="designHost"></div>
+              <div id="hfCard"></div>
             </div>
             <div class="dc-panel-foot" id="stylesFoot" hidden>Nothing goes live until you publish.</div>
           </aside>
@@ -11288,6 +11324,7 @@ function toggleTray(tab) {
 function closeSettingsPanel() {
   const p = $("settingsPanel"), sc = $("dcScrim"); if (!p) return;
   p.classList.remove("on"); p.setAttribute("aria-hidden", "true");
+  dcHFMark(null);
   if (sc) { sc.classList.remove("on"); sc.hidden = true; }
   if (PANEL_MODE === "section") {   // back to the full list, so a later "All sections" isn't one block
     PANEL_MODE = "styles"; BLOCK_SOLO = null; p.dataset.mode = "styles";
@@ -11301,8 +11338,100 @@ function closeSettingsPanel() {
 //   section  — this one section's fields, with the page visible behind it
 //   sections — the full list: ready-made layouts and saved sections
 //   forms    — the form builder
-const PANEL_TITLES = { styles: "Styles", sections: "All sections", forms: "Forms" };
-const PANEL_SUBS = { styles: "Changes show as you pick", sections: "Ready-made layouts and saved sections", forms: "Forms on this page" };
+// ── Items 41, 50 and 123: the site's header and footer, picked on the page ──
+// A press on the header or footer on the canvas outlines it, names it "Header · on every
+// page" (or Footer), and opens its card: the header's logo, arrangement (two pictures), what
+// it does when the page scrolls (four pictures) and the way to the menu; the footer's two
+// switches and the way to the business details its words come from. The scroll choice is
+// the style setting header_scroll (lib/site_header.ts on the server); with none set the
+// template's own shows, read from the canvas.
+const HF_SCROLLS = [
+  ["scroll", "Scrolls away", "The header scrolls away with the page."],
+  ["stay", "Stays on top", "The header stays at the top of the screen while visitors scroll."],
+  ["hide", "Hides, comes back", "The header slides away while visitors scroll down, and comes back when they scroll up."],
+  ["fade", "Fades away", "The header fades out while visitors scroll down, and comes back when they scroll up."],
+];
+const HF_PIC_PARTS = { standard: ["lg", "m1", "m2"], centered: ["lg", "m1", "m2"], scroll: ["bar", "l1", "l2", "l3"], stay: ["bar", "l1", "l2", "l3"], hide: ["bar", "l1", "l2", "up"], fade: ["bar", "l1", "l2", "l3"] };
+function hfTiles(host, label, opts, cur, onPick) {
+  host.appendChild(el("div", "ins-lbl", label));
+  const row = el("div", "hf-tiles"); row.style.setProperty("--n", String(opts.length)); row.setAttribute("role", "group"); row.setAttribute("aria-label", label);
+  opts.forEach(([v, name]) => {
+    const b = el("button", "hf-tile"); b.type = "button"; b.dataset.v = v || "standard"; b.setAttribute("aria-pressed", String(cur === v));
+    const pic = el("span", "hf-pic"); pic.dataset.pic = v || "standard"; pic.setAttribute("aria-hidden", "true");
+    (HF_PIC_PARTS[v || "standard"] || []).forEach((c) => pic.appendChild(el("i", c)));
+    b.append(pic, document.createTextNode(name));
+    b.addEventListener("click", () => onPick(v));
+    row.appendChild(b);
+  });
+  host.appendChild(row);
+  return row;
+}
+// What the header does now: the owner's choice, else what the template's own does on the canvas.
+function hfScrollNow() {
+  const t = DESIGN_TOKENS && DESIGN_TOKENS.header_scroll; if (t) return t;
+  try {
+    const h = $("designPreview").contentDocument.querySelector("header.site");
+    const pos = h && h.ownerDocument.defaultView.getComputedStyle(h).position;
+    return pos === "sticky" || pos === "fixed" ? "stay" : "scroll";
+  } catch (_) { return "stay"; }
+}
+function renderHFCard(which) {
+  const host = $("hfCard"); if (!host) return;
+  host.textContent = ""; host.dataset.which = which;
+  if (which === "header") {
+    host.appendChild(el("div", "ins-lbl", "Logo"));
+    const lr = el("div", "hf-logo"), lg = el("span", "lg"), logo = (S.media || []).find((m) => m.id === (S.settings && S.settings.logo_media_id));
+    if (logo && logo.thumb) lg.style.backgroundImage = "url(" + JSON.stringify(logo.thumb) + ")";
+    lr.append(lg, el("p", null, logo ? "Your logo shows beside your name." : "No logo yet: your name shows on its own."));
+    const ch = el("button", "dc-modal-cancel", logo ? "Change" : "Add a logo"); ch.type = "button"; ch.dataset.needs = "configure";
+    ch.addEventListener("click", () => { openSettingsPanel("styles"); stylesTab("colours"); });
+    lr.appendChild(ch); host.appendChild(lr);
+    hfTiles(host, "Arrangement", [["", "Standard"], ["centered", "Centered"]], String((S.settings && S.settings.nav_style) || ""), async (v) => {
+      try { await settingsPut({ nav_style: v }); toast("Header: " + (v ? "Centered" : "Standard") + " — publish to apply"); scheduleChangesRefresh(); refreshDesignPreview(); renderHFCard("header"); }
+      catch (err) { toast(nice(err), true); }
+    });
+    if (DESIGN_DEV) {
+      const now = hfScrollNow();
+      hfTiles(host, "When the page scrolls", HF_SCROLLS.map((x) => [x[0], x[1]]), now, async (v) => {
+        if (v === hfScrollNow()) return;
+        await saveTokens({ header_scroll: v }, "Header: " + HF_SCROLLS.find((x) => x[0] === v)[1].toLowerCase());
+        refreshDesignPreview();   // the canvas draws the new behaviour
+        if (PANEL_MODE === "header") renderHFCard("header");
+      });
+      host.appendChild(el("p", "hf-says", HF_SCROLLS.find((x) => x[0] === now)[2]));
+    }
+    host.appendChild(el("div", "ins-lbl", "Menu"));
+    const mr = el("div", "hf-row"), n = (typeof pgModel === "function" ? pgModel().menu.length : 0);
+    mr.appendChild(el("span", null, n + (n === 1 ? " item" : " items") + " in the menu"));
+    const ed = el("button", "dc-modal-cancel", "Edit the menu"); ed.type = "button"; ed.addEventListener("click", () => { closeSettingsPanel(); openPagesCard("dcPageSwitch"); });
+    mr.appendChild(ed); host.appendChild(mr);
+    return;
+  }
+  [["footer_hours", "Show opening hours"], ["footer_social", "Show social links"]].forEach(([field, label]) => {
+    const row = el("label", "pg-sw"); const t = el("span", null, label); const cb = el("input"); cb.type = "checkbox";
+    cb.checked = !S.settings || S.settings[field] !== false;
+    row.append(t, cb);
+    cb.addEventListener("change", async () => {
+      const on = cb.checked;
+      try { await settingsPut({ [field]: on }); toast(label.replace("Show ", "") + (on ? " shown" : " hidden") + " in the footer — publish to apply"); scheduleChangesRefresh(); refreshDesignPreview(); }
+      catch (err) { toast(nice(err), true); cb.checked = !on; }
+    });
+    host.appendChild(row);
+  });
+  host.appendChild(el("p", "hf-says", "Your address, phone and email come from your business details. Links to your privacy and accessibility pages are added for you."));
+  const biz = el("button", "dc-modal-cancel", "Change the business details"); biz.type = "button";
+  biz.addEventListener("click", () => { closeSettingsPanel(); exitEditMode("business"); });
+  const a = el("div", "hf-row"); a.appendChild(biz); host.appendChild(a);
+}
+// The header or footer whose card is open stays outlined on the canvas, its name showing.
+function dcHFMark(which) {
+  try {
+    const doc = $("designPreview").contentDocument;
+    doc.querySelectorAll("header.site,footer.site").forEach((n) => n.classList.toggle("dc-hf-on", !!which && n.matches(which === "header" ? "header.site" : "footer.site")));
+  } catch (_) {}
+}
+const PANEL_TITLES = { styles: "Styles", sections: "All sections", forms: "Forms", header: "Header", footer: "Footer" };
+const PANEL_SUBS = { styles: "Changes show as you pick", sections: "Ready-made layouts and saved sections", forms: "Forms on this page", header: "On every page", footer: "On every page" };
 function openSettingsPanel(mode, title) {
   const p = $("settingsPanel"), sc = $("dcScrim"); if (!p) return;
   const m = PANEL_TITLES[mode] || mode === "section" ? mode : "styles";
@@ -11319,7 +11448,7 @@ function openSettingsPanel(mode, title) {
   if (m === "section") { insSyncSeg(); const sc = p.querySelector(".dc-panel-scroll"); if (sc) sc.scrollTop = 0; }
   if (m === "styles") stylesTab(STYLES_TAB);
   p.setAttribute("aria-label", name);
-  const modal = m !== "section" && m !== "styles";   // a section or a style change: keep the page in view, undimmed
+  const modal = ["section", "styles", "header", "footer"].indexOf(m) < 0;   // a section, a style, the header or footer: keep the page in view, undimmed
   p.setAttribute("aria-modal", String(modal));
   const cl = $("btnSettingsClose");
   if (cl) { cl.textContent = modal ? "✕" : "Done"; cl.setAttribute("aria-label", modal ? "Close" : "Done"); }
@@ -11329,6 +11458,8 @@ function openSettingsPanel(mode, title) {
   }
   p.classList.add("on"); p.setAttribute("aria-hidden", "false");
   if (m === "sections" && $("blocksCard")) renderBlocksCard();
+  if (m === "header" || m === "footer") renderHFCard(m);
+  dcHFMark(m === "header" || m === "footer" ? m : null);
   setTimeout(() => { try {
     // already in a field in this panel: leave them there, or the words go nowhere
     const ae = document.activeElement;
@@ -13714,6 +13845,14 @@ function dcInjectCanvas(doc, main, live) {
       // the name chip at the section's top left: what it is and what kind
       "#dds-dc-chip{position:absolute;z-index:2147483000;display:none;align-items:center;height:24px;max-width:min(60vw,360px);padding:0 10px;border-radius:999px;background:var(--ddsdc-p-soft);color:var(--ddsdc-p);font:600 12px/1 var(--ddsdc-sans);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;pointer-events:none}" +
       "#dds-dc-chip.on{display:inline-flex}" +
+      // items 41, 50 and 123: the header and footer are picked like a section, and say they're on every page
+      "header.site[data-dc-hf]:hover,footer.site[data-dc-hf]:hover,header.site.dc-hf-on,footer.site.dc-hf-on{outline:2px solid var(--ddsdc-p);outline-offset:-2px;cursor:pointer}" +
+      // the chip stays in the tab order (a keyboard's way in), seen only on hover, focus or while its card is open
+      // it hangs off the edge (under the header, over the footer), so the name and menu stay clear to click
+      ".dc-hf-chip{position:absolute;left:12px;top:calc(100% - 12px);z-index:30;display:inline-flex;align-items:center;height:24px;padding:0 10px;border:0;border-radius:999px;background:var(--ddsdc-p-soft);color:var(--ddsdc-p);font:600 12px/1 var(--ddsdc-sans);white-space:nowrap;cursor:pointer;opacity:0;pointer-events:none}" +
+      "[data-dc-hf]:hover>.dc-hf-chip,.dc-hf-chip:focus-visible,.dc-hf-on>.dc-hf-chip{opacity:1;pointer-events:auto}" +
+      "footer.site>.dc-hf-chip{top:-12px}" +
+      ".dc-hf-chip:focus-visible{outline:2px solid var(--ddsdc-p);outline-offset:2px}" +
       "#dds-dc-chip .dc-chip-type{font-weight:500;opacity:.8;margin-left:5px}" +
       "#dds-dc-chip.compact .dc-chip-type{display:none}" +
       // the More menu under the pill: copy, cut, hide, columns
@@ -13787,7 +13926,9 @@ function dcInjectCanvas(doc, main, live) {
   // The pill sits INSIDE the selected section's top-right corner, the name chip at its
   // top left (direction A). Once the section's top edge has scrolled away the pill rides
   // the visible top, and it never leaves the section. On a narrow section the chip keeps
-  // the name only; if it would still touch the pill it drops under it.
+  // the name only; if it would still touch the pill it sits just above the section (item 51:
+  // in the phone frame it dropped under the pill, onto the section's heading), or under the
+  // pill when the section's top is off the screen.
   const placeMore = () => {
     const mb = bar.querySelector('[aria-haspopup="menu"]'); if (!mb) return;
     const br = bar.getBoundingClientRect(), mw = more.offsetWidth || 200;
@@ -13808,7 +13949,7 @@ function dcInjectCanvas(doc, main, live) {
     chip.classList.toggle("compact", r.width < 560);
     const ch = chip.offsetHeight || 24, cw = chip.offsetWidth || 0, cx = Math.max(left + 8, sx + 8 + ins.left);
     chip.style.left = cx + "px";
-    chip.style.top = (cx + cw + 8 > x ? y + h + 6 : y + (h - ch) / 2) + "px";
+    chip.style.top = (cx + cw + 8 <= x ? y + (h - ch) / 2 : top - ch - 6 >= sy + 4 ? top - ch - 6 : y + h + 6) + "px";
     if (more.classList.contains("on")) placeMore();
   };
   const hideBar = () => { bar.classList.remove("on"); chip.classList.remove("on"); more.classList.remove("on"); doc.__dcSel = null; if (ds.current) { ds.current.classList.remove("dc-hot"); ds.current = null; } };
@@ -14008,6 +14149,30 @@ function dcInjectCanvas(doc, main, live) {
   // expose a selector so the content-tree rows can flash + select a section on click
   DC_SHOWBAR = (elx) => { try { showBar(elx); } catch (_) {} };
   DC_HIDEBAR = () => { try { hideBar(); } catch (_) {} };
+  // Items 41, 50 and 123: a press on the header or footer (not on a link, the menu or words
+  // being typed) opens its card; its chip says it's on every page, and is the way in by keyboard.
+  try {
+    [["header", "header.site", "Header · on every page"], ["footer", "footer.site", "Footer · on every page"]].forEach(([which, sel, name]) => {
+      const box = doc.querySelector(sel);
+      if (!box || box.hasAttribute("data-dc-hf")) return;
+      box.setAttribute("data-dc-hf", which);
+      if (win.getComputedStyle(box).position === "static") box.style.position = "relative";   // the chip sits inside it
+      const chip = doc.createElement("button"); chip.type = "button"; chip.className = "dc-hf-chip"; chip.textContent = name;
+      chip.addEventListener("click", (e) => { e.preventDefault(); e.stopPropagation(); openSettingsPanel(which); });
+      box.insertBefore(chip, box.firstChild);
+      // read from the press lifting, not from a click: Safari sends no click for a press on
+      // something that takes none (a footer), as the sections' taps already know
+      box.addEventListener("pointerdown", (e) => { box.__dcDown = e.button ? null : { x: e.clientX, y: e.clientY, at: Date.now() }; });
+      box.addEventListener("pointerup", (e) => {
+        const d = box.__dcDown; box.__dcDown = null;
+        if (!d || Math.abs(e.clientX - d.x) > 10 || Math.abs(e.clientY - d.y) > 10 || Date.now() - d.at > 600) return;   // a drag, a scroll or a hold
+        if (DC_MODE !== "edit" || IPE) return;
+        if (e.target.closest && e.target.closest("a,button,input,select,textarea,nav,[data-dds-field],[data-pr],[contenteditable=true]")) return;
+        openSettingsPanel(which);
+      });
+    });
+    if ($("settingsPanel") && $("settingsPanel").classList.contains("on")) dcHFMark(PANEL_MODE === "header" || PANEL_MODE === "footer" ? PANEL_MODE : null);
+  } catch (_) {}
   // Click the header menu on the canvas → open the menu editor (edit labels, links,
   // dropdowns). The header/footer are global, so this edits the menu on every page.
   try {

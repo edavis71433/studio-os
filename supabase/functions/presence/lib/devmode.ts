@@ -29,6 +29,7 @@ const TOKEN_RULES: Record<string, RegExp> = {
   font_body: /^[a-zA-Z0-9'\", -]{3,120}$/,
   spacing_scale: /^(0?\.\d+|1(\.\d+)?)$/,        // CP-2: density preset (like font_scale)
   font_scale: /^(0?\.\d+|1(\.\d+)?)$/,
+  header_scroll: /^(scroll|stay|hide|fade)$/,   // builder items 50 and 123: what the header does on scroll (lib/site_header.ts)
 };
 export const ALLOWED_TOKENS = Object.keys(TOKEN_RULES);
 

@@ -16,6 +16,7 @@ import manifest_ha_1_0_0 from '../templates/harbor/1.0.0/manifest.json' with { t
 import { trackerScript } from './visits.ts';
 import { sanitizeDevHtml, sanitizeDevCss } from './devmode.ts';
 import { BLOCK_CSS, sectionStyles, pageClasses } from './site_blocks.ts';
+import { applyHeaderScroll } from './site_header.ts';
 
 // ── FD-T2: indexed template registry; each template's code loads on first use ──
 // slug → version → { manifest, code loader }. Render resolution goes through this
@@ -191,7 +192,9 @@ export async function renderSnapshot(snapshot: Snapshot, site: SiteConfig, opts:
   }
   // Item 61: the owner's switch decides the counter; the privacy page reads the same switch.
   const counting = (snapshot.content as SnapshotContent)?.settings?.visit_counter !== false;
-  const drawn = tintFavicon(await t.render(snapshot, t.manifest, site), snapshot.dev_customization?.theme_tokens?.accent, snapshot.template_slug);
+  const tokens = snapshot.dev_customization?.theme_tokens;
+  // items 50 and 123: the header scrolls away, stays on top, hides or fades, as the owner chose
+  const drawn = applyHeaderScroll(tintFavicon(await t.render(snapshot, t.manifest, site), tokens?.accent, snapshot.template_slug), tokens?.header_scroll);
   const dressed = injectDevLayer(drawn, snapshot.dev_customization);
   return injectCsp(injectAnalytics(opts.allSectionStyles ? dressed : trimSectionStyles(dressed), counting ? site.siteId : undefined));
 }

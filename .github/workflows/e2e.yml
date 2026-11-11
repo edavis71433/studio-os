@@ -75,6 +75,8 @@ jobs:
             case "$file" in
               # member-roles.spec.ts imports this, so a change here changes what the specs expect.
               supabase/functions/presence/lib/site_roles.ts) run=true ;;
+              # builder-header-footer.spec.ts scrolls a page drawn with this (builder items 50 and 123).
+              supabase/functions/presence/lib/site_header.ts) run=true ;;
               docs/*|supabase/*|runbooks/*|sql/*|templates/*) ;;
               tests/isolation/*|tests/presence/*|tests/smoke/*|tests/workflows/*) ;;
               .github/workflows/ci.yml|.github/workflows/deploy.yml|.github/workflows/rollback.yml|.github/workflows/schema-dump.yml) ;;
