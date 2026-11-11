@@ -24,7 +24,9 @@ import { svc, svcCount } from '../lib/db.ts';
 import { rateAllow } from '../lib/ratelimit.ts';
 import { deleteSite } from '../lib/netlify.ts';
 import { getSite } from '../lib/netlify.ts';
-import { rdapLookup, daysUntil } from '../lib/rdap.ts';
+import { rdapLookupDetailed, daysUntil, expiryRung, expiryWords } from '../lib/rdap.ts';
+import { domainHealth, padlockAfterCheck } from '../lib/domain_health.ts';
+import { provisionSsl } from '../lib/netlify.ts';
 import { verifyApex, dkimPresent, NETLIFY_APEX_IP } from '../platform/dns.ts';
 import { leadFollowupDue, leadFollowupCopy, renewalReminderWindow, renewalNoticePeriod, renewalReminderCopy } from '../lib/commercial.ts';
 import { supportAgingDue, supportAgingPeriod, SUPPORT_AGING_DAYS } from '../lib/intake.ts';
@@ -354,43 +356,76 @@ export async function runProspectNurture(limit = 10): Promise<{ sent: number; sk
 }
 
 // ── Phase INF (CP-8): the domain watch — RDAP expiry + registrar, daily ──────
-export async function runDomainWatch(limit = 10): Promise<{ checked: number; warned: number }> {
+/** Pure: the notice period for one rung of one domain's expiry. The domain and
+ *  its expiry date are in it, so each rung is said once per expiry, two domains
+ *  never share a reminder, and a renewal (a new date) starts the ladder again. */
+export const domainExpiryPeriod = (domain: string, expiresAt: string, rung: string) => `exp:${domain}:${String(expiresAt).slice(0, 10)}:${rung}`;
+
+// The daily domain watch (Nov 2026 review, items 132, 133 and 134). For each site
+// with its own domain, once a day:
+//   · the registration record, asked under the REGISTERED name ("www." dropped),
+//     with whether the lookup worked, so the Domains page can say when it didn't;
+//   · the expiry ladder: 30, 15, 7 and 1 day before and once after, each said once,
+//     to the client and, every time, to the studio that looks after them;
+//   · the padlock: when the records are right but no padlock is on, ask Netlify for
+//     it again (it used to be asked once, before the client had set anything up),
+//     and keep when that started; keep its end date. Home asks the studio when it
+//     has been stuck a day or ends within 14 days (agency/needs_you.ts).
+export async function runDomainWatch(limit = 10): Promise<{ checked: number; warned: number; reasked: number }> {
   const nowIso = new Date().toISOString();
   const staleBefore = new Date(Date.now() - 24 * 3600_000).toISOString();
-  const q = await svc(`presence_sites?custom_domain=not.is.null&or=(domain_checked_at.is.null,domain_checked_at.lt.${encodeURIComponent(staleBefore)})&select=id,client_id,custom_domain&limit=${limit}`);
-  let checked = 0, warned = 0;
-  for (const site of (Array.isArray(q.json) ? q.json : []) as Array<{ id: string; client_id: string; custom_domain: string }>) {
-    const info = await rdapLookup(site.custom_domain);
+  const q = await svc(`presence_sites?custom_domain=not.is.null&or=(domain_checked_at.is.null,domain_checked_at.lt.${encodeURIComponent(staleBefore)})&select=id,client_id,custom_domain,netlify_site_id,edition,cert_pending_since&limit=${limit}`);
+  let checked = 0, warned = 0, reasked = 0;
+  for (const site of (Array.isArray(q.json) ? q.json : []) as Array<{ id: string; client_id: string; custom_domain: string; netlify_site_id?: string | null; edition?: string | null; cert_pending_since?: string | null }>) {
+    const look = await rdapLookupDetailed(site.custom_domain);
+    const info = look.status === 'ok' ? look.info : null;
     checked++;
-    await svc(`presence_sites?id=eq.${site.id}`, { method: 'PATCH', body: JSON.stringify({
-      domain_checked_at: nowIso,
-      ...(info ? { domain_registrar: info.registrar, domain_expires_at: info.expires_at } : {}),
-    }) });
-    const days = info ? daysUntil(info.expires_at, nowIso) : null;
-    if (days !== null && days <= 30) {
-      const soon = days <= 7;
-      const when = days <= 0 ? 'has expired' : `expires in ${days} day${days === 1 ? '' : 's'}`;
-      const fresh = await raiseNotice({ siteId: site.id, clientId: site.client_id, kind: 'domain_expiry', period: periodOf(nowIso),
-        headline: `Your domain ${when}`,
-        body: `${site.custom_domain} ${when}${info?.registrar ? ` at ${info.registrar}` : ''}. Renew it at your registrar (auto-renew is the calm option) — if it lapses, your website and email stop answering. Nothing else is needed on our side.` });
-      if (fresh) {
-        warned++;
-        const cl = await svc(`clients?id=eq.${encodeURIComponent(site.client_id)}&select=email,name&limit=1`);
-        if (cl.json?.[0]?.email) {
-          const brand = await loadEmailBrand(site.id);   // BR-1: the customer's domain notice, on their brand
-          await sendEmail(cl.json[0].email, `Your domain ${site.custom_domain} ${when}`,
-            `<p><strong>${site.custom_domain}</strong> ${when}${info?.registrar ? ` at <strong>${info.registrar}</strong>` : ''}.</p><p>Renewing at your registrar (auto-renew is the calm option) keeps your website and email answering. Nothing is needed on our side — this is just the reminder registrars are quiet about.</p>`, brand);
-        }
-        if (soon) {
-          // OPERATIONAL, to the platform operator (critical:true — an opt-out
-          // must not silence it; a bounce/complaint still does).
-          const ops = Deno.env.get('OPS_ALERT_EMAIL') || '';
-          if (ops) sendEmail(ops, `[Studio OS ops] Domain ${when}: ${site.custom_domain}`, `<p>Customer domain ${site.custom_domain} ${when}. They have been notified.</p>`, undefined, { critical: true }).catch(() => {});
-        }
+    // the padlock, for a site we host (a watched site's padlock is its own host's business)
+    let padlock: ReturnType<typeof padlockAfterCheck> | null = null;
+    if (site.netlify_site_id && site.edition !== 'monitor') {
+      const h = await domainHealth({ custom_domain: site.custom_domain, netlify_site_id: site.netlify_site_id }).catch(() => null);
+      if (h && h.ssl && h.ssl.state !== 'unknown') {
+        padlock = padlockAfterCheck(h, site.cert_pending_since ?? null, nowIso);
+        if (padlock.reask) { await provisionSsl(site.netlify_site_id).catch(() => null); reasked++; }
       }
     }
+    await svc(`presence_sites?id=eq.${site.id}`, { method: 'PATCH', body: JSON.stringify({
+      domain_checked_at: nowIso,
+      domain_lookup_status: look.status,
+      ...(info ? { domain_registrar: info.registrar, domain_expires_at: info.expires_at } : {}),
+      ...(padlock ? { cert_state: padlock.cert_state, cert_expires_at: padlock.cert_expires_at, cert_pending_since: padlock.cert_pending_since, cert_checked_at: nowIso } : {}),
+    }) });
+    const days = info ? daysUntil(info.expires_at, nowIso) : null;
+    const rung = expiryRung(days);
+    if (!rung || !info || !info.expires_at || days === null) continue;
+    const words = expiryWords(site.custom_domain, days, info.registrar);
+    const period = domainExpiryPeriod(site.custom_domain, info.expires_at, rung);
+    const fresh = await raiseNotice({ siteId: site.id, clientId: site.client_id, kind: 'domain_expiry', period: domainExpiryPeriod(site.custom_domain, info.expires_at, rung), headline: words.headline, body: words.body });
+    if (!fresh) continue;
+    warned++;
+    // the rung before is answered by this one: one current reminder per domain on the bell
+    await svc(`presence_plan_notices?client_id=eq.${encodeURIComponent(site.client_id)}&kind=eq.domain_expiry&status=eq.active&period=like.${encodeURIComponent(`exp:${site.custom_domain}:%`)}&period=neq.${encodeURIComponent(period)}`, { method: 'PATCH', body: JSON.stringify({ status: 'dismissed' }) }).catch(() => null);
+    // …and so is a reminder from before the ladder, keyed by month (YYYY-MM)
+    await svc(`presence_plan_notices?client_id=eq.${encodeURIComponent(site.client_id)}&kind=eq.domain_expiry&status=eq.active&period=not.like.${encodeURIComponent('exp:%')}`, { method: 'PATCH', body: JSON.stringify({ status: 'dismissed' }) }).catch(() => null);
+    const esc = (x: unknown) => String(x ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c] as string));
+    const html = `<p><strong>${esc(site.custom_domain)}</strong> ${esc(words.when)}${info.registrar ? ` at <strong>${esc(info.registrar)}</strong>` : ''}.</p><p>${esc(words.after)}</p>`;
+    const cl = await svc(`clients?id=eq.${encodeURIComponent(site.client_id)}&select=email,name&limit=1`).catch(() => ({ json: [] as unknown[] }));
+    const clientEmail = (Array.isArray(cl.json) && (cl.json[0] as { email?: string } | undefined)?.email) || '';
+    if (clientEmail) {
+      const brand = await loadEmailBrand(site.id);   // BR-1: the customer's domain notice, on their brand
+      await sendEmail(clientEmail, `Your domain ${site.custom_domain} ${words.when}`, html, brand).catch(() => false);
+    }
+    // the studio that looks after this client gets a copy of every rung (it used to be told only inside 7 days, and only the platform)
+    const link = await svc(`presence_service_links?customer_site_id=eq.${site.id}&status=eq.active&select=agency_site_id&order=created_at.desc&limit=1`).catch(() => ({ json: [] as unknown[] }));
+    const studioSite = Array.isArray(link.json) && (link.json[0] as { agency_site_id?: string } | undefined)?.agency_site_id;
+    if (studioSite) await emailOperator(String(studioSite), `${site.custom_domain} ${words.when}`, `${html}<p>${clientEmail ? 'Your client has been sent the same reminder.' : 'Your client has no email on their record, so they haven’t been told.'}</p>`, 'domain-expiry');
+    if (rung === '7' || rung === '1' || rung === 'expired') {
+      // OPERATIONAL, to the platform operator (critical:true — an opt-out must not silence it; a bounce/complaint still does).
+      const ops = Deno.env.get('OPS_ALERT_EMAIL') || '';
+      if (ops) sendEmail(ops, `[Studio OS ops] Domain ${words.when}: ${site.custom_domain}`, `<p>Customer domain ${esc(site.custom_domain)} ${esc(words.when)}. They have been notified.</p>`, undefined, { critical: true }).catch(() => {});
+    }
   }
-  return { checked, warned };
+  return { checked, warned, reasked };
 }
 
 // ── Phase CRM (FD-CRM1): the un-replied lead follow-up nudge ──────────────────

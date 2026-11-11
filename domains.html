@@ -41,7 +41,7 @@
 
   /* the table scrolls in its own box (agency.html's .tscroll) — the page never overflows sideways */
   .tscroll{position:relative;overflow-x:auto;-webkit-overflow-scrolling:touch;background:var(--card);border:1px solid var(--line);border-radius:var(--dds-r-lg,10px);box-shadow:var(--shadow)}
-  .tscroll table{width:100%;border-collapse:collapse;font-size:14px;min-width:720px}
+  .tscroll table{width:100%;border-collapse:collapse;font-size:14px;min-width:820px}   /* a sixth column since item 134 */
   .tscroll thead th{text-align:left;font-size:12px;color:var(--faint);font-weight:500;border-bottom:1px solid var(--line);padding:0;white-space:nowrap}
   .tscroll thead th .thb{font:inherit;color:inherit;background:none;border:none;padding:var(--dds-s3,12px) var(--dds-s4,16px);width:100%;text-align:left;cursor:pointer;display:flex;align-items:center;gap:var(--dds-s1,4px)}
   .tscroll thead th .thb:hover{color:var(--p)}
@@ -106,13 +106,14 @@ const day=(iso)=>{if(!iso)return'';const d=new Date(iso);return isNaN(d)?'':d.to
 
 let DOMAINS=[],BUILTIN=[],PARTIAL=false,LOADED_AT=0,Q='',REQ_SEQ=0;
 let SORT=null;   // null = most urgent first (the server's order)
-const RANK={expired:0,down:1,expiring:2,offline:3,checking:4,not_live:5,elsewhere:6,connected:7};
+const RANK={expired:0,down:1,expiring:2,padlock:3,offline:4,checking:5,not_live:6,elsewhere:7,connected:8};   // the server's order (agency/sites.ts buildDomains)
 const COLS=[
   ['domain','Domain',(d)=>d.domain],
   ['site','Site',(d)=>String(d.name||'').toLowerCase()],
   ['status','Status',(d)=>RANK[d.status]==null?9:RANK[d.status]],
   ['provider','Provider',(d)=>String(d.provider||'~').toLowerCase()],
   ['expires','Expires',(d)=>d.expires_at||'9999'],
+  ['padlock','Padlock until',(d)=>d.padlock_until||'9999'],   // item 134: the security certificate's end date
 ];
 const where=(d,hash)=>d.own?'/presence.html'+hash:'/presence.html?client='+encodeURIComponent(d.site_id)+hash;
 const matches=(d)=>{const q=Q.trim().toLowerCase();return !q||[d.domain||d.address,d.name,d.provider].some(x=>String(x||'').toLowerCase().includes(q));};
@@ -121,11 +122,20 @@ function ordered(){
   if(SORT){const col=COLS.find(c=>c[0]===SORT.key)||COLS[0];list.sort((a,b)=>{const av=col[2](a),bv=col[2](b);return av<bv?-SORT.dir:av>bv?SORT.dir:0;});}
   return list;
 }
+// item 132: a registration lookup that failed (or found no record) is said, not left as "Not known yet"
+const UNREADABLE='<span class="muted">Couldn’t read this domain’s record</span><div class="sub">Tried again each day</div>';
 function expiresCell(d){
-  if(!d.expires_at)return'<span class="muted">Not known yet</span>';
+  if(!d.expires_at)return d.record==='unreadable'?UNREADABLE:'<span class="muted">Not known yet</span>';
   const n=d.days_left;
   const sub=n==null?'':n<0?`${-n} day${n===-1?'':'s'} ago`:n===0?'Today':`In ${n} day${n===1?'':'s'}`;
   return `${esc(day(d.expires_at))}${sub?`<div class="sub">${esc(sub)}</div>`:''}`;
+}
+function padlockCell(d){
+  if(!d.hosted)return'<span class="muted">Their host’s</span>';
+  if(!d.padlock_until)return d.status==='padlock'?'<span class="muted">Not on yet</span>':'<span class="muted">Not known yet</span>';
+  const n=Math.floor((Date.parse(d.padlock_until)-Date.now())/86400000);
+  const sub=n<0?'Ended':n===0?'Ends today':n<=14?`Ends in ${n} day${n===1?'':'s'}`:'';
+  return `${esc(day(d.padlock_until))}${sub?`<div class="sub">${esc(sub)}</div>`:''}`;
 }
 function tableHtml(list){
   const ths=COLS.map(([k,label])=>{const on=SORT&&SORT.key===k;return `<th scope="col"${on?` aria-sort="${SORT.dir>0?'ascending':'descending'}"`:''}><button type="button" class="thb" data-sort="${k}">${esc(label)}${on?`<span class="arrow" aria-hidden="true">${SORT.dir>0?'▲':'▼'}</span>`:''}</button></th>`;}).join('')+'<th scope="col" class="acts"><span class="sr-only">Actions</span></th>';
@@ -133,8 +143,9 @@ function tableHtml(list){
     <td><a class="dom" href="https://${esc(d.domain)}" target="_blank" rel="noopener" aria-label="${esc(d.domain)} (opens the site)">${esc(d.domain)}</a>${d.own?'<span class="own">Your studio</span>':''}</td>
     <td><a class="site" href="${esc(where(d,''))}">${esc(d.name||'(unnamed)')}</a></td>
     <td><span class="pill ${esc(d.tone)}">${esc(d.status_words)}</span></td>
-    <td>${d.provider?esc(d.provider):'<span class="muted">Not known yet</span>'}</td>
+    <td>${d.provider?esc(d.provider):d.record==='unreadable'?'<span class="muted">Couldn’t read it</span>':'<span class="muted">Not known yet</span>'}</td>
     <td class="when">${expiresCell(d)}</td>
+    <td class="when">${padlockCell(d)}</td>
     <td class="acts">${d.hosted?`<a class="rowact" href="${esc(where(d,'#domain'))}" aria-label="Domain settings for ${esc(d.domain)}">Domain settings</a>`:`<a class="rowact" href="${esc(where(d,''))}" aria-label="Open ${esc(d.name||'the site')}">Open site</a>`}</td>
   </tr>`).join('');
   return `<div class="tscroll"><table aria-label="Domains"><thead><tr>${ths}</tr></thead><tbody>${trs}</tbody></table></div>`;
@@ -162,7 +173,7 @@ function render(){
     h+=list.length?tableHtml(list):(DOMAINS.length?'':`<p class="muted">None of your clients has their own domain connected yet.</p>`);
     h+=builtinHtml(bl);
   }
-  h+=`<p class="how">Expiry dates and providers come from each domain’s public registration record, checked once a day. A domain expiring within 30 days is also on Home’s Needs you list. Renewing happens at the provider.</p>`;
+  h+=`<p class="how">Expiry dates and providers come from each domain’s public registration record, checked once a day. Reminders go to the client, with a copy to you, at 30, 15, 7 and 1 days and the day after it expires. A domain expiring within 30 days, or a padlock that ends within 14 days or hasn’t come on after a day, is also on Home’s Needs you list. Renewing happens at the provider; the padlock renews by itself while the domain points here.</p>`;
   const act=document.activeElement;const wasQ=!!(act&&act.id==='search');const qp=wasQ?act.selectionStart:0;
   $('main').innerHTML=h;
   wire();

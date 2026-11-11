@@ -439,9 +439,11 @@ try {
     !/const owner = ident\.json\?\.\[0\]\?\.email/.test(lc) && !/presence_identity\?site_id=eq\.[^&]*&select=email/.test(lc));
   const kinds = ['lead_followup', 'deal_followup', 'support_aging', 'renewal_reminder', 'agreement_renewal', 'deal_task_due'];
   for (const k of kinds) ok(`lifecycle: the ${k} email now routes through emailOperator (it was dying silently)`, new RegExp(`emailOperator\\([\\s\\S]*?'${k}'`).test(lc));
-  // seven call sites: the five originals + the two deal_task_due sends (overdue
-  // to-dos and passed next-step dates — runDealTaskReminders).
-  ok('lifecycle: every operator send goes through the ONE door', (lc.match(/emailOperator\(/g) || []).length === 7);
+  // eight call sites: the five originals + the two deal_task_due sends (overdue
+  // to-dos and passed next-step dates — runDealTaskReminders) + the studio's copy of
+  // each domain expiry reminder (builder list item 133, runDomainWatch).
+  ok('lifecycle: every operator send goes through the ONE door', (lc.match(/emailOperator\(/g) || []).length === 8);
+  ok('lifecycle: the domain expiry reminder reaches the studio through the same door', /emailOperator\(String\(studioSite\)[\s\S]*?'domain-expiry'\)/.test(lc));
 }
 {
   const sb = read('supabase/functions/presence/lib/service_bridge.ts');
