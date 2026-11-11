@@ -149,6 +149,14 @@ export function describeChanges(draftC: SnapshotContent, liveC: SnapshotContent 
       ? 'AI assistants like ChatGPT, Claude and Perplexity are asked not to read your site. Google and Bing search are not affected.'
       : 'AI assistants can read your site again.' });
   }
+  // ── ad tags (item 152): the cookie notice and the privacy page change with them ──
+  if (JSON.stringify(d.settings?.ad_tags || null) !== JSON.stringify(l.settings?.ad_tags || null)) {
+    const t = d.settings?.ad_tags || {};
+    const names = [t.google ? 'the Google tag' : '', t.meta ? 'Meta’s pixel' : ''].filter(Boolean).join(' and ');
+    out.push({ section: 'site', sentence: names
+      ? `Your site asks visitors about cookies and, for those who say yes, loads ${names}. Its privacy page says so.`
+      : 'Your site stops loading ad tags and stops asking visitors about cookies.' });
+  }
 
   // ── custom section blocks (home + pages) — without this, two versions that
   //    differ ONLY in blocks reported "identical" (G9 finding). Coarse but

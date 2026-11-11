@@ -15,6 +15,7 @@ import manifest_at_1_0_0 from '../templates/atelier/1.0.0/manifest.json' with { 
 import manifest_ha_1_0_0 from '../templates/harbor/1.0.0/manifest.json' with { type: 'json' };
 import { trackerScript } from './visits.ts';
 import { withAiCrawlerChoice } from './ai_crawlers.ts';
+import { injectAdTags } from './ad_tags.ts';
 import { sanitizeDevHtml, sanitizeDevCss } from './devmode.ts';
 import { BLOCK_CSS, sectionStyles, pageClasses } from './site_blocks.ts';
 
@@ -195,7 +196,9 @@ export async function renderSnapshot(snapshot: Snapshot, site: SiteConfig, opts:
   // List item 175: switched off, AI assistants are asked to stay out in robots.txt.
   const drawn = withAiCrawlerChoice(tintFavicon(await t.render(snapshot, t.manifest, site), snapshot.dev_customization?.theme_tokens?.accent, snapshot.template_slug), (snapshot.content as SnapshotContent)?.settings);
   const dressed = injectDevLayer(drawn, snapshot.dev_customization);
-  return injectCsp(injectAnalytics(opts.allSectionStyles ? dressed : trimSectionStyles(dressed), counting ? site.siteId : undefined));
+  // List item 152: the Google tag and the Meta Pixel, behind a cookie notice, on a site that has them.
+  const tagged = injectAdTags(opts.allSectionStyles ? dressed : trimSectionStyles(dressed), (snapshot.content as SnapshotContent)?.settings);
+  return injectCsp(injectAnalytics(tagged, counting ? site.siteId : undefined));
 }
 
 /** What the builder's canvas and the studio's site cards draw (routes/preview.ts,

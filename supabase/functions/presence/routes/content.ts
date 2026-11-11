@@ -22,6 +22,7 @@ import { listStarterLayouts, starterKeyFor } from '../lib/starter_layouts.ts';
 import { normalizeTags } from '../lib/search_index.ts';
 import { detectPageRenames, duplicatePageInSettings, pageRefs, PAGE_SLUG_RE, type PageRename } from '../lib/page_ops.ts';
 import { OPEN_STAGES } from '../lib/sales_lifecycle.ts';
+import { GOOGLE_TAG_RE, META_PIXEL_RE } from '../lib/ad_tags.ts';
 import type { SiteRow } from '../lib/site.ts';
 import type { Principal } from '../../_shared/auth.ts';
 import { UUID_LOWER_RE as UUID_RE } from '../lib/uuid.ts';
@@ -67,7 +68,7 @@ function clean(s: string): string {
   return out.trim();
 }
 
-type FieldRule = { max?: number; min?: number; required?: boolean; kind?: 'text' | 'bool' | 'int' | 'uuid' | 'date' | 'slug' | 'json' | 'tags' | 'stage_days'; json?: JsonShape };
+type FieldRule = { max?: number; min?: number; required?: boolean; kind?: 'text' | 'bool' | 'int' | 'uuid' | 'date' | 'slug' | 'json' | 'tags' | 'stage_days' | 'google_tag' | 'meta_pixel'; json?: JsonShape };
 // Item 72: a JSON field's limits. Without them a 40 MB pages list was stored and then re-read
 // on every load, preview, publish, hash and sweep. The size is the saved text's length; the
 // shape checks only what every reader assumes (a list of objects, an object), never a
@@ -148,6 +149,7 @@ const SETTINGS_FIELDS: Record<string, FieldRule> = {
   review_requests: { kind: 'bool' }, review_request_after_days: { kind: 'int', min: 1, max: 90 },   // list item 29 (0137)
   visit_counter: { kind: 'bool' },   // list item 61 (0139): the published site's visit counter, on unless switched off
   ai_crawlers: { kind: 'bool' },     // list item 175 (0159): let AI assistants read the published site, on unless switched off
+  google_tag_id: { kind: 'google_tag' }, meta_pixel_id: { kind: 'meta_pixel' },   // list item 152 (0155): ad tags, behind a cookie notice; empty = none
   stage_stale_days: { kind: 'stage_days' },   // { lead?: 1–365, qualified?: …, proposal?: …, contract?: … } — a shaped map, not free json
   google_site_verification: { max: 100 }, bing_site_verification: { max: 100 },   // Phase Z: Search Console / Bing ownership
   // Phase CP-2 Design Studio: structured layout choices (never raw CSS)
@@ -217,6 +219,14 @@ function validateFields(payload: Record<string, unknown>, spec: Record<string, F
       cleanBody[key] = shaped; fields.push(key); continue;
     }
     if (rule.kind === 'tags') { cleanBody[key] = normalizeTags(v); fields.push(key); continue; }   // Phase SEARCH: the ONE tag gate — normalized to a clean text[]
+    if (rule.kind === 'google_tag' || rule.kind === 'meta_pixel') {   // list item 152: an ad tag's ID goes into a script on the live site, so only its exact shape passes
+      const id = String(v ?? '').replace(/\s+/g, '').toUpperCase();
+      if (id && !(rule.kind === 'google_tag' ? GOOGLE_TAG_RE : META_PIXEL_RE).test(id)) {
+        errors.push({ field: key, plain: true, message: rule.kind === 'google_tag' ? 'A Google tag ID looks like G-XXXXXXXXXX or AW-XXXXXXXXX.' : 'A Meta Pixel ID is the 15 or 16 digits Meta Events Manager shows.' });
+        continue;
+      }
+      cleanBody[key] = id; fields.push(key); continue;
+    }
     if (rule.kind === 'date') { if (v === null || v === '') { cleanBody[key] = null; fields.push(key); continue; } cleanBody[key] = String(v); fields.push(key); continue; }
     if (rule.kind === 'slug') { const s = clean(String(v ?? '')).toLowerCase(); if (s && !SLUG_RE.test(s)) { errors.push({ field: key, message: 'Links use lowercase letters, numbers, and dashes.' }); continue; } cleanBody[key] = s; fields.push(key); continue; }
     const s = clean(String(v ?? ''));
@@ -327,7 +337,7 @@ async function singleton(req: Request, db: SiteDb, site: SiteRow, principal: Pri
   const method = req.method.toUpperCase();
   if (method === 'GET') {
     let r = await db(`${cfg.table}?site_id=eq.${site.id}&select=${cfg.select}&limit=1`);
-    for (const select of selectSteps(cfg.select).slice(1)) {   // pre-0159, pre-0139, pre-0137, pre-0134
+    for (const select of selectSteps(cfg.select).slice(1)) {   // pre-0159, pre-0155, pre-0139, pre-0137, pre-0134
       if (r.ok || r.status !== 400) break;
       r = await db(`${cfg.table}?site_id=eq.${site.id}&select=${select}&limit=1`);
     }
@@ -385,11 +395,13 @@ const AUTOMATION_SETTINGS_COLS = 'auto_ack_enquiries,invoice_reminders,invoice_r
 const REVIEW_SETTINGS_COLS = 'review_requests,review_request_after_days';
 // The 0139 column (list item 61's switch).
 const VISIT_SETTINGS_COLS = 'visit_counter';
+// The 0155 columns (list item 152's ad tags).
+const AD_SETTINGS_COLS = 'google_tag_id,meta_pixel_id';
 // The 0159 column (list item 175's AI crawler switch).
 const CRAWLER_SETTINGS_COLS = 'ai_crawlers';
 // Newest apply pack first. A database without a pack's columns 400s the widened select,
 // so a read or a save steps down one pack at a time; Settings never goes dark ahead of one.
-const OPTIONAL_SETTINGS_COLS = [CRAWLER_SETTINGS_COLS, VISIT_SETTINGS_COLS, REVIEW_SETTINGS_COLS, AUTOMATION_SETTINGS_COLS];
+const OPTIONAL_SETTINGS_COLS = [CRAWLER_SETTINGS_COLS, AD_SETTINGS_COLS, VISIT_SETTINGS_COLS, REVIEW_SETTINGS_COLS, AUTOMATION_SETTINGS_COLS];
 function selectSteps(select: string): string[] {
   const out = [select];
   let s = select;
@@ -403,7 +415,7 @@ function selectSteps(select: string): string[] {
 const SETTINGS_CFG = {
   table: 'presence_settings', entityType: 'settings', noun: 'site settings', fields: SETTINGS_FIELDS,
   select: 'site_id,category_order,cover_media_id,logo_media_id,og_media_id,announcement_text,announcement_url,announcement_expires_at,industry_key,google_site_verification,bing_site_verification,hero_layout,nav_style,sections_hidden,sections_order,footer_hours,footer_social,pages_noindex,page_seo,blocks,pages,nav,updated_at'
-    + ',' + AUTOMATION_SETTINGS_COLS + ',' + REVIEW_SETTINGS_COLS + ',' + VISIT_SETTINGS_COLS + ',' + CRAWLER_SETTINGS_COLS,
+    + ',' + AUTOMATION_SETTINGS_COLS + ',' + REVIEW_SETTINGS_COLS + ',' + VISIT_SETTINGS_COLS + ',' + AD_SETTINGS_COLS + ',' + CRAWLER_SETTINGS_COLS,
   conflict: 'site_id', summary: 'Updated site settings',
 } as const;
 

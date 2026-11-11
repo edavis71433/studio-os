@@ -107,7 +107,7 @@ ok('isVisitKind: guards the kind enum', isVisitKind('pageview') && isVisitKind('
   ok('switch: no change when both are on', !describeChanges(fx.content, structuredClone(fx.content)).changes.some((c) => /counting visits/.test(c.sentence)));
   const content = await Deno.readTextFile(new URL('../../supabase/functions/presence/routes/content.ts', import.meta.url));
   ok('switch: /settings accepts visit_counter as a yes/no', /visit_counter: \{ kind: 'bool' \}/.test(content));
-  ok('switch: the settings read steps down without the 0139 column (deploy-order tolerant)', /VISIT_SETTINGS_COLS = 'visit_counter'/.test(content) && /OPTIONAL_SETTINGS_COLS = \[(CRAWLER_SETTINGS_COLS, )?VISIT_SETTINGS_COLS, REVIEW_SETTINGS_COLS, AUTOMATION_SETTINGS_COLS\]/.test(content));
+  ok('switch: the settings read steps down without the 0139 column (deploy-order tolerant)', /VISIT_SETTINGS_COLS = 'visit_counter'/.test(content) && /OPTIONAL_SETTINGS_COLS = \[(?:[A-Z_]+_SETTINGS_COLS, )*VISIT_SETTINGS_COLS, REVIEW_SETTINGS_COLS, AUTOMATION_SETTINGS_COLS\]/.test(content));
   const mig = await Deno.readTextFile(new URL('../../supabase/migrations/0139_visit_counter_switch.sql', import.meta.url));
   const pack = await Deno.readTextFile(new URL('../../docs/presence/APPLY-0139-prod.sql', import.meta.url));
   ok('switch: migration 0139 and its apply pack add the column, on by default', /add column if not exists visit_counter boolean not null default true/.test(mig) && /add column if not exists visit_counter boolean not null default true/.test(pack));
