@@ -324,20 +324,21 @@ test.describe('Sites (builder list items 43 and 45)', () => {
     expect(t.thumbs.length).toBe(asked);
   });
 
-  test('table: Name · Team · Plan · Published · Last updated · Tags, sortable, and the choice is remembered', async ({ page }) => {
+  // items 129 and 180 (Nov 11): Health, Visitors and Search clicks join the table, and Team and
+  // Published leave it (who can edit stays on each card); sites-numbers.spec.ts covers the numbers
+  test('table: Site · Health · Visitors · Search clicks · Plan · Last updated · Tags, sortable, and the choice is remembered', async ({ page }) => {
     await openSites(page);
     await page.locator('#dispTable').click();
     const table = page.locator('#tableHost table');
-    await expect(table.locator('thead .thb')).toHaveText(['Name', 'Team', 'Plan', 'Published', 'Last updated', 'Tags']);
+    await expect(table.locator('thead .thb')).toHaveText(['Site', 'Health', 'Visitors', 'Search clicks', 'Plan', 'Last updated', 'Tags']);
     await expect(table.locator('tbody tr')).toHaveCount(3);
     await expect(page.locator('#grid')).toBeHidden();               // one view at a time: no cards above the table
     await expect(page.locator('.scard:visible')).toHaveCount(0);
     const bistro = table.locator('tbody tr', { hasText: 'Bistro Nine' });
-    await expect(bistro.locator('.av')).toHaveCount(3);
     await expect(bistro).toContainText('Website + tools');
-    await expect(bistro).toContainText('Oct 1');
+    await expect(bistro).toContainText('Oct 5');
     await expect(bistro.locator('.tagchip')).toHaveText('restaurant');
-    await expect(table.locator('tbody tr', { hasText: 'Cafe Eleven' })).toContainText('Not yet');
+    await expect(table.locator('tbody tr', { hasText: 'Cafe Eleven' })).toContainText('Not live yet');
     await table.locator('[data-sort="name"]').click();
     await expect(table.locator('tbody tr td:first-child .n')).toHaveText(['Bistro Nine', 'Cafe Eleven', 'Garage Ten']);
     await expect(table.locator('th[aria-sort="ascending"]')).toHaveCount(1);
