@@ -2208,6 +2208,8 @@ function askText(title, opts) {
 // here, whether its records are found, the padlock, and live (when we email). The time is the
 // honest one: usually within an hour of adding the records, sometimes a day or two.
 function waitSteps(dstat, dom) {
+  // its own line maker: renderFoundations' stepLine is local to it
+  const stepLine = (t) => { const p = el("p", "aihint", t); p.style.marginTop = "5px"; return p; };
   const box = el("div"); box.dataset.wait = "steps"; box.style.marginTop = "10px";
   const when = (iso) => { const d = new Date(iso); return isNaN(d) ? "" : d.toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }); };
   const ch = (dom && Array.isArray(dom.changes) ? dom.changes : []).find((c) => /^(Attached domain|Changed domain from) /.test(String(c.words || "")));

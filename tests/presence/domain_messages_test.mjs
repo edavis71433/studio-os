@@ -114,6 +114,7 @@ world();
 {
   const page = read('presence.html');
   ok('the waiting card shows its steps with times and the honest wait', /function waitSteps\(dstat, dom\)/.test(page) && /domCard\.appendChild\(waitSteps\(dstat, dom\)\)/.test(page) && /Usually live within an hour of adding the records, sometimes a day or two/.test(page));
+  ok('the waiting steps make their own lines (renderFoundations’ stepLine is local to it; without this the whole sheet failed to draw)', /function waitSteps\(dstat, dom\) \{\n[^\n]*\n  const stepLine = /.test(page));
   ok('the main name is said plainly', /"Visitors who type " \+ bareName \+ " or www\." \+ bareName \+ " end up on "/.test(page));
   ok('"I need to get one" checks a name and opens three companies with it filled in', /needPanel\.dataset\.need = "domain"/.test(page) && /registration\/results\/\?domain=/.test(page) && /porkbun\.com\/checkout\/search\?q=/.test(page) && /domainsearch\/find\?domainToCheck=/.test(page) && /Buy it in your own name and email, and turn on auto-renew/.test(page));
   const sheet = page.slice(page.indexOf('function renderFoundations('), page.indexOf('// ── M11: Presence Monitor'));
