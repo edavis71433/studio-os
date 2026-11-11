@@ -26,6 +26,17 @@ export const isDocMime = (m: string) => DOC_MIME.has(m);
 
 const EXT: Record<string, string> = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp', 'application/pdf': 'pdf' };
 
+/** Item 144: a site's live files and the bytes they take, counted and summed by the
+ *  database (0165, presence_media_usage) instead of fetched row by row. The old read
+ *  came back in PostgREST's pages of 1,000 rows, so past 1,000 files the total was
+ *  short. Null when the database can't say. */
+export async function mediaUsage(siteId: string): Promise<{ files: number; bytes: number } | null> {
+  const r = await svc('rpc/presence_media_usage', { method: 'POST', body: JSON.stringify({ p_site: siteId }) });
+  const row = r.ok && Array.isArray(r.json) ? r.json[0] : null;
+  const files = Number(row?.files), bytes = Number(row?.bytes);
+  return row && Number.isFinite(files) && Number.isFinite(bytes) ? { files, bytes } : null;
+}
+
 /** Issue a signed upload URL + create the media row in one call (G1 §8).
  *  Format-aware: images require alt text; documents require a name (stored in the
  *  same alt_text column, which satisfies the a11y CHECK and doubles as the title). */
@@ -41,14 +52,12 @@ export async function createUpload(siteId: string, req: { mime: string; bytes: n
   }
 
   // M6: per-site media quota — count + storage usage, enforced BEFORE we issue a
-  // URL or create a row (never touches existing media). One query over the live
-  // rows; array length is the file count, the bytes sum is the storage usage.
+  // URL or create a row (never touches existing media). The database counts and
+  // sums the live rows (item 144); when it can't say, the check is skipped, as before.
   const limits = mediaQuota();
-  const usage = await svc(`presence_media?site_id=eq.${siteId}&deleted_at=is.null&select=bytes`);
-  if (usage.ok && Array.isArray(usage.json)) {
-    const files = usage.json.length;
-    const used = usage.json.reduce((s: number, r: any) => s + (Number(r.bytes) || 0), 0);
-    const q = quotaExceeded(files, used, req.bytes, limits);
+  const usage = await mediaUsage(siteId);
+  if (usage) {
+    const q = quotaExceeded(usage.files, usage.bytes, req.bytes, limits);
     if (q.exceeded) return {
       error: 'quota_exceeded',
       message: q.reason === 'count'

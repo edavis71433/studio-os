@@ -64,8 +64,14 @@ https://app.davisdigitalstudio.com/ai-visibility https://tools.davisdigitalstudi
 /audit             https://tools.davisdigitalstudio.com/site-review   301!
 /audit.html        https://tools.davisdigitalstudio.com/site-review   301!
 /speed-test        https://tools.davisdigitalstudio.com/site-review   301!
-/ai-critique       /ai-critique.html   200
-/report-card       /report-card.html   200
+# List item 139: the last three retired pages forward too, and none of them ships
+# (scripts/build-public.sh leaves every retired page out of dist/)
+/ai-critique       https://tools.davisdigitalstudio.com/site-review   301!
+/ai-critique.html  https://tools.davisdigitalstudio.com/site-review   301!
+/report-card       https://tools.davisdigitalstudio.com/site-review   301!
+/report-card.html  https://tools.davisdigitalstudio.com/site-review   301!
+/buy-audit         https://davisdigitalstudio.com/website-audits      301!
+/buy-audit.html    https://davisdigitalstudio.com/website-audits      301!
 /roi-calculator    https://tools.davisdigitalstudio.com/site-review   301!
 /roi-calculator.html https://tools.davisdigitalstudio.com/site-review 301!
 /pricing-estimator https://davisdigitalstudio.com/pricing   301!
@@ -84,11 +90,84 @@ https://tools.davisdigitalstudio.com/   https://davisdigitalstudio.com/   302!
 # and only this host matches, so every other host keeps serving the root files.
 https://tools.davisdigitalstudio.com/sitemap.xml   /tools-sitemap.xml   200!
 https://tools.davisdigitalstudio.com/robots.txt    /tools-robots.txt    200!
+# List item 139: the tools host answers only for the two tools, their reports, the
+# privacy pages they link and the files those pages load. Every other address forwards
+# to the same address on the app host, which serves app pages and sends marketing ones
+# to the main site, so app pages and the old marketing copy aren't indexed here too.
+# Each allowed path is forced (!) because the catch-all below is.
+https://tools.davisdigitalstudio.com/site-review         /site-review.html    200!
+https://tools.davisdigitalstudio.com/site-review.html    /site-review         301!
+https://tools.davisdigitalstudio.com/ai-visibility       /ai-visibility.html  200!
+https://tools.davisdigitalstudio.com/ai-visibility.html  /ai-visibility       301!
+https://tools.davisdigitalstudio.com/report/*            /report.html         200!
+https://tools.davisdigitalstudio.com/privacy             /privacy.html        200!
+https://tools.davisdigitalstudio.com/ai-disclaimer       /ai-disclaimer.html  200!
+https://tools.davisdigitalstudio.com/analytics.js        /analytics.js        200!
+https://tools.davisdigitalstudio.com/tools-common.js     /tools-common.js     200!
+https://tools.davisdigitalstudio.com/site-review.js      /site-review.js      200!
+https://tools.davisdigitalstudio.com/ai-visibility.js    /ai-visibility.js    200!
+https://tools.davisdigitalstudio.com/tool-report.js      /tool-report.js      200!
+https://tools.davisdigitalstudio.com/tool-report.css     /tool-report.css     200!
+https://tools.davisdigitalstudio.com/styles.css          /styles.css          200!
+https://tools.davisdigitalstudio.com/nav.js              /nav.js              200!
+https://tools.davisdigitalstudio.com/tools-logo.webp     /tools-logo.webp     200!
+https://tools.davisdigitalstudio.com/favicon.png         /favicon.png         200!
+https://tools.davisdigitalstudio.com/og-image.jpg        /og-image.jpg        200!
+https://tools.davisdigitalstudio.com/*                   https://app.davisdigitalstudio.com/:splat  301!
 
 # Resources hub — permanent as of V2 (previously retired to /audit; that
 # redirect is removed, this clean-URL rewrite added in its place)
 /tools             https://davisdigitalstudio.com/free-tools 301!
 /tools.html        https://davisdigitalstudio.com/free-tools 301!
+
+# List item 139: one copy for search engines. The main site is on Squarespace
+# (davisdigitalstudio.com); the app host used to serve the old marketing copy as well.
+# Each of those addresses now forwards to its page on the main site, or the page that
+# took its place (the growth partnership; Los Angeles for the three city pages). The
+# bare address is a door (app-door.html): signed in, it opens the app; otherwise the
+# main site. The app's legal pages stay: the app and the free tools link them. The free
+# tools' .html spellings and the bare report page forward to the tools host.
+https://app.davisdigitalstudio.com/                      /app-door.html                                       200!
+https://app.davisdigitalstudio.com/index.html            https://davisdigitalstudio.com/                      301!
+https://app.davisdigitalstudio.com/about                 https://davisdigitalstudio.com/about                 301!
+https://app.davisdigitalstudio.com/about.html            https://davisdigitalstudio.com/about                 301!
+https://app.davisdigitalstudio.com/services              https://davisdigitalstudio.com/services              301!
+https://app.davisdigitalstudio.com/services.html         https://davisdigitalstudio.com/services              301!
+https://app.davisdigitalstudio.com/pricing               https://davisdigitalstudio.com/pricing               301!
+https://app.davisdigitalstudio.com/pricing.html          https://davisdigitalstudio.com/pricing               301!
+https://app.davisdigitalstudio.com/web-design            https://davisdigitalstudio.com/web-design            301!
+https://app.davisdigitalstudio.com/web-design.html       https://davisdigitalstudio.com/web-design            301!
+https://app.davisdigitalstudio.com/seo-strategy          https://davisdigitalstudio.com/seo-strategy          301!
+https://app.davisdigitalstudio.com/seo-strategy.html     https://davisdigitalstudio.com/seo-strategy          301!
+https://app.davisdigitalstudio.com/how-we-work           https://davisdigitalstudio.com/how-we-work           301!
+https://app.davisdigitalstudio.com/how-we-work.html      https://davisdigitalstudio.com/how-we-work           301!
+https://app.davisdigitalstudio.com/industries            https://davisdigitalstudio.com/industries            301!
+https://app.davisdigitalstudio.com/industries.html       https://davisdigitalstudio.com/industries            301!
+https://app.davisdigitalstudio.com/work                  https://davisdigitalstudio.com/work                  301!
+https://app.davisdigitalstudio.com/work.html             https://davisdigitalstudio.com/work                  301!
+https://app.davisdigitalstudio.com/contact               https://davisdigitalstudio.com/contact               301!
+https://app.davisdigitalstudio.com/contact.html          https://davisdigitalstudio.com/contact               301!
+https://app.davisdigitalstudio.com/restaurant-web-design https://davisdigitalstudio.com/restaurant-web-design 301!
+https://app.davisdigitalstudio.com/restaurant-web-design.html https://davisdigitalstudio.com/restaurant-web-design 301!
+https://app.davisdigitalstudio.com/salon-web-design      https://davisdigitalstudio.com/salon-web-design      301!
+https://app.davisdigitalstudio.com/salon-web-design.html https://davisdigitalstudio.com/salon-web-design      301!
+https://app.davisdigitalstudio.com/retail-web-design     https://davisdigitalstudio.com/retail-web-design     301!
+https://app.davisdigitalstudio.com/retail-web-design.html https://davisdigitalstudio.com/retail-web-design     301!
+https://app.davisdigitalstudio.com/home-services-web-design https://davisdigitalstudio.com/home-services-web-design 301!
+https://app.davisdigitalstudio.com/home-services-web-design.html https://davisdigitalstudio.com/home-services-web-design 301!
+https://app.davisdigitalstudio.com/health-wellness-web-design https://davisdigitalstudio.com/health-wellness-web-design 301!
+https://app.davisdigitalstudio.com/health-wellness-web-design.html https://davisdigitalstudio.com/health-wellness-web-design 301!
+https://app.davisdigitalstudio.com/monthly-retainer      https://davisdigitalstudio.com/growth-partnership    301!
+https://app.davisdigitalstudio.com/monthly-retainer.html https://davisdigitalstudio.com/growth-partnership    301!
+https://app.davisdigitalstudio.com/burbank-web-design    https://davisdigitalstudio.com/los-angeles-web-design 301!
+https://app.davisdigitalstudio.com/burbank-web-design.html https://davisdigitalstudio.com/los-angeles-web-design 301!
+https://app.davisdigitalstudio.com/glendale-web-design   https://davisdigitalstudio.com/los-angeles-web-design 301!
+https://app.davisdigitalstudio.com/glendale-web-design.html https://davisdigitalstudio.com/los-angeles-web-design 301!
+https://app.davisdigitalstudio.com/pasadena-web-design   https://davisdigitalstudio.com/los-angeles-web-design 301!
+https://app.davisdigitalstudio.com/pasadena-web-design.html https://davisdigitalstudio.com/los-angeles-web-design 301!
+https://app.davisdigitalstudio.com/site-review.html      https://tools.davisdigitalstudio.com/site-review     301!
+https://app.davisdigitalstudio.com/ai-visibility.html    https://tools.davisdigitalstudio.com/ai-visibility   301!
+https://app.davisdigitalstudio.com/report.html           https://tools.davisdigitalstudio.com/site-review     301!
 
 # Clean URLs for the marketing pages (extensionless links resolve to the .html file)
 # /portal: the marketing chrome's "Client login" uses the clean URL; portal.html

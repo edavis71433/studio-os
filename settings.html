@@ -37,6 +37,9 @@
   .setlay{display:grid;grid-template-columns:minmax(230px,270px) minmax(0,1fr);gap:24px;align-items:start;margin-top:var(--dds-s4,16px)}
   .setnav{position:sticky;top:16px;min-width:0}
   .setnav .setgrid{display:flex;flex-direction:column;gap:2px;margin:0;background:var(--card);border:1px solid var(--line);border-radius:var(--dds-r-lg,14px);padding:6px;box-shadow:var(--dds-shadow,none)}
+  /* list item 175: search inside Settings */
+  .setfind{display:block;width:100%;box-sizing:border-box;font:inherit;font-size:14px;padding:8px 12px;margin:0 0 8px;border:1px solid var(--line);border-radius:var(--dds-r,8px);background:var(--card);color:var(--ink)}
+  .setnone{padding:10px 12px;color:var(--ink-2);font-size:13px}
   .setnav .setcard{border:0;border-radius:var(--dds-r,10px);padding:8px 10px;gap:10px;align-items:center;background:transparent;box-shadow:none;min-width:0}
   .setnav a.setcard:hover{background:color-mix(in srgb,var(--ink) 4%,transparent)}
   .setnav .setcard .ico{width:28px;height:28px}
@@ -144,7 +147,7 @@
     <div><h1 id="pagehead" tabindex="-1">Settings</h1><div class="subline" id="subline"><span>Loading…</span></div></div>
   </div>
   <div class="setlay">
-  <nav class="setnav" aria-label="Settings areas"><div class="setgrid" id="cards"></div></nav>
+  <nav class="setnav" aria-label="Settings areas"><input type="search" id="setFind" class="setfind" placeholder="Search settings" aria-label="Search settings" aria-controls="cards" autocomplete="off"><div class="setgrid" id="cards"></div></nav>
   <div class="setmain">
   <section class="card" id="studio" aria-labelledby="profileHead" hidden>
     <div class="card-h"><h2 id="profileHead">Studio profile</h2><button class="btn sm primary" type="button" id="profileSave">Save</button></div>
@@ -370,34 +373,38 @@ const IC = {
   calendar: '<rect x="3" y="4" width="18" height="17" rx="2"/><path d="M3 9h18M8 2v4M16 2v4"/>',
 };
 const CARDS = [
-  { key: 'studio', href: '#studio', title: 'Studio profile', desc: 'Name, email, phone, where you work from, and the kind of business — it drives the nudges on Today.',
+  { key: 'studio', href: '#studio', title: 'Studio profile', desc: 'Name, email, phone, where you work from, and the kind of business — it drives the nudges on Today.', words: 'name email phone address location business industry kind',
     scopedTitle: (who) => possessive(who) + ' profile', scopedDesc: 'Their name, email, phone, where they work from, and the kind of business — it drives their nudges.' },
   // the studio's own switches — never a client's (the invoices and deals are the studio's book)
   // Bold redesign (Nov 2026): the deal stages are a section of their own (the studio's book, like Automations)
-  { key: 'stages', href: '#stages', title: 'Deal stages', desc: 'Your names for the four open stages, the chance each one closes, and when a deal counts as stalled.', studioOnly: true, needs: 'configure' },
-  { key: 'auto', href: '#automations', title: 'Automations', desc: 'Four switches: acknowledge enquiries, remind unpaid invoices, nudge quiet deals, ask for a review when a project is done. Each shows the sentence it sends.', studioOnly: true, needs: 'configure' },
+  { key: 'stages', href: '#stages', title: 'Deal stages', desc: 'Your names for the four open stages, the chance each one closes, and when a deal counts as stalled.', words: 'pipeline deals stalled chance close', studioOnly: true, needs: 'configure' },
+  { key: 'auto', href: '#automations', title: 'Automations', desc: 'Four switches: acknowledge enquiries, remind unpaid invoices, nudge quiet deals, ask for a review when a project is done. Each shows the sentence it sends.', words: 'automatic reminders emails nudge review request unpaid', studioOnly: true, needs: 'configure' },
   // the agency's own team: seats and roles (agency members at studio level only — never a client's settings)
-  { key: 'agency_team', href: '#team', title: 'Team', desc: 'Who is on your studio’s team, their roles, and the seats your plan covers.', agencyOnly: true },
+  { key: 'agency_team', href: '#team', title: 'Team', desc: 'Who is on your studio’s team, their roles, and the seats your plan covers.', words: 'people seats roles members invite staff', agencyOnly: true },
   // builder list item 58 (Nov 2026): the client's monthly report email, set once per client (inside a client only)
-  { key: 'report', icon: 'studio', href: '#report', title: 'Monthly report', desc: 'Once a month, this client gets how their website did, on your brand, with a line from you.', scopedOnly: true, feature: 'website', cap: 'configure' },
+  { key: 'report', icon: 'studio', href: '#report', title: 'Monthly report', desc: 'Once a month, this client gets how their website did, on your brand, with a line from you.', words: 'email client monthly report visitors', scopedOnly: true, feature: 'website', cap: 'configure' },
   // builder list item 54 (Nov 2026): a studio hides the menu areas it doesn't use
-  { key: 'menu', icon: 'studio', href: '#menu', title: 'Your menu', desc: 'Hide the areas your studio doesn’t use. A hidden area keeps its page and stays one search away.', agencyOnly: true, cap: 'configure' },
-  { key: 'billing', href: '#billing', title: 'Your plan', desc: 'Your Studio OS plan, how to change it, and closing your account.', ownerOnly: true, needs: 'owner' },   // item 166: "Plan" alone for the studio's own subscription
-  { key: 'money', href: '/pipeline.html?services=1', title: 'Invoices & agreements', desc: 'Your services and prices (they fill proposals), the agreement every deal starts from, deposits.', feature: 'relationship' },
+  { key: 'menu', icon: 'studio', href: '#menu', title: 'Your menu', desc: 'Hide the areas your studio doesn’t use. A hidden area keeps its page and stays one search away.', words: 'hide areas navigation sidebar', agencyOnly: true, cap: 'configure' },
+  { key: 'billing', href: '#billing', title: 'Your plan', desc: 'Your Studio OS plan, how to change it, and closing your account.', words: 'plan billing subscription payment card cancel close delete account export download data', ownerOnly: true, needs: 'owner' },   // item 166: "Plan" alone for the studio's own subscription (billing stays a search word)
+  { key: 'money', href: '/pipeline.html?services=1', title: 'Invoices & agreements', desc: 'Your services and prices (they fill proposals), the agreement every deal starts from, deposits.', words: 'services prices proposals deposits contracts tax', feature: 'relationship' },
   // Bold redesign (Nov 2026): the private calendar link (sales review item 46) has its own row — it lives on Connections
-  { key: 'calendar', href: '/connections.html#calSec', title: 'Calendar', desc: 'Your bookings and dated tasks in Google Calendar, Apple Calendar or Outlook, through a private link.', feature: 'connected', studioOnly: true },
-  { key: 'connections', href: '/connections.html', title: 'Connections', desc: 'Google Analytics, Search Console, Business Profile, email sending.', feature: 'connected', scoped: true },
+  { key: 'calendar', href: '/connections.html#calSec', title: 'Calendar', desc: 'Your bookings and dated tasks in Google Calendar, Apple Calendar or Outlook, through a private link.', words: 'ical google outlook apple bookings', feature: 'connected', studioOnly: true },
+  { key: 'connections', href: '/connections.html', title: 'Connections', desc: 'Google Analytics, Search Console, Business Profile, email sending.', words: 'google analytics search console business profile email sending integrations', feature: 'connected', scoped: true },
   // everyone — the operator too — lands on their own site's Domain & email desk. Final pass (Nov 8, F10):
   // the operator's card used to go to the platform Health Center instead (sales review B12 was exactly
   // that case); the platform-wide view is now a card of its own, for staff only.
-  { key: 'domains', href: '/presence.html#domain', title: 'Domain & email', desc: 'Put your site on your own domain; email records and the padlock.', feature: 'website', scoped: true },
+  { key: 'domains', href: '/presence.html#domain', title: 'Domain & email', desc: 'Put your site on your own domain; email records and the padlock.', words: 'domain dns records padlock ssl certificate www email', feature: 'website', scoped: true },
   { key: 'domains_all', icon: 'domains', href: '/admin-health.html', title: 'Every site’s domains', desc: 'Domains, email records and padlocks across the platform, in the Health Center. Staff only.', operatorOnly: true },
-  { key: 'team', href: '/sharing.html', title: 'Team & access', desc: 'Who can sign in, what clients can see, reviewer links.', feature: 'client_portal', cap: 'invite', scoped: true,
+  { key: 'team', href: '/sharing.html', title: 'Team & access', desc: 'Who can sign in, what clients can see, reviewer links.', words: 'sharing access reviewer client portal invite people', feature: 'client_portal', cap: 'invite', scoped: true,
     agencyTitle: 'Sharing & access', agencyDesc: 'What your clients can see in their portal, and reviewer links.' },
-  { key: 'notify', href: '/inbox.html', title: 'Notifications', desc: 'Enquiries, approvals and support requests ring the bell and land in the Inbox; the email digest follows the same list.', scoped: true },
+  { key: 'notify', href: '/inbox.html', title: 'Notifications', desc: 'Enquiries, approvals and support requests ring the bell and land in the Inbox; the email digest follows the same list.', words: 'notifications bell digest alerts emails', scoped: true },
   // the developer tools are the STUDIO's, never a client's — the card stays unscoped and says so while drilled in
-  { key: 'dev', href: '/developer.html', title: 'Developer', desc: 'API keys, webhooks, the schema dump. For you, not clients.', feature: 'developer', cap: 'use_developer_mode',
+  { key: 'dev', href: '/developer.html', title: 'Developer', desc: 'API keys, webhooks, the schema dump. For you, not clients.', words: 'api keys webhooks schema developer code', feature: 'developer', cap: 'use_developer_mode',
     scopedTitle: () => 'Your studio’s developer tools', scopedDesc: 'API keys, webhooks, the schema dump — your studio’s own, not this client’s. Opening it leaves the client.' },
+  // list item 175: website settings that live on the website page, found by searching only
+  { key: 'site_access', icon: 'domains', href: '/presence.html', title: 'Who can see your website', desc: 'Public, a visitor password, or offline. On your website’s Overview.', words: 'password private public offline availability hide lock coming soon', feature: 'website', scoped: true, searchOnly: true },
+  { key: 'ai_crawlers', icon: 'domains', href: '/presence.html#search', title: 'AI assistants', desc: 'Let ChatGPT, Claude and other AI assistants read your website, or ask them not to. In your website’s Search.', words: 'ai crawlers robots chatgpt claude perplexity gemini bots block', feature: 'website', scoped: true, searchOnly: true },
+  { key: 'visits', icon: 'domains', href: '/presence.html#business', title: 'Visit counter & privacy page', desc: 'Count visits to your website without cookies; its privacy page follows the switch. In Business details.', words: 'analytics tracking cookies privacy counter visitors', feature: 'website', scoped: true, searchOnly: true },
 ];
 let CTX = null;   // /portal/context — the shell already has it; fall back to our own read
 function hasFeature(f) { const list = CTX && CTX.edition_features; return !Array.isArray(list) || list.includes(f); }
@@ -421,9 +428,16 @@ function cardHtml(c, status) {
 }
 const STATUSES = {};   // the quick card statuses, kept so a repaint (dds:context) does not lose them
 function reveal(id, focusId) { const f = $(id); if (!f) return; f.hidden = false; f.scrollIntoView({ behavior: 'smooth', block: 'start' }); const n = focusId && $(focusId); if (n) n.focus({ preventScroll: true }); markCurrent(id); }   // C16: the row you pressed is the one marked
+// List item 175: the search box narrows the list to the areas whose name, line or search
+// words hold every word typed; a search also finds the website settings kept on the website page.
+const findWords = () => String(($('setFind') && $('setFind').value) || '').toLowerCase().split(/\s+/).filter(Boolean);
+const cardMatches = (c, words) => { const hay = [c.title, c.desc, c.agencyTitle, c.agencyDesc, c.words].filter(Boolean).join(' ').toLowerCase(); return words.every((w) => hay.includes(w)); };
 function renderCards() {
-  const show = CARDS.filter((c) => (!c.feature || hasFeature(c.feature)) && (!c.cap || hasCap(c.cap)) && !(c.ownerOnly && SCOPE) && !(c.studioOnly && SCOPE) && !(c.scopedOnly && !SCOPE) && !(c.agencyOnly && !(CTX && CTX.is_agency && !SCOPE)) && !(c.operatorOnly && (SCOPE || !(CTX && CTX.is_operator))));
-  $('cards').innerHTML = show.map((c) => cardHtml(c, STATUSES[c.key])).join('');
+  const words = findWords();
+  const show = CARDS.filter((c) => (!c.feature || hasFeature(c.feature)) && (!c.cap || hasCap(c.cap)) && !(c.ownerOnly && SCOPE) && !(c.studioOnly && SCOPE) && !(c.scopedOnly && !SCOPE) && !(c.agencyOnly && !(CTX && CTX.is_agency && !SCOPE)) && !(c.operatorOnly && (SCOPE || !(CTX && CTX.is_operator))))
+    .filter((c) => (words.length ? cardMatches(c, words) : !c.searchOnly));
+  $('cards').innerHTML = show.map((c) => cardHtml(c, STATUSES[c.key])).join('') ||
+    `<p class="setnone" role="status">No setting matches “${esc(words.join(' '))}”. Try a word like password, team or invoices.</p>`;
   const sc = $('cards').querySelector('[data-card="studio"]');
   if (sc) sc.addEventListener('click', (e) => { e.preventDefault(); reveal('studio', 'f-name'); });
   const bc = $('cards').querySelector('[data-card="billing"]');
@@ -562,6 +576,12 @@ function paintScope() {
   }
 }
 document.addEventListener('dds:context', () => { paintScope(); if (SCOPE && $('cards').children.length) renderCards(); });
+// List item 175: typing narrows the list; Enter opens the first match, Escape clears.
+$('setFind').addEventListener('input', () => renderCards());
+$('setFind').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') { const first = $('cards').querySelector('.setcard'); if (first) { e.preventDefault(); first.click(); } }
+  else if (e.key === 'Escape' && $('setFind').value) { e.preventDefault(); $('setFind').value = ''; renderCards(); }
+});
 
 // ── the plan, inline. /commerce/subscription is the caller's OWN account and refuses
 //    a client scope, so this only ever runs unscoped. Agencies also see their limits (/agency/usage:

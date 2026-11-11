@@ -185,6 +185,11 @@ Today: `prospect_discover`, `prospect_insights`, `prospect_email_draft`,
 unified score, no next-best-action. The agent unifies them into one pipeline with
 state and a single "what should I do about this lead next" answer.
 
+*Nov 11 2026 (builder list item 186): `prospect_discover`, `prospect_insights`,
+`prospect_email_draft`, `prospect_email_send` and `lead_brief` were removed from
+clever-api. Nothing had called them since Jul 11, when the old admin console became
+a stub; the Prospects page (presence `routes/prospects.ts`) replaced the finder.*
+
 ---
 
 ## PART 4 — AI across the modules (challenged; not gimmicks)
