@@ -761,6 +761,16 @@ async function route_(req: Request, cors: Record<string, string>): Promise<Respo
     pm = route.match(/^\/sales\/prospects\/([0-9a-f-]{36})\/pack$/);   // item 113: build the next piece of the pitch pack
     if (pm && method === 'POST') return (await import('./routes/pitch_pack.ts')).handleProspectPack(req, site, principal, pm[1], cors);
   }
+  // ── Free-tool leads (sales item 114): Site Review / AI Visibility requests on the Prospects page.
+  //    Staff-only inside each handler — audit_leads is platform-level, never a client site's. ──
+  if (route.startsWith('/sales/tool-leads')) {
+    const px = await import('./routes/prospects.ts');
+    if (route === '/sales/tool-leads' && method === 'GET') return px.handleToolLeads(site, principal, cors);
+    let tl = route.match(/^\/sales\/tool-leads\/([0-9a-f-]{36})$/);
+    if (tl && method === 'PATCH') return px.handleToolLead(req, site, principal, tl[1], cors);
+    tl = route.match(/^\/sales\/tool-leads\/([0-9a-f-]{36})\/convert$/);
+    if (tl && method === 'POST') return px.handleToolLeadConvert(req, site, principal, tl[1], cors);
+  }
   if (route === '/email/log-address' && (method === 'GET' || method === 'POST' || method === 'DELETE')) return handleEmailLogAddress(req, site, principal, cors);   // sales review item 69: BCC to log   // sales review item 69: which address mail goes out from, and is it verified
   if (route === '/calendar/link' && (method === 'GET' || method === 'POST' || method === 'DELETE')) {   // sales review item 46: your calendar in Google Calendar
     const { handleCalendarLink } = await import('./routes/calendar.ts');
