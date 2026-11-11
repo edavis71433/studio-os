@@ -181,6 +181,18 @@ const PIPE = {
   '/sales/receivables': { data: { items: [], total_cents: 0 } },
   '/identity': { data: { business_name: 'Example Studio' } },
 };
+// A tel: tap without waiting on a navigation that never comes. The link is found and
+// pressed in one step in the page, so a redraw of the preview can't take it away in
+// between, and the tap is seen to be kept before the test leaves "for the dialler".
+async function tapCall(page: Page, sel: string) {
+  await page.evaluate(() => { document.addEventListener('click', (e) => { if ((e.target as Element).closest('a[href^="tel:"]')) e.preventDefault(); }); });
+  await page.evaluate((s) => (document.querySelector(s) as HTMLElement).click(), sel);
+  await expect.poll(() => page.evaluate(() => sessionStorage.getItem('dds-call-tap') || '')).toContain('"deal":"d-1"');
+}
+const leaveAndComeBack = (page: Page, back = true) => page.evaluate((b) => {
+  const set = (v: string) => { Object.defineProperty(document, 'visibilityState', { value: v, configurable: true }); document.dispatchEvent(new Event('visibilitychange')); };
+  set('hidden'); if (b) set('visible');
+}, back);
 test.describe('Tap to call (item 89)', () => {
   test('the deal’s preview and the deal itself call the contact; back from the call, it offers to log it', async ({ page }) => {
     await installApp(page, { api: PIPE });
@@ -191,12 +203,8 @@ test.describe('Tap to call (item 89)', () => {
     await expect(call).toHaveText(/Call \(555\) 010-4410/);
     await expect(call).toHaveAttribute('href', 'tel:5550104410');
     // a tap leaves for the dialler (the page goes hidden), then comes back: one prompt
-    await page.evaluate(() => { document.addEventListener('click', (e) => { if ((e.target as Element).closest('a[href^="tel:"]')) e.preventDefault(); }); });
-    await call.evaluate((a) => (a as HTMLElement).click());   // a tel: tap, without waiting on a navigation that never comes
-    await page.evaluate(() => {
-      const set = (v: string) => { Object.defineProperty(document, 'visibilityState', { value: v, configurable: true }); document.dispatchEvent(new Event('visibilitychange')); };
-      set('hidden'); set('visible');
-    });
+    await tapCall(page, '#dprev a.dp-call');
+    await leaveAndComeBack(page);
     const ask = page.locator('.dds-toast').filter({ hasText: 'Back from your call with Marcus Bell?' });
     await expect(ask).toBeVisible();
     await ask.getByRole('button', { name: 'Log it' }).click();
@@ -214,6 +222,39 @@ test.describe('Tap to call (item 89)', () => {
     await page.evaluate(() => { Object.defineProperty(document, 'visibilityState', { value: 'visible', configurable: true }); document.dispatchEvent(new Event('visibilitychange')); });
     await page.waitForTimeout(400);
     await expect(page.locator('.dds-toast').filter({ hasText: 'Back from your call' })).toHaveCount(0);
+  });
+
+  test('back before the page knows who is signed in: it asks once it does', async ({ page }) => {
+    await installApp(page, { api: PIPE });
+    let answer!: () => void;
+    const held = new Promise<void>((r) => { answer = r; });
+    await page.route('**/functions/v1/presence/portal/context', async (route) => { await held; await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(STUDIO_CTX) }); });
+    await page.goto('/pipeline.html?deal=d-1');
+    await expect(page.locator('.dh-sub a[href="tel:5550104410"]')).toBeVisible();
+    await tapCall(page, '.dh-sub a[href="tel:5550104410"]');
+    await leaveAndComeBack(page);
+    const ask = page.locator('.dds-toast').filter({ hasText: 'Back from your call with Marcus Bell?' });
+    await page.waitForTimeout(300);
+    await expect(ask).toHaveCount(0);   // not yet: whether they may log a call isn't known
+    answer();
+    await expect(ask).toBeVisible();
+    await expect(ask).toHaveCount(1);
+  });
+
+  test('a phone that reloaded the page during the call still asks, once', async ({ page }) => {
+    await installApp(page, { api: PIPE });
+    await page.goto('/pipeline.html?deal=d-1');
+    await expect(page.locator('.dh-sub a[href="tel:5550104410"]')).toBeVisible();
+    await tapCall(page, '.dh-sub a[href="tel:5550104410"]');
+    await leaveAndComeBack(page, false);   // gone to the dialler, and the phone drops the page
+    await page.reload();
+    const ask = page.locator('.dds-toast').filter({ hasText: 'Back from your call with Marcus Bell?' });
+    await expect(ask).toBeVisible();
+    expect(await page.evaluate(() => sessionStorage.getItem('dds-call-tap'))).toBeNull();
+    await page.reload();   // asked once: the next load asks nothing
+    await expect(page.locator('.dh-sub a[href="tel:5550104410"]')).toBeVisible();
+    await page.waitForTimeout(400);
+    await expect(ask).toHaveCount(0);
   });
 
   test('New deal has Save & New (item 105)', async ({ page }) => {

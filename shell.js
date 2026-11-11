@@ -723,17 +723,31 @@
     try { sessionStorage.setItem(CALL_KEY, JSON.stringify({ deal: a.getAttribute('data-call-deal'), who: a.getAttribute('data-call-who') || '', at: Date.now(), left: false })); } catch (_) { /* storage may be denied */ }
   }, true);
   function callTap() { try { return JSON.parse(sessionStorage.getItem(CALL_KEY) || 'null'); } catch (_) { return null; } }
-  document.addEventListener('visibilitychange', function () {
-    var t = callTap(); if (!t) return;
-    if (document.visibilityState === 'hidden') { t.left = true; try { sessionStorage.setItem(CALL_KEY, JSON.stringify(t)); } catch (_) { /* */ } return; }
-    try { sessionStorage.removeItem(CALL_KEY); } catch (_) { /* */ }
-    if (!t.left || Date.now() - t.at > 30 * 60000 || !canCreate() || !window.ddsToast) return;
+  function dropCallTap() { try { sessionStorage.removeItem(CALL_KEY); } catch (_) { /* */ } }
+  // Asked once, from whichever comes last: the page showing again, or the shell learning
+  // who is signed in. A page back before its first read has finished keeps the question
+  // until then, and a phone that reloaded the page during the call (no visibilitychange
+  // comes after a reload) still asks.
+  function offerCallLog() {
+    var t = callTap();
+    if (!t || !t.left || document.visibilityState === 'hidden') return;
+    if (Date.now() - t.at > 30 * 60000) { dropCallTap(); return; }
+    if (!CTX) return;   // asked again on dds:context
+    dropCallTap();
+    if (!canCreate() || !window.ddsToast) return;
     var ask = window.ddsToast('Back from your call' + (t.who ? ' with ' + t.who : '') + '?', 'ok', { label: 'Log it', onClick: function () { openCreate('call', null, false, { deal_id: t.deal }); } });
     // an open sheet (a modal dialog, like the deal's preview on a phone) blocks taps on everything
     // outside it, so the question goes inside the sheet
     var sheet = null; try { sheet = document.querySelector('dialog:modal'); } catch (_) { /* an older browser: no :modal */ }
     if (sheet && ask && ask.parentNode !== sheet) sheet.appendChild(ask);
+  }
+  document.addEventListener('visibilitychange', function () {
+    var t = callTap(); if (!t) return;
+    if (document.visibilityState === 'hidden') { t.left = true; try { sessionStorage.setItem(CALL_KEY, JSON.stringify(t)); } catch (_) { /* */ } return; }
+    if (!t.left) { dropCallTap(); return; }   // a tap that never left the page asks nothing
+    offerCallLog();
   });
+  document.addEventListener('dds:context', offerCallLog);
   // ⌘K finds them by what you'd type ("log a call", "invoice"); listed last so
   // a page's own name still comes first
   var CREATE_DESTS = [
