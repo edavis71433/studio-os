@@ -843,7 +843,7 @@
     var cur = function (href) { return normalizePath(href) === herePath ? ' aria-current="page"' : ''; };
     // Look refresh E: an icon over each word (the words stay the names)
     var homeA = '<a href="' + esc(withScope(home.href)) + '"' + cur(home.href) + '>' + icon(isReviewer ? 'messages' : 'home') + '<span class="mlbl">' + esc(home.label) + '</span></a>';
-    var inboxA = inbox ? '<a href="' + esc(withScope(inbox.href)) + '"' + cur(inbox.href) + '>' + icon('inbox') + '<span class="mlbl">' + esc(inbox.label) + (att > 0 ? ' <span class="mdot">' + (att > 9 ? '9+' : att) + '</span>' : '') + '</span></a>' : '';
+    var inboxA = inbox ? '<a data-mbar="inbox" href="' + esc(withScope(inbox.href)) + '"' + cur(inbox.href) + '>' + icon('inbox') + '<span class="mlbl">' + esc(inbox.label) + (att > 0 ? ' <span class="mdot">' + (att > 9 ? '9+' : att) + '</span>' : '') + '</span></a>' : '';
     // The bold redesign (item 70): a studio at studio level gets the sales loop,
     // Home · Inbox · + · Pipeline · Customers. The + opens Create; the rest of
     // the menu is the top bar's App Launcher, which opens the same drawer.
@@ -860,9 +860,16 @@
       plus.addEventListener('click', function (e) { e.stopPropagation(); openCreate('', plus, e.detail === 0); });
       return;
     }
+    // bug hunt A3: a studio that hid Pipeline or Customers in Your menu still creates;
+    // on a phone the + is the only Create button, so it stays (Home · Inbox · + · Menu)
+    var plusHere = canCreate();
+    if (plusHere) bar.className = 'plus';
     bar.innerHTML = homeA + inboxA +
+      (plusHere ? '<button type="button" id="dds-mbar-create" class="mplus" aria-label="Create" aria-haspopup="dialog" aria-expanded="false">' + icon('plus') + '</button>' : '') +
       '<button type="button" id="dds-mbar-menu" aria-expanded="false" aria-controls="dds-drawer" aria-haspopup="true">' + icon('menu') + '<span class="mlbl">Menu</span></button>';
     document.body.appendChild(bar);
+    var plus2 = document.getElementById('dds-mbar-create');
+    if (plus2) plus2.addEventListener('click', function (e) { e.stopPropagation(); openCreate('', plus2, e.detail === 0); });
     var mb = document.getElementById('dds-mbar-menu');
     if (mb) mb.addEventListener('click', function (e) {
       e.stopPropagation(); toggleDrawer(nav, 'dds-mbar-menu');
@@ -995,6 +1002,7 @@
   // palette is a modal overlay above them; it closes them on open instead.)
   function closeAllLayers() {
     closeMenus(); closeNotifications(); closeProfile(); closeHelp(); closeDrawer(); closeShortcuts();
+    if (siteSwitchPop()) closeSiteSwitch(false);   // bug hunt A11: Switch site is one of the layers too
   }
 
   // ── command palette ──
@@ -1109,6 +1117,14 @@
   function paintBell() {
     var b = document.getElementById('dds-bell');
     if (b) b.innerHTML = bellInner(badgeCount());
+    paintMobileInboxDot();
+  }
+  // bug hunt A7: the phone bar's Inbox number was drawn once at boot; it follows the bell now
+  function paintMobileInboxDot() {
+    var lbl = document.querySelector('#dds-mbar a[data-mbar="inbox"] .mlbl'); if (!lbl) return;
+    var n = badgeCount(), dot = lbl.querySelector('.mdot');
+    if (n > 0) { if (!dot) { lbl.appendChild(document.createTextNode(' ')); dot = document.createElement('span'); dot.className = 'mdot'; lbl.appendChild(dot); } dot.textContent = n > 9 ? '9+' : String(n); }
+    else if (dot) { if (dot.previousSibling && dot.previousSibling.nodeType === 3) dot.previousSibling.remove(); dot.remove(); }
   }
   // Final pass (Nov 8, batch B): at STUDIO level /portal/context no longer
   // builds the needs-you list on every page boot. It hands back the kept total

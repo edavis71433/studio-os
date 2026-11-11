@@ -779,7 +779,7 @@ html.dds-app[data-theme="dark"] .seg button[aria-pressed="true"],html.dds-app[da
 }
 /* the studio's phone bar: Home · Inbox · + · Pipeline · Customers */
 @media (max-width:760.98px){
-  #dds-mbar.sales{align-items:center}
+  #dds-mbar.sales,#dds-mbar.plus{align-items:center}   /* .plus: Home · Inbox · + · Menu when the sales bar can't be drawn (bug hunt A3) */
   #dds-mbar.sales > a{min-width:0}
   #dds-mbar.sales .mlbl{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   #dds-mbar .mplus{flex:0 0 auto;width:54px;height:54px;margin:-20px 6px 0;padding:0;border-radius:50%;display:grid;place-items:center;
@@ -858,6 +858,8 @@ html.dds-cr-on body{overflow:hidden}
 .dds-cr .cr-err{margin:0 20px 10px;padding:10px 12px;border-radius:var(--dds-r,12px);background:var(--dds-bad-soft);color:var(--dds-bad);font-size:13.5px;font-weight:500}
 .dds-cr .cr-err .cr-second{display:block;margin-top:8px;font:inherit;font-weight:600;color:var(--dds-bad);background:var(--dds-card);border:1px solid currentColor;border-radius:999px;padding:7px 14px;cursor:pointer}
 @media (pointer:coarse){.dds-cr .cr-err .cr-second{min-height:44px}}
+.dds-cr #cr-who-hint .cr-retry{font:inherit;font-weight:600;color:var(--dds-p);background:none;border:none;padding:0 2px;text-decoration:underline;cursor:pointer}   /* bug hunt A8 */
+@media (pointer:coarse){.dds-cr #cr-who-hint .cr-retry{min-height:44px}}
 .dds-cr .cr-foot{display:flex;align-items:center;flex-wrap:wrap;gap:10px;padding:14px 20px calc(14px + env(safe-area-inset-bottom,0px));border-top:1px solid var(--dds-line);background:var(--dds-card)}
 .dds-cr .cr-note{flex:1 1 160px;min-width:0;font-size:12.5px;color:var(--dds-soft);line-height:1.35}
 .dds-cr .cr-cancel,.dds-cr .cr-go{min-height:44px;padding:0 18px;border-radius:999px;font-size:14px;font-weight:600}

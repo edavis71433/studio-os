@@ -478,3 +478,57 @@ test.describe('+ Create', () => {
     await expect(deal).toBeAttached();
   });
 });
+
+// ── Nov 10 review, bug hunt group A ──
+test.describe('+ Create: the bug hunt fixes (A3, A8, A9)', () => {
+  test('A3 — a studio that hid Pipeline in Your menu keeps the + on a phone: Home · Inbox · + · Menu', async ({ page }) => {
+    test.skip(!isPhone(page), 'the phone bar');
+    const nav = STUDIO_LEVEL_NAV.map((s) => s.key === 'pipeline' ? { ...s, items: s.items.map((i) => ({ ...i, hidden: true })) } : s);
+    await installApp(page, { api: { ...FIXTURES, '/portal/context': { data: { ...STUDIO_CTX.data, nav } } } });
+    await salesServer(page);
+    await page.goto('/agency.html');
+    const bar = page.locator('#dds-mbar');
+    await expect(bar.locator('#dds-mbar-create')).toBeVisible();
+    expect(await bar.locator('> a, > button').evaluateAll((els) => els.map((e) => e.id || (e.textContent || '').trim()))).toEqual(['Home', 'Inbox', 'dds-mbar-create', 'dds-mbar-menu']);
+    await bar.locator('#dds-mbar-create').click();
+    await expect(dlg(page).locator('.cr-item')).toHaveCount(7);
+  });
+
+  test('A8 — when people and deals won’t load, the box says so with Try again, and typing never turns it into "Loading…"', async ({ page }) => {
+    await installApp(page, { api: FIXTURES });
+    await salesServer(page);
+    let fail = true;
+    await page.route(/\/functions\/v1\/presence\/sales\/(deals|contacts)(\?|$)/, (route) => fail ? route.fulfill({ status: 500, contentType: 'application/json', body: '{"error":"down"}' }) : route.fallback());
+    await page.goto('/agency.html');
+    await openForm(page, 'Log a call');
+    const hint = dlg(page).locator('#cr-who-hint');
+    await expect(hint).toContainText('We couldn’t load your people and deals just now.');
+    await dlg(page).locator('#cr-who').fill('ja');
+    await expect(hint).toContainText('We couldn’t load your people and deals just now.');
+    await expect(hint).not.toContainText('Loading');
+    fail = false;
+    await hint.getByRole('button', { name: 'Try again' }).click();
+    await expect(option(page, 'Jane')).toBeVisible();
+  });
+
+  test('A9 — a save answers the form that sent it: close one mid-save, open another, and the new one stays as you left it', async ({ page }) => {
+    await installApp(page, { api: FIXTURES });
+    await salesServer(page);
+    let release: () => void = () => {};
+    const gate = new Promise<void>((r) => { release = r; });
+    await page.route(/\/functions\/v1\/presence\/sales\/deals$/, async (route) => { if (route.request().method() !== 'POST') return route.fallback(); await gate; return route.fallback(); });
+    await page.goto('/agency.html');
+    await openForm(page, 'New deal');
+    await dlg(page).locator('#cr-title').fill('Slow deal');
+    await dlg(page).locator('.cr-go').click();
+    await page.keyboard.press('Escape');
+    await expect(dlg(page)).toBeHidden();
+    await openForm(page, 'New deal');
+    await dlg(page).locator('#cr-title').fill('Second deal');
+    release();
+    await expect(page.locator('.dds-toast').last()).toContainText('Deal added — Slow deal');
+    await expect(dlg(page)).toBeVisible();
+    await expect(dlg(page).locator('#cr-title')).toHaveValue('Second deal');
+    await expect(dlg(page).locator('.cr-go')).toBeEnabled();
+  });
+});

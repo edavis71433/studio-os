@@ -996,3 +996,15 @@ test.describe('Today — the studio home (mockup)', () => {
     expect(overflow).toBeLessThanOrEqual(1);
   });
 });
+
+// ── Nov 10 review, bug hunt A14 ──
+test('A14 — a Not now that fails keeps the card and says so', async ({ page }) => {
+  await installApp(page);
+  await page.route(/\/functions\/v1\/presence\/moments\/[^/]+\/dismiss$/, (route) => route.fulfill({ status: 502, contentType: 'application/json', body: '{"error":"write_failed"}' }));
+  await page.goto('/today.html');
+  const card = page.locator('article.moment', { hasText: 'Add your holiday hours' });
+  await card.getByRole('button', { name: 'Not now' }).click();
+  await expect(page.locator('.dds-toast').last()).toContainText('Couldn’t save that just now');
+  await expect(card).toBeVisible();
+  await expect(card.getByRole('button', { name: 'Not now' })).toBeEnabled();
+});
