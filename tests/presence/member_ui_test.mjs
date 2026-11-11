@@ -57,6 +57,7 @@ const CONTROLS = [
   ['POST /foundations/domain', 'presence.html', `api("POST", "/foundations/domain", { domain })`, ['choose.dataset.needs = "configure"', 'havePanel.dataset.needs = "configure"', 'needPanel.dataset.needs = "configure"', 'btn.dataset.needs = "configure"; btn.textContent = "Connect your domain"']],
   ['DELETE /foundations/domain', 'presence.html', `api("DELETE", "/foundations/domain")`, ['rm.dataset.needs = "configure"']],
   ['POST /foundations/prepare', 'presence.html', `api("POST", "/foundations/prepare", { goal: "email_auth" })`, ['acts.dataset.needs = "configure"', 'after.dataset.needs = "configure"']],
+  ['POST /foundations/prepare', 'presence.html', `api("POST", "/foundations/prepare", { goal })`, ['mh.dataset.needs = "configure"']],   // builder list item 162, part two: the domain sheet's "More help" guides
   ['POST /preview/settings', 'presence.html', `act("/preview/settings", "Preview access updated"`, ['"Preview access updated", { password: pw }); });\n    acts.lastChild.dataset.needs = "configure";']],
   ['POST /preview/settings', 'presence.html', `act("/preview/settings", "Preview link reset"`, ['"Preview link reset", { regenerate_token: true }); });\n    acts.lastChild.dataset.needs = "configure";']],
   ['POST /site/offline', 'presence.html', `siteSetState("/site/offline"`, ['offBtn.dataset.needs = "configure"']],
@@ -73,6 +74,7 @@ const CONTROLS = [
   ['POST /email/log-address', 'connections.html', `make(mk, 'POST', 'Your log address is ready.')`, ['id="logMake" data-needs="configure"']],   // sales review item 69
   ['POST /email/log-address', 'connections.html', `make(nw, 'POST', 'Your new log address is ready.')`, ['id="logNew" data-needs="configure"']],
   ['DELETE /email/log-address', 'connections.html', `make(off, 'DELETE', 'Your log address is off.')`, ['id="logOff" data-needs="configure"']],
+  ['POST /reviews/google-link', 'presence.html', `api("POST", "/reviews/google-link"`, ['el("button", null, "Save Google link"); sv.dataset.needs = "configure"']],   // sales review item 115
 ];
 // nothing in a page calls these: they answer scripts and the operator's tools
 const NO_CONTROL = {
@@ -101,7 +103,7 @@ const SOURCE = Object.fromEntries(PAGES.map((p) => [p, read(p)]));
   const decided = read('tests/presence/member_capability_test.mjs');
   const listed = (name) => [...decided.split('const DECIDED = {')[1].split(`\n  ${name}: [`)[1].split('\n  ],')[0].matchAll(/'((?:DELETE|POST|PUT|PATCH) [^']+)'/g)].map((m) => m[1]);
   const routes = [...listed('delete'), ...listed('configure')];
-  ok('the decided delete and configure lists were read', routes.length === 35, String(routes.length));   // item 47 added two; item 104 took away the seven DNS document and zone writes; item 58 added two; item 112 added the prospect delete
+  ok('the decided delete and configure lists were read', routes.length === 36, String(routes.length));   // item 47 added two; item 104 took away the seven DNS document and zone writes; item 58 added two; item 112 added the prospect delete; item 115 added the Google review link
   const covered = new Set(CONTROLS.map(([r]) => r));
   const open = routes.filter((r) => !covered.has(r) && !NO_CONTROL[r]);
   ok('every decided delete and configure route is accounted for here', open.length === 0, open.join(', '));
@@ -137,7 +139,7 @@ const SOURCE = Object.fromEntries(PAGES.map((p) => [p, read(p)]));
       if (!known(page).some((k) => k.includes(call))) ok(`${page}: this configure write is listed`, false, call);
     }
   }
-  ok('tripwire: the configure scan found every call in the table', seen === 9, String(seen));
+  ok('tripwire: the configure scan found every call in the table', seen === 10, String(seen));   // item 162, part two: the domain sheet's "More help" guides
 }
 
 // ═══ 4. settings: one row, two kinds of field ═══
