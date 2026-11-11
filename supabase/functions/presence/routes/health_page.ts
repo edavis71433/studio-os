@@ -21,6 +21,8 @@ import { siteOrigin } from '../lib/site.ts';
 import { TOOLS_BASE_URL } from '../../_shared/tools/config.ts';
 import { buildContentPerformance } from '../lib/content_performance.ts';
 import { sslStatus } from '../lib/netlify.ts';
+import { buildHealthMemory, healthPdf, type HealthMemory } from '../lib/health_memory.ts';
+import { loadEmailBrand } from '../lib/email_brand.ts';
 
 const PROVIDER_LABEL: Record<string, string> = Object.fromEntries(CONNECTED_PROVIDERS.map((p: any) => [p.key, p.name]));
 const arr = (r: { json: unknown }): any[] => (Array.isArray(r.json) ? r.json : []);
@@ -39,7 +41,59 @@ function speedFor(r: unknown) {
   return { verdict: sp.verdict, sentence: sp.sentence, phones_ms: sp.phones?.p75_ms ?? null, computers_ms: sp.computers?.p75_ms ?? null, samples: sp.samples };
 }
 
+/** Builder list item 183: the kept days (0170) and the problems of the run behind the
+ *  newest one. `null` with `ready: false` before the migration; a failed read is
+ *  `null` with `ready: true`, and the card leaves the memory out. */
+export async function loadHealthMemory(site: SiteRow, nowIso: string, hidden = false): Promise<{ memory: HealthMemory | null; ready: boolean }> {
+  const since = new Date(Date.parse(nowIso) - 62 * 86_400_000).toISOString().slice(0, 10);
+  const d = await svc(`presence_health_days?site_id=eq.${site.id}&day=gte.${since}&select=day,critical,warning,fingerprints,run_id&order=day.desc&limit=70`).catch(() => ({ ok: false, status: 0, json: null as unknown, text: '' }));
+  if (!d.ok) return { memory: null, ready: !(d.status === 404 || /PGRST205|42P01/.test(String(d.text || ''))) };
+  const days = arr(d);
+  const runId = days[0]?.run_id ? String(days[0].run_id) : '';
+  let items: unknown[] | null = [];
+  if (runId) {
+    const q = await svc(`presence_evidence?run_id=eq.${runId}&site_id=eq.${site.id}&severity=in.(critical,warning)&select=type,severity,resource,human,next_action&limit=1000`).catch(() => ({ ok: false, json: null as unknown }));
+    items = ok(q) ? arr(q) : null;
+  }
+  if (items === null) return { memory: null, ready: true };
+  const live = site.edition === 'monitor' || site.status === 'live' || !!site.last_published_at;
+  return { memory: buildHealthMemory({ days, items: items as any[], live, hidden, todayIso: nowIso }), ready: true };
+}
+
 export async function handleWebsiteHealth(site: SiteRow, cors: Record<string, string>) {
+  const data = await websiteHealthData(site);
+  if (!data) return json({ error: 'template_missing', message: 'This site’s template isn’t available.' }, 500, cors);
+  return json({ data }, 200, cors);
+}
+
+/** GET /website-health/pdf (item 183): the same check as a PDF to keep or send, on the
+ *  brand of the studio that looks after the site (its own, without one). */
+export async function handleWebsiteHealthPdf(site: SiteRow, cors: Record<string, string>) {
+  const nowIso = new Date().toISOString();
+  const data = await websiteHealthData(site);
+  if (!data) return json({ error: 'template_missing', message: 'This site’s template isn’t available.' }, 500, cors);
+  const link = await svc(`presence_service_links?customer_site_id=eq.${site.id}&status=eq.active&select=agency_site_id&order=created_at.desc&limit=1`).catch(() => ({ ok: false, json: null as unknown }));
+  const studioSite = ok(link) && arr(link)[0]?.agency_site_id ? String(arr(link)[0].agency_site_id) : site.id;
+  const [brand, ident] = await Promise.all([
+    loadEmailBrand(studioSite, { logoTtl: 600 }).catch(() => ({ name: 'Studio OS', accent: '#6d3fd4' })),
+    svc(`presence_identity?site_id=eq.${site.id}&select=business_name&limit=1`).catch(() => ({ ok: false, json: null as unknown })),
+  ]);
+  const name = (ok(ident) && String(arr(ident)[0]?.business_name || '').trim()) || 'Your website';
+  const memory = data.memory || buildHealthMemory({ days: [], items: [], live: true, todayIso: nowIso });
+  const bytes = healthPdf(memory, { studio: { name: brand.name, accent: (brand as { accent?: string }).accent }, site: name, address: siteOrigin(site), facts: healthFacts(data), todayIso: nowIso });
+  const file = `${name.replace(/[^A-Za-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'Website'}-health-${nowIso.slice(0, 10)}.pdf`;
+  return new Response(bytes, { status: 200, headers: { ...cors, 'Content-Type': 'application/pdf', 'Content-Disposition': `attachment; filename="${file}"`, 'Cache-Control': 'no-store' } });
+}
+
+/** The Health check's two figures an owner asks first (item 151): how much it's been
+ *  up and how fast it loads, as the card already words them. */
+export function healthFacts(h: { categories?: Array<{ key?: string; checks?: Array<{ title?: string }> }> }): string[] {
+  const out: string[] = [];
+  for (const c of h.categories || []) for (const k of c.checks || []) if (c.key === 'speed' || /^Online \d/.test(String(k.title || ''))) out.push(String(k.title || ''));
+  return out.filter(Boolean);
+}
+
+async function websiteHealthData(site: SiteRow) {
   const now = new Date().toISOString();
   const nowMs = Date.parse(now);
 
@@ -48,7 +102,7 @@ export async function handleWebsiteHealth(site: SiteRow, cors: Record<string, st
   // the already-collected first-party visits (for the plain-English "what this
   // means" projection — no new tracking, reuses loadVisits + aggregateVisits).
   const monthAgo = new Date(nowMs - 30 * 86_400_000).toISOString();
-  const [tree, launch, connQ, formQ, snapQ, visits, upQ, sslQ, daysQ, speedQ, firstQ, identQ, locQ, setQ] = await Promise.all([
+  const [tree, launch, connQ, formQ, snapQ, visits, upQ, sslQ, daysQ, speedQ, firstQ, identQ, locQ, setQ, mem] = await Promise.all([
     siteContentTree(site),
     siteLaunchChecklist(site),
     svc(`presence_connections?site_id=eq.${site.id}&select=provider_key,status,health`),
@@ -71,8 +125,10 @@ export async function handleWebsiteHealth(site: SiteRow, cors: Record<string, st
     svc(`presence_identity?site_id=eq.${site.id}&select=phone&limit=1`).catch(() => ({ ok: false, json: null as any })),
     svc(`presence_locations?site_id=eq.${site.id}&select=phone&limit=1`).catch(() => ({ ok: false, json: null as any })),
     svc(`presence_settings?site_id=eq.${site.id}&select=og_media_id,cover_media_id&limit=1`).catch(() => ({ ok: false, json: null as any })),
+    // item 183: the kept days and today's problems, best-effort
+    loadHealthMemory(site, now).catch(() => ({ memory: null, ready: true })),
   ]);
-  if (!tree) return json({ error: 'template_missing', message: 'This site’s template isn’t available.' }, 500, cors);
+  if (!tree) return null;
   const upRow = (upQ && (upQ as any).ok) ? arr(upQ)[0] : null;
   const sslExpiresAt = (sslQ && (sslQ as any).ok) ? ((sslQ as any).expires_at ?? null) : null;
 
@@ -125,5 +181,5 @@ export async function handleWebsiteHealth(site: SiteRow, cors: Record<string, st
   // respects the fetch-cap `truncated` flag (never over-reads an incomplete set).
   const content_performance = buildContentPerformance(aggregateVisits(visits, nowMs, 30));
 
-  return json({ data: { ...buildWebsiteHealth(input), content_performance } }, 200, cors);
+  return { ...buildWebsiteHealth(input), content_performance, memory: mem.memory, memory_ready: mem.ready };
 }

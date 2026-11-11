@@ -57,7 +57,7 @@ import { handleDeletedPages, handleDeletedPageRestore } from './routes/deleted_p
 import { handlePageLockCreate, handlePageLockList } from './routes/page_locks.ts';
 import { handleHealth, handleChanges, handleContentTree, handleNotesList, handleNoteResolve, handleRestoreToDraft, handleMediaList } from './routes/room.ts';
 const { handleWebsiteTimeline } = lazyRoutes(() => import('./routes/timeline.ts'));
-const { handleWebsiteHealth } = lazyRoutes(() => import('./routes/health_page.ts'));
+const { handleWebsiteHealth, handleWebsiteHealthPdf } = lazyRoutes(() => import('./routes/health_page.ts'));
 const { handleBusinessInsights } = lazyRoutes(() => import('./routes/insights_page.ts'));
 const { handleMomentsList, handleMomentDismiss } = lazyRoutes(() => import('./routes/moments.ts'));
 import { handlePortalContext, handlePortalFeed, handleMembersList, handleMemberAdd, handleMemberRevoke, handleSharesList, handleShareSet, reviewerAllowed, memberWriteGate } from './routes/workspace.ts';
@@ -699,6 +699,7 @@ async function route_(req: Request, cors: Record<string, string>): Promise<Respo
   if (route === '/content-tree' && method === 'GET') return handleContentTree(site, cors);
   if (route === '/website-timeline' && method === 'GET') return handleWebsiteTimeline(site, cors);
   if (route === '/website-health' && method === 'GET') return handleWebsiteHealth(site, cors);
+  if (route === '/website-health/pdf' && method === 'GET') return handleWebsiteHealthPdf(site, cors);   // item 183
   if (route === '/business-insights' && method === 'GET') return handleBusinessInsights(site, cors);
   if (route === '/notes' && method === 'GET') return handleNotesList(site, cors);
   {
