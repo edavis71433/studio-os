@@ -318,7 +318,8 @@ test.describe('the live walk — what a client sees', () => {
     await installApp(page, { session: { ...OWNER_SESSION, user: { ...OWNER_SESSION.user, email: 'j@example.com', user_metadata: { name: 'j' } } }, api: CLIENT_API });
     await page.goto('/client.html');
     await expect(page.locator('#main h1').first()).toHaveText(/^Good (morning|afternoon|evening)\.$/);
-    await expect(page.locator('#glance-proj .gn')).toHaveText('In progress');
+    // item 179: the glance strip left Home — the project's status in words now
+    // lives on the project card and the record chip alone
     await expect(page.locator('[data-proj]')).toContainText('Status: In progress');
     await expect(page.locator('[data-proj]')).toContainText('Just getting started');
     await expect(page.locator('[data-proj]')).not.toContainText('0% along');

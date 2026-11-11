@@ -9,7 +9,9 @@
 
 // ── mirrors (verbatim) of the pure helpers in client.html ──
 const esc=(s)=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
-function wsCardState(d){if(!d||d.published!==true)return'hidden';const m=d.month;if(!m)return'hidden';if(m.has_data===false||!(m.visitors>0))return'empty';return'stats';}
+function wsCardState(d){if(!d||d.published!==true)return'hidden';const m=d.month;if(!m)return'bare';if(m.has_data===false||!(m.visitors>0))return'empty';return'stats';}
+function wsSiteInfo(d){const s=(d&&d.site)||{};const url=typeof s.url==='string'&&/^https:\/\//.test(s.url)?s.url:'';return{url,host:url.replace(/^https:\/\//,''),published_at:(typeof s.last_published_at==='string'&&s.last_published_at)||''};}
+function rel(iso){const t=Date.parse(iso);if(!isFinite(t))return'';const s=Math.floor((Date.now()-t)/1000);if(s<60)return'just now';const m=Math.floor(s/60);if(m<60)return m+(m===1?' min ago':' mins ago');const h=Math.floor(m/60);if(h<24)return h+(h===1?' hour ago':' hours ago');const d=Math.floor(h/24);if(d<7)return d+(d===1?' day ago':' days ago');return new Date(t).toLocaleDateString('en-US',{month:'short',day:'numeric'});}
 function wsPeople(n){n=Math.max(0,n|0);return n===1?'1 person':n+' people';}
 function wsLeadHtml(m){
   m=m||{};
@@ -69,34 +71,65 @@ function wsCardHtml(d){
   const state=wsCardState(d);
   if(state==='hidden')return'';
   const priv='<span class="wspriv">Counted privately — no cookies, no tracking of individual people.</span>';
-  if(state==='empty')return'<div class="card wscard"><span class="tag">Your website</span><h3>Your website is ready to be found.</h3>'
-    +'<p class="wslead">Stats will appear here as people visit — check back soon.</p>'
-    +'<div class="wsfoot">'+priv+'</div></div>';
+  const site=wsSiteInfo(d);
+  const pic='<div class="wspic" id="wspic"><div class="wsini" aria-hidden="true">✦</div></div>';
+  const bar='<div class="wsbar"><span class="pill-live">Live</span>'+(site.url?'<a class="wsdomain" href="'+esc(site.url)+'" target="_blank" rel="noopener">'+esc(site.host)+' ↗</a>':'')+(site.published_at?'<span class="wswhen">Published '+esc(rel(site.published_at))+'</span>':'')+'</div>';
+  const see=site.url?'<a class="btn wssee" href="'+esc(site.url)+'" target="_blank" rel="noopener">See your site</a>':'';
+  // 'bare' = the stats read inside the route failed (month:null) — the picture
+  // and the live link still work, and the card says the numbers couldn't be
+  // checked rather than pretending there are none (the A4 honesty rule).
+  if(state!=='stats')return '<div class="card wscard">'+pic+'<div class="wsin"><span class="tag">Your website</span>'+bar
+    +'<h3>'+(state==='empty'?'Your website is ready to be found.':'Your website, at a glance.')+'</h3>'
+    +'<p class="wslead">'+(state==='empty'?'Stats will appear here as people visit — check back soon.':'We couldn’t check your visitor numbers just now — your site itself is fine.')+'</p>'
+    +'<div class="wsfoot">'+see+priv+'</div></div></div>';
   const m=d.month,search=d.search;
   const wk=(m.weekly||[]).map(n=>Math.max(0,n|0));
   const pts=wsSparkPoints(wk,520,54,6);
   const full=wsFullHtml(m,search);
-  return '<div class="card wscard"><span class="tag">Your website</span><h3>People are finding you.</h3>'
+  return '<div class="card wscard">'+pic+'<div class="wsin"><span class="tag">Your website</span>'+bar
+    +'<h3>People are finding you.</h3>'
     +'<p class="wslead">'+wsLeadHtml(m)+(m.truncated?' <span class="muted" style="font-size:12px">· based on recent activity</span>':'')+'</p>'
     +(pts?'<svg class="wsspark" viewBox="0 0 520 54" preserveAspectRatio="none" aria-hidden="true" focusable="false"><polyline fill="none" stroke="var(--p)" stroke-width="2.5" opacity=".85" points="'+pts+'"/></svg><span class="sr-only">'+esc('Visitors per week, oldest to newest: '+wk.join(', ')+'.')+'</span>':'')
     +'<div class="wsmini">'+wsTiles(m,search).map(t=>'<div class="m"><p class="n">'+esc(t[0])+'</p><p class="l">'+esc(t[1])+'</p></div>').join('')+'</div>'
     +(full?'<div id="wsfull" hidden>'+full+'</div>':'')
-    +'<div class="wsfoot">'+(full?'<button type="button" id="wsmore" class="wsmore" aria-expanded="false" aria-controls="wsfull">See the full picture →</button>':'')+priv+'</div></div>';
+    +'<div class="wsfoot">'+see+(full?'<button type="button" id="wsmore" class="wsmore" aria-expanded="false" aria-controls="wsfull">See the full picture →</button>':'')+priv+'</div></div></div>';
 }
 
 const results=[];
 const ok=(n,p)=>{results.push({n,p});console.log(`${p?'PASS':'FAIL'}  ${n}`);};
 
-// ═══ wsCardState — hidden / empty / stats ═══
+// ═══ wsCardState — hidden / bare / empty / stats ═══
 ok('state: no payload / route missing / not published → hidden (the card never renders)',
   wsCardState(null)==='hidden' && wsCardState({})==='hidden' && wsCardState({published:false,month:{visitors:9}})==='hidden');
-ok('state: published but the month read FAILED (month:null) → hidden — a transient DB failure never masquerades as the empty story',
-  wsCardState({published:true,month:null})==='hidden' && wsCardState({published:true})==='hidden');
+ok('state: published but the month read FAILED (month:null) → bare — the picture and live link still render, but the card never claims the empty story for a transient DB failure',
+  wsCardState({published:true,month:null})==='bare' && wsCardState({published:true})==='bare');
 ok('state: published with a SUCCESSFUL zero-visitor read (or has_data:false) → the gentle empty state',
   wsCardState({published:true,month:{visitors:0,has_data:false}})==='empty'
   && wsCardState({published:true,month:{visitors:0,has_data:true}})==='empty'
   && wsCardState({published:true,month:{visitors:9,has_data:false}})==='empty');
 ok('state: published with visitors → stats', wsCardState({published:true,month:{visitors:214}})==='stats');
+
+// ═══ wsSiteInfo — the live address + published-when, https-only ═══
+ok('site info: https url passes through with its host; last_published_at carried',
+  JSON.stringify(wsSiteInfo({site:{url:'https://maria.example',last_published_at:'2026-11-01T00:00:00Z'}}))
+  ===JSON.stringify({url:'https://maria.example',host:'maria.example',published_at:'2026-11-01T00:00:00Z'}));
+ok('site info: a non-https url (or none, or junk types) yields NO link — the card never links http or javascript:',
+  wsSiteInfo({site:{url:'http://x.example'}}).url==='' && wsSiteInfo({site:{url:'javascript:alert(1)'}}).url===''
+  && wsSiteInfo({}).url==='' && wsSiteInfo(null).url==='' && wsSiteInfo({site:{url:42,last_published_at:9}}).published_at==='');
+ok('bare card: carries the picture slot, the live link and the couldn\'t-check line (never the "ready to be found" story)',
+  (()=>{const h=wsCardHtml({published:true,month:null,site:{url:'https://maria.example'}});
+    return h.includes('id="wspic"') && h.includes('maria.example ↗') && h.includes('We couldn’t check your visitor numbers just now')
+      && !h.includes('ready to be found');})());
+ok('empty card: picture slot + "ready to be found" + See your site when the url is known',
+  (()=>{const h=wsCardHtml({published:true,month:{visitors:0,has_data:true},site:{url:'https://maria.example'}});
+    return h.includes('id="wspic"') && h.includes('ready to be found') && h.includes('>See your site</a>');})());
+ok('stats card: picture slot + LIVE pill + domain link + the stats story together',
+  (()=>{const h=wsCardHtml({published:true,month:{visitors:214,actions:2},site:{url:'https://maria.example',last_published_at:new Date(Date.now()-3*86400000).toISOString()}});
+    return h.includes('id="wspic"') && h.includes('pill-live') && h.includes('maria.example ↗')
+      && h.includes('Published 3 days ago') && h.includes('People are finding you.');})());
+ok('hostile: a hostile site url never becomes a link, a hostile host string is escaped',
+  !wsCardHtml({published:true,month:{visitors:5},site:{url:'javascript:alert(1)'}}).includes('javascript:')
+  && wsCardHtml({published:true,month:{visitors:5},site:{url:'https://x.example/"><img onerror=x>'}}).includes('&quot;&gt;&lt;img'));
 
 // ═══ wsPeople — pluralization ═══
 ok('people: 1 → "1 person", n → "n people", junk → "0 people"',
@@ -212,6 +245,23 @@ ok('route: tolerant reads — each section null on failure, never a 500 for the 
   && /let month: unknown = null;/.test(cd) && /let search: unknown = null;/.test(cd));
 ok('wiring: GET /client/website-stats dispatched beside the other client routes',
   /route === '\/client\/website-stats' && method === 'GET'\) return handleClientWebsiteStats\(req, site, principal, cors\)/.test(idx));
+// ── item 179: the stats payload carries the site's own facts, and the picture route ──
+ok('route: the stats payload carries the live address (siteOrigin) + last_published_at',
+  /site: \{ url: siteOrigin\(site\) \|\| null, last_published_at: site\.last_published_at \|\| null \}/.test(cd));
+ok('route: handleClientWebsiteThumb exists with the standard client-handler signature',
+  /export async function handleClientWebsiteThumb\(_req: Request, site: SiteRow, _principal: Principal, cors: Record<string, string>\)/.test(cd));
+ok('route: the thumb reuses the ONE renderer (agency renderThumb, dynamic import) with the same size cap',
+  /await import\('\.\.\/agency\/sites\.ts'\)/.test(cd) && /renderThumb\(site\)/.test(cd) && /THUMB_MAX_CHARS/.test(cd));
+ok('route: a monitor-edition site (hosted elsewhere) answers 404, never a render attempt',
+  /site\.edition === 'monitor'.*hosted_elsewhere/.test(cd));
+ok('route: the thumb answer is no-store (its photo links expire)',
+  /handleClientWebsiteThumb[\s\S]*?'Cache-Control': 'no-store'/.test(cd));
+ok('wiring: GET /client/website-thumb dispatched beside website-stats',
+  /route === '\/client\/website-thumb' && method === 'GET'\) return handleClientWebsiteThumb\(req, site, principal, cors\)/.test(idx));
+ok('page: the picture frame is sandboxed with scripts OFF and drawn once per load (in-flight promise cached)',
+  page.includes("f.setAttribute('sandbox','allow-same-origin')")
+  && page.includes("if(!PORTAL.wsthumbFetch)PORTAL.wsthumbFetch=api('/client/website-thumb')")
+  && page.includes('PORTAL.wsthumb=undefined;PORTAL.wsthumbFetch=null;'));
 ok('wiring: every pre-existing /client/* dispatch is untouched',
   ['handleClientProjects','handleClientProject','handleClientReport','handleClientMessages','handleClientDeliverableDownload',
    'handleClientApprovalDecide','handleClientSurvey','handleClientSurveyRespond','handleClientNotifications','handleClientNotificationsRead',
@@ -232,8 +282,8 @@ ok('page: the privacy line matches what the collector actually does (cookie-less
   page.includes('Counted privately — no cookies, no tracking of individual people.'));
 
 // keep the mirrors honest: the page carries the exact same helper definitions
-for(const fn of ['wsCardState','wsPeople','wsLeadHtml','wsGscQualifier','wsTiles','wsSparkPoints','wsPageLabel','wsSourceLabel','wsCount','wsTermLine','wsFullHtml','wsCardHtml']){
-  const m=String({wsCardState,wsPeople,wsLeadHtml,wsGscQualifier,wsTiles,wsSparkPoints,wsPageLabel,wsSourceLabel,wsCount,wsTermLine,wsFullHtml,wsCardHtml}[fn]);
+for(const fn of ['wsCardState','wsSiteInfo','wsPeople','wsLeadHtml','wsGscQualifier','wsTiles','wsSparkPoints','wsPageLabel','wsSourceLabel','wsCount','wsTermLine','wsFullHtml','wsCardHtml']){
+  const m=String({wsCardState,wsSiteInfo,wsPeople,wsLeadHtml,wsGscQualifier,wsTiles,wsSparkPoints,wsPageLabel,wsSourceLabel,wsCount,wsTermLine,wsFullHtml,wsCardHtml}[fn]);
   ok(`mirror: client.html defines ${fn} verbatim`,page.includes(m));
 }
 

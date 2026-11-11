@@ -79,7 +79,7 @@ const NOW = '2026-11-11T12:00:00.000Z';
   ok('the Search tab card follows the same rule', /const left = Array\.isArray\(d\.checklist\)/.test(page));
   const admin = read('supabase/functions/presence/routes/admin.ts');
   ok('the sheet’s check carries the checklist', /checklist: truth\.checklist, all_ok: truth\.all_ok/.test(admin));
-  ok('Home and the Domains page read what the domain shows', /cert_pending_since,domain_serving&limit=1000/.test(read('supabase/functions/presence/agency/routes.ts')) && /domain_serving,domain_checks`/.test(read('supabase/functions/presence/agency/sites.ts')));
+  ok('Home and the Domains page read what the domain shows', /cert_pending_since,domain_serving[,&]/.test(read('supabase/functions/presence/agency/routes.ts')) && /domain_serving,domain_checks[`,]/.test(read('supabase/functions/presence/agency/sites.ts')));   // item 162 adds columns after them
 }
 
 // ═══ the live checks, against stubs ═══

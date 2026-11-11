@@ -81,7 +81,7 @@ test.describe('Client portal', () => {
     await expect(page.getByRole('heading', { name: 'Protect your email' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Approve' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Not yet' })).toBeVisible();
-    await expect(page.getByRole('heading', { name: 'Recent updates' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'From your studio' })).toBeVisible();
     await expect(page.getByText('Your new hours are live')).toBeVisible();
   });
 
@@ -452,41 +452,40 @@ test.describe('Client portal — Back to home hands focus back', () => {
   });
 });
 
-// ── slice 10: the Home greeting + at-a-glance strip + action-feed rows ───────
-// A time-of-day greeting headline over the unchanged sub line; a strip of mini
-// tiles (needs your OK · new messages · to pay · project status) built ONLY
-// from data Home already loads — a tile hides when its datum is absent, and a
-// zero count is real data, never faked. Queue rows carry the action-feed
+// ── item 179 (direction A): the studio-coloured hero + the counted queue ─────
+// Home opens with the plum hero (brand + time-of-day greeting), the website
+// card leads the page, and the "Needs you" heading carries the queue's own
+// count (the old glance strip is gone — the heading and the rows share ONE
+// array, so the numbers can't disagree). Queue rows keep the action-feed
 // anatomy (type icon + explicit CTA) with every existing behavior intact.
-test.describe('Client portal — Home greeting + glance strip (slice 10)', () => {
-  test('the headline is a time-of-day greeting; the sub line is unchanged', async ({ page }) => {
+test.describe('Client portal — Home hero + counted queue (item 179)', () => {
+  test('the hero carries the greeting and the new sub line', async ({ page }) => {
     await installApp(page, { api: CLIENT_API });
     await page.goto('/client.html');
-    await expect(page.locator('#main header h1')).toHaveText(/^Good (morning|afternoon|evening)/);
-    await expect(page.getByText('Everything your studio is doing with you, in one place.')).toBeVisible();
+    await expect(page.locator('#home-hero h1')).toHaveText(/^Good (morning|afternoon|evening)/);
+    await expect(page.getByText('Here’s where your website and projects stand.')).toBeVisible();
   });
 
-  test('the glance strip renders real tiles: needs-you · messages · to pay · project', async ({ page }) => {
+  test('phone: the hero names the studio (the bar\'s brand is a ≥720px affordance)', async ({ page }, testInfo) => {
+    test.skip(testInfo.project.name !== 'mobile', 'the hero brand row is the <720px contract');
+    await installApp(page, { api: { ...CLIENT_API, '/portal/context': MANAGED_CTX } });
+    await page.route('https://store.example/**', (r) => r.fulfill({ status: 200, contentType: 'image/png', body: Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=', 'base64') }));
+    await page.goto('/client.html');
+    await expect(page.locator('#home-hero .ph-name')).toHaveText('Marlow & Co');
+    await expect(page.locator('#home-hero .ph-logo')).toHaveAttribute('src', STUDIO.logo_url);
+  });
+
+  test('the "Needs you" heading carries the queue\'s own count; the project card keeps its line', async ({ page }) => {
     await installApp(page, { api: CLIENT_API });
     await page.goto('/client.html');
-    const strip = page.locator('#home-glance');
-    await expect(strip).toBeVisible();
-    // PS3 (D1a): the tile counts the QUEUE's rows by construction — approval
-    // a1 + the to-do row + the unpaid Deposit = 3 — and its label names the
-    // list it counts, so the two adjacent numbers can't read as contradictory
-    await expect(strip.locator('#glance-ok .gn')).toHaveText('3');
-    await expect(strip.locator('#glance-ok .gl')).toHaveText('in “Needs you”');
+    // approval a1 + the to-do row + the unpaid Deposit = 3 — the SAME array the
+    // rows render from, so the heading and the card can't contradict each other
+    await expect(page.locator('#needs-h')).toHaveText('Needs you · 3');
+    await expect(page.locator('#needs-body .qrow')).toHaveCount(3);
     await expect(page.locator(`#glance-${PID}`)).toContainText('1 needs your OK · 1 to-do for you'); // snapWaiting's two parts, each in its own words (portal walk, Nov 8)
-    await expect(strip.locator('#glance-msgs .gn')).toHaveText('0');     // a real zero, not a fake
-    await expect(strip.locator('#glance-due .gn')).toHaveText('$500');   // the unpaid Deposit
-    await expect(strip.locator('#glance-due .gl')).toHaveText('to pay');
-    await expect(strip.locator('#glance-proj .gn')).toHaveText('In progress');   // in words, never the raw "active" (Nov 10 walk)
-    await expect(strip.locator('#glance-proj .gl')).toHaveText('Website redesign');
-    // and the strip sits ABOVE the Needs-you queue (the website-card adjacency is untouched)
-    await expect(page.locator('#home-glance + #home-needs')).toBeVisible();
   });
 
-  test('tiles hide when their datum is absent — a reviewer gets no due/project tiles', async ({ page }) => {
+  test('a reviewer\'s queue counts too, with no client reads behind it', async ({ page }) => {
     await installApp(page, { api: {
       '/portal/context': REVIEWER_CTX,
       '/portal/feed': { data: { role: 'client_reviewer', moments: [],
@@ -494,36 +493,29 @@ test.describe('Client portal — Home greeting + glance strip (slice 10)', () =>
         last_published: null } },
     } });
     await page.goto('/client.html');
-    const strip = page.locator('#home-glance');
-    await expect(strip).toBeVisible();
-    await expect(strip.locator('#glance-ok .gn')).toHaveText('1');
-    await expect(strip.locator('#glance-due')).toHaveCount(0);
-    await expect(strip.locator('#glance-proj')).toHaveCount(0);
+    await expect(page.locator('#needs-h')).toHaveText('Needs you · 1');
+    await expect(page.locator('#home-website')).toBeHidden();   // no website of their own
   });
 
-  test('unread messages count into the tile, and opening the bell re-renders it whole', async ({ page }, testInfo) => {
+  test('opening the bell still clears the badge and the queue\'s unread dots', async ({ page }, testInfo) => {
     test.skip(testInfo.project.name === 'mobile', 'uses the ≥720px context-bar bell');
     await installApp(page, { api: MSG_API });
     await page.goto('/client.html');
-    // ONLY the genuine studio message counts — the support_message row derives
-    // from support updated_at (it moves on the client's own filing) and must not
-    await expect(page.locator('#glance-msgs .gn')).toHaveText('1');
-    await expect(page.locator('#glance-msgs .gl')).toHaveText('new message');
+    await expect(page.locator('#needs-body .qcard, #needs-body .card').first()).toBeVisible();
     await page.locator('#navbell').click();
-    // number AND label move together — never a frozen "0 new message"
-    await expect(page.locator('#glance-msgs .gn')).toHaveText('0');
-    await expect(page.locator('#glance-msgs .gl')).toHaveText('new messages');
+    await expect(page.locator('#navbell .badge')).not.toHaveClass(/on/);
+    await expect(page.locator('.qrow.unread')).toHaveCount(0);
   });
 
-  test('a failed feed read HIDES the needs-OK tile — never a fake zero', async ({ page }) => {
+  test('a failed feed read keeps its calm line under the queue — never a silent clear morning', async ({ page }) => {
     await installApp(page, { api: CLIENT_API });
     await page.route('**/functions/v1/presence/portal/feed**', (route) =>
       route.fulfill({ status: 500, contentType: 'application/json', body: JSON.stringify({ error: 'boom' }) }));
     await page.goto('/client.html');
-    await expect(page.locator('#home-glance')).toBeVisible();        // the other sources still answered
-    await expect(page.locator('#glance-ok')).toHaveCount(0);         // its source failed → the tile hides
-    await expect(page.locator('#glance-msgs .gn')).toHaveText('0');  // notifications succeeded — a REAL zero stays
-    await expect(page.locator('#glance-due .gn')).toHaveText('$500');
+    await expect(page.locator('#needs-body')).toContainText('We couldn’t check on pending approvals just now');
+    // the surviving sources still render their rows (the snapshot's approval +
+    // the to-do row + the Deposit — the snapshot read is not the feed's)
+    await expect(page.locator('#needs-h')).toHaveText('Needs you · 3');
   });
 
   test('queue rows carry the action-feed anatomy: type icon + explicit CTA text', async ({ page }) => {
@@ -546,21 +538,21 @@ test.describe('Client portal — Home greeting + glance strip (slice 10)', () =>
     await expect(page.getByRole('heading', { name: 'Needs your OK' })).toBeVisible();
   });
 
-  test('mobile: the strip stacks its tiles with no horizontal overflow', async ({ page }, testInfo) => {
-    test.skip(testInfo.project.name !== 'mobile', 'the stacked-tiles check is the <720px contract');
+  test('mobile: the hero and queue stack with no horizontal overflow', async ({ page }, testInfo) => {
+    test.skip(testInfo.project.name !== 'mobile', 'the stacked check is the <720px contract');
     await installApp(page, { api: CLIENT_API });
     await page.goto('/client.html');
-    await expect(page.locator('#home-glance')).toBeVisible();
+    await expect(page.locator('#home-hero')).toBeVisible();
     await expect(page.locator('#needs-body .qcard')).toBeVisible();
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
     expect(overflow).toBeLessThanOrEqual(1);
   });
 
-  test('no serious/critical axe violations on the slice-10 Home', async ({ page }, testInfo) => {
+  test('no serious/critical axe violations on the item-179 Home', async ({ page }, testInfo) => {
     test.skip(testInfo.project.name !== 'desktop-chromium', 'axe once, on desktop');
     await installApp(page, { api: CLIENT_API });
     await page.goto('/client.html');
-    await expect(page.locator('#home-glance')).toBeVisible();
+    await expect(page.locator('#home-hero')).toBeVisible();
     await expect(page.locator('#needs-body .qcard')).toBeVisible();
     await page.waitForLoadState('networkidle');
     const results = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa']).analyze();
@@ -878,13 +870,16 @@ test.describe('Client portal — Messages split view', () => {
   });
 });
 
-// ── slice 8b: the "Your website" card on Home ────────────────────────────────
-// Plain-English site stats between the "Needs you" queue and the project cards:
-// a bolded lead sentence built from real numbers, a soft sparkline, mini stat
-// tiles, and an in-place "See the full picture →" disclosure. Honest
-// degradation: no GSC (or a failed GSC read) → no Google tile/section; zero
-// visitors on a SUCCESSFUL read → a gentle "ready to be found" state;
-// unpublished / failed month read / 404 (older function build) → no card.
+// ── the "Your website" card — item 179: it LEADS Home now ────────────────────
+// The site they pay for, first: a picture of the site's own home page (the
+// server-drawn thumb in a sandboxed frame), the LIVE pill + live link +
+// published-when, then the plain-English stats: a bolded lead sentence, a soft
+// sparkline, mini stat tiles, and the in-place "See the full picture →"
+// disclosure. Honest degradation: no GSC (or a failed GSC read) → no Google
+// tile/section; zero visitors on a SUCCESSFUL read → a gentle "ready to be
+// found" state; a failed month read → the bare picture-and-link card that says
+// the numbers couldn't be checked; unpublished / 404 (older build) → no card.
+const WS_SITE = { url: 'https://maria-floristry.example', last_published_at: '2026-07-04T00:00:00Z' };
 const WS_STATS = { data: { published: true,
   month: {
     visitors: 214, pageviews: 380, actions: 11,
@@ -898,17 +893,31 @@ const WS_STATS = { data: { published: true,
     { term: 'wedding photographer austin', clicks: 12, impressions: 300 },
     { term: 'family photos near me', clicks: 6, impressions: 210 },
   ] },
+  site: WS_SITE,
 } };
-const WS_API = { ...CLIENT_API, '/client/website-stats': WS_STATS };
+const WS_THUMB = { data: { html: '<!doctype html><html><body style="background:#fff"><h1 data-thumb-proof>Maria Floristry</h1></body></html>', version: 'live' } };
+const WS_API = { ...CLIENT_API, '/client/website-stats': WS_STATS, '/client/website-thumb': WS_THUMB };
 
 test.describe('Client portal — the "Your website" card', () => {
-  test('renders between "Needs you" and the projects: sentence numbers, sparkline, three tiles', async ({ page }) => {
+  test('leads Home: picture slot, LIVE pill, live link, published-when, then the stats', async ({ page }) => {
     await installApp(page, { api: WS_API });
     await page.goto('/client.html');
-    // placement: after the needs queue and its Recent updates (Oct 2026 audit change 4
-    // moved the updates up under Needs you), before the projects
-    const card = page.locator('#home-needs + #home-updates + #home-website .wscard');
+    // placement (item 179): the website card comes FIRST — before the Needs-you queue
+    const card = page.locator('#home-website .wscard');
     await expect(card).toBeVisible();
+    expect(await page.evaluate(() => {
+      const ws = document.getElementById('home-website'), nq = document.getElementById('home-needs');
+      return !!ws && !!nq && !!(ws.compareDocumentPosition(nq) & Node.DOCUMENT_POSITION_FOLLOWING);
+    })).toBe(true);
+    // the site's own facts: LIVE pill · the live address (new tab) · published-when
+    await expect(card.locator('.pill-live')).toHaveText('Live');
+    const dom = card.locator('a.wsdomain');
+    await expect(dom).toHaveText('maria-floristry.example ↗');
+    await expect(dom).toHaveAttribute('href', WS_SITE.url);
+    await expect(dom).toHaveAttribute('target', '_blank');
+    await expect(card.locator('.wswhen')).toContainText('Published');
+    await expect(card.locator('#wspic')).toBeVisible();   // the picture slot leads the card
+    await expect(card.getByRole('link', { name: 'See your site' })).toHaveAttribute('href', WS_SITE.url);
     await expect(card.getByRole('heading', { name: 'People are finding you.' })).toBeVisible();
     // the lead sentence carries the real numbers, bolded
     await expect(card.locator('.wslead b').nth(0)).toHaveText('214 people');
@@ -1003,14 +1012,39 @@ test.describe('Client portal — the "Your website" card', () => {
     await expect(card.locator('.wslead')).not.toContainText('of them');
   });
 
-  test('published but the month read FAILED (month:null) → no card, never the empty story', async ({ page }) => {
-    await installApp(page, { api: { ...CLIENT_API, '/client/website-stats': { data: { published: true, month: null, search: null } } } });
+  test('published but the month read FAILED (month:null) → the bare picture-and-link card, never the empty story', async ({ page }) => {
+    await installApp(page, { api: { ...CLIENT_API, '/client/website-stats': { data: { published: true, month: null, search: null, site: WS_SITE } } } });
     await page.goto('/client.html');
-    await expect(page.getByRole('heading', { name: 'Needs you' })).toBeVisible();
-    // a transient DB failure must never masquerade as "ready to be found"
-    await expect(page.locator('#home-website')).toBeHidden();
-    await expect(page.locator('.wscard')).toHaveCount(0);
+    await expect(page.getByRole('heading', { name: /^Needs you/ })).toBeVisible();
+    // a transient DB failure must never masquerade as "ready to be found" — but
+    // the picture and the live link still earn their place (item 179)
+    const card = page.locator('#home-website .wscard');
+    await expect(card).toBeVisible();
+    await expect(card.getByText('We couldn’t check your visitor numbers just now')).toBeVisible();
+    await expect(card.locator('a.wsdomain')).toHaveAttribute('href', WS_SITE.url);
     await expect(page.getByText('ready to be found')).toHaveCount(0);
+    await expect(card.locator('.wsmini')).toHaveCount(0);
+  });
+
+  test('the picture: the server-drawn home page lands in a sandboxed, script-less frame', async ({ page }) => {
+    await installApp(page, { api: WS_API });
+    await page.goto('/client.html');
+    const frame = page.locator('#wspic iframe');
+    await expect(frame).toHaveAttribute('sandbox', 'allow-same-origin');   // no allow-scripts: the picture can't run code
+    await expect(frame).toHaveAttribute('referrerpolicy', 'no-referrer');
+    await expect(frame).toHaveAttribute('aria-hidden', 'true');
+    await expect(page.frameLocator('#wspic iframe').locator('[data-thumb-proof]')).toHaveText('Maria Floristry');
+  });
+
+  test('a failed picture draw keeps the quiet placeholder — the card and its stats still stand', async ({ page }) => {
+    await installApp(page, { api: { ...CLIENT_API, '/client/website-stats': WS_STATS } });
+    await page.route('**/functions/v1/presence/client/website-thumb**', (route) =>
+      route.fulfill({ status: 500, contentType: 'application/json', body: JSON.stringify({ error: 'render_failed' }) }));
+    await page.goto('/client.html');
+    const card = page.locator('#home-website .wscard');
+    await expect(card.getByRole('heading', { name: 'People are finding you.' })).toBeVisible();
+    await expect(card.locator('#wspic iframe')).toHaveCount(0);
+    await expect(card.locator('#wspic .wsini')).toBeVisible();
   });
 
   test('a FAILED Search Console read (unavailable) drops the Google tile and section, like not-connected', async ({ page }) => {
@@ -2014,10 +2048,8 @@ test.describe('Batch A regressions — portal', () => {
       ] } }) });
     });
     await page.goto('/client.html');
-    // Home's glance: the failed read HIDES the to-pay tile (never a fake $0),
-    // while the real counts still render their tiles
-    await expect(page.locator('#home-glance')).toBeVisible();
-    await expect(page.locator('#glance-due')).toHaveCount(0);
+    // Home's queue: the failed read keeps its own calm line (never a fake $0)
+    await expect(page.locator('#needs-body')).toContainText('We couldn’t check on invoices just now');
     // first Invoices visit: the couldn't-load line — never "No invoices yet"
     await page.locator('#tabnav [data-tab="invoices"]').click();
     await expect(page.getByText('We couldn’t load your invoices just now — please try again in a moment.')).toBeVisible();
@@ -2101,11 +2133,11 @@ test.describe('PS1 — failed-read honesty (portal)', () => {
     await expect(page.getByText('You’re all caught up.')).toHaveCount(0);
   });
 
-  test('a failed feed read gates Recent updates: the couldn’t-load line, never "Nothing new to share"', async ({ page }) => {
+  test('a failed feed read gates From your studio: the couldn’t-load line, never "Nothing new to share"', async ({ page }) => {
     await installApp(page, { api: EMPTY_CLIENT_API });
     await page.route('**/functions/v1/presence/portal/feed**', fail500);
     await page.goto('/client.html');
-    const sec = page.locator('section', { has: page.getByRole('heading', { name: 'Recent updates' }) });
+    const sec = page.locator('section', { has: page.getByRole('heading', { name: 'From your studio' }) });
     await expect(sec.getByText('We couldn’t load recent updates just now — please try again in a moment.')).toBeVisible();
     await expect(page.getByText('Nothing new to share right now', { exact: false })).toHaveCount(0);
   });
@@ -2172,10 +2204,8 @@ test.describe('PS1 — failed-read honesty (portal)', () => {
     // …with billing's one calm per-source line under them — never "caught up"
     await expect(body.getByText('We couldn’t check on invoices just now — please try again in a moment.')).toBeVisible();
     await expect(page.getByText('You’re all caught up.')).toHaveCount(0);
-    // the due tile hides BY CONTRACT (billingFailed) — never a fake $0
-    await expect(page.locator('#home-glance')).toBeVisible();
-    await expect(page.locator('#glance-due')).toHaveCount(0);
-    await expect(page.locator('#home-glance')).not.toContainText('$0');
+    // and nowhere does Home invent a fake $0 for the failed read
+    await expect(page.locator('#main')).not.toContainText('$0');
   });
 
   test('B5 — a failed support read: calm list-head line, project threads KEPT, never "No conversations yet"', async ({ page }) => {
@@ -2337,28 +2367,23 @@ test.describe('PS2 — Invoices tab (B1)', () => {
     await expect(page.locator('#main a.fbtn')).toHaveCount(1);
   });
 
-  test('the unpaid-total line uses glanceData\'s formula — the SAME string as Home\'s to-pay tile', async ({ page }) => {
+  test('the unpaid-total line uses the ONE unpaidInvoices formula and the ONE formatter', async ({ page }) => {
     await installApp(page, { api: INV_API });
     await page.goto('/client.html');
-    // Home's glance: 1234.5 + 800 unpaid (paid excluded) → $2,034.50
-    await expect(page.locator('#glance-due .gn')).toBeVisible();
-    const glance = (await page.locator('#glance-due .gn').textContent())!.trim();
-    expect(glance).toBe('$2,034.50');
     await openInvoices(page);
+    // 1234.5 + 800 unpaid (paid excluded) → $2,034.50 — grouped, cents kept
     const total = page.locator('#inv-unpaid');
     await expect(total).toContainText('Unpaid right now:');
-    const totalMoney = (await total.locator('strong').textContent())!.trim();
-    expect(totalMoney).toBe(glance); // pinned EQUAL — one formatter, one formula
+    await expect(total.locator('strong')).toHaveText('$2,034.50');
   });
 
-  test('money-formatter consistency: the same cents render as the SAME string on the glance tile, the Needs-you row, the invoice row and the total', async ({ page }) => {
+  test('money-formatter consistency: the same cents render as the SAME string on the Needs-you row, the invoice row and the total', async ({ page }) => {
     await installApp(page, { api: { ...CLIENT_API,
       '/client/billing': { data: { billing_type: 'service', invoices: [
         { id: 'w1', name: 'Deposit', description: null, amount: 1200, status: 'open', due_date: ymd(7), paid_at: null, pay_url: 'https://pay.example/w1', created_at: '2026-07-01T00:00:00Z' },
       ], summary: { open_count: 1, paid_count: 0 } } } } });
     await page.goto('/client.html');
-    await expect(page.locator('#glance-due .gn')).toHaveText('$1,200');
-    // the Needs-you invoice row carries the same formatted amount…
+    // the Needs-you invoice row carries the formatted amount…
     const qrow = page.locator('#needs-body .qrow').filter({ hasText: 'Deposit' });
     await expect(qrow).toContainText('$1,200 ·');
     // …and the old bare "$1200" never appears anywhere on Home
@@ -2474,10 +2499,9 @@ test.describe('PS2 — Invoices tab (B1)', () => {
     await expect(page.locator('#inv-unpaid strong')).toHaveText('$1,300');
   });
 
-  test('Home agrees: the to-pay tile and the Needs-you queue skip the processing invoice, and a queue row prints the SAME state word as the chip', async ({ page }) => {
+  test('Home agrees: the Needs-you queue skips the processing invoice, and a queue row prints the SAME state word as the chip', async ({ page }) => {
     await installApp(page, { api: FOUR_API });
     await page.goto('/client.html');
-    await expect(page.locator('#glance-due .gn')).toHaveText('$1,300');
     const body = page.locator('#needs-body');
     await expect(body.locator('.qrow').filter({ hasText: 'Build phase' })).toContainText('$800 · upcoming');
     await expect(body.locator('.qrow').filter({ hasText: 'Launch' })).toContainText('$500 · overdue');
@@ -2568,7 +2592,7 @@ test.describe('PS2 — Invoices tab (B1)', () => {
     await page.addInitScript(() => { try { localStorage.setItem('dds-paid-pending', JSON.stringify({ id: 'v2', at: Date.now() })); } catch { /* storage may be denied */ } });
     await page.goto('/client.html');
     await expect(page.locator('#tabnav [data-tab="home"]')).toHaveAttribute('aria-current', 'page');
-    await expect(page.locator('#glance-due .gn')).toHaveText('$800');   // Design phase is no longer "to pay"
+    // Design phase is no longer "to pay": its queue row is gone
     await expect(page.locator('#needs-body .qrow').filter({ hasText: 'Design phase' })).toHaveCount(0);
     await expect(page.locator('.dds-toast, #toast').filter({ hasText: 'confirming' })).toHaveCount(0);
     await openInvoices(page);
@@ -2690,20 +2714,12 @@ test.describe('PS3 — bell chrome + the three numbers (B6 core)', () => {
     }), { timeout: 7000 }).toBeLessThan(260);
   });
 
-  // ── the three adjacent numbers (D1a): each defined once, each labeled ──
-  test('D1a: the glance tile IS the queue row count by construction — a button that jumps to the list', async ({ page }) => {
+  // ── the adjacent numbers (D1a): each defined once, each labeled ──
+  test('D1a: the heading count IS the queue row count by construction', async ({ page }) => {
     await installApp(page, { api: CLIENT_API });
     await page.goto('/client.html');
-    const tile = page.locator('#glance-ok');
-    await expect(tile).toBeVisible();
-    // number 1 (the tile) === number 2 (the queue rows), by construction
     await expect(page.locator('#needs-body .qrow')).toHaveCount(3);
-    await expect(tile.locator('.gn')).toHaveText('3');
-    await expect(tile.locator('.gl')).toHaveText('in “Needs you”');
-    // the tile is a REAL button pointing at the list it counts
-    expect(await tile.evaluate((el) => el.tagName)).toBe('BUTTON');
-    await tile.click();
-    await expect(page.locator('#home-needs')).toBeInViewport();
+    await expect(page.locator('#needs-h')).toHaveText('Needs you · 3');
   });
 
   test('D1a: the bell badge is its OWN number — the server cursor — and the panel says what it means', async ({ page }) => {
@@ -2791,7 +2807,7 @@ test.describe('PS3 — bell chrome + the three numbers (B6 core)', () => {
         { id: 'm1', headline: 'Your new hours are live', summary: 'Published last week.', moment_type: 'good_news', created_at: new Date(Date.now() - 2 * 86400000).toISOString() },
       ], notices: [], pending_approvals: [], last_published: null } } } });
     await page.goto('/client.html');
-    const sec = page.locator('section', { has: page.getByRole('heading', { name: 'Recent updates' }) });
+    const sec = page.locator('section', { has: page.getByRole('heading', { name: 'From your studio' }) });
     const row = sec.locator('.qrow');
     await expect(row).toHaveCount(1);
     // the icon derives from the feed's own moment_type (workspace.ts:260),
@@ -3763,19 +3779,12 @@ test.describe('Client Home — one filled button, approve and pay in one click',
     await expect(page.locator('#toast')).toContainText('Approved — thank you.');
   });
 
-  test('the "to pay" tile is a door: it lands on the Pay link', async ({ page }) => {
-    await installApp(page, { api: CLIENT_API });
-    await page.goto('/client.html');
-    await page.locator('#glance-due').click();
-    await expect(page.getByRole('link', { name: 'View & pay — Deposit' })).toBeFocused();
-  });
-
-  test('Recent updates sits right under Needs you', async ({ page }) => {
+  test('From your studio sits right under Needs you', async ({ page }) => {
     await installApp(page, { api: CLIENT_API });
     await page.goto('/client.html');
     await expect(page.locator('#home-updates')).toBeVisible();
     const order = (await page.locator('#main h2').allTextContents()).map((t) => t.trim());
-    expect(order.indexOf('Recent updates')).toBe(order.indexOf('Needs you') + 1);
+    expect(order.indexOf('From your studio')).toBe(order.findIndex((t) => t.startsWith('Needs you')) + 1);
   });
 
   test('the welcome card shows on the first visit only', async ({ page }) => {

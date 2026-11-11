@@ -9,13 +9,13 @@ import { installApp, STUDIO_NAV, ALL_FEATURES } from './helpers/app';
 //   GET  /portal/members → { data: [member…] }    POST /portal/members ← { email, role }
 //   GET  /portal/shares  → { data: { shares: [{ surface, item_id, shared }] } }
 //   POST /portal/shares  ← { surface, shared }
-// Defaults: Today · Analytics · Photos · Connected data on; Drafts · Visual
-// Studio assets · Documents · Internal notes (private by default) off.
+// Defaults: Overview · Analytics · Photos · Visitor and review numbers on; Drafts ·
+// Images made for you · Documents · Internal notes (private by default) off.
 
 const MEMBERS_NONE = { data: [] };
 const SHARES_NONE = { data: { shares: [] } };
-const ON = ['Today', 'Analytics', 'Photos', 'Connected data'];
-const OFF = ['Drafts', 'Visual Studio assets', 'Documents', 'Internal notes'];
+const ON = ['Overview', 'Analytics', 'Photos', 'Visitor and review numbers'];   // item 136: named the way a client says them
+const OFF = ['Drafts', 'Images made for you', 'Documents', 'Internal notes'];
 
 test.describe('Sharing & access', () => {
   test('renders the board: breadcrumb · invite card with role · the eight surfaces with honest defaults and Visible/Hidden words', async ({ page }) => {
@@ -25,15 +25,16 @@ test.describe('Sharing & access', () => {
     await installApp(page, { api: { '/portal/members': MEMBERS_NONE, '/portal/shares': SHARES_NONE } });
     await page.goto('/sharing.html');
     const crumbs = page.getByRole('navigation', { name: 'Breadcrumb' });
-    await expect(crumbs.getByRole('link', { name: 'Workspace' })).toHaveAttribute('href', '/presence.html');
+    await expect(crumbs.getByRole('link', { name: 'Website' })).toHaveAttribute('href', '/presence.html');
     await expect(crumbs.locator('[aria-current="page"]')).toHaveText('Sharing & access');
     await expect(page.getByRole('heading', { level: 1, name: 'Sharing & access' })).toBeVisible();
     await expect(page.locator('h1')).toHaveCount(1);
     // invite: email · role (reviewer, view only — the one role a client gets) · Send invite
     await expect(page.getByRole('heading', { name: 'Invite a client' })).toBeVisible();
     await expect(page.locator('#email')).toHaveAttribute('placeholder', 'client@theirbusiness.com');
-    await expect(page.locator('#role')).toHaveValue('client_reviewer');
-    await expect(page.locator('#role option')).toHaveText(['Reviewer (view only)']);
+    await expect(page.locator('#role')).toHaveValue('client_reviewer');     // one role, said in words (item 136), not a one-choice menu
+    await expect(page.locator('select#role')).toHaveCount(0);
+    await expect(page.locator('.hint')).toContainText('They join as a reviewer: they can look and approve, never edit');
     await expect(page.getByRole('button', { name: 'Send invite' })).toBeVisible();
     await expect(page.locator('.hint')).toContainText('secure link');
     // the surfaces, in the board's order, each an aria switch + a word
@@ -185,7 +186,7 @@ test.describe('Sharing & access — client scope', () => {
     await page.goto(`/sharing.html?client=${CLIENT}`);
     // the page says whose site it is, and the way back stays in scope
     await expect(page.getByRole('heading', { level: 1 })).toHaveText('Sharing & access — Marlow’s Kitchen');
-    await expect(page.getByRole('navigation', { name: 'Breadcrumb' }).getByRole('link', { name: 'Workspace' })).toHaveAttribute('href', `/presence.html?client=${CLIENT}`);
+    await expect(page.getByRole('navigation', { name: 'Breadcrumb' }).getByRole('link', { name: 'Website' })).toHaveAttribute('href', `/presence.html?client=${CLIENT}`);
     await expect(page.locator('#dds-ctxbar')).toContainText('Marlow’s Kitchen');
     // the reads
     expect(seen).toContainEqual(['GET /portal/members', CLIENT]);
@@ -211,7 +212,7 @@ test.describe('Sharing & access — client scope', () => {
     const seen = spyScope(page);
     await page.goto('/sharing.html');
     await expect(page.getByRole('heading', { level: 1 })).toHaveText('Sharing & access');
-    await expect(page.getByRole('navigation', { name: 'Breadcrumb' }).getByRole('link', { name: 'Workspace' })).toHaveAttribute('href', '/presence.html');
+    await expect(page.getByRole('navigation', { name: 'Breadcrumb' }).getByRole('link', { name: 'Website' })).toHaveAttribute('href', '/presence.html');
     await expect(page.locator('#dds-ctxbar')).toHaveCount(0);
     await page.locator('#email').fill('ana@example.com');
     const invited = page.waitForRequest((r) => r.method() === 'POST' && r.url().endsWith('/portal/members'));
@@ -231,5 +232,35 @@ test.describe('Sharing & access — client scope', () => {
     await expect(page.getByRole('heading', { level: 1 })).toHaveText('Sharing & access');
     await expect.poll(() => seen.map(([call]) => call)).toEqual(expect.arrayContaining(['GET /portal/members', 'GET /portal/shares']));
     expect(seen.filter(([, scope]) => scope !== '')).toEqual([]);
+  });
+});
+
+// ── builder list item 136 (Nov 2026 review, structure finding 6) ──
+test.describe('Sharing & access — a studio picks the client first (item 136)', () => {
+  test('at studio level the page asks which client, links each to their own page, and never offers to invite to the studio’s site', async ({ page }) => {
+    const AGENCY = { data: { site_role: 'business_owner', edition: 'presence', edition_key: 'studio_os', edition_name: 'Studio OS', edition_features: ALL_FEATURES,
+      is_agency: true, is_operator: false, sees_full_workspace: true, capabilities: ['edit', 'publish', 'invite', 'configure', 'view_all'], landing: '/agency.html', attention_count: 0, nav: STUDIO_NAV, scope: null } };
+    const sites = [{ site_id: 'aaaaaaaa-1111-4111-8111-aaaaaaaaaaaa', name: 'Marlow’s Kitchen', domain: 'marlows.example' }, { site_id: 'bbbbbbbb-2222-4222-8222-bbbbbbbbbbbb', name: 'Harbor Dental', address: 'https://harbor.example' }, { site_id: 'cccccccc-3333-4333-8333-cccccccccccc', name: 'Bright Studio', own: true }];
+    await installApp(page, { api: { '/portal/context': AGENCY, '/agency/sites': { data: { sites } }, '/portal/members': MEMBERS_NONE, '/portal/shares': SHARES_NONE } });
+    const asked: string[] = [];
+    page.on('request', (r) => { const p = new URL(r.url()).pathname; if (/\/portal\/(members|shares)$/.test(p)) asked.push(p); });
+    await page.goto('/sharing.html');
+    await expect(page.getByRole('heading', { level: 1 })).toHaveText('Sharing & access');
+    const list = page.getByRole('list', { name: 'Clients' });
+    await expect(list.getByRole('listitem')).toHaveCount(2);                      // the studio's own site isn't a client
+    await expect(list.getByRole('listitem').first()).toHaveAttribute('href', '/sharing.html?client=aaaaaaaa-1111-4111-8111-aaaaaaaaaaaa');
+    await expect(list).toContainText('Marlow’s Kitchen');
+    await expect(page.getByRole('heading', { name: 'Invite a client' })).toHaveCount(0);
+    await expect(page.locator('#email')).toHaveCount(0);
+    await expect(page.getByRole('navigation', { name: 'Breadcrumb' }).getByRole('link', { name: 'Settings' })).toHaveAttribute('href', '/settings.html');
+    expect(asked).toEqual([]);                                                     // nothing read or written for the studio's own site
+  });
+
+  test('a failed client read says so', async ({ page }) => {
+    const AGENCY = { data: { site_role: 'business_owner', edition: 'presence', edition_key: 'studio_os', edition_features: ALL_FEATURES, is_agency: true, sees_full_workspace: true, capabilities: ['invite', 'configure', 'view_all'], landing: '/agency.html', attention_count: 0, nav: STUDIO_NAV, scope: null } };
+    await installApp(page, { api: { '/portal/context': AGENCY } });
+    await page.route(/\/functions\/v1\/presence\/agency\/sites$/, (r) => r.fulfill({ status: 502, contentType: 'application/json', body: '{"error":"x"}' }));
+    await page.goto('/sharing.html');
+    await expect(page.locator('#pickList')).toContainText('Your clients wouldn’t load just now.');
   });
 });

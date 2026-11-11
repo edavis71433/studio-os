@@ -18,6 +18,30 @@ export async function dnsLookup(name: string, type: 'A' | 'CNAME'): Promise<stri
   } catch { return []; }
 }
 
+// item 162 (review domains finding 24): every record at a name, for the Domains side panel.
+// Only the asked type AT that name: a CNAME on the way to an answer is its own row, and the
+// addresses behind someone else's name aren't the client's records. TXT keeps its case
+// (verification codes are case-sensitive) and loses its quotes.
+export const RECORD_TYPE_NUM = { A: 1, CNAME: 5, MX: 15, TXT: 16, AAAA: 28 } as const;
+export type RecordType = keyof typeof RECORD_TYPE_NUM;
+export function recordsFromAnswer(name: string, type: RecordType, answer: unknown): string[] {
+  const want = name.toLowerCase().replace(/\.$/, '');
+  return (Array.isArray(answer) ? answer : [])
+    .filter((a: any) => a && a.type === RECORD_TYPE_NUM[type] && String(a.name || '').toLowerCase().replace(/\.$/, '') === want)
+    .map((a: any) => {
+      const d = String(a.data || '');
+      return type === 'TXT' ? d.replace(/^"|"$/g, '').replace(/"\s*"/g, '') : d.replace(/\.$/, '').toLowerCase();
+    })
+    .filter(Boolean);
+}
+export async function dnsRecords(name: string, type: RecordType): Promise<string[]> {
+  try {
+    const r = await fetch(`https://dns.google/resolve?name=${encodeURIComponent(name)}&type=${type}`, { headers: { Accept: 'application/json' }, signal: AbortSignal.timeout(5000) });
+    if (!r.ok) { await r.body?.cancel().catch(() => {}); return []; }
+    return recordsFromAnswer(name, type, (await r.json()).Answer);
+  } catch { return []; }
+}
+
 /** The padlock is on (Netlify's words for a live certificate). */
 export const certIsOn = (state: string | null | undefined) => state === 'issued' || state === 'renewed';
 
