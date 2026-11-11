@@ -223,7 +223,13 @@ export function htmlToPlainText(html: string | null | undefined): string {
     .trim();
 }
 
-export async function sendEmail(to: string, subject: string, html: string, brand?: EmailBrand, opts?: { critical?: boolean; siteId?: string; replyTo?: string; headers?: Record<string, string> }): Promise<boolean> {
+/** Bytes as base64, for an email attachment. Pure. */
+export function base64Of(bytes: Uint8Array): string {
+  let s = '';
+  for (let i = 0; i < bytes.length; i += 0x8000) s += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+  return btoa(s);
+}
+export async function sendEmail(to: string, subject: string, html: string, brand?: EmailBrand, opts?: { critical?: boolean; siteId?: string; replyTo?: string; headers?: Record<string, string>; attachments?: Array<{ filename: string; content: Uint8Array }> }): Promise<boolean> {
   if (!RESEND_KEY) { console.warn('[commerce] RESEND_KEY unset — skipping email'); return false; }
   try {
     // Honor the suppression list at the ONE send point. critical:true =
@@ -259,6 +265,8 @@ export async function sendEmail(to: string, subject: string, html: string, brand
       body: JSON.stringify({
         from: EMAIL_FROM, to, subject, html: wrapped, text,
         reply_to: replyToFor(opts),
+        // sales item 82: an invoice, receipt or signed agreement goes with its PDF (Resend takes base64)
+        ...(opts?.attachments?.length ? { attachments: opts.attachments.map((a) => ({ filename: a.filename, content: base64Of(a.content) })) } : {}),
         headers: {
           'List-Unsubscribe': `<${unsubUrl}>, <mailto:support@davisdigitalstudio.com?subject=unsubscribe>`,
           'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click',

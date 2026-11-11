@@ -96,7 +96,7 @@ test.describe('Settings page', () => {
     await page.goto('/settings.html');
     const sec = page.locator('#billing');
     await expect(sec).toBeVisible();
-    await expect(sec.getByRole('heading', { level: 2, name: 'Plan & billing' })).toBeVisible();
+    await expect(sec.getByRole('heading', { level: 2, name: 'Your plan' })).toBeVisible();   // item 166: "Plan" alone for the studio's own subscription
     await expect(page.locator('#planLine')).toHaveText('Studio · Active · renews Nov 3');
     await expect(page.locator('#planLimits')).toHaveCount(0);          // not an agency: no limits line
     await expect(page.locator('#planTeam')).toHaveCount(0);            // self-serve: the button, not the sentence

@@ -107,6 +107,7 @@ const MEMBER_WRITES: Array<[MemberWriteNeed, string[]]> = [
     `DELETE /projects/${ID}/deliverables/${ID}`,
     `POST /comments/${ID}/delete`,
     `POST /sales/invoices/${ID}/void`,
+    `POST /sales/invoices/${ID}/payment/undo`,   // sales review item 77: taking back a recorded payment changes the books, like a void
     `POST /sales/deals/${ID}/retainer/cancel`,
     `POST /sales/recurring/${ID}/stop`,   // sales review item 47: stopping a recurring invoice ends its billing, like cancelling a retainer
     'DELETE /broadcasts/lists/[A-Za-z0-9-]{6,40}',   // sales review items 31 + 39: removing a picked list
@@ -195,7 +196,7 @@ const MEMBER_WRITES: Array<[MemberWriteNeed, string[]]> = [
     `POST /sales/estimates/${ID}/(send|proposal|invoice)`,   // sales review item 47: send an estimate, or turn it into a proposal or an invoice (drafts)
     `PATCH /sales/recurring/${ID}`,
     `POST /sales/recurring/${ID}/(pause|resume|skip)`,
-    `POST /sales/invoices/${ID}/send`,
+    `POST /sales/invoices/${ID}/(send|payment)`,   // item 77: recording a check, cash, transfer or Zelle payment is everyday bookkeeping
     `POST /sales/contracts/${ID}/(term|send)`,
     `POST /sales/proposals/${ID}/(send|revise)`,
     'POST /projects',

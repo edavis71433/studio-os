@@ -1,0 +1,223 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1, viewport-fit=cover">
+<title>Tell us about your business</title>
+<meta name="robots" content="noindex, nofollow">
+<meta name="referrer" content="no-referrer">
+<link rel="stylesheet" href="/fonts/brand.css">
+<!-- ═══════════════════════════════════════════════════════════════════════════
+  The content form (builder list item 176, Nov 2026) — the page a studio SENDS
+  A CLIENT before it builds their website: a few questions about the business
+  and a place for photos. Opened by the form's own link (?t=…), with no
+  sign-in and no app around it; it saves as they type, the photos go straight
+  into the site's Files, and Send tells the studio. The routes are
+  routes/intake_public.ts; the studio's side is sites-tools.js.
+═══════════════════════════════════════════════════════════════════════════ -->
+<style>
+  :root{
+    --bg:#faf8f5;--card:#fff;--ink:#1b1525;--soft:#6b6478;--faint:#746b8a;--line:#eee9e0;--field:#fbfaf8;
+    --p:#5b3fa0;--p-soft:#efeafa;--good:#33664b;--good-soft:#e7f1ea;--bad:#9a4242;--bad-soft:#f7e8e8;
+    --shadow:0 1px 2px rgba(27,21,37,.04),0 8px 24px rgba(27,21,37,.06);
+    --serif:'Fraunces',"Iowan Old Style",Georgia,serif;
+    --sans:'Inter',-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  }
+  @media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#171320;--card:#211b2e;--ink:#f1edf7;--soft:#b4abc6;--faint:#8d82a3;--line:#352c47;--field:#1c1727;--p:#b79ceb;--p-soft:#2d2440;--good:#8fcfa5;--good-soft:#1f3328;--bad:#f0a0a0;--bad-soft:#3a2222}}
+  *{box-sizing:border-box;margin:0}
+  [hidden]{display:none!important}
+  body{background:var(--bg);color:var(--ink);font-family:var(--sans);line-height:1.55;-webkit-font-smoothing:antialiased}
+  .wrap{max-width:640px;margin:0 auto;padding:28px 16px 80px}
+  header.brand{display:flex;align-items:center;gap:10px;margin-bottom:22px}
+  header.brand img{height:36px;max-width:180px;object-fit:contain}
+  header.brand .mk{width:32px;height:32px;border-radius:9px;background:var(--p);color:#fff;display:grid;place-items:center;font-weight:700;font-size:15px;flex:0 0 auto}
+  header.brand .nm{font-weight:600;font-size:15px}
+  h1{font-family:var(--serif);font-weight:500;font-size:clamp(26px,6vw,32px);line-height:1.2;margin-bottom:8px}
+  .sub{color:var(--soft);font-size:15px}
+  .prog{margin:22px 0 18px}
+  .prog .w{font-size:12.5px;font-weight:600;color:var(--soft);margin-bottom:6px}
+  .bar{height:8px;border-radius:999px;background:var(--line);overflow:hidden}
+  .bar i{display:block;height:100%;width:0;background:var(--p);border-radius:999px;transition:width .3s}
+  @media (prefers-reduced-motion:reduce){.bar i{transition:none}}
+  .q{background:var(--card);border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow);padding:16px;margin-bottom:12px}
+  .q label.ql,.q .ql{display:block;font-weight:600;font-size:15px;margin-bottom:2px}
+  .q .hint{font-size:13px;color:var(--faint);margin-bottom:8px}
+  textarea{width:100%;min-height:88px;font:inherit;font-size:16px;line-height:1.5;color:var(--ink);background:var(--field);border:1px solid var(--line);border-radius:10px;padding:10px 12px;resize:vertical;outline:none}
+  textarea:focus{border-color:var(--p);box-shadow:0 0 0 3px var(--p-soft)}
+  .saved{font-size:12px;font-weight:600;color:var(--good);margin-top:6px;min-height:18px}
+  .saved.bad{color:var(--bad)} .saved.wait{color:var(--faint)}
+  .files{display:flex;flex-wrap:wrap;gap:8px;margin:4px 0 10px}
+  .ph{position:relative;width:96px;height:96px;border-radius:10px;overflow:hidden;border:1px solid var(--line);background:var(--field)}
+  .ph img{width:100%;height:100%;object-fit:cover;display:block}
+  .ph .doc{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;padding:6px;text-align:center;font-size:11px;color:var(--soft);overflow:hidden}
+  .ph .doc b{color:var(--p);font-size:13px}
+  .ph .x{position:absolute;top:5px;right:5px;width:28px;height:28px;border-radius:999px;border:none;background:var(--card);color:var(--soft);font-weight:700;cursor:pointer;box-shadow:var(--shadow);font-size:12px}
+  .ph .x:hover{color:var(--bad)}
+  .ph.busy{display:grid;place-items:center;font-size:11.5px;color:var(--faint)}
+  .btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;font:inherit;font-size:14px;font-weight:600;border-radius:999px;padding:10px 18px;min-height:44px;cursor:pointer;border:1px solid var(--line);background:var(--card);color:var(--ink)}
+  .btn:hover{border-color:var(--p);color:var(--p)}
+  .btn.main{background:var(--p);border-color:var(--p);color:#fff;width:100%;font-size:15px;padding:13px 20px}
+  .btn.main:hover{filter:brightness(1.06);color:#fff}
+  @media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .btn.main{color:#171320}}
+  .btn:disabled{opacity:.6;cursor:default}
+  input[type=file]{position:absolute;width:1px;height:1px;opacity:0;pointer-events:none}
+  .ferr{font-size:13px;color:var(--bad);margin-top:6px}
+  .end{margin-top:22px}
+  .end .note{font-size:13px;color:var(--faint);text-align:center;margin-top:10px}
+  .banner{border-radius:14px;padding:14px 16px;margin:0 0 16px;font-size:14.5px}
+  .banner.good{background:var(--good-soft);color:var(--good)} .banner b{display:block;font-size:15px;margin-bottom:2px}
+  .center{text-align:center;padding:48px 8px}
+  .center p{color:var(--soft);margin:10px auto 0;max-width:44ch}
+  .spin{width:22px;height:22px;border:2.5px solid var(--line);border-top-color:var(--p);border-radius:50%;animation:sp .8s linear infinite;margin:60px auto}
+  @keyframes sp{to{transform:rotate(360deg)}}
+  @media (prefers-reduced-motion:reduce){.spin{animation:none}}
+  :focus-visible{outline:2px solid var(--p);outline-offset:2px}
+  .foot{font-size:12px;color:var(--faint);text-align:center;margin-top:28px}
+</style>
+</head>
+<body>
+<main class="wrap" id="main"><div class="spin" role="status" aria-label="Loading"></div></main>
+<script>
+const FN="https://qksstlqzbhesadrrofgn.supabase.co/functions/v1/presence";
+const T=(new URLSearchParams(location.search).get('t')||'').toLowerCase();
+const BASE=FN+'/intake/'+encodeURIComponent(T);
+const $=(id)=>document.getElementById(id);
+const esc=(s)=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+let F=null,DIRTY={},TIMER=null,SAVING=null,SENDING=false;
+const LIMITS={photo:10*1024*1024,pdf:25*1024*1024};
+
+function stop(head,line){$('main').innerHTML=`<div class="center"><h1>${esc(head)}</h1><p>${esc(line)}</p></div>`;}
+function brandHtml(s){
+  if(!s)return'';
+  const mark=s.logo_url?`<img src="${esc(s.logo_url)}" alt="${esc(s.name)}">`:`<span class="mk" aria-hidden="true">${esc(String(s.name||'S').trim().charAt(0).toUpperCase())}</span>`;
+  return `<header class="brand">${mark}${s.logo_url?'':`<span class="nm">${esc(s.name)}</span>`}</header>`;
+}
+// the words save as plain text: a "simple" request needs no preflight, so a save
+// is one round trip on a phone (the server reads the JSON whatever the type says)
+const post=(body,keepalive)=>fetch(BASE,{method:'POST',headers:{'Content-Type':'text/plain;charset=UTF-8'},body:JSON.stringify(body),keepalive:!!keepalive});
+
+async function load(){
+  if(!/^[0-9a-f]{72}$/.test(T)){stop('This link isn’t complete','Open the link from the email again, or ask the studio that sent it for a new one.');return;}
+  let r=null;try{r=await fetch(BASE,{cache:'no-store'});}catch(_){}
+  if(!r){stop('We couldn’t open the form','Check your connection, then reload this page.');return;}
+  if(r.status===404){stop('This link isn’t live','Ask the studio that sent it for a new one.');return;}
+  if(r.status===429){stop('One moment','That was a lot of requests in a short time. Wait a minute, then reload this page.');return;}
+  if(!r.ok){stop('We couldn’t open the form','Please reload this page in a minute.');return;}
+  F=(await r.json()).data;
+  if(F.studio&&F.studio.accent&&/^#[0-9a-f]{3,8}$/i.test(F.studio.accent)&&!matchMedia('(prefers-color-scheme: dark)').matches)document.documentElement.style.setProperty('--p',F.studio.accent);
+  if(F.status==='closed'){
+    document.title=(F.studio?F.studio.name+' — ':'')+'Form closed';
+    $('main').innerHTML=brandHtml(F.studio)+`<div class="center"><h1>This form is closed</h1><p>${esc(F.studio?F.studio.name:'The studio')} has what it needs. If you’d like to change something, reply to their email.</p></div>`;
+    return;
+  }
+  render();
+}
+function render(){
+  const studio=(F.studio&&F.studio.name)||'your studio';
+  document.title='Tell us about '+F.business_name;
+  const qs=F.questions.map(q=>{
+    const a=F.answers[q.id]||{text:'',files:[]};
+    if(q.kind==='files')return `<section class="q" aria-labelledby="ql-${esc(q.id)}"><h2 class="ql" id="ql-${esc(q.id)}">${esc(q.label)}</h2>${q.hint?`<p class="hint">${esc(q.hint)}</p>`:''}
+      <p class="hint">Photos (JPEG, PNG or WebP) up to 10MB each, or PDFs up to 25MB. They go straight to ${esc(studio)}.</p>
+      <div class="files" id="fl-${esc(q.id)}">${(a.files||[]).map(f=>fileHtml(f,q.id)).join('')}</div>
+      <input type="file" id="fi-${esc(q.id)}" data-q="${esc(q.id)}" accept="image/jpeg,image/png,image/webp,application/pdf" multiple aria-labelledby="ql-${esc(q.id)}">
+      <button type="button" class="btn" data-pick="${esc(q.id)}">Add photos</button>
+      <p class="ferr" id="fe-${esc(q.id)}" role="alert"></p></section>`;
+    return `<section class="q"><label class="ql" for="ta-${esc(q.id)}">${esc(q.label)}</label>${q.hint?`<p class="hint" id="qh-${esc(q.id)}">${esc(q.hint)}</p>`:''}
+      <textarea id="ta-${esc(q.id)}" data-q="${esc(q.id)}" maxlength="${F.limits.text}" placeholder="Type here…"${q.hint?` aria-describedby="qh-${esc(q.id)}"`:''}>${esc(a.text||'')}</textarea>
+      <p class="saved" id="sv-${esc(q.id)}" aria-live="polite"></p></section>`;
+  }).join('');
+  $('main').innerHTML=brandHtml(F.studio)+
+    `<h1>Tell us about ${esc(F.business_name)}</h1>
+    <p class="sub">${esc(studio)} is building your website. Your answers and photos help them get it right. It saves as you go, so you can come back to this link any time.</p>
+    <div class="prog"><p class="w" id="progW"></p><div class="bar" role="progressbar" aria-labelledby="progW" aria-valuemin="0" aria-valuemax="${F.total}" aria-valuenow="${F.answered}" id="bar"><i id="barFill"></i></div></div>
+    <div id="sentBanner"></div>
+    ${qs}
+    <div class="end"><button type="button" class="btn main" id="send">Send to ${esc(studio)}</button><p class="ferr" id="sendErr" role="alert" style="text-align:center"></p><p class="note">You can still change answers or add photos after sending.</p></div>
+    <p class="foot">Only ${esc(studio)} sees what you write here.</p>`;
+  paintProgress();paintSent();
+  document.querySelectorAll('textarea[data-q]').forEach(t=>{
+    t.addEventListener('input',()=>{DIRTY[t.getAttribute('data-q')]=t.value;mark(t.getAttribute('data-q'),'wait','Not saved yet…');clearTimeout(TIMER);TIMER=setTimeout(save,900);});
+    t.addEventListener('blur',()=>{if(Object.keys(DIRTY).length){clearTimeout(TIMER);save();}});
+  });
+  document.querySelectorAll('[data-pick]').forEach(b=>b.addEventListener('click',()=>$('fi-'+b.getAttribute('data-pick')).click()));
+  document.querySelectorAll('input[type=file][data-q]').forEach(i=>i.addEventListener('change',()=>{const files=[...i.files];i.value='';addFiles(i.getAttribute('data-q'),files);}));
+  $('main').addEventListener('click',(e)=>{const x=e.target.closest&&e.target.closest('[data-rm]');if(x)removeFile(x.getAttribute('data-rm'),x.getAttribute('data-rq'));});
+  $('send').addEventListener('click',send);
+}
+function fileHtml(f,q){
+  const qid=q||'';
+  return `<div class="ph" data-file="${esc(f.id)}">${f.thumb_url?`<img src="${esc(f.thumb_url)}" alt="${esc(f.name)}">`:`<span class="doc"><b>${f.mime==='application/pdf'?'PDF':'File'}</b>${esc(f.name)}</span>`}<button type="button" class="x" data-rm="${esc(f.id)}" data-rq="${esc(qid)}" aria-label="Remove ${esc(f.name)}">✕</button></div>`;
+}
+function paintProgress(){
+  const w=$('progW');if(w)w.textContent=F.answered+' of '+F.total+' answered';
+  const b=$('barFill');if(b)b.style.width=(F.total?Math.round(100*F.answered/F.total):0)+'%';
+  const bar=$('bar');if(bar)bar.setAttribute('aria-valuenow',String(F.answered));
+}
+function paintSent(){
+  const el=$('sentBanner');if(!el)return;
+  el.innerHTML=F.sent_at?`<div class="banner good" role="status"><b>Sent to ${esc((F.studio&&F.studio.name)||'your studio')}</b>They have your answers. You can still change them or add photos using this link.</div>`:'';
+}
+function mark(id,cls,words){const el=$('sv-'+id);if(el){el.className='saved'+(cls?' '+cls:'');el.textContent=words;}}
+function progressFrom(d){if(d&&typeof d.answered==='number'){F.answered=d.answered;F.total=d.total;paintProgress();}}
+
+async function save(extra,keepalive){
+  if(SAVING)await SAVING.catch(()=>{});
+  const answers=DIRTY;DIRTY={};
+  if(!Object.keys(answers).length&&!extra)return true;
+  const ids=Object.keys(answers);
+  ids.forEach(id=>mark(id,'wait','Saving…'));
+  let ok=false;
+  SAVING=(async()=>{
+    let r=null;try{r=await post({answers,...(extra||{})},keepalive);}catch(_){}
+    const body=r?await r.json().catch(()=>({})):{};
+    if(r&&r.ok){ok=true;progressFrom(body.data);if(body.data&&body.data.sent_at)F.sent_at=body.data.sent_at;ids.forEach(id=>mark(id,'','✓ Saved'));return;}
+    // keep what didn't save, so the next try sends it again
+    for(const id of ids)if(!(id in DIRTY))DIRTY[id]=answers[id];
+    const why=r&&r.status===409?(body.message||'This form is closed.'):r&&r.status===429?'Too many saves at once — it will try again.':'Not saved — check your connection. It will try again.';
+    ids.forEach(id=>mark(id,'bad',why));
+    if(!r||r.status>=500||r.status===429){clearTimeout(TIMER);TIMER=setTimeout(save,8000);}
+  })();
+  await SAVING;SAVING=null;
+  return ok;
+}
+async function send(){
+  if(SENDING)return;SENDING=true;const b=$('send');b.disabled=true;b.textContent='Sending…';$('sendErr').textContent='';
+  clearTimeout(TIMER);
+  const ok=await save({send:true});
+  SENDING=false;b.disabled=false;b.textContent='Send to '+((F.studio&&F.studio.name)||'your studio');
+  if(ok){paintSent();const el=$('sentBanner');if(el&&el.scrollIntoView)el.scrollIntoView({block:'center'});}
+  else $('sendErr').textContent='That didn’t send. Check your connection and press Send again.';
+}
+
+async function addFiles(qid,files){
+  const err=$('fe-'+qid);if(err)err.textContent='';
+  const list=$('fl-'+qid);
+  for(const file of files){
+    const type=String(file.type||'').toLowerCase();
+    const pdf=type==='application/pdf';
+    if(!pdf&&['image/jpeg','image/png','image/webp'].indexOf(type)<0){if(err)err.textContent=`“${file.name}” isn’t a photo we can use. Send a JPEG, PNG or WebP photo, or a PDF.`;continue;}
+    if(file.size>(pdf?LIMITS.pdf:LIMITS.photo)){if(err)err.textContent=`“${file.name}” is too big: ${pdf?'PDFs must be under 25MB':'photos must be under 10MB'}.`;continue;}
+    const ph=document.createElement('div');ph.className='ph busy';ph.textContent='Adding…';ph.setAttribute('role','status');list.appendChild(ph);
+    let r=null;
+    try{r=await fetch(BASE+'/files?q='+encodeURIComponent(qid)+'&name='+encodeURIComponent(file.name||''),{method:'POST',headers:{'Content-Type':type},body:file});}catch(_){}
+    const body=r?await r.json().catch(()=>({})):{};
+    if(!r||!r.ok){ph.remove();if(err)err.textContent=(body&&body.message)||`“${file.name}” didn’t upload — check your connection and try again.`;if(r&&(r.status===409||r.status===429))break;continue;}
+    const f=body.data.file;
+    const box=document.createElement('div');box.innerHTML=fileHtml(f,qid);ph.replaceWith(box.firstElementChild);
+    progressFrom(body.data);
+  }
+}
+async function removeFile(id,qid){
+  const el=document.querySelector('[data-file="'+CSS.escape(id)+'"]');if(el)el.style.opacity='.5';
+  let r=null;try{r=await fetch(BASE+'/files/'+encodeURIComponent(id),{method:'DELETE'});}catch(_){}
+  if(r&&r.ok){if(el)el.remove();progressFrom((await r.json().catch(()=>({}))).data);return;}
+  if(el)el.style.opacity='';
+  const err=qid&&$('fe-'+qid);if(err)err.textContent='That didn’t come off — please try again.';
+}
+// leaving the page with words not saved: send them on the way out
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden'&&Object.keys(DIRTY).length){clearTimeout(TIMER);save(null,true);}});
+load();
+</script>
+</body>
+</html>

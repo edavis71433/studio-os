@@ -57,6 +57,8 @@
   Cache-Control: no-cache, must-revalidate
 /domains
   Cache-Control: no-cache, must-revalidate
+/templates
+  Cache-Control: no-cache, must-revalidate
 /today
   Cache-Control: no-cache, must-revalidate
 /inbox
@@ -68,6 +70,11 @@
 /prospects
   Cache-Control: no-cache, must-revalidate
 /pitch
+  Cache-Control: no-cache, must-revalidate
+/intake
+  Cache-Control: no-store, no-cache, must-revalidate
+  X-Robots-Tag: noindex
+/week
   Cache-Control: no-cache, must-revalidate
 /crm
   Cache-Control: no-cache, must-revalidate
