@@ -5,7 +5,7 @@
   X-Content-Type-Options: nosniff
   Referrer-Policy: strict-origin-when-cross-origin
   Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=(self "https://buy.stripe.com")
-  Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-inline' https://www.googletagmanager.com https://www.google-analytics.com https://cdn.jsdelivr.net https://buy.stripe.com https://challenges.cloudflare.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob: https://*.supabase.co https://www.google-analytics.com https://www.googletagmanager.com https://images.unsplash.com https://plus.unsplash.com https://picsum.photos https://fastly.picsum.photos https://images.pexels.com; connect-src 'self' https://*.supabase.co https://cdn.jsdelivr.net https://formspree.io https://www.google-analytics.com https://analytics.google.com https://region1.google-analytics.com https://api.resend.com https://www.googleapis.com https://pagespeedonline.googleapis.com; frame-src https://buy.stripe.com https://calendly.com https://challenges.cloudflare.com; object-src 'none'; base-uri 'self'; form-action 'self' https://formspree.io https://buy.stripe.com
+  Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-inline' https://www.googletagmanager.com https://www.google-analytics.com https://challenges.cloudflare.com; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data: blob: https://*.supabase.co https://www.google-analytics.com https://www.googletagmanager.com https://images.pexels.com; connect-src 'self' https://*.supabase.co https://formspree.io https://www.google-analytics.com https://analytics.google.com https://region1.google-analytics.com; frame-src https://challenges.cloudflare.com; object-src 'none'; base-uri 'self'; form-action 'self' https://formspree.io; frame-ancestors 'none'
   Cache-Control: public, max-age=3600
 
 /*.html
@@ -228,6 +228,11 @@
 /ai-visibility
   Cache-Control: no-cache, must-revalidate
 
+# The brand fonts (fonts/brand.css, list item 143): each file's name comes from its
+# contents and never changes, so a year. It sits above the library's rule so a library
+# file, which this pattern may also match, keeps the month below.
+/fonts/*.woff2
+  Cache-Control: public, max-age=31536000, immutable
 # The font library and the template pictures (list item 88): a font file keeps one name per
 # family and weight, and the pictures are reshot rarely, so they needn't be asked for again
 # on every visit to the builder.
