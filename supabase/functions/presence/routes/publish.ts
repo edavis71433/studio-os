@@ -31,6 +31,7 @@ import { readIfMatch, preconditionOutcome, staleConflictBody, draftAsFound } fro
 import { describeVersionDiff, resolveTimewarpTarget, normalizeTimewarpDate, cleanCheckpointName, type TimewarpVersion } from '../lib/preview_env.ts';
 import { captureDraftSnapshot } from '../lib/staging.ts';
 import { applySnapshotToDraft, snapshotForRestore, leftOffSentence } from '../lib/draft_writer.ts';
+import { lockedRestoreMessage } from '../lib/section_lock.ts';
 import { insertSnapshot as insertSnapshotRow, type DraftSettings } from '../lib/draft_settings.ts';
 import { renderOfflinePage, offlineFileMap } from '../lib/offline_page.ts';
 import { loadEmailBrand } from '../lib/email_brand.ts';
@@ -574,6 +575,7 @@ export async function handleCheckpointRestore(req: Request, site: SiteRow, princ
   const snap = await snapshotForRestore(site.id, row.snapshot_id);
   if (!snap) return json({ error: 'not_restorable', message: 'That checkpoint is no longer available.' }, 410, cors);
   const res = await applySnapshotToDraft(site, snap, principal, `Returned to checkpoint “${row.name}”`, await draftAsFound(req), { settings: true });
+  if (res.error === 'section_locked') return json({ error: 'section_locked', message: lockedRestoreMessage(res.locked || [], 'that checkpoint'), sections: res.locked }, 403, cors);
   if (!res.ok) return json({ error: 'restore_failed', message: 'That didn’t work — your draft is unchanged and nothing was lost.' }, 502, cors);
   return json({ data: { ok: true, message: `Checkpoint “${row.name}” is now in your draft.${leftOffSentence(res.applied?.dropped_media ?? 0, 'that checkpoint')} Your previous draft was set aside as a safety copy — nothing was lost.`, applied: res.applied } }, 200, cors);
 }

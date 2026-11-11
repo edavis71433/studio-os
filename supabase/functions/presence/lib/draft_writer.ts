@@ -9,12 +9,16 @@
 //   • Media references that no longer resolve are dropped, counted, and told.
 //   • A restore (opts.settings) also brings back the website's settings: sections,
 //     pages, the menu, the header and footer choices (lib/draft_settings.ts).
+//   • The client's restore keeps the sections their studio locked (item 155): it is
+//     refused, before anything is written, when it would remove or change one.
 import { svc } from './db.ts';
 import { publishActorKind } from './actor_kind.ts';
 import { serializeDraft, variantPath } from './serializer.ts';
 import type { DraftRows, MediaManifestEntry } from './serializer.ts';
 import { draftSettingsOf, insertSnapshot, noDraftSettingsColumn, settingsBack, settingsFromContent } from './draft_settings.ts';
 import type { DraftSettings } from './draft_settings.ts';
+import { restoreUnderLocks } from './section_lock.ts';
+import type { LockedEdit } from './section_lock.ts';
 import { writeChangeEvent } from './provenance.ts';
 import { normalizeSnapshotContent, snapshotContentUsable } from './render_types.ts';
 import type { Snapshot, SnapshotContent } from './render_types.ts';
@@ -25,6 +29,7 @@ export interface ApplyResult {
   ok: boolean;
   error?: string;
   applied?: { entities: number; hidden: number; dropped_media: number };
+  locked?: LockedEdit[];   // error 'section_locked': what the client's restore would have done to them
 }
 
 interface MediaManifestRow { media_id: string; storage_path: string; variants: Array<{ output_path: string }> }
@@ -79,7 +84,42 @@ export async function applySnapshotToDraft(
   const c: SnapshotContent = normalizeSnapshotContent(structuredClone(snapshot.content));
   const actorKind = publishActorKind(principal);   // audit change 2: 'operator' when scoped into a client
 
-  // 1. safety snapshot — the current draft is set aside, never lost
+  let entities = 0, hidden = 0;
+  const gone = new Set<string>();   // storage paths of the photos left off, each once
+
+  // 1. media resolver against current library, and what step 5 writes into the settings:
+  // the section order, and on a restore all of the website's own — Home's sections, the
+  // pages, the menu, the header and footer, the logo, cover and share image, the
+  // announcement. As the snapshot kept them; one from before 0169 rebuilds them from its
+  // content. Worked out before anything is written, so a refused restore writes nothing.
+  const mediaRows: Array<{ id: string; storage_path: string; alt_text?: string | null }> = (await svc(`presence_media?site_id=eq.${site.id}&deleted_at=is.null&select=id,storage_path,alt_text`)).json ?? [];
+  const resolve = mediaResolver(snapshot.media_manifest || [], mediaRows, gone);
+  let back: DraftSettings = { category_order: c.settings?.category_order || [] };
+  if (opts.settings && snapshot.draft_settings && typeof snapshot.draft_settings === 'object') {
+    const live = new Set(mediaRows.map((m) => String(m.id).toLowerCase()));
+    const pathOf = new Map((snapshot.media_manifest || []).map((m) => [String(m.media_id).toLowerCase(), m.storage_path]));
+    // the photos that version showed and the library no longer holds
+    const goneIds = new Set([...pathOf.keys()].filter((id) => !live.has(id)));
+    const took = new Set<string>();
+    back = settingsBack(snapshot.draft_settings, goneIds, took);
+    for (const id of took) gone.add(pathOf.get(id) || id);
+  } else if (opts.settings) {
+    const altById = new Map(mediaRows.map((m) => [m.id, m.alt_text ?? '']));
+    back = settingsFromContent(c.settings, resolve, (id) => altById.get(id));
+  }
+  // Item 155: the client's restore keeps the sections their studio locked, the rule every
+  // save keeps (lib/section_lock.ts). One the version holds as it is now keeps its lock;
+  // one it would remove or change refuses the restore here, before the safety copy or
+  // anything else is written. The studio and platform staff are never stopped.
+  if (opts.settings && actorKind === 'client') {
+    const now = await svc(`presence_settings?site_id=eq.${site.id}&select=blocks,pages&limit=1`);
+    if (!now.ok) return { ok: false, error: `settings: ${now.status}` };
+    const kept = restoreUnderLocks(now.json?.[0] ?? {}, { blocks: back.blocks, pages: back.pages });
+    if (kept.edits.length) return { ok: false, error: 'section_locked', locked: kept.edits };
+    back = { ...back, blocks: kept.blocks, pages: kept.pages };
+  }
+
+  // 2. safety snapshot — the current draft is set aside, never lost
   try {
     let cur = current || null;
     if (!cur) {
@@ -97,13 +137,6 @@ export async function applySnapshotToDraft(
       }, cur.draftSettings ?? (cur.rows ? draftSettingsOf(cur.rows.presence_settings?.[0]) : null), 'return=minimal');   // and the sections, pages and menu as stored
     }
   } catch { /* safety snapshot is best-effort; the restore itself is still explicit */ }
-
-  let entities = 0, hidden = 0;
-  const gone = new Set<string>();   // storage paths of the photos left off, each once
-
-  // 2. media resolver against current library
-  const mediaRows: Array<{ id: string; storage_path: string; alt_text?: string | null }> = (await svc(`presence_media?site_id=eq.${site.id}&deleted_at=is.null&select=id,storage_path,alt_text`)).json ?? [];
-  const resolve = mediaResolver(snapshot.media_manifest || [], mediaRows, gone);
 
   // 3. identity (singleton upsert)
   const i = c.identity || ({} as SnapshotContent['identity']);
@@ -137,23 +170,7 @@ export async function applySnapshotToDraft(
     entities++;
   }
 
-  // 5. settings: the section order, and on a restore all of the website's own — Home's
-  // sections, the pages, the menu, the header and footer, the logo, cover and share image,
-  // the announcement. As the snapshot kept them; one from before 0169 rebuilds them from
-  // its content. Account settings in the same row are left alone.
-  let back: DraftSettings = { category_order: c.settings?.category_order || [] };
-  if (opts.settings && snapshot.draft_settings && typeof snapshot.draft_settings === 'object') {
-    const live = new Set(mediaRows.map((m) => String(m.id).toLowerCase()));
-    const pathOf = new Map((snapshot.media_manifest || []).map((m) => [String(m.media_id).toLowerCase(), m.storage_path]));
-    // the photos that version showed and the library no longer holds
-    const goneIds = new Set([...pathOf.keys()].filter((id) => !live.has(id)));
-    const took = new Set<string>();
-    back = settingsBack(snapshot.draft_settings, goneIds, took);
-    for (const id of took) gone.add(pathOf.get(id) || id);
-  } else if (opts.settings) {
-    const altById = new Map(mediaRows.map((m) => [m.id, m.alt_text ?? '']));
-    back = settingsFromContent(c.settings, resolve, (id) => altById.get(id));
-  }
+  // 5. settings, as step 1 worked them out. Account settings in the same row are left alone.
   const setRes = await svc('presence_settings?on_conflict=site_id', {
     method: 'POST', headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },
     body: JSON.stringify({ site_id: site.id, ...back }),
