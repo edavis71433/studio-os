@@ -139,6 +139,11 @@ export function describeChanges(draftC: SnapshotContent, liveC: SnapshotContent 
   // ── redirects (rare; keep honest) ──
   if (!jeq(d.redirects, l.redirects)) out.push({ section: 'site', sentence: 'Link redirects are updated.' });
 
+  // ── the pop-up (item 148) ──
+  if (!jeq(d.settings?.popup ?? null, l.settings?.popup ?? null)) {
+    out.push({ section: 'site', sentence: !d.settings?.popup ? 'The pop-up comes off your site.' : !l.settings?.popup ? 'Your site gets its pop-up.' : 'The pop-up is changed.' });
+  }
+
   // ── the visit counter (item 61): the counting and the privacy page change together ──
   if ((d.settings?.visit_counter !== false) !== (l.settings?.visit_counter !== false)) {
     out.push({ section: 'site', sentence: d.settings?.visit_counter === false

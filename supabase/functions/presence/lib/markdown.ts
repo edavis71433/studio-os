@@ -22,9 +22,11 @@ export function safeRedirectTo(path: unknown): string | null {
   return /^\/(?!\/)\S*$/.test(u) || /^https:\/\/\S+$/i.test(u) ? u : null;
 }
 
-/** https/mailto/tel URLs only; everything else (javascript:, data:, relative tricks) → null */
+/** https/mailto/tel URLs only; everything else (javascript:, data:, relative tricks) → null.
+ *  And (item 148) "#form-<form id>", which opens one of the site's forms in a dialog. */
 export function safeHref(url: string): string | null {
   const u = String(url ?? '').trim();
+  if (/^#form-[a-z0-9_]{1,40}$/.test(u)) return u;
   if (/^https:\/\/[^\s]+$/i.test(u)) return u;
   if (/^mailto:[^\s]+@[^\s]+$/i.test(u)) return u;
   if (/^tel:\+?[\d\-().\s]+$/i.test(u)) return u;

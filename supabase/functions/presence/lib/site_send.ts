@@ -82,7 +82,7 @@ var w=e.closest?e.closest('[data-field]'):null;if(w&&w.hidden)continue;var s=e.c
 if(e.checkValidity&&!e.checkValidity())return e;}return null;}
 function fail(f,kind,msg,field){busy(f,false);var p=note(f);p.className='ps-note is-err';p.textContent=msg||SAY[kind]||SAY.gone;if(kind!=='check')reach(p);
 if(field){var e=f.querySelector('[name="'+String(field).replace(/[^a-z0-9_]/gi,'')+'"]');if(e&&e.focus){try{e.focus();}catch(_){}}}}
-function sent(f,msg){var box=el('div','ps-sent');box.setAttribute('role','status');box.setAttribute('tabindex','-1');box.appendChild(el('p',null,msg||'Thank you, your message was sent.'));
+function sent(f,msg){try{f.dispatchEvent(new CustomEvent('ps-sent',{bubbles:true}));}catch(_){}var box=el('div','ps-sent');box.setAttribute('role','status');box.setAttribute('tabindex','-1');box.appendChild(el('p',null,msg||'Thank you, your message was sent.'));
 f.parentNode.insertBefore(box,f);f.style.display='none';try{box.focus();}catch(_){}}
 function send(f,ev){ev.preventDefault();if(f.getAttribute('data-sending'))return;
 var bad=firstBad(f);if(bad){if(bad.reportValidity)bad.reportValidity();else if(bad.focus)bad.focus();return;}
@@ -172,6 +172,75 @@ export function signupForm(id: string, endpoint: string | undefined, button: str
     `<div class="nl-row"><label class="nl-label" for="${attr(id)}-email">Your email</label><input type="email" id="${attr(id)}-email" name="email" required maxlength="254" autocomplete="email" placeholder="you@example.com"><button class="btn" type="submit"${buttonAttrs}>${esc(button)}</button></div>` +
     `<p class="nl-consent"><label><input type="checkbox" name="consent" value="yes" required> ${esc(SIGNUP_CONSENT)}</label></p></form>`;
 }
+
+// ── Builder list item 148: the pop-up and the forms a link opens ──────────────
+// lib/popup.ts decides whether and where (normalizePopup, injectPopup); what the page
+// draws and does lives here, beside the sender, so tests/e2e/popup.spec.ts drives it.
+export interface PopupSettings {
+  on: boolean;
+  heading: string;
+  text: string;
+  action: 'signup' | 'buttons';
+  buttons: Array<{ label: string; url: string }>;
+  after: 'seconds' | 'scroll';
+  seconds: number;
+  scroll: number;
+  pages: 'all' | 'home' | 'pick';
+  picked: string[];
+  again: 'day' | 'week' | 'two_weeks' | 'month';
+  phones: boolean;
+  from: string;
+  until: string;
+}
+export const POPUP_AGAIN_DAYS: Record<PopupSettings['again'], number> = { day: 1, week: 7, two_weeks: 14, month: 30 };
+// a short, stable fingerprint of what the pop-up says: a new pop-up is shown even to
+// someone who closed the last one
+function fnv(str: string): string {
+  let h = 0x811c9dc5;
+  for (let i = 0; i < str.length; i++) { h ^= str.charCodeAt(i); h = Math.imul(h, 0x01000193) >>> 0; }
+  return h.toString(36);
+}
+const jsData = (x: unknown) => JSON.stringify(x).replace(/</g, '\\u003c');
+const script = (js: string) => `<script>${js.replace(/<\//g, '<\\/')}</script>`;
+
+export const POPUP_STYLE = `<style>.ps-pop{width:min(420px,calc(100% - 32px));max-height:calc(100% - 32px);margin:auto;padding:0;border:0;border-radius:16px;background:var(--card,var(--paper,#fff));color:var(--ink,#1c1b18);box-shadow:0 18px 48px rgba(0,0,0,.28)}.ps-pop::backdrop{background:rgba(0,0,0,.4)}.ps-pop-in{position:relative;padding:28px 24px 22px}.ps-pop h2{margin:0 32px 8px 0;font-size:1.35rem;line-height:1.25}.ps-pop-text{margin:0 0 14px}.ps-pop-x{position:absolute;top:8px;right:8px;margin:0}.ps-pop-close{width:40px;height:40px;border:0;border-radius:999px;background:transparent;color:inherit;font-size:24px;line-height:1;cursor:pointer}.ps-pop-close:focus-visible{outline:2px solid var(--accent,#5b3fa0)}.ps-pop-btns{display:flex;flex-wrap:wrap;gap:10px;margin:6px 0 0}.ps-pop .nl-form{margin:6px 0 0;box-shadow:none;border:0;padding:0;background:transparent}.ps-pop-form{width:min(560px,calc(100% - 32px))}.ps-pop-form .presence-form{border:0;box-shadow:none;padding:0;background:transparent}@media (max-width:640px){.ps-pop{width:calc(100% - 20px)}}</style>`;
+export const POPUP_CLOSE = `<form method="dialog" class="ps-pop-x"><button type="submit" class="ps-pop-close" aria-label="Close">×</button></form>`;
+
+/** The pop-up's dialog and its timing script. */
+export function popupTags(p: PopupSettings, formEndpoint?: string): string {
+  const action = p.action === 'signup'
+    ? signupForm('ps-pop-nl', formEndpoint, 'Sign up')
+    : `<p class="ps-pop-btns">${p.buttons.map((b, i) => `<a class="btn${i ? ' ghost' : ''}" href="${attr(b.url)}">${esc(b.label)}</a>`).join('')}</p>`;
+  const cfg = { key: `ps-pop-${fnv([p.heading, p.text, p.action, ...p.buttons.map((b) => b.label + b.url)].join('|'))}`, after: p.after, seconds: p.seconds, scroll: p.scroll, againDays: POPUP_AGAIN_DAYS[p.again], phones: p.phones, from: p.from, until: p.until };
+  const js = `(function(){
+var D=document.getElementById('ps-pop');if(!D||typeof D.showModal!=='function')return;
+var C=${jsData(cfg)};
+function today(){var d=new Date();return d.getFullYear()+'-'+('0'+(d.getMonth()+1)).slice(-2)+'-'+('0'+d.getDate()).slice(-2);}
+var t=today();if((C.from&&t<C.from)||(C.until&&t>C.until))return;
+if(!C.phones&&window.matchMedia&&matchMedia('(max-width: 640px)').matches)return;
+function read(){try{return JSON.parse(localStorage.getItem(C.key)||'null')||{};}catch(_){return {};}}
+function write(o){try{localStorage.setItem(C.key,JSON.stringify(o));}catch(_){}}
+function joined(){var r=read();r.joined=true;write(r);}
+document.addEventListener('ps-sent',function(e){var k=e.target&&e.target.querySelector&&e.target.querySelector('input[name=form_kind]');if(k&&k.value==='signup')joined();});
+var m=read();if(m.joined||(m.closed&&Date.now()-m.closed<C.againDays*86400000))return;
+var done=false;
+function off(){window.removeEventListener('scroll',seen);}
+function show(){if(done)return;done=true;off();var cc=document.getElementById('presence-consent');if(document.querySelector('dialog[open]')||(cc&&!cc.hidden))return;try{D.showModal();}catch(_){}}
+function seen(){var h=document.documentElement,max=h.scrollHeight-h.clientHeight;if(max>0&&(window.scrollY||h.scrollTop)/max*100>=C.scroll)show();}
+if(C.after==='scroll')window.addEventListener('scroll',seen,{passive:true});else setTimeout(show,C.seconds*1000);
+D.addEventListener('close',function(){var r=read();if(!r.joined){r.closed=Date.now();write(r);}});
+D.addEventListener('click',function(e){if(e.target===D){D.close();return;}if(e.target.closest&&e.target.closest('a[href]')){var r=read();r.closed=Date.now();write(r);}});
+})();`;
+  return `<dialog id="ps-pop" class="ps-pop" aria-labelledby="ps-pop-h"><div class="ps-pop-in">${POPUP_CLOSE}<h2 id="ps-pop-h">${esc(p.heading)}</h2>${p.text ? `<p class="ps-pop-text">${esc(p.text)}</p>` : ''}${action}</div></dialog>${script(js)}`;
+}
+
+/** The one script that opens a form from a "#form-<id>" link (or scrolls to it on its page). */
+export const FORM_LINK_SCRIPT = script(`(function(){
+document.addEventListener('click',function(e){var a=e.target.closest&&e.target.closest('a[href^="#form-"]');if(!a)return;var id=a.getAttribute('href').slice(6);
+var d=document.getElementById('form-'+id);if(d&&typeof d.showModal==='function'){e.preventDefault();var p=document.querySelector('dialog[open]');if(p&&p!==d)p.close();if(!d.open)d.showModal();return;}
+var f=document.getElementById('presence-form-'+id);if(f){e.preventDefault();if(f.scrollIntoView)f.scrollIntoView({block:'start'});var i=f.querySelector('input:not([type=hidden]):not([tabindex="-1"]),select,textarea');if(i&&i.focus){try{i.focus({preventScroll:true});}catch(_){}}}});
+document.addEventListener('click',function(e){var d=e.target;if(d&&d.tagName==='DIALOG'&&d.id.indexOf('form-')===0)d.close();});
+})();`);
 
 /** Item 131: each page that holds a site form gets the sender, and each page with a
  *  site form or the booking widget gets the business's phone and email on <body>.
