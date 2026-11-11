@@ -781,6 +781,8 @@ async function route_(req: Request, cors: Record<string, string>): Promise<Respo
   // sales items 85 and 106: to-dos for anyone (the To-dos page reads every one), and a call logged for a person with no deal
   if (route === '/sales/tasks' && (method === 'GET' || method === 'POST')) return (await import('./routes/todos.ts')).handleSalesTasks(req, site, principal, cors);
   if (route === '/sales/people/activity' && method === 'POST') return (await import('./routes/todos.ts')).handlePeopleActivity(req, site, principal, cors);
+  // sales item 80: email a person from their record or deal; replies come back to the Inbox
+  if (route === '/sales/email' && method === 'POST') return (await import('./routes/record_email.ts')).handleRecordEmail(req, site, principal, cors);
   if (route === '/sales/reports' && method === 'GET') return handleSalesReports(req, site, principal, cors);   // sales review item 33: Analytics' fixed reports
   if (route === '/sales/views' && (method === 'GET' || method === 'PUT')) return handleSalesViews(req, site, principal, cors);   // sales review item 31: saved list views
   if (route === '/sales/stages' && (method === 'GET' || method === 'PUT')) return handleSalesStages(req, site, principal, cors);   // sales review item 38: rename the open stages
