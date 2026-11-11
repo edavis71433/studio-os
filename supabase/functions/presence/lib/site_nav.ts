@@ -9,7 +9,7 @@
 // The serializer is the authoritative validator (safe hrefs only, caps, one depth);
 // this helper only ESCAPES for output. Never emits script, style, or raw markup.
 
-export interface NavRenderItem { label: string; href: string; children?: Array<{ label: string; href: string }> }
+export interface NavRenderItem { label: string; href: string; folder?: true; children?: Array<{ label: string; href: string }> }
 
 /** Render the <li> items for a custom nav (goes inside the template's existing
  *  <nav class="primary"><ul>…</ul>). `currentPath` marks the active link. */
@@ -25,8 +25,12 @@ export function renderNavList(
     if (kids.length) {
       const active = it.href === currentPath || kids.some((k) => k.href === currentPath);
       const sub = kids.map((k) => `<li><a href="${attr(k.href)}"${cur(k.href)}>${esc(k.label)}</a></li>`).join('');
+      // Builder list item 48: a folder's name has no page to go to. It takes the template's link
+      // look and focus (so pointer, keyboard and a tap all open its dropdown) without being a link.
+      if (it.folder) return `<li class="has-sub nav-folder"><a role="button" tabindex="0"${active ? ' aria-current="page"' : ''} aria-haspopup="true" style="cursor:pointer">${esc(it.label)}<span class="sub-caret" aria-hidden="true">▾</span></a><ul class="subnav">${sub}</ul></li>`;
       return `<li class="has-sub"><a href="${attr(it.href)}"${active ? ' aria-current="page"' : ''} aria-haspopup="true">${esc(it.label)}<span class="sub-caret" aria-hidden="true">▾</span></a><ul class="subnav">${sub}</ul></li>`;
     }
+    if (it.folder) return '';   // an empty folder isn't drawn (the serializer drops it first)
     return `<li><a href="${attr(it.href)}"${cur(it.href)}>${esc(it.label)}</a></li>`;
   }).join('');
 }

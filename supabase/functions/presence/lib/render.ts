@@ -17,6 +17,7 @@ import { trackerScript } from './visits.ts';
 import { sanitizeDevHtml, sanitizeDevCss } from './devmode.ts';
 import { BLOCK_CSS, sectionStyles, pageClasses } from './site_blocks.ts';
 import { applyPageChrome } from './page_access.ts';
+import { applyHeaderScroll } from './site_header.ts';
 
 // ── FD-T2: indexed template registry; each template's code loads on first use ──
 // slug → version → { manifest, code loader }. Render resolution goes through this
@@ -192,9 +193,11 @@ export async function renderSnapshot(snapshot: Snapshot, site: SiteConfig, opts:
   }
   // Item 61: the owner's switch decides the counter; the privacy page reads the same switch.
   const counting = (snapshot.content as SnapshotContent)?.settings?.visit_counter !== false;
+  const tokens = snapshot.dev_customization?.theme_tokens;
   // items 48 and 120: an own page can leave out the site's header or footer, everywhere it is drawn
   const pages = (snapshot.content as SnapshotContent)?.settings?.pages;
-  const drawn = tintFavicon(applyPageChrome(await t.render(snapshot, t.manifest, site), pages), snapshot.dev_customization?.theme_tokens?.accent, snapshot.template_slug);
+  // items 50 and 123: the header scrolls away, stays on top, hides or fades, as the owner chose
+  const drawn = applyHeaderScroll(tintFavicon(applyPageChrome(await t.render(snapshot, t.manifest, site), pages), tokens?.accent, snapshot.template_slug), tokens?.header_scroll);
   const dressed = injectDevLayer(drawn, snapshot.dev_customization);
   return injectCsp(injectAnalytics(opts.allSectionStyles ? dressed : trimSectionStyles(dressed), counting ? site.siteId : undefined));
 }
