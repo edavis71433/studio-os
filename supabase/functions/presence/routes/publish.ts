@@ -30,7 +30,8 @@ import { tickChecklistForCustomerSite, emailCustomerSiteLive } from '../lib/serv
 import { readIfMatch, preconditionOutcome, staleConflictBody, draftAsFound } from '../lib/optimistic_lock.ts';
 import { describeVersionDiff, resolveTimewarpTarget, normalizeTimewarpDate, cleanCheckpointName, type TimewarpVersion } from '../lib/preview_env.ts';
 import { captureDraftSnapshot } from '../lib/staging.ts';
-import { applySnapshotToDraft } from '../lib/draft_writer.ts';
+import { applySnapshotToDraft, snapshotForRestore, leftOffSentence } from '../lib/draft_writer.ts';
+import { insertSnapshot as insertSnapshotRow, type DraftSettings } from '../lib/draft_settings.ts';
 import { renderOfflinePage, offlineFileMap } from '../lib/offline_page.ts';
 import { loadEmailBrand } from '../lib/email_brand.ts';
 import { snapshotContentUsable } from '../lib/render_types.ts';
@@ -62,7 +63,7 @@ export async function changeSummary(siteId: string): Promise<string> {
 /** Core pipeline shared by publish and restore — ONE path, ever.
  *  Exported for the admin operations (force publish / retry / restore-snapshot),
  *  which are the SAME pipeline with a staff actor — never a second path. */
-export async function runPipeline(site: SiteRow, principal: Principal, kind: 'publish' | 'restore', snapshotArg: { snapshot: Snapshot; snapshotId?: string; mediaManifest: any[] }, summary: string, cors: Record<string, string>, idempotencyKey?: string, opts?: { changeCount?: number }) {
+export async function runPipeline(site: SiteRow, principal: Principal, kind: 'publish' | 'restore', snapshotArg: { snapshot: Snapshot; snapshotId?: string; mediaManifest: any[]; draftSettings?: DraftSettings }, summary: string, cors: Record<string, string>, idempotencyKey?: string, opts?: { changeCount?: number }) {
   // Studio audit change 2: 'staff' (platform) · 'operator' (the client's studio,
   // scoped in via ?client=) · 'client' (the owner). The client's room reads this
   // back as "published by your studio" for the first two (lib/actor_kind.ts).
@@ -92,16 +93,13 @@ export async function runPipeline(site: SiteRow, principal: Principal, kind: 'pu
 
   // persist snapshot (publish only; restore reuses the retained one)
   if (!snapshotId) {
-    const insertSnapshot = (byKind: string) => svc('presence_snapshots', {
-      method: 'POST', headers: { Prefer: 'return=representation' },
-      body: JSON.stringify({
-        site_id: site.id, content: snapshotArg.snapshot.content, media_manifest: snapshotArg.mediaManifest,
-        content_contract_version: snapshotArg.snapshot.content_contract_version,
-        template_slug: snapshotArg.snapshot.template_slug, template_version: snapshotArg.snapshot.template_version,
-        dev_customization: snapshotArg.snapshot.dev_customization ?? null,  // Phase B1: capture the dev layer with the snapshot
-        created_by: principal.userId, created_by_kind: byKind,
-      }),
-    });
+    const insertSnapshot = (byKind: string) => insertSnapshotRow({
+      site_id: site.id, content: snapshotArg.snapshot.content, media_manifest: snapshotArg.mediaManifest,
+      content_contract_version: snapshotArg.snapshot.content_contract_version,
+      template_slug: snapshotArg.snapshot.template_slug, template_version: snapshotArg.snapshot.template_version,
+      dev_customization: snapshotArg.snapshot.dev_customization ?? null,  // Phase B1: capture the dev layer with the snapshot
+      created_by: principal.userId, created_by_kind: byKind,
+    }, snapshotArg.draftSettings);   // the sections, pages and menu as stored, for a restore
     let ins = await insertSnapshot(actorKind);
     // a database that predates migration 0133 rejects 'operator' (23514) — degrade
     // to 'staff' for the WHOLE pipeline (snapshot + publish record agree), never 502
@@ -343,7 +341,7 @@ export async function handlePublish(req: Request | null, site: SiteRow, principa
   if (!t) return json({ error: 'template_missing', message: CALM }, 500, cors);
 
   const now = new Date().toISOString();
-  const { snapshot, mediaManifest } = await serializeDraft(site.id, t.manifest, { templateSlug: site.template_slug, templateVersion: site.template_version, now });
+  const { snapshot, mediaManifest, draftSettings } = await serializeDraft(site.id, t.manifest, { templateSlug: site.template_slug, templateVersion: site.template_version, now });
 
   // M9 optimistic lock: if the caller reviewed a specific draft (If-Match), make
   // sure THAT is what publishes — refuse if the draft moved on since the review.
@@ -380,7 +378,7 @@ export async function handlePublish(req: Request | null, site: SiteRow, principa
       changeCount = describeChanges(snapshot.content, liveContent).count;
     } catch { changeCount = undefined; }
   }
-  return runPipeline(site, principal, 'publish', { snapshot, mediaManifest }, summary, cors, idemKey ?? undefined, { changeCount });
+  return runPipeline(site, principal, 'publish', { snapshot, mediaManifest, draftSettings }, summary, cors, idemKey ?? undefined, { changeCount });
 }
 
 export async function handleRestore(req: Request, site: SiteRow, principal: Principal, cors: Record<string, string>) {
@@ -577,12 +575,11 @@ export async function handleCheckpointRestore(req: Request, site: SiteRow, princ
   const row = l.json?.[0];
   if (!row) return json({ error: 'not_found', message: 'That checkpoint isn’t here.' }, 404, cors);
   if (!row.snapshot_id) return json({ error: 'not_restorable', message: 'That checkpoint is no longer available.' }, 410, cors);
-  const s = await svc(`presence_snapshots?id=eq.${row.snapshot_id}&site_id=eq.${site.id}&select=content,media_manifest,content_contract_version,template_slug,template_version,dev_customization&limit=1`);
-  const snap = s.json?.[0];
+  const snap = await snapshotForRestore(site.id, row.snapshot_id);
   if (!snap) return json({ error: 'not_restorable', message: 'That checkpoint is no longer available.' }, 410, cors);
-  const res = await applySnapshotToDraft(site, snap, principal, `Returned to checkpoint “${row.name}”`, await draftAsFound(req));
+  const res = await applySnapshotToDraft(site, snap, principal, `Returned to checkpoint “${row.name}”`, await draftAsFound(req), { settings: true });
   if (!res.ok) return json({ error: 'restore_failed', message: 'That didn’t work — your draft is unchanged and nothing was lost.' }, 502, cors);
-  return json({ data: { ok: true, message: `Checkpoint “${row.name}” is now in your draft. Your previous draft was set aside as a safety copy — nothing was lost.` } }, 200, cors);
+  return json({ data: { ok: true, message: `Checkpoint “${row.name}” is now in your draft.${leftOffSentence(res.applied?.dropped_media ?? 0, 'that checkpoint')} Your previous draft was set aside as a safety copy — nothing was lost.`, applied: res.applied } }, 200, cors);
 }
 
 // ── G10 · Unpublish / take offline — the reversible veil ─────────────────────

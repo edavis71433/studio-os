@@ -18,6 +18,7 @@ import { pageShowFields, type PageShow } from './page_access.ts';
 import { aggregateApproved, shapeReviewsForDisplay } from './reviews.ts';
 import { normalizeTags } from './search_index.ts';
 import { UUID_RE as SHARE_UUID_RE, UUID_PATTERN } from './uuid.ts';
+import { draftSettingsOf, type DraftSettings } from './draft_settings.ts';
 
 export const CONTENT_CONTRACT_VERSION = 1;
 
@@ -203,12 +204,13 @@ export async function readDraftRows(siteId: string, prev?: DraftRows, only?: Rea
   return rows;
 }
 
-export async function serializeDraft(siteId: string, manifest: TemplateManifest, opts: { templateSlug: string; templateVersion: string; now: string }): Promise<{ snapshot: Snapshot; mediaManifest: MediaManifestEntry[] }> {
+export async function serializeDraft(siteId: string, manifest: TemplateManifest, opts: { templateSlug: string; templateVersion: string; now: string }): Promise<{ snapshot: Snapshot; mediaManifest: MediaManifestEntry[]; draftSettings: DraftSettings }> {
   return buildSnapshot(await readDraftRows(siteId), manifest, opts);
 }
 
-/** Build the snapshot from a draft's rows (readDraftRows). Pure. */
-export function buildSnapshot(rows: DraftRows, manifest: TemplateManifest, opts: { templateSlug: string; templateVersion: string; now: string }): { snapshot: Snapshot; mediaManifest: MediaManifestEntry[] } {
+/** Build the snapshot from a draft's rows (readDraftRows), with the website's settings as
+ *  stored beside it (lib/draft_settings.ts), which a snapshot keeps for a restore. Pure. */
+export function buildSnapshot(rows: DraftRows, manifest: TemplateManifest, opts: { templateSlug: string; templateVersion: string; now: string }): { snapshot: Snapshot; mediaManifest: MediaManifestEntry[]; draftSettings: DraftSettings } {
   const { presence_identity: identArr, presence_locations: locArr, presence_offerings: offerings, presence_testimonials: testimonials, presence_faqs: faqs, presence_posts: posts,
     presence_media: media, presence_redirects: redirects, presence_settings: settingsArr, presence_dev_customizations: devArr, presence_reviews: reviewsArr } = rows;
   // Phase RV: resolve the approved reviews → display items + HONEST aggregate (only
@@ -375,7 +377,7 @@ export function buildSnapshot(rows: DraftRows, manifest: TemplateManifest, opts:
     created_at: opts.now,
     ...(devCustomization ? { dev_customization: devCustomization } : {}),
   };
-  return { snapshot, mediaManifest };
+  return { snapshot, mediaManifest, draftSettings: draftSettingsOf(settings) };
 }
 
 // ── Item 26: one section of an unsaved list, for the canvas while the save is on its way ──

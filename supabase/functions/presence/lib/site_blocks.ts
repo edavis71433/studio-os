@@ -752,19 +752,20 @@ function validateBlocksTracked(raw: unknown): { blocks: StoredBlock[]; src: numb
 export interface BlockResolveExtras {
   reviewsWall?: { items: import('./render_types.ts').ReviewDisplayItem[]; aggregate: { count: number; average: number } };
 }
+// Phase T-STYLE: the media-bearing branches rebuild their block object, so carry
+// the owner-chosen per-section style across the rebuild (default `out.push(b)` keeps it).
+// Phase EXP: the auto-expiring window rides along the same way, so a rebuilt
+// media block (team/gallery/image/columns/cards/…) keeps its show_from/show_until.
+// unresolveBlockMedia carries the same fields back.
+const lk = (b: StoredBlock) => ({
+  ...(b.look ? { look: b.look } : {}),
+  ...(b.style ? { style: b.style } : {}),   // G27: the per-element style override rides the rebuild too
+  ...((b as any).show_from ? { show_from: (b as any).show_from } : {}),
+  ...((b as any).show_until ? { show_until: (b as any).show_until } : {}),
+  ...(b.variant ? { variant: b.variant } : {}),   // Wave-1 G4: the style variant rides the rebuild too
+});
 export function resolveBlockMedia(blocks: StoredBlock[], ref: (id: string) => MediaRef | null, extras?: BlockResolveExtras): SiteBlock[] {
   const out: SiteBlock[] = [];
-  // Phase T-STYLE: the media-bearing branches rebuild their block object, so carry
-  // the owner-chosen per-section style across the rebuild (default `out.push(b)` keeps it).
-  // Phase EXP: the auto-expiring window rides along the same way, so a rebuilt
-  // media block (team/gallery/image/columns/cards/…) keeps its show_from/show_until.
-  const lk = (b: StoredBlock) => ({
-    ...(b.look ? { look: b.look } : {}),
-    ...(b.style ? { style: b.style } : {}),   // G27: the per-element style override rides the rebuild too
-    ...((b as any).show_from ? { show_from: (b as any).show_from } : {}),
-    ...((b as any).show_until ? { show_until: (b as any).show_until } : {}),
-    ...(b.variant ? { variant: b.variant } : {}),   // Wave-1 G4: the style variant rides the rebuild too
-  });
   for (const b of blocks) {
     switch (b.type) {
       case 'team':
@@ -894,6 +895,95 @@ export function resolveBlockMediaTracked(blocks: StoredBlock[], ref: (id: string
     for (const r of one) { out.push(r); src.push(i); }
   }
   return { blocks: out, src };
+}
+
+/** The way back from resolveBlockMedia, for a restore from a version kept before its
+ *  stored lists were (lib/draft_writer.ts): render-facing blocks → the stored shape,
+ *  each MediaRef back to the media id `idOf` finds for it. A photo that's no longer in
+ *  the library (null) leaves its place empty: a gallery, a logo row, a carousel or a
+ *  before-and-after pair loses that photo, and every other section keeps its words. A
+ *  free-form photo's own alt text comes back when it differs from the photo's (`altOf`).
+ *  A reviews wall goes back to how many it shows. What the render never had can't come
+ *  back: a link to a saved section returns as a copy of it, and a section validateBlocks
+ *  left out stays out. Pure. */
+export function unresolveBlockMedia(blocks: unknown, idOf: (m: MediaRef) => string | null, altOf?: (id: string) => string | undefined): StoredBlock[] {
+  const id = (m: MediaRef | null | undefined): string | null => (m && typeof m === 'object' ? idOf(m) : null);
+  const put = (key: string, m: MediaRef | null | undefined): Record<string, string> => { const v = id(m); return v ? { [key]: v } : {}; };
+  const out: StoredBlock[] = [];
+  for (const b of arr(blocks)) {
+    if (!b || typeof b !== 'object') continue;
+    switch (b.type) {
+      case 'team':
+        out.push({ type: 'team', title: b.title, members: arr(b.members).map((m) => ({ name: m.name, role: m.role, bio: m.bio, ...put('media_id', m.media) })), ...lk(b) });
+        break;
+      case 'gallery': {   // captions stay index-aligned as photos that are gone drop out
+        const image_ids: string[] = [], captions: string[] = [];
+        arr(b.images).forEach((m, i) => { const v = id(m); if (!v) return; image_ids.push(v); captions.push(arr(b.captions)[i] || ''); });
+        out.push({ type: 'gallery', title: b.title, image_ids, ...(captions.some(Boolean) ? { captions } : {}), ...(b.zoom ? { zoom: true } : {}), ...lk(b) } as StoredBlock);
+        break;
+      }
+      case 'before_after': {   // a pair is its two photos
+        const items = arr(b.items).map((it) => ({ before_id: id(it.before), after_id: id(it.after), caption: it.caption }))
+          .filter((it) => it.before_id && it.after_id) as Array<{ before_id: string; after_id: string; caption?: string }>;
+        out.push({ type: 'before_after', title: b.title, items, ...lk(b) });
+        break;
+      }
+      case 'video':
+        out.push({ type: 'video', title: b.title, url: b.url, caption: b.caption, ...put('poster_id', b.poster), ...lk(b) });
+        break;
+      case 'partners':
+        out.push({ type: 'partners', title: b.title, image_ids: arr(b.logos).map(id).filter((v): v is string => !!v), ...lk(b) });
+        break;
+      case 'reviews_wall':   // the reviews were the approved ones at the time; the block keeps only how many to show
+        out.push({ type: 'reviews_wall', title: b.title, max: Math.min(50, Math.max(12, arr(b.reviews).length)), ...lk(b) });
+        break;
+      case 'map':
+        out.push({ type: 'map', title: b.title, ...put('image_media_id', b.image), address: b.address, directions_url: b.directions_url, ...lk(b) });
+        break;
+      case 'image':
+        out.push({ type: 'image', title: b.title, ...put('image_id', b.image), caption: b.caption, alt: b.alt, link: b.link, decorative: b.decorative, ...lk(b) });
+        break;
+      case 'columns':
+        out.push({ type: 'columns', id: b.id, title: b.title, columns: arr(b.columns).map((c) => {
+          const nested = c.block ? unresolveBlockMedia([c.block], idOf, altOf)[0] : undefined;
+          return { body: c.body, ...put('image_id', c.image), button: c.button, span: c.span, ...(nested ? { block: nested } : {}) };
+        }), ...lk(b) });
+        break;
+      case 'tabs':
+        out.push({ type: 'tabs', title: b.title, tabs: arr(b.tabs).map((t) => ({ label: t.label, body: t.body, ...put('image_id', t.image) })), ...lk(b) });
+        break;
+      case 'carousel':   // a slide is its photo
+        out.push({ type: 'carousel', title: b.title, slides: arr(b.slides).map((sl) => ({ image_id: id(sl.image), caption: sl.caption })).filter((sl) => sl.image_id) as Array<{ image_id: string; caption?: string }>, ...lk(b) });
+        break;
+      case 'cards':
+        out.push({ type: 'cards', id: b.id, title: b.title, cards: arr(b.cards).map((c) => ({ heading: c.heading, text: c.text, ...put('image_id', c.image), link: c.link })), ...lk(b) });
+        break;
+      case 'download':
+        out.push({ type: 'download', title: b.title, ...put('file_id', b.file), label: b.label, ...lk(b) });
+        break;
+      case 'image_text':
+        out.push({ type: 'image_text', title: b.title, ...put('image_id', b.image), body: b.body, side: b.side, button: b.button, ...lk(b) } as StoredBlock);
+        break;
+      case 'freeform': {   // a photo element is its photo
+        const elements: StoredFreeformElement[] = [];
+        for (const el of arr(b.elements)) {
+          const base = { id: el.id, kind: el.kind, x: el.x, y: el.y, w: el.w, h: el.h, z: el.z, ...(el.hide_on_phone ? { hide_on_phone: true as const } : {}) };
+          if (el.kind === 'image') {
+            const m = el.image?.image, v = id(m);
+            if (!v) continue;
+            const alt = String(m?.alt ?? '');
+            elements.push({ ...base, kind: 'image', image: { image_id: v, ...(altOf && alt && alt !== (altOf(v) ?? '') ? { alt } : {}), ...(el.image.decorative ? { decorative: true as const } : {}) } });
+          } else if (el.kind === 'text' && el.text) elements.push({ ...base, kind: 'text', text: el.text });
+          else if (el.kind === 'button' && el.button) elements.push({ ...base, kind: 'button', button: el.button });
+        }
+        out.push({ type: 'freeform', id: b.id, title: b.title, aspect: b.aspect, elements, ...lk(b) });
+        break;
+      }
+      default:
+        out.push({ ...b });
+    }
+  }
+  return out;
 }
 
 // ── G27 · server-side contrast recomputation (design doc §3/§5). NEVER a hard
