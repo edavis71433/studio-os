@@ -1,11 +1,13 @@
 // ── Recently deleted pages, kept 30 days (builder list item 154, Nov 2026 review) ──
 // Deleting a page in the editor gave a 20-second Undo and a "Before deleting"
 // checkpoint, but restoring a checkpoint or a version never brought the page back:
-// the draft writer (lib/draft_writer.ts) rewrites business details, hours and the
-// lists, never the pages. Now every page that leaves a draft is kept exactly as it
-// was stored, for 30 days, by a trigger on presence_settings (migration 0154), and
-// Versions lists them here; Put back adds one page to the draft as it was and
-// changes nothing else. The live site waits for a publish, as with any edit.
+// the draft writer (lib/draft_writer.ts) rewrote business details, hours and the
+// lists, never the pages (since item 187 it brings back pages, sections and the menu
+// too, lib/draft_settings.ts). Now every page that leaves a draft, a restore's
+// included, is kept exactly as it was stored, for 30 days, by a trigger on
+// presence_settings (migration 0154), and Versions lists them here; Put back adds one
+// page to the draft as it was and changes nothing else. The live site waits for a
+// publish, as with any edit.
 //
 //   GET  /pages/deleted                → the list, newest first
 //   POST /pages/deleted/:id/restore    → put one back (its own address, or the first free "-2")
