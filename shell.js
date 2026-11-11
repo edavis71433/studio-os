@@ -732,7 +732,13 @@
     account: '<circle cx="12" cy="9" r="3.5"/><path d="M5 20a7 7 0 0 1 14 0"/>',
     plus: '<path d="M12 5v14M5 12h14"/>',
     dot: '<circle cx="12" cy="12" r="3"/>',
-    menu: '<path d="M4 7h16M4 12h16M4 17h16"/>'
+    menu: '<path d="M4 7h16M4 12h16M4 17h16"/>',
+    // ⌘K results (sales item 84): a document, a to-do, a note, money, a phone
+    doc: '<path d="M6 3h8l5 5v13H6z"/><path d="M14 3v5h5M9 13h6M9 17h4"/>',
+    todo: '<path d="M5 12l4 4 10-10"/>',
+    note: '<path d="M4 20h4L19 9l-4-4L4 16z"/><path d="M13 7l4 4"/>',
+    money: '<rect x="3" y="6" width="18" height="12" rx="2"/><circle cx="12" cy="12" r="2.5"/>',
+    phone: '<path d="M5 3h4l2 5-2.5 1.5a11 11 0 0 0 6 6L16 13l5 2v4a2 2 0 0 1-2 2A17 17 0 0 1 3 5a2 2 0 0 1 2-2z"/>'
   };
   function icon(key, cls) { return '<svg class="' + (cls || 'nic') + '" viewBox="0 0 24 24" aria-hidden="true" focusable="false">' + (ICON[key] || ICON.dot) + '</svg>'; }
   function bellInner(n) { return icon('bell') + (n > 0 ? '<span class="dot">' + (n > 9 ? '9+' : n) + '</span>' : ''); }
@@ -805,6 +811,10 @@
     { key: 'create_proposal', create: 'proposal', label: 'Send a proposal', section: 'Create', desc: 'new proposal quote' },
     { key: 'create_todo', create: 'todo', label: 'Add a to-do', section: 'Create', desc: 'new task reminder' },
   ].map(function (d) { d.href = '#create:' + d.create; return d; });
+  var SETTINGS_DESTS = [
+    { key: 'set_stages', label: 'Deal stages', section: 'Settings', desc: 'stage names rename pipeline chance', href: '/settings.html#stages' },
+    { key: 'set_automations', label: 'Automations', section: 'Settings', desc: 'reminders follow up review request automatic emails switches', href: '/settings.html#automations' },
+  ];
   // "#create" or "#create:call" in the address (a link from another page, a
   // bookmark) opens it once; the hash is cleared so a reload doesn't reopen it
   var CREATE_HASH = /^#create(?::(call|deal|invoice|proposal|todo|customer|update))?$/;
@@ -828,6 +838,9 @@
     var secKey = activeSectionKey(nav, activeKey);
     DESTS = flatten(nav);                          // ⌘K reaches EVERY capability (primary + utility)
     if (canCreate()) DESTS = DESTS.concat(CREATE_DESTS);
+    // item 84: two Settings cards by name ("deal stages", "automations"), for whoever can change them
+    if ((CTX && CTX.nav || []).some(function (s) { return s.key === 'settings'; }) && !(CTX.scope && CTX.scope.site_id) && !(window.ddsLacks && window.ddsLacks('configure')))
+      DESTS = DESTS.concat(SETTINGS_DESTS);
     // Architecture v1.0: the primary bar is outcomes only; utility sections
     // (Connections, Settings, Help) render in the profile/overflow menu.
     // Oct 2026 nav cut: a section whose items are ALL hidden (⌘K-only) is not drawn.
@@ -1200,12 +1213,16 @@
     if (window.ddsCreate && window.ddsCreate.isOpen()) window.ddsCreate.close();
     closeAllLayers();   // the palette is the front-most layer — no stacking under it
     if (!pal) {
-      pal = el('<div class="dds-palette"><div class="box" role="dialog" aria-modal="true" aria-label="Search Studio OS"><input placeholder="Search Studio OS…" aria-label="Search" role="combobox" aria-expanded="true" aria-controls="dds-pal-list" aria-autocomplete="list"><div class="results" id="dds-pal-list" role="listbox" aria-label="Results"></div></div></div>');
+      pal = el('<div class="dds-palette"><div class="box" role="dialog" aria-modal="true" aria-label="Search Studio OS"><div class="inrow">' + icon('search', 'pic') + '<input placeholder="Search people, websites, deals, messages…" aria-label="Search" role="combobox" aria-expanded="true" aria-controls="dds-pal-list" aria-autocomplete="list"><button type="button" class="pclose">Cancel</button></div><div class="results" id="dds-pal-list" role="listbox" aria-label="Results"></div><p class="hint" aria-hidden="true"></p></div></div>');
       document.body.appendChild(pal);
       pal.addEventListener('click', function (e) {
         if (e.target === pal) return closePalette();
+        if (e.target && e.target.closest && e.target.closest('.pclose')) return closePalette();   // a phone fills the screen with search: Cancel closes it
         var cr = e.target && e.target.closest ? e.target.closest('a.res[data-create]') : null;
         if (cr) { e.preventDefault(); openCreate(cr.getAttribute('data-create'), document.getElementById('dds-create')); return; }
+        // item 84: "Open website" on a website row opens the live site, not the row's own place
+        var alt = e.target && e.target.closest ? e.target.closest('.res [data-alt-href]') : null;
+        if (alt) { e.preventDefault(); e.stopPropagation(); window.open(alt.getAttribute('data-alt-href'), '_blank', 'noopener'); return; }
         // a record selection feeds the Customers caret's "Recent" group
         var a = e.target && e.target.closest ? e.target.closest('a.res[data-rec-label]') : null;
         if (a) pushRecent(a.getAttribute('data-rec-label'), a.getAttribute('data-rec-href'));
@@ -1215,6 +1232,8 @@
         var sel = pal.querySelector('.res.sel');
         if (e.key === 'Escape') return closePalette();
         if (e.key === 'Enter' && sel && sel.hasAttribute('data-create')) { e.preventDefault(); openCreate(sel.getAttribute('data-create'), document.getElementById('dds-create'), true); return; }
+        // Shift+Enter on a website row opens the site itself (its "Open website")
+        if (e.key === 'Enter' && sel && e.shiftKey && sel.querySelector('[data-alt-href]')) { e.preventDefault(); window.open(sel.querySelector('[data-alt-href]').getAttribute('data-alt-href'), '_blank', 'noopener'); return; }
         if (e.key === 'Enter' && sel) {
           if (sel.hasAttribute('data-rec-label')) pushRecent(sel.getAttribute('data-rec-label'), sel.getAttribute('data-rec-href'));
           location.href = sel.getAttribute('href');
@@ -1226,6 +1245,7 @@
           var pick = all[i < 0 ? 0 : i]; pick.classList.add('sel'); pick.setAttribute('aria-selected', 'true');
           e.target.setAttribute('aria-activedescendant', pick.id);
           if (pick.scrollIntoView) pick.scrollIntoView({ block: 'nearest' });
+          palHint();
         }
       });
     }
@@ -1238,14 +1258,69 @@
     var s = document.getElementById('dds-search'); if (s) s.focus();
   }
   function hasFiles() { return (CTX && CTX.nav || []).some(function (s) { return s.key === 'files'; }); }
+  // ── ⌘K across everything (sales item 84, Nov 2026) ──
+  // Results come in groups under small headings (Places, People, Websites, Enquiries,
+  // Deals and documents, Money, Projects, To-dos, Messages, Notes, Files, Actions), the
+  // words typed in bold, an icon for each kind, and what it is on the right. A website
+  // row carries "Open website" (Shift+Enter) beside opening it in Studio OS. A search
+  // that couldn't run says so above the places; it never reads as "nothing matches".
+  var PAL_GROUP = { places: 'Places', people: 'People', websites: 'Websites', enquiries: 'Enquiries', deals: 'Deals and documents', money: 'Money', projects: 'Projects', todos: 'To-dos', messages: 'Messages', notes: 'Notes', files: 'Files', actions: 'Actions' };
+  var PAL_ICON = { customer: 'customers', contact: 'customers', website: 'website', enquiry: 'inbox', deal: 'pipeline', proposal: 'doc', estimate: 'doc', agreement: 'doc', invoice: 'money', page: 'money', project: 'projects', todo: 'todo', message: 'messages', note: 'note', action: 'plus', file: 'files', place: 'dot' };
+  function palMark(text, q) {
+    // the typed words in bold (escaped first); a phone typed as digits marks its digits in a written number
+    var t = String(text == null ? '' : text), qq = String(q || '').trim();
+    if (!qq) return esc(t);
+    var at = t.toLowerCase().indexOf(qq.toLowerCase());
+    if (at >= 0) return esc(t.slice(0, at)) + '<b>' + esc(t.slice(at, at + qq.length)) + '</b>' + esc(t.slice(at + qq.length));
+    var d = qq.replace(/\D/g, '');
+    if (d.length >= 4 && /^[\d\s().+\-]+$/.test(qq)) {
+      for (var i = 0; i < t.length; i++) {
+        if (!/\d/.test(t[i])) continue;
+        var j = i, got = '';
+        while (j < t.length && got.length < d.length) { if (/\d/.test(t[j])) { if (t[j] !== d[got.length]) break; got += t[j]; } j++; }
+        if (got === d) return esc(t.slice(0, i)) + '<b>' + esc(t.slice(i, j)) + '</b>' + esc(t.slice(j));
+      }
+    }
+    return esc(t);
+  }
+  function palRow(o, n, q, selFirst) {
+    var sel = selFirst ? ' sel' : '';
+    var attrs = o.rec ? ' data-rec-label="' + esc(o.label) + '" data-rec-href="' + esc(o.href) + '"' : '';
+    if (o.create) attrs += ' data-create="' + esc(o.create) + '"';
+    var href = o.raw ? o.href : (/[?&]client=/.test(o.href) ? o.href : withScope(o.href));
+    var alt = o.alt && o.alt.href ? '<span class="alt" data-alt-href="' + esc(o.alt.href) + '" title="Opens the website itself (Shift+Enter)">' + esc(o.alt.label || 'Open website') + '</span>' : '';
+    return '<a class="res' + sel + '" id="dds-res-' + n + '" role="option" aria-selected="' + (selFirst ? 'true' : 'false') + '" href="' + esc(href) + '"' + attrs + '>'
+      + '<span class="ri" aria-hidden="true">' + icon(PAL_ICON[o.kind] || 'dot', 'pic') + '</span>'
+      + '<span class="rt"><span class="rl">' + palMark(o.label, q) + '</span>' + (o.snippet ? '<span class="rs">' + palMark(o.snippet, q) + '</span>' : '') + '</span>'
+      + alt + '<span class="s">' + palMark(o.sub || '', q) + '</span></a>';
+  }
+  function palGroups(groups, q) {
+    // groups: [[key, rows]]; one heading per group, the first row selected
+    var n = 0, html = '';
+    groups.forEach(function (g) {
+      if (!g[1].length) return;
+      var hid = 'dds-grp-' + g[0];
+      html += '<div class="grp" role="group" aria-labelledby="' + hid + '"><div class="gh" id="' + hid + '" role="presentation">' + esc(PAL_GROUP[g[0]] || g[0]) + '</div>';
+      g[1].forEach(function (o) { html += palRow(o, n, q, n === 0); n++; });
+      html += '</div>';
+    });
+    return html;
+  }
+  function palHint() {
+    var h = pal && pal.querySelector('.hint'); if (!h) return;
+    var sel = pal.querySelector('.res.sel');
+    h.textContent = '↑ ↓ to move · Enter to open · Esc to close' + (sel && sel.querySelector('[data-alt-href]') ? ' · Shift+Enter opens the website' : '');
+  }
   var fileSearchTok = 0;
   function paintResults(q) {
     var qq = String(q || '').trim().toLowerCase();
     var list = qq ? DESTS.filter(function (d) { return d.label.toLowerCase().indexOf(qq) >= 0 || d.section.toLowerCase().indexOf(qq) >= 0 || (d.desc && d.desc.toLowerCase().indexOf(qq) >= 0); }) : DESTS;
     var box = pal.querySelector('.results');
-    var navHtml = list.map(function (d, i) { return '<a class="res' + (i === 0 ? ' sel' : '') + '" id="dds-res-' + i + '" role="option" aria-selected="' + (i === 0 ? 'true' : 'false') + '" href="' + esc(withScope(d.href)) + '"' + (d.create ? ' data-create="' + esc(d.create) + '"' : '') + '>' + esc(d.label) + '<span class="s">' + esc(d.section) + '</span></a>'; }).join('');
-    box.innerHTML = navHtml || (qq ? '' : '');
-    var inp0 = pal.querySelector('input'); if (inp0) inp0.setAttribute('aria-activedescendant', navHtml ? 'dds-res-0' : '');
+    var places = list.map(function (d) { return { kind: d.create ? 'action' : 'place', label: d.label, sub: d.section, href: d.href, create: d.create || '', raw: !!d.create }; });
+    var placesHtml = palGroups([['places', places]], q);
+    box.innerHTML = placesHtml;
+    var inp0 = pal.querySelector('input'); if (inp0) inp0.setAttribute('aria-activedescendant', placesHtml ? 'dds-res-0' : '');
+    palHint();
     // ── Records + Files: global search across CRM records (GET /crm/search) AND
     //    files (GET /assets?q=) — the Salesforce global-search pattern. Both join the
     //    SAME listbox contract as nav rows (role=option + id + aria-selected).
@@ -1254,22 +1329,27 @@
       var enc = encodeURIComponent(qq);
       // finding A15: both searches went out on every key press, so a seven-letter name sent
       // fourteen. Wait for a short pause in the typing; a newer key press cancels this one.
-      new Promise(function (go) { setTimeout(go, 200); }).then(function () { return tok !== fileSearchTok ? [[], []] : Promise.all([
-        hasCrm() ? api('/crm/search?q=' + enc).then(function (r) { return (r.ok && r.body && r.body.data && r.body.data.results) || []; }, function () { return []; }) : Promise.resolve([]),
+      new Promise(function (go) { setTimeout(go, 200); }).then(function () { return tok !== fileSearchTok ? [null, []] : Promise.all([
+        hasCrm() ? api('/crm/search?q=' + enc).then(function (r) { return (r.ok && r.body && r.body.data) ? r.body.data : { failed: true }; }, function () { return { failed: true }; }) : Promise.resolve({ results: [] }),
         hasFiles() ? api('/assets?q=' + enc + '&limit=6').then(function (r) { return (r.ok && r.body && r.body.data && r.body.data.assets) || []; }, function () { return []; }) : Promise.resolve([]),
       ]); }).then(function (res) {
-        if (tok !== fileSearchTok) return; // a newer keystroke won
-        var recs = res[0], files = res[1];
+        if (tok !== fileSearchTok || !res[0]) return; // a newer keystroke won
+        var crm = res[0], files = res[1];
+        var recs = crm.results || [];
         var cur = pal.querySelector('.results'); if (!cur) return;
-        var have = !!navHtml;
-        if (!recs.length && !files.length) { if (!have) cur.innerHTML = '<div class="none">Nothing matches “' + esc(q) + '”.</div>'; return; }
-        var n = (navHtml.match(/id="dds-res-/g) || []).length;
-        var extra = '';
-        recs.forEach(function (rec) { var sel = !have && !extra; extra += '<a class="res' + (sel ? ' sel' : '') + '" id="dds-res-' + n + '" role="option" aria-selected="' + (sel ? 'true' : 'false') + '" data-rec-label="' + esc(rec.label) + '" data-rec-href="' + esc(rec.href) + '" href="' + esc(withScope(rec.href)) + '">' + esc(rec.label) + '<span class="s">' + esc(rec.sub || 'Record') + '</span></a>'; n++; });
-        files.forEach(function (a) { var sel = !have && !extra; var sub = a.in_use ? 'Files · on your site' : 'Files'; extra += '<a class="res' + (sel ? ' sel' : '') + '" id="dds-res-' + n + '" role="option" aria-selected="' + (sel ? 'true' : 'false') + '" href="' + esc(withScope('/files.html?focus=' + a.id)) + '">' + esc(a.name || 'File') + '<span class="s">' + esc(sub) + '</span></a>'; n++; });
-        cur.innerHTML = navHtml + extra;
+        // a search that couldn't run says so, above whatever places still match
+        var note = crm.failed ? '<div class="pnote" role="status">' + icon('overview', 'pic') + '<span>We couldn’t search just now. Try again in a moment.</span></div>' : '';
+        if (!recs.length && !files.length && !note) { if (!places.length) cur.innerHTML = '<div class="none">Nothing matches “' + esc(q) + '”.</div>'; return; }
+        var byGroup = {};
+        recs.forEach(function (r) { var g = r.group || (r.kind === 'action' ? 'actions' : 'people'); (byGroup[g] = byGroup[g] || []).push({ kind: r.kind, label: r.label, sub: r.sub, href: r.href, snippet: r.snippet, alt: r.alt, rec: true }); });
+        var order = ['places', 'people', 'websites', 'enquiries', 'deals', 'money', 'projects', 'todos', 'messages', 'notes', 'files', 'actions'];
+        byGroup.places = places;
+        byGroup.files = files.map(function (a) { return { kind: 'file', label: a.name || 'File', sub: a.in_use ? 'Files · on your site' : 'Files', href: '/files.html?focus=' + a.id }; });
+        cur.innerHTML = note + palGroups(order.map(function (k) { return [k, byGroup[k] || []]; }), q)
+          + (crm.partial ? '<p class="pnote quiet">Some places couldn’t be searched just now.</p>' : '');
         var inpF = pal.querySelector('input'); var firstSel = cur.querySelector('.res.sel');
         if (inpF) inpF.setAttribute('aria-activedescendant', firstSel ? firstSel.id : '');
+        palHint();
       });
     } else if (!list.length) {
       box.innerHTML = '<div class="none">Nothing matches “' + esc(q) + '”.</div>';

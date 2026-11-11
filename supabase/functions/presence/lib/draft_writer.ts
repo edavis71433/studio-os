@@ -7,10 +7,14 @@
 //   • Entities in the draft but absent from the applied snapshot are HIDDEN,
 //     not deleted (the toggle philosophy, applied to time).
 //   • Media references that no longer resolve are dropped, counted, and told.
+//   • A restore (opts.settings) also brings back the website's settings: sections,
+//     pages, the menu, the header and footer choices (lib/draft_settings.ts).
 import { svc } from './db.ts';
 import { publishActorKind } from './actor_kind.ts';
 import { serializeDraft, variantPath } from './serializer.ts';
-import type { MediaManifestEntry } from './serializer.ts';
+import type { DraftRows, MediaManifestEntry } from './serializer.ts';
+import { draftSettingsOf, insertSnapshot, noDraftSettingsColumn, settingsBack, settingsFromContent } from './draft_settings.ts';
+import type { DraftSettings } from './draft_settings.ts';
 import { writeChangeEvent } from './provenance.ts';
 import { normalizeSnapshotContent, snapshotContentUsable } from './render_types.ts';
 import type { Snapshot, SnapshotContent } from './render_types.ts';
@@ -24,29 +28,50 @@ export interface ApplyResult {
 }
 
 interface MediaManifestRow { media_id: string; storage_path: string; variants: Array<{ output_path: string }> }
+type KeptSnapshot = { content: unknown; media_manifest?: MediaManifestRow[]; content_contract_version: number; template_slug: string; template_version: string; dev_customization?: { theme_tokens?: Record<string, string>; custom_css?: string; custom_html?: string } | null; draft_settings?: DraftSettings | null };
 
-/** Map a MediaRef back to a still-existing media_id via the snapshot's media
- *  manifest (variant paths are deterministic per storage_path). */
-function mediaResolver(mediaManifest: MediaManifestRow[], liveMedia: Array<{ id: string; storage_path: string }>) {
+/** Map a MediaRef (or a share image's path) back to a still-existing media_id via the
+ *  snapshot's media manifest (variant paths are deterministic per storage_path; a file
+ *  that isn't a photo has its original's path). One that no longer resolves is null,
+ *  and its storage path joins `gone`, so a photo used twice is counted once. Pure. */
+export function mediaResolver(mediaManifest: MediaManifestRow[], liveMedia: Array<{ id: string; storage_path: string }>, gone: Set<string>) {
   const byVariant = new Map<string, string>(); // output_path -> storage_path
   for (const m of mediaManifest || []) for (const v of m.variants || []) byVariant.set(v.output_path, m.storage_path);
   const liveByPath = new Map(liveMedia.map((m) => [m.storage_path, m.id]));
-  return (ref: { variants?: Record<string, string> } | null | undefined): { id: string | null; dropped: boolean } => {
-    if (!ref?.variants) return { id: null, dropped: false };
-    for (const p of Object.values(ref.variants)) {
+  return (ref: { variants?: Record<string, string>; original?: string } | string | null | undefined): string | null => {
+    const paths = typeof ref === 'string' ? [ref] : [...Object.values(ref?.variants || {}), ...(ref?.original ? [ref.original] : [])];
+    if (!paths.length) return null;
+    for (const p of paths) {
       const sp = byVariant.get(p) ?? [...liveByPath.keys()].find((k) => variantPath(k, 800) === p || variantPath(k, 400) === p || variantPath(k, 1600) === p);
-      if (sp && liveByPath.has(sp)) return { id: liveByPath.get(sp)!, dropped: false };
+      if (sp && liveByPath.has(sp)) return liveByPath.get(sp)!;
     }
-    return { id: null, dropped: true };
+    gone.add(byVariant.get(paths[0]) ?? paths[0]);
+    return null;
   };
+}
+
+/** The words a restore adds when photos it would have brought back have left the
+ *  library, with a leading space; '' when none did. Pure. */
+export function leftOffSentence(n: number, from: string): string {
+  return n ? ` ${n} photo${n > 1 ? 's' : ''} from ${from} ${n > 1 ? 'are' : 'is'} no longer in your library and ${n > 1 ? 'were' : 'was'} left off.` : '';
+}
+
+/** A kept snapshot as a restore reads it, with the settings it kept. A database without
+ *  migration 0169 has none to give. Null when it isn't this site's. */
+export async function snapshotForRestore(siteId: string, snapshotId: string): Promise<KeptSnapshot | null> {
+  const read = (more: string) => svc(`presence_snapshots?id=eq.${snapshotId}&site_id=eq.${siteId}&select=content,media_manifest,content_contract_version,template_slug,template_version,dev_customization${more}&limit=1`);
+  let s = await read(',draft_settings');
+  if (noDraftSettingsColumn(s)) s = await read('');
+  return s.json?.[0] ?? null;
 }
 
 export async function applySnapshotToDraft(
   site: SiteRow,
-  snapshot: { content: unknown; media_manifest?: MediaManifestRow[]; content_contract_version: number; template_slug: string; template_version: string; dev_customization?: { theme_tokens?: Record<string, string>; custom_css?: string; custom_html?: string } | null },
+  snapshot: KeptSnapshot,
   principal: Principal,
   summary: string,
-  current?: { snapshot: Snapshot; mediaManifest: MediaManifestEntry[] } | null,   // the draft as the caller already read it
+  current?: { snapshot: Snapshot; mediaManifest: MediaManifestEntry[]; draftSettings?: DraftSettings; rows?: DraftRows } | null,   // the draft as the caller already read it
+  opts: { settings?: boolean } = {},   // a restore: bring back the sections, pages, menu, header and footer too
 ): Promise<ApplyResult> {
   // the gate refuses unusable content no matter who calls — REPLACE semantics
   // applied from a degenerate snapshot would blank the draft
@@ -63,24 +88,22 @@ export async function applySnapshotToDraft(
       if (t) cur = await serializeDraft(site.id, t.manifest, { templateSlug: site.template_slug, templateVersion: site.template_version, now: new Date().toISOString() });
     }
     if (cur) {
-      await svc('presence_snapshots', {
-        method: 'POST', headers: { Prefer: 'return=minimal' },
-        body: JSON.stringify({
-          site_id: site.id, content: cur.snapshot.content, media_manifest: cur.mediaManifest,
-          content_contract_version: cur.snapshot.content_contract_version,
-          template_slug: site.template_slug, template_version: site.template_version,
-          dev_customization: cur.snapshot.dev_customization ?? null,  // Phase B1: safety snapshot keeps the current dev layer too
-          created_by: principal.userId, created_by_kind: actorKind,
-        }),
-      });
+      await insertSnapshot({
+        site_id: site.id, content: cur.snapshot.content, media_manifest: cur.mediaManifest,
+        content_contract_version: cur.snapshot.content_contract_version,
+        template_slug: site.template_slug, template_version: site.template_version,
+        dev_customization: cur.snapshot.dev_customization ?? null,  // Phase B1: safety snapshot keeps the current dev layer too
+        created_by: principal.userId, created_by_kind: actorKind,
+      }, cur.draftSettings ?? (cur.rows ? draftSettingsOf(cur.rows.presence_settings?.[0]) : null), 'return=minimal');   // and the sections, pages and menu as stored
     }
   } catch { /* safety snapshot is best-effort; the restore itself is still explicit */ }
 
-  let entities = 0, hidden = 0, dropped = 0;
+  let entities = 0, hidden = 0;
+  const gone = new Set<string>();   // storage paths of the photos left off, each once
 
   // 2. media resolver against current library
-  const mediaRows = (await svc(`presence_media?site_id=eq.${site.id}&deleted_at=is.null&select=id,storage_path`)).json ?? [];
-  const resolve = mediaResolver(snapshot.media_manifest || [], mediaRows);
+  const mediaRows: Array<{ id: string; storage_path: string; alt_text?: string | null }> = (await svc(`presence_media?site_id=eq.${site.id}&deleted_at=is.null&select=id,storage_path,alt_text`)).json ?? [];
+  const resolve = mediaResolver(snapshot.media_manifest || [], mediaRows, gone);
 
   // 3. identity (singleton upsert)
   const i = c.identity || ({} as SnapshotContent['identity']);
@@ -114,11 +137,29 @@ export async function applySnapshotToDraft(
     entities++;
   }
 
-  // 5. settings (section order)
-  await svc('presence_settings?on_conflict=site_id', {
+  // 5. settings: the section order, and on a restore all of the website's own — Home's
+  // sections, the pages, the menu, the header and footer, the logo, cover and share image,
+  // the announcement. As the snapshot kept them; one from before 0169 rebuilds them from
+  // its content. Account settings in the same row are left alone.
+  let back: DraftSettings = { category_order: c.settings?.category_order || [] };
+  if (opts.settings && snapshot.draft_settings && typeof snapshot.draft_settings === 'object') {
+    const live = new Set(mediaRows.map((m) => String(m.id).toLowerCase()));
+    const pathOf = new Map((snapshot.media_manifest || []).map((m) => [String(m.media_id).toLowerCase(), m.storage_path]));
+    // the photos that version showed and the library no longer holds
+    const goneIds = new Set([...pathOf.keys()].filter((id) => !live.has(id)));
+    const took = new Set<string>();
+    back = settingsBack(snapshot.draft_settings, goneIds, took);
+    for (const id of took) gone.add(pathOf.get(id) || id);
+  } else if (opts.settings) {
+    const altById = new Map(mediaRows.map((m) => [m.id, m.alt_text ?? '']));
+    back = settingsFromContent(c.settings, resolve, (id) => altById.get(id));
+  }
+  const setRes = await svc('presence_settings?on_conflict=site_id', {
     method: 'POST', headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },
-    body: JSON.stringify({ site_id: site.id, category_order: c.settings?.category_order || [] }),
+    body: JSON.stringify({ site_id: site.id, ...back }),
   });
+  if (opts.settings && !setRes.ok) return { ok: false, error: `settings: ${setRes.status}` };
+  if (opts.settings) entities++;
 
   // 6. collection sync — upsert by original id; hide what the snapshot lacks
   const syncCollection = async (
@@ -143,10 +184,7 @@ export async function applySnapshotToDraft(
 
   try {
     await syncCollection('presence_offerings', new Set(c.offerings.map((o) => o.id)),
-      c.offerings.map((o, idx) => {
-        const m = resolve(o.media); if (m.dropped) dropped++;
-        return { id: o.id, site_id: site.id, name: o.name, category: o.category, description: o.description || '', price_text: o.price_text || '', media_id: m.id, is_visible: true, sort_order: o.sort_order ?? idx, deleted_at: null };
-      }));
+      c.offerings.map((o, idx) => ({ id: o.id, site_id: site.id, name: o.name, category: o.category, description: o.description || '', price_text: o.price_text || '', media_id: resolve(o.media), is_visible: true, sort_order: o.sort_order ?? idx, deleted_at: null })));
     await syncCollection('presence_testimonials', new Set(c.testimonials.map((t) => t.id)),
       c.testimonials.map((t, idx) => ({ id: t.id, site_id: site.id, quote: t.quote, author: t.author, source: t.source || '', quote_date: t.quote_date || null, is_visible: true, sort_order: t.sort_order ?? idx, deleted_at: null })));
     await syncCollection('presence_faqs', new Set(c.faqs.map((f) => f.id)),
@@ -157,10 +195,9 @@ export async function applySnapshotToDraft(
 
   // 7. posts: snapshot posts return to published; published drafts not in the snapshot step back to draft
   for (const p of c.posts) {
-    const m = resolve(p.hero); if (m.dropped) dropped++;
     const r = await svc('presence_posts?on_conflict=id', {
       method: 'POST', headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },
-      body: JSON.stringify({ id: p.id, site_id: site.id, title: p.title, slug: p.slug, body_md: p.body_md, excerpt: p.excerpt || '', hero_media_id: m.id, status: 'published', published_at: p.published_at, deleted_at: null }),
+      body: JSON.stringify({ id: p.id, site_id: site.id, title: p.title, slug: p.slug, body_md: p.body_md, excerpt: p.excerpt || '', hero_media_id: resolve(p.hero), status: 'published', published_at: p.published_at, deleted_at: null }),
     });
     if (r.ok) entities++;
   }
@@ -193,5 +230,5 @@ export async function applySnapshotToDraft(
   // 8. provenance — one event, names only
   await writeChangeEvent({ siteId: site.id, entityType: 'restore', entityId: null, action: 'restore', summary, principal, provenance: 'human' });
 
-  return { ok: true, applied: { entities, hidden, dropped_media: dropped } };
+  return { ok: true, applied: { entities, hidden, dropped_media: gone.size } };
 }

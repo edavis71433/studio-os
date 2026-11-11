@@ -936,3 +936,43 @@ html.dds-cr-on body{overflow:hidden}
   #ddsPrint tr{break-inside:avoid}
   #ddsPrint .pl-foot{margin:16pt 0 0;font-size:8.5pt;color:#69667d;text-align:center}
 }
+
+/* ══ ⌘K across everything (sales item 84, Nov 2026): results in groups under small
+   headings, an icon per kind, the typed words in bold, what it is on the right, "Open
+   website" on a website row, a plain note when search couldn't run, and the keys at
+   the foot. Drawn in Figma (section 13, "Search — grouped results"). ══ */
+.dds-palette .box{max-width:680px;width:calc(100% - 32px)}
+.dds-palette .inrow{display:flex;align-items:center;gap:10px;padding:0 var(--dds-s5,20px);border-bottom:1px solid var(--dds-line)}
+.dds-palette .inrow input{border-bottom:0;padding-left:0;padding-right:0}
+.dds-palette .pic{width:18px;height:18px;flex:0 0 auto;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.dds-palette .inrow .pic{color:var(--dds-p)}
+.dds-palette .pclose{display:none;flex:0 0 auto;font:inherit;font-size:15px;font-weight:600;color:var(--dds-p);background:none;border:0;padding:0 2px;min-height:44px;cursor:pointer}
+.dds-palette .results{max-height:min(62vh,560px);padding:4px 8px 8px}
+.dds-palette .gh{font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--dds-faint);padding:12px 10px 4px}
+.dds-palette .res{gap:12px;padding:8px 10px;min-height:44px;box-sizing:border-box}
+.dds-palette .res .ri{width:28px;height:28px;border-radius:8px;display:grid;place-items:center;background:var(--dds-bg-raised,var(--dds-bg));color:var(--dds-soft);flex:0 0 auto}
+.dds-palette .res.sel .ri{background:var(--dds-card);color:var(--dds-p)}
+.dds-palette .res .rt{display:flex;flex-direction:column;min-width:0;flex:0 1 auto}
+.dds-palette .res .rl{font-size:14px;line-height:1.35;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.dds-palette .res .rs{font-size:12.5px;color:var(--dds-soft);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.dds-palette .res b{font-weight:700}
+.dds-palette .res .s{flex:0 1 auto;margin-left:auto;max-width:48%;text-align:right;font-size:12px;color:var(--dds-faint);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.dds-palette .res .alt{flex:0 0 auto;font-size:12.5px;font-weight:600;color:var(--dds-ink);background:var(--dds-card);border:1px solid var(--dds-line-strong,var(--dds-line));border-radius:999px;padding:4px 12px;cursor:pointer}
+.dds-palette .res .alt:hover{border-color:var(--dds-p);color:var(--dds-p)}
+.dds-palette .pnote{display:flex;align-items:center;gap:10px;margin:8px 2px 2px;padding:10px 12px;border-radius:10px;background:var(--dds-bg-raised,var(--dds-bg));color:var(--dds-soft);font-size:13px}
+.dds-palette .pnote.quiet{background:none;padding:6px 10px;font-size:12px;color:var(--dds-faint)}
+.dds-palette .hint{margin:0;padding:8px var(--dds-s5,20px);border-top:1px solid var(--dds-line);background:var(--dds-bg-raised,var(--dds-bg));font-size:11.5px;color:var(--dds-faint)}
+@media (max-width:760px){
+  .dds-palette{padding-top:0}
+  .dds-palette .box{width:100%;max-width:none;height:100dvh;border-radius:0;display:flex;flex-direction:column}
+  .dds-palette .results{max-height:none;flex:1 1 auto}
+  /* a phone: what it is goes under the name, so neither is cut short */
+  .dds-palette .res{min-height:52px;display:grid;grid-template-columns:28px minmax(0,1fr) auto;grid-template-areas:"i t a" "i s a";column-gap:12px;row-gap:1px;align-items:center}
+  .dds-palette .res .ri{grid-area:i}
+  .dds-palette .res .rt{grid-area:t}
+  .dds-palette .res .s{grid-area:s;margin-left:0;max-width:none;text-align:left}
+  .dds-palette .res .alt{grid-area:a}
+  .dds-palette .hint{display:none}
+  .dds-palette .pclose{display:inline-flex;align-items:center}
+}
+@media (pointer:coarse){.dds-palette .res .alt{min-height:36px;display:inline-flex;align-items:center}}

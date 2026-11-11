@@ -27,7 +27,10 @@ const BOUNDARY = [
   ['routes/publish.ts', 'restore: publish lookup', /presence_publishes\?id=eq\.\$\{encodeURIComponent\(publishId\)\}&site_id=eq\.\$\{site\.id\}/],
   ['routes/publish.ts', 'restore: snapshot fetch (M2 hardened)', /presence_snapshots\?id=eq\.\$\{row\.snapshot_id\}&site_id=eq\.\$\{site\.id\}/],
   ['routes/room.ts', 'restore-to-draft: publish lookup', /presence_publishes\?id=eq\.\$\{publishId\}&site_id=eq\.\$\{site\.id\}/],
-  ['routes/room.ts', 'restore-to-draft: snapshot fetch (M2 hardened)', /presence_snapshots\?id=eq\.\$\{rec\.snapshot_id\}&site_id=eq\.\$\{site\.id\}/],
+  // item 187: both restores read the kept snapshot through one helper, which is scoped to the site it's handed
+  ['routes/room.ts', 'restore-to-draft: snapshot fetch (M2 hardened)', /snapshotForRestore\(site\.id, rec\.snapshot_id\)/],
+  ['routes/publish.ts', 'checkpoint restore: snapshot fetch (M2 hardened)', /snapshotForRestore\(site\.id, row\.snapshot_id\)/],
+  ['lib/draft_writer.ts', 'a restore\'s snapshot fetch (M2 hardened)', /presence_snapshots\?id=eq\.\$\{snapshotId\}&site_id=eq\.\$\{siteId\}/],
   ['routes/launches.ts', 'launch: getLaunch entry lookup', /presence_launches\?id=eq\.\$\{id\}&site_id=eq\.\$\{site\.id\}/],
 ];
 
