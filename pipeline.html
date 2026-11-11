@@ -741,7 +741,7 @@ const boardCanMove=(from,to)=>from!==to&&to!=='won'&&(BOARD_NEXT[from]||[]).incl
 // sync with crm.html by hand, like the stage maps above).
 const PATH_STEPS=['lead','qualified','proposal','contract'];
 // calm, human labels for the deal's history strip (the raw event kinds stay backstage)
-const EVT_LABEL={created:'Deal created',stage_change:'Moved stage',note:'Note added',proposal_sent:'Proposal sent',proposal_decided:'Proposal decision',contract_sent:'Agreement sent',contract_signed:'Agreement signed',invoice_sent:'Invoice sent',invoice_paid:'Invoice paid',converted:'Converted to project',proposal_deleted:'Draft proposal removed',contract_deleted:'Draft agreement removed'};
+const EVT_LABEL={created:'Deal created',stage_change:'Moved stage',note:'Note added',proposal_sent:'Proposal sent',proposal_decided:'Proposal decision',contract_sent:'Agreement sent',contract_signed:'Agreement signed',invoice_sent:'Invoice sent',invoice_paid:'Invoice paid',converted:'Converted to project',proposal_deleted:'Draft proposal removed',contract_deleted:'Draft agreement removed',invoice_voided:'Invoice voided'};
 // item 69: the client opened a document's page (mirrors crm/deal_activity.ts openedLine by hand)
 const OPENED_WHAT={proposal:'proposal',agreement:'agreement',invoice:'invoice',deposit:'deposit request',estimate:'estimate'};
 function evtLabel(e){
@@ -753,7 +753,10 @@ function evtLabel(e){
   if(e.kind==='contract_signed'&&d.signer)return 'Agreement signed — '+d.signer;
   if(e.kind==='invoice_sent'&&d.amount_cents&&d.recurring_id)return 'Recurring invoice sent — '+money(d.amount_cents)+(d.period?' ('+d.period+')':'');   // item 47
   if(e.kind==='invoice_sent'&&d.amount_cents)return (d.purpose==='deposit'?'Deposit requested':'Invoice sent')+' — '+money(d.amount_cents);
-  if(e.kind==='invoice_paid'&&d.amount_cents)return (d.retainer?'Retainer charge paid':d.purpose==='deposit'?'Deposit paid':'Invoice paid')+' — '+money(d.amount_cents);
+  if(e.kind==='invoice_paid'&&d.amount_cents)return (d.retainer?'Retainer payment':d.purpose==='deposit'?'Deposit paid':'Invoice paid')+' — '+money(d.amount_cents);
+  // item 107 (J8, mirrors crm/deal_activity.ts): the withdrawn invoice and the removed drafts name what they were
+  if(e.kind==='invoice_voided')return (d.purpose==='deposit'?'Deposit request voided':'Invoice voided')+(d.title?' — '+d.title:'')+(d.amount_cents?(d.title?' ('+money(d.amount_cents)+')':' — '+money(d.amount_cents)):'');
+  if((e.kind==='proposal_deleted'||e.kind==='contract_deleted')&&d.title)return EVT_LABEL[e.kind]+' — '+d.title;
   if(e.kind==='doc_opened')return 'They opened your '+(OPENED_WHAT[d.what]||'document');
   // item 47 (mirrors lib/estimates.ts estimateEventLine and lib/recurring_invoices.ts recurringEventLine)
   if(e.kind==='estimate_sent')return 'Estimate sent'+(d.total_cents?' — '+money(d.total_cents):'');
@@ -1746,7 +1749,7 @@ function wireInvoiceActions(root,refresh){
   });
   // Send/resend ONE invoice (e.g. the balance now the milestone is reached).
   // Reuses /sales/invoices/:id/send (the single-invoice primitives).
-  root.querySelectorAll('[data-send-inv]').forEach(b=>b.onclick=async()=>{b.disabled=true;try{const r=await api('/sales/invoices/'+b.dataset.sendInv+'/send','POST',{});toast((r.resent?'Re-sent':'Sent')+(r.emailed?' — emailed to the client':(r.url?' — link copied':'')));if(r.url&&navigator.clipboard)navigator.clipboard.writeText(r.url).catch(()=>{});refresh();}catch(e){toast(nice(e),true);b.disabled=false;}});
+  root.querySelectorAll('[data-send-inv]').forEach(b=>b.onclick=async()=>{b.disabled=true;try{const r=await api('/sales/invoices/'+b.dataset.sendInv+'/send','POST',{});toast((r.double_tap?'Already sent a moment ago':r.resent?'Re-sent':'Sent')+(r.emailed?' — emailed to the client':(r.url?' — link copied':'')));if(r.url&&navigator.clipboard)navigator.clipboard.writeText(r.url).catch(()=>{});refresh();}catch(e){toast(nice(e),true);b.disabled=false;}});
   // Void an invoice raised in error — the only exit an unpaid invoice has other
   // than being paid. The button is only rendered on a NOT-paid row, and the
   // server refuses a paid one anyway (409): the UI mirrors the rule, it doesn't
@@ -3493,29 +3496,33 @@ async function openDeal(id){
         const r=await api('/sales/deals/'+id+'/invoice','POST',body);
         const label=body.purpose==='deposit'?'Deposit request':'Invoice';
         if(r.warning==='link_failed'){toast(r.message||label+' saved, but the payment link didn’t generate — tap Send again.',true);openDeal(id);return;}
-        toast(r.emailed?((r.reused?label+' re-sent ('+money(r.amount_cents)+')':label+' sent')+' — emailed to the client')
+        toast(r.double_tap?label+' already sent a moment ago'+(r.url?' — link copied':''):r.emailed?((r.reused?label+' re-sent ('+money(r.amount_cents)+')':label+' sent')+' — emailed to the client')
           :(NO_EMAIL&&r.url?noEmailWhy(label,'payment link')
           :((r.reused?label+' re-sent ('+money(r.amount_cents)+')':label+' sent')+(r.url?' — link copied':''))));
         if(r.url&&navigator.clipboard)navigator.clipboard.writeText(r.url).catch(()=>{});
         openDeal(id);
       }catch(e){
-        if(e.status===409&&e.body&&e.body.error==='amount_mismatch'){
-          const open=e.body.open_invoice||{};
+        // item 107 (J2): an open one exists — at a different amount (amount_mismatch, the
+        // typed amount or what's left of the proposal), or the same one already sent
+        // (already_open). Nothing goes out until he picks: resend THAT invoice (its own
+        // send route, which never makes a new one) or send another (force).
+        const why=e.status===409&&e.body&&e.body.error;
+        if(why==='amount_mismatch'||why==='already_open'){
+          const open=e.body.open_invoice||{}; const want=Number(e.body.amount_cents)||body.amount_cents||0;
           $('invForm').innerHTML=`<div class="mut" style="margin:8px 0" role="alert">${esc(e.body.message||'An open one already exists.')} <span class="mut">If you send another, both links stay payable until one is paid.</span></div>
-            <div class="row2"><button class="btn ghost" id="resendOpen">Resend the ${money(open.amount_cents)||'previous'} link</button>
-            <button class="btn ghost" id="forceNew">Send another for the new amount</button></div>`;
+            <div class="row2"><button class="btn ghost" id="resendOpen">Resend the ${money(open.amount_cents)||'previous'} ${body.purpose==='deposit'?'deposit request':'invoice'}</button>
+            <button class="btn ghost" id="forceNew">${why==='already_open'?'Send another':'Send another for '+(money(want)||'the new amount')}</button></div>`;
           $('resendOpen').focus();
-          // Resend passes the OPEN amount explicitly (an ad-hoc deposit may have no
-          // accepted proposal to default from); both buttons guard the double-click.
+          // both buttons guard the double-click
           const arm=(id,fn)=>{const b=$(id);b.onclick=()=>{$('resendOpen').disabled=true;$('forceNew').disabled=true;fn();};};
-          arm('resendOpen',()=>sendMoney({purpose:body.purpose,amount_cents:Number(open.amount_cents)||undefined,title:open.title||undefined}));
-          arm('forceNew',()=>sendMoney({...body,force:true}));
+          arm('resendOpen',async()=>{try{const r=await api('/sales/invoices/'+open.id+'/send','POST',{});toast((r.double_tap?'Already sent a moment ago':'Re-sent')+(r.emailed?' — emailed to the client':(r.url?' — link copied':'')));if(r.url&&navigator.clipboard)navigator.clipboard.writeText(r.url).catch(()=>{});openDeal(id);}catch(x){toast(nice(x),true);$('resendOpen').disabled=false;$('forceNew').disabled=false;}});
+          arm('forceNew',()=>sendMoney({...body,...(want&&!body.amount_cents?{amount_cents:want}:{}),force:true}));
           return;
         }
         toast(nice(e),true);
       }
     }
-    const sendInv=$('sendInvoice'); if(sendInv) sendInv.onclick=()=>miniForm($('invForm'),[{name:'amount',label:'Amount (USD) — leave blank to use the accepted proposal',type:'number',step:'0.01',placeholder:'2500'}],async(v)=>{const body={purpose:'service'};if(v.amount)body.amount_cents=Math.round(parseFloat(v.amount)*100);await sendMoney(body);});
+    const sendInv=$('sendInvoice'); if(sendInv) sendInv.onclick=()=>miniForm($('invForm'),[{name:'amount',label:'Amount (USD) — leave blank to bill what’s left of the accepted proposal',type:'number',step:'0.01',placeholder:'2500'}],async(v)=>{const body={purpose:'service'};if(v.amount)body.amount_cents=Math.round(parseFloat(v.amount)*100);await sendMoney(body);});
     // Retainer: ONE calm toggle — amount + monthly/annual, then the client
     // authorizes via Stripe (nothing charges until they do). NOT a plan-builder.
     const setupRet=$('setupRetainer'); if(setupRet) setupRet.onclick=()=>{const host=$('retForm');host.innerHTML='<div class="mini" style="margin-top:8px"><label class="mut" for="ret-amt">Amount (USD)</label><div class="row2" style="margin-top:2px"><input id="ret-amt" type="number" step="0.01" min="1" placeholder="500" style="max-width:140px"><select id="ret-int" aria-label="Billing frequency"><option value="month">Every month</option><option value="year">Every year</option></select></div><div class="row2" style="justify-content:flex-end;margin-top:8px"><button class="btn ghost" id="ret-cancel" type="button">Cancel</button><button class="btn" id="ret-go" type="button">Start retainer</button></div></div>';$('ret-cancel').onclick=()=>host.innerHTML='';setTimeout(()=>{const a=$('ret-amt');if(a)a.focus();},20);$('ret-go').onclick=async()=>{const a=parseFloat($('ret-amt').value||'0');if(!a||a<1){toast('Enter a retainer amount of at least $1.',true);return;}$('ret-go').disabled=true;try{const r=await api('/sales/deals/'+id+'/retainer','POST',{amount_cents:Math.round(a*100),interval:$('ret-int').value||'month'});const x=r.data||{};toast(x.emailed?'Retainer set up — the authorization link was emailed to the client':'Retainer set up — copy the authorization link to send it');if(x.url&&!x.emailed&&navigator.clipboard)navigator.clipboard.writeText(x.url).catch(()=>{});openDeal(id);}catch(e){toast(nice(e),true);$('ret-go').disabled=false;}};};

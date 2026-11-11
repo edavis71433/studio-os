@@ -328,7 +328,8 @@ async function collectClientConversation(u: URL, rs: RelScope): Promise<{
     for (const ev of dealEvents) {
       const d = (ev.detail && typeof ev.detail === 'object') ? ev.detail : {};
       if (ev.kind === 'note' && ['call', 'email', 'meeting', 'note'].includes(String(d.activity_kind))) {
-        items.push({ id: ev.id, kind: 'activity', activity_kind: String(d.activity_kind), from: 'studio', body: String(d.body || ''), created_at: String(d.occurred_at || ev.created_at) });
+        // item 107 (J8): who logged it rides along, so a teammate's call is theirs on the record
+        items.push({ id: ev.id, kind: 'activity', activity_kind: String(d.activity_kind), from: 'studio', actor: String(ev.actor || ''), body: String(d.body || ''), created_at: String(d.occurred_at || ev.created_at) });
       } else if (SYS.includes(String(ev.kind))) {
         items.push({ id: ev.id, kind: 'activity', activity_kind: String(ev.kind), from: 'studio', body: '', created_at: ev.created_at });
       }
@@ -394,7 +395,7 @@ export async function handleCrmActivity(req: Request, jwt: string, site: SiteRow
     ]);
 
     const items = mergeActivity([
-      conv.items.map(mapConversationItem),
+      conv.items.map((m: any) => mapConversationItem(m, principal.email || '')),   // item 107 (J8): "You" only for the reader's own
       dealEvents.map((e) => { const it = mapDealEvent(e, dealId); return it && stageNames ? { ...it, title: renameMovedTo(it.title, stageNames) } : it; }),   // item 38
       tasks.map((t) => mapDoneTask(t, dealId)),
       siteEvents,
