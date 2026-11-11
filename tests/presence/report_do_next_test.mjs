@@ -40,6 +40,7 @@ const facts = {
   eq('list: eight shown, the rest counted', [l.items.length, l.more], [8, 0]);
   const many = D.composeDoNext({ ...facts, needs: Array.from({ length: 9 }, (_, i) => ({ key: `money:m${i}`, what: `Invoice ${i}`, when: '', verb: 'Resend', href: '/x' })) }, none, NOW);
   eq('list: past eight, “more” counts the rest of every source', [many.items.length, many.more], [8, 8]);
+  eq('list: a Needs you line written to follow the site’s name stands alone here', D.composeDoNext({ ...facts, needs: [{ key: 'publish:s', what: 'changes are sitting unpublished', when: '', verb: 'Review', href: '/x' }] }, none, NOW).items[0].title, 'Changes are sitting unpublished');
   let dec = D.applyDecision(none, 'reviews:pending', 'done', 'Approve 2 new reviews', 'eric@studio.example', NOW);
   dec = D.applyDecision(dec, 'ai:who-is-a-good-realtor-in-burbank', 'not_relevant', 'Claude…', 'eric@studio.example', NOW);
   const after = D.composeDoNext(facts, dec, NOW);
@@ -122,6 +123,7 @@ const extras = R.foldExtras({
   ok('email: switched off, no attachment and no line about one', !sends[1].attachments && !/is attached/.test(sends[1].html));
   const dl = await R.handleReportPdf(site, {});
   ok('download: last month’s PDF, as a file, never cached', dl.status === 200 && dl.headers.get('Content-Type') === 'application/pdf' && /filename="Maple-and-Main-Realty-October-2026\.pdf"/.test(dl.headers.get('Content-Disposition')) && dl.headers.get('Cache-Control') === 'no-store');
+  ok('download: the page on the app’s host can read the file’s name', dl.headers.get('Access-Control-Expose-Headers') === 'Content-Disposition');
   const N = await import(`${P}/agency/do_next.ts`);
   const member = { agency_id: 'ag', member_id: 'm1', email: 'eric@studio.example', role: 'owner' };
   const deps = { needs: async () => ({ rows: [{ key: 'enquiry:e1', site_id: SITE, what: 'Reply to an enquiry', when: 'Since Monday', verb: 'Reply', href: '/inbox.html' }, { key: 'money:x', site_id: 'other', what: 'Not theirs', when: '', verb: 'Open', href: '/' }], rest: [] }) };

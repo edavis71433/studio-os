@@ -61,7 +61,8 @@ export function composeDoNext(f: DoNextFacts, decisions: { decided: Record<strin
   const ws = `/presence.html?client=${f.siteId}`;
   const all: DoNextItem[] = [];
   const add = (it: DoNextItem) => { if (!all.some((x) => x.key === it.key)) all.push(it); };
-  for (const n of f.needs) add({ key: n.key, source: 'needs', title: n.what, sub: n.when, verb: n.verb || 'Open', href: n.href });
+  // Needs you writes "changes are sitting unpublished" after the site's name; here it stands alone
+  for (const n of f.needs) add({ key: n.key, source: 'needs', title: n.what.charAt(0).toUpperCase() + n.what.slice(1), sub: n.when, verb: n.verb || 'Open', href: n.href });
   const healthTypes = new Set<string>();
   for (const h of (f.health || []).slice().sort((a, b) => (a.severity === b.severity ? b.n - a.n : a.severity === 'critical' ? -1 : 1)).slice(0, 3)) {
     healthTypes.add(h.type);

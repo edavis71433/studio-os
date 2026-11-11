@@ -191,6 +191,28 @@
   .wbtn{font:inherit;font-size:13px;font-weight:600;border:1px solid var(--line);border-radius:999px;background:transparent;color:var(--ink);padding:7px 14px;text-decoration:none;min-height:36px;display:inline-flex;align-items:center}
   .wbtn:hover{border-color:var(--accent);color:var(--accent)}
   .wbtn.main{background:var(--dds-grad-btn,var(--accent));border-color:transparent;color:var(--dds-on-p,#fff)} .wbtn.main:hover{filter:brightness(1.06);color:var(--dds-on-p,#fff)}
+  /* builder list item 184: one Do next list for this client, with Done and Not relevant */
+  .dn{margin-top:var(--dds-s5,20px);border:1px solid var(--line);border-radius:var(--dds-r-xl,16px);background:var(--card);box-shadow:var(--dds-shadow,0 1px 2px rgba(27,21,37,.04),0 8px 24px rgba(27,21,37,.06));padding:18px 20px}
+  .dn-h{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
+  .dn-h h2{margin:0;font-family:var(--dds-serif,'Fraunces',Georgia,serif);font-size:21px;font-weight:600}
+  .dn-h .n{font-size:13px;color:var(--soft)}
+  .dn-sub{margin:4px 0 6px;font-size:12.5px;color:var(--faint)}
+  .dn-list{list-style:none;margin:0;padding:0}
+  .dn-list li{display:flex;align-items:center;gap:12px;padding:11px 0;border-top:1px solid var(--line)}
+  .dn-tag{flex:0 0 88px;font-size:11px;font-weight:600}
+  .dn-tag span{display:inline-block;border-radius:999px;padding:2px 8px;background:var(--accent-soft);color:var(--accent)}
+  .dn-tag.health span{background:var(--dds-bad-soft,#fdeaea);color:var(--dds-bad,#9a4242)}
+  .dn-tag.search span,.dn-tag.ai span{background:var(--dds-info-soft,#e8f1fb);color:var(--dds-info,#2a6fb5)}
+  .dn-tag.reviews span{background:var(--warn-soft);color:var(--warn)}
+  .dn-tag.idea span{background:var(--good-soft);color:var(--good)}
+  .dn-t{flex:1;min-width:0}
+  .dn-t b{display:block;font-size:14px;font-weight:500;overflow-wrap:anywhere}
+  .dn-t span{display:block;font-size:12px;color:var(--faint)}
+  .dn-acts{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
+  .dn .wbtn{min-height:32px;padding:5px 11px;font-size:12.5px}
+  .dn-more{margin-top:8px;font:inherit;font-size:12.5px;font-weight:600;color:var(--accent);background:none;border:0;padding:4px 0;cursor:pointer}
+  .dn-done li{color:var(--soft)} .dn-done .dn-t b{text-decoration:line-through;text-decoration-color:var(--line)}
+  @media (max-width:700px){.dn-list li{flex-wrap:wrap}.dn-tag{flex-basis:100%}.dn-acts{width:100%;justify-content:flex-start}.dn .wbtn{min-height:44px}}
   @media (max-width:700px){.wdeck{grid-template-columns:1fr}.wpic{min-height:0}.wname{font-size:19px}.wbtn{min-height:44px}}   /* the height comes from the script (width × 0.625): an aspect-ratio here fed the height back into the width, without end */
   .hl-panel{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:1px;margin-top:var(--dds-s5,20px);border:1px solid var(--line);border-radius:var(--dds-r-lg,10px);background:var(--line);overflow:hidden}
   .hl{display:flex;align-items:center;gap:var(--dds-s3,12px);padding:var(--dds-s3,12px) var(--dds-s4,16px);min-width:0;background:var(--card);color:inherit;text-decoration:none}
@@ -525,6 +547,52 @@ async function mountSiteDeck(){
 // client's scope (exactly as crm.html reads it) and the project at studio level
 // (no scope header), as the record's Project tab does. Each tile exists only
 // when its read came back; a failed record read leaves the page as it was.
+async function apiPostStudio(path, body){ const r = await fetch(FN + path, { method: 'POST', headers: { 'Content-Type':'application/json', 'Authorization':'Bearer '+SUPABASE_KEY, 'x-dds-user-jwt':TOKEN,'x-dds-scope-site':'' }, body: JSON.stringify(body) }); const j = await r.json().catch(() => ({})); return r.ok ? j : Promise.reject(j); }
+// ── builder list item 184: one Do next list per client (GET /agency/sites/:id/do-next) ──
+// Needs you, the health check, Search, reviews, AI answers and the coach's ideas for this
+// client, in that order. Most items leave on their own when the thing is done; Done puts one
+// away for 30 days and Not relevant for good (POST …/do-next/decide). A failed read leaves
+// the Overview as it was.
+const DN_TAG = { 'needs': 'Needs you', 'health': 'Health', 'search': 'Search', 'reviews': 'Reviews', 'ai': 'AI answers', 'idea': 'Idea' };   // quoted: the role-limits test reads an unquoted needs: as a marked control
+let DN = null, DN_SHOW = false;
+async function mountDoNext(){
+  const id=new URLSearchParams(location.search).get('client');if(!id)return;
+  let r;try{r=await apiGetStudio('/agency/sites/'+encodeURIComponent(id)+'/do-next');}catch(_){return;}
+  if(!r||!r.data||!Array.isArray(r.data.items))return;   // an older server, or another answer: the Overview stays as it was
+  DN={items:r.data.items,decided:Array.isArray(r.data.decided)?r.data.decided:[],more:r.data.more||0};paintDoNext();
+}
+function paintDoNext(){
+  const id=new URLSearchParams(location.search).get('client');
+  let card=document.getElementById('do-next');
+  if(!card){
+    const main=$('main');if(!main)return;
+    card=document.createElement('section');card.className='dn';card.id='do-next';card.setAttribute('aria-labelledby','dn-h');
+    const deck=document.getElementById('client-site'),facts=document.getElementById('client-facts');
+    if(deck)deck.after(card);else if(facts)main.insertBefore(card,facts);else main.insertBefore(card,main.firstChild);
+  }
+  const d=DN||{items:[],decided:[],more:0};
+  const done=d.decided.filter((x)=>x.state==='done').length,nr=d.decided.length-done;
+  const rows=d.items.map((it,i)=>`<li data-key="${esc(it.key)}"><span class="dn-tag ${esc(it.source)}"><span>${esc(DN_TAG[it.source]||'')}</span></span><span class="dn-t"><b>${esc(it.title)}</b>${it.sub?`<span>${esc(it.sub)}</span>`:''}</span><span class="dn-acts">${/^\//.test(String(it.href||''))?`<a class="wbtn main" href="${esc(it.href)}">${esc(it.verb||'Open')}</a>`:''}<button type="button" class="wbtn" data-dn="done" data-i="${i}" aria-label="Done: ${esc(it.title)}">✓ Done</button><button type="button" class="wbtn" data-dn="not_relevant" data-i="${i}" aria-label="Not relevant: ${esc(it.title)}">Not relevant</button></span></li>`).join('');
+  const decidedRows=DN_SHOW?d.decided.map((x)=>`<li><span class="dn-tag"><span>${x.state==='done'?'Done':'Not relevant'}</span></span><span class="dn-t"><b>${esc(x.title||x.key)}</b></span><span class="dn-acts"><button type="button" class="wbtn" data-dn="undo" data-key="${esc(x.key)}" aria-label="Undo: ${esc(x.title||x.key)}">Undo</button></span></li>`).join(''):'';
+  card.innerHTML=`<div class="dn-h"><h2 id="dn-h">Do next</h2><span class="n">${d.items.length?`${d.items.length} to do${d.more?`, and ${d.more} more after these`:''}`:'Nothing waiting'}</span></div>
+    <p class="dn-sub">One list from Needs you, the health check, Search, reviews and this week’s ideas. Most tick themselves when the thing is done.</p>
+    ${d.items.length?`<ul class="dn-list">${rows}</ul>`:'<p class="dn-sub">Nothing to do for this client right now.</p>'}
+    ${d.decided.length?`<button type="button" class="dn-more" aria-expanded="${DN_SHOW}">${done} done and ${nr} not relevant this month · ${DN_SHOW?'Hide them':'Show them'}</button>${DN_SHOW?`<ul class="dn-list dn-done">${decidedRows}</ul>`:''}`:''}`;
+  card.querySelectorAll('[data-dn]').forEach((b)=>b.addEventListener('click',()=>decideDoNext(b,id)));
+  const more=card.querySelector('.dn-more');if(more)more.addEventListener('click',()=>{DN_SHOW=!DN_SHOW;paintDoNext();const m=document.querySelector('#do-next .dn-more');if(m)m.focus();});
+}
+async function decideDoNext(btn,id){
+  const decision=btn.getAttribute('data-dn');
+  const it=decision==='undo'?{key:btn.getAttribute('data-key'),title:''}:(DN.items[Number(btn.getAttribute('data-i'))]||null);
+  if(!it)return;
+  btn.disabled=true;
+  try{
+    const r=await apiPostStudio('/agency/sites/'+encodeURIComponent(id)+'/do-next/decide',{key:it.key,decision,title:it.title});
+    if(r.data&&Array.isArray(r.data.items))DN={items:r.data.items,decided:Array.isArray(r.data.decided)?r.data.decided:[],more:r.data.more||0};
+    paintDoNext();
+    if(window.ddsToast)ddsToast(decision==='done'?'Done. It’s off the list for 30 days.':decision==='not_relevant'?'Off the list for good.':'Back on the list.');
+  }catch(e){btn.disabled=false;if(window.ddsToast)ddsToast((e&&e.message)||'That didn’t save. Nothing changed; try again.','err');}
+}
 async function apiGetStudio(path){ const r = await fetch(FN + path, { headers: { 'Content-Type':'application/json', 'Authorization':'Bearer '+SUPABASE_KEY, 'x-dds-user-jwt':TOKEN,'x-dds-scope-site':'' } }); return r.ok ? r.json() : Promise.reject(r.status); }
 function clientFacts(rec,proj,ctx){
   if(!rec||!rec.identity)return null;
@@ -1074,7 +1142,7 @@ const SHELL_READY = document.readyState === 'loading' ? new Promise((r)=>documen
     // A failed feed must NOT masquerade as "all clear" — say we couldn't check.
     if(feedFailed){ const h=document.getElementById('main'); if(h){ const n=document.createElement('div'); n.style.cssText='margin:0 0 14px;padding:11px 16px;border-radius:12px;background:var(--warn-soft,#f3ead9);color:var(--warn,#775d31);font-size:13.5px'; n.textContent='We couldn’t load what needs you just now — refresh to try again.'; h.insertBefore(n,h.firstChild);} }
     studioProjectCard(bridged && bridged.data);
-    if(c0 && (c0.is_agency || c0.is_operator) && new URLSearchParams(location.search).get('client')) mountSiteDeck();
+    if(c0 && (c0.is_agency || c0.is_operator) && new URLSearchParams(location.search).get('client')) mountSiteDeck().finally(mountDoNext);   // item 184: the Do next list under their website
     orientationCard(ctx && ctx.data);
     planCard(ctx && ctx.data);
     healthLine();

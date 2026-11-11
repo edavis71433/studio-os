@@ -500,7 +500,8 @@ export async function handleReportPdf(site: SiteRow, cors: Record<string, string
   const [data, brand, client] = await Promise.all([loadReportData(site, win, tz), studio ? loadEmailBrand(studio, { logoTtl: 600 }) : Promise.resolve(EMAIL_BRAND_DEFAULT), clientOf(site).catch(() => ({ email: null, name: null }))]);
   const file = reportFileName(data.siteName, data.monthLabel);
   const bytes = reportPdf(data, { studioName: brand.name, accent: brand.accent, clientName: client.name, siteName: data.siteName || 'Your website' });
-  return new Response(bytes, { status: 200, headers: { ...cors, 'Content-Type': 'application/pdf', 'Content-Disposition': `attachment; filename="${file}"`, 'Cache-Control': 'no-store' } });
+  // Expose-Headers: the page is on another host, and can't read the file's name otherwise
+  return new Response(bytes, { status: 200, headers: { ...cors, 'Content-Type': 'application/pdf', 'Content-Disposition': `attachment; filename="${file}"`, 'Access-Control-Expose-Headers': 'Content-Disposition', 'Cache-Control': 'no-store' } });
 }
 
 /** A preview of last month's report to the caller, now. */

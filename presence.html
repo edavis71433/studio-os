@@ -2906,6 +2906,7 @@ function routeHash() {
   if (h === "pages") { go("pages"); return; }                   // content-tree.html retired
   if (h === "activity") { go("history"); setTimeout(() => hbScrollTo("activitySec"), 200); return; }  // timeline.html retired
   if (h === "preview") { openPreview("draft"); return; }
+  if (h === "plan") { if (hasFeature("business_moments")) openCoachDesk(); return; }   // builder list item 184: a coach idea on the client's Do next list
   if (h === "foundations" || h === "export") { openFoundationsDesk(); return; }   // deep-link the technical desk (approvals + "Download everything I own" live here)
   // #monitor — the analytics "Add their website address" CTA (routes/analytics.ts
   // record_href). The card lives far down the Business view; without the scroll,

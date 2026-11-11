@@ -101,6 +101,12 @@
   .sw:focus-visible{outline:2px solid var(--p);outline-offset:2px}
   .swrow .t{flex:1;min-width:0} .swrow .t b{display:block;font-weight:600} .swrow .t b input{width:56px;height:28px;border:1px solid var(--line);border-radius:var(--dds-r,8px);padding:0 var(--dds-s2,8px);font:inherit;font-size:13.5px;text-align:center;margin:0 2px;background:var(--card);color:var(--ink)}
   .swrow .t .how{font-size:12.5px;color:var(--faint);margin-top:2px}
+  /* builder list item 184: what the monthly report holds, as chips */
+  .rp-in{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin-top:var(--dds-s2,8px)}
+  .rp-in ul{display:flex;flex-wrap:wrap;gap:6px;margin:0;padding:0;list-style:none}
+  .rp-in .lbl{font-size:12px;color:var(--faint);margin-right:2px}
+  .rp-in li{font-size:12px;font-weight:500;border-radius:999px;padding:3px 9px;background:var(--p-soft);color:var(--p)}
+  .rp-in li.off{background:var(--bg);color:var(--faint);border:1px dashed var(--line)}
   .swrow .t .say{margin-top:var(--dds-s2,8px);font-size:13px;color:var(--soft);border-left:3px solid var(--line);padding:6px 10px;border-radius:0 var(--dds-r,8px) var(--dds-r,8px) 0;background:var(--bg)}
   .swrow .t .say .lbl{display:block;font-size:11.5px;color:var(--faint);text-transform:uppercase;letter-spacing:.04em;margin-bottom:2px}
   .stale.snames input{width:150px}
@@ -240,7 +246,8 @@
     <div class="swrow" id="reportSwRow">
       <button type="button" class="sw" role="switch" id="sw-report" aria-checked="false" aria-labelledby="sw-report-l"></button>
       <div class="t"><b id="sw-report-l">Send this client a monthly report</b>
-        <div class="how">In the first days of each month: visitors and pages viewed, enquiries, the pages people read most, and what changed. Sent to the email on their record, from your studio, with a reply address that reaches you.</div>
+        <div class="how">In the first days of each month: visitors and pages viewed, enquiries, how they did on Google and in AI answers, their reviews, the website’s health, the pages people read most, and what changed. Each part shows when there’s something to say. Sent to the email on their record, from your studio, with a reply address that reaches you.</div>
+        <div class="rp-in"><span class="lbl" id="reportInL">In the report:</span><ul id="reportIn" aria-labelledby="reportInL"></ul></div>
         <div class="how" id="reportLast"></div>
         <div class="how" id="reportWarn" role="status" hidden style="color:var(--bad,#b3261e)"></div></div>
     </div>
@@ -252,11 +259,17 @@
         <div class="how" id="aiCost"></div>
         <div class="how" id="aiLast"></div></div>
     </div>
+    <!-- builder list item 184: the same report as a PDF on the email, and to download any time -->
+    <div class="swrow" id="reportPdfRow">
+      <button type="button" class="sw" role="switch" id="sw-pdf" aria-checked="true" aria-labelledby="sw-pdf-l" aria-describedby="pdfHow"></button>
+      <div class="t"><b id="sw-pdf-l">Attach a PDF copy</b>
+        <div class="how" id="pdfHow">The same report as a file they can keep or print, on your brand. Download last month’s below to see it.</div></div>
+    </div>
     <div class="swrow" style="display:block" id="reportLineRow">
       <b style="font-weight:600">A line from you</b>
       <div class="how">Goes at the top of every report, in your words. Written once; change it any time.</div>
       <textarea id="report-note" maxlength="600" rows="3" placeholder="e.g. Thanks for a great month. The new photos are bringing people to the Services page." style="width:100%;margin-top:8px;font:inherit;font-size:14px;border:1px solid var(--line);background:var(--bg);color:var(--ink);border-radius:var(--dds-r,8px);padding:8px 12px;resize:vertical"></textarea>
-      <div style="margin-top:10px;display:flex;align-items:center;gap:10px;flex-wrap:wrap"><button type="button" class="btn" id="reportSave">Save the line</button><button type="button" class="btn ghost" id="reportPreview">Send me a preview</button><span class="how" id="reportMsg" role="status"></span></div>
+      <div style="margin-top:10px;display:flex;align-items:center;gap:10px;flex-wrap:wrap"><button type="button" class="btn" id="reportSave">Save the line</button><button type="button" class="btn ghost" id="reportPreview">Send me a preview</button><button type="button" class="btn ghost" id="reportPdf">Download last month’s PDF</button><span class="how" id="reportMsg" role="status"></span></div>
     </div>
   </section>
   <!-- builder list item 54 (Nov 2026): the menu areas a studio hides. Agency members at
@@ -892,10 +905,17 @@ function paintReport() {
   $('sw-ai').setAttribute('aria-checked', d.ai_checks ? 'true' : 'false');
   $('aiCost').textContent = d.ai_cost ? d.ai_cost + '.' : '';
   $('aiLast').textContent = aiStatusLine(d);
+  // item 184: the PDF switch, and what the report holds (AI answers only with the check on)
+  $('sw-pdf').setAttribute('aria-checked', d.pdf === false ? 'false' : 'true');
+  $('reportIn').innerHTML = REPORT_PARTS.map(([k, w]) => {
+    const off = (k === 'ai' && !d.ai_checks) || (k === 'pdf' && d.pdf === false);
+    return '<li' + (off ? ' class="off"' : '') + '>' + esc(w) + (off ? ', off' : '') + '</li>';
+  }).join('');
   // Nov 2026 review (finding 2): a client who can't be emailed is said so on the card, never a silent "On"
   const warn = d.blocked ? 'This client can’t get the report: ' + (REPORT_BLOCK_WORDS[d.blocked] || 'they can’t be emailed') + '.' + (d.blocked === 'no_email' ? ' Add their email on their record.' : '') : '';
   $('reportWarn').textContent = warn; $('reportWarn').hidden = !warn;
 }
+const REPORT_PARTS = [['visits', 'Visitors'], ['enquiries', 'Enquiries'], ['google', 'Google searches'], ['ai', 'AI answers'], ['reviews', 'Reviews'], ['health', 'Website health'], ['pages', 'Pages read most'], ['changes', 'What changed'], ['pdf', 'PDF copy']];
 const REPORT_BLOCK_WORDS = { no_email: 'there’s no email on their record', unsubscribed: 'they unsubscribed from emails', bounced: 'emails to them bounce' };
 // what happened last, in words: sent, skipped (why) or failed; `last_month` alone only means "handled"
 function reportStatusLine(d) {
@@ -946,6 +966,25 @@ function wireReport() {
     const next = !(REPORT && REPORT.ai_checks === true);
     $('sw-ai').setAttribute('aria-checked', next ? 'true' : 'false');
     if (await saveReport({ ai_checks: next })) toast(next ? 'On. The first check runs soon, then on the 1st of each month.' : 'Off. No more AI checks for this client.');
+  });
+  $('sw-pdf').addEventListener('click', async () => {
+    const was = !(REPORT && REPORT.pdf === false), next = !was;
+    $('sw-pdf').setAttribute('aria-checked', next ? 'true' : 'false');
+    if (await saveReport({ pdf: next }, () => $('sw-pdf').setAttribute('aria-checked', was ? 'true' : 'false'))) toast(next ? 'On. The report goes with a PDF copy.' : 'Off. The report goes without a PDF.');
+  });
+  // GET /report/monthly/pdf: last month's report as a file (a fetch with the sign-in, saved as a download)
+  $('reportPdf').addEventListener('click', async () => {
+    const b = $('reportPdf'); b.disabled = true; $('reportMsg').textContent = 'Making the PDF…';
+    try {
+      const r = await fetch(FN + '/report/monthly/pdf', { headers: H() });
+      if (!r.ok) throw new Error('pdf');
+      const blob = await r.blob();
+      const name = (/filename="([^"]+)"/.exec(r.headers.get('Content-Disposition') || '') || [])[1] || 'monthly-report.pdf';
+      const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name;
+      document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+      $('reportMsg').textContent = 'Downloaded ' + name + '.';
+    } catch (_) { $('reportMsg').textContent = ''; toast('The PDF didn’t download. Nothing changed; try again.', true); }
+    b.disabled = false;
   });
   $('reportSave').addEventListener('click', async () => { if (await saveReport({ note: $('report-note').value })) { $('reportMsg').textContent = 'Saved.'; setTimeout(() => { $('reportMsg').textContent = ''; }, 2500); } });
   $('reportPreview').addEventListener('click', async () => {
