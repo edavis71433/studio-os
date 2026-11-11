@@ -590,6 +590,19 @@ html.dc-edit:not(.plan-watch) .dc-close{height:36px;padding:0 14px;font-size:13p
 .ins-field{display:flex;flex-direction:column;gap:6px}
 .ins-lbl{display:block;font-size:12.5px;font-weight:500;color:var(--ink-2);margin:0}
 .ins-note{font-size:12.5px;color:var(--ink-3);line-height:1.5}
+/* item 155: a locked section's card leads with why, in the client's blue or the studio's plum */
+.ins-lock{display:flex;flex-wrap:wrap;align-items:flex-start;gap:8px 10px;margin:0 0 14px;padding:12px 14px;border-radius:12px;background:var(--info-soft);color:var(--ink)}
+.ins-lock>svg{flex:none;margin-top:1px;color:var(--info)}
+.ins-lock>p{flex:1 1 200px;margin:0;font-size:12.5px;line-height:1.5}
+.ins-lock.studio{background:var(--plum-soft,#f0ebfd)}
+.ins-lock.studio>svg{color:var(--plum)}
+.ins-lock .ins-lock-sw{flex:1 1 100%;display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:40px;margin:0;font-size:13.5px;color:var(--ink);cursor:pointer}
+.ins-lock .ins-lock-sw input{flex:none;-webkit-appearance:none;appearance:none;position:relative;width:40px;height:24px;margin:0;border-radius:999px;background:var(--hair-2);cursor:pointer;transition:background var(--dur) var(--ease)}
+.ins-lock .ins-lock-sw input::after{content:"";position:absolute;top:3px;left:3px;width:18px;height:18px;border-radius:50%;background:var(--sheet);box-shadow:0 1px 2px rgba(0,0,0,.2);transition:transform var(--dur) var(--ease)}
+.ins-lock .ins-lock-sw input:checked{background:var(--plum)}
+.ins-lock .ins-lock-sw input:checked::after{transform:translateX(16px)}
+.ins-lock .ins-lock-sw input:focus-visible{outline:2px solid var(--plum);outline-offset:2px}
+@media (prefers-reduced-motion:reduce){.ins-lock .ins-lock-sw input,.ins-lock .ins-lock-sw input::after{transition:none}}
 .ins-row{display:flex;align-items:center;justify-content:space-between;gap:10px;font-size:12.5px;color:var(--ink-3)}
 #settingsPanel[data-mode="section"] #blocksCard input:not([type=checkbox]):not([type=color]):not([type=date]):not([type=number]):not([type=range]),#settingsPanel[data-mode="section"] #blocksCard textarea,#settingsPanel[data-mode="section"] #blocksCard select{background:var(--dc-raised,var(--paper)) !important;border:1px solid var(--hair) !important;border-radius:12px !important;padding:11px 12px !important;font-size:14px !important;line-height:1.5 !important;color:var(--ink) !important;margin-bottom:10px !important}
 #settingsPanel[data-mode="section"] #blocksCard .ins-field input{margin-bottom:0 !important}
@@ -1166,6 +1179,9 @@ html.dds-has-shell.dds-has-ctxbar .stage{top:calc(var(--dds-shell-h) + var(--dds
 /* ── overlays as letters ── */
 .scrim{position:fixed;inset:0;background:color-mix(in srgb,var(--scrim-ink) 42%,transparent);z-index:80;display:none;align-items:flex-end;justify-content:center}
 .scrim.on{display:flex}
+/* item 171 (E1, E2): in the editor a sheet, the photo picker and the rest, opens above the bar, the dock and
+   the cards, so its own buttons take the press and nothing behind the dimmed screen does */
+html.dc-edit:not(.plan-watch) .scrim{z-index:96}
 @media(min-width:761px){.scrim{align-items:center}}
 .sheetcard{background:var(--sheet);border:1px solid var(--hair);border-radius:var(--r-lg) var(--r-lg) 0 0;width:100%;max-width:520px;max-height:88vh;overflow:auto;padding:var(--dds-s7,32px) var(--dds-s7,32px) var(--dds-s6,24px);box-shadow:var(--dds-shadow-pop,0 8px 28px rgba(21,20,26,.12))}
 @media(min-width:761px){.sheetcard{border-radius:var(--r-lg)}}
@@ -9196,9 +9212,9 @@ function renderLinkedChip(blk, idx, card) {
   [up, dn, rm].forEach((b) => { b.type = "button"; b.style.cssText = miniBtn; });
   up.disabled = idx === 0; dn.disabled = idx === BLOCKS_WORK.length - 1;
   if (up.disabled) up.style.opacity = ".35"; if (dn.disabled) dn.style.opacity = ".35";
-  up.addEventListener("click", () => { if (idx === 0) return; panelSwap(idx, idx - 1); renderBlocksCard(); });
-  dn.addEventListener("click", () => { if (idx === BLOCKS_WORK.length - 1) return; panelSwap(idx, idx + 1); renderBlocksCard(); });
-  rm.addEventListener("click", () => { panelRemove(idx); renderBlocksCard(); });
+  up.addEventListener("click", () => { if (idx === 0 || lockStop(idx)) return; panelSwap(idx, idx - 1); renderBlocksCard(); });
+  dn.addEventListener("click", () => { if (idx === BLOCKS_WORK.length - 1 || lockStop(idx)) return; panelSwap(idx, idx + 1); renderBlocksCard(); });
+  rm.addEventListener("click", () => { if (lockStop(idx)) return; panelRemove(idx); renderBlocksCard(); });
   head.append(nm, up, dn, rm); sub.appendChild(head);
   if (!item && CL_ITEMS !== null) {
     sub.appendChild(el("div", "hint", "The saved section this links to was removed, so this spot simply won’t appear on your site. Remove it here to tidy up."));
@@ -10428,9 +10444,9 @@ function renderBlocksCard() {
     [up, dn, rm].forEach((b) => { b.type = "button"; b.style.cssText = miniBtn; });
     up.disabled = idx === 0; dn.disabled = idx === BLOCKS_WORK.length - 1;
     if (up.disabled) up.style.opacity = ".35"; if (dn.disabled) dn.style.opacity = ".35";
-    up.addEventListener("click", () => { if (idx === 0) return; panelSwap(idx, idx - 1); if (BLOCK_SOLO === idx) BLOCK_SOLO = idx - 1; renderBlocksCard(); });
-    dn.addEventListener("click", () => { if (idx === BLOCKS_WORK.length - 1) return; panelSwap(idx, idx + 1); if (BLOCK_SOLO === idx) BLOCK_SOLO = idx + 1; renderBlocksCard(); });
-    rm.addEventListener("click", () => { const wasSolo = solo !== null; panelRemove(idx); if (wasSolo) closeSettingsPanel(); renderBlocksCard(); });
+    up.addEventListener("click", () => { if (idx === 0 || lockStop(idx)) return; panelSwap(idx, idx - 1); if (BLOCK_SOLO === idx) BLOCK_SOLO = idx - 1; renderBlocksCard(); });
+    dn.addEventListener("click", () => { if (idx === BLOCKS_WORK.length - 1 || lockStop(idx)) return; panelSwap(idx, idx + 1); if (BLOCK_SOLO === idx) BLOCK_SOLO = idx + 1; renderBlocksCard(); });
+    rm.addEventListener("click", () => { if (lockStop(idx)) return; const wasSolo = solo !== null; panelRemove(idx); if (wasSolo) closeSettingsPanel(); renderBlocksCard(); });
     const sv = el("button", null, "Save for reuse"); sv.type = "button"; sv.title = "Save this section to your content library"; sv.style.cssText = miniBtn;
     sv.addEventListener("click", () => clSave(idx));   // CL-1
     head.append(nm, sv, up, dn, rm); box.appendChild(head);
@@ -10686,7 +10702,7 @@ function renderBlocksCard() {
     // Phase EXP: the shared "Show this only for a while" window — same set of sections
     // (a spacer/auto TOC has nothing to schedule).
     if (!def.dividerSimple && !def.tocSimple) blockWindowRow(idx, blk, panes ? panes.when : sub, !!panes);
-    if (panes) insFinish(panes, idx, blk, def);
+    if (panes) { insFinish(panes, idx, blk, def); insLockNote(box, panes, idx, blk); }
     card.appendChild(box);
     // FD-T-LIB: a just-added section scrolls into view and takes focus, so it's
     // never "added but invisible" below the fold.
@@ -12375,6 +12391,35 @@ function lookSet(idx, key, value) {
   dcLiveFromPanel();
 }
 // the footer under every tab: who can see this section, and the quiet tools
+// Item 155: a locked section's card says so at its top. The studio gets the switch for the
+// client's words and Unlock; the client gets only the Content tab, its words open or shut, and
+// nothing else to press. Run for every section's card, so an unlocked one gets its tabs back.
+function insLockNote(box, panes, idx, blk) {
+  const lock = blkLock(blk), mine = lockedForMe(blk), seg = $("inspectorSeg");
+  if (seg) seg.querySelectorAll("[data-itab]").forEach((b) => { b.hidden = mine && b.dataset.itab !== "content"; });
+  if (!lock) return;
+  const note = el("div", "ins-lock" + (mine ? "" : " studio")); note.id = "insLock";
+  note.insertAdjacentHTML("afterbegin", uiIcon("lock", 16));
+  note.appendChild(el("p", null, mine
+    ? LOCK_SAY + (lock.words ? " You can change its words; ask your studio for anything else." : " Ask your studio if it needs to change.")
+    : "Locked for your client. They see a padlock and can’t move, restyle or delete it."));
+  box.insertBefore(note, box.firstChild);
+  if (!mine) {
+    const row = el("label", "pg-sw ins-lock-sw"); const t = el("span", null, "Client can change its words"); const cb = el("input"); cb.type = "checkbox"; cb.checked = !!lock.words;
+    cb.addEventListener("change", () => dcLockBlock(idx, true, cb.checked));
+    row.append(t, cb); note.appendChild(row);
+    const un = el("button", "dc-modal-cancel", "Unlock"); un.type = "button"; un.addEventListener("click", () => dcLockBlock(idx, false));
+    note.appendChild(un);
+    return;
+  }
+  if (INS_TAB !== "content") insTab("content");
+  // what isn't words: picking photos, adding or removing items, choices and switches
+  box.querySelectorAll("button, select, input[type=checkbox], input[type=radio], input[type=file], input[type=range], input[type=color], input[type=number], input[type=date]").forEach((n) => {
+    if (n.closest(".ins-lock") || (lock.words && n.closest(".ai-wrap"))) return;   // Write with AI writes words
+    n.disabled = true;
+  });
+  if (!lock.words) box.querySelectorAll("input, textarea").forEach((n) => { if (!n.closest(".ins-lock")) n.readOnly = true; });
+}
 function insFinish(panes, idx, blk, def) {
   const box = panes.content.parentNode;
   const notes = { style: "This section keeps your site’s style.", layout: "Nothing to lay out here.", when: "This section always shows." };
@@ -12569,6 +12614,7 @@ function exitEditMode(to) {   // to: the tab to land on (the Pages card's "Chang
   if (document.activeElement && document.activeElement.blur) document.activeElement.blur();   // a focused field commits on blur
   blocksSaveNow(); formsSaveNow();
   closeDesignPanels();
+  document.querySelectorAll(".scrim.on").forEach((sh) => closeSheet(sh.id));   // item 171 (E2): a sheet goes with the editor
   if (DC_MODE !== "edit") dcSetMode("edit");
   go(to || EDIT_RETURN);
 }
@@ -12590,6 +12636,7 @@ const KEY_MAC = /Mac|iPhone|iPad|iPod/.test(navigator.platform || navigator.user
   document.addEventListener("keydown", (e) => {
     if (!(e.ctrlKey || e.metaKey)) return;
     if ($("stage").classList.contains("on") || $("ritualWrap").classList.contains("on")) return;   // nothing to undo behind these
+    if (document.querySelector("dialog[open], .scrim.on")) return;   // item 171 (E6): not while a question or a sheet is up
     const dv = $("view-design");
     if (dv && dv.classList.contains("on") && DC_MODE === "timewarp") return;   // view modes are read-only — no blind undo
     const t = e.target; if (t && /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName || "")) return;   // don't hijack field editing
@@ -12624,6 +12671,10 @@ const KEY_MAC = /Mac|iPhone|iPad|iPod/.test(navigator.platform || navigator.user
   on("dkFind", () => { dcDockMore(false); openTrayPanel("add", true); });   // opens the library with its search box focused
   on("dkPreview", () => { dcDockMore(false); dcOpenPreview(); });
   on("dkMore", () => dcDockMore());
+  // item 171 (E4): on a phone More closes by itself: on a press anywhere outside it, and once any other
+  // dock button is used (a press on the page closes it too, in dcInjectCanvas)
+  document.addEventListener("pointerdown", (e) => { const d = $("dcDock"); if (d && d.classList.contains("more-open") && !d.contains(e.target)) dcDockMore(false); }, true);
+  const dk = $("dcDock"); if (dk) dk.addEventListener("click", (e) => { const b = e.target.closest && e.target.closest("button"); if (b && b.id !== "dkMore") dcDockMore(false); });
   on("dcBtnPreview", dcOpenPreview);
   on("btnPageInfo", togglePageInfoMenu);   // slice B: the Page Information menu (Share draft lives inside it now)
   // Slice D: the modes bar. #btnComments now lives INSIDE the segment (G11
@@ -12641,6 +12692,7 @@ const KEY_MAC = /Mac|iPhone|iPad|iPod/.test(navigator.platform || navigator.user
   const sc = $("dcScrim"); if (sc) sc.addEventListener("click", closeDesignPanels);
   document.addEventListener("keydown", (e) => {
     if (e.key !== "Escape") return;
+    if (document.querySelector("dialog[open]")) return;   // item 171 (E7): a question (or the photo editor) answers its own Escape
     if (PAGES_OPEN) {
       if (PI_OPEN) return;   // the Page menu closes itself first
       const pop = document.querySelector(".pp-pop:not(.pi-pop)"); if (pop) { e.stopPropagation(); pop.remove(); return; }   // so does a page's ⋯ menu
@@ -12861,6 +12913,7 @@ const BI_PATHS = {
   more: '<circle cx="5" cy="12" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="19" cy="12" r="1.4"/>',
   grip: '<circle cx="9" cy="6" r="1.3"/><circle cx="15" cy="6" r="1.3"/><circle cx="9" cy="12" r="1.3"/><circle cx="15" cy="12" r="1.3"/><circle cx="9" cy="18" r="1.3"/><circle cx="15" cy="18" r="1.3"/>',
   pencil: '<path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/>',
+  unlock: '<rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 7.6-1.7"/>',
   copy: '<rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>',
   scissors: '<circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M20 4L8.1 15.9M14.5 14.5L20 20M8.1 8.1L12 12"/>',
   x: '<path d="M18 6L6 18M6 6l12 12"/>',
@@ -13259,6 +13312,7 @@ function addBlockAt(d, at) {
   return i;   // the index it ACTUALLY used — callers stamp the new block via this, never a re-derived clamp
 }
 function moveBlockTo(from, gap) {
+  if (lockStop(from)) return false;   // item 155
   if (!spliceMove(BLOCKS_WORK, from, gap)) return false;
   renderBlocksCard();
   return true;
@@ -13763,18 +13817,39 @@ function dcMoveCol(bi, from, gap) {
   saveBlocks();
   return true;
 }
+// ── Item 155: locked sections ──
+// The studio locks a section from its More menu so the client can't move, restyle, copy or
+// delete it by accident: the section carries lock: { id, words } (lib/section_lock.ts on the
+// server refuses a client's save that would break it). With words open the client can still
+// change its words. The client sees a padlock in its name and fewer tools; only the studio
+// unlocks, and the studio is never held by its own lock. A copy is never locked.
+const blkLock = (b) => (b && b.lock && typeof b.lock.id === "string" ? b.lock : null);
+const lockedForMe = (b) => !!blkLock(b) && !S.isStudio;
+const LOCK_SAY = "Your studio locked this section so it stays as designed.";
+// Every way to move, copy, cut or delete a section asks this first (the tools are hidden too).
+function lockStop(bi) { if (!lockedForMe(BLOCKS_WORK[bi])) return false; toast(LOCK_SAY + " Ask them if it needs to change.", true); return true; }
+function dcLockBlock(bi, on, words) {
+  const b = BLOCKS_WORK[bi]; if (!b) return;
+  if (on) {
+    const id = blkLock(b) ? b.lock.id : "lk-" + ((crypto.randomUUID && crypto.randomUUID().replace(/-/g, "").slice(0, 12)) || Date.now().toString(36));
+    b.lock = { id, words: words === undefined ? (blkLock(b) ? b.lock.words : true) : !!words };
+  } else delete b.lock;
+  renderBlocksCard(); saveBlocks();
+  toast(!on ? "Unlocked: your client can change this section again"
+    : words === undefined ? "Locked: your client can change its words, nothing else" : (b.lock.words ? "Your client can change its words" : "Your client can’t change its words either"));
+}
 function dcDuplicate(bi) {
   dcSoloEnd();
-  const b = BLOCKS_WORK[bi]; if (!b) return;
+  const b = BLOCKS_WORK[bi]; if (!b || lockStop(bi)) return;
   const def = BLOCK_DEFS.find((x) => x.type === b.type);
-  const copy = JSON.parse(JSON.stringify(b)); delete copy._clEdit;
+  const copy = JSON.parse(JSON.stringify(b)); delete copy._clEdit; delete copy.lock;
   if (def && def.multi) copy.id = uniqueBlockId(b.type);   // multi-instance blocks get a fresh render key
   // G13 fix (review finding 1): compose the insertion shift BEFORE the splice.
   dcCaptureScroll(); dcComposeSrcMap(BLOCKS_WORK.length, (v) => dcShiftIndex(v, bi + 1, 1)); BLOCKS_WORK.splice(bi + 1, 0, copy); BLOCK_FOCUS = bi + 1; DC_FOCUS_BI = bi + 1; renderBlocksCard(); saveBlocks();
 }
 async function dcDelete(bi) {
   dcSoloEnd();
-  const b = BLOCKS_WORK[bi]; if (!b) return;
+  const b = BLOCKS_WORK[bi]; if (!b || lockStop(bi)) return;
   const def = BLOCK_DEFS.find((x) => x.type === b.type);
   if (!(await askYes("Delete this " + (((def && def.name) || "section").toLowerCase()) + "? Your live site is unchanged until you publish.", { ok: "Delete", danger: true }))) return;
   bi = BLOCKS_WORK.indexOf(b); if (bi < 0) return;   // read again: the list can move while the question is up
@@ -13792,14 +13867,14 @@ function dcClipGet() { try { return JSON.parse(sessionStorage.getItem(DC_CLIP_KE
 function dcClipSet(b) { try { sessionStorage.setItem(DC_CLIP_KEY, JSON.stringify(b)); } catch (_) {} }
 function dcCopyBlock(bi) {
   const b = BLOCKS_WORK[bi]; if (!b) return;
-  const copy = JSON.parse(JSON.stringify(b)); delete copy._clEdit;
+  const copy = JSON.parse(JSON.stringify(b)); delete copy._clEdit; delete copy.lock;   // item 155: a copy is never locked
   dcClipSet(copy);
   const def = BLOCK_DEFS.find((x) => x.type === b.type);
   toast("Copied “" + ((def && def.name) || "section") + "” — use the ＋ points to paste it");
 }
 function dcCutBlock(bi) {
   dcSoloEnd();
-  const b = BLOCKS_WORK[bi]; if (!b) return;
+  const b = BLOCKS_WORK[bi]; if (!b || lockStop(bi)) return;
   dcCopyBlock(bi);
   // G13 fix (review finding 1): same removal shift as dcDelete, pre-splice.
   dcCaptureScroll(); dcComposeSrcMap(BLOCKS_WORK.length, (v) => dcShiftIndex(v, bi, -1)); BLOCKS_WORK.splice(bi, 1); renderBlocksCard(); saveBlocks();
@@ -13808,7 +13883,7 @@ function dcCutBlock(bi) {
 function dcPasteAt(gap) {
   dcSoloEnd();
   const clip = dcClipGet(); if (!clip) { toast("Nothing copied yet"); return; }
-  const blk = JSON.parse(JSON.stringify(clip)); delete blk._clEdit;
+  const blk = JSON.parse(JSON.stringify(clip)); delete blk._clEdit; delete blk.lock;
   if (blk.id) blk.id = uniqueBlockId(blk.type + "_" + blk.id);   // MULTI blocks get a fresh render key
   const at = Math.max(0, Math.min(gap == null ? BLOCKS_WORK.length : gap, BLOCKS_WORK.length));
   // G13 fix (review finding 1): compose the insertion shift BEFORE the splice.
@@ -14273,6 +14348,8 @@ function ipeStart(doc, fieldEl, secEl) {
   const c = eeClassify(secEl);
   const path = fieldEl.getAttribute && fieldEl.getAttribute('data-dds-field');
   if (!ipeGate(DC_MODE, path, c) || !(BLOCKS_WORK || [])[c.bi]) { eeDoubleClickTarget(secEl); return; }   // never a dead double-click
+  const lk = BLOCKS_WORK[c.bi];
+  if (lockedForMe(lk) && !lk.lock.words) { eeEditBlock(c.bi); return; }   // item 155: locked with its words shut: the card says why
   const md = fieldEl.hasAttribute('data-dds-md');
   const prev = {};
   ['contenteditable', 'role', 'aria-label', 'aria-multiline', 'spellcheck'].forEach((a) => { prev[a] = fieldEl.getAttribute(a); });
@@ -14705,7 +14782,8 @@ function dcInjectCanvas(doc, main, live) {
       "header.site[data-dc-hf]:hover,footer.site[data-dc-hf]:hover,header.site.dc-hf-on,footer.site.dc-hf-on{outline:2px solid var(--ddsdc-p);outline-offset:-2px;cursor:pointer}" +
       ".dds-phonebar[data-dc-pb]:hover,.dds-phonebar.dc-hf-on{outline:2px solid var(--ddsdc-p);outline-offset:-2px;cursor:pointer}" +   // item 122: the phone bar belongs to the footer
       // on a phone the editor's dock covers the frame's foot: the bar sits just above it, and the page's end above both
-      ".dds-phonebar{bottom:var(--ddsdc-foot,0px)!important}.dds-pb-gap{height:calc(64px + var(--ddsdc-foot,0px))!important}" +
+      ".dds-phonebar{bottom:var(--ddsdc-foot,0px)!important}" +
+      "html body{padding-bottom:var(--ddsdc-foot,0px)}" +   // item 171 (E5): the page's end scrolls clear of the phone's dock
       // the chip stays in the tab order (a keyboard's way in), seen only on hover, focus or while its card is open
       // it hangs off the edge (under the header, over the footer), so the name and menu stay clear to click
       ".dc-hf-chip{position:absolute;left:12px;top:calc(100% - 12px);z-index:30;display:inline-flex;align-items:center;height:24px;padding:0 10px;border:0;border-radius:999px;background:var(--ddsdc-p-soft);color:var(--ddsdc-p);font:600 12px/1 var(--ddsdc-sans);white-space:nowrap;cursor:pointer;opacity:0;pointer-events:none}" +
@@ -14717,6 +14795,8 @@ function dcInjectCanvas(doc, main, live) {
       ".dds-theme-tag{position:absolute;display:inline-flex;align-items:center;gap:6px;height:24px;padding:0 10px 0 6px;border-radius:999px;background:var(--ddsdc-card);border:1px solid var(--ddsdc-line);box-shadow:0 2px 8px rgba(0,0,0,.12);color:var(--ddsdc-ink);font:600 11.5px/1 var(--ddsdc-sans);white-space:nowrap}" +
       ".dds-theme-tag i{width:12px;height:12px;border-radius:50%;border:1px solid var(--ddsdc-line2)}" +
       "#dds-dc-chip .dc-chip-type{font-weight:500;opacity:.8;margin-left:5px}" +
+      "#dds-dc-chip.locked>svg{flex:none;width:12px;height:12px;margin-right:5px;vertical-align:-1px}" +   // item 155: a locked section's padlock
+      "#dds-dc-bar .dc-b.dc-locked{color:var(--ddsdc-p)}" +
       "#dds-dc-chip.compact .dc-chip-type{display:none}" +
       // the More menu under the pill: copy, cut, hide, columns
       "#dds-dc-more{position:absolute;z-index:2147483001;display:none;flex-direction:column;min-width:200px;padding:6px;background:var(--ddsdc-card);border:1px solid rgba(var(--ddsdc-p-rgb),.08);border-radius:14px;box-shadow:var(--ddsdc-shadow);font-family:var(--ddsdc-sans)}" +
@@ -14792,10 +14872,16 @@ function dcInjectCanvas(doc, main, live) {
   // the name only; if it would still touch the pill it sits just above the section (item 51:
   // in the phone frame it dropped under the pill, onto the section's heading), or under the
   // pill when the section's top is off the screen.
+  // The menu opens under the pill, or above it when the screen's end (on a phone, the dock
+  // floating over the frame's last --ddsdc-foot pixels) leaves no room below: it moves with the
+  // pill as the page scrolls, so its last item (Lock this section, item 155) could never be reached.
   const placeMore = () => {
     const mb = bar.querySelector('[aria-haspopup="menu"]'); if (!mb) return;
-    const br = bar.getBoundingClientRect(), mw = more.offsetWidth || 200;
-    more.style.top = (br.bottom + win.scrollY + 6) + "px";
+    const br = bar.getBoundingClientRect(), mw = more.offsetWidth || 200, mh = more.offsetHeight || 0;
+    const foot = parseFloat(win.getComputedStyle(doc.documentElement).getPropertyValue("--ddsdc-foot")) || 0;
+    const below = win.innerHeight - foot - br.bottom - 6, above = br.top - 6;
+    const up = mh > below && above > below;
+    more.style.top = (up ? Math.max(win.scrollY + 4, br.top + win.scrollY - 6 - mh) : br.bottom + win.scrollY + 6) + "px";
     more.style.left = Math.max(win.scrollX + 8, br.right + win.scrollX - mw) + "px";
   };
   const place = (el2) => {
@@ -14860,30 +14946,38 @@ function dcInjectCanvas(doc, main, live) {
       const bi = c.bi, b = BLOCKS_WORK[bi] || {};
       const def = BLOCK_DEFS.find((x) => x.type === b.type) || {};
       chipType = def.name || b.type || "Section"; chipName = heading || chipType; if (chipName === chipType) chipType = "";
-      const grip = mkBtn("Move", "Drag to move this section (or use the editor’s up/down arrows)", null, { cls: "dc-grip", icon: "grip" });
-      // pointer-drag reorder — same engine as the tray. The grip lives INSIDE the
-      // iframe, so its coords are iframe-local (iframeLocal:true translates them to
-      // the parent for the ghost + drop-line). Resolves to one list index via dcMove.
-      grip.addEventListener("pointerdown", (e) => { e.preventDefault(); e.stopPropagation(); pdStart(e, { kind: "move", from: bi, iframeLocal: true, label: (BLOCKS_WORK[bi] && (BLOCK_DEFS.find((x) => x.type === BLOCKS_WORK[bi].type) || {}).name) || "Section", icon: "⠿" }, grip); });
-      bar.appendChild(grip);
-      bar.appendChild(mkBtn("Edit", "Edit this section", () => eeEditBlock(bi), { icon: "pencil" }));
-      bar.appendChild(mkBtn("Duplicate", "Duplicate this section", () => dcDuplicate(bi), { icon: "copy" }));
-      bar.appendChild(mkBtn("Style", "Style this section — its colours, type and layout", () => eeEditBlock(bi, "style"), { icon: "spark" }));
-      bar.appendChild(mkBtn("Delete", "Delete this section", () => dcDelete(bi), { cls: "dc-danger", icon: "x" }));
-      // the rest behind More: copy, cut, hide, and a Columns section's column count
-      more.appendChild(mkItem("Copy", "Copy this section — paste it anywhere", () => dcCopyBlock(bi), { icon: "clipboard" }));
-      more.appendChild(mkItem("Cut", "Cut this section — paste it anywhere", () => dcCutBlock(bi), { icon: "scissors" }));
-      more.appendChild(mkItem("Hide", "Hide this section", () => eeHideKey(el2.getAttribute("data-dds-key") || ddsKeyFor(bi)), { icon: "eyeoff" }));
-      if (b.type === "columns") {   // Layout Container: 1–6 columns; drag dividers to resize
-        const nc = Array.isArray(b.columns) ? b.columns.length : 2;
-        more.appendChild(mkItem(nc + (nc === 1 ? " column" : " columns"), "Columns — drag the dividers on the page to resize their widths", () => eeEditBlock(bi), { icon: "columns" }));
-        more.appendChild(mkItem("Add a column", "Add a column", () => dcSetColumns(bi, nc + 1), { cls: nc >= 6 ? "dc-off" : "", icon: "plus" }));
-        more.appendChild(mkItem("Remove a column", "Remove a column", () => dcSetColumns(bi, nc - 1), { cls: nc <= 1 ? "dc-off" : "", icon: "x" }));
+      if (lockedForMe(b)) {   // item 155: the studio locked it — its words at most, and a padlock that opens the card saying why
+        if (b.lock.words) bar.appendChild(mkBtn("Edit words", "Change this section’s words", () => eeEditBlock(bi), { icon: "pencil" }));
+        bar.appendChild(mkBtn("Locked", "Your studio locked this section so it stays as designed", () => eeEditBlock(bi), { cls: "dc-locked", icon: "lock" }));
+      } else {
+        const grip = mkBtn("Move", "Drag to move this section (or use the editor’s up/down arrows)", null, { cls: "dc-grip", icon: "grip" });
+        // pointer-drag reorder — same engine as the tray. The grip lives INSIDE the
+        // iframe, so its coords are iframe-local (iframeLocal:true translates them to
+        // the parent for the ghost + drop-line). Resolves to one list index via dcMove.
+        grip.addEventListener("pointerdown", (e) => { e.preventDefault(); e.stopPropagation(); pdStart(e, { kind: "move", from: bi, iframeLocal: true, label: (BLOCKS_WORK[bi] && (BLOCK_DEFS.find((x) => x.type === BLOCKS_WORK[bi].type) || {}).name) || "Section", icon: "⠿" }, grip); });
+        bar.appendChild(grip);
+        bar.appendChild(mkBtn("Edit", "Edit this section", () => eeEditBlock(bi), { icon: "pencil" }));
+        bar.appendChild(mkBtn("Duplicate", "Duplicate this section", () => dcDuplicate(bi), { icon: "copy" }));
+        bar.appendChild(mkBtn("Style", "Style this section — its colours, type and layout", () => eeEditBlock(bi, "style"), { icon: "spark" }));
+        bar.appendChild(mkBtn("Delete", "Delete this section", () => dcDelete(bi), { cls: "dc-danger", icon: "x" }));
+        // the rest behind More: copy, cut, hide, and a Columns section's column count
+        more.appendChild(mkItem("Copy", "Copy this section — paste it anywhere", () => dcCopyBlock(bi), { icon: "clipboard" }));
+        more.appendChild(mkItem("Cut", "Cut this section — paste it anywhere", () => dcCutBlock(bi), { icon: "scissors" }));
+        more.appendChild(mkItem("Hide", "Hide this section", () => eeHideKey(el2.getAttribute("data-dds-key") || ddsKeyFor(bi)), { icon: "eyeoff" }));
+        if (b.type === "columns") {   // Layout Container: 1–6 columns; drag dividers to resize
+          const nc = Array.isArray(b.columns) ? b.columns.length : 2;
+          more.appendChild(mkItem(nc + (nc === 1 ? " column" : " columns"), "Columns — drag the dividers on the page to resize their widths", () => eeEditBlock(bi), { icon: "columns" }));
+          more.appendChild(mkItem("Add a column", "Add a column", () => dcSetColumns(bi, nc + 1), { cls: nc >= 6 ? "dc-off" : "", icon: "plus" }));
+          more.appendChild(mkItem("Remove a column", "Remove a column", () => dcSetColumns(bi, nc - 1), { cls: nc <= 1 ? "dc-off" : "", icon: "x" }));
+        }
+        if (S.isStudio) more.appendChild(blkLock(b)   // item 155: only the studio locks and unlocks
+          ? mkItem("Unlock", "Unlock this section: your client can change it again", () => dcLockBlock(bi, false), { icon: "unlock" })
+          : mkItem("Lock this section", "Lock this section: your client can’t move, restyle or delete it", () => dcLockBlock(bi, true), { icon: "lock" }));
+        const mb = mkBtn("More", "More", null, { icon: "more" });
+        mb.setAttribute("aria-haspopup", "menu"); mb.setAttribute("aria-expanded", "false");
+        mb.addEventListener("click", () => { const on = !more.classList.contains("on"); more.classList.toggle("on", on); mb.setAttribute("aria-expanded", String(on)); if (on) { placeMore(); const f = more.querySelector(".dc-mi"); if (f) { try { f.focus({ preventScroll: true }); } catch (_) {} } } });
+        bar.appendChild(mb);
       }
-      const mb = mkBtn("More", "More", null, { icon: "more" });
-      mb.setAttribute("aria-haspopup", "menu"); mb.setAttribute("aria-expanded", "false");
-      mb.addEventListener("click", () => { const on = !more.classList.contains("on"); more.classList.toggle("on", on); mb.setAttribute("aria-expanded", String(on)); if (on) { placeMore(); const f = more.querySelector(".dc-mi"); if (f) { try { f.focus({ preventScroll: true }); } catch (_) {} } } });
-      bar.appendChild(mb);
     } else {
       chipName = heading || DC_CORE_NAME[c.view] || "Section"; chipType = "Built-in section";
       bar.appendChild(mkBtn("Edit", "Edit this section", () => eeEditCore(c.view), { icon: "pencil" }));
@@ -14896,6 +14990,9 @@ function dcInjectCanvas(doc, main, live) {
     }
     chip.textContent = chipName;
     if (chipType) { const t = doc.createElement("span"); t.className = "dc-chip-type"; t.textContent = "· " + chipType; chip.appendChild(t); }
+    const locked = c.kind === "block" && !!blkLock(BLOCKS_WORK[c.bi]);   // item 155: a locked section wears a padlock in its name, for both sides
+    chip.classList.toggle("locked", locked);
+    if (locked) chip.insertAdjacentHTML("afterbegin", uiIcon("lock", 12));
     bar.classList.add("on"); chip.classList.add("on"); place(el2);
   };
   // G13: refresh the sid→index lookup from the server sidecar, then wire every
@@ -15008,6 +15105,8 @@ function dcInjectCanvas(doc, main, live) {
   if (!doc.body.hasAttribute("data-dc-hintguard")) {
     doc.body.setAttribute("data-dc-hintguard", "1");
     ["pointerdown", "keydown"].forEach((t) => doc.addEventListener(t, dcDismissShellHint, true));
+    // item 171 (E3): a press on the page closes the Pages card, as a press anywhere else in the editor does
+    doc.addEventListener("pointerdown", () => { if (PAGES_OPEN) closePagesCard(false); dcDockMore(false); }, true);   // and the phone's More (E4)
   }
   // expose a selector so the content-tree rows can flash + select a section on click
   DC_SHOWBAR = (elx) => { try { showBar(elx); } catch (_) {} };
@@ -15283,10 +15382,11 @@ function dcTreeRow(el2, c) {
     return btn;
   };
   if (isBlock) {
-    acts.appendChild(mkA("↑", "Move up", () => dcMove(c.bi, c.bi - 1), c.bi <= 0));
-    acts.appendChild(mkA("↓", "Move down", () => dcMove(c.bi, c.bi + 2), c.bi >= (BLOCKS_WORK.length - 1)));
+    const held = lockedForMe(BLOCKS_WORK[c.bi]);   // item 155: a section the studio locked stays where it is
+    acts.appendChild(mkA("↑", held ? LOCK_SAY : "Move up", () => dcMove(c.bi, c.bi - 1), held || c.bi <= 0));
+    acts.appendChild(mkA("↓", held ? LOCK_SAY : "Move down", () => dcMove(c.bi, c.bi + 2), held || c.bi >= (BLOCKS_WORK.length - 1)));
     acts.appendChild(mkA(uiIcon("cog", 14), "Settings for this section", () => eeEditBlock(c.bi)));
-    acts.appendChild(mkA(uiIcon("trash", 14), "Remove this section", () => dcDelete(c.bi)));
+    acts.appendChild(mkA(uiIcon("trash", 14), held ? LOCK_SAY : "Remove this section", () => dcDelete(c.bi), held));
   } else {
     const keys = c.key ? dcCoreKeys(el2.parentNode) : [], at = keys.indexOf(c.key);
     if (at >= 0) {
