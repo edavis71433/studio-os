@@ -115,6 +115,40 @@ export async function createContactAndClient(
   return { contactId, clientId };
 }
 
+// Builder list item 135: a client made with no owner (a studio's "+ New site")
+// gets its owner's login later, the same chain createContactAndClient builds:
+// auth.users → contacts(auth_user_id) → clients.contact_id, plus the email on
+// the client row. Only while the client has no owner, and only for an email
+// nobody signs in with yet: an existing account is never attached to someone
+// else's site (final pass S1: asked, never taken). Undoes what it made when a
+// later step fails.
+export type AttachOwnerError = 'account_exists' | 'has_owner' | 'auth_failed' | 'contact_failed';
+export async function attachOwnerLogin(clientId: string, email: string, name: string): Promise<{ ok: true; contactId: string } | { ok: false; error: AttachOwnerError }> {
+  const want = String(email || '').trim().toLowerCase();
+  if (!validEmail(want)) return { ok: false, error: 'auth_failed' };
+  if (await findClientByEmail(want)) return { ok: false, error: 'account_exists' };
+  const auth = await createAuthUser(want, crypto.randomUUID() + 'Aa1!');
+  if (!('id' in auth)) return { ok: false, error: auth.error === 'account_exists' ? 'account_exists' : 'auth_failed' };
+  const contactIns = await svc('contacts', {
+    method: 'POST', headers: { Prefer: 'return=representation' },
+    body: JSON.stringify({ name: (String(name || '').trim() || want.split('@')[0]).slice(0, 120), email: want, auth_user_id: auth.id, stage: 'active', tenant_id: TENANT_ID }),
+  });
+  const contactId = contactIns.json?.[0]?.id;
+  if (!contactIns.ok || !contactId) { await deleteAuthUser(auth.id); return { ok: false, error: 'contact_failed' }; }
+  // still ownerless at the moment of writing, so two invitations at once can't both land
+  const w = await svc(`clients?id=eq.${clientId}&email=is.null&contact_id=is.null&select=id`, {
+    method: 'PATCH', headers: { Prefer: 'return=representation' },
+    body: JSON.stringify({ email: want, contact_email: want, contact_id: contactId }),
+  });
+  if (!w.ok || !Array.isArray(w.json) || !w.json.length) {
+    await svc(`contacts?id=eq.${contactId}`, { method: 'DELETE' }).catch(() => {});
+    await deleteAuthUser(auth.id);
+    // 409: another client took this email meanwhile (clients_email_key)
+    return { ok: false, error: w.status === 409 ? 'account_exists' : w.ok ? 'has_owner' : 'contact_failed' };
+  }
+  return { ok: true, contactId: String(contactId) };
+}
+
 // A recovery/verify email link the customer can click. Uses Supabase's own
 // recover endpoint so the link is a real, signed one that lands on
 // set-password.html (the existing flow) — used here as "confirm it's you".
