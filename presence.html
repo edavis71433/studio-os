@@ -537,6 +537,9 @@ html.dc-edit:not(.plan-watch) .dc-twbar[hidden]{display:none}
 #hfCard .pg-sw input:focus-visible{outline:2px solid var(--plum);outline-offset:2px}
 @media (prefers-reduced-motion:reduce){#hfCard .pg-sw input,#hfCard .pg-sw input::after{transition:none}}
 .hf-row{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--ink)}
+/* item 122: the phone bar's Off, Light and Dark, the card's own segmented control */
+#hfCard .hf-seg{margin:0}
+#hfCard .hf-seg button[aria-pressed="true"]{background:var(--sheet);color:var(--ink);font-weight:600;box-shadow:var(--dds-shadow)}
 .hf-row span{flex:1}
 #settingsPanel:not([data-mode="styles"]) #designGallery,#settingsPanel:not([data-mode="styles"]) #stylesAsk{display:none !important}
 #settingsPanel[data-mode="section"] #designHost>*:not(#blocksCard),#settingsPanel[data-mode="sections"] #designHost>*:not(#blocksCard),#settingsPanel[data-mode="forms"] #designHost>*:not(#formsCard){display:none}
@@ -4377,9 +4380,24 @@ function rvStars(n) {
 }
 function renderReviews(wrap, data) {
   const reviews = data.reviews || [], counts = data.counts || {}, agg = data.aggregate || { count: 0, average: 0 };
+  const g = data.google || {};
 
-  // ── 1. Ask for a review ─────────────────────────────────────────────────────
-  const c1 = rvCard("Ask for a review", "Send a happy customer a friendly, branded link to leave a review. They write it; you approve it before it ever shows. (Nothing is posted on their behalf.)");
+  // ── 1. Ask for a review (item 115: it can point at the Google review box) ───
+  const c1 = rvCard("Ask for a review", "Send a happy customer a friendly, branded link to leave a review. They write it — nothing is posted on their behalf.");
+
+  // Where the request sends them: your site's review page, or the Google review box.
+  const destWrap = el("div"); destWrap.style.cssText = "display:flex;gap:16px;flex-wrap:wrap;margin:0 0 12px";
+  const mkDest = (value, label, disabled) => {
+    const lab = el("label"); lab.style.cssText = "display:flex;align-items:center;gap:6px;font-size:13.5px" + (disabled ? ";color:var(--soft,#888)" : "");
+    const rb = el("input"); rb.type = "radio"; rb.name = "rv-dest"; rb.value = value; rb.disabled = !!disabled; if (value === "site") rb.checked = true;
+    lab.append(rb, el("span", null, label)); return lab;
+  };
+  destWrap.appendChild(el("span", null, "Send them to:")).style.cssText = "font-size:13px;font-weight:600";
+  destWrap.appendChild(mkDest("site", "Your website’s review page", false));
+  destWrap.appendChild(mkDest("google", "Your Google review box", !g.link));
+  c1.appendChild(destWrap);
+  const rvDest = () => { const r = wrap.querySelector('input[name="rv-dest"]:checked'); return r && r.value === "google" ? "google" : "site"; };
+
   const rowA = el("div"); rowA.style.cssText = "display:grid;grid-template-columns:1fr 1fr auto;gap:10px;align-items:end;flex-wrap:wrap";
   const em = el("input"); em.type = "email"; em.placeholder = "Customer email"; em.style.cssText = RV_ICSS;
   const nm = el("input"); nm.type = "text"; nm.placeholder = "Their name (optional)"; nm.style.cssText = RV_ICSS;
@@ -4388,7 +4406,7 @@ function renderReviews(wrap, data) {
     const email = em.value.trim(); if (!email) { toast("Add the customer's email", true); return; }
     ask.disabled = true;
     try {
-      const r = await api("POST", "/reviews/request", { email, name: nm.value.trim() });
+      const r = await api("POST", "/reviews/request", { email, name: nm.value.trim(), destination: rvDest() });
       toast(r.data && r.data.sent === false ? "That address has opted out — nothing sent." : "Review request sent");
       em.value = ""; nm.value = "";
     } catch (err) { toast(nice(err), true); } finally { ask.disabled = false; }
@@ -4396,8 +4414,87 @@ function renderReviews(wrap, data) {
   const fA = (label, node) => { const w = el("label"); w.style.cssText = "display:flex;flex-direction:column;gap:4px;font-size:13px;font-weight:600"; w.appendChild(el("span", null, label)); w.appendChild(node); return w; };
   rowA.append(fA("Email", em), fA("Name", nm), ask);
   c1.appendChild(rowA);
+
+  // The Google link's state, in plain words — and the paste-once place id.
+  const gState = el("div"); gState.style.cssText = "margin-top:12px;padding:10px 12px;border:1px dashed var(--line,#ddd);border-radius:10px;font-size:13px";
+  if (g.link && g.source === "google") {
+    gState.appendChild(el("p", null, "Google requests use the review link from your Google listing.")).style.margin = "0";
+  } else {
+    if (g.link) gState.appendChild(el("p", null, "Google requests use the place id you pasted.")).style.cssText = "margin:0 0 8px";
+    else if (g.connected) gState.appendChild(el("p", null, "Your Google listing is connected, but Google hasn’t approved the listing connection yet, so it hasn’t handed back your review link. Paste your place id below to send Google requests now.")).style.cssText = "margin:0 0 8px";
+    else gState.appendChild(el("p", null, "To send people to your Google review box, paste your Google place id — or the full “write a review” link from Google.")).style.cssText = "margin:0 0 8px";
+    if (g.can_save_place_id === false) {
+      gState.appendChild(el("p", "hint", "Saving a place id needs a one-time database update by your studio first.")).style.margin = "0";
+    } else {
+      const rowG = el("div"); rowG.style.cssText = "display:flex;gap:8px;flex-wrap:wrap";
+      const pid = el("input"); pid.type = "text"; pid.placeholder = "Google place id or “write a review” link"; pid.value = g.place_id || ""; pid.style.cssText = RV_ICSS + ";flex:1;min-width:220px";
+      const sv = el("button", null, "Save Google link"); sv.dataset.needs = "configure"; sv.style.cssText = BK_BTN + ";border-color:var(--plum,#5b3fa0);color:var(--plum,#5b3fa0)";
+      sv.addEventListener("click", async () => {
+        sv.disabled = true;
+        try {
+          const r = await api("POST", "/reviews/google-link", { place_id: pid.value.trim() });
+          toast(r.data && r.data.link ? "Saved — Google requests are ready" : "Cleared — requests use your website’s page");
+          loadReviews();
+        } catch (err) { toast(nice(err), true); sv.disabled = false; }
+      });
+      rowG.append(pid, sv); gState.appendChild(rowG);
+    }
+  }
+  c1.appendChild(gState);
   c1.appendChild(el("div", "hint", "Tip: the best time to ask is right after a completed job, appointment, or sale.")).style.cssText = "margin-top:10px;font-size:12.5px";
   wrap.appendChild(c1);
+
+  // ── 1b. Just paid you (item 115): the ticked list — an offer, never automatic ─
+  const paid = data.recently_paid || [];
+  if (paid.length) {
+    const cp = rvCard("Just paid you", "Customers whose invoice was paid recently — the best moment to ask. Tick who to ask; each person is asked at most once a month.");
+    const boxes = [];
+    paid.forEach((p) => {
+      const row = el("label"); row.style.cssText = "display:flex;align-items:center;gap:10px;padding:8px 10px;border:1px solid var(--line,#eee);border-radius:10px;margin-bottom:6px;font-size:13.5px;cursor:pointer";
+      const cb = el("input"); cb.type = "checkbox"; cb.value = p.contact_id; boxes.push(cb);
+      const who = el("span", null, p.name || p.email); who.style.fontWeight = "600";
+      const what = el("span", "hint", (p.purpose === "deposit" ? "Deposit" : "Paid") + (p.title ? " — " + p.title : "") + (p.paid_at ? " · " + bkWhenLabel(String(p.paid_at).slice(0, 10)) : ""));
+      what.style.cssText = "font-size:12.5px";
+      row.append(cb, who, what); cp.appendChild(row);
+    });
+    const go = el("button", "pillbtn", "Ask the ticked customers"); go.style.cssText = "height:36px;padding:0 16px;font-size:13.5px;margin-top:6px";
+    go.addEventListener("click", async () => {
+      const ids = boxes.filter((b) => b.checked).map((b) => b.value);
+      if (!ids.length) { toast("Tick at least one customer", true); return; }
+      go.disabled = true;
+      try {
+        const r = await api("POST", "/reviews/request", { contact_ids: ids, destination: rvDest() });
+        const d = (r && r.data) || {};
+        const skipped = (d.skipped || []).length;
+        toast("Asked " + (d.sent || 0) + (skipped ? " — " + skipped + " skipped (asked recently, opted out, or no email)" : ""));
+      } catch (err) { toast(nice(err), true); } finally { go.disabled = false; }
+    });
+    cp.appendChild(go);
+    wrap.appendChild(cp);
+  }
+
+  // ── 1c. Your Google reviews (item 115): pulled in once Google approves ──────
+  const cg = rvCard("Your Google reviews", null);
+  if (g.listing && (g.listing.rating || g.listing.review_count)) {
+    const line = el("div"); line.style.cssText = "display:flex;align-items:center;gap:10px;flex-wrap:wrap";
+    line.appendChild(rvStars(g.listing.rating));
+    line.appendChild(el("span", null, (g.listing.rating || "—") + " from " + (g.listing.review_count || 0) + " Google reviews")).style.fontWeight = "600";
+    cg.appendChild(line);
+    const bits = [];
+    if (g.listing.new_reviews) bits.push(g.listing.new_reviews + " new in the last month");
+    if (g.listing.unreplied) bits.push(g.listing.unreplied + " without a reply");
+    if (bits.length) cg.appendChild(el("p", "hint", bits.join(" · "))).style.cssText = "margin:8px 0 0;font-size:12.5px";
+    if (g.listing.maps_uri) {
+      const a = el("a", null, "Open your listing on Google →"); a.href = g.listing.maps_uri; a.target = "_blank"; a.rel = "noopener";
+      a.style.cssText = "display:inline-block;margin-top:10px;font-size:13px"; cg.appendChild(a);
+    }
+    cg.appendChild(el("p", "hint", "Google reviews are read here, not managed here — reply to them on Google.")).style.cssText = "margin:8px 0 0;font-size:12px";
+  } else {
+    cg.appendChild(el("p", "hint", g.connected
+      ? "Google hasn’t approved the listing connection yet. Your Google reviews will show here once it does — nothing for you to do."
+      : "Not connected. Once Google approves the listing connection, connect your Google Business Profile and your Google reviews will show here."));
+  }
+  wrap.appendChild(cg);
 
   // ── 2. Waiting for you (pending) ────────────────────────────────────────────
   const pending = reviews.filter((r) => r.status === "pending");
@@ -11772,16 +11869,63 @@ function renderHFCard(which) {
     });
     host.appendChild(row);
   });
+  if (DESIGN_DEV) pbPart(host);
   host.appendChild(el("p", "hf-says", "Your address, phone and email come from your business details. Links to your privacy and accessibility pages are added for you."));
   const biz = el("button", "dc-modal-cancel", "Change the business details"); biz.type = "button";
   biz.addEventListener("click", () => { closeSettingsPanel(); exitEditMode("business"); });
   const a = el("div", "hf-row"); a.appendChild(biz); host.appendChild(a);
 }
+// ── Item 122: the phone bar, Call, Directions, Hours and Email along the bottom of every page
+// on a phone. One choice, Off, Light or Dark, is the style setting phone_bar (lib/phone_bar.ts
+// on the server, which draws it); Off removes the setting. A button shows only when the
+// business details have something behind it, worked out here the same way, so the card says
+// which ones the bar will have and what's missing.
+function pbNow() { const t = DESIGN_TOKENS && DESIGN_TOKENS.phone_bar; return t === "light" || t === "dark" ? t : ""; }
+function pbButtons() {
+  const i = S.identity || {}, loc = S.location || {}, out = [];
+  const tel = String(loc.phone || i.phone || "").trim().replace(/\s*(?:ext\.?|extension|x|#)\s*\d+\s*$/i, "").replace(/\D/g, "");
+  if (tel.length >= 7) out.push("Call");
+  if (String(loc.address_line1 || "").trim()) out.push("Directions");
+  if (loc.temporarily_closed || (loc.hours || []).some((d) => d && !d.closed && (d.intervals || []).length)) out.push("Hours");
+  if (/^[^\s@<>"']+@[^\s@<>"']+\.[^\s@<>"']+$/.test(String(i.email || "").trim())) out.push("Email");
+  return out;
+}
+function pbPart(host) {
+  host.appendChild(el("div", "ins-lbl", "Phone bar · phones only"));
+  const now = pbNow();
+  const seg = el("div", "dc-seg hf-seg"); seg.id = "pbSeg"; seg.setAttribute("role", "group"); seg.setAttribute("aria-label", "Phone bar");
+  [["", "Off"], ["light", "Light"], ["dark", "Dark"]].forEach(([v, name]) => {
+    const b = el("button", null, name); b.type = "button"; b.dataset.v = v || "off"; b.setAttribute("aria-pressed", String(now === v));
+    b.addEventListener("click", async () => {
+      if (v === pbNow()) return;
+      await saveTokens({ phone_bar: v }, "Phone bar: " + name.toLowerCase());
+      refreshDesignPreview();   // the canvas draws it (at a phone's width)
+      if (PANEL_MODE === "footer") renderHFCard("footer");
+    });
+    seg.appendChild(b);
+  });
+  host.appendChild(seg);
+  const NEEDS = { Call: "a phone number", Directions: "an address", Hours: "opening hours", Email: "an email" };
+  const and = (xs) => xs.join(", ").replace(/, ([^,]*)$/, " and $1");
+  const has = pbButtons(), missing = Object.keys(NEEDS).filter((x) => has.indexOf(x) < 0);
+  const says = !has.length ? "Add a phone number, an address, opening hours or an email to your business details, and the bar can show them."
+    : !now ? "Call, Directions, Hours and Email along the bottom of every page on a phone, from your business details."
+    : "On a phone, every page with the footer shows " + and(has) + " along the bottom."
+      + (missing.length ? " Add " + and(missing.map((x) => NEEDS[x])) + " to your business details to show " + and(missing) + " too." : "");
+  const p = el("p", "hf-says", says); p.id = "pbSays"; host.appendChild(p);
+  // on a computer the canvas is wide, where the bar isn't shown: one press shows the page as a phone does
+  const ph = $("dpDevSeg") && $("dpDevSeg").querySelector('[data-dpdev="phone"]');
+  if (now && has.length && ph && ph.offsetParent && ph.getAttribute("aria-pressed") !== "true") {
+    const r = el("div", "hf-row"), b = el("button", "dc-modal-cancel", "See it on a phone"); b.type = "button"; b.id = "pbSee";
+    b.addEventListener("click", () => { ph.click(); b.parentNode.remove(); });
+    r.appendChild(b); host.appendChild(r);
+  }
+}
 // The header or footer whose card is open stays outlined on the canvas, its name showing.
 function dcHFMark(which) {
   try {
     const doc = $("designPreview").contentDocument;
-    doc.querySelectorAll("header.site,footer.site").forEach((n) => n.classList.toggle("dc-hf-on", !!which && n.matches(which === "header" ? "header.site" : "footer.site")));
+    doc.querySelectorAll("header.site,footer.site,.dds-phonebar").forEach((n) => n.classList.toggle("dc-hf-on", !!which && n.matches(which === "header" ? "header.site" : "footer.site,.dds-phonebar")));
   } catch (_) {}
 }
 const PANEL_TITLES = { styles: "Styles", sections: "All sections", forms: "Forms", header: "Header", footer: "Footer" };
@@ -14287,9 +14431,11 @@ function dcChromeInsets() {
   return out;
 }
 function dcChromeTokens() {
+  let foot = 0;   // on a phone the dock runs along the bottom, over the frame's last strip
   try {
     const dk = $("dcDock"), fr = $("designPreview"); DC_CHROME_INSET = 0;
     if (dk && fr && window.innerWidth > 760) { const a = dk.getBoundingClientRect(), b = fr.getBoundingClientRect(); if (a.width && a.height) DC_CHROME_INSET = Math.max(0, Math.round(a.right + 8 - b.left)); }
+    else if (dk && fr) { const a = dk.getBoundingClientRect(), b = fr.getBoundingClientRect(); if (a.width && a.height) foot = Math.max(0, Math.round(b.bottom - a.top + 8)); }
   } catch (_) {}
   const cs = getComputedStyle(document.documentElement);
   const v = (n, d) => { const x = (cs.getPropertyValue(n) || "").trim(); return x || d; };
@@ -14303,7 +14449,7 @@ function dcChromeTokens() {
     + ";--ddsdc-grad:" + v("--dds-grad-btn", "linear-gradient(135deg,#6d3fd4 0%,#7a4bdd 100%)")
     + ";--ddsdc-bad:" + v("--dds-bad", "#bf3535") + ";--ddsdc-bad-soft:" + v("--dds-bad-soft", "#fdeaea")
     + ";--ddsdc-shadow:" + v("--dds-shadow-pop", "0 20px 48px -12px rgba(23,21,34,.24),0 2px 6px rgba(23,21,34,.06)")
-    + ";--ddsdc-sans:" + v("--dds-sans", "Inter,-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif") + "}";
+    + ";--ddsdc-sans:" + v("--dds-sans", "Inter,-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif") + ";--ddsdc-foot:" + foot + "px}";
 }
 function dcInjectCanvas(doc, main, live) {
   const win = doc.defaultView;
@@ -14334,6 +14480,9 @@ function dcInjectCanvas(doc, main, live) {
       "#dds-dc-chip.on{display:inline-flex}" +
       // items 41, 50 and 123: the header and footer are picked like a section, and say they're on every page
       "header.site[data-dc-hf]:hover,footer.site[data-dc-hf]:hover,header.site.dc-hf-on,footer.site.dc-hf-on{outline:2px solid var(--ddsdc-p);outline-offset:-2px;cursor:pointer}" +
+      ".dds-phonebar[data-dc-pb]:hover,.dds-phonebar.dc-hf-on{outline:2px solid var(--ddsdc-p);outline-offset:-2px;cursor:pointer}" +   // item 122: the phone bar belongs to the footer
+      // on a phone the editor's dock covers the frame's foot: the bar sits just above it, and the page's end above both
+      ".dds-phonebar{bottom:var(--ddsdc-foot,0px)!important}.dds-pb-gap{height:calc(64px + var(--ddsdc-foot,0px))!important}" +
       // the chip stays in the tab order (a keyboard's way in), seen only on hover, focus or while its card is open
       // it hangs off the edge (under the header, over the footer), so the name and menu stay clear to click
       ".dc-hf-chip{position:absolute;left:12px;top:calc(100% - 12px);z-index:30;display:inline-flex;align-items:center;height:24px;padding:0 10px;border:0;border-radius:999px;background:var(--ddsdc-p-soft);color:var(--ddsdc-p);font:600 12px/1 var(--ddsdc-sans);white-space:nowrap;cursor:pointer;opacity:0;pointer-events:none}" +
@@ -14663,6 +14812,20 @@ function dcInjectCanvas(doc, main, live) {
       });
     });
     if ($("settingsPanel") && $("settingsPanel").classList.contains("on")) dcHFMark(PANEL_MODE === "header" || PANEL_MODE === "footer" ? PANEL_MODE : null);
+  } catch (_) {}
+  // Item 122: the phone bar (drawn at a phone's width) is the footer's, so a press on it opens the
+  // Footer card, where its switch is. Its links don't leave the canvas; Hours still opens the week.
+  try {
+    const pb = doc.querySelector(".dds-phonebar");
+    if (pb && !pb.hasAttribute("data-dc-pb")) {
+      pb.setAttribute("data-dc-pb", "1");
+      pb.addEventListener("click", (e) => {
+        if (e.target.closest && e.target.closest("a")) e.preventDefault();
+        if (DC_MODE !== "edit" || IPE) return;
+        if (PANEL_MODE !== "footer" || !$("settingsPanel").classList.contains("on")) openSettingsPanel("footer");
+      }, true);
+      if (PANEL_MODE === "footer" && $("settingsPanel") && $("settingsPanel").classList.contains("on")) pb.classList.add("dc-hf-on");
+    }
   } catch (_) {}
   // Click the header menu on the canvas → open the menu editor (edit labels, links,
   // dropdowns). The header/footer are global, so this edits the menu on every page.

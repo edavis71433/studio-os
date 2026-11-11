@@ -385,6 +385,32 @@ async function call(member, method, route, body, { jwt = 'jwt-studio', principal
   ok('shape: the fake built-in row has exactly the keys buildDomains sends', fakeBuiltin.slice().sort().join(',') === Object.keys(d.builtin[0]).sort().join(','), `fake: ${fakeBuiltin}`);
 }
 
+// ═══ 9. one domain: the side panel, notes, and Check now (builder list item 162) ═══
+{
+  reset();
+  const quietly = async (fn) => { const e = console.error, w = console.warn; console.error = () => {}; console.warn = () => {}; try { return await fn(); } finally { console.error = e; console.warn = w; } };
+  const d = await quietly(() => call(asMember(), 'GET', `/agency/domains/${S1}`));
+  ok('domain detail: 200 with the row, the records list and the notes (empty to start)', d.status === 200 && d.body.data.domain === 'bistro.example' && Array.isArray(d.body.data.records) && d.body.data.notes.renews === 'unknown' && d.body.data.notes.account === '', JSON.stringify(d.body).slice(0, 200));
+  ok('domain detail: the studio’s own domain opens too', (await quietly(() => call(asMember(), 'GET', `/agency/domains/${OWN}`))).status === 200);
+  ok('domain detail: someone else’s site is not yours', (await quietly(() => call(asMember(), 'GET', `/agency/domains/${STRANGER}`))).status === 404);
+  ok('domain detail: a site with no domain of its own has no panel', (await quietly(() => call(asMember(), 'GET', `/agency/domains/${S3}`))).status === 404);
+  const put = await call(asMember(), 'PUT', `/agency/domains/${S1}/notes`, { account: '  The client’s own GoDaddy  ', renews: 'yes', renews_confirmed_at: '2026-11-11', note: 'Card ends 2027', junk: 'x' });
+  ok('notes: saved, tidied, signed', put.status === 200 && put.body.data.account === 'The client’s own GoDaddy' && put.body.data.renews === 'yes' && put.body.data.renews_confirmed_at === '2026-11-11' && put.body.data.updated_by === 'eric@studio.example' && !('junk' in put.body.data));
+  ok('notes: kept in a reserved row on the CLIENT’s site', T.presence_sales_templates.some((t) => t.site_id === S1 && t.name === '__domain_notes__' && /Card ends 2027/.test(t.body)));
+  ok('notes: read back in the panel', (await quietly(() => call(asMember(), 'GET', `/agency/domains/${S1}`))).body.data.notes.note === 'Card ends 2027');
+  ok('notes: a read-only seat can look but not write', (await call(asMember({ member_id: RO, role: 'readonly' }), 'PUT', `/agency/domains/${S1}/notes`, { note: 'x' })).status === 403 && (await quietly(() => call(asMember({ member_id: RO, role: 'readonly' }), 'GET', `/agency/domains/${S1}`))).status === 200);
+  ok('notes: "don’t know" carries no confirmed date', (await call(asMember(), 'PUT', `/agency/domains/${S1}/notes`, { renews: 'unknown', renews_confirmed_at: '2026-11-11' })).body.data.renews_confirmed_at === null);
+  T.presence_sites.find((x) => x.id === S1).domain_checked_at = new Date().toISOString();
+  const soon = await call(asMember(), 'POST', `/agency/domains/${S1}/check`);
+  ok('check now: not twice inside a minute', soon.status === 429 && /a minute/.test(soon.body.message));
+  T.presence_sites.find((x) => x.id === S1).domain_checked_at = '2026-01-01T00:00:00Z';
+  writes = [];
+  const chk = await quietly(() => call(asMember(), 'POST', `/agency/domains/${S1}/check`));
+  ok('check now: runs the same check as the daily watch and answers with the panel', chk.status === 200 && chk.body.data.domain === 'bistro.example' && writes.some((w) => w.table === 'presence_sites' && w.method === 'PATCH' && 'domain_checked_at' in (w.body || {})), JSON.stringify(chk.body).slice(0, 160));
+  ok('check now: a site without its own domain says so', (await call(asMember(), 'POST', `/agency/domains/${S3}/check`)).status === 409);
+  ok('check now: not for someone else’s site', (await call(asMember(), 'POST', `/agency/domains/${STRANGER}/check`)).status === 404);
+}
+
 const passed = results.filter((r) => r.p).length;
 console.log(`\n${passed}/${results.length} passed`);
 if (passed !== results.length) { console.error('FAILURES'); Deno.exit(1); }
