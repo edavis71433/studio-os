@@ -24,7 +24,7 @@ import { svc, svcCount } from '../lib/db.ts';
 import { rateAllow } from '../lib/ratelimit.ts';
 import { deleteSite } from '../lib/netlify.ts';
 import { getSite } from '../lib/netlify.ts';
-import { rdapLookupDetailed, daysUntil, expiryRung, expiryWords } from '../lib/rdap.ts';
+import { rdapLookupDetailed, daysUntil, expiryRung, expiryWords, lookupPatch } from '../lib/rdap.ts';
 import { domainHealth, padlockAfterCheck, domainTruth } from '../lib/domain_health.ts';
 import { provisionSsl } from '../lib/netlify.ts';
 import { verifyApex, dkimPresent, NETLIFY_APEX_IP } from '../platform/dns.ts';
@@ -397,11 +397,7 @@ export async function checkOneDomain(site: DomainCheckSite, nowIso = new Date().
   }
   await svc(`presence_sites?id=eq.${site.id}`, { method: 'PATCH', body: JSON.stringify({
     domain_checked_at: nowIso,
-    domain_lookup_status: look.status,
-    ...(look.status === 'ok' ? { domain_registered_name: look.name } : {}),   // item 134: tells a "www." twin from a sub-name
-    ...(info ? { domain_registrar: info.registrar, domain_expires_at: info.expires_at } : {}),
-    // item 162 (review domains finding 6): the lock, who runs the DNS, the status words, since when
-    ...(look.status === 'ok' ? { domain_lock: look.facts.lock, domain_dns_host: look.facts.dns_host || null, domain_statuses: look.facts.statuses, domain_registered_at: look.facts.registered_at } : {}),
+    ...lookupPatch(look),   // the lookup's status, and on success the registrar, expiry, registered name, lock, DNS company, status words, registration date
     ...(padlock ? { cert_state: padlock.cert_state, cert_expires_at: padlock.cert_expires_at, cert_pending_since: padlock.cert_pending_since, cert_checked_at: nowIso } : {}),
     ...(truth ? { domain_serving: truth.serving, domain_checks: truth.checklist, domain_serving_checked_at: nowIso } : {}),
   }) });

@@ -411,6 +411,24 @@ async function call(member, method, route, body, { jwt = 'jwt-studio', principal
   ok('check now: not for someone else’s site', (await call(asMember(), 'POST', `/agency/domains/${STRANGER}/check`)).status === 404);
 }
 
+// ═══ 10. the panel, part two: where to go, mail and history (item 162, findings 6, 7 and 23) ═══
+{
+  reset();
+  const quietly = async (fn) => { const e = console.error, w = console.warn; console.error = () => {}; console.warn = () => {}; try { return await fn(); } finally { console.error = e; console.warn = w; } };
+  T.presence_sites.find((x) => x.id === S1).domain_dns_host = 'Cloudflare';
+  T.presence_change_events = [
+    { site_id: S1, entity_type: 'domain', action: 'create', summary: 'Attached domain bistro.example', actor_kind: 'operator', created_at: '2026-10-01T09:00:00Z' },
+    { site_id: S2, entity_type: 'domain', action: 'create', summary: 'Attached domain garage.example', actor_kind: 'operator', created_at: '2026-10-02T09:00:00Z' },
+    { site_id: S1, entity_type: 'settings', action: 'update', summary: 'Changed the colours', actor_kind: 'operator', created_at: '2026-10-03T09:00:00Z' },
+  ];
+  T.presence_plan_notices = [{ client_id: C1, kind: 'domain_expiry', status: 'active', period: 'exp:bistro.example:2026-11-18:30', created_at: '2026-10-19T00:00:00Z' }];
+  const r = await quietly(() => call(asMember(), 'GET', `/agency/domains/${S1}`));
+  const d = r.body.data || {};
+  ok('panel: records at the company that runs the DNS, renewal at the seller, and the seller’s name left alone', r.status === 200 && d.where && d.where.records_at.company === 'Cloudflare' && d.where.records_at.sign_in === 'https://dash.cloudflare.com/' && d.where.renew_at.company === 'Registrar A' && d.provider === 'Registrar A', JSON.stringify(d.where));
+  ok('panel: mail in one line', d.mail && d.mail.has_mail === false && d.mail.words === 'No email runs on this domain.');
+  ok('panel: this domain’s history only, newest first, saying who', (d.history || []).map((h) => h.words).join(' | ') === '30-day reminder sent to the client and you | Attached domain bistro.example, by your studio', JSON.stringify(d.history));
+}
+
 const passed = results.filter((r) => r.p).length;
 console.log(`\n${passed}/${results.length} passed`);
 if (passed !== results.length) { console.error('FAILURES'); Deno.exit(1); }

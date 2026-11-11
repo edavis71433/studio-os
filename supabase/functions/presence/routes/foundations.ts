@@ -8,7 +8,8 @@
 // decided; automated steps are applied by the OPERATOR route (admin) using
 // provider capabilities, and only on approved plans.
 import { json } from '../../_shared/http.ts';
-import { registrarTip } from '../lib/rdap.ts';
+import { registrarTip, providerGuide } from '../lib/rdap.ts';
+import { getSite } from '../lib/netlify.ts';
 import { svc, type SiteDb } from '../lib/db.ts';
 import { writeChangeEvent } from '../lib/provenance.ts';
 import { readZone } from '../platform/dns.ts';
@@ -91,7 +92,7 @@ export async function handleFoundationsGet(site: SiteRow, cors: Record<string, s
 }
 
 export async function handleFoundationsPrepare(req: Request, site: SiteRow, principal: Principal, cors: Record<string, string>) {
-  let body: { goal?: string; deploy_id?: string; deploy_title?: string; provider?: string } = {};
+  let body: { goal?: string; deploy_id?: string; deploy_title?: string; provider?: string; preview?: boolean } = {};
   try { body = await req.json(); } catch { return json({ error: 'bad_json', message: 'That didn’t read right.' }, 400, cors); }
   const domain = await siteDomain(site);
   const now = new Date().toISOString();
@@ -100,14 +101,21 @@ export async function handleFoundationsPrepare(req: Request, site: SiteRow, prin
   try {
     if (body.goal === 'connect_domain') {
       if (!domain) return json({ error: 'no_domain', message: 'Tell us the domain first — it can be set with your studio.' }, 400, cors);
-      plan = planConnectDomain(domain, null);
+      // item 162: the site's own address, so the www record is the real one, not a placeholder
+      const nf = site.netlify_site_id ? await getSite(site.netlify_site_id).catch(() => null) : null;
+      plan = planConnectDomain(domain, nf && nf.ok && nf.site ? nf.site.default_domain : null);
     } else if (body.goal === 'email_auth') {
       if (!domain) return json({ error: 'no_domain', message: 'Email protection needs a domain first.' }, 400, cors);
       plan = planEmailAuth(domain);
     } else if (body.goal === 'registrar_care') {
       if (!domain) return json({ error: 'no_domain', message: 'Domain care needs a domain first.' }, 400, cors);
       const reg = registrarFor('manual');
-      plan = planRegistrarCare(domain, (a, d) => reg.guide(a, d));
+      // item 162 (review domains finding 8): the seller by name, its sign-in page and where the switch is
+      const sold = await svc(`presence_sites?id=eq.${site.id}&select=domain_registrar&limit=1`).then((r) => String((Array.isArray(r.json) && (r.json[0] as { domain_registrar?: string } | undefined)?.domain_registrar) || '')).catch(() => '');
+      const g = providerGuide(sold);
+      plan = planRegistrarCare(domain, (a, d) => g && a === 'auto_renew' ? [`Sign in to ${g.company} (${g.sign_in}) and turn on auto-renew for ${d}: it’s under ${g.renewal}.`]
+        : g && a === 'whois_privacy' ? [`While you’re signed in to ${g.company}, turn on privacy for ${d} so your home address isn’t public.`]
+        : reg.guide(a, d));
     } else if (body.goal === 'hosting_restore') {
       if (!site.netlify_site_id || !body.deploy_id) return json({ error: 'bad_request', message: 'A previous version to restore is needed.' }, 400, cors);
       plan = planHostingRestore(body.deploy_id, body.deploy_title || 'a previous version');
@@ -140,6 +148,8 @@ export async function handleFoundationsPrepare(req: Request, site: SiteRow, prin
     return json({ error: 'plan_failed', message: (e as Error)?.message?.slice(0, 200) || 'The plan couldn’t be prepared.' }, 502, cors);
   }
 
+  // item 162: the studio's Domains panel reads the steps before sending them; a preview saves nothing
+  if (body.preview === true) return json({ data: { ...plan, preview: true } }, 200, cors);
   // the rollback reference: the zone as it stands at proposal time
   const prior = domain ? await readZone(domain, now) : null;
   const ins = await svc(`presence_infra_plans?select=${PLAN_SELECT}`, {
