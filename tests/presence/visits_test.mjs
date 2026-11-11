@@ -65,7 +65,7 @@ ok('cleanUtms: sanitizes + caps', (() => { const u = cleanUtms({ s: 'spring<scri
   ok('tracker: uses sendBeacon (no latency, fire-and-forget)', t.includes('sendBeacon'));
   ok('tracker: sets NO cookie and uses NO localStorage', !/document\.cookie|localStorage/.test(t));
   ok('tracker: posts to the site-scoped collector', t.includes('/px/aaaaaaaa-1111-4111-8111-aaaaaaaaaaaa'));
-  ok('tracker: is lightweight (< 1200 bytes)', t.length < 1200);
+  ok('tracker: is lightweight (< 1800 bytes; item 157 added button words and time on page)', t.length < 1800, String(t.length));
 }
 
 ok('isVisitKind: guards the kind enum', isVisitKind('pageview') && isVisitKind('phone') && !isVisitKind('evil') && !isVisitKind(null));
