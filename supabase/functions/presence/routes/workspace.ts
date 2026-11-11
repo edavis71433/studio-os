@@ -102,6 +102,16 @@ async function requireManager(jwt: string, site: SiteRow, principal: Principal, 
   return { role };
 }
 
+/** A managed client's first name as their studio has it (lib/customer_names.ts:
+ *  the contact behind the customer, else the record's own name). '' when unknown. */
+async function clientGreetingName(agencySiteId: string, clientId: string, siteId: string): Promise<string> {
+  const { loadCustomerNames, greetingName } = await import('../lib/customer_names.ts');
+  const read = async (p: string) => { const r = await svc(p); return r.ok && Array.isArray(r.json) ? r.json : []; };
+  const c = (await read(`clients?id=eq.${clientId}&select=name&limit=1`))[0];
+  const named = await loadCustomerNames(agencySiteId, [{ clientId, clientName: c?.name, customerSiteId: siteId }], read);
+  return greetingName(named[clientId]);
+}
+
 export async function handlePortalContext(jwt: string, site: SiteRow, principal: Principal, cors: Record<string, string>, scopedName?: string | null) {
   const role = await resolveSiteRoleCached(principal, jwt, site.id);
   const isOperator = principal.kind === 'staff' || principal.kind === 'system';
@@ -179,7 +189,12 @@ export async function handlePortalContext(jwt: string, site: SiteRow, principal:
   const isManagedClient = !!(customerLinks && customerLinks.length > 0);
   // builder list item 59: a managed client's pages carry their studio's name and logo (routes/studio_brand.ts)
   const studioSiteId = isManagedClient ? String(customerLinks![0]?.agency_site_id || '') : '';
-  const studio = studioSiteId ? await import('./studio_brand.ts').then((m) => m.studioBrandOf(studioSiteId)).catch(() => null) : null;
+  // builder list item 179: and the client's own first name, from the studio's record
+  // of them, so Home greets the person and not their sign-in. Read beside the brand.
+  const [studio, clientFirstName] = await Promise.all([
+    studioSiteId ? import('./studio_brand.ts').then((m) => m.studioBrandOf(studioSiteId)).catch(() => null) : Promise.resolve(null),
+    studioSiteId && site.client_id ? clientGreetingName(studioSiteId, String(site.client_id), site.id).catch(() => '') : Promise.resolve(''),
+  ]);
 
   // Phase D: resolve the FEATURE edition from the licensed plan (falls back to
   // the site edition when no entitlement plan is recorded). Navigation adapts to
@@ -278,6 +293,7 @@ export async function handlePortalContext(jwt: string, site: SiteRow, principal:
     site_role: role,
     capabilities: caps,
     studio,                              // builder list item 59: { name, logo_url, accent } for a managed client, else null
+    client_first_name: clientFirstName || null,   // builder list item 179: the name on the studio's record of this client
     edition: site.edition,               // 'monitor' | 'presence' (site hosting dimension)
     site_live: !!siteLive,               // sales review item 24: the client Overview's Website tile (hosted elsewhere · live · not live yet)
     edition_key: editionKey,             // Phase D: the FEATURE edition (cms_only … enterprise)
