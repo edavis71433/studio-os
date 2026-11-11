@@ -24,7 +24,7 @@ import { resolveAgencyMember } from '../agency/auth.ts';
 import { filterForRole, visibleTo } from '../lib/visibility.ts';
 import { svc, svcCount } from '../lib/db.ts';
 import { displayName } from '../lib/dam.ts';
-import { resolveSiteRoleCached, listSiteMembers, addSiteMember, revokeSiteMember, loadShares, overrideFor, setShare, isSharedStudioSite } from '../lib/workspace.ts';
+import { resolveSiteRoleCached, listSiteMembers, addSiteMember, changeSiteMemberRole, revokeSiteMember, loadShares, overrideFor, setShare, isSharedStudioSite } from '../lib/workspace.ts';
 import { loadThreadMarks, newestClientMessageAt, threadUnread } from '../lib/thread_reads.ts';
 import { shapeClientConversations, studioBellCount, noticeDismissible, NOTICE_ACCOUNT_KINDS, freshEnquiries, invoiceReminderIds, renderableNotices, noticeTier, noticePriority } from '../lib/inbox_feed.ts';
 import { clearNotice } from '../lib/notice.ts';
@@ -722,26 +722,90 @@ export async function buildPortalFeed(jwt: string, site: SiteRow, principal: Pri
   return data;
 }
 
+// Builder item 53: the words a role goes by, everywhere a person reads one
+export const SEAT_ROLE_WORDS: Record<SiteRole, string> = { business_owner: 'Co-owner', business_staff: 'Staff', developer: 'Developer', client_reviewer: 'Reviewer' };
+const STUDIO_ROLE_WORDS: Record<string, string> = { owner: 'Studio owner', admin: 'Admin', account_manager: 'Account manager' };
+
+/** The studio that works on this site, and who on its team can open it (the roles
+ *  lib/scope.ts lets in). Null when no studio works on it or the read failed. */
+async function studioOf(siteId: string, me: string | null): Promise<{ name: string; role: string; people: Array<{ email: string; role: string; me: boolean }> } | null> {
+  try {
+    const link = ((await svc(`presence_agency_clients?site_id=eq.${siteId}&status=eq.active&select=agency_id&limit=1`)).json as any[])?.[0];
+    if (!link?.agency_id) return null;
+    const [ag, team] = await Promise.all([
+      svc(`presence_agencies?id=eq.${link.agency_id}&select=name&limit=1`),
+      svc(`presence_agency_members?agency_id=eq.${link.agency_id}&status=eq.active&select=email,role&order=created_at.asc&limit=200`),
+    ]);
+    const { can } = await import('../agency/auth.ts');
+    const mine = String(me || '').toLowerCase();
+    const people = (((team.json as any[]) || []).filter((m) => can(m.role, 'bulk_publish')))
+      .map((m) => ({ email: String(m.email || '').toLowerCase(), role: STUDIO_ROLE_WORDS[m.role] || String(m.role || ''), me: !!mine && String(m.email || '').toLowerCase() === mine }));
+    return { name: String(((ag.json as any[]) || [])[0]?.name || 'Your studio'), role: 'Website manager', people };
+  } catch { return null; }
+}
+
+/** The People sheet (builder item 53): the owner, the studio that works on the site,
+ *  the seats, an open transfer, and who may start one. `data` stays the seat list. */
 export async function handleMembersList(jwt: string, site: SiteRow, principal: Principal, cors: Record<string, string>) {
   const g = await requireManager(jwt, site, principal, cors); if (g instanceof Response) return g;
-  return json({ data: await listSiteMembers(site.id) }, 200, cors);
+  const now = new Date().toISOString();
+  const { ownerFacts, ownerWho, openTransfer, transferSummary, lastSignIn } = await import('../lib/site_transfer.ts');
+  const { transferSideFor } = await import('./site_transfer.ts');
+  const [members, facts, open, studio, side] = await Promise.all([
+    listSiteMembers(site.id),
+    ownerFacts(site.id).catch(() => null),
+    openTransfer(site.id, now).catch(() => ({ row: null, missing: true })),
+    studioOf(site.id, principal.email),
+    transferSideFor(jwt, site, principal).catch(() => null),
+  ]);
+  const who = ownerWho(facts?.client, facts?.contact?.name);
+  const signedIn = who ? await lastSignIn(facts?.contact?.auth_user_id) : undefined;
+  const owner = who ? { ...who, signed_in: signedIn === undefined ? null : signedIn !== null, me: !!principal.email && who.email === String(principal.email).toLowerCase() } : null;
+  return json({ data: members.map((m) => ({ ...m, role_words: SEAT_ROLE_WORDS[m.role as SiteRole] || m.role })), owner, studio, transfer: transferSummary(open.row, now), transfer_ready: !open.missing, can_transfer: side }, 200, { ...cors, 'Cache-Control': 'no-store' });
 }
+
+const ADD_WORDS: Record<string, [number, string]> = {
+  bad_email: [400, 'That doesn’t look like an email address.'],
+  bad_role: [400, 'Pick a role: Co-owner, Staff, Developer or Reviewer.'],
+  shared_site: [400, 'This is your studio’s own site, which holds every client’s files, so a reviewer here would see them all. Open that client and invite the reviewer there instead.'],
+  check_failed: [502, 'We couldn’t check this site just now, so nobody was added. Try again in a moment.'],
+  is_owner: [409, 'That’s the owner’s own email. The owner already has everything.'],
+  write_failed: [502, 'That didn’t save — please try again.'],
+};
 
 export async function handleMemberAdd(req: Request, jwt: string, site: SiteRow, principal: Principal, cors: Record<string, string>) {
   const g = await requireManager(jwt, site, principal, cors); if (g instanceof Response) return g;
   let body: any = {}; try { body = await req.json(); } catch { /* */ }
-  const res = await addSiteMember(site.id, String(body?.email || ''), body?.role, principal.userId || 'owner');
+  const { ownerFacts, ownerEmailsOf } = await import('../lib/site_transfer.ts');
+  const ownerEmails = ownerEmailsOf(await ownerFacts(site.id).catch(() => null));
+  const res = await addSiteMember(site.id, String(body?.email || ''), body?.role, principal.userId || 'owner', { restore: body?.restore === true, ownerEmails });
   if (!res.ok) {
-    const msg = res.error === 'bad_email' ? 'That doesn’t look like an email address.' : res.error === 'bad_role' ? 'Pick a valid role.'
-      : res.error === 'shared_site' ? 'This is your studio’s own site, which holds every client’s files, so a reviewer here would see them all. Open that client and invite the reviewer there instead.'
-      : res.error === 'check_failed' ? 'We couldn’t check this site just now, so nobody was added. Try again in a moment.'
-      : 'That didn’t save — please try again.';
-    return json({ error: res.error, message: msg }, res.error === 'write_failed' || res.error === 'check_failed' ? 502 : 400, cors);
+    const m = res.member, words = m ? (SEAT_ROLE_WORDS[m.role as SiteRole] || m.role) : '';
+    // bug hunt I1's rule, here too: someone already here is pointed at, never invited again
+    if (res.error === 'already_member') return json({ error: 'already_member', member: m ? { id: m.id, email: m.email, role: m.role } : null, message: `${m?.email || 'They'} ${m ? `are already here as ${words}` : 'are already here'}. Change their role in the list instead.` }, 409, cors);
+    if (res.error === 'was_removed') return json({ error: 'was_removed', member: m ? { id: m.id, email: m.email, role: m.role } : null, message: `${m?.email || 'They'} were removed earlier. Press Bring them back to let them in again with the role you picked.` }, 409, cors);
+    const [status, message] = ADD_WORDS[res.error || 'write_failed'] || ADD_WORDS.write_failed;
+    return json({ error: res.error, message }, status, cors);
   }
+  const reviewer = body?.role === 'client_reviewer';
   const message = res.emailed
-    ? 'Invited — we’ve emailed them a sign-in link. They’ll see only what you choose to share.'
+    ? (reviewer ? 'Invited — we’ve emailed them a sign-in link. They’ll see only what you choose to share.' : `Invited as ${SEAT_ROLE_WORDS[body.role as SiteRole] || 'a member'} — we’ve emailed them a sign-in link.`)
     : 'Added — but the invite email didn’t send. Send them their sign-in link yourself, or try again.';
-  return json({ data: { ok: true, emailed: !!res.emailed, message } }, 200, cors);
+  return json({ data: { ok: true, emailed: !!res.emailed, restored: !!res.restored, member: res.member || null, message } }, 200, cors);
+}
+
+/** Change one seat's role (builder item 53). The owner's own role isn't a seat, so it
+ *  can't be changed here; handing the site over is Transfer ownership. */
+export async function handleMemberRole(req: Request, jwt: string, site: SiteRow, memberId: string, principal: Principal, cors: Record<string, string>) {
+  const g = await requireManager(jwt, site, principal, cors); if (g instanceof Response) return g;
+  let body: any = {}; try { body = await req.json(); } catch { /* */ }
+  const res = await changeSiteMemberRole(site.id, memberId, body?.role);
+  if (!res.ok) {
+    if (res.error === 'not_found') return json({ error: 'not_found', message: 'That person isn’t on this site any more.' }, 404, cors);
+    const [status, message] = ADD_WORDS[res.error || 'write_failed'] || ADD_WORDS.write_failed;
+    return json({ error: res.error, message }, status, cors);
+  }
+  return json({ data: { ok: true, member: res.member, message: `${res.member?.email || 'Their role'} is now ${SEAT_ROLE_WORDS[body.role as SiteRole] || body.role}.` } }, 200, cors);
 }
 
 export async function handleMemberRevoke(jwt: string, site: SiteRow, memberId: string, principal: Principal, cors: Record<string, string>) {

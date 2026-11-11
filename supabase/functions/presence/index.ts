@@ -60,7 +60,7 @@ const { handleWebsiteTimeline } = lazyRoutes(() => import('./routes/timeline.ts'
 const { handleWebsiteHealth, handleWebsiteHealthPdf } = lazyRoutes(() => import('./routes/health_page.ts'));
 const { handleBusinessInsights } = lazyRoutes(() => import('./routes/insights_page.ts'));
 const { handleMomentsList, handleMomentDismiss } = lazyRoutes(() => import('./routes/moments.ts'));
-import { handlePortalContext, handlePortalFeed, handleMembersList, handleMemberAdd, handleMemberRevoke, handleSharesList, handleShareSet, reviewerAllowed, memberWriteGate } from './routes/workspace.ts';
+import { handlePortalContext, handlePortalFeed, handleMembersList, handleMemberAdd, handleMemberRevoke, handleMemberRole, handleSharesList, handleShareSet, reviewerAllowed, memberWriteGate } from './routes/workspace.ts';
 const { handleDevFiles, handleDevCustomizationGet, handleDevCustomizationPut, handleBrandKitGet, handleBrandKitPut, handleBrandKitApply } = lazyRoutes(() => import('./routes/dev.ts'));
 const { handleStockSearch, handleStockImport } = lazyRoutes(() => import('./routes/stock.ts'));
 const { handleContentLibraryList, handleContentLibrarySave, handleContentLibraryUpdate, handleContentLibraryDelete } = lazyRoutes(() => import('./routes/content_library.ts'));
@@ -427,6 +427,17 @@ async function route_(req: Request, cors: Record<string, string>): Promise<Respo
   //    site), so it sits BEFORE the caller-site gate. Distinct from the site-aware
   //    Concierge; deterministic-first, honest fallback, no invented features.
   if (route === '/help/ask' && method === 'POST') return handleHelpAsk(req, cors);
+
+  // ── Builder item 53: a transfer of ownership, answered by the person an email
+  //    reached. Before any site is resolved: the new owner has no site here yet, and
+  //    the owner answers about theirs. Each route checks the signed-in email itself.
+  if (route === '/transfers' || route.startsWith('/transfers/')) {
+    const { handleTransfersMine, handleTransferAnswer } = await import('./routes/site_transfer.ts');
+    if (route === '/transfers' && method === 'GET') return handleTransfersMine(principal, cors);
+    const tm = route.match(/^\/transfers\/([0-9a-f-]{36})\/(agree|accept|decline)$/);
+    if (tm && method === 'POST') return handleTransferAnswer(req, tm[1], tm[2] as 'agree' | 'accept' | 'decline', principal, cors);
+    return json({ error: 'not_found', message: 'No such page.' }, 404, cors);
+  }
 
   // 3. resolve the caller's site. Un-scoped: RLS confines to the caller's OWN
   //    site. Scoped (SC-1): an agency operator drilled into a client — the
@@ -1048,7 +1059,12 @@ async function route_(req: Request, cors: Record<string, string>): Promise<Respo
   {
     const m = route.match(/^\/portal\/members\/([0-9a-f-]{36})\/revoke$/);
     if (m && method === 'POST') return handleMemberRevoke(jwt, site, m[1], principal, cors);
+    const r = route.match(/^\/portal\/members\/([0-9a-f-]{36})\/role$/);   // builder item 53: change a seat's role
+    if (r && method === 'POST') return handleMemberRole(req, jwt, site, r[1], principal, cors);
   }
+  // builder item 53: hand the site to a new owner (the owner, or the studio asking the owner)
+  if (route === '/portal/transfer' && method === 'POST') { const { handleTransferStart } = await import('./routes/site_transfer.ts'); return handleTransferStart(req, jwt, site, principal, cors); }
+  if (route === '/portal/transfer/cancel' && method === 'POST') { const { handleTransferCancel } = await import('./routes/site_transfer.ts'); return handleTransferCancel(jwt, site, principal, cors); }
   if (route === '/portal/shares' && method === 'GET') return handleSharesList(jwt, site, principal, cors);
   if (route === '/portal/shares' && method === 'POST') return handleShareSet(req, jwt, site, principal, cors);
 
