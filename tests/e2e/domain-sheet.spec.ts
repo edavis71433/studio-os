@@ -81,7 +81,7 @@ test.describe('Domain & email sheet: their provider, the guides, every record (i
   test('…and while the company isn’t known yet, the general step stays', async ({ page }) => {
     await installApp(page, { api: { ...BASE, '/foundations/domain': { data: { ...ATTACHED.data, provider: { registrar: '', dns_host: '', records_at: null, renew_at: null } } } } });
     await page.goto('/presence.html#domain');
-    await expect(page.locator('#deskResults')).toContainText('1. Open your domain’s DNS settings (at GoDaddy, Namecheap — wherever you bought it).');
+    await expect(page.locator('#deskResults')).toContainText('1. Sign in where your domain’s settings are kept: usually the company you bought it from.');
     await expect(page.locator('[data-step="provider"]')).toHaveCount(0);
   });
 
@@ -199,5 +199,55 @@ test.describe('Domain & email sheet: safer changes (item 163)', () => {
     await expect(changes).toContainText('Recent changes');
     await expect(changes).toContainText('Nov 10, 2026 · Changed domain from old.example to bistro.example (old.example forwards), by your studio');
     await expect(page.getByRole('button', { name: 'Change to a different domain' })).toBeVisible();   // a typo can be fixed before it goes live
+  });
+});
+
+// ── Nov 10 review, builder list item 164: clearer messages (findings 13, 16, 17 and 18) ──
+test.describe('Domain & email sheet: clearer messages (item 164)', () => {
+  test('waiting: the steps with times, the main name, and an honest wait', async ({ page }) => {
+    await installApp(page, { api: { ...BASE, '/foundations/domain': { data: { ...ATTACHED.data, changes: [{ at: '2026-11-10T12:00:00Z', words: 'Attached domain bistro.example, by your studio' }] } } } });
+    await page.goto('/presence.html#domain');
+    const steps = page.locator('[data-wait="steps"] p');
+    await expect(steps.nth(0)).toHaveText(/^✓ Connected here · Nov \d+, \d+:\d\d [AP]M$/);
+    await expect(steps.nth(1)).toHaveText('• Records found · not yet, we looked just now');
+    await expect(steps.nth(2)).toHaveText('• Padlock on · comes after the records');
+    await expect(steps.nth(3)).toHaveText('• Live · we’ll email you the moment it is');
+    await expect(page.locator('[data-wait="steps"]')).toContainText('Usually live within an hour of adding the records, sometimes a day or two');
+    await expect(page.locator('[data-step="main"]')).toHaveText('Visitors who type bistro.example or www.bistro.example end up on bistro.example.');
+    await expect(page.locator('#deskResults')).not.toContainText('usually within an hour');
+  });
+
+  test('records in, padlock coming: said without the hosting company’s words', async ({ page }) => {
+    await installApp(page, { api: { ...BASE, '/foundations/domain': { data: { ...ATTACHED.data, health: 'ssl_pending' } } } });
+    await page.goto('/presence.html#domain');
+    await expect(page.locator('#deskResults')).toContainText('bistro.example: your records are in. The padlock is being switched on, usually within a few minutes.');
+    const steps = page.locator('[data-wait="steps"] p');
+    await expect(steps.nth(1)).toHaveText('✓ Records found');
+    await expect(steps.nth(2)).toHaveText('• Padlock on · being switched on');
+    await expect(page.locator('#deskResults')).not.toContainText('DNS is set');
+  });
+
+  test('“I need to get one” checks a name, offers spellings, and opens a domain company with it filled in', async ({ page }) => {
+    const asked: string[] = [];
+    await installApp(page, { api: { ...BASE, '/foundations/domain': { data: null } } });
+    await page.route(/\/functions\/v1\/presence\/foundations\/domain\/lookup/, (route: Route) => {
+      const name = new URL(route.request().url()).searchParams.get('name') || '';
+      asked.push(name);
+      return route.fulfill(json({ data: { name, found: name === 'bistronine.com' } }));
+    });
+    await page.goto('/presence.html#domain');
+    await expect(page.locator('#deskResults')).toContainText('Right now your site is at its built-in address.');
+    await page.getByRole('button', { name: 'I need to get one' }).click();
+    const need = page.locator('[data-need="domain"]');
+    await need.getByRole('textbox', { name: 'A name you’d like' }).fill('Bistro Nine');
+    await need.getByRole('button', { name: 'Check' }).click();
+    const lines = need.locator('[data-need="results"] p');
+    await expect(lines).toHaveCount(3);
+    await expect(lines.nth(0)).toHaveText('bistronine.com: taken.');
+    await expect(lines.nth(1)).toHaveText('bistronine.co: free. Buy at Namecheap ↗ · Buy at Porkbun ↗ · Buy at GoDaddy ↗');
+    await expect(lines.nth(1).getByRole('link', { name: 'Buy at Porkbun ↗' })).toHaveAttribute('href', 'https://porkbun.com/checkout/search?q=bistronine.co');
+    await expect(lines.nth(2)).toHaveAttribute('data-name', 'getbistronine.com');
+    expect(asked.sort()).toEqual(['bistronine.co', 'bistronine.com', 'getbistronine.com']);
+    await expect(need).toContainText('Buy it in your own name and email, and turn on auto-renew.');
   });
 });

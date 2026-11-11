@@ -2204,6 +2204,22 @@ function askText(title, opts) {
     dlg.showModal(); setTimeout(() => inp.focus(), 20);
   });
 }
+// Item 164 (review domains finding 13): the wait, in steps with times. When the domain was connected
+// here, whether its records are found, the padlock, and live (when we email). The time is the
+// honest one: usually within an hour of adding the records, sometimes a day or two.
+function waitSteps(dstat, dom) {
+  const box = el("div"); box.dataset.wait = "steps"; box.style.marginTop = "10px";
+  const when = (iso) => { const d = new Date(iso); return isNaN(d) ? "" : d.toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }); };
+  const ch = (dom && Array.isArray(dom.changes) ? dom.changes : []).find((c) => /^(Attached domain|Changed domain from) /.test(String(c.words || "")));
+  const found = dstat.health === "ssl_pending" || dstat.health === "ok";
+  [[true, "Connected here", ch ? when(ch.at) : ""],
+   [found, "Records found", found ? "" : "not yet, we looked just now"],
+   [dstat.health === "ok", "Padlock on", dstat.health === "ssl_pending" ? "being switched on" : found ? "" : "comes after the records"],
+   [dstat.health === "ok", "Live", "we’ll email you the moment it is"],
+  ].forEach(([done, label, note]) => { const l = stepLine((done ? "✓ " : "• ") + label + (note ? " · " + note : "")); l.dataset.wait = done ? "done" : "todo"; if (done) l.style.color = "var(--soft,#6b6478)"; box.appendChild(l); });
+  const t = stepLine("Usually live within an hour of adding the records, sometimes a day or two while the internet catches up."); t.style.marginTop = "6px"; box.appendChild(t);
+  return box;
+}
 // Item 163 (review domains finding 12): changing the domain asks for the new name and whether the
 // old one keeps working, on by default (a business that changes names keeps its old links).
 function askDomainChange(old) {
@@ -3708,19 +3724,19 @@ function renderFoundations(f, plans, launch, dom) {
   } else if (dstat) {
     // Attached — walk them through the two records; it goes live on its own after.
     if (dstat.health === "ssl_pending") {
-      const p = el("p", "aihint", dstat.custom_domain + " — DNS is set. We’re switching on the security certificate now — usually a few minutes. Nothing for you to do."); p.style.marginTop = "6px"; p.style.fontWeight = "600"; domCard.appendChild(p);
+      const p = el("p", "aihint", dstat.custom_domain + ": your records are in. The padlock is being switched on, usually within a few minutes. Nothing for you to do."); p.style.marginTop = "6px"; p.style.fontWeight = "600"; domCard.appendChild(p);
     } else {
       // item 162, part two (review domains findings 6 and 7): the company that runs this domain's
       // records, by name, with its sign-in page; the steps used to guess "GoDaddy, Namecheap"
       const recAt = dstat.provider && dstat.provider.records_at;
       const p = el("p", "aihint", dstat.custom_domain + " — almost there. Two quick steps " + (recAt ? "at " + recAt.company : "where you bought your domain") + ":"); p.style.marginTop = "6px"; p.style.fontWeight = "600"; domCard.appendChild(p);
       const apex = (dstat.dns && dstat.dns.expected_apex_ip && dstat.dns.expected_apex_ip[0]) || "75.2.60.5";
-      const cname = (dstat.dns && dstat.dns.expected_cname) || "your site’s .netlify.app address";
+      const cname = (dstat.dns && dstat.dns.expected_cname) || "your site’s built-in address";
       if (recAt) {
         const s1 = stepLine("1. Sign in to " + recAt.company + (recAt.path ? ", then open " + recAt.path : "") + ". "); s1.dataset.step = "provider";
         if (recAt.sign_in) { const a = el("a", null, "Sign in to " + recAt.company + " ↗"); a.href = recAt.sign_in; a.target = "_blank"; a.rel = "noopener"; a.style.cssText = "color:var(--plum,#5b3fa0);font-weight:600;white-space:nowrap;text-decoration:underline"; s1.appendChild(a); }
         domCard.appendChild(s1);
-      } else domCard.appendChild(stepLine("1. Open your domain’s DNS settings (at GoDaddy, Namecheap — wherever you bought it)."));
+      } else domCard.appendChild(stepLine("1. Sign in where your domain’s settings are kept: usually the company you bought it from."));   // item 164 (finding 18): no "DNS", no guessed company
       domCard.appendChild(stepLine("2. Add these two records exactly — tap Copy so there are no typos:"));
       [["A", "@", apex], ["CNAME", "www", cname]].forEach(([type, name, val]) => {
         const r = el("div"); r.style.cssText = "display:flex;gap:8px;align-items:center;margin:5px 0 0 14px;flex-wrap:wrap";
@@ -3730,14 +3746,18 @@ function renderFoundations(f, plans, launch, dom) {
       });
       // item 163 (review domains finding 14): the records marked MX are the client's email
       const mxLine = stepLine("Leave anything marked MX or Mail alone: that’s your email."); mxLine.dataset.step = "mail"; domCard.appendChild(mxLine);
-      const s3 = stepLine("That’s everything. We check on our own — your site appears here the moment it’s ready, usually within an hour."); s3.style.color = "var(--soft,#6b6478)"; s3.style.marginTop = "8px"; domCard.appendChild(s3);
+      // item 164 (review domains finding 16): which name visitors end up on, said plainly
+      const bareName = String(dstat.custom_domain).replace(/^www\./, "");
+      if (/^[^.]+\.[^.]+$/.test(bareName)) { const mn = stepLine("Visitors who type " + bareName + " or www." + bareName + " end up on " + dstat.custom_domain + "."); mn.dataset.step = "main"; domCard.appendChild(mn); }
+      const s3 = stepLine("That’s everything. We look again each time you open this, and every day."); s3.style.color = "var(--soft,#6b6478)"; s3.style.marginTop = "8px"; domCard.appendChild(s3);
     }
+    domCard.appendChild(waitSteps(dstat, dom));   // item 164 (review domains finding 13): where it stands, with times
     const acts = el("div", "doa"); acts.style.marginTop = "8px"; acts.style.gap = "8px";
     const chk = el("button", "textact", "Check if it’s ready"); chk.addEventListener("click", () => openFoundationsDesk()); acts.appendChild(chk);
     acts.appendChild(changeBtn()); acts.appendChild(removeBtn("Remove")); domCard.appendChild(acts);
   } else {
     // No domain yet — the branching intro, plain language, two clear choices.
-    domCard.appendChild(stepLine("Right now your site is at a temporary address. Want it on your own domain (like yourbusiness.com)?"));
+    domCard.appendChild(stepLine("Right now your site is at its built-in address. Want it on your own domain, like yourbusiness.com?"));   // item 164 (finding 18): it's permanent and working, not "temporary"
     domCard.appendChild(askOwner("aihint", "Ask the account owner to connect it."));
     const choose = el("div", "doa"); choose.dataset.needs = "configure"; choose.style.cssText = "gap:8px;margin-top:8px;flex-wrap:wrap";
     const haveBtn = el("button", "textact", "I already have a domain"); haveBtn.style.cssText = "border:2px solid var(--plum,#5b3fa0);background:var(--plum-tint,#faf7ff);color:var(--plum-deep,#3a2470);border-radius:999px;padding:7px 14px;font:inherit;font-weight:600;cursor:pointer";
@@ -3785,10 +3805,36 @@ function renderFoundations(f, plans, launch, dom) {
 
     if (DESK_DOMAIN_INTENT) { DESK_DOMAIN_INTENT = false; setTimeout(() => { haveBtn.click(); inp.focus(); }, 0); }
     const needPanel = el("div"); needPanel.dataset.needs = "configure"; needPanel.style.cssText = "display:none;margin-top:10px";
-    needPanel.appendChild(stepLine("No problem — getting one takes a couple of minutes:"));
-    needPanel.appendChild(stepLine("1. Go to a domain company — Namecheap, Porkbun, or GoDaddy (about $12 a year)."));
-    needPanel.appendChild(stepLine("2. Search for the name you want and buy it."));
-    needPanel.appendChild(stepLine("3. Come back here and tap “I already have a domain.”"));
+    // item 164 (review domains finding 17): check a name here, with two or three spellings, then
+    // open a domain company with the name filled in. Bought in their own name; no selling by us.
+    needPanel.dataset.need = "domain";
+    needPanel.appendChild(stepLine("Type a name you’d like and we’ll check whether it’s free."));
+    const nrow = el("div", "doa"); nrow.style.cssText = "gap:8px;flex-wrap:wrap;margin-top:6px";
+    const ninp = el("input"); ninp.type = "text"; ninp.placeholder = "yourbusiness"; ninp.setAttribute("aria-label", "A name you’d like"); ninp.setAttribute("autocomplete", "off");
+    ninp.style.cssText = "flex:1;min-width:180px;padding:8px 10px;border:1px solid var(--line,#ddd);border-radius:8px;font:inherit;font-size:16px";
+    const nbtn = el("button", "textact", "Check");
+    nrow.appendChild(ninp); nrow.appendChild(nbtn); needPanel.appendChild(nrow);
+    const nout = el("div"); nout.dataset.need = "results"; nout.setAttribute("role", "status"); needPanel.appendChild(nout);
+    const firm = stepLine("Buy it in your own name and email, and turn on auto-renew. Then come back and tap “I already have a domain.”"); firm.style.marginTop = "8px"; needPanel.appendChild(firm);
+    const BUY = [["Namecheap", (n) => "https://www.namecheap.com/domains/registration/results/?domain=" + encodeURIComponent(n)], ["Porkbun", (n) => "https://porkbun.com/checkout/search?q=" + encodeURIComponent(n)], ["GoDaddy", (n) => "https://www.godaddy.com/domainsearch/find?domainToCheck=" + encodeURIComponent(n)]];
+    let nseq = 0;
+    const checkName = async () => {
+      const raw = String(ninp.value || "").trim().toLowerCase().replace(/^https?:\/\//, "").replace(/[\/?#].*$/, "");
+      const clean = (raw.includes(".") ? raw.split(".")[0] : raw).replace(/[^a-z0-9-]+/g, "").replace(/^-+|-+$/g, "");
+      if (clean.length < 2) { nout.textContent = "Type a name first, like yourbusiness."; return; }
+      const names = [...new Set([/^([a-z0-9-]+\.)+[a-z]{2,}$/.test(raw) ? raw : clean + ".com", clean + ".com", clean + ".co", "get" + clean + ".com"])].slice(0, 3);
+      const seq = ++nseq; nbtn.disabled = true; nout.textContent = "Checking…";
+      const res = await Promise.all(names.map((n) => api("GET", "/foundations/domain/lookup?name=" + encodeURIComponent(n)).then((r) => [n, r && r.data ? r.data.found : null]).catch(() => [n, null])));
+      if (seq !== nseq) return;
+      nbtn.disabled = false; nout.textContent = "";
+      res.forEach(([n, found]) => {
+        const line = stepLine(n + (found === false ? ": free. " : found === true ? ": taken." : ": couldn’t check just now.")); line.dataset.name = n; line.dataset.free = found === false ? "yes" : found === true ? "no" : "unknown";
+        if (found === false) BUY.forEach(([co, url], i) => { if (i) line.appendChild(document.createTextNode(" · ")); const a = el("a", null, "Buy at " + co + " ↗"); a.href = url(n); a.target = "_blank"; a.rel = "noopener"; a.style.cssText = "color:var(--plum,#5b3fa0);font-weight:600;white-space:nowrap;text-decoration:underline"; line.appendChild(a); });
+        nout.appendChild(line);
+      });
+    };
+    nbtn.addEventListener("click", checkName);
+    ninp.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); checkName(); } });
     domCard.appendChild(needPanel);
 
     haveBtn.addEventListener("click", () => { havePanel.style.display = "block"; needPanel.style.display = "none"; setTimeout(() => inp.focus(), 20); });
@@ -6088,7 +6134,7 @@ function renderDomainCard() {
   const temp = siteLiveUrl ? siteLiveUrl() : null;
   const btn = el("button", "pillbtn sm hb-act"); btn.type = "button";
   if (!d) {
-    card.appendChild(el("div", "note", "Your site is on a temporary address" + (temp ? " (" + temp.replace(/^https:\/\//, "") + ")" : "") + ". Put it on your own name, like yourbusiness.com."));
+    card.appendChild(el("div", "note", "Your site is on its built-in address" + (temp ? " (" + temp.replace(/^https:\/\//, "") + ")" : "") + ". Put it on your own name, like yourbusiness.com."));   // item 164 (finding 18)
     card.appendChild(askOwner("note", "Ask the account owner to connect it."));
     btn.dataset.needs = "configure"; btn.textContent = "Connect your domain"; btn.addEventListener("click", () => openFoundationsDesk({ domain: true }));
   } else if (d.health === "ok") {
