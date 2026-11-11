@@ -25,6 +25,7 @@ import {
 import { validateBlocks } from '../lib/site_blocks.ts';
 import { validateFormValues, type FormDefinition } from '../lib/forms.ts';
 import { notSentReason } from '../lib/legal_pages.ts';
+import { enquiryState, customerEmails } from '../lib/enquiry_state.ts';
 
 const SB_URL = Deno.env.get('SUPABASE_URL') || '';
 const APPROVAL_SECRET = Deno.env.get('APPROVAL_SECRET') || Deno.env.get('SCHEDULER_SECRET') || '';
@@ -193,9 +194,14 @@ export async function handleFormSubmit(req: Request, siteId: string, cors: Recor
   return ok200('Thanks — your message was sent.');
 }
 
+/** The Enquiries queue answers the newest FORM_INBOX_PAGE; `more` says it was cut (bug hunt C15). */
+export const FORM_INBOX_PAGE = 100;
 export async function handleFormInbox(site: SiteRow, cors: Record<string, string>) {
-  const r = await svc(`presence_form_submissions?site_id=eq.${site.id}&spam=eq.false&select=id,form_kind,name,email,phone,message,source_page,status,created_at,fields&order=created_at.desc&limit=100`);
-  const rows = Array.isArray(r.json) ? r.json : [];
+  // one past the page, so the queue can say when it stops short of every enquiry
+  const r = await svc(`presence_form_submissions?site_id=eq.${site.id}&spam=eq.false&select=id,form_kind,name,email,phone,message,source_page,status,created_at,fields&order=created_at.desc&limit=${FORM_INBOX_PAGE + 1}`);
+  const all = Array.isArray(r.json) ? r.json : [];
+  const more = all.length > FORM_INBOX_PAGE;
+  const rows = all.slice(0, FORM_INBOX_PAGE);
   // P2-F G1 — link each website enquiry to the CRM deal it became (if any), so the
   // inbox can show "converted → view deal" and disable a second conversion. One
   // bounded query over the deals already linked by source_submission_id.
@@ -205,10 +211,17 @@ export async function handleFormInbox(site: SiteRow, cors: Record<string, string
     const dq = await svc(`presence_deals?site_id=eq.${site.id}&deleted_at=is.null&source_submission_id=in.(${ids.join(',')})&select=id,source_submission_id`);
     for (const d of (Array.isArray(dq.json) ? dq.json : [])) if (d.source_submission_id) dealMap.set(String(d.source_submission_id), String(d.id));
   }
+  // C5: "In pipeline" only with a live deal; one marked converted with none left is a
+  // Customer when the person became one (a contact linked to a client), else just seen
+  const noDeal = rows.filter((s: any) => s.status === 'converted' && !dealMap.has(String(s.id)) && s.email);
+  const customers = noDeal.length ? (await customerEmails(site.id, noDeal.map((s: any) => String(s.email)))) || new Set<string>() : new Set<string>();
   // `fields` is read only for the studio's replies (fields.__studio_replies) — the raw
   // form values stay server-side as before; each row carries `replies` instead.
-  const submissions = rows.map(({ fields, ...s }: any) => ({ ...s, replies: leadReplies(fields), note: leadNote(fields), deal_id: dealMap.get(String(s.id)) || null, converted: s.status === 'converted' || dealMap.has(String(s.id)) }));
-  return json({ data: { submissions, unread: submissions.filter((s: any) => s.status === 'new').length } }, 200, cors);
+  const submissions = rows.map(({ fields, ...s }: any) => {
+    const dealId = dealMap.get(String(s.id)) || null;
+    return { ...s, replies: leadReplies(fields), note: leadNote(fields), deal_id: dealId, ...enquiryState(s.status, dealId, customers.has(String(s.email || '').trim().toLowerCase())) };
+  });
+  return json({ data: { submissions, unread: submissions.filter((s: any) => s.status === 'new').length, more } }, 200, cors);
 }
 
 // ═══ Oct 2026 workflow audit, change 5 · reply to a website enquiry from Studio OS ═══

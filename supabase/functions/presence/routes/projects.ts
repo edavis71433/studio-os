@@ -25,10 +25,18 @@ import {
 import type { SiteRow } from '../lib/site.ts';
 import type { Principal } from '../../_shared/auth.ts';
 import { UUID_RE } from '../lib/uuid.ts';
+import { callerToday } from '../lib/sales_lifecycle.ts';
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 const clean = (s: unknown, max = 500) => String(s ?? '').replace(/[\u0000-\u0008\u000B-\u001F\u007F]/g, '').trim().slice(0, max);
 const nowIso = () => new Date().toISOString();
+/** Bug hunt C11 (Nov 10 2026): a step is overdue once the CALLER's day is over. The
+ *  server's UTC day turns over mid-afternoon in Los Angeles, so a step due today
+ *  read "overdue" from about 4pm there. deriveTaskState calls a step late once the
+ *  end of its due day is before `now`, and the start of the caller's today is exactly
+ *  that line. The page sends ?today= (item 65's callerToday); without it, or with a
+ *  day no time zone could be on, this is the start of the UTC day — the old rule. */
+const overdueLine = (req: Request) => callerToday(new URL(req.url).searchParams.get('today'), nowIso()) + 'T00:00:00.000Z';
 const rows = (r: { json?: unknown }) => (Array.isArray((r as any).json) ? (r as any).json : []) as any[];
 const dateOrNull = (v: unknown): { ok: true; v: string | null } | { ok: false } => {
   if (v === undefined || v === null || v === '') return { ok: true, v: null };
@@ -205,7 +213,7 @@ export async function handleProject(req: Request, jwt: string, site: SiteRow, pr
       svc(`presence_deliverables?project_id=eq.${id}&site_id=eq.${site.id}&deleted_at=is.null&select=id,title,note,status,client_visible,media_id,created_at&order=created_at.desc&limit=200`),
       loadApprovals(`project_id=eq.${id}&site_id=eq.${site.id}&deleted_at=is.null&order=created_at.desc&limit=100`, 'id,subject_type,subject_id,title,summary,content_hash,status,client_visible,requested_at,decided_at,decision_note'),
     ]);
-    const now = nowIso();
+    const now = overdueLine(req);   // C11: each task's derived.overdue on the caller's day
     const milestones = forViewer(rows(ms), studio).sort(compareOrder);
     const tasksAll = rows(ts);
     const tasks = forViewer(tasksAll, studio).sort(compareOrder).map((t) => ({ ...t, derived: deriveTaskState(t, now) }));
@@ -280,7 +288,7 @@ export async function handleProjectReport(req: Request, jwt: string, site: SiteR
   const approvals = forViewer(rows(ap), studio);
   const lastEv = (studio ? rows(ev) : rows(ev).filter((e) => e.client_visible === true))[0];
   const csatRatings = await csatRatingsForProject(site.id, id);   // service edge #1: computed CSAT average
-  const summary = reportSummary({ tasks, milestones, deliverables, approvals, lastActivityAt: lastEv?.created_at || null, csatRatings }, nowIso());
+  const summary = reportSummary({ tasks, milestones, deliverables, approvals, lastActivityAt: lastEv?.created_at || null, csatRatings }, overdueLine(req));   // C11
   return json({ data: { project: { id: project.id, name: project.name, status: project.status, start_date: project.start_date, target_date: project.target_date }, summary, generated_at: nowIso(), is_studio_view: studio } }, 200, cors);
 }
 
@@ -306,7 +314,7 @@ export async function handleProjectsProgress(req: Request, jwt: string, site: Si
     svcAll(`presence_milestones?project_id=${inIds}&site_id=eq.${site.id}&deleted_at=is.null&select=id,project_id,title,status,sort_order,created_at,client_visible`, 'id'),
   ]);
   if (!pj.ok) return json({ error: 'read_failed', message: 'The projects couldn’t be read just now.' }, 502, cors);
-  const now = new Date().toISOString();
+  const now = overdueLine(req);   // C11: "N steps overdue" and Late on the caller's day
   const out: Record<string, { progress: { total: number; done: number; pct: number }; pending_approvals: number } & BoardFacts> = {};
   for (const p of rows(pj)) {
     if (!studio && !p.client_visible) continue;

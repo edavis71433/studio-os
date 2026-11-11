@@ -132,6 +132,10 @@
   .seats{font-size:13px;color:var(--soft);margin:0}
   .rolehelp{font-size:12.5px;color:var(--faint);margin:var(--dds-s2,8px) 0 0}
   .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+  /* bug hunt C4: a part whose read failed says so (and keeps its save off); C16: a switch that can't be pressed right now */
+  .unread{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:var(--dds-s3,12px);padding:10px 12px;border:1px solid var(--line);border-radius:var(--dds-r,8px);background:var(--bg);font-size:13.5px;color:var(--soft)}
+  [data-held]{display:none!important}   /* C4: the rows a failed read feeds (their own display rules would beat [hidden]) */
+  .sw[aria-disabled="true"]{opacity:.5;cursor:not-allowed}
 </style>
 </head>
 <body>
@@ -183,7 +187,7 @@
        when a deal counts as stalled (they lived under Automations) -->
   <section class="card" id="stages" aria-labelledby="stagesHead" hidden data-needs="configure">
     <div class="card-h"><h2 id="stagesHead" tabindex="-1">Deal stages</h2><span class="hint">Names · chances · when a deal stalls</span></div>
-    <div class="swrow" style="display:block">
+    <div class="swrow" style="display:block" id="staleRow">
       <b style="font-weight:600">Flag a deal as stalled after</b>
       <div class="how">The pipeline board marks a deal “Stalled” when nothing has moved for this many days. Per stage; 14 unless you say otherwise.</div>
       <div class="stale">
@@ -323,8 +327,13 @@ function scopeName() { const c = CTX || window.__ddsContext; const sc = SCOPE &&
 let TOKEN = "";
 sb.auth.onAuthStateChange(function (_e, s) { if (s && s.access_token) TOKEN = s.access_token; });
 const H = () => ({ 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + SUPABASE_KEY, 'x-dds-user-jwt': TOKEN, 'x-dds-scope-site': SCOPE });
+// a dropped connection answers like a refusal (status 0) instead of throwing, so a
+// flipped switch flips back and says why (bug hunt C4/C6)
+const NET_MSG = 'That didn’t go through — check your connection and try again.';
 async function api(path, method, body) {
-  const r = await fetch(FN + path, { method: method || 'GET', headers: H(), body: body === undefined ? undefined : JSON.stringify(body) });
+  let r;
+  try { r = await fetch(FN + path, { method: method || 'GET', headers: H(), body: body === undefined ? undefined : JSON.stringify(body) }); }
+  catch (_) { return { ok: false, status: 0, body: { message: NET_MSG } }; }
   return { ok: r.ok, status: r.status, body: await r.json().catch(() => ({})) };
 }
 const toast = (m, bad) => { if (window.ddsToast) window.ddsToast(m, bad ? 'err' : 'ok'); };
@@ -365,7 +374,7 @@ const CARDS = [
     scopedTitle: (who) => possessive(who) + ' profile', scopedDesc: 'Their name, email, phone, where they work from, and the kind of business — it drives their nudges.' },
   // the studio's own switches — never a client's (the invoices and deals are the studio's book)
   // Bold redesign (Nov 2026): the deal stages are a section of their own (the studio's book, like Automations)
-  { key: 'stages', href: '#stages', title: 'Deal stages', desc: 'Your names for the four open stages, the chance each one closes, and when a deal counts as stalled.', studioOnly: true },
+  { key: 'stages', href: '#stages', title: 'Deal stages', desc: 'Your names for the four open stages, the chance each one closes, and when a deal counts as stalled.', studioOnly: true, needs: 'configure' },
   { key: 'auto', href: '#automations', title: 'Automations', desc: 'Four switches: acknowledge enquiries, remind unpaid invoices, nudge quiet deals, ask for a review when a project is done. Each shows the sentence it sends.', studioOnly: true, needs: 'configure' },
   // the agency's own team: seats and roles (agency members at studio level only — never a client's settings)
   { key: 'agency_team', href: '#team', title: 'Team', desc: 'Who is on your studio’s team, their roles, and the seats your plan covers.', agencyOnly: true },
@@ -411,7 +420,7 @@ function cardHtml(c, status) {
     (/^#/.test(href) ? '' : '<span class="go" aria-hidden="true">→</span>') + '</a>';
 }
 const STATUSES = {};   // the quick card statuses, kept so a repaint (dds:context) does not lose them
-function reveal(id, focusId) { const f = $(id); if (!f) return; f.hidden = false; f.scrollIntoView({ behavior: 'smooth', block: 'start' }); const n = focusId && $(focusId); if (n) n.focus({ preventScroll: true }); }
+function reveal(id, focusId) { const f = $(id); if (!f) return; f.hidden = false; f.scrollIntoView({ behavior: 'smooth', block: 'start' }); const n = focusId && $(focusId); if (n) n.focus({ preventScroll: true }); markCurrent(id); }   // C16: the row you pressed is the one marked
 function renderCards() {
   const show = CARDS.filter((c) => (!c.feature || hasFeature(c.feature)) && (!c.cap || hasCap(c.cap)) && !(c.ownerOnly && SCOPE) && !(c.studioOnly && SCOPE) && !(c.scopedOnly && !SCOPE) && !(c.agencyOnly && !(CTX && CTX.is_agency && !SCOPE)) && !(c.operatorOnly && (SCOPE || !(CTX && CTX.is_operator))));
   $('cards').innerHTML = show.map((c) => cardHtml(c, STATUSES[c.key])).join('');
@@ -440,11 +449,19 @@ function markCurrent(id) {
 }
 function spySections() {
   if (!('IntersectionObserver' in window)) return;
+  const ids = ['studio', 'stages', 'report', 'menu', 'automations', 'team', 'billing'];   // C16: a client's Monthly report too
+  // C16: the band (15–30% down the screen) never reaches the last part when the page ends
+  // first, so Plan & billing never lit up; at the very bottom the last part shown is marked
+  const atBottom = () => window.scrollY > 0 && window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 2;
+  const lastShown = () => ids.map((id) => $(id)).filter((sec) => sec && !sec.hidden && sec.getClientRects().length).pop();
+  const bottom = () => { if (!atBottom()) return false; const l = lastShown(); if (l) markCurrent(l.id); return !!l; };
   const io = new IntersectionObserver((entries) => {
+    if (bottom()) return;
     const on = entries.filter((e) => e.isIntersecting).sort((x, y) => x.boundingClientRect.top - y.boundingClientRect.top)[0];
     if (on) markCurrent(on.target.id);
   }, { rootMargin: '-15% 0px -70% 0px' });
-  for (const id of ['studio', 'stages', 'menu', 'automations', 'team', 'billing']) { const sec = $(id); if (sec) io.observe(sec); }
+  for (const id of ids) { const sec = $(id); if (sec) io.observe(sec); }
+  window.addEventListener('scroll', bottom, { passive: true });
 }
 
 // ── the team, inline: GET /agency/members, POST to invite, PATCH to change a role
@@ -647,6 +664,7 @@ async function loadStudioLook() {
 async function loadProfile() {
   loadStudioLook().catch(() => {});
   const [i, s] = await Promise.all([api('/identity'), api('/settings')]);
+  IDENT_READ = i.ok; SETTINGS_READ = s.ok;   // C4: a failed read is not "nothing saved yet"
   IDENT = (i.ok && i.body && i.body.data) || null;
   SETTINGS = (s.ok && s.body && s.body.data) || null;
   const d = IDENT || {};
@@ -656,9 +674,45 @@ async function loadProfile() {
   $('f-area').value = d.service_area || '';
   const ind = $('f-industry'); ind.value = (SETTINGS && SETTINGS.industry_key) || 'generic'; if (ind.selectedIndex < 0) ind.value = 'generic';
   $('studio').hidden = false;
+  holdUnread();
   return d;
 }
+// ── C4 (bug hunt, Nov 10): when /identity or /settings can't be read, the part it
+//    feeds says so and keeps its save off. It used to show empty boxes and switches
+//    all off as if nothing were set, and the next save wrote those blanks and defaults
+//    over the real settings. The studio card needs both reads (the kind of business is
+//    a setting); the automations and the stalled-days boxes need /settings. ──
+let IDENT_READ = false, SETTINGS_READ = false;
+const UNREAD = {
+  studio: { rows: ['profileForm'], off: ['profileSave'], words: 'Your details couldn’t load just now. Saving is off until they do, so nothing you had is written over.' },
+  automations: { rows: [], words: 'Your automations couldn’t load just now. They can’t be changed until they do; nothing is switched on or off meanwhile.' },
+  stages: { rows: ['staleRow'], words: 'When a deal counts as stalled couldn’t load just now. It can’t be changed until it does.' },
+};
+function holdUnread() {
+  const held = { studio: !IDENT_READ || !SETTINGS_READ, automations: !SETTINGS_READ, stages: !SETTINGS_READ };
+  for (const id of Object.keys(UNREAD)) {
+    const sec = $(id), g = UNREAD[id], on = held[id]; if (!sec) continue;
+    const rows = id === 'automations' ? [...sec.querySelectorAll('.swrow')] : g.rows.map((r) => $(r));
+    rows.forEach((el) => { if (el) el.toggleAttribute('data-held', on); });
+    (g.off || []).forEach((b) => { const el = $(b); if (el) el.disabled = on; });
+    let n = sec.querySelector(':scope > .unread');
+    if (!on) { if (n) n.remove(); continue; }
+    if (n) continue;
+    n = document.createElement('div'); n.className = 'unread'; n.setAttribute('role', 'status');
+    n.innerHTML = `<span>${esc(g.words)}</span><button type="button" class="btn sm">Try again</button>`;
+    n.querySelector('button').addEventListener('click', retryReads);
+    sec.querySelector('.card-h').insertAdjacentElement('afterend', n);
+  }
+}
+async function retryReads(e) {
+  const b = e && e.currentTarget; if (b) b.disabled = true;
+  await loadProfile();   // a part that loads lets go of its notice (holdUnread)
+  renderSubline();
+  if (!SCOPE && SETTINGS_READ) paintAutomations();
+  if (b && b.isConnected) { b.disabled = false; toast('Still couldn’t load — try again in a moment.', true); }
+}
 async function saveProfile() {
+  if (!IDENT_READ || !SETTINGS_READ) return;   // C4: held — the boxes aren't what is saved
   const b = $('profileSave'); b.disabled = true;
   const name = $('f-name').value.trim();
   if (!name) { toast('Give your studio a name.', true); b.disabled = false; $('f-name').focus(); return; }
@@ -673,7 +727,7 @@ async function saveProfile() {
   const bad = rs.find((r) => !r.ok);
   if (bad) { toast(nice(bad.body, bad.status === 422 ? 'Some fields need a second look.' : 'That didn’t save — nothing was changed.'), true); return; }
   IDENT = (rs[0].body && rs[0].body.data) || { ...(IDENT || {}), ...identity };
-  if (rs[1]) SETTINGS = (rs[1].body && rs[1].body.data) || { ...(SETTINGS || {}), industry_key: industry };
+  if (rs[1]) SETTINGS = { ...(SETTINGS || {}), industry_key: (rs[1].body && rs[1].body.data && rs[1].body.data.industry_key) || industry };   // C3: only the field it wrote
   toast('Saved.');
   renderSubline();
 }
@@ -698,8 +752,7 @@ function paintAutomations() {
   const nDeal = Number(st.deal_nudge_days) >= 1 ? Math.trunc(Number(st.deal_nudge_days)) : 3;
   setVal('n-inv', String(nInv)); $('n-inv-echo').textContent = String(nInv);
   setVal('n-deal', String(nDeal)); $('say-deal').textContent = dealNudgeSentence(nDeal);
-  const stale = (st.stage_stale_days && typeof st.stage_stale_days === 'object') ? st.stage_stale_days : {};
-  for (const k of STAGE_KEYS) { const n = Math.trunc(Number(stale[k])); setVal('st-' + k, (Number.isFinite(n) && n >= 1) ? String(n) : ''); }
+  if (!STALE_SAVING) paintStaleDays();   // C3: never under a change still waiting to save
   $('automations').hidden = false;
   $('stages').hidden = false;
   loadStageNames();
@@ -769,17 +822,24 @@ async function loadMenu() {
   paintMenu();
   $('menu').hidden = false;
 }
+// C16: the switches grey while one is saving (a second press used to vanish unsent),
+// and for a role the server won't let change the menu (it says so: can_edit)
+const menuLocked = () => !!(MENU && MENU.can_edit === false);
 function paintMenu() {
   const hidden = new Set((MENU && MENU.hidden) || []);
+  const had = document.activeElement && document.activeElement.getAttribute && document.activeElement.getAttribute('data-menu-key');
+  const off = MENU_BUSY || menuLocked();
   $('menuRows').innerHTML = ((MENU && MENU.choices) || []).map((c) => `<div class="swrow">
-      <button type="button" class="sw" role="switch" id="sw-menu-${esc(c.key)}" data-menu-key="${esc(c.key)}" aria-checked="${hidden.has(c.key) ? 'false' : 'true'}" aria-labelledby="sw-menu-${esc(c.key)}-l"></button>
+      <button type="button" class="sw" role="switch" id="sw-menu-${esc(c.key)}" data-menu-key="${esc(c.key)}" aria-checked="${hidden.has(c.key) ? 'false' : 'true'}" aria-labelledby="sw-menu-${esc(c.key)}-l"${off ? ' aria-disabled="true"' : ''}></button>
       <div class="t"><b id="sw-menu-${esc(c.key)}-l">${esc(c.label)}</b><div class="how">${esc(c.what)}${hidden.has(c.key) ? ' <span class="muted">Hidden from the menu.</span>' : ''}</div></div>
     </div>`).join('');
   $('menuRows').querySelectorAll('[data-menu-key]').forEach((b) => b.addEventListener('click', () => toggleMenu(b.getAttribute('data-menu-key'))));
+  if (had) { const b = $('sw-menu-' + had); if (b) b.focus(); }   // the redraw keeps your place
+  $('menuNote').textContent = menuLocked() ? 'Your role can see the menu but not change it. Your studio’s owner, an admin or an account manager can.' : 'Home and Settings always stay. The menu changes the next time a page opens.';
 }
 let MENU_BUSY = false;
 async function toggleMenu(key) {
-  if (MENU_BUSY || !MENU) return;
+  if (MENU_BUSY || !MENU || menuLocked()) return;
   MENU_BUSY = true;
   const before = (MENU.hidden || []).slice();
   const hidden = before.includes(key) ? before.filter((k) => k !== key) : before.concat([key]);
@@ -791,9 +851,14 @@ async function toggleMenu(key) {
   toast(hidden.includes(key) ? 'Hidden. The menu changes the next time a page opens.' : 'Back in the menu from the next page on.');
 }
 async function saveAutomation(patch, undo) {
+  if (!SETTINGS_READ) { if (undo) undo(); toast('Your settings couldn’t load, so nothing was saved. Try again first.', true); return false; }   // C4
   const r = await api('/settings', 'PUT', patch);
   if (!r.ok) { toast(nice(r.body, 'That didn’t save — nothing was changed.'), true); if (undo) undo(); return false; }
-  SETTINGS = (r.body && r.body.data) || { ...(SETTINGS || {}), ...patch };
+  // C3: only the fields this save wrote are taken from its answer — a switch's answer
+  // that left the server before a days save must not put the old days back on screen
+  const got = (r.body && r.body.data) || {};
+  SETTINGS = { ...(SETTINGS || {}) };
+  for (const k of Object.keys(patch)) SETTINGS[k] = k in got ? got[k] : patch[k];
   paintAutomations();
   toast('Saved.');
   return true;
@@ -811,9 +876,16 @@ async function loadStageNames() {
   if (STAGE_NAMES_ASKED) return; STAGE_NAMES_ASKED = true;
   const r = await api('/sales/stages').catch(() => null);
   if (r && r.ok) { paintStageNames(r.body && r.body.data); paintStageChances(r.body && r.body.data);
-    const d = (r.body && r.body.data) || {}, named = Object.values(d.custom || {}).filter((v) => String(v || '').trim()).length;
-    setStatus('stages', { text: `4 stages${named ? ` · ${named} renamed` : ''}${d.chances ? ' · chances set' : ''}`, cls: 'plain' }); }
+    stagesStatus(r.body && r.body.data); }
   else { for (const id of ['stageNames', 'stageChances']) { const box = $(id); if (box) box.hidden = true; } }   // no sales area (or a failed read): the blocks hide, never a dead form
+}
+// C16: the Deal stages row says "chances set" only when a percent differs from its usual
+// one (the server always sends every percent), and it follows each save
+function stagesStatus(d) {
+  const named = Object.values((d && d.custom) || {}).filter((v) => String(v || '').trim()).length;
+  const c = (d && d.chances) || {}, def = (d && d.chance_defaults) || CHANCE_DEFAULTS;
+  const set = STAGE_KEYS.some((k) => c[k] != null && Number(c[k]) !== Number(def[k] ?? CHANCE_DEFAULTS[k]));
+  setStatus('stages', { text: `4 stages${named ? ` · ${named} renamed` : ''}${set ? ' · chances set' : ''}`, cls: 'plain' });
 }
 // ── sales review item 69: the chance each open stage closes (PUT /sales/stages { chances }) ──
 const CHANCE_DEFAULTS = { lead: 10, qualified: 25, proposal: 50, contract: 75 };
@@ -838,7 +910,7 @@ async function saveStageChances() {
   const r = await api('/sales/stages', 'PUT', { chances });
   btn.disabled = false;
   if (!r.ok) { toast(nice(r.body, 'Your percents didn’t save — nothing was changed.'), true); return; }
-  paintStageChances(r.body && r.body.data);
+  paintStageChances(r.body && r.body.data); stagesStatus(r.body && r.body.data);
   msg.textContent = 'Saved. Pipeline’s Expected total uses these.';
 }
 async function saveStageNames() {
@@ -847,7 +919,7 @@ async function saveStageNames() {
   const r = await api('/sales/stages', 'PUT', { names });
   btn.disabled = false;
   if (!r.ok) { toast(nice(r.body, 'Your stage names didn’t save — nothing was changed.'), true); return; }
-  paintStageNames(r.body && r.body.data);
+  paintStageNames(r.body && r.body.data); stagesStatus(r.body && r.body.data);
   const kept = Object.keys((r.body && r.body.data && r.body.data.custom) || {}).length;
   msg.textContent = kept ? 'Saved. The Pipeline, records and reports use these names.' : 'Saved — the usual names are back.';
 }
@@ -861,12 +933,32 @@ function wireAutomations() {
   $('n-rev').addEventListener('input', () => { $('n-rev-echo').textContent = $('n-rev').value || '3'; });
   $('n-inv').addEventListener('input', () => { $('n-inv-echo').textContent = $('n-inv').value || '2'; });
   $('n-deal').addEventListener('input', () => { const n = Math.trunc(Number($('n-deal').value)); $('say-deal').textContent = dealNudgeSentence(Number.isFinite(n) && n >= 1 ? n : 3); });
-  for (const k of STAGE_KEYS) $('st-' + k).addEventListener('change', () => {
-    const cur = (SETTINGS && SETTINGS.stage_stale_days && typeof SETTINGS.stage_stale_days === 'object') ? { ...SETTINGS.stage_stale_days } : {};
+  for (const k of STAGE_KEYS) $('st-' + k).addEventListener('change', saveStaleDays);
+}
+// ── C3 (bug hunt, Nov 10): the four stalled-days boxes are ONE setting. Each save
+//    used to send the copy read with the page plus the one box changed, so changing
+//    two boxes in a row wrote the first one's old value back over it, under two
+//    "Saved." Now each save is built from all four boxes as they stand, one save at a
+//    time: a change made while one is saving waits, then goes with the boxes as they
+//    are, and nothing repaints the boxes under a change still waiting. ──
+let STALE_SAVING = false, STALE_AGAIN = false;
+function staleFromBoxes() {
+  const cur = (SETTINGS && SETTINGS.stage_stale_days && typeof SETTINGS.stage_stale_days === 'object') ? { ...SETTINGS.stage_stale_days } : {};
+  for (const k of STAGE_KEYS) {
     const n = Math.trunc(Number($('st-' + k).value));
     if (Number.isFinite(n) && n >= 1) cur[k] = Math.min(n, 365); else delete cur[k];   // blank = back to the default 14
-    saveAutomation({ stage_stale_days: cur });
-  });
+  }
+  return cur;
+}
+function paintStaleDays() {
+  const stale = (SETTINGS && SETTINGS.stage_stale_days && typeof SETTINGS.stage_stale_days === 'object') ? SETTINGS.stage_stale_days : {};
+  for (const k of STAGE_KEYS) { const el = $('st-' + k), n = Math.trunc(Number(stale[k])); if (el && el !== document.activeElement) el.value = (Number.isFinite(n) && n >= 1) ? String(n) : ''; }
+}
+async function saveStaleDays() {
+  if (STALE_SAVING) { STALE_AGAIN = true; return; }
+  STALE_SAVING = true;
+  try { let ok = true; do { STALE_AGAIN = false; ok = await saveAutomation({ stage_stale_days: staleFromBoxes() }); } while (ok && STALE_AGAIN); }
+  finally { STALE_SAVING = false; paintStaleDays(); }   // what was kept (365 at most), or after a refusal what is really saved
 }
 function renderSubline() {
   const bits = [];
@@ -876,6 +968,21 @@ function renderSubline() {
 }
 function signedOut() {
   $('main').innerHTML = '<div class="center"><h2>Sign in to see your settings.</h2><p><a class="link" href="/studio.html">Sign in →</a></p></div>';
+}
+// C9 (bug hunt, Nov 10): a link straight to a part (Plan & billing from "Update payment",
+// or from search) jumped there once, then Team, Your menu and the rest filled in above
+// it and pushed it off the screen. It now stays put while anything on the page changes
+// size, and lets go the moment you scroll, tap, click or type, or after 15 seconds.
+function holdAnchor(sec) {
+  if (!sec) return;
+  sec.hidden = false; sec.scrollIntoView({ block: 'start' });
+  if (!('ResizeObserver' in window)) return;
+  const ro = new ResizeObserver(() => sec.scrollIntoView({ block: 'start' }));
+  const evs = ['wheel', 'touchstart', 'pointerdown', 'keydown'];
+  const stop = () => { ro.disconnect(); evs.forEach((ev) => window.removeEventListener(ev, stop, true)); };
+  evs.forEach((ev) => window.addEventListener(ev, stop, { capture: true, passive: true }));
+  ro.observe($('main'));
+  setTimeout(stop, 15000);
 }
 (async function init() {
   try {
@@ -927,11 +1034,11 @@ function signedOut() {
     { const dl = $('dlData'); if (dl) dl.addEventListener('click', downloadMyData); }   // item 69: Download my data
     loadPlan().catch(() => {});
     loadTeam().catch(() => {});
-    if (location.hash === '#team') { const sec = $('team'); if (sec) { sec.hidden = false; sec.scrollIntoView({ block: 'start' }); } }
+    if (location.hash === '#team') holdAnchor($('team'));
     if (location.hash === '#studio') { const n = $('f-name'); if (n) n.focus(); }
-    if (location.hash === '#billing') { const sec = $('billing'); if (sec) { sec.hidden = false; sec.scrollIntoView({ block: 'start' }); } }
-    if (location.hash === '#automations' && !SCOPE) { const sec = $('automations'); if (sec) { sec.hidden = false; sec.scrollIntoView({ block: 'start' }); } }
-    if (location.hash === '#stages' && !SCOPE) { const sec = $('stages'); if (sec) { sec.hidden = false; sec.scrollIntoView({ block: 'start' }); } }
+    if (location.hash === '#billing') holdAnchor($('billing'));
+    if (location.hash === '#automations' && !SCOPE) holdAnchor($('automations'));
+    if (location.hash === '#stages' && !SCOPE) holdAnchor($('stages'));
     spySections();
   } catch (_) {
     $('main').innerHTML = '<div class="center"><h2>We couldn’t load your settings just now.</h2><p>Nothing’s wrong with your account — refresh to try again.</p></div>';

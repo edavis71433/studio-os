@@ -31,7 +31,7 @@ step(8, 'Publish runs the ONE pipeline; success updates the live site', /status:
 
 // forms → CRM (10, 11, 21)
 step(10, 'A website enquiry converts to a CRM deal, idempotently (no duplicate)', /source_submission_id=eq\.\$\{srcSub\}[\s\S]*?already_converted: true/.test(sales));
-step(11, 'The enquiry surfaces in the Studio (leads inbox links its deal)', /converted: s\.status === 'converted' \|\| dealMap\.has/.test(commercial));
+step(11, 'The enquiry surfaces in the Studio (leads inbox links its deal)', /deal_id: dealId, \.\.\.enquiryState\(s\.status, dealId,/.test(commercial));
 
 // analytics + oversight (12, 17)
 step(12, 'Analytics is site-scoped + connection-state aware (no fake data)', /gscConnected/.test(analytics) && /presence_visits\?site_id=eq/.test(analytics));
