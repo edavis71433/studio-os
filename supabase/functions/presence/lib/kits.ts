@@ -5,7 +5,14 @@
 //      business's reviews), no posts, no media, no verification tokens.
 //   2. Applying a kit is FILL-ONLY-EMPTY — it can add to a fresh site but can
 //      NEVER overwrite or delete existing work (no-data-loss, test-locked).
+// Builder list item 145 adds one exception to law 1, on purpose: a kit saved as
+// "my template" also carries its site's pages, with their words and copies of
+// their photos (payload.layout). Business details still never travel, and every
+// copy is recorded on the new site, so publishing lists whatever is still exactly
+// as copied until it is changed or kept (lib/site_layout.ts).
 // Pure functions; routes do the I/O and agency fencing.
+
+import type { SiteLayout } from './site_layout.ts';
 
 export interface KitOffering { name: string; category: string; description: string; price_text: string; sort_order: number }
 export interface KitFaq { question: string; answer: string; sort_order: number }
@@ -19,6 +26,10 @@ export interface KitPayload {
   voice: { tone_notes: string; preferred_vocabulary: string; never_claim: string };
   theme_tokens: Record<string, string>;
   seo_defaults: { seo_title_pattern: string };   // reserved seam; V1 keeps it empty
+  // builder list item 145: a kit saved as "my template" also carries its site's
+  // pages, sections, menu and photos (lib/site_layout.ts), and how much of each
+  layout?: SiteLayout;
+  layout_summary?: { pages: number; sections: number; photos: number };
 }
 
 const s = (v: unknown, max: number): string => {
