@@ -77,6 +77,10 @@ export interface SnapshotContent {
     /** List item 175: false when the owner asked AI assistants not to read the site. Absent
      *  means allowed: robots.txt then stays exactly as the template draws it. */
     ai_crawlers?: boolean;
+    /** List item 124: true when the owner hid the site from search (every page says noindex). */
+    search_hidden?: boolean;
+    /** List item 124: the owner's llms.txt, written at /llms.txt; absent when there is none. */
+    llms_txt?: string;
     /** List item 152: the site's ad tags (lib/ad_tags.ts), only when the owner set one. They
      *  load behind a cookie notice, and the privacy page describes them. */
     ad_tags?: { google?: string; meta?: string };

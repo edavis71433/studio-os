@@ -161,6 +161,7 @@ const MEMBER_WRITES: Array<[MemberWriteNeed, string[]]> = [
   ['edit', [
     'POST /redirects',
     'POST /visibility/check',
+    'PUT /visibility/follow',   // builder item 181: the searches the site follows on Google
     'POST /preview/(publish|share-link|section)',   // section: draws one unsaved section for the canvas, stores nothing
     'POST /publishes/checkpoints',
     'POST /page-locks',   // builder items 48 and 120: a page's password, as editing the page's settings is

@@ -98,6 +98,7 @@ import { handleCommerce, isPublicCommerceRoute } from './routes/commerce.ts';
 import { handleScopedCommerce } from './routes/commerce_scoped.ts';
 const { handleSystem } = lazyRoutes(() => import('./routes/system.ts'));
 const { handleVisibility, handleVisibilityCheck } = lazyRoutes(() => import('./routes/visibility.ts'));
+const { handleFollowGet, handleFollowPut, handleLlmsDraft } = lazyRoutes(() => import('./routes/search_tab.ts'));
 const { handleConnectionsList, handleConnectionProfile, handleConnectionConnect, handleConnectionCallback, handleConnectionRefresh, handleConnectionDisconnect, handleConnectionProperties, handleConnectionPropertySelect, handleWritePrepare, handleWriteList, handleWriteDecide, handleWriteExecute, handleWriteRollback, handleConnectionAsk, handleConnectionAskStatus } = lazyRoutes(() => import('./routes/connections.ts'));
 const { handleMarketplaceList, handleMarketplacePrepare, handleMarketplaceDecide, handleMarketplaceExecute, handleMarketplaceRollback, handleMarketplaceFeatures } = lazyRoutes(() => import('./routes/marketplace.ts'));
 const { handleEnterpriseOverview, handleEnterpriseLocations, handleEnterpriseLocationConfig, handleEnterpriseRolloutPrepare, handleEnterpriseDecide, handleEnterpriseExecute, handleEnterpriseRollback, handleEnterpriseAudit } = lazyRoutes(() => import('./routes/enterprise.ts'));
@@ -559,6 +560,9 @@ async function route_(req: Request, cors: Record<string, string>): Promise<Respo
   if (route === '/search/health' && method === 'GET') return handleSearchHealth(site, cors);              // Phase SD
   if (route === '/visibility' && method === 'GET') return handleVisibility(site, cors);                   // the Search tab
   if (route === '/visibility/check' && method === 'POST') return handleVisibilityCheck(site, cors);
+  if (route === '/visibility/follow' && method === 'GET') return handleFollowGet(site, cors);              // item 181
+  if (route === '/visibility/follow' && method === 'PUT') return handleFollowPut(req, site, principal, cors);
+  if (route === '/visibility/llms-draft' && method === 'GET') return handleLlmsDraft(site, cors);         // item 124
   if (route === '/redirects' && method === 'GET') return handleRedirectsList(site, cors);                 // Phase SD
   if (route === '/redirects' && method === 'POST') return handleRedirectCreate(req, site, principal, cors);
   {
