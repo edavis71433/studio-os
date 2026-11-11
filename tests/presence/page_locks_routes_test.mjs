@@ -1,6 +1,6 @@
 // ── Page passwords: the real routes (builder list items 48 and 120, Nov 2026) ──
 // POST /page-locks keeps the key a password makes, never the password; GET /page-locks lists
-// this site's locks; a publish reads only this site's keys. Before APPLY-0151 the table isn't
+// this site's locks; a publish reads only this site's keys. Before APPLY-0158 the table isn't
 // there: setting a password says so plainly, the list is empty, and a publish finds no key
 // (so the page stays off the live site). Real handlers against the shared in-memory PostgREST.
 //   deno run --allow-read --allow-env --allow-net tests/presence/page_locks_routes_test.mjs

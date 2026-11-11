@@ -13,7 +13,7 @@
 // usual, then sealed: the published file holds the page encrypted (AES-GCM, with a key made
 // from the password by PBKDF2) and a small box in the site's own look that asks for the
 // password and opens the page in the visitor's browser. The server never keeps the password,
-// only the key made from it (presence_page_locks, migration 0151), so a password page can't
+// only the key made from it (presence_page_locks, migration 0158), so a password page can't
 // go live without its key: one whose key is missing is kept off the site, like a private one.
 //
 // Everything here is pure. The password box and the sealing are in lib/page_gate.ts.

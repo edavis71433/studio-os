@@ -4,7 +4,7 @@
 // settings (pages[].lock, with access 'password'); the password itself is never kept. GET
 // /page-locks lists this site's lock ids, so the editor can say a page's password is saved.
 // The keys are read only by a publish, which seals each password page with its own.
-// presence_page_locks (migration 0151) is service-role only.
+// presence_page_locks (migration 0158) is service-role only.
 import { json } from '../../_shared/http.ts';
 import { svc } from '../lib/db.ts';
 import { rateAllow } from '../lib/ratelimit.ts';

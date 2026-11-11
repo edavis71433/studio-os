@@ -1,4 +1,4 @@
--- APPLY 0151 (production) — Page passwords (builder list items 48 and 120).
+-- APPLY 0158 (production) — Page passwords (builder list items 48 and 120).
 -- Safe to run more than once. One new table; nothing existing changes.
 -- Paste into Supabase -> SQL Editor -> Run.
 create table if not exists public.presence_page_locks (
