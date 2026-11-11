@@ -203,8 +203,11 @@ try {
     ok('reminder: every reminder went out', r.reminded === 3 && w.emails.length === 3, JSON.stringify({ reminded: r.reminded, emails: w.emails.length }));
     ok('reminder: the salon’s two customers reply to the salon', by('sam@customer.example')?.reply_to === 'hello@salon.example' && by('kim@customer.example')?.reply_to === 'hello@salon.example');
     ok('reminder: the studio’s own customer replies to the studio’s own address', by('lee@customer.example')?.reply_to === 'studio@example.com');
-    const ownerReads = w.gets.filter((p) => p.startsWith(`presence_identity?site_id=eq.${SALON}&select=business_name,email`)).length;
+    const ownerReads = w.gets.filter((p) => p.startsWith(`presence_identity?site_id=eq.${SALON}&select=business_name,email&`)).length;
     ok('reminder: the salon’s owner address is read once, not once per appointment', ownerReads === 1, `read ${ownerReads}×`);
+    // item 149: the business's name, address and phone for the calendar links, once per site too
+    const bizReads = w.gets.filter((p) => p.startsWith(`presence_identity?site_id=eq.${SALON}&select=business_name,email,phone&`)).length;
+    ok('reminder: the salon’s details for the calendar links are read once, not once per appointment', bizReads === 1, `read ${bizReads}×`);
   }
   // the hand-sent review request
   {
