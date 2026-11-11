@@ -30,8 +30,9 @@ import type { Principal } from '../../_shared/auth.ts';
 import { buildPortfolio, filterPortfolio } from './portfolio.ts';
 import type { PortfolioInput } from './portfolio.ts';
 import { daysBetween, DOMAIN_SOON_DAYS, PADLOCK_SOON_DAYS, PADLOCK_STUCK_HOURS } from './needs_you.ts';
+import { registryWarnings, sameCompany } from '../lib/rdap.ts';
 import { DOWN_THRESHOLD } from '../monitor/heartbeat.ts';
-import { readReservedJson, updateReservedJson, RESERVED_NAMES } from '../lib/reserved_store.ts';
+import { readReservedJson, updateReservedJson, writeReservedJson, RESERVED_NAMES } from '../lib/reserved_store.ts';
 import { siteOrigin, hostedName, SITE_COLS } from '../lib/site.ts';
 import type { SiteRow } from '../lib/site.ts';
 import { getTemplate, renderForBuilder, latestTemplateVersion } from '../lib/render.ts';
@@ -45,9 +46,11 @@ import { previewCache, previewCacheKey } from '../lib/preview_cache.ts';
 import { previewUrlMap } from '../lib/media.ts';
 import { withSampleWords } from '../lib/sample_words.ts';
 import { writeChangeEvent } from '../lib/provenance.ts';
-import { kitFromSite, applyKitTo } from './kit_io.ts';
+import { kitFromSite, applyKitTo, layoutFromSite } from './kit_io.ts';
 import type { KitPayload } from '../lib/kits.ts';
 import { UUID_LOWER_RE as UUID_RE } from '../lib/uuid.ts';
+import { normalizeCopied } from '../lib/site_layout.ts';
+import { keepCopied } from '../lib/copied_record.ts';
 import { claimPortfolioSite } from '../lib/connect_requests.ts';
 import { attachOwnerLogin, validEmail } from '../commerce/account.ts';
 import type { AttachOwnerError } from '../commerce/account.ts';
@@ -186,6 +189,8 @@ export interface SitesInput {
   opened: Record<string, string>;
   pins: string[];
   nowIso: string;
+  /** item 145: the sites started from another site or a template, and whether the studio kept what came across */
+  copied?: Record<string, { from: string; kept: boolean }>;
 }
 export type SiteCard = ReturnType<typeof buildSites>[number];
 
@@ -222,6 +227,7 @@ export function buildSites(i: SitesInput) {
       // what the thumbnail route can draw: the live page, else the draft; a site
       // we only watch lives on someone else's host, so there is nothing of ours to draw
       thumb: hosted ? (state.key === 'not_live' ? 'draft' : 'live') : null,
+      copied: (i.copied && i.copied[p.site_id]) || null,
       // item 135: made with + New site and nobody invited yet (only said when the client was read)
       no_owner: ownerBy.has(clientId) && !hasOwner(ownerBy.get(clientId)),
     };
@@ -248,6 +254,8 @@ export interface DomainIn {
   cert_expires_at?: string | null; cert_pending_since?: string | null;
   /** item 134 (findings 3, 5): what the domain shows (latest · old_copy · other · unreachable), and the checklist */
   domain_serving?: string | null; domain_checks?: Array<{ key: string; ok: boolean; words: string }> | null;
+  /** item 162 (0162): the transfer lock, who runs the DNS, the registry's status words, since when */
+  domain_lock?: boolean | null; domain_dns_host?: string | null; domain_statuses?: string[] | null; domain_registered_at?: string | null;
 }
 export type DomainTone = 'good' | 'warn' | 'bad' | 'quiet';
 /** One domain's status in a few words. Expiry first, on the same 30-day line as
@@ -256,6 +264,11 @@ export function domainStatus(d: DomainIn, nowIso: string): { key: string; words:
   const days = daysBetween(nowIso, d.domain_expires_at);
   const is = (key: string, words: string, tone: DomainTone) => ({ key, words, tone, days_left: days });
   const plural = (n: number) => `${n} day${n === 1 ? '' : 's'}`;
+  // item 162 (review domains finding 6): the registry's own words beat our dates (a lapsed .com's date can jump a year ahead)
+  const st = Array.isArray(d.domain_statuses) ? d.domain_statuses : [];
+  if (st.includes('pending delete')) return is('registry', 'About to be deleted', 'bad');
+  if (st.includes('redemption period')) return is('registry', 'In the redemption period', 'bad');
+  if (st.includes('client hold') || st.includes('server hold')) return is('registry', 'On hold at the registry', 'bad');
   if (days !== null && days < 0) return is('expired', `Expired ${plural(-days)} ago`, 'bad');
   if (days !== null && days <= DOMAIN_SOON_DAYS) return is('expiring', days === 0 ? 'Expires today' : `Expires in ${plural(days)}`, 'warn');
   if (d.edition === 'monitor') return is('elsewhere', 'On their own host', 'quiet');
@@ -278,7 +291,7 @@ export function domainStatus(d: DomainIn, nowIso: string): { key: string; words:
 /** Every custom domain with its status, provider and expiry, the most urgent
  *  first; and the hosted sites still on their built-in address. Pure. */
 export function buildDomains(rows: DomainIn[], nowIso: string) {
-  const RANK: Record<string, number> = { expired: 0, down: 1, old_copy: 2, other_site: 3, expiring: 4, padlock: 5, partly: 6, offline: 7, checking: 8, not_live: 9, elsewhere: 10, connected: 11 };
+  const RANK: Record<string, number> = { registry: 0, expired: 1, down: 2, old_copy: 3, other_site: 4, expiring: 5, padlock: 6, partly: 7, offline: 8, checking: 9, not_live: 10, elsewhere: 11, connected: 12 };
   const domains = rows.filter((r) => r.custom_domain).map((r) => {
     const st = domainStatus(r, nowIso);
     return {
@@ -291,6 +304,11 @@ export function buildDomains(rows: DomainIn[], nowIso: string) {
       record: r.domain_lookup_status === 'failed' || r.domain_lookup_status === 'not_found' ? 'unreadable' : r.domain_lookup_status === 'ok' ? 'ok' : 'unknown',
       padlock_until: r.edition !== 'monitor' ? (r.cert_expires_at || null) : null,   // item 134
       checks: r.edition !== 'monitor' && Array.isArray(r.domain_checks) ? r.domain_checks.filter((c) => c && typeof c.words === 'string').map((c) => ({ ok: c.ok === true, words: c.words })) : [],   // item 134: what was checked, for the row
+      // item 162: who runs the DNS (when it isn't the seller), the lock, and what the registry's words mean
+      dns_host: r.domain_dns_host && !sameCompany(r.domain_dns_host, r.domain_registrar) ? r.domain_dns_host : '',
+      lock: typeof r.domain_lock === 'boolean' ? r.domain_lock : null,
+      warnings: registryWarnings(Array.isArray(r.domain_statuses) ? { lock: typeof r.domain_lock === 'boolean' ? r.domain_lock : null, statuses: r.domain_statuses } : null),   // { key, severity, words }
+      registered_at: r.domain_registered_at || null,
       hosted: r.edition !== 'monitor',
     };
   });
@@ -422,7 +440,47 @@ const forbid = (cors: Record<string, string>) => json({ error: 'forbidden', mess
 const notYours = (cors: Record<string, string>) => json({ error: 'not_found', message: 'Not one of your clients.' }, 404, cors);
 const EXTRA_COLS = 'id,client_id,netlify_site_id,offline_at,uptime_ok,uptime_fail_streak,domain_checked_at,template_slug,created_at';
 /** the Domains page also reads the lookup's result and the padlock (items 132 and 134, migration 0149) */
-const DOMAIN_COLS = `${EXTRA_COLS},domain_lookup_status,cert_expires_at,cert_pending_since,domain_serving,domain_checks`;   // domain_serving, domain_checks: 0153
+const DOMAIN_COLS = `${EXTRA_COLS},domain_lookup_status,cert_expires_at,cert_pending_since,domain_serving,domain_checks,domain_lock,domain_dns_host,domain_statuses,domain_registered_at`;   // domain_serving, domain_checks: 0153; domain_lock…domain_registered_at: 0162
+
+// ── one domain's side panel (item 162) ──
+export const CHECK_NOW_GAP_MS = 60_000;   // "Check now" at most once a minute per domain
+export interface DomainNotes { account: string; renews: 'yes' | 'no' | 'unknown'; renews_confirmed_at: string | null; note: string; updated_by?: string | null; updated_at?: string | null }
+/** Pure: the studio's notes on a domain, cleaned (review domains finding 10): whose account it
+ *  is in, whether it renews by itself (and when that was confirmed), and a free note. */
+export function normalizeDomainNotes(raw: unknown): DomainNotes {
+  const r = (raw && typeof raw === 'object' ? raw : {}) as Record<string, unknown>;
+  const renews = r.renews === 'yes' || r.renews === 'no' ? r.renews : 'unknown';
+  const conf = typeof r.renews_confirmed_at === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(r.renews_confirmed_at) ? r.renews_confirmed_at : null;
+  return {
+    account: typeof r.account === 'string' ? r.account.trim().slice(0, 120) : '',
+    renews, renews_confirmed_at: renews === 'unknown' ? null : conf,
+    note: typeof r.note === 'string' ? r.note.trim().slice(0, 600) : '',
+    updated_by: typeof r.updated_by === 'string' ? r.updated_by : null,
+    updated_at: typeof r.updated_at === 'string' ? r.updated_at : null,
+  };
+}
+const RECORD_TYPES = ['A', 'AAAA', 'CNAME', 'MX', 'TXT'] as const;   // the order the panel lists them in
+/** Everything the side panel shows for one domain: the row, the registry's facts, the
+ *  checklist, every record live (finding 24: the client's card stops at six), and the notes. */
+async function domainDetail(siteId: string, nowIso: string) {
+  const row = rowsOf<DomainIn & { id: string; domain_registered_name?: string | null; netlify_site_id?: string | null }>(
+    await svc(`presence_sites?id=eq.${siteId}&select=${DOMAIN_COLS},edition,status,last_published_at,custom_domain,domain_registrar,domain_expires_at,domain_registered_name&limit=1`).catch(() => ({ ok: false, json: [] })))[0];
+  if (!row || !row.custom_domain) return null;
+  const ident = rowsOf<{ business_name?: string }>(await svc(`presence_identity?site_id=eq.${siteId}&select=business_name&limit=1`).catch(() => ({ ok: false, json: [] })))[0];
+  const built = buildDomains([{ ...row, site_id: siteId, name: String(ident?.business_name || 'This site') }], nowIso).domains[0];
+  const { dnsRecords, twinName } = await import('../lib/domain_health.ts');
+  const names = [row.custom_domain, twinName(row.custom_domain, row.domain_registered_name || null)].filter(Boolean) as string[];
+  const records: Array<{ name: string; type: string; value: string }> = [];
+  await Promise.all(names.flatMap((n) => RECORD_TYPES.map(async (t) => { for (const v of await dnsRecords(n, t)) records.push({ name: n, type: t, value: v }); })));
+  records.sort((a, b) => a.name.localeCompare(b.name) || RECORD_TYPES.indexOf(a.type as typeof RECORD_TYPES[number]) - RECORD_TYPES.indexOf(b.type as typeof RECORD_TYPES[number]) || a.value.localeCompare(b.value));
+  const statuses = Array.isArray(row.domain_statuses) ? row.domain_statuses : [];
+  return {
+    ...built,
+    dns_host_full: row.domain_dns_host || '',   // the row's dns_host is blank when it's the seller; the panel names it either way
+    statuses, all_checks: Array.isArray(row.domain_checks) ? row.domain_checks : [],
+    records, notes: normalizeDomainNotes(await readReservedJson(siteId, RESERVED_NAMES.domainNotes)),
+  };
+}
 
 /** The Sites and Domains routes, or null when the route is someone else's. */
 export async function handleAgencySites(req: Request, route: string, method: string, member: AgencyMember, principal: Principal, cors: Record<string, string>, deps: SitesDeps): Promise<Response | null> {
@@ -440,7 +498,7 @@ export async function handleAgencySites(req: Request, route: string, method: str
     const soft = () => ({ ok: false, json: null as unknown });
     const userId = UUID_RE.test(String(principal.userId || '')) ? String(principal.userId) : '';
     // each read is best-effort: a failed one leaves its column empty and `partial` says so
-    const [extraQ, planQ, seatQ, ownerQ, linkQ, studioQ, openQ, pins] = await Promise.all([
+    const [extraQ, planQ, seatQ, ownerQ, linkQ, studioQ, openQ, pins, copiedQ] = await Promise.all([
       ids.length ? svc(`presence_sites?id=${IN}&select=${EXTRA_COLS}&limit=1000`).catch(soft) : none,
       clientIds.length ? svc(`presence_entitlements?client_id=in.(${clientIds.join(',')})&product=eq.presence&select=client_id,plan,status,term,current_period_end,trial_ends_at,cancel_at_period_end&limit=1000`).catch(soft) : none,
       ids.length ? svc(`presence_site_members?site_id=${IN}&status=in.(active,invited)&select=site_id,email,role,status&limit=2000`).catch(soft) : none,
@@ -452,14 +510,21 @@ export async function handleAgencySites(req: Request, route: string, method: str
       // requests, so the thousand rows reach back a thousand pages, not thirty.
       userId && ids.length ? svc(`presence_scoped_access_events?operator_user_id=eq.${userId}&outcome=eq.allowed&route=eq.${encodeURIComponent('/portal/context')}&select=client_site_id,created_at&order=created_at.desc&limit=1000`).catch(soft) : none,
       deps.ownSite().then(async (own) => (own ? { ok: true, own: true, pins: normalizePins(await readReservedJson(own.id, RESERVED_NAMES.sitePins))[member.member_id] || [] } : { ok: true, own: false, pins: [] as string[] })).catch(() => ({ ok: false, own: false, pins: [] as string[] })),
+      // item 145: which sites were started from another site or a template (their copy records)
+      ids.length ? svc(`presence_sales_templates?site_id=${IN}&kind=eq.proposal&name=eq.${encodeURIComponent(RESERVED_NAMES.copiedFrom)}&deleted_at=is.null&select=site_id,body&limit=1000`).catch(soft) : none,
     ]);
+    const copied: Record<string, { from: string; kept: boolean }> = {};
+    for (const r of rowsOf<{ site_id: string; body: string }>(copiedQ)) {
+      let rec = null; try { rec = normalizeCopied(JSON.parse(String(r.body || 'null'))); } catch { rec = null; }
+      if (rec) copied[r.site_id] = { from: rec.from, kept: rec.kept };
+    }
     const rows = buildSites({
       portfolio, extras: rowsOf<SiteExtra>(extraQ), plans: rowsOf<PlanRow>(planQ), seats: rowsOf<SeatRow>(seatQ), owners: rowsOf<OwnerRow>(ownerQ),
       portalSites: rowsOf<{ customer_site_id: string }>(linkQ).map((l) => String(l.customer_site_id)),
       studio: rowsOf<StudioSeat>(studioQ), me: member.email, opened: lastOpenedBySite(rowsOf(openQ)),
-      pins: pins.pins.filter((id) => ids.includes(id)), nowIso: now,
+      pins: pins.pins.filter((id) => ids.includes(id)), nowIso: now, copied,
     });
-    const partial = [extraQ, planQ, seatQ, ownerQ, linkQ, studioQ, openQ].some((q) => (q as { ok?: boolean }).ok === false) || !pins.ok;
+    const partial = [extraQ, planQ, seatQ, ownerQ, linkQ, studioQ, openQ, copiedQ].some((q) => (q as { ok?: boolean }).ok === false) || !pins.ok;
     // a studio seat that can't open a client (lib/scope.ts asks bulk_publish) gets no doors into one,
     // and not the client's own people by name
     const canOpen = can(member.role, 'bulk_publish');
@@ -497,7 +562,9 @@ export async function handleAgencySites(req: Request, route: string, method: str
     // the kit, on its own: a kit that won't apply never undoes the site (the page offers it again)
     let kitOut: { id: string; name: string; applied?: Record<string, unknown>; skipped?: string[]; failed?: boolean } | null = null;
     if (kit) {
-      try { kitOut = { id: kitId, name: kit.name, ...(await applyKitTo(kit.payload, acct.siteId, principal, `Started from the “${kit.name}” starter kit`)) }; }
+      // a template (item 145) brings pages too: its copied words and photos are recorded under its name, as Apply does
+      const tpl = !!kit.payload.layout;
+      try { kitOut = { id: kitId, name: kit.name, ...(await applyKitTo(kit.payload, acct.siteId, principal, `Started from the “${kit.name}” ${tpl ? 'template' : 'starter kit'}`, tpl ? { label: `your “${kit.name}” template` } : {})) }; }
       catch { kitOut = { id: kitId, name: kit.name, failed: true }; }
     }
     return json({ data: { site_id: acct.siteId, client_id: acct.clientId, name, kit: kitOut } }, 201, cors);
@@ -524,7 +591,43 @@ export async function handleAgencySites(req: Request, route: string, method: str
     return json({ data: buildDomains(list, now), partial: (extraQ as { ok?: boolean }).ok === false }, 200, cors);
   }
 
-  const m = route.match(/^\/agency\/sites\/([0-9a-f-]{36})\/(thumb|pin|duplicate|invite)$/);
+  // ── one domain: the side panel, the studio's notes, and "Check now" (item 162, review domains
+  //    findings 9, 10, 23 and 24). A client of this studio's, or the studio's own site. ──
+  {
+    const dm = route.match(/^\/agency\/domains\/([0-9a-f-]{36})(?:\/(notes|check))?$/);
+    if (dm) {
+      const siteId = dm[1], what = dm[2] || '';
+      if (!can(member.role, 'read')) return forbid(cors);
+      const own = await deps.ownSite().catch(() => null);
+      if (!(own && own.id === siteId) && !(await agencySiteIds(member.agency_id)).includes(siteId)) return notYours(cors);
+      if (what === 'notes' && method === 'PUT') {
+        if (!can(member.role, 'manage_clients')) return forbid(cors);
+        let b: unknown = null; try { b = await req.json(); } catch { /* answered below */ }
+        if (!b || typeof b !== 'object') return json({ error: 'bad_request', message: 'Send the notes to save.' }, 400, cors);
+        const next = { ...normalizeDomainNotes(b), updated_by: member.email || null, updated_at: now };
+        const ok = await writeReservedJson(siteId, RESERVED_NAMES.domainNotes, next, member.email || 'studio');
+        if (!ok) return json({ error: 'write_failed', message: 'That didn’t save.' }, 502, cors);
+        return json({ data: next }, 200, cors);
+      }
+      if (what === 'check' && method === 'POST') {
+        const sq = rowsOf<{ id: string; client_id: string; custom_domain: string | null; netlify_site_id: string | null; edition: string | null; cert_pending_since: string | null; domain_checked_at: string | null }>(
+          await svc(`presence_sites?id=eq.${siteId}&select=id,client_id,custom_domain,netlify_site_id,edition,cert_pending_since,domain_checked_at&limit=1`))[0];
+        if (!sq || !sq.custom_domain) return json({ error: 'no_domain', message: 'This site has no domain of its own to check.' }, 409, cors);
+        const since = sq.domain_checked_at ? Date.parse(now) - Date.parse(sq.domain_checked_at) : Infinity;
+        if (since < CHECK_NOW_GAP_MS) return json({ error: 'too_soon', message: 'Checked a moment ago. Give it a minute before checking again.' }, 429, cors);
+        await (await import('../commerce/lifecycle.ts')).checkOneDomain({ ...sq, custom_domain: sq.custom_domain }, now);
+        const detail = await domainDetail(siteId, now);
+        return detail ? json({ data: detail }, 200, cors) : notYours(cors);
+      }
+      if (what === '' && method === 'GET') {
+        const detail = await domainDetail(siteId, now);
+        return detail ? json({ data: detail }, 200, { ...cors, 'Cache-Control': 'no-store' }) : notYours(cors);
+      }
+      return null;
+    }
+  }
+
+    const m = route.match(/^\/agency\/sites\/([0-9a-f-]{36})\/(thumb|pin|duplicate|copied|invite)$/);
   if (!m) return null;
   const siteId = m[1], what = m[2];
 
@@ -560,12 +663,15 @@ export async function handleAgencySites(req: Request, route: string, method: str
     return json({ data: { site_id: siteId, pinned, pins: stored[member.member_id] || [] } }, 200, cors);
   }
 
-  // ── Duplicate site (item 45): a NEW customer's site starts from this one's
-  //    setup. The page creates the customer first (POST /sales/customers, the Add
-  //    a customer flow) and sends the new site here. Starter kits do the copying
+  // ── Duplicate site (item 45): a NEW customer's site starts from this one. The
+  //    page creates the customer first (POST /sales/customers, the Add a customer
+  //    flow) and sends the new site here. Starter kits do the copying
   //    (agency/kit_io.ts): services, FAQs, voice, colors and industry, fill-only-
-  //    empty; plus the look (the template), which never touches content. Business
-  //    facts, photos, reviews and the pages' own words are never copied. ──
+  //    empty; and since item 145 the pages too: every section with its words and
+  //    copies of its photos, the menu, the look. The old business's name in the
+  //    words becomes the new one, and publishing lists whatever is still exactly
+  //    as copied until it is changed or kept (lib/site_layout.ts). Business
+  //    details, reviews, testimonials, posts and contacts are never copied. ──
   if (what === 'duplicate' && method === 'POST') {
     if (!can(member.role, 'manage_clients')) return forbid(cors);
     let b: { site_id?: unknown } = {}; try { b = await req.json(); } catch { /* answered below */ }
@@ -580,19 +686,38 @@ export async function handleAgencySites(req: Request, route: string, method: str
     const names = rowsOf<{ id: string; name: string }>(await svc(`clients?id=eq.${src.client_id}&select=id,name&limit=1`).catch(() => null));
     const from = String(names[0]?.name || 'another site').trim();
     const kit = await kitFromSite(src.id);
+    kit.layout = await layoutFromSite(src.id, { label: from });
+    // a site with no pages of its own still passes on its look
+    if (!kit.layout.template_slug) kit.layout.template_slug = src.template_slug || null;
     const applied = await applyKitTo(kit, dst.id, principal, `Started from ${from}’s setup`);
-    // the look: the source's template at its latest version, as Styles would set it
-    let look: string | null = null;
-    const version = latestTemplateVersion(src.template_slug);
-    const tpl = version ? getTemplate(src.template_slug, version) : null;
-    if (tpl && src.template_slug !== dst.template_slug) {
-      const w = await svc(`presence_sites?id=eq.${dst.id}`, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ template_slug: src.template_slug, template_version: version }) });
-      if (w.ok) {
-        look = tpl.manifest.name;
-        await writeChangeEvent({ siteId: dst.id, entityType: 'settings', entityId: null, action: 'update', summary: `Changed the site’s look to ${tpl.manifest.name}`, principal, provenance: 'human', fields: ['template_slug'] });
-      } else applied.skipped.push('the look (that didn’t save)');
-    } else if (tpl) look = tpl.manifest.name;
-    return json({ data: { site_id: dst.id, from_site_id: src.id, look, applied: applied.applied, skipped: applied.skipped } }, 200, cors);
+    let look = applied.layout && applied.layout.applied ? applied.layout.look : null;
+    if (!look) {
+      // the look on its own, when no pages came across: the source's template at its latest version, as Styles would set it
+      const version = latestTemplateVersion(src.template_slug);
+      const tpl = version ? getTemplate(src.template_slug, version) : null;
+      if (tpl && src.template_slug !== dst.template_slug) {
+        const w = await svc(`presence_sites?id=eq.${dst.id}`, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ template_slug: src.template_slug, template_version: version }) });
+        if (w.ok) {
+          look = tpl.manifest.name;
+          await writeChangeEvent({ siteId: dst.id, entityType: 'settings', entityId: null, action: 'update', summary: `Changed the site’s look to ${tpl.manifest.name}`, principal, provenance: 'human', fields: ['template_slug'] });
+        } else applied.skipped.push('the look (that didn’t save)');
+      } else if (tpl) look = tpl.manifest.name;
+    }
+    const pages = applied.layout && applied.layout.applied ? { pages: applied.layout.pages, sections: applied.layout.sections, menu: applied.layout.menu, photos: applied.layout.photos, photos_failed: applied.layout.photos_failed } : null;
+    return json({ data: { site_id: dst.id, from_site_id: src.id, look, applied: applied.applied, pages, skipped: applied.skipped } }, 200, cors);
+  }
+
+  // ── Keep them as they are (item 145): the studio has looked at what Duplicate
+  //    or a template copied onto this site, and it may publish as it is. ──
+  if (what === 'copied' && method === 'POST') {
+    if (!can(member.role, 'manage_clients')) return forbid(cors);
+    let b: { keep?: unknown } = {}; try { b = await req.json(); } catch { /* answered below */ }
+    if (b.keep !== true) return json({ error: 'bad_request', message: 'Say keep: true.' }, 400, cors);
+    if (!(await agencySiteIds(member.agency_id)).includes(siteId)) return notYours(cors);
+    const rec = await keepCopied(siteId, member.email);
+    if (!rec) return json({ error: 'not_found', message: 'Nothing was copied onto this site.' }, 404, cors);
+    await writeChangeEvent({ siteId, entityType: 'settings', entityId: null, action: 'update', summary: `Kept the words and photos copied from ${rec.from} as they are`, principal, provenance: 'human' }).catch(() => {});
+    return json({ data: { site_id: siteId, copied: { from: rec.from, kept: rec.kept } } }, 200, cors);
   }
 
   // ── Invite the owner (item 135): the later, separate step for a site made with

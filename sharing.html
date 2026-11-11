@@ -56,6 +56,7 @@
   .sel select{appearance:none;-webkit-appearance:none;font:inherit;font-weight:500;border:none;background:transparent;color:inherit;padding:0 var(--dds-s5,20px) 0 0;cursor:pointer;outline:none}
   .sel .car{position:absolute;right:9px;top:50%;transform:translateY(-50%);width:12px;height:12px;pointer-events:none;color:var(--soft)}
   .hint{font-size:12.5px;color:var(--faint);margin-top:10px}
+  a.rowitem.pick{color:inherit;text-decoration:none}a.rowitem.pick:hover .t{text-decoration:underline}   /* item 136: the client picker */
   button{font-family:inherit;font-size:13.5px;font-weight:500;border-radius:var(--dds-r,8px);border:1px solid var(--line);background:var(--card);color:var(--ink);padding:0 var(--dds-s4,16px);height:38px;cursor:pointer;transition:var(--dds-t-fast,120ms) var(--dds-ease,ease-out);display:inline-flex;align-items:center;gap:var(--dds-s2,8px)}
   button:hover{border-color:var(--line-strong);background:var(--bg)} button:disabled{opacity:.55;cursor:default}
   button.pri{background:var(--p);color:#fff;border-color:var(--p)} button.pri:hover{background:var(--p-deep);border-color:var(--p-deep)}
@@ -90,7 +91,7 @@
 </head>
 <body>
 <div class="wrap">
-  <nav class="crumbs" aria-label="Breadcrumb"><a class="back" href="/presence.html"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="width:14px;height:14px"><path d="M15 6l-6 6 6 6"/></svg>Workspace</a><span class="sep" aria-hidden="true">›</span><span aria-current="page">Sharing &amp; access</span></nav>
+  <nav class="crumbs" aria-label="Breadcrumb"><a class="back" href="/presence.html"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="width:14px;height:14px"><path d="M15 6l-6 6 6 6"/></svg>Website</a><span class="sep" aria-hidden="true">›</span><span aria-current="page">Sharing &amp; access</span></nav>
   <div id="main"><div class="spin" role="status" aria-label="Loading"></div></div>
 </div>
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
@@ -123,12 +124,12 @@ function toast(m){if(window.ddsToast)return void ddsToast(m);const t=$('toast');
 
 // surfaces the owner can share with a client reviewer + their default posture
 const SURFACES=[
-  {k:'business_moments',t:'Today',d:'Your calm daily updates',def:true,ic:'home',tone:'p'},
+  {k:'business_moments',t:'Overview',d:'Their calm daily updates',def:true,ic:'home',tone:'p'},
   {k:'reports',t:'Analytics',d:'Reviews & findings',def:true,ic:'chart',tone:'info'},
   {k:'media',t:'Photos',d:'Your photos & media',def:true,ic:'image',tone:'good'},
-  {k:'connected',t:'Connected data',d:'Your review/visitor numbers',def:true,ic:'link',tone:'info'},
+  {k:'connected',t:'Visitor and review numbers',d:'From the accounts their site is connected to',def:true,ic:'link',tone:'info'},
   {k:'drafts',t:'Drafts',d:'Work in progress',def:false,ic:'edit',tone:'warn'},
-  {k:'visual_assets',t:'Visual Studio assets',d:'AI-made images',def:false,ic:'spark',tone:'p'},
+  {k:'visual_assets',t:'Images made for you',d:'Pictures made for their site',def:false,ic:'spark',tone:'p'},
   {k:'files',t:'Documents',d:'Documents & deliverables',def:false,ic:'doc',tone:''},
   {k:'internal_notes',t:'Internal notes',d:'Private to your studio',def:false,internal:true,ic:'lock',tone:'warn'},
 ];
@@ -157,6 +158,8 @@ document.addEventListener('dds:context',paintScope);
 // the breadcrumb's way back keeps the client in scope (the shell rewrites app
 // anchors too; this makes the page honest on its own)
 (function(){const s=scopeId();if(!s)return;const a=document.querySelector('.crumbs a.back');if(a)a.setAttribute('href','/presence.html?client='+encodeURIComponent(s));})();
+// item 136: at studio level the picker's way back is Settings, where the page is opened from
+document.addEventListener('dds:context',()=>{const c=window.__ddsContext;if(scopeId()||!(c&&c.is_agency))return;const a=document.querySelector('.crumbs a.back');if(a&&!a.dataset.settings){a.dataset.settings='1';a.setAttribute('href','/settings.html');a.lastChild.textContent='Settings';}});
 
 function render(members){
   const who=scopeName();
@@ -164,9 +167,9 @@ function render(members){
   // invite + members
   html+=`<section class="card pad" aria-labelledby="inviteH"><h2 id="inviteH">Invite a client</h2>
     <div class="invite"><input id="email" type="email" placeholder="client@theirbusiness.com" aria-label="Client email" autocomplete="off">
-      <label class="sel"><select id="role" aria-label="Role"><option value="client_reviewer">Reviewer (view only)</option></select><svg class="car" viewBox="0 0 24 24" aria-hidden="true" style="stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round"><path d="M6 9l6 6 6-6"/></svg></label>
+      <input type="hidden" id="role" value="client_reviewer">
       <button class="pri" id="add" type="button">Send invite</button></div>
-    <p class="hint">They’ll get an email with a secure link to review your site.</p>`;
+    <p class="hint">They join as a reviewer: they can look and approve, never edit, publish or connect. They’ll get an email with a secure link.</p>`;
   if(members.length){html+=`<div class="people">`;for(const m of members){html+=`<div class="rowitem"><span class="grow"><span class="t">${esc(m.email)}</span><span class="d">${esc(String(m.role||'').replace('_',' '))} · ${esc(m.status||'')}</span></span>${m.role!=='business_owner'?`<span class="acts"><button class="sm" data-resend="${esc(m.email)}" data-role="${esc(m.role)}">Resend invite</button> <button class="sm" data-revoke="${esc(m.id)}">Remove</button></span>`:''}</div>`;}html+=`</div>`;}
   html+=`</section>`;
   // shares
@@ -202,6 +205,21 @@ async function toggle(btn){const surface=btn.getAttribute('data-surface');const 
 function notOwner(){$('main').innerHTML=`<div class="center"><h2>Only the account owner can manage sharing.</h2><p class="muted">Ask your studio if you need access changed.</p></div>`;}
 function signedOut(){$('main').innerHTML=`<div class="center"><h2>Sign in to manage sharing.</h2><p style="margin-top:18px"><a class="link" href="/studio.html">Sign in →</a></p></div>`;}
 function trouble(){$('main').innerHTML=`<div class="center"><h2>Couldn’t load this just now.</h2><p class="muted">Please refresh.</p></div>`;}
+// Builder list item 136 (Nov 2026 review, structure finding 6): opened from studio
+// Settings with no client chosen, this page used to say "Invite a client" and work on
+// the STUDIO's own site. A studio at studio level now picks the client first; each
+// client's sharing is its own page (?client=). A business owner's own site is theirs
+// to share, so nothing changes for them.
+async function pickClient(){
+  {const a=document.querySelector('.crumbs a.back');if(a&&!a.dataset.settings){a.dataset.settings='1';a.setAttribute('href','/settings.html');a.lastChild.textContent='Settings';}}
+  $('main').innerHTML=`<header class="phead"><div class="ptitle"><h1 id="pagehead" tabindex="-1">Sharing &amp; access</h1><p class="sub">Each client has their own reviewers and their own switches for what they see. Choose the client.</p></div></header><div class="card" id="pickList"><div class="spin" role="status" aria-label="Loading"></div></div>`;
+  const r=await api('/agency/sites').catch(()=>({ok:false}));
+  const list=(r.ok&&r.body&&r.body.data&&Array.isArray(r.body.data.sites))?r.body.data.sites.filter(x=>x&&x.site_id&&!x.own):null;
+  const box=$('pickList');if(!box)return;
+  if(!list){box.innerHTML=`<p class="muted" style="padding:var(--dds-s4,16px)">Your clients wouldn’t load just now. Refresh to try again.</p>`;return;}
+  if(!list.length){box.innerHTML=`<p class="muted" style="padding:var(--dds-s4,16px)">No clients yet. Once you add one, their sharing is set here.</p>`;return;}
+  box.innerHTML=`<div role="list" aria-label="Clients">${list.map(x=>`<a class="rowitem pick" role="listitem" href="/sharing.html?client=${encodeURIComponent(x.site_id)}"><span class="grow"><span class="t">${esc(x.name||'(unnamed)')}</span><span class="d">${esc(x.domain||x.address||'')}</span></span><span aria-hidden="true">›</span></a>`).join('')}</div>`;
+}
 
 async function load(){
   // PERF: reuse the shell's /portal/context (window.ddsContext) — fall back to our own read.
@@ -211,6 +229,7 @@ async function load(){
   const ctx=await (useShared?window.ddsContext().then((d)=>({ok:true,body:{data:d}})):Promise.reject()).catch(()=>api('/portal/context'));if(!ctx.ok){trouble();return;}
   CTX=ctx.body.data||null;
   if(!(ctx.body.data&&ctx.body.data.sees_full_workspace)){notOwner();return;}
+  if(!scopeId()&&CTX&&CTX.is_agency){await pickClient();return;}   // item 136: a studio chooses the client first
   const [mem,sh]=await Promise.all([api('/portal/members'),api('/portal/shares')]);
   if(mem.status===403){notOwner();return;}
   SHARES={};if(sh.ok&&sh.body.data&&sh.body.data.shares)for(const s of sh.body.data.shares)SHARES[s.surface+':'+(s.item_id||'*')]=s.shared;
