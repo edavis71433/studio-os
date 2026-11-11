@@ -503,6 +503,25 @@ test.describe('Sites (builder list items 43 and 45)', () => {
     const ks = await page.locator('.sband .kpi').evaluateAll((els) => els.map((e) => Math.round(e.getBoundingClientRect().left)));
     expect(new Set(ks).size).toBe(2);
   });
+
+  // Nov 11 2026: on a phone the h1 gave its width up to the buttons beside it and "Sites"
+  // was drawn over the Cards/Table switch. The letters spill out of a squeezed h1, so its
+  // own box isn't enough: the words are measured too.
+  test('phone width: the title and the Cards/Table switch never overlap', async ({ page }) => {
+    await page.setViewportSize({ width: 375, height: 812 });
+    await openSites(page);
+    await expect(page.locator('.lhead .seg')).toBeVisible();
+    const b = await page.evaluate(() => {
+      const box = (r: DOMRect) => ({ left: r.left, right: r.right, top: r.top, bottom: r.bottom });
+      const h1 = document.getElementById('pagehead')!, words = document.createRange();
+      words.selectNodeContents(h1);
+      return { h1: box(h1.getBoundingClientRect()), words: box(words.getBoundingClientRect()), seg: box(document.querySelector('.lhead .seg')!.getBoundingClientRect()) };
+    });
+    const apart = (a: typeof b.seg, z: typeof b.seg) => a.right <= z.left || z.right <= a.left || a.bottom <= z.top || z.bottom <= a.top;
+    expect(apart(b.h1, b.seg)).toBe(true);
+    expect(apart(b.words, b.seg)).toBe(true);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)).toBeLessThanOrEqual(0);
+  });
 });
 
 // ── Item 154 (Nov 10 review: file 02 finding 6): a trash for sites, 90 days to restore ──
