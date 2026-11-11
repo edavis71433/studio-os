@@ -67,6 +67,8 @@
   Cache-Control: no-cache, must-revalidate
 /prospects
   Cache-Control: no-cache, must-revalidate
+/pitch
+  Cache-Control: no-cache, must-revalidate
 /crm
   Cache-Control: no-cache, must-revalidate
 /pipeline
