@@ -25,6 +25,13 @@ const db = installFakePostgrest({ unique: {
 } });
 const fake = globalThis.fetch;
 const emails = [], outbound = [];
+// Work a route hands to EdgeRuntime.waitUntil (lib/after_response.ts: the emails and notes after a
+// change or a cancel, a calendar read) is held here, and each part waits for the last part's before
+// it resets the fake. Left running, a late "moved" email from one part landed in the next part's
+// list and was read as that part's own (seen under load, Nov 11 2026).
+const afterResponse = [];
+globalThis.EdgeRuntime = { waitUntil: (p) => afterResponse.push(p) };
+const quiet = async () => { while (afterResponse.length) await Promise.race([Promise.allSettled(afterResponse.splice(0)), new Promise((r) => setTimeout(r, 20_000))]); };
 const CAL = new Map();   // a calendar's address → what it answers
 let busyLimit = true;    // false: the once-a-minute calendar read is refused, as if another visitor's had just started
 globalThis.fetch = async (url, init = {}) => {
@@ -69,7 +76,8 @@ const appt = (over = {}) => {
   return { id: APPT, site_id: SID, type_id: TYPE, type_name: 'Haircut', contact_id: null, slot_start: instant(local), slot_end: new Date(Date.parse(instant(local)) + 3600_000).toISOString(), slot_start_local: local, duration_min: 60, timezone: LA, price_cents: 4000, customer_name: 'Sam Rivera', customer_email: 'sam@customer.example', customer_phone: '', note: '', status: 'confirmed', source: 'website', created_at: '2026-11-08T12:00:00.000Z', updated_at: '2026-11-08T12:00:00.000Z', canceled_at: null, ...over };
 };
 const HOURS = Array.from({ length: 7 }, () => [{ start: '09:00', end: '17:00' }]);
-const seed = (o = {}) => {
+const seed = async (o = {}) => {
+  await quiet();
   db.reset({
     presence_sites: [{ id: SID, client_id: CLIENT, status: 'ready', custom_domain: 'salon.example', netlify_site_id: 'nf-1', last_published_at: '2026-11-01T00:00:00Z' }],
     presence_identity: [{ site_id: SID, business_name: 'Marlow Salon', email: 'hello@salon.example', phone: '(555) 123-4567' }],
@@ -131,7 +139,7 @@ ok('link: with no key set, no link is offered', (await BL.manageToken(APPT, ''))
 }
 
 // ═══ B · the customer's page ═══
-seed();
+await seed();
 {
   const r = await R.handleManageGet(get(`/book/manage?t=${encodeURIComponent(T)}`), {});
   const d = (await out(r))?.data || {};
@@ -172,7 +180,7 @@ seed();
   ok('move: the owner is told at once, on the bell and by email', n && n.kind === 'new_booking' && n.status === 'active' && n.headline === `Booking moved: Haircut — now ${humanSlot(`${D4}T11:00`)}` && n.body === `Sam Rivera moved it from ${humanSlot(`${D3}T10:00`)}.` && own && own.subject === 'Booking moved — Haircut' && own.html.includes('sam@customer.example'), JSON.stringify(n));
 }
 {
-  seed({ autoConfirm: false });
+  await seed({ autoConfirm: false });
   const r = await R.handleManagePost(post('/book/manage', { t: T, action: 'move', slot: `${D4}T09:00` }), {});
   const d = (await out(r))?.data || {};
   ok('move: when the owner confirms each booking, a moved one waits for their OK again', r.status === 200 && d.status === 'pending' && row().status === 'pending' && d.message.endsWith('Marlow Salon will confirm the new time shortly.'));
@@ -183,7 +191,7 @@ seed();
   ok('move: moving again tells the owner again', again.status === 200 && (db.tables.presence_plan_notices || []).filter((x) => x.period.startsWith(`moved:${APPT}:`)).length === 2);
 }
 {
-  seed();
+  await seed();
   const r = await R.handleManagePost(post('/book/manage', { t: T, action: 'cancel' }), {});
   const d = (await out(r))?.data || {};
   ok('cancel: canceled, and the customer is told the business knows', r.status === 200 && d.status === 'canceled' && d.message === 'Your booking is canceled. Marlow Salon has been told.' && row().status === 'canceled' && !!row().canceled_at);
@@ -201,7 +209,7 @@ seed();
 }
 {
   const soon = Date.now() + 60 * 60_000;
-  seed({ appts: [appt({ slot_start_local: localAt(soon), slot_start: new Date(soon).toISOString(), slot_end: new Date(soon + 3600_000).toISOString() })] });
+  await seed({ appts: [appt({ slot_start_local: localAt(soon), slot_start: new Date(soon).toISOString(), slot_end: new Date(soon + 3600_000).toISOString() })] });
   const v = (await out(await R.handleManageGet(get(`/book/manage?t=${encodeURIComponent(T)}`), {})))?.data || {};
   const r = await R.handleManagePost(post('/book/manage', { t: T, action: 'cancel' }), {});
   const b = await out(r);
@@ -210,24 +218,24 @@ seed();
   ok('too late: and a cancel is refused with the reason and the booking as it is', r.status === 409 && b?.error === 'too_late' && b?.message.startsWith('It’s too close to the time') && b?.data?.state === 'too_late' && row().status === 'confirmed' && Array.isArray(s) && s.length === 0);
 }
 {
-  seed({ reserved: [reserved(RESERVED_NAMES.bookingOptions, { self_manage: false, calendar_url: '', calendar_host: '' })] });
+  await seed({ reserved: [reserved(RESERVED_NAMES.bookingOptions, { self_manage: false, calendar_url: '', calendar_host: '' })] });
   const v = (await out(await R.handleManageGet(get(`/book/manage?t=${encodeURIComponent(T)}`), {})))?.data || {};
   const r = await R.handleManagePost(post('/book/manage', { t: T, action: 'cancel' }), {});
   ok('switched off: the page says to get in touch, and nothing can change', v.state === 'off' && r.status === 409 && (await out(r))?.error === 'off' && row().status === 'confirmed');
 }
 {
-  seed({ enabled: false });
+  await seed({ enabled: false });
   const v = (await out(await R.handleManageGet(get(`/book/manage?t=${encodeURIComponent(T)}`), {})))?.data || {};
   const mv = await R.handleManagePost(post('/book/manage', { t: T, action: 'move', slot: `${D4}T11:00` }), {});
   const cx = await R.handleManagePost(post('/book/manage', { t: T, action: 'cancel' }), {});
   ok('booking off: no moving, but a customer can still cancel', v.state === 'open' && v.can_move === false && mv.status === 409 && (await out(mv))?.error === 'disabled' && cx.status === 200 && row().status === 'canceled');
 }
 {
-  seed({ appts: [appt({ slot_start: new Date(Date.now() - 7200_000).toISOString(), slot_start_local: localAt(Date.now() - 7200_000) })] });
+  await seed({ appts: [appt({ slot_start: new Date(Date.now() - 7200_000).toISOString(), slot_start_local: localAt(Date.now() - 7200_000) })] });
   ok('passed: a booking whose time has gone says so', ((await out(await R.handleManageGet(get(`/book/manage?t=${encodeURIComponent(T)}`), {})))?.data || {}).state === 'past');
 }
 {
-  seed();
+  await seed();
   const r = await R.handleManageIcs(get(`/book/manage/calendar.ics?t=${encodeURIComponent(T)}`));
   const text = await r.text();
   ok('file: "Apple and others" opens the booking as a calendar file', r.status === 200 && r.headers.get('content-type')?.startsWith('text/calendar') && r.headers.get('content-disposition') === 'attachment; filename="booking.ics"' && text.includes('SUMMARY:Haircut with Marlow Salon') && text.includes('LOCATION:12 Main St\\, Burbank\\, CA 91502') && text.replace(/\r\n /g, '').includes(`URL:https://app.example/booking.html?t=${T}`));
@@ -236,7 +244,7 @@ seed();
 
 // ═══ C · a new booking answers with the links ═══
 {
-  seed();
+  await seed();
   const r = await R.handleBookingCreate(post(`/book/${SID}`, { type_id: TYPE, slot_start: `${D4}T15:00`, name: 'Lee Park', email: 'lee@customer.example', phone: '', note: '', _hp: '' }), SID, {});
   const d = (await out(r))?.data || {};
   const made = (db.tables.presence_appointments || []).find((a) => a.slot_start_local === `${D4}T15:00`);
@@ -262,7 +270,7 @@ const vcal = (...ev) => ['BEGIN:VCALENDAR', 'VERSION:2.0', ...ev.flat(), 'END:VC
 const busyNoon = (d) => ['BEGIN:VEVENT', 'UID:dentist', 'SUMMARY:Dentist', `DTSTART;TZID=America/Los_Angeles:${d.replace(/-/g, '')}T120000`, `DTEND;TZID=America/Los_Angeles:${d.replace(/-/g, '')}T130000`, 'END:VEVENT'];
 const publicTimes = async (d = D3) => ((await out(await R.handleBookingSlots(get(`/book/${SID}/slots?type=${TYPE}&date=${d}`), SID, {})))?.data?.slots || []).map((x) => x.slice(11));
 {
-  seed();
+  await seed();
   CAL.set(ADDR, { body: vcal(busyNoon(D3)) });
   const r = await R.handleBookingSettingsPut(put({ calendar_url: 'webcal://calendar.example/private-abc123/basic.ics' }), SITE, OWNER, {});
   const text = JSON.stringify(await out(r));
@@ -306,7 +314,7 @@ const publicTimes = async (d = D3) => ((await out(await R.handleBookingSlots(get
 {
   // the owner swaps calendars while a visitor's read of the old one is still on its way
   const A = 'https://calendar.example/a.ics', B = 'https://calendar.example/b.ics';
-  seed();
+  await seed();
   CAL.set(A, { body: vcal(busyNoon(D3)) });
   await R.handleBookingSettingsPut(put({ calendar_url: A }), SITE, OWNER, {});
   const c = readReserved(RESERVED_NAMES.bookingBusy), old = new Date(Date.now() - 20 * 60_000).toISOString();
@@ -325,7 +333,7 @@ const publicTimes = async (d = D3) => ((await out(await R.handleBookingSlots(get
 }
 {
   // the kept copy is seven hours old and another visitor's read has just started: keep what's known
-  seed({ reserved: [reserved(RESERVED_NAMES.bookingOptions, { self_manage: true, calendar_url: ADDR, calendar_host: 'calendar.example' })] });
+  await seed({ reserved: [reserved(RESERVED_NAMES.bookingOptions, { self_manage: true, calendar_url: ADDR, calendar_host: 'calendar.example' })] });
   CAL.set(ADDR, { body: vcal(busyNoon(D3)) });
   await R.handleBookingSettingsPut(put({ calendar_url: ADDR }), SITE, OWNER, {});
   const c = readReserved(RESERVED_NAMES.bookingBusy), old = new Date(Date.now() - 7 * 3600_000).toISOString();
@@ -343,7 +351,7 @@ for (const [name, addr, answer, error] of [
   ['a name that points inside one', 'https://intranet.example/cal.ics', null, 'calendar_unreachable'],
   ['a redirect onto an address inside one', 'https://calendar.example/moved.ics', { status: 302, headers: { Location: 'https://[::ffff:7f00:1]/cal.ics' } }, 'calendar_unreachable'],
 ]) {
-  seed();
+  await seed();
   if (answer) CAL.set(addr, answer);
   const r = await R.handleBookingSettingsPut(put({ calendar_url: addr }), SITE, OWNER, {});
   const b = await out(r);
@@ -351,7 +359,7 @@ for (const [name, addr, answer, error] of [
   if (error !== 'calendar_gone' && error !== 'calendar_not_calendar' && !addr.startsWith('http:')) ok(`refused: ${name} — never even asked`, !outbound.some((u) => /127\.0\.0\.1|intranet\.example|::ffff/.test(u)), outbound.join(' '));
 }
 {
-  seed({ reserved: [reserved(RESERVED_NAMES.bookingOptions, { self_manage: true, calendar_url: ADDR, calendar_host: 'calendar.example' }), reserved(RESERVED_NAMES.bookingBusy, { for: 'k', at: new Date().toISOString(), tried: new Date().toISOString(), ok: true, ranges: [[Date.now() + 3600_000, Date.now() + 7200_000]] })] });
+  await seed({ reserved: [reserved(RESERVED_NAMES.bookingOptions, { self_manage: true, calendar_url: ADDR, calendar_host: 'calendar.example' }), reserved(RESERVED_NAMES.bookingBusy, { for: 'k', at: new Date().toISOString(), tried: new Date().toISOString(), ok: true, ranges: [[Date.now() + 3600_000, Date.now() + 7200_000]] })] });
   const r = await R.handleBookingSettingsPut(put({ self_manage: false }), SITE, OWNER, {});
   ok('switch: turning changes off keeps the calendar and the hours', r.status === 200 && (await out(r))?.data?.self_manage === false && readReserved(RESERVED_NAMES.bookingOptions)?.calendar_url === ADDR && JSON.stringify(db.tables.presence_booking_settings[0].weekly) === JSON.stringify(HOURS));
   const off = await R.handleBookingSettingsPut(put({ calendar_url: '' }), SITE, OWNER, {});
@@ -365,7 +373,7 @@ for (const [name, addr, answer, error] of [
 {
   const tomorrow = Date.now() + 20 * 3600_000, soon = Date.now() + 90 * 60_000;
   const R1 = 'b1000000-0000-4000-8000-000000000011', R2 = 'b1000000-0000-4000-8000-000000000012';
-  seed({ appts: [
+  await seed({ appts: [
     appt({ id: R1, slot_start: new Date(tomorrow).toISOString(), slot_end: new Date(tomorrow + 3600_000).toISOString(), slot_start_local: localAt(tomorrow), customer_email: 'sam@customer.example' }),
     appt({ id: R2, slot_start: new Date(soon).toISOString(), slot_end: new Date(soon + 3600_000).toISOString(), slot_start_local: localAt(soon), customer_email: 'kim@customer.example' }),
   ] });
