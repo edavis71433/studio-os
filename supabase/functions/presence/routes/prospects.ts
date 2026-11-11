@@ -240,6 +240,127 @@ export async function handleProspectDraft(_req: Request, site: SiteRow, _princip
   return json({ data: { subject, body, sent: false, note: 'This is only a draft to copy — Studio OS doesn’t send it.' } }, 200, cors);
 }
 
+// ── Free-tool leads (sales review item 114) ──────────────────────────────────
+// A free Site Review / AI Visibility unlock mirrors the visitor into
+// audit_leads (migration 0136) — and until now no app page read that table.
+// They surface HERE, on the Prospects page the studio already works: each with
+// its score and report link, and one click that makes a contact AND a deal
+// together. These are the PLATFORM's own enquiries (audit_leads has no
+// site_id), so every route is staff-only; the contact and deal land in the
+// site the staff member is scoped into. Nothing here sends email, ever.
+//
+//   GET   /sales/tool-leads             — the leads, newest first
+//   PATCH /sales/tool-leads/:id         — status (contacted / not a fit)
+//   POST  /sales/tool-leads/:id/convert — one click: contact + deal (once)
+const TOOL_WORDS: Record<string, string> = {
+  site_review: 'Site Review', ai_visibility: 'AI Visibility Check',
+  website_audit: 'Website audit', local_visibility: 'Local visibility quiz', free_tools: 'Free tool',
+};
+const LEAD_STATUSES = new Set(['new', 'contacted', 'not_a_fit']);
+const LEAD_COLS = 'id,created_at,tool,business_name,client_email,url,city,business_type,score,status,notes,contact_id,deal_id';
+const LEAD_COLS_PRE_0150 = LEAD_COLS.replace(',deal_id', '');   // before APPLY-0150, audit_leads has no deal_id
+
+const staffOnly = (principal: Principal, cors: Record<string, string>) =>
+  principal.kind === 'staff' ? null : json({ error: 'forbidden', message: 'Free-tool leads are the platform’s own enquiries — staff only.' }, 403, cors);
+
+// what the page shows; the raw notes stay server-side (only the report link travels)
+function leadView(l: any) {
+  const report = /Free Tools report: (https?:\/\/\S+)/.exec(String(l.notes || ''));
+  return {
+    id: l.id, created_at: l.created_at, tool: l.tool,
+    tool_word: TOOL_WORDS[String(l.tool)] || 'Free tool',
+    business_name: l.business_name || null, client_email: l.client_email || null,
+    url: l.url || null, city: l.city || null, business_type: l.business_type || null,
+    score: Number.isFinite(Number(l.score)) && l.score !== null ? Number(l.score) : null,
+    status: l.status || 'new', contact_id: l.contact_id || null, deal_id: l.deal_id ?? null,
+    report_url: report ? report[1] : null,
+  };
+}
+
+// deploy-order tolerant read: with deal_id first, then the pre-0150 shape
+async function readLeads(filter: string) {
+  let r = await svc(`audit_leads?${filter}&select=${LEAD_COLS}`).catch(() => null);
+  if (r && !(r as any).ok && (r as any).status === 400) r = await svc(`audit_leads?${filter}&select=${LEAD_COLS_PRE_0150}`).catch(() => null);
+  return r;
+}
+
+export async function handleToolLeads(_site: SiteRow, principal: Principal, cors: Record<string, string>): Promise<Response> {
+  const refuse = staffOnly(principal, cors); if (refuse) return refuse;
+  // or-filter, not a bare neq: a pre-default row with NULL status must still show
+  const r = await readLeads('or=(status.is.null,status.neq.not_a_fit)&order=created_at.desc&limit=200');
+  if (!r || !(r as any).ok) return json({ error: 'read_failed', message: 'We couldn’t load the free-tool leads just now.' }, 502, cors);
+  return json({ data: rows(r).map(leadView) }, 200, cors);
+}
+
+async function loadLead(id: string): Promise<any | null> {
+  if (!UUID_RE.test(id)) return null;
+  const r = await readLeads(`id=eq.${id}&limit=1`);
+  return r && (r as any).ok ? rows(r)[0] || null : null;
+}
+
+// ── PATCH one lead: worked by hand (contacted), or off the list (not a fit) ──
+export async function handleToolLead(req: Request, _site: SiteRow, principal: Principal, id: string, cors: Record<string, string>): Promise<Response> {
+  const refuse = staffOnly(principal, cors); if (refuse) return refuse;
+  if (req.method !== 'PATCH') return json({ error: 'method_not_allowed' }, 405, cors);
+  const lead = await loadLead(id);
+  if (!lead) return json({ error: 'not_found', message: 'That lead isn’t on the list.' }, 404, cors);
+  let b: any = {}; try { b = await req.json(); } catch { return json({ error: 'bad_json' }, 400, cors); }
+  if (!LEAD_STATUSES.has(String(b.status))) return json({ error: 'validation', message: 'That isn’t a lead status.' }, 422, cors);
+  const r = await svc(`audit_leads?id=eq.${lead.id}`, { method: 'PATCH', headers: { 'Prefer': 'return=representation' }, body: JSON.stringify({ status: String(b.status) }) }).catch(() => null);
+  if (!r || !(r as any).ok || !rows(r)[0]) return json({ error: 'write_failed', message: 'That didn’t save — please try again.' }, 502, cors);
+  return json({ data: leadView(rows(r)[0]) }, 200, cors);
+}
+
+// ── "→ Contact + deal": one click, once — like a prospect's or enquiry's convert ──
+export async function handleToolLeadConvert(_req: Request, site: SiteRow, principal: Principal, id: string, cors: Record<string, string>): Promise<Response> {
+  const refuse = staffOnly(principal, cors); if (refuse) return refuse;
+  const lead = await loadLead(id);
+  if (!lead) return json({ error: 'not_found', message: 'That lead isn’t on the list.' }, 404, cors);
+  if (lead.deal_id) {
+    const d = rows(await svc(`presence_deals?id=eq.${lead.deal_id}&site_id=eq.${site.id}&deleted_at=is.null&select=id,title,stage,contact_id&limit=1`).catch(() => null) || { json: [] })[0];
+    return json({ data: { deal: d || { id: lead.deal_id }, contact: lead.contact_id ? { id: lead.contact_id } : null }, already_converted: true }, 200, cors);
+  }
+  // the contact: reuse this site's contact with the lead's email, else make one
+  const email = clean(lead.client_email, 160).toLowerCase();
+  const who = clean(lead.business_name, 120) || email || 'Free-tool lead';
+  let contact: any = null;
+  if (email) {
+    const existing = await svc(`presence_contacts?site_id=eq.${site.id}&email=eq.${encodeURIComponent(email)}&deleted_at=is.null&select=id,name,email&limit=1`).catch(() => null);
+    contact = existing && (existing as any).ok ? rows(existing)[0] || null : null;
+  }
+  if (!contact) {
+    const ins = await svc('presence_contacts', { method: 'POST', headers: { 'Prefer': 'return=representation' }, body: JSON.stringify({
+      site_id: site.id, name: who, email: email || null,
+    }) }).catch(() => null);
+    contact = ins && (ins as any).ok ? rows(ins)[0] : null;
+    if (!contact) return json({ error: 'write_failed', message: 'That contact didn’t save — please try again.' }, 502, cors);
+  }
+  // the deal, with the lead's facts along (score, their site, the report)
+  const toolWord = TOOL_WORDS[String(lead.tool)] || 'Free tool';
+  const report = /Free Tools report: (https?:\/\/\S+)/.exec(String(lead.notes || ''));
+  const facts = [
+    `${toolWord} request.`,
+    Number.isFinite(Number(lead.score)) && lead.score !== null ? `Score: ${Number(lead.score)}/100` : '',
+    lead.url ? `Their site: ${clean(lead.url, 300)}` : '',
+    [clean(lead.business_type, 80), clean(lead.city, 80)].filter(Boolean).join(' in '),
+    report ? `Report: ${report[1]}` : '',
+  ].filter(Boolean).join('\n');
+  const ins = await svc('presence_deals', { method: 'POST', headers: { 'Prefer': 'return=representation' }, body: JSON.stringify({
+    site_id: site.id, contact_id: contact.id, title: who, stage: 'lead', source: 'free_tools', notes: facts.slice(0, 2000),
+  }) }).catch(() => null);
+  const deal = ins && (ins as any).ok ? rows(ins)[0] : null;
+  if (!deal) return json({ error: 'write_failed', message: 'That deal didn’t save — please try again.' }, 502, cors);
+  await dealEvent(site.id, deal.id, 'created', principal, { to_stage: 'lead', detail: { audit_lead_id: lead.id } }).catch(() => {});
+  // remember the conversion on the lead — converted leads also never meet the
+  // day-7 follow-up sweep, which only looks at status=new. Before APPLY-0150
+  // the deal_id column isn't there (PostgREST 400s the whole patch), so fall
+  // back to stamping contact and status alone.
+  const stamp = { contact_id: contact.id, deal_id: deal.id, status: 'converted' };
+  const patched = await svc(`audit_leads?id=eq.${lead.id}`, { method: 'PATCH', body: JSON.stringify(stamp) }).catch(() => null);
+  if (!patched || !(patched as any).ok) await svc(`audit_leads?id=eq.${lead.id}`, { method: 'PATCH', body: JSON.stringify({ contact_id: contact.id, status: 'converted' }) }).catch(() => {});
+  return json({ data: { deal, contact } }, 201, cors);
+}
+
 // ── export: the saved list as one CSV ────────────────────────────────────────
 export async function handleProspectsExport(site: SiteRow, _principal: Principal, cors: Record<string, string>): Promise<Response> {
   const r = await svc(`presence_prospects?site_id=eq.${site.id}&deleted_at=is.null&select=${COLS}&order=score.desc.nullslast,created_at.desc&limit=2000`).catch(() => null);

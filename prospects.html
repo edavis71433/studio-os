@@ -13,6 +13,12 @@
   quick look at its website — no website scores highest. Tick to save; a saved
   row can become a deal ("→ Deal", once) or a first-email DRAFT to copy.
   NOTHING on this page sends email — the server has no send route here at all.
+
+  Free-tool leads (sales item 114, Nov 2026): people who ran the free Site
+  Review or AI Visibility check and left their email surface at the top, each
+  with its score and report, and one click makes a contact AND a deal. Staff
+  only — the server answers 403 for anyone else and the section simply stays
+  hidden for them.
 ═══════════════════════════════════════════════════════════════════════════ -->
 <style>
   :root{
@@ -129,7 +135,7 @@ const FN=SUPABASE_URL+"/functions/v1/presence";
 const sb=supabase.createClient(SUPABASE_URL,SUPABASE_KEY,{auth:{storageKey:'dds-portal-auth',persistSession:true,autoRefreshToken:true}});
 const $=(id)=>document.getElementById(id);
 const esc=(s)=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
-let TOKEN="",SAVED=[],FINDS=null,QUERYRAN="",BUSY=false;
+let TOKEN="",SAVED=[],FINDS=null,QUERYRAN="",BUSY=false,LEADS=[],LEADS_OK=false;
 const scope=()=>new URLSearchParams(location.search).get('client')||'';
 const H=()=>({'Content-Type':'application/json','Authorization':'Bearer '+SUPABASE_KEY,'x-dds-user-jwt':TOKEN,'x-dds-scope-site':scope()});
 async function api(path,method,body){const r=await fetch(FN+path,{method:method||'GET',headers:H(),body:body?JSON.stringify(body):undefined});return{ok:r.ok,status:r.status,body:await r.json().catch(()=>({}))};}
@@ -146,6 +152,40 @@ const factsHtml=(p)=>{
   if(p.address)bits.push(`<span>${esc(p.address)}</span>`);
   return bits.join('');
 };
+
+// free-tool leads: the report score, read as warmth — a LOW score is the warm one
+const leadHeat=(s)=>!Number.isFinite(Number(s))||s===null?'':Number(s)<=49?'hot':Number(s)<=74?'warm':'cool';
+const leadBadge=(l)=>`<span class="badge ${leadHeat(l.score)}">${esc(l.tool_word)}${l.score!==null&&Number.isFinite(Number(l.score))?' · '+esc(l.score)+'/100':''}</span>`;
+const leadFacts=(l)=>{
+  const bits=[];
+  if(l.client_email)bits.push(`<a href="mailto:${esc(l.client_email)}">${esc(l.client_email)}</a>`);
+  if(l.url)bits.push(`<a href="${esc(l.url)}" target="_blank" rel="noopener noreferrer">${esc(String(l.url).replace(/^https?:\/\//,'').replace(/\/$/,''))}</a>`);
+  const who=[l.business_type,l.city].filter(Boolean).join(' in ');
+  if(who)bits.push(`<span>${esc(who)}</span>`);
+  if(l.report_url)bits.push(`<a href="${esc(l.report_url)}" target="_blank" rel="noopener noreferrer">See their report</a>`);
+  if(l.created_at)bits.push(`<span>${esc(String(l.created_at).slice(0,10))}</span>`);
+  return bits.join('');
+};
+function leadsHtml(){
+  if(!LEADS_OK||!LEADS.length)return'';
+  return`
+    <section class="card" id="leadsCard" aria-label="Free-tool leads">
+      <h2>Free-tool leads</h2>
+      <p class="hint">People who ran a free Site Review or AI Visibility check and left their email — the warmest enquiries you have. One click makes a contact and a deal.</p>
+      <div class="rows">
+        ${LEADS.map(l=>`
+          <div class="row saved-row" data-lead-row="${esc(l.id)}">
+            <div class="who"><div class="nm">${esc(l.business_name||l.client_email||'Someone')} ${leadBadge(l)}</div>${l.status==='converted'?'<div class="ind">In your pipeline</div>':l.status==='contacted'?'<div class="ind">Contacted</div>':''}</div>
+            <div class="acts">
+              ${l.deal_id?`<a class="abtn" href="/pipeline.html?deal=${esc(l.deal_id)}">Open the deal</a>`:`<button class="main" data-lead-deal="${esc(l.id)}">→ Contact + deal</button>`}
+              ${l.contact_id?`<a class="abtn" href="/crm.html?contact=${esc(l.contact_id)}">Open the contact</a>`:''}
+              ${l.status==='converted'?'':l.status==='contacted'?`<button data-lead-status="${esc(l.id)}" data-to="not_a_fit">Not a fit</button>`:`<button data-lead-status="${esc(l.id)}" data-to="contacted">Mark contacted</button><button data-lead-status="${esc(l.id)}" data-to="not_a_fit">Not a fit</button>`}
+            </div>
+            <div class="facts">${leadFacts(l)}</div>
+          </div>`).join('')}
+      </div>
+    </section>`;
+}
 
 function render(){
   const m=$('main');
@@ -214,6 +254,7 @@ function render(){
       </form>
       <p class="note" id="findNote" style="margin-top:10px"></p>
     </section>
+    ${leadsHtml()}
     ${finds}
     ${saved}`;
   wire();
@@ -275,6 +316,20 @@ function wire(){
     if(!r.ok){toast('That didn’t save — try again.');await load();return;}
     const row=SAVED.find(p=>p.id===s.dataset.status);if(row)row.status=s.value;
   }));
+  document.querySelectorAll('[data-lead-deal]').forEach(b=>b.addEventListener('click',async()=>{
+    b.disabled=true;
+    const r=await api('/sales/tool-leads/'+b.dataset.leadDeal+'/convert','POST',{});
+    if(!r.ok&&!(r.body&&r.body.already_converted)){b.disabled=false;return toast((r.body&&r.body.message)||'That didn’t work — try again.');}
+    toast(r.body.already_converted?'Already in your pipeline.':'Contact and deal started.');
+    await load();
+  }));
+  document.querySelectorAll('[data-lead-status]').forEach(b=>b.addEventListener('click',async()=>{
+    b.disabled=true;
+    const r=await api('/sales/tool-leads/'+b.dataset.leadStatus,'PATCH',{status:b.dataset.to});
+    if(!r.ok){b.disabled=false;return toast((r.body&&r.body.message)||'That didn’t save — try again.');}
+    toast(b.dataset.to==='not_a_fit'?'Marked not a fit.':'Marked contacted.');
+    await load();
+  }));
   $('d-close').addEventListener('click',()=>$('draftDlg').close());
   $('d-copy').addEventListener('click',async()=>{
     try{await navigator.clipboard.writeText('Subject: '+$('d-subject').value+'\n\n'+$('d-body').value);toast('Copied — paste it into your own email.');}
@@ -283,7 +338,9 @@ function wire(){
 }
 
 async function load(){
-  const r=await api('/sales/prospects');
+  // the free-tool leads ride along; 403 (not platform staff) just hides the section
+  const [r,lr]=await Promise.all([api('/sales/prospects'),api('/sales/tool-leads')]);
+  LEADS_OK=lr.ok;LEADS=lr.ok&&lr.body&&Array.isArray(lr.body.data)?lr.body.data:[];
   if(!r.ok){
     if(r.status===503&&r.body&&r.body.message){$('main').innerHTML=`<div class="center"><h2>One quick setup step</h2><p class="muted">${esc(r.body.message)}</p></div>`;return;}
     trouble();return;
