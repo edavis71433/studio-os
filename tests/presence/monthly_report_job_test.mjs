@@ -18,6 +18,7 @@ const NAME = '__monthly_report__';
 
 // ── the world ──
 let row, clientEmail, suppressed, resendOk, sends, onSend, visitsPages, visitsFail;
+let zone = null; const visitReads = [];   // D7: the client site's own clock (null: no row, the default), and the visit windows read
 let clock = 0;
 const stamp = () => new Date(Date.UTC(2026, 10, 1, 0, 0, 0, ++clock)).toISOString();
 function reset(setting) {
@@ -54,7 +55,9 @@ globalThis.fetch = async (url, init = {}) => {
   if (table === 'suppressed_emails') return reply(suppressed ? [{ reason: suppressed }] : []);
   if (table === 'presence_service_links') return reply([{ agency_site_id: STUDIO_SITE }]);
   if (table === 'presence_identity') return reply([{ business_name: 'The Studio' }]);
+  if (table === 'presence_locations') return reply(zone ? [{ site_id: CLIENT_SITE, timezone: zone }] : []);
   if (table === 'presence_visits') {
+    visitReads.push(q);
     if (visitsFail) return reply({ message: 'boom' }, 500);
     const off = Number(u.searchParams.get('offset') || 0), lim = Number(u.searchParams.get('limit') || 1000);
     return reply(visitsPages.slice(off, off + lim));
@@ -151,7 +154,29 @@ ok('a send that works on the second try is recorded as sent, the tries cleared',
 
 // not the first days of the month
 reset({ enabled: true, note: '', last_month: '2026-10' });
-ok('after the 3rd nothing is read or sent', (await quiet(() => runMonthlyReports(20, '2026-12-04T00:00:00.000Z'))).not_due === true && sends.length === 0);
+// D7: midnight UTC on the 4th is still the 3rd west of London (Los Angeles is 4pm on the 3rd), so the
+// day after the first days everywhere is the 5th: twelve hours behind UTC is then the 4th
+ok('after the 3rd nothing is read or sent', (await quiet(() => runMonthlyReports(20, '2026-12-05T00:00:00.000Z'))).not_due === true && sends.length === 0);
+
+// ── D7 (Nov 10): the month turns on the client site's own clock, not London's ──
+{
+  zone = 'America/Los_Angeles';
+  reset({ enabled: true, note: '', last_month: '2026-10' });
+  const early = await quiet(() => runMonthlyReports(20, '2026-12-01T05:00:00.000Z'));   // 9pm on November 30 in Los Angeles
+  ok('D7: on the evening of November 30 in Los Angeles nothing goes out, though London is in December', early.sent === 0 && sends.length === 0 && stored().last_month === '2026-10', JSON.stringify(early));
+  visitReads.length = 0;
+  const due = await quiet(() => runMonthlyReports(20, '2026-12-01T09:00:00.000Z'));   // 1am on December 1 there
+  ok('D7: …once December starts there, November’s report goes out', due.sent === 1 && stored().last_month === '2026-11', JSON.stringify(due));
+  ok('D7: …counting November on that clock: midnight to midnight in Los Angeles (summer time to winter time)', visitReads.some((q) => q.includes('ts=gte.2026-11-01T07:00:00.000Z') && q.includes('ts=lt.2026-12-01T08:00:00.000Z')), visitReads[0]);
+  zone = 'Pacific/Auckland';
+  reset({ enabled: true, note: '', last_month: '2026-10' });
+  const nz = await quiet(() => runMonthlyReports(20, '2026-11-30T12:00:00.000Z'));   // 1am on December 1 in Auckland, still November 30 in London
+  ok('D7: in Auckland the report goes out on their December 1st, a day the UTC clock still calls November 30', nz.sent === 1 && stored().last_month === '2026-11', JSON.stringify(nz));
+  zone = 'Not/A_Zone';
+  reset({ enabled: true, note: '', last_month: '2026-10' });
+  ok('D7: a zone the clock does not know is read as Los Angeles', (await quiet(() => runMonthlyReports(20, '2026-12-01T05:00:00.000Z'))).sent === 0 && (await quiet(() => runMonthlyReports(20, '2026-12-01T09:00:00.000Z'))).sent === 1);
+  zone = null;
+}
 
 // the paged read
 visitsPages = Array.from({ length: 2500 }, (_, i) => ({ i }));

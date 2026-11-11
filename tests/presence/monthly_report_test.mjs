@@ -1,11 +1,13 @@
 // ── Builder list item 58 (Nov 2026): the monthly report email to clients ──
 //   deno run --allow-read --allow-env tests/presence/monthly_report_test.mjs
-// The setting is one reserved row; last month is found in UTC; the report is due
+// The setting is one reserved row; last month is found on the site's clock (UTC when no zone
+// is given, bug hunt D7); the report is due
 // only in the first days of a month, once; the fold uses the same visit counting
 // as Analytics; the words say a part that couldn't be read rather than a zero.
 import {
   normalizeReportSetting, lastMonth, reportDueNow, foldReport, reportHtml, REPORT_NOTE_MAX, REPORT_SEND_DAYS,
   applyReportChange, blockedReason, afterFailure, REPORT_MAX_TRIES, BLOCK_WORDS,
+  reportZone, monthNow, anyZoneInSendDays, REPORT_DEFAULT_TZ,
 } from '../../supabase/functions/presence/ops/monthly_report.ts';
 import { RESERVED_NAMES } from '../../supabase/functions/presence/lib/reserved_store.ts';
 
@@ -112,6 +114,37 @@ const mr = read('supabase/functions/presence/ops/monthly_report.ts');
 ok('the job claims the month before it sends', mr.indexOf('const claimed = await SAVE(') > 0 && mr.indexOf('const claimed = await SAVE(') < mr.indexOf('await sendReport(site, win, claimedSetting'));
 ok('the visits are read in full pages, not one capped read', /svcPages\(`presence_visits\?site_id=eq\./.test(mr) && !/limit=\$\{VISITS_CAP\}/.test(mr));
 ok('switching on for a client who can’t be emailed is refused with the reason', /error: 'cannot_send', blocked: reach\.blocked/.test(mr));
+
+// ── bug hunt D7 (Nov 10): the month and the last publish follow the site's clock ──
+{
+  const LA = 'America/Los_Angeles';
+  ok('D7: a zone the clock knows is kept; anything else is Los Angeles', reportZone('Europe/London') === 'Europe/London' && reportZone('Not/A_Zone') === LA && reportZone('') === LA && reportZone(null) === LA && REPORT_DEFAULT_TZ === LA);
+  // 6pm on October 31 in Los Angeles is already November 1 in London
+  const oct31 = '2026-11-01T01:00:00.000Z';
+  ok('D7: at 6pm on October 31 in Los Angeles it is still October there', monthNow(oct31, LA) === '2026-10' && monthNow(oct31) === '2026-11');
+  ok('D7: …so last month is September there, and nothing is due', lastMonth(oct31, LA).month === '2026-09' && !reportDueNow(normalizeReportSetting({ enabled: true, last_month: '2026-08' }), oct31, LA));
+  const octLA = lastMonth('2026-11-02T12:00:00.000Z', LA);
+  ok('D7: October in Los Angeles runs midnight to midnight there (summer time)', octLA.month === '2026-10' && octLA.startIso === '2026-10-01T07:00:00.000Z' && octLA.endIso === '2026-11-01T07:00:00.000Z' && octLA.label === 'October 2026');
+  const novLA = lastMonth('2026-12-02T12:00:00.000Z', LA);
+  ok('D7: November there starts on summer time and ends on winter time', novLA.startIso === '2026-11-01T07:00:00.000Z' && novLA.endIso === '2026-12-01T08:00:00.000Z');
+  const visitAt6pm = { ts: oct31, kind: 'pageview', path: '/late', visitor_hash: 'late' };
+  const inOct = foldReport({ month: octLA.month, label: octLA.label, startMs: Date.parse(octLA.startIso), endMs: Date.parse(octLA.endIso), visits: [visitAt6pm], enquiries: 0, publishes: [], address: '', visitsCap: 5000, timeZone: LA });
+  const novFold = foldReport({ month: novLA.month, label: novLA.label, startMs: Date.parse(novLA.startIso), endMs: Date.parse(novLA.endIso), visits: [visitAt6pm], enquiries: 0, publishes: [], address: '', visitsCap: 5000, timeZone: LA });
+  ok('D7: a visit at 6pm Pacific on October 31 counts in October’s report, not November’s', inOct.pageviews === 1 && novFold.pageviews === 0);
+  const due = normalizeReportSetting({ enabled: true, last_month: '2026-09' });
+  ok('D7: due once the 1st starts on the site’s clock, not London’s', !reportDueNow(due, '2026-11-01T06:00:00.000Z', LA) && reportDueNow(due, '2026-11-01T08:00:00.000Z', LA));
+  ok('D7: Auckland’s 1st comes while London is still on the 31st', reportDueNow(due, '2026-10-31T12:00:00.000Z', 'Pacific/Auckland') && !reportDueNow(due, '2026-10-31T12:00:00.000Z'));
+  ok('D7: due up to the 3rd there, even when London is on the 4th', reportDueNow(due, '2026-11-04T06:00:00.000Z', LA) && !reportDueNow(due, '2026-11-04T09:00:00.000Z', LA));
+  // switched on at 6pm on October 31 in Los Angeles: September is the month handled, so October's report goes out
+  const on = applyReportChange(normalizeReportSetting({ enabled: false }), { enabled: true }, null, oct31, LA);
+  ok('D7: switched on late on the 31st there, the month that just ended there still gets its report', on.last_month === '2026-09' && reportDueNow(on, '2026-11-02T12:00:00.000Z', LA));
+  ok('D7: (with London’s clock the same press skipped October)', applyReportChange(normalizeReportSetting({ enabled: false }), { enabled: true }, null, oct31).last_month === '2026-10');
+  // a publish at 7pm Pacific on October 20 is October 21 in London
+  const pub = foldReport({ month: octLA.month, label: octLA.label, startMs: Date.parse(octLA.startIso), endMs: Date.parse(octLA.endIso), visits: [], enquiries: 0, publishes: [{ created_at: '2026-10-21T02:00:00.000Z' }], address: '', visitsCap: 5000, timeZone: LA });
+  ok('D7: "the last on …" names the day it was published there', /the last on October 20\./.test(reportHtml(pub, { studioName: 'S', note: '' }).html) && /the last on October 21\./.test(reportHtml({ ...pub, timeZone: undefined }, { studioName: 'S', note: '' }).html));
+  ok('D7: on a day no clock is in its first days the job reads nothing; on the 30th Kiritimati is already on the 1st', !anyZoneInSendDays('2026-11-15T00:00:00.000Z') && anyZoneInSendDays('2026-11-30T12:00:00.000Z') && anyZoneInSendDays('2026-12-04T11:00:00.000Z') && !anyZoneInSendDays('2026-12-05T00:00:00.000Z'));
+  ok('D7: with no zone given, the UTC clock, as before', lastMonth('2026-11-02T03:00:00.000Z').startIso === '2026-10-01T00:00:00.000Z' && monthNow('2026-11-01T01:00:00.000Z') === '2026-11');
+}
 
 const passed = results.filter((r) => r.p).length;
 console.log(`${passed}/${results.length} passed`);

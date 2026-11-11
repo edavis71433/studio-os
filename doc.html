@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex,nofollow">
 <meta name="referrer" content="no-referrer">
-<title>Document — Studio OS</title>
+<title>Document</title>
 <style>
   /* Minimal standalone shell — the fetched document replaces this page entirely,
      bringing its own print CSS and toolbar. This styles only the loading/error states. */
@@ -32,14 +32,21 @@
 (async function(){
   var FN="https://qksstlqzbhesadrrofgn.supabase.co/functions/v1/presence";
   var t=new URLSearchParams(location.search).get('t')||'';
+  // Sales items 79 and 92: the server's own "not working" page names who sent the document
+  // and why (expired, or no longer there); it is shown when the server sent one. This line is
+  // only for no answer at all, so it names nobody.
   function fail(){
-    document.getElementById('state').innerHTML='<h1>This document link isn’t working</h1><p class="muted">It may have expired — ask your studio for a fresh copy. Nothing is lost.</p>';
+    document.getElementById('state').innerHTML='<h1>This document link isn’t working</h1><p class="muted">It may have expired. Ask whoever sent it for a fresh copy. Nothing is lost.</p>';
   }
   if(!t){fail();return;}
   try{
     var r=await fetch(FN+'/sales/doc/'+encodeURIComponent(t));
-    if(!r.ok){fail();return;}
     var html=await r.text();
+    if(!r.ok){
+      if(/<h1[^>]*>This document link isn’t working<\/h1>/.test(html)){document.open();document.write(html);document.close();}
+      else fail();
+      return;
+    }
     // Our own first-party server-rendered document (all user data is escaped
     // server-side); document.write swaps it in wholesale so its print behavior
     // is byte-identical to the direct render.

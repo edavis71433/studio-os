@@ -1,0 +1,180 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<meta name="referrer" content="no-referrer">
+<title>Your booking</title>
+<style>
+  :root{--bg:#faf8f5;--ink:#1b1525;--soft:#6b6478;--line:#e4dfec;--card:#fff;--plum:#5b3fa0;--warn:#a3423a}
+  @media (prefers-color-scheme:dark){:root{--bg:#171320;--ink:#efeaf7;--soft:#a79ebc;--line:#2e2740;--card:#1f1a2b;--plum:#b79ceb;--warn:#f0a39b}}
+  *{box-sizing:border-box;margin:0}
+  body{background:var(--bg);color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;line-height:1.6;-webkit-font-smoothing:antialiased}
+  .center{max-width:520px;margin:10vh auto;padding:0 20px 40px;text-align:center}
+  h1{font-weight:500;font-size:clamp(20px,5vw,26px);margin-bottom:8px}
+  h1:focus{outline:none}
+  .muted{color:var(--soft);font-size:15px;margin-top:10px}
+  .msg{margin:18px 0 0;padding:14px 16px;border:1px solid var(--line);border-radius:12px;background:var(--card);text-align:left}
+  .msg strong{display:block}
+  .msg p{color:var(--soft);font-size:15px;overflow-wrap:anywhere}
+  .note{margin:0 0 14px;padding:12px 14px;border-radius:12px;background:var(--card);border:1px solid var(--line);font-weight:600}
+  .row{display:flex;gap:10px;flex-wrap:wrap;justify-content:center}
+  button{margin-top:18px;min-height:44px;padding:10px 20px;border:0;border-radius:999px;background:var(--plum);color:#fff;font:inherit;font-weight:600;cursor:pointer}
+  button.second{background:var(--card);color:var(--ink);border:1px solid var(--line)}
+  button.quiet{background:none;color:var(--ink);text-decoration:underline;font-weight:500}
+  button:disabled{opacity:.6;cursor:default}
+  label{display:block;margin-top:18px;font-weight:600;font-size:15px}
+  input[type=date]{margin-top:6px;min-height:44px;padding:8px 12px;border:1px solid var(--line);border-radius:10px;background:var(--card);color:var(--ink);font:inherit}
+  .slots{display:grid;grid-template-columns:repeat(auto-fill,minmax(96px,1fr));gap:8px;margin-top:14px}
+  .slots button{margin:0;background:var(--card);color:var(--ink);border:1px solid var(--line);font-weight:500}
+  .err{color:var(--warn);font-size:14px;margin-top:10px;min-height:1.4em}
+  .cal a{white-space:nowrap}
+  a{color:inherit}
+</style>
+</head>
+<body>
+<main class="center" id="state" aria-live="polite"><p class="muted">One moment…</p></main>
+<script>
+// Builder list item 149: the private "Pick another time or cancel" link in a booking's
+// confirmation and reminder lands here with ?t=<signed link>. It reads the booking and
+// changes nothing until a button is pressed, since mail scanners open links on their own.
+// The customer picks another open time or cancels, and the business is told at once;
+// once it's too close to the time, or if the business doesn't take changes online, it
+// shows how to reach them instead. The function at *.supabase.co can't show a page, so
+// this page on the app asks it: GET /book/manage to read, POST to act.
+(function(){
+  var q=new URLSearchParams(location.search);
+  var FN=(q.get('env')==='staging'?'https://wjlpursnwbmlcdwbeowv.supabase.co':'https://qksstlqzbhesadrrofgn.supabase.co')+'/functions/v1/presence';
+  var t=q.get('t')||'';
+  var state=document.getElementById('state');
+  var B=null;
+  var MO=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  var DAYS=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+  function node(tag,cls,text){ var n=document.createElement(tag); if(cls) n.className=cls; if(text!=null) n.textContent=text; return n; }
+  function line(tag,cls,text){ var n=node(tag,cls,text); state.appendChild(n); return n; }
+  function head(text){ state.innerHTML=''; var h=line('h1','',text); h.tabIndex=-1; h.focus(); return h; }
+  function btn(text,cls,fn){ var b=node('button',cls||'',text); b.type='button'; b.addEventListener('click',fn); return b; }
+  function call(method,path,body){
+    return fetch(FN+path,body?{method:method,headers:{Accept:'application/json','Content-Type':'application/json'},body:JSON.stringify(body)}:{method:method,headers:{Accept:'application/json'}})
+      .then(function(r){ return r.json().catch(function(){ return {}; }).then(function(j){ return {r:r,j:j}; }); });
+  }
+  function bad(){ head('That link didn’t work'); line('p','muted','The link looks incomplete or is no longer valid. To change your booking, reply to its confirmation email.'); }
+  function offline(){ head('This page couldn’t load'); line('p','muted','Check your connection, then reload the page.'); }
+  // "Monday, Nov 17 at 2:30 PM" and "2:30 PM", from the business's own "YYYY-MM-DDTHH:MM"
+  function hm(s){ var p=s.split('T')[1].split(':'), h=+p[0]; return (h%12===0?12:h%12)+':'+p[1]+' '+(h<12?'AM':'PM'); }
+  function human(s){ var d=s.split('T')[0].split('-'); var wd=new Date(Date.UTC(+d[0],+d[1]-1,+d[2])).getUTCDay(); return DAYS[wd]+', '+MO[+d[1]-1]+' '+(+d[2])+' at '+hm(s); }
+  function plusDays(ymd,n){ var d=ymd.split('-'); return new Date(Date.UTC(+d[0],+d[1]-1,+d[2])+n*86400000).toISOString().slice(0,10); }
+  function reach(p,lead){
+    var tel=(B.reach&&B.reach.tel)||'', mail=(B.reach&&B.reach.mail)||'';
+    if(!tel&&!mail){ p.appendChild(document.createTextNode(' Reply to your confirmation email to reach them.')); return p; }
+    p.appendChild(document.createTextNode(' '+lead+' '));
+    if(tel){ p.appendChild(document.createTextNode('call ')); var a=node('a',null,tel); a.href='tel:'+tel.replace(/[^0-9+]/g,''); p.appendChild(a); }
+    if(tel&&mail) p.appendChild(document.createTextNode(' or '));
+    if(mail){ p.appendChild(document.createTextNode('email ')); var m=node('a',null,mail); m.href='mailto:'+mail; p.appendChild(m); }
+    p.appendChild(document.createTextNode('.')); return p;
+  }
+  function summary(){
+    var box=node('div','msg');
+    box.appendChild(node('strong',null,B.service||'Your booking'));
+    box.appendChild(node('p',null,B.when));
+    if(B.business) box.appendChild(node('p',null,'With '+B.business+(B.price?(' · '+B.price):'')));
+    if(B.state!=='canceled'&&B.state!=='past'&&B.state!=='done') box.appendChild(node('p',null,B.status==='pending'?'Waiting for '+(B.business||'them')+' to confirm.':'Confirmed.'));
+    state.appendChild(box);
+  }
+  function calLinks(){
+    var C=B.calendar; if(!C) return;
+    var list=[['Google',C.google],['Outlook',C.outlook],['Apple and others',C.ics]].filter(function(x){ return String(x[1]||'').indexOf('https://')===0; });
+    if(!list.length) return;
+    var p=line('p','muted cal','Add it to your calendar: ');
+    list.forEach(function(x,i){ if(i) p.appendChild(document.createTextNode(' · ')); var a=node('a',null,x[0]); a.href=x[1]; a.target='_blank'; a.rel='noopener'; p.appendChild(a); });
+  }
+  function view(note){
+    if(B.state==='canceled'){
+      head('This booking was canceled'); if(note) state.insertBefore(node('p','note',note),state.firstChild.nextSibling); summary();
+      if(B.site_url){ var p=line('p','muted',''); var a=node('a',null,'Book another time'); a.href=B.site_url; p.appendChild(a); }
+      return;
+    }
+    if(B.state==='past'||B.state==='done'){ head('This booking’s time has passed'); summary(); return; }
+    head('Your booking');
+    if(note) state.insertBefore(node('p','note',note),state.firstChild.nextSibling);
+    summary(); calLinks();
+    if(B.state==='open'){
+      var row=line('div','row','');
+      if(B.can_move) row.appendChild(btn('Pick another time','',pick));
+      row.appendChild(btn('Cancel booking','second',askCancel));
+      if(!B.can_move) reach(line('p','muted','Online booking is off just now, so the time can’t be changed here.'),'To change it,');
+    } else if(B.state==='too_late'){
+      reach(line('p','muted','It’s too close to the time to change this booking online.'),'To change or cancel,');
+    } else {
+      reach(line('p','muted','This booking can’t be changed online.'),'To change or cancel,');
+    }
+  }
+  // read it again after a change, so the page shows what's true now
+  function load(note){
+    return call('GET','/book/manage?t='+encodeURIComponent(t)).then(function(o){
+      if(o.r.status===404){ bad(); return; }
+      if(!o.r.ok||!o.j||!o.j.data){ offline(); return; }
+      B=o.j.data; view(note);
+    }).catch(offline);
+  }
+  function pick(){
+    head('Pick another time');
+    line('p','muted','For your '+(B.service||'booking')+(B.business?' with '+B.business:'')+'. You have '+B.when+' now.');
+    var lab=line('label','','Day'); var inp=node('input'); inp.type='date'; inp.min=B.today; inp.max=plusDays(B.today,B.max_days_ahead||60); lab.appendChild(document.createElement('br')); lab.appendChild(inp);
+    var list=line('div','',''), err=line('p','err','');
+    var back=line('div','row',''); back.appendChild(btn('Back','quiet',function(){ view(); }));
+    inp.addEventListener('change',function(){ if(inp.value) times(inp.value,list,err); });
+  }
+  function times(day,list,err){
+    list.innerHTML=''; err.textContent=''; list.appendChild(node('p','muted','Finding open times…'));
+    call('GET','/book/manage/slots?t='+encodeURIComponent(t)+'&date='+encodeURIComponent(day)).then(function(o){
+      list.innerHTML='';
+      var sl=(o.r.ok&&o.j&&o.j.data&&o.j.data.slots)||null;
+      if(!sl){ err.textContent='We couldn’t load the times for that day. Try again, or pick another day.'; return; }
+      if(!sl.length){ list.appendChild(node('p','muted','No open times that day — try another.')); return; }
+      var grid=node('div','slots');
+      sl.forEach(function(s){ grid.appendChild(btn(hm(s),'',function(){ askMove(s); })); });
+      list.appendChild(grid);
+    }).catch(function(){ list.innerHTML=''; err.textContent='We couldn’t load the times for that day. Try again, or pick another day.'; });
+  }
+  function askMove(slot){
+    head('Move your booking?');
+    line('p','muted','From '+B.when+' to '+human(slot)+'.');
+    var err=node('p','err','');
+    var row=line('div','row','');
+    var yes=btn('Move my booking','',function(){
+      yes.disabled=true; yes.textContent='Moving…'; err.textContent='';
+      call('POST','/book/manage',{t:t,action:'move',slot:slot}).then(function(o){
+        if(o.r.ok&&o.j&&o.j.data&&o.j.data.ok){ load(o.j.data.message); return; }
+        if(o.j&&o.j.data&&o.j.data.state){ B=o.j.data; view(o.j.message); return; }   // it can't be changed any more: say why
+        yes.disabled=false; yes.textContent='Move my booking';
+        err.textContent=(o.j&&o.j.message)||'That didn’t go through, so your booking is unchanged. Please try again.';
+      }).catch(function(){ yes.disabled=false; yes.textContent='Move my booking'; err.textContent='That didn’t go through, so your booking is unchanged. Check your connection and try again.'; });
+    });
+    row.appendChild(yes); row.appendChild(btn('Pick a different time','second',pick));
+    state.appendChild(err);
+  }
+  function askCancel(){
+    head('Cancel this booking?');
+    summary();
+    var err=node('p','err','');
+    var row=line('div','row','');
+    var yes=btn('Yes, cancel it','',function(){
+      yes.disabled=true; yes.textContent='Canceling…'; err.textContent='';
+      call('POST','/book/manage',{t:t,action:'cancel'}).then(function(o){
+        if(o.r.ok&&o.j&&o.j.data&&o.j.data.ok){ load(o.j.data.message); return; }
+        if(o.j&&o.j.data&&o.j.data.state){ B=o.j.data; view(o.j.message); return; }
+        yes.disabled=false; yes.textContent='Yes, cancel it';
+        err.textContent=(o.j&&o.j.message)||'That didn’t go through, so your booking is unchanged. Please try again.';
+      }).catch(function(){ yes.disabled=false; yes.textContent='Yes, cancel it'; err.textContent='That didn’t go through, so your booking is unchanged. Check your connection and try again.'; });
+    });
+    row.appendChild(yes); row.appendChild(btn('Keep my booking','second',function(){ view(); }));
+    state.appendChild(err);
+  }
+  if(!/^[0-9a-f-]{36}\.[0-9a-f]{32}$/.test(t)){ bad(); return; }
+  load();
+})();
+</script>
+</body>
+</html>
