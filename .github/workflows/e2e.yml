@@ -28,6 +28,15 @@ on:
   pull_request:
   workflow_dispatch:
 
+# A pull request pushed again stops its older run, so the machines go to the newest
+# push. On Nov 11 2026 older pushes of the same branches kept running beside the new
+# ones, and main's runs and their `browser` job waited behind them until deploys gave
+# up. A push to main or a manual run gets a group of its own (its run id), so it is
+# never cancelled or held: deploy.yml waits for the run on its exact commit.
+concurrency:
+  group: e2e-${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   scope:
     runs-on: ubuntu-latest
@@ -122,8 +131,10 @@ jobs:
     name: browser on ${{ matrix.project }}
     runs-on: ubuntu-latest
     # A device takes about a third of what all three took together. A run that hits
-    # this cap is cancelled with no test summary at all.
-    timeout-minutes: 45
+    # this cap is cancelled with no test summary at all. Main runs the tablet in full:
+    # on Nov 11 2026, with the machines busy, that took 30 to 45 minutes, and three of
+    # six runs hit the old 45-minute cap, so their deploys waited and shipped nothing.
+    timeout-minutes: 75
     # Playwright's image for the exact version in package-lock.json: the browsers and
     # their system libraries are already in it, so nothing is downloaded or installed
     # per run. Move it with Playwright; tests/workflows/e2e_scope_test.mjs checks that
