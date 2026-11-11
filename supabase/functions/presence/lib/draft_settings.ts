@@ -15,10 +15,10 @@
 // A snapshot from before has none: its settings are rebuilt from the content
 // (settingsFromContent), which brings back what that version showed.
 //
-// Either way a photo that has left the library is taken out (withoutMedia, the draft
-// writer counts it), and a page the restore takes off the draft is kept 30 days in
-// Recently deleted pages by the trigger on presence_settings (migration 0154), which also
-// takes a page off that list when it comes back exactly as it was.
+// Either way a photo the version showed that has since left the library is taken out
+// (withoutMedia; the draft writer counts it), and a page the restore takes off the draft
+// is kept 30 days in Recently deleted pages by the trigger on presence_settings (migration
+// 0154), which also takes a page off that list when it comes back exactly as it was.
 import { svc } from './db.ts';
 import { SETTINGS_CONTENT_FIELDS } from './site_roles.ts';
 import { pageShowFields } from './page_access.ts';
