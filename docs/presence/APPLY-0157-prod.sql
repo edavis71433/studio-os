@@ -1,4 +1,4 @@
--- APPLY 0154 (production) — "Join our list" (builder list item 146).
+-- APPLY 0157 (production) — "Join our list" (builder list item 146).
 -- Safe to run more than once. Two new columns on contacts (when someone joined the
 -- site's email list, and what they agreed to) and one small index; nothing existing
 -- changes. Paste into Supabase → SQL Editor → Run.

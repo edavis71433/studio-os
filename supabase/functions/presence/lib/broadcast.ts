@@ -244,7 +244,7 @@ export async function fetchAudienceRows(siteId: string, key: AudienceKey, opts: 
   if (key === 'contacts') {
     return await need(`presence_contacts?site_id=eq.${siteId}&deleted_at=is.null&select=email,name&limit=${RECIPIENT_CAP}`);
   }
-  if (key === 'subscribers') {   // item 146: contacts who joined the list (migration 0154)
+  if (key === 'subscribers') {   // item 146: contacts who joined the list (migration 0157)
     return await need(`presence_contacts?site_id=eq.${siteId}&deleted_at=is.null&subscribed_at=not.is.null&select=email,name&limit=${RECIPIENT_CAP}`);
   }
   const base = `presence_form_submissions?site_id=eq.${siteId}&spam=is.false&select=email,name,created_at`;

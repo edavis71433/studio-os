@@ -231,7 +231,7 @@ export async function handleFormSubmit(req: Request, siteId: string, cors: Recor
 // The Newsletter section's box: an email and a consent tick, sent like a form (the time
 // ticket and the spam checks of item 140 included). Whoever joins becomes a contact of
 // the site with subscribed_at and a note of what they agreed to and where (migration
-// 0154); Send an update's "People who joined your list" writes to them, and the
+// 0157); Send an update's "People who joined your list" writes to them, and the
 // unsubscribe link every update carries is how they leave. A robot is thanked and
 // nothing is kept. Joining twice changes nothing, and a sign-up never lifts an
 // unsubscribe: the one suppression list still decides who gets mail.
