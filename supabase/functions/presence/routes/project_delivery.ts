@@ -179,7 +179,7 @@ export async function handleApprovalsCreate(req: Request, jwt: string, site: Sit
   if (a.client_visible) {
     const when = a.due_date ? `<p>They’d like your answer by <strong>${dueDateText(String(a.due_date))}</strong>.</p>` : '';
     emailBridgedCustomer(site.id, projectId, `Needs your OK — ${title}`,
-      `<p>Your studio has something ready for your review: <strong>${title.replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c] as string))}</strong>.</p>${when}<p>Nothing goes ahead without you — take a look when you have a minute.</p>`).catch(() => {});
+      `<p>Your studio has something ready for your review: <strong>${title.replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c] as string))}</strong>.</p>${when}<p>Nothing goes ahead without you — take a look when you have a minute.</p>`, { approval: a.id }).catch(() => {});
   }
   return json({ data: a }, 201, cors);
 }

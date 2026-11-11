@@ -94,6 +94,8 @@ const post = (b) => new Request('https://x/', { method: 'POST', body: JSON.strin
   const pd = read('supabase/functions/presence/routes/project_delivery.ts');
   ok('ask: a website ask captures the draft before anything is written, and replaces the one waiting', /captureWebsiteDraft\(site\.id, projectId, principal\)/.test(pd) && /project_id=eq\.\$\{projectId\}&subject_type=eq\.website&status=eq\.pending/.test(pd));
   ok('ask: before 0179 a website ask says it isn’t switched on yet', /website && \/subject_type\/\.test\(ins\.text/.test(pd));
+  const sb = read('supabase/functions/presence/lib/service_bridge.ts');
+  ok('email: the ask’s button opens that approval (the project stays in the link as the fallback)', /\{ approval: a\.id \}\)\.catch/.test(pd) && /\?project=\$\{encodeURIComponent\(projectId\)\}\$\{approval \? `&approval=\$\{approval\}` : ''\}/.test(sb) && /approval \? 'Take a look →' : 'Open your project →'/.test(sb));
 }
 
 // ═══ the client reads the draft ═══
