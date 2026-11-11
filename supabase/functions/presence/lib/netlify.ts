@@ -174,13 +174,25 @@ export async function setCustomDomain(netlifySiteId: string, domain: string | nu
   return { ok: true, site: toSiteInfo(r.json) };
 }
 
+/** List item 175: put a visitor password on the whole live site, or take it off (empty).
+ *  Netlify keeps the password and shows its own password page before any page of the
+ *  site; it is never stored on our side. */
+export async function setSitePassword(netlifySiteId: string, password: string): Promise<{ ok: boolean; error?: string }> {
+  if (!NETLIFY_TOKEN) return { ok: false, error: 'NETLIFY_AUTH_TOKEN not configured' };
+  const r = await nf(`/sites/${encodeURIComponent(netlifySiteId)}`, { method: 'PATCH', body: JSON.stringify({ password }) });
+  if (!r.ok) return { ok: false, error: `password update failed: ${r.status} ${r.text.slice(0, 200)}` };
+  return { ok: true };
+}
+
 /** Certificate state. 200 with empty body = no cert yet (valid pre-DNS state). */
-export async function sslStatus(netlifySiteId: string): Promise<{ ok: boolean; state: string; expires_at: string | null }> {
+export async function sslStatus(netlifySiteId: string): Promise<{ ok: boolean; state: string; expires_at: string | null; domains?: string[] }> {
   if (!NETLIFY_TOKEN) return { ok: false, state: 'unknown', expires_at: null };
   const r = await nf(`/sites/${encodeURIComponent(netlifySiteId)}/ssl`);
   if (!r.ok) return { ok: false, state: 'unknown', expires_at: null };
-  if (!r.json) return { ok: true, state: 'none', expires_at: null };
-  return { ok: true, state: String(r.json.state || 'unknown'), expires_at: r.json.expires_at ? String(r.json.expires_at) : null };
+  if (!r.json) return { ok: true, state: 'none', expires_at: null, domains: [] };
+  // `domains`: the names the certificate covers (item 134: "the padlock covers both names")
+  const domains = Array.isArray(r.json.domains) ? r.json.domains.map((d: unknown) => String(d).toLowerCase()) : [];
+  return { ok: true, state: String(r.json.state || 'unknown'), expires_at: r.json.expires_at ? String(r.json.expires_at) : null, domains };
 }
 
 /** Ask Netlify to (re)provision the certificate — safe to call repeatedly. */

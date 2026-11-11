@@ -46,13 +46,14 @@ import { handleMessages, handleNotifications, handleNotificationsRead, handlePro
 import { handleProjectSurveys, handleSurvey, handleSurveyRespond, handleSupport, handleSupportOne, handleSupportMessage } from './routes/service_intake.ts';
 import { handleClientProjects, handleClientProject, handleClientReport, handleClientMessages, handleClientDeliverableDownload, handleClientApprovalDecide, handleClientSurvey, handleClientSurveyRespond, handleClientNotifications, handleClientNotificationsRead, handleClientSupport, handleClientSupportOne, handleClientSupportMessage, handleClientBilling, handleClientDocuments, handleClientBook, handleClientTaskDone, handleClientUploadUrl, handleClientUploadCreate, handleClientServices, handleClientWebsiteStats, handleStudioCustomers } from './routes/client_delivery.ts';
 import { handleSavedReplies, handleFaqAdmin, handleClientFaq } from './routes/service_edges.ts';
-import { handlePublish, handleRestore, handlePublishHistory, handleVersionLabel, handleCompareVersions, handleTimewarp, handleCheckpointList, handleCheckpointSave, handleCheckpointRestore, handleCheckpointDelete, handleTakeOffline, handleBackOnline } from './routes/publish.ts';
+import { handlePublish, handleRestore, handlePublishHistory, handleVersionLabel, handleCompareVersions, handleTimewarp, handleCheckpointList, handleCheckpointSave, handleCheckpointRestore, handleCheckpointDelete, handleTakeOffline, handleBackOnline, handleSitePassword } from './routes/publish.ts';
 const { handleLaunchList, handleLaunchCreate, handleLaunchGet, handleLaunchRecapture, handleLaunchDecide, handleLaunchSchedule, handleLaunchPromote, handleLaunchRollback, handleLaunchCancel } = lazyRoutes(() => import('./routes/launches.ts'));
 import { handleMediaUpload, handleMediaUpdate, handleMediaDelete } from './routes/media.ts';
 import { handleAssetsList, handleAssetsCollections, handleAssetsHealth, handleAssetsBulk, handleAssetsMatch, handleAssetsFolderMove, handleAssetUpdate, handleAssetStatus, handleAssetDelete, handleAssetDetail, handleAssetDownload, handleAssetReplace, handleAssetRollback, handleAssetDuplicate, handleAssetSuggest, handleAssetSocial, handleAssetCards, handleAssetRemoveBackground, handleAssetCutout, handleCutoutJob } from './routes/assets.ts';
 const { handleVisualKinds, handleVisualGenerate, handleVisualList, handleVisualGet, handleVisualVary, handleVisualEdit, handleVisualDecide } = lazyRoutes(() => import('./routes/visual.ts'));
 const { handleAdmin, handleDomain } = lazyRoutes(() => import('./routes/admin.ts'));
 import { handleCollection, handleLocation, handleSettings, handleBlockSuggestions, handlePageDuplicate, handlePageRefs, SPECS } from './routes/content.ts';
+import { handlePageLockCreate, handlePageLockList } from './routes/page_locks.ts';
 import { handleHealth, handleChanges, handleContentTree, handleNotesList, handleNoteResolve, handleRestoreToDraft, handleMediaList } from './routes/room.ts';
 const { handleWebsiteTimeline } = lazyRoutes(() => import('./routes/timeline.ts'));
 const { handleWebsiteHealth } = lazyRoutes(() => import('./routes/health_page.ts'));
@@ -266,6 +267,13 @@ async function route_(req: Request, cors: Record<string, string>): Promise<Respo
   {
     const m = route.match(/^\/public\/studio\/([0-9a-f-]{36})\/brand$/);
     if (m && method === 'GET') return (await import('./routes/studio_brand.ts')).handlePublicStudioBrand(m[1], cors);
+  }
+
+  // ── Pitch pack (sales item 113): PUBLIC, pre-auth, authorized by the pack's own
+  //    unguessable token (routes/pitch_pack.ts). Read-only; pitch.html renders it. ──
+  {
+    const m = route.match(/^\/sales\/pack\/([0-9a-f]{24,64})$/);
+    if (m && method === 'GET') return (await import('./routes/pitch_pack.ts')).handlePackPublic(m[1], cors);
   }
 
   // ── L5.5: Industry Pack Marketplace — OPERATOR management. Infrastructure,
@@ -554,6 +562,7 @@ async function route_(req: Request, cors: Record<string, string>): Promise<Respo
   //    online restores the last live version through the ONE pipeline. ──
   if (route === '/site/offline' && method === 'POST') return handleTakeOffline(site, principal, cors);
   if (route === '/site/online' && method === 'POST') return handleBackOnline(site, principal, cors);
+  if (route === '/site/password' && method === 'POST') return handleSitePassword(req, site, principal, cors);   // list item 175
   if (route === '/publishes' && method === 'GET') return handlePublishHistory(site, cors);
   // ── Version tools: compare any two versions · Timewarp · draft checkpoints ──
   // (all under /publishes/* so featureForRoute maps them to the 'website' area).
@@ -758,6 +767,8 @@ async function route_(req: Request, cors: Record<string, string>): Promise<Respo
     if (pm && method === 'POST') return px.handleProspectConvert(req, site, principal, pm[1], cors);
     pm = route.match(/^\/sales\/prospects\/([0-9a-f-]{36})\/draft$/);
     if (pm && method === 'POST') return px.handleProspectDraft(req, site, principal, pm[1], cors);
+    pm = route.match(/^\/sales\/prospects\/([0-9a-f-]{36})\/pack$/);   // item 113: build the next piece of the pitch pack
+    if (pm && method === 'POST') return (await import('./routes/pitch_pack.ts')).handleProspectPack(req, site, principal, pm[1], cors);
   }
   if (route === '/email/log-address' && (method === 'GET' || method === 'POST' || method === 'DELETE')) return handleEmailLogAddress(req, site, principal, cors);   // sales review item 69: BCC to log   // sales review item 69: which address mail goes out from, and is it verified
   if (route === '/calendar/link' && (method === 'GET' || method === 'POST' || method === 'DELETE')) {   // sales review item 46: your calendar in Google Calendar
@@ -1221,6 +1232,9 @@ async function route_(req: Request, cors: Record<string, string>): Promise<Respo
   //    create-with-source over the ONE pages store; refs = delete-awareness) ──
   if (route === '/pages/duplicate' && method === 'POST') return handlePageDuplicate(req, db, site, principal, cors);
   if (route === '/pages/refs' && method === 'GET') return handlePageRefs(req, site, cors);
+  // items 48 and 120: a page's password (only the key made from it is kept)
+  if (route === '/page-locks' && method === 'POST') return handlePageLockCreate(req, site, principal, cors);
+  if (route === '/page-locks' && method === 'GET') return handlePageLockList(site, cors);
   if (route === '/blocks/suggested' && method === 'GET') return handleBlockSuggestions(site, cors);   // FD-T4 vertical presets
   {
     const m = route.match(/^\/(offerings|testimonials|faqs|posts)(?:\/([0-9a-f-]{36}))?$/);

@@ -1,4 +1,4 @@
-const CACHE_NAME = 'dds-v17'; // bumped: the worker now caches only the marketing pages listed below, so every old copy of an app page rotates out
+const CACHE_NAME = 'dds-v18'; // bumped: /report-card forwards to the Site Review now (list item 139), so its old copy rotates out
 const PRECACHE = [
   '/about',
   '/services',
@@ -14,7 +14,7 @@ const PRECACHE = [
 // cached copy only when there is no connection. An unlisted page, every app page
 // included, goes straight to the network. Paths _redirects sends off this site stay off.
 const NETWORK_FIRST = ['/', '/about', '/services', '/work', '/contact', '/how-we-work', '/industries', '/web-design',
-  '/seo-strategy', '/monthly-retainer', '/privacy', '/terms', '/accessibility', '/ai-disclaimer', '/report-card',
+  '/seo-strategy', '/monthly-retainer', '/privacy', '/terms', '/accessibility', '/ai-disclaimer',
   '/burbank-web-design', '/glendale-web-design', '/pasadena-web-design', '/health-wellness-web-design',
   '/home-services-web-design', '/restaurant-web-design', '/retail-web-design', '/salon-web-design'];
 // The Free Tools report page carries private data and versioned scripts: never from this cache.

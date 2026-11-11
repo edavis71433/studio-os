@@ -42,6 +42,14 @@ for f in email-signature.html styleguide.html a11y.html provision.html; do
   rm -f "dist/$f"
 done
 
+# List item 139: the retired tools stay out too. Each address forwards (_redirects,
+# forced 301s): the free tools to tools.davisdigitalstudio.com, the paid-audit checkout
+# to the main site's audits page, the resources hub to its free tools page. Pinned by
+# tests/e2e/marketing.spec.ts, which runs this script and inspects dist/.
+for f in audit.html ai-critique.html report-card.html roi-calculator.html pricing-estimator.html local-visibility.html tools.html buy-audit.html; do
+  rm -f "dist/$f"
+done
+
 # platform files (exact names — package.json/deno.json are NOT public)
 for f in _redirects _headers robots.txt tools-robots.txt security.txt sitemap.xml tools-sitemap.xml manifest.json manifest-app.json; do
   [ -f "$f" ] && cp "$f" dist/
