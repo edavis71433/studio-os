@@ -258,7 +258,7 @@ const TOOL_WORDS: Record<string, string> = {
 };
 const LEAD_STATUSES = new Set(['new', 'contacted', 'not_a_fit']);
 const LEAD_COLS = 'id,created_at,tool,business_name,client_email,url,city,business_type,score,status,notes,contact_id,deal_id';
-const LEAD_COLS_PRE_0150 = LEAD_COLS.replace(',deal_id', '');   // before APPLY-0150, audit_leads has no deal_id
+const LEAD_COLS_PRE_0151 = LEAD_COLS.replace(',deal_id', '');   // before APPLY-0151, audit_leads has no deal_id
 
 const staffOnly = (principal: Principal, cors: Record<string, string>) =>
   principal.kind === 'staff' ? null : json({ error: 'forbidden', message: 'Free-tool leads are the platform’s own enquiries — staff only.' }, 403, cors);
@@ -277,10 +277,10 @@ function leadView(l: any) {
   };
 }
 
-// deploy-order tolerant read: with deal_id first, then the pre-0150 shape
+// deploy-order tolerant read: with deal_id first, then the pre-0151 shape
 async function readLeads(filter: string) {
   let r = await svc(`audit_leads?${filter}&select=${LEAD_COLS}`).catch(() => null);
-  if (r && !(r as any).ok && (r as any).status === 400) r = await svc(`audit_leads?${filter}&select=${LEAD_COLS_PRE_0150}`).catch(() => null);
+  if (r && !(r as any).ok && (r as any).status === 400) r = await svc(`audit_leads?${filter}&select=${LEAD_COLS_PRE_0151}`).catch(() => null);
   return r;
 }
 
@@ -352,7 +352,7 @@ export async function handleToolLeadConvert(_req: Request, site: SiteRow, princi
   if (!deal) return json({ error: 'write_failed', message: 'That deal didn’t save — please try again.' }, 502, cors);
   await dealEvent(site.id, deal.id, 'created', principal, { to_stage: 'lead', detail: { audit_lead_id: lead.id } }).catch(() => {});
   // remember the conversion on the lead — converted leads also never meet the
-  // day-7 follow-up sweep, which only looks at status=new. Before APPLY-0150
+  // day-7 follow-up sweep, which only looks at status=new. Before APPLY-0151
   // the deal_id column isn't there (PostgREST 400s the whole patch), so fall
   // back to stamping contact and status alone.
   const stamp = { contact_id: contact.id, deal_id: deal.id, status: 'converted' };

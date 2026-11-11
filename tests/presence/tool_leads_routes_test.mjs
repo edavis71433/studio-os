@@ -101,7 +101,7 @@ const world = (rows) => { db.reset({ presence_sites: [{ id: SITE, client_id: OWN
   ok('a lead that isn\'t there answers 404', missing.status === 404);
 }
 
-// ═══ before APPLY-0150 (no deal_id column) everything still works ═══
+// ═══ before APPLY-0151 (no deal_id column) everything still works ═══
 {
   world([lead(L1)]);
   const real = globalThis.fetch;
@@ -113,9 +113,9 @@ const world = (rows) => { db.reset({ presence_sites: [{ id: SITE, client_id: OWN
     return real(url, init);
   };
   const list = await res(await PX.handleToolLeads(site, staff, cors));
-  ok('pre-0150, the list falls back to the old shape and still answers', list.status === 200 && list.body.data.length === 1 && list.body.data[0].deal_id === null);
+  ok('pre-0151, the list falls back to the old shape and still answers', list.status === 200 && list.body.data.length === 1 && list.body.data[0].deal_id === null);
   const r = await res(await PX.handleToolLeadConvert(req('POST', `/sales/tool-leads/${L1}/convert`), site, staff, L1, cors));
-  ok('pre-0150, the convert still works and stamps what it can', r.status === 201 && leads()[0].status === 'converted' && leads()[0].contact_id && !leads()[0].deal_id);
+  ok('pre-0151, the convert still works and stamps what it can', r.status === 201 && leads()[0].status === 'converted' && leads()[0].contact_id && !leads()[0].deal_id);
   globalThis.fetch = real;
 }
 
