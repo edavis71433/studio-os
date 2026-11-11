@@ -151,18 +151,16 @@ export function bookingLinksHtml(l: BookingLinks, canManage: boolean): string {
       : `<p style="color:#666;font-size:.9rem">Need to change or cancel? Just reply to this email.</p>`);
 }
 
-/** The calendar file as an email attachment. */
-export function icsAttachment(ics: string): { filename: string; content: string } {
-  let bin = '';
-  for (const b of new TextEncoder().encode(ics)) bin += String.fromCharCode(b);
-  return { filename: 'booking.ics', content: btoa(bin) };
+/** The calendar file as an email attachment (sendEmail sends it on as base64). */
+export function icsAttachment(ics: string): { filename: string; content: Uint8Array } {
+  return { filename: 'booking.ics', content: new TextEncoder().encode(ics) };
 }
 
 type Bits = Awaited<ReturnType<typeof bookingBits>>;
 /** Everything one booking email adds: the closing lines and the calendar file. `known` is
  *  the business, read once by a sweep that sends many. Never throws: without the business's
  *  details the email still ends "just reply to this email". */
-export async function bookingMail(a: ApptLike & { site_id: string }, nowMs = Date.now(), known?: Bits | Promise<Bits>): Promise<{ html: string; attachments: Array<{ filename: string; content: string }>; links: BookingLinks; canManage: boolean; biz: BookingBits }> {
+export async function bookingMail(a: ApptLike & { site_id: string }, nowMs = Date.now(), known?: Bits | Promise<Bits>): Promise<{ html: string; attachments: Array<{ filename: string; content: Uint8Array }>; links: BookingLinks; canManage: boolean; biz: BookingBits }> {
   try {
     const bits = await (known || bookingBits(String(a.site_id)));
     const canManage = manageState(a, { selfManage: bits.opts.self_manage, leadHours: bits.leadHours }, nowMs) === 'open';

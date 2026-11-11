@@ -100,7 +100,8 @@ ok('short: truncated JPEG (2 bytes) declared image/jpeg → REJECTED', magicMatc
 {
   const media = read('supabase/functions/presence/lib/media.ts');
   ok('wiring: createUpload enforces the per-site quota BEFORE issuing a URL', /quotaExceeded\(/.test(media) && /mediaQuota\(\)/.test(media) && /quota_exceeded/.test(media));
-  ok('tenant: quota usage query is SITE-scoped (no cross-tenant count)', /presence_media\?site_id=eq\.\$\{siteId\}&deleted_at=is\.null&select=bytes/.test(media));
+  // item 144: the database counts and sums (0165 presence_media_usage), still for this one site
+  ok('tenant: quota usage query is SITE-scoped (no cross-tenant count)', /rpc\/presence_media_usage', \{ method: 'POST', body: JSON\.stringify\(\{ p_site: siteId \}\) \}/.test(media) && /where m\.site_id = p_site and m\.deleted_at is null/.test(read('supabase/migrations/0165_media_usage.sql')));
   ok('wiring: importImage validates magic bytes (rejects polyglots)', /magicMatchesMime\(bytes, mime\)/.test(media) && /invalid_image/.test(media));
   ok('wiring: importImage strips EXIF from the stored JPEG original', /stripJpegExif\(bytes\)/.test(media));
   // FD-AUD1: delete must refuse while the image is the site's logo/OG/cover or embedded in a block

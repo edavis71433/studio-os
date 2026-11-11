@@ -314,7 +314,7 @@ const notice = (id) => world.notices.find((r) => r.id === id);
   // when invWaits(v) — the one money formula says upcoming or overdue) alongside
   // Send / Copy link — so a paid row, a PROCESSING row (the client already paid;
   // the server 409s) and a voided row never get one.
-  ok('deal page: the void control is inside the waiting-only branch (never paid / processing / void)', /const waits=invWaits\(v\);/.test(invRow) && /const acts=waits\?`/.test(invRow) && invRow.indexOf('data-void-inv') > invRow.indexOf('const acts=waits?`') && /const invWaits=\(v\)=>\{const st=invState\(v\);return st==='upcoming'\|\|st==='overdue';\};/.test(pipeline));
+  ok('deal page: the void control is inside the waiting-only branch (never paid / processing / void)', /const waits=invWaits\(v\);/.test(invRow) && /const acts=undoBtn\+payBtn\+\(waits\?`/.test(invRow) && invRow.indexOf('data-void-inv') > invRow.indexOf('const acts=undoBtn+payBtn+(waits?`') && /const invWaits=\(v\)=>\{const st=invState\(v\);return st==='upcoming'\|\|st==='overdue';\};/.test(pipeline));
   ok('deal page: the existing Voided render is still there for a row that reaches that state', /\$\{moneyChip\(v\)\}/.test(invRow) && /<span class="stage void" data-money="void">Voided<\/span>/.test(pipeline));
   ok('deal page: voiding confirms first (same idiom as the draft deletes)', /\[data-void-inv\][\s\S]{0,320}confirm\(/.test(pipeline));
   // The handler is the ONE shared wiring (wireInvoiceActions) now — the drawer

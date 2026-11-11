@@ -127,7 +127,7 @@ ok('link: with no key set, no link is offered', (await BL.manageToken(APPT, ''))
   ok('email: the calendar line, and the change link while it works', yes.includes('Add it to your calendar:') && yes.includes('>Google</a> · <a') && yes.includes('>Apple and others</a>') && yes.includes('href="https://g.example/?a=1&amp;b=2"') && yes.includes('>Pick another time or cancel</a>, or just reply to this email.'));
   ok('email: once it doesn’t, "just reply" as before', !no.includes('Pick another time') && no.includes('Need to change or cancel? Just reply to this email.') && no.includes('Add it to your calendar:'));
   const att = BL.icsAttachment('SUMMARY:Café\r\n');
-  ok('email: the file attached as booking.ics, accents intact', att.filename === 'booking.ics' && unb64(att.content) === 'SUMMARY:Café\r\n');
+  ok('email: the file attached as booking.ics, accents intact', att.filename === 'booking.ics' && new TextDecoder().decode(att.content) === 'SUMMARY:Café\r\n');
 }
 
 // ═══ B · the customer's page ═══

@@ -307,7 +307,7 @@ test.describe('the Edit bar and the panels', () => {
       await mount(page, '/presence.html#design', { '/settings': { data: { blocks: BLOCKS, section_meta: META, pages: many } } });
       await expect(page.locator('html')).toHaveClass(/dc-edit/);
       await expect(page.locator('#dcPageName')).toHaveText('Home');
-      await expect(page.locator('#dcPageCount')).toHaveText('7 pages');   // the pages fold into the switcher
+      await expect(page.locator('#dcPageCount')).toHaveText(/^(Live|Not live yet|\d+ changes?)$/);   // the page's status beside its name (item 125)
       const m = await metrics(page);
       expect(m.barH).toBeLessThanOrEqual(56);
       expect(m.barScroll).toBeLessThanOrEqual(m.barClient);          // nothing pushed off the end

@@ -265,6 +265,8 @@
   .hero .acts{position:absolute;top:22px;right:24px}
   .hero .btn{background:#fff;color:#3d2185;box-shadow:0 8px 20px -10px rgba(0,0,0,.45)}
   .hero .btn:hover{filter:none;background:#f3eefe}
+  .hero .btn.week{background:rgba(255,255,255,.16);color:#fff;border:1px solid rgba(255,255,255,.32);box-shadow:none;text-decoration:none;display:inline-flex;align-items:center;justify-content:center}   /* item 176: Plan my week */
+  .hero .btn.week:hover{background:rgba(255,255,255,.26)}
   .hero a:focus-visible,.hero button:focus-visible{outline:2px solid #fff;outline-offset:2px}
   @media (max-width:759px){
     .top.hero{padding:20px 18px 18px;border-radius:var(--dds-r-lg,16px)}
@@ -1040,7 +1042,7 @@ function renderTop(){
   t.classList.add('has-today');
   t.innerHTML=`<div class="top hero"><div class="hrow"><span class="hdate">${esc(todayWords())}</span><span class="sep" aria-hidden="true">·</span><div class="brand">${esc((ME&&ME.agency)||'Your agency')}</div><span class="rolebadge">● ${esc(roleWords(ME&&ME.role))}</span></div>
     <p class="hi">${esc(greetWord())}</p><p class="hsub" id="heroSub"></p><div class="hchips" id="heroChips"></div>
-    <div class="acts"><button type="button" class="btn" id="addCust" title="Set up a customer with their own workspace and a sign-in invitation">+ Add a customer</button></div></div>
+    <div class="acts"><button type="button" class="btn" id="addCust" title="Set up a customer with their own workspace and a sign-in invitation">+ Add a customer</button><a class="btn week" id="weekBtn" href="/week.html" data-noscope="1">Plan my week</a></div></div>
     <aside class="todaycard" id="todayCard" aria-labelledby="todayHead"><h2 id="todayHead"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="3.5" y="5" width="17" height="15" rx="2"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg>Today</h2><div id="todayRows"><p class="tq">Looking…</p></div></aside>`;
   const ac=$('addCust');if(ac)ac.addEventListener('click',openAddCustomer);
   paintHero();paintToday();

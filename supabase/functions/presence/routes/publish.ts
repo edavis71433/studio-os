@@ -8,6 +8,7 @@ import { fetchLibraryFonts, libraryFontsIn } from '../lib/fonts.ts';
 import { json } from '../../_shared/http.ts';
 import { svc } from '../lib/db.ts';
 import { getTemplate, renderSnapshot } from '../lib/render.ts';
+import { publishedCspFor, siteHomes } from '../lib/site_csp.ts';
 import { liveContent, lockIdsIn, lockPages } from '../lib/page_access.ts';
 import { readPageLocks } from './page_locks.ts';
 import { serializeDraft } from '../lib/serializer.ts';
@@ -174,6 +175,7 @@ export async function runPipeline(site: SiteRow, principal: Principal, kind: 'pu
     ...(fnBase ? { bookEndpoint: `${fnBase}/functions/v1/presence/book/${site.id}` } : {}),
   };
   let fileMap: Record<string, string | Uint8Array>;
+  let csp = '';
   // Items 48 and 120: a private page stays off the live site and a password page goes up
   // sealed (lib/page_access.ts). The snapshot Versions keeps is the draft as it was; only what
   // is drawn for the live site changes. A password page whose key can't be read stays off too.
@@ -182,7 +184,9 @@ export async function runPipeline(site: SiteRow, principal: Principal, kind: 'pu
   const liveSnap = liveC === snapshotArg.snapshot.content ? snapshotArg.snapshot : { ...snapshotArg.snapshot, content: liveC };
   try {
     fileMap = await renderSnapshot(liveSnap, siteCfg);
+    const drawn = fileMap;   // item 144: a sealed page's scripts run once it is opened, so they are named from here
     fileMap = await lockPages(fileMap, sealed.map((p) => ({ ...p, ...locks.get(p.lock)! })));
+    csp = await publishedCspFor([drawn, fileMap], fnBase ? new URL(fnBase).origin : '', siteHomes(site));
   } catch (e) { return await fail('render', String(e).slice(0, 300)); }
   at('render');
   const { files: images, failed } = await fetchVariants(snapshotArg.mediaManifest);
@@ -204,7 +208,8 @@ export async function runPipeline(site: SiteRow, principal: Principal, kind: 'pu
   // clickjacking (X-Frame-Options DENY + CSP frame-ancestors 'none'), MIME-sniff,
   // referrer, permissions, and a real CSP header. Merged into (never clobbering)
   // the template's asset-cache `_headers`. One source of truth: lib/security_headers.ts.
-  fileMap['_headers'] = mergeSecurityHeaders(mergeAssetCaching(typeof fileMap['_headers'] === 'string' ? fileMap['_headers'] as string : undefined));
+  // Item 144: the CSP is the one this site's own pages need (publishedCspFor, above).
+  fileMap['_headers'] = mergeSecurityHeaders(mergeAssetCaching(typeof fileMap['_headers'] === 'string' ? fileMap['_headers'] as string : undefined), csp);
 
   await svc(`presence_publishes?id=eq.${pubId}`, { method: 'PATCH', body: JSON.stringify({ status: 'deploying' }) });
   const dep = await deployFileMap(site.netlify_site_id, fileMap, { title: `${kind} ${pubId}` });

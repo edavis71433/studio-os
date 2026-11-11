@@ -187,7 +187,7 @@ test.describe('Sites (builder list items 43 and 45)', () => {
     await expect(card.locator('.owner')).toContainText('Nobody has been emailed.');
     await expect(page.locator('.scard[data-site="s1"] .owner')).toHaveCount(0);
     await card.locator('[data-menu]').click();
-    await expect(page.locator('#rowMenuHost [role="menuitem"]')).toHaveText(['Pin to top', 'Duplicate site', 'Save as a template', 'Invite the owner', 'Open record', 'Move to trash']);
+    await expect(page.locator('#rowMenuHost [role="menuitem"]')).toHaveText(['Pin to top', 'Duplicate site', 'Save as a template', 'Invite the owner', 'Ask for their content', 'Hand-over kit', 'Open record', 'Move to trash']);
     await page.keyboard.press('Escape');
     await card.getByRole('button', { name: 'Invite the owner' }).click();
     const dlg = page.locator('#invDlg');
@@ -356,7 +356,7 @@ test.describe('Sites (builder list items 43 and 45)', () => {
     const t = await openSites(page);
     await page.locator('.scard[data-site="s3"] [data-menu]').click();
     const menu = page.locator('#rowMenuHost [role="menu"]');
-    await expect(menu.locator('[role="menuitem"]')).toHaveText(['Pin to top', 'Duplicate site', 'Save as a template', 'Open record', 'Move to trash']);
+    await expect(menu.locator('[role="menuitem"]')).toHaveText(['Pin to top', 'Duplicate site', 'Save as a template', 'Ask for their content', 'Hand-over kit', 'Open record', 'Move to trash']);   // item 176 adds Ask for their content and Hand-over kit
     await menu.getByRole('menuitem', { name: 'Pin to top' }).click();
     await expect.poll(() => t.writes.find((w) => w.path === '/agency/sites/s3/pin')?.body).toEqual({ pinned: true });
     await expect(page.locator('.scard[data-site="s3"] .tpin')).toHaveText('Pinned');
@@ -371,7 +371,7 @@ test.describe('Sites (builder list items 43 and 45)', () => {
   test('a watch plan has no Duplicate, and no studio site means no Pin', async ({ page }) => {
     await openSites(page, [BISTRO, GARAGE], { body: { can_pin: false } });
     await page.locator('.scard[data-site="s2"] [data-menu]').click();
-    await expect(page.locator('#rowMenuHost [role="menuitem"]')).toHaveText(['View live site', 'Open record', 'Move to trash']);
+    await expect(page.locator('#rowMenuHost [role="menuitem"]')).toHaveText(['View live site', 'Ask for their content', 'Hand-over kit', 'Open record', 'Move to trash']);
   });
 
   test('a seat that can’t open a client (view only, designer…) gets the live site, never a door that says no', async ({ page }) => {
@@ -629,7 +629,7 @@ test.describe('Sites: the pages travel (item 145)', () => {
     await expect(page.locator('#rowMenuHost [role="menuitem"]')).not.toContainText(['Save as a template']);   // a site we only watch has no pages of ours
     await page.keyboard.press('Escape');
     await page.locator('.scard[data-site="s1"] [data-menu]').click();
-    await expect(page.locator('#rowMenuHost [role="menuitem"]')).toHaveText(['Pin to top', 'Duplicate site', 'Save as a template', 'View live site', 'Open record', 'Move to trash']);
+    await expect(page.locator('#rowMenuHost [role="menuitem"]')).toHaveText(['Pin to top', 'Duplicate site', 'Save as a template', 'View live site', 'Ask for their content', 'Hand-over kit', 'Open record', 'Move to trash']);
     await page.locator('#rowMenuHost').getByRole('menuitem', { name: 'Save as a template' }).click();
     const dlg = page.locator('#tplDlg');
     await expect(dlg).toBeVisible();

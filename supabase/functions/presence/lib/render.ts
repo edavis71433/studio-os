@@ -20,7 +20,7 @@ import { withAiCrawlerChoice } from './ai_crawlers.ts';
 import { injectAdTags } from './ad_tags.ts';
 import { sanitizeDevHtml, sanitizeDevCss } from './devmode.ts';
 import { BLOCK_CSS, sectionStyles, pageClasses } from './site_blocks.ts';
-import { applyPageChrome } from './page_access.ts';
+import { applyPageChrome, applyNotFoundPage } from './page_access.ts';
 import { applyHeaderScroll } from './site_header.ts';
 import { applyPhoneBar } from './phone_bar.ts';
 
@@ -207,10 +207,12 @@ export async function renderSnapshot(snapshot: Snapshot, site: SiteConfig, opts:
   // item 122: Call, Directions, Hours and Email along the bottom of every page on a phone, when turned on
   // (after the page's own header and footer choice, so a page that hides its footer has no bar either)
   const barred = applyPhoneBar(drawn, tokens?.phone_bar, snapshot.content as SnapshotContent, tokens?.accent);
+  // item 121: the owner's own page answers a broken link, when they've picked one (its copy keeps the bar)
+  const found = applyNotFoundPage(barred, pages);
   // item 148: the pop-up and any form a "#form-<id>" link opens (lib/popup.ts), then item 131:
   // pages with the site's forms send them from the page (lib/site_send.ts)
   const content = snapshot.content as SnapshotContent;
-  const dressed = injectSender(injectPopup(injectDevLayer(barred, snapshot.dev_customization), content, site), content, site);
+  const dressed = injectSender(injectPopup(injectDevLayer(found, snapshot.dev_customization), content, site), content, site);
   // List item 152: the Google tag and the Meta Pixel, behind a cookie notice, on a site that has them.
   const tagged = injectAdTags(opts.allSectionStyles ? dressed : trimSectionStyles(dressed), (snapshot.content as SnapshotContent)?.settings);
   return injectCsp(injectAnalytics(tagged, counting ? site.siteId : undefined));
