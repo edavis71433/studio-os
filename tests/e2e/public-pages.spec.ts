@@ -82,3 +82,63 @@ test.describe('unsubscribe works from the link a person clicks', () => {
     expect(calls).toEqual(['GET']);
   });
 });
+
+// Sales item 74: unsubscribing says what still arrives, and can be taken back from the same page.
+test.describe('unsubscribe can be taken back', () => {
+  // a small server: where the address stands, and what the page asked for
+  async function world(page: Page, start: { unsubscribed?: boolean; since?: string; stopped?: string } = {}) {
+    const w = { unsubscribed: !!start.unsubscribed, calls: [] as string[] };
+    await page.route(`${FN}/unsubscribe?**`, (route) => {
+      const u = new URL(route.request().url()), m = route.request().method();
+      const resume = u.searchParams.get('resume') === '1';
+      w.calls.push(m + (resume ? ' resume' : ''));
+      if (m === 'GET') return json(route, 200, { data: { valid: true, unsubscribed: w.unsubscribed, since: w.unsubscribed ? (start.since || null) : null, stopped: start.stopped || null } });
+      w.unsubscribed = !resume;
+      return json(route, 200, { data: { unsubscribed: w.unsubscribed } });
+    });
+    return w;
+  }
+  test('Start emails again turns them back on, and Unsubscribe stops them again', async ({ page }) => {
+    const w = await world(page);
+    await page.goto('/unsubscribe.html?e=pat%40client.example&t=tok');
+    await expect(page.getByText('Receipts, documents, sign-in links, bookings, payment reminders and alerts about your own business still arrive.')).toBeVisible();
+    await page.getByRole('button', { name: 'Yes, unsubscribe' }).click();
+    await expect(page.getByRole('heading', { name: 'You’re unsubscribed' })).toBeVisible();
+    await page.getByRole('button', { name: 'Start emails again' }).click();
+    await expect(page.getByRole('heading', { name: 'Emails are back on' })).toBeVisible();
+    await expect(page.getByText('will get these emails again.')).toBeVisible();
+    await page.getByRole('button', { name: 'Unsubscribe', exact: true }).click();
+    await expect(page.getByRole('heading', { name: 'You’re unsubscribed' })).toBeVisible();
+    expect(w.calls).toEqual(['GET', 'POST', 'POST resume', 'POST']);
+  });
+  test('someone already unsubscribed is told since when, and offered Start emails again', async ({ page }) => {
+    const w = await world(page, { unsubscribed: true, since: '2026-11-03T18:00:00Z' });
+    await page.goto('/unsubscribe.html?e=pat%40client.example&t=tok');
+    await expect(page.getByRole('heading', { name: 'You’re already unsubscribed' })).toBeVisible();
+    await expect(page.getByText('has been unsubscribed since Nov 3, 2026.')).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Yes, unsubscribe' })).toHaveCount(0);
+    await page.getByRole('button', { name: 'Start emails again' }).click();
+    await expect(page.getByRole('heading', { name: 'Emails are back on' })).toBeVisible();
+    expect(w.calls).toEqual(['GET', 'POST resume']);
+  });
+  test('an address that bounced is not started again from here', async ({ page }) => {
+    const w = await world(page, { stopped: 'bounce' });
+    await page.goto('/unsubscribe.html?e=pat%40client.example&t=tok');
+    await expect(page.getByRole('heading', { name: 'Emails to this address are stopped' })).toBeVisible();
+    await expect(page.getByText('stopped because they couldn’t be delivered.')).toBeVisible();
+    await expect(page.getByRole('button')).toHaveCount(0);
+    expect(w.calls).toEqual(['GET']);
+  });
+  test('a failed Start emails again keeps the button and says so', async ({ page }) => {
+    await page.route(`${FN}/unsubscribe?**`, (route) => {
+      if (route.request().method() === 'GET') return json(route, 200, { data: { valid: true, unsubscribed: true, since: null } });
+      return json(route, 502, { error: 'not_saved', message: 'That didn’t go through. Try again in a moment.' });
+    });
+    await page.goto('/unsubscribe.html?e=pat%40client.example&t=tok');
+    await expect(page.getByRole('heading', { name: 'You’re already unsubscribed' })).toBeVisible();
+    await expect(page.getByText('has been unsubscribed.')).toBeVisible();
+    await page.getByRole('button', { name: 'Start emails again' }).click();
+    await expect(page.getByRole('alert')).toHaveText('That didn’t go through. Try again in a moment.');
+    await expect(page.getByRole('button', { name: 'Start emails again' })).toBeEnabled();
+  });
+});

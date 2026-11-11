@@ -620,7 +620,8 @@ async function acknowledgeEnquiry(siteId: string, sub: { name: string; email: st
   // Item 72: an answer to this reaches the owner's own email. Someone writing in for
   // the first time is no contact yet, so the site's inbound address (siteId, left as
   // the fallback) dropped their answer as a stranger's.
-  return await sendEmail(sub.email, copy.subject, `<p>${esc(copy.sentence)}</p>${copy.footer ? `<p style="color:#6b6478;font-size:13px">${esc(copy.footer)}</p>` : ''}`, brand, { critical: true, siteId, replyTo });   // they wrote in; this is the reply they are waiting for
+  // they wrote in; this is the reply they are waiting for, from the business they wrote to (sales item 78)
+  return await sendEmail(sub.email, copy.subject, `<p>${esc(copy.sentence)}</p>${copy.footer ? `<p style="color:#6b6478;font-size:13px">${esc(copy.footer)}</p>` : ''}`, brand, { critical: true, asBusiness: true, siteId, replyTo });
 }
 
 async function notifyOwnerOfLead(siteId: string, sub: { id?: string; form_kind: string; name: string; email: string; phone: string; message: string; files?: number }) {
@@ -634,8 +635,10 @@ async function notifyOwnerOfLead(siteId: string, sub: { id?: string; form_kind: 
   // item 147: files are opened from the Inbox (they never travel by email)
   const filesLine = sub.files ? `<p>${sub.files === 1 ? 'A file came' : `${sub.files} files came`} with it. Open ${sub.files === 1 ? 'it' : 'them'} from your Inbox.</p>` : '';
   const spamLine = tok ? `<p style="margin-top:14px;color:#6b6478;font-size:13px">Not a real customer? <a href="${appBase()}/spam.html?t=${encodeURIComponent(tok)}" style="color:#6b6478">This was spam</a>. It moves to Spam, and more from them goes there too.</p>` : '';
+  // Sales item 74: a new enquiry is the business's own news, so it always arrives (critical);
+  // an unsubscribe from some other email must never cost the owner a customer.
   await sendEmail(String(to), `New ${sub.form_kind} from your website`,
-    `<p>Someone reached out through your website.</p><p><b>${esc(who)}</b></p><p>${esc(sub.message)}</p>${filesLine}<p class="cta"><a href="${siteBase()}/crm.html" style="display:inline-block;margin-top:6px;background:${brand.accent};color:#fff;padding:9px 16px;border-radius:999px;text-decoration:none">See it in your workspace →</a></p>${spamLine}`, brand);
+    `<p>Someone reached out through your website.</p><p><b>${esc(who)}</b></p><p>${esc(sub.message)}</p>${filesLine}<p class="cta"><a href="${siteBase()}/crm.html" style="display:inline-block;margin-top:6px;background:${brand.accent};color:#fff;padding:9px 16px;border-radius:999px;text-decoration:none">See it in your workspace →</a></p>${spamLine}`, brand, { critical: true });
 }
 
 // ═══ FD-3 · Approval → notify → one-tap approve ══════════════════════════════

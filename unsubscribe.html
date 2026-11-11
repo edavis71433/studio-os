@@ -16,6 +16,9 @@
   .muted{color:var(--soft);font-size:15px}
   button{margin-top:18px;min-height:44px;padding:10px 20px;border:0;border-radius:999px;background:var(--plum);color:#fff;font:inherit;font-weight:600;cursor:pointer}
   button:disabled{opacity:.6;cursor:default}
+  button.ghost{background:transparent;color:var(--plum);box-shadow:inset 0 0 0 1.5px var(--plum)}
+  .muted+.muted{margin-top:6px}
+  .small{color:var(--soft);font-size:13px;margin-top:10px}
   .err{color:var(--warn);font-size:14px;margin-top:10px;min-height:1.4em}
   a{color:inherit}
 </style>
@@ -26,15 +29,22 @@
 // The unsubscribe page. An email's footer link lands here with ?e=<address>&t=<token>.
 // The function at *.supabase.co can't show a page (Supabase serves HTML from that address
 // as plain text, so its old page showed code and its button couldn't be pressed), so
-// this page asks it directly: first whether the link is good, then, on the button, to
-// stop the emails. Mail clients' own one-click unsubscribe still goes to the function.
+// this page asks it directly: first whether the link is good and where things stand,
+// then, on the button, to stop the emails. Sales item 74: someone who changed their
+// mind can start emails again from the same page (drawn in Figma, page "Emails and
+// unsubscribe — sales items 74, 75, 78"). A bounce or a spam complaint can't be undone
+// here. Mail clients' own one-click unsubscribe still goes to the function.
 (function(){
   var q=new URLSearchParams(location.search);
   var FN=(q.get('env')==='staging'?'https://wjlpursnwbmlcdwbeowv.supabase.co':'https://qksstlqzbhesadrrofgn.supabase.co')+'/functions/v1/presence';
   var e=q.get('e')||'', t=q.get('t')||'';
   var url=FN+'/unsubscribe?e='+encodeURIComponent(e)+'&t='+encodeURIComponent(t);
+  // what still arrives after an unsubscribe: the mail the server sends as critical (routes/email_infra.ts STILL_ARRIVES)
+  var STILL='Receipts, documents, sign-in links, bookings, payment reminders and alerts about your own business still arrive.';
   var state=document.getElementById('state');
   function line(tag,cls,text){ var n=document.createElement(tag); if(cls) n.className=cls; n.textContent=text; state.appendChild(n); return n; }
+  // a line with the address in bold: before + <strong>address</strong> + after
+  function withEmail(before,after){ var p=line('p','muted',before); var s=document.createElement('strong'); s.textContent=e; p.appendChild(s); p.appendChild(document.createTextNode(after)); return p; }
   function bad(msg){
     state.innerHTML='';
     line('h1','','That link didn’t work');
@@ -42,24 +52,64 @@
     if(!/support@/.test(msg||'')){ var a=document.createElement('a'); a.href='mailto:support@davisdigitalstudio.com'; a.textContent='Email support@davisdigitalstudio.com'; p.appendChild(a); p.appendChild(document.createTextNode(' and we’ll take care of it.')); }
   }
   function offline(){ state.innerHTML=''; line('h1','','This page couldn’t load'); line('p','muted','Check your connection, then reload the page.'); }
-  function call(method){ return fetch(url,{method:method,headers:{Accept:'application/json'}}).then(function(r){ return r.json().catch(function(){ return {}; }).then(function(j){ return {r:r,j:j}; }); }); }
-  if(!e||!t){ bad(''); return; }
-  call('GET').then(function(o){
-    if(!o.r.ok){ bad(o.j&&o.j.message); return; }
-    state.innerHTML='';
-    line('h1','','Stop these emails?');
-    var p=line('p','muted','Emails to '); var b0=document.createElement('strong'); b0.textContent=e; p.appendChild(b0); p.appendChild(document.createTextNode(' stop, apart from receipts and security notices.'));
-    var b=document.createElement('button'); b.type='button'; b.textContent='Yes, unsubscribe'; state.appendChild(b);
+  function call(method,extra){ return fetch(url+(extra||''),{method:method,headers:{Accept:'application/json'}}).then(function(r){ return r.json().catch(function(){ return {}; }).then(function(j){ return {r:r,j:j}; }); }); }
+  function sinceWords(iso){ var d=iso?new Date(iso):null; return d&&!isNaN(d)?' since '+d.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}):''; }
+  // one button, its error line under it, and what pressing it does
+  function action(label,ghost,run){
+    var b=document.createElement('button'); b.type='button'; b.textContent=label; if(ghost) b.className='ghost'; state.appendChild(b);
     var err=line('p','err',''); err.setAttribute('role','alert');
     b.addEventListener('click',function(){
       b.disabled=true; err.textContent='';
-      call('POST').then(function(r2){
-        if(!r2.r.ok){ b.disabled=false; err.textContent=(r2.j&&r2.j.message)||'That didn’t go through. Try again in a moment.'; return; }
-        state.innerHTML='';
-        line('h1','','You’re unsubscribed');
-        var d=line('p','muted',''); var s=document.createElement('strong'); s.textContent=e; d.appendChild(s); d.appendChild(document.createTextNode(' won’t receive marketing or reminder emails from us anymore. Account-critical emails (receipts, security) may still arrive.'));
+      run().then(function(o){
+        if(o.r.ok) return;
+        b.disabled=false; err.textContent=(o.j&&o.j.message)||'That didn’t go through. Try again in a moment.';
       }).catch(function(){ b.disabled=false; err.textContent='That didn’t go through. Check your connection and try again.'; });
     });
+    return b;
+  }
+  function unsubscribe(){ return call('POST').then(function(o){ if(o.r.ok) done(); return o; }); }
+  function startAgain(){ return call('POST','&resume=1').then(function(o){ if(o.r.ok) backOn(); return o; }); }
+  function ask(){
+    state.innerHTML='';
+    line('h1','','Stop these emails?');
+    withEmail('Emails to ',' stop.');
+    line('p','muted',STILL);
+    action('Yes, unsubscribe',false,unsubscribe);
+  }
+  function done(){
+    state.innerHTML='';
+    line('h1','','You’re unsubscribed');
+    withEmail('',' won’t get these emails anymore.');
+    line('p','muted',STILL);
+    action('Start emails again',true,startAgain);
+    line('p','small','Changed your mind? This turns them back on.');
+  }
+  function already(since){
+    state.innerHTML='';
+    line('h1','','You’re already unsubscribed');
+    withEmail('',' has been unsubscribed'+sinceWords(since)+'.');
+    line('p','muted',STILL);
+    action('Start emails again',true,startAgain);
+  }
+  function backOn(){
+    state.innerHTML='';
+    line('h1','','Emails are back on');
+    withEmail('',' will get these emails again.');
+    action('Unsubscribe',true,unsubscribe);
+  }
+  function stopped(reason){
+    state.innerHTML='';
+    line('h1','','Emails to this address are stopped');
+    withEmail('Emails to ',reason==='complaint'?' stopped because one was marked as spam.':' stopped because they couldn’t be delivered.');
+    var p=line('p','muted',''); var a=document.createElement('a'); a.href='mailto:support@davisdigitalstudio.com'; a.textContent='Email support@davisdigitalstudio.com'; p.appendChild(a); p.appendChild(document.createTextNode(' to turn them back on.'));
+  }
+  if(!e||!t){ bad(''); return; }
+  call('GET').then(function(o){
+    if(!o.r.ok){ bad(o.j&&o.j.message); return; }
+    var d=(o.j&&o.j.data)||{};
+    if(d.stopped) stopped(d.stopped);
+    else if(d.unsubscribed) already(d.since);
+    else ask();
   }).catch(offline);
 })();
 </script>

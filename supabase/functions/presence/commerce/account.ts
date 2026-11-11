@@ -229,7 +229,30 @@ export function base64Of(bytes: Uint8Array): string {
   for (let i = 0; i < bytes.length; i += 0x8000) s += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
   return btoa(s);
 }
-export async function sendEmail(to: string, subject: string, html: string, brand?: EmailBrand, opts?: { critical?: boolean; siteId?: string; replyTo?: string; headers?: Record<string, string>; attachments?: Array<{ filename: string; content: Uint8Array }> }): Promise<boolean> {
+
+/** The From a send carries (sales item 78). Mail a business sends to its own customers shows that
+ *  business's name; the address stays the platform's sending address, so delivery (SPF, DKIM,
+ *  DMARC) is unchanged. The name is cleaned for the header: no quotes, angle brackets, line
+ *  breaks or "@" (a name must never read as an address), at most 70 characters. Pure; exported
+ *  for tests/presence/email_sender_test.mjs. */
+export function fromFor(base: string, name?: string | null): string {
+  const b = String(base || '').trim();
+  const addr = /<([^<>\s]+@[^<>\s]+)>\s*$/.exec(b)?.[1] || (PLAIN_ADDRESS.test(b) ? b : '');
+  const clean = String(name || '').replace(/[\u0000-\u001f\u007f@]/g, ' ').replace(/["\\<>]/g, '').replace(/\s+/g, ' ').trim().slice(0, 70).trim();
+  if (!addr || !clean) return b;
+  return `"${clean}" <${addr}>`;
+}
+
+/** Can an unsubscribe stop this send? Sales items 74 and 75: mail that always arrives (critical:
+ *  receipts, documents, sign-in links, a business's own alerts, payment reminders) carries no
+ *  unsubscribe at all, neither the one-click header nor a link, because an unsubscribe would not
+ *  stop it and a button that does nothing invites a spam report, which blocks every email to
+ *  that person. Everything else carries both. Pure. */
+export function unsubscribable(opts?: { critical?: boolean }): boolean {
+  return !opts?.critical;
+}
+
+export async function sendEmail(to: string, subject: string, html: string, brand?: EmailBrand, opts?: { critical?: boolean; asBusiness?: boolean; siteId?: string; replyTo?: string; headers?: Record<string, string>; attachments?: Array<{ filename: string; content: Uint8Array }> }): Promise<boolean> {
   if (!RESEND_KEY) { console.warn('[commerce] RESEND_KEY unset — skipping email'); return false; }
   try {
     // Honor the suppression list at the ONE send point. critical:true =
@@ -237,23 +260,29 @@ export async function sendEmail(to: string, subject: string, html: string, brand
     // survives an OPT-OUT (exactly what the unsubscribe page promises) but
     // NEVER a bounce/complaint (dead/hostile address; re-sending only burns
     // the domain). Recipients are MASKED in logs (edge logs are retained).
-    const { maySend, maskEmail, unsubscribeUrl } = await import('../routes/email_infra.ts');
+    const { maySend, maskEmail, unsubscribeUrl, unsubscribePageUrl } = await import('../routes/email_infra.ts');
     const gate = await maySend(to, opts);
     if (!gate.ok) { console.warn(`[email] suppressed (${gate.reason}) — not sending to ${maskEmail(to)}`); return false; }
-    const unsubUrl = await unsubscribeUrl(to);
+    // Sales items 74 + 75: only mail an unsubscribe stops offers one (see unsubscribable)
+    const optional = unsubscribable(opts);
+    const unsubUrl = optional ? await unsubscribeUrl(to) : '';
+    const pageUrl = optional ? await unsubscribePageUrl(to) : '';
+    // Sales item 78: asBusiness = the brand's business is the sender (its name, its footer)
+    const asBusiness = !!(opts?.asBusiness && brand && brand.name !== EMAIL_BRAND_DEFAULT.name);
     // BR-1: every email flows through the ONE branded shell (Studio OS default, or
     // the customer's Brand Kit when the caller passes it). No second email engine.
-    const wrapped = brandEmailShell(html, brand || EMAIL_BRAND_DEFAULT);
+    const wrapped = brandEmailShell(html, brand || EMAIL_BRAND_DEFAULT, { unsubscribeUrl: pageUrl || null, asBusiness });
     // A plain-text alternative improves deliverability (spam-scoring) and serves
     // text-only clients — derived from the body HTML (see htmlToPlainText: cell
     // and block boundaries survive the tag strip, so a table still reads).
-    const text = htmlToPlainText(html);
+    const text = htmlToPlainText(html) + (pageUrl ? `\n\nUnsubscribe: ${pageUrl}` : '');
     const r = await fetch('https://api.resend.com/emails', {
       method: 'POST',
       headers: { Authorization: `Bearer ${RESEND_KEY}`, 'Content-Type': 'application/json' },
       // List-Unsubscribe: RFC 8058 one-click HTTPS endpoint (what Gmail/Yahoo
-      // bulk-sender rules actually honor) + mailto fallback. The POST lands on
-      // /unsubscribe which writes the ONE suppression store this send checks.
+      // bulk-sender rules actually honor) + mailto fallback, on mail an unsubscribe
+      // stops. The POST lands on /unsubscribe which writes the ONE suppression store
+      // this send checks.
       // R1 loop-closure: when the caller is SITE mail (a studio↔customer message,
       // ack, or bridge nudge) AND an inbound domain is configured, the reply-to is
       // that site's inbound address (<siteId>@<domain>) so a customer's REPLY lands
@@ -263,13 +292,15 @@ export async function sendEmail(to: string, subject: string, html: string, brand
       // email) comes before both — see replyToFor. opts.headers are spread AFTER
       // the List-Unsubscribe headers (e.g. the inbound ack's Auto-Submitted:auto-replied).
       body: JSON.stringify({
-        from: EMAIL_FROM, to, subject, html: wrapped, text,
+        from: asBusiness ? fromFor(EMAIL_FROM, brand?.name) : EMAIL_FROM, to, subject, html: wrapped, text,
         reply_to: replyToFor(opts),
         // sales item 82: an invoice, receipt or signed agreement goes with its PDF (Resend takes base64)
         ...(opts?.attachments?.length ? { attachments: opts.attachments.map((a) => ({ filename: a.filename, content: base64Of(a.content) })) } : {}),
         headers: {
-          'List-Unsubscribe': `<${unsubUrl}>, <mailto:support@davisdigitalstudio.com?subject=unsubscribe>`,
-          'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click',
+          ...(optional ? {
+            'List-Unsubscribe': `<${unsubUrl}>, <mailto:support@davisdigitalstudio.com?subject=unsubscribe>`,
+            'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click',
+          } : {}),
           ...(opts?.headers || {}),
         },
       }),

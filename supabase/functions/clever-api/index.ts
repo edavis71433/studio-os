@@ -659,7 +659,7 @@ async function sendEmail(to: string, subject: string, html: string, opts?: { fro
     // critical:true = transactional (login links, signed copies, payment links):
     // survives an OPT-OUT — matching the unsubscribe page's promise — but never
     // a bounce/complaint.
-    const { maySend, unsubscribeUrl, maskEmail } = await import('../_shared/email_infra.ts');
+    const { maySend, unsubscribeUrl, unsubscribePageUrl, maskEmail } = await import('../_shared/email_infra.ts');
     const gate = await maySend(to, { critical: !!(opts && opts.critical) });
     if (!gate.ok) {
       console.warn(`[email] suppressed (${gate.reason}) — not sending to`, maskEmail(to), '| subject:', subject);
@@ -672,12 +672,19 @@ async function sendEmail(to: string, subject: string, html: string, opts?: { fro
       .replace(/<[^>]+>/g, '')
       .replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"')
       .replace(/\n{3,}/g, '\n\n').trim();
+    // Sales items 74 + 75, as in the presence sender: mail an unsubscribe stops carries the
+    // one-click header AND a plain Unsubscribe link at its foot; mail that always arrives
+    // (critical: a receipt, an invoice, a quote, a sign-in) carries neither.
+    const optional = !(opts && opts.critical);
+    const pageUrl = optional ? await unsubscribePageUrl(to) : '';
     const payload: Record<string, unknown> = {
-      from: (opts && opts.from) || FROM, to: [to], subject, html, text,
-      headers: {
+      from: (opts && opts.from) || FROM, to: [to], subject,
+      html: optional ? withUnsubscribeLink(html, pageUrl) : html,
+      text: optional ? `${text}\n\nUnsubscribe: ${pageUrl}` : text,
+      headers: optional ? {
         'List-Unsubscribe': `<${await unsubscribeUrl(to)}>, <mailto:support@davisdigitalstudio.com?subject=unsubscribe>`,
         'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click',
-      },
+      } : {},
     };
     if (opts && opts.replyTo) payload.reply_to = opts.replyTo;
     const r = await fetch('https://api.resend.com/emails', {
@@ -699,9 +706,19 @@ async function sendEmail(to: string, subject: string, html: string, opts?: { fro
   }
 }
 
+/** Sales item 75: the plain Unsubscribe line at the foot of an email, before </body> when the
+ *  email is a whole document. Grey that reads on the dark shell and on a white one. */
+function withUnsubscribeLink(html: string, url: string): string {
+  if (!/^https:\/\//.test(url)) return html;
+  const safe = url.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
+  const line = `<p style="max-width:560px;margin:0 auto;padding:0 24px 28px;font-family:'Helvetica Neue',Arial,sans-serif;font-size:12px;color:#8a8494;text-align:center">Don’t want these emails? <a href="${safe}" style="color:#8a8494;text-decoration:underline">Unsubscribe</a></p>`;
+  const at = String(html || '').search(/<\/body>/i);
+  return at >= 0 ? html.slice(0, at) + line + html.slice(at) : String(html || '') + line;
+}
+
 // Boolean wrapper for new code paths that want a truthful emailed flag without
 // inspecting a Response object. Never throws.
-async function emailOk(to: string, subject: string, html: string, opts?: { from?: string; replyTo?: string }): Promise<boolean> {
+async function emailOk(to: string, subject: string, html: string, opts?: { from?: string; replyTo?: string; critical?: boolean }): Promise<boolean> {
   try {
     const r = await sendEmail(to, subject, html, opts);
     return !!(r && (r as Response).ok);
@@ -7398,7 +7415,8 @@ serveWithRequestCors(async (req) => {
         ],
         { label: 'Open your portal →', href: 'https://davisdigitalstudio.com/portal.html' }
       );
-      const clientEmailed = await emailOk(email, `Your Davis Digital Studio portal is ready`, html, CLIENT_OPTS);
+      // sales item 74: a sign-in always arrives and carries no unsubscribe
+      const clientEmailed = await emailOk(email, `Your Davis Digital Studio portal is ready`, html, { ...CLIENT_OPTS, critical: true });
       const ericEmailed = await emailOk(ERIC, `Portal created: ${name}`, notifyShell(`New client portal created`, [`${name} (${email}) now has a portal.`]));
       return json({ ok: true, emailed: clientEmailed, admin_emailed: ericEmailed });
     }
@@ -10242,7 +10260,7 @@ ${JSON.stringify(ctx).slice(0, 6000)}`;
               to,
               `Friendly reminder: invoice${amt ? ` for ${amt}` : ''} from Davis Digital Studio`,
               notifyShell(`A quick invoice reminder, ${cname}`, lines,
-                inv.stripe_url ? { label: 'Pay this invoice →', href: String(inv.stripe_url) } : undefined), CLIENT_OPTS,
+                inv.stripe_url ? { label: 'Pay this invoice →', href: String(inv.stripe_url) } : undefined), { ...CLIENT_OPTS, critical: true },
             );
             await fetch(`${SB_URL}/rest/v1/invoices?id=eq.${encodeURIComponent(inv.id)}`, {
               method: 'PATCH',
@@ -10280,7 +10298,8 @@ ${JSON.stringify(ctx).slice(0, 6000)}`;
             if (GOOGLE_REVIEW_LINK) {
               lines.push(`And if you have one spare minute, a short Google review helps a small studio like mine more than you would guess: ${GOOGLE_REVIEW_LINK}`);
             }
-            await sendEmail(to, `Thank you, ${cname}`, notifyShell(`Payment received, with thanks`, lines), CLIENT_OPTS);
+            // sales item 74: a receipt always arrives and carries no unsubscribe
+            await sendEmail(to, `Thank you, ${cname}`, notifyShell(`Payment received, with thanks`, lines), { ...CLIENT_OPTS, critical: true });
             await fetch(`${SB_URL}/rest/v1/invoices?id=eq.${encodeURIComponent(inv.id)}`, {
               method: 'PATCH',
               headers: { 'apikey': SB_SERVICE, 'Authorization': `Bearer ${SB_SERVICE}`, 'Content-Type': 'application/json', 'Prefer': 'return=minimal' },
@@ -11523,10 +11542,11 @@ if (type === 'gp_quote_respond') {
       const row = pr.ok && Array.isArray(pr.data) ? pr.data[0] : null;
       const to = row?.contact_email || row?.client_email;
       if (to) {
+        // sales item 74: a quote is a document: it always arrives and carries no unsubscribe
         await sendEmail(to, `Your quote from Davis Digital Studio`,
           notifyShell('Here is your quote',
             [patch.amount ? `Price: ${patch.amount}` : '', patch.eric_note || ''].filter(Boolean) as string[],
-            { label: 'See it in your workspace →', href: 'https://davisdigitalstudio.com/portal.html' }), CLIENT_OPTS);
+            { label: 'See it in your workspace →', href: 'https://davisdigitalstudio.com/portal.html' }), { ...CLIENT_OPTS, critical: true });
       }
     }
   } catch (_) {}

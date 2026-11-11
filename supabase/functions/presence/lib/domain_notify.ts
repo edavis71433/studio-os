@@ -83,7 +83,8 @@ export async function tellOwnerAndStudio(site: { id: string; client_id?: string 
     const to = String(first(clQ)?.email || '');
     if (to) {
       const { sendEmail } = await import('../commerce/account.ts');
-      out.client = await sendEmail(to, mail.subject.slice(0, 180), mail.html, await loadEmailBrand(site.id)).catch(() => false);
+      // Sales item 74: a removed domain or lost email records is the owner's own business, so it always arrives (critical)
+      out.client = await sendEmail(to, mail.subject.slice(0, 180), mail.html, await loadEmailBrand(site.id), { critical: true }).catch(() => false);
     }
     const studioSite = first(linkQ)?.agency_site_id;
     if (studioSite) out.studio = await emailOperator(String(studioSite), mail.subject, mail.html + (opts.studioNote ? `<p>${opts.studioNote}</p>` : ''), what);

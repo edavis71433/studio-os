@@ -48,10 +48,10 @@ export async function unsubscribeUrl(email: string): Promise<string> {
   return `${base}/functions/v1/presence/unsubscribe?e=${encodeURIComponent(email.trim().toLowerCase())}&t=${t}`;
 }
 
-/** The unsubscribe link a person clicks, in an email's footer: the page on the app
- *  (unsubscribe.html). Supabase serves an HTML answer from the function's own address as
- *  plain text, so the function's link showed the page's code and its button couldn't be
- *  pressed; the page asks the function itself. */
+/** The unsubscribe link a person clicks, in an email's footer (sales item 75: every email an
+ *  unsubscribe can stop carries it): the page on the app (unsubscribe.html). Supabase serves
+ *  an HTML answer from the function's own address as plain text, so the function's link
+ *  showed the page's code and its button couldn't be pressed; the page asks the function itself. */
 export async function unsubscribePageUrl(email: string): Promise<string> {
   const app = (Deno.env.get('APP_URL') || 'https://app.davisdigitalstudio.com').replace(/\/$/, '');
   const t = await unsubscribeToken(email);
@@ -73,12 +73,34 @@ export async function isSuppressed(email: string): Promise<boolean> {
   return (await suppressionOf(email)) !== null;
 }
 
+/** Sales item 74: why and since when an address gets no email — { reason, since } or null.
+ *  The unsubscribe page and a person's record say it in words. Null on a store hiccup. */
+export async function suppressionDetail(email: string): Promise<{ reason: string; since: string | null } | null> {
+  try {
+    const r = await fetch(`${SB_URL}/rest/v1/suppressed_emails?email=eq.${encodeURIComponent(email.trim().toLowerCase())}&select=reason,created_at&limit=1`, { headers: svcHeaders });
+    const rows = r.ok ? await r.json() : [];
+    return Array.isArray(rows) && rows.length ? { reason: String(rows[0].reason || 'opt_out'), since: rows[0].created_at ? String(rows[0].created_at) : null } : null;
+  } catch { return null; }
+}
+
 /** Add an address to the ONE suppression store. Idempotent. Best-effort. */
 export async function suppress(email: string, reason: string, source: string): Promise<void> {
   await fetch(`${SB_URL}/rest/v1/suppressed_emails?on_conflict=email`, {
     method: 'POST', headers: { ...svcHeaders, Prefer: 'resolution=ignore-duplicates,return=minimal' },
     body: JSON.stringify({ email: email.trim().toLowerCase(), reason, source }),
   }).catch(() => {});
+}
+
+/** Sales item 74, "Start emails again": take back an UNSUBSCRIBE, and only that. A bounce or a
+ *  spam complaint stays (the address is dead or the person said "spam"; mailing it again only
+ *  hurts every sender on the domain). True when the store answered. */
+export async function resubscribe(email: string): Promise<boolean> {
+  try {
+    const r = await fetch(`${SB_URL}/rest/v1/suppressed_emails?email=eq.${encodeURIComponent(email.trim().toLowerCase())}&reason=eq.opt_out`, {
+      method: 'DELETE', headers: { ...svcHeaders, Prefer: 'return=minimal' },
+    });
+    return r.ok;
+  } catch { return false; }
 }
 
 /** May we send this email? Transactional/critical mail (receipts, security,

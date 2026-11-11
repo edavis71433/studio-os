@@ -428,8 +428,9 @@ async function notifyCustomer(siteId: string, appt: any, status: string, moved =
     (status === 'confirmed' ? '' : `<p style="color:#666">This time is being held for you — you’ll get a confirmation once it’s approved.</p>`) +
     mail.html;
   // A booking confirmation is transactional (a direct response to the customer's own
-  // action) → critical:true survives an opt-out but still respects bounces.
-  await sendEmail(to, `${head} — ${appt.type_name}`, body, brand, { critical: true, replyTo, attachments: mail.attachments });
+  // action) → critical:true survives an opt-out but still respects bounces. Sales item 78:
+  // it comes from the business (asBusiness: its name as the sender, its footer).
+  await sendEmail(to, `${head} — ${appt.type_name}`, body, brand, { critical: true, asBusiness: true, replyTo, attachments: mail.attachments });
 }
 
 async function notifyOwnerOfBooking(siteId: string, appt: any, status: string): Promise<void> {
@@ -451,11 +452,12 @@ async function notifyOwnerOfBooking(siteId: string, appt: any, status: string): 
   if (!to) return;
   const brand = await loadEmailBrand(siteId);
   const price = priceText(appt.price_cents);
+  // Sales item 74: the owner hears about every booking, unsubscribed or not (critical)
   await sendEmail(String(to), `New booking — ${appt.type_name}`,
     `<p>You have a new booking${status === 'confirmed' ? '' : ' request'} from your website.</p>` +
     `<p><b>${esc(appt.type_name)}</b> — ${esc(when)}${price ? ` · ${esc(price)}` : ''}</p>` +
     `<p>${esc(who)}</p>${appt.note ? `<p style="color:#666">“${esc(String(appt.note).slice(0, 400))}”</p>` : ''}` +
-    `<p class="cta"><a href="${siteBase()}/presence.html#bookings" style="display:inline-block;margin-top:6px;background:${brand.accent};color:#fff;padding:9px 16px;border-radius:999px;text-decoration:none">See it in your workspace →</a></p>`, brand);
+    `<p class="cta"><a href="${siteBase()}/presence.html#bookings" style="display:inline-block;margin-top:6px;background:${brand.accent};color:#fff;padding:9px 16px;border-radius:999px;text-decoration:none">See it in your workspace →</a></p>`, brand, { critical: true });
 }
 
 // ═══════════════════════════ OWNER (authed) endpoints ════════════════════════
@@ -657,7 +659,8 @@ async function notifyCustomerCanceled(siteId: string, appt: any, reason: string,
     `<p><b>${esc(appt.type_name)}</b> — ${esc(when)}</p>` +
     (reason ? `<p style="color:#666">${esc(reason.slice(0, 300))}</p>` : '') +
     `<p style="color:#666;font-size:.9rem">You’re welcome to book another time whenever it suits you. If it’s in your calendar, you can delete it there.</p>`;
-  await sendEmail(to, `Booking canceled — ${appt.type_name}`, body, brand, { critical: true, replyTo });
+  // sales item 78: from the business, like the confirmation
+  await sendEmail(to, `Booking canceled — ${appt.type_name}`, body, brand, { critical: true, asBusiness: true, replyTo });
 }
 
 // ═════════ PUBLIC: the customer's own change-or-cancel link (builder list item 149) ═════════
@@ -824,8 +827,9 @@ async function notifyOwnerOfChange(siteId: string, appt: any, from: string): Pro
   if (!to) return;
   const brand = await loadEmailBrand(siteId);
   const contact = [appt.customer_email, appt.customer_phone].filter(Boolean).join(' · ');
+  // Sales item 74: like a new booking, a moved or canceled one always reaches the owner (critical)
   await sendEmail(String(to), `${from ? 'Booking moved' : 'Booking canceled'} — ${appt.type_name}`,
     `<p>${esc(line)}</p>` +
     `<p><b>${esc(appt.type_name)}</b> — ${esc(when)}${from ? '' : ' (canceled)'}</p>${contact ? `<p>${esc(contact)}</p>` : ''}` +
-    `<p class="cta"><a href="${siteBase()}/presence.html#bookings" style="display:inline-block;margin-top:6px;background:${brand.accent};color:#fff;padding:9px 16px;border-radius:999px;text-decoration:none">See your bookings →</a></p>`, brand);
+    `<p class="cta"><a href="${siteBase()}/presence.html#bookings" style="display:inline-block;margin-top:6px;background:${brand.accent};color:#fff;padding:9px 16px;border-radius:999px;text-decoration:none">See your bookings →</a></p>`, brand, { critical: true });
 }
