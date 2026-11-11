@@ -329,7 +329,7 @@ function paintPanel(){
       <label for="dpConf">Confirmed on</label><input id="dpConf" type="date" value="${esc(nt.renews_confirmed_at||'')}">
       <label for="dpNote">A note</label><textarea id="dpNote" rows="3" maxlength="600" placeholder="Anything the next person should know">${esc(nt.note||'')}</textarea>
       <div class="dp-acts"><button type="submit" class="btn">Save notes</button><span class="muted" id="dpSaved" role="status"></span></div></form>
-      ${nt.updated_at?`<p class="muted" style="font-size:12px;margin-top:8px">Last saved ${esc(ago(nt.updated_at))}${nt.updated_by?' by '+esc(nt.updated_by):''}.</p>`:''}</section>`;
+      ${nt.updated_at?`<p class="muted" style="font-size:12px;margin-top:8px">Last saved ${esc(ago(nt.updated_at).replace(/^Just now$/,'just now'))}${nt.updated_by?' by '+esc(nt.updated_by):''}.</p>`:''}</section>`;
   $('dpClose').addEventListener('click',closePanel);
   $('dpCheck').addEventListener('click',checkNow);
   $('dpNotes').addEventListener('submit',saveNotes);
