@@ -255,7 +255,7 @@ export async function handleSalesDeleted(site: SiteRow, cors: Record<string, str
 // Sales item 83: a deleted deal comes back, as it was. The website enquiry it came from went back
 // to the queue when it was deleted; it is this deal's again, unless the enquiry has become
 // another deal since (one enquiry, one deal: then this one comes back without the link).
-export async function handleSalesDealRestore(site: SiteRow, id: string, cors: Record<string, string>): Promise<Response> {
+export async function handleSalesRestoreDeal(site: SiteRow, id: string, cors: Record<string, string>): Promise<Response> {
   if (!UUID_RE.test(id)) return json({ error: 'bad_request' }, 400, cors);
   const cur = await svc(`presence_deals?id=eq.${id}&site_id=eq.${site.id}&deleted_at=not.is.null&select=id,source_submission_id&limit=1`);
   if (!cur.ok) return json({ error: 'read_failed', message: 'We couldn’t bring that deal back just now — please try again.' }, 502, cors);
@@ -308,12 +308,15 @@ const CONTACT_FILTER_CAP = 5000;
 async function contactFilterIds(siteId: string, more: string, order: string, lf: ListFilters, nowMs: number): Promise<{ ids: string[]; partial: boolean } | null> {
   const ok = (r: { ok: boolean }) => r.ok;
   const cutoff = lf.quiet ? quietCutoff(lf.quiet, nowMs) : '';
-  const [dealsR, eventsR, invR, orderedR] = await Promise.all([
+  const [dealsR, eventsR, invR, orderedR, personR] = await Promise.all([
     svc(`presence_deals?site_id=eq.${siteId}&contact_id=not.is.null&select=id,contact_id,deleted_at&limit=${CONTACT_FILTER_CAP}`),
     lf.quiet ? svc(`presence_deal_events?site_id=eq.${siteId}&kind=eq.note&created_at=gte.${encodeURIComponent(cutoff)}&select=deal_id,detail,created_at&limit=${CONTACT_FILTER_CAP}`) : Promise.resolve(null),
     lf.owes ? svc(`presence_invoices?site_id=eq.${siteId}&status=eq.open&deleted_at=is.null&select=deal_id,customer_client_id,status,processing_since&limit=2000`)
       .then((r) => r.ok ? r : svc(`presence_invoices?site_id=eq.${siteId}&status=eq.open&deleted_at=is.null&select=deal_id,customer_client_id,status&limit=2000`)) : Promise.resolve(null),
     svc(`presence_contacts?site_id=eq.${siteId}${more}&select=id&order=${order}&limit=${CONTACT_FILTER_CAP}`),
+    // item 85: a call, email or meeting logged for the person with no deal counts too (APPLY-0173;
+    // before it there is no such table, and nothing to count)
+    lf.quiet ? svc(`presence_person_events?site_id=eq.${siteId}&deleted_at=is.null&contact_id=not.is.null&occurred_at=gte.${encodeURIComponent(cutoff)}&select=contact_id&limit=${CONTACT_FILTER_CAP}`).catch(() => null) : Promise.resolve(null),
   ]);
   if (!ok(dealsR) || (eventsR && !ok(eventsR)) || (invR && !ok(invR)) || !ok(orderedR)) return null;
   const deals = rows(dealsR);
@@ -321,6 +324,7 @@ async function contactFilterIds(siteId: string, more: string, order: string, lf:
   const not: Array<Set<string>> = [];
   if (lf.nodeal) not.push(new Set(deals.filter((d: any) => !d.deleted_at).map((d: any) => String(d.contact_id))));
   if (lf.quiet && eventsR) not.push(contactedContactIds(rows(eventsR), dealContact, cutoff));
+  if (lf.quiet && personR && personR.ok) not.push(new Set(rows(personR).map((e: any) => String(e.contact_id))));
   let only: Set<string> | null = null;
   if (lf.owes && invR) {
     const invoices = rows(invR);
@@ -1014,18 +1018,23 @@ export async function handleSalesReports(_req: Request, site: SiteRow, _principa
 export async function loadMyTasks(siteId: string, userId: string | null): Promise<{ all: ReturnType<typeof buildMyTasks>; partial: boolean }> {
   let partial = false;
   const read = async (path: string) => { try { const r = await svc(path); if (!r.ok) { partial = true; return []; } return rows(r); } catch { partial = true; return []; } };
+  // item 85: a to-do may be for a person or a customer (APPLY-0173); before it, the older select
+  const tasksPath = (cols: string) => `presence_deal_tasks?site_id=eq.${siteId}&status=eq.open&deleted_at=is.null&select=${cols}&order=due_date.asc.nullslast,created_at.asc&limit=200`;   // batch B: ordered, so the cap keeps the soonest
   const [deals, dealTasks, projectTasks] = await Promise.all([
     read(`presence_deals?site_id=eq.${siteId}&deleted_at=is.null&stage=in.(lead,qualified,proposal,contract)&select=id,title,stage,next_step,next_step_at&order=updated_at.desc&limit=200`),
-    read(`presence_deal_tasks?site_id=eq.${siteId}&status=eq.open&deleted_at=is.null&select=id,deal_id,title,due_date,status&order=due_date.asc.nullslast,created_at.asc&limit=200`),   // batch B: ordered, so the cap keeps the soonest
+    svc(tasksPath('id,deal_id,contact_id,client_id,title,due_date,status')).then((r) => r.ok ? rows(r) : read(tasksPath('id,deal_id,title,due_date,status'))).catch(() => read(tasksPath('id,deal_id,title,due_date,status'))),
     read(`presence_tasks?site_id=eq.${siteId}&status=in.(todo,in_progress,blocked)&client_action_required=eq.false&deleted_at=is.null&select=id,project_id,title,status,due_date,assigned_to,client_action_required,sort_order&order=due_date.asc.nullslast,created_at.asc&limit=300`),   // batch B: ordered, so the cap keeps the soonest
   ]);
   const ids = (list: any[], k: string) => [...new Set(list.map((x) => String(x?.[k] || '')).filter((x) => UUID_RE.test(x)))];
   const dealIds = ids(dealTasks, 'deal_id'), projIds = ids(projectTasks, 'project_id');
-  const [taskDeals, projects] = await Promise.all([
+  const personIds = ids(dealTasks, 'contact_id'), customerIds = ids(dealTasks, 'client_id');
+  const [taskDeals, projects, people, customers] = await Promise.all([
     dealIds.length ? read(`presence_deals?id=in.(${dealIds.join(',')})&site_id=eq.${siteId}&deleted_at=is.null&select=id,title,stage`) : Promise.resolve([]),
     projIds.length ? read(`presence_projects?id=in.(${projIds.join(',')})&site_id=eq.${siteId}&deleted_at=is.null&select=id,name,status`) : Promise.resolve([]),
+    personIds.length ? read(`presence_contacts?id=in.(${personIds.join(',')})&site_id=eq.${siteId}&select=id,name,email,deleted_at`) : Promise.resolve([]),
+    customerIds.length ? read(`clients?id=in.(${customerIds.join(',')})&select=id,name,email`) : Promise.resolve([]),
   ]);
-  return { all: buildMyTasks({ deals, dealTasks, taskDeals, projectTasks, projects, userId }), partial };
+  return { all: buildMyTasks({ deals, dealTasks, taskDeals, projectTasks, projects, userId, people, customers }), partial };
 }
 export async function handleSalesMyTasks(_req: Request, site: SiteRow, principal: Principal, cors: Record<string, string>): Promise<Response> {
   const { all, partial } = await loadMyTasks(site.id, principal.userId || null);
@@ -1317,7 +1326,13 @@ export async function handleSalesDealActivity(req: Request, site: SiteRow, princ
   if (!ins.ok || !rows(ins)[0]) return json({ error: 'write_failed', message: 'That didn’t save — please try again.' }, 502, cors);
   // Bump the deal so a freshly-contacted deal rises in the pipeline list (best-effort).
   await svc(`presence_deals?id=eq.${id}&site_id=eq.${site.id}`, { method: 'PATCH', body: JSON.stringify({ updated_at: nowIso() }) }).catch(() => {});
-  return json({ data: { item: rows(ins)[0], last_contacted_at: occurredAt } }, 201, cors);
+  // sales item 85: "Follow up on [day]" in the same step adds a to-do on the deal, due that day
+  let followUp: any = null;
+  if (typeof b.follow_up === 'string' && DATE_RE.test(b.follow_up)) {
+    const t = await svc('presence_deal_tasks', { method: 'POST', headers: { Prefer: 'return=representation' }, body: JSON.stringify({ site_id: site.id, deal_id: id, title: clean(b.follow_up_title, 200) || 'Follow up', due_date: b.follow_up, status: 'open' }) });
+    followUp = t.ok && rows(t)[0] ? rows(t)[0] : { error: 'That follow-up to-do didn’t save. Add it from the To-do tab.' };
+  }
+  return json({ data: { item: rows(ins)[0], last_contacted_at: occurredAt, ...(followUp ? { follow_up: followUp } : {}) } }, 201, cors);
 }
 
 export async function handleSalesDealStage(req: Request, site: SiteRow, principal: Principal, id: string, cors: Record<string, string>): Promise<Response> {

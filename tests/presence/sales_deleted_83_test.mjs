@@ -67,24 +67,24 @@ const world = () => ({
 // ═══ 2. a deal comes back ═══
 {
   db.reset(world());
-  let r = await res(await S.handleSalesDealRestore(site, did(1), cors));
+  let r = await res(await S.handleSalesRestoreDeal(site, did(1), cors));
   const d1 = db.tables.presence_deals.find((x) => x.id === did(1));
   ok('the deal is back, as it was', r.status === 200 && r.body.data.restored === true && d1.deleted_at === null && d1.stage === 'proposal', JSON.stringify(r));
   ok('its website enquiry is its own again', db.tables.presence_form_submissions[0].status === 'converted');
-  r = await res(await S.handleSalesDealRestore(site, did(3), cors));
+  r = await res(await S.handleSalesRestoreDeal(site, did(3), cors));
   ok('a deal that was never deleted is a 404 that says where to look', r.status === 404 && /Recently deleted/.test(r.body.message), JSON.stringify(r));
-  r = await res(await S.handleSalesDealRestore(site, 'nope', cors));
+  r = await res(await S.handleSalesRestoreDeal(site, 'nope', cors));
   ok('a bad id is a 400', r.status === 400);
   // the enquiry became another deal while this one was deleted
   const w = world();
   w.presence_deals.push({ id: did(4), site_id: SITE, title: 'Harbor Dental, again', stage: 'lead', contact_id: cid(1), source_submission_id: SUB, deleted_at: null, created_at: ago(1), updated_at: ago(1) });
   w.presence_form_submissions[0].status = 'converted';
   db.reset(w);
-  r = await res(await S.handleSalesDealRestore(site, did(1), cors));
+  r = await res(await S.handleSalesRestoreDeal(site, did(1), cors));
   const back = db.tables.presence_deals.find((x) => x.id === did(1));
   ok('one enquiry, one deal: it comes back without the link when the enquiry became another deal', r.status === 200 && back.deleted_at === null && back.source_submission_id === null, JSON.stringify(back));
   db.reset(world()); db.failMethod.set('presence_deals', 'PATCH');
-  r = await res(await S.handleSalesDealRestore(site, did(1), cors));
+  r = await res(await S.handleSalesRestoreDeal(site, did(1), cors));
   ok('a write that fails says so and changes nothing', r.status === 502 && db.tables.presence_deals.find((x) => x.id === did(1)).deleted_at !== null, JSON.stringify(r));
 }
 
@@ -102,7 +102,7 @@ const world = () => ({
 // ═══ 4. routes, roles, the delete itself ═══
 {
   const idx = read('supabase/functions/presence/index.ts'), pipe = read('pipeline.html');
-  ok('index: GET /sales/deleted and POST /sales/deals/:id/restore are routed', idx.includes("if (route === '/sales/deleted' && method === 'GET') return handleSalesDeleted(site, cors);") && idx.includes("if (m && method === 'POST') return handleSalesDealRestore(site, m[1], cors);"));
+  ok('index: GET /sales/deleted and POST /sales/deals/:id/restore are routed', idx.includes("if (route === '/sales/deleted' && method === 'GET') return handleSalesDeleted(site, cors);") && idx.includes("if (m && method === 'POST') return handleSalesRestoreDeal(site, m[1], cors);"));
   const ID = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
   eq('roles: bringing a deal back is an edit, like a contact; deleting one stays delete', [R.memberWriteNeeds(`/sales/deals/${ID}/restore`, 'POST'), R.memberWriteNeeds(`/sales/contacts/${ID}/restore`, 'POST'), R.memberWriteNeeds(`/sales/deals/${ID}`, 'DELETE')], ['edit', 'edit', 'delete']);
   ok('Pipeline: deleting a deal asks in place (not a pop-up) and says it can come back', pipe.includes("k.confirmIn(delDeal,{text:q,yes:'Yes, delete it'})") && pipe.includes('You can bring it back from Recently deleted for 30 days.'));

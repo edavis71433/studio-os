@@ -219,6 +219,8 @@ html.dds-embed #detailWrap{padding-top:0}
   .bar{display:flex;gap:var(--dds-s2,8px);align-items:center;flex-wrap:wrap;margin-bottom:var(--dds-s4,16px)}
   .chip{font-size:13px;padding:var(--dds-s1,4px) var(--dds-s3,12px);border-radius:999px;border:1px solid var(--line);background:var(--card);color:var(--soft);cursor:pointer;font-family:inherit}
   .chip.on{background:var(--p-soft);border-color:var(--p);color:var(--p);font-weight:600}
+  .qfu{flex-wrap:wrap;gap:6px}.qfu .chip{font-size:12.5px}   /* sales item 85: Follow up on [day] */
+  @media (max-width:767px){.qfu .chip,.qfu input[type=date]{min-height:44px}}
   /* visual refresh: the display toggle is a segmented control, not chips */
   .viewtog{display:inline-flex;gap:0;border:1px solid var(--line);border-radius:var(--dds-r,8px);overflow:hidden;background:var(--bg)}
   .viewtog .chip{border:none;border-radius:0;background:transparent;padding:var(--dds-s1,4px) var(--dds-s3,12px);font-size:12.5px;font-weight:500}
@@ -3305,6 +3307,7 @@ async function openDeal(id){
             <div class="kinds" id="qlKinds" role="group" aria-label="Type of activity">${qlKindBtns}</div>
             <textarea id="qlBody" rows="2" placeholder="What happened? (optional for a call, email, or meeting)"></textarea>
             <div class="qrow"><label class="mut" for="qlDate" style="margin:0">When</label><input type="date" id="qlDate" max="${todayStr}" value="${todayStr}"><span style="flex:1"></span><button class="btn" id="qlSave">${logLabel('call')}</button></div>
+            <div class="qrow qfu"><label class="mut" for="qlFollow" style="margin:0">Follow up on</label><input type="date" id="qlFollow" min="${todayStr}" aria-label="Follow up on (optional): adds a to-do"><button type="button" class="chip sm" data-fu="1">Tomorrow</button><button type="button" class="chip sm" data-fu="7">Next week</button><span class="mut" style="font-size:12.5px">optional, adds a to-do</span></div>
           </div>
           <ul class="tl">${tlHtml}</ul>
         </div>
@@ -3462,7 +3465,12 @@ async function openDeal(id){
     // "last contacted", so the drawer + card refresh after saving.
     let qlKind='call';
     const qlKinds=$('qlKinds'); if(qlKinds) qlKinds.querySelectorAll('.kb').forEach(btn=>btn.onclick=()=>{qlKind=btn.dataset.k;const sv=$('qlSave');if(sv)sv.textContent=logLabel(qlKind);qlKinds.querySelectorAll('.kb').forEach(x=>{x.classList.toggle('on',x===btn);x.setAttribute('aria-pressed',x===btn?'true':'false');});const ta=$('qlBody');if(ta)ta.placeholder=qlKind==='note'?'What do you want to remember about this deal?':'What happened? (optional for a call, email, or meeting)';});
-    const qlSave=$('qlSave'); if(qlSave) qlSave.onclick=async()=>{const ta=$('qlBody');const body=(ta&&ta.value.trim())||'';if(qlKind==='note'&&!body){toast('Write a short note.',true);if(ta)ta.focus();return;}qlSave.disabled=true;try{await api('/sales/deals/'+id+'/activity','POST',{kind:qlKind,body,occurred_at:dayAtNoon($('qlDate')&&$('qlDate').value)});toast('Logged');openDeal(id);load();}catch(e){toast(nice(e),true);qlSave.disabled=false;}};
+    // sales item 85: "Follow up on [day]" adds a to-do on the deal in the same step (Tomorrow and Next week fill the day)
+    $('detailInner').querySelectorAll('[data-fu]').forEach(b=>b.onclick=()=>{const f=$('qlFollow');if(f){f.value=localYmd(Date.now()+Number(b.dataset.fu)*86400000);f.focus();}});
+    const qlSave=$('qlSave'); if(qlSave) qlSave.onclick=async()=>{const ta=$('qlBody');const body=(ta&&ta.value.trim())||'';if(qlKind==='note'&&!body){toast('Write a short note.',true);if(ta)ta.focus();return;}
+      const fu=($('qlFollow')&&$('qlFollow').value)||'',who=(c&&(c.name||c.email))||'';
+      qlSave.disabled=true;try{const r=await api('/sales/deals/'+id+'/activity','POST',{kind:qlKind,body,occurred_at:dayAtNoon($('qlDate')&&$('qlDate').value),...(fu?{follow_up:fu,follow_up_title:'Follow up'+(who?' with '+who:'')}:{})});
+        const f=r&&r.data&&r.data.follow_up;toast(fu?(f&&f.id?'Logged, and a to-do to follow up on '+niceDay(fu)+'.':'Logged. The follow-up to-do didn’t save: add it from To-dos.'):'Logged',!!(fu&&!(f&&f.id)));openDeal(id);load();}catch(e){toast(nice(e),true);qlSave.disabled=false;}};
     // ONE send path per doc-kind (reused by the list buttons, "Save & send", and
     // the convert gate's "send first"). It records the link in LINKS, copies it,
     // and — critically — tells the operator honestly whether it was EMAILED or
