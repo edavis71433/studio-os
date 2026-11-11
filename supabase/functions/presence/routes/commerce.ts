@@ -250,12 +250,19 @@ async function handleSubscription(jwt: string, cors: Record<string, string>) {
   // The customer's AI position for the month — a calm true/false, NEVER a number
   // or a dollar figure (Law 13). Lets the billing surface say "AI generation for
   // this month is used up — resets next month" honestly.
+  // Bug hunt I2 (Nov 10): is a closing of the account already asked for? Settings shows it on
+  // every visit, with its real date and the Cancel button; the open request was kept
+  // (commerce/deletion.ts) but nothing read on load carried it. Read alongside the rest; a
+  // failed read leaves the field out rather than claim there is none.
+  const delP = svc(`presence_account_deletions?client_id=eq.${encodeURIComponent(site.client_id)}&status=in.(pending,executing)&select=scheduled_for,status&order=requested_at.desc&limit=1`).catch(() => null);
   const ceiling = await checkAiCeiling(site.client_id);
   const aiPooled = ceiling.ceiling_usd == null;   // pooled-by-contract plan → no hard cap
   const aiAtLimit = ceiling.allowed === false;
   // Does this customer ALSO have agency SERVICE billing (invoices), which is
   // billed SEPARATELY from this software subscription? Keep the two distinct.
   const invCount = (await svc(`invoices?client_id=eq.${encodeURIComponent(site.client_id)}&deleted_at=is.null&select=id&limit=1`)).json;
+  const del = await delP;
+  const open = del && del.ok && Array.isArray(del.json) ? (del.json[0] || null) : undefined;
   return json({ data: {
     billing_type: 'saas',   // this is the Studio OS SOFTWARE subscription (distinct from agency service invoices)
     plan: ent.plan, plan_name: def?.name || ent.plan, status: ent.status, term: ent.term,
@@ -264,6 +271,7 @@ async function handleSubscription(jwt: string, cors: Record<string, string>) {
     can_manage_billing: !!ent.plan && (def?.selfServe ?? false),
     ai_pooled: aiPooled, ai_at_limit: aiAtLimit,   // calm position, no numbers
     has_service_billing: Array.isArray(invCount) && invCount.length > 0,   // → see /client/billing
+    ...(open === undefined ? {} : { deletion: open ? { scheduled_for: open.scheduled_for, status: open.status } : null }),
   } }, 200, cors);
 }
 
@@ -276,7 +284,10 @@ async function handlePortal(jwt: string, cors: Record<string, string>) {
   const customerId = r.json?.[0]?.stripe_customer_id;
   if (!customerId) return json({ error: 'no_billing', message: 'This account isn’t on a paid subscription — there’s nothing to manage yet.' }, 409, cors);
   try {
-    const portal = await createBillingPortal(String(customerId), `${siteUrl()}/presence.html`);
+    // bug hunt I9: back to where "Manage billing" was pressed, on the app's own address (the
+    // marketing domain's forward to the app is not promised for every page)
+    const app = (Deno.env.get('APP_URL') || 'https://app.davisdigitalstudio.com').replace(/\/$/, '');
+    const portal = await createBillingPortal(String(customerId), `${app}/settings.html#billing`);
     return json({ data: { url: portal.url } }, 200, cors);
   } catch (e) {
     return json({ error: 'portal_failed', message: 'We couldn’t open billing management just now.', detail: String((e as Error).message || e) }, 502, cors);

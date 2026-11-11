@@ -166,7 +166,7 @@ globalThis.fetch = async (url, init = {}) => {
   const reply = (body, status = 200) => new Response(body === null ? '' : JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
   if (u.hostname === 'api.stripe.com') {
     const form = new URLSearchParams(String(init.body || ''));
-    stripeCalls.push({ path: u.pathname, customer: form.get('customer') });
+    stripeCalls.push({ path: u.pathname, customer: form.get('customer'), return_url: form.get('return_url') });
     return reply({ id: 'bps_1', url: `https://billing.stripe.test/${form.get('customer')}` });
   }
   const token = (headers.get('Authorization') || '').replace(/^Bearer /, '');
@@ -420,6 +420,26 @@ for (const [label, header] of [['no header', undefined], ['the empty header the 
   ok('un-scoped: no header and an empty header are the same answer, byte for byte', a.text === b.text && a.status === b.status);
   const none = await call(null, 'GET', '/commerce/subscription');
   ok('un-scoped: still 401 without a sign-in', none.status === 401);
+}
+
+// ═══ bug hunt I2 (Nov 10): a closing already asked for rides on the subscription read ═══
+// Settings drew "Request deletion" on every load, because nothing read on load said a request
+// was open; the only way back to Cancel was to ask again. The read now carries the open
+// request's real date (null when there is none), and the portal returns to Settings (I9).
+{
+  reset();
+  const before = await call('jwt-studio', 'GET', '/commerce/subscription');
+  ok('I2: nothing asked for → deletion is null', before.status === 200 && before.body?.data?.deletion === null, before.text.slice(0, 200));
+  const asked = await call('jwt-studio', 'POST', '/commerce/delete-request', { body: {} });
+  const when = T.presence_account_deletions[0]?.scheduled_for;
+  const after = await call('jwt-studio', 'GET', '/commerce/subscription');
+  ok('I2: after a request, a fresh read carries the date it completes (what the card shows on every visit)', !!when && after.body?.data?.deletion?.scheduled_for === when && after.body?.data?.deletion?.status === 'pending' && asked.body?.data?.scheduled_for === when, after.text.slice(0, 240));
+  await call('jwt-studio', 'POST', '/commerce/delete-cancel', { body: {} });
+  const back = await call('jwt-studio', 'GET', '/commerce/subscription');
+  ok('I2: …and after Cancel it is gone again', back.body?.data?.deletion === null, back.text.slice(0, 200));
+  stripeCalls.length = 0;
+  await call('jwt-studio', 'POST', '/commerce/portal', { body: {} });
+  ok('I9: Manage billing comes back to Settings, not the website page', stripeCalls.length === 1 && /settings\.html#billing$/.test(String(stripeCalls[0].return_url || '')), JSON.stringify(stripeCalls[0] || {}));
 }
 
 // ═══ 6. public routes ignore a stray scope: a stranger can still sign up ═══

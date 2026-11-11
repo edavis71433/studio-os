@@ -60,7 +60,7 @@ test.describe('Settings page', () => {
     await expect(page.locator('#f-industry')).toHaveValue('generic');
     await expect(page.locator('#main')).not.toContainText('Setting the table');
     // quick statuses, never blockers (bug 7: the card names what is connected)
-    await expect(page.locator('[data-card="connections"] .st')).toContainText('2 connected — Google Analytics, Search Console · 1 needs attention');
+    await expect(page.locator('[data-card="connections"] .st')).toContainText('1 needs attention · 2 connected — Google Analytics, Search Console');
     await expect(page.locator('[data-card="billing"] .st')).toContainText('Studio · Active');
   });
 
@@ -188,7 +188,7 @@ test.describe('Settings page', () => {
     // the studio's own plan never shows inside a client
     await expect(page.locator('[data-card="billing"]')).toHaveCount(0);
     await expect(page.locator('#billing')).toBeHidden();
-    await expect(page.locator('[data-card="connections"] .st')).toContainText('2 connected — Google Analytics, Search Console · 1 needs attention');
+    await expect(page.locator('[data-card="connections"] .st')).toContainText('1 needs attention · 2 connected — Google Analytics, Search Console');
     expect(seen.map(([p]) => p)).not.toContain('/commerce/subscription');
     expect(seen.map(([p]) => p)).not.toContain('/agency/usage');
     expect(seen.filter(([p, scope]) => p === '/identity' && scope !== CLIENT)).toEqual([]);   // the profile read IS the client's

@@ -26,6 +26,7 @@ import { handleClientTools } from './client_tools.ts';
 import { HIDEABLE_SECTIONS, normalizeHidden } from '../lib/navigation.ts';
 import { readReservedJsonOrThrow, writeReservedJson, RESERVED_NAMES } from '../lib/reserved_store.ts';
 import { sendInviteLink } from '../lib/workspace.ts';
+import { emailMatch, isUniqueViolation } from '../lib/contact_email.ts';
 import { brandFromKit } from '../lib/email_brand.ts';
 import { runEvidence } from '../evidence/engine.ts';
 import { runJudgment } from '../judgment/engine.ts';
@@ -463,16 +464,37 @@ async function handleAgencyInner(req: Request, route: string, method: string, me
     if (!can(member.role, 'manage_members')) return forbid(cors);
     const b = await body();
     const email = String(b?.email || '').toLowerCase().trim();
-    const role = ['owner', 'admin', 'account_manager', 'content_strategist', 'designer', 'developer', 'support', 'readonly'].includes(b?.role) ? b.role : null;
+    // Bug hunt I1 (Nov 10): an invite never makes an owner. The page never offered it; an
+    // owner is made from the list, by changing the role of someone already on the team.
+    if (b?.role === 'owner') return json({ error: 'bad_role', message: 'An invite can’t make an owner. Invite them with another role, then make them an owner in the list.' }, 400, cors);
+    const role = ['admin', 'account_manager', 'content_strategist', 'designer', 'developer', 'support', 'readonly'].includes(b?.role) ? b.role : null;
     if (!email.includes('@') || !role) return json({ error: 'bad_request', message: 'An email and a role are needed.' }, 400, cors);
+    // I1: an email already on the team is never rewritten by an invite. The write used to be
+    // an upsert on (agency, email), so "Invite" could change anyone's role, the only owner's
+    // included, and turn a removed person back on, all under "Invited". Someone on the team
+    // keeps their role (the PATCH route, with its own-row and last-owner rules, changes it);
+    // someone removed comes back only when the page says so (`restore`), after asking.
+    const cur = await svc(`presence_agency_members?agency_id=eq.${member.agency_id}&${emailMatch(email)}&select=id,email,role,status&limit=1`);
+    if (!cur.ok) return json({ error: 'read_failed', message: 'That invite didn’t go out — try again in a moment.' }, 502, cors);
+    const existing = (cur.json ?? [])[0] as { id: string; email: string; role: string; status: string } | undefined;
+    const already = () => json({ error: 'already_member', message: `${email} is already on the team. Change their role in the list.` }, 409, cors);
+    if (existing && existing.status !== 'revoked') return already();
+    if (existing && b?.restore !== true) return json({ error: 'was_removed', message: `${email} was removed from the team. Invite them again to bring them back.` }, 409, cors);
+    // a seat is needed only now: a new person, or a removed one coming back
     const seats = await svc(`presence_agency_members?agency_id=eq.${member.agency_id}&status=eq.active&select=id&limit=500`);
     if ((seats.json ?? []).length >= member.seat_limit) {
       return json({ error: 'seat_limit', message: `The plan covers ${member.seat_limit} seats — the limit can grow with the plan.` }, 400, cors);
     }
-    const w = await svc(`presence_agency_members?on_conflict=agency_id,email&select=id,email,role,status`, {
-      method: 'POST', headers: { Prefer: 'resolution=merge-duplicates,return=representation' },
-      body: JSON.stringify({ agency_id: member.agency_id, email, role, status: 'active' }),
-    });
+    const w = existing
+      ? await svc(`presence_agency_members?id=eq.${existing.id}&agency_id=eq.${member.agency_id}&status=eq.revoked&select=id,email,role,status`, {
+        method: 'PATCH', headers: { Prefer: 'return=representation' }, body: JSON.stringify({ role, status: 'active' }),
+      })
+      : await svc(`presence_agency_members?select=id,email,role,status`, {
+        method: 'POST', headers: { Prefer: 'return=representation' },
+        body: JSON.stringify({ agency_id: member.agency_id, email, role, status: 'active' }),
+      });
+    // two invites of one new email at once: the second meets the (agency, email) rule
+    if (!existing && !w.ok && isUniqueViolation(w)) return already();
     if (!w.ok || !w.json?.[0]) return json({ error: 'write_failed', message: 'That didn’t save.' }, 502, cors);
     // best-effort invite — the seat row is the truth; email never blocks it.
     // The ONE shared sender (lib/workspace.ts), on the AGENCY's brand (white label).
@@ -484,7 +506,7 @@ async function handleAgencyInner(req: Request, route: string, method: string, me
       brand: brandFromKit({ primary: String(member.branding?.color_accent || '') }, agencyName),
       next: '/agency.html',
     }).catch(() => false);
-    return json({ data: { ...w.json[0], emailed } }, 200, cors);
+    return json({ data: { ...w.json[0], emailed, restored: !!existing } }, 200, cors);
   }
   {
     const m = route.match(/^\/agency\/members\/([0-9a-f-]{36})$/);

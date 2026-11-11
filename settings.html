@@ -48,6 +48,8 @@
   .setnav .setcard .t .dsc{display:none}
   .setnav .setcard .t .st,.setnav .setcard .t .st.warn,.setnav .setcard .t .st.plain{display:block;margin:1px 0 0;padding:0;border-radius:0;background:none;font-size:11.5px;font-weight:500;color:var(--faint);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .setnav .setcard .t .st.warn{color:var(--warn)}
+  /* bug hunt I6: a warning says what is wrong first, and takes a second line rather than lose it */
+  .setnav .setcard .t .st.warn{white-space:normal;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
   .setnav .setcard .go{flex:0 0 auto;margin-left:auto;color:var(--faint);font-size:13px}
   .setnav .setcard[aria-current="location"]{background:var(--p-soft)}
   .setnav .setcard[aria-current="location"] .t b{color:var(--p)}
@@ -235,14 +237,14 @@
        saves with its button; Send me a preview emails last month's report to you, now. -->
   <section class="card" id="report" aria-labelledby="reportHead" hidden data-needs="configure">
     <div class="card-h"><h2 id="reportHead" tabindex="-1">Monthly report</h2><span class="hint" id="reportHint">Once a month, how their website did, on your brand.</span></div>
-    <div class="swrow">
+    <div class="swrow" id="reportSwRow">
       <button type="button" class="sw" role="switch" id="sw-report" aria-checked="false" aria-labelledby="sw-report-l"></button>
       <div class="t"><b id="sw-report-l">Send this client a monthly report</b>
         <div class="how">In the first days of each month: visitors and pages viewed, enquiries, the pages people read most, and what changed. Sent to the email on their record, from your studio, with a reply address that reaches you.</div>
         <div class="how" id="reportLast"></div>
         <div class="how" id="reportWarn" role="status" hidden style="color:var(--bad,#b3261e)"></div></div>
     </div>
-    <div class="swrow" style="display:block">
+    <div class="swrow" style="display:block" id="reportLineRow">
       <b style="font-weight:600">A line from you</b>
       <div class="how">Goes at the top of every report, in your words. Written once; change it any time.</div>
       <textarea id="report-note" maxlength="600" rows="3" placeholder="e.g. Thanks for a great month. The new photos are bringing people to the Services page." style="width:100%;margin-top:8px;font:inherit;font-size:14px;border:1px solid var(--line);background:var(--bg);color:var(--ink);border-radius:var(--dds-r,8px);padding:8px 12px;resize:vertical"></textarea>
@@ -423,7 +425,7 @@ function cardHtml(c, status) {
   const leaves = !/^#/.test(href) && !(SCOPE && c.scoped) && href.indexOf('/pipeline.html') !== 0;
   return `<a class="setcard" href="${esc(href)}" data-card="${esc(c.key)}"${leaves ? ' data-noscope="1"' : ''}${c.needs ? ` data-needs="${esc(c.needs)}"` : ''}>` +
     `<span class="ico" aria-hidden="true"><svg viewBox="0 0 24 24">${IC[c.icon || c.key]}</svg></span>` +
-    `<span class="t"><b>${esc(title)}</b><span class="dsc">${esc(desc)}</span>${status ? `<span class="st ${esc(status.cls || '')}">${esc(status.text)}</span>` : ''}</span>` +
+    `<span class="t"><b>${esc(title)}</b><span class="dsc">${esc(desc)}</span>${status ? statusHtml(status) : ''}</span>` +
     (/^#/.test(href) ? '' : '<span class="go" aria-hidden="true">→</span>') + '</a>';
 }
 const STATUSES = {};   // the quick card statuses, kept so a repaint (dds:context) does not lose them
@@ -498,12 +500,13 @@ function memberHtml(m) {
 // Speed (Nov 10 2026, finding I8): Team and Plan & billing both show the seat and client counts;
 // the page asks for them once per open and both read the one answer.
 let USAGE_ASK = null;
-function usageOnce() { return USAGE_ASK || (USAGE_ASK = api('/agency/usage').catch(() => null)); }
+function usageOnce() { return USAGE_ASK || (USAGE_ASK = api('/agency/usage').then((r) => { if (!r || !r.ok) USAGE_ASK = null; return r; }, () => { USAGE_ASK = null; return null; })); }   // a failed answer isn't kept: Try again asks anew
 async function loadTeam() {
   if (SCOPE || !(CTX && CTX.is_agency)) return;
   const sec = $('team'); if (!sec) return;
   const [me, list, usage] = await Promise.all([api('/agency/me'), api('/agency/members'), usageOnce()]);
-  if (!me.ok || !list.ok) { sec.hidden = false; $('people').innerHTML = '<p class="seats">We couldn’t load your team just now.</p>'; return; }
+  // I5: a dropped connection lands here too (api() answers it as status 0), and says so with a way to try again
+  if (!me.ok || !list.ok) { sec.hidden = false; unreadIn($('people'), 'We couldn’t load your team just now.', loadTeam); return; }
   TEAM_ME = { ...(me.body.data || {}) };   // /agency/me: agency, role, plan, branding, email, member_id
   TEAM = Array.isArray(list.body.data) ? list.body.data : [];
   const u = usage && usage.ok && usage.body && usage.body.data && usage.body.data.seats;
@@ -538,28 +541,59 @@ function renderTeam() {
   }));
 }
 const inviteForm = $('inviteForm');
-if (inviteForm) inviteForm.addEventListener('submit', async (e) => {
+// Bug hunt I1 (Nov 10): inviting an email already on the team used to rewrite that person's
+// role (the only owner's too) and let a removed person back in, under "Invited". Now someone
+// on the team keeps their role and the list is pointed at; someone removed comes back only on
+// a second press that names what they come back as. The server holds the same rules.
+let RESTORE_T = 0;
+function disarmRestore() { const b = $('inviteBtn'); if (!b) return; clearTimeout(RESTORE_T); if (b.dataset.restore === undefined) return; delete b.dataset.restore; b.textContent = 'Invite'; }
+function armRestore(email, role) {
+  const b = $('inviteBtn'); b.dataset.restore = email; b.textContent = 'Bring them back';
+  toast(`${email} was removed from the team. Press “Bring them back” to let them in again as ${ROLE_WORD[role] || role}.`);
+  clearTimeout(RESTORE_T); RESTORE_T = setTimeout(disarmRestore, 8000);
+}
+function onTeamAlready(m, email) {
+  toast(m ? `${m.email} is already on the team as ${ROLE_WORD[m.role] || m.role}. Change their role in the list.` : `${email} is already on the team. Change their role in the list.`, true);
+  const row = m && $('people').querySelector(`[data-member="${m.id}"]`); if (!row) return;
+  row.scrollIntoView({ block: 'center' }); const s = row.querySelector('select'); if (s) s.focus({ preventScroll: true });
+}
+if (inviteForm) {
+  $('inv-email').addEventListener('input', disarmRestore); $('inv-role').addEventListener('change', disarmRestore);
+  inviteForm.addEventListener('submit', async (e) => {
   e.preventDefault();
   const email = $('inv-email').value.trim().toLowerCase(), role = $('inv-role').value;
   if (!email.includes('@')) { toast('Enter their email.', true); $('inv-email').focus(); return; }
-  const b = $('inviteBtn'); b.disabled = true;
-  const r = await api('/agency/members', 'POST', { email, role });
-  b.disabled = false;
-  if (!r.ok) { toast(nice(r.body, 'That invite didn’t go out.'), true); return; }
+  const b = $('inviteBtn');
+  const known = (TEAM || []).find((m) => String(m.email || '').toLowerCase() === email);
+  if (known && known.status !== 'revoked') { onTeamAlready(known, email); return; }
+  const restore = !!known && b.dataset.restore === email;
+  if (known && !restore) { armRestore(email, role); return; }
+  b.disabled = true;
+  const r = await api('/agency/members', 'POST', restore ? { email, role, restore: true } : { email, role });
+  b.disabled = false; disarmRestore();
+  if (!r.ok) {
+    const code = r.body && r.body.error;
+    if (code === 'already_member') { onTeamAlready((TEAM || []).find((m) => String(m.email || '').toLowerCase() === email) || null, email); return; }   // added meanwhile, from another tab
+    if (code === 'was_removed') { armRestore(email, role); return; }
+    toast(nice(r.body, 'That invite didn’t go out.'), true); return;
+  }
   const d = r.body.data || {};
   const row = { id: d.id, email: d.email || email, role: d.role || role, status: d.status || 'active', created_at: new Date().toISOString() };
-  const i = TEAM.findIndex((m) => m.email === row.email); if (i >= 0) TEAM[i] = { ...TEAM[i], ...row }; else TEAM.push(row);
+  const i = TEAM.findIndex((m) => String(m.email || '').toLowerCase() === row.email); if (i >= 0) TEAM[i] = { ...TEAM[i], ...row, created_at: TEAM[i].created_at }; else TEAM.push(row);
   $('inv-email').value = '';
-  toast(d.emailed === false ? 'Added — the invite email didn’t send; share the sign-in page with them.' : 'Invited — they get an email with a sign-in link.');
+  toast(d.restored ? `${row.email} is back on the team as ${ROLE_WORD[row.role] || row.role}.` : d.emailed === false ? 'Added — the invite email didn’t send; share the sign-in page with them.' : 'Invited — they get an email with a sign-in link.');
   const active = TEAM.filter((m) => m.status !== 'revoked').length; setStatus('agency_team', { text: `${active} on the team` });
   renderTeam();
-});
+  });
+}
+// I6: the whole line rides along as a tooltip, for a status the narrow list cuts short
+const statusHtml = (status) => `<span class="st ${esc(status.cls || '')}" title="${esc(status.text)}">${esc(status.text)}</span>`;
 function setStatus(key, status) {
   STATUSES[key] = status;
   const card = $('cards').querySelector(`[data-card="${key}"] .t`);
   if (!card) return;
   const old = card.querySelector('.st'); if (old) old.remove();
-  if (status) card.insertAdjacentHTML('beforeend', `<span class="st ${esc(status.cls || '')}">${esc(status.text)}</span>`);
+  if (status) card.insertAdjacentHTML('beforeend', statusHtml(status));
 }
 // ── whose settings: the title and the profile heading name the client in scope ──
 function paintScope() {
@@ -603,21 +637,40 @@ function paintUpsell(host) {
   p.appendChild(a); host.appendChild(p);
 }
 // Closing the account: two presses to ask, reversible until the cooling-off ends.
+// Bug hunt I2 (Nov 10): a request already made shows on every visit, with the day it
+// completes and the Cancel button. The card used to forget it once the page closed, and
+// "Completes in 30 days" counted from today, whatever day the request was made.
+const longDate = (iso) => { const d = new Date(iso); return isNaN(d) ? '' : d.toLocaleDateString(undefined, { month: 'long', day: 'numeric', year: 'numeric' }); };
+let PLAN_STATUS = null;   // the plan card's own status line, for when a closing is canceled
+function showClosing(when, days) {
+  const ask = $('deleteAsk'), cancel = $('deleteCancel'); if (!ask || !cancel) return;
+  const on = when ? longDate(when) : '';
+  ask.disabled = true; delete ask.dataset.armed;
+  ask.textContent = on ? `Scheduled for ${on}` : days ? `Scheduled. Completes in ${days} day${days === 1 ? '' : 's'}` : 'Request recorded. Check your email';
+  cancel.hidden = false;
+  const card = $('deleteCard'); if (card) card.open = true;
+  if (!on) return;
+  let line = $('planClosing');
+  if (!line) { line = document.createElement('p'); line.className = 'line warn'; line.id = 'planClosing'; const host = $('plan'); if (host) host.insertBefore(line, host.firstChild); }
+  line.textContent = `Your account is set to close on ${on}. You can cancel that under Close your account until then.`;
+  setStatus('billing', { text: `Closing ${shortDate(when)}`, cls: 'warn' });
+}
 function wireDeletion() {
   const ask = $('deleteAsk'), cancel = $('deleteCancel'); if (!ask || !cancel) return;
-  const requested = (days) => { ask.disabled = true; ask.textContent = days ? `Scheduled. Completes in ${days} day${days === 1 ? '' : 's'}` : 'Request recorded. Check your email'; cancel.hidden = false; };
   ask.addEventListener('click', async () => {
     if (!ask.dataset.armed) { ask.dataset.armed = '1'; ask.textContent = 'Are you sure? Press again to confirm'; setTimeout(() => { if (!ask.disabled) { delete ask.dataset.armed; ask.textContent = 'Request deletion'; } }, 6000); return; }
     const r = await api('/commerce/delete-request', 'POST', {}).catch(() => null);
     if (!r || !r.ok) { toast(nice(r && r.body, 'Couldn’t record that. Nothing changed.'), true); return; }
     const d = r.body && r.body.data;
-    requested(d && d.completes_within_days);
+    showClosing(d && d.scheduled_for, d && d.completes_within_days);
     toast(d && d.already_pending ? 'You already have a deletion request pending.' : 'Deletion requested. Check your email.');
   });
   cancel.addEventListener('click', async () => {
     const r = await api('/commerce/delete-cancel', 'POST', {}).catch(() => null);
     if (!r || !r.ok) { toast(nice(r && r.body, 'Couldn’t cancel that just now.'), true); return; }
     cancel.hidden = true; ask.disabled = false; delete ask.dataset.armed; ask.textContent = 'Request deletion';
+    const line = $('planClosing'); if (line) line.remove();
+    if (PLAN_STATUS) setStatus('billing', PLAN_STATUS);
     toast((r.body && r.body.data && r.body.data.message) || 'Deletion canceled.');
   });
 }
@@ -628,13 +681,16 @@ async function loadPlan() {
   const s = r.ok && r.body && r.body.data;
   sec.hidden = false;
   if (!s) {
+    // I5: a read that never answered, or failed on our side, is not "no plan on this account"
+    if (r.status === 0 || r.status >= 500) { unreadIn(host, 'Your plan couldn’t load just now.', loadPlan); return; }
     host.innerHTML = `<p class="line">We couldn’t find a plan on this account.</p><p class="team"><a href="${SUPPORT}?subject=${encodeURIComponent('My Studio OS plan')}">Ask our team →</a></p>`;
     return;
   }
   const planName = s.plan_name || s.plan || 'Your plan';
   const word = STATUS_WORD[s.status] || (s.status ? String(s.status).replace(/_/g, ' ').replace(/^./, (c) => c.toUpperCase()) : 'Active');
   const bad = s.status && s.status !== 'active';
-  setStatus('billing', { text: planName + ' · ' + word, cls: bad ? 'warn' : '' });
+  PLAN_STATUS = { text: planName + ' · ' + word, cls: bad ? 'warn' : '' };
+  setStatus('billing', PLAN_STATUS);
   let line = esc(planName) + ' · ' + esc(word);
   if (s.current_period_end && !bad) line += ' · ' + (s.cancel_at_period_end ? 'ends ' : 'renews ') + esc(shortDate(s.current_period_end));
   if (s.in_grace) line += ' · a payment didn’t go through — your site stays up while you fix it';
@@ -655,6 +711,7 @@ async function loadPlan() {
   if (s.has_service_billing) html += `<p class="aside">Invoices for project work from your studio are billed separately.</p>`;
   host.innerHTML = html;
   paintUpsell(host);
+  if (s.deletion && s.deletion.scheduled_for) showClosing(s.deletion.scheduled_for);   // I2: a closing already asked for, on every visit
   const b = $('manageBilling');
   if (b) b.addEventListener('click', async () => {
     b.disabled = true; const t = b.textContent; b.textContent = 'Opening…';
@@ -709,13 +766,18 @@ async function loadProfile() {
 //    over the real settings. The studio card needs both reads (the kind of business is
 //    a setting); the automations and the stalled-days boxes need /settings. ──
 let IDENT_READ = false, SETTINGS_READ = false;
+// I4 (bug hunt, Nov 10): a client's monthly report is held the same way when its read fails.
+// The card used to stay hidden, but the side list opened it anyway, with the switch off and
+// the line blank, and "Save the line" wrote that blank over the client's saved line.
+let REPORT_TRIED = false, REPORT_READ = false;
 const UNREAD = {
   studio: { rows: ['profileForm'], off: ['profileSave'], words: 'Your details couldn’t load just now. Saving is off until they do, so nothing you had is written over.' },
   automations: { rows: [], words: 'Your automations couldn’t load just now. They can’t be changed until they do; nothing is switched on or off meanwhile.' },
   stages: { rows: ['staleRow'], words: 'When a deal counts as stalled couldn’t load just now. It can’t be changed until it does.' },
+  report: { rows: ['reportSwRow', 'reportLineRow'], words: 'This client’s monthly report couldn’t load just now. It can’t be changed until it does, so nothing saved is written over.', retry: () => retryReport() },
 };
 function holdUnread() {
-  const held = { studio: !IDENT_READ || !SETTINGS_READ, automations: !SETTINGS_READ, stages: !SETTINGS_READ };
+  const held = { studio: !IDENT_READ || !SETTINGS_READ, automations: !SETTINGS_READ, stages: !SETTINGS_READ, report: REPORT_TRIED && !REPORT_READ };
   for (const id of Object.keys(UNREAD)) {
     const sec = $(id), g = UNREAD[id], on = held[id]; if (!sec) continue;
     const rows = id === 'automations' ? [...sec.querySelectorAll('.swrow')] : g.rows.map((r) => $(r));
@@ -726,9 +788,22 @@ function holdUnread() {
     if (n) continue;
     n = document.createElement('div'); n.className = 'unread'; n.setAttribute('role', 'status');
     n.innerHTML = `<span>${esc(g.words)}</span><button type="button" class="btn sm">Try again</button>`;
-    n.querySelector('button').addEventListener('click', retryReads);
+    n.querySelector('button').addEventListener('click', g.retry || retryReads);
     sec.querySelector('.card-h').insertAdjacentElement('afterend', n);
   }
+}
+// I5 (bug hunt, Nov 10): Team and Plan & billing say so when their read fails, dropped
+// connection included, in the same notice, with Try again. A plan that couldn't be read
+// used to say "We couldn't find a plan on this account".
+function unreadIn(host, words, retry) {
+  if (!host) return;
+  host.innerHTML = `<div class="unread" role="status"><span>${esc(words)}</span><button type="button" class="btn sm">Try again</button></div>`;
+  const b = host.querySelector('button');
+  b.addEventListener('click', async () => {
+    b.disabled = true; b.textContent = 'Trying…';
+    await retry().catch(() => {});
+    if (host.querySelector(':scope > .unread')) toast('Still couldn’t load — try again in a moment.', true);
+  });
 }
 async function retryReads(e) {
   const b = e && e.currentTarget; if (b) b.disabled = true;
@@ -764,20 +839,19 @@ const reviewAskSentence = (biz) => `Thanks for choosing ${biz || 'us'}. If you h
 const dealNudgeSentence = (n) => `This deal has had no next step for ${n === 1 ? 'a day' : n + ' days'} — a quick follow-up keeps it moving.`;   // mirrors commerce/lifecycle.ts dealNudgeCopy (qualified)
 function paintAutomations() {
   const st = SETTINGS || {};
-  // a repaint after one save must never clobber the field the owner is typing in
+  // a repaint after one save must never clobber the field the owner is typing in, nor
+  // (I3) a switch or box whose own save is still on its way: it shows what was pressed
   const typing = document.activeElement;
-  const setVal = (id, v) => { const el = $(id); if (el !== typing) el.value = v; };
-  $('sw-ack').setAttribute('aria-checked', st.auto_ack_enquiries === true ? 'true' : 'false');
-  $('sw-inv').setAttribute('aria-checked', st.invoice_reminders === true ? 'true' : 'false');
-  $('sw-deal').setAttribute('aria-checked', st.deal_nudges === true ? 'true' : 'false');
-  $('sw-rev').setAttribute('aria-checked', st.review_requests === true ? 'true' : 'false');
+  const setVal = (id, v, key) => { const el = $(id); if (el !== typing && !AUTO_FLIGHT[key]) el.value = v; };
+  const setSw = (id, key) => { if (!AUTO_FLIGHT[key]) $(id).setAttribute('aria-checked', st[key] === true ? 'true' : 'false'); };
+  setSw('sw-ack', 'auto_ack_enquiries'); setSw('sw-inv', 'invoice_reminders'); setSw('sw-deal', 'deal_nudges'); setSw('sw-rev', 'review_requests');
   const nRev = Number(st.review_request_after_days) >= 1 ? Math.trunc(Number(st.review_request_after_days)) : 3;
-  setVal('n-rev', String(nRev)); $('n-rev-echo').textContent = String(nRev);
+  setVal('n-rev', String(nRev), 'review_request_after_days'); if (!AUTO_FLIGHT.review_request_after_days) $('n-rev-echo').textContent = String(nRev);
   $('say-rev').textContent = reviewAskSentence(IDENT && IDENT.business_name);
   const nInv = Number(st.invoice_remind_after_days) >= 1 ? Math.trunc(Number(st.invoice_remind_after_days)) : 2;
   const nDeal = Number(st.deal_nudge_days) >= 1 ? Math.trunc(Number(st.deal_nudge_days)) : 3;
-  setVal('n-inv', String(nInv)); $('n-inv-echo').textContent = String(nInv);
-  setVal('n-deal', String(nDeal)); $('say-deal').textContent = dealNudgeSentence(nDeal);
+  setVal('n-inv', String(nInv), 'invoice_remind_after_days'); if (!AUTO_FLIGHT.invoice_remind_after_days) $('n-inv-echo').textContent = String(nInv);
+  setVal('n-deal', String(nDeal), 'deal_nudge_days'); if (!AUTO_FLIGHT.deal_nudge_days) $('say-deal').textContent = dealNudgeSentence(nDeal);
   if (!STALE_SAVING) paintStaleDays();   // C3: never under a change still waiting to save
   $('automations').hidden = false;
   $('stages').hidden = false;
@@ -789,12 +863,21 @@ let REPORT = null, REPORT_BUSY = false;
 async function loadReport() {
   if (!SCOPE || !hasFeature('website') || !hasCap('configure')) return;
   const r = await api('/report/monthly', 'GET');
-  if (!r.ok || !r.body || !r.body.data) return;   // without the answer the card stays away
-  REPORT = r.body.data; paintReport(); $('report').hidden = false;
+  REPORT_TRIED = true;
+  REPORT_READ = !!(r.ok && r.body && r.body.data);
+  if (REPORT_READ) { REPORT = r.body.data; paintReport(); }
+  holdUnread();   // I4: a failed read shows the card with "couldn't load" and Try again, its controls held
+  $('report').hidden = false;
+}
+async function retryReport(e) {
+  const b = e && e.currentTarget; if (b) b.disabled = true;
+  await loadReport();
+  if (b && b.isConnected) { b.disabled = false; toast('Still couldn’t load — try again in a moment.', true); }
 }
 function paintReport() {
   const d = REPORT || {};
   $('sw-report').setAttribute('aria-checked', d.enabled ? 'true' : 'false');
+  paintReportBusy();
   if (document.activeElement !== $('report-note')) $('report-note').value = d.note || '';
   $('reportLast').textContent = reportStatusLine(d);
   // Nov 2026 review (finding 2): a client who can't be emailed is said so on the card, never a silent "On"
@@ -814,19 +897,32 @@ function reportStatusLine(d) {
   return d.enabled ? 'Nothing sent yet; the first report goes out in the first days of next month.' : '';
 }
 function monthWords(ym) { const m = /^(\d{4})-(\d{2})$/.exec(String(ym || '')); if (!m) return ym; return new Date(Date.UTC(+m[1], +m[2] - 1, 1)).toLocaleDateString('en-US', { month: 'long', year: 'numeric', timeZone: 'UTC' }); }
-async function saveReport(patch, undo) {
-  if (REPORT_BUSY) return; REPORT_BUSY = true;
+// Item 101 (C16's last line): one save at a time. While one saves, the switch is greyed and
+// "Save the line" is off, the way Your menu does it. A second press used to show the switch
+// flipped while nothing was sent, and a line saved during a switch save was dropped unsaid.
+function paintReportBusy() {
+  const sw = $('sw-report'); if (REPORT_BUSY) sw.setAttribute('aria-disabled', 'true'); else sw.removeAttribute('aria-disabled');
+  $('reportSave').disabled = REPORT_BUSY;
+}
+async function saveReport(patch) {
+  if (REPORT_BUSY || !REPORT_READ) return false;   // I4: never written over what couldn't be read
+  REPORT_BUSY = true; paintReportBusy();
   const r = await api('/report/monthly', 'PUT', patch);
   REPORT_BUSY = false;
-  if (!r.ok) { if (undo) undo(); toast(nice(r.body, 'That didn’t save — nothing was changed.'), true); return false; }
+  if (!r.ok) {
+    if (r.body && r.body.blocked) REPORT = { ...(REPORT || {}), blocked: r.body.blocked };   // the warning line names why
+    paintReport();   // back to what is saved
+    toast(nice(r.body, 'That didn’t save — nothing was changed.'), true); return false;
+  }
   REPORT = { ...(REPORT || {}), ...(r.body.data || patch) }; paintReport();   // keeps `blocked`, which only GET answers
   return true;
 }
 function wireReport() {
   $('sw-report').addEventListener('click', async () => {
-    const was = REPORT && REPORT.enabled === true, next = !was;
+    if (REPORT_BUSY || !REPORT_READ) return;   // greyed: the press does nothing, and shows nothing
+    const next = !(REPORT && REPORT.enabled === true);
     $('sw-report').setAttribute('aria-checked', next ? 'true' : 'false');
-    if (await saveReport({ enabled: next }, () => $('sw-report').setAttribute('aria-checked', was ? 'true' : 'false'))) toast(next ? 'On. The first report goes out in the first days of next month.' : 'Off. No more reports to this client.');
+    if (await saveReport({ enabled: next })) toast(next ? 'On. The first report goes out in the first days of next month.' : 'Off. No more reports to this client.');
   });
   $('reportSave').addEventListener('click', async () => { if (await saveReport({ note: $('report-note').value })) { $('reportMsg').textContent = 'Saved.'; setTimeout(() => { $('reportMsg').textContent = ''; }, 2500); } });
   $('reportPreview').addEventListener('click', async () => {
@@ -879,15 +975,25 @@ async function toggleMenu(key) {
   try { if (window.ddsContextForget) window.ddsContextForget(); } catch (_) { /* */ }   // the next page asks for the menu again
   toast(hidden.includes(key) ? 'Hidden. The menu changes the next time a page opens.' : 'Back in the menu from the next page on.');
 }
+// I3 (bug hunt, Nov 10): answers can come back in any order. Each field counts the saves it
+// has on their way, and a repaint leaves a field alone while one is out; an answer older than
+// one already taken for the field is not taken (the newest save is the one the server keeps).
+// Two switches flipped close together used to repaint each other from an answer that left
+// before the other save, showing off what was on.
+const AUTO_SEQ = {}, AUTO_FLIGHT = {}, AUTO_TAKEN = {};
 async function saveAutomation(patch, undo) {
   if (!SETTINGS_READ) { if (undo) undo(); toast('Your settings couldn’t load, so nothing was saved. Try again first.', true); return false; }   // C4
+  const keys = Object.keys(patch), mine = {};
+  for (const k of keys) { mine[k] = AUTO_SEQ[k] = (AUTO_SEQ[k] || 0) + 1; AUTO_FLIGHT[k] = (AUTO_FLIGHT[k] || 0) + 1; }
   const r = await api('/settings', 'PUT', patch);
-  if (!r.ok) { toast(nice(r.body, 'That didn’t save — nothing was changed.'), true); if (undo) undo(); return false; }
+  for (const k of keys) AUTO_FLIGHT[k] -= 1;
+  // a refusal puts back what is saved (SETTINGS) once no other save of the field is out
+  if (!r.ok) { toast(nice(r.body, 'That didn’t save — nothing was changed.'), true); paintAutomations(); return false; }
   // C3: only the fields this save wrote are taken from its answer — a switch's answer
   // that left the server before a days save must not put the old days back on screen
   const got = (r.body && r.body.data) || {};
   SETTINGS = { ...(SETTINGS || {}) };
-  for (const k of Object.keys(patch)) SETTINGS[k] = k in got ? got[k] : patch[k];
+  for (const k of keys) if (mine[k] > (AUTO_TAKEN[k] || 0)) { AUTO_TAKEN[k] = mine[k]; SETTINGS[k] = k in got ? got[k] : patch[k]; }
   paintAutomations();
   toast('Saved.');
   return true;
@@ -955,7 +1061,7 @@ async function saveStageNames() {
 function wireAutomations() {
   const sn = $('snSave'); if (sn) sn.addEventListener('click', saveStageNames);
   const sc = $('scSave'); if (sc) sc.addEventListener('click', saveStageChances);   // item 69
-  const flip = (id, key) => { const b = $(id); b.addEventListener('click', () => { const on = b.getAttribute('aria-checked') !== 'true'; b.setAttribute('aria-checked', on ? 'true' : 'false'); saveAutomation({ [key]: on }, () => b.setAttribute('aria-checked', on ? 'false' : 'true')); }); };
+  const flip = (id, key) => { const b = $(id); b.addEventListener('click', () => { const on = b.getAttribute('aria-checked') !== 'true'; b.setAttribute('aria-checked', on ? 'true' : 'false'); saveAutomation({ [key]: on }, () => b.setAttribute('aria-checked', on ? 'false' : 'true')); }); };   // the undo only serves C4's "couldn't load" refusal
   flip('sw-ack', 'auto_ack_enquiries'); flip('sw-inv', 'invoice_reminders'); flip('sw-deal', 'deal_nudges'); flip('sw-rev', 'review_requests');
   const days = (id, key, min, max, fallback) => { const i = $(id); i.addEventListener('change', () => { let n = Math.trunc(Number(i.value)); if (!Number.isFinite(n) || n < min) n = fallback; if (n > max) n = max; i.value = String(n); saveAutomation({ [key]: n }); }); };
   days('n-inv', 'invoice_remind_after_days', 1, 90, 2); days('n-deal', 'deal_nudge_days', 1, 90, 3); days('n-rev', 'review_request_after_days', 1, 90, 3);
@@ -992,7 +1098,7 @@ async function saveStaleDays() {
 function renderSubline() {
   const bits = [];
   if (IDENT && IDENT.business_name) bits.push(esc(IDENT.business_name));
-  if (CTX && CTX.edition_name) bits.push(esc(CTX.edition_name) + (CTX.plan_key ? '' : ''));
+  if (CTX && CTX.edition_name) bits.push(esc(CTX.edition_name));
   $('subline').innerHTML = bits.map((x, i) => (i ? '<span class="dot">·</span>' : '') + '<span>' + x + '</span>').join('');
 }
 function signedOut() {
@@ -1044,7 +1150,8 @@ function holdAnchor(sec) {
       // studio audit bug 7: the card says what is connected — the count, the first names, or "nothing yet"
       const names = list.filter((x, i) => states[i] === 'on').map((x) => String(x.label || x.key || '')).filter(Boolean);
       const named = names.length ? ' — ' + names.slice(0, 2).map((n) => n.charAt(0).toUpperCase() + n.slice(1)).join(', ') + (names.length > 2 ? ' +' + (names.length - 2) : '') : '';
-      if (on || attn) setStatus('connections', { text: `${on} connected${named}${attn ? ' · ' + attn + (attn === 1 ? ' needs' : ' need') + ' attention' : ''}`, cls: attn ? 'warn' : '' });
+      // I6: what needs attention comes first, so the narrow list never cuts it off
+      if (on || attn) setStatus('connections', { text: `${attn ? attn + (attn === 1 ? ' needs' : ' need') + ' attention · ' : ''}${on} connected${named}`, cls: attn ? 'warn' : '' });
       else setStatus('connections', { text: 'Nothing connected yet', cls: '' });
     }).catch(() => {});
     // bold redesign: the Calendar row says whether the private calendar link is on (GET /calendar/link —
@@ -1057,9 +1164,11 @@ function holdAnchor(sec) {
     // the mail provider has it verified (GET /email/sending). Studio level only: a client's card is their desk.
     if (!SCOPE && hasFeature('website')) api('/email/sending').then((r) => {
       const d = (r && r.ok && r.body && r.body.data) || null; if (!d || !d.from) return;
-      if (d.sending === 'verified') setStatus('domains', { text: `Emails go out from ${d.from} · verified`, cls: '' });
-      else if (d.sending === 'not_verified') setStatus('domains', { text: `Emails go out from ${d.from} · not verified, so they may land in spam`, cls: 'warn' });
-      else setStatus('domains', { text: `Emails go out from ${d.from} · couldn’t check it just now`, cls: 'warn' });
+      // I6 (bug hunt, Nov 10): the state first, then the address; the address used to fill the
+      // line and push "not verified, so they may land in spam" out of sight
+      if (d.sending === 'verified') setStatus('domains', { text: `Verified · emails go out from ${d.from}`, cls: '' });
+      else if (d.sending === 'not_verified') setStatus('domains', { text: `Not verified, so emails may land in spam · from ${d.from}`, cls: 'warn' });
+      else setStatus('domains', { text: `Couldn’t check your email address just now · ${d.from}`, cls: 'warn' });
     }).catch(() => {});
     loadPlan().catch(() => {});
     loadTeam().catch(() => {});
@@ -1072,7 +1181,7 @@ function holdAnchor(sec) {
     if (!SCOPE) { wireAutomations(); paintAutomations(); }
     if (location.hash === '#team') holdAnchor($('team'));
     if (location.hash === '#studio') { const n = $('f-name'); if (n) n.focus(); }
-    if (location.hash === '#billing') holdAnchor($('billing'));
+    if (location.hash === '#billing' && !SCOPE) holdAnchor($('billing'));   // I7: billing is the studio's own, never a client's (a client's "Update payment" link lands at the top)
     if (location.hash === '#automations' && !SCOPE) holdAnchor($('automations'));
     if (location.hash === '#stages' && !SCOPE) holdAnchor($('stages'));
     spySections();

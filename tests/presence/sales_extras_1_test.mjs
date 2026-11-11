@@ -113,7 +113,7 @@ const DEALS = [
   const st = read('../../settings.html'), pipe = read('../../pipeline.html'), an = read('../../analytics.html'), idx = read('../../supabase/functions/presence/index.ts');
   ok('Settings: a percents card of its own (the names card keeps its four boxes)', /id="stageChances"/.test(st) && (st.match(/id="sc-(lead|qualified|proposal|contract)" min="0" max="100"/g) || []).length === 4 && /id="scSave">Save percents</.test(st));
   ok('Settings: saving sends only the percents', /api\('\/sales\/stages', 'PUT', \{ chances \}\)/.test(st));
-  ok('Settings: the Domain & email card says where emails go out from and whether it\'s verified', /api\('\/email\/sending'\)/.test(st) && /setStatus\('domains', \{ text: `Emails go out from \$\{d\.from\} · verified`/.test(st) && /not verified, so they may land in spam/.test(st));
+  ok('Settings: the Domain & email card says where emails go out from and whether it\'s verified', /api\('\/email\/sending'\)/.test(st) && /setStatus\('domains', \{ text: `Verified · emails go out from \$\{d\.from\}`/.test(st) && /Not verified, so emails may land in spam · from \$\{d\.from\}/.test(st));   // bug hunt I6: the state first
   ok('Pipeline: an Expected tile, kept off a phone (it rides under Open there)', /const expT=ex\?tile\('Expected'/.test(pipe) && /\$\{openT\}\$\{expT\}\$\{wonT\}/.test(pipe) && /\.stats \.st-exp\{display:none\}/.test(pipe) && /\.stats \.exp-sub\{display:inline\}/.test(pipe));
   ok('Pipeline: the stage cells show each stage\'s percent', /\$\{b\.chance!=null\?` · \$\{b\.chance\}%`:''\}/.test(pipe));
   ok('Analytics: Deals by stage gains an Expected column when the server sends it', /\.\.\.\(exp\?\['Expected'\]:\[\]\)/.test(an));
