@@ -79,6 +79,19 @@ const brand = read('fonts/brand.css');
   ok('every page that draws in a brand face loads /fonts/brand.css', without.length === 0, without.join(', '));
 }
 
+{
+  // the free tools' host serves only the files its pages load (_redirects, list item 139), so it
+  // must serve brand.css and every font file brand.css names, or the tools draw in fallback fonts
+  const TOOLS = 'https://tools.davisdigitalstudio.com';
+  const lines = read('_redirects').split('\n').map((l) => l.replace(/#.*$/, '').trim()).filter(Boolean);
+  const served = new Map(lines.map((l) => l.split(/\s+/)).filter(([from, , code]) => from.startsWith(TOOLS + '/') && code === '200!').map(([from, to]) => [from.slice(TOOLS.length), to]));
+  const catchAll = lines.findIndex((l) => l.startsWith(`${TOOLS}/* `));
+  const files = ['/fonts/brand.css', ...new Set([...brand.matchAll(/url\(([^)]+)\)/g)].map((m) => m[1].replace(/^['"]|['"]$/g, '')))];
+  const missing = files.filter((f) => served.get(f) !== f);
+  ok('the tools host serves brand.css and every font file it names', missing.length === 0, missing.join(', '));
+  ok('…above its catch-all forward', files.every((f) => { const i = lines.findIndex((l) => l.startsWith(`${TOOLS}${f} `)); return i > -1 && i < catchAll; }));
+}
+
 // ── 3. how long the browser keeps them ───────────────────────────────────────
 const headers = read('_headers');
 const rule = (path) => { const m = new RegExp(`^${path.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\n\\s*Cache-Control: ([^\\n]+)`, 'm').exec(headers); return m ? m[1] : null; };
