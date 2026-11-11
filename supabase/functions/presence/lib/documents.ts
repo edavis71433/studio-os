@@ -40,16 +40,32 @@ export async function signDocToken(payload: DocTokenPayload, secret: string): Pr
   const body = b64url(JSON.stringify(payload));
   return `${body}.${await hmacHex(secret, body)}`;
 }
-/** Verify a doc token: signature valid, well-formed, and unexpired at `nowSec`.
- *  Returns the payload or null. Pure (deterministic for a fixed nowSec). */
-export async function verifyDocToken(token: string, secret: string, nowSec: number): Promise<DocTokenPayload | null> {
+/** Read a doc token: signature valid and well-formed, whatever its date. Sales item 79:
+ *  the page decides about the date once it knows the document (see lastingRecord).
+ *  Returns the payload or null. Pure. */
+export async function readDocToken(token: string, secret: string): Promise<DocTokenPayload | null> {
   const parts = String(token || '').split('.');
   if (parts.length !== 2 || !parts[0] || !parts[1]) return null;
   if (!timingSafeEqual(parts[1], await hmacHex(secret, parts[0]))) return null;
   let p: any; try { p = JSON.parse(unb64url(parts[0])); } catch { return null; }
   if (!p || p.t !== 'doc' || !isKind(p.k) || !UUID_RE.test(p.id || '') || !UUID_RE.test(p.site_id || '') || typeof p.exp !== 'number') return null;
-  if (p.exp < nowSec) return null;
   return p as DocTokenPayload;
+}
+/** Verify a doc token: signature valid, well-formed, and unexpired at `nowSec`.
+ *  Returns the payload or null. Pure (deterministic for a fixed nowSec). */
+export async function verifyDocToken(token: string, secret: string, nowSec: number): Promise<DocTokenPayload | null> {
+  const p = await readDocToken(token, secret);
+  if (!p || p.exp < nowSec) return null;
+  return p;
+}
+/** Sales item 79: a SIGNED agreement and a PAID invoice (a receipt) are finished records,
+ *  so a link to one keeps working after its date, as the page has always promised ("keep
+ *  this for your records"). The token still names exactly one document and only ever
+ *  shows it; a proposal, an estimate or an unpaid invoice still ends with its link, because
+ *  what they say can change. Pure. */
+export function lastingRecord(kind: DocKind, row: { status?: unknown } | null | undefined): boolean {
+  const st = String(row?.status || '');
+  return (kind === 'contract' && st === 'signed') || (kind === 'invoice' && st === 'paid');
 }
 
 // ── formatting (pure) ────────────────────────────────────────────────────────
@@ -144,7 +160,7 @@ const brandOf = (b?: Partial<DocBrand> | null): DocBrand => ({
 // Self-contained: inline styles, no external assets. On screen it's a calm card;
 // @media print hides the toolbar/chrome, drops shadows, and sets page margins so
 // the browser's Save-as-PDF yields a clean, keepable document.
-function shell(o: { title: string; brand: DocBrand; docLabel: string; heading: string; sub?: string; bodyHtml: string; pdfUrl?: string | null; pdfName?: string | null; headHtml?: string }): string {
+function shell(o: { title: string; brand: DocBrand; docLabel: string; heading: string; sub?: string; bodyHtml: string; pdfUrl?: string | null; pdfName?: string | null; headHtml?: string; lasting?: boolean }): string {
   const b = o.brand;
   return `<!doctype html><html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
@@ -221,9 +237,16 @@ function shell(o: { title: string; brand: DocBrand; docLabel: string; heading: s
     <div class="hr"></div>
     ${o.bodyHtml}
   </div></div>
-  <footer>Prepared by ${esc(b.name)}. Keep this document for your records — reprint any time from your original link.</footer>
+  <footer>${footerWords(b.name, !!o.lasting, !!o.pdfUrl)}</footer>
 </div>${o.pdfUrl ? pdfScript(o.pdfUrl, o.pdfName || 'document.pdf') : ''}
 </body></html>`;
+}
+/** The line under a document (sales item 79): a finished record (a signed agreement, a receipt)
+ *  says its link keeps working; anything that can still change makes no promise about its link. Pure. */
+export function footerWords(name: string, lasting: boolean, hasPdf: boolean): string {
+  return lasting
+    ? `Prepared by ${esc(name)}. Keep this for your records: this link keeps working${hasPdf ? ', and Download PDF saves a copy' : ''}.`
+    : `Prepared by ${esc(name)}.`;
 }
 /** Sales item 82: "Download PDF" fetches the PDF and saves it under its own name.
  *  Fetching (rather than a plain link) keeps the file's type whatever the host
@@ -332,7 +355,7 @@ export function renderInvoiceDocument(v: any, brandIn?: Partial<DocBrand> | null
     : voided ? 'This request was voided and is no longer payable.'
     : `Payment is processed securely.${no ? ` Please quote ${no} with any payment by check or transfer.` : ''} This document is your copy of the request.`;
   const body = `${parties}${table}${paidBox}${pay}<p class="note">${esc(note)}</p>`;   // the table's bold total is the amount (the old amount box said it twice)
-  return shell({ title: `${heading}${no ? ' ' + no : ''} — ${brand.name}`, brand, docLabel, heading, sub: undefined, bodyHtml: body, pdfUrl: ctx?.pdfUrl, pdfName: ctx?.pdfName, headHtml });
+  return shell({ title: `${heading}${no ? ' ' + no : ''} — ${brand.name}`, brand, docLabel, heading, sub: undefined, bodyHtml: body, pdfUrl: ctx?.pdfUrl, pdfName: ctx?.pdfName, headHtml, lasting: paid });
 }
 
 // ── CONTRACT (draft/sent = copy · signed = Document of Record) ────────────────
@@ -360,7 +383,7 @@ export function renderContractDocument(c: any, brandIn?: Partial<DocBrand> | nul
     : c?.status === 'sent' ? 'Sent for signature — not yet signed.'
     : 'Draft — not yet sent for signature.';
   const body = `<div class="body">${esc(String(c?.body || ''))}</div>${cert}${signed ? '' : `<p class="note">This copy is not an executed agreement until it is signed.</p>`}`;
-  return shell({ title: `${c?.title || 'Agreement'} — ${brand.name}`, brand, docLabel: signed ? 'Signed agreement' : 'Agreement', heading: String(c?.title || 'Service agreement'), sub: statusSub, bodyHtml: body, pdfUrl: ctx?.pdfUrl, pdfName: ctx?.pdfName });
+  return shell({ title: `${c?.title || 'Agreement'} — ${brand.name}`, brand, docLabel: signed ? 'Signed agreement' : 'Agreement', heading: String(c?.title || 'Service agreement'), sub: statusSub, bodyHtml: body, pdfUrl: ctx?.pdfUrl, pdfName: ctx?.pdfName, lasting: signed });
 }
 
 /** Dispatch by kind. `data` is an already-loaded, site-scoped row. Pure. */
