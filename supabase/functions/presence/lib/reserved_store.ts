@@ -15,6 +15,7 @@ export const RESERVED_NAMES = {
   calendarFeed: '__calendar_feed__',      // sales review item 46: the private calendar link
   navHidden: '__nav_hidden__',            // builder list item 54: the menu areas the studio hides (agency/routes.ts, routes/workspace.ts)
   monthlyReport: '__monthly_report__',    // builder list item 58: the client's monthly report email (on, the studio's line, last month sent) (ops/monthly_report.ts)
+  copiedFrom: '__copied_from__',          // builder list item 145: what Duplicate or a template copied onto a new site, until changed or kept (lib/site_layout.ts)
   domainNotes: '__domain_notes__',        // builder list item 162: the studio's notes on a client's domain (whose account, renews by itself, a note) (agency/sites.ts)
 } as const;
 
