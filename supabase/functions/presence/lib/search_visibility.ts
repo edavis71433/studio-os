@@ -101,11 +101,17 @@ export function scoreSummary(row: Record<string, unknown> | null | undefined, re
   };
 }
 
+/** One of the saved check's tables, by its title (the report page draws the same ones). */
+const reportRows = (findings: Record<string, any>, title: string): unknown[][] =>
+  arr<unknown[]>(arr<Record<string, any>>(findings.tables).find((t) => t.title === title)?.rows).filter(Array.isArray);
+
 /** An AI Visibility row → its headline. Only the result: who ran it is not ours to
- *  show, and the name is shown so a check run under another spelling reads as such. */
+ *  show, and the name is shown so a check run under another spelling reads as such.
+ *  List item 153: with it, who the assistants named instead and the websites their
+ *  answers drew on, the most-named and most-cited first, as the report lists them. */
 export function aiSummary(row: Record<string, unknown> | null | undefined, reportBase: string) {
   if (!row) return null;
-  const scores = obj(row.scores), input = obj(row.input);
+  const scores = obj(row.scores), input = obj(row.input), findings = obj(row.findings);
   const overall = scoreOf(scores.overall);
   if (overall === null) return null;
   return {
@@ -116,5 +122,9 @@ export function aiSummary(row: Record<string, unknown> | null | undefined, repor
     city: String(input.city || ''),
     checked_at: String(row.created_at || ''),
     report_url: row.id ? `${reportBase}/report/${row.id}` : null,
+    competitors: reportRows(findings, 'Who AI recommends instead').slice(0, 3)
+      .map((r) => ({ name: String(r[0] ?? '').trim(), times: Number(r[1]) || 0 })).filter((c) => c.name),
+    sources: reportRows(findings, 'Sources AI used').filter((r) => Number(r[1]) > 0).slice(0, 4)
+      .map((r) => ({ name: String(r[0] ?? '').trim(), cited: Number(r[1]) || 0, own: r[3] === 'Your website' })).filter((x) => x.name),
   };
 }

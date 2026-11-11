@@ -801,6 +801,7 @@ html.plan-watch .ss-bar,html.plan-watch [data-grp="Content"],html.plan-watch .na
 .sv-pri.now{background:var(--clay-soft);color:var(--ink)}
 .sv-pri.soon{background:var(--amber-soft);color:var(--ink)}
 .sv-nums{display:flex;gap:var(--dds-s5,20px);flex-wrap:wrap;margin-bottom:var(--dds-s2,8px)}
+.sv-ai-list{font-size:13px;margin:var(--dds-s2,8px) 0 0;max-width:560px}   /* list item 153 */
 .sv-nums div{min-width:64px}
 .sv-nums b{display:block;font-size:22px;font-weight:600;font-variant-numeric:tabular-nums;line-height:1.2}
 .sv-nums span{font-size:12px;color:var(--ink-3)}
@@ -7699,6 +7700,15 @@ function renderSvAi() {
         grid.append(el("span", null, p.name), bar, el("span", "sv-pn", p.score === null ? "Not measured" : String(p.score)));
       });
       host.appendChild(grid);
+    }
+    // list item 153: who the assistants named instead, and the websites their answers drew on
+    if ((a.competitors || []).length) {
+      const p = el("p", "sv-ai-list"); p.append(el("b", null, "Named instead of you: "), a.competitors.map((c) => `${c.name} (${c.times} time${c.times === 1 ? "" : "s"})`).join(", "));
+      host.appendChild(p);
+    }
+    if ((a.sources || []).length) {
+      const p = el("p", "sv-ai-list"); p.append(el("b", null, "Websites the answers drew on: "), a.sources.map((x) => `${x.own ? "your website" : x.name} (${x.cited})`).join(", "));
+      host.appendChild(p);
     }
     host.appendChild(el("p", "hint", `Checked ${svWhen(a.checked_at)}${a.business_name ? ` for ${a.business_name}${a.city ? ` in ${a.city}` : ""}` : ""}.`));
   } else {

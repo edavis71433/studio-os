@@ -106,6 +106,7 @@
   .chartnote{font-size:12px;color:var(--faint);margin-top:6px;font-variant-numeric:tabular-nums}
   .srcs{display:grid;grid-template-columns:minmax(90px,130px) 1fr 48px;gap:10px var(--dds-s3,12px);align-items:center;font-size:13px}
   .srcs .n{text-align:right;font-variant-numeric:tabular-nums;font-weight:600}
+  .srcai{margin:var(--dds-s3,12px) 0 0;font-size:12.5px;color:var(--soft)}   /* list item 153 */
   .progress{height:6px;border-radius:3px;background:var(--line);overflow:hidden}
   .progress i{display:block;height:100%;background:var(--p);border-radius:3px}
   .rows{display:flex;flex-direction:column}
@@ -675,6 +676,8 @@ function websiteBand(d){
     let body=null;
     if(measuring&&(t.top_sources||[]).length){
       body=`<div class="srcs">${t.top_sources.map(s=>`<span>${esc(s.source)}</span><div class="progress" aria-hidden="true"><i style="width:${Math.max(0,Math.min(100,Number(s.share)||0))}%"></i></div><span class="n">${num(s.visits)}</span>`).join('')}</div>`;
+      // list item 153: the "AI assistants" row, by assistant
+      if((t.ai_sources||[]).length)body+=`<p class="srcai">From AI assistants: ${t.ai_sources.map(a=>`${esc(a.name)} ${num(a.visits)}`).join(' · ')}</p>`;
     }
     h+=card('','Where visitors come from',measuring?`${num(t.visitors)} visitors · ${periodLabel()}${tTrunc?' · based on recent activity':''}`:based(periodLabel(),tTrunc),body||(external?offSite('Where visitors come from'):emptyState('No visits yet','Your visitor sources will appear here.')),[BI,'View website insights']);
   }
