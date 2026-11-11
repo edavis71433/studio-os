@@ -260,6 +260,13 @@ async function route_(req: Request, cors: Record<string, string>): Promise<Respo
     if (m && method === 'GET') return (await import('./routes/studio_brand.ts')).handlePublicStudioBrand(m[1], cors);
   }
 
+  // ── Pitch pack (sales item 113): PUBLIC, pre-auth, authorized by the pack's own
+  //    unguessable token (routes/pitch_pack.ts). Read-only; pitch.html renders it. ──
+  {
+    const m = route.match(/^\/sales\/pack\/([0-9a-f]{24,64})$/);
+    if (m && method === 'GET') return (await import('./routes/pitch_pack.ts')).handlePackPublic(m[1], cors);
+  }
+
   // ── L5.5: Industry Pack Marketplace — OPERATOR management. Infrastructure,
   //    not client-scoped: reachable by staff or system (service-role/cron), and
   //    handled BEFORE the caller-site resolution (operators own no site). Every
@@ -750,6 +757,8 @@ async function route_(req: Request, cors: Record<string, string>): Promise<Respo
     if (pm && method === 'POST') return px.handleProspectConvert(req, site, principal, pm[1], cors);
     pm = route.match(/^\/sales\/prospects\/([0-9a-f-]{36})\/draft$/);
     if (pm && method === 'POST') return px.handleProspectDraft(req, site, principal, pm[1], cors);
+    pm = route.match(/^\/sales\/prospects\/([0-9a-f-]{36})\/pack$/);   // item 113: build the next piece of the pitch pack
+    if (pm && method === 'POST') return (await import('./routes/pitch_pack.ts')).handleProspectPack(req, site, principal, pm[1], cors);
   }
   if (route === '/email/log-address' && (method === 'GET' || method === 'POST' || method === 'DELETE')) return handleEmailLogAddress(req, site, principal, cors);   // sales review item 69: BCC to log   // sales review item 69: which address mail goes out from, and is it verified
   if (route === '/calendar/link' && (method === 'GET' || method === 'POST' || method === 'DELETE')) {   // sales review item 46: your calendar in Google Calendar

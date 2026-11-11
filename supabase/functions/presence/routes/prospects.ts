@@ -123,7 +123,11 @@ export async function handleProspects(req: Request, site: SiteRow, _principal: P
   if (req.method === 'GET') {
     const r = await svc(`presence_prospects?site_id=eq.${site.id}&deleted_at=is.null&select=${COLS}&order=score.desc.nullslast,created_at.desc&limit=500`).catch(() => null);
     if (!r || !(r as any).ok) return r && tableMissing(r as any) ? needsUpdate(cors) : json({ error: 'read_failed', message: 'We couldn’t load your prospects just now.' }, 502, cors);
-    return json({ data: rows(r).map(withWord) }, 200, cors);
+    // item 113: each row knows its pitch pack (one read; before APPLY-0149 there are simply none)
+    const packs = new Map<string, any>();
+    const pk = await svc(`presence_pitch_packs?site_id=eq.${site.id}&select=prospect_id,token,status&limit=1000`).catch(() => null);
+    if (pk && (pk as any).ok) for (const row of rows(pk)) packs.set(String(row.prospect_id), row);
+    return json({ data: rows(r).map((p: any) => { const k = packs.get(String(p.id)); return { ...withWord(p), pack_status: k?.status || null, pack_url: k?.status === 'ready' ? `/pitch.html?t=${k.token}` : null }; }) }, 200, cors);
   }
   if (req.method === 'POST') {
     let b: any = {}; try { b = await req.json(); } catch { return json({ error: 'bad_json' }, 400, cors); }
