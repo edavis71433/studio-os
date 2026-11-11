@@ -384,6 +384,9 @@ decision, not a gap.
   3/3; deno check 0 new; audit + rate still work (suite [E][F][G]); PROD untouched
   (v249); 0003-0005 held; no other handler touched.
 
+- *Nov 11 2026 (builder list item 186): the whole visibility block (`visibility_list`, `_check`, `_add`,
+  `_remove`, `_sync_clients`) was removed from clever-api, with the isolation suite's [I] section: no page
+  had called it since Jul 11. The `monitored_sites` table stays; other routes still read it.*
 - **Module 2: `visibility_list` — DONE on STAGING 2026-07-05.** Purely read-only
   (unlike lead_detail which writes unread=false), staff-gated, reads monitored_sites
   + site_checks (each one clean tenant-scoped `_staff` policy). Converted both reads
