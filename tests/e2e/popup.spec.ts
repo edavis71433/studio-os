@@ -35,6 +35,9 @@ test.describe('the pop-up on a client’s page', () => {
     expect(await page.evaluate(() => !!document.activeElement?.closest('#ps-pop'))).toBe(true);   // focus moved into it
     await page.keyboard.press('Escape');
     await expect(pop(page)).toBeHidden();
+    // Chrome fires a dialog's close event a moment after it hides, and that's when the browser
+    // notes it was closed: no person reloads that fast, a test can (it failed under load)
+    await expect.poll(() => page.evaluate(() => Object.keys(localStorage).some((k) => k.startsWith('ps-pop-') && /"closed":\d/.test(localStorage.getItem(k) || '')))).toBe(true);
     await page.reload();
     await page.clock.runFor(20_000);
     await expect(pop(page)).toBeHidden();                          // closed: not again this week
