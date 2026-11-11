@@ -115,6 +115,7 @@ ok('stopping one that isn’t forwarding says so, nothing written', (await fwd('
   ok('the panel offers Gmail’s records, and says which other domains send visitors here', /\['email_setup','Gmail on this domain'\]/.test(dp) && /'Also sends visitors here'/.test(dp));
   const page = read('presence.html');
   ok('the sheet names the main name and can switch it to www.', /pm\.dataset\.main = "name"/.test(page) && /api\("POST", "\/foundations\/domain", \{ domain: twin \}\)/.test(page));
+  ok('the forwarding block makes its own lines (renderFoundations’ stepLine is local to it)', /function forwardsBlock\(dstat\) \{\n[^\n]*\n  const stepLine = /.test(page));
   ok('the sheet has the plain forwarding form', /function forwardsBlock\(dstat\)/.test(page) && /api\("POST", "\/foundations\/domain\/forward", \{ domain: d \}\)/.test(page) && /api\("DELETE", "\/foundations\/domain\/forward", \{ domain: n \}\)/.test(page));
   ok('the email card fills every Gmail record in one pick', /api\("POST", "\/foundations\/prepare", \{ goal: "email_setup", provider: "google_workspace" \}\)/.test(page));
 }
