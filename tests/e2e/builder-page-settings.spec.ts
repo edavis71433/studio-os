@@ -1,6 +1,6 @@
 import { test, expect, Page, Route } from '@playwright/test';
 import { installApp, STUDIO_NAV, ALL_FEATURES } from './helpers/app';
-import { newPageLock, gatePage, sealPage } from '../../supabase/functions/presence/lib/page_access';
+import { newPageLock, gatePage, sealPage } from '../../supabase/functions/presence/lib/page_gate';
 
 // One page's settings in the Pages card (builder list items 48 and 120, Nov 2026; Figma
 // "A · Page settings"): the page, who can see it, header and footer, the menu, and how it shows
