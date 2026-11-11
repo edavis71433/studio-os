@@ -31,7 +31,7 @@ const { handleMediaDelete } = await import(`${P}/routes/media.ts`);
 const { handleAssetDelete, handleAssetStatus } = await import(`${P}/routes/assets.ts`);
 const { handleRedirectDelete } = await import(`${P}/routes/search.ts`);
 const { handleContentLibraryDelete } = await import(`${P}/routes/content_library.ts`);
-const { handleCheckpointDelete, handleTakeOffline, handleBackOnline } = await import(`${P}/routes/publish.ts`);
+const { handleCheckpointDelete, handleTakeOffline, handleBackOnline, handleSitePassword } = await import(`${P}/routes/publish.ts`);
 const { handleBookingTypeDelete, handleBookingSettingsPut } = await import(`${P}/routes/booking.ts`);
 const { handleKnowledgeDelete } = await import(`${P}/routes/knowledge.ts`);
 const { handleCommentDelete } = await import(`${P}/routes/comments.ts`);
@@ -144,7 +144,7 @@ const DECIDED = {
   ],
   configure: [
     'DELETE /foundations/domain', 'POST /foundations/domain', 'POST /foundations/prepare',
-    'POST /preview/settings', 'POST /site/offline', 'POST /site/online', 'PUT /bookings/settings',
+    'POST /preview/settings', 'POST /site/offline', 'POST /site/online', 'POST /site/password', 'PUT /bookings/settings',
     'PUT /sales/contacts/fields', 'PUT /sales/stages', 'POST /calendar/link', 'DELETE /calendar/link',
     'POST /email/log-address', 'DELETE /email/log-address',
     'PUT /report/monthly', 'POST /report/monthly/preview',   // builder list item 58
@@ -227,6 +227,7 @@ const ALL = Object.entries(DECIDED).flatMap(([need, names]) => names.map((name) 
   const has = (need, ...names) => names.every((n) => DECIDED[need].includes(n));
   ok('decided: withdrawing an invoice and cancelling a retainer count as delete', has('delete', 'POST /sales/invoices/:id/void', 'POST /sales/deals/:id/retainer/cancel'));
   ok('decided: taking the site offline and back is configure, not publish', has('configure', 'POST /site/offline', 'POST /site/online'));
+  ok('decided: a visitor password is configure, like taking the site offline (list item 175)', has('configure', 'POST /site/password'));
   ok('decided: removing the domain is configure, so a developer keeps it', has('configure', 'DELETE /foundations/domain'));
   ok('decided: the everyday lists stay edit', has('edit', 'PUT /sales/services', 'PUT /service/faq', 'PUT /service/saved-replies', 'POST /bookings/types', 'PATCH /bookings/types/:id', 'POST /redirects'));
   ok('decided: archiving a file is not deleting it', has('edit', 'POST /assets/bulk') && has('approve', 'POST /assets/:id/status'));
@@ -317,6 +318,7 @@ const CHANGED = [
   { name: 'POST /report/monthly/preview', fx: { only: ['clients'] }, run: (r, p) => handleReportPreview(A, p, cors) },   // with every read answering a row the address reads as suppressed; the send is the write
   { name: 'POST /site/offline', run: (r, p) => handleTakeOffline(A, p, cors) },
   { name: 'POST /site/online', fx: { site: { offline_at: '2026-01-01T00:00:00Z' } }, run: (r, p) => handleBackOnline(A, p, cors) },
+  { name: 'POST /site/password', body: { password: 'letmein' }, run: (r, p) => handleSitePassword(r, A, p, cors) },   // list item 175: Netlify's answer is the outside call that proves the owner reached it
 ];
 {
   const expected = ALL.filter(({ need }) => need === 'delete' || need === 'configure').map((r) => r.name).sort();
@@ -449,6 +451,7 @@ const WRITE_HANDLERS = [
   // sales review item 112: prospects (DELETE and PATCH /sales/prospects/:id share handleProspect)
   'handleProspects', 'handleProspect', 'handleProspectDiscover', 'handleProspectConvert', 'handleProspectDraft', 'handleProspectPack',
   'handleStudioRequests',   // final pass S1: POST /portal/studio-requests/:id/(accept|decline) are open; the route answers the owner only
+  'handleSitePassword',   // builder list item 175: POST /site/password needs configure
   'handleScheduleCancel', 'handleScheduleCreate', 'handleSettings', 'handleShareSet', 'handleStockImport',
   'handleSupport', 'handleSupportMessage', 'handleSupportOne', 'handleSurveyRespond', 'handleTakeOffline',
   'handleTask', 'handleTasksCreate', 'handleThreadRead', 'handleVersionLabel', 'handleVisualDecide',

@@ -114,7 +114,7 @@ export function newPreviewToken(): string {
 export interface PreviewStatus {
   draft: { unpublished_changes: number };
   preview: { exists: boolean; url: string | null; updated_at: string | null; has_password: boolean };
-  live: { published: boolean; last_published_at: string | null; summary: string | null; offline_since: string | null };
+  live: { published: boolean; last_published_at: string | null; summary: string | null; offline_since: string | null; password_since: string | null };
 }
 export function shapePreviewStatus(input: {
   draftChanges: number;
@@ -122,6 +122,7 @@ export function shapePreviewStatus(input: {
   live: { last_published_at: string | null; summary: string | null } | null;
   baseUrl: string;
   offlineAt?: string | null;   // G10: when the owner took the site offline (null/absent = online)
+  passwordAt?: string | null;  // list item 175: when a visitor password went on (null/absent = none)
 }): PreviewStatus {
   const p = input.preview;
   return {
@@ -132,7 +133,7 @@ export function shapePreviewStatus(input: {
       updated_at: p?.updated_at ?? null,
       has_password: !!(p && p.password_hash),
     },
-    live: { published: !!(input.live && input.live.last_published_at), last_published_at: input.live?.last_published_at ?? null, summary: input.live?.summary ?? null, offline_since: input.offlineAt ?? null },
+    live: { published: !!(input.live && input.live.last_published_at), last_published_at: input.live?.last_published_at ?? null, summary: input.live?.summary ?? null, offline_since: input.offlineAt ?? null, password_since: input.passwordAt ?? null },
   };
 }
 

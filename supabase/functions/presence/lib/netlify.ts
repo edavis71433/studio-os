@@ -174,6 +174,16 @@ export async function setCustomDomain(netlifySiteId: string, domain: string | nu
   return { ok: true, site: toSiteInfo(r.json) };
 }
 
+/** List item 175: put a visitor password on the whole live site, or take it off (empty).
+ *  Netlify keeps the password and shows its own password page before any page of the
+ *  site; it is never stored on our side. */
+export async function setSitePassword(netlifySiteId: string, password: string): Promise<{ ok: boolean; error?: string }> {
+  if (!NETLIFY_TOKEN) return { ok: false, error: 'NETLIFY_AUTH_TOKEN not configured' };
+  const r = await nf(`/sites/${encodeURIComponent(netlifySiteId)}`, { method: 'PATCH', body: JSON.stringify({ password }) });
+  if (!r.ok) return { ok: false, error: `password update failed: ${r.status} ${r.text.slice(0, 200)}` };
+  return { ok: true };
+}
+
 /** Certificate state. 200 with empty body = no cert yet (valid pre-DNS state). */
 export async function sslStatus(netlifySiteId: string): Promise<{ ok: boolean; state: string; expires_at: string | null }> {
   if (!NETLIFY_TOKEN) return { ok: false, state: 'unknown', expires_at: null };
