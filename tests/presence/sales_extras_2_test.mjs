@@ -161,6 +161,64 @@ const unzip = (bytes) => {
   ok('a list that can\'t be read is left out and named in the READ-ME, never shipped empty', !('invoices-and-payments.csv' in part) && /couldn't be read just now.*invoices-and-payments\.csv/.test(part['READ-ME.txt']));
   db.fail.delete('presence_invoices');
 
+  // ── bug hunt F6 (Nov 10): every row, and proposals at what the client sees ──
+  // The database answers at most 1,000 rows to one read (PostgREST's cap); the file used to
+  // ask for 5,000 in one read and stop at 1,000 without a word. The fake gets the same cap.
+  const capped = async (fn) => {
+    const fake = globalThis.fetch;
+    globalThis.fetch = (url, init) => {
+      const u = new URL(String(url));
+      if (u.pathname.startsWith('/rest/v1/') && Number(u.searchParams.get('limit') || 0) > 1000) u.searchParams.set('limit', '1000');
+      return fake(u.toString(), init);
+    };
+    try { return await fn(); } finally { globalThis.fetch = fake; }
+  };
+  const many = Array.from({ length: 2345 }, (_, i) => ({ id: `c${String(i).padStart(6, '0')}-0000-4000-8000-000000000000`, site_id: SITE, name: `Person ${i}`, email: `p${i}@example.com`, phone: '', company: '', found_via: '', deleted_at: null, created_at: '2026-01-01T00:00:00Z', updated_at: day(-1) }));
+  db.reset({ ...world(), presence_contacts: [...many, { ...many[0], id: 'c9999999-0000-4000-8000-000000000000', name: 'Gone', email: 'gone@example.com', deleted_at: day(-1) }],
+    // $1,000 of work, 10% off, 8% tax: the client sees $972.00, not the $1,000 subtotal
+    presence_proposals: [{ id: 'p2', site_id: SITE, deal_id: D2, title: 'Brand kit', version: 2, status: 'sent', subtotal_cents: 100000, line_items: [{ label: 'Brand kit', qty: 1, unit_cents: 100000 }, { __meta__: { discount: { mode: 'percent', value: 10 }, tax_pct: 8 } }], sent_at: day(-2), deleted_at: null, created_at: day(-2) },
+      { id: 'p3', site_id: SITE, deal_id: D2, title: 'Older one', version: 1, status: 'declined', subtotal_cents: 50000, line_items: null, sent_at: day(-9), deleted_at: null, created_at: day(-9) }] });
+  const big = unzip(new Uint8Array(await (await capped(() => X.handleSalesExport(site, owner, cors))).arrayBuffer()));
+  const contactRows = big['contacts.csv'].trim().split('\r\n').slice(1);
+  ok('F6: past 1,000 every live contact is in the file, once each, oldest first (read a page at a time)', contactRows.length === 2345 && new Set(contactRows).size === 2345 && contactRows[0].startsWith('Person 0,') && contactRows[2344].startsWith('Person 2344,') && !/Gone/.test(big['contacts.csv']), `${contactRows.length} rows`);
+  ok('F6: the pages come in a fixed order (oldest, then id), so a page can neither skip nor repeat a row', db.log.filter((c) => c.url.includes('presence_contacts')).every((c) => c.url.includes('order=created_at.asc,id.asc')));
+  ok('F6: a proposal prints what the client sees: discount and tax applied', /Logo refresh,Brand kit,2,sent,972\.00/.test(big['proposals.csv']), big['proposals.csv']);
+  ok('F6: a proposal with no items keeps its stored amount', /Logo refresh,Older one,1,declined,500\.00/.test(big['proposals.csv']));
+  ok('F6: nothing reached the bound, so the READ-ME says nothing about a cut', !/first 50,000 rows/.test(big['READ-ME.txt']));
+  ok('F6: the same total the client view uses', X.proposalTotalCents({ subtotal_cents: 100000, line_items: [{ label: 'x', qty: 1, unit_cents: 100000 }, { __meta__: { discount: { mode: 'percent', value: 10 }, tax_pct: 8 } }] }) === 97200 && X.proposalTotalCents({ subtotal_cents: 0, line_items: [] }) === 0);
+  // a table past the bound (50 pages of 1,000) says where it stops, in the READ-ME
+  {
+    const fake = globalThis.fetch;
+    globalThis.fetch = (url, init) => {
+      const u = new URL(String(url));
+      if (u.pathname === '/rest/v1/presence_deal_tasks') { const off = Number(u.searchParams.get('offset') || 0); return Promise.resolve(new Response(JSON.stringify(Array.from({ length: 1000 }, (_, i) => ({ id: `t${off + i}`, site_id: SITE, deal_id: D2, title: `Task ${off + i}`, status: 'open', created_at: day(-1) }))), { status: 200, headers: { 'Content-Type': 'application/json' } })); }
+      return fake(url, init);
+    };
+    try {
+      const cut = unzip(new Uint8Array(await (await X.handleSalesExport(site, owner, cors)).arrayBuffer()));
+      ok('F6: a table past 50,000 rows is named in the READ-ME, with where it stops', /These hold only their first 50,000 rows, oldest first: tasks\.csv\./.test(cut['READ-ME.txt']) && cut['tasks.csv'].trim().split('\r\n').length - 1 >= 50000, cut['READ-ME.txt']);
+    } finally { globalThis.fetch = fake; }
+  }
+  // a table without deleted_at (enquiries) is refused that filter (400) and read without it;
+  // a read that merely failed is a failure, never a file with deleted rows in it
+  {
+    const fake = globalThis.fetch;
+    let mode = 'no_column';
+    globalThis.fetch = (url, init) => {
+      const u = decodeURIComponent(String(url));
+      if (/\/rest\/v1\/presence_form_submissions\?/.test(u) && u.includes('deleted_at=is.null')) return Promise.resolve(new Response(JSON.stringify(mode === 'no_column' ? { code: '42703', message: 'column presence_form_submissions.deleted_at does not exist' } : { message: 'boom' }), { status: mode === 'no_column' ? 400 : 503, headers: { 'Content-Type': 'application/json' } }));
+      return fake(url, init);
+    };
+    try {
+      db.reset(world());
+      const a = unzip(new Uint8Array(await (await X.handleSalesExport(site, owner, cors)).arrayBuffer()));
+      ok('F6: no deleted_at column (400) → read without it', /Sam,sam@example\.com/.test(a['enquiries.csv'] || ''));
+      mode = 'down';
+      const b = unzip(new Uint8Array(await (await X.handleSalesExport(site, owner, cors)).arrayBuffer()));
+      ok('F6: a read that failed (503) is left out and named, not read again without the filter', !('enquiries.csv' in b) && /couldn't be read just now.*enquiries\.csv/.test(b['READ-ME.txt']));
+    } finally { globalThis.fetch = fake; }
+  }
+
   const staff = { ...owner, userId: '77777777-7777-4777-8777-777777777777', member: { site_id: SITE, role: 'business_staff' } };
   ok('a team seat whose role may export gets it too', (await X.handleSalesExport(site, staff, cors)).status === 200);
   const odd = await X.handleSalesExport(site, { ...staff, member: { site_id: SITE, role: 'not_a_role' } }, cors);
