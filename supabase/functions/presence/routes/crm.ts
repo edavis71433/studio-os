@@ -13,7 +13,7 @@
 //   POST /crm/notes/:id/pin        — { pinned }
 //   DELETE /crm/notes/:id          — soft-delete
 import { loadCustomerNames } from '../lib/customer_names.ts';
-import { loadStageLabels, renameMovedTo } from '../lib/stage_names.ts';
+import { loadStageLabels, renameMovedTo, DEFAULT_STAGE_LABEL } from '../lib/stage_names.ts';
 import { callerToday } from '../lib/sales_lifecycle.ts';
 import { json } from '../../_shared/http.ts';
 import type { SiteRow } from '../lib/site.ts';
@@ -27,6 +27,8 @@ import { linksForCustomer, healUnstampedSupport } from '../lib/service_bridge.ts
 import { resolveSite } from '../lib/site.ts';
 import { resolveMemberSite } from '../lib/workspace.ts';
 import { UUID_RE } from '../lib/uuid.ts';
+import { cleanSearch, phoneDigits, phonePattern, phoneHas, snippet, arrangeResults, shortDate, type SearchResult } from '../lib/record_search.ts';
+import { CONNECT_INTENT_TAG } from './sales.ts';
 
 /** W3: resolve this customer's Pipeline deal + linked project so the studio can
  *  open them in context from the CRM (studio-side only; additive, best-effort).
@@ -75,56 +77,154 @@ async function customerRequesterKeys(_agencySiteId: string, clientId: string): P
   return { keys: raw.map((k) => encodeURIComponent(`"${k.replace(/"/g, '')}"`)), emails };
 }
 
-/** ── /crm/search — global record search (the Salesforce global-search pattern) ──
- *  Searches contacts + deals + projects on the operator's site by name/title, each
- *  result linking to its Client Record. Studio-side only; feeds the ⌘K palette. */
+/** ── /crm/search — ⌘K across everything the studio keeps (sales item 84) ──
+ *  People (customers, contacts, a phone number by its digits), their websites and
+ *  domains, website enquiries, deals and their documents (proposals, estimates,
+ *  agreements), money, projects, to-dos, messages and notes: each result in its
+ *  group (lib/record_search.ts) and opening where it lives. Studio-side only. Each
+ *  place is read on its own: one that fails leaves its group out and the answer
+ *  says `partial`; when every read fails the answer is 502, never "nothing matches". */
+const DOC_WORD: Record<string, Record<string, string>> = {
+  proposal: { draft: 'Draft', sent: 'Sent', accepted: 'Accepted', declined: 'Declined' },
+  estimate: { draft: 'Draft', sent: 'Sent', approved: 'Approved', declined: 'Declined' },
+  agreement: { draft: 'Draft', sent: 'Sent', signed: 'Signed', voided: 'Voided' },
+};
+const LOGGED_WORD: Record<string, string> = { call: 'Logged call', email: 'Logged email', meeting: 'Logged meeting', note: 'Note' };
+const quoteOf = (t: string) => `“${t}”`;
+/** The studio's client websites (its portfolio) with their names and domains, and
+ *  its own site. Read only for a studio member; platform staff search without them. */
+async function searchSites(agencyId: string, own: SiteRow): Promise<{ sites: Array<{ id: string; name: string; domain: string; status: string; edition: string; own: boolean }>; ok: boolean }> {
+  const links = await svc(`presence_agency_clients?agency_id=eq.${agencyId}&status=eq.active&select=site_id&limit=1000`);
+  if (!links.ok) return { sites: [], ok: false };
+  const ids = [...new Set([...arr(links).map((l: any) => String(l.site_id || '')), String(own.id)].filter((x) => UUID_RE.test(x)))];
+  const IN = `in.(${ids.join(',')})`;
+  const [sitesR, identR] = await Promise.all([
+    svc(`presence_sites?id=${IN}&select=id,client_id,custom_domain,status,edition&limit=1000`),
+    svc(`presence_identity?site_id=${IN}&select=site_id,business_name&limit=1000`),
+  ]);
+  if (!sitesR.ok) return { sites: [], ok: false };
+  const rowsS = arr(sitesR);
+  const bizBy: Record<string, string> = {};
+  for (const i of arr(identR)) if (i.business_name) bizBy[String(i.site_id)] = String(i.business_name);
+  const clientIds = [...new Set(rowsS.map((x: any) => String(x.client_id || '')).filter((x) => UUID_RE.test(x)))];
+  const clientsR = clientIds.length ? await svc(`clients?id=in.(${clientIds.join(',')})&select=id,name&limit=1000`) : { ok: true, json: [] };
+  const clientName: Record<string, string> = {};
+  for (const c of arr(clientsR)) clientName[String(c.id)] = String(c.name || '');
+  return {
+    ok: identR.ok && clientsR.ok,
+    sites: rowsS.map((x: any) => ({ id: String(x.id), name: bizBy[String(x.id)] || clientName[String(x.client_id)] || '', domain: String(x.custom_domain || ''), status: String(x.status || ''), edition: String(x.edition || ''), own: String(x.id) === String(own.id) })),
+  };
+}
+const siteWord = (s: { status: string; edition: string }) => s.edition === 'monitor' ? 'Hosted elsewhere' : s.status === 'live' ? 'Live' : s.status === 'paused' ? 'Offline' : 'Not live yet';
+
 export async function handleCrmSearch(req: Request, jwt: string, site: SiteRow, principal: Principal, cors: Record<string, string>) {
-  if (!(await isStudioSide(jwt, principal))) return json({ data: { results: [] } }, 200, cors);
+  const staff = principal.kind === 'staff' || principal.kind === 'system';
+  const member = staff ? null : await resolveAgencyMember(jwt).catch(() => null);
+  if (!staff && !member) return json({ data: { results: [] } }, 200, cors);
   const u = new URL(req.url);
-  const q = (u.searchParams.get('q') || '').replace(/[(),*"\\%]/g, ' ').trim().slice(0, 60);
+  const q = cleanSearch(u.searchParams.get('q'));
   if (q.length < 2) return json({ data: { results: [] } }, 200, cors);
-  const eq = encodeURIComponent(q);
-  const ql = q.toLowerCase();
-  try {
-    // Phase 2 (search across everything): customers and invoices join contacts,
-    // deals and projects; a money word ("invoice", "owed", "unpaid") lists what's
-    // open; and the first customers matched get ACTION rows ("Send invoice to
-    // Jordan", "Message Jordan") that land on the record with the form open.
-    const moneyWord = /^(inv|invoice|invoices|owed|unpaid|outstanding|money|paid)/.test(ql);
-    const cents = /^\$?\d{2,}(\.\d{2})?$/.test(ql) ? Math.round(Number(ql.replace('$', '')) * 100) : 0;
-    const [contacts, deals, projects, links, invoices] = await Promise.all([
-      svc(`presence_contacts?site_id=eq.${site.id}&deleted_at=is.null&or=(name.ilike.*${eq}*,email.ilike.*${eq}*,company.ilike.*${eq}*)&select=id,name,email,company&limit=6`),
-      svc(`presence_deals?site_id=eq.${site.id}&deleted_at=is.null&title=ilike.*${eq}*&select=id,title,stage,converted_client_id&order=updated_at.desc&limit=6`),
-      svc(`presence_projects?site_id=eq.${site.id}&deleted_at=is.null&name=ilike.*${eq}*&select=id,name,status&limit=6`),
-      svc(`presence_service_links?agency_site_id=eq.${site.id}&status=eq.active&select=customer_client_id,customer_site_id&limit=200`),
-      moneyWord
-        ? svc(`presence_invoices?site_id=eq.${site.id}&deleted_at=is.null&status=eq.open&select=id,title,amount_cents,status,deal_id&order=created_at.desc&limit=6`)
-        : svc(`presence_invoices?site_id=eq.${site.id}&deleted_at=is.null&or=(title.ilike.*${eq}*${cents ? `,amount_cents.eq.${cents}` : ''})&select=id,title,amount_cents,status,deal_id&order=created_at.desc&limit=6`),
-    ]);
-    const results: any[] = [];
-    // customers: the studio's bridged clients, matched by name/email in memory (≤200)
-    const siteByClient: Record<string, string> = {};
-    const clientIds = [...new Set(arr(links).map((l: any) => { if (l.customer_site_id) siteByClient[String(l.customer_client_id)] = String(l.customer_site_id); return String(l.customer_client_id || ''); }).filter(Boolean))];
-    const customers = clientIds.length ? arr(await svc(`clients?id=in.(${clientIds.join(',')})&select=id,name,email&limit=200`)) : [];
-    const hit = (s: unknown) => String(s || '').toLowerCase().includes(ql);
-    const matchedCustomers = customers.filter((c: any) => hit(c.name) || hit(c.email)).slice(0, 6);
-    const recordHref = (c: any) => siteByClient[String(c.id)] ? `/crm.html?client=${siteByClient[String(c.id)]}` : `/crm.html?client_id=${c.id}`;
-    for (const c of matchedCustomers) results.push({ kind: 'customer', label: String(c.name || c.email || 'Customer'), sub: 'Customer', href: recordHref(c) });
-    for (const c of arr(contacts)) results.push({ kind: 'contact', label: String(c.name || c.email || 'Contact'), sub: 'Contact' + (c.company ? ' · ' + String(c.company) : ''), href: `/crm.html?contact=${c.id}&tab=details` });
-    for (const d of arr(deals)) results.push({ kind: 'deal', label: String(d.title || 'Deal'), sub: 'Deal' + (d.stage ? ' · ' + String(d.stage) : ''), href: `/crm.html?deal=${d.id}&tab=deal` });
-    for (const v of arr(invoices)) results.push({ kind: 'invoice', label: `${String(v.title || 'Invoice')} — $${Math.round((Number(v.amount_cents) || 0) / 100).toLocaleString('en-US')}`, sub: 'Invoice · ' + (v.status === 'open' ? 'awaiting payment' : String(v.status || '')), href: v.deal_id ? `/crm.html?deal=${v.deal_id}&tab=billing` : '/pipeline.html' });
-    for (const p of arr(projects)) results.push({ kind: 'project', label: String(p.name || 'Project'), sub: 'Project', href: `/crm.html?project=${p.id}&tab=delivery` });
-    if (moneyWord) results.push({ kind: 'page', label: 'Who owes you', sub: 'Pipeline · outstanding invoices', href: '/pipeline.html#receivables' });
-    // actions on the matched customers (the ones with a record to land on)
-    for (const c of matchedCustomers.slice(0, 2)) {
-      const name = String(c.name || c.email || 'them');
-      results.push({ kind: 'action', label: `Send invoice to ${name}`, sub: 'Action', href: `${recordHref(c)}&tab=billing&act=invoice` });
-      results.push({ kind: 'action', label: `Message ${name}`, sub: 'Action', href: `${recordHref(c)}&tab=details&act=message` });
+  const S = site.id, eq = encodeURIComponent(q), like = `ilike.*${eq}*`, ql = q.toLowerCase();
+  const hit = (s: unknown) => String(s || '').toLowerCase().includes(ql);
+  // Phase 2 (search across everything): a money word ("invoice", "owed", "unpaid") lists what's open
+  const moneyWord = /^(inv|invoice|invoices|owed|unpaid|outstanding|money|paid)/.test(ql);
+  const cents = /^\$?\d{2,}(\.\d{2})?$/.test(ql) ? Math.round(Number(ql.replace('$', '')) * 100) : 0;
+  const phone = phoneDigits(q), pat = phone ? encodeURIComponent(phonePattern(phone)) : '';
+  // the words inside notes, messages and enquiries are looked through from three letters on
+  const deep = q.length >= 3;
+  let asked = 0, failed = 0;
+  const read = async (path: string): Promise<any[]> => {
+    asked++;
+    try { const r = await svc(path); if (!r.ok) { failed++; return []; } return arr(r); } catch { failed++; return []; }
+  };
+  const none = Promise.resolve([] as any[]);
+  const sitesP = member ? (asked++, searchSites(String(member.agency_id), site).then((x) => { if (!x.ok) failed++; return x.sites; }, () => { failed++; return [] as Awaited<ReturnType<typeof searchSites>>['sites']; })) : Promise.resolve([] as Awaited<ReturnType<typeof searchSites>>['sites']);
+  const [contacts, phoneContacts, deals, projects, links, invoices, enquiries, phoneEnquiries, proposals, estimates, agreements, dealTasks, projectTasks, support, supportReplies, projectMsgs, logged, sites, stageLabels] = await Promise.all([
+    read(`presence_contacts?site_id=eq.${S}&deleted_at=is.null&or=(name.${like},email.${like},company.${like}${deep ? `,notes.${like}` : ''})&select=id,name,email,phone,company,notes&order=updated_at.desc&limit=10`),
+    phone ? read(`presence_contacts?site_id=eq.${S}&deleted_at=is.null&phone=ilike.${pat}&select=id,name,email,phone,company&order=updated_at.desc&limit=25`) : none,
+    read(`presence_deals?site_id=eq.${S}&deleted_at=is.null&or=(title.${like}${deep ? `,notes.${like}` : ''})&select=id,title,stage,notes,converted_client_id&order=updated_at.desc&limit=10`),
+    read(`presence_projects?site_id=eq.${S}&deleted_at=is.null&name=${like}&select=id,name,status&limit=6`),
+    read(`presence_service_links?agency_site_id=eq.${S}&status=eq.active&select=customer_client_id,customer_site_id&limit=200`),
+    moneyWord
+      ? read(`presence_invoices?site_id=eq.${S}&deleted_at=is.null&status=eq.open&select=id,title,amount_cents,status,deal_id&order=created_at.desc&limit=6`)
+      : read(`presence_invoices?site_id=eq.${S}&deleted_at=is.null&or=(title.${like}${cents ? `,amount_cents.eq.${cents}` : ''})&select=id,title,amount_cents,status,deal_id&order=created_at.desc&limit=6`),
+    read(`presence_form_submissions?site_id=eq.${S}&spam=eq.false&or=(name.${like},email.${like}${deep ? `,message.${like}` : ''})&select=id,name,email,message,created_at&order=created_at.desc&limit=6`),
+    phone ? read(`presence_form_submissions?site_id=eq.${S}&spam=eq.false&phone=ilike.${pat}&select=id,name,email,phone,created_at&order=created_at.desc&limit=10`) : none,
+    read(`presence_proposals?site_id=eq.${S}&deleted_at=is.null&title=${like}&select=id,deal_id,title,status,created_at&order=created_at.desc&limit=4`),
+    read(`presence_estimates?site_id=eq.${S}&deleted_at=is.null&title=${like}&select=id,deal_id,title,status,created_at&order=created_at.desc&limit=4`),
+    read(`presence_contracts?site_id=eq.${S}&deleted_at=is.null&title=${like}&select=id,deal_id,title,status,created_at&order=created_at.desc&limit=4`),
+    read(`presence_deal_tasks?site_id=eq.${S}&deleted_at=is.null&title=${like}&select=id,deal_id,title,due_date,status&order=created_at.desc&limit=4`),
+    read(`presence_tasks?site_id=eq.${S}&deleted_at=is.null&title=${like}&select=id,project_id,title,due_date,status&order=created_at.desc&limit=4`),
+    deep ? read(`presence_support_requests?site_id=eq.${S}&deleted_at=is.null&or=(subject.${like},body.${like})&select=id,subject,body,created_at&order=created_at.desc&limit=4`) : none,
+    deep ? read(`presence_support_messages?site_id=eq.${S}&deleted_at=is.null&body=${like}&select=id,request_id,body,created_at&order=created_at.desc&limit=4`) : none,
+    deep ? read(`presence_project_messages?site_id=eq.${S}&deleted_at=is.null&body=${like}&select=id,project_id,body,created_at&order=created_at.desc&limit=4`) : none,
+    deep ? read(`presence_deal_events?site_id=eq.${S}&kind=eq.note&detail->>body=${like}&select=id,deal_id,detail,created_at&order=created_at.desc&limit=4`) : none,
+    sitesP,
+    loadStageLabels(S).catch(() => DEFAULT_STAGE_LABEL),
+  ]);
+  if (asked && failed === asked) return json({ error: 'read_failed', message: 'Search couldn’t load just now.' }, 502, cors);
+  const results: SearchResult[] = [];
+  const add = (r: SearchResult) => { results.push(r); };
+  const dealHref = (id: unknown, tab = 'deal') => `/crm.html?deal=${id}&tab=${tab}`;
+  // customers: the studio's bridged clients, matched by name/email in memory (≤200)
+  const siteByClient: Record<string, string> = {};
+  const clientIds = [...new Set(links.map((l: any) => { if (l.customer_site_id) siteByClient[String(l.customer_client_id)] = String(l.customer_site_id); return String(l.customer_client_id || ''); }).filter(Boolean))];
+  const customers = clientIds.length ? await read(`clients?id=in.(${clientIds.join(',')})&select=id,name,email&limit=200`) : [];
+  const matchedCustomers = customers.filter((c: any) => hit(c.name) || hit(c.email)).slice(0, 6);
+  const recordHref = (c: any) => siteByClient[String(c.id)] ? `/crm.html?client=${siteByClient[String(c.id)]}` : `/crm.html?client_id=${c.id}`;
+  for (const c of matchedCustomers) add({ kind: 'customer', group: 'people', label: String(c.name || c.email || 'Customer'), sub: 'Customer', href: recordHref(c) });
+  // contacts: by name, email or company in People; a match only in their notes is a note
+  for (const c of contacts) {
+    const who = String(c.name || c.email || 'Contact');
+    if (hit(c.name) || hit(c.email) || hit(c.company)) add({ kind: 'contact', group: 'people', label: who, sub: 'Contact' + (c.company ? ' · ' + String(c.company) : ''), href: `/crm.html?contact=${c.id}&tab=details` });
+    else {
+      const note = String(c.notes || '').replace(CONNECT_INTENT_TAG, ' ').trim();   // the connect-on-signup marker is not a note
+      if (hit(note)) add({ kind: 'note', group: 'notes', label: quoteOf(snippet(note, q, 80)), sub: `Note on ${who}`, href: `/crm.html?contact=${c.id}&tab=details` });
     }
-    return json({ data: { results } }, 200, cors);
-  } catch (_e) {
-    return json({ data: { results: [] } }, 200, cors);
   }
+  // a phone number by its digits, whatever way it was written down
+  for (const c of phoneContacts) if (phoneHas(c.phone, phone)) add({ kind: 'contact', group: 'people', label: String(c.name || c.email || 'Contact'), sub: [String(c.phone), c.company ? String(c.company) : ''].filter(Boolean).join(' · '), href: `/crm.html?contact=${c.id}&tab=details` });
+  for (const w of sites) {
+    if (!(hit(w.name) || hit(w.domain))) continue;
+    // the row opens the site in Studio OS; "Open website" beside it opens the site itself
+    add({ kind: 'website', group: 'websites', label: w.own ? (w.name ? `${w.name} (your website)` : 'Your website') : (w.name || w.domain || 'Website'), sub: [w.domain, siteWord(w)].filter(Boolean).join(' · '), href: w.own ? '/presence.html' : `/presence.html?client=${w.id}`, ...(w.domain && /^[a-z0-9.-]+\.[a-z]{2,}$/i.test(w.domain) ? { alt: { label: 'Open website', href: `https://${w.domain}` } } : {}) });
+  }
+  for (const e of [...enquiries, ...phoneEnquiries.filter((e: any) => phoneHas(e.phone, phone))]) {
+    const byPhone = phoneHas(e.phone, phone), inMsg = !hit(e.name) && !hit(e.email) && !byPhone && hit(e.message);
+    add({ kind: 'enquiry', group: 'enquiries', label: String(e.name || e.email || 'Someone'), ...(inMsg ? { snippet: quoteOf(snippet(e.message, q, 70)) } : {}), sub: [byPhone ? String(e.phone) : 'Enquiry', shortDate(e.created_at)].filter(Boolean).join(' · '), href: `/inbox.html#enquiries?sel=lead:${e.id}` });
+  }
+  for (const d of deals) {
+    if (hit(d.title)) add({ kind: 'deal', group: 'deals', label: String(d.title || 'Deal'), sub: 'Deal' + (d.stage ? ' · ' + String(stageLabels[String(d.stage)] || d.stage) : ''), href: dealHref(d.id) });
+    else if (hit(d.notes)) add({ kind: 'note', group: 'notes', label: quoteOf(snippet(d.notes, q, 80)), sub: `Note on ${String(d.title || 'a deal')}`, href: dealHref(d.id) });
+  }
+  for (const [list, kind, word] of [[proposals, 'proposal', 'Proposal'], [estimates, 'estimate', 'Estimate'], [agreements, 'agreement', 'Agreement']] as Array<[any[], string, string]>) {
+    for (const x of list) add({ kind, group: 'deals', label: String(x.title || word), sub: [word, DOC_WORD[kind][String(x.status)] || '', shortDate(x.created_at)].filter(Boolean).join(' · '), href: dealHref(x.deal_id) });
+  }
+  for (const v of invoices) add({ kind: 'invoice', group: 'money', label: `${String(v.title || 'Invoice')} — $${Math.round((Number(v.amount_cents) || 0) / 100).toLocaleString('en-US')}`, sub: 'Invoice · ' + (v.status === 'open' ? 'awaiting payment' : String(v.status || '')), href: v.deal_id ? dealHref(v.deal_id, 'billing') : '/pipeline.html' });
+  // item 76 rides along: Pipeline listens for #outstanding — #receivables opened the board and stopped
+  if (moneyWord) add({ kind: 'page', group: 'money', label: 'Who owes you', sub: 'Pipeline · outstanding invoices', href: '/pipeline.html#outstanding' });
+  for (const p of projects) add({ kind: 'project', group: 'projects', label: String(p.name || 'Project'), sub: 'Project', href: `/crm.html?project=${p.id}&tab=delivery` });
+  const todoSub = (t: any, word: string) => [word, t.status === 'done' ? 'done' : t.due_date ? 'due ' + shortDate(t.due_date) : ''].filter(Boolean).join(' · ');
+  for (const t of dealTasks) add({ kind: 'todo', group: 'todos', label: String(t.title || 'To-do'), sub: todoSub(t, 'To-do'), href: dealHref(t.deal_id) });
+  for (const t of projectTasks) add({ kind: 'todo', group: 'todos', label: String(t.title || 'Task'), sub: todoSub(t, 'Project task'), href: `/crm.html?project=${t.project_id}&tab=delivery` });
+  for (const m of support) add({ kind: 'message', group: 'messages', label: hit(m.subject) ? String(m.subject) : quoteOf(snippet(m.body, q, 80)), sub: ['Support request', shortDate(m.created_at)].filter(Boolean).join(' · '), href: `/inbox.html#support?sel=sup:${m.id}` });
+  for (const m of supportReplies) add({ kind: 'message', group: 'messages', label: quoteOf(snippet(m.body, q, 80)), sub: ['Support reply', shortDate(m.created_at)].filter(Boolean).join(' · '), href: `/inbox.html#support?sel=sup:${m.request_id}` });
+  for (const m of projectMsgs) add({ kind: 'message', group: 'messages', label: quoteOf(snippet(m.body, q, 80)), sub: ['Project message', shortDate(m.created_at)].filter(Boolean).join(' · '), href: `/crm.html?project=${m.project_id}&tab=activity` });
+  for (const e of logged) { const d = e.detail || {}; add({ kind: 'note', group: 'notes', label: quoteOf(snippet(d.body, q, 80)), sub: [LOGGED_WORD[String(d.activity_kind)] || 'Note', shortDate(d.occurred_at || e.created_at)].filter(Boolean).join(' · '), href: dealHref(e.deal_id, 'activity') }); }
+  // the relationship notes kept on each client's record
+  if (deep && sites.length) {
+    const ids = sites.filter((w) => !w.own).map((w) => w.id);
+    const nameOf: Record<string, string> = Object.fromEntries(sites.map((w) => [w.id, w.name]));
+    const notes = ids.length ? await read(`presence_relationship_notes?site_id=in.(${ids.join(',')})&deleted_at=is.null&body=${like}&select=id,site_id,body,created_at&order=created_at.desc&limit=4`) : [];
+    for (const n of notes) add({ kind: 'note', group: 'notes', label: quoteOf(snippet(n.body, q, 80)), sub: `Note on ${nameOf[String(n.site_id)] || 'a customer'}`, href: `/crm.html?client=${n.site_id}&tab=details` });
+  }
+  // actions on the matched customers (the ones with a record to land on)
+  for (const c of matchedCustomers.slice(0, 2)) {
+    const name = String(c.name || c.email || 'them');
+    add({ kind: 'action', group: 'actions', label: `Send invoice to ${name}`, sub: 'Action', href: `${recordHref(c)}&tab=billing&act=invoice` });
+    add({ kind: 'action', group: 'actions', label: `Message ${name}`, sub: 'Action', href: `${recordHref(c)}&tab=details&act=message` });
+  }
+  return json({ data: { results: arrangeResults(results), partial: failed > 0 } }, 200, cors);
 }
 
 /** ── /crm/messages — ONE activity thread per client (the Salesforce model) ──
