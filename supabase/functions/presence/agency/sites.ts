@@ -4,7 +4,9 @@
 // when it renews, who can edit) and as a table (Name · Team · Plan · Published ·
 // Last updated · Tags), pinned sites first, then the ones you opened last; every
 // domain in one list (status, provider, expiry); Pin and Duplicate on each site's
-// menu.
+// menu. Item 135 (Nov 10): + New site makes a site from a business name and,
+// if picked, a starter kit, with nobody emailed; Invite the owner is the later
+// step that gives the owner a login and makes them a customer.
 //
 // Where each fact comes from. Nothing new is stored but the pins:
 //   • the rows, names, tags and last changes: the portfolio gather (routes.ts), so
@@ -43,8 +45,15 @@ import { previewCache, previewCacheKey } from '../lib/preview_cache.ts';
 import { previewUrlMap } from '../lib/media.ts';
 import { withSampleWords } from '../lib/sample_words.ts';
 import { writeChangeEvent } from '../lib/provenance.ts';
-import { kitFromSite, applyKitTo } from './kit_io.ts';
+import { kitFromSite, applyKitTo, layoutFromSite } from './kit_io.ts';
+import type { KitPayload } from '../lib/kits.ts';
 import { UUID_LOWER_RE as UUID_RE } from '../lib/uuid.ts';
+import { normalizeCopied } from '../lib/site_layout.ts';
+import { keepCopied } from '../lib/copied_record.ts';
+import { claimPortfolioSite } from '../lib/connect_requests.ts';
+import { attachOwnerLogin, validEmail } from '../commerce/account.ts';
+import type { AttachOwnerError } from '../commerce/account.ts';
+import { provisionCustomerAccount, bridgeCustomerToStudio, ensureConnectContact, linkContactToCustomer, sendCustomerInvite } from '../routes/sales.ts';
 
 const rowsOf = <T,>(q: { ok?: boolean; json?: unknown } | null | undefined): T[] => (q && q.ok !== false && Array.isArray(q.json) ? (q.json as T[]) : []);
 
@@ -93,7 +102,13 @@ export function siteState(p: { edition?: string | null; status?: string | null; 
 /* ── who can edit ── */
 export interface SeatRow { site_id: string; email: string; role: string; status?: string | null }
 export interface StudioSeat { email: string; role: string }
-export interface OwnerRow { id: string; name?: string | null; email?: string | null }
+export interface OwnerRow { id: string; name?: string | null; email?: string | null; contact_email?: string | null; contact_id?: string | null }
+/** Item 135: does this client have an owner who can sign in? A site made with
+ *  "+ New site" has none until Invite the owner: no email on the client row and
+ *  no linked contact (the two ways my_client_ids() finds a client). Pure. */
+export function hasOwner(c: OwnerRow | null | undefined): boolean {
+  return !!c && !!(String(c.email || '').trim() || String(c.contact_email || '').trim() || c.contact_id);
+}
 export interface TeamMember { who: string; email: string; side: 'studio' | 'client'; role: string; me: boolean; invited: boolean }
 /** The studio roles that may open a client's site at all (lib/scope.ts asks bulk_publish). */
 export const STUDIO_EDITORS: readonly AgencyRole[] = ['owner', 'admin', 'account_manager'];
@@ -115,7 +130,7 @@ export function teamOf(i: { studio: StudioSeat[]; seats: SeatRow[]; owner?: Owne
     const email = String(s.email || '').toLowerCase();
     add({ who: email, email, side: 'studio', role: STUDIO_ROLE_WORDS[s.role] || s.role, me: !!me && email === me, invited: false });
   }
-  if (i.owner && !i.portalClient) {
+  if (i.owner && !i.portalClient && hasOwner(i.owner)) {
     const email = String(i.owner.email || '').toLowerCase();
     add({ who: String(i.owner.name || '').trim() || email, email, side: 'client', role: 'Owner', me: !!me && email === me, invited: false });
   }
@@ -173,6 +188,8 @@ export interface SitesInput {
   opened: Record<string, string>;
   pins: string[];
   nowIso: string;
+  /** item 145: the sites started from another site or a template, and whether the studio kept what came across */
+  copied?: Record<string, { from: string; kept: boolean }>;
 }
 export type SiteCard = ReturnType<typeof buildSites>[number];
 
@@ -209,6 +226,9 @@ export function buildSites(i: SitesInput) {
       // what the thumbnail route can draw: the live page, else the draft; a site
       // we only watch lives on someone else's host, so there is nothing of ours to draw
       thumb: hosted ? (state.key === 'not_live' ? 'draft' : 'live') : null,
+      copied: (i.copied && i.copied[p.site_id]) || null,
+      // item 135: made with + New site and nobody invited yet (only said when the client was read)
+      no_owner: ownerBy.has(clientId) && !hasOwner(ownerBy.get(clientId)),
     };
   });
   rows.sort((a, b) => {
@@ -231,6 +251,8 @@ export interface DomainIn {
   domain_lookup_status?: string | null;
   /** item 134: the padlock's end date, and since when the records were right with no padlock on */
   cert_expires_at?: string | null; cert_pending_since?: string | null;
+  /** item 134 (findings 3, 5): what the domain shows (latest · old_copy · other · unreachable), and the checklist */
+  domain_serving?: string | null; domain_checks?: Array<{ key: string; ok: boolean; words: string }> | null;
 }
 export type DomainTone = 'good' | 'warn' | 'bad' | 'quiet';
 /** One domain's status in a few words. Expiry first, on the same 30-day line as
@@ -250,13 +272,18 @@ export function domainStatus(d: DomainIn, nowIso: string): { key: string; words:
   const pe = d.edition !== 'monitor' ? daysBetween(nowIso, d.cert_expires_at) : null;
   if (pe !== null && pe <= PADLOCK_SOON_DAYS) return is('padlock', pe < 0 ? 'Padlock ended' : pe === 0 ? 'Padlock ends today' : `Padlock ends in ${plural(pe)}`, 'warn');
   if ((Number(d.uptime_fail_streak) || 0) >= DOWN_THRESHOLD) return is('down', 'Not answering', 'bad');
+  // item 134 (review findings 3 and 5): "Connected" needs the domain to show OUR latest site
+  if (d.edition !== 'monitor' && d.domain_serving === 'old_copy') return is('old_copy', 'Showing an old copy', 'bad');
+  if (d.edition !== 'monitor' && d.domain_serving === 'other') return is('other_site', 'Showing something else', 'bad');
+  if (d.edition !== 'monitor' && Array.isArray(d.domain_checks) && d.domain_checks.some((c) => c && c.ok === false && c.key !== 'serving')) return is('partly', 'Not fully set up', 'warn');
+  if (d.domain_serving === 'latest') return is('connected', 'Connected', 'good');
   if (d.uptime_ok === true) return is('connected', 'Connected', 'good');
   return is('checking', 'Not checked yet', 'quiet');
 }
 /** Every custom domain with its status, provider and expiry, the most urgent
  *  first; and the hosted sites still on their built-in address. Pure. */
 export function buildDomains(rows: DomainIn[], nowIso: string) {
-  const RANK: Record<string, number> = { expired: 0, down: 1, expiring: 2, padlock: 3, offline: 4, checking: 5, not_live: 6, elsewhere: 7, connected: 8 };
+  const RANK: Record<string, number> = { expired: 0, down: 1, old_copy: 2, other_site: 3, expiring: 4, padlock: 5, partly: 6, offline: 7, checking: 8, not_live: 9, elsewhere: 10, connected: 11 };
   const domains = rows.filter((r) => r.custom_domain).map((r) => {
     const st = domainStatus(r, nowIso);
     return {
@@ -268,6 +295,7 @@ export function buildDomains(rows: DomainIn[], nowIso: string) {
       // item 132: a lookup that failed or found no record is said, never a quiet "Not known yet"
       record: r.domain_lookup_status === 'failed' || r.domain_lookup_status === 'not_found' ? 'unreadable' : r.domain_lookup_status === 'ok' ? 'ok' : 'unknown',
       padlock_until: r.edition !== 'monitor' ? (r.cert_expires_at || null) : null,   // item 134
+      checks: r.edition !== 'monitor' && Array.isArray(r.domain_checks) ? r.domain_checks.filter((c) => c && typeof c.words === 'string').map((c) => ({ ok: c.ok === true, words: c.words })) : [],   // item 134: what was checked, for the row
       hosted: r.edition !== 'monitor',
     };
   });
@@ -399,7 +427,7 @@ const forbid = (cors: Record<string, string>) => json({ error: 'forbidden', mess
 const notYours = (cors: Record<string, string>) => json({ error: 'not_found', message: 'Not one of your clients.' }, 404, cors);
 const EXTRA_COLS = 'id,client_id,netlify_site_id,offline_at,uptime_ok,uptime_fail_streak,domain_checked_at,template_slug,created_at';
 /** the Domains page also reads the lookup's result and the padlock (items 132 and 134, migration 0149) */
-const DOMAIN_COLS = `${EXTRA_COLS},domain_lookup_status,cert_expires_at,cert_pending_since`;
+const DOMAIN_COLS = `${EXTRA_COLS},domain_lookup_status,cert_expires_at,cert_pending_since,domain_serving,domain_checks`;   // domain_serving, domain_checks: 0153
 
 /** The Sites and Domains routes, or null when the route is someone else's. */
 export async function handleAgencySites(req: Request, route: string, method: string, member: AgencyMember, principal: Principal, cors: Record<string, string>, deps: SitesDeps): Promise<Response | null> {
@@ -417,11 +445,11 @@ export async function handleAgencySites(req: Request, route: string, method: str
     const soft = () => ({ ok: false, json: null as unknown });
     const userId = UUID_RE.test(String(principal.userId || '')) ? String(principal.userId) : '';
     // each read is best-effort: a failed one leaves its column empty and `partial` says so
-    const [extraQ, planQ, seatQ, ownerQ, linkQ, studioQ, openQ, pins] = await Promise.all([
+    const [extraQ, planQ, seatQ, ownerQ, linkQ, studioQ, openQ, pins, copiedQ] = await Promise.all([
       ids.length ? svc(`presence_sites?id=${IN}&select=${EXTRA_COLS}&limit=1000`).catch(soft) : none,
       clientIds.length ? svc(`presence_entitlements?client_id=in.(${clientIds.join(',')})&product=eq.presence&select=client_id,plan,status,term,current_period_end,trial_ends_at,cancel_at_period_end&limit=1000`).catch(soft) : none,
       ids.length ? svc(`presence_site_members?site_id=${IN}&status=in.(active,invited)&select=site_id,email,role,status&limit=2000`).catch(soft) : none,
-      clientIds.length ? svc(`clients?id=in.(${clientIds.join(',')})&select=id,name,email&limit=1000`).catch(soft) : none,
+      clientIds.length ? svc(`clients?id=in.(${clientIds.join(',')})&select=id,name,email,contact_email,contact_id&limit=1000`).catch(soft) : none,
       ids.length ? svc(`presence_service_links?customer_site_id=${IN}&status=eq.active&select=customer_site_id&limit=1000`).catch(soft) : none,
       svc(`presence_agency_members?agency_id=eq.${member.agency_id}&status=eq.active&select=email,role&limit=200`).catch(soft),
       // "last opened": this member's own visits inside clients, newest first (psae_operator_idx). Only the
@@ -429,19 +457,64 @@ export async function handleAgencySites(req: Request, route: string, method: str
       // requests, so the thousand rows reach back a thousand pages, not thirty.
       userId && ids.length ? svc(`presence_scoped_access_events?operator_user_id=eq.${userId}&outcome=eq.allowed&route=eq.${encodeURIComponent('/portal/context')}&select=client_site_id,created_at&order=created_at.desc&limit=1000`).catch(soft) : none,
       deps.ownSite().then(async (own) => (own ? { ok: true, own: true, pins: normalizePins(await readReservedJson(own.id, RESERVED_NAMES.sitePins))[member.member_id] || [] } : { ok: true, own: false, pins: [] as string[] })).catch(() => ({ ok: false, own: false, pins: [] as string[] })),
+      // item 145: which sites were started from another site or a template (their copy records)
+      ids.length ? svc(`presence_sales_templates?site_id=${IN}&kind=eq.proposal&name=eq.${encodeURIComponent(RESERVED_NAMES.copiedFrom)}&deleted_at=is.null&select=site_id,body&limit=1000`).catch(soft) : none,
     ]);
+    const copied: Record<string, { from: string; kept: boolean }> = {};
+    for (const r of rowsOf<{ site_id: string; body: string }>(copiedQ)) {
+      let rec = null; try { rec = normalizeCopied(JSON.parse(String(r.body || 'null'))); } catch { rec = null; }
+      if (rec) copied[r.site_id] = { from: rec.from, kept: rec.kept };
+    }
     const rows = buildSites({
       portfolio, extras: rowsOf<SiteExtra>(extraQ), plans: rowsOf<PlanRow>(planQ), seats: rowsOf<SeatRow>(seatQ), owners: rowsOf<OwnerRow>(ownerQ),
       portalSites: rowsOf<{ customer_site_id: string }>(linkQ).map((l) => String(l.customer_site_id)),
       studio: rowsOf<StudioSeat>(studioQ), me: member.email, opened: lastOpenedBySite(rowsOf(openQ)),
-      pins: pins.pins.filter((id) => ids.includes(id)), nowIso: now,
+      pins: pins.pins.filter((id) => ids.includes(id)), nowIso: now, copied,
     });
-    const partial = [extraQ, planQ, seatQ, ownerQ, linkQ, studioQ, openQ].some((q) => (q as { ok?: boolean }).ok === false) || !pins.ok;
+    const partial = [extraQ, planQ, seatQ, ownerQ, linkQ, studioQ, openQ, copiedQ].some((q) => (q as { ok?: boolean }).ok === false) || !pins.ok;
     // a studio seat that can't open a client (lib/scope.ts asks bulk_publish) gets no doors into one,
     // and not the client's own people by name
     const canOpen = can(member.role, 'bulk_publish');
     if (!canOpen) for (const r of rows) r.team = r.team.map((t) => (t.side === 'client' ? { ...t, who: 'Someone on their side', email: '' } : t));
-    return json({ data: rows, partial, can_open: canOpen, can_pin: pins.own, can_duplicate: can(member.role, 'manage_clients') }, 200, cors);
+    const manage = can(member.role, 'manage_clients');
+    return json({ data: rows, partial, can_open: canOpen, can_pin: pins.own, can_duplicate: manage, can_create: manage }, 200, cors);
+  }
+
+  // ── + New site (item 135): a site from a business name and, if picked, one of
+  //    the studio's starter kits. Nobody is emailed and nobody gets a login: the
+  //    client record has no owner until Invite the owner (below). The site joins
+  //    the studio's portfolio, so Sites, Home and the doors into it work; it joins
+  //    the studio's customers when its owner is invited. The account and the site
+  //    are made the one way every customer's are (routes/sales.ts
+  //    provisionCustomerAccount, no email: "a studio-managed workspace"). ──
+  if (route === '/agency/sites' && method === 'POST') {
+    if (!can(member.role, 'manage_clients')) return forbid(cors);
+    let b: { business_name?: unknown; kit_id?: unknown } = {}; try { b = await req.json(); } catch { /* answered below */ }
+    const name = String(b.business_name ?? '').replace(/\s+/g, ' ').trim().slice(0, 120);
+    if (!name) return json({ error: 'bad_request', message: 'Name the business.' }, 400, cors);
+    const kitId = b.kit_id == null || b.kit_id === '' ? '' : String(b.kit_id);
+    if (kitId && !UUID_RE.test(kitId)) return json({ error: 'not_found', message: 'That starter kit isn’t one of yours.' }, 404, cors);
+    const links = rowsOf<{ site_id: string }>(await svc(`presence_agency_clients?agency_id=eq.${member.agency_id}&select=site_id&limit=1000`));
+    if (links.length >= member.client_limit) return json({ error: 'client_limit', message: `The plan covers ${member.client_limit} clients — the limit can grow with the plan.` }, 400, cors);
+    // the kit is checked before anything is made, so a wrong one makes nothing
+    const kit = kitId ? rowsOf<{ name: string; payload: KitPayload }>(await svc(`presence_starter_kits?id=eq.${kitId}&agency_id=eq.${member.agency_id}&select=name,payload&limit=1`))[0] : null;
+    if (kitId && !kit) return json({ error: 'not_found', message: 'That starter kit isn’t one of yours.' }, 404, cors);
+    const acct = await provisionCustomerAccount({ email: '', businessName: name, plan: 'presence', actorEmail: member.email });
+    if (!acct.ok || !acct.clientId || !acct.siteId) return json({ error: acct.error || 'provision_incomplete', message: acct.message || 'We couldn’t make the site just now — please try again.' }, acct.httpStatus || 502, cors);
+    const claim = await claimPortfolioSite(member.agency_id, acct.siteId, '');
+    if (claim !== 'linked' && claim !== 'already') {
+      await svc(`clients?id=eq.${acct.clientId}`, { method: 'DELETE' }).catch(() => {});   // nothing lingers: the site and its plan go with the client
+      return json({ error: 'write_failed', message: 'The site didn’t save — please try again.' }, 502, cors);
+    }
+    // the kit, on its own: a kit that won't apply never undoes the site (the page offers it again)
+    let kitOut: { id: string; name: string; applied?: Record<string, unknown>; skipped?: string[]; failed?: boolean } | null = null;
+    if (kit) {
+      // a template (item 145) brings pages too: its copied words and photos are recorded under its name, as Apply does
+      const tpl = !!kit.payload.layout;
+      try { kitOut = { id: kitId, name: kit.name, ...(await applyKitTo(kit.payload, acct.siteId, principal, `Started from the “${kit.name}” ${tpl ? 'template' : 'starter kit'}`, tpl ? { label: `your “${kit.name}” template` } : {})) }; }
+      catch { kitOut = { id: kitId, name: kit.name, failed: true }; }
+    }
+    return json({ data: { site_id: acct.siteId, client_id: acct.clientId, name, kit: kitOut } }, 201, cors);
   }
 
   // ── every domain: the clients' and the studio's own ──
@@ -465,7 +538,7 @@ export async function handleAgencySites(req: Request, route: string, method: str
     return json({ data: buildDomains(list, now), partial: (extraQ as { ok?: boolean }).ok === false }, 200, cors);
   }
 
-  const m = route.match(/^\/agency\/sites\/([0-9a-f-]{36})\/(thumb|pin|duplicate)$/);
+  const m = route.match(/^\/agency\/sites\/([0-9a-f-]{36})\/(thumb|pin|duplicate|copied|invite)$/);
   if (!m) return null;
   const siteId = m[1], what = m[2];
 
@@ -501,12 +574,15 @@ export async function handleAgencySites(req: Request, route: string, method: str
     return json({ data: { site_id: siteId, pinned, pins: stored[member.member_id] || [] } }, 200, cors);
   }
 
-  // ── Duplicate site (item 45): a NEW customer's site starts from this one's
-  //    setup. The page creates the customer first (POST /sales/customers, the Add
-  //    a customer flow) and sends the new site here. Starter kits do the copying
+  // ── Duplicate site (item 45): a NEW customer's site starts from this one. The
+  //    page creates the customer first (POST /sales/customers, the Add a customer
+  //    flow) and sends the new site here. Starter kits do the copying
   //    (agency/kit_io.ts): services, FAQs, voice, colors and industry, fill-only-
-  //    empty; plus the look (the template), which never touches content. Business
-  //    facts, photos, reviews and the pages' own words are never copied. ──
+  //    empty; and since item 145 the pages too: every section with its words and
+  //    copies of its photos, the menu, the look. The old business's name in the
+  //    words becomes the new one, and publishing lists whatever is still exactly
+  //    as copied until it is changed or kept (lib/site_layout.ts). Business
+  //    details, reviews, testimonials, posts and contacts are never copied. ──
   if (what === 'duplicate' && method === 'POST') {
     if (!can(member.role, 'manage_clients')) return forbid(cors);
     let b: { site_id?: unknown } = {}; try { b = await req.json(); } catch { /* answered below */ }
@@ -521,19 +597,81 @@ export async function handleAgencySites(req: Request, route: string, method: str
     const names = rowsOf<{ id: string; name: string }>(await svc(`clients?id=eq.${src.client_id}&select=id,name&limit=1`).catch(() => null));
     const from = String(names[0]?.name || 'another site').trim();
     const kit = await kitFromSite(src.id);
+    kit.layout = await layoutFromSite(src.id, { label: from });
+    // a site with no pages of its own still passes on its look
+    if (!kit.layout.template_slug) kit.layout.template_slug = src.template_slug || null;
     const applied = await applyKitTo(kit, dst.id, principal, `Started from ${from}’s setup`);
-    // the look: the source's template at its latest version, as Styles would set it
-    let look: string | null = null;
-    const version = latestTemplateVersion(src.template_slug);
-    const tpl = version ? getTemplate(src.template_slug, version) : null;
-    if (tpl && src.template_slug !== dst.template_slug) {
-      const w = await svc(`presence_sites?id=eq.${dst.id}`, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ template_slug: src.template_slug, template_version: version }) });
-      if (w.ok) {
-        look = tpl.manifest.name;
-        await writeChangeEvent({ siteId: dst.id, entityType: 'settings', entityId: null, action: 'update', summary: `Changed the site’s look to ${tpl.manifest.name}`, principal, provenance: 'human', fields: ['template_slug'] });
-      } else applied.skipped.push('the look (that didn’t save)');
-    } else if (tpl) look = tpl.manifest.name;
-    return json({ data: { site_id: dst.id, from_site_id: src.id, look, applied: applied.applied, skipped: applied.skipped } }, 200, cors);
+    let look = applied.layout && applied.layout.applied ? applied.layout.look : null;
+    if (!look) {
+      // the look on its own, when no pages came across: the source's template at its latest version, as Styles would set it
+      const version = latestTemplateVersion(src.template_slug);
+      const tpl = version ? getTemplate(src.template_slug, version) : null;
+      if (tpl && src.template_slug !== dst.template_slug) {
+        const w = await svc(`presence_sites?id=eq.${dst.id}`, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ template_slug: src.template_slug, template_version: version }) });
+        if (w.ok) {
+          look = tpl.manifest.name;
+          await writeChangeEvent({ siteId: dst.id, entityType: 'settings', entityId: null, action: 'update', summary: `Changed the site’s look to ${tpl.manifest.name}`, principal, provenance: 'human', fields: ['template_slug'] });
+        } else applied.skipped.push('the look (that didn’t save)');
+      } else if (tpl) look = tpl.manifest.name;
+    }
+    const pages = applied.layout && applied.layout.applied ? { pages: applied.layout.pages, sections: applied.layout.sections, menu: applied.layout.menu, photos: applied.layout.photos, photos_failed: applied.layout.photos_failed } : null;
+    return json({ data: { site_id: dst.id, from_site_id: src.id, look, applied: applied.applied, pages, skipped: applied.skipped } }, 200, cors);
+  }
+
+  // ── Keep them as they are (item 145): the studio has looked at what Duplicate
+  //    or a template copied onto this site, and it may publish as it is. ──
+  if (what === 'copied' && method === 'POST') {
+    if (!can(member.role, 'manage_clients')) return forbid(cors);
+    let b: { keep?: unknown } = {}; try { b = await req.json(); } catch { /* answered below */ }
+    if (b.keep !== true) return json({ error: 'bad_request', message: 'Say keep: true.' }, 400, cors);
+    if (!(await agencySiteIds(member.agency_id)).includes(siteId)) return notYours(cors);
+    const rec = await keepCopied(siteId, member.email);
+    if (!rec) return json({ error: 'not_found', message: 'Nothing was copied onto this site.' }, 404, cors);
+    await writeChangeEvent({ siteId, entityType: 'settings', entityId: null, action: 'update', summary: `Kept the words and photos copied from ${rec.from} as they are`, principal, provenance: 'human' }).catch(() => {});
+    return json({ data: { site_id: siteId, copied: { from: rec.from, kept: rec.kept } } }, 200, cors);
+  }
+
+  // ── Invite the owner (item 135): the later, separate step for a site made with
+  //    + New site. Their login (commerce/account.ts attachOwnerLogin), then what
+  //    Add a customer does for a new customer: the studio's project and portal
+  //    link, the person in the studio's contacts, and the sign-in email on the
+  //    studio's brand. An email that already has an account is refused, never
+  //    attached. Nothing on the site changes and nothing is published. ──
+  if (what === 'invite' && method === 'POST') {
+    if (!can(member.role, 'manage_clients')) return forbid(cors);
+    let b: { email?: unknown; name?: unknown } = {}; try { b = await req.json(); } catch { /* answered below */ }
+    const email = String(b.email ?? '').trim().toLowerCase().slice(0, 160);
+    const person = String(b.name ?? '').replace(/\s+/g, ' ').trim().slice(0, 120);
+    if (!validEmail(email)) return json({ error: 'validation', message: 'Enter their email — that’s where the sign-in link goes.' }, 422, cors);
+    if (!(await agencySiteIds(member.agency_id)).includes(siteId)) return notYours(cors);
+    const site = rowsOf<{ id: string; client_id: string | null }>(await svc(`presence_sites?id=eq.${siteId}&select=id,client_id&limit=1`))[0];
+    const client = site?.client_id ? rowsOf<OwnerRow>(await svc(`clients?id=eq.${site.client_id}&select=id,name,email,contact_email,contact_id&limit=1`))[0] : null;
+    if (!client) return notYours(cors);
+    if (hasOwner(client)) return json({ error: 'has_owner', message: 'This site already has an owner.' }, 409, cors);
+    const own = await deps.ownSite();
+    if (!own) return json({ error: 'no_studio_site', message: 'Invitations go out from your studio’s own site, and this sign-in doesn’t have one.' }, 409, cors);
+    const login = await attachOwnerLogin(client.id, email, person || String(client.name || ''));
+    if (!login.ok) return inviteRefused(login.error, cors);
+    const label = String(client.name || '').trim() || 'New customer';
+    // best-effort from here, as in Add a customer: the login is the truth
+    await bridgeCustomerToStudio({ agencySiteId: own.id, clientId: client.id, customerSiteId: siteId, label }).catch(() => null);
+    const ct = await ensureConnectContact(own.id, email, person, false).catch(() => null);
+    await linkContactToCustomer(own.id, ct?.id, client.id).catch(() => {});
+    await svc(`presence_agency_clients?site_id=eq.${siteId}&agency_id=eq.${member.agency_id}`, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ owner_email: email }) }).catch(() => null);
+    const invited = await sendCustomerInvite(own.id, email, true).catch(() => false);
+    await writeChangeEvent({ siteId: own.id, entityType: 'client', entityId: client.id, action: 'invite', summary: `Invited the owner of ${label}`, principal, provenance: 'human' }).catch(() => {});
+    return json({ data: { site_id: siteId, email, invited } }, 200, cors);
   }
   return null;
+}
+
+const REFUSED: Record<AttachOwnerError, [number, string]> = {
+  account_exists: [409, 'That email already has a Studio OS account, so it can’t be a new owner here. Use another address for this business.'],
+  has_owner: [409, 'This site already has an owner.'],
+  auth_failed: [502, 'We couldn’t set up their sign-in just now — please try again.'],
+  contact_failed: [502, 'We couldn’t set up their sign-in just now — please try again.'],
+};
+function inviteRefused(error: AttachOwnerError, cors: Record<string, string>): Response {
+  const [status, message] = REFUSED[error];
+  return json({ error, message }, status, cors);
 }

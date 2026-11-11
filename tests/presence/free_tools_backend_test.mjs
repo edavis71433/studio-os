@@ -61,6 +61,25 @@ ok('subject name: one line, no angle brackets', subjectName('Rosa\r\nBcc: x@y.z 
 ok('subject name: bounded length', subjectName('a'.repeat(300)).length === 80);
 ok('subject name: fallback when empty', subjectName('') === 'your business');
 
+// ── SSRF guard: the deep audit's own copy of _shared/tools/url_guard.ts ──
+// The URL parser rewrites [::ffff:127.0.0.1] as [::ffff:7f00:1]; an IPv6 address
+// that carries an IPv4 one must be judged by that IPv4 address in both copies.
+const guardSrc = ['_ipv4Blocked', '_ipv6Groups', '_ipv6Blocked', '_ipBlocked', '_isIpLiteral'].map(extractFn).join('\n') + '\nasync ' + extractFn('assertPublicHttpUrl');
+const cleverGuard = await import('data:application/typescript,' + encodeURIComponent(`${guardSrc}\nexport { _ipBlocked, assertPublicHttpUrl };`));
+const { ipBlocked } = await import('../../supabase/functions/_shared/tools/url_guard.ts');
+const cleverRefuses = async (u) => { try { await cleverGuard.assertPublicHttpUrl(u); return false; } catch { return true; } };
+const through = [];
+for (const u of ['http://[::ffff:127.0.0.1]/', 'http://[::ffff:7f00:1]/', 'http://[::ffff:169.254.169.254]/latest', 'http://[::ffff:a9fe:a9fe]/',
+  'http://[::ffff:10.0.0.5]/', 'http://[::ffff:c0a8:101]/', 'http://[::127.0.0.1]/', 'http://[64:ff9b::a9fe:a9fe]/', 'http://[2002:c0a8:101::1]/',
+  'http://[::1]/', 'http://[fe80::1]/', 'http://[fd12::1]/', 'http://127.0.0.1/', 'http://0xa9fea9fe/']) if (!(await cleverRefuses(u))) through.push(u);
+ok('SSRF guard: refuses loopback, metadata and private addresses, IPv6 that carries one included', through.length === 0, through.join(' '));
+ok('SSRF guard: allows a public address, written as IPv6 too', !(await cleverRefuses('http://[::ffff:5db8:d822]/')) && !(await cleverRefuses('http://[2002:5db8:d822::1]/')) && !(await cleverRefuses('http://[2606:4700:4700::1111]/')) && !(await cleverRefuses('http://93.184.216.34/')));
+const sample = ['127.0.0.1', '10.0.0.5', '169.254.169.254', '100.64.0.1', '93.184.216.34', '8.8.8.8', '::', '::1', '[::ffff:7f00:1]',
+  '::ffff:127.0.0.1', '::ffff:a9fe:a9fe', '::ffff:5db8:d822', '::ffff:93.184.216.34', '::7f00:1', '64:ff9b::a9fe:a9fe', '64:ff9b::5db8:d822',
+  '2002:c0a8:101::1', '2002:5db8:d822::1', 'fe80::1', 'fc00::1', 'fec0::1', 'ff02::1', '::ffff:0:7f00:1', '64:ff9b:1::a00:5', '2606:4700:4700::1111'];
+const differ = sample.filter((a) => cleverGuard._ipBlocked(a) !== ipBlocked(a));
+ok('SSRF guard: judges every address as _shared/tools/url_guard.ts does', differ.length === 0, differ.join(' '));
+
 const failed = results.filter((x) => !x).length;
 console.log(`\n${results.length - failed}/${results.length} passed`);
 if (failed) Deno.exit(1);

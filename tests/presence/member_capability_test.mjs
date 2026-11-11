@@ -190,6 +190,7 @@ const DECIDED = {
     'POST /projects/:id/deliverables', 'POST /projects/:id/deliverables/upload-url', 'POST /projects/:id/milestones',
     'POST /projects/:id/status', 'POST /projects/:id/surveys', 'POST /projects/:id/tasks',
     'POST /publishes/:id/label', 'POST /publishes/checkpoints', 'POST /publishes/checkpoints/:id/restore',
+    'POST /page-locks',   // builder items 48 and 120: a page's password, as editing the page's settings is
     'POST /redirects', 'POST /restore-to-draft', 'POST /review/reports/:id/dismiss', 'POST /review/run',
     'POST /reviews/:id/approve', 'POST /reviews/:id/hide', 'POST /reviews/:id/reply', 'POST /sales/contacts',
     'POST /sales/contacts/:id/restore', 'POST /sales/contracts/:id/send', 'POST /sales/contracts/:id/term',
@@ -428,7 +429,7 @@ const WRITE_HANDLERS = [
   'handleMediaUpdate', 'handleMediaUpload', 'handleMemberAdd', 'handleMemberRevoke', 'handleMessages',
   'handleMilestone', 'handleMilestonesCreate', 'handleMomentDismiss', 'handleMonitorConnect',
   'handleMonitorDisconnect', 'handleMonitorVerify', 'handleNoteResolve', 'handleNotificationsRead',
-  'handlePageDuplicate', 'handlePreviewPromote', 'handlePreviewPublish', 'handlePreviewSection', 'handlePreviewSettings',
+  'handlePageDuplicate', 'handlePageLockCreate', 'handlePreviewPromote', 'handlePreviewPublish', 'handlePreviewSection', 'handlePreviewSettings',
   'handlePreviewShareLink', 'handleProject', 'handleProjectChecklist', 'handleProjectStatus', 'handleProjectSurveys',
   'handleProjects', 'handlePublish', 'handlePutIdentity', 'handlePutTemplate', 'handleRedirectCreate',
   'handleRedirectDelete', 'handleRestore', 'handleRestoreToDraft', 'handleReviewApprove', 'handleReviewDismiss',
@@ -448,6 +449,10 @@ const WRITE_HANDLERS = [
   'handleRecurringStart', 'handleRecurringChange', 'handleRecurringAction',
   // sales review item 112: prospects (DELETE and PATCH /sales/prospects/:id share handleProspect)
   'handleProspects', 'handleProspect', 'handleProspectDiscover', 'handleProspectConvert', 'handleProspectDraft', 'handleProspectPack',
+  // sales review item 114: free-tool leads are the PLATFORM's own enquiries. Deliberately on
+  // no member list (an unlisted write refuses every seat — asserted above), and the handlers
+  // themselves refuse anyone who isn't platform staff (tool_leads_routes_test.mjs proves it).
+  'handleToolLead', 'handleToolLeadConvert',
   'handleStudioRequests',   // final pass S1: POST /portal/studio-requests/:id/(accept|decline) are open; the route answers the owner only
   'handleScheduleCancel', 'handleScheduleCreate', 'handleSettings', 'handleShareSet', 'handleStockImport',
   'handleSupport', 'handleSupportMessage', 'handleSupportOne', 'handleSurveyRespond', 'handleTakeOffline',

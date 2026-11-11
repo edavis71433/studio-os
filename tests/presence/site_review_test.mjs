@@ -34,6 +34,34 @@ ok('guard: refuses other schemes, credentials and single-label hosts',
   (await rejects(() => assertPublicHttpUrl('https://user:pw@example.com/', noDns))) && (await rejects(() => assertPublicHttpUrl('http://intranet/', noDns))));
 ok('guard: refuses a public name that resolves to a private address', await rejects(() => assertPublicHttpUrl('https://sneaky.example.com/', async (_h, t) => (t === 'A' ? ['10.1.2.3'] : []))));
 ok('guard: allows a normal public site', !(await rejects(() => assertPublicHttpUrl('https://www.bacchuskitchen.com/', async (_h, t) => (t === 'A' ? ['198.185.159.144'] : [])))));
+// An IPv6 address can carry an IPv4 one, and the URL parser rewrites
+// [::ffff:127.0.0.1] as [::ffff:7f00:1], so every spelling must be judged.
+const allowedOf = async (urls, resolve = noDns) => { const out = []; for (const u of urls) if (!(await rejects(() => assertPublicHttpUrl(u, resolve)))) out.push(u); return out; };
+{
+  const carried = ['http://[::ffff:127.0.0.1]/', 'http://[::ffff:7f00:1]/', 'http://[0:0:0:0:0:ffff:7f00:1]/',
+    'http://[::ffff:169.254.169.254]/latest', 'http://[::ffff:a9fe:a9fe]/latest/meta-data',
+    'http://[::ffff:10.0.0.5]/', 'http://[::ffff:c0a8:101]/', 'http://[::ffff:ac10:1]/', 'http://[::ffff:6440:1]/',
+    'http://[::127.0.0.1]/', 'http://[::a9fe:a9fe]/',
+    'http://[64:ff9b::7f00:1]/', 'http://[64:ff9b::169.254.169.254]/', 'http://[64:ff9b::a00:5]/',
+    'http://[2002:7f00:1::]/', 'http://[2002:a9fe:a9fe::1]/', 'http://[2002:c0a8:101::1]/'];
+  const through = await allowedOf(carried);
+  ok('guard: refuses IPv6 that carries a loopback, metadata or private IPv4 address (mapped hex or dotted, compatible, NAT64, 6to4)', through.length === 0, through.join(' '));
+  const local = ['http://[::1]/', 'http://[::]/', 'http://[fe80::1]/', 'http://[fc00::1]/', 'http://[fd12:3456:789a::1]/',
+    'http://[fec0::1]/', 'http://[ff02::1]/', 'http://[::ffff:0:7f00:1]/', 'http://[64:ff9b:1::a00:5]/'];
+  const localThrough = await allowedOf(local);
+  ok('guard: refuses IPv6 loopback, link-local, unique-local, multicast and reserved addresses', localThrough.length === 0, localThrough.join(' '));
+  const answers = ['::ffff:127.0.0.1', '::ffff:7f00:1', '::ffff:a9fe:a9fe', '64:ff9b::a00:1', '2002:c0a8:101::1', 'fe80::1'];
+  const answersThrough = [];
+  for (const ip of answers) if (!(await rejects(() => assertPublicHttpUrl('https://sneaky.example.com/', async (_h, t) => (t === 'AAAA' ? [ip] : ['93.184.216.34']))))) answersThrough.push(ip);
+  ok('guard: refuses a public name whose IPv6 answer carries a private address', answersThrough.length === 0, answersThrough.join(' '));
+  const publicV6 = ['http://[::ffff:5db8:d822]/', 'http://[::ffff:93.184.216.34]/', 'http://[64:ff9b::5db8:d822]/', 'http://[2002:5db8:d822::1]/', 'http://[2606:4700:4700::1111]/'];
+  const allowed = await allowedOf(publicV6);
+  ok('guard: allows a public address written as IPv6 (93.184.216.34 mapped, NAT64, 6to4; a plain public IPv6)',
+    allowed.length === publicV6.length && !(await rejects(() => assertPublicHttpUrl('https://www.example.com/', async (_h, t) => (t === 'AAAA' ? ['2606:4700:4700::1111', '::ffff:93.184.216.34'] : ['93.184.216.34'])))),
+    publicV6.filter((u) => !allowed.includes(u)).join(' '));
+  const spelled = await allowedOf(['http://2130706433/', 'http://0x7f.1/', 'http://017700000001/', 'http://0xa9fea9fe/']);
+  ok('guard: refuses loopback and metadata written as one number, in hex or in octal', spelled.length === 0, spelled.join(' '));
+}
 ok('normalize: adds https, drops the fragment, refuses junk',
   normalizeSiteUrl('bacchuskitchen.com') === 'https://bacchuskitchen.com/' && normalizeSiteUrl('http://x.com/a#b') === 'http://x.com/a' &&
   normalizeSiteUrl('mailto:a@b.com') === null && normalizeSiteUrl('not a url') === null && normalizeSiteUrl('localhost') === null && normalizeSiteUrl('') === null);

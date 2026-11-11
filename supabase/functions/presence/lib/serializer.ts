@@ -14,6 +14,7 @@ import { validateBlocksWithMap, resolveBlockMediaTracked, renderSiteBlocks, type
 import { esc, attr, safeHref } from './markdown.ts';
 import { linkedRefIds, resolveLinkedBlocksTracked } from './linked_sections.ts';
 import { RESERVED_PAGE_SLUGS } from './page_ops.ts';
+import { pageShowFields, type PageShow } from './page_access.ts';
 import { aggregateApproved, shapeReviewsForDisplay } from './reviews.ts';
 import { normalizeTags } from './search_index.ts';
 import { UUID_RE as SHARE_UUID_RE, UUID_PATTERN } from './uuid.ts';
@@ -254,9 +255,10 @@ export function buildSnapshot(rows: DraftRows, manifest: TemplateManifest, opts:
     seenSlugs.add(slug);
     const title = (String(p?.title || '').trim().slice(0, 80)) || slug;
     const pc = compose(Array.isArray(p?.blocks) ? p.blocks : []);
-    const base = { slug, title, blocks: pc.blocks, blocks_src: pc.src };
+    // items 48 and 120: who can see it, and whether it shows the header and footer (absent = as before)
+    const base = { slug, title, blocks: pc.blocks, blocks_src: pc.src, ...pageShowFields(p) };
     return p?.hideNav === true ? { ...base, hideNav: true } : base;
-  }).filter((p): p is { slug: string; title: string; blocks: SiteBlock[]; blocks_src: number[]; hideNav?: boolean } => !!p);
+  }).filter((p): p is { slug: string; title: string; blocks: SiteBlock[]; blocks_src: number[]; hideNav?: boolean } & PageShow => !!p);
 
   // Editable GLOBAL nav (the header/footer are global — one edit changes every page).
   // Each item: a trimmed/capped label + a SAFE href — an internal path ("/", "/x/") or
@@ -277,10 +279,15 @@ export function buildSnapshot(rows: DraftRows, manifest: TemplateManifest, opts:
   };
   const rawNav: any[] = Array.isArray(settings.nav) ? settings.nav : [];
   const customNav = rawNav.slice(0, 12).map((it: any) => {
-    const top = navItem(it); if (!top) return null;
     const kids = (Array.isArray(it?.children) ? it.children : []).slice(0, 8).map(navItem).filter(Boolean) as Array<{ label: string; href: string }>;
+    // Builder list item 48: a folder is a heading with no page; it's drawn only with something in it
+    if (it?.folder === true) {
+      const label = String(it?.label ?? '').replace(/\s+/g, ' ').trim().slice(0, 40);
+      return label && kids.length ? { label, href: '', folder: true as const, children: kids } : null;
+    }
+    const top = navItem(it); if (!top) return null;
     return kids.length ? { ...top, children: kids } : top;
-  }).filter(Boolean) as Array<{ label: string; href: string; children?: Array<{ label: string; href: string }> }>;
+  }).filter(Boolean) as Array<{ label: string; href: string; folder?: true; children?: Array<{ label: string; href: string }> }>;
 
   const content: SnapshotContent = {
     identity: {

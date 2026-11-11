@@ -52,6 +52,7 @@ import { handleAssetsList, handleAssetsCollections, handleAssetsHealth, handleAs
 const { handleVisualKinds, handleVisualGenerate, handleVisualList, handleVisualGet, handleVisualVary, handleVisualEdit, handleVisualDecide } = lazyRoutes(() => import('./routes/visual.ts'));
 const { handleAdmin, handleDomain } = lazyRoutes(() => import('./routes/admin.ts'));
 import { handleCollection, handleLocation, handleSettings, handleBlockSuggestions, handlePageDuplicate, handlePageRefs, SPECS } from './routes/content.ts';
+import { handlePageLockCreate, handlePageLockList } from './routes/page_locks.ts';
 import { handleHealth, handleChanges, handleContentTree, handleNotesList, handleNoteResolve, handleRestoreToDraft, handleMediaList } from './routes/room.ts';
 const { handleWebsiteTimeline } = lazyRoutes(() => import('./routes/timeline.ts'));
 const { handleWebsiteHealth } = lazyRoutes(() => import('./routes/health_page.ts'));
@@ -760,6 +761,16 @@ async function route_(req: Request, cors: Record<string, string>): Promise<Respo
     pm = route.match(/^\/sales\/prospects\/([0-9a-f-]{36})\/pack$/);   // item 113: build the next piece of the pitch pack
     if (pm && method === 'POST') return (await import('./routes/pitch_pack.ts')).handleProspectPack(req, site, principal, pm[1], cors);
   }
+  // ── Free-tool leads (sales item 114): Site Review / AI Visibility requests on the Prospects page.
+  //    Staff-only inside each handler — audit_leads is platform-level, never a client site's. ──
+  if (route.startsWith('/sales/tool-leads')) {
+    const px = await import('./routes/prospects.ts');
+    if (route === '/sales/tool-leads' && method === 'GET') return px.handleToolLeads(site, principal, cors);
+    let tl = route.match(/^\/sales\/tool-leads\/([0-9a-f-]{36})$/);
+    if (tl && method === 'PATCH') return px.handleToolLead(req, site, principal, tl[1], cors);
+    tl = route.match(/^\/sales\/tool-leads\/([0-9a-f-]{36})\/convert$/);
+    if (tl && method === 'POST') return px.handleToolLeadConvert(req, site, principal, tl[1], cors);
+  }
   if (route === '/email/log-address' && (method === 'GET' || method === 'POST' || method === 'DELETE')) return handleEmailLogAddress(req, site, principal, cors);   // sales review item 69: BCC to log   // sales review item 69: which address mail goes out from, and is it verified
   if (route === '/calendar/link' && (method === 'GET' || method === 'POST' || method === 'DELETE')) {   // sales review item 46: your calendar in Google Calendar
     const { handleCalendarLink } = await import('./routes/calendar.ts');
@@ -1216,6 +1227,9 @@ async function route_(req: Request, cors: Record<string, string>): Promise<Respo
   //    create-with-source over the ONE pages store; refs = delete-awareness) ──
   if (route === '/pages/duplicate' && method === 'POST') return handlePageDuplicate(req, db, site, principal, cors);
   if (route === '/pages/refs' && method === 'GET') return handlePageRefs(req, site, cors);
+  // items 48 and 120: a page's password (only the key made from it is kept)
+  if (route === '/page-locks' && method === 'POST') return handlePageLockCreate(req, site, principal, cors);
+  if (route === '/page-locks' && method === 'GET') return handlePageLockList(site, cors);
   if (route === '/blocks/suggested' && method === 'GET') return handleBlockSuggestions(site, cors);   // FD-T4 vertical presets
   {
     const m = route.match(/^\/(offerings|testimonials|faqs|posts)(?:\/([0-9a-f-]{36}))?$/);
