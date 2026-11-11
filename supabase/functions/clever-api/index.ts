@@ -750,17 +750,45 @@ function _ipv4Blocked(ip: string): boolean {
   if (a >= 224) return true;                          // multicast / reserved
   return false;
 }
+// An IPv6 address as its eight 16-bit groups, or null when it isn't one. A
+// trailing dotted IPv4 part (::ffff:1.2.3.4) counts as the last two groups.
+function _ipv6Groups(s: string): number[] | null {
+  const d = s.match(/^(.*:)(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
+  if (d) {
+    const q = d.slice(2).map(Number);
+    if (q.some((n) => n > 255)) return null;
+    s = `${d[1]}${(q[0] * 256 + q[1]).toString(16)}:${(q[2] * 256 + q[3]).toString(16)}`;
+  }
+  const halves = s.split('::');
+  if (halves.length > 2) return null;
+  const head = halves[0] ? halves[0].split(':') : [];
+  const tail = halves[1] ? halves[1].split(':') : [];
+  if (![...head, ...tail].every((g) => /^[0-9a-f]{1,4}$/.test(g))) return null;
+  const gap = 8 - head.length - tail.length;
+  if (halves.length === 2 ? gap < 1 : gap !== 0) return null;
+  return [...head, ...Array(gap).fill('0'), ...tail].map((g) => parseInt(g, 16));
+}
+// The URL parser rewrites [::ffff:127.0.0.1] as [::ffff:7f00:1], so an address
+// is judged by its groups, never by how it was written. One that carries an
+// IPv4 address is judged by that address.
+function _ipv6Blocked(s: string): boolean {
+  const g = _ipv6Groups(s);
+  if (!g) return true;                                // not a readable address
+  const zero = (from: number, to: number) => g.slice(from, to).every((n) => n === 0);
+  const v4 = (hi: number, lo: number) => _ipv4Blocked(`${hi >> 8}.${hi & 255}.${lo >> 8}.${lo & 255}`);
+  if (zero(0, 7) && g[7] <= 1) return true;           // :: and loopback ::1
+  if (zero(0, 5) && (g[5] === 0xffff || g[5] === 0)) return v4(g[6], g[7]); // IPv4-mapped ::ffff:0:0/96, IPv4-compatible ::/96
+  if (g[0] === 0x64 && g[1] === 0xff9b && zero(2, 6)) return v4(g[6], g[7]); // NAT64 64:ff9b::/96
+  if (g[0] === 0x2002) return v4(g[1], g[2]);         // 6to4 2002::/16
+  if (g[0] < 0x100) return true;                      // the rest of ::/8 is reserved (::ffff:0:a.b.c.d, 64:ff9b:1::/48)
+  if (g[0] >= 0xfc00 && g[0] <= 0xfdff) return true;  // unique-local fc00::/7
+  if (g[0] >= 0xfe80 && g[0] <= 0xfeff) return true;  // link-local fe80::/10, old site-local fec0::/10
+  if (g[0] >= 0xff00) return true;                    // multicast
+  return false;
+}
 function _ipBlocked(host: string): boolean {
   const s = host.toLowerCase().replace(/^\[|\]$/g, '');
-  if (s.includes(':')) {                              // IPv6
-    if (s === '::1' || s === '::') return true;
-    if (/^fe[89ab]/.test(s)) return true;             // link-local fe80::/10
-    if (s.startsWith('fc') || s.startsWith('fd')) return true; // unique-local fc00::/7
-    const m = s.match(/(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})$/); // IPv4-mapped ::ffff:a.b.c.d
-    if (m) return _ipv4Blocked(m[1]);
-    return false;
-  }
-  return _ipv4Blocked(s);
+  return s.includes(':') ? _ipv6Blocked(s) : _ipv4Blocked(s);
 }
 function _isIpLiteral(host: string): boolean {
   return /^\d{1,3}(\.\d{1,3}){3}$/.test(host) || host.includes(':');

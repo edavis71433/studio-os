@@ -283,7 +283,7 @@ h1.doc{font-family:var(--serif);font-weight:500;font-size:24px;letter-spacing:-.
 .pg-gear:hover{color:var(--ink);border-color:var(--ink-3)}
 .pg-dropline{height:2px;margin:-1px var(--dds-s3,12px);background:var(--plum);border-radius:2px;position:relative;z-index:6}
 .pg-empty{padding:var(--dds-s4,16px);color:var(--ink-3);font-size:13px}
-#pageSettings,#linkSettings{z-index:2147483200}  /* the Pages tab keeps the shell on screen, so these sit over it */
+#pageSettings,#linkSettings,#folderSettings{z-index:2147483200}  /* the Pages tab keeps the shell on screen, so these sit over it */
 .pg-settings .field{margin-bottom:var(--dds-s4,16px)}
 .pg-settings>.hint{font-size:12px;color:var(--ink-2);margin-bottom:var(--dds-s2,8px)}
 .pg-h{font-size:13px;font-weight:600;margin:var(--dds-s5,20px) 0 var(--dds-s2,8px);padding-top:var(--dds-s4,16px);border-top:1px solid var(--hair)}
@@ -414,6 +414,10 @@ html.dc-edit:not(.plan-watch) #pcBody{padding:0 20px 20px}
 .pc-h[hidden]{display:none}
 .pc-link{padding:4px 8px;margin:-4px -8px -4px 0;border:0;border-radius:8px;background:none;color:var(--plum);font:600 12px/1.2 var(--sans);letter-spacing:0;text-transform:none;cursor:pointer}
 .pc-link:hover{background:var(--plum-soft)}
+.pc-hacts{display:flex;align-items:center;gap:2px}
+.pc-row[data-page="folder"] .ic{background:var(--plum-soft);color:var(--plum)}
+.pc-row.pg-slot,.pg-row.pg-slot{justify-content:center;min-height:44px;padding:8px 12px;border:1.5px dashed var(--hair-2);background:transparent;color:var(--ink-3);cursor:default}
+.pg-slot .pp-name{font-size:12.5px;font-weight:500;line-height:1.35;text-align:center;white-space:normal}
 .pc-list{display:flex;flex-direction:column;gap:8px;margin:0 0 18px}
 .pc-list[hidden]{display:none}
 .pc-row{position:relative;display:flex;align-items:center;gap:4px;min-height:56px;box-sizing:border-box;padding:6px 4px 6px 2px;border:1px solid var(--hair);border-radius:14px;background:var(--sheet);cursor:pointer}
@@ -501,6 +505,41 @@ html.dc-edit:not(.plan-watch) .dc-twbar{position:absolute;top:calc(var(--dc-bar-
 html.dc-edit:not(.plan-watch) .dc-twbar[hidden]{display:none}
 /* the settings panel does one job at a time (openSettingsPanel) */
 #settingsPanel[data-mode="styles"] #blocksCard,#settingsPanel[data-mode="styles"] #formsCard{display:none}
+/* items 41, 50 and 123: the header's and footer's own card */
+#settingsPanel:not([data-mode="header"]):not([data-mode="footer"]) #hfCard{display:none}
+#settingsPanel[data-mode="header"] .dc-panel-scroll>:not(#hfCard),#settingsPanel[data-mode="footer"] .dc-panel-scroll>:not(#hfCard){display:none !important}
+#hfCard{display:flex;flex-direction:column;gap:14px;padding:4px 20px 20px}
+#hfCard .ins-lbl{margin-top:4px}
+.hf-logo{display:flex;align-items:center;gap:12px}
+.hf-logo .lg{flex:none;width:44px;height:44px;box-sizing:border-box;border:1px solid var(--hair);border-radius:10px;background:var(--dc-raised,var(--paper)) center/cover no-repeat}
+.hf-logo p,.hf-says{flex:1;margin:0;font-size:12.5px;line-height:1.45;color:var(--ink-2)}
+.hf-tiles{display:grid;grid-template-columns:repeat(var(--n,2),minmax(0,1fr));gap:8px}
+.hf-tile{display:flex;flex-direction:column;align-items:center;gap:6px;min-width:0;padding:0;border:0;background:transparent;color:var(--ink-2);font:500 11.5px/1.25 var(--sans);text-align:center;cursor:pointer}
+.hf-pic{position:relative;display:block;width:100%;height:58px;box-sizing:border-box;border:1px solid var(--hair);border-radius:10px;background:var(--dc-raised,var(--paper));overflow:hidden}
+.hf-pic i{position:absolute;display:block;height:4px;border-radius:2px;background:var(--ink-3);opacity:.6}
+.hf-tile[aria-pressed=true]{color:var(--plum);font-weight:600}
+.hf-tile[aria-pressed=true] .hf-pic{border:2px solid var(--plum)}
+.hf-tile:focus-visible{outline:2px solid var(--plum);outline-offset:2px;border-radius:10px}
+.hf-pic .lg{top:24px;left:10px;width:22px;height:7px;background:var(--ink);opacity:.85}
+.hf-pic .m1{top:25px;right:28px;width:12px}.hf-pic .m2{top:25px;right:10px;width:12px}
+.hf-pic[data-pic="centered"] .lg{top:16px;left:calc(50% - 11px)}
+.hf-pic[data-pic="centered"] .m1{top:32px;right:auto;left:calc(50% - 20px)}.hf-pic[data-pic="centered"] .m2{top:32px;right:auto;left:calc(50% + 6px)}
+.hf-pic .bar{top:0;left:0;right:0;height:12px;border-radius:0;background:var(--plum);opacity:.85}
+.hf-pic .l1{top:22px;left:8px;right:12px}.hf-pic .l2{top:31px;left:8px;right:22px}.hf-pic .l3{top:40px;left:8px;right:16px}
+.hf-pic[data-pic="scroll"] .bar{top:-6px;background:var(--ink-3);opacity:.35}
+.hf-pic[data-pic="hide"] .bar{top:-7px}
+.hf-pic[data-pic="hide"] .up{top:auto;bottom:6px;left:calc(50% - 4px);width:8px;height:8px;border-radius:2px;background:var(--plum);opacity:.8}
+.hf-pic[data-pic="fade"] .bar{opacity:.25}
+/* the footer's switches: a checkbox drawn as a switch (the page settings' .pg-sw, kept to this card) */
+#hfCard .pg-sw{display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:44px;margin:0;font-size:14px;color:var(--ink);cursor:pointer}
+#hfCard .pg-sw input{flex:none;-webkit-appearance:none;appearance:none;position:relative;width:40px;height:24px;margin:0;border-radius:999px;background:var(--hair-2);cursor:pointer;transition:background var(--dur) var(--ease)}
+#hfCard .pg-sw input::after{content:"";position:absolute;top:3px;left:3px;width:18px;height:18px;border-radius:50%;background:var(--sheet);box-shadow:0 1px 2px rgba(0,0,0,.2);transition:transform var(--dur) var(--ease)}
+#hfCard .pg-sw input:checked{background:var(--plum)}
+#hfCard .pg-sw input:checked::after{transform:translateX(16px)}
+#hfCard .pg-sw input:focus-visible{outline:2px solid var(--plum);outline-offset:2px}
+@media (prefers-reduced-motion:reduce){#hfCard .pg-sw input,#hfCard .pg-sw input::after{transition:none}}
+.hf-row{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--ink)}
+.hf-row span{flex:1}
 #settingsPanel:not([data-mode="styles"]) #designGallery,#settingsPanel:not([data-mode="styles"]) #stylesAsk{display:none !important}
 #settingsPanel[data-mode="section"] #designHost>*:not(#blocksCard),#settingsPanel[data-mode="sections"] #designHost>*:not(#blocksCard),#settingsPanel[data-mode="forms"] #designHost>*:not(#formsCard){display:none}
 #settingsPanel[data-mode="section"] #blocksCard{margin-top:0 !important;border:0;padding:0;background:transparent}
@@ -1556,7 +1595,7 @@ body.pd-dragging *{cursor:grabbing !important}
         <h1 class="doc" role="heading" aria-level="2">Pages</h1>
         <p class="docsub">Drag a page to change its place in your site’s top menu. Pages under Not linked stay live, but aren’t in the menu.</p>
         <section class="hb-sec" id="pagesSec" aria-labelledby="pagesH" tabindex="-1">
-          <div class="hb-sec-h"><h2 id="pagesH">Main navigation</h2><span class="pg-adds"><button type="button" class="quietact" id="btnPagesAddLink">＋ Add a link</button><button type="button" class="quietact" id="btnPagesAdd">＋ Add a page</button></span></div>
+          <div class="hb-sec-h"><h2 id="pagesH">Main navigation</h2><span class="pg-adds"><button type="button" class="quietact" id="btnPagesAddFolder">＋ Add a folder</button><button type="button" class="quietact" id="btnPagesAddLink">＋ Add a link</button><button type="button" class="quietact" id="btnPagesAdd">＋ Add a page</button></span></div>
           <div class="hb-list pg-list" id="pagesList"></div>
         </section>
         <section class="hb-sec" id="pagesOffSec" aria-labelledby="pagesOffH">
@@ -1864,7 +1903,7 @@ body.pd-dragging *{cursor:grabbing !important}
               <div id="pcList">
                 <div class="tray-searchwrap pc-findwrap"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg><input type="search" id="pcFind" class="pc-find" placeholder="Find a page" aria-label="Find a page" autocomplete="off"></div>
                 <div id="pagesBar" class="pc-lists">
-                  <div class="pc-h"><span id="pcMenuH">Main menu · drag to reorder</span><button type="button" class="pc-link" id="btnPcLink" title="Add a link to another website, an email address or a phone number">＋ Link</button></div>
+                  <div class="pc-h"><span id="pcMenuH">Main menu · drag to reorder</span><span class="pc-hacts"><button type="button" class="pc-link" id="btnPcFolder" title="Add a menu heading that opens a list of pages">＋ Folder</button><button type="button" class="pc-link" id="btnPcLink" title="Add a link to another website, an email address or a phone number">＋ Link</button></span></div>
                   <div class="pc-list" id="pcMenu" role="list" aria-labelledby="pcMenuH"></div>
                   <div class="pc-h" id="pcOffH">Not in the menu</div>
                   <div class="pc-list pc-drop" id="pcOff" role="list" aria-labelledby="pcOffH"></div>
@@ -1924,6 +1963,7 @@ body.pd-dragging *{cursor:grabbing !important}
               <div class="hint" id="stylesAsk" hidden data-if-lacks="configure" style="padding:16px 18px">Ask the account owner to change your template, colors or fonts.</div>
               <div id="designGallery" hidden data-needs="owner"></div>
               <div id="designHost"></div>
+              <div id="hfCard"></div>
             </div>
             <div class="dc-panel-foot" id="stylesFoot" hidden>Nothing goes live until you publish.</div>
           </aside>
@@ -4977,7 +5017,7 @@ function pgLift(m, e) {
 // and an item with its own dropdown stays on the top level.
 function pgLand(m, item, before) {
   if (before && before.parent) {
-    if ((item.children || []).length) { m.nav.splice(m.nav.indexOf(before.parent) + 1, 0, item); return true; }
+    if ((item.children || []).length || item.folder) { m.nav.splice(m.nav.indexOf(before.parent) + 1, 0, item); return true; }
     if (before.parent.children.length >= PG_KIDS_MAX) { toast("A dropdown holds " + PG_KIDS_MAX + " links.", true); return false; }
     before.parent.children.splice(before.parent.children.indexOf(before.it), 0, item); return true;
   }
@@ -5028,6 +5068,12 @@ async function pgMoveNow(ref, zone, beforeRef, focus) {
   if (zone === "off" && !e.it) { renderPagesList(); return; }   // it's already off the menu
   const was = JSON.stringify(m.nav), before = beforeRef ? pgEntry(m, beforeRef) : null;
   const item = pgLift(m, e);
+  // item 48: dropped on an empty folder's "Drag a page here" row
+  const into = beforeRef && beforeRef.href === PG_SLOT ? m.nav.find((x) => x.folder && x.href === beforeRef.parent) : null;
+  if (zone !== "off" && into && !item.folder && !(item.children || []).length) {
+    into.children = (into.children || []).concat([item]);
+    return pgWriteMenu(m.nav, "In the “" + into.label + "” folder now. Publish to apply.", focus ? { href: ref.href, parent: into.href } : null);
+  }
   if (zone === "off") {
     (item.children || []).forEach((k) => m.nav.push(k));
     return pgWriteMenu(m.nav, "Off the menu. It stays live on your site. Publish to apply.", focus ? ref : null);
@@ -5052,19 +5098,20 @@ function pgNudge(ref, dir) {
 }
 const PG_GRIP = '<svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" fill="currentColor"><circle cx="9" cy="6" r="1.6"/><circle cx="15" cy="6" r="1.6"/><circle cx="9" cy="12" r="1.6"/><circle cx="15" cy="12" r="1.6"/><circle cx="9" cy="18" r="1.6"/><circle cx="15" cy="18" r="1.6"/></svg>';
 const PG_GEAR = '<svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h10M18 7h2M4 17h2M10 17h10"/><circle cx="16" cy="7" r="2"/><circle cx="8" cy="17" r="2"/></svg>';
+const PG_FOLDER = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>';
 const PG_LINK = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 14a4 4 0 0 0 6 .4l3-3a4 4 0 0 0-5.7-5.7l-1.1 1.1"/><path d="M14 10a4 4 0 0 0-6-.4l-3 3a4 4 0 0 0 5.7 5.7l1.1-1.1"/></svg>';
 function pgRow(entry, ctx) {
-  const pg = entry.pg, it = entry.it, name = it ? it.label : pg.title;
+  const pg = entry.pg, it = entry.it, name = it ? it.label : pg.title, folder = !pg && !!(it && it.folder);
   const ref = { href: it ? it.href : pg.path, parent: entry.parent ? entry.parent.href : null };
-  const row = el("div", "hb-row pg-row" + (entry.parent ? " child" : "")); row.dataset.page = pg ? pg.key : "link"; row.dataset.href = ref.href;
+  const row = el("div", "hb-row pg-row" + (entry.parent ? " child" : "")); row.dataset.page = pg ? pg.key : folder ? "folder" : "link"; row.dataset.href = ref.href;
   if (ref.parent) row.dataset.parent = ref.parent;
   const grab = el("button", "pg-grab"); grab.type = "button"; grab.innerHTML = PG_GRIP; grab.title = "Drag to move";
   grab.setAttribute("aria-label", "Move " + name + ". Use the up and down arrow keys.");
   grab.addEventListener("pointerdown", (e) => pgDragStart(e, row, ref, !pg || (it && (it.children || []).length > 0)));
   grab.addEventListener("keydown", (e) => { if (e.key === "ArrowUp" || e.key === "ArrowDown") { e.preventDefault(); pgNudge(ref, e.key === "ArrowUp" ? -1 : 1); } });
   row.appendChild(grab);
-  const ic = el("span", "ic"); ic.innerHTML = pg ? (HB_ICON[pg.icon] || HB_ICON.page) : PG_LINK; row.appendChild(ic);
-  const t = el("div", "t"); t.appendChild(el("b", null, name)); t.appendChild(el("span", null, pg ? pg.sum : it.href)); row.appendChild(t);
+  const ic = el("span", "ic"); ic.innerHTML = pg ? (HB_ICON[pg.icon] || HB_ICON.page) : folder ? PG_FOLDER : PG_LINK; row.appendChild(ic);
+  const t = el("div", "t"); t.appendChild(el("b", null, name)); t.appendChild(el("span", null, pg ? pg.sum : folder ? pgFolderSub(it) : it.href)); row.appendChild(t);
   if (pg) row.appendChild(hbPageChip(pg, ctx.changes, ctx.live, ctx.firstPublish));
   const acts = el("div", "acts");
   if (pg) {
@@ -5073,7 +5120,7 @@ function pgRow(entry, ctx) {
     acts.appendChild(edit);
   }
   const gear = el("button", "pg-gear"); gear.type = "button"; gear.innerHTML = PG_GEAR; gear.title = "Settings"; gear.setAttribute("aria-label", "Settings for " + name);
-  gear.addEventListener("click", () => { if (pg) pgOpenSettings(ref); else pgOpenLink(ref); });
+  gear.addEventListener("click", () => { if (pg) pgOpenSettings(ref); else if (folder) pgOpenFolder(ref); else pgOpenLink(ref); });
   acts.appendChild(gear); row.appendChild(acts);
   return row;
 }
@@ -5089,7 +5136,7 @@ function renderPagesList() {
   renderPagesCard(m, ctx);
   const list = $("pagesList"), off = $("pagesUnlinked"); if (!list || !off) return;
   list.innerHTML = ""; off.innerHTML = "";
-  m.menu.forEach((e) => list.appendChild(pgRow(e, ctx)));
+  m.menu.forEach((e) => { list.appendChild(pgRow(e, ctx)); if (pgFolderEmpty(e)) list.appendChild(pgSlot(e.it, "hb-row pg-row")); });
   m.unlinked.forEach((pg) => off.appendChild(pgRow({ it: null, pg, parent: null }, ctx)));
   if (!m.unlinked.length) off.appendChild(el("div", "pg-empty", "Drag a page here to take it off the menu. It stays live on your site."));
   const auto = $("btnNavAuto"); if (auto) auto.hidden = !pgHasCustomNav();
@@ -5120,12 +5167,12 @@ function pcChip(pg, ctx) {
   return chip;
 }
 function pcRow(entry, ctx) {
-  const pg = entry.pg, it = entry.it;
+  const pg = entry.pg, it = entry.it, folder = !pg && !!(it && it.folder);
   const ref = { href: it ? it.href : pg.path, parent: entry.parent ? entry.parent.href : null };
   const canvas = !!pg && pg.view === "design", slug = canvas ? (pg.slug || "") : null, on = canvas && slug === DC_PAGE;
   const name = canvas ? pg.title : it ? it.label : pg.title;   // a page on the canvas goes by its own name, as the old tabs did
   const row = el("div", "pc-row" + (canvas ? " page-pill" : "") + (on ? " on" : "") + (entry.parent ? " child" : ""));
-  row.setAttribute("role", "listitem"); row.dataset.href = ref.href; row.dataset.page = pg ? pg.key : "link";
+  row.setAttribute("role", "listitem"); row.dataset.href = ref.href; row.dataset.page = pg ? pg.key : folder ? "folder" : "link";
   if (ref.parent) row.dataset.parent = ref.parent;
   const own = slug ? dcPageObj(slug) : null; if (own && own.hideNav) row.dataset.nav = "hidden";
   const grab = el("button", "pg-grab"); grab.type = "button"; grab.innerHTML = PG_GRIP; grab.title = "Drag to move";
@@ -5133,15 +5180,15 @@ function pcRow(entry, ctx) {
   grab.addEventListener("pointerdown", (e) => pgDragStart(e, row, ref, !pg || (it && (it.children || []).length > 0)));
   grab.addEventListener("keydown", (e) => { if (e.key === "ArrowUp" || e.key === "ArrowDown") { e.preventDefault(); pgNudge(ref, e.key === "ArrowUp" ? -1 : 1); } });
   row.appendChild(grab);
-  const ic = el("span", "ic"); ic.innerHTML = pg ? (HB_ICON[pg.icon] || HB_ICON.page) : PG_LINK; row.appendChild(ic);
+  const ic = el("span", "ic"); ic.innerHTML = pg ? (HB_ICON[pg.icon] || HB_ICON.page) : folder ? PG_FOLDER : PG_LINK; row.appendChild(ic);
   const open = el("button", "pc-open"); open.type = "button";
   open.appendChild(el("span", "pp-name", name));
   // items 48 and 120: a landing page says what it leaves out
   const bare = own && (own.noHeader || own.noFooter) ? (own.noHeader && own.noFooter ? "No header or footer" : own.noHeader ? "No header" : "No footer") : "";
-  const sub = on ? "Editing now" : !pg ? it.href : canvas && it && it.label !== pg.title ? "In the menu as “" + it.label + "”" : bare || pg.sum;
+  const sub = on ? "Editing now" : folder ? pgFolderSub(it) : !pg ? it.href : canvas && it && it.label !== pg.title ? "In the menu as “" + it.label + "”" : bare || pg.sum;
   open.appendChild(el("span", "pc-sub", sub));
   if (on) open.setAttribute("aria-current", "page");
-  open.title = canvas ? "Edit this page" : pg ? "This page’s settings" : "This link’s settings";
+  open.title = canvas ? "Edit this page" : pg ? "This page’s settings" : folder ? "This folder’s settings" : "This link’s settings";
   row.appendChild(open);
   const acc = own && (own.access === "password" || own.access === "private") ? own.access : "";
   if (acc) {
@@ -5162,7 +5209,7 @@ function pcRow(entry, ctx) {
   // the whole row is the target, as the old tab was: a press anywhere but its own buttons opens it
   row.addEventListener("click", (e) => {
     if (e.target.closest(".pg-grab,.pp-menu")) return;
-    if (e.target.closest(".pg-gear") || !canvas) { if (pg) pgOpenSettings(ref); else pgOpenLink(ref); return; }
+    if (e.target.closest(".pg-gear") || !canvas) { if (pg) pgOpenSettings(ref); else if (folder) pgOpenFolder(ref); else pgOpenLink(ref); return; }
     closePagesCard(false); dcSwitchPage(slug);
   });
   return row;
@@ -5180,13 +5227,13 @@ function renderPagesCard(m, ctx) {
     if (r.classList.contains("page-pill")) { if (tabs.has(e.pg.key)) r.classList.remove("page-pill", "on"); tabs.add(e.pg.key); }
     host.appendChild(r);
   };
-  m.menu.forEach((e) => add(menu, e));
+  m.menu.forEach((e) => { add(menu, e); if (pgFolderEmpty(e)) menu.appendChild(pgSlot(e.it, "pc-row")); });
   const opens = new Map(); m.unlinked.forEach((pg) => opens.set(pg.path, pg));   // the page an address opens is the last named (pgModel's byHref)
   m.unlinked.forEach((pg) => { if (opens.get(pg.path) === pg) add(off, { it: null, pg, parent: null }); });
   if (!m.unlinked.length) off.appendChild(el("div", "pc-empty", "Drag a page here to take it off the menu. It stays live.")).setAttribute("role", "listitem");
   const auto = $("btnPcAuto"); if (auto) auto.hidden = !pgHasCustomNav();
-  const n = hbPageRows().length, links = m.menu.filter((e) => !e.pg).length;
-  const sub = $("pagesSub"); if (sub) { sub.textContent = n + " pages" + (links ? " · " + links + (links === 1 ? " link" : " links") : ""); sub.hidden = false; }
+  const n = hbPageRows().length, links = m.menu.filter((e) => !e.pg && !e.it.folder).length, folders = m.menu.filter((e) => e.it && e.it.folder).length;
+  const sub = $("pagesSub"); if (sub) { sub.textContent = n + " pages" + (folders ? " · " + folders + (folders === 1 ? " folder" : " folders") : "") + (links ? " · " + links + (links === 1 ? " link" : " links") : ""); sub.hidden = false; }
   pcFilter();
 }
 // Find a page: rows whose name has the words stay; a heading with none under it goes
@@ -5393,7 +5440,7 @@ function pgOpenSettings(startRef) {
       if (!(e.it.children || []).length) {
         const under = pgUnderSelect(m, e);
         under.addEventListener("change", async () => { const to = await pgSetUnder(ref, under.value); if (to) ref = to; paint(); });
-        box.appendChild(pgField("Show under", under, "Pick a menu item to make this a link in its dropdown."));
+        box.appendChild(pgField("Show under", under, "Pick a menu item or folder to put this page in its dropdown."));
       }
     }
     if (inCard && pg.view !== "design") {   // the template's own page: its words are kept on another tab
@@ -5629,6 +5676,83 @@ function pgOpenLink(startRef) {
       rm.addEventListener("click", async () => { close(); await pgSetInMenu(ref, false); });
       const done = el("button", "dc-modal-cancel pg-done", "Done"); done.type = "button"; done.addEventListener("click", close);
       foot.append(rm, done);
+    }
+    box.appendChild(foot);
+  };
+  paint();
+  pgFocusFirst(box);
+}
+// ── Item 48, second half: folders in the menu ──
+// A folder is a menu heading with no page of its own; its dropdown lists the pages put in it.
+// It lives in the custom menu as { label, href: "#f-…", folder: true, children }: the href only
+// names it here, and the server draws a folder from its pages and leaves an empty one out. It
+// stays on the top level, never inside another dropdown. Removing one keeps its pages: they
+// take its place at the top of the menu.
+const PG_SLOT = "#end";   // the "Drag a page here" row under an empty folder
+function pgFolderEmpty(e) { return !!(e.it && e.it.folder && !e.parent && !(e.it.children || []).length); }
+function pgFolderSub(it) { const n = (it.children || []).length; return n ? "Folder · " + n + (n === 1 ? " page" : " pages") : "Empty folder"; }
+function pgSlot(it, cls) {
+  const r = el("div", cls + " child pg-slot"); r.setAttribute("role", "listitem");
+  r.dataset.href = PG_SLOT; r.dataset.parent = it.href;
+  r.appendChild(el("span", "pp-name", "Drag a page here, or pick “" + it.label + "” under Show under in a page’s settings"));
+  return r;
+}
+function pgOpenFolder(startRef) {
+  const { box, close } = pgHost("folderSettings", startRef ? "Folder settings" : "Add a folder");
+  const ref = startRef ? { href: startRef.href, parent: null } : null;
+  const paint = () => {
+    const m = pgModel(), e = ref ? pgEntry(m, ref) : null;
+    if (ref && (!e || !e.it || !e.it.folder)) { close(); return; }
+    box.textContent = "";
+    box.appendChild(el("h3", "dc-modal-h", e ? e.it.label + " folder" : "Add a folder"));
+    if (!e) box.appendChild(el("p", "dc-modal-sub", "A menu heading that opens a list of pages. It has no page of its own."));
+    const lab = pgInput(e ? e.it.label : "", 40, "e.g. Services");
+    box.appendChild(pgField("Name in the menu", lab, e ? null : "Then drag pages into it, or pick it under Show under in a page’s settings."));
+    const msg = el("div", "hint pg-err"); msg.hidden = true; msg.setAttribute("role", "alert"); box.appendChild(msg);
+    const bad = (t) => { msg.textContent = t; msg.hidden = false; };
+    const foot = el("div", "pg-foot");
+    if (!e) {
+      const add = el("button", "dc-modal-cancel pg-done", "Add to the menu"); add.type = "button";
+      const go = () => {
+        const label = lab.value.trim().slice(0, 40);
+        if (!label) return bad("Give it a name for the menu.");
+        pgTurn(async () => {
+          if (!(await dcSavePendingEdits())) return;
+          const fresh = pgModel();
+          if (fresh.nav.length >= PG_NAV_MAX) return bad("The menu holds " + PG_NAV_MAX + " items. Take one off first.");
+          fresh.nav.push({ label, href: "#f-" + Math.random().toString(36).slice(2, 8), folder: true });
+          if (await pgWriteMenu(fresh.nav, "Folder added. Drag pages into it.")) close();
+        });
+      };
+      add.addEventListener("click", go);
+      lab.addEventListener("keydown", (ev) => { if (ev.key === "Enter") { ev.preventDefault(); go(); } });
+      const cancel = el("button", "dc-modal-cancel", "Cancel"); cancel.type = "button"; cancel.addEventListener("click", close);
+      foot.append(cancel, add);
+    } else {
+      const kids = e.it.children || [];
+      const names = kids.map((k) => k.label);
+      box.appendChild(el("p", "pc-note", names.length ? seoList(names) + (names.length === 1 ? " is" : " are") + " in it." : "Nothing is in it yet. Drag pages into it, or pick it under Show under in a page’s settings."));
+      lab.addEventListener("change", () => {
+        const label = lab.value.trim().slice(0, 40); if (!label) { lab.value = e.it.label; return; }
+        pgTurn(async () => {
+          if (!(await dcSavePendingEdits())) return;
+          const fresh = pgModel(), cur = pgEntry(fresh, ref); if (!cur || cur.it.label === label) return;
+          cur.it.label = label;
+          if (await pgWriteMenu(fresh.nav, "Saved. Publish to apply.")) paint();
+        });
+      });
+      const rm = el("button", "dc-modal-cancel danger", "Remove folder"); rm.type = "button";
+      rm.addEventListener("click", () => {
+        pgTurn(async () => {
+          if (!(await dcSavePendingEdits())) return;
+          const fresh = pgModel(), cur = pgEntry(fresh, ref); if (!cur) return;
+          fresh.nav.splice(fresh.nav.indexOf(cur.it), 1, ...(cur.it.children || []));
+          if (await pgWriteMenu(fresh.nav, kids.length ? "Folder removed. Its pages are at the top of the menu now." : "Folder removed.")) close();
+        });
+      });
+      const done = el("button", "dc-modal-cancel pg-done", "Done"); done.type = "button"; done.addEventListener("click", close);
+      foot.append(rm, done);
+      box.appendChild(el("p", "hint", "Removing it keeps its pages: they move to the top of the menu."));
     }
     box.appendChild(foot);
   };
@@ -5890,6 +6014,7 @@ function closeTodoPanel() { const p = $("todoPanel"); if (p && p.classList.conta
   const tc = $("btnTodoClose"); if (tc) tc.addEventListener("click", closeTodoPanel);
   const add = $("btnPagesAdd"); if (add) add.addEventListener("click", () => { go("design"); setTimeout(() => dcAddPage(), 300); });
   const addLink = $("btnPagesAddLink"); if (addLink) addLink.addEventListener("click", () => pgOpenLink(null));
+  const addFolder = $("btnPagesAddFolder"); if (addFolder) addFolder.addEventListener("click", () => pgOpenFolder(null));
   const auto = $("btnNavAuto"); if (auto) auto.addEventListener("click", pgResetNav);
   document.addEventListener("keydown", (e) => { if (e.key === "Escape") closeTodoPanel(); });
   const frame = $("siteFrame");
@@ -9001,7 +9126,8 @@ async function dcChoosePageLayout(title) {
 function dcCleanNav(nav) {
   return Array.isArray(nav) ? nav.map((it) => {
     const o = { label: String(it.label || "").trim().slice(0, 40), href: String(it.href || "").trim() };
-    const kids = (Array.isArray(it.children) ? it.children : []).map((k) => ({ label: String(k.label || "").trim().slice(0, 40), href: String(k.href || "").trim() })).filter((k) => k.label && k.href).slice(0, 8);
+    if (it.folder === true) o.folder = true;   // item 48: a heading with no page; its href only names it here
+    const kids = (Array.isArray(it.children) ? it.children : []).map((k) => ({ label: String(k.label || "").trim().slice(0, 40), href: String(k.href || "").trim() })).filter((k) => k.label && k.href && !k.folder).slice(0, 8);
     if (kids.length) o.children = kids;
     return o;
   }).filter((it) => it.label && it.href).slice(0, 12) : [];
@@ -11602,6 +11728,7 @@ function toggleTray(tab) {
 function closeSettingsPanel() {
   const p = $("settingsPanel"), sc = $("dcScrim"); if (!p) return;
   p.classList.remove("on"); p.setAttribute("aria-hidden", "true");
+  dcHFMark(null);
   dcColourAids();
   if (sc) { sc.classList.remove("on"); sc.hidden = true; }
   if (PANEL_MODE === "section") {   // back to the full list, so a later "All sections" isn't one block
@@ -11616,8 +11743,100 @@ function closeSettingsPanel() {
 //   section  — this one section's fields, with the page visible behind it
 //   sections — the full list: ready-made layouts and saved sections
 //   forms    — the form builder
-const PANEL_TITLES = { styles: "Styles", sections: "All sections", forms: "Forms" };
-const PANEL_SUBS = { styles: "Changes show as you pick", sections: "Ready-made layouts and saved sections", forms: "Forms on this page" };
+// ── Items 41, 50 and 123: the site's header and footer, picked on the page ──
+// A press on the header or footer on the canvas outlines it, names it "Header · on every
+// page" (or Footer), and opens its card: the header's logo, arrangement (two pictures), what
+// it does when the page scrolls (four pictures) and the way to the menu; the footer's two
+// switches and the way to the business details its words come from. The scroll choice is
+// the style setting header_scroll (lib/site_header.ts on the server); with none set the
+// template's own shows, read from the canvas.
+const HF_SCROLLS = [
+  ["scroll", "Scrolls away", "The header scrolls away with the page."],
+  ["stay", "Stays on top", "The header stays at the top of the screen while visitors scroll."],
+  ["hide", "Hides, comes back", "The header slides away while visitors scroll down, and comes back when they scroll up."],
+  ["fade", "Fades away", "The header fades out while visitors scroll down, and comes back when they scroll up."],
+];
+const HF_PIC_PARTS = { standard: ["lg", "m1", "m2"], centered: ["lg", "m1", "m2"], scroll: ["bar", "l1", "l2", "l3"], stay: ["bar", "l1", "l2", "l3"], hide: ["bar", "l1", "l2", "up"], fade: ["bar", "l1", "l2", "l3"] };
+function hfTiles(host, label, opts, cur, onPick) {
+  host.appendChild(el("div", "ins-lbl", label));
+  const row = el("div", "hf-tiles"); row.style.setProperty("--n", String(opts.length)); row.setAttribute("role", "group"); row.setAttribute("aria-label", label);
+  opts.forEach(([v, name]) => {
+    const b = el("button", "hf-tile"); b.type = "button"; b.dataset.v = v || "standard"; b.setAttribute("aria-pressed", String(cur === v));
+    const pic = el("span", "hf-pic"); pic.dataset.pic = v || "standard"; pic.setAttribute("aria-hidden", "true");
+    (HF_PIC_PARTS[v || "standard"] || []).forEach((c) => pic.appendChild(el("i", c)));
+    b.append(pic, document.createTextNode(name));
+    b.addEventListener("click", () => onPick(v));
+    row.appendChild(b);
+  });
+  host.appendChild(row);
+  return row;
+}
+// What the header does now: the owner's choice, else what the template's own does on the canvas.
+function hfScrollNow() {
+  const t = DESIGN_TOKENS && DESIGN_TOKENS.header_scroll; if (t) return t;
+  try {
+    const h = $("designPreview").contentDocument.querySelector("header.site");
+    const pos = h && h.ownerDocument.defaultView.getComputedStyle(h).position;
+    return pos === "sticky" || pos === "fixed" ? "stay" : "scroll";
+  } catch (_) { return "stay"; }
+}
+function renderHFCard(which) {
+  const host = $("hfCard"); if (!host) return;
+  host.textContent = ""; host.dataset.which = which;
+  if (which === "header") {
+    host.appendChild(el("div", "ins-lbl", "Logo"));
+    const lr = el("div", "hf-logo"), lg = el("span", "lg"), logo = (S.media || []).find((m) => m.id === (S.settings && S.settings.logo_media_id));
+    if (logo && logo.thumb) lg.style.backgroundImage = "url(" + JSON.stringify(logo.thumb) + ")";
+    lr.append(lg, el("p", null, logo ? "Your logo shows beside your name." : "No logo yet: your name shows on its own."));
+    const ch = el("button", "dc-modal-cancel", logo ? "Change" : "Add a logo"); ch.type = "button"; ch.dataset.needs = "configure";
+    ch.addEventListener("click", () => { openSettingsPanel("styles"); stylesTab("colours"); });
+    lr.appendChild(ch); host.appendChild(lr);
+    hfTiles(host, "Arrangement", [["", "Standard"], ["centered", "Centered"]], String((S.settings && S.settings.nav_style) || ""), async (v) => {
+      try { await settingsPut({ nav_style: v }); toast("Header: " + (v ? "Centered" : "Standard") + " — publish to apply"); scheduleChangesRefresh(); refreshDesignPreview(); renderHFCard("header"); }
+      catch (err) { toast(nice(err), true); }
+    });
+    if (DESIGN_DEV) {
+      const now = hfScrollNow();
+      hfTiles(host, "When the page scrolls", HF_SCROLLS.map((x) => [x[0], x[1]]), now, async (v) => {
+        if (v === hfScrollNow()) return;
+        await saveTokens({ header_scroll: v }, "Header: " + HF_SCROLLS.find((x) => x[0] === v)[1].toLowerCase());
+        refreshDesignPreview();   // the canvas draws the new behaviour
+        if (PANEL_MODE === "header") renderHFCard("header");
+      });
+      host.appendChild(el("p", "hf-says", HF_SCROLLS.find((x) => x[0] === now)[2]));
+    }
+    host.appendChild(el("div", "ins-lbl", "Menu"));
+    const mr = el("div", "hf-row"), n = (typeof pgModel === "function" ? pgModel().menu.length : 0);
+    mr.appendChild(el("span", null, n + (n === 1 ? " item" : " items") + " in the menu"));
+    const ed = el("button", "dc-modal-cancel", "Edit the menu"); ed.type = "button"; ed.addEventListener("click", () => { closeSettingsPanel(); openPagesCard("dcPageSwitch"); });
+    mr.appendChild(ed); host.appendChild(mr);
+    return;
+  }
+  [["footer_hours", "Show opening hours"], ["footer_social", "Show social links"]].forEach(([field, label]) => {
+    const row = el("label", "pg-sw"); const t = el("span", null, label); const cb = el("input"); cb.type = "checkbox";
+    cb.checked = !S.settings || S.settings[field] !== false;
+    row.append(t, cb);
+    cb.addEventListener("change", async () => {
+      const on = cb.checked;
+      try { await settingsPut({ [field]: on }); toast(label.replace("Show ", "") + (on ? " shown" : " hidden") + " in the footer — publish to apply"); scheduleChangesRefresh(); refreshDesignPreview(); }
+      catch (err) { toast(nice(err), true); cb.checked = !on; }
+    });
+    host.appendChild(row);
+  });
+  host.appendChild(el("p", "hf-says", "Your address, phone and email come from your business details. Links to your privacy and accessibility pages are added for you."));
+  const biz = el("button", "dc-modal-cancel", "Change the business details"); biz.type = "button";
+  biz.addEventListener("click", () => { closeSettingsPanel(); exitEditMode("business"); });
+  const a = el("div", "hf-row"); a.appendChild(biz); host.appendChild(a);
+}
+// The header or footer whose card is open stays outlined on the canvas, its name showing.
+function dcHFMark(which) {
+  try {
+    const doc = $("designPreview").contentDocument;
+    doc.querySelectorAll("header.site,footer.site").forEach((n) => n.classList.toggle("dc-hf-on", !!which && n.matches(which === "header" ? "header.site" : "footer.site")));
+  } catch (_) {}
+}
+const PANEL_TITLES = { styles: "Styles", sections: "All sections", forms: "Forms", header: "Header", footer: "Footer" };
+const PANEL_SUBS = { styles: "Changes show as you pick", sections: "Ready-made layouts and saved sections", forms: "Forms on this page", header: "On every page", footer: "On every page" };
 function openSettingsPanel(mode, title) {
   const p = $("settingsPanel"), sc = $("dcScrim"); if (!p) return;
   const m = PANEL_TITLES[mode] || mode === "section" ? mode : "styles";
@@ -11634,7 +11853,7 @@ function openSettingsPanel(mode, title) {
   if (m === "section") { insSyncSeg(); const sc = p.querySelector(".dc-panel-scroll"); if (sc) sc.scrollTop = 0; }
   if (m === "styles") stylesTab(STYLES_TAB);
   p.setAttribute("aria-label", name);
-  const modal = m !== "section" && m !== "styles";   // a section or a style change: keep the page in view, undimmed
+  const modal = ["section", "styles", "header", "footer"].indexOf(m) < 0;   // a section, a style, the header or footer: keep the page in view, undimmed
   p.setAttribute("aria-modal", String(modal));
   const cl = $("btnSettingsClose");
   if (cl) { cl.textContent = modal ? "✕" : "Done"; cl.setAttribute("aria-label", modal ? "Close" : "Done"); }
@@ -11644,6 +11863,8 @@ function openSettingsPanel(mode, title) {
   }
   p.classList.add("on"); p.setAttribute("aria-hidden", "false");
   if (m === "sections" && $("blocksCard")) renderBlocksCard();
+  if (m === "header" || m === "footer") renderHFCard(m);
+  dcHFMark(m === "header" || m === "footer" ? m : null);
   dcColourAids();
   setTimeout(() => { try {
     // already in a field in this panel: leave them there, or the words go nowhere
@@ -11923,7 +12144,7 @@ function openPagesCard(fromId) {
   // a press anywhere else puts it away; its menus and the dialogs they open don't count
   PAGES_DOWN = (e) => {
     if (c.contains(e.target)) return;
-    if (e.target.closest && e.target.closest("#dcPageSwitch,#dkPages,.pp-pop,.pi-pop,.dc-modal-scrim,.dc-modal,.ask,.scrim,dialog,#pageSettings,#linkSettings")) return;
+    if (e.target.closest && e.target.closest("#dcPageSwitch,#dkPages,.pp-pop,.pi-pop,.dc-modal-scrim,.dc-modal,.ask,.scrim,dialog,#pageSettings,#linkSettings,#folderSettings")) return;
     closePagesCard(false);
   };
   document.addEventListener("mousedown", PAGES_DOWN, true);
@@ -12079,7 +12300,7 @@ function closeDesignPanels() { closePagesCard(false); dcDockMore(false); closeTr
   // the floating studio: the page switcher, the dock, and the Pages card's own buttons
   on("dcPageSwitch", () => togglePagesCard("dcPageSwitch")); on("dkPages", () => togglePagesCard("dkPages")); on("btnPagesClose", () => closePagesCard(true));
   on("btnPageAdd", () => { closePagesCard(false); dcAddPage(); });   // the name and layout dialogs take over; the new page opens on the canvas
-  on("btnPcLink", () => pgOpenLink(null)); on("btnPcAuto", pgResetNav);
+  on("btnPcLink", () => pgOpenLink(null)); on("btnPcFolder", () => pgOpenFolder(null)); on("btnPcAuto", pgResetNav);
   on("pcBack", () => { if (PC_PANE) PC_PANE.close(); });
   on("pcHeadFoot", pcHeadFoot); on("pcNotFound", pcNotFound); on("pcSearchLook", pcSearchLook);
   const find = $("pcFind"); if (find) find.addEventListener("input", pcFilter);
@@ -14162,6 +14383,14 @@ function dcInjectCanvas(doc, main, live) {
       // the name chip at the section's top left: what it is and what kind
       "#dds-dc-chip{position:absolute;z-index:2147483000;display:none;align-items:center;height:24px;max-width:min(60vw,360px);padding:0 10px;border-radius:999px;background:var(--ddsdc-p-soft);color:var(--ddsdc-p);font:600 12px/1 var(--ddsdc-sans);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;pointer-events:none}" +
       "#dds-dc-chip.on{display:inline-flex}" +
+      // items 41, 50 and 123: the header and footer are picked like a section, and say they're on every page
+      "header.site[data-dc-hf]:hover,footer.site[data-dc-hf]:hover,header.site.dc-hf-on,footer.site.dc-hf-on{outline:2px solid var(--ddsdc-p);outline-offset:-2px;cursor:pointer}" +
+      // the chip stays in the tab order (a keyboard's way in), seen only on hover, focus or while its card is open
+      // it hangs off the edge (under the header, over the footer), so the name and menu stay clear to click
+      ".dc-hf-chip{position:absolute;left:12px;top:calc(100% - 12px);z-index:30;display:inline-flex;align-items:center;height:24px;padding:0 10px;border:0;border-radius:999px;background:var(--ddsdc-p-soft);color:var(--ddsdc-p);font:600 12px/1 var(--ddsdc-sans);white-space:nowrap;cursor:pointer;opacity:0;pointer-events:none}" +
+      "[data-dc-hf]:hover>.dc-hf-chip,.dc-hf-chip:focus-visible,.dc-hf-on>.dc-hf-chip{opacity:1;pointer-events:auto}" +
+      "footer.site>.dc-hf-chip{top:-12px}" +
+      ".dc-hf-chip:focus-visible{outline:2px solid var(--ddsdc-p);outline-offset:2px}" +
       // item 118: each section's colour theme, while colours are being chosen
       "#dds-dc-themes{position:absolute;left:0;top:0;width:0;height:0;z-index:2147482990;pointer-events:none}" +
       ".dds-theme-tag{position:absolute;display:inline-flex;align-items:center;gap:6px;height:24px;padding:0 10px 0 6px;border-radius:999px;background:var(--ddsdc-card);border:1px solid var(--ddsdc-line);box-shadow:0 2px 8px rgba(0,0,0,.12);color:var(--ddsdc-ink);font:600 11.5px/1 var(--ddsdc-sans);white-space:nowrap}" +
@@ -14239,7 +14468,9 @@ function dcInjectCanvas(doc, main, live) {
   // The pill sits INSIDE the selected section's top-right corner, the name chip at its
   // top left (direction A). Once the section's top edge has scrolled away the pill rides
   // the visible top, and it never leaves the section. On a narrow section the chip keeps
-  // the name only; if it would still touch the pill it drops under it.
+  // the name only; if it would still touch the pill it sits just above the section (item 51:
+  // in the phone frame it dropped under the pill, onto the section's heading), or under the
+  // pill when the section's top is off the screen.
   const placeMore = () => {
     const mb = bar.querySelector('[aria-haspopup="menu"]'); if (!mb) return;
     const br = bar.getBoundingClientRect(), mw = more.offsetWidth || 200;
@@ -14260,7 +14491,7 @@ function dcInjectCanvas(doc, main, live) {
     chip.classList.toggle("compact", r.width < 560);
     const ch = chip.offsetHeight || 24, cw = chip.offsetWidth || 0, cx = Math.max(left + 8, sx + 8 + ins.left);
     chip.style.left = cx + "px";
-    chip.style.top = (cx + cw + 8 > x ? y + h + 6 : y + (h - ch) / 2) + "px";
+    chip.style.top = (cx + cw + 8 <= x ? y + (h - ch) / 2 : top - ch - 6 >= sy + 4 ? top - ch - 6 : y + h + 6) + "px";
     if (more.classList.contains("on")) placeMore();
   };
   const hideBar = () => { bar.classList.remove("on"); chip.classList.remove("on"); more.classList.remove("on"); doc.__dcSel = null; if (ds.current) { ds.current.classList.remove("dc-hot"); ds.current = null; } };
@@ -14460,6 +14691,30 @@ function dcInjectCanvas(doc, main, live) {
   // expose a selector so the content-tree rows can flash + select a section on click
   DC_SHOWBAR = (elx) => { try { showBar(elx); } catch (_) {} };
   DC_HIDEBAR = () => { try { hideBar(); } catch (_) {} };
+  // Items 41, 50 and 123: a press on the header or footer (not on a link, the menu or words
+  // being typed) opens its card; its chip says it's on every page, and is the way in by keyboard.
+  try {
+    [["header", "header.site", "Header · on every page"], ["footer", "footer.site", "Footer · on every page"]].forEach(([which, sel, name]) => {
+      const box = doc.querySelector(sel);
+      if (!box || box.hasAttribute("data-dc-hf")) return;
+      box.setAttribute("data-dc-hf", which);
+      if (win.getComputedStyle(box).position === "static") box.style.position = "relative";   // the chip sits inside it
+      const chip = doc.createElement("button"); chip.type = "button"; chip.className = "dc-hf-chip"; chip.textContent = name;
+      chip.addEventListener("click", (e) => { e.preventDefault(); e.stopPropagation(); openSettingsPanel(which); });
+      box.insertBefore(chip, box.firstChild);
+      // read from the press lifting, not from a click: Safari sends no click for a press on
+      // something that takes none (a footer), as the sections' taps already know
+      box.addEventListener("pointerdown", (e) => { box.__dcDown = e.button ? null : { x: e.clientX, y: e.clientY, at: Date.now() }; });
+      box.addEventListener("pointerup", (e) => {
+        const d = box.__dcDown; box.__dcDown = null;
+        if (!d || Math.abs(e.clientX - d.x) > 10 || Math.abs(e.clientY - d.y) > 10 || Date.now() - d.at > 600) return;   // a drag, a scroll or a hold
+        if (DC_MODE !== "edit" || IPE) return;
+        if (e.target.closest && e.target.closest("a,button,input,select,textarea,nav,[data-dds-field],[data-pr],[contenteditable=true]")) return;
+        openSettingsPanel(which);
+      });
+    });
+    if ($("settingsPanel") && $("settingsPanel").classList.contains("on")) dcHFMark(PANEL_MODE === "header" || PANEL_MODE === "footer" ? PANEL_MODE : null);
+  } catch (_) {}
   // Click the header menu on the canvas → open the menu editor (edit labels, links,
   // dropdowns). The header/footer are global, so this edits the menu on every page.
   try {

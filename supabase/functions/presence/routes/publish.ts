@@ -38,6 +38,7 @@ import type { SiteRow } from '../lib/site.ts';
 import { siteOrigin, hostedName } from '../lib/site.ts';
 import type { Principal } from '../../_shared/auth.ts';
 import { UUID_LOWER_RE as UUID_RE } from '../lib/uuid.ts';
+import { copiedBlockerFor } from '../lib/copied_record.ts';
 
 
 export const CALM = 'We hit a snag updating your site and we’re on it — nothing changed on your live site.';
@@ -350,6 +351,9 @@ export async function handlePublish(req: Request | null, site: SiteRow, principa
   }
 
   const v = validateSnapshot(snapshot, t.manifest);
+  // item 145: nothing copied from another site goes live untouched unless the studio kept it
+  const copied = await copiedBlockerFor(site.id, snapshot.content, mediaManifest);
+  if (copied) { v.blockers.push(copied); v.ok = false; }
   if (!v.ok) return json({ error: 'validation_failed', message: 'A few things need fixing before your site can publish.', fields: v.blockers, warnings: v.warnings }, 422, cors);
 
   const summary = await changeSummary(site.id);
