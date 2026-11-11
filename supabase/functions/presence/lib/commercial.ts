@@ -63,7 +63,9 @@ export function formParamsToSubmission(get: (k: string) => string | null): any {
 export function validateSubmission(body: any): { ok: true; sub: CleanSubmission; spam: boolean } | { ok: false; error: string } {
   const form_kind: FormKind = isFormKind(body?.form_kind) ? body.form_kind : 'contact';
   const name = clip(body?.name, 120);
-  const email = clip(body?.email, 200);
+  // item 110 (K1): kept lower-cased, as every contact is — a Jane@Example.com enquiry made a
+  // contact no later add, import, booking or "→ Deal" for jane@example.com could find
+  const email = clip(body?.email, 200).toLowerCase();
   const phone = clip(body?.phone, 40);
   const message = clip(body?.message, 4000);
   const source_page = clip(body?.source_page, 300);

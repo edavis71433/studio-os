@@ -36,6 +36,7 @@ import type { SiteRow } from '../lib/site.ts';
 import type { Principal } from '../../_shared/auth.ts';
 import { validateReviewInput, cleanOwnerReply, aggregateApproved, aggregateText, starString } from '../lib/reviews.ts';
 import { UUID_RE } from '../lib/uuid.ts';
+import { normEmail, emailMatch } from '../lib/contact_email.ts';
 
 const rows = (r: { json?: unknown }) => (Array.isArray((r as any).json) ? (r as any).json : []) as any[];
 const esc = (s: unknown) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c] as string));
@@ -114,11 +115,12 @@ export async function handleReviewSubmit(req: Request, siteId: string, cors: Rec
   let contactId: string | null = null;
   try {
     if (v.review.email) {
-      const existing = rows(await svc(`presence_contacts?site_id=eq.${siteId}&email=eq.${encodeURIComponent(v.review.email)}&deleted_at=is.null&select=id&limit=1`))[0];
+      // item 110 (K1): found whatever the capitals, kept lower-cased like every contact
+      const existing = rows(await svc(`presence_contacts?site_id=eq.${siteId}&${emailMatch(v.review.email)}&deleted_at=is.null&select=id&limit=1`))[0];
       if (existing) contactId = existing.id;
       else {
         const ins = await svc('presence_contacts', { method: 'POST', headers: { Prefer: 'return=representation' },
-          body: JSON.stringify({ site_id: siteId, name: v.review.name, email: v.review.email }) });
+          body: JSON.stringify({ site_id: siteId, name: v.review.name, email: normEmail(v.review.email) }) });
         contactId = rows(ins)[0]?.id || null;
       }
     }

@@ -9,78 +9,117 @@
 <link rel="manifest" href="/manifest.json">
 <link rel="stylesheet" href="/fonts/brand.css">
 <style>
-  /* the same tokens as studio.html — the two doors are one product (experience review #40) */
-  :root{--p:#5b3fa0;--ink:#1b1525;--muted:#6b6478;--soft:#6b6478;--cream:#faf8f5;--card:#fff;--line:#eee9e0;
+  /* ── builder list item 188 (Nov 11 2026): the sign-in pages in the new look, drawn in Figma first
+     (file HSP7ScFSz2mg1xGzHRrEZi, page "Sign-in pages — new look"), matching the client portal's
+     direction A: the studio's colours and name in a dark band, a cream sheet, one clear way in.
+     The same tokens and layout as studio.html — the two doors are one product. ── */
+  :root{--p:#5b3fa0;--ink:#1b1525;--muted:#6b6478;--soft:#6b6478;--cream:#faf8f5;--card:#fff;--line:#e4ddd1;
+    --band:#241d38;--band-soft:#d9cdeb;--band-accent:#b79ceb;
     --serif:'Fraunces',"Iowan Old Style",Georgia,serif;--sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif}
   @media (prefers-color-scheme:dark){:root{--cream:#171320;--card:#1f1a2b;--ink:#efeaf7;--muted:#a79ebc;--soft:#a79ebc;--line:#2a2338;--p:#b79ceb}}
   *{box-sizing:border-box;margin:0}
-  body{background:var(--cream);color:var(--ink);font-family:var(--sans);line-height:1.6;-webkit-font-smoothing:antialiased;
-    min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px}
-  .card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:40px 36px;width:100%;max-width:420px;
-    box-shadow:0 1px 2px rgba(27,21,37,.04),0 14px 40px rgba(27,21,37,.08)}
-  /* ── one door design, shared with portal.html (experience review #40): the same
-     mark + wordmark, an eyebrow naming the door, one sentence, the app's 8px corners ── */
-  .brand{display:flex;align-items:center;gap:10px;margin-bottom:22px}
-  .mark{display:inline-flex;width:34px;height:34px;border-radius:9px;background:var(--p);color:#fff;font-weight:700;
+  body{background:var(--band);color:var(--ink);font-family:var(--sans);line-height:1.6;-webkit-font-smoothing:antialiased;min-height:100vh}
+  .door{min-height:100vh;display:flex;flex-direction:column}
+  .side{color:#fff;padding:max(52px,calc(env(safe-area-inset-top) + 28px)) 24px 26px;display:flex;flex-direction:column;gap:12px}
+  .sheet{flex:1;background:var(--cream);border-radius:28px 28px 0 0;padding:30px 24px 36px;display:flex;justify-content:center}
+  .card{width:100%;max-width:400px}
+  .brand{display:flex;align-items:center;gap:10px;margin-bottom:6px}
+  .mark{display:inline-flex;width:34px;height:34px;border-radius:9px;background:#5b3fa0;color:#fff;font-weight:700;
     align-items:center;justify-content:center;font-size:17px;flex:0 0 auto}
-  .word{font-family:var(--serif);font-size:21px;font-weight:500;letter-spacing:-.2px}
-  .logo{height:40px;width:auto;max-width:200px;display:block}   /* builder list item 59: the studio's own logo */
-  .brand .studio-by{display:block;font-size:12px;color:var(--muted,#6b6478);margin-top:2px}
+  .word{font-family:var(--serif);font-size:21px;font-weight:500;letter-spacing:-.2px;color:#fff}
+  .logo{height:44px;width:auto;max-width:220px;display:block;background:#fff;border-radius:10px;padding:6px 10px}   /* builder list item 59: the studio's own logo, on a white chip so any logo reads on the band */
+  .brand .studio-by{display:block;font-size:12px;color:var(--band-soft);margin-top:2px}
   .eyebrow{font-size:11px;font-weight:600;letter-spacing:2px;color:var(--p);text-transform:uppercase;margin-bottom:8px}
-  h1{font-family:var(--serif);font-weight:500;font-size:28px;line-height:1.15;margin-bottom:6px;letter-spacing:-.3px}
-  .sub{color:var(--soft);font-size:14px;margin-bottom:22px}
+  .side .eyebrow{color:var(--band-accent);margin:4px 0 0}
+  .lede{font-family:var(--serif);font-weight:300;font-size:34px;line-height:1.1;letter-spacing:-.4px;color:#fff}
+  /* their website, drawn (no one's data until they sign in) */
+  .glimpse{background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.14);border-radius:16px;padding:12px;max-width:380px;margin-top:6px}
+  .gpic{background:rgba(255,255,255,.92);border-radius:10px;padding:12px;display:flex;flex-direction:column;gap:8px}
+  .gl{display:block;height:8px;border-radius:4px}
+  h1{font-family:var(--serif);font-weight:400;font-size:30px;line-height:1.15;margin-bottom:6px;letter-spacing:-.3px}
+  .sub{color:var(--soft);font-size:14.5px;margin-bottom:18px}
   .sub .em{color:var(--ink);font-weight:600}
-  label{display:block;font-size:13px;font-weight:600;color:var(--muted);margin:14px 0 5px}
-  input{width:100%;font:inherit;font-size:16px;border:1px solid var(--line);background:var(--cream);color:var(--ink);
-    border-radius:8px;padding:11px 13px;outline:none}
+  label{display:block;font-size:13px;font-weight:600;color:var(--ink);margin:14px 0 6px}
+  input{width:100%;font:inherit;font-size:16px;border:1px solid var(--line);background:var(--card);color:var(--ink);
+    border-radius:12px;padding:13px 15px;outline:none}
   input:focus{border-color:var(--p)}
   input.code{letter-spacing:8px;font-size:22px;text-align:center;font-weight:600}
-  button{font-family:inherit;font-size:15px;font-weight:600;border-radius:8px;border:1px solid var(--p);
-    background:var(--p);color:#fff;padding:12px 22px;cursor:pointer;width:100%;margin-top:20px}
+  .pwbox{position:relative}
+  .pwbox input{padding-right:70px}
+  .pwbox .show{all:unset;position:absolute;right:10px;top:50%;transform:translateY(-50%);font-size:13px;font-weight:600;color:var(--p);cursor:pointer;padding:6px 8px;border-radius:8px}
+  .pwbox .show:focus-visible{outline:2px solid var(--p);outline-offset:1px}
+  button{font-family:inherit;font-size:15px;font-weight:600;border-radius:999px;border:1px solid var(--p);
+    background:var(--p);color:#fff;padding:14px 22px;cursor:pointer;width:100%;margin-top:22px}
   button:disabled{opacity:.55;cursor:default}
   /* dark mode: --p lifts to #b79ceb, so the filled button needs dark ink (#fff on #b79ceb fails contrast).
      .linky buttons keep their own higher-specificity accent color. */
-  @media (prefers-color-scheme:dark){button{color:#171320} .mark{color:#171320}}
-  .err{background:#fbeaea;color:#8a2f2f;border-radius:10px;padding:11px 14px;font-size:13.5px;margin-top:14px;display:none}
+  @media (prefers-color-scheme:dark){button{color:#171320}}
+  .err{background:#fbeaea;color:#8a2f2f;border-radius:12px;padding:11px 14px;font-size:13.5px;margin-top:14px;display:none}
   @media (prefers-color-scheme:dark){.err{background:#3a2026;color:#f2b8b8}}
-  .ok{background:#eef4ef;color:#2e6a44;border-radius:10px;padding:11px 14px;font-size:13.5px;margin-top:14px}
+  .ok{background:#eef4ef;color:#2e6a44;border-radius:12px;padding:11px 14px;font-size:13.5px;margin-top:14px}
   @media (prefers-color-scheme:dark){.ok{background:#1f2a24;color:#8bbf9f}}
   .muted{color:var(--muted);font-size:13px;margin-top:16px;text-align:center}
   .muted a{color:var(--p);text-decoration:underline;text-underline-offset:2px}   /* told apart by more than colour (list item 137) */
-  .muted button.linky{all:unset;color:var(--p);cursor:pointer;font-size:13px}
+  .muted button.linky{all:unset;color:var(--p);cursor:pointer;font-size:13.5px;font-weight:600}
   .muted button.linky:focus-visible{outline:2px solid var(--p);outline-offset:2px;border-radius:4px}
   .muted button.linky:disabled{color:var(--muted);cursor:default}
+  input:focus-visible,button:focus-visible{outline:2px solid var(--p);outline-offset:2px}
+  .rule{height:1px;background:var(--line);margin:20px 0 4px}
+  .mailbtns{display:flex;gap:10px;margin:2px 0 6px}
+  .qbtn{flex:1;text-align:center;font-size:14px;font-weight:600;color:var(--ink);text-decoration:none;background:var(--card);border:1px solid var(--line);border-radius:999px;padding:11px 12px}
+  .qbtn:focus-visible{outline:2px solid var(--p);outline-offset:2px}
   .panel{display:none}
   .spin{width:22px;height:22px;border:2.5px solid var(--line);border-top-color:var(--p);border-radius:50%;animation:sp .8s linear infinite;margin:8px auto}
   @keyframes sp{to{transform:rotate(360deg)}}
   @media (prefers-reduced-motion:reduce){.spin{animation:none}}
+  @media (min-width:900px){
+    .door{flex-direction:row}
+    .side{width:54%;max-width:780px;padding:64px clamp(40px,6vw,88px);justify-content:center;gap:16px}
+    .lede{font-size:clamp(44px,4.4vw,58px);line-height:1.06}
+    .glimpse{max-width:520px;padding:16px;margin-top:14px}
+    .gpic{padding:18px;gap:10px}
+    .gl{height:10px;border-radius:5px}
+    .sheet{border-radius:0;align-items:center;padding:48px}
+    .card{max-width:380px}
+  }
 </style>
 </head>
 <body>
-<div class="card">
-  <div class="brand" id="brand"><span class="mark" aria-hidden="true">S</span><span class="word">Studio OS</span></div>
-
+<div class="door">
+  <aside class="side" aria-label="Your client portal">
+    <div class="brand" id="brand"><span class="mark" aria-hidden="true">S</span><span class="word">Studio OS</span></div>
+    <div class="eyebrow">Your client portal</div>
+    <p class="lede">Your website, your project, one place.</p>
+    <div class="glimpse" aria-hidden="true"><div class="gpic">
+      <span class="gl" style="width:46%;background:#241d38;opacity:.85"></span>
+      <span class="gl" style="width:84%;background:#d9cdeb"></span>
+      <span class="gl" style="width:70%;background:#d9cdeb"></span>
+      <span class="gl" style="width:32%;background:#5b3fa0;opacity:.85"></span>
+    </div></div>
+  </aside>
+  <main class="sheet">
+  <div class="card">
   <!-- SIGN IN · PASSWORDLESS (primary) -->
   <div id="emailPanel">
-    <div class="eyebrow">Client portal</div>
-    <h1>See your project</h1>
-    <p class="sub">Sign in with your email — we’ll send a secure link, no password needed.</p>
+    <h1>Sign in</h1>
+    <p class="sub">We’ll email you a link. No password to remember.</p>
     <form id="fEmail" novalidate>
       <label for="em">Email</label>
-      <input id="em" type="email" autocomplete="email" inputmode="email" placeholder="you@business.com" required>
+      <input id="em" type="email" autocomplete="email" inputmode="email" placeholder="you@yourbusiness.com" required>
       <button id="sendGo" type="submit">Email me a sign-in link</button>
     </form>
     <div class="err" id="errEmail" role="alert"></div>
-    <p class="muted"><button class="linky" id="toPw" type="button">Prefer a password? Sign in with a password instead</button></p>
+    <p class="muted"><button class="linky" id="toPw" type="button">Use a password instead</button></p>
+    <div class="rule" aria-hidden="true"></div>
     <p class="muted">First time here? Use the link in your invitation email to set things up.</p>
     <p class="muted">Run a studio on Studio OS? <a href="/studio.html">Your sign-in is here</a>.</p>
   </div>
 
   <!-- CODE ENTRY (after a code is sent) -->
   <div id="codePanel" class="panel">
-    <div class="eyebrow">Check your email</div>
-    <h1>Check your email</h1>
+    <h1>Check your inbox</h1>
     <p class="sub" id="codeSub">If that email has an account, a sign-in link is on its way. Tap the link to sign in — or, if your email includes a 6-digit code, enter it below.</p>
+    <div class="mailbtns"><a class="qbtn" href="https://mail.google.com/mail/u/0/#inbox" target="_blank" rel="noopener">Open Gmail</a><a class="qbtn" href="https://outlook.live.com/mail/0/" target="_blank" rel="noopener">Open Outlook</a></div>
     <form id="fCode" novalidate>
       <label for="code">6-digit code</label>
       <input id="code" class="code" type="text" inputmode="numeric" autocomplete="one-time-code"
@@ -97,14 +136,13 @@
 
   <!-- SIGN IN · PASSWORD (preserved fallback) -->
   <div id="pwPanel" class="panel">
-    <div class="eyebrow">Client portal</div>
-    <h1>See your project</h1>
-    <p class="sub">Sign in with your email and password.</p>
+    <h1>Sign in</h1>
+    <p class="sub">With your email and password.</p>
     <form id="f" novalidate>
       <label for="empw">Email</label>
-      <input id="empw" type="email" autocomplete="email" inputmode="email" placeholder="you@business.com" required>
+      <input id="empw" type="email" autocomplete="email" inputmode="email" placeholder="you@yourbusiness.com" required>
       <label for="pw">Password</label>
-      <input id="pw" type="password" autocomplete="current-password" placeholder="Your password" required>
+      <div class="pwbox"><input id="pw" type="password" autocomplete="current-password" placeholder="Your password" required><button class="show" type="button" aria-label="Show password" aria-pressed="false">Show</button></div>
       <button id="go" type="submit">Sign in →</button>
     </form>
     <div class="err" id="err" role="alert"></div>
@@ -132,8 +170,11 @@
     <div class="eyebrow">Check your email</div>
     <h1>On its way</h1>
     <p class="sub">If that address has an account, a reset link is on its way. It lands you on a page to choose a new password.</p>
+    <div class="mailbtns"><a class="qbtn" href="https://mail.google.com/mail/u/0/#inbox" target="_blank" rel="noopener">Open Gmail</a><a class="qbtn" href="https://outlook.live.com/mail/0/" target="_blank" rel="noopener">Open Outlook</a></div>
     <p class="muted"><button class="linky" id="backToLogin" type="button">Back to sign in</button></p>
   </div>
+</div>
+  </main>
 </div>
 
 <script src="/vendor/supabase-js-2.45.4.js"></script>
@@ -168,6 +209,7 @@ var sb = null;
 // writes 'dds-studio-brand'). Either way the page reads ONE public, cached answer
 // (/public/studio/<id>/brand) that gives away only what the studio's website shows.
 // Nothing here changes who can sign in; it only changes whose name is at the top.
+function mixHex(a, b, t){ var pa=parseInt(a.slice(1),16), pb=parseInt(b.slice(1),16); var ch=function(sh){ return Math.round(((pa>>sh)&255)*t+((pb>>sh)&255)*(1-t)); }; return '#'+((1<<24)+(ch(16)<<16)+(ch(8)<<8)+ch(0)).toString(16).slice(1); }
 function paintStudioBrand(b){
   if (!b || !b.name) return;
   var box = $('brand'); if (!box) return;
@@ -181,6 +223,7 @@ function paintStudioBrand(b){
     var word = document.createElement('span'); word.className = 'word'; word.textContent = safe;
     box.appendChild(mark); box.appendChild(word);
   }
+  if (b.accent && /^#[0-9a-f]{6}$/i.test(b.accent)) { try { document.documentElement.style.setProperty('--band', mixHex(b.accent, '#160f22', 0.3)); } catch(e){} }   // item 188: the band in a dark tint of the studio's colour
   try { document.title = safe + ' — Client sign in'; } catch(e){}
 }
 (function studioBrandBoot(){
@@ -377,6 +420,10 @@ $('signout1').addEventListener('click', async function(){ if (sb) { try{ await s
     }
   } catch (e) { /* stay on the sign-in form */ }
 })();
+</script>
+<script>
+// item 188: Show / Hide on the password field
+document.querySelectorAll('.pwbox .show').forEach(function(b){ b.addEventListener('click', function(){ var i=b.parentNode.querySelector('input'); var on=i.type==='password'; i.type=on?'text':'password'; b.textContent=on?'Hide':'Show'; b.setAttribute('aria-pressed', on?'true':'false'); b.setAttribute('aria-label', on?'Hide password':'Show password'); i.focus(); }); });
 </script>
 </body>
 </html>

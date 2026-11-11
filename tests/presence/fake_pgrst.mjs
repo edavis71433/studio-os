@@ -9,11 +9,11 @@
 //   db.writes('presence_sales_templates')      // what it wrote
 //
 // It understands the filters the presence function uses: eq / neq / is /
-// in.(…) / like / ilike / gte / lte / gt / lt, not.<op>, or=(…) with quoted
+// in.(…) / like / ilike / gte / lte / gt / lt / cs.{…} (array contains), not.<op>, or=(…) with quoted
 // values, and a jsonb path column (detail->>key); select is ignored (whole rows
 // come back); order (every key, in turn), offset and limit apply. POST honours on_conflict + Prefer resolution=ignore|merge-
 // duplicates, and the `unique` keys (with an optional row predicate, for a
-// partial unique index) answer 409 like the database. PATCH and DELETE apply
+// partial unique index, or a key function, for an expression index) answer 409 like the database. PATCH and DELETE apply
 // to every matching row. A user JWT (anything but the service key) sees only
 // `ownSite[token]` in presence_sites — row-level security, roughly.
 export function installFakePostgrest(opts = {}) {
@@ -30,9 +30,11 @@ export function installFakePostgrest(opts = {}) {
   const reply = (body, status = 200, headers = {}) => new Response(status === 204 ? null : (body === null ? '' : JSON.stringify(body)), { status, headers: { 'Content-Type': 'application/json', ...headers } });
   const unq = (v) => { v = String(v); return v.startsWith('"') && v.endsWith('"') ? v.slice(1, -1).replace(/\\(.)/g, '$1') : v; };
   const splitTop = (s) => { const out = []; let cur = '', depth = 0, q = false; for (let i = 0; i < s.length; i++) { const ch = s[i]; if (q) { cur += ch; if (ch === '\\') { cur += s[++i] ?? ''; continue; } if (ch === '"') q = false; continue; } if (ch === '"') { q = true; cur += ch; continue; } if (ch === '(') depth++; if (ch === ')') depth--; if (ch === ',' && depth === 0) { out.push(cur); cur = ''; continue; } cur += ch; } if (cur) out.push(cur); return out; };
-  const likeRe = (p, flags) => new RegExp('^' + String(p).replace(/[.+?^${}()|[\]\\]/g, '\\$&').replace(/[*%]/g, '.*') + '$', flags);
+  // LIKE, as Postgres reads it: % (and PostgREST's *) is any run, _ is any one character,
+  // and a backslash makes the next character itself ("jane\\_doe" is a literal underscore)
+  const likeRe = (p, flags) => { let re = ''; const t = String(p); for (let i = 0; i < t.length; i++) { const ch = t[i]; if (ch === '\\' && i + 1 < t.length) { re += t[++i].replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); continue; } if (ch === '%' || ch === '*') re += '.*'; else if (ch === '_') re += '.'; else re += ch.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); } return new RegExp('^' + re + '$', flags); };
   const test = (row, col, expr) => {
-    const m = /^(not\.)?(eq|neq|is|in|like|ilike|gte|lte|gt|lt)\.(.*)$/s.exec(expr);
+    const m = /^(not\.)?(eq|neq|is|in|like|ilike|gte|lte|gt|lt|cs)\.(.*)$/s.exec(expr);
     if (!m) return true;
     // a JSON path (detail->>message_id) reads inside a jsonb column, as text, like PostgREST
     const [, not, op, raw] = m; const jp = /^(\w+)->>(\w+)$/.exec(col); const v = jp ? (row[jp[1]] && typeof row[jp[1]] === 'object' && row[jp[1]][jp[2]] != null ? String(row[jp[1]][jp[2]]) : null) : row[col]; let r;
@@ -42,6 +44,8 @@ export function installFakePostgrest(opts = {}) {
     else if (op === 'in') r = splitTop(raw.replace(/^\(|\)$/g, '')).map(unq).includes(String(v));
     else if (op === 'like') r = v != null && likeRe(unq(raw), 's').test(String(v));
     else if (op === 'ilike') r = v != null && likeRe(unq(raw), 'is').test(String(v));
+    // cs.{a,"b c"}: an array column holding every one of those values (tags @> '{a,b c}')
+    else if (op === 'cs') { const want = splitTop(raw.replace(/^\{|\}$/g, '')).map(unq).filter((x) => x !== ''); r = Array.isArray(v) && want.every((w) => v.map(String).includes(w)); }
     else if (op === 'gte') r = String(v ?? '') >= unq(raw); else if (op === 'lte') r = String(v ?? '') <= unq(raw);
     else if (op === 'gt') r = String(v ?? '') > unq(raw); else r = String(v ?? '') < unq(raw);
     return not ? !r : r;
@@ -57,8 +61,10 @@ export function installFakePostgrest(opts = {}) {
     for (const spec of unique[table] || []) {
       const cols = Array.isArray(spec) ? spec : spec.cols;
       const where = Array.isArray(spec) ? null : spec.where;
+      // key: an expression index, e.g. (r) => r.site_id + '|' + r.email.toLowerCase() for (site_id, lower(email))
+      const key = Array.isArray(spec) ? null : spec.key;
       if (where && !where(rec)) continue;
-      const hit = rows.find((r) => (!where || where(r)) && cols.every((c) => String(r[c]) === String(rec[c])));
+      const hit = rows.find((r) => (!where || where(r)) && (key ? key(r) === key(rec) : cols.every((c) => String(r[c]) === String(rec[c]))));
       if (hit) return hit;
     }
     return null;
