@@ -3,11 +3,12 @@
 // GENERATED from structured business facts — the owner never writes legal HTML.
 // The honest foundation: Studio OS sites set no cookies and carry no third-party
 // embeds or outside analytics (maps are links), so no consent banner is required.
-// Two real data flows are described as they are: the contact form, and the site's
-// own first-party visit counter (lib/visits.ts trackerScript, routes/collect.ts),
-// which the owner can switch off (item 61); the page reads the same switch the
-// publish step does. Deterministic: the effective date is the snapshot date (the
-// only clock a renderer may read).
+// The real data flows are described as they are: the contact form, the site's own
+// first-party visit counter (lib/visits.ts trackerScript, routes/collect.ts), which
+// the owner can switch off (item 61; the page reads the same switch the publish
+// step does), and, only on a site that has them, online booking (routes/booking.ts)
+// and the reviews it shows (routes/reviews.ts), list item 138. Deterministic: the
+// effective date is the snapshot date (the only clock a renderer may read).
 //
 // Terms of Service are deliberately NOT auto-generated in V1: terms make
 // business-specific legal promises (refunds, liability, jurisdiction) that a
@@ -15,7 +16,7 @@
 // owner-approved terms). Both templates render these bodies through their own
 // shell, so look-and-feel stays per-template while the words stay one source.
 import { esc } from './markdown.ts';
-import type { SnapshotContent } from './render_types.ts';
+import type { SiteConfig, SnapshotContent } from './render_types.ts';
 
 function contactLine(c: SnapshotContent): string {
   const i = c.identity; const l = c.locations?.[0];
@@ -27,9 +28,20 @@ function contactLine(c: SnapshotContent): string {
   return bits.join(' · ');
 }
 
-/** The Privacy Policy body (inside <main>): facts-true, plain words. */
-export function privacyBody(c: SnapshotContent, effectiveDate: string, hasForm: boolean): string {
+/** Whether a section of this type is anywhere on the site: the home page, an added page, or
+ *  inside a column. The serializer has already dropped what won't draw (a reviews wall with
+ *  nothing approved yet), so a section here is one a visitor can use. */
+function siteHas(c: SnapshotContent, type: string): boolean {
+  const lists = [c.settings?.blocks || [], ...(c.settings?.pages || []).map((p) => p.blocks || [])];
+  return lists.some((list) => list.some((b) => b?.type === type || (b?.type === 'columns' && b.columns.some((col) => col.block?.type === type))));
+}
+
+/** The Privacy Policy body (inside <main>): facts-true, plain words. A form or a booking
+ *  is described only when the site can take one (its address is set at publish). */
+export function privacyBody(c: SnapshotContent, effectiveDate: string, site: Pick<SiteConfig, 'formEndpoint' | 'bookEndpoint'>): string {
   const name = esc(c.identity.business_name);
+  const hasForm = !!site.formEndpoint;
+  const booking = !!site.bookEndpoint && siteHas(c, 'booking'), reviews = siteHas(c, 'reviews_wall');
   return `<section class="block wrap"><h1>Privacy policy</h1>
 <p class="post-meta">Effective ${esc(effectiveDate)}</p>
 <h2>Who we are</h2>
@@ -38,7 +50,15 @@ export function privacyBody(c: SnapshotContent, effectiveDate: string, hasForm: 
 ${hasForm
     ? `<p>If you send us a message through the contact form, we receive what you type — your name, an email address or phone number, and your message. We use it for one thing: getting back to you. We don’t sell it, share it for marketing, or add you to lists you didn’t ask for.</p>`
     : `<p>This website has no forms and collects nothing you type.</p>`}
-${c.settings?.visit_counter === false
+${booking
+    ? `<h2>Booking an appointment</h2>
+<p>If you book an appointment on this website, we receive what you enter: your name, an email address or phone number, the service and time you picked, and any note you add. We use it to keep your appointment: we email you a confirmation and a reminder before it, and contact you if something changes. We don’t sell it, share it for marketing, or add you to lists you didn’t ask for.</p>
+`
+    : ''}${reviews
+    ? `<h2>Reviews</h2>
+<p>The reviews on this website come from our customers. After a visit we may email you to ask for one, and every such email has a link to stop them. If you leave a review, we keep your name, your star rating, what you wrote and any email address you give. Nothing appears here until we have read it and said yes; then your rating, your words, the name you gave and the date show on this website, sometimes with a reply from us. Your email address is never shown, and if you ask, we’ll take your review down.</p>
+`
+    : ''}${c.settings?.visit_counter === false
     ? `<h2>Cookies and visit counts</h2>
 <p>This website sets <strong>no cookies</strong>, stores nothing on your device, and does not count or track visits. There is nothing to consent to, which is why there is no cookie banner.</p>`
     : `<h2>Cookies and visit counts</h2>
@@ -47,7 +67,7 @@ ${c.settings?.visit_counter === false
 <h2>Hosting</h2>
 <p>The site is served as static pages by our hosting provider, which may keep standard, short-lived server logs (such as IP addresses) for security and reliability.</p>
 <h2>Your choices</h2>
-<p>If you’ve sent us a message and would like to see, correct, or delete it, contact us using the details above and we’ll take care of it.</p>
+<p>If you’ve sent us a message${booking ? (reviews ? ', booked with us' : ' or booked with us') : ''}${reviews ? ' or left a review' : ''} and would like to see, correct, or delete it, contact us using the details above and we’ll take care of it.</p>
 </section>`;
 }
 
