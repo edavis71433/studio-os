@@ -20,6 +20,7 @@ import { sanitizeDevHtml, sanitizeDevCss } from './devmode.ts';
 import { BLOCK_CSS, sectionStyles, pageClasses } from './site_blocks.ts';
 import { applyPageChrome } from './page_access.ts';
 import { applyHeaderScroll } from './site_header.ts';
+import { applyPhoneBar } from './phone_bar.ts';
 
 // ── FD-T2: indexed template registry; each template's code loads on first use ──
 // slug → version → { manifest, code loader }. Render resolution goes through this
@@ -201,7 +202,10 @@ export async function renderSnapshot(snapshot: Snapshot, site: SiteConfig, opts:
   // items 50 and 123: the header scrolls away, stays on top, hides or fades, as the owner chose
   // List item 175: switched off, AI assistants are asked to stay out in robots.txt.
   const drawn = withAiCrawlerChoice(applyHeaderScroll(tintFavicon(applyPageChrome(await t.render(snapshot, t.manifest, site), pages), tokens?.accent, snapshot.template_slug), tokens?.header_scroll), (snapshot.content as SnapshotContent)?.settings);
-  const dressed = injectDevLayer(drawn, snapshot.dev_customization);
+  // item 122: Call, Directions, Hours and Email along the bottom of every page on a phone, when turned on
+  // (after the page's own header and footer choice, so a page that hides its footer has no bar either)
+  const barred = applyPhoneBar(drawn, tokens?.phone_bar, snapshot.content as SnapshotContent, tokens?.accent);
+  const dressed = injectDevLayer(barred, snapshot.dev_customization);
   // List item 152: the Google tag and the Meta Pixel, behind a cookie notice, on a site that has them.
   const tagged = injectAdTags(opts.allSectionStyles ? dressed : trimSectionStyles(dressed), (snapshot.content as SnapshotContent)?.settings);
   return injectCsp(injectAnalytics(tagged, counting ? site.siteId : undefined));
