@@ -13,7 +13,7 @@ const code = html.split('\n').filter((l) => !l.trim().startsWith('//')).join('\n
 ok('no question uses the browser’s confirm()', !/(?<![\w.])confirm\(/.test(code));
 ok('…nor alert() or prompt()', !/(?<![\w.])(alert|prompt)\(/.test(code));
 const asks = (code.match(/(?<![\w.])askYes\(/g) || []).length;
-ok('the 21 questions ask through askYes', asks >= 22, String(asks));   // 21 questions and its definition (since item 125 a saved checkpoint comes back through the restore sheet)
+ok('the 20 questions ask through askYes', asks >= 21, String(asks));   // 20 questions and its definition (since item 125 a saved checkpoint comes back through the restore sheet; item 163 made removing a domain a typed question, askText)
 ok('Escape answers no, and the main button yes', /dlg\.addEventListener\("cancel", \(e\) => \{ e\.preventDefault\(\); finish\(false\); \}\)/.test(html) && /form\.addEventListener\("submit", \(e\) => \{ e\.preventDefault\(\); finish\(true\); \}\)/.test(html));
 ok('a risky question starts on Cancel', /\(opts\.danger \? cancel : ok\)\.focus\(\)/.test(html));
 ok('the question keeps its line breaks and is the dialog’s name', /white-space:pre-line/.test(html) && /dlg\.setAttribute\("aria-labelledby", msg\.id\)/.test(html));

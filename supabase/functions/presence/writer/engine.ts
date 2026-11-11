@@ -239,9 +239,11 @@ export async function acceptDraft(site: SiteRow, draftId: string, optionIndex: n
     const nFqE = (edits?.faqs_edit || opt.payload.faqs_edit || []).length; if (nFqE) parts.push(`${nFqE} improved answer${nFqE > 1 ? 's' : ''}`);
     const nPoE = (edits?.posts_edit || opt.payload.posts_edit || []).length; if (nPoE) parts.push(`${nPoE} improved update${nPoE > 1 ? 's' : ''}`);
     summary = `Accepted a drafted proposal: ${parts.join(', ') || row.prompt_summary}`;
+    // the draft's own colours, fonts and custom code go through as they are: the gate writes
+    // the style layer it's handed (REPLACE), so leaving it out cleared them
     const applied = await applySnapshotToDraft(
       site,
-      { content: merged, media_manifest: mediaManifest, content_contract_version: snapshot.content_contract_version, template_slug: site.template_slug, template_version: site.template_version },
+      { content: merged, media_manifest: mediaManifest, content_contract_version: snapshot.content_contract_version, template_slug: site.template_slug, template_version: site.template_version, dev_customization: snapshot.dev_customization ?? null },
       principal, summary, cur,
     );
     if (!applied.ok) return { ok: false, applied_summary: '', error: applied.error || 'apply_failed' };

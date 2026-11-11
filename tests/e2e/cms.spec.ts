@@ -185,7 +185,7 @@ test.describe('CMS workspace', () => {
       '/foundations/plans': { data: [] }, '/launch': { data: { launched: true, sentence: 'Live.', items: [] } } } });
     await page.goto('/presence.html#search');
     const card = page.locator('#domainCard');
-    await expect(card).toContainText('temporary address');
+    await expect(card).toContainText('built-in address');
     await card.getByRole('button', { name: 'Connect your domain' }).click();
     await expect(page.getByPlaceholder('yourbusiness.com')).toBeFocused();
     const post = page.waitForRequest((r) => r.method() === 'POST' && /\/foundations\/domain$/.test(new URL(r.url()).pathname));
@@ -201,7 +201,7 @@ test.describe('CMS workspace', () => {
     await installApp(page, { api: { ...BOARD_API, ...EXTRAS, '/health': { data: { state: 'healthy', sentence: 'Your website is live and up to date.' } } } });
     await page.goto('/presence.html#search');
     await expect(page.locator('#healthCard').getByRole('heading', { name: 'Health check' })).toBeVisible();
-    await expect(page.locator('#domainCard')).toContainText('temporary address');
+    await expect(page.locator('#domainCard')).toContainText('built-in address');
     await page.evaluate(() => (window as any).go('history'));
     await expect(page.locator('#activitySec').getByRole('heading', { name: 'Recent activity' })).toBeVisible();
   });

@@ -66,9 +66,14 @@ const CONTROLS = [
   ['DELETE /offerings/:id', 'presence.html', 'api("DELETE", `/${rec.col}/${rec.id}`)', ['window.ddsLacks && window.ddsLacks("delete") ? null : { kind: "create"']],
 
   ['POST /foundations/domain', 'presence.html', `api("POST", "/foundations/domain", { domain })`, ['choose.dataset.needs = "configure"', 'havePanel.dataset.needs = "configure"', 'needPanel.dataset.needs = "configure"', 'btn.dataset.needs = "configure"; btn.textContent = "Connect your domain"']],
-  ['DELETE /foundations/domain', 'presence.html', `api("DELETE", "/foundations/domain")`, ['rm.dataset.needs = "configure"']],
+  ['DELETE /foundations/domain', 'presence.html', `api("DELETE", "/foundations/domain", { confirm })`, ['rm.dataset.needs = "configure"']],   // item 163: the name typed back
+  ['POST /foundations/domain', 'presence.html', `api("POST", "/foundations/domain", { domain: ans.domain, keep_old: ans.keepOld })`, ['b.dataset.needs = "configure"; b.dataset.change = "domain"']],   // item 163: change to a different domain
   ['POST /foundations/prepare', 'presence.html', `api("POST", "/foundations/prepare", { goal: "email_auth" })`, ['acts.dataset.needs = "configure"', 'after.dataset.needs = "configure"']],
-  ['POST /foundations/prepare', 'presence.html', `api("POST", "/foundations/prepare", { goal })`, ['mh.dataset.needs = "configure"']],   // builder list item 162, part two: the domain sheet's "More help" guides
+  ['POST /foundations/prepare', 'presence.html', `api("POST", "/foundations/prepare", { goal })`, ['mh.dataset.needs = "configure"']],
+  ['POST /foundations/prepare', 'presence.html', `api("POST", "/foundations/prepare", { goal: "email_setup", provider: "google_workspace" })`, ['gm.dataset.needs = "configure"']],   // item 174: Gmail's records in one pick
+  ['POST /foundations/domain', 'presence.html', `api("POST", "/foundations/domain", { domain: twin })`, ['sw.dataset.needs = "configure"; sw.dataset.main = "switch"']],   // item 174: the www. switch
+  ['POST /foundations/domain/forward', 'presence.html', `api("POST", "/foundations/domain/forward", { domain: d })`, ['add.dataset.needs = "configure"']],   // item 174: another domain sends visitors here
+  ['DELETE /foundations/domain/forward', 'presence.html', `api("DELETE", "/foundations/domain/forward", { domain: n })`, ['stop.dataset.needs = "configure"']],   // builder list item 162, part two: the domain sheet's "More help" guides
   ['POST /preview/settings', 'presence.html', `act("/preview/settings", "Preview access updated"`, ['"Preview access updated", { password: pw }); });\n    acts.lastChild.dataset.needs = "configure";']],
   ['POST /preview/settings', 'presence.html', `act("/preview/settings", "Preview link reset"`, ['"Preview link reset", { regenerate_token: true }); });\n    acts.lastChild.dataset.needs = "configure";']],
   ['POST /site/offline', 'presence.html', `siteSetState("/site/offline"`, ['offBtn.dataset.needs = "configure"']],
@@ -115,7 +120,7 @@ const SOURCE = Object.fromEntries(PAGES.map((p) => [p, read(p)]));
   const decided = read('tests/presence/member_capability_test.mjs');
   const listed = (name) => [...decided.split('const DECIDED = {')[1].split(`\n  ${name}: [`)[1].split('\n  ],')[0].matchAll(/'((?:DELETE|POST|PUT|PATCH) [^']+)'/g)].map((m) => m[1]);
   const routes = [...listed('delete'), ...listed('configure')];
-  ok('the decided delete and configure lists were read', routes.length === 41, String(routes.length));   // item 47 added two; item 104 took away the seven DNS document and zone writes; item 58 added two; item 112 added the prospect delete; item 115 added the Google review link; item 175 the visitor password; item 77 the payment undo; items 86 + 105 added three (import undo, merge, unmerge)
+  ok('the decided delete and configure lists were read', routes.length === 43, String(routes.length));   // item 47 added two; item 104 took away the seven DNS document and zone writes; item 58 added two; item 112 added the prospect delete; item 115 added the Google review link; item 175 the visitor password; item 77 the payment undo; item 174 added the two domain forwards; items 86 + 105 added three (import undo, merge, unmerge)
   const covered = new Set(CONTROLS.map(([r]) => r));
   const open = routes.filter((r) => !covered.has(r) && !NO_CONTROL[r]);
   ok('every decided delete and configure route is accounted for here', open.length === 0, open.join(', '));
@@ -140,7 +145,7 @@ const SOURCE = Object.fromEntries(PAGES.map((p) => [p, read(p)]));
     ok(`${page}: every DELETE it sends is decided`, fresh.length === 0, fresh.join(' | '));
   }
   // crm.html: 4 — the record's two note removals are one removeNote since item 98 (it asks first now); item 108 added the draft estimate's
-  ok('tripwire: the DELETE scan found the calls it is meant to find', sent('pipeline.html').length === 5 && sent('presence.html').length === 12 && sent('contacts.html').length === 2 && sent('crm.html').length === 4 && sent('files.html').length === 1);
+  ok('tripwire: the DELETE scan found the calls it is meant to find', sent('pipeline.html').length === 5 && sent('presence.html').length === 13 && sent('contacts.html').length === 2 && sent('crm.html').length === 4 && sent('files.html').length === 1);
 
   const CONFIG = /\/(?:foundations\/(?:domain|prepare)|preview\/settings|site\/(?:offline|online)|bookings\/settings|sales\/contacts\/fields)\b/;
   const writes = new RegExp(`(?:api\\(\\s*["'](?:POST|PUT|DELETE)["']\\s*,\\s*["'\`]|act\\(["']|siteSetState\\(["'])${CONFIG.source}|api\\(["'\`]${CONFIG.source}["'\`]\\s*,\\s*["'](?:POST|PUT|DELETE)["']`, 'g');
@@ -151,7 +156,7 @@ const SOURCE = Object.fromEntries(PAGES.map((p) => [p, read(p)]));
       if (!known(page).some((k) => k.includes(call))) ok(`${page}: this configure write is listed`, false, call);
     }
   }
-  ok('tripwire: the configure scan found every call in the table', seen === 10, String(seen));   // item 162, part two: the domain sheet's "More help" guides
+  ok('tripwire: the configure scan found every call in the table', seen === 15, String(seen));   // item 174: the www. switch and the two forward calls   // item 162, part two: the domain sheet's "More help" guides; item 163: change to a different domain
 }
 
 // ═══ 4. settings: one row, two kinds of field ═══

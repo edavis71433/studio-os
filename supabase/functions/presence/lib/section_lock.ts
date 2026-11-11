@@ -89,3 +89,46 @@ export function lockedMessage(edits: LockedEdit[]): string {
   if (e.what === 'locked') return 'Only your studio can lock a section. Nothing was changed.';
   return `Your studio locked “${e.name}” so it stays as designed. Ask them if it needs to change. Nothing was changed.`;
 }
+
+// ── A restore (builder list item 187) ──
+// Restoring a version writes Home's sections and the pages as that version kept them, which
+// for the client is a save like any other: it may not remove a locked section or change it
+// beyond what its lock allows. A version from before the lock mostly holds the section just
+// as it is now, only without the lock, so the lock is carried over onto that copy (same page,
+// the same as the lock sees it) and the restore goes ahead. A lock the version brings back is
+// the studio's own, so it comes back with it.
+
+/** Two sections the same as a lock sees them (its words open or not), their locks aside. */
+function sameUnderLock(a: Block, b: Block, words: boolean): boolean {
+  const { lock: _a, ...x } = a, { lock: _b, ...y } = b;
+  return seen(x, words) === seen(y, words);
+}
+
+/** A client's restore under the studio's locks: the lists it would write, each locked
+ *  section's lock carried over onto the version's unlocked copy of it, and what it would
+ *  still do to a locked section (remove it, or change it), which refuses the restore. */
+export function restoreUnderLocks(stored: Lists, restoring: Lists): { blocks: unknown[]; pages: unknown[]; edits: LockedEdit[] } {
+  const blocks = Array.isArray(restoring.blocks) ? [...restoring.blocks] : [];
+  const pages = (Array.isArray(restoring.pages) ? restoring.pages : []).map((p) => (isObj(p) && Array.isArray(p.blocks) ? { ...p, blocks: [...p.blocks] } : p));
+  const into = new Map<string, unknown[]>([['', blocks]]);
+  for (const p of pages) if (isObj(p) && typeof p.slug === 'string' && p.slug && Array.isArray(p.blocks)) into.set(p.slug, p.blocks);
+  for (const [where, list] of listsOf(stored, { home: true, pages: true })) {
+    const to = into.get(where);
+    if (!to) continue;
+    for (const b of list) {
+      const l = lockOf(b);
+      if (!l || to.some((x) => lockOf(x)?.id === l.id)) continue;
+      const i = to.findIndex((x) => isObj(x) && !lockOf(x) && sameUnderLock(x, b, l.words));
+      if (i >= 0) to[i] = { ...(to[i] as Block), lock: b.lock };
+    }
+  }
+  return { blocks, pages, edits: lockedEdits(stored, { blocks, pages }).filter((e) => e.what !== 'locked') };
+}
+
+/** The one sentence a client's refused restore answers with; `from` is "that version" or
+ *  "that checkpoint". With the longest name it stays under the 160 characters the editor
+ *  shows as they are. */
+export function lockedRestoreMessage(edits: LockedEdit[], from: string): string {
+  const e = edits[0];
+  return e ? `Your studio locked “${e.name}”, and ${from} changes it. Ask them to restore it. Nothing was changed.` : '';
+}

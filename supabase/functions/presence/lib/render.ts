@@ -14,6 +14,7 @@ import manifest_me_1_0_0 from '../templates/meadow/1.0.0/manifest.json' with { t
 import manifest_at_1_0_0 from '../templates/atelier/1.0.0/manifest.json' with { type: 'json' };
 import manifest_ha_1_0_0 from '../templates/harbor/1.0.0/manifest.json' with { type: 'json' };
 import { trackerScript } from './visits.ts';
+import { injectSender } from './site_send.ts';
 import { withAiCrawlerChoice } from './ai_crawlers.ts';
 import { injectAdTags } from './ad_tags.ts';
 import { sanitizeDevHtml, sanitizeDevCss } from './devmode.ts';
@@ -207,7 +208,8 @@ export async function renderSnapshot(snapshot: Snapshot, site: SiteConfig, opts:
   const barred = applyPhoneBar(drawn, tokens?.phone_bar, snapshot.content as SnapshotContent, tokens?.accent);
   // item 121: the owner's own page answers a broken link, when they've picked one (its copy keeps the bar)
   const found = applyNotFoundPage(barred, pages);
-  const dressed = injectDevLayer(found, snapshot.dev_customization);
+  // item 131: pages with the site's forms send them from the page (lib/site_send.ts)
+  const dressed = injectSender(injectDevLayer(found, snapshot.dev_customization), snapshot.content as SnapshotContent, site);
   // List item 152: the Google tag and the Meta Pixel, behind a cookie notice, on a site that has them.
   const tagged = injectAdTags(opts.allSectionStyles ? dressed : trimSectionStyles(dressed), (snapshot.content as SnapshotContent)?.settings);
   return injectCsp(injectAnalytics(tagged, counting ? site.siteId : undefined));
