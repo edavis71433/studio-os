@@ -3,8 +3,21 @@
 // lean, privacy-first visit row, and aggregates stored rows into plain-English-
 // ready counts. Everything here is pure (except the sha256 hash) → unit-tested.
 
-export type VisitKind = 'pageview' | 'phone' | 'email' | 'cta' | 'download' | 'outbound';
-export const VISIT_KINDS: VisitKind[] = ['pageview', 'phone', 'email', 'cta', 'download', 'outbound'];
+// List item 157: 'button' is a press on a link drawn as a button (the templates' .btn) that
+// isn't a call, an email or a download, with its words; 'leave' is how long a page stayed
+// open and in view, sent once as the visitor leaves it.
+export type VisitKind = 'pageview' | 'phone' | 'email' | 'cta' | 'download' | 'outbound' | 'button' | 'leave';
+export const VISIT_KINDS: VisitKind[] = ['pageview', 'phone', 'email', 'cta', 'download', 'outbound', 'button', 'leave'];
+
+/** A pressed button's words as the collector keeps them: text only, one line, 60 characters. */
+export function cleanLabel(v: unknown): string {
+  return String(v ?? '').replace(/[\u0000-\u001f\u007f<>]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 60);
+}
+/** How long a page stayed open, in whole milliseconds: at least a second, at most half an hour; else null. */
+export function cleanMs(v: unknown): number | null {
+  const n = Math.round(Number(v));
+  return Number.isFinite(n) && n >= 1000 ? Math.min(n, 1_800_000) : null;
+}
 export const isVisitKind = (k: unknown): k is VisitKind => typeof k === 'string' && (VISIT_KINDS as string[]).includes(k);
 
 /** Classify a user-agent — device / browser / os / isBot. Deterministic, no lib. */
@@ -126,6 +139,45 @@ export interface VisitAgg {
 
 const topN = (m: Map<string, number>, n: number) => [...m.entries()].sort((a, b) => b[1] - a[1]).slice(0, n);
 
+// ── List item 157: which buttons get pressed, and how long pages stay open (pure) ──
+export interface EngagementRow { kind: string; path: string; label?: string | null; ms?: number | null; visitor_hash?: string }
+export interface Engagement {
+  buttons: Array<{ label: string; kind: string; path: string; presses: number; people: number }>;
+  time: { median_seconds: number | null; pages: Array<{ path: string; seconds: number; visits: number }> };
+}
+const median = (xs: number[]): number => { const s = [...xs].sort((a, b) => a - b); const m = s.length >> 1; return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2; };
+/** The presses with words (a button, a call, an email), most pressed first, and the middle
+ *  time a page stayed open, per page and for the whole site. The middle, not the average,
+ *  so one tab left open overnight doesn't speak for everyone. */
+export function engagementOf(rows: EngagementRow[]): Engagement {
+  const presses = new Map<string, { label: string; kind: string; path: string; presses: number; seen: Set<string> }>();
+  const times = new Map<string, number[]>();
+  const all: number[] = [];
+  for (const r of rows) {
+    if (r.kind === 'leave') {
+      const ms = Number(r.ms);
+      if (!Number.isFinite(ms) || ms < 1000) continue;
+      const list = times.get(r.path) || []; list.push(ms); times.set(r.path, list); all.push(ms);
+      continue;
+    }
+    const label = String(r.label || '').trim();
+    if (!label) continue;
+    const key = `${r.kind}|${r.path}|${label.toLowerCase()}`;
+    const p = presses.get(key) || { label, kind: r.kind, path: r.path, presses: 0, seen: new Set<string>() };
+    p.presses++; if (r.visitor_hash) p.seen.add(r.visitor_hash);
+    presses.set(key, p);
+  }
+  return {
+    buttons: [...presses.values()].sort((a, b) => b.presses - a.presses || a.label.localeCompare(b.label)).slice(0, 8)
+      .map(({ seen, ...p }) => ({ ...p, people: seen.size })),
+    time: {
+      median_seconds: all.length ? Math.round(median(all) / 1000) : null,
+      pages: [...times.entries()].sort((a, b) => b[1].length - a[1].length).slice(0, 10)
+        .map(([path, list]) => ({ path, seconds: Math.round(median(list) / 1000), visits: list.length })),
+    },
+  };
+}
+
 export function aggregateVisits(rows: VisitRow[], nowMs: number, windowDays: number): VisitAgg {
   const w = windowDays * 86_400_000;
   const curStart = nowMs - w, priorStart = nowMs - 2 * w;
@@ -187,7 +239,15 @@ export function trackerScript(siteId: string, collectBase: string): string {
     `function s(o){try{navigator.sendBeacon(U,JSON.stringify(o))}catch(e){}}` +
     `s({k:'pageview',p:location.pathname,r:document.referrer,u:{s:q('source'),m:q('medium'),c:q('campaign')}});` +
     `document.addEventListener('click',function(e){var a=e.target.closest&&e.target.closest('a');if(!a)return;var h=(a.getAttribute('href')||'');` +
-    `var k=a.hasAttribute('download')||/\\.(pdf|zip|docx?|xlsx?|csv)$/i.test(h)?'download':/^tel:/i.test(h)?'phone':/^mailto:/i.test(h)?'email':a.hasAttribute('data-cta')?'cta':(/^https?:/i.test(h)&&h.indexOf(location.host)<0)?'outbound':'';` +
-    `if(k)s({k:k,p:location.pathname})},true)}catch(e){}})();`;
+    `var b=/(^|\\s)btn(\\s|$)/.test(a.className||'');` +
+    `var k=a.hasAttribute('download')||/\\.(pdf|zip|docx?|xlsx?|csv)$/i.test(h)?'download':/^tel:/i.test(h)?'phone':/^mailto:/i.test(h)?'email':a.hasAttribute('data-cta')?'cta':b?'button':(/^https?:/i.test(h)&&h.indexOf(location.host)<0)?'outbound':'';` +
+    // list item 157: a button's own words, and a phone or email link's, so Analytics can say which ones get pressed
+    `var l=b||k==='cta'||k==='phone'||k==='email'?(a.getAttribute('aria-label')||a.textContent||'').replace(/\\s+/g,' ').trim().slice(0,60):'';` +
+    `if(k)s({k:k,p:location.pathname,l:l})},true);` +
+    // list item 157: how long the page was open and in view, sent once as the visitor leaves it
+    `var t0=document.visibilityState==='visible'?Date.now():0,seen=0,gone=0;` +
+    `function leave(){if(t0){seen+=Date.now()-t0;t0=0}if(!gone&&seen>=1000){gone=1;s({k:'leave',p:location.pathname,ms:Math.min(seen,1800000)})}}` +
+    `document.addEventListener('visibilitychange',function(){if(document.visibilityState==='hidden')leave();else if(!gone)t0=Date.now()});` +
+    `addEventListener('pagehide',leave)}catch(e){}})();`;
   return `<script id="presence-analytics" data-site="${siteId}">${js}</script>`;
 }

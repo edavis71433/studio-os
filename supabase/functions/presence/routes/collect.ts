@@ -6,7 +6,7 @@
 // salted-hash pattern from the lead form; adds no new infrastructure.
 import { svc } from '../lib/db.ts';
 import { rateAllow, clientIp } from '../lib/ratelimit.ts';
-import { parseUA, refHost, cleanPath, cleanUtms, visitorDayHash, isVisitKind } from '../lib/visits.ts';
+import { parseUA, refHost, cleanPath, cleanUtms, visitorDayHash, isVisitKind, cleanLabel, cleanMs } from '../lib/visits.ts';
 
 const VISITS_SALT = Deno.env.get('VISITS_SALT') || Deno.env.get('APPROVAL_SECRET') || 'presence-visits';
 const noContent = (cors: Record<string, string>) => new Response(null, { status: 204, headers: cors });
@@ -23,6 +23,10 @@ export async function handleCollect(req: Request, siteId: string, cors: Record<s
   let b: any = {};
   try { const t = await req.text(); if (t && t.length < 2000) b = JSON.parse(t); } catch { return noContent(cors); }
   const kind = isVisitKind(b?.k) ? b.k : 'pageview';
+  // list item 157: a page's time comes with how long it was open, or it isn't worth a row
+  const ms = kind === 'leave' ? cleanMs(b?.ms) : null;
+  if (kind === 'leave' && ms === null) return noContent(cors);
+  const label = kind === 'pageview' || kind === 'leave' ? '' : cleanLabel(b?.l);
 
   const ua = req.headers.get('user-agent') || '';
   const { device, browser, os, bot } = parseUA(ua);
@@ -35,16 +39,19 @@ export async function handleCollect(req: Request, siteId: string, cors: Record<s
   const country = (req.headers.get('cf-ipcountry') || req.headers.get('x-country') || '').slice(0, 2).toUpperCase().replace(/[^A-Z]/g, '');
   const region = (req.headers.get('cf-region') || '').slice(0, 40);
 
+  const row = {
+    site_id: siteId, kind,
+    path: cleanPath(b?.p || '/'),
+    ref_host: kind === 'pageview' ? refHost(String(b?.r || ''), host) : '',
+    utm_source: utm.source, utm_medium: utm.medium, utm_campaign: utm.campaign,
+    device, browser, os, country, region, visitor_hash: visitor,
+  };
+  const extra = { ...(label ? { label } : {}), ...(ms !== null ? { ms } : {}) };
+  const write = (body: Record<string, unknown>) => svc('presence_visits', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify(body) }).catch(() => null);
   // fire-and-forget insert; never await-block the response beyond the write
-  await svc('presence_visits', {
-    method: 'POST', headers: { Prefer: 'return=minimal' },
-    body: JSON.stringify({
-      site_id: siteId, kind,
-      path: cleanPath(b?.p || '/'),
-      ref_host: kind === 'pageview' ? refHost(String(b?.r || ''), host) : '',
-      utm_source: utm.source, utm_medium: utm.medium, utm_campaign: utm.campaign,
-      device, browser, os, country, region, visitor_hash: visitor,
-    }),
-  }).catch(() => {});
+  const w = await write({ ...row, ...extra });
+  // Before migration 0156 a row naming a button's words is refused: keep the tap as it was
+  // always kept. A button press or a page's time is new, so it waits for the migration.
+  if (w && !w.ok && w.status === 400 && Object.keys(extra).length && kind !== 'button' && kind !== 'leave') await write(row);
   return noContent(cors);
 }

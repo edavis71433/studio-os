@@ -563,6 +563,8 @@ const monthShort=(p)=>{const m=/^(\d{4})-(\d{2})$/.exec(String(p||''));return m?
 // One row per page. A column only exists when the numbers behind it do, so an older
 // function build (no people per page) or a site with no Search Console data shows a
 // shorter table instead of empty cells.
+// list item 157: seconds in plain words ("45 sec", "2 min 10 sec")
+function duration(sec){ const s=Math.max(0,Math.round(Number(sec)||0)); if(s<60)return `${s} sec`; const m=Math.floor(s/60),r=s%60; return r?`${m} min ${r} sec`:`${m} min`; }
 function pageTable(rows,cols){
   const head=cols.map(c=>`<th scope="col" title="${esc(c.title||c.name)}">${esc(c.name)}</th>`).join('');
   const body=rows.map(p=>`<tr><td title="${esc(p.path)}"><b>${esc(pageName(p.path))}</b><span>${esc(p.path)}</span></td>${cols.map(c=>`<td>${c.value(p)}</td>`).join('')}</tr>`).join('');
@@ -690,6 +692,9 @@ function websiteBand(d){
       const cols=[{name:'Views',title:'Page views',value:p=>num(p.views)}];
       if(rows.some(p=>p.visitors!=null))cols.push({name:'People',title:'Different people who opened this page',value:p=>num(p.visitors)});
       if(googlePages.length)cols.push({name:'Google',title:`Clicks from Google${gscQual(g.period)}`,value:p=>fromGoogle.has(p.path)?num(fromGoogle.get(p.path)):'—'});
+      // list item 157: the middle time a page stayed open
+      const timed=new Map(((t.time_on_page&&t.time_on_page.pages)||[]).map(p=>[p.path,p.seconds]));
+      if(timed.size)cols.push({name:'Time',title:'How long the page usually stays open (the middle visit)',value:p=>timed.has(p.path)?duration(timed.get(p.path)):'—'});
       body=pageTable(rows,cols);
     }else if(external&&googlePages.length){
       // the same table, from what Google can see of a site we don't host
@@ -710,6 +715,15 @@ function websiteBand(d){
       :searchEmpty('Connect Search Console to see what people search to find you.');
     const cta=searchCta?`<div class="crow"><span class="fine">${gOk||gDown?'What people searched to find you':gNoDom||gDraft?'':'Takes about a minute. Read-only.'}</span><a class="btn sm" href="${esc(withScope(searchCta[0]))}">${esc(searchCta[1])}</a></div>`:'';
     h+=`<section class="card" id="searchCard"><div class="card-h"><h3>Google search</h3><span class="hr">${chip}</span></div><div class="cb">${body}</div>${cta}</section>`;
+  }
+  if(measuring&&Array.isArray(t.buttons)){
+    // list item 157: which buttons people press, so the owner can see which ones work
+    const kinds={button:'Button',cta:'Button',phone:'Call',email:'Email'};
+    const body=t.buttons.length
+      ?`<table class="ptable" id="buttonTable"><thead><tr><th scope="col">Button</th><th scope="col" title="Times pressed">Presses</th><th scope="col" title="Different people who pressed it">People</th></tr></thead><tbody>${t.buttons.map(b=>`<tr><td><b>${esc(b.label)}</b><span>${esc(kinds[b.kind]||'Button')} · ${esc(pageName(b.path))}</span></td><td>${num(b.presses)}</td><td>${num(b.people)}</td></tr>`).join('')}</tbody></table>`
+      :emptyState('No presses yet','When visitors press your buttons, call or email you, the ones they use show here.');
+    const mid=t.time_on_page&&t.time_on_page.median_seconds;
+    h+=card('span2','Buttons people press',`${periodLabel()}${mid?` · pages usually stay open ${duration(mid)}`:''}`,body,null);
   }
   h+=`</div>`;
   return h;

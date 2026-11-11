@@ -77,6 +77,8 @@ jobs:
               supabase/functions/presence/lib/site_roles.ts) run=true ;;
               # ad-tags.spec.ts runs the cookie notice and its loader (list item 152).
               supabase/functions/presence/lib/ad_tags.ts) run=true ;;
+              # button-presses.spec.ts runs the visit counter's own script (list item 157).
+              supabase/functions/presence/lib/visits.ts) run=true ;;
               docs/*|supabase/*|runbooks/*|sql/*|templates/*) ;;
               tests/isolation/*|tests/presence/*|tests/smoke/*|tests/workflows/*) ;;
               .github/workflows/ci.yml|.github/workflows/deploy.yml|.github/workflows/rollback.yml|.github/workflows/schema-dump.yml) ;;

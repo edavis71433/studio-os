@@ -19,7 +19,7 @@ import {
   trafficInsights, trafficNotice, periodWord, foldPortfolioVisitors, PORTFOLIO_VISITS_CAP,
   searchReadinessState, hostingSurface, type Period,
 } from '../analytics/compose.ts';
-import { aggregateVisits, type VisitRow } from '../lib/visits.ts';
+import { aggregateVisits, engagementOf, type VisitRow, type Engagement } from '../lib/visits.ts';
 import { searchInsights, searchNotice, searchHealth, agencySearchState, type GscMetrics } from '../analytics/search_perf.ts';
 import { summarizePipeline } from '../lib/sales_lifecycle.ts';
 import {
@@ -110,13 +110,21 @@ const periodDays = (p: Period) => (p === 'week' ? 7 : 30);
 export type VisitRows = VisitRow[] & { truncated?: boolean };
 export async function loadVisits(siteId: string, period: Period, nowMs: number): Promise<VisitRows> {
   const startIso = new Date(nowMs - 2 * periodDays(period) * 86_400_000).toISOString();
-  const r = await svc(`presence_visits?site_id=eq.${siteId}&ts=gte.${startIso}&select=ts,kind,path,ref_host,utm_source,device,country,visitor_hash&order=ts.desc&limit=5000`);
+  const r = await svc(`presence_visits?site_id=eq.${siteId}&ts=gte.${startIso}&kind=not.in.(button,leave)&select=ts,kind,path,ref_host,utm_source,device,country,visitor_hash&order=ts.desc&limit=5000`);   // item 157's rows never crowd visits out
   const rows = (Array.isArray((r as any).json) ? (r as any).json : []) as VisitRows;
   if (rows.length >= 5000) rows.truncated = true;
   return rows;
 }
 
 const arr = (r: { json?: unknown }): any[] => (Array.isArray((r as { json?: unknown[] }).json) ? (r as { json: any[] }).json : []);
+
+/** List item 157: the dashboard's buttons and time on page, from their own read, this period
+ *  only; nothing when that read failed (before migration 0156, say). */
+function engagementFrom(r: unknown, startMs: number): { buttons?: Engagement['buttons']; time_on_page?: Engagement['time'] } {
+  if (!(r && (r as { ok?: boolean }).ok)) return {};
+  const e = engagementOf(arr(r as { json?: unknown }).filter((v) => Date.parse(String(v.ts || '')) >= startMs));
+  return { buttons: e.buttons, time_on_page: e.time };
+}
 const periodOf = (req: Request): Period => (new URL(req.url).searchParams.get('period') === 'month' ? 'month' : 'week');
 
 /** Are the traffic/search providers actually connected? (Both are live now —
@@ -472,13 +480,17 @@ export async function handleAnalyticsDashboard(req: Request, site: SiteRow, cors
   // newest-first, so hitting a cap means "the most recent N" — a deterministic,
   // honest subset — and the per-section truncated_* flags below let the page
   // say so instead of presenting a silent undercount as the whole story.
-  const [dealsR, subsR, supR, invR, visitsR, gsc] = await Promise.all([
+  const [dealsR, subsR, supR, invR, visitsR, gsc, engageR] = await Promise.all([
     safe(svc(dealsQuery)),
     safe(svc(`presence_form_submissions?site_id=eq.${site.id}&spam=is.false&select=created_at,status&order=created_at.desc&limit=1000`)),
     safe(svc(`presence_support_requests?site_id=eq.${site.id}&deleted_at=is.null&status=in.(open,in_progress)&select=created_at&order=created_at.asc&limit=500`)),
     safe(svc(invoicesQuery)),
-    safe(svc(`presence_visits?site_id=eq.${site.id}&ts=gte.${visitStartIso}&select=ts,kind,path,ref_host,utm_source,device,country,visitor_hash&order=ts.desc&limit=5000`)),
+    safe(svc(`presence_visits?site_id=eq.${site.id}&ts=gte.${visitStartIso}&kind=not.in.(button,leave)&select=ts,kind,path,ref_host,utm_source,device,country,visitor_hash&order=ts.desc&limit=5000`)),
     safe(readGsc(site.client_id)),
+    // list item 157: the presses with words and the pages' times, read on their own so they
+    // never crowd visits out of the read above. Before migration 0156 this read fails, and
+    // the page simply has nothing to say about buttons yet.
+    safe(svc(`presence_visits?site_id=eq.${site.id}&ts=gte.${new Date(startMs).toISOString()}&kind=in.(button,cta,phone,email,leave)&select=ts,kind,path,label,ms,visitor_hash&order=ts.desc&limit=5000`)),
   ]);
   // Do WE serve this website? A monitor-edition workspace watches a website the
   // client already had (0031); everything about what we can measure follows from
@@ -537,6 +549,7 @@ export async function handleAnalyticsDashboard(req: Request, site: SiteRow, cors
       pages: agg.pages,
       top_sources: sourceShares(agg.topSources, agg.visitors),
       ai_sources: agg.aiAssistants,   // list item 153: who the "AI assistants" row is
+      ...engagementFrom(engageR, startMs),   // list item 157: buttons, and time on page
       weekly: weeklyVisitors(visits, nowMs),
       has_data: agg.hasData,
       truncated: visits.length >= 5000,
