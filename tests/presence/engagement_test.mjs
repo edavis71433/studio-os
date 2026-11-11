@@ -78,7 +78,7 @@ const read = (p) => Deno.readTextFileSync(new URL(`../../${p}`, import.meta.url)
 
 // ═══ 4. the privacy page and the migration ═══
 {
-  ok('privacy: the counter\'s description names buttons and time on a page', read('supabase/functions/presence/lib/legal_pages.ts').includes('a button, a download or a link to another website, it notes which kind of link it was and, for a button, a phone number or an email address, the words on it. When you leave a page, it notes how long the page was open.'));
+  ok('privacy: the counter\'s description names buttons and time on a page', read('supabase/functions/presence/lib/legal_pages.ts').includes('a button, a download or a link to another website, it notes which kind of link it was and, for a button, a phone number or an email address, the words on it. When you leave a page, it notes how long the page was open'));   // item 151 adds how quickly it showed
   for (const [name, src] of [['migration 0156', read('supabase/migrations/0156_button_presses_time_on_page.sql')], ['apply pack 0156', read('docs/presence/APPLY-0156-prod.sql')]]) {
     ok(`${name}: adds the words and the time, and the two kinds`, /add column if not exists label text not null default '';/.test(src) && /add column if not exists ms integer;/.test(src) && /check \(kind in \('pageview','phone','email','cta','download','outbound','button','leave'\)\)/.test(src));
   }

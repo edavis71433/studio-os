@@ -19,7 +19,7 @@ import {
   trafficInsights, trafficNotice, periodWord, foldPortfolioVisitors, PORTFOLIO_VISITS_CAP,
   searchReadinessState, hostingSurface, type Period,
 } from '../analytics/compose.ts';
-import { aggregateVisits, engagementOf, type VisitRow, type Engagement } from '../lib/visits.ts';
+import { aggregateVisits, engagementOf, speedOf, type VisitRow, type Engagement } from '../lib/visits.ts';
 import { searchInsights, searchNotice, searchHealth, agencySearchState, type GscMetrics } from '../analytics/search_perf.ts';
 import { summarizePipeline } from '../lib/sales_lifecycle.ts';
 import {
@@ -480,7 +480,7 @@ export async function handleAnalyticsDashboard(req: Request, site: SiteRow, cors
   // newest-first, so hitting a cap means "the most recent N" — a deterministic,
   // honest subset — and the per-section truncated_* flags below let the page
   // say so instead of presenting a silent undercount as the whole story.
-  const [dealsR, subsR, supR, invR, visitsR, gsc, engageR] = await Promise.all([
+  const [dealsR, subsR, supR, invR, visitsR, gsc, engageR, speedR] = await Promise.all([
     safe(svc(dealsQuery)),
     safe(svc(`presence_form_submissions?site_id=eq.${site.id}&spam=is.false&select=created_at,status&order=created_at.desc&limit=1000`)),
     safe(svc(`presence_support_requests?site_id=eq.${site.id}&deleted_at=is.null&status=in.(open,in_progress)&select=created_at&order=created_at.asc&limit=500`)),
@@ -491,6 +491,8 @@ export async function handleAnalyticsDashboard(req: Request, site: SiteRow, cors
     // never crowd visits out of the read above. Before migration 0156 this read fails, and
     // the page simply has nothing to say about buttons yet.
     safe(svc(`presence_visits?site_id=eq.${site.id}&ts=gte.${new Date(startMs).toISOString()}&kind=in.(button,cta,phone,email,leave)&select=ts,kind,path,label,ms,visitor_hash&order=ts.desc&limit=5000`)),
+    // list item 151: how fast pages showed for visitors, on its own read (it fails alone before 0160)
+    safe(svc(`presence_visits?site_id=eq.${site.id}&ts=gte.${new Date(startMs).toISOString()}&kind=eq.leave&lcp_ms=not.is.null&select=path,device,lcp_ms&order=ts.desc&limit=5000`)),
   ]);
   // Do WE serve this website? A monitor-edition workspace watches a website the
   // client already had (0031); everything about what we can measure follows from
@@ -550,6 +552,7 @@ export async function handleAnalyticsDashboard(req: Request, site: SiteRow, cors
       top_sources: sourceShares(agg.topSources, agg.visitors),
       ai_sources: agg.aiAssistants,   // list item 153: who the "AI assistants" row is
       ...engagementFrom(engageR, startMs),   // list item 157: buttons, and time on page
+      ...(speedR && (speedR as { ok?: boolean }).ok ? { speed: (({ sentence, pages }) => ({ sentence, pages }))(speedOf(arr(speedR as { json?: unknown }))) } : {}),   // list item 151
       weekly: weeklyVisitors(visits, nowMs),
       has_data: agg.hasData,
       truncated: visits.length >= 5000,

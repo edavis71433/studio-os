@@ -59,6 +59,17 @@ test.describe('Analytics: buttons people press', () => {
     await expect(pages.locator('tbody tr').nth(1)).toContainText('2 min 10 sec');
   });
 
+  // list item 151: how fast each page shows for real visitors
+  test('Top pages says how fast each page loads, and the site’s speed in a sentence', async ({ page }) => {
+    await installApp(page, { api: { '/analytics/dashboard': DASH({ speed: { sentence: 'A little slow on phones: the menu page takes 3.4 s for most visitors.', pages: [{ path: '/', phones_ms: 1900, computers_ms: 900, samples: 60 }, { path: '/menu/', phones_ms: 3400, computers_ms: null, samples: 25 }] } }) } });
+    await page.goto('/analytics.html');
+    const card = page.locator('section.card', { has: page.getByRole('heading', { name: 'Top pages' }) });
+    await expect(card).toContainText('A little slow on phones: the menu page takes 3.4 s for most visitors');
+    await expect(card.locator('#pageTable thead')).toContainText('Loads in');
+    await expect(card.locator('#pageTable tbody tr').nth(0)).toContainText('1.9 s');
+    await expect(card.locator('#pageTable tbody tr').nth(1)).toContainText('3.4 s');
+  });
+
   test('no presses yet says so; a server without the new read shows no card at all', async ({ page }) => {
     await installApp(page, { api: { '/analytics/dashboard': DASH({ buttons: [], time_on_page: { median_seconds: null, pages: [] } }) } });
     await page.goto('/analytics.html');

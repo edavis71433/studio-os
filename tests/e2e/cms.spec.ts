@@ -132,6 +132,32 @@ test.describe('CMS workspace', () => {
     await expect(card.getByRole('link', { name: 'Add one' })).toHaveAttribute('href', '/presence.html#search');
   });
 
+  // list item 151: one Site health place — uptime and real speed always in view, and a new site's go-live list
+  test('Search: Health check shows the uptime and speed lines, and a new site’s “Before you go live” list', async ({ page }) => {
+    const H = { data: { overall: 'attention', headline: '', summary: '6 looking good · 3 to look at', ok_count: 6, attention_count: 3, categories: [
+      { key: 'website_status', label: 'Website status', checks: [{ title: 'Online 99.8% of the last 30 days', why: '998 of our 1000 checks found it answering.', state: 'ok', status_label: 'Working' }] },
+      { key: 'speed', label: 'Speed', checks: [{ title: 'Slow on phones: the menu page takes 5.2 s for most visitors', why: 'For three visitors in four…', state: 'attention', status_label: 'Needs a look', action_label: 'Find what slows it', action_href: 'https://tools.example/site-review?url=x' }] },
+      { key: 'golive', label: 'Before you go live', checks: [
+        { title: 'Send yourself a test message', why: 'Fill in your own contact form once.', state: 'attention', status_label: 'Needs a look', action_label: 'Open your contact page', action_href: 'https://marlows.example/contact/' },
+        { title: 'Your phone number taps to call', why: 'Visitors on a phone can call you in one tap.', state: 'ok', status_label: 'Working' },
+        { title: 'Choose your sharing picture', why: 'A picture shows when someone shares your site.', state: 'attention', status_label: 'Needs a look', action_label: 'Choose one', action_href: '/presence.html#search' },
+      ] },
+    ] } };
+    await installApp(page, { api: { ...BOARD_API, ...EXTRAS, '/website-health': H } });
+    await page.goto('/presence.html#search');
+    const card = page.locator('#healthCard');
+    await expect(card.locator('.hb-facts')).toHaveText('Online 99.8% of the last 30 days · Slow on phones: the menu page takes 5.2 s for most visitors');
+    const list = card.locator('.hb-golive li');
+    await expect(card.getByRole('heading', { name: 'Before you go live' })).toBeVisible();
+    await expect(list).toHaveCount(3);
+    await expect(list.nth(1)).toHaveAttribute('data-done', '1');
+    await expect(list.nth(1)).toContainText('✓ Your phone number taps to call');
+    await expect(list.nth(0).getByRole('link', { name: 'Open your contact page' })).toHaveAttribute('href', 'https://marlows.example/contact/');
+    // the speed's door is among the things to look at; the go-live items aren't listed twice
+    await expect(card.getByRole('link', { name: 'Find what slows it' })).toHaveCount(1);
+    await expect(card.getByText('Send yourself a test message')).toHaveCount(1);
+  });
+
   test('Pages: a page the map says is blocked wears that word instead of "changes waiting"', async ({ page }) => {
     await installApp(page, { api: { ...BOARD_API, ...EXTRAS } });
     await page.goto('/presence.html#pages');

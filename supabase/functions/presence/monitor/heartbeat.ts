@@ -142,6 +142,9 @@ export async function runUptimeHeartbeat(limit = 25): Promise<HeartbeatResult> {
           method: 'PATCH',
           body: JSON.stringify({ uptime_ok: nextStep.ok, uptime_fail_streak: nextStep.fail_streak, uptime_checked_at: nowIso }),
         }).catch(() => {});
+        // List item 151: the day's tally, so Site health can say how much of the month it was up.
+        // Before migration 0160 the function isn't there and this quietly does nothing.
+        await svc('rpc/presence_uptime_tick', { method: 'POST', body: JSON.stringify({ p_site: site.id, p_ok: probe.ok }) }).catch(() => {});
 
         if (nextStep.transition === 'confirmed_down') {
           confirmed_down++;

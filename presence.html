@@ -242,6 +242,8 @@ button:disabled{opacity:.55;cursor:default}
 .hb-checks li{font-size:12.5px;line-height:1.45}
 .hb-checks li b{display:block;font-weight:600;font-size:13px}
 .hb-checks li a{color:var(--plum)}
+.hb-facts{font-weight:600;color:var(--ink-2)}
+.hb-golive li[data-done="1"] b{color:var(--sage)}   /* list item 151 */
 .hb-card .hb-act{margin-top:10px}
 .hb-row.act .ic{font-size:15px}
 .hb-progress{height:6px;border-radius:3px;background:var(--hair);overflow:hidden;margin-top:10px}
@@ -5478,8 +5480,25 @@ function renderHealthCard() {
   chip.appendChild(document.createTextNode(h.overall === "healthy" ? "All good" : h.overall === "attention" ? (h.attention_count + " to look at") : "Getting started"));
   head.appendChild(chip); card.appendChild(head);
   card.appendChild(el("div", "note", h.summary || h.headline || ""));
+  // list item 151: the two figures an owner asks first, how much it's been up and how fast
+  // it loads, shown whether or not they need a look; and a new site's go-live list
+  const facts = [];
+  h.categories.forEach((c) => (c.checks || []).forEach((k) => { if (c.key === "speed" || /^Online \d/.test(k.title)) facts.push(k.title); }));
+  if (facts.length) card.appendChild(el("div", "note hb-facts", facts.join(" · ")));
+  const golive = h.categories.find((c) => c.key === "golive");
+  if (golive) {
+    card.appendChild(el("h3", "hb-sub-h", "Before you go live"));
+    const ul = el("ul", "hb-checks hb-golive");
+    golive.checks.forEach((k) => {
+      const li = el("li"); li.dataset.done = k.state === "ok" ? "1" : "0";
+      li.appendChild(el("b", null, (k.state === "ok" ? "✓ " : "") + k.title)); li.appendChild(document.createTextNode(k.why || ""));
+      if (k.state !== "ok" && k.action_label && k.action_href) { li.appendChild(document.createTextNode(" ")); const a = el("a", null, k.action_label); a.href = k.action_href; li.appendChild(a); }
+      ul.appendChild(li);
+    });
+    card.appendChild(ul);
+  }
   const needs = [];
-  h.categories.forEach((c) => (c.checks || []).forEach((k) => { if (k.state === "attention") needs.push(k); }));
+  h.categories.forEach((c) => { if (c.key !== "golive") (c.checks || []).forEach((k) => { if (k.state === "attention") needs.push(k); }); });
   if (needs.length) {
     const ul = el("ul", "hb-checks");
     needs.slice(0, 3).forEach((k) => {
