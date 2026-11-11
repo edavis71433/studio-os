@@ -46,6 +46,11 @@ const CONTROLS = [
   ['DELETE /sales/estimates/:id', 'pipeline.html', `api('/sales/estimates/'+b.dataset.delEst,'DELETE')`, ['data-needs="delete" data-del-est=']],   // sales review item 47
   ['DELETE /sales/prospects/:id', 'prospects.html', `api('/sales/prospects/'+b.dataset.remove,'DELETE')`, ['data-needs="delete" data-remove=']],   // sales review item 112
   ['POST /sales/recurring/:id/stop', 'pipeline.html', `api('/sales/recurring/'+sid+'/'+act,'POST',{})`, ['data-needs="delete" data-rec-stop=']],
+  // sales review items 86 + 105: undoing an import, and merging two records (the dry run, the merge, its undo)
+  ['POST /sales/contacts/imports/:id/undo', 'contacts.html', `api('/sales/contacts/imports/'+encodeURIComponent(IMPORT.id)+'/undo','POST',{})`, ['id="undoImport" data-needs="delete"']],
+  ['POST /sales/contacts/:id/merge', 'contacts.html', `api('/sales/contacts/'+encodeURIComponent(keepId)+'/merge','POST',{from:otherId})`, ['data-needs="delete" data-merge=', 'id="e-merge" data-needs="delete"']],
+  ['POST /sales/contacts/:id/merge', 'contacts.html', `api('/sales/contacts/'+encodeURIComponent(MERGE.keep)+'/merge','POST',body)`, ['id="mergeGo" data-needs="delete"']],
+  ['POST /sales/contacts/:id/unmerge', 'contacts.html', `api('/sales/contacts/'+encodeURIComponent(away.id)+'/unmerge','POST',{})`, []],
   // sales item 108: the record's Billing tab carries the estimates and the recurring invoice too
   ['DELETE /sales/estimates/:id', 'crm.html', `apiAg('/sales/estimates/'+b.getAttribute('data-del-est'),'DELETE')`, ['data-del-est="${esc(e.id)}" data-needs="delete"']],
   ['POST /sales/recurring/:id/stop', 'crm.html', `apiAg('/sales/recurring/'+id+'/'+verb,'POST',{})`, ['data-rec-stop="${esc(s.id)}" data-needs="delete"']],
@@ -115,7 +120,7 @@ const SOURCE = Object.fromEntries(PAGES.map((p) => [p, read(p)]));
   const decided = read('tests/presence/member_capability_test.mjs');
   const listed = (name) => [...decided.split('const DECIDED = {')[1].split(`\n  ${name}: [`)[1].split('\n  ],')[0].matchAll(/'((?:DELETE|POST|PUT|PATCH) [^']+)'/g)].map((m) => m[1]);
   const routes = [...listed('delete'), ...listed('configure')];
-  ok('the decided delete and configure lists were read', routes.length === 40, String(routes.length));   // item 47 added two; item 104 took away the seven DNS document and zone writes; item 58 added two; item 112 added the prospect delete; item 115 added the Google review link; item 175 the visitor password; item 77 the payment undo; item 174 added the two domain forwards
+  ok('the decided delete and configure lists were read', routes.length === 43, String(routes.length));   // item 47 added two; item 104 took away the seven DNS document and zone writes; item 58 added two; item 112 added the prospect delete; item 115 added the Google review link; item 175 the visitor password; item 77 the payment undo; item 174 added the two domain forwards; items 86 + 105 added three (import undo, merge, unmerge)
   const covered = new Set(CONTROLS.map(([r]) => r));
   const open = routes.filter((r) => !covered.has(r) && !NO_CONTROL[r]);
   ok('every decided delete and configure route is accounted for here', open.length === 0, open.join(', '));

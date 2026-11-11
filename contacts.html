@@ -172,6 +172,30 @@
   .tagrow{display:flex;flex-wrap:wrap;gap:4px}
   .c .tagrow{margin-top:8px}
   .tagfilter{display:inline-flex;align-items:center;gap:6px;margin-left:8px}
+  /* item 86: the newest import of the day, with its Undo */
+  .impstrip{display:flex;align-items:center;flex-wrap:wrap;gap:8px 14px;margin:0 0 12px;padding:10px 14px;border-radius:var(--dds-r-lg,12px);background:var(--good-soft);color:var(--ink);font-size:14px}
+  .impstrip .ok{width:22px;height:22px;border-radius:50%;display:grid;place-items:center;background:var(--good);color:#fff;font-size:12px;flex:0 0 auto}
+  .impstrip .t{flex:1 1 220px}
+  .impstrip .muted{font-size:12.5px}
+  /* items 86 + 105: merge two records */
+  #mergeDlg{max-width:760px}
+  .mgrid .av,.mpick .av{width:36px;height:36px;border-radius:50%;display:grid;place-items:center;background:var(--dds-grad-brand,var(--p));color:#fff;font-size:13px;font-weight:700;flex:0 0 auto}
+  .mpick{list-style:none;padding:0;margin:10px 0 0;max-height:46vh;overflow:auto}
+  .mpick button{display:flex;align-items:center;gap:10px;width:100%;text-align:left;font:inherit;font-size:14px;color:var(--ink);background:none;border:1px solid transparent;border-radius:12px;padding:8px 10px;min-height:48px;cursor:pointer}
+  .mpick button:hover,.mpick button:focus-visible{border-color:var(--p);background:var(--p-soft)}
+  .mpick small{display:block;font-size:12px;color:var(--faint)}
+  .mgrid{display:grid;grid-template-columns:130px 1fr 1fr;gap:8px 10px;align-items:stretch;margin-top:6px}
+  .mgrid .mh{display:flex;align-items:center;gap:10px;background:var(--bg);border-radius:12px;padding:10px 12px;min-width:0}
+  .mgrid .mh b{display:block;font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.mgrid .mh small{display:block;font-size:12px;color:var(--faint);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .mgrid .fl{font-size:13px;color:var(--soft);align-self:center}
+  .mgrid label.opt{display:flex;align-items:center;gap:10px;min-height:44px;box-sizing:border-box;border:1px solid var(--line);border-radius:12px;padding:8px 12px;font-size:14px;font-weight:500;color:var(--ink);cursor:pointer;min-width:0;margin:0}
+  .mgrid label.opt span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .mgrid label.opt.empty span{color:var(--faint)}
+  .mgrid label.opt:has(input:checked){border-color:var(--p);background:var(--p-soft)}
+  .mgrid label.opt input{width:auto;accent-color:var(--p);flex:0 0 auto;margin:0}
+  .mgrid .full{grid-column:2 / -1;background:var(--bg);border-radius:12px;padding:10px 12px;font-size:14px}
+  .mmoves{margin:14px 0 0;padding:12px 14px;border-radius:12px;background:var(--p-soft);color:var(--p-deep,var(--ink));font-size:14px}
+  @media (max-width:640px){.mgrid{grid-template-columns:1fr 1fr}.mgrid .fl{grid-column:1 / -1;margin-top:6px}.mgrid .mhl{display:none}.mgrid .full{grid-column:1 / -1}}
   .tagfilter button{font:inherit;font-size:12px;font-weight:600;border:0;background:var(--p-soft);color:var(--p);border-radius:999px;padding:2px 10px;cursor:pointer;min-height:24px}
   #cu-mode{display:flex;flex-direction:column;gap:var(--dds-s2,8px);margin:2px 0 var(--dds-s1,4px)}
   .modeopt{display:flex;align-items:flex-start;gap:var(--dds-s2,8px);border:1px solid var(--line);border-radius:var(--dds-r,8px);padding:10px var(--dds-s3,12px);cursor:pointer;font-size:14px;color:var(--ink)}
@@ -348,6 +372,7 @@
     <label for="e-found">How did they find you?</label>
     <select id="e-found"><option value="">Not recorded</option><option>Google</option><option>Referral</option><option>Word of mouth</option><option>Social</option><option>Repeat client</option><option>Website</option><option>Other</option></select>
       <div id="e-custom"></div>
+      <p class="note"><button type="button" class="linkbtn" id="e-merge" data-needs="delete" style="font:inherit;color:var(--p);background:none;border:0;padding:0;cursor:pointer;min-height:32px">Merge with another record…</button></p>
       <div class="row2"><button type="button" class="btn ghost" id="e-cancel">Cancel</button><button type="submit" class="btn" id="e-save">Save changes</button></div>
     </div>
   </form>
@@ -356,6 +381,9 @@
      server's dry-run answer (DELETE without ?confirm=1 never writes), so the
      facts are the database's, not the roster's. -->
 <dialog id="delDlg" aria-label="Remove contact"><div class="dbody" id="delBody"></div></dialog>
+<!-- items 86 + 105: two records for one person, merged into the one you keep. Built from the
+     server's dry run (POST …/merge without confirm), so what moves is the database's word. -->
+<dialog id="mergeDlg" aria-labelledby="merge-h"><div class="dbody" id="mergeBody"></div></dialog>
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 <script src="/vendor/supabase-js-2.45.4.js"></script>
 <script>
@@ -529,6 +557,11 @@ function headerHtml(count){
 // numbers compared as digits, so "5550102468" and "(555) 010-2468" are one
 // number, and near-identical names ("Jordan" / "Jordon") count. It says who and
 // why on hover/focus; it never hides, reorders or merges anything.
+// items 86 + 105: a row flagged as a possible duplicate offers to merge the two
+function mergeBtn(c,cls){
+  const d=c&&c.possible_duplicate_of;
+  return d&&d.id?`<button class="${cls}" data-needs="delete" data-merge="${esc(c.id)}" data-merge-with="${esc(d.id)}" title="Merge with ${esc(d.name||'the other record')}" aria-label="Merge ${esc(c.name||c.email||'this contact')} with ${esc(d.name||'the other record')}">Merge…</button>`:'';
+}
 function dupFlag(c){
   const d=c&&c.possible_duplicate_of;
   if(!d||!d.name)return '';
@@ -558,6 +591,7 @@ function tableHtml(list){
       <td class="acts"><div class="rowacts">
         <button class="rowact" data-edit="${esc(c.id)}" title="Edit this contact" aria-label="Edit ${who}">Edit</button>
         <button class="rowact" data-deal="${esc(c.id)}" title="Start a pipeline deal with this contact">→ New deal</button>
+        ${mergeBtn(c,'rowact')}
         <button class="rowact danger" data-needs="delete" data-del="${esc(c.id)}" title="Remove this contact from your list" aria-label="Delete ${who}">Delete</button>
       </div></td>
     </tr>`;
@@ -583,6 +617,7 @@ function cardsHtml(list){
         ${c.email?`<a class="reply" href="mailto:${esc(c.email)}">Email</a>`:(c.phone?`<a class="reply" href="tel:${esc(tel)}">Call</a>`:'')}
         <button data-edit="${esc(c.id)}" aria-label="Edit ${who}">Edit</button>
         <button data-deal="${esc(c.id)}" title="Start a pipeline deal with this contact">→ New deal</button>
+        ${mergeBtn(c,'')}
         <button class="danger" data-needs="delete" data-del="${esc(c.id)}" aria-label="Delete ${who}">Delete</button>
       </div></div>`;
   }
@@ -658,7 +693,7 @@ function addButtons(){
 function render(){
   const rows=sortedRows();
   let h=headerHtml(rows.length)
-    +`<div class="bar"><input class="search" id="q" type="search" aria-label="Search contacts" placeholder="Search name, email, or company…" value="${esc(Q)}">${scope()?'':addButtons()}</div><div id="csvZone"></div>`
+    +`<div class="bar"><input class="search" id="q" type="search" aria-label="Search contacts" placeholder="Search name, email, or company…" value="${esc(Q)}">${scope()?'':addButtons()}</div><div id="csvZone"></div><div id="importStrip"></div>`
     +`<div id="listZone">${listHtml(rows)}</div>`;
   // Any re-render (sort, view, display, refresh) must not destroy an open — or
   // in-flight — CSV import panel: carry the LIVE #csvZone node (its handlers,
@@ -668,6 +703,7 @@ function render(){
   const zKeep=!!(zPrev&&zPrev.innerHTML.trim());
   $('main').innerHTML=h;wire();wireList();
   if(zKeep){const z=document.getElementById('csvZone');if(z)z.replaceWith(zPrev);}
+  paintImportStrip();
 }
 // C5: keystrokes re-render ONLY the list zone (+ the meta count) — the search
 // input node is never rebuilt, so caret and focus survive without restoration.
@@ -728,6 +764,7 @@ function wireList(){
   document.querySelectorAll('[data-deal]').forEach(b=>b.addEventListener('click',(e)=>{e.stopPropagation();newDeal(b.getAttribute('data-deal'));}));
   document.querySelectorAll('[data-edit]').forEach(b=>b.addEventListener('click',(e)=>{e.stopPropagation();openEdit(b.getAttribute('data-edit'));}));
   document.querySelectorAll('[data-del]').forEach(b=>b.addEventListener('click',(e)=>{e.stopPropagation();askDelete(b.getAttribute('data-del'));}));
+  document.querySelectorAll('[data-merge]').forEach(b=>b.addEventListener('click',(e)=>{e.stopPropagation();openMerge(b.getAttribute('data-merge'),b.getAttribute('data-merge-with'),b);}));
   // Tap a contact card / table row → the unified Client Record (Details tab).
   // Links and buttons inside do their own thing and don't open it — the card's
   // email and phone links too, by click or by Enter (the rows' rule).
@@ -956,23 +993,81 @@ function mapHeader(h){h=String(h).toLowerCase().trim();
   if(/^(full[ _-]?name|name|contact|contact name)$/.test(h))return'name';
   // "first"/"last" alone are names only as whole words with "name": "Last activity" was glued onto names
   if(/\b(first|given)[ _-]?name\b|^first$/.test(h))return'first';if(/\b(last|family)[ _-]?name\b|\bsurname\b|^last$/.test(h))return'last';
-  if(/e-?mail/.test(h))return'email';if(/phone|mobile|\btel\b|telephone|\bcell\b/.test(h))return'phone';   // "tel" caught Outlook's "Telex"
+  if(/e-?mail/.test(h))return'email';
+  // item 86: a second number ("Phone 2 - Value", "Other Phone", "Mobile Phone" beside a phone) is the second phone
+  if(/phone|mobile|\btel\b|telephone|\bcell\b/.test(h))return /\b2\b|second|other|alternate/.test(h)?'phone2':'phone';   // "tel" caught Outlook's "Telex"
+  if(/\bjob[ _-]?title\b|\bposition\b|organi[sz]ation title|^role$/.test(h))return'job_title';
+  // item 86: an address in one line ("Address 1 - Formatted") or in its parts (Google's and Outlook's)
+  if(/formatted|^address$|^mailing address$/.test(h))return'address';
+  if(/street/.test(h))return'street';if(/\bcity\b/.test(h))return'city';if(/\b(state|region|province)\b/.test(h))return'state';if(/postal|\bzip\b/.test(h))return'zip';
+  if(/^(labels|tags?|group membership|categories)$/.test(h))return'tags';
+  if(/^notes?$|^comments?$/.test(h))return'notes';
+  if(/lead source|how (did )?they find|found (us|you)|^source$/.test(h))return'found_via';
+  const cf=(FIELD_DEFS||[]).find(f=>String(f.label||'').toLowerCase()===h);if(cf)return'custom:'+cf.key;
   if(/company|business|organi[sz]ation/.test(h)&&!NOT_COMPANY.test(h))return'company';return null;}
-function openImport(){
+// item 86: what each column of a file can go to — the fields a contact holds, and your own
+function importTargets(){
+  return [['name','Full name'],['first','First name'],['last','Last name'],['email','Email'],['phone','Phone'],['phone2','Second phone'],
+    ['company','Company'],['job_title','Job title'],['address','Address (one line)'],['street','Street'],['city','City'],['state','State'],['zip','ZIP'],
+    ['tags','Tags'],['notes','Notes'],['found_via','How they found you']]
+    .concat((FIELD_DEFS||[]).map(f=>['custom:'+f.key,f.label||f.key]));
+}
+async function openImport(){
   const k=KIT(),z=$('csvZone');if(!k||!z)return;
+  await loadFieldDefs().catch(()=>{});   // your own fields are columns an import can fill
   k.importPanel(z,{back:'#importCsv',
     title:'Import contacts from a CSV',
-    help:'Export from anywhere (Google Contacts, Outlook, a spreadsheet, another tool) — we look for name, email, phone, and company columns. Anyone already in your contacts (matched by email) is skipped automatically.',
+    help:'Export from anywhere (Google Contacts, Outlook, a spreadsheet, another tool). You pick where each column goes, and whether people already here (matched by email) are updated. An import can be undone for a day.',
     noun:'contact',
     mapHeader,
-    ready:(keys)=>(keys.includes('email')||keys.includes('name')||keys.includes('first'))?'':'We couldn’t find a name or email column. Check the first row has headers like “Name” and “Email”.',
+    targets:importTargets(),
+    existing:{legend:'People already in your contacts (same email)',update:'Update them with what this file has',skip:'Leave them as they are'},
+    ready:(keys)=>(keys.includes('email')||keys.includes('name')||keys.includes('first'))?'':'Pick a column for the name or the email — an import needs one of them.',
     toItem:(o)=>{const name=o.name||[o.first,o.last].filter(Boolean).join(' ');const email=String(o.email||'').toLowerCase();
-      if(!name&&!email)return null;return{name:name||undefined,email:email||undefined,phone:o.phone||undefined,company:o.company||undefined};},
+      if(!name&&!email)return null;
+      const it={name:name||undefined,email:email||undefined,phone:o.phone||undefined,phone2:o.phone2||undefined,company:o.company||undefined,job_title:o.job_title||undefined,notes:o.notes||undefined,found_via:o.found_via||undefined};
+      const parts={street:o.street||o.address||'',city:o.city||'',state:o.state||'',zip:o.zip||''};
+      if(Object.values(parts).some(Boolean))it.address=parts;
+      // Google writes its labels "a ::: b" and gives everyone "* myContacts"; a label starting with * is Google's own, not yours
+      if(o.tags){const t=String(o.tags).split(/\s*:::\s*|[,;]/).map(x=>x.trim()).filter(x=>x&&x.charAt(0)!=='*');if(t.length)it.tags=t;}
+      const custom={};for(const key of Object.keys(o))if(key.indexOf('custom:')===0&&o[key])custom[key.slice(7)]=o[key];
+      if(Object.keys(custom).length)it.custom=custom;
+      return it;},
     label:(it)=>it.name||it.email,
-    send:async(it)=>{const r=await api('/sales/contacts','POST',it);if(!r.ok)return'failed';return r.body&&r.body.deduped?'existed':'added';},
-    summary:(c)=>`${c.added} added${c.existed?`, ${c.existed} already existed`:''}${c.failed?`, ${c.failed} couldn’t be imported`:''}.`,
-    done:()=>load().catch(()=>{}),
+    // the import is a record of its own, so it can be undone; each row carries its id
+    start:async(o)=>{let r;try{r=await api('/sales/contacts/imports','POST',{file_name:o.fileName||'',on_existing:o.onExisting});}catch(_){return null;}return r.ok&&r.body&&r.body.data?r.body.data.id:null;},
+    send:async(it,ctx)=>{const body=Object.assign({},it,ctx&&ctx.importId?{import_id:ctx.importId}:{});const r=await api('/sales/contacts','POST',body);if(!r.ok)return'failed';return r.body&&r.body.updated?'updated':(r.body&&r.body.deduped?'existed':'added');},
+    summary:(c)=>`${c.added} added${c.updated?`, ${c.updated} updated`:''}${c.existed?`, ${c.existed} already here and left as they were`:''}${c.failed?`, ${c.failed} couldn’t be imported`:''}.`,
+    done:()=>{load().catch(()=>{});loadImportStrip();},
   });
+}
+// ── item 86: Undo an import, for a day. The newest import of the day shows above the
+//    list with what it did and one button that takes it back. ──
+let IMPORT=null,IMPORT_ASKED=false;
+async function loadImportStrip(){
+  if(scope())return;
+  let r;try{r=await api('/sales/contacts/imports');}catch(_){return;}
+  const d=r.ok&&r.body&&r.body.data;   // the latest import, or nothing; anything else paints no strip
+  IMPORT=(d&&!Array.isArray(d)&&d.id&&isFinite(Date.parse(d.created_at))&&!d.undone_at)?d:null;
+  paintImportStrip();
+}
+function paintImportStrip(){
+  const h=$('importStrip');if(!h)return;
+  if(!IMPORT){h.innerHTML='';return;}
+  const at=new Date(IMPORT.created_at),when=at.toLocaleTimeString([], {hour:'numeric',minute:'2-digit'});
+  const day=new Date().toDateString()===at.toDateString()?'today':'yesterday';
+  h.innerHTML=`<div class="impstrip" role="status"><span class="ok" aria-hidden="true">✓</span><span class="t">Imported ${day} at ${esc(when)}: ${IMPORT.added} added${IMPORT.updated?`, ${IMPORT.updated} updated`:''}.</span><span class="muted">Undo works for a day</span><button type="button" class="btn ghost" id="undoImport" data-needs="delete">Undo this import</button></div>`;
+  $('undoImport').onclick=undoImport;
+}
+async function undoImport(){
+  const k=KIT(),b=$('undoImport');if(!IMPORT||!b)return;
+  if(k&&!(await k.confirmIn(b,{text:`Take this import back? The ${IMPORT.added} added go, the ${IMPORT.updated} updated go back as they were.`,yes:'Yes, undo it'})))return;
+  b.disabled=true;
+  let r;try{r=await api('/sales/contacts/imports/'+encodeURIComponent(IMPORT.id)+'/undo','POST',{});}catch(_){r={ok:false,status:0,body:{}};}
+  if(!r.ok){toast((r.body&&r.body.message)||'That import couldn’t be undone just now — try again in a moment.');b.disabled=false;return;}
+  const d=(r.body&&r.body.data)||{};
+  toast(d.already?'That import was already undone.':`Import undone: ${d.removed||0} taken off, ${d.restored||0} put back as they were${d.kept?`; ${d.kept} kept (they have a deal now, or were changed since)`:''}.`);
+  IMPORT=null;paintImportStrip();load().catch(()=>{});
 }
 
 // Start a pipeline deal straight from a contact — no re-typing. One at a time per
@@ -1059,6 +1154,29 @@ async function openEdit(id){
   setTimeout(()=>$('e-name').focus(),20);
 }
 $('e-cancel').onclick=()=>{EDIT_ID='';$('editDlg').close();};
+$('e-merge').onclick=()=>{const id=EDIT_ID;if(!id)return;$('editDlg').close();EDIT_ID='';openMergePicker(id);};
+// item 86: pick the record to fold into this one (a search over everyone, not only the loaded hundred)
+function openMergePicker(keepId){
+  const keep=findRow(keepId)||{};
+  $('mergeBody').innerHTML=`<h3 id="merge-h">Merge ${esc(keep.name||keep.email||'this contact')} with…</h3>
+    <label for="mp-q">Find the other record</label><input id="mp-q" type="search" autocomplete="off" placeholder="Name, email or company">
+    <ul class="mpick" id="mp-list" aria-label="Records"></ul>
+    <div class="row2"><button type="button" class="btn ghost" id="merge-cancel">Cancel</button></div>`;
+  if(!$('mergeDlg').open)$('mergeDlg').showModal();
+  $('merge-cancel').onclick=()=>$('mergeDlg').close();
+  let seq=0;
+  const paint=async()=>{
+    const q=$('mp-q').value.trim(),n=++seq;
+    const p=new URLSearchParams({limit:'20'});if(q)p.set('q',q);
+    let r;try{r=await api('/sales/contacts?'+p.toString());}catch(_){r={ok:false};}
+    if(n!==seq)return;
+    const list=((r.ok&&r.body&&r.body.data)||[]).filter(c=>String(c.id)!==String(keepId));
+    $('mp-list').innerHTML=list.length?list.map(c=>`<li><button type="button" data-pick-merge="${esc(c.id)}"><span class="av" aria-hidden="true">${esc(String(c.name||c.email||'?').trim().charAt(0).toUpperCase())}</span><span><b>${esc(c.name||c.email||'Contact')}</b><small>${esc([c.email,c.company].filter(Boolean).join(' · '))}</small></span></button></li>`).join(''):`<li class="note">${r.ok?'No one matches.':'We couldn’t search just now.'}</li>`;
+    $('mp-list').querySelectorAll('[data-pick-merge]').forEach(b=>b.onclick=()=>openMerge(keepId,b.getAttribute('data-pick-merge')));
+  };
+  $('mp-q').addEventListener('input',debounce(paint,200));
+  paint();setTimeout(()=>$('mp-q').focus(),20);
+}
 $('editForm').onsubmit=async(e)=>{
   e.preventDefault();
   const id=EDIT_ID;if(!id)return;
@@ -1089,6 +1207,74 @@ $('editForm').onsubmit=async(e)=>{
   toast(r.body&&(r.body.warning==='custom_unavailable'||r.body.warning==='fields_unavailable'||r.body.warning==='found_via_unavailable')?((r.body.message)||'Saved.'):'Contact updated.');
   load().catch(()=>toast('Saved — but we couldn’t refresh the list. Refresh will catch it up.'));
 };
+
+// ── MERGE two records for one person (sales items 86 + 105) ─────────────────
+// The server's dry run says what each record holds and what would move; you pick,
+// field by field, what the record you keep says (its own value by default). Merge
+// moves their deals, bookings and reviews, keeps both sets of tags and notes, and
+// sets the other record aside for 30 days; Undo in the message after puts it back.
+const MERGE_FIELDS=[['name','Name'],['email','Email'],['phone','Phone'],['phone2','Second phone'],['job_title','Job title'],['company','Company'],['address','Address'],['found_via','How they found you']];
+let MERGE=null;
+async function openMerge(keepId,otherId,opener){
+  if(!keepId||!otherId)return;
+  MERGE={keep:keepId,other:otherId,opener:opener||null,data:null};
+  $('mergeBody').innerHTML='<h3 id="merge-h">Merge two records for one person</h3><div class="spin" role="status" aria-label="Loading"></div>';
+  if(!$('mergeDlg').open)$('mergeDlg').showModal();
+  let r;try{r=await api('/sales/contacts/'+encodeURIComponent(keepId)+'/merge','POST',{from:otherId});}catch(_){r={ok:false,status:0,body:{}};}
+  if(!MERGE||MERGE.keep!==keepId)return;
+  if(!r.ok){$('mergeBody').innerHTML=`<h3 id="merge-h">Merge two records for one person</h3><p class="note" role="alert" style="color:var(--bad)">${esc((r.body&&r.body.message)||(r.status?'We couldn’t read those two records just now.':'We couldn’t reach the server.'))}</p><div class="row2"><button type="button" class="btn ghost" id="merge-cancel">Close</button></div>`;$('merge-cancel').onclick=()=>$('mergeDlg').close();return;}
+  MERGE.data=r.body.data;paintMerge();
+}
+function paintMerge(){
+  const d=MERGE&&MERGE.data;if(!d)return;
+  const a=d.keep,b=d.other,ini=(c)=>esc(String(c.name||c.email||'?').trim().split(/\s+/).map(w=>w[0]).slice(0,2).join('').toUpperCase());
+  const head=(c,cls)=>`<div class="mh ${cls}"><span class="av" aria-hidden="true">${ini(c)}</span><span style="min-width:0"><b>${esc(c.name||c.email||'Contact')}</b><small>${esc(c.email||c.phone||'')}</small></span></div>`;
+  const opt=(f,side,v,checked)=>`<label class="opt${v?'':' empty'}"><input type="radio" name="mg-${f}" value="${side}"${checked?' checked':''}><span>${v?esc(v):'Not filled in'}</span></label>`;
+  let rows='';
+  for(const [f,label] of MERGE_FIELDS){
+    const va=a[f]||'',vb=b[f]||'';
+    if(!va&&!vb)continue;
+    const keepOther=!va&&!!vb;   // the kept record has nothing here: the other's value by default
+    rows+=`<div class="fl" id="mgl-${f}">${esc(label)}</div>`+opt(f,'keep',va,!keepOther)+opt(f,'other',vb,keepOther);
+  }
+  const tags=[...new Set([...(a.tags||[]),...(b.tags||[])])];
+  const mv=d.moves||{},parts=[];
+  if(mv.deals)parts.push(mv.deals+' deal'+(mv.deals===1?'':'s')+' (with their proposals, invoices and projects)');
+  if(mv.bookings)parts.push(mv.bookings+' booking'+(mv.bookings===1?'':'s'));
+  if(mv.reviews)parts.push(mv.reviews+' review'+(mv.reviews===1?'':'s'));
+  parts.push('notes');
+  $('mergeBody').innerHTML=`<h3 id="merge-h">Merge two records for one person</h3>
+    <div class="mgrid" role="group" aria-labelledby="merge-h"><span class="mhl"></span>${head(a,'')}${head(b,'')}${rows}
+      ${tags.length?`<div class="fl">Tags</div><div class="full">Both sets of tags are kept: ${esc(tags.join(', '))}</div>`:''}</div>
+    <p class="mmoves">Everything moves to the one you keep: ${esc(parts.join(', '))}.</p>
+    <p class="note">The other record is set aside for 30 days. Undo, in the message after, brings it back.</p>
+    ${d.partial?'<p class="note" style="color:var(--bad)">We couldn’t count everything attached just now; the merge still moves all of it.</p>':''}
+    <div class="row2"><button type="button" class="btn ghost" id="merge-cancel">Cancel</button><button type="button" class="btn" id="mergeGo" data-needs="delete">Merge into one</button></div>`;
+  $('merge-cancel').onclick=()=>{$('mergeDlg').close();};
+  $('mergeGo').onclick=doMerge;
+  const f=$('mergeBody').querySelector('input[type=radio]');if(f)f.focus();
+}
+async function doMerge(){
+  const d=MERGE&&MERGE.data;if(!d)return;
+  const pick={};for(const [f] of MERGE_FIELDS){const c=document.querySelector(`input[name="mg-${f}"]:checked`);if(c)pick[f]=c.value;}
+  const go=$('mergeGo');go.disabled=true;go.textContent='Merging…';
+  const body={from:MERGE.other,pick,confirm:true};
+  let r;try{r=await api('/sales/contacts/'+encodeURIComponent(MERGE.keep)+'/merge','POST',body);}catch(_){r={ok:false,status:0,body:{}};}
+  if(!r.ok){
+    $('mergeBody').insertAdjacentHTML('afterbegin',`<p class="note" role="alert" style="color:var(--bad);margin:0 0 8px">${esc((r.body&&r.body.message)||'Nothing was merged — we couldn’t reach the server.')}</p>`);
+    go.disabled=false;go.textContent='Merge into one';return;
+  }
+  const away=(r.body.data&&r.body.data.merged_away)||{id:MERGE.other,name:''};
+  $('mergeDlg').close();MERGE=null;
+  const msg=`Merged into one${away.name?` — ${away.name}’s record was set aside`:''}.`;
+  if(window.ddsToast)ddsToast(msg,'ok',{label:'Undo',onClick:async()=>{
+    let u;try{u=await api('/sales/contacts/'+encodeURIComponent(away.id)+'/unmerge','POST',{});}catch(_){u={ok:false,body:{}};}
+    toast(u.ok?'The merge is undone — both records are back.':((u.body&&u.body.message)||'We couldn’t undo that merge just now.'));
+    await load();
+  }});
+  else toast(msg);
+  await load();
+}
 
 // ── DELETE a contact ────────────────────────────────────────────────────────
 // Two steps, always. The first DELETE carries no ?confirm=1 and the server
@@ -1181,6 +1367,7 @@ async function load(){
   { const live=new Set(ALL.map(c=>String(c.id))); for(const id of [...PICKED])if(!live.has(id))PICKED.delete(id); }
   render();loadSavedViews();
   if(Q.trim())searchServer();   // item 66: a search still in the box looks past the loaded pages again
+  if(!IMPORT_ASKED){IMPORT_ASKED=true;loadImportStrip();}   // item 86: the newest import of the day, with its Undo
 }
 (async function(){try{const{data}=await sb.auth.getSession();TOKEN=(data&&data.session&&data.session.access_token)||"";if(!TOKEN){signedOut();return;}await load();}catch(_){trouble();}})();
 </script>

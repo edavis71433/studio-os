@@ -733,6 +733,14 @@ async function route_(req: Request, cors: Record<string, string>): Promise<Respo
   // Owner-defined contact custom-field DEFINITIONS (≤5 labeled fields). Literal
   // path — matched before the :id route below (a uuid can't be "fields"). Studio-gated.
   if (route === '/sales/contacts/fields' && (method === 'GET' || method === 'PUT')) return handleSalesContactFields(req, site, principal, cors);
+  // items 86 + 105: an import is a record you can undo for a day; two records for one person merge (and unmerge)
+  if (route === '/sales/contacts/imports' && (method === 'GET' || method === 'POST')) return (await import('./routes/contacts_more.ts')).handleContactImports(req, site, principal, cors);
+  {
+    const mi = route.match(/^\/sales\/contacts\/imports\/([0-9a-f-]{36})\/undo$/);
+    if (mi && method === 'POST') return (await import('./routes/contacts_more.ts')).handleContactImportUndo(req, site, principal, mi[1], cors);
+    const mm = route.match(/^\/sales\/contacts\/([0-9a-f-]{36})\/(merge|unmerge)$/);
+    if (mm && method === 'POST') { const cm = await import('./routes/contacts_more.ts'); return mm[2] === 'merge' ? cm.handleContactMerge(req, site, principal, mm[1], cors) : cm.handleContactUnmerge(req, site, principal, mm[1], cors); }
+  }
   {
     // Contact DETAIL: tap a contact → their deals + recent activity + last-spoke
     // + custom-field values (GET); edit info + field values (PATCH); remove them
