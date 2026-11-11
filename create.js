@@ -39,9 +39,12 @@
       default: return '';
     }
   }
-  // "$1,200.50" → 120050; nothing usable → 0
+  // "$1,200.50" → 120050; "5k" or "$2.5K" → thousands (item 97: "5k" was dropped and the deal
+  // saved with no value); nothing usable → 0
   function crCents(v) {
     var s = String(v == null ? '' : v).replace(/[$\s,]/g, '');
+    var k = /^(\d+(?:\.\d+)?)k$/i.exec(s);
+    if (k) return Math.round(Number(k[1]) * 100000);
     if (!/^\d+(\.\d{1,2})?$/.test(s)) return 0;
     return Math.round(Number(s) * 100);
   }
@@ -605,6 +608,8 @@
     var k = S.kind, c = S.pick;
     if (k !== 'deal' && !c) return need(k === 'call' ? 'Pick who you talked to.' : k === 'invoice' ? 'Pick who the invoice is for.' : k === 'proposal' ? 'Pick the deal.' : 'Pick the deal it’s for.', '#cr-who');
     if (k === 'deal' && !val('cr-title')) return need('Give the deal a name.', '#cr-title');
+    // item 97: a value that isn't a number is said, never saved as no value
+    if (k === 'deal' && val('cr-value') && !crCents(val('cr-value'))) return need('Write the value as a number, like 2500 or 2.5k.', '#cr-value');
     if (k === 'invoice' && !crCents(val('cr-amt'))) return need('Enter the amount.', '#cr-amt');
     if (k === 'todo' && !val('cr-what')) return need('Say what needs doing.', '#cr-what');
     if (k === 'proposal') { close(); location.assign('/pipeline.html?deal=' + encodeURIComponent(c.deal_id) + '&dtab=billing&compose=proposal'); return; }

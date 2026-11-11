@@ -486,6 +486,10 @@ html.dc-edit:not(.plan-watch) #pcBody{padding:0 20px 20px}
 .pc-pane-body .dc-modal-h{font-family:var(--serif);font-size:20px;font-weight:600;letter-spacing:-.01em}
 .pc-pane-body input[type=text],.pc-pane-body select{width:100%;box-sizing:border-box}
 .pc-note{margin:0 0 12px;font-size:13px;line-height:1.5;color:var(--ink-2)}
+/* item 146: the sign-up box's "where sign-ups go" choice, drawn like the card's text boxes */
+.nl-mode{width:100%;padding:8px;border:1px solid var(--line);border-radius:8px;font:inherit;font-size:13px;margin-bottom:6px;box-sizing:border-box}
+/* item 147: a form's Answers button, drawn like its Remove form button */
+.ff-btn{font:inherit;font-size:12px;padding:2px 9px;border-radius:8px;border:1px solid var(--line);background:transparent;cursor:pointer}
 /* item 121: the not-found choice (Ready-made or One of my pages), and the password page's words */
 .pc-nf-seg{margin:0 0 10px}
 .pc-nf-seg button[aria-pressed="true"]{background:var(--sheet);color:var(--ink);font-weight:600;box-shadow:var(--dds-shadow)}
@@ -9842,7 +9846,7 @@ function emptyBlock(def) {
   if (def.reviewsWallSimple) { b.max = 12; return b; }   // approved reviews injected at publish
   if (def.apptSimple) { b.url = ""; return b; }
   if (def.bookingSimple) { b.intro = ""; return b; }
-  if (def.newsletterSimple) { b.url = ""; return b; }
+  if (def.newsletterSimple) { b.url = ""; b.collect = true; return b; }   // item 146: a new box collects into your own list
   if (def.mapSimple) { b.address = ""; return b; }
   if (def.mediaKind === "gallery") { b.image_ids = []; return b; }
   if (def.mediaKind === "video") { b.url = ""; return b; }
@@ -10746,15 +10750,21 @@ function renderBlocksCard() {
       sub.appendChild(go);
       sub.appendChild(el("div", "hint", "This section shows a calm, mobile-friendly booking widget on your site. Your services, hours, and appointments live in the Bookings tab — first-party, no external calendar."));
     } else if (def.newsletterSimple) {
-      const t = el("input"), bt = el("input"), u = el("input");
+      // Builder list item 146: the box collects emails into your own list (Send an update writes
+      // to them), or the button sends visitors to another company's sign-up page.
+      const t = el("input"), bt = el("input"), u = el("input"), mode = el("select", "nl-mode"), why = el("div", "hint");
+      mode.setAttribute("aria-label", "Where sign-ups go");
+      mode.innerHTML = '<option value="collect">Collect emails here, into your own list</option><option value="link">Send people to another sign-up page</option>';
+      mode.value = blk.url && !blk.collect ? "link" : "collect";
       t.placeholder = "A short line (optional) — e.g. Get updates from us."; t.value = blk.text || "";
       bt.placeholder = "Button label (e.g. Sign up)"; bt.value = blk.button || "";
       u.placeholder = "Your sign-up link (e.g. your Mailchimp or newsletter page)"; u.value = blk.url || "";
       [t, bt, u].forEach((inp) => { inp.type = "text"; inp.style.cssText = inputCss; });
-      const commit = () => { BLOCKS_WORK[idx] = wLook(idx, { type: "newsletter", title: ti.value.trim(), text: t.value.trim(), button: bt.value.trim(), url: u.value.trim() }); };
+      const show = () => { const link = mode.value === "link"; u.hidden = !link; why.textContent = link ? "Visitors tap the button and land on your sign-up page — nothing external loads on your site." : "Visitors type their email and tick yes. They join your list, and you write to them from Send an update; every email has an unsubscribe link."; };
+      const commit = () => { const link = mode.value === "link"; BLOCKS_WORK[idx] = wLook(idx, { type: "newsletter", title: ti.value.trim(), text: t.value.trim(), button: bt.value.trim(), url: link ? u.value.trim() : "", collect: !link }); };
       [t, bt, u].forEach((inp) => inp.addEventListener("change", commit));
-      sub.append(t, aiField(t, { field: "banner text" }), bt, u);
-      sub.appendChild(el("div", "hint", "Visitors tap the button and land on your sign-up page — nothing external loads on your site."));
+      mode.addEventListener("change", () => { show(); commit(); });
+      sub.append(mode, t, aiField(t, { field: "banner text" }), bt, u, why); show();
     } else if (def.mapSimple) {
       const ad = el("input"), du = el("input");
       ad.placeholder = "Your address (shown as text)"; ad.value = blk.address || "";
@@ -11613,7 +11623,7 @@ function renderCardsBlockBody(blk, idx, sub, ti) {
 // (lib/forms.ts) is the authoritative safety gate; this UI can only ever produce
 // whitelisted, typed fields — never raw HTML/JS. Saved as you go, mirroring
 // the content-block editor above.
-const FF_TYPES = [["text", "Short text"], ["textarea", "Long text (paragraph)"], ["email", "Email"], ["phone", "Phone"], ["number", "Number"], ["date", "Date"], ["select", "Dropdown (pick one)"], ["radio", "Choose one"], ["checkbox", "Checkboxes (pick many)"], ["consent", "Consent checkbox"], ["rating", "Star rating"]];
+const FF_TYPES = [["text", "Short text"], ["textarea", "Long text (paragraph)"], ["email", "Email"], ["phone", "Phone"], ["number", "Number"], ["date", "Date"], ["select", "Dropdown (pick one)"], ["radio", "Choose one"], ["checkbox", "Checkboxes (pick many)"], ["consent", "Consent checkbox"], ["rating", "Star rating"], ["file", "Photo or file"]];
 const FF_CHOICE = ["select", "radio", "checkbox"];
 const FF_KINDS = [["contact", "Message / contact"], ["quote", "Quote / request"], ["booking", "Booking"]];
 const FF_OPS = [["equals", "equals"], ["notEquals", "does not equal"], ["isEmpty", "is empty"], ["notEmpty", "is not empty"], ["contains", "contains"], ["gt", "greater than"], ["lt", "less than"]];
@@ -11731,6 +11741,18 @@ function mountFormsCard() {
   card.addEventListener("change", () => formsSaveSoon());
   formsLoad();
 }
+// Bump ?v= whenever form-answers.js changes: browsers keep a .js file for a day.
+let FORM_ANSWERS = null;
+function openFormAnswers(form, btn) {
+  if (!FORM_ANSWERS) FORM_ANSWERS = new Promise((res, rej) => {
+    const s = document.createElement("script"); s.src = "/form-answers.js?v=1";
+    s.onload = () => window.DDSFormAnswers ? res(window.DDSFormAnswers) : rej(new Error("missing"));
+    s.onerror = () => rej(new Error("load"));
+    document.head.appendChild(s);
+  }).catch((e) => { FORM_ANSWERS = null; throw e; });   // a failed load can be tried again
+  FORM_ANSWERS.then((m) => m.open({ formId: form.id, page: FORMS_PAGE, title: form.title || "Form", get: (route) => api("GET", route), opener: btn }))
+    .catch(() => toast("The answers couldn’t open just now. Try again in a moment."));
+}
 function renderFormsCard() {
   const card = $("formsCard"); if (!card) return; card.textContent = "";
   const formsPage = FORMS_PAGE ? dcPageObj(FORMS_PAGE) : null;
@@ -11746,7 +11768,12 @@ function renderFormsCard() {
     const nm = el("div", null, form.title || "Form"); nm.style.cssText = "flex:1;font-weight:600;font-size:13px";
     const rm = el("button", null, "Remove form"); rm.type = "button"; rm.style.cssText = FF_BTN;
     rm.addEventListener("click", async () => { const f = FORMS_WORK[fi]; if (await askYes("Remove this form?", { ok: "Remove form", danger: true })) { const at = FORMS_WORK.indexOf(f); if (at >= 0) FORMS_WORK.splice(at, 1); renderFormsCard(); } });
-    head.append(nm, rm); panel.appendChild(head);
+    // Builder list item 147: this form's own table of answers (form-answers.js, loaded on first use)
+    const ans = el("button", "ff-btn", "Answers"); ans.type = "button";
+    ans.addEventListener("click", () => openFormAnswers(form, ans));
+    head.append(nm, ans, rm); panel.appendChild(head);
+    // Item 148: a button anywhere on the site opens this form in a pop-up with this link
+    panel.appendChild(el("div", "hint", "To open this form from any button or banner, give it the link #form-" + form.id + " (it opens over the page)."));
 
     // form settings
     const ti = el("input"); ti.type = "text"; ti.placeholder = "Form title"; ti.value = form.title || ""; ti.style.cssText = FF_IN;
@@ -11806,7 +11833,7 @@ function renderFormsCard() {
       stepIn.style.cssText = "width:56px;padding:5px 7px;border:1px solid var(--line,#ddd);border-radius:8px;font:inherit;font-size:12px";
       stepIn.addEventListener("change", () => commitField(fi, xi, { step: stepIn.value === "" ? undefined : Math.max(1, Math.min(12, Math.trunc(Number(stepIn.value)) || 1)) }));
       stepWrap.append(document.createTextNode("Page/step"), stepIn); adv.appendChild(stepWrap);
-      if (fld.type !== "consent") {
+      if (fld.type !== "consent" && fld.type !== "file") {   // a link can't choose a visitor's files (item 147)
         const pfL = el("label"); pfL.style.cssText = "font-size:12px;display:inline-flex;align-items:center;gap:6px";
         const pf = el("input"); pf.type = "checkbox"; pf.checked = !!fld.prefill; pf.style.cssText = "width:auto;margin:0";
         pf.addEventListener("change", () => commitField(fi, xi, { prefill: pf.checked }));
@@ -15772,6 +15799,23 @@ function mountAnnouncementCard() {
     catch (err) { whisper("topWhisper", "failed"); toast(nice(err), true); }
   };
   ["ann-text", "ann-url", "ann-until"].forEach((id) => $(id).addEventListener("change", annSave));
+  // Builder list item 148: the pop-up's card sits under this one (popup-card.js, loaded on first use),
+  // drawn again from what's loaded like this one, never while someone types in it
+  const oldPop = $("popCard"); if (oldPop && oldPop.contains(document.activeElement)) return; if (oldPop) oldPop.remove();
+  loadPopupCard().then((m) => m.mount(host, { popup: S.settings.popup || null, pages: dcPageList().filter((p) => p.slug), offeringLabel: VOCAB.label,
+    save: (popup) => settingsPut({ popup }), whisper: (st) => whisper("topWhisper", st), toast, changed: scheduleChangesRefresh })).catch(() => {});
+}
+// Bump ?v= whenever popup-card.js changes: browsers keep a .js file for a day.
+let POPUP_CARD = null;
+function loadPopupCard() {
+  if (window.DDSPopupCard) return Promise.resolve(window.DDSPopupCard);
+  if (!POPUP_CARD) POPUP_CARD = new Promise((res, rej) => {
+    const s = document.createElement("script"); s.src = "/popup-card.js?v=1";
+    s.onload = () => window.DDSPopupCard ? res(window.DDSPopupCard) : rej(new Error("missing"));
+    s.onerror = () => rej(new Error("load"));
+    document.head.appendChild(s);
+  }).catch((e) => { POPUP_CARD = null; throw e; });
+  return POPUP_CARD;
 }
 // ── L2: the commercial capacity notice — one calm card, never a number ──
 // P2-F G3 — every notice kind gets a home. Website-attention items (publish

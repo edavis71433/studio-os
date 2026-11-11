@@ -37,7 +37,7 @@ export const SAMPLE_BLOCKS: Record<string, Record<string, unknown>> = {
   reviews_wall: { type: 'reviews_wall', title: 'What customers say', max: 6 },
   appointment: { type: 'appointment', title: 'Book a time', url: 'https://example.com/book', text: 'Pick a time that suits you.', button: 'See open times' },
   booking: { type: 'booking', title: 'Book online', intro: 'Choose a service and a time. You’ll get a confirmation by email.' },
-  newsletter: { type: 'newsletter', title: 'Stay in the loop', url: 'https://example.com/subscribe', text: 'News and offers, once a month.', button: 'Sign up' },
+  newsletter: { type: 'newsletter', title: 'Stay in the loop', collect: true, text: 'News and offers, once a month.', button: 'Sign up' },   // item 146: the box collects here
   social: { type: 'social', title: 'Follow along', links: [
     { network: 'instagram', url: 'https://instagram.com/example' }, { network: 'facebook', url: 'https://facebook.com/example' }, { network: 'youtube', url: 'https://youtube.com/@example' }] },
   events: { type: 'events', title: 'Coming up', items: [

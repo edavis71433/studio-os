@@ -65,6 +65,7 @@ export function seesFullWorkspace(role: SiteRole): boolean {
 export const SETTINGS_CONTENT_FIELDS: ReadonlySet<string> = new Set([
   'category_order', 'cover_media_id', 'logo_media_id', 'og_media_id',
   'announcement_text', 'announcement_url', 'announcement_expires_at',
+  'popup',   // builder list item 148: the site's pop-up is content, like the announcement bar
   'hero_layout', 'nav_style', 'sections_hidden', 'sections_order', 'footer_hours', 'footer_social',
   'pages_noindex', 'page_seo', 'blocks', 'pages', 'nav',
 ]);
@@ -111,6 +112,8 @@ const MEMBER_WRITES: Array<[MemberWriteNeed, string[]]> = [
     `POST /sales/deals/${ID}/retainer/cancel`,
     `POST /sales/recurring/${ID}/stop`,   // sales review item 47: stopping a recurring invoice ends its billing, like cancelling a retainer
     'DELETE /broadcasts/lists/[A-Za-z0-9-]{6,40}',   // sales review items 31 + 39: removing a picked list
+    `POST /sales/contacts/imports/${ID}/undo`,   // sales review item 86: undoing an import takes the people it added off the list
+    `POST /sales/contacts/${ID}/(merge|unmerge)`,   // items 86 + 105: a merge folds one record away (and its undo brings it back)
   ]],
   ['configure', [
     'PUT /sales/stages',   // sales review item 38: renaming the studio's deal stages is a setting
@@ -187,6 +190,7 @@ const MEMBER_WRITES: Array<[MemberWriteNeed, string[]]> = [
     `POST /broadcasts/${ID}/cancel`,
     `POST /broadcasts/${ID}/test`,   // bold redesign: "Send me a test" — only ever to the member's own address, so edit, not publish
     'POST /sales/(contacts|customers|deals|templates)',
+    'POST /sales/contacts/imports',   // sales review item 86: starting an import (each row is a POST /sales/contacts)
     'POST /sales/prospects(/discover)?',   // sales review item 112: find businesses, save the ticked ones
     `POST /sales/prospects/${ID}/(convert|draft|pack)`,   // item 112: start the deal; a draft only returns words — nothing sends; item 113: pack builds a share link
     `PATCH /sales/prospects/${ID}`,
