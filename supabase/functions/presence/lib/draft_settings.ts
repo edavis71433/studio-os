@@ -29,7 +29,7 @@ import type { MediaRef, SnapshotContent } from './render_types.ts';
 /** The website's settings as stored: SETTINGS_CONTENT_FIELDS → value. */
 export type DraftSettings = Record<string, unknown>;
 
-// Each field's column default (migrations 0019, 0051, 0057, 0058, 0068, 0104, 0105): what a
+// Each field's column default (migrations 0019, 0051, 0057, 0058, 0068, 0104, 0105, 0161): what a
 // site that never set it has, so a version without it goes back to it. A field added to
 // SETTINGS_CONTENT_FIELDS later and not named here stays as it is on a restore from a
 // version kept before it existed.
@@ -38,6 +38,7 @@ const DEFAULTS: Record<string, unknown> = {
   announcement_text: '', announcement_url: '', announcement_expires_at: null,
   hero_layout: '', nav_style: '', sections_hidden: [], sections_order: [], footer_hours: true, footer_social: true,
   pages_noindex: [], page_seo: {}, blocks: [], pages: [], nav: [],
+  popup: null,   // builder list item 148: no pop-up
 };
 
 /** The website's settings in a draft's settings row, as stored. A field the row lacks
@@ -114,6 +115,7 @@ export function settingsFromContent(settings: SnapshotContent['settings'], idOf:
     announcement_text: s.announcement?.text || '', announcement_url: s.announcement?.url || '', announcement_expires_at: s.announcement?.expires_at || null,
     page_seo: pageSeo,
     pages_noindex: Array.isArray(s.pages_noindex) ? s.pages_noindex : [],
+    popup: s.popup || null,   // item 148: a version carries its pop-up only while it was on
   };
 }
 

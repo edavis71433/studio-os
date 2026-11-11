@@ -127,6 +127,18 @@ const parses = (code) => { try { new Function(code); return true; } catch { retu
   ok('privacy: beside the ad tags’ cookie paragraphs (counter on or off), the pop-up’s note is said once', tagged.includes('loads the Google tag') && tagged.split(NOTE).length === 2 && taggedOff.includes('loads the Google tag') && taggedOff.split(NOTE).length === 2);
 }
 
+// ═══ a restore brings the pop-up back as the version had it (after builder list item 187) ═══
+{
+  const { draftSettingsOf, settingsFromContent, settingsBack } = await import('../../supabase/functions/presence/lib/draft_settings.ts');
+  const { SETTINGS_CONTENT_FIELDS } = await import('../../supabase/functions/presence/lib/site_roles.ts');
+  const STORED = { ...BASE, on: false, seconds: 20 };   // set up, then switched off: kept as stored all the same
+  const SHOWN = normalizePopup(BASE);
+  const idOf = () => null;
+  ok('restore: the pop-up is website content, so a version keeps it', SETTINGS_CONTENT_FIELDS.has('popup') && JSON.stringify(draftSettingsOf({ popup: STORED }).popup) === JSON.stringify(STORED) && draftSettingsOf(null).popup === null);
+  ok('restore: an older version rebuilds it from what it showed: its pop-up, or none', JSON.stringify(settingsFromContent({ popup: SHOWN }, idOf).popup) === JSON.stringify(SHOWN) && settingsFromContent({}, idOf).popup === null);
+  ok('restore: it goes back as kept, and a version kept before it existed has none', JSON.stringify(settingsBack({ popup: STORED }, new Set(), new Set()).popup) === JSON.stringify(STORED) && settingsBack({}, new Set(), new Set()).popup === null);
+}
+
 const passed = results.filter(Boolean).length;
 console.log(`\n════ POP-UP (item 148): ${passed}/${results.length} ${passed === results.length ? 'PASSED' : 'FAILED'} ════`);
 if (passed !== results.length) Deno.exit(1);
