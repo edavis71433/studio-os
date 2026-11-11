@@ -170,7 +170,7 @@ article.post p{margin-bottom:16px}
 footer.site{background:var(--accent);color:#d9e1f0;padding:50px 0 32px;margin-top:72px;border-top:3px solid var(--steel)}
 footer.site a{color:#b9cdea}
 footer.site h2{font-size:1.08rem;color:#fff}
-footer.site table.hours th{color:#b6c4dc}
+footer.site table.hours th{color:#d0d9ea}
 .cols{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:30px}
 .credit{margin-top:30px;padding-top:18px;border-top:1px solid rgba(255,255,255,.16);font-size:.88rem;color:#a7b6d1;display:flex;gap:14px;flex-wrap:wrap}
 :focus-visible{outline:2px solid var(--steel-dark);outline-offset:2px}
@@ -581,7 +581,7 @@ export const render: RenderFn = (snapshot: Snapshot, _manifest, site: SiteConfig
   page('/not-sent/', { title: `Not sent — ${i.business_name}`, description: `Your message to ${i.business_name} didn’t send.`, ld: [], active: 'contact', body: `<section class="hero"><div class="wrap">${notSentInner()}</div></section>` });
   files['not-sent/index.html'] = (files['not-sent/index.html'] as string).replace('</title>', '</title>\n<meta name="robots" content="noindex">');
   // The generated legal foundation — facts-true, the owner never writes legal HTML
-  page('/privacy/', { title: `Privacy — ${i.business_name}`, description: `How ${i.business_name} handles your information.`, ld: [], active: '', body: privacyBody(c, snapshot.created_at.slice(0, 10), !!site.formEndpoint) });
+  page('/privacy/', { title: `Privacy — ${i.business_name}`, description: `How ${i.business_name} handles your information.`, ld: [], active: '', body: privacyBody(c, snapshot.created_at.slice(0, 10), site) });
   page('/accessibility/', { title: `Accessibility — ${i.business_name}`, description: `${i.business_name}’s accessibility commitment.`, ld: [], active: '', body: accessibilityBody(c) });
   page('/updates/', { ...seoOv('updates', `Updates — ${i.business_name}`, `News and updates from ${i.business_name}.`), ld: [], active: 'updates', body: postIndexBody(c) });
   if (noidx.has('updates')) markNoindex('updates/index.html');

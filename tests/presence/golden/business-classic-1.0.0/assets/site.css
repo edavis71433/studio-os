@@ -90,6 +90,7 @@ article.post p{margin-bottom:16px}
 footer.site{background:var(--ink);color:#dfe4e1;padding:46px 0 32px;margin-top:64px}
 footer.site a{color:#bfe3da}
 footer.site h2{font-size:1.1rem}
+footer.site table.hours th{color:#b4bdb9}
 .cols{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:30px}
 .credit{margin-top:30px;padding-top:18px;border-top:1px solid rgba(255,255,255,.14);font-size:.88rem;color:#9aa5a0;display:flex;gap:14px;flex-wrap:wrap}
 :focus-visible{outline:2px solid var(--accent);outline-offset:2px}

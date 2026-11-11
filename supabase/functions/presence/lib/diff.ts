@@ -25,6 +25,8 @@ const dayText = (d: HoursDay | undefined): string =>
   !d || d.closed || !d.intervals?.length ? 'Closed' : d.intervals.map((i) => `${fmtT(i.open)}–${fmtT(i.close)}`).join(', ');
 const q = (s: string, max = 48): string => `“${s.length > max ? s.slice(0, max - 1) + '…' : s}”`;
 const jeq = (a: unknown, b: unknown): boolean => JSON.stringify(a ?? null) === JSON.stringify(b ?? null);
+// a map whose keys were saved in another order is the same map
+const sortedKeys = (o: Record<string, unknown>): Array<[string, string]> => Object.keys(o).sort().map((k) => [k, JSON.stringify(o[k] && typeof o[k] === 'object' ? Object.fromEntries(Object.entries(o[k] as Record<string, unknown>).sort(([a], [b]) => a.localeCompare(b))) : o[k])]);
 
 /** Describe every difference between the draft and what is live, in plain language. */
 export function describeChanges(draftC: SnapshotContent, liveC: SnapshotContent | null): ChangeSet {
@@ -143,10 +145,27 @@ export function describeChanges(draftC: SnapshotContent, liveC: SnapshotContent 
       ? 'Your site stops counting visits, and its privacy page says so.'
       : 'Your site starts counting visits again, and its privacy page says so.' });
   }
+  // ── the AI crawler switch (item 175): robots.txt changes with it ──
+  if ((d.settings?.ai_crawlers !== false) !== (l.settings?.ai_crawlers !== false)) {
+    out.push({ section: 'site', sentence: d.settings?.ai_crawlers === false
+      ? 'AI assistants like ChatGPT, Claude and Perplexity are asked not to read your site. Google and Bing search are not affected.'
+      : 'AI assistants can read your site again.' });
+  }
+  // ── ad tags (item 152): the cookie notice and the privacy page change with them ──
+  if (JSON.stringify(d.settings?.ad_tags || null) !== JSON.stringify(l.settings?.ad_tags || null)) {
+    const t = d.settings?.ad_tags || {};
+    const names = [t.google ? 'the Google tag' : '', t.meta ? 'Meta’s pixel' : ''].filter(Boolean).join(' and ');
+    out.push({ section: 'site', sentence: names
+      ? `Your site asks visitors about cookies and, for those who say yes, loads ${names}. Its privacy page says so.`
+      : 'Your site stops loading ad tags and stops asking visitors about cookies.' });
+  }
 
   // ── custom section blocks (home + pages) — without this, two versions that
   //    differ ONLY in blocks reported "identical" (G9 finding). Coarse but
   //    honest: count add/remove/change per page by stable id (type+index else).
+  //    They live in the settings: read at the top of the content, as this did until
+  //    Nov 2026, they were never found, so a draft that only changed sections said
+  //    "nothing to publish" (builder items 48 and 120 found it).
   const blockDelta = (a: unknown[], b: unknown[], where: string) => {
     const key = (x: any, i: number) => (x && typeof x.id === 'string' && x.id ? `id:${x.id}` : `ix:${x?.type}#${i}`);
     const am = new Map((a || []).map((x: any, i: number) => [key(x, i), x]));
@@ -160,12 +179,42 @@ export function describeChanges(draftC: SnapshotContent, liveC: SnapshotContent 
     if (changed) bits.push(`${changed} changed`);
     if (bits.length) out.push({ section: 'site', sentence: `${bits.join(', ')}${where}.` });
   };
-  blockDelta((l as any).blocks || [], (d as any).blocks || [], ' on your home page');
-  const dPages = new Map(((d as any).pages || []).map((p: any) => [p.slug || p.id, p]));
-  for (const p of ((l as any).pages || []) as any[]) {
-    const dp: any = dPages.get(p.slug || p.id);
-    if (dp) blockDelta(p.blocks || [], dp.blocks || [], ` on ${q(dp.title || dp.slug || 'a page')}`);
+  type Settings = NonNullable<SnapshotContent['settings']>;
+  const ds: Settings = d.settings || {}, ls: Settings = l.settings || {};
+  blockDelta(ls.blocks || [], ds.blocks || [], ' on your home page');
+
+  // ── the owner's own pages: added, removed, renamed, their sections, and who can see
+  //    them (items 48 and 120) ──
+  type OwnPage = NonNullable<Settings['pages']>[number];
+  const lPages = new Map<string, OwnPage>((ls.pages || []).map((p) => [p.slug, p]));
+  const dPages = new Map<string, OwnPage>((ds.pages || []).map((p) => [p.slug, p]));
+  for (const p of ds.pages || []) {
+    const prev = lPages.get(p.slug);
+    if (!prev) {
+      out.push({ section: 'site', sentence: p.access === 'private' ? `New page ${q(p.title)}, kept private.` : `New page: ${q(p.title)}.` });
+      continue;
+    }
+    if (prev.title !== p.title) out.push({ section: 'site', sentence: `The page ${q(prev.title)} is renamed ${q(p.title)}.` });
+    blockDelta(prev.blocks || [], p.blocks || [], ` on ${q(p.title)}`);
+    const was = prev.access || 'everyone', now = p.access || 'everyone';
+    if (was !== now) {
+      out.push({ section: 'site', sentence: now === 'password' ? `${q(p.title)} will need a password to open.`
+        : now === 'private' ? `${q(p.title)} comes off your live site and stays private.`
+        : `${q(p.title)} is open to everyone.` });
+    } else if (now === 'password' && prev.lock !== p.lock) out.push({ section: 'site', sentence: `${q(p.title)} gets a new password.` });
+    const hdr = !!prev.noHeader !== !!p.noHeader, ftr = !!prev.noFooter !== !!p.noFooter;
+    if (hdr && ftr && !!p.noHeader === !!p.noFooter) out.push({ section: 'site', sentence: p.noHeader ? `${q(p.title)} leaves out the header and footer.` : `${q(p.title)} shows the header and footer again.` });
+    else {
+      if (hdr) out.push({ section: 'site', sentence: p.noHeader ? `${q(p.title)} leaves out the header.` : `${q(p.title)} shows the header again.` });
+      if (ftr) out.push({ section: 'site', sentence: p.noFooter ? `${q(p.title)} leaves out the footer.` : `${q(p.title)} shows the footer again.` });
+    }
   }
+  for (const p of ls.pages || []) if (!dPages.has(p.slug)) out.push({ section: 'site', sentence: `The page ${q(p.title)} is removed.` });
+
+  // ── the menu and how pages show on Google ──
+  if (!jeq(ds.nav || [], ls.nav || [])) out.push({ section: 'site', sentence: 'Your menu changes.' });
+  if (!jeq([...(ds.pages_noindex || [])].sort(), [...(ls.pages_noindex || [])].sort())) out.push({ section: 'site', sentence: 'Which pages show on Google changes.' });
+  if (!jeq(sortedKeys(ds.page_seo || {}), sortedKeys(ls.page_seo || {}))) out.push({ section: 'site', sentence: 'How your pages read on Google changes.' });
 
   return { count: out.length, changes: out, first_publish: false };
 }

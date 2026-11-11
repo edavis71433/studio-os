@@ -352,10 +352,10 @@ test.describe('Sites (builder list items 43 and 45)', () => {
 // ── Domains (item 52) ──
 const DOMAINS = { data: {
   domains: [
-    { domain: 'gone.example', site_id: 's9', name: 'Gone Deli', own: false, status: 'expired', status_words: 'Expired 2 days ago', tone: 'bad', days_left: -2, provider: 'Registrar A', expires_at: '2026-11-06T00:00:00Z', checked_at: '2026-11-08T00:00:00Z', record: 'ok', padlock_until: null, hosted: true },
-    { domain: 'bistro.example', site_id: 's1', name: 'Bistro Nine', own: false, status: 'expiring', status_words: 'Expires in 12 days', tone: 'warn', days_left: 12, provider: 'Registrar B', expires_at: '2026-11-20T00:00:00Z', checked_at: '2026-11-08T00:00:00Z', record: 'ok', padlock_until: '2027-01-15T00:00:00Z', hosted: true },
-    { domain: 'garage.example', site_id: 's2', name: 'Garage Ten', own: false, status: 'elsewhere', status_words: 'On their own host', tone: 'quiet', days_left: null, provider: '', expires_at: null, checked_at: null, record: 'ok', padlock_until: null, hosted: false },
-    { domain: 'mystudio.example', site_id: 'own', name: 'Bright Studio', own: true, status: 'connected', status_words: 'Connected', tone: 'good', days_left: 200, provider: 'Registrar C', expires_at: '2027-05-27T00:00:00Z', checked_at: '2026-11-08T00:00:00Z', record: 'ok', padlock_until: '2027-03-01T00:00:00Z', hosted: true },
+    { domain: 'gone.example', site_id: 's9', name: 'Gone Deli', own: false, status: 'expired', status_words: 'Expired 2 days ago', tone: 'bad', days_left: -2, provider: 'Registrar A', expires_at: '2026-11-06T00:00:00Z', checked_at: '2026-11-08T00:00:00Z', record: 'ok', padlock_until: null, checks: [], hosted: true },
+    { domain: 'bistro.example', site_id: 's1', name: 'Bistro Nine', own: false, status: 'expiring', status_words: 'Expires in 12 days', tone: 'warn', days_left: 12, provider: 'Registrar B', expires_at: '2026-11-20T00:00:00Z', checked_at: '2026-11-08T00:00:00Z', record: 'ok', padlock_until: '2027-01-15T00:00:00Z', checks: [], hosted: true },
+    { domain: 'garage.example', site_id: 's2', name: 'Garage Ten', own: false, status: 'elsewhere', status_words: 'On their own host', tone: 'quiet', days_left: null, provider: '', expires_at: null, checked_at: null, record: 'ok', padlock_until: null, checks: [], hosted: false },
+    { domain: 'mystudio.example', site_id: 'own', name: 'Bright Studio', own: true, status: 'connected', status_words: 'Connected', tone: 'good', days_left: 200, provider: 'Registrar C', expires_at: '2027-05-27T00:00:00Z', checked_at: '2026-11-08T00:00:00Z', record: 'ok', padlock_until: '2027-03-01T00:00:00Z', checks: [], hosted: true },
   ],
   builtin: [{ address: 'presence-cccccccccccc.netlify.app', site_id: 's3', name: 'Cafe Eleven', own: false }],
 }, partial: false };
@@ -452,7 +452,7 @@ test.describe('Sites: the bug hunt fixes (A1, A10)', () => {
 test.describe('Domains: the padlock and an unreadable record (items 132, 134)', () => {
   test('a Padlock until column, a stuck padlock in the status, and "couldn’t read this domain’s record" instead of "Not known yet"', async ({ page }) => {
     const data = JSON.parse(JSON.stringify(DOMAINS)) as typeof DOMAINS;
-    data.data.domains.push({ domain: 'www.oldhost.example', site_id: 's7', name: 'Old Host Bakery', own: false, status: 'padlock', status_words: 'Padlock not on yet', tone: 'warn', days_left: null, provider: '', expires_at: null, checked_at: '2026-11-08T00:00:00Z', record: 'unreadable', padlock_until: null, hosted: true } as never);
+    data.data.domains.push({ domain: 'www.oldhost.example', site_id: 's7', name: 'Old Host Bakery', own: false, status: 'padlock', status_words: 'Padlock not on yet', tone: 'warn', days_left: null, provider: '', expires_at: null, checked_at: '2026-11-08T00:00:00Z', record: 'unreadable', padlock_until: null, checks: [], hosted: true } as never);
     await installApp(page, { api: { '/portal/context': studioContext, '/agency/domains': data } });
     await page.goto('/domains.html');
     const table = page.locator('table[aria-label="Domains"]');
@@ -465,5 +465,21 @@ test.describe('Domains: the padlock and an unreadable record (items 132, 134)', 
     await expect(row('www.oldhost.example').locator('td').nth(4)).toContainText('Couldn’t read this domain’s record');
     await expect(page.locator('.how')).toContainText('at 30, 15, 7 and 1 days and the day after it expires');
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true);
+  });
+});
+
+// ── Nov 10 review, builder list item 134 (second half): "Connected" means it shows our site ──
+test.describe('Domains: what the domain really shows (item 134)', () => {
+  test('an old copy reads as such, and what still needs doing sits under the status', async ({ page }) => {
+    const data = JSON.parse(JSON.stringify(DOMAINS)) as typeof DOMAINS;
+    data.data.domains.unshift({ domain: 'www.harbor.example', site_id: 's8', name: 'Harbor Dental', own: false, status: 'old_copy', status_words: 'Showing an old copy', tone: 'bad', days_left: 200, provider: 'Registrar D', expires_at: '2027-05-27T00:00:00Z', checked_at: '2026-11-10T00:00:00Z', record: 'ok', padlock_until: '2027-02-01T00:00:00Z',
+      checks: [{ ok: true, words: 'www.harbor.example points here' }, { ok: false, words: 'harbor.example doesn’t point here yet' }, { ok: false, words: 'Showing an old copy of the site (another hosting project or a cache is answering)' }], hosted: true } as never);
+    await installApp(page, { api: { '/portal/context': studioContext, '/agency/domains': data } });
+    await page.goto('/domains.html');
+    const row = page.locator('table[aria-label="Domains"] tbody tr[data-domain="www.harbor.example"]');
+    await expect(row.locator('.pill')).toHaveText('Showing an old copy');
+    await expect(row.locator('td').nth(2).locator('.sub')).toContainText('harbor.example doesn’t point here yet');
+    await expect(row.locator('td').nth(2).locator('.sub')).toContainText('Showing an old copy of the site');
+    await expect(row.locator('td').nth(2).locator('.sub')).not.toContainText('points here yet points here');   // only what isn't fine
   });
 });

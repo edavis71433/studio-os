@@ -292,7 +292,9 @@ const read = (p) => Deno.readTextFileSync(new URL(`../../${p}`, import.meta.url)
 const js = read('site-review.js');
 ok('page: never parses report data as HTML', !/innerHTML/.test(js));
 ok('page: fires scan_started, scan_completed and scan_failed', ['scan_started', 'scan_completed', 'scan_failed'].every((e) => js.includes(`'${e}'`)));
-ok('page: Turnstile site key wired in', js.includes('0x4AAAAAAFl7hPNwYacRr2Z2') && read('site-review.html').includes('challenges.cloudflare.com/turnstile'));
+ok('page: Turnstile site key wired in', js.includes('0x4AAAAAAFl7hPNwYacRr2Z2') && js.includes('challenges.cloudflare.com/turnstile'));
+// list item 138: Cloudflare's check loads when the visitor starts, never with the page
+ok('page: the page itself loads nothing from Cloudflare; the script adds the check on a first focus or tap in the form', !read('site-review.html').includes('challenges.cloudflare.com') && /addEventListener\('focusin', loadTurnstile\)/.test(js) && /addEventListener\('pointerdown', loadTurnstile\)/.test(js));
 ok('redirects: /site-review serves the page', /^\/site-review\s+\/site-review\.html\s+200$/m.test(read('_redirects')));
 ok('deploy: site-review ships to production', read('.github/workflows/deploy.yml').includes('functions deploy site-review --no-verify-jwt --project-ref ${{ secrets.SUPABASE_PROJECT_REF_PROD }}'));
 

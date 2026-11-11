@@ -15,8 +15,11 @@ import manifest_at_1_0_0 from '../templates/atelier/1.0.0/manifest.json' with { 
 import manifest_ha_1_0_0 from '../templates/harbor/1.0.0/manifest.json' with { type: 'json' };
 import { trackerScript } from './visits.ts';
 import { injectSender } from './site_send.ts';
+import { withAiCrawlerChoice } from './ai_crawlers.ts';
+import { injectAdTags } from './ad_tags.ts';
 import { sanitizeDevHtml, sanitizeDevCss } from './devmode.ts';
 import { BLOCK_CSS, sectionStyles, pageClasses } from './site_blocks.ts';
+import { applyPageChrome } from './page_access.ts';
 
 // ── FD-T2: indexed template registry; each template's code loads on first use ──
 // slug → version → { manifest, code loader }. Render resolution goes through this
@@ -192,10 +195,15 @@ export async function renderSnapshot(snapshot: Snapshot, site: SiteConfig, opts:
   }
   // Item 61: the owner's switch decides the counter; the privacy page reads the same switch.
   const counting = (snapshot.content as SnapshotContent)?.settings?.visit_counter !== false;
-  const drawn = tintFavicon(await t.render(snapshot, t.manifest, site), snapshot.dev_customization?.theme_tokens?.accent, snapshot.template_slug);
+  // items 48 and 120: an own page can leave out the site's header or footer, everywhere it is drawn
+  const pages = (snapshot.content as SnapshotContent)?.settings?.pages;
+  // List item 175: switched off, AI assistants are asked to stay out in robots.txt.
+  const drawn = withAiCrawlerChoice(tintFavicon(applyPageChrome(await t.render(snapshot, t.manifest, site), pages), snapshot.dev_customization?.theme_tokens?.accent, snapshot.template_slug), (snapshot.content as SnapshotContent)?.settings);
   // item 131: pages with the site's forms send them from the page (lib/site_send.ts)
   const dressed = injectSender(injectDevLayer(drawn, snapshot.dev_customization), snapshot.content as SnapshotContent, site);
-  return injectCsp(injectAnalytics(opts.allSectionStyles ? dressed : trimSectionStyles(dressed), counting ? site.siteId : undefined));
+  // List item 152: the Google tag and the Meta Pixel, behind a cookie notice, on a site that has them.
+  const tagged = injectAdTags(opts.allSectionStyles ? dressed : trimSectionStyles(dressed), (snapshot.content as SnapshotContent)?.settings);
+  return injectCsp(injectAnalytics(tagged, counting ? site.siteId : undefined));
 }
 
 /** What the builder's canvas and the studio's site cards draw (routes/preview.ts,
