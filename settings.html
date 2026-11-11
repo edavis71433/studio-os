@@ -481,10 +481,14 @@ function memberHtml(m) {
   const act = canManageTeam() && !mine ? (revoked ? `<button class="btn sm" type="button" data-restore="${esc(m.id)}">Restore</button>` : `<button class="btn sm" type="button" data-revoke="${esc(m.id)}">Remove</button>`) : '';
   return `<div class="member${revoked ? ' revoked' : ''}" data-member="${esc(m.id)}"><div class="who"><b>${esc(m.email)}</b><span>${m.created_at ? 'since ' + esc(shortDate(m.created_at)) : ''}</span></div>${roleCtl}${act}</div>`;
 }
+// Speed (Nov 10 2026, finding I8): Team and Plan & billing both show the seat and client counts;
+// the page asks for them once per open and both read the one answer.
+let USAGE_ASK = null;
+function usageOnce() { return USAGE_ASK || (USAGE_ASK = api('/agency/usage').catch(() => null)); }
 async function loadTeam() {
   if (SCOPE || !(CTX && CTX.is_agency)) return;
   const sec = $('team'); if (!sec) return;
-  const [me, list, usage] = await Promise.all([api('/agency/me'), api('/agency/members'), api('/agency/usage').catch(() => null)]);
+  const [me, list, usage] = await Promise.all([api('/agency/me'), api('/agency/members'), usageOnce()]);
   if (!me.ok || !list.ok) { sec.hidden = false; $('people').innerHTML = '<p class="seats">We couldn’t load your team just now.</p>'; return; }
   TEAM_ME = { ...(me.body.data || {}) };   // /agency/me: agency, role, plan, branding, email, member_id
   TEAM = Array.isArray(list.body.data) ? list.body.data : [];
@@ -600,7 +604,7 @@ function wireDeletion() {
 async function loadPlan() {
   if (SCOPE) return;
   const host = $('plan'), sec = $('billing');
-  const [r, u] = await Promise.all([api('/commerce/subscription'), (CTX && CTX.is_agency) ? api('/agency/usage').catch(() => null) : Promise.resolve(null)]);
+  const [r, u] = await Promise.all([api('/commerce/subscription'), (CTX && CTX.is_agency) ? usageOnce() : Promise.resolve(null)]);
   const s = r.ok && r.body && r.body.data;
   sec.hidden = false;
   if (!s) {
@@ -813,9 +817,11 @@ function wireReport() {
 }
 // ── item 54: the menu areas this studio hides (GET/PUT /agency/nav) ──
 let MENU = null;   // { hidden: [...], choices: [{key,label,what}] }
+let MENU_ASKED = false;   // finding C19: once per open, not again after every automation save
 async function loadMenu() {
   const agency = !!(CTX && CTX.is_agency) && !SCOPE;
   if (!agency || !hasCap('configure')) return;
+  if (MENU_ASKED) return; MENU_ASKED = true;
   const r = await api('/agency/nav', 'GET');
   if (!r.ok || !r.body || !r.body.data) return;   // without the answer the card stays away: never a switch that lies
   MENU = r.body.data;
@@ -848,6 +854,7 @@ async function toggleMenu(key) {
   MENU_BUSY = false;
   if (!r.ok) { MENU = { ...MENU, hidden: before }; paintMenu(); toast(nice(r.body, 'That didn’t save — the menu is as it was.'), true); return; }
   MENU = r.body.data || MENU; paintMenu();
+  try { if (window.ddsContextForget) window.ddsContextForget(); } catch (_) { /* */ }   // the next page asks for the menu again
   toast(hidden.includes(key) ? 'Hidden. The menu changes the next time a page opens.' : 'Back in the menu from the next page on.');
 }
 async function saveAutomation(patch, undo) {
@@ -989,17 +996,19 @@ function holdAnchor(sec) {
     const { data } = await sb.auth.getSession();
     TOKEN = (data && data.session && data.session.access_token) || "";
     if (!TOKEN) { signedOut(); return; }
-    // the shell's context is the same read — reuse it, fall back to our own
+    // Speed (Nov 10 2026): this page used to load in rounds, one after another: who you are,
+    // then your studio details, then everything else. Your studio details need no answer from
+    // the first round, so they start now; the rest start together the moment it lands.
+    const profile = loadProfile(); profile.catch(() => {});
+    // the shell's context is the same read — reuse it, fall back to our own. shell.js is
+    // deferred, so it is not there yet when this runs: wait for it rather than ask twice.
+    if (document.readyState === 'loading') await new Promise((r) => document.addEventListener('DOMContentLoaded', r, { once: true }));
     try { CTX = window.ddsContext ? await window.ddsContext() : null; } catch (_) { CTX = null; }
     if (!CTX) { const r = await api('/portal/context'); CTX = (r.ok && r.body && r.body.data) || null; }
     paintScope();
     renderCards();
     $('profileSave').addEventListener('click', saveProfile);
     $('profileForm').addEventListener('submit', (e) => { e.preventDefault(); saveProfile(); });
-    await loadProfile().catch(() => { $('studio').hidden = false; toast('Couldn’t load your studio details just now.', true); });
-    renderSubline();
-    if (!SCOPE) { wireAutomations(); paintAutomations(); }
-    else { wireReport(); loadReport(); }
     // small, honest statuses on the cards that can answer quickly — never a blocker
     // GET /connections answers { data: { groups: { <category>: [ { connection: { status, health } } ] } } }
     // (routes/connections.ts) — the same rows connections.html paints its chips from.
@@ -1030,10 +1039,15 @@ function holdAnchor(sec) {
       else if (d.sending === 'not_verified') setStatus('domains', { text: `Emails go out from ${d.from} · not verified, so they may land in spam`, cls: 'warn' });
       else setStatus('domains', { text: `Emails go out from ${d.from} · couldn’t check it just now`, cls: 'warn' });
     }).catch(() => {});
-    wireDeletion();
-    { const dl = $('dlData'); if (dl) dl.addEventListener('click', downloadMyData); }   // item 69: Download my data
     loadPlan().catch(() => {});
     loadTeam().catch(() => {});
+    if (!SCOPE) { loadStageNames(); loadMenu(); }   // with the rest, not after the studio details
+    else { wireReport(); loadReport(); }
+    wireDeletion();
+    { const dl = $('dlData'); if (dl) dl.addEventListener('click', downloadMyData); }   // item 69: Download my data
+    await profile.catch(() => { $('studio').hidden = false; toast('Couldn’t load your studio details just now.', true); });
+    renderSubline();
+    if (!SCOPE) { wireAutomations(); paintAutomations(); }
     if (location.hash === '#team') holdAnchor($('team'));
     if (location.hash === '#studio') { const n = $('f-name'); if (n) n.focus(); }
     if (location.hash === '#billing') holdAnchor($('billing'));

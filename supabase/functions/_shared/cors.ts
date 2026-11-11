@@ -14,6 +14,13 @@ const ALLOWED_ORIGINS = (Deno.env.get('ALLOWED_ORIGINS') || '')
   .split(',').map((o) => o.trim()).filter(Boolean);
 export const CORS_ORIGINS = ALLOWED_ORIGINS.length ? ALLOWED_ORIGINS : DEFAULT_ORIGINS;
 
+// Speed (Nov 10 2026): the app and this server are on different addresses, so the
+// browser asks "may I?" (a preflight OPTIONS) before each call. With no max-age the
+// browser keeps that answer for 5 seconds, so nearly every call was made twice.
+// 24 hours here; browsers cap it lower themselves (Chrome 2 hours, Safari 10 minutes).
+// It only matters on the OPTIONS answer and is ignored on the others.
+export const PREFLIGHT_MAX_AGE = '86400';
+
 export function corsFor(req: Request) {
   const origin = req.headers.get('origin') || '';
   const allow = CORS_ORIGINS.includes(origin) ? origin : CORS_ORIGINS[0];
@@ -24,6 +31,7 @@ export function corsFor(req: Request) {
     // need them listed or every browser preflight fails. Additive for the
     // POST-only monolith (extra names in this header grant nothing by themselves).
     'Access-Control-Allow-Methods': 'GET, POST, PUT, PATCH, DELETE, OPTIONS',
+    'Access-Control-Max-Age': PREFLIGHT_MAX_AGE,
     'Vary': 'Origin',
   };
 }
@@ -34,5 +42,6 @@ export const cors = {
   'Access-Control-Allow-Origin': CORS_ORIGINS[0],
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-dds-admin, x-dds-user-jwt, x-dds-scope-site, if-match, x-operator-secret, x-system-secret',
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
+  'Access-Control-Max-Age': PREFLIGHT_MAX_AGE,
   'Vary': 'Origin',
 };

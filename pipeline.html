@@ -588,6 +588,9 @@ function fitTiles(host){
   host.querySelectorAll('.stats .v').forEach(v=>{v.style.fontSize='';let fs=15;while(v.scrollWidth>v.clientWidth+1&&fs>11){fs-=1;v.style.fontSize=fs+'px';}});
 }
 addEventListener('resize',()=>{clearTimeout(fitTiles.t);fitTiles.t=setTimeout(()=>fitTiles(document.querySelector('.stats')&&document.querySelector('.stats').parentNode),150);});
+// the page's font can land after the tiles are drawn, and it is wider than the stand-in: fit again then
+if(document.fonts&&document.fonts.ready)document.fonts.ready.then(()=>fitTiles(document.querySelector('.stats')&&document.querySelector('.stats').parentNode));
+if(document.fonts&&document.fonts.addEventListener)document.fonts.addEventListener('loadingdone',()=>fitTiles(document.querySelector('.stats')&&document.querySelector('.stats').parentNode));
 const money=(c)=>c?money0(c):'';   // final pass, batch C: one money format — "$1,234.50", never "$1,234.5" (money0, below)
 // ── Oct 2026 benchmark (item 2): money in four states, ONE formula ──────────
 // Paid · Processing · Upcoming · Overdue come from moneyState — a VERBATIM mirror

@@ -571,7 +571,13 @@ const money=(c)=>{const v=(c||0)/100;return '$'+v.toLocaleString(undefined,Numbe
 let REQ_SEQ=0;   // request-generation guard: a slow response that resolves after a newer request started is DISCARDED
 sb.auth.onAuthStateChange(function(_e,s){if(s&&s.access_token)TOKEN=s.access_token;}); // keep token fresh (auto-refresh)
 const H=()=>({'Content-Type':'application/json','Authorization':'Bearer '+SUPABASE_KEY,'x-dds-user-jwt':TOKEN});
-async function api(path){const r=await fetch(FN+path,{headers:H()});return{ok:r.ok,status:r.status,body:await r.json().catch(()=>({}))};}
+// Speed (Nov 10 2026): Home's reads used to wait for /agency/me (which studio this is) before
+// they started. boot() now starts them with it (early); each answer goes to the first api()
+// call for that same path, and whatever is left is dropped when boot ends.
+const EARLY=new Map();
+function early(paths){for(const p of paths){const pr=apiNow(p);pr.catch(()=>{});EARLY.set(p,pr);}}
+async function apiNow(path){const r=await fetch(FN+path,{headers:H()});return{ok:r.ok,status:r.status,body:await r.json().catch(()=>({}))};}
+function api(path){const e=EARLY.get(path);if(e){EARLY.delete(path);return e;}return apiNow(path);}
 async function apiSend(method,path,payload,site){const h=H();if(site)h['x-dds-scope-site']=site;const r=await fetch(FN+path,{method,headers:h,body:payload?JSON.stringify(payload):undefined});return{ok:r.ok,status:r.status,body:await r.json().catch(()=>({}))};}   // site: act inside that client's account, as the shell's ?client= does
 const initial=(s)=>String(s||'?').trim().charAt(0).toUpperCase();
 const updatedLabel=()=>{const m=Math.floor((Date.now()-LOADED_AT)/60000);return m<1?'Updated just now':'Updated '+m+' min ago';};
@@ -1388,7 +1394,9 @@ $('custForm').onsubmit=async(e)=>{
 async function boot(){
   try{const{data}=await sb.auth.getSession();TOKEN=(data&&data.session&&data.session.access_token)||"";
     if(!TOKEN){signedOut();return;}
+    early(['/agency/needs-you','/sales/summary','/sales/deals?limit=100','/sales/my-tasks','/agency/portfolio','/studio/customers','/sales/receivables']);
     const me=await api('/agency/me');
+    if(!me.ok)EARLY.clear();
     if(me.status===401){signedOut();return;}   // stale session ≠ "not an agency" — send them to the door
     if(me.status===403){notAgency();return;}
     if(!me.ok){trouble();return;}
@@ -1403,8 +1411,9 @@ async function boot(){
     await load();
     await needs;
     await studio;
+    EARLY.clear();
     mountAsk();      // and the Ask box (sales review item 23)
-  }catch(_){trouble();}
+  }catch(_){EARLY.clear();trouble();}
 }
 boot();
 // + Create (the sidebar button, the phone's +, the c key) made a deal, logged a
@@ -1588,8 +1597,7 @@ async function wakeRow(key,btn){
   if(NEEDS)NEEDS.snoozed=(NEEDS.snoozed||[]).filter(x=>x.key!==key);
   if(QTAB==='snoozed'&&NEEDS&&!NEEDS.snoozed.length)QTAB='needs';   // the last one back: show where it went
   toast('It’s back on your list.');
-  try{if(window.ddsBellRefresh)window.ddsBellRefresh();}catch(_){}
-  mountNeeds(true);   // back in its own place in the order
+  mountNeeds(true);   // back in its own place in the order; its answer carries the bell's number, so the bell isn't asked separately
   return true;
 }
 async function doneRow(key,btn){

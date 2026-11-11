@@ -1066,10 +1066,12 @@
     var tok = ++fileSearchTok;
     if (qq.length >= 2 && (hasFiles() || hasCrm())) {
       var enc = encodeURIComponent(qq);
-      Promise.all([
+      // finding A15: both searches went out on every key press, so a seven-letter name sent
+      // fourteen. Wait for a short pause in the typing; a newer key press cancels this one.
+      new Promise(function (go) { setTimeout(go, 200); }).then(function () { return tok !== fileSearchTok ? [[], []] : Promise.all([
         hasCrm() ? api('/crm/search?q=' + enc).then(function (r) { return (r.ok && r.body && r.body.data && r.body.data.results) || []; }, function () { return []; }) : Promise.resolve([]),
         hasFiles() ? api('/assets?q=' + enc + '&limit=6').then(function (r) { return (r.ok && r.body && r.body.data && r.body.data.assets) || []; }, function () { return []; }) : Promise.resolve([]),
-      ]).then(function (res) {
+      ]); }).then(function (res) {
         if (tok !== fileSearchTok) return; // a newer keystroke won
         var recs = res[0], files = res[1];
         var cur = pal.querySelector('.results'); if (!cur) return;
@@ -1142,6 +1144,7 @@
     var changed = n !== CTX.attention_count;
     CTX.attention_count = n; CTX.attention_stale = false;
     try { window.__ddsContext = CTX; } catch (_) { /* */ }
+    keepContext(ctxKeptAt);
     if (changed) paintBell();
     try { document.dispatchEvent(new CustomEvent('dds:attention', { detail: n })); } catch (_) { /* */ }
   }
@@ -1173,6 +1176,7 @@
         CTX.attention_count = n;
         try { window.__ddsContext = CTX; } catch (_) { /* */ }
         paintBell();                                              // badge only — never a full re-render
+        keepContext(ctxKeptAt);
       })['catch'](function () { /* keep the last good badge */ });
     } catch (_) { /* the shell must never break over its own badge */ }
   }
@@ -1460,6 +1464,7 @@
       e.preventDefault();
       // PII: recent-record names must not persist for the next user of a shared machine
       try { localStorage.removeItem(RECENTS_KEY); } catch (_) { /* */ }
+      window.ddsContextForget();
       if (sb) sb.auth.signOut().then(function () { location.href = door; }); else location.href = door;
     });
   }
@@ -2106,6 +2111,79 @@
     return (' ' + (document.documentElement.getAttribute('data-dds-lacks') || '') + ' ').indexOf(' ' + need + ' ') >= 0;
   };
 
+  // ── The sign-in context is kept for the visit (speed, Nov 10 2026) ──
+  // Every page used to wait for /portal/context before its menu drew, and every
+  // move between pages asked again. The answer is now kept in this tab
+  // (sessionStorage, per signed-in user and per client scope), so the next page
+  // draws its menu at once and asks nothing. A copy older than CTX_FRESH_MS is
+  // still used at once and read again behind the page; one older than
+  // CTX_KEEP_MS is not used. It is a convenience only: the server checks every
+  // call for itself. Sign out, and a page that changes the menu or the plan
+  // (ddsContextForget), drop it.
+  var CTX_FRESH_MS = 120000, CTX_KEEP_MS = 30 * 60000, CTX_PREFIX = 'dds-ctx:';
+  var ctxUid = '';
+  function ctxKey(uid) { return CTX_PREFIX + uid + ':' + (scopeId() || '-'); }
+  function keptContext(uid) {
+    if (!uid) return null;
+    try {
+      var k = JSON.parse(sessionStorage.getItem(ctxKey(uid)) || 'null');
+      if (!k || !k.data || typeof k.at !== 'number') return null;
+      var age = Date.now() - k.at;
+      return (age >= 0 && age <= CTX_KEEP_MS) ? k : null;
+    } catch (_) { return null; }
+  }
+  function keepContext(at) {
+    if (!ctxUid || !CTX) return;
+    try { sessionStorage.setItem(ctxKey(ctxUid), JSON.stringify({ at: at || Date.now(), data: CTX })); } catch (_) { /* storage may be full or denied */ }
+  }
+  var ctxKeptAt = 0;
+  window.ddsContextForget = function () {
+    try {
+      for (var i = sessionStorage.length - 1; i >= 0; i--) { var k = sessionStorage.key(i); if (k && k.indexOf(CTX_PREFIX) === 0) sessionStorage.removeItem(k); }
+    } catch (_) { /* */ }
+  };
+  // everything but the bell's number, which has its own refresh
+  function ctxShape(c) { var o = {}; for (var k in c) if (k !== 'attention_count' && k !== 'attention_stale') o[k] = c[k]; return JSON.stringify(o); }
+  function useContext(data, uid, keptAt) {
+    CTX = data; ctxUid = uid; ctxKeptAt = keptAt || Date.now(); markRoleLimits(CTX); render();
+    try { paintStudioRequests(); } catch (_) { /* a request banner must never break the shell */ }
+    // B4: a fresh read IS the endpoint's read, so the 60s throttle window starts
+    // here; a kept copy starts it when it was read
+    if (keptAt) lastAttentionAt = keptAt; else markAttentionFresh();
+    // batch B: a studio total Home already handed over wins; a stale or
+    // missing one is refreshed behind the page unless Home hands one over first
+    if (pendingBell !== null) { setAttention(Number(pendingBell)); pendingBell = null; }
+    else if (!keptAt && studioTotals() && CTX.attention_stale) setTimeout(function () { if (!pageSetBell) readStudioTotal(false); }, 1200);
+    try { trackCrmRecent(); } catch (_) { /* recents are best-effort */ }
+    // PERF: /portal/context is the single most expensive boot read (~17
+    // queries incl. 3× auth). The shell already has it — publish it so
+    // a page can reuse it instead of firing an identical second request.
+    try { window.__ddsContext = CTX; document.dispatchEvent(new CustomEvent('dds:context', { detail: CTX })); } catch (_) { /* */ }
+    if (!keptAt) keepContext(ctxKeptAt);
+    try { maybeTour(); } catch (_) { /* the tour must never break the shell */ }
+  }
+  // An older kept copy is read again behind the page. The frame is redrawn only
+  // when something other than the bell's number changed; a failed read keeps
+  // the copy on screen, and a refused one (signed out elsewhere) drops it.
+  function rereadContext(uid) {
+    api('/portal/context').then(function (r) {
+      if (!r || !r.ok || !r.body || !r.body.data) { if (r && (r.status === 401 || r.status === 403)) window.ddsContextForget(); return; }
+      var next = r.body.data, changed = ctxShape(next) !== ctxShape(CTX);
+      var n = next.attention_count;
+      if (changed) {
+        if (pageSetBell) { next.attention_count = CTX.attention_count; next.attention_stale = CTX.attention_stale; }   // Home's own number stands
+        CTX = next; markRoleLimits(CTX); render();
+        try { paintStudioRequests(); } catch (_) { /* */ }
+        try { window.__ddsContext = CTX; document.dispatchEvent(new CustomEvent('dds:context', { detail: CTX })); } catch (_) { /* */ }
+      } else if (!pageSetBell) {
+        CTX.attention_stale = next.attention_stale;
+        if (typeof n === 'number' && isFinite(n) && n >= 0 && n !== CTX.attention_count) { CTX.attention_count = n; paintBell(); }
+      }
+      markAttentionFresh(); ctxKeptAt = Date.now(); keepContext(ctxKeptAt);
+      if (!pageSetBell && studioTotals() && CTX.attention_stale) readStudioTotal(false);
+    })['catch'](function () { /* keep the copy on screen */ });
+  }
+
   function boot() {
     mountFrame();
     scanHints();
@@ -2122,21 +2200,20 @@
         TOKEN = (sess && sess.access_token) || "";
         sb.__email = (sess && sess.user && sess.user.email) || '';
         if (!TOKEN) { minimalShell(); return; }
+        var uid = (sess && sess.user && sess.user.id) || '';
+        var kept = keptContext(uid);
+        if (kept) {
+          // kept from an earlier page of this visit: the menu draws now and the page's
+          // own reads start now. An older copy is read again behind the page.
+          useContext(kept.data, uid, kept.at);
+          var age = Date.now() - kept.at;
+          if (age > CTX_FRESH_MS || (age > ATTENTION_THROTTLE_MS && !studioTotals())) rereadContext(uid);
+          else if (studioTotals() && (CTX.attention_stale || age > ATTENTION_THROTTLE_MS)) setTimeout(function () { if (!pageSetBell) { markAttentionFresh(); readStudioTotal(false); } }, 1200);
+          return;
+        }
         api('/portal/context').then(function (r) {
           if (!r.ok || !r.body || !r.body.data) { minimalShell(); return; }
-          CTX = r.body.data; markRoleLimits(CTX); render();
-          try { paintStudioRequests(); } catch (_) { /* a request banner must never break the shell */ }
-          markAttentionFresh();   // B4: this read IS the endpoint's read — start the 60s throttle window here
-          // batch B: a studio total Home already handed over wins; a stale or
-          // missing one is refreshed behind the page unless Home hands one over first
-          if (pendingBell !== null) { setAttention(Number(pendingBell)); pendingBell = null; }
-          else if (studioTotals() && CTX.attention_stale) setTimeout(function () { if (!pageSetBell) readStudioTotal(false); }, 1200);
-          try { trackCrmRecent(); } catch (_) { /* recents are best-effort */ }
-          // PERF: /portal/context is the single most expensive boot read (~17
-          // queries incl. 3× auth). The shell already fetched it — publish it so
-          // a page can reuse it instead of firing an identical second request.
-          try { window.__ddsContext = CTX; document.dispatchEvent(new CustomEvent('dds:context', { detail: CTX })); } catch (_) { /* */ }
-          try { maybeTour(); } catch (_) { /* the tour must never break the shell */ }
+          useContext(r.body.data, uid, 0);
         });
       }).catch(minimalShell);
     });
@@ -2166,6 +2243,7 @@
           var msg = (r && r.body && r.body.message) || '';
           if (!r || !r.ok) { yes.disabled = false; no.disabled = false; if (window.ddsToast) window.ddsToast(msg || 'That didn’t save. Please try again.', 'err'); return; }
           box.remove();
+          window.ddsContextForget();   // answered: the kept copy still lists this request
           if (verb === 'accept') {
             if (window.ddsToast) window.ddsToast('You’re connected with ' + String(rq.studio || 'the studio') + '.');
             setTimeout(function () { location.reload(); }, 900);

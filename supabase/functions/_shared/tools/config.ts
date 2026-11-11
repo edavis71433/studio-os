@@ -79,6 +79,7 @@ export function toolsCors(req: Request): Record<string, string> {
     'Access-Control-Allow-Origin': TOOL_ORIGINS.includes(origin) ? origin : TOOL_ORIGINS[0],
     'Access-Control-Allow-Headers': 'content-type',
     'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+    'Access-Control-Max-Age': '86400',   // the browser keeps the "may I?" answer, as _shared/cors.ts does
     'Vary': 'Origin',
   };
 }

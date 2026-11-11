@@ -1166,7 +1166,7 @@ async function load(){
   if(CTX&&CTX.is_agency&&!scope()){await loadPortfolio();return;}
   await loadDash();
 }
-(async function(){try{const{data}=await sb.auth.getSession();TOKEN=(data&&data.session&&data.session.access_token)||"";if(!TOKEN){signedOut();return;}const c=await (window.ddsContext?window.ddsContext().then((d)=>({ok:true,body:{data:d}})):Promise.reject()).catch(()=>api('/portal/context'));CTX=(c.ok&&c.body.data)||{};await load();}catch(_){trouble();}})();
+(async function(){try{const{data}=await sb.auth.getSession();TOKEN=(data&&data.session&&data.session.access_token)||"";if(!TOKEN){signedOut();return;}if(document.readyState==='loading')await new Promise((r)=>document.addEventListener('DOMContentLoaded',r,{once:true}));/* shell.js is deferred: wait for it rather than ask who-am-I twice */const c=await (window.ddsContext?window.ddsContext().then((d)=>({ok:true,body:{data:d}})):Promise.reject()).catch(()=>api('/portal/context'));CTX=(c.ok&&c.body.data)||{};await load();}catch(_){trouble();}})();
 </script>
 </body>
 </html>
