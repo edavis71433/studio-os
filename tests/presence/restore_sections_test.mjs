@@ -72,6 +72,7 @@ const WEBSITE = {
   logo_media_id: MEDIA[3], og_media_id: null, cover_media_id: MEDIA[0],
   announcement_text: 'Open late on Fridays', announcement_url: '', announcement_expires_at: null,
   page_seo: { 'page:our-team': { title: 'Meet the team', share_image: MEDIA[1] } }, pages_noindex: ['page:offers'],
+  popup: { on: true, heading: 'Ten percent off on Tuesdays', text: 'Join our list for the code.', action: 'signup', buttons: [], after: 'seconds', seconds: 8, scroll: 50, pages: 'all', picked: [], again: 'week', phones: true, from: '', until: '' },   // builder list item 148
 };
 // account settings in the same row: a restore never touches them
 const ACCOUNT = { google_site_verification: 'code-from-google', auto_ack_enquiries: true, industry_key: 'restaurant' };
@@ -92,7 +93,7 @@ const editSince = () => {
   s.pages = [PAGES[0], { slug: 'new-page', title: 'New page', blocks: [{ type: 'richtext', body: 'Draft words.' }] }];   // a page deleted, one added
   s.nav = [{ label: 'Home', href: '/' }];
   s.nav_style = ''; s.hero_layout = ''; s.footer_hours = true; s.sections_hidden = [];
-  s.announcement_text = ''; s.logo_media_id = null; s.cover_media_id = null; s.page_seo = {}; s.pages_noindex = [];
+  s.announcement_text = ''; s.logo_media_id = null; s.cover_media_id = null; s.page_seo = {}; s.pages_noindex = []; s.popup = null;
   s.google_site_verification = 'changed since';                                          // account settings move on their own
 };
 const saveCheckpoint = async (name) => {
@@ -288,7 +289,7 @@ const websiteNow = () => Object.fromEntries(SETTINGS_CONTENT_FIELDS ? [...SETTIN
 // ═══ 8. the defaults: a draft with no settings row keeps the column defaults ═══
 {
   const d = draftSettingsOf(null);
-  ok('no settings row: every website field at its column default', same(d, { category_order: [], cover_media_id: null, logo_media_id: null, og_media_id: null, announcement_text: '', announcement_url: '', announcement_expires_at: null, hero_layout: '', nav_style: '', sections_hidden: [], sections_order: [], footer_hours: true, footer_social: true, pages_noindex: [], page_seo: {}, blocks: [], pages: [], nav: [] }), canon(d));
+  ok('no settings row: every website field at its column default', same(d, { category_order: [], cover_media_id: null, logo_media_id: null, og_media_id: null, announcement_text: '', announcement_url: '', announcement_expires_at: null, hero_layout: '', nav_style: '', sections_hidden: [], sections_order: [], footer_hours: true, footer_social: true, pages_noindex: [], page_seo: {}, blocks: [], pages: [], nav: [], popup: null }), canon(d));
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);
