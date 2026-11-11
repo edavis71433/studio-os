@@ -266,7 +266,8 @@ for (const p of ['agency.html', 'customers.html', 'contacts.html']) {
 {
   const doc = read('doc.html');
   ok('doc-viewer: docViewerUrl mints <SITE_URL>/doc.html?t=<token> (site origin, not the function domain)', /export function docViewerUrl\(token: string\)/.test(sales) && /siteUrl\(\)\}\/doc\.html\?t=\$\{encodeURIComponent\(token\)\}/.test(sales));
-  ok('doc-viewer: NO minted link points at the raw function /sales/doc URL anymore', !/functions\/v1\/presence\/sales\/doc\/\$\{/.test(sales));
+  // sales item 82: the PDF's address is the function's own, but it is only ever FETCHED (the page builds the file from the bytes), never opened as a page
+  ok('doc-viewer: NO minted link points at the raw function /sales/doc URL anymore (the PDF fetch aside)', (sales.match(/functions\/v1\/presence\/sales\/doc\/\$\{/g) || []).length === (sales.match(/functions\/v1\/presence\/sales\/doc\/\$\{encodeURIComponent\(token\)\}\?format=pdf/g) || []).length);
   ok('doc-viewer: emailed docLink and the CRM document-link route both mint via docViewerUrl', (sales.match(/docViewerUrl\(token\)/g) || []).length >= 2);
   ok('doc-viewer: the raw GET /sales/doc render route STAYS (the viewer fetches it)', /handleSalesDocument\(req, m\[1\], cors\)/.test(idx));
   ok('doc-viewer: doc.html fetches /sales/doc/<token> bare (public token-gated GET) and document.writes the render', /\/sales\/doc\/'\+encodeURIComponent\(t\)/.test(doc) && /document\.open\(\);document\.write\(html\);document\.close\(\)/.test(doc));

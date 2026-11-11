@@ -131,7 +131,7 @@ ok('Project messages and support threads fold the quote (all three lists)', (pro
 
 // ═══ (e) customers' answers to studio emails land in the Inbox ═══
 {
-  const withSite = (sales.match(/brand, \{ critical: true, siteId(: tok\.site_id)? \}\)/g) || []).length;
+  const withSite = (sales.match(/brand, \{ critical: true, siteId(: tok\.site_id)?(?: \}\)|, \.\.\.\()/g) || []).length;   // sales item 82: the invoice and signed-copy emails add their PDF after the site
   ok('sales: all six studio→customer emails (proposal, the one-link send, invoice, retainer, signed copy, portal invite) carry the studio site', withSite === 6, `found ${withSite}`);
   ok('sales: no studio→customer send is left on the human reply-to', !/brand, \{ critical: true \}\)/.test(sales));
   ok('lifecycle: the invoice reminder and the proposal/agreement reminder carry the site', /brand, \{ siteId: inv\.site_id \}\)\.catch/.test(lifecycle) && /brand, \{ siteId: doc\.site_id \}\)\.catch/.test(lifecycle));

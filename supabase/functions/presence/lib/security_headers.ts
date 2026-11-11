@@ -80,12 +80,12 @@ export function mergeAssetCaching(existing?: string): string {
   return blocks.map((b) => `${b.path}\n${b.headers.map(([k, v]) => `  ${k}: ${v}`).join('\n')}`).join('\n') + '\n';
 }
 
-export function mergeSecurityHeaders(existing?: string): string {
+export function mergeSecurityHeaders(existing?: string, csp?: string): string {
   const owned = new Set(SECURITY_RESPONSE_HEADERS.map(([k]) => k.toLowerCase()));
   const blocks = parseHeaders(existing ?? '');
   let star = blocks.find((b) => b.path === '/*');
   if (!star) { star = { path: '/*', headers: [] }; blocks.push(star); }
   star.headers = star.headers.filter(([k]) => !owned.has(k.toLowerCase()));
-  for (const [k, v] of SECURITY_RESPONSE_HEADERS) star.headers.push([k, v]);
+  for (const [k, v] of SECURITY_RESPONSE_HEADERS) star.headers.push([k, k === 'Content-Security-Policy' && csp ? csp : v]);
   return blocks.map((b) => `${b.path}\n${b.headers.map(([k, v]) => `  ${k}: ${v}`).join('\n')}`).join('\n') + '\n';
 }
