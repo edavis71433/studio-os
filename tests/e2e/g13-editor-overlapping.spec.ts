@@ -16,7 +16,7 @@ test.describe('G13 in-place canvas text editor — writes to /settings that over
     expect(aboutIn(sent[1])?.hideNav).toBe(true);
     expect(aboutIn(sent[1])?.blocks[0].subtitle).toBe('Edit while hiding');
     await expect.poll(() => aboutIn(stored(draft))?.hideNav, { timeout: 6000 }).toBe(true);
-    await expect(pill(page, 'About')).toContainText('(hidden)');
+    await expect(pill(page, 'About')).toHaveAttribute('data-nav', 'hidden');
   });
 
   test('a Hide slow to land can\'t undo an edit saved after it', async ({ page }) => {
@@ -32,7 +32,7 @@ test.describe('G13 in-place canvas text editor — writes to /settings that over
     await pageMenu(page, 'About', 'Hide from menu');
     await editAndWaitOut(page, frame, 'Saved after the hide');
     release();
-    await expect(pill(page, 'About')).toContainText('(hidden)');   // the hide has landed
+    await expect(pill(page, 'About')).toHaveAttribute('data-nav', 'hidden');   // the hide has landed
     await expect.poll(() => aboutIn(stored(draft))?.blocks[0].subtitle, { timeout: 6000 }).toBe('Saved after the hide');
     expect(aboutIn(stored(draft))?.hideNav).toBe(true);
   });
@@ -132,7 +132,7 @@ test.describe('G13 in-place canvas text editor — writes to /settings that over
   test('＋ Page while Hide is out keeps the hide', async ({ page }) => {
     const { frame } = await mountPages(page);
     const { sent, release } = await hideOut(page, frame);
-    await openPages(page); await page.locator('#pagesBar .page-add').click();
+    await openPages(page); await page.locator('#pagesCard .page-add').click();
     await page.getByPlaceholder('e.g. Services, Gallery, Pricing').fill('Gallery');
     await page.getByRole('button', { name: 'Next: pick a layout' }).click();
     await page.locator('.dc-layout-card', { hasText: 'Blank page' }).click();
@@ -202,7 +202,7 @@ test.describe('G13 in-place canvas text editor — writes to /settings that over
     await page.waitForTimeout(300);
     release();
     await page.waitForTimeout(300);                                // the slow answer has landed
-    await expect(pill(page, 'About')).toContainText('(hidden)');
+    await expect(pill(page, 'About')).toHaveAttribute('data-nav', 'hidden');
     await page.evaluate(() => (window as unknown as { dcDuplicate: (bi: number) => void }).dcDuplicate(0));
     await expect.poll(() => aboutIn(stored(draft))?.blocks.length, { timeout: 6000 }).toBe(2);
     expect(aboutIn(stored(draft))?.hideNav).toBe(true);
