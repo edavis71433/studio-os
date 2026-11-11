@@ -170,7 +170,7 @@ article.post p{margin-bottom:16px}
 footer.site{background:var(--accent);color:#d9e1f0;padding:50px 0 32px;margin-top:72px;border-top:3px solid var(--steel)}
 footer.site a{color:#b9cdea}
 footer.site h2{font-size:1.08rem;color:#fff}
-footer.site table.hours th{color:#b6c4dc}
+footer.site table.hours th{color:#d0d9ea}
 .cols{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:30px}
 .credit{margin-top:30px;padding-top:18px;border-top:1px solid rgba(255,255,255,.16);font-size:.88rem;color:#a7b6d1;display:flex;gap:14px;flex-wrap:wrap}
 :focus-visible{outline:2px solid var(--steel-dark);outline-offset:2px}
