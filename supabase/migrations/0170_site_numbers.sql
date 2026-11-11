@@ -15,9 +15,9 @@
 --   presence_month_visitors(site ids, since, zone): each site's visitors and page views
 --     per month, counted in the database, on the zone's clock (UTC unless one is given;
 --     the monthly report gives the site's own). The Sites page asks once for every site;
---     reading the rows instead stopped at 1,000 a request. "Visitors" is what
---     Analytics already counts: the visitor mark changes each day, so a month's
---     visitors are its daily visitors added up.
+--     reading the rows instead stopped at 1,000 a request. They are visits, as
+--     Analytics calls them: the visitor mark changes each day, so a month's
+--     count is its daily visitors added up.
 create table if not exists public.presence_health_days (
   site_id uuid not null references public.presence_sites(id) on delete cascade,
   day date not null,

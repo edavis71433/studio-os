@@ -324,13 +324,13 @@ test.describe('Sites (builder list items 43 and 45)', () => {
     expect(t.thumbs.length).toBe(asked);
   });
 
-  // items 129 and 180 (Nov 11): Health, Visitors and Search clicks join the table, and Team and
+  // items 129 and 180 (Nov 11): Health, Visits and Search clicks join the table, and Team and
   // Published leave it (who can edit stays on each card); sites-numbers.spec.ts covers the numbers
-  test('table: Site · Health · Visitors · Search clicks · Plan · Last updated · Tags, sortable, and the choice is remembered', async ({ page }) => {
+  test('table: Site · Health · Visits · Search clicks · Plan · Last updated · Tags, sortable, and the choice is remembered', async ({ page }) => {
     await openSites(page);
     await page.locator('#dispTable').click();
     const table = page.locator('#tableHost table');
-    await expect(table.locator('thead .thb')).toHaveText(['Site', 'Health', 'Visitors', 'Search clicks', 'Plan', 'Last updated', 'Tags']);
+    await expect(table.locator('thead .thb')).toHaveText(['Site', 'Health', 'Visits', 'Search clicks', 'Plan', 'Last updated', 'Tags']);
     await expect(table.locator('tbody tr')).toHaveCount(3);
     await expect(page.locator('#grid')).toBeHidden();               // one view at a time: no cards above the table
     await expect(page.locator('.scard:visible')).toHaveCount(0);

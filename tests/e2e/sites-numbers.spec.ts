@@ -59,7 +59,8 @@ test.describe('Sites numbers (builder list items 129 and 180)', () => {
     const errors = await openSites(page, { display: 'cards' });
     const maple = page.locator('.scard[data-site="s1"] .snums');
     await expect(maple).toBeVisible();
-    await expect(maple.locator('.snum .l')).toHaveText(['Visitors · Oct', 'Search clicks', 'Health']);
+    await expect(maple.locator('.snum .l')).toHaveText(['Visits · Oct', 'Search clicks', 'Health']);
+    await expect(maple.locator('.snum .l').first()).toHaveAttribute('title', 'A person counts once a day: someone who comes back on three days is three visits.');
     await expect(maple.locator('.snum').nth(0)).toContainText('812');
     await expect(maple.locator('.snum').nth(0).locator('.dchip.up')).toContainText('18%');
     await expect(maple.locator('.snum').nth(0).locator('.dchip.up')).toHaveAttribute('title', 'Up 18% on September');
@@ -84,7 +85,7 @@ test.describe('Sites numbers (builder list items 129 and 180)', () => {
     await openSites(page, { display: 'table' });
     const table = page.locator('#tableHost');
     await expect(table.locator('.tcap')).toContainText('October, compared with September. A drop is red.');
-    await expect(table.locator('thead .thb')).toHaveText(['Site', 'Health', 'Visitors', 'Search clicks', 'Plan', 'Last updated', 'Tags']);
+    await expect(table.locator('thead .thb')).toHaveText(['Site', 'Health', 'Visits', 'Search clicks', 'Plan', 'Last updated', 'Tags']);
     const blue = table.locator('tbody tr', { hasText: 'Bluebird Bakery' });
     await expect(blue.locator('td.num .dchip.down')).toHaveCount(3);
     await expect(table.locator('tbody tr', { hasText: 'Harbor Dental' })).toContainText('No counter');

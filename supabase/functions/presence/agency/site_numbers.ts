@@ -7,9 +7,9 @@
 //   GET /agency/site-numbers   { data: { [site_id]: SiteNumbers }, month, prior_month, … }
 //
 //   • visitors: last whole month against the month before, from the visit counter,
-//     counted in the database (presence_month_visitors, migration 0170). Analytics'
-//     own meaning: the visitor mark changes each day, so these are daily visitors
-//     added up;
+//     counted in the database (presence_month_visitors, migration 0170). The page
+//     calls them visits, as Analytics does (bug hunt H5): the visitor mark changes
+//     each day, so these are daily visitors added up;
 //   • Google clicks: the same two months from Search Console (`signals`, kept per
 //     client, whole past months only: the current month never exists there);
 //   • health: the studio's 0 to 100 number (lib/health_score.ts) today, against the
