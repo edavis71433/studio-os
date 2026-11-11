@@ -183,7 +183,7 @@ const MEMBER_WRITES: Array<[MemberWriteNeed, string[]]> = [
     `POST /broadcasts/${ID}/test`,   // bold redesign: "Send me a test" — only ever to the member's own address, so edit, not publish
     'POST /sales/(contacts|customers|deals|templates)',
     'POST /sales/prospects(/discover)?',   // sales review item 112: find businesses, save the ticked ones
-    `POST /sales/prospects/${ID}/(convert|draft)`,   // item 112: start the deal; a draft only returns words — nothing sends
+    `POST /sales/prospects/${ID}/(convert|draft|pack)`,   // item 112: start the deal; a draft only returns words — nothing sends; item 113: pack builds a share link
     `PATCH /sales/prospects/${ID}`,
     `PATCH /sales/(contacts|deals|deal-tasks)/${ID}`,
     `POST /sales/contacts/${ID}/restore`,

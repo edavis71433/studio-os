@@ -209,6 +209,7 @@ const DECIDED = {
     // sales review item 112: prospecting — find, save, move along, start the deal; the draft only returns words
     'POST /sales/prospects', 'POST /sales/prospects/discover', 'PATCH /sales/prospects/:id',
     'POST /sales/prospects/:id/convert', 'POST /sales/prospects/:id/draft',
+    'POST /sales/prospects/:id/pack',   // sales review item 113: the pitch pack build
   ],
   open: [
     'DELETE /crm/notes/:id', 'POST /client/notifications/read', 'POST /concierge/ask', 'POST /crm/notes',
@@ -446,7 +447,7 @@ const WRITE_HANDLERS = [
   'handleEstimateCreate', 'handleEstimateSend', 'handleEstimateToProposal', 'handleEstimateToInvoice', 'handleEstimateDelete',
   'handleRecurringStart', 'handleRecurringChange', 'handleRecurringAction',
   // sales review item 112: prospects (DELETE and PATCH /sales/prospects/:id share handleProspect)
-  'handleProspects', 'handleProspect', 'handleProspectDiscover', 'handleProspectConvert', 'handleProspectDraft',
+  'handleProspects', 'handleProspect', 'handleProspectDiscover', 'handleProspectConvert', 'handleProspectDraft', 'handleProspectPack',
   // sales review item 114: free-tool leads are the PLATFORM's own enquiries. Deliberately on
   // no member list (an unlisted write refuses every seat — asserted above), and the handlers
   // themselves refuse anyone who isn't platform staff (tool_leads_routes_test.mjs proves it).

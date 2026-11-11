@@ -84,7 +84,7 @@
   .link{color:var(--p);font-weight:600}
   .spin{width:28px;height:28px;border:3px solid var(--line);border-top-color:var(--p);border-radius:50%;margin:60px auto;animation:sp 1s linear infinite}
   @keyframes sp{to{transform:rotate(360deg)}}
-  dialog{border:none;border-radius:14px;padding:0;width:min(560px,calc(100% - 32px));background:var(--card);color:var(--ink);box-shadow:0 20px 60px rgba(0,0,0,.3)}
+  dialog{border:none;border-radius:14px;padding:0;width:min(560px,calc(100% - 32px));background:var(--card);color:var(--ink);box-shadow:0 20px 60px rgba(0,0,0,.3);margin:auto}   /* the * reset killed the UA's centering */
   dialog::backdrop{background:rgba(27,21,37,.4)}
   .dbody{padding:22px}
   .dbody h3{font-family:var(--serif);font-weight:500;font-size:19px;margin-bottom:10px}
@@ -112,6 +112,19 @@
   <div id="main"><div class="spin" role="status" aria-label="Loading"></div></div>
   <footer>Studio OS · Prospects — businesses worth a hello. Nothing is emailed from here.</footer>
 </div>
+<dialog id="packDlg" aria-label="Pitch pack">
+  <form class="dbody" method="dialog">
+    <h3>Pitch pack</h3>
+    <p class="note" id="packNote">Their website score and AI visibility, beside two nearby businesses — one link you can send them. Each check takes up to a minute; this can run for a few minutes in all.</p>
+    <div id="packSteps" style="margin:14px 0 2px;font-size:14px"></div>
+    <div class="row2">
+      <button type="button" class="btn ghost" id="pk-close">Close</button>
+      <button type="button" class="btn ghost" id="pk-copy" hidden>Copy the link</button>
+      <a class="btn" id="pk-open" hidden target="_blank" rel="noopener" style="text-decoration:none;display:none">Open the pack</a>
+      <button type="button" class="btn" id="pk-go">Build it</button>
+    </div>
+  </form>
+</dialog>
 <dialog id="draftDlg" aria-label="First email draft">
   <form class="dbody" method="dialog">
     <h3>A first email — yours to copy</h3>
@@ -222,6 +235,7 @@ function render(){
                 ${['New','Contacted','In pipeline','Not a fit'].map(s=>`<option ${s===p.status?'selected':''} ${s==='In pipeline'&&!p.deal_id?'disabled':''}>${s}</option>`).join('')}
               </select>
               <button data-draft="${esc(p.id)}">Draft a first email</button>
+              ${p.pack_url?`<a class="abtn" href="${esc(p.pack_url)}" target="_blank" rel="noopener">Open pack</a>`:`<button data-pack="${esc(p.id)}">${p.pack_status==='building'?'Finish the pack':'Pitch pack'}</button>`}
               ${p.deal_id?`<a class="abtn" href="/pipeline.html?deal=${esc(p.deal_id)}">Open the deal</a>`:`<button class="main" data-deal="${esc(p.id)}">→ Deal</button>`}
               <button data-needs="delete" data-remove="${esc(p.id)}" aria-label="Remove ${esc(p.business_name)}">Remove</button>
             </div>
@@ -305,6 +319,7 @@ function wire(){
     $('d-subject').value=r.body.data.subject;$('d-body').value=r.body.data.body;
     $('draftDlg').showModal();
   }));
+  document.querySelectorAll('[data-pack]').forEach(b=>b.addEventListener('click',()=>openPack(b.dataset.pack)));
   document.querySelectorAll('[data-remove]').forEach(b=>b.addEventListener('click',async()=>{
     if(b.dataset.armed!=='1'){b.dataset.armed='1';b.textContent='Remove — sure?';setTimeout(()=>{b.dataset.armed='';b.textContent='Remove';},3000);return;}
     const r=await api('/sales/prospects/'+b.dataset.remove,'DELETE');
@@ -330,13 +345,52 @@ function wire(){
     toast(b.dataset.to==='not_a_fit'?'Marked not a fit.':'Marked contacted.');
     await load();
   }));
+  if(wire.once)return;wire.once=true;   // the dialogs are static — once is enough
   $('d-close').addEventListener('click',()=>$('draftDlg').close());
+  $('pk-close').addEventListener('click',()=>$('packDlg').close());
+  $('pk-go').addEventListener('click',buildPack);
   $('d-copy').addEventListener('click',async()=>{
     try{await navigator.clipboard.writeText('Subject: '+$('d-subject').value+'\n\n'+$('d-body').value);toast('Copied — paste it into your own email.');}
     catch(_){$('d-body').select();document.execCommand('copy');toast('Copied — paste it into your own email.');}
   });
 }
 
+// ── the pitch pack build: one call per piece, honest progress (item 113) ─────
+let PACK_ID='',PACK_BUSY=false;
+function openPack(id){
+  PACK_ID=id;PACK_BUSY=false;
+  const p=SAVED.find(x=>x.id===id);
+  $('packSteps').innerHTML='';
+  $('pk-go').hidden=false;$('pk-go').disabled=false;$('pk-go').textContent=(p&&p.pack_status==='building')?'Carry on building':'Build it';
+  $('pk-copy').hidden=true;$('pk-open').hidden=true;$('pk-open').style.display='none';
+  $('packNote').textContent='Their website score and AI visibility, beside two nearby businesses — one link you can send them. Each check takes up to a minute; this can run for a few minutes in all.';
+  $('packDlg').showModal();
+}
+async function buildPack(){
+  if(PACK_BUSY)return;PACK_BUSY=true;
+  const steps=$('packSteps');const go=$('pk-go');go.disabled=true;go.textContent='Building…';
+  let guard=0,res=null;
+  while(guard++<8){
+    steps.innerHTML=`<p>Working — piece ${Math.min(guard,4)} of 4… keep this open.</p>`;
+    let r;try{r=await api('/sales/prospects/'+PACK_ID+'/pack','POST',{});}catch(_){r={ok:false,body:{}};}
+    if(!r.ok){PACK_BUSY=false;go.disabled=false;go.textContent='Try again';steps.innerHTML=`<p>${esc((r.body&&r.body.message)||'That didn’t work — try again.')}</p>`;return;}
+    res=r.body.data;
+    steps.innerHTML=`<p>${res.done} of ${res.total} pieces done…</p>`;
+    if(res.state==='ready')break;
+  }
+  PACK_BUSY=false;
+  if(res&&res.state==='ready'){
+    steps.innerHTML='<p>Done. The link below is public but unguessable — send it in your email.</p>';
+    go.hidden=true;
+    const url=location.origin+res.share_url;
+    $('pk-copy').hidden=false;$('pk-copy').onclick=async()=>{try{await navigator.clipboard.writeText(url);toast('Link copied.');}catch(_){toast(url);}};
+    const op=$('pk-open');op.hidden=false;op.style.display='inline-flex';op.href=res.share_url;
+    load();
+  }else{
+    go.disabled=false;go.textContent='Carry on building';
+    steps.innerHTML+='<p>Still going — press “Carry on building” to finish.</p>';
+  }
+}
 async function load(){
   // the free-tool leads ride along; 403 (not platform staff) just hides the section
   const [r,lr]=await Promise.all([api('/sales/prospects'),api('/sales/tool-leads')]);
