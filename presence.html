@@ -521,6 +521,55 @@ html.dc-edit:not(.plan-watch) .dc-close{height:36px;padding:0 14px;font-size:13p
 .ins-tile .ins-tile-row{display:flex;gap:4px;width:100%}
 .ins-tile .ins-tile-row i{flex:1 1 0;height:14px;border-radius:3px}
 .ins-tile-l{display:block;margin-top:6px;font-size:12px;font-weight:500;color:var(--ink-2)}
+/* items 49 and 118: a section's colour theme, each tile drawn in the site's own colours */
+.ins-themes{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px}
+.ins-theme{display:flex;flex-direction:column;align-items:center;gap:6px;min-width:0;padding:0;border:0;background:transparent;color:var(--ink-2);font:500 11.5px/1.2 var(--sans);cursor:pointer}
+.ins-theme-pic{display:flex;flex-direction:column;align-items:flex-start;justify-content:center;gap:5px;width:100%;height:60px;box-sizing:border-box;padding:10px 8px;border:1px solid var(--hair);border-radius:12px}
+.ins-theme-pic i{display:block;width:70%;height:5px;border-radius:2px}
+.ins-theme-pic i+i{width:90%;height:3px;opacity:.55}
+.ins-theme-pic b{display:block;width:40%;height:8px;border-radius:4px}
+.ins-theme[aria-pressed=true]{color:var(--plum);font-weight:600}
+.ins-theme[aria-pressed=true] .ins-theme-pic{border:2.5px solid var(--plum);padding:8.5px 6.5px}
+.ins-theme:focus-visible{outline:2px solid var(--plum);outline-offset:2px;border-radius:12px}
+.ins-says{margin:0;font-size:12.5px;line-height:1.45;color:var(--ink-2)}
+.ins-group{margin:4px 0 0;padding-top:14px;border-top:1px solid var(--hair);font-size:13px;font-weight:600;color:var(--ink)}
+/* the Layout tab: each layout drawn as itself (insPic) */
+.ins-tile-pic:has(.ins-pic){padding:8px;justify-content:stretch;align-items:stretch}
+.ins-tile.on .ins-tile-pic:has(.ins-pic){padding:7px}
+.ins-pic{display:grid;gap:3px;width:100%;height:100%}
+.ins-pic i{display:block;width:auto;height:auto;border-radius:2px;background:var(--ink-3);opacity:.5}
+.ins-pic i.h{background:var(--ink);opacity:.8}
+.ins-pic i.k{background:var(--plum);opacity:.8;border-radius:4px}
+.ins-pic[data-pic="gallery:default"],.ins-pic[data-pic="reviews_wall:default"],.ins-pic[data-pic="pricing:default"]{grid-template-columns:repeat(3,1fr)}
+.ins-pic[data-pic="gallery:default"]{grid-template-rows:repeat(2,1fr)}
+.ins-pic[data-pic="gallery:masonry"]{grid-template-columns:repeat(3,1fr);grid-template-rows:repeat(6,1fr);grid-auto-flow:column}
+.ins-pic[data-pic="gallery:masonry"] i:nth-child(1){grid-row:span 4}.ins-pic[data-pic="gallery:masonry"] i:nth-child(2){grid-row:span 2}
+.ins-pic[data-pic="gallery:masonry"] i:nth-child(3){grid-row:span 2}.ins-pic[data-pic="gallery:masonry"] i:nth-child(4){grid-row:span 4}
+.ins-pic[data-pic="gallery:masonry"] i:nth-child(5){grid-row:span 3}.ins-pic[data-pic="gallery:masonry"] i:nth-child(6){grid-row:span 3}
+.ins-pic[data-pic="gallery:filmstrip"]{grid-template-columns:1fr 1fr 1fr .4fr;padding:8px 0}
+.ins-pic[data-pic="reviews_wall:default"] i,.ins-pic[data-pic="pricing:default"] i{border:1px solid var(--ink-3);background:transparent;opacity:.7}
+.ins-pic[data-pic="pricing:default"] i:nth-child(2){border-color:var(--plum);border-width:2px}
+.ins-pic[data-pic="reviews_wall:quotes"]{grid-template-rows:auto 1fr 1fr;justify-items:center;align-content:center}
+.ins-pic[data-pic="reviews_wall:quotes"] i:nth-child(1){width:18px;height:12px;background:none;opacity:.8;border-left:5px solid var(--ink);border-right:5px solid var(--ink);border-radius:0}
+.ins-pic[data-pic="reviews_wall:quotes"] i:nth-child(2){width:80%;height:4px}.ins-pic[data-pic="reviews_wall:quotes"] i:nth-child(3){width:55%;height:4px}
+.ins-pic[data-pic="reviews_wall:strip"]{grid-template-columns:repeat(3,1fr);align-content:center;padding:10px 0;border-block:2px solid var(--hair)}
+.ins-pic[data-pic="reviews_wall:strip"] i{height:8px}
+.ins-pic[data-pic="accordion:default"]{grid-template-rows:repeat(3,1fr)}
+.ins-pic[data-pic="accordion:default"] i{background:transparent;border:1px solid var(--ink-3);opacity:.7}
+.ins-pic[data-pic="accordion:two-column"]{grid-template-columns:1fr 1fr;grid-template-rows:6px 4px 4px 6px 4px;column-gap:8px}
+.ins-pic[data-pic="accordion:two-column"] i:nth-child(4n+1){background:var(--ink);opacity:.8}
+.ins-pic[data-pic="cta:default"]{grid-template-columns:1fr auto;align-items:center;padding:0 4px;background:var(--plum-soft);border-radius:6px}
+.ins-pic[data-pic="cta:default"] i{height:6px}.ins-pic[data-pic="cta:default"] i.k{width:22px;height:10px}
+.ins-pic[data-pic="cta:card"]{justify-items:center;align-content:center;margin:2px 18px;border:1px solid var(--ink-3);border-radius:6px}
+.ins-pic[data-pic="cta:card"] i{width:70%;height:5px}.ins-pic[data-pic="cta:card"] i.k{width:26px;height:9px}
+.ins-pic[data-pic="pricing:list"]{grid-template-rows:repeat(3,1fr);align-content:center}
+.ins-pic[data-pic="pricing:list"] i{height:4px;background:linear-gradient(90deg,var(--ink) 30%,transparent 30% 78%,var(--ink) 78%);opacity:.6}
+.ins-pic[data-pic="width:normal"]{padding:6px 16px}
+.ins-pic[data-pic="width:normal"] i,.ins-pic[data-pic="width:full"] i{background:var(--plum-soft);opacity:1;border:1px solid var(--plum)}
+/* item 118: picking a look shows the whole page, at half size (desktop only) */
+html.dc-zoomout .dp-stage:not(.dev-tablet):not(.dev-phone) .dp-frame iframe{height:200%;transform:translateX(var(--dc-zoom-x,25%)) scale(.5);transform-origin:0 0}
+#dcZoomNote{position:absolute;left:16px;top:12px;z-index:3;display:none;padding:6px 12px;border-radius:999px;background:var(--plum-soft);color:var(--plum);font:600 12px/1.2 var(--sans);pointer-events:none}
+html.dc-zoomout .dp-stage:not(.dev-tablet):not(.dev-phone) #dcZoomNote{display:block}
 .ins-tile.on .ins-tile-l{color:var(--plum);font-weight:600}
 .ins-tile:focus-visible .ins-tile-pic{outline:2px solid var(--plum);outline-offset:2px}
 .ins-swatches{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
@@ -1759,6 +1808,7 @@ body.pd-dragging *{cursor:grabbing !important}
               <div class="dp-stage" id="dpStage">
                 <div class="dp-frame">
                   <iframe id="designPreview" title="Live design preview of your draft home page" aria-hidden="true"></iframe>
+                  <div id="dcZoomNote" role="status">The whole page · back to full size when you leave Looks</div>
                   <div id="designPreviewEmpty" hidden>
                     <p class="eq" id="dpEmptyTitle">Your preview appears once your pages have content.</p>
                     <p class="eh" id="dpEmptyBody">Your preview is built from your real content. Start with the basics, or add what you offer.</p>
@@ -8221,9 +8271,13 @@ function mountFontLibrary(card, T) {
     box.appendChild(Object.assign(el("div", null, label), { style: "font-size:12px;font-weight:600;margin:10px 0 6px" }));
     const grid = el("div"); grid.style.cssText = "display:grid;grid-template-columns:repeat(auto-fill,minmax(132px,1fr));gap:6px";
     grid.setAttribute("role", "group"); grid.setAttribute("aria-label", label + " font");
-    DESIGN_FONTS.forEach((f) => {
-      const on = firstOf(T[tok]) === f.css.toLowerCase();
-      const b = el("button", null, f.family + (on ? " ✓" : "")); b.type = "button";
+    // item 119: the fonts the site already uses come first (this one's pick, then the other's),
+    // so reusing one is the easy choice: fewer fonts, faster site
+    const other = firstOf(T[tok === "font_display" ? "font_body" : "font_display"]);
+    const rank = (f) => (firstOf(T[tok]) === f.css.toLowerCase() ? 0 : other === f.css.toLowerCase() ? 1 : 2);
+    DESIGN_FONTS.map((f, i) => [f, i]).sort((a, b) => rank(a[0]) - rank(b[0]) || a[1] - b[1]).map(([f]) => f).forEach((f) => {
+      const on = firstOf(T[tok]) === f.css.toLowerCase(), used = !on && other === f.css.toLowerCase();
+      const b = el("button", null, f.family + (on ? " ✓" : used ? " · in use" : "")); b.type = "button";
       b.setAttribute("aria-pressed", String(on));
       b.style.cssText = "font-family:'" + f.css + "'," + f.fallback + ";font-size:15px;text-align:left;padding:7px 10px;border-radius:10px;cursor:pointer;background:" + (on ? "var(--plum-tint,#faf7ff)" : "transparent") + ";border:2px solid " + (on ? "var(--plum,#5b3fa0)" : "var(--line,#ddd)");
       b.addEventListener("click", () => saveTokens({ [tok]: f.css + ", " + f.fallback }, msg + f.family));
@@ -8256,6 +8310,10 @@ async function mountDesignCard(fresh = true) {
   looksWrap.appendChild(el("div", "hint", "One tap restyles your whole site — colors, type and corners together, always readable. Nothing reaches your live site until you publish."));
   const fixedColors = FIXED_COLOR_TEMPLATES.has((S.site && S.site.template_slug) || "");
   if (fixedColors) card.appendChild(el("div", "hint", "This template keeps its own dark colors, so the color and background choices don't change it. Fonts, text size, corners and spacing do.")).dataset.stab = "colours";
+  // item 118: which colour themes this page's sections wear (the canvas tags each one while this tab is open)
+  const nowRow = el("div", "ins-field"); nowRow.id = "stThemesNow"; nowRow.dataset.stab = "colours";
+  nowRow.append(el("div", "ins-lbl", "Colour themes on this page"), el("p", "ins-says"));
+  card.appendChild(nowRow);
   // colors
   if (!fixedColors) stab(pillRow(card, "Colors", PALETTES, (p) => (p.accent ? String(T.accent || "").toLowerCase() === p.accent : !T.accent),
     (p) => saveTokens(p.key ? { ...p.tokens } : { accent: "", accent_dark: "", ink: "", soft: "" }, p.key ? p.name : "Original colors"), "swatch"), "colours");
@@ -9402,7 +9460,7 @@ function blockVariantRow(idx, blk, sub) {
   const opts = BLOCK_VARIANT_OPTS[blk && blk.type]; if (!opts) return;
   const isOn = (o) => String((BLOCKS_WORK[idx] && BLOCKS_WORK[idx].variant) || "") === o[1];
   const pick = (o) => { const b = { ...BLOCKS_WORK[idx] }; if (o[1]) b.variant = o[1]; else delete b.variant; BLOCKS_WORK[idx] = b; renderBlocksCard(); dcLiveFromPanel(); };
-  if (sub.classList && sub.classList.contains("ins-pane")) { insTiles(sub, "Layout", opts, isOn, pick); return; }   // the inspector: pictures
+  if (sub.classList && sub.classList.contains("ins-pane")) { insTiles(sub, "Layout", opts, isOn, pick, (o) => blk.type + ":" + (o[1] || "default")); return; }   // the inspector: each layout drawn as itself
   pillRow(sub, "Style", opts, isOn, pick);
 }
 // A calm, collapsed "Look of this section" control row — plain words, smart defaults,
@@ -9414,8 +9472,8 @@ function blockLookRow(idx, blk, sub) {
   if (sub && sub.content) {   // the inspector's panes: each choice on the tab it belongs to
     const panes = sub;
     const bands = [["", "Default"], ["tinted", "Tinted"], ["plain", "Plain"], ["accent", "Accent band"], ["dark", "Dark band"]];
-    pillRow(panes.style, "Background band", bands.map(([v, l]) => [l, v]), (o) => (cur.background || "") === o[1], (o) => lookSet(idx, "background", o[1]));
-    insTiles(panes.layout, "Width", [["Normal", ""], ["Full width", "full"]], (o) => (cur.width || "") === o[1], (o) => lookSet(idx, "width", o[1]));
+    insThemes(panes.style, idx, cur, (blk && blk.style) || {});   // items 49 and 118: the band is the section's colour theme
+    insTiles(panes.layout, "Width", [["Normal", ""], ["Full width", "full"]], (o) => (cur.width || "") === o[1], (o) => lookSet(idx, "width", o[1]), (o) => "width:" + (o[1] || "normal"));
     pillRow(panes.layout, "Spacing", [["Tight", "tight"], ["Normal", ""], ["Roomy", "roomy"]], (o) => (cur.spacing || "") === o[1], (o) => lookSet(idx, "spacing", o[1]));
     pillRow(panes.layout, "Text", [["Default", ""], ["Centered", "center"]], (o) => (cur.align || "") === o[1], (o) => lookSet(idx, "align", o[1]));
     pillRow(panes.when, "Show on", [["All screens", ""], ["Desktop only", "mobile"], ["Phones only", "desktop"]], (o) => (cur.hideOn || "") === o[1], (o) => lookSet(idx, "hideOn", o[1]));
@@ -9562,12 +9620,18 @@ function blockStyleRow(idx, blk, sub, flat) {
   };
   // Enumerated picks — pillRows; the FIRST option is the default, stored as ABSENT
   // (the BLOCK_STYLE_FIELDS convention, matching parseStyle exactly).
-  pillRow(det, "Font", [["Default", ""], ["Heading face", "display"], ["Body face", "body"]],
-    (o) => String(st.font || "") === o[1], (o) => setStyle({ font: o[1] }));
-  pillRow(det, "Text size", [["Smaller", "s"], ["Normal", ""], ["Larger", "l"], ["Extra large", "xl"]],
-    (o) => String(st.size || "") === o[1], (o) => setStyle({ size: o[1] }));
-  pillRow(det, "Alignment", [["Default", ""], ["Left", "left"], ["Centered", "center"], ["Right", "right"]],
-    (o) => String(st.align || "") === o[1], (o) => setStyle({ align: o[1] }));
+  // the inspector's Style tab: the colour theme leads (insThemes), then colours, then type
+  const typeRows = () => {
+    if (flat) det.appendChild(el("div", "ins-group", "Type"));
+    pillRow(det, "Font", [["Default", ""], ["Heading face", "display"], ["Body face", "body"]],
+      (o) => String(st.font || "") === o[1], (o) => setStyle({ font: o[1] }));
+    pillRow(det, "Text size", [["Smaller", "s"], ["Normal", ""], ["Larger", "l"], ["Extra large", "xl"]],
+      (o) => String(st.size || "") === o[1], (o) => setStyle({ size: o[1] }));
+    pillRow(det, "Alignment", [["Default", ""], ["Left", "left"], ["Centered", "center"], ["Right", "right"]],
+      (o) => String(st.align || "") === o[1], (o) => setStyle({ align: o[1] }));
+  };
+  if (!flat) typeRows();
+  else det.appendChild(el("div", "ins-group", "Colours · from your site"));
   // Three color wells — curated brand shades first, the Brand-Kit color-input+hex
   // pair behind "Custom…", and a "Default" clear chip each.
   const well = (label, key) => {
@@ -9619,7 +9683,7 @@ function blockStyleRow(idx, blk, sub, flat) {
     det.appendChild(wrap);
   };
   well(flat ? "Text colour" : "Text", "text_color");
-  well(flat ? "Background · from your site colours" : "Background", "bg_color");
+  well(flat ? "Background" : "Background", "bg_color");
   well(flat ? "Buttons" : "Accent", "accent");
   // LIVE CONTRAST (§5) — a chip per governing pair, with the one-tap fix beside a
   // failing one. Recomputed on every redraw (every pick redraws), so it's live.
@@ -9641,6 +9705,7 @@ function blockStyleRow(idx, blk, sub, flat) {
     det.appendChild(crow);
     if (pairs.some((p) => p.siteBg)) det.appendChild(Object.assign(el("div", "hint", "Text is checked against your page background."), { style: "margin-top:4px" }));
   }
+  if (flat) typeRows();
   det.appendChild(el("div", "hint", flat ? "Only this section changes. Everything else keeps your site’s overall design." : "Optional — give just this section its own colors, face, size or alignment. Everything else keeps your site's overall design."));
   sub.appendChild(det);
 }
@@ -11117,7 +11182,10 @@ async function mountLookCard() {
     const dev = b.dataset.dpdev;
     seg.querySelectorAll("button").forEach((x) => { const on = x === b; x.classList.toggle("on", on); x.setAttribute("aria-pressed", String(on)); });
     const stage = $("dpStage"); if (stage) stage.className = "dp-stage" + (dev === "desktop" ? "" : " dev-" + dev);
+    dcZoomSync(); setTimeout(dcThemeTags, 260);   // the frame finishes changing width first
   });
+  let resized = null;
+  window.addEventListener("resize", () => { clearTimeout(resized); resized = setTimeout(dcColourAids, 150); });
 })();
 
 // ── Slice D (AC-4) — the modes bar: Edit · Preview · Comments · Timewarp ─────
@@ -11288,6 +11356,7 @@ function toggleTray(tab) {
 function closeSettingsPanel() {
   const p = $("settingsPanel"), sc = $("dcScrim"); if (!p) return;
   p.classList.remove("on"); p.setAttribute("aria-hidden", "true");
+  dcColourAids();
   if (sc) { sc.classList.remove("on"); sc.hidden = true; }
   if (PANEL_MODE === "section") {   // back to the full list, so a later "All sections" isn't one block
     PANEL_MODE = "styles"; BLOCK_SOLO = null; p.dataset.mode = "styles";
@@ -11329,6 +11398,7 @@ function openSettingsPanel(mode, title) {
   }
   p.classList.add("on"); p.setAttribute("aria-hidden", "false");
   if (m === "sections" && $("blocksCard")) renderBlocksCard();
+  dcColourAids();
   setTimeout(() => { try {
     // already in a field in this panel: leave them there, or the words go nowhere
     const ae = document.activeElement;
@@ -11346,6 +11416,7 @@ function stylesTab(name) {
   const p = $("settingsPanel"); if (p) p.dataset.stab = STYLES_TAB;
   const seg = $("stylesSeg"); if (seg) seg.querySelectorAll("[data-stab]").forEach((b) => b.setAttribute("aria-selected", String(b.dataset.stab === STYLES_TAB)));
   const sc = p && p.querySelector(".dc-panel-scroll"); if (sc) sc.scrollTop = 0;
+  dcColourAids();
 }
 // ── the inspector (the floating studio, part two): one section, four tabs. Content holds the
 // fields; Style its colours and type; Layout its arrangement; When its dates and where it shows.
@@ -11357,6 +11428,7 @@ function insSyncSeg() {
 function insTab(name) {
   INS_TAB = ["content", "style", "layout", "when"].indexOf(name) >= 0 ? name : "content";
   insSyncSeg();
+  setTimeout(dcColourAids, 0);   // the tab's panes swap first
   document.querySelectorAll("#blocksCard .ins-pane").forEach((p) => { p.hidden = p.dataset.pane !== INS_TAB; });
 }
 function insPanes(box) {
@@ -11374,7 +11446,7 @@ function insHead(blk, def) {
   if (p) p.setAttribute("aria-label", name);
 }
 // picture tiles: a small sketch per choice, the chosen one outlined in plum
-function insTiles(host, label, opts, isOn, onPick) {
+function insTiles(host, label, opts, isOn, onPick, picFor) {
   const wrap = el("div", "ins-field");
   wrap.appendChild(el("div", "ins-lbl", label));
   const row = el("div", "ins-tiles");
@@ -11382,7 +11454,9 @@ function insTiles(host, label, opts, isOn, onPick) {
     const on = isOn(o);
     const b = el("button", "ins-tile" + (on ? " on" : "")); b.type = "button"; b.setAttribute("aria-pressed", String(on));
     const pic = el("div", "ins-tile-pic");
-    if (i % 3 === 1) { const r = el("div", "ins-tile-row"); r.append(el("i"), el("i")); pic.appendChild(r); const l = el("i"); l.style.width = "70%"; pic.appendChild(l); }
+    const drawn = picFor ? insPic(picFor(o)) : null;
+    if (drawn) pic.appendChild(drawn);
+    else if (i % 3 === 1) { const r = el("div", "ins-tile-row"); r.append(el("i"), el("i")); pic.appendChild(r); const l = el("i"); l.style.width = "70%"; pic.appendChild(l); }
     else if (i % 3 === 2) { const r = el("div", "ins-tile-row"); r.append(el("i"), el("i"), el("i")); pic.appendChild(r); }
     else { const h = el("i", "h"); h.style.width = "60%"; const a = el("i"); a.style.width = "85%"; const c = el("i"); c.style.width = "85%"; pic.append(h, a, c); }
     b.appendChild(pic);
@@ -11393,6 +11467,132 @@ function insTiles(host, label, opts, isOn, onPick) {
   wrap.appendChild(row); host.appendChild(wrap);
   return row;
 }
+// ── Items 49 and 118: a section's colour theme, drawn in the site's own colours ──
+// The five bands the server draws (lib/site_blocks.ts .block--bg-*) are the section's colour
+// themes. Each tile is a little section in that theme, in this site's colours as the canvas
+// has them, so picking one is picking what you see. A custom background colour (the Colours
+// group below) and a theme are one background at a time, as lookSet already keeps them.
+const INS_THEMES = [
+  ["", "Default", "Follows your template: sections take turns with a soft band."],
+  ["tinted", "Tinted", "A soft wash of your accent colour behind the section."],
+  ["plain", "Plain", "No band: the section sits on the page’s own background."],
+  ["accent", "Accent", "Your accent colour behind light words, with white buttons."],
+  ["dark", "Dark", "Light words on a deep background, buttons in your accent colour."],
+];
+// The site's colours as the canvas draws them (every template names them alike), or quiet
+// stand-ins before the canvas has drawn.
+function dcSiteColours() {
+  const out = { paper: "#f7f7f5", card: "#ffffff", ink: "#1c2430", soft: "#5b6572", accent: "#23635a", accentDark: "", wash: "#eef1ee" };
+  try {
+    const d = $("designPreview") && $("designPreview").contentDocument;
+    const cs = d && d.documentElement && d.defaultView.getComputedStyle(d.documentElement);
+    if (cs) [["paper", "--paper"], ["card", "--card"], ["ink", "--ink"], ["soft", "--soft"], ["accent", "--accent"], ["accentDark", "--accent-dark"], ["wash", "--wash"]].forEach(([k, v]) => {
+      const x = cs.getPropertyValue(v).trim(); if (x && !/^var\(/.test(x)) out[k] = x;
+    });
+  } catch (_) {}
+  if (!out.accentDark) out.accentDark = out.accent;
+  return out;
+}
+// what a theme looks like: its background, words and button
+function insThemeLook(v, c) {
+  if (v === "tinted") return { bg: "color-mix(in srgb," + c.accent + " 8%," + c.paper + ")", ink: c.ink, btn: c.accent };
+  if (v === "plain") return { bg: c.paper, ink: c.ink, btn: c.accent };
+  if (v === "accent") return { bg: c.accentDark, ink: "#ffffff", btn: "#ffffff" };
+  if (v === "dark") return { bg: "#1a1622", ink: "#f2eef8", btn: c.accent };
+  return { bg: "linear-gradient(180deg," + c.card + " 0 55%," + c.wash + " 55%)", ink: c.ink, btn: c.accent };
+}
+function insThemes(host, idx, look, style) {
+  const own = !!(style && style.bg_color);
+  const cur = own ? null : String((look && look.background) || "");
+  const c = dcSiteColours();
+  const wrap = el("div", "ins-field"); wrap.dataset.group = "theme";
+  wrap.appendChild(el("div", "ins-lbl", "Colour theme"));
+  const row = el("div", "ins-themes"); row.setAttribute("role", "group"); row.setAttribute("aria-label", "Colour theme");
+  INS_THEMES.forEach(([v, name]) => {
+    const b = el("button", "ins-theme"); b.type = "button"; b.dataset.theme = v || "default";
+    b.setAttribute("aria-pressed", String(cur === v));
+    const look2 = insThemeLook(v, c), pic = el("span", "ins-theme-pic");
+    pic.style.background = look2.bg;
+    const h = el("i"), l = el("i"), k = el("b"); h.style.background = look2.ink; l.style.background = look2.ink; k.style.background = look2.btn;
+    pic.append(h, l, k);
+    b.append(pic, document.createTextNode(name));
+    b.addEventListener("click", () => lookSet(idx, "background", v));
+    row.appendChild(b);
+  });
+  wrap.appendChild(row);
+  wrap.appendChild(el("p", "ins-says", own ? "A background colour of your own is set under Colours. Pick a theme to use it instead." : INS_THEMES.find((t) => t[0] === cur)[2]));
+  host.appendChild(wrap);
+  return wrap;
+}
+// The Layout tab's pictures: each layout drawn as itself (styles: .ins-pic[data-pic]).
+const INS_PIC_PARTS = {
+  "gallery:default": 6, "gallery:masonry": 6, "gallery:filmstrip": 4,
+  "reviews_wall:default": 3, "reviews_wall:quotes": 3, "reviews_wall:strip": 3,
+  "accordion:default": 3, "accordion:two-column": 10,
+  "cta:default": ["", "k"], "cta:card": ["", "", "k"],
+  "pricing:default": 3, "pricing:list": 3,
+  "width:normal": 1, "width:full": 1,
+};
+function insPic(key) {
+  const parts = INS_PIC_PARTS[key]; if (!parts) return null;
+  const pic = el("span", "ins-pic"); pic.dataset.pic = key; pic.setAttribute("aria-hidden", "true");
+  (Array.isArray(parts) ? parts : Array.from({ length: parts }, () => "")).forEach((cls) => pic.appendChild(el("i", cls || null)));
+  return pic;
+}
+// ── Item 118: the canvas names each section's colour theme while colours are being chosen ──
+// While Styles is on Colours, or one section's card is on Style, every section on the page
+// wears a small tag ("Aa · Dark"), and Styles lists the themes in use. Built-in sections keep
+// the template's own colours. The tags sit in the page's frame, over the sections, and never
+// take a click.
+function dcThemeTagsWanted() {
+  const p = $("settingsPanel");
+  if (!p || !p.classList.contains("on")) return false;
+  return (PANEL_MODE === "styles" && STYLES_TAB === "colours") || (PANEL_MODE === "section" && INS_TAB === "style");
+}
+function dcThemeOf(sec) {
+  if (sec.hasAttribute("data-dds-core")) return "Template";
+  const b = BLOCKS_WORK && BLOCKS_WORK[Number(sec.getAttribute("data-dds-src"))];
+  if (b && b.style && b.style.bg_color) return "Own colour";
+  const v = String((b && b.look && b.look.background) || "");
+  const t = INS_THEMES.find((x) => x[0] === v);
+  return t ? t[1] : "Default";
+}
+function dcThemeTags() {
+  let doc = null; try { doc = $("designPreview").contentDocument; } catch (_) {}
+  const old = doc && doc.getElementById("dds-dc-themes"); if (old) old.remove();
+  const now = $("stThemesNow");
+  if (!doc || !doc.body || !dcThemeTagsWanted()) return;
+  const win = doc.defaultView, layer = doc.createElement("div");
+  layer.id = "dds-dc-themes"; layer.setAttribute("aria-hidden", "true");
+  const counts = new Map();
+  doc.querySelectorAll("main [data-dds-core], main [data-dds-src]").forEach((sec) => {
+    if (sec.parentElement && sec.parentElement.closest("[data-dds-src],[data-dds-core]")) return;   // a section inside a section is part of it
+    const r = sec.getBoundingClientRect(); if (!r.height) return;
+    const name = dcThemeOf(sec); counts.set(name, (counts.get(name) || 0) + 1);
+    const tag = doc.createElement("span"); tag.className = "dds-theme-tag";
+    const dot = doc.createElement("i"); dot.style.background = win.getComputedStyle(sec).backgroundColor;
+    tag.append(dot, doc.createTextNode("Aa · " + name));
+    tag.style.left = Math.round(Math.max(r.left, (DC_CHROME_INSET || 0) - win.scrollX) + win.scrollX + 12) + "px";   // clear of the dock
+    tag.style.top = Math.round(r.top + win.scrollY + (sec.classList.contains("dc-hot") ? 44 : 12)) + "px";   // clear of the picked section's name chip
+    layer.appendChild(tag);
+  });
+  doc.body.appendChild(layer);
+  if (now) { const p = now.querySelector(".ins-says"); if (p) p.textContent = counts.size ? [...counts].map(([n, k]) => k + " " + n).join(" · ") : "Nothing on this page has a colour theme yet."; }
+}
+// ── Item 118: picking a ready-made look shows the whole page at half size (desktop) ──
+function dcZoomSync() {
+  const p = $("settingsPanel"), stage = $("dpStage");
+  const on = !!(p && p.classList.contains("on") && PANEL_MODE === "styles" && STYLES_TAB === "looks" && window.innerWidth > 1180
+    && stage && !stage.classList.contains("dev-tablet") && !stage.classList.contains("dev-phone")) && document.documentElement.classList.contains("dc-edit");
+  document.documentElement.classList.toggle("dc-zoomout", on);
+  if (!on) return;
+  // the page keeps its own width, at half size, in the room between the dock and the Styles card
+  const fr = $("designPreview").closest(".dp-frame"), dk = $("dcDock"); if (!fr) return;
+  const b = fr.getBoundingClientRect(), c = p.getBoundingClientRect(), d = dk ? dk.getBoundingClientRect() : null;
+  const left = d && d.width ? Math.max(0, d.right - b.left + 16) : 0, right = Math.min(b.width, c.left - b.left - 16), w = b.width / 2;
+  fr.style.setProperty("--dc-zoom-x", Math.round(Math.max(0, left + Math.max(0, (right - left - w) / 2))) + "px");
+}
+function dcColourAids() { dcThemeTags(); dcZoomSync(); }
 // round swatches; "" is the slashed circle for the default
 function insSwatches(host, label, opts, cur, onPick) {
   const wrap = el("div", "ins-field");
@@ -13714,6 +13914,10 @@ function dcInjectCanvas(doc, main, live) {
       // the name chip at the section's top left: what it is and what kind
       "#dds-dc-chip{position:absolute;z-index:2147483000;display:none;align-items:center;height:24px;max-width:min(60vw,360px);padding:0 10px;border-radius:999px;background:var(--ddsdc-p-soft);color:var(--ddsdc-p);font:600 12px/1 var(--ddsdc-sans);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;pointer-events:none}" +
       "#dds-dc-chip.on{display:inline-flex}" +
+      // item 118: each section's colour theme, while colours are being chosen
+      "#dds-dc-themes{position:absolute;left:0;top:0;width:0;height:0;z-index:2147482990;pointer-events:none}" +
+      ".dds-theme-tag{position:absolute;display:inline-flex;align-items:center;gap:6px;height:24px;padding:0 10px 0 6px;border-radius:999px;background:var(--ddsdc-card);border:1px solid var(--ddsdc-line);box-shadow:0 2px 8px rgba(0,0,0,.12);color:var(--ddsdc-ink);font:600 11.5px/1 var(--ddsdc-sans);white-space:nowrap}" +
+      ".dds-theme-tag i{width:12px;height:12px;border-radius:50%;border:1px solid var(--ddsdc-line2)}" +
       "#dds-dc-chip .dc-chip-type{font-weight:500;opacity:.8;margin-left:5px}" +
       "#dds-dc-chip.compact .dc-chip-type{display:none}" +
       // the More menu under the pill: copy, cut, hide, columns
@@ -14025,6 +14229,7 @@ function dcInjectCanvas(doc, main, live) {
   if (!live) dcBuildInserts(doc, main);   // AEM-style "＋ Add section" targets between sections
   try { dcInjectColControls(doc, main); } catch (_) {}   // Layout Mode column resize
   if (!live) dcBuildTree(main);           // left-rail Content Tree of every component on the page
+  dcThemeTags();                          // item 118: the theme tags follow every redraw
 }
 
 // ── AEM insertion targets: a clickable/droppable "＋ Add section" bar at every gap
