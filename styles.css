@@ -10,7 +10,7 @@
   --p-deep:#2A1B4A;       /* deep panel purple */
   --p-mist:#EDE8F7;       /* faint purple wash */
   --brass:#B08D57;        /* restrained metallic accent */
-  --brass-deep:#8A6B3C;
+  --brass-deep:#836539;    /* gold for text: 4.76:1 on --paper-2, 5.18:1 on paper (list item 137) */
   --muted:#6B6276;        /* secondary text */
   --hair:#E7E1D6;         /* hairline on paper */
   --hair-dk:rgba(255,255,255,.12);
@@ -29,15 +29,12 @@ img{max-width:100%;display:block}
 /* ---------- type ---------- */
 .serif{font-family:var(--serif)}
 h1,h2,h3{font-family:var(--serif);font-weight:380;letter-spacing:-.02em;line-height:1.04}
-/* Color is a 5% darkening of --brass-deep, not the token itself — .eyebrow is the
-   only component of the ~12 that use --brass-deep which regularly sits on
-   .panel-warm (#F4F0E9), where the token's own value measures 4.35:1, just under
-   AA's 4.5:1 floor. This passes there (4.76:1) and everywhere else the token
-   already passed (5.18:1 on paper, vs. 4.74:1 before) — a strict improvement,
-   not a trade-off. Found on the homepage, confirmed recurring on Solutions;
-   fixed at the source instead of patching per-page from here on. */
+/* --brass-deep used to be #8A6B3C, 4.35:1 on .panel-warm (#F4F0E9), just under
+   AA's 4.5:1. The eyebrow was darkened first, on its own; list item 137 found the
+   gold text links failing on the same panels and darkened the token itself, so
+   every gold text passes there (4.76:1) and on paper (5.18:1). */
 .eyebrow{font-family:var(--mono);font-size:11px;letter-spacing:.22em;text-transform:uppercase;
-  color:#836539;font-weight:500;display:inline-flex;align-items:center;gap:10px}
+  color:var(--brass-deep);font-weight:500;display:inline-flex;align-items:center;gap:10px}
 .eyebrow::before{content:"";width:22px;height:1px;background:var(--brass)}
 
 /* ---------- layout ---------- */

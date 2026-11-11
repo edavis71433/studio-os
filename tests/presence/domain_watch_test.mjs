@@ -70,7 +70,7 @@ ok('issued and renewed are on; pending and none are not', certIsOn('issued') && 
 // ═══ the wiring ═══
 {
   const life = read('supabase/functions/presence/commerce/lifecycle.ts');
-  ok('the watch asks under the registered name and records how it went', /rdapLookupDetailed\(site\.custom_domain\)/.test(life) && /domain_lookup_status: look\.status/.test(life));
+  ok('the watch asks under the registered name and records how it went', /rdapLookupDetailed\(site\.custom_domain\)/.test(life) && /\.\.\.lookupPatch\(look\)/.test(life) && /domain_lookup_status: look\.status/.test(read('supabase/functions/presence/lib/rdap.ts')));   // item 162: one home for what a lookup writes
   ok('the studio gets every rung by email', /emailOperator\(String\(studioSite\)/.test(life));
   ok('a stuck padlock is asked for again each day', /if \(padlock\.reask\) \{ await provisionSsl\(site\.netlify_site_id\)/.test(life));
   const admin = read('supabase/functions/presence/routes/admin.ts');

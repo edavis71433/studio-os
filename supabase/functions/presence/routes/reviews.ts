@@ -50,6 +50,9 @@ const appUrl = () => (Deno.env.get('APP_URL') || 'https://app.davisdigitalstudio
 const reviewPageUrl = (siteId: string) => `${appUrl()}/review.html?site=${siteId}`;
 /** The function's own address: the page's form posts here, and the viewer asks it for the page. */
 const reviewEndpoint = (siteId: string) => `${fnBase()}/functions/v1/presence/reviews/${siteId}`;
+/** Item 115: the Google review box for a place id — the link Google documents for
+ *  "write a review". Used only when the GBP listing hasn't handed us its own link. */
+const googleReviewLink = (placeId: string) => `https://search.google.com/local/writereview?placeid=${encodeURIComponent(placeId)}`;
 
 async function hashIp(req: Request): Promise<string> {
   const ip = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || '';
@@ -173,13 +176,98 @@ async function notifyOwnerOfReview(siteId: string, review: any): Promise<void> {
 const unavailable = (cors: Record<string, string>) =>
   json({ error: 'unavailable', message: 'Reviews need a one-time database update before they can be switched on.' }, 503, cors);
 
+// ── Item 115: reviews that go to GOOGLE ──────────────────────────────────────
+// A review request can send the customer to the business's Google review box
+// instead of the site's own review page. The link comes from the site's Google
+// Business Profile connection when its listing read has run (Google hands back
+// metadata.newReviewUri), else from a place id the owner pastes once
+// (presence_identity.google_place_id, migration 0163). Google's approval of the
+// platform's listing access is still pending, so everything here degrades
+// plainly: no link → the page says so and the site's own page keeps working.
+
+export interface GoogleReviewFacts {
+  connected: boolean;            // the GBP connection row says 'connected'
+  link: string | null;           // where a Google review request sends people
+  source: 'google' | 'pasted' | null;
+  place_id: string | null;       // the pasted id (never the listing's own link)
+  can_save_place_id: boolean;    // false before migration 0163 is applied
+  listing: {                     // the pulled-in Google reviews, aggregate only
+    rating: number | null; review_count: number | null;
+    new_reviews: number | null; unreplied: number | null;
+    name: string; maps_uri: string; as_of: string | null;
+  } | null;
+}
+
+/** What the site knows about its Google review box and Google reviews, honestly. */
+export async function googleReviewFacts(siteId: string): Promise<GoogleReviewFacts> {
+  const [connQ, dataQ, identQ] = await Promise.all([
+    svc(`presence_connections?site_id=eq.${siteId}&provider_key=eq.google_business_profile&select=status,health&limit=1`).catch(() => ({ ok: false } as any)),
+    svc(`presence_connected_data?site_id=eq.${siteId}&provider_key=eq.google_business_profile&select=data,fetched_at&limit=1`).catch(() => ({ ok: false } as any)),
+    svc(`presence_identity?site_id=eq.${siteId}&select=google_place_id&limit=1`).catch(() => ({ ok: false } as any)),
+  ]);
+  const conn = rows(connQ)[0] || null;
+  const dataRow = rows(dataQ)[0] || null;
+  const d = (dataRow?.data && typeof dataRow.data === 'object') ? dataRow.data as Record<string, unknown> : null;
+  const listingLink = String(d?.listing_review_uri || '').slice(0, 500).trim();
+  // Before migration 0163 the column read fails — read as "no pasted id, can't save one".
+  const canSave = !!(identQ as any)?.ok;
+  const pastedId = canSave ? String(rows(identQ)[0]?.google_place_id || '').trim() : '';
+  const num = (v: unknown) => (typeof v === 'number' && Number.isFinite(v)) ? v : null;
+  return {
+    connected: conn?.status === 'connected',
+    link: listingLink || (pastedId ? googleReviewLink(pastedId) : null),
+    source: listingLink ? 'google' : (pastedId ? 'pasted' : null),
+    place_id: pastedId || null,
+    can_save_place_id: canSave,
+    listing: d ? {
+      rating: num(d.rating), review_count: num(d.review_count),
+      new_reviews: num(d.new_reviews), unreplied: num(d.unreplied_reviews),
+      name: String(d.listing_name || '').slice(0, 200), maps_uri: String(d.listing_maps_uri || '').slice(0, 500),
+      as_of: dataRow?.fetched_at || null,
+    } : null,
+  };
+}
+
+/** Item 115: the customers whose invoice or deposit was PAID lately — the moment
+ *  worth an ask. A read, never a send: the page offers them as a ticked list and
+ *  the owner presses the button. Best-effort — any trouble reads as an empty list. */
+async function recentlyPaidContacts(siteId: string): Promise<Array<{ contact_id: string; name: string; email: string; paid_at: string; title: string; amount_cents: number; purpose: string }>> {
+  try {
+    const since = new Date(Date.now() - 60 * 86400_000).toISOString();
+    const invs = rows(await svc(`presence_invoices?site_id=eq.${siteId}&status=eq.paid&paid_at=gte.${encodeURIComponent(since)}&deleted_at=is.null&deal_id=not.is.null&select=deal_id,title,amount_cents,purpose,paid_at&order=paid_at.desc&limit=30`));
+    const dealIds = [...new Set(invs.map((i) => String(i.deal_id)).filter((id) => UUID_RE.test(id)))];
+    if (!dealIds.length) return [];
+    const deals = rows(await svc(`presence_deals?id=in.(${dealIds.join(',')})&site_id=eq.${siteId}&select=id,contact_id`));
+    const contactOfDeal = new Map(deals.filter((dl) => dl.contact_id).map((dl) => [String(dl.id), String(dl.contact_id)]));
+    const contactIds = [...new Set([...contactOfDeal.values()].filter((id) => UUID_RE.test(id)))];
+    if (!contactIds.length) return [];
+    const contacts = rows(await svc(`presence_contacts?id=in.(${contactIds.join(',')})&site_id=eq.${siteId}&deleted_at=is.null&select=id,name,email`));
+    const byId = new Map(contacts.map((c) => [String(c.id), c]));
+    const out: Array<{ contact_id: string; name: string; email: string; paid_at: string; title: string; amount_cents: number; purpose: string }> = [];
+    const seen = new Set<string>();
+    for (const inv of invs) {   // newest first — one row per person, their latest payment
+      const cid = contactOfDeal.get(String(inv.deal_id));
+      const c = cid ? byId.get(cid) : null;
+      const email = String(c?.email || '').trim().toLowerCase();
+      if (!c || !email || seen.has(cid!)) continue;
+      seen.add(cid!);
+      out.push({ contact_id: cid!, name: String(c.name || '').slice(0, 120), email, paid_at: String(inv.paid_at || ''), title: String(inv.title || '').slice(0, 120), amount_cents: Number(inv.amount_cents) || 0, purpose: String(inv.purpose || '') });
+    }
+    return out;
+  } catch { return []; }
+}
+
 /** The moderation queue: pending first (what needs the owner), then approved + hidden,
  *  plus the HONEST aggregate over approved rows (mirrors what the site displays). */
 export async function handleReviewsList(req: Request, site: SiteRow, cors: Record<string, string>): Promise<Response> {
   const u = new URL(req.url);
   const filter = u.searchParams.get('status');   // optional: pending|approved|hidden
   const scope = (filter === 'pending' || filter === 'approved' || filter === 'hidden') ? `&status=eq.${filter}` : '';
-  const r = await svc(`presence_reviews?site_id=eq.${site.id}${scope}&select=id,reviewer_name,reviewer_email,rating,body,status,owner_reply,source,created_at,approved_at&order=created_at.desc&limit=300`);
+  const [r, google, recentlyPaid] = await Promise.all([
+    svc(`presence_reviews?site_id=eq.${site.id}${scope}&select=id,reviewer_name,reviewer_email,rating,body,status,owner_reply,source,created_at,approved_at&order=created_at.desc&limit=300`),
+    googleReviewFacts(site.id),
+    recentlyPaidContacts(site.id),
+  ]);
   if (!r.ok) return unavailable(cors);
   const all = rows(r);
   const approved = all.filter((x) => x.status === 'approved');
@@ -193,7 +281,31 @@ export async function handleReviewsList(req: Request, site: SiteRow, cors: Recor
     },
     aggregate: agg,
     aggregate_text: aggregateText(agg),
+    google,
+    recently_paid: recentlyPaid,
   } }, 200, cors);
+}
+
+/** Item 115: save (or clear) the pasted Google place id — the paste-once fallback
+ *  while the listing connection waits on Google. Accepts the bare id or the full
+ *  "write a review" link, and stores only the id. A configure write (it decides
+ *  where review requests send people), gated in lib/site_roles.ts. */
+export async function handleReviewGoogleLink(req: Request, site: SiteRow, _principal: Principal, cors: Record<string, string>): Promise<Response> {
+  let b: any = {}; try { b = await req.json(); } catch { return json({ error: 'bad_json' }, 400, cors); }
+  const raw = String(b?.place_id ?? '').trim().slice(0, 600);
+  let id = '';
+  if (raw) {
+    try { id = (new URL(raw).searchParams.get('placeid') || new URL(raw).searchParams.get('place_id') || '').trim(); } catch { id = raw; }
+    if (!/^[A-Za-z0-9_-]{10,200}$/.test(id)) {
+      return json({ error: 'bad_place_id', message: 'That doesn’t look like a Google place id. Paste the id itself, or the full “write a review” link from Google.' }, 400, cors);
+    }
+  }
+  const w = await svc('presence_identity?on_conflict=site_id', {
+    method: 'POST', headers: { Prefer: 'resolution=merge-duplicates,return=representation' },
+    body: JSON.stringify({ site_id: site.id, google_place_id: id || null }),
+  });
+  if (!w.ok || !rows(w)[0]) return json({ error: 'unavailable', message: 'Saving the Google link needs a one-time database update first. Nothing was changed.' }, 503, cors);
+  return json({ data: { ok: true, place_id: id || null, link: id ? googleReviewLink(id) : null } }, 200, cors);
 }
 
 /** Dismiss the "new review" bell nudge tied to ONE review once the owner has acted. */
@@ -242,6 +354,40 @@ export async function handleReviewReply(req: Request, site: SiteRow, id: string,
  *  never posts a review on their behalf. Target by contact_id OR a raw email+name. */
 export async function handleReviewRequest(req: Request, site: SiteRow, _principal: Principal, cors: Record<string, string>): Promise<Response> {
   let b: any = {}; try { b = await req.json(); } catch { return json({ error: 'bad_json' }, 400, cors); }
+
+  // Item 115: the request can point at the business's GOOGLE review box instead
+  // of the site's own review page — only when a Google link actually exists.
+  const destination = b?.destination === 'google' ? 'google' : 'site';
+  let googleLink = '';
+  if (destination === 'google') {
+    const g = await googleReviewFacts(site.id);
+    if (!g.link) return json({ error: 'no_google_link', message: 'There’s no Google review link yet. Paste the business’s Google place id (or connect its Google listing) first.' }, 409, cors);
+    googleLink = g.link;
+  }
+
+  // Item 115: "sendable to a ticked list" — contact_ids sends one ask per ticked
+  // person, each behind the SAME guards as a single ask (site cap, once a month
+  // per person, suppression at the one send point). Never more than 50 at once.
+  const tickedIds: string[] = Array.isArray(b?.contact_ids) ? [...new Set(b.contact_ids.map((x: unknown) => String(x)).filter((x: string) => UUID_RE.test(x)))].slice(0, 50) as string[] : [];
+  if (tickedIds.length) {
+    const contacts = rows(await svc(`presence_contacts?id=in.(${tickedIds.join(',')})&site_id=eq.${site.id}&deleted_at=is.null&select=id,name,email`));
+    const ownerAddress = await ownerReplyTo(site.id);   // one lookup for the whole list
+    let sent = 0;
+    const skipped: Array<{ name: string; reason: string }> = [];
+    const label = (c: any) => String(c?.name || c?.email || 'A customer').slice(0, 120);
+    for (const id of tickedIds) {
+      const c = contacts.find((x) => String(x.id) === id);
+      if (!c) { skipped.push({ name: 'A ticked person', reason: 'not_found' }); continue; }
+      const em = String(c.email || '').trim().toLowerCase();
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(em)) { skipped.push({ name: label(c), reason: 'no_email' }); continue; }
+      if (!(await rateAllow(`reviewask:site:${site.id}`, 20, 3600))) { skipped.push({ name: label(c), reason: 'site_limit' }); continue; }
+      if (!(await rateAllow(await reviewAskBucket(site.id, em), 1, REVIEW_ASK_WINDOW))) { skipped.push({ name: label(c), reason: 'asked_recently' }); continue; }
+      if (await sendReviewAsk(site.id, em, String(c.name || '').trim().slice(0, 120), ownerAddress, googleLink || undefined)) sent++;
+      else skipped.push({ name: label(c), reason: 'opted_out' });
+    }
+    return json({ data: { ok: true, sent, skipped, destination } }, 200, cors);
+  }
+
   let email = String(b?.email || '').trim().toLowerCase();
   let name = String(b?.name || '').trim().slice(0, 120);
   const contactId = String(b?.contact_id || '').trim();
@@ -258,8 +404,8 @@ export async function handleReviewRequest(req: Request, site: SiteRow, _principa
   }
 
   // sendEmail returns false when suppressed (opt-out/bounce) — report calmly either way.
-  const sent = await sendReviewAsk(site.id, email, name);
-  return json({ data: { ok: true, sent, email } }, 200, cors);
+  const sent = await sendReviewAsk(site.id, email, name, undefined, googleLink || undefined);
+  return json({ data: { ok: true, sent, email, destination } }, 200, cors);
 }
 
 /** Item 73: one person is asked for a review at most once in this window. */
@@ -275,20 +421,25 @@ export async function reviewAskBucket(siteId: string, email: string): Promise<st
  *  A reply reaches the business that asked (item 72): `replyTo` is its owner's address
  *  when the caller already read it (the sweep reads every site's at once), else it is
  *  looked up here. False when the address is suppressed (opt-out or bounce). */
-export async function sendReviewAsk(siteId: string, email: string, name: string, replyTo?: string): Promise<boolean> {
+export async function sendReviewAsk(siteId: string, email: string, name: string, replyTo?: string, googleLink?: string): Promise<boolean> {
   const [identR, brand, ownerAddress] = await Promise.all([
     svc(`presence_identity?site_id=eq.${siteId}&select=business_name&limit=1`),
     loadEmailBrand(siteId),
     replyTo === undefined ? ownerReplyTo(siteId) : replyTo,
   ]);
   const biz = rows(identR)[0]?.business_name || 'us';
-  const link = reviewPageUrl(siteId);
+  // Item 115: a Google-destination ask links the Google review box; the words
+  // change only where honesty demands it (a Google review is public right away —
+  // nothing is "seen by us first").
+  const link = googleLink || reviewPageUrl(siteId);
   const hi = name ? `Hi ${esc(name.slice(0, 120))},` : 'Hi there,';
   return await sendEmail(email, `How was your experience with ${biz}?`,
     `<p>${hi}</p>` +
     `<p>Thanks for choosing ${esc(biz)}. If you have a moment, we’d love a quick review — it really helps.</p>` +
-    `<p class="cta"><a href="${esc(link)}" style="display:inline-block;margin-top:6px;background:${brand.accent};color:#fff;padding:11px 20px;border-radius:999px;text-decoration:none;font-weight:600">Leave a review →</a></p>` +
-    `<p style="color:#888;font-size:.85rem;margin-top:14px">It only takes a minute, and your words appear on our site once we’ve seen them.</p>`, brand, { replyTo: ownerAddress });
+    `<p class="cta"><a href="${esc(link)}" style="display:inline-block;margin-top:6px;background:${brand.accent};color:#fff;padding:11px 20px;border-radius:999px;text-decoration:none;font-weight:600">${googleLink ? 'Review us on Google →' : 'Leave a review →'}</a></p>` +
+    (googleLink
+      ? `<p style="color:#888;font-size:.85rem;margin-top:14px">It only takes a minute, and your review goes straight onto our Google listing.</p>`
+      : `<p style="color:#888;font-size:.85rem;margin-top:14px">It only takes a minute, and your words appear on our site once we’ve seen them.</p>`), brand, { replyTo: ownerAddress });
 }
 
 // ═════════ the public review page HTML (self-contained, zero external origins) ═════════

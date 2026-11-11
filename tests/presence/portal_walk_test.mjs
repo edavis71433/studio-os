@@ -52,7 +52,9 @@ ok('to-dos are called to-dos; approvals need your OK', /to-do\$\{s\.todos\.lengt
 ok('a paid invoice says when', /Paid\$\{paidOn\?' '\+esc\(paidOn\):''\} — thank you\./.test(cl));
 ok('no booking times → Ask for a call, prefilled', /openSupport\(null,'requests',\{subject:'A call',body:'I’d like to book a call\. Times that work for me: '\}\)/.test(cl));
 ok('each tab names itself', /document\.title=\(\{home:'Home',messages:'Messages',files:'Files',invoices:'Invoices',requests:'Requests',help:'Help'\}\[tab\]\|\|'Home'\)\+' — '\+studioBrand\(\)/.test(cl));   // builder list item 59: the studio's own name when there is one
-ok('phones: an odd last tile fills its row; mid widths fit all six tabs', /\.glance \.gt:last-child:nth-child\(odd\)\{grid-column:1\/-1\}/.test(cl) && /@media \(min-width:720px\) and \(max-width:920px\)\{\.tab \.ti\{display:none\}/.test(cl));
+// item 179: the at-a-glance strip left Home (its count lives in the "Needs you · N"
+// heading), so only the mid-width tab rule remains pinned here.
+ok('mid widths fit all six tabs', /@media \(min-width:720px\) and \(max-width:920px\)\{\.tab \.ti\{display:none\}/.test(cl));
 
 console.log(`\n${pass} passed, ${fail} failed`);
 if (fail) { console.log('Failed:\n  ' + failed.join('\n  ')); Deno.exit(1); }

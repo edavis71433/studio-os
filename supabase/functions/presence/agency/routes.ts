@@ -70,7 +70,7 @@ export async function gather(agencyId: string, nowIso: string): Promise<Portfoli
   // wave, and the three reads that wait on it (the latest runs' evidence, the
   // client names, their billing) go side by side — six waits became four.
   const [sitesQ, momQ, oppQ, planQ, draftQ, connQ, revQ, brandQ, evtQ, runQ, leadsQ, noticesQ, filesQ, slQ] = await Promise.all([
-    svc(`presence_sites?id=in.(${ids.join(',')})&select=id,client_id,edition,status,last_published_at,custom_domain,domain_registrar,domain_expires_at,cert_expires_at,cert_pending_since,domain_serving&limit=1000`),   // cert_*: item 134 (0149); domain_serving (0153)
+    svc(`presence_sites?id=in.(${ids.join(',')})&select=id,client_id,edition,status,last_published_at,custom_domain,domain_registrar,domain_expires_at,cert_expires_at,cert_pending_since,domain_serving,domain_statuses&limit=1000`),   // cert_*: item 134 (0149); domain_serving (0153); domain_statuses: item 162 (0162)
     svc(`presence_moments?${IN}&status=eq.active&select=site_id,moment_key,moment_type,headline&limit=1000`),
     svc(`presence_growth_opportunities?${IN}&status=eq.open&select=site_id,area,opportunity,timing_ends,created_at&limit=1000`),
     svc(`presence_infra_plans?${IN}&status=in.(proposed,approved)&select=site_id,kind,title,status&limit=1000`),
@@ -233,7 +233,7 @@ async function handleAgencyInner(req: Request, route: string, method: string, me
     // which sites are archived, alongside the list: the roster page folds the
     // bridge list (/studio/customers) into these rows and must NOT give an
     // archived client a fresh bridge-only row in All. Same read, no second gather.
-    const archivedSiteIds = all.filter((r) => r.archived).map((r) => r.site_id);
+    const archivedSiteIds = all.filter((r) => r.archived || r.trashed).map((r) => r.site_id);   // item 154: nor a trashed one
     return json({ data: out, archived_site_ids: archivedSiteIds }, 200, cors);
   }
 

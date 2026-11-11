@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Studio OS</title>
+<meta name="robots" content="noindex,nofollow">
+<!-- ═══════════════════════════════════════════════════════════════════════════
+  The bare app address (list item 139). app.davisdigitalstudio.com/ used to show an
+  old copy of the marketing site, a second home page for search engines. It is a door
+  now: someone signed in goes on into the app (each sign-in door sends a signed-in
+  person straight to their own landing page), and everyone else goes to the main
+  site. _redirects serves this page at the app host's root only.
+═══════════════════════════════════════════════════════════════════════════ -->
+<style>
+  body{font-family:'Inter',-apple-system,'Segoe UI',sans-serif;color:#1b1525;background:#faf8f5;max-width:460px;margin:16vh auto;padding:0 24px;text-align:center;line-height:1.6}
+  a{color:#5b3fa0;font-weight:600}
+</style>
+<script>
+  (function () {
+    var has = function (k) { try { return !!localStorage.getItem(k); } catch (e) { return false; } };
+    location.replace(has('dds-portal-auth') ? '/studio' : has('dds-client-auth') ? '/portal.html' : 'https://davisdigitalstudio.com/');
+  })();
+</script>
+</head>
+<body>
+  <p><a href="https://davisdigitalstudio.com/">Davis Digital Studio</a> · <a href="/studio">Studio sign in</a> · <a href="/portal.html">Client sign in</a></p>
+</body>
+</html>
