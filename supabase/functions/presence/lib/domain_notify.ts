@@ -25,11 +25,17 @@ export function byWhom(p: { scope?: unknown; kind?: string; email?: string | nul
   return p.email ? String(p.email) : 'someone on your account';
 }
 
-export type DomainChange = 'attached' | 'changed' | 'removed' | 'mail_gone';
+export type DomainChange = 'attached' | 'changed' | 'removed' | 'mail_gone' | 'live';
 /** Pure: the email for one change, plain words, no hosting company's name. */
 export function domainChangeEmail(kind: DomainChange, o: { domain: string; old?: string | null; forwarded?: boolean; by?: string; builtIn?: string | null; mx?: string[]; recordsAt?: string | null }): { subject: string; html: string } {
   const d = escHtml(o.domain), by = escHtml(o.by || 'someone on your account');
   const unexpected = '<p>If this wasn’t expected, reply to this email.</p>';
+  // item 164 (review domains finding 13): the moment it's live, said once
+  if (kind === 'live') {
+    const bare = o.domain.startsWith('www.') ? o.domain.slice(4) : o.domain;
+    const pair = /^[^.]+\.[^.]+$/.test(bare) ? ` Visitors who type ${escHtml(bare)} or www.${escHtml(bare)} end up there.` : '';
+    return { subject: `Your website is live at ${o.domain}`, html: `<p>Your website is live at <a href="https://${d}">${d}</a>, with the padlock on.${pair}</p><p>Share it anywhere: it’s the address to print, post and hand out.</p>` };
+  }
   if (kind === 'attached') return {
     subject: `${o.domain} was connected to your website`,
     html: `<p><strong>${d}</strong> was connected to your website by ${by}.</p><p>It goes live once its two records are added where the domain’s settings are kept.</p>${unexpected}`,
@@ -84,6 +90,29 @@ export async function afterResponse(work: Promise<unknown>, capMs = 3000): Promi
     await Promise.race([safe, new Promise((res) => { timer = setTimeout(res, capMs); })]);
     if (timer !== undefined) clearTimeout(timer);
   } catch { /* best-effort */ }
+}
+
+/** Item 164 (review domains finding 13): "your website is live" goes to the owner and the studio
+ *  the first time a domain passes every check, once per domain (a settings row remembers it,
+ *  written compare-and-swap so two checks at once still send one). The studio's delivery
+ *  checklist ticks "Domain connected" at the same moment. True when it went out now. */
+export async function announceLiveOnce(site: { id: string; client_id?: string | null }, domain: string, nowIso: string): Promise<boolean> {
+  try {
+    const { readReservedJson, updateReservedJson, RESERVED_NAMES } = await import('./reserved_store.ts');
+    const seen = await readReservedJson(site.id, RESERVED_NAMES.domainLive) as { domain?: string } | null;
+    if (seen && seen.domain === domain) return false;   // the usual case: told already, nothing written
+    let fresh = false;
+    const r = await updateReservedJson(site.id, RESERVED_NAMES.domainLive, (cur) => {
+      const c = cur as { domain?: string; at?: string } | null;
+      fresh = !(c && c.domain === domain);
+      return fresh ? { domain, at: nowIso } : c;
+    }, 'system');
+    if (r === null || !fresh) return false;
+    await tellOwnerAndStudio(site, domainChangeEmail('live', { domain }), 'domain-live');
+    const { tickChecklistForCustomerSite } = await import('./service_bridge.ts');
+    await tickChecklistForCustomerSite(site.id, 'domain_connected', 'domain-live', 'system').catch(() => false);
+    return true;
+  } catch { return false; }
 }
 
 // ── forwarding an old name (finding 12) ──

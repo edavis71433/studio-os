@@ -29,7 +29,7 @@ import {
 import { computeReadiness } from './monitor.ts';
 import { applyPlan } from './foundations.ts';
 import { domainHealth, domainTruth, twinName, dnsRecordsSure } from '../lib/domain_health.ts';
-import { byWhom, domainChangeEmail, tellOwnerAndStudio, afterResponse, escHtml } from '../lib/domain_notify.ts';
+import { byWhom, domainChangeEmail, tellOwnerAndStudio, afterResponse, escHtml, announceLiveOnce } from '../lib/domain_notify.ts';
 import { writeReservedJson, RESERVED_NAMES } from '../lib/reserved_store.ts';
 import { rdapLookupDetailed, lookupPatch, whereToGo } from '../lib/rdap.ts';
 import { rateAllow } from '../lib/ratelimit.ts';
@@ -245,6 +245,8 @@ export async function handleDomain(req: Request, method: string, site: SiteRow, 
     if (st.health === 'ok' && site.custom_domain && site.netlify_site_id) {
       // the registered name the lookup found tells "www." twins from sub-names (shop.example.com has none)
       const truth = await domainTruth({ custom_domain: site.custom_domain, netlify_site_id: site.netlify_site_id }, facts.registered).catch(() => null);
+      // item 164 (finding 13): the first time every check passes, the owner and the studio hear it's live
+      if (truth && truth.all_ok) await afterResponse(announceLiveOnce({ id: site.id, client_id: (site as { client_id?: string | null }).client_id || null }, site.custom_domain, new Date().toISOString()));
       if (truth) return json({ data: { ...st, provider: facts.provider, changes, serving: truth.serving, checklist: truth.checklist, all_ok: truth.all_ok } }, 200, cors);
     }
     return json({ data: { ...st, provider: facts.provider, changes } }, 200, cors);
@@ -270,7 +272,8 @@ export async function handleDomain(req: Request, method: string, site: SiteRow, 
     const old = site.custom_domain && site.custom_domain.toLowerCase() !== domain ? site.custom_domain.toLowerCase() : null;
     const keepOld = !!old && body?.keep_old === true;
     const set = await setCustomDomain(site.netlify_site_id, domain);
-    if (!set.ok) return json({ error: 'domain_failed', message: 'The hosting provider rejected that domain — it may be attached to another account. Detail (operator): ' + (set.error || 'unknown') }, 502, cors);
+    // item 164 (review domains finding 18): the hosting company's own words stay in the log, not on the client's screen
+    if (!set.ok) { console.warn(`[domain] attach refused for site ${site.id}: ${set.error || 'unknown'}`); return json({ error: 'domain_failed', message: 'That domain couldn’t be connected. It may still be connected to a website somewhere else: remove it there first, or ask your studio.' }, 502, cors); }
     if (old || (set.site?.domain_aliases || []).length) {
       const before = (set.site?.domain_aliases || []).map((a) => a.toLowerCase());
       const isNew = new Set(names);   // the new name (and its www. twin) is the main one now, never also an extra
@@ -296,13 +299,13 @@ export async function handleDomain(req: Request, method: string, site: SiteRow, 
     const typed = String(body?.confirm || '').trim().toLowerCase().replace(/^https?:\/\//, '').replace(/[/?#].*$/, '').replace(/\.$/, '');
     if (typed !== site.custom_domain.toLowerCase()) return json({ error: 'confirm_needed', message: `To remove it, type ${site.custom_domain} exactly.` }, 400, cors);
     const removed = await setCustomDomain(site.netlify_site_id, null);
-    if (!removed.ok) return json({ error: 'domain_failed', message: 'Could not detach the domain — try again. Detail (operator): ' + (removed.error || 'unknown') }, 502, cors);
+    if (!removed.ok) { console.warn(`[domain] remove failed for site ${site.id}: ${removed.error || 'unknown'}`); return json({ error: 'domain_failed', message: 'The domain couldn’t be removed just now. Try again in a minute.' }, 502, cors); }
     if ((removed.site?.domain_aliases || []).length) await setDomainAliases(site.netlify_site_id, []).catch(() => null);   // nothing left to send them on to
     await svc(`presence_sites?id=eq.${site.id}`, { method: 'PATCH', body: JSON.stringify({ custom_domain: null }) });
     await writeChangeEvent({ siteId: site.id, entityType: 'domain', entityId: null, action: 'delete', summary: `Removed domain ${site.custom_domain}`, principal, provenance: 'human' });
     await afterResponse(tellOwnerAndStudio({ id: site.id, client_id: (site as { client_id?: string | null }).client_id || null },
       domainChangeEmail('removed', { domain: site.custom_domain, by: byWhom(principal), builtIn: removed.site?.default_domain || null }), 'domain-removed'));
-    return json({ data: { ok: true, message: 'Domain removed — the site still serves from its netlify.app address.' } }, 200, cors);
+    return json({ data: { ok: true, message: 'Domain removed. Your site is still online at its built-in address.' } }, 200, cors);
   }
   return null;
 }

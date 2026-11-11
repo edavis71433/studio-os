@@ -26,7 +26,7 @@ import { deleteSite } from '../lib/netlify.ts';
 import { getSite } from '../lib/netlify.ts';
 import { rdapLookupDetailed, daysUntil, expiryRung, expiryWords, lookupPatch } from '../lib/rdap.ts';
 import { domainHealth, padlockAfterCheck, domainTruth, dnsRecordsSure } from '../lib/domain_health.ts';
-import { mailWatch, domainChangeEmail, tellOwnerAndStudio } from '../lib/domain_notify.ts';
+import { mailWatch, domainChangeEmail, tellOwnerAndStudio, announceLiveOnce } from '../lib/domain_notify.ts';
 import type { DomainMail } from '../lib/domain_notify.ts';
 import { whereToGo } from '../lib/rdap.ts';
 import { provisionSsl } from '../lib/netlify.ts';
@@ -397,6 +397,8 @@ export async function checkOneDomain(site: DomainCheckSite, nowIso = new Date().
     }
     // item 134 (review findings 3 and 5): what the domain really shows, and both names
     truth = await domainTruth({ custom_domain: site.custom_domain, netlify_site_id: site.netlify_site_id }, look.status === 'ok' ? look.name : null).catch(() => null);
+    // item 164 (review domains finding 13): the first day every check passes, "your website is live"
+    if (truth && truth.all_ok) await announceLiveOnce({ id: site.id, client_id: site.client_id }, site.custom_domain, nowIso);
   }
   await svc(`presence_sites?id=eq.${site.id}`, { method: 'PATCH', body: JSON.stringify({
     domain_checked_at: nowIso,
