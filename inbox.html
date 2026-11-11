@@ -470,6 +470,10 @@ let VIEW=['needs','messages','ok','enquiries','website','support'].indexOf(HASH_
 // status chip · kind · order. Open = still in play (new, read, replied,
 // converted); Not a fit / archived only under All.
 let EFILTER='open',KIND_F='all',SORT='newest';
+// item 140: the Spam chip's rows (what the spam checks held back in the last 30 days), read
+// on first use; null until then. They join ITEMS as queue rows marked spam, which only the
+// Spam chip shows.
+let SPAM=null,SPAM_FAILED=false;
 // ── the client · project lenses (D-filter) ───────────────────────────────────
 // Eric: "messages still cant be filtered by project/contact unless i go through
 // their profile". This is a LENS, not a relocation. Every option is derived from
@@ -525,7 +529,7 @@ const viewMatch=(it)=>matchView(VIEW,it);
 // queue's own default
 function vchipCount(v){
   let rows=ITEMS.filter(it=>matchView(v,it)).filter(lensMatch);
-  if(v==='enquiries')rows=rows.filter(it=>{const st=String((it.lead||{}).status||'new');return st!=='archived'&&st!=='not_a_fit';});
+  if(v==='enquiries')rows=rows.filter(it=>{const st=String((it.lead||{}).status||'new');return !it.spam&&st!=='archived'&&st!=='not_a_fit';});
   return rows.length+(v==='everything'?SYSROWS.filter(lensMatch).length:0);
 }
 function paintVchips(){
@@ -737,7 +741,7 @@ function renderConsole(){
 function enqToolbar(){
   const chip=(f,label)=>`<button type="button" data-ef="${f}" aria-pressed="${EFILTER===f?'true':'false'}" class="${EFILTER===f?'on':''}">${label}${f==='all'?'':' <span class="n" hidden></span>'}</button>`;
   const opt=(v,label,cur)=>`<option value="${v}"${cur===v?' selected':''}>${label}</option>`;
-  return `<div class="efilt" id="efilt" role="group" aria-label="Filter enquiries">${chip('open','Open')}${chip('new','New')}${chip('all','All')}</div>
+  return `<div class="efilt" id="efilt" role="group" aria-label="Filter enquiries">${chip('open','Open')}${chip('new','New')}${chip('all','All')}${chip('spam','Spam')}</div>
     <div class="ebar">
       <select id="kindf" aria-label="Filter by kind" data-on="${KIND_F==='all'?'0':'1'}">${opt('all','All kinds',KIND_F)}${opt('quote','Quotes',KIND_F)}${opt('booking','Bookings',KIND_F)}${opt('contact','Messages',KIND_F)}</select>
       <select id="sortf" aria-label="Sort enquiries">${opt('newest','Newest',SORT)}${opt('oldest','Oldest',SORT)}</select>
@@ -750,6 +754,7 @@ function wireEnqToolbar(){
     EFILTER=b.getAttribute('data-ef');
     ef.querySelectorAll('[data-ef]').forEach(x=>{const on=x===b;x.classList.toggle('on',on);x.setAttribute('aria-pressed',on?'true':'false');});
     narrowed();
+    if(EFILTER==='spam'&&SPAM===null)loadSpam().then(narrowed);
   }));
   const kf=$('kindf');kf.addEventListener('change',()=>{KIND_F=kf.value;kf.setAttribute('data-on',KIND_F==='all'?'0':'1');narrowed();});
   const sf=$('sortf');sf.addEventListener('change',()=>{SORT=sf.value;narrowed();});
@@ -758,8 +763,8 @@ function wireEnqToolbar(){
 // the queue's counts on the Open / New chips — every enquiry, before search
 function paintEnqCounts(){
   const ef=$('efilt');if(!ef)return;
-  const q=ITEMS.filter(x=>x.kind==='lead'&&viewMatch(x)).map(x=>String((x.lead&&x.lead.status)||'new'));
-  const n={open:q.filter(s=>s!=='archived'&&s!=='not_a_fit').length,new:q.filter(s=>s==='new').length};
+  const q=ITEMS.filter(x=>x.kind==='lead'&&!x.spam&&viewMatch(x)).map(x=>String((x.lead&&x.lead.status)||'new'));
+  const n={open:q.filter(s=>s!=='archived'&&s!=='not_a_fit').length,new:q.filter(s=>s==='new').length,spam:SPAM?SPAM.length:0};
   ef.querySelectorAll('[data-ef] .n').forEach(s=>{const v=n[s.parentNode.getAttribute('data-ef')]||0;s.textContent=String(v);s.hidden=!v;});
 }
 // a narrower list: the roving index resets, and a selection the list no longer
@@ -846,6 +851,7 @@ function rowMatch(r){
 function enqMatch(r){
   if(VIEW!=='enquiries'||r.kind!=='lead')return true;
   const l=r.lead||{},st=String(l.status||'new');
+  if(EFILTER==='spam'||r.spam)return EFILTER==='spam'&&!!r.spam&&(KIND_F==='all'||(l.form_kind||'contact')===KIND_F);   // item 140
   if(EFILTER==='open'&&(st==='archived'||st==='not_a_fit'))return false;
   if(EFILTER==='new'&&st!=='new')return false;
   return KIND_F==='all'||(l.form_kind||'contact')===KIND_F;
@@ -870,6 +876,7 @@ const leadState=(l)=>{
 function rowChip(r){
   if(!r.lead)return r.chip||'';
   const st=leadState(r.lead);
+  if(r.spam)return (KIND[r.lead.form_kind]||'Message')+' · Spam';   // item 140: what the spam checks held back
   return (KIND[r.lead.form_kind]||'Message')+(st?' · '+st:'');
 }
 // The lenses narrow by IDENTITY, not by text — a client row answers to its own
@@ -924,7 +931,8 @@ function renderList(){
     // included) with the "M new" qualifier; the chips carry the totals.
     const newN=convs.filter(i=>i.lead&&String(i.lead.status||'new')==='new').length;
     const oldN=convs.filter(i=>i.lead&&String(i.lead.status||'new')==='new'&&oldOf(i)).length;
-    $('lmeta').textContent=`${convs.length} enquir${convs.length===1?'y':'ies'} · ${newN} new${oldN?`, ${oldN} over a month old`:''} · Sorted by ${SORT==='oldest'?'oldest':'newest'}${CUT.queue?` · Showing your newest ${CUT.queue} only`:''}`;
+    $('lmeta').textContent=EFILTER==='spam'?(SPAM===null?'Looking in Spam…':`${convs.length} in Spam, from the last 30 days`)
+      :`${convs.length} enquir${convs.length===1?'y':'ies'} · ${newN} new${oldN?`, ${oldN} over a month old`:''} · Sorted by ${SORT==='oldest'?'oldest':'newest'}${CUT.queue?` · Showing your newest ${CUT.queue} only`:''}`;
     paintEnqCounts();
   }else{
     // "N waiting for a reply", not "need you": Home's Needs-you list is the one
@@ -950,6 +958,7 @@ function renderList(){
     if(VIEW==='enquiries'&&!FCLIENT&&!FPROJECT){
       const msg=(Q.trim()||KIND_F!=='all')?`No enquiries match${Q.trim()?` “${esc(Q.trim())}”`:' that filter'}.`
         :EFILTER==='new'?'No new enquiries — you’re caught up.'
+        :EFILTER==='spam'?(SPAM===null?'Looking in Spam…':SPAM_FAILED?'Spam couldn’t load just now. Refresh to try again.':'Nothing in Spam. What the spam checks hold back shows here for 30 days, with Not spam.')
         :'Nothing yet. When someone fills in your website’s contact form, it lands here — and in Customers.';
       rows.innerHTML=`<li class="lempty" role="presentation">${msg}${bits.length?`<div class="lclear"><button type="button" data-clear>${clearLabel(bits.length)}</button></div>`:''}</li>`;
       renderPane();return;
@@ -1038,7 +1047,39 @@ function renderPane(){
   if(it.kind==='message')return void paneMessage(host,it);
   if(it.kind==='support')return void paneSupport(host,it);
   if(it.kind==='approval')return void paneApproval(host,it);
+  if(it.kind==='lead'&&it.spam)return void paneSpam(host,it);
   if(it.kind==='lead')return void paneLead(host,it);
+}
+// item 140: a message the spam checks held back: what it said, why it's in Spam, and
+// Not spam, which brings it back as a new enquiry and stops marking that address.
+async function loadSpam(){
+  const r=await api('/forms/inbox?spam=1');
+  const list=(r.ok&&r.body.data&&Array.isArray(r.body.data.spam))?r.body.data.spam:null;
+  SPAM_FAILED=!list;
+  SPAM=(list||[]).map(l=>({kind:'lead',queue:true,spam:true,id:'spam:'+l.id,lead_id:String(l.id||''),name:l.name||l.email||l.phone||'Someone',who:l.name||l.email||'Someone',when:String(l.created_at||''),preview:l.message||'',chip:KIND[l.form_kind]||'Message',chipCls:'lead',unread:false,needs:false,lead:l}));
+  ITEMS=ITEMS.filter(x=>!x.spam).concat(SPAM);
+}
+function paneSpam(host,it){
+  const l=it.lead||{};
+  const contact=[l.email?esc(l.email):'',l.phone?esc(l.phone):''].filter(Boolean).join(' · ');
+  host.innerHTML=paneHead(it,`<span class="pchip plain">${esc(rowChip(it))}</span>${it.when?`<span>${esc(when(it.when))}</span>`:''}`,`<button id="notSpam" class="primary">Not spam</button>`)+
+    `<div class="pbody"><div class="card">
+      <p class="muted" style="font-size:13.5px;margin:0 0 8px">${esc(l.spam_reason||'')}</p>
+      ${contact?`<div style="font-size:13.5px;color:var(--soft)">${contact}</div>`:''}
+      ${l.message?`<div class="body">${esc(l.message)}</div>`:'<div class="body muted">No message — just their details.</div>'}
+    </div></div>`;
+  wireBack();
+  const b=$('notSpam');
+  b.addEventListener('click',async()=>{
+    b.disabled=true;
+    const r=await api('/forms/inbox/'+encodeURIComponent(it.lead_id),'POST',{spam:false});
+    if(!r.ok){toast('That didn’t update.');b.disabled=false;return;}
+    toast('Back in your enquiries, and that address is no longer marked as spam.');
+    SPAM=(SPAM||[]).filter(x=>x.lead_id!==it.lead_id);
+    ITEMS=ITEMS.filter(x=>x.id!==it.id);SEL='';
+    await refresh();
+    const rows=$('rows');if(rows)rows.focus();
+  });
 }
 const paneHead=(it,subHtml,actsHtml)=>`<div class="phead">
   <button type="button" class="pback" id="paneBack">← Inbox</button>
@@ -1420,7 +1461,7 @@ function paneLead(host,it){
   const inPipe=inPipeline(l),settled=inPipe||!!l.customer;
   host.innerHTML=paneHead(it,`<span class="pchip" style="background:var(--good-soft);color:var(--good)">${esc(it.chip)}</span>${leadState(l)?`<span class="pchip plain stchip ${esc(settled?'converted':st)}">${esc(leadState(l))}</span>`:''}${it.when?`<span>${esc(when(it.when))}</span>`:''}`,
     // bold redesign: the one-click deal sits in the head (Spam beside it); once in the pipeline, the way to it
-    inPipe?`<a class="btnlink" href="/crm.html?deal=${esc(l.deal_id)}&tab=deal" title="This website enquiry is in your pipeline">✓ In pipeline — view deal</a>`:`<button id="leadDeal" class="primary" title="Start a deal in your pipeline from this website enquiry">+ Make it a deal</button>${l.customer?'':`<button class="quiet" id="leadSpam" title="A bot or a vendor pitch — hidden for good">${si('flag')} Spam</button>`}`)+
+    inPipe?`<a class="btnlink" href="/crm.html?deal=${esc(l.deal_id)}&tab=deal" title="This website enquiry is in your pipeline">✓ In pipeline — view deal</a>`:`<button id="leadDeal" class="primary" title="Start a deal in your pipeline from this website enquiry">+ Make it a deal</button>${l.customer?'':`<button class="quiet" id="leadSpam" title="A bot or a vendor pitch — it moves to Spam, and more from them goes there too">${si('flag')} Spam</button>`}`)+
     (inPipe?'':`<div class="deal-explain" role="note"><b>Make it a deal</b> puts “${esc(leadDealTitle(l))}” on your board as a new lead${l.email?', with their email,':''} and marks this enquiry In pipeline. One click.</div>`)+
     `<div class="pbody"><div class="card">
       ${contact?`<div style="font-size:13.5px;color:var(--soft)">${contact}</div>`:''}
@@ -1537,7 +1578,8 @@ async function markSpam(it,btn){
   btn.disabled=true;
   const r=await api('/forms/inbox/'+encodeURIComponent(it.lead_id),'POST',{spam:true});
   if(!r.ok){toast('That didn’t update.');btn.disabled=false;return;}
-  toast('Marked as spam — it won’t show again.');
+  toast('Moved to Spam. More from this address goes there too.');
+  SPAM=null;   // item 140: the Spam chip reads it again
   leadMarked(it,'spam');
 }
 // Phase 2 (one customer model): Make customer = contact + customer (+ deal) from
@@ -1655,6 +1697,7 @@ async function loadData(){
   NOTIFS=(notifs.ok&&Array.isArray(notifs.body.data))?notifs.body.data:[];
   CUT={queue:(leads.ok&&leads.body.data&&leads.body.data.more)?LEADS.length:0,enq:FEED.enquiries_more?(FEED.enquiries||[]).length:0,convs:FEED.client_messages_more?(FEED.client_messages||[]).length:0};
   ITEMS=buildItems(FEED,LEADS,NOTIFS);
+  if(SPAM)ITEMS=ITEMS.concat(SPAM);   // item 140: the Spam chip's rows survive a refresh
   SYSROWS=buildSystem(FEED,NOTIFS);
   if(!TEAM&&ITEMS.some(x=>x.kind==='support'&&x.assigned_to))loadTeam().then(()=>{if(seq===REQ_SEQ)renderList();});   // item 34: name who has each request
   // the meta line's honesty: TOTAL counts what the Everything view actually

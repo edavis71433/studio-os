@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<meta name="referrer" content="no-referrer">
+<title>Mark as spam</title>
+<style>
+  :root{--bg:#faf8f5;--ink:#1b1525;--soft:#6b6478;--line:#e4dfec;--card:#fff;--plum:#5b3fa0;--warn:#a3423a}
+  @media (prefers-color-scheme:dark){:root{--bg:#171320;--ink:#efeaf7;--soft:#a79ebc;--line:#2e2740;--card:#1f1a2b;--plum:#b79ceb;--warn:#f0a39b}}
+  *{box-sizing:border-box;margin:0}
+  body{background:var(--bg);color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;line-height:1.6;-webkit-font-smoothing:antialiased}
+  .center{max-width:520px;margin:12vh auto;padding:0 20px;text-align:center}
+  h1{font-weight:500;font-size:clamp(20px,5vw,26px);margin-bottom:8px}
+  .muted{color:var(--soft);font-size:15px}
+  .msg{margin:18px 0 0;padding:14px 16px;border:1px solid var(--line);border-radius:12px;background:var(--card);text-align:left}
+  .msg strong{display:block}
+  .msg p{color:var(--soft);font-size:15px;white-space:pre-wrap;overflow-wrap:anywhere}
+  button{margin-top:18px;min-height:44px;padding:10px 20px;border:0;border-radius:999px;background:var(--plum);color:#fff;font:inherit;font-weight:600;cursor:pointer}
+  button.quiet{background:none;color:var(--ink);text-decoration:underline;font-weight:500}
+  button:disabled{opacity:.6;cursor:default}
+  .err{color:var(--warn);font-size:14px;margin-top:10px;min-height:1.4em}
+  a{color:inherit}
+</style>
+</head>
+<body>
+<main class="center" id="state"><p class="muted">One moment…</p></main>
+<script>
+// Builder list item 140: the "This was spam" link in an owner's new-enquiry email lands
+// here with ?t=<signed link>. It shows the message and asks first, since mail scanners
+// open links on their own; the button moves it to Spam, and more from that address goes
+// there too (Undo takes both back). The function at *.supabase.co can't show a page, so
+// this page on the app asks it: GET to read the message, POST to mark it.
+(function(){
+  var q=new URLSearchParams(location.search);
+  var FN=(q.get('env')==='staging'?'https://wjlpursnwbmlcdwbeowv.supabase.co':'https://qksstlqzbhesadrrofgn.supabase.co')+'/functions/v1/presence';
+  var t=q.get('t')||'';
+  var state=document.getElementById('state');
+  function line(tag,cls,text){ var n=document.createElement(tag); if(cls) n.className=cls; n.textContent=text; state.appendChild(n); return n; }
+  function bad(msg){ state.innerHTML=''; line('h1','','That link didn’t work'); line('p','muted',msg||'The link looks incomplete. Open your Inbox to mark the message as spam there.'); }
+  function offline(){ state.innerHTML=''; line('h1','','This page couldn’t load'); line('p','muted','Check your connection, then reload the page.'); }
+  function call(method,body){
+    var url=FN+'/forms/spam'+(method==='GET'?'?t='+encodeURIComponent(t):'');
+    return fetch(url,body?{method:method,headers:{Accept:'application/json','Content-Type':'application/json'},body:JSON.stringify(body)}:{method:method,headers:{Accept:'application/json'}})
+      .then(function(r){ return r.json().catch(function(){ return {}; }).then(function(j){ return {r:r,j:j}; }); });
+  }
+  function show(msg){
+    var box=document.createElement('div'); box.className='msg';
+    var who=document.createElement('strong'); who.textContent=msg.who; box.appendChild(who);
+    if(msg.preview){ var p=document.createElement('p'); p.textContent=msg.preview; box.appendChild(p); }
+    state.appendChild(box);
+  }
+  function view(msg){
+    state.innerHTML='';
+    if(msg.spam){
+      line('h1','','It’s in Spam');
+      line('p','muted','More from this sender goes to Spam too. Changed your mind?');
+    }else{
+      line('h1','','Is this message spam?');
+      line('p','muted','It moves to Spam, and more from this sender goes there too. You can undo it.');
+    }
+    show(msg);
+    var b=document.createElement('button'); b.type='button';
+    if(msg.spam) b.className='quiet';
+    b.textContent=msg.spam?'It’s not spam':'Yes, it’s spam';
+    state.appendChild(b);
+    var err=line('p','err',''); err.setAttribute('role','alert');
+    b.addEventListener('click',function(){
+      b.disabled=true; err.textContent='';
+      call('POST',msg.spam?{t:t,undo:true}:{t:t}).then(function(o){
+        if(!o.r.ok){ b.disabled=false; err.textContent=(o.j&&o.j.message)||'That didn’t go through. Try again in a moment.'; return; }
+        msg.spam=!!(o.j&&o.j.data&&o.j.data.spam);
+        view(msg);
+        line('p','muted',msg.spam?'Done: moved to Spam.':'Done: it’s back in your Inbox, and that sender is no longer marked.').setAttribute('role','status');
+      }).catch(function(){ b.disabled=false; err.textContent='That didn’t go through. Check your connection and try again.'; });
+    });
+  }
+  if(!t){ bad(''); return; }
+  call('GET').then(function(o){
+    if(!o.r.ok){ bad(o.j&&o.j.message); return; }
+    view(o.j.data||{});
+  }).catch(offline);
+})();
+</script>
+</body>
+</html>

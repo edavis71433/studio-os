@@ -22,6 +22,8 @@ export const RESERVED_NAMES = {
   domainNotes: '__domain_notes__',        // builder list item 162: the studio's notes on a client's domain (whose account, renews by itself, a note) (agency/sites.ts)
   domainMail: '__domain_mail__',          // builder list item 163: the domain's email records as they were, to say so if they vanish (lib/domain_notify.ts)
   domainLive: '__domain_live__',          // builder list item 164: the domain the "your website is live" email went out for, so it goes once (lib/domain_notify.ts)
+  formCheck: '__form_check__',           // builder list item 140: since when the site's pages ask for a time ticket (lib/form_check.ts)
+  spamSenders: '__spam_senders__',        // builder list item 140: hashes of the addresses the owner marked as spam (lib/form_check.ts)
 } as const;
 
 const rowsOf = (r: { json?: unknown }) => (Array.isArray((r as any).json) ? (r as any).json : []) as any[];
