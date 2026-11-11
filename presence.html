@@ -2211,7 +2211,8 @@ function waitSteps(dstat, dom) {
   // its own line maker: renderFoundations' stepLine is local to it
   const stepLine = (t) => { const p = el("p", "aihint", t); p.style.marginTop = "5px"; return p; };
   const box = el("div"); box.dataset.wait = "steps"; box.style.marginTop = "10px";
-  const when = (iso) => { const d = new Date(iso); return isNaN(d) ? "" : d.toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }); };
+  // date and time built apart: Safari's engine joins them with " at ", Chrome's with ", "
+  const when = (iso) => { const d = new Date(iso); return isNaN(d) ? "" : d.toLocaleDateString("en-US", { month: "short", day: "numeric" }) + ", " + d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" }); };
   const ch = (dom && Array.isArray(dom.changes) ? dom.changes : []).find((c) => /^(Attached domain|Changed domain from) /.test(String(c.words || "")));
   const found = dstat.health === "ssl_pending" || dstat.health === "ok";
   [[true, "Connected here", ch ? when(ch.at) : ""],
