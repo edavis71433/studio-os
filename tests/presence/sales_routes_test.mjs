@@ -187,7 +187,7 @@ ok('convert: hands off to the EXISTING guided onboarding (get-started)', /get-st
   const commerce = read('supabase/functions/presence/routes/commerce.ts');
   ok('signup-hook: commerce imports the SHARED bridge + tag from sales (no parallel bridge)', /import \{ bridgeCustomerToStudio, CONNECT_INTENT_TAG \} from '\.\/sales\.ts'/.test(commerce));
   // finds the tagged pending contact by email, resolves its site_id (= the studio)
-  ok('signup-hook: resolves the pre-listing studio via the tagged presence_contacts (site_id)', /presence_contacts\?email=eq\.\$\{encodeURIComponent\(email\)\}&notes=ilike\.\*\$\{needle\}\*/.test(commerce) && /CONNECT_INTENT_TAG\.replace\(/.test(commerce));
+  ok('signup-hook: resolves the pre-listing studio via the tagged presence_contacts (site_id)', /presence_contacts\?\$\{emailMatch\(email\)\}&notes=ilike\.\*\$\{needle\}\*/.test(commerce) && /CONNECT_INTENT_TAG\.replace\(/.test(commerce));
   // calls the shared bridge — never a second bridge implementation in commerce
   ok('signup-hook: bridges via the shared bridgeCustomerToStudio (single bridge path)', /bridgeCustomerToStudio\(\{ agencySiteId, clientId, customerSiteId/.test(commerce) && !/ensureBridge\(/.test(commerce) && !/presence_service_links/.test(commerce));
   // wired into handleSignup for BOTH the trial and the paid path, best-effort

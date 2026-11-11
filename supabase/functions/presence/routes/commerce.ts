@@ -45,6 +45,7 @@ import { applyEntitlementPatch } from '../commerce/entitlement_sync.ts';
 import { isServiceRetainerMeta, applyRetainerSync } from '../commerce/retainers.ts';
 import { checkAiCeiling } from '../commerce/metering.ts';
 import { UUID_RE } from '../lib/uuid.ts';
+import { emailMatch } from '../lib/contact_email.ts';
 
 const TRIAL_DAYS = 14;
 
@@ -89,7 +90,7 @@ function handlePlans(cors: Record<string, string>) {
 async function autoConnectPreListedStudio(clientId: string, customerSiteId: string | null, email: string, businessName: string): Promise<void> {
   try {
     const needle = CONNECT_INTENT_TAG.replace(/[^a-z-]/gi, '');   // 'connect-on-signup' — the searchable inner tag (single source of truth)
-    const pending = (await svc(`presence_contacts?email=eq.${encodeURIComponent(email)}&notes=ilike.*${needle}*&deleted_at=is.null&select=site_id&order=updated_at.desc&limit=1`)).json?.[0];
+    const pending = (await svc(`presence_contacts?${emailMatch(email)}&notes=ilike.*${needle}*&deleted_at=is.null&select=site_id&order=updated_at.desc&limit=1`)).json?.[0];   // item 110 (K1): whatever the capitals
     const agencySiteId = pending?.site_id ? String(pending.site_id) : '';
     if (!agencySiteId) return;   // no studio pre-listed this email → nothing to connect
     const r = await bridgeCustomerToStudio({ agencySiteId, clientId, customerSiteId, label: businessName });
