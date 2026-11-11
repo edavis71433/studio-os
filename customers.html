@@ -383,6 +383,8 @@ const scope=()=>new URLSearchParams(location.search).get('client')||'';
 // NOT sent here; scope() survives only for outbound links (scoped()).
 const H=()=>({'Content-Type':'application/json','Authorization':'Bearer '+SUPABASE_KEY,'x-dds-user-jwt':TOKEN});
 async function api(path,method,body){const r=await fetch(FN+path,{method:method||'GET',headers:H(),body:body?JSON.stringify(body):undefined});return{ok:r.ok,status:r.status,body:await r.json().catch(()=>({}))};}
+// item 89: a phone number is a tap to call (People showed it as text)
+const telOf=(p)=>{const d=String(p||'').trim().replace(/[^\d+]/g,'').replace(/(?!^)\+/g,'');return d.replace(/\D/g,'').length>=3?'tel:'+d:'';};
 const initial=(s)=>{const ch=Array.from(String(s||'?').trim())[0]||'?';const up=ch.toUpperCase();return up.length===1?up:ch;};
 // keep any agency drill-in scope on internal links
 function scoped(href){const c=scope();if(!c||!href||href.charAt(0)!=='/')return href;return href+(href.indexOf('?')>=0?'&':'?')+'client='+encodeURIComponent(c);}
@@ -486,7 +488,9 @@ async function bulkSend(){
   const people=CUSTOMERS.filter(c=>PICKED.has(String(c.client_id))&&c.email).map(c=>({email:c.email,name:c.name||''}));
   if(!people.length){toast('None of the customers you picked has an email address.');return;}
   const b=$('bulkSend');if(b)b.disabled=true;
-  if(!(await k.sendTo(people)))if(b)b.disabled=false;
+  // item 110 (K5): a dropped connection left the button grey with no word
+  let ok=false;try{ok=await k.sendTo(people);}catch(_){toast('We couldn’t reach the server — nothing was sent. Try again in a moment.');}
+  if(!ok){const nb=$('bulkSend');if(nb)nb.disabled=false;}
 }
 // "Mark as" sets each picked customer's main project to Active or On hold.
 // Complete is left to the project page on purpose: completing a project emails
@@ -497,12 +501,13 @@ async function bulkMark(to){
   let ok=0,fail=0,none=0;
   for(const c of picked){
     if(!c.project_id){none++;continue;}
-    const r=await api('/projects/'+encodeURIComponent(c.project_id)+'/status','POST',{to});
+    let r;try{r=await api('/projects/'+encodeURIComponent(c.project_id)+'/status','POST',{to});}catch(_){r={ok:false};}   // K5: a dropped connection counts as "couldn't change"
     if(r.ok)ok++;else fail++;
   }
   const word=to==='on_hold'?'on hold':'active';
   toast(`${ok} marked ${word}${fail?` · ${fail} couldn’t change from where they are`:''}${none?` · ${none} with no project`:''}.`);
-  await load();
+  // item 110 (K5): a list that couldn't refresh says so (it stayed stale, with an unhandled error)
+  await load().catch(()=>toast('Marked — but we couldn’t refresh the list. Refresh will catch it up.'));
 }
 function importCustomers(){
   const k=KIT(),z=$('csvZone');if(!k||!z)return;
@@ -658,15 +663,28 @@ let PEOPLE=null, PEOPLE_FAILED=false;
 const PPAGE=100;
 let PTOTAL=null,PNEXT=0,PFULL=false,PBUSY=false,PSRCH=null,PSRCH_SEQ=0,PSRCH_ERR='';
 const pHasMore=()=>PTOTAL!=null?PNEXT<PTOTAL:PFULL;
-const pSrchNow=()=>{const q=Q.trim();return(PSRCH&&q&&PSRCH.q===q)?PSRCH:null;};
-const pRead=(off,q)=>{const p=new URLSearchParams({limit:String(PPAGE),offset:String(off),total:'1'});if(q)p.set('q',q);return api('/sales/contacts?'+p.toString());};
+// item 110 (K4): past 100 people, Customers / Not yet filtered only the people loaded. The chip
+// now goes to the server (customer=yes|no) unless everyone is already here. PLOADED is the
+// chip the loaded people were read under.
+let PLOADED='',PALL=null;   // PALL: how many people in all, from the last read under All
+const pWhole=()=>PLOADED==='all'&&!pHasMore();
+const pHaveAll=()=>pWhole()||(PLOADED===PFILTER&&!pHasMore());
+const pSrchNow=()=>{const q=Q.trim();return(PSRCH&&q&&PSRCH.q===q&&PSRCH.f===PFILTER)?PSRCH:null;};
+const pRead=(off,q)=>{const p=new URLSearchParams({limit:String(PPAGE),offset:String(off),total:'1'});if(q)p.set('q',q);if(PFILTER!=='all')p.set('customer',PFILTER==='customers'?'yes':'no');return api('/sales/contacts?'+p.toString());};
 const pTotalOf=(r)=>(r&&r.ok&&r.body&&typeof r.body.total==='number')?r.body.total:null;
+let PLOAD_SEQ=0;
 async function loadPeople(){
+  const seq=++PLOAD_SEQ,f=PFILTER;
   let r;try{r=await pRead(0,'');}catch(_){r={ok:false,body:{}};}
+  if(seq!==PLOAD_SEQ)return;   // a newer chip or reload asked since
   PEOPLE_FAILED=!r.ok; PEOPLE=r.ok&&Array.isArray(r.body.data)?r.body.data:[];
-  PTOTAL=pTotalOf(r); PNEXT=PEOPLE.length; PFULL=PEOPLE.length>=PPAGE; PSRCH=null; PSRCH_ERR='';
-  if(TAB==='people'){render();if(Q.trim())pSearchServer();}
+  PTOTAL=pTotalOf(r); PNEXT=PEOPLE.length; PFULL=PEOPLE.length>=PPAGE; PSRCH=null; PSRCH_ERR=''; PLOADED=f;
+  if(f==='all'&&r.ok)PALL=PTOTAL!=null?PTOTAL:PEOPLE.length;
+  if(TAB==='people'){paintPeoplePage();if(Q.trim())pSearchServer();}
 }
+// item 110 (K6): with People drawn, a reload repaints the list, the chips and the count. render()
+// rebuilt the search box too, so Refresh or + Create took the focus and the last letters typed.
+function paintPeoplePage(){if($('search')&&$('pchips')&&$('listZone'))repaintPeople();else render();}
 function pMoreHtml(){
   const s=pSrchNow();
   if(Q.trim()&&!s)return'';
@@ -674,7 +692,9 @@ function pMoreHtml(){
   if(!more)return'';
   return `<div class="more-line"><span id="pMoreCount">Showing ${shown}${total!=null?' of '+total:''}${s?' matches':''}</span> · <button type="button" class="morebtn" id="pMoreBtn" aria-describedby="pMoreCount"${PBUSY?' disabled':''}>${PBUSY?'Loading…':'Show more'}</button></div>`;
 }
-function repaintPeople(){const z=$('listZone');if(z){z.innerHTML=peopleHtml();wirePeople();}const pc=$('pchips');if(pc){pc.innerHTML=peopleChipsHtml();wirePChips();}const lm=$('lmeta');if(lm)lm.textContent=lmetaText([]);}
+// the People tab's number: everyone, never the count of one chip's people
+function peopleTabCount(){return PALL!=null?` <span class="n">${PALL}</span>`:'';}
+function repaintPeople(){const tp=$('tabPeople');if(tp)tp.innerHTML='People'+peopleTabCount();const z=$('listZone');if(z){z.innerHTML=peopleHtml();wirePeople();}const pc=$('pchips');if(pc){pc.innerHTML=peopleChipsHtml();wirePChips();}const lm=$('lmeta');if(lm)lm.textContent=lmetaText([]);}
 async function showMorePeople(){
   if(PBUSY)return;
   const s=pSrchNow();
@@ -690,28 +710,28 @@ async function showMorePeople(){
 }
 async function pSearchServer(){
   const q=Q.trim();
-  if(!q||!pHasMore()){PSRCH=null;return;}
-  if(PSRCH&&PSRCH.q===q)return;
+  if(!q||pHaveAll()){PSRCH=null;return;}
+  if(pSrchNow())return;
   const seq=++PSRCH_SEQ;
   let r;try{r=await pRead(0,q);}catch(_){r={ok:false,body:{}};}
   if(seq!==PSRCH_SEQ||Q.trim()!==q||TAB!=='people')return;
   if(!r.ok){PSRCH=null;PSRCH_ERR=q;repaintPeople();return;}
   PSRCH_ERR='';
   const rows=(r.body&&r.body.data)||[],tot=pTotalOf(r);
-  PSRCH={q,rows,total:tot,more:tot!=null?rows.length<tot:rows.length>=PPAGE};
+  PSRCH={q,f:PFILTER,rows,total:tot,more:tot!=null?rows.length<tot:rows.length>=PPAGE};
   repaintPeople();
 }
 function tabsHtml(){
-  return `<div class="seg tabs2" role="tablist" aria-label="Customers or people"><button role="tab" id="tabCustomers" aria-selected="${TAB==='customers'?'true':'false'}" aria-pressed="${TAB==='customers'?'true':'false'}">Customers</button><button role="tab" id="tabPeople" aria-selected="${TAB==='people'?'true':'false'}" aria-pressed="${TAB==='people'?'true':'false'}">People${PEOPLE?` <span class="n">${PTOTAL!=null?PTOTAL:PEOPLE.length}</span>`:''}</button></div>`;
+  return `<div class="seg tabs2" role="tablist" aria-label="Customers or people"><button role="tab" id="tabCustomers" aria-selected="${TAB==='customers'?'true':'false'}" aria-pressed="${TAB==='customers'?'true':'false'}">Customers</button><button role="tab" id="tabPeople" aria-selected="${TAB==='people'?'true':'false'}" aria-pressed="${TAB==='people'?'true':'false'}">People${peopleTabCount()}</button></div>`;
 }
 let PFILTER='all';
 function peopleChipsHtml(){
   if(!PEOPLE||PEOPLE_FAILED||!PEOPLE.length)return '';
   const yes=PEOPLE.filter(p=>p.client_id).length;
-  // item 66: while some people are not loaded, only All carries a number (the total);
-  // a count of the loaded ones would read as everyone
-  const part=pHasMore();
-  const ch=[['all','All',part?PTOTAL:PEOPLE.length],['customers','Customers',part?null:yes],['not','Not yet',part?null:PEOPLE.length-yes]];
+  // item 66: while some people are not loaded, only the chip the server counted carries a
+  // number (its total); a count of the loaded ones would read as everyone
+  const whole=pWhole(),n=(k,local)=>whole?local:(PLOADED===k?PTOTAL:null);
+  const ch=[['all','All',n('all',PEOPLE.length)],['customers','Customers',n('customers',yes)],['not','Not yet',n('not',PEOPLE.length-yes)]];
   return `<div class="trow"><div class="chips" role="group" aria-label="Show">${ch.map(([v,l,n])=>(n===0&&v!=='all'&&PFILTER!==v)?'':`<button type="button" class="chip" data-pchip="${v}" aria-pressed="${PFILTER===v?'true':'false'}">${l}${n!=null?` <span class="n">${n}</span>`:''}</button>`).join('')}</div></div>`;
 }
 function peopleHtml(){
@@ -719,18 +739,26 @@ function peopleHtml(){
   if(PEOPLE_FAILED)return'<p class="muted" style="padding:20px 0">We couldn’t load your people just now. <a href="/contacts.html">Open Contacts</a></p>';
   const q=Q.trim().toLowerCase();
   const s=pSrchNow();   // item 66: past the loaded pages, the server's matches answer the search
+  if(!s&&!pWhole()&&PLOADED!==PFILTER)return'<div class="spin" role="status" aria-label="Loading people"></div>';   // item 110: that chip's people are on their way
   const list=(s?s.rows:PEOPLE).filter(c=>(PFILTER==='all'||(PFILTER==='customers')===!!c.client_id)&&(!q||((c.name||'')+' '+(c.email||'')+' '+(c.company||'')).toLowerCase().includes(q)));
-  if(!list.length)return`<p class="muted" style="padding:20px 0">${q?(pHasMore()&&!s?(PSRCH_ERR===Q.trim()?'We couldn’t search everyone just now. These are the people loaded so far.':'Looking through everyone…'):'No one matches “'+esc(Q)+'”.'):PEOPLE.length?'No one here — try “All”.':'No people yet — a website enquiry, a deal or an added customer puts someone here.'}</p>`+pMoreHtml();
+  if(!list.length)return`<p class="muted" style="padding:20px 0">${q?(!pHaveAll()&&!s?(PSRCH_ERR===Q.trim()?'We couldn’t search everyone just now. These are the people loaded so far.':'Looking through everyone…'):'No one matches “'+esc(Q)+'”.'):PEOPLE.length?'No one here — try “All”.':'No people yet — a website enquiry, a deal or an added customer puts someone here.'}</p>`+pMoreHtml();
   const byClient={}; for(const c of CUSTOMERS)byClient[String(c.client_id)]=c;
   const trs=list.map(c=>{
     const cust=c.client_id?byClient[String(c.client_id)]:null;
     const rec=c.client_id?(cust&&cust.customer_site_id?`/crm.html?client=${esc(cust.customer_site_id)}`:`/crm.html?client_id=${esc(c.client_id)}`):`/crm.html?contact=${esc(c.id)}&tab=details`;
     const nm=c.name||c.email||'Someone';
-    return `<tr data-person="${esc(c.id)}" tabindex="0" aria-label="Preview ${esc(nm)}"><td data-col="name"><span class="nm"><span class="av sm" aria-hidden="true">${esc(ini2(nm))}</span><span><a href="${rec}" data-noscope="1">${esc(nm)}</a>${c.company?`<span class="pn">${esc(c.company)}</span>`:''}</span></span></td><td data-col="email">${c.email?`<a href="mailto:${esc(c.email)}">${esc(c.email)}</a>`:'—'}</td><td data-col="phone">${esc(c.phone||'—')}</td><td data-col="customer">${c.client_id?`<a href="${rec}" data-noscope="1">${esc((cust&&cust.name)||c.company||'Customer')} ↗</a>`:'<span class="pill lead">Not yet</span>'}</td><td class="acts"><a class="rowact" href="${rec}" data-noscope="1">Open record</a></td></tr>`;
+    return `<tr data-person="${esc(c.id)}" tabindex="0" aria-label="Preview ${esc(nm)}"><td data-col="name"><span class="nm"><span class="av sm" aria-hidden="true">${esc(ini2(nm))}</span><span><a href="${rec}" data-noscope="1">${esc(nm)}</a>${c.company?`<span class="pn">${esc(c.company)}</span>`:''}</span></span></td><td data-col="email">${c.email?`<a href="mailto:${esc(c.email)}">${esc(c.email)}</a>`:'—'}</td><td data-col="phone">${c.phone&&telOf(c.phone)?`<a href="${esc(telOf(c.phone))}">${esc(c.phone)}</a>`:esc(c.phone||'—')}</td><td data-col="customer">${c.client_id?`<a href="${rec}" data-noscope="1">${esc((cust&&cust.name)||c.company||'Customer')} ↗</a>`:'<span class="pill lead">Not yet</span>'}</td><td class="acts"><a class="rowact" href="${rec}" data-noscope="1">Open record</a></td></tr>`;
   }).join('');
   return `<div class="tscroll people"><table aria-label="People"><thead><tr><th scope="col">Name</th><th scope="col">Email</th><th scope="col">Phone</th><th scope="col">Customer</th><th scope="col" class="acts"><span class="sr-only">Actions</span></th></tr></thead><tbody>${trs}</tbody></table></div>`+pMoreHtml();
 }
-function wirePChips(){document.querySelectorAll('[data-pchip]').forEach(b=>b.addEventListener('click',()=>{const v=b.getAttribute('data-pchip');PFILTER=v;render();const nb=document.querySelector('[data-pchip="'+v+'"]');if(nb)nb.focus();}));}
+function wirePChips(){document.querySelectorAll('[data-pchip]').forEach(b=>b.addEventListener('click',()=>{
+  const v=b.getAttribute('data-pchip');PFILTER=v;PSRCH=null;
+  const back=()=>{const nb=document.querySelector('[data-pchip="'+v+'"]');if(nb)nb.focus();};
+  // item 110 (K4): everyone here → filter on the page; else the server reads that chip's people
+  if(pHaveAll()){render();back();if(Q.trim())pSearchServer();return;}
+  const z=$('listZone');if(z)z.innerHTML='<div class="spin" role="status" aria-label="Loading people"></div>';
+  loadPeople().then(back);
+}));}
 function wirePeople(){
   const byId={}; for(const p of (PEOPLE||[]).concat((PSRCH&&PSRCH.rows)||[]))byId[String(p.id)]=p;
   const mb=$('pMoreBtn');if(mb)mb.addEventListener('click',showMorePeople);   // item 66
@@ -847,7 +875,7 @@ function wireList(){
     const to=bm.value;if(!to)return;const k=KIT();const n=PICKED.size;
     const word=to==='on_hold'?'on hold':'active';
     if(k&&!(await k.confirmIn(bm,{text:`Mark ${n} customer${n===1?'':'s'} ${word}?`,yes:'Yes, mark them'}))){bm.value='';return;}
-    bulkMark(to);
+    bulkMark(to).catch(()=>toast('We couldn’t finish marking them — Refresh shows where each one is.'));   // K5: never a silent stop
   });
   const bc=$('bulkClear');if(bc)bc.addEventListener('click',()=>{PICKED.clear();renderListZone();refocus('#pickAll');});
 }
@@ -1177,9 +1205,13 @@ async function load(){
   CUSTOMERS=Array.isArray(r.body.data)?r.body.data:[];
   LOADED_AT=Date.now();
   { const live=new Set(CUSTOMERS.map(c=>String(c.client_id))); for(const id of [...PICKED])if(!live.has(id))PICKED.delete(id); }
-  render();
+  // item 110 (K6): on People, the list repaints and the people are read again; the search box stays
+  if(TAB==='people'&&PEOPLE!==null){paintPeoplePage();loadPeople();}else render();
   loadSavedViews();
-  if(PV){for(const k of Object.keys(PV_CACHE))delete PV_CACHE[k];pvRefresh();}   // a reload re-reads the open preview too
+  // item 110 (K2): every kept preview goes, open or not. Only an OPEN one was emptied, so a closed
+  // preview reopened after Refresh or a call logged from + Create showed what it saw the first time
+  for(const k of Object.keys(PV_CACHE))delete PV_CACHE[k];
+  if(PV)pvRefresh();   // a reload re-reads the open preview too
 }
 let VIEWS_ASKED=false;
 function loadSavedViews(){

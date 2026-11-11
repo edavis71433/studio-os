@@ -35,6 +35,7 @@
   --fill-ink:#fff;                 /* text on plum/amber solid fills (dark ink in dark mode) */
   --plum-tint:#faf7ff;             /* tinted plum chip/panel background */
   --plum-line:#d9cef0;             /* plum-cast hairline for tinted panels */
+  --plum-grad:var(--dds-grad-btn,linear-gradient(135deg,#6d3fd4 0%,#7a4bdd 100%)); /* the one filled button; the fallback keeps it filled if shell.css is late */
   --scrim-ink:var(--ink);          /* scrims mix from ink in light, pure black in dark */
   --seg-chip:var(--sheet);         /* the device segment's raised "on" chip */
   --seg-ring:0 1px 4px rgba(0,0,0,.12); /* chip state indicator: soft shadow in light, plum ring in dark (1.4.11) */
@@ -421,7 +422,7 @@ html.dc-edit:not(.plan-watch) .dc-bar{position:absolute;top:var(--dc-bar-top);le
 /* ── the Pages card (part three, Figma 66:339): the menu in its order, then the pages off it,
    then the header and footer, the not-found page and search. A row is a page: a grip, its
    icon, its name, what is waiting on it, a gear. A page drawn on the canvas also has ⋯. ── */
-.pc-add{flex:none;height:36px;margin-left:auto;padding:0 14px;border:0;border-radius:999px;background:var(--plum) var(--dds-grad-btn,linear-gradient(135deg,#6d3fd4 0%,#7a4bdd 100%));color:var(--dds-on-p,var(--fill-ink));font:600 13px/1 var(--sans);white-space:nowrap;cursor:pointer}
+.pc-add{flex:none;height:36px;margin-left:auto;padding:0 14px;border:0;border-radius:999px;background:var(--plum) var(--plum-grad);color:var(--dds-on-p,var(--fill-ink));font:600 13px/1 var(--sans);white-space:nowrap;cursor:pointer}
 .pc-add:hover{filter:brightness(1.06)}
 /* item 34: one main button at a time. With a page's settings (or any pane) open, its Done is the
    main button, so + Add page steps back to a quiet one */
@@ -507,7 +508,7 @@ html.dc-edit:not(.plan-watch) .dc-bar .dpdevseg button.on{background:var(--seg-c
 #dpDevSeg svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
 /* Publish: the one plum gradient button on the screen; outlined when there is nothing to publish */
 .dc-bar .pillbtn{height:36px;padding:0 14px;border-radius:999px;border:1px solid var(--hair-2);background:var(--sheet);color:var(--ink);font-size:13px;font-weight:600}
-.dc-bar .pillbtn.inked{border-color:transparent;background:var(--plum) var(--dds-grad-btn,linear-gradient(135deg,#6d3fd4 0%,#7a4bdd 100%));color:var(--dds-on-p,var(--fill-ink));box-shadow:0 6px 16px -8px color-mix(in srgb,var(--plum) 70%,transparent)}
+.dc-bar .pillbtn.inked{border-color:transparent;background:var(--plum) var(--plum-grad);color:var(--dds-on-p,var(--fill-ink));box-shadow:0 6px 16px -8px color-mix(in srgb,var(--plum) 70%,transparent)}
 .dc-bar .pillbtn.inked:hover{filter:brightness(1.06)}
 /* ── the dock: a white card on the left, one icon and one word per tool ── */
 .dc-dock{position:absolute;left:16px;top:50%;transform:translateY(-50%);z-index:85;display:flex;flex-direction:column;align-items:center;gap:4px;padding:8px;background:var(--sheet);border:1px solid color-mix(in srgb,var(--hair) 55%,transparent);border-radius:18px;box-shadow:var(--dds-shadow-pop)}
@@ -801,7 +802,7 @@ html.dc-edit:not(.plan-watch) .ritualwrap.as-card .ritual{max-width:none;margin:
 .ritualwrap.as-card .blocklist button.textact:hover{text-decoration:none;background:color-mix(in srgb,var(--plum) 16%,var(--sheet))}
 .rit-ok{display:none}
 .ritualwrap.as-card .rit-ok{display:block}
-.ritualwrap.as-card .pubbtn{height:44px;padding:0 20px;border-radius:999px;background:var(--plum) var(--dds-grad-btn,linear-gradient(135deg,#6d3fd4 0%,#7a4bdd 100%));color:var(--dds-on-p,var(--fill-ink));box-shadow:0 6px 16px -8px color-mix(in srgb,var(--plum) 70%,transparent);margin-top:16px;font-size:14px}
+.ritualwrap.as-card .pubbtn{height:44px;padding:0 20px;border-radius:999px;background:var(--plum) var(--plum-grad);color:var(--dds-on-p,var(--fill-ink));box-shadow:0 6px 16px -8px color-mix(in srgb,var(--plum) 70%,transparent);margin-top:16px;font-size:14px}
 .ritualwrap.as-card .pubbtn:hover{filter:brightness(1.06)}
 .ritualwrap.as-card .pubbtn.quiet{background:transparent;color:var(--plum);border:1px solid var(--hair-2);box-shadow:none}
 .ritualwrap.as-card .notyet{display:inline-flex;align-items:center;height:36px;padding:0 14px;border-radius:999px;background:var(--plum-soft);color:var(--plum);font-size:13px;font-weight:600;margin:10px 8px 0 0}
@@ -921,7 +922,7 @@ html.plan-watch .ss-bar,html.plan-watch [data-grp="Content"],html.plan-watch .na
 :root[data-theme="dark"] .srp-title{color:#8ab4f8}:root[data-theme="dark"] .srp-desc{color:#bdc1c6}
 .cnt{font-size:12px;color:var(--ink-2);margin-top:6px}
 .cnt.good{color:var(--sage)}
-.cnt.warn{color:#a05a2c}
+.cnt.warn{color:var(--amber)}
 .seo-setup{max-width:560px;border:1px solid var(--hair);border-radius:var(--dds-r-xl,14px);padding:var(--dds-s4,16px) var(--dds-s5,20px);margin:0 0 var(--dds-s6,24px);background:var(--sheet)}
 .seo-setup h3{font-size:15px;font-weight:600;margin:0 0 var(--dds-s1,4px)}
 .seo-setup .field{margin-bottom:var(--dds-s4,16px)}
@@ -1160,8 +1161,17 @@ html.plan-watch #svWords{display:none}
    same 72px + safe-area the shell reserves). */
 html.dds-has-shell .stage{top:var(--dds-shell-h)}
 html.dds-has-shell.dds-has-ctxbar .stage{top:calc(var(--dds-shell-h) + var(--dds-ctxbar-h))}
-@media (min-width:761px){html.dds-side.dds-has-shell .stage,html.dds-side.dds-has-shell.dds-has-ctxbar .stage{top:0;left:var(--dds-side-w)}}
+@media (min-width:761px){html.dds-side.dds-has-shell .stage,html.dds-side.dds-has-shell.dds-has-ctxbar .stage{top:0;left:var(--page-left)}}
 @media (max-width:760.98px){html.dds-has-shell .stage{bottom:calc(72px + env(safe-area-inset-bottom,0px))}}
+/* ≥761px the sidebar floats: its card and a gap either side are --page-left, and the page
+   starts past them. Everything that covers the page starts there too, because the shell sits
+   above all of it: the stage, the sheets, the publish ritual, page settings and the action
+   toasts. They used the whole screen, so on a tablet the sidebar hid their left edge ("ure it
+   renews by itself") and took the presses meant for it, as it once did to shell.css's own
+   toasts. Edit mode hides the shell, so there they keep the whole screen. */
+@media (min-width:761px){html.dds-side.dds-has-shell{--page-left:calc(var(--dds-side-w) + var(--dds-side-gap) * 2)}}
+html.dc-edit:not(.plan-watch).dds-side{--page-left:0px}
+html.dds-side .scrim,html.dds-side .ritualwrap,html.dds-side .dc-modal-scrim,html.dds-side .toasts{left:var(--page-left,0px)}
 .stagebar{flex:none;display:flex;align-items:flex-end;gap:var(--dds-s6,24px);padding:var(--dds-s4,16px) var(--dds-s7,32px) 0;color:rgba(239,234,247,.7)}
 .stagebar .back{font-size:13px;color:rgba(239,234,247,.75);padding-bottom:10px}
 .stagebar .back:hover{color:#efeaf7}
@@ -1193,7 +1203,7 @@ html.dds-has-shell.dds-has-ctxbar .stage{top:calc(var(--dds-shell-h) + var(--dds
 /* item 171 (E1, E2): in the editor a sheet, the photo picker and the rest, opens above the bar, the dock and
    the cards, so its own buttons take the press and nothing behind the dimmed screen does */
 html.dc-edit:not(.plan-watch) .scrim{z-index:96}
-@media(min-width:761px){.scrim{align-items:center}}
+@media(min-width:761px){.scrim{align-items:center;padding:0 var(--dds-s4,16px)}}   /* a gutter beside the sidebar on the narrowest tablets */
 .sheetcard{background:var(--sheet);border:1px solid var(--hair);border-radius:var(--r-lg) var(--r-lg) 0 0;width:100%;max-width:520px;max-height:88vh;overflow:auto;padding:var(--dds-s7,32px) var(--dds-s7,32px) var(--dds-s6,24px);box-shadow:var(--dds-shadow-pop,0 8px 28px rgba(21,20,26,.12))}
 @media(min-width:761px){.sheetcard{border-radius:var(--r-lg)}}
 .sheetcard h2{font-family:var(--serif);font-weight:500;font-size:21px;margin-bottom:6px}
@@ -2283,10 +2293,10 @@ function askDomainChange(old) {
     const keep = el("label"); keep.style.cssText = "display:flex;gap:8px;align-items:flex-start;margin-top:12px;font-size:14px;line-height:1.4";
     const cb = el("input"); cb.type = "checkbox"; cb.checked = true; cb.style.marginTop = "3px";
     keep.appendChild(cb); keep.appendChild(el("span", null, "Keep " + old + " working: its visitors are sent on to the new domain, to the same page")); form.appendChild(keep);
-    const err = el("div", null, ""); err.setAttribute("role", "alert"); err.style.cssText = "font-size:13px;color:#b42318;margin-top:8px"; form.appendChild(err);
+    const err = el("div", null, ""); err.setAttribute("role", "alert"); err.style.cssText = "font-size:13px;color:var(--clay);margin-top:8px"; form.appendChild(err);
     const row = el("div"); row.style.cssText = "display:flex;gap:8px;justify-content:flex-end;margin-top:14px";
     const cancel = el("button", null, "Cancel"); cancel.type = "button"; cancel.style.cssText = "font:inherit;font-size:13px;font-weight:600;border:1px solid var(--line,#ddd);background:transparent;color:var(--ink,#1b1525);border-radius:999px;padding:8px 16px;cursor:pointer";
-    const ok = el("button", null, "Change domain"); ok.type = "submit"; ok.style.cssText = "font:inherit;font-size:13px;font-weight:600;border:1px solid var(--plum,#5b3fa0);background:var(--plum,#5b3fa0);color:#fff;border-radius:999px;padding:8px 16px;cursor:pointer";
+    const ok = el("button", null, "Change domain"); ok.type = "submit"; ok.style.cssText = "font:inherit;font-size:13px;font-weight:600;border:1px solid var(--plum,#5b3fa0);background:var(--plum,#5b3fa0);color:var(--fill-ink);border-radius:999px;padding:8px 16px;cursor:pointer";
     row.appendChild(cancel); row.appendChild(ok); form.appendChild(row); dlg.appendChild(form); document.body.appendChild(dlg);
     let done = false; const finish = (v) => { if (done) return; done = true; try { dlg.close(); } catch (e) {} dlg.remove(); resolve(v); };
     cancel.addEventListener("click", () => finish(null));
@@ -2315,7 +2325,7 @@ function askYes(message, opts) {
     dlg.setAttribute("aria-labelledby", msg.id);
     const row = el("div"); row.style.cssText = "display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap;margin-top:16px";
     const cancel = el("button", "ask-cancel", opts.cancel || "Cancel"); cancel.type = "button"; cancel.style.cssText = "font:inherit;font-size:13px;font-weight:600;border:1px solid var(--line,#ddd);background:transparent;color:var(--ink,#1b1525);border-radius:999px;padding:8px 15px;cursor:pointer";
-    const ok = el("button", "ask-ok", opts.ok || "OK"); ok.type = "submit"; ok.style.cssText = opts.danger ? "font:inherit;font-size:13px;font-weight:600;border:1px solid #b42318;background:#b42318;color:#fff;border-radius:999px;padding:8px 16px;cursor:pointer" : "font:inherit;font-size:13px;font-weight:600;border:1px solid var(--plum,#5b3fa0);background:var(--plum,#5b3fa0);color:var(--fill-ink,#fff);border-radius:999px;padding:8px 16px;cursor:pointer";
+    const ok = el("button", "ask-ok", opts.ok || "OK"); ok.type = "submit"; ok.style.cssText = opts.danger ? "font:inherit;font-size:13px;font-weight:600;border:1px solid var(--clay);background:var(--clay);color:var(--fill-ink);border-radius:999px;padding:8px 16px;cursor:pointer" : "font:inherit;font-size:13px;font-weight:600;border:1px solid var(--plum,#5b3fa0);background:var(--plum,#5b3fa0);color:var(--fill-ink,#fff);border-radius:999px;padding:8px 16px;cursor:pointer";
     row.appendChild(cancel); row.appendChild(ok); form.appendChild(row); dlg.appendChild(form); document.body.appendChild(dlg);
     let done = false; const finish = (v) => { if (done) return; done = true; try { dlg.close(); } catch (e) {} dlg.remove(); resolve(v); };
     cancel.addEventListener("click", () => finish(false));
@@ -8636,7 +8646,7 @@ async function mountSearchCard() {
   const line = (ok2, good, fix) => {
     const p = el("div", null, ""); p.style.cssText = "display:flex;gap:8px;align-items:baseline;padding:3px 0;font-size:13px";
     const mk2 = el("span", null, ok2 ? "" : "•"); if (ok2) mk2.innerHTML = uiIcon("check", 13);
-    p.appendChild(Object.assign(mk2, { style: "color:" + (ok2 ? "#2e6b46" : "#a05a2c") + ";font-weight:700" }));
+    p.appendChild(Object.assign(mk2, { style: "color:" + (ok2 ? "var(--sage)" : "var(--amber)") + ";font-weight:700" }));
     p.appendChild(el("span", null, ok2 ? good : fix));
     card.appendChild(p);
   };
@@ -10540,11 +10550,11 @@ function blockStyleRow(idx, blk, sub, flat) {
     pairs.forEach((p) => {
       const pass = p.ratio >= 4.5;
       const chip = el("span", null, p.name + " · Contrast " + p.ratio.toFixed(1) + (pass ? " — passes" : " — hard to read (needs 4.5)"));
-      chip.style.cssText = "font-size:12px;font-weight:600;padding:2px 9px;border-radius:999px;" + (pass ? "background:#eaf7ee;color:#1c6b34" : "background:#fdecea;color:#8a2a20");
+      chip.style.cssText = "font-size:12px;font-weight:600;padding:2px 9px;border-radius:999px;" + (pass ? "background:var(--sage-soft);color:var(--sage)" : "background:var(--clay-soft);color:var(--clay)");
       crow.appendChild(chip);
       if (!pass) {
         const fix = el("button", null, "Darken until readable"); fix.type = "button";
-        fix.style.cssText = "font:inherit;font-size:12px;font-weight:600;padding:2px 10px;border-radius:999px;border:1px solid #8a2a20;background:transparent;color:#8a2a20;cursor:pointer";
+        fix.style.cssText = "font:inherit;font-size:12px;font-weight:600;padding:2px 10px;border-radius:999px;border:1px solid var(--clay);background:transparent;color:var(--clay);cursor:pointer";
         fix.addEventListener("click", () => setStyle({ [p.key]: ovDarkenUntil(p.color, p.fixAgainst, 4.5) }, true));
         crow.appendChild(fix);
       }
@@ -10682,7 +10692,7 @@ function renderBlocksCard() {
       upd.addEventListener("click", () => clUpdateSource(idx));
       cxl.addEventListener("click", () => { BLOCKS_WORK[idx] = { type: "linked", ref: blk._clEdit }; renderBlocksCard(); });
       head.append(lbl, upd, cxl);
-      box.appendChild(Object.assign(el("div", "hint", "This is your saved section. Changes here update every place it’s linked — after you Update and publish. “Cancel” keeps it as it was."), { style: "margin:0 0 8px;font-size:12px;color:#6b4fa0" }));
+      box.appendChild(Object.assign(el("div", "hint", "This is your saved section. Changes here update every place it’s linked — after you Update and publish. “Cancel” keeps it as it was."), { style: "margin:0 0 8px;font-size:12px;color:var(--plum)" }));
     }
     // The floating studio: one section's editor is the inspector card. Its fields land on the
     // Content tab and its look, layout and timing on their own tabs; the pill on the page

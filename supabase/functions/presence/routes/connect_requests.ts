@@ -17,6 +17,7 @@ import { writeChangeEvent } from '../lib/provenance.ts';
 import { pendingRequestsFor, studioNames, ownerEmails, claimPortfolioSite, releasePortfolioSite } from '../lib/connect_requests.ts';
 import { bridgeCustomerToStudio } from './sales.ts';
 import { UUID_RE } from '../lib/uuid.ts';
+import { emailMatch } from '../lib/contact_email.ts';   // item 110 (K1): the contact is found whatever its capitals
 
 const rows = (r: { json?: unknown }) => (Array.isArray((r as any)?.json) ? (r as any).json : []) as any[];
 const ownerOnly = (principal: Principal) => principal.kind === 'client' && !(principal as any).member && !principal.scope;
@@ -80,7 +81,7 @@ export async function handleStudioRequests(req: Request, route: string, site: Si
       : json({ error: 'write_failed', message: 'That didn’t save. Please try again.' }, 502, cors);
   }
   // 3) the studio's contact for this email is now you; the request is answered
-  await svc(`presence_contacts?site_id=eq.${studioSiteId}&email=eq.${encodeURIComponent(String(r.email))}&deleted_at=is.null`, { method: 'PATCH', body: JSON.stringify({ client_id: site.client_id }) }).catch(() => {});
+  await svc(`presence_contacts?site_id=eq.${studioSiteId}&${emailMatch(r.email)}&deleted_at=is.null`, { method: 'PATCH', body: JSON.stringify({ client_id: site.client_id }) }).catch(() => {});
   await decide('accepted').catch(() => null);
   // 4) the studio sees it happen
   await writeChangeEvent({ siteId: studioSiteId, entityType: 'client', entityId: String(site.client_id), action: 'connect', summary: `${label} accepted your request — they’re in Customers now`, principal, provenance: 'human' }).catch(() => {});
