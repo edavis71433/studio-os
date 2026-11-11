@@ -427,13 +427,15 @@ test.describe('Settings — automations', () => {
     return out;
   };
 
-  test('the card opens the section: four switches, all off by default, each with the sentence it will send', async ({ page }) => {
+  test('the card opens the section: the recipes and seven switches, all off by default, each with the sentence it will send', async ({ page }) => {
     await installApp(page, { api: API });
     await page.goto('/settings.html');
     await page.locator('[data-card="auto"]').click();
     await expect(page.locator('#automations')).toBeVisible();
-    await expect(page.locator('#automations [role="switch"]')).toHaveCount(4);
-    for (const id of ['sw-ack', 'sw-inv', 'sw-deal', 'sw-rev']) await expect(page.locator('#' + id)).toHaveAttribute('aria-checked', 'false');
+    await expect(page.locator('#automations [role="switch"]')).toHaveCount(7);   // sales item 87 added three
+    await expect(page.locator('#recipes [data-recipe]')).toHaveCount(6);
+    await expect(page.locator('#recipes [data-recipe-on]')).toHaveCount(6);       // none on yet
+    for (const id of ['sw-ack', 'sw-inv', 'sw-deal', 'sw-rev', 'sw-fu', 'sw-inv2', 'sw-exp']) await expect(page.locator('#' + id)).toHaveAttribute('aria-checked', 'false');
     await expect(page.locator('#say-ack')).toHaveText('Thanks for getting in touch — we’ve got your message and will reply within one business day.');
     await expect(page.locator('#say-inv')).toContainText('Just a friendly nudge: the invoice for $1,250.00 is still open.');
     await expect(page.locator('#say-deal')).toHaveText('This deal has had no next step for 3 days — a quick follow-up keeps it moving.');
@@ -497,11 +499,17 @@ test.describe('Settings — automations', () => {
     await expect(page.locator('#sw-ack')).toHaveAttribute('aria-checked', 'false');
   });
 
-  test('drilled into a client the studio’s switches stay out of sight', async ({ page }) => {
+  test('drilled into a client the studio’s switches stay out of sight; their website’s two replies show', async ({ page }) => {
     await installApp(page, { api: { ...API, '/portal/context': SCOPED_CTX } });
     await page.goto('/settings.html?client=' + CLIENT + '#automations');
     await expect(page.locator('[data-card="auto"]')).toHaveCount(0);
-    await expect(page.locator('#automations')).toBeHidden();
+    await expect(page.locator('[data-card="replies"]')).toBeVisible();   // sales item 87
+    await expect(page.locator('#automations')).toBeVisible();
+    await expect(page.locator('#sw-ack')).toBeVisible();
+    await expect(page.locator('#sw-fu')).toBeVisible();
+    for (const id of ['sw-inv', 'sw-deal', 'sw-rev', 'sw-exp']) await expect(page.locator('#' + id)).toBeHidden();
+    await expect(page.locator('#recipes [data-recipe]')).toHaveCount(2);
+    await expect(page.locator('#stages')).toBeHidden();
   });
 });
 // ── Oct 2026 studio audit, change 6: the agency's TEAM lives on Settings ──────
