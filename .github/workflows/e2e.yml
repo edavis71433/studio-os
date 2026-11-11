@@ -77,6 +77,8 @@ jobs:
               supabase/functions/presence/lib/site_roles.ts) run=true ;;
               # site-send.spec.ts drives the script this one puts on client sites.
               supabase/functions/presence/lib/site_send.ts) run=true ;;
+              # builder-page-settings.spec.ts opens a sealed password page with this (builder items 48 and 120).
+              supabase/functions/presence/lib/page_gate.ts) run=true ;;
               docs/*|supabase/*|runbooks/*|sql/*|templates/*) ;;
               tests/isolation/*|tests/presence/*|tests/smoke/*|tests/workflows/*) ;;
               .github/workflows/ci.yml|.github/workflows/deploy.yml|.github/workflows/rollback.yml|.github/workflows/schema-dump.yml) ;;
