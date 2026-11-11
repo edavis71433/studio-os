@@ -156,7 +156,8 @@ const SOURCE = Object.fromEntries(PAGES.map((p) => [p, read(p)]));
       if (!known(page).some((k) => k.includes(call))) ok(`${page}: this configure write is listed`, false, call);
     }
   }
-  ok('tripwire: the configure scan found every call in the table', seen === 15, String(seen));   // item 174: the www. switch and the two forward calls   // item 162, part two: the domain sheet's "More help" guides; item 163: change to a different domain
+  // builder list item 149: the Bookings view's own-calendar and change-or-cancel cards save through PUT /bookings/settings too
+  ok('tripwire: the configure scan found every call in the table', seen === 16, String(seen));   // item 174: the www. switch and the two forward calls   // item 162, part two: the domain sheet's "More help" guides; item 163: change to a different domain
 }
 
 // ═══ 4. settings: one row, two kinds of field ═══

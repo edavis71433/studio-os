@@ -271,7 +271,7 @@ for (const p of ['agency.html', 'customers.html', 'contacts.html']) {
   ok('doc-viewer: emailed docLink and the CRM document-link route both mint via docViewerUrl', (sales.match(/docViewerUrl\(token\)/g) || []).length >= 2);
   ok('doc-viewer: the raw GET /sales/doc render route STAYS (the viewer fetches it)', /handleSalesDocument\(req, m\[1\], cors\)/.test(idx));
   ok('doc-viewer: doc.html fetches /sales/doc/<token> bare (public token-gated GET) and document.writes the render', /\/sales\/doc\/'\+encodeURIComponent\(t\)/.test(doc) && /document\.open\(\);document\.write\(html\);document\.close\(\)/.test(doc));
-  ok('doc-viewer: doc.html is unindexable and shows a friendly expiry message on failure', /noindex,nofollow/.test(doc) && /ask your studio for a fresh copy/.test(doc));
+  ok('doc-viewer: doc.html is unindexable and shows a friendly expiry message on failure', /noindex,nofollow/.test(doc) && /Ask whoever sent it for a fresh copy/.test(doc));
 }
 
 // ── ONE LINK (benchmark 2026-10, item 5): the deal-bound `flow` token ──

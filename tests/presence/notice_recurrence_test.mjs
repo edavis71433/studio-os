@@ -97,6 +97,9 @@ const TERMINAL_OK = [
   { kind: 'deletion_requested', marker: 'del:', why: 'a cancelled deletion request that is re-requested mints a NEW request id' },
   { kind: 'new_review', marker: 'review:', why: 'one row per review; moderating THAT review is terminal — a new review mints a new id' },
   { kind: 'new_booking', marker: 'appt:', why: 'one row per appointment; deciding THAT booking is terminal — a new booking mints a new id' },
+  // builder list item 149: the owner hears when a customer moves or cancels
+  { kind: 'new_booking', marker: 'moved:', why: 'moved:<appt>:<the moment it moved> — every move is its own row, so moving back and forth is told each time' },
+  { kind: 'new_booking', marker: 'canceled:', why: 'canceled:<appt> — a booking is canceled once; a new booking mints a new id' },
   { kind: 'approval_overdue', marker: 'approvalOverduePeriod(', why: 'one row per approval (audit change 8); deciding THAT approval is terminal — a re-request mints a new approval id' },
   // sales review item 47
   { kind: 'deal_signed', marker: 'estimate:', why: 'estimate:<deal>:<estimate> — an estimate is approved once; turning THAT estimate into a proposal or an invoice is terminal, and a new estimate mints a new id' },

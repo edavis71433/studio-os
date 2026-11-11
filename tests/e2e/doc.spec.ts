@@ -30,7 +30,22 @@ test.describe('doc.html viewer', () => {
       route.fulfill({ status: 403, contentType: 'text/plain; charset=utf-8', body: '<!doctype html><title>Document unavailable</title>' }));
     await page.goto('/doc.html?t=expired-token');
     await expect(page.locator('#state h1')).toHaveText('This document link isn’t working');
-    await expect(page.getByText('ask your studio for a fresh copy')).toBeVisible();
+    await expect(page.getByText('Ask whoever sent it for a fresh copy')).toBeVisible();
+  });
+
+  // sales items 79 + 92: the server's own page says who sent it and why, so the viewer shows that
+  test('the server’s own “not working” page, naming the sender, is shown as it is', async ({ page }) => {
+    await page.route('**/functions/v1/presence/sales/doc/**', (route) =>
+      route.fulfill({ status: 403, contentType: 'text/plain; charset=utf-8', body: '<!doctype html><meta charset="utf-8"><title>Document unavailable</title><div><h1 style="font-weight:500">This document link isn’t working</h1><p>It has expired. Ask Fixture Studio for a fresh copy. Nothing is lost.</p></div>' }));
+    await page.goto('/doc.html?t=expired-token');
+    await expect(page.locator('h1')).toHaveText('This document link isn’t working');
+    await expect(page.getByText('It has expired. Ask Fixture Studio for a fresh copy. Nothing is lost.')).toBeVisible();
+    await expect(page.getByText('Ask whoever sent it')).toHaveCount(0);
+  });
+  test('the viewer’s own title no longer says Studio OS (item 92)', async ({ page }) => {
+    await page.route('**/functions/v1/presence/sales/doc/**', (route) => route.abort('failed'));
+    await page.goto('/doc.html?t=any-token');
+    await expect(page).toHaveTitle('Document');
   });
 
   test('a missing token shows the error immediately (no fetch)', async ({ page }) => {

@@ -29,7 +29,7 @@ import { leftToBill, reuseDecision, retainerPaid, linesFromProposal } from '../l
 import { editionFor } from '../commerce/catalog.ts';
 import type { PlanKey } from '../commerce/catalog.ts';
 import { hmacHex, timingSafeEqual } from '../../_shared/hmac.ts';
-import { signDocToken, verifyDocToken, renderDocument, invoiceNo, dayLabel, type DocKind } from '../lib/documents.ts';
+import { signDocToken, readDocToken, lastingRecord, renderDocument, invoiceNo, dayLabel, type DocKind } from '../lib/documents.ts';
 import { documentPdf, pdfFileName } from '../lib/doc_pdf.ts';   // sales item 82: the same documents as real PDFs
 import { docContextFor } from '../lib/doc_context.ts';   // sales item 81: from, billed to, dates, part payments
 import {
@@ -2491,11 +2491,16 @@ export async function handleSalesDocument(req: Request, token: string, cors: Rec
   if (!(await rateAllow(`sales_doc:${clientIp(req)}`, 60, 60))) return errResp('Too many requests — try again in a moment.', 429);
   const secret = linkSecret();
   if (!secret) return errResp('This link isn’t available right now.', 503);
-  const tok = await verifyDocToken(token, secret, Math.floor(Date.now() / 1000));
-  if (!tok) return errResp('It may have expired — ask your studio for a fresh copy. Nothing is lost.', 403);
+  // Sales item 79: the signature first, the date once the document is known: a link to a
+  // signed agreement or a receipt keeps working after its date (lastingRecord)
+  const tok = await readDocToken(token, secret);
+  if (!tok) return errResp('This link isn’t complete. Open it again from your email, or ask whoever sent it for a fresh copy.', 403);
   let brand: { name: string; accent: string; accentDark: string } | undefined;
   try { brand = await loadEmailBrand(tok.site_id); } catch { /* neutral default in the renderer */ }
   const row = await docRow(tok.k, tok.id, tok.site_id);
+  const expired = tok.exp < Math.floor(Date.now() / 1000);
+  const sender = brand?.name && brand.name !== EMAIL_BRAND_DEFAULT.name ? brand.name : 'whoever sent it';
+  if (expired && !lastingRecord(tok.k, row)) return errResp(`It has expired. Ask ${sender} for a fresh copy. Nothing is lost.`, 403);
   if (!row) return errResp(`This ${tok.k === 'contract' ? 'agreement' : tok.k} is no longer available.`, 404);
   // Item 69: the copy linked from the invoice EMAIL (e: 1) counts as the client opening
   // it; the drawer's own Open/print link never does, nor does fetching its PDF.
