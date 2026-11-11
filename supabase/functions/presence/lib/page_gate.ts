@@ -55,7 +55,7 @@ const LOCK_SVG = '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="11"
  *  title, stylesheet and fonts, without its description, share tags or structured data),
  *  the site's header and footer as the page drew them, the password box in the middle, and
  *  the sealed page. Pure. */
-export function gatePage(html: string, sealed: { iv: string; data: string }, lock: { salt: string; iterations: number }, opts: { title: string }): string {
+export function gatePage(html: string, sealed: { iv: string; data: string }, lock: { salt: string; iterations: number }, opts: { title: string; heading?: string; note?: string }): string {
   const headM = html.match(/^[\s\S]*?<\/head>/);
   let head = headM ? headM[0] : '<!DOCTYPE html>\n<html lang="en">\n<head>\n<meta charset="utf-8">\n<meta name="viewport" content="width=device-width, initial-scale=1">\n</head>';
   head = head
@@ -81,8 +81,8 @@ ${notices}
 ${header}<main id="main" class="dds-lock-wrap">
 <form class="dds-lock" id="dds-lock-form" autocomplete="off">
 <span class="dds-lock-ic">${LOCK_SVG}</span>
-<h1>This page needs a password</h1>
-<p>Type the password you were given to see ${name}.</p>
+<h1>${opts.heading ? escHtml(opts.heading) : 'This page needs a password'}</h1>
+<p>${opts.note ? escHtml(opts.note) : `Type the password you were given to see ${name}.`}</p>
 <label for="dds-lock-pw">Password</label>
 <input id="dds-lock-pw" name="password" type="password" autocomplete="current-password" placeholder="Password" required>
 <div class="dds-lock-msg" id="dds-lock-msg" role="alert" aria-live="polite"></div>
@@ -139,14 +139,14 @@ export async function openSealedPage(sealed: { iv: string; data: string }, keyB6
 
 /** Every password page of a rendered site, sealed behind its box. A page whose file isn't
  *  there is left alone (nothing to protect). */
-export async function lockPages(fileMap: FileMap, pages: Array<{ slug: string; title: string; salt: string; iterations: number; key: string }>): Promise<FileMap> {
+export async function lockPages(fileMap: FileMap, pages: Array<{ slug: string; title: string; salt: string; iterations: number; key: string; heading?: string; note?: string }>): Promise<FileMap> {
   if (!pages.length) return fileMap;
   const out: FileMap = { ...fileMap };
   for (const p of pages) {
     const file = `${p.slug}/index.html`;
     const html = out[file];
     if (typeof html !== 'string') continue;
-    out[file] = gatePage(html, await sealPage(html, p.key), { salt: p.salt, iterations: p.iterations }, { title: p.title });
+    out[file] = gatePage(html, await sealPage(html, p.key), { salt: p.salt, iterations: p.iterations }, { title: p.title, heading: p.heading, note: p.note });
   }
   return out;
 }

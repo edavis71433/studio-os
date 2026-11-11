@@ -21,6 +21,8 @@ import { componentsForIndustry } from '../lib/site_components.ts';
 import { listStarterLayouts, starterKeyFor } from '../lib/starter_layouts.ts';
 import { normalizeTags } from '../lib/search_index.ts';
 import { detectPageRenames, duplicatePageInSettings, pageRefs, PAGE_SLUG_RE, type PageRename } from '../lib/page_ops.ts';
+import { lockedEdits, lockedMessage } from '../lib/section_lock.ts';
+import { publishActorKind } from '../lib/actor_kind.ts';
 import { OPEN_STAGES } from '../lib/sales_lifecycle.ts';
 import { GOOGLE_TAG_RE, META_PIXEL_RE } from '../lib/ad_tags.ts';
 import type { SiteRow } from '../lib/site.ts';
@@ -501,6 +503,14 @@ export async function handleSettings(req: Request, db: SiteDb, site: SiteRow, pr
   if (payload && Array.isArray(payload.pages)) {
     const d = detectPageRenames(payload.pages);
     payload.pages = d.pages; renames = d.renames;
+  }
+  // Item 155: a section the studio locked stays as it is for the client, however the save
+  // comes (lib/section_lock.ts); the studio itself and platform staff are never stopped.
+  if (publishActorKind(principal) === 'client' && payload && (Array.isArray(payload.blocks) || Array.isArray(payload.pages))) {
+    const cur = await db(`presence_settings?site_id=eq.${site.id}&select=blocks,pages&limit=1`);
+    if (!cur.ok) return json({ error: 'read_failed', message: 'We couldn’t check your sections just now. Nothing was changed.' }, 502, cors);
+    const edits = lockedEdits(cur.json?.[0] ?? {}, payload, Object.fromEntries(renames.map((r) => [r.from, r.to])));
+    if (edits.length) return json({ error: 'section_locked', message: lockedMessage(edits), sections: edits }, 403, cors);
   }
   const resp = await singleton(req, db, site, principal, cors, SETTINGS_CFG, payload);
   if (resp && resp.status === 200 && renames.length) await redirectsForRenames(site, principal, renames);
