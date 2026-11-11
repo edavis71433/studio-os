@@ -66,6 +66,8 @@ const SYS_LABEL: Record<string, string> = {
   created: 'Deal created', stage_change: 'Moved stage', proposal_sent: 'Proposal sent',
   proposal_decided: 'Proposal decision', contract_sent: 'Agreement sent', contract_signed: 'Agreement signed',
   invoice_sent: 'Invoice sent', invoice_paid: 'Invoice paid', converted: 'Converted to a customer',
+  // item 107 (J8): these three fell through to "invoice voided" in lower case
+  invoice_voided: 'Invoice voided', proposal_deleted: 'Draft proposal removed', contract_deleted: 'Draft agreement removed',
 };
 // Item 69: the client opened a document's page (routes/sales.ts firstOpen) — "They
 // opened your proposal". pipeline.html mirrors these by hand, like SYS_LABEL.
@@ -76,10 +78,14 @@ export function openedLine(what: unknown): string {
 }
 const STAGE_LABEL: Record<string, string> = { lead: 'New lead', qualified: 'Qualified', proposal: 'Proposal sent', contract: 'Agreement out', won: 'Won', lost: 'Not a fit' };
 
-function usd(cents: unknown): string {
-  const n = Number(cents);
+/** Money the way the record prints it: whole dollars when whole, else two
+ *  decimals — "$1,250" and "$1,250.50", never "$1,250.5" (item 107, J7). Empty
+ *  for nothing. Pure; crm/activity.ts uses it for the Upcoming band too. */
+export function usd(cents: unknown): string {
+  const n = Math.round(Number(cents));
   if (!Number.isFinite(n) || n === 0) return '';
-  return '$' + (n / 100).toLocaleString('en-US', { minimumFractionDigits: 0 });
+  const whole = n % 100 === 0;
+  return (n < 0 ? '−$' : '$') + (Math.abs(n) / 100).toLocaleString('en-US', whole ? { maximumFractionDigits: 0 } : { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
 /** Plain-language label for a SYSTEM deal event (mirrors pipeline.html's evtLabel
@@ -92,7 +98,11 @@ export function describeSystemEvent(row: any): string {
   if (k === 'contract_signed' && d.signer) return 'Agreement signed — ' + d.signer;
   if (k === 'invoice_sent' && d.amount_cents && d.recurring_id) return 'Recurring invoice sent' + (usd(d.amount_cents) ? ' — ' + usd(d.amount_cents) : '') + (d.period ? ` (${d.period})` : '');   // item 47
   if (k === 'invoice_sent' && d.amount_cents) return (d.purpose === 'deposit' ? 'Deposit requested' : 'Invoice sent') + (usd(d.amount_cents) ? ' — ' + usd(d.amount_cents) : '');
-  if (k === 'invoice_paid' && d.amount_cents) return (d.purpose === 'deposit' ? 'Deposit paid' : 'Invoice paid') + (usd(d.amount_cents) ? ' — ' + usd(d.amount_cents) : '');
+  // item 108 (J4): a retainer charge writes no invoice — it is a retainer payment, not "Invoice paid"
+  if (k === 'invoice_paid' && d.amount_cents) return (d.retainer ? 'Retainer payment' : d.purpose === 'deposit' ? 'Deposit paid' : 'Invoice paid') + (usd(d.amount_cents) ? ' — ' + usd(d.amount_cents) : '');
+  // item 107 (J8): the withdrawn invoice and the removed drafts name what they were
+  if (k === 'invoice_voided') return (d.purpose === 'deposit' ? 'Deposit request voided' : 'Invoice voided') + (d.title ? ' — ' + String(d.title) : '') + (usd(d.amount_cents) ? (d.title ? ` (${usd(d.amount_cents)})` : ' — ' + usd(d.amount_cents)) : '');
+  if ((k === 'proposal_deleted' || k === 'contract_deleted') && d.title) return SYS_LABEL[k] + ' — ' + String(d.title);
   if (k === 'doc_opened') return openedLine(d.what);
   if (k === 'estimate_sent' || k === 'estimate_decided' || k === 'estimate_deleted') return estimateEventLine(k, d);   // item 47
   if (k === 'recurring_invoice') return recurringEventLine(d);

@@ -1,0 +1,177 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Templates — Studio OS</title>
+<meta name="robots" content="noindex, nofollow">
+<!-- Studio level, never scoped: a stray ?client= is dropped before the shell reads the URL, as on Home. -->
+<script>(function(){try{if(/[?&]client=/.test(location.search)){var u=new URL(location.href);u.searchParams.delete('client');history.replaceState(null,'',u.pathname+(u.search||'')+u.hash);}}catch(_){}})();</script>
+<link rel="stylesheet" href="/fonts/brand.css">
+<style>
+  /* the page skin = the shell's --dds-* tokens, aliased the way domains.html does */
+  :root{
+    --bg:var(--dds-bg,#faf8f5);--card:var(--dds-card,#fff);--ink:var(--dds-ink,#1b1525);--soft:var(--dds-soft,#6b6478);--faint:var(--dds-faint,#746b8a);--line:var(--dds-line,#eee9e0);
+    --p:var(--dds-p,#5b3fa0);--p-soft:var(--dds-p-soft,#efeafa);--info:var(--dds-info,#245fa0);--info-soft:var(--dds-info-soft,#e6effa);--bad:var(--dds-bad,#9a4242);
+    --shadow:var(--dds-shadow,0 1px 2px rgba(27,21,37,.04),0 8px 24px rgba(27,21,37,.06));
+    --sans:'Inter',-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  }
+  *{box-sizing:border-box;margin:0}
+  [hidden]{display:none!important}
+  body{background:var(--bg);color:var(--ink);font-family:var(--sans);line-height:1.5;-webkit-font-smoothing:antialiased}
+  .wrap{max-width:var(--dds-w-data,1600px);margin:0 auto;padding:var(--dds-s7,32px) var(--dds-s5,20px) 90px}
+  .lhead{background:var(--card);border:1px solid var(--line);border-radius:var(--dds-r-lg,10px);box-shadow:var(--shadow);padding:var(--dds-s3,12px) var(--dds-s4,16px) 10px;margin-bottom:var(--dds-s4,16px)}
+  .lrow1{display:flex;align-items:center;gap:10px}
+  .obj-ic{width:34px;height:34px;border-radius:var(--dds-r,8px);background:var(--p);color:#fff;display:grid;place-items:center;font-size:16px;flex:0 0 auto}
+  .lhead h1{font-family:var(--sans);font-weight:600;font-size:20px;margin:0;letter-spacing:-.01em;flex:1;min-width:0}
+  .lmeta{margin-top:6px;font-size:12px;color:var(--faint)}
+  .tabs{display:flex;gap:var(--dds-s1,4px);margin-top:10px;border-top:1px solid var(--line);padding-top:var(--dds-s2,8px)}
+  .tabs a{font-size:13.5px;font-weight:600;color:var(--soft);text-decoration:none;padding:6px var(--dds-s3,12px);border-radius:var(--dds-r,8px)}
+  .tabs a:hover{color:var(--p);background:var(--p-soft)}
+  .tabs a[aria-current="page"]{color:var(--p);background:var(--p-soft)}
+  .intro{font-size:13.5px;color:var(--soft);max-width:var(--dds-w-focus,760px);margin:0 0 var(--dds-s4,16px)}
+  /* item 166: every template and starter kit, with what it brings, where it came from, Rename and Remove */
+  .klist{background:var(--card);border:1px solid var(--line);border-radius:var(--dds-r-lg,14px);box-shadow:var(--shadow);overflow:hidden;max-width:1100px}
+  .krow{display:flex;align-items:center;gap:14px;padding:14px 18px;border-top:1px solid var(--line)}
+  .krow:first-child{border-top:none}
+  .kw{flex:1;min-width:0}
+  .kn{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+  .kn b{font-size:14.5px;font-weight:600;overflow-wrap:anywhere}
+  .kchip{font-size:11.5px;font-weight:600;border-radius:999px;padding:1px 8px;white-space:nowrap}
+  .kchip.tpl{background:var(--p-soft);color:var(--p)} .kchip.kit{background:var(--info-soft);color:var(--info)}
+  .kb{font-size:13px;color:var(--soft);margin-top:2px}
+  .kf{font-size:12px;color:var(--faint);margin-top:2px;overflow-wrap:anywhere}
+  .kacts{display:flex;gap:6px;flex:0 0 auto;flex-wrap:wrap;justify-content:flex-end}
+  .rowact{font:inherit;font-size:12.5px;font-weight:600;border:1px solid var(--line);border-radius:999px;background:transparent;color:var(--ink);padding:6px var(--dds-s3,12px);cursor:pointer;white-space:nowrap;min-height:36px}
+  .rowact:hover{border-color:var(--p);color:var(--p)}
+  .rowact.main{background:var(--p);border-color:var(--p);color:#fff}
+  .rowact[data-armed]{border-color:var(--bad);color:var(--bad)}
+  .rowact:disabled{opacity:.6;cursor:default}
+  .kname{display:flex;flex-direction:column;gap:4px}
+  .kname label{font-size:13px;font-weight:600;color:var(--soft)}
+  .kname input{width:100%;font-family:inherit;font-size:16px;border:1px solid var(--line);background:var(--bg);color:var(--ink);border-radius:var(--dds-r,8px);padding:8px 12px;outline:none}
+  .kname input:focus{border-color:var(--p)}
+  @media (max-width:640px){.krow{flex-direction:column;align-items:stretch}.kacts{justify-content:flex-start}.rowact{min-height:44px}}
+  /* dark mode fills with the light accent, which wants dark ink (shell.css's rule for its own buttons) */
+  @media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .rowact.main{color:#171320}}
+  :root[data-theme="dark"] .rowact.main{color:#171320}
+  .center{text-align:center;padding:52px var(--dds-s5,20px)}.center h2{font-weight:600;font-size:20px;margin:0 0 var(--dds-s2,8px)}
+  .muted{color:var(--soft);font-size:14px}
+  a.link{color:var(--p);text-decoration:none;font-weight:500}a.link:hover{text-decoration:underline}
+  .btn{font:inherit;font-size:13.5px;font-weight:500;border:none;border-radius:var(--dds-r,8px);padding:var(--dds-s2,8px) var(--dds-s4,16px);background:var(--p);color:#fff;cursor:pointer}
+  @media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .btn{color:#171320}}
+  :root[data-theme="dark"] .btn{color:#171320}
+  .spin{width:22px;height:22px;border:2.5px solid var(--line);border-top-color:var(--p);border-radius:50%;animation:sp .8s linear infinite;margin:var(--dds-s8,40px) auto}
+  @keyframes sp{to{transform:rotate(360deg)}}
+  @media (prefers-reduced-motion:reduce){.spin{animation:none}}
+  :focus-visible{outline:2px solid var(--p);outline-offset:2px}
+</style>
+<link rel="stylesheet" href="/shell.css"><script src="/shell.js" defer></script>
+</head>
+<body>
+<div class="wrap">
+  <div id="main"><div class="spin" role="status" aria-label="Loading"></div></div>
+</div>
+
+<script src="/vendor/supabase-js-2.45.4.js"></script>
+<script>
+// ── Templates (builder list item 166, Nov 2026 review, file 05 finding 13) ────
+// Starter kits could be saved and picked but never seen, renamed or removed. This
+// tab of Sites lists every template (item 145: a saved site's pages, sections, menu,
+// photos and look) and every starter kit (the setup only), with what each brings and
+// which site it came from. Rename happens in place; Remove asks with a second press.
+// GET /agency/kits, PATCH /agency/kits/:id { name }, DELETE /agency/kits/:id
+// (agency/routes.ts; a template's own photo copies go with it).
+const SUPABASE_URL="https://qksstlqzbhesadrrofgn.supabase.co";
+const SUPABASE_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFrc3N0bHF6Ymhlc2FkcnJvZmduIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE5NzMwMDMsImV4cCI6MjA5NzU0OTAwM30.4V94Ua7z5cntPWtvtqN24TUnfY5A6K6-zCxY0iEcgYo";
+const FN=SUPABASE_URL+"/functions/v1/presence";
+const sb=supabase.createClient(SUPABASE_URL,SUPABASE_KEY,{auth:{storageKey:'dds-portal-auth',persistSession:true,autoRefreshToken:true}});
+const $=(id)=>document.getElementById(id);
+const esc=(s)=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const toast=(m,bad)=>{ if(window.ddsToast) window.ddsToast(m,bad?'err':'ok'); };
+let TOKEN="",ME="";
+sb.auth.onAuthStateChange(function(_e,s){if(s&&s.access_token)TOKEN=s.access_token;});
+const H=()=>({'Content-Type':'application/json','Authorization':'Bearer '+SUPABASE_KEY,'x-dds-user-jwt':TOKEN});
+async function api(method,path,payload){
+  try{const r=await fetch(FN+path,{method,headers:H(),body:payload?JSON.stringify(payload):undefined});return{ok:r.ok,status:r.status,body:await r.json().catch(()=>({}))};}
+  catch(_){return{ok:false,status:0,body:{message:'We lost the connection — nothing changed. Try again in a moment.'}};}
+}
+const day=(iso)=>{if(!iso)return'';const d=new Date(iso);return isNaN(d)?'':d.toLocaleDateString('en-US',{month:'short',day:'numeric',year:d.getFullYear()===new Date().getFullYear()?undefined:'numeric'});};
+const n=(c,w)=>(c||0)+' '+w+(c===1?'':'s');
+
+let KITS=[],CAN=false,EDITING=null,BUSY=false;
+// what a kit brings, in the words its row says
+function brings(k){
+  const b=k.brings||{},kit=[b.offerings?n(b.offerings,'service'):'',b.faqs?n(b.faqs,'FAQ'):'',(b.voice||b.colors)?[b.voice?'voice':'',b.colors?'colors':''].filter(Boolean).join(' and '):''].filter(Boolean);
+  if(k.kind==='template'){const s=k.summary||{};const pages=[s.pages?n(s.pages,'page'):'',n(s.sections,'section'),s.photos?n(s.photos,'photo'):''].filter(Boolean).join(' · ');return pages+(kit.length?', plus '+kit.join(' · '):'');}
+  return kit.length?kit.join(' · '):'Its industry and look';
+}
+function fromLine(k){
+  const who=k.created_by?(ME&&String(k.created_by).toLowerCase()===ME?'you':k.created_by):'';
+  const from=k.from_name?'From '+k.from_name:(k.created_from_site?'From a site no longer in your list':'');
+  return [from,'Saved '+day(k.created_at)+(who?' by '+who:'')].filter(Boolean).join(' · ');
+}
+function rowHtml(k){
+  if(EDITING===k.id)return `<div class="krow" data-kit="${esc(k.id)}"><form class="kw kname" data-rename="${esc(k.id)}"><label for="kn-${esc(k.id)}">Name</label><input id="kn-${esc(k.id)}" maxlength="80" value="${esc(k.name)}" autocomplete="off"><div class="kb">${esc(brings(k))}</div></form><div class="kacts"><button type="button" class="rowact" data-cancel>Cancel</button><button type="button" class="rowact main" data-save="${esc(k.id)}">Save</button></div></div>`;
+  return `<div class="krow" data-kit="${esc(k.id)}"><div class="kw"><div class="kn"><b>${esc(k.name)}</b><span class="kchip ${k.kind==='template'?'tpl':'kit'}">${k.kind==='template'?'Template':'Starter kit'}</span></div><div class="kb">${esc(brings(k))}</div><div class="kf">${esc(fromLine(k))}</div></div>${CAN?`<div class="kacts"><button type="button" class="rowact" data-edit="${esc(k.id)}" aria-label="Rename ${esc(k.name)}">Rename</button><button type="button" class="rowact" data-remove="${esc(k.id)}" aria-label="Remove ${esc(k.name)}">Remove</button></div>`:''}</div>`;
+}
+function render(){
+  const t=KITS.filter(k=>k.kind==='template').length,s=KITS.length-t;
+  let h=`<header class="lhead"><div class="lrow1"><span class="obj-ic" aria-hidden="true">◫</span><h1 id="pagehead" tabindex="-1">Templates</h1></div>
+    <div class="lmeta">${KITS.length?esc(n(t,'template')+' · '+n(s,'starter kit')+' · newest first'):'Nothing saved yet'}</div>
+    <nav class="tabs" aria-label="Sites, domains and templates"><a href="/sites.html">Sites</a><a href="/domains.html">Domains</a><a href="/templates.html" aria-current="page">Templates</a></nav></header>
+    <p class="intro">Start a new site from one of these under “Start from”. A template brings a saved site’s pages, sections, menu, photos and look; a starter kit brings the setup only: services, FAQs, voice and colors.</p>`;
+  if(!KITS.length)h+=`<div class="center"><p class="muted">No templates or starter kits yet.</p><p class="muted" style="margin-top:8px;font-size:13px">Save one from a site’s ⋯ menu on <a class="link" href="/sites.html">Sites</a> (Save as a template), or a customer’s ⋯ on <a class="link" href="/agency.html">Home</a> (Save as a starter kit).</p></div>`;
+  else h+=`<div class="klist" id="klist">${KITS.map(rowHtml).join('')}</div>`;
+  $('main').innerHTML=h;
+  wire();
+}
+function wire(){
+  const list=$('klist');if(!list)return;
+  list.querySelectorAll('[data-edit]').forEach(b=>b.addEventListener('click',()=>{EDITING=b.getAttribute('data-edit');render();const i=document.getElementById('kn-'+EDITING);if(i){i.focus();i.select();}}));
+  list.querySelectorAll('[data-cancel]').forEach(b=>b.addEventListener('click',()=>{const id=EDITING;EDITING=null;render();const e=document.querySelector('[data-edit="'+CSS.escape(id)+'"]');if(e)e.focus();}));
+  list.querySelectorAll('[data-save]').forEach(b=>b.addEventListener('click',()=>rename(b.getAttribute('data-save'))));
+  list.querySelectorAll('form[data-rename]').forEach(f=>{
+    f.addEventListener('submit',(e)=>{e.preventDefault();rename(f.getAttribute('data-rename'));});
+    f.addEventListener('keydown',(e)=>{if(e.key==='Escape'){e.preventDefault();const id=EDITING;EDITING=null;render();const ed=document.querySelector('[data-edit="'+CSS.escape(id)+'"]');if(ed)ed.focus();}});
+  });
+  list.querySelectorAll('[data-remove]').forEach(b=>b.addEventListener('click',()=>remove(b)));
+}
+async function rename(id){
+  if(BUSY)return;const k=KITS.find(x=>x.id===id);const i=document.getElementById('kn-'+id);if(!k||!i)return;
+  const name=i.value.replace(/\s+/g,' ').trim();
+  if(!name){toast('Give it a name.',true);i.focus();return;}
+  if(name===k.name){EDITING=null;render();return;}
+  BUSY=true;const sv=document.querySelector('[data-save="'+CSS.escape(id)+'"]');if(sv){sv.disabled=true;sv.textContent='Saving…';}
+  const r=await api('PATCH','/agency/kits/'+encodeURIComponent(id),{name});BUSY=false;
+  if(!r.ok){toast((r.body&&r.body.message)||'That didn’t save.',true);if(sv){sv.disabled=false;sv.textContent='Save';}return;}
+  k.name=(r.body.data&&r.body.data.name)||name;EDITING=null;render();toast('Renamed “'+k.name+'”.');
+  const e=document.querySelector('[data-edit="'+CSS.escape(id)+'"]');if(e)e.focus();
+}
+// Remove asks with a second press (Home's archive pattern); a template's photo copies go with it
+async function remove(b){
+  if(BUSY)return;const id=b.getAttribute('data-remove');const k=KITS.find(x=>x.id===id);if(!k)return;
+  if(!b.dataset.armed){b.dataset.armed='1';b.textContent='Remove '+k.name+'? Press again';setTimeout(()=>{if(b.isConnected){delete b.dataset.armed;b.textContent='Remove';}},4000);return;}
+  BUSY=true;b.disabled=true;b.textContent='Removing…';
+  const r=await api('DELETE','/agency/kits/'+encodeURIComponent(id));BUSY=false;
+  if(!r.ok){toast((r.body&&r.body.message)||'That didn’t go through.',true);b.disabled=false;delete b.dataset.armed;b.textContent='Remove';return;}
+  KITS=KITS.filter(x=>x.id!==id);render();toast('Removed “'+k.name+'”. Sites already started from it keep everything they got.');
+  const h=$('pagehead');if(h)h.focus();
+}
+
+function notAgency(){$('main').innerHTML=`<div class="center"><h2>This isn’t an agency account.</h2><p class="muted">Templates lists the starting points a studio saves for its clients’ sites.</p></div>`;}
+function signedOut(){$('main').innerHTML=`<div class="center"><h2>Sign in to your studio.</h2><p style="margin-top:20px"><a class="link" href="/studio.html">Sign in →</a></p></div>`;}
+function trouble(){$('main').innerHTML=`<div class="center"><h2>We couldn’t load your templates just now.</h2><p class="muted" style="margin-bottom:16px">A brief hiccup — it usually passes.</p><button id="retry" class="btn">Try again</button></div>`;const rt=$('retry');if(rt)rt.addEventListener('click',()=>boot());}
+async function boot(){
+  try{const{data}=await sb.auth.getSession();TOKEN=(data&&data.session&&data.session.access_token)||"";ME=String((data&&data.session&&data.session.user&&data.session.user.email)||'').toLowerCase();
+    if(!TOKEN){signedOut();return;}
+    const r=await api('GET','/agency/kits');
+    if(!r.ok){if(r.status===401){signedOut();return;}if(r.status===403){notAgency();return;}trouble();return;}
+    KITS=Array.isArray(r.body.data)?r.body.data:[];CAN=r.body.can_manage!==false;
+    render();
+  }catch(_){trouble();}
+}
+boot();
+</script>
+</body>
+</html>

@@ -22,7 +22,7 @@ ok('migration: customer-scoped read index + deny-all RLS', /presence_invoices_cu
 // route + handler
 ok('route: POST /sales/deals/:id/invoice → handleSalesInvoice', /\\\/sales\\\/deals\\\/\(\[0-9a-f-\]\{36\}\)\\\/invoice\$/.test(index) && /handleSalesInvoice\(req, site, principal, m\[1\], cors\)/.test(index));
 ok('handler: defaults the amount to the ACCEPTED proposal total', /presence_proposals\?deal_id=eq\.\$\{dealId\}&site_id=eq\.\$\{site\.id\}&status=eq\.accepted[\s\S]*?subtotal_cents/.test(sales));
-ok('handler: writes presence_invoices with the customer + purpose + cents', /svc\('presence_invoices'[\s\S]*?customer_client_id: deal\.converted_client_id[\s\S]*?amount_cents: amountCents/.test(sales));
+ok('handler: writes presence_invoices with the customer + purpose + cents', /const newRow: Record<string, unknown> = \{ site_id: site\.id, deal_id: dealId, customer_client_id: deal\.converted_client_id[\s\S]*?amount_cents: amountCents[\s\S]*?svc\('presence_invoices', \{ method: 'POST', headers: \{ Prefer: 'return=representation' \}, body: JSON\.stringify\(newRow\) \}\)/.test(sales));   // sales item 81: the row is built first (its lines ride along when billed from the proposal)
 ok('handler: refuses without Stripe configured (503, never fake)', /if \(!stripeConfigured\(\)\) return json\(\{ error: 'unavailable'/.test(sales));
 ok('handler: emails the pay link + records an invoice_sent event', /emailInvoice\(site\.id, dealId/.test(sales) && /dealEvent\(site\.id, dealId, 'invoice_sent'/.test(sales));
 
