@@ -8,7 +8,8 @@ import { svc } from '../lib/db.ts';
 import { rateAllow, clientIp } from '../lib/ratelimit.ts';
 import { parseUA, refHost, cleanPath, cleanUtms, visitorDayHash, isVisitKind, cleanLabel, cleanMs, cleanLcp } from '../lib/visits.ts';
 
-const VISITS_SALT = Deno.env.get('VISITS_SALT') || Deno.env.get('APPROVAL_SECRET') || 'presence-visits';
+// exported for routes/visit_source.ts, which rebuilds a visitor's daily hash to find their page views (item 89)
+export const VISITS_SALT = Deno.env.get('VISITS_SALT') || Deno.env.get('APPROVAL_SECRET') || 'presence-visits';
 const noContent = (cors: Record<string, string>) => new Response(null, { status: 204, headers: cors });
 
 export async function handleCollect(req: Request, siteId: string, cors: Record<string, string>) {

@@ -84,6 +84,8 @@ const { handleBrandProfileGet, handleBrandProfilePut, handleBrandReviewRun, hand
 const { handleCoachRun, handleCoachList, handleCoachDecide, handleCoachHealth, handleCoachJourney } = lazyRoutes(() => import('./routes/coach.ts'));
 import { handleAnalyticsHome, handleAnalyticsPortfolio, handleAnalyticsDashboard } from './routes/analytics.ts';
 import { handleCollect } from './routes/collect.ts';
+import { noteVisitSource } from './routes/visit_source.ts';
+import { runAfterResponse } from './lib/after_response.ts';
 const { handleKnowledgeImport, handleKnowledgeList, handleKnowledgeDelete } = lazyRoutes(() => import('./routes/knowledge.ts'));
 import { handleMonitorGet, handleMonitorConnect, handleMonitorVerify, handleMonitorDisconnect } from './routes/monitor.ts';
 const { handleFoundationsGet, handleFoundationsPrepare, handleFoundationsPlans, handleFoundationsDecide } = lazyRoutes(() => import('./routes/foundations.ts'));
@@ -183,7 +185,8 @@ async function route_(req: Request, cors: Record<string, string>): Promise<Respo
   //    session; both are authorized by the target itself (site id / signed token).
   {
     const m = route.match(/^\/forms\/([0-9a-f-]{36})\/submit$/);
-    if (m && method === 'POST') return handleFormSubmit(req, m[1], cors);
+    // item 89: once the visitor has their answer, the enquiry notes where their visit began
+    if (m && method === 'POST') { const sentAt = Date.now(), res = await handleFormSubmit(req, m[1], cors); runAfterResponse(noteVisitSource(req, m[1], sentAt).catch(() => false)); return res; }
   }
   // ── Phase BK: PUBLIC native booking — a website visitor lists services, reads
   //    open slots, and books an appointment. No session; authorized by the site id

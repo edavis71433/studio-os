@@ -26,6 +26,7 @@ import { validateBlocks } from '../lib/site_blocks.ts';
 import { validateFormValues, type FormDefinition } from '../lib/forms.ts';
 import { notSentReason } from '../lib/legal_pages.ts';
 import { enquiryState, customerEmails } from '../lib/enquiry_state.ts';
+import { leadVisit } from '../lib/visit_source.ts';   // item 89
 
 const SB_URL = Deno.env.get('SUPABASE_URL') || '';
 const APPROVAL_SECRET = Deno.env.get('APPROVAL_SECRET') || Deno.env.get('SCHEDULER_SECRET') || '';
@@ -215,12 +216,15 @@ export async function handleFormInbox(site: SiteRow, cors: Record<string, string
   // Customer when the person became one (a contact linked to a client), else just seen
   const noDeal = rows.filter((s: any) => s.status === 'converted' && !dealMap.has(String(s.id)) && s.email);
   const customers = noDeal.length ? (await customerEmails(site.id, noDeal.map((s: any) => String(s.email)))) || new Set<string>() : new Set<string>();
+  // item 89: where each enquiry's visitor came from, noted after they sent it (routes/visit_source.ts)
+  const visits = new Map(rows.map((s: any) => [String(s.id), leadVisit(s.fields)]));
   // `fields` is read only for the studio's replies (fields.__studio_replies) — the raw
   // form values stay server-side as before; each row carries `replies` instead.
   const submissions = rows.map(({ fields, ...s }: any) => {
     const dealId = dealMap.get(String(s.id)) || null;
     return { ...s, replies: leadReplies(fields), note: leadNote(fields), deal_id: dealId, ...enquiryState(s.status, dealId, customers.has(String(s.email || '').trim().toLowerCase())) };
   });
+  for (const s of submissions as any[]) s.visit = visits.get(String(s.id)) || null;
   return json({ data: { submissions, unread: submissions.filter((s: any) => s.status === 'new').length, more } }, 200, cors);
 }
 
@@ -337,7 +341,8 @@ export async function handleFormStatus(req: Request, site: SiteRow, id: string, 
   return json({ data: { ok: true } }, 200, cors);
 }
 
-async function hashIp(req: Request): Promise<string> {
+// the IP hash an enquiry keeps; routes/visit_source.ts finds the enquiry a visitor just sent by it (item 89)
+export async function hashIp(req: Request): Promise<string> {
   const ip = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || '';
   if (!ip) return '';
   // salt fallback chain: never a guessable literal (an unset APPROVAL_SECRET
