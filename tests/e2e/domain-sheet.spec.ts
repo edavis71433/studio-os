@@ -267,11 +267,13 @@ test.describe('Domain & email sheet: borrowed from Namecheap and Squarespace (it
 
   test('another domain can send its visitors here, and stop', async ({ page }) => {
     const fw: Array<{ method: string; body: unknown }> = [];
-    await installApp(page, { api: { ...BASE, '/foundations/domain': { data: { ...LIVE.data, forwards: ['ancient.example'] } } } });
+    await installApp(page, { api: { ...BASE, '/foundations/domain': { data: { ...LIVE.data, forwards: ['ancient.example', 'second.example', 'www.second.example'] } } } });
     await page.route(/\/functions\/v1\/presence\/foundations\/domain\/forward$/, (route: Route) => { fw.push({ method: route.request().method(), body: route.request().postDataJSON() }); return route.fulfill(json({ data: { forwards: [] } })); });
     await page.goto('/presence.html#domain');
     const box = page.locator('[data-forwards="domain"]');
     await expect(box.locator('[data-forward="ancient.example"]')).toContainText('ancient.example sends visitors to bistro.example');
+    await expect(box.locator('[data-forward="second.example"]')).toContainText('second.example and www.second.example send visitors to bistro.example');   // a pair is one line
+    await expect(box.locator('[data-forward]')).toHaveCount(2);
     await box.getByRole('textbox', { name: 'A domain to send here' }).fill('https://Old.Example/');
     await box.getByRole('button', { name: 'Send it here' }).click();
     await expect.poll(() => fw.length).toBe(1);

@@ -2213,9 +2213,12 @@ function forwardsBlock(dstat) {
   const h = stepLine("Other domains that send visitors here"); h.style.fontWeight = "600"; box.appendChild(h);
   const list = Array.isArray(dstat.forwards) ? dstat.forwards : [];
   if (!list.length) { const e = stepLine("None yet. An old name, or a second one you own, can send its visitors to " + dstat.custom_domain + "."); e.style.color = "var(--soft,#6b6478)"; box.appendChild(e); }
-  list.forEach((n) => {
+  // a name and its www. are one line with one Stop (the server takes both off together)
+  list.filter((n) => !(n.startsWith("www.") && list.includes(n.slice(4)))).forEach((n) => {
+    const both = list.includes("www." + n);
     const row = el("div", "doa"); row.dataset.forward = n; row.style.cssText = "gap:8px;flex-wrap:wrap;margin-top:4px;align-items:center";
-    row.appendChild(el("span", null, n + " sends visitors to " + dstat.custom_domain));
+    const what = el("span", "aihint", (both ? n + " and www." + n + " send" : n + " sends") + " visitors to " + dstat.custom_domain); what.style.margin = "0";
+    row.appendChild(what);
     const stop = el("button", "textact", "Stop"); stop.dataset.needs = "configure";
     stop.addEventListener("click", async () => {
       if (!(await askYes("Stop " + n + " sending visitors to " + dstat.custom_domain + "?", { ok: "Stop forwarding", danger: true }))) return;
