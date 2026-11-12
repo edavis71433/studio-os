@@ -37,6 +37,9 @@ export interface LocationContent {
   postal_code: string; country: string; phone?: string; timezone: string;
   hours: HoursDay[]; holiday_exceptions?: HolidayException[];
   temporarily_closed?: boolean; temporarily_closed_note?: string;
+  /** Builder list item 127 (0182): a second location's name for itself ("Glendale"), and
+   *  true when it keeps the main location's hours. Only ever on locations[1]. */
+  label?: string; same_hours?: true;
 }
 
 export interface SnapshotContent {
@@ -46,9 +49,13 @@ export interface SnapshotContent {
     booking_url?: string; ordering_url?: string;
     social?: Record<string, string>;
     seo_title?: string; seo_description?: string;
+    /** Builder list item 127 (0182): one sentence, 150 characters at most, the line Google, AI
+     *  assistants and directories quote. Only present when set. */
+    short_description?: string;
   };
   /** M7 (reconciliation §9): locations is a LIST — v1 carries exactly one.
-   *  Multi-location becomes an additive change, not a contract major. */
+   *  Multi-location becomes an additive change, not a contract major. Builder list item
+   *  127: a second location, when the business has one, is locations[1]. */
   locations: LocationContent[];
   /** M7: presentation settings — offering section (category) display order.
    *  Phase V (additive, all optional): logo (header/favicon/OG fallback), the
