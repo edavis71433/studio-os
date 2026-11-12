@@ -56,6 +56,20 @@ ok('interrupted scheduled publish pages', sweepIssues({ ...healthy, scheduled_pu
   ok('runWeeklyDigest NEVER returns a bare false boolean (the permanent-paging bug)', !/return \{ sent: false/.test(src) && /skipped_dedupe: true/.test(src) && /skipped_no_email: true/.test(src));
 }
 
+// ── the busy-day check, the same bug again (Nov 12 2026) ─────────────────────
+// `truncated: false` on every result marked every tick from Nov 10 to Nov 12 failed.
+{
+  const { runTrafficSpikes } = await import('../../supabase/functions/presence/ops/traffic_spikes.ts');
+  const notDue = await runTrafficSpikes(200, '2026-11-12T05:00:00.000Z');   // 95 ticks of 96 a day: back before any read
+  ok('the busy-day check outside its hour → clean (its REAL result)', sweepIssues({ ...healthy, traffic_spikes: notDue }).length === 0, JSON.stringify(sweepIssues({ ...healthy, traffic_spikes: notDue })));
+  ok('a busy-day check that ran, or was cut off at its bound → clean',
+    sweepIssues({ ...healthy, traffic_spikes: { sites: 8, spikes: 1 } }).length === 0 &&
+    sweepIssues({ ...healthy, traffic_spikes: { sites: 8, spikes: 0, skipped_truncated: true } }).length === 0);
+  ok('a busy-day check whose read failed pages', sweepIssues({ ...healthy, traffic_spikes: { sites: 8, spikes: 0, failures: 1 } }).length > 0);
+  const src = Deno.readTextFileSync(new URL('../../supabase/functions/presence/ops/traffic_spikes.ts', import.meta.url));
+  ok('runTrafficSpikes NEVER returns a bare false boolean', !/return \{[^}]*:\s*false\b/.test(src));
+}
+
 // ── split-mode GROUPS ↔ default-chain parity ──────────────────────────────────
 {
   const sys = Deno.readTextFileSync(new URL('../../supabase/functions/presence/routes/system.ts', import.meta.url));

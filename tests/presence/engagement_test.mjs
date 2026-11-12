@@ -73,7 +73,7 @@ const read = (p) => Deno.readTextFileSync(new URL(`../../${p}`, import.meta.url)
   ok('time: no visits, no number (never a zero)', engagementOf([]).time.median_seconds === null && engagementOf([]).buttons.length === 0);
   const an = read('supabase/functions/presence/routes/analytics.ts');
   ok('reads: the visits reads (Analytics, the client portal, the monthly report) leave these rows out, so they never crowd visits past the cap', /v\.kind in \('pageview', 'phone', 'email', 'cta', 'download'\)/.test(read('supabase/migrations/0194_visit_stats.sql')) && /kind=in\.\(pageview,phone,email,cta,download\)/.test(read('supabase/functions/presence/lib/visit_stats.ts')) && /presence_visits\?[^`]*kind=not\.in\.\(button,leave\)/.test(read('supabase/functions/presence/ops/monthly_report.ts')));
-  ok('reads: the buttons and times have a read of their own, this period only', /kind=in\.\(button,cta,phone,email,leave\)&select=ts,kind,path,label,ms,visitor_hash/.test(an) && /\.\.\.engagementFrom\(engageR, startMs\)/.test(an));
+  ok('reads: the buttons and times have a read of their own, this period only', /kind=in\.\(button,cta,phone,email,leave\)&select=ts,kind,path,label,ms,visitor_hash/.test(an) && /\.\.\.engagementFrom\(engageR, startMs, closed \? endMs : Infinity\)/.test(an));   // item 175: a past window stops at its end
 }
 
 // ═══ 4. the privacy page and the migration ═══

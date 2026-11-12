@@ -22,6 +22,7 @@ import { kitFromSite, applyKitTo, layoutFromSite } from './kit_io.ts';
 import { layoutCounts } from '../lib/site_layout.ts';
 import { removeTemplatePhotos } from '../lib/media.ts';
 import { handleAgencySites } from './sites.ts';
+import { handleSiteFolders } from './site_folders.ts';   // builder list item 176
 import { handleClientTools } from './client_tools.ts';
 import { handleSiteNumbers } from './site_numbers.ts';
 import { handleDoNext } from './do_next.ts';
@@ -267,6 +268,12 @@ async function handleAgencyInner(req: Request, route: string, method: string, me
   //    loaded only when asked for, as the report job's own module is ──
   if (route === '/agency/monthly-reports') {
     const r = await (await import('./monthly_reports.ts')).handleMonthlyReports(route, method, member, cors);
+    if (r) return r;
+  }
+
+  // ── builder list item 176: folders, tags and saved views on Sites ──
+  {
+    const r = await handleSiteFolders(req, route, method, member, cors, { ownSite: () => ownSiteOf(req.headers.get('x-dds-user-jwt') || '', principal) });
     if (r) return r;
   }
 

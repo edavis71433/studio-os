@@ -23,7 +23,7 @@ import { summarizePipeline, callerOffsetMinutes } from '../lib/sales_lifecycle.t
 import { readCloseDates } from '../lib/deal_closes.ts';
 import { UUID_RE } from '../lib/uuid.ts';
 import {
-  parseDashPeriod, dashRange, priorMonthIso, weeklyBuckets, sourceShares,
+  parseDashPeriod, parseDashDates, dashRange, priorMonthIso, weeklyBuckets, sourceShares,
   invoiceBuckets, recentWins, oldestAgeDays, priorPeriodStart, searchPagePath, DASH_WEEKS,
 } from '../lib/analytics_dashboard.ts';
 
@@ -120,9 +120,9 @@ const arr = (r: { json?: unknown }): any[] => (Array.isArray((r as { json?: unkn
 
 /** List item 157: the dashboard's buttons and time on page, from their own read, this period
  *  only; nothing when that read failed (before migration 0156, say). */
-function engagementFrom(r: unknown, startMs: number): { buttons?: Engagement['buttons']; time_on_page?: Engagement['time'] } {
+function engagementFrom(r: unknown, startMs: number, endMs = Infinity): { buttons?: Engagement['buttons']; time_on_page?: Engagement['time'] } {
   if (!(r && (r as { ok?: boolean }).ok)) return {};
-  const e = engagementOf(arr(r as { json?: unknown }).filter((v) => Date.parse(String(v.ts || '')) >= startMs));
+  const e = engagementOf(arr(r as { json?: unknown }).filter((v) => { const t = Date.parse(String(v.ts || '')); return t >= startMs && t < endMs; }));
   return { buttons: e.buttons, time_on_page: e.time };
 }
 
@@ -359,15 +359,25 @@ export async function handleAnalyticsPortfolio(jwt: string, cors: Record<string,
 // never a 500 for the whole board. Pure math lives in lib/analytics_dashboard.ts
 // (+ summarizePipeline in lib/sales_lifecycle.ts) so tests can pin it.
 export async function handleAnalyticsDashboard(req: Request, site: SiteRow, cors: Record<string, string>) {
-  const period = parseDashPeriod(new URL(req.url).searchParams.get('period'));
+  const sp = new URL(req.url).searchParams;
+  let period = parseDashPeriod(sp.get('period'));
   // bug hunt H1: "won this month" on the caller's clock, as Pipeline counts it (item 104's ?tzo=)
-  const tzo = callerOffsetMinutes(new URL(req.url).searchParams.get('tzo'));
+  const tzo = callerOffsetMinutes(sp.get('tzo'));
   const nowIso = new Date().toISOString();
   const nowMs = Date.parse(nowIso);
-  const { startMs } = dashRange(period, nowMs);
+  // builder list item 175: the presets and two picked dates, their edges on the caller's clock;
+  // picked dates that don't make a window are this month, which the page sees and doesn't show
+  const dates = period === 'custom' ? parseDashDates(sp.get('from'), sp.get('to'), nowMs, tzo) : null;
+  if (period === 'custom' && !dates) period = 'this_month';
+  const { startMs, endMs, days } = dashRange(period, nowMs, { offsetMinutes: tzo, ...(dates || {}) });
+  // a window that ended before now (yesterday, last week or month or year, some picked dates):
+  // the reads stop at its end, and the 12-week lines end there too
+  const closed = endMs < nowMs;
+  const until = closed ? `&ts=lt.${new Date(endMs).toISOString()}` : '';
+  const inWindow = (ms: number) => Number.isFinite(ms) && ms >= startMs && (!closed || ms < endMs);
   // one visits read serves the KPIs (period window), the 12-week line AND the
   // period before this one, for "up 12% on the period before"
-  const priorStartMs = priorPeriodStart(period, startMs, nowMs);
+  const priorStartMs = priorPeriodStart(period, startMs, endMs);
 
   const safe = async <T>(p: Promise<T>): Promise<T | null> => { try { return await p; } catch { return null; } };
   const stageNamesP = loadStageLabels(site.id).catch(() => null);   // item 38 names; batch B: read with the others, not after
@@ -433,14 +443,15 @@ export async function handleAnalyticsDashboard(req: Request, site: SiteRow, cors
     safe(svc(invoicesQuery)),
     // item 207: the period's numbers, the period before and the 12-week line, counted in the
     // database. The row read this replaces stopped at 1,000 rows and never said so.
-    safe(readVisitStats(site.id, { startMs, priorStartMs, weeks: DASH_WEEKS, nowMs })),
+    // item 175: a window that ended stops there, and its 12-week line ends there too
+    safe(readVisitStats(site.id, { startMs, endMs: closed ? endMs : null, priorStartMs, weeks: DASH_WEEKS, nowMs: endMs })),
     safe(readGsc(site.client_id)),
     // list item 157: the presses with words and the pages' times, read on their own so they
     // never crowd visits out of the read above. Before migration 0156 this read fails, and
     // the page simply has nothing to say about buttons yet.
-    safe(svc(`presence_visits?site_id=eq.${site.id}&ts=gte.${new Date(startMs).toISOString()}&kind=in.(button,cta,phone,email,leave)&select=ts,kind,path,label,ms,visitor_hash&order=ts.desc&limit=5000`)),
+    safe(svc(`presence_visits?site_id=eq.${site.id}&ts=gte.${new Date(startMs).toISOString()}${until}&kind=in.(button,cta,phone,email,leave)&select=ts,kind,path,label,ms,visitor_hash&order=ts.desc&limit=5000`)),
     // list item 151: how fast pages showed for visitors, on its own read (it fails alone before 0160)
-    safe(svc(`presence_visits?site_id=eq.${site.id}&ts=gte.${new Date(startMs).toISOString()}&kind=eq.leave&lcp_ms=not.is.null&select=path,device,lcp_ms&order=ts.desc&limit=5000`)),
+    safe(svc(`presence_visits?site_id=eq.${site.id}&ts=gte.${new Date(startMs).toISOString()}${until}&kind=eq.leave&lcp_ms=not.is.null&select=path,device,lcp_ms&order=ts.desc&limit=5000`)),
     needsExt ? safe(svc(`presence_monitor_connections?site_id=eq.${site.id}&select=domain,status&limit=1`)) : Promise.resolve(null),
     safe(connectionState(site.id)),
   ]);
@@ -480,15 +491,15 @@ export async function handleAnalyticsDashboard(req: Request, site: SiteRow, cors
   }
   const subs = okRows(subsR);
   const enquiries = subs ? {
-    count: subs.filter((s) => Date.parse(s.created_at) >= startMs).length,
+    count: subs.filter((s) => inWindow(Date.parse(s.created_at))).length,
     unanswered: subs.filter((s) => s.status === 'new').length,
-    weekly: weeklyBuckets(subs.map((s) => s.created_at), nowMs),
+    weekly: weeklyBuckets(subs.map((s) => s.created_at), endMs),
   } : null;
   const sup = okRows(supR);
   // H11: the read stops at 500 (oldest first), so 500 means "500 or more", said as such
   const support = sup ? { open: sup.length, ...(sup.length >= 500 ? { open_capped: true } : {}), oldest_age_days: oldestAgeDays(sup.map((s) => s.created_at), nowMs) } : null;
   const invs = okRows(invR);
-  const invoices = invs ? invoiceBuckets(invs, nowIso.slice(0, 10), startMs) : null;
+  const invoices = invs ? invoiceBuckets(invs, nowIso.slice(0, 10), startMs, closed ? endMs : Infinity) : null;
 
   // ── Website band ──
   const visits = visitsR;   // item 207: counted in the database for exactly this window (lib/visit_stats.ts)
@@ -505,7 +516,7 @@ export async function handleAnalyticsDashboard(req: Request, site: SiteRow, cors
       pages: agg.pages,
       top_sources: sourceShares(agg.topSources, agg.visitors),
       ai_sources: agg.aiAssistants,   // list item 153: who the "AI assistants" row is
-      ...engagementFrom(engageR, startMs),   // list item 157: buttons, and time on page
+      ...engagementFrom(engageR, startMs, closed ? endMs : Infinity),   // list item 157: buttons, and time on page
       ...(speedR && (speedR as { ok?: boolean }).ok ? { speed: (({ sentence, pages }) => ({ sentence, pages }))(speedOf(arr(speedR as { json?: unknown }))) } : {}),   // list item 151
       weekly: visits.weekly || [],
       has_data: agg.hasData,
@@ -557,6 +568,9 @@ export async function handleAnalyticsDashboard(req: Request, site: SiteRow, cors
 
   return json({ data: {
     period,
+    // item 175: where the window starts and ends (end = now while it runs to today), and the
+    // picked dates echoed back, so the page can say the dates and check it got what it asked
+    window: { start: new Date(startMs).toISOString(), end: new Date(endMs).toISOString(), closed, ...(dates ? { from: dates.from, to: dates.to } : {}) },
     generated_at: nowIso,
     sales: {
       // `scope`: 'client' means the deals/invoices above are the ones ATTACHED to

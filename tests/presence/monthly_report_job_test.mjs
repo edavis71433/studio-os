@@ -220,9 +220,12 @@ ok('a sent month goes on top of the earlier ones', JSON.stringify(stored().sent_
 }
 
 // the busy-day check
-ok('the busy-day check runs only in the first hour of the UTC day', (await quiet(() => runTrafficSpikes(200, '2026-11-10T05:00:00.000Z'))).not_due === true);
+ok('the busy-day check runs only in the first hour of the UTC day', (await quiet(() => runTrafficSpikes(200, '2026-11-10T05:00:00.000Z'))).skipped_not_due === true);
 visitsFail = true;
-ok('…and says nothing when its read fails', (await quiet(() => runTrafficSpikes(200, '2026-11-10T00:15:00.000Z'))).read_failed === true);
+{
+  const r = await quiet(() => runTrafficSpikes(200, '2026-11-10T00:15:00.000Z'));
+  ok('…and says nothing when its read fails, counting the read as a failure for the watchdog', r.spikes === 0 && r.failures === 1, JSON.stringify(r));
+}
 visitsFail = false;
 
 const passed = results.filter((r) => r.p).length;
