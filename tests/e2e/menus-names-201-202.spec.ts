@@ -161,7 +161,7 @@ test.describe('The frame (builder 201)', () => {
     await installApp(page);
     await page.goto('/today.html');
     await page.waitForFunction(() => !!(window as unknown as { ddsListKit?: unknown }).ddsListKit);
-    await page.evaluate(() => { const b = document.createElement('button'); b.id = 'askme'; b.type = 'button'; b.textContent = 'Delete'; document.body.appendChild(b); });
+    await page.evaluate(() => { const b = document.createElement('button'); b.id = 'askme'; b.type = 'button'; b.textContent = 'Delete'; const m = document.getElementById('main') || document.body; m.insertBefore(b, m.firstChild); });   // in the page, clear of a phone's bottom bar
     const answer = page.evaluate(() => (window as unknown as { ddsListKit: { confirmIn: (a: Element | null, o: unknown) => Promise<boolean> } }).ddsListKit.confirmIn(document.getElementById('askme'), { text: 'Delete it?', yes: 'Yes, delete' }));
     await page.getByRole('button', { name: 'Yes, delete' }).click();
     expect(await answer).toBe(true);
