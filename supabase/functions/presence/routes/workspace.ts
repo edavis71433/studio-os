@@ -388,6 +388,16 @@ export function studioLevelFeed<T extends { notices: any[]; moments: any[]; pend
   return { ...d, notices: (d.notices || []).filter((n) => !STUDIO_WEBSITE_NOTICE_KINDS.has(String(n?.kind ?? ''))), moments: [], pending_approvals: [] };
 }
 
+/** The client themself, not the studio working on their site: no drill-in from the
+ *  studio (principal.scope), no platform staff, no staff or developer seat. Mirrors the
+ *  bridged-customer test in handlePortalContext. Item 173: the studio opening a client's
+ *  Overview was told "An update from your studio", a line written for the client. */
+export function isTheClientThemself(principal: Pick<Principal, 'kind' | 'scope'>, role: string | null | undefined): boolean {
+  if (principal.scope) return false;
+  if (principal.kind === 'staff' || principal.kind === 'system') return false;
+  return role !== 'business_staff' && role !== 'developer';
+}
+
 /** What the feed hands the Inbox, at most: the newest FEED_ENQUIRIES new enquiries,
  *  the newest FEED_CONVERSATIONS conversations, and the first FEED_MESSAGE_CHARS of an
  *  enquiry's message. `enquiries_more` / `client_messages_more` / `message_cut` say
@@ -398,6 +408,7 @@ export const FEED_ENQUIRIES = 50, FEED_CONVERSATIONS = 20, FEED_MESSAGE_CHARS = 
 export async function buildPortalFeed(jwt: string, site: SiteRow, principal: Principal): Promise<any> {
   const role = await resolveSiteRoleCached(principal, jwt, site.id);
   const seesFull = siteCan(role, 'view_all');   // owner surfaces get the notices rail; reviewers don't
+  const clientSelf = isTheClientThemself(principal, role);   // item 173: the studio's updates row is for the client only
   // review finding 5: a reviewer on a studio's shared site gets no waiting files (they'd be every client's)
   const filesHidden = role === 'client_reviewer' ? (await isSharedStudioSite(site.id)) !== false : false;
   const noEnq = Promise.resolve({ ok: true, json: [] as any[] });
@@ -431,7 +442,7 @@ export async function buildPortalFeed(jwt: string, site: SiteRow, principal: Pri
     // (one past FEED_ENQUIRIES, so the Inbox can say when the list stops short; bug hunt C15)
     seesFull ? svc(`presence_form_submissions?site_id=eq.${site.id}&spam=eq.false&status=eq.new&select=id,form_kind,name,email,phone,message,status,created_at&order=created_at.desc&limit=${FEED_ENQUIRIES + 1}`) : noEnq,
     // bridged-customer links (owner-only; the unread reads that DEPEND on them stay below)
-    seesFull && site.client_id ? svc(`presence_service_links?customer_client_id=eq.${site.client_id}&status=eq.active&select=project_id,agency_site_id&limit=50`).catch(swallow) : noEnq,
+    seesFull && site.client_id && clientSelf ? svc(`presence_service_links?customer_client_id=eq.${site.client_id}&status=eq.active&select=project_id,agency_site_id&limit=50`).catch(swallow) : noEnq,
     // FIX 5 inputs: open support requests + client message events (owner-only, best-effort).
     // F3: the select PREFERS the write-time client_id stamp (0115); on a pre-0115
     // database the widened select 400s, so it falls back to the old column list —
@@ -542,7 +553,8 @@ export async function buildPortalFeed(jwt: string, site: SiteRow, principal: Pri
   // (counted into the bell by /portal/context) — without a findable row here the
   // badge points at nothing. One calm row that links where the items actually are.
   // Owners only: a client_reviewer can't open /client/* (403), so never show them the row.
-  if (seesFull && site.client_id) {
+  // And the client only: the studio drilled into this site is the one sending the updates.
+  if (seesFull && site.client_id && clientSelf) {
     try {
       const links = ((bridgeQ.json as any[]) || []);
       if (links.length) {
