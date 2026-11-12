@@ -85,6 +85,8 @@ const CONTROLS = [
   ['PUT /bookings/settings', 'presence.html', `api("PUT", "/bookings/settings", payload)`, ['c1.dataset.needs = "configure"', 'c2.dataset.needs = "configure"']],
   ['PUT /sales/contacts/fields', 'contacts.html', `api('/sales/contacts/fields','PUT',{fields})`, ['id="manageFields" data-needs="configure"']],
   ['PUT /sales/stages', 'settings.html', `api('/sales/stages', 'PUT', { names })`, ['id="automations" aria-labelledby="autoHead" hidden data-needs="configure"']],
+  ['POST /sales/setup', 'agency.html', `apiSend('POST','/sales/setup',{hidden})`, ['id="setup" class="setup" aria-labelledby="setupHead" hidden data-needs="configure"', 'id="setupHide" data-needs="configure"']],   // sales item 105: Home's setup strip, and its Hide
+  ['PUT /sales/goal-ai', 'settings.html', `api('/sales/goal-ai', 'PUT', patch)`, ['id="goal" aria-labelledby="goalHead" hidden data-needs="configure"']],   // sales item 94: the month's goal and the AI help switch (the switch is the owner's alone: the route says so)
   // sales item 124: a stage's "what to do now" note, from Settings and from the note under the stage bar
   ['PUT /sales/stages', 'settings.html', `api('/sales/stages', 'PUT', { note })`, ['id="stages" aria-labelledby="stagesHead" hidden data-needs="configure"']],
   ['PUT /sales/stages', 'crm.html', `apiAg('/sales/stages','PUT',{note:{stage,text}})`, ['id="snEdit" data-needs="configure"']],
@@ -133,7 +135,7 @@ const SOURCE = Object.fromEntries(PAGES.map((p) => [p, read(p)]));
   const decided = read('tests/presence/member_capability_test.mjs');
   const listed = (name) => [...decided.split('const DECIDED = {')[1].split(`\n  ${name}: [`)[1].split('\n  ],')[0].matchAll(/'((?:DELETE|POST|PUT|PATCH) [^']+)'/g)].map((m) => m[1]);
   const routes = [...listed('delete'), ...listed('configure')];
-  ok('the decided delete and configure lists were read', routes.length === 46, String(routes.length));   // item 47 added two; item 104 took away the seven DNS document and zone writes; item 58 added two; item 112 added the prospect delete; item 115 added the Google review link; item 175 the visitor password; item 77 the payment undo; item 174 added the two domain forwards; items 86 + 105 added three (import undo, merge, unmerge); item 106 the project template and saved to-do list removals; sales item 117 the client's retainer cancel
+  ok('the decided delete and configure lists were read', routes.length === 48, String(routes.length));   // sales item 94 added the month's goal; sales item 105 added Home's setup strip; item 47 added two; item 104 took away the seven DNS document and zone writes; item 58 added two; item 112 added the prospect delete; item 115 added the Google review link; item 175 the visitor password; item 77 the payment undo; item 174 added the two domain forwards; items 86 + 105 added three (import undo, merge, unmerge); item 106 the project template and saved to-do list removals; sales item 117 the client's retainer cancel
   const covered = new Set(CONTROLS.map(([r]) => r));
   const open = routes.filter((r) => !covered.has(r) && !NO_CONTROL[r] && !PORTAL_OWNER_ONLY[r]);
   for (const [route, c] of Object.entries(PORTAL_OWNER_ONLY)) {
@@ -222,7 +224,7 @@ const SOURCE = Object.fromEntries(PAGES.map((p) => [p, read(p)]));
   ok('css: a note beats the builder\'s [hidden] rule only for someone lacking it', css.includes('html[data-dds-lacks~="configure"] [data-if-lacks="configure"][hidden]{display:block!important}'));
   ok('builder: a note starts hidden, so nobody else ever sees it', SOURCE['presence.html'].includes('n.hidden = true; n.dataset.ifLacks = "configure"'));
   const marked = PAGES.filter((p) => /data-needs|dataset\.needs|needs: '/.test(SOURCE[p]) && p !== 'shell.js');
-  ok('the ten pages with marked controls are the ones expected', JSON.stringify(marked.sort()) === JSON.stringify(['broadcasts.html', 'connections.html', 'contacts.html', 'crm.html', 'files.html', 'pipeline.html', 'presence.html', 'projects.html', 'prospects.html', 'settings.html']), marked.join(', '));   // projects.html: Remove a project template (sales item 106)   // prospects.html: Remove (sales review item 112)   // connections.html: the calendar link (sales review item 46)   // broadcasts.html: Remove this list (sales review items 31 + 39)
+  ok('the eleven pages with marked controls are the ones expected', JSON.stringify(marked.sort()) === JSON.stringify(['agency.html', 'broadcasts.html', 'connections.html', 'contacts.html', 'crm.html', 'files.html', 'pipeline.html', 'presence.html', 'projects.html', 'prospects.html', 'settings.html']), marked.join(', '));   // projects.html: Remove a project template (sales item 106)   // prospects.html: Remove (sales review item 112)   // connections.html: the calendar link (sales review item 46)   // broadcasts.html: Remove this list (sales review items 31 + 39)
   for (const p of marked) ok(`${p} loads the shell script and its stylesheet`, SOURCE[p].includes('src="/shell.js"') && SOURCE[p].includes('href="/shell.css"'));
 }
 
