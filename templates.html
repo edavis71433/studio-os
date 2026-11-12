@@ -119,7 +119,7 @@ function render(){
   const t=KITS.filter(k=>k.kind==='template').length,s=KITS.length-t;
   let h=`<header class="lhead"><div class="lrow1"><span class="obj-ic" aria-hidden="true">◫</span><h1 id="pagehead" tabindex="-1">Templates</h1></div>
     <div class="lmeta">${KITS.length?esc(n(t,'template')+' · '+n(s,'starter kit')+' · newest first'):'Nothing saved yet'}</div>
-    <nav class="tabs" aria-label="Sites, domains and templates"><a href="/sites.html">Sites</a><a href="/domains.html">Domains</a><a href="/templates.html" aria-current="page">Templates</a></nav></header>
+    <nav class="tabs" aria-label="Sites, domains, templates and usage"><a href="/sites.html">Sites</a><a href="/domains.html">Domains</a><a href="/templates.html" aria-current="page">Templates</a><a href="/usage.html">Usage</a></nav></header>
     <p class="intro">Start a new site from one of these under “Start from”. A template brings a saved site’s pages, sections, menu, photos and look; a starter kit brings the setup only: services, FAQs, voice and colors.</p>`;
   if(!KITS.length)h+=`<div class="center"><p class="muted">No templates or starter kits yet.</p><p class="muted" style="margin-top:8px;font-size:13px">Save one from a site’s ⋯ menu on <a class="link" href="/sites.html">Sites</a> (Save as a template), or a customer’s ⋯ on <a class="link" href="/agency.html">Home</a> (Save as a starter kit).</p></div>`;
   else h+=`<div class="klist" id="klist">${KITS.map(rowHtml).join('')}</div>`;

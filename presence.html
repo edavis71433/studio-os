@@ -1167,6 +1167,102 @@ html.plan-watch .ss-bar,html.plan-watch [data-grp="Content"],html.plan-watch .na
 .sv-said p{margin:6px 0 0;font-size:13px;color:var(--ink-2)}
 .sv-fol-x{font:inherit;border:0;background:none;color:var(--ink-3);cursor:pointer;padding:2px 6px;border-radius:6px}
 .sv-fol-x:hover:not(:disabled){color:var(--clay)} .sv-fol-x:disabled{opacity:.4;cursor:default}
+/* item 185: the map rank grid. The map is dark in both looks; the four bands always carry their number */
+.rg-card{--rg-top3:#11744a;--rg-top10:#f2b544;--rg-top20:#ec7a3f;--rg-out:#bf3535;--rg-gap:#4a4763;--rg-night:#171522;--rg-ring:#b79cff;--rg-ink-dark:#171522;--rg-ink-light:#ffffff}
+.rg-left{font-size:12px;color:var(--ink-2)}
+.rg-tabs{display:flex;gap:8px;flex-wrap:wrap;margin:4px 0 16px}
+.rg-tab{font:inherit;font-size:13px;font-weight:600;min-height:38px;padding:0 15px;border-radius:999px;border:1px solid var(--hair-2);background:var(--sheet);color:var(--ink);cursor:pointer}
+.rg-tab[aria-pressed="true"]{background:var(--ink);border-color:var(--ink);color:var(--sheet)}
+.rg-tab .n{font-weight:500;opacity:.75}
+.rg-body{display:grid;grid-template-columns:minmax(0,520px) minmax(0,1fr);gap:28px;align-items:start}
+.rg-map{position:relative;aspect-ratio:1;border-radius:14px;overflow:hidden;background-color:var(--rg-night);background-image:linear-gradient(rgba(255,255,255,.05) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.05) 1px,transparent 1px);background-size:7.15% 7.15%}
+.rg-rings{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
+.rg-rings circle{fill:none;stroke:rgba(255,255,255,.16);stroke-width:.25;stroke-dasharray:1 1.2}
+.rg-dots{position:absolute;inset:0;display:grid}
+.rg-dots.n7{padding:6.25%;grid-template-columns:repeat(7,1fr);grid-template-rows:repeat(7,1fr)}
+.rg-dots.n5{padding:8.333%;grid-template-columns:repeat(5,1fr);grid-template-rows:repeat(5,1fr)}
+.rg-cell{display:grid;place-items:center;min-width:0;min-height:0}
+button.rg-cell{font:inherit;color:inherit;border:0;background:none;padding:0;margin:0;cursor:pointer;border-radius:50%}
+button.rg-cell:hover .rg-dot{transform:scale(1.08)} button.rg-cell:focus-visible{outline:3px solid var(--rg-ring);outline-offset:-3px}
+.rg-dot{display:grid;place-items:center;width:min(42px,80%);aspect-ratio:1;border-radius:50%;border:2px solid rgba(255,255,255,.9);font:700 14px/1 var(--sans);font-variant-numeric:tabular-nums;padding:0;box-sizing:border-box}
+.rg-dots.n5 .rg-dot{width:min(54px,76%);font-size:16px}
+.rg-dot.top3{background:var(--rg-top3);color:var(--rg-ink-light)} .rg-dot.top10{background:var(--rg-top10);color:var(--rg-ink-dark)}
+.rg-dot.top20{background:var(--rg-top20);color:var(--rg-ink-dark)} .rg-dot.out{background:var(--rg-out);color:var(--rg-ink-light);font-size:11.5px}
+.rg-dot.gap{background:var(--rg-gap);color:var(--rg-ink-light);border-color:var(--rg-gap)}
+.rg-dot.home{box-shadow:0 0 0 4px var(--rg-night),0 0 0 7px var(--rg-ring)}
+.rg-north,.rg-scale,.rg-across{position:absolute;font:600 11px/1 var(--sans);color:rgba(255,255,255,.72)}
+.rg-north{left:3%;top:3%} .rg-across{right:3%;bottom:3%}
+.rg-scale{left:3%;bottom:3%;white-space:nowrap} .rg-scale i{display:block;width:100%;height:2px;margin-top:5px;background:rgba(255,255,255,.72)}
+.rg-map.n7 .rg-scale{width:12.5%} .rg-map.n5 .rg-scale{width:16.667%}
+.rg-past{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:0 0 12px;padding:8px 12px;border-radius:12px;background:var(--plum-soft);font-size:13px;color:var(--ink)}
+.rg-side{display:flex;flex-direction:column;gap:16px;min-width:0}
+.rg-big{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.rg-big b{font-size:44px;font-weight:700;line-height:1;font-variant-numeric:tabular-nums}
+.rg-side p.rg-lead{font-size:14px;color:var(--ink-2);margin:0;max-width:56ch}
+.rg-two{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.rg-two div{border-radius:12px;background:var(--paper);padding:12px 14px;min-width:0}
+.rg-two span{display:block;font-size:12px;font-weight:500;color:var(--ink-2)} .rg-two b{display:block;font-size:24px;font-weight:700;margin:2px 0;font-variant-numeric:tabular-nums} .rg-two small{display:block;font-size:12px;color:var(--ink-3)}
+.rg-legend{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:12px;font-weight:500;color:var(--ink-2)}
+.rg-legend span{display:inline-flex;align-items:center;gap:6px} .rg-legend i{width:12px;height:12px;border-radius:50%}
+.rg-legend i.top3{background:var(--rg-top3)} .rg-legend i.top10{background:var(--rg-top10)} .rg-legend i.top20{background:var(--rg-top20)} .rg-legend i.out{background:var(--rg-out)}
+.rg-rivals h4,.rg-hist h4{margin:0 0 4px;font-size:13px;font-weight:600}
+.rg-rivals ol{list-style:none;margin:0;padding:0}
+.rg-rivals li{display:flex;align-items:center;gap:12px;padding:9px 0;border-top:1px solid var(--hair)} .rg-rivals li:first-child{border-top:0}
+.rg-num{flex:0 0 26px;height:26px;border-radius:50%;display:grid;place-items:center;background:var(--plum-soft);color:var(--plum);font-size:12px;font-weight:700}
+.rg-rivals .t{flex:1;min-width:0} .rg-rivals .t b{display:block;font-size:13.5px;font-weight:600;overflow-wrap:anywhere} .rg-rivals .t span{display:block;font-size:12px;color:var(--ink-3)}
+.rg-maps{font-size:12.5px;font-weight:600;color:var(--plum);white-space:nowrap;text-decoration:none} .rg-maps:hover{text-decoration:underline}
+.rg-note{font-size:11.5px;color:var(--ink-3);margin:0}
+.rg-hist{display:grid;grid-template-columns:minmax(0,300px) minmax(0,1fr);gap:28px;margin-top:20px;padding-top:18px;border-top:1px solid var(--hair)}
+.rg-chart{width:100%;height:auto;display:block}
+.rg-chart rect{fill:var(--sage-soft)} .rg-chart rect.now{fill:var(--rg-top3)}
+.rg-chart text{font-size:10.5px;fill:var(--ink-3)} .rg-chart text.v{font-weight:700;fill:var(--ink-2)}
+.rg-hist-h{display:flex;align-items:center;gap:8px} .rg-hist-h h4{margin-right:auto}
+.rg-minis{display:flex;gap:14px;flex-wrap:wrap}
+.rg-mini{font:inherit;text-align:left;border:1px solid var(--hair);border-radius:12px;background:var(--sheet);padding:10px;cursor:pointer;color:var(--ink)}
+.rg-mini:hover,.rg-mini[aria-pressed="true"]{border-color:var(--plum)}
+.rg-mini b{display:block;font-size:12px;font-weight:600;margin-top:6px} .rg-mini span{display:block;font-size:11px;color:var(--ink-3)}
+.rg-tiny{display:grid;gap:2px;width:82px}
+.rg-tiny.n7{grid-template-columns:repeat(7,1fr)} .rg-tiny.n5{grid-template-columns:repeat(5,1fr)}
+.rg-tiny i{aspect-ratio:1;border-radius:3px;background:var(--rg-gap)}
+.rg-tiny i.top3{background:var(--rg-top3)} .rg-tiny i.top10{background:var(--rg-top10)} .rg-tiny i.top20{background:var(--rg-top20)} .rg-tiny i.out{background:var(--rg-out)}
+.rg-cost{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:18px;padding:10px 14px;border-radius:12px;background:var(--plum-soft);font-size:12.5px;color:var(--ink)}
+.rg-tag{display:inline-block;border-radius:999px;padding:3px 9px;background:var(--plum);color:var(--fill-ink);font-size:11px;font-weight:600;white-space:nowrap}
+.rg-off{display:flex;gap:22px;align-items:center}
+.rg-off .rg-tiny{width:140px;padding:12px;border-radius:12px;background:var(--rg-night);gap:8px;box-sizing:content-box}
+.rg-off .rg-tiny i{border-radius:50%}
+.rg-off .rg-tiny i.home{background:var(--rg-ring)}
+.rg-off p{margin:0 0 10px;font-size:13.5px;color:var(--ink-2);max-width:60ch}
+.rg-off .acts{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+.rg-empty{font-size:13.5px;color:var(--ink-2);margin:0}
+.rg-dlg-sec{display:flex;flex-direction:column;gap:8px}
+.rg-dlg-sec > b{font-size:12.5px;font-weight:600;color:var(--ink-2)}
+.rg-biz{border:1px solid var(--hair);border-radius:12px;padding:12px 14px;display:flex;flex-direction:column;gap:6px}
+.rg-biz b{font-size:14px} .rg-biz span{font-size:12.5px;color:var(--ink-2)}
+.rg-biz .row{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+.rg-src{display:inline-block;border-radius:999px;padding:3px 8px;background:var(--sage-soft);color:var(--sage);font-size:11.5px;font-weight:600}
+.rg-chips{display:flex;gap:8px;flex-wrap:wrap}
+.rg-chip{display:inline-flex;align-items:center;gap:4px;min-height:34px;padding:0 6px 0 12px;border-radius:999px;border:1px solid var(--hair-2);background:var(--sheet);font-size:12.5px;font-weight:600}
+.rg-chip button{font:inherit;border:0;background:none;color:var(--ink-3);cursor:pointer;min-width:28px;min-height:28px;border-radius:999px} .rg-chip button:hover{color:var(--clay)}
+.rg-add{display:flex;gap:8px} .rg-add input{flex:1;min-width:0}
+.rg-seg{display:inline-flex;gap:2px;padding:3px;border-radius:999px;background:var(--paper);flex-wrap:wrap}
+.rg-seg button{font:inherit;font-size:12.5px;font-weight:500;min-height:34px;padding:0 14px;border:0;border-radius:999px;background:none;color:var(--ink-2);cursor:pointer}
+.rg-seg button[aria-pressed="true"]{background:var(--sheet);color:var(--ink);font-weight:600;box-shadow:0 1px 3px rgba(0,0,0,.08)}
+.rg-segrow{display:flex;gap:10px;align-items:center;flex-wrap:wrap;font-size:12.5px;color:var(--ink-2)}
+.rg-costbox{border-radius:12px;background:var(--plum-soft);padding:12px 14px;font-size:12.5px;color:var(--ink)}
+.rg-costbox b{display:block;margin-bottom:4px}
+.rg-cand{display:flex;align-items:center;gap:12px;width:100%;font:inherit;text-align:left;padding:12px 14px;border:1px solid var(--hair);border-radius:12px;background:var(--sheet);color:var(--ink);cursor:pointer}
+.rg-cand[aria-pressed="true"]{border:2px solid var(--plum);background:var(--plum-tint)}
+.rg-cand .t{flex:1;min-width:0} .rg-cand b{display:block;font-size:13.5px} .rg-cand span{display:block;font-size:12px;color:var(--ink-2)}
+.rg-spot{list-style:none;margin:0;padding:0;border:1px solid var(--hair);border-radius:12px}
+.rg-spot li{display:flex;align-items:center;gap:10px;padding:9px 12px;border-top:1px solid var(--hair)} .rg-spot li:first-child{border-top:0}
+.rg-spot .rg-dot{width:26px;font-size:11.5px;border-width:0}
+.rg-spot .t{flex:1;min-width:0;font-size:13.5px;font-weight:600;overflow-wrap:anywhere}
+.rg-table{width:100%;border-collapse:collapse;font-size:13px}
+.rg-table th{text-align:left;font-size:11.5px;font-weight:600;color:var(--ink-2);padding:6px 6px;white-space:nowrap}
+.rg-table td{padding:8px 6px;border-top:1px solid var(--hair);vertical-align:middle}
+.rg-table button{font:inherit;font-weight:500;border:0;background:none;padding:0;color:var(--plum);cursor:pointer;text-align:left}
+@media (max-width:1180px){.rg-body{grid-template-columns:minmax(0,1fr)}.rg-map{max-width:560px}}
+@media (max-width:760px){.rg-hist{grid-template-columns:minmax(0,1fr)}.rg-big b{font-size:34px}.rg-off{flex-direction:column;align-items:flex-start}.rg-dot{font-size:12.5px}.rg-dot.out{font-size:10px}}
 @media (max-width:1180px){.sv-ai{grid-template-columns:1fr}}
 @media (max-width:1180px){.sv-fol{grid-template-columns:1fr}}
 @media (max-width:1100px){.sv-tools{grid-template-columns:repeat(3,minmax(0,1fr))}}
@@ -2086,6 +2182,7 @@ html.bs-open .scrim{z-index:96}   /* Files and the categories card open over the
           <div class="hb-card" id="domainCard" hidden></div>
         </div>
         <section class="sv-card sv-wide" aria-labelledby="svFollowH" id="svFollowCard" hidden><div class="sv-head"><h3 id="svFollowH">Searches you follow</h3><span class="sv-headn" id="svFollowN"></span><button type="button" class="pillbtn sm inked" id="btnSvFollow">+ Follow a search</button></div><div id="svFollow"></div></section>
+        <section class="sv-card sv-wide rg-card" aria-labelledby="rgH" id="rgCard" hidden><div class="sv-head"><h3 id="rgH">On Google Maps</h3><span class="sv-headn" id="rgMeta"></span><span class="rg-left" id="rgLeft"></span><button type="button" class="pillbtn sm" id="btnRgSettings" hidden>Grid settings</button><button type="button" class="pillbtn sm inked" id="btnRgScan" hidden>Scan now</button></div><div id="rgBody"></div></section>
         <section class="sv-card sv-wide" aria-labelledby="svAiWH" id="svAiWatch" hidden><div class="sv-head"><h3 id="svAiWH">In AI answers</h3><span class="sv-headn" id="svAiWMeta"></span><button type="button" class="pillbtn sm" id="btnSvAiQ">+ Add a question</button></div><div id="svAiW"></div></section>
         <div id="svScore" class="sv-card sv-score-card"><div class="loadline"><div class="lq">Checking how you show up…</div><div class="shimmer"></div></div></div>
         <div class="sv-grid">
@@ -9520,6 +9617,7 @@ async function loadSearch() {
   renderSvPhrases();   // item 160
   if (SV && SV.follow && SV.console && SV.console.status === "connected") loadSvFollow(); else { SV_FOLLOW = null; renderSvFollow(); }   // item 181
   loadSvAiWatch();   // item 182
+  loadRankGrid();   // item 185
 }
 (function wireSeoPreview() {
   ["f-seo_title", "f-seo_description", "f-business_name", "f-description"].forEach((id) => { const n = $(id); if (n) n.addEventListener("input", renderSearchPreview); });
@@ -10221,6 +10319,389 @@ function svOpenAiQuestions() {
   addB.addEventListener("click", addIt);
   inp.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); addIt(); } });
   setTimeout(() => inp.focus(), 30);
+}
+// ── item 185: the map rank grid. GET /visibility/maps (routes/rank_grid.ts): the setting, each
+// search's newest scan and the history. The studio (platform staff, or a studio scoped in) sets it
+// up, scans and sees what each scan cost; a client sees their own grid once it is on, never a cost,
+// a rival or the setup. Names come from Google as they are shown (GET /visibility/maps/names) and
+// are never stored; this page keeps them only while it is open.
+let RG = null, RG_PICK = null, RG_SHOW = null, RG_BUSY = false;   // the data; the search shown; a past scan shown instead
+const RG_NAMES = new Map();   // place id → { name, address, maps }, for this visit only
+async function loadRankGrid() {
+  try { RG = (await api("GET", "/visibility/maps")).data; } catch (_) { RG = null; }
+  if (RG && RG_PICK && !(RG.phrases || []).includes(RG_PICK)) RG_PICK = null;
+  if (RG_SHOW && !(RG && RG.history || []).some((h) => h.id === RG_SHOW.id)) RG_SHOW = null;
+  renderRankGrid();
+}
+const rgBand = (v) => (v == null ? "gap" : v === 0 ? "out" : v <= 3 ? "top3" : v <= 10 ? "top10" : "top20");
+const rgOrd = (n) => n + (n % 100 >= 11 && n % 100 <= 13 ? "th" : ["th", "st", "nd", "rd"][n % 10] || "th");
+const rgPlace = (v) => (v == null ? "no answer from Google" : v === 0 ? "not in the top 20" : rgOrd(v));
+const rgMiles = (v) => (v === 0.5 ? "half a mile" : `${v % 1 ? v.toFixed(1) : v} mile${v === 1 ? "" : "s"}`);
+const rgCost = (usd) => { if (!(usd > 0)) return "Free"; const c = usd * 100; if (c < 0.75) return "half a cent"; if (c < 1.25) return "1 cent"; if (c < 100) { const r = Math.round(c * 2) / 2; return `${r % 1 ? Math.floor(r) + "½" : r} cents`; } return "$" + usd.toFixed(2); };
+// where a spot is, as lib/rank_grid.ts's spotWords and gridPoints have it (row 0 north, column 0 west)
+function rgSpotWords(i, size, spacing) {
+  const r = Math.floor(i / size), c = i % size, mid = (size - 1) / 2, parts = [];
+  if (r !== mid) parts.push(`${rgMiles(Math.abs(r - mid) * spacing)} ${r < mid ? "north" : "south"}`);
+  if (c !== mid) parts.push(`${rgMiles(Math.abs(c - mid) * spacing)} ${c < mid ? "west" : "east"}`);
+  return parts.length ? parts.join(", ") : "The business’s own spot";
+}
+function rgSpotAt(center, i, size, spacing) {
+  const r = Math.floor(i / size), c = i % size, mid = (size - 1) / 2, step = spacing * 1609.344;
+  const lat = center.lat + (mid - r) * step / 111320, lng = center.lng + (c - mid) * step / (111320 * Math.cos(center.lat * Math.PI / 180));
+  return { lat: Math.round(lat * 1e6) / 1e6, lng: Math.round(lng * 1e6) / 1e6 };
+}
+const rgName = () => (S.identity && S.identity.business_name) || "the business";
+// did the newest scan centre on the business-details address, because Google hides the business's own?
+const RG_HIDDEN = () => Object.values((RG && RG.latest) || {}).some((s) => s && s.requests && s.requests.from === "address");
+async function rgNames(ids) {
+  const want = [...new Set(ids.filter((id) => id && !RG_NAMES.has(id)))].slice(0, 6);
+  if (!want.length || !RG || !RG.studio) return;
+  try {
+    const r = (await api("GET", "/visibility/maps/names?ids=" + encodeURIComponent(want.join(",")))).data;
+    (r.names || []).forEach((n) => RG_NAMES.set(n.id, n));
+  } catch (_) { /* names stay "a business on Google"; the Maps link still opens it */ }
+}
+const rgNameOf = (id) => { const n = RG_NAMES.get(id); return (n && n.name) || "A business on Google"; };
+const rgMapsOf = (id) => { const n = RG_NAMES.get(id); return (n && n.maps) || "https://www.google.com/maps/place/?q=place_id:" + encodeURIComponent(id); };
+function rgMap(scan, studio, past) {
+  const n = scan.size, mid = Math.floor(n * n / 2);
+  const map = el("div", "rg-map n" + n);
+  const rings = [1, 2, 3].filter((k) => k <= (n - 1) / 2).map((k) => `<circle cx="50" cy="50" r="${(100 / (n + 1)) * k}"/>`).join("");
+  map.innerHTML = `<svg class="rg-rings" viewBox="0 0 100 100" aria-hidden="true">${rings}</svg>`;
+  const dots = el("div", "rg-dots n" + n); dots.setAttribute("role", "group");
+  dots.setAttribute("aria-label", `Where ${rgName()} comes up for “${scan.phrase}”, spot by spot from the north-west corner`);
+  scan.ranks.forEach((v, i) => {
+    // the studio's spots open their top 3: the whole cell is the button, the dot sits in it
+    const word = `${rgSpotWords(i, n, scan.spacing)}: ${rgPlace(v)}`, open = studio && !past;
+    const cell = el(open ? "button" : "div", "rg-cell");
+    const dot = el("span", `rg-dot ${rgBand(v)}${i === mid ? " home" : ""}`, v == null ? "?" : v === 0 ? "20+" : String(v));
+    if (open) { cell.type = "button"; cell.dataset.spot = String(i); cell.setAttribute("aria-label", word); cell.title = word; dot.setAttribute("aria-hidden", "true"); cell.addEventListener("click", () => rgOpenSpot(scan, i)); }
+    else { dot.setAttribute("role", "img"); dot.setAttribute("aria-label", word); dot.title = word; }
+    cell.appendChild(dot); dots.appendChild(cell);
+  });
+  map.appendChild(dots);
+  map.appendChild(el("span", "rg-north", "N ↑"));
+  const sc = el("span", "rg-scale", rgMiles(scan.spacing).replace(/^half a mile$/, "½ mile")); sc.appendChild(el("i")); map.appendChild(sc);
+  map.appendChild(el("span", "rg-across", `${(n - 1) * scan.spacing} miles across`));
+  return map;
+}
+function rgTiny(ranks, n, home) {
+  const t = el("span", "rg-tiny n" + n); t.setAttribute("aria-hidden", "true");
+  ranks.forEach((v, i) => t.appendChild(el("i", home && i === Math.floor(n * n / 2) ? "home" : (v === undefined ? "" : rgBand(v)))));
+  return t;
+}
+function rgChart(rows) {
+  if (!rows.length) return "";
+  const W = 300, H = 150, B = 22, T = 18, max = Math.max(1, ...rows.map((r) => r.top3)) * 1.15, bw = 28, gap = (W - rows.length * bw) / Math.max(1, rows.length);
+  const bars = rows.map((r, i) => { const h = Math.max(3, (r.top3 / max) * (H - B - T)), x = gap / 2 + i * (bw + gap); return `<rect class="${i === rows.length - 1 ? "now" : ""}" x="${x.toFixed(1)}" y="${(H - B - h).toFixed(1)}" width="${bw}" height="${h.toFixed(1)}" rx="4"/><text class="v" x="${(x + bw / 2).toFixed(1)}" y="${(H - B - h - 5).toFixed(1)}" text-anchor="middle">${r.top3}</text><text x="${(x + bw / 2).toFixed(1)}" y="${H - 6}" text-anchor="middle">${esc(svMonth(r.month).slice(0, 3))}</text>`; }).join("");
+  const aria = "Spots in the top 3, month by month: " + rows.map((r) => `${svMonth(r.month)} ${r.top3}`).join(", ");
+  return `<svg class="rg-chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(aria)}">${bars}</svg>`;
+}
+function renderRankGrid() {
+  const card = $("rgCard"), body = $("rgBody"); if (!card || !body) return;
+  const g = RG, studio = !!(g && g.studio);
+  card.hidden = !g || (!studio && (!g.enabled || !g.ready));
+  if (card.hidden) return;
+  const meta = $("rgMeta"), left = $("rgLeft"), bSet = $("btnRgSettings"), bScan = $("btnRgScan");
+  bSet.hidden = !studio; bSet.onclick = rgOpenSettings;
+  bScan.hidden = !studio || !g.enabled; bScan.onclick = rgScanNow;
+  left.textContent = ""; meta.textContent = "";
+  body.innerHTML = "";
+  if (studio && !g.ready) { body.appendChild(el("p", "rg-empty", "The map rank grid needs a one-time database update before it can scan. Everything else on this page works.")); return; }
+  if (!g.enabled) {   // the studio's view while it is off
+    const off = el("div", "rg-off");
+    off.appendChild(rgTiny(Array(49).fill(undefined), 7, true));
+    const tx = el("div");
+    tx.appendChild(el("p", null, `See where ${rgName()} comes up on Google Maps from 49 spots around the business, once a month, so you can show the client the streets where they win and where they don’t.`));
+    const acts = el("div", "acts");
+    const go2 = el("button", "pillbtn inked", "Set it up"); go2.type = "button"; go2.addEventListener("click", rgOpenSettings); acts.appendChild(go2);
+    acts.appendChild(el("span", "hint", g.key ? `About ${g.prices ? g.prices.scan_words : "half a cent"} a scan. Only you see the cost; the client sees nothing while it is off.` : "Google isn’t connected for the platform yet: it needs the Places key first."));
+    tx.appendChild(acts); off.appendChild(tx); body.appendChild(off);
+    meta.textContent = "Off";
+    return;
+  }
+  const phrases = g.phrases || [];
+  if (!RG_PICK || !phrases.includes(RG_PICK)) RG_PICK = phrases.find((p) => g.latest && g.latest[p]) || phrases[0] || null;
+  const latest = RG_PICK && g.latest ? g.latest[RG_PICK] : null;
+  const scan = RG_SHOW && RG_SHOW.phrase === RG_PICK ? RG_SHOW : latest;
+  meta.textContent = studio
+    ? `${latest ? "Scanned " + svWhen(latest.scanned_at) + " · " : ""}next scan ${g.next} · every month`
+    : (latest ? `Checked by your studio on ${svWhen(latest.scanned_at)}` : "");
+  if (studio && g.today) {
+    const leftN = Math.max(0, g.today.cap - g.today.used);
+    left.textContent = `${leftN} of ${g.today.cap} scans left today`;
+    bScan.disabled = RG_BUSY || !leftN || !g.key || !g.place || !RG_PICK;
+    bScan.title = !g.key ? "Google isn’t connected for the platform yet" : !g.place ? "Confirm the business on Google first" : !leftN ? "Three a day per client: the next can run tomorrow" : "";
+  }
+  if (phrases.length > 1 || studio) {
+    const tabs = el("div", "rg-tabs"); tabs.setAttribute("role", "group"); tabs.setAttribute("aria-label", "Searches");
+    phrases.forEach((p) => {
+      const s = g.latest && g.latest[p];
+      const b = el("button", "rg-tab"); b.type = "button"; b.setAttribute("aria-pressed", p === RG_PICK ? "true" : "false"); b.dataset.phrase = p;
+      b.appendChild(document.createTextNode(p));
+      if (s && studio) b.appendChild(el("span", "n", ` · ${s.top3} in the top 3`));
+      b.addEventListener("click", () => { RG_PICK = p; RG_SHOW = null; renderRankGrid(); const nb = body.querySelector(`.rg-tab[aria-pressed="true"]`); if (nb) nb.focus(); });
+      tabs.appendChild(b);
+    });
+    if (studio && phrases.length < 3) { const add = el("button", "rg-tab", "+ Add a search"); add.type = "button"; add.addEventListener("click", rgOpenSettings); tabs.appendChild(add); }
+    body.appendChild(tabs);
+  }
+  if (!scan) {
+    body.appendChild(el("p", "rg-empty", RG_PICK ? `No scan of “${RG_PICK}” yet. ${studio ? `Scan now runs one; the monthly scan runs on ${g.next}.` : ""}` : "Add a search to scan in the grid’s settings."));
+    return;
+  }
+  const past = scan !== latest;
+  if (past) {
+    const p = el("div", "rg-past"); p.appendChild(el("span", null, `Showing the scan of ${svWhen(scan.scanned_at)}.`));
+    const back = el("button", "sv-linkbtn", "Back to the newest"); back.type = "button"; back.addEventListener("click", () => { RG_SHOW = null; renderRankGrid(); }); p.appendChild(back);
+    body.appendChild(p);
+  }
+  const wrap = el("div", "rg-body");
+  wrap.appendChild(rgMap(scan, studio, past));
+  const side = el("div", "rg-side");
+  const big = el("div", "rg-big"); big.appendChild(el("b", null, `${scan.top3} of ${scan.total}`));
+  if (!past && scan.change && scan.change.top3) big.insertAdjacentHTML("beforeend", `<span class="sv-chg ${scan.change.top3 > 0 ? "up" : "down"}"><span aria-hidden="true">${scan.change.top3 > 0 ? "▲" : "▼"} ${Math.abs(scan.change.top3)} since ${esc(svWhen(scan.change.since).replace(/, \d{4}$/, ""))}</span><span class="sr-only">${scan.change.top3 > 0 ? "up" : "down"} ${Math.abs(scan.change.top3)} since the scan before</span></span>`);
+  side.appendChild(big);
+  side.appendChild(el("p", "rg-lead", `spots where ${studio ? rgName() : "you"} come${studio ? "s" : ""} up in the top 3 on Google Maps for “${scan.phrase}”`));
+  const two = el("div", "rg-two");
+  two.innerHTML = `<div><span>Average place</span><b>${scan.avg == null ? "–" : esc(String(scan.avg))}</b><small>where it shows</small></div><div><span>Not in the top 20</span><b>${scan.out} spot${scan.out === 1 ? "" : "s"}</b><small>of ${scan.total}${scan.read < scan.total ? `; Google didn’t answer at ${scan.total - scan.read}` : ""}</small></div>`;
+  side.appendChild(two);
+  const leg = el("div", "rg-legend");
+  leg.innerHTML = [["top3", "Top 3"], ["top10", "4 to 10"], ["top20", "11 to 20"], ["out", "Not in the top 20"]].map(([k, w]) => `<span><i class="${k}"></i>${w}</span>`).join("");
+  side.appendChild(leg);
+  if (studio && !past && (scan.rivals || []).length) {
+    const box = el("div", "rg-rivals"); box.appendChild(el("h4", null, "Ahead of you most often"));
+    const ol = el("ol"); box.appendChild(ol);
+    const paint = () => {
+      ol.innerHTML = "";
+      scan.rivals.forEach((r, i) => {
+        const li = el("li"); li.appendChild(el("span", "rg-num", String(i + 1)));
+        const t = el("div", "t"); t.appendChild(el("b", null, rgNameOf(r.id))); t.appendChild(el("span", null, `#1 at ${r.first} spot${r.first === 1 ? "" : "s"} · top 3 at ${r.top3}`)); li.appendChild(t);
+        const a = el("a", "rg-maps", "Google Maps ↗"); a.href = rgMapsOf(r.id); a.target = "_blank"; a.rel = "noopener"; a.setAttribute("aria-label", `${rgNameOf(r.id)} on Google Maps`); li.appendChild(a);
+        ol.appendChild(li);
+      });
+    };
+    paint();
+    rgNames(scan.rivals.map((r) => r.id)).then(paint);
+    box.appendChild(el("p", "rg-note", "Names from Google Maps, fresh each time you open this: Google’s rules don’t let us keep them."));
+    side.appendChild(box);
+  }
+  wrap.appendChild(side);
+  body.appendChild(wrap);
+  // the history: a bar a month, and the scans before this one
+  const mine = (g.history || []).filter((h) => h.phrase === scan.phrase);
+  // a bar a month: that month's monthly scan, the same day each month; a month with only Scan now uses its newest
+  const months = [];
+  mine.forEach((h) => {
+    const m = String(h.scanned_at).slice(0, 7), at = months.find((x) => x.month === m);
+    if (!at) months.push({ month: m, top3: h.top3, kind: h.kind });
+    else if (at.kind !== "monthly" && h.kind === "monthly") { at.top3 = h.top3; at.kind = "monthly"; }
+  });
+  const before = mine.filter((h) => h.id !== scan.id).slice(0, 4);
+  if (months.length > 1 || before.length) {
+    const hist = el("div", "rg-hist");
+    const c = el("div"); c.appendChild(el("h4", null, "Spots in the top 3, month by month"));
+    c.insertAdjacentHTML("beforeend", rgChart(months.slice(0, 6).reverse()));
+    c.appendChild(el("p", "rg-note", `“${scan.phrase}”, each month’s monthly scan. Out of ${scan.total} spots.`));
+    hist.appendChild(c);
+    const m = el("div");
+    const mh = el("div", "rg-hist-h"); mh.appendChild(el("h4", null, `Earlier scans of “${scan.phrase}”`));
+    if (studio) { const all = el("button", "sv-linkbtn", "Every scan ›"); all.type = "button"; all.addEventListener("click", rgOpenHistory); mh.appendChild(all); }
+    m.appendChild(mh);
+    const row = el("div", "rg-minis");
+    before.forEach((h) => {
+      const b = el("button", "rg-mini"); b.type = "button"; b.setAttribute("aria-pressed", RG_SHOW && RG_SHOW.id === h.id ? "true" : "false");
+      b.setAttribute("aria-label", `Show the scan of ${svWhen(h.scanned_at)}: ${h.top3} of ${h.total} in the top 3`);
+      b.appendChild(rgTiny(h.ranks, h.size)); b.appendChild(el("b", null, svWhen(h.scanned_at).replace(/, \d{4}$/, "")));
+      b.appendChild(el("span", null, `${h.kind === "now" ? "Scan now" : "Monthly"} · ${h.top3} in top 3`));
+      b.addEventListener("click", () => { RG_SHOW = { ...h, spacing: h.spacing || scan.spacing, read: h.ranks.filter((v) => v != null).length, out: h.ranks.filter((v) => v === 0).length, change: null }; renderRankGrid(); });
+      row.appendChild(b);
+    });
+    if (!before.length) row.appendChild(el("p", "rg-note", "The scans before this one will sit here."));
+    m.appendChild(row); hist.appendChild(m);
+    body.appendChild(hist);
+  }
+  if (studio && !past && scan.cost_words) {
+    const cost = el("div", "rg-cost");
+    cost.appendChild(el("span", "rg-tag", "Only the studio sees this"));
+    const req = scan.requests || {}, asked = req.ids_only || scan.total;
+    cost.appendChild(el("span", null, req.from === "address"
+      ? `This scan cost ${scan.cost_words} at Google’s prices: ${asked} searches that only list places, free, and a look-up of the address in the business details, as Google hides this business’s address. Google’s first 5,000 of those a month are free.`
+      : `This scan cost ${scan.cost_words} at Google’s prices: ${asked} searches that only list places, free, and one look-up of where the business is${g.prices ? ", " + rgCost(g.prices.scan_usd) : ""}. Google’s first 10,000 look-ups a month are free.`));
+    body.appendChild(cost);
+  }
+}
+async function rgScanNow() {
+  const btn = $("btnRgScan"); if (!RG || RG_BUSY || !RG_PICK) return;
+  const phrase = RG_PICK; RG_BUSY = true; btn.disabled = true;
+  const meta = $("rgMeta"); const was = meta.textContent;
+  meta.textContent = `Scanning “${phrase}” from ${(RG.size || 7) ** 2} spots…`;
+  try {
+    const s = (await api("POST", "/visibility/maps/scan", { phrase })).data;
+    RG_SHOW = null;
+    toast(`Scanned “${phrase}”: in the top 3 at ${s.top3} of ${s.total} spots.`);
+  } catch (err) { meta.textContent = was; toast(nice(err), true); }
+  RG_BUSY = false;
+  await loadRankGrid();
+}
+function rgOpenSpot(scan, i) {
+  const v = scan.ranks[i], ids = (scan.tops && scan.tops[i]) || [];
+  const d = svDialog(rgSpotWords(i, scan.size, scan.spacing), `Searching “${scan.phrase}” here, ${rgName()} is ${v === 0 ? "not in the top 20" : v == null ? "unknown: Google didn’t answer here" : rgOrd(v)}.`);
+  const ul = el("ul", "rg-spot"); d.body.appendChild(el("b", "hint", "The top 3 from here")); d.body.appendChild(ul);
+  const paint = () => {
+    ul.innerHTML = "";
+    if (!ids.length) ul.appendChild(el("li", null, "Google didn’t answer for this spot."));
+    ids.slice(0, 3).forEach((id, k) => {
+      const li = el("li"); li.appendChild(el("span", "rg-dot top3", String(k + 1)));
+      li.appendChild(el("span", "t", id === scan.place_id ? `${rgName()} (this business)` : rgNameOf(id)));
+      const a = el("a", "rg-maps", "Maps ↗"); a.href = rgMapsOf(id); a.target = "_blank"; a.rel = "noopener"; a.setAttribute("aria-label", `${id === scan.place_id ? rgName() : rgNameOf(id)} on Google Maps`); li.appendChild(a);
+      ul.appendChild(li);
+    });
+  };
+  paint(); rgNames(ids.filter((id) => id !== scan.place_id)).then(paint);
+  if (scan.center) {
+    const at = rgSpotAt(scan.center, i, scan.size, scan.spacing);
+    const a = el("a", "pillbtn sm", "Open this spot in Google Maps ↗"); a.href = `https://www.google.com/maps/search/${encodeURIComponent(scan.phrase)}/@${at.lat},${at.lng},14z`; a.target = "_blank"; a.rel = "noopener";
+    const acts = el("div", "acts"); acts.appendChild(a); d.body.appendChild(acts);
+  }
+  d.body.appendChild(el("p", "hint", "Names from Google Maps, as you open this. A real phone here can differ a little: Google also weighs the person’s own searches."));
+}
+function rgOpenHistory() {
+  const g = RG || {}, rows = g.history || [];
+  const d = svDialog(`Every scan · ${rgName()}`, "Kept for good. Spot locations are cleared after 30 days, as Google asks.");
+  const t = el("table", "rg-table");
+  t.innerHTML = `<caption class="sr-only">Every scan of the map rank grid</caption><thead><tr><th scope="col">When</th><th scope="col">Search</th><th scope="col">How</th><th scope="col">Top 3</th><th scope="col">Average</th><th scope="col">Cost</th></tr></thead><tbody>${rows.map((h, i) => `<tr><td><button type="button" data-h="${i}">${esc(svWhen(h.scanned_at))}</button></td><td>${esc(h.phrase)}</td><td>${h.kind === "now" ? "Scan now" : "Monthly"}</td><td>${h.top3} of ${h.total}</td><td>${h.avg == null ? "–" : esc(String(h.avg))}</td><td>${esc(h.cost_words || "")}</td></tr>`).join("")}</tbody>`;
+  d.body.appendChild(t);
+  t.querySelectorAll("[data-h]").forEach((b) => b.addEventListener("click", () => {
+    const h = rows[Number(b.dataset.h)]; RG_PICK = h.phrase;
+    const latest = g.latest && g.latest[h.phrase];
+    RG_SHOW = latest && latest.id === h.id ? null : { ...h, spacing: h.spacing || g.spacing, read: h.ranks.filter((v) => v != null).length, out: h.ranks.filter((v) => v === 0).length, change: null };
+    d.close(); renderRankGrid();
+  }));
+  const month = new Date().toISOString().slice(0, 7), mine = rows.filter((h) => String(h.scanned_at).slice(0, 7) === month);
+  d.body.appendChild(el("p", "hint", `This month: ${mine.length} scan${mine.length === 1 ? "" : "s"}, ${rgCost(mine.reduce((a, h) => a + (h.cost_usd || 0), 0))} at Google’s prices. Pick a date to show that scan on the card.`));
+}
+function rgBizBox(host, g, onChange) {
+  host.innerHTML = "";
+  const src = { listing: "From their Google listing", pasted: "From the place id pasted for reviews", search: "Found by name and address" };
+  const box = el("div", "rg-biz"); host.appendChild(box);
+  const show = (id) => { const n = RG_NAMES.get(id); box.querySelector("b").textContent = (n && n.name) || "A business on Google"; box.querySelector(".addr").textContent = (n && n.address) || ""; };
+  if (g.place || g.suggested) {
+    const p = g.place || g.suggested;
+    box.appendChild(el("b", null, "…")); box.appendChild(el("span", "addr", "")); box.appendChild(el("span", "hint", "From Google Maps"));
+    const row = el("div", "row"); box.appendChild(row);
+    row.appendChild(el("span", "rg-src", (g.place ? "✓ " : "") + (src[p.source] || "On Google")));
+    const a = el("a", "rg-maps", "Google Maps ↗"); a.href = p.maps; a.target = "_blank"; a.rel = "noopener"; row.appendChild(a);
+    if (g.place) { const nb = el("button", "sv-linkbtn", "Not this one?"); nb.type = "button"; nb.addEventListener("click", () => rgOpenFind(onChange)); row.appendChild(nb); }
+    else {
+      const yes = el("button", "pillbtn sm inked", "Yes, that’s them"); yes.type = "button";
+      yes.addEventListener("click", async () => { yes.disabled = true; try { await api("PUT", "/visibility/maps/place", { place_id: p.id, source: p.source }); toast("Matched on Google."); onChange(); } catch (err) { yes.disabled = false; toast(nice(err), true); } });
+      const other = el("button", "sv-linkbtn", "Find it another way"); other.type = "button"; other.addEventListener("click", () => rgOpenFind(onChange));
+      row.appendChild(yes); row.appendChild(other);
+    }
+    if (g.place && RG_HIDDEN()) box.appendChild(el("span", "hint", "Google hides this business’s address, so the grid centres on the address in its business details."));
+    rgNames([p.id]).then(() => show(p.id));
+  } else {
+    box.appendChild(el("span", null, "Not matched yet. Find the business on Google by its name and address, once."));
+    const f = el("button", "pillbtn sm inked", "Find the business on Google"); f.type = "button"; f.addEventListener("click", () => rgOpenFind(onChange));
+    const row = el("div", "row"); row.appendChild(f); box.appendChild(row);
+  }
+}
+function rgOpenSettings() {
+  const g = RG || {};
+  if (!g.studio) return;
+  const draft = { enabled: !!g.enabled, phrases: (g.phrases || []).slice(), size: g.size || 7, spacing: g.spacing || 1 };
+  const d = svDialog(`Map rank grid · ${rgName()}`, "Only the studio sees and changes this. The client sees the grid, never the cost.", () => loadRankGrid());
+  const sw = el("label", "sv-switch"); const cb = el("input"); cb.type = "checkbox"; cb.id = "rgSwitch"; cb.checked = draft.enabled;
+  const swt = el("span"); swt.appendChild(el("b", null, "Scan every month")); swt.appendChild(el("span", "hint", ` On the 1st, every search below. Off: nothing runs and nothing is spent.`));
+  sw.append(cb, swt); d.body.appendChild(sw);
+  cb.addEventListener("change", () => { draft.enabled = cb.checked; });
+  const bizSec = el("div", "rg-dlg-sec"); bizSec.appendChild(el("b", null, "The business on Google"));
+  const bizHost = el("div"); bizSec.appendChild(bizHost); d.body.appendChild(bizSec);
+  const refreshBiz = async () => { try { RG = (await api("GET", "/visibility/maps")).data; } catch (_) {} rgBizBox(bizHost, RG || {}, refreshBiz); };
+  rgBizBox(bizHost, g, refreshBiz);
+  const phSec = el("div", "rg-dlg-sec"); d.body.appendChild(phSec);
+  const phHead = el("b"); phSec.appendChild(phHead);
+  const chips = el("div", "rg-chips"); phSec.appendChild(chips);
+  const add = el("div", "rg-add"); const inp = el("input"); inp.type = "text"; inp.maxLength = 60; inp.placeholder = "plumber"; inp.setAttribute("aria-label", "A search to scan, the way a customer would type it");
+  const addB = el("button", "pillbtn sm", "Add"); addB.type = "button"; add.append(inp, addB); phSec.appendChild(add);
+  phSec.appendChild(el("p", "hint", "The way a customer would type it. A town in the search pins it to that town, as it would for them."));
+  const paintPh = () => {
+    phHead.textContent = `Searches to scan · ${draft.phrases.length} of 3`;
+    chips.innerHTML = "";
+    draft.phrases.forEach((p, i) => { const c = el("span", "rg-chip", p); const x = el("button", null, "✕"); x.type = "button"; x.setAttribute("aria-label", `Take “${p}” off`); x.addEventListener("click", () => { draft.phrases.splice(i, 1); paintPh(); paintCost(); }); c.appendChild(x); chips.appendChild(c); });
+    add.hidden = draft.phrases.length >= 3;
+  };
+  const addIt = () => { const v = inp.value.replace(/\s+/g, " ").trim(); if (v.length < 2) { inp.focus(); return; } if (!draft.phrases.some((p) => p.toLowerCase() === v.toLowerCase())) draft.phrases.push(v); inp.value = ""; paintPh(); paintCost(); inp.focus(); };
+  addB.addEventListener("click", addIt); inp.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); addIt(); } });
+  const gridSec = el("div", "rg-dlg-sec"); gridSec.appendChild(el("b", null, "The grid")); d.body.appendChild(gridSec);
+  const seg = (label, opts, key) => {
+    const row = el("div", "rg-segrow"); if (label) row.appendChild(el("span", null, label));
+    const s = el("div", "rg-seg"); s.setAttribute("role", "group"); s.setAttribute("aria-label", label || "Grid size");
+    opts.forEach(([v, w]) => { const b = el("button", null, w); b.type = "button"; b.dataset.v = String(v); b.setAttribute("aria-pressed", draft[key] === v ? "true" : "false"); b.addEventListener("click", () => { draft[key] = v; s.querySelectorAll("button").forEach((x) => x.setAttribute("aria-pressed", x.dataset.v === String(v) ? "true" : "false")); paintCost(); }); s.appendChild(b); });
+    row.appendChild(s); return row;
+  };
+  gridSec.appendChild(seg("", [[5, "5 × 5 · 25 spots"], [7, "7 × 7 · 49 spots"]], "size"));
+  gridSec.appendChild(seg("Between spots", [[0.5, "½ mile"], [1, "1 mile"], [2, "2 miles"]], "spacing"));
+  const across = el("p", "hint"); gridSec.appendChild(across);
+  const costBox = el("div", "rg-costbox"); d.body.appendChild(costBox);
+  const paintCost = () => {
+    across.textContent = `Covers ${(draft.size - 1) * draft.spacing} miles across, centred on the business.`;
+    const one = g.prices ? g.prices.scan_usd : 0.005, n = Math.max(1, draft.phrases.length);
+    const hiddenUsd = g.prices && typeof g.prices.hidden_usd === "number" ? g.prices.hidden_usd : null;
+    const each = RG_HIDDEN() && hiddenUsd != null ? hiddenUsd : one;
+    costBox.innerHTML = `<b>What it costs</b>Each scan: ${draft.size * draft.size} searches that only list places, free, and one look-up of where the business is, ${esc(rgCost(one))}${hiddenUsd != null ? `, or ${esc(rgCost(hiddenUsd))} for a business that hides its address on Google` : ""}. ${n === 1 ? "One search" : n + " searches"} a month: ${esc(rgCost(each * n))}. Google’s price list, read ${esc(g.prices ? svWhen(g.prices.as_of + "T12:00:00Z") : "Nov 12, 2026")}.`;
+  };
+  paintPh(); paintCost();
+  if (!g.key) d.body.appendChild(el("p", "sv-problem", "Google isn’t connected for the platform yet: the Places key is needed before anything can scan."));
+  const acts = el("div", "acts"); const save = el("button", "pillbtn sm inked", "Save"); save.type = "button"; const cancel = el("button", "pillbtn sm", "Cancel"); cancel.type = "button";
+  acts.append(save, cancel); d.body.appendChild(acts);
+  cancel.addEventListener("click", () => d.close());
+  save.addEventListener("click", async () => {
+    save.disabled = true;
+    try { await api("PUT", "/visibility/maps", draft); toast(draft.enabled ? "Saved. The grid is on for this client." : "Saved."); d.close(); }
+    catch (err) { save.disabled = false; toast(nice(err), true); }
+  });
+}
+function rgOpenFind(onDone) {
+  const d = svDialog(`Which one is ${rgName()}?`, "We search Google for the name and address. Pick the business; we keep only Google’s id for it.");
+  const row = el("div", "rg-add"); const inp = el("input"); inp.type = "text"; inp.maxLength = 160; inp.placeholder = "Business name, street, town"; inp.setAttribute("aria-label", "The business’s name and address");
+  const go2 = el("button", "pillbtn sm", "Search"); go2.type = "button"; row.append(inp, go2); d.body.appendChild(row);
+  const list = el("div", "rg-dlg-sec"); list.setAttribute("role", "group"); list.setAttribute("aria-label", "What Google found"); d.body.appendChild(list);
+  const note = el("p", "hint"); note.setAttribute("role", "status"); d.body.appendChild(note);
+  const acts = el("div", "acts"); const use = el("button", "pillbtn sm inked", "Use this one"); use.type = "button"; use.disabled = true;
+  const none = el("button", "pillbtn sm", "None of these"); none.type = "button"; acts.append(use, none); d.body.appendChild(acts);
+  const paste = el("details"); paste.appendChild(el("summary", "hint", "Have a place id from Google? Paste it instead"));
+  const pin = el("input"); pin.type = "text"; pin.maxLength = 600; pin.placeholder = "ChIJ…"; pin.setAttribute("aria-label", "A Google place id");
+  const pgo = el("button", "pillbtn sm", "Use this id"); pgo.type = "button"; const prow = el("div", "rg-add"); prow.append(pin, pgo); paste.appendChild(prow); d.body.appendChild(paste);
+  let picked = null;
+  const usePlace = async (place_id, source, btn) => {
+    btn.disabled = true;
+    try { await api("PUT", "/visibility/maps/place", { place_id, source }); toast("Matched on Google."); d.close(); if (onDone) onDone(); }
+    catch (err) { btn.disabled = false; toast(nice(err), true); }
+  };
+  const search = async () => {
+    go2.disabled = true; note.textContent = "Searching Google…"; list.innerHTML = ""; picked = null; use.disabled = true;
+    try {
+      const r = (await api("POST", "/visibility/maps/find", { query: inp.value.trim() })).data;
+      if (!inp.value.trim()) inp.value = r.query;
+      (r.found || []).forEach((f) => {
+        f.address && RG_NAMES.set(f.id, { id: f.id, name: f.name, address: f.address, maps: f.maps });
+        const b = el("button", "rg-cand"); b.type = "button"; b.setAttribute("aria-pressed", "false");
+        const t = el("span", "t"); t.appendChild(el("b", null, f.name)); t.appendChild(el("span", null, [f.address, f.kind].filter(Boolean).join(" · "))); b.appendChild(t);
+        b.addEventListener("click", () => { picked = f.id; list.querySelectorAll(".rg-cand").forEach((x) => x.setAttribute("aria-pressed", x === b ? "true" : "false")); use.disabled = false; });
+        const a = el("a", "rg-maps", "Maps ↗"); a.href = f.maps; a.target = "_blank"; a.rel = "noopener"; a.setAttribute("aria-label", `${f.name} on Google Maps`); a.addEventListener("click", (e) => e.stopPropagation());
+        const line = el("div", "rg-segrow"); line.append(b, a); list.appendChild(line);
+      });
+      note.textContent = (r.found || []).length ? `From Google Maps. This search cost about ${r.cost_words} at Google’s prices.` : "Google found nothing for that. Try the name and the town only.";
+    } catch (err) { note.textContent = ""; toast(nice(err), true); }
+    go2.disabled = false;
+  };
+  go2.addEventListener("click", search); inp.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); search(); } });
+  use.addEventListener("click", () => { if (picked) usePlace(picked, "search", use); });
+  none.addEventListener("click", () => d.close());
+  pgo.addEventListener("click", () => { const v = pin.value.trim(); if (v) usePlace(v, "pasted", pgo); else pin.focus(); });
+  search();
 }
 // ── Phase UX (FD-R2): the workspace speaks the business's language ──
 // A plumber's SITE says "Services" (T3 vocabulary) — the workspace must too.

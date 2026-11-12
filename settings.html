@@ -103,6 +103,14 @@
   .sw:focus-visible{outline:2px solid var(--p);outline-offset:2px}
   .swrow .t{flex:1;min-width:0} .swrow .t b{display:block;font-weight:600} .swrow .t b input{width:56px;height:28px;border:1px solid var(--line);border-radius:var(--dds-r,8px);padding:0 var(--dds-s2,8px);font:inherit;font-size:13.5px;text-align:center;margin:0 2px;background:var(--card);color:var(--ink)}
   .swrow .t .how{font-size:12.5px;color:var(--faint);margin-top:2px}
+  /* sales item 94: the goal's amount box and AI help's four facts */
+  .goalin{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:10px}
+  .goalin .cur{font-weight:600;color:var(--soft)}
+  .goalin input{width:132px;height:40px;border:1px solid var(--line);border-radius:var(--dds-r,8px);padding:0 12px;font:inherit;font-size:15px;font-weight:600;background:var(--card);color:var(--ink)}
+  .goalin .per{font-size:13.5px;color:var(--soft)}
+  .aifacts{list-style:none;margin:10px 0 6px;padding:10px 12px;border-radius:var(--dds-r,8px);background:var(--p-soft,#efeafa);display:grid;gap:4px;font-size:13px;line-height:1.45;color:var(--ink)}
+  .aifacts strong{font-weight:650}
+  @media (max-width:767px){.goalin input{font-size:16px;height:44px;width:150px}.goalin .btn{min-height:44px}}
   /* builder list item 184: what the monthly report holds, as chips */
   .swrow.rp-in{flex-wrap:wrap;align-items:center;gap:6px}
   .rp-in ul{display:flex;flex-wrap:wrap;gap:6px;margin:0;padding:0;list-style:none;flex:1 1 280px;min-width:0}   /* beside the label when there's room, as drawn */
@@ -350,6 +358,32 @@
         <label><span data-stage-label="contract">Agreement out</span> <input type="number" id="sc-contract" min="0" max="100" step="1" placeholder="75" aria-label="Chance a deal at Agreement out closes, in percent"> %</label>
       </div>
       <div style="margin-top:10px;display:flex;align-items:center;gap:10px"><button type="button" class="btn" id="scSave">Save percents</button><span class="how" id="scMsg" role="status" style="margin:0"></span></div>
+    </div>
+  </section>
+  <!-- sales item 94 (Nov 2026): the month's sales goal, which Home and Pipeline show this month
+       against, and the AI help switch (Draft a reply, Where things stand: about 1 cent a press,
+       off for every studio until its owner switches it on). GET/PUT /sales/goal-ai: the goal
+       saves with its button, the switch as it flips, and only the studio's owner may flip it. -->
+  <section class="card" id="goal" aria-labelledby="goalHead" hidden data-needs="configure">
+    <div class="card-h"><h2 id="goalHead" tabindex="-1">Goal and AI help</h2><span class="hint">Your number for the month, and AI help that drafts and sums up</span></div>
+    <div class="swrow goalrow">
+      <div class="t"><b id="goalL">Monthly sales goal</b>
+        <div class="how" id="goalHow">Home and Pipeline show this month against it: what you’ve won, what open deals should still bring at each stage’s chance, and what’s left to find. Leave it empty and nothing shows.</div>
+        <div class="goalin"><span class="cur" aria-hidden="true">$</span><input id="goalAmt" type="text" inputmode="decimal" autocomplete="off" maxlength="12" placeholder="8,000" aria-labelledby="goalL" aria-describedby="goalHow goalEx"><span class="per">a month</span><button type="button" class="btn sm primary" id="goalSave">Save</button></div>
+        <div class="how" id="goalEx"></div></div>
+    </div>
+    <div class="swrow" id="aiRow">
+      <button type="button" class="sw" role="switch" id="sw-aihelp" aria-checked="false" aria-labelledby="sw-aihelp-l" aria-describedby="aiHelpHow aiHelpFacts aiOwner"></button>
+      <div class="t"><b id="sw-aihelp-l">AI help: draft a reply, and sum a person up</b>
+        <div class="how" id="aiHelpHow">Adds “Draft a reply” to the Inbox and to Email on a record, and “Where things stand” to every record. It uses Claude, the same AI as the AI answers check.</div>
+        <ul class="aifacts" id="aiHelpFacts">
+          <li><strong>About 1¢ each press.</strong> Nothing runs by itself: only Draft, Sum them up and Refresh ask.</li>
+          <li><strong>Never sends anything.</strong> A draft lands in the box for you to change; Send stays yours.</li>
+          <li><strong>Stops at 50 a day</strong> (about 50¢), so a stuck button can’t run up a bill.</li>
+          <li><strong>Off for every new studio.</strong> Only the owner can switch it on or off.</li>
+        </ul>
+        <div class="how" id="aiUse"></div>
+        <div class="how" id="aiOwner" hidden>Only the studio’s owner can switch AI help on or off.</div></div>
     </div>
   </section>
   <!-- Benchmark 2026-10, item 6: three switches, not a workflow builder. Each
@@ -625,6 +659,7 @@ const IC = {
   auto: '<path d="M13 3L4 14h7l-1 7 9-11h-7z"/>',
   domains: '<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/>',
   dev: '<path d="M8 9l-4 3 4 3"/><path d="M16 9l4 3-4 3"/><path d="M14 5l-4 14"/>',
+  goal: '<circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="4.5"/><circle cx="12" cy="12" r="1"/>',
   stages: '<rect x="3" y="4" width="5" height="16" rx="1"/><rect x="9.5" y="4" width="5" height="10" rx="1"/><rect x="16" y="4" width="5" height="13" rx="1"/>',
   calendar: '<rect x="3" y="4" width="18" height="17" rx="2"/><path d="M3 9h18M8 2v4M16 2v4"/>',
   security: '<path d="M12 3 5 6v5c0 4.4 3 8.3 7 9.5 4-1.2 7-5.1 7-9.5V6z"/><rect x="9" y="11" width="6" height="5" rx="1"/><path d="M10 11V9.5a2 2 0 0 1 4 0V11"/>',
@@ -637,6 +672,8 @@ const CARDS = [
   // the studio's own switches — never a client's (the invoices and deals are the studio's book)
   // Bold redesign (Nov 2026): the deal stages are a section of their own (the studio's book, like Automations)
   { key: 'stages', href: '#stages', title: 'Deal stages', desc: 'Your names for the four open stages, the chance each one closes, and when a deal counts as stalled.', words: 'pipeline deals stalled chance close', studioOnly: true, needs: 'configure' },
+  // sales item 94: the month's goal and the AI help switch (the studio's own, like the stages)
+  { key: 'goal', href: '#goal', title: 'Goal and AI help', desc: 'A monthly sales goal for Home and Pipeline, and AI help that drafts a reply or sums a customer up.', words: 'goal target monthly sales number ai help draft reply summary claude assistant cost', studioOnly: true, needs: 'configure' },
   { key: 'auto', href: '#automations', title: 'Automations', desc: 'Ready-made recipes: answer and follow up enquiries, remind unpaid invoices and quotes about to run out, nudge quiet deals, ask for a review. Each shows what it sends.', words: 'automatic reminders emails nudge review request unpaid recipes follow up quote expires auto reply', studioOnly: true, needs: 'configure' },
   // sales item 87: inside a client, the replies THEIR website sends: the acknowledgement and the follow-ups
   { key: 'replies', icon: 'auto', href: '#automations', title: 'Enquiry replies', desc: 'The reply their website visitors get right away, and two follow-ups if an enquiry goes quiet. In your words or theirs.', words: 'auto reply acknowledgement follow up enquiry automatic email', scopedOnly: true, feature: 'website', needs: 'configure' },
@@ -731,6 +768,8 @@ function renderCards() {
       else toast(NOTIFY ? 'This client’s site isn’t one your studio looks after.' : 'Your notification choices couldn’t load just now. Try again in a moment.', true);   // never an empty part
     });
   });
+  const gl = $('cards').querySelector('[data-card="goal"]');
+  if (gl) gl.addEventListener('click', (e) => { e.preventDefault(); reveal('goal', 'goalHead'); });
   const kc = $('cards').querySelector('[data-card="security"]');
   if (kc) kc.addEventListener('click', (e) => { e.preventDefault(); reveal('security', 'securityHead'); });
   const gc = $('cards').querySelector('[data-card="stages"]');
@@ -746,7 +785,7 @@ function markCurrent(id) {
 }
 function spySections() {
   if (!('IntersectionObserver' in window)) return;
-  const ids = ['studio', 'security', 'stages', 'report', 'reports', 'menu', 'notify', 'automations', 'team', 'billing'];   // C16: a client's Monthly report too; item 160: the studio's Monthly reports; item 126: Notifications
+  const ids = ['studio', 'security', 'stages', 'goal', 'report', 'reports', 'menu', 'notify', 'automations', 'team', 'billing'];   // C16: a client's Monthly report too; item 160: the studio's Monthly reports; item 126: Notifications; sales item 94: Goal and AI help
   // C16: the band (15–30% down the screen) never reaches the last part when the page ends
   // first, so Plan & billing never lit up; at the very bottom the last part shown is marked
   const atBottom = () => window.scrollY > 0 && window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 2;
@@ -1259,7 +1298,7 @@ async function retryReport(e) {
   await loadReport();
   if (b && b.isConnected) { b.disabled = false; toast('Still couldn’t load — try again in a moment.', true); }
 }
-const REPORT_PARTS = [['visits', 'Visits'], ['enquiries', 'Enquiries'], ['google', 'On Google'], ['ai', 'AI answers'], ['reviews', 'Reviews'], ['health', 'Website health'], ['pages', 'Most read pages'], ['changes', 'What changed']];
+const REPORT_PARTS = [['visits', 'Visits'], ['enquiries', 'Enquiries'], ['google', 'On Google'], ['maps', 'On Google Maps'], ['ai', 'AI answers'], ['reviews', 'Reviews'], ['health', 'Website health'], ['pages', 'Most read pages'], ['changes', 'What changed']];
 const REPORT_BLOCK_WORDS = { no_email: 'there’s no email on their record', unsubscribed: 'they unsubscribed from emails', bounced: 'emails to them bounce', quiet: 'a quiet month, under your number of visits' };
 const CC_BLOCK_WORDS = { unsubscribed: 'unsubscribed', bounced: 'emails bounce' };
 const SUGGEST_FROM = { idea: 'From their Do next list: a Growth Coach idea', ai: 'From their Do next list: an AI answer that misses them', search: 'From their Do next list: a Search to-do', health: 'From their Do next list: a website fix', reviews: 'From their Do next list: Google reviews waiting', own: 'Your own words' };
@@ -1323,12 +1362,14 @@ async function changeCc(next, said) {
   }
 }
 // ── item 160: what it says ──
+// a part that can't show yet: AI answers until the check is on (item 184), the map grid until it is on (item 185)
+const partWaits = (d, k) => (k === 'ai' && !d.ai_checks) || (k === 'maps' && !d.maps_on);
 function paintParts(d) {
   const off = new Set(d.parts_off || []);
   const words = Array.isArray(d.parts) && d.parts.length ? d.parts.map((p) => [p.key, p.words]) : REPORT_PARTS;
   $('reportIn').innerHTML = words.map(([k, w]) => {
-    const aiOff = k === 'ai' && !d.ai_checks;   // item 184: AI answers only with the check on
-    return `<button type="button" class="rpart${aiOff ? ' off' : ''}" data-part="${esc(k)}" aria-pressed="${!aiOff && !off.has(k) ? 'true' : 'false'}">${esc(w)}${aiOff ? ', off' : ''}</button>`;
+    const waits = partWaits(d, k);
+    return `<button type="button" class="rpart${waits ? ' off' : ''}" data-part="${esc(k)}" aria-pressed="${!waits && !off.has(k) ? 'true' : 'false'}">${esc(w)}${waits ? ', off' : ''}</button>`;
   }).join('');
   $('reportIn').querySelectorAll('[data-part]').forEach((b) => b.addEventListener('click', () => togglePart(b.getAttribute('data-part'))));
 }
@@ -1336,10 +1377,11 @@ async function togglePart(k) {
   if (REPORT_BUSY || !REPORT_READ) return;
   const d = REPORT || {};
   if (k === 'ai' && !d.ai_checks) { toast('Switch on “Check AI answers every month” below to put AI answers in the report.'); return; }
+  if (k === 'maps' && !d.maps_on) { toast('Switch the map rank grid on from this client’s Search tab to put it in the report.'); return; }
   const off = new Set(d.parts_off || []);
   const words = (Array.isArray(d.parts) && d.parts.length ? d.parts.map((p) => p.key) : REPORT_PARTS.map((p) => p[0]));
   if (off.has(k)) off.delete(k); else off.add(k);
-  if (words.every((w) => off.has(w))) { toast('Leave at least one part in the report.', true); return; }
+  if (words.filter((w) => !partWaits(d, w)).every((w) => off.has(w))) { toast('Leave at least one part in the report.', true); return; }
   const name = (REPORT_PARTS.find((p) => p[0] === k) || [k, k])[1];
   REPORT = { ...d, parts_off: words.filter((w) => off.has(w)) }; paintParts(REPORT);
   if (await saveReport({ parts_off: REPORT.parts_off })) toast(off.has(k) ? name + ' is left out of the report.' : name + ' is back in the report.');
@@ -1605,6 +1647,79 @@ async function switchOnTheRest() {
 // ── item 54: the menu areas this studio hides (GET/PUT /agency/nav) ──
 let MENU = null;   // { hidden: [...], choices: [{key,label,what}] }
 let MENU_ASKED = false;   // finding C19: once per open, not again after every automation save
+// ── sales item 94: Goal and AI help (GET/PUT /sales/goal-ai) ──────────────────────────
+// The goal is a number for the month; Home and Pipeline show this month against it. The
+// switch turns AI help on for the whole studio (about 1 cent a press, 50 a day at most);
+// only the owner may flip it, so anyone else sees it greyed with the reason.
+let GOALAI = null, GOAL_MONTH = null, GOAL_BUSY = false;
+const usd0 = (c) => '$' + Math.round((Number(c) || 0) / 100).toLocaleString('en-US');
+const localDay = () => { const d = new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); };
+function goalCentsOf(v) {   // "$8,000" or "8000.50" → cents; empty → null; anything else → NaN
+  const t = String(v || '').replace(/[$,\s]/g, '');
+  if (!t) return null;
+  return /^\d+(\.\d{1,2})?$/.test(t) ? Math.round(Number(t) * 100) : NaN;
+}
+function paintGoalEx() {
+  const el = $('goalEx'); if (!el) return;
+  const c = goalCentsOf($('goalAmt').value);
+  if (!GOAL_MONTH || !c) { el.textContent = c ? '' : 'No goal yet, so Home and Pipeline show none.'; return; }
+  const won = GOAL_MONTH.won, exp = GOAL_MONTH.expected, left = Math.max(0, c - won - exp);
+  el.textContent = `This month so far: ${usd0(won)} won · ${usd0(exp)} still expected · ${usd0(left)} left to find`;
+}
+function paintGoalAi() {
+  const d = GOALAI; if (!d) return;
+  if (document.activeElement !== $('goalAmt')) $('goalAmt').value = d.goal_cents ? (d.goal_cents / 100).toLocaleString('en-US', { maximumFractionDigits: 2 }) : '';
+  paintGoalEx();
+  const sw = $('sw-aihelp');
+  sw.setAttribute('aria-checked', d.ai_on ? 'true' : 'false');
+  if (d.can_switch) sw.removeAttribute('aria-disabled'); else sw.setAttribute('aria-disabled', 'true');
+  $('aiOwner').hidden = !!d.can_switch;
+  const u = d.usage;
+  const at = u && u.last_at ? new Date(u.last_at) : null;
+  const when = at ? (at.toDateString() === new Date().toDateString() ? 'today at ' + at.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }) : at.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })) : '';
+  $('aiUse').textContent = !u ? '' : u.month_uses
+    ? `This month: ${u.month_uses} use${u.month_uses === 1 ? '' : 's'}, about ${Math.max(1, Math.round(u.month_cents))}¢${when ? ' · last used ' + when : ''}`
+    : (d.ai_on ? 'Not used yet this month.' : '');
+  setStatus('goal', { text: `${d.goal_cents ? usd0(d.goal_cents) + ' a month' : 'No goal yet'} · AI help ${d.ai_on ? 'on' : 'off'}`, cls: 'plain' });
+}
+async function loadGoalAi() {
+  const [r, s] = await Promise.all([
+    api('/sales/goal-ai?today=' + localDay() + '&tzo=' + new Date().getTimezoneOffset()).catch(() => null),
+    api('/sales/summary?today=' + localDay() + '&tzo=' + new Date().getTimezoneOffset()).catch(() => null),
+  ]);
+  const sd = s && s.ok && s.body && s.body.data;
+  if (sd) GOAL_MONTH = { won: Number(sd.won_month && sd.won_month.value_cents) || 0, expected: Number(sd.expected && sd.expected.value_cents) || 0 };
+  if (!r || !r.ok || !r.body || !r.body.data) { $('goalSave').disabled = true; $('sw-aihelp').setAttribute('aria-disabled', 'true'); $('goalEx').textContent = (r && r.body && r.body.message) || 'The goal and AI help couldn’t load just now. Refresh to try again.'; return; }
+  GOALAI = r.body.data; paintGoalAi();
+}
+async function saveGoalAi(patch) {
+  if (GOAL_BUSY) return null; GOAL_BUSY = true;
+  try {
+    const r = await api('/sales/goal-ai', 'PUT', patch).catch(() => null);
+    if (!r || !r.ok) { toast((r && r.body && r.body.message) || 'That didn’t save just now. Try again.', true); return null; }
+    GOALAI = Object.assign({}, GOALAI, r.body.data); paintGoalAi(); return GOALAI;
+  } finally { GOAL_BUSY = false; }
+}
+(function wireGoalAi() {
+  const amt = $('goalAmt'); if (!amt) return;
+  amt.addEventListener('input', paintGoalEx);
+  amt.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); $('goalSave').click(); } });
+  $('goalSave').addEventListener('click', async () => {
+    const c = goalCentsOf(amt.value);
+    if (Number.isNaN(c)) { toast('Enter the goal in dollars, like 8,000.', true); amt.focus(); return; }
+    const d = await saveGoalAi({ goal_cents: c });
+    if (d) toast(d.goal_cents ? `Saved. Home and Pipeline show this month against ${usd0(d.goal_cents)}.` : 'Goal cleared. Home and Pipeline show none.');
+  });
+  $('sw-aihelp').addEventListener('click', async () => {
+    if (!GOALAI) return;
+    if (!GOALAI.can_switch) { toast('Only the studio’s owner can switch AI help on or off.', true); return; }
+    const next = !GOALAI.ai_on;
+    $('sw-aihelp').setAttribute('aria-checked', next ? 'true' : 'false');
+    const d = await saveGoalAi({ ai_on: next });
+    if (!d) { $('sw-aihelp').setAttribute('aria-checked', GOALAI.ai_on ? 'true' : 'false'); return; }
+    toast(d.ai_on ? 'AI help is on. Draft a reply and Where things stand are ready, about 1¢ each press.' : 'AI help is off. Nothing more runs, and nothing more costs.');
+  });
+})();
 async function loadMenu() {
   const agency = !!(CTX && CTX.is_agency) && !SCOPE;
   if (!agency || !hasCap('configure')) return;
@@ -1919,6 +2034,7 @@ function holdAnchor(sec) {
     loadTeam().catch(() => {});
     if (!inClient()) { loadStageNames(); loadMenu(); loadReports(); $('reportsAll').addEventListener('click', switchOnTheRest); }   // with the rest, not after the studio details; item 160: every client's report, which loadReports keeps to the studio's own level
     else { wireReport(); loadReport(); }
+    if (!inClient()) loadGoalAi();   // sales item 94: Goal and AI help, the studio's own like Deal stages
     loadNotify();   // item 126: a studio's notifications per client site (agency members only)
     wireDeletion();
     if (!inClient()) { wireSecurity(); loadSecurity().catch(() => {}); }   // item 191: your own sign-in, in your own business too
@@ -1931,6 +2047,7 @@ function holdAnchor(sec) {
     if (location.hash === '#billing' && !inClient()) holdAnchor($('billing'));   // I7: billing is the studio's own, never a client's (a client's "Update payment" link lands at the top)
     if (location.hash === '#automations' && automationsHere()) holdAnchor($('automations'));
     if (location.hash === '#stages' && !inClient()) holdAnchor($('stages'));
+    if (location.hash === '#goal' && !inClient()) holdAnchor($('goal'));   // sales item 94: Home's goal card and AI help's Open Settings land here
     if (location.hash === '#security' && !inClient()) holdAnchor($('security'));   // item 191: the studio home's nudge lands here
     if (location.hash === '#notify') loadNotify().then(() => { if (!$('notify').hidden) holdAnchor($('notify')); });
     spySections();
