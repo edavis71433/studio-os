@@ -979,3 +979,110 @@ html.dds-cr-on body{overflow:hidden}
   .dds-palette .pclose{display:inline-flex;align-items:center}
 }
 @media (pointer:coarse){.dds-palette .res .alt{min-height:36px;display:inline-flex;align-items:center}}
+
+/* ══ One page header, on every page (builder item 165, Figma 295:3) ═════════════
+   A page's title came in three designs: a dot or an emoji with a heavy serif, a lighter
+   serif, or no title at all where a view picker stood in for it. Now every page draws
+   the same header:
+     <header class="dds-ph">
+       <nav class="dds-ph-trail">…</nav>                 only when the page lives inside another
+       <div class="dds-ph-row">
+         <span class="dds-ph-ic"><svg/></span>           the page's icon, from the one icon set
+         <div class="dds-ph-tt">
+           <div class="dds-ph-tl"><h1/> [picker]</div>   the title, always; a view picker beside it
+           <p class="dds-ph-line"/>                      one line saying what is here, with counts
+         </div>
+         <div class="dds-ph-acts">
+           <button class="dds-ph-dots" popovertarget>⋯  phones only: the other actions
+           <div class="dds-ph-more" popover>…</div>      the other actions (outline)
+           <the one filled action>                       at most one
+         </div>
+       </div>
+       [<nav class="dds-ph-tabs">…</nav>]                a row of tabs under it
+     </header>
+   On a phone the filled action goes full width under the title, the others behind ⋯
+   (a sheet from the bottom), the tabs under them. */
+.dds-ph{display:flex;flex-direction:column;gap:10px;margin:0 0 var(--dds-s5,20px);font-family:var(--dds-sans);color:var(--dds-ink)}
+.dds-ph-trail{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--dds-soft)}
+.dds-ph-trail a{color:inherit;text-decoration:none;font-weight:500}
+.dds-ph-trail a:hover{color:var(--dds-p);text-decoration:underline}
+.dds-ph-row{display:flex;align-items:center;flex-wrap:wrap;gap:10px 14px;min-width:0}   /* actions that don't fit beside the title drop under it, still on the right */
+.dds-ph-ic{flex:0 0 auto;width:40px;height:40px;border-radius:12px;background:var(--dds-p-soft);color:var(--dds-p);display:grid;place-items:center}
+.dds-ph-ic svg{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:1.75;stroke-linecap:round;stroke-linejoin:round}
+.dds-ph-tt{flex:1 1 220px;min-width:0;display:flex;flex-direction:column;gap:2px}
+.dds-ph-tl{display:flex;align-items:center;flex-wrap:wrap;gap:6px 10px;min-width:0}
+.dds-ph-tl h1,.dds-ph h1{margin:0;font-family:var(--dds-serif);font-size:30px;font-weight:600;line-height:1.2;letter-spacing:-.015em;color:var(--dds-ink);overflow-wrap:normal;word-break:normal}
+.dds-ph-line{margin:0;font-size:13.5px;line-height:1.4;color:var(--dds-soft)}
+.dds-ph-line:empty{display:none}
+/* the view picker: a pill beside the title, never instead of it */
+.dds-ph-pick{display:inline-flex;align-items:center;gap:6px;min-height:28px;padding:0 12px 0 14px;border:1px solid var(--dds-line-strong);border-radius:999px;background:var(--dds-card);color:var(--dds-ink);font:inherit;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap}
+.dds-ph-pick:hover{border-color:var(--dds-p)}
+.dds-ph-pick .car{font-size:10px;color:var(--dds-soft)}
+.dds-ph-acts{flex:0 0 auto;display:flex;align-items:center;flex-wrap:wrap;justify-content:flex-end;gap:8px;margin-left:auto}
+/* the other actions: in the row on a computer (the popover is laid out as a plain row there) */
+.dds-ph-more{display:flex;align-items:center;flex-wrap:wrap;gap:8px;position:static;inset:auto;margin:0;padding:0;width:auto;height:auto;border:0;background:none;color:inherit;overflow:visible}
+.dds-ph-dots{display:none}
+/* a button that is only an icon in the row (↻) says its name beside it in the phone's sheet */
+.dds-ph-say{display:none}
+.dds-ph-tabs{display:flex;gap:22px;overflow-x:auto;scrollbar-width:none;padding:2px 0 0}
+.dds-ph-tabs::-webkit-scrollbar{display:none}
+.dds-ph-tabs a,.dds-ph-tabs button{position:relative;display:inline-flex;align-items:center;min-height:32px;padding:0 4px 6px;font:inherit;font-size:14px;font-weight:500;color:var(--dds-soft);text-decoration:none;background:none;border:0;cursor:pointer;white-space:nowrap}
+.dds-ph-tabs a:hover,.dds-ph-tabs button:hover{color:var(--dds-ink)}
+.dds-ph-tabs [aria-current="page"],.dds-ph-tabs [aria-selected="true"]{color:var(--dds-ink);font-weight:600}
+.dds-ph-tabs [aria-current="page"]::after,.dds-ph-tabs [aria-selected="true"]::after{content:"";position:absolute;left:4px;right:4px;bottom:0;height:3px;border-radius:2px;background:var(--dds-p)}
+@media (max-width:760.98px){
+  .dds-ph{gap:10px;margin-bottom:var(--dds-s4,12px)}
+  .dds-ph-row{display:grid;grid-template-columns:auto minmax(0,1fr) auto;grid-template-areas:"ic tt dots" "fill fill fill";column-gap:12px;row-gap:10px;align-items:center}
+  .dds-ph-ic{grid-area:ic;width:36px;height:36px;border-radius:10px}
+  .dds-ph-ic svg{width:20px;height:20px}
+  .dds-ph-tt{grid-area:tt}
+  .dds-ph-tl h1,.dds-ph h1{font-size:26px}
+  .dds-ph-acts{display:contents}
+  .dds-ph-acts > .dds-ph-fill{grid-area:fill;width:100%;justify-content:center;min-height:44px}
+  .dds-ph-acts > :not(.dds-ph-fill):not(.dds-ph-dots):not(.dds-ph-more){grid-area:dots;justify-self:end}
+}
+/* the ⋯ and its sheet, where the browser can draw it (older ones keep the row) */
+@supports selector(:popover-open){
+  @media (max-width:760.98px){
+    .dds-ph-dots{grid-area:dots;display:inline-grid;place-items:center;width:46px;min-height:44px;padding:0;border:1px solid var(--dds-line-strong);border-radius:12px;background:var(--dds-card);color:var(--dds-ink);font:inherit;font-size:18px;line-height:1;cursor:pointer}
+    .dds-ph-more:not(:popover-open){display:none}
+    .dds-ph-more:popover-open{position:fixed;inset:auto 0 0 0;margin:0;width:100%;max-height:70vh;overflow:auto;box-sizing:border-box;display:flex;flex-direction:column;align-items:stretch;gap:6px;
+      padding:16px 16px calc(16px + env(safe-area-inset-bottom,0px));border:0;border-radius:var(--dds-r-xl,20px) var(--dds-r-xl,20px) 0 0;background:var(--dds-card);color:var(--dds-ink);box-shadow:var(--dds-shadow-pop)}
+    .dds-ph-more:popover-open::backdrop{background:rgba(15,13,24,.45)}
+    .dds-ph-more:popover-open > *{min-height:44px;justify-content:center}
+    .dds-ph-more:popover-open .dds-ph-say{display:inline;margin-left:6px;font-size:14px;font-weight:600}
+  }
+}
+/* The header's icons: the shell's own set (shell.js ICON, the same paths; tests/presence/page_header_test.mjs
+   keeps them the same), drawn as masks so a page names one with data-ic and needs no script; the
+   last few are pages the shell's set had no picture for. */
+.dds-ph-ic::before{content:"";width:22px;height:22px;background:currentColor;-webkit-mask:var(--ph-ic) center/contain no-repeat;mask:var(--ph-ic) center/contain no-repeat}
+@media (max-width:760.98px){.dds-ph-ic::before{width:20px;height:20px}}
+.dds-ph-ic[data-ic="home"]{--ph-ic:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z'/%3E%3C/svg%3E")}
+.dds-ph-ic[data-ic="today"]{--ph-ic:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z'/%3E%3C/svg%3E")}
+.dds-ph-ic[data-ic="overview"]{--ph-ic:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='9'/%3E%3Cpath d='M12 7v5l3 2'/%3E%3C/svg%3E")}
+.dds-ph-ic[data-ic="inbox"]{--ph-ic:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3 13l2-8h14l2 8v6H3z'/%3E%3Cpath d='M3 13h5l1.5 3h5L16 13h5'/%3E%3C/svg%3E")}
+.dds-ph-ic[data-ic="messages"]{--ph-ic:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 5h16v11H9l-5 4z'/%3E%3C/svg%3E")}
+.dds-ph-ic[data-ic="customers"]{--ph-ic:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='9' cy='8' r='3.5'/%3E%3Cpath d='M2.5 20a6.5 6.5 0 0 1 13 0'/%3E%3Ccircle cx='17' cy='9' r='2.5'/%3E%3Cpath d='M15.5 14.5A5 5 0 0 1 21.5 20'/%3E%3C/svg%3E")}
+.dds-ph-ic[data-ic="pipeline"]{--ph-ic:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='3' y='4' width='5' height='16' rx='1'/%3E%3Crect x='9.5' y='4' width='5' height='10' rx='1'/%3E%3Crect x='16' y='4' width='5' height='13' rx='1'/%3E%3C/svg%3E")}
+.dds-ph-ic[data-ic="projects"]{--ph-ic:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z'/%3E%3C/svg%3E")}
+.dds-ph-ic[data-ic="project"]{--ph-ic:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z'/%3E%3C/svg%3E")}
+.dds-ph-ic[data-ic="files"]{--ph-ic:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 3h8l5 5v13H6z'/%3E%3Cpath d='M14 3v5h5'/%3E%3C/svg%3E")}
+.dds-ph-ic[data-ic="analytics"]{--ph-ic:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 19V5'/%3E%3Cpath d='M4 19h16'/%3E%3Cpath d='M8 15l4-5 3 3 5-6'/%3E%3C/svg%3E")}
+.dds-ph-ic[data-ic="website"]{--ph-ic:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='9'/%3E%3Cpath d='M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18'/%3E%3C/svg%3E")}
+.dds-ph-ic[data-ic="settings"]{--ph-ic:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='3'/%3E%3Cpath d='M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z'/%3E%3C/svg%3E")}
+.dds-ph-ic[data-ic="connections"]{--ph-ic:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='6' cy='12' r='2.5'/%3E%3Ccircle cx='18' cy='6' r='2.5'/%3E%3Ccircle cx='18' cy='18' r='2.5'/%3E%3Cpath d='M8.3 10.8l7.4-3.6M8.3 13.2l7.4 3.6'/%3E%3C/svg%3E")}
+.dds-ph-ic[data-ic="help"]{--ph-ic:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='9'/%3E%3Cpath d='M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.7.3-1 .8-1 1.5'/%3E%3Cpath d='M12 17h.01'/%3E%3C/svg%3E")}
+.dds-ph-ic[data-ic="todos"]{--ph-ic:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5 12l4 4 10-10'/%3E%3C/svg%3E")}
+.dds-ph-ic[data-ic="invoices"]{--ph-ic:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 3h12v18l-3-2-3 2-3-2-3 2z'/%3E%3Cpath d='M9 8h6M9 12h6'/%3E%3C/svg%3E")}
+.dds-ph-ic[data-ic="spark"]{--ph-ic:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 3.5l1.9 5.6 5.6 1.9-5.6 1.9L12 18.5l-1.9-5.6L4.5 11l5.6-1.9z'/%3E%3Cpath d='M19 3v3.5M17.25 4.75h3.5'/%3E%3C/svg%3E")}
+.dds-ph-ic[data-ic="get_started"]{--ph-ic:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 3l8 4v5c0 5-3.5 8-8 9-4.5-1-8-4-8-9V7z'/%3E%3Cpath d='M9 12l2 2 4-4'/%3E%3C/svg%3E")}
+.dds-ph-ic[data-ic="sites"]{--ph-ic:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='3' y='4' width='18' height='14' rx='2'/%3E%3Cpath d='M3 9h18M8 21h8'/%3E%3C/svg%3E")}
+.dds-ph-ic[data-ic="templates"]{--ph-ic:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='3' y='3' width='18' height='18' rx='2'/%3E%3Cpath d='M3 9h18M9 9v12'/%3E%3C/svg%3E")}
+.dds-ph-ic[data-ic="health"]{--ph-ic:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3 12h4l2-5 4 10 2-5h6'/%3E%3C/svg%3E")}
+.dds-ph-ic[data-ic="update"]{--ph-ic:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3 11v2a1 1 0 0 0 1 1h3l6 4V6L7 10H4a1 1 0 0 0-1 1z'/%3E%3Cpath d='M17 9a4 4 0 0 1 0 6'/%3E%3C/svg%3E")}
+.dds-ph-ic[data-ic="developer"]{--ph-ic:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M8 9l-4 3 4 3'/%3E%3Cpath d='M16 9l4 3-4 3'/%3E%3Cpath d='M14 5l-4 14'/%3E%3C/svg%3E")}
+.dds-ph-ic[data-ic="sharing"]{--ph-ic:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='8' cy='8' r='3'/%3E%3Ccircle cx='16' cy='8' r='3'/%3E%3Cpath d='M2 20a6 6 0 0 1 12 0'/%3E%3Cpath d='M10 20a6 6 0 0 1 12 0'/%3E%3C/svg%3E")}
+.dds-ph-ic[data-ic="deleted"]{--ph-ic:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3 12a9 9 0 1 0 3-6.7'/%3E%3Cpath d='M3 4v5h5'/%3E%3C/svg%3E")}
+.dds-ph-ic[data-ic="week"]{--ph-ic:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='3' y='4' width='18' height='17' rx='2'/%3E%3Cpath d='M3 9h18M8 2v4M16 2v4'/%3E%3C/svg%3E")}
+.dds-ph-ic[data-ic="prospects"]{--ph-ic:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='8'/%3E%3Ccircle cx='12' cy='12' r='3.5'/%3E%3Cpath d='M12 2v3M12 19v3M2 12h3M19 12h3'/%3E%3C/svg%3E")}
