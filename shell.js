@@ -2380,6 +2380,9 @@
     } catch (_) { /* a11y enhancement is best-effort */ }
   }
   function minimalShell() {
+    // Builder item 192: nobody is signed in. Leave this page's address for the studio's
+    // sign-in page, which takes the person back here once they're in (studio.html).
+    if (!TOKEN) try { localStorage.setItem('dds-studio-return', JSON.stringify({ path: location.pathname + location.search + location.hash, at: Date.now() })); } catch (_) {}
     root.innerHTML = '<a class="dds-brand" href="/"><span class="mark">S</span>Studio OS</a><div style="flex:1"></div><a class="dds-ic" href="/help.html" aria-label="Help">?</a><a class="dds-ic" href="/studio.html" aria-label="Sign in">◐</a>';
   }
 
