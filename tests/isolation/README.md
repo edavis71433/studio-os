@@ -2,7 +2,7 @@
 
 The suites that prove one studio can't read or change another's data. They need a
 real database: real sign-ins, the real row rules and the real servers. Builder item
-212 (Nov 2026) made them run before every release, on a scratch database made for
+212 (Nov 2026) made them run with every release, on a scratch database made for
 the run and thrown away after it.
 
 ## How they run
@@ -30,10 +30,12 @@ on that runner.
 
 ## When they run
 
-- Before every production deploy: `deploy.yml` calls `isolation.yml` beside the
-  pull request checks and the browser gate, and nothing deploys unless it passed. It
-  takes about ten minutes and runs while the browser gate waits, so a deploy takes no
-  longer.
+- With every production deploy: `deploy.yml` calls `isolation.yml` beside the pull
+  request checks and the browser gate, and its result, the date and the commit go in
+  the run's summary. It takes a few minutes. For now it reports and doesn't hold up
+  the deploy: it joins `deploy-production`'s `needs` once it has passed on several
+  deploys in a row, the last step of item 212. A deploy run that shows it red needs
+  a look before the next one.
 - On a pull request that changes the workflow, the script or this folder.
 - By hand: Actions, "Walls between studios (scratch database)", Run workflow.
 

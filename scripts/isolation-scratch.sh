@@ -3,7 +3,7 @@
 # The suites that prove one studio can't read another's data need a real database:
 # real sign-ins, the real row rules and the real servers. They last ran on Jul 5 2026,
 # on a staging project that no longer exists. This script builds a throwaway one on
-# the machine it runs on and runs them there, so every release can run them first
+# the machine it runs on and runs them there, with every release
 # (.github/workflows/isolation.yml, called by deploy.yml).
 #
 # What it does, in order:
@@ -32,7 +32,11 @@ LOG="$WORK/functions.log"
 supabase() { (cd "$WORK" && npx --yes "supabase@$CLI_VERSION" "$@"); }
 
 say() { printf '\n── %s ──\n' "$*"; }
-fail() { printf '::error title=Walls between studios::%s\n' "$*"; exit 1; }
+fail() {
+  printf '::error title=Walls between studios::%s\n' "$*"
+  [ -n "${GITHUB_STEP_SUMMARY:-}" ] && echo "Walls between studios: not checked on $(date -u '+%Y-%m-%d at %H:%M UTC'), commit $(git -C "$REPO" rev-parse --short HEAD 2>/dev/null || echo unknown). $*" >> "$GITHUB_STEP_SUMMARY"
+  exit 1
+}
 
 # ── 1. A scratch database with production's migrations ──────────────────────────
 say "Setting up a scratch project in $WORK"
