@@ -5,11 +5,14 @@
 // question, reviews, website health, what people read and what changed. A part that
 // couldn't be read is left out, never shown as zero. Pure: same data, same bytes.
 import { PdfDoc, rgb, wrapText, type PdfFont, type Rgb } from './pdf.ts';
-import type { ReportData } from '../ops/monthly_report.ts';
+import type { ReportData, ReportMaps } from '../ops/monthly_report.ts';
 import type { ReportPart } from './report_choices.ts';
 
 const INK: Rgb = [0.09, 0.082, 0.133], SOFT: Rgb = [0.333, 0.322, 0.416], LINE: Rgb = [0.906, 0.902, 0.937];
 const GOOD: Rgb = [0.067, 0.455, 0.29], BAD: Rgb = [0.749, 0.208, 0.208], PANEL: Rgb = [0.965, 0.961, 0.98];
+// builder list item 185: the map rank grid's bands, on a dark square as on the Search tab
+const NIGHT: Rgb = [0.09, 0.082, 0.133];
+const BAND: Record<string, Rgb> = { top3: GOOD, top10: [0.949, 0.71, 0.267], top20: [0.925, 0.478, 0.247], out: BAD, gap: [0.29, 0.278, 0.388] };
 const L = 54, R = 558, W = R - L, TOP = 742, BOTTOM = 64;
 const n1 = (n: number) => n.toLocaleString('en-US');
 
@@ -20,6 +23,15 @@ export function changeOn(now: number | null, before: number | null, priorLabel: 
   const pct = Math.round(((now - before) / before) * 100);
   return pct === 0 ? `the same as ${priorLabel}` : `${pct > 0 ? 'up' : 'down'} ${Math.abs(pct)}% on ${priorLabel}`;
 }
+
+// ── builder list item 185: the map rank grid's words, shared by the email and this copy ──
+export const mapBand = (v: number | null) => (v == null ? 'gap' : v === 0 ? 'out' : v <= 3 ? 'top3' : v <= 10 ? 'top10' : 'top20');
+/** The words both copies use. Pure. */
+export function mapsSentence(m: ReportMaps): string {
+  const change = m.priorTop3 === null ? '' : m.top3 === m.priorTop3 ? ', the same as the month before' : `, ${Math.abs(m.top3 - m.priorTop3)} ${m.top3 > m.priorTop3 ? 'more' : 'fewer'} than the month before`;
+  return `For “${m.phrase}”, you came up in Google Maps’ top 3 at ${m.top3} of ${m.total} spots around your business${change}.`;
+}
+export const mapsFootnote = (m: ReportMaps) => `Each square is a spot around your business, ${m.spacing === 0.5 ? 'half a mile' : `${m.spacing} mile${m.spacing === 1 ? '' : 's'}`} apart. Checked by your studio on ${new Date(m.checkedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' })}.`;
 
 /** The file name a client keeps: "Maple-and-Main-Realty-October-2026.pdf". Pure. */
 export const reportFileName = (name: string, monthLabel: string) => `${String(name || 'Website').replace(/&/g, 'and').replace(/[^A-Za-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'Website'}-${monthLabel.replace(/\s+/g, '-')}.pdf`;
@@ -68,6 +80,17 @@ export function reportPdf(d: ReportData, o: { studioName: string; accent?: strin
       const move = f.position !== null && f.priorPosition !== null ? Math.round(f.priorPosition) - Math.round(f.position) : null;
       para(`“${f.term}”: ${place}${move ? `, ${move > 0 ? 'up' : 'down'} ${Math.abs(move)} place${Math.abs(move) === 1 ? '' : 's'}` : ''}${f.clicks ? ` · ${n1(f.clicks)} click${f.clicks === 1 ? '' : 's'}` : ''}`, 10, 'R', INK, 8);
     }
+  }
+  if (d.maps && on('maps')) {   // builder list item 185: the grid as squares, then the words
+    const m = d.maps, cell = 9, gap = 2, side = m.size * (cell + gap) + gap;
+    head('On Google Maps');
+    need(side + 12);
+    pdf.rect(L, y - side, side, side, NIGHT);
+    m.ranks.forEach((v, i) => pdf.rect(L + gap + (i % m.size) * (cell + gap), y - gap - (Math.floor(i / m.size) + 1) * (cell + gap) + gap, cell, cell, BAND[mapBand(v)]));
+    y -= side + 10;
+    para(mapsSentence(m));
+    for (const o of m.others) para(`“${o.phrase}”: top 3 at ${o.top3} of ${o.total} spots`, 10, 'R', INK, 8);
+    para(`${mapsFootnote(m)} Green is the top 3, yellow 4 to 10, orange 11 to 20, red not in the top 20.`, 8.5, 'R', SOFT);
   }
   if (d.ai && on('ai')) {
     head('In AI answers');

@@ -1174,7 +1174,7 @@ async function retryReport(e) {
   await loadReport();
   if (b && b.isConnected) { b.disabled = false; toast('Still couldn’t load — try again in a moment.', true); }
 }
-const REPORT_PARTS = [['visits', 'Visits'], ['enquiries', 'Enquiries'], ['google', 'On Google'], ['ai', 'AI answers'], ['reviews', 'Reviews'], ['health', 'Website health'], ['pages', 'Most read pages'], ['changes', 'What changed']];
+const REPORT_PARTS = [['visits', 'Visits'], ['enquiries', 'Enquiries'], ['google', 'On Google'], ['maps', 'On Google Maps'], ['ai', 'AI answers'], ['reviews', 'Reviews'], ['health', 'Website health'], ['pages', 'Most read pages'], ['changes', 'What changed']];
 const REPORT_BLOCK_WORDS = { no_email: 'there’s no email on their record', unsubscribed: 'they unsubscribed from emails', bounced: 'emails to them bounce', quiet: 'a quiet month, under your number of visits' };
 const CC_BLOCK_WORDS = { unsubscribed: 'unsubscribed', bounced: 'emails bounce' };
 const SUGGEST_FROM = { idea: 'From their Do next list: a Growth Coach idea', ai: 'From their Do next list: an AI answer that misses them', search: 'From their Do next list: a Search to-do', health: 'From their Do next list: a website fix', reviews: 'From their Do next list: Google reviews waiting', own: 'Your own words' };
@@ -1238,12 +1238,14 @@ async function changeCc(next, said) {
   }
 }
 // ── item 160: what it says ──
+// a part that can't show yet: AI answers until the check is on (item 184), the map grid until it is on (item 185)
+const partWaits = (d, k) => (k === 'ai' && !d.ai_checks) || (k === 'maps' && !d.maps_on);
 function paintParts(d) {
   const off = new Set(d.parts_off || []);
   const words = Array.isArray(d.parts) && d.parts.length ? d.parts.map((p) => [p.key, p.words]) : REPORT_PARTS;
   $('reportIn').innerHTML = words.map(([k, w]) => {
-    const aiOff = k === 'ai' && !d.ai_checks;   // item 184: AI answers only with the check on
-    return `<button type="button" class="rpart${aiOff ? ' off' : ''}" data-part="${esc(k)}" aria-pressed="${!aiOff && !off.has(k) ? 'true' : 'false'}">${esc(w)}${aiOff ? ', off' : ''}</button>`;
+    const waits = partWaits(d, k);
+    return `<button type="button" class="rpart${waits ? ' off' : ''}" data-part="${esc(k)}" aria-pressed="${!waits && !off.has(k) ? 'true' : 'false'}">${esc(w)}${waits ? ', off' : ''}</button>`;
   }).join('');
   $('reportIn').querySelectorAll('[data-part]').forEach((b) => b.addEventListener('click', () => togglePart(b.getAttribute('data-part'))));
 }
@@ -1251,10 +1253,11 @@ async function togglePart(k) {
   if (REPORT_BUSY || !REPORT_READ) return;
   const d = REPORT || {};
   if (k === 'ai' && !d.ai_checks) { toast('Switch on “Check AI answers every month” below to put AI answers in the report.'); return; }
+  if (k === 'maps' && !d.maps_on) { toast('Switch the map rank grid on from this client’s Search tab to put it in the report.'); return; }
   const off = new Set(d.parts_off || []);
   const words = (Array.isArray(d.parts) && d.parts.length ? d.parts.map((p) => p.key) : REPORT_PARTS.map((p) => p[0]));
   if (off.has(k)) off.delete(k); else off.add(k);
-  if (words.every((w) => off.has(w))) { toast('Leave at least one part in the report.', true); return; }
+  if (words.filter((w) => !partWaits(d, w)).every((w) => off.has(w))) { toast('Leave at least one part in the report.', true); return; }
   const name = (REPORT_PARTS.find((p) => p[0] === k) || [k, k])[1];
   REPORT = { ...d, parts_off: words.filter((w) => off.has(w)) }; paintParts(REPORT);
   if (await saveReport({ parts_off: REPORT.parts_off })) toast(off.has(k) ? name + ' is left out of the report.' : name + ' is back in the report.');

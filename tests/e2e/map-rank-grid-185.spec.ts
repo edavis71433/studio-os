@@ -1,5 +1,5 @@
 import { test, expect, type Page, type Route } from '@playwright/test';
-import { installApp } from './helpers/app';
+import { installApp, STUDIO_NAV, ALL_FEATURES } from './helpers/app';
 
 // Builder list item 185 (Nov 2026): the map rank grid on the Search tab. For a client and a
 // search a customer would type, where the business comes up on Google Maps from a grid of spots
@@ -271,5 +271,60 @@ test.describe('The map rank grid (builder list item 185)', () => {
       const side = await card.locator('.rg-side').boundingBox();
       expect(side!.y).toBeGreaterThan(map!.y + map!.height - 1);   // on a phone the numbers sit under the map
     }
+  });
+});
+
+// ── follow-up (approved Nov 12): the grid in the monthly report. Settings › Monthly report gets an
+// "On Google Maps" part, which waits (", off") until the grid is switched on, like AI answers.
+const RCLIENT = 'aaaaaaaa-1111-4111-8111-aaaaaaaaaaaa';
+const RCTX = { data: { site_role: 'business_owner', edition: 'presence', edition_key: 'studio_os', edition_name: 'Studio OS', edition_features: ALL_FEATURES, is_agency: true, is_operator: false, sees_full_workspace: true, capabilities: ['edit', 'publish', 'invite', 'configure', 'use_developer_mode', 'view_all'], landing: '/today.html', attention_count: 0, nav: STUDIO_NAV, scope: { site_id: RCLIENT, name: 'Copperline Plumbing' } } };
+const RSTATE = {
+  enabled: true, note: '', last_month: null, last_result: null, tries: null, blocked: null, updated_by: null, updated_at: null, note_max: 600, next_month: '2026-11',
+  pdf: true, ai_checks: false, ai_month: null, ai_result: null, ai_tries: null, ai_questions: 7, ai_cost: 'About 42 cents a month for 7 questions',
+  parts_off: [], cc: [], copy_to: null, quiet_min: null, propose: { mode: 'off', text: '', pick: null, log: [] },
+  to: 'sam@copperline.example', client_name: 'Sam Ortiz', me: 'eric@studio.example', cc_max: 4, cc_blocked: {}, quiet_default: 30, propose_max: 400,
+  propose_next: null, propose_options: [],
+};
+async function openReportCard(page: Page, mapsOn: boolean) {
+  const puts: Array<Record<string, unknown>> = [];
+  let state: Record<string, unknown> = { ...RSTATE, maps_on: mapsOn };
+  await installApp(page, { api: { '/identity': { data: { site_id: 's1', business_name: 'Studio', email: 'hello@example.com' } }, '/settings': { data: { industry_key: 'generic' } }, '/portal/context': RCTX } as never });
+  await page.route(/\/functions\/v1\/presence\/report\/monthly$/, async (route: Route) => {
+    if (route.request().method() === 'PUT') { const b = route.request().postDataJSON() as Record<string, unknown>; puts.push(b); state = { ...state, ...b }; }
+    return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: state }) });
+  });
+  await page.goto(`/settings.html?client=${RCLIENT}#report`);
+  await expect(page.locator('#report')).toBeVisible();
+  return puts;
+}
+
+test.describe('The map rank grid in the monthly report (builder list item 185)', () => {
+  test('On Google Maps waits for the grid, says how to switch it on, and the last part that can show stays', async ({ page }) => {
+    const puts = await openReportCard(page, false);
+    const sec = page.locator('#report');
+    const maps = sec.locator('#reportIn button').nth(3);
+    await expect(maps).toHaveText('On Google Maps, off');
+    await expect(maps).toHaveClass(/off/);
+    await expect(maps).toHaveAttribute('aria-pressed', 'false');
+    await maps.click();
+    await expect(page.locator('.dds-toast').last()).toContainText('Switch the map rank grid on from this client’s Search tab');
+    expect(puts).toEqual([]);
+    // with the grid and the AI check both off, the last of the other seven can't go
+    for (const p of ['Visits', 'Enquiries', 'On Google', 'Reviews', 'Website health', 'Most read pages']) { await sec.getByRole('button', { name: p, exact: true }).click(); await expect(sec.getByRole('button', { name: p, exact: true })).toHaveAttribute('aria-pressed', 'false'); }
+    const before = puts.length;
+    await sec.getByRole('button', { name: 'What changed', exact: true }).click();
+    await expect(page.locator('.dds-toast').last()).toContainText('Leave at least one part in the report.');
+    expect(puts.length).toBe(before);
+  });
+
+  test('once the grid is on, On Google Maps is a part like the others', async ({ page }) => {
+    const puts = await openReportCard(page, true);
+    const maps = page.locator('#report #reportIn button').nth(3);
+    await expect(maps).toHaveText('On Google Maps');
+    await expect(maps).toHaveAttribute('aria-pressed', 'true');
+    await maps.click();
+    await expect(maps).toHaveAttribute('aria-pressed', 'false');
+    await expect.poll(() => puts[0]).toEqual({ parts_off: ['maps'] });
+    await expect(page.locator('.dds-toast').last()).toContainText('On Google Maps is left out of the report.');
   });
 });
