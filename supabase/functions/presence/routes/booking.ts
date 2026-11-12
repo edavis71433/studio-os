@@ -35,6 +35,7 @@ import { svc } from '../lib/db.ts';
 import { rateAllow, clientIp, tooMany } from '../lib/ratelimit.ts';
 import { raiseNotice } from '../lib/notice.ts';
 import { sendEmail } from '../commerce/account.ts';
+import { autoReplyVerdict } from '../lib/auto_reply.ts';   // item 203
 import { loadEmailBrand } from '../lib/email_brand.ts';
 import { ownerReplyTo } from '../lib/service_bridge.ts';
 import { siteOrigin, SITE_COLS, type SiteRow } from '../lib/site.ts';
@@ -356,11 +357,15 @@ export async function handleBookingCreate(req: Request, siteId: string, cors: Re
 
   // Fan-out (all best-effort, non-blocking): customer confirmation email + owner
   // notice (bell + push) + owner email. Reuse the ONE of each — no new systems.
-  notifyCustomer(siteId, appt, status).catch(() => {});
+  // Item 203: the confirmation is a site's automatic reply, so one a day to an address and
+  // none to the do-not-send list; the page shows the booking's links either way. It is the
+  // customer's own appointment, so it still goes when the day's count can't be read.
+  const mailed = !!appt.customer_email && await autoReplyVerdict(siteId, String(appt.customer_email), { failOpen: true }) === 'send';
+  if (mailed) notifyCustomer(siteId, appt, status).catch(() => {});
   notifyOwnerOfBooking(siteId, appt, status).catch(() => {});
 
   const when = humanSlot(v.booking.slot_start) || v.booking.slot_start;
-  return calmOk(bookedMessage(status, type.name, v.booking.slot_start), { status, when, service: type.name, links: await linksForPage(appt) });
+  return calmOk(bookedMessage(status, type.name, v.booking.slot_start, mailed), { status, when, service: type.name, links: await linksForPage(appt) });
 }
 
 /** Item 149: the widget's "you're booked" shows the calendar links and the private
@@ -377,10 +382,10 @@ async function linksForPage(appt: any, madeNow = true): Promise<BookingLinks | u
   } catch { return undefined; }
 }
 
-function bookedMessage(status: string, service: string, slotLocal: string): string {
+function bookedMessage(status: string, service: string, slotLocal: string, mailed = true): string {
   const when = humanSlot(slotLocal) || slotLocal;
   return status === 'confirmed'
-    ? `You’re booked for ${service} — ${when}. A confirmation is on its way.`
+    ? `You’re booked for ${service} — ${when}.${mailed ? ' A confirmation is on its way.' : ''}`
     : `Thanks — your ${service} request for ${when} was received. You’ll get a note once it’s confirmed.`;
 }
 

@@ -3,7 +3,7 @@ import { installApp, STUDIO_NAV, ALL_FEATURES } from './helpers/app';
 import { senderTag, signupForm, SIGNUP_CONSENT, TICKET_SETTLE_MS } from '../../supabase/functions/presence/lib/site_send';
 
 // Builder list item 146: the Newsletter section's "Join our list" box. On a client's page
-// it sends in the page like any form (with its time ticket) and says "You're on the list"
+// it sends in the page like any form (with its time ticket) and says to check their email (item 203)
 // where it was; in the editor, a box collects into the site's own list unless the owner
 // picks "Send people to another sign-up page".
 const SITE = 'https://shop.example';
@@ -23,14 +23,14 @@ async function openBox(page: Page) {
 }
 
 test.describe('the “Join our list” box on a client’s page', () => {
-  test('an email and a yes: “You’re on the list” where the box was, without leaving the page', async ({ page }) => {
+  test('an email and a yes: “check your email” where the box was, without leaving the page (item 203)', async ({ page }) => {
     let sent = '';
-    await page.route(EP, (route) => { sent = route.request().postData() || ''; return answer(route, 200, { data: { ok: true, message: 'You’re on the list. Thank you!' } }); });
+    await page.route(EP, (route) => { sent = route.request().postData() || ''; return answer(route, 200, { data: { ok: true, message: 'Almost there: check your email and press “Yes, add me”.' } }); });
     await openBox(page);
     await page.getByLabel('Your email').fill('sam@customer.example');
     await page.getByLabel(SIGNUP_CONSENT).check();
     await page.getByRole('button', { name: 'Sign up' }).click();
-    await expect(page.getByRole('status').filter({ hasText: 'You’re on the list. Thank you!' })).toBeVisible({ timeout: TICKET_SETTLE_MS + 7000 });
+    await expect(page.getByRole('status').filter({ hasText: 'Almost there: check your email and press “Yes, add me”.' })).toBeVisible({ timeout: TICKET_SETTLE_MS + 7000 });
     await expect(page.locator('form.nl-form')).toBeHidden();
     expect(page.url()).toBe(`${SITE}/`);
     for (const [k, v] of [['form_kind', 'signup'], ['email', 'sam@customer.example'], ['consent', 'yes'], ['source_page', '/']]) expect(sent).toMatch(new RegExp(`name="${k}"\\r\\n\\r\\n${v.replace(/\./g, '\\.')}\\r\\n`));
