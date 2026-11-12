@@ -7,6 +7,7 @@ import { json } from '../../_shared/http.ts';
 import { svc, svcCount } from '../lib/db.ts';
 import { readReservedJsonOrThrow, writeReservedJson, RESERVED_NAMES } from '../lib/reserved_store.ts';
 import { setupSteps, setupShows, setupHidden } from '../lib/setup_strip.ts';
+import { normalizeGoalAi } from '../lib/sales_ai.ts';
 import type { SiteRow } from '../lib/site.ts';
 import type { Principal } from '../../_shared/auth.ts';
 
@@ -22,7 +23,7 @@ export async function handleSetupStrip(req: Request, site: SiteRow, principal: P
     return ok ? json({ data: { hidden: b.hidden } }, 200, cors) : json({ error: 'write_failed', message: 'That didn’t save just now. Try again.' }, 502, cors);
   }
   const S = site.id;
-  const [ident, loc, settings, services, contacts, deals, stored] = await Promise.all([
+  const [ident, loc, settings, services, contacts, deals, stored, goal] = await Promise.all([
     first(`presence_identity?site_id=eq.${S}&select=business_name&limit=1`),
     first(`presence_locations?site_id=eq.${S}&select=address_line1,city&limit=1`),
     first(`presence_settings?site_id=eq.${S}&select=brand_kit,logo_media_id&limit=1`),
@@ -30,6 +31,7 @@ export async function handleSetupStrip(req: Request, site: SiteRow, principal: P
     svcCount(`presence_contacts?site_id=eq.${S}&deleted_at=is.null`),
     svcCount(`presence_deals?site_id=eq.${S}&deleted_at=is.null`),
     readReservedJsonOrThrow(S, RESERVED_NAMES.setupStrip).then((v) => ({ v }), () => null),
+    readReservedJsonOrThrow(S, RESERVED_NAMES.salesGoalAi).then((v) => ({ v }), () => null),   // sales item 94: the month's goal
   ]);
   const steps = setupSteps({
     business: ident && loc ? !!String(ident.row?.business_name || '').trim() && !!String(loc.row?.address_line1 || loc.row?.city || '').trim() : null,
@@ -37,6 +39,7 @@ export async function handleSetupStrip(req: Request, site: SiteRow, principal: P
     services: services ? Array.isArray(services.row?.line_items) && services.row.line_items.length > 0 : null,
     contact: contacts === null ? null : contacts > 0,
     deal: deals === null ? null : deals > 0,
+    goal: goal ? normalizeGoalAi(goal.v).goal_cents !== null : null,
   });
   // a hide that can't be read is never a strip popping back: it stays away this time
   const hidden = stored ? setupHidden(stored.v) : true;

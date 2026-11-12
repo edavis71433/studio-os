@@ -23,7 +23,8 @@ import { moneyState, moneyBuckets } from '../lib/money_state.ts';
 import { buildMyTasks, MY_TASKS_MAX } from '../lib/my_tasks.ts';
 import { revenueByMonth, dealsByStage, wonAndLost, enquiriesBySource, overdueInvoices, OPEN_STAGES as REPORT_OPEN_STAGES } from '../lib/sales_reports.ts';
 import { normalizeViews, normalizeViewList, isViewList } from '../lib/saved_views.ts';
-import { readReservedJsonOrThrow, writeReservedJson, updateReservedJson, RESERVED_NAMES } from '../lib/reserved_store.ts';
+import { readReservedJsonOrThrow, readReservedJson, writeReservedJson, updateReservedJson, RESERVED_NAMES } from '../lib/reserved_store.ts';
+import { normalizeGoalAi, goalProgress } from '../lib/sales_ai.ts';
 import { normalizeStageNames, stageLabels, loadStageLabels, forgetStageLabels, renameMovedTo, DEFAULT_STAGE_LABEL, normalizeStageChances, stageChances, loadStageChances, forgetStageChances, expectedValue, DEFAULT_STAGE_CHANCE } from '../lib/stage_names.ts';
 import { validateRetainerInput, mergeRetainerState, retainerSubscriptionIds, type RetainerState } from '../commerce/retainers.ts';
 import { leftToBill, reuseDecision, retainerPaid, retainerPayments, linesFromProposal } from '../lib/invoice_billing.ts';   // sales items 107, 108, 81, 120
@@ -830,6 +831,7 @@ export async function handleSalesSummary(req: Request, site: SiteRow, principal:
   if (req.method !== 'GET') return json({ error: 'method_not_allowed' }, 405, cors);
   const namesP = loadStageLabels(site.id).catch(() => null);   // item 38 names; batch B: read with the others, not after
   const chancesP = loadStageChances(site.id);   // item 69: each open stage's chance (defaults when unreadable)
+  const goalP = readReservedJson(site.id, RESERVED_NAMES.salesGoalAi);   // sales item 94: the month's goal (none when unreadable: the card stays away)
   // A solo studio's whole pipeline is small; scan a generous cap. `truncated`
   // tells the truth if we ever hit it — the totals are then a floor, never a
   // fabricated whole-set sum.
@@ -861,7 +863,9 @@ export async function handleSalesSummary(req: Request, site: SiteRow, principal:
   const chances = await chancesP;
   const ex = expectedValue(deals, chances);
   sum.by_stage = sum.by_stage.map((s) => ({ ...s, chance: chances[s.stage] ?? null, expected_cents: ex.by_stage[s.stage] ?? 0 }));
-  return json({ data: { ...sum, ar, expected: { value_cents: ex.value_cents } }, truncated: deals.length >= CAP }, 200, cors);
+  // sales item 94: the month's goal against won this month and what open deals should still bring
+  const goal = goalProgress(normalizeGoalAi(await goalP).goal_cents, sum.won_month.value_cents, ex.value_cents);
+  return json({ data: { ...sum, ar, expected: { value_cents: ex.value_cents }, goal }, truncated: deals.length >= CAP }, 200, cors);
 }
 
 // ═══ RECEIVABLES — the "who owes me money" list behind the AR strip ═══

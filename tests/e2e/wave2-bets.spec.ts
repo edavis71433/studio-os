@@ -5,7 +5,7 @@ import { installApp } from './helpers/app';
 // Wave 2 — the benchmark's bigger bets (docs/design/BENCHMARK-2026-10.md §7):
 //   10  keyboard beyond ⌘K      `/` search · `?` shortcuts · `n` New
 //    8  the bell grows up       All · Needs you · Updates, Mark read vs Clear, priority rows
-//    7  AI shows its sources    chips under a concierge answer; Draft a reply in the Inbox
+//    7  AI shows its sources    chips under a concierge answer; Draft a reply in the Inbox (AI help since sales item 94)
 //   12  sample data on a trial  Today's example-data card and its two-step Remove
 // Hermetic like every other spec: the harness fixtures stand in for the API.
 
@@ -31,7 +31,6 @@ const INBOX_API = {
   '/forms/inbox': { data: { submissions: [{ id: 'l-9', form_kind: 'quote', name: 'Sam Rivera', email: 'sam@example.com', phone: '', message: 'Can I get a quote for a patio?', source_page: '/contact/', status: 'new', created_at: '2026-07-13T00:00:00Z' }], unread: 1 } },
   '/notifications': { data: [], unread_count: 0 },
   '/crm/activity': { data: { upcoming: [], items: [{ id: 'i1', kind: 'message', type: 'message', title: 'The client sent a message', body: 'Hello — how is it going?', at: '2026-07-15T00:00:00Z', meta: null, href: null }], reply_to: '/projects/aaaaaaaa-2222-4222-8222-aaaaaaaaaaaa/messages', reply_support_to: null } },
-  '/writer/rewrite': { data: { text: 'Hi Marlow’s Kitchen — it’s going well. The homepage draft is ready for you to look at this week.' } },
 };
 
 test.describe('Wave 2 bets', () => {
@@ -186,11 +185,13 @@ test.describe('Wave 2 bets', () => {
     await expect(box.locator('.lowc')).toHaveCount(0);
   });
 
-  test('7: Draft a reply calls /writer/rewrite, lands in the textarea for editing, never sends', async ({ page }) => {
+  // Sales item 94 (Nov 2026) moved Draft a reply onto AI help (/sales/ai/draft): it reads the whole
+  // conversation, is off until the studio's owner switches it on, and still never sends.
+  test('7: Draft a reply asks AI help, lands in the textarea for editing, never sends', async ({ page }) => {
     const asks: Array<Record<string, unknown>> = [];
     const sends: string[] = [];
     await installApp(page, { api: INBOX_API });
-    await page.route('**/functions/v1/presence/writer/rewrite', (route) => { asks.push(route.request().postDataJSON()); return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(INBOX_API['/writer/rewrite']) }); });
+    await page.route('**/functions/v1/presence/sales/ai/draft', (route) => { asks.push(route.request().postDataJSON()); return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: { text: 'Hi Marlow’s Kitchen — it’s going well. The homepage draft is ready for you to look at this week.', from: 'Marlow’s messages' } }) }); });
     await page.route('**/functions/v1/presence/projects/**', (route) => { sends.push(route.request().method()); return route.fulfill({ status: 200, contentType: 'application/json', body: '{"data":{"ok":true}}' }); });
     await page.goto('/inbox.html');
     await page.locator('#rows [role=option]').filter({ hasText: 'Marlow’s Kitchen' }).first().click();
@@ -198,14 +199,12 @@ test.describe('Wave 2 bets', () => {
     await expect(pane.locator('#msgBody')).toBeVisible();
     await pane.getByRole('button', { name: 'Draft a reply' }).click();
     await expect(pane.locator('#msgBody')).toHaveValue(/homepage draft is ready/);
-    await expect(pane.locator('.ai-note')).toHaveText('Drafted by AI — edit before sending.');
+    await expect(pane.locator('.ai-band')).toContainText('Drafted by AI from Marlow’s messages. Read it and change anything. Nothing is sent until you press Send.');
     await expect.poll(() => asks.length).toBe(1);
-    expect(asks[0].action).toBe('write');
-    expect(String(asks[0].prompt)).toContain('how is it going');
+    expect(asks[0]).toMatchObject({ kind: 'record', client_id: 'c-1', project: 'aaaaaaaa-2222-4222-8222-aaaaaaaaaaaa' });
     expect(sends).toEqual([]);                                   // nothing was sent
-    await pane.locator('#msgBody').press('End');
-    await pane.locator('#msgBody').type(' Thanks!');
-    await expect(pane.locator('.ai-note')).toHaveCount(0);       // the note leaves on the first edit
+    await pane.getByRole('button', { name: 'Undo draft' }).click();
+    await expect(pane.locator('#msgBody')).toHaveValue('');      // Undo puts the box back as it was
     await expect(pane.getByRole('button', { name: 'Send' })).toBeVisible();   // Send is still the operator's click
     // the enquiry and support composers carry the same button. Under 1024px the
     // panes stack and the open conversation hides the list (inbox.html's D5:
@@ -218,17 +217,16 @@ test.describe('Wave 2 bets', () => {
     await expect(pane.getByRole('button', { name: 'Draft a reply' })).toBeVisible();
   });
 
-  test('7: a plan without drafting gets the server’s sentence, and the textarea is untouched', async ({ page }) => {
+  test('7: AI help that is off says so in the server’s words, and the textarea is untouched', async ({ page }) => {
     await installApp(page, { api: INBOX_API });
-    await page.route('**/functions/v1/presence/writer/rewrite', (route) => route.fulfill({ status: 403, contentType: 'application/json', body: JSON.stringify({ error: 'plan_upgrade_required', message: 'Your current plan doesn’t include this — upgrading adds it.' }) }));
+    await page.route('**/functions/v1/presence/sales/ai/draft', (route) => route.fulfill({ status: 409, contentType: 'application/json', body: JSON.stringify({ error: 'ai_off', can_switch: false, message: 'AI help is off. Ask the studio’s owner to switch it on.' }) }));
     await page.goto('/inbox.html');
     await page.locator('#rows [role=option]').filter({ hasText: 'Marlow’s Kitchen' }).first().click();
     const pane = page.locator('#rpane');
     await pane.locator('#msgBody').fill('Hi —');
     await pane.getByRole('button', { name: 'Draft a reply' }).click();
-    await expect(page.locator('.dds-toast')).toContainText('upgrading adds it');
+    await expect(pane.locator('.ai-band')).toHaveText('AI help is off. Ask the studio’s owner to switch it on.');
     await expect(pane.locator('#msgBody')).toHaveValue('Hi —');
-    await expect(pane.locator('.ai-note')).toHaveCount(0);
   });
 
   // ── 12 · sample data on a new trial ──

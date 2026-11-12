@@ -36,6 +36,7 @@ export const RESERVED_NAMES = {
   todoLists: '__todo_lists__',            // sales item 106: the studio's saved lists of deal to-dos (lib/todo_templates.ts)
   handoverPack: '__handover_pack__',     // sales item 93: when the hand-over pack email last went to the client, so a second press isn't a second email (routes/handover_pack.ts)
   setupStrip: '__setup_strip__',          // sales item 105: whether the studio hid Home's setup strip (routes/setup_strip.ts)
+  salesGoalAi: '__sales_goal_ai__',       // sales item 94: the month's sales goal, and whether AI help is on (routes/sales_ai.ts)
   bookingBusy: '__booking_busy__',        // builder list item 149: the busy times last read from that calendar, and how the last read went (routes/booking.ts)
 } as const;
 

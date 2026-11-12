@@ -386,6 +386,9 @@
   #sumcards{display:flex;flex-direction:column;gap:var(--dds-s3,12px);margin-bottom:var(--dds-s3,12px)}
   #sumcards .card.sc{margin:0}
   #sumcards:empty{display:none}
+  /* sales item 94: Where things stand, at the top of the rail (sales-ai.js draws it) */
+  #aicard,#aicardMain{margin-bottom:var(--dds-s3,12px)}
+  #aicard:empty,#aicardMain:empty{display:none}
   .sc{padding:14px 16px}
   .sc-h{display:flex;align-items:baseline;justify-content:space-between;gap:10px;margin-bottom:8px}
   .sc-h h2{font-family:var(--sans);font-size:15px;font-weight:650;margin:0;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -426,7 +429,7 @@
   #handoverDlg .hofoot .abtn{height:44px;border-radius:999px;padding:0 18px;font-size:14px}
   #handoverDlg .hoerr{color:var(--bad,#b32929);font-size:13.5px;margin:12px 0 0}
 </style>
-<link rel="stylesheet" href="/shell.css"><script src="/shell.js" defer></script>
+<link rel="stylesheet" href="/shell.css"><script src="/shell.js" defer></script><script src="/sales-ai.js" defer></script>
 </head>
 <body>
 <div class="wrap">
@@ -712,9 +715,11 @@ function renderShell(){
     <div id="pathwrap"></div>
     <div class="body">
       <div class="col-main">
+        <div id="aicardMain"></div>
         ${avail.length?`<div class="tabs" role="tablist" aria-label="Record sections">${tabsHtml}</div><div id="tabbody" role="tabpanel" aria-labelledby="tab-${TAB||avail[0]}"><div class="spin" role="status" aria-label="Loading"></div></div>`:'<p class="muted">Nothing to show for this record yet.</p>'}
       </div>
       <aside class="rail" ${showRail?'':'hidden'}>
+        <div id="aicard"></div>
         <div id="sumcards"></div>
         <div id="dcard"></div>
       </aside>
@@ -737,6 +742,7 @@ function renderShell(){
   renderHighlights();
   renderActions();
   renderSummaryCards();
+  renderAiCard();
   renderDetailsCard();
 }
 
@@ -1925,6 +1931,7 @@ function renderRail(){
   const draft=snapComposer();
   host.innerHTML=`<div id="composer"></div><div id="fchips" class="fchips" role="group" aria-label="Filter the timeline"></div><div id="upband"></div><div id="timeline"></div>`;
   renderComposer(); renderFilters(); renderUpcoming(); renderTimeline();
+  if(AI_SUM)AI_SUM.redraw();   // sales item 94: "N new things since then" counts the history just read
   restoreComposer(draft);
   if(FOCUS_COMPOSER){FOCUS_COMPOSER=false;host.scrollIntoView({block:'start'});const ta=$('msgBody');if(ta)ta.focus();}
 }
@@ -1981,7 +1988,7 @@ function renderComposer(){
   host.innerHTML=html;
   for(const id of COMPOSER_FIELDS){const el=$(id);if(el&&DRAFTS[id]!=null)el.value=DRAFTS[id];}   // B21: what was typed here before
   const eb=$('emBox');
-  if(eb)emailBoxInto(eb,{req:apiAg,ids:mailIds(),idp:'em',focus:EM_FOCUS,values:{subject:DRAFTS.emSubject||'',body:DRAFTS.emBody||''},onSent:emailSent});
+  if(eb)emailBoxInto(eb,{req:apiAg,ids:mailIds(),idp:'em',focus:EM_FOCUS,values:{subject:DRAFTS.emSubject||'',body:DRAFTS.emBody||''},onSent:emailSent,tools:emAiTools});
   host.querySelectorAll('[data-ct]').forEach(b=>b.addEventListener('click',()=>{COMPOSER=b.getAttribute('data-ct');COMPOSER_PICKED=true;renderComposer();}));
   // E2: the composer tablist honors the arrow-key contract — arrows move focus
   // AND selection (the re-render hands focus back to the moved-to tab);
@@ -2006,6 +2013,40 @@ function renderComposer(){
   const tg=$('taskGo'); if(tg)tg.addEventListener('click',addTask);
   host.querySelectorAll('[data-aud]').forEach(b=>b.addEventListener('click',()=>{NEWAUD=b.getAttribute('data-aud');host.querySelectorAll('[data-aud]').forEach(x=>{const on=x===b;x.classList.toggle('on',on);x.setAttribute('aria-pressed',on?'true':'false');});const hh=$('notehint');if(hh)hh.textContent=NEWAUD==='shared'?'The client will see this note.':'Internal notes stay with your studio.';}));
   const ng=$('noteGo'); if(ng)ng.addEventListener('click',addNote);
+}
+// ── sales item 94: AI help on a record. "Where things stand" tops the rail (kept with its date,
+// so a later visit shows it without paying again) and "Draft it for me" sits in the Email box.
+// Both read the record the way this page does (the keys loadActivity sends, in this page's
+// scope); AI help is off until the studio's owner switches it on, and the server says so.
+// sales-ai.js draws both. Nothing is ever sent by it. ──
+let AI_SUM=null;
+const aiFirst=(n)=>String(n||'').trim().split(/\s+/)[0]||'';
+const aiWho=()=>aiFirst((REC&&REC.header&&(REC.header.person||REC.header.name))||'');
+function aiRecordQuery(){
+  const ids=idParams(),o={};
+  if(ids.project)o.project=ids.project;
+  if(REC&&REC.identity&&REC.identity.client_id)o.client_id=REC.identity.client_id;
+  if(ids.deal)o.deal=ids.deal;
+  if(ids.contact)o.contact=ids.contact;
+  return o;
+}
+function renderAiCard(){
+  // a record with a rail has it at the rail's top; a person on their own (no rail) above the tabs
+  const rail=document.querySelector('aside.rail'),inRail=!!(rail&&!rail.hidden);
+  const host=$(inRail?'aicard':'aicardMain'),other=$(inRail?'aicardMain':'aicard');
+  if(other)other.innerHTML='';
+  if(!host)return;
+  const c=REC&&REC.canonical;
+  if(!c||!c.value){host.innerHTML='';AI_SUM=null;return;}
+  const go=()=>{if(!host.isConnected||!window.ddsSalesAi)return;AI_SUM=window.ddsSalesAi.summary(host,{req:api,subject:c.key+':'+c.value,query:aiRecordQuery,who:aiWho(),dealToo:!!idParams().deal,newSince:(iso)=>{const t=Date.parse(iso);return Number.isFinite(t)?(ACT.items||[]).filter(i=>i&&Date.parse(i.at)>t).length:0;}});};
+  if(window.ddsSalesAi||document.readyState!=='loading')go();else document.addEventListener('DOMContentLoaded',go,{once:true});
+}
+function emAiTools(row,k){
+  if(!window.ddsSalesAi)return;
+  const who=aiWho();
+  window.ddsSalesAi.pill(row,{req:api,ta:k.body,go:k.go,label:'Draft it for me',hint:'AI help · about 1¢ a draft',sendLabel:'Send email',
+    payload:()=>Object.assign({kind:'record',subject:k.subj.value||'',today:recTodayYmd()},aiRecordQuery()),
+    writing:()=>`Writing a draft from ${who?who+'’s':'their'} messages${idParams().deal?' and this deal':''}…`});
 }
 // shell.js loads deferred: on the first draw the kit may still be on its way
 function emailBoxInto(el,o){

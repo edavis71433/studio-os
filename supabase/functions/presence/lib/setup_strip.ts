@@ -6,7 +6,7 @@
 // away for the whole studio (a reserved row, lib/reserved_store.ts). A step whose
 // check couldn't be read is left off rather than shown as not done. Pure.
 
-export type SetupKey = 'business' | 'logo' | 'services' | 'contact' | 'deal';
+export type SetupKey = 'business' | 'logo' | 'services' | 'contact' | 'deal' | 'goal';
 export interface SetupStep { key: SetupKey; title: string; why: string; act: string; href: string; done: boolean }
 
 export const SETUP_STEPS: ReadonlyArray<Omit<SetupStep, 'done'>> = [
@@ -15,6 +15,7 @@ export const SETUP_STEPS: ReadonlyArray<Omit<SetupStep, 'done'>> = [
   { key: 'services', title: 'Services and prices', why: 'Proposals fill themselves in', act: 'Add a service', href: '/pipeline.html?services=1' },
   { key: 'contact', title: 'Your first contact', why: 'Add one, or bring in a list', act: 'Add a contact', href: '/contacts.html?add=1' },
   { key: 'deal', title: 'Your first deal', why: 'Pipeline follows it to Won', act: 'Add a deal', href: '/pipeline.html' },
+  { key: 'goal', title: 'A monthly goal', why: 'Home and Pipeline track it for you', act: 'Set a goal', href: '/settings.html#goal' },   // sales item 94
 ];
 
 /** The steps, in order, from what was found: true done, false not yet, null (or missing)

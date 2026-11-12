@@ -170,6 +170,23 @@
         read from the studio's OWN site (never scoped) — pipeline's .stats anatomy ── */
   #studio{margin-bottom:var(--dds-s6,24px)}
   .numbers .nhead{display:flex;align-items:baseline;justify-content:space-between;gap:var(--dds-s3,12px)}
+  /* sales item 94: the month's goal (Settings, Goal and AI help): won (solid), still expected
+     from open deals at each stage's chance (light), and what is left to find */
+  .gbar{display:flex;height:12px;border-radius:999px;background:var(--p-soft);overflow:hidden}
+  .gbar .gwon{background:var(--p)} .gbar .gexp{background:color-mix(in srgb,var(--p) 42%,var(--card))}
+  .glegend{list-style:none;margin:0;padding:0;display:flex;flex-wrap:wrap;gap:4px 18px;font-size:13px;color:var(--soft)}
+  .glegend b{color:var(--ink);font-weight:650;font-variant-numeric:tabular-nums}
+  .glegend i{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:6px;vertical-align:0}
+  .glegend .dwon{background:var(--p)} .glegend .dexp{background:color-mix(in srgb,var(--p) 42%,var(--card))} .glegend .dleft{box-shadow:inset 0 0 0 1.5px color-mix(in srgb,var(--p) 55%,var(--card))}
+  .goalcard{background:var(--card);border:1px solid var(--line);border-radius:var(--dds-r-card,16px);padding:16px 18px;margin:0 0 var(--dds-s4,16px);box-shadow:var(--dds-shadow,none)}
+  .goalcard .gtop{display:flex;align-items:baseline;gap:4px 12px;flex-wrap:wrap;margin-bottom:10px}
+  .goalcard h2{font-size:13.5px;font-weight:600;color:var(--soft);margin:0}
+  .goalcard .gamt{font-size:22px;font-weight:700;color:var(--ink);font-variant-numeric:tabular-nums;letter-spacing:-.01em}
+  .goalcard .gamt span{color:var(--faint);font-weight:600}
+  .goalcard .gleft{margin-left:auto;font-size:12.5px;color:var(--p)}
+  .goalcard .gleft a{color:var(--p);font-weight:600}
+  .goalcard .glegend{margin-top:10px}
+  @media (max-width:640px){.goalcard .gtop{display:grid;grid-template-columns:1fr auto}.goalcard .gamt{grid-column:1 / -1;order:2}.goalcard .gleft{margin-left:0}.goalcard .glegend{flex-direction:column}}
   .numbers .nhead .qhead{margin-bottom:var(--dds-s2,8px)}
   .nall{font-size:13px;font-weight:600;color:var(--p);text-decoration:none;white-space:nowrap}
   .nall:hover{text-decoration:underline}
@@ -1262,6 +1279,17 @@ function wireMyTasks(){
     const nx=(row&&(row.querySelector('button.tdone')||row.querySelector('a')))||document.querySelector('#my-tasks .rh');if(nx)nx.focus();
   }));
 }
+// sales item 94: the month's goal, from /sales/summary's `goal` (set in Settings, Goal and AI
+// help). Won this month (solid), what open deals should still bring (light), what is left to find.
+function goalCardHtml(s){
+  const g=s&&s.goal;if(!g||!g.goal_cents)return'';
+  const now=new Date(),left=new Date(now.getFullYear(),now.getMonth()+1,0).getDate()-now.getDate();
+  const w=(c)=>Math.max(0,Math.min(100,Math.round((Number(c)||0)/g.goal_cents*1000)/10));
+  const won=w(g.won_cents),exp=Math.min(100-won,w(g.expected_cents));
+  return `<section class="goalcard" id="goalCard" aria-labelledby="goalH"><div class="gtop"><h2 id="goalH">${esc(now.toLocaleDateString('en-US',{month:'long'}))} goal</h2><span class="gamt">${esc(money(g.won_cents))} <span>of ${esc(money(g.goal_cents))}</span></span><span class="gleft">${g.reached?'Reached':left+' day'+(left===1?'':'s')+' left'} · <a href="/settings.html#goal" data-noscope="1">Edit goal</a></span></div>`
+    +`<div class="gbar" role="img" aria-label="${esc(`Won ${money(g.won_cents)||'$0'}, still expected ${money(g.expected_cents)||'$0'}, left to find ${money(g.left_cents)||'$0'}`)}"><span class="gwon" data-w="${won}"></span><span class="gexp" data-w="${exp}"></span></div>`
+    +`<ul class="glegend"><li><i class="dwon" aria-hidden="true"></i>Won <b>${esc(money(g.won_cents)||'$0')}</b></li><li><i class="dexp" aria-hidden="true"></i>Still expected <b>${esc(money(g.expected_cents)||'$0')}</b></li><li><i class="dleft" aria-hidden="true"></i>Left to find <b>${esc(money(g.left_cents)||'$0')}</b></li></ul></section>`;
+}
 let SSEQ=0;
 async function mountStudio(){
   const host=$('studio');if(!host)return;
@@ -1273,8 +1301,9 @@ async function mountStudio(){
   DEALS=Array.isArray(deals)?deals:null;DEALS_CUT=Array.isArray(deals)&&deals.length>=100;STUDIO_DONE=true;
   paintNeeds();paintToday();   // item 70: My to-dos and Waiting on them are tabs of the list now
   const tiles=statTiles(summary,deals);const strip=pipelineStripHtml(summary,deals);const todos=MYTASKS?[]:weekTodos(deals);const top=strip?[]:keyDeals(deals);const wins=recentWins(deals);
-  if(!tiles.length&&!todos.length&&!top.length&&!wins.length){host.hidden=true;host.innerHTML='';return;}
-  let h='';
+  const goal=goalCardHtml(summary);
+  if(!goal&&!tiles.length&&!todos.length&&!top.length&&!wins.length){host.hidden=true;host.innerHTML='';return;}
+  let h=goal;
   // Oct 2026 nav cut: Analytics left the menu — the home's Numbers section owns
   // it: the money/pipeline tiles plus "See all numbers →" (the full page; ⌘K too).
   if(tiles.length)h+=`<div class="numbers" id="numbers"><div class="nhead"><h2 class="qhead">Numbers</h2><a class="nall" id="allNumbers" href="/analytics.html" data-noscope="1">See all numbers →</a></div><div class="stats" role="list" aria-label="Your numbers">${tiles.map(statHtml).join('')}</div></div>`;
@@ -1288,6 +1317,7 @@ async function mountStudio(){
     h+='</div>';
   }
   host.hidden=false;host.innerHTML=h;
+  host.querySelectorAll('.gbar [data-w]').forEach(e=>{e.style.width=e.getAttribute('data-w')+'%';});   // sales item 94: the goal bar's parts
 }
 
 // ── ADD A CUSTOMER — customers.html's flow, ported wholesale and kept in sync by
