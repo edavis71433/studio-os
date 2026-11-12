@@ -9,9 +9,11 @@
 //   site has a menu of its own. On a client's site the copy is recorded, so Publish lists
 //   the sections still exactly as copied until they are changed or kept
 //   (lib/copied_record.ts). A draft write: the editor sends it in the draft's line and it
-//   answers the new version (lib/optimistic_lock.ts DRAFT_WRITE).
+//   answers the new version (lib/optimistic_lock.ts DRAFT_WRITE). It writes with the function's own key,
+//   after its own checks (a member's seat can't reach it: lib/site_roles.ts lists it as one that checks
+//   the caller itself), as Duplicate site and a template's pages do (agency/kit_io.ts).
 import { json } from '../../_shared/http.ts';
-import { svc, type SiteDb } from '../lib/db.ts';
+import { svc } from '../lib/db.ts';
 import { writeChangeEvent } from '../lib/provenance.ts';
 import { guardStaleDraft } from '../lib/optimistic_lock.ts';
 import { resolveAgencyMember, agencySiteIds } from '../agency/auth.ts';
@@ -40,7 +42,7 @@ export async function handleReadyPages(site: SiteRow, cors: Record<string, strin
   return json({ data: { groups: PAGE_GROUPS, pages: listReadyPages(), recommended: starterKeyFor(industry) } }, 200, cors);
 }
 
-export async function handlePageFromSaved(req: Request, db: SiteDb, site: SiteRow, principal: Principal, cors: Record<string, string>) {
+export async function handlePageFromSaved(req: Request, site: SiteRow, principal: Principal, cors: Record<string, string>) {
   const stale = await guardStaleDraft(req, site, cors);
   if (stale) return stale;
   let b: Record<string, unknown> = {};
@@ -63,7 +65,7 @@ export async function handlePageFromSaved(req: Request, db: SiteDb, site: SiteRo
   if (!payload || !payload.blocks.length) return json({ error: 'empty_page', message: 'That saved page has no sections.' }, 422, cors);
 
   const [cur, identQ] = await Promise.all([
-    db(`presence_settings?site_id=eq.${site.id}&select=blocks,pages,nav&limit=1`),
+    svc(`presence_settings?site_id=eq.${site.id}&select=blocks,pages,nav&limit=1`),
     svc(`presence_identity?site_id=eq.${site.id}&select=business_name&limit=1`),
   ]);
   if (!cur.ok) return json({ error: 'read_failed', message: 'We couldn’t load your pages just now. Nothing was added.' }, 502, cors);
@@ -103,7 +105,7 @@ export async function handlePageFromSaved(req: Request, db: SiteDb, site: SiteRo
   }
   const land = landSavedPage(settings, payload, { title, slug: b.slug, map, toName });
   if ('error' in land) return json({ error: land.error, message: land.message }, 422, cors);
-  const w = await db(`presence_settings?on_conflict=site_id&select=site_id,pages,nav`, {
+  const w = await svc(`presence_settings?on_conflict=site_id&select=site_id,pages,nav`, {
     method: 'POST', headers: { Prefer: 'resolution=merge-duplicates,return=representation' },
     body: JSON.stringify({ site_id: site.id, pages: land.pages, ...(land.nav ? { nav: land.nav } : {}) }),
   });

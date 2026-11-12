@@ -1347,7 +1347,7 @@ async function route_(req: Request, cors: Record<string, string>): Promise<Respo
   if (route === '/pages/duplicate' && method === 'POST') return handlePageDuplicate(req, db, site, principal, cors);
   // builder list item 216: the ready-made pages by what each is for, and a page saved to the studio landing here
   if (route === '/pages/ready' && method === 'GET') return handleReadyPages(site, cors);
-  if (route === '/pages/from-saved' && method === 'POST') return handlePageFromSaved(req, db, site, principal, cors);
+  if (route === '/pages/from-saved' && method === 'POST') return handlePageFromSaved(req, site, principal, cors);   // the studio's alone: the route checks, not a seat
   if (route === '/pages/refs' && method === 'GET') return handlePageRefs(req, site, cors);
   if (route === '/pages/deleted' && method === 'GET') return handleDeletedPages(site, cors);   // item 154: pages deleted in the last 30 days
   { const dm = route.match(/^\/pages\/deleted\/([0-9a-f-]{36})\/restore$/); if (dm && method === 'POST') return handleDeletedPageRestore(req, db, site, principal, dm[1], cors); }

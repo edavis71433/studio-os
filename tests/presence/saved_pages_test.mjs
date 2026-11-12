@@ -127,12 +127,11 @@ async function agency(member, method, route, body) {
   const res = await handleAgency(req, route, method, member, { kind: 'client', userId: USER, email: member.email }, {});
   return { status: res.status, body: await res.json() };
 }
-const svcDb = (path, init = {}) => fetch(`http://stub.local/rest/v1/${path}`, init).then(async (r) => { const text = await r.text(); let json = null; try { json = text ? JSON.parse(text) : null; } catch { /* */ } return { ok: r.ok, status: r.status, json, text }; });
 const SITE = (id) => ({ id, template_slug: 'business-classic', template_version: '1.0.0' });
 async function land(siteId, body, opts = {}) {
   const req = new Request('http://stub.local/functions/v1/presence/pages/from-saved', { method: 'POST', body: JSON.stringify(body), headers: { 'Content-Type': 'application/json', 'x-dds-user-jwt': opts.jwt ?? 'jwt-studio' } });
   const principal = { kind: 'client', userId: USER, email: 'eric@studio.example', scope: opts.own ? null : { site_id: siteId, name: 'x' }, member: null };
-  const res = await handlePageFromSaved(req, svcDb, SITE(siteId), principal, {});
+  const res = await handlePageFromSaved(req, SITE(siteId), principal, {});
   return { status: res.status, body: await res.json() };
 }
 const settingsOf = (id) => T.presence_settings.find((s) => s.site_id === id);
@@ -266,10 +265,10 @@ const settingsOf = (id) => T.presence_settings.find((s) => s.site_id === id);
   const rx = (src) => (src.match(/const DRAFT_WRITE = (\/.*\/);/) || [])[1];
   ok('a draft write on both sides, in the same words', rx(lock) && rx(lock) === rx(page) && rx(lock).includes('pages\\/(?:duplicate|from-saved)'));
   const idx = read('supabase/functions/presence/index.ts');
-  ok('router: POST /pages/from-saved', idx.includes("if (route === '/pages/from-saved' && method === 'POST') return handlePageFromSaved(req, db, site, principal, cors);"));
+  ok('router: POST /pages/from-saved, off the member data path', idx.includes("if (route === '/pages/from-saved' && method === 'POST') return handlePageFromSaved(req, site, principal, cors);"));
   ok('agency: the saved pages routes run inside the studio router', read('supabase/functions/presence/agency/routes.ts').includes('const r = await handleSavedPages(req, route, method, member, cors, { ownSite: () => ownSiteOf('));
   const roles = await import(`${P}/lib/site_roles.ts`);
-  ok('members: adding one is an edit, and the route admits the studio alone', roles.contentWriteNeeds('/pages/from-saved', 'POST') === 'edit' && read('supabase/functions/presence/routes/saved_pages.ts').includes("return json({ error: 'forbidden', message: 'Only your studio can add its saved pages.' }, 403, cors);"));
+  ok('members: open on the member list, because the route admits the studio alone and says so', roles.memberWriteNeeds('/pages/from-saved', 'POST') === 'open' && roles.contentWriteNeeds('/pages/from-saved', 'POST') === null && read('supabase/functions/presence/routes/saved_pages.ts').includes("return json({ error: 'forbidden', message: 'Only your studio can add its saved pages.' }, 403, cors);"));
   for (const [name, sql] of [['migration', read('supabase/migrations/0217_saved_pages.sql')], ['pack', read('docs/presence/APPLY-0217-prod.sql')]]) {
     ok(`${name}: one row a saved page, closed to everyone but the function`, /create table if not exists public\.presence_saved_pages/.test(sql) && /enable row level security/.test(sql) && /revoke all on public\.presence_saved_pages from anon, authenticated/.test(sql) && /references public\.presence_agencies\(id\) on delete cascade/.test(sql));
     ok(`${name}: what it is for is one of the four`, sql.includes("check (purpose in ('introduce', 'sell', 'show', 'home'))"));

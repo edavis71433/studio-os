@@ -77,7 +77,6 @@ export const SETTINGS_CONTENT_FIELDS: ReadonlySet<string> = new Set([
 export function contentWriteNeeds(route: string, method: string, settingsFields: string[] = []): SiteCapability | null {
   if (method === 'PUT' && (route === '/identity' || route === '/location' || route === '/brand/profile')) return 'edit';
   if (method === 'POST' && route === '/pages/duplicate') return 'edit';
-  if (method === 'POST' && route === '/pages/from-saved') return 'edit';   // builder list item 216: and the route admits the studio alone
   if (method === 'POST' && /^\/pages\/deleted\/[0-9a-f-]{36}\/restore$/.test(route)) return 'edit';   // item 154: putting a deleted page back is an edit of the pages
   if (method === 'PUT' && route === '/settings') return settingsFields.every((f) => SETTINGS_CONTENT_FIELDS.has(f)) ? 'edit' : 'configure';
   const m = route.match(/^\/(?:offerings|testimonials|faqs|posts)(\/[0-9a-f-]{36})?$/);
@@ -263,6 +262,8 @@ const MEMBER_WRITES: Array<[MemberWriteNeed, string[]]> = [
     `POST /portal/studio-requests/${ID}/(accept|decline)`,
     // builder item 193: only the studio marks an approved plan finished; the route refuses anyone else and says why
     `POST /foundations/plans/${ID}/done`,
+    // builder item 216: only the studio adds one of its saved pages; the route refuses anyone else and says why
+    'POST /pages/from-saved',
     'POST /crm/notes',
     `POST /crm/notes/${ID}/pin`,
     `DELETE /crm/notes/${ID}`,
