@@ -678,6 +678,7 @@ html.dc-edit:not(.plan-watch) .dc-close{height:36px;padding:0 14px;font-size:13p
 .dc-seg button:hover{color:var(--ink)}
 .dc-seg button[aria-selected="true"]{background:var(--sheet);color:var(--ink);font-weight:600;box-shadow:var(--dds-shadow)}
 .dc-seg button:focus-visible{outline:2px solid var(--plum);outline-offset:2px}
+#stylesSeg button{padding:0 3px}   /* five tabs (item 217): every name whole on the card */
 .dc-panel-foot{flex:0 0 auto;padding:10px 20px 16px;font-size:12px;color:var(--ink-3);border-top:1px solid var(--hair)}
 .dc-panel-foot[hidden]{display:none}
 /* the inspector: one section, four tabs */
@@ -782,10 +783,11 @@ html.dc-zoomout .dp-stage:not(.dev-tablet):not(.dev-phone) #dcZoomNote{display:b
 .ins-row>span{flex:1 1 auto}
 .ins-style>.ins-field{margin-top:14px}
 .ins-row .dc-actbtn{flex:none;white-space:nowrap}
-/* the Styles card: Looks, Fonts, Colours, Text. Rows are tagged with their tab; the rest hide. */
+/* the Styles card: Looks, Fonts, Colours, Buttons, Text. Rows are tagged with their tab; the rest hide. */
 #settingsPanel[data-mode="styles"][data-stab="looks"] .dc-panel-scroll [data-stab]:not([data-stab="looks"]),
 #settingsPanel[data-mode="styles"][data-stab="fonts"] .dc-panel-scroll [data-stab]:not([data-stab="fonts"]),
 #settingsPanel[data-mode="styles"][data-stab="colours"] .dc-panel-scroll [data-stab]:not([data-stab="colours"]),
+#settingsPanel[data-mode="styles"][data-stab="buttons"] .dc-panel-scroll [data-stab]:not([data-stab="buttons"]),
 #settingsPanel[data-mode="styles"][data-stab="text"] .dc-panel-scroll [data-stab]:not([data-stab="text"]){display:none !important}
 html.dc-edit:not(.plan-watch) #settingsPanel #designHost{padding:0 20px 20px}
 html.dc-edit:not(.plan-watch) #settingsPanel #designGallery{padding:0 20px 14px}
@@ -793,6 +795,34 @@ html.dc-edit:not(.plan-watch) #settingsPanel #designHost .field{border:0;box-sha
 html.dc-edit:not(.plan-watch) #settingsPanel #designCard>label{display:none}
 html.dc-edit:not(.plan-watch) #settingsPanel #designHost .field>label{font-size:12.5px;font-weight:500;color:var(--ink-2)}
 .st-looks{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+/* item 217: the Buttons tab. Each set and form style is a small drawing in the site's own
+   colours (--bs-*, set from the canvas); lib/site_buttons.ts draws the real ones on the site. */
+.st-group{margin-top:14px}
+.st-sets{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.st-sets.fs{grid-template-columns:repeat(4,minmax(0,1fr))}
+.st-set{display:flex;flex-direction:column;gap:6px;min-width:0;min-height:44px;padding:5px 5px 7px;border:1px solid var(--hair);border-radius:12px;background:var(--sheet);color:var(--ink);font:inherit;text-align:left;cursor:pointer}
+.st-set:hover{border-color:var(--ink-3)}
+.st-set.on{border:2px solid var(--plum);padding:4px 4px 6px}
+.st-set:focus-visible{outline:2px solid var(--plum);outline-offset:2px}
+.st-set-pic{display:flex;flex-direction:column;align-items:flex-start;gap:6px;min-height:64px;padding:10px 8px;border-radius:8px;background:var(--bs-paper);overflow:hidden}
+.st-set-l{padding:0 3px;font:500 12px/1.25 var(--sans)}
+.st-set.on .st-set-l{color:var(--plum);font-weight:600}
+.st-set-pic i{display:inline-block;max-width:100%;padding:5px 9px;border:1.5px solid transparent;border-radius:6px;font:600 10.5px/1 var(--sans);font-style:normal;white-space:nowrap;overflow:hidden;text-overflow:clip}
+.bs-own .bs-main,.bs-filled .bs-main,.bs-pill .bs-main,.bs-square .bs-main{background:var(--bs-fill);color:var(--bs-on)}
+.bs-own .bs-second,.bs-pill .bs-second,.bs-square .bs-second{border-color:var(--bs-line);color:var(--bs-line)}
+.bs-filled i{border-radius:8px}
+.bs-filled .bs-second{background:color-mix(in srgb,var(--bs-fill) 12%,var(--bs-paper));color:var(--bs-line)}
+.bs-outline .bs-main{border-color:var(--bs-line);color:var(--bs-line);border-radius:7px}
+.bs-outline .bs-second,.bs-underline .bs-second{padding-left:0;padding-right:0;color:var(--bs-ink);text-decoration:underline;text-underline-offset:2px}
+.bs-pill i{border-radius:999px}
+.bs-square i{border-radius:0;text-transform:uppercase;letter-spacing:.08em}
+.bs-underline .bs-main{padding-left:0;padding-right:0;color:var(--bs-line);font-weight:700;text-decoration:underline;text-decoration-thickness:2px;text-underline-offset:3px}
+.bs-underline .bs-main::after{content:" \2192"}
+.st-set-pic .fs-f{display:block;width:100%;height:16px;padding:0;border:1px solid color-mix(in srgb,var(--bs-ink) 22%,var(--bs-paper));border-radius:5px;background:var(--bs-card)}
+.st-set-pic .fs-f.short{width:70%}
+.fs-line .fs-f{border-width:0 0 1.5px;border-color:var(--bs-ink);border-radius:0;background:transparent}
+.fs-soft .fs-f{border-color:transparent;border-radius:7px;background:color-mix(in srgb,var(--bs-ink) 8%,var(--bs-paper))}
+.fs-round .fs-f{border-color:color-mix(in srgb,var(--bs-ink) 40%,var(--bs-paper));border-radius:999px}
 .st-look{padding:0;border:0;background:transparent;text-align:left;cursor:pointer;font:inherit;color:var(--ink);min-width:0}
 .st-look-pic{height:78px;padding:8px;border-radius:10px;border:1px solid var(--hair);display:flex;flex-direction:column;gap:4px;align-items:flex-start;justify-content:center}
 .st-look.on .st-look-pic{border:2px solid var(--plum);padding:7px}
@@ -2466,6 +2496,7 @@ html.bs-open .scrim{z-index:96}   /* Files and the categories card open over the
               <button type="button" role="tab" data-stab="looks" aria-selected="true">Looks</button>
               <button type="button" role="tab" data-stab="fonts" aria-selected="false">Fonts</button>
               <button type="button" role="tab" data-stab="colours" aria-selected="false">Colours</button>
+              <button type="button" role="tab" data-stab="buttons" aria-selected="false">Buttons</button>
               <button type="button" role="tab" data-stab="text" aria-selected="false">Text</button>
             </div>
             <!-- one scroll container for the whole panel (theme gallery + design cards) -->
@@ -10810,6 +10841,7 @@ function dcPatchTokens(tokens) {
 let TOKENS_SEQ = 0;
 async function saveTokens(change, msg) {
   const before = DESIGN_TOKENS, next = { ...DESIGN_TOKENS };
+  const redraw = "buttons" in change || "forms" in change;   // item 217: the server draws a set's own style (lib/site_buttons.ts)
   for (const [k, v] of Object.entries(change)) { if (v === "" || v == null) delete next[k]; else next[k] = v; }
   const seq = ++TOKENS_SEQ;
   const put = api("PUT", "/dev/customization", { theme_tokens: next });   // Undo reads the tokens from before, here
@@ -10820,7 +10852,7 @@ async function saveTokens(change, msg) {
     await put;
     if (seq === TOKENS_SEQ) remount();
     toast(msg + " — publish to see it live"); scheduleChangesRefresh(); stageStale();
-    if (!shown) refreshDesignPreview();
+    if (!shown || redraw) refreshDesignPreview();
   } catch (err) {
     if (seq === TOKENS_SEQ) { DESIGN_TOKENS = before; if (shown) dcPatchTokens(before); remount(); }
     toast(nice(err), true);
@@ -11072,6 +11104,50 @@ function lookTiles(host, label, looks, isOn, onPick) {
   wrap.appendChild(grid); host.appendChild(wrap);
   return wrap;
 }
+// ── Item 217: Styles › Buttons. One set restyles every button on the site, the main one and the
+// second beside it, and one form style every box people type into (lib/site_buttons.ts draws
+// them on the site; tests/presence/button_sets_test.mjs ties these lists to it). Each tile is a
+// small drawing in this site's colours: white or dark words on the fill, as the server picks them.
+const BUTTON_SET_OPTS = [["Your template’s", ""], ["Filled", "filled"], ["Outline", "outline"], ["Pill", "pill"], ["Square", "square"], ["Underline", "underline"]];
+const FORM_STYLE_OPTS = [["Template’s", ""], ["Line", "line"], ["Soft", "soft"], ["Round", "round"]];
+function buttonSetColours() {
+  const c = dcSiteColours(), hx = (v, d) => normHexJs(v) || d;
+  const paper = hx(c.paper, "#ffffff"), ink = hx(c.ink, "#000000"), accent = hx(c.accent, ink), dark = hx(c.accentDark, accent);
+  const fill = ovContrast("#ffffff", accent) >= 4.5 || ovContrast("#ffffff", dark) < 4.5 ? accent : dark;
+  const line = [dark, accent, ink].find((h) => ovContrast(h, paper) >= 4.5) || ink;
+  return { paper, card: hx(c.card, paper), ink, fill, line, on: ovContrast("#ffffff", fill) >= 4.5 ? "#ffffff" : ink };
+}
+// The tiles take the colours the canvas draws with. The Styles card is built before the canvas
+// has drawn, so opening the Buttons tab paints them again (stylesTab).
+function buttonSetPaint(root) {
+  const col = buttonSetColours();
+  (root || document).querySelectorAll(".st-set-pic").forEach((pic) => [["--bs-paper", col.paper], ["--bs-card", col.card], ["--bs-ink", col.ink], ["--bs-fill", col.fill], ["--bs-on", col.on], ["--bs-line", col.line]].forEach(([k, v]) => pic.style.setProperty(k, v)));
+}
+function buttonSetRows(card, T) {
+  const tiles = (label, says, opts, kind, cur, onPick, draw) => {
+    const wrap = el("div", "ins-field st-group"); wrap.dataset.stab = "buttons";
+    wrap.append(el("div", "ins-lbl", label), el("p", "ins-says", says));
+    const grid = el("div", "st-sets " + kind); grid.setAttribute("role", "group"); grid.setAttribute("aria-label", label);
+    opts.forEach((o) => {
+      const on = cur === o[1];
+      const b = el("button", "st-set" + (on ? " on" : "")); b.type = "button"; b.setAttribute("aria-pressed", String(on));
+      const pic = el("span", "st-set-pic " + kind + "-" + (o[1] || "own")); pic.setAttribute("aria-hidden", "true");
+      draw(pic);
+      b.append(pic, el("span", "st-set-l", o[0] + (on ? " ✓" : "")));
+      b.addEventListener("click", () => { if (!on) onPick(o); });
+      grid.appendChild(b);
+    });
+    wrap.appendChild(grid); card.appendChild(wrap);
+  };
+  tiles("Button set", "Every button on the site at once: the main one and the second one beside it, on every page and section.",
+    BUTTON_SET_OPTS, "bs", String(T.buttons || ""), (o) => saveTokens({ buttons: o[1] }, o[1] ? "Buttons: " + o[0] : "Buttons: your template’s own"),
+    (pic) => pic.append(el("i", "bs-main", "Book"), el("i", "bs-second", "See menu")));
+  tiles("Forms", "The boxes people type into, on every form, sign-up and booking.",
+    FORM_STYLE_OPTS, "fs", String(T.forms || ""), (o) => saveTokens({ forms: o[1] }, o[1] ? "Forms: " + o[0] : "Forms: your template’s own"),
+    (pic) => pic.append(el("i", "fs-f"), el("i", "fs-f short")));
+  card.appendChild(el("div", "hint", "Every set stays readable on light, dark and accent sections. It is checked on every template and palette. Nothing reaches your live site until you publish.")).dataset.stab = "buttons";
+  buttonSetPaint(card);
+}
 // The two faces in use, each a row that opens the font library (or the Type row when there is none).
 function fontRows(card, T) {
   const wrap = el("div", "ins-field"); wrap.dataset.stab = "fonts"; wrap.style.marginTop = "4px";
@@ -11181,6 +11257,7 @@ async function mountDesignCard(fresh = true) {
     (o) => saveTokens({ motion: o[1] }, o[1] ? "Gentle motion: sections fade up as visitors scroll" : "Motion: still")), "looks");
   card.appendChild(el("div", "hint", "Gentle motion fades each section up as visitors scroll to it. Anyone whose device asks for less motion sees it still, and nothing waits to show.")).dataset.stab = "looks";
   card.appendChild(siteIconRow());
+  buttonSetRows(card, T);   // item 217
   // DS-8: suggest for my business (deterministic; owner approves by clicking Apply)
   const ik = (S.settings && S.settings.industry_key) || "generic";
   const sug = SUGGEST[ik];
@@ -14457,14 +14534,15 @@ function openSettingsPanel(mode, title) {
       || m === "section" && p.querySelector('#inspectorSeg [aria-selected="true"]') || cl).focus({ preventScroll: true });
   } catch (_) {} }, 40);
 }
-// ── Styles (the floating studio, part two): Looks, Fonts, Colours and Text. Each card and
-// row in the panel is tagged with the tab it belongs to (data-stab); the rest hide.
+// ── Styles (the floating studio, part two): Looks, Fonts, Colours, Buttons (item 217) and Text.
+// Each card and row in the panel is tagged with the tab it belongs to (data-stab); the rest hide.
 let STYLES_TAB = "looks";
 function stylesTab(name) {
-  STYLES_TAB = ["looks", "fonts", "colours", "text"].indexOf(name) >= 0 ? name : "looks";
+  STYLES_TAB = ["looks", "fonts", "colours", "buttons", "text"].indexOf(name) >= 0 ? name : "looks";
   const p = $("settingsPanel"); if (p) p.dataset.stab = STYLES_TAB;
   const seg = $("stylesSeg"); if (seg) seg.querySelectorAll("[data-stab]").forEach((b) => b.setAttribute("aria-selected", String(b.dataset.stab === STYLES_TAB)));
   const sc = p && p.querySelector(".dc-panel-scroll"); if (sc) sc.scrollTop = 0;
+  if (STYLES_TAB === "buttons") buttonSetPaint();   // item 217: in the colours the canvas has drawn by now
   dcColourAids();
 }
 // ── the inspector (the floating studio, part two): one section, four tabs. Content holds the
