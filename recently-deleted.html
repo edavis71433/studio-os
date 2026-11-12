@@ -1,0 +1,182 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1, viewport-fit=cover">
+<title>Recently deleted — Studio OS</title>
+<meta name="robots" content="noindex, nofollow">
+<meta name="description" content="Deals, contacts and to-dos deleted in the last 30 days. Bring any of them back.">
+<link rel="stylesheet" href="/fonts/brand.css">
+<!-- ═══════════════════════════════════════════════════════════════════════
+  Recently deleted (sales item 83, Nov 2026; drawn in Figma, section 263:865).
+  One place for what was deleted in the last 30 days: deals, contacts and to-dos,
+  each with Restore. Everything here was a soft delete, so Restore puts it back
+  exactly as it was (GET /sales/deleted; POST /sales/deals/:id/restore,
+  POST /sales/contacts/:id/restore, PATCH /sales/deal-tasks/:id {restore}).
+  A contact merged into another isn't here: the merge's own Undo brings it back.
+  Reached from Settings, from the Undo messages and ⌘K; not in the main menu.
+═════════════════════════════════════════════════════════════════════════ -->
+<style>
+  :root{
+    --bg:var(--dds-bg,#faf8f5);--card:var(--dds-card,#fff);--ink:var(--dds-ink,#1b1525);--soft:var(--dds-soft,#6b6478);--faint:var(--dds-faint,#746b8a);--line:var(--dds-line,#eee9e0);
+    --p:var(--dds-p,#5b3fa0);--p-deep:var(--dds-p-deep,#2a1b4a);--p-soft:var(--dds-p-soft,#efeafa);
+    --info:var(--dds-info,#2b5c8a);--info-soft:var(--dds-info-soft,#e8f0f8);--bad:var(--dds-bad,#9a4242);
+    --shadow:var(--dds-shadow,0 1px 2px rgba(27,21,37,.04),0 8px 24px rgba(27,21,37,.06));
+    --serif:'Fraunces',"Iowan Old Style",Georgia,serif;
+    --sans:'Inter',-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  }
+  *{box-sizing:border-box;margin:0}
+  body{background:var(--bg);color:var(--ink);font-family:var(--sans);line-height:1.55;-webkit-font-smoothing:antialiased}
+  .wrap{max-width:1180px;margin:0 auto;padding:var(--dds-s6,24px) var(--dds-s5,20px) 90px}
+  .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+  .crumb{font-size:13px;color:var(--faint);margin-bottom:4px}
+  .crumb a{color:var(--p);text-decoration:none;font-weight:500}
+  .crumb a:hover{text-decoration:underline}
+  h1{font-family:var(--serif);font-weight:600;font-size:30px;letter-spacing:-.01em;line-height:1.2}
+  .lede{color:var(--soft);font-size:15px;margin:4px 0 16px}
+  /* the kinds, as chips (pressed = shown) */
+  .kchips{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:16px}
+  .kchip{font:inherit;font-size:14px;font-weight:500;border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:999px;padding:7px 16px;min-height:36px;cursor:pointer;display:inline-flex;align-items:center;gap:8px;box-shadow:var(--shadow)}
+  .kchip .n{font-weight:700;font-variant-numeric:tabular-nums}
+  .kchip[aria-pressed="true"]{background:var(--dds-grad-btn,var(--p));border-color:transparent;color:var(--dds-on-p,#fff)}
+  @media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .kchip[aria-pressed="true"]{color:#171320}}
+  :root[data-theme="dark"] .kchip[aria-pressed="true"]{color:#171320}
+  .list{background:var(--card);border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow);overflow:hidden}
+  .drow{display:grid;grid-template-columns:auto 1fr auto auto;gap:4px 16px;align-items:center;padding:14px 20px;border-bottom:1px solid var(--line)}
+  .drow:last-child{border-bottom:0}
+  .dic{width:36px;height:36px;border-radius:50%;background:var(--p-soft);color:var(--p);display:grid;place-items:center}
+  .dic svg{width:18px;height:18px}
+  .dt{font-weight:600;font-size:15px;line-height:1.35}
+  .ds{font-size:13.5px;color:var(--soft)}
+  .dw{font-size:13.5px;color:var(--faint);white-space:nowrap}
+  .rbtn{font:inherit;font-size:14px;font-weight:600;border:1px solid var(--dds-line-strong,#d6d4e2);background:var(--card);color:var(--ink);border-radius:999px;padding:8px 18px;min-height:40px;cursor:pointer}
+  .rbtn:hover{background:var(--p-soft)}
+  .rbtn[disabled]{opacity:.55;cursor:default}
+  .note{display:flex;align-items:center;gap:10px;margin-top:16px;background:var(--info-soft);color:var(--info);border-radius:12px;padding:12px 16px;font-size:14px}
+  .note svg{flex:0 0 auto;width:18px;height:18px}
+  .note a{color:inherit;font-weight:600}
+  .partial{margin-bottom:12px;font-size:14px;color:var(--bad)}
+  .empty{text-align:center;padding:48px 20px}
+  .empty .dic{margin:0 auto 12px;width:44px;height:44px}
+  .empty h2{font-size:17px;font-weight:600;margin-bottom:6px}
+  .empty p{color:var(--soft);font-size:14.5px}
+  .empty p.small{font-size:13px;color:var(--faint);margin-top:8px}
+  .center{text-align:center;padding:48px 12px}
+  .center h2{font-family:var(--serif);font-weight:500;font-size:22px;margin-bottom:8px}
+  .muted{color:var(--soft);font-size:14.5px}
+  .link{color:var(--p);font-weight:600}
+  .btn{font:inherit;font-size:14px;font-weight:600;border:none;border-radius:999px;padding:9px 18px;cursor:pointer;background:var(--dds-grad-btn,var(--p));color:var(--dds-on-p,#fff)}
+  @media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .btn{color:#171320}}
+  :root[data-theme="dark"] .btn{color:#171320}
+  .spin{width:28px;height:28px;border:3px solid var(--line);border-top-color:var(--p);border-radius:50%;margin:60px auto;animation:sp 1s linear infinite}
+  @keyframes sp{to{transform:rotate(360deg)}}
+  @media (max-width:767px){
+    .wrap{padding:16px 16px 100px}
+    h1{font-size:26px}
+    .drow{grid-template-columns:auto 1fr auto;padding:14px 16px;align-items:start}
+    .dw{grid-column:2;grid-row:2;white-space:normal}
+    .rbtn{grid-column:3;grid-row:1;min-height:44px}
+    .kchip{min-height:44px;padding:6px 13px;flex:0 0 auto}
+    .kchips{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;margin:0 -16px 16px;padding:2px 16px 6px}   /* one row that slides, as drawn */
+    .kchips::-webkit-scrollbar{display:none}
+  }
+</style>
+<link rel="stylesheet" href="/shell.css"><script src="/shell.js" defer></script>
+</head>
+<body>
+<div class="wrap">
+  <div id="main"><div class="spin" role="status" aria-label="Loading"></div></div>
+</div>
+<script src="/vendor/supabase-js-2.45.4.js"></script>
+<script>
+const SUPABASE_URL="https://qksstlqzbhesadrrofgn.supabase.co";
+const SUPABASE_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFrc3N0bHF6Ymhlc2FkcnJvZmduIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE5NzMwMDMsImV4cCI6MjA5NzU0OTAwM30.4V94Ua7z5cntPWtvtqN24TUnfY5A6K6-zCxY0iEcgYo";
+const FN=SUPABASE_URL+"/functions/v1/presence";
+const sb=supabase.createClient(SUPABASE_URL,SUPABASE_KEY,{auth:{storageKey:'dds-portal-auth',persistSession:true,autoRefreshToken:true}});
+const $=(id)=>document.getElementById(id);
+const esc=(s)=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+let TOKEN="",DATA=null,SHOW='all';
+sb.auth.onAuthStateChange(function(_e,s){if(s&&s.access_token)TOKEN=s.access_token;});
+const scope=()=>new URLSearchParams(location.search).get('client')||'';
+// builder item 83: ?client= is also how someone with places in two businesses opens their second one. That is
+// their own business, not a studio inside a client, so its own deleted deals, contacts and to-dos show here. The shell tells the two apart
+// (ddsScopeInfo, once its context is in); without it, the address decides, as before.
+async function inClientNow(){const id=scope();if(!id)return false;if(document.readyState==='loading')await new Promise((r)=>document.addEventListener('DOMContentLoaded',r,{once:true}));if(window.ddsContext)await window.ddsContext().catch(()=>null);return window.ddsScopeInfo&&/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)?!!window.ddsScopeInfo():true;}
+const H=()=>({'Content-Type':'application/json','Authorization':'Bearer '+SUPABASE_KEY,'x-dds-user-jwt':TOKEN,'x-dds-scope-site':scope()});
+async function api(path,method,body){let r;try{r=await fetch(FN+path,{method:method||'GET',headers:H(),body:body?JSON.stringify(body):undefined});}catch(_){return{ok:false,status:0,body:{}};}return{ok:r.ok,status:r.status,body:await r.json().catch(()=>({}))};}
+function toast(m,bad,action){if(window.ddsToast)return void ddsToast(m,bad?'err':'ok',action);}
+const ICON={deal:'<rect x="3" y="4" width="5" height="16" rx="1"/><rect x="9.5" y="4" width="5" height="10" rx="1"/><rect x="16" y="4" width="5" height="13" rx="1"/>',todo:'<path d="M5 12l5 5 9-10"/>',contact:'<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0"/><circle cx="17" cy="9" r="2.5"/><path d="M15.5 14.5A5 5 0 0 1 21.5 20"/>',clock:'<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>'};
+const svg=(k)=>`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">${ICON[k]}</svg>`;
+const money=(c)=>c?'$'+(c/100).toLocaleString('en-US',{minimumFractionDigits:c%100?2:0,maximumFractionDigits:2}):'';
+const niceDay=(s)=>{const m=/^(\d{4})-(\d{2})-(\d{2})/.exec(String(s||''));return m?new Date(+m[1],+m[2]-1,+m[3]).toLocaleDateString('en-US',{month:'short',day:'numeric'}):'';};
+// "Deleted 3 days ago", by the local calendar day
+function ago(iso){
+  const t=Date.parse(iso||'');if(!isFinite(t))return'';
+  const day=(ms)=>{const d=new Date(ms);return Date.UTC(d.getFullYear(),d.getMonth(),d.getDate());};
+  const n=Math.round((day(Date.now())-day(t))/86400000);
+  if(n<=0)return'Deleted today';if(n===1)return'Deleted yesterday';if(n<7)return`Deleted ${n} days ago`;if(n<14)return'Deleted last week';return`Deleted ${Math.floor(n/7)} weeks ago`;
+}
+// one list of everything, newest first, each row saying what it is
+function rowsOf(d){
+  const out=[];
+  for(const x of d.deals||[])out.push({kind:'deal',id:x.id,title:x.title,sub:['Deal',x.stage_label,money(x.value_cents),x.person].filter(Boolean).join(' · '),at:x.deleted_at,home:'Pipeline',open:'/pipeline.html?deal='+encodeURIComponent(x.id)});
+  for(const x of d.contacts||[])out.push({kind:'contact',id:x.id,title:x.name,sub:['Contact',x.company,x.email].filter(Boolean).join(' · '),at:x.deleted_at,home:'Contacts',open:'/crm.html?contact='+encodeURIComponent(x.id)});
+  for(const x of d.todos||[]){
+    const who=x.for_name||x.deal_title||'';
+    out.push({kind:'todo',id:x.id,title:x.title,sub:['To-do',who?'for '+who:'',x.due_date?'was due '+niceDay(x.due_date):''].filter(Boolean).join(' · '),at:x.deleted_at,home:'To-dos',open:x.deal_id?'/pipeline.html?deal='+encodeURIComponent(x.deal_id):(x.href||'/todos.html')});
+  }
+  return out.sort((a,b)=>String(b.at||'').localeCompare(String(a.at||'')));
+}
+const KINDS=[['all','All'],['deal','Deals'],['contact','Contacts'],['todo','To-dos']];
+const PARTIAL_WORD={deals:'deals',contacts:'contacts',todos:'to-dos',names:'some names'};
+function render(focusSel){
+  const all=rowsOf(DATA),shown=SHOW==='all'?all:all.filter(r=>r.kind===SHOW);
+  const count=(k)=>k==='all'?all.length:all.filter(r=>r.kind===k).length;
+  const partial=(DATA.partial||[]).filter(k=>PARTIAL_WORD[k]);
+  let h=`<p class="crumb"><a href="/settings.html">Settings</a> <span aria-hidden="true">/</span> Recently deleted</p>
+    <h1>Recently deleted</h1>
+    <p class="lede">Deals, contacts and to-dos you deleted in the last ${esc(DATA.days||30)} days. Bring any of them back.</p>`;
+  if(partial.length)h+=`<p class="partial" role="status">We couldn’t read your deleted ${esc([...new Set(partial.map(k=>PARTIAL_WORD[k]))].join(' and '))} just now, so this may not be everything. Refresh to try again.</p>`;
+  if(all.length)h+=`<div class="kchips" role="group" aria-label="Show">${KINDS.map(([k,l])=>`<button type="button" class="kchip" data-show="${k}" aria-pressed="${SHOW===k?'true':'false'}">${l} <span class="n">${count(k)}</span></button>`).join('')}</div>`;
+  if(!all.length){
+    h+=`<div class="list"><div class="empty"><div class="dic">${svg('todo')}</div><h2>Nothing deleted in the last ${esc(DATA.days||30)} days</h2><p>When you delete a deal, a contact or a to-do, it waits here for ${esc(DATA.days||30)} days so you can bring it back.</p><p class="small">Websites you moved to the trash are on <a class="link" href="/sites.html">Sites</a>.</p></div></div>`;
+  }else{
+    h+=`<div class="list" role="list" aria-label="Deleted in the last ${esc(DATA.days||30)} days">`+(shown.length?shown.map(r=>`<div class="drow" role="listitem" data-row="${esc(r.kind+':'+r.id)}"><span class="dic">${svg(r.kind)}</span><div><div class="dt">${esc(r.title)}</div><div class="ds">${esc(r.sub)}</div></div><span class="dw">${esc(ago(r.at))}</span><button type="button" class="rbtn" data-restore="${esc(r.kind+':'+r.id)}" aria-label="Restore ${esc(r.title)}">Restore</button></div>`).join(''):`<div class="empty"><p>Nothing of this kind was deleted lately.</p></div>`)+`</div>`;
+    h+=`<p class="note">${svg('clock')}<span>After ${esc(DATA.days||30)} days things leave this list. Websites you moved to the trash are on <a href="/sites.html">Sites</a>.</span></p>`;
+  }
+  $('main').innerHTML=h;
+  document.querySelectorAll('[data-show]').forEach(b=>b.addEventListener('click',()=>{SHOW=b.getAttribute('data-show');render('[data-show="'+SHOW+'"]');}));
+  document.querySelectorAll('[data-restore]').forEach(b=>b.addEventListener('click',()=>restore(b)));
+  if(focusSel){const n=document.querySelector(focusSel);if(n)n.focus();}
+}
+async function restore(btn){
+  const [kind,id]=btn.getAttribute('data-restore').split(':');
+  const row=rowsOf(DATA).find(r=>r.kind===kind&&r.id===id);if(!row)return;
+  btn.disabled=true;btn.textContent='Restoring…';
+  const r=kind==='deal'?await api('/sales/deals/'+encodeURIComponent(id)+'/restore','POST',{})
+    :kind==='contact'?await api('/sales/contacts/'+encodeURIComponent(id)+'/restore','POST')
+    :await api('/sales/deal-tasks/'+encodeURIComponent(id),'PATCH',{restore:true});
+  if(!r.ok&&r.status!==404){btn.disabled=false;btn.textContent='Restore';toast((r.body&&r.body.message)||'That didn’t come back just now. Try again in a moment.',true);return;}
+  // gone from the list either way: put back now, or (404) already back
+  const list={deal:'deals',contact:'contacts',todo:'todos'}[kind];
+  const at=[...document.querySelectorAll('[data-restore]')].indexOf(btn);
+  DATA[list]=(DATA[list]||[]).filter(x=>x.id!==id);
+  render();
+  const btns=[...document.querySelectorAll('[data-restore]')];const nx=btns[Math.min(at,btns.length-1)]||document.querySelector('[data-show="'+SHOW+'"]')||$('main').querySelector('h1');
+  if(nx){if(nx.tagName==='H1')nx.setAttribute('tabindex','-1');nx.focus();}
+  if(r.ok)toast(`${row.title} is back in ${row.home}`,false,{label:'Open',onClick:()=>{location.href=row.open;}});
+  else toast(`${row.title} was already back.`);
+}
+async function load(){
+  if(await inClientNow()){$('main').innerHTML=`<div class="center"><h2>Recently deleted lives at the studio level.</h2><p class="muted">You’re looking at one client. What you delete belongs to your studio.</p><p style="margin-top:16px"><a class="link" data-noscope href="/recently-deleted.html">Leave this client and open Recently deleted →</a></p></div>`;return;}
+  const r=await api('/sales/deleted');
+  if(r.status===401){signedOut();return;}
+  if(!r.ok||!r.body||!r.body.data){trouble();return;}
+  DATA=r.body.data;render();
+}
+function signedOut(){$('main').innerHTML=`<div class="center"><h2>Sign in to see what was deleted.</h2><p style="margin-top:18px"><a class="link" href="/studio.html">Sign in →</a></p></div>`;}
+function trouble(){$('main').innerHTML=`<div class="center"><h2>We couldn’t load what was deleted just now.</h2><p class="muted" style="margin-bottom:16px">A brief hiccup. Try again.</p><button id="retry" class="btn">Try again</button></div>`;const rt=$('retry');if(rt)rt.addEventListener('click',load);}
+(async function(){try{const{data}=await sb.auth.getSession();TOKEN=(data&&data.session&&data.session.access_token)||"";if(!TOKEN){signedOut();return;}await load();}catch(_){trouble();}})();
+</script>
+</body>
+</html>

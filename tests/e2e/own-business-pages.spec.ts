@@ -277,6 +277,33 @@ test('Developer and Get started: your second business reads its own; a studio in
   expect(errors).toEqual([]);
 });
 
+// ── To-dos, Invoices and Recently deleted (sales 83 and 85) ───────────────────
+// Each said "lives at the studio level" whenever ?client= was there, your own second business included.
+const LIST_PAGES = [
+  { path: '/todos.html', read: '/sales/tasks', notice: 'To-dos live at the studio level.', api: { '/sales/tasks': { data: { partial: false, done_days: 30, total: 0, items: [] } } } },
+  { path: '/invoices.html', read: '/sales/invoices', notice: 'Invoices live at the studio level.', api: { '/sales/invoices': { data: { today: '2026-11-12', partial: false, items: [] } } } },
+  { path: '/recently-deleted.html', read: '/sales/deleted', notice: 'Recently deleted lives at the studio level.', api: { '/sales/deleted': { data: { days: 30, partial: [], deals: [], contacts: [], todos: [] } } } },
+];
+
+test('To-dos, Invoices and Recently deleted: your second business lists its own; a client’s says they live at the studio level', async ({ page }) => {
+  test.slow();   // nine pages opened in turn
+  const errors = errorsOf(page);
+  const rec = recorder(page);
+  for (const p of LIST_PAGES) {
+    for (const who of [FIRST, SECOND]) {
+      rec.reset();
+      await open(page, who, p.path, p.api);
+      await expect.poll(() => rec.asked(p.read).map((s) => s.scope), { message: `${p.path}, ${who.name}` }).toEqual([who.client]);
+      await expect(page.getByRole('heading', { name: p.notice })).toHaveCount(0);
+    }
+    rec.reset();
+    await open(page, STUDIO, p.path, p.api);
+    await expect(page.getByRole('heading', { name: p.notice })).toBeVisible();
+    expect(rec.asked(p.read)).toEqual([]);
+  }
+  expect(errors).toEqual([]);
+});
+
 // ── The website editor ──────────────────────────────────────────────────────────
 const FIRST_RUN = { '/commerce/first-run': { data: { dismissed: false, complete: false, done: 0, total: 1, steps: [{ key: 'details', title: 'Add your business details', done: false }] } } };
 

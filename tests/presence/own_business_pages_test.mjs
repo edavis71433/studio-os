@@ -214,6 +214,23 @@ for (const page of ['developer', 'get-started']) {
     && /async function businessKnown\(\)\{if\(!new URLSearchParams\(location\.search\)\.get\('client'\)\)return;[^\n]*await window\.ddsContext\(\)\.catch\(\(\)=>null\);\}/.test(html));
 }
 
+// ── To-dos, Invoices and Recently deleted (sales 83 and 85): a client's notice, or your own business's list ──
+// Each said "lives at the studio level" whenever ?client= was there; they now wait for the shell's context
+// when it is, and ask it.
+for (const page of ['todos', 'invoices', 'recently-deleted']) {
+  const html = read(`${page}.html`);
+  const src = grab(html, /async function inClientNow\(\)\{[^\n]*\}/, `${page} inClientNow`);
+  const verdicts = await Promise.all([...SHELL_CASES_OF(CASES), ODD].map(async (c) => {
+    const win = { ...c.win, ddsContext: c.win === NO_SHELL ? undefined : async () => c.ctx || {} };
+    const got = await new Function('scope', 'document', 'window', `${src}\nreturn inClientNow();`)(() => c.client, { readyState: 'complete' }, win);
+    return got === c.want ? '' : c.n;
+  }));
+  ok(`${page}: shows the studio-level notice only for a studio inside a client`, verdicts.every((v) => !v), verdicts.filter(Boolean).join('; '));
+  ok(`${page}: the check comes first in load(), and every read still carries the address`, /async function load\(\)\{\n  if\(await inClientNow\(\)\)\{\$\('main'\)\.innerHTML=/.test(html) && /'x-dds-scope-site':scope\(\)\}\);/.test(html));
+}
+ok('contacts and pipeline: the filter chips stay in your own second business',
+  /host\.hidden=!k\|\|inClient\(\);/.test(contacts) && /host\.hidden=VIEW==='board'\|\|!k\|\|inClient\(\)\|\|!DEALS\.length;/.test(pipeline));
+
 // ── the shell's own answer, which every page above leans on, is PR 341's and unchanged ──
 const shell = read('shell.js');
 ok('shell: ddsScopeInfo is null for one of your own businesses, the scope for a studio inside a client',

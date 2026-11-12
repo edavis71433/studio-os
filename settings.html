@@ -440,6 +440,7 @@ const nice = (b, fallback) => (b && typeof b.message === 'string' && /^[A-Z]/.te
 //    the caller's plan or role doesn't include is left out, never shown dead. ──
 const IC = {
   studio: '<path d="M3 21h18"/><path d="M5 21V7l7-4 7 4v14"/><path d="M9 21v-6h6v6"/>',
+  deleted: '<path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5"/>',   // sales item 83: a way back
   team: '<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0"/><circle cx="17" cy="9" r="2.5"/><path d="M15.5 14.5A5 5 0 0 1 21.5 20"/>',
   agency_team: '<circle cx="8" cy="8" r="3"/><circle cx="16" cy="8" r="3"/><path d="M2 20a6 6 0 0 1 12 0"/><path d="M10 20a6 6 0 0 1 12 0"/>',
   billing: '<path d="M12 3v18"/><path d="M17 7.5c0-1.9-2.2-3-5-3s-5 1.1-5 3 2.2 2.5 5 3 5 1.1 5 3-2.2 3-5 3-5-1.1-5-3"/>',
@@ -469,6 +470,8 @@ const CARDS = [
   { key: 'menu', icon: 'studio', href: '#menu', title: 'Your menu', desc: 'Hide the areas your studio doesn’t use. A hidden area keeps its page and stays one search away.', words: 'hide areas navigation sidebar', agencyOnly: true, cap: 'configure' },
   { key: 'billing', href: '#billing', title: 'Your plan', desc: 'Your Studio OS plan, how to change it, and closing your account.', words: 'plan billing subscription payment card cancel close delete account export download data', ownerOnly: true, needs: 'owner' },   // item 166: "Plan" alone for the studio's own subscription (billing stays a search word)
   { key: 'money', href: '/pipeline.html?services=1', title: 'Invoices & agreements', desc: 'Your services and prices (they fill proposals), the agreement every deal starts from, deposits.', words: 'services prices proposals deposits contracts tax', feature: 'relationship' },
+  // sales item 83 (Nov 2026): one place for what was deleted lately, with Restore
+  { key: 'deleted', href: '/recently-deleted.html', title: 'Recently deleted', desc: 'Deals, contacts and to-dos you deleted in the last 30 days. Bring any of them back.', words: 'trash bin undo restore deleted removed recover', feature: 'relationship', studioOnly: true },
   // Bold redesign (Nov 2026): the private calendar link (sales review item 46) has its own row — it lives on Connections
   { key: 'calendar', href: '/connections.html#calSec', title: 'Calendar', desc: 'Your bookings and dated tasks in Google Calendar, Apple Calendar or Outlook, through a private link.', words: 'ical google outlook apple bookings', feature: 'connected', studioOnly: true },
   { key: 'connections', href: '/connections.html', title: 'Connections', desc: 'Google Analytics, Search Console, Business Profile, email sending.', words: 'google analytics search console business profile email sending integrations', feature: 'connected', scoped: true },
