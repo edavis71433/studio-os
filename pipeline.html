@@ -4190,8 +4190,8 @@ async function openDeal(id){
 
 // sales review item 38: the studio's own names for its open stages (Settings → Name your deal stages)
 function studioLevelTools(){
-  loadSavedViews();
   loadTeam();   // sales item 37: owners and Everyone / Mine
+  loadSavedViews();
   api('/sales/stages').then(r=>{const l=r&&r.data&&r.data.labels;if(l&&STAGES.some(k=>l[k]&&l[k]!==STAGE_LABEL[k])){Object.assign(STAGE_LABEL,l);renderFilters();if(DEALS_LOADED)renderCurrent();if(CURRENT_DEAL&&!$('detailWrap').hidden)openDeal(CURRENT_DEAL);}}).catch(()=>{});
 }
 // builder item 83: under ?client= the page starts as a client's pipeline. One of your own businesses gets
