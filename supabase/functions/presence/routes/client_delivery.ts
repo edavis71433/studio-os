@@ -24,8 +24,8 @@ import { signDocToken, type DocKind } from '../lib/documents.ts';
 import { proposalTotals } from '../lib/sales_lifecycle.ts';
 import { linkSecret, docViewerUrl } from './sales.ts';
 import { readGsc, readSearchTerms } from './analytics.ts';
-import { aggregateVisits, type VisitRow } from '../lib/visits.ts';
-import { dashRange, weeklyVisitors, sourceShares, DASH_WEEKS } from '../lib/analytics_dashboard.ts';
+import { readVisitStats } from '../lib/visit_stats.ts';
+import { dashRange, sourceShares, DASH_WEEKS } from '../lib/analytics_dashboard.ts';
 import type { SiteRow } from '../lib/site.ts';
 import { siteOrigin } from '../lib/site.ts';
 import type { Principal } from '../../_shared/auth.ts';
@@ -82,16 +82,22 @@ export async function handleClientBilling(_req: Request, site: SiteRow, _princip
   // processing_since lands with migration 0132 — deploy-order tolerant: the full
   // select first, then the pre-0132 shape, so a function deploy ahead of the
   // migration never blanks the client's money surface.
-  const SEL = 'id,title,description,amount_cents,status,due_date,paid_at,stripe_url,created_at';
+  const SEL = 'id,title,description,amount_cents,status,due_date,paid_at,stripe_url,created_at,site_id';
   let r = await svc(`presence_invoices?customer_client_id=eq.${me}&deleted_at=is.null&select=${SEL},processing_since&order=created_at.desc&limit=200`);
   if (!r.ok) r = await svc(`presence_invoices?customer_client_id=eq.${me}&deleted_at=is.null&select=${SEL}&order=created_at.desc&limit=200`);
+  // Builder list item 179, part four: each invoice on the client's papers shelf opens
+  // as the studio's branded copy (doc.html, the Documents tab's own short-lived signed
+  // link); once paid, that copy is the receipt (sales item 79). Withdrawn ones get none.
+  const secret = linkSecret();
+  const exp = Math.floor(Date.now() / 1000) + 30 * 86400;
+  const viewUrl = async (i: any) => (secret && i.site_id) ? docViewerUrl(await signDocToken({ t: 'doc', k: 'invoice', id: String(i.id), site_id: String(i.site_id), exp }, secret)) : null;
   // Oct 2026 benchmark (item 2): the four money states — paid · processing ·
   // upcoming · overdue — come from ONE formula (lib/money_state.ts), computed
   // here against the server's UTC day. The portal re-runs the same mirrored
   // formula against the client's LOCAL day (PS2's rule) and adds the
   // just-came-back-from-Stripe case; `state` on the wire is the server's word.
   const today = nowIso().slice(0, 10);
-  const list = rows(r).map((i) => {
+  const list = await Promise.all(rows(r).map(async (i) => {
     const state = moneyState(i, today);
     return {
       id: i.id, name: clean(i.title, 200), description: clean(i.description, 1000),
@@ -103,14 +109,19 @@ export async function handleClientBilling(_req: Request, site: SiteRow, _princip
       // one whose payment is already PROCESSING (a second charge on a settling
       // ACH payment is a double-pay). Allow-list the two payable states.
       pay_url: ((state === 'upcoming' || state === 'overdue') && i.stripe_url) ? i.stripe_url : null,
+      view_url: state ? await viewUrl(i) : null,
       created_at: i.created_at,
     };
-  });
+  }));
   const b = moneyBuckets(list, today);
+  // Sales item 117: the retainers their studio set up for them, with every charge and a
+  // way to cancel. The email said "you can cancel any time" and the portal showed nothing.
+  const retainers = await (await import('./client_retainers.ts')).clientRetainers(me);
   return json({ data: {
     billing_type: 'service',   // agency project work — SEPARATE from the software subscription
     note: 'These are invoices from your studio for project and service work. Your website subscription is billed separately.',
     invoices: list,
+    retainers,
     // open_count = still waiting on the client (upcoming + overdue); processing
     // money is neither open nor paid yet, so it gets its own count.
     summary: { open_count: b.upcoming.count + b.overdue.count, paid_count: b.paid.count, processing_count: b.processing.count, overdue_count: b.overdue.count, upcoming_count: b.upcoming.count },
@@ -636,7 +647,7 @@ export async function handleClientSupport(req: Request, site: SiteRow, principal
     const u = new URL(req.url);
     const limit = clampLimit(u.searchParams.get('limit')), offset = clampOffset(u.searchParams.get('offset'));
     const byActivity = offset + limit <= SUPPORT_POOL;   // past the pool, pages stay in updated_at order
-    const r = await svc(`presence_support_requests?site_id=eq.${s}&requester=eq.${encodeURIComponent(readerKey(principal))}&deleted_at=is.null&select=id,subject,status,priority,project_id,resolved_at,created_at,updated_at,requester&order=updated_at.desc&limit=${byActivity ? SUPPORT_POOL : limit}&offset=${byActivity ? 0 : offset}`);
+    const r = await svc(`presence_support_requests?site_id=eq.${s}&requester=eq.${encodeURIComponent(readerKey(principal))}&deleted_at=is.null&select=id,subject,status,priority,project_id,resolved_at,created_at,updated_at,requester,body&order=updated_at.desc&limit=${byActivity ? SUPPORT_POOL : limit}&offset=${byActivity ? 0 : offset}`);
     if (!r.ok) return json({ error: 'read_failed' }, 502, cors);
     let list = rows(r);
     // Additive `last_activity_at` = max(updated_at, the newest reply's created_at):
@@ -660,6 +671,10 @@ export async function handleClientSupport(req: Request, site: SiteRow, principal
         }
       } catch { /* omit the field — callers fall back to updated_at */ }
     }
+    // Builder list item 179, part three: a request nobody has replied to yet reads
+    // as its own first words ("You: …"), never as "A conversation with your studio"
+    // (the Nov 10 walk). The opening text is the client's own; only one line leaves.
+    for (const row of list) { if (!row.last_message) { const ll = lastLine({ at: String(row.created_at || ''), body: String(row.body || ''), mine: true, studioAt: '' }); if (ll) row.last_message = ll; } delete row.body; }
     if (byActivity) {
       const at = (x: any) => String(x.last_activity_at || x.updated_at || '');
       list = list.sort((a: any, b: any) => at(b).localeCompare(at(a)) || String(b.id).localeCompare(String(a.id))).slice(offset, offset + limit);
@@ -839,34 +854,28 @@ export async function handleClientWebsiteStats(_req: Request, site: SiteRow, _pr
   if (!published) return json({ data: { published: false, month: null, search: null } }, 200, cors);
   const statNowIso = nowIso();
   const nowMs = Date.parse(statNowIso);
-  const { startMs, days } = dashRange('this_month', nowMs);
-  // one visits fetch serves the this-month numbers AND the 12-week line (the
-  // same shape handleAnalyticsDashboard uses)
-  const visitStartIso = new Date(Math.min(startMs, nowMs - DASH_WEEKS * 7 * 86_400_000)).toISOString();
+  const { startMs } = dashRange('this_month', nowMs);
+  // one visits read serves the this-month numbers AND the 12-week line (the same
+  // read handleAnalyticsDashboard uses). Item 207: counted in the database; the row
+  // read it replaces stopped at 1,000 rows, so a busier month was understated.
   const safe = async <T>(p: Promise<T>): Promise<T | null> => { try { return await p; } catch { return null; } };
-  const [visitsR, gsc] = await Promise.all([
-    safe(svc(`presence_visits?site_id=eq.${site.id}&ts=gte.${visitStartIso}&kind=not.in.(button,leave)&select=ts,kind,path,ref_host,utm_source,device,country,visitor_hash&order=ts.desc&limit=5000`)),
+  const [stats, gsc] = await Promise.all([
+    safe(readVisitStats(site.id, { startMs, weeks: DASH_WEEKS, nowMs })),
     safe(readGsc(site.client_id)),
   ]);
   let month: unknown = null;
-  const vRows = (visitsR && (visitsR as { ok?: boolean }).ok && Array.isArray((visitsR as { json?: unknown }).json))
-    ? (visitsR as { json: VisitRow[] }).json : null;
-  if (vRows) {
-    // EXACT calendar boundary (same fix as handleAnalyticsDashboard): intersect
-    // with the true month start before aggregating, so the ceil'd days window
-    // never bleeds prior-month rows into "this month" (worst on the 1st).
-    const periodRows = vRows.filter((v) => { const ms = Date.parse(String(v.ts || '')); return Number.isFinite(ms) && ms >= startMs; });
-    const agg = aggregateVisits(periodRows, nowMs, days);
+  if (stats) {
+    const agg = stats.agg;
     const sources = sourceShares(agg.topSources, agg.visitors);   // already ≤5, largest first
     month = {
       visitors: agg.visitors, pageviews: agg.pageviews,
       actions: agg.events.phone + agg.events.email + agg.events.cta,
       top_source: sources[0] || null,
-      weekly: weeklyVisitors(vRows, nowMs),   // 12 buckets, oldest first
+      weekly: stats.weekly || [],             // 12 buckets, oldest first
       top_pages: agg.topPages,                // ≤5
       sources,
       has_data: agg.hasData,
-      truncated: vRows.length >= 5000,        // hit the fetch cap → "based on recent activity"
+      truncated: stats.truncated,             // only before migration 0194, past 50,000 rows → "based on recent activity"
     };
   }
   // search: null = genuinely not connected; { unavailable: true } = the signals

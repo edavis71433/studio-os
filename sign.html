@@ -508,6 +508,8 @@ function payHtml(dep,rows,c,paid){
   const then=later.length?`Then ${andList(later)}. Each comes with its own invoice.`:'';
   const head=p1?`Part 1 of ${rows.length}`:'Your deposit';
   if(paid)return `<div class="card next" id="step-pay"><p class="eyebrow">${esc(head)}</p><div class="ok">✓ ${p1?'Part 1 paid':'Deposit paid'} — thank you. Your studio has been told and will kick things off.</div>${then?`<p class="fine">${esc(then)}</p>`:''}</div>`;
+  // sales item 118: a bank payment takes days to arrive; its link is used up, so no Pay button
+  if(dep&&dep.processing)return `<div class="card next" id="step-pay"><p class="eyebrow">${esc(head)}</p><div class="ok">Payment on its way. Your ${money(dep.amount_cents)} bank payment takes a few days to arrive. There’s nothing more to do, and you’ll get a receipt when it lands.</div>${then?`<p class="fine">${esc(then)}</p>`:''}</div>`;
   if(dep&&dep.url)return `<div class="card next no-print" id="step-pay"><p class="eyebrow">Next step</p><h3>${esc(head)}</h3><p class="big">${money(dep.amount_cents)}</p><a class="paybtn" id="pay" href="${esc(dep.url)}">Pay ${money(dep.amount_cents)} securely</a><p class="fine">${esc(then||'Prefer later? This page keeps the link — come back any time.')}</p></div>`;
   if(dep)return `<div class="card next" id="step-pay"><p class="eyebrow">Next step</p><h3>${esc(head)}</h3><p class="muted">Your ${money(dep.amount_cents)} deposit is being set up — your studio will send the payment link. Nothing to do now.</p></div>`;
   return `<div class="card next" id="step-pay"><p class="eyebrow">Next step</p><h3>All set for now</h3><p class="muted">Nothing to pay right now — your studio has been told you signed and will send an invoice when it’s time.</p></div>`;

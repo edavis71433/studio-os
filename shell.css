@@ -209,6 +209,7 @@ html.dds-has-shell.dds-has-ctxbar body{padding-top:calc(var(--dds-shell-h) + var
 .dds-pop .row{padding:var(--dds-s2) 10px;border-radius:var(--dds-r);font-size:13.5px;color:var(--dds-ink);display:block;text-decoration:none}
 .dds-pop .row:hover{background:var(--dds-p-soft)}
 .dds-pop .row .sub{color:var(--dds-soft);font-size:12.5px;margin-top:1px}
+.dds-pop .row .sub .go{color:var(--dds-p);font-weight:600;white-space:nowrap}   /* item 126: the line's one link, named */
 .dds-pop .muted{color:var(--dds-soft);font-size:13px;padding:var(--dds-s3) 10px;text-align:center}
 .dds-pop .who{padding:10px;border-bottom:1px solid var(--dds-line);margin-bottom:6px}
 .dds-pop .who .n{font-weight:600;font-size:14px}
@@ -292,8 +293,10 @@ html.dds-embed .dds-waffle{display:none!important}
 /* Very narrow phones: the 44px icon floor makes waffle+brand+search+3 icons
    overflow a 360px bar. Help moves to the profile menu (it's in UTILS there);
    the brand may truncate rather than push the controls off-screen. */
+/* item 128: What's new's dot is a dot, not a count */
+.dds-ic .dot.wn-dot{min-width:0;width:8px;height:8px;padding:0;top:8px;right:8px}
 @media (max-width:420px){
-  a.dds-ic[href="/help.html"],#dds-settings{display:none}
+  a.dds-ic[href="/help.html"],#dds-settings,#dds-new{display:none}
   .dds-brand{min-width:0;overflow:hidden;white-space:nowrap}
 }
 @media (prefers-reduced-motion:reduce){#dds-shell,.dds-pop,.dds-palette,.dds-drawer,.dds-nav .sec .menu{transition:none;animation:none}}

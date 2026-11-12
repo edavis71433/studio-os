@@ -252,7 +252,7 @@ export async function healUnstampedSupport(agencySiteId: string): Promise<void> 
  *  message, an approval request). Without this, the delivery loop stalls unless
  *  the client habitually opens the portal — an approval could sit unseen forever.
  *  Best-effort: resolves project → bridge → customer email; never throws. */
-export async function emailBridgedCustomer(agencySiteId: string, projectId: string, subject: string, bodyHtml: string): Promise<boolean> {
+export async function emailBridgedCustomer(agencySiteId: string, projectId: string, subject: string, bodyHtml: string, open?: { approval?: string }): Promise<boolean> {
   try {
     const link = rows(await svc(`presence_service_links?project_id=eq.${projectId}&agency_site_id=eq.${agencySiteId}&status=eq.active&select=customer_client_id&limit=1`))[0];
     if (!link?.customer_client_id) return false;
@@ -264,7 +264,10 @@ export async function emailBridgedCustomer(agencySiteId: string, projectId: stri
     const brand = await loadEmailBrand(agencySiteId);
     // Deep-link straight to the project (client.html honors ?project=) — landing
     // on Home and hunting for the approval was the #1 seam in the email loop.
-    const btn = `<a href="${(Deno.env.get('SITE_URL') || 'https://davisdigitalstudio.com')}/client.html?project=${encodeURIComponent(projectId)}" style="display:inline-block;margin-top:6px;background:${brand.accent};color:#fff;padding:9px 16px;border-radius:999px;text-decoration:none">Open your project →</a>`;
+    // Builder list item 179: an ask for an OK opens that approval itself (the portal
+    // falls back to the project when it can't), so the button says what it opens.
+    const approval = open?.approval && /^[0-9a-f-]{36}$/i.test(open.approval) ? open.approval : '';
+    const btn = `<a href="${(Deno.env.get('SITE_URL') || 'https://davisdigitalstudio.com')}/client.html?project=${encodeURIComponent(projectId)}${approval ? `&approval=${approval}` : ''}" style="display:inline-block;margin-top:6px;background:${brand.accent};color:#fff;padding:9px 16px;border-radius:999px;text-decoration:none">${approval ? 'Take a look →' : 'Open your project →'}</a>`;
     // critical: this is the "your project needs you" nudge — an opted-out client's
     // approval/message must still reach them (bounces still suppress).
     return await sendEmail(email, subject, `${bodyHtml}<p class="cta">${btn}</p>`, brand, { critical: true, asBusiness: true, siteId: agencySiteId });
@@ -742,6 +745,26 @@ export async function tickChecklistForDeal(agencySiteId: string, dealId: string,
     const deal = rows(await svc(`presence_deals?id=eq.${dealId}&site_id=eq.${agencySiteId}&select=created_project_id&limit=1`))[0];
     if (!deal?.created_project_id) return false;
     return await tickChecklistStep(agencySiteId, String(deal.created_project_id), key, actor, actorKind);
+  } catch { return false; }
+}
+
+/** Take a self-ticked step back off (sales item 118): a deposit recorded by hand
+ *  and then undone is not paid, and the checklist must not go on saying it is.
+ *  Only a step that is done moves; no project yet is a clean false. */
+export async function untickChecklistForDeal(agencySiteId: string, dealId: string, key: string, actor = 'system', actorKind = 'system'): Promise<boolean> {
+  try {
+    if (!agencySiteId || !dealId || !key) return false;
+    const deal = rows(await svc(`presence_deals?id=eq.${dealId}&site_id=eq.${agencySiteId}&select=created_project_id&limit=1`))[0];
+    if (!deal?.created_project_id) return false;
+    const { checklistSource } = await import('./project_checklist.ts');
+    const up = await svc(
+      `presence_tasks?project_id=eq.${deal.created_project_id}&site_id=eq.${agencySiteId}&source=eq.${encodeURIComponent(checklistSource(key))}&status=eq.done&deleted_at=is.null&select=id,title,client_visible`,
+      { method: 'PATCH', headers: { Prefer: 'return=representation' }, body: JSON.stringify({ status: 'todo', completed_at: null, updated_at: nowIso() }) },
+    );
+    const row = rows(up)[0];
+    if (!row) return false;
+    await projectEventRow(agencySiteId, String(deal.created_project_id), 'task_status_change', actor, actorKind, row.client_visible === true, { task_id: row.id, title: row.title, status: 'todo', auto: key });
+    return true;
   } catch { return false; }
 }
 

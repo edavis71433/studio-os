@@ -1215,7 +1215,8 @@ function myTasksHtml(){
   if(hiddenHere>0)h+=`<p class="quiet"><button type="button" class="linkbtn" id="myTasksMore">Show all ${items.length}</button></p>`;
   else if(beyond>0)h+=`<p class="quiet">${beyond} more on your deals and projects.</p>`;
   if(MYTASKS.partial)h+='<p class="quiet">Some of this couldn’t be checked just now — ↻ tries again.</p>';
-  return h+'<div class="rfoot"><a href="/pipeline.html" data-noscope="1">Pipeline →</a> · <a href="/projects.html" data-noscope="1">Projects →</a></div></div>';
+  // sales item 85: the whole list has a page of its own
+  return h+'<div class="rfoot"><a href="/todos.html" data-noscope="1">All to-dos →</a> · <a href="/pipeline.html" data-noscope="1">Pipeline →</a> · <a href="/projects.html" data-noscope="1">Projects →</a></div></div>';
 }
 function paintMyTasks(){
   if(!$('my-tasks')||!MYTASKS)return;

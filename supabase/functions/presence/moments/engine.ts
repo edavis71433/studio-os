@@ -52,7 +52,7 @@ export async function runMoments(site: SiteRow): Promise<MomentsSummary> {
     const rb = latest.json?.[0]?.batch_id ?? null;
     if (!rb) return { ok: false, batch_id: null, recommendation_batch_id: null, active: 0, suppressed: 0, deferred: [], untranslated_rules: [], ms: Date.now() - t0, error: 'no_recommendation_batch' };
 
-    const rQ = await svc(`presence_recommendations?batch_id=eq.${rb}&select=recommendation_hash,rule,priority,audience,status,value_dimensions,timing,expires_at,affected_resources&limit=200`);
+    const rQ = await svc(`presence_recommendations?site_id=eq.${site.id}&batch_id=eq.${rb}&select=recommendation_hash,rule,priority,audience,status,value_dimensions,timing,expires_at,affected_resources&limit=200`);
     const recs: RecRow[] = await withEvidence(rQ.json ?? []);
 
     // 2. memory: prior first_seen per key + the freshest dismissal per key (within TTL window)

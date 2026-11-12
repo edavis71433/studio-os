@@ -69,6 +69,12 @@
   Cache-Control: no-cache, must-revalidate
 /prospects
   Cache-Control: no-cache, must-revalidate
+/todos
+  Cache-Control: no-cache, must-revalidate
+/invoices
+  Cache-Control: no-cache, must-revalidate
+/recently-deleted
+  Cache-Control: no-cache, must-revalidate
 /pitch
   Cache-Control: no-cache, must-revalidate
 /intake
@@ -103,6 +109,8 @@
 /developer
   Cache-Control: no-cache, must-revalidate
 /approve
+  Cache-Control: no-cache, must-revalidate
+/transfer
   Cache-Control: no-cache, must-revalidate
 /leads
   Cache-Control: no-cache, must-revalidate

@@ -15,8 +15,8 @@ import { CONNECTED_PROVIDERS } from '../connected/providers.ts';
 import { siteContentTree } from './room.ts';
 import { siteLaunchChecklist } from './services.ts';
 import { buildWebsiteHealth, type WebsiteHealthInput } from '../lib/website_health.ts';
-import { loadVisits } from './analytics.ts';
-import { aggregateVisits, speedOf } from '../lib/visits.ts';
+import { loadVisitAgg } from './analytics.ts';
+import { speedOf } from '../lib/visits.ts';
 import { siteOrigin } from '../lib/site.ts';
 import { TOOLS_BASE_URL } from '../../_shared/tools/config.ts';
 import { buildContentPerformance } from '../lib/content_performance.ts';
@@ -101,7 +101,7 @@ async function websiteHealthData(site: SiteRow) {
   // reused projections + the honest launch probes, in parallel with the small
   // evidence reads (contact-form message received, a saved version exists) and
   // the already-collected first-party visits (for the plain-English "what this
-  // means" projection — no new tracking, reuses loadVisits + aggregateVisits).
+  // means" projection — no new tracking, reuses loadVisitAgg).
   const monthAgo = new Date(nowMs - 30 * 86_400_000).toISOString();
   const [tree, launch, connQ, formQ, snapQ, visits, upQ, sslQ, daysQ, speedQ, firstQ, identQ, locQ, setQ, mem] = await Promise.all([
     siteContentTree(site),
@@ -109,7 +109,7 @@ async function websiteHealthData(site: SiteRow) {
     svc(`presence_connections?site_id=eq.${site.id}&select=provider_key,status,health`),
     svc(`presence_form_submissions?site_id=eq.${site.id}&spam=eq.false&select=id&limit=1`),
     svc(`presence_snapshots?site_id=eq.${site.id}&select=id&limit=1`),
-    loadVisits(site.id, 'month', nowMs),
+    loadVisitAgg(site.id, 'month', nowMs),   // item 207: counted in the database
     // Real uptime-heartbeat state (0094). Best-effort: pre-migration this 400s and
     // we fall back to the publish-state inference — never breaks the page.
     svc(`presence_sites?id=eq.${site.id}&select=uptime_ok,uptime_checked_at&limit=1`).catch(() => ({ ok: false, json: null as any })),
@@ -180,7 +180,7 @@ async function websiteHealthData(site: SiteRow) {
   // Plain-English "what this means" over the visits we already collect (30-day
   // window — the calmest for an owner). Deterministic, honest empty state, and it
   // respects the fetch-cap `truncated` flag (never over-reads an incomplete set).
-  const content_performance = buildContentPerformance(aggregateVisits(visits, nowMs, 30));
+  const content_performance = buildContentPerformance(visits);
 
   return { ...buildWebsiteHealth(input), content_performance, memory: mem.memory, memory_ready: mem.ready };
 }

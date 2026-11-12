@@ -27,7 +27,7 @@ export async function runRecommendation(site: SiteRow): Promise<RecommendSummary
     const jb = latest.json?.[0]?.batch_id ?? null;
     if (!jb) return { ok: false, batch_id: null, judgment_batch_id: null, recommended: 0, active: 0, suppressed: 0, unconsumed_rules: [], ms: Date.now() - t0, error: 'no_judgment_batch' };
 
-    const jQ = await svc(`presence_judgments?batch_id=eq.${jb}&select=judgment_hash,judgment_key,rule,category,priority,severity,confidence,reasoning,timing,audience,status,evidence_count,evidence_ids,first_seen_at,expires_at&limit=200`);
+    const jQ = await svc(`presence_judgments?site_id=eq.${site.id}&batch_id=eq.${jb}&select=judgment_hash,judgment_key,rule,category,priority,severity,confidence,reasoning,timing,audience,status,evidence_count,evidence_ids,first_seen_at,expires_at&limit=200`);
     const judgments: JudgmentRow[] = (jQ.json ?? []).map((j: JudgmentRow) => ({ ...j, confidence: Number(j.confidence) }));
 
     // 2. prior state per recommendation key

@@ -13,12 +13,11 @@ function chipsFor(d){
   if((d.approvals||[]).filter(a=>a&&a.status==='pending').length)chips.push({id:'sec-approvals',label:'Approvals'});
   if((d.deliverables||[]).length)chips.push({id:'sec-files',label:'Files'});
   if(d.hasMessages)chips.push({id:'sec-messages',label:'Messages'});
-  if(d.hasSupport)chips.push({id:'sec-support',label:'Support'});
   return chips;
 }
 function notifBucket(iso,nowMs){const t=Date.parse(iso);if(!isFinite(t))return'Earlier';const days=Math.floor((nowMs-t)/86400000);if(days<=0)return'Today';if(days<7)return'This week';return'Earlier';}
 function groupNotifs(items,nowMs){const order=['Today','This week','Earlier'];const map={};for(const it of(items||[])){const b=notifBucket(it&&it.created_at,nowMs);(map[b]=map[b]||[]).push(it);}return order.filter(b=>map[b]&&map[b].length).map(b=>({bucket:b,items:map[b]}));}
-function sectionForAnchor(a){a=String(a||'').replace(/^#/,'');if(a.indexOf('approval')===0)return'sec-approvals';if(a.indexOf('file')===0||a.indexOf('deliverable')===0)return'sec-files';if(a.indexOf('message')===0)return'sec-messages';if(a.indexOf('support')===0)return'sec-support';if(a.indexOf('survey')===0)return'sec-surveys';if(a.indexOf('milestone')===0)return'sec-milestones';if(a.indexOf('task')===0)return'sec-todos';return'sec-overview';}
+function sectionForAnchor(a){a=String(a||'').replace(/^#/,'');if(a.indexOf('approval')===0)return'sec-approvals';if(a.indexOf('file')===0||a.indexOf('deliverable')===0)return'sec-files';if(a.indexOf('message')===0)return'sec-messages';if(a.indexOf('survey')===0)return'sec-surveys';if(a.indexOf('milestone')===0)return'sec-milestones';if(a.indexOf('task')===0)return'sec-todos';return'sec-overview';}
 function firstName(u){if(!u)return'';const cap=(p)=>p.charAt(0).toUpperCase()+p.slice(1);const m=(u.user_metadata||{});const n=String(m.name||m.full_name||'').trim().split(/\s+/)[0].replace(/[.,]+$/,'');if(n.length>1)return n===n.toLowerCase()?cap(n):n;const e=(u.email||'').split('@')[0];if(e&&/^[a-z]+([._-][a-z]+)?$/i.test(e)){const p=e.split(/[._-]/)[0];if(p.length>1)return cap(p);}return'';}
 const esc=(s)=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 function rel(iso){const t=Date.parse(iso);if(!isFinite(t))return'';const s=Math.floor((Date.now()-t)/1000);if(s<60)return'just now';const m=Math.floor(s/60);if(m<60)return m+(m===1?' min ago':' mins ago');const h=Math.floor(m/60);if(h<24)return h+(h===1?' hour ago':' hours ago');const d=Math.floor(h/24);if(d<7)return d+(d===1?' day ago':' days ago');return new Date(t).toLocaleDateString('en-US',{month:'short',day:'numeric'});}
@@ -84,8 +83,9 @@ function unreadKeysFrom(notifs){
   }
   return keys;
 }
-function convRows(projects,support,latest){
+function convRows(projects,support,latest,studio){
   const names={};for(const p of (projects||[]))if(p&&p.id)names[p.id]=p.name;
+  const who=String(studio||'').trim()||'Your studio';
   const rows=[];
   for(const p of (projects||[])){
     if(!p||!p.id)continue;
@@ -93,16 +93,21 @@ function convRows(projects,support,latest){
     const lm=fetched?(latest||{})[p.id]:null;
     rows.push({id:'proj:'+p.id,kind:'project',pid:p.id,title:p.name||'Project',when:(lm&&lm.created_at)||'',
       preview:lm?(lm.body||''):(fetched?'No messages yet — say hello any time.':'Open this conversation'),
-      unfetched:!fetched,chip:'Message',chipCls:'',unreadKey:'msgs-'+p.id});
+      unfetched:!fetched,chip:'',chipCls:'',unreadKey:'msgs-'+p.id});
   }
   for(const rq of (support||[])){
     if(!rq||!rq.id)continue;
-    const status=String(rq.status||'open');
-    // recency prefers last_activity_at (new function builds — replies only INSERT
-    // and never bump updated_at) with the updated_at fallback for old builds.
-    rows.push({id:'sup:'+rq.id,kind:'support',sid:rq.id,pid:rq.project_id||'',title:rq.subject||'Support request',
-      when:rq.last_activity_at||rq.updated_at||'',preview:rq.project_id?(names[rq.project_id]||'A project request'):'A conversation with your studio',
-      chip:'Support · '+status.replace(/_/g,' '),chipCls:'support',status,unreadKey:'support-'+rq.id});
+    const status=String(rq.status||'open');const done=status==='resolved'||status==='closed';
+    // item 179 part three: one door — a question, a request and a service ask are all
+    // conversations, in plain words: a service ask reads as the service ("Asked" until
+    // it's handled), anything handled says Done, and each line says who wrote it.
+    // Recency prefers last_activity_at (replies only INSERT and never bump
+    // updated_at) with the updated_at fallback for old builds.
+    const subj=String(rq.subject||'');const service=subj.indexOf('Service request: ')===0;
+    const lm=rq.last_message&&rq.last_message.text?rq.last_message:null;
+    rows.push({id:'sup:'+rq.id,kind:service?'service':'support',sid:rq.id,pid:rq.project_id||'',title:(service?subj.slice(17):subj)||'Support request',
+      when:rq.last_activity_at||rq.updated_at||'',preview:lm?((lm.from==='you'?'You: ':who+': ')+lm.text):(rq.project_id?(names[rq.project_id]||'A project request'):'A conversation with your studio'),
+      chip:done?'Done':service?'Asked':'',chipCls:done?'done':'',status,unreadKey:'support-'+rq.id});
   }
   rows.sort(convCompare);
   return rows;
@@ -167,19 +172,19 @@ const ok=(n,p)=>{results.push({n,p});console.log(`${p?'PASS':'FAIL'}  ${n}`);};
 const idsOf=(cs)=>cs.map(c=>c.id);
 
 // ═══ chipsFor — content-gated section chips ═══
-ok('chips: Messages + Support always present (composer / open-a-request CTA)',
-  JSON.stringify(idsOf(chipsFor({hasMessages:true,hasSupport:true})))===JSON.stringify(['sec-messages','sec-support']));
+ok('chips: Messages always present (the composer); no Support chip since requests live in Messages (item 179 part three)',
+  JSON.stringify(idsOf(chipsFor({hasMessages:true})))===JSON.stringify(['sec-messages']));
 ok('chips: Overview only when there is a summary',
-  idsOf(chipsFor({hasOverview:true,hasMessages:true,hasSupport:true}))[0]==='sec-overview');
+  idsOf(chipsFor({hasOverview:true,hasMessages:true}))[0]==='sec-overview');
 ok('chips: Approvals only when at least one is pending',
-  idsOf(chipsFor({approvals:[{status:'pending'}],hasMessages:true,hasSupport:true})).includes('sec-approvals')
-  && !idsOf(chipsFor({approvals:[{status:'approved'}],hasMessages:true,hasSupport:true})).includes('sec-approvals'));
+  idsOf(chipsFor({approvals:[{status:'pending'}],hasMessages:true})).includes('sec-approvals')
+  && !idsOf(chipsFor({approvals:[{status:'approved'}],hasMessages:true})).includes('sec-approvals'));
 ok('chips: Files only when a deliverable exists',
-  idsOf(chipsFor({deliverables:[{id:'x'}],hasMessages:true,hasSupport:true})).includes('sec-files')
-  && !idsOf(chipsFor({deliverables:[],hasMessages:true,hasSupport:true})).includes('sec-files'));
-ok('chips: full set is in canonical order Overview·Approvals·Files·Messages·Support',
-  JSON.stringify(idsOf(chipsFor({hasOverview:true,approvals:[{status:'pending'}],deliverables:[{id:'d'}],hasMessages:true,hasSupport:true})))
-  ===JSON.stringify(['sec-overview','sec-approvals','sec-files','sec-messages','sec-support']));
+  idsOf(chipsFor({deliverables:[{id:'x'}],hasMessages:true})).includes('sec-files')
+  && !idsOf(chipsFor({deliverables:[],hasMessages:true})).includes('sec-files'));
+ok('chips: full set is in canonical order Overview·Approvals·Files·Messages',
+  JSON.stringify(idsOf(chipsFor({hasOverview:true,approvals:[{status:'pending'}],deliverables:[{id:'d'}],hasMessages:true})))
+  ===JSON.stringify(['sec-overview','sec-approvals','sec-files','sec-messages']));
 ok('chips: null/empty bundle yields no chips (no crash)', chipsFor().length===0 && chipsFor(null).length===0);
 
 // ═══ notifBucket — calm recency buckets ═══
@@ -219,7 +224,7 @@ ok('anchor: #approvals / #approval-123 → sec-approvals',
 ok('anchor: #files & #deliverable → sec-files',
   sectionForAnchor('#files')==='sec-files' && sectionForAnchor('deliverable-1')==='sec-files');
 ok('anchor: #messages → sec-messages', sectionForAnchor('#messages')==='sec-messages');
-ok('anchor: #support-99 → sec-support', sectionForAnchor('#support-99')==='sec-support');
+ok('anchor: #support-99 is not a record section any more → sec-overview (navFromHref opens it in Messages first)', sectionForAnchor('#support-99')==='sec-overview');
 ok('anchor: #task-7 → sec-todos, #milestones → sec-milestones, #surveys → sec-surveys',
   sectionForAnchor('#task-7')==='sec-todos' && sectionForAnchor('#milestones')==='sec-milestones' && sectionForAnchor('#surveys')==='sec-surveys');
 ok('anchor: unknown / empty → sec-overview', sectionForAnchor('')==='sec-overview' && sectionForAnchor('#whatever')==='sec-overview');
@@ -320,14 +325,22 @@ ok('conv: one row per project + one per support request; null/id-less entries sk
   CROWS.length===5);
 ok('conv: sorted newest-activity first; timestamp-less rows sink — fetched-empty before unfetched',
   JSON.stringify(CROWS.map(r=>r.id))===JSON.stringify(['sup:s2','proj:p1','sup:s1','proj:p2','proj:p3']));
-ok('conv: a project row carries the latest message as preview + its recency + a Message chip',
-  (()=>{const r=CROWS.find(x=>x.id==='proj:p1');return r.title==='Website redesign'&&r.preview==='Welcome aboard!'&&r.when==='2026-07-07T00:00:00Z'&&r.chip==='Message'&&r.unreadKey==='msgs-p1';})());
+ok('conv: a project row carries the latest message as preview + its recency, and no chip (item 179 part three)',
+  (()=>{const r=CROWS.find(x=>x.id==='proj:p1');return r.title==='Website redesign'&&r.preview==='Welcome aboard!'&&r.when==='2026-07-07T00:00:00Z'&&r.chip===''&&r.unreadKey==='msgs-p1';})());
 ok('conv: only a FETCHED-and-empty thread claims "No messages yet"',
   (()=>{const r=CROWS.find(x=>x.id==='proj:p2');return r.preview==='No messages yet — say hello any time.'&&r.when===''&&r.unfetched===false;})());
 ok('conv: an unfetched row (beyond the cap / failed fetch) gets the neutral preview, claims nothing',
   (()=>{const r=CROWS.find(x=>x.id==='proj:p3');return r.preview==='Open this conversation'&&r.when===''&&r.unfetched===true;})());
-ok('conv: a support chip carries the status with underscores humanized',
-  (()=>{const r=CROWS.find(x=>x.id==='sup:s2');return r.chip==='Support · in progress'&&r.chipCls==='support'&&r.unreadKey==='support-s2';})());
+ok('conv (item 179 part three): a request in progress carries no chip; anything handled says Done',
+  (()=>{const r=CROWS.find(x=>x.id==='sup:s2');return r.chip===''&&r.kind==='support'&&r.unreadKey==='support-s2';})()
+  && convRows([],[{id:'s3',subject:'Old question',status:'closed',project_id:null,updated_at:'2026-07-01T00:00:00Z'}],{})[0].chip==='Done');
+ok('conv (item 179 part three): a service ask reads as the service, Asked until it is handled',
+  (()=>{const r=convRows([],[{id:'s4',subject:'Service request: Extra page',status:'open',project_id:null,updated_at:'2026-07-01T00:00:00Z'}],{})[0];return r.kind==='service'&&r.title==='Extra page'&&r.chip==='Asked';})()
+  && convRows([],[{id:'s4',subject:'Service request: Extra page',status:'resolved',project_id:null,updated_at:'2026-07-01T00:00:00Z'}],{})[0].chip==='Done');
+ok('conv (item 179 part three): each line says who wrote it — you, or the studio by name',
+  convRows([],[{id:'s5',subject:'Q',status:'open',project_id:null,updated_at:'2026-07-01T00:00:00Z',last_message:{from:'studio',text:'Done, have a look.'}}],{},'Marlow & Co')[0].preview==='Marlow & Co: Done, have a look.'
+  && convRows([],[{id:'s6',subject:'Q',status:'open',project_id:null,updated_at:'2026-07-01T00:00:00Z',last_message:{from:'you',text:'Thanks!'}}],{},'Marlow & Co')[0].preview==='You: Thanks!'
+  && convRows([],[{id:'s7',subject:'Q',status:'open',project_id:null,updated_at:'2026-07-01T00:00:00Z',last_message:{from:'studio',text:'Hi'}}],{})[0].preview==='Your studio: Hi');
 ok('conv: project-scoped support previews its project name; general previews the studio line',
   CROWS.find(x=>x.id==='sup:s2').preview==='Website redesign'
   && CROWS.find(x=>x.id==='sup:s1').preview==='A conversation with your studio');
@@ -335,6 +348,11 @@ ok('conv: support recency prefers last_activity_at (replies never bump updated_a
   convRows([],[{id:'s9',subject:'X',status:'open',project_id:null,updated_at:'2026-07-01T00:00:00Z',last_activity_at:'2026-07-09T00:00:00Z'}],{})[0].when==='2026-07-09T00:00:00Z'
   && convRows([],[{id:'s9',subject:'X',status:'open',project_id:null,updated_at:'2026-07-01T00:00:00Z'}],{})[0].when==='2026-07-01T00:00:00Z');
 ok('conv: empty/null inputs → no rows (no crash)', convRows(null,null,null).length===0);
+ok('mirror: client.html defines chipsFor verbatim', Deno.readTextFileSync(new URL('../../client.html', import.meta.url)).includes(String(chipsFor)));
+ok('mirror: client.html defines sectionForAnchor verbatim', Deno.readTextFileSync(new URL('../../client.html', import.meta.url)).includes(String(sectionForAnchor)));
+ok('a bare #support link opens the Messages list, an id opens that conversation', (()=>{const t=Deno.readTextFileSync(new URL('../../client.html', import.meta.url));
+  return t.includes("if(sup){openMessagesTo(sup[1]);return;}\n  if(/#support$/i.test(href)){showTab('messages');return;}");})());
+ok('mirror: client.html defines convRows verbatim', Deno.readTextFileSync(new URL('../../client.html', import.meta.url)).includes(String(convRows)));
 
 // ═══ supportThreadItems — attribution: server `from` field first, author_kind fallback ═══
 const STI=supportThreadItems(

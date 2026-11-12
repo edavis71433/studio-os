@@ -114,7 +114,7 @@ test.describe('one set of tabs', () => {
     await mount(page, '/presence.html');
     const menu = (await page.locator('#nav .navitem').allTextContents()).map((s) => s.trim());
     const sheet = (await page.locator('#sectionsNav .navitem').allTextContents()).map((s) => s.trim());
-    expect(menu).toEqual(['Overview', 'Pages', 'Styles', 'Files', 'Search', 'Services', 'Questions', 'Testimonials', 'Updates', 'Bookings', 'Reviews', 'Analytics', 'Business details', 'Domain & email', 'Versions', 'Connections', 'Sharing & access', 'See the client’s view']);
+    expect(menu).toEqual(['Overview', 'Pages', 'Styles', 'Files', 'Search', 'Services', 'Questions', 'Testimonials', 'Blog', 'Bookings', 'Reviews', 'Analytics', 'Business details', 'Domain & email', 'Versions', 'Connections', 'Sharing & access', 'See the client’s view']);
     expect(sheet).toEqual(['Edit site', ...menu]);     // plus the way into Edit mode
     await page.evaluate(() => (window as any).go('faqs'));
     await expect(page.locator('#view-faqs')).toBeVisible();

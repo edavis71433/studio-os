@@ -68,6 +68,7 @@ export const SETTINGS_CONTENT_FIELDS: ReadonlySet<string> = new Set([
   'popup',   // builder list item 148: the site's pop-up is content, like the announcement bar
   'hero_layout', 'nav_style', 'sections_hidden', 'sections_order', 'footer_hours', 'footer_social',
   'pages_noindex', 'page_seo', 'blocks', 'pages', 'nav',
+  'post_categories', 'post_authors',   // builder list item 40: the blog's categories and authors are content
 ]);
 
 /** The capability this write needs, or null when it isn't a write on the content
@@ -102,6 +103,7 @@ const ID = '[0-9a-f-]{36}';
 const KEY = '[a-z0-9_]+';
 const MEMBER_WRITES: Array<[MemberWriteNeed, string[]]> = [
   ['delete', [
+    `POST /client/retainers/${ID}/cancel`,   // sales item 117: stopping the business's own recurring payment is the owner's call
     `DELETE /(media|assets|redirects|content-library|publishes/checkpoints|bookings/types|knowledge/docs)/${ID}`,
     `DELETE /sales/(contacts|deals|proposals|contracts|templates|estimates)/${ID}`,
     `DELETE /sales/prospects/${ID}`,   // sales review item 112: taking a prospect off the list
@@ -148,6 +150,7 @@ const MEMBER_WRITES: Array<[MemberWriteNeed, string[]]> = [
   ]],
   ['publish', [
     'POST /(publish|restore|preview/promote|schedule)',
+    `POST /posts/${ID}/(publish|unpublish)`,   // builder list item 40: one blog post onto (or off) the live site, on its own
     `POST /schedule/${ID}/cancel`,
     `POST /launches/${ID}/(schedule|promote|rollback)`,
     `POST /broadcasts/${ID}/send`,
@@ -155,6 +158,7 @@ const MEMBER_WRITES: Array<[MemberWriteNeed, string[]]> = [
   ['comment', [
     'POST /comments',
     `POST /comments/${ID}/resolve`,
+    `POST /client/approvals/${ID}/notes`,   // builder list item 179: a note on one part of the website draft
     `POST /(client/)?projects/${ID}/messages`,
     `POST /(client/)?support/${ID}/messages`,
     'POST /client/support',
@@ -164,6 +168,7 @@ const MEMBER_WRITES: Array<[MemberWriteNeed, string[]]> = [
     'POST /redirects',
     'POST /visibility/check',
     'PUT /visibility/follow',   // builder item 181: the searches the site follows on Google
+    'PUT /visibility/phrases',   // builder item 160: the two or three phrases the business wants to be found for
     'PUT /visibility/ai/questions',   // builder item 182: the questions its monthly AI check asks (the switch is configure)
     'POST /preview/(publish|share-link|section)',   // section: draws one unsaved section for the canvas, stores nothing
     'POST /publishes/checkpoints',
@@ -194,12 +199,14 @@ const MEMBER_WRITES: Array<[MemberWriteNeed, string[]]> = [
     `POST /broadcasts/${ID}/cancel`,
     `POST /broadcasts/${ID}/test`,   // bold redesign: "Send me a test" — only ever to the member's own address, so edit, not publish
     'POST /sales/(contacts|customers|deals|templates)',
+    'POST /sales/(tasks|people/activity)',   // sales items 85 and 106: a to-do for anyone, a call logged for a person with no deal
+    'POST /sales/email',   // sales item 80: one email to one person on file, like the Inbox's reply to an enquiry
     'POST /sales/contacts/imports',   // sales review item 86: starting an import (each row is a POST /sales/contacts)
     'POST /sales/prospects(/discover)?',   // sales review item 112: find businesses, save the ticked ones
     `POST /sales/prospects/${ID}/(convert|draft|pack)`,   // item 112: start the deal; a draft only returns words — nothing sends; item 113: pack builds a share link
     `PATCH /sales/prospects/${ID}`,
     `PATCH /sales/(contacts|deals|deal-tasks)/${ID}`,
-    `POST /sales/contacts/${ID}/restore`,
+    `POST /sales/(contacts|deals)/${ID}/restore`,   // sales item 83: bringing back a deleted deal loses nothing, like a contact
     'PUT /sales/services',
     `POST /sales/deals/${ID}/(stage|activity|tasks|proposals|contracts|convert|resend-invite|invoice|schedule|retainer|send|estimates|recurring)`,
     `POST /sales/estimates/${ID}/(send|proposal|invoice)`,   // sales review item 47: send an estimate, or turn it into a proposal or an invoice (drafts)
@@ -240,7 +247,8 @@ const MEMBER_WRITES: Array<[MemberWriteNeed, string[]]> = [
     'POST /concierge/ask',
     // these check the role themselves: the owner, a developer, or a studio
     'POST /portal/(members|shares)',
-    `POST /portal/members/${ID}/revoke`,
+    `POST /portal/members/${ID}/(revoke|role)`,   // builder item 53: changing a seat's role is managing people, like the invite
+    'POST /portal/transfer(/cancel)?',   // builder item 53: only the owner, or their studio asking the owner; the route refuses anyone else and says why
     'PUT /dev/(customization|brand-kit)',
     'POST /dev/brand-kit/apply',
     'PUT /site/template',

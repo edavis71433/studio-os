@@ -359,6 +359,50 @@ html:not(.is-studio) #dcModeSeg [data-dcmode="timewarp"]{display:none}
 .biz-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(340px,100%),1fr));column-gap:var(--dds-s8,48px);align-items:start;max-width:1100px}
 .biz-col{min-width:0}
 .biz-col>h5.rune:first-child{margin-top:var(--dds-s2,8px)}
+/* item 127: four cards; under each field, where it shows on the site */
+.biz-card{background:var(--sheet);border:1px solid var(--hair);border-radius:var(--r-lg);padding:var(--dds-s5,20px) var(--dds-s5,20px) var(--dds-s1,4px);margin:0 0 var(--dds-s5,20px);min-width:0}
+.biz-col>.biz-card>h5.rune:first-child{margin:0 0 var(--dds-s4,16px);font:600 19px/1.25 var(--serif)}
+.biz-card>h5.rune::after{display:none}
+.biz-card>h5.rune .biz-help{font:500 12.5px/1 var(--sans);letter-spacing:0;text-transform:none;color:var(--plum)}
+.biz-card .field{max-width:none}
+.biz-card>.hint,.biz-place2>.hint,.biz-place2>p.hint{font-size:12px;color:var(--ink-2);margin:6px 0 var(--dds-s4,16px)}   /* the sentences outside a field read like the ones inside */
+.biz-new{display:inline-block;margin-left:6px;padding:0 8px;border-radius:999px;background:var(--plum-soft);color:var(--plum);font:600 11px/1.6 var(--sans);vertical-align:1px}
+.biz-card .biz-short{background:var(--plum-tint);border:1px solid var(--plum-line);border-radius:var(--r-lg);padding:var(--dds-s3,12px)}
+.biz-short textarea{min-height:64px}
+.biz-short .cnt{font-size:11.5px;color:var(--ink-3);margin-top:4px}
+.biz-share{margin-top:var(--dds-s3,12px);background:var(--sheet);border:1px solid var(--hair);border-radius:var(--r);padding:10px 12px}
+.biz-share-k{display:block;font:600 10.5px/1 var(--sans);letter-spacing:.08em;text-transform:uppercase;color:var(--ink-3);margin-bottom:8px}
+.biz-share-row{display:flex;gap:12px;align-items:flex-start}
+.biz-share-text{min-width:0}
+.biz-share-img{flex:none;width:64px;height:48px;border-radius:6px;background:var(--wash) center/cover no-repeat}
+.biz-share-name{margin:0;font-weight:600;font-size:13px;color:var(--ink)}
+.biz-share-desc{margin:2px 0 0;font-size:12.5px;line-height:1.45;color:var(--ink-2);overflow-wrap:anywhere}
+.biz-share-desc.empty{font-style:italic;opacity:.72}
+.biz-share-host{margin:2px 0 0;font-size:11.5px;color:var(--ink-3)}
+.biz-row3{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(0,1fr) minmax(0,1fr);gap:var(--dds-s3,12px)}
+.biz-place{display:flex;align-items:center;gap:8px;margin:0 0 var(--dds-s3,12px);font-weight:600;font-size:13.5px;color:var(--ink)}
+.biz-pin{display:inline-flex;color:var(--plum)}
+.biz-chip{padding:0 8px;border-radius:999px;background:var(--wash);color:var(--ink-2);font:500 11px/1.6 var(--sans)}
+.biz-place2{border-top:1px solid var(--hair);padding-top:var(--dds-s4,16px);margin-bottom:var(--dds-s4,16px)}
+.biz-add{display:flex;align-items:center;justify-content:center;gap:6px;width:100%;min-height:44px;border:1.5px dashed var(--plum-line);border-radius:var(--r);background:none;color:var(--plum);font:600 13px/1 var(--sans);cursor:pointer}
+.biz-add:hover{background:var(--plum-tint)}
+.biz-seg{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:var(--dds-s2,8px)}
+.biz-card .biz-seg label{display:flex;align-items:center;gap:8px;min-height:44px;margin:0;padding:0 12px;border:1px solid var(--hair);border-radius:var(--r);font-size:13px;color:var(--ink);cursor:pointer}
+.biz-card .biz-seg label:has(input:checked){border-color:var(--plum);background:var(--plum-tint);color:var(--plum)}
+.biz-p2-lbl{display:block;font-size:12.5px;color:var(--ink-3);font-weight:500;margin-bottom:var(--dds-s1,4px)}
+.biz-rm{background:none;border:0;padding:0;min-height:44px;color:var(--clay);font:600 13px/1 var(--sans);cursor:pointer}
+.biz-rm:hover{text-decoration:underline}
+/* a narrow card (two columns, or a phone) puts each day's times under its name and Closed */
+.biz-card{container-type:inline-size}
+@container (max-width:470px){
+.biz-card .hrow{display:grid;grid-template-columns:auto auto auto minmax(0,1fr);gap:6px 10px;align-items:center}
+.biz-card .hrow .day{grid-column:1/4;grid-row:1;width:auto}
+.biz-card .hrow .closedlab{grid-column:4;grid-row:1;justify-self:end;width:auto;margin-left:0}
+.biz-card .hrow input[type=time]:first-of-type{grid-column:1;grid-row:2}
+.biz-card .hrow .to{grid-column:2;grid-row:2}
+.biz-card .hrow input[type=time]:last-of-type{grid-column:3;grid-row:2}
+}
+@media(max-width:560px){.biz-card{padding:var(--dds-s4,16px) var(--dds-s4,16px) var(--dds-s1,4px)}.biz-row3{grid-template-columns:1fr 1fr}.biz-row3 .field:first-child{grid-column:1/-1}.biz-seg{grid-template-columns:1fr}}
 .ver-live{display:inline-block;margin-left:var(--dds-s2,8px);padding:1px 8px;border-radius:999px;background:var(--hair);color:var(--ink-2);font-size:12px;font-weight:600;vertical-align:1px}
 .hcompare{flex-basis:100%;margin-top:var(--dds-s2,8px)}
 .ver-more{margin-top:var(--dds-s6,24px);border-top:1px solid var(--hair);padding-top:var(--dds-s4,16px)}
@@ -1033,6 +1077,33 @@ html.plan-watch .ss-bar,html.plan-watch [data-grp="Content"],html.plan-watch .na
 .sv-head{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:var(--dds-s2,8px)}
 .sv-head h3{margin:0}
 .sv-headn{font-size:12.5px;color:var(--ink-2);margin-right:auto}
+/* item 160: what people type to find you */
+.sv-phrases{margin:0 0 var(--dds-s4,16px)}
+.sv-phrases h3{font:600 19px/1.25 var(--serif)}
+.sv-card p.sv-ph-intro{font-size:13px;color:var(--ink-2);max-width:72ch}
+.sv-ph-row{display:flex;align-items:center;gap:8px 10px;flex-wrap:wrap;padding:8px 8px 8px 10px;border-radius:var(--r-lg);background:var(--paper);margin:0 0 8px}
+.sv-ph-q{display:inline-flex;align-items:center;gap:6px;min-height:32px;padding:0 12px;border-radius:999px;background:var(--sheet);border:1px solid var(--hair);font-weight:600;font-size:13px;color:var(--ink);overflow-wrap:anywhere}
+.sv-ph-st{display:inline-flex;align-items:center;gap:5px;padding:3px 9px;border-radius:999px;font:600 11.5px/1.4 var(--sans)}
+.sv-ph-st.ok{background:var(--sage-soft);color:var(--sage)}
+.sv-ph-st.no{background:var(--amber-soft);color:var(--amber-text)}
+.sv-ph-add{margin-left:auto;min-height:36px;padding:0 14px;border:0;border-radius:999px;background:var(--plum-soft);color:var(--plum);font:600 12.5px/1 var(--sans);cursor:pointer}
+.sv-ph-x{display:inline-grid;place-items:center;min-width:36px;min-height:36px;border:0;border-radius:999px;background:none;color:var(--ink-2);cursor:pointer}
+.sv-ph-st.ok~.sv-ph-x{margin-left:auto}
+.sv-ph-x:hover{background:var(--sheet);color:var(--ink)}
+.sv-ph-new{display:flex;gap:8px;margin:4px 0 10px;max-width:520px}
+.sv-ph-new input{flex:1;min-width:0;font:inherit;font-size:14px;min-height:40px;padding:0 12px;border:1px solid var(--hair);border-radius:var(--r);background:var(--sheet);color:var(--ink)}
+.sv-ph-ideas{display:flex;flex-wrap:wrap;align-items:center;gap:6px;font-size:12.5px;color:var(--ink-2)}
+.sv-ph-idea{min-height:32px;padding:0 11px;border:0;border-radius:999px;background:var(--plum-soft);color:var(--plum);font:600 12px/1 var(--sans);cursor:pointer}
+.sv-ph-pick{margin:0 0 10px;padding:14px;border:1px solid var(--plum-line);border-radius:var(--r-lg);background:var(--sheet)}
+.sv-ph-pick h4{margin:0 0 10px;font:600 16px/1.3 var(--serif);color:var(--ink)}
+.sv-ph-page{display:block;width:100%;margin:0 0 6px;padding:9px 12px;border:1px solid var(--hair);border-radius:var(--r);background:var(--paper);color:var(--ink);font:inherit;text-align:left;cursor:pointer}
+.sv-ph-page[aria-pressed="true"]{border-color:var(--plum);background:var(--plum-tint);color:var(--plum)}
+.sv-ph-page b{display:block;font-size:13px}
+.sv-ph-page span{font-size:12px;color:var(--ink-2)}
+.sv-ph-out{margin:10px 0}
+.sv-ph-out label{display:block;margin-bottom:6px;font:600 10.5px/1 var(--sans);letter-spacing:.08em;text-transform:uppercase;color:var(--ink-3)}
+.sv-ph-out input{width:100%;box-sizing:border-box;min-height:40px;padding:0 12px;border:1px solid var(--hair);border-radius:var(--r);background:var(--sheet);color:var(--ink);font:600 14px/1.3 var(--sans)}
+.sv-ph-acts{display:flex;flex-wrap:wrap;gap:8px;margin:10px 0 6px}
 .sv-fol{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,440px);gap:var(--dds-s5,20px);align-items:start}
 .sv-fol table{width:100%;border-collapse:collapse;font-size:13.5px}
 .sv-fol th{text-align:left;font-size:12px;font-weight:600;color:var(--ink-2);padding:6px 8px;white-space:nowrap}
@@ -1588,6 +1659,20 @@ body.pd-dragging .dc-tree-grab{cursor:grabbing}
 .cm-who .cm-k.client{color:var(--plum,#5b3fa0)}
 .cm-body{font-size:13px;line-height:1.55;margin-top:var(--dds-s1,4px);white-space:pre-wrap;overflow-wrap:anywhere}
 .cm-itemacts{display:flex;gap:var(--dds-s2,8px);margin-top:6px}
+/* item 159: Open / Done over a thread, a note's picture, and adding one */
+.cm-filter{display:inline-flex;gap:2px;padding:3px;margin:10px 0 2px;border-radius:999px;background:var(--wash,#f4f0fb)}
+.cm-filter button{font:inherit;font-size:12px;font-weight:600;min-height:30px;padding:0 12px;border:none;border-radius:999px;background:transparent;color:var(--ink-2,#8a8172);cursor:pointer}
+.cm-filter button[aria-pressed="true"]{background:var(--card,#fff);color:var(--ink,#1b1525);box-shadow:0 1px 2px rgba(23,21,34,.12)}
+.cm-who .cm-name{text-transform:none;letter-spacing:0;font-weight:700;color:var(--ink,#1b1525)}
+.cm-pic{display:block;margin-top:6px;max-width:100%}
+.cm-pic img{display:block;max-width:100%;max-height:220px;border-radius:8px;border:1px solid var(--hair,#e7e0f2)}
+.cm-attach{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:600;color:var(--plum);cursor:pointer;margin:6px 0 0;position:relative}
+.cm-attach input{position:absolute;width:1px;height:1px;opacity:0}
+.cm-attach:focus-within{outline:2px solid var(--plum);outline-offset:2px;border-radius:6px}
+.cm-thumb{display:flex;align-items:center;gap:8px;margin-top:6px;font-size:12px}
+.cm-thumb img{width:64px;height:44px;object-fit:cover;border-radius:6px;border:1px solid var(--hair,#e7e0f2)}
+.cm-thumb button{font:inherit;font-size:12px;color:var(--ink-2,#8a8172);background:none;border:none;cursor:pointer;text-decoration:underline;padding:0}
+.cm-none{font-size:12.5px;color:var(--ink-2,#8a8172);margin-top:10px}
 .cm-itemacts button{font:inherit;font-size:12px;color:var(--ink-2,#8a8172);background:none;border:none;cursor:pointer;padding:2px 0;text-decoration:underline}
 .cm-itemacts button:hover{color:var(--plum,#5b3fa0)}
 .cm-reply{width:100%;box-sizing:border-box;font:inherit;font-size:13px;border:1px solid var(--line,#ddd);border-radius:var(--dds-r,8px);padding:var(--dds-s2,8px);min-height:60px;resize:vertical;margin-top:10px}
@@ -1726,6 +1811,72 @@ body.pd-dragging *{cursor:grabbing !important}
 :root[data-theme="dark"] .dds-hint .x{background:rgba(23,19,32,.12);color:#171320}
 :root[data-theme="dark"] .dds-hint .x:hover{background:rgba(23,19,32,.22)}
 :root[data-theme="dark"] .dds-hint .x:focus-visible{outline-color:#171320}
+/* item 156: a whole list of old addresses at once, under the forwards */
+.rdx-open{font:inherit;font-size:12.5px;font-weight:600;color:var(--plum);background:none;border:none;padding:6px 0;cursor:pointer;text-decoration:underline;text-underline-offset:3px}
+.rdx{margin-top:8px;padding:12px;border:1px solid var(--line);border-radius:12px;background:var(--bg-2,var(--bg));display:grid;gap:8px}
+.rdx[hidden]{display:none}
+.rdx-row{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.rdx-row input[type=text]{flex:1;min-width:140px;padding:7px 9px;font:inherit;font-size:12.5px;border:1px solid var(--line);border-radius:8px;background:var(--card,#fff);color:inherit}
+.rdx textarea{width:100%;box-sizing:border-box;min-height:120px;padding:8px 10px;font:12.5px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;border:1px solid var(--line);border-radius:8px;background:var(--card,#fff);color:inherit;resize:vertical}
+.rdx button.rdx-b{font:inherit;font-size:12px;font-weight:600;padding:6px 12px;border-radius:999px;border:1px solid var(--line);background:var(--card,#fff);color:inherit;cursor:pointer;min-height:32px}
+.rdx button.rdx-go{background:var(--plum);border-color:var(--plum);color:var(--on-p,#fff)}
+.rdx button[disabled]{opacity:.55;cursor:default}
+.rdx-file{font-size:12.5px;font-weight:600;cursor:pointer;display:inline-flex;align-items:center;gap:6px;min-height:32px}
+.rdx-file input{font-size:12px;max-width:210px}
+.rdx-sum{font-size:12.5px;line-height:1.5}
+.rdx-tw{max-height:260px;overflow:auto;border:1px solid var(--line);border-radius:8px;background:var(--card,#fff)}
+.rdx-table{width:100%;border-collapse:collapse;font-size:12px}
+.rdx-table th,.rdx-table td{text-align:left;padding:5px 8px;border-bottom:1px solid var(--line);vertical-align:top;overflow-wrap:anywhere}
+.rdx-table th{font-weight:600;color:var(--ink-2);position:sticky;top:0;background:var(--card,#fff)}
+.rdx-table tr.skip td{color:var(--warn,#94530a)}
+.rdx-table tr.same td{color:var(--ink-3)}
+.rdx-more{font:inherit;font-size:12px;font-weight:600;color:var(--plum);background:none;border:none;padding:4px 0;cursor:pointer;text-decoration:underline}
+/* ── Blog (builder list item 40): the posts as cards with where each stands, the filters,
+   and the categories and authors sheet. The writing screen brings its own styles
+   (blog-studio.js); while it's open the app's own bars step aside, as in Edit mode. ── */
+html.bs-open #dds-shell,html.bs-open #dds-ctxbar,html.bs-open #dds-mbar,html.bs-open .topbar,html.bs-open #dock{display:none !important}
+html.bs-open .scrim{z-index:96}   /* Files and the categories card open over the writing screen */
+.bl-head{display:flex;flex-wrap:wrap;gap:var(--dds-s2,8px);justify-content:flex-end;margin:-6px 0 var(--dds-s4,16px)}
+.bl-head .pillbtn{height:40px;padding:0 var(--dds-s4,16px);border-radius:999px;font-weight:600}
+.bl-head .pillbtn.inked{background:var(--plum-grad);border-color:transparent}
+.bl-filters{display:flex;flex-wrap:wrap;align-items:center;gap:var(--dds-s2,8px);margin:0 0 var(--dds-s5,20px)}
+.bl-pill{font:500 13px/1 var(--sans);min-height:36px;padding:0 14px;border-radius:999px;border:1px solid var(--hair);background:var(--sheet);color:var(--ink);cursor:pointer}
+.bl-pill[aria-pressed="true"]{background:var(--ink);border-color:var(--ink);color:var(--sheet)}
+.bl-catsel select{font:500 13px/1 var(--sans);min-height:36px;padding:0 12px;border-radius:999px;border:1px solid var(--hair);background:var(--sheet);color:var(--ink)}
+.bl-lists{margin-left:auto;display:inline-flex;align-items:center;gap:6px;font:600 13px/1 var(--sans);color:var(--plum);background:none;border:0;min-height:36px;cursor:pointer;padding:0 4px}
+.bl-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:var(--dds-s5,20px)}
+.bl-card{display:flex;flex-direction:column;background:var(--sheet);border:1px solid var(--hair);border-radius:var(--dds-r-lg,16px);overflow:hidden;box-shadow:var(--dds-shadow,0 1px 2px rgba(23,21,34,.05))}
+.bl-photo{aspect-ratio:16/9;overflow:hidden;background:var(--wash);cursor:pointer}
+.bl-photo img{width:100%;height:100%;object-fit:cover;display:block}
+.bl-photo.none{background:linear-gradient(135deg,var(--plum-soft),var(--wash))}
+.bl-body{display:flex;flex-direction:column;gap:8px;padding:14px 16px 12px;flex:1}
+.bl-top{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.bl-chip{display:inline-flex;align-items:center;gap:6px;font:600 11.5px/1 var(--sans);border-radius:999px;padding:5px 10px}
+.bl-chip::before{content:"";width:6px;height:6px;border-radius:999px;background:currentColor}
+.bl-chip.live{background:var(--sage-soft);color:var(--sage)}
+.bl-chip.sched{background:var(--info-soft);color:var(--info)}
+.bl-chip.draft{background:var(--soft-bg);color:var(--soft)}
+.bl-cat{font:700 11px/1 var(--sans);letter-spacing:.08em;text-transform:uppercase;color:var(--plum)}
+.bl-title{margin:0;font:600 17px/1.3 var(--sans)}
+.bl-title button{font:inherit;color:var(--ink);background:none;border:0;padding:0;text-align:left;cursor:pointer}
+.bl-title button:hover{text-decoration:underline}
+.bl-meta{margin:0;font-size:13px;color:var(--soft)}
+.bl-acts{display:flex;align-items:center;gap:var(--dds-s3,12px);border-top:1px solid var(--hair);padding-top:10px;margin-top:auto}
+.bl-act{display:inline-flex;align-items:center;gap:6px;font:600 13px/1 var(--sans);color:var(--plum);background:none;border:0;padding:0;min-height:36px;cursor:pointer;text-decoration:none}
+.bl-rm{margin-left:auto;font:500 12.5px/1 var(--sans);color:var(--soft);background:none;border:0;min-height:36px;cursor:pointer}
+.bl-rm.armed{color:var(--clay)}
+.bl-none{color:var(--soft);font-size:14px}
+.bl-lbl{font:600 11.5px/1 var(--sans);letter-spacing:.08em;text-transform:uppercase;color:var(--soft);margin:var(--dds-s4,16px) 0 var(--dds-s2,8px)}
+.bl-row{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:12px;background:var(--soft-bg);margin-bottom:8px}
+.bl-rowtext{display:flex;flex-direction:column;gap:2px;flex:1;min-width:0}
+.bl-rowtext span{font-size:12.5px;color:var(--soft)}
+.bl-row .textact{min-height:36px}
+.bl-x{color:var(--clay)}
+.bl-av{width:36px;height:36px;border-radius:999px;background:var(--plum-soft);color:var(--plum);display:inline-grid;place-items:center;font:700 12px/1 var(--sans);overflow:hidden;flex:0 0 auto}
+.bl-av img{width:100%;height:100%;object-fit:cover}
+.bl-empty{font-size:13px;color:var(--soft);margin:0 0 8px}
+.bs-addline{display:inline-block;margin:2px 0 4px;min-height:36px}
+@media (max-width:760px){.bl-head{justify-content:stretch}.bl-head .pillbtn{flex:1}.bl-lists{margin-left:0}.bl-grid{grid-template-columns:1fr}.bl-row{flex-wrap:wrap}}
 </style>
 </head>
 <body>
@@ -1821,15 +1972,19 @@ body.pd-dragging *{cursor:grabbing !important}
       <!-- BUSINESS -->
       <section class="view" id="view-business">
         <h1 class="doc" role="heading" aria-level="2">Business details</h1>
-        <p class="docsub">Your name, contact details, address and hours. Changes save as you type and go live when you publish.</p>
+        <p class="docsub">Your name, contact details, places and hours. Changes save as you type and go live when you publish.</p>
         <div id="bizWaiting"></div>
         <div class="biz-grid">
           <div class="biz-col">
-          <h5 class="rune">About your business <span class="whisper" id="save-identity"></span><button class="quietact" style="letter-spacing:0;text-transform:none;font-weight:400" onclick="openDesk('identity_copy','business')"><span class="aimark">✦</span> Draft with help</button></h5>
-          <div class="field"><label for="f-business_name">Business name</label><input type="text" id="f-business_name" data-sing="identity" data-field="business_name" maxlength="120"></div>
-          <div class="field"><label for="f-tagline">Tagline</label><input type="text" id="f-tagline" data-sing="identity" data-field="tagline" maxlength="140"><div class="hint">One short line under your name.</div></div>
-          <div class="field"><label for="f-description">Description</label><textarea id="f-description" data-sing="identity" data-field="description" maxlength="1000"></textarea></div>
-          <div class="field"><label for="f-story">Your story</label><textarea id="f-story" data-sing="identity" data-field="story" maxlength="4000"></textarea><div class="hint">Shown on your About page.</div></div>
+          <section class="biz-card" aria-labelledby="bizAboutH">
+          <h5 class="rune" id="bizAboutH">About your business <span class="whisper" id="save-identity"></span><button class="quietact biz-help" onclick="openDesk('identity_copy','business')"><span class="aimark">✦</span> Draft with help</button></h5>
+          <div class="field"><label for="f-business_name">Business name</label><input type="text" id="f-business_name" data-sing="identity" data-field="business_name" maxlength="120"><div class="hint" data-shows="business_name"></div></div>
+          <div class="field"><label for="f-tagline">Tagline</label><input type="text" id="f-tagline" data-sing="identity" data-field="tagline" maxlength="140"><div class="hint" data-shows="tagline"></div></div>
+          <div class="field biz-short"><label for="f-short_description">Short description <span class="biz-new">New</span></label><textarea id="f-short_description" data-sing="identity" data-field="short_description" maxlength="150" rows="2" aria-describedby="cnt-short_description bizShortShows"></textarea><div class="cnt" id="cnt-short_description" aria-live="polite"></div><div class="hint" id="bizShortShows" data-shows="short_description"></div>
+            <div class="biz-share" role="group" aria-label="When someone shares your site"><span class="biz-share-k" aria-hidden="true">When someone shares your site</span><div class="biz-share-row"><span class="biz-share-img" id="bizShareImg" aria-hidden="true"></span><div class="biz-share-text"><p class="biz-share-name" id="bizShareName"></p><p class="biz-share-desc" id="bizShareDesc"></p><p class="biz-share-host" id="bizShareHost"></p></div></div></div>
+          </div>
+          <div class="field"><label for="f-description">Description</label><textarea id="f-description" data-sing="identity" data-field="description" maxlength="1000"></textarea><div class="hint" data-shows="description"></div></div>
+          <div class="field"><label for="f-story">Your story</label><textarea id="f-story" data-sing="identity" data-field="story" maxlength="4000"></textarea><div class="hint" data-shows="story"></div></div>
           <div class="field" data-needs="configure"><label for="f-industry">What kind of business</label><select id="f-industry">
             <option value="generic">General / other</option>
             <option value="restaurant">Restaurant</option><option value="coffee_shop">Coffee shop / café</option><option value="bar">Bar</option>
@@ -1838,30 +1993,42 @@ body.pd-dragging *{cursor:grabbing !important}
             <option value="medical">Medical</option><option value="dental">Dental</option><option value="veterinary">Veterinary</option>
             <option value="law">Law</option><option value="accounting">Accounting</option><option value="insurance">Insurance</option><option value="consulting">Consulting</option><option value="marketing">Marketing</option><option value="real_estate">Real estate</option><option value="photography">Photography</option>
             <option value="retail">Retail / shop</option><option value="nonprofit">Nonprofit</option><option value="church">Church</option><option value="professional">Professional services</option>
-          </select><div class="hint" id="industryHint">Sets the words your site uses, like Services or Menu. Applies when you next publish.</div></div>
-          <h5 class="rune">Contact</h5>
-          <div class="field"><label for="f-phone">Phone</label><input type="tel" class="mono" id="f-phone" data-sing="identity" data-field="phone" maxlength="32"></div>
-          <div class="field"><label for="f-email">Email</label><input type="email" id="f-email" data-sing="identity" data-field="email" maxlength="160"></div>
-          <div class="field"><label for="f-service_area">Where you work</label><input type="text" id="f-service_area" data-sing="identity" data-field="service_area" maxlength="200"><div class="hint">e.g. “Serving Austin and the Hill Country” — shown on your site and read by search engines.</div></div>
-          <div class="field"><label for="f-booking_url">Reservation link</label><input type="url" id="f-booking_url" data-sing="identity" data-field="booking_url" placeholder="https://…"></div>
-          <div class="field"><label for="f-ordering_url">Online ordering link</label><input type="url" id="f-ordering_url" data-sing="identity" data-field="ordering_url" placeholder="https://…"></div>
+          </select><div class="hint" id="industryHint">Sets the words your site uses, like Menu or Services, and tells Google what you are. Applies when you next publish.</div></div>
+          </section>
+          <section class="biz-card" aria-labelledby="bizContactH">
+          <h5 class="rune" id="bizContactH">Contact</h5>
+          <div class="field"><label for="f-phone">Phone</label><input type="tel" class="mono" id="f-phone" data-sing="identity" data-field="phone" maxlength="32"><div class="hint" data-shows="phone"></div></div>
+          <div class="field"><label for="f-email">Email</label><input type="email" id="f-email" data-sing="identity" data-field="email" maxlength="160"><div class="hint" data-shows="email"></div></div>
+          <div class="field"><label for="f-service_area">Where you work</label><input type="text" id="f-service_area" data-sing="identity" data-field="service_area" maxlength="200" placeholder="e.g. Serving Austin and the Hill Country"><div class="hint" data-shows="service_area"></div></div>
+          <div class="field"><label for="f-booking_url">Reservation link</label><input type="url" id="f-booking_url" data-sing="identity" data-field="booking_url" placeholder="https://…"><div class="hint" data-shows="booking_url"></div></div>
+          <div class="field"><label for="f-ordering_url">Online ordering link</label><input type="url" id="f-ordering_url" data-sing="identity" data-field="ordering_url" placeholder="https://…"><div class="hint" data-shows="ordering_url"></div></div>
+          </section>
           </div>
           <div class="biz-col">
-          <h5 class="rune">Address <span class="whisper" id="save-location"></span></h5>
-          <div class="field"><label for="f-address_line1">Street address</label><input type="text" id="f-address_line1" data-sing="location" data-field="address_line1" maxlength="160"></div>
+          <section class="biz-card" aria-labelledby="bizPlacesH">
+          <h5 class="rune" id="bizPlacesH">Locations <span class="whisper" id="save-location"></span></h5>
+          <p class="biz-place"><span class="biz-pin" aria-hidden="true"></span>Main location <span class="biz-chip">Shows first</span></p>
+          <div class="field"><label for="f-address_line1">Street address</label><input type="text" id="f-address_line1" data-sing="location" data-field="address_line1" maxlength="160"><div class="hint" data-shows="address"></div></div>
+          <div class="biz-row3">
           <div class="field"><label for="f-city">City</label><input type="text" id="f-city" data-sing="location" data-field="city" maxlength="80"></div>
           <div class="field"><label for="f-region">State</label><input type="text" id="f-region" data-sing="location" data-field="region" maxlength="40"></div>
           <div class="field"><label for="f-postal_code">ZIP</label><input type="text" class="mono" id="f-postal_code" data-sing="location" data-field="postal_code" maxlength="16"></div>
-          <div class="field"><label for="f-locphone">Phone at this location</label><input type="tel" class="mono" id="f-locphone" data-sing="location" data-field="phone" maxlength="32"><div class="hint">Only if it differs from your main number.</div></div>
-          <h5 class="rune">Hours <span class="whisper" id="save-hours"></span></h5>
+          </div>
+          <div class="field"><label for="f-locphone">Phone at this location</label><input type="tel" class="mono" id="f-locphone" data-sing="location" data-field="phone" maxlength="32"><div class="hint" data-shows="locphone"></div></div>
+          <div class="biz-place2" id="place2"></div>
+          </section>
+          <section class="biz-card" aria-labelledby="bizHoursH">
+          <h5 class="rune" id="bizHoursH">Hours <span class="whisper" id="save-hours"></span></h5>
           <div class="hoursgrid" id="hoursGrid"></div>
           <label class="closedrow"><input type="checkbox" id="closedSwitch"> Temporarily closed right now</label>
           <div class="field" style="margin-top:10px"><input type="text" id="f-closednote" aria-label="A short note for customers while you’re closed" placeholder="A short note for customers (optional)" maxlength="200" hidden></div>
-          <div id="privacyWrap" data-needs="configure">
+          <div class="hint biz-hours-hint" data-shows="hours"></div>
+          </section>
+          <section class="biz-card" id="privacyWrap" data-needs="configure">
           <h5 class="rune">Privacy <span class="whisper" id="save-privacy"></span></h5>
           <label class="closedrow" style="margin-top:var(--dds-s3,12px)"><input type="checkbox" id="visitSwitch" aria-describedby="visitHint"> Count visits to your site</label>
           <div class="field" style="margin-top:0"><div class="hint" id="visitHint" style="max-width:560px"></div></div>
-          </div>
+          </section>
           </div>
         </div>
 
@@ -1879,6 +2046,7 @@ body.pd-dragging *{cursor:grabbing !important}
       <section class="view" id="view-search">
         <h1 class="doc" role="heading" aria-level="2">Search</h1>
         <p class="docsub">How people find you on Google and in AI answers, and what would help. Checking and connecting never change your website.</p>
+        <section class="sv-card sv-phrases" aria-labelledby="svPhrasesH" id="svPhrasesCard" hidden><div class="sv-head"><h3 id="svPhrasesH">What people type to find you</h3><span class="sv-headn" id="svPhrasesN"></span></div><div id="svPhrases"></div></section>
         <div class="sv-tools" id="svTools" role="group" aria-label="Search tools" hidden></div>
         <div class="sv-sum" id="svNums" hidden></div>
         <div class="sv-grid sv-top">
@@ -1915,7 +2083,7 @@ body.pd-dragging *{cursor:grabbing !important}
           <p class="hint" style="margin:0 0 12px">Your answers write a search headline, a description and your “Where you work” line. Nothing goes live until you publish.</p>
           <div class="field"><label for="sw-name">What is your business called?</label><input type="text" id="sw-name" maxlength="120"></div>
           <div class="field"><label for="sw-places">Where do you serve customers?</label><input type="text" id="sw-places" maxlength="200" placeholder="Burbank, Glendale"><div class="hint">One or more places, separated by commas.</div></div>
-          <div class="field"><label for="sw-words">Which words would a customer search for?</label><input type="text" id="sw-words" maxlength="200" placeholder="Italian restaurant, catering, private events"><div class="hint">Up to three, separated by commas.</div></div>
+          <div class="field"><label for="sw-words">Which words would a customer search for?</label><input type="text" id="sw-words" maxlength="200" placeholder="Italian restaurant, catering, private events"><div class="hint">Up to three, separated by commas. They’re kept as what people type to find you, at the top of this tab.</div></div>
           <div class="hint" style="margin-top:0">This is what Save writes:</div>
           <div class="srp" id="swOut" aria-live="polite">
             <div class="srp-site"><span class="srp-fav" id="swFav" aria-hidden="true">?</span><div><div class="srp-name" id="swName"></div><div class="srp-url" id="swUrl"></div></div></div>
@@ -1968,12 +2136,14 @@ body.pd-dragging *{cursor:grabbing !important}
 
       <!-- UPDATES -->
       <section class="view" id="view-updates">
-        <h1 class="doc" role="heading" aria-level="2">Updates</h1>
-        <p class="docsub">News and seasonal notes. Drafts stay private. What you choose to show goes on your Updates page when you publish.</p>
-        <div id="postList"></div>
-        <button class="addline" id="btnAddPost">＋ Write an update</button>
-        <button class="addline" style="border-top:none" onclick="openDesk('post','updates')"><span class="aimark">✦</span> Draft one with help</button>
-        <div id="postAddWrap"></div>
+        <h1 class="doc" role="heading" aria-level="2">Blog</h1>
+        <p class="docsub">Posts go on your site’s Updates page. Publish one now or pick a day and time. Nothing else in your draft goes with it.</p>
+        <div class="bl-head">
+          <button type="button" class="pillbtn" id="btnPostHelp"><span class="aimark">✦</span> Draft one with help</button>
+          <button type="button" class="pillbtn inked" id="btnAddPost">+ New post</button>
+        </div>
+        <div class="bl-filters" id="blFilters" role="group" aria-label="Which posts to show"></div>
+        <div id="postList" class="bl-grid"></div>
       </section>
 
       <!-- FILES (#180: the full library — collections · search · sort · non-image kinds) -->
@@ -2296,6 +2466,15 @@ body.pd-dragging *{cursor:grabbing !important}
       <button class="quietact" data-close>Never mind</button>
       <button class="pillbtn inked" id="deskGo">Write the drafts</button>
     </div>
+  </div>
+</div>
+
+<!-- Blog (builder list item 40): the categories and authors a post picks from -->
+<div class="scrim" id="blogListsScrim">
+  <div class="sheetcard" role="dialog" aria-modal="true" aria-labelledby="blogListsTitle">
+    <h2 id="blogListsTitle">Categories and authors</h2>
+    <div class="body" id="blogListsBody"></div>
+    <div class="foot"><button class="pillbtn inked" data-close>Done</button></div>
   </div>
 </div>
 
@@ -2938,7 +3117,7 @@ $("dock").addEventListener("click", (e) => {
 // phone it is the Sections sheet. Styles opens Edit mode on its Styles panel.
 const SITE_MENU = [
   [null, [["today", "Overview"], ["pages", "Pages"], ["styles", "Styles"], ["media", "Files"], ["search", "Search"]]],
-  ["Content", [["offerings", "Menu"], ["faqs", "Questions"], ["testimonials", "Testimonials"], ["updates", "Updates"]]],
+  ["Content", [["offerings", "Menu"], ["faqs", "Questions"], ["testimonials", "Testimonials"], ["updates", "Blog"]]],
   [null, [["bookings", "Bookings"], ["reviews", "Reviews"], ["analytics", "Analytics"]]],
   ["Site settings", [["business", "Business details"], ["domain", "Domain & email"], ["history", "Versions"], ["connections", "Connections"], ["sharing", "Sharing & access"], ["clientview", "See the client’s view"]]],
 ];
@@ -3126,6 +3305,154 @@ document.querySelectorAll("[data-sing]").forEach((inp) => {
     }, 700);
   });
 });
+
+/* ── item 127: where each detail shows, the short description, a second location ── */
+// One sentence under each Business details field says where it shows on the live site.
+// Checked against the eight templates: Restaurant Classic shows Where you work on its
+// About page only and calls its booking button Reserve a table; the phone bar and the
+// footer's hours only count when they're on.
+function bizShows() {
+  const rc = (S.site && S.site.template_slug) === "restaurant-classic", bar = !!pbNow();
+  const footHours = !(S.settings && S.settings.footer_hours === false);   // Edit site's footer switch
+  return {
+    business_name: "Shows at the top of every page, in the browser tab, in Google results and on the emails you send.",
+    tagline: "Shows under your name at the top of your home page.",
+    short_description: "What Google, AI assistants and directories quote about you, and the line under your link when someone shares your site. One sentence: what you are, where, and what you’re known for.",
+    description: "Shows on your home page and your About page. Google uses it when you have no short description or search description.",
+    story: "Shows on your About page.",
+    phone: bar ? "Shows in your footer and on your Contact page, on the Call button of the phone bar, and to Google." : "Shows in your footer and on your Contact page, and to Google.",
+    email: "Shows in your footer and on your Contact page as an email link.",
+    service_area: rc ? "Shows on your About page." : "Shows at the top of your home page and on your About page, and tells Google the places you serve.",
+    booking_url: rc ? "Your home page’s Reserve a table button opens it, and Google is told you take reservations." : "The first button at the top of your home page opens it.",
+    ordering_url: "Your home page’s Order online button opens it.",
+    address: "Shows in your footer and on your Contact page with a Get directions link. Google uses it for your listing.",
+    locphone: "Only if it differs from your main number. It then shows with this address instead.",
+    hours: `Shows on your Contact page${footHours ? " and in your footer" : ""}${bar ? ", and behind Hours on the phone bar" : ""}. Google reads them too.`,
+  };
+}
+function paintBizShows() {
+  const words = bizShows();
+  document.querySelectorAll("#view-business [data-shows]").forEach((n) => { n.textContent = words[n.dataset.shows] || ""; });
+  document.querySelectorAll("#view-business .biz-pin").forEach((n) => { if (!n.firstChild) n.innerHTML = uiIcon("pin", 14); });
+}
+// The share preview: the picture, name and line a link to the home page carries, as the
+// templates choose them (the share photo, the hero photo, a menu or service photo, a
+// post's cover, the logo).
+function bizShareThumb() {
+  const st = S.settings || {}, media = S.media || [];
+  const ids = [st.og_media_id, st.cover_media_id, ...(S.offerings || []).map((o) => o.media_id), ...(S.posts || []).filter((p) => p.status === "published").map((p) => p.hero_media_id), st.logo_media_id];
+  for (const id of ids) { const m = id && media.find((x) => x.id === id); if (m && m.thumb) return m.thumb; }
+  return "";
+}
+function paintBizShort() {
+  const box = $("f-short_description"); if (!box) return;
+  const val = (id) => { const n = $(id); return n ? String(n.value || "").trim() : ""; };
+  $("cnt-short_description").textContent = `${[...box.value].length} of 150`;
+  const line = val("f-short_description") || val("f-seo_description") || val("f-description");
+  $("bizShareName").textContent = val("f-business_name") || "Your business";
+  const d = $("bizShareDesc"); d.textContent = line || "Add a short description and it shows here."; d.classList.toggle("empty", !line);
+  $("bizShareHost").textContent = seoHost();
+  const thumb = bizShareThumb(), img = $("bizShareImg");
+  img.style.backgroundImage = thumb ? `url("${thumb.replace(/["\\]/g, "")}")` : "";
+}
+["f-short_description", "f-business_name", "f-description"].forEach((id) => { const n = $(id); if (n) n.addEventListener("input", paintBizShort); });
+
+// A second location lives beside the first, in the location row's second_location
+// (lib/second_location.ts): a name, an address, a phone, and the main location's hours or
+// its own week. It saves whole with each change once it has a street and a city; before
+// that it isn't a place yet, and what's stored stays. Removing it is one step back.
+let PLACE2 = null;
+const place2Ready = (p) => !!(p && String(p.address_line1 || "").trim() && String(p.city || "").trim());
+function renderPlace2() {
+  const host = $("place2"); if (!host) return;
+  const p = PLACE2;
+  if (!p) {
+    host.innerHTML = `<button type="button" class="biz-add" id="btnPlace2">${uiIcon("plus", 14)} Add a second location</button><div class="hint">For a second shop, kitchen or office. It shows beside your main address.</div>`;
+    $("btnPlace2").addEventListener("click", () => {
+      PLACE2 = { label: "", address_line1: "", address_line2: "", city: "", region: "", postal_code: "", phone: "", same_hours: true, hours: [] };
+      renderPlace2(); $("f2-label").focus();
+    });
+    return;
+  }
+  const bar = !!pbNow();
+  host.innerHTML = `<p class="biz-place"><span class="biz-pin" aria-hidden="true">${uiIcon("pin", 14)}</span>Second location <span class="biz-new">New</span></p>
+<div class="field"><label for="f2-label">A name for this place</label><input type="text" id="f2-label" data-p2="label" maxlength="60" placeholder="e.g. Glendale"><div class="hint">Visitors see it above the address, so they know which place is which.</div></div>
+<div class="field"><label for="f2-address_line1">Street address</label><input type="text" id="f2-address_line1" data-p2="address_line1" maxlength="160"><div class="hint">Shows beside your main address in your footer and on your Contact page, with its own Get directions link.</div></div>
+<div class="biz-row3">
+<div class="field"><label for="f2-city">City</label><input type="text" id="f2-city" data-p2="city" maxlength="80"></div>
+<div class="field"><label for="f2-region">State</label><input type="text" id="f2-region" data-p2="region" maxlength="40"></div>
+<div class="field"><label for="f2-postal_code">ZIP</label><input type="text" class="mono" id="f2-postal_code" data-p2="postal_code" maxlength="16"></div>
+</div>
+<div class="field"><label for="f2-phone">Phone at this place</label><input type="tel" class="mono" id="f2-phone" data-p2="phone" maxlength="32"><div class="hint">${bar ? "Shows with this address. The phone bar keeps calling your main number." : "Shows with this address."}</div></div>
+<div class="field" role="group" aria-labelledby="p2HoursL"><span class="biz-p2-lbl" id="p2HoursL">Hours</span>
+<div class="biz-seg"><label><input type="radio" name="p2hours" value="same"> Same hours as the main location</label><label><input type="radio" name="p2hours" value="own"> Its own hours</label></div>
+<div class="hoursgrid" id="hoursGrid2" hidden></div>
+<div class="hint">Google is told you have two places, each with its address, phone and hours.</div></div>
+<p class="hint" id="p2Wait" hidden>It saves once it has a street address and a city.</p>
+<button type="button" class="biz-rm" id="btnPlace2Rm">Remove the second location</button>`;
+  host.querySelectorAll("[data-p2]").forEach((inp) => {
+    inp.value = p[inp.dataset.p2] || "";
+    inp.addEventListener("input", () => { PLACE2[inp.dataset.p2] = inp.value; savePlace2(); });
+  });
+  host.querySelectorAll('input[name="p2hours"]').forEach((r) => {
+    r.checked = (r.value === "same") === (p.same_hours !== false);
+    r.addEventListener("change", () => { PLACE2.same_hours = r.value === "same"; renderPlace2Hours(); savePlace2(); });
+  });
+  $("btnPlace2Rm").addEventListener("click", removePlace2);
+  $("p2Wait").hidden = place2Ready(p) || !(p.label || p.address_line1 || p.city);
+  renderPlace2Hours();
+}
+// Its own week starts as a copy of the main location's, drawn like it.
+function renderPlace2Hours() {
+  const grid = $("hoursGrid2"); if (!grid || !PLACE2) return;
+  grid.innerHTML = ""; grid.hidden = PLACE2.same_hours !== false;
+  if (grid.hidden) return;
+  if (!Array.isArray(PLACE2.hours) || PLACE2.hours.length !== 7) PLACE2.hours = undoClone(hoursFromState());
+  PLACE2.hours.forEach((day, idx) => {
+    const name = DAYS.find(([k]) => k === day.day)[1];
+    const row = el("div", "hrow");
+    row.appendChild(el("span", "day", name));
+    const iv = (day.intervals && day.intervals[0]) || { open: "09:00", close: "17:00" };
+    const open = el("input"); open.type = "time"; open.value = iv.open || "09:00"; open.disabled = !!day.closed; open.setAttribute("aria-label", name + " opens");
+    const close = el("input"); close.type = "time"; close.value = iv.close || "17:00"; close.disabled = !!day.closed; close.setAttribute("aria-label", name + " closes");
+    const lab = el("label", "closedlab"); const cb = el("input"); cb.type = "checkbox"; cb.checked = !!day.closed;
+    lab.append(cb, document.createTextNode("Closed"));
+    row.append(open, el("span", "to", "to"), close, lab);
+    const save = () => { PLACE2.hours[idx] = { day: day.day, closed: cb.checked, intervals: cb.checked ? [] : [{ open: open.value || "09:00", close: close.value || "17:00" }] }; savePlace2(); };
+    cb.addEventListener("change", () => { open.disabled = close.disabled = cb.checked; save(); });
+    open.addEventListener("change", save); close.addEventListener("change", save);
+    grid.appendChild(row);
+  });
+}
+function savePlace2() {
+  const ready = place2Ready(PLACE2), wait = $("p2Wait");
+  if (wait) wait.hidden = ready;
+  if (!ready) return;
+  whisper("save-location", "saving"); whisper("topWhisper", "saving");
+  debounce("location:second_location", async () => {
+    const body = { second_location: undoClone(PLACE2) };
+    try {
+      await api("PUT", "/location", body);
+      S.location = { ...(S.location || {}), second_location: body.second_location };   // the next undo step needs what's saved now
+      whisper("save-location", "saved"); whisper("topWhisper", "saved");
+      scheduleChangesRefresh();
+    } catch (err) { whisper("save-location", ""); whisper("topWhisper", "failed"); toast(nice(err), true); }
+  }, 700);
+}
+async function removePlace2() {
+  clearTimeout(debounces["location:second_location"]); delete debounceFns["location:second_location"];
+  const had = S.location && S.location.second_location;
+  PLACE2 = null; renderPlace2();
+  if (!had) return;
+  whisper("save-location", "saving"); whisper("topWhisper", "saving");
+  try {
+    await api("PUT", "/location", { second_location: null });
+    S.location = { ...(S.location || {}), second_location: null };
+    whisper("save-location", "saved"); whisper("topWhisper", "saved");
+    scheduleChangesRefresh();
+    toastAction("Second location removed", "Put it back", () => { PLACE2 = undoClone(had); renderPlace2(); savePlace2(); });
+  } catch (err) { PLACE2 = undoClone(had); renderPlace2(); whisper("save-location", ""); whisper("topWhisper", "failed"); toast(nice(err), true); }
+}
 
 /* ── hours (identical PUT /location) ── */
 let HOURS_BEFORE = null;
@@ -3483,71 +3810,175 @@ function renderTes() {
     list.appendChild(a);
   });
 }
+/* ── Blog (builder list item 40): every post as a card that says where it stands (Live,
+ *    the day and time it goes out, or Draft), its category and who wrote it. A card opens
+ *    the writing screen (blog-studio.js, loaded on first use), which saves as you type and
+ *    publishes one post on its own. ── */
+let BLOG_SHOW = "all", BLOG_CAT = "";
+const blogLists = () => ({
+  categories: Array.isArray(S.settings && S.settings.post_categories) ? S.settings.post_categories : [],
+  authors: Array.isArray(S.settings && S.settings.post_authors) ? S.settings.post_authors : [],
+});
+const siteTz = () => (S.location && S.location.timezone) || "America/Los_Angeles";
+const blogWhen = (iso) => new Date(iso).toLocaleString("en-US", { timeZone: siteTz(), weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }).replace(/, (\d{1,2}:\d{2}) (AM|PM)$/, (_m, t, ap) => " · " + t + " " + ap.toLowerCase());
+const postState = (p) => (p.status === "published" ? "live" : p.status === "scheduled" ? "sched" : "draft");
+const siteIsLive = () => !!(S.site && S.site.status === "live");
+function paintBlogFilters() {
+  const host = $("blFilters"); if (!host) return;
+  const n = { all: S.posts.length, live: 0, sched: 0, draft: 0 };
+  S.posts.forEach((p) => { n[postState(p)]++; });
+  const cats = blogLists().categories;
+  host.innerHTML = [["all", "All"], ["live", "Live"], ["sched", "Scheduled"], ["draft", "Drafts"]]
+    .map(([k, w]) => `<button type="button" class="bl-pill" data-show="${k}" aria-pressed="${BLOG_SHOW === k}">${w} ${n[k]}</button>`).join("")
+    + (cats.length ? `<label class="bl-catsel"><span class="sr-only">Category</span><select id="blCat"><option value="">Every category</option>${cats.map((c) => `<option value="${esc(c.id)}"${BLOG_CAT === c.id ? " selected" : ""}>${esc(c.name)}</option>`).join("")}</select></label>` : "")
+    + `<button type="button" class="bl-lists" id="btnBlogLists">${uiIcon("cog", 15)} Categories and authors</button>`;
+  host.querySelectorAll("[data-show]").forEach((b) => b.addEventListener("click", () => { BLOG_SHOW = b.dataset.show; renderPosts(); }));
+  const sel = $("blCat"); if (sel) sel.addEventListener("change", () => { BLOG_CAT = sel.value; renderPosts(); });
+  $("btnBlogLists").addEventListener("click", openBlogLists);
+}
 function renderPosts() {
-  const list = $("postList"); list.innerHTML = "";
-  const wash = changedIds();
+  const list = $("postList"); if (!list) return;
+  list.innerHTML = "";
+  paintBlogFilters();
   if (!S.posts.length) {
     list.appendChild(estateWithAction("Summer patio is open.",
-      "Your first update can be one sentence, like this. Write it as a draft; show it when it’s ready — customers see it on your Updates page.",
-      "Write the first update", () => $("btnAddPost").click()));
+      "Your first post can be one sentence, like this. Write it, add a photo, then publish it now or pick a day and time. It goes on your site’s Updates page.",
+      "Write the first post", () => $("btnAddPost").click()));
     return;
   }
-  S.posts.forEach((p) => {
-    const shown = p.status === "published";
-    const a = el("div", "artifact" + (!shown ? " dimmed" : ""));
-    const row = el("div", "arow");
-    const q = el("span", "aq");
-    if (wash.has(p.id) && shown) q.appendChild(el("span", "washed-dot"));
-    q.appendChild(document.createTextNode(p.title));
-    if (!shown) q.appendChild(Object.assign(el("span", "smalltag", "draft"), { style: "margin-left:10px" }));
-    row.appendChild(q);
-    const acts = el("span", "aacts");
-    const tog = el("button", "quietact", shown ? "make it a draft" : "show it");
-    tog.addEventListener("click", async (e) => {
-      e.stopPropagation();
-      try { const r = await api("PATCH", `/posts/${p.id}`, { status: shown ? "draft" : "published" });
-        Object.assign(p, r.data); renderPosts(); scheduleChangesRefresh(); }
-      catch (err) { toast(nice(err), true); }
-    });
-    acts.appendChild(tog);
-    const edit = el("button", "quietact", "edit");
-    edit.addEventListener("click", () => { const open = a.querySelector(".editor"); if (open) open.remove(); else a.appendChild(postEditor(p)); });
-    acts.appendChild(edit);
-    row.appendChild(acts);
-    a.appendChild(row);
-    a.appendChild(el("div", "meta", shown && p.published_at ? fmtDate(p.published_at).toUpperCase() : "UNDATED UNTIL SHOWN"));
-    list.appendChild(a);
+  const lists = blogLists(), wash = changedIds();
+  const shown = S.posts.filter((p) => (BLOG_SHOW === "all" || postState(p) === BLOG_SHOW) && (!BLOG_CAT || p.category === BLOG_CAT));
+  if (!shown.length) { list.appendChild(el("p", "bl-none", "No posts here yet.")); return; }
+  shown.forEach((p) => {
+    const st = postState(p), cat = lists.categories.find((c) => c.id === p.category), au = lists.authors.find((a) => a.id === p.author);
+    const card = el("article", "bl-card"); card.dataset.post = p.id;
+    const m = p.hero_media_id ? (S.media || []).find((x) => x.id === p.hero_media_id) : null;
+    const chip = st === "live" ? "Live" : st === "sched" ? "Goes out " + blogWhen(p.published_at) : "Draft";
+    const when = st === "live" && p.published_at ? fmtDate(p.published_at) : st === "sched" ? "scheduled" : "edited " + fmtDate(p.updated_at || p.published_at || new Date().toISOString());
+    const action = st === "live" && siteIsLive() ? `<a class="bl-act" href="${esc(withClient("/broadcasts.html?post=" + p.id))}">${uiIcon("mail", 15)} Email it to your list</a>`
+      : `<button type="button" class="bl-act" data-open>${st === "sched" ? "Change the time" : st === "live" ? "Edit" : "Keep writing"}</button>`;
+    card.innerHTML = `<div class="bl-photo${m && m.thumb ? "" : " none"}">${m && m.thumb ? `<img src="${esc(m.thumb)}" alt="" loading="lazy">` : ""}</div>
+      <div class="bl-body">
+        <div class="bl-top"><span class="bl-chip ${st}">${esc(chip)}</span>${cat ? `<span class="bl-cat">${esc(cat.name)}</span>` : ""}${wash.has(p.id) && st === "live" ? `<span class="washed-dot" title="Changed since your last publish"></span>` : ""}</div>
+        <h3 class="bl-title"><button type="button" data-open>${esc(p.title || "Untitled post")}</button></h3>
+        <p class="bl-meta">${esc((au ? "By " + au.name + " · " : "") + when)}</p>
+        <div class="bl-acts">${action}<button type="button" class="bl-rm" data-act="del" data-needs="delete">Remove</button></div>
+      </div>`;
+    card.querySelectorAll("[data-open]").forEach((b) => b.addEventListener("click", () => openPost(p)));
+    card.querySelector(".bl-photo").addEventListener("click", () => openPost(p));
+    armDelete(card.querySelector('[data-act="del"]'), async () => { if (await deletePost(p)) renderPosts(); });
+    list.appendChild(card);
   });
 }
-function postEditor(p) {
-  const ed = el("div", "editor");
-  ed.innerHTML = `
-    <div class="field"><label>Title</label><input type="text" data-k="title" value="${esc(p.title)}" maxlength="160"></div>
-    <div class="field"><label>The update</label><textarea data-k="body_md" maxlength="20000" style="min-height:130px">${esc(p.body_md || "")}</textarea></div>
-    <div class="field"><label>Tags</label><input type="text" data-k="tags" value="${esc((p.tags || []).join(", "))}" maxlength="200" placeholder="events, seasonal, news"><div class="hint">Separate with commas. Tags let visitors filter your Updates page and help on-site search.</div></div>
-    <div class="field" style="max-width:220px"><label>Photograph</label><button class="textact" data-act="photo" style="background:none">${p.hero_media_id ? "Change photograph" : "Choose one"}</button></div>
-    <div class="eacts">
-      <button class="pillbtn" data-act="save">Done</button>
-      <span class="spacer"></span>
-      <button class="danger" data-act="del" data-needs="delete">Remove for good</button>
-    </div>`;
-  ed.querySelector('[data-act="photo"]').addEventListener("click", () => openPicker(async (mediaId) => {
-    try { const r = await api("PATCH", `/posts/${p.id}`, { hero_media_id: mediaId }); Object.assign(p, r.data); renderPosts(); scheduleChangesRefresh(); }
-    catch (err) { toast(nice(err), true); }
-  }));
-  if (p.status === "published") {
-    const improve = el("button", "quietact", "✦ improve with help");
-    improve.style.marginLeft = "18px";
-    improve.addEventListener("click", () => openEditDesk("edit_post", "updates", p.id, "rewrite"));
-    ed.querySelector(".eacts").insertBefore(improve, ed.querySelector(".spacer"));
-  }
-  editorAutosave(ed, () => { const body = {}; ed.querySelectorAll("[data-k]").forEach((i) => { body[i.dataset.k] = i.dataset.k === "tags" ? splitTags(i.value) : i.value; }); return body; },
-    async (body) => { const r = await api("PATCH", `/posts/${p.id}`, body); Object.assign(p, r.data); }, renderPosts);
-  armDelete(ed.querySelector('[data-act="del"]'), async () => {
-    try { await api("DELETE", `/posts/${p.id}`); S.posts = S.posts.filter((x) => x.id !== p.id); renderPosts(); toast("Removed"); scheduleChangesRefresh(); }
-    catch (err) { toast(nice(err), true); }
+// The writing screen shows the post in the site's own fonts and colours: the template's,
+// with the owner's own choices from Styles over them.
+const TEMPLATE_LOOK = {
+  "atelier": { bg: "#fbfaf7", ink: "#1c1b18", soft: "#5b564c", accent: "#7a5f3a", line: "#e5e0d5", display: "Georgia,'Times New Roman',serif", body: "'Avenir Next','Helvetica Neue',system-ui,sans-serif" },
+  "aurora": { bg: "#ffffff", ink: "#16171d", soft: "#636471", accent: "#3730a3", line: "#eaeaf1", display: "system-ui,-apple-system,'Segoe UI',Roboto,sans-serif", body: "system-ui,-apple-system,'Segoe UI',Roboto,sans-serif" },
+  "business-classic": { bg: "#f7f7f5", ink: "#1c2430", soft: "#5b6572", accent: "#17453f", line: "#e2e4e1", display: "system-ui,-apple-system,'Segoe UI',Roboto,sans-serif", body: "system-ui,-apple-system,'Segoe UI',Roboto,sans-serif" },
+  "editorial": { bg: "#f6f3ec", ink: "#1a1a1c", soft: "#5f5a52", accent: "#4f181d", line: "#ddd6c8", display: "'Iowan Old Style',Palatino,Georgia,serif", body: "'Iowan Old Style','Palatino Linotype',Palatino,serif" },
+  "harbor": { bg: "#ffffff", ink: "#1c2434", soft: "#4a556a", accent: "#12203a", line: "#c9d5e6", display: "system-ui,-apple-system,'Segoe UI',Roboto,sans-serif", body: "system-ui,-apple-system,'Segoe UI',Roboto,sans-serif" },
+  "meadow": { bg: "#faf7f0", ink: "#243428", soft: "#55624f", accent: "#345c41", line: "#e4dfcd", display: "'Palatino Linotype',Palatino,Georgia,serif", body: "'Seravek','Gill Sans',system-ui,sans-serif" },
+  "restaurant-classic": { bg: "#faf6ef", ink: "#241d1a", soft: "#6b5f58", accent: "#6f2e24", line: "#e7ddd0", display: "Georgia,'Iowan Old Style','Times New Roman',serif", body: "system-ui,-apple-system,'Segoe UI',sans-serif" },
+  "slate": { bg: "#101216", ink: "#eef1f5", soft: "#9ba4b5", accent: "#2dd4bf", line: "#262a33", display: "system-ui,-apple-system,'Segoe UI',Roboto,sans-serif", body: "system-ui,-apple-system,'Segoe UI',Roboto,sans-serif" },
+};
+function blogLook() {
+  const base = TEMPLATE_LOOK[(S.site && S.site.template_slug) || ""] || TEMPLATE_LOOK["business-classic"];
+  const t = DESIGN_TOKENS || {};
+  return { ...base, ...(t.ink ? { ink: t.ink } : {}), ...(t.soft ? { soft: t.soft } : {}), ...(t.accent_dark || t.accent ? { accent: t.accent_dark || t.accent } : {}), ...(t.bg ? { bg: t.bg } : {}),
+    ...(t.font_display ? { display: t.font_display } : {}), ...(t.font_body ? { body: t.font_body } : {}), radius: t.radius || "14px" };
+}
+// The one place a post is removed: the card's Remove, and the writing screen's.
+async function deletePost(p) {
+  try { await api("DELETE", `/posts/${p.id}`); S.posts = S.posts.filter((x) => x.id !== p.id); toast("Removed"); scheduleChangesRefresh(); return true; }
+  catch (err) { toast(nice(err), true); return false; }
+}
+let BLOG_STUDIO = null;
+function loadBlogStudio() {
+  if (window.DDSBlogStudio) return Promise.resolve(window.DDSBlogStudio);
+  // Bump ?v= whenever blog-studio.js changes: browsers keep a .js file for a day.
+  if (!BLOG_STUDIO) BLOG_STUDIO = new Promise((res, rej) => {
+    const sc = document.createElement("script"); sc.src = "/blog-studio.js?v=1";
+    sc.onload = () => window.DDSBlogStudio ? res(window.DDSBlogStudio) : rej(new Error("missing"));
+    sc.onerror = () => rej(new Error("load"));
+    document.head.appendChild(sc);
+  }).catch((e) => { BLOG_STUDIO = null; throw e; });
+  return BLOG_STUDIO;
+}
+async function blogListsPut(field, next) {
+  try { await settingsPut({ [field]: next }); renderPosts(); return true; }
+  catch (err) { toast(nice(err), true); return false; }
+}
+async function addBlogCategory(name) {
+  const lists = blogLists();
+  const have = lists.categories.find((c) => c.name.toLowerCase() === name.toLowerCase());
+  if (have) return have;
+  if (!(await blogListsPut("post_categories", [...lists.categories, { name }]))) return null;
+  return blogLists().categories.find((c) => c.name.toLowerCase() === name.toLowerCase()) || null;
+}
+async function addBlogAuthor(name, bio) {
+  const lists = blogLists();
+  if (!(await blogListsPut("post_authors", [...lists.authors, { name, ...(bio ? { bio } : {}) }]))) return null;
+  return blogLists().authors.filter((a) => a.name === name).slice(-1)[0] || null;
+}
+function blogHost() {
+  const live = siteLiveUrl();
+  return {
+    api, toast, nice, askText, splitTags, openPicker,
+    timezone: siteTz(), origin: live ? live.replace(/^https?:\/\//, "").replace(/\/$/, "") : "yoursite.com",
+    siteLive: siteIsLive(), look: blogLook(),
+    mediaOf: (id) => (S.media || []).find((m) => m.id === id) || null,
+    lists: blogLists, addCategory: (n) => addBlogCategory(n), addAuthor: (n) => addBlogAuthor(n),
+    emailHref: (p) => withClient("/broadcasts.html?post=" + p.id),
+    // the writing screen offers Remove only to someone who may delete (a role without it isn't shown it)
+    canDelete: () => !(window.ddsLacks && window.ddsLacks("delete")),
+    removePost: async (p) => (await askYes(`Remove “${p.title || "this post"}”? It comes off your site with your next publish.`, { ok: "Remove it", danger: true })) && deletePost(p),
+    onSaved: (p) => { const { _slugDraft, _slugTouched, ...clean } = p; const i = S.posts.findIndex((x) => x.id === p.id); if (i >= 0) S.posts[i] = { ...S.posts[i], ...clean }; scheduleChangesRefresh(); },
+    onClose: () => { renderPosts(); const c = document.querySelector(`.bl-card[data-post] .bl-title button`); if (c) c.focus(); },
+  };
+}
+// The two lists a post picks from. Removing a category keeps its posts; they lose the label.
+function openBlogLists() {
+  paintBlogLists();
+  openSheet("blogListsScrim");
+}
+function paintBlogLists() {
+  const host = $("blogListsBody"); if (!host) return;
+  const lists = blogLists();
+  const used = (k, id) => S.posts.filter((p) => p[k] === id).length;
+  const n = (k, id) => { const c = used(k, id); return c === 1 ? "1 post" : c + " posts"; };
+  const initials = (name) => String(name || "").split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0].toUpperCase()).join("");
+  host.innerHTML = `<p class="bl-lbl">Categories</p>
+    ${lists.categories.map((c, i) => `<div class="bl-row"><div class="bl-rowtext"><strong>${esc(c.name)}</strong><span>${n("category", c.id)}</span></div><button type="button" class="textact" data-cren="${i}">Rename</button><button type="button" class="textact bl-x" data-crm="${i}">Remove</button></div>`).join("") || `<p class="bl-empty">None yet. Each category gets its own page on your site.</p>`}
+    <button type="button" class="bs-addline textact" data-cadd>+ New category</button>
+    <p class="bl-lbl">Authors</p>
+    ${lists.authors.map((a, i) => { const m = a.photo_media_id ? (S.media || []).find((x) => x.id === a.photo_media_id) : null;
+      return `<div class="bl-row"><span class="bl-av">${m && m.thumb ? `<img src="${esc(m.thumb)}" alt="">` : esc(initials(a.name))}</span><div class="bl-rowtext"><strong>${esc(a.name)}</strong><span>${esc((a.bio ? a.bio + " · " : "") + n("author", a.id))}</span></div><button type="button" class="textact" data-aed="${i}">Edit</button><button type="button" class="textact" data-aph="${i}">Photo</button><button type="button" class="textact bl-x" data-arm="${i}">Remove</button></div>`; }).join("") || `<p class="bl-empty">Nobody yet.</p>`}
+    <button type="button" class="bs-addline textact" data-aadd>+ Add an author</button>
+    <p class="hint">An author is a name, an optional photo and one line about them. They show on every post that person wrote. Removing a category keeps its posts; they just lose the label.</p>`;
+  const cats = () => blogLists().categories.map((c) => ({ ...c })), aus = () => blogLists().authors.map((a) => ({ ...a }));
+  const save = async (field, next) => { if (await blogListsPut(field, next)) paintBlogLists(); };
+  host.querySelector("[data-cadd]").addEventListener("click", async () => { const v = await askText("A new category", { hint: "Like News, Recipes or Events.", ok: "Add it" }); if (v && v.trim()) save("post_categories", [...cats(), { name: v.trim() }]); });
+  host.querySelector("[data-aadd]").addEventListener("click", async () => {
+    const name = await askText("Their name", { ok: "Next" }); if (!name || !name.trim()) return;
+    const bio = await askText("One line about them", { hint: "Like “Owner and head chef”. Leave it empty for none.", ok: "Add" });
+    save("post_authors", [...aus(), { name: name.trim(), ...(bio && bio.trim() ? { bio: bio.trim() } : {}) }]);
   });
-  return ed;
+  host.querySelectorAll("[data-cren]").forEach((b) => b.addEventListener("click", async () => { const list = cats(), c = list[+b.dataset.cren]; const v = await askText("Rename the category", { value: c.name, ok: "Rename" }); if (v && v.trim() && v.trim() !== c.name) { c.name = v.trim(); save("post_categories", list); } }));
+  host.querySelectorAll("[data-crm]").forEach((b) => b.addEventListener("click", async () => { const list = cats(), c = list[+b.dataset.crm]; if (await askYes(`Remove the category “${c.name}”? Its posts stay; they just lose the label.`, { ok: "Remove it", danger: true })) save("post_categories", list.filter((x) => x.id !== c.id)); }));
+  host.querySelectorAll("[data-aed]").forEach((b) => b.addEventListener("click", async () => {
+    const list = aus(), a = list[+b.dataset.aed];
+    const name = await askText("Their name", { value: a.name, ok: "Next" }); if (name == null || !name.trim()) return;
+    const bio = await askText("One line about them", { value: a.bio || "", hint: "Leave it empty for none.", ok: "Save" }); if (bio == null) return;
+    a.name = name.trim(); if (bio.trim()) a.bio = bio.trim(); else delete a.bio; save("post_authors", list);
+  }));
+  host.querySelectorAll("[data-aph]").forEach((b) => b.addEventListener("click", () => { const list = aus(), a = list[+b.dataset.aph]; closeSheet("blogListsScrim"); openPicker((id) => { if (id === undefined) return; if (id) a.photo_media_id = id; else delete a.photo_media_id; save("post_authors", list).then(() => openBlogLists()); }); }));
+  host.querySelectorAll("[data-arm]").forEach((b) => b.addEventListener("click", async () => { const list = aus(), a = list[+b.dataset.arm]; if (await askYes(`Remove ${a.name} from your authors? Their posts stay, without a name on them.`, { ok: "Remove", danger: true })) save("post_authors", list.filter((x) => x.id !== a.id)); }));
+}
+async function openPost(p) {
+  let studio;
+  try { studio = await loadBlogStudio(); } catch (_) { toast("The writing screen didn’t load. Check your connection and try again.", true); return; }
+  studio.open(p, blogHost());
 }
 /* add lines for the three collections */
 function inlineAdd(wrapId, fields, onAdd, addLabel) {
@@ -4340,14 +4771,19 @@ $("btnAddTes").addEventListener("click", () => inlineAdd("tesAddWrap",
     try { const r = await api("POST", "/testimonials", b); S.testimonials.push(r.data); done(); renderTes(); toast("Kept"); scheduleChangesRefresh(); }
     catch (err) { toast(nice(err), true); }
   }, "Keep this kind word"));
-$("btnAddPost").addEventListener("click", () => inlineAdd("postAddWrap",
-  [["title","Title","text",160,"Summer patio is open"],["body_md","The update","textarea",20000,""],["tags","Tags (comma-separated)","text",200,"events, seasonal"]],
-  async (b, done) => {
-    if (!b.title) { toast("An update needs a title.", true); return; }
-    const body = { ...b, tags: splitTags(b.tags || ""), status: "draft" };
-    try { const r = await api("POST", "/posts", body); S.posts.unshift(r.data); done(); renderPosts(); toast("Saved as a draft — show it when it’s ready"); scheduleChangesRefresh(); }
-    catch (err) { toast(nice(err), true); }
-  }, "Save as a draft"));
+$("btnAddPost").addEventListener("click", async () => {
+  const b = $("btnAddPost"); if (b.disabled) return; b.disabled = true;
+  // a draft first, so the writing screen saves into a post that already exists
+  const lists = blogLists();
+  const slug = "post-" + Date.now().toString(36);
+  try {
+    const r = await api("POST", "/posts", { title: "Untitled post", slug, status: "draft", ...(BLOG_CAT ? { category: BLOG_CAT } : {}), ...(lists.authors.length === 1 ? { author: lists.authors[0].id } : {}) });
+    S.posts.unshift(r.data); renderPosts(); scheduleChangesRefresh();
+    await openPost(r.data);
+  } catch (err) { toast(nice(err), true); }
+  b.disabled = false;
+});
+$("btnPostHelp").addEventListener("click", () => openDesk("post", "updates"));
 
 /* ── Author "find anything" — search across the owner's OWN loaded content and
    jump to the right editor. Pure client-side over already-loaded state (no new
@@ -7719,6 +8155,22 @@ function openCommentsThread(slug, bid, name) {
   p.classList.add("on"); p.setAttribute("aria-hidden", "false");
   setTimeout(() => { try { $("btnCommentsClose").focus(); } catch (_) {} }, 40);
 }
+// Item 159: a thread shows its open notes, its done ones, or all; Open first while any is open.
+let CM_FILTER = null;   // null = choose by the thread: open when it has any, else all
+// one picture a note, made small in the browser first (the same as the client's panel)
+function cmShrink(file) {
+  return new Promise((resolve, reject) => {
+    if (!file || !/^image\/(jpeg|png|webp|gif)$/.test(file.type)) { reject(new Error("Choose a photo or a screenshot (JPEG, PNG or WebP).")); return; }
+    const img = new Image(), u = URL.createObjectURL(file);
+    img.onload = () => {
+      const k = Math.min(1, 1600 / Math.max(img.width, img.height)), w = Math.max(1, Math.round(img.width * k)), h = Math.max(1, Math.round(img.height * k));
+      const c = document.createElement("canvas"); c.width = w; c.height = h; c.getContext("2d").drawImage(img, 0, 0, w, h);
+      URL.revokeObjectURL(u); resolve({ data: c.toDataURL("image/jpeg", 0.85), w, h });
+    };
+    img.onerror = () => { URL.revokeObjectURL(u); reject(new Error("That picture couldn’t be read.")); };
+    img.src = u;
+  });
+}
 function cmRenderThread(slug, bid, name) {
   const host = $("cmPanelBody"); if (!host) return;
   host.textContent = "";
@@ -7733,18 +8185,48 @@ function cmRenderThread(slug, bid, name) {
       res.addEventListener("click", () => cmResolveThread(slug, bid, name));
       wrap.appendChild(res);
     }
-    t.comments.forEach((c) => wrap.appendChild(cmItem(c, slug, bid, name)));   // already newest-first from the server
+    const done = t.comments.length - t.open_count;
+    const show = CM_FILTER || (t.open_count ? "open" : "all");
+    const seg = el("div", "cm-filter"); seg.setAttribute("role", "group"); seg.setAttribute("aria-label", "Show notes");
+    [["open", "Open (" + t.open_count + ")"], ["done", "Done (" + done + ")"], ["all", "All"]].forEach(([k, label]) => {
+      const b = el("button", null, label); b.type = "button"; b.dataset.cmFilter = k; b.setAttribute("aria-pressed", String(show === k));
+      b.addEventListener("click", () => { CM_FILTER = k; cmRenderThread(slug, bid, name); const nb = $("cmPanelBody").querySelector('[data-cm-filter="' + k + '"]'); if (nb) nb.focus(); });
+      seg.appendChild(b);
+    });
+    wrap.appendChild(seg);
+    const shown = t.comments.filter((c) => show === "all" || (show === "open" ? c.status === "open" : c.status === "resolved"));
+    if (!shown.length) wrap.appendChild(el("div", "cm-none", show === "open" ? "Nothing open here. Every note is done." : "No notes are done here yet."));
+    shown.forEach((c) => wrap.appendChild(cmItem(c, slug, bid, name)));   // already newest-first from the server
   }
   const ta = el("textarea", "cm-reply"); ta.maxLength = 2000;
   ta.placeholder = t && t.comments.length ? "Write a reply…" : "Write a note…";
   ta.setAttribute("aria-label", "Your note");
   wrap.appendChild(ta);
+  // item 159: a picture with the note (a screenshot of what you mean)
+  let pic = null;
+  const att = el("label", "cm-attach"); att.appendChild(document.createTextNode("Add a screenshot or photo"));
+  const fin = el("input"); fin.type = "file"; fin.accept = "image/*"; att.appendChild(fin);
+  const thumb = el("div", "cm-thumb"); thumb.hidden = true;
+  fin.addEventListener("change", async () => {
+    const f = fin.files && fin.files[0]; fin.value = ""; if (!f) return;
+    try {
+      pic = await cmShrink(f);
+      thumb.textContent = ""; thumb.hidden = false; att.hidden = true;
+      const im = el("img"); im.src = pic.data; im.alt = "The picture going with this note"; thumb.appendChild(im);
+      const rm = el("button", null, "Remove"); rm.type = "button";
+      rm.addEventListener("click", () => { pic = null; thumb.hidden = true; thumb.textContent = ""; att.hidden = false; });
+      thumb.appendChild(rm);
+    } catch (err) { toast(nice(err), true); }
+  });
+  wrap.append(att, thumb);
   const sendLabel = t && t.comments.length ? "Reply" : "Add note";
   const send = el("button", "cm-send", sendLabel); send.type = "button";
   send.addEventListener("click", async () => {
     const body = ta.value.trim(); if (!body) { toast("Write a note first.", true); return; }
     send.disabled = true; send.textContent = "Sending…";
-    try { await api("POST", "/comments", { page_slug: slug || "", block_id: bid || "", body }); await cmLoad(); cmSyncButton(); dcRefreshTree(); cmRenderThread(slug, bid, name); }
+    const msg = { page_slug: slug || "", block_id: bid || "", body };
+    if (pic) Object.assign(msg, { image: pic.data, w: pic.w, h: pic.h });
+    try { await api("POST", "/comments", msg); CM_FILTER = null; await cmLoad(); cmSyncButton(); dcRefreshTree(); cmRenderThread(slug, bid, name); }
     catch (err) { send.disabled = false; send.textContent = sendLabel; toast(nice(err), true); }
   });
   wrap.appendChild(send);
@@ -7754,10 +8236,18 @@ function cmItem(c, slug, bid, name) {
   const it = el("div", "cm-item" + (c.status === "resolved" ? " resolved" : ""));
   const who = el("div", "cm-who");
   who.appendChild(el("span", "cm-k" + (c.author_kind === "client" ? " client" : ""), c.author_kind === "client" ? "Client" : "You"));
+  if (c.author_kind === "client" && c.author_name) who.appendChild(el("span", "cm-name", c.author_name));   // item 159: the name they gave
   who.appendChild(el("span", null, new Date(c.created_at).toLocaleString()));
   if (c.status === "resolved") who.appendChild(el("span", null, "· resolved"));
   it.appendChild(who);
   it.appendChild(el("div", "cm-body", c.body));   // textContent — never markup
+  if (c.picture && c.picture.url) {   // item 159: the note's picture, a link that lasts ten minutes
+    const a = el("a", "cm-pic"); a.href = c.picture.url; a.target = "_blank"; a.rel = "noopener";
+    a.title = "Open the picture full size";
+    const im = el("img"); im.src = c.picture.url; im.alt = "Picture sent with this note"; im.loading = "lazy";
+    if (c.picture.w && c.picture.h) { im.width = c.picture.w; im.height = c.picture.h; }
+    a.appendChild(im); it.appendChild(a);
+  }
   const acts = el("div", "cm-itemacts");
   if (c.status === "open") {
     const r = el("button", null, "Resolve"); r.type = "button";
@@ -8268,7 +8758,7 @@ $("btnRestoreGo").addEventListener("click", async () => {
 /* ── initial load (identical fetches) ── */
 function fillSingles() {
   const i = S.identity || {};
-  [["f-business_name","business_name"],["f-tagline","tagline"],["f-description","description"],["f-phone","phone"],["f-email","email"],["f-story","story"],["f-booking_url","booking_url"],["f-ordering_url","ordering_url"],["f-service_area","service_area"],["f-seo_title","seo_title"],["f-seo_description","seo_description"]]
+  [["f-business_name","business_name"],["f-tagline","tagline"],["f-short_description","short_description"],["f-description","description"],["f-phone","phone"],["f-email","email"],["f-story","story"],["f-booking_url","booking_url"],["f-ordering_url","ordering_url"],["f-service_area","service_area"],["f-seo_title","seo_title"],["f-seo_description","seo_description"]]
     .forEach(([id, k]) => { $(id).value = i[k] || ""; });
   if ($("f-industry")) $("f-industry").value = (S.settings && S.settings.industry_key) || "generic";
   industryHint();
@@ -8280,6 +8770,10 @@ function fillSingles() {
   [["f-address_line1","address_line1"],["f-city","city"],["f-region","region"],["f-postal_code","postal_code"],["f-locphone","phone"]]
     .forEach(([id, k]) => { $(id).value = l[k] || ""; });
   renderHours();
+  PLACE2 = undoClone(l.second_location) || null;
+  renderPlace2();
+  paintBizShows();
+  paintBizShort();
   renderSearchPreview();
 }
 const SHELL_LOADED = document.readyState === "loading" ? new Promise((r) => document.addEventListener("DOMContentLoaded", r, { once: true })) : Promise.resolve();
@@ -8539,8 +9033,9 @@ function seoHomeWords() {
   const val = (id) => { const n = $(id); return n ? String(n.value || "").trim() : ""; };
   const i = S.identity || {};
   const name = val("f-business_name") || i.business_name || "";
-  const t = val("f-seo_title"), d = val("f-seo_description"), bizDesc = val("f-description") || i.description || "";
-  return { name, title: t || name, description: d || bizDesc, titleOwn: !!t, descOwn: !!d };
+  const t = val("f-seo_title"), d = val("f-seo_description"), short = val("f-short_description") || i.short_description || "";
+  const bizDesc = short || val("f-description") || i.description || "";   // item 127: Google gets the short description before the long one
+  return { name, title: t || name, description: d || bizDesc, titleOwn: !!t, descOwn: !!d, short: !!short };
 }
 let SRP_HOME = null;
 function renderSearchPreview() {
@@ -8549,7 +9044,7 @@ function renderSearchPreview() {
   const w = seoHomeWords();
   srpFill(SRP_HOME, { name: w.name, host: seoHost(), hostMuted: !siteLiveUrl(), title: w.title, description: w.description });
   seoCounterInto("cnt-seo_title", "title", $("f-seo_title").value, "Empty — Google shows your business name");
-  seoCounterInto("cnt-seo_description", "description", $("f-seo_description").value, w.description ? "Empty — Google shows your description" : "Empty — and so is your description, so add one here");
+  seoCounterInto("cnt-seo_description", "description", $("f-seo_description").value, w.short ? "Empty — Google shows your short description" : w.description ? "Empty — Google shows your description" : "Empty — and so is your description, so add one here");
   if (!$("seoSetup").hidden) renderSeoSetupOut();
   renderSeoTasks();
 }
@@ -8565,7 +9060,7 @@ function openSeoSetup() {
   $("sw-name").value = val("f-business_name") || i.business_name || "";
   const area = val("f-service_area").replace(/^serving\s+/i, "").replace(/\s+and\s+/gi, ", ");
   $("sw-places").value = area || loc.city || "";
-  $("sw-words").value = "";
+  $("sw-words").value = ((SV && SV.phrases && SV.phrases.list) || []).map((x) => x.phrase).join(", ");   // item 160: the phrases kept
   const own = !!(val("f-seo_title") || val("f-seo_description"));
   $("swReplaceWrap").hidden = !own; $("swReplace").checked = false;
   p.hidden = false; renderSeoSetupOut();
@@ -8598,10 +9093,15 @@ async function saveSeoSetup() {
   if ((replace || !val("f-seo_title")) && s.title) body.seo_title = s.title;
   if ((replace || !val("f-seo_description")) && s.description) body.seo_description = s.description;
   if (s.service_area && !val("f-service_area")) body.service_area = s.service_area;
-  if (!Object.keys(body).length) { toast("Nothing to change — your search setup already says this."); closeSeoSetup(); return; }
+  // item 160: the words are kept as what people type to find you, up to three
+  const had = ((SV && SV.phrases && SV.phrases.list) || []).map((x) => x.phrase);
+  const words = String(a.words || "").split(",").map((x) => x.replace(/\s+/g, " ").trim().toLowerCase()).filter(Boolean).filter((x, n, all) => all.indexOf(x) === n).slice(0, 3);
+  const phrases = words.length && words.join("|") !== had.join("|") ? words : null;
+  if (!Object.keys(body).length && !phrases) { toast("Nothing to change — your search setup already says this."); closeSeoSetup(); return; }
   btn.disabled = true; btn.textContent = "Saving…"; whisper("save-identity", "saving"); whisper("topWhisper", "saving");
   try {
-    const r = await api("PUT", "/identity", body);
+    const r = Object.keys(body).length ? await api("PUT", "/identity", body) : null;
+    if (phrases) svPhrasesTake((await api("PUT", "/visibility/phrases", { phrases })).data);
     const saved = (r && r.data && typeof r.data.business_name === "string") ? r.data : {};
     S.identity = { ...i, ...body, ...saved };
     const ids = { business_name: "f-business_name", seo_title: "f-seo_title", seo_description: "f-seo_description", service_area: "f-service_area" };
@@ -8889,6 +9389,7 @@ async function loadSearch() {
   if (!$("view-search").classList.contains("on")) return;
   renderSvScore(); renderSvFix(); renderSvConsole(); renderSvListing(); renderSvAi(); renderSeoTasks();
   renderSvTools(); renderSvNums(); renderSvMovers();   // item 124
+  renderSvPhrases();   // item 160
   if (SV && SV.follow && SV.console && SV.console.status === "connected") loadSvFollow(); else { SV_FOLLOW = null; renderSvFollow(); }   // item 181
   loadSvAiWatch();   // item 182
 }
@@ -8956,10 +9457,12 @@ function redirectsManager() {
   add.style.cssText = "font:inherit;font-size:12px;padding:6px 12px;border-radius:999px;border:1px solid var(--line,#ddd);background:transparent;cursor:pointer";
   form.append(fi, tiR, add); box.appendChild(form);
   box.appendChild(el("div", "hint", "Anyone visiting the old address lands on the new one — and Google follows along. Applies when you publish."));
+  let showAll = false;
   async function loadRedirects() {
     try {
-      const r = await api("GET", "/redirects"); const rows = r.data || [];
-      list.innerHTML = rows.length ? "" : "No forwards yet.";
+      const r = await api("GET", "/redirects"); const all = r.data || [];
+      list.innerHTML = all.length ? "" : "No forwards yet.";
+      const rows = showAll ? all : all.slice(0, 20);   // item 156: an imported site can have hundreds
       rows.forEach((row) => {
         const line2 = el("div"); line2.style.cssText = "display:flex;gap:8px;align-items:center;font-size:12.5px;padding:3px 0";
         line2.appendChild(el("span", null, row.from_path + " → " + row.to_path));
@@ -8968,14 +9471,105 @@ function redirectsManager() {
         x.addEventListener("click", async () => { try { await api("DELETE", "/redirects/" + row.id); loadRedirects(); toast("Forward removed — publish to apply"); scheduleChangesRefresh(); } catch (err) { toast(nice(err), true); } });
         line2.appendChild(x); list.appendChild(line2);
       });
+      if (all.length > rows.length) {
+        const more = el("button", "rdx-more", `Show all ${all.length} forwards`); more.type = "button";
+        more.addEventListener("click", () => { showAll = true; loadRedirects(); });
+        list.appendChild(more);
+      }
     } catch (_) { list.textContent = "Forwards couldn’t load just now."; }
   }
   add.addEventListener("click", async () => {
     try { await api("POST", "/redirects", { from_path: fi.value, to_path: tiR.value }); fi.value = ""; tiR.value = ""; loadRedirects(); toast("Forward added — publish to apply"); scheduleChangesRefresh(); }
     catch (err) { toast(nice(err), true); }
   });
+  box.appendChild(redirectsImport(() => { showAll = false; loadRedirects(); }));
   loadRedirects();
   return box;
+}
+// Item 156: a whole list of old addresses at once, when a client moves from another website.
+// Paste the lines (or choose a spreadsheet saved as CSV), or read the old site's own page
+// list for suggestions; Check the list says what each line will do, and nothing is saved
+// until Bring them in. The server keeps publishing's rules: 500 at most, no chains, no loops.
+let RDX_SEQ = 0;
+function redirectsImport(onDone) {
+  const n = ++RDX_SEQ;
+  const wrap = el("div");
+  const open = el("button", "rdx-open", "Bring in a whole list…"); open.type = "button";
+  open.setAttribute("aria-expanded", "false"); open.setAttribute("aria-controls", "rdx-" + n);
+  const panel = el("div", "rdx"); panel.id = "rdx-" + n; panel.hidden = true;
+  panel.appendChild(el("div", "hint", "Moving a client from another website? Bring in all their old addresses at once: one per line, the old address and then where it goes now. A spreadsheet saved as CSV works too, and so does reading the old site’s own list of pages."));
+  const oldRow = el("div", "rdx-row");
+  const oldSite = el("input"); oldSite.type = "text"; oldSite.placeholder = "oldsite.com"; oldSite.setAttribute("aria-label", "The old website’s address");
+  const read = el("button", "rdx-b", "Read its pages"); read.type = "button";
+  oldRow.append(oldSite, read);
+  const ta = el("textarea"); ta.rows = 6; ta.setAttribute("aria-label", "Addresses to bring in, one per line");
+  ta.placeholder = "/about-us  /about/\n/our-menu  /menu/\nhttps://oldsite.com/contact-us  /contact/";
+  const fileRow = el("div", "rdx-row");
+  const fl = el("label", "rdx-file", "Choose a spreadsheet (CSV)"); const file = el("input"); file.type = "file"; file.accept = ".csv,text/csv,text/plain"; fl.appendChild(file);
+  const check = el("button", "rdx-b", "Check the list"); check.type = "button";
+  fileRow.append(fl, check);
+  const out = el("div"); out.setAttribute("role", "status");
+  const go = el("button", "rdx-b rdx-go", "Bring them in"); go.type = "button"; go.hidden = true;
+  panel.append(oldRow, ta, fileRow, out, go);
+  wrap.append(open, panel);
+  let checked = null;   // the text the shown plan is for; editing it asks for a new check
+  const reset = () => { checked = null; out.textContent = ""; go.hidden = true; };
+  open.addEventListener("click", () => { const on = panel.hidden; panel.hidden = !on; open.setAttribute("aria-expanded", String(on)); if (on) ta.focus(); });
+  ta.addEventListener("input", reset);
+  file.addEventListener("change", async () => {
+    const f = file.files && file.files[0]; if (!f) return;
+    if (f.size > 512 * 1024) { toast("That file is too big. A list of up to 1,000 lines fits.", true); file.value = ""; return; }
+    ta.value = await f.text(); file.value = ""; reset(); ta.focus();
+  });
+  read.addEventListener("click", async () => {
+    const v = oldSite.value.trim(); if (!v) { oldSite.focus(); return; }
+    read.disabled = true; read.textContent = "Reading…";
+    try {
+      const d = (await api("GET", "/redirects/suggest?from=" + encodeURIComponent(v))).data || {};
+      const lines = d.lines || [];
+      ta.value = lines.map((l) => l.from + "  " + l.to).join("\n");
+      reset();
+      const unsure = lines.length - (d.sure || 0);
+      out.appendChild(el("div", "rdx-sum", `Found ${d.found} pages on ${d.host}. ${lines.length ? `${lines.length} need a forward${unsure ? `; ${unsure} ${unsure === 1 ? "has" : "have"} no close match here and go to your home page, so check ${unsure === 1 ? "it" : "them"}` : ""}. Change any line, then Check the list.` : "Each one already has the same address here, so none needs a forward."}`));
+    } catch (err) { toast(nice(err), true); }
+    read.disabled = false; read.textContent = "Read its pages";
+  });
+  const say = (v, r) => v === "add" ? (r.note ? "New. " + r.note : "New") : v === "replace" ? r.note : v === "same" ? "Already there" : "Skipped: " + r.reason;
+  check.addEventListener("click", async () => {
+    const text = ta.value; if (!text.trim()) { ta.focus(); return; }
+    check.disabled = true;
+    try {
+      const plan = (await api("POST", "/redirects", { list: text, dry_run: true })).data || {};
+      out.textContent = ""; checked = text;
+      const lines = (plan.rows || []).length;
+      const parts = [plan.add ? `${plan.add} new forward${plan.add === 1 ? "" : "s"}` : "", plan.replace ? `${plan.replace} replace${plan.replace === 1 ? "s" : ""} one you had` : "", plan.same ? `${plan.same} already there` : "", plan.skipped ? `${plan.skipped} skipped` : ""].filter(Boolean);
+      out.appendChild(el("div", "rdx-sum", `${lines} line${lines === 1 ? "" : "s"}: ${parts.join(", ") || "nothing to bring in"}. Nothing is saved until you bring them in.${(plan.repoint || []).length ? ` ${plan.repoint.length} older forward${plan.repoint.length === 1 ? "" : "s"} will go straight to the final page.` : ""}`));
+      const tw = el("div", "rdx-tw"), tb = el("table", "rdx-table");
+      tb.innerHTML = "<thead><tr><th scope=\"col\">Line</th><th scope=\"col\">Old address</th><th scope=\"col\">Goes to</th><th scope=\"col\">What happens</th></tr></thead>";
+      const body = el("tbody");
+      (plan.rows || []).forEach((r) => {
+        const tr = el("tr", r.verdict);
+        [String(r.line), r.from, r.to, say(r.verdict, r)].forEach((t) => tr.appendChild(el("td", null, t || "")));
+        body.appendChild(tr);
+      });
+      tb.appendChild(body); tw.appendChild(tb); out.appendChild(tw);
+      const k = (plan.add || 0) + (plan.replace || 0);
+      go.hidden = !k; go.textContent = `Bring in ${k} forward${k === 1 ? "" : "s"}`;
+    } catch (err) { toast(nice(err), true); }
+    check.disabled = false;
+  });
+  go.addEventListener("click", async () => {
+    if (checked === null || checked !== ta.value) { reset(); toast("The list changed: check it again first.", true); return; }
+    go.disabled = true;
+    try {
+      const plan = (await api("POST", "/redirects", { list: checked })).data || {};
+      toast(`${plan.add || 0} forward${plan.add === 1 ? "" : "s"} brought in${plan.replace ? `, ${plan.replace} replaced` : ""} — publish to apply`);
+      ta.value = ""; reset(); panel.hidden = true; open.setAttribute("aria-expanded", "false");
+      scheduleChangesRefresh(); onDone();
+    } catch (err) { toast(nice(err), true); }
+    go.disabled = false;
+  });
+  return wrap;
 }
 // ── items 124 and 181 (Nov 2026): the Search tab's tools row, this month's numbers, the ranked
 // to-do list, the pages that moved most, and the searches a client follows. GET /visibility
@@ -9119,7 +9713,7 @@ function renderSvNums() {
   host.hidden = !tiles.length;
   host.innerHTML = tiles.join("");
 }
-const SV_GO_WORD = { publish: "Publish", "tool:hide": "Open", health: "See it", "connect:console": "Connect", domain: "Connect", wording: "Write", pages: "Open Pages", review: "Read it", "connect:listing": "Connect", files: "Open Files", "tool:llms": "Write", follow: "Follow", monitor: "Add it" };
+const SV_GO_WORD = { phrases: "Pick a page", publish: "Publish", "tool:hide": "Open", health: "See it", "connect:console": "Connect", domain: "Connect", wording: "Write", pages: "Open Pages", review: "Read it", "connect:listing": "Connect", files: "Open Files", "tool:llms": "Write", follow: "Follow", monitor: "Add it" };
 function svTodoGo(t) {
   const g = String(t.go || "");
   const toCard = (id) => { const n = $(id); if (n) { n.hidden = false; n.scrollIntoView({ behavior: "smooth", block: "center" }); } };
@@ -9134,7 +9728,130 @@ function svTodoGo(t) {
   if (g === "connect:console") return toCard("svConsoleCard");
   if (g === "connect:listing") return toCard("svListingCard");
   if (g === "follow") return svOpenFollow();
+  if (g === "phrases") { const ph = String(t.key).replace(/^phrase:/, ""); SV_PH_PICK = { phrase: ph, key: null, title: svPhraseTitle(ph) }; renderSvPhrases(); return toCard("svPhrasesCard"); }
   if (g.startsWith("tool:")) return svOpenTool(g.slice(5));
+}
+/* ── item 160: what people type to find you ── */
+// The two or three phrases the business wants to be found for, each checked against every
+// page's search headline (lib/search_phrases.ts). GET /visibility brings them; a change
+// saves the list and answers with the new view, and the checklist's phrase tasks follow it.
+// A missing one gets Add it to a page: pick the page that is about it, and its search
+// headline gets the phrase, saved to the draft like any other wording.
+let SV_PH_PICK = null;   // { phrase, key, title } while "Which page is about it?" is open
+function svPhraseTitle(phrase) {
+  const name = String((S.identity && S.identity.business_name) || "").trim();
+  const lead = phrase.charAt(0).toUpperCase() + phrase.slice(1);
+  const t = name && !phrase.toLowerCase().includes(name.toLowerCase()) ? `${lead} — ${name}` : lead;
+  return t.length > SEO_TITLE_MAX ? lead : t;
+}
+function svPhrasesTake(view) {
+  if (!SV || !view) return;
+  SV.phrases = view;
+  if (Array.isArray(SV.tasks) && Array.isArray(view.tasks)) {
+    // the phrase tasks sit where the server ranks them, after the headline's own
+    const rest = SV.tasks.filter((t) => !String(t.key).startsWith("phrase:"));
+    const at = rest.findIndex((t) => t.key === "title") + 1;
+    const all = at > 0 ? [...rest.slice(0, at), ...view.tasks, ...rest.slice(at)] : rest.concat(view.tasks);
+    const rank = { critical: 0, high: 1, medium: 2 };
+    SV.tasks = all.map((t, n) => [t, n]).sort((a, b) => Number(a[0].done) - Number(b[0].done) || (rank[a[0].priority] ?? 3) - (rank[b[0].priority] ?? 3) || a[1] - b[1]).map(([t]) => t);
+  }
+  renderSvPhrases(); renderSeoTasks();
+}
+async function svPhrasesSave(list, btn) {
+  if (btn) btn.disabled = true;
+  try { svPhrasesTake((await api("PUT", "/visibility/phrases", { phrases: list })).data); return true; }
+  catch (err) { if (btn) btn.disabled = false; toast(nice(err), true); return false; }
+}
+function renderSvPhrases() {
+  const card = $("svPhrasesCard"), host = $("svPhrases"); if (!card || !host) return;
+  const v = SV && SV.phrases;
+  card.hidden = !v;
+  if (!v) return;
+  const list = v.list || [], max = v.max || 3;
+  if (SV_PH_PICK && !list.some((x) => x.phrase === SV_PH_PICK.phrase && !x.found)) SV_PH_PICK = null;
+  $("svPhrasesN").textContent = `${list.length} of ${max}`;
+  host.innerHTML = "";
+  host.appendChild(el("p", "sv-ph-intro", "Two to four words each, the way a customer would type them into Google. We check that each one is in the search headline of one of your pages, the line Google shows in bold."));
+  list.forEach((x) => {
+    const row = el("div", "sv-ph-row"); row.dataset.phrase = x.phrase;
+    const q = el("span", "sv-ph-q"); q.innerHTML = uiIcon("search", 13); q.appendChild(document.createTextNode(x.phrase)); row.appendChild(q);
+    const st = el("span", "sv-ph-st " + (x.found ? "ok" : "no")); st.innerHTML = uiIcon(x.found ? "check" : "clock", 12);
+    st.appendChild(document.createTextNode(x.found ? `In your ${x.found.label} page’s search headline` : "Not in any page’s search headline yet"));
+    row.appendChild(st);
+    if (!x.found) {
+      const add = el("button", "sv-ph-add", "Add it to a page"); add.type = "button";
+      add.addEventListener("click", () => { SV_PH_PICK = { phrase: x.phrase, key: null, title: svPhraseTitle(x.phrase) }; renderSvPhrases(); const first = host.querySelector(".sv-ph-page"); if (first) first.focus(); });
+      row.appendChild(add);
+    }
+    const off = el("button", "sv-ph-x"); off.type = "button"; off.innerHTML = uiIcon("x", 14); off.setAttribute("aria-label", `Take “${x.phrase}” off`);
+    off.addEventListener("click", () => svPhrasesSave(list.map((y) => y.phrase).filter((y) => y !== x.phrase), off));
+    row.appendChild(off);
+    host.appendChild(row);
+    if (SV_PH_PICK && SV_PH_PICK.phrase === x.phrase) host.appendChild(svPhrasePicker(v, x));
+  });
+  if (list.length >= max) return;
+  const form = el("form", "sv-ph-new");
+  const inp = el("input"); inp.type = "text"; inp.maxLength = 60; inp.id = "svPhraseNew";
+  inp.placeholder = ["Add a phrase, the way a customer would type it", "Add a second phrase", "Add a third phrase"][list.length] || "Add a phrase";
+  inp.setAttribute("aria-label", inp.placeholder);
+  const addBtn = el("button", "pillbtn", "Add"); addBtn.type = "submit";
+  form.append(inp, addBtn);
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const words = inp.value.trim(); if (!words) { inp.focus(); return; }
+    if (await svPhrasesSave([...list.map((y) => y.phrase), words], addBtn)) { const n = $("svPhraseNew"); if (n) n.focus(); }
+  });
+  host.appendChild(form);
+  const ideas = (v.ideas || []).filter((i) => !list.some((y) => y.phrase === i));
+  if (!ideas.length) return;
+  const row = el("div", "sv-ph-ideas"); row.appendChild(el("span", null, "✦ Ideas from your services and area:"));
+  ideas.forEach((i) => { const c = el("button", "sv-ph-idea", "+ " + i); c.type = "button"; c.setAttribute("aria-label", `Add “${i}”`); c.addEventListener("click", () => svPhrasesSave([...list.map((y) => y.phrase), i], c)); row.appendChild(c); });
+  host.appendChild(row);
+}
+function svPhrasePicker(v, x) {
+  const box = el("div", "sv-ph-pick"); box.setAttribute("role", "group"); box.setAttribute("aria-labelledby", "svPhPickH");
+  const h = el("h4", null, `Which page is about “${x.phrase}”?`); h.id = "svPhPickH"; box.appendChild(h);
+  (v.pages || []).forEach((pg) => {
+    const b = el("button", "sv-ph-page"); b.type = "button"; b.setAttribute("aria-pressed", SV_PH_PICK.key === pg.key ? "true" : "false");
+    b.append(el("b", null, pg.label), el("span", null, "Now: " + pg.title));
+    b.addEventListener("click", () => { SV_PH_PICK.key = pg.key; renderSvPhrases(); const n = $("svPhraseTitle"); if (n) n.focus(); });
+    box.appendChild(b);
+  });
+  if (SV_PH_PICK.key) {
+    const out = el("div", "sv-ph-out");
+    const lab = el("label", null, "New search headline"); lab.setAttribute("for", "svPhraseTitle");
+    const inp = el("input"); inp.type = "text"; inp.id = "svPhraseTitle"; inp.maxLength = 120; inp.value = SV_PH_PICK.title;
+    inp.addEventListener("input", () => { SV_PH_PICK.title = inp.value; });
+    out.append(lab, inp); box.appendChild(out);
+  }
+  const acts = el("div", "sv-ph-acts");
+  const use = el("button", "pillbtn inked", "Use this headline"); use.type = "button"; use.disabled = !SV_PH_PICK.key;
+  use.addEventListener("click", () => svPhraseUse(use));
+  const not = el("button", "pillbtn", "Not now"); not.type = "button";
+  not.addEventListener("click", () => { SV_PH_PICK = null; renderSvPhrases(); });
+  acts.append(use, not); box.appendChild(acts);
+  box.appendChild(el("p", "hint", "It saves to your draft and reaches Google when you publish."));
+  return box;
+}
+async function svPhraseUse(btn) {
+  const pick = SV_PH_PICK; if (!pick || !pick.key) return;
+  const title = String(pick.title || "").replace(/\s+/g, " ").trim();
+  if (!title) { const n = $("svPhraseTitle"); if (n) n.focus(); return; }
+  btn.disabled = true; btn.textContent = "Saving…";
+  try {
+    if (pick.key === "home") {
+      await api("PUT", "/identity", { seo_title: title });
+      S.identity = { ...(S.identity || {}), seo_title: title };
+      const f = $("f-seo_title"); if (f) f.value = title;
+      renderSearchPreview();
+    } else {
+      await settingsPut(() => { const map = { ...((S.settings && S.settings.page_seo) || {}) }; map[pick.key] = { ...(map[pick.key] || {}), title }; return { page_seo: map }; });
+    }
+    scheduleChangesRefresh();
+    SV_PH_PICK = null;
+    toast("Saved — publish to apply");
+    svPhrasesTake((await api("GET", "/visibility/phrases")).data);
+  } catch (err) { btn.disabled = false; btn.textContent = "Use this headline"; toast(nice(err), true); }
 }
 const SV_TODO = { show: "all", done: false };
 const SV_PRI_WORD = { critical: "Critical", high: "High", medium: "Medium" };
@@ -16431,7 +17148,7 @@ function industryHint() {
   const h = $("industryHint"), sel = $("f-industry"); if (!h || !sel) return;
   h.textContent = sel.value === "generic"
     ? "Which is closest? It sets the words your site and this editor use, like Menu, Services or Classes."
-    : "Sets the words your site uses, like Services or Menu. Applies when you next publish.";
+    : "Sets the words your site uses, like Menu or Services, and tells Google what you are. Applies when you next publish.";
 }
 $("f-industry").addEventListener("change", async () => {
   const sel = $("f-industry"), was = vocabWords();

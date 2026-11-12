@@ -6,6 +6,7 @@
 // lazy path and the cron.
 import { svc } from './db.ts';
 import { deployState } from './netlify.ts';
+import { checkSoon } from './check_soon.ts';
 
 // ── tunables (configurable; sensible defaults) ──
 export const DEPLOY_POLL_MS = Number(Deno.env.get('DEPLOY_POLL_MS')) || 30_000;   // in-request poll bound (netlify.ts)
@@ -52,6 +53,7 @@ export async function reconcileOnePublish(p: InflightPublish, nowMs: number): Pr
     await svc(`presence_sites?id=eq.${p.site_id}`, { method: 'PATCH', body: JSON.stringify({ status: 'live', last_published_at: nowIso }) });
     // item 90: the timed-section sweep works out the new snapshot's next instant (best-effort; see routes/publish.ts)
     await svc(`presence_sites?id=eq.${p.site_id}`, { method: 'PATCH', body: JSON.stringify({ next_window_at: null }) }).catch(() => {});
+    await checkSoon(p.site_id);   // item 206: the next tick checks the health of what just went live
     // The OTHER door to "live" — an async deploy that finished after the request
     // returned. The checklist's "Site live" step must tick from both, or a slow
     // deploy silently costs the studio 10%. Same idempotent tick as routes/publish.ts;

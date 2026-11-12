@@ -1,4 +1,5 @@
 import { test, expect, Page, Route } from '@playwright/test';
+import AxeBuilder from '@axe-core/playwright';
 import { installApp, STUDIO_LEVEL_NAV, ALL_FEATURES } from './helpers/app';
 
 // Builder list items 43, 45 and 52 (Nov 2026): the studio's Sites page (every client
@@ -15,6 +16,7 @@ const site = (over: Record<string, unknown>) => ({
   team: [{ who: 'owner@studio.example', email: 'owner@studio.example', side: 'studio', role: 'Owner', me: true, invited: false }],
   tags: [], published_at: '2026-10-01T00:00:00Z', updated_at: '2026-10-05T00:00:00Z',
   unpublished_changes: false, billing_issue: false, opened_at: null, pinned: false, thumb: 'live', copied: null, no_owner: false,
+  owner: null, transfer: null,   // item 53, who owns it and a transfer of ownership waiting
   ...over,
 });
 const BISTRO = site({ site_id: 's1', name: 'Bistro Nine', address: 'https://bistro.example', domain: 'bistro.example', domain_expires_at: '2026-11-20T00:00:00Z', tags: ['restaurant'],
@@ -254,7 +256,7 @@ test.describe('Sites (builder list items 43 and 45)', () => {
     expect(overflow).toBeLessThanOrEqual(0);
   });
 
-  test('a card: address, status, plan and renewal, domain renewal, who can edit, and the three doors into that client', async ({ page }) => {
+  test('a card: address, status, plan and renewal, domain renewal, what you are on it, and the three doors into that client', async ({ page }) => {
     await openSites(page);
     const card = page.locator('.scard[data-site="s1"]');
     await expect(card.locator('.sname')).toHaveText('Bistro Nine');
@@ -263,7 +265,8 @@ test.describe('Sites (builder list items 43 and 45)', () => {
     await expect(card.locator('.pill')).toHaveText('Live');
     await expect(card).toContainText('Website + tools · Monthly · Renews Dec 1');
     await expect(card).toContainText('Domain renews Nov 20');
-    await expect(card).toContainText('Can edit: You + 1 in your studio · 1 on their side');
+    await expect(card.locator('.who')).toContainText('You: Website manager');   // builder item 53: who owns it, said plainly (this one has no owner on file)
+    await expect(card.locator('.sfoot')).toHaveText('Edited Oct 5');
     await expect(card.locator('.sacts a')).toHaveText(['Website', 'Analytics', 'Settings']);
     await expect(card.locator('.sacts a').nth(0)).toHaveAttribute('href', '/presence.html?client=s1');
     await expect(card.locator('.sacts a').nth(1)).toHaveAttribute('href', '/analytics.html?client=s1');
@@ -326,11 +329,11 @@ test.describe('Sites (builder list items 43 and 45)', () => {
 
   // items 129 and 180 (Nov 11): Health, Visits and Search clicks join the table, and Team and
   // Published leave it (who can edit stays on each card); sites-numbers.spec.ts covers the numbers
-  test('table: Site · Health · Visits · Search clicks · Plan · Last updated · Tags, sortable, and the choice is remembered', async ({ page }) => {
+  test('table: Site · Owner · Health · Visits · Search clicks · Plan · People · Last updated · Tags, sortable, and the choice is remembered', async ({ page }) => {
     await openSites(page);
     await page.locator('#dispTable').click();
     const table = page.locator('#tableHost table');
-    await expect(table.locator('thead .thb')).toHaveText(['Site', 'Health', 'Visits', 'Search clicks', 'Plan', 'Last updated', 'Tags']);
+    await expect(table.locator('thead .thb')).toHaveText(['Site', 'Owner', 'Health', 'Visits', 'Search clicks', 'Plan', 'People', 'Last updated', 'Tags']);   // builder item 53: Owner and People
     await expect(table.locator('tbody tr')).toHaveCount(3);
     await expect(page.locator('#grid')).toBeHidden();               // one view at a time: no cards above the table
     await expect(page.locator('.scard:visible')).toHaveCount(0);
@@ -1050,4 +1053,30 @@ test.describe('Domains: borrowed from Namecheap and Squarespace (item 174)', () 
     await expect.poll(() => calls.length).toBe(1);
     expect(calls[0]).toEqual({ body: { goal: 'email_setup', provider: 'google_workspace', preview: true }, scope: 's1' });
   });
+});
+
+// Builder list item 150 (review file 05, finding 18): Sites and Domains in the accessibility
+// scan, light and dark, with the cards' pictures and the table drawn.
+test.describe('Sites and Domains accessibility (builder list item 150)', () => {
+  test.beforeEach(({}, testInfo) => { test.skip(testInfo.project.name !== 'desktop-chromium', 'axe once, on desktop'); });
+  const scan = async (page: Page) => {
+    await page.waitForLoadState('networkidle');
+    const r = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa']).analyze();
+    return r.violations.filter((v) => v.impact === 'serious' || v.impact === 'critical').map((v) => `${v.id} (${v.nodes.length}): ${v.nodes.map((n) => n.target.join(' ') + ' ' + String(n.any[0]?.message || '').slice(0, 170)).join(' | ')}`);
+  };
+  for (const scheme of ['light', 'dark'] as const) {
+    test(`no serious/critical axe violations on Sites (${scheme})`, async ({ page }) => {
+      await page.emulateMedia({ colorScheme: scheme });
+      await openSites(page);
+      await expect(page.locator('.scard')).toHaveCount(3);
+      expect(await scan(page)).toEqual([]);
+    });
+    test(`no serious/critical axe violations on Domains (${scheme})`, async ({ page }) => {
+      await page.emulateMedia({ colorScheme: scheme });
+      await installApp(page, { api: { '/portal/context': studioContext, '/agency/domains': DOMAINS } });
+      await page.goto('/domains.html');
+      await expect(page.locator('table[aria-label="Domains"] tbody tr')).toHaveCount(4);
+      expect(await scan(page)).toEqual([]);
+    });
+  }
 });

@@ -33,6 +33,7 @@ const CONTROLS = [
   ['POST /comments/:id/delete', 'presence.html', `"/comments/" + c.id + "/delete"`, ['d.dataset.needs = "delete"']],
   ['DELETE /sales/contacts/:id', 'contacts.html', `api('/sales/contacts/'+encodeURIComponent(id),'DELETE')`, ['class="rowact danger" data-needs="delete" data-del=', 'class="danger" data-needs="delete" data-del=']],
   ['DELETE /sales/contacts/:id', 'contacts.html', `api('/sales/contacts/'+encodeURIComponent(id)+'?confirm=1','DELETE')`, []],
+  ['DELETE /sales/contacts/:id', 'contacts.html', `api('/sales/contacts/'+encodeURIComponent(id)+'?confirm=1','DELETE')`, ['id="bulkDel" data-needs="delete"']],   // sales item 90: Delete for the people picked
   ['DELETE /sales/contacts/:id', 'crm.html', `apiAg('/sales/contacts/'+cid,'DELETE')`, ['id="ec-del" data-needs="delete"']],
   ['DELETE /sales/contacts/:id', 'crm.html', `apiAg('/sales/contacts/'+cid+'?confirm=1','DELETE')`, []],
   ['DELETE /sales/deals/:id', 'pipeline.html', `api('/sales/deals/'+id,'DELETE')`, ['<div class="sec" data-needs="delete"']],
@@ -99,6 +100,12 @@ const CONTROLS = [
 const NO_CONTROL = {
   'DELETE /projects/:id/deliverables/:id2': /\/deliverables\/[^\n]*DELETE|DELETE[^\n]*\/deliverables\//,
 };
+// Sales item 117: the client portal has no shell and no data-needs marks. Its one owner-only
+// control, Cancel retainer, sits on the Documents shelf, which draws nothing of billing for anyone
+// but the client themself; the server's gate refuses any other seat.
+const PORTAL_OWNER_ONLY = {
+  'POST /client/retainers/:id/cancel': { page: 'client.html', call: `api('/client/retainers/'+encodeURIComponent(id)+'/cancel','POST',{})`, guard: `if(PORTAL.persona!=='client'){ // reviewer: /client/* is 403 server-side — the calm read-only state, NO fetches, never an error line; money lives with the account owner` },
+};
 const PAGES = [...Deno.readDirSync(ROOT)].filter((f) => f.isFile && /\.(html|js)$/.test(f.name)).map((f) => f.name);
 const SOURCE = Object.fromEntries(PAGES.map((p) => [p, read(p)]));
 
@@ -122,9 +129,13 @@ const SOURCE = Object.fromEntries(PAGES.map((p) => [p, read(p)]));
   const decided = read('tests/presence/member_capability_test.mjs');
   const listed = (name) => [...decided.split('const DECIDED = {')[1].split(`\n  ${name}: [`)[1].split('\n  ],')[0].matchAll(/'((?:DELETE|POST|PUT|PATCH) [^']+)'/g)].map((m) => m[1]);
   const routes = [...listed('delete'), ...listed('configure')];
-  ok('the decided delete and configure lists were read', routes.length === 45, String(routes.length));   // item 47 added two; item 104 took away the seven DNS document and zone writes; item 58 added two; item 112 added the prospect delete; item 115 added the Google review link; item 175 the visitor password; item 77 the payment undo; item 174 added the two domain forwards; items 86 + 105 added three (import undo, merge, unmerge); item 106 the project template removal
+  ok('the decided delete and configure lists were read', routes.length === 46, String(routes.length));   // item 47 added two; item 104 took away the seven DNS document and zone writes; item 58 added two; item 112 added the prospect delete; item 115 added the Google review link; item 175 the visitor password; item 77 the payment undo; item 174 added the two domain forwards; items 86 + 105 added three (import undo, merge, unmerge); item 106 the project template and saved to-do list removals; sales item 117 the client's retainer cancel
   const covered = new Set(CONTROLS.map(([r]) => r));
-  const open = routes.filter((r) => !covered.has(r) && !NO_CONTROL[r]);
+  const open = routes.filter((r) => !covered.has(r) && !NO_CONTROL[r] && !PORTAL_OWNER_ONLY[r]);
+  for (const [route, c] of Object.entries(PORTAL_OWNER_ONLY)) {
+    const src = SOURCE[c.page];
+    ok(`${route}: offered only on the portal's client-only Documents shelf`, count(src, c.call) === 1 && src.indexOf(c.guard) > src.indexOf('async function renderDocuments(){') && src.indexOf(c.guard) < src.indexOf('  paintShelf();\n') && count(src, 'wireRetainers();') === 1 && src.indexOf('  wireRetainers();') > src.indexOf('function paintShelf(){') && PAGES.filter((p) => SOURCE[p].includes('/client/retainers/')).join() === c.page);
+  }
   ok('every decided delete and configure route is accounted for here', open.length === 0, open.join(', '));
   for (const [route, rx] of Object.entries(NO_CONTROL)) {
     const pages = PAGES.filter((p) => rx.test(SOURCE[p]));
@@ -147,8 +158,9 @@ const SOURCE = Object.fromEntries(PAGES.map((p) => [p, read(p)]));
     ok(`${page}: every DELETE it sends is decided`, fresh.length === 0, fresh.join(' | '));
   }
   // crm.html: 4 — the record's two note removals are one removeNote since item 98 (it asks first now); item 108 added the draft estimate's
+  // contacts.html: 3 since item 90 (Delete for the people picked sends the confirmed call too)
   // pipeline.html: 6 since sales item 106 added removing a saved to-do list
-  ok('tripwire: the DELETE scan found the calls it is meant to find', sent('pipeline.html').length === 6 && sent('presence.html').length === 13 && sent('contacts.html').length === 2 && sent('crm.html').length === 4 && sent('files.html').length === 1);
+  ok('tripwire: the DELETE scan found the calls it is meant to find', sent('pipeline.html').length === 6 && sent('presence.html').length === 13 && sent('contacts.html').length === 3 && sent('crm.html').length === 4 && sent('files.html').length === 1);
 
   const CONFIG = /\/(?:foundations\/(?:domain|prepare)|preview\/settings|site\/(?:offline|online)|bookings\/settings|sales\/contacts\/fields)\b/;
   const writes = new RegExp(`(?:api\\(\\s*["'](?:POST|PUT|DELETE)["']\\s*,\\s*["'\`]|act\\(["']|siteSetState\\(["'])${CONFIG.source}|api\\(["'\`]${CONFIG.source}["'\`]\\s*,\\s*["'](?:POST|PUT|DELETE)["']`, 'g');

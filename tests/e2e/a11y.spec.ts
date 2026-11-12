@@ -5,6 +5,10 @@ import { installApp } from './helpers/app';
 // Accessibility — automated axe scan (WCAG 2 A/AA) plus the keyboard + ARIA
 // basics of the shared shell. Only runs on the desktop project (one scan is
 // enough; layout-per-viewport is covered by responsive.spec).
+// The pages built since (Sites, Domains, Files, Analytics, Projects, Send an update,
+// Settings, Connections, Sharing & access) are scanned in light and dark in their own
+// specs, beside their fixtures (builder list item 150); tests/presence/a11y_pages_test.mjs
+// fails if one loses its scan.
 test.describe('Accessibility', () => {
   // hook form: (fixtures, testInfo) is stable across Playwright versions, while
   // the skip-predicate second argument was dropped in newer majors.

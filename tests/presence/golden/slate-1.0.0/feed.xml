@@ -9,7 +9,15 @@
 <link>https://vermilionandvine.example/updates/winter-menu-2026/</link>
 <guid>https://vermilionandvine.example/updates/winter-menu-2026/</guid>
 <pubDate>Mon, 12 Jan 2026 18:00:00 GMT</pubDate>
+<category>News</category>
 <description>Six new plates, two returning favorites, and a mulled thing for the patio.</description>
+</item>
+<item>
+<title>Wine dinner on the patio</title>
+<link>https://vermilionandvine.example/updates/wine-dinner/</link>
+<guid>https://vermilionandvine.example/updates/wine-dinner/</guid>
+<pubDate>Mon, 02 Feb 2026 18:00:00 GMT</pubDate>
+<category>Events</category>
 </item>
 </channel>
 </rss>

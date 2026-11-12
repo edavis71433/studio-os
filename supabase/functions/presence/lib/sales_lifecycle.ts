@@ -25,6 +25,17 @@ export function canTransition(from: Stage, to: Stage): boolean {
   return (NEXT[from] || []).includes(to);
 }
 
+/** Builder item 75: may an Undo put a Not a fit deal straight back to `to`? Only when its
+ *  newest stage move (`last`, a stage_change row) took it from `to` into Not a fit within
+ *  UNDO_LOST_MS. Any later move, or an older one, and the way back is the ladder's (reopen
+ *  as a new lead). Pure. */
+export const UNDO_LOST_MS = 30 * 60_000;
+export function undoLostAllowed(last: { from_stage?: string; to_stage?: string; created_at?: string } | null | undefined, to: string, nowMs: number): boolean {
+  if (!last || last.to_stage !== 'lost' || !isStage(to) || to === 'won' || to === 'lost' || last.from_stage !== to) return false;
+  const at = Date.parse(String(last.created_at || ''));
+  return Number.isFinite(at) && nowMs - at >= -60_000 && nowMs - at <= UNDO_LOST_MS;
+}
+
 // ── proposals ──
 export interface LineItem { label: string; qty: number; unit_cents: number; }
 // The proposal's optional discount, flat tax rate, and revise/supersede trail

@@ -401,6 +401,14 @@ export async function handleProjectStatus(req: Request, jwt: string, site: SiteR
   const up = await svc(`presence_projects?id=eq.${id}&site_id=eq.${site.id}&status=eq.${project.status}&select=*`, { method: 'PATCH', headers: { Prefer: 'return=representation' }, body: JSON.stringify(patch) });
   if (!up.ok || !rows(up)[0]) return json({ error: 'conflict', message: 'That project just changed — refresh and try again.' }, 409, cors); // optimistic: prior-status guard in WHERE
   await projectEvent(site.id, id, 'status_change', principal, project.client_visible, { from: project.status, to });
+  // builder item 75: a reason given with the change (Customers' bulk "Mark as") is kept as an
+  // internal note on the project: the status change itself can be the client's to see
+  const reason = clean(b.reason, 300);
+  if (reason) {
+    const word = to === 'on_hold' ? 'Put on hold' : to === 'active' ? 'Marked active' : to === 'complete' ? 'Marked complete' : 'Archived';
+    await svc('presence_project_messages', { method: 'POST', headers: { Prefer: 'return=minimal' },
+      body: JSON.stringify({ site_id: site.id, project_id: id, audience: 'internal', body: `${word}: ${reason}`, author: principal.email || principal.userId || 'system', author_kind: principal.kind }) }).catch(() => {});
+  }
   // service edge #1: a completed project offers the client a one-question CSAT
   // (reuses the survey spine; idempotent per project; emails the bridged customer).
   if (to === 'complete') await offerCsat({ agencySiteId: site.id, projectId: id, source: 'project', sourceId: id });

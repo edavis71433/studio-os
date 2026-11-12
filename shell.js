@@ -252,8 +252,19 @@
         + '.dds-confirm{display:inline-flex;flex-wrap:wrap;align-items:center;gap:6px 8px}.dds-confirm .q{font-weight:600}'
         + '.dds-confirm button{font:inherit;font-size:13px;font-weight:600;border-radius:999px;padding:5px 12px;min-height:32px;border:1px solid var(--line,#e6e1ee);background:var(--card,#fff);color:var(--ink,#1b1525);cursor:pointer}'
         + '.dds-confirm .go{background:var(--p,#5b3fa0);border-color:var(--p,#5b3fa0);color:#fff}'
+        // builder item 75 + sales item 90: a question that takes an answer (askIn), in the same place
+        + '.dds-askin select,.dds-askin input{font:inherit;font-size:13px;min-height:32px;max-width:240px;box-sizing:border-box;border:1px solid var(--line,#e6e1ee);border-radius:8px;padding:4px 8px;background:var(--card,#fff);color:var(--ink,#1b1525)}'
+        + '.dds-askin input[type=text]{min-width:180px}.dds-askin .why{flex-basis:100%;font-size:12.5px;color:var(--bad,#a3423a)}.dds-askin .why:empty{display:none}'
+        // sales item 90: field filter chips (pressed = on; the two with a value carry a select)
+        + '.dds-fchips{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin:0 0 10px}'
+        + '.dds-fchip{font:inherit;font-size:13px;font-weight:500;border:1px solid var(--line,#e6e1ee);background:var(--card,#fff);color:var(--soft,#5c5468);border-radius:999px;padding:5px 12px;min-height:32px;cursor:pointer;display:inline-flex;align-items:center;gap:6px;white-space:nowrap;box-sizing:border-box}'
+        + '.dds-fchip .n{font-size:11.5px;font-weight:600;color:var(--faint,#6b6478);font-variant-numeric:tabular-nums}'
+        + '.dds-fchip:hover{border-color:var(--p,#5b3fa0);color:var(--ink,#1b1525)}'
+        + '.dds-fchip[aria-pressed="true"],.dds-fchip.on{background:var(--p-soft,#efe9fa);border-color:transparent;color:var(--p,#5b3fa0);font-weight:600}'
+        + '.dds-fchip.sel{padding-right:6px}.dds-fchip select{font:inherit;font-size:13px;font-weight:600;border:0;background:transparent;color:inherit;padding:2px 4px;cursor:pointer;max-width:150px}'
+        + '.dds-fclear{font:inherit;font-size:13px;font-weight:600;border:0;background:none;color:var(--p,#5b3fa0);padding:5px 8px;cursor:pointer;min-height:32px}'
         // …and on a phone every control here is at least 44px, the pick cell included
-        + '@media (max-width:767px){td.pick,th.pick{width:44px;min-width:44px}td.pick input,th.pick input{width:22px;height:22px}.dds-bulk button,.dds-bulk select,.dds-confirm button{min-height:44px}.dds-colmenu label{min-height:44px}}'
+        + '@media (max-width:767px){td.pick,th.pick{width:44px;min-width:44px}td.pick input,th.pick input{width:22px;height:22px}.dds-bulk button,.dds-bulk select,.dds-confirm button{min-height:44px}.dds-colmenu label{min-height:44px}.dds-askin select,.dds-askin input,.dds-fchip,.dds-fclear{min-height:44px}.dds-askin input[type=text]{min-width:0;flex:1 1 160px}}'
         // Safari draws a native drop-down at its own height whatever min-height says — the bulk bar's is drawn here, arrow included
         + '.dds-bulk select{-webkit-appearance:none;appearance:none;padding-right:28px;background-image:url("data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 width=%2710%27 height=%276%27 viewBox=%270 0 10 6%27%3E%3Cpath d=%27M1 1l4 4 4-4%27 fill=%27none%27 stroke=%27%236b6478%27 stroke-width=%271.6%27/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 11px center;background-size:10px 6px}'
         + '.dds-sr{position:absolute!important;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}'
@@ -529,6 +540,105 @@
         box.querySelector('.no').focus();
       });
     }
+    // ── builder item 75 + sales item 90: a question that takes an answer, asked in place the way
+    //    confirmIn asks: "the question · [answer] · [Yes, …] [Cancel]". o.field (or o.fields, for
+    //    more than one) = { kind: 'select'|'date'|'text', label, options: [[value, label]], value,
+    //    placeholder, required, need }. Resolves the answer (an array of them for o.fields; '' for
+    //    an optional one left empty), or null for Cancel or Escape. Focus starts in the first answer.
+    function askIn(anchor, o) {
+      style(); o = o || {};
+      var specs = o.fields || [o.field || {}];
+      return new Promise(function (resolve) {
+        if (!anchor || !anchor.parentNode) { resolve(null); return; }
+        var id = 'ddsAq' + Math.random().toString(36).slice(2, 8);
+        var box = document.createElement('span'); box.className = 'dds-confirm dds-askin'; box.setAttribute('role', 'group'); box.setAttribute('aria-labelledby', id);
+        box.innerHTML = '<span class="q"></span>';
+        box.querySelector('.q').id = id; box.querySelector('.q').textContent = o.text || '';
+        var inputs = specs.map(function (f) {
+          var el;
+          if (f.kind === 'select') {
+            el = document.createElement('select');
+            el.innerHTML = (f.placeholder ? '<option value="">' + esc2(f.placeholder) + '</option>' : '') + (f.options || []).map(function (op) { return '<option value="' + esc2(op[0]) + '">' + esc2(op[1]) + '</option>'; }).join('');
+          } else {
+            el = document.createElement('input'); el.type = f.kind === 'date' ? 'date' : 'text';
+            if (f.kind !== 'date') { el.maxLength = f.max || 200; el.autocomplete = 'off'; }
+            if (f.placeholder) el.placeholder = f.placeholder;
+          }
+          if (f.value != null) el.value = f.value;
+          el.setAttribute('aria-label', f.label || o.text || '');
+          box.appendChild(el);
+          return el;
+        });
+        var go = document.createElement('button'); go.type = 'button'; go.className = 'go'; go.textContent = o.yes || 'Yes';
+        var no = document.createElement('button'); no.type = 'button'; no.className = 'no'; no.textContent = 'Cancel';
+        var why = document.createElement('span'); why.className = 'why'; why.setAttribute('role', 'status');
+        box.appendChild(go); box.appendChild(no); box.appendChild(why);
+        go.setAttribute('aria-describedby', id); no.setAttribute('aria-describedby', id);
+        anchor.hidden = true; anchor.parentNode.insertBefore(box, anchor.nextSibling);
+        var done = false;
+        function finish(v) {
+          if (done) return; done = true;
+          if (box.isConnected) box.remove();
+          anchor.hidden = false; resolve(v);
+          if (v === null && anchor.isConnected && anchor.focus) try { anchor.focus(); } catch (_) { /* */ }
+        }
+        go.addEventListener('click', function () {
+          var vals = inputs.map(function (el) { return String(el.value || '').trim(); });
+          for (var i = 0; i < specs.length; i++) if (specs[i].required && !vals[i]) { why.textContent = specs[i].need || 'Fill this in first.'; inputs[i].focus(); return; }
+          finish(o.fields ? vals : vals[0]);
+        });
+        no.addEventListener('click', function () { finish(null); });
+        box.addEventListener('keydown', function (e) {
+          if (e.key === 'Escape') { e.preventDefault(); finish(null); }
+          else if (e.key === 'Enter' && e.target && e.target.tagName === 'INPUT') { e.preventDefault(); go.click(); }
+        });
+        inputs[0].focus();
+      });
+    }
+    // ── sales item 90: a list's field filters as chips (lib/list_filters.ts is the server's copy of
+    //    the rules). o = { value: { quiet, owes, nodeal, closing, added, via }, offer: the keys this
+    //    list has, in order, counts: { key: n } (optional), vias: the "How they found you" picks,
+    //    onChange(next) }. A chip is pressed or not; "Not contacted in" and "Found via" pick a value.
+    var FCHIP_WORDS = { owes: 'Owes you money', nodeal: 'No deal yet', closing: 'Closing this month', added: 'Added this month' };
+    function filterChips(host, o) {
+      style(); o = o || {};
+      if (!host) return;
+      var v = o.value || {}, counts = o.counts || {};
+      var n = function (k) { return counts[k] != null ? ' <span class="n">' + counts[k] + '</span>' : ''; };
+      var h = '<div class="dds-fchips" role="group" aria-label="Filter this list">';
+      (o.offer || []).forEach(function (k) {
+        if (k === 'quiet') {
+          h += '<label class="dds-fchip sel' + (v.quiet ? ' on' : '') + '"><span>Not contacted in</span><select data-fchip="quiet" aria-label="Not contacted in">'
+            + '<option value="">any time</option>' + [30, 60, 90].map(function (d) { return '<option value="' + d + '"' + (v.quiet === d ? ' selected' : '') + '>' + d + ' days</option>'; }).join('') + '</select></label>';
+        } else if (k === 'via') {
+          h += '<label class="dds-fchip sel' + (v.via ? ' on' : '') + '"><span>Found via</span><select data-fchip="via" aria-label="How they found you">'
+            + '<option value="">anywhere</option>' + (o.vias || []).map(function (x) { return '<option value="' + esc2(x) + '"' + (v.via === x ? ' selected' : '') + '>' + esc2(x) + '</option>'; }).join('') + '</select></label>';
+        } else if (FCHIP_WORDS[k]) {
+          h += '<button type="button" class="dds-fchip" data-fchip="' + k + '" aria-pressed="' + (v[k] ? 'true' : 'false') + '">' + esc2(FCHIP_WORDS[k]) + n(k) + '</button>';
+        }
+      });
+      var any = Object.keys(v).some(function (k) { return !!v[k]; });
+      if (any) h += '<button type="button" class="dds-fclear" data-fchip="clear">Clear filters</button>';
+      host.innerHTML = h + '</div>';
+      function next(k, val) {
+        var out = {}; Object.keys(v).forEach(function (x) { if (v[x]) out[x] = v[x]; });
+        if (k === 'clear') out = {};
+        else if (val) out[k] = val; else delete out[k];
+        if (o.onChange) o.onChange(out, k);
+      }
+      host.querySelectorAll('button[data-fchip]').forEach(function (b) {
+        b.addEventListener('click', function () { var k = b.getAttribute('data-fchip'); next(k, k === 'clear' ? null : !v[k]); });
+      });
+      host.querySelectorAll('select[data-fchip]').forEach(function (s) {
+        s.addEventListener('change', function () { var k = s.getAttribute('data-fchip'); next(k, k === 'quiet' ? (Number(s.value) || 0) : s.value); });
+      });
+    }
+    // a bulk change's message with its Undo (the Undo runs once; a second press does nothing)
+    function undoToast(msg, undo, kind) {
+      if (!window.ddsToast) return null;
+      var used = false;
+      return window.ddsToast(msg, kind || 'ok', { label: 'Undo', onClick: function () { if (used) return; used = true; Promise.resolve().then(undo).catch(function () { window.ddsToast('That couldn’t be undone just now.', 'err'); }); } });
+    }
     // one polite announcer for the whole page ("3 selected")
     function announce(text) {
       style();
@@ -650,7 +760,118 @@
       // a browser that never says the print is done gets the page back on the next tap or key
       setTimeout(function () { if (!done) { document.addEventListener('pointerdown', back, true); document.addEventListener('keydown', back, true); } }, 0);
     }
-    return { use: function (fn) { REQ = fn; }, views: views, saveViews: saveViews, ask: ask, columnsMenu: columnsMenu, sendTo: sendTo, parseCsv: parseCsv, importPanel: importPanel, style: style, fit: fit, confirmIn: confirmIn, announce: announce, tagInput: tagInput, cleanTag: cleanTag, charts: charts, chartTips: chartTips, printList: printList };
+    return { use: function (fn) { REQ = fn; }, views: views, saveViews: saveViews, ask: ask, columnsMenu: columnsMenu, sendTo: sendTo, parseCsv: parseCsv, importPanel: importPanel, style: style, fit: fit, confirmIn: confirmIn, askIn: askIn, filterChips: filterChips, undoToast: undoToast, announce: announce, tagInput: tagInput, cleanTag: cleanTag, charts: charts, chartTips: chartTips, printList: printList };
+  })();
+
+  // ── The Email box (sales item 80, Nov 2026; drawn in Figma 264:1136, 264:1604 and 265:1452):
+  //    email one person from their record or their deal, with or without a project. GET
+  //    /sales/email says who it goes to (the address on file, never one typed here), who it goes
+  //    out as and where a reply comes back, so a missing or stopped address is said before a word
+  //    is written; POST /sales/email sends it and keeps it on their timeline. One box, two homes:
+  //    the record's composer and Pipeline's deal card. The page hands over its own request
+  //    function (the record asks the studio's own site, even from inside a client). ──
+  window.ddsEmailBox = (function () {
+    var INFO = {}, SR = null, styled = false, seq = 0;
+    var NOT_YET = 'Email from here arrives with an update that’s on its way. Try again a little later.';
+    var MAIL = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3.5 6.5l8.5 6 8.5-6"/></svg>';
+    function esc3(v) { return String(v == null ? '' : v).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
+    function first(n) { return String(n || '').trim().split(/\s+/)[0] || ''; }
+    function initials(n) { var w = String(n || '').trim().split(/\s+/).filter(Boolean); return (Array.from(w[0] || '?')[0] + (w.length > 1 ? Array.from(w[w.length - 1])[0] : '')).toUpperCase(); }
+    function key(ids) { var k = ['deal_id', 'contact_id', 'client_id']; for (var i = 0; i < k.length; i++) if (ids && ids[k[i]]) return k[i] + '=' + encodeURIComponent(ids[k[i]]); return ''; }
+    function style() {
+      if (styled) return; styled = true;
+      var st = document.createElement('style');
+      st.textContent = '.dm{display:flex;flex-direction:column;gap:10px;margin:0}'
+        + '.dm-r{display:flex;align-items:center;gap:12px;min-width:0}.dm-l{flex:0 0 56px;font-size:13px;color:var(--soft,#5c5468)}'
+        + '.dm-to{display:inline-flex;align-items:center;gap:8px;min-width:0;max-width:100%;padding:4px 14px 4px 4px;border-radius:999px;background:var(--p-soft,#efe9fa);font-size:14px;color:var(--ink,#1b1525)}'
+        + '.dm-to b{font-weight:600;white-space:nowrap}.dm-a{color:var(--soft,#5c5468);font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}'
+        + '.dm-av{flex:0 0 auto;width:26px;height:26px;border-radius:50%;display:inline-grid;place-items:center;font-size:11px;font-weight:700;letter-spacing:.02em;background:var(--p,#5b3fa0);color:#fff}'
+        + '.dm-s{flex:1;min-width:0;font:inherit;font-size:14.5px;padding:9px 12px;min-height:40px;box-sizing:border-box;border:1px solid var(--line,#e6e1ee);border-radius:10px;background:var(--card,#fff);color:var(--ink,#1b1525)}'
+        + '.dm-b{display:block;width:100%;box-sizing:border-box;min-height:150px;resize:vertical;font:inherit;font-size:14.5px;line-height:1.5;padding:12px 14px;border:1px solid var(--line,#e6e1ee);border-radius:12px;background:var(--card,#fff);color:var(--ink,#1b1525)}'
+        + '.dm-sr{align-self:flex-start;max-width:100%;font:inherit;font-size:13px;color:var(--ink,#1b1525);background:var(--card,#fff);border:1px solid var(--line,#e6e1ee);border-radius:999px;padding:6px 12px;min-height:32px;cursor:pointer}'
+        + '.dm-f{display:flex;align-items:center;gap:10px 14px;flex-wrap:wrap}'
+        + '.dm-n{flex:1 1 220px;margin:0;display:flex;gap:8px;align-items:flex-start;font-size:12.5px;line-height:1.45;color:var(--soft,#5c5468)}.dm-n svg{flex:0 0 auto;margin-top:1px}.dm-n span{overflow-wrap:anywhere}'
+        + '.dm-go{font:inherit;font-size:14px;font-weight:600;border:0;border-radius:999px;padding:10px 22px;min-height:40px;background:var(--p,#5b3fa0);color:#fff;cursor:pointer;margin-left:auto}.dm-go:disabled{opacity:.65;cursor:default}'
+        + '.dm-err{margin:0;font-size:13px;color:var(--bad,#a3423a)}.dm-err:empty{display:none}.dm-hint{margin:0;font-size:12.5px;color:var(--soft,#5c5468)}'
+        + '.dm-say{margin:0;font-size:13.5px;line-height:1.5;color:var(--soft,#5c5468)}.dm-say button{font:inherit;font-size:13px;font-weight:600;margin-left:6px;border:1px solid var(--line,#e6e1ee);border-radius:999px;padding:4px 12px;min-height:32px;background:var(--card,#fff);color:var(--ink,#1b1525);cursor:pointer}'
+        // white on the dark theme's light purple reads 2.3:1: dark text on the filled parts
+        + '@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .dm-go,:root:not([data-theme="light"]) .dm-av{color:#171320}}'
+        + ':root[data-theme="dark"] .dm-go,:root[data-theme="dark"] .dm-av{color:#171320}'
+        // a phone: 16px type, so focusing a field never zooms the page, and finger-sized controls
+        + '@media (max-width:767px){.dm-s,.dm-b{font-size:16px}.dm-s,.dm-sr,.dm-go,.dm-say button{min-height:44px}.dm-l{flex-basis:50px}.dm-go{flex:1 1 auto}}'
+        + '@media (pointer:coarse){.dm-s,.dm-sr,.dm-go,.dm-say button{min-height:44px}}';
+      document.head.appendChild(st);
+    }
+    // host: where the box draws. o: { req(path, method, body) → {ok, status, body}, ids: one of
+    // {deal_id} {contact_id} {client_id}, idp: the field ids' start (idp+'Subject', idp+'Body'),
+    // values: {subject, body} typed before, focus: put the caret in it once drawn, onSent(data, firstName) }
+    function open(host, o) {
+      style(); o = o || {};
+      var req = o.req || function (p, m, b) { return window.ddsApi(p, { method: m, body: b }); };
+      var k = key(o.ids), mine = String(++seq);
+      host.setAttribute('data-dm', mine);
+      var live = function () { return host.isConnected && host.getAttribute('data-dm') === mine; };
+      if (!k) { host.innerHTML = '<p class="dm-say">Open their record to email them.</p>'; return; }
+      var c = INFO[k];
+      if (c && c.r) { draw(c.r); return; }   // read before: drawn at once, so a redraw keeps what's typed
+      if (!c) c = INFO[k] = { p: Promise.resolve(req('/sales/email?' + k)).then(function (r) { if (r && r.ok && r.body && r.body.data) c.r = r; else delete INFO[k]; return r; }, function () { delete INFO[k]; return { ok: false, status: 0, body: {} }; }) };
+      host.innerHTML = '<p class="dm-say" role="status">Getting the email ready…</p>';
+      c.p.then(function (r) { if (live()) draw(r); });
+      function draw(r) {
+        var d = r && r.body && r.body.data;
+        if (!r || !r.ok || !d) {
+          // pages go live before the server's update: an older server has no /sales/email yet
+          if (r && r.status === 404 && !(r.body && r.body.message)) { host.innerHTML = '<p class="dm-say">' + esc3(NOT_YET) + '</p>'; return; }
+          host.innerHTML = '<p class="dm-say">' + esc3((r && r.body && r.body.message) || (r && r.status === 0 ? 'You look offline. Try again when you’re back online.' : 'We couldn’t get the email ready just now.')) + '<button type="button" class="dm-retry">Try again</button></p>';
+          host.querySelector('.dm-retry').onclick = function () { open(host, o); };
+          return;
+        }
+        var to = d.to || {}, nm = to.name || to.email || 'them', fn = first(to.name) || nm;
+        if (!to.email) { host.innerHTML = '<p class="dm-say">There’s no email address on file for ' + esc3(nm) + '. Add one on their details first.</p>'; return; }
+        if (d.stopped) { host.innerHTML = '<p class="dm-say">' + esc3(d.stopped === 'complaint' ? fn + ' marked an earlier email as spam, so no more email goes to them from here.' : 'Email to ' + to.email + ' bounced, so it can’t be sent there. Check the address on their details.') + '</p>'; return; }
+        var idp = o.idp || ('dm' + mine), v = o.values || {};
+        var back = d.replies === 'inbox' ? 'Replies come to your Inbox' : 'Replies go to ' + (d.reply_to || 'your email');
+        host.innerHTML = '<form class="dm" novalidate>'
+          + '<div class="dm-r"><span class="dm-l">To</span><span class="dm-to"><span class="dm-av" aria-hidden="true">' + esc3(initials(to.name || to.email)) + '</span><b>' + esc3(to.name || to.email) + '</b>' + (to.name ? '<span class="dm-a">' + esc3(to.email) + '</span>' : '') + '</span></div>'
+          + '<div class="dm-r"><label class="dm-l" for="' + idp + 'Subject">Subject</label><input id="' + idp + 'Subject" class="dm-s" type="text" maxlength="200" autocomplete="off" value="' + esc3(v.subject || '') + '"></div>'
+          + '<textarea id="' + idp + 'Body" class="dm-b" rows="7" maxlength="8000" placeholder="Write your email…" aria-label="Your email to ' + esc3(fn) + '">' + esc3(v.body || '') + '</textarea>'
+          + (d.unsubscribed ? '<p class="dm-hint">' + esc3(fn) + ' unsubscribed from your updates. An email you write to just them still reaches them.</p>' : '')
+          + '<div class="dm-f"><p class="dm-n">' + MAIL + '<span>Sent as <b>' + esc3(d.as || 'your studio') + '</b>' + (d.from ? ' from ' + esc3(d.from) : '') + ' · ' + esc3(back) + '</span></p><button type="submit" class="dm-go">Send email</button></div>'
+          + '<p class="dm-err" role="alert"></p></form>';
+        var form = host.querySelector('form'), subj = form.querySelector('.dm-s'), body = form.querySelector('.dm-b'), go = form.querySelector('.dm-go'), errEl = form.querySelector('.dm-err');
+        // saved replies, when there are any (read once a page)
+        if (!SR) SR = Promise.resolve(req('/service/saved-replies')).then(function (r) { return (r && r.ok && r.body && r.body.data && r.body.data.replies) || []; }, function () { return []; });
+        SR.then(function (list) {
+          if (!list.length || !body.isConnected || form.querySelector('.dm-sr')) return;
+          var map = {}; list.forEach(function (x) { map[x.id] = x.body; });
+          var sel = document.createElement('select'); sel.className = 'dm-sr'; sel.setAttribute('aria-label', 'Insert a saved reply');
+          sel.innerHTML = '<option value="">Insert a saved reply…</option>' + list.map(function (x) { return '<option value="' + esc3(x.id) + '">' + esc3(x.title) + '</option>'; }).join('');
+          sel.onchange = function () { var b = map[sel.value]; if (b) { var cur = body.value; body.value = cur ? cur.replace(/\s*$/, '') + '\n\n' + b : b; body.dispatchEvent(new Event('input', { bubbles: true })); body.focus(); } sel.value = ''; };
+          body.parentNode.insertBefore(sel, body);
+        });
+        function err(m) { errEl.textContent = m || ''; }
+        function ready() { go.disabled = false; go.textContent = 'Send email'; }
+        form.addEventListener('input', function () { if (errEl.textContent) err(''); });
+        body.addEventListener('keydown', function (e) { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); send(); } });
+        form.addEventListener('submit', function (e) { e.preventDefault(); send(); });
+        if (o.focus) (subj.value ? body : subj).focus({ preventScroll: true });
+        function send() {
+          if (go.disabled) return;
+          var s = subj.value.trim(), b = body.value.trim();
+          if (!s) { err('Give the email a subject.'); subj.focus(); return; }
+          if (!b) { err('Write your message first.'); body.focus(); return; }
+          go.disabled = true; go.textContent = 'Sending…'; err('');
+          var payload = {}; for (var x in o.ids) if (o.ids[x]) payload[x] = o.ids[x];
+          payload.subject = s; payload.body = b;
+          Promise.resolve(req('/sales/email', 'POST', payload)).then(function (r) {
+            ready();
+            if (r && r.ok && r.body && r.body.data && r.body.data.sent) { subj.value = ''; body.value = ''; if (o.onSent) o.onSent(r.body.data, fn); return; }
+            err(r && r.status === 404 && !(r.body && r.body.message) ? NOT_YET : (r && r.body && r.body.message) || (r && r.status === 0 ? 'You look offline. Nothing was sent.' : 'That didn’t send, and nothing went out. Try again in a moment.'));
+          }, function () { ready(); err('That didn’t send, and nothing went out. Try again in a moment.'); });
+        }
+      }
+    }
+    return { open: open };
   })();
 
   // ── DOM ──
@@ -728,6 +949,7 @@
     settings: '<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/>',
     bell: '<path d="M6 16V11a6 6 0 0 1 12 0v5l2 2H4z"/><path d="M10 20a2 2 0 0 0 4 0"/>',
     search: '<circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/>',
+    spark: '<path d="M12 3.5l1.9 5.6 5.6 1.9-5.6 1.9L12 18.5l-1.9-5.6L4.5 11l5.6-1.9z"/><path d="M19 3v3.5M17.25 4.75h3.5"/>',
     help: '<circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.7.3-1 .8-1 1.5"/><path d="M12 17h.01"/>',
     account: '<circle cx="12" cy="9" r="3.5"/><path d="M5 20a7 7 0 0 1 14 0"/>',
     plus: '<path d="M12 5v14M5 12h14"/>',
@@ -736,11 +958,49 @@
     // ⌘K results (sales item 84): a document, a to-do, a note, money, a phone
     doc: '<path d="M6 3h8l5 5v13H6z"/><path d="M14 3v5h5M9 13h6M9 17h4"/>',
     todo: '<path d="M5 12l4 4 10-10"/>',
+    todos: '<path d="M5 12l4 4 10-10"/>',   // sales item 85: the To-dos page in the menu
+    invoices: '<path d="M6 3h12v18l-3-2-3 2-3-2-3 2z"/><path d="M9 8h6M9 12h6"/>',   // …and Invoices
     note: '<path d="M4 20h4L19 9l-4-4L4 16z"/><path d="M13 7l4 4"/>',
     money: '<rect x="3" y="6" width="18" height="12" rx="2"/><circle cx="12" cy="12" r="2.5"/>',
     phone: '<path d="M5 3h4l2 5-2.5 1.5a11 11 0 0 0 6 6L16 13l5 2v4a2 2 0 0 1-2 2A17 17 0 0 1 3 5a2 2 0 0 1 2-2z"/>'
   };
   function icon(key, cls) { return '<svg class="' + (cls || 'nic') + '" viewBox="0 0 24 24" aria-hidden="true" focusable="false">' + (ICON[key] || ICON.dot) + '</svg>'; }
+  // ── What's new (builder list item 128) ─────────────────────────────────────
+  // Beside the bell: each week's changes to the tools, a picture and a sentence each
+  // (whats-new.js reads /whats-new.json). A studio reads every entry, a business running
+  // its own site the ones that touch a website; a client in the portal finds it in Help
+  // instead, since the portal's bell is already its news. A dot says there is something
+  // this device hasn't seen; nothing opens by itself.
+  function whatsNewWho() {
+    if (!CTX || CTX.is_client_portal || isReviewerCtx()) return '';   // a studio's client reads it in the portal's Help
+    return CTX.is_agency ? 'studio' : 'owner';
+  }
+  var WN_LOAD = null;
+  function loadWhatsNew() {
+    if (window.DDSWhatsNew) return Promise.resolve(window.DDSWhatsNew);
+    if (!WN_LOAD) WN_LOAD = new Promise(function (res, rej) {
+      var s = document.createElement('script'); s.src = '/whats-new.js?v=1';
+      s.onload = function () { res(window.DDSWhatsNew); };
+      s.onerror = function () { WN_LOAD = null; rej(new Error('whats-new')); };
+      document.head.appendChild(s);
+    });
+    return WN_LOAD;
+  }
+  function setWhatsNewDot(on) {
+    var b = document.getElementById('dds-new'); if (!b) return;
+    var d = b.querySelector('.wn-dot');
+    if (on && !d) b.insertAdjacentHTML('beforeend', '<span class="dot wn-dot" aria-hidden="true"></span>');
+    if (!on && d) d.remove();
+    b.setAttribute('aria-label', on ? 'What’s new, with something you haven’t seen' : 'What’s new');
+  }
+  function paintWhatsNewDot() {
+    var who = whatsNewWho(); if (!who) return;
+    loadWhatsNew().then(function (W) { return W.hasNew(who); }).then(setWhatsNewDot)['catch'](function () { /* no dot */ });
+  }
+  function openWhatsNew(opener) {
+    var who = whatsNewWho(); if (!who) return;
+    loadWhatsNew().then(function (W) { W.open({ who: who, opener: opener, onSeen: function () { setWhatsNewDot(false); } }); })['catch'](function () { /* a press retries */ });
+  }
   function bellInner(n) { return icon('bell') + (n > 0 ? '<span class="dot">' + (n > 9 ? '9+' : n) + '</span>' : ''); }
 
   // ── "+ Create" (sales list item 70, the bold redesign, Nov 2026) ─────────────
@@ -910,6 +1170,7 @@
       '<div class="dds-search" id="dds-search" role="button" tabindex="0" aria-label="Search"><span>' + icon('search', 'nic') + '</span><span>Search</span><kbd>' + (/Mac|iPhone|iPad/.test(navigator.platform || '') ? '⌘K' : 'Ctrl K') + '</kbd></div>' +
       '<div class="dds-right">' +
         '<button class="dds-ic" id="dds-bell" aria-label="Notifications" aria-haspopup="true" aria-expanded="false">' + bellInner(att) + '</button>' +
+        (whatsNewWho() ? '<button class="dds-ic" id="dds-new" aria-label="What’s new" aria-haspopup="dialog">' + icon('spark') + '</button>' : '') +
         '<a class="dds-ic" href="/help.html" id="dds-help" aria-label="Help — how do I…?" aria-haspopup="true" aria-expanded="false">' + icon('help') + '</a>' +
         '<button class="dds-ic" id="dds-profile" aria-label="Account" aria-haspopup="true" aria-expanded="false">' + icon('account') + '</button>' +
       '</div>';
@@ -930,6 +1191,10 @@
   // quiet: the studio-level and client-level pages look identical otherwise.
   function mountContextBar(scope) {
     var old = document.getElementById('dds-ctxbar'); if (old) old.remove();
+    closeBizSwitch(false);
+    // builder item 83: someone with a place in two or more businesses sees which one this is, and can switch
+    var biz = !(scope && scope.name) ? businessInHand() : null;
+    if (biz) { mountBusinessBar(biz); return; }
     if (!scope || !scope.name || !CTX || !CTX.is_agency) { document.documentElement.classList.remove('dds-has-ctxbar'); return; }
     // Oct 2026 nav cut: the card carries WHO (initials + name) and the way out.
     // Their record, Today and website are the client's own menu items now
@@ -952,6 +1217,111 @@
     root.appendChild(bar);
     document.documentElement.classList.add('dds-has-ctxbar');
   }
+
+  // ── builder item 83 (Nov 2026): one person, two businesses ─────────────────────
+  // /portal/context lists `businesses` only for someone invited somewhere with two or
+  // more, each with their role in words, the one in hand marked `current` and the one
+  // the server opens unasked marked `default`. The bar says which business this is
+  // ("You’re Staff"); Switch business lists them. A pick opens that business's own
+  // first page: the default one with no ?client=, any other with ?client=<its id>,
+  // which every page already sends, and which the server reads as one of the person's
+  // own businesses, never as a studio inside a client. A business seen through the
+  // client portal opens at the client door. The last one used is remembered, so the
+  // sign-in doors open it next time.
+  var HELD_KEY = 'dds-held-businesses', LAST_KEY = 'dds-last-business';
+  function businessInHand() {
+    if (!CTX || (CTX.scope && CTX.scope.site_id) || !CTX.business) return null;
+    return Array.isArray(CTX.businesses) && CTX.businesses.length > 1 ? CTX.business : null;
+  }
+  function rememberBusinesses() {
+    try {
+      var list = CTX && Array.isArray(CTX.businesses) ? CTX.businesses : [];
+      if (list.length > 1) localStorage.setItem(HELD_KEY, JSON.stringify(list.map(function (b) { return b.site_id; })));
+      else localStorage.removeItem(HELD_KEY);
+      if (list.length > 1 && CTX.business && ctxUid) localStorage.setItem(LAST_KEY, JSON.stringify({ uid: ctxUid, site_id: CTX.business.site_id }));
+    } catch (_) { /* storage may be denied: the bar still works, nothing is remembered */ }
+  }
+  // the URL scope is one of this person's own businesses (known before the context lands, from the last visit)
+  function heldBusinessId(id) {
+    if (!id) return false;
+    if (CTX && Array.isArray(CTX.businesses) && CTX.businesses.some(function (b) { return b.site_id === id; })) return true;
+    try { var held = JSON.parse(localStorage.getItem(HELD_KEY) || '[]'); return Array.isArray(held) && held.indexOf(id) >= 0; } catch (_) { return false; }
+  }
+  function bizInitials(name) { return String(name || '?').split(/\s+/).filter(Boolean).slice(0, 2).map(function (w) { return w.charAt(0).toUpperCase(); }).join('') || 'B'; }
+  function bizRoleLine(b) {
+    if (b.role === 'client_reviewer') return 'You review its work · opens the client view';
+    return b.role_words === 'Owner' ? 'You own it' : 'You’re ' + b.role_words;
+  }
+  function mountBusinessBar(b) {
+    var bar = el('<div id="dds-ctxbar" class="biz" role="region" aria-label="Your business">' +
+      '<span class="lbl">' + esc(b.role_words === 'Owner' ? 'You own it' : 'You’re ' + b.role_words) + '</span>' +
+      '<span class="who"><span class="av" aria-hidden="true">' + esc(bizInitials(b.name)) + '</span><strong>' + esc(b.name) + '</strong></span>' +
+      '<span class="acts"><button type="button" class="switch" id="dds-biz-switch" aria-haspopup="dialog" aria-expanded="false" aria-controls="dds-biz-pop">Switch business</button></span></div>');
+    bar.querySelector('#dds-biz-switch').addEventListener('click', function (e) { e.stopPropagation(); toggleBizSwitch(); });
+    root.appendChild(bar);
+    document.documentElement.classList.add('dds-has-ctxbar');
+  }
+  function bizPop() { return document.getElementById('dds-biz-pop'); }
+  function closeBizSwitch(refocus) {
+    var pop = bizPop(); if (pop) pop.remove();
+    var b = document.getElementById('dds-biz-switch'); if (b) { b.setAttribute('aria-expanded', 'false'); if (refocus) b.focus(); }
+  }
+  function toggleBizSwitch() {
+    if (bizPop()) { closeBizSwitch(true); return; }
+    var btn = document.getElementById('dds-biz-switch'); if (!btn || !CTX) return;
+    [].forEach.call(document.querySelectorAll('.dds-pop.open'), function (o) { o.classList.remove('open'); });
+    var list = CTX.businesses || [];
+    var pop = el('<div class="dds-pop dds-sites-pop open" id="dds-biz-pop" role="dialog" aria-label="Your businesses">' +
+      '<div class="n" style="font-weight:600;padding:4px 6px 8px">Your businesses</div>' +
+      (list.length > 6 ? '<input type="search" class="q" id="dds-biz-q" placeholder="Find a business…" aria-label="Find a business" autocomplete="off">' : '') +
+      '<div class="list" id="dds-biz-list" role="list"></div>' +
+      '<div class="sub" style="font-size:12px;color:var(--dds-faint);padding:8px 6px 2px">Each business keeps its own pages, people and settings. Next time you sign in, you come back to the last one you used.</div></div>');
+    document.body.appendChild(pop);
+    btn.setAttribute('aria-expanded', 'true');
+    paintBizRows(pop, '');
+    placeSiteSwitch(btn, pop);
+    var q = pop.querySelector('#dds-biz-q');
+    var firstRow = pop.querySelector('.list a.row');
+    (q || firstRow || btn).focus();
+    pop.addEventListener('click', function (e) { e.stopPropagation(); });
+    pop.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape') { e.stopPropagation(); closeBizSwitch(true); return; }
+      var rows = [].slice.call(pop.querySelectorAll('.list a.row'));
+      var i = rows.indexOf(document.activeElement);
+      if (e.key === 'ArrowDown') { e.preventDefault(); (rows[i + 1] || rows[0] || q).focus(); }
+      if (e.key === 'ArrowUp') { e.preventDefault(); (i > 0 ? rows[i - 1] : (q || rows[rows.length - 1])).focus(); }
+    });
+    if (q) q.addEventListener('input', function () { paintBizRows(pop, q.value); });
+  }
+  function paintBizRows(pop, query) {
+    var box = pop.querySelector('#dds-biz-list'); if (!box) return;
+    var q = String(query || '').trim().toLowerCase();
+    var rows = (CTX.businesses || []).filter(function (b) { return !q || String(b.name || '').toLowerCase().indexOf(q) >= 0; });
+    if (!rows.length) { box.innerHTML = '<div class="muted">No business matches that.</div>'; return; }
+    box.innerHTML = rows.map(function (b) {
+      return '<a class="row site' + (b.current ? ' now' : '') + '" role="listitem" href="#" data-biz="' + esc(b.site_id) + '" data-noscope="1"' + (b.current ? ' aria-current="true"' : '') + '>' +
+        '<span class="av" aria-hidden="true">' + esc(bizInitials(b.name)) + '</span><span class="tx"><span class="n">' + esc(b.name) + '</span><span class="sub">' + esc(bizRoleLine(b)) + (b.current ? ' · here now' : '') + '</span></span></a>';
+    }).join('');
+    [].forEach.call(box.querySelectorAll('[data-biz]'), function (a) { a.addEventListener('click', function (e) { e.preventDefault(); openBusiness(a.getAttribute('data-biz')); }); });
+  }
+  // a business's own first page, as the server says for that business (a studio's client lands in the portal)
+  function openBusiness(id) {
+    var b = (CTX && CTX.businesses || []).filter(function (x) { return x.site_id === id; })[0];
+    if (!b) return;
+    if (b.current) { closeBizSwitch(true); return; }
+    try { if (ctxUid) localStorage.setItem(LAST_KEY, JSON.stringify({ uid: ctxUid, site_id: id })); } catch (_) { /* */ }
+    var withId = function (path) { return b['default'] ? path : path + (path.indexOf('?') >= 0 ? '&' : '?') + 'client=' + encodeURIComponent(id); };
+    if (b.role === 'client_reviewer') { location.href = withId('/portal.html'); return; }
+    fetch(FN + '/portal/context', { headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + SUPABASE_KEY, 'x-dds-user-jwt': TOKEN, 'x-dds-scope-site': b['default'] ? '' : id } })
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (j) {
+        var land = j && j.data && j.data.landing;
+        if (!land || !SAFE_HREF.test(land)) { if (window.ddsToast) window.ddsToast('That business wouldn’t open just now. Try again in a moment.', 'err'); return; }
+        location.href = land === '/client.html' ? withId('/portal.html') : withId(land);
+      })['catch'](function () { if (window.ddsToast) window.ddsToast('That business wouldn’t open just now. Try again in a moment.', 'err'); });
+  }
+  document.addEventListener('click', function () { if (bizPop()) closeBizSwitch(false); });
+  window.addEventListener('resize', function () { var b = document.getElementById('dds-biz-switch'), p = bizPop(); if (b && p) placeSiteSwitch(b, p); });
 
   // ── item 44 (Nov 9 2026): the site switcher. "Switch site" on the client card
   // opens a small panel with a search box and every site the studio looks after
@@ -1182,6 +1552,11 @@
     // bell + profile
     document.getElementById('dds-bell').addEventListener('click', function (e) { e.stopPropagation(); toggleNotifications(); });
     document.getElementById('dds-profile').addEventListener('click', function (e) { e.stopPropagation(); toggleProfile(); });
+    var newTrig = document.getElementById('dds-new');
+    if (newTrig) {
+      newTrig.addEventListener('click', function (e) { e.stopPropagation(); closeMenus(); openWhatsNew(newTrig); });
+      (window.requestIdleCallback || function (f) { return setTimeout(f, 1200); })(paintWhatsNewDot);
+    }
     // in-app help (HELP-1): the "?" opens a grounded "how do I…?" panel; the href
     // stays a real fallback to the full Help page if JS is off.
     var helpTrig = document.getElementById('dds-help');
@@ -1513,19 +1888,33 @@
   }
   // Studio level: the needs-you rows (one per thing, money first) + the feed's news.
   function studioBellRows(d, ny) {
-    var needs = (ny.rows || []).concat(ny.rest || []).map(function (n) {
-      return { id: 'need:' + String(n.key || ''), href: n.href || '/agency.html', title: (n.name ? n.name + ' — ' : '') + (n.what || ''), sub: n.when || '', tier: 'needs_you', priority: n.kind === 'money', clearable: false };
+    // builder list item 126: a client site's new enquiries fold into one line in the bell,
+    // naming the site, the number and one link ("3 new enquiries on Bacchus Kitchen");
+    // Home keeps a row for each, with its own Reply
+    var all = (ny.rows || []).concat(ny.rest || []), bySite = {}, folded = {}, needs = [];
+    all.forEach(function (n) { if (n && n.kind === 'enquiry' && n.site_id) (bySite[n.site_id] = bySite[n.site_id] || []).push(n); });
+    all.forEach(function (n) {
+      var g = n && n.kind === 'enquiry' && n.site_id ? bySite[n.site_id] : null;
+      if (g && g.length > 1) {
+        if (folded[n.site_id]) return;
+        folded[n.site_id] = true;
+        needs.push({ id: 'need:enquiries:' + n.site_id, href: '/inbox.html?client=' + encodeURIComponent(n.site_id) + '#enquiries', title: g.length + ' new enquiries on ' + (n.name || 'a client’s site'), sub: g[0].when ? 'The oldest: ' + String(g[0].when).replace(/^\w/, function (c) { return c.toLowerCase(); }) : '', go: 'Reply', tier: 'needs_you', priority: false, clearable: false });
+        return;
+      }
+      needs.push({ id: 'need:' + String(n.key || ''), href: n.href || '/agency.html', title: (n.name ? n.name + ' — ' : '') + (n.what || ''), sub: n.when || '', tier: 'needs_you', priority: n.kind === 'money', clearable: false });
     });
     var news = shapeBellRows({ notices: (d.notices || []).filter(function (n) { return n.tier === 'update'; }) }, false);
     // builder list item 47: news per client site, each naming the site and opening the right
-    // place inside it ("Bacchus Kitchen — Published 3 changes"); the server carries ?client=
+    // place inside it; the server carries ?client=. Item 126: the server folds repeats and
+    // words each line (title), and names its one link (link): "3 new bookings on Bacchus Kitchen"
     var perSite = (ny.news || []).map(function (n) {
-      return { id: 'news:' + String(n.id || n.site_id + ':' + n.kind), href: n.href || ('/today.html?client=' + encodeURIComponent(n.site_id)), title: (n.name ? n.name + ' — ' : '') + (n.headline || ''), sub: n.body || '', tier: 'update', priority: false, clearable: false };
+      return { id: 'news:' + String(n.id || n.site_id + ':' + n.kind), href: n.href || ('/today.html?client=' + encodeURIComponent(n.site_id)), title: n.title || ((n.name ? n.name + ' — ' : '') + (n.headline || '')), sub: n.title ? (n.sub || '') : (n.body || ''), go: n.link || '', tier: 'update', priority: false, clearable: false };
     });
     return needs.concat(perSite).concat(news);
   }
   function bellRowHtml(r, seen) {
-    return '<a class="row' + (r.priority ? ' pri' : '') + (seen ? ' seen' : '') + '" data-tier="' + r.tier + '" href="' + esc(r.href) + '"><b>' + esc(r.title) + '</b>' + (r.sub ? '<div class="sub">' + esc(r.sub) + '</div>' : '') + '</a>';
+    var sub = (r.sub ? esc(r.sub) : '') + (r.go ? (r.sub ? ' · ' : '') + '<span class="go">' + esc(r.go) + '</span>' : '');
+    return '<a class="row' + (r.priority ? ' pri' : '') + (seen ? ' seen' : '') + '" data-tier="' + r.tier + '" href="' + esc(r.href) + '"><b>' + esc(r.title) + '</b>' + (sub ? '<div class="sub">' + sub + '</div>' : '') + '</a>';
   }
   function paintBellRows() {
     if (!notif) return;
@@ -1720,6 +2109,7 @@
     rows += '<a class="row" href="#" id="dds-theme-toggle">' + esc(themeLabel()) + '</a>';
     // Re-take the first-login tour any time (it marks itself seen on finish/skip)
     if (tourAvailable()) rows += '<a class="row" href="#" id="dds-tour-again">Show me around</a>';
+    if (whatsNewWho()) rows += '<a class="row" href="#" id="dds-new-row">What’s new<span class="sub">Changes to your tools, week by week</span></a>';
     rows += '<a class="row" href="mailto:support@davisdigitalstudio.com">Support</a>';
     rows += '<a class="row" href="#" id="dds-signout">Sign out</a>';
     prof.innerHTML = '<div class="who"><div class="n">' + esc(email) + '</div><div class="r">' + esc([roleWord, plan].filter(Boolean).join(' · ')) + '</div></div>' + rows;
@@ -1734,6 +2124,8 @@
     if (nt) nt.addEventListener('click', function (e) { e.preventDefault(); togglePush(); });
     var th = document.getElementById('dds-theme-toggle');
     if (th) th.addEventListener('click', function (e) { e.preventDefault(); cycleTheme(); th.textContent = themeLabel(); });
+    var wr = document.getElementById('dds-new-row');
+    if (wr) wr.addEventListener('click', function (e) { e.preventDefault(); var op = document.getElementById('dds-profile'); closeProfile(); openWhatsNew(op); });
     var ta = document.getElementById('dds-tour-again');
     if (ta) ta.addEventListener('click', function (e) { e.preventDefault(); var op = document.getElementById('dds-profile'); closeProfile(); try { startTour(op); } catch (_) { /* */ } });
     var so = document.getElementById('dds-signout');
@@ -2034,6 +2426,9 @@
     } catch (_) { /* a11y enhancement is best-effort */ }
   }
   function minimalShell() {
+    // Builder item 192: nobody is signed in. Leave this page's address for the studio's
+    // sign-in page, which takes the person back here once they're in (studio.html).
+    if (!TOKEN) try { localStorage.setItem('dds-studio-return', JSON.stringify({ path: location.pathname + location.search + location.hash, at: Date.now() })); } catch (_) {}
     root.innerHTML = '<a class="dds-brand" href="/"><span class="mark">S</span>Studio OS</a><div style="flex:1"></div><a class="dds-ic" href="/help.html" aria-label="Help">?</a><a class="dds-ic" href="/studio.html" aria-label="Sign in">◐</a>';
   }
 
@@ -2257,6 +2652,7 @@
   window.ddsScopeInfo = function () {
     var s = CTX && CTX.scope, id = scopeId();
     if (s && s.site_id) return { id: s.site_id, name: s.name || '' };
+    if (heldBusinessId(id)) return null;   // builder item 83: one of the person's own businesses, not a studio inside a client
     return id ? { id: id, name: '' } : null;
   };
   window.ddsStudioLevel = function (host, opts) {
@@ -2427,6 +2823,7 @@
   function useContext(data, uid, keptAt) {
     CTX = data; ctxUid = uid; ctxKeptAt = keptAt || Date.now(); markRoleLimits(CTX); render();
     try { paintStudioRequests(); } catch (_) { /* a request banner must never break the shell */ }
+    rememberBusinesses();   // builder item 83
     // B4: a fresh read IS the endpoint's read, so the 60s throttle window starts
     // here; a kept copy starts it when it was read
     if (keptAt) lastAttentionAt = keptAt; else markAttentionFresh();
@@ -2454,6 +2851,7 @@
         if (pageSetBell) { next.attention_count = CTX.attention_count; next.attention_stale = CTX.attention_stale; }   // Home's own number stands
         CTX = next; markRoleLimits(CTX); render();
         try { paintStudioRequests(); } catch (_) { /* */ }
+        rememberBusinesses();   // builder item 83
         try { window.__ddsContext = CTX; document.dispatchEvent(new CustomEvent('dds:context', { detail: CTX })); } catch (_) { /* */ }
       } else if (!pageSetBell) {
         CTX.attention_stale = next.attention_stale;

@@ -448,14 +448,17 @@ export function renderInvoiceDocument(v: any, brandIn?: Partial<DocBrand> | null
   const docLabel = invoiceDocLabel(v);
   const heading = String(v?.title || (isDeposit ? 'Deposit' : 'Invoice'));
   const no = invoiceNo(v?.number);
-  const pill = paid ? '<span class="pill paid">✓ Paid in full</span>' : voided ? '<span class="pill void">Voided</span>' : `<span class="pill due">${esc(v?.due_date ? 'Due ' + dayLabel(v.due_date, ctx?.tz || null) : 'Due on receipt')}</span>`;
+  const pill = paid ? '<span class="pill paid">✓ Paid in full</span>' : voided ? '<span class="pill void">Voided</span>' : v?.processing_since ? '<span class="pill due">Payment on its way</span>' : `<span class="pill due">${esc(v?.due_date ? 'Due ' + dayLabel(v.due_date, ctx?.tz || null) : 'Due on receipt')}</span>`;
   // who it's from, who it's billed to, and the details a bookkeeper files it by
   const from = partyLines(ctx?.studio ? { ...ctx.studio, name: brand.name } : null);
   const billTo = partyLines(ctx?.billTo);
   const details: string[] = [];
   if (no) details.push(`${paid ? 'Receipt for invoice' : 'Invoice no.'} ${no}`);
   if (v?.created_at) details.push('Issued ' + dayLabel(v.created_at, tz));
-  if (!paid && !voided) details.push(v?.due_date ? 'Due ' + dayLabel(v.due_date, tz) : 'Due on receipt');
+  // Sales item 118: a bank payment that is settling. The link took its one payment, so
+  // "Amount due" and a Pay button (which opened a switched-off Stripe page) were both wrong.
+  const settling = !paid && !voided && !!v?.processing_since;
+  if (!paid && !voided) details.push(settling ? 'Payment on its way' : v?.due_date ? 'Due ' + dayLabel(v.due_date, tz) : 'Due on receipt');
   if (paid) details.push(paidLine(v, tz));
   if (voided) details.push('Voided — no longer payable');
   if (ctx?.forWhat) details.push('For ' + ctx.forWhat);
@@ -468,16 +471,17 @@ export function renderInvoiceDocument(v: any, brandIn?: Partial<DocBrand> | null
   const lines = invoiceLines(v, billed);
   const rows = lines.map((l) => `<tr${l.amount_cents < 0 ? ' class="less"' : ''}><td>${esc(l.label)}</td><td class="qty">${l.qty !== 1 ? esc(String(l.qty)) : ''}</td><td>${esc(l.amount_cents < 0 ? '−' + money(-l.amount_cents, currency) : money(l.amount_cents, currency))}</td></tr>`).join('');
   const partRows = payments.map((p) => `<tr class="less"><td>${esc(paidLine(p, tz))}</td><td class="qty"></td><td>−${esc(money(p.amount_cents, currency))}</td></tr>`).join('');
-  const totalLabel = paid ? 'Total paid' : voided ? 'Total (voided)' : 'Amount due';
+  const totalLabel = paid ? 'Total paid' : voided ? 'Total (voided)' : settling ? 'Payment on its way' : 'Amount due';
   const totalCents = paid ? billed : amount;
   const table = `<table><thead><tr><th>Description</th><th class="qty">Qty</th><th>Amount</th></tr></thead><tbody>${rows}${payments.length && !paid ? `<tr><td style="color:var(--soft)">Total</td><td class="qty"></td><td style="color:var(--soft)">${esc(money(billed, currency))}</td></tr>` + partRows : ''}<tr class="total"><td>${esc(totalLabel)}</td><td class="qty"></td><td>${esc(money(totalCents, currency))}</td></tr></tbody></table>`;
   // a paid one opens with when and how it was paid, every part named
   const banner = paid ? `<div class="banner"><span class="dot" aria-hidden="true">✓</span><div><b>Paid in full. Thank you.</b>${esc(paidLine(v, tz))}${payments.length ? ` · with ${payments.length} earlier part payment${payments.length === 1 ? '' : 's'}: ${esc(payments.map((p) => paidLine(p, tz)).join('; '))}` : ''}</div></div>` : '';
   // A live pay link is an ACTION, not part of the printed record → no-print (the side card, and the bar a phone keeps at the bottom).
-  const payUrl = (!paid && !voided && v?.stripe_url) ? String(v.stripe_url) : '';
+  const payUrl = (!paid && !voided && !settling && v?.stripe_url) ? String(v.stripe_url) : '';   // item 118: none while a bank payment settles
   const payLink = payUrl ? `<a class="paylink" href="${esc(payUrl)}">Pay ${esc(money(v?.amount_cents, currency))} securely →</a>` : '';
   const note = paid ? 'Thank you — this is your receipt of payment.'
     : voided ? 'This request was voided and is no longer payable.'
+    : settling ? 'Your payment is on its way. A bank payment takes a few days to arrive, and there is nothing more to do. You’ll get a receipt when it lands.'
     : `Payment is processed securely.${no ? ` Please quote ${no} with any payment by check or transfer.` : ''} This document is your copy of the request.`;
   const body = `${parties}${table}<p class="note">${esc(note)}</p>`;
   // the side card: the amount and the one thing to do next
@@ -487,9 +491,11 @@ export function renderInvoiceDocument(v: any, brandIn?: Partial<DocBrand> | null
     ? `<div class="lbl">How it was paid</div>${[...payments, { amount_cents: amount, paid_at: v?.paid_at, paid_method: v?.paid_method, paid_note: v?.paid_note }].map((p) => `<div class="row"><span>${esc(dayLabel(p.paid_at, tz) || 'Paid')}<small>${esc([payMethodWords(p.paid_method).replace(/^(by|in) /, '').replace(/^./, (ch) => ch.toUpperCase()), String(p.paid_note || '').trim()].filter(Boolean).join(' · '))}</small></span><span>${esc(money(p.amount_cents, currency))}</span></div>`).join('')}<div class="sum"><span>Total paid</span><span>${esc(money(billed, currency))}</span></div>${dl}`
     : voided
       ? `<div class="lbl">Voided</div><div class="n struck">${esc(money(amount, currency))}</div><p>This request was voided and is no longer payable.</p>${dl}`
+      : settling
+      ? `<div class="lbl">Payment on its way</div><div class="n">${esc(money(amount, currency))}</div><p>A bank payment takes a few days to arrive. There is nothing more to do, and you’ll get a receipt when it lands.</p>${dl}`
       : `<div class="lbl">Amount due</div><div class="n">${esc(money(amount, currency))}</div><p>${esc(dueWords)}${paidParts ? ` ${esc(money(paidParts, currency))} of ${esc(money(billed, currency))} is already paid.` : ''}</p>${payLink}${payLink ? '<p>A receipt comes by email as soon as it goes through.</p>' : ''}${payLink && dl ? '<hr>' : ''}${dl}`;
   const payBar = payLink ? `${ctx?.pdfUrl ? pdfButton('PDF') : ''}${payLink}` : '';
-  const sub = [v?.created_at ? 'Issued ' + dayLabel(v.created_at, tz) : '', paid ? (dayLabel(v?.paid_at, tz) ? 'Paid ' + dayLabel(v.paid_at, tz) : '') : voided ? 'Voided' : (v?.due_date ? 'Due ' + dayLabel(v.due_date, tz) : 'Due on receipt')].filter(Boolean).join(' · ');
+  const sub = [v?.created_at ? 'Issued ' + dayLabel(v.created_at, tz) : '', paid ? (dayLabel(v?.paid_at, tz) ? 'Paid ' + dayLabel(v.paid_at, tz) : '') : voided ? 'Voided' : settling ? 'Payment on its way' : (v?.due_date ? 'Due ' + dayLabel(v.due_date, tz) : 'Due on receipt')].filter(Boolean).join(' · ');
   return shell({ title: `${heading}${no ? ' ' + no : ''} — ${brand.name}`, brand, kickerHtml: kicker(`<div class="doclabel">${esc(docLabel)}${no ? ' ' + esc(no) : ''}</div>`, forWhomOf(ctx)), heading, sub, figure: { label: totalLabel, amount: money(totalCents, currency), pillHtml: pill }, bannerHtml: banner, bodyHtml: body, asideHtml: aside, payBarHtml: payBar || undefined, pdfUrl: ctx?.pdfUrl, pdfName: ctx?.pdfName, lasting: paid });
 }
 
