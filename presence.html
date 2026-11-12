@@ -359,6 +359,50 @@ html:not(.is-studio) #dcModeSeg [data-dcmode="timewarp"]{display:none}
 .biz-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(340px,100%),1fr));column-gap:var(--dds-s8,48px);align-items:start;max-width:1100px}
 .biz-col{min-width:0}
 .biz-col>h5.rune:first-child{margin-top:var(--dds-s2,8px)}
+/* item 127: four cards; under each field, where it shows on the site */
+.biz-card{background:var(--sheet);border:1px solid var(--hair);border-radius:var(--r-lg);padding:var(--dds-s5,20px) var(--dds-s5,20px) var(--dds-s1,4px);margin:0 0 var(--dds-s5,20px);min-width:0}
+.biz-col>.biz-card>h5.rune:first-child{margin:0 0 var(--dds-s4,16px);font:600 19px/1.25 var(--serif)}
+.biz-card>h5.rune::after{display:none}
+.biz-card>h5.rune .biz-help{font:500 12.5px/1 var(--sans);letter-spacing:0;text-transform:none;color:var(--plum)}
+.biz-card .field{max-width:none}
+.biz-card>.hint,.biz-place2>.hint,.biz-place2>p.hint{font-size:12px;color:var(--ink-2);margin:6px 0 var(--dds-s4,16px)}   /* the sentences outside a field read like the ones inside */
+.biz-new{display:inline-block;margin-left:6px;padding:0 8px;border-radius:999px;background:var(--plum-soft);color:var(--plum);font:600 11px/1.6 var(--sans);vertical-align:1px}
+.biz-card .biz-short{background:var(--plum-tint);border:1px solid var(--plum-line);border-radius:var(--r-lg);padding:var(--dds-s3,12px)}
+.biz-short textarea{min-height:64px}
+.biz-short .cnt{font-size:11.5px;color:var(--ink-3);margin-top:4px}
+.biz-share{margin-top:var(--dds-s3,12px);background:var(--sheet);border:1px solid var(--hair);border-radius:var(--r);padding:10px 12px}
+.biz-share-k{display:block;font:600 10.5px/1 var(--sans);letter-spacing:.08em;text-transform:uppercase;color:var(--ink-3);margin-bottom:8px}
+.biz-share-row{display:flex;gap:12px;align-items:flex-start}
+.biz-share-text{min-width:0}
+.biz-share-img{flex:none;width:64px;height:48px;border-radius:6px;background:var(--wash) center/cover no-repeat}
+.biz-share-name{margin:0;font-weight:600;font-size:13px;color:var(--ink)}
+.biz-share-desc{margin:2px 0 0;font-size:12.5px;line-height:1.45;color:var(--ink-2);overflow-wrap:anywhere}
+.biz-share-desc.empty{font-style:italic;opacity:.72}
+.biz-share-host{margin:2px 0 0;font-size:11.5px;color:var(--ink-3)}
+.biz-row3{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(0,1fr) minmax(0,1fr);gap:var(--dds-s3,12px)}
+.biz-place{display:flex;align-items:center;gap:8px;margin:0 0 var(--dds-s3,12px);font-weight:600;font-size:13.5px;color:var(--ink)}
+.biz-pin{display:inline-flex;color:var(--plum)}
+.biz-chip{padding:0 8px;border-radius:999px;background:var(--wash);color:var(--ink-2);font:500 11px/1.6 var(--sans)}
+.biz-place2{border-top:1px solid var(--hair);padding-top:var(--dds-s4,16px);margin-bottom:var(--dds-s4,16px)}
+.biz-add{display:flex;align-items:center;justify-content:center;gap:6px;width:100%;min-height:44px;border:1.5px dashed var(--plum-line);border-radius:var(--r);background:none;color:var(--plum);font:600 13px/1 var(--sans);cursor:pointer}
+.biz-add:hover{background:var(--plum-tint)}
+.biz-seg{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:var(--dds-s2,8px)}
+.biz-card .biz-seg label{display:flex;align-items:center;gap:8px;min-height:44px;margin:0;padding:0 12px;border:1px solid var(--hair);border-radius:var(--r);font-size:13px;color:var(--ink);cursor:pointer}
+.biz-card .biz-seg label:has(input:checked){border-color:var(--plum);background:var(--plum-tint);color:var(--plum)}
+.biz-p2-lbl{display:block;font-size:12.5px;color:var(--ink-3);font-weight:500;margin-bottom:var(--dds-s1,4px)}
+.biz-rm{background:none;border:0;padding:0;min-height:44px;color:var(--clay);font:600 13px/1 var(--sans);cursor:pointer}
+.biz-rm:hover{text-decoration:underline}
+/* a narrow card (two columns, or a phone) puts each day's times under its name and Closed */
+.biz-card{container-type:inline-size}
+@container (max-width:470px){
+.biz-card .hrow{display:grid;grid-template-columns:auto auto auto minmax(0,1fr);gap:6px 10px;align-items:center}
+.biz-card .hrow .day{grid-column:1/4;grid-row:1;width:auto}
+.biz-card .hrow .closedlab{grid-column:4;grid-row:1;justify-self:end;width:auto;margin-left:0}
+.biz-card .hrow input[type=time]:first-of-type{grid-column:1;grid-row:2}
+.biz-card .hrow .to{grid-column:2;grid-row:2}
+.biz-card .hrow input[type=time]:last-of-type{grid-column:3;grid-row:2}
+}
+@media(max-width:560px){.biz-card{padding:var(--dds-s4,16px) var(--dds-s4,16px) var(--dds-s1,4px)}.biz-row3{grid-template-columns:1fr 1fr}.biz-row3 .field:first-child{grid-column:1/-1}.biz-seg{grid-template-columns:1fr}}
 .ver-live{display:inline-block;margin-left:var(--dds-s2,8px);padding:1px 8px;border-radius:999px;background:var(--hair);color:var(--ink-2);font-size:12px;font-weight:600;vertical-align:1px}
 .hcompare{flex-basis:100%;margin-top:var(--dds-s2,8px)}
 .ver-more{margin-top:var(--dds-s6,24px);border-top:1px solid var(--hair);padding-top:var(--dds-s4,16px)}
@@ -1887,15 +1931,19 @@ html.bs-open .scrim{z-index:96}   /* Files and the categories card open over the
       <!-- BUSINESS -->
       <section class="view" id="view-business">
         <h1 class="doc" role="heading" aria-level="2">Business details</h1>
-        <p class="docsub">Your name, contact details, address and hours. Changes save as you type and go live when you publish.</p>
+        <p class="docsub">Your name, contact details, places and hours. Changes save as you type and go live when you publish.</p>
         <div id="bizWaiting"></div>
         <div class="biz-grid">
           <div class="biz-col">
-          <h5 class="rune">About your business <span class="whisper" id="save-identity"></span><button class="quietact" style="letter-spacing:0;text-transform:none;font-weight:400" onclick="openDesk('identity_copy','business')"><span class="aimark">✦</span> Draft with help</button></h5>
-          <div class="field"><label for="f-business_name">Business name</label><input type="text" id="f-business_name" data-sing="identity" data-field="business_name" maxlength="120"></div>
-          <div class="field"><label for="f-tagline">Tagline</label><input type="text" id="f-tagline" data-sing="identity" data-field="tagline" maxlength="140"><div class="hint">One short line under your name.</div></div>
-          <div class="field"><label for="f-description">Description</label><textarea id="f-description" data-sing="identity" data-field="description" maxlength="1000"></textarea></div>
-          <div class="field"><label for="f-story">Your story</label><textarea id="f-story" data-sing="identity" data-field="story" maxlength="4000"></textarea><div class="hint">Shown on your About page.</div></div>
+          <section class="biz-card" aria-labelledby="bizAboutH">
+          <h5 class="rune" id="bizAboutH">About your business <span class="whisper" id="save-identity"></span><button class="quietact biz-help" onclick="openDesk('identity_copy','business')"><span class="aimark">✦</span> Draft with help</button></h5>
+          <div class="field"><label for="f-business_name">Business name</label><input type="text" id="f-business_name" data-sing="identity" data-field="business_name" maxlength="120"><div class="hint" data-shows="business_name"></div></div>
+          <div class="field"><label for="f-tagline">Tagline</label><input type="text" id="f-tagline" data-sing="identity" data-field="tagline" maxlength="140"><div class="hint" data-shows="tagline"></div></div>
+          <div class="field biz-short"><label for="f-short_description">Short description <span class="biz-new">New</span></label><textarea id="f-short_description" data-sing="identity" data-field="short_description" maxlength="150" rows="2" aria-describedby="cnt-short_description bizShortShows"></textarea><div class="cnt" id="cnt-short_description" aria-live="polite"></div><div class="hint" id="bizShortShows" data-shows="short_description"></div>
+            <div class="biz-share" role="group" aria-label="When someone shares your site"><span class="biz-share-k" aria-hidden="true">When someone shares your site</span><div class="biz-share-row"><span class="biz-share-img" id="bizShareImg" aria-hidden="true"></span><div class="biz-share-text"><p class="biz-share-name" id="bizShareName"></p><p class="biz-share-desc" id="bizShareDesc"></p><p class="biz-share-host" id="bizShareHost"></p></div></div></div>
+          </div>
+          <div class="field"><label for="f-description">Description</label><textarea id="f-description" data-sing="identity" data-field="description" maxlength="1000"></textarea><div class="hint" data-shows="description"></div></div>
+          <div class="field"><label for="f-story">Your story</label><textarea id="f-story" data-sing="identity" data-field="story" maxlength="4000"></textarea><div class="hint" data-shows="story"></div></div>
           <div class="field" data-needs="configure"><label for="f-industry">What kind of business</label><select id="f-industry">
             <option value="generic">General / other</option>
             <option value="restaurant">Restaurant</option><option value="coffee_shop">Coffee shop / café</option><option value="bar">Bar</option>
@@ -1904,30 +1952,42 @@ html.bs-open .scrim{z-index:96}   /* Files and the categories card open over the
             <option value="medical">Medical</option><option value="dental">Dental</option><option value="veterinary">Veterinary</option>
             <option value="law">Law</option><option value="accounting">Accounting</option><option value="insurance">Insurance</option><option value="consulting">Consulting</option><option value="marketing">Marketing</option><option value="real_estate">Real estate</option><option value="photography">Photography</option>
             <option value="retail">Retail / shop</option><option value="nonprofit">Nonprofit</option><option value="church">Church</option><option value="professional">Professional services</option>
-          </select><div class="hint" id="industryHint">Sets the words your site uses, like Services or Menu. Applies when you next publish.</div></div>
-          <h5 class="rune">Contact</h5>
-          <div class="field"><label for="f-phone">Phone</label><input type="tel" class="mono" id="f-phone" data-sing="identity" data-field="phone" maxlength="32"></div>
-          <div class="field"><label for="f-email">Email</label><input type="email" id="f-email" data-sing="identity" data-field="email" maxlength="160"></div>
-          <div class="field"><label for="f-service_area">Where you work</label><input type="text" id="f-service_area" data-sing="identity" data-field="service_area" maxlength="200"><div class="hint">e.g. “Serving Austin and the Hill Country” — shown on your site and read by search engines.</div></div>
-          <div class="field"><label for="f-booking_url">Reservation link</label><input type="url" id="f-booking_url" data-sing="identity" data-field="booking_url" placeholder="https://…"></div>
-          <div class="field"><label for="f-ordering_url">Online ordering link</label><input type="url" id="f-ordering_url" data-sing="identity" data-field="ordering_url" placeholder="https://…"></div>
+          </select><div class="hint" id="industryHint">Sets the words your site uses, like Menu or Services, and tells Google what you are. Applies when you next publish.</div></div>
+          </section>
+          <section class="biz-card" aria-labelledby="bizContactH">
+          <h5 class="rune" id="bizContactH">Contact</h5>
+          <div class="field"><label for="f-phone">Phone</label><input type="tel" class="mono" id="f-phone" data-sing="identity" data-field="phone" maxlength="32"><div class="hint" data-shows="phone"></div></div>
+          <div class="field"><label for="f-email">Email</label><input type="email" id="f-email" data-sing="identity" data-field="email" maxlength="160"><div class="hint" data-shows="email"></div></div>
+          <div class="field"><label for="f-service_area">Where you work</label><input type="text" id="f-service_area" data-sing="identity" data-field="service_area" maxlength="200" placeholder="e.g. Serving Austin and the Hill Country"><div class="hint" data-shows="service_area"></div></div>
+          <div class="field"><label for="f-booking_url">Reservation link</label><input type="url" id="f-booking_url" data-sing="identity" data-field="booking_url" placeholder="https://…"><div class="hint" data-shows="booking_url"></div></div>
+          <div class="field"><label for="f-ordering_url">Online ordering link</label><input type="url" id="f-ordering_url" data-sing="identity" data-field="ordering_url" placeholder="https://…"><div class="hint" data-shows="ordering_url"></div></div>
+          </section>
           </div>
           <div class="biz-col">
-          <h5 class="rune">Address <span class="whisper" id="save-location"></span></h5>
-          <div class="field"><label for="f-address_line1">Street address</label><input type="text" id="f-address_line1" data-sing="location" data-field="address_line1" maxlength="160"></div>
+          <section class="biz-card" aria-labelledby="bizPlacesH">
+          <h5 class="rune" id="bizPlacesH">Locations <span class="whisper" id="save-location"></span></h5>
+          <p class="biz-place"><span class="biz-pin" aria-hidden="true"></span>Main location <span class="biz-chip">Shows first</span></p>
+          <div class="field"><label for="f-address_line1">Street address</label><input type="text" id="f-address_line1" data-sing="location" data-field="address_line1" maxlength="160"><div class="hint" data-shows="address"></div></div>
+          <div class="biz-row3">
           <div class="field"><label for="f-city">City</label><input type="text" id="f-city" data-sing="location" data-field="city" maxlength="80"></div>
           <div class="field"><label for="f-region">State</label><input type="text" id="f-region" data-sing="location" data-field="region" maxlength="40"></div>
           <div class="field"><label for="f-postal_code">ZIP</label><input type="text" class="mono" id="f-postal_code" data-sing="location" data-field="postal_code" maxlength="16"></div>
-          <div class="field"><label for="f-locphone">Phone at this location</label><input type="tel" class="mono" id="f-locphone" data-sing="location" data-field="phone" maxlength="32"><div class="hint">Only if it differs from your main number.</div></div>
-          <h5 class="rune">Hours <span class="whisper" id="save-hours"></span></h5>
+          </div>
+          <div class="field"><label for="f-locphone">Phone at this location</label><input type="tel" class="mono" id="f-locphone" data-sing="location" data-field="phone" maxlength="32"><div class="hint" data-shows="locphone"></div></div>
+          <div class="biz-place2" id="place2"></div>
+          </section>
+          <section class="biz-card" aria-labelledby="bizHoursH">
+          <h5 class="rune" id="bizHoursH">Hours <span class="whisper" id="save-hours"></span></h5>
           <div class="hoursgrid" id="hoursGrid"></div>
           <label class="closedrow"><input type="checkbox" id="closedSwitch"> Temporarily closed right now</label>
           <div class="field" style="margin-top:10px"><input type="text" id="f-closednote" aria-label="A short note for customers while you’re closed" placeholder="A short note for customers (optional)" maxlength="200" hidden></div>
-          <div id="privacyWrap" data-needs="configure">
+          <div class="hint biz-hours-hint" data-shows="hours"></div>
+          </section>
+          <section class="biz-card" id="privacyWrap" data-needs="configure">
           <h5 class="rune">Privacy <span class="whisper" id="save-privacy"></span></h5>
           <label class="closedrow" style="margin-top:var(--dds-s3,12px)"><input type="checkbox" id="visitSwitch" aria-describedby="visitHint"> Count visits to your site</label>
           <div class="field" style="margin-top:0"><div class="hint" id="visitHint" style="max-width:560px"></div></div>
-          </div>
+          </section>
           </div>
         </div>
 
@@ -3203,6 +3263,154 @@ document.querySelectorAll("[data-sing]").forEach((inp) => {
     }, 700);
   });
 });
+
+/* ── item 127: where each detail shows, the short description, a second location ── */
+// One sentence under each Business details field says where it shows on the live site.
+// Checked against the eight templates: Restaurant Classic shows Where you work on its
+// About page only and calls its booking button Reserve a table; the phone bar and the
+// footer's hours only count when they're on.
+function bizShows() {
+  const rc = (S.site && S.site.template_slug) === "restaurant-classic", bar = !!pbNow();
+  const footHours = !(S.settings && S.settings.footer_hours === false);   // Edit site's footer switch
+  return {
+    business_name: "Shows at the top of every page, in the browser tab, in Google results and on the emails you send.",
+    tagline: "Shows under your name at the top of your home page.",
+    short_description: "What Google, AI assistants and directories quote about you, and the line under your link when someone shares your site. One sentence: what you are, where, and what you’re known for.",
+    description: "Shows on your home page and your About page. Google uses it when you have no short description or search description.",
+    story: "Shows on your About page.",
+    phone: bar ? "Shows in your footer and on your Contact page, on the Call button of the phone bar, and to Google." : "Shows in your footer and on your Contact page, and to Google.",
+    email: "Shows in your footer and on your Contact page as an email link.",
+    service_area: rc ? "Shows on your About page." : "Shows at the top of your home page and on your About page, and tells Google the places you serve.",
+    booking_url: rc ? "Your home page’s Reserve a table button opens it, and Google is told you take reservations." : "The first button at the top of your home page opens it.",
+    ordering_url: "Your home page’s Order online button opens it.",
+    address: "Shows in your footer and on your Contact page with a Get directions link. Google uses it for your listing.",
+    locphone: "Only if it differs from your main number. It then shows with this address instead.",
+    hours: `Shows on your Contact page${footHours ? " and in your footer" : ""}${bar ? ", and behind Hours on the phone bar" : ""}. Google reads them too.`,
+  };
+}
+function paintBizShows() {
+  const words = bizShows();
+  document.querySelectorAll("#view-business [data-shows]").forEach((n) => { n.textContent = words[n.dataset.shows] || ""; });
+  document.querySelectorAll("#view-business .biz-pin").forEach((n) => { if (!n.firstChild) n.innerHTML = uiIcon("pin", 14); });
+}
+// The share preview: the picture, name and line a link to the home page carries, as the
+// templates choose them (the share photo, the hero photo, a menu or service photo, a
+// post's cover, the logo).
+function bizShareThumb() {
+  const st = S.settings || {}, media = S.media || [];
+  const ids = [st.og_media_id, st.cover_media_id, ...(S.offerings || []).map((o) => o.media_id), ...(S.posts || []).filter((p) => p.status === "published").map((p) => p.hero_media_id), st.logo_media_id];
+  for (const id of ids) { const m = id && media.find((x) => x.id === id); if (m && m.thumb) return m.thumb; }
+  return "";
+}
+function paintBizShort() {
+  const box = $("f-short_description"); if (!box) return;
+  const val = (id) => { const n = $(id); return n ? String(n.value || "").trim() : ""; };
+  $("cnt-short_description").textContent = `${[...box.value].length} of 150`;
+  const line = val("f-short_description") || val("f-seo_description") || val("f-description");
+  $("bizShareName").textContent = val("f-business_name") || "Your business";
+  const d = $("bizShareDesc"); d.textContent = line || "Add a short description and it shows here."; d.classList.toggle("empty", !line);
+  $("bizShareHost").textContent = seoHost();
+  const thumb = bizShareThumb(), img = $("bizShareImg");
+  img.style.backgroundImage = thumb ? `url("${thumb.replace(/["\\]/g, "")}")` : "";
+}
+["f-short_description", "f-business_name", "f-description"].forEach((id) => { const n = $(id); if (n) n.addEventListener("input", paintBizShort); });
+
+// A second location lives beside the first, in the location row's second_location
+// (lib/second_location.ts): a name, an address, a phone, and the main location's hours or
+// its own week. It saves whole with each change once it has a street and a city; before
+// that it isn't a place yet, and what's stored stays. Removing it is one step back.
+let PLACE2 = null;
+const place2Ready = (p) => !!(p && String(p.address_line1 || "").trim() && String(p.city || "").trim());
+function renderPlace2() {
+  const host = $("place2"); if (!host) return;
+  const p = PLACE2;
+  if (!p) {
+    host.innerHTML = `<button type="button" class="biz-add" id="btnPlace2">${uiIcon("plus", 14)} Add a second location</button><div class="hint">For a second shop, kitchen or office. It shows beside your main address.</div>`;
+    $("btnPlace2").addEventListener("click", () => {
+      PLACE2 = { label: "", address_line1: "", address_line2: "", city: "", region: "", postal_code: "", phone: "", same_hours: true, hours: [] };
+      renderPlace2(); $("f2-label").focus();
+    });
+    return;
+  }
+  const bar = !!pbNow();
+  host.innerHTML = `<p class="biz-place"><span class="biz-pin" aria-hidden="true">${uiIcon("pin", 14)}</span>Second location <span class="biz-new">New</span></p>
+<div class="field"><label for="f2-label">A name for this place</label><input type="text" id="f2-label" data-p2="label" maxlength="60" placeholder="e.g. Glendale"><div class="hint">Visitors see it above the address, so they know which place is which.</div></div>
+<div class="field"><label for="f2-address_line1">Street address</label><input type="text" id="f2-address_line1" data-p2="address_line1" maxlength="160"><div class="hint">Shows beside your main address in your footer and on your Contact page, with its own Get directions link.</div></div>
+<div class="biz-row3">
+<div class="field"><label for="f2-city">City</label><input type="text" id="f2-city" data-p2="city" maxlength="80"></div>
+<div class="field"><label for="f2-region">State</label><input type="text" id="f2-region" data-p2="region" maxlength="40"></div>
+<div class="field"><label for="f2-postal_code">ZIP</label><input type="text" class="mono" id="f2-postal_code" data-p2="postal_code" maxlength="16"></div>
+</div>
+<div class="field"><label for="f2-phone">Phone at this place</label><input type="tel" class="mono" id="f2-phone" data-p2="phone" maxlength="32"><div class="hint">${bar ? "Shows with this address. The phone bar keeps calling your main number." : "Shows with this address."}</div></div>
+<div class="field" role="group" aria-labelledby="p2HoursL"><span class="biz-p2-lbl" id="p2HoursL">Hours</span>
+<div class="biz-seg"><label><input type="radio" name="p2hours" value="same"> Same hours as the main location</label><label><input type="radio" name="p2hours" value="own"> Its own hours</label></div>
+<div class="hoursgrid" id="hoursGrid2" hidden></div>
+<div class="hint">Google is told you have two places, each with its address, phone and hours.</div></div>
+<p class="hint" id="p2Wait" hidden>It saves once it has a street address and a city.</p>
+<button type="button" class="biz-rm" id="btnPlace2Rm">Remove the second location</button>`;
+  host.querySelectorAll("[data-p2]").forEach((inp) => {
+    inp.value = p[inp.dataset.p2] || "";
+    inp.addEventListener("input", () => { PLACE2[inp.dataset.p2] = inp.value; savePlace2(); });
+  });
+  host.querySelectorAll('input[name="p2hours"]').forEach((r) => {
+    r.checked = (r.value === "same") === (p.same_hours !== false);
+    r.addEventListener("change", () => { PLACE2.same_hours = r.value === "same"; renderPlace2Hours(); savePlace2(); });
+  });
+  $("btnPlace2Rm").addEventListener("click", removePlace2);
+  $("p2Wait").hidden = place2Ready(p) || !(p.label || p.address_line1 || p.city);
+  renderPlace2Hours();
+}
+// Its own week starts as a copy of the main location's, drawn like it.
+function renderPlace2Hours() {
+  const grid = $("hoursGrid2"); if (!grid || !PLACE2) return;
+  grid.innerHTML = ""; grid.hidden = PLACE2.same_hours !== false;
+  if (grid.hidden) return;
+  if (!Array.isArray(PLACE2.hours) || PLACE2.hours.length !== 7) PLACE2.hours = undoClone(hoursFromState());
+  PLACE2.hours.forEach((day, idx) => {
+    const name = DAYS.find(([k]) => k === day.day)[1];
+    const row = el("div", "hrow");
+    row.appendChild(el("span", "day", name));
+    const iv = (day.intervals && day.intervals[0]) || { open: "09:00", close: "17:00" };
+    const open = el("input"); open.type = "time"; open.value = iv.open || "09:00"; open.disabled = !!day.closed; open.setAttribute("aria-label", name + " opens");
+    const close = el("input"); close.type = "time"; close.value = iv.close || "17:00"; close.disabled = !!day.closed; close.setAttribute("aria-label", name + " closes");
+    const lab = el("label", "closedlab"); const cb = el("input"); cb.type = "checkbox"; cb.checked = !!day.closed;
+    lab.append(cb, document.createTextNode("Closed"));
+    row.append(open, el("span", "to", "to"), close, lab);
+    const save = () => { PLACE2.hours[idx] = { day: day.day, closed: cb.checked, intervals: cb.checked ? [] : [{ open: open.value || "09:00", close: close.value || "17:00" }] }; savePlace2(); };
+    cb.addEventListener("change", () => { open.disabled = close.disabled = cb.checked; save(); });
+    open.addEventListener("change", save); close.addEventListener("change", save);
+    grid.appendChild(row);
+  });
+}
+function savePlace2() {
+  const ready = place2Ready(PLACE2), wait = $("p2Wait");
+  if (wait) wait.hidden = ready;
+  if (!ready) return;
+  whisper("save-location", "saving"); whisper("topWhisper", "saving");
+  debounce("location:second_location", async () => {
+    const body = { second_location: undoClone(PLACE2) };
+    try {
+      await api("PUT", "/location", body);
+      S.location = { ...(S.location || {}), second_location: body.second_location };   // the next undo step needs what's saved now
+      whisper("save-location", "saved"); whisper("topWhisper", "saved");
+      scheduleChangesRefresh();
+    } catch (err) { whisper("save-location", ""); whisper("topWhisper", "failed"); toast(nice(err), true); }
+  }, 700);
+}
+async function removePlace2() {
+  clearTimeout(debounces["location:second_location"]); delete debounceFns["location:second_location"];
+  const had = S.location && S.location.second_location;
+  PLACE2 = null; renderPlace2();
+  if (!had) return;
+  whisper("save-location", "saving"); whisper("topWhisper", "saving");
+  try {
+    await api("PUT", "/location", { second_location: null });
+    S.location = { ...(S.location || {}), second_location: null };
+    whisper("save-location", "saved"); whisper("topWhisper", "saved");
+    scheduleChangesRefresh();
+    toastAction("Second location removed", "Put it back", () => { PLACE2 = undoClone(had); renderPlace2(); savePlace2(); });
+  } catch (err) { PLACE2 = undoClone(had); renderPlace2(); whisper("save-location", ""); whisper("topWhisper", "failed"); toast(nice(err), true); }
+}
 
 /* ── hours (identical PUT /location) ── */
 let HOURS_BEFORE = null;
@@ -8454,7 +8662,7 @@ $("btnRestoreGo").addEventListener("click", async () => {
 /* ── initial load (identical fetches) ── */
 function fillSingles() {
   const i = S.identity || {};
-  [["f-business_name","business_name"],["f-tagline","tagline"],["f-description","description"],["f-phone","phone"],["f-email","email"],["f-story","story"],["f-booking_url","booking_url"],["f-ordering_url","ordering_url"],["f-service_area","service_area"],["f-seo_title","seo_title"],["f-seo_description","seo_description"]]
+  [["f-business_name","business_name"],["f-tagline","tagline"],["f-short_description","short_description"],["f-description","description"],["f-phone","phone"],["f-email","email"],["f-story","story"],["f-booking_url","booking_url"],["f-ordering_url","ordering_url"],["f-service_area","service_area"],["f-seo_title","seo_title"],["f-seo_description","seo_description"]]
     .forEach(([id, k]) => { $(id).value = i[k] || ""; });
   if ($("f-industry")) $("f-industry").value = (S.settings && S.settings.industry_key) || "generic";
   industryHint();
@@ -8466,6 +8674,10 @@ function fillSingles() {
   [["f-address_line1","address_line1"],["f-city","city"],["f-region","region"],["f-postal_code","postal_code"],["f-locphone","phone"]]
     .forEach(([id, k]) => { $(id).value = l[k] || ""; });
   renderHours();
+  PLACE2 = undoClone(l.second_location) || null;
+  renderPlace2();
+  paintBizShows();
+  paintBizShort();
   renderSearchPreview();
 }
 const SHELL_LOADED = document.readyState === "loading" ? new Promise((r) => document.addEventListener("DOMContentLoaded", r, { once: true })) : Promise.resolve();
@@ -8725,8 +8937,9 @@ function seoHomeWords() {
   const val = (id) => { const n = $(id); return n ? String(n.value || "").trim() : ""; };
   const i = S.identity || {};
   const name = val("f-business_name") || i.business_name || "";
-  const t = val("f-seo_title"), d = val("f-seo_description"), bizDesc = val("f-description") || i.description || "";
-  return { name, title: t || name, description: d || bizDesc, titleOwn: !!t, descOwn: !!d };
+  const t = val("f-seo_title"), d = val("f-seo_description"), short = val("f-short_description") || i.short_description || "";
+  const bizDesc = short || val("f-description") || i.description || "";   // item 127: Google gets the short description before the long one
+  return { name, title: t || name, description: d || bizDesc, titleOwn: !!t, descOwn: !!d, short: !!short };
 }
 let SRP_HOME = null;
 function renderSearchPreview() {
@@ -8735,7 +8948,7 @@ function renderSearchPreview() {
   const w = seoHomeWords();
   srpFill(SRP_HOME, { name: w.name, host: seoHost(), hostMuted: !siteLiveUrl(), title: w.title, description: w.description });
   seoCounterInto("cnt-seo_title", "title", $("f-seo_title").value, "Empty — Google shows your business name");
-  seoCounterInto("cnt-seo_description", "description", $("f-seo_description").value, w.description ? "Empty — Google shows your description" : "Empty — and so is your description, so add one here");
+  seoCounterInto("cnt-seo_description", "description", $("f-seo_description").value, w.short ? "Empty — Google shows your short description" : w.description ? "Empty — Google shows your description" : "Empty — and so is your description, so add one here");
   if (!$("seoSetup").hidden) renderSeoSetupOut();
   renderSeoTasks();
 }
@@ -16710,7 +16923,7 @@ function industryHint() {
   const h = $("industryHint"), sel = $("f-industry"); if (!h || !sel) return;
   h.textContent = sel.value === "generic"
     ? "Which is closest? It sets the words your site and this editor use, like Menu, Services or Classes."
-    : "Sets the words your site uses, like Services or Menu. Applies when you next publish.";
+    : "Sets the words your site uses, like Menu or Services, and tells Google what you are. Applies when you next publish.";
 }
 $("f-industry").addEventListener("change", async () => {
   const sel = $("f-industry"), was = vocabWords();
