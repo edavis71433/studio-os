@@ -76,7 +76,7 @@ const NOW = '2026-11-11T12:00:00.000Z';
   ok('the migration and its production pack add the same four columns and check', cols.every((c) => mig.includes(`add column if not exists ${c}`) && pack.includes(`add column if not exists ${c}`)) && [mig, pack].every((x) => /domain_serving in \('latest','old_copy','other','unreachable'\)/.test(x)));
   const page = read('presence.html');
   ok('the client’s sheet no longer claims both names work without checking', !/either way works/.test(page) && /dstat\.all_ok === true/.test(page) && /lines\.forEach\(\(c\) => \{ const l = stepLine/.test(page));
-  ok('the Search tab card follows the same rule', /const left = Array\.isArray\(d\.checklist\)/.test(page));
+  ok('the Search tab card follows the same rule', /const left = checked \? d\.checklist\.filter/.test(page));   // item 193: and with no checklist it claims nothing
   const admin = read('supabase/functions/presence/routes/admin.ts');
   ok('the sheet’s check carries the checklist', /checklist: truth\.checklist, all_ok: truth\.all_ok/.test(admin));
   ok('Home and the Domains page read what the domain shows', /cert_pending_since,domain_serving[,&]/.test(read('supabase/functions/presence/agency/routes.ts')) && /domain_serving,domain_checks[`,]/.test(read('supabase/functions/presence/agency/sites.ts')));   // item 162 adds columns after them

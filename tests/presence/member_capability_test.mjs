@@ -230,6 +230,7 @@ const DECIDED = {
     // builder item 53: a seat's role changes like the invite (the route asks for the invite capability);
     // only the owner, or their studio asking the owner, can start or stop a transfer (the route refuses anyone else)
     'POST /portal/members/:id/role', 'POST /portal/transfer', 'POST /portal/transfer/cancel',
+    'POST /foundations/plans/:id/done',   // builder item 193: studio-only, checked by the route itself
   ],
 };
 const ALL = Object.entries(DECIDED).flatMap(([need, names]) => names.map((name) => ({ name, need })));
@@ -482,6 +483,7 @@ const WRITE_HANDLERS = [
   'handleToolLead', 'handleToolLeadConvert',
   'handleStudioRequests',   // final pass S1: POST /portal/studio-requests/:id/(accept|decline) are open; the route answers the owner only
   'handleMemberRole', 'handleTransferStart', 'handleTransferCancel',   // builder item 53: open on the member list; each route checks the role itself
+  'handleFoundationsPlanDone',   // builder item 193: open on the member list; the route answers the studio only
   'handleSitePassword',   // builder list item 175: POST /site/password needs configure
   'handleScheduleCancel', 'handleScheduleCreate', 'handleSettings', 'handleShareSet', 'handleStockImport',
   'handleSupport', 'handleSupportMessage', 'handleSupportOne', 'handleSurveyRespond', 'handleTakeOffline',

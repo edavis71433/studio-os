@@ -91,7 +91,7 @@ import { noteVisitSource } from './routes/visit_source.ts';
 import { runAfterResponse } from './lib/after_response.ts';
 const { handleKnowledgeImport, handleKnowledgeList, handleKnowledgeDelete } = lazyRoutes(() => import('./routes/knowledge.ts'));
 import { handleMonitorGet, handleMonitorConnect, handleMonitorVerify, handleMonitorDisconnect } from './routes/monitor.ts';
-const { handleFoundationsGet, handleFoundationsPrepare, handleFoundationsPlans, handleFoundationsDecide } = lazyRoutes(() => import('./routes/foundations.ts'));
+const { handleFoundationsGet, handleFoundationsPrepare, handleFoundationsPlans, handleFoundationsDecide, handleFoundationsPlanDone } = lazyRoutes(() => import('./routes/foundations.ts'));
 const { handleExport, handleLaunch } = lazyRoutes(() => import('./routes/services.ts'));
 import { resolveAgencyMember } from './agency/auth.ts';
 import { handleAgency } from './agency/routes.ts';
@@ -1219,6 +1219,9 @@ async function route_(req: Request, cors: Record<string, string>): Promise<Respo
   {
     const m = route.match(/^\/foundations\/plans\/([0-9a-f-]{36})\/decide$/);
     if (m && method === 'POST') return handleFoundationsDecide(req, site, m[1], principal, cors);
+    // Nov 12 review, finding 13: the studio marks an approved plan finished
+    const d = route.match(/^\/foundations\/plans\/([0-9a-f-]{36})\/done$/);
+    if (d && method === 'POST') return handleFoundationsPlanDone(site, d[1], principal, cors);
   }
   // ── M11: Presence Monitor connection (read-only observation of an existing website) ──
   if (route === '/monitor/connection' && method === 'GET') return handleMonitorGet(jwt, site, cors);

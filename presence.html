@@ -3884,6 +3884,8 @@ async function openFoundationsDesk(opts) {
 }
 function renderFoundations(f, plans, launch, dom) {
   const wrap = $("deskResults"); wrap.innerHTML = "";
+  // Nov 12 review, finding 13: plans the server finished on this very open (their records were found)
+  const clearedPlans = Array.isArray(f.cleared_plans) ? f.cleared_plans : [];
 
   // ── M14: the Launch Assistant — the whole launch, one calm list ──
   if (launch) {
@@ -3932,9 +3934,12 @@ function renderFoundations(f, plans, launch, dom) {
     // item 134 (Nov 2026 review, domains findings 3 and 5): "live and secure" only when every
     // check passes (both names point here, nothing old left over, the padlock covers both, and
     // the domain shows THIS site); otherwise say what's left. No checklist, no claim.
+    // Nov 12 review, finding 16: with no checklist the checks didn't run, so nothing is claimed.
+    // A missing list used to read as "everything passed" and showed the green tick.
     const lines = Array.isArray(dstat.checklist) ? dstat.checklist : null;
-    const allOk = !lines || dstat.all_ok === true;
-    const p = el("p", "aihint", allOk ? "✓ " + dstat.custom_domain + " is live and secure." : dstat.custom_domain + " is connected, with something left to finish:"); p.style.marginTop = "6px"; p.style.fontWeight = "600"; domCard.appendChild(p);
+    const allOk = !!lines && dstat.all_ok === true;
+    const p = el("p", "aihint", !lines ? "We couldn’t check " + dstat.custom_domain + " just now." : allOk ? "✓ " + dstat.custom_domain + " is live and secure." : dstat.custom_domain + " is connected, with something left to finish:"); p.style.marginTop = "6px"; p.style.fontWeight = "600"; p.dataset.domain = !lines ? "unchecked" : allOk ? "live" : "left"; domCard.appendChild(p);
+    if (!lines) { const again = el("button", "textact", "Check again"); again.dataset.check = "again"; again.addEventListener("click", () => openFoundationsDesk()); domCard.appendChild(again); }
     if (lines) lines.forEach((c) => { const l = stepLine((c.ok ? "✓ " : "• ") + String(c.words || "")); l.dataset.check = c.ok ? "ok" : "todo"; if (c.ok) l.style.color = "var(--soft,#6b6478)"; domCard.appendChild(l); });
     // item 174 (Squarespace's Primary tag and "Use www" switch): which name is the main one, and switching it
     const bareN = String(dstat.custom_domain).replace(/^www\./, "");
@@ -4133,14 +4138,19 @@ function renderFoundations(f, plans, launch, dom) {
     const why = el("p", "aihint", "Emails you send from your domain can land in people’s spam. Setting this up adds a few small records that tell inboxes your mail is really from you."); why.style.marginTop = "5px"; emailCard.appendChild(why);
     emailCard.appendChild(askOwner("aihint", "Ask the account owner to set this up."));
     const acts = el("div", "doa"); acts.dataset.needs = "configure"; acts.style.marginTop = "6px";
-    const b = el("button", "textact", "Set up email protection");
+    // Nov 12 review, finding 13: one plan, not one per press. While its steps wait below, the
+    // button gives way to a line that says so (the server hands back the open plan too).
+    const waiting = plans.some((p) => p.kind === "email_auth" && (p.status === "proposed" || p.status === "approved") && !clearedPlans.includes(p.id));
+    const b = el("button", "textact", "Set up email protection"); b.dataset.email = "protect";
     b.addEventListener("click", async () => {
-      try { await api("POST", "/foundations/prepare", { goal: "email_auth" }); toast("Set up — the records to add are below."); openFoundationsDesk(); }
-      catch (err) { toast(nice(err), true); }
+      b.disabled = true;
+      try { const r = await api("POST", "/foundations/prepare", { goal: "email_auth" }); toast(r && r.data && r.data.already ? "Those steps are already below, waiting for you." : "Set up — the records to add are below."); openFoundationsDesk(); }
+      catch (err) { toast(nice(err), true); b.disabled = false; }
     });
-    acts.appendChild(b);
-    emailCard.appendChild(acts);
-    const after = el("p", "aihint", "You’ll get a short list of records to copy-paste where you bought your domain — same as connecting it. We check the rest."); after.dataset.needs = "configure"; after.style.marginTop = "6px"; after.style.color = "var(--soft,#6b6478)"; emailCard.appendChild(after);
+    if (waiting) { const w = el("p", "aihint", "The records to add are at the bottom, under “Waiting for your OK”."); w.dataset.email = "waiting"; emailCard.appendChild(w); }
+    else { acts.appendChild(b); emailCard.appendChild(acts); }
+    // finding 14: the records are the ones for whoever runs their email, never Google's by default
+    const after = el("p", "aihint", (f.email.provider ? "Your email runs at " + f.email.provider + ", so you’ll get " + f.email.provider + "’s records" : "You’ll get a short list of records") + " to copy-paste where your domain’s settings are kept, and only the ones that are missing. We check the rest."); after.dataset.needs = "configure"; after.dataset.email = "after"; after.style.marginTop = "6px"; after.style.color = "var(--soft,#6b6478)"; emailCard.appendChild(after);
   } else {
     const okp = el("p", "aihint", "✓ All set — inboxes can trust mail from your domain. Nothing to do."); okp.style.marginTop = "5px"; okp.style.fontWeight = "600"; emailCard.appendChild(okp);
   }
@@ -4170,14 +4180,18 @@ function renderFoundations(f, plans, launch, dom) {
     wrap.appendChild(card);
   }
 
-  const open = plans.filter((p) => p.status === "proposed" || p.status === "approved");
+  const open = plans.filter((p) => (p.status === "proposed" || p.status === "approved") && !clearedPlans.includes(p.id));
   if (open.length) {
     const h = el("h5", "rune", "Waiting for your OK");
     h.style.marginTop = "26px";
     wrap.appendChild(h);
     open.forEach((p) => {
       const card = el("div", "deskopt");
-      card.appendChild(el("div", "dol", p.status === "approved" ? "approved — being handled" : "your decision"));
+      // Nov 12 review, finding 13: an approved plan used to read as being handled when no page
+      // could finish one. Now the label says who does what next, and the studio has Mark as done.
+      const hasRecords = (p.steps || []).some((s) => (s.records || []).length);
+      card.dataset.plan = p.status;
+      card.appendChild(el("div", "dol", p.status !== "approved" ? "your decision" : S.isStudio ? "approved · mark it done once the work is finished" : hasRecords ? "approved · add the records below. It closes by itself once we find them" : "approved · your studio finishes this"));
       card.appendChild(el("div", "dop", p.title));
       const riskWord = p.risk === "low" ? "Safe to approve — easily undone." : p.risk === "medium" ? "Worth a careful look before approving." : p.risk === "high" ? "Bigger change — read the steps first." : "";
       const sum = el("p", "aihint", p.summary + (riskWord ? " " + riskWord : "")); sum.style.marginTop = "6px";
@@ -4198,7 +4212,7 @@ function renderFoundations(f, plans, launch, dom) {
         const acts = el("div", "doa");
         const ap = el("button", "textact", "Approve it");
         ap.addEventListener("click", async () => {
-          try { await api("POST", `/foundations/plans/${p.id}/decide`, { decision: "approve" }); toast("Approved — your studio takes it from here."); openFoundationsDesk(); }
+          try { await api("POST", `/foundations/plans/${p.id}/decide`, { decision: "approve" }); toast(hasRecords ? "Approved. Add the records below. It closes by itself once we find them." : "Approved. Your studio finishes it from here."); openFoundationsDesk(); }
           catch (err) { toast(nice(err), true); }
         });
         acts.appendChild(ap);
@@ -4209,6 +4223,15 @@ function renderFoundations(f, plans, launch, dom) {
         });
         acts.appendChild(ab);
         card.appendChild(acts);
+      } else if (S.isStudio) {
+        const acts = el("div", "doa"); acts.dataset.needs = "configure";
+        const dn = el("button", "textact", "Mark as done"); dn.dataset.plan = "done";
+        dn.addEventListener("click", async () => {
+          dn.disabled = true;
+          try { await api("POST", `/foundations/plans/${p.id}/done`); toast("Marked done."); openFoundationsDesk(); }
+          catch (err) { toast(nice(err), true); dn.disabled = false; }
+        });
+        acts.appendChild(dn); card.appendChild(acts);
       }
       wrap.appendChild(card);
     });
@@ -6392,9 +6415,11 @@ function renderDomainCard() {
     btn.dataset.needs = "configure"; btn.textContent = "Connect your domain"; btn.addEventListener("click", () => openFoundationsDesk({ domain: true }));
   } else if (d.health === "ok") {
     // item 134: the same rule as the desk — "live and secure" only when every check passes
-    const left = Array.isArray(d.checklist) ? d.checklist.filter((c) => c && !c.ok) : [];
-    card.appendChild(el("div", "note", left.length ? d.custom_domain + " is connected. Still to finish: " + left.map((c) => String(c.words || "")).join("; ") + "." : "✓ " + d.custom_domain + " is live and secure."));
-    btn.textContent = left.length ? "See what’s left" : "Domain & email"; btn.addEventListener("click", () => openFoundationsDesk());
+    // Nov 12 review, finding 16: no checklist means the checks didn't run, so no green tick
+    const checked = Array.isArray(d.checklist);
+    const left = checked ? d.checklist.filter((c) => c && !c.ok) : [];
+    card.appendChild(el("div", "note", !checked ? "We couldn’t check " + d.custom_domain + " just now." : left.length ? d.custom_domain + " is connected. Still to finish: " + left.map((c) => String(c.words || "")).join("; ") + "." : "✓ " + d.custom_domain + " is live and secure."));
+    btn.textContent = !checked ? "Check again" : left.length ? "See what’s left" : "Domain & email"; btn.addEventListener("click", () => openFoundationsDesk());
   } else {
     card.appendChild(el("div", "note", d.health === "ssl_pending"
       ? d.custom_domain + " is connected — the security certificate is switching on. Nothing for you to do."

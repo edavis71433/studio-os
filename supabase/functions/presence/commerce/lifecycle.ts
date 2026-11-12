@@ -30,7 +30,8 @@ import { mailWatch, domainChangeEmail, tellOwnerAndStudio, announceLiveOnce } fr
 import type { DomainMail } from '../lib/domain_notify.ts';
 import { whereToGo } from '../lib/rdap.ts';
 import { provisionSsl } from '../lib/netlify.ts';
-import { verifyApex, dkimPresent, NETLIFY_APEX_IP } from '../platform/dns.ts';
+import { verifyApex, dkimPresent, NETLIFY_APEX_IP, bareDomain } from '../platform/dns.ts';
+import { clearFoundPlans } from '../platform/plan_found.ts';
 import { leadFollowupDue, leadFollowupCopy, renewalReminderWindow, renewalNoticePeriod, renewalReminderCopy } from '../lib/commercial.ts';
 import { supportAgingDue, supportAgingPeriod, SUPPORT_AGING_DAYS } from '../lib/intake.ts';
 import { editionFromPlan, EDITION_DEFS } from './editions.ts';
@@ -407,6 +408,9 @@ export async function checkOneDomain(site: DomainCheckSite, nowIso = new Date().
     ...(padlock ? { cert_state: padlock.cert_state, cert_expires_at: padlock.cert_expires_at, cert_pending_since: padlock.cert_pending_since, cert_checked_at: nowIso } : {}),
     ...(truth ? { domain_serving: truth.serving, domain_checks: truth.checklist, domain_serving_checked_at: nowIso } : {}),
   }) });
+  // Nov 12 review, finding 13: an approved plan whose records now answer is finished (it reads the
+  // records only when the site has such a plan)
+  await clearFoundPlans(site.id, bareDomain(site.custom_domain), nowIso).catch(() => []);
   // item 163 (review domains finding 14): the email records saved when the domain was attached
   // (or on the first check after) are compared each day; vanished ones are told once, with the
   // old values to put back
