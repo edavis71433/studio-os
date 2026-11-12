@@ -358,14 +358,14 @@ async function clientBundleFor(me: string, projectId: string) {
   return { link, siteId: s, project };
 }
 
-export async function handleClientProject(_req: Request, site: SiteRow, _principal: Principal, id: string, cors: Record<string, string>): Promise<Response> {
+export async function handleClientProject(_req: Request, site: SiteRow, principal: Principal, id: string, cors: Record<string, string>): Promise<Response> {
   if (!UUID_RE.test(id)) return json({ error: 'bad_request' }, 400, cors);
   const me = customerOf(site);
   if (!me) return json({ error: 'not_found' }, 404, cors);
   const ctx = await clientBundleFor(me, id);
   if (!ctx) return json({ error: 'not_found', message: 'That project isn’t here.' }, 404, cors);
   const s = ctx.siteId; const now = nowIso();
-  const [ms, ts, ev, dl, ap, sv] = await Promise.all([
+  const [ms, ts, ev, dl, ap, sv, mine] = await Promise.all([
     svc(`presence_milestones?project_id=eq.${id}&site_id=eq.${s}&deleted_at=is.null&client_visible=is.true&select=id,title,status,due_date,sort_order,completed_at&order=sort_order.asc`),
     // `source` rides along so the portal knows which to-dos are ITS OWN to tick
     // and which the studio settles (clientMayTick) — the button is drawn from
@@ -378,9 +378,13 @@ export async function handleClientProject(_req: Request, site: SiteRow, _princip
     // the deliverable's own row, with "due {date}" when the studio set one
     loadApprovals(`project_id=eq.${id}&site_id=eq.${s}&deleted_at=is.null&client_visible=is.true&order=created_at.desc&limit=100`, 'id,subject_type,subject_id,title,summary,content_hash,status,decided_at'),
     svc(`presence_surveys?project_id=eq.${id}&site_id=eq.${s}&deleted_at=is.null&client_visible=is.true&status=eq.active&select=id,title,created_at&order=created_at.desc&limit=50`),
+    // item 179: which of those this person already answered, so an answered one stops asking
+    svc(`presence_survey_responses?project_id=eq.${id}&site_id=eq.${s}&respondent=eq.${encodeURIComponent(readerKey(principal))}&status=eq.submitted&deleted_at=is.null&select=survey_id&limit=100`).catch(() => ({ ok: false, json: [] })),
   ]);
   const tasks = rows(ts).sort(compareOrder).map((t) => ({ ...t, derived: deriveTaskState(t, now) }));
-  return json({ data: { project: ctx.project, milestones: rows(ms).sort(compareOrder), tasks, events: rows(ev), deliverables: rows(dl), approvals: ap, surveys: rows(sv), progress: progressOf(rows(ts)) } }, 200, cors);
+  const answered = new Set(rows(mine as any).map((r) => String(r.survey_id)));
+  const surveys = rows(sv).map((r) => (answered.has(String(r.id)) ? { ...r, answered: true } : r));
+  return json({ data: { project: ctx.project, milestones: rows(ms).sort(compareOrder), tasks, events: rows(ev), deliverables: rows(dl), approvals: ap, surveys, progress: progressOf(rows(ts)) } }, 200, cors);
 }
 
 export async function handleClientReport(_req: Request, site: SiteRow, _principal: Principal, id: string, cors: Record<string, string>): Promise<Response> {
@@ -503,7 +507,7 @@ export async function handleClientSurveyRespond(req: Request, site: SiteRow, pri
   const found = await linkForCustomerVia(me, 'presence_surveys', id);
   if (!found) return json({ error: 'not_found' }, 404, cors);
   const s = found.link.agency_site_id;
-  const survey = rows(await svc(`presence_surveys?id=eq.${id}&site_id=eq.${s}&deleted_at=is.null&client_visible=is.true&status=eq.active&select=id,project_id,questions&limit=1`))[0];
+  const survey = rows(await svc(`presence_surveys?id=eq.${id}&site_id=eq.${s}&deleted_at=is.null&client_visible=is.true&status=eq.active&select=id,project_id,questions,title&limit=1`))[0];
   if (!survey) return json({ error: 'not_found', message: 'That survey isn’t open.' }, 404, cors);
   let b: any = {}; try { b = await req.json(); } catch { return json({ error: 'bad_json' }, 400, cors); }
   const norm = normalizeAnswers(b.answers, survey.questions || []);
@@ -519,6 +523,14 @@ export async function handleClientSurveyRespond(req: Request, site: SiteRow, pri
     return json({ error: 'write_failed' }, 502, cors);
   }
   if (survey.project_id) await clientEvent(s, survey.project_id, 'survey_submitted', principal, { survey_id: id });
+  // item 179: answering the project questionnaire IS sending it back, so its checklist step ticks itself
+  if (survey.project_id) {
+    const { isQuestionnaireTitle } = await import('../lib/starter_questionnaire.ts');
+    if (isQuestionnaireTitle(survey.title)) {
+      const { tickChecklistStep } = await import('../lib/service_bridge.ts');
+      await tickChecklistStep(s, survey.project_id, 'questionnaire_returned', readerKey(principal), principal.kind);
+    }
+  }
   return json({ data: { id: rows(ins)[0].id, status: 'submitted' } }, 201, cors);
 }
 

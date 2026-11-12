@@ -623,7 +623,7 @@ test.describe('Client portal — Messages split view', () => {
     await expect(rows.nth(0).locator('.schip')).toHaveCount(0);
     await expect(rows.nth(1).locator('.schip')).toHaveCount(0);
     await expect(rows.nth(2).locator('.schip')).toHaveText('Done');
-    await expect(rows.nth(1).locator('.mav')).toHaveText('Y');   // the studio's initial leads its conversation
+    await expect(rows.nth(1).locator('.mav')).toHaveText('✦');   // a studio with no name of its own gets the mark, never a made-up initial
     // the message + support_message notifications light exactly their two rows,
     // each with the sr-only "New — " text alternative for the dot
     await expect(page.locator('.mrow.unread')).toHaveCount(2);
@@ -800,7 +800,7 @@ test.describe('Client portal — Messages split view', () => {
     let threadGets = 0;
     await page.route(`**/functions/v1/presence/client/support/${SUP_GEN}`, (route) => {
       // first GET (opening the pane) succeeds; the post-reply refetch fails
-      if (route.request().method() === 'GET' && ++threadGets > 1)
+      if (route.request().method() === 'GET' && threadGets > 0)
         return route.fulfill({ status: 500, contentType: 'application/json', body: JSON.stringify({ error: 'read_failed' }) });
       return route.fallback();
     });
@@ -809,6 +809,7 @@ test.describe('Client portal — Messages split view', () => {
     await page.locator('.mrow', { hasText: 'Logo tweak' }).click();
     const pane = page.locator('#mpane');
     await expect(pane.getByText('Could we nudge the logo left?')).toBeVisible();
+    threadGets = 1;   // every read from here on fails (the newest conversation opens by itself on a computer, so reads aren't counted)
     await pane.getByLabel('Write to Your studio').fill('Perfect, thank you.');
     await pane.getByRole('button', { name: 'Send', exact: true }).click();
     await expect(page.locator('#toast')).toContainText('this thread will catch up');
@@ -1105,12 +1106,13 @@ test.describe('Client portal — the "Your website" card', () => {
     await expect(page.locator('.wscard')).toHaveCount(0);
   });
 
-  test('unpublished site → the card is hidden entirely', async ({ page }) => {
+  test('unpublished site → the card says it is being built (item 179), never a number', async ({ page }) => {
     await installApp(page, { api: { ...CLIENT_API, '/client/website-stats': { data: { published: false, month: null, search: null } } } });
     await page.goto('/client.html');
     await expect(page.getByRole('heading', { name: 'Needs you' })).toBeVisible();
-    await expect(page.locator('#home-website')).toBeHidden();
-    await expect(page.locator('.wscard')).toHaveCount(0);
+    await expect(page.locator('#home-website .wsbuild h3')).toHaveText('Your website is on its way.');
+    await expect(page.locator('#home-website .pill-live')).toHaveCount(0);
+    await expect(page.locator('#home-website .wsmini')).toHaveCount(0);
   });
 
   test('mobile: the card renders and the tiles stack without horizontal scroll', async ({ page }, testInfo) => {
@@ -3186,7 +3188,7 @@ test.describe('PS6 — project-record cohesion (B3)', () => {
     // the Messages view survives — the record never paints over it
     await page.waitForTimeout(400);
     await expect(page.locator('#mrows')).toBeVisible();
-    await expect(page.locator('#main').getByRole('heading', { name: 'Website redesign' })).toHaveCount(0);
+    await expect(page.locator('#main .phead')).toHaveCount(0);   // the record's own header (the conversation beside the list carries the project's name too)
   });
 
   test('a NETWORK THROW on the record read lands the calm trouble card with a way back — never a stuck skeleton', async ({ page }) => {
@@ -3460,7 +3462,7 @@ test.describe('PS6 — project-record cohesion (B3)', () => {
     for (const note of await page.locator('#sec-todos .tdnote').all()) await expect(note).toContainText('marks this one off');
     await expect(page.locator('#sec-todos .tdnote').nth(1)).toHaveText('Your studio marks this one off once it arrives.');
     // they still count as waiting on the client — the ask has not gone away
-    await expect(page.locator('.hl', { hasText: 'Waiting on you' }).locator('.hl-v')).toHaveText('4');   // 3 to-dos + 1 pending approval
+    await expect(page.locator('.hl', { hasText: 'Waiting on you' }).locator('.hl-v')).toHaveText('3');   // 2 to-dos + 1 pending approval; the draft review waits on the studio's draft, not on them
   });
 
   test('an ordinary to-do keeps its Mark done button right beside a checklist step (no regression)', async ({ page }) => {
@@ -3484,8 +3486,10 @@ test.describe('PS6 — project-record cohesion (B3)', () => {
     await page.goto('/client.html');
     const body = page.locator('#needs-body');
     // item 179 part two: one row per step, each with its own verb
-    await expect(body.locator('.kchip', { hasText: 'To-do' })).toHaveCount(3);
-    for (const t of CHECKLIST_TODOS) await expect(body.getByRole('heading', { name: t.title })).toBeVisible();
+    // the draft review asks for nothing until the studio shares a draft, so it isn't queued
+    await expect(body.locator('.kchip', { hasText: 'To-do' })).toHaveCount(2);
+    for (const t of CHECKLIST_TODOS.filter((x) => x.source !== 'checklist:client_review')) await expect(body.getByRole('heading', { name: t.title })).toBeVisible();
+    await expect(body.getByRole('heading', { name: 'Review the design draft' })).toHaveCount(0);
   });
 
   test('PS1 residual — the Documents shelf on a failed projects read: the couldn’t-load line, never "No files yet"', async ({ page }) => {

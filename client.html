@@ -495,6 +495,12 @@
   .wspic{position:relative;aspect-ratio:16/9;overflow:hidden;background:var(--p-soft);border-bottom:1px solid var(--line)}
   .wspic iframe{position:absolute;top:0;left:0;width:1280px;height:720px;border:0;transform-origin:0 0;transform:scale(var(--wsk,.25));pointer-events:none;background:#fff;opacity:0;transition:opacity var(--dds-t-slow,320ms) ease-out}
   .wspic iframe.on{opacity:1}
+  .wspic.dim iframe.on{opacity:.45}   /* the draft so far, before the studio has shared it */
+  .pill-build,.pill-draft{display:inline-flex;align-items:center;font-size:10px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;border-radius:999px;padding:3px 9px}
+  .pill-build{background:var(--p-soft);color:var(--p)} .pill-draft{background:var(--warn-soft);color:var(--warn)}
+  .wsbuild .wsfoot{justify-content:flex-start}
+  /* a phone keeps each Needs you row on one line: words left, its button right */
+  @media (max-width:560px){.qrow{flex-wrap:nowrap}.qmain{flex:1 1 0}.qact{flex-direction:column;align-items:stretch}}
   .wspic .wsini{position:absolute;inset:0;display:grid;place-items:center;font-family:var(--serif);font-size:42px;color:var(--p)}
   .wsbar{display:flex;align-items:center;gap:6px 10px;flex-wrap:wrap;margin:2px 0 6px}
   .wsbar .wsdomain{font-weight:600;font-size:14.5px;color:var(--p);text-decoration:none}
@@ -507,7 +513,7 @@
      updates right (direction A's desktop). Everything else spans both. */
   @media (min-width:1000px){
     body.homeview .wrap{max-width:1100px}
-    body.homeview #main{display:grid;grid-template-columns:minmax(0,3fr) minmax(0,2fr);gap:0 22px;align-items:start}
+    body.homeview #main{display:grid;grid-template-columns:minmax(0,3fr) minmax(0,2fr);gap:0 22px;align-items:start;grid-auto-flow:row dense}   /* dense: with no website card the projects move up, never an empty half */
     body.homeview #main>*{grid-column:1/-1;min-width:0}
     body.homeview #main>#home-website{grid-column:1;grid-row:span 2}
     body.homeview #main>#home-needs{grid-column:2}
@@ -817,6 +823,26 @@ function portalMoment(m){return !!m&&['needs_attention','reminder','opportunity'
 // transient DB failure must never masquerade as the "ready to be found" story);
 // empty = a SUCCESSFUL read with no visitors yet (gentle — never "0 people").
 function wsCardState(d){if(!d||d.published!==true)return'hidden';const m=d.month;if(!m)return'bare';if(m.has_data===false||!(m.visitors>0))return'empty';return'stats';}
+// Item 179: the card while the site isn't live yet. Every client site starts here, so
+// Home still leads with the website: where it stands, and the one thing to do.
+// building = nothing to look at yet (or a change was asked for); ready = the studio
+// shared the draft for an OK; approved = the client said yes, going live soon.
+function wsDraftOf(snaps){for(const s of (snaps||[])){if(s&&s.website)return{a:s.website,pid:s.id};}return null;}
+function wsBuildState(d,draft){if(!d||d.published!==false)return'hidden';const st=draft&&draft.a&&draft.a.status;return st==='pending'?'ready':st==='approved'?'approved':'building';}
+function wsBuildHtml(state,draft,waiting,studio){
+  if(state==='hidden')return'';
+  const a=(draft&&draft.a)||{};
+  const pill=state==='ready'?'<span class="pill-draft">Draft ready</span>':state==='approved'?'<span class="pill-live">Approved</span>':'<span class="pill-build">Being built</span>';
+  const head=state==='ready'?'Your draft is ready to look at.':state==='approved'?'You approved your website.':'Your website is on its way.';
+  let lead;
+  if(state==='ready')lead='It isn’t live yet.'+(a.summary?' '+esc(studio)+' asked: “'+esc(a.summary)+'”':' Have a look and tell '+esc(studio)+' what you think.');
+  else if(state==='approved')lead=(a.decided_at?esc(rel(a.decided_at))+' · ':'')+esc(studio)+' is getting it ready to go live. You’ll hear here the moment it’s up.';
+  else if(a.status&&a.status!=='pending'&&a.status!=='approved')lead='You asked for a change. '+esc(studio)+' is working on it, and the new draft will show up here.';
+  else lead='It isn’t live yet. '+esc(studio)+' is building it. '+(waiting>0?'Next: the '+(waiting===1?'one thing':waiting+' things')+' under Needs you.':'You’ll get a draft to look at here as soon as it’s ready.');
+  const act=draft&&(state==='ready'||state==='approved')?'<button type="button" class="'+(state==='ready'?'approve':'')+' wsreview" data-ws-apr="'+esc(a.id)+'" data-ws-proj="'+esc(draft.pid)+'">'+(state==='ready'?'Review the draft':'See the draft again')+'</button>':'';
+  return '<div class="card wscard wsbuild">'+'<div class="wspic'+(state==='building'?' dim':'')+'" id="wspic"><div class="wsini" aria-hidden="true">✦</div></div><div class="wsin"><span class="tag">Your website</span><div class="wsbar">'+pill+'</div>'
+    +'<h3>'+head+'</h3><p class="wslead">'+lead+'</p>'+(act?'<div class="wsfoot">'+act+'</div>':'')+'</div></div>';
+}
 function wsSiteInfo(d){const s=(d&&d.site)||{};const url=typeof s.url==='string'&&/^https:\/\//.test(s.url)?s.url:'';return{url,host:url.replace(/^https:\/\//,''),published_at:(typeof s.last_published_at==='string'&&s.last_published_at)||''};}
 function wsPeople(n){n=Math.max(0,n|0);return n===1?'1 person':n+' people';}
 // The lead sentence, from real numbers: bolded counts, sensible degradation —
@@ -925,16 +951,19 @@ const tabOf=(t)=>TAB_ALIAS[t]||t;
 // /portal/context carries `studio` ({ name, logo_url, accent }) for a managed
 // client, read from the studio's own site (its name, colour and Files › Set as
 // logo). A reviewer, or a read without it, still gets the honest generic.
-function studioBrand(){const s=PORTAL.ctx&&PORTAL.ctx.studio;return (s&&s.name&&String(s.name).trim())||'Your studio';}
+// Item 179: the platform's own stand-in name (is_default) is never shown to a client.
+function studioNamed(){const s=PORTAL.ctx&&PORTAL.ctx.studio;return !!(s&&!s.is_default&&s.name&&String(s.name).trim());}
+function studioBrand(){return studioNamed()?String(PORTAL.ctx.studio.name).trim():'Your studio';}
+function studioInitial(){return studioNamed()?studioBrand().charAt(0).toUpperCase():'✦';}
 function studioLogo(){const s=PORTAL.ctx&&PORTAL.ctx.studio;return (s&&typeof s.logo_url==='string'&&/^https:\/\//.test(s.logo_url))?s.logo_url:'';}
 // the sign-in page shows the same name and logo next time (portal.html reads this)
-function rememberStudio(){try{const s=PORTAL.ctx&&PORTAL.ctx.studio;if(s&&s.name)localStorage.setItem('dds-studio-brand',JSON.stringify({name:s.name,logo_url:studioLogo()||null,accent:s.accent||''}));}catch(_){}}
+function rememberStudio(){try{const s=PORTAL.ctx&&PORTAL.ctx.studio;if(studioNamed())localStorage.setItem('dds-studio-brand',JSON.stringify({name:s.name,logo_url:studioLogo()||null,accent:s.accent||''}));}catch(_){}}
 function showNav(){
   const nav=$('tabnav');if(!nav)return;
   const acct=(((clientName()||((USER&&USER.email)||''))||'').charAt(0)||'•').toUpperCase();
   const badge=PORTAL.unread?`<span class="badge on" aria-hidden="true">${PORTAL.unread>9?'9+':PORTAL.unread}</span>`:'<span class="badge" aria-hidden="true"></span>';
   nav.innerHTML=`<div class="tabnav-inner">`+
-    `<span class="cb-brand">${studioLogo()?`<img class="cb-logo" src="${esc(studioLogo())}" alt="">`:`<span class="cb-mark" aria-hidden="true">✦</span>`}<span class="cb-name">${esc(studioBrand())}</span></span>`+
+    `<span class="cb-brand">${studioLogo()?`<img class="cb-logo" src="${esc(studioLogo())}" alt="">`:`<span class="cb-mark" aria-hidden="true">${esc(studioInitial())}</span>`}<span class="cb-name">${esc(studioBrand())}</span></span>`+
     `<div class="cb-tabs">`+TABS.map(t=>`<button class="tab" type="button" data-tab="${t[0]}"><span class="ti" aria-hidden="true">${t[1]}</span><span class="tl">${t[2]}</span></button>`).join('')+`</div>`+
     `<span class="cb-right">`+
       `<button id="navbell" class="bell cb-bell" aria-label="What’s new${PORTAL.unread?` — ${PORTAL.unread} new`:''}" aria-expanded="false" aria-haspopup="true">${si('bell')}${badge}</button>`+
@@ -1016,8 +1045,11 @@ async function ensureSnaps(){
       return {id:p.id,name:p.name,pct:prog.pct,total:prog.total,
         milestones:(d.milestones||[]),
         approvals:(d.approvals||[]).filter(a=>a&&a.status==='pending'),
-        todos:(d.tasks||[]).filter(t=>t&&t.client_action_required&&t.status!=='done'),
-        surveys:(d.surveys||[]),deliverables:(d.deliverables||[])};
+        // "Review the design draft" asks for nothing until the studio shares the draft, and then
+        // the draft's own row asks; a questionnaire already answered stops asking too
+        todos:(d.tasks||[]).filter(t=>t&&t.client_action_required&&t.status!=='done'&&todoKind(t)!=='review'),
+        surveys:(d.surveys||[]).filter(sv=>sv&&!sv.answered),deliverables:(d.deliverables||[]),
+        website:(d.approvals||[]).find(a=>a&&a.subject_type==='website')||null};
     // failed:true so the queue can tell "couldn't read" from "genuinely
     // empty" — its empty arrays keep every other consumer degrading as before
     }catch(_){return {id:p.id,name:p.name,failed:true,milestones:[],approvals:[],todos:[],surveys:[],deliverables:[]};}
@@ -1120,16 +1152,16 @@ function renderHome(){
   // the ONE persistent bell (#navbell, outside #main) serves every viewport.
   const logo=studioLogo();
   let html=`<header class="phero" id="home-hero">`+
-    `<div class="ph-brand">${logo?`<img class="ph-logo" src="${esc(logo)}" alt="">`:`<span class="ph-mark" aria-hidden="true">${esc((studioBrand().charAt(0)||'✦').toUpperCase())}</span>`}<span class="ph-name">${esc(studioBrand())}</span></div>`+
+    `<div class="ph-brand">${logo?`<img class="ph-logo" src="${esc(logo)}" alt="">`:`<span class="ph-mark" aria-hidden="true">${esc(studioInitial())}</span>`}<span class="ph-name">${esc(studioBrand())}</span></div>`+
     `<div class="rolebadge">● ${P.persona==='client'?'Your workspace':'Client view'}</div>`+   // persona, not projects.length — a failed projects read must not demote a client's badge
     `<h1>${esc(portalGreeting(new Date().getHours(),clientName()))}</h1>`+
     `<p class="sub">${P.persona==='client'?'Here’s where your website and projects stand.':'Everything your studio shares with you, in one place.'}</p>`+
   `</header>`;
-  html+=welcomeCardHtml();
   html+=connectAskHtml();
   // item 179: the "Your website" card leads Home — the thing they pay for,
   // first. Filled by loadWebsiteCard (hidden for a reviewer / unpublished site).
-  html+=`<section id="home-website" hidden></section>`;
+  // A client's slot holds its place while the card loads, so nothing jumps when it lands.
+  html+=P.persona==='client'?`<section id="home-website"><div class="card wscard" aria-hidden="true"><div class="wspic"></div><div class="wsin"><div class="skel" style="margin:0"><div class="l w40"></div><div class="l w80"></div></div></div></div></section>`:`<section id="home-website" hidden></section>`;
   html+=`<section id="home-needs"><h2 id="needs-h">Needs you</h2><div id="needs-body"><div class="skel"><div class="l w60"></div><div class="l w40"></div></div></div></section>`;
   // Oct 2026 audit change 4: what your studio just did sits right under what needs you
   html+=`<section id="home-updates"><h2>From your studio</h2>`;
@@ -1149,6 +1181,7 @@ function renderHome(){
   html+=`<section id="home-projects"><h2>Your projects</h2>${P.projectsFailed
     ?`<p class="muted fload">We couldn’t load your projects just now.</p>`
     :projectCardsHtml(projects)}</section>`;
+  html+=welcomeCardHtml();   // the first-visit tour comes after the website and what needs them, never before
   $('main').innerHTML=html;
   wireWelcome();
   document.querySelectorAll('[data-proj]').forEach(c=>{const open=()=>openProject(c.getAttribute('data-proj'));c.addEventListener('click',open);c.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();open();}});});
@@ -1200,8 +1233,11 @@ async function buildNeedsYou(){
       const sub=a.summary?(draft?`${esc(studioBrand())} asked: “${esc(a.summary)}”`:`${esc(s.name)} · ${esc(a.summary)}`):esc(s.name);
       return row(draft?'Draft':'Approval','',seen.has('approval-'+a.id),esc(ttl),sub,
         `<button class="${top}" data-open-apr="${esc(a.id)}" data-apr-proj="${esc(s.id)}" aria-label="Open — ${esc(ttl)}">Open</button>`);}
-    if(it.kind==='todo'){const s=it.s,t=it.t;const k=todoKind(t);const verb=TODO_VERB[k];
-      return row('To-do','todo',seen.has('task-'+t.id)||seen.has('todos-'+s.id),esc(t.title||'A to-do'),esc(TODO_SUB[k]?TODO_SUB[k]+' · '+s.name:s.name),
+    if(it.kind==='todo'){const s=it.s,t=it.t;const k=todoKind(t);
+      // the questionnaire opens its questions when the project has them; otherwise it is a file to send back
+      const byMail=k==='questionnaire'&&!questionnaireOf(s.surveys);
+      const verb=byMail?'Send':TODO_VERB[k];
+      return row('To-do','todo',seen.has('task-'+t.id)||seen.has('todos-'+s.id),esc(t.title||'A to-do'),esc(((x)=>PORTAL.projects.length>1?(x?x+' · '+s.name:s.name):x)(byMail?'The one your studio emailed you':(TODO_SUB[k]||''))),
         `<button class="${top}" data-open-todo="${esc(t.id)}" data-todo-proj="${esc(s.id)}" aria-label="${verb} — ${esc(t.title||'A to-do')}">${verb}</button>`,TODO_ICO[k]);}
     if(it.kind==='survey'){const s=it.s,sv=it.sv;
       return row('Survey','',seen.has('surveys-'+s.id),esc(sv.title||'A quick survey'),esc(s.name),
@@ -1288,6 +1324,7 @@ function wsCardHtml(d){
 // full load (like billing); a reviewer never fetches (no website of their own).
 // The in-flight promise is cached too, so Home→away→Home never refires a
 // request that's already running (at most one fetch per load).
+function wsSlotOff(){const host=document.getElementById('home-website');if(host){host.hidden=true;host.innerHTML='';}}
 async function loadWebsiteCard(){
   if(PORTAL.persona!=='client')return;
   if(PORTAL.wstats===undefined){
@@ -1299,12 +1336,21 @@ async function loadWebsiteCard(){
     if(!PORTAL.wstatsFetch)PORTAL.wstatsFetch=api('/client/website-stats').then(r=>r.ok?((r.body&&r.body.data)||null):false).catch(()=>false);
     PORTAL.wstats=await PORTAL.wstatsFetch;
     PORTAL.wstatsFetch=null;   // settled — a later call may start a fresh read
-    if(PORTAL.wstats===false){PORTAL.wstats=undefined;return;}
+    if(PORTAL.wstats===false){PORTAL.wstats=undefined;wsSlotOff();return;}
+  }
+  let h=wsCardHtml(PORTAL.wstats);
+  // not live yet: the card says where the site stands (needs the projects, for the draft)
+  let draft=null;
+  if(!h&&PORTAL.wstats&&PORTAL.wstats.published===false){
+    const snaps=await ensureSnaps();
+    draft=wsDraftOf(snaps);
+    h=wsBuildHtml(wsBuildState(PORTAL.wstats,draft),draft,snaps.reduce((n,x)=>n+snapWaiting(x),0),studioBrand());
   }
   const host=document.getElementById('home-website');if(!host)return;   // the user moved on mid-fetch
-  const h=wsCardHtml(PORTAL.wstats);
-  if(!h)return;   // hidden state — the slot stays empty
+  if(!h){wsSlotOff();return;}   // nothing to show: the slot closes and Home's other column moves up
   host.innerHTML=h;host.hidden=false;
+  const rv=host.querySelector('[data-ws-apr]');
+  if(rv)rv.addEventListener('click',()=>openApproval(rv.getAttribute('data-ws-proj'),rv.getAttribute('data-ws-apr'),'home'));
   loadWebsiteThumb();   // item 179: the card leads with a picture of the site itself
   const btn=document.getElementById('wsmore');
   // the disclosure contract (slice 2): the SAME card grows in place; the button
@@ -1340,7 +1386,7 @@ async function loadWebsiteThumb(){
   // scripts stay off (no allow-scripts): the picture can't run code, count a visit or send a form
   f.setAttribute('sandbox','allow-same-origin');f.setAttribute('tabindex','-1');f.setAttribute('aria-hidden','true');
   f.setAttribute('referrerpolicy','no-referrer');f.title='Picture of your website’s home page';
-  f.addEventListener('load',()=>f.classList.add('on'),{once:true});
+  f.addEventListener('load',()=>{f.classList.add('on');const ini=box.querySelector('.wsini');if(ini)ini.remove();},{once:true});
   f.srcdoc=PORTAL.wsthumb;box.appendChild(f);
   // drawn at 1280px wide, scaled to the card (and re-scaled when the card resizes)
   const fit=()=>{if(box.clientWidth)box.style.setProperty('--wsk',String(box.clientWidth/1280));};
@@ -1451,8 +1497,8 @@ async function renderMessages(focusSup,opts){
   // below still render, and neither "No conversations yet" copy can fire.
   // Nothing is cached, so re-entering the tab retries for free.
   let support=[],supFailed=false;
-  try{const r=await api('/client/support');if(r&&r.ok)support=(((r.body&&r.body.data)||[])).filter(x=>x&&x.id);else supFailed=true;}catch(_){supFailed=true;}
-  if(view!==VIEW_SEQ)return;   // the user moved on mid-fetch (another tab OR a drill-in) — never paint over the newer view
+  // item 179: the requests and the project previews go out together (they used to wait in turn)
+  const supP=(async()=>{try{const r=await api('/client/support');if(r&&r.ok)support=(((r.body&&r.body.data)||[])).filter(x=>x&&x.id);else supFailed=true;}catch(_){supFailed=true;}})();
   // the newest message per project gives each project row its preview + recency.
   // DATA CHOICE: limit=1 here — deliberately NOT a full bundle per row; the pane
   // fetches a project's bundle (for event attribution) only when it's opened.
@@ -1464,7 +1510,7 @@ async function renderMessages(focusSup,opts){
   await Promise.all(PORTAL.projects.slice(0,8).map(async(p)=>{try{
     const r=await api('/client/projects/'+p.id+'/messages?limit=1');
     if(r&&r.ok){const d=r.body&&r.body.data;latest[p.id]=(Array.isArray(d)?d:[])[0]||null;}   // null = fetched, confirmed empty; a failed fetch leaves the key ABSENT
-  }catch(_){}}));
+  }catch(_){}}).concat([supP]));
   if(view!==VIEW_SEQ)return;   // re-check before every paint of #main
   MC.rows=convRows(PORTAL.projects,support,latest,studioBrand());
   MC.unread=unreadKeysFrom(PORTAL.notifs);
@@ -1512,6 +1558,8 @@ async function renderMessages(focusSup,opts){
   if(focusSup&&MC.rows.some(r=>r.id==='sup:'+focusSup))openConv('sup:'+focusSup);
   else if(focusSup)openSupportThread(focusSup,null);   // an id not in the list (stale link) — the legacy full view degrades gracefully
   else if(opts&&opts.compose)openComposePane();
+  // item 179: beside the list there is room, so the newest conversation is already open
+  else if(MC.rows.length&&window.matchMedia&&window.matchMedia('(min-width:720px)').matches)openConv(MC.rows[0].id,true);
   else renderMPane();
 }
 function renderMRows(){
@@ -1523,7 +1571,7 @@ function renderMRows(){
   if(!MC.rows.length){rows.innerHTML=(MC.supFailed||MC.projFailed)
     ?`<li class="mempty" role="presentation">We couldn’t check just now — try again in a moment.</li>`
     :`<li class="mempty" role="presentation">No conversations yet — Write starts one.</li>`;return;}
-  const initial=esc((studioBrand().charAt(0)||'S').toUpperCase());
+  const initial=esc(studioInitial());
   rows.innerHTML=MC.rows.map((r)=>{
     const unread=MC.unread.has(r.unreadKey);
     // the dot is a bare pseudo-element — unread rows carry an sr-only "New — "
@@ -1566,13 +1614,15 @@ function syncBellBadges(){
   document.querySelectorAll('.bell').forEach(el=>el.setAttribute('aria-label',label));
   document.querySelectorAll('.bell .badge').forEach(b=>{if(PORTAL.unread){b.classList.add('on');b.textContent=PORTAL.unread>9?'9+':String(PORTAL.unread);}else{b.classList.remove('on');b.textContent='';}});
 }
-function openConv(id){
+function openConv(id,auto){
   const row=MC.rows.find(r=>r.id===id);if(!row)return;
   MC.sel=id;MC.compose=false;
-  markConvSeen(row);
+  // opened for them (the newest, beside the list on a computer): its dot stays until they
+  // choose it themselves, and the cursor stays where it was
+  if(!auto)markConvSeen(row);
   renderMRows();renderMPane();
   const c=$('mconsole');if(c)c.classList.add('pane-open');   // <720px: push the pane in
-  focusMPane();
+  if(!auto)focusMPane();
 }
 // closing back (mobile) returns focus to the listbox; the roving row stays put
 function closeMPane(){MC.sel='';MC.compose=false;renderMRows();renderMPane();const r=$('mrows');if(r)r.focus();}
@@ -1688,7 +1738,7 @@ function dayWord(iso){const t=Date.parse(iso);if(!isFinite(t))return'';const d=n
 function chatTime(iso){const t=Date.parse(iso);return isFinite(t)?new Date(t).toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'}):'';}
 function chatHtml(items){
   const list=(items||[]).filter(i=>i&&i.at).slice().sort((a,b)=>a.at<b.at?-1:a.at>b.at?1:0);
-  const who=studioBrand(),av=esc((who.charAt(0)||'S').toUpperCase());
+  const who=studioBrand(),av=esc(studioInitial());
   let h='',day='';
   for(const it of list){
     const dw=dayWord(it.at);if(dw&&dw!==day){day=dw;h+=`<div class="cday">${esc(dw)}</div>`;}
@@ -2756,11 +2806,11 @@ function todoAskHtml(t,data,aps){
   const go=(to,label)=>`<div class="row"><button data-todo-go="${to}">${label}</button></div>`;
   // item 179 part two: each ask opens its own page, with the thing to do right there
   const open=(label)=>`<div class="row"><button data-todo-open="${esc(t.id)}">${label}</button></div>`;
-  if(key==='content_received')return open('Send files')+tick;
+  if(key==='content_received')return open('Send')+tick;   // the same verb Home's row says
   if(key==='questionnaire_returned'){
     const sv=questionnaireOf(data&&data.surveys);
-    return sv?`<div class="row"><button data-survey="${esc(sv.id)}">Open the questionnaire</button></div>${tick}`
-      :`<p class="muted tdnote">Your studio sends the questionnaire by email. Filled it in already? Send it here, and your studio marks this one off.</p>${open('Send it here')}`;
+    return sv?`<div class="row"><button data-survey="${esc(sv.id)}">Start</button></div>${tick}`
+      :`<p class="muted tdnote">Your studio sends the questionnaire by email. Filled it in already? Send it here, and your studio marks this one off.</p>${open('Send')}`;
   }
   if(key==='client_review'){
     const wa=(aps||[]).find(a=>a&&a.subject_type==='website');
@@ -2909,7 +2959,7 @@ async function openApproval(pid,aid,from){
   const ttl=a.title||(draft?'Your website draft':'A change is ready');
   const chips=`<span class="tag">${esc(AP_KIND[a.subject_type]||'Approval')}</span><span class="sm">${draft?'Not live yet · ':''}${esc(proj.name||'')}</span>`;
   let ask=sheetHead(chips,ttl,'');
-  if(a.summary)ask+=`<div class="askcard"><span class="askav" aria-hidden="true">${esc((studioBrand().charAt(0)||'S').toUpperCase())}</span><span><span class="askwho">${esc(studioBrand())} asked</span><span class="askq">“${esc(a.summary)}”</span></span></div>`;
+  if(a.summary)ask+=`<div class="askcard"><span class="askav" aria-hidden="true">${esc(studioInitial())}</span><span><span class="askwho">${esc(studioBrand())} asked</span><span class="askq">“${esc(a.summary)}”</span></span></div>`;
   let thing='';
   if(draft)thing=`<div class="card draftcard"><div class="dstrip"><i></i><i></i><i></i><span>${esc(draftHost())} · draft, not live yet</span></div><div class="dpic" id="dpic"><span class="dwait">Drawing the draft…</span></div><div class="dpages" id="dpages" role="group" aria-label="Pages in the draft"></div></div>`;
   else if(f)thing=`<div class="card draftcard">${apIsImage(f.title)?`<div id="apimg" class="dpic" style="aspect-ratio:auto;min-height:120px"><span class="dwait">Fetching the picture…</span></div>`:''}<div class="frow"><span class="fico" aria-hidden="true">${fileIcon(f.title)}</span><span class="fmain"><span class="fname">${esc(f.title)}</span><span class="fmeta">Shared by ${esc(studioBrand())}${f.created_at?' · '+esc(fdate(f.created_at)):''}</span></span><button class="fbtn" data-dl="${esc(f.id)}" aria-label="Open full size — ${esc(f.title)}">Open full size</button></div></div>`;
@@ -3129,10 +3179,10 @@ async function openProject(id,focusSection){
   // highlights tiles (label-over-value) — only the facts this project has
   const prog=(s&&s.progress)||data.progress||null;
   const msTotals=(s&&s.milestones)||{total:(data.milestones||[]).length,complete:(data.milestones||[]).filter(m=>m&&m.status==='complete').length};
-  const waiting=aps.length+acts.filter(t=>t.status!=='done').length;
+  const waiting=aps.length+acts.filter(t=>t.status!=='done'&&todoKind(t)!=='review').length;   // the draft's own approval is what waits, as on Home
   const files=(data.deliverables||[]).length;
   const tiles=[];
-  if(prog&&prog.total>0)tiles.push(['Progress',prog.pct+'%']);
+  if(prog&&prog.total>0)tiles.push(['Progress',prog.pct>0?prog.pct+'%':'Just started']);   // never a bare 0%
   tiles.push(['Waiting on you',String(waiting)]);
   if(msTotals.total>0)tiles.push(['Milestones',`${msTotals.complete} of ${msTotals.total}`]);
   if(files>0)tiles.push(['Files shared',String(files)]);
@@ -3470,7 +3520,8 @@ function takeReturn(){try{const v=JSON.parse(localStorage.getItem(RETURN_KEY)||'
 // anyone who has since become more than a reviewer gets the read after all.
 function personaKey(){return 'dds-portal-persona:'+((USER&&USER.id)||'');}
 function rememberedReviewer(){try{return !!(USER&&USER.id)&&localStorage.getItem(personaKey())==='reviewer';}catch(_){return false;}}
-function rememberPersona(c){try{if(!(USER&&USER.id))return;if(PORTAL.persona==='reviewer'&&c.site_role==='client_reviewer')localStorage.setItem(personaKey(),'reviewer');else localStorage.removeItem(personaKey());}catch(_){}}
+function rememberedClient(){try{return !!(USER&&USER.id)&&localStorage.getItem(personaKey())==='client';}catch(_){return false;}}
+function rememberPersona(c){try{if(!(USER&&USER.id))return;if(PORTAL.persona==='reviewer'&&c.site_role==='client_reviewer')localStorage.setItem(personaKey(),'reviewer');else if(PORTAL.persona==='client')localStorage.setItem(personaKey(),'client');else localStorage.removeItem(personaKey());}catch(_){}}
 let LOADED_ONCE=false;   // the address's #tab and a kept destination are honoured by the first load only (later loads follow an action)
 function signedOut(){$('main').innerHTML=`<div class="center"><h2>Sign in to see your updates.</h2><p style="margin-top:20px"><a class="link" href="/portal.html">Sign in →</a></p></div>`;}
 function trouble(){$('main').innerHTML=`<div class="center"><h2>We couldn’t load your updates just now.</h2><p class="muted">Please refresh in a moment.</p></div>`;}
@@ -3504,6 +3555,12 @@ async function load(){
   // notifications and Google ask together. Each used to wait for the one before: five round
   // trips before Home could paint, on a phone connection too.
   const skipProj=rememberedReviewer();   // G12: a reviewer's projects read is refused every time
+  // item 179: someone known to be a client here gets everything Home needs in the same round
+  const early=rememberedClient();
+  const askPath='/connections/ask'+(askTok?'?token='+encodeURIComponent(askTok):'');
+  const nP=early?api('/client/notifications').catch(()=>null):null,aP=early?api(askPath).catch(()=>null):null;
+  if(early){PORTAL.wstatsFetch=api('/client/website-stats').then(r=>r.ok?((r.body&&r.body.data)||null):false).catch(()=>false);
+    PORTAL.wsthumbFetch=api('/client/website-thumb').then(r=>(r.ok&&r.body&&r.body.data&&typeof r.body.data.html==='string')?r.body.data.html:null).catch(()=>null);}
   const [ctx,proj0,feed]=await Promise.all([api('/portal/context'),skipProj?Promise.resolve(null):api('/client/projects').catch(()=>null),api('/portal/feed')]);
   if(!ctx.ok){hideNav();trouble();return;}
   const c=ctx.body.data||{};
@@ -3518,7 +3575,7 @@ async function load(){
   // persistent tab nav + the cross-project Home; tabs degrade to calm empty states.
   PORTAL.ctx=c;
   rememberStudio();
-  try{const fb=$('footby');if(fb)fb.textContent='by '+((c.studio&&c.studio.name)?studioBrand():'your studio');}catch(_){}
+  try{const fb=$('footby');if(fb)fb.textContent='by '+(studioNamed()?studioBrand():'your studio');}catch(_){}
   PORTAL.persona=(projects.length||c.is_managed_client)?'client':'reviewer';
   rememberPersona(c);   // G12
   PORTAL.projects=projects;
@@ -3531,9 +3588,10 @@ async function load(){
   PORTAL.feedFailed=!feed.ok;   // a failed feed read must never masquerade as zero approvals
   // PS3: the boot notifications GET is persona-gated — a reviewer's /client/*
   // 403 is contract (reviewerAllowed); their bell boots calm with ZERO fetches.
+  if(PORTAL.persona!=='client'){PORTAL.wstatsFetch=null;PORTAL.wsthumbFetch=null;}   // an early read for someone no longer a client is dropped
   const [n,a]=PORTAL.persona==='client'?await Promise.all([
-    api('/client/notifications').catch(()=>null),
-    api('/connections/ask'+(askTok?'?token='+encodeURIComponent(askTok):'')).catch(()=>null),   // the studio's ask to connect Google, never a blocker
+    nP||api('/client/notifications').catch(()=>null),
+    aP||api(askPath).catch(()=>null),   // the studio's ask to connect Google, never a blocker
   ]):[null,null];
   const nb=(n&&n.body)||{};
   PORTAL.notifsFailed=PORTAL.persona==='client'&&!(n&&n.ok);   // …nor a failed notifications read as zero messages — but a reviewer's 403 here is the CONTRACT (reviewerAllowed), not a failure: their bell stays calm
