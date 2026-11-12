@@ -82,16 +82,22 @@ export async function handleClientBilling(_req: Request, site: SiteRow, _princip
   // processing_since lands with migration 0132 — deploy-order tolerant: the full
   // select first, then the pre-0132 shape, so a function deploy ahead of the
   // migration never blanks the client's money surface.
-  const SEL = 'id,title,description,amount_cents,status,due_date,paid_at,stripe_url,created_at';
+  const SEL = 'id,title,description,amount_cents,status,due_date,paid_at,stripe_url,created_at,site_id';
   let r = await svc(`presence_invoices?customer_client_id=eq.${me}&deleted_at=is.null&select=${SEL},processing_since&order=created_at.desc&limit=200`);
   if (!r.ok) r = await svc(`presence_invoices?customer_client_id=eq.${me}&deleted_at=is.null&select=${SEL}&order=created_at.desc&limit=200`);
+  // Builder list item 179, part four: each invoice on the client's papers shelf opens
+  // as the studio's branded copy (doc.html, the Documents tab's own short-lived signed
+  // link); once paid, that copy is the receipt (sales item 79). Withdrawn ones get none.
+  const secret = linkSecret();
+  const exp = Math.floor(Date.now() / 1000) + 30 * 86400;
+  const viewUrl = async (i: any) => (secret && i.site_id) ? docViewerUrl(await signDocToken({ t: 'doc', k: 'invoice', id: String(i.id), site_id: String(i.site_id), exp }, secret)) : null;
   // Oct 2026 benchmark (item 2): the four money states — paid · processing ·
   // upcoming · overdue — come from ONE formula (lib/money_state.ts), computed
   // here against the server's UTC day. The portal re-runs the same mirrored
   // formula against the client's LOCAL day (PS2's rule) and adds the
   // just-came-back-from-Stripe case; `state` on the wire is the server's word.
   const today = nowIso().slice(0, 10);
-  const list = rows(r).map((i) => {
+  const list = await Promise.all(rows(r).map(async (i) => {
     const state = moneyState(i, today);
     return {
       id: i.id, name: clean(i.title, 200), description: clean(i.description, 1000),
@@ -103,9 +109,10 @@ export async function handleClientBilling(_req: Request, site: SiteRow, _princip
       // one whose payment is already PROCESSING (a second charge on a settling
       // ACH payment is a double-pay). Allow-list the two payable states.
       pay_url: ((state === 'upcoming' || state === 'overdue') && i.stripe_url) ? i.stripe_url : null,
+      view_url: state ? await viewUrl(i) : null,
       created_at: i.created_at,
     };
-  });
+  }));
   const b = moneyBuckets(list, today);
   return json({ data: {
     billing_type: 'service',   // agency project work — SEPARATE from the software subscription

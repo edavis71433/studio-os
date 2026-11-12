@@ -52,9 +52,9 @@ ok('"Something else?" opens that subject form, not the general Write pane (which
 ok('a to-do\'s status in words', /const TASK_WORD=\{todo:'To do',in_progress:'In progress',blocked:'Waiting on something',done:'Done'\};/.test(cl));
 // item 179: each to-do is its own Needs-you row now; the project card still counts them in words
 ok('to-dos are called to-dos; approvals need your OK', /to-do\$\{nt===1\?'':'s'\} for you/.test(cl) && /need\$\{na===1\?'s':''\} your OK/.test(cl));
-ok('a paid invoice says when', /Paid\$\{paidOn\?' '\+esc\(paidOn\):''\} — thank you\./.test(cl));
+ok('a paid invoice says when', /st==='paid'\?\(i\.paid_at\?'paid '\+shelfDay\(i\.paid_at,now\):'paid'\)/.test(cl));   // item 179 part four: "$600 · paid Oct 2" on the shelf
 ok('no booking times → Ask for a call, prefilled', /openSupport\(null,'messages',\{subject:'A call',body:'I’d like to book a call\. Times that work for me: '\}\)/.test(cl));
-ok('each tab names itself', /document\.title=\(\{home:'Home',messages:'Messages',files:'Files',invoices:'Invoices',help:'Help'\}\[tab\]\|\|'Home'\)\+' — '\+studioBrand\(\)/.test(cl));   // builder list item 59: the studio's own name when there is one
+ok('each tab names itself', /document\.title=\(\{home:'Home',messages:'Messages',documents:'Documents',help:'Help'\}\[tab\]\|\|'Home'\)\+' — '\+studioBrand\(\)/.test(cl));   // builder list item 59: the studio's own name when there is one
 // item 179: the at-a-glance strip left Home (its count lives in the "Needs you · N"
 // heading), so only the mid-width tab rule remains pinned here.
 ok('mid widths fit all six tabs', /@media \(min-width:720px\) and \(max-width:920px\)\{\.tab \.ti\{display:none\}/.test(cl));

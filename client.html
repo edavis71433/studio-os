@@ -140,9 +140,9 @@
     .chipbar{top:52px}
     section[id^="sec-"],#sec-overview{scroll-margin-top:118px}
   }
-  /* ── slice 12: the Files tab — share card (dashed) + document/file list views.
-     All class names are f-prefixed and unique to this tab (the slice-9 .sec
-     lesson: no generic names that could bleed into other views). ── */
+  /* ── slice 12: the share card (dashed, on a project page) + the file rows the
+     project page and the papers shelf draw. All class names are f-prefixed (the
+     slice-9 .sec lesson: no generic names that could bleed into other views). ── */
   .fshare{background:var(--card);border:1.5px dashed var(--p);border-radius:16px;padding:18px 20px;box-shadow:var(--shadow);margin:4px 0 8px;display:flex;gap:14px;align-items:center;flex-wrap:wrap}
   .fshare-i{width:42px;height:42px;border-radius:12px;background:var(--p-soft);display:grid;place-items:center;font-size:20px;flex:0 0 auto}
   .fshare-m{flex:1 1 220px;min-width:0}
@@ -190,16 +190,64 @@
   .finote.fconf{color:var(--good);display:inline-flex;align-items:center;gap:6px}
   .finote.fconf .fchk{display:inline-grid;place-items:center;width:16px;height:16px;border-radius:50%;background:var(--good);color:#fff;font-size:10px;font-weight:700;flex:0 0 auto}
   .finote.fconf.stale{color:var(--faint)} .finote.fconf.stale .fchk{background:var(--faint)}
-  .invtotal{font-size:14px;color:var(--soft);margin:0 0 12px}
-  .invtotal strong{color:var(--ink)}
-  @media (max-width:719px){
-    .frow.inv{flex-wrap:wrap}
-    .frow.inv .fmain{min-width:58%}
-    .frow.inv .finote,.frow.inv a.fbtn{margin-left:46px} /* stacked under the name, aligned past the 34px icon + 12px gap */
+  @media (max-width:999px){   /* a shelf row with a note (a payment confirming) stacks it under the name */
+    .srow.acts:not(.fresh) .fst:not(.od){display:none}   /* a phone row shows its one button OR a chip (the line under the name already says the state); Overdue and a new report's New always show */
+    .srow.noted{flex-wrap:wrap}
+    .srow.noted .finote{flex:0 0 100%;margin-left:46px} /* aligned past the 34px icon + 12px gap */
   }
   .fbtn,a.fbtn{flex:0 0 auto;display:inline-flex;align-items:center;font-size:12.5px;font-weight:600;border:1px solid var(--line);background:transparent;color:var(--ink);border-radius:999px;padding:7px 14px;cursor:pointer;text-decoration:none;white-space:nowrap;transition:.15s}
-  a.fbtn.pay{background:var(--p);border-color:var(--p);color:#fff} /* paying is the Invoices tab's one next action (Oct 2026 experience review) */
   .fbtn:hover,a.fbtn:hover{border-color:var(--p);color:var(--p)}
+  /* ── item 179 part four: the papers shelf. On a phone each paper is one row with a
+     line under its name and the filters are chips; from 1000px the filters become a
+     rail with counts and the row splits into columns: what it is · amount or state ·
+     date · chip · the one thing to do. What you owe sits on top. ── */
+  /* the send button sits on the line under the title, clear of a phone's floating bell */
+  .shelfhead{display:grid;grid-template-columns:minmax(0,1fr) auto;grid-template-areas:"t t" "s b";column-gap:14px;align-items:center}
+  .shelfhead h1{grid-area:t}
+  .shelfhead .sub{grid-area:s}
+  .shelfsend{grid-area:b;justify-self:end;display:inline-flex;align-items:center;gap:6px;font-size:13px;font-weight:600;padding:7px 14px;border-radius:999px;border:1.5px dashed var(--p);background:var(--card);color:var(--p);cursor:pointer;white-space:nowrap}
+  .shelfsend svg{width:15px;height:15px;display:block}
+  .shelfsend:hover{background:var(--p-soft);color:var(--p);border-color:var(--p)}
+  .shelfsend .lg,.owebtn .lg{display:none}
+  .shelfform{margin:12px 0 4px;background:var(--card);border:1px solid var(--line);border-radius:16px;padding:14px 16px;box-shadow:var(--shadow)}
+  .owe{display:flex;align-items:center;gap:14px;background:var(--card);border:1px solid var(--line);border-radius:16px;padding:16px 18px;box-shadow:var(--shadow);margin:0 0 4px}
+  .owe.late{border-color:var(--dds-bad,#c43c3c)}
+  .owem{flex:1 1 auto;min-width:0}
+  .owet{margin:0;font-family:var(--serif);font-size:21px;line-height:1.2;color:var(--ink)}
+  .owes{margin:3px 0 0;font-size:12.5px;color:var(--soft)}
+  a.owebtn{flex:0 0 auto;text-decoration:none;display:inline-flex;align-items:center}
+  button.owebtn{flex:0 0 auto}
+  .shelfnav{display:flex;gap:8px;overflow-x:auto;scrollbar-width:none;margin:16px 0 2px;padding-bottom:2px}
+  .shelfnav::-webkit-scrollbar{display:none}
+  .shelfnav .sl,.shelfnav .sc{display:none}
+  .shelfbody>.owe{margin-top:14px}
+  .shelfmonth{font-family:inherit;font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--faint);margin:18px 0 8px}
+  .shelfbody .fload{margin:12px 0 0}
+  .shelfnote{font-size:12.5px;margin:2px 0 0}
+  .srow .sinfo,.srow .sdate,.srow .fst.none{display:none}
+  .fico.invoices{background:var(--good-soft);color:var(--good)}
+  .fico.ask,.fst.ask{background:var(--warn-soft);color:var(--warn)}
+  .fst.mute{background:var(--bg);color:var(--faint)}
+  @media (min-width:640px){.shelfsend .lg,.owebtn .lg{display:inline}}
+  @media (min-width:1000px){
+    .shelf{display:grid;grid-template-columns:210px minmax(0,1fr);gap:0 26px;align-items:start;margin-top:18px}
+    .shelfnav{flex-direction:column;gap:2px;margin:0;overflow:visible;position:sticky;top:84px}
+    .shelfnav .chip{display:flex;justify-content:space-between;align-items:center;gap:10px;border:0;background:transparent;border-radius:10px;padding:9px 12px;font-weight:500;color:var(--soft);text-align:left;width:100%}
+    .shelfnav .chip:hover{background:var(--bg);color:var(--ink)}
+    .shelfnav .chip[aria-pressed="true"]{background:var(--p-soft);color:var(--p);font-weight:600}
+    .shelfnav .sl,.shelfnav .sc{display:inline}
+    .shelfnav .ss{display:none}
+    .shelfnav .sc{font-size:12px;color:var(--faint);font-weight:500}
+    .shelfbody>.owe:first-child,.shelfbody>.shelfgroup:first-child .shelfmonth{margin-top:0}
+    .srow{display:grid;grid-template-columns:34px minmax(0,1.5fr) minmax(0,1.3fr) 60px 124px 84px;gap:12px;align-items:center}
+    .srow .sline{display:none}
+    .srow .sinfo{display:block;font-size:12.5px;color:var(--soft);min-width:0}
+    .srow .sdate{display:block;font-size:12.5px;color:var(--faint)}
+    .srow .fst{justify-self:start}
+    .srow .fst.none{display:block;visibility:hidden}
+    .srow .fbtn,.srow .finote{justify-self:end}
+    .srow.noted .finote{grid-column:2 / -1;justify-self:start}   /* a payment confirming reads under the name, not squeezed into the last column */
+  }
   .fload{margin:0 0 14px;font-size:14px}
   /* ── milestone Path (Lightning chevron geometry — read-only, informational) ── */
   .tl-here{display:inline-block;font-size:10.5px;font-weight:700;color:var(--p);background:var(--p-soft);border-radius:999px;padding:2px 8px;text-transform:uppercase;letter-spacing:.05em;vertical-align:middle}
@@ -735,7 +783,7 @@ function bellSinceLabel(unread){unread=Math.max(0,unread|0);return unread+' upda
 // unknown/absent types keep the neutral sparkle. Informational rows stay
 // unactionable — the icon narrates tone, never a to-do.
 // ── one icon set (Oct 2026 experience review): the shell's 2px-stroke SVGs, never an emoji as a control's icon ──
-const SI={home:'<path d="M3 11l9-8 9 8v9a2 2 0 0 1-2 2h-4v-7H9v7H5a2 2 0 0 1-2-2z"/>',message:'<path d="M21 12a8 8 0 0 1-8 8H8l-5 3 1.5-4.5A8 8 0 1 1 21 12z"/>',folder:'<path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>',receipt:'<path d="M5 3h14v18l-3-2-3 2-3-2-3 2z"/><path d="M9 8h6M9 12h6"/>',sparkles:'<path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8z"/><path d="M19 17l.7 2 2 .7-2 .7-.7 2-.7-2-2-.7 2-.7z"/>',help:'<circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.7.3-1 .8-1 1.5"/><path d="M12 17h.01"/>',bell:'<path d="M6 16V11a6 6 0 0 1 12 0v5l2 2H4z"/><path d="M10 20a2 2 0 0 0 4 0"/>',thumbsup:'<path d="M7 11v10H3V11z"/><path d="M7 11l4-8a2.5 2.5 0 0 1 2.5 2.5V9h5a2 2 0 0 1 2 2.3l-1.2 7A2 2 0 0 1 17.3 20H7"/>',link:'<path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1"/><path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/>',check:'<path d="M5 12l5 5 9-10"/>',clipboard:'<rect x="6" y="4" width="12" height="17" rx="2"/><path d="M9 4V2.5h6V4"/><path d="M9 10h6M9 14h6"/>',pencil:'<path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/>',file:'<path d="M6 3h8l5 5v13H6z"/><path d="M14 3v5h5"/>',image:'<rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="1.5"/><path d="M21 16l-5-5-8 8"/>',upload:'<path d="M12 16V4"/><path d="M6 10l6-6 6 6"/><path d="M4 20h16"/>',calendar:'<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/>',paperclip:'<path d="M21 11.5l-9 9a5.5 5.5 0 0 1-7.8-7.8l9-9a3.5 3.5 0 0 1 5 5l-9 9a1.5 1.5 0 0 1-2.1-2.1l8.5-8.5"/>',cog:'<circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1L7 17M17 7l2.1-2.1"/>',send:'<path d="M12 19V5"/><path d="M6 11l6-6 6 6"/>'};
+const SI={chart:'<path d="M3 20h18M7 16v-5M12 16V6M17 16v-8"/>',home:'<path d="M3 11l9-8 9 8v9a2 2 0 0 1-2 2h-4v-7H9v7H5a2 2 0 0 1-2-2z"/>',message:'<path d="M21 12a8 8 0 0 1-8 8H8l-5 3 1.5-4.5A8 8 0 1 1 21 12z"/>',folder:'<path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>',receipt:'<path d="M5 3h14v18l-3-2-3 2-3-2-3 2z"/><path d="M9 8h6M9 12h6"/>',sparkles:'<path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8z"/><path d="M19 17l.7 2 2 .7-2 .7-.7 2-.7-2-2-.7 2-.7z"/>',help:'<circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.7.3-1 .8-1 1.5"/><path d="M12 17h.01"/>',bell:'<path d="M6 16V11a6 6 0 0 1 12 0v5l2 2H4z"/><path d="M10 20a2 2 0 0 0 4 0"/>',thumbsup:'<path d="M7 11v10H3V11z"/><path d="M7 11l4-8a2.5 2.5 0 0 1 2.5 2.5V9h5a2 2 0 0 1 2 2.3l-1.2 7A2 2 0 0 1 17.3 20H7"/>',link:'<path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1"/><path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/>',check:'<path d="M5 12l5 5 9-10"/>',clipboard:'<rect x="6" y="4" width="12" height="17" rx="2"/><path d="M9 4V2.5h6V4"/><path d="M9 10h6M9 14h6"/>',pencil:'<path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/>',file:'<path d="M6 3h8l5 5v13H6z"/><path d="M14 3v5h5"/>',image:'<rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="1.5"/><path d="M21 16l-5-5-8 8"/>',upload:'<path d="M12 16V4"/><path d="M6 10l6-6 6 6"/><path d="M4 20h16"/>',calendar:'<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/>',paperclip:'<path d="M21 11.5l-9 9a5.5 5.5 0 0 1-7.8-7.8l9-9a3.5 3.5 0 0 1 5 5l-9 9a1.5 1.5 0 0 1-2.1-2.1l8.5-8.5"/>',cog:'<circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1L7 17M17 7l2.1-2.1"/>',send:'<path d="M12 19V5"/><path d="M6 11l6-6 6 6"/>'};
 const si=(k)=>`<svg class="si" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">${SI[k]||SI.dot}</svg>`;
 function momentIcon(t){return({good_news:'🎉',celebration:'🎉',needs_attention:'⚠️',reminder:'⏰',opportunity:'💡',seasonal:'🍂',business_health:'📈',learning:'📚'})[String(t||'')]||'✨';}
 // Nov 10 walk: the website coach writes its asks for whoever runs the site ("…then
@@ -848,8 +896,11 @@ let CURRENT_TAB='home';
 let VIEW_SEQ=0;
 // item 179 part three: Requests and Support folded into Messages — one door, five tabs.
 // An old #requests link (an email, a bookmark) lands in Messages.
-const TABS=[['home',si('home'),'Home'],['messages',si('message'),'Messages'],['files',si('folder'),'Files'],['invoices',si('receipt'),'Invoices'],['help',si('help'),'Help']];
-const TAB_ALIAS={requests:'messages'};
+const TABS=[['home',si('home'),'Home'],['messages',si('message'),'Messages'],['documents',si('folder'),'Documents'],['help',si('help'),'Help']];
+// item 179 part four: Files and Invoices folded into Documents — an old #files or
+// #invoices link opens the shelf on that filter.
+const TAB_ALIAS={requests:'messages',files:'documents',invoices:'documents'};
+const SHELF_FROM_TAB={files:'files',invoices:'invoices'};
 const tabOf=(t)=>TAB_ALIAS[t]||t;
 // The context bar's "app name" is the studio's identity. Builder list item 59:
 // /portal/context carries `studio` ({ name, logo_url, accent }) for a managed
@@ -894,13 +945,13 @@ function setActiveTab(tab){const nav=$('tabnav');if(!nav)return;nav.querySelecto
 // console's own wrap class (renderMessages re-adds it for the split view).
 function setWide(on){try{document.body.classList.toggle('wide',!!on);document.body.classList.remove('msgsview');document.body.classList.remove('homeview');}catch(_){}}
 function showTab(tab){
-  tab=tabOf(tab);
+  const named=String(tab||'');tab=tabOf(named);
+  if(tab==='documents')SHELF_CAT=SHELF_FROM_TAB[named]||'all';   // the tab itself opens on All; an old name opens its filter
   VIEW_SEQ++;   // this tab owns #main now — invalidate any in-flight view render
   CURRENT_TAB=tab;setActiveTab(tab);setWide(false);try{window.scrollTo(0,0);}catch(_){}
-  try{document.title=({home:'Home',messages:'Messages',files:'Files',invoices:'Invoices',help:'Help'}[tab]||'Home')+' — '+studioBrand();}catch(_){}   // the walk found "Your updates" on every tab
+  try{document.title=({home:'Home',messages:'Messages',documents:'Documents',help:'Help'}[tab]||'Home')+' — '+studioBrand();}catch(_){}   // the walk found "Your updates" on every tab
   if(tab==='messages')return renderMessages();
-  if(tab==='files')return renderFiles();
-  if(tab==='invoices')return renderInvoices();
+  if(tab==='documents')return renderDocuments();
   if(tab==='help')return renderHelp();
   return renderHome();
 }
@@ -1140,7 +1191,7 @@ async function buildNeedsYou(){
     // the SAME state word the Invoices tab chips print (one formula, item 2) —
     // the two surfaces must never disagree about the same invoice
     const stWord=(MONEY_WORD[moneyState(i,nyToday,PAID_PENDING)]||'').toLowerCase();
-    const nyPay=i.pay_url&&/^https:\/\//.test(i.pay_url)?i.pay_url:null;   // https-only (invoiceRowHtml's rule)
+    const nyPay=i.pay_url&&/^https:\/\//.test(i.pay_url)?i.pay_url:null;   // https-only (the shelf's rule)
     return row('Invoice','invoice',false,esc(i.name||'Invoice'),`${i.amount?esc(fmtMoney(i.amount))+' · ':''}${esc(stWord)}${i.due_date?` · due ${esc(invDueLabel(i.due_date)||i.due_date)}`:''}`,
       nyPay?`<a class="${top||'link'}" data-pay href="${esc(nyPay)}" aria-label="Pay — ${esc(i.name||'Invoice')}">Pay</a>`:`<button class="${top}" data-tab-go="invoices" aria-label="View invoice — ${esc(i.name||'Invoice')}">View invoice</button>`);
   });
@@ -1791,20 +1842,8 @@ function fileRowHtml(f,ap){
     `<span class="fmeta">${mine?'Sent to your studio':'Shared by your studio'}${when?` · ${esc(when)}`:''}${due}</span></span>`+
     `<button class="fbtn" data-dl="${esc(f.id)}" aria-label="Download — ${esc(f.title)}">Download</button>${acts}</div>`;
 }
-// Documents (proposals, agreements & estimates): a Signed chip is the good/green
-// state; everything else stays purple. Meta = kind · signed/sent <date>.
-function docRowHtml(d){
-  const contract=d.kind==='contract';const signed=!!(contract&&d.signed_at);const est=d.kind==='estimate';
-  const status=contract?(signed?'Signed':'Awaiting signature'):est?(d.status==='approved'?'Approved':d.status==='declined'?'Not now':'Sent'):(d.status==='accepted'?'Accepted':d.status==='declined'?'Declined':'Sent');
-  const when=signed?fdate(d.signed_at):fdate(d.created_at);
-  const meta=(contract?'Agreement':est?'Estimate':'Proposal')+(when?` · ${signed?'signed':'sent'} ${when}`:'');
-  const view=d.view_url?`<a class="fbtn" href="${esc(d.view_url)}" target="_blank" rel="noopener" aria-label="View — ${esc(d.title)}">View</a>`:'';
-  return `<div class="frow"><span class="fico" aria-hidden="true">${contract?si('pencil'):si('file')}</span>`+
-    `<span class="fmain"><span class="fname">${esc(d.title)}</span><span class="fmeta">${esc(meta)}</span></span>`+
-    `<span class="fst${signed?' sig':''}">${esc(status)}</span>${view}</div>`;
-}
 // The client→studio share card (uploads are PER-PROJECT: hidden entirely with
-// zero projects; a reviewer never reaches any of this — renderFiles' persona
+// zero projects; a reviewer never reaches any of this — renderDocuments' persona
 // gate returns the calm read-only state before any share UI or /client/* read).
 // Type/size honesty up front: the ONE media store accepts JPEG/PNG/WebP images
 // up to 10MB and PDF documents up to 25MB (lib/media.ts MIME_ALLOW / MAX_BYTES /
@@ -1875,6 +1914,8 @@ async function shareCompose(file){
   const multi=list.length>1;
   host.hidden=false;
   host.innerHTML=`<p class="fsel">${esc(file.name)}</p>`+
+    // the shelf's send button has no card around it to name the limits, so its form does
+    (host.classList.contains('shelfform')?`<p class="fshare-d">JPEG, PNG or WebP images up to 10MB, or PDFs up to 25MB. It lands in your project’s files right away.</p>`:'')+
     (multi?`<label class="fld" for="fproj">Which project is this for?</label><select id="fproj" class="fin">${list.map(p=>`<option value="${esc(p.id)}"${p.id===SHARE_CTX.pid?' selected':''}>${esc(p.name)}</option>`).join('')}</select>`:'')+
     `<label class="fld" for="ftitle">Title <span class="muted" style="font-weight:400">(optional)</span></label><input id="ftitle" class="fin" type="text" value="${esc(file.name)}">`+
     `<div class="row" style="margin-top:14px"><button type="submit" class="approve" id="fgo">Send to your studio</button><button type="button" id="fno">Cancel</button></div>`;
@@ -1929,49 +1970,198 @@ async function shareSend(file){
     // back to the share card's button.
     if(view===VIEW_SEQ){
       if(SHARE_CTX.ondone)SHARE_CTX.ondone();
-      else renderFiles().then(()=>{const c=$('fchoose');if(c)c.focus();});
+      else renderDocuments().then(()=>{const c=$('fchoose');if(c)c.focus();});
     }
   }catch(_){fail('The upload didn’t finish — please try again.');}
 }
-async function renderFiles(){
+// ── DOCUMENTS: the papers shelf (item 179 part four, Figma "Client portal — parts 2
+// to 4", part 4). Files and Invoices fold into one shelf: every paper the studio
+// sent (invoices, proposals and estimates, agreements, files), newest first by
+// month, each with the one thing to do, and what you owe on top with the one
+// filled button. On a phone the filters are chips over the list; from 1000px a
+// rail with counts. The pure helpers are mirrored in tests/presence/portal_shelf_test.mjs. ──
+const SHELF_CATS=[['reports','Monthly reports','Reports'],['invoices','Invoices','Invoices'],['proposals','Proposals and estimates','Proposals'],['agreements','Agreements','Agreements'],['files','Files','Files']];
+let SHELF_CAT='all',SHELF_DATA=null;
+// a date on the client's own calendar: a bare YYYY-MM-DD is that day, a timestamp is
+// read in local time (a UTC slice would file a late-evening paper under tomorrow)
+function shelfDate(s){s=String(s||'');const m=/^(\d{4})-(\d{2})-(\d{2})$/.exec(s);if(m)return new Date(+m[1],+m[2]-1,+m[3]);const t=Date.parse(s);return isFinite(t)?new Date(t):null;}
+function shelfDay(s,now){const d=shelfDate(s);if(!d)return'';return d.toLocaleDateString('en-US',d.getFullYear()===now.getFullYear()?{month:'short',day:'numeric'}:{month:'short',day:'numeric',year:'numeric'});}
+function shelfMonth(s,now){const d=shelfDate(s);if(!d)return'Earlier';return d.toLocaleDateString('en-US',d.getFullYear()===now.getFullYear()?{month:'long'}:{month:'long',year:'numeric'});}
+// a link the shelf may open: the studio's own https pages (or a same-site path), nothing else
+function shelfUrl(u){u=String(u||'');return /^(https:\/\/|\/(?!\/))/i.test(u)?u:'';}
+// One row per paper: {cat, kind, title, info, when, chip, tone, act}. act is a link
+// ({verb, href}, Pay in this tab), a file to save ({verb, dl}), an OK asked of you
+// opened in place ({verb, apr, pid}), a monthly report to download ({verb, rep}), or
+// a note ({note}). A report is filed under the month it went out (the first days of
+// the next month), and says New until it's opened on this device.
+function shelfRows(invoices,docs,snaps,reports,todayYmd,pending,now){
+  const rows=[];
+  let newest=true;
+  for(const rp of (reports||[])){
+    const m=/^(\d{4})-(0[1-9]|1[0-2])$/.exec(String((rp&&rp.month)||''));if(!m)continue;
+    const y=+m[1],mo=+m[2];
+    const name=new Date(y,mo-1,1).toLocaleDateString('en-US',y===now.getFullYear()?{month:'long'}:{month:'long',year:'numeric'});
+    const out=(mo===12?(y+1)+'-01':y+'-'+String(mo+1).padStart(2,'0'))+'-01';
+    rows.push({cat:'reports',kind:'Monthly report',title:name+' report',info:'PDF · visitors, searches and what changed',when:out,chip:newest&&!rp.opened?'New':'',tone:'',act:{verb:'Open',rep:m[0]}});
+    newest=false;
+  }
+  for(const i of (invoices||[])){
+    if(!i||!i.id)continue;
+    const st=moneyState(i,todayYmd,pending);const amt=i.amount?fmtMoney(i.amount):'';
+    const pay=(st==='upcoming'||st==='overdue')&&/^https:\/\//.test(String(i.pay_url||''))?i.pay_url:'';
+    const view=shelfUrl(i.view_url);
+    const info=[amt,st==='paid'?(i.paid_at?'paid '+shelfDay(i.paid_at,now):'paid'):st==='processing'?'':st?(i.due_date?'due '+shelfDay(i.due_date,now):''):'withdrawn'].filter(Boolean).join(' · ');
+    const act=st==='paid'?(view?{verb:'Receipt',href:view}:null):st==='processing'?{note:'processing',inv:i}:!st?null:pay?{verb:'Pay',href:pay,pay:true}:view?{verb:'View',href:view}:{note:'details'};
+    rows.push({cat:'invoices',kind:'Invoice',title:i.name||'Invoice',info,when:String(i.created_at||i.due_date||''),chip:st?MONEY_WORD[st]:'Voided',tone:st==='paid'?'sig':st==='overdue'?'od':st==='processing'?'pr':st?'':'mute',act});
+  }
+  for(const d of (docs||[])){
+    if(!d||!d.id)continue;
+    const view=shelfUrl(d.view_url);const amt=d.amount?fmtMoney(d.amount):'';
+    if(d.kind==='contract'){
+      const signed=!!d.signed_at||d.status==='signed';
+      rows.push({cat:'agreements',kind:'Agreement',title:d.title||'Agreement',info:signed?'signed '+shelfDay(d.signed_at||d.created_at,now):'waiting for your signature',when:String(d.created_at||''),
+        chip:signed?'Signed':'Your signature',tone:signed?'sig':'ask',act:view?{verb:signed?'View':'Look',href:view}:null});
+      continue;
+    }
+    const est=d.kind==='estimate';const st=String(d.status||'sent');
+    const yes=est?st==='approved':st==='accepted',no=st==='declined',old=st==='superseded',open=!yes&&!no&&!old;
+    rows.push({cat:'proposals',kind:est?'Estimate':'Proposal',title:d.title||(est?'Estimate':'Proposal'),
+      info:[amt,yes?(est?'approved':'accepted'):no?(est?'not now':'declined'):old?'replaced by a newer one':'waiting for your OK'].filter(Boolean).join(' · '),when:String(d.created_at||''),
+      chip:yes?(est?'Approved':'Accepted'):no?(est?'Not now':'Declined'):old?'Replaced':'Your OK',tone:yes?'sig':open?'ask':'mute',act:view?{verb:open?'Look':'View',href:view}:null});
+  }
+  for(const sn of (snaps||[])){
+    if(!sn||sn.failed)continue;
+    for(const f of (sn.deliverables||[])){
+      if(!f||!f.id)continue;
+      const mine=isClientUpload(f);const ap=approvalForFile(sn.approvals,f.id);   // a snapshot keeps only the approvals still waiting
+      rows.push({cat:'files',kind:mine?'File you sent':'File from your studio',title:f.title||'File',info:mine?'You sent this':'From your studio',when:String(f.created_at||''),
+        chip:ap?'Your OK':mine?'You shared':'',tone:ap?'ask':'you',act:ap?{verb:'Look',apr:ap.id,pid:sn.id}:{verb:'Save',dl:f.id}});
+    }
+  }
+  rows.sort((a,b)=>b.when.localeCompare(a.when));   // newest first, across kinds
+  return rows;
+}
+// the rows under each month's heading, in order (the rows arrive newest first)
+function shelfGroups(rows,now){const out=[];let cur=null;for(const r of (rows||[])){const m=shelfMonth(r.when,now);if(!cur||cur.month!==m){cur={month:m,rows:[]};out.push(cur);}cur.rows.push(r);}return out;}
+function shelfCounts(rows){const c={all:0,invoices:0,proposals:0,agreements:0,files:0};for(const r of (rows||[])){c.all++;c[r.cat]=(c[r.cat]||0)+1;}return c;}
+// what you owe: the unpaid total, how many, and the one due first
+function shelfOwe(unpaid){
+  const due=(unpaid||[]).filter(i=>i&&(Number(i.amount)||0)>0);if(!due.length)return null;
+  const next=due.slice().sort((a,b)=>String(a.due_date||'9999').localeCompare(String(b.due_date||'9999')))[0];
+  return {total:due.reduce((a,i)=>a+(Number(i.amount)||0),0),count:due.length,next};
+}
+function shelfOweHtml(o,cat){
+  if(!o)return'';
+  const n=o.next,one=o.count===1,late=invState(n)==='overdue';
+  const pay=one&&/^https:\/\//.test(String(n.pay_url||''))?n.pay_url:'';
+  const day=(ymd)=>{const d=shelfDate(ymd);return d?d.toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric'}):'';};
+  const when=n.due_date?` · ${late?'was due':'due'} ${day(n.due_date)}`:'';
+  const sub=one?`${n.name||'Invoice'}${when}`:`${o.count} invoices · the next${when?when.slice(2):' has no due date'}`;
+  const btn=pay?`<a class="approve owebtn" href="${esc(pay)}" aria-label="Pay ${esc(fmtMoney(o.total))} — ${esc(n.name||'Invoice')}"><span>Pay<span class="lg"> ${esc(fmtMoney(o.total))}</span></span></a>`
+    :(!one&&cat!=='invoices')?`<button type="button" class="approve owebtn" data-shelf-go="invoices">See invoices</button>`:'';
+  return `<div class="owe${late?' late':''}" id="inv-unpaid"><span class="fico invoices" aria-hidden="true">${si('receipt')}</span><div class="owem"><p class="owet">You owe ${esc(fmtMoney(o.total))}</p><p class="owes">${esc(sub)}</p></div>${btn}</div>`;
+}
+function shelfRowHtml(r,now){
+  const a=r.act;let act='';
+  if(a&&a.href)act=`<a class="fbtn" href="${esc(a.href)}"${a.pay?'':' target="_blank" rel="noopener"'} aria-label="${esc(a.verb)} — ${esc(r.title)}">${esc(a.verb)}</a>`;   // Pay stays in this tab (G9); the studio's copies open beside it
+  else if(a&&a.dl)act=`<button class="fbtn" data-dl="${esc(a.dl)}" aria-label="Save — ${esc(r.title)}">Save</button>`;
+  else if(a&&a.apr)act=`<button class="fbtn" data-shelf-apr="${esc(a.apr)}" data-shelf-pid="${esc(a.pid)}" aria-label="Look — ${esc(r.title)}">Look</button>`;
+  else if(a&&a.rep)act=`<button class="fbtn" data-shelf-rep="${esc(a.rep)}" aria-label="Open — ${esc(r.title)}">Open</button>`;
+  else if(a&&a.note==='processing')act=paidConfirmNote(a.inv);
+  else if(a&&a.note==='details')act=`<span class="finote">Your studio will send payment details.</span>`;
+  const day=shelfDay(r.when,now);
+  // a phone reads one line under the name ("Invoice · $450 · due Nov 14"); a computer
+  // splits it into columns (what it is · amount or state · date · chip · the one thing to do)
+  const line=r.cat==='files'?(day?' · '+day:''):(r.info?' · '+r.info:'');
+  return `<div class="frow srow${a&&a.note?' noted':act?' acts':''}${r.chip==='New'?' fresh':''}" role="listitem"><span class="fico ${esc(r.cat)}${r.tone==='ask'?' ask':''}" aria-hidden="true">${r.cat==='invoices'?si('receipt'):r.cat==='agreements'?si('pencil'):r.cat==='files'?fileIcon(r.title):r.cat==='reports'?si('chart'):si('file')}</span>`+
+    `<div class="fmain"><h3 class="fname">${esc(r.title)}</h3><span class="fmeta">${esc(r.kind)}<span class="sline">${esc(line)}</span></span></div>`+
+    `<span class="sinfo">${esc(r.info)}</span><span class="sdate">${esc(day)}</span>`+
+    `${r.chip?`<span class="fst${r.tone?' '+r.tone:''}">${esc(r.chip)}</span>`:'<span class="fst none"></span>'}${act}</div>`;
+}
+function studioMid(){const s=studioBrand();return s==='Your studio'?'your studio':s;}
+async function renderDocuments(){
   const view=++VIEW_SEQ;   // this render owns #main until something newer bumps the token (renderMessages' contract)
-  if(PORTAL.persona!=='client'){ // reviewer: /client/* is 403 server-side — the calm read-only state, NO fetches, never an error line (renderMessages' contract)
-    $('main').innerHTML=portalHeader('Files & documents','Everything your studio has shared — files, proposals, and agreements.')+
-      emptyCard('Your studio’s files and documents will appear here once they’ve set up your account.','📁');
+  if(PORTAL.persona!=='client'){ // reviewer: /client/* is 403 server-side — the calm read-only state, NO fetches, never an error line; money lives with the account owner
+    $('main').innerHTML=portalHeader('Documents','Everything your studio shares with this account, in one place.')+
+      emptyCard('Your studio’s files and documents will appear here once they’ve set up your account. Invoices go to the account owner — there’s nothing here for you to pay.','📁');
     return;
   }
+  setWide(true);
   $('main').innerHTML=spinnerHtml();
-  // persona is 'client' past the gate above (the load() derivation makes a
-  // reviewer-with-projects unrepresentable), so sharing depends only on having
-  // a project to attach the file to.
+  // persona is 'client' past the gate above, so sending a file depends only on
+  // having a project to attach it to (uploads are project-scoped)
   const canShare=PORTAL.projects.length>0;
-  const [snaps,docsRes]=await Promise.all([ensureSnaps(),api('/client/documents').catch(()=>null)]);
+  const [snaps,docsRes,b,repRes]=await Promise.all([ensureSnaps(),api('/client/documents').catch(()=>null),ensureBilling(),api('/client/reports').catch(()=>null)]);
   if(view!==VIEW_SEQ)return;   // the user moved on mid-fetch — never paint over the newer view
-  const docsFailed=!(docsRes&&docsRes.ok);
-  const docs=(!docsFailed&&docsRes.body.data&&docsRes.body.data.documents)||[];
-  let html=portalHeader('Files & documents',canShare
-    ?'Everything your studio has shared — and anything you want to send them.'
-    :'Everything your studio has shared — files, proposals, and agreements.');
-  if(canShare)html+=shareCardHtml();
-  // Documents: proposals & agreements the client can re-open any time. A FAILED
-  // read says so — it must never masquerade as "no documents".
-  if(docsFailed)html+=`<section><h2>Documents</h2><p class="muted fload">We couldn’t load your documents just now — please try again in a moment.</p></section>`;
-  else if(docs.length)html+=`<section><h2>Documents</h2><div class="flv" id="fdocs">${docs.map(docRowHtml).join('')}</div></section>`;
-  const withFiles=snaps.filter(s=>s&&!s.failed&&s.deliverables&&s.deliverables.length);
-  const failedSnaps=snaps.filter(s=>s&&s.failed);
-  for(const s of withFiles)html+=`<section><h2>${esc(s.name)}</h2><div class="flv">${s.deliverables.map(f=>fileRowHtml(f)).join('')}</div></section>`;
-  // per-project read failures get their own honest line — never the empty copy
-  for(const s of failedSnaps)html+=`<section><h2>${esc(s.name)}</h2><p class="muted fload">We couldn’t load this project’s files just now — please try again in a moment.</p></section>`;
-  // PS6 (PS1 residual): a failed PROJECTS read left every project section silently
-  // absent — say so, and never let "No files yet" masquerade over it below
-  if(PORTAL.projectsFailed)html+=`<section><h2>Project files</h2><p class="muted fload">We couldn’t load your project files just now — please try again in a moment.</p></section>`;
-  if(!docsFailed&&!docs.length&&!withFiles.length&&!failedSnaps.length&&!PORTAL.projectsFailed)html+=emptyCard('No files yet. When your studio shares a document, design, or download, it’ll appear here.','📁');
-  $('main').innerHTML=html;
-  wireDownloads(document);
+  SHELF_DATA={snaps,docsRes,b,repRes};
+  $('main').innerHTML=`<header class="shelfhead"><h1 tabindex="-1">Documents</h1><p class="sub">Everything ${esc(studioMid())} has sent you, in one place.</p>`+
+    (canShare?`<button type="button" class="shelfsend" id="fchoose" aria-label="Send your studio a file"><span aria-hidden="true">${si('upload')}</span><span>Send<span class="lg"> your studio</span> a file</span></button><input type="file" id="ffile" class="fshare-file" accept="${SHARE_ACCEPT}" aria-hidden="true" tabindex="-1">`:'')+
+    `</header>${canShare?`<form class="fsend shelfform" id="fsend" aria-live="polite" hidden></form>`:''}<div class="shelf" id="shelf"></div>`;
+  paintShelf();
   if(canShare)wireShareCard();
 }
+// the list and its filters repaint without a refetch, and never touch the header's send form
+function paintShelf(){
+  const host=$('shelf'),d=SHELF_DATA;if(!host||!d)return;
+  const now=new Date(),today=portalTodayYmd();
+  const docsFailed=!(d.docsRes&&d.docsRes.ok);
+  const docs=(!docsFailed&&d.docsRes.body&&d.docsRes.body.data&&d.docsRes.body.data.documents)||[];
+  const billFailed=!!(d.b&&d.b.failed);
+  // a 404 is a server without the reports read yet (a deploy in flight): no reports, said nowhere
+  const repFailed=!(d.repRes&&(d.repRes.ok||d.repRes.status===404));
+  const reports=((d.repRes&&d.repRes.ok&&d.repRes.body&&d.repRes.body.data&&d.repRes.body.data.reports)||[]).map(r=>({...r,opened:reportOpened(r&&r.month)}));
+  const rows=shelfRows((d.b&&d.b.invoices)||[],docs,d.snaps,reports,today,PAID_PENDING,now);
+  const counts=shelfCounts(rows);
+  const cat=SHELF_CAT==='all'||SHELF_CATS.some(c=>c[0]===SHELF_CAT)?SHELF_CAT:'all';
+  const shows=(c)=>cat==='all'||cat===c;
+  const chip=(id,label,short,n)=>`<button type="button" class="chip" data-shelf="${id}" aria-pressed="${cat===id?'true':'false'}"><span class="sl">${esc(label)}</span><span class="ss">${esc(short)}</span><span class="sc">${n}</span></button>`;
+  // a filter shows only when it holds something (or is the one you're on)
+  let html=`<nav class="shelfnav" aria-label="Show">${chip('all','All','All',counts.all)}${SHELF_CATS.filter(c=>counts[c[0]]||cat===c[0]).map(c=>chip(c[0],c[1],c[2],counts[c[0]])).join('')}</nav><div class="shelfbody">`;
+  if(shows('invoices')&&!billFailed)html+=shelfOweHtml(shelfOwe(unpaidInvoices(d.b)),cat);
+  // a failed read says so, on the filters it feeds — never the empty story
+  if(shows('invoices')&&billFailed)html+=`<p class="muted fload">We couldn’t load your invoices just now — please try again in a moment.</p>`;
+  if((shows('proposals')||shows('agreements'))&&docsFailed)html+=`<p class="muted fload">We couldn’t load your documents just now — please try again in a moment.</p>`;
+  if(shows('reports')&&repFailed)html+=`<p class="muted fload">We couldn’t load your monthly reports just now — please try again in a moment.</p>`;
+  if(shows('files')){
+    for(const sn of (d.snaps||[]).filter(x=>x&&x.failed))html+=`<p class="muted fload">We couldn’t load the files from ${esc(sn.name||'a project')} just now — please try again in a moment.</p>`;
+    if(PORTAL.projectsFailed)html+=`<p class="muted fload">We couldn’t load your project files just now — please try again in a moment.</p>`;
+  }
+  const list=rows.filter(r=>shows(r.cat));
+  for(const g of shelfGroups(list,now))html+=`<section class="shelfgroup"><h2 class="shelfmonth">${esc(g.month)}</h2><div class="flv" role="list">${g.rows.map(r=>shelfRowHtml(r,now)).join('')}</div></section>`;
+  if(cat==='invoices'&&!billFailed&&list.length)html+=`<p class="muted shelfnote">Your website subscription is billed separately.</p>`;
+  const failed=billFailed||docsFailed||repFailed||PORTAL.projectsFailed||(d.snaps||[]).some(x=>x&&x.failed);
+  if(!list.length&&!failed)html+=emptyCard(({
+    invoices:'No invoices yet. When your studio bills you for project or service work, it’ll show up here. (Your website subscription is billed separately.)',
+    proposals:'No proposals or estimates yet.',agreements:'No agreements yet.',reports:'No monthly reports yet.',
+    files:'No files yet. When your studio shares a document, design, or download, it’ll appear here.',
+  })[cat]||'Nothing here yet. When your studio sends you an invoice, a proposal or a file, you’ll find it here.','📁');
+  host.innerHTML=html+`</div>`;
+  wireDownloads(host);
+  host.querySelectorAll('[data-shelf]').forEach(b=>b.addEventListener('click',()=>{SHELF_CAT=b.getAttribute('data-shelf');paintShelf();const nb=$('shelf')&&$('shelf').querySelector(`[data-shelf="${SHELF_CAT}"]`);if(nb)nb.focus();}));
+  host.querySelectorAll('[data-shelf-go]').forEach(b=>b.addEventListener('click',()=>{SHELF_CAT=b.getAttribute('data-shelf-go');paintShelf();const nb=$('shelf')&&$('shelf').querySelector(`[data-shelf="${SHELF_CAT}"]`);if(nb)nb.focus();}));
+  host.querySelectorAll('[data-shelf-apr]').forEach(b=>b.addEventListener('click',()=>openApproval(b.getAttribute('data-shelf-pid'),b.getAttribute('data-shelf-apr'),'documents')));
+  host.querySelectorAll('[data-shelf-rep]').forEach(b=>b.addEventListener('click',()=>openReport(b.getAttribute('data-shelf-rep'),b)));
+}
+// a report opened on this device loses its New
+function reportOpened(month){try{return localStorage.getItem('dds-report-opened:'+month)==='1';}catch(_){return false;}}
+// the month's report as a file: a fetch with the sign-in, saved as a download (the
+// studio's Settings card does the same). Only a month that went out is ever served.
+async function openReport(month,btn){
+  if(btn)btn.disabled=true;
+  try{
+    const r=await fetch(FN+'/client/reports/'+encodeURIComponent(month)+'/pdf',{headers:H()});
+    if(!r.ok)throw new Error('pdf');
+    const blob=await r.blob();
+    const name=(/filename="([^"]+)"/.exec(r.headers.get('Content-Disposition')||'')||[])[1]||('monthly-report-'+month+'.pdf');
+    const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;
+    document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),5000);
+    try{localStorage.setItem('dds-report-opened:'+month,'1');}catch(_){}
+    toast('Downloaded '+name+'.');
+    if(CURRENT_TAB==='documents'&&$('shelf'))paintShelf();   // the New chip goes
+  }catch(_){toast('The report didn’t download. Please try again.');if(btn)btn.disabled=false;}
+}
 // ── INVOICES (PS2, B1) — the studio's service invoices (separate from the SaaS
-// subscription), as .frow list rows to fileRowHtml's anatomy. ──
+// subscription); the papers shelf draws them as .frow rows. ──
 // Invoice due_date is a DATE-ONLY string (YYYY-MM-DD). Date.parse would read it
 // as UTC midnight and shift a day west of Greenwich, so BOTH the display label
 // and the overdue math work in the client's LOCAL calendar: the string's own
@@ -2008,37 +2198,6 @@ function moneyBuckets(list,todayYmd,pending){
 }
 // the portal's own state call: local today + the just-paid ids
 function invState(i){return moneyState(i,portalTodayYmd(),PAID_PENDING);}
-// One invoice row: 🧾 + name (a REAL h3 heading — screen readers navigate the
-// money surface by invoice name) + "amount · due <date>" meta + status chip +
-// the row action. Chip: Paid (green) / Overdue (derived, warn) / the server's
-// own word (sent, open …) — never an invented state. Action: an unpaid invoice
-// with a pay link gets Pay, in THIS tab (Nov 10 review, G9: a new tab left this
-// one saying Pay after Stripe came back in a second copy); a paid one says thank you;
-// an unpaid one without a link says the studio will send payment details;
-// void/canceled rows get no action at all (there is nothing to do or await).
-function invoiceRowHtml(i,todayYmd){
-  const st=moneyState(i,todayYmd,PAID_PENDING);
-  const dead=!st;   // void/canceled — no money state, nothing to do or await
-  const due=invDueLabel(i.due_date)||String(i.due_date||'');
-  const meta=[i.amount?fmtMoney(i.amount):'',due?'due '+due:''].filter(Boolean).join(' · ');
-  const chip=dead?'Voided':MONEY_WORD[st];
-  const cls=st==='paid'?' sig':st==='overdue'?' od':st==='processing'?' pr':'';
-  // https-only pay links (defense-in-depth on the money surface): the server
-  // only ever writes Stripe https URLs, so anything else is treated as absent.
-  // A processing row never offers Pay, whatever the server shipped: the client
-  // already paid, and a second charge on a settling payment is a double-pay.
-  const pay=st!=='processing'&&i.pay_url&&/^https:\/\//.test(i.pay_url)?i.pay_url:null;
-  const paidOn=i.paid_at?invDueLabel(String(i.paid_at).slice(0,10)):'';
-  const act=st==='paid'?`<span class="finote">Paid${paidOn?' '+esc(paidOn):''} — thank you.</span>`
-    :dead?''
-    :st==='processing'?paidConfirmNote(i)
-    :pay?`<a class="fbtn pay" href="${esc(pay)}" aria-label="Pay — ${esc(i.name||'Invoice')}">Pay →</a>`
-    :`<span class="finote">Your studio will send payment details.</span>`;
-  return `<div class="frow inv" role="listitem"><span class="fico" aria-hidden="true">${si('receipt')}</span>`+
-    `<div class="fmain"><h3 class="fname">${esc(i.name||'Invoice')}</h3>`+
-    `${meta?`<span class="fmeta">${esc(meta)}</span>`:''}</div>`+
-    `<span class="fst${cls}">${esc(chip)}</span>${act}</div>`;
-}
 // ── Oct 2026 benchmark (item 1): the moment after a client pays ──────────────
 // Stripe's Payment Link sends the payer back to /client.html?paid=<invoice id>.
 // Until the webhook flips the row the server still says open — so the row
@@ -2068,7 +2227,7 @@ function paidBegin(id,at){
   PAID_PENDING=[String(id)];PAID_SINCE=at||Date.now();PAID_STALE=Date.now()-PAID_SINCE>=PAID_POLL_LIMIT_MS;
   if(PAID_TIMER)clearTimeout(PAID_TIMER);PAID_TIMER=setTimeout(paidPoll,PAID_POLL_MS);
 }
-function paidRepaint(){if(CURRENT_TAB==='invoices')renderInvoices();else if(CURRENT_TAB==='home')renderHome();}
+function paidRepaint(){if(CURRENT_TAB==='documents')renderDocuments();else if(CURRENT_TAB==='home')renderHome();}
 async function paidPoll(){
   PAID_TIMER=null;if(!PAID_PENDING.length)return;
   PORTAL.billing=null;   // bypass the per-load cache — a fresh read is the whole point
@@ -2085,32 +2244,6 @@ async function paidPoll(){
 // tab by hand) reaches this one through the shared ten-minute note, so this tab
 // stops offering Pay too
 window.addEventListener('storage',(e)=>{if(e.key!=='dds-paid-pending'||!PORTAL.ready)return;const v=paidStored();if(v&&PAID_PENDING.indexOf(String(v.id))<0){paidBegin(v.id,+v.at||Date.now());paidRepaint();}});
-async function renderInvoices(){
-  const view=++VIEW_SEQ;   // this render owns #main until something newer bumps the token (renderMessages' contract)
-  if(PORTAL.persona!=='client'){ // reviewer: /client/billing is 403 server-side — the calm read-only state, ZERO fetches, in the account-owner voice (never the client-shaped "No invoices yet")
-    $('main').innerHTML=portalHeader('Invoices','Billing lives with the account owner.')+
-      emptyCard('Invoices for this work go to the account owner — there’s nothing here for you to pay.','🧾');
-    return;
-  }
-  $('main').innerHTML=spinnerHtml();
-  const b=await ensureBilling();
-  if(view!==VIEW_SEQ)return;   // the user moved on mid-fetch — never paint over the newer view
-  const inv=(b&&b.invoices)||[];
-  let html=portalHeader('Invoices',inv.length?'Invoices from your studio for project and service work.':'');
-  // a FAILED read says so — never the "No invoices yet" story (and ensureBilling
-  // didn't cache it, so coming back to this tab retries the read)
-  if(b&&b.failed){html+=`<div class="card"><p class="muted">We couldn’t load your invoices just now — please try again in a moment.</p></div>`;$('main').innerHTML=html;return;}
-  if(!inv.length){html+=emptyCard('No invoices yet. When your studio bills you for project or service work, it’ll show up here. (Your website subscription is billed separately.)','🧾');$('main').innerHTML=html;return;}
-  const today=portalTodayYmd();
-  // the ONE formula over the same unpaidInvoices Home's queue counts — the
-  // tab's total and Home can never disagree (one formula, one formatter)…
-  const total=unpaidInvoices(b).reduce((a,i)=>a+(Number(i&&i.amount)||0),0);
-  html+=`<p class="muted" style="margin:0 0 14px">Your website subscription is billed separately.</p>`;   // 0-top: the legacy -14px was tuned for a sub-less header and overlapped the sub line
-  // …and the line only exists when something truly is unpaid — never a fake $0
-  if(total>0)html+=`<p class="invtotal" id="inv-unpaid">Unpaid right now: <strong>${esc(fmtMoney(total))}</strong></p>`;
-  html+=`<div class="flv" role="list" aria-label="Invoices">${inv.map(i=>invoiceRowHtml(i,today)).join('')}</div>`;
-  $('main').innerHTML=html;
-}
 // ── ASK FOR A SERVICE (item 179 part three: the old Requests tab, now a door in
 // Messages). The studio's offers meant for this client (lib/portal_services.ts
 // filters them server-side); Ask for this opens a short brief that becomes a
@@ -2286,7 +2419,7 @@ async function openServiceRequest(svc){
 }
 // ── HELP — the studio's FAQ (searchable/expandable) + a way to reach a human ──
 // PS4 (B2): the reviewer is persona-gated BEFORE the fetch (zero /client/*
-// reads — the renderMessages/renderFiles contract; Help was the last tab still
+// reads — the renderMessages/renderDocuments contract; Help was the last tab still
 // firing a doomed 403 read), the FAQ read is three-way honest (failed ≠ empty ≠
 // loaded, and a failure is never cached — tab re-entry retries free), and the
 // account card is a proper profile section whose "message your studio" pointers
@@ -2312,9 +2445,9 @@ function wireAccountSection(){
 // The starter answers: how this portal works, true for every studio. Same markup as
 // the studio's own articles (lib/faq.ts renderFaq), so the search covers them too.
 const STARTER_FAQ=[
-  ['How do I send my studio a file?','Open Files and press Choose a file. Photos (JPEG, PNG or WebP) up to 10MB and PDFs up to 25MB go straight to your studio.'],
+  ['How do I send my studio a file?','Open Documents and press Send a file. Photos (JPEG, PNG or WebP) up to 10MB and PDFs up to 25MB go straight to your studio.'],
   ['How do I approve something?','Anything waiting for your OK is at the top of Home, under Needs you, and in your project. Press Approve, or Request changes to say what you’d like different. Nothing changes until you approve.'],
-  ['How do I pay an invoice?','Open Invoices and press Pay. You pay on Stripe’s secure page and come straight back here, where the invoice shows Processing and then Paid.'],
+  ['How do I pay an invoice?','Open Documents: what you owe is at the top, with Pay. You pay on Stripe’s secure page and come straight back here, where the invoice shows Processing and then Paid.'],
   ['How do I ask for something new?','Open Messages to book a call, ask for one of your studio’s services, or press Write and say what you need. Nothing is charged until your studio replies.'],
   ['How do I change my password?','Under Your account, further down this page, press Change password and we’ll email you a link to set a new one.'],
 ];
@@ -2421,8 +2554,7 @@ function welcomeCardHtml(){
     `<h3>Welcome${n?`, ${esc(n)}`:''}</h3>`+
     `<p>This is your workspace with your studio — here's where everything lives:</p>`+
     step('messages',si('message'),'Messages','Talk to your studio, book a call or ask for a service.')+
-    step('files',si('folder'),'Files & documents','Download what they share; find your proposals & agreements.')+
-    step('invoices',si('receipt'),'Invoices','See and pay what you owe.')+
+    step('documents',si('folder'),'Documents','Monthly reports, invoices, proposals and files, in one place. Pay what you owe there.')+
     `</div>`;
 }
 function wireWelcome(){
@@ -2552,7 +2684,7 @@ function todoAskHtml(t,data,aps){
 // Back returns to where it was opened from: Home, or the project it came from.
 const AP_KIND={deliverable:'File',task:'Task',project:'Project',custom:'Request',website:'Draft'};
 const AP_DONE={approved:['✓ Approved','ok'],rejected:['Declined',''],changes_requested:['✎ Changes requested','chg']};
-function sheetBack(from){return from&&from.pid?{label:from.name||'Back to the project',go:()=>openProject(from.pid)}:{label:'Home',go:goHome};}
+function sheetBack(from){return from&&from.pid?{label:from.name||'Back to the project',go:()=>openProject(from.pid)}:from==='documents'?{label:'Documents',go:()=>showTab('documents')}:{label:'Home',go:goHome};}
 function sheetBackHtml(back){return `<p class="sheetback"><a class="link" href="#" id="sheetBack">‹ ${esc(back.label)}</a></p>`;}
 function sheetHead(chips,title,sub){return `<header class="sheet"><div class="sheetmeta">${chips}</div><h1 tabindex="-1">${esc(title)}</h1>${sub?`<p class="sub">${esc(sub)}</p>`:''}</header>`;}
 function wireSheet(back,focusSel){
@@ -3233,7 +3365,7 @@ function keepReturn(q){
     if(id('project'))v.project=id('project');
     if(id('approval'))v.approval=id('approval');   // item 179: an ask's email opens the approval itself
     if(id('support'))v.support=id('support');
-    const t=tabOf(String(location.hash||'').slice(1));if(TAB_IDS.indexOf(t)>=0)v.tab=t;
+    const t=String(location.hash||'').slice(1);if(TAB_IDS.indexOf(tabOf(t))>=0)v.tab=t;   // the name as written: #invoices keeps its filter
     if(!Object.keys(v).length)return;
     v.at=Date.now();localStorage.setItem(RETURN_KEY,JSON.stringify(v));
   }catch(_){}
@@ -3264,7 +3396,7 @@ async function load(){
   // item 179: "Needs your OK" emails carry the approval too — it opens in place, the project stays the fallback
   const dapr=String((fromUrl?params.get('approval'):(kept&&kept.approval))||'');
   // a tab named in the address (#invoices: the cancelled-payment page's way back), first load only
-  const hashTab=first&&TAB_IDS.indexOf(tabOf(String(location.hash||'').slice(1)))>=0?tabOf(String(location.hash).slice(1)):'';
+  const hashTab=first&&TAB_IDS.indexOf(tabOf(String(location.hash||'').slice(1)))>=0?String(location.hash).slice(1):'';   // showTab resolves an old name to its tab and filter
   const wantTab=hashTab||(kept&&kept.tab)||'';
   // studio audit change 9: the studio's "connect your Google" email lands here with
   // ?connect=<signed token>; a sign-in on the way stashes it (see the boot below)
