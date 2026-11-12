@@ -497,6 +497,10 @@ const WRITE_HANDLERS = [
   // no member list (an unlisted write refuses every seat — asserted above), and the handlers
   // themselves refuse anyone who isn't platform staff (tool_leads_routes_test.mjs proves it).
   'handleToolLead', 'handleToolLeadConvert',
+  // builder list item 185: the map rank grid spends the platform's Google key, so it is the studio's
+  // alone. Its writes are on no member list (every seat is refused at the gate), and the handlers
+  // refuse anyone who isn't platform staff or a studio scoped in (rank_grid_test.mjs proves it).
+  'handleMapsPut', 'handleMapsPlace', 'handleMapsFind', 'handleMapsScan',
   'handleStudioRequests',   // final pass S1: POST /portal/studio-requests/:id/(accept|decline) are open; the route answers the owner only
   'handleMemberRole', 'handleTransferStart', 'handleTransferCancel',   // builder item 53: open on the member list; each route checks the role itself
   'handleSitePassword',   // builder list item 175: POST /site/password needs configure
