@@ -299,6 +299,13 @@ html.dds-embed .dds-waffle{display:none!important}
   a.dds-ic[href="/help.html"],#dds-settings,#dds-new{display:none}
   .dds-brand{min-width:0;overflow:hidden;white-space:nowrap}
 }
+/* A phone in the sidebar layout (html.dds-side) kept the search box's words and
+   its shortcut key, which pushed the Account button half off the right edge of a
+   402px iPhone (real Safari, Nov 8 2026). On a phone the search is its icon. */
+@media (max-width:480px){
+  #dds-search span:not(:first-child),#dds-search kbd{display:none !important}
+  #dds-search{min-width:0;flex:0 0 auto}
+}
 @media (prefers-reduced-motion:reduce){#dds-shell,.dds-pop,.dds-palette,.dds-drawer,.dds-nav .sec .menu{transition:none;animation:none}}
 
 /* ── PT-5: contextual onboarding hint (teach in context, dismiss forever) ──── */

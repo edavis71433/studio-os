@@ -258,6 +258,12 @@ test.describe('on a phone', () => {
     await page.locator('#sectionsNav .navitem[data-view="pages"]').click();
     await expect(page.locator('#view-pages')).toBeVisible();
   });
+  test('the top bar fits: the Account button is fully on screen', async ({ page }) => {
+    await mount(page, '/presence.html');
+    const p = (await page.locator('#dds-profile').boundingBox())!;
+    expect(p.x + p.width).toBeLessThanOrEqual(page.viewportSize()!.width);
+    await expect(page.locator('#dds-search kbd')).toBeHidden();
+  });
   test('the site stops above the dock', async ({ page }) => {
     await mount(page, '/presence.html');
     await expect(page.frameLocator('#siteFrame').locator('h1').first()).toBeVisible();
@@ -343,6 +349,19 @@ const touchChecks = () => {
     await expect(h).toHaveAttribute('contenteditable', /true|plaintext-only/);
     await expect(frame.locator('#dds-dc-bar')).not.toHaveClass(/\bon\b/);   // the toolbar steps aside while you type
   });
+  test('Return saves the words and lets go of them, so an iPhone puts its keyboard away', async ({ page }) => {
+    const { writes, frame } = await touchCanvas(page);
+    const h = frame.locator('section#a h2[data-dds-field="title"]');
+    await frame.locator('section#a').tap();
+    await h.tap();
+    await expect(h).toHaveAttribute('contenteditable', /true|plaintext-only/);
+    await page.keyboard.press('End');
+    await page.keyboard.insertText(' today');
+    await page.keyboard.press('Enter');
+    // straight away, before the save redraws the canvas: nothing keeps the keyboard
+    expect(await h.evaluate((el) => el.ownerDocument.activeElement === el)).toBe(false);
+    await expect.poll(() => writes.filter((w) => w.path === '/settings' && w.body && Array.isArray(w.body.blocks)).map((w) => w.body.blocks[0].title).at(-1)).toBe('Your heading today');
+  });
   test('the editor’s tip says to tap, not double-click', async ({ page }) => {
     await touchCanvas(page);
     await expect(page.locator('.dds-hint.dds-live')).toContainText('Tap a section to select it, then tap its words');
@@ -363,6 +382,22 @@ test.describe('editing by touch: Chrome on an Android phone', () => {
   test.use(PIXEL);
   test.beforeEach(({ browserName }) => { test.skip(browserName !== 'chromium', 'Chrome only'); });
   touchChecks();
+});
+test.describe('after an iPhone keyboard closes', () => {
+  test('the editor goes back to the top, so Exit and Publish are on screen', async ({ page }) => {
+    await touchCanvas(page);
+    const y = await page.evaluate(async () => {
+      const pad = document.createElement('div'); pad.style.height = '3000px'; document.body.appendChild(pad);   // room to be scrolled, as Safari does for its keyboard
+      window.scrollTo(0, 400);
+      const before = window.scrollY;
+      window.visualViewport!.dispatchEvent(new Event('resize'));   // the keyboard has gone: the viewport is full height again
+      await new Promise((r) => setTimeout(r, 50));
+      return [before, window.scrollY];
+    });
+    expect(y[0]).toBeGreaterThan(0);
+    expect(y[1]).toBe(0);
+    await expect(page.locator('#btnEditExit')).toBeInViewport();
+  });
 });
 test.describe('editing with a mouse is unchanged', () => {
   test.beforeEach(({}, testInfo) => { test.skip(!!testInfo.project.use.hasTouch, 'a mouse'); });
