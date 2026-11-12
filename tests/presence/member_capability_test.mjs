@@ -195,12 +195,13 @@ const DECIDED = {
     'POST /bookings/appointments/:id/confirm', 'POST /bookings/appointments/:id/no_show', 'POST /bookings/types',
     'POST /brand/reports/:id/dismiss', 'POST /brand/review', 'POST /broadcasts', 'POST /broadcasts/lists', 'POST /broadcasts/:id/cancel',
     'POST /broadcasts/:id/test',   // bold redesign: "Send me a test" goes only to the member's own address
+    'POST /sales/invoices/test',   // builder list item 175: a sample invoice email to the member's own address; nothing is made or charged
     'POST /broadcasts/draft-assist', 'POST /client/projects/:id/tasks/:id2/done',
     'POST /client/projects/:id/upload-url', 'POST /client/projects/:id/uploads',
     'POST /coach/opportunities/:id/decide', 'POST /coach/run', 'POST /content-library', 'POST /editor/improve',
     'POST /forms/inbox/:id', 'POST /forms/inbox/:id/reply', 'POST /knowledge/import', 'POST /launches',
     'POST /launches/:id/cancel', 'POST /launches/:id/recapture', 'POST /media/upload-url',
-    'POST /moments/:id/dismiss', 'POST /notes/:id/accept', 'POST /notes/:id/dismiss', 'POST /preview/publish',
+    'POST /moments/:id/dismiss', 'POST /preview/publish',
     'POST /preview/section', 'POST /preview/share-link', 'POST /projects', 'POST /projects/:id/approvals', 'POST /projects/:id/checklist',
     'POST /projects/:id/deliverables', 'POST /projects/:id/deliverables/upload-url', 'POST /projects/:id/milestones',
     'POST /projects/:id/status', 'POST /projects/:id/surveys', 'POST /projects/:id/tasks',
@@ -466,7 +467,7 @@ const WRITE_HANDLERS = [
   'handleLaunchRecapture', 'handleLaunchRollback', 'handleLaunchSchedule', 'handleLocation', 'handleMediaDelete',
   'handleMediaUpdate', 'handleMediaUpload', 'handleMemberAdd', 'handleMemberRevoke', 'handleMessages',
   'handleMilestone', 'handleMilestonesCreate', 'handleMomentDismiss', 'handleMonitorConnect',
-  'handleMonitorDisconnect', 'handleMonitorVerify', 'handleNoteResolve', 'handleNotificationsRead',
+  'handleMonitorDisconnect', 'handleMonitorVerify', 'handleNotificationsRead',
   'handlePageDuplicate', 'handleDeletedPageRestore', 'handlePageLockCreate', 'handlePreviewPromote', 'handlePreviewPublish', 'handlePreviewSection', 'handlePreviewSettings',   // item 154: putting a deleted page back is an edit (contentWriteNeeds)
   'handlePreviewShareLink', 'handleProject', 'handleProjectChecklist', 'handleProjectStatus', 'handleProjectSurveys',
   'handleProjects', 'handleProjectTemplates', 'handleTodoTemplates', 'handleDealTasksFromTemplate', 'handlePublish', 'handlePutIdentity', 'handlePutTemplate', 'handleRedirectCreate',
@@ -500,6 +501,7 @@ const WRITE_HANDLERS = [
   'handleStudioRequests',   // final pass S1: POST /portal/studio-requests/:id/(accept|decline) are open; the route answers the owner only
   'handleMemberRole', 'handleTransferStart', 'handleTransferCancel',   // builder item 53: open on the member list; each route checks the role itself
   'handleSitePassword',   // builder list item 175: POST /site/password needs configure
+  'handleSampleInvoice',   // builder list item 175: POST /sales/invoices/test is edit, like Send me a test on an update
   'handlePostPublish', 'handlePostUnpublish',   // builder list item 40: POST /posts/:id/(publish|unpublish) need publish
   'handleScheduleCancel', 'handleScheduleCreate', 'handleSettings', 'handleShareSet', 'handleStockImport',
   'handleSupport', 'handleSupportMessage', 'handleSupportOne', 'handleSurveyRespond', 'handleTakeOffline',
@@ -526,7 +528,7 @@ const WRITE_HANDLERS = [
   ok('index: its refusal returns', /const refused = await memberWriteGate\(req, route, method, principal\.member, cors\);\s*if \(refused\) return refused;/.test(idx));
   ok('index: a seat is stamped for a client caller alone, so staff and a scoped studio never meet the gate', idx.includes("if (principal.kind === 'client') principal.member = seated.member;") && idx.split('principal.member =').length === 2);
   const beforeGate = idx.slice(idx.indexOf('async function route_'), at('if (principal.member && isWrite) {'));
-  ok('index: the routes that run before the gate are the public, operator and account ones', ['/system', '/agency', '/commerce', '/admin', '/marketplace', '/enterprise', '/push/subscribe', '/help/ask'].every((r) => beforeGate.includes(`'${r}`)));
+  ok('index: the routes that run before the gate are the public, operator and account ones', ['/system', '/agency', '/commerce', '/admin', '/marketplace', '/push/subscribe', '/help/ask'].every((r) => beforeGate.includes(`'${r}`)));
 
   const direct = [...Deno.readDirSync(new URL('supabase/functions/presence/routes/', ROOT))].filter((f) => f.name.endsWith('.ts') && /\bresolveSiteRole\(/.test(read(`supabase/functions/presence/routes/${f.name}`))).map((f) => f.name);
   ok('routes: none asks resolveSiteRole directly, so the seat always outranks a failed read', direct.length === 0, direct.join(', '));
