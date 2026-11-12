@@ -33,6 +33,7 @@ import { signDocToken, readDocToken, lastingRecord, renderDocument, invoiceNo, d
 import { documentPdf, pdfFileName } from '../lib/doc_pdf.ts';   // sales item 82: the same documents as real PDFs
 import { docContextFor } from '../lib/doc_context.ts';   // sales item 81: from, billed to, dates, part payments
 import { declineReason, declineWords, validSignerEmail, maskEmail, agreementHtml } from '../lib/agreement_layout.ts';   // sales item 88
+import { normalizeSchedule, scheduleView, signingPart, partsAtSigning, partsIntoAgreement, type SchedulePart } from '../lib/proposal_schedule.ts';   // sales item 106
 import {
   canTransition, isStage, normalizeLineItems, canDecideProposal, contractHash,
   canSignContract, convertOutcome, clampLimit, type Stage,
@@ -1246,12 +1247,13 @@ export async function handleSalesTemplates(req: Request, site: SiteRow, principa
   if (isReservedName(name)) return json({ error: 'reserved_name', message: 'That name is kept for Studio OS’s own settings. Please choose another.' }, 422, cors);
   let title = clean(b.title, 200), body = '', line_items: unknown[] = [];
   if (UUID_RE.test(b.from_proposal_id || '')) {   // save an existing proposal as the template
-    const p = rows(await svc(`presence_proposals?id=eq.${b.from_proposal_id}&site_id=eq.${site.id}&deleted_at=is.null&select=title,line_items&limit=1`))[0];
+    const p = rows(await svc(`presence_proposals?id=eq.${b.from_proposal_id}&site_id=eq.${site.id}&deleted_at=is.null&select=title,line_items,terms&limit=1`))[0];
     if (!p) return json({ error: 'not_found', message: 'That proposal isn’t here.' }, 404, cors);
     // Keep the items + any discount/tax, but DROP the revise trail (revised_from/
-    // superseded_by) — a reusable template isn't a version of anything.
+    // superseded_by) — a reusable template isn't a version of anything. Sales item 106:
+    // its payment parts ride along, and its terms are kept in the template's body.
     const sp = splitLineItems(p.line_items);
-    title = title || p.title; line_items = packLineItems(sp.items, { discount: sp.meta.discount ?? null, tax_pct: sp.meta.tax_pct ?? null });
+    title = title || p.title; line_items = packLineItems(sp.items, { discount: sp.meta.discount ?? null, tax_pct: sp.meta.tax_pct ?? null, schedule: sp.meta.schedule ?? null }); body = clean(p.terms, 5000);
   } else if (UUID_RE.test(b.from_contract_id || '')) {   // save an existing contract as the template
     const c = rows(await svc(`presence_contracts?id=eq.${b.from_contract_id}&site_id=eq.${site.id}&deleted_at=is.null&select=title,body&limit=1`))[0];
     if (!c) return json({ error: 'not_found', message: 'That agreement isn’t here.' }, 404, cors);
@@ -1327,6 +1329,9 @@ async function fillPlaceholders(siteId: string, deal: any, text: string): Promis
   let studioName = '';
   try { if (deal.contact_id) contact = rows(await svc(`presence_contacts?id=eq.${deal.contact_id}&site_id=eq.${siteId}&select=name,company&limit=1`))[0] || null; } catch { /* best-effort */ }
   try { studioName = rows(await svc(`presence_identity?site_id=eq.${siteId}&select=business_name&limit=1`))[0]?.business_name || ''; } catch { /* best-effort */ }
+  // sales item 106: a proposal paid in parts rewrites the standard half-and-half passages
+  const plan = deal?.id ? await proposalSchedule(siteId, deal.id).catch(() => null) : null;
+  if (plan) text = partsIntoAgreement(text, plan.parts, plan.total_cents).text;
   return applyPlaceholders(text, buildPlaceholderValues({ deal, contact, studioName }));
 }
 
@@ -1339,7 +1344,9 @@ export async function handleSalesProposalCreate(req: Request, site: SiteRow, pri
   if (b.template_id) {   // one-tap: draft from a saved template
     const t = await loadTemplate(site.id, String(b.template_id), 'proposal');
     if (!t) return json({ error: 'not_found', message: 'That template isn’t here.' }, 404, cors);
-    b = { ...b, line_items: t.line_items, title: b.title || t.title || t.name };
+    // sales item 106: a template also brings its terms (kept in its body) and its payment parts (its meta)
+    // the editor may send its own (adjusted) lines with the template's id: those win
+    b = { ...b, line_items: b.line_items !== undefined ? b.line_items : t.line_items, title: b.title || t.title || t.name, terms: b.terms !== undefined ? b.terms : String(t.body || ''), ...(b.schedule === undefined ? { schedule: splitLineItems(t.line_items).meta.schedule ?? null } : {}) };
   }
   const norm = normalizeLineItems(b.line_items);
   if (!norm.ok) return json({ error: 'validation', message: norm.error }, 422, cors);
@@ -1347,7 +1354,10 @@ export async function handleSalesProposalCreate(req: Request, site: SiteRow, pri
   // brought in via its line_items (never the revise trail on a plain create).
   const bodyMeta = normalizeProposalMeta(b);
   const tplMeta = splitLineItems(b.line_items).meta;
-  const meta: ProposalMeta = { discount: bodyMeta.discount ?? tplMeta.discount ?? null, tax_pct: bodyMeta.tax_pct ?? tplMeta.tax_pct ?? null };
+  // sales item 106: paid in parts — the editor's parts win, else the template's
+  const sch = normalizeSchedule(b.schedule !== undefined ? b.schedule : (tplMeta.schedule ?? null));
+  if (!sch.ok) return json({ error: 'validation', message: sch.error }, 422, cors);
+  const meta: ProposalMeta = { discount: bodyMeta.discount ?? tplMeta.discount ?? null, tax_pct: bodyMeta.tax_pct ?? tplMeta.tax_pct ?? null, schedule: sch.parts };
   const ins = await svc('presence_proposals', { method: 'POST', headers: { Prefer: 'return=representation' },
     body: JSON.stringify({ site_id: site.id, deal_id: dealId, title: clean(b.title, 200) || 'Proposal',
       line_items: packLineItems(norm.items, meta), subtotal_cents: norm.subtotal_cents, currency: clean(b.currency, 8) || 'usd',
@@ -1378,10 +1388,13 @@ export async function handleSalesProposalRevise(req: Request, site: SiteRow, pri
   const norm = normalizeLineItems(rawItems);
   if (!norm.ok) return json({ error: 'validation', message: norm.error }, 422, cors);
   const bodyMeta = normalizeProposalMeta(b);
+  const sch = normalizeSchedule(b.schedule !== undefined ? b.schedule : (priorSplit.meta.schedule ?? null));   // sales item 106
+  if (!sch.ok) return json({ error: 'validation', message: sch.error }, 422, cors);
   const meta: ProposalMeta = {
     discount: (b.discount !== undefined) ? (bodyMeta.discount ?? null) : (priorSplit.meta.discount ?? null),
     tax_pct: (b.tax_pct !== undefined) ? (bodyMeta.tax_pct ?? null) : (priorSplit.meta.tax_pct ?? null),
     revised_from: id,
+    schedule: sch.parts,
   };
   const newVersion = (Math.trunc(Number(prior.version)) || 1) + 1;
   const title = clean(b.title, 200) || prior.title || 'Proposal';
@@ -2208,23 +2221,41 @@ export async function handleSalesContractCreate(req: Request, site: SiteRow, pri
  *  unpaid-reminder sweep picks it up like any open invoice. Best-effort: a mint
  *  failure never blocks the send; a link failure leaves the row for the
  *  drawer's Send button to repair (handleSalesInvoiceSend). */
+/** Sales item 106: the payment parts of the proposal an agreement goes with, when it is
+ *  paid in parts: the accepted one, else (unless `acceptedOnly`) the newest one sent or
+ *  drafted, since the proposal and the agreement often go out together on one link. */
+export async function proposalSchedule(siteId: string, dealId: string, acceptedOnly = false): Promise<{ parts: SchedulePart[]; total_cents: number } | null> {
+  const list = rows(await svc(`presence_proposals?deal_id=eq.${dealId}&site_id=eq.${siteId}&status=in.(accepted,sent,draft)&deleted_at=is.null&select=status,line_items&order=created_at.desc&limit=20`))
+    .filter((x: any) => !splitLineItems(x.line_items).meta.superseded_by);
+  const p = list.find((x: any) => x.status === 'accepted') || (acceptedOnly ? null : (list.find((x: any) => x.status === 'sent') || list.find((x: any) => x.status === 'draft')));
+  if (!p) return null;
+  const sch = normalizeSchedule(splitLineItems(p.line_items).meta.schedule ?? null);
+  if (!sch.ok || !sch.parts) return null;
+  return { parts: sch.parts, total_cents: proposalTotals(p.line_items).total_cents };
+}
 async function ensureDepositForContractSend(site: SiteRow, principal: Principal, contract: any): Promise<{ minted: boolean; amount_cents?: number; invoice_id?: string; warning?: string }> {
   try {
     const dealId = contract?.deal_id;
     if (!dealId) return { minted: false };
-    if (!/deposit/i.test(String(contract.body || ''))) return { minted: false };   // the document made no deposit promise
+    // Sales item 106: the proposal this agreement goes with is paid in parts. A first part
+    // "when you sign" is the deposit; a schedule without one has no deposit (signing makes
+    // every part), whatever the agreement's words say
+    const plan = await proposalSchedule(site.id, dealId).catch(() => null);
+    const first = plan ? signingPart(plan.parts, plan.total_cents) : null;
+    if (plan && !first) return { minted: false };
+    if (!first && !/deposit/i.test(String(contract.body || ''))) return { minted: false };   // the document made no deposit promise
     const deal = await loadDeal(site.id, dealId);
     if (!deal) return { minted: false };
-    const { deposit_cents } = depositSplit(deal.expected_value_cents);
+    const deposit_cents = first ? first.amount_cents : depositSplit(deal.expected_value_cents).deposit_cents;
     if (deposit_cents < 50) return { minted: false, warning: 'no_value' };         // the doc printed "[50% deposit]" — the deal needs a value
     if (!stripeConfigured()) return { minted: false };
     // AT MOST ONCE, EVER — any prior deposit row (open, paid, OR void) means the
     // deal's deposit story is already being told; never a second automatic one.
     const prior = rows(await svc(`presence_invoices?deal_id=eq.${dealId}&site_id=eq.${site.id}&purpose=eq.deposit&deleted_at=is.null&select=id,status&limit=1`));
     if (prior[0]) return { minted: false };
-    const description = `Deposit — ${deal.title || 'project'}`;
+    const description = `${first ? first.label : 'Deposit'} — ${deal.title || 'project'}`;
     const ins = await svc('presence_invoices', { method: 'POST', headers: { Prefer: 'return=representation' },
-      body: JSON.stringify({ site_id: site.id, deal_id: dealId, customer_client_id: deal.converted_client_id || null, customer_site_id: deal.converted_site_id || null, title: 'Deposit', description, amount_cents: deposit_cents, currency: 'usd', purpose: 'deposit', status: 'open', due_date: null, created_by: principal.email || principal.userId || 'system' }) });
+      body: JSON.stringify({ site_id: site.id, deal_id: dealId, customer_client_id: deal.converted_client_id || null, customer_site_id: deal.converted_site_id || null, title: first ? first.label : 'Deposit', description, amount_cents: deposit_cents, currency: 'usd', purpose: 'deposit', status: 'open', due_date: null, created_by: principal.email || principal.userId || 'system' }) });
     const inv = rows(ins)[0];
     if (!inv) return { minted: false };
     try {
@@ -2377,6 +2408,11 @@ export async function handleSalesContractSign(req: Request, id: string, cors: Re
     } catch { /* the signature stands; its echo is best-effort */ }
   }
 
+  // Sales item 106: paid in parts — signing makes the later parts as invoices, each with its due
+  // date (a "days after you sign" part counts from today). They wait on the Billing tab for the
+  // studio's Send, like any open invoice. At most once: a deal that already has them is left.
+  await mintLaterParts(tok.site_id, dealId, signedAt.slice(0, 10)).catch(() => {});
+
   // The delivery checklist's step 1 is a FACT the system just established, so it
   // ticks itself rather than waiting for the studio to remember. A no-op when
   // the deal hasn't been converted yet — the usual order is sign THEN convert,
@@ -2457,6 +2493,25 @@ async function askInfo(siteId: string, dealId: unknown): Promise<{ email: string
   } catch { return null; }
 }
 
+/** Sales item 106: the parts of a paid-in-parts proposal after the first become invoices once
+ *  the agreement is signed. Idempotent: any invoice already titled "Part 2 of …" (or later)
+ *  on the deal means they were made. Best-effort; the signature never waits on it. */
+async function mintLaterParts(siteId: string, dealId: string, signedYmd: string): Promise<number> {
+  const plan = await proposalSchedule(siteId, dealId, true);
+  if (!plan) return 0;
+  const have = rows(await svc(`presence_invoices?deal_id=eq.${dealId}&site_id=eq.${siteId}&deleted_at=is.null&select=title,purpose,amount_cents&limit=100`));
+  if (have.some((i: any) => /^Part \d+ of /.test(String(i.title || '')) && !/^Part 1 of /.test(String(i.title || '')))) return 0;   // made already
+  // the deposit already on the deal decides: part 1 → the rest; none → every part; anything else → none
+  const stages = partsAtSigning(plan.parts, plan.total_cents, signedYmd, have.filter((i: any) => i.purpose === 'deposit'));
+  if (!stages.length) return 0;
+  const deal = await loadDeal(siteId, dealId);
+  if (!deal) return 0;
+  const ins = await svc('presence_invoices', { method: 'POST', headers: { Prefer: 'return=representation' },
+    body: JSON.stringify(stages.map((st) => ({ site_id: siteId, deal_id: dealId, customer_client_id: deal.converted_client_id || null, customer_site_id: deal.converted_site_id || null,
+      title: st.label, description: `${st.label} — ${deal.title || 'project'}`, amount_cents: st.amount_cents, currency: 'usd', purpose: st.purpose || 'service', status: 'open', due_date: st.due_date ?? null, created_by: 'payment-plan' }))) });
+  return rows(ins).length;
+}
+
 // ═══ PUBLIC VIEW (token) — a prospect reviews the proposal/contract before acting ═══
 export async function handleSalesPublicView(req: Request, token: string, cors: Record<string, string>): Promise<Response> {
   if (!(await rateAllow(`sales_view:${clientIp(req)}`, 60, 60))) return tooMany(cors);
@@ -2499,7 +2554,9 @@ export async function handleSalesPublicView(req: Request, token: string, cors: R
     await Promise.all(opens);
     const expired = !!(proposal?.expires_at && String(proposal.expires_at) < nowIso());
     const [signer, ask] = await Promise.all([pageSigner(tok.site_id, contractOut), askInfo(tok.site_id, tok.id)]);
-    return json({ data: { kind: 'flow', brand, deal: { id: deal.id, title: deal.title }, proposal: proposal ? { ...proposal, expired } : null, proposal_pending, contract: contractOut, contract_pending, deposit, studio_signer: signer, ask } }, 200, cors);
+    // sales item 106: how they'll pay, part by part, when the proposal is paid in parts
+    const schedule = proposal ? scheduleView(splitLineItems(proposal.line_items).meta.schedule ?? null, proposalTotals(proposal.line_items).total_cents) : null;
+    return json({ data: { kind: 'flow', brand, deal: { id: deal.id, title: deal.title }, proposal: proposal ? { ...proposal, expired, schedule } : null, proposal_pending, contract: contractOut, contract_pending, deposit, studio_signer: signer, ask } }, 200, cors);
   }
   if (tok.t === 'proposal') {
     // first_viewed_at/expires_at land with migration 0107 — try the full select, fall
@@ -2513,7 +2570,8 @@ export async function handleSalesPublicView(req: Request, token: string, cors: R
     // say so on the deal (best-effort; no-ops before the migration adds the column).
     if (!p.first_viewed_at) await firstOpen('presence_proposals', tok.id, tok.site_id, propDeal, 'proposal');
     const expired = !!(p.expires_at && String(p.expires_at) < nowIso());
-    return json({ data: { kind: 'proposal', brand, expired, ...p, ask: await askInfo(tok.site_id, propDeal) } }, 200, cors);
+    const schedule = scheduleView(splitLineItems(p.line_items).meta.schedule ?? null, proposalTotals(p.line_items).total_cents);   // sales item 106
+    return json({ data: { kind: 'proposal', brand, expired, ...p, schedule, ask: await askInfo(tok.site_id, propDeal) } }, 200, cors);
   }
   // sales item 88: the countersignature (0176) — tolerant read before it
   let cq = await svc(`presence_contracts?id=eq.${tok.id}&site_id=eq.${tok.site_id}&deleted_at=is.null&select=id,deal_id,title,body,content_hash,status,signed_at,signer_name,signer_email,countersigned_name,countersigned_title,countersigned_at&limit=1`);

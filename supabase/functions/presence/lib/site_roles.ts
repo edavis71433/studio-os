@@ -106,6 +106,7 @@ const MEMBER_WRITES: Array<[MemberWriteNeed, string[]]> = [
     `DELETE /sales/(contacts|deals|proposals|contracts|templates|estimates)/${ID}`,
     `DELETE /sales/prospects/${ID}`,   // sales review item 112: taking a prospect off the list
     `DELETE /projects/${ID}/deliverables/${ID}`,
+    `DELETE /projects/templates/${ID}`,   // sales item 106: removing a saved project template, like a saved proposal template
     `POST /comments/${ID}/delete`,
     `POST /sales/invoices/${ID}/void`,
     `POST /sales/invoices/${ID}/payment/undo`,   // sales review item 77: taking back a recorded payment changes the books, like a void
@@ -207,6 +208,7 @@ const MEMBER_WRITES: Array<[MemberWriteNeed, string[]]> = [
     `POST /sales/contracts/${ID}/(term|send)`,
     `POST /sales/proposals/${ID}/(send|revise)`,
     'POST /projects',
+    'POST /projects/templates',   // sales item 106: saving a project as a template
     `PATCH /projects/${ID}`,
     `POST /projects/${ID}/(status|tasks|checklist|milestones|approvals|surveys|deliverables|deliverables/upload-url)`,
     `PATCH /projects/${ID}/(tasks|milestones|deliverables)/${ID}`,

@@ -38,6 +38,7 @@ const { handleKnowledgeDelete } = await import(`${P}/routes/knowledge.ts`);
 const { handleCommentDelete } = await import(`${P}/routes/comments.ts`);
 const { handleSalesContact, handleSalesContactFields, handleSalesDeal, handleSalesProposalDelete, handleSalesContractDelete, handleSalesTemplateDelete, handleSalesInvoiceVoid, handleSalesRetainerCancel } = await import(`${P}/routes/sales.ts`);
 const { handleDeliverable } = await import(`${P}/routes/project_delivery.ts`);
+const { handleProjectTemplates } = await import(`${P}/routes/projects.ts`);   // sales item 106
 const { handleDomain, handleDomainForward } = await import(`${P}/routes/admin.ts`);
 const { handleFoundationsPrepare } = await import(`${P}/routes/foundations.ts`);
 const { handlePreviewSettings } = await import(`${P}/routes/preview_env.ts`);
@@ -147,6 +148,7 @@ const DECIDED = {
     // sales review items 86 + 105: undoing an import takes people off; a merge folds a record away (and back)
     'POST /sales/contacts/imports/:id/undo', 'POST /sales/contacts/:id/merge', 'POST /sales/contacts/:id/unmerge',
     'POST /sales/invoices/:id/payment/undo',   // sales review item 77: taking back a recorded payment changes the books, like a void
+    'DELETE /projects/templates/:id',   // sales item 106: removing a saved project template
   ],
   configure: [
     'DELETE /foundations/domain', 'POST /foundations/domain', 'POST /foundations/prepare',
@@ -221,6 +223,7 @@ const DECIDED = {
     'POST /sales/prospects/:id/pack',   // sales review item 113: the pitch pack build
     'POST /sales/contacts/imports',   // sales review item 86: starting an import (each row is a POST /sales/contacts)
     'POST /sales/invoices/:id/payment',   // sales review item 77: recording a check, cash, transfer or Zelle payment
+    'POST /projects/templates',   // sales item 106: saving a project as a template
   ],
   open: [
     'DELETE /crm/notes/:id', 'POST /client/notifications/read', 'POST /concierge/ask', 'POST /crm/notes',
@@ -307,6 +310,7 @@ const CHANGED = [
   { name: 'DELETE /sales/proposals/:id', run: (r, p) => handleSalesProposalDelete(A, p, ROW, cors) },
   { name: 'DELETE /sales/contracts/:id', run: (r, p) => handleSalesContractDelete(A, p, ROW, cors) },
   { name: 'DELETE /sales/templates/:id', run: (r, p) => handleSalesTemplateDelete(A, ROW, cors) },
+  { name: 'DELETE /projects/templates/:id', fx: { only: ['presence_sales_templates'], rows: { presence_sales_templates: { body: JSON.stringify([{ id: ROW, name: 'Website build', milestones: [{ title: 'Kickoff', tasks: [{ title: 'Brief' }] }], created_at: '2026-11-11T00:00:00Z' }]), updated_at: '2026-11-11T00:00:00Z' } } }, run: (r, p) => handleProjectTemplates(r, p.jwt, A, p, ROW, cors) },   // sales item 106
   { name: 'DELETE /projects/:id/deliverables/:id2', run: (r, p) => handleDeliverable(r, p.jwt, A, p, ROW, ROW2, cors) },
   { name: 'POST /sales/invoices/:id/void', run: (r, p) => handleSalesInvoiceVoid(A, p, ROW, cors) },
   { name: 'DELETE /broadcasts/lists/:id', fx: { only: ['presence_sales_templates'], rows: { presence_sales_templates: { body: JSON.stringify([{ id: ROW, name: 'Picked', people: [{ email: 'a@example.com' }], created_at: '2026-01-01T00:00:00Z' }]) } } }, run: (r, p) => handleBroadcastListDelete(A, p, ROW, cors) },
@@ -451,7 +455,7 @@ const WRITE_HANDLERS = [
   'handleMonitorDisconnect', 'handleMonitorVerify', 'handleNoteResolve', 'handleNotificationsRead',
   'handlePageDuplicate', 'handleDeletedPageRestore', 'handlePageLockCreate', 'handlePreviewPromote', 'handlePreviewPublish', 'handlePreviewSection', 'handlePreviewSettings',   // item 154: putting a deleted page back is an edit (contentWriteNeeds)
   'handlePreviewShareLink', 'handleProject', 'handleProjectChecklist', 'handleProjectStatus', 'handleProjectSurveys',
-  'handleProjects', 'handlePublish', 'handlePutIdentity', 'handlePutTemplate', 'handleRedirectCreate',
+  'handleProjects', 'handleProjectTemplates', 'handlePublish', 'handlePutIdentity', 'handlePutTemplate', 'handleRedirectCreate',
   'handleRedirectDelete', 'handleRestore', 'handleRestoreToDraft', 'handleReviewApprove', 'handleReviewDismiss',
   'handleReviewHide', 'handleReviewReply', 'handleReviewRequest', 'handleReviewRun', 'handleSalesAddCustomer',
   'handleSalesContact', 'handleSalesContactFields', 'handleSalesContactRestore', 'handleSalesContacts',

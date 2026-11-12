@@ -12,7 +12,8 @@ import { svc, svcAll } from '../lib/db.ts';
 import { resolveSiteRoleCached } from '../lib/workspace.ts';
 import { ensureProjectForDeal, ensureBridge, reconcileChecklistFacts } from '../lib/service_bridge.ts';
 import { offerCsat, csatRatingsForProject } from '../lib/csat.ts';
-import { templateByKey, type ProjectTemplate } from '../lib/project_templates.ts';
+import { templateByKey, templateChoices, templateFromProject, savedTemplates, templateStepCount, dueFromStart, MAX_SAVED_PROJECT_TEMPLATES, type ProjectTemplate, type SavedProjectTemplate } from '../lib/project_templates.ts';
+import { readReservedJsonOrThrow, updateReservedJson, RESERVED_NAMES } from '../lib/reserved_store.ts';   // sales item 106
 import {
   checklistState, checklistRowsFor, checklistStep, checklistKeyOf, isChecklistSource,
   DELIVERY_CHECKLIST, checklistStageOf,
@@ -70,7 +71,7 @@ export async function loadProject(siteId: string, id: string) {
  *  directly (no per-item activity events — this is the initial scaffold, not a
  *  stream of "a task was added" notifications to the customer). Best-effort per
  *  row; a hiccup on one task never blocks the project being usable. */
-async function applyTemplate(siteId: string, projectId: string, tmpl: ProjectTemplate): Promise<void> {
+async function applyTemplate(siteId: string, projectId: string, tmpl: ProjectTemplate | SavedProjectTemplate, startDate: string | null = null): Promise<void> {
   let mOrder = 0, tOrder = 0;
   for (const m of tmpl.milestones) {
     let milestoneId: string | null = null;
@@ -83,10 +84,61 @@ async function applyTemplate(siteId: string, projectId: string, tmpl: ProjectTem
     for (const t of (m.tasks || [])) {
       const clientAction = t.client_action_required === true;
       await svc('presence_tasks', { method: 'POST', headers: { Prefer: 'return=minimal' },
-        body: JSON.stringify({ site_id: siteId, project_id: projectId, milestone_id: milestoneId, title: t.title, detail: '', status: 'todo', priority: 'normal', client_visible: clientAction, client_action_required: clientAction, due_date: null, sort_order: tOrder, source: 'template' }) }).catch(() => {});
+        // sales item 106: a saved template's step is due N days after the project's start
+        body: JSON.stringify({ site_id: siteId, project_id: projectId, milestone_id: milestoneId, title: t.title, detail: '', status: 'todo', priority: 'normal', client_visible: clientAction, client_action_required: clientAction, due_date: dueFromStart(startDate, (t as { due_days?: number }).due_days), sort_order: tOrder, source: 'template' }) }).catch(() => {});
       tOrder += 10;
     }
   }
+}
+
+// ═══ PROJECT TEMPLATES (sales item 106) ═══
+// GET lists the built-in starter and the studio's own; POST { name, from_project_id }
+// saves a project's milestones and steps as one (lib/project_templates.ts); DELETE
+// /projects/templates/:id removes one. Studio side only, like every project write.
+export async function handleProjectTemplates(req: Request, jwt: string, site: SiteRow, principal: Principal, id: string | null, cors: Record<string, string>): Promise<Response> {
+  if (!(await isStudioSide(jwt, site, principal))) return studioDenied(cors);
+  if (req.method === 'GET' && !id) {
+    let saved: SavedProjectTemplate[];
+    try { saved = savedTemplates(await readReservedJsonOrThrow(site.id, RESERVED_NAMES.projectTemplates)); }
+    catch { return json({ error: 'read_failed', message: 'Your templates couldn’t load just now.' }, 502, cors); }
+    return json({ data: { builtin: templateChoices(), saved: saved.map((t) => ({ id: t.id, name: t.name, milestones: t.milestones.length, steps: templateStepCount(t), created_at: t.created_at })) } }, 200, cors);
+  }
+  if (req.method === 'POST' && !id) {
+    let b: any = {}; try { b = await req.json(); } catch { return json({ error: 'bad_json' }, 400, cors); }
+    const name = clean(b.name, 80);
+    if (!name) return json({ error: 'validation', message: 'Give the template a name.' }, 422, cors);
+    if (!UUID_RE.test(String(b.from_project_id || ''))) return json({ error: 'validation', message: 'Pick the project to save.' }, 422, cors);
+    const project = await loadProject(site.id, String(b.from_project_id));
+    if (!project) return json({ error: 'not_found', message: 'That project isn’t here.' }, 404, cors);
+    const [ms, ts] = await Promise.all([
+      svc(`presence_milestones?project_id=eq.${project.id}&site_id=eq.${site.id}&deleted_at=is.null&select=id,title,sort_order&order=sort_order.asc&limit=60`),
+      svc(`presence_tasks?project_id=eq.${project.id}&site_id=eq.${site.id}&deleted_at=is.null&select=title,milestone_id,client_action_required,due_date,sort_order,source&order=sort_order.asc&limit=200`),
+    ]);
+    if (!ms.ok || !ts.ok) return json({ error: 'read_failed', message: 'That project couldn’t be read just now.' }, 502, cors);
+    const tpl = templateFromProject({ id: crypto.randomUUID(), name, now: new Date().toISOString(), startDate: project.start_date, milestones: rows(ms), tasks: rows(ts) });
+    if (!templateStepCount(tpl)) return json({ error: 'empty', message: 'That project has no steps of its own to save yet.' }, 422, cors);
+    let full = false;
+    const next = await updateReservedJson(site.id, RESERVED_NAMES.projectTemplates, (cur) => {
+      const list = savedTemplates(cur);
+      if (list.length >= MAX_SAVED_PROJECT_TEMPLATES) { full = true; return list; }
+      return [...list, tpl];
+    }, principal.email || principal.userId || 'system');
+    if (full) return json({ error: 'too_many', message: `You can keep up to ${MAX_SAVED_PROJECT_TEMPLATES} project templates. Remove one first.` }, 409, cors);
+    if (!next) return json({ error: 'write_failed', message: 'The template didn’t save — please try again.' }, 502, cors);
+    return json({ data: { id: tpl.id, name: tpl.name, milestones: tpl.milestones.length, steps: templateStepCount(tpl) } }, 201, cors);
+  }
+  if (req.method === 'DELETE' && id) {
+    let found = false;
+    const next = await updateReservedJson(site.id, RESERVED_NAMES.projectTemplates, (cur) => {
+      const list = savedTemplates(cur);
+      found = list.some((t) => t.id === id);
+      return list.filter((t) => t.id !== id);
+    }, principal.email || principal.userId || 'system');
+    if (!next && !found) return json({ error: 'not_found', message: 'That template isn’t here.' }, 404, cors);
+    if (!found) return json({ error: 'not_found', message: 'That template isn’t here.' }, 404, cors);
+    return json({ data: { ok: true, id } }, 200, cors);
+  }
+  return json({ error: 'method_not_allowed' }, 405, cors);
 }
 
 // ═══ PROJECTS ═══
@@ -165,8 +217,10 @@ export async function handleProjects(req: Request, jwt: string, site: SiteRow, p
     }
 
     // A4: seed a starter scaffold into the (empty) new project — fills only, never merges.
-    const tmpl = templateByKey(clean(b.template, 40));
-    if (tmpl) await applyTemplate(site.id, project.id, tmpl);
+    // Sales item 106: or one of the studio's own saved templates, by its id, dated from the start.
+    let tmpl: ProjectTemplate | SavedProjectTemplate | null = templateByKey(clean(b.template, 40));
+    if (!tmpl && UUID_RE.test(String(b.template || ''))) tmpl = savedTemplates(await readReservedJsonOrThrow(site.id, RESERVED_NAMES.projectTemplates).catch(() => null)).find((t) => t.id === b.template) || null;
+    if (tmpl) await applyTemplate(site.id, project.id, tmpl, sd.v || new Date().toISOString().slice(0, 10));
 
     return json({ data: project, templated: !!tmpl, bridged: !!customerClientId }, 201, cors);
   }

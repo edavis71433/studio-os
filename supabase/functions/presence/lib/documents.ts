@@ -21,6 +21,7 @@ import { splitLineItems, computeProposalTotals, subtotalOf, type LineItem } from
 import { hmacHex, timingSafeEqual } from '../../_shared/hmac.ts';
 import { UUID_RE } from './uuid.ts';
 import { agreementHtml } from './agreement_layout.ts';   // sales item 88: headings and numbered sections
+import { scheduleView } from './proposal_schedule.ts';   // sales item 106: paid in parts
 
 // ── the studio's identity on the page (structurally the EmailBrand shape) ─────
 export interface DocBrand { name: string; accent: string; accentDark: string }
@@ -309,8 +310,12 @@ function renderLineItemsDocument(p: any, brandIn: Partial<DocBrand> | null | und
       <tr class="sub"><td style="color:var(--soft)">Subtotal</td><td style="color:var(--soft)">${esc(money(t.subtotal_cents, currency))}</td></tr>
       ${t.discount_cents > 0 ? `<tr class="sub"><td style="color:var(--soft)">${esc(discLabel)}</td><td style="color:var(--soft)">−${esc(money(t.discount_cents, currency))}</td></tr>` : ''}
       ${t.tax_cents > 0 ? `<tr class="sub"><td style="color:var(--soft)">${esc(taxLabel)}</td><td style="color:var(--soft)">+${esc(money(t.tax_cents, currency))}</td></tr>` : ''}` : '';
+  // sales item 106: how they'll pay, part by part (an estimate never has parts)
+  const parts = scheduleView(meta.schedule ?? null, t.total_cents);
+  const partsHtml = parts ? `<div class="hr"></div><div class="doclabel" style="margin-top:0">How you’ll pay</div><table><tbody>${parts.map((r) => `<tr><td>Part ${r.n} of ${r.of} · ${esc(r.words)}</td><td>${esc(money(r.amount_cents, currency))}</td></tr>`).join('')}</tbody></table>` : '';
   const body = `
     <table><tbody>${rows}${breakdown}<tr class="total"><td>Total</td><td>${esc(money(t.total_cents, currency))}</td></tr></tbody></table>
+    ${partsHtml}
     ${p?.terms ? `<div class="hr"></div><p class="terms">${esc(p.terms)}</p>` : ''}
     <p class="note">${esc(o.note)}</p>`;
   return shell({ title: `${o.heading} — ${brand.name}`, brand, docLabel: o.docLabel, heading: o.heading, sub: undefined, bodyHtml: body, pdfUrl: ctx?.pdfUrl, pdfName: ctx?.pdfName });

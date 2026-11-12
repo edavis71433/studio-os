@@ -11,6 +11,7 @@ import {
 } from './documents.ts';
 import { splitLineItems, computeProposalTotals, subtotalOf } from './sales_lifecycle.ts';
 import { agreementBlocks } from './agreement_layout.ts';   // sales item 88: the agreement as a document
+import { scheduleView } from './proposal_schedule.ts';   // sales item 106: paid in parts
 
 const INK: Rgb = [0.106, 0.082, 0.145];
 const SOFT: Rgb = [0.42, 0.392, 0.471];
@@ -194,6 +195,9 @@ function linesPdf(p: any, brandIn: Partial<DocBrand> | null | undefined, ctx: Do
   }
   totals.push({ label: 'Total', amount: money(t.total_cents, currency), bold: true });
   table(f, rows, totals);
+  // sales item 106: how they'll pay, part by part
+  const parts = scheduleView(meta.schedule ?? null, t.total_cents);
+  if (parts) { f.para('How you’ll pay', { font: 'B', size: 10 }); table(f, parts.map((r) => ({ label: `Part ${r.n} of ${r.of} · ${r.words}`, amount: money(r.amount_cents, currency) })), []); }
   if (p?.terms) { f.para('Terms', { font: 'B', size: 10 }); f.para(p.terms, { size: 9.5, color: SOFT }); f.gap(6); }
   f.para(o.note, { size: 9, color: SOFT });
   feet(pdf, `${brand.name} · ${o.label}`);
