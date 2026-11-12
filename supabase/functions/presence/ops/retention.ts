@@ -12,7 +12,7 @@ const SEARCH_TERM_MONTHS = 13;  // presence_search_terms — 13 months (year-ove
 const SCHEDULED_RUNS_DAYS = 90; // presence_scheduled_runs — ops forensics window
 const OPS_ERRORS_DAYS = 90;     // ops_errors — request-path error ledger
 const RATE_LIMIT_DAYS = 1;      // rate_limit_state — windows are minutes; a day is generous
-const EVIDENCE_DAYS = 180;      // presence_evidence_runs, before migration 0190 — the old one-statement prune
+const EVIDENCE_DAYS = 180;      // presence_evidence_runs, before migration 0193 — the old one-statement prune
 const HEALTH_HISTORY_DAYS = 30; // item 206: findings, judgments and recommendations — readers use the latest per site
 const HEALTH_PRUNE_RUNS = 500;  // item 206: runs cleared per tick at most, so one call stays well inside the API's 8 seconds
 const HEALTH_DAYS = 400;        // presence_health_days — one small row per site per day; a year of trend lines
@@ -64,10 +64,10 @@ export async function runRetentionSweep(now: Date = new Date()): Promise<Record<
   await prune('health_days', `presence_health_days?day=lt.${daysAgo(HEALTH_DAYS).slice(0, 10)}`);
 
   // Evidence: needs "all but each site's latest run" — SQL, not REST.
-  // Item 206: presence_prune_health (0190) clears health-check history older than 30
+  // Item 206: presence_prune_health (0193) clears health-check history older than 30
   // days: the runs (their findings and judgments go with them) and the recommendations,
   // which nothing ever cleared. It takes a bounded bite per call, so a backlog is worked
-  // off over the next ticks and never as one long statement. Before 0190 the function
+  // off over the next ticks and never as one long statement. Before 0193 the function
   // isn't there (404): the 0091 prune runs as it always has, on its old 180 days, since
   // its single statement couldn't clear a 30-day backlog inside the API's time limit.
   // A pre-0091 environment 404s on both → recorded false, never throws.

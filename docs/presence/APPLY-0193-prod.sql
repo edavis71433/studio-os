@@ -1,5 +1,5 @@
 -- ===========================================================================
---  APPLY PACK - migration 0190  (owner-apply, prod)
+--  APPLY PACK - migration 0193  (owner-apply, prod)
 -- ===========================================================================
 --  Builder list item 206: a site's health is checked once a day and after each
 --  publish, and old check results are cleared after 30 days.
@@ -35,7 +35,7 @@
 --    Nothing a page reads is among them (see step 3), and Supabase's daily
 --    backup holds the day before.
 --
---  Covers: supabase/migrations/0190_health_history_prune.sql
+--  Covers: supabase/migrations/0193_health_history_prune.sql
 -- ===========================================================================
 
 

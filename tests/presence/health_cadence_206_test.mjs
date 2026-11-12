@@ -105,24 +105,24 @@ const checksOf = (id) => world.checks.filter((c) => c.site === id).length;
   eq('the constants: a little under a day, and an hour', [K.CHECK_EVERY_MS < DAY && K.CHECK_EVERY_MS > DAY - 15 * MIN, K.CHECK_RETRY_MS], [true, HOUR]);
 }
 
-// ── 4. the sweep clears 30-day-old history in bites, and keeps working before 0190 ──
+// ── 4. the sweep clears 30-day-old history in bites, and keeps working before 0193 ──
 {
   const R = await import(`${P}/ops/retention.ts`);
   world.seen = []; world.rpc = { presence_prune_health: (b) => { world.asked = b; return reply({ runs: 500, recommendations: 9000 }); } };
   const out = await R.runRetentionSweep(new Date(now));
   eq('sweep: asks for 30 days, 500 runs at a time', world.asked, { keep_days: 30, max_runs: 500 });
   eq('sweep: reports what it cleared', [out.evidence_runs, out.recommendations], [500, 9000]);
-  ok('sweep: the old one-statement prune is not called once 0190 is in', !world.seen.some((s) => s.includes('rpc/prune_evidence_runs')));
+  ok('sweep: the old one-statement prune is not called once 0193 is in', !world.seen.some((s) => s.includes('rpc/prune_evidence_runs')));
   world.seen = []; world.rpc = { prune_evidence_runs: (b) => { world.askedOld = b; return reply(3); } };
-  const before0190 = await R.runRetentionSweep(new Date(now));
-  eq('before 0190: the old prune runs on its old 180 days, never 30 in one statement', [world.askedOld, before0190.evidence_runs], [{ keep_days: 180 }, 3]);
+  const before0193 = await R.runRetentionSweep(new Date(now));
+  eq('before 0193: the old prune runs on its old 180 days, never 30 in one statement', [world.askedOld, before0193.evidence_runs], [{ keep_days: 180 }, 3]);
   world.rpc = { presence_prune_health: () => reply({ message: 'permission denied for function presence_prune_health' }, 403) };
   eq('a refused prune is a failed sweep the watchdog hears about', (await R.runRetentionSweep(new Date(now))).evidence_runs, false);
 }
 
 // ── 5. the migration and the pack ──
 {
-  const migration = read('../../supabase/migrations/0190_health_history_prune.sql'), pack = read('../../docs/presence/APPLY-0190-prod.sql');
+  const migration = read('../../supabase/migrations/0193_health_history_prune.sql'), pack = read('../../docs/presence/APPLY-0193-prod.sql');
   for (const [name, sql] of [['migration', migration], ['pack', pack]]) {
     ok(`${name}: the function, for the function's key only`, /create or replace function public\.presence_prune_health\(keep_days int default 30, max_runs int default 500\)/.test(sql) && /grant execute on function public\.presence_prune_health\(int, int\) to service_role/.test(sql) && /revoke all on function public\.presence_prune_health\(int, int\) from public, anon, authenticated/.test(sql));
     ok(`${name}: each site's newest run and newest good run are never cleared`, /distinct on \(site_id\) id from public\.presence_evidence_runs\s+order by site_id, started_at desc/.test(sql) && /where finished_at is not null and error_text is null\s+order by site_id, started_at desc/.test(sql));
