@@ -2,6 +2,36 @@
   "about": "What's new (builder list item 128). One entry per change, written once: what changed for the reader, not how it was built. `who` says who reads it: studio (a studio, every entry), owner (a business running its own site), client (a client in the portal, in the entry's `client` words, which never name Studio OS or show studio screens). Pictures are taken on sample data, never a client's site, by scripts/whats-new/shoot.spec.ts (WHATS_NEW_SHOOT=1 npx playwright test -c scripts/whats-new/playwright.config.ts). Newest first; the panel groups them by week.",
   "entries": [
     {
+      "id": "blog",
+      "date": "2026-11-12",
+      "who": ["studio", "owner"],
+      "title": "A real blog, with its own writing screen",
+      "sentence": "Write a post on a screen that looks like your site, with photos, categories and authors. Publish it now, pick a day and time, or send it to your email list.",
+      "picture": "/thumbs/whats-new/blog.jpg",
+      "alt": "The writing screen on a sample restaurant’s post: the title, the author and the cover photo in the site’s own look, with Post settings beside it.",
+      "show": "/presence.html#updates"
+    },
+    {
+      "id": "business-details",
+      "date": "2026-11-12",
+      "who": ["studio", "owner"],
+      "title": "Business details say where each one shows",
+      "sentence": "A sentence under every field says where it appears on your site. New: a short description for Google and shared links, and a second location.",
+      "picture": "/thumbs/whats-new/business-details.jpg",
+      "alt": "Business details on a sample restaurant: a short description with its share preview, and a second location in Glendale.",
+      "show": "/presence.html#business"
+    },
+    {
+      "id": "search-phrases",
+      "date": "2026-11-12",
+      "who": ["studio", "owner"],
+      "title": "Tell Google what you want to be found for",
+      "sentence": "Pick two or three phrases on the Search tab. It checks each page’s headline, and with one tap writes a headline that has the phrase.",
+      "picture": "/thumbs/whats-new/search-phrases.jpg",
+      "alt": "The Search tab’s phrases card: one phrase found in the Home page’s headline, another ready to go on the Private events page.",
+      "show": "/presence.html#search"
+    },
+    {
       "id": "search-todo",
       "date": "2026-11-12",
       "who": ["studio", "owner"],

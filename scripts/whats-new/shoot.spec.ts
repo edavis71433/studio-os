@@ -149,3 +149,66 @@ test('real-pictures: the template picker’s pictures, each drawn on sample data
   await page.waitForTimeout(400);
   await shoot(page, 'real-pictures');
 });
+
+// ── This week's builder changes (items 40, 127 and 160), drawn on the same sample restaurant ──
+const BUILDER_API = {
+  '/changes': { data: { count: 0, first_publish: false, changes: [], blockers: 0, warnings: 0, draft_hash: 'h' } },
+  '/health': { data: {} }, '/offerings': { data: [] }, '/faqs': { data: [] }, '/testimonials': { data: [] },
+  '/dev/customization': { data: { theme_tokens: {}, font_library: [] } },
+};
+const WEEK = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'].map((day, i) => ({ day, closed: i === 0, intervals: i === 0 ? [] : [{ open: '17:00', close: '22:00' }] }));
+const SAMPLE_SITE = (over: Record<string, unknown> = {}) => ({ data: {
+  site: { id: '00000000-0000-4000-8000-000000000001', status: 'live', edition: 'presence', custom_domain: 'marlows.example', template_slug: 'restaurant-classic', last_published_at: '2026-07-01T00:00:00Z', netlify_site_id: 'n1' },
+  identity: { business_name: 'Marlow’s Kitchen', tagline: 'Seasonal plates in Burbank', description: 'We started as a Saturday stall at the farmers market.', short_description: 'A neighbourhood kitchen in Burbank: seasonal plates and sourdough baked every morning.', phone: '(555) 010-0142', email: 'hello@marlows.example', seo_title: 'Italian restaurant in Burbank — Marlow’s Kitchen', seo_description: 'Seasonal plates in Burbank, CA.' },
+  location: { address_line1: '12 Main St', city: 'Burbank', region: 'CA', postal_code: '91502', timezone: 'America/Los_Angeles', hours: WEEK,
+    second_location: { label: 'Glendale', address_line1: '410 Brand Blvd', address_line2: '', city: 'Glendale', region: 'CA', postal_code: '91203', phone: '(555) 010-0199', same_hours: true, hours: [] } },
+  voice: {}, offerings: [], faqs: [], testimonials: [], posts: [], ...over,
+} });
+
+test('blog: writing a post on a screen that looks like the site', async ({ page }) => {
+  await quiet(page);
+  const COVER = '00000000-0000-4000-8000-000000000502';
+  await installApp(page, { api: { ...BUILDER_API, '/site': SAMPLE_SITE(),
+    '/media': { data: [{ id: COVER, alt_text: 'The patio with its heaters on', mime: 'image/jpeg', width: 1600, height: 1067, thumb: `/__wn_photo__/${COVER}.svg`, used_by: [] }] },
+    '/settings': { data: { blocks: [], section_meta: {}, pages: [], post_categories: [{ id: 'news', name: 'News' }], post_authors: [{ id: 'maria-lopez', name: 'Maria Lopez', bio: 'Owner and head chef' }] } },
+    '/posts': { data: [{ id: '00000000-0000-4000-8000-000000000011', title: 'Summer patio is open', slug: 'summer-patio', body_md: 'Our patio opens Friday, with heaters for the cool nights and a short menu of plates to share.\n\nBook a table outside, or just walk in.', excerpt: '', hero_media_id: COVER, status: 'draft', published_at: null, tags: [], noindex: false, category: 'news', author: 'maria-lopez', updated_at: '2026-11-10T17:00:00Z' }] },
+  } as never });
+  await page.route(/\/__wn_photo__\//, (r: Route) => r.fulfill({ status: 200, contentType: 'image/svg+xml', body: PHOTO }));
+  await page.goto('/presence.html#updates');
+  await page.locator('.bl-card .bl-title button').first().click();
+  await expect(page.locator('.bs-body')).toBeVisible();
+  await page.waitForTimeout(800);
+  await shoot(page, 'blog');
+});
+
+test('business-details: four cards, each field saying where it shows', async ({ page }) => {
+  await quiet(page);
+  await installApp(page, { api: { ...BUILDER_API, '/site': SAMPLE_SITE(), '/media': { data: [] }, '/posts': { data: [] } } as never });
+  await page.goto('/presence.html#business');
+  await expect(page.locator('#f-short_description')).toHaveValue(/neighbourhood kitchen/);
+  await page.evaluate(() => { const c = document.querySelector('#view-business .biz-grid') as HTMLElement; window.scrollTo(0, c.getBoundingClientRect().top + window.scrollY - 24); });
+  await page.waitForTimeout(500);
+  await shoot(page, 'business-details');
+});
+
+test('search-phrases: what people type to find you, and Add it to a page', async ({ page }) => {
+  await quiet(page);
+  const OFF = { status: 'disconnected', health: 'unknown', reason: '', last_sync_at: null, connect_href: '/connections.html', readiness: 'connect', unavailable: false, has_data: false, property: null, data: null };
+  const pages = [
+    { key: 'home', label: 'Home', title: 'Italian restaurant in Burbank — Marlow’s Kitchen' },
+    { key: 'offerings', label: 'Menu', title: 'Menu — Marlow’s Kitchen' },
+    { key: 'page:private-events', label: 'Private events', title: 'Private events — Marlow’s Kitchen' },
+  ];
+  const phrases = { max: 3, pages, ideas: ['catering burbank', 'wine dinners burbank', 'brunch glendale'],
+    list: [{ phrase: 'italian restaurant burbank', found: pages[0] }, { phrase: 'private dining glendale', found: null }],
+    tasks: [{ key: 'phrase:private dining glendale', priority: 'high', done: false, title: 'Put “private dining glendale” in a page’s search headline', sub: 'Google reads the headline first. Pick the page that is about it.', go: 'phrases' }] };
+  await installApp(page, { api: { ...BUILDER_API, '/site': SAMPLE_SITE(), '/media': { data: [] }, '/posts': { data: [] }, '/settings': { data: { blocks: [], section_meta: {}, pages: [], page_seo: {} } },
+    '/visibility': { data: { state: 'ready', address: { url: 'https://marlows.example/', domain: 'marlows.example', hosted: true }, score: null, ai: null, ai_check_url: 'https://tools.example.com/ai', console: OFF, listing: OFF, tasks: phrases.tasks, phrases } },
+  } as never });
+  await page.goto('/presence.html#search');
+  await page.locator('.sv-ph-row[data-phrase="private dining glendale"]').getByRole('button', { name: 'Add it to a page' }).click();
+  await page.locator('.sv-ph-pick').getByRole('button', { name: /Private events/ }).click();
+  await page.evaluate(() => { const c = document.getElementById('svPhrasesCard')!; window.scrollTo(0, c.getBoundingClientRect().top + window.scrollY - 24); });
+  await page.waitForTimeout(500);
+  await shoot(page, 'search-phrases');
+});
