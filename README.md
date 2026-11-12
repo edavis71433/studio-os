@@ -66,7 +66,7 @@ As of mid-November 2026:
 - **About 190 Playwright spec files** across desktop, tablet and phone, against stubbed backends (no secrets, no live data)
 - **About 440 Deno suites** for the server and the pages' logic, plus a typecheck of every function
 - **Accessibility assertions** via `@axe-core/playwright` on key pages
-- **Five GitHub Actions workflows**: `ci`, `e2e`, `deploy` (by hand, after the checks), `rollback`, `schema-dump`
+- **Six GitHub Actions workflows**: `ci`, `e2e`, `isolation` (the walls between studios, on a scratch database, with every deploy), `deploy` (by hand, after the checks), `rollback`, `schema-dump`
 
 ```bash
 npm ci
