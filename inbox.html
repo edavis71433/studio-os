@@ -166,6 +166,9 @@
   a.btnlink.primary,button.btnlink.primary{background:var(--p);color:#fff}
   .lreply{margin-top:var(--dds-s3,12px);padding:10px var(--dds-s3,12px);border-left:3px solid var(--p);background:var(--p-soft);border-radius:0 var(--dds-r,8px) var(--dds-r,8px) 0}
   .lreply .body{margin-top:var(--dds-s1,4px);white-space:pre-wrap}
+  /* sales item 87: the automatic follow-ups an enquiry got, and the next one */
+  .lfu{margin-top:var(--dds-s2,8px);padding:8px var(--dds-s3,12px);border-left:3px solid var(--line);border-radius:0 var(--dds-r,8px) var(--dds-r,8px) 0;font-size:12.5px;color:var(--soft)}
+  .lfu b{font-weight:600;color:var(--ink)}
   select{font:inherit;font-size:13px;color:var(--ink);background:var(--card);border:1px solid var(--line);border-radius:var(--dds-r,8px);padding:6px var(--dds-s2,8px)}
   .card{background:var(--card);border:1px solid var(--line);border-radius:var(--dds-r-lg,10px);padding:var(--dds-s4,16px) var(--dds-s5,20px);box-shadow:var(--shadow);margin-bottom:var(--dds-s4,16px)}
   .card .who{font-weight:600;font-size:15.5px}
@@ -1467,6 +1470,15 @@ function foundHtml(l,settled){
   const pick=foundOf(l),fromVisit=!!(l.visit&&pick&&pick===l.visit.found_via);
   return `<div class="lfound"><label for="leadFound">How did they find you?</label><select id="leadFound" class="dds-pick"><option value="">Not recorded</option>${FOUND_PICKS.map(x=>`<option${x===pick?' selected':''}>${esc(x)}</option>`).join('')}</select>${fromVisit?'<span class="muted" id="leadFoundNote">filled in from their visit</span>':''}</div>`;
 }
+// sales item 87: the follow-ups that went (newest last) and when the next one goes
+function followupHtml(l){
+  const fu=l.followups;if(!fu)return'';
+  const day=(iso)=>{const t=Date.parse(iso||'');return isFinite(t)?new Date(t).toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'}):'';};
+  const sent=(fu.sent||[]).map(x=>`<div class="lfu"><b>Follow-up ${esc(x.n)} sent</b>${x.at?' · '+esc(when(x.at)):''} — automatic, in your words</div>`).join('');
+  const next=(fu.next&&!fu.off)?`<div class="lfu">Follow-up ${esc(fu.next.n)} goes ${Date.parse(fu.next.at)<=Date.now()+3600000?'soon':'on '+esc(day(fu.next.at))}, unless they write back, book or you mark this enquiry.</div>`:'';
+  const off=fu.off?'<div class="lfu">Follow-ups stopped by you.</div>':'';
+  return sent+next+off;
+}
 function paneLead(host,it){
   const l=it.lead||{};
   const sent=Array.isArray(l.replies)?l.replies:[];
@@ -1485,6 +1497,7 @@ function paneLead(host,it){
       ${leadFilesHtml(l)}
       ${visitHtml(l)}
       ${sent.map(r=>`<div class="lreply"><div class="muted" style="font-size:12.5px">You replied${r.at?' · '+esc(when(r.at)):''}</div><div class="body">${esc(r.body)}</div></div>`).join('')}
+      ${followupHtml(l)}
       ${foundHtml(l,settled)}
       <div class="lnote"><label for="leadNote">Your note <span class="muted">— never sent to them</span></label>
         <textarea id="leadNote" maxlength="1000" placeholder="e.g. Called back — wants a quote in March">${esc(note?note.body:'')}</textarea>
@@ -1493,6 +1506,7 @@ function paneLead(host,it){
         ${(settled||!l.email)?'':`<button id="leadConvert" title="Set them up as a customer now — contact, customer and (optionally) a deal in one go">Make customer</button>`}
         ${st==='new'?`<button id="leadRead">Mark read</button>`:''}
         ${(settled||st==='not_a_fit'||st==='archived')?'':`<button id="leadNotFit" title="Not what you do, or not a real lead — it leaves the queue and stops counting">Not a fit</button>`}
+        ${(l.followups&&l.followups.next&&!l.followups.off)?`<button id="leadFuStop" title="No more automatic follow-ups to them">Stop follow-ups</button>`:''}
       </div>
     </div></div>
     ${l.email?`<div class="pcomposer"><form id="leadForm"><label for="leadBody" style="font-size:12.5px;color:var(--faint)">Reply to ${esc(l.name||l.email)} — sent by email from your studio</label>
@@ -1509,6 +1523,13 @@ function paneLead(host,it){
     ns.disabled=false;
     if(r.ok){l.note=body?{body,at:new Date().toISOString()}:null;const at=$('leadNoteAt');if(at)at.textContent=body?'Saved just now':'';toast(body?'Note saved.':'Note cleared.');}
     else toast('Couldn’t save the note just now — try again in a moment.');
+  });
+  // item 87: Stop follow-ups (the enquiry and its status stay as they are)
+  const fs=$('leadFuStop');if(fs)fs.addEventListener('click',async()=>{
+    fs.disabled=true;
+    const r=await api('/forms/inbox/'+encodeURIComponent(it.lead_id),'POST',{followups:'off'});
+    if(!r.ok){fs.disabled=false;toast('Couldn’t stop them just now — try again in a moment.');return;}
+    l.followups={...(l.followups||{}),off:true,next:null};toast('Stopped. No more automatic follow-ups to them.');paneLead(host,it);
   });
   // the quiet fallback still takes the enquiry off "new" (as the old Reply link did)
   const lm=$('leadMailto');if(lm)lm.addEventListener('click',()=>{if(String(l.status||'new')==='new')api('/forms/inbox/'+encodeURIComponent(it.lead_id),'POST',{status:'read'}).catch(()=>{});});
