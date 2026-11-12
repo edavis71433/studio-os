@@ -118,7 +118,7 @@ globalThis.fetch = async (url, init = {}) => {
     return reply({ id: 'nf1', name: 'bistro', default_domain: 'presence-abc.netlify.app', custom_domain: 'bistro.example', domain_aliases: [], state: 'current', ssl_url: null });
   }
   if (u.hostname === 'rdap.org') return reply({}, 404);
-  if (u.hostname !== 'stub.local') return reply('<h1>page</h1>', 200, { Server: 'Netlify' });
+  if (u.hostname !== 'stub.local') return w.originDown && u.hostname.endsWith('netlify.app') ? reply('down', 503) : reply('<h1>page</h1>', 200, { Server: 'Netlify' });
   const table = u.pathname.replace('/rest/v1/', ''); const q = decodeURIComponent(u.search);
   if (table === 'presence_infra_plans') {
     const want = (p) => (!/[?&]id=eq\.([^&]+)/.test(q) || p.id === q.match(/[?&]id=eq\.([^&]+)/)[1])
@@ -260,6 +260,12 @@ world({ dns: LIVE_DNS });
 {
   const r = await quiet(async () => jsonOf(await handleDomain(new Request('http://stub.local/functions/v1/presence/foundations/domain'), 'GET', SITE('bistro.example'), OWNER, {})));
   ok('when it runs, the checklist comes and nothing is flagged', r.body.data.all_ok === true && Array.isArray(r.body.data.checklist) && r.body.data.check_failed === undefined, JSON.stringify(r.body.data).slice(0, 300));
+}
+// 16: our own copy of the page didn't answer, so there was nothing to compare with
+world({ dns: LIVE_DNS, originDown: true });
+{
+  const t = await quiet(() => domainTruth({ custom_domain: 'bistro.example', netlify_site_id: 'nf1' }, 'bistro.example'));
+  ok('a comparison that couldn’t be made is a line that isn’t passed, never a silent pass', t.all_ok === false && t.checklist.some((l) => l.key === 'serving' && !l.ok && /couldn’t compare/.test(l.words)), t.checklist.map((l) => l.words).join(' | '));
 }
 // 17, end to end: www pointing at the bare name
 world({ dns: { 'bistro.example': { A: [NETLIFY_APEX_IP] }, 'www.bistro.example': { CNAME: ['bistro.example.'], A: [{ name: 'www.bistro.example.', type: 5, data: 'bistro.example.' }, { name: 'bistro.example.', type: 1, data: NETLIFY_APEX_IP }] } } });

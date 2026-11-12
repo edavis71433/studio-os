@@ -139,7 +139,7 @@ export interface NameCheck { name: string; points: boolean; leftovers: string[] 
 export interface CheckLine { key: string; ok: boolean; words: string }
 
 /** Pure: the checklist the sheet and the Domains page show, one line per thing. */
-export function domainChecklist(i: { domain: string; names: NameCheck[]; padlockOn: boolean; padlockNames: string[]; serving: Serving | null }): CheckLine[] {
+export function domainChecklist(i: { domain: string; names: NameCheck[]; padlockOn: boolean; padlockNames: string[]; serving: Serving | null; compared?: boolean }): CheckLine[] {
   const out: CheckLine[] = [];
   for (const n of i.names) {
     out.push({ key: `points:${n.name}`, ok: n.points, words: n.points ? `${n.name} points here` : `${n.name} doesn’t point here yet` });
@@ -151,6 +151,9 @@ export function domainChecklist(i: { domain: string; names: NameCheck[]; padlock
       ? { key: 'padlock', ok: false, words: `The padlock doesn’t cover ${missing.join(' or ')} yet` }
       : { key: 'padlock', ok: true, words: i.names.length > 1 ? 'The padlock covers both names' : 'The padlock is on' });
   } else out.push({ key: 'padlock', ok: false, words: 'The padlock isn’t on yet' });
+  // Nov 12 review, finding 16: when our own copy of the page didn't answer there was nothing to
+  // compare with, and the list used to pass without the comparison. Now that is a line of its own.
+  if (i.serving === null && i.compared === false) out.push({ key: 'serving', ok: false, words: 'We couldn’t compare the page just now. Check again in a minute' });
   if (i.serving) out.push({ key: 'serving', ok: i.serving === 'latest', words: {
     latest: 'Showing your latest site',
     old_copy: 'Showing an old copy of the site (another hosting project or a cache is answering)',
@@ -199,6 +202,6 @@ export async function domainTruth(site: { custom_domain: string; netlify_site_id
   const ssl = await sslStatus(site.netlify_site_id);
   const [atDomain, atOrigin] = await Promise.all([pageHash(`https://${site.custom_domain}/`), target ? pageHash(`https://${target}/`) : Promise.resolve({ ok: false, server: '', hash: null })]);
   const serving = classifyServing(atDomain, atOrigin);
-  const lines = domainChecklist({ domain: site.custom_domain, names, padlockOn: certIsOn(ssl.state), padlockNames: ssl.domains || [], serving });
+  const lines = domainChecklist({ domain: site.custom_domain, names, padlockOn: certIsOn(ssl.state), padlockNames: ssl.domains || [], serving, compared: serving !== null });
   return { serving, checklist: lines, all_ok: checklistOk(lines) };
 }
