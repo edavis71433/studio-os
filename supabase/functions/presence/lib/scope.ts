@@ -9,7 +9,8 @@
 // (my_presence_site_ids admits only the owner), so a scope that passes here reads
 // and writes site content through siteDb (lib/db.ts): service role, pinned to this site.
 import { svc } from './db.ts';
-import { resolveAgencyMember, agencySiteIds, can } from '../agency/auth.ts';
+import { resolveAgencyMember, agencySiteIds, isActiveClient, can } from '../agency/auth.ts';
+import { afterResponseOrNow } from './after_response.ts';
 import { sendEmail } from '../commerce/account.ts';
 import { SITE_COLS, type SiteRow } from './site.ts';
 import { UUID_RE } from './uuid.ts';
@@ -143,10 +144,16 @@ export type ScopeResult =
  *  visit is recorded. If not, the refusal stands and is recorded as before. */
 export async function resolveScopedSite(jwt: string, requestedSiteId: string, audit?: AuditCtx, held?: (siteId: string) => Promise<HeldBusiness | null>): Promise<ScopeResult> {
   // helper: compute the decision + agency + client name, then log once, then return.
+  // Builder item 209 (review file 06, finding 83): the record is written after the response
+  // (EdgeRuntime.waitUntil), not before it, so no request inside a client waits on the ledger.
+  // It is still written for every request, allowed and denied; its own refinement read
+  // (archived or never authorised) goes along with it.
   const finish = async (dec: ScopeDecision, agencyId: string | null, clientName: string, refine?: (r: AuditReason) => Promise<AuditReason> | AuditReason): Promise<void> => {
-    let reason = auditReason(dec.reason);
-    if (refine) reason = await refine(reason);
-    await logScopedAccess(buildScopeAuditRow({ audit, agencyId, clientSiteId: isScopeId(requestedSiteId) ? requestedSiteId : '00000000-0000-0000-0000-000000000000', clientName, outcome: dec.ok ? 'allowed' : 'denied', reason }));
+    await afterResponseOrNow((async () => {
+      let reason = auditReason(dec.reason);
+      if (refine) reason = await refine(reason);
+      await logScopedAccess(buildScopeAuditRow({ audit, agencyId, clientSiteId: isScopeId(requestedSiteId) ? requestedSiteId : '00000000-0000-0000-0000-000000000000', clientName, outcome: dec.ok ? 'allowed' : 'denied', reason }));
+    })());
   };
 
   if (!isScopeId(requestedSiteId)) {
@@ -157,7 +164,9 @@ export async function resolveScopedSite(jwt: string, requestedSiteId: string, au
   const member = await resolveAgencyMember(jwt);                 // fail-closed: bad token / paused agency / no row → null
   const agencyId = member ? member.agency_id : null;
   const roleCanManage = !!member && can(member.role, 'bulk_publish');
-  const authorized = member ? await agencySiteIds(member.agency_id) : [];   // ACTIVE clients only
+  // Builder item 209 (finding 83): ask about this one client (an ACTIVE one), not for the list of
+  // every client; a role that can't open clients is refused below without asking at all.
+  const authorized = member && roleCanManage && await isActiveClient(member.agency_id, requestedSiteId) ? [requestedSiteId] : [];
   // load the site ONLY after the authorization checks would pass, to avoid a
   // read on an unauthorized/forged id (defense in depth + no info leak on timing)
   const pre = scopeDecision({ requestedSiteId, isAgencyMember: !!member, roleCanManage, authorizedSiteIds: authorized, siteExists: true });
