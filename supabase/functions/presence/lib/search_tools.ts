@@ -80,6 +80,14 @@ export interface SearchFacts {
 const RANK: Record<Priority, number> = { critical: 0, high: 1, medium: 2 };
 const plural = (n: number, one: string, many: string) => (n === 1 ? one : many.replace('{n}', String(n)));
 
+/** One High task per phrase the business wants to be found for (builder list item 160),
+ *  done when some page's search headline has it. The Search tab's phrases card rebuilds
+ *  these after a change without reading the whole tab again. Pure. */
+export function phraseTasks(phrases: Array<{ phrase: string; found: boolean }>): SearchTask[] {
+  return phrases.map((p) => ({ key: `phrase:${p.phrase}`, priority: 'high' as Priority, done: p.found, title: `Put “${p.phrase}” in a page’s search headline`,
+    sub: p.found ? '' : 'Google reads the headline first. Pick the page that is about it.', go: p.found ? null : 'phrases' }));
+}
+
 /** The Search tab's to-do list: open tasks first, Critical, High, then Medium; the
  *  checklist's finished tasks after them, each with its done dot. Only true things:
  *  a task shows when its fact says so. Pure. */
@@ -98,7 +106,7 @@ export function searchTasks(f: SearchFacts): SearchTask[] {
   if (hosted) add('domain', 'high', f.customDomain, 'Put the site on your own domain', f.customDomain ? '' : 'Google trusts yourbusiness.com more than a built-in address.', f.customDomain ? null : 'domain');
   add('title', 'high', f.title, 'Add a search headline', f.title ? '' : 'The blue words people click on Google.', f.title ? null : 'wording');
   // builder list item 160: each phrase the business wants to be found for, in some page's headline
-  for (const p of f.phrases || []) add(`phrase:${p.phrase}`, 'high', p.found, `Put “${p.phrase}” in a page’s search headline`, p.found ? '' : 'Google reads the headline first. Pick the page that is about it.', p.found ? null : 'phrases');
+  t.push(...phraseTasks(f.phrases || []));
   add('description', 'high', f.description, 'Add a search description', f.description ? '' : 'The line under the headline. Google writes its own when there is none.', f.description ? null : 'wording');
   const desc = (f.issues || []).find((i) => i.type === 'seo.description_missing');
   if (desc) add('health:seo.description_missing', 'high', false, plural(desc.n, 'Add a search description to one more page', 'Add a search description to {n} pages'), 'Each page’s settings button on the Pages tab.', 'pages');

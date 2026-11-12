@@ -6,9 +6,9 @@
 //   PUT /visibility/follow     { terms: [...] } follow up to ten; a new one gets its
 //                              last six months from Search Console after the answer
 //   GET /visibility/llms-draft a first llms.txt from the business details
-//   PUT /visibility/phrases    { phrases: [...] } the two or three phrases the business wants
-//                              to be found for (builder list item 160); GET /visibility adds
-//                              them, each with the page headline it's in, and ideas
+//   GET /visibility/phrases    the two or three phrases the business wants to be found for
+//   PUT /visibility/phrases    { phrases: [...] } (builder list item 160); GET /visibility adds
+//                              them too, each with the page headline it's in, and ideas
 // Under /visibility for the reason routes/visibility.ts gives: search works whoever
 // hosts the site, and the /search segment is closed to a watch-only plan. Each read
 // here is best-effort and leaves its own part out when it fails.
@@ -20,6 +20,7 @@ import { siteOrigin, type SiteRow } from '../lib/site.ts';
 import { readSearchPages } from './analytics.ts';
 import { searchTasks, pageMovers, normalizeFollowed, applyFollow, followedSeries, draftLlmsTxt, FOLLOW_MAX, LLMS_TXT_MAX, type SearchTask } from '../lib/search_tools.ts';
 import { applyPhrases, normalizePhrases, pageHeadlines, phraseFoundIn, phraseIdeas, PHRASES_MAX } from '../lib/search_phrases.ts';
+import { phraseTasks } from '../lib/search_tools.ts';
 import type { Principal } from '../../_shared/auth.ts';
 
 const rows = (r: unknown): any[] => { const j = (r as { json?: unknown } | null)?.json; return Array.isArray(j) ? j : []; };
@@ -56,11 +57,19 @@ export async function phrasesView(site: SiteRow, stored?: unknown) {
   const ident = rows(identQ)[0] || {}, set = rows(setQ)[0] || {}, loc = rows(locQ)[0] || {};
   const { phrases } = normalizePhrases(raw);
   const headlines = pageHeadlines({ name: String(ident.business_name || ''), seoTitle: ident.seo_title, industry: set.industry_key, pageSeo: set.page_seo, pages: set.pages, hidden: Array.isArray(set.pages_noindex) ? set.pages_noindex.map(String) : [] });
+  const list = phrases.map((phrase) => { const h = phraseFoundIn(phrase, headlines); return { phrase, found: h ? { key: h.key, label: h.label, title: h.title } : null }; });
   return {
     max: PHRASES_MAX,
-    list: phrases.map((phrase) => { const h = phraseFoundIn(phrase, headlines); return { phrase, found: h ? { key: h.key, label: h.label, title: h.title } : null }; }),
+    list,
     ideas: phraseIdeas({ industry: set.industry_key, offerings: rows(offQ), city: loc.city, serviceArea: ident.service_area, chosen: phrases }),
+    pages: headlines,   // every page's search headline now, for "Which page is about it?"
+    tasks: phraseTasks(list.map((p) => ({ phrase: p.phrase, found: !!p.found }))),
   };
+}
+
+/** GET /visibility/phrases: the phrases view on its own, read again after a headline changes. */
+export async function handlePhrasesGet(site: SiteRow, cors: Record<string, string>) {
+  return json({ data: await phrasesView(site) }, 200, cors);
 }
 
 /** What GET /visibility adds for the new Search tab. */

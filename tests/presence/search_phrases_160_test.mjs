@@ -80,6 +80,11 @@ const S = await import('../../supabase/functions/presence/lib/search_phrases.ts'
   ok('four are refused and nothing changes', r.status === 422 && store.__search_phrases__.phrases.length === 3);
   const v = await phrasesView(site);
   ok('the Search tab’s read carries them', v.list.length === 3 && v.list[2].phrase === 'wine bar burbank');
+  ok('…with every page’s search headline now, to pick the one a phrase belongs on', v.pages.some((h) => h.key === 'home' && /Marlow’s Kitchen/.test(h.title)) && v.pages.some((h) => h.key === 'contact'));
+  ok('…and the checklist’s tasks for them, the same as GET /visibility’s', JSON.stringify(v.tasks.map((t) => [t.key, t.done, t.go])) === JSON.stringify([['phrase:italian restaurant burbank', true, null], ['phrase:catering glendale', false, 'phrases'], ['phrase:wine bar burbank', false, 'phrases']]));
+  const { handlePhrasesGet } = await import('../../supabase/functions/presence/routes/search_tab.ts');
+  const g = await handlePhrasesGet(site, {});
+  ok('GET /visibility/phrases answers the same view, without a write', g.status === 200 && (await g.json()).data.list.length === 3);
   globalThis.fetch = realFetch;
 }
 
@@ -87,6 +92,7 @@ const S = await import('../../supabase/functions/presence/lib/search_phrases.ts'
 {
   const idx = read('supabase/functions/presence/index.ts');
   ok('the save is routed', idx.includes(`if (route === '/visibility/phrases' && method === 'PUT') return handlePhrasesPut(req, site, principal, cors);`));
+  ok('…and so is the read', idx.includes(`if (route === '/visibility/phrases' && method === 'GET') return handlePhrasesGet(site, cors);`));
   ok('saving phrases is an edit for a member', read('supabase/functions/presence/lib/site_roles.ts').includes(`'PUT /visibility/phrases',`));
   const tab = read('supabase/functions/presence/routes/search_tab.ts');
   ok('GET /visibility’s extras carry the phrases and feed the tasks', /phrasesView\(site\),/.test(tab) && /phrases: phrases\.list\.map/.test(tab));
