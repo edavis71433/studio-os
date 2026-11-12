@@ -11,7 +11,9 @@
   Prospects — the lead list (Semrush review, sales item 112, Nov 2026).
   Type a trade and a town; the server asks Google Places and gives each find a
   quick look at its website — no website scores highest. Tick to save; a saved
-  row can become a deal ("→ Deal", once) or a first-email DRAFT to copy.
+  row can become a deal ("→ Deal", once; sales item 119: it makes the contact
+  too) or a first-email DRAFT to copy. A pitch pack's notes on what it couldn't
+  check show here, for the studio only, with Rebuild beside the pack.
   NOTHING on this page sends email — the server has no send route here at all.
 
   Free-tool leads (sales item 114, Nov 2026): people who ran the free Site
@@ -77,6 +79,10 @@
   @media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .acts .main{color:#171320}}
   :root[data-theme="dark"] .acts .main{color:#171320}
   .already{font-size:12.5px;color:var(--faint);font-weight:600}
+  /* item 119: the studio's own notes on a pitch pack (never on the public pack) */
+  .pnotes{grid-column:1 / -1;font-size:13px;color:var(--soft);background:var(--p-soft);border-radius:var(--dds-r,8px);padding:8px 12px}
+  .pnotes b{color:var(--ink);font-weight:600}
+  .pnotes ul{margin:4px 0 0;padding-left:18px}
   .note{font-size:13px;color:var(--faint)}
   .center{text-align:center;padding:48px 12px}
   .center h2{font-family:var(--serif);font-weight:500;font-size:22px;margin-bottom:8px}
@@ -200,6 +206,12 @@ function leadsHtml(){
     </section>`;
 }
 
+// item 119: what the pitch pack couldn't check, for the studio's eyes only (the public pack never says)
+function packNotesHtml(p){
+  const n=Array.isArray(p.pack_notes)?p.pack_notes:[];
+  if(!p.pack_url||!n.length)return'';
+  return `<div class="pnotes" data-pack-notes="${esc(p.id)}"><b>Pitch pack notes</b>, only you see these:<ul>${n.map(x=>`<li>${esc(x)}</li>`).join('')}</ul></div>`;
+}
 function render(){
   const m=$('main');
   const finds=FINDS?`
@@ -225,7 +237,7 @@ function render(){
   const saved=SAVED.length?`
     <section class="card" aria-label="Your prospects">
       <h2>Your list</h2>
-      <p class="hint">${SAVED.length} prospect${SAVED.length===1?'':'s'}, warmest first. “→ Deal” puts one in your pipeline; the email draft is only ever words to copy.</p>
+      <p class="hint">${SAVED.length} prospect${SAVED.length===1?'':'s'}, warmest first. “→ Deal” puts one in your pipeline, with the business as its contact; the email draft is only ever words to copy.</p>
       <div class="rows">
         ${SAVED.map(p=>`
           <div class="row saved-row" data-id="${esc(p.id)}">
@@ -235,11 +247,12 @@ function render(){
                 ${['New','Contacted','In pipeline','Not a fit'].map(s=>`<option ${s===p.status?'selected':''} ${s==='In pipeline'&&!p.deal_id?'disabled':''}>${s}</option>`).join('')}
               </select>
               <button data-draft="${esc(p.id)}">Draft a first email</button>
-              ${p.pack_url?`<a class="abtn" href="${esc(p.pack_url)}" target="_blank" rel="noopener">Open pack</a>`:`<button data-pack="${esc(p.id)}">${p.pack_status==='building'?'Finish the pack':'Pitch pack'}</button>`}
+              ${p.pack_url?`<a class="abtn" href="${esc(p.pack_url)}" target="_blank" rel="noopener">Open pack</a><button data-rebuild="${esc(p.id)}" aria-label="Rebuild the pitch pack for ${esc(p.business_name)}">Rebuild</button>`:`<button data-pack="${esc(p.id)}">${p.pack_status==='building'?'Finish the pack':'Pitch pack'}</button>`}
               ${p.deal_id?`<a class="abtn" href="/pipeline.html?deal=${esc(p.deal_id)}">Open the deal</a>`:`<button class="main" data-deal="${esc(p.id)}">→ Deal</button>`}
               <button data-needs="delete" data-remove="${esc(p.id)}" aria-label="Remove ${esc(p.business_name)}">Remove</button>
             </div>
             <div class="facts">${factsHtml(p)}</div>
+            ${packNotesHtml(p)}
           </div>`).join('')}
       </div>
     </section>`:`
@@ -308,7 +321,9 @@ function wire(){
     b.disabled=true;
     const r=await api('/sales/prospects/'+b.dataset.deal+'/convert','POST',{});
     if(!r.ok&&!(r.body&&r.body.already_converted)){b.disabled=false;return toast((r.body&&r.body.message)||'That didn’t work — try again.');}
-    toast(r.body.already_converted?'Already in your pipeline.':'Deal started.');
+    // item 119: the deal comes with its contact (one already holding that phone number is used)
+    const c=r.body&&r.body.contact;
+    toast(r.body.already_converted?'Already in your pipeline.':c&&c.reused?`Deal started with ${c.name}, already in your contacts.`:'Deal and contact started.');
     await load();
   }));
   document.querySelectorAll('[data-draft]').forEach(b=>b.addEventListener('click',async()=>{
@@ -320,6 +335,7 @@ function wire(){
     $('draftDlg').showModal();
   }));
   document.querySelectorAll('[data-pack]').forEach(b=>b.addEventListener('click',()=>openPack(b.dataset.pack)));
+  document.querySelectorAll('[data-rebuild]').forEach(b=>b.addEventListener('click',()=>openPack(b.dataset.rebuild,true)));
   document.querySelectorAll('[data-remove]').forEach(b=>b.addEventListener('click',async()=>{
     if(b.dataset.armed!=='1'){b.dataset.armed='1';b.textContent='Remove — sure?';setTimeout(()=>{b.dataset.armed='';b.textContent='Remove';},3000);return;}
     const r=await api('/sales/prospects/'+b.dataset.remove,'DELETE');
@@ -356,14 +372,17 @@ function wire(){
 }
 
 // ── the pitch pack build: one call per piece, honest progress (item 113) ─────
-let PACK_ID='',PACK_BUSY=false;
-function openPack(id){
-  PACK_ID=id;PACK_BUSY=false;
+let PACK_ID='',PACK_BUSY=false,PACK_REBUILD=false;
+// item 119: Rebuild starts a finished pack over; the link already sent keeps working and shows the new results
+function openPack(id,rebuild){
+  PACK_ID=id;PACK_BUSY=false;PACK_REBUILD=!!rebuild;
   const p=SAVED.find(x=>x.id===id);
   $('packSteps').innerHTML='';
-  $('pk-go').hidden=false;$('pk-go').disabled=false;$('pk-go').textContent=(p&&p.pack_status==='building')?'Carry on building':'Build it';
+  $('pk-go').hidden=false;$('pk-go').disabled=false;$('pk-go').textContent=rebuild?'Rebuild it':(p&&p.pack_status==='building')?'Carry on building':'Build it';
   $('pk-copy').hidden=true;$('pk-open').hidden=true;$('pk-open').style.display='none';
-  $('packNote').textContent='Their website score and AI visibility, beside two nearby businesses — one link you can send them. Each check takes up to a minute; this can run for a few minutes in all.';
+  $('packNote').textContent=rebuild
+    ?'This checks their website, two nearby businesses and AI visibility again. The link you already sent keeps working and shows the new results. Each check takes up to a minute.'
+    :'Their website score and AI visibility, beside two nearby businesses — one link you can send them. Each check takes up to a minute; this can run for a few minutes in all.';
   $('packDlg').showModal();
 }
 async function buildPack(){
@@ -372,7 +391,8 @@ async function buildPack(){
   let guard=0,res=null;
   while(guard++<8){
     steps.innerHTML=`<p>Working — piece ${Math.min(guard,4)} of 4… keep this open.</p>`;
-    let r;try{r=await api('/sales/prospects/'+PACK_ID+'/pack','POST',{});}catch(_){r={ok:false,body:{}};}
+    let r;try{r=await api('/sales/prospects/'+PACK_ID+'/pack','POST',PACK_REBUILD?{rebuild:true}:{});}catch(_){r={ok:false,body:{}};}
+    if(r.ok)PACK_REBUILD=false;   // the pack started over; the next calls carry on building it
     if(!r.ok){PACK_BUSY=false;go.disabled=false;go.textContent='Try again';steps.innerHTML=`<p>${esc((r.body&&r.body.message)||'That didn’t work — try again.')}</p>`;return;}
     res=r.body.data;
     steps.innerHTML=`<p>${res.done} of ${res.total} pieces done…</p>`;
@@ -380,7 +400,9 @@ async function buildPack(){
   }
   PACK_BUSY=false;
   if(res&&res.state==='ready'){
-    steps.innerHTML='<p>Done. The link below is public but unguessable — send it in your email.</p>';
+    const notes=Array.isArray(res.notes)?res.notes:[];
+    steps.innerHTML='<p>Done. The link below is public but unguessable — send it in your email.</p>'
+      +(notes.length?`<div class="pnotes" style="margin-top:10px"><b>What the pack couldn’t check</b>, only you see this:<ul>${notes.map(x=>`<li>${esc(x)}</li>`).join('')}</ul></div>`:'');
     go.hidden=true;
     const url=location.origin+res.share_url;
     $('pk-copy').hidden=false;$('pk-copy').onclick=async()=>{try{await navigator.clipboard.writeText(url);toast('Link copied.');}catch(_){toast(url);}};
