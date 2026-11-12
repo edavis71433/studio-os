@@ -354,7 +354,7 @@ const subEvent = (id, over = {}) => ({ id, object: 'subscription', status: 'acti
   const r3 = await runInvoiceReminders(20);
   ok('a reminder that went never goes twice', r3.reminded === 0 && world.mail.length === 1);
   ok('the failed line sits under the invoice’s reminder prefix, so paying or voiding clears it', invoiceReminderFailedPeriod(INV, 'due').startsWith(`invremind:${INV}:`));
-  ok('"the third and last" only where there are three: an invoice with no due date gets two', /second and last/.test(invoiceReminderOperatorBody('after', true, true)) && /third and last/.test(invoiceReminderOperatorBody('after', true, false)) && /no client email/.test(invoiceReminderOperatorBody('after', false, true)));
+  ok('"the third and last" only where there are three: an invoice with no due date gets two', /the second automatic reminder and the last/.test(invoiceReminderOperatorBody('after', true, true)) && /the third automatic reminder and the last/.test(invoiceReminderOperatorBody('after', true, false)) && /One more goes in a week/.test(invoiceReminderOperatorBody('after', true, false, true)) && /no client email/.test(invoiceReminderOperatorBody('after', false, true)));
 }
 
 // ═══ 118 · reminders count from the day the invoice was sent (finding 9) ═══
@@ -404,7 +404,8 @@ const subEvent = (id, over = {}) => ({ id, object: 'subscription', status: 'acti
   ok('the client’s document read never selects the private note; the studio’s deal read does', !/paid_private_note/.test(docRow) && !/paid_private_note/.test(read('supabase/functions/presence/lib/doc_context.ts')) && !/paid_private_note/.test(read('supabase/functions/presence/routes/client_delivery.ts')) && /paid_note,payment_for,paid_private_note&order=/.test(sales));
   await undo(INV);
   ok('undo clears both notes', row().paid_note === '' && row().paid_private_note === '');
-  const crm = read('crm.html'), pipe = read('pipeline.html');
+  const crm = read('crm.html'), pipe = read('pipeline.html'), invs = read('invoices.html');
+  ok('Invoices page: the same two notes, each saying who sees it', /Note on their receipt \(optional\)/.test(invs) && /Shown on their receipt: the client sees this note/.test(invs) && /Private note, only you see it \(optional\)/.test(invs) && /private_note:\$\('payPrivate'\)\.value\.trim\(\)/.test(invs) && !/>Note \(optional\)</.test(invs));
   for (const [name, src] of [['record', crm], ['deal page', pipe]]) {
     ok(`${name}: the note says it is shown on their receipt, and a private note sits beside it`, /Note on their receipt \(optional\)/.test(src) && /Shown on their receipt: the client sees this note on the receipt, its PDF and the receipt email\./.test(src) && /Private note, only you see it \(optional\)/.test(src) && !/<label>Note \(optional\)/.test(src));
     ok(`${name}: the private note is sent, and shown back only to the studio`, /private_note:/.test(src) && /v\.paid_private_note\?/.test(src));

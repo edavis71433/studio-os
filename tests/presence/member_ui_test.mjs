@@ -98,6 +98,12 @@ const CONTROLS = [
 const NO_CONTROL = {
   'DELETE /projects/:id/deliverables/:id2': /\/deliverables\/[^\n]*DELETE|DELETE[^\n]*\/deliverables\//,
 };
+// Sales item 117: the client portal has no shell and no data-needs marks. Its one owner-only
+// control, Cancel retainer, sits on the Invoices tab, which draws nothing of billing for anyone
+// but the client themself; the server's gate refuses any other seat.
+const PORTAL_OWNER_ONLY = {
+  'POST /client/retainers/:id/cancel': { page: 'client.html', call: `api('/client/retainers/'+encodeURIComponent(id)+'/cancel','POST',{})`, guard: `if(PORTAL.persona!=='client'){ // reviewer: /client/billing is 403 server-side` },
+};
 const PAGES = [...Deno.readDirSync(ROOT)].filter((f) => f.isFile && /\.(html|js)$/.test(f.name)).map((f) => f.name);
 const SOURCE = Object.fromEntries(PAGES.map((p) => [p, read(p)]));
 
@@ -121,9 +127,13 @@ const SOURCE = Object.fromEntries(PAGES.map((p) => [p, read(p)]));
   const decided = read('tests/presence/member_capability_test.mjs');
   const listed = (name) => [...decided.split('const DECIDED = {')[1].split(`\n  ${name}: [`)[1].split('\n  ],')[0].matchAll(/'((?:DELETE|POST|PUT|PATCH) [^']+)'/g)].map((m) => m[1]);
   const routes = [...listed('delete'), ...listed('configure')];
-  ok('the decided delete and configure lists were read', routes.length === 43, String(routes.length));   // item 47 added two; item 104 took away the seven DNS document and zone writes; item 58 added two; item 112 added the prospect delete; item 115 added the Google review link; item 175 the visitor password; item 77 the payment undo; item 174 added the two domain forwards; items 86 + 105 added three (import undo, merge, unmerge)
+  ok('the decided delete and configure lists were read', routes.length === 44, String(routes.length));   // item 47 added two; item 104 took away the seven DNS document and zone writes; item 58 added two; item 112 added the prospect delete; item 115 added the Google review link; item 175 the visitor password; item 77 the payment undo; item 174 added the two domain forwards; items 86 + 105 added three (import undo, merge, unmerge); sales item 117 the client's retainer cancel
   const covered = new Set(CONTROLS.map(([r]) => r));
-  const open = routes.filter((r) => !covered.has(r) && !NO_CONTROL[r]);
+  const open = routes.filter((r) => !covered.has(r) && !NO_CONTROL[r] && !PORTAL_OWNER_ONLY[r]);
+  for (const [route, c] of Object.entries(PORTAL_OWNER_ONLY)) {
+    const src = SOURCE[c.page];
+    ok(`${route}: offered only inside the portal's client-only Invoices tab`, count(src, c.call) === 1 && src.indexOf(c.guard) > src.indexOf('async function renderInvoices(){') && src.indexOf(c.guard) < src.indexOf('const rets=((b&&b.retainers)||[])') && PAGES.filter((p) => SOURCE[p].includes('/client/retainers/')).join() === c.page);
+  }
   ok('every decided delete and configure route is accounted for here', open.length === 0, open.join(', '));
   for (const [route, rx] of Object.entries(NO_CONTROL)) {
     const pages = PAGES.filter((p) => rx.test(SOURCE[p]));
