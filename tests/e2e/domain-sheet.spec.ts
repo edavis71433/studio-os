@@ -395,13 +395,16 @@ test.describe('Domain & email sheet: the smaller fixes (item 194)', () => {
     await expect(desk).not.toContainText('A   @');
   });
 
-  test('every Copy button says what it copies, and the domain box has a name', async ({ page }) => {
+  test('every Copy button says what it copies', async ({ page }) => {
     await installApp(page, { api: { ...BASE, '/foundations/domain': { data: { ...ATTACHED.data, records: PAIR } } } });
     await page.goto('/presence.html#domain');
     const desk = page.locator('#deskResults');
     await expect(desk.getByRole('button', { name: 'Copy the value of the A record for @: 75.2.60.5' })).toBeVisible();
     await expect(desk.getByRole('button', { name: 'Copy the value of the CNAME record for www: bistro.netlify.app' })).toBeVisible();
     await expect(desk.getByRole('button', { name: 'Copy', exact: true })).toHaveCount(0);
+  });
+
+  test('the domain box has a name a screen reader can say', async ({ page }) => {
     await installApp(page, { api: { ...BASE, '/foundations/domain': { data: null } } });
     await page.goto('/presence.html#domain');
     await expect(page.getByRole('textbox', { name: 'Your domain' })).toBeFocused();
