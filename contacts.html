@@ -1458,7 +1458,8 @@ async function askDelete(id){
     }
     $('delDlg').close();
     const kept=(d.body&&d.body.data&&d.body.data.kept_items)||[];
-    const msg=kept.length?((b.name||who)+' removed — their '+kept.join(', ')+' stayed.'):((b.name||who)+' removed.');
+    // sales item 83: and it waits in Recently deleted for 30 days after the Undo has gone
+    const msg=(kept.length?((b.name||who)+' removed — their '+kept.join(', ')+' stayed.'):((b.name||who)+' removed.'))+' It stays in Recently deleted for 30 days.';
     // Phase 4 (delete safety): the removal is a soft delete, so the toast carries
     // ONE Undo that puts the contact straight back (POST …/restore).
     if(window.ddsToast)ddsToast(msg,'ok',{label:'Undo',onClick:async()=>{
