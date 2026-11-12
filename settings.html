@@ -24,10 +24,7 @@
   *{box-sizing:border-box}
   body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);line-height:1.5;-webkit-font-smoothing:antialiased}
   .wrap{max-width:1040px;margin:0 auto;padding:var(--dds-s7,32px) var(--dds-s5,20px) 90px}
-  .toprow{display:flex;align-items:flex-start;justify-content:space-between;gap:var(--dds-s4,16px);flex-wrap:wrap}
-  h1{font-family:var(--serif);font-weight:500;font-size:28px;line-height:1.2;margin:0;letter-spacing:-.01em}
-  .subline{display:flex;gap:10px;flex-wrap:wrap;align-items:center;color:var(--soft);font-size:13px;margin-top:var(--dds-s1,4px)}
-  .subline .dot{color:var(--faint)}
+  /* builder item 165: the page header is the shared one (shell.css .dds-ph); its line is #subline */
   .setgrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:var(--dds-s4,16px);margin-top:var(--dds-s5,20px)}
   @media (max-width:700px){.setgrid{grid-template-columns:minmax(0,1fr)}}
   /* ══ Bold redesign — Settings (Nov 2026): on a computer a list on the left that
@@ -307,9 +304,10 @@
 </head>
 <body>
 <div class="wrap" id="main">
-  <div class="toprow">
-    <div><h1 id="pagehead" tabindex="-1">Settings</h1><div class="subline" id="subline"><span>Loading…</span></div></div>
-  </div>
+  <header class="dds-ph">
+    <div class="dds-ph-row"><span class="dds-ph-ic" data-ic="settings" aria-hidden="true"></span>
+      <div class="dds-ph-tt"><div class="dds-ph-tl"><h1 id="pagehead" tabindex="-1">Settings</h1></div><p class="dds-ph-line" id="subline">Loading…</p></div></div>
+  </header>
   <div class="setlay">
   <nav class="setnav" aria-label="Settings areas"><input type="search" id="setFind" class="setfind" placeholder="Search settings" aria-label="Search settings" aria-controls="cards" autocomplete="off"><div class="setgrid" id="cards"></div></nav>
   <div class="setmain">
@@ -2056,7 +2054,8 @@ function renderSubline() {
   const bits = [];
   if (IDENT && IDENT.business_name) bits.push(esc(IDENT.business_name));
   if (CTX && CTX.edition_name) bits.push(esc(CTX.edition_name));
-  $('subline').innerHTML = bits.map((x, i) => (i ? '<span class="dot">·</span>' : '') + '<span>' + x + '</span>').join('');
+  // builder item 165: the header's one line — the business and its plan, or one plain sentence
+  $('subline').innerHTML = bits.length ? bits.join(' · ') : 'How your studio works, in one place.';
 }
 function signedOut() {
   $('main').innerHTML = '<div class="center"><h2>Sign in to see your settings.</h2><p><a class="link" href="/studio.html">Sign in →</a></p></div>';

@@ -33,16 +33,7 @@
   svg{display:block}
   :focus-visible{outline:2px solid var(--p);outline-offset:2px}
 
-  /* ── crumb · title row · chips ── */
-  .crumb{font-size:12.5px;color:var(--faint);display:flex;gap:6px;align-items:center;margin-bottom:10px;flex-wrap:wrap}
-  .crumb a{color:var(--faint);text-decoration:none;border-radius:var(--dds-r-sm,6px);padding:1px var(--dds-s1,4px);margin-left:-4px}
-  .crumb a:hover{color:var(--p);background:var(--p-soft)}
-  .crumb [aria-current="page"]{color:var(--ink);font-weight:500}
-  .toprow{display:flex;align-items:flex-start;justify-content:space-between;gap:var(--dds-s4,16px);flex-wrap:wrap}
-  h1.title{font-family:var(--serif);font-weight:500;font-size:28px;letter-spacing:-.01em;margin:0;line-height:1.15}
-  .subline{display:flex;gap:var(--dds-s3,12px);flex-wrap:wrap;align-items:center;color:var(--soft);font-size:13px;margin-top:var(--dds-s1,4px)}
-  .subline .dot{color:var(--faint)}
-  .chips{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+  /* builder item 165: the page header is the shared one (shell.css .dds-ph), Settings in its trail */
   .chip{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:500;padding:2px var(--dds-s2,8px);border-radius:999px;border:1px solid var(--line);background:var(--card);color:var(--soft);line-height:18px;white-space:nowrap}
   .chip .d{width:6px;height:6px;border-radius:50%;background:var(--faint)}
   .chip.good{background:var(--good-soft);border-color:transparent;color:var(--good)} .chip.good .d{background:var(--good)}
@@ -149,19 +140,16 @@
   .toast.show{opacity:1}
   @keyframes sp{to{transform:rotate(360deg)}}
   @media (prefers-reduced-motion:reduce){.spin{animation:none}}
-  @media (max-width:640px){.wrap{padding:16px 16px 90px}h1.title{font-size:24px}.row .acts{margin-left:0}}
+  @media (max-width:640px){.wrap{padding:16px 16px 90px}.row .acts{margin-left:0}}
 </style>
 <link rel="stylesheet" href="/shell.css"><script src="/shell.js" defer></script>
 </head>
 <body>
 <div class="wrap">
-  <nav class="crumb" aria-label="Breadcrumb"><a href="/settings.html">Settings</a><span aria-hidden="true">›</span><span aria-current="page">Connections</span></nav>
-  <header class="toprow">
-    <div>
-      <h1 class="title">Connections</h1>
-      <div class="subline"><span id="sub">The outside services your studio talks to.</span><span class="dot" id="subdot" hidden>·</span><span class="chips" id="counts"></span></div>
-    </div>
-    <div id="topActs"></div>
+  <header class="dds-ph"><nav class="dds-ph-trail" aria-label="Where this page is"><a href="/settings.html">Settings</a><span aria-hidden="true">›</span></nav>
+    <div class="dds-ph-row"><span class="dds-ph-ic" data-ic="connections" aria-hidden="true"></span>
+      <div class="dds-ph-tt"><div class="dds-ph-tl"><h1 id="pagehead" tabindex="-1">Connections</h1></div><p class="dds-ph-line" id="phLine">Google, your calendar and email sending, in one place</p></div>
+      <div class="dds-ph-acts" id="topActs"></div></div>
   </header>
   <div id="main"><div class="spin" role="status" aria-label="Loading"></div></div>
 </div>
@@ -402,14 +390,17 @@ function row(e){
 }
 
 // the header chips + the warning band, from the same entries the rows show
+// builder item 165: the header's one line, as drawn, with the counts the rows show
+const HEAD_LINE='Google, your calendar and email sending, in one place';
+function headLine(counts){ const l=$('phLine'); if(l) l.textContent=[HEAD_LINE].concat(counts||[]).join(' · '); }
 function headCounts(entries){
   const connected = entries.filter(e=>statusOf(e).cls==='ok').length;
   const attention = entries.filter(e=>statusOf(e).cls==='attn');
-  let h='';
-  if(connected) h+=`<span class="chip good"><i class="d"></i>${connected} connected</span>`;
-  if(attention.length) h+=`<span class="chip warn"><i class="d"></i>${attention.length} need${attention.length===1?'s':''} attention</span>`;
-  if(!connected && !attention.length) h+=`<span class="chip"><i class="d"></i>Nothing connected yet</span>`;
-  $('counts').innerHTML=h; $('subdot').hidden=false;
+  const bits=[];
+  if(connected) bits.push(`${connected} connected`);
+  if(attention.length) bits.push(`${attention.length} need${attention.length===1?'s':''} attention`);
+  if(!connected && !attention.length) bits.push('nothing connected yet');
+  headLine(bits);
   return attention;
 }
 function alertBand(attention){
@@ -464,9 +455,8 @@ function railAsk(){
 function render(surface){
   const groups = (surface && surface.groups) || {};
   const keys = Object.keys(groups);
-  if(surface && surface.note) $('sub').textContent = surface.note;
   if(!keys.length){
-    $('counts').innerHTML=''; $('subdot').hidden=true;
+    headLine();
     $('main').innerHTML = `<div class="center"><h2>Nothing to connect just yet.</h2>
       <p class="sub">As services become available for your plan, they’ll appear here — nothing to set up in advance.</p></div>`;
     return;
@@ -624,10 +614,12 @@ function paintAskClient(entries){
   const open = entries.filter(e=>ASKABLE.includes(e.key) && !statusOf(e).connected && !statusOf(e).unavailable);
   if(!IN_CLIENT || !open.length){ host.innerHTML=''; return; }
   const asked = open.some(e=>(e.connection||{}).status==='pending');
-  host.innerHTML = `<button type="button" class="btn" id="askClient">${asked?'Ask again':'Ask '+esc(CLIENT_NAME||'the client')+' to connect their Google'}</button>`;
+  // builder item 165: the one other action, outline, behind ⋯ on a phone
+  host.innerHTML = `<button type="button" class="dds-ph-dots" popovertarget="phMore" aria-label="More actions" title="More actions">⋯</button><div class="dds-ph-more" id="phMore" popover><button type="button" class="btn" id="askClient">${asked?'Ask again':'Ask '+esc(CLIENT_NAME||'the client')+' to connect their Google'}</button></div>`;
   $('askClient').addEventListener('click', askClient);
 }
 async function askClient(){
+  try{ const m=$('phMore'); if(m&&m.hidePopover) m.hidePopover(); }catch(_){}   // the phone's ⋯ sheet steps aside for the question
   const who = CLIENT_NAME || 'the client';
   if(!(await askConfirm('Email ' + who + ' a link to connect their Google?', 'They sign in to their portal and approve it on Google’s own screen, with their own account — read-only, and theirs to disconnect any time. You can still connect it for them from here.', 'Send the email'))) return;
   const btn = $('askClient'); if(btn){ btn.disabled = true; btn.textContent = 'Sending…'; }
@@ -751,13 +743,13 @@ async function refresh(key, btn){
   problem(key, serverMsg(r, 'Couldn’t read from it just now — it may need a quick reconnect.'), r.body);
 }
 
-function signedOut(){ $('sub').textContent=''; $('counts').innerHTML=''; $('subdot').hidden=true; $('main').innerHTML = `<div class="center"><h2>Sign in to manage your connections.</h2><p class="sub">Your connections live with your account — sign in to see and manage them.</p><p style="margin-top:22px"><a class="link" href="/studio.html">Sign in →</a></p></div>`; }
+function signedOut(){ headLine(); $('main').innerHTML = `<div class="center"><h2>Sign in to manage your connections.</h2><p class="sub">Your connections live with your account — sign in to see and manage them.</p><p style="margin-top:22px"><a class="link" href="/studio.html">Sign in →</a></p></div>`; }
 // A 404 here is `no_site` — the caller owns no site of their own (an agency
 // operator, which is exactly Eric). That is PERMANENT: "please refresh in a
 // moment" sent him round the loop forever, because refreshing can never fix it.
 // The fix is a client scope, so say that, and hand him the door.
 function trouble(status){
-  $('counts').innerHTML=''; $('subdot').hidden=true;
+  headLine();
   if(status === 404){
     $('main').innerHTML = `<div class="center"><h2>Open a client first.</h2>
       <p class="sub">Connections belong to a particular business, and your studio account doesn’t have a website of its own. Pick a client and you’ll see everything they can connect — refreshing this page won’t change it.</p>

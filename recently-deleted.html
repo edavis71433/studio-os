@@ -29,11 +29,7 @@
   body{background:var(--bg);color:var(--ink);font-family:var(--sans);line-height:1.55;-webkit-font-smoothing:antialiased}
   .wrap{max-width:1180px;margin:0 auto;padding:var(--dds-s6,24px) var(--dds-s5,20px) 90px}
   .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
-  .crumb{font-size:13px;color:var(--faint);margin-bottom:4px}
-  .crumb a{color:var(--p);text-decoration:none;font-weight:500}
-  .crumb a:hover{text-decoration:underline}
-  h1{font-family:var(--serif);font-weight:600;font-size:30px;letter-spacing:-.01em;line-height:1.2}
-  .lede{color:var(--soft);font-size:15px;margin:4px 0 16px}
+  /* builder item 165: the page header is the shared one (shell.css .dds-ph), Settings in its trail */
   /* the kinds, as chips (pressed = shown) */
   .kchips{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:16px}
   .kchip{font:inherit;font-size:14px;font-weight:500;border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:999px;padding:7px 16px;min-height:36px;cursor:pointer;display:inline-flex;align-items:center;gap:8px;box-shadow:var(--shadow)}
@@ -72,7 +68,6 @@
   @keyframes sp{to{transform:rotate(360deg)}}
   @media (max-width:767px){
     .wrap{padding:16px 16px 100px}
-    h1{font-size:26px}
     .drow{grid-template-columns:auto 1fr auto;padding:14px 16px;align-items:start}
     .dw{grid-column:2;grid-row:2;white-space:normal}
     .rbtn{grid-column:3;grid-row:1;min-height:44px}
@@ -133,9 +128,11 @@ function render(focusSel){
   const all=rowsOf(DATA),shown=SHOW==='all'?all:all.filter(r=>r.kind===SHOW);
   const count=(k)=>k==='all'?all.length:all.filter(r=>r.kind===k).length;
   const partial=(DATA.partial||[]).filter(k=>PARTIAL_WORD[k]);
-  let h=`<p class="crumb"><a href="/settings.html">Settings</a> <span aria-hidden="true">/</span> Recently deleted</p>
-    <h1>Recently deleted</h1>
-    <p class="lede">Deals, contacts and to-dos you deleted in the last ${esc(DATA.days||30)} days. Bring any of them back.</p>`;
+  const days=DATA.days||30;
+  const line=all.length?`${all.length} thing${all.length===1?'':'s'} deleted in the last ${days} days`:`Deals, contacts and to-dos you delete wait here for ${days} days`;
+  let h=`<header class="dds-ph"><nav class="dds-ph-trail" aria-label="Where this page is"><a href="/settings.html">Settings</a><span aria-hidden="true">›</span></nav>
+    <div class="dds-ph-row"><span class="dds-ph-ic" data-ic="deleted" aria-hidden="true"></span>
+      <div class="dds-ph-tt"><div class="dds-ph-tl"><h1 id="pagehead" tabindex="-1">Recently deleted</h1></div><p class="dds-ph-line" id="phLine">${esc(line)}</p></div></div></header>`;
   if(partial.length)h+=`<p class="partial" role="status">We couldn’t read your deleted ${esc([...new Set(partial.map(k=>PARTIAL_WORD[k]))].join(' and '))} just now, so this may not be everything. Refresh to try again.</p>`;
   if(all.length)h+=`<div class="kchips" role="group" aria-label="Show">${KINDS.map(([k,l])=>`<button type="button" class="kchip" data-show="${k}" aria-pressed="${SHOW===k?'true':'false'}">${l} <span class="n">${count(k)}</span></button>`).join('')}</div>`;
   if(!all.length){
@@ -163,7 +160,7 @@ async function restore(btn){
   DATA[list]=(DATA[list]||[]).filter(x=>x.id!==id);
   render();
   const btns=[...document.querySelectorAll('[data-restore]')];const nx=btns[Math.min(at,btns.length-1)]||document.querySelector('[data-show="'+SHOW+'"]')||$('main').querySelector('h1');
-  if(nx){if(nx.tagName==='H1')nx.setAttribute('tabindex','-1');nx.focus();}
+  if(nx)nx.focus();
   if(r.ok)toast(`${row.title} is back in ${row.home}`,false,{label:'Open',onClick:()=>{location.href=row.open;}});
   else toast(`${row.title} was already back.`);
 }
