@@ -49,22 +49,51 @@ export function brandFromKit(kit: { primary?: string } | null | undefined, busin
   return { name: (businessName || '').trim() || EMAIL_BRAND_DEFAULT.name, accent, accentDark: darken(accent, 0.16) };
 }
 
+// Sales item 125: the emails wear the new look. The card opens with a band in the brand's colour
+// carrying its logo or name; an email about a document says what it is there too (emailBand).
+const BAND_MARK = /^\s*<!--band:([^\u001f]*)\u001f(.*?)-->/;
+const bandSafe = (s: unknown) => esc(String(s ?? '').trim().slice(0, 140)).replace(/--/g, '&#45;&#45;');
+/** A headline for the band, to put FIRST in an email's body: small words over a title
+ *  ("Invoice #0013" over "Website refresh"). The shell lifts it into the band; a mail app never
+ *  shows it as text. Pure. */
+export function emailBand(kicker: unknown, title: unknown): string {
+  const t = bandSafe(title);
+  return t ? `<!--band:${bandSafe(kicker)}\u001f${t}-->` : '';
+}
+/** A small box of facts for a document email: rows of a label and a value, the last one large
+ *  when `big` (the amount). `tone: 'good'` is the green of something paid or signed. Every style
+ *  is inline (mail apps drop style blocks). Values are escaped here. Pure. */
+export function emailFacts(rows: Array<[string, string]>, o: { big?: boolean; tone?: 'good' } = {}): string {
+  const live = rows.filter((r) => r && String(r[1] ?? '').trim());
+  if (!live.length) return '';
+  const bg = o.tone === 'good' ? '#e7f1ea' : '#f6f3ee', soft = o.tone === 'good' ? '#2f6a4a' : '#6b6478', ink = o.tone === 'good' ? '#2f6a4a' : '#1b1525';
+  const tr = live.map(([k, v], i) => {
+    const last = !!o.big && i === live.length - 1;
+    return `<tr><td style="padding:5px 12px 5px 0;font-size:14px;color:${last ? ink : soft};${last ? 'font-weight:600' : ''}">${esc(k)}</td><td align="right" style="padding:5px 0;color:${ink};${last ? "font-family:Georgia,'Times New Roman',serif;font-size:22px;font-weight:600" : 'font-size:14px'}">${esc(v)}</td></tr>`;
+  }).join('');
+  return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:${bg};border-radius:14px;margin:14px 0"><tr><td style="padding:11px 18px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0">${tr}</table></td></tr></table>`;
+}
+
 /** Wrap a body HTML fragment in the branded shell. Pure. Idempotent (a body that's
  *  already a full document is returned untouched, so nothing double-wraps). */
 export function brandEmailShell(bodyHtml: string, brand: EmailBrand = EMAIL_BRAND_DEFAULT, opts: EmailShellOpts = {}): string {
-  const b = String(bodyHtml || '');
+  let b = String(bodyHtml || '');
   if (/^\s*<!doctype|<html[\s>]/i.test(b)) return b;
   const name = esc(brand.name);
-  // builder list item 59: the studio's logo in place of its name when it set one (the name stays as the alt text)
-  const logo = typeof brand.logoUrl === 'string' && /^https:\/\//.test(brand.logoUrl) ? `<img src="${esc(brand.logoUrl)}" alt="${name}" style="display:block;height:40px;width:auto;max-width:220px;border:0">` : '';
+  // a headline the caller set for the band (emailBand), lifted out of the body
+  const mark = BAND_MARK.exec(b);
+  if (mark) b = b.slice(mark[0].length);
+  const sans = "-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif";
+  const headline = mark ? `${mark[1] ? `<div style="font-family:${sans};font-size:11px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:#ffffff;opacity:.82;margin-top:18px">${mark[1]}</div>` : ''}<div style="font-family:Fraunces,Georgia,'Times New Roman',serif;font-size:26px;line-height:1.25;color:#ffffff;margin-top:${mark[1] ? '4px' : '16px'}">${mark[2]}</div>` : '';
+  // builder list item 59: the studio's logo in place of its name when it set one (the name stays as the alt text); on the band it sits on a white chip
+  const logo = typeof brand.logoUrl === 'string' && /^https:\/\//.test(brand.logoUrl) ? `<img src="${esc(brand.logoUrl)}" alt="${name}" style="display:block;height:34px;width:auto;max-width:220px;border:0;background:#ffffff;border-radius:9px;padding:6px 10px">` : '';
   return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<style>a{color:${brand.accentDark}} .cta a{color:#ffffff!important}</style></head>
+<style>a{color:${brand.accentDark}} .cta a{color:#ffffff!important;padding:12px 22px!important;font-weight:600}</style></head>
 <body style="margin:0;padding:0;background:#f4f2ef;-webkit-font-smoothing:antialiased">
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f4f2ef"><tr><td align="center" style="padding:28px 14px">
-<table role="presentation" width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;background:#ffffff;border-radius:14px;overflow:hidden;box-shadow:0 1px 3px rgba(27,21,37,.08)">
-<tr><td style="height:6px;background:${brand.accent};font-size:0;line-height:0">&nbsp;</td></tr>
-<tr><td style="padding:22px 30px 6px">${logo || `<div style="font-family:'Iowan Old Style',Palatino,Georgia,serif;font-weight:600;font-size:19px;color:${brand.accentDark};letter-spacing:-.01em">${name}</div>`}</td></tr>
-<tr><td style="padding:6px 30px 26px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;font-size:15px;line-height:1.6;color:#1b1525">${b}</td></tr>
+<table role="presentation" width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;background:#ffffff;border-radius:18px;overflow:hidden;box-shadow:0 1px 3px rgba(27,21,37,.08)">
+<tr><td bgcolor="${brand.accent}" style="background:${brand.accent};padding:22px 30px ${mark ? '26px' : '22px'}">${logo || `<div style="font-family:${sans};font-weight:600;font-size:19px;color:#ffffff;letter-spacing:-.01em">${name}</div>`}${headline}</td></tr>
+<tr><td style="padding:24px 30px 28px;font-family:${sans};font-size:15px;line-height:1.6;color:#1b1525">${b}</td></tr>
 <tr><td style="padding:16px 30px;border-top:1px solid #eee9e0;font-family:-apple-system,'Segoe UI',sans-serif;font-size:12px;line-height:1.5;color:#938ba3">${emailFooterHtml(brand, opts)}</td></tr>
 </table></td></tr></table></body></html>`;
 }

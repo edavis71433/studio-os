@@ -7,33 +7,56 @@
 <meta name="robots" content="noindex, nofollow">
 <link rel="stylesheet" href="/fonts/brand.css">
 <style>
-  :root { --p:#5b3fa0; --ink:#1a1523; --muted:#7a6d8e; --cream:#faf8f4; }
+  /* Sales item 125: the pay pages in the new look. A band in the studio's own colour when this
+     browser knows the studio (the name and colour a signed-in client left in localStorage
+     'dds-studio-brand'), the product's plum otherwise; the card rises over it with a round seal. */
+  :root { --p:#5b3fa0; --band-a:#241d38; --band-b:#5b3fa0; --ink:#1a1523; --muted:#6b6478; --cream:#faf8f5; --card:#fff; --seal:#2f6a4a; }
   * { margin:0; padding:0; box-sizing:border-box; }
-  body { font-family:'Inter',sans-serif; background:var(--cream); color:var(--ink); min-height:100vh; display:flex; align-items:center; justify-content:center; padding:24px; }
-  .card { background:#fff; border:1px solid rgba(91,63,160,0.12); border-radius:20px; padding:48px 40px; max-width:480px; text-align:center; }
-  .mark { width:56px; height:56px; border-radius:16px; background:#3f7d5b; color:#fff; font-size:26px; display:flex; align-items:center; justify-content:center; margin:0 auto 22px; }
-  h1 { font-family:'Fraunces',serif; font-weight:400; font-size:28px; margin-bottom:12px; }
+  body { font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif; background:var(--cream); color:var(--ink); min-height:100vh; -webkit-font-smoothing:antialiased; }
+  .band { background:var(--band-b); background:linear-gradient(100deg,var(--band-a),var(--band-b)); color:#fff; padding:22px 24px 96px; min-height:170px; }
+  .band .studio { max-width:520px; margin:0 auto; display:flex; align-items:center; gap:10px; font-weight:600; font-size:15px; min-height:30px; }
+  .band .smark { flex:none; width:30px; height:30px; border-radius:9px; background:rgba(255,255,255,.18); display:grid; place-items:center; font-size:14px; font-weight:700; }
+  .wrap { max-width:520px; margin:-72px auto 0; padding:0 16px 40px; }
+  .card { background:var(--card); border-radius:24px; padding:0 32px 36px; text-align:center; box-shadow:0 1px 2px rgba(27,21,37,.04),0 10px 30px rgba(27,21,37,.08); }
+  .mark { width:72px; height:72px; border-radius:50%; background:var(--seal); color:#fff; font-size:30px; font-weight:700; display:flex; align-items:center; justify-content:center; margin:0 auto 18px; border:5px solid var(--card); position:relative; top:-36px; margin-bottom:-18px; }
+  h1 { font-family:'Fraunces',Georgia,serif; font-weight:400; font-size:clamp(25px,6vw,30px); line-height:1.2; margin-bottom:12px; }
   p { font-size:14.5px; line-height:1.65; color:var(--muted); margin-bottom:10px; }
-  a.btn { display:inline-block; margin-top:18px; background:var(--p); color:#fff; text-decoration:none; padding:12px 26px; border-radius:100px; font-size:14px; font-weight:600; }
-  a.plain { display:inline-block; margin-top:12px; color:var(--muted); font-size:13px; text-decoration:none; }
-  /* ── Dark-mode variant (token-level; mirrors signup.html's recipe).
-     The button keeps #5b3fa0 + white — that pairing passes in both themes. ── */
+  a.btn { display:block; margin-top:20px; background:var(--p); color:#fff; text-decoration:none; padding:14px 26px; min-height:48px; border-radius:100px; font-size:15px; font-weight:600; }
+  a.btn:focus-visible, a.plain:focus-visible { outline:3px solid var(--p); outline-offset:3px; }
+  a.plain { display:inline-block; margin-top:14px; color:var(--muted); font-size:13px; text-decoration:none; }
+  p a { color:var(--p); }
   @media (prefers-color-scheme:dark){
-    :root { --ink:#EFEAF7; --muted:#A79DBE; --cream:#171320; }
-    .card { background:#241d38; border-color:rgba(183,156,235,.18); }
+    :root { --ink:#EFEAF7; --muted:#A79DBE; --cream:#171320; --card:#241d38; }
+    p a { color:#c4aee8; }
   }
 </style>
 </head>
 <body>
-  <div class="card">
+  <div class="band"><div class="studio" id="studio"></div></div>
+  <div class="wrap"><div class="card">
     <div class="mark">✓</div>
     <h1 id="h">Payment received. Thank you.</h1>
     <p>Your payment went through securely via Stripe, and a receipt is on its way to your email.</p>
     <p id="sub">Everything updates on its own: your invoice is marked paid, and your project keeps moving. No sign-in yet? Nothing to do: your workspace invitation arrives by email once your project starts.</p>
     <a class="btn" id="cta" href="https://davisdigitalstudio.com/portal.html">Sign in to your workspace →</a>
     <a class="plain" id="plain" href="https://davisdigitalstudio.com">davisdigitalstudio.com</a>
-  </div>
+  </div></div>
   <script>
+    // Sales item 125: the band wears the studio's name and colour when this browser knows them.
+    (function () {
+      var b = null; try { b = JSON.parse(localStorage.getItem('dds-studio-brand') || 'null'); } catch (e) {}
+      if (new URLSearchParams(location.search).get('kind') === 'audit') b = { name: 'Davis Digital Studio' };   // an audit buyer is the platform's own customer
+      if (!b || typeof b.name !== 'string' || !b.name.trim()) return;
+      var name = b.name.trim().slice(0, 80), el = document.getElementById('studio');
+      var m = document.createElement('span'); m.className = 'smark'; m.setAttribute('aria-hidden', 'true'); m.textContent = name.charAt(0).toUpperCase();
+      var t = document.createElement('span'); t.textContent = name;
+      el.appendChild(m); el.appendChild(t);
+      var hex = /^#[0-9a-f]{6}$/i.test(b.accent || '') ? b.accent : '';
+      if (!hex) return;
+      var mix = function (h, to, k) { return '#' + [1, 3, 5].map(function (i) { var a = parseInt(h.substr(i, 2), 16), z = parseInt(to.substr(i, 2), 16); return ('0' + Math.round(a + (z - a) * k).toString(16)).slice(-2); }).join(''); };
+      var root = document.documentElement.style;
+      root.setProperty('--band-b', hex); root.setProperty('--band-a', mix(hex, '#140c1f', 0.45)); root.setProperty('--p', mix(hex, '#140c1f', 0.12));
+    })();
     // Audit buyers arrive with ?kind=audit and aren't portal clients — swap the
     // invoice/project copy for what actually happens next with an audit order.
     // Oct 2026 (item 1): Stripe now returns service-invoice payers to
