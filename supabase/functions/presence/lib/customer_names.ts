@@ -33,6 +33,17 @@ export function customerNames(p: CustomerNameParts): { name: string; business_na
   return { name, business_name: business, person_name: person };
 }
 
+/** The first name to greet a customer by in their portal (builder list item 179):
+ *  the person on their record, else the record's own name when no business name
+ *  has taken its place (a deal converts under the contact's name). '' when only a
+ *  business is known, or when the name is an initial or an address. Pure. */
+export function greetingName(n: { name?: unknown; business_name?: unknown; person_name?: unknown } | null | undefined): string {
+  const person = t(n?.person_name) || (!t(n?.business_name) && t(n?.name) !== 'Customer' ? t(n?.name) : '');
+  const first = person.split(' ')[0].replace(/[.,;:!?]+$/, '');
+  if (first.length < 2 || /[\d@]/.test(first)) return '';
+  return first === first.toLowerCase() ? first.charAt(0).toUpperCase() + first.slice(1) : first;
+}
+
 // ── Reading the parts (item 49) ───────────────────────────────────────────────
 // The second walk found PR 151 showed nothing new live: the contact behind a
 // customer is tied to them through the WON DEAL (presence_deals.contact_id with

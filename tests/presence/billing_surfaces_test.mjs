@@ -38,26 +38,28 @@ ok('studio: only on the studio side, resolved via the service link', /if \(studi
 ok('studio: labels it billing_type saas (the customer software subscription, not agency billing)', /customer_saas = \{[\s\S]*?billing_type: 'saas'/.test(projects));
 
 // ── Client App renders the service-billing section, labeled distinct from SaaS ──
-// PS2 rewrote appendBilling's paragraph cards into invoiceRowHtml .frow rows:
-// the pins follow the new renderer but stay non-vacuous — rerouting the tab off
-// /client/billing (via ensureBilling), dropping the row renderer, or unwiring
-// the rows from renderInvoices must each redden here.
-ok('client app: fetches /client/billing (ensureBilling) and renders it through invoiceRowHtml rows',
-  /api\('\/client\/billing'\)/.test(clientHtml) && /function invoiceRowHtml/.test(clientHtml)
-  && /const b=await ensureBilling\(\);/.test(clientHtml) && /inv\.map\(i=>invoiceRowHtml\(i,today\)\)/.test(clientHtml));
+// Item 179 part four folded the Invoices tab into the Documents shelf: the pins
+// follow the shelf but stay non-vacuous — rerouting it off /client/billing (via
+// ensureBilling), dropping the row builder, or unwiring the invoice rows from the
+// shelf's paint must each redden here.
+ok('client app: fetches /client/billing (ensureBilling) and renders it through the shelf’s rows',
+  /api\('\/client\/billing'\)/.test(clientHtml) && /function shelfRows\(invoices,docs,snaps,reports,todayYmd,pending,now\)/.test(clientHtml)
+  && /const \[snaps,docsRes,b,repRes\]=await Promise\.all\(\[ensureSnaps\(\),api\('\/client\/documents'\)\.catch\(\(\)=>null\),ensureBilling\(\),api\('\/client\/reports'\)\.catch\(\(\)=>null\)\]\);/.test(clientHtml)
+  && /const rows=shelfRows\(\(d\.b&&d\.b\.invoices\)\|\|\[\],docs,d\.snaps,reports,today,PAID_PENDING,now\);/.test(clientHtml));
 ok('client app: states the software subscription is billed separately', /billed separately/i.test(clientHtml));
-// the Pay action exists ONLY past the paid and void/canceled guards, opens the
-// server's pay_url in THIS tab (Nov 10 review, G9: a new tab left the first one
-// still saying Pay after Stripe returned to a second copy), and is named per invoice
-ok('client app: shows a safe pay link for unpaid invoices only (paid/dead guards first, https-only, same tab)',
-  // Oct 2026 (item 2): the guards read the one money formula's state — paid,
-  // then void/canceled (dead), then PROCESSING (the client already paid) — and
-  // only then the pay link
-  /const act=st==='paid'\?/.test(clientHtml) && /:dead\?''/.test(clientHtml) && /:st==='processing'\?paidConfirmNote\(i\)/.test(clientHtml)
-  // the anchor renders ONLY through the https-allowlisted `pay` value (the
-  // scheme gate is the review's defense-in-depth on the money surface)
-  && /const pay=st!=='processing'&&i\.pay_url&&\/\^https:\\\/\\\/\/\.test\(i\.pay_url\)\?i\.pay_url:null;/.test(clientHtml)
-  && /:pay\?`<a class="fbtn pay" href="\$\{esc\(pay\)\}" aria-label="Pay — /.test(clientHtml)
+// the Pay action exists ONLY past the paid, processing and void/canceled guards,
+// opens the server's pay_url in THIS tab (Nov 10 review, G9: a new tab left the
+// first one still saying Pay after Stripe returned to a second copy), and is
+// named per invoice
+ok('client app: shows a safe pay link for unpaid invoices only (paid/processing/dead guards first, https-only, same tab)',
+  // the one money formula's state decides: paid, then PROCESSING (the client
+  // already paid), then void/canceled (dead), and only then the pay link
+  /const act=st==='paid'\?\(view\?\{verb:'Receipt',href:view\}:null\):st==='processing'\?\{note:'processing',inv:i\}:!st\?null:pay\?\{verb:'Pay',href:pay,pay:true\}/.test(clientHtml)
+  // the link renders ONLY through the https-allowlisted `pay` value, and only
+  // while the invoice waits on payment (the scheme gate is the review's
+  // defense-in-depth on the money surface)
+  && /const pay=\(st==='upcoming'\|\|st==='overdue'\)&&\/\^https:\\\/\\\/\/\.test\(String\(i\.pay_url\|\|''\)\)\?i\.pay_url:'';/.test(clientHtml)
+  && /act=`<a class="fbtn" href="\$\{esc\(a\.href\)\}"\$\{a\.pay\?'':' target="_blank" rel="noopener"'\} aria-label="\$\{esc\(a\.verb\)\} — /.test(clientHtml)
   && !/data-pay href="[^"]*" target="_blank"/.test(clientHtml));
 
 const passed = results.filter((r) => r.p).length;
