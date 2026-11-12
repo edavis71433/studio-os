@@ -64,6 +64,7 @@ export function seesFullWorkspace(role: SiteRole): boolean {
 // needs 'configure'.
 export const SETTINGS_CONTENT_FIELDS: ReadonlySet<string> = new Set([
   'category_order', 'cover_media_id', 'logo_media_id', 'og_media_id',
+  'icon_media_id',   // builder list item 158: the site's own small icon, part of the look like the logo
   'announcement_text', 'announcement_url', 'announcement_expires_at',
   'popup',   // builder list item 148: the site's pop-up is content, like the announcement bar
   'hero_layout', 'nav_style', 'sections_hidden', 'sections_order', 'footer_hours', 'footer_social',
@@ -176,6 +177,7 @@ const MEMBER_WRITES: Array<[MemberWriteNeed, string[]]> = [
     'POST /page-locks',   // builder items 48 and 120: a page's password, as editing the page's settings is
     `POST /publishes/checkpoints/${ID}/restore`,
     `POST /publishes/${ID}/label`,
+    'PUT /publishes/stars',   // builder item 158: star a version, as naming one is
     'POST /restore-to-draft',
     'POST /launches',
     `POST /launches/${ID}/(recapture|cancel)`,
@@ -190,7 +192,6 @@ const MEMBER_WRITES: Array<[MemberWriteNeed, string[]]> = [
     `POST /assets/${ID}/(replace|rollback|duplicate|suggest|remove-background|cutout)`,
     'POST /visual/generate',
     `POST /visual/plans/${ID}/(vary|edit)`,
-    `POST /notes/${ID}/(dismiss|accept)`,
     `POST /moments/${ID}/dismiss`,
     'POST /broadcasts',
     'POST /broadcasts/lists',   // sales review items 31 + 39: keep the people picked for an update
@@ -199,6 +200,7 @@ const MEMBER_WRITES: Array<[MemberWriteNeed, string[]]> = [
     `PATCH /broadcasts/${ID}`,
     `POST /broadcasts/${ID}/cancel`,
     `POST /broadcasts/${ID}/test`,   // bold redesign: "Send me a test" — only ever to the member's own address, so edit, not publish
+    'POST /sales/invoices/test',   // builder item 175: a sample invoice email to the member's own address; nothing is made or charged
     'POST /sales/(contacts|customers|deals|templates)',
     'POST /sales/(tasks|people/activity)',   // sales items 85 and 106: a to-do for anyone, a call logged for a person with no deal
     'POST /sales/email',   // sales item 80: one email to one person on file, like the Inbox's reply to an enquiry
@@ -256,6 +258,8 @@ const MEMBER_WRITES: Array<[MemberWriteNeed, string[]]> = [
     'PUT /site/template',
     // sales review final pass (S1): only the site's owner answers a studio's request; the route refuses anyone else and says why
     `POST /portal/studio-requests/${ID}/(accept|decline)`,
+    // builder item 193: only the studio marks an approved plan finished; the route refuses anyone else and says why
+    `POST /foundations/plans/${ID}/done`,
     'POST /crm/notes',
     `POST /crm/notes/${ID}/pin`,
     `DELETE /crm/notes/${ID}`,

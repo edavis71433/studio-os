@@ -29,7 +29,7 @@ import type { MediaRef, SnapshotContent } from './render_types.ts';
 /** The website's settings as stored: SETTINGS_CONTENT_FIELDS → value. */
 export type DraftSettings = Record<string, unknown>;
 
-// Each field's column default (migrations 0019, 0051, 0057, 0058, 0068, 0104, 0105, 0161): what a
+// Each field's column default (migrations 0019, 0051, 0057, 0058, 0068, 0104, 0105, 0161, 0184): what a
 // site that never set it has, so a version without it goes back to it. A field added to
 // SETTINGS_CONTENT_FIELDS later and not named here stays as it is on a restore from a
 // version kept before it existed.
@@ -39,6 +39,7 @@ const DEFAULTS: Record<string, unknown> = {
   hero_layout: '', nav_style: '', sections_hidden: [], sections_order: [], footer_hours: true, footer_social: true,
   pages_noindex: [], page_seo: {}, blocks: [], pages: [], nav: [],
   popup: null,   // builder list item 148: no pop-up
+  icon_media_id: null,   // builder list item 158: the template's letter in the browser tab
 };
 
 /** The website's settings in a draft's settings row, as stored. A field the row lacks
@@ -111,7 +112,7 @@ export function settingsFromContent(settings: SnapshotContent['settings'], idOf:
     nav_style: s.nav_style || '', hero_layout: s.hero_layout || '',
     sections_hidden: s.sections?.hidden || [], sections_order: s.sections?.order || [],
     footer_hours: s.footer?.hours !== false, footer_social: s.footer?.social !== false,
-    logo_media_id: media(s.logo), og_media_id: media(s.og_image), cover_media_id: media(s.cover),
+    logo_media_id: media(s.logo), og_media_id: media(s.og_image), cover_media_id: media(s.cover), icon_media_id: media(s.icon),
     announcement_text: s.announcement?.text || '', announcement_url: s.announcement?.url || '', announcement_expires_at: s.announcement?.expires_at || null,
     page_seo: pageSeo,
     pages_noindex: Array.isArray(s.pages_noindex) ? s.pages_noindex : [],

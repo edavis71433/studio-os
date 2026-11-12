@@ -18,7 +18,7 @@
 // that writes only the month mark, so two ticks can't both send and a switch
 // flipped mid-run stays flipped; switching on marks last month as handled, so the
 // first report really is next month's; the visits are read in full pages.
-import { svc, svcCount, svcPages } from '../lib/db.ts';
+import { svc, svcCount, svcPages, svcPaged } from '../lib/db.ts';
 import { aggregateVisits } from '../lib/visits.ts';
 import type { VisitRow } from '../lib/visits.ts';
 import { loadEmailBrand, EMAIL_BRAND_DEFAULT } from '../lib/email_brand.ts';
@@ -29,17 +29,28 @@ import { siteOrigin } from '../lib/site.ts';
 import { normalizeQuestions, costWords } from '../lib/ai_watch.ts';
 import { normalizeFollowed } from '../lib/search_tools.ts';
 import { reportPdf, reportFileName, changeOn } from '../lib/report_pdf.ts';
+import {
+  REPORT_PARTS, REPORT_PART_WORDS, REPORT_CC_MAX, QUIET_DEFAULT, PROPOSE_TEXT_MAX,
+  normalizePartsOff, normalizeCc, normalizeQuiet, normalizeCopyTo, normalizePropose,
+  proposalCandidates, pickProposal, afterProposal, quietMonth,
+  type ReportPart, type ProposeSetting, type Proposal,
+} from '../lib/report_choices.ts';
+import { normalizeDecisions } from '../lib/do_next.ts';
 import type { SiteRow } from '../lib/site.ts';
 import { json } from '../../_shared/http.ts';
 
 export const REPORT_NOTE_MAX = 600;
 export const REPORT_SEND_DAYS = 3;   // the report goes out on the 1st, 2nd or 3rd of the month
 
+/** Item 209: the clients a monthly run reads at once, and at most how many pages. */
+export const REPORT_PAGE = 100, REPORT_PAGES = 50;
 export const REPORT_MAX_TRIES = 3;   // a send that fails is tried again on the next tick, up to this many times a month
 export const REPORT_KEEP_MONTHS = 24;   // item 179: the months the client's Documents shelf lists, newest first
 
-/** What happened to the last month handled: sent, skipped (why), or failed for good. */
-export interface ReportResult { month: string; status: 'sent' | 'skipped' | 'failed'; reason: string | null; at: string }
+/** What happened to the last month handled: sent, skipped (why: no_email, unsubscribed,
+ *  bounced, or quiet for a month under the studio's number), or failed for good. `cc` is
+ *  how many more people it went to (item 160). */
+export interface ReportResult { month: string; status: 'sent' | 'skipped' | 'failed'; reason: string | null; at: string; cc?: number }
 /** `last_month` is the month HANDLED (sent, skipped or given up on), the send-once gate. */
 export interface ReportSetting {
   enabled: boolean; note: string; last_month: string | null;
@@ -57,6 +68,10 @@ export interface ReportSetting {
   ai_checks: boolean; ai_month: string | null;
   ai_result: { month: string; status: 'checked' | 'failed'; reason: string | null; at: string } | null;
   ai_tries: { month: string; count: number } | null;
+  /** Builder list items 160 and 176 (lib/report_choices.ts): the parts switched off, up to
+   *  four more people, a copy to the studio person who asked, the fewest visits a month
+   *  needs for its report to go (null: always), and what to suggest next. */
+  parts_off: ReportPart[]; cc: string[]; copy_to: string | null; quiet_min: number | null; propose: ProposeSetting;
 }
 /** Why a client can't be emailed, in the words the card uses. */
 export const BLOCK_WORDS: Record<string, string> = {
@@ -104,6 +119,8 @@ export function normalizeReportSetting(raw: unknown): ReportSetting {
     ai_month: typeof r.ai_month === 'string' && /^\d{4}-\d{2}$/.test(r.ai_month) ? r.ai_month : null,
     ai_result: normalizeAiResult(r.ai_result),
     ai_tries: r.ai_tries && typeof r.ai_tries === 'object' && typeof (r.ai_tries as any).month === 'string' && Number.isFinite((r.ai_tries as any).count) ? { month: String((r.ai_tries as any).month), count: Math.max(0, Math.floor(Number((r.ai_tries as any).count))) } : null,
+    parts_off: normalizePartsOff(r.parts_off), cc: normalizeCc(r.cc), copy_to: normalizeCopyTo(r.copy_to),
+    quiet_min: normalizeQuiet(r.quiet_min), propose: normalizePropose(r.propose),
   };
 }
 
@@ -128,15 +145,30 @@ function normalizeResult(raw: unknown): ReportResult | null {
   if (!r || typeof r.month !== 'string' || !/^\d{4}-\d{2}$/.test(r.month)) return null;
   const status = r.status === 'sent' || r.status === 'skipped' || r.status === 'failed' ? r.status : null;
   if (!status) return null;
-  return { month: r.month, status, reason: typeof r.reason === 'string' ? r.reason : null, at: typeof r.at === 'string' ? r.at : '' };
+  return { month: r.month, status, reason: typeof r.reason === 'string' ? r.reason : null, at: typeof r.at === 'string' ? r.at : '', ...(Number.isFinite(r.cc) && Number(r.cc) > 0 ? { cc: Math.trunc(Number(r.cc)) } : {}) };
 }
 
+/** What a PUT may change. */
+export interface ReportChange { enabled?: unknown; note?: unknown; ai_checks?: unknown; pdf?: unknown; parts_off?: unknown; cc?: unknown; copy?: unknown; quiet_min?: unknown; propose?: unknown }
 /** Pure: the setting after the studio flips the switch or edits the line. Switching
  *  ON marks last month as handled, so nothing goes out until next month's first
  *  days, which is what the card promises (review finding 4). */
-export function applyReportChange(cur: ReportSetting, b: { enabled?: unknown; note?: unknown; ai_checks?: unknown; pdf?: unknown }, who: string | null, nowIso: string, tz = 'UTC'): ReportSetting {
+export function applyReportChange(cur: ReportSetting, b: ReportChange, who: string | null, nowIso: string, tz = 'UTC'): ReportSetting {
   const next: ReportSetting = { ...cur, updated_by: who || cur.updated_by, updated_at: nowIso };
   if (typeof b.note === 'string') next.note = b.note.slice(0, REPORT_NOTE_MAX);
+  // items 160 and 176: what it says, who gets it, a quiet month, what to suggest next
+  if (Array.isArray(b.parts_off)) next.parts_off = normalizePartsOff(b.parts_off);
+  if (Array.isArray(b.cc)) next.cc = normalizeCc(b.cc);
+  if (typeof b.copy === 'boolean') next.copy_to = b.copy ? normalizeCopyTo(who) : null;
+  if (b.quiet_min !== undefined) next.quiet_min = normalizeQuiet(b.quiet_min);
+  if (b.propose && typeof b.propose === 'object') {
+    const pr = b.propose as Record<string, unknown>;
+    const p = { ...cur.propose };
+    if (pr.mode === 'off' || pr.mode === 'auto' || pr.mode === 'own') p.mode = pr.mode;
+    if (typeof pr.text === 'string') p.text = normalizePropose({ text: pr.text }).text;
+    if (pr.pick === null || typeof pr.pick === 'string') p.pick = normalizePropose({ pick: pr.pick }).pick;
+    next.propose = p;
+  }
   // item 182: switching the AI check on runs the first one soon (this month isn't handled yet)
   if (typeof b.ai_checks === 'boolean') next.ai_checks = b.ai_checks;
   if (typeof b.pdf === 'boolean') next.pdf = b.pdf;   // item 184
@@ -296,23 +328,26 @@ const pageName = (p: string) => p === '/' || p === '' ? 'Home page' : p.replace(
 
 /** The email body (inside the branded shell). Pure. Every line is a sentence; a part
  *  that couldn't be read is said so, never shown as zero. */
-export function reportHtml(d: ReportData, o: { studioName: string; note: string; clientName?: string | null; pdf?: string | null }): { subject: string; html: string } {
+export function reportHtml(d: ReportData, o: { studioName: string; note: string; clientName?: string | null; pdf?: string | null; off?: ReportPart[]; proposal?: string | null }): { subject: string; html: string } {
   const who = (o.clientName || '').trim();
   const parts: string[] = [];
+  const on = (p: ReportPart) => !(o.off || []).includes(p);   // items 160: a part the studio switched off never shows
   parts.push(`<p style="margin:0 0 6px;font-size:13px;letter-spacing:.06em;text-transform:uppercase;color:#6b6478">Your website in ${esc(d.monthLabel)}</p>`);
   parts.push(`<h1 style="margin:0 0 14px;font-family:'Iowan Old Style',Palatino,Georgia,serif;font-size:24px;line-height:1.2">${who ? `${esc(who)}, here’s` : 'Here’s'} how your website did${d.address ? ` at <a href="${esc(d.address)}" style="text-decoration:none">${esc(d.address.replace(/^https?:\/\//, ''))}</a>` : ''}.</h1>`);
   if (o.note.trim()) parts.push(`<blockquote style="margin:0 0 18px;padding:12px 16px;border-left:3px solid #d6d4e2;background:#f7f6fb;border-radius:0 10px 10px 0;color:#2b2540">${esc(o.note.trim()).replace(/\n/g, '<br>')}<br><span style="font-size:13px;color:#6b6478">${esc(o.studioName)}</span></blockquote>`);
   const tile = (label: string, value: string, sub: string) => `<td width="50%" style="padding:0 6px 12px 0;vertical-align:top"><div style="background:#f7f6fb;border-radius:12px;padding:14px 16px"><div style="font-size:12px;color:#6b6478">${label}</div><div style="font-size:26px;font-weight:700;letter-spacing:-.02em;line-height:1.1;margin:4px 0 2px">${value}</div><div style="font-size:12px;color:#6b6478">${sub}</div></div></td>`;
   const tiles: string[] = [];
   // bug hunt H5: the counter knows a person for one day only, so a month's count is visits
-  if (d.visitors === null) tiles.push(tile('Visits', '—', 'We couldn’t read the visit counts this time.'));
+  if (!on('visits')) { /* left out */ }
+  else if (d.visitors === null) tiles.push(tile('Visits', '—', 'We couldn’t read the visit counts this time.'));
   else tiles.push(tile('Visits', n1(d.visitors), `${n1(d.pageviews || 0)} page${(d.pageviews || 0) === 1 ? '' : 's'} viewed${d.truncated ? ', from recent activity' : ''}${changeOn(d.visitors, d.priorVisitors, d.priorLabel) ? `, ${changeOn(d.visitors, d.priorVisitors, d.priorLabel)}` : ''}`));
-  if (d.enquiries === null) tiles.push(tile('Enquiries', '—', 'We couldn’t read the enquiries this time.'));
+  if (!on('enquiries')) { /* left out */ }
+  else if (d.enquiries === null) tiles.push(tile('Enquiries', '—', 'We couldn’t read the enquiries this time.'));
   else tiles.push(tile('Enquiries', n1(d.enquiries), d.enquiries === 0 ? 'No one wrote in through the site' : `${d.enquiries === 1 ? 'Someone' : 'People'} wrote in through your site`));
-  parts.push(`<table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>${tiles.join('')}</tr></table>`);
+  if (tiles.length) parts.push(`<table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>${tiles.join('')}</tr></table>`);
   // ── builder list item 184: Google, AI answers, reviews and health ──
   const up = (c: string) => `<span style="color:${/^down/.test(c) ? '#bf3535' : '#11744a'}">${esc(c)}</span>`;
-  if (d.search) {
+  if (d.search && on('google')) {
     const c = changeOn(d.search.clicks, d.search.priorClicks, d.priorLabel);
     parts.push(`<p style="margin:14px 0 6px"><strong>On Google</strong></p><p style="margin:0 0 8px">${n1(d.search.clicks)} click${d.search.clicks === 1 ? '' : 's'} to your site and ${n1(d.search.impressions)} times seen${c ? `, ${up(c)}` : ''}.</p>`);
     if (d.followed.length) {
@@ -323,11 +358,11 @@ export function reportHtml(d: ReportData, o: { studioName: string; note: string;
       }).join('')}</table>`);
     }
   }
-  if (d.ai) {
+  if (d.ai && on('ai')) {
     const was = d.ai.priorNamed;
     parts.push(`<p style="margin:14px 0 6px"><strong>In AI answers</strong></p><p style="margin:0 0 8px">${esc(d.ai.engines)} named ${esc(d.siteName || 'you')} for ${d.ai.named} of the ${d.ai.asked} questions we ask it each month${was === null ? '' : was === d.ai.named ? ', the same as the month before' : `, ${d.ai.named > was ? 'up' : 'down'} from ${was}`}.${d.ai.newlyNamed ? ` New this month: “${esc(d.ai.newlyNamed)}”.` : ''}</p>`);
   }
-  if (d.reviews && (d.reviews.count !== null || d.reviews.ownNew)) {
+  if (d.reviews && (d.reviews.count !== null || d.reviews.ownNew) && on('reviews')) {
     const r = d.reviews, bits: string[] = [];
     if (r.rating !== null && r.count !== null) bits.push(`${r.rating.toFixed(1)} stars from ${n1(r.count)} Google review${r.count === 1 ? '' : 's'}`);
     if (r.newGoogle) bits.push(`${r.newGoogle} new in the last 30 days`);
@@ -335,18 +370,22 @@ export function reportHtml(d: ReportData, o: { studioName: string; note: string;
     if (r.ownNew) bits.push(`${r.ownNew} new on your site`);
     parts.push(`<p style="margin:14px 0 6px"><strong>Reviews</strong></p><p style="margin:0 0 8px">${esc(bits.join('. '))}.</p>`);
   }
-  if (d.health) {
+  if (d.health && on('health')) {
     const h = d.health;
     parts.push(`<p style="margin:14px 0 6px"><strong>Website health</strong></p><p style="margin:0 0 8px">${h.n === 0 ? 'Nothing to look at' : `${h.n} thing${h.n === 1 ? '' : 's'} to look at`}${h.then !== null ? (h.then === h.n ? ', the same as a month ago' : `, ${Math.abs(h.then - h.n)} ${h.then > h.n ? 'fewer' : 'more'} than a month ago`) : ''}${h.fixed ? `. ${h.fixed} fixed this month` : ''}.</p>`);
   }
-  if (d.topPages.length) {
+  if (!on('pages')) { /* left out */ }
+  else if (d.topPages.length) {
     parts.push(`<p style="margin:10px 0 6px"><strong>What people read most</strong></p><ol style="margin:0 0 14px;padding-left:20px">${d.topPages.map((p) => `<li>${esc(pageName(p.path))} <span style="color:#6b6478">· ${n1(p.views)} view${p.views === 1 ? '' : 's'}</span></li>`).join('')}</ol>`);
-  } else if (d.visitors !== null && d.visitors === 0) {
+  } else if (d.visitors !== null && d.visitors === 0 && on('visits')) {
     parts.push(`<p style="margin:10px 0 14px">A quiet month for visitors. ${esc(o.studioName)} can help bring people in; just reply to this email.</p>`);
   }
-  if (d.publishes === null) parts.push(`<p style="margin:10px 0 14px"><strong>What changed:</strong> we couldn’t read the publish history this time.</p>`);
+  if (!on('changes')) { /* left out */ }
+  else if (d.publishes === null) parts.push(`<p style="margin:10px 0 14px"><strong>What changed:</strong> we couldn’t read the publish history this time.</p>`);
   else if (d.publishes === 0) parts.push(`<p style="margin:10px 0 14px"><strong>What changed:</strong> nothing was published this month. Your site stayed as it was.</p>`);
   else parts.push(`<p style="margin:10px 0 14px"><strong>What changed:</strong> ${d.publishes === 1 ? 'one update went live' : `${n1(d.publishes)} updates went live`}${d.lastPublishedAt ? `, the last on ${new Date(d.lastPublishedAt).toLocaleDateString('en-US', { month: 'long', day: 'numeric', timeZone: reportZone(d.timeZone, 'UTC') })}` : ''}.</p>`);
+  // item 176: one suggestion a month, in plain words, answered by replying
+  if (o.proposal && o.proposal.trim()) parts.push(`<div style="margin:16px 0 0;padding:14px 16px;border:1px solid #dcd2f7;border-radius:12px;background:#f4f0fd"><p style="margin:0 0 6px"><strong>What we suggest next</strong></p><p style="margin:0 0 8px">${esc(o.proposal.trim())}</p><p style="margin:0;font-weight:600">Reply to this email and we’ll set it up →</p></div>`);
   if (o.pdf) parts.push(`<p style="margin:14px 0 0;padding:10px 12px;border:1px solid #eee9e0;border-radius:10px;font-size:13px"><strong>A copy to keep:</strong> ${esc(o.pdf)} is attached.</p>`);
   parts.push(`<p style="margin:16px 0 0;font-size:13px;color:#6b6478">Sent once a month by ${esc(o.studioName)}. Reply to this email to reach us.</p>`);
   return { subject: `Your website in ${d.monthLabel}`, html: parts.join('') };
@@ -435,15 +474,30 @@ export async function readReportSetting(siteId: string): Promise<ReportSetting> 
 /** Compose and send one site's report for a window, to `to`. Replies belong to the
  *  STUDIO's site: the reply door (routes/inbound_email.ts) admits a client only
  *  through their link to the studio, so a reply address built from the client's
- *  own site id would drop every reply as unknown (review finding 1). */
-export async function sendReport(site: SiteRow, win: ReturnType<typeof lastMonth>, setting: ReportSetting, to: string, opts: { preview?: boolean; clientName?: string | null; timeZone?: string } = {}): Promise<boolean> {
+ *  own site id would drop every reply as unknown (review finding 1). Items 160 and
+ *  176: the parts the studio switched off stay out, the month's suggestion goes in
+ *  (`proposal`), and the studio's copy says whose report it is. `data` may come
+ *  read already (the job reads it once for the quiet-month check). */
+export async function sendReport(site: SiteRow, win: ReturnType<typeof lastMonth>, setting: ReportSetting, to: string, opts: { preview?: boolean; copy?: boolean; clientName?: string | null; timeZone?: string; data?: ReportData | null; proposal?: string | null } = {}): Promise<boolean> {
   const studio = await studioSiteOf(site.id);
-  const [data, brand] = await Promise.all([loadReportData(site, win, opts.timeZone), studio ? loadEmailBrand(studio) : Promise.resolve(EMAIL_BRAND_DEFAULT)]);
+  const [data, brand] = await Promise.all([opts.data ? Promise.resolve(opts.data) : loadReportData(site, win, opts.timeZone), studio ? loadEmailBrand(studio) : Promise.resolve(EMAIL_BRAND_DEFAULT)]);
   // item 184: a PDF copy to keep, attached unless the studio switched it off
   const file = setting.pdf !== false ? reportFileName(data.siteName, data.monthLabel) : null;
-  const { subject, html } = reportHtml(data, { studioName: brand.name, note: setting.note, clientName: opts.clientName ?? null, pdf: file });
-  const attachments = file ? [{ filename: file, content: reportPdf(data, { studioName: brand.name, accent: brand.accent, clientName: opts.clientName ?? null, siteName: data.siteName || 'Your website' }) }] : undefined;
-  return await sendEmail(to, opts.preview ? `[Preview] ${subject}` : subject, html, brand, { siteId: studio || site.id, asBusiness: true, ...(attachments ? { attachments } : {}) });   // sales item 92: from the studio, in its name
+  const { subject, html } = reportHtml(data, { studioName: brand.name, note: setting.note, clientName: opts.clientName ?? null, pdf: file, off: setting.parts_off, proposal: opts.proposal ?? null });
+  const attachments = file ? [{ filename: file, content: reportPdf(data, { studioName: brand.name, accent: brand.accent, clientName: opts.clientName ?? null, siteName: data.siteName || 'Your website', off: setting.parts_off, proposal: opts.proposal ?? null }) }] : undefined;
+  const mark = opts.preview ? '[Preview] ' : opts.copy ? '[Your copy] ' : '';
+  const body = opts.copy ? `<p style="margin:0 0 14px;padding:8px 12px;border-radius:8px;background:#f7f6fb;font-size:13px;color:#6b6478">Your copy of the report ${esc(data.siteName || 'your client')} got.</p>${html}` : html;
+  return await sendEmail(to, mark + subject, body, brand, { siteId: studio || site.id, asBusiness: true, ...(attachments ? { attachments } : {}) });   // sales item 92: from the studio, in its name
+}
+
+/** Item 176: this month's suggestion, and the ones it could have been (best first), from
+ *  the client's Do next list. Reads nothing for "off" or "my own words". */
+export async function proposalFor(site: SiteRow, s: ReportSetting, month: string, nowIso = new Date().toISOString(), wantOptions = false): Promise<{ next: Proposal | null; options: Proposal[] }> {
+  if (s.propose.mode === 'own' || (s.propose.mode === 'off' && !wantOptions)) return { next: pickProposal(s.propose, [], month), options: [] };
+  const { doNextFacts } = await import('../agency/do_next.ts');
+  const [facts, decisions] = await Promise.all([doNextFacts(site, async () => ({})), readReservedJson(site.id, RESERVED_NAMES.doNext).catch(() => null)]);
+  const cands = proposalCandidates(facts, normalizeDecisions(decisions).decided, nowIso);
+  return { next: pickProposal(s.propose, cands, month), options: cands.slice(0, 3) };
 }
 
 /** Thrown inside a claim when the month is no longer due, so nothing is written. */
@@ -462,15 +516,26 @@ export function afterFailure(s: ReportSetting, month: string, before: string | n
 /** The monthly job: on the first days of a month, every switched-on client site that
  *  hasn't had last month handled yet. Each month is CLAIMED first (a compare-and-swap
  *  on the setting that writes only the month mark), then sent; a client who can't be
- *  emailed is marked skipped once, with the reason, and is not a failure. */
-export async function runMonthlyReports(limit = 20, nowIso = new Date().toISOString()): Promise<{ sent: number; skipped: number; unreachable: number; failures: number; not_due?: boolean }> {
+ *  emailed is marked skipped once, with the reason, and is not a failure. Item 160: a
+ *  month under the studio's visits number is skipped the same way ("quiet"); once the
+ *  client's report is out, the extra people and the studio's copy get theirs, each on
+ *  its own (one that fails doesn't undo the month). Item 176: the suggestion it carried
+ *  is logged, so a picked one rests three months. */
+export async function runMonthlyReports(limit = 20, nowIso = new Date().toISOString()): Promise<{ sent: number; skipped: number; unreachable: number; failures: number; quiet?: number; not_due?: boolean }> {
   // D7: each site's month turns on its own clock; on a day no clock is in its first days, read nothing
   if (!anyZoneInSendDays(nowIso)) return { sent: 0, skipped: 0, unreachable: 0, failures: 0, not_due: true };
-  const q = await svc(`presence_sales_templates?kind=eq.proposal&name=eq.${encodeURIComponent(RESERVED_NAMES.monthlyReport)}&deleted_at=is.null&select=site_id,body&limit=${Math.max(1, Math.min(200, limit * 5))}`);
-  const rows = (Array.isArray(q.json) ? q.json : []) as Array<{ site_id: string; body: string }>;
-  const zones = rows.length ? await zonesOf(rows.map((r) => String(r.site_id))) : new Map<string, string>();
-  let sent = 0, skipped = 0, unreachable = 0, failures = 0;
-  for (const r of rows) {
+  // Item 209 (review file 06, finding 63): every client with the report on, a page at a
+  // time in a set order, until `limit` went out. One read of up to 200 in no order used
+  // to be all of it, so past about 100 clients the same ones came back every time.
+  let zones = new Map<string, string>();
+  const rows = (async function* () {
+    for await (const page of svcPaged(`presence_sales_templates?kind=eq.proposal&name=eq.${encodeURIComponent(RESERVED_NAMES.monthlyReport)}&deleted_at=is.null&select=site_id,body`, 'site_id.asc', REPORT_PAGE, REPORT_PAGES)) {
+      zones = await zonesOf(page.map((r) => String(r.site_id)));
+      yield* page as Array<{ site_id: string; body: string }>;
+    }
+  })();
+  let sent = 0, skipped = 0, unreachable = 0, failures = 0, quiet = 0;
+  for await (const r of rows) {
     if (sent >= limit) break;
     let seen: ReportSetting; try { seen = normalizeReportSetting(JSON.parse(r.body)); } catch { skipped++; continue; }
     const tz = zones.get(String(r.site_id)) || REPORT_DEFAULT_TZ;
@@ -492,47 +557,96 @@ export async function runMonthlyReports(limit = 20, nowIso = new Date().toISOStr
     }).catch(() => null);
     if (!claimed || !claimedSetting) { skipped++; continue; }   // another tick has it, it was switched off, or the save failed: nothing sent
     if (reach.blocked) { unreachable++; continue; }
-    const ok = await sendReport(site, win, claimedSetting, reach.email as string, { clientName: reach.name, timeZone: tz }).catch(() => false);
+    const setting = claimedSetting as ReportSetting;
+    const data = await loadReportData(site, win, tz).catch(() => null);
+    // item 160: a quiet month under the studio's number is skipped once, and the card says so
+    if (data && quietMonth(setting.quiet_min, data.visitors)) {
+      quiet++;
+      await SAVE(site.id, (s) => ({ ...s, tries: null, last_result: { month: win.month, status: 'skipped', reason: 'quiet', at: nowIso } })).catch(() => null);
+      continue;
+    }
+    const proposal = (await proposalFor(site, setting, win.month, nowIso).catch(() => ({ next: null, options: [] }))).next;
+    const ok = await sendReport(site, win, setting, reach.email as string, { clientName: reach.name, timeZone: tz, data, proposal: proposal?.text ?? null }).catch(() => false);
     if (ok) {
       sent++;
+      // the extra people and the studio's copy, each on its own; the do-not-send list is checked at the send
+      let cc = 0;
+      for (const to of setting.cc) if (await sendReport(site, win, setting, to, { timeZone: tz, data, proposal: proposal?.text ?? null }).catch(() => false)) cc++;
+      if (setting.copy_to) await sendReport(site, win, setting, setting.copy_to, { copy: true, clientName: reach.name, timeZone: tz, data, proposal: proposal?.text ?? null }).catch(() => false);
       // item 179: the month joins the client's shelf only now, when it really went out
-      await SAVE(site.id, (s) => ({ ...s, tries: null, last_result: { month: win.month, status: 'sent', reason: null, at: nowIso }, sent_months: withSentMonth(s.sent_months, win.month) })).catch(() => null);
+      await SAVE(site.id, (s) => ({ ...s, tries: null, last_result: { month: win.month, status: 'sent', reason: null, at: nowIso, ...(cc ? { cc } : {}) }, propose: afterProposal(s.propose, win.month, proposal), sent_months: withSentMonth(s.sent_months, win.month) })).catch(() => null);
     } else {
       failures++;
       await SAVE(site.id, (s) => afterFailure(s, win.month, before, nowIso)).catch(() => null);
     }
   }
-  return { sent, skipped, unreachable, failures };
+  return { sent, skipped, unreachable, failures, ...(quiet ? { quiet } : {}) };
 }
 
 // ── the site-scoped routes: GET and PUT /report/monthly, POST /report/monthly/preview ──
-export async function handleReportGet(site: SiteRow, cors: Record<string, string>) {
-  const [s, reach, tz, qs] = await Promise.all([readReportSetting(site.id), reachOf(site).catch(() => null), zoneOfSite(site.id), readReservedJson(site.id, RESERVED_NAMES.aiQuestions)]);
+/** What the card shows: the setting, who it goes to and who of them can't get it, and
+ *  (item 176) what the next report would suggest and what else it could. */
+async function reportCard(site: SiteRow, s: ReportSetting, principal: { email?: string | null }) {
+  const nowIso = new Date().toISOString();
+  const [reach, tz, qs] = await Promise.all([reachOf(site).catch(() => null), zoneOfSite(site.id), readReservedJson(site.id, RESERVED_NAMES.aiQuestions)]);
   // item 182: what the monthly AI check would cost, for this client's questions (the AI check's seven until they change them)
   const n = normalizeQuestions(qs).questions.length || 7;
-  return json({ data: { ...s, note_max: REPORT_NOTE_MAX, next_month: monthNow(new Date().toISOString(), tz), blocked: reach ? reach.blocked : null, ai_questions: n, ai_cost: costWords(n) } }, 200, cors);   // this month's report goes out in the first days of next month
+  const month = monthNow(nowIso, tz);   // this month's report goes out in the first days of next month
+  // item 160: an extra person on the do-not-send list is left out at the send; the card says who
+  const { suppressionOf } = await import('../routes/email_infra.ts');
+  const ccBlocked: Record<string, string> = {};
+  await Promise.all(s.cc.map(async (e) => { const r = await suppressionOf(e).catch(() => null); if (r) ccBlocked[e] = r === 'opt_out' ? 'unsubscribed' : 'bounced'; }));
+  const pr = await proposalFor(site, s, month, nowIso, true).catch(() => ({ next: null, options: [] as Proposal[] }));
+  return {
+    ...s, note_max: REPORT_NOTE_MAX, next_month: month, blocked: reach ? reach.blocked : null, ai_questions: n, ai_cost: costWords(n),
+    to: reach?.email || null, client_name: reach?.name || null, me: principal.email || null,
+    cc_max: REPORT_CC_MAX, cc_blocked: ccBlocked, quiet_default: QUIET_DEFAULT, propose_max: PROPOSE_TEXT_MAX,
+    parts: REPORT_PARTS.map((k) => ({ key: k, words: REPORT_PART_WORDS[k] })),
+    propose_next: pr.next, propose_options: pr.options,
+  };
+}
+export async function handleReportGet(site: SiteRow, principal: { email?: string | null }, cors: Record<string, string>) {
+  return json({ data: await reportCard(site, await readReportSetting(site.id), principal) }, 200, cors);
 }
 export async function handleReportPut(req: Request, site: SiteRow, principal: { email?: string | null }, cors: Record<string, string>) {
-  let b: { enabled?: unknown; note?: unknown; ai_checks?: unknown; pdf?: unknown } = {}; try { b = await req.json(); } catch { /* answered below */ }
-  if (typeof b.enabled !== 'boolean' && typeof b.note !== 'string' && typeof b.ai_checks !== 'boolean' && typeof b.pdf !== 'boolean') return json({ error: 'bad_request', message: 'Say whether the report is on, or give the line to send with it.' }, 400, cors);
+  let b: ReportChange = {}; try { b = await req.json(); } catch { /* answered below */ }
+  const known = typeof b.enabled === 'boolean' || typeof b.note === 'string' || typeof b.ai_checks === 'boolean' || typeof b.pdf === 'boolean'
+    || Array.isArray(b.parts_off) || Array.isArray(b.cc) || typeof b.copy === 'boolean' || b.quiet_min !== undefined || (!!b.propose && typeof b.propose === 'object');
+  if (!known) return json({ error: 'bad_request', message: 'Say whether the report is on, or give the line to send with it.' }, 400, cors);
+  // item 160: say plainly what can't be kept, rather than dropping it
+  if (Array.isArray(b.parts_off) && normalizePartsOff(b.parts_off).length >= REPORT_PARTS.length) return json({ error: 'bad_request', message: 'Leave at least one part in the report.' }, 400, cors);
+  if (Array.isArray(b.cc)) {
+    const typed = b.cc.map((x) => String(x ?? '').trim()).filter(Boolean);
+    const bad = typed.find((e) => normalizeCc([e]).length === 0);
+    if (bad) return json({ error: 'bad_request', message: `“${bad.slice(0, 80)}” isn’t an email address.` }, 400, cors);
+    if (typed.length > REPORT_CC_MAX) return json({ error: 'bad_request', message: `Up to ${REPORT_CC_MAX} more people.` }, 400, cors);
+  }
+  if (b.copy === true && !normalizeCopyTo(principal.email)) return json({ error: 'bad_request', message: 'Your sign-in has no email to send a copy to.' }, 400, cors);
+  if (b.quiet_min !== undefined && b.quiet_min !== null && b.quiet_min !== false && normalizeQuiet(b.quiet_min) === null) return json({ error: 'bad_request', message: 'Give the fewest visits as a whole number, 1 or more.' }, 400, cors);
+  if (b.propose && typeof b.propose === 'object' && (b.propose as { mode?: unknown }).mode === 'own' && typeof (b.propose as { text?: unknown }).text === 'string' && !(b.propose as { text: string }).text.trim()) return json({ error: 'bad_request', message: 'Write the suggestion, or pick one of ours.' }, 400, cors);
   // switching on for a client who can't be emailed would promise a report that never goes (review finding 2)
   if (b.enabled === true) {
     const reach = await reachOf(site).catch(() => null);
     if (reach?.blocked) return json({ error: 'cannot_send', blocked: reach.blocked, message: `It can’t go out: ${BLOCK_WORDS[reach.blocked] || 'they can’t be emailed'}.${reach.blocked === 'no_email' ? ' Add their email on their record, then switch it on.' : ''}` }, 409, cors);
   }
+  const client = Array.isArray(b.cc) ? await clientOf(site).catch(() => ({ email: null, name: null })) : null;
+  if (client) b = { ...b, cc: normalizeCc(b.cc, client.email) };   // their own address is already on the report
   const nowIso = new Date().toISOString();
   const tz = typeof b.enabled === 'boolean' ? await zoneOfSite(site.id) : 'UTC';   // only switching on reads the clock
   const next = await updateReservedJson(site.id, RESERVED_NAMES.monthlyReport, (cur) => applyReportChange(normalizeReportSetting(cur), b, principal.email || null, nowIso, tz), principal.email || 'studio');
   if (!next) return json({ error: 'write_failed', message: 'That didn’t save.' }, 502, cors);
+  // item 176: a change to the suggestion answers with what it now is (one extra read); anything else, the setting alone
+  if (b.propose && typeof b.propose === 'object') return json({ data: await reportCard(site, normalizeReportSetting(next), principal) }, 200, cors);
   return json({ data: next }, 200, cors);
 }
-/** GET /report/monthly/pdf (item 184): last month's report as a PDF, to download. */
+/** GET /report/monthly/pdf (item 184): last month's report as a PDF, to download. Items 160 and
+ *  176: the parts switched off stay out, and the suggestion the next report would carry is in. */
 export async function handleReportPdf(site: SiteRow, cors: Record<string, string>) {
-  const [studio, tz] = await Promise.all([studioSiteOf(site.id), zoneOfSite(site.id)]);
+  const [studio, tz, setting] = await Promise.all([studioSiteOf(site.id), zoneOfSite(site.id), readReportSetting(site.id)]);
   const win = lastMonth(new Date().toISOString(), tz);   // D7: last month on the site's clock, as the email has it
-  const [data, brand, client] = await Promise.all([loadReportData(site, win, tz), studio ? loadEmailBrand(studio, { logoTtl: 600 }) : Promise.resolve(EMAIL_BRAND_DEFAULT), clientOf(site).catch(() => ({ email: null, name: null }))]);
+  const [data, brand, client, pr] = await Promise.all([loadReportData(site, win, tz), studio ? loadEmailBrand(studio, { logoTtl: 600 }) : Promise.resolve(EMAIL_BRAND_DEFAULT), clientOf(site).catch(() => ({ email: null, name: null })), proposalFor(site, setting, win.month).catch(() => ({ next: null, options: [] as Proposal[] }))]);
   const file = reportFileName(data.siteName, data.monthLabel);
-  const bytes = reportPdf(data, { studioName: brand.name, accent: brand.accent, clientName: client.name, siteName: data.siteName || 'Your website' });
+  const bytes = reportPdf(data, { studioName: brand.name, accent: brand.accent, clientName: client.name, siteName: data.siteName || 'Your website', off: setting.parts_off, proposal: pr.next?.text ?? null });
   // Expose-Headers: the page is on another host, and can't read the file's name otherwise
   return new Response(bytes, { status: 200, headers: { ...cors, 'Content-Type': 'application/pdf', 'Content-Disposition': `attachment; filename="${file}"`, 'Access-Control-Expose-Headers': 'Content-Disposition', 'Cache-Control': 'no-store' } });
 }
@@ -559,15 +673,20 @@ export async function handleClientReportPdf(site: SiteRow, month: string, cors: 
   const win = monthWindow(month, tz) as NonNullable<ReturnType<typeof monthWindow>>;   // the month on the site's clock, as the email had it
   const [data, brand, client] = await Promise.all([loadReportData(site, win, tz), studio ? loadEmailBrand(studio, { logoTtl: 600 }) : Promise.resolve(EMAIL_BRAND_DEFAULT), clientOf(site).catch(() => ({ email: null, name: null }))]);
   const file = reportFileName(data.siteName, data.monthLabel);
-  const bytes = reportPdf(data, { studioName: brand.name, accent: brand.accent, clientName: client.name, siteName: data.siteName || 'Your website' });
+  // items 160 and 176: the parts the studio left out stay out; a month's suggestion went in the email only
+  const bytes = reportPdf(data, { studioName: brand.name, accent: brand.accent, clientName: client.name, siteName: data.siteName || 'Your website', off: s.parts_off });
   return new Response(bytes, { status: 200, headers: { ...cors, 'Content-Type': 'application/pdf', 'Content-Disposition': `attachment; filename="${file}"`, 'Access-Control-Expose-Headers': 'Content-Disposition', 'Cache-Control': 'no-store' } });
 }
 
-/** A preview of last month's report to the caller, now. */
+
+/** A preview of last month's report to the caller, now: exactly what the client would
+ *  get, with the parts and the suggestion as they stand (items 160 and 176). */
 export async function handleReportPreview(site: SiteRow, principal: { email?: string | null }, cors: Record<string, string>) {
   if (!principal.email) return json({ error: 'bad_request', message: 'Your sign-in has no email to send the preview to.' }, 400, cors);
   const [setting, client, tz] = await Promise.all([readReportSetting(site.id), clientOf(site), zoneOfSite(site.id)]);
-  const ok = await sendReport(site, lastMonth(new Date().toISOString(), tz), setting, principal.email, { preview: true, clientName: client.name, timeZone: tz }).catch(() => false);
+  const win = lastMonth(new Date().toISOString(), tz);
+  const pr = await proposalFor(site, setting, win.month).catch(() => ({ next: null, options: [] as Proposal[] }));
+  const ok = await sendReport(site, win, setting, principal.email, { preview: true, clientName: client.name, timeZone: tz, proposal: pr.next?.text ?? null }).catch(() => false);
   if (!ok) return json({ error: 'fetch_failed', message: 'The preview didn’t send. Check that email sending is set up, then try again.' }, 502, cors);
   return json({ data: { sent_to: principal.email } }, 200, cors);
 }

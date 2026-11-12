@@ -4,7 +4,8 @@
 // (−1). Social profiles were found by searching the raw HTML, so Squarespace's
 // xmlns:fb attribute counted as a Facebook page and "x.com" matched inside
 // "dropbox.com". This suite covers supabase/functions/_shared/site_discovery.ts
-// with a stubbed fetch (no network) and checks how clever-api wires it in.
+// with a stubbed fetch (no network). The old deep audit in clever-api that first
+// used it left with builder item 213; the free tools and presence use it now.
 //
 //   deno run --allow-read tests/presence/site_discovery_test.mjs
 import {
@@ -135,12 +136,6 @@ const D = (routes, budgetMs) => { const s = stub(routes); return checkDiscoverab
   ok('fetch: redirect loops stop', r === null && s.calls.length <= 4);
 }
 
-// ── wiring in clever-api ──
-const src = Deno.readTextFileSync(new URL('../../supabase/functions/clever-api/index.ts', import.meta.url));
-ok('clever-api: imports the discovery helpers', /import \{ checkDiscoverability, socialProfiles \} from '\.\.\/_shared\/site_discovery\.ts'/.test(src));
-ok('clever-api: deepAudit runs the guarded discovery on the final URL', /checkDiscoverability\(out\.url, assertPublicHttpUrl, BROWSER_UA\)/.test(src) && /if \(disc\) out\.discoverability = disc;/.test(src));
-ok('clever-api: social links come from real profile links, not a text search', /out\.local\.socialLinks = socialProfiles\(html, out\.url, schemas\)/.test(src) && !/lc\.includes\(p\)/.test(src));
-ok('clever-api: lite PSI keeps Lighthouse 13 checklist details', /details\.type === 'checklist' \? \{ details: \{ type: 'checklist', items: a\.details\.items \} \}/.test(src));
 
 const failed = results.filter((x) => !x).length;
 console.log(`\n${results.length - failed}/${results.length} passed`);

@@ -3,6 +3,7 @@
 //   POST /foundations/prepare             — {goal, params?} → an Infrastructure Change Plan
 //   GET  /foundations/plans               — proposed/approved/applied plans
 //   POST /foundations/plans/:id/decide    — {decision: approve|abandon}
+//   POST /foundations/plans/:id/done      — the studio marks an approved plan finished
 // The customer manages their presence; Studio OS manages the complexity.
 // Nothing here performs an infrastructure action: plans are prepared and
 // decided; automated steps are applied by the OPERATOR route (admin) using
@@ -12,12 +13,13 @@ import { registrarTip, providerGuide } from '../lib/rdap.ts';
 import { getSite } from '../lib/netlify.ts';
 import { svc, type SiteDb } from '../lib/db.ts';
 import { writeChangeEvent } from '../lib/provenance.ts';
-import { readZone } from '../platform/dns.ts';
+import { readZone, bareDomain } from '../platform/dns.ts';
 import { explainRecord } from '../platform/dns.ts';
 import { planConnectDomain, planEmailAuth, planRegistrarCare, planHostingRestore } from '../platform/plans.ts';
 import { planMigration } from '../platform/migration.ts';
 import { planTransferIn, planTransferOut } from '../platform/transfer.ts';
-import { planEmailSetup } from '../platform/email_providers.ts';
+import { planEmailSetup, emailFacts } from '../platform/email_providers.ts';
+import { clearFoundPlans } from '../platform/plan_found.ts';
 import { diffZones, planDnsRepair } from '../platform/zone.ts';
 import { registrarFor, hostFor, dnsFor } from '../platform/contract.ts';
 import { applyRecords, applyableRecords, mergeDesired } from '../platform/managed_dns.ts';
@@ -38,19 +40,36 @@ async function siteDomain(site: SiteRow): Promise<string | null> {
   return c.json?.[0]?.domain ?? null;
 }
 
+/** A date the way a person writes it: February 12, 2027 (Nov 12 review, finding 18: the sheet
+ *  showed 2027-02-12). Empty when there is none to show. */
+export function plainDate(iso: string | null | undefined): string {
+  const d = iso ? new Date(iso) : null;
+  return d && !isNaN(d.getTime()) ? d.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric', timeZone: 'UTC' }) : '';
+}
+
 export async function handleFoundationsGet(site: SiteRow, cors: Record<string, string>) {
   const now = new Date().toISOString();
   const domain = await siteDomain(site);
-  const zone = domain ? await readZone(domain, now) : null;
+  // Nov 12 review, finding 15: the records and the email check are read on the bare name. With
+  // "www." as the main name the read used to ask about www.x.com, where mail never lives.
+  const bare = domain ? bareDomain(domain) : null;
+  const zone = bare ? await readZone(bare, now) : null;
+  // Nov 12 review, finding 25: one picture of the records a day. Every open used to save a row,
+  // and nothing ever cleared them.
   if (zone) {
-    await svc('presence_zone_snapshots', { method: 'POST', headers: { Prefer: 'return=minimal' },
-      body: JSON.stringify({ site_id: site.id, domain: zone.domain, records: zone.records, taken_at: now }) });
+    const today = await svc(`presence_zone_snapshots?site_id=eq.${site.id}&taken_at=gte.${now.slice(0, 10)}T00:00:00Z&select=id&limit=1`).catch(() => null);
+    const have = !!(today && today.ok && Array.isArray(today.json) && today.json.length);
+    if (!have && today && today.ok) {
+      await svc('presence_zone_snapshots', { method: 'POST', headers: { Prefer: 'return=minimal' },
+        body: JSON.stringify({ site_id: site.id, domain: zone.domain, records: zone.records, taken_at: now }) });
+    }
   }
   const host = hostFor('netlify');
   const ssl = site.netlify_site_id ? await host.ssl(site.netlify_site_id) : null;
-  const mx = zone?.records.filter((r) => r.type === 'MX') ?? [];
-  const spf = zone?.records.some((r) => r.type === 'TXT' && r.value.startsWith('v=spf1')) ?? false;
-  const dmarc = zone?.records.some((r) => r.name.startsWith('_dmarc')) ?? false;
+  const mail = emailFacts(zone?.records ?? [], bare || '');
+  const spf = mail.hasSpf, dmarc = mail.hasDmarc;
+  // finding 13: an approved plan whose records now answer is finished, here and at the daily check
+  const cleared = zone && bare ? await clearFoundPlans(site.id, bare, now, zone) : [];
 
   return json({ data: {
     domain: domain ? {
@@ -66,28 +85,35 @@ export async function handleFoundationsGet(site: SiteRow, cors: Record<string, s
     dns: zone ? {
       record_count: zone.records.length,
       records: zone.records.map((r) => ({ ...r, plain: explainRecord(r) })),
-      sentence: `${zone.records.length} records answer for ${domain} right now — each explained below in plain words. Changes always arrive as a plan you approve first.`,
-    } : { record_count: 0, records: [], sentence: 'Nothing to read yet — DNS appears here once a domain is connected.' },
+      sentence: `${zone.records.length} records answer for ${bare} right now, each said below in plain words. Changes always arrive as steps you approve first.`,
+    } : { record_count: 0, records: [], sentence: 'Nothing to read yet. The domain’s records show here once a domain is connected.' },
     ssl: ssl ? {
       state: ssl.state,
       sentence: ssl.state === 'issued' || ssl.state === 'renewed'
-        ? `The security certificate is healthy${ssl.expires_at ? ` and renews itself before ${ssl.expires_at.slice(0, 10)}` : ' and renews itself automatically'}. Nothing for you to do — ever.`
-        : 'The security certificate is being arranged — this settles on its own once the domain answers.',
-    } : { state: 'n/a', sentence: site.edition === 'monitor' ? 'Your current host manages the certificate; the observer checks it stays healthy.' : 'Certificates are provisioned automatically when hosting attaches.' },
+        ? `The padlock is on${plainDate(ssl.expires_at) ? ` and renews itself before ${plainDate(ssl.expires_at)}` : ' and renews itself'}. Nothing for you to do.`
+        : 'The padlock is being switched on. It comes by itself once the domain’s records point here.',
+    } : { state: 'n/a', sentence: site.edition === 'monitor' ? 'The company that hosts your site looks after the padlock. We check it stays on.' : 'The padlock comes by itself once your site is set up here.' },
     email: {
-      has_mail: mx.length > 0, spf, dmarc,
-      sentence: mx.length === 0 ? 'No email runs on this domain — nothing to protect.'
-        : spf && dmarc ? 'Email from your domain is authenticated — inboxes can trust it.'
-        : 'Email runs on this domain but isn’t fully protected yet — a small plan fixes that.',
+      has_mail: mail.hasMail, spf, dmarc,
+      // finding 14: who runs the email, so the protection offered is that company's
+      provider: mail.provider ? mail.provider.name : null,
+      // finding 23: the card names the missing record
+      missing: !mail.hasMail ? [] : [...(spf ? [] : ['sender']), ...(dmarc ? [] : ['fakes'])],
+      sentence: !mail.hasMail ? 'No email runs on this domain, so there is nothing to protect.'
+        : spf && dmarc ? 'Email from your domain is protected. Inboxes can trust it.'
+        : !spf && !dmarc ? 'Email runs on this domain, and two records are missing: the one that lists who may send as you, and the one that tells inboxes what to do with fakes.'
+        : !spf ? 'Email runs on this domain, and one record is missing: the one that lists who may send as you.'
+        : 'Email runs on this domain, and one record is missing: the one that tells inboxes what to do with fakes.',
     },
     hosting: {
       managed: !!site.netlify_site_id,
       sentence: site.netlify_site_id
-        ? 'Hosting, the CDN, deploys, backups, and restores are managed here — every published version is kept and restorable.'
+        ? 'Your site is hosted here. Every published version is kept, and any of them can be put back.'
         : site.edition === 'monitor'
-          ? 'Your website stays on its current hosting; the platform observes it and prepares guidance. Managed hosting comes with an upgrade, whenever you want it.'
-          : 'Hosting attaches when the site is provisioned.',
+          ? 'Your website stays where it is hosted now. We watch it and tell you what we find.'
+          : 'Your site is hosted here once it is set up.',
     },
+    cleared_plans: cleared,
   } }, 200, cors);
 }
 
@@ -98,6 +124,7 @@ export async function handleFoundationsPrepare(req: Request, site: SiteRow, prin
   const now = new Date().toISOString();
   let plan: InfraPlan;
   let extra: Record<string, unknown> = {};
+  let zoneNow: Awaited<ReturnType<typeof readZone>> | null = null;
   try {
     if (body.goal === 'connect_domain') {
       if (!domain) return json({ error: 'no_domain', message: 'Tell us the domain first — it can be set with your studio.' }, 400, cors);
@@ -106,7 +133,15 @@ export async function handleFoundationsPrepare(req: Request, site: SiteRow, prin
       plan = planConnectDomain(domain, nf && nf.ok && nf.site ? nf.site.default_domain : null);
     } else if (body.goal === 'email_auth') {
       if (!domain) return json({ error: 'no_domain', message: 'Email protection needs a domain first.' }, 400, cors);
-      plan = planEmailAuth(domain);
+      // Nov 12 review, findings 14 and 15: read who runs the email on the bare name, give that
+      // company's records, and only the ones that are missing
+      const bare = bareDomain(domain);
+      zoneNow = await readZone(bare, now);
+      const mail = emailFacts(zoneNow.records, bare);
+      if (!mail.hasMail) return json({ error: 'no_mail', message: 'We couldn’t find email on this domain just now. If it has email, try again in a minute.' }, 409, cors);
+      if (mail.hasSpf && mail.hasDmarc) return json({ error: 'already_protected', message: 'Both records are already there. Email from this domain is protected.' }, 409, cors);
+      plan = planEmailAuth(bare, mail);
+      extra = { email_provider: mail.provider ? mail.provider.slug : null };
     } else if (body.goal === 'registrar_care') {
       if (!domain) return json({ error: 'no_domain', message: 'Domain care needs a domain first.' }, 400, cors);
       const reg = registrarFor('manual');
@@ -124,7 +159,7 @@ export async function handleFoundationsPrepare(req: Request, site: SiteRow, prin
       plan = body.goal === 'transfer_in' ? planTransferIn(domain) : planTransferOut(domain);
     } else if (body.goal === 'email_setup') {
       if (!domain) return json({ error: 'no_domain', message: 'Email setup needs a domain first.' }, 400, cors);
-      plan = planEmailSetup(domain, String(body.provider || 'other'));
+      plan = planEmailSetup(bareDomain(domain), String(body.provider || 'other'));   // finding 15: mail lives on the bare name
     } else if (body.goal === 'dns_repair') {
       if (!domain) return json({ error: 'no_domain', message: 'DNS repair needs a domain first.' }, 400, cors);
       const [zQ, observed] = await Promise.all([
@@ -142,7 +177,7 @@ export async function handleFoundationsPrepare(req: Request, site: SiteRow, prin
       extra = { content_mapping: mp.content_mapping, redirects: mp.redirects, launch_checks: mp.launch_checks, post_launch_qa: mp.post_launch_qa };
       plan = mp;
     } else {
-      return json({ error: 'bad_goal', message: 'Plans exist for: connect_domain, email_auth, email_setup, registrar_care, hosting_restore, migration, transfer_in, transfer_out, dns_repair.' }, 400, cors);
+      return json({ error: 'bad_goal', message: 'That isn’t something we have steps for yet.' }, 400, cors);
     }
   } catch (e) {
     return json({ error: 'plan_failed', message: (e as Error)?.message?.slice(0, 200) || 'The plan couldn’t be prepared.' }, 502, cors);
@@ -151,7 +186,12 @@ export async function handleFoundationsPrepare(req: Request, site: SiteRow, prin
   // item 162: the studio's Domains panel reads the steps before sending them; a preview saves nothing
   if (body.preview === true) return json({ data: { ...plan, preview: true } }, 200, cors);
   // the rollback reference: the zone as it stands at proposal time
-  const prior = domain ? await readZone(domain, now) : null;
+  // Nov 12 review, finding 13: the same plan can't be made twice. Each press of "Set up email
+  // protection" used to add another; an open one is handed back instead.
+  const openQ = await svc(`presence_infra_plans?site_id=eq.${site.id}&kind=eq.${plan.kind}&status=in.(proposed,approved)&select=${PLAN_SELECT}&order=created_at.desc&limit=10`);
+  const open = (Array.isArray(openQ.json) ? openQ.json as Array<{ title?: string }> : []).find((p) => p && p.title === plan.title);
+  if (open) return json({ data: { ...open, already: true } }, 200, cors);
+  const prior = zoneNow || (domain ? await readZone(bareDomain(domain), now) : null);
   const ins = await svc(`presence_infra_plans?select=${PLAN_SELECT}`, {
     method: 'POST', headers: { Prefer: 'return=representation' },
     body: JSON.stringify({
@@ -186,7 +226,19 @@ export async function handleFoundationsDecide(req: Request, site: SiteRow, planI
   return json({ data: { id: planId, status: decision } }, 200, cors);
 }
 
-/** OPERATOR-ONLY (called from admin router): apply an APPROVED plan's
+/** POST /foundations/plans/:id/done (Nov 12 review, finding 13): the studio marks an approved
+ *  plan finished. Home said "Apply" and opened a sheet with no such button; the only route
+ *  that finished a plan sat on the staff-only admin path, called by no page. The studio is a
+ *  member working inside the client's site, or platform staff; the approval law in applyPlan
+ *  still refuses anything not approved. */
+export async function handleFoundationsPlanDone(site: SiteRow, planId: string, principal: Principal, cors: Record<string, string>) {
+  if (!(principal.scope || principal.kind === 'staff')) {
+    return json({ error: 'studio_only', message: 'Your studio marks this done. It also closes by itself once its records are found.' }, 403, cors);
+  }
+  return applyPlan(site, planId, principal, cors);
+}
+
+/** OPERATOR-ONLY (called from admin router, and by the studio's "Mark as done" above): apply an APPROVED plan's
  *  automated steps through provider capabilities; guided steps are marked
  *  done by the human who performed them. The approval law is enforced here:
  *  a plan that isn't approved cannot be applied, ever. */

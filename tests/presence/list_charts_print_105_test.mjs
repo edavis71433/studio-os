@@ -105,7 +105,7 @@ const selects = (table) => db.log.filter((l) => l.method === 'GET' && l.url.star
   ok('Contacts: the charts repaint with the list (a search, a tag, Show more)', (contacts.match(/paintCharts\(\);\n\}/g) || []).length === 2);
   ok('Contacts: Print first loads the rest of the view, up to 1,000 people', /for\(let i=0;i<10&&moreToLoad\(\);i\+\+\)/.test(contacts) && /if\(!r\.ok\|\|!takePage\(r,s\)\)break;/.test(contacts));
   ok('Contacts: Show more and Print share one page-append', /if\(!takePage\(r,s\)\)\{renderListZone\(\);return;\}/.test(contacts));
-  ok('Contacts: the tools stay at the studio level with the rest of the header\'s tools', /\$\{scope\(\)\?'':`<div class="ltools">[^`]*id="chartsBtn"[^`]*id="printBtn"/.test(contacts));
+  ok('Contacts: the tools stay at the studio level with the rest of the header\'s tools', /\$\{inClient\(\)\?'':`<div class="ltools">[^`]*id="chartsBtn"[^`]*id="printBtn"/.test(contacts));
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);

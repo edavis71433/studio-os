@@ -353,6 +353,12 @@ const $=(id)=>document.getElementById(id);
 const esc=(s)=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const scope=()=>new URLSearchParams(location.search).get('client')||'';
 let TOKEN="", PERIOD='this_month', CTX=null, DASH=null;
+// builder item 83: ?client= is also how someone with places in two businesses opens their second one,
+// their own business and not a studio inside a client, so it keeps the reports their first one shows.
+// The context says which, as the shell's ddsScopeInfo reads it: a scope is a studio inside a client, a
+// business on the person's list is their own; else the shell's memory of the person's businesses, else
+// the address, as before.
+const inClient=()=>{const id=scope();if(!id)return false;if(CTX&&CTX.scope&&CTX.scope.site_id)return true;if(CTX&&Array.isArray(CTX.businesses)&&CTX.businesses.some((b)=>b&&b.site_id===id))return false;return window.ddsScopeInfo&&/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)?!!window.ddsScopeInfo():true;};
 // C8: the sign-in pass is renewed about every hour; keep the renewed one, as the other
 // pages do, or Refresh after an hour is refused and reads as "Sign in"
 sb.auth.onAuthStateChange(function(_e,s){if(s&&s.access_token)TOKEN=s.access_token;});
@@ -870,7 +876,7 @@ let REP_STALE=false;
 function quietStudio(v){const n=Number(v)||0;const el=document.getElementById('allQuietStudio');if(!el||!n)return;
   el.innerHTML=`${n===1?'one thing needs you':n+' things need you'} in your own studio — <a href="/agency.html" data-noscope="1">see Home</a>.`;}
 document.addEventListener('dds:attention',e=>quietStudio(e.detail));
-const reportsShell=()=>scope()?'':`<section class="reports" id="reports" aria-labelledby="reportsH"><h2 class="band" id="reportsH">Reports</h2><div id="reportsBody"><p class="muted">Reading your reports…</p></div></section>`;
+const reportsShell=()=>inClient()?'':`<section class="reports" id="reports" aria-labelledby="reportsH"><h2 class="band" id="reportsH">Reports</h2><div id="reportsBody"><p class="muted">Reading your reports…</p></div></section>`;
 async function loadReports(force){
   if(!$('reportsBody'))return;
   if(!REP||force||REP_STALE){let r;try{r=await api('/sales/reports');}catch(_){r={ok:false};}

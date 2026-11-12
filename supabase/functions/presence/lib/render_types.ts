@@ -68,6 +68,8 @@ export interface SnapshotContent {
     /** Phase Z: search-engine ownership tokens (meta tags at render). */
     verification?: { google?: string; bing?: string };
     logo?: MediaRef | null;
+    /** Builder list item 158 (0184): the site's own browser-tab icon; absent = the template's letter (lib/site_icon.ts). */
+    icon?: MediaRef | null;
     og_image?: MediaRef | null;
     cover?: MediaRef | null;   // owner-chosen hero image (preferred over the auto-pick)
     announcement?: { text: string; url?: string; expires_at?: string | null };
