@@ -540,6 +540,21 @@ const possessive = (n) => /s$/i.test(n) ? n + '’' : n + '’s';
 // the client's NAME comes from the shell's context (its scope.name is what the
 // "Viewing client" bar shows); the shell may settle after our first paint
 function scopeName() { const c = CTX || window.__ddsContext; const sc = SCOPE && c && c.scope; return (sc && sc.name) ? String(sc.name) : ''; }
+// builder item 83: ?client= is also how someone with places in two businesses opens their second
+// one. That is their own business, not a studio inside a client, so it keeps every card their first
+// one shows. The context says which, as the shell's ddsScopeInfo reads it: a scope is a studio inside
+// a client, a business on the person's list is their own; else the businesses the shell remembers
+// from the last visit, else the address, as before. SCOPE itself still goes with every read and every
+// link: it is how the server knows the business.
+function inClient() {
+  if (!SCOPE) return false;
+  const c = CTX || window.__ddsContext;
+  if (c && c.scope && c.scope.site_id) return true;
+  if (c && Array.isArray(c.businesses) && c.businesses.some((b) => b && b.site_id === SCOPE)) return false;
+  return window.ddsScopeInfo ? !!window.ddsScopeInfo() : true;
+}
+let ctxIn = null;
+const CTX_IN = new Promise((r) => { ctxIn = r; });   // settles once the page has its context, or knows it has none
 let TOKEN = "";
 sb.auth.onAuthStateChange(function (_e, s) { if (s && s.access_token) TOKEN = s.access_token; });
 const H = () => ({ 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + SUPABASE_KEY, 'x-dds-user-jwt': TOKEN, 'x-dds-scope-site': SCOPE });
@@ -637,12 +652,15 @@ function hasCap(c) { const list = CTX && CTX.capabilities; return !Array.isArray
 // domain desk of the site in scope.
 function cardHtml(c, status) {
   const who = scopeName() || 'this client';
+  const inC = inClient();
   const inPage = !!(CTX && CTX.is_agency) && c.agencyHref;   // item 126: a studio's Notifications is a part of this page, inside a client too
-  const href = inPage ? c.agencyHref : (SCOPE && c.scoped) ? withClient(c.href) : c.href;
+  // inside a client only the scoped cards carry it; in one of your own businesses every link keeps the business
+  const carry = !inPage && !!SCOPE && !/^#/.test(c.href) && (c.scoped || !inC);
+  const href = inPage ? c.agencyHref : carry ? withClient(c.href) : c.href;
   const agency = !!(CTX && CTX.is_agency) && !SCOPE;
-  const title = (SCOPE && c.scopedTitle) ? c.scopedTitle(who) : (agency && c.agencyTitle) ? c.agencyTitle : c.title;
-  const desc = (SCOPE && c.scopedDesc) ? c.scopedDesc : (agency && c.agencyDesc) ? c.agencyDesc : c.desc;
-  const leaves = !/^#/.test(href) && !(SCOPE && c.scoped) && href.indexOf('/pipeline.html') !== 0;
+  const title = (inC && c.scopedTitle) ? c.scopedTitle(who) : (agency && c.agencyTitle) ? c.agencyTitle : c.title;
+  const desc = (inC && c.scopedDesc) ? c.scopedDesc : (agency && c.agencyDesc) ? c.agencyDesc : c.desc;
+  const leaves = !/^#/.test(href) && !carry && href.indexOf('/pipeline.html') !== 0;
   return `<a class="setcard" href="${esc(href)}" data-card="${esc(c.key)}"${leaves ? ' data-noscope="1"' : ''}${c.needs ? ` data-needs="${esc(c.needs)}"` : ''}>` +
     `<span class="ico" aria-hidden="true"><svg viewBox="0 0 24 24">${IC[c.icon || c.key]}</svg></span>` +
     `<span class="t"><b>${esc(title)}</b><span class="dsc">${esc(desc)}</span>${status ? statusHtml(status) : ''}</span>` +
@@ -656,7 +674,8 @@ const findWords = () => String(($('setFind') && $('setFind').value) || '').toLow
 const cardMatches = (c, words) => { const hay = [c.title, c.desc, c.agencyTitle, c.agencyDesc, c.words].filter(Boolean).join(' ').toLowerCase(); return words.every((w) => hay.includes(w)); };
 function renderCards() {
   const words = findWords();
-  const show = CARDS.filter((c) => (!c.feature || hasFeature(c.feature)) && (!c.cap || hasCap(c.cap)) && !(c.ownerOnly && SCOPE) && !(c.studioOnly && SCOPE) && !(c.scopedOnly && !SCOPE) && !(c.agencyOnly && !(CTX && CTX.is_agency && !SCOPE)) && !(c.operatorOnly && (SCOPE || !(CTX && CTX.is_operator))))
+  const inC = inClient();
+  const show = CARDS.filter((c) => (!c.feature || hasFeature(c.feature)) && (!c.cap || hasCap(c.cap)) && !(c.ownerOnly && inC) && !(c.studioOnly && inC) && !(c.scopedOnly && !inC) && !(c.agencyOnly && !(CTX && CTX.is_agency && !SCOPE)) && !(c.operatorOnly && (SCOPE || !(CTX && CTX.is_operator))))
     .filter((c) => (words.length ? cardMatches(c, words) : !c.searchOnly));
   $('cards').innerHTML = show.map((c) => cardHtml(c, STATUSES[c.key])).join('') ||
     `<p class="setnone" role="status">No setting matches “${esc(words.join(' '))}”. Try a word like password, team or invoices.</p>`;
@@ -831,7 +850,7 @@ function paintScope() {
   const h = $('pagehead'); if (h) h.textContent = 'Settings' + (who ? ' — ' + who : '');
   document.title = 'Settings' + (who ? ' — ' + who : '') + ' — Studio OS';
   const ph = $('profileHead'), pn = $('profileNote');
-  if (SCOPE) {
+  if (inClient()) {
     const name = who || 'This client';
     if (ph) ph.textContent = possessive(name) + ' profile';
     if (pn) pn.textContent = `These are ${possessive(name)} details, not your studio’s: what their customers see on their site, documents and emails. The kind of business drives their nudges.`;
@@ -905,7 +924,7 @@ function wireDeletion() {
   });
 }
 async function loadPlan() {
-  if (SCOPE) return;
+  if (inClient()) return;
   const host = $('plan'), sec = $('billing');
   const [r, u] = await Promise.all([api('/commerce/subscription'), (CTX && CTX.is_agency) ? usageOnce() : Promise.resolve(null)]);
   const s = r.ok && r.body && r.body.data;
@@ -959,7 +978,8 @@ async function loadPlan() {
 let IDENT = null, SETTINGS = null;
 // builder list item 59: the name and logo clients see on their sign-in page, their portal and every email
 async function loadStudioLook() {
-  if (SCOPE) return;
+  if (SCOPE) await CTX_IN;   // builder item 83: whose settings these are is known once the context is in
+  if (inClient()) return;
   const r = await api('/brand/studio', 'GET');
   if (!r.ok || !r.body || !r.body.data) return;
   const d = r.body.data;
@@ -987,7 +1007,8 @@ async function loadProfile() {
   $('f-area').value = d.service_area || '';
   const ind = $('f-industry'); ind.value = (SETTINGS && SETTINGS.industry_key) || 'generic'; if (ind.selectedIndex < 0) ind.value = 'generic';
   $('f-signer').value = (SETTINGS && SETTINGS.signs_as_name) || ''; $('f-signer-title').value = (SETTINGS && SETTINGS.signs_as_title) || '';   // sales item 88
-  document.querySelectorAll('[data-signer]').forEach((el) => { el.hidden = !!SCOPE; });   // the studio signs, never a client's settings
+  const signer = () => document.querySelectorAll('[data-signer]').forEach((el) => { el.hidden = inClient(); });   // the studio signs, never a client's settings
+  signer(); if (SCOPE) CTX_IN.then(signer);   // the profile can land before the context, which decides it again (your own second business signs for itself)
   $('studio').hidden = false;
   holdUnread();
   return d;
@@ -1057,8 +1078,8 @@ async function saveProfile() {
   // the select is gone for a role without configure, and it can still read differently from an unset row
   const mayConfigure = !(window.ddsLacks && window.ddsLacks('configure'));
   if (mayConfigure && (!SETTINGS || SETTINGS.industry_key !== industry)) setPatch.industry_key = industry;
-  // sales item 88: who signs agreements, studio level only
-  if (mayConfigure && !SCOPE) {
+  // sales item 88: who signs agreements, never from inside a client
+  if (mayConfigure && !inClient()) {
     const sn = $('f-signer').value.trim(), stt = $('f-signer-title').value.trim();
     if ((SETTINGS && SETTINGS.signs_as_name || '') !== sn) setPatch.signs_as_name = sn;
     if ((SETTINGS && SETTINGS.signs_as_title || '') !== stt) setPatch.signs_as_title = stt;
@@ -1083,7 +1104,7 @@ const ACK_SENTENCE = 'Thanks for getting in touch — we’ve got your message a
 const ackPreview = (words) => String(words || '').trim() || ACK_SENTENCE;
 // Automations show at the studio's own level, and inside a client only the two enquiry rows
 // (their website's replies): the invoices, deals and reviews are the studio's book.
-const automationsHere = () => !SCOPE || (hasFeature('website') && hasCap('configure'));
+const automationsHere = () => !inClient() || (hasFeature('website') && hasCap('configure'));
 // The recipes: one tap switches on the rows they name (a row's own switch turns it off again).
 const RECIPES = [
   { key: 'ack', title: 'Answer every enquiry within a minute', line: 'A short reply on your brand, with a copy of what they wrote.', on: (st) => st.auto_ack_enquiries === true, patch: { auto_ack_enquiries: true }, row: 'row-ack', scoped: true },
@@ -1095,7 +1116,7 @@ const RECIPES = [
 ];
 function paintRecipes() {
   const st = SETTINGS || {};
-  const list = RECIPES.filter((r) => !SCOPE || r.scoped);
+  const list = RECIPES.filter((r) => !inClient() || r.scoped);
   $('recipes').innerHTML = list.map((r) => { const on = r.on(st); return `<div class="recipe" role="listitem" data-recipe="${esc(r.key)}"${on ? ' data-on="1"' : ''}><b>${esc(r.title)}</b><span class="rl">${esc(r.line)}</span><span class="ra">${on ? '<span class="ron">On</span><button type="button" class="rgo" data-recipe-go="' + esc(r.key) + '">Change it</button>' : '<button type="button" class="btn sm primary" data-recipe-on="' + esc(r.key) + '">Turn on</button>'}</span></div>`; }).join('');
 }
 function goRow(id) { const row = $(id); if (!row) return; row.scrollIntoView({ behavior: 'smooth', block: 'center' }); row.classList.remove('flash'); void row.offsetWidth; row.classList.add('flash'); const sw = row.querySelector('.sw'); if (sw) sw.focus({ preventScroll: true }); }
@@ -1117,8 +1138,8 @@ function paintAutomations() {
   if (!AUTO_FLIGHT.auto_ack_message && document.activeElement !== $('w-ack')) $('say-ack').textContent = ackPreview(st.auto_ack_message);
   paintRecipes();
   // inside a client only their website's two rows; the studio's book stays out
-  $('automations').querySelectorAll('.swrow').forEach((row) => { row.hidden = !!SCOPE && !row.hasAttribute('data-scoped'); });
-  $('autoHint').textContent = SCOPE ? 'What ' + possessive(scopeName() || 'this client') + ' website sends when someone writes in. Each saves as you flip it.' : 'Ready-made recipes, and the switches behind them. Each saves as you flip it.';
+  $('automations').querySelectorAll('.swrow').forEach((row) => { row.hidden = inClient() && !row.hasAttribute('data-scoped'); });
+  $('autoHint').textContent = inClient() ? 'What ' + possessive(scopeName() || 'this client') + ' website sends when someone writes in. Each saves as you flip it.' : 'Ready-made recipes, and the switches behind them. Each saves as you flip it.';
   const nRev = Number(st.review_request_after_days) >= 1 ? Math.trunc(Number(st.review_request_after_days)) : 3;
   setVal('n-rev', String(nRev), 'review_request_after_days'); if (echoes('n-rev', 'review_request_after_days')) $('n-rev-echo').textContent = String(nRev);
   $('say-rev').textContent = reviewAskSentence(IDENT && IDENT.business_name);
@@ -1128,7 +1149,7 @@ function paintAutomations() {
   setVal('n-deal', String(nDeal), 'deal_nudge_days'); if (echoes('n-deal', 'deal_nudge_days')) $('say-deal').textContent = dealNudgeSentence(nDeal);
   if (!STALE_SAVING) paintStaleDays();   // C3: never under a change still waiting to save
   $('automations').hidden = false;
-  if (SCOPE) return;   // the studio's own sections stay out of a client's settings
+  if (inClient()) return;   // the studio's own sections stay out of a client's settings
   $('stages').hidden = false;
   loadStageNames();
   loadMenu();
@@ -1139,7 +1160,7 @@ function paintAutomations() {
 // write over a report that couldn't be read (I4).
 let REPORT = null, REPORT_BUSY = false;
 async function loadReport() {
-  if (!SCOPE || !hasFeature('website') || !hasCap('configure')) return;
+  if (!inClient() || !hasFeature('website') || !hasCap('configure')) return;
   const r = await api('/report/monthly', 'GET');
   REPORT_TRIED = true;
   REPORT_READ = !!(r.ok && r.body && r.body.data);
@@ -1771,6 +1792,7 @@ function holdAnchor(sec) {
     if (document.readyState === 'loading') await new Promise((r) => document.addEventListener('DOMContentLoaded', r, { once: true }));
     try { CTX = window.ddsContext ? await window.ddsContext() : null; } catch (_) { CTX = null; }
     if (!CTX) { const r = await api('/portal/context'); CTX = (r.ok && r.body && r.body.data) || null; }
+    ctxIn();
     paintScope();
     renderCards();
     $('profileSave').addEventListener('click', saveProfile);
@@ -1794,13 +1816,13 @@ function holdAnchor(sec) {
     }).catch(() => {});
     // bold redesign: the Calendar row says whether the private calendar link is on (GET /calendar/link —
     // an older server, or an answer that isn't about the link, leaves the row without a status)
-    if (!SCOPE && hasFeature('connected')) api('/calendar/link').then((r) => {
+    if (!inClient() && hasFeature('connected')) api('/calendar/link').then((r) => {
       const d = (r && r.ok && r.body && r.body.data) || null; if (!d || typeof d.can_manage !== 'boolean') return;
       setStatus('calendar', { text: d.on ? 'Your calendar link is on' : 'No calendar link yet', cls: d.on ? '' : 'plain' });
     }).catch(() => {});
     // sales review item 69: the Domain & email card says which address your emails go out from, and whether
     // the mail provider has it verified (GET /email/sending). Studio level only: a client's card is their desk.
-    if (!SCOPE && hasFeature('website')) api('/email/sending').then((r) => {
+    if (!inClient() && hasFeature('website')) api('/email/sending').then((r) => {
       const d = (r && r.ok && r.body && r.body.data) || null; if (!d || !d.from) return;
       // I6 (bug hunt, Nov 10): the state first, then the address; the address used to fill the
       // line and push "not verified, so they may land in spam" out of sight
@@ -1810,7 +1832,7 @@ function holdAnchor(sec) {
     }).catch(() => {});
     loadPlan().catch(() => {});
     loadTeam().catch(() => {});
-    if (!SCOPE) { loadStageNames(); loadMenu(); loadReports(); $('reportsAll').addEventListener('click', switchOnTheRest); }   // with the rest, not after the studio details; item 160: every client's report
+    if (!inClient()) { loadStageNames(); loadMenu(); loadReports(); $('reportsAll').addEventListener('click', switchOnTheRest); }   // with the rest, not after the studio details; item 160: every client's report, which loadReports keeps to the studio's own level
     else { wireReport(); loadReport(); }
     loadNotify();   // item 126: a studio's notifications per client site (agency members only)
     wireDeletion();
@@ -1820,9 +1842,9 @@ function holdAnchor(sec) {
     if (automationsHere()) { wireAutomations(); paintAutomations(); }
     if (location.hash === '#team') holdAnchor($('team'));
     if (location.hash === '#studio') { const n = $('f-name'); if (n) n.focus(); }
-    if (location.hash === '#billing' && !SCOPE) holdAnchor($('billing'));   // I7: billing is the studio's own, never a client's (a client's "Update payment" link lands at the top)
+    if (location.hash === '#billing' && !inClient()) holdAnchor($('billing'));   // I7: billing is the studio's own, never a client's (a client's "Update payment" link lands at the top)
     if (location.hash === '#automations' && automationsHere()) holdAnchor($('automations'));
-    if (location.hash === '#stages' && !SCOPE) holdAnchor($('stages'));
+    if (location.hash === '#stages' && !inClient()) holdAnchor($('stages'));
     if (location.hash === '#notify') loadNotify().then(() => { if (!$('notify').hidden) holdAnchor($('notify')); });
     spySections();
   } catch (_) {

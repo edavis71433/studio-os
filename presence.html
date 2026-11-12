@@ -5954,7 +5954,7 @@ function applyEditionGating() {
       const n = document.createElement("div");
       n.id = "monitorNote";
       n.style.cssText = "max-width:900px;margin:10px auto 0;padding:10px 16px;border-radius:10px;background:var(--warn-soft,#f3ead9);color:var(--warn,#775d31);font-size:13.5px";
-      const forClient = new URLSearchParams(location.search).get("client");
+      const forClient = studioInClient();
       n.textContent = forClient
         ? "This client’s plan watches their website — it doesn’t include editing or publishing here. To build it from Studio OS, move them to a plan with the website builder."
         : "This plan watches your website — it doesn’t include editing or publishing here. To build it from Studio OS, ask us about upgrading.";
@@ -7644,6 +7644,19 @@ function scopedClientName() {
     return (sc && sc.name) ? String(sc.name) : "";
   } catch (_) { return ""; }
 }
+// Builder item 83: ?client= is also how someone with places in two businesses opens their second
+// one. That is their own business, not a studio inside a client, so the editor speaks to its owner
+// and shows the owner's own setup list, welcome and plan notice, as at their first one. The context
+// says which, as the shell's ddsScopeInfo reads it: a scope is a studio inside a client, a business on
+// the person's list is their own; else the businesses the shell remembers, else the address, as before.
+function studioInClient() {
+  const id = new URLSearchParams(location.search).get("client");
+  if (!id) return false;
+  const c = S.ctx || window.__ddsContext;
+  if (c && c.scope && c.scope.site_id) return true;
+  if (c && Array.isArray(c.businesses) && c.businesses.some((b) => b && b.site_id === id)) return false;
+  return window.ddsScopeInfo && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id) ? !!window.ddsScopeInfo() : true;   // the shell reads only a real site id
+}
 // "Marlow’s Kitchen’s" — a name already ending in s takes the bare apostrophe.
 function possessive(name) { return /s$/i.test(name) ? name + "’" : name + "’s"; }
 function openRitual(opts) {
@@ -8684,7 +8697,7 @@ async function loadHistory() {
 // Who published it, in the words of whoever is reading: a studio working inside a
 // client's site and the client see the same row from opposite sides.
 function versionWho(p) {
-  const scoped = !!new URLSearchParams(location.search).get("client");
+  const scoped = studioInClient();
   if (p.by_kind === "client") return scoped ? "the client" : "you";
   if (p.by_kind === "operator" || p.by_kind === "staff") return scoped ? "your team" : "your studio";
   return "";
@@ -17486,7 +17499,7 @@ async function renderPlanNotice() {
 // under a client view.
 let SETUP_DISMISSED = null;   // null until the owner's hide is read; a client view never reads it
 let SETUP_SEEN = null;        // the steps done when the owner last saw the list, so one done since ticks in front of them
-function setupScoped() { return !!new URLSearchParams(location.search).get("client"); }
+function setupScoped() { return studioInClient(); }
 function setupSteps() {
   const idn = S.identity || {}, loc = S.location || {}, set = S.settings || {}, site = S.site || {};
   const live = S.previewStatus && S.previewStatus.live;
@@ -17527,7 +17540,7 @@ function renderSetup() {
   if (!wrap || !S.site || S.site.edition === "monitor") return off();
   const scoped = setupScoped();
   const ctx0 = window.__ddsContext || S.ctx;
-  if (!scoped && ctx0 && ctx0.is_agency && !(ctx0.scope && ctx0.scope.name)) return off();   // a studio's own site is a practice site
+  if (!scoped && !new URLSearchParams(location.search).get("client") && ctx0 && ctx0.is_agency && !(ctx0.scope && ctx0.scope.name)) return off();   // a studio's own site is a practice site (one of its own businesses, item 83, is not)
   if (!scoped && SETUP_DISMISSED !== false) return off();   // hidden by the owner, or not known yet
   const steps = setupSteps();
   const done = steps.filter((x) => x.done).length, total = steps.length;
@@ -17658,7 +17671,7 @@ function refreshSiteStatus(force) {
     // The plan card and the welcome are the owner's (same rule as the billing and
     // deletion cards in refreshAll). A drilled-in operator gets the client's notices
     // from the bell and Today, and the server refuses both routes under a scope.
-    if (!new URLSearchParams(location.search).get("client")) {
+    if (!studioInClient()) {
       renderFirstRun();
       renderPlanNotice();
     }
