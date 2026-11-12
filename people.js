@@ -87,6 +87,25 @@
     this.host = host; this.o = o; this.d = null; this.view = o.view || 'people'; this.armed = ''; this.err = null; this.pick = 'business_staff'; this.busy = false;
   }
   Sheet.prototype.req = function (path, method, body) { return this.o.api(path, method || 'GET', body); };
+  // builder item 191: inviting a co-owner, making someone one, bringing one back and handing
+  // the site over ask for a fresh code first; fresh-code.js asks for it and sends again
+  var freshP = null;
+  function loadFresh() {
+    if (window.ddsFresh) return Promise.resolve(window.ddsFresh);
+    if (!freshP) freshP = new Promise(function (res) {
+      var s = document.createElement('script'); s.src = '/fresh-code.js?v=191';
+      s.onload = function () { res(window.ddsFresh || null); };
+      s.onerror = function () { freshP = null; res(null); };
+      document.head.appendChild(s);
+    });
+    return freshP;
+  }
+  Sheet.prototype.reqFresh = function (path, method, body) {
+    var me = this;
+    return loadFresh().then(function (F) {
+      return F ? F.run(function (extra) { return me.req(path, method, Object.assign({}, body, extra)); }, { sb: me.o.sb }) : me.req(path, method, body);
+    });
+  };
   Sheet.prototype.load = function () {
     var me = this;
     me.host.innerHTML = '<div class="pp"><div class="pp-load" role="status">Loading the people…</div></div>';
@@ -216,8 +235,9 @@
     me.email = String(f && f.value || '').trim();
     if (!me.email) { me.err = { message: 'Type their email first.' }; return me.draw(); }
     me.busy = true; me.err = null; me.draw();
-    return me.req('/portal/members', 'POST', { email: me.email, role: me.pick }).then(function (r) {
+    return me.reqFresh('/portal/members', 'POST', { email: me.email, role: me.pick }).then(function (r) {
       me.busy = false;
+      if (r.cancelled) return me.draw();
       var b = r.body || {};
       if (r.ok) { me.say((b.data && b.data.message) || 'Invited.'); me.email = ''; me.view = 'people'; me.changed(); return me.load(); }
       if (b.error === 'already_member') { me.showId = b.member && b.member.id; me.err = { message: b.message, action: 'show', label: 'Show me' }; }
@@ -228,7 +248,8 @@
   };
   Sheet.prototype.restore = function (email, role, btn) {
     var me = this; if (btn) btn.disabled = true;
-    return me.req('/portal/members', 'POST', { email: email, role: role, restore: true }).then(function (r) {
+    return me.reqFresh('/portal/members', 'POST', { email: email, role: role, restore: true }).then(function (r) {
+      if (r.cancelled) { if (btn) btn.disabled = false; return; }
       if (r.ok) { me.say(email + ' is back as ' + roleName(role) + '.'); me.email = ''; me.view = 'people'; me.changed(); return me.load(); }
       if (btn) btn.disabled = false; me.say((r.body && r.body.message) || 'That didn’t work. Try again.', true);
     });
@@ -243,8 +264,9 @@
   Sheet.prototype.setRole = function (id, role, sel) {
     var me = this, seat = (me.d.data || []).filter(function (m) { return m.id === id; })[0], was = seat ? seat.role : '';
     sel.disabled = true;
-    return me.req('/portal/members/' + encodeURIComponent(id) + '/role', 'POST', { role: role }).then(function (r) {
+    return me.reqFresh('/portal/members/' + encodeURIComponent(id) + '/role', 'POST', { role: role }).then(function (r) {
       sel.disabled = false;
+      if (r.cancelled) { sel.value = was; return; }
       if (r.ok) { if (seat) { seat.role = role; seat.role_words = roleName(role); } me.say((r.body.data && r.body.data.message) || 'Changed.'); me.changed(); return; }
       sel.value = was; me.say((r.body && r.body.message) || 'That didn’t save. Try again.', true);
     });
@@ -264,8 +286,9 @@
     me.toEmail = String(f && f.value || '').trim(); me.keep = !!(k && k.checked);
     if (!me.toEmail) { me.err = { message: 'Type the new owner’s email first.' }; return me.draw(); }
     me.busy = true; me.err = null; me.draw();
-    return me.req('/portal/transfer', 'POST', { email: me.toEmail, keep_owner: me.keep }).then(function (r) {
+    return me.reqFresh('/portal/transfer', 'POST', { email: me.toEmail, keep_owner: me.keep }).then(function (r) {
       me.busy = false;
+      if (r.cancelled) return me.draw();
       if (r.ok) { me.say((r.body.data && r.body.data.message) || 'Sent.'); me.toEmail = ''; me.view = 'people'; me.changed(); return me.load(); }
       me.err = { message: (r.body && r.body.message) || 'That didn’t send. Try again.' }; me.draw();
     });

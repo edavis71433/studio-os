@@ -41,6 +41,7 @@ import { hostedName, SITE_COLS as SITE_ROW_COLS } from '../lib/site.ts';
 import type { Principal } from '../../_shared/auth.ts';
 import type { Snapshot } from '../lib/render_types.ts';
 import { UUID_LOWER_RE as UUID_RE } from '../lib/uuid.ts';
+import { requireFresh } from '../lib/fresh_code.ts';   // builder item 191
 
 const SB_URL = Deno.env.get('SUPABASE_URL') || '';
 const SB_SERVICE = Deno.env.get('SERVICE_ROLE_KEY') || Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
@@ -413,6 +414,9 @@ async function handleDomainWrite(req: Request, method: string, site: SiteRow, pr
     const body = await readBody(req);
     const typed = String(body?.confirm || '').trim().toLowerCase().replace(/^https?:\/\//, '').replace(/[/?#].*$/, '').replace(/\.$/, '');
     if (typed !== site.custom_domain.toLowerCase()) return json({ error: 'confirm_needed', message: `To remove it, type ${site.custom_domain} exactly.` }, 400, cors);
+    // item 191: and a fresh code (their app's, or one we email them); the owner is told below, as since item 163
+    const fresh = await requireFresh(principal, body, 'domain_remove', site.custom_domain, cors);
+    if (fresh instanceof Response) return fresh;
     const removed = await setCustomDomain(site.netlify_site_id, null);
     if (!removed.ok) { console.warn(`[domain] remove failed for site ${site.id}: ${removed.error || 'unknown'}`); return json({ error: 'domain_failed', message: 'The domain couldn’t be removed just now. Try again in a minute.' }, 502, cors); }
     if ((removed.site?.domain_aliases || []).length) await setDomainAliases(site.netlify_site_id, []).catch(() => null);   // nothing left to send them on to

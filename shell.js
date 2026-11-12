@@ -2438,6 +2438,25 @@
     root.innerHTML = '<a class="dds-brand" href="/"><span class="mark">S</span>Studio OS</a><div style="flex:1"></div><a class="dds-ic" href="/help.html" aria-label="Help">?</a><a class="dds-ic" href="/studio.html" aria-label="Sign in">◐</a>';
   }
 
+  // Builder item 191: two-step sign-in is on and this device hasn't had the code from the
+  // phone yet, so the server treats it as signed out. The studio's sign-in page asks for
+  // the code, then brings them back here (dds-studio-return, as for anyone signed out).
+  // The sign-in kept on this device says so, with no call: a fresh sign-in carries the
+  // person's factors, and the token says whether the code was typed (aal2).
+  function secondStepDue(sess) {
+    try {
+      var f = (sess && sess.user && sess.user.factors) || [];
+      if (!f.some(function (x) { return x && x.status === 'verified'; })) return false;
+      return JSON.parse(atob(String(sess.access_token).split('.')[1].replace(/-/g, '+').replace(/_/g, '/'))).aal !== 'aal2';
+    } catch (_) { return false; }
+  }
+  function toSecondStep() {
+    // never twice in a row: if the sign-in page sent them straight back, the page shows signed out
+    try { if (Date.now() - Number(sessionStorage.getItem('dds-step-sent') || 0) < 30000) { minimalShell(); return; } sessionStorage.setItem('dds-step-sent', String(Date.now())); } catch (_) { /* */ }
+    try { localStorage.setItem('dds-studio-return', JSON.stringify({ path: location.pathname + location.search + location.hash, at: Date.now() })); } catch (_) { /* */ }
+    location.replace('/studio.html');
+  }
+
   // ── PT-5: contextual onboarding — teach in context, show ONCE, disappear ────
   // Declarative + reuses the shell: any page marks a `.dds-hint[data-hint]`
   // element (hidden) next to the thing it explains. We reveal unseen ones with a
@@ -2884,6 +2903,7 @@
         TOKEN = (sess && sess.access_token) || "";
         sb.__email = (sess && sess.user && sess.user.email) || '';
         if (!TOKEN) { minimalShell(); return; }
+        if (secondStepDue(sess)) { toSecondStep(); return; }   // builder item 191
         var uid = (sess && sess.user && sess.user.id) || '';
         var kept = keptContext(uid);
         if (kept) {

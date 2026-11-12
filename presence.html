@@ -9,6 +9,7 @@
 <!-- P2-B: adopt the ONE shared shell (top bar · ⌘K · notifications · account · sign-out) + shared state helpers. Additive + non-invasive; the editor SPA below is unchanged. -->
 <link rel="stylesheet" href="/shell.css">
 <script src="/shell.js" defer></script>
+<script src="/fresh-code.js?v=191" defer></script>
 <style>
 /* ═══ The builder on the workspace brand (visual refresh) ═════════════════════
    shell.css is the canonical palette: its light block, dark block and the
@@ -4492,7 +4493,12 @@ function renderFoundations(f, plans, dom) {
     if (typed === null) return;
     if (String(typed).trim().toLowerCase() !== String(dstat.custom_domain).toLowerCase()) { toast("That doesn’t match " + dstat.custom_domain + ", so nothing was removed.", true); return; }
     const confirm = String(typed).trim();
-    try { await api("DELETE", "/foundations/domain", { confirm }); toast("Domain removed."); openFoundationsDesk(); } catch (err) { toast(nice(err), true); } }); return rm; };
+    // item 191: removing it asks for a fresh code first (fresh-code.js); the refusal that asks is an answer, not a fault
+    const send = (extra) => api("DELETE", "/foundations/domain", { confirm, ...extra }).then((d) => ({ ok: true, status: 200, body: d }), (err) => ({ ok: false, status: err.status || 0, body: err.body || { message: nice(err) } }));
+    const r = window.ddsFresh ? await window.ddsFresh.run(send, { sb }) : await send({});
+    if (r.cancelled) return;
+    if (!r.ok) { toast((r.body && r.body.message) || "That didn’t go through. Nothing was removed.", true); return; }
+    toast("Domain removed."); openFoundationsDesk(); }); return rm; };
   // item 163 (finding 12): a new domain can keep the old one working, sending its visitors on
   const changeBtn = () => { const b = el("button", "textact", "Change to a different domain"); b.dataset.needs = "configure"; b.dataset.change = "domain"; b.addEventListener("click", async () => {
     const ans = await askDomainChange(dstat.custom_domain);

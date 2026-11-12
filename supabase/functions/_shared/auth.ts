@@ -30,6 +30,25 @@ export const TENANT_ID = '00000000-0000-0000-0000-000000000001'; // DDS = tenant
 // bounded at 5s vs. the token's own 3600s validity). Failure is NOT cached.
 const AUTH_MEMO_TTL_MS = 5_000;
 const authMemo = new Map<string, { user: any; at: number }>();
+
+/** The claims of a token GoTrue has already accepted (read only, never trusted on their own). */
+export function jwtClaims(jwt: string): Record<string, unknown> | null {
+  try {
+    const part = jwt.split('.')[1] || '';
+    const b64 = part.replace(/-/g, '+').replace(/_/g, '/');
+    const payload = JSON.parse(atob(b64 + '='.repeat((4 - (b64.length % 4)) % 4)));
+    return payload && typeof payload === 'object' ? payload : null;
+  } catch (_) { return null; }
+}
+/** Builder list item 191: someone who turned two-step sign-in on (a verified second factor,
+ *  an authenticator app) is signed in only once they typed its code, when their token says
+ *  aal2. Their password or an emailed link alone (aal1) is not a sign-in here, so a stolen
+ *  password gets nowhere. Everyone else signs in as before. Pure. */
+export function secondStepMissing(user: { factors?: unknown } | null | undefined, jwt: string): boolean {
+  const verified = (Array.isArray(user?.factors) ? user!.factors as Array<{ status?: unknown }> : []).some((f) => f?.status === 'verified');
+  return verified && jwtClaims(jwt)?.aal !== 'aal2';
+}
+
 export async function authUser(jwt: string): Promise<any | null> {
   if (!jwt) return null;
   const hit = authMemo.get(jwt);
@@ -39,6 +58,7 @@ export async function authUser(jwt: string): Promise<any | null> {
     if (!uRes.ok) return null;
     const user = await uRes.json();
     if (!user || !user.id) return null;
+    if (secondStepMissing(user, jwt)) return null;   // item 191: half signed in is not signed in
     // bounded: evict expired/oldest before insert
     if (authMemo.size >= 200) {
       const now = Date.now();

@@ -107,8 +107,13 @@ const quiet = async (fn) => { const e = console.error, x = console.warn, l = con
 const jsonOf = async (res) => ({ status: res.status, body: await res.json() });
 const SITE = (custom) => ({ id: 'site1', client_id: 'c1', status: 'live', last_published_at: '2026-10-01T00:00:00Z', template_slug: 'business-classic', template_version: '1.0.0', custom_domain: custom, netlify_site_id: 'nf1', edition: 'presence' });
 const req = (method, body) => new Request('http://stub.local/functions/v1/presence/foundations/domain', { method, body: body === undefined ? undefined : JSON.stringify(body), headers: { 'Content-Type': 'application/json' } });
-const OWNER = { kind: 'client', userId: 'u1', email: 'owner@bistro.example' };
-const STUDIO = { kind: 'client', userId: 'u2', email: 'eric@studio.example', scope: { site_id: 'site1', name: 'Bistro Nine' } };
+// builder item 191: removing a domain asks for a fresh code; these people signed in with their
+// authenticator app's code a moment ago, so it counts (lib/fresh_code.ts)
+const { freshDeps } = await import(`${P}/lib/fresh_code.ts`);
+freshDeps.user = async (jwt) => ({ id: jwt === 'jwt-studio' ? 'u2' : 'u1', email: 'owner@bistro.example', factors: [{ id: 'f1', factor_type: 'totp', status: 'verified' }] });
+freshDeps.claims = () => ({ aal: 'aal2', amr: [{ method: 'totp', timestamp: Math.floor(Date.now() / 1000) }] });
+const OWNER = { kind: 'client', userId: 'u1', email: 'owner@bistro.example', jwt: 'jwt-owner' };
+const STUDIO = { kind: 'client', userId: 'u2', email: 'eric@studio.example', jwt: 'jwt-studio', scope: { site_id: 'site1', name: 'Bistro Nine' } };
 
 // attach
 world();
@@ -191,7 +196,7 @@ world({ reserved: null });
   const at = (s) => pub.indexOf(s);
   ok('publishing puts the forwarding rules on top of _redirects, from the host’s own list, before the deploy', at('withForwarding(') > 0 && at('getSite(site.netlify_site_id)') > 0 && at('withForwarding(') < at('const dep = await deployFileMap('));
   const page = read('presence.html');
-  ok('the sheet asks for the domain typed back before removing it', /askText\("Remove " \+ dstat\.custom_domain/.test(page) && /api\("DELETE", "\/foundations\/domain", \{ confirm \}\)/.test(page));
+  ok('the sheet asks for the domain typed back before removing it', /askText\("Remove " \+ dstat\.custom_domain/.test(page) && /api\("DELETE", "\/foundations\/domain", \{ confirm(, \.\.\.extra)? \}\)/.test(page));
   ok('the sheet can change the domain, keeping the old one working by default', /function askDomainChange\(old\)/.test(page) && /cb\.checked = true/.test(page) && /keep_old: ans\.keepOld/.test(page));
   ok('the steps protect the email records, and the card shows recent changes', /Leave anything marked MX or Mail alone/.test(page) && /ch\.dataset\.changes = "domain"/.test(page));
   ok('the reserved name for the email picture is listed', /domainMail: '__domain_mail__'/.test(read('supabase/functions/presence/lib/reserved_store.ts')));

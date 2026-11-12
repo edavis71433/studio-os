@@ -58,6 +58,8 @@ async function verifiedNotices(site: SiteRow, rows: any[]): Promise<any[]> {
   return keep;
 }
 import { missingColumnSignal } from '../lib/inbound_email.ts';
+import { requireFresh } from '../lib/fresh_code.ts';   // builder item 191
+import { alertOwner } from '../lib/security_alerts.ts';
 
 /** The ONLY routes a client_reviewer (the client portal audience) may reach.
  *  Everything else in the client gate is 403 for a reviewer — so the simplified
@@ -818,7 +820,16 @@ export async function handleMemberAdd(req: Request, jwt: string, site: SiteRow, 
     return json({ data: { ok: true, emailed: !!again.emailed, member: again.member, message: again.emailed ? `Sent ${again.member?.email || 'them'} a new sign-in link.` : 'The email didn’t send. Try again in a moment.' } }, again.emailed ? 200 : 502, cors);
   }
   const { ownerFacts, ownerEmailsOf } = await import('../lib/site_transfer.ts');
-  const ownerEmails = ownerEmailsOf(await ownerFacts(site.id).catch(() => null));
+  const facts = await ownerFacts(site.id).catch(() => null);
+  const ownerEmails = ownerEmailsOf(facts);
+  // item 191: a co-owner can do almost everything, so inviting one (or bringing one back) asks for a fresh code first
+  const coOwner = body?.role === 'business_owner', invitee = String(body?.email || '').trim().toLowerCase();
+  let fresh: { way: 'app' | 'email' | 'none' } = { way: 'none' };
+  if (coOwner && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(invitee) && !ownerEmails.includes(invitee)) {
+    const f = await requireFresh(principal, body, 'invite_coowner', `${invitee} as Co-owner of ${String(facts?.client?.name || '').trim() || 'this site'}`, cors);
+    if (f instanceof Response) return f;
+    fresh = f;
+  }
   // platform staff alone may still make a Developer seat (lib/workspace.ts DEVELOPER_PAUSED)
   const res = await addSiteMember(site.id, String(body?.email || ''), body?.role, principal.userId || 'owner', { restore: body?.restore === true, ownerEmails, allowDeveloper: principal.kind === 'staff' });
   if (!res.ok) {
@@ -830,6 +841,8 @@ export async function handleMemberAdd(req: Request, jwt: string, site: SiteRow, 
     return json({ error: res.error, message }, status, cors);
   }
   const reviewer = body?.role === 'client_reviewer';
+  // item 191: the owner hears a co-owner was added, whoever added them
+  if (coOwner) await alertOwner(site.id, 'coowner_added', { business: String(facts?.client?.name || '').trim(), who: invitee, by: principal.email || 'Someone signed in', confirmedWith: fresh.way });
   const message = res.emailed
     ? (reviewer ? 'Invited — we’ve emailed them a sign-in link. They’ll see only what you choose to share.' : `Invited as ${SEAT_ROLE_WORDS[body.role as SiteRole] || 'a member'} — we’ve emailed them a sign-in link.`)
     : 'Added — but the invite email didn’t send. Send them their sign-in link yourself, or try again.';
@@ -841,12 +854,27 @@ export async function handleMemberAdd(req: Request, jwt: string, site: SiteRow, 
 export async function handleMemberRole(req: Request, jwt: string, site: SiteRow, memberId: string, principal: Principal, cors: Record<string, string>) {
   const g = await requireManager(jwt, site, principal, cors); if (g instanceof Response) return g;
   let body: any = {}; try { body = await req.json(); } catch { /* */ }
+  // item 191: making someone a co-owner is inviting a co-owner, so it asks for a fresh code first
+  const coOwner = body?.role === 'business_owner';
+  let fresh: { way: 'app' | 'email' | 'none' } = { way: 'none' }, seatEmail = '';
+  if (coOwner) {
+    const seat = await svc(`presence_site_members?id=eq.${encodeURIComponent(memberId)}&site_id=eq.${site.id}&select=email,role&limit=1`);
+    const row = Array.isArray(seat.json) ? seat.json[0] : null;
+    if (!row) return json({ error: 'not_found', message: 'That person isn’t on this site any more.' }, 404, cors);
+    seatEmail = String(row.email || '');
+    if (row.role !== 'business_owner') {
+      const f = await requireFresh(principal, body, 'invite_coowner', `${seatEmail} as Co-owner`, cors);
+      if (f instanceof Response) return f;
+      fresh = f;
+    }
+  }
   const res = await changeSiteMemberRole(site.id, memberId, body?.role, { allowDeveloper: principal.kind === 'staff' });
   if (!res.ok) {
     if (res.error === 'not_found') return json({ error: 'not_found', message: 'That person isn’t on this site any more.' }, 404, cors);
     const [status, message] = ADD_WORDS[res.error || 'write_failed'] || ADD_WORDS.write_failed;
     return json({ error: res.error, message }, status, cors);
   }
+  if (coOwner && fresh.way !== 'none') await alertOwner(site.id, 'coowner_added', { who: seatEmail || String(res.member?.email || ''), by: principal.email || 'Someone signed in', confirmedWith: fresh.way });
   return json({ data: { ok: true, member: res.member, message: `${res.member?.email || 'Their role'} is now ${SEAT_ROLE_WORDS[body.role as SiteRole] || body.role}.` } }, 200, cors);
 }
 

@@ -489,7 +489,7 @@
 
 <script src="/vendor/supabase-js-2.45.4.js"></script>
 <script src="/sites-tools.js?v=176b"></script>
-<script src="/people.js?v=53"></script>
+<script src="/people.js?v=191"></script>
 <script>
 // ── Sites (builder list items 43 and 45, Nov 2026) ───────────────────────────
 // Every client's website, the way Squarespace's dashboard and Wix's Sites table
@@ -1649,7 +1649,7 @@ function openPeople(id,view){
   PEOPLE_DIRTY=false;PEOPLE_FOR=id;
   // opened from the menu, which is gone now: the sheet hands focus back to the site's ⋯ button
   const ae=document.activeElement;if(!ae||ae===document.body||!document.contains(ae)){const b=visibleMenuBtn(id);if(b)b.focus();}
-  ddsPeople.open({siteName:s.name||'',address:s.domain||hostOf(s.address),view:view||'people',api:scopedApi(id),onChanged:()=>{PEOPLE_DIRTY=true;}});
+  ddsPeople.open({siteName:s.name||'',address:s.domain||hostOf(s.address),view:view||'people',sb,api:scopedApi(id),onChanged:()=>{PEOPLE_DIRTY=true;}});
   const dlg=document.getElementById('dds-people');
   if(dlg&&!dlg.dataset.sitesWired){dlg.dataset.sitesWired='1';dlg.addEventListener('close',()=>{
     if(!PEOPLE_DIRTY)return;PEOPLE_DIRTY=false;const was=PEOPLE_FOR;

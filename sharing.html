@@ -97,7 +97,7 @@
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
 <script src="/vendor/supabase-js-2.45.4.js"></script>
-<script src="/people.js?v=53"></script>
+<script src="/people.js?v=191"></script>
 <script>
 // Sharing & access (A7.2). The owner chooses who can get in, each with a role
 // (builder list item 53: the People sheet, people.js, shared with the Sites page),
@@ -177,7 +177,7 @@ function render(){
   // (Developer Mode is fully built and appears under Settings when the account has
   //  that capability — no "coming soon" placeholder belongs here.)
   $('main').innerHTML=html;wire();
-  if(window.ddsPeople)ddsPeople.mount($('peopleHost'),{siteName:who,api:(path,method,body)=>api(path,method,body)});
+  if(window.ddsPeople)ddsPeople.mount($('peopleHost'),{siteName:who,sb,api:(path,method,body)=>api(path,method,body)});
 }
 function wire(){
   document.querySelectorAll('[data-surface]').forEach(b=>b.addEventListener('click',()=>toggle(b)));
