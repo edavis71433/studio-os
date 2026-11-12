@@ -41,6 +41,7 @@ import type { SnapshotContent } from '../lib/render_types.ts';
 import type { SiteRow } from '../lib/site.ts';
 import { siteOrigin, hostedName } from '../lib/site.ts';
 import { startCheckingSends } from '../lib/form_check.ts';
+import { checkSoon } from '../lib/check_soon.ts';
 import type { Principal } from '../../_shared/auth.ts';
 import { UUID_LOWER_RE as UUID_RE } from '../lib/uuid.ts';
 import { copiedBlockerFor } from '../lib/copied_record.ts';
@@ -237,6 +238,8 @@ export async function runPipeline(site: SiteRow, principal: Principal, kind: 'pu
   // goes live lifts the offline veil. Separate best-effort PATCH so a database
   // without 0111 applied never fails the main status write above.
   if (live) await svc(`presence_sites?id=eq.${site.id}`, { method: 'PATCH', body: JSON.stringify({ offline_at: null }) }).catch(() => {});
+  // Item 206: what visitors see just changed, so the next tick checks the site's health.
+  if (live) await checkSoon(site.id);
   // Item 90: the timed-section sweep works out this snapshot's next show-from or show-until
   // instant on its next tick. Separate and best-effort, like offline_at: before 0142 the
   // column doesn't exist, and the status write above must not fail over it.
