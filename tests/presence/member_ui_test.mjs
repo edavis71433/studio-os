@@ -33,6 +33,7 @@ const CONTROLS = [
   ['POST /comments/:id/delete', 'presence.html', `"/comments/" + c.id + "/delete"`, ['d.dataset.needs = "delete"']],
   ['DELETE /sales/contacts/:id', 'contacts.html', `api('/sales/contacts/'+encodeURIComponent(id),'DELETE')`, ['class="rowact danger" data-needs="delete" data-del=', 'class="danger" data-needs="delete" data-del=']],
   ['DELETE /sales/contacts/:id', 'contacts.html', `api('/sales/contacts/'+encodeURIComponent(id)+'?confirm=1','DELETE')`, []],
+  ['DELETE /sales/contacts/:id', 'contacts.html', `api('/sales/contacts/'+encodeURIComponent(id)+'?confirm=1','DELETE')`, ['id="bulkDel" data-needs="delete"']],   // sales item 90: Delete for the people picked
   ['DELETE /sales/contacts/:id', 'crm.html', `apiAg('/sales/contacts/'+cid,'DELETE')`, ['id="ec-del" data-needs="delete"']],
   ['DELETE /sales/contacts/:id', 'crm.html', `apiAg('/sales/contacts/'+cid+'?confirm=1','DELETE')`, []],
   ['DELETE /sales/deals/:id', 'pipeline.html', `api('/sales/deals/'+id,'DELETE')`, ['<div class="sec" data-needs="delete"']],
@@ -145,7 +146,8 @@ const SOURCE = Object.fromEntries(PAGES.map((p) => [p, read(p)]));
     ok(`${page}: every DELETE it sends is decided`, fresh.length === 0, fresh.join(' | '));
   }
   // crm.html: 4 — the record's two note removals are one removeNote since item 98 (it asks first now); item 108 added the draft estimate's
-  ok('tripwire: the DELETE scan found the calls it is meant to find', sent('pipeline.html').length === 5 && sent('presence.html').length === 13 && sent('contacts.html').length === 2 && sent('crm.html').length === 4 && sent('files.html').length === 1);
+  // contacts.html: 3 since item 90 (Delete for the people picked sends the confirmed call too)
+  ok('tripwire: the DELETE scan found the calls it is meant to find', sent('pipeline.html').length === 5 && sent('presence.html').length === 13 && sent('contacts.html').length === 3 && sent('crm.html').length === 4 && sent('files.html').length === 1);
 
   const CONFIG = /\/(?:foundations\/(?:domain|prepare)|preview\/settings|site\/(?:offline|online)|bookings\/settings|sales\/contacts\/fields)\b/;
   const writes = new RegExp(`(?:api\\(\\s*["'](?:POST|PUT|DELETE)["']\\s*,\\s*["'\`]|act\\(["']|siteSetState\\(["'])${CONFIG.source}|api\\(["'\`]${CONFIG.source}["'\`]\\s*,\\s*["'](?:POST|PUT|DELETE)["']`, 'g');

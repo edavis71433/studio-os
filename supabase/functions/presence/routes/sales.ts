@@ -33,7 +33,7 @@ import { signDocToken, readDocToken, lastingRecord, renderDocument, invoiceNo, d
 import { documentPdf, pdfFileName } from '../lib/doc_pdf.ts';   // sales item 82: the same documents as real PDFs
 import { docContextFor } from '../lib/doc_context.ts';   // sales item 81: from, billed to, dates, part payments
 import {
-  canTransition, isStage, normalizeLineItems, canDecideProposal, contractHash,
+  canTransition, undoLostAllowed, isStage, normalizeLineItems, canDecideProposal, contractHash,
   canSignContract, convertOutcome, clampLimit, type Stage,
   buildPaymentSchedule, depositBalanceStages, equalInstallmentStages, type StageInput,
   summarizePipeline, ALL_TIME_WINDOW_DAYS, nextStepStaleAfter,
@@ -57,6 +57,7 @@ import { readCloseDates } from '../lib/deal_closes.ts';
 import { reopenEnquiry } from '../lib/enquiry_state.ts';
 import { normEmail, emailMatch, isUniqueViolation } from '../lib/contact_email.ts';   // item 110 (K1): one person, one email, whatever its capitals
 import { contactMoreFrom, cleanTag, CONTACT_MORE_COLS } from '../lib/contact_fields.ts';   // item 89: address, job title, second phone, tags
+import { normalizeListFilters, quietCutoff, contactedContactIds, owingContactIds, keepIds, type ListFilters } from '../lib/list_filters.ts';   // item 90: field filters
 import { liveImport, importUpdate, noteImportRow } from './contacts_more.ts';   // item 86: imports that update and can be undone
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;                       // expected_close: ISO date only
@@ -240,6 +241,42 @@ export function contactsOrder(sort: unknown, dir: unknown): string {
   if (!CONTACT_SORTS.has(k)) return 'updated_at.desc,id.desc';
   return `${k}.${dir === 'desc' ? 'desc' : 'asc'},id.desc`;
 }
+// item 90: the people a worked-out filter keeps, in the list's order. Their deals (deleted ones
+// too: a call logged on a deal since deleted was still a call) name whose activity is whose; the
+// calls, emails and meetings since the cutoff say who was contacted; the invoices still waiting
+// say who owes you. null = a read failed (the page says so, never a wrong list).
+const CONTACT_FILTER_CAP = 5000;
+async function contactFilterIds(siteId: string, more: string, order: string, lf: ListFilters, nowMs: number): Promise<{ ids: string[]; partial: boolean } | null> {
+  const ok = (r: { ok: boolean }) => r.ok;
+  const cutoff = lf.quiet ? quietCutoff(lf.quiet, nowMs) : '';
+  const [dealsR, eventsR, invR, orderedR] = await Promise.all([
+    svc(`presence_deals?site_id=eq.${siteId}&contact_id=not.is.null&select=id,contact_id,deleted_at&limit=${CONTACT_FILTER_CAP}`),
+    lf.quiet ? svc(`presence_deal_events?site_id=eq.${siteId}&kind=eq.note&created_at=gte.${encodeURIComponent(cutoff)}&select=deal_id,detail,created_at&limit=${CONTACT_FILTER_CAP}`) : Promise.resolve(null),
+    lf.owes ? svc(`presence_invoices?site_id=eq.${siteId}&status=eq.open&deleted_at=is.null&select=deal_id,customer_client_id,status,processing_since&limit=2000`)
+      .then((r) => r.ok ? r : svc(`presence_invoices?site_id=eq.${siteId}&status=eq.open&deleted_at=is.null&select=deal_id,customer_client_id,status&limit=2000`)) : Promise.resolve(null),
+    svc(`presence_contacts?site_id=eq.${siteId}${more}&select=id&order=${order}&limit=${CONTACT_FILTER_CAP}`),
+  ]);
+  if (!ok(dealsR) || (eventsR && !ok(eventsR)) || (invR && !ok(invR)) || !ok(orderedR)) return null;
+  const deals = rows(dealsR);
+  const dealContact = new Map<string, string>(deals.map((d: any) => [String(d.id), String(d.contact_id)]));
+  const not: Array<Set<string>> = [];
+  if (lf.nodeal) not.push(new Set(deals.filter((d: any) => !d.deleted_at).map((d: any) => String(d.contact_id))));
+  if (lf.quiet && eventsR) not.push(contactedContactIds(rows(eventsR), dealContact, cutoff));
+  let only: Set<string> | null = null;
+  if (lf.owes && invR) {
+    const invoices = rows(invR);
+    const clientIds = [...new Set(invoices.map((i: any) => String(i.customer_client_id || '')).filter((x: string) => UUID_RE.test(x)))].slice(0, 200);
+    const clientContacts = new Map<string, string[]>();
+    if (clientIds.length) {
+      const cr = await svc(`presence_contacts?site_id=eq.${siteId}&deleted_at=is.null&client_id=in.(${clientIds.join(',')})&select=id,client_id&limit=1000`);
+      if (!cr.ok && cr.status !== 400) return null;   // 400 = no client_id column yet: nobody is a customer's person
+      for (const c of rows(cr)) { const k = String(c.client_id); clientContacts.set(k, [...(clientContacts.get(k) || []), String(c.id)]); }
+    }
+    only = owingContactIds(invoices, dealContact, clientContacts);
+  }
+  const ordered = rows(orderedR).map((r: any) => String(r.id));
+  return { ids: keepIds(ordered, only, not), partial: ordered.length >= CONTACT_FILTER_CAP };
+}
 export async function handleSalesContacts(req: Request, site: SiteRow, principal: Principal, cors: Record<string, string>): Promise<Response> {
   if (req.method === 'GET') {
     const u = new URL(req.url);
@@ -272,22 +309,44 @@ export async function handleSalesContacts(req: Request, site: SiteRow, principal
     // item 89: tag=restaurant lists everyone with that tag (tags @> '{restaurant}', presence_contacts_tags_idx)
     const tag = cleanTag(u.searchParams.get('tag'));
     if (tag) more += `&tags=cs.${encodeURIComponent(`{"${tag.replace(/["\\]/g, '')}"}`)}`;
+    // item 90: field filters. How they found you (via=) and when they were added (created_since=,
+    // the start of the page's own month) are plain filters; "not contacted in N days" (quiet=),
+    // "owes you money" (owes=1) and "no deal yet" (nodeal=1) are worked out from their deals and
+    // invoices below (lib/list_filters.ts), then the page is cut from what is left
+    const lf = normalizeListFilters({ quiet: u.searchParams.get('quiet'), owes: u.searchParams.get('owes'), nodeal: u.searchParams.get('nodeal'), via: u.searchParams.get('via') });
+    if (lf.via) more += `&found_via=eq.${encodeURIComponent(lf.via)}`;
+    const added = String(u.searchParams.get('created_since') || '');
+    if (/^\d{4}-\d{2}-\d{2}(T[\d:.]+Z?)?$/.test(added) && Number.isFinite(Date.parse(added))) more += `&created_at=gte.${encodeURIComponent(added)}`;
+    const computed = !!(lf.quiet || lf.owes || lf.nodeal) && !ids.length && !withDeleted;
     const order = contactsOrder(u.searchParams.get('sort'), u.searchParams.get('dir'));
     // item 66: id breaks ties in the order, so offset pages never repeat or skip a person
     const mkPath = (cols: string) => `presence_contacts?site_id=eq.${site.id}${more}&select=${cols}${withDeleted ? ',deleted_at' : ''}&order=${order}&limit=${limit}&offset=${offset}`;
+    // item 90: with a worked-out filter, the page is the people kept, read by id in their order
+    let pageIds: string[] | null = null, keptTotal: number | null = null, partial = false;
+    if (computed) {
+      const cut = await contactFilterIds(site.id, more, order, lf, Date.now());
+      if (!cut) return json({ error: 'read_failed', message: 'We couldn’t work out that filter just now. Try again in a moment.' }, 502, cors);
+      pageIds = cut.ids.slice(offset, offset + limit); keptTotal = cut.ids.length; partial = cut.partial;
+    }
+    const byIds = (cols: string) => `presence_contacts?site_id=eq.${site.id}&deleted_at=is.null&id=in.(${(pageIds || []).join(',')})&select=${cols}`;
+    const pathFor = (cols: string) => pageIds ? byIds(cols) : mkPath(cols);
     // item 66: total=1 asks how many match in all (one HEAD count beside the page
     // read, so every page costs the same two reads at any roster size). The pages
     // that list people ask for it to say "Showing 100 of N"; nobody else pays.
-    const totalP = u.searchParams.get('total') === '1' ? svcCount(`presence_contacts?site_id=eq.${site.id}${more}`).catch(() => null) : Promise.resolve(undefined);
+    const totalP = keptTotal !== null ? Promise.resolve(keptTotal) : u.searchParams.get('total') === '1' ? svcCount(`presence_contacts?site_id=eq.${site.id}${more}`).catch(() => null) : Promise.resolve(undefined);
     // item 89: the row shows a job title and tags, and a second phone to call; before APPLY-0166 the older select.
     // item 105: found_via rides along for the list's "How they found you" chart (APPLY-0143; without it, every
     // contact counts as not recorded).
-    let r = await svc(mkPath(`id,name,email,phone,company,client_id,updated_at,found_via,${CONTACT_MORE_COLS.join(',')}`));
-    if (!r.ok && r.status === 400) r = await svc(mkPath('id,name,email,phone,company,client_id,updated_at,found_via'));
-    if (!r.ok && r.status === 400) r = await svc(mkPath('id,name,email,phone,company,client_id,updated_at'));
-    if (!r.ok && r.status === 400) r = await svc(mkPath('id,name,email,phone,company,updated_at'));
-    if (!r.ok) return json({ error: 'read_failed', message: 'We couldn’t load your contacts just now.' }, 502, cors);
-    const list = rows(r);
+    let list: any[] = [];
+    if (!pageIds || pageIds.length) {
+      let r = await svc(pathFor(`id,name,email,phone,company,client_id,updated_at,found_via,${CONTACT_MORE_COLS.join(',')}`));
+      if (!r.ok && r.status === 400) r = await svc(pathFor('id,name,email,phone,company,client_id,updated_at,found_via'));
+      if (!r.ok && r.status === 400) r = await svc(pathFor('id,name,email,phone,company,client_id,updated_at'));
+      if (!r.ok && r.status === 400) r = await svc(pathFor('id,name,email,phone,company,updated_at'));
+      if (!r.ok) return json({ error: 'read_failed', message: 'We couldn’t load your contacts just now.' }, 502, cors);
+      list = rows(r);
+      if (pageIds) { const at = new Map(pageIds.map((id, i) => [id, i])); list.sort((a, b) => (at.get(String(a.id)) ?? 0) - (at.get(String(b.id)) ?? 0)); }
+    }
     // dupes=1: the roster's quiet "possible duplicate" hint. Same normalisation
     // the CREATE-time prompt uses (phoneKey → "5550102468" === "(555) 010-2468";
     // nameSimilarity → "Jordan" ≈ "Jordon"), just run across the page instead of
@@ -297,7 +356,8 @@ export async function handleSalesContacts(req: Request, site: SiteRow, principal
     const total = await totalP;
     // total: the count when asked for (null when the count failed: the page then
     // offers "Show more" while a page comes back full, and never claims a number)
-    return json({ data: list, limit, offset, ...(total === undefined ? {} : { total }) }, 200, cors);
+    // partial (item 90): a worked-out filter looked through the first CONTACT_FILTER_CAP people only
+    return json({ data: list, limit, offset, ...(total === undefined ? {} : { total }), ...(partial ? { partial: true } : {}) }, 200, cors);
   }
   if (req.method === 'POST') {
     let b: any = {}; try { b = await req.json(); } catch { return json({ error: 'bad_json' }, 400, cors); }
@@ -917,7 +977,8 @@ export async function handleSalesDeals(req: Request, site: SiteRow, principal: P
     // next_step/next_step_at land with migration 0089 — try the full select, fall
     // back to the pre-0089 shape so a deploy ahead of the migration never breaks
     // the pipeline list.
-    const baseCols = 'id,title,stage,source,expected_value_cents,expected_close,contact_id,converted_client_id,updated_at';
+    // item 90: created_at rides along for the "Added this month" filter
+    const baseCols = 'id,title,stage,source,expected_value_cents,expected_close,contact_id,converted_client_id,updated_at,created_at';
     const filters = `${stage && isStage(stage) ? `&stage=eq.${stage}` : ''}${q ? `&title.ilike.*${encodeURIComponent(q)}*` : ''}`;
     // item 105: found_via (APPLY-0143) rides along for the list's "Where they came from" chart, then the same read without it.
     let r = await svc(`presence_deals?site_id=eq.${site.id}&deleted_at=is.null&select=${baseCols},next_step,next_step_at,found_via&order=updated_at.desc&limit=${limit}&offset=${offset}${filters}`);
@@ -949,6 +1010,17 @@ export async function handleSalesDeals(req: Request, site: SiteRow, principal: P
         const signed = new Set(rows(await svc(`presence_contracts?site_id=eq.${site.id}&status=eq.signed&deal_id=in.(${ids.join(',')})&deleted_at=is.null&select=deal_id`)).map((c: any) => c.deal_id));
         for (const d of deals) d.agreement_signed = signed.has(d.id);
       } catch { /* badge falls back to the plain stage label */ }
+      // item 90: what each deal is still owed (open invoices, not a payment already on its way),
+      // for the list's "Owes you money" filter. null = couldn't tell (the filter then says so)
+      try {
+        const ids = deals.map((d: any) => d.id).filter(Boolean);
+        let ir = await svc(`presence_invoices?site_id=eq.${site.id}&status=eq.open&deleted_at=is.null&deal_id=in.(${ids.join(',')})&select=deal_id,amount_cents,status,processing_since&limit=1000`);
+        if (!ir.ok) ir = await svc(`presence_invoices?site_id=eq.${site.id}&status=eq.open&deleted_at=is.null&deal_id=in.(${ids.join(',')})&select=deal_id,amount_cents,status&limit=1000`);
+        if (!ir.ok) throw new Error('invoices');
+        const owed: Record<string, number> = {};
+        for (const i of rows(ir)) if (!i.processing_since) owed[i.deal_id] = (owed[i.deal_id] || 0) + (Number(i.amount_cents) || 0);
+        for (const d of deals) d.owes_cents = owed[d.id] || 0;
+      } catch { for (const d of deals) d.owes_cents = null; }
     }
     // Sales review B4: a closed deal whose next step names work that is behind
     // it ("Sign Contract" on a Won deal) read as overdue in red. The page hides
@@ -1190,12 +1262,21 @@ export async function handleSalesDealStage(req: Request, site: SiteRow, principa
   const deal = await loadDeal(site.id, id);
   if (!deal) return json({ error: 'not_found' }, 404, cors);
   if (deal.stage === to) return json({ data: deal }, 200, cors); // idempotent no-op
-  if (!canTransition(deal.stage, to)) return json({ error: 'invalid_transition', message: `A deal can’t move from ${deal.stage} to ${to}.` }, 409, cors);
+  // builder item 75: Undo, after "Mark as not a fit" (one deal or many), puts the deal back where
+  // it was. The ladder only reopens a Not a fit deal as a new lead, so the way back is allowed only
+  // as that Undo: the deal is still Not a fit, and its newest move was into Not a fit from that
+  // very stage, a short while ago. The reason it was given goes with it.
+  const undo = b.undo === true && deal.stage === 'lost' && to !== 'won' && to !== 'lost';
+  if (undo) {
+    const last = rows(await svc(`presence_deal_events?deal_id=eq.${id}&site_id=eq.${site.id}&kind=eq.stage_change&select=from_stage,to_stage,created_at&order=created_at.desc&limit=1`))[0];
+    if (!undoLostAllowed(last, to, Date.now())) return json({ error: 'undo_expired', message: 'That can’t be undone any more. Open the deal and reopen it instead.' }, 409, cors);
+  } else if (!canTransition(deal.stage, to)) return json({ error: 'invalid_transition', message: `A deal can’t move from ${deal.stage} to ${to}.` }, 409, cors);
   const patch: Record<string, unknown> = { stage: to };
   if (to === 'lost') patch.lost_reason = clean(b.reason, 200);
+  if (undo) patch.lost_reason = '';
   const up = await svc(`presence_deals?id=eq.${id}&site_id=eq.${site.id}&stage=eq.${deal.stage}&select=*`, { method: 'PATCH', headers: { Prefer: 'return=representation' }, body: JSON.stringify(patch) });
   if (!up.ok || !rows(up)[0]) return json({ error: 'conflict', message: 'That deal just changed — refresh and try again.' }, 409, cors); // optimistic: stage guard in WHERE
-  await dealEvent(site.id, id, 'stage_change', principal, { from_stage: deal.stage, to_stage: to });
+  await dealEvent(site.id, id, 'stage_change', principal, { from_stage: deal.stage, to_stage: to, ...(undo ? { detail: { undo: true } } : {}) });
   // Sales review B4: moving to Won by hand never retired "Sign contract" (only
   // the signature and convert paths did), so a won deal kept a red overdue step.
   if (to === 'won') { await clearStaleNextStep(site.id, id, 'won'); const fresh = await loadDeal(site.id, id); if (fresh) return json({ data: fresh }, 200, cors); }

@@ -25,7 +25,8 @@ ok('sales: add-customer (connect) links the contact', /const ct = await ensureCo
 ok('sales: add-customer (provision) links the contact', /\{ const ct = await ensureConnectContact\(site\.id, email, name, false\); await linkContactToCustomer\(site\.id, ct\?\.id, clientId\)/.test(sales));
 ok('sales: an enquiry converted this way is marked converted', /async function markSubmissionConverted/.test(sales) && (sales.match(/markSubmissionConverted\(site\.id, b\.source_submission_id\)/g) || []).length >= 2);
 // the read tolerates a database without the column
-ok('sales: contacts read selects client_id and retries narrow on 400', /company,client_id,updated_at/.test(sales) && /r\.status === 400\) r = await svc\(mkPath\('id,name,email,phone,company,updated_at'\)\)/.test(sales));
+// item 90: the select chain runs through pathFor (the page by offset, or by the ids a field filter kept)
+ok('sales: contacts read selects client_id and retries narrow on 400', /company,client_id,updated_at/.test(sales) && /r\.status === 400\) r = await svc\(pathFor\('id,name,email,phone,company,updated_at'\)\)/.test(sales));
 
 // search across everything
 // item 84: the search reads every place through one site constant (S = site.id) and one pattern (like = ilike.*q*)
