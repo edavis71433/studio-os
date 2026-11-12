@@ -286,7 +286,7 @@ test.describe('Client portal — Home queue + project record page', () => {
     await page.goto(`/client.html?project=${PID}`);
     await page.locator('#msg').fill('Thanks — looks great!');
     const post = page.waitForRequest((r) => r.method() === 'POST' && r.url().includes(`/client/projects/${PID}/messages`));
-    await page.getByRole('button', { name: 'Send' }).click();
+    await page.getByRole('button', { name: 'Send', exact: true }).click();
     expect((await post).postDataJSON()).toEqual({ body: 'Thanks — looks great!' });
   });
 
@@ -612,16 +612,18 @@ test.describe('Client portal — Messages split view', () => {
     await installApp(page, { api: MSG_API });
     await page.goto('/client.html');
     await openMessagesTab(page);
-    await expect(page.getByText('3 conversations')).toBeVisible();
+    await expect(page.locator('#mlmeta')).toHaveText('Conversations · 3');
     const rows = page.locator('#mrows [role="option"]');
     await expect(rows).toHaveCount(3);
     // newest activity first: open support (07-06) · project thread (07-05) · resolved (07-04)
     await expect(rows.nth(0)).toContainText('Logo tweak');
     await expect(rows.nth(1)).toContainText('Website redesign');
     await expect(rows.nth(2)).toContainText('Copy fixes');
-    await expect(rows.nth(0).locator('.kchip')).toHaveText('Support · open');
-    await expect(rows.nth(1).locator('.kchip')).toHaveText('Message');
-    await expect(rows.nth(2).locator('.kchip')).toHaveText('Support · resolved');
+    // item 179 part three: plain words — a chip only when something is handled (Done) or asked
+    await expect(rows.nth(0).locator('.schip')).toHaveCount(0);
+    await expect(rows.nth(1).locator('.schip')).toHaveCount(0);
+    await expect(rows.nth(2).locator('.schip')).toHaveText('Done');
+    await expect(rows.nth(1).locator('.mav')).toHaveText('Y');   // the studio's initial leads its conversation
     // the message + support_message notifications light exactly their two rows,
     // each with the sr-only "New — " text alternative for the dot
     await expect(page.locator('.mrow.unread')).toHaveCount(2);
@@ -652,11 +654,12 @@ test.describe('Client portal — Messages split view', () => {
     // text match on "Website redesign" would be ambiguous
     await page.locator(`[data-mrow="proj:${PID}"]`).click();
     const pane = page.locator('#mpane');
-    await expect(pane.locator('.ti.t-message')).toContainText('Your studio sent a message');
-    await expect(pane.locator('.ti.t-message .ti-body')).toHaveText('Welcome aboard!');
-    await pane.getByLabel('Message your studio').fill('Thanks — looks great!');
+    // item 179 part three: the studio on the left, said by name to a screen reader
+    await expect(pane.locator('.cmsg:not(.me) .cb')).toContainText('Your studio: ');
+    await expect(pane.locator('.cmsg:not(.me) .cb')).toContainText('Welcome aboard!');
+    await pane.getByLabel('Write to Your studio').fill('Thanks — looks great!');
     const post = page.waitForRequest((r) => r.method() === 'POST' && r.url().includes(`/client/projects/${PID}/messages`));
-    await pane.getByRole('button', { name: 'Send' }).click();
+    await pane.getByRole('button', { name: 'Send', exact: true }).click();
     expect((await post).postDataJSON()).toEqual({ body: 'Thanks — looks great!' });
   });
 
@@ -673,13 +676,13 @@ test.describe('Client portal — Messages split view', () => {
     await page.locator('.mrow', { hasText: 'Logo tweak' }).click();
     const pane = page.locator('#mpane');
     await expect(pane.locator('.mpname')).toHaveText('Logo tweak');
-    await expect(pane.locator('#msupstatus')).toHaveText('open');
-    await expect(pane.getByText('You opened this request')).toBeVisible();
-    await expect(pane.getByText('Could we nudge the logo left?')).toBeVisible();
-    await expect(pane.getByText('Your studio replied')).toBeVisible();
-    await pane.getByLabel('Add to this request').fill('Perfect, thank you.');
+    await expect(pane.locator('#msupstatus')).toHaveText('Open');
+    // item 179 part three: your opening words on the right, the studio's reply on the left
+    await expect(pane.locator('.cmsg.me .cb')).toContainText('Could we nudge the logo left?');
+    await expect(pane.locator('.cmsg:not(.me) .cb')).toContainText('On it — new version tomorrow.');
+    await pane.getByLabel('Write to Your studio').fill('Perfect, thank you.');
     const post = page.waitForRequest((r) => r.method() === 'POST' && r.url().includes(`/client/support/${SUP_GEN}/messages`));
-    await pane.getByRole('button', { name: 'Send' }).click();
+    await pane.getByRole('button', { name: 'Send', exact: true }).click();
     expect((await post).postDataJSON()).toEqual({ body: 'Perfect, thank you.' });
   });
 
@@ -689,7 +692,7 @@ test.describe('Client portal — Messages split view', () => {
     await openMessagesTab(page);
     await page.locator('.mrow', { hasText: 'Copy fixes' }).click();
     const pane = page.locator('#mpane');
-    await expect(pane.getByText('This request is resolved. Open a new one if you need anything else.')).toBeVisible();
+    await expect(pane.getByText('This one is done. Write to start a new conversation.')).toBeVisible();
     await expect(pane.locator('textarea')).toHaveCount(0);
   });
 
@@ -715,12 +718,12 @@ test.describe('Client portal — Messages split view', () => {
         : route.fallback());
     await page.goto('/client.html');
     await openMessagesTab(page);
-    await page.getByRole('button', { name: 'Message your studio' }).click();
+    await page.getByRole('button', { name: 'Write to Your studio' }).click();
     const pane = page.locator('#mpane');
     await expect(pane.getByText('Goes straight to your project conversation.')).toBeVisible();
-    await pane.getByLabel('Message your studio').fill('Quick question about hosting');
+    await pane.getByLabel('What would you like to say?').fill('Quick question about hosting');
     const post = page.waitForRequest((r) => r.method() === 'POST' && r.url().includes(`/client/projects/${PID}/messages`));
-    await pane.getByRole('button', { name: 'Send' }).click();
+    await pane.getByRole('button', { name: 'Send', exact: true }).click();
     expect((await post).postDataJSON()).toEqual({ body: 'Quick question about hosting' });
     await expect(page.locator('#toast')).toContainText('Sent — your studio will get back to you.');
     // the PROJECT conversation opens — and no support ticket was minted
@@ -738,20 +741,20 @@ test.describe('Client portal — Messages split view', () => {
         : route.fallback());
     await page.goto('/client.html');
     await openMessagesTab(page);
-    await expect(page.getByText('2 conversations')).toBeVisible();   // the two support threads, no project rows
-    await page.getByRole('button', { name: 'Message your studio' }).click();
+    await expect(page.locator('#mlmeta')).toHaveText('Conversations · 2');   // the two support threads, no project rows
+    await page.getByRole('button', { name: 'Write to Your studio' }).click();
     const pane = page.locator('#mpane');
     await expect(pane.getByText('The first line becomes the subject.')).toBeVisible();
-    await pane.getByLabel('Message your studio').fill('One more thing\nAbout the logo');
+    await pane.getByLabel('What would you like to say?').fill('One more thing\nAbout the logo');
     const post = page.waitForRequest((r) => r.method() === 'POST' && /\/client\/support$/.test(new URL(r.url()).pathname));
-    await pane.getByRole('button', { name: 'Send' }).click();
+    await pane.getByRole('button', { name: 'Send', exact: true }).click();
     expect((await post).postDataJSON()).toEqual({ subject: 'One more thing', body: 'One more thing\nAbout the logo' });
     // the EXISTING conversation opened — still 2 rows, no third ticket. The
     // list itself is behind "← Messages" at phone widths (the split view shows
     // one pane there), so the proof is the row count + meta, not visibility.
     await expect(page.locator('#mpane .mpname')).toHaveText('Logo tweak');
     await expect(page.locator('#mrows [data-mrow]')).toHaveCount(2);
-    await expect(page.locator('#mlmeta')).toHaveText(/^2 conversations/);
+    await expect(page.locator('#mlmeta')).toHaveText('Conversations · 2');
   });
 
   test('compose failure: a 500 keeps the composer usable (toast + re-enabled button)', async ({ page }) => {
@@ -763,13 +766,13 @@ test.describe('Client portal — Messages split view', () => {
         : route.fallback());
     await page.goto('/client.html');
     await openMessagesTab(page);
-    await page.getByRole('button', { name: 'Message your studio' }).click();
+    await page.getByRole('button', { name: 'Write to Your studio' }).click();
     const pane = page.locator('#mpane');
-    await pane.getByLabel('Message your studio').fill('Hello?');
-    await pane.getByRole('button', { name: 'Send' }).click();
+    await pane.getByLabel('What would you like to say?').fill('Hello?');
+    await pane.getByRole('button', { name: 'Send', exact: true }).click();
     await expect(page.locator('#toast')).toContainText('That didn’t send.');
-    await expect(pane.getByRole('button', { name: 'Send' })).toBeEnabled();
-    await expect(pane.getByLabel('Message your studio')).toHaveValue('Hello?'); // nothing typed is lost
+    await expect(pane.getByRole('button', { name: 'Send', exact: true })).toBeEnabled();
+    await expect(pane.getByLabel('What would you like to say?')).toHaveValue('Hello?'); // nothing typed is lost
   });
 
   test('project send failure: the thread is kept, nothing is erased', async ({ page }) => {
@@ -782,12 +785,12 @@ test.describe('Client portal — Messages split view', () => {
     await openMessagesTab(page);
     await page.locator(`[data-mrow="proj:${PID}"]`).click();
     const pane = page.locator('#mpane');
-    await expect(pane.locator('.ti.t-message .ti-body')).toHaveText('Welcome aboard!');
-    await pane.getByLabel('Message your studio').fill('Anyone there?');
-    await pane.getByRole('button', { name: 'Send' }).click();
+    await expect(pane.locator('.cmsg:not(.me) .cb')).toContainText('Welcome aboard!');
+    await pane.getByLabel('Write to Your studio').fill('Anyone there?');
+    await pane.getByRole('button', { name: 'Send', exact: true }).click();
     await expect(page.locator('#toast')).toContainText('That didn’t send.');
-    await expect(pane.locator('.ti.t-message .ti-body')).toHaveText('Welcome aboard!'); // the thread survives
-    await expect(pane.getByRole('button', { name: 'Send' })).toBeEnabled();
+    await expect(pane.locator('.cmsg:not(.me) .cb')).toContainText('Welcome aboard!'); // the thread survives
+    await expect(pane.getByRole('button', { name: 'Send', exact: true })).toBeEnabled();
   });
 
   test('support reply refetch-failure: the reply sends, the thread + composer are kept', async ({ page }) => {
@@ -806,14 +809,14 @@ test.describe('Client portal — Messages split view', () => {
     await page.locator('.mrow', { hasText: 'Logo tweak' }).click();
     const pane = page.locator('#mpane');
     await expect(pane.getByText('Could we nudge the logo left?')).toBeVisible();
-    await pane.getByLabel('Add to this request').fill('Perfect, thank you.');
-    await pane.getByRole('button', { name: 'Send' }).click();
+    await pane.getByLabel('Write to Your studio').fill('Perfect, thank you.');
+    await pane.getByRole('button', { name: 'Send', exact: true }).click();
     await expect(page.locator('#toast')).toContainText('this thread will catch up');
     // the refetch failed AFTER a successful reply — the thread and composer survive (no error card)
     await expect(pane.getByText('Could we nudge the logo left?')).toBeVisible();
     await expect(pane.getByText('That request isn’t available right now.')).toHaveCount(0);
-    await expect(pane.getByLabel('Add to this request')).toBeVisible();
-    await expect(pane.getByRole('button', { name: 'Send' })).toBeEnabled();
+    await expect(pane.getByLabel('Write to Your studio')).toBeVisible();
+    await expect(pane.getByRole('button', { name: 'Send', exact: true })).toBeEnabled();
   });
 
   test('keyboard: focus + Enter opens the first row, Space opens, the active row survives a send re-sort', async ({ page }, testInfo) => {
@@ -844,8 +847,8 @@ test.describe('Client portal — Messages split view', () => {
     await expect(page.locator(`[data-mrow="proj:${PID}"]`)).toHaveAttribute('aria-selected', 'true');
     // a send re-sorts the list — the active row must still be THIS conversation
     const pane = page.locator('#mpane');
-    await pane.getByLabel('Message your studio').fill('Ready for round two');
-    await pane.getByRole('button', { name: 'Send' }).click();
+    await pane.getByLabel('Write to Your studio').fill('Ready for round two');
+    await pane.getByRole('button', { name: 'Send', exact: true }).click();
     await expect(page.locator('#mrows [role="option"]').first()).toContainText('Website redesign'); // re-sorted to the top
     await expect(rows).toHaveAttribute('aria-activedescendant', `mrow-proj_${PID}`);
     await expect(page.locator(`[data-mrow="proj:${PID}"]`)).toHaveClass(/kfocus/);
@@ -1174,40 +1177,45 @@ const REQ_API = {
   '/book/site-1/types': { data: { enabled: true, intro: 'Pick a time that suits you.', max_days_ahead: 30,
     types: [{ id: 'bt1', name: 'Intro call', duration_min: 30, price_text: '', description: '' }] } },
 };
+// item 179 part three: the old Requests tab folded into Messages — Book a call and
+// Ask for a service are the two doors at the top of the list, a service ask comes
+// back as a conversation, and Something else? starts a request of its own (the
+// Nov 8 walk: never folded into an older conversation). The name stays: this is
+// where a client asks for things now, the services page inside Messages.
 const openRequestsTab = async (page: import('@playwright/test').Page) => {
-  await page.locator('#tabnav [data-tab="requests"]').click();
-  await expect(page.locator('#main').getByRole('heading', { name: 'Requests', exact: true })).toBeVisible();
+  await openMessagesTab(page);
+  await page.locator('#msvc').click();
+  await expect(page.locator('#main').getByRole('heading', { name: 'Ask for a service' })).toBeVisible();
 };
 
-test.describe('Client portal — Requests tab (slice 11)', () => {
-  test('quick-action tiles render, and Book a call round-trips into the booking flow', async ({ page }) => {
+test.describe('Client portal — Ask for a service and Book a call, inside Messages (item 179 part three)', () => {
+  test('Messages carries the two doors, and Book a call round-trips into the booking flow and back', async ({ page }) => {
     await installApp(page, { api: REQ_API });
     await page.goto('/client.html');
-    await openRequestsTab(page);
-    await expect(page.locator('.acttile')).toHaveCount(2);
-    await expect(page.locator('#bookCall')).toContainText('Book a call');
-    await expect(page.locator('#newReq')).toContainText('Something else?');
-    // the tile drives the EXISTING openBooking flow: /client/book resolves the
-    // site, /book/<site>/types lists the studio's bookable services
-    await page.locator('#bookCall').click();
+    await openMessagesTab(page);
+    await expect(page.locator('#mbook')).toContainText('Book a call');
+    await expect(page.locator('#msvc')).toContainText('Ask for a service');
+    await page.locator('#mbook').click();
     await expect(page.getByRole('heading', { name: 'Book a call' })).toBeVisible();
     await expect(page.getByText('Pick a time that suits you.')).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Intro call' })).toBeVisible();
-    // and the back link lands on the Requests tab again
-    await page.getByRole('link', { name: '← Back to requests' }).click();
-    await expect(page.locator('.acttile')).toHaveCount(2);
+    await page.getByRole('link', { name: '‹ Messages' }).click();
+    await expect(page.locator('#mrows')).toBeVisible();
+    await expect(page.locator('#tabnav [data-tab="messages"]')).toHaveAttribute('aria-current', 'page');
   });
 
-  test('the Something-else tile opens the free-form message flow (openSupport)', async ({ page }) => {
+  test('Something else? on the services page starts a request with its own subject, and Back returns to the services', async ({ page }) => {
     await installApp(page, { api: REQ_API });
     await page.goto('/client.html');
     await openRequestsTab(page);
-    await page.locator('#newReq').click();
+    await page.locator('#svcwrite').click();
     await expect(page.getByRole('heading', { name: 'Message your studio' })).toBeVisible();
     await expect(page.getByLabel('Subject')).toBeVisible();
+    await page.getByRole('link', { name: '← Back' }).click();
+    await expect(page.locator('#main').getByRole('heading', { name: 'Ask for a service' })).toBeVisible();
   });
 
-  test('the service catalog is a card grid: category chip, name, price — Request this opens the brief and POSTs it', async ({ page }) => {
+  test('the service catalog is a card grid: category chip, name, price — Ask for this opens the brief, POSTs it, and the ask opens in Messages', async ({ page }) => {
     await installApp(page, { api: REQ_API });
     // the list fixture serves GET /client/support; the brief POST needs a created id back
     await page.route('**/functions/v1/presence/client/support', (route) =>
@@ -1224,8 +1232,7 @@ test.describe('Client portal — Requests tab (slice 11)', () => {
     await expect(card.locator('.svcprice')).toHaveText('From $800');
     // a category-less service simply has no chip
     await expect(grid.locator('.card', { hasText: 'Extra page' }).locator('.kchip')).toHaveCount(0);
-    // Request this → the EXISTING structured-brief flow, unchanged payload
-    await card.getByRole('button', { name: 'Request this — Brand refresh' }).click();
+    await card.getByRole('button', { name: 'Ask for this — Brand refresh' }).click();
     await expect(page.getByRole('heading', { name: 'Request: Brand refresh' })).toBeVisible();
     await page.getByLabel('What do you need?').fill('A softer palette.');
     const post = page.waitForRequest((r) => r.method() === 'POST' && /\/client\/support$/.test(new URL(r.url()).pathname));
@@ -1235,172 +1242,18 @@ test.describe('Client portal — Requests tab (slice 11)', () => {
       brief: { need: 'A softer palette.', timeline: '', budget: '' },
     });
     await expect(page.locator('#toast')).toContainText('Sent — your studio will review');
-  });
-
-  test('the requests list is a list view: whole-row buttons with icon, Updated meta, status chip', async ({ page }) => {
-    await installApp(page, { api: REQ_API });
-    await page.goto('/client.html');
-    await openRequestsTab(page);
-    const listHost = page.locator('#reqlist');
-    // default filter: Open — the resolved request is not shown
-    await expect(page.locator('#reqFilterOpen')).toHaveAttribute('aria-pressed', 'true');
-    await expect(page.locator('#reqFilterAll')).toHaveAttribute('aria-pressed', 'false');
-    await expect(listHost.locator('.reqrow')).toHaveCount(2);
-    await expect(listHost.getByText('Copy fixes')).toHaveCount(0);
-    const row = listHost.locator('.reqrow', { hasText: 'Logo tweak' });
-    await expect(row.locator('.qico')).toHaveAttribute('aria-hidden', 'true');
-    // the meta is the honest "Updated <rel>" and its recency SOURCE is
-    // last_activity_at: this row's own updated_at is Jun 20 — the meta must
-    // read the activity stamp (Jul 1). No last-actor field in the payload,
-    // so no "your studio replied" claim either.
-    await expect(row.locator('.reqmeta')).toHaveText('Updated Jul 1');
-    await expect(listHost.locator('.reqrow', { hasText: 'New headshots' }).locator('.reqmeta')).toHaveText('Updated Jun 25');
-    await expect(row.locator('.schip')).toHaveText('open');
-    await expect(listHost.locator('.reqrow', { hasText: 'New headshots' }).locator('.schip')).toHaveText('in progress');
-    // freshest ACTIVITY first — the fixture arrives in backend updated_at order
-    // (New headshots first); the page must lead with Logo tweak (activity Jul 1)
-    await expect(listHost.locator('.reqrow').nth(0)).toContainText('Logo tweak');
-    await expect(listHost.locator('.reqrow').nth(1)).toContainText('New headshots');
-    // All shows everything, with the resolved row in the "done" (good) styling
-    await page.locator('#reqFilterAll').click();
-    await expect(page.locator('#reqFilterAll')).toHaveAttribute('aria-pressed', 'true');
-    await expect(page.locator('#reqFilterOpen')).toHaveAttribute('aria-pressed', 'false');
-    await expect(listHost.locator('.reqrow')).toHaveCount(3);
-    // …still in activity order, resolved (oldest activity) last
-    await expect(listHost.locator('.reqrow').nth(0)).toContainText('Logo tweak');
-    await expect(listHost.locator('.reqrow').nth(2)).toContainText('Copy fixes');
-    const done = listHost.locator('.reqrow', { hasText: 'Copy fixes' });
-    await expect(done.locator('.schip.done')).toHaveText('resolved');
-    await expect(done.locator('.qico.done')).toBeVisible();
-    // back to Open — the filter is a pure client-side toggle
-    await page.locator('#reqFilterOpen').click();
-    await expect(listHost.locator('.reqrow')).toHaveCount(2);
-  });
-
-  test('an older function build (rows without last_activity_at) falls back to updated_at for meta AND order', async ({ page }) => {
-    await installApp(page, { api: { ...REQ_API, '/client/support': { data: [
-      { id: SUP_PROG, subject: 'New headshots', status: 'in_progress', project_id: null, updated_at: '2026-06-25T00:00:00Z' },
-      { id: SUP_GEN, subject: 'Logo tweak', status: 'open', project_id: null, updated_at: '2026-06-20T00:00:00Z' },
-    ] } } });
-    await page.goto('/client.html');
-    await openRequestsTab(page);
-    const listHost = page.locator('#reqlist');
-    await expect(listHost.locator('.reqrow', { hasText: 'New headshots' }).locator('.reqmeta')).toHaveText('Updated Jun 25');
-    await expect(listHost.locator('.reqrow', { hasText: 'Logo tweak' }).locator('.reqmeta')).toHaveText('Updated Jun 20');
-    await expect(listHost.locator('.reqrow').nth(0)).toContainText('New headshots');
-  });
-
-  test('all-resolved: the filter defaults to All so the list is never mysteriously empty', async ({ page }) => {
-    await installApp(page, { api: { ...REQ_API, '/client/support': { data: [
-      { id: SUP_PRJ, subject: 'Copy fixes', status: 'resolved', project_id: PID, updated_at: '2026-07-04T00:00:00Z' },
-    ] } } });
-    await page.goto('/client.html');
-    await openRequestsTab(page);
-    await expect(page.locator('#reqFilterAll')).toHaveAttribute('aria-pressed', 'true');
-    await expect(page.locator('#reqlist .reqrow', { hasText: 'Copy fixes' })).toBeVisible();
-    // Open is still reachable and says so honestly
-    await page.locator('#reqFilterOpen').click();
-    await expect(page.locator('#reqlist .reqrow')).toHaveCount(0);
-    await expect(page.locator('#reqlist')).toContainText('No open requests');
-  });
-
-  test('a request row opens its thread in the Messages reading pane', async ({ page }) => {
-    await installApp(page, { api: REQ_API });
-    await page.goto('/client.html');
-    await openRequestsTab(page);
-    await page.locator('#reqlist .reqrow', { hasText: 'Logo tweak' }).click();
-    // openMessagesTo: the Messages tab activates with the thread in the pane
+    // the answer comes back as a conversation: Messages opens with it
     await expect(page.locator('#tabnav [data-tab="messages"]')).toHaveAttribute('aria-current', 'page');
-    await expect(page.locator('#mpane')).toContainText('Could we nudge the logo left?');
-  });
-
-  test('no requests yet: the calm empty state, no filter chips', async ({ page }) => {
-    await installApp(page, { api: { ...REQ_API, '/client/support': { data: [] } } });
-    await page.goto('/client.html');
+    await expect(page.locator('#mpane .mpname')).toHaveText('Logo tweak');
+    // and back from the brief goes to the services page
     await openRequestsTab(page);
-    await expect(page.getByText('You haven’t made any requests yet.', { exact: false })).toBeVisible();
-    await expect(page.locator('.reqfilter')).toHaveCount(0);
-    await expect(page.locator('#reqlist')).toHaveCount(0);
-  });
-
-  // ── failure honesty: a failed read must NEVER render the empty-state copy ──
-  test('a 502 on the requests read shows the couldn’t-load line — never the empty state', async ({ page }) => {
-    await installApp(page, { api: REQ_API });
-    await page.route('**/functions/v1/presence/client/support', (route) =>
-      route.request().method() === 'GET'
-        ? route.fulfill({ status: 502, contentType: 'application/json', body: JSON.stringify({ error: 'bad_gateway' }) })
-        : route.fallback());
-    await page.goto('/client.html');
-    await openRequestsTab(page);
-    await expect(page.getByText('We couldn’t load your requests just now — please try again in a moment.')).toBeVisible();
-    await expect(page.getByText('You haven’t made any requests yet.', { exact: false })).toHaveCount(0);
-    await expect(page.locator('.reqfilter')).toHaveCount(0);
-    // the services read succeeded — that section still renders fully
-    await expect(page.locator('.svcgrid .card')).toHaveCount(3);
-  });
-
-  test('a 502 on the services read shows the couldn’t-load line — never the no-services copy', async ({ page }) => {
-    await installApp(page, { api: REQ_API });
-    await page.route('**/functions/v1/presence/client/services', (route) =>
-      route.fulfill({ status: 502, contentType: 'application/json', body: JSON.stringify({ error: 'bad_gateway' }) }));
-    await page.goto('/client.html');
-    await openRequestsTab(page);
-    await expect(page.getByText('We couldn’t load your studio’s services just now — please try again in a moment.')).toBeVisible();
-    await expect(page.getByText('hasn’t listed services here yet', { exact: false })).toHaveCount(0);
-    // the requests read succeeded — the list still renders
-    await expect(page.locator('#reqlist .reqrow')).toHaveCount(2);
-  });
-
-  // ── booking-flow depth: date → slots → confirm → the exact POST payload ──
-  test('booking depth: pick a day, pick a slot, confirm — the POST carries {type_id, slot_start, name, email}', async ({ page }) => {
-    const SLOT = '2026-08-01T10:00:00Z';
-    await installApp(page, { api: { ...REQ_API,
-      '/book/site-1/slots': { data: { slots: [SLOT, '2026-08-01T11:00:00Z'] } },
-    } });
-    await page.goto('/client.html');
-    await openRequestsTab(page);
-    await page.locator('#bookCall').click();
-    await page.getByRole('button', { name: 'Choose' }).click();
-    await expect(page.getByRole('heading', { name: 'Intro call' })).toBeVisible();
-    // pick a day — the change handler refetches slots for THAT date
-    const day = new Date(Date.now() + 3 * 86400000).toISOString().slice(0, 10);
-    const slotsReq = page.waitForRequest((r) => r.url().includes('/book/site-1/slots') && r.url().includes(`date=${day}`));
-    await page.locator('#bk-date').fill(day);
-    await slotsReq;
-    // slots render as time buttons; picking one opens the confirm step
-    await page.getByRole('button', { name: '10:00' }).click();
-    await expect(page.getByRole('heading', { name: 'Confirm your booking' })).toBeVisible();
-    await page.getByLabel('Your name').fill('Sam Client');
-    await page.getByLabel('Email').fill('sam@example.com');
-    const post = page.waitForRequest((r) => r.method() === 'POST' && /\/book\/site-1$/.test(new URL(r.url()).pathname));
-    await page.getByRole('button', { name: 'Book it' }).click();
-    expect((await post).postDataJSON()).toEqual({ type_id: 'bt1', slot_start: SLOT, name: 'Sam Client', email: 'sam@example.com' });
-    // the booked screen + its back link land on the Requests tab again
-    await expect(page.getByRole('heading', { name: /You’re booked/ })).toBeVisible();
-    await page.getByRole('link', { name: '← Back to requests' }).click();
-    await expect(page.locator('.acttile')).toHaveCount(2);
-  });
-
-  test('booking fallback: no bookable site → the calm not-set-up state, back to requests', async ({ page }) => {
-    await installApp(page, { api: { ...REQ_API, '/client/book': { data: {} } } });
-    await page.goto('/client.html');
-    await openRequestsTab(page);
-    await page.locator('#bookCall').click();
-    await expect(page.getByText('Online booking isn’t set up yet', { exact: false })).toBeVisible();
-    await page.getByRole('link', { name: '← Back to requests' }).click();
-    await expect(page.locator('.acttile')).toHaveCount(2);
-  });
-
-  test('booking fallback: engine disabled / no types → the no-times state', async ({ page }) => {
-    await installApp(page, { api: { ...REQ_API, '/book/site-1/types': { data: { enabled: false } } } });
-    await page.goto('/client.html');
-    await openRequestsTab(page);
-    await page.locator('#bookCall').click();
-    await expect(page.getByText('hasn’t opened any times for booking yet', { exact: false })).toBeVisible();
+    await page.getByRole('button', { name: 'Ask for this — Extra page' }).click();
+    await page.getByRole('link', { name: '‹ Ask for a service' }).click();
+    await expect(page.locator('#main').getByRole('heading', { name: 'Ask for a service' })).toBeVisible();
   });
 
   // ── degraded (non-UUID) service ids ride the POST untouched ──
-  test('Request this on the custom and svc:0 cards POSTs their non-UUID ids as-is', async ({ page }) => {
+  test('Ask for this on the custom and svc:0 cards POSTs their non-UUID ids as-is', async ({ page }) => {
     await installApp(page, { api: REQ_API });
     await page.route('**/functions/v1/presence/client/support', (route) =>
       route.request().method() === 'POST'
@@ -1408,7 +1261,7 @@ test.describe('Client portal — Requests tab (slice 11)', () => {
         : route.fallback());
     await page.goto('/client.html');
     await openRequestsTab(page);
-    await page.getByRole('button', { name: 'Request this — Custom request' }).click();
+    await page.getByRole('button', { name: 'Ask for this — Custom request' }).click();
     await page.getByLabel('What do you need?').fill('Something bespoke.');
     let post = page.waitForRequest((r) => r.method() === 'POST' && /\/client\/support$/.test(new URL(r.url()).pathname));
     await page.getByRole('button', { name: 'Send request' }).click();
@@ -1416,8 +1269,9 @@ test.describe('Client portal — Requests tab (slice 11)', () => {
       subject: 'Service request: Custom request', service: 'custom',
       brief: { need: 'Something bespoke.', timeline: '', budget: '' },
     });
-    // success re-renders the Requests view — the next card is right there
-    await page.getByRole('button', { name: 'Request this — Extra page' }).click();
+    await expect(page.locator('#mrows')).toBeVisible();
+    await page.locator('#msvc').click();
+    await page.getByRole('button', { name: 'Ask for this — Extra page' }).click();
     await page.getByLabel('What do you need?').fill('One more page please.');
     post = page.waitForRequest((r) => r.method() === 'POST' && /\/client\/support$/.test(new URL(r.url()).pathname));
     await page.getByRole('button', { name: 'Send request' }).click();
@@ -1433,7 +1287,7 @@ test.describe('Client portal — Requests tab (slice 11)', () => {
     page.on('request', (r) => { if (r.method() === 'POST' && /\/client\/support$/.test(new URL(r.url()).pathname)) posts++; });
     await page.goto('/client.html');
     await openRequestsTab(page);
-    await page.getByRole('button', { name: 'Request this — Brand refresh' }).click();
+    await page.getByRole('button', { name: 'Ask for this — Brand refresh' }).click();
     await page.getByRole('button', { name: 'Send request' }).click();
     await expect(page.locator('#toast')).toContainText('Tell your studio what you need first.');
     expect(posts).toBe(0);
@@ -1448,7 +1302,7 @@ test.describe('Client portal — Requests tab (slice 11)', () => {
         : route.fallback());
     await page.goto('/client.html');
     await openRequestsTab(page);
-    await page.getByRole('button', { name: 'Request this — Brand refresh' }).click();
+    await page.getByRole('button', { name: 'Ask for this — Brand refresh' }).click();
     await page.getByLabel('What do you need?').fill('A softer palette.');
     await page.getByRole('button', { name: 'Send request' }).click();
     await expect(page.locator('#toast')).toContainText('That didn’t send — please try again.');
@@ -1456,86 +1310,101 @@ test.describe('Client portal — Requests tab (slice 11)', () => {
     await expect(page.getByLabel('What do you need?')).toHaveValue('A softer palette.');
   });
 
-  // ── "Something else?" round-trips to the Requests tab (back AND success) ──
-  test('Something else? returns to Requests on back and after a successful send — never strands on Home', async ({ page }) => {
+  test('a 502 on the services read shows the couldn’t-load line — never the no-services copy', async ({ page }) => {
     await installApp(page, { api: REQ_API });
+    await page.route('**/functions/v1/presence/client/services', (route) => route.fulfill({ status: 502, contentType: 'application/json', body: '{}' }));
     await page.goto('/client.html');
     await openRequestsTab(page);
-    await page.locator('#newReq').click();
-    await expect(page.getByRole('heading', { name: 'Message your studio' })).toBeVisible();
-    // back → the Requests tab, not Home
-    await page.getByRole('link', { name: '← Back' }).click();
-    await expect(page.locator('.acttile')).toHaveCount(2);
-    await expect(page.getByRole('heading', { name: 'Needs you' })).toHaveCount(0);
-    // and a successful send lands back on Requests too
-    await page.locator('#newReq').click();
-    await page.getByLabel('Subject').fill('A quick question');
-    await page.getByLabel('What do you need?').fill('Can we add a testimonial?');
-    await page.getByRole('button', { name: 'Send' }).click();
-    await expect(page.locator('#toast')).toContainText('Sent — your studio will get back to you.');
-    await expect(page.locator('.acttile')).toHaveCount(2);
-    await expect(page.locator('#tabnav [data-tab="requests"]')).toHaveAttribute('aria-current', 'page');
-    await expect(page.getByRole('heading', { name: 'Needs you' })).toHaveCount(0);
+    await expect(page.getByText('We couldn’t load your studio’s services just now — please try again in a moment.')).toBeVisible();
+    await expect(page.getByText('hasn’t listed services here yet', { exact: false })).toHaveCount(0);
+    await expect(page.locator('#svcwrite')).toBeVisible();   // Write still works
   });
 
-  // ── the Open/All chips are pure client-side, and the choice persists ──
-  test('chip clicks trigger zero refetches, and the All choice survives tab-away/back', async ({ page }) => {
-    await installApp(page, { api: REQ_API });
-    let supportGets = 0;
-    await page.route('**/functions/v1/presence/client/support', (route) => {
-      if (route.request().method() === 'GET') supportGets++;
-      return route.fallback();
-    });
+  test('booking depth: the next days as buttons, a slot, confirm — the POST carries {type_id, slot_start, name, email}', async ({ page }) => {
+    const SLOT = '2026-08-01T10:00:00Z';
+    await installApp(page, { api: { ...REQ_API,
+      '/book/site-1/slots': { data: { slots: [SLOT, '2026-08-01T11:00:00Z'] } },
+    } });
     await page.goto('/client.html');
-    await openRequestsTab(page);
-    await expect(page.locator('#reqlist .reqrow')).toHaveCount(2);
-    expect(supportGets).toBe(1);
-    await page.locator('#reqFilterAll').click();
-    await expect(page.locator('#reqlist .reqrow')).toHaveCount(3);
-    await page.locator('#reqFilterOpen').click();
-    await expect(page.locator('#reqlist .reqrow')).toHaveCount(2);
-    await page.locator('#reqFilterAll').click();
-    await expect(page.locator('#reqlist .reqrow')).toHaveCount(3);
-    expect(supportGets).toBe(1);   // filtering never refetched
-    // tab away and back — the explicit All choice persists for the session
-    await page.locator('#tabnav [data-tab="messages"]').click();
+    await openMessagesTab(page);
+    await page.locator('#mbook').click();
+    await page.getByRole('button', { name: 'Choose' }).click();
+    await expect(page.getByRole('heading', { name: 'Intro call' })).toBeVisible();
+    // the next days are buttons; tomorrow is picked, and a day button reads its own slots
+    const days = page.locator('[data-bkday]');
+    await expect(days).toHaveCount(7);
+    await expect(days.first()).toHaveAttribute('aria-pressed', 'true');
+    const third = await days.nth(2).getAttribute('data-bkday');
+    let slotsReq = page.waitForRequest((r) => r.url().includes('/book/site-1/slots') && r.url().includes(`date=${third}`));
+    await days.nth(2).click();
+    await slotsReq;
+    await expect(days.nth(2)).toHaveAttribute('aria-pressed', 'true');
+    // any other day still goes through the date box
+    const day = new Date(Date.now() + 12 * 86400000).toISOString().slice(0, 10);
+    slotsReq = page.waitForRequest((r) => r.url().includes('/book/site-1/slots') && r.url().includes(`date=${day}`));
+    await page.locator('#bk-date').fill(day);
+    await slotsReq;
+    await page.getByRole('button', { name: '10:00' }).click();
+    await expect(page.getByRole('heading', { name: 'Confirm your booking' })).toBeVisible();
+    await page.getByLabel('Your name').fill('Sam Client');
+    await page.getByLabel('Email').fill('sam@example.com');
+    const post = page.waitForRequest((r) => r.method() === 'POST' && /\/book\/site-1$/.test(new URL(r.url()).pathname));
+    await page.getByRole('button', { name: 'Book it' }).click();
+    expect((await post).postDataJSON()).toEqual({ type_id: 'bt1', slot_start: SLOT, name: 'Sam Client', email: 'sam@example.com' });
+    await expect(page.getByRole('heading', { name: /You’re booked/ })).toBeVisible();
+    await page.getByRole('link', { name: '‹ Messages' }).click();
     await expect(page.locator('#mrows')).toBeVisible();
-    await openRequestsTab(page);
-    await expect(page.locator('#reqFilterAll')).toHaveAttribute('aria-pressed', 'true');
-    await expect(page.locator('#reqlist .reqrow')).toHaveCount(3);
   });
 
-  // NOTE: the two former "reviewer" cases here fed a reviewer populated 200s on
-  // /client/services + /client/support — a world the persona can NEVER see
-  // (reviewerAllowed() 403s both, workspace.ts:31). Batch A (finding A2) made the
-  // Requests tab gate the reviewer BEFORE any fetch, so the honest contract now
-  // lives in "Batch A regressions — portal › A2" below (calm card, zero /client/*
-  // reads), which also carries the zero-tiles / zero-Request-buttons guards.
+  test('booking fallback: no bookable site → the calm not-set-up state, back to Messages', async ({ page }) => {
+    await installApp(page, { api: { ...REQ_API, '/client/book': { data: {} } } });
+    await page.goto('/client.html');
+    await openMessagesTab(page);
+    await page.locator('#mbook').click();
+    await expect(page.getByText('Online booking isn’t set up yet', { exact: false })).toBeVisible();
+    await page.getByRole('link', { name: '‹ Messages' }).click();
+    await expect(page.locator('#mrows')).toBeVisible();
+  });
 
-  test('mobile: the tiles and service cards stack in one column, no horizontal overflow', async ({ page }, testInfo) => {
+  test('booking fallback: engine disabled / no types → the no-times state', async ({ page }) => {
+    await installApp(page, { api: { ...REQ_API, '/book/site-1/types': { data: { enabled: false } } } });
+    await page.goto('/client.html');
+    await openMessagesTab(page);
+    await page.locator('#mbook').click();
+    await expect(page.getByText('hasn’t opened any times for booking yet', { exact: false })).toBeVisible();
+  });
+
+  test('an old #requests link lands in Messages; the tab bar has five tabs', async ({ page }) => {
+    await installApp(page, { api: REQ_API });
+    await page.goto('/client.html#requests');
+    await expect(page.locator('#mrows')).toBeVisible();
+    await expect(page.locator('#tabnav [data-tab="messages"]')).toHaveAttribute('aria-current', 'page');
+    await expect(page.locator('#tabnav .tab')).toHaveCount(5);
+    await expect(page.locator('#tabnav [data-tab="requests"]')).toHaveCount(0);
+  });
+
+  test('mobile: the two doors sit side by side, the service cards stack, no horizontal overflow', async ({ page }, testInfo) => {
     test.skip(testInfo.project.name !== 'mobile', 'the stacked layout is the <720px contract');
     await installApp(page, { api: REQ_API });
     await page.goto('/client.html');
-    await openRequestsTab(page);
-    // the tiles stack: the second tile sits BELOW the first
-    const tiles = page.locator('.acttile');
-    const t0 = await tiles.nth(0).boundingBox(); const t1 = await tiles.nth(1).boundingBox();
-    expect(t1!.y).toBeGreaterThan(t0!.y + t0!.height - 1);
-    // the service cards stack too
+    await openMessagesTab(page);
+    const b = await page.locator('#mbook').boundingBox(); const s = await page.locator('#msvc').boundingBox();
+    expect(Math.abs(b!.y - s!.y)).toBeLessThan(2);
+    expect(s!.x).toBeGreaterThan(b!.x + b!.width - 1);
+    await page.locator('#msvc').click();
     const cards = page.locator('.svcgrid .card');
     const c0 = await cards.nth(0).boundingBox(); const c1 = await cards.nth(1).boundingBox();
     expect(c1!.y).toBeGreaterThan(c0!.y + c0!.height - 1);
-    await expect(page.locator('#reqlist .reqrow').first()).toBeVisible();
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
     expect(overflow).toBeLessThanOrEqual(1);
   });
 
-  test('no serious/critical axe violations on the Requests tab', async ({ page }, testInfo) => {
+  test('no serious/critical axe violations on the services page', async ({ page }, testInfo) => {
     test.skip(testInfo.project.name !== 'desktop-chromium', 'axe once, on desktop');
     await installApp(page, { api: REQ_API });
     await page.goto('/client.html');
     await openRequestsTab(page);
-    await expect(page.locator('#reqlist .reqrow').first()).toBeVisible();
+    await expect(page.locator('.svcgrid .card').first()).toBeVisible();
     const results = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa']).analyze();
     const serious = results.violations.filter((v) => v.impact === 'serious' || v.impact === 'critical');
     expect(serious.map((v) => `${v.id}: ${v.nodes.map((n) => n.target).join(' | ')}`)).toEqual([]);
@@ -2028,7 +1897,7 @@ test.describe('Client portal — Files tab (slice 12)', () => {
 // the drill-in support thread attributes by the server `from` field — a studio
 // reply whose author_kind resolves to 'client' must never render as "You".
 test.describe('Batch A regressions — portal', () => {
-  test('A2 — reviewer Requests: calm state, no /client/support or /client/services fetches', async ({ page }) => {
+  test('A2 — reviewer Messages (item 179: Requests folded in): calm state, no /client/support or /client/services fetches', async ({ page }) => {
     const calls: string[] = [];
     await installApp(page, { api: {
       '/portal/context': REVIEWER_CTX,
@@ -2038,15 +1907,13 @@ test.describe('Batch A regressions — portal', () => {
       if (r.url().includes('/client/support') || r.url().includes('/client/services')) calls.push(r.url());
     });
     await page.goto('/client.html');
-    await page.locator('#tabnav [data-tab="requests"]').click();
-    await expect(page.getByText('Your studio’s services will appear here once they’ve set up your account.')).toBeVisible();
+    await page.locator('#tabnav [data-tab="messages"]').click();
+    await expect(page.getByText('Your studio will reach you here. Messaging opens up once they’ve set up your account.')).toBeVisible();
     // never the couldn't-load cards…
     await expect(page.getByText('We couldn’t load', { exact: false })).toHaveCount(0);
-    // …the reviewer gets NO way to act: no catalog cards, no Request buttons, no
-    // quick-action tiles (the early persona gate renders none of the acting UI)…
-    await expect(page.locator('.svcgrid .card')).toHaveCount(0);
-    await expect(page.getByRole('button', { name: /Request this/ })).toHaveCount(0);
-    await expect(page.locator('.acttile')).toHaveCount(0);
+    // …the reviewer gets NO way to act: no Write, no Book a call, no Ask for a service
+    // (the early persona gate renders none of the acting UI)…
+    await expect(page.locator('#mnew, #mbook, #msvc')).toHaveCount(0);
     // …and no reviewer-doomed /client/* reads were fired at all
     expect(calls).toHaveLength(0);
   });
@@ -2090,15 +1957,14 @@ test.describe('Batch A regressions — portal', () => {
         messages: [{ id: 'x1', body: 'Fixed — take a look.', author_kind: 'client', from: 'studio', created_at: '2026-07-04T00:00:00Z' }],
       } },
     } });
-    await page.goto(`/client.html?project=${PID}`);
-    // PS6: the support section is reqRowHtml queue-rows — the whole row opens the thread
-    await page.locator('#sec-support [data-sup]').click();
-    const thread = page.locator('#sthread');
-    const reply = thread.locator('.ti').filter({ hasText: 'Fixed — take a look.' });
-    await expect(reply).toContainText('Your studio replied');
-    await expect(reply).not.toContainText('You replied');
-    // the request body itself stays the client's own ("You opened this request")
-    await expect(thread.locator('.ti').filter({ hasText: 'Some typos on the About page.' })).toContainText('You opened this request');
+    // item 179 part three: every request lives in Messages — the deep link opens it there
+    await page.goto(`/client.html?support=${SUP_PRJ}`);
+    const thread = page.locator('#mpane');
+    const reply = thread.locator('.cmsg').filter({ hasText: 'Fixed — take a look.' });
+    await expect(reply).toContainText('Your studio: ');
+    await expect(reply).not.toHaveClass(/\bme\b/);
+    // the request body itself stays the client's own
+    await expect(thread.locator('.cmsg.me').filter({ hasText: 'Some typos on the About page.' })).toContainText('You: ');
   });
 });
 
@@ -2230,7 +2096,7 @@ test.describe('PS1 — failed-read honesty (portal)', () => {
     await page.locator('#tabnav [data-tab="messages"]').click();
     await expect(page.locator('#mrows')).toBeVisible();
     // the list head says so, calmly…
-    await expect(page.getByText('We couldn’t check on support requests just now — please try again in a moment.')).toBeVisible();
+    await expect(page.getByText('We couldn’t check on your requests just now — please try again in a moment.')).toBeVisible();
     // …the project thread rows survive the support failure…
     await expect(page.locator(`[data-mrow="proj:${PID}"]`)).toBeVisible();
     // …and the empty-state copy never fires over a failed read
@@ -2655,7 +2521,7 @@ test.describe('PS3 — bell chrome + the three numbers (B6 core)', () => {
     test.skip(testInfo.project.name !== 'mobile', 'phone reachability is the <720px contract');
     await installApp(page, { api: CLIENT_API });
     await page.goto('/client.html');
-    for (const tab of ['home', 'messages', 'files', 'invoices', 'requests', 'help']) {
+    for (const tab of ['home', 'messages', 'files', 'invoices', 'help']) {   // five tabs since item 179 part three
       await page.locator(`#tabnav [data-tab="${tab}"]`).click();
       await expect(page.locator('#navbell'), `bell on ${tab}`).toBeVisible();
       await expect(page.locator('#navbell .badge'), `badge on ${tab}`).toHaveText('1');
@@ -2840,17 +2706,18 @@ test.describe('PS3 — bell chrome + the three numbers (B6 core)', () => {
     } });
     await page.goto('/client.html');
     await expect(page.getByRole('heading', { name: 'Needs you' })).toBeVisible();
-    // the tour names Messages/Files/Invoices/Requests — tabs a reviewer's
+    // the tour names Messages/Files/Invoices — tabs a reviewer's
     // persona renders as calm empty states; don't tour what they can't use
     await expect(page.locator('#welcome')).toHaveCount(0);
     await expect(page.locator('.wl-step')).toHaveCount(0);
   });
 
-  test('…and a client still gets the four-step tour (the gate does not over-fire)', async ({ page }) => {
+  test('…and a client still gets the tour (the gate does not over-fire)', async ({ page }) => {
     await installApp(page, { api: CLIENT_API });
     await page.goto('/client.html');
     await expect(page.locator('#welcome')).toBeVisible();
-    await expect(page.locator('.wl-step')).toHaveCount(4);
+    // item 179 part three: Messages, Files, Invoices (Requests folded into Messages)
+    await expect(page.locator('.wl-step')).toHaveCount(3);
   });
 });
 
@@ -2982,8 +2849,8 @@ const BOOK_SLOT = '2026-08-01T10:00:00Z';
 const BOOK_API = { ...REQ_API, '/book/site-1/slots': { data: { date: '2026-08-01', duration_min: 30, slots: [BOOK_SLOT, '2026-08-01T11:00:00Z'] } } };
 const openBookingFlow = async (page: import('@playwright/test').Page) => {
   await page.goto('/client.html');
-  await openRequestsTab(page);
-  await page.locator('#bookCall').click();
+  await openMessagesTab(page);
+  await page.locator('#mbook').click();   // item 179 part three: Book a call is a door in Messages
 };
 
 test.describe('PS5 — booking flow honesty (B4)', () => {
@@ -3252,20 +3119,19 @@ test.describe('PS6 — project-record cohesion (B3)', () => {
     await expect(rail.locator('#msg')).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Needs your OK' })).toBeVisible();
     await expect(page.locator('#sec-files')).toContainText('Homepage mockup');
-    await expect(page.locator('#sec-support')).toBeVisible();
   });
 
-  test('failure matrix — a failed SUPPORT read: its calm line in sec-support, the CTA kept, the rail survives', async ({ page }) => {
+  test('item 179 part three — the record has no Support box and reads no requests; its link goes to Messages', async ({ page }) => {
     await installApp(page, { api: CLIENT_API });
-    await page.route('**/functions/v1/presence/client/support', (route) =>
-      route.request().method() === 'GET' ? fail500(route) : route.fallback());
+    let supportReads = 0;
+    page.on('request', (r) => { if (r.method() === 'GET' && /\/client\/support$/.test(new URL(r.url()).pathname)) supportReads++; });
     await page.goto(`/client.html?project=${PID}`);
     await expect(page.getByRole('heading', { name: 'Website redesign' })).toBeVisible();
-    const sup = page.locator('#sec-support');
-    await expect(sup.getByText('We couldn’t check on support requests just now — please try again in a moment.')).toBeVisible();
-    await expect(sup.getByRole('button', { name: 'Open a support request' })).toBeVisible();
-    // the rail's real thread survived the support failure
     await expect(page.locator('#ptl .ti.t-message .ti-body')).toHaveText('Welcome aboard!');
+    await expect(page.locator('#sec-support')).toHaveCount(0);
+    expect(supportReads).toBe(0);
+    await page.getByRole('link', { name: 'All your conversations →' }).click();
+    await expect(page.locator('#mrows')).toBeVisible();
   });
 
   test('failure matrix — a failed REPORT read: the tiles fall back to the bundle’s own facts, nothing else is lost', async ({ page }) => {
@@ -3397,13 +3263,12 @@ test.describe('PS6 — project-record cohesion (B3)', () => {
     await expect(sel).toHaveValue(P2);   // preselected to THIS record — not the list's first
   });
 
-  // ── support rows + focus management ──
-  test('drill-in Support: reqRowHtml queue-rows on last_activity_at recency — a fresh reply outranks a later-touched request', async ({ page }) => {
+  // ── requests in Messages + focus management ──
+  test('Messages: requests sort on last_activity_at recency — a fresh reply outranks a later-touched request (item 179 part three: they left the project page)', async ({ page }) => {
     const SA = '44444444-4444-4444-8444-444444444444', SB = '55555555-5555-4555-8555-555555555555';
     await installApp(page, { api: { ...CLIENT_API,
       // A was TOUCHED later (updated_at) but B has the fresher REPLY
-      // (last_activity_at) — recency must follow activity, matching each row's
-      // own "Updated …" meta and the Requests tab's order
+      // (last_activity_at) — recency must follow activity
       '/client/support': { data: [
         { id: SA, subject: 'Logo tweak', status: 'open', project_id: PID, updated_at: '2026-07-10T00:00:00Z', last_activity_at: '2026-07-08T00:00:00Z' },
         { id: SB, subject: 'Copy pass', status: 'open', project_id: PID, updated_at: '2026-07-05T00:00:00Z', last_activity_at: '2026-07-09T00:00:00Z' },
@@ -3413,17 +3278,18 @@ test.describe('PS6 — project-record cohesion (B3)', () => {
         messages: [],
       } },
     } });
-    await page.goto(`/client.html?project=${PID}`);
-    await expect(page.getByRole('heading', { name: 'Website redesign' })).toBeVisible();
-    const rows = page.locator('#sec-support .reqrow');
-    await expect(rows).toHaveCount(2);
-    await expect(rows.nth(0)).toContainText('Copy pass');   // freshest ACTIVITY first
-    await expect(rows.nth(1)).toContainText('Logo tweak');
-    await expect(rows.nth(0).locator('.schip')).toHaveText('open');
-    // the WHOLE row opens its thread — the project-scoped fallback view
-    await rows.nth(0).click();
-    await expect(page.locator('#main').getByRole('heading', { name: 'Copy pass' })).toBeVisible();
-    await expect(page.locator('#sthread')).toBeVisible();
+    await page.goto('/client.html');
+    await openMessagesTab(page);
+    await expect(page.locator('.mrow', { hasText: 'Logo tweak' })).toBeVisible();
+    const texts = await page.locator('#mrows [role="option"]').allInnerTexts();
+    const iB = texts.findIndex((t) => t.includes('Copy pass')), iA = texts.findIndex((t) => t.includes('Logo tweak'));
+    expect(iB).toBeGreaterThanOrEqual(0);
+    expect(iA).toBeGreaterThan(iB);   // freshest ACTIVITY first
+    // an open question wears no chip — only a service ask ("Asked") or a handled one ("Done") does
+    await expect(page.locator('.mrow', { hasText: 'Copy pass' }).locator('.schip')).toHaveCount(0);
+    // the WHOLE row opens its conversation
+    await page.locator('.mrow', { hasText: 'Copy pass' }).click();
+    await expect(page.locator('#mpane')).toContainText('A quick copy review?');
   });
 
   test('entry hands focus to the record h1 — every drill-in paint says where you are', async ({ page }) => {
@@ -3550,16 +3416,15 @@ test.describe('PS6 — project-record cohesion (B3)', () => {
     await expect(page.getByText('No conversations yet', { exact: false })).toHaveCount(0);
   });
 
-  // ── openSupportThread (the project-scoped fallback view) to the cross-cutting
-  // contract: VIEW_SEQ re-check + a caught throw → calm trouble card (never a
-  // stuck skeleton), a themed reply textarea, and a reply that repaints the
-  // thread IN PLACE (focus + scroll survive, no full-view re-run). ──
+  // ── openSupportThread (the stale-link fallback: a request id the Messages
+  // list doesn't hold) to the cross-cutting contract: VIEW_SEQ re-check + a
+  // caught throw → calm trouble card (never a stuck skeleton), a themed reply
+  // textarea, and a reply that repaints the thread IN PLACE (focus + scroll
+  // survive, no full-view re-run). ──
   const STID = '88888888-8888-4888-8888-888888888888';
   const STHREAD_API = {
     ...CLIENT_API,
-    '/client/support': { data: [
-      { id: STID, subject: 'Logo tweak', status: 'open', project_id: PID, updated_at: '2026-07-10T00:00:00Z', last_activity_at: '2026-07-10T00:00:00Z' },
-    ] },
+    '/client/support': { data: [] },   // the link names a request the list doesn't hold
     [`/client/support/${STID}`]: { data: {
       request: { id: STID, subject: 'Logo tweak', body: 'Could we nudge the logo left?', status: 'open', project_id: PID, created_at: '2026-07-05T00:00:00Z' },
       messages: [{ id: 'sm1', body: 'On it — new version tomorrow.', author_kind: 'staff', created_at: '2026-07-06T00:00:00Z' }],
@@ -3570,21 +3435,17 @@ test.describe('PS6 — project-record cohesion (B3)', () => {
     await installApp(page, { api: STHREAD_API });
     await page.route(`**/functions/v1/presence/client/support/${STID}`, (route) =>
       route.request().method() === 'GET' ? route.abort() : route.fallback());
-    await page.goto(`/client.html?project=${PID}`);
-    await expect(page.getByRole('heading', { name: 'Website redesign' })).toBeVisible();
-    await page.locator('#sec-support .reqrow').first().click();
+    await page.goto(`/client.html?support=${STID}`);
     await expect(page.getByText('We couldn’t load this request just now — please try again in a moment.')).toBeVisible();
     await expect(page.locator('.skel')).toHaveCount(0);   // the skeleton resolved, not stuck
-    // the Back link really returns to the project record
+    // the Back link really goes somewhere (Home: the request's project is unknown)
     await page.getByRole('link', { name: '← Back' }).click();
-    await expect(page.getByRole('heading', { name: 'Website redesign' })).toBeVisible();
+    await expect(page.locator('#tabnav [data-tab="home"]')).toHaveAttribute('aria-current', 'page');
   });
 
   test('openSupportThread — the reply textarea carries card/ink tokens + font:inherit (never white-on-dark)', async ({ page }) => {
     await installApp(page, { api: STHREAD_API });
-    await page.goto(`/client.html?project=${PID}`);
-    await expect(page.getByRole('heading', { name: 'Website redesign' })).toBeVisible();
-    await page.locator('#sec-support .reqrow').first().click();
+    await page.goto(`/client.html?support=${STID}`);
     await expect(page.locator('#main').getByRole('heading', { name: 'Logo tweak' })).toBeVisible();
     const style = await page.locator('#smsg').getAttribute('style');
     expect(style).toContain('background:var(--card)');
@@ -3611,12 +3472,11 @@ test.describe('PS6 — project-record cohesion (B3)', () => {
         messages,
       } }) });
     });
-    await page.goto(`/client.html?project=${PID}`);
-    await page.locator('#sec-support .reqrow').first().click();
+    await page.goto(`/client.html?support=${STID}`);
     await expect(page.locator('#main').getByRole('heading', { name: 'Logo tweak' })).toBeVisible();
     const ta = page.locator('#smsg');
     await ta.fill('Perfect, thank you.');
-    await page.getByRole('button', { name: 'Send' }).click();
+    await page.getByRole('button', { name: 'Send', exact: true }).click();
     // the reply lands in the thread via the surgical refetch…
     await expect(page.locator('#sthread')).toContainText('Perfect, thank you.');
     // …focus stays on the composer (a full view re-run drops it to the body)…
@@ -3721,16 +3581,16 @@ test.describe('PS7 — composer VIEW_SEQ + polish (B6 remainder)', () => {
     await installApp(page, { api: REQ_API });
     await page.goto('/client.html');
     await expect(page.getByRole('heading', { name: 'Needs you' })).toBeVisible();
-    // gate the Requests render's services read so that render stays IN FLIGHT
+    // gate the services page's read so that render stays IN FLIGHT
     let releaseSvc: (() => void) | null = null;
     const gate = new Promise<void>((res) => { releaseSvc = res; });
     await page.route('**/functions/v1/presence/client/services', async (route) => { await gate; return route.fallback(); });
-    // kick a stale Requests render (captures a token, paints a spinner, awaits the
-    // gated read) then open the brief composer OVER that spinner
-    await page.evaluate(() => { (window as any).showTab('requests'); (window as any).openServiceRequest({ id: 'svc-x', name: 'Brand refresh' }); });
+    // kick a stale Ask-for-a-service render (captures a token, paints a spinner,
+    // awaits the gated read) then open the brief composer OVER that spinner
+    await page.evaluate(() => { (window as any).openServices(); (window as any).openServiceRequest({ id: 'svc-x', name: 'Brand refresh' }); });
     await expect(page.getByRole('heading', { name: 'Request: Brand refresh' })).toBeVisible();
     await page.getByLabel('What do you need?').fill('A softer palette, please.');
-    releaseSvc!();   // the stale Requests render lands now
+    releaseSvc!();   // the stale services render lands now
     await page.waitForTimeout(400);
     // the composer + the half-typed brief survive — the stale render was dropped
     await expect(page.getByRole('heading', { name: 'Request: Brand refresh' })).toBeVisible();
@@ -3744,7 +3604,7 @@ test.describe('PS7 — composer VIEW_SEQ + polish (B6 remainder)', () => {
     let releaseSvc: (() => void) | null = null;
     const gate = new Promise<void>((res) => { releaseSvc = res; });
     await page.route('**/functions/v1/presence/client/services', async (route) => { await gate; return route.fallback(); });
-    await page.evaluate(() => { (window as any).showTab('requests'); (window as any).openSupport(null, 'requests'); });
+    await page.evaluate(() => { (window as any).openServices(); (window as any).openSupport(null, 'messages'); });
     await expect(page.getByRole('heading', { name: 'Message your studio' })).toBeVisible();
     await page.getByLabel('What do you need?').fill('A half-typed message.');
     releaseSvc!();
@@ -3756,8 +3616,9 @@ test.describe('PS7 — composer VIEW_SEQ + polish (B6 remainder)', () => {
   test('openSupport fields carry card/ink tokens + font:inherit, and entry focus lands on the subject', async ({ page }) => {
     await installApp(page, { api: REQ_API });
     await page.goto('/client.html');
-    await openRequestsTab(page);
-    await page.locator('#newReq').click();
+    await openMessagesTab(page);
+    // item 179 part three: the subject form is now only the call-ask fallback (Book a call with no booking link)
+    await page.evaluate(() => (window as any).openSupport(null, 'messages'));
     await expect(page.getByRole('heading', { name: 'Message your studio' })).toBeVisible();
     await expect.poll(() => page.evaluate(() => (document.activeElement && (document.activeElement as HTMLElement).id) || '')).toBe('sup-subj');
     for (const id of ['sup-subj', 'sup-body']) {
@@ -3772,7 +3633,7 @@ test.describe('PS7 — composer VIEW_SEQ + polish (B6 remainder)', () => {
     await installApp(page, { api: REQ_API });
     await page.goto('/client.html');
     await openRequestsTab(page);
-    await page.getByRole('button', { name: 'Request this — Brand refresh' }).click();
+    await page.getByRole('button', { name: 'Ask for this — Brand refresh' }).click();
     await expect(page.getByRole('heading', { name: 'Request: Brand refresh' })).toBeVisible();
     await expect.poll(() => page.evaluate(() => (document.activeElement && (document.activeElement as HTMLElement).id) || '')).toBe('sr-need');
   });
@@ -4004,26 +3865,39 @@ test.describe('Client portal — connect your Google (the studio asked)', () => 
 test.describe('Client portal walk fixes (Nov 2026)', () => {
   test('Something else? opens a NEW request — its subject is kept, never folded into an older conversation', async ({ page }) => {
     let posted: unknown = null;
-    await installApp(page, { api: REQ_API });
+    const NEW_ID = 'eeeeeeee-0000-4000-8000-000000000001';
+    const listed = (REQ_API['/client/support'] as { data: Array<Record<string, unknown>> }).data;
+    await installApp(page, { api: { ...REQ_API, [`/client/support/${NEW_ID}`]: { data: {
+      request: { id: NEW_ID, subject: 'A new page for events', body: 'Could we add an events page?', status: 'open', project_id: null, created_at: '2026-07-12T00:00:00Z' },
+      messages: [],
+    } } } });
     await page.route('**/functions/v1/presence/client/support', (route) => {
-      if (route.request().method() !== 'POST') return route.fallback();
+      if (route.request().method() !== 'POST') {
+        // once sent, the list holds it (newest activity first), as the server's does
+        const data = posted ? [{ id: NEW_ID, subject: 'A new page for events', status: 'open', project_id: null, updated_at: '2026-07-12T00:00:00Z', last_activity_at: '2026-07-12T00:00:00Z' }, ...listed] : listed;
+        return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data }) });
+      }
       posted = route.request().postDataJSON();
-      return route.fulfill({ status: 201, contentType: 'application/json', body: JSON.stringify({ data: { id: 'new-1' } }) });
+      return route.fulfill({ status: 201, contentType: 'application/json', body: JSON.stringify({ data: { id: NEW_ID } }) });
     });
     await page.goto('/client.html');
     await openRequestsTab(page);
-    await page.locator('#newReq').click();
+    await page.locator('#svcwrite').click();
     await page.getByLabel('Subject').fill('A new page for events');
     await page.getByLabel('What do you need?').fill('Could we add an events page?');
-    await page.getByRole('button', { name: 'Send' }).click();
+    await page.getByRole('button', { name: 'Send', exact: true }).click();
     await expect.poll(() => posted).toMatchObject({ subject: 'A new page for events', body: 'Could we add an events page?', new_request: true });
+    // item 179 part three: the new conversation opens in Messages
+    await expect(page.locator('#mrows')).toBeVisible();
+    await expect(page.locator('#mpane .mpname')).toHaveText('A new page for events');
+    await expect(page.locator('#mpane')).toContainText('Could we add an events page?');
   });
 
   test('Book a call with no open times offers Ask for a call, prefilled', async ({ page }) => {
     await installApp(page, { api: { ...REQ_API, '/book/site-1/types': { data: { enabled: false } } } });
     await page.goto('/client.html');
-    await openRequestsTab(page);
-    await page.locator('#bookCall').click();
+    await openMessagesTab(page);
+    await page.locator('#mbook').click();
     await expect(page.getByText('hasn’t opened any times for booking yet', { exact: false })).toBeVisible();
     await page.getByRole('button', { name: 'Ask for a call' }).click();
     await expect(page.getByRole('heading', { name: 'Message your studio' })).toBeVisible();
@@ -4043,9 +3917,13 @@ test.describe('Client portal walk fixes (Nov 2026)', () => {
   test('each tab names itself in the browser tab', async ({ page }) => {
     await installApp(page, { api: REQ_API });
     await page.goto('/client.html');
-    await openRequestsTab(page);
-    await expect(page).toHaveTitle('Requests — Your studio');
+    await page.locator('#tabnav [data-tab="files"]').click();
+    await expect(page).toHaveTitle('Files — Your studio');
     await page.locator('#tabnav [data-tab="messages"]').click();
+    await expect(page).toHaveTitle('Messages — Your studio');
+    // item 179 part three: an old #requests address lands on Messages
+    await page.goto('/client.html#requests');
+    await expect(page.locator('#mrows')).toBeVisible();
     await expect(page).toHaveTitle('Messages — Your studio');
   });
 
