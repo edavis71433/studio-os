@@ -62,11 +62,26 @@ export function undoPatch(current: Record<string, any>, changes: Record<string, 
 /** A note line naming an email the merged-away record wrote from, so it stays findable. */
 export const otherEmailNote = (email: string) => `Also wrote from ${email}`;
 
+/** Joined notes stop at this, like the notes box itself (routes/sales.ts keeps a contact's notes to 2,000). */
+export const MERGE_NOTES_MAX = 2000;
+/** Text cut to `max` characters at a word break, with "…" to show it was cut; how much went. */
+function cutNotes(text: string, max: number): { text: string; cut: number } {
+  if (text.length <= max) return { text, cut: 0 };
+  let end = max - 1;
+  const space = text.lastIndexOf(' ', end), nl = text.lastIndexOf('\n', end);
+  const br = Math.max(space, nl);
+  if (br > max - 60) end = br;
+  const kept = text.slice(0, end).replace(/\s+$/, '');
+  return { text: kept + '…', cut: text.length - kept.length };
+}
+
 /** Folding `other` into `keep`. `pick` says, per field, whether the other record's
  *  value wins ('other'); a field the kept record has empty takes the other's
- *  anyway. Tags and your own fields come from both, notes from both (the other's
- *  under a line naming it), and an email that isn't kept goes into the notes. */
-export function mergeValues(keep: Record<string, any>, other: Record<string, any>, pick: Partial<Record<MergePick, 'keep' | 'other'>> = {}): { values: Record<string, unknown>; conflict: string | null } {
+ *  anyway. Tags and your own fields come from both, notes from both, and an email
+ *  that isn't kept goes into the notes. Sales item 121: that email line goes FIRST,
+ *  so a cut never loses it, and `notesCut` says how many characters didn't fit
+ *  (0 when nothing was cut; the full notes stay on the record set aside, for Undo). */
+export function mergeValues(keep: Record<string, any>, other: Record<string, any>, pick: Partial<Record<MergePick, 'keep' | 'other'>> = {}): { values: Record<string, unknown>; conflict: string | null; notesCut: number } {
   const values: Record<string, unknown> = {};
   for (const k of MERGE_PICKS) {
     const mine = k === 'address' ? normalizeAddress(keep.address) : keep[k], theirs = k === 'address' ? normalizeAddress(other.address) : other[k];
@@ -83,13 +98,15 @@ export function mergeValues(keep: Record<string, any>, other: Record<string, any
   if (on && on !== kn) notes.push(on);
   const lostEmail = String(other.email || '').trim() && String(values.email || '').toLowerCase() !== String(other.email || '').toLowerCase() ? String(other.email) : '';
   const lostKept = String(keep.email || '').trim() && String(values.email || '').toLowerCase() !== String(keep.email || '').toLowerCase() ? String(keep.email) : '';
-  for (const e of [lostEmail, lostKept]) if (e && !notes.join('\n').includes(otherEmailNote(e))) notes.push(otherEmailNote(e));
-  values.notes = notes.join('\n\n').slice(0, 2000);
+  const emailLines: string[] = [];
+  for (const e of [lostEmail, lostKept]) if (e && !notes.join('\n').includes(otherEmailNote(e)) && !emailLines.includes(otherEmailNote(e))) emailLines.push(otherEmailNote(e));
+  const joined = cutNotes([...emailLines, ...notes].join('\n\n'), MERGE_NOTES_MAX);
+  values.notes = joined.text;
   // a person can belong to one customer: two different customers is a merge to refuse
   const kc = keep.client_id ? String(keep.client_id) : '', oc = other.client_id ? String(other.client_id) : '';
-  if (kc && oc && kc !== oc) return { values, conflict: 'different_customers' };
+  if (kc && oc && kc !== oc) return { values, conflict: 'different_customers', notesCut: joined.cut };
   values.client_id = kc || oc || null;
-  return { values, conflict: null };
+  return { values, conflict: null, notesCut: joined.cut };
 }
 
 /** The values a merge view shows for one record, one line each. */
