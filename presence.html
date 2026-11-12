@@ -1659,6 +1659,20 @@ body.pd-dragging .dc-tree-grab{cursor:grabbing}
 .cm-who .cm-k.client{color:var(--plum,#5b3fa0)}
 .cm-body{font-size:13px;line-height:1.55;margin-top:var(--dds-s1,4px);white-space:pre-wrap;overflow-wrap:anywhere}
 .cm-itemacts{display:flex;gap:var(--dds-s2,8px);margin-top:6px}
+/* item 159: Open / Done over a thread, a note's picture, and adding one */
+.cm-filter{display:inline-flex;gap:2px;padding:3px;margin:10px 0 2px;border-radius:999px;background:var(--wash,#f4f0fb)}
+.cm-filter button{font:inherit;font-size:12px;font-weight:600;min-height:30px;padding:0 12px;border:none;border-radius:999px;background:transparent;color:var(--ink-2,#8a8172);cursor:pointer}
+.cm-filter button[aria-pressed="true"]{background:var(--card,#fff);color:var(--ink,#1b1525);box-shadow:0 1px 2px rgba(23,21,34,.12)}
+.cm-who .cm-name{text-transform:none;letter-spacing:0;font-weight:700;color:var(--ink,#1b1525)}
+.cm-pic{display:block;margin-top:6px;max-width:100%}
+.cm-pic img{display:block;max-width:100%;max-height:220px;border-radius:8px;border:1px solid var(--hair,#e7e0f2)}
+.cm-attach{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:600;color:var(--plum);cursor:pointer;margin:6px 0 0;position:relative}
+.cm-attach input{position:absolute;width:1px;height:1px;opacity:0}
+.cm-attach:focus-within{outline:2px solid var(--plum);outline-offset:2px;border-radius:6px}
+.cm-thumb{display:flex;align-items:center;gap:8px;margin-top:6px;font-size:12px}
+.cm-thumb img{width:64px;height:44px;object-fit:cover;border-radius:6px;border:1px solid var(--hair,#e7e0f2)}
+.cm-thumb button{font:inherit;font-size:12px;color:var(--ink-2,#8a8172);background:none;border:none;cursor:pointer;text-decoration:underline;padding:0}
+.cm-none{font-size:12.5px;color:var(--ink-2,#8a8172);margin-top:10px}
 .cm-itemacts button{font:inherit;font-size:12px;color:var(--ink-2,#8a8172);background:none;border:none;cursor:pointer;padding:2px 0;text-decoration:underline}
 .cm-itemacts button:hover{color:var(--plum,#5b3fa0)}
 .cm-reply{width:100%;box-sizing:border-box;font:inherit;font-size:13px;border:1px solid var(--line,#ddd);border-radius:var(--dds-r,8px);padding:var(--dds-s2,8px);min-height:60px;resize:vertical;margin-top:10px}
@@ -8141,6 +8155,22 @@ function openCommentsThread(slug, bid, name) {
   p.classList.add("on"); p.setAttribute("aria-hidden", "false");
   setTimeout(() => { try { $("btnCommentsClose").focus(); } catch (_) {} }, 40);
 }
+// Item 159: a thread shows its open notes, its done ones, or all; Open first while any is open.
+let CM_FILTER = null;   // null = choose by the thread: open when it has any, else all
+// one picture a note, made small in the browser first (the same as the client's panel)
+function cmShrink(file) {
+  return new Promise((resolve, reject) => {
+    if (!file || !/^image\/(jpeg|png|webp|gif)$/.test(file.type)) { reject(new Error("Choose a photo or a screenshot (JPEG, PNG or WebP).")); return; }
+    const img = new Image(), u = URL.createObjectURL(file);
+    img.onload = () => {
+      const k = Math.min(1, 1600 / Math.max(img.width, img.height)), w = Math.max(1, Math.round(img.width * k)), h = Math.max(1, Math.round(img.height * k));
+      const c = document.createElement("canvas"); c.width = w; c.height = h; c.getContext("2d").drawImage(img, 0, 0, w, h);
+      URL.revokeObjectURL(u); resolve({ data: c.toDataURL("image/jpeg", 0.85), w, h });
+    };
+    img.onerror = () => { URL.revokeObjectURL(u); reject(new Error("That picture couldn’t be read.")); };
+    img.src = u;
+  });
+}
 function cmRenderThread(slug, bid, name) {
   const host = $("cmPanelBody"); if (!host) return;
   host.textContent = "";
@@ -8155,18 +8185,48 @@ function cmRenderThread(slug, bid, name) {
       res.addEventListener("click", () => cmResolveThread(slug, bid, name));
       wrap.appendChild(res);
     }
-    t.comments.forEach((c) => wrap.appendChild(cmItem(c, slug, bid, name)));   // already newest-first from the server
+    const done = t.comments.length - t.open_count;
+    const show = CM_FILTER || (t.open_count ? "open" : "all");
+    const seg = el("div", "cm-filter"); seg.setAttribute("role", "group"); seg.setAttribute("aria-label", "Show notes");
+    [["open", "Open (" + t.open_count + ")"], ["done", "Done (" + done + ")"], ["all", "All"]].forEach(([k, label]) => {
+      const b = el("button", null, label); b.type = "button"; b.dataset.cmFilter = k; b.setAttribute("aria-pressed", String(show === k));
+      b.addEventListener("click", () => { CM_FILTER = k; cmRenderThread(slug, bid, name); const nb = $("cmPanelBody").querySelector('[data-cm-filter="' + k + '"]'); if (nb) nb.focus(); });
+      seg.appendChild(b);
+    });
+    wrap.appendChild(seg);
+    const shown = t.comments.filter((c) => show === "all" || (show === "open" ? c.status === "open" : c.status === "resolved"));
+    if (!shown.length) wrap.appendChild(el("div", "cm-none", show === "open" ? "Nothing open here. Every note is done." : "No notes are done here yet."));
+    shown.forEach((c) => wrap.appendChild(cmItem(c, slug, bid, name)));   // already newest-first from the server
   }
   const ta = el("textarea", "cm-reply"); ta.maxLength = 2000;
   ta.placeholder = t && t.comments.length ? "Write a reply…" : "Write a note…";
   ta.setAttribute("aria-label", "Your note");
   wrap.appendChild(ta);
+  // item 159: a picture with the note (a screenshot of what you mean)
+  let pic = null;
+  const att = el("label", "cm-attach"); att.appendChild(document.createTextNode("Add a screenshot or photo"));
+  const fin = el("input"); fin.type = "file"; fin.accept = "image/*"; att.appendChild(fin);
+  const thumb = el("div", "cm-thumb"); thumb.hidden = true;
+  fin.addEventListener("change", async () => {
+    const f = fin.files && fin.files[0]; fin.value = ""; if (!f) return;
+    try {
+      pic = await cmShrink(f);
+      thumb.textContent = ""; thumb.hidden = false; att.hidden = true;
+      const im = el("img"); im.src = pic.data; im.alt = "The picture going with this note"; thumb.appendChild(im);
+      const rm = el("button", null, "Remove"); rm.type = "button";
+      rm.addEventListener("click", () => { pic = null; thumb.hidden = true; thumb.textContent = ""; att.hidden = false; });
+      thumb.appendChild(rm);
+    } catch (err) { toast(nice(err), true); }
+  });
+  wrap.append(att, thumb);
   const sendLabel = t && t.comments.length ? "Reply" : "Add note";
   const send = el("button", "cm-send", sendLabel); send.type = "button";
   send.addEventListener("click", async () => {
     const body = ta.value.trim(); if (!body) { toast("Write a note first.", true); return; }
     send.disabled = true; send.textContent = "Sending…";
-    try { await api("POST", "/comments", { page_slug: slug || "", block_id: bid || "", body }); await cmLoad(); cmSyncButton(); dcRefreshTree(); cmRenderThread(slug, bid, name); }
+    const msg = { page_slug: slug || "", block_id: bid || "", body };
+    if (pic) Object.assign(msg, { image: pic.data, w: pic.w, h: pic.h });
+    try { await api("POST", "/comments", msg); CM_FILTER = null; await cmLoad(); cmSyncButton(); dcRefreshTree(); cmRenderThread(slug, bid, name); }
     catch (err) { send.disabled = false; send.textContent = sendLabel; toast(nice(err), true); }
   });
   wrap.appendChild(send);
@@ -8176,10 +8236,18 @@ function cmItem(c, slug, bid, name) {
   const it = el("div", "cm-item" + (c.status === "resolved" ? " resolved" : ""));
   const who = el("div", "cm-who");
   who.appendChild(el("span", "cm-k" + (c.author_kind === "client" ? " client" : ""), c.author_kind === "client" ? "Client" : "You"));
+  if (c.author_kind === "client" && c.author_name) who.appendChild(el("span", "cm-name", c.author_name));   // item 159: the name they gave
   who.appendChild(el("span", null, new Date(c.created_at).toLocaleString()));
   if (c.status === "resolved") who.appendChild(el("span", null, "· resolved"));
   it.appendChild(who);
   it.appendChild(el("div", "cm-body", c.body));   // textContent — never markup
+  if (c.picture && c.picture.url) {   // item 159: the note's picture, a link that lasts ten minutes
+    const a = el("a", "cm-pic"); a.href = c.picture.url; a.target = "_blank"; a.rel = "noopener";
+    a.title = "Open the picture full size";
+    const im = el("img"); im.src = c.picture.url; im.alt = "Picture sent with this note"; im.loading = "lazy";
+    if (c.picture.w && c.picture.h) { im.width = c.picture.w; im.height = c.picture.h; }
+    a.appendChild(im); it.appendChild(a);
+  }
   const acts = el("div", "cm-itemacts");
   if (c.status === "open") {
     const r = el("button", null, "Resolve"); r.type = "button";
