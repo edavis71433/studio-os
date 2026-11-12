@@ -905,6 +905,9 @@ async function route_(req: Request, cors: Record<string, string>): Promise<Respo
     // Studio-gated & site-scoped like every authed /sales/* route.
     m = route.match(/^\/sales\/invoices\/([0-9a-f-]{36})\/void$/);
     if (m && method === 'POST') return handleSalesInvoiceVoid(site, principal, m[1], cors);
+    // Builder list item 175: "Send a test invoice to myself", the email and PDF a customer
+    // gets, with sample lines, to the person asking only. Nothing is made; nothing can be paid.
+    if (route === '/sales/invoices/test' && method === 'POST') return (await import('./routes/sample_invoice.ts')).handleSampleInvoice(site, principal, cors);
     // Sales item 77: a payment that came in outside Stripe (check, cash, bank transfer,
     // Zelle): all of the invoice or part of it, and Undo for one recorded by mistake.
     m = route.match(/^\/sales\/invoices\/([0-9a-f-]{36})\/payment(\/undo)?$/);
@@ -1320,7 +1323,7 @@ async function route_(req: Request, cors: Record<string, string>): Promise<Respo
     }
   }
   // ── Builder list item 58: the monthly report email to this client (ops/monthly_report.ts) ──
-  if (route === '/report/monthly' && method === 'GET') return (await import('./ops/monthly_report.ts')).handleReportGet(site, cors);
+  if (route === '/report/monthly' && method === 'GET') return (await import('./ops/monthly_report.ts')).handleReportGet(site, principal, cors);
   if (route === '/report/monthly' && method === 'PUT') return (await import('./ops/monthly_report.ts')).handleReportPut(req, site, principal, cors);
   if (route === '/report/monthly/preview' && method === 'POST') return (await import('./ops/monthly_report.ts')).handleReportPreview(site, principal, cors);
   if (route === '/report/monthly/pdf' && method === 'GET') return (await import('./ops/monthly_report.ts')).handleReportPdf(site, cors);   // item 184

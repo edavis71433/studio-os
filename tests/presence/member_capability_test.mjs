@@ -195,6 +195,7 @@ const DECIDED = {
     'POST /bookings/appointments/:id/confirm', 'POST /bookings/appointments/:id/no_show', 'POST /bookings/types',
     'POST /brand/reports/:id/dismiss', 'POST /brand/review', 'POST /broadcasts', 'POST /broadcasts/lists', 'POST /broadcasts/:id/cancel',
     'POST /broadcasts/:id/test',   // bold redesign: "Send me a test" goes only to the member's own address
+    'POST /sales/invoices/test',   // builder list item 175: a sample invoice email to the member's own address; nothing is made or charged
     'POST /broadcasts/draft-assist', 'POST /client/projects/:id/tasks/:id2/done',
     'POST /client/projects/:id/upload-url', 'POST /client/projects/:id/uploads',
     'POST /coach/opportunities/:id/decide', 'POST /coach/run', 'POST /content-library', 'POST /editor/improve',
@@ -504,6 +505,7 @@ const WRITE_HANDLERS = [
   'handleStudioRequests',   // final pass S1: POST /portal/studio-requests/:id/(accept|decline) are open; the route answers the owner only
   'handleMemberRole', 'handleTransferStart', 'handleTransferCancel',   // builder item 53: open on the member list; each route checks the role itself
   'handleSitePassword',   // builder list item 175: POST /site/password needs configure
+  'handleSampleInvoice',   // builder list item 175: POST /sales/invoices/test is edit, like Send me a test on an update
   'handlePostPublish', 'handlePostUnpublish',   // builder list item 40: POST /posts/:id/(publish|unpublish) need publish
   'handleScheduleCancel', 'handleScheduleCreate', 'handleSettings', 'handleShareSet', 'handleStockImport',
   'handleSupport', 'handleSupportMessage', 'handleSupportOne', 'handleSurveyRespond', 'handleTakeOffline',
