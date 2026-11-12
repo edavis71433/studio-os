@@ -109,6 +109,9 @@ const TERMINAL_OK = [
   { kind: 'deal_signed', marker: 'estimate:', why: 'estimate:<deal>:<estimate> — an estimate is approved once; turning THAT estimate into a proposal or an invoice is terminal, and a new estimate mints a new id' },
   { kind: 'deal_followup', marker: 'estdeclined:', why: 'estdeclined:<deal>:<estimate> — an estimate gets one answer; a fresh estimate mints a new id' },
   { kind: 'deal_followup', marker: 'pausePeriod(', why: 'recurpause:<deal>:<schedule>:<date> — one row per send date that could not go out; resuming clears it, and a later pause is on a later date' },
+  // sales item 87: the recipes, each a silent ledger row that gates ONE email
+  { kind: 'lead_followup', marker: 'enqfollow:', why: 'enqfollow:<enquiry>:<1|2> — each of an enquiry\'s two follow-ups goes once, ever, by design; a new enquiry mints a new id' },
+  { kind: 'deal_followup', marker: 'expiry:', why: 'expiry:<proposal or estimate> — one note a week before it runs out, once per document; a revised proposal is a new document with a new id' },
   { kind: 'deal_followup', marker: 'reviewAskPeriod(', why: 'reviewask:<project id> — list item 29 asks a finished project\'s client for a review once, ever, by design (a silent ledger row); a reopened and re-finished project is not asked twice' },
 ];
 const clearedRaises = raises.filter((r) => r.kind && clearedKinds.has(r.kind));

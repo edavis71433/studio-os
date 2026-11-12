@@ -169,6 +169,10 @@
   .kindchips{display:flex;gap:6px;flex-wrap:wrap}
   .kindchips button{font-size:12.5px;padding:6px var(--dds-s3,12px);border-radius:999px;border:1px solid var(--line);background:transparent;color:var(--soft);cursor:pointer;font-weight:500}
   .kindchips button.on{background:var(--p-soft);color:var(--p);border-color:var(--p)}
+  /* sales item 85: Follow up on [day], in the same step as the log */
+  .fu-chip{font:inherit;font-size:12.5px;padding:5px 11px;border-radius:999px;border:1px solid var(--line);background:transparent;color:var(--soft);cursor:pointer;font-weight:500}
+  .fu-chip:hover{border-color:var(--p);color:var(--p)}
+  @media (max-width:767px){.fu-chip,.fu-row input[type=date]{min-height:44px}}
   .seg{display:inline-flex;border:1px solid var(--line);border-radius:var(--dds-r,8px);overflow:hidden}
   .seg button{border:none;border-radius:0;padding:6px var(--dds-s3,12px);font-size:12.5px;background:transparent;color:var(--soft);font-family:inherit;font-weight:500;cursor:pointer}
   .seg button.on{background:var(--p-soft);color:var(--p)}
@@ -583,7 +587,9 @@ function idParams(){ // the identity keys carried onto sub-requests / links
   const id=(REC&&REC.identity)||{}; return {client:id.customer_site_id||scopeParam()||'', deal:id.deal_id||'', project:id.project_id||'', contact:id.contact_id||''};
 }
 // the record has a history to show (the old rail's rule): a project, a deal, a client, or a scoped customer
-const hasActivity=()=>!!(idParams().project||idParams().deal||(REC&&REC.identity&&REC.identity.client_id)||(REC&&REC.sections&&REC.sections.overview));
+// sales items 85 and 80: a person on their own (a contact with no deal) has a history too: calls,
+// to-dos and emails kept for them
+const hasActivity=()=>!!(idParams().project||idParams().deal||idParams().contact||(REC&&REC.identity&&REC.identity.client_id)||(REC&&REC.sections&&REC.sections.overview));
 function availTabs(){
   const s=(REC&&REC.sections)||{}; const out=[];
   if(hasActivity())out.push('activity');
@@ -642,7 +648,7 @@ async function loadRecord(){
   const act=QP().get('act');
   if(act){const q=QP();q.delete('act');history.replaceState(null,'','/crm.html?'+q.toString());}   // once: a reload doesn't open the form again
   if(act==='invoice'||act==='deposit')DEAL_READY.then(()=>{if(idParams().deal)openBilling(act);});
-  else if(act==='message'||act==='note'||act==='task')setTimeout(()=>focusComposer(act),300);
+  else if(act==='message'||act==='note'||act==='task'||act==='email')setTimeout(()=>focusComposer(act),300);
 }
 
 // ── the record shell: header + highlights + Path + two-region body ──────────
@@ -848,9 +854,10 @@ function renderActions(){
     if(draft&&stage!=='won'&&stage!=='lost')btns.push({id:'act-proposal',label:'Send proposal',on:()=>openBilling('proposal:'+draft.id)});
     const draftCon=d&&(DEAL.contracts||[]).find(k=>k.status==='draft');
     if(draftCon&&stage!=='won'&&stage!=='lost')btns.push({id:'act-agreement',label:'Send agreement',on:()=>openBilling('contract:'+draftCon.id)});
-    btns.push({id:'act-log',label:'Log a call',on:()=>focusComposer('logcall')});
-    btns.push({id:'act-task',label:'Add to-do',on:()=>focusComposer('task')});
   }
+  // item 85: a call or a to-do is for anyone, deal or not; item 80: Email them from here
+  if(ids.deal||hasPerson()){btns.push({id:'act-log',label:'Log a call',on:()=>focusComposer('logcall')});btns.push({id:'act-task',label:'Add to-do',on:()=>focusComposer('task')});}
+  if(canEmail())btns.push({id:'act-email',label:'Email',on:()=>focusComposer('email')});
   btns.push({id:'act-message',label:'Message',on:()=>focusComposer('message')});
   if(REC.sections&&REC.sections.overview)btns.push({id:'act-note',label:'Note',on:()=>focusComposer('note')});
   if(ids.project)btns.push({id:'act-project',label:'Open project',href:agHref('projects.html','project='+encodeURIComponent(ids.project))});
@@ -863,7 +870,9 @@ function renderActions(){
     ?`<a class="abtn" id="${b.id}" href="${esc(b.href)}">${esc(b.label)}</a>`
     :`<button type="button" class="abtn${b.primary?' primary':''}" id="${b.id}">${esc(b.label)}</button>`;
   // bold redesign (Nov 2026): the verbs sit in the header, read left to right — Log a call, Message, then the money one
-  const FRONT=['act-log','act-message',both?'act-send-both':'act-invoice'];
+  // item 80 (Figma 264:1136): with an address and no project to message them through, Email stands in
+  // front and Message goes under More; a client with a project keeps Message there (item 41)
+  const FRONT=['act-log',canEmail()&&!ids.project?'act-email':'act-message',both?'act-send-both':'act-invoice'];
   const front=FRONT.map(id=>btns.find(b=>b.id===id)).filter(Boolean);
   const rest=btns.filter(b=>!FRONT.includes(b.id));
   host.innerHTML=front.map(render).join('')+(rest.length?`<div class="more"><button type="button" class="abtn" id="act-more" aria-haspopup="true" aria-expanded="false">More ▾</button><div class="more-menu" id="act-menu" hidden>${rest.map(render).join('')}</div></div>`:'');
@@ -899,9 +908,9 @@ function openBilling(which){
 // screens the rail sits above the tabs, so scrolling to it is the whole move.
 function focusComposer(tab){
   if(TAB!=='activity'&&availTabs().includes('activity'))showTab('activity');
-  COMPOSER=tab; renderComposer();
+  COMPOSER=tab; COMPOSER_PICKED=true; EM_FOCUS=tab==='email'; renderComposer(); EM_FOCUS=false;
   const host=$('acard'); if(host)host.scrollIntoView({behavior:'smooth',block:'start'});
-  setTimeout(()=>{const f=document.querySelector('#composer textarea, #composer input[type=text]');if(f)f.focus({preventScroll:true});},250);
+  setTimeout(()=>{const c=$('composer');if(c&&c.contains(document.activeElement))return;const f=document.querySelector('#composer textarea, #composer input[type=text]');if(f)f.focus({preventScroll:true});},250);
 }
 
 // panels that arrive after the record: profile (health), deal, project, activity.
@@ -1755,6 +1764,7 @@ async function loadActivity(){
   if(ids.project)q.push('project='+encodeURIComponent(ids.project));
   if(REC.identity&&REC.identity.client_id)q.push('client_id='+encodeURIComponent(REC.identity.client_id));
   if(ids.deal)q.push('deal='+encodeURIComponent(ids.deal));
+  if(ids.contact)q.push('contact='+encodeURIComponent(ids.contact));   // items 85 and 80: what was kept for the person themselves
   const scopedCustomer=!!(REC.sections&&REC.sections.overview);   // the scope header alone resolves the identity server-side
   if(!q.length&&!scopedCustomer){ACT={items:[],upcoming:[],reply_to:null,reply_support_to:null,failed:false};renderRail();return;}
   const early=ACT_EARLY; ACT_EARLY=null;   // item 45: the first load uses the read that started beside the record's
@@ -1839,7 +1849,7 @@ const TYPE_ICON={message:si('message'),email:si('mail'),call:si('phone'),task:si
 // half-typed message/log/task/note survives. (The active COMPOSER tab already
 // persists as module state.) Successful submits clear their field BEFORE the
 // refresh, so a sent draft never resurrects.
-const COMPOSER_FIELDS=['msgBody','logBody','logDate','taskTitle','taskDue','noteBody'];
+const COMPOSER_FIELDS=['msgBody','logBody','logDate','logFollow','taskTitle','taskDue','noteBody','emSubject','emBody'];
 // B21: the drafts also survive switching the composer's own tabs (Message → Note → back) and the
 // record's (Activity → Details → back): both redraw the fields, and the snapshot below only covers
 // a rail refresh. What's typed is kept as it's typed and put back whenever the composer draws.
@@ -1901,10 +1911,18 @@ function renderRail(){
 }
 
 // ── the composer: ONE publisher — Message · Log a call · To-do · Note ───────
+// sales item 85: calls and to-dos are for anyone: on the deal when there is one, else on the person or customer
+const personIds=()=>{const id=(REC&&REC.identity)||{};return{contact_id:id.contact_id||null,client_id:id.client_id||null};};
+const hasPerson=()=>{const p=personIds();return!!(p.contact_id||p.client_id);};
+const NOT_YET='Calls and to-dos for someone without a deal arrive with an update that’s on its way. Try again a little later.';
+// item 80: an email from here goes to the address on file for the deal's person, the person or the customer
+const mailIds=()=>{const d=idParams().deal;if(d)return{deal_id:d};const p=personIds();return p.contact_id?{contact_id:p.contact_id}:p.client_id?{client_id:p.client_id}:null;};
+const canEmail=()=>!!mailIds()&&!!((REC&&REC.header&&REC.header.email)||(DEAL&&DEAL.contact&&DEAL.contact.email));
+let COMPOSER_PICKED=false, EM_FOCUS=false;
 function composerTabs(){
   const s=(REC&&REC.sections)||{}; const hasDeal=!!idParams().deal;
-  const tabs=[['message','Message']];
-  if(hasDeal){tabs.push(['logcall','Log a call']);tabs.push(['task','To-do']);}   // deal-backed writes — hidden honestly when there's no deal
+  const tabs=canEmail()?[['email','Email'],['message','Message']]:[['message','Message']];
+  if(hasDeal||hasPerson()){tabs.push(['logcall','Log a call']);tabs.push(['task','To-do']);}
   if(s.overview)tabs.push(['note','Note']);   // notes live on the customer's site scope
   return tabs;
 }
@@ -1913,9 +1931,13 @@ const logLabel=(k)=>k==='email'?'Log email':k==='meeting'?'Log meeting':k==='not
 function renderComposer(){
   const host=$('composer'); if(!host)return;
   const tabs=composerTabs();
+  // item 80: with no project or support thread the Message tab can't send, so the record opens on Email
+  if(!COMPOSER_PICKED&&COMPOSER==='message'&&!(ACT&&(ACT.reply_to||ACT.reply_support_to))&&tabs.some(t=>t[0]==='email'))COMPOSER='email';
   if(!tabs.some(t=>t[0]===COMPOSER))COMPOSER=tabs[0][0];
   let html=`<div class="composer-tabs" role="tablist" aria-label="Compose">${tabs.map(t=>`<button role="tab" data-ct="${t[0]}" aria-selected="${COMPOSER===t[0]?'true':'false'}" tabindex="${COMPOSER===t[0]?'0':'-1'}"${COMPOSER===t[0]?' class="on"':''}>${t[1]}</button>`).join('')}</div><div class="composer-pane">`;
-  if(COMPOSER==='message'){
+  if(COMPOSER==='email'){
+    html+=`<div id="emBox"></div>`;   // item 80: shell.js's Email box draws here
+  }else if(COMPOSER==='message'){
     const replyPath=ACT.reply_to||ACT.reply_support_to;
     if(replyPath){
       html+=`<form id="msgForm"><label for="msgBody" style="font-size:12.5px;color:var(--faint)">${ACT.reply_to?'Reply to the client':'Reply to the client (their open support thread)'}</label><textarea id="msgBody" placeholder="Write a message…" aria-label="Reply to the client"></textarea><div class="composer-row"><span class="spacer"></span><button type="submit">Send</button></div></form>`;   // outlined — the Path's next step is the record's one filled button (experience review #4)
@@ -1926,7 +1948,8 @@ function renderComposer(){
     const kinds=[['call',si('phone')+' Call'],['email',si('mail')+' Email'],['meeting',si('users')+' Meeting'],['note',si('pencil')+' Note']];
     html+=`<div class="kindchips" role="group" aria-label="What are you logging?">${kinds.map(k=>`<button data-lk="${k[0]}"${LOGKIND===k[0]?' class="on" aria-pressed="true"':' aria-pressed="false"'}>${k[1]}</button>`).join('')}</div>
       <textarea id="logBody" style="margin-top:9px" placeholder="What happened? (optional for calls/emails/meetings)" aria-label="Activity notes"></textarea>
-      <div class="composer-row"><label for="logDate" style="font-size:12.5px;color:var(--faint)">When</label><input type="date" id="logDate" max="${recTodayYmd()}" value="${recTodayYmd()}" aria-label="When it happened"><span class="spacer"></span><button class="primary" id="logGo">${logLabel(LOGKIND)}</button></div>`;
+      <div class="composer-row"><label for="logDate" style="font-size:12.5px;color:var(--faint)">When</label><input type="date" id="logDate" max="${recTodayYmd()}" value="${recTodayYmd()}" aria-label="When it happened"><span class="spacer"></span><button class="primary" id="logGo">${logLabel(LOGKIND)}</button></div>
+      <div class="composer-row fu-row"><label for="logFollow" style="font-size:12.5px;color:var(--faint)">Follow up on</label><input type="date" id="logFollow" min="${recTodayYmd()}" aria-label="Follow up on (optional): adds a to-do"><button type="button" class="fu-chip" data-fu="1">Tomorrow</button><button type="button" class="fu-chip" data-fu="7">Next week</button><span style="font-size:12px;color:var(--faint)">optional, adds a to-do</span></div>`;   // item 85: one step, not two
   }else if(COMPOSER==='task'){
     html+=`<input type="text" id="taskTitle" placeholder="What needs doing?" aria-label="To-do title" maxlength="200" style="width:100%">
       <div class="composer-row"><label for="taskDue" style="font-size:12.5px;color:var(--faint)">Due</label><input type="date" id="taskDue" aria-label="Due date"><span class="spacer"></span><button class="primary" id="taskGo">Add to-do</button></div>`;
@@ -1938,7 +1961,9 @@ function renderComposer(){
   html+=`</div>`;
   host.innerHTML=html;
   for(const id of COMPOSER_FIELDS){const el=$(id);if(el&&DRAFTS[id]!=null)el.value=DRAFTS[id];}   // B21: what was typed here before
-  host.querySelectorAll('[data-ct]').forEach(b=>b.addEventListener('click',()=>{COMPOSER=b.getAttribute('data-ct');renderComposer();}));
+  const eb=$('emBox');
+  if(eb)emailBoxInto(eb,{req:apiAg,ids:mailIds(),idp:'em',focus:EM_FOCUS,values:{subject:DRAFTS.emSubject||'',body:DRAFTS.emBody||''},onSent:emailSent});
+  host.querySelectorAll('[data-ct]').forEach(b=>b.addEventListener('click',()=>{COMPOSER=b.getAttribute('data-ct');COMPOSER_PICKED=true;renderComposer();}));
   // E2: the composer tablist honors the arrow-key contract — arrows move focus
   // AND selection (the re-render hands focus back to the moved-to tab);
   // Home/End jump. Roving tabindex is set in the markup above.
@@ -1951,16 +1976,27 @@ function renderComposer(){
     else if(e.key==='Home')j=0;
     else if(e.key==='End')j=tabsEls.length-1;
     if(j<0)return;e.preventDefault();
-    COMPOSER=tabsEls[j].getAttribute('data-ct');renderComposer();
+    COMPOSER=tabsEls[j].getAttribute('data-ct');COMPOSER_PICKED=true;renderComposer();
     const nb=host.querySelector('[data-ct="'+COMPOSER+'"]');if(nb)nb.focus();
   });
   const f=$('msgForm'); if(f)f.onsubmit=sendMessage;
   if($('msgBody'))insertSavedReplies('msgBody');   // C3: the saved-reply picker, when any exist
   host.querySelectorAll('[data-lk]').forEach(b=>b.addEventListener('click',()=>{LOGKIND=b.getAttribute('data-lk');host.querySelectorAll('[data-lk]').forEach(x=>{const on=x===b;x.classList.toggle('on',on);x.setAttribute('aria-pressed',on?'true':'false');});const g=$('logGo');if(g)g.textContent=logLabel(LOGKIND);}));
   const lg=$('logGo'); if(lg)lg.addEventListener('click',logActivity);
+  host.querySelectorAll('[data-fu]').forEach(b=>b.addEventListener('click',()=>{const f=$('logFollow');if(f){const d=new Date(Date.now()+Number(b.getAttribute('data-fu'))*86400000);f.value=recTodayYmd(d.getTime());DRAFTS.logFollow=f.value;f.focus();}}));
   const tg=$('taskGo'); if(tg)tg.addEventListener('click',addTask);
   host.querySelectorAll('[data-aud]').forEach(b=>b.addEventListener('click',()=>{NEWAUD=b.getAttribute('data-aud');host.querySelectorAll('[data-aud]').forEach(x=>{const on=x===b;x.classList.toggle('on',on);x.setAttribute('aria-pressed',on?'true':'false');});const hh=$('notehint');if(hh)hh.textContent=NEWAUD==='shared'?'The client will see this note.':'Internal notes stay with your studio.';}));
   const ng=$('noteGo'); if(ng)ng.addEventListener('click',addNote);
+}
+// shell.js loads deferred: on the first draw the kit may still be on its way
+function emailBoxInto(el,o){
+  const go=()=>{if(!el.isConnected)return;if(window.ddsEmailBox)window.ddsEmailBox.open(el,o);else el.innerHTML='<p class="muted">Reload the page to email them from here.</p>';};
+  if(window.ddsEmailBox||document.readyState!=='loading')go();else document.addEventListener('DOMContentLoaded',go,{once:true});
+}
+function emailSent(d,first){
+  clearDraft('emSubject');clearDraft('emBody');
+  toast(d&&d.logged===false?(d.message||'Sent.'):'Email sent to '+(first||'them')+'.');
+  loadActivity();
 }
 async function sendMessage(e){
   e.preventDefault();
@@ -1974,24 +2010,31 @@ async function sendMessage(e){
   }catch(_){toast('Couldn’t send.');btn.disabled=false;}
 }
 async function logActivity(){
-  const deal=idParams().deal; if(!deal)return;
+  const deal=idParams().deal; if(!deal&&!hasPerson())return;
   const body=($('logBody')&&$('logBody').value||'').trim();
   if(LOGKIND==='note'&&!body){toast('Write a short note.');return;}
   const btn=$('logGo'); btn.disabled=true;
-  const r=await apiAg('/sales/deals/'+encodeURIComponent(deal)+'/activity','POST',{kind:LOGKIND,body,occurred_at:recDayAtNoon($('logDate')&&$('logDate').value)});
-  if(r.ok){clearDraft('logBody');clearDraft('logDate');toast('Logged.');
+  // item 85: on the deal when there is one, else on the person (or the customer) themselves; "Follow up on" adds a to-do for them
+  const fu=($('logFollow')&&$('logFollow').value)||'',who=(REC&&REC.header&&(REC.header.person||REC.header.name))||'';
+  const base={kind:LOGKIND,body,occurred_at:recDayAtNoon($('logDate')&&$('logDate').value),...(fu?{follow_up:fu,follow_up_title:'Follow up'+(who?' with '+who:'')}:{})};
+  const r=deal?await apiAg('/sales/deals/'+encodeURIComponent(deal)+'/activity','POST',base):await apiAg('/sales/people/activity','POST',{...base,...personIds()});
+  const f=r.ok&&r.body&&r.body.data&&r.body.data.follow_up;
+  if(!deal&&r.status===404){toast(NOT_YET);btn.disabled=false;return;}   // an older server: pages go live before the server's update
+  if(r.ok){clearDraft('logBody');clearDraft('logDate');clearDraft('logFollow');toast(fu?(f&&f.id?'Logged, and a to-do to follow up on '+dueLabel(fu)+'.':'Logged. The follow-up to-do didn’t save: add it from the To-do tab.'):'Logged.');
     // B4: "Last talked" moves at once (the server answers with the day just logged; an older day doesn't win)
     const at=r.body&&r.body.data&&r.body.data.last_contacted_at;if(at&&DEAL&&!DEAL.error&&!(Date.parse(DEAL.last_contacted_at)>Date.parse(at))){DEAL.last_contacted_at=at;renderHighlights();if(TAB==='deal')showTab(TAB,true);}
     await loadActivity();}
   else{toast((r.body&&r.body.message)||'That didn’t save.');btn.disabled=false;}
 }
 async function addTask(){
-  const deal=idParams().deal; if(!deal)return;
+  const deal=idParams().deal; if(!deal&&!hasPerson())return;
   const title=($('taskTitle')&&$('taskTitle').value||'').trim();
   if(!title){toast('Give the to-do a title.');return;}
   const btn=$('taskGo'); btn.disabled=true;
   const due=($('taskDue')&&$('taskDue').value)||'';
-  const r=await apiAg('/sales/deals/'+encodeURIComponent(deal)+'/tasks','POST',due?{title,due_date:due}:{title});
+  // item 85: on the deal when there is one, else a to-do for the person (or the customer) themselves
+  const r=deal?await apiAg('/sales/deals/'+encodeURIComponent(deal)+'/tasks','POST',due?{title,due_date:due}:{title}):await apiAg('/sales/tasks','POST',{title,...(due?{due_date:due}:{}),...personIds()});
+  if(!deal&&r.status===404){toast(NOT_YET);btn.disabled=false;return;}
   if(r.ok){clearDraft('taskTitle');clearDraft('taskDue');toast('Added.');await loadActivity();}
   else{toast((r.body&&r.body.message)||'That didn’t save.');btn.disabled=false;}
 }
