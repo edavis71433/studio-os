@@ -350,6 +350,7 @@ export function buildSnapshot(rows: DraftRows, manifest: TemplateManifest, opts:
         : {}),
       // Phase V no-code essentials — through ref() so variants land in the media manifest
       logo: ref(settings.logo_media_id),
+      ...(settings.icon_media_id ? { icon: ref(settings.icon_media_id) } : {}),   // builder list item 158 (0184): absent = byte-identical
       og_image: ref(settings.og_media_id),
       cover: ref(settings.cover_media_id),   // the owner's chosen hero image (preferred over an auto-pick)
       ...(String(settings.announcement_text || '').trim()

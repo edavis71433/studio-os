@@ -24,6 +24,8 @@ import { BLOCK_CSS, sectionStyles, pageClasses } from './site_blocks.ts';
 import { applyPageChrome, applyNotFoundPage } from './page_access.ts';
 import { applyHeaderScroll } from './site_header.ts';
 import { applyPhoneBar } from './phone_bar.ts';
+import { applyMotion } from './site_motion.ts';
+import { applySiteIcon } from './site_icon.ts';
 
 // ── FD-T2: indexed template registry; each template's code loads on first use ──
 // slug → version → { manifest, code loader }. Render resolution goes through this
@@ -205,8 +207,11 @@ export async function renderSnapshot(snapshot: Snapshot, site: SiteConfig, opts:
   // items 50 and 123: the header scrolls away, stays on top, hides or fades, as the owner chose
   // List item 175: switched off, AI assistants are asked to stay out in robots.txt.
   const drawn = withAiCrawlerChoice(applyHeaderScroll(tintFavicon(applyPageChrome(await t.render(snapshot, t.manifest, site), pages), tokens?.accent, snapshot.template_slug), tokens?.header_scroll), (snapshot.content as SnapshotContent)?.settings);
+  // item 158: sections fade up as they scroll into view, when switched on (never on the builder's
+  // canvas), and the tab shows the site's own icon when the owner picked one
+  const moved = applySiteIcon(opts.allSectionStyles ? drawn : applyMotion(drawn, tokens?.motion), (snapshot.content as SnapshotContent)?.settings?.icon);
   // List item 124: hidden from search, every page says noindex; the owner's llms.txt is written.
-  const searched = withSearchChoices(drawn, (snapshot.content as SnapshotContent)?.settings);
+  const searched = withSearchChoices(moved, (snapshot.content as SnapshotContent)?.settings);
   // item 122: Call, Directions, Hours and Email along the bottom of every page on a phone, when turned on
   // (after the page's own header and footer choice, so a page that hides its footer has no bar either)
   const barred = applyPhoneBar(searched, tokens?.phone_bar, snapshot.content as SnapshotContent, tokens?.accent);

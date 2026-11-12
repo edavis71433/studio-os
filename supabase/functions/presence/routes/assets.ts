@@ -103,7 +103,8 @@ const SETTINGS_MEDIA_COLS = 'logo_media_id,og_media_id,cover_media_id,blocks,pag
 interface Refs { map: Map<string, UsageRef[]>; complete: boolean; library: LibraryItem[]; offeringLabel: string; settings: Record<string, unknown> | null }
 async function referencedRefs(site: SiteRow): Promise<Refs> {
   const [settingsR, offs, posts, dels, libR] = await Promise.all([
-    svc(`presence_settings?site_id=eq.${site.id}&select=${SETTINGS_MEDIA_COLS}&limit=1`),
+    // item 158 (0184): with the site icon; a database without it reads the rest
+    svc(`presence_settings?site_id=eq.${site.id}&select=${SETTINGS_MEDIA_COLS},icon_media_id&limit=1`).then((r) => (r.ok ? r : svc(`presence_settings?site_id=eq.${site.id}&select=${SETTINGS_MEDIA_COLS}&limit=1`))),
     svc(`presence_offerings?site_id=eq.${site.id}&deleted_at=is.null&media_id=not.is.null&select=media_id,name,is_visible`),
     svc(`presence_posts?site_id=eq.${site.id}&deleted_at=is.null&hero_media_id=not.is.null&select=hero_media_id,title,status`),
     svc(`presence_deliverables?site_id=eq.${site.id}&deleted_at=is.null&select=media_id,title&limit=${DELIVERABLE_CAP}`),
@@ -469,11 +470,18 @@ export async function handleAssetSocial(site: SiteRow, id: string, cors: Record<
     signOriginalImage(asset.storage_path, asset.mime || ''),
   ]);
   const crops = list.map((c, i) => ({ ...c, url: urls[i] }));
-  const isShareImage = await isCurrentOg(site, id);
-  return json({ data: { crops, fallback_url: fallback, focal: list[0]?.object_position || '50% 50%', is_share_image: isShareImage } }, 200, cors);
+  const used = await currentUses(site, id);
+  return json({ data: { crops, fallback_url: fallback, focal: list[0]?.object_position || '50% 50%', is_share_image: used.og, is_site_icon: used.icon } }, 200, cors);
 }
-async function isCurrentOg(site: SiteRow, id: string): Promise<boolean> {
-  try { const s = await svc(`presence_settings?site_id=eq.${site.id}&select=og_media_id&limit=1`); return arr(s)[0]?.og_media_id === id; } catch { return false; }
+// Is this picture the share image, or (builder list item 158) the site's tab icon? Before 0184
+// there is no icon column, so the read steps down and the share image still answers.
+async function currentUses(site: SiteRow, id: string): Promise<{ og: boolean; icon: boolean }> {
+  try {
+    let s = await svc(`presence_settings?site_id=eq.${site.id}&select=og_media_id,icon_media_id&limit=1`);
+    if (!s.ok) s = await svc(`presence_settings?site_id=eq.${site.id}&select=og_media_id&limit=1`);
+    const row = arr(s)[0] || {};
+    return { og: row.og_media_id === id, icon: row.icon_media_id === id };
+  } catch { return { og: false, icon: false }; }
 }
 
 // ── G31: branded social cards — one photo → many platform formats, COMPOSED ──

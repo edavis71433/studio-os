@@ -132,7 +132,9 @@ export async function deleteMedia(siteId: string, mediaId: string) {
     // drops it from every page — gone for good after the media_gc window.
     // Item 115: and the owner's own pages, each page's share image, the Brand Kit
     // logo, and the saved sections a page can link to.
-    svc(`presence_settings?site_id=eq.${siteId}&select=logo_media_id,og_media_id,cover_media_id,blocks,pages,page_seo,brand_kit&limit=1`),
+    // item 158 (0184): with the site icon; a database without it reads the rest
+    svc(`presence_settings?site_id=eq.${siteId}&select=logo_media_id,og_media_id,cover_media_id,icon_media_id,blocks,pages,page_seo,brand_kit&limit=1`)
+      .then((r) => (r.ok ? r : svc(`presence_settings?site_id=eq.${siteId}&select=logo_media_id,og_media_id,cover_media_id,blocks,pages,page_seo,brand_kit&limit=1`))),
     svc(`presence_content_library?site_id=eq.${siteId}&select=name,payload&limit=500`),
   ]);
   const s = Array.isArray(settingsQ.json) ? settingsQ.json[0] : null;
@@ -141,6 +143,7 @@ export async function deleteMedia(siteId: string, mediaId: string) {
     if (s.logo_media_id === mediaId) siteRefs.push('your logo');
     if (s.og_media_id === mediaId) siteRefs.push('your social-share image');
     if (s.cover_media_id === mediaId) siteRefs.push('your cover photo');
+    if (s.icon_media_id === mediaId) siteRefs.push('your site icon');   // item 158
     // blocks is a JSON column; media ids live inside it as UUID strings (exact,
     // 36-char — no false substring match between distinct UUIDs).
     if (s.blocks && JSON.stringify(s.blocks).includes(mediaId)) siteRefs.push('a section on your website');

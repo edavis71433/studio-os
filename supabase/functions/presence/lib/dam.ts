@@ -269,7 +269,7 @@ export function mediaIdsIn(v: unknown, out: Set<string> = new Set(), depth = 0):
 }
 
 export interface SettingsMedia {
-  logo_media_id?: string | null; og_media_id?: string | null; cover_media_id?: string | null;
+  logo_media_id?: string | null; og_media_id?: string | null; cover_media_id?: string | null; icon_media_id?: string | null;
   blocks?: unknown; pages?: unknown; page_seo?: unknown; brand_kit?: unknown;
 }
 export interface LibraryItem { id: string; name?: string | null; payload?: unknown }
@@ -295,6 +295,8 @@ export function settingsMediaUses(s: SettingsMedia | null | undefined, opts: { l
   if (cover) add(cover, { surface: 'cover', label: 'your cover photo', live: false });
   const og = oneId(s.og_media_id);
   if (og) add(og, { surface: 'seo', label: 'your social share image', live: false });
+  const icon = oneId(s.icon_media_id);   // builder list item 158
+  if (icon) add(icon, { surface: 'brand', label: 'your site icon (in the browser tab)', live: false });
 
   const sections = (blocks: unknown, where: string) => {
     if (!Array.isArray(blocks)) return;
@@ -360,7 +362,7 @@ export function repointSettingsMedia(s: SettingsMedia | null | undefined, fromId
     if (v && typeof v === 'object') return Object.fromEntries(Object.entries(v as Record<string, unknown>).map(([k, x]) => [k, swap(x, depth + 1)]));
     return v;
   };
-  for (const col of ['logo_media_id', 'og_media_id', 'cover_media_id', 'blocks', 'pages', 'page_seo', 'brand_kit'] as const) {
+  for (const col of ['logo_media_id', 'og_media_id', 'cover_media_id', 'icon_media_id', 'blocks', 'pages', 'page_seo', 'brand_kit'] as const) {
     const cur = s[col];
     if (cur == null) continue;
     if (!mediaIdsIn(cur).has(from)) continue;

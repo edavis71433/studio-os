@@ -142,6 +142,7 @@ const SETTINGS_FIELDS: Record<string, FieldRule> = {
   category_order: { kind: 'json', json: { bytes: 64 * KB, shape: 'list', items: 200 } }, cover_media_id: { kind: 'uuid' },
   // Phase V no-code essentials: logo (FD-N2), share image (FD-N3), announcement bar (FD-N4)
   logo_media_id: { kind: 'uuid' }, og_media_id: { kind: 'uuid' },
+  icon_media_id: { kind: 'uuid' },   // builder list item 158 (0184): the site's own small icon in a browser tab
   announcement_text: { max: 140 }, announcement_url: { max: 300 }, announcement_expires_at: { kind: 'date' },
   popup: { kind: 'json', json: { bytes: 8 * KB, shape: 'object' } },   // builder list item 148 (0161): made safe at publish (lib/popup.ts)
   industry_key: { max: 40 },   // Phase T3: drives template vocabulary + schema
@@ -407,9 +408,11 @@ const CRAWLER_SETTINGS_COLS = 'ai_crawlers';
 const POPUP_SETTINGS_COLS = 'popup';
 // The 0171 columns (list item 124's Hide from search and llms.txt).
 const SEARCH_SETTINGS_COLS = 'search_hidden,llms_txt';
+// The 0184 column (builder list item 158's site icon).
+const ICON_SETTINGS_COLS = 'icon_media_id';
 // Newest apply pack first. A database without a pack's columns 400s the widened select,
 // so a read or a save steps down one pack at a time; Settings never goes dark ahead of one.
-const OPTIONAL_SETTINGS_COLS = [SEARCH_SETTINGS_COLS, POPUP_SETTINGS_COLS, CRAWLER_SETTINGS_COLS, AD_SETTINGS_COLS, VISIT_SETTINGS_COLS, REVIEW_SETTINGS_COLS, AUTOMATION_SETTINGS_COLS];
+const OPTIONAL_SETTINGS_COLS = [ICON_SETTINGS_COLS, SEARCH_SETTINGS_COLS, POPUP_SETTINGS_COLS, CRAWLER_SETTINGS_COLS, AD_SETTINGS_COLS, VISIT_SETTINGS_COLS, REVIEW_SETTINGS_COLS, AUTOMATION_SETTINGS_COLS];
 function selectSteps(select: string): string[] {
   const out = [select];
   let s = select;
@@ -423,7 +426,7 @@ function selectSteps(select: string): string[] {
 const SETTINGS_CFG = {
   table: 'presence_settings', entityType: 'settings', noun: 'site settings', fields: SETTINGS_FIELDS,
   select: 'site_id,category_order,cover_media_id,logo_media_id,og_media_id,announcement_text,announcement_url,announcement_expires_at,industry_key,google_site_verification,bing_site_verification,hero_layout,nav_style,sections_hidden,sections_order,footer_hours,footer_social,pages_noindex,page_seo,blocks,pages,nav,updated_at'
-    + ',' + AUTOMATION_SETTINGS_COLS + ',' + REVIEW_SETTINGS_COLS + ',' + VISIT_SETTINGS_COLS + ',' + AD_SETTINGS_COLS + ',' + CRAWLER_SETTINGS_COLS + ',' + POPUP_SETTINGS_COLS + ',' + SEARCH_SETTINGS_COLS,
+    + ',' + AUTOMATION_SETTINGS_COLS + ',' + REVIEW_SETTINGS_COLS + ',' + VISIT_SETTINGS_COLS + ',' + AD_SETTINGS_COLS + ',' + CRAWLER_SETTINGS_COLS + ',' + POPUP_SETTINGS_COLS + ',' + SEARCH_SETTINGS_COLS + ',' + ICON_SETTINGS_COLS,
   conflict: 'site_id', summary: 'Updated site settings',
 } as const;
 

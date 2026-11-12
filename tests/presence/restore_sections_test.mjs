@@ -72,7 +72,7 @@ const NAV = [{ label: 'Home', href: '/' }, { label: 'More', href: '', folder: tr
 const WEBSITE = {
   category_order: ['Mains'], blocks: HOME, pages: PAGES, nav: NAV, nav_style: 'centered', hero_layout: 'split',
   sections_hidden: ['testimonials'], sections_order: ['hero', 'offerings', 'faq'], footer_hours: false, footer_social: true,
-  logo_media_id: MEDIA[3], og_media_id: null, cover_media_id: MEDIA[0],
+  logo_media_id: MEDIA[3], og_media_id: null, cover_media_id: MEDIA[0], icon_media_id: MEDIA[3],   // builder list item 158: the logo as the tab icon too
   announcement_text: 'Open late on Fridays', announcement_url: '', announcement_expires_at: null,
   page_seo: { 'page:our-team': { title: 'Meet the team', share_image: MEDIA[1] } }, pages_noindex: ['page:offers'],
   popup: { on: true, heading: 'Ten percent off on Tuesdays', text: 'Join our list for the code.', action: 'signup', buttons: [], after: 'seconds', seconds: 8, scroll: 50, pages: 'all', picked: [], again: 'week', phones: true, from: '', until: '' },   // builder list item 148
@@ -96,7 +96,7 @@ const editSince = () => {
   s.pages = [PAGES[0], { slug: 'new-page', title: 'New page', blocks: [{ type: 'richtext', body: 'Draft words.' }] }];   // a page deleted, one added
   s.nav = [{ label: 'Home', href: '/' }];
   s.nav_style = ''; s.hero_layout = ''; s.footer_hours = true; s.sections_hidden = [];
-  s.announcement_text = ''; s.logo_media_id = null; s.cover_media_id = null; s.page_seo = {}; s.pages_noindex = []; s.popup = null;
+  s.announcement_text = ''; s.logo_media_id = null; s.cover_media_id = null; s.page_seo = {}; s.pages_noindex = []; s.popup = null; s.icon_media_id = null;
   s.google_site_verification = 'changed since';                                          // account settings move on their own
 };
 const saveCheckpoint = async (name) => {
@@ -201,7 +201,7 @@ const websiteNow = () => Object.fromEntries(SETTINGS_CONTENT_FIELDS ? [...SETTIN
   ]), canon(s.blocks));
   ok('rebuilt: the deleted page back, with its password and header choices; the new one gone', same(s.pages, PAGES), canon(s.pages));
   ok('rebuilt: the menu back', same(s.nav, NAV), canon(s.nav));
-  ok('rebuilt: logo, cover, share image back as media ids, not file paths', s.logo_media_id === MEDIA[3] && s.cover_media_id === MEDIA[0] && same(s.page_seo, WEBSITE.page_seo), canon(s.page_seo));
+  ok('rebuilt: logo, cover, share image and site icon back as media ids, not file paths', s.logo_media_id === MEDIA[3] && s.cover_media_id === MEDIA[0] && s.icon_media_id === MEDIA[3] && same(s.page_seo, WEBSITE.page_seo), canon(s.page_seo));
   ok('rebuilt: header, footer, announcement, section order and search settings back',
     s.nav_style === 'centered' && s.hero_layout === 'split' && s.footer_hours === false && s.announcement_text === 'Open late on Fridays'
     && same(s.sections_hidden, ['testimonials']) && same(s.sections_order, WEBSITE.sections_order) && same(s.pages_noindex, ['page:offers']) && same(s.category_order, ['Mains']));
@@ -292,7 +292,7 @@ const websiteNow = () => Object.fromEntries(SETTINGS_CONTENT_FIELDS ? [...SETTIN
 // ═══ 8. the defaults: a draft with no settings row keeps the column defaults ═══
 {
   const d = draftSettingsOf(null);
-  ok('no settings row: every website field at its column default', same(d, { category_order: [], cover_media_id: null, logo_media_id: null, og_media_id: null, announcement_text: '', announcement_url: '', announcement_expires_at: null, hero_layout: '', nav_style: '', sections_hidden: [], sections_order: [], footer_hours: true, footer_social: true, pages_noindex: [], page_seo: {}, blocks: [], pages: [], nav: [], popup: null }), canon(d));
+  ok('no settings row: every website field at its column default', same(d, { category_order: [], cover_media_id: null, logo_media_id: null, og_media_id: null, announcement_text: '', announcement_url: '', announcement_expires_at: null, hero_layout: '', nav_style: '', sections_hidden: [], sections_order: [], footer_hours: true, footer_social: true, pages_noindex: [], page_seo: {}, blocks: [], pages: [], nav: [], popup: null, icon_media_id: null }), canon(d));
 }
 
 // ═══ 9. the client's restore keeps the sections their studio locked (item 155) ═══
