@@ -20,6 +20,7 @@ import { REALIZED_BLOCK_TYPES, validateBlocksWithMap, type SectionMapEntry } fro
 import { componentsForIndustry } from '../lib/site_components.ts';
 import { listStarterLayouts, starterKeyFor } from '../lib/starter_layouts.ts';
 import { normalizeTags } from '../lib/search_index.ts';
+import { normalizeAuthors, normalizeCategories, scheduleProblem } from '../lib/blog.ts';
 import { detectPageRenames, duplicatePageInSettings, pageRefs, PAGE_SLUG_RE, type PageRename } from '../lib/page_ops.ts';
 import { lockedEdits, lockedMessage } from '../lib/section_lock.ts';
 import { publishActorKind } from '../lib/actor_kind.ts';
@@ -70,7 +71,7 @@ function clean(s: string): string {
   return out.trim();
 }
 
-type FieldRule = { max?: number; min?: number; required?: boolean; kind?: 'text' | 'bool' | 'int' | 'uuid' | 'date' | 'slug' | 'json' | 'tags' | 'stage_days' | 'google_tag' | 'meta_pixel'; json?: JsonShape };
+type FieldRule = { max?: number; min?: number; required?: boolean; kind?: 'text' | 'bool' | 'int' | 'uuid' | 'date' | 'slug' | 'json' | 'tags' | 'stage_days' | 'google_tag' | 'meta_pixel' | 'ref' | 'post_status'; json?: JsonShape; blog?: 'categories' | 'authors' };
 // Item 72: a JSON field's limits. Without them a 40 MB pages list was stored and then re-read
 // on every load, preview, publish, hash and sweep. The size is the saved text's length; the
 // shape checks only what every reader assumes (a list of objects, an object), never a
@@ -87,6 +88,11 @@ interface EntitySpec {
   softDelete: boolean;
   createDefaults?: Record<string, unknown>;
 }
+
+// The 0181 columns (builder list item 40). Before the apply pack a read that names them
+// 400s, so the list is read again without them and posts keep working.
+const POST_BLOG_COLS = ',category,author';
+const POST_STATUSES = ['draft', 'scheduled', 'published'];
 
 export const SPECS: Record<string, EntitySpec> = {
   offerings: {
@@ -123,11 +129,14 @@ export const SPECS: Record<string, EntitySpec> = {
     fields: {
       title: { max: 160, required: true }, slug: { kind: 'slug', max: 80 },
       body_md: { max: 20000 }, excerpt: { max: 300 },
-      hero_media_id: { kind: 'uuid' }, status: { max: 12 }, published_at: { kind: 'date' },
+      hero_media_id: { kind: 'uuid' }, status: { kind: 'post_status' }, published_at: { kind: 'date' },
       noindex: { kind: 'bool' },   // Phase SD: 'Show this update on Google?'
       tags: { kind: 'tags' },      // Phase SEARCH: flat, normalized update tags
+      // Builder list item 40 (0181): a day and time to go live, and one category and author
+      // by id from the site's lists (lib/blog.ts)
+      category: { kind: 'ref' }, author: { kind: 'ref' },
     },
-    select: 'id,title,slug,body_md,excerpt,hero_media_id,status,published_at,noindex,tags,updated_at',
+    select: 'id,title,slug,body_md,excerpt,hero_media_id,status,published_at,noindex,tags,updated_at' + POST_BLOG_COLS,
     order: 'updated_at.desc', softDelete: true,
   },
 };
@@ -174,6 +183,9 @@ const SETTINGS_FIELDS: Record<string, FieldRule> = {
   pages: { kind: 'json', json: { bytes: 2048 * KB, shape: 'pages', items: 40 } },
   // Editable GLOBAL nav [{label,href,children?}] (validated at serialize time)
   nav: { kind: 'json', json: { bytes: 64 * KB, shape: 'list', items: 60 } },
+  // Builder list item 40 (0181): the blog's categories and authors, made safe as they're saved
+  post_categories: { kind: 'json', json: { bytes: 16 * KB, shape: 'list', items: 60 }, blog: 'categories' },
+  post_authors: { kind: 'json', json: { bytes: 32 * KB, shape: 'list', items: 40 }, blog: 'authors' },
 };
 
 /** Item 72: why a JSON value can't be saved, in a sentence, or null when it can. Pure. */
@@ -220,6 +232,8 @@ function validateFields(payload: Record<string, unknown>, spec: Record<string, F
     if (rule.kind === 'json') {
       const problem = rule.json ? jsonFieldProblem(v, rule.json) : null;
       if (problem) { errors.push({ field: key, message: problem, plain: true }); continue; }
+      // item 40: the blog's lists are made safe here, so only clean values are stored
+      if (rule.blog) { cleanBody[key] = rule.blog === 'categories' ? normalizeCategories(v) : normalizeAuthors(v); fields.push(key); continue; }
       cleanBody[key] = v ?? (key === 'hours' || key === 'holiday_exceptions' || key === 'category_order' ? [] : null); fields.push(key); continue;
     }
     if (rule.kind === 'stage_days') {   // the per-stage "stale after N days" map (lib/sales_lifecycle.ts staleDaysFor): open stages only, whole days 1–365
@@ -229,6 +243,16 @@ function validateFields(payload: Record<string, unknown>, spec: Record<string, F
       cleanBody[key] = shaped; fields.push(key); continue;
     }
     if (rule.kind === 'tags') { cleanBody[key] = normalizeTags(v); fields.push(key); continue; }   // Phase SEARCH: the ONE tag gate — normalized to a clean text[]
+    if (rule.kind === 'ref') {   // item 40: one of the site's categories or authors by id, or '' for none
+      const s = clean(String(v ?? '')).toLowerCase();
+      if (s && !(s.length <= 40 && SLUG_RE.test(s))) { errors.push({ field: key, message: 'That isn’t one of your choices.', plain: true }); continue; }
+      cleanBody[key] = s; fields.push(key); continue;
+    }
+    if (rule.kind === 'post_status') {   // item 40: a draft, a post waiting for its time, or a published one
+      const s = String(v ?? '');
+      if (!POST_STATUSES.includes(s)) { errors.push({ field: key, message: 'A post is a draft, scheduled or published.', plain: true }); continue; }
+      cleanBody[key] = s; fields.push(key); continue;
+    }
     if (rule.kind === 'google_tag' || rule.kind === 'meta_pixel') {   // list item 152: an ad tag's ID goes into a script on the live site, so only its exact shape passes
       const id = String(v ?? '').replace(/\s+/g, '').toUpperCase();
       if (id && !(rule.kind === 'google_tag' ? GOOGLE_TAG_RE : META_PIXEL_RE).test(id)) {
@@ -275,8 +299,15 @@ export async function handleCollection(req: Request, db: SiteDb, site: SiteRow, 
     if (stale) return stale;
   }
 
+  // Item 40: before APPLY-0181 a read or a write that names the blog's new columns 400s;
+  // it's asked again without them, so posts keep working ahead of the pack.
+  const stepDown = async (go: (select: string) => Promise<{ ok: boolean; status: number; json?: any; text?: string }>) => {
+    const r = await go(spec.select);
+    return (r.ok || r.status !== 400 || entity !== 'posts') ? r : go(spec.select.replace(POST_BLOG_COLS, ''));
+  };
+
   if (method === 'GET' && !id) {
-    const r = await db(`${spec.table}?site_id=eq.${site.id}&deleted_at=is.null&select=${spec.select}&order=${spec.order}`);
+    const r = await stepDown((select) => db(`${spec.table}?site_id=eq.${site.id}&deleted_at=is.null&select=${select}&order=${spec.order}`));
     if (!r.ok) return json({ error: 'read_failed', message: `We couldn’t load your ${spec.noun}s just now.` }, 502, cors);
     return json({ data: r.json ?? [] }, 200, cors);
   }
@@ -290,13 +321,16 @@ export async function handleCollection(req: Request, db: SiteDb, site: SiteRow, 
     if ('hero_media_id' in v.cleanBody && !(await mediaBelongs(site.id, v.cleanBody.hero_media_id))) return json({ error: 'bad_media', message: 'That photo isn’t in your library.' }, 422, cors);
     if (entity === 'posts') {
       if (!v.cleanBody.slug) v.cleanBody.slug = slugify(String(v.cleanBody.title || ''));
-      if (v.cleanBody.status && !['draft', 'published'].includes(String(v.cleanBody.status))) v.cleanBody.status = 'draft';
+      if (v.cleanBody.status === 'scheduled') {   // item 40: it goes out at its time, which must be ahead
+        const problem = scheduleProblem(v.cleanBody.published_at, new Date().toISOString());
+        if (problem) return json({ error: 'bad_time', message: problem, fields: [{ field: 'published_at', message: problem }] }, 422, cors);
+      }
       if (v.cleanBody.status === 'published' && !v.cleanBody.published_at) v.cleanBody.published_at = new Date().toISOString();
     }
-    const w = await db(`${spec.table}?select=${spec.select}`, {
+    const w = await stepDown((select) => db(`${spec.table}?select=${select}`, {
       method: 'POST', headers: { Prefer: 'return=representation' },
       body: JSON.stringify({ site_id: site.id, ...v.cleanBody }),
-    });
+    }));
     if (!w.ok || !w.json?.[0]) return json({ error: 'write_failed', message: 'That didn’t save — nothing was changed. Please try again.', detail: w.status === 409 ? 'That link is already used by another update.' : undefined }, w.status === 409 ? 409 : 502, cors);
     await writeChangeEvent({ siteId: site.id, entityType: spec.entityType, entityId: w.json[0].id, action: 'create', summary: `Added a ${spec.noun}`, principal, provenance: 'human', fields: v.fields });
     return json({ data: w.json[0] }, 201, cors);
@@ -311,13 +345,20 @@ export async function handleCollection(req: Request, db: SiteDb, site: SiteRow, 
     if (v.fields.length === 0) return json({ error: 'empty_update', message: 'No editable fields were provided.' }, 400, cors);
     if ('media_id' in v.cleanBody && !(await mediaBelongs(site.id, v.cleanBody.media_id))) return json({ error: 'bad_media', message: 'That photo isn’t in your library.' }, 422, cors);
     if ('hero_media_id' in v.cleanBody && !(await mediaBelongs(site.id, v.cleanBody.hero_media_id))) return json({ error: 'bad_media', message: 'That photo isn’t in your library.' }, 422, cors);
-    if (entity === 'posts' && v.cleanBody.status === 'published') {
-      const cur = await svc(`presence_posts?id=eq.${id}&site_id=eq.${site.id}&select=published_at&limit=1`);
-      if (!cur.json?.[0]?.published_at && !v.cleanBody.published_at) { v.cleanBody.published_at = new Date().toISOString(); v.fields.push('published_at'); }
+    if (entity === 'posts' && v.cleanBody.status) {
+      const cur = await svc(`presence_posts?id=eq.${id}&site_id=eq.${site.id}&select=status,published_at&limit=1`);
+      const row = cur.json?.[0];
+      if (v.cleanBody.status === 'published' && !row?.published_at && !v.cleanBody.published_at) { v.cleanBody.published_at = new Date().toISOString(); v.fields.push('published_at'); }
+      if (v.cleanBody.status === 'scheduled') {   // item 40: the time it goes out, as sent or as kept, must be ahead
+        const problem = scheduleProblem('published_at' in v.cleanBody ? v.cleanBody.published_at : row?.published_at, new Date().toISOString());
+        if (problem) return json({ error: 'bad_time', message: problem, fields: [{ field: 'published_at', message: problem }] }, 422, cors);
+      }
+      // a scheduled post taken back to a draft forgets its time; a published one keeps its date
+      if (v.cleanBody.status === 'draft' && row?.status === 'scheduled' && !('published_at' in v.cleanBody)) { v.cleanBody.published_at = null; v.fields.push('published_at'); }
     }
-    const w = await db(`${spec.table}?id=eq.${id}&site_id=eq.${site.id}&deleted_at=is.null&select=${spec.select}`, {
+    const w = await stepDown((select) => db(`${spec.table}?id=eq.${id}&site_id=eq.${site.id}&deleted_at=is.null&select=${select}`, {
       method: 'PATCH', headers: { Prefer: 'return=representation' }, body: JSON.stringify(v.cleanBody),
-    });
+    }));
     if (!w.ok) return json({ error: 'write_failed', message: 'That didn’t save — nothing was changed. Please try again.' }, 502, cors);
     if (!w.json?.[0]) return json({ error: 'not_found', message: `We couldn’t find that ${spec.noun}.` }, 404, cors);
     const action = v.fields.length === 1 && v.fields[0] === 'is_visible' ? (v.cleanBody.is_visible ? 'show' : 'hide')
@@ -415,9 +456,11 @@ const POPUP_SETTINGS_COLS = 'popup';
 const SEARCH_SETTINGS_COLS = 'search_hidden,llms_txt';
 // The 0175 columns (sales item 87's recipes).
 const RECIPE_SETTINGS_COLS = 'auto_ack_message,enquiry_followups,enquiry_followup_1_days,enquiry_followup_2_days,enquiry_followup_1_message,enquiry_followup_2_message,invoice_overdue_repeat,quote_expiry_reminders';
+// The 0181 columns (builder list item 40's categories and authors).
+const BLOG_SETTINGS_COLS = 'post_categories,post_authors';
 // Newest apply pack first. A database without a pack's columns 400s the widened select,
 // so a read or a save steps down one pack at a time; Settings never goes dark ahead of one.
-const OPTIONAL_SETTINGS_COLS = [RECIPE_SETTINGS_COLS, SEARCH_SETTINGS_COLS, POPUP_SETTINGS_COLS, CRAWLER_SETTINGS_COLS, AD_SETTINGS_COLS, VISIT_SETTINGS_COLS, REVIEW_SETTINGS_COLS, AUTOMATION_SETTINGS_COLS];
+const OPTIONAL_SETTINGS_COLS = [BLOG_SETTINGS_COLS, RECIPE_SETTINGS_COLS, SEARCH_SETTINGS_COLS, POPUP_SETTINGS_COLS, CRAWLER_SETTINGS_COLS, AD_SETTINGS_COLS, VISIT_SETTINGS_COLS, REVIEW_SETTINGS_COLS, AUTOMATION_SETTINGS_COLS];
 function selectSteps(select: string): string[] {
   const out = [select];
   let s = select;
@@ -431,7 +474,7 @@ function selectSteps(select: string): string[] {
 const SETTINGS_CFG = {
   table: 'presence_settings', entityType: 'settings', noun: 'site settings', fields: SETTINGS_FIELDS,
   select: 'site_id,category_order,cover_media_id,logo_media_id,og_media_id,announcement_text,announcement_url,announcement_expires_at,industry_key,google_site_verification,bing_site_verification,hero_layout,nav_style,sections_hidden,sections_order,footer_hours,footer_social,pages_noindex,page_seo,blocks,pages,nav,updated_at'
-    + ',' + AUTOMATION_SETTINGS_COLS + ',' + REVIEW_SETTINGS_COLS + ',' + VISIT_SETTINGS_COLS + ',' + AD_SETTINGS_COLS + ',' + CRAWLER_SETTINGS_COLS + ',' + POPUP_SETTINGS_COLS + ',' + SEARCH_SETTINGS_COLS + ',' + RECIPE_SETTINGS_COLS,
+    + ',' + AUTOMATION_SETTINGS_COLS + ',' + REVIEW_SETTINGS_COLS + ',' + VISIT_SETTINGS_COLS + ',' + AD_SETTINGS_COLS + ',' + CRAWLER_SETTINGS_COLS + ',' + POPUP_SETTINGS_COLS + ',' + SEARCH_SETTINGS_COLS + ',' + RECIPE_SETTINGS_COLS + ',' + BLOG_SETTINGS_COLS,
   conflict: 'site_id', summary: 'Updated site settings',
 } as const;
 

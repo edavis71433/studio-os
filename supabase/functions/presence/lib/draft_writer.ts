@@ -214,7 +214,9 @@ export async function applySnapshotToDraft(
   for (const p of c.posts) {
     const r = await svc('presence_posts?on_conflict=id', {
       method: 'POST', headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },
-      body: JSON.stringify({ id: p.id, site_id: site.id, title: p.title, slug: p.slug, body_md: p.body_md, excerpt: p.excerpt || '', hero_media_id: resolve(p.hero), status: 'published', published_at: p.published_at, deleted_at: null }),
+      // item 40: a version that knew the post's category and author brings them back too
+      body: JSON.stringify({ id: p.id, site_id: site.id, title: p.title, slug: p.slug, body_md: p.body_md, excerpt: p.excerpt || '', hero_media_id: resolve(p.hero), status: 'published', published_at: p.published_at, deleted_at: null,
+        ...(p.category ? { category: p.category.id } : {}), ...(p.author ? { author: p.author.id } : {}) }),
     });
     if (r.ok) entities++;
   }

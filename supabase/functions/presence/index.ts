@@ -53,6 +53,7 @@ import { handleAssetsList, handleAssetsCollections, handleAssetsHealth, handleAs
 const { handleVisualKinds, handleVisualGenerate, handleVisualList, handleVisualGet, handleVisualVary, handleVisualEdit, handleVisualDecide } = lazyRoutes(() => import('./routes/visual.ts'));
 const { handleAdmin, handleDomain, handleDomainLookup, handleDomainForward } = lazyRoutes(() => import('./routes/admin.ts'));
 import { handleCollection, handleLocation, handleSettings, handleBlockSuggestions, handlePageDuplicate, handlePageRefs, SPECS } from './routes/content.ts';
+import { handlePostPublish, handlePostUnpublish, handlePostEmailDraft } from './routes/blog.ts';
 import { handleDeletedPages, handleDeletedPageRestore } from './routes/deleted_pages.ts';
 import { handlePageLockCreate, handlePageLockList } from './routes/page_locks.ts';
 import { handleHealth, handleChanges, handleContentTree, handleNotesList, handleNoteResolve, handleRestoreToDraft, handleMediaList } from './routes/room.ts';
@@ -1343,6 +1344,12 @@ async function route_(req: Request, cors: Record<string, string>): Promise<Respo
   if (route === '/page-locks' && method === 'POST') return handlePageLockCreate(req, site, principal, cors);
   if (route === '/page-locks' && method === 'GET') return handlePageLockList(site, cors);
   if (route === '/blocks/suggested' && method === 'GET') return handleBlockSuggestions(site, cors);   // FD-T4 vertical presets
+  {   // builder list items 40 and 160: one post live (or off) on its own, and the email it becomes
+    const bm = route.match(/^\/posts\/([0-9a-f-]{36})\/(publish|unpublish|email-draft)$/);
+    if (bm && bm[2] === 'publish' && method === 'POST') return handlePostPublish(site, principal, bm[1], cors);
+    if (bm && bm[2] === 'unpublish' && method === 'POST') return handlePostUnpublish(site, principal, bm[1], cors);
+    if (bm && bm[2] === 'email-draft' && method === 'GET') return handlePostEmailDraft(site, bm[1], cors);
+  }
   {
     const m = route.match(/^\/(offerings|testimonials|faqs|posts)(?:\/([0-9a-f-]{36}))?$/);
     if (m && m[1] in SPECS) { const r = await handleCollection(req, db, site, principal, m[1], m[2] ?? null, cors); if (r) return r; }

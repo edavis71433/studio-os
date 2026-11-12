@@ -1746,6 +1746,52 @@ body.pd-dragging *{cursor:grabbing !important}
 .rdx-table tr.skip td{color:var(--warn,#94530a)}
 .rdx-table tr.same td{color:var(--ink-3)}
 .rdx-more{font:inherit;font-size:12px;font-weight:600;color:var(--plum);background:none;border:none;padding:4px 0;cursor:pointer;text-decoration:underline}
+/* ── Blog (builder list item 40): the posts as cards with where each stands, the filters,
+   and the categories and authors sheet. The writing screen brings its own styles
+   (blog-studio.js); while it's open the app's own bars step aside, as in Edit mode. ── */
+html.bs-open #dds-shell,html.bs-open #dds-ctxbar,html.bs-open #dds-mbar,html.bs-open .topbar,html.bs-open #dock{display:none !important}
+html.bs-open .scrim{z-index:96}   /* Files and the categories card open over the writing screen */
+.bl-head{display:flex;flex-wrap:wrap;gap:var(--dds-s2,8px);justify-content:flex-end;margin:-6px 0 var(--dds-s4,16px)}
+.bl-head .pillbtn{height:40px;padding:0 var(--dds-s4,16px);border-radius:999px;font-weight:600}
+.bl-head .pillbtn.inked{background:var(--plum-grad);border-color:transparent}
+.bl-filters{display:flex;flex-wrap:wrap;align-items:center;gap:var(--dds-s2,8px);margin:0 0 var(--dds-s5,20px)}
+.bl-pill{font:500 13px/1 var(--sans);min-height:36px;padding:0 14px;border-radius:999px;border:1px solid var(--hair);background:var(--sheet);color:var(--ink);cursor:pointer}
+.bl-pill[aria-pressed="true"]{background:var(--ink);border-color:var(--ink);color:var(--sheet)}
+.bl-catsel select{font:500 13px/1 var(--sans);min-height:36px;padding:0 12px;border-radius:999px;border:1px solid var(--hair);background:var(--sheet);color:var(--ink)}
+.bl-lists{margin-left:auto;display:inline-flex;align-items:center;gap:6px;font:600 13px/1 var(--sans);color:var(--plum);background:none;border:0;min-height:36px;cursor:pointer;padding:0 4px}
+.bl-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:var(--dds-s5,20px)}
+.bl-card{display:flex;flex-direction:column;background:var(--sheet);border:1px solid var(--hair);border-radius:var(--dds-r-lg,16px);overflow:hidden;box-shadow:var(--dds-shadow,0 1px 2px rgba(23,21,34,.05))}
+.bl-photo{aspect-ratio:16/9;overflow:hidden;background:var(--wash);cursor:pointer}
+.bl-photo img{width:100%;height:100%;object-fit:cover;display:block}
+.bl-photo.none{background:linear-gradient(135deg,var(--plum-soft),var(--wash))}
+.bl-body{display:flex;flex-direction:column;gap:8px;padding:14px 16px 12px;flex:1}
+.bl-top{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.bl-chip{display:inline-flex;align-items:center;gap:6px;font:600 11.5px/1 var(--sans);border-radius:999px;padding:5px 10px}
+.bl-chip::before{content:"";width:6px;height:6px;border-radius:999px;background:currentColor}
+.bl-chip.live{background:var(--sage-soft);color:var(--sage)}
+.bl-chip.sched{background:var(--info-soft);color:var(--info)}
+.bl-chip.draft{background:var(--soft-bg);color:var(--soft)}
+.bl-cat{font:700 11px/1 var(--sans);letter-spacing:.08em;text-transform:uppercase;color:var(--plum)}
+.bl-title{margin:0;font:600 17px/1.3 var(--sans)}
+.bl-title button{font:inherit;color:var(--ink);background:none;border:0;padding:0;text-align:left;cursor:pointer}
+.bl-title button:hover{text-decoration:underline}
+.bl-meta{margin:0;font-size:13px;color:var(--soft)}
+.bl-acts{display:flex;align-items:center;gap:var(--dds-s3,12px);border-top:1px solid var(--hair);padding-top:10px;margin-top:auto}
+.bl-act{display:inline-flex;align-items:center;gap:6px;font:600 13px/1 var(--sans);color:var(--plum);background:none;border:0;padding:0;min-height:36px;cursor:pointer;text-decoration:none}
+.bl-rm{margin-left:auto;font:500 12.5px/1 var(--sans);color:var(--soft);background:none;border:0;min-height:36px;cursor:pointer}
+.bl-rm.armed{color:var(--clay)}
+.bl-none{color:var(--soft);font-size:14px}
+.bl-lbl{font:600 11.5px/1 var(--sans);letter-spacing:.08em;text-transform:uppercase;color:var(--soft);margin:var(--dds-s4,16px) 0 var(--dds-s2,8px)}
+.bl-row{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:12px;background:var(--soft-bg);margin-bottom:8px}
+.bl-rowtext{display:flex;flex-direction:column;gap:2px;flex:1;min-width:0}
+.bl-rowtext span{font-size:12.5px;color:var(--soft)}
+.bl-row .textact{min-height:36px}
+.bl-x{color:var(--clay)}
+.bl-av{width:36px;height:36px;border-radius:999px;background:var(--plum-soft);color:var(--plum);display:inline-grid;place-items:center;font:700 12px/1 var(--sans);overflow:hidden;flex:0 0 auto}
+.bl-av img{width:100%;height:100%;object-fit:cover}
+.bl-empty{font-size:13px;color:var(--soft);margin:0 0 8px}
+.bs-addline{display:inline-block;margin:2px 0 4px;min-height:36px}
+@media (max-width:760px){.bl-head{justify-content:stretch}.bl-head .pillbtn{flex:1}.bl-lists{margin-left:0}.bl-grid{grid-template-columns:1fr}.bl-row{flex-wrap:wrap}}
 </style>
 </head>
 <body>
@@ -1988,12 +2034,14 @@ body.pd-dragging *{cursor:grabbing !important}
 
       <!-- UPDATES -->
       <section class="view" id="view-updates">
-        <h1 class="doc" role="heading" aria-level="2">Updates</h1>
-        <p class="docsub">News and seasonal notes. Drafts stay private. What you choose to show goes on your Updates page when you publish.</p>
-        <div id="postList"></div>
-        <button class="addline" id="btnAddPost">＋ Write an update</button>
-        <button class="addline" style="border-top:none" onclick="openDesk('post','updates')"><span class="aimark">✦</span> Draft one with help</button>
-        <div id="postAddWrap"></div>
+        <h1 class="doc" role="heading" aria-level="2">Blog</h1>
+        <p class="docsub">Posts go on your site’s Updates page. Publish one now or pick a day and time. Nothing else in your draft goes with it.</p>
+        <div class="bl-head">
+          <button type="button" class="pillbtn" id="btnPostHelp"><span class="aimark">✦</span> Draft one with help</button>
+          <button type="button" class="pillbtn inked" id="btnAddPost">+ New post</button>
+        </div>
+        <div class="bl-filters" id="blFilters" role="group" aria-label="Which posts to show"></div>
+        <div id="postList" class="bl-grid"></div>
       </section>
 
       <!-- FILES (#180: the full library — collections · search · sort · non-image kinds) -->
@@ -2316,6 +2364,15 @@ body.pd-dragging *{cursor:grabbing !important}
       <button class="quietact" data-close>Never mind</button>
       <button class="pillbtn inked" id="deskGo">Write the drafts</button>
     </div>
+  </div>
+</div>
+
+<!-- Blog (builder list item 40): the categories and authors a post picks from -->
+<div class="scrim" id="blogListsScrim">
+  <div class="sheetcard" role="dialog" aria-modal="true" aria-labelledby="blogListsTitle">
+    <h2 id="blogListsTitle">Categories and authors</h2>
+    <div class="body" id="blogListsBody"></div>
+    <div class="foot"><button class="pillbtn inked" data-close>Done</button></div>
   </div>
 </div>
 
@@ -2958,7 +3015,7 @@ $("dock").addEventListener("click", (e) => {
 // phone it is the Sections sheet. Styles opens Edit mode on its Styles panel.
 const SITE_MENU = [
   [null, [["today", "Overview"], ["pages", "Pages"], ["styles", "Styles"], ["media", "Files"], ["search", "Search"]]],
-  ["Content", [["offerings", "Menu"], ["faqs", "Questions"], ["testimonials", "Testimonials"], ["updates", "Updates"]]],
+  ["Content", [["offerings", "Menu"], ["faqs", "Questions"], ["testimonials", "Testimonials"], ["updates", "Blog"]]],
   [null, [["bookings", "Bookings"], ["reviews", "Reviews"], ["analytics", "Analytics"]]],
   ["Site settings", [["business", "Business details"], ["domain", "Domain & email"], ["history", "Versions"], ["connections", "Connections"], ["sharing", "Sharing & access"], ["clientview", "See the client’s view"]]],
 ];
@@ -3503,71 +3560,175 @@ function renderTes() {
     list.appendChild(a);
   });
 }
+/* ── Blog (builder list item 40): every post as a card that says where it stands (Live,
+ *    the day and time it goes out, or Draft), its category and who wrote it. A card opens
+ *    the writing screen (blog-studio.js, loaded on first use), which saves as you type and
+ *    publishes one post on its own. ── */
+let BLOG_SHOW = "all", BLOG_CAT = "";
+const blogLists = () => ({
+  categories: Array.isArray(S.settings && S.settings.post_categories) ? S.settings.post_categories : [],
+  authors: Array.isArray(S.settings && S.settings.post_authors) ? S.settings.post_authors : [],
+});
+const siteTz = () => (S.location && S.location.timezone) || "America/Los_Angeles";
+const blogWhen = (iso) => new Date(iso).toLocaleString("en-US", { timeZone: siteTz(), weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }).replace(/, (\d{1,2}:\d{2}) (AM|PM)$/, (_m, t, ap) => " · " + t + " " + ap.toLowerCase());
+const postState = (p) => (p.status === "published" ? "live" : p.status === "scheduled" ? "sched" : "draft");
+const siteIsLive = () => !!(S.site && S.site.status === "live");
+function paintBlogFilters() {
+  const host = $("blFilters"); if (!host) return;
+  const n = { all: S.posts.length, live: 0, sched: 0, draft: 0 };
+  S.posts.forEach((p) => { n[postState(p)]++; });
+  const cats = blogLists().categories;
+  host.innerHTML = [["all", "All"], ["live", "Live"], ["sched", "Scheduled"], ["draft", "Drafts"]]
+    .map(([k, w]) => `<button type="button" class="bl-pill" data-show="${k}" aria-pressed="${BLOG_SHOW === k}">${w} ${n[k]}</button>`).join("")
+    + (cats.length ? `<label class="bl-catsel"><span class="sr-only">Category</span><select id="blCat"><option value="">Every category</option>${cats.map((c) => `<option value="${esc(c.id)}"${BLOG_CAT === c.id ? " selected" : ""}>${esc(c.name)}</option>`).join("")}</select></label>` : "")
+    + `<button type="button" class="bl-lists" id="btnBlogLists">${uiIcon("cog", 15)} Categories and authors</button>`;
+  host.querySelectorAll("[data-show]").forEach((b) => b.addEventListener("click", () => { BLOG_SHOW = b.dataset.show; renderPosts(); }));
+  const sel = $("blCat"); if (sel) sel.addEventListener("change", () => { BLOG_CAT = sel.value; renderPosts(); });
+  $("btnBlogLists").addEventListener("click", openBlogLists);
+}
 function renderPosts() {
-  const list = $("postList"); list.innerHTML = "";
-  const wash = changedIds();
+  const list = $("postList"); if (!list) return;
+  list.innerHTML = "";
+  paintBlogFilters();
   if (!S.posts.length) {
     list.appendChild(estateWithAction("Summer patio is open.",
-      "Your first update can be one sentence, like this. Write it as a draft; show it when it’s ready — customers see it on your Updates page.",
-      "Write the first update", () => $("btnAddPost").click()));
+      "Your first post can be one sentence, like this. Write it, add a photo, then publish it now or pick a day and time. It goes on your site’s Updates page.",
+      "Write the first post", () => $("btnAddPost").click()));
     return;
   }
-  S.posts.forEach((p) => {
-    const shown = p.status === "published";
-    const a = el("div", "artifact" + (!shown ? " dimmed" : ""));
-    const row = el("div", "arow");
-    const q = el("span", "aq");
-    if (wash.has(p.id) && shown) q.appendChild(el("span", "washed-dot"));
-    q.appendChild(document.createTextNode(p.title));
-    if (!shown) q.appendChild(Object.assign(el("span", "smalltag", "draft"), { style: "margin-left:10px" }));
-    row.appendChild(q);
-    const acts = el("span", "aacts");
-    const tog = el("button", "quietact", shown ? "make it a draft" : "show it");
-    tog.addEventListener("click", async (e) => {
-      e.stopPropagation();
-      try { const r = await api("PATCH", `/posts/${p.id}`, { status: shown ? "draft" : "published" });
-        Object.assign(p, r.data); renderPosts(); scheduleChangesRefresh(); }
-      catch (err) { toast(nice(err), true); }
-    });
-    acts.appendChild(tog);
-    const edit = el("button", "quietact", "edit");
-    edit.addEventListener("click", () => { const open = a.querySelector(".editor"); if (open) open.remove(); else a.appendChild(postEditor(p)); });
-    acts.appendChild(edit);
-    row.appendChild(acts);
-    a.appendChild(row);
-    a.appendChild(el("div", "meta", shown && p.published_at ? fmtDate(p.published_at).toUpperCase() : "UNDATED UNTIL SHOWN"));
-    list.appendChild(a);
+  const lists = blogLists(), wash = changedIds();
+  const shown = S.posts.filter((p) => (BLOG_SHOW === "all" || postState(p) === BLOG_SHOW) && (!BLOG_CAT || p.category === BLOG_CAT));
+  if (!shown.length) { list.appendChild(el("p", "bl-none", "No posts here yet.")); return; }
+  shown.forEach((p) => {
+    const st = postState(p), cat = lists.categories.find((c) => c.id === p.category), au = lists.authors.find((a) => a.id === p.author);
+    const card = el("article", "bl-card"); card.dataset.post = p.id;
+    const m = p.hero_media_id ? (S.media || []).find((x) => x.id === p.hero_media_id) : null;
+    const chip = st === "live" ? "Live" : st === "sched" ? "Goes out " + blogWhen(p.published_at) : "Draft";
+    const when = st === "live" && p.published_at ? fmtDate(p.published_at) : st === "sched" ? "scheduled" : "edited " + fmtDate(p.updated_at || p.published_at || new Date().toISOString());
+    const action = st === "live" && siteIsLive() ? `<a class="bl-act" href="${esc(withClient("/broadcasts.html?post=" + p.id))}">${uiIcon("mail", 15)} Email it to your list</a>`
+      : `<button type="button" class="bl-act" data-open>${st === "sched" ? "Change the time" : st === "live" ? "Edit" : "Keep writing"}</button>`;
+    card.innerHTML = `<div class="bl-photo${m && m.thumb ? "" : " none"}">${m && m.thumb ? `<img src="${esc(m.thumb)}" alt="" loading="lazy">` : ""}</div>
+      <div class="bl-body">
+        <div class="bl-top"><span class="bl-chip ${st}">${esc(chip)}</span>${cat ? `<span class="bl-cat">${esc(cat.name)}</span>` : ""}${wash.has(p.id) && st === "live" ? `<span class="washed-dot" title="Changed since your last publish"></span>` : ""}</div>
+        <h3 class="bl-title"><button type="button" data-open>${esc(p.title || "Untitled post")}</button></h3>
+        <p class="bl-meta">${esc((au ? "By " + au.name + " · " : "") + when)}</p>
+        <div class="bl-acts">${action}<button type="button" class="bl-rm" data-act="del" data-needs="delete">Remove</button></div>
+      </div>`;
+    card.querySelectorAll("[data-open]").forEach((b) => b.addEventListener("click", () => openPost(p)));
+    card.querySelector(".bl-photo").addEventListener("click", () => openPost(p));
+    armDelete(card.querySelector('[data-act="del"]'), async () => { if (await deletePost(p)) renderPosts(); });
+    list.appendChild(card);
   });
 }
-function postEditor(p) {
-  const ed = el("div", "editor");
-  ed.innerHTML = `
-    <div class="field"><label>Title</label><input type="text" data-k="title" value="${esc(p.title)}" maxlength="160"></div>
-    <div class="field"><label>The update</label><textarea data-k="body_md" maxlength="20000" style="min-height:130px">${esc(p.body_md || "")}</textarea></div>
-    <div class="field"><label>Tags</label><input type="text" data-k="tags" value="${esc((p.tags || []).join(", "))}" maxlength="200" placeholder="events, seasonal, news"><div class="hint">Separate with commas. Tags let visitors filter your Updates page and help on-site search.</div></div>
-    <div class="field" style="max-width:220px"><label>Photograph</label><button class="textact" data-act="photo" style="background:none">${p.hero_media_id ? "Change photograph" : "Choose one"}</button></div>
-    <div class="eacts">
-      <button class="pillbtn" data-act="save">Done</button>
-      <span class="spacer"></span>
-      <button class="danger" data-act="del" data-needs="delete">Remove for good</button>
-    </div>`;
-  ed.querySelector('[data-act="photo"]').addEventListener("click", () => openPicker(async (mediaId) => {
-    try { const r = await api("PATCH", `/posts/${p.id}`, { hero_media_id: mediaId }); Object.assign(p, r.data); renderPosts(); scheduleChangesRefresh(); }
-    catch (err) { toast(nice(err), true); }
-  }));
-  if (p.status === "published") {
-    const improve = el("button", "quietact", "✦ improve with help");
-    improve.style.marginLeft = "18px";
-    improve.addEventListener("click", () => openEditDesk("edit_post", "updates", p.id, "rewrite"));
-    ed.querySelector(".eacts").insertBefore(improve, ed.querySelector(".spacer"));
-  }
-  editorAutosave(ed, () => { const body = {}; ed.querySelectorAll("[data-k]").forEach((i) => { body[i.dataset.k] = i.dataset.k === "tags" ? splitTags(i.value) : i.value; }); return body; },
-    async (body) => { const r = await api("PATCH", `/posts/${p.id}`, body); Object.assign(p, r.data); }, renderPosts);
-  armDelete(ed.querySelector('[data-act="del"]'), async () => {
-    try { await api("DELETE", `/posts/${p.id}`); S.posts = S.posts.filter((x) => x.id !== p.id); renderPosts(); toast("Removed"); scheduleChangesRefresh(); }
-    catch (err) { toast(nice(err), true); }
+// The writing screen shows the post in the site's own fonts and colours: the template's,
+// with the owner's own choices from Styles over them.
+const TEMPLATE_LOOK = {
+  "atelier": { bg: "#fbfaf7", ink: "#1c1b18", soft: "#5b564c", accent: "#7a5f3a", line: "#e5e0d5", display: "Georgia,'Times New Roman',serif", body: "'Avenir Next','Helvetica Neue',system-ui,sans-serif" },
+  "aurora": { bg: "#ffffff", ink: "#16171d", soft: "#636471", accent: "#3730a3", line: "#eaeaf1", display: "system-ui,-apple-system,'Segoe UI',Roboto,sans-serif", body: "system-ui,-apple-system,'Segoe UI',Roboto,sans-serif" },
+  "business-classic": { bg: "#f7f7f5", ink: "#1c2430", soft: "#5b6572", accent: "#17453f", line: "#e2e4e1", display: "system-ui,-apple-system,'Segoe UI',Roboto,sans-serif", body: "system-ui,-apple-system,'Segoe UI',Roboto,sans-serif" },
+  "editorial": { bg: "#f6f3ec", ink: "#1a1a1c", soft: "#5f5a52", accent: "#4f181d", line: "#ddd6c8", display: "'Iowan Old Style',Palatino,Georgia,serif", body: "'Iowan Old Style','Palatino Linotype',Palatino,serif" },
+  "harbor": { bg: "#ffffff", ink: "#1c2434", soft: "#4a556a", accent: "#12203a", line: "#c9d5e6", display: "system-ui,-apple-system,'Segoe UI',Roboto,sans-serif", body: "system-ui,-apple-system,'Segoe UI',Roboto,sans-serif" },
+  "meadow": { bg: "#faf7f0", ink: "#243428", soft: "#55624f", accent: "#345c41", line: "#e4dfcd", display: "'Palatino Linotype',Palatino,Georgia,serif", body: "'Seravek','Gill Sans',system-ui,sans-serif" },
+  "restaurant-classic": { bg: "#faf6ef", ink: "#241d1a", soft: "#6b5f58", accent: "#6f2e24", line: "#e7ddd0", display: "Georgia,'Iowan Old Style','Times New Roman',serif", body: "system-ui,-apple-system,'Segoe UI',sans-serif" },
+  "slate": { bg: "#101216", ink: "#eef1f5", soft: "#9ba4b5", accent: "#2dd4bf", line: "#262a33", display: "system-ui,-apple-system,'Segoe UI',Roboto,sans-serif", body: "system-ui,-apple-system,'Segoe UI',Roboto,sans-serif" },
+};
+function blogLook() {
+  const base = TEMPLATE_LOOK[(S.site && S.site.template_slug) || ""] || TEMPLATE_LOOK["business-classic"];
+  const t = DESIGN_TOKENS || {};
+  return { ...base, ...(t.ink ? { ink: t.ink } : {}), ...(t.soft ? { soft: t.soft } : {}), ...(t.accent_dark || t.accent ? { accent: t.accent_dark || t.accent } : {}), ...(t.bg ? { bg: t.bg } : {}),
+    ...(t.font_display ? { display: t.font_display } : {}), ...(t.font_body ? { body: t.font_body } : {}), radius: t.radius || "14px" };
+}
+// The one place a post is removed: the card's Remove, and the writing screen's.
+async function deletePost(p) {
+  try { await api("DELETE", `/posts/${p.id}`); S.posts = S.posts.filter((x) => x.id !== p.id); toast("Removed"); scheduleChangesRefresh(); return true; }
+  catch (err) { toast(nice(err), true); return false; }
+}
+let BLOG_STUDIO = null;
+function loadBlogStudio() {
+  if (window.DDSBlogStudio) return Promise.resolve(window.DDSBlogStudio);
+  // Bump ?v= whenever blog-studio.js changes: browsers keep a .js file for a day.
+  if (!BLOG_STUDIO) BLOG_STUDIO = new Promise((res, rej) => {
+    const sc = document.createElement("script"); sc.src = "/blog-studio.js?v=1";
+    sc.onload = () => window.DDSBlogStudio ? res(window.DDSBlogStudio) : rej(new Error("missing"));
+    sc.onerror = () => rej(new Error("load"));
+    document.head.appendChild(sc);
+  }).catch((e) => { BLOG_STUDIO = null; throw e; });
+  return BLOG_STUDIO;
+}
+async function blogListsPut(field, next) {
+  try { await settingsPut({ [field]: next }); renderPosts(); return true; }
+  catch (err) { toast(nice(err), true); return false; }
+}
+async function addBlogCategory(name) {
+  const lists = blogLists();
+  const have = lists.categories.find((c) => c.name.toLowerCase() === name.toLowerCase());
+  if (have) return have;
+  if (!(await blogListsPut("post_categories", [...lists.categories, { name }]))) return null;
+  return blogLists().categories.find((c) => c.name.toLowerCase() === name.toLowerCase()) || null;
+}
+async function addBlogAuthor(name, bio) {
+  const lists = blogLists();
+  if (!(await blogListsPut("post_authors", [...lists.authors, { name, ...(bio ? { bio } : {}) }]))) return null;
+  return blogLists().authors.filter((a) => a.name === name).slice(-1)[0] || null;
+}
+function blogHost() {
+  const live = siteLiveUrl();
+  return {
+    api, toast, nice, askText, splitTags, openPicker,
+    timezone: siteTz(), origin: live ? live.replace(/^https?:\/\//, "").replace(/\/$/, "") : "yoursite.com",
+    siteLive: siteIsLive(), look: blogLook(),
+    mediaOf: (id) => (S.media || []).find((m) => m.id === id) || null,
+    lists: blogLists, addCategory: (n) => addBlogCategory(n), addAuthor: (n) => addBlogAuthor(n),
+    emailHref: (p) => withClient("/broadcasts.html?post=" + p.id),
+    // the writing screen offers Remove only to someone who may delete (a role without it isn't shown it)
+    canDelete: () => !(window.ddsLacks && window.ddsLacks("delete")),
+    removePost: async (p) => (await askYes(`Remove “${p.title || "this post"}”? It comes off your site with your next publish.`, { ok: "Remove it", danger: true })) && deletePost(p),
+    onSaved: (p) => { const { _slugDraft, _slugTouched, ...clean } = p; const i = S.posts.findIndex((x) => x.id === p.id); if (i >= 0) S.posts[i] = { ...S.posts[i], ...clean }; scheduleChangesRefresh(); },
+    onClose: () => { renderPosts(); const c = document.querySelector(`.bl-card[data-post] .bl-title button`); if (c) c.focus(); },
+  };
+}
+// The two lists a post picks from. Removing a category keeps its posts; they lose the label.
+function openBlogLists() {
+  paintBlogLists();
+  openSheet("blogListsScrim");
+}
+function paintBlogLists() {
+  const host = $("blogListsBody"); if (!host) return;
+  const lists = blogLists();
+  const used = (k, id) => S.posts.filter((p) => p[k] === id).length;
+  const n = (k, id) => { const c = used(k, id); return c === 1 ? "1 post" : c + " posts"; };
+  const initials = (name) => String(name || "").split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0].toUpperCase()).join("");
+  host.innerHTML = `<p class="bl-lbl">Categories</p>
+    ${lists.categories.map((c, i) => `<div class="bl-row"><div class="bl-rowtext"><strong>${esc(c.name)}</strong><span>${n("category", c.id)}</span></div><button type="button" class="textact" data-cren="${i}">Rename</button><button type="button" class="textact bl-x" data-crm="${i}">Remove</button></div>`).join("") || `<p class="bl-empty">None yet. Each category gets its own page on your site.</p>`}
+    <button type="button" class="bs-addline textact" data-cadd>+ New category</button>
+    <p class="bl-lbl">Authors</p>
+    ${lists.authors.map((a, i) => { const m = a.photo_media_id ? (S.media || []).find((x) => x.id === a.photo_media_id) : null;
+      return `<div class="bl-row"><span class="bl-av">${m && m.thumb ? `<img src="${esc(m.thumb)}" alt="">` : esc(initials(a.name))}</span><div class="bl-rowtext"><strong>${esc(a.name)}</strong><span>${esc((a.bio ? a.bio + " · " : "") + n("author", a.id))}</span></div><button type="button" class="textact" data-aed="${i}">Edit</button><button type="button" class="textact" data-aph="${i}">Photo</button><button type="button" class="textact bl-x" data-arm="${i}">Remove</button></div>`; }).join("") || `<p class="bl-empty">Nobody yet.</p>`}
+    <button type="button" class="bs-addline textact" data-aadd>+ Add an author</button>
+    <p class="hint">An author is a name, an optional photo and one line about them. They show on every post that person wrote. Removing a category keeps its posts; they just lose the label.</p>`;
+  const cats = () => blogLists().categories.map((c) => ({ ...c })), aus = () => blogLists().authors.map((a) => ({ ...a }));
+  const save = async (field, next) => { if (await blogListsPut(field, next)) paintBlogLists(); };
+  host.querySelector("[data-cadd]").addEventListener("click", async () => { const v = await askText("A new category", { hint: "Like News, Recipes or Events.", ok: "Add it" }); if (v && v.trim()) save("post_categories", [...cats(), { name: v.trim() }]); });
+  host.querySelector("[data-aadd]").addEventListener("click", async () => {
+    const name = await askText("Their name", { ok: "Next" }); if (!name || !name.trim()) return;
+    const bio = await askText("One line about them", { hint: "Like “Owner and head chef”. Leave it empty for none.", ok: "Add" });
+    save("post_authors", [...aus(), { name: name.trim(), ...(bio && bio.trim() ? { bio: bio.trim() } : {}) }]);
   });
-  return ed;
+  host.querySelectorAll("[data-cren]").forEach((b) => b.addEventListener("click", async () => { const list = cats(), c = list[+b.dataset.cren]; const v = await askText("Rename the category", { value: c.name, ok: "Rename" }); if (v && v.trim() && v.trim() !== c.name) { c.name = v.trim(); save("post_categories", list); } }));
+  host.querySelectorAll("[data-crm]").forEach((b) => b.addEventListener("click", async () => { const list = cats(), c = list[+b.dataset.crm]; if (await askYes(`Remove the category “${c.name}”? Its posts stay; they just lose the label.`, { ok: "Remove it", danger: true })) save("post_categories", list.filter((x) => x.id !== c.id)); }));
+  host.querySelectorAll("[data-aed]").forEach((b) => b.addEventListener("click", async () => {
+    const list = aus(), a = list[+b.dataset.aed];
+    const name = await askText("Their name", { value: a.name, ok: "Next" }); if (name == null || !name.trim()) return;
+    const bio = await askText("One line about them", { value: a.bio || "", hint: "Leave it empty for none.", ok: "Save" }); if (bio == null) return;
+    a.name = name.trim(); if (bio.trim()) a.bio = bio.trim(); else delete a.bio; save("post_authors", list);
+  }));
+  host.querySelectorAll("[data-aph]").forEach((b) => b.addEventListener("click", () => { const list = aus(), a = list[+b.dataset.aph]; closeSheet("blogListsScrim"); openPicker((id) => { if (id === undefined) return; if (id) a.photo_media_id = id; else delete a.photo_media_id; save("post_authors", list).then(() => openBlogLists()); }); }));
+  host.querySelectorAll("[data-arm]").forEach((b) => b.addEventListener("click", async () => { const list = aus(), a = list[+b.dataset.arm]; if (await askYes(`Remove ${a.name} from your authors? Their posts stay, without a name on them.`, { ok: "Remove", danger: true })) save("post_authors", list.filter((x) => x.id !== a.id)); }));
+}
+async function openPost(p) {
+  let studio;
+  try { studio = await loadBlogStudio(); } catch (_) { toast("The writing screen didn’t load. Check your connection and try again.", true); return; }
+  studio.open(p, blogHost());
 }
 /* add lines for the three collections */
 function inlineAdd(wrapId, fields, onAdd, addLabel) {
@@ -4360,14 +4521,19 @@ $("btnAddTes").addEventListener("click", () => inlineAdd("tesAddWrap",
     try { const r = await api("POST", "/testimonials", b); S.testimonials.push(r.data); done(); renderTes(); toast("Kept"); scheduleChangesRefresh(); }
     catch (err) { toast(nice(err), true); }
   }, "Keep this kind word"));
-$("btnAddPost").addEventListener("click", () => inlineAdd("postAddWrap",
-  [["title","Title","text",160,"Summer patio is open"],["body_md","The update","textarea",20000,""],["tags","Tags (comma-separated)","text",200,"events, seasonal"]],
-  async (b, done) => {
-    if (!b.title) { toast("An update needs a title.", true); return; }
-    const body = { ...b, tags: splitTags(b.tags || ""), status: "draft" };
-    try { const r = await api("POST", "/posts", body); S.posts.unshift(r.data); done(); renderPosts(); toast("Saved as a draft — show it when it’s ready"); scheduleChangesRefresh(); }
-    catch (err) { toast(nice(err), true); }
-  }, "Save as a draft"));
+$("btnAddPost").addEventListener("click", async () => {
+  const b = $("btnAddPost"); if (b.disabled) return; b.disabled = true;
+  // a draft first, so the writing screen saves into a post that already exists
+  const lists = blogLists();
+  const slug = "post-" + Date.now().toString(36);
+  try {
+    const r = await api("POST", "/posts", { title: "Untitled post", slug, status: "draft", ...(BLOG_CAT ? { category: BLOG_CAT } : {}), ...(lists.authors.length === 1 ? { author: lists.authors[0].id } : {}) });
+    S.posts.unshift(r.data); renderPosts(); scheduleChangesRefresh();
+    await openPost(r.data);
+  } catch (err) { toast(nice(err), true); }
+  b.disabled = false;
+});
+$("btnPostHelp").addEventListener("click", () => openDesk("post", "updates"));
 
 /* ── Author "find anything" — search across the owner's OWN loaded content and
    jump to the right editor. Pure client-side over already-loaded state (no new
