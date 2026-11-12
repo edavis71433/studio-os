@@ -75,6 +75,7 @@ export interface SearchFacts {
   followed: number;
   issues: Array<{ type: string; severity: string; n: number }> | null;   // today's health problems
   review: Array<{ title: string; priority: string; fix?: string }> | null;   // the Site Review's findings
+  phrases?: Array<{ phrase: string; found: boolean }>;   // builder list item 160: what people type to find you, each in a page headline or not
 }
 const RANK: Record<Priority, number> = { critical: 0, high: 1, medium: 2 };
 const plural = (n: number, one: string, many: string) => (n === 1 ? one : many.replace('{n}', String(n)));
@@ -96,6 +97,8 @@ export function searchTasks(f: SearchFacts): SearchTask[] {
   add('console', 'high', f.console, 'Connect Google Search Console', f.console ? '' : 'See what people search to find you, and what they click.', f.console ? null : 'connect:console');
   if (hosted) add('domain', 'high', f.customDomain, 'Put the site on your own domain', f.customDomain ? '' : 'Google trusts yourbusiness.com more than a built-in address.', f.customDomain ? null : 'domain');
   add('title', 'high', f.title, 'Add a search headline', f.title ? '' : 'The blue words people click on Google.', f.title ? null : 'wording');
+  // builder list item 160: each phrase the business wants to be found for, in some page's headline
+  for (const p of f.phrases || []) add(`phrase:${p.phrase}`, 'high', p.found, `Put “${p.phrase}” in a page’s search headline`, p.found ? '' : 'Google reads the headline first. Pick the page that is about it.', p.found ? null : 'phrases');
   add('description', 'high', f.description, 'Add a search description', f.description ? '' : 'The line under the headline. Google writes its own when there is none.', f.description ? null : 'wording');
   const desc = (f.issues || []).find((i) => i.type === 'seo.description_missing');
   if (desc) add('health:seo.description_missing', 'high', false, plural(desc.n, 'Add a search description to one more page', 'Add a search description to {n} pages'), 'Each page’s settings button on the Pages tab.', 'pages');
