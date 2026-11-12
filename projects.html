@@ -1186,7 +1186,7 @@ async function openProject(id,opts){
       <div class="dbody"><div class="dgrid">
         <div class="dmain">
           <div class="rsec"><h3>Tasks${rp&&rp.progress?`<span class="n">${Number(rp.progress.done||0)}/${Number(rp.progress.total||0)}</span>`:''} ${STUDIO?`${chkMissing?'<button class="btn ghost sm" id="addStep">+ Standard step</button>':''}<button class="btn ghost sm" id="addTask">+ Add</button>`:''}</h3>${chkNudge}<div id="tsList">${ts}</div><div id="tsForm"></div></div>
-          <div class="rsec"><h3>Approvals ${STUDIO?'<button class="btn ghost sm" id="addAppr">+ Request</button>':''}</h3><div id="apList">${ap}</div><div id="apForm"></div></div>
+          <div class="rsec"><h3>Approvals ${STUDIO?'<button class="btn ghost sm" id="addAppr">+ Request</button><button class="btn ghost sm" id="askDraft">Send the website draft</button>':''}</h3><div id="apList">${ap}</div><div id="apForm"></div></div>
           ${STUDIO?`<div class="rsec"><h3>Surveys <button class="btn ghost sm" id="addSurvey">+ Survey</button></h3><div id="svList" class="mut">Loading…</div><div id="svForm"></div></div>`:''}
           <div class="rsec msgs"><h3>Messages</h3><div id="msgList" class="mut">Loading…</div><div id="msgForm"></div></div>
         </div>
@@ -1260,6 +1260,10 @@ async function openProject(id,opts){
     $('detailInner').querySelectorAll('[data-dl]').forEach(b=>b.onclick=async()=>{try{const r=await api('/projects/'+id+'/deliverables/'+b.dataset.dl+'/download');window.open(r.data.url,'_blank','noopener');}catch(e){toast(nice(e),true);}});
     // approvals
     if($('addAppr'))$('addAppr').onclick=()=>miniForm($('apForm'),[{name:'title',label:'What needs approval?'},{name:'summary',label:'Details (optional)',type:'textarea'},{name:'due_date',label:'Answer by (optional)',type:'date'}],async v=>{await api('/projects/'+id+'/approvals','POST',{subject_type:'project',subject_id:id,title:v.title,summary:v.summary,due_date:v.due_date||undefined});reopen();});
+    // builder list item 179: send the client's website draft for their OK. The server
+    // captures the draft as it stands now and the client sees exactly that version in
+    // the portal, page by page, with Approve, Ask for a change and notes on its parts.
+    if($('askDraft'))$('askDraft').onclick=()=>miniForm($('apForm'),[{name:'title',label:'What should we call it?',value:'Your website draft'},{name:'summary',label:'A question for them (optional)',type:'textarea',placeholder:'Does this feel like your business?'},{name:'due_date',label:'Answer by (optional)',type:'date'}],async v=>{await api('/projects/'+id+'/approvals','POST',{subject_type:'website',title:v.title||undefined,summary:v.summary||undefined,due_date:v.due_date||undefined});toast('The draft is with them. They can approve it or leave notes from their portal.');reopen();});
     // audit change 8: ask the client to approve ONE file — subject_type
     // 'deliverable' binds the decision to that file's exact version; the title
     // defaults to the file's; the date is what the reminders chase.

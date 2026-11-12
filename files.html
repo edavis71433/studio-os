@@ -303,6 +303,9 @@
   .fbar svg{width:16px;height:16px;flex:none}
   .fbar b{color:var(--ink);font-weight:600}
   .fbar .btn{padding:6px var(--dds-s3,12px);font-size:12.5px}
+  .attnbar span{flex:1 1 220px}
+  .why{font-size:12px;color:var(--warn);font-weight:500;margin-top:2px}
+  .nmw{display:flex;flex-direction:column;min-width:0}
   .fpick{display:flex;flex-wrap:wrap;gap:6px;margin:4px 0 12px}
   .fopt{font:inherit;font-size:13px;border:1px solid var(--line);background:var(--bg);color:var(--ink);border-radius:999px;padding:6px var(--dds-s3,12px);cursor:pointer}
   .fopt:hover,.fopt:focus-visible{border-color:var(--p);color:var(--p)}
@@ -379,6 +382,7 @@ const COLS=[
   {key:'downloads',label:'Downloads',ic:'dl',f:{collection:'Downloads'}},
   {key:'private',label:'Client-private',ic:'lock',f:{},priv:true},   // Oct 2026 review: files private to one client (0131)
   {key:'archive',label:'Archive',ic:'arch',f:{status:'archived'}},
+  {key:'attn',label:'Could use attention',ic:'all',f:{},attn:true},   // bug hunt D12: the nudge's Review opens it; no button of its own
 ];
 let S={col:'all',q:'',client:'',use:false,caps:[],policy:'immediate',assets:[],full:[],counts:{},countsOk:false,health:[],canEdit:true,loadedOnce:false,current:null,cards:[],   // countsOk stays false until a collections read SUCCEEDS — unknown never paints as 0
   folder:'',newFolders:[],storage:null,   // item 56: the open folder (col 'folder'), folders made here and still empty; the meter
@@ -669,6 +673,7 @@ function applyFilters(){
   const c=COLS.find(x=>x.key===S.col);
   if(c&&c.kind)rows=rows.filter(r=>r.kind===c.kind);
   if(c&&c.favs)rows=rows.filter(r=>r.favorite);
+  if(c&&c.attn){const ids=new Set(attnFindings().map(f=>f.asset_id));rows=rows.filter(r=>ids.has(r.id));}
   // Oct 2026 review (0131): a client-private file shows in the Client-private
   // collection and under its own client's filter — never in a shared view
   if(c&&c.priv)rows=rows.filter(r=>r.client_private);
@@ -713,8 +718,8 @@ async function load(soft,browse){
   S.policy=(a.body.data&&a.body.data.policy)||'immediate';
   S.storage=(a.body.data&&a.body.data.storage)||null;   // absent on a server from before the meter: no meter, never a guess
   if(S.col==='all'&&!S.q.trim()){deriveRailCounts(full,a.body.data&&a.body.data.total);deriveClientRail(full);}
-  applyFilters();
   S.health=(h.ok&&h.body.data&&h.body.data.findings)||[];   // health is a nudge — its failure just means no nudge
+  applyFilters();
   S.countsOk=!!col.ok;   // collections failure degrades the rail count-less, with a notice — never fake zeros
   S.counts=buildCounts((col.ok&&col.body.data)||[]);
   if(S.countsOk)S.newFolders=S.newFolders.filter(n=>!(S.counts[n]>0));   // a folder made here is real once a file is in it
@@ -928,6 +933,8 @@ function render(){
   const inFolder=S.col==='folder'&&S.folder;
   const bodyHtml=rows.length
     ?(DISPLAY==='table'?tableHtml(rows):`<div class="grid">${rows.map(tile).join('')}</div>`)
+    :S.col==='attn'
+      ?`<div class="empty"><h2>Nothing here needs attention now.</h2><p>Every file has a description, is on your site, and is a sensible size.</p></div>`
     :inFolder&&!S.q
       ?`<div class="empty"><h2>This folder is empty.</h2><p>${S.canEdit?'Add files here, or tick files in All files and choose Move to folder. A new folder keeps once a file is in it.':'Files your studio puts in this folder will appear here.'}</p></div>`
       :`<div class="empty"><h2>${S.q?'No files match that search.':'Nothing here yet.'}</h2><p>${S.canEdit?'Drag files in, or use Add files above.':'Files your studio adds will appear here.'}</p></div>`;
@@ -943,7 +950,7 @@ function render(){
         ${lheadHtml(rows.length)}
         ${notice}
         ${filtersHtml(`<div class="search">${svg(IC.search)}<input id="q" type="search" aria-label="${inFolder?'Search this folder':'Search files'}" placeholder="${inFolder?'Search this folder':'Search files — try “logo”'}" value="${esc(S.q)}" autocomplete="off"></div>`,'')}
-        ${fbar}
+        ${fbar}${S.col==='attn'?attnBar():''}
         <div class="drop" id="drop">Drop to upload</div>
         ${bulkBar()}
         ${nudge}
@@ -991,7 +998,7 @@ function tableHtml(rows){
     const cur=S.current&&S.current.asset&&S.current.asset.id===a.id;
     return `<tr data-open="${esc(a.id)}" tabindex="0" aria-label="Open ${esc(a.name)}"${cur?' class="cur" aria-current="true"':''}>
       ${ckTd}
-      <td><span class="ncell"><span class="mthumb"${t}>${inner}</span><span class="nm2" title="${esc(a.name)}">${esc(a.name)}</span>${a.client_private?`<span class="lock" title="Private to this client — not in the shared library or the site picker">🔒 Private${a.client_name?' to '+esc(a.client_name):''}</span>`:''}</span></td>
+      <td><span class="ncell"><span class="mthumb"${t}>${inner}</span>${S.col==='attn'?`<span class="nmw"><span class="nm2" title="${esc(a.name)}">${esc(a.name)}</span><span class="why">${esc(attnWhy(a.id))}</span></span>`:`<span class="nm2" title="${esc(a.name)}">${esc(a.name)}</span>`}${a.client_private?`<span class="lock" title="Private to this client — not in the shared library or the site picker">🔒 Private${a.client_name?' to '+esc(a.client_name):''}</span>`:''}</span></td>
       ${RAILC.length?(()=>{const cl=clientLabel(a);return `<td class="cli" title="${esc(cl)}">${esc(cl)}</td>`;})():''}
       <td>${a.kind==='document'?'PDF':'Photo'}</td>
       <td class="num">${bytes(a.bytes)||'—'}</td>
@@ -1022,8 +1029,16 @@ function bulkBar(){
     </span>
   </div>`;
 }
+// The four kinds the nudge counts, in its words. The attention view (D12) shows the
+// files behind them, each with its own reasons, so Review shows what the line says.
+const ATTN_WORDS={missing_alt:'Needs a description',unused:'Not on your site',oversized:'Large file',duplicate:'Looks duplicated'};
+function attnFindings(){return (S.health||[]).filter(f=>ATTN_WORDS[f.kind]);}
+function attnWhy(id){return [...new Set(attnFindings().filter(f=>f.asset_id===id).map(f=>ATTN_WORDS[f.kind]))].join(' · ');}
+function attnBar(){
+  return `<div class="fbar attnbar"><span>Showing the files that could use attention. Each says what it needs.</span><button class="btn" id="attnDone">Show all files</button></div>`;
+}
 function renderNudge(){
-  if(!S.health.length||S.col==='archive')return'';
+  if(!S.health.length||S.col==='archive'||S.col==='attn')return'';
   const by={};S.health.forEach(f=>{by[f.kind]=(by[f.kind]||0)+1;});
   const parts=[];
   if(by.missing_alt)parts.push(`<b>${by.missing_alt}</b> need a description`);
@@ -1039,7 +1054,8 @@ function tile(a){
   const inner=a.thumb?'':ic;
   // bold redesign: a pill when it's on the site, the plain words when not (they say what was measured)
   const who=a.client_id?`<div class="who"><i class="av" aria-hidden="true">${esc(initialsOf(clientLabel(a)))}</i><span>${esc(clientLabel(a))}</span></div>`:'';
-  const meta=`<div class="meta"><div class="nm" title="${esc(a.name)}">${esc(a.name)}</div><div class="use">${a.in_use?'<span class="pill good">On your site</span>':'Not on your site'}${a.brand?'<span class="pill brand">Brand</span>':''}</div>${who}</div>`;
+  const why=S.col==='attn'?attnWhy(a.id):'';
+  const meta=`<div class="meta"><div class="nm" title="${esc(a.name)}">${esc(a.name)}</div><div class="use">${a.in_use?'<span class="pill good">On your site</span>':'Not on your site'}${a.brand?'<span class="pill brand">Brand</span>':''}</div>${why?`<div class="why">${esc(why)}</div>`:''}${who}</div>`;
   // the Pending badge obeys the SAME honesty rule as the table's Status column
   // (stateShown) — otherwise Grid and Table would contradict each other about
   // the same file the moment a 'pending' row existed
@@ -1101,7 +1117,9 @@ function wire(){
   const add=$('add');if(add)add.onclick=()=>$('picker').click();
   const fr=$('fRename');if(fr)fr.onclick=()=>renameFolder();
   const fx=$('fRemove');if(fx)fx.onclick=()=>removeFolder();
-  const tidy=$('tidy');if(tidy)tidy.onclick=()=>{S.q='';S.col='all';SORT={key:'added',dir:-1};load(false,true);};
+  // bug hunt D12: Review shows the files the line is about (it used to reload the same list)
+  const tidy=$('tidy');if(tidy)tidy.onclick=()=>{S.q='';S.col='attn';S.folder='';MORE_OPEN=false;S.selected.clear();load(false,true).then(()=>{const b=$('attnDone');if(b)b.focus();});};
+  const ad=$('attnDone');if(ad)ad.onclick=()=>{S.col='all';load(false,true).then(()=>{const b=$('tidy')||$('q');if(b)b.focus();});};
 }
 function togglePick(id){ if(S.selected.has(id))S.selected.delete(id); else S.selected.add(id); render();
   const nb=document.querySelector('[data-pick="'+id+'"]'); if(nb)nb.focus(); }   // focus survives the re-render
@@ -1212,18 +1230,25 @@ function markCurrent(id){
 }
 if(DOCK){const onDock=()=>setPanelMode();if(DOCK.addEventListener)DOCK.addEventListener('change',onDock);else if(DOCK.addListener)DOCK.addListener(onDock);}
 function focusPanel(){const x=$('panel').querySelector('.x');if(x)x.focus();}
+// Bug hunt D10: two quick clicks could leave the first file's answer, arriving last, in
+// the panel under the second one's highlight (and Rename or Delete then acted on it).
+// Like the list's REQ_SEQ, only the newest ask may draw; closing the panel ends any ask.
+let DETAIL_SEQ=0;
 async function openDetail(id){
+  const ask=++DETAIL_SEQ;
   const scrim=$('scrim'),panel=$('panel');
   detailOpener=document.activeElement;
   panel.innerHTML=`<button class="x" onclick="closeDetail()" aria-label="Close file details">×</button><div class="spin"></div>`;
   scrim.classList.add('on');panel.classList.add('on');setPanelMode();markCurrent(id);
   focusPanel();   // move focus INTO the dialog (Escape already closes it)
   const r=await api('/assets/'+id);
+  if(ask!==DETAIL_SEQ)return;   // another file was opened, or the panel closed, while this one loaded
   if(!r.ok){panel.innerHTML=`<button class="x" onclick="closeDetail()" aria-label="Close file details">×</button><div class="empty"><h2>Couldn’t open that file.</h2></div>`;focusPanel();return;}
   S.current=r.body.data;S.currentAt=Date.now();renderDetail();
   if(!$('panel').contains(document.activeElement))focusPanel();   // re-render replaced the focused node
 }
 function closeDetail(){
+  DETAIL_SEQ++;   // an answer still on its way must not fill the closed panel
   const wasOpen=$('panel').classList.contains('on');
   $('scrim').classList.remove('on');$('panel').classList.remove('on');S.current=null;setPanelMode();markCurrent('');
   if(wasOpen&&detailOpener&&detailOpener.focus&&document.contains(detailOpener))detailOpener.focus();   // return focus to the opener
@@ -1543,10 +1568,18 @@ async function saveDetail(){
   const r=await api('/assets/'+a.id,'PATCH',body);
   if(r.ok){toast('Saved');closeDetail();load();}else toast((r.body&&r.body.message)||'Could not save');
 }
+// Bug hunt D11: in Favorites, a file let go of its star but stayed on the list and in the
+// count until a reload, and a star that failed to save said nothing.
 async function toggleFav(id){
   const a=S.assets.find(x=>x.id===id);const next=!(a&&a.favorite);
   const r=await api('/assets/'+id,'PATCH',{favorite:next});
-  if(r.ok){if(a)a.favorite=next;render();}
+  if(!r.ok){toast((r.body&&r.body.message)||'Couldn’t save that star. Try again in a moment.');return;}
+  const row=S.full.find(x=>x.id===id)||a;
+  if(row&&row.favorite!==next&&!row.client_private&&RAILN.fav!==undefined)RAILN.fav=Math.max(0,RAILN.fav+(next?1:-1));
+  if(row)row.favorite=next;if(a)a.favorite=next;
+  const focusAfter=!next&&S.col==='fav';
+  applyFilters();render();
+  if(focusAfter){const h=$('pagehead');if(h)h.focus();}   // the starred file left the list: keep focus on the page
 }
 async function setAssetStatus(id,action){
   const r=await api('/assets/'+id+'/status','POST',{action});
@@ -1693,7 +1726,13 @@ $('replacer').onchange=async(e)=>{
 ['dragleave','drop'].forEach(ev=>document.addEventListener(ev,(e)=>{if(e.relatedTarget&&ev==='dragleave')return;const d=$('drop');if(d&&(ev==='drop'||e.clientX<=0))d.classList.remove('on');}));
 document.addEventListener('drop',(e)=>{if(!S.canEdit)return;e.preventDefault();const d=$('drop');if(d)d.classList.remove('on');if(document.querySelector('dialog[open]'))return;   /* a file dropped on the photo editor (or a question) isn't an upload */const f=[...(e.dataTransfer.files||[])].filter(x=>/^(image\/(jpeg|png|webp)|application\/pdf)$/.test(x.type));if(f.length)uploadFiles(f);});
 $('scrim').onclick=closeDetail;
-document.addEventListener('keydown',(e)=>{if(e.key==='Escape')closeDetail();});
+// Bug hunt D9: Escape closes one thing at a time. While a question, the photo editor or a
+// menu of the shell's is open, the key is theirs and the open file stays where it is.
+// (This listener runs before shell.js's, which is deferred, so its menus are still open here.)
+function escapeIsTaken(e){
+  return e.defaultPrevented||!!document.querySelector('dialog[open],.dds-pop.open,.dds-palette.open,.dds-drawer.open,.dds-nav .sec.open');
+}
+document.addEventListener('keydown',(e)=>{if(e.key==='Escape'&&!escapeIsTaken(e))closeDetail();});
 // deep link: /files.html?focus=<id> (from ⌘K)
 function focusParam(){return new URLSearchParams(location.search).get('focus')||'';}
 

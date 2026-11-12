@@ -495,17 +495,26 @@ async function bulkSend(){
 // "Mark as" sets each picked customer's main project to Active or On hold.
 // Complete is left to the project page on purpose: completing a project emails
 // the client a one-question survey.
-async function bulkMark(to){
+// builder item 75: a reason can go with it (kept as a private note on each project, never the
+// client's to see), and Undo puts each one back to what it was.
+async function bulkMark(to,reason){
   const picked=CUSTOMERS.filter(c=>PICKED.has(String(c.client_id)));
   PICKED.clear();renderListZone();   // the bar goes at once: picks made while this runs are new picks, never wiped at the end
-  let ok=0,fail=0,none=0;
+  const moved=[];let fail=0,none=0,same=0;
   for(const c of picked){
     if(!c.project_id){none++;continue;}
-    let r;try{r=await api('/projects/'+encodeURIComponent(c.project_id)+'/status','POST',{to});}catch(_){r={ok:false};}   // K5: a dropped connection counts as "couldn't change"
-    if(r.ok)ok++;else fail++;
+    const was=String(c.status||'active');if(was===to){same++;continue;}
+    let r;try{r=await api('/projects/'+encodeURIComponent(c.project_id)+'/status','POST',reason?{to,reason}:{to});}catch(_){r={ok:false};}   // K5: a dropped connection counts as "couldn't change"
+    if(r.ok)moved.push({id:c.project_id,was});else fail++;
   }
   const word=to==='on_hold'?'on hold':'active';
-  toast(`${ok} marked ${word}${fail?` · ${fail} couldn’t change from where they are`:''}${none?` · ${none} with no project`:''}.`);
+  const msg=`${moved.length} marked ${word}${same?` · ${same} already ${word}`:''}${fail?` · ${fail} couldn’t change from where they are`:''}${none?` · ${none} with no project`:''}.`;
+  const k=KIT();
+  if(moved.length&&k&&k.undoToast)k.undoToast(msg,async()=>{
+    let bad=0;for(const m of moved){let r;try{r=await api('/projects/'+encodeURIComponent(m.id)+'/status','POST',{to:m.was});}catch(_){r={ok:false};}if(!r.ok)bad++;}
+    toast(bad?`${bad} couldn’t be put back.`:'Put back as they were.');await load().catch(()=>{});
+  });
+  else toast(msg);
   // item 110 (K5): a list that couldn't refresh says so (it stayed stale, with an unhandled error)
   await load().catch(()=>toast('Marked — but we couldn’t refresh the list. Refresh will catch it up.'));
 }
@@ -874,8 +883,10 @@ function wireList(){
   const bm=$('bulkMark');if(bm)bm.addEventListener('change',async()=>{
     const to=bm.value;if(!to)return;const k=KIT();const n=PICKED.size;
     const word=to==='on_hold'?'on hold':'active';
-    if(k&&!(await k.confirmIn(bm,{text:`Mark ${n} customer${n===1?'':'s'} ${word}?`,yes:'Yes, mark them'}))){bm.value='';return;}
-    bulkMark(to).catch(()=>toast('We couldn’t finish marking them — Refresh shows where each one is.'));   // K5: never a silent stop
+    // builder item 75: it asks first and takes a reason (optional; only your team sees it)
+    const reason=k?await k.askIn(bm,{text:`Mark ${n} customer${n===1?'':'s'} ${word}?`,field:{kind:'text',label:'Why (optional, only your team sees it)',placeholder:'Why? (optional)',max:300},yes:'Yes, mark them'}):'';
+    if(reason===null){bm.value='';return;}
+    bulkMark(to,reason).catch(()=>toast('We couldn’t finish marking them — Refresh shows where each one is.'));   // K5: never a silent stop
   });
   const bc=$('bulkClear');if(bc)bc.addEventListener('click',()=>{PICKED.clear();renderListZone();refocus('#pickAll');});
 }

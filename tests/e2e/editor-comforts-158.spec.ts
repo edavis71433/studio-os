@@ -81,9 +81,10 @@ test.describe('Versions: a star on the ones that matter (builder item 158)', () 
     await expect(show(page).getByRole('button')).toHaveText(['All', 'Published', 'Starred (1)']);
     await expect(show(page).getByRole('button', { name: 'All' })).toHaveAttribute('aria-pressed', 'true');
     // the saved checkpoint is starred already; the newest publish isn't
-    await expect(rows(page).nth(1).locator('.ver-star')).toHaveText('★ Starred');
+    await expect(rows(page).nth(1).locator('.ver-star')).toHaveText('Starred');
     await expect(rows(page).nth(1).locator('.ver-star')).toHaveAttribute('aria-pressed', 'true');
-    await expect(rows(page).nth(0).locator('.ver-star')).toHaveText('☆ Star');
+    await expect(rows(page).nth(0).locator('.ver-star')).toHaveText('Star');
+    await expect(rows(page).nth(0).locator('.ver-star svg')).toHaveCount(1);   // the editor's own star icon, not a typed one
     await rows(page).nth(0).locator('.ver-star').click();
     await expect.poll(() => m.writes.find((w) => w.path === '/publishes/stars')?.body).toEqual({ id: 'p0', starred: true });
     await expect(rows(page).nth(0).locator('.ver-star')).toHaveAttribute('aria-pressed', 'true');

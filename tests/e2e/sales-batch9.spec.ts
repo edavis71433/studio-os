@@ -73,6 +73,7 @@ test.describe('item 41 — three buttons on the record', () => {
     const bar = page.locator('#actbar');
     await expect(bar.locator(':scope > .abtn')).toHaveText(['Log a call', 'Message', 'Send invoice']);
     await expect(page.locator('#act-menu #act-project')).toHaveCount(1);
+    await expect(page.locator('#act-menu #act-email')).toHaveCount(1);   // sales item 80: a client with a project keeps Message in front; Email is under More
   });
 });
 

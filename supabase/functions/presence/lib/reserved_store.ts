@@ -18,6 +18,7 @@ export const RESERVED_NAMES = {
   calendarFeed: '__calendar_feed__',      // sales review item 46: the private calendar link
   navHidden: '__nav_hidden__',            // builder list item 54: the menu areas the studio hides (agency/routes.ts, routes/workspace.ts)
   monthlyReport: '__monthly_report__',    // builder list item 58: the client's monthly report email (on, the studio's line, last month sent) (ops/monthly_report.ts)
+  siteNotify: '__site_notify__',          // builder list item 126: what the studio hears about each client site, and how (lib/site_notify.ts)
   versionStars: '__version_stars__',      // builder list item 158: the versions starred in Versions (routes/publish.ts)
   followedSearches: '__followed_searches__',   // builder list item 181: the searches a client follows on Google, ten at most (lib/search_tools.ts)
   aiQuestions: '__ai_questions__',        // builder list item 182: the questions a client's monthly AI check asks, ten at most (lib/ai_watch.ts)

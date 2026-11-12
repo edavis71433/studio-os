@@ -26,6 +26,20 @@ html.dds-embed #detailWrap{padding-top:0}
   .bchip .n{font-size:11.5px;font-weight:600;color:var(--faint);font-variant-numeric:tabular-nums}
   .bchip:hover{border-color:color-mix(in srgb,var(--p) 45%,var(--line));color:var(--ink)}
   .bchip[aria-pressed="true"]{background:var(--p-soft);border-color:transparent;color:var(--p);font-weight:600}
+  /* sales item 90: a value, close date or next step changes right in the table (the pencil) */
+  .ced-cell{white-space:nowrap}
+  .cedit{font:inherit;border:0;background:none;color:var(--faint);padding:4px;margin-left:4px;border-radius:6px;cursor:pointer;vertical-align:middle;opacity:.55;min-width:28px;min-height:28px;display:inline-flex;align-items:center;justify-content:center}
+  tr:hover .cedit,.cedit:focus-visible{opacity:1}
+  .cedit:hover{color:var(--p);background:var(--p-soft)}
+  .cedit .si{width:15px;height:15px}
+  @media (pointer:coarse){.cedit{opacity:1;min-width:44px;min-height:44px}}
+  .ced{display:flex;flex-wrap:wrap;gap:6px;align-items:center;white-space:normal}
+  .ced input{font:inherit;font-size:13.5px;min-height:34px;box-sizing:border-box;border:1px solid var(--p);border-radius:8px;padding:4px 8px;background:var(--card);color:var(--ink);max-width:190px}
+  .ced button{font:inherit;font-size:13px;font-weight:600;border-radius:999px;padding:4px 12px;min-height:32px;border:1px solid var(--line);background:var(--card);color:var(--ink);cursor:pointer}
+  .ced .ced-save{background:var(--p);border-color:var(--p);color:#fff}
+  @media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .ced .ced-save{color:#171320}}
+  :root[data-theme="dark"] .ced .ced-save{color:#171320}
+  @media (max-width:767px){.ced input,.ced button{min-height:44px}}
   .bchip[aria-pressed="true"] .n{color:var(--p)}
   .col-h{flex-wrap:wrap;row-gap:2px}
   .col-sub{flex:1 0 100%;display:flex;align-items:baseline;gap:8px;min-height:0}
@@ -85,7 +99,12 @@ html.dds-embed #detailWrap{padding-top:0}
   .dp-step span{color:var(--soft);font-size:12px}
   .dp-step.late{color:var(--bad)}
   .dp-l{font-family:var(--dds-sans,inherit);font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--faint);margin:16px 0 6px}
-  .dp-acts{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+  .dp-acts{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+  .dp-acts button.on{background:var(--p-soft);border-color:transparent;color:var(--p)}
+  /* sales item 80 (Figma 264:1604): the deal card's Email box, under the quick actions */
+  .dp-mail{margin:12px 0 2px;padding:14px;border:1px solid var(--dds-line-strong,var(--line));border-radius:16px;background:var(--card)}
+  .dpm-h{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:-4px -6px 8px 0}.dpm-h h3{margin:0;font-size:14.5px;font-weight:650;color:var(--ink)}
+  .dpm-h .dp-x{width:32px;height:32px;font-size:19px}
   .dp-acts button{font:inherit;font-size:12.5px;font-weight:600;padding:10px 6px;border-radius:var(--dds-r,12px);background:var(--card);color:var(--ink);border:1px solid var(--dds-line-strong,var(--line));cursor:pointer}
   .dp-acts button:hover{border-color:var(--p);color:var(--p)}
   /* item 89: tap to call from the preview (a phone opens its dialler; back here, shell.js offers to log it) */
@@ -120,7 +139,8 @@ html.dds-embed #detailWrap{padding-top:0}
     .bchips{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none}
     .bchips::-webkit-scrollbar{display:none}
   }
-  @media (pointer:coarse){.dp-x{width:44px;height:44px}.dp-acts button,.dp-open,.dp-next,.dp-call{min-height:44px}}
+  @media (pointer:coarse){.dp-x,.dpm-h .dp-x{width:44px;height:44px}.dp-acts button,.dp-open,.dp-next,.dp-call{min-height:44px}}
+  @media (max-width:360px){.dp-acts{grid-template-columns:repeat(2,1fr)}}
   @media (prefers-reduced-motion:reduce){dialog.dprev{animation:none}}
 
   /* ══ Bold redesign — the one-screen proposal: services as chips, the lines,
@@ -205,6 +225,8 @@ html.dds-embed #detailWrap{padding-top:0}
   .bar{display:flex;gap:var(--dds-s2,8px);align-items:center;flex-wrap:wrap;margin-bottom:var(--dds-s4,16px)}
   .chip{font-size:13px;padding:var(--dds-s1,4px) var(--dds-s3,12px);border-radius:999px;border:1px solid var(--line);background:var(--card);color:var(--soft);cursor:pointer;font-family:inherit}
   .chip.on{background:var(--p-soft);border-color:var(--p);color:var(--p);font-weight:600}
+  .qfu{flex-wrap:wrap;gap:6px}.qfu .chip{font-size:12.5px}   /* sales item 85: Follow up on [day] */
+  @media (max-width:767px){.qfu .chip,.qfu input[type=date]{min-height:44px}}
   /* visual refresh: the display toggle is a segmented control, not chips */
   .viewtog{display:inline-flex;gap:0;border:1px solid var(--line);border-radius:var(--dds-r,8px);overflow:hidden;background:var(--bg)}
   .viewtog .chip{border:none;border-radius:0;background:transparent;padding:var(--dds-s1,4px) var(--dds-s3,12px);font-size:12.5px;font-weight:500}
@@ -531,6 +553,8 @@ html.dds-embed #detailWrap{padding-top:0}
   <div class="summary" id="summary" aria-live="polite"></div>
   <!-- not tabs — chips that filter/switch in place, so: role=group + aria-pressed -->
   <div class="bar" id="filters" role="group" aria-label="Filter by stage"></div>
+  <!-- sales item 90: field filters (not contacted in N days, owes money…), List and Table only -->
+  <div id="fchips"></div>
   <!-- "Manage services" also lives here: it used to be reachable ONLY from
        inside an open deal's Proposals section, so the catalog that unhides the
        proposal line-item dropdown was effectively undiscoverable. -->
@@ -873,6 +897,8 @@ async function api(path,method,body){
   if(!r.ok){const e=new Error((b&&b.message)||'That didn’t go through.');e.status=r.status;e.body=b;throw e;}
   return b;
 }
+// shell.js's Email box (item 80) takes a request that answers {ok, status, body} and never throws
+const apiR=(p,m,b)=>api(p,m,b).then(body=>({ok:true,status:200,body}),e=>({ok:false,status:(e&&e.status)||0,body:(e&&e.body)||{}}));
 
 // The studio's own name (for the starter agreement's sign-off) — fetched once,
 // best-effort; scope-aware because H() carries x-dds-scope-site, so a scoped
@@ -1697,7 +1723,7 @@ async function renderSummary(gen){
   // Its own tile on a computer or tablet; on a phone the four tiles keep their one row (item 58), so it rides under Open.
   const ex=(s.expected&&open.count)?s.expected:null;
   const expSub=ex?`<span class="exp-sub"><span class="exp-sep"> · </span>${money(ex.value_cents)||'$0'} expected</span>`:'';
-  const openT=open.count?tile('Open',money(open.value_cents)||'$0',`<span class="across">across ${plur(open.count,'deal')}</span>`+expSub,'open','','',ex?'has-exp':''):tile('Open','$0','no open deals yet','open','');
+  const openT=open.count?tile('Open',money(open.value_cents)||'$0',`<span class="across">across ${plur(open.count,'deal')}</span>`+expSub,'open','','',ex?'has-exp':''):tile('Open','$0','nothing open right now','open','');   // item 173: the strip shows only when there are deals, so "yet" read wrong when all are closed
   const expT=ex?tile('Expected',money(ex.value_cents)||'$0','at each stage’s chance','rate','info','','st-exp'):'';
   const wonT=wm.count?tile('Won this month',money(wm.value_cents)||'$0',plur(wm.count,'deal'),'won','good'):tile('Won this month','—','none yet','won','good');
   const winT=(wr.pct===null||wr.pct===undefined)?tile('Win rate','—','nothing won or ruled out yet','rate','info')
@@ -1962,11 +1988,13 @@ async function fillMissingNames(){
 // every keystroke by construction (the contacts.html list-only-re-render idiom).
 function visibleDeals(){
   const q=Q.trim().toLowerCase();
-  if(!q)return DEALS;
+  // sales item 90: the field filters narrow the list and the table (the board keeps its own chips)
+  const fl=VIEW!=='board'&&anyFilter()?(d)=>fMatch(FFILT,d):null;
+  if(!q)return fl?DEALS.filter(fl):DEALS;
   if(!CONTACT_TEXT&&!CONTACT_LOADING)ensureContactNames().then(()=>{if(Q.trim())renderCurrent();});
   return DEALS.filter(d=>{
     const ct=(CONTACT_TEXT&&d.contact_id&&CONTACT_TEXT[d.contact_id])||'';
-    return (String(d.title||'').toLowerCase()+' '+ct).includes(q);
+    return (String(d.title||'').toLowerCase()+' '+ct).includes(q)&&(!fl||fl(d));
   });
 }
 // ── the .lmeta line: visible count · value (money0 — the same cents formatter
@@ -2113,10 +2141,14 @@ function renderFirstDeal(host){
 // paths all come through here so the meta line never drifts from the list.
 function renderCurrent(){
   renderMeta();
+  paintFchips();
   if(VIEW==='board'){renderBoard();return;}
   const host=VIEW==='table'?$('table'):$('list');
   if(!DEALS.length){renderRosterEmpty(host);return;}
-  if(!visibleDeals().length){host.innerHTML='<div class="dds-empty"><h3>No deals match that.</h3><p>Try a different deal, company, or contact name.</p></div>';return;}
+  if(!visibleDeals().length){
+    if(anyFilter()){host.innerHTML='<div class="dds-empty"><h3>No deals match these filters.</h3><p>Turn one off, or <button type="button" class="linkbtn" id="fclearEmpty">clear the filters</button>.</p></div>';const fc=$('fclearEmpty');if(fc)fc.addEventListener('click',()=>setFilters({}));return;}
+    host.innerHTML='<div class="dds-empty"><h3>No deals match that.</h3><p>Try a different deal, company, or contact name.</p></div>';return;
+  }
   if(VIEW==='table')renderTable();else renderList();
 }
 // A deal is closed once it is won or not a fit; a closed deal's next step that
@@ -2151,6 +2183,33 @@ function renderList(){
 // deals in the Table to act on together, and a CSV import of deals. The shared
 // pieces live in shell.js (window.ddsListKit). ──
 let SAVED=[],CURVIEW='',PICKED=new Set();
+// ── Sales item 90 (Nov 2026): field filters, kept in a saved view. The list and the table hold
+// the newest 100 deals, so they filter here (lib/list_filters.ts is the server's copy of the rules):
+// not contacted in 30, 60 or 90 days, closing this month, owes you money, added this month, and how
+// they found you. The board keeps its own chips. ──
+let FFILT={};
+const anyFilter=()=>Object.keys(FFILT).some(k=>!!FFILT[k]);
+function fMatch(f,d){
+  if(f.quiet){const t=Date.parse(d.last_contacted_at||'');if(Number.isFinite(t)&&t>=Date.now()-f.quiet*86400000)return false;}
+  if(f.closing&&String(d.expected_close||'').slice(0,7)!==monthKey())return false;
+  if(f.owes&&!(Number(d.owes_cents)>0))return false;
+  if(f.added){const t=Date.parse(d.created_at||'');if(!Number.isFinite(t)||localYmd(t).slice(0,7)!==monthKey())return false;}
+  if(f.via&&d.found_via!==f.via)return false;
+  return true;
+}
+function setFilters(next,key){
+  FFILT=next||{};PICKED.clear();renderCurrent();
+  const host=$('fchips');const n=host&&(host.querySelector('[data-fchip="'+key+'"]')||host.querySelector('[data-fchip]'));if(n&&key)n.focus();
+}
+function paintFchips(){
+  const host=$('fchips'),k=KIT();if(!host)return;
+  host.hidden=VIEW==='board'||!k||!!scope()||!DEALS.length;
+  if(host.hidden){host.innerHTML='';return;}
+  // each chip says how many of the deals in view it would keep on its own (the search applied)
+  const q=Q.trim().toLowerCase(),base=q?DEALS.filter(d=>(String(d.title||'').toLowerCase()+' '+((CONTACT_TEXT&&d.contact_id&&CONTACT_TEXT[d.contact_id])||'')).includes(q)):DEALS;
+  const count=(f)=>base.filter(d=>fMatch(f,d)).length;
+  k.filterChips(host,{value:FFILT,offer:['quiet','closing','owes','added','via'],vias:FOUND_VIA,counts:{closing:count({closing:true}),owes:count({owes:true}),added:count({added:true})},onChange:(next,key)=>setFilters(next,key)});
+}
 const COLS_KEY='dds-cols:pipeline';
 let HIDDEN=(function(){try{return new Set(JSON.parse(localStorage.getItem(COLS_KEY)||'[]'));}catch(_){return new Set();}})();
 const KIT=()=>window.ddsListKit||null;
@@ -2169,6 +2228,7 @@ function applySaved(v){
   FILTER=(v.base&&STAGES.includes(v.base))?v.base:'';Q=v.q||'';const si=$('dealSearch');if(si)si.value=Q;
   TSORT=(v.sort&&TCOLS.some(c=>c[0]===v.sort.key))?{key:v.sort.key,dir:v.sort.dir<0?-1:1}:{key:'next',dir:1};
   HIDDEN=(v.cols&&v.cols.length)?new Set(TCOLS.map(c=>c[0]).filter(k=>k!=='title'&&!v.cols.includes(k))):new Set();
+  FFILT=(v.filters&&typeof v.filters==='object')?{...v.filters}:{};   // item 90
   CURVIEW=v.id;PICKED.clear();paintViewsMenu();history.replaceState(null,'',listUrl());renderFilters();load();
 }
 async function saveView(){
@@ -2177,7 +2237,7 @@ async function saveView(){
   const name=await k.ask({title:'Save this view',label:'Name',value:cur?cur.name:'',ok:'Save view',back:'#pvBtn'});
   if(!name)return;
   const same=SAVED.find(x=>x.name.toLowerCase()===name.toLowerCase());
-  const view={id:(same&&same.id)||(cur&&cur.name.toLowerCase()===name.toLowerCase()?cur.id:undefined),name,base:FILTER||'',q:Q,cols:shownT().map(c=>c[0]),sort:TSORT};
+  const view={id:(same&&same.id)||(cur&&cur.name.toLowerCase()===name.toLowerCase()?cur.id:undefined),name,base:FILTER||'',q:Q,cols:shownT().map(c=>c[0]),sort:TSORT,...(anyFilter()?{filters:FFILT}:{})};
   const out=await k.saveViews('pipeline',SAVED.filter(x=>x.id!==view.id&&x.name.toLowerCase()!==name.toLowerCase()).concat(view));
   if(!out){toast('That view didn’t save — try again in a moment.',true);return;}
   SAVED=out;const now=SAVED.find(x=>x.name.toLowerCase()===name.toLowerCase());CURVIEW=now?now.id:'';
@@ -2247,7 +2307,9 @@ function wireViews(){
 }
 function bulkHtml(){
   if(!PICKED.size)return'';
-  return `<div class="dds-bulk" role="region" aria-label="Selected deals"><b>${PICKED.size} selected</b><button type="button" class="go" id="bulkSend">Send an update</button><button type="button" id="bulkLost">Mark as not a fit</button><button type="button" class="clr" id="bulkClear">Clear</button></div>`;
+  // sales item 90: more to do with the deals picked — move them, set a close date, give each a to-do
+  const moves=STAGES.filter(s=>s!=='won'&&s!=='lost').map(s=>`<option value="${s}">${esc(stageLabel(s))}</option>`).join('');
+  return `<div class="dds-bulk" role="region" aria-label="Selected deals"><b>${PICKED.size} selected</b><button type="button" class="go" id="bulkSend">Send an update</button><select id="bulkMove" aria-label="Move the selected deals to"><option value="">Move to…</option>${moves}</select><button type="button" id="bulkClose">Set close date</button><button type="button" id="bulkTodo">Add a to-do</button><button type="button" id="bulkLost">Mark as not a fit</button><button type="button" class="clr" id="bulkClear">Clear</button></div>`;
 }
 async function bulkSend(){
   const k=KIT();if(!k)return;
@@ -2263,19 +2325,105 @@ async function bulkSend(){
   const b=$('bulkSend');if(b)b.disabled=true;
   if(!(await k.sendTo(people)))if(b)b.disabled=false;
 }
+const many=(n,w)=>n+' '+w+(n===1?'':'s');
+// a bulk change's message: with an Undo when something changed, a plain one when nothing did
+function bulkDone(msg,undo,bad){const k=KIT();if(undo&&k&&k.undoToast)k.undoToast(msg,undo,bad?'err':'ok');else toast(msg,bad);}
 async function bulkLost(){
-  // final pass, batch C: marking deals not a fit asks in place first
-  const k=KIT(),n=PICKED.size;
-  if(k&&!(await k.confirmIn($('bulkLost'),{text:`Mark ${n} deal${n===1?'':'s'} as not a fit?`,yes:'Yes, mark them'})))return;
+  // builder item 75: it asks first (batch C), takes the reason (the Not a fit report counts deals by
+  // it, and bulk ones came in with none), and can be undone
+  const k=KIT(),n=PICKED.size;if(!k)return;
+  const reason=await k.askIn($('bulkLost'),{text:`Mark ${many(n,'deal')} as not a fit?`,field:{kind:'select',label:'Why they weren’t a fit',placeholder:'Pick the reason…',options:LOST_REASONS.map(r=>[r,r]),required:true,need:'Pick the reason first.'},yes:'Mark them not a fit'});
+  if(reason===null)return;
   const picked=DEALS.filter(d=>PICKED.has(String(d.id)));
   PICKED.clear();renderTable();   // the bar goes at once: picks made while this runs are new picks, never wiped at the end
-  let ok=0,skip=0,fail=0;
+  const moved=[];let skip=0,fail=0;
   for(const d of picked){
     if(!boardCanMove(d.stage,'lost')){skip++;continue;}   // won, already not a fit, or a customer
-    try{await api('/sales/deals/'+encodeURIComponent(d.id)+'/stage','POST',{to:'lost'});ok++;}catch(_){fail++;}
+    try{await api('/sales/deals/'+encodeURIComponent(d.id)+'/stage','POST',{to:'lost',reason});moved.push({id:d.id,from:d.stage});}catch(_){fail++;}
   }
-  toast(`${ok} marked not a fit${skip?` · ${skip} already won or not a fit`:''}${fail?` · ${fail} couldn’t change`:''}.`,!!fail);
-  load();
+  bulkDone(`${moved.length} marked not a fit (${reason})${skip?` · ${skip} already won or not a fit`:''}${fail?` · ${fail} couldn’t change`:''}.`,moved.length?()=>undoMoves(moved,true):null,!!fail);
+  load(true);
+}
+// Undo of a bulk move: each deal goes back where it was. Out of Not a fit that is the server's Undo
+// (only for a short while, and only if nothing moved it since); any other move goes back one step.
+async function undoMoves(moved,fromLost){
+  let back=0,fail=0;
+  for(const m of moved){try{await api('/sales/deals/'+encodeURIComponent(m.id)+'/stage','POST',fromLost?{to:m.from,undo:true}:{to:m.from});back++;}catch(_){fail++;}}
+  toast(fail?`${back} put back · ${fail} couldn’t be (they changed since)`:`Put back: ${many(back,'deal')}.`,!!fail);
+  load(true);
+}
+async function bulkMove(sel){
+  const to=sel.value;if(!to)return;
+  const k=KIT(),n=PICKED.size;if(!k)return;
+  if(!(await k.confirmIn(sel,{text:`Move ${many(n,'deal')} to ${stageLabel(to)}?`,yes:'Yes, move them'}))){sel.value='';return;}
+  const picked=DEALS.filter(d=>PICKED.has(String(d.id)));
+  PICKED.clear();renderTable();
+  const moved=[];let same=0,stay=0,fail=0;
+  for(const d of picked){
+    if(d.stage===to){same++;continue;}
+    if(d.converted_client_id||!boardCanMove(d.stage,to)){stay++;continue;}   // a deal moves one stage at a time; won and not a fit stay put
+    try{await api('/sales/deals/'+encodeURIComponent(d.id)+'/stage','POST',{to});moved.push({id:d.id,from:d.stage});}catch(_){fail++;}
+  }
+  bulkDone(`${moved.length} moved to ${stageLabel(to)}${same?` · ${same} already there`:''}${stay?` · ${stay} left where ${stay===1?'it is':'they are'} (a deal moves one stage at a time, and won or not-a-fit deals stay put)`:''}${fail?` · ${fail} couldn’t move`:''}.`,moved.length?()=>undoMoves(moved,false):null,!!fail);
+  load(true);
+}
+async function bulkClose(){
+  const k=KIT(),n=PICKED.size;if(!k)return;
+  const day=await k.askIn($('bulkClose'),{text:`Close date for ${many(n,'deal')}:`,field:{kind:'date',label:'Close date',required:true,need:'Pick a date first.'},yes:'Set it'});
+  if(day===null)return;
+  const picked=DEALS.filter(d=>PICKED.has(String(d.id)));
+  PICKED.clear();renderTable();
+  const done=[];let fail=0;
+  for(const d of picked){try{await api('/sales/deals/'+encodeURIComponent(d.id),'PATCH',{expected_close:day});done.push({id:d.id,was:d.expected_close||''});}catch(_){fail++;}}
+  bulkDone(`${many(done.length,'deal')} now close${done.length===1?'s':''} ${niceDay(day)}${fail?` · ${fail} couldn’t change`:''}.`,done.length?async()=>{
+    let back=0,bad=0;for(const x of done){try{await api('/sales/deals/'+encodeURIComponent(x.id),'PATCH',{expected_close:x.was||null});back++;}catch(_){bad++;}}
+    toast(bad?`${back} put back · ${bad} couldn’t be`:`Close dates put back.`,!!bad);load(true);
+  }:null,!!fail);
+  load(true);
+}
+async function bulkTodo(){
+  const k=KIT(),n=PICKED.size;if(!k)return;
+  const vals=await k.askIn($('bulkTodo'),{text:`A to-do on ${n===1?'the deal':'each of the '+n+' deals'}:`,fields:[{kind:'text',label:'What needs doing?',placeholder:'What needs doing?',required:true,need:'Say what needs doing first.'},{kind:'date',label:'Due (optional)'}],yes:'Add it'});
+  if(vals===null)return;
+  const [title,due]=vals;
+  const picked=DEALS.filter(d=>PICKED.has(String(d.id)));
+  PICKED.clear();renderTable();
+  const made=[];let fail=0;
+  for(const d of picked){try{const r=await api('/sales/deals/'+encodeURIComponent(d.id)+'/tasks','POST',due?{title,due_date:due}:{title});if(r&&r.data&&r.data.id)made.push(r.data.id);else fail++;}catch(_){fail++;}}
+  bulkDone(`To-do added to ${many(made.length,'deal')}${due?`, due ${niceDay(due)}`:''}${fail?` · ${fail} couldn’t be added`:''}.`,made.length?async()=>{
+    let gone=0,bad=0;for(const id of made){try{await api('/sales/deal-tasks/'+encodeURIComponent(id),'PATCH',{delete:true});gone++;}catch(_){bad++;}}
+    toast(bad?`${gone} taken off · ${bad} couldn’t be`:`To-dos taken off.`,!!bad);
+  }:null,!!fail);
+}
+// ── Sales item 90: change a deal's value, close date or next step right in the table ──
+const CED_WORD={value:'value',close:'close date',next:'next step'};
+function editCell(btn){
+  const id=btn.getAttribute('data-id'),k=btn.getAttribute('data-cedit'),d=DEALS.find(x=>String(x.id)===id);if(!d)return;
+  const td=btn.closest('td'),who=d.title||'this deal';
+  const back=()=>{renderTable();const b=$('table').querySelector(`[data-cedit="${k}"][data-id="${id}"]`);if(b)b.focus();};
+  const form=document.createElement('form');form.className='ced';
+  if(k==='value')form.innerHTML=`<input type="text" inputmode="decimal" autocomplete="off" aria-label="Value of ${esc(who)}" placeholder="$0" value="${d.expected_value_cents?esc(String(d.expected_value_cents/100)):''}">`;
+  else if(k==='close')form.innerHTML=`<input type="date" aria-label="Close date of ${esc(who)}" value="${esc(String(d.expected_close||'').slice(0,10))}">`;
+  else form.innerHTML=`<input type="text" maxlength="200" autocomplete="off" aria-label="Next step for ${esc(who)}" placeholder="What happens next?" value="${esc(d.next_step||'')}"><input type="date" aria-label="When, for ${esc(who)}" value="${esc(String(d.next_step_at||'').slice(0,10))}">`;
+  form.insertAdjacentHTML('beforeend','<button type="submit" class="ced-save">Save</button><button type="button" class="ced-x">Cancel</button>');
+  td.innerHTML='';td.appendChild(form);
+  const first=form.querySelector('input');first.focus();if(first.select&&first.type==='text')first.select();
+  form.addEventListener('keydown',(e)=>{if(e.key==='Escape'){e.preventDefault();back();}},true);   // capture: a date box keeps its own keys to itself
+  form.querySelector('.ced-x').addEventListener('click',back);
+  form.addEventListener('submit',async(e)=>{
+    e.preventDefault();
+    const ins=form.querySelectorAll('input');let patch,was;
+    if(k==='value'){patch={expected_value_cents:amountCents(ins[0].value)};was={expected_value_cents:d.expected_value_cents||0};}
+    else if(k==='close'){patch={expected_close:ins[0].value||null};was={expected_close:d.expected_close||null};}
+    else{patch={next_step:ins[0].value.trim(),next_step_at:ins[1].value||null};was={next_step:d.next_step||'',next_step_at:d.next_step_at||null};}
+    const sv=form.querySelector('.ced-save');sv.disabled=true;
+    try{
+      const r=await api('/sales/deals/'+encodeURIComponent(id),'PATCH',patch);
+      Object.assign(d,(r&&r.data)||patch);back();
+      bulkDone(`Saved the ${CED_WORD[k]} of ${who}.`,async()=>{try{const u=await api('/sales/deals/'+encodeURIComponent(id),'PATCH',was);Object.assign(d,(u&&u.data)||was);renderCurrent();toast('Put back.');}catch(_){toast('That couldn’t be put back.',true);}});
+      renderMeta();
+    }catch(err){sv.disabled=false;toast(nice(err),true);}
+  });
 }
 // item 32: deals from a CSV — the contacts importer's flow (shell.js). Each row
 // makes (or reuses, by email) its contact, then the deal at its open stage.
@@ -2340,6 +2488,7 @@ const TCOLS=[
   ['contact','Contact',(d)=>String((CONTACT_NAME&&CONTACT_NAME[d.contact_id])||'').toLowerCase()],
   ['stage','Stage',(d)=>STAGES.indexOf(d.stage)],
   ['value','Value',(d)=>Number(d.expected_value_cents||0)],
+  ['close','Close date',(d)=>String(d.expected_close||'9999-99-99')],   // item 90: changeable in place, like the value and the next step
   ['next','Next step (due)',(d)=>(isClosed(d)?'~':'')+(shownStep(d)&&d.next_step_at||'9999-99-99')],   // no due date sorts last; closed deals after open ones
   ['last','Last contacted',(d)=>String(d.last_contacted_at||'')],
 ];
@@ -2370,9 +2519,11 @@ function renderTable(){
         :ds==='today'?`<span class="due-today">Due today: ${esc(step)}</span>`
                :`${esc(step)}${d.next_step_at?` <span class="mut">· ${esc(niceDay(d.next_step_at))}</span>`:''}`)
       :'—';
+    // item 90: the value, close date and next step each carry a pencil that changes them right here
+    const ed=(k)=>`<button type="button" class="cedit" data-cedit="${k}" data-id="${esc(d.id)}" aria-label="Change the ${CED_WORD[k]} of ${esc(d.title||'this deal')}" title="Change">${svgi('pencil')}</button>`;
     const CELL={title:()=>`<td><span class="dn">${esc(d.title||'Untitled deal')}</span></td>`,contact:()=>`<td>${esc(cn)}</td>`,
       stage:()=>`<td>${stageBadge(d.stage,d.agreement_signed)}${needsConvert(d)?' <span class="mut conv">· not a customer yet</span>':''}</td>`,
-      value:()=>`<td class="num">${money(d.expected_value_cents)||'—'}</td>`,next:()=>`<td>${ns}</td>`,last:()=>`<td>${d.last_contacted_at?esc(ago(d.last_contacted_at)):'—'}</td>`};
+      value:()=>`<td class="num ced-cell">${money(d.expected_value_cents)||'—'}${ed('value')}</td>`,close:()=>`<td class="ced-cell">${d.expected_close?esc(niceDay(d.expected_close)):'—'}${ed('close')}</td>`,next:()=>`<td class="ced-cell">${ns}${ed('next')}</td>`,last:()=>`<td>${d.last_contacted_at?esc(ago(d.last_contacted_at)):'—'}</td>`};
     return `<tr data-id="${d.id}"${needsConvert(d)?' data-convert="1"':''} tabindex="0" aria-label="Open ${esc(d.title||'Untitled deal')}${needsConvert(d)?' — not a customer yet':''}">
       <td class="pick"><input type="checkbox" data-pick="${esc(d.id)}" aria-label="Select ${esc(d.title||'Untitled deal')}"${PICKED.has(String(d.id))?' checked':''}></td>
       ${shownT().map(([k])=>CELL[k]()).join('')}
@@ -2386,6 +2537,10 @@ function renderTable(){
   const pa=host.querySelector('#pickAll');if(pa)pa.addEventListener('change',()=>{const ids=list.map(d=>String(d.id));if(pa.checked)ids.forEach(i=>PICKED.add(i));else ids.forEach(i=>PICKED.delete(i));renderTable();refocus('#pickAll');});
   const bs=host.querySelector('#bulkSend');if(bs)bs.addEventListener('click',bulkSend);
   const bl=host.querySelector('#bulkLost');if(bl)bl.addEventListener('click',bulkLost);
+  const bm=host.querySelector('#bulkMove');if(bm)bm.addEventListener('change',()=>{bulkMove(bm);});
+  const bcd=host.querySelector('#bulkClose');if(bcd)bcd.addEventListener('click',bulkClose);
+  const bt=host.querySelector('#bulkTodo');if(bt)bt.addEventListener('click',bulkTodo);
+  host.querySelectorAll('[data-cedit]').forEach(b=>b.addEventListener('click',(e)=>{e.stopPropagation();editCell(b);}));
   const bc=host.querySelector('#bulkClear');if(bc)bc.addEventListener('click',()=>{PICKED.clear();renderTable();refocus('#pickAll');});
   host.querySelectorAll('[data-tsort]').forEach(b=>b.onclick=()=>{
     const k=b.getAttribute('data-tsort');
@@ -2398,8 +2553,8 @@ function renderTable(){
   });
   host.querySelectorAll('tr[data-id]').forEach(tr=>{
     const open=()=>{if(tr.dataset.convert)WANT_CONVERT_NEXT=true;openDeal(tr.getAttribute('data-id'));};
-    tr.onclick=(e)=>{if(e.target.closest('input,td.pick'))return;open();};
-    tr.onkeydown=(e)=>{if(e.target.closest('input'))return;if(e.key==='Enter'||e.key===' '){e.preventDefault();open();}};
+    tr.onclick=(e)=>{if(e.target.closest('input,td.pick,.cedit,.ced'))return;open();};
+    tr.onkeydown=(e)=>{if(e.target.closest('input,button,select,.ced'))return;if(e.key==='Enter'||e.key===' '){e.preventDefault();open();}};
   });
 }
 
@@ -2521,6 +2676,9 @@ function dpMount(){
     else if(k==='open'){closeDealPreview(false);openDeal(id);}
     else if(k==='win'){closeDealPreview(false);WANT_CONVERT_NEXT=true;openDeal(id);}
     else if(k==='proposal')location.assign('/pipeline.html?deal='+encodeURIComponent(id)+'&dtab=billing&compose=proposal');
+    // item 80: Email opens its box in the card; × (or Email again) puts it away
+    else if(k==='email'){DP.mail=DP.mail?null:{};dpPaint();}
+    else if(k==='mailx'){DP.mail=null;dpPaint();const e=$('dprev').querySelector('[data-dp="email"]');if(e)e.focus({preventScroll:true});}
     else if(k==='call'||k==='invoice'){
       // + Create's form (PR 206), started on this deal; without + Create, the full deal
       const ok=typeof window.ddsOpenCreate==='function'&&window.ddsOpenCreate(k,b,false,{deal_id:id});
@@ -2552,6 +2710,8 @@ function dpPaint(){
   const box=$('dprev');if(!box||!DP)return;
   const d=DEALS.find(x=>String(x.id)===DP.id);if(!d){closeDealPreview();return;}
   const fk=box.contains(document.activeElement)?(document.activeElement.getAttribute('data-k')||''):'';
+  // item 80: the Email box keeps its own node through a repaint, with what's typed and where the caret was
+  const mail=DP.mail,mAe=mail&&mail.el&&mail.el.contains(document.activeElement)?document.activeElement:null,mSel=mAe&&typeof mAe.selectionStart==='number'?[mAe.selectionStart,mAe.selectionEnd]:null;
   const who=(d.contact_id&&CONTACT_NAME&&CONTACT_NAME[d.contact_id])||'';
   const ch=STAGE_CHANCE[d.stage],at=DP_PATH.indexOf(d.stage);
   const nxt=d.stage==='contract'?'won':BOARD_STAGES[BOARD_STAGES.indexOf(d.stage)+1];
@@ -2573,12 +2733,19 @@ function dpPaint(){
       ${nextBtn}${step}
       ${(()=>{const ph=d.contact_id&&CONTACT_PHONE[d.contact_id];return ph?callLink(ph,d.id,who,'dp-call'):'';})()}
       <h3 class="dp-l">Quick actions</h3>
-      <div class="dp-acts" role="group" aria-label="Quick actions"><button type="button" data-dp="call" data-k="call">Log a call</button><button type="button" data-dp="proposal" data-k="proposal">Proposal</button><button type="button" data-dp="invoice" data-k="invoice">Invoice</button></div>
+      <div class="dp-acts" role="group" aria-label="Quick actions"><button type="button" data-dp="call" data-k="call">Log a call</button><button type="button" data-dp="email" data-k="email" aria-expanded="${mail?'true':'false'}"${mail?' class="on"':''}>Email</button><button type="button" data-dp="proposal" data-k="proposal">Proposal</button><button type="button" data-dp="invoice" data-k="invoice">Invoice</button></div>
+      ${mail?`<section class="dp-mail" aria-labelledby="dpm-h"><div class="dpm-h"><h3 id="dpm-h">Email ${esc(who?who.trim().split(/\s+/)[0]:'them')}</h3><button type="button" class="dp-x" data-dp="mailx" data-k="mailx" aria-label="Put the email away">×</button></div><div data-mail-slot></div></section>`:''}
       <h3 class="dp-l">Latest</h3>
       ${latest}
     </div>
     <div class="dp-foot"><button type="button" class="dp-open" data-dp="open" data-k="open">Open full deal <span aria-hidden="true">→</span></button></div>`;
   if(fk){const n=box.querySelector(`[data-k="${fk}"]`)||$('dprev-h');if(n)n.focus({preventScroll:true});}
+  const slot=mail&&box.querySelector('[data-mail-slot]');
+  if(slot&&mail.el){slot.replaceWith(mail.el);if(mAe){mAe.focus({preventScroll:true});if(mSel)try{mAe.setSelectionRange(mSel[0],mSel[1]);}catch(_){}}}
+  else if(slot&&window.ddsEmailBox){
+    mail.el=slot;slot.removeAttribute('data-mail-slot');const pid=DP.id;
+    window.ddsEmailBox.open(slot,{req:apiR,ids:{deal_id:pid},idp:'dpm',focus:true,onSent:(r,first)=>{toast(r&&r.logged===false?(r.message||'Sent.'):'Email sent to '+(first||'them')+'.');if(DP&&DP.id===pid){DP.mail=null;dpPaint();dpActivity();const e=$('dprev').querySelector('[data-dp="email"]');if(e)e.focus({preventScroll:true});}}});
+  }
 }
 function closeDealPreview(restore){
   if(!DP)return;
@@ -3160,6 +3327,7 @@ async function openDeal(id){
             <div class="kinds" id="qlKinds" role="group" aria-label="Type of activity">${qlKindBtns}</div>
             <textarea id="qlBody" rows="2" placeholder="What happened? (optional for a call, email, or meeting)"></textarea>
             <div class="qrow"><label class="mut" for="qlDate" style="margin:0">When</label><input type="date" id="qlDate" max="${todayStr}" value="${todayStr}"><span style="flex:1"></span><button class="btn" id="qlSave">${logLabel('call')}</button></div>
+            <div class="qrow qfu"><label class="mut" for="qlFollow" style="margin:0">Follow up on</label><input type="date" id="qlFollow" min="${todayStr}" aria-label="Follow up on (optional): adds a to-do"><button type="button" class="chip sm" data-fu="1">Tomorrow</button><button type="button" class="chip sm" data-fu="7">Next week</button><span class="mut" style="font-size:12.5px">optional, adds a to-do</span></div>
           </div>
           <ul class="tl">${tlHtml}</ul>
         </div>
@@ -3243,7 +3411,17 @@ async function openDeal(id){
     // Lost is gentle but deliberate: an optional one-line reason (stored on the
     // deal via the stage route's `reason` → lost_reason) so "why" survives.
     const markLost=$('markLost'); if(markLost) markLost.onclick=()=>miniForm($('lostForm'),[{name:'reason',label:'Reason (optional) — pick one or write your own',placeholder:'e.g. Price',list:{id:'lostReasons',options:LOST_REASONS}}],async(v)=>{try{await api('/sales/deals/'+id+'/stage','POST',{to:'lost',reason:v.reason||undefined});PENDING_BACK='';toast('Marked as not a fit');openDeal(id);load();}catch(e){toast(nice(e),true);}});
-    const delDeal=$('delDeal'); if(delDeal) delDeal.onclick=async()=>{if(!confirm('Delete this deal? It leaves your pipeline; the history stays in your records. This can’t be undone here.'))return;delDeal.disabled=true;try{await api('/sales/deals/'+id,'DELETE');toast('Deal deleted');closeDealDetail();load();}catch(e){toast(nice(e),true);delDeal.disabled=false;}};
+    // sales item 83: it asks in place, and Undo (or Recently deleted, for 30 days) brings the deal back
+    const delDeal=$('delDeal'); if(delDeal) delDeal.onclick=async()=>{
+      const k=KIT(),q='Delete this deal? It leaves your pipeline. You can bring it back from Recently deleted for 30 days.';
+      if(k&&k.confirmIn){if(!(await k.confirmIn(delDeal,{text:q,yes:'Yes, delete it'})))return;}else if(!confirm(q))return;
+      delDeal.disabled=true;
+      try{
+        await api('/sales/deals/'+id,'DELETE');closeDealDetail();load();
+        const back=async()=>{try{await api('/sales/deals/'+encodeURIComponent(id)+'/restore','POST',{});toast('The deal is back.');load(true);}catch(e){toast(nice(e),true);}};
+        if(k&&k.undoToast)k.undoToast('Deal deleted. It stays in Recently deleted for 30 days.',back);else toast('Deal deleted');
+      }catch(e){toast(nice(e),true);delDeal.disabled=false;}
+    };
     const edNotes=$('ed-notes-'+id); if(edNotes&&window.ddsDraftRestore)window.ddsDraftRestore(edNotes); // an unsaved note survives an accidental Esc
     // Saving Details saves the CONTACT too. An existing contact is patched in
     // place; a contactless deal mints one and links it — the same two-step the
@@ -3307,7 +3485,12 @@ async function openDeal(id){
     // "last contacted", so the drawer + card refresh after saving.
     let qlKind='call';
     const qlKinds=$('qlKinds'); if(qlKinds) qlKinds.querySelectorAll('.kb').forEach(btn=>btn.onclick=()=>{qlKind=btn.dataset.k;const sv=$('qlSave');if(sv)sv.textContent=logLabel(qlKind);qlKinds.querySelectorAll('.kb').forEach(x=>{x.classList.toggle('on',x===btn);x.setAttribute('aria-pressed',x===btn?'true':'false');});const ta=$('qlBody');if(ta)ta.placeholder=qlKind==='note'?'What do you want to remember about this deal?':'What happened? (optional for a call, email, or meeting)';});
-    const qlSave=$('qlSave'); if(qlSave) qlSave.onclick=async()=>{const ta=$('qlBody');const body=(ta&&ta.value.trim())||'';if(qlKind==='note'&&!body){toast('Write a short note.',true);if(ta)ta.focus();return;}qlSave.disabled=true;try{await api('/sales/deals/'+id+'/activity','POST',{kind:qlKind,body,occurred_at:dayAtNoon($('qlDate')&&$('qlDate').value)});toast('Logged');openDeal(id);load();}catch(e){toast(nice(e),true);qlSave.disabled=false;}};
+    // sales item 85: "Follow up on [day]" adds a to-do on the deal in the same step (Tomorrow and Next week fill the day)
+    $('detailInner').querySelectorAll('[data-fu]').forEach(b=>b.onclick=()=>{const f=$('qlFollow');if(f){f.value=localYmd(Date.now()+Number(b.dataset.fu)*86400000);f.focus();}});
+    const qlSave=$('qlSave'); if(qlSave) qlSave.onclick=async()=>{const ta=$('qlBody');const body=(ta&&ta.value.trim())||'';if(qlKind==='note'&&!body){toast('Write a short note.',true);if(ta)ta.focus();return;}
+      const fu=($('qlFollow')&&$('qlFollow').value)||'',who=(c&&(c.name||c.email))||'';
+      qlSave.disabled=true;try{const r=await api('/sales/deals/'+id+'/activity','POST',{kind:qlKind,body,occurred_at:dayAtNoon($('qlDate')&&$('qlDate').value),...(fu?{follow_up:fu,follow_up_title:'Follow up'+(who?' with '+who:'')}:{})});
+        const f=r&&r.data&&r.data.follow_up;toast(fu?(f&&f.id?'Logged, and a to-do to follow up on '+niceDay(fu)+'.':'Logged. The follow-up to-do didn’t save: add it from To-dos.'):'Logged',!!(fu&&!(f&&f.id)));openDeal(id);load();}catch(e){toast(nice(e),true);qlSave.disabled=false;}};
     // ONE send path per doc-kind (reused by the list buttons, "Save & send", and
     // the convert gate's "send first"). It records the link in LINKS, copies it,
     // and — critically — tells the operator honestly whether it was EMAILED or

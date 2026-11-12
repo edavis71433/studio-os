@@ -27,6 +27,7 @@ import { getSite } from '../lib/netlify.ts';
 import { rdapLookupDetailed, daysUntil, expiryRung, expiryWords, lookupPatch } from '../lib/rdap.ts';
 import { domainHealth, padlockAfterCheck, domainTruth, dnsRecordsSure } from '../lib/domain_health.ts';
 import { mailWatch, domainChangeEmail, tellOwnerAndStudio, announceLiveOnce } from '../lib/domain_notify.ts';
+import { studioWantsEmail } from '../lib/site_notify.ts';
 import type { DomainMail } from '../lib/domain_notify.ts';
 import { whereToGo } from '../lib/rdap.ts';
 import { provisionSsl } from '../lib/netlify.ts';
@@ -437,7 +438,7 @@ export async function checkOneDomain(site: DomainCheckSite, nowIso = new Date().
   // the studio that looks after this client gets a copy of every rung (it used to be told only inside 7 days, and only the platform)
   const link = await svc(`presence_service_links?customer_site_id=eq.${site.id}&status=eq.active&select=agency_site_id&order=created_at.desc&limit=1`).catch(() => ({ json: [] as unknown[] }));
   const studioSite = Array.isArray(link.json) && (link.json[0] as { agency_site_id?: string } | undefined)?.agency_site_id;
-  if (studioSite) await emailOperator(String(studioSite), `${site.custom_domain} ${words.when}`, `${html}<p>${clientEmail ? 'Your client has been sent the same reminder.' : 'Your client has no email on their record, so they haven’t been told.'}</p>`, 'domain-expiry');
+  if (studioSite && await studioWantsEmail(String(studioSite), site.id)) await emailOperator(String(studioSite), `${site.custom_domain} ${words.when}`, `${html}<p>${clientEmail ? 'Your client has been sent the same reminder.' : 'Your client has no email on their record, so they haven’t been told.'}</p>`, 'domain-expiry');
   if (rung === '7' || rung === '1' || rung === 'expired') {
     // OPERATIONAL, to the platform operator (critical:true — an opt-out must not silence it; a bounce/complaint still does).
     const ops = Deno.env.get('OPS_ALERT_EMAIL') || '';
@@ -859,26 +860,42 @@ export async function runDealTaskReminders(limit = 20): Promise<{ nudged: number
   };
 
   // ── overdue deal to-dos (presence_deal_tasks, 0108) ──
-  const tq = await svc(`presence_deal_tasks?status=eq.open&deleted_at=is.null&due_date=not.is.null&due_date=lte.${today}&select=id,site_id,deal_id,title,due_date&order=due_date.asc&limit=${limit}`).catch(() => ({ ok: false, json: null as any }));
-  for (const t of (tq.ok && Array.isArray(tq.json) ? tq.json : []) as Array<{ id: string; site_id: string; deal_id: string; title?: string; due_date: string; status?: string }>) {
+  // sales item 85: since APPLY-0173 a to-do may be for a person, a customer or nobody; those get
+  // the same calm nudge, pointing at their record (or the To-dos page). Before it, the older select.
+  const tqPath = (cols: string) => `presence_deal_tasks?status=eq.open&deleted_at=is.null&due_date=not.is.null&due_date=lte.${today}&select=${cols}&order=due_date.asc&limit=${limit}`;
+  let tq = await svc(tqPath('id,site_id,deal_id,contact_id,client_id,title,due_date')).catch(() => ({ ok: false, json: null as any }));
+  if (!tq.ok) tq = await svc(tqPath('id,site_id,deal_id,title,due_date')).catch(() => ({ ok: false, json: null as any }));
+  for (const t of (tq.ok && Array.isArray(tq.json) ? tq.json : []) as Array<{ id: string; site_id: string; deal_id: string | null; contact_id?: string | null; client_id?: string | null; title?: string; due_date: string; status?: string }>) {
     if (!dealTaskDue({ status: 'open', due_date: t.due_date }, nowIso)) continue;   // pure guard defends the SQL window
-    const deal = (await svc(`presence_deals?id=eq.${encodeURIComponent(t.deal_id)}&site_id=eq.${encodeURIComponent(t.site_id)}&deleted_at=is.null&select=id,title,stage,converted_client_id&limit=1`).catch(() => ({ json: null as any }))).json?.[0];
-    if (!deal || deal.stage === 'lost' || deal.converted_client_id) continue;       // the deal left the pipeline — its to-dos go quiet with it
+    let onWhat = '', href = '', label = '', inWords = '';
+    if (t.deal_id) {
+      const deal = (await svc(`presence_deals?id=eq.${encodeURIComponent(t.deal_id)}&site_id=eq.${encodeURIComponent(t.site_id)}&deleted_at=is.null&select=id,title,stage,converted_client_id&limit=1`).catch(() => ({ json: null as any }))).json?.[0];
+      if (!deal || deal.stage === 'lost' || deal.converted_client_id) continue;       // the deal left the pipeline — its to-dos go quiet with it
+      onWhat = String(deal.title || 'a deal').slice(0, 80); href = `${base}/pipeline.html?deal=${deal.id}`; label = 'Open the deal'; inWords = 'so the deal keeps its momentum';
+    } else if (t.contact_id) {
+      const c = (await svc(`presence_contacts?id=eq.${encodeURIComponent(t.contact_id)}&site_id=eq.${encodeURIComponent(t.site_id)}&deleted_at=is.null&select=id,name,email&limit=1`).catch(() => ({ json: null as any }))).json?.[0];
+      if (!c) continue;                                                                // a person taken off the list: their to-dos go quiet too
+      onWhat = String(c.name || c.email || 'a contact').slice(0, 80); href = `${base}/crm.html?contact=${c.id}`; label = 'Open their record'; inWords = 'so nobody waits on you';
+    } else if (t.client_id) {
+      const k = (await svc(`clients?id=eq.${encodeURIComponent(t.client_id)}&select=id,name,email&limit=1`).catch(() => ({ json: null as any }))).json?.[0];
+      onWhat = String((k && (k.name || k.email)) || 'a customer').slice(0, 80); href = `${base}/crm.html?client_id=${t.client_id}`; label = 'Open their record'; inWords = 'so nobody waits on you';
+    } else {
+      onWhat = 'your own list'; href = `${base}/todos.html`; label = 'Open your to-dos'; inWords = 'so it doesn’t slip';
+    }
     const clientId = await clientFor(t.site_id);
     if (!clientId) continue;
     const title = String(t.title || 'a to-do').slice(0, 80);
-    const dealTitle = String(deal.title || 'a deal').slice(0, 80);
     const overdue = String(t.due_date).slice(0, 10) < today;
     const fresh = await raiseNotice({
       siteId: t.site_id, clientId, kind: 'deal_task_due', period: dealTaskPeriod(t.id, Date.now()),
-      headline: `${overdue ? 'Overdue' : 'Due today'} — ${title} (${dealTitle})`,
-      body: `You set this to-do ${overdue ? `for ${String(t.due_date).slice(0, 10)} and it hasn’t been marked done` : 'for today'}. Tick it off or move the date so the deal keeps its momentum.`,
+      headline: `${overdue ? 'Overdue' : 'Due today'} — ${title} (${onWhat})`,
+      body: `You set this to-do ${overdue ? `for ${String(t.due_date).slice(0, 10)} and it hasn’t been marked done` : 'for today'}. Tick it off or move the date ${inWords}.`,
     });
     if (fresh) {
       nudged++;
-      emailOperator(t.site_id, `A deal to-do is ${overdue ? 'overdue' : 'due today'} — ${title}`,
-        `<p>On <b>${esc(dealTitle)}</b>: “${esc(title)}” was due ${esc(String(t.due_date).slice(0, 10))}. A quick tick — or a new date — keeps the deal honest.</p>`,
-        'deal_task_due', { label: 'Open the deal', href: `${base}/pipeline.html?deal=${deal.id}` }).catch(() => {});
+      emailOperator(t.site_id, `A ${t.deal_id ? 'deal ' : ''}to-do is ${overdue ? 'overdue' : 'due today'} — ${title}`,
+        `<p>${t.deal_id ? 'On' : 'For'} <b>${esc(onWhat)}</b>: “${esc(title)}” was due ${esc(String(t.due_date).slice(0, 10))}. A quick tick — or a new date — keeps ${t.deal_id ? 'the deal' : 'it'} honest.</p>`,
+        'deal_task_due', { label, href }).catch(() => {});
     }
   }
 
