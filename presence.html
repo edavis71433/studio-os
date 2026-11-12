@@ -1855,6 +1855,46 @@ body.pd-dragging *{cursor:grabbing !important}
 .ver-star[aria-pressed="true"] svg{fill:currentColor}   /* the editor's own star, filled when starred */
 .ver-star[aria-pressed="true"]{color:var(--amber,#94530a)}
 .ver-star:focus-visible{outline:2px solid var(--plum);outline-offset:1px}
+/* item 158: the list of keys, from ? or the foot of the right-click menu */
+.dck-sheet{border:0;border-radius:20px;padding:22px 24px;width:min(440px,94vw);max-height:88vh;overflow:auto;background:var(--sheet);color:var(--ink);box-shadow:var(--dds-shadow-lg,var(--shadow))}
+.dck-sheet::backdrop{background:color-mix(in srgb,var(--ink) 35%,transparent)}
+.dck-head{display:flex;gap:12px;align-items:flex-start;margin-bottom:6px}
+.dck-head > div{flex:1;min-width:0}
+.dck-head h2{margin:0;font-family:var(--serif);font-weight:500;font-size:24px;line-height:1.2}
+.dck-head p{margin:4px 0 0;font-size:13px;color:var(--ink-2)}
+.dck-done{font:inherit;font-size:13px;font-weight:600;min-height:36px;padding:0 16px;border:1px solid var(--hair);border-radius:999px;background:var(--sheet);color:var(--ink);cursor:pointer}
+.dck-done:focus-visible{outline:2px solid var(--plum);outline-offset:2px}
+.dck-grp{margin:16px 0 4px;font-size:12px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;color:var(--ink-2)}
+.dck-row{display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:36px;font-size:14px}
+.dck-keys{display:inline-flex;gap:4px;flex:none}
+.dck-keys kbd{min-width:24px;height:24px;padding:0 6px;display:inline-flex;align-items:center;justify-content:center;box-sizing:border-box;border:1px solid var(--hair);border-radius:6px;background:var(--sheet);color:var(--ink-2);font:500 12px/1 var(--sans)}
+.dck-note{margin:16px 0 0;padding:12px 14px;border-radius:12px;background:var(--info-soft);color:var(--info);font-size:13px;line-height:1.5}
+/* item 158: the draft on your phone, from Preview's bar and the Page menu */
+.stage-phone{display:inline-flex;align-items:center;gap:6px;align-self:center;min-height:34px;padding:0 14px;border:0;border-radius:999px;background:var(--plum);color:var(--fill-ink,#fff);font:inherit;font-size:13px;font-weight:600;cursor:pointer}
+.stage-phone svg{flex:none}
+.stage-phone:focus-visible{outline:2px solid #efeaf7;outline-offset:2px}
+.op-sheet{border:0;border-radius:20px;padding:22px 24px;width:min(400px,94vw);max-height:90vh;overflow:auto;background:var(--sheet);color:var(--ink);box-shadow:var(--dds-shadow-lg,var(--shadow))}
+.op-sheet::backdrop{background:color-mix(in srgb,var(--ink) 35%,transparent)}
+.op-head{display:flex;gap:12px;align-items:flex-start}
+.op-head > div{flex:1;min-width:0}
+.op-head h2{margin:0;font-family:var(--serif);font-weight:500;font-size:24px;line-height:1.2}
+.op-head p{margin:4px 0 0;font-size:13px;color:var(--ink-2)}
+.op-x{display:inline-flex;align-items:center;justify-content:center;width:36px;height:36px;flex:none;border:0;border-radius:999px;background:transparent;color:var(--ink-2);cursor:pointer}
+.op-x:hover{background:var(--wash)}
+.op-code{display:flex;flex-direction:column;gap:10px;align-items:center;justify-content:center;min-height:248px;margin:16px 0;padding:14px;border-radius:16px;background:var(--wash)}
+.op-code svg{width:220px;height:220px;display:block;border-radius:6px}
+.op-what{margin:0 0 12px;font-size:14px;line-height:1.55}
+.op-note{margin:0 0 16px;padding:12px 14px;border-radius:12px;background:var(--info-soft);color:var(--info);font-size:13px;line-height:1.5}
+.op-acts{display:flex;gap:8px;flex-wrap:wrap}
+.op-copy{display:inline-flex;align-items:center;gap:6px;min-height:38px;padding:0 16px;border:1px solid var(--hair);border-radius:999px;background:var(--sheet);color:var(--ink);font:inherit;font-size:13px;font-weight:600;cursor:pointer}
+.op-copy[disabled]{opacity:.5;cursor:default}
+.op-done{display:inline-flex;align-items:center;justify-content:center;min-height:38px;padding:0 18px;border:0;border-radius:999px;background:var(--plum);color:var(--fill-ink,#fff);font:inherit;font-size:13px;font-weight:600;cursor:pointer;text-decoration:none}
+.op-err{margin:0;color:var(--clay);font-size:14px;text-align:center}
+.op-wait{margin:0;color:var(--ink-2);font-size:14px}
+@media(max-width:760px){   /* a phone's Preview bar wraps, so Open in my browser stays on the screen */
+  .stagebar{flex-wrap:wrap;row-gap:var(--dds-s2,8px);column-gap:var(--dds-s4,16px);padding-left:var(--dds-s4,16px);padding-right:var(--dds-s4,16px)}
+  .stage-phone{margin-bottom:var(--dds-s2,8px)}
+}
 /* ── Blog (builder list item 40): the posts as cards with where each stands, the filters,
    and the categories and authors sheet. The writing screen brings its own styles
    (blog-studio.js); while it's open the app's own bars step aside, as in Edit mode. ── */
@@ -2528,6 +2568,7 @@ html.bs-open .scrim{z-index:96}   /* Files and the categories card open over the
       <button data-dev="desktop" class="on">Desktop</button>
       <button data-dev="mobile">Phone</button>
     </div>
+    <button type="button" class="stage-phone" id="btnOnPhone"></button>
   </div>
   <div class="stagewrap"><div class="proof" id="proofFrame"><iframe id="previewFrame" title="Preview of your website"></iframe></div></div>
 </div>
@@ -3270,6 +3311,7 @@ document.querySelectorAll(".scrim").forEach((s) => {
 });
 document.addEventListener("keydown", (e) => {
   if (e.key !== "Escape") return;
+  if (document.querySelector("dialog[open]")) return;   // a question or card on top answers its own Escape (item 158: the phone code over Preview)
   document.querySelectorAll(".scrim.on").forEach((s) => closeSheet(s.id));
   document.querySelectorAll(".editor").forEach((n) => n.remove()); // Esc closes inline editors, untouched
   if ($("stage").classList.contains("on")) closePreview();
@@ -7373,6 +7415,7 @@ $("btnStageClose").addEventListener("click", closePreview);
 // menu and grabs focus) would otherwise eat the key or pull focus off the opener.
 window.addEventListener("keydown", (e) => {
   if (e.key !== "Escape" || !$("stage").classList.contains("on")) return;
+  if (document.querySelector("dialog[open]")) return;   // a card over the preview (item 158's code) answers its own Escape
   e.stopPropagation(); closePreview();
 }, true);
 $("btnEditSite").addEventListener("click", () => {
@@ -7983,20 +8026,107 @@ async function renderRitualSchedule(host, publishable, toSchedule) {
    the current draft (captured into the private preview through the one preview
    machinery) and copies it. No sign-in needed to view; it expires on its own. ── */
 let SHARE_DRAFT_BUSY = false;   // slice B: the dc-bar button is gone — this guard is the double-fire protection now
+// one private link to the draft as it stands now: read-only, no sign-in, 7 days
+async function mintDraftLink() {
+  const r = (await api("POST", "/preview/share-link", { capture: true, ttl_seconds: 7 * 86400 })).data;
+  return { url: r.url, until: r.expires_at ? new Date(r.expires_at).toLocaleDateString("en-US", { month: "short", day: "numeric" }) : "" };
+}
 async function shareDraftLink() {
   if (SHARE_DRAFT_BUSY) return;
   SHARE_DRAFT_BUSY = true;
   toast("Preparing your draft link…");   // the menu closes on click — say work is happening
   try {
-    const r = (await api("POST", "/preview/share-link", { capture: true, ttl_seconds: 7 * 86400 })).data;
-    const until = r.expires_at ? new Date(r.expires_at).toLocaleDateString("en-US", { month: "short", day: "numeric" }) : "";
+    const { url, until } = await mintDraftLink();
     let copied = false;
-    try { await navigator.clipboard.writeText(r.url); copied = true; } catch (_) { /* clipboard can be blocked */ }
+    try { await navigator.clipboard.writeText(url); copied = true; } catch (_) { /* clipboard can be blocked */ }
     if (copied) toast(`Draft link copied — read-only, works until ${until}. Text it to anyone.`);
-    else { window.prompt(`Your read-only draft link (works until ${until}) — copy it:`, r.url); }
+    else { window.prompt(`Your read-only draft link (works until ${until}) — copy it:`, url); }
   } catch (err) { toast(nice(err), true); }
   SHARE_DRAFT_BUSY = false;
 }
+
+/* ── Item 158: open the draft on your phone. A phone frame on a laptop is not a phone: Preview's
+   "On my phone" (and the Page menu's "Open on my phone…") shows the same private link as a code
+   the phone's camera opens (qr.js draws it), so the draft opens in the phone's own browser the
+   way a visitor would see it. On a phone there is nothing to scan: the button opens the link in
+   a new tab. The link shows the draft as it was when the code was made, so the card says to
+   press the button again after more changes. ── */
+const onAPhone = () => window.matchMedia("(max-width: 760px) and (pointer: coarse)").matches;
+let QR_LOAD = null;
+function loadQr() {
+  if (window.DDSQR) return Promise.resolve(window.DDSQR);
+  if (!QR_LOAD) QR_LOAD = new Promise((res, rej) => {
+    const s = document.createElement("script"); s.src = "/qr.js?v=1";   // bump ?v= whenever qr.js changes
+    s.onload = () => window.DDSQR ? res(window.DDSQR) : rej(new Error("missing"));
+    s.onerror = () => rej(new Error("load"));
+    document.head.appendChild(s);
+  }).catch((e) => { QR_LOAD = null; throw e; });   // a failed load can be tried again
+  return QR_LOAD;
+}
+let PHONE_OPEN = false;
+async function openOnPhone() {
+  if (PHONE_OPEN) return;
+  if (onAPhone()) {
+    const tab = window.open("", "_blank");   // opened while the press still counts, so the phone's browser allows it
+    try {
+      const { url } = await mintDraftLink();
+      if (tab) { try { tab.opener = null; } catch (_) {} tab.location.href = url; return; }
+    } catch (err) { if (tab) tab.close(); toast(nice(err), true); return; }
+    // the browser said no to a new tab: fall through to the card, whose link is a plain one to tap
+  }
+  PHONE_OPEN = true;
+  const back = document.activeElement;
+  const dlg = el("dialog", "op-sheet"); dlg.setAttribute("aria-labelledby", "opTitle");
+  const head = el("div", "op-head"), hx = el("div"), h = el("h2", null, "Open it on your phone"); h.id = "opTitle";
+  hx.append(h, el("p", null, onAPhone() ? "Your draft, in your browser, the way a visitor would see it." : "Point your phone’s camera at the code."));
+  const x = el("button", "op-x"); x.type = "button"; x.setAttribute("aria-label", "Close"); x.innerHTML = uiIcon("x", 18);
+  head.append(hx, x);
+  const box = el("div", "op-code"); box.appendChild(el("p", "op-wait", "Making your link…"));
+  const what = el("p", "op-what", "Your draft opens on the phone the way a visitor would see it, as a page you can scroll and tap. After more changes, press On my phone here again and reload the page there.");
+  const note = el("p", "op-note"); note.hidden = true;
+  const acts = el("div", "op-acts");
+  const copy = el("button", "op-copy"); copy.type = "button"; copy.disabled = true; copy.innerHTML = uiIcon("copy", 16) + "<span>Copy the link</span>";
+  const done = el("button", "op-done", "Done"); done.type = "button";
+  acts.append(copy, done);
+  dlg.append(head, box, what, note, acts);
+  document.body.appendChild(dlg);
+  let shut = false;
+  const close = () => { if (shut) return; shut = true; PHONE_OPEN = false; try { dlg.close(); } catch (_) {} dlg.remove(); if (back && back.isConnected) { try { back.focus({ preventScroll: true }); } catch (_) {} } };
+  x.addEventListener("click", close); done.addEventListener("click", close);
+  dlg.addEventListener("cancel", (e) => { e.preventDefault(); close(); });
+  dlg.addEventListener("click", (e) => { if (e.target === dlg) close(); });
+  dlg.showModal(); done.focus();
+  const make = async () => {
+    box.textContent = ""; box.appendChild(el("p", "op-wait", "Making your link…")); copy.disabled = true;
+    try {
+      const [link, Q] = await Promise.all([mintDraftLink(), onAPhone() ? Promise.resolve(null) : loadQr()]);
+      if (shut) return;
+      box.textContent = "";
+      if (Q) box.innerHTML = Q.svg(link.url, "A code that opens your draft on a phone");
+      else { const a = el("a", "op-done op-open", "Open in my browser"); a.href = link.url; a.target = "_blank"; a.rel = "noopener"; box.appendChild(a); }
+      note.textContent = `It’s a private link to your draft, not your live site: read-only, no sign-in, and it works until ${link.until}. Anyone with the link can see the draft.`;
+      note.hidden = false; copy.disabled = false;
+      copy.onclick = async () => {
+        try { await navigator.clipboard.writeText(link.url); toast("Link copied"); }
+        catch (_) { window.prompt("Copy the link to your draft:", link.url); }
+      };
+    } catch (err) {
+      if (shut) return;
+      box.textContent = "";
+      const p = el("p", "op-err", nice(err)); p.setAttribute("role", "alert");
+      const again = el("button", "op-copy", "Try again"); again.type = "button"; again.addEventListener("click", make);
+      box.append(p, again);
+    }
+  };
+  make();
+}
+(function onPhoneButton() {
+  const b = $("btnOnPhone"); if (!b) return;
+  const paint = () => { const ph = onAPhone(); b.innerHTML = uiIcon(ph ? "share" : "qr", 16) + "<span></span>"; b.lastChild.textContent = ph ? "Open in my browser" : "On my phone"; };
+  queueMicrotask(paint);   // its icon comes from BI_PATHS, set further down this script
+  try { window.matchMedia("(max-width: 760px) and (pointer: coarse)").addEventListener("change", paint); } catch (_) {}
+  b.addEventListener("click", () => openOnPhone());
+})();
 
 /* ── Slice B (builder redesign §2.2b, AC-5): the Page Information menu — ONE
    place for everything about this page/site. Deep-links, not rebuilds: every
@@ -8053,6 +8183,7 @@ function togglePageInfoMenu() {
   mi("Publish now…", () => openRitual(), { id: "piPublishNow", title: "Review every change, then put it live — the same door as the Publish button" });
   mi("Publish later / scheduled changes…", () => openRitual({ schedule: true }), { id: "piPublishLater", title: "Pick a time — your changes go live on their own; see or cancel anything already scheduled" });
   mi("Share a draft link…", () => shareDraftLink(), { id: "piShareDraft", title: "Copy a private, expiring link to this draft — no sign-in needed to view" });
+  mi(onAPhone() ? "Open in my browser…" : "Open on my phone…", () => openOnPhone(), { id: "piOnPhone", title: "See this draft on your phone, the way a visitor would: a code its camera opens, for the same private link" });
   // Take offline / bring back (G10) — state from the SAME /preview/status
   // History uses, cached in S.previewStatus so reopens paint instantly, then
   // revalidated in the background. A fetch failure must NOT hide the item —
@@ -14729,6 +14860,8 @@ const BI_PATHS = {
   check: '<path d="M20 6L9 17l-5-5"/>',
   up: '<path d="M12 19V5"/><path d="M5 12l7-7 7 7"/>',
   down: '<path d="M12 5v14"/><path d="M19 12l-7 7-7-7"/>',
+  keyboard: '<rect x="2" y="6" width="20" height="12" rx="2"/><path d="M6 10h.01M10 10h.01M14 10h.01M18 10h.01M7 14h10"/>',
+  qr: '<rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><path d="M14 14h3v3M21 14v.01M14 21h.01M17 21h4v-4"/>',
 };
 function uiIcon(name, size) {
   const s = size || 16;
@@ -15697,6 +15830,138 @@ function dcPasteAt(gap) {
   // G13 fix (review finding 1): compose the insertion shift BEFORE the splice.
   dcCaptureScroll(); dcComposeSrcMap(BLOCKS_WORK.length, (v) => dcShiftIndex(v, at, 1)); BLOCKS_WORK.splice(at, 0, blk); BLOCK_FOCUS = at; DC_FOCUS_BI = at; renderBlocksCard(); saveBlocks();
 }
+// ── Item 158: right-click on a section, a few keys, and the list of them ──
+// One list of what can be done to a section feeds the right-click menu and the keys, so the
+// two never disagree; each action carries its key when it has one. On a Windows computer
+// Ctrl stands for ⌘ and Alt for ⌥. A null in the list is a line between groups.
+const DCK = KEY_MAC ? { mod: "⌘", alt: "⌥", shift: "⇧", del: "⌫" } : { mod: "Ctrl", alt: "Alt", shift: "Shift", del: "Delete" };
+const DCK_ARIA = { "⌘": "Meta", Ctrl: "Control", "⌥": "Alt", Alt: "Alt", "⇧": "Shift", Shift: "Shift", "⌫": "Backspace", Delete: "Delete", "↑": "ArrowUp", "↓": "ArrowDown" };
+const dcKeysAria = (keys) => keys.map((k) => DCK_ARIA[k] || k).join("+");
+function dcSectionActions(el2) {
+  const c = eeClassify(el2), out = [];
+  if (!c) return out;
+  if (c.kind === "block") {
+    const bi = c.bi, b = BLOCKS_WORK[bi] || {}, n = (BLOCKS_WORK || []).length;
+    if (lockedForMe(b)) {   // item 155: a locked section offers its words at most
+      if (b.lock.words) out.push({ id: "edit", label: "Edit words", icon: "pencil", keys: ["Enter"], run: () => eeEditBlock(bi) });
+      return out;
+    }
+    out.push({ id: "edit", label: "Edit section", icon: "pencil", keys: ["Enter"], run: () => eeEditBlock(bi) });
+    out.push({ id: "style", label: "Style", icon: "spark", run: () => eeEditBlock(bi, "style") });
+    out.push({ id: "dup", label: "Duplicate", icon: "copy", keys: [DCK.mod, "D"], run: () => dcDuplicate(bi) });
+    out.push(null);
+    out.push({ id: "copy", label: "Copy", icon: "clipboard", keys: [DCK.mod, "C"], run: () => dcCopyBlock(bi) });
+    out.push({ id: "cut", label: "Cut", icon: "scissors", keys: [DCK.mod, "X"], run: () => dcCutBlock(bi) });
+    if (dcClipGet()) out.push({ id: "paste", label: "Paste below", icon: "clipboard", keys: [DCK.mod, "V"], run: () => dcPasteAt(bi + 1) });
+    out.push(null);
+    out.push({ id: "up", label: "Move up", icon: "up", keys: [DCK.alt, "↑"], off: bi <= 0, run: () => dcMove(bi, bi - 1) });
+    out.push({ id: "down", label: "Move down", icon: "down", keys: [DCK.alt, "↓"], off: bi >= n - 1, run: () => dcMove(bi, bi + 2) });
+    out.push({ id: "hide", label: "Hide on this page", icon: "eyeoff", run: () => eeHideKey(el2.getAttribute("data-dds-key") || ddsKeyFor(bi)) });
+    if (S.isStudio) out.push(blkLock(b)   // only the studio locks and unlocks
+      ? { id: "lock", label: "Unlock", icon: "unlock", run: () => dcLockBlock(bi, false) }
+      : { id: "lock", label: "Lock this section", icon: "lock", run: () => dcLockBlock(bi, true) });
+    out.push(null);
+    out.push({ id: "del", label: "Delete", icon: "trash", keys: [DCK.del], danger: true, run: () => dcDelete(bi) });
+  } else {   // a built-in section: the same few things its tools offer
+    const keys = el2.parentElement ? dcCoreKeys(el2.parentElement) : [], at = c.key ? keys.indexOf(c.key) : -1;
+    out.push({ id: "edit", label: "Edit section", icon: "pencil", keys: ["Enter"], run: () => eeEditCore(c.view) });
+    if (at >= 0) {
+      out.push(null);
+      out.push({ id: "up", label: "Move up", icon: "up", keys: [DCK.alt, "↑"], off: at <= 0, run: () => dcMoveCore(c.key, -1) });
+      out.push({ id: "down", label: "Move down", icon: "down", keys: [DCK.alt, "↓"], off: at >= keys.length - 1, run: () => dcMoveCore(c.key, 1) });
+    }
+    if (c.key) { out.push(null); out.push({ id: "remove", label: "Remove from the page", icon: "x", danger: true, run: () => eeHideKey(c.key) }); }
+  }
+  return out;
+}
+// the action a key press asks for, or null
+function dcKeyAction(e) {
+  const mod = KEY_MAC ? e.metaKey && !e.ctrlKey : e.ctrlKey && !e.metaKey, k = (e.key || "").toLowerCase();
+  if (mod && !e.altKey && !e.shiftKey) return ({ d: "dup", c: "copy", x: "cut", v: "paste" })[k] || null;
+  if (e.altKey && !e.metaKey && !e.ctrlKey && !e.shiftKey) return e.key === "ArrowUp" ? "up" : e.key === "ArrowDown" ? "down" : null;
+  if (e.metaKey || e.ctrlKey || e.altKey || e.shiftKey) return null;
+  return e.key === "Enter" ? "edit" : (e.key === "Backspace" || e.key === "Delete") ? "del" : null;
+}
+// the section the keys work on: the one whose tools are showing (a pointer, a tap or a right-click picked it)
+function dcPickedSection() {
+  const d = dcFrameDoc(); if (!d) return null;
+  const st = d.__dcBarState, bar = d.getElementById("dds-dc-bar");
+  return st && st.current && st.current.isConnected && bar && bar.classList.contains("on") ? st.current : null;
+}
+const dcTyping = (t) => !!t && (/^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName || "") || !!t.isContentEditable);
+function dcHasSelection() {
+  const d = dcFrameDoc();
+  return !!(String(window.getSelection ? window.getSelection() : "").trim() || (d && d.getSelection && String(d.getSelection()).trim()));
+}
+// Keys on the editor (inDoc is the page's own document when the press happened inside it).
+// They never fire while someone is typing in a box or in the page's words, and only in the editor.
+function dcEditorKey(e, inDoc) {
+  const dv = $("view-design"); if (!dv || !dv.classList.contains("on") || e.defaultPrevented || dcTyping(e.target)) return;
+  if (e.key === "?" && !e.metaKey && !e.ctrlKey && !e.altKey) {   // the list, in place of the shell's general one
+    if (DCK_DLG) { e.preventDefault(); e.stopImmediatePropagation(); DCK_DLG.close(); return; }
+    if (document.querySelector("dialog[open]")) return;
+    e.preventDefault(); e.stopImmediatePropagation(); dcKeysSheet(); return;
+  }
+  if (DC_MODE !== "edit" || IPE || IDE || PDRAG || document.querySelector("dialog[open], .scrim.on")) return;
+  if ($("stage").classList.contains("on") || $("ritualWrap").classList.contains("on")) return;
+  const id = dcKeyAction(e); if (!id) return;
+  const el2 = dcPickedSection(); if (!el2) return;
+  // Enter and Delete belong to whatever has the focus; they reach the section only from the page itself
+  const home = inDoc || document;
+  if ((id === "edit" || id === "del") && e.target !== home.body && e.target !== home.documentElement && e.target !== home) return;
+  if ((id === "copy" || id === "cut") && dcHasSelection()) return;   // words someone selected stay the browser's to copy
+  const c = eeClassify(el2);
+  if (c && c.kind === "block" && id !== "edit" && lockStop(c.bi)) { e.preventDefault(); return; }
+  const act = dcSectionActions(el2).find((a) => a && a.id === id);
+  if (!act || act.off) return;
+  e.preventDefault(); e.stopPropagation();
+  act.run();
+}
+document.addEventListener("keydown", (e) => dcEditorKey(e, null), true);   // ahead of the shell's own keys
+// a press anywhere in the editor around the page closes a right-click menu left open on it
+document.addEventListener("pointerdown", () => { const d = dcFrameDoc(); if (d && d.__dcCloseCtx) d.__dcCloseCtx(false); }, true);
+// Pressed inside the page, the editor's own keys still work: undo, redo, Escape and the search.
+function dcFrameKeys(doc) {
+  doc.addEventListener("keydown", (e) => {
+    dcEditorKey(e, doc);
+    if (e.defaultPrevented || dcTyping(e.target) || IPE || IDE) return;
+    const mod = e.metaKey || e.ctrlKey, k = (e.key || "").toLowerCase();
+    if (!(mod && (k === "z" || k === "y" || k === "k")) && e.key !== "Escape") return;
+    e.preventDefault();
+    document.dispatchEvent(new KeyboardEvent("keydown", { key: e.key, code: e.code, metaKey: e.metaKey, ctrlKey: e.ctrlKey, shiftKey: e.shiftKey, altKey: e.altKey, bubbles: true, cancelable: true }));
+  });
+}
+// The list of keys, from ? or the foot of the right-click menu. Esc or Done closes it.
+let DCK_DLG = null;
+function dcKeysSheet() {
+  if (DCK_DLG) { DCK_DLG.close(); return; }
+  const back = document.activeElement;
+  const dlg = el("dialog", "dck-sheet"); dlg.setAttribute("aria-labelledby", "dckTitle");
+  const head = el("div", "dck-head"), hx = el("div"), h = el("h2", null, "Keyboard shortcuts"); h.id = "dckTitle";
+  hx.append(h, el("p", null, "Press ? anywhere in the editor to see this."));
+  const done = el("button", "dck-done", "Done"); done.type = "button";
+  head.append(hx, done); dlg.appendChild(head);
+  const group = (title, rows) => {
+    dlg.appendChild(el("div", "dck-grp", title));
+    rows.forEach(([what, keys]) => {
+      const r = el("div", "dck-row"); r.appendChild(el("span", null, what));
+      const ks = el("span", "dck-keys"); keys.forEach((k) => ks.appendChild(el("kbd", null, k))); r.appendChild(ks);
+      dlg.appendChild(r);
+    });
+  };
+  group("Anywhere in the editor", [["Undo", [DCK.mod, "Z"]], ["Redo", [DCK.shift, DCK.mod, "Z"]], ["Close the open card", ["Esc"]], ["Search Studio OS", [DCK.mod, "K"]], ["This list", ["?"]]]);
+  group("The section you picked", [["Edit it", ["Enter"]], ["Duplicate it", [DCK.mod, "D"]], ["Copy, cut, paste below", [DCK.mod, "C", "X", "V"]], ["Move it up or down", [DCK.alt, "↑", "↓"]], ["Delete it (asks first)", [DCK.del]]]);
+  dlg.appendChild(el("p", "dck-note", (KEY_MAC ? "On a Windows computer, Ctrl takes the place of ⌘ and Alt of ⌥." : "On a Mac, ⌘ takes the place of Ctrl and ⌥ of Alt.")
+    + " Keys never fire while you are typing in a box or in the page’s words."));
+  document.body.appendChild(dlg);
+  let shut = false;
+  const close = () => { if (shut) return; shut = true; DCK_DLG = null; try { dlg.close(); } catch (_) {} dlg.remove(); if (back && back.isConnected) { try { back.focus({ preventScroll: true }); } catch (_) {} } };
+  done.addEventListener("click", close);
+  dlg.addEventListener("cancel", (e) => { e.preventDefault(); close(); });
+  dlg.addEventListener("click", (e) => { if (e.target === dlg) close(); });
+  DCK_DLG = { close };
+  dlg.showModal(); done.focus();
+}
 // ── column controls (responsive grid) — PURE helpers, extracted + unit-tested ──
 // The Columns block is the render engine's LAYOUT CONTAINER (Adobe Layout Mode):
 // 1–6 columns on a 12-unit responsive grid, each column spanning part of the grid,
@@ -16602,7 +16867,7 @@ function dcInjectCanvas(doc, main, live) {
       "#dds-dc-themes{position:absolute;left:0;top:0;width:0;height:0;z-index:2147482990;pointer-events:none}" +
       ".dds-theme-tag{position:absolute;display:inline-flex;align-items:center;gap:6px;height:24px;padding:0 10px 0 6px;border-radius:999px;background:var(--ddsdc-card);border:1px solid var(--ddsdc-line);box-shadow:0 2px 8px rgba(0,0,0,.12);color:var(--ddsdc-ink);font:600 12px/1 var(--ddsdc-sans);white-space:nowrap}" +
       ".dds-theme-tag i{width:12px;height:12px;border-radius:50%;border:1px solid var(--ddsdc-line2)}" +
-      "#dds-dc-chip .dc-chip-type{font-weight:500;opacity:.8;margin-left:5px}" +
+      "#dds-dc-chip .dc-chip-type{font-weight:500;margin-left:5px}" +   // full strength: faded, it read 3.8 to 1 on the chip (item 158's check)
       "#dds-dc-chip.locked>svg{flex:none;width:12px;height:12px;margin-right:5px;vertical-align:-1px}" +   // item 155: a locked section's padlock
       "#dds-dc-bar .dc-b.dc-locked{color:var(--ddsdc-p)}" +
       "#dds-dc-chip.compact .dc-chip-type{display:none}" +
@@ -16614,6 +16879,22 @@ function dcInjectCanvas(doc, main, live) {
       "#dds-dc-more .dc-mi:hover{background:var(--ddsdc-up)}" +
       "#dds-dc-more .dc-danger:hover{background:var(--ddsdc-bad-soft);color:var(--ddsdc-bad)}" +
       "#dds-dc-more .dc-mi:focus-visible{outline:2px solid var(--ddsdc-p);outline-offset:-2px}" +
+      // item 158: the right-click menu, at the pointer, with each action's key on its right
+      "#dds-dc-ctx{position:absolute;z-index:2147483002;display:none;flex-direction:column;width:272px;max-width:calc(100vw - 16px);left:var(--dcx,0);top:var(--dcy,0);padding:6px;background:var(--ddsdc-card);border:1px solid rgba(var(--ddsdc-p-rgb),.08);border-radius:14px;box-shadow:var(--ddsdc-shadow);font-family:var(--ddsdc-sans)}" +
+      "#dds-dc-ctx.on{display:flex}" +
+      "#dds-dc-ctx .dc-ctx-list{display:flex;flex-direction:column}" +
+      "#dds-dc-ctx .dc-ctx-h{padding:6px 10px 7px;font:500 12px/1.3 var(--ddsdc-sans);color:var(--ddsdc-soft);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}" +
+      "#dds-dc-ctx .dc-mi{display:flex;align-items:center;gap:10px;min-height:34px;padding:0 10px;border:0;border-radius:10px;background:transparent;color:var(--ddsdc-ink);font:500 13px/1 var(--ddsdc-sans);text-align:left;white-space:nowrap;cursor:pointer}" +
+      "#dds-dc-ctx .dc-mi svg{width:16px;height:16px;flex:none;fill:none;stroke:currentColor;stroke-width:1.75;stroke-linecap:round;stroke-linejoin:round;color:var(--ddsdc-soft)}" +
+      "#dds-dc-ctx .dc-mi:hover,#dds-dc-ctx .dc-mi:focus{background:var(--ddsdc-up);outline:none}" +
+      "#dds-dc-ctx .dc-mi:focus-visible{outline:2px solid var(--ddsdc-p);outline-offset:-2px}" +
+      "#dds-dc-ctx .dc-danger,#dds-dc-ctx .dc-danger svg{color:var(--ddsdc-bad)}" +
+      "#dds-dc-ctx .dc-danger:hover,#dds-dc-ctx .dc-danger:focus{background:var(--ddsdc-bad-soft)}" +
+      "#dds-dc-ctx .dc-off{opacity:.4;pointer-events:none}" +
+      "#dds-dc-ctx .dc-all,#dds-dc-ctx .dc-all svg{color:var(--ddsdc-p);font-weight:600}" +
+      "#dds-dc-ctx .dc-sep{height:1px;margin:5px 6px;background:rgba(var(--ddsdc-p-rgb),.1)}" +
+      "#dds-dc-ctx .dc-keys{margin-left:auto;display:inline-flex;gap:3px;padding-left:14px}" +
+      "#dds-dc-ctx kbd{min-width:20px;height:20px;padding:0 5px;display:inline-flex;align-items:center;justify-content:center;box-sizing:border-box;border:1px solid rgba(var(--ddsdc-p-rgb),.18);border-radius:5px;background:var(--ddsdc-card);color:var(--ddsdc-soft);font:500 12px/1 var(--ddsdc-sans)}" +
       "[data-dc]:focus-visible{outline:2px solid var(--ddsdc-p);outline-offset:-2px}" +
       // ── insertion targets: a line between every section (and top/bottom) with a plum
       // "Add section" pill on it. Clicking one opens the section picker AT that spot; it's
@@ -16669,6 +16950,9 @@ function dcInjectCanvas(doc, main, live) {
   if (!chip) { chip = doc.createElement("div"); chip.id = "dds-dc-chip"; chip.setAttribute("aria-hidden", "true"); doc.body.appendChild(chip); }
   let more = doc.getElementById("dds-dc-more");
   if (!more) { more = doc.createElement("div"); more.id = "dds-dc-more"; more.setAttribute("role", "menu"); more.setAttribute("aria-label", "More for this section"); doc.body.appendChild(more); }
+  // item 158: and the right-click menu, its name above its list
+  let ctx = doc.getElementById("dds-dc-ctx");
+  if (!ctx) { ctx = doc.createElement("div"); ctx.id = "dds-dc-ctx"; doc.body.appendChild(ctx); }
   // Item 82: what the bar points at and its hide timer live on the document. A live redraw
   // runs this again on the same document while older sections keep their first listeners;
   // with a copy per run, leaving a redrawn section for an older one hid the bar under the
@@ -16709,8 +16993,17 @@ function dcInjectCanvas(doc, main, live) {
     chip.style.top = (cx + cw + 8 <= x ? y + (h - ch) / 2 : top - ch - 6 >= sy + 4 ? top - ch - 6 : y + h + 6) + "px";
     if (more.classList.contains("on")) placeMore();
   };
-  const hideBar = () => { bar.classList.remove("on"); chip.classList.remove("on"); more.classList.remove("on"); doc.__dcSel = null; if (ds.current) { ds.current.classList.remove("dc-hot"); ds.current = null; } };
-  const scheduleHide = () => { clearTimeout(ds.hideT); ds.hideT = setTimeout(hideBar, 170); };
+  // item 158: the right-click menu. It holds the section's actions with their keys, and it keeps
+  // its section picked while it's open; a press elsewhere, Escape, or a choice closes it.
+  const closeCtx = (back) => {
+    if (!ctx.classList.contains("on")) return;
+    ctx.classList.remove("on"); ctx.textContent = "";
+    const b = doc.__dcCtxBack; doc.__dcCtxBack = null;
+    if (back && b && b.isConnected) { try { b.focus({ preventScroll: true }); } catch (_) {} }
+  };
+  doc.__dcCloseCtx = closeCtx;
+  const hideBar = () => { closeCtx(false); bar.classList.remove("on"); chip.classList.remove("on"); more.classList.remove("on"); doc.__dcSel = null; if (ds.current) { ds.current.classList.remove("dc-hot"); ds.current = null; } };
+  const scheduleHide = () => { clearTimeout(ds.hideT); if (ctx.classList.contains("on")) return; ds.hideT = setTimeout(hideBar, 170); };
   // List item 31: a finger has no hover. A tap selects a section and its toolbar
   // stays until another tap selects something else or lands off every section; a
   // second tap on the selected section's words edits them in place, as a
@@ -16725,6 +17018,21 @@ function dcInjectCanvas(doc, main, live) {
     bar.addEventListener("mouseleave", scheduleHide);
     more.addEventListener("mouseenter", () => clearTimeout(ds.hideT));
     more.addEventListener("mouseleave", scheduleHide);
+  }
+  if (!ctx.__dcWired) {
+    ctx.__dcWired = true;
+    ctx.addEventListener("mouseenter", () => clearTimeout(ds.hideT));
+    ctx.addEventListener("keydown", (e) => {   // a menu's keys: up and down, Home and End, Escape
+      const items = [...ctx.querySelectorAll(".dc-mi:not(.dc-off)")], at = items.indexOf(doc.activeElement);
+      if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); doc.__dcCloseCtx(true); return; }
+      if (e.key === "Tab") { doc.__dcCloseCtx(false); return; }
+      if (!/^(ArrowDown|ArrowUp|Home|End)$/.test(e.key) || !items.length) return;
+      e.preventDefault(); e.stopPropagation();
+      const nx = e.key === "Home" ? 0 : e.key === "End" ? items.length - 1
+        : e.key === "ArrowDown" ? (at + 1) % items.length : (at <= 0 ? items.length - 1 : at - 1);
+      try { items[nx].focus({ preventScroll: true }); } catch (_) {}
+    });
+    doc.addEventListener("pointerdown", (e) => { if (ctx.classList.contains("on") && !ctx.contains(e.target)) doc.__dcCloseCtx(false); }, true);
   }
   const mkBtn = (label, aria, fn, opts) => {
     const b = doc.createElement("button"); b.type = "button"; b.className = "dc-b" + ((opts && opts.cls) ? " " + opts.cls : "");
@@ -16741,6 +17049,37 @@ function dcInjectCanvas(doc, main, live) {
     b.setAttribute("aria-label", aria); b.title = aria;
     b.addEventListener("click", (e) => { e.preventDefault(); e.stopPropagation(); more.classList.remove("on"); if (fn) fn(); });
     return b;
+  };
+  const ctxItem = (a) => {
+    const b = doc.createElement("button"); b.type = "button"; b.setAttribute("role", "menuitem");
+    b.className = "dc-mi" + (a.danger ? " dc-danger" : "") + (a.off ? " dc-off" : "") + (a.cls ? " " + a.cls : "");
+    b.innerHTML = uiIcon(a.icon, 16) + "<span></span>"; b.querySelector("span").textContent = a.label;
+    if (a.keys) {   // the key, drawn on the right; a screen reader hears it from aria-keyshortcuts
+      const ks = doc.createElement("span"); ks.className = "dc-keys"; ks.setAttribute("aria-hidden", "true");
+      a.keys.forEach((k) => { const kb = doc.createElement("kbd"); kb.textContent = k; ks.appendChild(kb); });
+      b.appendChild(ks); b.setAttribute("aria-keyshortcuts", dcKeysAria(a.keys));
+    }
+    if (a.off) b.setAttribute("aria-disabled", "true");
+    b.addEventListener("click", (e) => { e.preventDefault(); e.stopPropagation(); if (a.off) return; closeCtx(false); a.run(); });
+    return b;
+  };
+  const openCtx = (el2, x, y) => {
+    ctx.textContent = "";
+    const h = doc.createElement("div"); h.className = "dc-ctx-h"; h.id = "dds-dc-ctx-h"; h.textContent = ds.label || "This section";
+    const list = doc.createElement("div"); list.className = "dc-ctx-list"; list.setAttribute("role", "menu"); list.setAttribute("aria-labelledby", h.id);
+    ctx.append(h, list);
+    const sep = () => { const l = list.lastChild; if (l && !l.classList.contains("dc-sep")) { const s = doc.createElement("div"); s.className = "dc-sep"; s.setAttribute("role", "separator"); list.appendChild(s); } };
+    dcSectionActions(el2).forEach((a) => { if (a) list.appendChild(ctxItem(a)); else sep(); });
+    sep();
+    list.appendChild(ctxItem({ label: "All keyboard shortcuts", icon: "keyboard", keys: ["?"], cls: "dc-all", run: () => dcKeysSheet() }));
+    ctx.classList.add("on");
+    // at the pointer; turned up or in when the screen's end (on a phone, the dock) leaves no room
+    const vw = doc.documentElement.clientWidth, vh = win.innerHeight, w = ctx.offsetWidth, hh = ctx.offsetHeight;
+    const foot = parseFloat(win.getComputedStyle(doc.documentElement).getPropertyValue("--ddsdc-foot")) || 0;
+    const left = Math.max(8, Math.min(x, vw - w - 8)), top = y + hh + 8 <= vh - foot ? y : Math.max(8, Math.min(y - hh, vh - foot - hh - 8));
+    ctx.style.setProperty("--dcx", left + win.scrollX + "px"); ctx.style.setProperty("--dcy", top + win.scrollY + "px");
+    doc.__dcCtxBack = doc.activeElement && doc.activeElement !== doc.body ? doc.activeElement : null;
+    const f = list.querySelector(".dc-mi:not(.dc-off)"); if (f) { try { f.focus({ preventScroll: true }); } catch (_) {} }
   };
   const showBar = (el2) => {
     if (IPE || DC_MODE !== "edit") return;   // G13 slice 2: the toolbar sleeps while a text session is active; item 99: and outside Edit mode, since Comments never edits
@@ -16771,6 +17110,10 @@ function dcInjectCanvas(doc, main, live) {
         // the rest behind More: copy, cut, hide, and a Columns section's column count
         more.appendChild(mkItem("Copy", "Copy this section — paste it anywhere", () => dcCopyBlock(bi), { icon: "clipboard" }));
         more.appendChild(mkItem("Cut", "Cut this section — paste it anywhere", () => dcCutBlock(bi), { icon: "scissors" }));
+        // item 158: what a right-click offers is here too, for a finger: paste below and moving
+        if (dcClipGet()) more.appendChild(mkItem("Paste below", "Paste the copied section below this one", () => dcPasteAt(bi + 1), { icon: "clipboard" }));
+        more.appendChild(mkItem("Move up", "Move this section up", () => dcMove(bi, bi - 1), { cls: bi <= 0 ? "dc-off" : "", icon: "up" }));
+        more.appendChild(mkItem("Move down", "Move this section down", () => dcMove(bi, bi + 2), { cls: bi >= BLOCKS_WORK.length - 1 ? "dc-off" : "", icon: "down" }));
         more.appendChild(mkItem("Hide", "Hide this section", () => eeHideKey(el2.getAttribute("data-dds-key") || ddsKeyFor(bi)), { icon: "eyeoff" }));
         if (b.type === "columns") {   // Layout Container: 1–6 columns; drag dividers to resize
           const nc = Array.isArray(b.columns) ? b.columns.length : 2;
@@ -16797,6 +17140,7 @@ function dcInjectCanvas(doc, main, live) {
       if (c.key) bar.appendChild(mkBtn("Remove", "Remove this section from the page (bring it back in Styles → Your home page)", () => eeHideKey(c.key), { cls: "dc-danger", icon: "x" }));
     }
     chip.textContent = chipName;
+    ds.label = chipName + (chipType ? " · " + chipType : "");   // the right-click menu's name for it
     if (chipType) { const t = doc.createElement("span"); t.className = "dc-chip-type"; t.textContent = "· " + chipType; chip.appendChild(t); }
     const locked = c.kind === "block" && !!blkLock(BLOCKS_WORK[c.bi]);   // item 155: a locked section wears a padlock in its name, for both sides
     chip.classList.toggle("locked", locked);
@@ -16855,6 +17199,19 @@ function dcInjectCanvas(doc, main, live) {
       el2.setAttribute("data-dc", "1");
       el2.addEventListener("mouseenter", () => { if (!byTouch()) showBar(el2); });
       el2.addEventListener("mouseleave", () => { if (!byTouch()) scheduleHide(); });
+      // item 158: a right-click opens the section's actions at the pointer. Comments mode, a long
+      // press and words being typed keep the browser's own menu (it has copy and paste).
+      el2.addEventListener("contextmenu", (e) => {
+        if (DC_MODE !== "edit" || byTouch()) return;
+        if ((IPE && IPE.el && IPE.el.contains(e.target)) || (IDE && IDE.el.contains(e.target))) return;
+        if (e.target.closest && e.target.closest("#dds-dc-bar,#dds-dc-more,#dds-dc-ctx,.dc-ins,.dc-colh")) return;
+        e.preventDefault(); showBar(el2);
+        if (!bar.classList.contains("on")) return;
+        doc.__dcSel = el2; more.classList.remove("on");
+        let x = e.clientX, y = e.clientY;
+        if (!x && !y) { const r = el2.getBoundingClientRect(); x = r.left + 24; y = Math.max(8, r.top) + 24; }   // the menu key on a keyboard
+        openCtx(el2, x, y);
+      });
       el2.addEventListener("click", (e) => {
         if (!byTouch()) return;   // a mouse click keeps its meaning: hover shows the bar, a double-click edits
         if (e.target.closest && e.target.closest(".dc-ins,#dds-dc-bar,#dds-dc-more,#dds-ipe-bar,.dc-colh,.dc-emptyzone")) return;
@@ -16913,6 +17270,7 @@ function dcInjectCanvas(doc, main, live) {
   if (!doc.body.hasAttribute("data-dc-hintguard")) {
     doc.body.setAttribute("data-dc-hintguard", "1");
     ["pointerdown", "keydown"].forEach((t) => doc.addEventListener(t, dcDismissShellHint, true));
+    dcFrameKeys(doc);   // item 158: the section keys, and the editor's own, with the page in focus
     // item 171 (E3): a press on the page closes the Pages card, as a press anywhere else in the editor does
     doc.addEventListener("pointerdown", () => { if (PAGES_OPEN) closePagesCard(false); dcDockMore(false); }, true);   // and the phone's More (E4)
   }
