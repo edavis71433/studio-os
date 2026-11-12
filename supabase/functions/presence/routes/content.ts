@@ -438,7 +438,7 @@ async function singleton(req: Request, db: SiteDb, site: SiteRow, principal: Pri
 export const handleLocation = (req: Request, db: SiteDb, site: SiteRow, principal: Principal, cors: Record<string, string>) =>
   singleton(req, db, site, principal, cors, {
     table: 'presence_locations', entityType: 'location', noun: 'address & hours', fields: LOCATION_FIELDS,
-    select: 'id,address_line1,address_line2,city,region,postal_code,country,phone,timezone,hours,holiday_exceptions,temporarily_closed,temporarily_closed_note,updated_at,' + PLACE_COLS,
+    select: 'id,address_line1,address_line2,city,region,postal_code,country,phone,timezone,hours,holiday_exceptions,temporarily_closed,temporarily_closed_note,updated_at,' + PLACE_SETTINGS_COLS,
     conflict: 'site_id', summary: 'Updated hours & location',
   });
 
@@ -465,10 +465,10 @@ const RECIPE_SETTINGS_COLS = 'auto_ack_message,enquiry_followups,enquiry_followu
 const BLOG_SETTINGS_COLS = 'post_categories,post_authors';
 // The 0182 column on presence_locations (builder list item 127's second location). The
 // location's read and save step down past it the same way.
-const PLACE_COLS = 'second_location';
+const PLACE_SETTINGS_COLS = 'second_location';
 // Newest apply pack first. A database without a pack's columns 400s the widened select,
 // so a read or a save steps down one pack at a time; Settings never goes dark ahead of one.
-const OPTIONAL_SETTINGS_COLS = [PLACE_COLS, BLOG_SETTINGS_COLS, RECIPE_SETTINGS_COLS, SEARCH_SETTINGS_COLS, POPUP_SETTINGS_COLS, CRAWLER_SETTINGS_COLS, AD_SETTINGS_COLS, VISIT_SETTINGS_COLS, REVIEW_SETTINGS_COLS, AUTOMATION_SETTINGS_COLS];
+const OPTIONAL_SETTINGS_COLS = [PLACE_SETTINGS_COLS, BLOG_SETTINGS_COLS, RECIPE_SETTINGS_COLS, SEARCH_SETTINGS_COLS, POPUP_SETTINGS_COLS, CRAWLER_SETTINGS_COLS, AD_SETTINGS_COLS, VISIT_SETTINGS_COLS, REVIEW_SETTINGS_COLS, AUTOMATION_SETTINGS_COLS];
 function selectSteps(select: string): string[] {
   const out = [select];
   let s = select;
