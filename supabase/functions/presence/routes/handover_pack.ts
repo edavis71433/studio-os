@@ -93,7 +93,8 @@ export async function handleHandoverPack(req: Request, site: SiteRow, principal:
   const pages = Object.entries(ex.pages).filter(([, v]) => typeof v === 'string') as Array<[string, string]>;
   for (const [path, body] of pages) text(`website/${path.replace(/^\/+/, '')}`, body);
   for (const [path, bytes] of Object.entries(ex.pages)) if (bytes instanceof Uint8Array) files.push({ name: `website/${path.replace(/^\/+/, '')}`, data: bytes });
-  for (const [path, bytes] of Object.entries(ex.photos.files)) files.push({ name: `website/${path.replace(/^\/+/, '')}`, data: bytes });
+  // item 208 lets a photo size be named by its digest and loaded later; no live list is passed here, but load any that are
+  for (const [path, v] of Object.entries(ex.photos.files)) { const data = v instanceof Uint8Array ? v : await v.load(); if (data) files.push({ name: `website/${path.replace(/^\/+/, '')}`, data }); }
   if (ex.photos.failed.length) text('website/PHOTOS-MISSING.txt', `${ex.photos.failed.length} photo size${ex.photos.failed.length === 1 ? '' : 's'} couldn't be fetched when this pack was made, so a page may show an empty frame. The full-size photos are in photos-and-files/.\r\n`);
 
   // their photos and files: the smaller ones inside, a very large one (or one that won't come) as a link
