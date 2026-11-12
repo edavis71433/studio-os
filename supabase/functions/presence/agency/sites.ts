@@ -59,6 +59,7 @@ import { normalizeCopied } from '../lib/site_layout.ts';
 import { keepCopied } from '../lib/copied_record.ts';
 import { claimPortfolioSite } from '../lib/connect_requests.ts';
 import { attachOwnerLogin, validEmail } from '../commerce/account.ts';
+import { ownerWho, openTransfersFor, transferSummary } from '../lib/site_transfer.ts';
 import type { AttachOwnerError } from '../commerce/account.ts';
 import { provisionCustomerAccount, bridgeCustomerToStudio, ensureConnectContact, linkContactToCustomer, sendCustomerInvite } from '../routes/sales.ts';
 
@@ -120,8 +121,9 @@ export interface TeamMember { who: string; email: string; side: 'studio' | 'clie
 /** The studio roles that may open a client's site at all (lib/scope.ts asks bulk_publish). */
 export const STUDIO_EDITORS: readonly AgencyRole[] = ['owner', 'admin', 'account_manager'];
 const STUDIO_ROLE_WORDS: Record<string, string> = { owner: 'Owner', admin: 'Admin', account_manager: 'Account manager' };
-/** A site's seats that carry `edit` (lib/site_roles.ts); a reviewer only reviews. */
-const SEAT_WORDS: Record<string, string> = { business_owner: 'Owner', business_staff: 'Staff', developer: 'Developer' };
+/** A site's seats that carry `edit` (lib/site_roles.ts); a reviewer only reviews. Item 53:
+ *  an owner seat is a Co-owner, since the site has one owner, the person the client record names. */
+const SEAT_WORDS: Record<string, string> = { business_owner: 'Co-owner', business_staff: 'Staff', developer: 'Developer' };
 
 /** Everyone who can change this site: the studio first, then their side. The
  *  owner counts when they use the full workspace; a client the studio serves
@@ -197,6 +199,9 @@ export interface SitesInput {
   nowIso: string;
   /** item 145: the sites started from another site or a template, and whether the studio kept what came across */
   copied?: Record<string, { from: string; kept: boolean }>;
+  /** item 53: the owners' contacts (their names) and any open transfer of ownership, by site */
+  contacts?: Array<{ id: string; name?: string | null }>;
+  transfers?: Record<string, ReturnType<typeof transferSummary>>;
 }
 export type SiteCard = ReturnType<typeof buildSites>[number];
 
@@ -206,6 +211,7 @@ export function buildSites(i: SitesInput) {
   const extra = new Map(i.extras.map((x) => [x.id, x]));
   const planBy = new Map(i.plans.map((p) => [p.client_id, p]));
   const ownerBy = new Map(i.owners.map((o) => [o.id, o]));
+  const contactName = new Map((i.contacts || []).map((c) => [c.id, c.name || '']));
   const portal = new Set(i.portalSites);
   const seatsBy = new Map<string, SeatRow[]>();
   for (const s of i.seats) seatsBy.set(s.site_id, [...(seatsBy.get(s.site_id) || []), s]);
@@ -236,6 +242,9 @@ export function buildSites(i: SitesInput) {
       copied: (i.copied && i.copied[p.site_id]) || null,
       // item 135: made with + New site and nobody invited yet (only said when the client was read)
       no_owner: ownerBy.has(clientId) && !hasOwner(ownerBy.get(clientId)),
+      // item 53: who owns it, in words, and a transfer of ownership still waiting
+      owner: hasOwner(ownerBy.get(clientId)) ? ownerWho(ownerBy.get(clientId), contactName.get(String(ownerBy.get(clientId)?.contact_id || '')) || null) : null,
+      transfer: (i.transfers && i.transfers[p.site_id]) || null,
     };
   });
   rows.sort((a, b) => {
@@ -564,6 +573,12 @@ export async function handleAgencySites(req: Request, route: string, method: str
       // item 145: which sites were started from another site or a template (their copy records)
       ids.length ? svc(`presence_sales_templates?site_id=${IN}&kind=eq.proposal&name=eq.${encodeURIComponent(RESERVED_NAMES.copiedFrom)}&deleted_at=is.null&select=site_id,body&limit=1000`).catch(soft) : none,
     ]);
+    // item 53: the owners' names live on their contacts; one read for every site, and one for open transfers
+    const contactIds = [...new Set(rowsOf<OwnerRow>(ownerQ).map((o) => String(o.contact_id || '')).filter((x) => UUID_RE.test(x)))];
+    const [contactQ, transfers] = await Promise.all([
+      contactIds.length ? svc(`contacts?id=in.(${contactIds.join(',')})&select=id,name&limit=1000`).catch(soft) : none,
+      openTransfersFor(ids, now),
+    ]);
     const copied: Record<string, { from: string; kept: boolean }> = {};
     for (const r of rowsOf<{ site_id: string; body: string }>(copiedQ)) {
       let rec = null; try { rec = normalizeCopied(JSON.parse(String(r.body || 'null'))); } catch { rec = null; }
@@ -574,6 +589,7 @@ export async function handleAgencySites(req: Request, route: string, method: str
       portalSites: rowsOf<{ customer_site_id: string }>(linkQ).map((l) => String(l.customer_site_id)),
       studio: rowsOf<StudioSeat>(studioQ), me: member.email, opened: lastOpenedBySite(rowsOf(openQ)),
       pins: pins.pins.filter((id) => ids.includes(id)), nowIso: now, copied,
+      contacts: rowsOf<{ id: string; name?: string | null }>(contactQ), transfers,
     });
     const partial = [extraQ, planQ, seatQ, ownerQ, linkQ, studioQ, openQ, copiedQ].some((q) => (q as { ok?: boolean }).ok === false) || !pins.ok;
     // item 154: the Trash (before migration 0154 there's no such state, so it's simply empty)
@@ -582,9 +598,14 @@ export async function handleAgencySites(req: Request, route: string, method: str
     // a studio seat that can't open a client (lib/scope.ts asks bulk_publish) gets no doors into one,
     // and not the client's own people by name
     const canOpen = can(member.role, 'bulk_publish');
-    if (!canOpen) for (const r of rows) r.team = r.team.map((t) => (t.side === 'client' ? { ...t, who: 'Someone on their side', email: '' } : t));
+    if (!canOpen) for (const r of rows) {
+      r.team = r.team.map((t) => (t.side === 'client' ? { ...t, who: 'Someone on their side', email: '' } : t));
+      if (r.owner) r.owner = { name: 'The owner', email: '' };
+      if (r.transfer) r.transfer = { ...r.transfer, to_email: '', from_email: '' };
+    }
     const manage = can(member.role, 'manage_clients');
-    return json({ data: rows, partial, can_open: canOpen, can_pin: pins.own, can_duplicate: manage, can_create: manage, can_trash: manage, trash, trash_days: TRASH_DAYS }, 200, cors);
+    // item 53: what the studio is on every client's site, said once (Wix's "Agency · Website Manager")
+    return json({ data: rows, partial, can_open: canOpen, can_pin: pins.own, can_duplicate: manage, can_create: manage, can_trash: manage, can_people: manage, studio_role: canOpen ? 'Website manager' : 'View only', studio_name: member.agency_name || '', trash, trash_days: TRASH_DAYS }, 200, cors);
   }
 
   // ── + New site (item 135): a site from a business name and, if picked, one of
@@ -816,7 +837,9 @@ export async function handleAgencySites(req: Request, route: string, method: str
     await svc(`presence_agency_clients?site_id=eq.${siteId}&agency_id=eq.${member.agency_id}`, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ owner_email: email }) }).catch(() => null);
     const invited = await sendCustomerInvite(own.id, email, true).catch(() => false);
     await writeChangeEvent({ siteId: own.id, entityType: 'client', entityId: client.id, action: 'invite', summary: `Invited the owner of ${label}`, principal, provenance: 'human' }).catch(() => {});
-    return json({ data: { site_id: siteId, email, invited } }, 200, cors);
+    // builder item 192: the page to share when the email didn't go out (it shows this studio's name)
+    const portal_url = `${(Deno.env.get('SITE_URL') || 'https://davisdigitalstudio.com').replace(/\/$/, '')}/portal.html?studio=${own.id}`;
+    return json({ data: { site_id: siteId, email, invited, portal_url } }, 200, cors);
   }
 
   // ── Move to trash (item 154): the site goes offline (the short "temporarily

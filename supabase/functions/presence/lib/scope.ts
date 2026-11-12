@@ -13,6 +13,7 @@ import { resolveAgencyMember, agencySiteIds, can } from '../agency/auth.ts';
 import { sendEmail } from '../commerce/account.ts';
 import { SITE_COLS, type SiteRow } from './site.ts';
 import { UUID_RE } from './uuid.ts';
+import type { SiteRole } from './site_roles.ts';
 
 export function isScopeId(s: unknown): boolean { return typeof s === 'string' && UUID_RE.test(s); }
 
@@ -117,8 +118,12 @@ async function clientName(siteId: string): Promise<string> {
   return name;
 }
 
+/** Builder item 83: one of the caller's own businesses, picked with the same ?client=
+ *  a studio uses (lib/workspace.ts resolveHeldBusiness). Never a studio scope. */
+export interface HeldBusiness { site: SiteRow; member: { site_id: string; role: SiteRole } | null }
 export type ScopeResult =
   | { ok: true; site: SiteRow; scoped: { site_id: string; name: string } }
+  | { ok: true; site: SiteRow; held: HeldBusiness }
   | { ok: false; status: number; reason: string };
 
 /** Resolve a requested client scope to a SiteRow — authorized by agency membership,
@@ -129,8 +134,14 @@ export type ScopeResult =
  *  best-effort — it is written AFTER the decision and never changes it, so a logging
  *  failure can neither expose data nor block an authorized request. `resolveScopedSite`
  *  is invoked ONLY when a scope was requested, so un-scoped (own-site) access is never
- *  logged here. */
-export async function resolveScopedSite(jwt: string, requestedSiteId: string, audit?: AuditCtx): Promise<ScopeResult> {
+ *  logged here.
+ *
+ *  Builder item 83: when the studio's own check says no (not a studio, a role that
+ *  can't open clients, or not one of its clients), `held` is asked whether the site
+ *  is one of the caller's own businesses: one they own, or hold a seat on. If it is,
+ *  that is the answer, as the person themself, never as a studio, and no studio
+ *  visit is recorded. If not, the refusal stands and is recorded as before. */
+export async function resolveScopedSite(jwt: string, requestedSiteId: string, audit?: AuditCtx, held?: (siteId: string) => Promise<HeldBusiness | null>): Promise<ScopeResult> {
   // helper: compute the decision + agency + client name, then log once, then return.
   const finish = async (dec: ScopeDecision, agencyId: string | null, clientName: string, refine?: (r: AuditReason) => Promise<AuditReason> | AuditReason): Promise<void> => {
     let reason = auditReason(dec.reason);
@@ -150,6 +161,10 @@ export async function resolveScopedSite(jwt: string, requestedSiteId: string, au
   // load the site ONLY after the authorization checks would pass, to avoid a
   // read on an unauthorized/forged id (defense in depth + no info leak on timing)
   const pre = scopeDecision({ requestedSiteId, isAgencyMember: !!member, roleCanManage, authorizedSiteIds: authorized, siteExists: true });
+  if (!pre.ok && held && (pre.reason === 'not_agency' || pre.reason === 'role' || pre.reason === 'unauthorized')) {
+    const own = await held(requestedSiteId).catch(() => null);
+    if (own && own.site.id === requestedSiteId) return { ok: true, site: own.site, held: own };
+  }
   if (!pre.ok) {
     // audit-only refinement: distinguish an ARCHIVED client from a never-authorized
     // one. This never affects the security decision (still denied either way) — it

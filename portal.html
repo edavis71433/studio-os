@@ -118,7 +118,7 @@
   <!-- CODE ENTRY (after a code is sent) -->
   <div id="codePanel" class="panel">
     <h1>Check your inbox</h1>
-    <p class="sub" id="codeSub">If that email has an account, a sign-in link is on its way. Tap the link to sign in — or, if your email includes a 6-digit code, enter it below.</p>
+    <p class="sub" id="codeSub">If that email has an account, a sign-in email is on its way. Enter its 6-digit code below, or tap the link in it.</p>
     <div class="mailbtns"><a class="qbtn" href="https://mail.google.com/mail/u/0/#inbox" target="_blank" rel="noopener">Open Gmail</a><a class="qbtn" href="https://outlook.live.com/mail/0/" target="_blank" rel="noopener">Open Outlook</a></div>
     <form id="fCode" novalidate>
       <label for="code">6-digit code</label>
@@ -169,8 +169,9 @@
   <div id="resetSent" class="panel">
     <div class="eyebrow">Check your email</div>
     <h1>On its way</h1>
-    <p class="sub">If that address has an account, a reset link is on its way. It lands you on a page to choose a new password.</p>
+    <p class="sub">If that address has an account, a code is on its way. Enter it on the next page to choose a new password.</p>
     <div class="mailbtns"><a class="qbtn" href="https://mail.google.com/mail/u/0/#inbox" target="_blank" rel="noopener">Open Gmail</a><a class="qbtn" href="https://outlook.live.com/mail/0/" target="_blank" rel="noopener">Open Outlook</a></div>
+    <p class="muted"><a id="haveCode" href="/set-password.html?next=/portal.html">I have my code</a></p>
     <p class="muted"><button class="linky" id="backToLogin" type="button">Back to sign in</button></p>
   </div>
 </div>
@@ -256,16 +257,41 @@ function noAccess(msg){
 }
 
 // ── the ONE post-sign-in role-router (used by password, OTP, and link arrivals) ──
+// Builder item 83: someone with places in two businesses comes back to one. A link may
+// name it (?client=<site id>, from Switch business); else the last one they used on this
+// device, if it was theirs (dds-last-business, written by the shell). The context is
+// asked for it first; if it isn't one of theirs any more, the usual landing stands.
+function pickedBusiness(token){
+  var UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  try { var q = new URLSearchParams(location.search).get('client') || ''; if (UUID.test(q)) return q; } catch (e) {}
+  try {
+    var sub = JSON.parse(atob(String(token).split('.')[1].replace(/-/g, '+').replace(/_/g, '/'))).sub;
+    var last = JSON.parse(localStorage.getItem('dds-last-business') || 'null');
+    if (last && last.uid && last.uid === sub && UUID.test(String(last.site_id || ''))) return String(last.site_id);
+  } catch (e) {}
+  return '';
+}
+// the landing for the business in hand: the one the server opens unasked needs no ?client=
+function landingFor(d, picked){
+  var land = d.landing;
+  var held = picked && d.business && d.business.site_id === picked && !d.business['default'];
+  var studio = picked && d.scope && d.scope.site_id === picked;
+  if (!held && !studio) return land;
+  return land + (land.indexOf('?') >= 0 ? '&' : '?') + 'client=' + encodeURIComponent(picked);
+}
 async function route(token){
   show('routing');
   var sawNetworkTrouble = false;
   // 1) ask the platform who this is — it answers with the right landing page
   try {
-    var r = await withTimeout(fetch(FN + "/presence/portal/context", {
-      headers: { "Content-Type":"application/json", "Authorization":"Bearer " + SUPABASE_KEY, "x-dds-user-jwt": token }
-    }), 9000);
+    var picked = pickedBusiness(token);
+    var ask = function(scope){ return withTimeout(fetch(FN + "/presence/portal/context", {
+      headers: { "Content-Type":"application/json", "Authorization":"Bearer " + SUPABASE_KEY, "x-dds-user-jwt": token, "x-dds-scope-site": scope }
+    }), 9000); };
+    var r = await ask(picked);
+    if (picked && !r.ok) { picked = ''; r = await ask(''); }   // not one of theirs (any more): the usual landing
     var j = await r.json().catch(function(){ return {}; });
-    if (r.ok && j && j.data && j.data.landing) { location.href = j.data.landing; return; }
+    if (r.ok && j && j.data && j.data.landing) { location.href = landingFor(j.data, picked); return; }
     // paused/lapsed — show the server's OWN words (what happened + how to fix it)
     if (r.status === 403 && j && j.message) { noAccess(j.message); return; }
   } catch (e) { sawNetworkTrouble = true; }
@@ -321,7 +347,7 @@ $('fEmail').addEventListener('submit', async function(ev){
   var b = $('sendGo'); b.disabled = true; b.textContent = 'Sending…';
   await sendCode(em);
   pendingEmail = em;
-  $('codeSub').innerHTML = "If <span class=\"em\"></span> has an account, a sign-in link is on its way. Tap the link to sign in — or, if your email includes a 6-digit code, enter it below.";
+  $('codeSub').innerHTML = "If <span class=\"em\"></span> has an account, a sign-in email is on its way. Enter its 6-digit code below, or tap the link in it.";
   $('codeSub').querySelector('.em').textContent = em;
   b.disabled = false; b.textContent = 'Email me a sign-in link';
   clearErr('errCode');
@@ -381,6 +407,7 @@ $('forgot').addEventListener('click', async function(){
   var em = $('empw').value.trim();
   if (!em) { errIn('err', 'Type your email above first, then tap “Forgot your password?” again.'); $('empw').focus(); return; }
   try { await sb.auth.resetPasswordForEmail(em, { redirectTo: location.origin + '/set-password.html?next=/portal.html' }); } catch(e){}
+  try { sessionStorage.setItem('dds-reset-email', em); } catch(e){}   // the next page fills it in
   show('resetSent');
 });
 
@@ -394,7 +421,10 @@ $('retry').addEventListener('click', async function(){
   var s = await sb.auth.getSession(); var t = s && s.data && s.data.session && s.data.session.access_token;
   if (t) route(t); else show('emailPanel');
 });
-$('signout1').addEventListener('click', async function(){ if (sb) { try{ await sb.auth.signOut(); }catch(e){} } show('emailPanel'); });
+// Builder item 192: the sign-in buttons were left greyed out, saying "Signing in…", by the
+// sign-in that led to this panel. Signing out gives them back.
+function freshButtons(){ [['go', 'Sign in →'], ['codeGo', 'Sign in →']].forEach(function(x){ var b = $(x[0]); if (b) { b.disabled = false; b.textContent = x[1]; } }); }
+$('signout1').addEventListener('click', async function(){ if (sb) { try{ await sb.auth.signOut(); }catch(e){} } freshButtons(); show('emailPanel'); });
 
 // Already signed in — or arriving from a magic LINK? This page is a door, not a
 // stop. A clicked magic link lands here with the session tokens in the URL hash;

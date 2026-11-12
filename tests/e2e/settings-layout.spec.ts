@@ -121,4 +121,19 @@ test.describe('Settings — the list beside the sections (bold redesign)', () =>
     const bad = r.violations.filter((v) => v.impact === 'serious' || v.impact === 'critical');
     expect(bad.map((v) => v.id + ': ' + v.nodes.map((n) => n.target.join(' ')).join(', '))).toEqual([]);
   });
+
+  // builder list item 150: the whole page, in light and dark
+  for (const scheme of ['light', 'dark'] as const) {
+    test(`no serious/critical axe violations on the whole page (${scheme})`, async ({ page }, testInfo) => {
+      test.skip(testInfo.project.name !== 'desktop-chromium', 'axe once, on desktop');
+      await page.emulateMedia({ colorScheme: scheme });
+      await installApp(page, { api: API });
+      await page.goto('/settings.html');
+      await expect(page.locator('#stages')).toBeVisible();
+      await page.waitForLoadState('networkidle');
+      const r = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa']).analyze();
+      const bad = r.violations.filter((v) => v.impact === 'serious' || v.impact === 'critical');
+      expect(bad.map((v) => v.id + ': ' + v.nodes.map((n) => n.target.join(' ')).join(', '))).toEqual([]);
+    });
+  }
 });

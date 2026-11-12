@@ -21,6 +21,7 @@ import { runMoments } from '../moments/engine.ts';
 import { runGrowthCoach } from '../coach/engine.ts';
 import { sendEmail } from '../commerce/account.ts';
 import { SITE_COLS, type SiteRow } from '../lib/site.ts';
+import { checkAgainInAnHour, checkDueBefore } from '../lib/check_soon.ts';
 
 const DEFAULT_LIMIT = 40;               // sites per invocation — cron cadence covers the rest
 const OPS_ALERT_EMAIL = Deno.env.get('OPS_ALERT_EMAIL') || 'eric@davisdigitalstudio.com';
@@ -39,7 +40,12 @@ export interface CycleResult {
 // round-robin, so no site starves however many exist. updated_at ordering was
 // wrong here: nothing in the cycle bumps it, so the same window repeated
 // forever. Falls back to the old ordering until 0091 is applied.
-async function activeSites(limit: number): Promise<SiteRow[]> {
+//
+// Item 206: only the sites that are DUE. The mark doubles as "last checked": a site
+// is due when it has none (new, or a publish just emptied it) or when it is a day
+// old (lib/check_soon.ts). Every tick used to take every site, 96 times a day.
+// `dueOnly: false` is the coach run, which is asked for by hand and takes every site.
+async function activeSites(limit: number, nowMs = Date.now(), dueOnly = true): Promise<SiteRow[]> {
   // svcAll, not a bare select: PostgREST's max-rows cap would silently truncate
   // a NONDETERMINISTIC subset of active clients (~1000), dropping their sites
   // out of observation with zero signal. Paged + ordered + logged at the bound.
@@ -47,7 +53,7 @@ async function activeSites(limit: number): Promise<SiteRow[]> {
   const er = await svcAll('presence_entitlements?product=eq.presence&status=eq.active&select=client_id', 'client_id');
   const activeClients = new Set(er.map((r: any) => String(r.client_id)));
   if (!activeClients.size) return [];
-  let sr = await svc(`presence_sites?status=in.(ready,live)&select=${SITE_COLS}&order=last_observed_at.asc.nullsfirst&limit=${limit * 3}`);
+  let sr = await svc(`presence_sites?status=in.(ready,live)${dueOnly ? `&or=(last_observed_at.is.null,last_observed_at.lt.${checkDueBefore(nowMs)})` : ''}&select=${SITE_COLS}&order=last_observed_at.asc.nullsfirst&limit=${limit * 3}`);
   if (!sr.ok) sr = await svc(`presence_sites?status=in.(ready,live)&select=${SITE_COLS}&order=updated_at.asc&limit=${limit * 3}`);
   const fetched = (sr.ok && Array.isArray(sr.json) ? sr.json : []) as SiteRow[];
   const sites = fetched.filter((s: any) => activeClients.has(String(s.client_id))).slice(0, limit);
@@ -55,7 +61,7 @@ async function activeSites(limit: number): Promise<SiteRow[]> {
   // client has no active entitlement would otherwise sit unstamped at the
   // nulls-first front of the window forever and (past limit*3 of them) starve
   // the active sites — the exact defect this cursor exists to fix.
-  await stampCursor('presence_sites', 'id', fetched.map((s) => s.id), { last_observed_at: new Date().toISOString() });
+  await stampCursor('presence_sites', 'id', fetched.map((s) => s.id), { last_observed_at: new Date(nowMs).toISOString() });
   return sites;
 }
 
@@ -266,16 +272,18 @@ async function ledgerClose(id: string | null, ok: boolean, result: unknown, erro
   });
 }
 
-// The main cycle: run each active site, ledger each, alert on failures.
+// The main cycle: run each active site that is due a check, ledger each, alert on failures.
 export async function runOperationsCycle(opts: { limit?: number; withCoach?: boolean } = {}): Promise<CycleResult> {
   const limit = opts.limit ?? DEFAULT_LIMIT;
   const withCoach = opts.withCoach ?? false;
-  const sites = await activeSites(limit);
+  const sites = await activeSites(limit, Date.now(), !withCoach);
   const results: SiteRunResult[] = [];
   for (const site of sites) {
     const runId = await ledgerOpen('cycle', site.id);
     const res = await runSiteCycle(site, withCoach);
     await ledgerClose(runId, res.ok, { steps: res.steps }, res.error || (res.ok ? '' : 'one or more steps failed'));
+    // item 206: a check that failed doesn't wait a day for its next try
+    if (!res.ok) await checkAgainInAnHour(site.id, Date.now());
     results.push(res);
   }
   const failures = results.filter((r) => !r.ok).length;

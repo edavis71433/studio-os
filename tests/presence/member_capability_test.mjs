@@ -144,6 +144,7 @@ const DECIDED = {
     'DELETE /redirects/:id', 'DELETE /sales/contacts/:id', 'DELETE /sales/contracts/:id', 'DELETE /sales/deals/:id',
     'DELETE /sales/proposals/:id', 'DELETE /sales/templates/:id', 'POST /comments/:id/delete',
     'POST /sales/deals/:id/retainer/cancel', 'POST /sales/invoices/:id/void', 'DELETE /broadcasts/lists/:id',
+    'POST /client/retainers/:id/cancel',   // sales item 117: a client stopping their own retainer is the owner's call
     'DELETE /sales/estimates/:id', 'POST /sales/recurring/:id/stop',   // sales review item 47
     'DELETE /sales/prospects/:id',   // sales review item 112: taking a prospect off the list
     // sales review items 86 + 105: undoing an import takes people off; a merge folds a record away (and back)
@@ -181,6 +182,7 @@ const DECIDED = {
     'POST /client/projects/:id/messages', 'POST /client/support', 'POST /client/support/:id/messages',
     'POST /client/surveys/:id/respond', 'POST /comments', 'POST /comments/:id/resolve',
     'POST /projects/:id/messages', 'POST /support/:id/messages', 'POST /surveys/:id/respond',
+    'POST /client/approvals/:id/notes',   // builder list item 179: a note on one part of the website draft
   ],
   edit: [
     'PATCH /assets/:id', 'PATCH /bookings/types/:id', 'PATCH /broadcasts/:id', 'PATCH /projects/:id',
@@ -205,8 +207,10 @@ const DECIDED = {
     'POST /page-locks',   // builder items 48 and 120: a page's password, as editing the page's settings is
     'POST /redirects', 'POST /restore-to-draft', 'POST /review/reports/:id/dismiss', 'POST /review/run',
     'POST /reviews/:id/approve', 'POST /reviews/:id/hide', 'POST /reviews/:id/reply', 'POST /sales/contacts',
-    'POST /sales/contacts/:id/restore', 'POST /sales/contracts/:id/send', 'POST /sales/contracts/:id/term',
+    'POST /sales/contacts/:id/restore', 'POST /sales/deals/:id/restore', 'POST /sales/contracts/:id/send', 'POST /sales/contracts/:id/term',
     'POST /sales/customers', 'POST /sales/deals', 'POST /sales/deals/:id/activity',
+    'POST /sales/tasks', 'POST /sales/people/activity',   // sales items 85 and 106: to-dos and calls for anyone
+    'POST /sales/email',   // sales item 80: an email from the record, like the reply to an enquiry
     'POST /sales/deals/:id/contracts', 'POST /sales/deals/:id/convert', 'POST /sales/deals/:id/invoice',
     'POST /sales/deals/:id/proposals', 'POST /sales/deals/:id/resend-invite', 'POST /sales/deals/:id/retainer',
     'POST /sales/deals/:id/schedule', 'POST /sales/deals/:id/send', 'POST /sales/deals/:id/stage',
@@ -233,6 +237,9 @@ const DECIDED = {
     'POST /crm/notes/:id/pin', 'POST /dev/brand-kit/apply', 'POST /notifications/read', 'POST /portal/members',
     'POST /portal/members/:id/revoke', 'POST /portal/shares', 'POST /threads/read', 'PUT /dev/brand-kit',
     'PUT /dev/customization', 'PUT /site/template', 'POST /portal/studio-requests/:id/accept', 'POST /portal/studio-requests/:id/decline',
+    // builder item 53: a seat's role changes like the invite (the route asks for the invite capability);
+    // only the owner, or their studio asking the owner, can start or stop a transfer (the route refuses anyone else)
+    'POST /portal/members/:id/role', 'POST /portal/transfer', 'POST /portal/transfer/cancel',
   ],
 };
 const ALL = Object.entries(DECIDED).flatMap(([need, names]) => names.map((name) => ({ name, need })));
@@ -319,6 +326,7 @@ const CHANGED = [
   { name: 'POST /sales/invoices/:id/void', run: (r, p) => handleSalesInvoiceVoid(A, p, ROW, cors) },
   { name: 'DELETE /broadcasts/lists/:id', fx: { only: ['presence_sales_templates'], rows: { presence_sales_templates: { body: JSON.stringify([{ id: ROW, name: 'Picked', people: [{ email: 'a@example.com' }], created_at: '2026-01-01T00:00:00Z' }]) } } }, run: (r, p) => handleBroadcastListDelete(A, p, ROW, cors) },
   { name: 'POST /sales/deals/:id/retainer/cancel', fx: { rows: { presence_deals: { retainer: { status: 'pending' } } } }, run: (r, p) => handleSalesRetainerCancel(r, A, p, ROW, cors) },
+  { name: 'POST /client/retainers/:id/cancel', fx: { rows: { presence_deals: { retainer: { status: 'active' } } } }, run: async (r, p) => (await import('../../supabase/functions/presence/routes/client_retainers.ts')).handleClientRetainerCancel(r, A, p, ROW, cors) },   // sales item 117
   { name: 'DELETE /sales/estimates/:id', run: (r, p) => handleEstimateDelete(A, p, ROW, cors) },     // sales review item 47
   { name: 'DELETE /sales/prospects/:id', run: (r, p) => handleProspect(r, A, p, ROW, cors) },     // sales review item 112
   { name: 'POST /sales/recurring/:id/stop', run: (r, p) => handleRecurringAction(r, A, p, ROW, 'stop', cors) },
@@ -442,8 +450,9 @@ const WRITE_HANDLERS = [
   'handleBrandProfilePut', 'handleBrandReportDismiss', 'handleBrandReviewRun', 'handleBroadcastCancel',
   'handleBroadcastCreate', 'handleBroadcastDraftAssist', 'handleBroadcastListCreate', 'handleBroadcastListDelete', 'handleBroadcastSend', 'handleBroadcastTest', 'handleBroadcastUpdate',
   'handleCheckpointDelete', 'handleCheckpointRestore', 'handleCheckpointSave', 'handleClientApprovalDecide',
-  'handleClientMessages', 'handleClientNotificationsRead', 'handleClientSupport', 'handleClientSupportMessage',
+  'handleClientMessages', 'handleClientNotificationsRead', 'handleClientRetainerCancel', 'handleClientSupport', 'handleClientSupportMessage',
   'handleClientSurveyRespond', 'handleClientTaskDone', 'handleClientUploadCreate', 'handleClientUploadUrl',
+  'handleClientDraftNote',   // builder list item 179: POST /client/approvals/:id/notes needs comment
   'handleCoachDecide', 'handleCoachRun', 'handleCollection', 'handleCommentCreate', 'handleCommentDelete',
   'handleCommentResolve', 'handleConciergeAsk', 'handleConnectionAsk', 'handleConnectionCallback',
   'handleConnectionConnect', 'handleConnectionDisconnect', 'handleConnectionPropertySelect',
@@ -462,7 +471,9 @@ const WRITE_HANDLERS = [
   'handleProjects', 'handleProjectTemplates', 'handleTodoTemplates', 'handleDealTasksFromTemplate', 'handlePublish', 'handlePutIdentity', 'handlePutTemplate', 'handleRedirectCreate',
   'handleRedirectDelete', 'handleRestore', 'handleRestoreToDraft', 'handleReviewApprove', 'handleReviewDismiss',
   'handleReviewHide', 'handleReviewReply', 'handleReviewRequest', 'handleReviewRun', 'handleSalesAddCustomer',
-  'handleSalesContact', 'handleSalesContactFields', 'handleSalesContactRestore', 'handleSalesContacts',
+  'handleSalesContact', 'handleSalesContactFields', 'handleSalesContactRestore', 'handleSalesRestoreDeal', 'handleSalesContacts',
+  'handleSalesTasks', 'handlePeopleActivity',   // sales items 85 and 106 (see DECIDED.edit)
+  'handleRecordEmail',   // sales item 80: POST /sales/email is an edit
   'handleSalesContractCreate', 'handleSalesContractDelete', 'handleSalesContractSend', 'handleSalesContractTerm',
   'handleSalesConvert', 'handleSalesDeal', 'handleSalesDealActivity', 'handleSalesDealSend', 'handleSalesDealStage',
   'handleSalesDeals', 'handleSalesInvoice', 'handleSalesInvoiceSend', 'handleSalesInvoiceVoid',
@@ -486,6 +497,7 @@ const WRITE_HANDLERS = [
   // themselves refuse anyone who isn't platform staff (tool_leads_routes_test.mjs proves it).
   'handleToolLead', 'handleToolLeadConvert',
   'handleStudioRequests',   // final pass S1: POST /portal/studio-requests/:id/(accept|decline) are open; the route answers the owner only
+  'handleMemberRole', 'handleTransferStart', 'handleTransferCancel',   // builder item 53: open on the member list; each route checks the role itself
   'handleSitePassword',   // builder list item 175: POST /site/password needs configure
   'handleScheduleCancel', 'handleScheduleCreate', 'handleSettings', 'handleShareSet', 'handleStockImport',
   'handleSupport', 'handleSupportMessage', 'handleSupportOne', 'handleSurveyRespond', 'handleTakeOffline',

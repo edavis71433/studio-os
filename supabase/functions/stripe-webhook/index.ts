@@ -123,6 +123,25 @@ async function forwardInvoicePaid(invoiceId: string): Promise<{ delivered: boole
   } catch (e) { console.warn(`[stripe-webhook] invoice-paid echo for ${invoiceId} threw: ${String(e)}`); return { delivered: false }; }
 }
 
+/** A bank payment bounced (sales item 116): hand the invoice to the presence
+ *  function, which makes the fresh pay link, tells the studio (bell, push, email)
+ *  and emails the client the new link. An id only, the same secret, the same
+ *  honest `delivered` as the paid echo above. Never throws. */
+async function forwardInvoiceBounced(invoiceId: string): Promise<{ delivered: boolean }> {
+  if (!BILLING_SYNC_SECRET) { console.warn(`[stripe-webhook] BILLING_SYNC_SECRET unset — cannot make a fresh pay link for bounced ${invoiceId}`); return { delivered: false }; }
+  try {
+    const r = await fetch(`${SB_URL}/functions/v1/presence/commerce/invoice-bounced`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-commerce-secret': BILLING_SYNC_SECRET, apikey: SB_SERVICE, Authorization: `Bearer ${SB_SERVICE}` },
+      body: JSON.stringify({ invoice_id: invoiceId }),
+    });
+    if (!r.ok) { console.warn(`[stripe-webhook] invoice-bounced hop for ${invoiceId} returned ${r.status}`); return { delivered: false }; }
+    const out = await r.json().catch(() => null);
+    const d = out && typeof out === 'object' ? (out as { data?: { notice?: unknown; already?: unknown } }).data : null;
+    return { delivered: !!d && (d.notice === true || d.already === true) };
+  } catch (e) { console.warn(`[stripe-webhook] invoice-bounced hop for ${invoiceId} threw: ${String(e)}`); return { delivered: false }; }
+}
+
 const enc = new TextEncoder();
 
 function timingSafeEqual(a: string, b: string): boolean {
@@ -409,6 +428,39 @@ Deno.serve(async (req: Request) => {
     }
   };
 
+  // ── MONEY THAT WENT WRONG QUIETLY (sales item 116, Nov 12 2026 review) ────
+  // Three more payment outcomes that left no trace inside the app. Each raises a
+  // Needs you line on the same rail and the same money kind as the voided case
+  // above ('invoice_void_paid', 0119: priority, the alert icon, a tap opens the
+  // deal), told apart by its period, so no kind list has to change:
+  //   paidtwice:<invoice>:<payment>   a second payment landed on a paid invoice
+  //   payamount:<invoice>:<payment>   the amount paid is not the amount owed
+  //   bounced:<invoice>:g<n>          a bank payment was refused after it started
+  // ignore-duplicates on (client_id, kind, period): a Stripe retry re-raises nothing.
+  const money = (c: unknown) => '$' + ((Number(c) || 0) / 100).toLocaleString('en-US', { minimumFractionDigits: 2 });
+  /** The Stripe payment this event is about, and how much it was for. One payment
+   *  reaches us as a checkout session AND as its payment intent: both name the intent. */
+  const paymentOf = (): { ref: string; cents: number | null } => {
+    const ref = String(obj?.object === 'payment_intent' ? (obj?.id || '') : (typeof obj?.payment_intent === 'string' ? obj.payment_intent : (obj?.payment_intent?.id || '')));
+    const raw = obj?.object === 'payment_intent' ? (obj?.amount_received ?? obj?.amount) : obj?.amount_total;
+    // invoices are in US dollars; a payer shown another currency by Stripe pays a different NUMBER, which is not a wrong amount
+    const usd = String(obj?.currency || 'usd').toLowerCase() === 'usd';
+    const cents = !usd || raw === undefined || raw === null || !Number.isFinite(Number(raw)) ? null : Math.round(Number(raw));
+    return { ref, cents };
+  };
+  const raiseMoneyNotice = async (inv: any, period: string, headline: string, body: string, clientIdKnown = ''): Promise<void> => {
+    try {
+      const clientId = clientIdKnown || String((await dbGet(`presence_sites?id=eq.${encodeURIComponent(String(inv?.site_id ?? ''))}&select=client_id&limit=1`))[0]?.client_id || '');
+      if (!clientId) return;
+      await dbInsertReturning('presence_plan_notices?on_conflict=client_id,kind,period', {
+        site_id: inv.site_id, client_id: clientId, kind: 'invoice_void_paid', period, status: 'active',
+        headline: headline.slice(0, 200), body: body.slice(0, 1000),
+      }, 'return=minimal,resolution=ignore-duplicates');
+      console.error(`[stripe-webhook] ${type} → ${period}: operator notice raised`);
+    } catch (e) { console.error(`[stripe-webhook] could not raise ${period}:`, e); }
+  };
+  const whatOf = (inv: any) => String(inv.title || (inv.purpose === 'deposit' ? 'Deposit' : 'Invoice'));
+
   // ── PROCESSING (Oct 2026 benchmark, item 2) ─────────────────────────────
   // A delayed payment method (ACH debit and the like) completes the Checkout
   // session BEFORE the money settles: checkout.session.completed arrives with
@@ -437,6 +489,42 @@ Deno.serve(async (req: Request) => {
     const ok = await db(`presence_invoices?id=eq.${encodeURIComponent(invoiceId)}&status=eq.open`, 'PATCH', { processing_since: null, updated_at: eventTime });
     console[ok ? 'log' : 'error'](`[stripe-webhook] ${type} → presence_invoice ${invoiceId} processing ${ok ? 'cleared' : 'NOT cleared (migration 0132 applied?)'} (via ${via}) — the invoice is open again`);
   };
+  // A payment that FAILED. Two different things arrive here:
+  //   · a card declined on the pay page: nothing was settling, the link is not
+  //     spent, the client just tries again. Nothing to tell anyone (as before).
+  //   · a BANK payment refused after it started (the invoice was Processing). The
+  //     link took its one payment when the session completed and has switched
+  //     itself off, so "open again" used to mean an unpaid invoice whose Pay
+  //     button, Send and reminders all handed out a dead link, with a log line as
+  //     the only record (sales item 116). Now the spent link comes off the row,
+  //     link_gen moves on (0188) so the next link is a NEW one, and the presence
+  //     function makes that link, tells the studio and emails the client.
+  // Stripe sends the bounce twice (the session's async_payment_failed and the
+  // intent's payment_failed); the guarded write lets only the first one act.
+  // Before 0188 the guarded write is refused and the old clear runs instead.
+  const bouncePresenceInvoice = async (invoiceId: string, via: string): Promise<void> => {
+    const inv = (await dbGet(`presence_invoices?id=eq.${encodeURIComponent(invoiceId)}&select=id,site_id,deal_id,title,amount_cents,purpose,status,processing_since,link_gen&limit=1`))[0];
+    if (!inv || inv.status !== 'open' || !inv.processing_since) { await clearPresenceInvoiceProcessing(invoiceId, via); return; }
+    const gen = Math.max(0, Math.trunc(Number(inv.link_gen) || 0)) + 1;
+    let moved: any[] = [];
+    try {
+      const r = await fetch(`${SB_URL}/rest/v1/presence_invoices?id=eq.${encodeURIComponent(invoiceId)}&status=eq.open&processing_since=not.is.null`, {
+        method: 'PATCH',
+        headers: { apikey: SB_SERVICE, Authorization: `Bearer ${SB_SERVICE}`, 'Content-Type': 'application/json', Prefer: 'return=representation' },
+        body: JSON.stringify({ processing_since: null, stripe_url: null, stripe_payment_link_id: null, link_gen: gen, updated_at: eventTime }),
+      });
+      if (!r.ok) { await clearPresenceInvoiceProcessing(invoiceId, via); return; }
+      moved = await r.json().catch(() => []);
+    } catch { await clearPresenceInvoiceProcessing(invoiceId, via); return; }
+    if (!Array.isArray(moved) || moved.length === 0) return;   // the other bounce event got here first
+    console.error(`[stripe-webhook] ${type} → bank payment BOUNCED on presence_invoice ${invoiceId} (via ${via}) — open again, spent link removed`);
+    const hop = await forwardInvoiceBounced(invoiceId);
+    if (!hop.delivered) {
+      // THE FLOOR, as for a paid echo that didn't land: the studio is still told, in the app
+      await raiseMoneyNotice(inv, `bounced:${inv.id}:g${gen}`, `Bank payment bounced: ${whatOf(inv)} (${money(inv.amount_cents)})`,
+        'Their bank refused the payment, so the invoice is unpaid again and its old pay link no longer works. Open the deal and press Send on the invoice to give them a fresh one.');
+    }
+  };
 
   // Multi-tenant service invoices/deposits (presence_invoices) — same one authority,
   // flipped via metadata.presence_invoice_id (threaded onto the Payment Link's intent).
@@ -444,7 +532,11 @@ Deno.serve(async (req: Request) => {
     // Fetch first: (a) an unknown id must NOT log a false success, (b) only an
     // OPEN invoice may flip (a voided one stays void even if its old link is paid),
     // (c) the row's site/deal ids feed the owner-facing echo below.
-    const inv = (await dbGet(`presence_invoices?id=eq.${encodeURIComponent(invoiceId)}&select=id,site_id,deal_id,title,amount_cents,purpose,status&limit=1`))[0];
+    // paid_method (0167) and paid_ref (0188) tell a SECOND payment from Stripe repeating
+    // itself; before those migrations the wider read is refused and the old one stands.
+    const inv = (await dbGet(`presence_invoices?id=eq.${encodeURIComponent(invoiceId)}&select=id,site_id,deal_id,title,amount_cents,purpose,status,paid_method,paid_ref&limit=1`))[0]
+      || (await dbGet(`presence_invoices?id=eq.${encodeURIComponent(invoiceId)}&select=id,site_id,deal_id,title,amount_cents,purpose,status&limit=1`))[0];
+    const pay = paymentOf();
     if (!inv) {
       console.error(`[stripe-webhook] ${type} → presence_invoice ${invoiceId} not found (via ${via}) — acking so Stripe stops retrying`);
       return new Response('ok (unknown invoice)', { status: 200 });
@@ -454,7 +546,19 @@ Deno.serve(async (req: Request) => {
       // the row but died before (or during) its echo. The clear is idempotent —
       // it matches only still-ACTIVE invremind rows — so re-running it costs one
       // no-op PATCH and is the only thing that can rescue a stranded reminder.
-      await clearInvoiceReminder(inv);
+      const clientId = await clearInvoiceReminder(inv);
+      // PAID TWICE (sales item 116). This branch used to end here without a word,
+      // whoever was paying. It is a second payment when the invoice was marked paid
+      // by hand (Stripe never paid it, so any Stripe money is extra: the studio
+      // recorded a check and the client still had the pay page open), or when a
+      // DIFFERENT Stripe payment paid it. The same payment again is just Stripe
+      // repeating itself, and stays silent.
+      const byHand = String(inv.paid_method || '') !== '';
+      const other = String(inv.paid_ref || '') !== '' && !!pay.ref && String(inv.paid_ref) !== pay.ref;
+      if (pay.ref && (byHand || other)) {
+        await raiseMoneyNotice(inv, `paidtwice:${inv.id}:${pay.ref}`, `Paid twice, refund one: ${whatOf(inv)} (${money(inv.amount_cents)})`,
+          `This invoice was already paid${byHand ? ', by a payment you recorded by hand' : ''}, and ${pay.cents !== null ? money(pay.cents) : 'another payment'} has now come in for it online. Refund the online one in Stripe${byHand ? ', or keep it and Undo the one you recorded' : ''}.`, clientId);
+      }
       return new Response('ok (already paid)', { status: 200 });
     }
     if (inv.status !== 'open') {
@@ -475,7 +579,9 @@ Deno.serve(async (req: Request) => {
       headers: { apikey: SB_SERVICE, Authorization: `Bearer ${SB_SERVICE}`, 'Content-Type': 'application/json', Prefer: 'return=representation' },
       body: JSON.stringify(body),
     });
-    let flipped = await flipWith({ status: 'paid', paid_at: eventTime, updated_at: eventTime, processing_since: null });
+    // paid_ref (0188) remembers WHICH payment paid it; before that migration the column is refused too
+    let flipped = await flipWith({ status: 'paid', paid_at: eventTime, updated_at: eventTime, processing_since: null, paid_ref: pay.ref });
+    if (!flipped.ok) flipped = await flipWith({ status: 'paid', paid_at: eventTime, updated_at: eventTime, processing_since: null });
     if (!flipped.ok) flipped = await flipWith({ status: 'paid', paid_at: eventTime, updated_at: eventTime });
     if (!flipped.ok) {
       console.error(`[stripe-webhook] ${type} FAILED to mark presence_invoice ${invoiceId} paid (via ${via}) — returning 500 so Stripe retries`);
@@ -492,6 +598,18 @@ Deno.serve(async (req: Request) => {
     // will ever get. Ordering is the whole fix — it is deliberately not inside
     // the echo's try{}, because that try is what used to swallow its turn.
     const clientId = await clearInvoiceReminder(inv);
+    // THE WRONG AMOUNT (sales item 116): the amount paid was never compared with
+    // the amount owed. A client with the pay page open from before a part payment
+    // was recorded pays the old, higher amount; the invoice is paid, and the
+    // studio is holding the difference. The row that was flipped is the truth of
+    // what was owed at that moment.
+    const owed = Math.round(Number(flippedRows[0]?.amount_cents ?? inv.amount_cents) || 0);
+    if (pay.cents !== null && pay.cents !== owed) {
+      await raiseMoneyNotice(inv, `payamount:${inv.id}:${pay.ref || 'x'}`,
+        pay.cents > owed ? `Paid too much, refund the difference: ${whatOf(inv)}` : `Paid less than owed: ${whatOf(inv)}`,
+        pay.cents > owed ? `${money(pay.cents)} came in online for an invoice that was down to ${money(owed)}. It is marked paid. Refund ${money(pay.cents - owed)} in Stripe.`
+          : `${money(pay.cents)} came in online for an invoice of ${money(owed)}. It is marked paid, so ${money(owed - pay.cents)} is not being asked for: raise an invoice for the rest if it is still owed.`, clientId);
+    }
     // The owner-facing echo: a deal event (Pipeline history) + a notice (bell /
     // Today / Inbox) — without these, payment was invisible inside the app.
     try {
@@ -593,7 +711,7 @@ Deno.serve(async (req: Request) => {
       if (type === 'checkout.session.async_payment_failed') {
         const md = obj.metadata || {};
         await recordPayment(obj, md, 'failed');
-        if (md.presence_invoice_id) await clearPresenceInvoiceProcessing(String(md.presence_invoice_id), 'async_payment_failed');
+        if (md.presence_invoice_id) await bouncePresenceInvoice(String(md.presence_invoice_id), 'async_payment_failed');
         console.error(`[stripe-webhook] delayed payment FAILED${md.presence_invoice_id ? ` for presence_invoice ${md.presence_invoice_id}` : ''} (session ${obj.id || '?'}) — invoice open again, nothing marked paid`);
         return new Response('ok', { status: 200 });
       }
@@ -618,7 +736,7 @@ Deno.serve(async (req: Request) => {
         await recordPayment(obj, md, 'failed');
         // A processing (ACH) payment that bounced: the stamp comes off so the
         // invoice shows Upcoming/Overdue with its Pay button again.
-        if (md.presence_invoice_id) await clearPresenceInvoiceProcessing(String(md.presence_invoice_id), 'payment_intent.payment_failed');
+        if (md.presence_invoice_id) await bouncePresenceInvoice(String(md.presence_invoice_id), 'payment_intent.payment_failed');
         console.error(`[stripe-webhook] payment FAILED${md.invoice_id ? ` for invoice ${md.invoice_id}` : ''} (${obj.id || '?'}): ${obj.last_payment_error?.message || 'no detail'} — invoice state unchanged`);
         return new Response('ok', { status: 200 });
       }

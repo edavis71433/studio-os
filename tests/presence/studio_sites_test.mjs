@@ -281,6 +281,11 @@ async function call(member, method, route, body, { jwt = 'jwt-studio', principal
   ok('sites: …and, unable to open a client, doesn\'t get the client\'s own people by name (the studio\'s team stays named)', roS1.team.filter((m) => m.side === 'client').every((m) => m.who === 'Someone on their side' && m.email === '') && roS1.team.filter((m) => m.side === 'client').length === 2 && roS1.team.some((m) => m.email === 'eric@studio.example'));
   const noOwn = await call(asMember(), 'GET', '/agency/sites', null, { jwt: 'jwt-nobody' });
   ok('sites: with no studio site to keep pins on, Pin isn\'t offered', noOwn.status === 200 && noOwn.body.can_pin === false && noOwn.body.data.length === 4);
+  // builder item 53: who owns each site, said on the card, and the studio's role said once
+  ok('owners: each card names its owner (the contact holds no name here, so the email)', by[S1].owner && by[S1].owner.email === 'owner@bistro.example' && by[S1].owner.name === 'owner@bistro.example');
+  ok('owners: no transfer is waiting (before 0177 the read just finds none)', rows.every((x) => x.transfer === null));
+  ok('owners: the studio is the Website manager; a view-only seat reads View only, and no owner by name', r.body.studio_role === 'Website manager' && r.body.can_people === true && ro.body.studio_role === 'View only' && ro.body.can_people === false && roS1.owner.name === 'The owner' && roS1.owner.email === '');
+  ok('owners: the studio\'s own name rides along, for its mark on the cards', r.body.studio_name === 'Bright Studio');
   ok('sites: reading the page writes nothing', writes.length === 0);
 }
 

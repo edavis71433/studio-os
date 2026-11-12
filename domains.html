@@ -60,7 +60,7 @@
   .tscroll td.when{white-space:nowrap;font-size:13px}
   .tscroll th.acts,.tscroll td.acts{width:1%;white-space:nowrap;text-align:right}
   .pill{font-size:12px;font-weight:500;padding:2px var(--dds-s2,8px);border-radius:999px;white-space:nowrap;background:var(--bg);color:var(--soft)}
-  .pill.good{background:var(--good-soft);color:var(--good)} .pill.warn{background:var(--warn-soft);color:var(--warn)} .pill.bad{background:#f7e3e3;color:var(--bad)}
+  .pill.good{background:var(--good-soft);color:var(--good)} .pill.warn{background:var(--warn-soft);color:var(--warn)} .pill.bad{background:var(--dds-bad-soft,#fdeaea);color:var(--bad)}
   .own{font-size:11px;font-weight:600;color:var(--p);background:var(--p-soft);border-radius:999px;padding:1px var(--dds-s2,8px);margin-left:6px;white-space:nowrap}
   .rowact{font:inherit;font-size:12.5px;font-weight:600;border:1px solid var(--line);border-radius:999px;background:transparent;color:var(--ink);padding:6px var(--dds-s3,12px);cursor:pointer;white-space:nowrap;text-decoration:none;display:inline-flex;align-items:center;min-height:36px}
   .rowact:hover{border-color:var(--p);color:var(--p)}
@@ -72,7 +72,7 @@
   @media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .btn{color:#171320}}
   :root[data-theme="dark"] .btn{color:#171320}
   a.link{color:var(--p);text-decoration:none;font-weight:500}a.link:hover{text-decoration:underline}
-  .center{text-align:center;padding:52px var(--dds-s5,20px)}.center h2{font-family:var(--serif);font-weight:500;font-size:22px;margin:0 0 var(--dds-s2,8px)}
+  .center{text-align:center;padding:52px var(--dds-s5,20px)}.center .cta{margin-top:var(--dds-s4,16px)}.center a.btn{display:inline-block;text-decoration:none}.center h2{font-family:var(--serif);font-weight:500;font-size:22px;margin:0 0 var(--dds-s2,8px)}
   .muted{color:var(--soft);font-size:14px}
   .spin{width:22px;height:22px;border:2.5px solid var(--line);border-top-color:var(--p);border-radius:50%;animation:sp .8s linear infinite;margin:var(--dds-s8,40px) auto}
   @keyframes sp{to{transform:rotate(360deg)}}
@@ -250,7 +250,8 @@ function render(){
   h+=`<label class="sr-only" for="search">Search domains</label><input class="search" id="search" type="search" placeholder="Search by domain, site or provider…" value="${esc(Q)}">`;
   h+=chipsHtml();
   if(PARTIAL)h+=`<div class="notice">Some details wouldn’t load just now — refresh to try again.</div>`;
-  if(!DOMAINS.length&&!BUILTIN.length)h+=`<div class="center"><p class="muted">No domains yet. A client’s domain shows here once it’s connected to their site.</p></div>`;
+  // item 173: the empty page had only a sentence; a domain is connected from its site, so it leads there
+  if(!DOMAINS.length&&!BUILTIN.length)h+=`<div class="center"><p class="muted">No domains yet. A client’s domain shows here once it’s connected to their site.</p><p class="muted">Each domain belongs to one site: pick the site, then open Domain &amp; email and follow the steps.</p><p class="cta"><a class="btn" id="pickSite" href="/sites.html">Choose a site</a></p></div>`;
   else if(!list.length&&!bl.length)h+=`<div class="center"><p class="muted">No domains match that.</p></div>`;
   else{
     if(FILTER!=='nodomain')h+=list.length?tableHtml(list):(DOMAINS.length?(FILTER==='all'?'':`<p class="muted">Nothing under “${esc(FILTERS[FILTER].label)}”.</p>`):`<p class="muted">None of your clients has their own domain connected yet.</p>`);
