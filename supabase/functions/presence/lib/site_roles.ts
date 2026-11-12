@@ -189,7 +189,6 @@ const MEMBER_WRITES: Array<[MemberWriteNeed, string[]]> = [
     `POST /assets/${ID}/(replace|rollback|duplicate|suggest|remove-background|cutout)`,
     'POST /visual/generate',
     `POST /visual/plans/${ID}/(vary|edit)`,
-    `POST /notes/${ID}/(dismiss|accept)`,
     `POST /moments/${ID}/dismiss`,
     'POST /broadcasts',
     'POST /broadcasts/lists',   // sales review items 31 + 39: keep the people picked for an update
@@ -255,6 +254,8 @@ const MEMBER_WRITES: Array<[MemberWriteNeed, string[]]> = [
     'PUT /site/template',
     // sales review final pass (S1): only the site's owner answers a studio's request; the route refuses anyone else and says why
     `POST /portal/studio-requests/${ID}/(accept|decline)`,
+    // builder item 193: only the studio marks an approved plan finished; the route refuses anyone else and says why
+    `POST /foundations/plans/${ID}/done`,
     'POST /crm/notes',
     `POST /crm/notes/${ID}/pin`,
     `DELETE /crm/notes/${ID}`,

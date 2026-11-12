@@ -29,6 +29,9 @@ const deal = await A('/sales/deals', 'POST', { title: `${tag} engagement`, conta
 const proj = await A('/projects', 'POST', { deal_id: deal.body?.data?.id });
 const projectId = proj.body?.data?.id;
 ok('1. a converted deal has a project (handoff)', proj.status === 201 && projectId && proj.body?.data?.deal_id === deal.body?.data?.id);
+// A project made from a deal starts with the delivery checklist (Nov 2026), so step 14 counts
+// what the steps below add to the report as it stands now.
+const before = (await A(`/projects/${projectId}/report`)).body?.data?.summary || {};
 
 // 2) studio assigns tasks + milestones
 const ms = await A(`/projects/${projectId}/milestones`, 'POST', { title: 'Launch' });
@@ -41,13 +44,17 @@ ok('3. an internal task is client_visible=false; a client-action task is shared'
 
 // 4) studio uploads + shares a client-visible file
 const up = await A(`/projects/${projectId}/deliverables/upload-url`, 'POST', { mime: 'application/pdf', bytes: pdf.length, title: 'Handoff.pdf' });
-await fetch(up.body?.data?.upload_url, { method: 'PUT', headers: { 'Content-Type': 'application/pdf', 'x-upsert': 'true' }, body: pdf }).catch(() => {});
+// The upload link names the project's address as the server sees it. On production that is the
+// target's own address; on a scratch database it is the address inside Docker, which this machine
+// can't reach, so the same path and token are sent to the target's address.
+const atTarget = (u) => (typeof u === 'string' && u ? new URL(TARGET).origin + u.replace(/^https?:\/\/[^/]+/, '') : u);
+await fetch(atTarget(up.body?.data?.upload_url), { method: 'PUT', headers: { 'Content-Type': 'application/pdf', 'x-upsert': 'true' }, body: pdf }).catch(() => {});
 const deliverable = await A(`/projects/${projectId}/deliverables`, 'POST', { media_id: up.body?.data?.media_id, title: 'Handoff', status: 'shared' });
-ok('4. studio uploads + shares a client-visible file', deliverable.status === 201 && deliverable.body?.data?.status === 'shared');
+ok('4. studio uploads + shares a client-visible file', deliverable.status === 201 && deliverable.body?.data?.status === 'shared', `upload-url ${up.status} ${JSON.stringify(up.body).slice(0, 160)}; deliverable ${deliverable.status} ${JSON.stringify(deliverable.body).slice(0, 160)}`);
 
 // 5) the file is accessible via a signed URL
 const dl = await A(`/projects/${projectId}/deliverables/${deliverable.body?.data?.id}/download`);
-ok('5. the shared file is accessible (signed URL)', dl.ok && /^https?:\/\//.test(dl.body?.data?.url || ''));
+ok('5. the shared file is accessible (signed URL)', dl.ok && /^https?:\/\//.test(dl.body?.data?.url || ''), `${dl.status} ${JSON.stringify(dl.body).slice(0, 160)}`);
 
 // 6) studio + client exchange messages (client thread)
 const clientMsg = await A(`/projects/${projectId}/messages`, 'POST', { audience: 'client', body: 'Welcome aboard!' });
@@ -88,7 +95,11 @@ ok('13. studio resolves the support request', resolve.ok && resolve.body?.data?.
 // 14) client reporting reflects the authoritative activity
 const report = await A(`/projects/${projectId}/report`);
 const s = report.body?.data?.summary;
-ok('14. reporting reflects authoritative data (tasks, milestone, files, approvals)', report.ok && s?.progress?.total === 2 && s?.milestones?.total === 1 && s?.shared_files === 1 && s?.open_client_actions === 1);
+const n0 = (v) => Number(v) || 0;
+ok('14. reporting reflects authoritative data (tasks, milestone, files, approvals)', report.ok
+  && s?.progress?.total === n0(before.progress?.total) + 2 && s?.milestones?.total === n0(before.milestones?.total) + 1
+  && s?.shared_files === n0(before.shared_files) + 1 && s?.open_client_actions === n0(before.open_client_actions) + 1,
+  `before ${JSON.stringify(before).slice(0, 150)} after ${JSON.stringify(s).slice(0, 150)}`);
 
 // 15) retried actions do not create duplicates
 const reproj = await A('/projects', 'POST', { deal_id: deal.body?.data?.id });

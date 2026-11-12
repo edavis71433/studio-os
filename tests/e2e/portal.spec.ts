@@ -1045,6 +1045,36 @@ test.describe('Client portal — the "Your website" card', () => {
     await expect(card.locator('.wsmini')).toHaveCount(0);
   });
 
+  // Builder list item 194 (Nov 12 review, code finding 22): the portal never mentioned a domain.
+  // While one is connected and not live, Home shows the records, where to add them and Check.
+  test('a domain that isn’t live yet: its records, where to add them, and a Check button that asks again', async ({ page }) => {
+    const waiting = { data: { domain: 'bistro.example', state: 'records', left: [], wait: 'Usually within an hour of adding the records, sometimes a day or two.',
+      where: { company: 'Cloudflare', sign_in: 'https://dash.cloudflare.com/' },
+      records: [{ type: 'A', host: '@', value: '75.2.60.5' }, { type: 'CNAME', host: 'www', value: 'bistro.netlify.app' }] } };
+    let asked = 0;
+    await installApp(page, { api: { ...CLIENT_API } });
+    await page.route(/\/functions\/v1\/presence\/client\/domain$/, (route) => { asked++; return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(asked === 1 ? waiting : { data: { domain: 'bistro.example', state: 'live', records: [], left: [], where: null, wait: '' } }) }); });
+    await page.goto('/client.html');
+    const card = page.locator('#home-domain');
+    await expect(card.getByRole('heading', { name: 'Your domain' })).toBeVisible();
+    await expect(card).toContainText('bistro.example isn’t live yet. Add these two records at Cloudflare.');
+    await expect(card.getByRole('link', { name: 'Sign in to Cloudflare ↗' })).toHaveAttribute('href', 'https://dash.cloudflare.com/');
+    await expect(card.locator('.domrecs li')).toHaveCount(2);
+    await expect(card.getByRole('button', { name: 'Copy the value of the CNAME record for www: bistro.netlify.app' })).toBeVisible();
+    await expect(card).toContainText('Usually within an hour of adding the records, sometimes a day or two.');
+    await card.getByRole('button', { name: 'Check if it’s ready' }).click();
+    await expect(card).toContainText('✓ bistro.example is live.');
+    expect(asked).toBe(2);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true);
+  });
+
+  test('no domain, or a live one: Home has no domain card', async ({ page }) => {
+    await installApp(page, { api: { ...CLIENT_API, '/client/domain': { data: { domain: null } } } });
+    await page.goto('/client.html');
+    await expect(page.getByRole('heading', { name: /^Needs you/ })).toBeVisible();
+    await expect(page.locator('#home-domain')).toBeHidden();
+  });
+
   test('the picture: the server-drawn home page lands in a sandboxed, script-less frame', async ({ page }) => {
     await installApp(page, { api: WS_API });
     await page.goto('/client.html');

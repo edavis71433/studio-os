@@ -437,6 +437,9 @@ h5.rune .whisper.ok{color:var(--sage)}
 .deskopt .dop{font-family:var(--sans);font-size:14px;line-height:1.6;white-space:pre-line;max-height:220px;overflow:auto}
 .deskopt .doa{display:flex;gap:var(--dds-s5,20px);margin-top:var(--dds-s3,12px);align-items:baseline}
 .aihint{font-size:12px;color:var(--ink-2);font-style:normal;font-family:var(--sans)}
+/* builder item 194: one domain record with its Copy button, on the Domain & email sheet */
+.dnsrec{display:flex;gap:8px;align-items:center;margin:5px 0 0 14px;flex-wrap:wrap}
+.dnsrec-v{font:13px/1.4 ui-monospace,monospace;background:var(--soft-bg,#f4f2ef);color:var(--ink,#1b1525);padding:5px 9px;border-radius:6px;word-break:break-all}
 .aimark{color:var(--plum);font-style:normal}
 
 /* ══ Edit mode: the floating studio (direction A, Nov 2026) ═══════════════════
@@ -2558,6 +2561,24 @@ function askText(title, opts) {
     dlg.showModal(); setTimeout(() => inp.focus(), 20);
   });
 }
+// Builder item 194 (Nov 12 review, findings 19, 23 and 26). One record, shown the way a provider's
+// form wants it: the name is "@", "www" or "_dmarc", never the full name (most forms add the
+// domain themselves, so _dmarc.x.com typed as shown became _dmarc.x.com.x.com). Its Copy button
+// is named for what it copies; every one used to be just "Copy".
+function dnsRecHost(name, domain) {
+  const n = String(name || "").toLowerCase().replace(/\.$/, ""), bare = String(domain || "").toLowerCase().replace(/^www\./, "");
+  if (!bare) return n;
+  return n === bare ? "@" : n.endsWith("." + bare) ? n.slice(0, -(bare.length + 1)) : n;
+}
+function dnsRecordRow(type, host, val) {
+  const r = el("div", "dnsrec"); r.dataset.rec = type + " " + host;
+  const code = el("span", "dnsrec-v", type + "   " + host + "   →   " + val);
+  const cp = el("button", "textact", "Copy"); cp.setAttribute("aria-label", "Copy the value of the " + type + " record for " + host + ": " + val);
+  cp.addEventListener("click", () => { if (navigator.clipboard) navigator.clipboard.writeText(String(val)).then(() => toast("Copied " + val)).catch(() => {}); });
+  r.appendChild(code); r.appendChild(cp); return r;
+}
+// The one honest wait (finding 21): the server sends it; this is the same sentence for an older server.
+const DOMAIN_WAIT = "Usually within an hour of adding the records, sometimes a day or two.";
 // Item 174 (Namecheap's and Squarespace's plain redirect form): another domain the client owns sends
 // its visitors here, page for page, from the next publish. Its records point here too (the same two).
 function forwardsBlock(dstat) {
@@ -2568,10 +2589,15 @@ function forwardsBlock(dstat) {
   const list = Array.isArray(dstat.forwards) ? dstat.forwards : [];
   if (!list.length) { const e = stepLine("None yet. An old name, or a second one you own, can send its visitors to " + dstat.custom_domain + "."); e.style.color = "var(--soft,#6b6478)"; box.appendChild(e); }
   // a name and its www. are one line with one Stop (the server takes both off together)
+  // builder item 194 (finding 20): a forwarded domain was shown as working the moment it was added
+  // and never checked. Now it says "waiting" until a check sees its records, and shows them.
+  const checks = Array.isArray(dstat.forward_checks) ? dstat.forward_checks : [];
   list.filter((n) => !(n.startsWith("www.") && list.includes(n.slice(4)))).forEach((n) => {
     const both = list.includes("www." + n);
-    const row = el("div", "doa"); row.dataset.forward = n; row.style.cssText = "gap:8px;flex-wrap:wrap;margin-top:4px;align-items:center";
-    const what = el("span", "aihint", (both ? n + " and www." + n + " send" : n + " sends") + " visitors to " + dstat.custom_domain); what.style.margin = "0";
+    const mine = checks.filter((c) => c && (c.name === n || (both && c.name === "www." + n)));
+    const waiting = mine.some((c) => c.points === false);
+    const row = el("div", "doa"); row.dataset.forward = n; row.dataset.state = waiting ? "waiting" : "sending"; row.style.cssText = "gap:8px;flex-wrap:wrap;margin-top:4px;align-items:center";
+    const what = el("span", "aihint", waiting ? n + " is waiting for its records. It sends visitors to " + dstat.custom_domain + " once they point here:" : (both ? n + " and www." + n + " send" : n + " sends") + " visitors to " + dstat.custom_domain); what.style.margin = "0";
     row.appendChild(what);
     const stop = el("button", "textact", "Stop"); stop.dataset.needs = "configure";
     stop.addEventListener("click", async () => {
@@ -2579,6 +2605,7 @@ function forwardsBlock(dstat) {
       try { await api("DELETE", "/foundations/domain/forward", { domain: n }); toast("Stopped."); openFoundationsDesk(); } catch (err) { toast(nice(err), true); }
     });
     row.appendChild(stop); box.appendChild(row);
+    if (waiting) mine.filter((c) => c.points === false).forEach((c) => (c.records || []).forEach((r) => box.appendChild(dnsRecordRow(r.type, r.host, r.value))));
   });
   const add = el("div", "doa"); add.dataset.needs = "configure"; add.style.cssText = "gap:8px;flex-wrap:wrap;margin-top:6px";
   const inp = el("input"); inp.type = "text"; inp.placeholder = "oldname.com"; inp.setAttribute("aria-label", "A domain to send here"); inp.setAttribute("autocomplete", "off");
@@ -2592,12 +2619,12 @@ function forwardsBlock(dstat) {
     catch (err) { toast(nice(err), true); go.disabled = false; }
   });
   add.appendChild(inp); add.appendChild(go); box.appendChild(add);
-  const note = stepLine("Its records point here too: the same two as for your main domain. It starts sending visitors with your next publish."); note.style.color = "var(--soft,#6b6478)"; box.appendChild(note);
+  const note = stepLine("Its records point here too: the same as for your main domain. It starts sending visitors with your next publish, once we’ve seen them."); note.style.color = "var(--soft,#6b6478)"; box.appendChild(note);
   return box;
 }
 // Item 164 (review domains finding 13): the wait, in steps with times. When the domain was connected
 // here, whether its records are found, the padlock, and live (when we email). The time is the
-// honest one: usually within an hour of adding the records, sometimes a day or two.
+// honest one, said one way everywhere (builder item 194, finding 21).
 function waitSteps(dstat, dom) {
   // its own line maker: renderFoundations' stepLine is local to it
   const stepLine = (t) => { const p = el("p", "aihint", t); p.style.marginTop = "5px"; return p; };
@@ -2609,9 +2636,9 @@ function waitSteps(dstat, dom) {
   [[true, "Connected here", ch ? when(ch.at) : ""],
    [found, "Records found", found ? "" : "not yet, we looked just now"],
    [dstat.health === "ok", "Padlock on", dstat.health === "ssl_pending" ? "being switched on" : found ? "" : "comes after the records"],
-   [dstat.health === "ok", "Live", "we’ll email you the moment it is"],
+   [dstat.health === "ok", "Live", "we’ll email you when a check sees it. We look once a day, and each time this opens"],
   ].forEach(([done, label, note]) => { const l = stepLine((done ? "✓ " : "• ") + label + (note ? " · " + note : "")); l.dataset.wait = done ? "done" : "todo"; if (done) l.style.color = "var(--soft,#6b6478)"; box.appendChild(l); });
-  const t = stepLine("Usually live within an hour of adding the records, sometimes a day or two while the internet catches up."); t.style.marginTop = "6px"; box.appendChild(t);
+  const t = stepLine(String(dstat.wait || DOMAIN_WAIT)); t.dataset.wait = "time"; t.style.marginTop = "6px"; box.appendChild(t);
   return box;
 }
 // Item 163 (review domains finding 12): changing the domain asks for the new name and whether the
@@ -4306,29 +4333,21 @@ async function openFoundationsDesk(opts) {
   $("deskGo").hidden = true;
   openSheet("deskScrim");
   try {
-    const [f, plans, launch, dom] = await Promise.all([api("GET", "/foundations"), api("GET", "/foundations/plans"), api("GET", "/launch"), api("GET", "/foundations/domain").catch(() => ({ data: null }))]);
-    renderFoundations(f.data, plans.data || [], launch.data, dom && dom.data);
+    // builder item 194 (findings 18 and 25): the launch list is off this sheet. It was a second,
+    // weaker checklist (a parked domain got ticks while the card under it said "two steps left"),
+    // and asking for it read the domain's records a second time on every open.
+    const [f, plans, dom] = await Promise.all([api("GET", "/foundations"), api("GET", "/foundations/plans"), api("GET", "/foundations/domain").catch(() => ({ data: null }))]);
+    renderFoundations(f.data, plans.data || [], dom && dom.data);
   } catch (err) {
     $("deskResults").innerHTML = "";
     toast(nice(err), true);
   }
 }
-function renderFoundations(f, plans, launch, dom) {
+function renderFoundations(f, plans, dom) {
   const wrap = $("deskResults"); wrap.innerHTML = "";
+  // Nov 12 review, finding 13: plans the server finished on this very open (their records were found)
+  const clearedPlans = Array.isArray(f.cleared_plans) ? f.cleared_plans : [];
 
-  // ── M14: the Launch Assistant — the whole launch, one calm list ──
-  if (launch) {
-    const card = el("div", "deskopt");
-    card.appendChild(el("div", "dol", launch.launched ? "launched" : "getting launched"));
-    card.appendChild(el("div", "dop", launch.sentence));
-    launch.items.filter((it) => it.state !== "n/a").forEach((it) => {
-      const line = el("p", "aihint", (it.state === "done" ? "✓ " : "· ") + it.step + (it.state === "done" ? "" : " — " + it.how));
-      line.style.marginTop = "4px";
-      if (it.state === "done") line.style.opacity = "0.65";
-      card.appendChild(line);
-    });
-    wrap.appendChild(card);
-  }
   const section = (label, sentence) => {
     const card = el("div", "deskopt");
     card.appendChild(el("div", "dol", label));
@@ -4363,9 +4382,12 @@ function renderFoundations(f, plans, launch, dom) {
     // item 134 (Nov 2026 review, domains findings 3 and 5): "live and secure" only when every
     // check passes (both names point here, nothing old left over, the padlock covers both, and
     // the domain shows THIS site); otherwise say what's left. No checklist, no claim.
+    // Nov 12 review, finding 16: with no checklist the checks didn't run, so nothing is claimed.
+    // A missing list used to read as "everything passed" and showed the green tick.
     const lines = Array.isArray(dstat.checklist) ? dstat.checklist : null;
-    const allOk = !lines || dstat.all_ok === true;
-    const p = el("p", "aihint", allOk ? "✓ " + dstat.custom_domain + " is live and secure." : dstat.custom_domain + " is connected, with something left to finish:"); p.style.marginTop = "6px"; p.style.fontWeight = "600"; domCard.appendChild(p);
+    const allOk = !!lines && dstat.all_ok === true;
+    const p = el("p", "aihint", !lines ? "We couldn’t check " + dstat.custom_domain + " just now." : allOk ? "✓ " + dstat.custom_domain + " is live and secure." : dstat.custom_domain + " is connected, with something left to finish:"); p.style.marginTop = "6px"; p.style.fontWeight = "600"; p.dataset.domain = !lines ? "unchecked" : allOk ? "live" : "left"; domCard.appendChild(p);
+    if (!lines) { const again = el("button", "textact", "Check again"); again.dataset.check = "again"; again.addEventListener("click", () => openFoundationsDesk()); domCard.appendChild(again); }
     if (lines) lines.forEach((c) => { const l = stepLine((c.ok ? "✓ " : "• ") + String(c.words || "")); l.dataset.check = c.ok ? "ok" : "todo"; if (c.ok) l.style.color = "var(--soft,#6b6478)"; domCard.appendChild(l); });
     // item 174 (Squarespace's Primary tag and "Use www" switch): which name is the main one, and switching it
     const bareN = String(dstat.custom_domain).replace(/^www\./, "");
@@ -4383,12 +4405,16 @@ function renderFoundations(f, plans, launch, dom) {
   } else if (dstat) {
     // Attached — walk them through the two records; it goes live on its own after.
     if (dstat.health === "ssl_pending") {
-      const p = el("p", "aihint", dstat.custom_domain + ": your records are in. The padlock is being switched on, usually within a few minutes. Nothing for you to do."); p.style.marginTop = "6px"; p.style.fontWeight = "600"; domCard.appendChild(p);
+      // builder item 194 (finding 21): "nothing for you to do" was decided from one name alone, so a
+      // missing www. record showed up later. Both names are checked first.
+      const missing = (Array.isArray(dstat.names) ? dstat.names : []).filter((n) => n && n.points === false).map((n) => n.name);
+      const p = el("p", "aihint", missing.length ? dstat.custom_domain + ": its record is in. One more to add, for " + missing.join(" and ") + ":" : dstat.custom_domain + ": your records are in. The padlock is being switched on. Nothing for you to do."); p.style.marginTop = "6px"; p.style.fontWeight = "600"; p.dataset.domain = missing.length ? "one-more" : "padlock"; domCard.appendChild(p);
+      (Array.isArray(dstat.records) ? dstat.records : []).filter((r) => missing.includes(r.name)).forEach((r) => domCard.appendChild(dnsRecordRow(r.type, r.host, r.value)));
     } else {
       // item 162, part two (review domains findings 6 and 7): the company that runs this domain's
       // records, by name, with its sign-in page; the steps used to guess "GoDaddy, Namecheap"
       const recAt = dstat.provider && dstat.provider.records_at;
-      const p = el("p", "aihint", dstat.custom_domain + " — almost there. Two quick steps " + (recAt ? "at " + recAt.company : "where you bought your domain") + ":"); p.style.marginTop = "6px"; p.style.fontWeight = "600"; domCard.appendChild(p);
+      const p = el("p", "aihint", dstat.custom_domain + " — almost there. Two quick steps " + (recAt ? "at " + recAt.company : "where your domain’s settings are kept") + ":"); p.style.marginTop = "6px"; p.style.fontWeight = "600"; domCard.appendChild(p);
       const apex = (dstat.dns && dstat.dns.expected_apex_ip && dstat.dns.expected_apex_ip[0]) || "75.2.60.5";
       const cname = (dstat.dns && dstat.dns.expected_cname) || "your site’s built-in address";
       if (recAt) {
@@ -4396,13 +4422,12 @@ function renderFoundations(f, plans, launch, dom) {
         if (recAt.sign_in) { const a = el("a", null, "Sign in to " + recAt.company + " ↗"); a.href = recAt.sign_in; a.target = "_blank"; a.rel = "noopener"; a.style.cssText = "color:var(--plum,#5b3fa0);font-weight:600;white-space:nowrap;text-decoration:underline"; s1.appendChild(a); }
         domCard.appendChild(s1);
       } else domCard.appendChild(stepLine("1. Sign in where your domain’s settings are kept: usually the company you bought it from."));   // item 164 (finding 18): no "DNS", no guessed company
-      domCard.appendChild(stepLine("2. Add these two records exactly — tap Copy so there are no typos:"));
-      [["A", "@", apex], ["CNAME", "www", cname]].forEach(([type, name, val]) => {
-        const r = el("div"); r.style.cssText = "display:flex;gap:8px;align-items:center;margin:5px 0 0 14px;flex-wrap:wrap";
-        const code = el("span", null, type + "   " + name + "   →   " + val); code.style.cssText = "font:13px/1.4 ui-monospace,monospace;background:var(--soft-bg,#f4f2ef);color:var(--ink,#1b1525);padding:5px 9px;border-radius:6px";
-        const cp = el("button", "textact", "Copy"); cp.addEventListener("click", () => { if (navigator.clipboard) navigator.clipboard.writeText(String(val)).then(() => toast("Copied " + val)).catch(() => {}); });
-        r.appendChild(code); r.appendChild(cp); domCard.appendChild(r);
-      });
+      // builder item 194 (finding 19): the records come from the server. A sub-name (shop.x.com)
+      // gets ONE record for itself; it used to be shown "@" and "www", which the check never
+      // looks at and which can take over the main site.
+      const recs = Array.isArray(dstat.records) && dstat.records.length ? dstat.records.map((r) => [r.type, r.host, r.value || cname]) : [["A", "@", apex], ["CNAME", "www", cname]];
+      const s2 = stepLine(recs.length === 1 ? "2. Add this one record exactly — tap Copy so there are no typos:" : "2. Add these two records exactly — tap Copy so there are no typos:"); s2.dataset.step = "records"; domCard.appendChild(s2);
+      recs.forEach(([type, name, val]) => domCard.appendChild(dnsRecordRow(type, name, val)));
       // item 163 (review domains finding 14): the records marked MX are the client's email
       const mxLine = stepLine("Leave anything marked MX or Mail alone: that’s your email."); mxLine.dataset.step = "mail"; domCard.appendChild(mxLine);
       // item 164 (review domains finding 16): which name visitors end up on, said plainly
@@ -4424,16 +4449,16 @@ function renderFoundations(f, plans, launch, dom) {
     choose.appendChild(haveBtn); choose.appendChild(needBtn); domCard.appendChild(choose);
 
     const havePanel = el("div"); havePanel.dataset.needs = "configure"; havePanel.style.cssText = "display:none;margin-top:10px";
-    havePanel.appendChild(stepLine("Type your domain and we’ll connect it. You’ll get two simple records to add — we handle the rest."));
+    havePanel.appendChild(stepLine("Type your domain and we’ll connect it. You’ll get the records to add — we handle the rest."));
     const row = el("div", "doa"); row.style.cssText = "gap:8px;flex-wrap:wrap;margin-top:6px";
-    const inp = el("input"); inp.type = "text"; inp.placeholder = "yourbusiness.com"; inp.setAttribute("autocomplete", "off");
+    const inp = el("input"); inp.type = "text"; inp.placeholder = "yourbusiness.com"; inp.setAttribute("aria-label", "Your domain"); inp.setAttribute("autocomplete", "off");
     inp.style.cssText = "flex:1;min-width:180px;padding:8px 10px;border:1px solid var(--line,#ddd);border-radius:8px;font:inherit;font-size:16px";
     const connectBtn = el("button", "textact", "Connect it →");
     connectBtn.addEventListener("click", async () => {
       const domain = (inp.value || "").trim().toLowerCase().replace(/^https?:\/\//, "").replace(/\/.*$/, "");
       if (!domain) { toast("Type your domain first (e.g. yourbusiness.com).", true); return; }
       connectBtn.disabled = true;
-      try { await api("POST", "/foundations/domain", { domain }); toast("Connected — here are your two records."); openFoundationsDesk(); }
+      try { await api("POST", "/foundations/domain", { domain }); toast("Connected. Here’s what to add."); openFoundationsDesk(); }
       catch (err) { toast(nice(err), true); connectBtn.disabled = false; }
     });
     row.appendChild(inp); row.appendChild(connectBtn); havePanel.appendChild(row);
@@ -4564,14 +4589,19 @@ function renderFoundations(f, plans, launch, dom) {
     const why = el("p", "aihint", "Emails you send from your domain can land in people’s spam. Setting this up adds a few small records that tell inboxes your mail is really from you."); why.style.marginTop = "5px"; emailCard.appendChild(why);
     emailCard.appendChild(askOwner("aihint", "Ask the account owner to set this up."));
     const acts = el("div", "doa"); acts.dataset.needs = "configure"; acts.style.marginTop = "6px";
-    const b = el("button", "textact", "Set up email protection");
+    // Nov 12 review, finding 13: one plan, not one per press. While its steps wait below, the
+    // button gives way to a line that says so (the server hands back the open plan too).
+    const waiting = plans.some((p) => p.kind === "email_auth" && (p.status === "proposed" || p.status === "approved") && !clearedPlans.includes(p.id));
+    const b = el("button", "textact", "Set up email protection"); b.dataset.email = "protect";
     b.addEventListener("click", async () => {
-      try { await api("POST", "/foundations/prepare", { goal: "email_auth" }); toast("Set up — the records to add are below."); openFoundationsDesk(); }
-      catch (err) { toast(nice(err), true); }
+      b.disabled = true;
+      try { const r = await api("POST", "/foundations/prepare", { goal: "email_auth" }); toast(r && r.data && r.data.already ? "Those steps are already below, waiting for you." : "Set up — the records to add are below."); openFoundationsDesk(); }
+      catch (err) { toast(nice(err), true); b.disabled = false; }
     });
-    acts.appendChild(b);
-    emailCard.appendChild(acts);
-    const after = el("p", "aihint", "You’ll get a short list of records to copy-paste where you bought your domain — same as connecting it. We check the rest."); after.dataset.needs = "configure"; after.style.marginTop = "6px"; after.style.color = "var(--soft,#6b6478)"; emailCard.appendChild(after);
+    if (waiting) { const w = el("p", "aihint", "The records to add are at the bottom, under “Waiting for your OK”."); w.dataset.email = "waiting"; emailCard.appendChild(w); }
+    else { acts.appendChild(b); emailCard.appendChild(acts); }
+    // finding 14: the records are the ones for whoever runs their email, never Google's by default
+    const after = el("p", "aihint", (f.email.provider ? "Your email runs at " + f.email.provider + ", so you’ll get " + f.email.provider + "’s records" : "You’ll get a short list of records") + " to copy-paste where your domain’s settings are kept, and only the ones that are missing. We check the rest."); after.dataset.needs = "configure"; after.dataset.email = "after"; after.style.marginTop = "6px"; after.style.color = "var(--soft,#6b6478)"; emailCard.appendChild(after);
   } else {
     const okp = el("p", "aihint", "✓ All set — inboxes can trust mail from your domain. Nothing to do."); okp.style.marginTop = "5px"; okp.style.fontWeight = "600"; emailCard.appendChild(okp);
   }
@@ -4601,14 +4631,18 @@ function renderFoundations(f, plans, launch, dom) {
     wrap.appendChild(card);
   }
 
-  const open = plans.filter((p) => p.status === "proposed" || p.status === "approved");
+  const open = plans.filter((p) => (p.status === "proposed" || p.status === "approved") && !clearedPlans.includes(p.id));
   if (open.length) {
     const h = el("h5", "rune", "Waiting for your OK");
     h.style.marginTop = "26px";
     wrap.appendChild(h);
     open.forEach((p) => {
       const card = el("div", "deskopt");
-      card.appendChild(el("div", "dol", p.status === "approved" ? "approved — being handled" : "your decision"));
+      // Nov 12 review, finding 13: an approved plan used to read as being handled when no page
+      // could finish one. Now the label says who does what next, and the studio has Mark as done.
+      const hasRecords = (p.steps || []).some((s) => (s.records || []).length);
+      card.dataset.plan = p.status;
+      card.appendChild(el("div", "dol", p.status !== "approved" ? "your decision" : S.isStudio ? "approved · mark it done once the work is finished" : hasRecords ? "approved · add the records below. It closes by itself once we find them" : "approved · your studio finishes this"));
       card.appendChild(el("div", "dop", p.title));
       const riskWord = p.risk === "low" ? "Safe to approve — easily undone." : p.risk === "medium" ? "Worth a careful look before approving." : p.risk === "high" ? "Bigger change — read the steps first." : "";
       const sum = el("p", "aihint", p.summary + (riskWord ? " " + riskWord : "")); sum.style.marginTop = "6px";
@@ -4618,18 +4652,15 @@ function renderFoundations(f, plans, launch, dom) {
         st.style.marginTop = "4px";
         card.appendChild(st);
         (s.records || []).forEach((r) => {
-          // same copy-friendly record row as the domain wizard — no hand-typing DNS values
-          const row = el("div"); row.style.cssText = "display:flex;gap:8px;align-items:center;margin:4px 0 0 14px;flex-wrap:wrap";
-          const code = el("span", null, `${r.type}   ${r.name}   →   ${r.value}`); code.style.cssText = "font:12.5px/1.4 ui-monospace,monospace;background:var(--soft-bg,#f4f2ef);color:var(--ink,#1b1525);padding:5px 9px;border-radius:6px;word-break:break-all";
-          const cp = el("button", "textact", "Copy"); cp.addEventListener("click", () => { if (navigator.clipboard) navigator.clipboard.writeText(String(r.value)).then(() => toast("Copied")).catch(() => {}); });
-          row.appendChild(code); row.appendChild(cp); card.appendChild(row);
+          // the same row as the domain steps, with the name the way the provider's form wants it
+          card.appendChild(dnsRecordRow(r.type, dnsRecHost(r.name, dstat && dstat.custom_domain), r.value));
         });
       });
       if (p.status === "proposed") {
         const acts = el("div", "doa");
         const ap = el("button", "textact", "Approve it");
         ap.addEventListener("click", async () => {
-          try { await api("POST", `/foundations/plans/${p.id}/decide`, { decision: "approve" }); toast("Approved — your studio takes it from here."); openFoundationsDesk(); }
+          try { await api("POST", `/foundations/plans/${p.id}/decide`, { decision: "approve" }); toast(hasRecords ? "Approved. Add the records below. It closes by itself once we find them." : "Approved. Your studio finishes it from here."); openFoundationsDesk(); }
           catch (err) { toast(nice(err), true); }
         });
         acts.appendChild(ap);
@@ -4640,6 +4671,15 @@ function renderFoundations(f, plans, launch, dom) {
         });
         acts.appendChild(ab);
         card.appendChild(acts);
+      } else if (S.isStudio) {
+        const acts = el("div", "doa"); acts.dataset.needs = "configure";
+        const dn = el("button", "textact", "Mark as done"); dn.dataset.plan = "done";
+        dn.addEventListener("click", async () => {
+          dn.disabled = true;
+          try { await api("POST", `/foundations/plans/${p.id}/done`); toast("Marked done."); openFoundationsDesk(); }
+          catch (err) { toast(nice(err), true); dn.disabled = false; }
+        });
+        acts.appendChild(dn); card.appendChild(acts);
       }
       wrap.appendChild(card);
     });
@@ -6828,14 +6868,19 @@ function renderDomainCard() {
     btn.dataset.needs = "configure"; btn.textContent = "Connect your domain"; btn.addEventListener("click", () => openFoundationsDesk({ domain: true }));
   } else if (d.health === "ok") {
     // item 134: the same rule as the desk — "live and secure" only when every check passes
-    const left = Array.isArray(d.checklist) ? d.checklist.filter((c) => c && !c.ok) : [];
-    card.appendChild(el("div", "note", left.length ? d.custom_domain + " is connected. Still to finish: " + left.map((c) => String(c.words || "")).join("; ") + "." : "✓ " + d.custom_domain + " is live and secure."));
-    btn.textContent = left.length ? "See what’s left" : "Domain & email"; btn.addEventListener("click", () => openFoundationsDesk());
+    // Nov 12 review, finding 16: no checklist means the checks didn't run, so no green tick
+    const checked = Array.isArray(d.checklist);
+    const left = checked ? d.checklist.filter((c) => c && !c.ok) : [];
+    card.appendChild(el("div", "note", !checked ? "We couldn’t check " + d.custom_domain + " just now." : left.length ? d.custom_domain + " is connected. Still to finish: " + left.map((c) => String(c.words || "")).join("; ") + "." : "✓ " + d.custom_domain + " is live and secure."));
+    btn.textContent = !checked ? "Check again" : left.length ? "See what’s left" : "Domain & email"; btn.addEventListener("click", () => openFoundationsDesk());
   } else {
+    // builder item 194 (findings 19 and 21): both names before "nothing for you to do", and a sub-name has one record
+    const more = (Array.isArray(d.names) ? d.names : []).some((n) => n && n.points === false);
+    const one = Array.isArray(d.records) && d.records.length === 1;
     card.appendChild(el("div", "note", d.health === "ssl_pending"
-      ? d.custom_domain + " is connected — the security certificate is switching on. Nothing for you to do."
-      : d.custom_domain + " — almost there: two records to add where you bought it."));
-    btn.textContent = d.health === "ssl_pending" ? "Check on it" : "See the two records"; btn.addEventListener("click", () => openFoundationsDesk());
+      ? (more ? d.custom_domain + " is connected, with one more record to add." : d.custom_domain + " is connected. The padlock is being switched on. Nothing for you to do.")
+      : d.custom_domain + " — almost there: " + (one ? "one record" : "two records") + " to add where your domain’s settings are kept."));
+    btn.textContent = d.health === "ssl_pending" ? (more ? "See the record" : "Check on it") : one ? "See the record" : "See the two records"; btn.addEventListener("click", () => openFoundationsDesk());
   }
   card.appendChild(btn);
 }
