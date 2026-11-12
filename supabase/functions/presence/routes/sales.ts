@@ -14,7 +14,7 @@ import { rateAllow, clientIp, tooMany } from '../lib/ratelimit.ts';
 import { resolveAgencyMember } from '../agency/auth.ts';
 import { isCustomerOfStudio, claimPortfolioSite, requestConnection } from '../lib/connect_requests.ts';
 import { ensureProjectForDeal, ensureBridge, linksForCustomer, emailOperator, tickChecklistForDeal } from '../lib/service_bridge.ts';
-import { loadEmailBrand, EMAIL_BRAND_DEFAULT } from '../lib/email_brand.ts';
+import { loadEmailBrand, EMAIL_BRAND_DEFAULT, emailBand, emailFacts } from '../lib/email_brand.ts';
 import { applyPlaceholders, buildPlaceholderValues, depositSplit } from '../lib/doc_placeholders.ts';
 import { raiseNotice, clearNotice, clearNoticePrefix, dealFollowupPeriodPrefix, dealFollowupLegacyPeriod } from '../lib/notice.ts';
 import { stripeConfigured, createServicePaymentLink, createServiceRetainerLink, deactivatePaymentLink, cancelSubscription } from '../commerce/stripe.ts';
@@ -1608,7 +1608,7 @@ async function emailSalesDoc(siteId: string, dealId: string | null, kind: 'propo
       : `${who} prepared a proposal for you. Take a look whenever you’re ready — nothing is final until you accept.`;
     const label = kind === 'contract' ? 'Review &amp; sign →' : 'Review the proposal →';
     const btn = `<a href="${url}" style="display:inline-block;margin-top:6px;background:${brand.accent};color:#fff;padding:9px 16px;border-radius:999px;text-decoration:none">${label}</a>`;
-    return await sendEmail(String(email), subject, `<p>${line}</p><p class="cta">${btn}</p>`, brand, { critical: true, asBusiness: true, siteId });   // a doc THEY are waiting to sign = transactional; their answer lands in the Inbox
+    return await sendEmail(String(email), subject, `${emailBand(kind === 'contract' ? 'Agreement' : 'Proposal', subject)}<p>${line}</p><p class="cta">${btn}</p>`, brand, { critical: true, asBusiness: true, siteId });   // a doc THEY are waiting to sign = transactional; their answer lands in the Inbox
   } catch { return false; }
 }
 
@@ -1632,7 +1632,7 @@ async function emailSalesFlow(siteId: string, dealId: string, url: string | null
         : `${who} has prepared your proposal. Take a look whenever you’re ready — nothing is final until you accept.`;
     const label = has.contract ? 'Review &amp; sign →' : 'Review the proposal →';
     const btn = `<a href="${url}" style="display:inline-block;margin-top:6px;background:${brand.accent};color:#fff;padding:9px 16px;border-radius:999px;text-decoration:none">${label}</a>`;
-    return await sendEmail(String(email), `Your ${what} from ${brand.name}`, `<p>${line}</p><p class="cta">${btn}</p>`, brand, { critical: true, asBusiness: true, siteId });   // a doc THEY are waiting to sign = transactional; their answer lands in the Inbox
+    return await sendEmail(String(email), `Your ${what} from ${brand.name}`, `${emailBand(what, has.contract ? 'Ready for you to review and sign' : 'Ready for you to review')}<p>${line}</p><p class="cta">${btn}</p>`, brand, { critical: true, asBusiness: true, siteId });   // a doc THEY are waiting to sign = transactional; their answer lands in the Inbox
   } catch { return false; }
 }
 
@@ -1666,7 +1666,7 @@ export async function emailInvoice(siteId: string, dealId: string, title: string
     const noteLine = note ? `<p>${escH(note)}</p>` : '';
     const pdf = row ? (() => { try { const { deal_id: _d, ...data } = row; return documentPdf('invoice', data, brand, ctx); } catch { return null; } })() : null;
     return await sendEmail(String(email), `${title}${no ? ' ' + no : ''} — ${amount}`,
-      `<p>${first ? `Hi ${escH(first)},` : 'Hi there,'}</p><p>${who ? `${who} has sent you` : 'Here is'} ${what} for <strong>${amount}</strong>, ${due}. You can pay securely here — nothing else needed.</p>${noteLine}<p class="cta">${btn}</p>${docLine}`,
+      `${emailBand(`${isDeposit ? 'Deposit request' : 'Invoice'}${no ? ' ' + no : ''}`, title)}<p>${first ? `Hi ${escH(first)},` : 'Hi there,'}</p><p>${who ? `${who} has sent you` : 'Here is'} ${what} for <strong>${amount}</strong>, ${due}. You can pay securely here — nothing else needed.</p>${noteLine}${emailFacts([['Due', row?.due_date ? dayLabel(row.due_date, ctx?.tz) : 'On receipt'], ['Amount due', amount]], { big: true })}<p class="cta">${btn}</p>${docLine}`,
       brand, { critical: true, asBusiness: true, siteId, ...(pdf ? { attachments: [{ filename: pdfFileName('invoice', row), content: pdf }] } : {}) });   // a payment link = transactional; their answer lands in the Inbox
   } catch { return false; }
 }
@@ -2631,6 +2631,7 @@ export async function handleSalesContractSign(req: Request, id: string, cors: Re
       // sales item 88: the agreement laid out with its headings and numbered sections, signed by both
       const counterLine = counter && counter.name ? `Countersigned for ${escHtml(counter.business || 'the studio')} by: <strong>${escHtml(counter.name)}</strong>${counter.title ? ', ' + escHtml(counter.title) : ''}<br>` : '';
       copyEmailed = await sendEmail(to, `Your signed copy — ${c.title || 'Service agreement'}`,
+        emailBand('Signed agreement', 'Your signed copy') +
         `<p>Here's your copy of the agreement, exactly as signed${counter && counter.name ? ' by both of you' : ''}. Keep this email — it's your record.</p>` +
         `<div style="border:1px solid #e5e0d6;border-radius:12px;padding:16px 18px;margin:12px 0;font-size:14px">${agreementHtml(String(c.body || ''), { email: true, accent: brand.accentDark })}</div>` +
         `<p style="font-size:13px;color:#6b6478;margin:14px 0 4px"><strong>Signature certificate</strong></p>` +

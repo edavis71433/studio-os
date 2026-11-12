@@ -514,7 +514,7 @@ async function handleInvoicePaidEcho(req: Request, cors: Record<string, string>)
     // no resolvable client email → a loud warn, never a quiet skip.
     try {
       if (payerEmail) {
-        const [{ sendEmail }, { loadEmailBrand, EMAIL_BRAND_DEFAULT }] = await Promise.all([
+        const [{ sendEmail }, { loadEmailBrand, EMAIL_BRAND_DEFAULT, emailBand, emailFacts }] = await Promise.all([
           import('../commerce/account.ts'),
           import('../lib/email_brand.ts'),
         ]);
@@ -541,11 +541,9 @@ async function handleInvoicePaidEcho(req: Request, cors: Record<string, string>)
         // like the invoice email's (item 72: it used to reach the platform's mailbox,
         // whichever site sent it).
         receipted = await sendEmail(payerEmail, `Payment received — thank you${no ? ` (${no})` : ''}`,
+          emailBand(`Receipt${no ? ' · ' + (isDeposit ? 'Deposit ' : 'Invoice ') + no : ''}`, 'Payment received. Thank you.') +
           `<p>Your payment went through securely.</p>` +
-          `<table style="margin:8px 0;border-collapse:collapse">` +
-          `<tr><td style="padding:2px 12px 2px 0;color:#666">${isDeposit ? 'Deposit' : 'Invoice'}</td><td><b>${esc(what)}${no ? ` ${esc(no)}` : ''}</b></td></tr>` +
-          `<tr><td style="padding:2px 12px 2px 0;color:#666">Amount</td><td><b>${esc(amount)}</b></td></tr>` +
-          `</table>` +
+          emailFacts([[isDeposit ? 'Deposit' : 'Invoice', `${what}${no ? ` ${no}` : ''}`], ['Amount paid', amount]], { big: true, tone: 'good' }) +
           `<p>${isDeposit ? 'The deposit is in and the work can begin.' : 'The invoice is settled — nothing else is needed from you.'} ${told}, and everything updates on its own.</p>` +
           `<p style="color:#666;font-size:.9rem">${attachments ? 'Your receipt is attached as a PDF. ' : ''}Keep this email for your records.</p>`,
           brand, { critical: true, asBusiness: true, siteId: String(inv.site_id), ...(attachments ? { attachments } : {}) });
