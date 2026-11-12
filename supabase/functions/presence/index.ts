@@ -1000,6 +1000,12 @@ async function route_(req: Request, cors: Record<string, string>): Promise<Respo
   if (route === '/client/projects' && method === 'GET') return handleClientProjects(req, site, principal, cors);
   if (route === '/client/billing' && method === 'GET') return handleClientBilling(req, site, principal, cors);
   if (route === '/client/documents' && method === 'GET') return handleClientDocuments(req, site, principal, cors);
+  // item 179: the monthly reports that went out, for the client's Documents shelf
+  if (route === '/client/reports' && method === 'GET') return (await import('./ops/monthly_report.ts')).handleClientReports(site, cors);
+  {
+    const m = route.match(/^\/client\/reports\/(\d{4}-\d{2})\/pdf$/);
+    if (m && method === 'GET') return (await import('./ops/monthly_report.ts')).handleClientReportPdf(site, m[1], cors);
+  }
   if (route === '/client/book' && method === 'GET') return handleClientBook(req, site, principal, cors);
   if (route === '/client/notifications' && method === 'GET') return handleClientNotifications(req, site, principal, cors);
   if (route === '/client/notifications/read' && method === 'POST') return handleClientNotificationsRead(req, site, principal, cors);
