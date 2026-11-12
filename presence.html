@@ -10520,8 +10520,9 @@ function rgOpenSettings() {
   const paintCost = () => {
     across.textContent = `Covers ${(draft.size - 1) * draft.spacing} miles across, centred on the business.`;
     const one = g.prices ? g.prices.scan_usd : 0.005, n = Math.max(1, draft.phrases.length);
-    const hidden = !!(RG_HIDDEN() && g.prices), each = hidden ? g.prices.hidden_usd : one;
-    costBox.innerHTML = `<b>What it costs</b>Each scan: ${draft.size * draft.size} searches that only list places, free, and one look-up of where the business is, ${esc(rgCost(one))}${g.prices ? `, or ${esc(rgCost(g.prices.hidden_usd))} for a business that hides its address on Google` : ""}. ${n === 1 ? "One search" : n + " searches"} a month: ${esc(rgCost(each * n))}. Google’s price list, read ${esc(g.prices ? svWhen(g.prices.as_of + "T12:00:00Z") : "Nov 12, 2026")}.`;
+    const hiddenUsd = g.prices && typeof g.prices.hidden_usd === "number" ? g.prices.hidden_usd : null;
+    const each = RG_HIDDEN() && hiddenUsd != null ? hiddenUsd : one;
+    costBox.innerHTML = `<b>What it costs</b>Each scan: ${draft.size * draft.size} searches that only list places, free, and one look-up of where the business is, ${esc(rgCost(one))}${hiddenUsd != null ? `, or ${esc(rgCost(hiddenUsd))} for a business that hides its address on Google` : ""}. ${n === 1 ? "One search" : n + " searches"} a month: ${esc(rgCost(each * n))}. Google’s price list, read ${esc(g.prices ? svWhen(g.prices.as_of + "T12:00:00Z") : "Nov 12, 2026")}.`;
   };
   paintPh(); paintCost();
   if (!g.key) d.body.appendChild(el("p", "sv-problem", "Google isn’t connected for the platform yet: the Places key is needed before anything can scan."));
@@ -10546,7 +10547,7 @@ function rgOpenFind(onDone) {
   const pin = el("input"); pin.type = "text"; pin.maxLength = 600; pin.placeholder = "ChIJ…"; pin.setAttribute("aria-label", "A Google place id");
   const pgo = el("button", "pillbtn sm", "Use this id"); pgo.type = "button"; const prow = el("div", "rg-add"); prow.append(pin, pgo); paste.appendChild(prow); d.body.appendChild(paste);
   let picked = null;
-  const confirm = async (place_id, source, btn) => {
+  const usePlace = async (place_id, source, btn) => {
     btn.disabled = true;
     try { await api("PUT", "/visibility/maps/place", { place_id, source }); toast("Matched on Google."); d.close(); if (onDone) onDone(); }
     catch (err) { btn.disabled = false; toast(nice(err), true); }
@@ -10569,9 +10570,9 @@ function rgOpenFind(onDone) {
     go2.disabled = false;
   };
   go2.addEventListener("click", search); inp.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); search(); } });
-  use.addEventListener("click", () => { if (picked) confirm(picked, "search", use); });
+  use.addEventListener("click", () => { if (picked) usePlace(picked, "search", use); });
   none.addEventListener("click", () => d.close());
-  pgo.addEventListener("click", () => { const v = pin.value.trim(); if (v) confirm(v, "pasted", pgo); else pin.focus(); });
+  pgo.addEventListener("click", () => { const v = pin.value.trim(); if (v) usePlace(v, "pasted", pgo); else pin.focus(); });
   search();
 }
 // ── Phase UX (FD-R2): the workspace speaks the business's language ──

@@ -55,7 +55,7 @@ const STUDIO = (over: Record<string, unknown> = {}) => ({ data: {
   key: true, place: { id: ME, source: 'listing', confirmed_by: 'eric@studio.example', confirmed_at: '2026-10-01T00:00:00Z', maps: `https://www.google.com/maps/place/?q=place_id:${ME}` },
   suggested: null, last_result: { month: '2026-11', status: 'scanned', reason: null, at: '2026-11-01T08:00:00Z' },
   today: { used: 1, cap: 3 },
-  prices: { as_of: '2026-11-12', source: 'https://developers.google.com/maps/billing-and-pricing/pricing', scan_usd: 0.005, scan_words: 'half a cent', name_usd: 0.017, find_usd: 0.032 },
+  prices: { as_of: '2026-11-12', source: 'https://developers.google.com/maps/billing-and-pricing/pricing', scan_usd: 0.005, scan_words: 'half a cent', hidden_usd: 0.037, hidden_words: '3½ cents', name_usd: 0.017, find_usd: 0.032 },
   ...over,
 } });
 // what a client's own view carries: no cost, no rivals, no place ids, no setup
@@ -181,7 +181,7 @@ test.describe('The map rank grid (builder list item 185)', () => {
     await dlg.getByRole('button', { name: '5 × 5 · 25 spots' }).click();
     await dlg.getByRole('button', { name: '½ mile' }).click();
     await expect(dlg).toContainText('Covers 2 miles across, centred on the business.');
-    await expect(dlg.locator('.rg-costbox')).toContainText('Each scan: 25 searches that only list places, free, and one look-up of where the business is, half a cent. 2 searches a month: 1 cent.');
+    await expect(dlg.locator('.rg-costbox')).toContainText('Each scan: 25 searches that only list places, free, and one look-up of where the business is, half a cent, or 3½ cents for a business that hides its address on Google. 2 searches a month: 1 cent.');
     await dlg.locator('#rgSwitch').check();
     await dlg.getByRole('button', { name: 'Save' }).click();
     await expect.poll(() => sent.find((s) => s.path === '/visibility/maps' && s.method === 'PUT')?.body).toEqual({ enabled: true, phrases: ['plumber', 'water heater repair'], size: 5, spacing: 0.5 });
@@ -235,6 +235,17 @@ test.describe('The map rank grid (builder list item 185)', () => {
     expect(sent.filter((s) => s.path === '/visibility/maps/names')).toEqual([]);   // no names asked of Google for a client
     await noSideScroll(page);
     expect(errors).toEqual([]);
+  });
+
+  test('a business that hides its address on Google: the grid centres on its business details, and the cost says so', async ({ page }) => {
+    const hidden = { requests: { ids_only: 49, location: 1, address: 1, from: 'address' }, cost_usd: 0.037, cost_words: '3½ cents' };
+    await openGrid(page, STUDIO({ latest: { plumber: scan(hidden), 'emergency plumber': scan({ ...hidden, id: 'scan-nov-e', phrase: 'emergency plumber', ranks: worse(4), change: null }) } })); await closeTip(page);
+    const card = page.locator('#rgCard');
+    await expect(card.locator('.rg-cost')).toContainText('This scan cost 3½ cents at Google’s prices: 49 searches that only list places, free, and a look-up of the address in the business details, as Google hides this business’s address.');
+    await page.locator('#btnRgSettings').click();
+    const dlg = page.locator('dialog.sv-dlg');
+    await expect(dlg.locator('.rg-biz')).toContainText('Google hides this business’s address, so the grid centres on the address in its business details.');
+    await expect(dlg.locator('.rg-costbox')).toContainText('2 searches a month: 7½ cents.');
   });
 
   test('the client sees nothing while it is off', async ({ page }) => {
