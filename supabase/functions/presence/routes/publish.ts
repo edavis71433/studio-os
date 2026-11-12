@@ -14,7 +14,8 @@ import { readPageLocks } from './page_locks.ts';
 import { serializeDraft } from '../lib/serializer.ts';
 import { validateSnapshot } from '../lib/manifest_validate.ts';
 import { fetchVariants } from '../lib/media.ts';
-import { deployFileMap, netlifyConfigured, setSitePassword, getSite } from '../lib/netlify.ts';
+import { deployFileMap, netlifyConfigured, setSitePassword, getSite, digestFiles, sameFiles } from '../lib/netlify.ts';
+import type { DeployFile, NetlifySiteInfo } from '../lib/netlify.ts';
 import { withForwarding } from '../lib/domain_notify.ts';
 import { mergeSecurityHeaders, mergeAssetCaching } from '../lib/security_headers.ts';
 import { writeChangeEvent } from '../lib/provenance.ts';
@@ -49,6 +50,23 @@ import { copiedBlockerFor } from '../lib/copied_record.ts';
 
 export const CALM = 'We hit a snag updating your site and we’re on it — nothing changed on your live site.';
 
+/** Item 208: the host deploy of the newest live publish, and the files it went up with
+ *  (path → SHA-1, migration 0205). Null before the migration, or when the newest live
+ *  publish didn't record them. */
+export async function liveDeployFiles(siteId: string): Promise<{ deployId: string; files: Record<string, string> } | null> {
+  const r = await svc(`presence_publishes?site_id=eq.${siteId}&status=eq.live&select=netlify_deploy_id,deploy_files&order=created_at.desc&limit=1`).catch(() => null);
+  const row = r && r.ok && Array.isArray(r.json) ? r.json[0] : null;
+  const files = row?.deploy_files;
+  return row?.netlify_deploy_id && files && typeof files === 'object' && !Array.isArray(files) ? { deployId: String(row.netlify_deploy_id), files: files as Record<string, string> } : null;
+}
+
+/** The answer when the live site already had every file: nothing was sent. */
+export function unchangedMessage(kind: 'publish' | 'restore'): string {
+  return kind === 'restore'
+    ? 'Your live site already shows that version, so nothing needed sending.'
+    : 'Your live site already shows these changes, so nothing needed sending.';
+}
+
 export async function changeSummary(siteId: string): Promise<string> {
   const lastLive = await svc(`presence_publishes?site_id=eq.${siteId}&status=eq.live&select=created_at&order=created_at.desc&limit=1`);
   const since = lastLive.json?.[0]?.created_at;
@@ -79,6 +97,7 @@ export async function runPipeline(site: SiteRow, principal: Principal, kind: 'pu
   const t0 = performance.now();
   const st: Record<string, number> = {};
   const at = (k: string) => { st[k] = Math.round(performance.now() - t0); };
+  const counts: Record<string, number> = {};   // item 208: photos named by digest, files the host asked for
 
   // ── M5: global concurrent-deploy ceiling — an operational safeguard ON TOP OF
   //    (never replacing) the per-site one-in-flight index. Counts deploys currently
@@ -139,7 +158,7 @@ export async function runPipeline(site: SiteRow, principal: Principal, kind: 'pu
   // M5: one structured telemetry line per publish at its terminal outcome —
   // stage timings + total; never throws (telemetry must not break a publish).
   const logStages = (outcome: string) => {
-    try { console.log(JSON.stringify({ evt: 'publish_stages', pub_id: pubId, site_id: site.id, kind, outcome, ms: st, total_ms: Math.round(performance.now() - t0) })); } catch { /* */ }
+    try { console.log(JSON.stringify({ evt: 'publish_stages', pub_id: pubId, site_id: site.id, kind, outcome, ms: st, total_ms: Math.round(performance.now() - t0), files: counts })); } catch { /* */ }
   };
   const fail = async (stage: string, detail: string) => {
     at(stage);
@@ -190,9 +209,12 @@ export async function runPipeline(site: SiteRow, principal: Principal, kind: 'pu
     csp = await publishedCspFor([drawn, fileMap], fnBase ? new URL(fnBase).origin : '', siteHomes(site));
   } catch (e) { return await fail('render', String(e).slice(0, 300)); }
   at('render');
-  const { files: images, failed } = await fetchVariants(snapshotArg.mediaManifest);
+  // Item 208: a photo the live site already has is named by the digest it went up with,
+  // and made again only if the host asks for it
+  const lastLive = await liveDeployFiles(site.id);
+  const { files: images, failed, reused } = await fetchVariants(snapshotArg.mediaManifest, lastLive?.files ?? null);
   if (failed.length) return await fail('images', `variant generation failed for: ${failed.join('; ')}`);
-  Object.assign(fileMap, images);
+  const files: Record<string, DeployFile> = { ...fileMap, ...images };
   at('images');
   // the library fonts the style names, copied into the site so it never loads one from elsewhere
   const { files: fonts, failed: fontsFailed } = await fetchLibraryFonts(libraryFontsIn(snapshotArg.snapshot?.dev_customization?.theme_tokens));
@@ -200,7 +222,7 @@ export async function runPipeline(site: SiteRow, principal: Principal, kind: 'pu
   // the font's fallback until the next publish copies it; a publish that failed here said
   // "We hit a snag" over a site that would have looked fine.
   if (fontsFailed.length) console.warn(`[publish] font files not copied, the fallback font shows: ${fontsFailed.join('; ')}`);
-  Object.assign(fileMap, fonts);
+  Object.assign(files, fonts);
   at('fonts');
 
   // ── Response-level security headers (parity with the marketing site) ────────
@@ -210,20 +232,44 @@ export async function runPipeline(site: SiteRow, principal: Principal, kind: 'pu
   // referrer, permissions, and a real CSP header. Merged into (never clobbering)
   // the template's asset-cache `_headers`. One source of truth: lib/security_headers.ts.
   // Item 144: the CSP is the one this site's own pages need (publishedCspFor, above).
-  fileMap['_headers'] = mergeSecurityHeaders(mergeAssetCaching(typeof fileMap['_headers'] === 'string' ? fileMap['_headers'] as string : undefined), csp);
+  files['_headers'] = mergeSecurityHeaders(mergeAssetCaching(typeof files['_headers'] === 'string' ? files['_headers'] as string : undefined), csp);
   // Item 163 (review domains finding 12): an old domain kept on the site when the domain changed
   // forwards to the current one, path and all. Netlify serves an extra name as-is; only a rule at
   // the top of _redirects makes it a permanent move. Netlify's own list of names is the record.
+  let nfs: { ok: boolean; site?: NetlifySiteInfo } | null = null;
   if (site.custom_domain && site.netlify_site_id) {
-    const nfs = await getSite(site.netlify_site_id).catch(() => null);
+    nfs = await getSite(site.netlify_site_id).catch(() => null);
     const aliases = nfs && nfs.ok && nfs.site ? nfs.site.domain_aliases || [] : [];
-    if (aliases.length) fileMap['_redirects'] = withForwarding(typeof fileMap['_redirects'] === 'string' ? fileMap['_redirects'] as string : '', aliases, site.custom_domain);
+    if (aliases.length) files['_redirects'] = withForwarding(typeof files['_redirects'] === 'string' ? files['_redirects'] as string : '', aliases, site.custom_domain);
+  }
+
+  // Item 208 (review file 03, findings 1 and 11): every deploy is a paid one, a publish and a
+  // restore alike. When the live site already has exactly these files, under the deploy the
+  // newest live publish made, nothing is sent: the publish is recorded, and the site is as it was.
+  const digests = await digestFiles(files);
+  if (lastLive && sameFiles(digests, lastLive.files)) {
+    nfs ??= await getSite(site.netlify_site_id).catch(() => null);
+    if (nfs?.ok && nfs.site?.published_deploy_id === lastLive.deployId) {
+      const done = new Date().toISOString();
+      await svc(`presence_publishes?id=eq.${pubId}`, { method: 'PATCH', body: JSON.stringify({ status: 'live', netlify_deploy_id: lastLive.deployId, completed_at: done }) });
+      // separate and best-effort: a database without 0205 never fails the status write above
+      await svc(`presence_publishes?id=eq.${pubId}`, { method: 'PATCH', body: JSON.stringify({ unchanged: true, deploy_files: digests }) }).catch(() => {});
+      await svc(`presence_sites?id=eq.${site.id}`, { method: 'PATCH', body: JSON.stringify({ status: 'live', last_published_at: done }) });
+      if (site.client_id) await clearNotice(site.client_id, 'publish_failed');
+      await tickChecklistForCustomerSite(site.id, 'site_live', 'publish', 'system').catch(() => false)
+        .then((fresh) => fresh ? emailCustomerSiteLive(site.id) : false).catch(() => false);
+      await writeChangeEvent({ siteId: site.id, entityType: kind, entityId: null, action: kind, summary, principal, provenance: 'human' });
+      counts.reused = reused;
+      logStages('unchanged');
+      return json({ data: { status: 'live', unchanged: true, message: unchangedMessage(kind), summary } }, 200, cors);
+    }
   }
 
   await svc(`presence_publishes?id=eq.${pubId}`, { method: 'PATCH', body: JSON.stringify({ status: 'deploying' }) });
-  const dep = await deployFileMap(site.netlify_site_id, fileMap, { title: `${kind} ${pubId}` });
+  const dep = await deployFileMap(site.netlify_site_id, files, { title: `${kind} ${pubId}`, digests });
   if (!dep.ok) return await fail('deploy', dep.error || 'unknown');
   at('deploy');
+  counts.reused = reused; counts.uploaded = dep.uploaded ?? 0;
   // Item 140: these pages ask for a time ticket before they send, so from now on this
   // site's form sends and bookings must carry one (lib/form_check.ts). Best-effort.
   if (siteCfg.formEndpoint) await startCheckingSends(site.id).catch(() => {});
@@ -233,6 +279,9 @@ export async function runPipeline(site: SiteRow, principal: Principal, kind: 'pu
     method: 'PATCH',
     body: JSON.stringify({ status: live ? 'live' : 'deploying', netlify_deploy_id: dep.deployId, ...(live ? { completed_at: new Date().toISOString() } : {}) }),
   });
+  // Item 208: what went up, for the next publish to compare with. Separate and best-effort,
+  // like offline_at below: a database without 0205 never fails the status write above.
+  if (dep.files) await svc(`presence_publishes?id=eq.${pubId}`, { method: 'PATCH', body: JSON.stringify({ deploy_files: dep.files }) }).catch(() => {});
   if (live) await svc(`presence_sites?id=eq.${site.id}`, { method: 'PATCH', body: JSON.stringify({ status: 'live', last_published_at: new Date().toISOString() }) });
   // G10: a live deploy of real content IS being online — any publish/restore that
   // goes live lifts the offline veil. Separate best-effort PATCH so a database
