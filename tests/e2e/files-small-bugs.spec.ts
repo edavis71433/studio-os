@@ -52,10 +52,35 @@ test.describe('Files: small bugs (item 172, D9 to D12)', () => {
     await page.goto('/files.html');
     await tile(page, SHOP).click();
     await expect(page.locator('#panel .ptitle')).toHaveText('Shopfront at dusk');
+    const search = page.locator('.dds-palette.open');
+    // the cursor in the search box, as when someone is typing a search: the box closes the
+    // search from its own listener, before Files hears the key
     await page.keyboard.press(process.platform === 'darwin' ? 'Meta+k' : 'Control+k');
-    await expect(page.locator('.dds-palette.open')).toBeVisible();
+    await expect(search.locator('input')).toBeFocused();
     await page.keyboard.press('Escape');
-    await expect(page.locator('.dds-palette.open')).toHaveCount(0);
+    await expect(search).toHaveCount(0);
+    await panelOpen(page);
+    // the search open with the cursor gone from its box: the shell closes it
+    await page.keyboard.press(process.platform === 'darwin' ? 'Meta+k' : 'Control+k');
+    await expect(search.locator('input')).toBeFocused();
+    await search.locator('input').evaluate((el) => (el as HTMLInputElement).blur());
+    await page.keyboard.press('Escape');
+    await expect(search).toHaveCount(0);
+    await panelOpen(page);
+    await expect(page.locator('#panel .ptitle')).toHaveText('Shopfront at dusk');
+  });
+
+  test('D9: Escape in the shell’s help box closes the help and leaves the open file alone', async ({ page }, info) => {
+    test.skip(info.project.name !== 'desktop-chromium', 'on a computer the file sits beside the grid, with the bar in reach');
+    await pinGrid(page);
+    await installApp(page, { api: API });
+    await page.goto('/files.html');
+    await tile(page, SHOP).click();
+    await expect(page.locator('#panel .ptitle')).toHaveText('Shopfront at dusk');
+    await page.locator('#dds-help').click();
+    await page.locator('#dds-help-q').focus();
+    await page.keyboard.press('Escape');
+    await expect(page.locator('#dds-help-q')).toBeHidden();
     await panelOpen(page);
     await expect(page.locator('#panel .ptitle')).toHaveText('Shopfront at dusk');
   });
