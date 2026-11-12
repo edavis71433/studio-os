@@ -216,15 +216,14 @@ test.describe('Client portal — Home queue + project record page', () => {
     await expect(body.locator('.kchip', { hasText: 'To-do' })).toBeVisible();
     await expect(body.locator('.kchip', { hasText: 'Invoice' })).toBeVisible();
     await expect(body.getByRole('heading', { name: 'Homepage design' })).toBeVisible();
-    await expect(body.getByText('1 to-do for you')).toBeVisible();   // to-dos are called to-dos (client portal walk, Nov 8)
+    // item 179 part two: each to-do is its own row, named for what it asks
+    await expect(body.getByRole('heading', { name: 'Send your logo' })).toBeVisible();
     // action names include the row title (aria-label) so repeated actions stay
-    // distinguishable. Slice 10 (approved mock): the visible CTAs became explicit
-    // verbs — "Review & approve" / "View & pay" — and the accessible names follow
-    // (label-in-name intact: the visible text starts each name).
-    await expect(body.getByRole('link', { name: 'View & pay — Deposit' })).toBeVisible();
-    // Oct 2026 audit change 4: a project approval approves right on Home; "See it first" opens the record
-    await expect(body.getByRole('button', { name: 'Approve — Homepage design' })).toBeVisible();
-    await expect(body.getByRole('button', { name: 'See it first — Homepage design' })).toBeVisible();
+    // distinguishable (label-in-name intact: the visible verb starts each name).
+    await expect(body.getByRole('link', { name: 'Pay — Deposit' })).toBeVisible();
+    // item 179 part two: one verb a row, and it opens the thing itself
+    await expect(body.getByRole('button', { name: 'Open — Homepage design' })).toBeVisible();
+    await expect(body.getByRole('button', { name: 'Open — Send your logo' })).toBeVisible();
     // the unread row carries an sr-only "New — " text alternative for its dot
     await expect(body.locator('.qrow.unread .sr-only')).toHaveText('New — ');
     // the unread notification for approval a1 marks its row as new
@@ -538,17 +537,20 @@ test.describe('Client portal — Home hero + counted queue (item 179)', () => {
     await expect(body.locator('.qcard')).toBeVisible();
     await expect(body.locator('.qico')).toHaveCount(3); // approval · to-do · invoice
     await expect(body.locator('.qico').first()).toHaveAttribute('aria-hidden', 'true');
-    await expect(body.getByRole('button', { name: 'See it first — Homepage design' })).toHaveText('See it first');
-    await expect(body.getByRole('button', { name: 'Open to-dos — Website redesign' })).toHaveText('Open to-dos');
-    await expect(body.getByRole('link', { name: 'View & pay — Deposit' })).toHaveText('View & pay');
+    await expect(body.getByRole('button', { name: 'Open — Homepage design' })).toHaveText('Open');
+    await expect(body.getByRole('button', { name: 'Open — Send your logo' })).toHaveText('Open');
+    await expect(body.getByRole('link', { name: 'Pay — Deposit' })).toHaveText('Pay');
   });
 
-  test('the See it first CTA still round-trips into the project record', async ({ page }) => {
+  test('Open shows the approval itself, and back returns Home (item 179 part two)', async ({ page }) => {
     await installApp(page, { api: CLIENT_API });
     await page.goto('/client.html');
-    await page.getByRole('button', { name: 'See it first — Homepage design' }).click();
-    await expect(page.getByRole('heading', { name: 'Website redesign' })).toBeVisible();
-    await expect(page.getByRole('heading', { name: 'Needs your OK' })).toBeVisible();
+    await page.getByRole('button', { name: 'Open — Homepage design' }).click();
+    await expect(page.locator('#main h1')).toHaveText('Homepage design');
+    await expect(page.locator('.askcard')).toContainText('“The first mockup.”');
+    await expect(page.getByRole('button', { name: 'Looks good — approve' })).toBeVisible();
+    await page.getByRole('link', { name: '‹ Home' }).click();
+    await expect(page.getByRole('heading', { name: /^Needs you/ })).toBeVisible();
   });
 
   test('mobile: the hero and queue stack with no horizontal overflow', async ({ page }, testInfo) => {
@@ -2210,10 +2212,9 @@ test.describe('PS1 — failed-read honesty (portal)', () => {
     await page.goto('/client.html');
     const body = page.locator('#needs-body');
     // the OTHER sources' rows survive the billing failure…
-    // Oct 2026 audit change 4: a project approval approves right on Home; "See it first" opens the record
-    await expect(body.getByRole('button', { name: 'Approve — Homepage design' })).toBeVisible();
-    await expect(body.getByRole('button', { name: 'See it first — Homepage design' })).toBeVisible();
-    await expect(body.getByRole('button', { name: 'Open to-dos — Website redesign' })).toBeVisible();
+    // item 179 part two: one verb a row, and it opens the thing itself
+    await expect(body.getByRole('button', { name: 'Open — Homepage design' })).toBeVisible();
+    await expect(body.getByRole('button', { name: 'Open — Send your logo' })).toBeVisible();
     // …with billing's one calm per-source line under them — never "caught up"
     await expect(body.getByText('We couldn’t check on invoices just now — please try again in a moment.')).toBeVisible();
     await expect(page.getByText('You’re all caught up.')).toHaveCount(0);
@@ -3520,8 +3521,9 @@ test.describe('PS6 — project-record cohesion (B3)', () => {
     await installApp(page, { api: withTodos(CHECKLIST_TODOS) });
     await page.goto('/client.html');
     const body = page.locator('#needs-body');
-    await expect(body.locator('.kchip', { hasText: 'To-do' })).toBeVisible();
-    await expect(body.getByText('3 to-dos for you')).toBeVisible();
+    // item 179 part two: one row per step, each with its own verb
+    await expect(body.locator('.kchip', { hasText: 'To-do' })).toHaveCount(3);
+    for (const t of CHECKLIST_TODOS) await expect(body.getByRole('heading', { name: t.title })).toBeVisible();
   });
 
   test('PS1 residual — Files tab on a failed projects read: the couldn’t-load line, never "No files yet"', async ({ page }) => {
@@ -3695,11 +3697,17 @@ test.describe('PS6 — project-record cohesion (B3)', () => {
       const el = document.activeElement;
       return el && el.tagName === 'H1' ? (el.textContent || '') : '';
     })).toContain('How did we do?');
-    // the fields carry the theme tokens (never white-on-dark)
-    const style = await page.locator('#svq-1').getAttribute('style');
-    expect(style).toContain('font:inherit');
-    expect(style).toContain('var(--card)');
-    expect(style).toContain('var(--ink)');
+    // the fields carry the theme tokens (never white-on-dark). Item 179 part two: one
+    // question to a screen, its field styled by the shared .fieldin rule
+    const fld = page.locator('#svq');
+    await expect(fld).toHaveClass(/fieldin/);
+    const got = await fld.evaluate((el) => {
+      const probe = document.createElement('div'); probe.style.cssText = 'background:var(--card);color:var(--ink)'; document.body.appendChild(probe);
+      const want = getComputedStyle(probe); const cs = getComputedStyle(el);
+      const out = { bg: cs.backgroundColor === want.backgroundColor, ink: cs.color === want.color, font: cs.fontFamily === getComputedStyle(document.body).fontFamily };
+      probe.remove(); return out;
+    });
+    expect(got).toEqual({ bg: true, ink: true, font: true });
   });
 });
 
@@ -3778,18 +3786,19 @@ test.describe('Client Home — one filled button, approve and pay in one click',
     const body = page.locator('#needs-body');
     await expect(body.locator('.qcard')).toBeVisible();
     await expect(body.locator('.approve')).toHaveCount(1);
-    await expect(body.locator('.qrow').first().locator('.approve')).toHaveText('Approve');
+    await expect(body.locator('.qrow').first().locator('.approve')).toHaveText('Open');
     // the Pay further down is a plain link, not a second filled button
-    await expect(body.getByRole('link', { name: 'View & pay — Deposit' })).not.toHaveClass(/approve/);
+    await expect(body.getByRole('link', { name: 'Pay — Deposit' })).not.toHaveClass(/approve/);
   });
 
-  test('Approve on Home decides the project approval in place (same call as the record)', async ({ page }) => {
+  test('Open, then Approve decides the project approval in place (same call as the record)', async ({ page }) => {
     await installApp(page, { api: CLIENT_API });
     await page.goto('/client.html');
+    await page.getByRole('button', { name: 'Open — Homepage design' }).click();
     const post = page.waitForRequest((r) => r.method() === 'POST' && /\/client\/approvals\/a1\/decide$/.test(new URL(r.url()).pathname));
-    await page.getByRole('button', { name: 'Approve — Homepage design' }).click();
+    await page.getByRole('button', { name: 'Looks good — approve' }).click();
     expect((await post).postDataJSON()).toEqual({ decision: 'approved', presented_hash: 'h1', note: '' });
-    await expect(page.locator('#toast')).toContainText('Approved — thank you.');
+    await expect(page.getByRole('heading', { name: 'Approved — thank you.' })).toBeVisible();
   });
 
   test('From your studio sits right under Needs you', async ({ page }) => {

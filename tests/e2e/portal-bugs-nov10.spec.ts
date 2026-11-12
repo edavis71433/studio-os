@@ -340,8 +340,11 @@ test.describe('the live walk — what a client sees', () => {
     await expect(todos.locator('.card', { hasText: 'questionnaire' })).toContainText('Your studio sends the questionnaire by email.');
     await expect(todos.locator('.card', { hasText: 'Review the design draft' })).toContainText('Your studio will share the draft here for your OK.');
     await expect(todos.locator('.card', { hasText: 'Review the design draft' }).getByRole('button')).toHaveCount(0);
-    await todos.locator('.card', { hasText: 'Send your content and photos' }).getByRole('button', { name: 'Share a file' }).click();
-    await expect(page.locator('#fchoose')).toBeFocused();
+    // item 179 part two: the content ask opens its own page, with the file box right there
+    await expect(todos.locator('.card', { hasText: 'questionnaire' }).getByRole('button', { name: 'Send it here' })).toBeVisible();
+    await todos.locator('.card', { hasText: 'Send your content and photos' }).getByRole('button', { name: 'Send files' }).click();
+    await expect(page.locator('#main h1')).toHaveText('Send your content and photos');
+    await expect(page.getByRole('button', { name: 'Choose files' })).toBeVisible();
   });
 
   test('…and once the studio has sent them, the questionnaire opens and the draft is one tap away', async ({ page }) => {

@@ -48,7 +48,8 @@ ok('the studio\'s Inbox times support rows by real activity too', /created_at: s
 const cl = read('client.html');
 ok('"Something else?" sends new_request', /\{subject,body:\$\('sup-body'\)\.value\.trim\(\),project_id:pid,new_request:true\}/.test(cl));
 ok('a to-do\'s status in words', /const TASK_WORD=\{todo:'To do',in_progress:'In progress',blocked:'Waiting on something',done:'Done'\};/.test(cl));
-ok('to-dos are called to-dos; approvals need your OK', /to-do\$\{s\.todos\.length===1\?'':'s'\} for you/.test(cl) && /need\$\{na===1\?'s':''\} your OK/.test(cl));
+// item 179: each to-do is its own Needs-you row now; the project card still counts them in words
+ok('to-dos are called to-dos; approvals need your OK', /to-do\$\{nt===1\?'':'s'\} for you/.test(cl) && /need\$\{na===1\?'s':''\} your OK/.test(cl));
 ok('a paid invoice says when', /Paid\$\{paidOn\?' '\+esc\(paidOn\):''\} — thank you\./.test(cl));
 ok('no booking times → Ask for a call, prefilled', /openSupport\(null,'requests',\{subject:'A call',body:'I’d like to book a call\. Times that work for me: '\}\)/.test(cl));
 ok('each tab names itself', /document\.title=\(\{home:'Home',messages:'Messages',files:'Files',invoices:'Invoices',requests:'Requests',help:'Help'\}\[tab\]\|\|'Home'\)\+' — '\+studioBrand\(\)/.test(cl));   // builder list item 59: the studio's own name when there is one

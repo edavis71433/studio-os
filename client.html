@@ -482,6 +482,90 @@
   .schip.done{background:var(--good-soft);color:var(--good)}
   .reqchev{flex:0 0 auto;color:var(--faint);font-size:17px}
   .reqnone{padding:14px 0;margin:0;font-size:13.5px}
+  /* ── item 179 part two: each to-do and approval opens the thing itself (Figma page
+     "Client portal — parts 2 to 4"). A phone stacks the ask, the thing and your
+     answer; ≥1000px puts the thing on the left and the ask and answer on the right. ── */
+  .sheetback{margin:0}
+  .sheetmeta{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:14px}
+  .sheetmeta .tag{margin:0}
+  .sheetmeta .sm{font-size:12.5px;color:var(--faint)}
+  .tag.todo{background:var(--warn-soft);color:var(--warn)}
+  .sheet h1{font-family:var(--serif);font-weight:500;font-size:clamp(26px,5vw,34px);margin:8px 0 .2em;letter-spacing:-.02em;line-height:1.1}
+  .sheet .sub{color:var(--soft);font-size:15px;margin:0}
+  .sheetcols{display:flex;flex-direction:column}
+  .sheetcols>*{min-width:0}
+  @media (min-width:1000px){
+    .sheetcols{display:grid;grid-template-columns:minmax(0,3fr) minmax(0,2fr);grid-template-rows:auto 1fr;grid-template-areas:"thing ask" "thing answer";gap:0 24px;align-items:start}
+    .sheetcols.headtop{grid-template-rows:auto auto;grid-template-areas:"ask ask" "thing answer"}
+    .sheetcols.solo{grid-template-columns:minmax(0,1fr);grid-template-areas:"ask" "answer";max-width:660px}
+    .sheetcols .s-ask{grid-area:ask}.sheetcols .s-thing{grid-area:thing}.sheetcols .s-answer{grid-area:answer}
+    .sheetcols .s-thing>.card:first-child,.sheetcols .s-thing>.dropbox:first-child,.sheetcols.headtop .s-answer>section:first-child{margin-top:14px}
+  }
+  .askcard{display:flex;gap:10px;align-items:flex-start;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:12px 14px;margin-top:14px}
+  .askav{flex:0 0 auto;width:28px;height:28px;border-radius:50%;background:#5b3fa0;color:#fff;display:grid;place-items:center;font-size:12px;font-weight:700}   /* the brand mark's purple in both themes, as .phero .ph-mark */
+  .askwho{display:block;font-size:12.5px;font-weight:600;color:var(--ink)}
+  .askq{display:block;font-size:14px;color:var(--soft);margin-top:2px;overflow-wrap:anywhere}
+  .draftcard{padding:0;overflow:hidden;margin:14px 0 0}
+  .dstrip{display:flex;align-items:center;gap:6px;padding:8px 12px;background:var(--bg);border-bottom:1px solid var(--line);font-size:11.5px;color:var(--faint);overflow:hidden;white-space:nowrap}
+  .dstrip i{width:7px;height:7px;border-radius:50%;background:var(--line);flex:0 0 auto}
+  .dpic{position:relative;aspect-ratio:4/3;overflow:hidden;background:var(--p-soft)}
+  .dpic iframe{position:absolute;top:0;left:0;width:1280px;height:960px;border:0;transform-origin:0 0;transform:scale(var(--dk,.27));pointer-events:none;background:#fff}
+  .dpic .dwait{position:absolute;inset:0;display:grid;place-items:center;color:var(--faint);font-size:13px;padding:16px;text-align:center}
+  .dpages{display:flex;align-items:center;gap:6px;flex-wrap:wrap;padding:10px 12px;border-top:1px solid var(--line)}
+  .dpages button{font-size:12.5px;padding:5px 11px}
+  .dpages button[aria-pressed="true"]{background:var(--p-soft);border-color:var(--p);color:var(--p)}
+  .dpages .dfullbtn{margin-left:auto;border-color:transparent;color:var(--p);padding:5px 4px}
+  .apimg{display:block;width:100%;height:auto;border-bottom:1px solid var(--line)}
+  .apacts{display:flex;flex-direction:column;gap:10px;margin-top:16px}
+  .apacts button{width:100%;justify-content:center;display:inline-flex;padding:11px 18px}
+  @media (min-width:1000px){.apacts{flex-direction:row}.apacts button{flex:1 1 0;width:auto}}
+  .notecard{margin-top:16px}
+  .notecard .nhead{display:block;font-size:14px;font-weight:600;color:var(--ink);margin:0 0 10px}
+  .notecard .nlabel{display:block;font-size:13px;font-weight:600;color:var(--soft);margin:0 0 5px}
+  .fieldin{width:100%;font:inherit;font-size:14px;border:1px solid var(--line);border-radius:10px;padding:9px 11px;background:var(--card);color:var(--ink)}
+  textarea.fieldin{min-height:66px;resize:vertical;margin-top:10px}
+  .notelist{list-style:none;margin:0;padding:0}
+  .notelist li{display:flex;gap:10px;align-items:flex-start;justify-content:space-between;padding:11px 0;border-top:1px solid var(--line)}
+  .notelist li:first-child{border-top:0;padding-top:2px}
+  .notelist .nwhere{display:block;font-size:12px;font-weight:600;color:var(--faint)}
+  .notelist .nbody{display:block;font-size:14px;color:var(--ink);overflow-wrap:anywhere;margin-top:2px}
+  .histline{display:flex;gap:6px;align-items:center;font-size:12.5px;color:var(--good);margin-top:14px}
+  .thanks{text-align:center;padding:28px 22px;margin-top:16px}
+  .thanks .tick{width:56px;height:56px;border-radius:50%;background:var(--good-soft);color:var(--good);display:grid;place-items:center;margin:0 auto 12px;font-size:24px}
+  .thanks.chg .tick{background:var(--p-soft);color:var(--p)}
+  .thanks h1{font-family:var(--serif);font-weight:500;font-size:26px;margin:0 0 6px;letter-spacing:-.01em}
+  .thanks .row{justify-content:center}
+  .dropbox{display:flex;flex-direction:column;align-items:center;gap:10px;text-align:center;background:var(--card);border:1.5px dashed var(--p);border-radius:16px;padding:22px 18px;margin-top:16px}
+  .dropbox .di{width:44px;height:44px;border-radius:12px;background:var(--p-soft);color:var(--p);display:grid;place-items:center;font-size:20px}
+  .dropbox .dt{font-weight:600;font-size:15px;margin:0;color:var(--ink)}
+  .dropbox .dd{font-size:13px;color:var(--faint);margin:0;max-width:40ch}
+  .dropbox.over{background:var(--p-soft)}
+  .dropbox .dprog{font-size:13px;color:var(--soft);margin:0}
+  .helps{padding:4px 16px}
+  .helps .hrow{display:flex;gap:10px;align-items:flex-start;padding:10px 0;border-top:1px solid var(--line)}
+  .helps .hrow:first-child{border-top:0}
+  .helps .hck{flex:0 0 auto;width:22px;height:22px;border-radius:50%;background:var(--p-soft);color:var(--p);display:grid;place-items:center;font-size:12px}
+  .helps strong{display:block;font-size:14px;color:var(--ink)}
+  .helps .hsub{display:block;font-size:13px;color:var(--soft)}
+  .donebtn{width:100%;justify-content:center;display:inline-flex;margin-top:16px;padding:11px 18px}
+  .qprog{margin:16px 0 0;font-size:12.5px;font-weight:600;color:var(--faint)}
+  .qsteps{display:flex;gap:6px;margin-top:8px}
+  .qsteps i{flex:1 1 0;height:6px;border-radius:999px;background:var(--line)}
+  .qsteps i.on{background:var(--p)}
+  .qcardq{margin-top:14px}
+  .qcardq label{display:block;font-family:var(--serif);font-size:18px;line-height:1.3;margin-bottom:12px;color:var(--ink)}
+  .qnav{display:flex;gap:10px;margin-top:14px}
+  .qnav .approve{flex:1 1 auto;justify-content:center;display:inline-flex}
+  .qkeep{font-size:12.5px;color:var(--faint);margin-top:10px}
+  /* the draft, full screen: the whole page at its own size, still inside the portal */
+  .dfull{position:fixed;inset:0;z-index:60;background:var(--bg);display:flex;flex-direction:column}
+  .dfull[hidden]{display:none}
+  .dfullbar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:10px 14px;padding-top:calc(10px + env(safe-area-inset-top));background:var(--chrome);color:var(--on-chrome)}
+  .dfullbar button{color:var(--on-chrome);border-color:rgba(255,255,255,.25);font-size:13px;padding:6px 12px}
+  .dfullbar button:hover{border-color:var(--chrome-accent);color:var(--on-chrome)}
+  .dfullbar button[aria-pressed="true"]{background:rgba(255,255,255,.14);border-color:var(--chrome-accent)}
+  .dfullbar .dfname{font-family:var(--serif);font-size:15px;margin-right:auto}
+  .dfull iframe{flex:1 1 auto;width:100%;border:0;background:#fff}
 </style>
 <script>
 // Self-contained client portal: the operator shell (shell.css/shell.js) is
@@ -550,6 +634,9 @@ function firstName(u){if(!u)return'';const cap=(p)=>p.charAt(0).toUpperCase()+p.
 // tests/presence/today_home_test.mjs; keep both copies in sync). ──
 // Time-of-day greeting, with the client's first name when we truly know it.
 function portalGreeting(h,name){const g=h<12?'Good morning':h<18?'Good afternoon':'Good evening';return g+(name?', '+name:'')+'.';}
+// item 179: the client's own name, from the studio's record of them (/portal/context
+// client_first_name), else what their sign-in knows (firstName)
+function clientName(){const n=PORTAL.ctx&&PORTAL.ctx.client_first_name;return (typeof n==='string'&&n.trim())?n.trim():firstName(USER);}
 // ONE definition of "needs your OK" per project snapshot — pending approvals +
 // to-dos flagged for the client. Each project card's "N things need your OK"
 // line uses it, so Home can never show two contradictory counts on one render.
@@ -567,6 +654,13 @@ const TASK_WORD={todo:'To do',in_progress:'In progress',blocked:'Waiting on some
 // a project's status in words (the Nov 10 walk found the raw "active" on a Home tile,
 // the project card and the record's chip); mirrored in tests/presence/today_home_test.mjs
 function projectWord(s){s=String(s||'');return({active:'In progress',on_hold:'On hold',complete:'Done',archived:'Closed'})[s]||s.replace(/_/g,' ');}
+// item 179 part two: which of the studio's asks a to-do is, and the one verb its
+// row says (mirrored 1:1 in tests/presence/today_home_test.mjs). The three
+// checklist asks each open their own thing; any other to-do opens its own page.
+function todoKind(t){const k=String((t&&t.source)||'').replace(/^checklist:/,'');return k==='questionnaire_returned'?'questionnaire':k==='content_received'?'content':k==='client_review'?'review':'task';}
+const TODO_VERB={questionnaire:'Start',content:'Send',review:'Open',task:'Open'};
+// the studio's questionnaire, when it sent one as a survey
+function questionnaireOf(surveys){return (surveys||[]).find(s=>s&&/questionnaire|intake|brief/i.test(String(s.title||'')))||null;}
 // PS2: the ONE portal money formatter — the Needs-you invoice row, the Invoices
 // rows and the tab's unpaid-total line all render the same cents the same way
 // ($1,200, $1,234.50 — never a bare $1200 drifting between surfaces). Server
@@ -586,8 +680,13 @@ function needsYouItems(feed,snaps,billing){
   for(const s of (snaps||[])){
     if(!s)continue;
     for(const a of (s.approvals||[]))items.push({kind:'approval',s,a});
-    if((s.todos||[]).length)items.push({kind:'todos',s});
-    for(const sv of (s.surveys||[]))items.push({kind:'survey',s,sv});
+    // item 179: one row per to-do, each with its own verb. A draft waiting for an OK
+    // stands in for "Review the design draft", and the questionnaire's survey rides
+    // on its to-do instead of being a second row.
+    const draftWaiting=(s.approvals||[]).some(a=>a&&a.subject_type==='website');
+    const q=(s.todos||[]).some(t=>todoKind(t)==='questionnaire')?questionnaireOf(s.surveys):null;
+    for(const t of (s.todos||[]))if(t&&!(draftWaiting&&todoKind(t)==='review'))items.push({kind:'todo',s,t});
+    for(const sv of (s.surveys||[]))if(sv&&!(q&&sv.id===q.id))items.push({kind:'survey',s,sv});
   }
   for(const i of unpaidInvoices(billing))items.push({kind:'invoice',i});
   return items;
@@ -722,7 +821,7 @@ function studioLogo(){const s=PORTAL.ctx&&PORTAL.ctx.studio;return (s&&typeof s.
 function rememberStudio(){try{const s=PORTAL.ctx&&PORTAL.ctx.studio;if(s&&s.name)localStorage.setItem('dds-studio-brand',JSON.stringify({name:s.name,logo_url:studioLogo()||null,accent:s.accent||''}));}catch(_){}}
 function showNav(){
   const nav=$('tabnav');if(!nav)return;
-  const acct=(((firstName(USER)||((USER&&USER.email)||''))||'').charAt(0)||'•').toUpperCase();
+  const acct=(((clientName()||((USER&&USER.email)||''))||'').charAt(0)||'•').toUpperCase();
   const badge=PORTAL.unread?`<span class="badge on" aria-hidden="true">${PORTAL.unread>9?'9+':PORTAL.unread}</span>`:'<span class="badge" aria-hidden="true"></span>';
   nav.innerHTML=`<div class="tabnav-inner">`+
     `<span class="cb-brand">${studioLogo()?`<img class="cb-logo" src="${esc(studioLogo())}" alt="">`:`<span class="cb-mark" aria-hidden="true">✦</span>`}<span class="cb-name">${esc(studioBrand())}</span></span>`+
@@ -913,7 +1012,7 @@ function renderHome(){
   let html=`<header class="phero" id="home-hero">`+
     `<div class="ph-brand">${logo?`<img class="ph-logo" src="${esc(logo)}" alt="">`:`<span class="ph-mark" aria-hidden="true">${esc((studioBrand().charAt(0)||'✦').toUpperCase())}</span>`}<span class="ph-name">${esc(studioBrand())}</span></div>`+
     `<div class="rolebadge">● ${P.persona==='client'?'Your workspace':'Client view'}</div>`+   // persona, not projects.length — a failed projects read must not demote a client's badge
-    `<h1>${esc(portalGreeting(new Date().getHours(),firstName(USER)))}</h1>`+
+    `<h1>${esc(portalGreeting(new Date().getHours(),clientName()))}</h1>`+
     `<p class="sub">${P.persona==='client'?'Here’s where your website and projects stand.':'Everything your studio shares with you, in one place.'}</p>`+
   `</header>`;
   html+=welcomeCardHtml();
@@ -968,10 +1067,13 @@ async function buildNeedsYou(){
   const seen=unreadKeysFrom(PORTAL.notifs);
   // unread rows carry an sr-only "New — " prefix (the dot is a bare pseudo-element);
   // action buttons get aria-labels that include the row title so repeated
-  // "Review & approve" / "Open to-dos" names stay distinguishable to a screen
-  // reader. Slice 10: each row leads with a type icon (action-feed anatomy).
-  const QICO={Approval:si('thumbsup'),Connected:si('link'),'To-do':si('check'),Survey:si('clipboard'),Invoice:si('receipt')};
-  const row=(kind,cls,unread,title,sub,acts)=>`<div class="qrow${unread?' unread':''}"><span class="qico${cls?' '+cls:''}" aria-hidden="true">${QICO[kind]||si('bell')}</span><div class="qmain"><span class="kchip${cls?' '+cls:''}">${kind}</span><h3>${unread?'<span class="sr-only sr-new">New — </span>':''}${title}</h3>${sub?`<p>${sub}</p>`:''}</div><div class="qact">${acts}</div></div>`;
+  // "Open" / "Start" names stay distinguishable to a screen reader.
+  // Slice 10: each row leads with a type icon (action-feed anatomy).
+  const QICO={Approval:si('thumbsup'),Draft:si('image'),Connected:si('link'),'To-do':si('check'),Survey:si('clipboard'),Invoice:si('receipt')};
+  const row=(kind,cls,unread,title,sub,acts,ico)=>`<div class="qrow${unread?' unread':''}"><span class="qico${cls?' '+cls:''}" aria-hidden="true">${ico||QICO[kind]||si('bell')}</span><div class="qmain"><span class="kchip${cls?' '+cls:''}">${kind}</span><h3>${unread?'<span class="sr-only sr-new">New — </span>':''}${title}</h3>${sub?`<p>${sub}</p>`:''}</div><div class="qact">${acts}</div></div>`;
+  // item 179 part two: each row has one verb, and it opens the thing itself
+  const TODO_ICO={questionnaire:si('clipboard'),content:si('upload'),review:si('image'),task:si('check')};
+  const TODO_SUB={questionnaire:'A short questionnaire',content:'Your logo, photos and any words for the site',review:'Your studio shares the draft here for your OK'};
   // PS3 (D1a): the rows come from needsYouItems — the SAME array whose length
   // the "Needs you · N" heading shows, so the two numbers agree by construction.
   const nyToday=portalTodayYmd();
@@ -982,23 +1084,25 @@ async function buildNeedsYou(){
     if(it.kind==='feed'){const p=it.p;
       return row(p.kind==='connected'?'Connected':'Approval','',false,esc(p.title||'A change is ready'),esc(p.summary||''),
         `<button class="${top}" data-approve="${esc(p.decide_path)}" aria-label="Approve — ${esc(p.title||'A change is ready')}">Approve</button><button data-decline="${esc(p.decide_path)}" aria-label="Not yet — ${esc(p.title||'A change is ready')}">Not yet</button>`);}
-    if(it.kind==='approval'){const s=it.s,a=it.a;
-      // approve right here (the row names the change and its summary); "See it first" opens the record
-      return row('Approval','',seen.has('approval-'+a.id),esc(a.title||'A change is ready'),esc(s.name)+(a.summary?` · ${esc(a.summary)}`:''),
-        `<button class="${top}" data-qapr="${esc(a.id)}" data-qah="${esc(a.content_hash||'')}" data-qproj="${esc(s.id)}" aria-label="Approve — ${esc(a.title||'A change is ready')}">Approve</button><button data-open-proj="${esc(s.id)}" data-open-sec="sec-approvals" aria-label="See it first — ${esc(a.title||'A change is ready')}">See it first</button>`);}
-    if(it.kind==='todos'){const s=it.s;
-      return row('To-do','todo',s.todos.some(t=>t&&seen.has('task-'+t.id))||seen.has('todos-'+s.id),`${s.todos.length} to-do${s.todos.length===1?'':'s'} for you`,esc(s.name),
-        `<button class="${top}" data-open-proj="${esc(s.id)}" data-open-sec="sec-todos" aria-label="Open to-dos — ${esc(s.name)}">Open to-dos</button>`);}
+    if(it.kind==='approval'){const s=it.s,a=it.a;const draft=a.subject_type==='website';
+      const ttl=a.title||(draft?'Your website draft':'A change is ready');
+      // the row says what's asked; Open shows the thing itself, with Approve on it
+      const sub=a.summary?(draft?`${esc(studioBrand())} asked: “${esc(a.summary)}”`:`${esc(s.name)} · ${esc(a.summary)}`):esc(s.name);
+      return row(draft?'Draft':'Approval','',seen.has('approval-'+a.id),esc(ttl),sub,
+        `<button class="${top}" data-open-apr="${esc(a.id)}" data-apr-proj="${esc(s.id)}" aria-label="Open — ${esc(ttl)}">Open</button>`);}
+    if(it.kind==='todo'){const s=it.s,t=it.t;const k=todoKind(t);const verb=TODO_VERB[k];
+      return row('To-do','todo',seen.has('task-'+t.id)||seen.has('todos-'+s.id),esc(t.title||'A to-do'),esc(TODO_SUB[k]?TODO_SUB[k]+' · '+s.name:s.name),
+        `<button class="${top}" data-open-todo="${esc(t.id)}" data-todo-proj="${esc(s.id)}" aria-label="${verb} — ${esc(t.title||'A to-do')}">${verb}</button>`,TODO_ICO[k]);}
     if(it.kind==='survey'){const s=it.s,sv=it.sv;
       return row('Survey','',seen.has('surveys-'+s.id),esc(sv.title||'A quick survey'),esc(s.name),
-        `<button class="${top}" data-open-survey="${esc(sv.id)}" data-survey-proj="${esc(s.id)}" aria-label="Answer — ${esc(sv.title||'A quick survey')}">Answer →</button>`);}
+        `<button class="${top}" data-open-survey="${esc(sv.id)}" data-survey-proj="${esc(s.id)}" aria-label="Start — ${esc(sv.title||'A quick survey')}">Start</button>`);}
     const i=it.i;
     // the SAME state word the Invoices tab chips print (one formula, item 2) —
     // the two surfaces must never disagree about the same invoice
     const stWord=(MONEY_WORD[moneyState(i,nyToday,PAID_PENDING)]||'').toLowerCase();
     const nyPay=i.pay_url&&/^https:\/\//.test(i.pay_url)?i.pay_url:null;   // https-only (invoiceRowHtml's rule)
     return row('Invoice','invoice',false,esc(i.name||'Invoice'),`${i.amount?esc(fmtMoney(i.amount))+' · ':''}${esc(stWord)}${i.due_date?` · due ${esc(invDueLabel(i.due_date)||i.due_date)}`:''}`,
-      nyPay?`<a class="${top||'link'}" data-pay href="${esc(nyPay)}" aria-label="View &amp; pay — ${esc(i.name||'Invoice')}">View &amp; pay</a>`:`<button class="${top}" data-tab-go="invoices" aria-label="View invoice — ${esc(i.name||'Invoice')}">View invoice</button>`);
+      nyPay?`<a class="${top||'link'}" data-pay href="${esc(nyPay)}" aria-label="Pay — ${esc(i.name||'Invoice')}">Pay</a>`:`<button class="${top}" data-tab-go="invoices" aria-label="View invoice — ${esc(i.name||'Invoice')}">View invoice</button>`);
   });
   // item 179: the heading carries the queue's count — the SAME array whose rows
   // render below it, so the two can never disagree (the old strip's D1a rule).
@@ -1018,17 +1122,10 @@ async function buildNeedsYou(){
   if(!items.length)return;   // nothing to wire — only the honest lines rendered
   body.querySelectorAll('[data-approve]').forEach(b=>b.addEventListener('click',()=>decideFeed(b.getAttribute('data-approve'),'approve',b)));
   body.querySelectorAll('[data-decline]').forEach(b=>b.addEventListener('click',()=>decideFeed(b.getAttribute('data-decline'),'abandon',b)));
-  body.querySelectorAll('[data-open-proj]').forEach(b=>b.addEventListener('click',()=>openProject(b.getAttribute('data-open-proj'),b.getAttribute('data-open-sec'))));
-  // inline approve of a project approval — the SAME decide call (and 409 honesty) as the record page
-  body.querySelectorAll('[data-qapr]').forEach(b=>b.addEventListener('click',async()=>{
-    b.disabled=true;
-    const r=await api('/client/approvals/'+b.getAttribute('data-qapr')+'/decide','POST',{decision:'approved',presented_hash:b.getAttribute('data-qah'),note:''});
-    if(r.ok){PORTAL.snaps=null;toast('Approved — thank you.');buildNeedsYou();return;}
-    toast((r.body&&r.body.message)||'That didn’t go through — please try again.');
-    if(r.status===409){PORTAL.snaps=null;buildNeedsYou();return;}
-    b.disabled=false;
-  }));
-  body.querySelectorAll('[data-open-survey]').forEach(b=>b.addEventListener('click',()=>openSurvey(b.getAttribute('data-open-survey'),b.getAttribute('data-survey-proj'),b)));
+  // item 179 part two: the thing itself — the approval with its draft or file, the to-do's own page
+  body.querySelectorAll('[data-open-apr]').forEach(b=>b.addEventListener('click',()=>openApproval(b.getAttribute('data-apr-proj'),b.getAttribute('data-open-apr'))));
+  body.querySelectorAll('[data-open-todo]').forEach(b=>b.addEventListener('click',()=>openTodo(b.getAttribute('data-todo-proj'),b.getAttribute('data-open-todo'))));
+  body.querySelectorAll('[data-open-survey]').forEach(b=>b.addEventListener('click',()=>openSurvey(b.getAttribute('data-open-survey'),b.getAttribute('data-survey-proj'),b,'home')));
   body.querySelectorAll('[data-tab-go]').forEach(b=>b.addEventListener('click',()=>showTab(b.getAttribute('data-tab-go'))));
 }
 // ── slice 8b: the "Your website" card — plain-English site stats, in place ──
@@ -2102,7 +2199,7 @@ function bookConfirm(slot){
   BOOK.slot=slot;
   // D5a: the portal knows who's signed in — prefill, keep editable (booking on
   // someone else's behalf stays one edit away)
-  const meName=firstName(USER),meEmail=(USER&&USER.email)?USER.email:'';
+  const meName=clientName(),meEmail=(USER&&USER.email)?USER.email:'';
   // the summary names the DAY, not just the time — what the client confirms
   // must name the day they're booking (the race fix's visible partner)
   const day=bookDayLabel(slot);
@@ -2159,7 +2256,7 @@ async function openServiceRequest(svc){
 // account card is a proper profile section whose "message your studio" pointers
 // only render for a persona that CAN message.
 function accountSectionHtml(canMessage){
-  const name=firstName(USER);
+  const name=clientName();
   const email=(USER&&USER.email)?USER.email:'';
   const av=((name||email||'').charAt(0)||'•').toUpperCase();
   return `<section id="sec-you"><h2>Your account</h2><div class="card">`+
@@ -2281,7 +2378,7 @@ function welcomeCardHtml(){
   // the next visit opens on Needs you instead of the tour (× still dismisses now)
   WELCOME_THIS_VISIT=true;
   try{localStorage.setItem(WELCOME_KEY,'1');}catch(_){}
-  const n=firstName(USER);
+  const n=clientName();
   const step=(tab,icon,label,desc)=>`<button class="wl-step" data-wtab="${tab}" style="display:flex;gap:10px;align-items:flex-start;text-align:left;width:100%;border:none;background:none;padding:9px 0;cursor:pointer;border-top:1px solid var(--line)"><span aria-hidden="true" style="font-size:18px;line-height:1.3">${icon}</span><span><span style="font-weight:600;display:block">${label}</span><span class="muted" style="font-size:13px">${desc}</span></span></button>`;
   // First-run orientation — names every destination, not just approve/download/message.
   return `<div class="card welcome" id="welcome" role="note"><button class="x" id="welcomeX" aria-label="Dismiss welcome">×</button>`+
@@ -2398,14 +2495,332 @@ function todoAskHtml(t,data,aps){
   const key=String((t&&t.source)||'').replace(/^checklist:/,'');
   const tick='<p class="muted tdnote">Your studio marks this one off once it arrives.</p>';
   const go=(to,label)=>`<div class="row"><button data-todo-go="${to}">${label}</button></div>`;
-  if(key==='content_received')return go('share','Share a file')+tick;
+  // item 179 part two: each ask opens its own page, with the thing to do right there
+  const open=(label)=>`<div class="row"><button data-todo-open="${esc(t.id)}">${label}</button></div>`;
+  if(key==='content_received')return open('Send files')+tick;
   if(key==='questionnaire_returned'){
-    const sv=((data&&data.surveys)||[]).find(s=>s&&/questionnaire|intake|brief/i.test(String(s.title||'')));
+    const sv=questionnaireOf(data&&data.surveys);
     return sv?`<div class="row"><button data-survey="${esc(sv.id)}">Open the questionnaire</button></div>${tick}`
-      :`<p class="muted tdnote">Your studio sends the questionnaire by email. Filled it in already? Share it with the file box below, and your studio marks this one off.</p>${go('share','Share a file')}`;
+      :`<p class="muted tdnote">Your studio sends the questionnaire by email. Filled it in already? Send it here, and your studio marks this one off.</p>${open('Send it here')}`;
   }
-  if(key==='client_review')return (aps||[]).length?go('review','Review it')+tick:'<p class="muted tdnote">Your studio will share the draft here for your OK. Nothing to do until then.</p>';
+  if(key==='client_review'){
+    const wa=(aps||[]).find(a=>a&&a.subject_type==='website');
+    if(wa)return `<div class="row"><button data-apr-open="${esc(wa.id)}">See the draft</button></div>`+tick;
+    return (aps||[]).length?go('review','Review it')+tick:'<p class="muted tdnote">Your studio will share the draft here for your OK. Nothing to do until then.</p>';
+  }
   return tick;
+}
+// ── item 179 part two: the thing itself, opened in place ─────────────────────
+// Drawn in Figma first (page "Client portal — parts 2 to 4", part 2): a to-do or
+// an approval opens as its own page. A phone stacks the ask, the thing and your
+// answer; ≥1000px puts the thing on the left and the ask and answer on the right.
+// Back returns to where it was opened from: Home, or the project it came from.
+const AP_KIND={deliverable:'File',task:'Task',project:'Project',custom:'Request',website:'Draft'};
+const AP_DONE={approved:['✓ Approved','ok'],rejected:['Declined',''],changes_requested:['✎ Changes requested','chg']};
+function sheetBack(from){return from&&from.pid?{label:from.name||'Back to the project',go:()=>openProject(from.pid)}:{label:'Home',go:goHome};}
+function sheetBackHtml(back){return `<p class="sheetback"><a class="link" href="#" id="sheetBack">‹ ${esc(back.label)}</a></p>`;}
+function sheetHead(chips,title,sub){return `<header class="sheet"><div class="sheetmeta">${chips}</div><h1 tabindex="-1">${esc(title)}</h1>${sub?`<p class="sub">${esc(sub)}</p>`:''}</header>`;}
+function wireSheet(back,focusSel){
+  const b=$('sheetBack');if(b)b.addEventListener('click',(e)=>{e.preventDefault();back.go();});
+  const f=(focusSel&&document.querySelector(focusSel))||$('main').querySelector('h1');if(f)f.focus({preventScroll:true});   // the drill-in says where you are
+}
+function sheetCantLoad(back){$('main').innerHTML=sheetBackHtml(back)+emptyCard('We couldn’t load this just now — please try again in a moment.','✋');wireSheet(back);}
+// a to-do or approval page reads the project's bundle; anything but OK leaves calmly
+async function sheetBundle(pid,view,back){
+  const r=await api('/client/projects/'+pid);
+  if(view!==VIEW_SEQ)return null;
+  if(r.ok)return (r.body&&r.body.data)||{};
+  if(r.offline)sheetCantLoad(back);else{toast('That isn’t here any more.');back.go();}
+  return null;
+}
+// the website's address for the draft's strip, from the website card's read when it had one
+function draftHost(){const s=wsSiteInfo(PORTAL.wstats);return s.host||'Your website';}
+// which deliverables draw inline — fileIcon's own image rule
+function apIsImage(title){return /\.(png|jpe?g|webp)$/i.test(String(title||''));}
+// A drawn page sits in a srcdoc frame, whose links resolve against the PORTAL's
+// address: a tap on the draft's own "#dds-draft-page=…" link would load the portal
+// inside the frame. A base of about:srcdoc keeps those links inside the drawn page
+// (its photos and fonts are full addresses, its styles inlined), and every other
+// link opens a new window, which the frame's sandbox refuses: it does nothing.
+function draftDoc(html){const b='<base href="about:srcdoc" target="_blank">';html=String(html).replace(/href="#dds-draft-page=/g,'target="_self" href="#dds-draft-page=');return /<head[^>]*>/i.test(html)?html.replace(/<head([^>]*)>/i,(m,a)=>'<head'+a+'>'+b):b+html;}
+// the slug a "#dds-draft-page=%2Fmenu%2F" link names ('' = Home)
+function draftSlugOf(h){return decodeURIComponent(String(h||'').slice(16)).replace(/^\/+|\/+$/g,'');}
+
+// ── the website draft, drawn page by page (GET /client/approvals/:id/draft) ──
+const DRAFT={aid:'',page:'',pages:[],sections:{},notes:[],notesRead:false,cache:new Map(),seq:0};
+async function draftPage(aid,slug){
+  const key=String(slug||'');
+  if(DRAFT.aid===aid&&DRAFT.cache.has(key))return DRAFT.cache.get(key);
+  const r=await api('/client/approvals/'+aid+'/draft?page='+encodeURIComponent(key));
+  const d=r.ok&&r.body&&r.body.data;
+  if(!d||typeof d.html!=='string')return null;
+  if(DRAFT.aid===aid)DRAFT.cache.set(key,d);
+  return d;
+}
+async function showDraftPage(view,a,slug){
+  const box=$('dpic'),pages=$('dpages');if(!box||!pages)return;
+  const seq=++DRAFT.seq;
+  box.innerHTML='<span class="dwait">Drawing the draft…</span>';
+  const d=await draftPage(a.id,slug);
+  if(view!==VIEW_SEQ||seq!==DRAFT.seq)return;
+  if(!d){box.innerHTML='<span class="dwait">The draft couldn’t be drawn just now. Please try again in a moment.</span>';return;}
+  DRAFT.page=d.page||'';DRAFT.pages=Array.isArray(d.pages)?d.pages:[];DRAFT.sections[DRAFT.page]=Array.isArray(d.sections)?d.sections:[];
+  if(!DRAFT.notesRead){DRAFT.notes=Array.isArray(d.notes)?d.notes:[];DRAFT.notesRead=true;}
+  // scripts stay off (no allow-scripts): the draft can't run code, count a visit or send a form
+  const f=document.createElement('iframe');
+  f.setAttribute('sandbox','allow-same-origin');f.setAttribute('tabindex','-1');f.setAttribute('aria-hidden','true');f.setAttribute('referrerpolicy','no-referrer');
+  f.title='Picture of the draft';f.srcdoc=draftDoc(d.html);
+  box.innerHTML='';box.appendChild(f);
+  box.style.setProperty('--dk',String((box.clientWidth||345)/1280));
+  pages.innerHTML=(DRAFT.pages.length>1?DRAFT.pages.map(p=>`<button type="button" data-dpage="${esc(p.slug)}" aria-pressed="${p.slug===DRAFT.page?'true':'false'}">${esc(p.title)}</button>`).join(''):'')+
+    `<button type="button" class="dfullbtn" id="dfullopen">Full screen ↗</button>`;
+  pages.querySelectorAll('[data-dpage]').forEach(b=>b.addEventListener('click',()=>showDraftPage(view,a,b.getAttribute('data-dpage'))));
+  $('dfullopen').addEventListener('click',(e)=>openDraftFull(a,e.currentTarget));
+  paintNotePicker();paintDraftNotes();
+}
+// Full screen: the page at its own size in an overlay. Links between the draft's
+// pages come back as #dds-draft-page=<path> (routes/client_drafts.ts DRAFT_NAV);
+// a click on one turns the page here, and any other link goes nowhere.
+function openDraftFull(a,from){
+  const opener=from||document.activeElement;   // Safari doesn't focus a button on a tap: the button is handed in
+  let ov=$('dfull');
+  if(!ov){ov=document.createElement('div');ov.id='dfull';ov.className='dfull';ov.setAttribute('role','dialog');ov.setAttribute('aria-modal','true');document.body.appendChild(ov);}
+  ov.setAttribute('aria-label',(a.title||'Your website draft')+', full screen');
+  ov.hidden=false;document.documentElement.style.overflow='hidden';
+  let watch=0;   // WebKit runs no outside click handler in a scripts-off frame: a page link shows up as the frame's own address instead
+  const close=()=>{clearInterval(watch);ov.hidden=true;ov.innerHTML='';document.documentElement.style.overflow='';document.removeEventListener('keydown',onKey);if(opener&&opener.focus&&document.contains(opener))opener.focus();};
+  const onKey=(e)=>{if(e.key==='Escape'){e.preventDefault();close();}};
+  document.addEventListener('keydown',onKey);
+  let seq=0;   // a slow page read must never draw over a page picked after it
+  const go=(slug)=>{if(DRAFT.pages.some(x=>x.slug===slug))paint(slug);};
+  const paint=async(slug)=>{
+    const my=++seq;clearInterval(watch);
+    ov.innerHTML=`<div class="dfullbar"><span class="dfname">${esc(a.title||'Your website draft')}</span>`+
+      (DRAFT.pages.length>1?DRAFT.pages.map(p=>`<button type="button" data-fpage="${esc(p.slug)}" aria-pressed="${p.slug===slug?'true':'false'}">${esc(p.title)}</button>`).join(''):'')+
+      `<button type="button" id="dfullclose">Close</button></div><iframe title="The draft, ${esc((DRAFT.pages.find(p=>p.slug===slug)||{}).title||'Home')}" sandbox="allow-same-origin" referrerpolicy="no-referrer"></iframe>`;
+    $('dfullclose').addEventListener('click',close);
+    ov.querySelectorAll('[data-fpage]').forEach(b=>b.addEventListener('click',()=>paint(b.getAttribute('data-fpage'))));
+    $('dfullclose').focus();
+    const d=await draftPage(a.id,slug);
+    const f=ov.querySelector('iframe');if(!f||ov.hidden||my!==seq)return;
+    if(!d){f.srcdoc='<p style="font:15px system-ui;padding:24px;color:#6b6478">This page couldn’t be drawn just now.</p>';return;}
+    // the frame first loads about:blank, then the drawn page: hook the drawn page's own document, once
+    const hook=()=>{try{
+      const doc=f.contentDocument;if(!doc||doc.URL!=='about:srcdoc'||doc.ddsHooked)return;doc.ddsHooked=true;
+      doc.addEventListener('click',(e)=>{
+        const l=e.target&&e.target.closest?e.target.closest('a'):null;if(!l)return;
+        e.preventDefault();
+        const h=l.getAttribute('href')||'';
+        if(h.indexOf('#dds-draft-page=')===0)go(draftSlugOf(h));
+      });
+    }catch(_){}};
+    f.addEventListener('load',hook);
+    f.srcdoc=draftDoc(d.html);
+    watch=setInterval(()=>{try{const h=(f.contentWindow&&f.contentWindow.location.hash)||'';if(h.indexOf('#dds-draft-page=')===0){clearInterval(watch);go(draftSlugOf(h));}}catch(_){}},200);
+  };
+  paint(DRAFT.page);
+}
+function paintNotePicker(){
+  const sel=$('npart');if(!sel)return;
+  const page=DRAFT.pages.find(p=>p.slug===DRAFT.page)||{title:'Home'};
+  sel.innerHTML=`<option value="">The whole page (${esc(page.title)})</option>`+(DRAFT.sections[DRAFT.page]||[]).map(s=>`<option value="${esc(s.id)}">${esc(s.name)}</option>`).join('');
+}
+function paintDraftNotes(){
+  const host=$('draftnotes'),list=$('notelist');if(!host||!list)return;
+  const ns=DRAFT.notes||[];host.hidden=!ns.length;
+  const h=host.querySelector('h2');if(h)h.textContent='Your notes on this draft · '+ns.length;
+  list.innerHTML=ns.map(n=>`<li><span><span class="nwhere">${esc(n.page_title||'A page')} · ${esc(n.part||'The whole page')}${n.created_at?' · '+esc(rel(n.created_at)):''}</span><span class="nbody">“${esc(n.body)}”</span></span><span class="schip${n.status==='done'?' done':''}">${n.status==='done'?'Done':'Open'}</span></li>`).join('');
+}
+
+// ── one approval, seen and answered in place ──
+async function openApproval(pid,aid,from){
+  if(PORTAL.persona!=='client')return goHome();
+  const view=++VIEW_SEQ;   // this drill-in owns #main now — a late tab render must not clobber it
+  const back=sheetBack(from);
+  setWide(true);try{window.scrollTo(0,0);}catch(_){}
+  $('main').innerHTML=skeleton();
+  const data=await sheetBundle(pid,view,back);if(!data)return;
+  const proj=data.project||{};
+  const a=(data.approvals||[]).find(x=>x&&x.id===aid);
+  if(!a){toast('That request isn’t here any more.');return back.go();}
+  const draft=a.subject_type==='website';
+  const pending=a.status==='pending';
+  const f=a.subject_type==='deliverable'?((data.deliverables||[]).find(d=>d&&d.id===a.subject_id)||null):null;
+  if(draft&&DRAFT.aid!==aid)Object.assign(DRAFT,{aid,page:'',pages:[],sections:{},notes:[],notesRead:false,cache:new Map()});
+  const ttl=a.title||(draft?'Your website draft':'A change is ready');
+  const chips=`<span class="tag">${esc(AP_KIND[a.subject_type]||'Approval')}</span><span class="sm">${draft?'Not live yet · ':''}${esc(proj.name||'')}</span>`;
+  let ask=sheetHead(chips,ttl,'');
+  if(a.summary)ask+=`<div class="askcard"><span class="askav" aria-hidden="true">${esc((studioBrand().charAt(0)||'S').toUpperCase())}</span><span><span class="askwho">${esc(studioBrand())} asked</span><span class="askq">“${esc(a.summary)}”</span></span></div>`;
+  let thing='';
+  if(draft)thing=`<div class="card draftcard"><div class="dstrip"><i></i><i></i><i></i><span>${esc(draftHost())} · draft, not live yet</span></div><div class="dpic" id="dpic"><span class="dwait">Drawing the draft…</span></div><div class="dpages" id="dpages" role="group" aria-label="Pages in the draft"></div></div>`;
+  else if(f)thing=`<div class="card draftcard">${apIsImage(f.title)?`<div id="apimg" class="dpic" style="aspect-ratio:auto;min-height:120px"><span class="dwait">Fetching the picture…</span></div>`:''}<div class="frow"><span class="fico" aria-hidden="true">${fileIcon(f.title)}</span><span class="fmain"><span class="fname">${esc(f.title)}</span><span class="fmeta">Shared by ${esc(studioBrand())}${f.created_at?' · '+esc(fdate(f.created_at)):''}</span></span><button class="fbtn" data-dl="${esc(f.id)}" aria-label="Open full size — ${esc(f.title)}">Open full size</button></div></div>`;
+  let answer='';
+  if(a.due_date&&pending)answer+=`<p class="apdue${approvalOverdue(a)?' late':''}" style="margin-top:14px">${approvalOverdue(a)?'Overdue — your answer was due '+esc(niceDay(a.due_date))+'. Nothing moves until you decide.':'Please answer by '+esc(niceDay(a.due_date))+'.'}</p>`;
+  if(pending)answer+=`<div class="apacts"><button class="approve" id="apok">Looks good — approve</button><button id="apchg" aria-expanded="false" aria-controls="apchgbox">Ask for a change</button></div>`+
+    `<div class="card notecard" id="apchgbox" hidden><label class="nhead" for="apchgt">What would you like changed?</label><textarea id="apchgt" class="fieldin" rows="3" placeholder="This goes straight to ${esc(studioBrand())}."></textarea><p class="muted" style="font-size:12.5px;margin-top:8px">Nothing changes until you approve. This just tells your studio what to adjust.</p><div class="row"><button class="approve" id="apchgsend">Send request</button></div></div>`;
+  else{const d=AP_DONE[a.status]||[String(a.status||'').replace(/_/g,' '),''];answer+=`<div class="card" style="margin-top:16px"><ul class="hist"><li><span class="ht">Your answer</span><span class="hs ${d[1]}">${esc(d[0])}${a.decided_at?` · ${esc(rel(a.decided_at))}`:''}</span></li></ul></div>`;}
+  if(draft&&(pending||a.status==='changes_requested'))answer+=`<div class="card notecard" id="notecard"><span class="nhead">Or leave a note on one part</span><label class="nlabel" for="npart">Which part?</label><select id="npart" class="fieldin"><option value="">The whole page</option></select><textarea id="nbody" class="fieldin" rows="3" aria-label="Your note" placeholder="Tell ${esc(studioBrand())} what you’d change…"></textarea><div class="row"><button id="nsend">Send note</button></div><p class="muted" style="font-size:12.5px;margin-top:8px">Nothing goes live until you approve. Your studio sees each note pinned to that part of the draft.</p></div>`;
+  if(draft)answer+=`<section id="draftnotes" hidden style="margin-top:22px"><h2>Your notes on this draft</h2><div class="card"><ul class="notelist" id="notelist"></ul></div></section>`;
+  const prior=(data.approvals||[]).filter(x=>x&&x.id!==aid&&x.status==='approved'&&x.decided_at).sort((x,y)=>String(y.decided_at).localeCompare(String(x.decided_at)))[0];
+  if(prior)answer+=`<p class="histline"><span aria-hidden="true">✓</span>You approved ${esc(prior.title||'a change')} · ${esc(rel(prior.decided_at))}</p>`;
+  $('main').innerHTML=sheetBackHtml(back)+`<div class="sheetcols${thing?'':' solo'}"><div class="s-ask">${ask}</div>${thing?`<div class="s-thing">${thing}</div>`:''}<div class="s-answer">${answer}</div></div>`;
+  wireSheet(back);
+  wireDownloads($('main'));
+  if(draft){
+    const box=$('dpic');
+    const fit=()=>{if(box&&box.clientWidth)box.style.setProperty('--dk',String(box.clientWidth/1280));};
+    if(box&&'ResizeObserver' in window)new ResizeObserver(fit).observe(box);
+    showDraftPage(view,a,DRAFT.page||'');
+    const ns=$('nsend');
+    if(ns)ns.addEventListener('click',async()=>{
+      const ta=$('nbody');const v=(ta.value||'').trim();
+      if(!v){toast('Write a note first.');ta.focus();return;}
+      ns.disabled=true;
+      const r=await api('/client/approvals/'+aid+'/notes','POST',{page:DRAFT.page,block_id:($('npart')&&$('npart').value)||'',body:v});
+      if(view!==VIEW_SEQ)return;
+      ns.disabled=false;
+      if(r.ok&&r.body&&r.body.data){ta.value='';DRAFT.notes=[r.body.data].concat(DRAFT.notes||[]);paintDraftNotes();toast('Your note went to '+studioBrand()+'.');}
+      else toast((r.body&&r.body.message)||'That note didn’t send. Please try again.');
+    });
+  }
+  // a file's picture: the same signed download Open full size uses; any failure keeps the quiet line
+  if(f&&apIsImage(f.title))(async()=>{
+    const rr=await api('/client/deliverables/'+f.id+'/download');
+    if(view!==VIEW_SEQ)return;
+    const box=$('apimg');if(!box)return;
+    const url=rr.ok&&rr.body&&rr.body.data&&String(rr.body.data.url||'');
+    if(!url||!/^https:\/\//.test(url)){box.innerHTML='<span class="dwait">The picture couldn’t load here. Use Open full size.</span>';return;}
+    const im=new Image();im.alt=f.title||'The file';im.className='apimg';
+    im.addEventListener('load',()=>{if(view===VIEW_SEQ){box.style.minHeight='';box.innerHTML='';box.appendChild(im);}});
+    im.addEventListener('error',()=>{if(view===VIEW_SEQ)box.innerHTML='<span class="dwait">The picture couldn’t load here. Use Open full size.</span>';});
+    im.src=url;
+  })();
+  if(!pending)return;
+  // the decide call is the record page's exact contract: presented_hash + the 409 re-read
+  const decide=async(decision,note,btn)=>{
+    btn.disabled=true;
+    const r=await api('/client/approvals/'+aid+'/decide','POST',{decision,presented_hash:a.content_hash||'',note:note||''});
+    if(view!==VIEW_SEQ)return;
+    if(r.ok){PORTAL.snaps=null;return paintApprovalDone(back,decision,draft);}
+    toast((r.body&&r.body.message)||'That didn’t go through — please try again.');
+    if(r.status===409){PORTAL.snaps=null;return openApproval(pid,aid,from);}   // it changed under you — re-read, never decide blind
+    btn.disabled=false;
+  };
+  $('apok').addEventListener('click',()=>decide('approved','',$('apok')));
+  $('apchg').addEventListener('click',()=>{const box=$('apchgbox');const open=box.hidden;box.hidden=!open;$('apchg').setAttribute('aria-expanded',open?'true':'false');if(open)$('apchgt').focus();});
+  $('apchgsend').addEventListener('click',()=>{const v=($('apchgt').value||'').trim();if(!v){toast('Say what you’d like changed.');$('apchgt').focus();return;}decide('changes_requested',v,$('apchgsend'));});
+}
+// one clear answer after the tap; the row has left Needs you
+function paintApprovalDone(back,decision,draft){
+  const ok=decision==='approved';
+  $('main').innerHTML=sheetBackHtml(back)+`<div class="card thanks${ok?'':' chg'}" role="status"><span class="tick" aria-hidden="true">${ok?'✓':'✎'}</span>`+
+    `<h1 tabindex="-1">${ok?'Approved — thank you.':'Sent — your studio will take a look.'}</h1>`+
+    `<p class="muted">${ok?(draft?`${esc(studioBrand())} has been told. They’ll put it live and let you know here.`:`${esc(studioBrand())} has been told and will take it from here.`):'Nothing changes until you approve the next version.'}</p>`+
+    `<div class="row"><button class="approve" id="thxback">Back to ${esc(back.label==='Home'?'Home':'the project')}</button></div></div>`+
+    (ok?`<p class="muted" style="text-align:center;font-size:13px;margin-top:12px">Changed your mind? Message your studio and they’ll hold off.</p>`:'');
+  wireSheet(back);
+  $('thxback').addEventListener('click',back.go);
+}
+
+// ── a to-do, opened ──
+const HELPS=[['Your logo','The best file you have; your studio tidies it.'],['5 to 10 photos','Your work, your place, your team.'],['A few lines about you','In your own words. Your studio polishes them.']];
+async function openTodo(pid,tid,from){
+  if(PORTAL.persona!=='client')return goHome();
+  const view=++VIEW_SEQ;
+  const back=sheetBack(from);
+  setWide(true);try{window.scrollTo(0,0);}catch(_){}
+  $('main').innerHTML=skeleton();
+  const data=await sheetBundle(pid,view,back);if(!data)return;
+  const proj=data.project||{};
+  const t=(data.tasks||[]).find(x=>x&&x.id===tid);
+  if(!t){toast('That to-do isn’t here any more.');return back.go();}
+  const k=todoKind(t);
+  // the draft and the questionnaire are the things themselves
+  if(k==='review'){const wa=(data.approvals||[]).find(a=>a&&a.status==='pending'&&a.subject_type==='website');if(wa)return openApproval(pid,wa.id,from);}
+  if(k==='questionnaire'){const sv=questionnaireOf(data.surveys);if(sv)return openSurvey(sv.id,pid,null,from||'home');}
+  const done=t.status==='done';
+  const chips=`<span class="tag todo">To-do</span><span class="sm">For ${esc(proj.name||'your project')}</span>`;
+  const subs={content:'Your studio ticks this off once everything has arrived.',questionnaire:'Your studio sends the questionnaire by email. Filled it in already? Send it here, and your studio ticks this off.'};
+  if(k==='content'||k==='questionnaire'){
+    const mine=(data.deliverables||[]).filter(isClientUpload);
+    const sent=`<section style="margin-top:22px"><h2>Sent so far · ${mine.length}</h2>${mine.length?`<div class="flv">${mine.map(fx=>fileRowHtml(fx)).join('')}</div>`:emptyCard('Nothing yet. What you send shows up here.')}</section>`;
+    const drop=`<div class="dropbox" id="dropbox"><span class="di" aria-hidden="true">${si('upload')}</span><p class="dt">${k==='content'?'Choose photos or a PDF':'Choose your filled-in questionnaire'}</p><p class="dd">JPEG, PNG or WebP images up to 10MB, or PDFs up to 25MB. Pick several at once.</p><p class="dprog" id="dprog" aria-live="polite"></p><button class="approve" id="dchoose">Choose files</button><input type="file" id="dfiles" class="fshare-file" accept="${SHARE_ACCEPT}" multiple aria-hidden="true" tabindex="-1"></div>`;
+    const helps=k==='content'?`<section style="margin-top:22px"><h2>What helps most</h2><div class="card helps">${HELPS.map(h=>`<div class="hrow"><span class="hck" aria-hidden="true">✓</span><span><strong>${esc(h[0])}</strong><span class="hsub">${esc(h[1])}</span></span></div>`).join('')}</div></section>`:'';
+    const tell=done?`<p class="histline"><span aria-hidden="true">✓</span>Done — your studio has ticked this off.</p>`:`<button class="donebtn" id="tdone">I’ve sent everything — tell my studio</button><p class="muted" style="font-size:12.5px;margin-top:8px">This writes to ${esc(studioBrand())} in your project’s conversation, so they can check and tick it off.</p>`;
+    $('main').innerHTML=sheetBackHtml(back)+`<div class="sheetcols headtop"><div class="s-ask">${sheetHead(chips,t.title||'Send your files',subs[k])}</div><div class="s-thing">${drop}${sent}</div><div class="s-answer">${helps}${tell}</div></div>`;
+    wireSheet(back);
+    wireDownloads($('main'));
+    const inp=$('dfiles'),choose=$('dchoose'),box=$('dropbox');
+    const go=async(files)=>{
+      files=[...(files||[])];if(!files.length)return;
+      choose.disabled=true;
+      const res=await sendFilesTo(pid,files,(i,n)=>{const pr=$('dprog');if(pr&&view===VIEW_SEQ)pr.textContent=n>1?`Sending ${i} of ${n}…`:'Sending…';});
+      if(view!==VIEW_SEQ)return;
+      PORTAL.snaps=null;
+      if(res.sent)toast(res.sent===1?'Sent to your studio ✓':`${res.sent} files sent to your studio ✓`);
+      if(res.failed.length)toast(res.failed.length===1?`${res.failed[0].name}: ${res.failed[0].msg}`:`${res.failed.length} files didn’t send. Please try those again.`);
+      if(res.sent)return openTodo(pid,tid,from);
+      choose.disabled=false;const pr=$('dprog');if(pr)pr.textContent='';
+    };
+    choose.addEventListener('click',()=>inp.click());
+    inp.addEventListener('change',()=>go(inp.files));
+    box.addEventListener('dragover',(e)=>{e.preventDefault();box.classList.add('over');});
+    box.addEventListener('dragleave',()=>box.classList.remove('over'));
+    box.addEventListener('drop',(e)=>{e.preventDefault();box.classList.remove('over');go(e.dataTransfer&&e.dataTransfer.files);});
+    const td=$('tdone');
+    if(td)td.addEventListener('click',async()=>{
+      td.disabled=true;
+      const r=await api('/client/projects/'+pid+'/messages','POST',{body:`I’ve sent everything for “${t.title||'my to-do'}”.`});
+      if(view!==VIEW_SEQ)return;
+      if(r.ok){delete MC.cache[pid];td.textContent='Your studio has been told ✓';toast('Sent — your studio will check and tick it off.');}
+      else{td.disabled=false;toast('That didn’t send — please try again.');}
+    });
+    return;
+  }
+  // the draft's to-do before there's a draft, and every other to-do: its own words, and Mark done when it's yours to tick
+  const due=t.due_date?`<p class="apdue${t.derived&&t.derived.overdue?' late':''}" style="margin-top:14px">${t.derived&&t.derived.overdue?'Overdue — this was due ':'Due '}${esc(niceDay(t.due_date))}.</p>`:'';
+  let body='';
+  if(k==='review'){
+    const other=(data.approvals||[]).some(a=>a&&a.status==='pending');
+    body=`<div class="card" style="margin-top:16px"><p>${other?'Something is waiting for your OK on this project.':'Your studio will share the draft here for your OK. Nothing to do until then.'}</p>${other?`<div class="row"><button class="approve" id="tseeaps">See what’s waiting</button></div>`:''}</div>`;
+  }else{
+    body=`<div class="card" style="margin-top:16px">${t.detail?`<p style="white-space:pre-wrap">${esc(t.detail)}</p>`:`<p>${esc(TASK_WORD[t.status]||String(t.status||'').replace(/_/g,' '))}</p>`}`+
+      (done?`<p class="histline"><span aria-hidden="true">✓</span>Done</p>`:clientMayTick(t)?`<div class="row"><button class="approve" id="tmark">Mark done</button></div>`:`<p class="muted tdnote" style="margin-top:10px">Your studio marks this one off once it’s done.</p>`)+`</div>`;
+  }
+  $('main').innerHTML=sheetBackHtml(back)+`<div class="sheetcols solo"><div class="s-ask">${sheetHead(chips,t.title||'A to-do','')}</div><div class="s-answer">${due}${body}</div></div>`;
+  wireSheet(back);
+  const sa=$('tseeaps');if(sa)sa.addEventListener('click',()=>openProject(pid,'sec-approvals'));
+  const tm=$('tmark');
+  if(tm)tm.addEventListener('click',async()=>{
+    tm.disabled=true;
+    const r=await api('/client/projects/'+pid+'/tasks/'+tid+'/done','POST',{});
+    if(view!==VIEW_SEQ)return;
+    if(r&&r.ok){PORTAL.snaps=null;toast('Marked done — your studio will see it.');return back.go();}
+    toast((r&&r.body&&r.body.message)||'Couldn’t update that.');tm.disabled=false;
+  });
+}
+// Several files at once, each through the ONE upload backend (upload-url → PUT →
+// record), named by its own file name. Each is checked before anything is sent; a
+// record step that fails for a passing reason is tried once more, since the bytes
+// are already up. Returns how many went and which didn't, in words.
+async function sendFilesTo(pid,files,onStep){
+  let sent=0;const failed=[];
+  for(let i=0;i<files.length;i++){
+    const file=files[i];if(onStep)onStep(i+1,files.length,file);
+    const bad=sharePreflight(file);if(bad){failed.push({name:file.name,msg:bad});continue;}
+    try{
+      const up=await api('/client/projects/'+pid+'/upload-url','POST',{mime:file.type||'application/octet-stream',bytes:file.size,title:file.name});
+      const d=up.ok&&up.body&&up.body.data;
+      if(!d||!d.upload_url){failed.push({name:file.name,msg:shareServerMsg(up.body&&up.body.message,file)||'Uploads aren’t available right now.'});continue;}
+      const put=await fetch(d.upload_url,{method:'PUT',headers:{'Content-Type':file.type||'application/octet-stream','x-upsert':'true'},body:file});
+      if(!put.ok){failed.push({name:file.name,msg:'The upload didn’t finish.'});continue;}
+      let rec=await api('/client/projects/'+pid+'/uploads','POST',{media_id:d.media_id,title:file.name});
+      if(!rec.ok&&rec.status!==422)rec=await api('/client/projects/'+pid+'/uploads','POST',{media_id:d.media_id,title:file.name});
+      if(!rec.ok){failed.push({name:file.name,msg:shareServerMsg(rec.body&&rec.body.message,file)||'Couldn’t save that file.'});continue;}
+      sent++;
+    }catch(_){failed.push({name:file.name,msg:'The upload didn’t finish.'});}
+  }
+  return {sent,failed};
 }
 let PROJ_EVENTS=[],PROJ_MSGS=[];   // the open project's timeline inputs
 let PROJ_MSGS_FAILED=false;   // PS6: a failed messages read renders ITS calm line in the rail — never the "say hello" empty copy
@@ -2446,7 +2861,6 @@ async function openProject(id,focusSection){
   PROJ_MSGS=Array.isArray(msgData)?msgData.slice():[];   // shape-guarded — a non-array payload must never throw the whole record
   PROJ_MSGS_FAILED=!(msgRes&&msgRes.ok);   // failed ≠ empty: the rail says so instead of "say hello"
   const hasOverview=!!(s&&s.progress&&s.milestones);
-  const AKIND={deliverable:'File',task:'Task',project:'Project',custom:'Request'};
   const aps=(data.approvals||[]).filter(a=>a.status==='pending');
   const acts=(data.tasks||[]).filter(t=>t.client_action_required);
   let html=`<p><a class="link" href="/client.html" id="projBack">← Back to home</a></p><header><div class="phead"><h1>${esc(p.name)}</h1><span class="statuschip">${esc(projectWord(p.status))}</span></div></header>`;
@@ -2473,7 +2887,7 @@ async function openProject(id,focusSection){
   // approvals that need the client — per-kind tag, per-card id (notification
   // anchors emit #approval-<id>), and a helper line so "request changes" is
   // clearly safe. Decided ones form a paper-trail section below.
-  if(aps.length){html+=`<section id="sec-approvals"><h2>Needs your OK</h2>`;for(const a of aps){html+=`<div class="card approve" id="approval-${esc(a.id)}"><span class="tag">${esc(AKIND[a.subject_type]||'Approval')}</span><h3>${esc(a.title)}</h3><p>${esc(a.summary||'')}</p>${a.due_date?`<p class="apdue${approvalOverdue(a)?' late':''}">${approvalOverdue(a)?'Overdue — your answer was due '+esc(niceDay(a.due_date))+'. Nothing moves until you decide.':'Please answer by '+esc(niceDay(a.due_date))+'.'}</p>`:''}<div class="row"><button class="approve" data-adec="${esc(a.id)}" data-ah="${esc(a.content_hash)}">Approve</button><button data-areq="${esc(a.id)}">Request changes</button></div><div id="note-${esc(a.id)}" style="display:none;margin-top:12px"><textarea id="nt-${esc(a.id)}" rows="2" aria-label="What would you like changed?" style="width:100%;font:inherit;border:1px solid var(--line);border-radius:10px;padding:9px;background:var(--card);color:var(--ink)" placeholder="What would you like changed? This goes straight to your studio."></textarea><p class="muted" style="font-size:12.5px;margin-top:6px">Nothing changes until you approve — this just tells your studio what to adjust.</p><div class="row"><button class="approve" data-asend="${esc(a.id)}" data-ah="${esc(a.content_hash)}">Send request</button><button data-acancel="${esc(a.id)}">Cancel</button></div></div></div>`;}html+=`</section>`;}
+  if(aps.length){html+=`<section id="sec-approvals"><h2>Needs your OK</h2>`;for(const a of aps){html+=`<div class="card approve" id="approval-${esc(a.id)}"><span class="tag">${esc(AP_KIND[a.subject_type]||'Approval')}</span><h3>${esc(a.title)}</h3><p>${esc(a.summary||'')}</p>${a.due_date?`<p class="apdue${approvalOverdue(a)?' late':''}">${approvalOverdue(a)?'Overdue — your answer was due '+esc(niceDay(a.due_date))+'. Nothing moves until you decide.':'Please answer by '+esc(niceDay(a.due_date))+'.'}</p>`:''}<div class="row">${a.subject_type==='website'?`<button data-apr-open="${esc(a.id)}" aria-label="See the draft — ${esc(a.title||'Your website draft')}">See the draft</button>`:''}<button class="approve" data-adec="${esc(a.id)}" data-ah="${esc(a.content_hash)}">Approve</button><button data-areq="${esc(a.id)}">Request changes</button></div><div id="note-${esc(a.id)}" style="display:none;margin-top:12px"><textarea id="nt-${esc(a.id)}" rows="2" aria-label="What would you like changed?" style="width:100%;font:inherit;border:1px solid var(--line);border-radius:10px;padding:9px;background:var(--card);color:var(--ink)" placeholder="What would you like changed? This goes straight to your studio."></textarea><p class="muted" style="font-size:12.5px;margin-top:6px">Nothing changes until you approve — this just tells your studio what to adjust.</p><div class="row"><button class="approve" data-asend="${esc(a.id)}" data-ah="${esc(a.content_hash)}">Send request</button><button data-acancel="${esc(a.id)}">Cancel</button></div></div></div>`;}html+=`</section>`;}
   const decided=(data.approvals||[]).filter(a=>a.status==='approved'||a.status==='rejected'||a.status==='changes_requested');
   if(decided.length){const DLBL={approved:['✓ Approved','ok'],rejected:['Declined',''],changes_requested:['✎ Changes requested','chg']};
     html+=`<section><h2>Decided</h2><div class="card"><ul class="hist">${decided.map(a=>{const d=DLBL[a.status];return`<li id="approval-${esc(a.id)}"><span class="ht">${esc(a.title)}</span><span class="hs ${d[1]}">${esc(d[0])}${a.decided_at?` · ${esc(rel(a.decided_at))}`:''}</span></li>`;}).join('')}</ul></div></section>`;}
@@ -2555,7 +2969,11 @@ async function openProject(id,focusSection){
   // shareSend — a client who moved on mid-send is never yanked back)
   wireShareCard({pid:id,ondone:()=>openProject(id,'sec-files')});
   wireDownloads(document);
-  document.querySelectorAll('[data-survey]').forEach(a=>a.addEventListener('click',(e)=>{e.preventDefault();openSurvey(a.getAttribute('data-survey'),id,a);}));
+  // item 179 part two: a to-do, the draft and the questionnaire open their own pages, with the way back to this record
+  const fromHere={pid:id,name:p.name};
+  document.querySelectorAll('[data-survey]').forEach(a=>a.addEventListener('click',(e)=>{e.preventDefault();openSurvey(a.getAttribute('data-survey'),id,a,fromHere);}));
+  document.querySelectorAll('[data-todo-open]').forEach(b=>b.addEventListener('click',()=>openTodo(id,b.getAttribute('data-todo-open'),fromHere)));
+  document.querySelectorAll('[data-apr-open]').forEach(b=>b.addEventListener('click',()=>openApproval(id,b.getAttribute('data-apr-open'),fromHere)));
   // a to-do's "Share a file" / "Review it" jump to the place on this page where it's done
   document.querySelectorAll('[data-todo-go]').forEach(b=>b.addEventListener('click',()=>{const share=b.getAttribute('data-todo-go')==='share';scrollToSection(share?'sec-files':'sec-approvals');const t=share?$('fchoose'):document.querySelector('#sec-approvals [data-adec]');if(t)t.focus({preventScroll:true});}));
   const pb=$('projBack');if(pb)pb.addEventListener('click',(e)=>{e.preventDefault();backHome(id);});
@@ -2702,7 +3120,7 @@ function paintSThread(rq,msgs){
   const items=supportThreadItems(rq,msgs);
   host.innerHTML=items.length?`<div class="tlhost">${tlItemsHtml(items)}</div>`:emptyCard('No replies yet — your studio usually replies within a day.','💬');
 }
-async function openSurvey(sid,pid,ctrl){
+async function openSurvey(sid,pid,ctrl,from){
   const view=++VIEW_SEQ;   // this drill-in paints #main on success — a late tab render must not clobber it
   // busy state on the INVOKING control — a slow read is never a dead click, and
   // the current view (often the wide record page) stays put until the survey
@@ -2715,28 +3133,50 @@ async function openSurvey(sid,pid,ctrl){
   if(view!==VIEW_SEQ){busy(false);return;}   // the user moved on mid-fetch — never paint over the newer view (and un-busy the control)
   if(!r||!r.ok){toast(r&&r.offline?OFFLINE_MSG:'That survey isn’t available.');busy(false);return;}   // the current view stays intact
   busy(false);
-  setWide(false);   // only collapse the wide layout once the survey actually renders
+  setWide(false);try{window.scrollTo(0,0);}catch(_){}   // only collapse the wide layout once the survey actually renders
+  // item 179 part two: back goes where it was opened from ('home', or {pid,name} for
+  // the project); a caller that names neither keeps the old way back, to the project
+  const back=from?sheetBack(from):{label:'Back to the project',go:()=>openProject(pid)};
   const sv=r.body.data.survey||{}; const done=r.body.data.my_response&&r.body.data.my_response.status==='submitted';
-  let html=`<p><a class="link" href="#" id="back">← Back to project</a></p><header><h1 tabindex="-1">${esc(sv.title||'Survey')}</h1></header><section>`;
-  if(done){html+=`<div class="card"><p class="muted">Thanks — you’ve already answered this survey.</p></div></section>`;$('main').innerHTML=html;const h=$('main').querySelector('h1');if(h)h.focus({preventScroll:true});$('back').addEventListener('click',(e)=>{e.preventDefault();openProject(pid);});return;}
-  let qi=0;
-  for(const q of (sv.questions||[])){
-    // Each generated field gets a real id so its label's `for` associates it
-    // (q.key is server data — an index-based id is guaranteed attribute-safe).
-    // Fields carry font:inherit + the card/ink tokens (white-on-dark before).
-    const fid=`svq-${++qi}`;
-    const box=`id="${fid}" style="width:100%;font:inherit;padding:9px;border:1px solid var(--line);border-radius:10px;background:var(--card);color:var(--ink)"`;
-    let field;
-    if(q.type==='rating') field=`<select data-q="${esc(q.key)}" ${box}><option value="" disabled selected>Choose a rating (1–5)…</option>${[1,2,3,4,5].map(n=>`<option>${n}</option>`).join('')}</select>`;
-    else if(q.type==='choice') field=`<select data-q="${esc(q.key)}" ${box}><option value="" disabled selected>Choose…</option>${(q.choices||[]).map(c=>`<option>${esc(c)}</option>`).join('')}</select>`;
-    else field=`<input data-q="${esc(q.key)}" type="text" ${box}>`;
-    html+=`<div class="card"><label for="${fid}" style="display:block;font-weight:600;margin-bottom:6px">${esc(q.label)}</label>${field}</div>`;
+  const qs=(Array.isArray(sv.questions)?sv.questions:[]).filter(q=>q&&q.key);
+  const chips=`<span class="tag todo">${/questionnaire|intake|brief/i.test(String(sv.title||''))?'To-do':'Survey'}</span><span class="sm">${qs.length} question${qs.length===1?'':'s'}</span>`;
+  if(done||!qs.length){
+    $('main').innerHTML=sheetBackHtml(back)+sheetHead(chips,sv.title||'Survey','')+`<div class="card" style="margin-top:16px"><p class="muted">${done?'Thanks — you’ve already answered this survey.':'This survey has no questions yet.'}</p></div>`;
+    wireSheet(back);return;
   }
-  html+=`<div class="row"><button class="approve" id="subSurvey">Send your answers</button></div></section>`;
-  $('main').innerHTML=html;
-  const h1=$('main').querySelector('h1');if(h1)h1.focus({preventScroll:true});   // entry focus — the drill-in says where you are
-  $('back').addEventListener('click',(e)=>{e.preventDefault();openProject(pid);});
-  $('subSurvey').addEventListener('click',async()=>{const b=$('subSurvey');b.disabled=true;const answers={};document.querySelectorAll('[data-q]').forEach(el=>{answers[el.getAttribute('data-q')]=el.value;});const rr=await api('/client/surveys/'+sid+'/respond','POST',{answers});if(rr.ok){toast('Thank you!');openProject(pid);}else{toast('That didn’t send — please try again.');b.disabled=false;}});
+  // one question to a screen, with a progress line; the answers stay on this device
+  // until they're sent, so a client can stop and come back
+  const KEY='dds-survey-draft:'+sid;
+  let answers={};try{const v=JSON.parse(localStorage.getItem(KEY)||'{}');if(v&&typeof v==='object')answers=v;}catch(_){}
+  const keep=()=>{try{localStorage.setItem(KEY,JSON.stringify(answers));}catch(_){}};
+  let i=0;
+  const paint=(focusField)=>{
+    const q=qs[i];const last=i===qs.length-1;const val=answers[q.key]==null?'':String(answers[q.key]);
+    // q.key is server data — the field's id is fixed and its key rides in data-q
+    let field;
+    if(q.type==='rating')field=`<select id="svq" class="fieldin" data-q="${esc(q.key)}"><option value="" disabled${val?'':' selected'}>Choose a rating (1–5)…</option>${[1,2,3,4,5].map(n=>`<option${String(n)===val?' selected':''}>${n}</option>`).join('')}</select>`;
+    else if(q.type==='choice')field=`<select id="svq" class="fieldin" data-q="${esc(q.key)}"><option value="" disabled${val?'':' selected'}>Choose…</option>${(q.choices||[]).map(c=>`<option${String(c)===val?' selected':''}>${esc(c)}</option>`).join('')}</select>`;
+    else field=`<textarea id="svq" class="fieldin" rows="4" data-q="${esc(q.key)}" style="margin-top:0">${esc(val)}</textarea>`;
+    $('main').innerHTML=sheetBackHtml(back)+sheetHead(chips,sv.title||'Survey','')+
+      `<p class="qprog" id="qprog">Question ${i+1} of ${qs.length}</p><div class="qsteps" aria-hidden="true">${qs.map((_,j)=>`<i class="${j<=i?'on':''}"></i>`).join('')}</div>`+
+      `<div class="card qcardq"><label for="svq">${esc(q.label||'Your answer')}</label>${field}</div>`+
+      `<div class="qnav"><button class="approve" id="${last?'subSurvey':'qnext'}">${last?'Send your answers':'Next'}</button>${i>0?'<button id="qback">Back</button>':''}</div>`+
+      `<p class="qkeep">Your answers stay on this device until you send them, so you can stop and come back.</p>`;
+    wireSheet(back,focusField?'#svq':null);
+    const fld=$('svq');const save=()=>{answers[q.key]=fld.value;keep();};
+    fld.addEventListener('input',save);fld.addEventListener('change',save);
+    const qb=$('qback');if(qb)qb.addEventListener('click',()=>{save();i--;paint(true);});
+    const qn=$('qnext');if(qn)qn.addEventListener('click',()=>{save();i++;paint(true);});
+    const sb=$('subSurvey');
+    if(sb)sb.addEventListener('click',async()=>{
+      save();sb.disabled=true;
+      const rr=await api('/client/surveys/'+sid+'/respond','POST',{answers:Object.fromEntries(qs.map(x=>[x.key,answers[x.key]==null?'':String(answers[x.key])]))});
+      if(view!==VIEW_SEQ)return;
+      if(rr.ok){try{localStorage.removeItem(KEY);}catch(_){}PORTAL.snaps=null;toast('Thank you!');back.go();}
+      else{toast('That didn’t send — please try again.');sb.disabled=false;}
+    });
+  };
+  paint(false);
 }
 // `ret` names the view to return to on back/success when there's no project —
 // the Requests tab passes 'requests' so its "Something else?" round-trips home
@@ -2770,6 +3210,7 @@ function keepReturn(q){
   try{
     const v={},id=(k)=>{const x=q.get(k)||'';return /^[0-9a-zA-Z-]{1,64}$/.test(x)?x:'';};
     if(id('project'))v.project=id('project');
+    if(id('approval'))v.approval=id('approval');   // item 179: an ask's email opens the approval itself
     if(id('support'))v.support=id('support');
     const t=String(location.hash||'').slice(1);if(TAB_IDS.indexOf(t)>=0)v.tab=t;
     if(!Object.keys(v).length)return;
@@ -2799,6 +3240,8 @@ async function load(){
   const kept=first?takeReturn():null;
   const fromUrl=!!(params.get('support')||params.get('project'));
   const dsup=fromUrl?params.get('support'):((kept&&kept.support)||''); const deep=fromUrl?params.get('project'):((kept&&kept.project)||'');
+  // item 179: "Needs your OK" emails carry the approval too — it opens in place, the project stays the fallback
+  const dapr=String((fromUrl?params.get('approval'):(kept&&kept.approval))||'');
   // a tab named in the address (#invoices: the cancelled-payment page's way back), first load only
   const hashTab=first&&TAB_IDS.indexOf(String(location.hash||'').slice(1))>=0?String(location.hash).slice(1):'';
   const wantTab=hashTab||(kept&&kept.tab)||'';
@@ -2860,6 +3303,7 @@ async function load(){
   // deep links open the relevant drill-down; the nav stays visible around it.
   // ?support= now opens the Messages tab with that thread in the reading pane.
   if(dsup){await openMessagesTo(dsup);if(PORTAL.persona==='client')api('/client/notifications/read','POST',{}).catch(()=>{});return;}   // PS3: the mark-read POST is /client/* — client persona only
+  if(deep&&/^[0-9a-f-]{36}$/i.test(dapr)){await openApproval(deep,dapr);if(PORTAL.persona==='client')api('/client/notifications/read','POST',{}).catch(()=>{});return;}
   if(deep){await openProject(deep);if(PORTAL.persona==='client')api('/client/notifications/read','POST',{}).catch(()=>{});return;}
   // item 1: the just-paid invoice — from the URL (the Stripe return: open the
   // Invoices tab and say thank you) or from the ten-minute memory (a sign-in or
