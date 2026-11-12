@@ -2167,8 +2167,23 @@ function accountSectionHtml(canMessage){
     `<div class="acctrow"><div class="acctlab"><strong>Appearance</strong><span class="muted">Light, dark, or match your device.</span></div><button id="appearance">${esc(themeLabel())}</button></div>`+
     (email?`<div class="acctrow"><div class="acctlab"><strong>Password</strong><span class="muted">We’ll email you a link to set a new one.</span></div><button id="chgpw">Change password</button></div>`:'')+
     `<div class="acctrow"><div class="acctlab"><strong>Session</strong><span class="muted">Signed in on this device.</span></div><button id="signout2">Sign out</button></div>`+
+    businessesHtml()+
     (canMessage?`<p class="muted" style="font-size:12.5px;margin-top:10px">Need to change your name or email? Message your studio and they’ll update it.</p>`:'')+
     `</div></section>`;
+}
+// Builder item 83: someone with a place in two or more businesses switches here. The
+// context lists them (each with the role in words); the one the server opens unasked
+// needs no ?client=. A business seen through this portal opens here; one where they
+// work in the full workspace opens through the studio door, which asks them to sign in
+// there once.
+function businessesHtml(){
+  const list=Array.isArray(PORTAL.ctx&&PORTAL.ctx.businesses)?PORTAL.ctx.businesses:[];
+  if(list.length<2)return'';
+  const href=(b)=>{const door=b.role==='client_reviewer'?'/client.html':'/studio.html';return b['default']?door:door+'?client='+encodeURIComponent(b.site_id);};
+  const role=(b)=>b.role==='client_reviewer'?'You review its work':b.role_words==='Owner'?'You own it':'You’re '+b.role_words;
+  return `<div class="acctrow" id="acctBiz"><div class="acctlab"><strong>Your businesses</strong><span class="muted">Each keeps its own pages, people and settings.</span>`+
+    list.map(b=>b.current?`<span class="muted" aria-current="true">${esc(b.name)} · ${esc(role(b))} · here now</span>`:`<a class="link" href="${esc(href(b))}">${esc(b.name)}</a><span class="muted">${esc(role(b))}</span>`).join('')+
+    `</div></div>`;
 }
 function wireAccountSection(){
   const email=(USER&&USER.email)?USER.email:'';

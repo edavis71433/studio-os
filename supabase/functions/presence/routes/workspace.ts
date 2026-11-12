@@ -24,7 +24,7 @@ import { resolveAgencyMember } from '../agency/auth.ts';
 import { filterForRole, visibleTo } from '../lib/visibility.ts';
 import { svc, svcCount } from '../lib/db.ts';
 import { displayName } from '../lib/dam.ts';
-import { resolveSiteRoleCached, listSiteMembers, addSiteMember, changeSiteMemberRole, resendSiteInvite, revokeSiteMember, loadShares, overrideFor, setShare, isSharedStudioSite } from '../lib/workspace.ts';
+import { resolveSiteRoleCached, listSiteMembers, addSiteMember, changeSiteMemberRole, resendSiteInvite, revokeSiteMember, loadShares, overrideFor, setShare, isSharedStudioSite, listBusinesses } from '../lib/workspace.ts';
 import { loadThreadMarks, newestClientMessageAt, threadUnread } from '../lib/thread_reads.ts';
 import { shapeClientConversations, studioBellCount, noticeDismissible, NOTICE_ACCOUNT_KINDS, freshEnquiries, invoiceReminderIds, renderableNotices, noticeTier, noticePriority } from '../lib/inbox_feed.ts';
 import { clearNotice } from '../lib/notice.ts';
@@ -124,6 +124,9 @@ export async function handlePortalContext(jwt: string, site: SiteRow, principal:
   const studioReqP: Promise<Array<{ id: string; studio: string }>> = role === 'business_owner' && !scopedName && !isOperator && !worksOnSite
     ? import('./connect_requests.ts').then((m) => m.studioRequestsFor(site, principal)).catch(() => [])
     : Promise.resolve([]);
+  // builder item 83: the businesses this person can switch between (someone invited
+  // somewhere, with two or more); started now, read at the end
+  const businessesP = !isOperator && !scopedName ? listBusinesses(jwt, principal).catch(() => []) : Promise.resolve([]);
   const none = Promise.resolve({ ok: true, json: [] as any[] });
   const swallow = () => ({ ok: false, json: null as any });
   const [agencyMember, linksQ, ent, nQ, iQ, wQ, fQ, eQ, supQ, seenQ, msgQ, cmQ] = await Promise.all([
@@ -274,6 +277,8 @@ export async function handlePortalContext(jwt: string, site: SiteRow, principal:
   // its own site, which is the site in hand when nothing is scoped). A failed read hides nothing.
   const hiddenSections = (isAgency && !scopedName) ? normalizeHidden(await readReservedJson(site.id, RESERVED_NAMES.navHidden)) : [];
   const navCtx = { role, edition: site.edition, capabilities: caps, isAgency, isOperator, editionKey, isManagedClient, scoped: !!scopedName, siteLive, hiddenSections };
+  // `default`: the one the server opens when nothing is picked (owned first, else the oldest seat), so a page can open it with no ?client=
+  const businesses = (await businessesP).map((b, i) => ({ site_id: b.site_id, name: b.name, role: b.role, role_words: b.owned ? 'Owner' : (SEAT_ROLE_WORDS[b.role] || b.role), current: b.site_id === site.id, default: i === 0 }));
   return json({ data: {
     site_role: role,
     capabilities: caps,
@@ -296,6 +301,8 @@ export async function handlePortalContext(jwt: string, site: SiteRow, principal:
     attention_count,                     // Phase FLOW: the shell bell badge (notices + pending approvals); null = not known yet (studio level, batch B)
     attention_stale,                     // batch B: the shell refreshes a stale or missing studio total behind the page
     studio_requests: await studioReqP,   // final pass S1: studios asking this owner to connect
+    businesses,                          // builder item 83: [] unless this person can switch between two or more businesses
+    business: businesses.find((b) => b.current) || null,   // …and which one this is
     nav: buildNav(navCtx),               // the ONE navigation source of truth, edition- + entitlement-filtered
   } }, 200, cors);
 }

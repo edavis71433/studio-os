@@ -52,6 +52,51 @@ export async function resolveMemberSite(principal: { userId: string | null; emai
   return { site: site as SiteRow, member: isSiteRole(seat.role) ? { site_id: site.id, role: seat.role } : null };
 }
 
+// ── Builder item 83: a person with places in two businesses picks one ─────────
+// The pick rides on the ?client= every page already sends as x-dds-scope-site. When
+// that isn't a studio's client (lib/scope.ts asks the studio's rules first), it is
+// one of the caller's own businesses or nothing: a site they own (RLS proves it), else
+// one where they hold an active seat, which then decides their role there.
+const personOr = (p: { userId: string | null; email: string | null }) => `or=(user_id.eq.${encodeURIComponent(p.userId || '00000000-0000-0000-0000-000000000000')},email.eq.${encodeURIComponent((p.email || '').toLowerCase())})`;
+export async function resolveHeldBusiness(jwt: string, principal: { kind: string; userId: string | null; email: string | null }, siteId: string): Promise<{ site: SiteRow; member: { site_id: string; role: SiteRole } | null } | null> {
+  if (principal.kind !== 'client' || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(siteId)) return null;
+  const { asUser } = await import('./db.ts');
+  const own = await asUser(jwt, `presence_sites?id=eq.${siteId}&select=${SITE_COLS}&limit=1`);
+  const mine = own.ok && Array.isArray(own.json) ? (own.json as SiteRow[])[0] : null;
+  if (mine) return { site: mine, member: null };
+  if (!principal.userId && !principal.email) return null;
+  const m = await svc(`presence_site_members?site_id=eq.${siteId}&status=eq.active&${personOr(principal)}&select=site_id,role&limit=1`);
+  const seat = Array.isArray(m.json) ? (m.json as any[])[0] : null;
+  if (!seat || !isSiteRole(seat.role)) return null;
+  const s = await svc(`presence_sites?id=eq.${siteId}&select=${SITE_COLS}&limit=1`);
+  const site = Array.isArray(s.json) ? (s.json as SiteRow[])[0] : null;
+  return site ? { site, member: { site_id: site.id, role: seat.role as SiteRole } } : null;
+}
+
+/** Every business this person can open as themself: the sites they own, then their
+ *  seats, oldest first, one row per site. Only someone invited somewhere gets a list
+ *  (a seat and a second business); everyone else gets none, so nothing changes for
+ *  them. Names come from each site's business details. Best-effort: [] on a failure. */
+export async function listBusinesses(jwt: string, principal: { kind: string; userId: string | null; email: string | null }): Promise<Array<{ site_id: string; name: string; role: SiteRole; owned: boolean }>> {
+  if (principal.kind !== 'client' || (!principal.userId && !principal.email)) return [];
+  try {
+    const seatQ = await svc(`presence_site_members?status=eq.active&${personOr(principal)}&select=site_id,role,created_at&order=created_at.asc&limit=50`);
+    const seats = (Array.isArray(seatQ.json) ? seatQ.json as any[] : []).filter((s) => s.site_id && isSiteRole(s.role));
+    if (!seats.length) return [];
+    const { asUser } = await import('./db.ts');
+    const ownQ = await asUser(jwt, 'presence_sites?select=id&order=created_at.asc&limit=20');
+    const owned = Array.isArray(ownQ.json) ? (ownQ.json as any[]).map((s) => String(s.id)) : [];
+    const out: Array<{ site_id: string; role: SiteRole; owned: boolean }> = [];
+    const seen = new Set<string>();
+    for (const id of owned) { if (!seen.has(id)) { seen.add(id); out.push({ site_id: id, role: 'business_owner', owned: true }); } }
+    for (const s of seats) { const id = String(s.site_id); if (!seen.has(id)) { seen.add(id); out.push({ site_id: id, role: s.role as SiteRole, owned: false }); } }
+    if (out.length < 2) return [];
+    const names = await svc(`presence_identity?site_id=in.(${out.map((b) => b.site_id).join(',')})&select=site_id,business_name`);
+    const nameOf = new Map((Array.isArray(names.json) ? names.json as any[] : []).map((n) => [String(n.site_id), String(n.business_name || '').trim()]));
+    return out.map((b) => ({ ...b, name: nameOf.get(b.site_id) || 'Your business' }));
+  } catch { return []; }
+}
+
 // D1 (perf): a request-scoped memo so the site-role is resolved ONCE per request.
 // Keyed by the principal object, which is created fresh per request and GC'd after,
 // so there is no cross-request staleness. The reviewer-boundary gate and the P2-D
