@@ -90,7 +90,7 @@ function signInPanel(note){
 // builder item 191: an account with two-step sign-in on types the code from its app here,
 // after the emailed link; until then the server treats the link's sign-in as signed out
 function stepPanel(factor){
-  paint(`<h1>One more step.</h1><p id="tstHow">This account has two-step sign-in on. Type the 6-digit code from your authenticator app.</p><div id="tstBox"></div><div class="row"><button type="button" class="pri" id="tstGo">Confirm</button></div><p class="foot">Signed in as ${esc(EMAIL)}. Lost or changed your phone? Email support@davisdigitalstudio.com from this address. We check it’s you before turning two-step sign-in off.</p>`);
+  paint(`<h1>One more step.</h1><p id="tstHow">This account has two-step sign-in on. Type the 6-digit code from your authenticator app.</p><div id="tstBox"></div><div class="row"><button type="button" class="pri" id="tstGo">Confirm</button></div><p class="foot">Signed in as ${esc(EMAIL)}. Lost or changed your phone? Ask your studio, or whoever sent you this. They check it’s you, then have two-step sign-in turned off.</p>`);
   let busy=false;
   const go=async()=>{
     if(busy)return;const c=bx.value();

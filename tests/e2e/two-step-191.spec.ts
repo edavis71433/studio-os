@@ -223,6 +223,9 @@ test.describe('Two-step sign-in (builder item 191)', () => {
     await page.locator('#saveBtn').click();
     await expect(page.getByRole('heading', { name: 'One more step.' })).toBeVisible();
     expect(await calls(page)).toEqual(['otp recovery']);                  // nothing saved yet
+    // the way back without the phone: the studio's sign-in page, never one studio's own address (item 192)
+    await expect(page.locator('#spLost')).toHaveText('Lost or changed your phone? Start again from the sign-in page and press “Can’t get a code?”.');
+    expect(await page.locator('a[href^="mailto:"]').count()).toBe(0);
     await typeCode(page, '#stepState', '999999');
     await expect(page.locator('#stepState .ddsf-err')).toContainText('That code isn’t right.');
     await typeCode(page, '#stepState', GOOD);
