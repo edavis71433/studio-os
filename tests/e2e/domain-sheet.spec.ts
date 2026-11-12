@@ -291,3 +291,78 @@ test.describe('Domain & email sheet: borrowed from Namecheap and Squarespace (it
     expect(prepared[0]).toEqual({ goal: 'email_setup', provider: 'google_workspace' });
   });
 });
+
+// Builder list item 193 (Nov 12 review, code findings 13 to 17): the sheet tells the truth.
+// "Live and secure" only when the checks ran; one email-protection plan, for whoever runs the
+// client's email; an approved plan says who does what next, and the studio can finish it.
+test.describe('Domain & email sheet: it tells the truth (item 193)', () => {
+  const MAIL = (over: Record<string, unknown> = {}) => {
+    const f = FOUNDATIONS();
+    return { data: { ...f.data, email: { has_mail: true, spf: false, dmarc: false, provider: 'Microsoft 365', sentence: 'Email runs on this domain but isn’t fully protected yet — a small plan fixes that.' }, ...over } };
+  };
+  const PLAN = (status: string) => ({ id: 'p1', kind: 'email_auth', title: 'Protect email sent from @bistro.example', summary: 'A few small records tell inboxes your mail is really from you.', risk: 'Low.', status,
+    steps: [{ what: 'Add Microsoft 365’s sender record', automated: false, records: [{ type: 'TXT', name: 'bistro.example', value: 'v=spf1 include:spf.protection.outlook.com ~all' }] }] });
+  const NO_LIST = { data: { ...LIVE.data, checklist: undefined, all_ok: undefined, check_failed: true } };
+
+  test('when the checks couldn’t run it says so and offers Check again, never “live and secure”', async ({ page }) => {
+    let asked = 0;
+    await installApp(page, { api: { ...BASE } });
+    await page.route(/\/functions\/v1\/presence\/foundations\/domain$/, (route: Route) => { asked++; return route.fulfill(json(asked === 1 ? NO_LIST : LIVE)); });
+    await page.goto('/presence.html#domain');
+    const desk = page.locator('#deskResults');
+    await expect(desk.locator('[data-domain="unchecked"]')).toHaveText('We couldn’t check bistro.example just now.');
+    await expect(desk).not.toContainText('live and secure');
+    await desk.getByRole('button', { name: 'Check again' }).click();
+    await expect(desk.locator('[data-domain="live"]')).toHaveText('✓ bistro.example is live and secure.');
+    expect(asked).toBe(2);
+  });
+
+  test('email protection names whose records are coming, makes one plan, then gives way to it', async ({ page }) => {
+    const prepared: unknown[] = [];
+    let plans: unknown[] = [];
+    await installApp(page, { api: { ...BASE, '/foundations': MAIL(), '/foundations/domain': LIVE } });
+    await page.route(/\/functions\/v1\/presence\/foundations\/plans$/, (route: Route) => route.fulfill(json({ data: plans })));
+    await page.route(/\/functions\/v1\/presence\/foundations\/prepare$/, (route: Route) => { prepared.push(route.request().postDataJSON()); plans = [PLAN('proposed')]; return route.fulfill(json({ data: plans[0] })); });
+    await page.goto('/presence.html#domain');
+    const desk = page.locator('#deskResults');
+    await expect(desk.locator('[data-email="after"]')).toHaveText('Your email runs at Microsoft 365, so you’ll get Microsoft 365’s records to copy-paste where your domain’s settings are kept, and only the ones that are missing. We check the rest.');
+    await desk.getByRole('button', { name: 'Set up email protection' }).click();
+    await expect(desk.locator('[data-email="waiting"]')).toHaveText('The records to add are at the bottom, under “Waiting for your OK”.');
+    await expect(desk.getByRole('button', { name: 'Set up email protection' })).toHaveCount(0);   // no second press, no second plan
+    await expect(desk.locator('[data-plan="proposed"]')).toHaveCount(1);
+    expect(prepared).toEqual([{ goal: 'email_auth' }]);
+  });
+
+  test('an approved plan tells the client what happens next, with no button that does nothing', async ({ page }) => {
+    await installApp(page, { api: { ...BASE, '/foundations': MAIL(), '/foundations/plans': { data: [PLAN('approved')] }, '/foundations/domain': LIVE } });
+    await page.goto('/presence.html#domain');
+    const card = page.locator('#deskResults [data-plan="approved"]');
+    await expect(card).toContainText('approved · add the records below. It closes by itself once we find them');
+    await expect(card).not.toContainText('being handled');
+    await expect(card.getByRole('button', { name: 'Mark as done' })).toHaveCount(0);
+  });
+
+  test('the studio gets Mark as done, and pressing it finishes the plan', async ({ page }) => {
+    const done: string[] = [];
+    let plans: unknown[] = [PLAN('approved')];
+    const studio = ctx(ALL_FEATURES); (studio.data as Record<string, unknown>).is_agency = true;
+    await installApp(page, { api: { ...BASE, '/portal/context': studio, '/foundations': MAIL(), '/foundations/domain': LIVE } });
+    await page.route(/\/functions\/v1\/presence\/foundations\/plans$/, (route: Route) => route.fulfill(json({ data: plans })));
+    await page.route(/\/functions\/v1\/presence\/foundations\/plans\/p1\/done$/, (route: Route) => { done.push(route.request().method()); plans = [{ ...PLAN('applied') }]; return route.fulfill(json({ data: { id: 'p1', status: 'applied', notes: [] } })); });
+    await page.goto('/presence.html#domain');
+    const card = page.locator('#deskResults [data-plan="approved"]');
+    await expect(card).toContainText('approved · mark it done once the work is finished');
+    await card.getByRole('button', { name: 'Mark as done' }).click();
+    await expect(page.locator('#deskResults [data-plan]')).toHaveCount(0);
+    await expect(page.locator('#deskResults')).not.toContainText('Waiting for your OK');
+    expect(done).toEqual(['POST']);
+  });
+
+  test('a plan whose records were just found leaves the list on the same open', async ({ page }) => {
+    await installApp(page, { api: { ...BASE, '/foundations': MAIL({ cleared_plans: ['p1'] }), '/foundations/plans': { data: [PLAN('approved')] }, '/foundations/domain': LIVE } });
+    await page.goto('/presence.html#domain');
+    await expect(page.locator('#deskResults')).toContainText('where your site lives');
+    await expect(page.locator('#deskResults [data-plan]')).toHaveCount(0);
+    await expect(page.locator('#deskResults').getByRole('button', { name: 'Set up email protection' })).toHaveCount(1);
+  });
+});

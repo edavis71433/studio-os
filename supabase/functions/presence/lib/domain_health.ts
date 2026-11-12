@@ -139,7 +139,7 @@ export interface NameCheck { name: string; points: boolean; leftovers: string[] 
 export interface CheckLine { key: string; ok: boolean; words: string }
 
 /** Pure: the checklist the sheet and the Domains page show, one line per thing. */
-export function domainChecklist(i: { domain: string; names: NameCheck[]; padlockOn: boolean; padlockNames: string[]; serving: Serving | null }): CheckLine[] {
+export function domainChecklist(i: { domain: string; names: NameCheck[]; padlockOn: boolean; padlockNames: string[]; serving: Serving | null; compared?: boolean }): CheckLine[] {
   const out: CheckLine[] = [];
   for (const n of i.names) {
     out.push({ key: `points:${n.name}`, ok: n.points, words: n.points ? `${n.name} points here` : `${n.name} doesn’t point here yet` });
@@ -151,6 +151,9 @@ export function domainChecklist(i: { domain: string; names: NameCheck[]; padlock
       ? { key: 'padlock', ok: false, words: `The padlock doesn’t cover ${missing.join(' or ')} yet` }
       : { key: 'padlock', ok: true, words: i.names.length > 1 ? 'The padlock covers both names' : 'The padlock is on' });
   } else out.push({ key: 'padlock', ok: false, words: 'The padlock isn’t on yet' });
+  // Nov 12 review, finding 16: when our own copy of the page didn't answer there was nothing to
+  // compare with, and the list used to pass without the comparison. Now that is a line of its own.
+  if (i.serving === null && i.compared === false) out.push({ key: 'serving', ok: false, words: 'We couldn’t compare the page just now. Check again in a minute' });
   if (i.serving) out.push({ key: 'serving', ok: i.serving === 'latest', words: {
     latest: 'Showing your latest site',
     old_copy: 'Showing an old copy of the site (another hosting project or a cache is answering)',
@@ -171,13 +174,23 @@ async function pageHash(url: string): Promise<{ ok: boolean; server: string; has
   } catch { return { ok: false, server: '', hash: null }; }
 }
 
-async function checkName(name: string, target: string | null): Promise<NameCheck> {
-  const [cnames, aRecords] = await Promise.all([dnsLookup(name, 'CNAME'), dnsLookup(name, 'A')]);
+const IS_ADDRESS = /^\d{1,3}(\.\d{1,3}){3}$/;
+/** Pure: one name's check, from its two lookups. An address lookup on a name that is a pointer
+ *  answers with the pointer first and the addresses behind it after, so `aRecords` can hold a
+ *  NAME ("www" pointing at the bare domain is how most providers set it up). That name used to
+ *  be read as an old record: "delete x.com at the provider", and an owner who obeyed took www.
+ *  offline (Nov 12 review, finding 17). Leftovers are real addresses only, and only on a name
+ *  that holds its own records: behind a pointer the addresses belong to the name pointed at,
+ *  which is checked on its own line. */
+export function nameCheckFrom(name: string, target: string | null, cnames: string[], aRecords: string[]): NameCheck {
   const viaCname = target !== null && cnames.includes(target);
   const ours = aRecords.filter((ip) => NETLIFY_APEX_IPS.has(ip));
-  // with a CNAME to us the A answers are ours by definition; without one, any other address beside ours is left over
-  const leftovers = viaCname ? [] : aRecords.filter((ip) => !NETLIFY_APEX_IPS.has(ip) && ours.length > 0);
+  const leftovers = cnames.length ? [] : aRecords.filter((ip) => IS_ADDRESS.test(ip) && !NETLIFY_APEX_IPS.has(ip) && ours.length > 0);
   return { name, points: viaCname || ours.length > 0, leftovers };
+}
+async function checkName(name: string, target: string | null): Promise<NameCheck> {
+  const [cnames, aRecords] = await Promise.all([dnsLookup(name, 'CNAME'), dnsLookup(name, 'A')]);
+  return nameCheckFrom(name, target, cnames, aRecords);
 }
 
 /** The live checks for one hosted site: both names, the padlock's names, and what the domain shows. */
@@ -189,6 +202,6 @@ export async function domainTruth(site: { custom_domain: string; netlify_site_id
   const ssl = await sslStatus(site.netlify_site_id);
   const [atDomain, atOrigin] = await Promise.all([pageHash(`https://${site.custom_domain}/`), target ? pageHash(`https://${target}/`) : Promise.resolve({ ok: false, server: '', hash: null })]);
   const serving = classifyServing(atDomain, atOrigin);
-  const lines = domainChecklist({ domain: site.custom_domain, names, padlockOn: certIsOn(ssl.state), padlockNames: ssl.domains || [], serving });
+  const lines = domainChecklist({ domain: site.custom_domain, names, padlockOn: certIsOn(ssl.state), padlockNames: ssl.domains || [], serving, compared: serving !== null });
   return { serving, checklist: lines, all_ok: checklistOk(lines) };
 }

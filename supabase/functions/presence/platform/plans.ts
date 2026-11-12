@@ -8,6 +8,8 @@
 import { templateRecords, validateRecord, explainRecord } from './dns.ts';
 import type { DnsRecord } from './dns.ts';
 import type { ApprovedPlanBase } from '../lib/approved_plan.ts';
+import { dmarcRecord } from './email_providers.ts';
+import type { EmailProviderPreset } from './email_providers.ts';
 
 export type PlanKind = 'connect_domain' | 'email_auth' | 'registrar_care' | 'hosting_restore' | 'migration'
   // M14 (additive, matching the 0035 CHECK):
@@ -55,20 +57,38 @@ export function planConnectDomain(domain: string, target: string | null): InfraP
   };
 }
 
-export function planEmailAuth(domain: string): InfraPlan {
-  const records = templateRecords('email_auth', { domain });
+/** What is already on the domain, read before the plan is made (Nov 12 review, finding 14). */
+export interface EmailFacts { provider: EmailProviderPreset | null; mxHost?: string | null; hasSpf: boolean; hasDmarc: boolean }
+
+/** Email protection for the company that really runs the client's email, adding only what is
+ *  missing. Google's records used to go to everyone: on Microsoft 365, GoDaddy or Zoho that
+ *  made real mail fail the sender check, and a second sender record beside an existing one
+ *  breaks both. With no facts (nothing read yet) no sender record is offered at all. */
+export function planEmailAuth(domain: string, facts: EmailFacts = { provider: null, hasSpf: false, hasDmarc: false }): InfraPlan {
+  const p = facts.provider;
+  const steps: PlanStep[] = [];
+  if (!facts.hasSpf) {
+    if (p) {
+      const rec = p.spf(domain);
+      const v = validateRecord(rec); if (!v.ok) throw new Error(`preset invalid: ${v.problem}`);
+      steps.push(step(`Add ${p.name}’s sender record`, `It lists who may send email as you. This is the one for ${p.name}, which runs your email.`, false, [rec]));
+    } else {
+      steps.push(step(`Ask the company that runs your email${facts.mxHost ? ` (its mail server is ${facts.mxHost})` : ''} for its sender record, and add it`,
+        'It lists who may send email as you, and every email company has its own. We don’t guess: the wrong one sends your real mail to spam.', false));
+    }
+  }
+  if (!facts.hasDmarc) steps.push(step('Add the record that tells inboxes what to do with fakes', 'It asks inboxes to report email that pretends to be you. It only watches: nothing is blocked.', false, [dmarcRecord(domain)]));
+  steps.push(step(p ? `Turn on email signing in ${p.name}` : 'Turn on email signing with your email company', p ? p.dkim_note : 'Signing proves a message wasn’t altered. The record for it comes from your email company’s own settings.', false));
+  steps.push(step('We look for the records and close this when they’re found', 'Each time this sheet opens, and once a day.', true));
+  const have = facts.hasSpf ? ' Your sender record is already there, so it stays as it is.' : facts.hasDmarc ? ' The record for fakes is already there, so it stays as it is.' : '';
   return {
     kind: 'email_auth',
     title: `Protect email sent from @${domain}`,
-    summary: 'Three records make your email provably yours: SPF says who may send, DKIM signs each message, DMARC tells inboxes to care. Delivery of existing email does not change.',
-    steps: [
-      step('Add the SPF and DMARC records at your DNS host', 'Without them, anyone can send email pretending to be you — and inboxes increasingly junk unprotected senders.', false, records.filter((r) => !/\._domainkey/.test(r.name))),
-      step('Copy the DKIM record from your email provider’s admin panel, then add it', 'The signing key is issued by your mail provider — the platform names the record but never invents the key.', false, records.filter((r) => /\._domainkey/.test(r.name))),
-      step('The platform re-checks the records and confirms alignment', 'The email-authentication observer verifies SPF and DMARC now answer.', true),
-    ],
-    risk: 'Low with p=none (monitor-only DMARC, the default here). Tightening to quarantine/reject is a later, separate decision.',
+    summary: `A few small records tell inboxes your mail is really from you, so it stays out of spam.${p ? ` Your email runs at ${p.name}, so these are ${p.name}’s.` : ''}${have} Email you already get and send keeps working the same way.`,
+    steps,
+    risk: 'Low. These records only add proof; nothing about how your email is delivered changes.',
     reversible: true,
-    rollback_note: 'Remove the added TXT records; email flows exactly as before.',
+    rollback_note: 'Remove the added records; email flows exactly as before.',
     requires_approval: true,
   };
 }

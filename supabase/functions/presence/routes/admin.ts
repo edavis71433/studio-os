@@ -290,6 +290,9 @@ export async function handleDomain(req: Request, method: string, site: SiteRow, 
       // item 164 (finding 13): the first time every check passes, the owner and the studio hear it's live
       if (truth && truth.all_ok) await afterResponse(announceLiveOnce({ id: site.id, client_id: (site as { client_id?: string | null }).client_id || null }, site.custom_domain, new Date().toISOString()));
       if (truth) return json({ data: { ...st, provider: facts.provider, changes, forwards, serving: truth.serving, checklist: truth.checklist, all_ok: truth.all_ok } }, 200, cors);
+      // Nov 12 review, finding 16: the checks couldn't run (the hosting company was slow, say). The
+      // page used to read a missing checklist as "everything passed"; now it is told, and says so
+      return json({ data: { ...st, provider: facts.provider, changes, forwards, check_failed: true } }, 200, cors);
     }
     return json({ data: { ...st, provider: facts.provider, changes, forwards } }, 200, cors);
   }
