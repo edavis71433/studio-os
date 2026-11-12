@@ -391,7 +391,7 @@ test.describe('+ Create', () => {
     await page.keyboard.press('Escape');
     // the shortcuts list says so
     await page.locator('body').press('?');
-    await expect(page.locator('.dds-keys')).toContainText('Create — log a call, a deal, an invoice…');
+    await expect(page.locator('.dds-keys')).toContainText('Create — log a call, a deal, an invoice, a project…');
     await page.keyboard.press('Escape');
     // a link from anywhere: #create:invoice
     await page.goto('/agency.html#create:invoice');
