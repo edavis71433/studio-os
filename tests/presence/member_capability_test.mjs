@@ -172,6 +172,7 @@ const DECIDED = {
     'POST /broadcasts/:id/send', 'POST /launches/:id/promote', 'POST /launches/:id/rollback',
     'POST /launches/:id/schedule', 'POST /preview/promote', 'POST /publish', 'POST /restore', 'POST /schedule',
     'POST /schedule/:id/cancel',
+    'POST /posts/:id/publish', 'POST /posts/:id/unpublish',   // builder list item 40: one blog post onto (or off) the live site
   ],
   comment: [
     'POST /client/projects/:id/messages', 'POST /client/support', 'POST /client/support/:id/messages',
@@ -489,6 +490,7 @@ const WRITE_HANDLERS = [
   'handleStudioRequests',   // final pass S1: POST /portal/studio-requests/:id/(accept|decline) are open; the route answers the owner only
   'handleMemberRole', 'handleTransferStart', 'handleTransferCancel',   // builder item 53: open on the member list; each route checks the role itself
   'handleSitePassword',   // builder list item 175: POST /site/password needs configure
+  'handlePostPublish', 'handlePostUnpublish',   // builder list item 40: POST /posts/:id/(publish|unpublish) need publish
   'handleScheduleCancel', 'handleScheduleCreate', 'handleSettings', 'handleShareSet', 'handleStockImport',
   'handleSupport', 'handleSupportMessage', 'handleSupportOne', 'handleSurveyRespond', 'handleTakeOffline',
   'handleTask', 'handleTasksCreate', 'handleThreadRead', 'handleVersionLabel', 'handleVisualDecide',

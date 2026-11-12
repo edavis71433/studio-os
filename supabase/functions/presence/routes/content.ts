@@ -71,7 +71,7 @@ function clean(s: string): string {
   return out.trim();
 }
 
-type FieldRule = { max?: number; min?: number; required?: boolean; kind?: 'text' | 'bool' | 'int' | 'uuid' | 'date' | 'slug' | 'json' | 'tags' | 'stage_days' | 'google_tag' | 'meta_pixel' | 'ref' | 'post_status' | 'post_categories' | 'post_authors'; json?: JsonShape };
+type FieldRule = { max?: number; min?: number; required?: boolean; kind?: 'text' | 'bool' | 'int' | 'uuid' | 'date' | 'slug' | 'json' | 'tags' | 'stage_days' | 'google_tag' | 'meta_pixel' | 'ref' | 'post_status'; json?: JsonShape; blog?: 'categories' | 'authors' };
 // Item 72: a JSON field's limits. Without them a 40 MB pages list was stored and then re-read
 // on every load, preview, publish, hash and sweep. The size is the saved text's length; the
 // shape checks only what every reader assumes (a list of objects, an object), never a
@@ -184,8 +184,8 @@ const SETTINGS_FIELDS: Record<string, FieldRule> = {
   // Editable GLOBAL nav [{label,href,children?}] (validated at serialize time)
   nav: { kind: 'json', json: { bytes: 64 * KB, shape: 'list', items: 60 } },
   // Builder list item 40 (0181): the blog's categories and authors, made safe as they're saved
-  post_categories: { kind: 'post_categories', json: { bytes: 16 * KB, shape: 'list', items: 60 } },
-  post_authors: { kind: 'post_authors', json: { bytes: 32 * KB, shape: 'list', items: 40 } },
+  post_categories: { kind: 'json', json: { bytes: 16 * KB, shape: 'list', items: 60 }, blog: 'categories' },
+  post_authors: { kind: 'json', json: { bytes: 32 * KB, shape: 'list', items: 40 }, blog: 'authors' },
 };
 
 /** Item 72: why a JSON value can't be saved, in a sentence, or null when it can. Pure. */
@@ -232,6 +232,8 @@ function validateFields(payload: Record<string, unknown>, spec: Record<string, F
     if (rule.kind === 'json') {
       const problem = rule.json ? jsonFieldProblem(v, rule.json) : null;
       if (problem) { errors.push({ field: key, message: problem, plain: true }); continue; }
+      // item 40: the blog's lists are made safe here, so only clean values are stored
+      if (rule.blog) { cleanBody[key] = rule.blog === 'categories' ? normalizeCategories(v) : normalizeAuthors(v); fields.push(key); continue; }
       cleanBody[key] = v ?? (key === 'hours' || key === 'holiday_exceptions' || key === 'category_order' ? [] : null); fields.push(key); continue;
     }
     if (rule.kind === 'stage_days') {   // the per-stage "stale after N days" map (lib/sales_lifecycle.ts staleDaysFor): open stages only, whole days 1–365
@@ -250,11 +252,6 @@ function validateFields(payload: Record<string, unknown>, spec: Record<string, F
       const s = String(v ?? '');
       if (!POST_STATUSES.includes(s)) { errors.push({ field: key, message: 'A post is a draft, scheduled or published.', plain: true }); continue; }
       cleanBody[key] = s; fields.push(key); continue;
-    }
-    if (rule.kind === 'post_categories' || rule.kind === 'post_authors') {   // item 40: the blog's lists, made safe here so only clean values are stored
-      const problem = rule.json ? jsonFieldProblem(v ?? [], rule.json) : null;
-      if (problem) { errors.push({ field: key, message: problem, plain: true }); continue; }
-      cleanBody[key] = rule.kind === 'post_categories' ? normalizeCategories(v) : normalizeAuthors(v); fields.push(key); continue;
     }
     if (rule.kind === 'google_tag' || rule.kind === 'meta_pixel') {   // list item 152: an ad tag's ID goes into a script on the live site, so only its exact shape passes
       const id = String(v ?? '').replace(/\s+/g, '').toUpperCase();
