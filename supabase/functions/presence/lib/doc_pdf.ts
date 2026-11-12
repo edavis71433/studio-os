@@ -1,12 +1,14 @@
 // ── The documents as real PDFs (sales item 82) ───────────────────────────────
 // The same invoice, receipt, proposal, estimate and agreement lib/documents.ts
-// draws as a page, laid out on US Letter with lib/pdf.ts: the studio's name in its
-// colour, who it's from and who it's billed to, the lines and totals, and for a
-// signed agreement the certificate of record. Pure: the caller (routes/sales.ts)
+// draws as a page, laid out on US Letter with lib/pdf.ts. Sales item 124, the new
+// look: a band in the studio's colour opens the first page with its mark and name,
+// the title and the number that matters; then who it's from and who it's billed to,
+// the lines and totals, and for a signed agreement the signatures and the
+// certificate of record. Later pages carry a small running head. Pure: the caller (routes/sales.ts)
 // loads the row, the brand and the context; same input, same bytes.
 import { PdfDoc, rgb, textWidth, wrapText, type PdfFont, type Rgb } from './pdf.ts';
 import {
-  money, utcStamp, invoiceNo, dayLabel, paidLine, partyLines, invoiceLines, invoiceDocLabel,
+  money, utcStamp, invoiceNo, dayLabel, paidLine, partyLines, invoiceLines, invoiceDocLabel, mixHex,
   type DocBrand, type DocContext, type DocKind,
 } from './documents.ts';
 import { splitLineItems, computeProposalTotals, subtotalOf } from './sales_lifecycle.ts';
@@ -20,7 +22,7 @@ const PANEL: Rgb = [0.965, 0.957, 0.945];
 const GOOD: Rgb = [0.173, 0.361, 0.259];
 const GOOD_BG: Rgb = [0.906, 0.945, 0.918];
 const WARN: Rgb = [0.467, 0.365, 0.192];
-const L = 54, R = 558, W = R - L, TOP = 742, BOTTOM = 72;
+const L = 54, R = 558, W = R - L, TOP = 736, BOTTOM = 72;
 
 /** A cursor that flows down the page and starts a new one when it runs out. */
 class Flow {
@@ -42,47 +44,65 @@ class Flow {
 
 function newPdf(title: string): PdfDoc { return new PdfDoc(title); }
 
-/** The first page's top: the colour bar, the studio's name and lines, and on the
- *  right what the document is, its number and its state. Returns the flow below it. */
-function head(pdf: PdfDoc, brand: DocBrand, o: { label: string; no?: string; state?: string; stateColor?: Rgb; from?: string[] }): Flow {
-  const accent = rgb(brand.accent), deep = rgb(brand.accentDark, accent);
-  pdf.rect(0, 786, 612, 6, accent);
+const WHITE: Rgb = [1, 1, 1];
+/** The band's colours for a brand: the colour itself, a soft white for small words on it, and a pale tint for boxes. */
+function tones(brand: DocBrand): { band: Rgb; onBand: Rgb; mark: Rgb; tint: Rgb; deep: Rgb } {
+  return { band: rgb(brand.accent), onBand: rgb(mixHex(brand.accent, '#ffffff', 0.8)), mark: rgb(mixHex(brand.accent, '#ffffff', 0.22)), tint: rgb(mixHex(brand.accent, '#ffffff', 0.9)), deep: rgb(brand.accentDark, rgb(brand.accent)) };
+}
+/** The first page's top: a band in the studio's colour with its mark and name, what
+ *  the document is, its title and a line under it, and on the right the number that
+ *  matters with its state. Returns the flow below it. */
+function head(pdf: PdfDoc, brand: DocBrand, o: { label: string; no?: string; title: string; sub?: string; figureLabel?: string; figure?: string; state?: string }): Flow {
+  const t = tones(brand);
+  const rightW = o.figure ? Math.max(textWidth(o.figure, 'B', 26), 90) + 8 : o.state ? textWidth(o.state, 'B', 9) + 8 : 0;
+  const titleLines = wrapText(o.title, 'B', 20, W - rightW - 16).slice(0, 3);
+  const bandH = 96 + titleLines.length * 24 + (o.sub ? 16 : 0);
+  pdf.rect(0, 792 - bandH, 612, bandH, t.band);
+  // the mark and the name
+  const letter = (brand.name.trim().match(/[A-Za-z0-9]/) || [''])[0].toUpperCase();
+  if (letter) { pdf.rect(L, 742, 20, 20, t.mark); pdf.text(L + 10 - textWidth(letter, 'B', 11) / 2, 748, letter, { font: 'B', size: 11, color: WHITE }); }
+  pdf.text(L + (letter ? 28 : 0), 747.5, brand.name, { font: 'B', size: 12.5, color: WHITE });
+  pdf.textRight(R, 748, `${o.label}${o.no ? '  ' + o.no : ''}`.toUpperCase(), { font: 'B', size: 9, color: WHITE });
+  // the title, and the line under it
+  let y = 742 - 34;
+  for (const line of titleLines) { pdf.text(L, y, line, { font: 'B', size: 20, color: WHITE }); y -= 24; }
+  if (o.sub) pdf.text(L, y + 6, o.sub, { size: 9.5, color: t.onBand });
+  // the number that matters, bottom right of the band
+  const base = 792 - bandH + 22;
+  if (o.figure) {
+    pdf.textRight(R, base + (o.state ? 14 : 0), o.figure, { font: 'B', size: 26, color: WHITE });
+    if (o.figureLabel) pdf.textRight(R, base + (o.state ? 14 : 0) + 28, o.figureLabel.toUpperCase(), { font: 'B', size: 8, color: t.onBand });
+    if (o.state) pdf.textRight(R, base, o.state, { font: 'B', size: 9, color: WHITE });
+  } else if (o.state) pdf.textRight(R, base, o.state, { font: 'B', size: 9, color: WHITE });
   const f = new Flow(pdf);
-  pdf.text(L, f.y - 18, brand.name, { font: 'B', size: 18, color: deep });
-  let ly = f.y - 34;
-  for (const l of (o.from || []).slice(0, 5)) { pdf.text(L, ly, l, { size: 9, color: SOFT }); ly -= 12; }
-  pdf.textRight(R, f.y - 10, o.label.toUpperCase(), { font: 'B', size: 9, color: SOFT });
-  if (o.no) pdf.textRight(R, f.y - 32, o.no, { font: 'B', size: 20, color: INK });
-  if (o.state) pdf.textRight(R, f.y - (o.no ? 48 : 26), o.state, { font: 'B', size: 9.5, color: o.stateColor || SOFT });
-  f.y = Math.min(ly, f.y - 56) - 14;
+  f.y = 792 - bandH - 26;
   return f;
 }
 
-/** Two side-by-side boxes ("Billed to", "Details"), each a list of lines. */
+/** Side-by-side columns ("From", "Billed to", "Details"), each a small label and its lines, the first in bold. */
 function boxes(f: Flow, cols: Array<{ title: string; lines: string[] }>): void {
   const live = cols.filter((c) => c.lines.length);
   if (!live.length) return;
-  const gapX = 14, bw = (W - gapX * (live.length - 1)) / live.length, size = 9.5, lead = 13.5;
-  const wrapped = live.map((c) => c.lines.flatMap((l) => wrapText(l, 'R', size, bw - 24)));
-  const h = 30 + Math.max(...wrapped.map((w) => w.length)) * lead + 6;
-  f.need(h);
+  const gapX = 18, bw = (W - gapX * (live.length - 1)) / live.length, size = 9.5, lead = 13.5;
+  const wrapped = live.map((c) => c.lines.flatMap((l) => wrapText(l, 'R', size, bw)));
+  const h = 18 + Math.max(...wrapped.map((w) => w.length)) * lead;
+  f.need(h + 16);
   live.forEach((c, i) => {
     const x = L + i * (bw + gapX);
-    f.pdf.rect(x, f.y - h, bw, h, PANEL);
-    f.pdf.text(x + 12, f.y - 16, c.title.toUpperCase(), { font: 'B', size: 8, color: SOFT });
-    wrapped[i].forEach((l, j) => f.pdf.text(x + 12, f.y - 32 - j * lead, l, { font: j === 0 ? 'B' : 'R', size, color: j === 0 ? INK : SOFT }));
+    f.pdf.text(x, f.y - 8, c.title.toUpperCase(), { font: 'B', size: 8, color: SOFT });
+    wrapped[i].forEach((l, j) => f.pdf.text(x, f.y - 24 - j * lead, l, { font: j === 0 ? 'B' : 'R', size, color: j === 0 ? INK : SOFT }));
   });
-  f.y -= h + 18;
+  f.y -= h + 10; f.rule(); f.gap(16);
 }
 
 /** The lines table: Description · Qty · Amount, then totals (bold last). */
-function table(f: Flow, rows: Array<{ label: string; qty?: string; amount: string; soft?: boolean }>, totals: Array<{ label: string; amount: string; bold?: boolean }>): void {
+function table(f: Flow, rows: Array<{ label: string; qty?: string; amount: string; soft?: boolean }>, totals: Array<{ label: string; amount: string; bold?: boolean }>, tint: Rgb = PANEL, first = 'DESCRIPTION'): void {
   const qtyRight = R - 110, size = 10, lead = 14;
   f.need(24);
-  f.pdf.text(L, f.y - 10, 'DESCRIPTION', { font: 'B', size: 8, color: SOFT });
+  f.pdf.text(L, f.y - 10, first, { font: 'B', size: 8, color: SOFT });
   f.pdf.textRight(qtyRight, f.y - 10, 'QTY', { font: 'B', size: 8, color: SOFT });
   f.pdf.textRight(R, f.y - 10, 'AMOUNT', { font: 'B', size: 8, color: SOFT });
-  f.gap(16); f.rule();
+  f.gap(16); f.rule(INK);
   for (const r of rows) {
     const lines = wrapText(r.label, 'R', size, qtyRight - L - 60);
     const h = lines.length * lead + 10;
@@ -93,12 +113,19 @@ function table(f: Flow, rows: Array<{ label: string; qty?: string; amount: strin
     f.gap(h); f.rule();
   }
   for (const t of totals) {
-    f.need(22);
-    const font: PdfFont = t.bold ? 'B' : 'R';
-    const sz = t.bold ? 11.5 : 10;
-    f.pdf.text(L, f.y - 15, t.label, { font, size: sz, color: t.bold ? INK : SOFT });
-    f.pdf.textRight(R, f.y - 15, t.amount, { font, size: sz, color: t.bold ? INK : SOFT });
-    f.gap(22);
+    if (t.bold) {   // the amount that matters, in a tinted box on the right
+      f.need(36); f.gap(4);
+      const bw = Math.min(W, Math.max(250, textWidth(t.label, 'B', 11) + textWidth(t.amount, 'B', 14) + 48));
+      f.pdf.rect(R - bw, f.y - 28, bw, 28, tint);
+      f.pdf.text(R - bw + 12, f.y - 18, t.label, { font: 'B', size: 11, color: INK });
+      f.pdf.textRight(R - 12, f.y - 19, t.amount, { font: 'B', size: 14, color: INK });
+      f.gap(32);
+      continue;
+    }
+    f.need(20);
+    f.pdf.text(L, f.y - 14, t.label, { size: 10, color: SOFT });
+    f.pdf.textRight(R, f.y - 14, t.amount, { size: 10, color: SOFT });
+    f.gap(20);
   }
   f.gap(6);
 }
@@ -115,17 +142,23 @@ function panel(f: Flow, lines: string[], o: { bg?: Rgb; color?: Rgb; bold?: bool
 }
 
 /** Every page's foot: what it is and "Page 1 of 2", once the count is known. */
-function feet(pdf: PdfDoc, left: string): void {
+function feet(pdf: PdfDoc, left: string, run?: { name: string; what: string; color: Rgb }): void {
   const n = pdf.pageCount;
   for (let i = 0; i < n; i++) {
     pdf.onPage(i, () => {
       pdf.line(L, 50, R, 50, LINE, 0.5);
       pdf.text(L, 36, left, { size: 8, color: SOFT });
+      if (i > 0 && run) {   // a small running head: the studio, what this is, and a rule in its colour
+        pdf.text(L, 764, run.name, { font: 'B', size: 9, color: INK });
+        pdf.textRight(R, 764, run.what.toUpperCase(), { font: 'B', size: 7.5, color: SOFT });
+        pdf.line(L, 756, R, 756, run.color, 1.5);
+      }
       if (n > 1) pdf.textRight(R, 36, `Page ${i + 1} of ${n}`, { size: 8, color: SOFT });
     });
   }
 }
-const fromLines = (ctx?: DocContext | null) => partyLines(ctx?.studio ? { ...ctx.studio, name: '' } : null);
+const fromLines = (ctx: DocContext | null | undefined, brand: DocBrand) => partyLines(ctx?.studio ? { ...ctx.studio, name: brand.name } : null);
+const forWhom = (ctx?: DocContext | null) => String(ctx?.billTo?.company || ctx?.billTo?.name || '').trim();
 const brandOf = (b?: Partial<DocBrand> | null): DocBrand => ({ name: (b?.name || '').trim() || 'Studio OS', accent: b?.accent || '#5b3fa0', accentDark: b?.accentDark || '#3a2470' });
 
 // ── INVOICE / DEPOSIT REQUEST / RECEIPT ──────────────────────────────────────
@@ -135,20 +168,20 @@ export function invoicePdf(v: any, brandIn?: Partial<DocBrand> | null, ctx?: Doc
   const label = invoiceDocLabel(v), no = invoiceNo(v?.number);
   const title = String(v?.title || (v?.purpose === 'deposit' ? 'Deposit' : 'Invoice'));
   const pdf = newPdf(`${label}${no ? ' ' + no : ''} — ${title}`);
-  const f = head(pdf, brand, { label, no, state: paid ? 'PAID' : voided ? 'VOIDED' : 'AMOUNT DUE', stateColor: paid ? GOOD : voided ? SOFT : WARN, from: fromLines(ctx) });
-  f.para(ctx?.forWhat ? `For ${ctx.forWhat}` : label, { font: 'B', size: 8.5, color: SOFT });
-  f.para(title, { font: 'B', size: 16, lead: 22 });
-  f.gap(8);
+  const t = tones(brand);
   const details: string[] = [];
   if (no) details.push(`${paid ? 'Receipt for invoice' : 'Invoice no.'} ${no}`);
   if (v?.created_at) details.push('Issued ' + dayLabel(v.created_at, tz));
   if (!paid && !voided) details.push(v?.due_date ? 'Due ' + dayLabel(v.due_date, tz) : 'Due on receipt');
   if (paid) details.push(paidLine(v, tz));
   if (voided) details.push('Voided: no longer payable');
-  boxes(f, [{ title: 'Billed to', lines: partyLines(ctx?.billTo) }, { title: 'Details', lines: details }]);
+  if (ctx?.forWhat) details.push('For ' + ctx.forWhat);
   const payments = (Array.isArray(ctx?.payments) ? ctx!.payments! : []).filter((p) => Number(p?.amount_cents) > 0);
   const amount = Math.round(Number(v?.amount_cents) || 0);
   const billed = amount + payments.reduce((n, p) => n + Math.round(Number(p.amount_cents) || 0), 0);
+  const sub = [v?.created_at ? 'Issued ' + dayLabel(v.created_at, tz) : '', paid ? (dayLabel(v?.paid_at, tz) ? 'Paid ' + dayLabel(v.paid_at, tz) : '') : voided ? 'Voided' : (v?.due_date ? 'Due ' + dayLabel(v.due_date, tz) : 'Due on receipt')].filter(Boolean).join('  ·  ');
+  const f = head(pdf, brand, { label: forWhom(ctx) ? `${label} for ${forWhom(ctx)}` : label, no, title, sub, figureLabel: paid ? 'Total paid' : voided ? 'Total (voided)' : 'Amount due', figure: money(paid ? billed : amount, currency), state: paid ? 'PAID IN FULL' : voided ? 'VOIDED' : '' });
+  boxes(f, [{ title: 'From', lines: fromLines(ctx, brand) }, { title: paid ? 'Paid by' : 'Billed to', lines: partyLines(ctx?.billTo) }, { title: 'Details', lines: details }]);
   const lines = invoiceLines(v, billed);
   const fmt = (c: number) => (c < 0 ? '-' + money(-c, currency) : money(c, currency));
   const rows = lines.map((l) => ({ label: l.label, qty: l.qty !== 1 ? String(l.qty) : '', amount: fmt(l.amount_cents), soft: l.amount_cents < 0 }));
@@ -157,20 +190,20 @@ export function invoicePdf(v: any, brandIn?: Partial<DocBrand> | null, ctx?: Doc
     ...(payments.length && !paid ? [{ label: 'Total', amount: money(billed, currency) }, ...payments.map((p) => ({ label: paidLine(p, tz), amount: fmt(-Math.round(Number(p.amount_cents) || 0)) }))] : []),
     { label: paid ? 'Total paid' : voided ? 'Total (voided)' : 'Amount due', amount: money(paid ? billed : amount, currency), bold: true },
   ];
-  table(f, rows, totals);
+  table(f, rows, totals, paid ? GOOD_BG : t.tint, 'WHAT THIS COVERS');
   if (paid) panel(f, [paidLine(v, tz), ...payments.map((p) => 'Earlier part payment: ' + paidLine(p, tz))], { bg: GOOD_BG, color: GOOD, bold: true });
   if (!paid && !voided && v?.stripe_url) {
     const url = String(v.stripe_url);
     f.para('Pay securely online:', { font: 'B', size: 10 });
     const before = f.y;
-    f.para(url, { size: 9.5, color: rgb(brand.accentDark) });
+    f.para(url, { size: 9.5, color: t.deep });
     pdf.link(L, f.y, Math.min(W, textWidth(url, 'R', 9.5)), before - f.y, url);
     f.gap(6);
   }
   f.para(paid ? 'Thank you. This is your receipt of payment.'
     : voided ? 'This request was voided and is no longer payable.'
     : `${no ? `Please quote ${no} with any payment by check or transfer. ` : ''}Keep this document for your records.`, { size: 9, color: SOFT });
-  feet(pdf, `${brand.name}${no ? ' · ' + label + ' ' + no : ''}`);
+  feet(pdf, `${brand.name}${no ? ' · ' + label + ' ' + no : ''}`, { name: brand.name, what: `${label}${no ? ' ' + no : ''}`, color: t.band });
   return pdf.bytes();
 }
 
@@ -179,12 +212,11 @@ function linesPdf(p: any, brandIn: Partial<DocBrand> | null | undefined, ctx: Do
   const brand = brandOf(brandIn), currency = String(p?.currency || 'usd');
   const title = String(p?.title || o.label);
   const pdf = newPdf(`${o.label} — ${title}`);
-  const f = head(pdf, brand, { label: o.label, state: o.state, stateColor: o.stateColor, from: fromLines(ctx) });
-  f.para(title, { font: 'B', size: 16, lead: 22 });
-  f.gap(10);
-  if (ctx?.billTo) boxes(f, [{ title: 'Prepared for', lines: partyLines(ctx.billTo) }]);
+  const tn = tones(brand);
   const { items, meta } = splitLineItems(p?.line_items);
   const t = computeProposalTotals(items, meta);
+  const f = head(pdf, brand, { label: forWhom(ctx) ? `${o.label} for ${forWhom(ctx)}` : o.label, title, figureLabel: 'Total', figure: money(t.total_cents, currency), state: o.state });
+  boxes(f, [{ title: 'From', lines: fromLines(ctx, brand) }, { title: 'Prepared for', lines: partyLines(ctx?.billTo) }]);
   const rows = items.map((i) => ({ label: i.label, qty: i.qty !== 1 ? String(i.qty) : '', amount: money(subtotalOf([i]), currency) }));
   if (!rows.length) rows.push({ label: 'No line items.', qty: '', amount: '', soft: true } as any);
   const totals: Array<{ label: string; amount: string; bold?: boolean }> = [];
@@ -194,13 +226,13 @@ function linesPdf(p: any, brandIn: Partial<DocBrand> | null | undefined, ctx: Do
     if (t.tax_cents > 0) totals.push({ label: meta.tax_pct != null ? `Tax (${Number(meta.tax_pct)}%)` : 'Tax', amount: '+' + money(t.tax_cents, currency) });
   }
   totals.push({ label: 'Total', amount: money(t.total_cents, currency), bold: true });
-  table(f, rows, totals);
+  table(f, rows, totals, tn.tint, 'WHAT’S INCLUDED');
   // sales item 106: how they'll pay, part by part
   const parts = scheduleView(meta.schedule ?? null, t.total_cents);
-  if (parts) { f.para('How you’ll pay', { font: 'B', size: 10 }); table(f, parts.map((r) => ({ label: `Part ${r.n} of ${r.of} · ${r.words}`, amount: money(r.amount_cents, currency) })), []); }
-  if (p?.terms) { f.para('Terms', { font: 'B', size: 10 }); f.para(p.terms, { size: 9.5, color: SOFT }); f.gap(6); }
+  if (parts) { f.para('How you’ll pay', { font: 'B', size: 10 }); table(f, parts.map((r) => ({ label: `Part ${r.n} of ${r.of} · ${r.words}`, amount: money(r.amount_cents, currency) })), [], tn.tint, 'PART'); }
+  if (p?.terms) { f.para('Good to know', { font: 'B', size: 10 }); f.para(p.terms, { size: 9.5, color: SOFT }); f.gap(6); }
   f.para(o.note, { size: 9, color: SOFT });
-  feet(pdf, `${brand.name} · ${o.label}`);
+  feet(pdf, `${brand.name} · ${o.label}`, { name: brand.name, what: `${o.label} · ${title}`.slice(0, 70), color: tn.band });
   return pdf.bytes();
 }
 export function proposalPdf(p: any, brand?: Partial<DocBrand> | null, ctx?: DocContext | null): Uint8Array<ArrayBuffer> {
@@ -220,15 +252,15 @@ export function contractPdf(c: any, brandIn?: Partial<DocBrand> | null, ctx?: Do
   const signed = c?.status === 'signed';
   const title = String(c?.title || 'Service agreement');
   const pdf = newPdf(`${signed ? 'Signed agreement' : 'Agreement'} — ${title}`);
-  const f = head(pdf, brand, { label: signed ? 'Signed agreement' : 'Agreement', state: signed ? 'SIGNED' : c?.status === 'sent' ? 'AWAITING SIGNATURE' : 'DRAFT', stateColor: signed ? GOOD : SOFT, from: fromLines(ctx) });
-  f.para(title, { font: 'B', size: 16, lead: 22 });
-  f.para(signed ? 'Executed copy: this is the signed document of record.' : c?.status === 'sent' ? 'Sent for signature, not yet signed.' : 'Draft, not yet sent for signature.', { size: 9.5, color: SOFT });
-  f.gap(10); f.rule(); f.gap(12);
+  const tn = tones(brand);
+  const f = head(pdf, brand, { label: signed ? 'Signed agreement' : 'Agreement', title,
+    sub: signed ? 'Executed copy: this is the signed document of record.' : c?.status === 'sent' ? 'Sent for signature, not yet signed.' : 'Draft, not yet sent for signature.',
+    state: signed ? (c?.countersigned_name ? 'SIGNED BY BOTH' : 'SIGNED') : c?.status === 'sent' ? 'AWAITING SIGNATURE' : 'DRAFT' });
   // sales item 88: a title, numbered headings, paragraphs and list items (lib/agreement_layout.ts)
   const accent = rgb(brand.accentDark, rgb(brand.accent));
   for (const b of agreementBlocks(c?.body)) {
-    if (b.t === 'title') { f.para(b.text, { font: 'B', size: 12.5, lead: 18, color: accent }); f.gap(4); continue; }
-    if (b.t === 'heading') { f.need(44); f.gap(6); f.para((b.n ? b.n + '. ' : '') + b.text, { font: 'B', size: 11, lead: 16 }); f.gap(2); continue; }
+    if (b.t === 'title') { f.para(b.text.toUpperCase(), { font: 'B', size: 8.5, lead: 14, color: SOFT }); f.gap(6); continue; }
+    if (b.t === 'heading') { f.need(44); f.gap(6); f.para((b.n ? b.n + '.  ' : '') + b.text, { font: 'B', size: 11, lead: 16, color: tn.deep }); f.gap(2); continue; }
     if (b.t === 'item') { f.para(b.mark + '  ' + b.text, { size: 10, lead: 15, indent: 14 }); continue; }
     for (const line of b.text.split('\n')) f.para(line, { size: 10, lead: 15 });
     f.gap(5);
@@ -258,13 +290,20 @@ export function contractPdf(c: any, brandIn?: Partial<DocBrand> | null, ctx?: Do
     rows.push(`Signed at: ${utcStamp(c?.signed_at || ev?.at)}`);
     rows.push(`Document fingerprint (SHA-256): ${String(c?.content_hash || ev?.hash || '')}`);
     if (ev?.ip_hash) rows.push(`Signing evidence (hashed IP): ${String(ev.ip_hash)}`);
-    f.para('CERTIFICATE OF RECORD', { font: 'B', size: 8.5, color: SOFT });
-    panel(f, rows);
+    // the certificate: a box in the studio's colour, a title, then its rows
+    const cw = rows.flatMap((r) => wrapText(r, 'R', 9.5, W - 32));
+    const ch = 40 + cw.length * 14 + 10;
+    f.need(ch + 30);
+    f.pdf.rect(L, f.y - ch, W, ch, tn.tint);
+    f.pdf.rect(L, f.y - ch, 3, ch, tn.band);
+    f.pdf.text(L + 16, f.y - 22, 'Certificate of record', { font: 'B', size: 12, color: tn.deep });
+    cw.forEach((l, i) => f.pdf.text(L + 16, f.y - 42 - i * 14, l, { size: 9.5, color: INK }));
+    f.y -= ch + 10;
     f.para('Typing a name to sign is an electronic signature. The fingerprint identifies the exact text that was signed; it changes if even one character does, so this copy shows any change.', { size: 8.5, color: SOFT });
   } else {
     f.para('This copy is not an executed agreement until it is signed.', { size: 9, color: SOFT });
   }
-  feet(pdf, `${brand.name} · ${signed ? 'Signed agreement' : 'Agreement'}`);
+  feet(pdf, `${brand.name} · ${signed ? 'Signed agreement' : 'Agreement'}`, { name: brand.name, what: `${signed ? 'Signed agreement' : 'Agreement'} · ${title}`.slice(0, 70), color: tn.band });
   return pdf.bytes();
 }
 
