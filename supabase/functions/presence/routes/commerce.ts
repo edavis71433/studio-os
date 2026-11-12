@@ -688,7 +688,7 @@ async function handleBillingSync(req: Request, cors: Record<string, string>): Pr
  *  routes below but act on the signed-in caller, so they are not on it. */
 const PUBLIC_ROUTES: ReadonlySet<string> = new Set([
   'GET /commerce/plans', 'POST /commerce/signup', 'POST /commerce/verify', 'GET /commerce/checkout-status',
-  'POST /commerce/billing-sync', 'POST /commerce/invoice-paid',
+  'POST /commerce/billing-sync', 'POST /commerce/invoice-paid', 'POST /commerce/invoice-bounced',
 ]);
 export function isPublicCommerceRoute(route: string, method: string): boolean {
   return PUBLIC_ROUTES.has(`${method} ${route}`);
@@ -781,6 +781,8 @@ export async function handleCommerce(req: Request, route: string, method: string
   if (route === '/commerce/checkout-status' && method === 'GET') return handleCheckoutStatus(req, cors);
   if (route === '/commerce/billing-sync' && method === 'POST') return handleBillingSync(req, cors);
   if (route === '/commerce/invoice-paid' && method === 'POST') return handleInvoicePaidEcho(req, cors);
+  // sales item 116: a bank payment bounced (called by the stripe-webhook, secret-gated like the echo above)
+  if (route === '/commerce/invoice-bounced' && method === 'POST') { const { handleInvoiceBounced } = await import('./invoice_bounced.ts'); return handleInvoiceBounced(req, BILLING_SYNC_SECRET, cors); }
 
   // authed
   const authed = principal.kind === 'client' || principal.kind === 'staff';

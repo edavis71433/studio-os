@@ -319,7 +319,7 @@ export function renderInvoiceDocument(v: any, brandIn?: Partial<DocBrand> | null
   const docLabel = invoiceDocLabel(v);
   const heading = String(v?.title || (isDeposit ? 'Deposit' : 'Invoice'));
   const no = invoiceNo(v?.number);
-  const pill = paid ? '<span class="pill paid">Paid</span>' : voided ? '<span class="pill void">Voided</span>' : '<span class="pill due">Amount due</span>';
+  const pill = paid ? '<span class="pill paid">Paid</span>' : voided ? '<span class="pill void">Voided</span>' : v?.processing_since ? '<span class="pill due">Payment on its way</span>' : '<span class="pill due">Amount due</span>';
   // the head: who it's from on the left, what it is and its number on the right
   const from = partyLines(ctx?.studio ? { ...ctx.studio, name: '' } : null);
   const headHtml = `<div class="head"><div><div class="wordmark">${esc(brand.name)}</div>${from.length ? `<div class="from">${from.map(esc).join('<br>')}</div>` : ''}</div>
@@ -330,7 +330,10 @@ export function renderInvoiceDocument(v: any, brandIn?: Partial<DocBrand> | null
   const details: string[] = [];
   if (no) details.push(`${paid ? 'Receipt for invoice' : 'Invoice no.'} ${no}`);
   if (v?.created_at) details.push('Issued ' + dayLabel(v.created_at, tz));
-  if (!paid && !voided) details.push(v?.due_date ? 'Due ' + dayLabel(v.due_date, tz) : 'Due on receipt');
+  // Sales item 118: a bank payment that is settling. The link took its one payment, so
+  // "Amount due" and a Pay button (which opened a switched-off Stripe page) were both wrong.
+  const settling = !paid && !voided && !!v?.processing_since;
+  if (!paid && !voided) details.push(settling ? 'Payment on its way' : v?.due_date ? 'Due ' + dayLabel(v.due_date, tz) : 'Due on receipt');
   if (paid) details.push(paidLine(v, tz));
   if (voided) details.push('Voided — no longer payable');
   const box = (k: string, lines: string[]) => `<div class="party"><div class="k">${esc(k)}</div>${lines.map((l, i) => i === 0 ? `<div class="first">${esc(l)}</div>` : `<div>${esc(l)}</div>`).join('')}</div>`;
@@ -343,16 +346,17 @@ export function renderInvoiceDocument(v: any, brandIn?: Partial<DocBrand> | null
   const lines = invoiceLines(v, billed);
   const rows = lines.map((l) => `<tr${l.amount_cents < 0 ? ' class="less"' : ''}><td>${esc(l.label)}</td><td class="qty">${l.qty !== 1 ? esc(String(l.qty)) : ''}</td><td>${esc(l.amount_cents < 0 ? '−' + money(-l.amount_cents, currency) : money(l.amount_cents, currency))}</td></tr>`).join('');
   const partRows = payments.map((p) => `<tr class="less"><td>${esc(paidLine(p, tz))}</td><td class="qty"></td><td>−${esc(money(p.amount_cents, currency))}</td></tr>`).join('');
-  const totalLabel = paid ? 'Total paid' : voided ? 'Total (voided)' : 'Amount due';
+  const totalLabel = paid ? 'Total paid' : voided ? 'Total (voided)' : settling ? 'Payment on its way' : 'Amount due';
   const totalCents = paid ? billed : amount;
   const table = `<table><thead><tr><th>Description</th><th class="qty">Qty</th><th>Amount</th></tr></thead><tbody>${rows}${payments.length && !paid ? `<tr><td style="color:var(--soft)">Total</td><td class="qty"></td><td style="color:var(--soft)">${esc(money(billed, currency))}</td></tr>` + partRows : ''}<tr class="total"><td>${esc(totalLabel)}</td><td class="qty"></td><td>${esc(money(totalCents, currency))}</td></tr></tbody></table>`;
   const paidBox = paid ? `<div class="paidbox">${esc(paidLine(v, tz))}${payments.length ? ` · with ${payments.length} earlier part payment${payments.length === 1 ? '' : 's'}: ${esc(payments.map((p) => paidLine(p, tz)).join('; '))}` : ''}</div>` : '';
   // A live pay link is an ACTION, not part of the printed record → no-print.
-  const pay = (!paid && !voided && v?.stripe_url)
+  const pay = (!paid && !voided && !settling && v?.stripe_url)
     ? `<p class="no-print" style="margin-top:16px"><a class="paylink" href="${esc(String(v.stripe_url))}">Pay ${esc(money(v?.amount_cents, currency))} securely →</a></p>`
     : '';
   const note = paid ? 'Thank you — this is your receipt of payment.'
     : voided ? 'This request was voided and is no longer payable.'
+    : settling ? 'Your payment is on its way. A bank payment takes a few days to arrive, and there is nothing more to do. You’ll get a receipt when it lands.'
     : `Payment is processed securely.${no ? ` Please quote ${no} with any payment by check or transfer.` : ''} This document is your copy of the request.`;
   const body = `${parties}${table}${paidBox}${pay}<p class="note">${esc(note)}</p>`;   // the table's bold total is the amount (the old amount box said it twice)
   return shell({ title: `${heading}${no ? ' ' + no : ''} — ${brand.name}`, brand, docLabel, heading, sub: undefined, bodyHtml: body, pdfUrl: ctx?.pdfUrl, pdfName: ctx?.pdfName, headHtml, lasting: paid });

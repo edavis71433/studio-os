@@ -1029,6 +1029,10 @@ async function route_(req: Request, cors: Record<string, string>): Promise<Respo
   //    client + verifies a service_link before touching agency-site data. ──
   if (route === '/client/projects' && method === 'GET') return handleClientProjects(req, site, principal, cors);
   if (route === '/client/billing' && method === 'GET') return handleClientBilling(req, site, principal, cors);
+  { // sales item 117: the client cancels their own retainer (an owner's call: 'delete' in lib/site_roles.ts)
+    const m = route.match(/^\/client\/retainers\/([0-9a-f-]{36})\/cancel$/);
+    if (m && method === 'POST') return (await import('./routes/client_retainers.ts')).handleClientRetainerCancel(req, site, principal, m[1], cors);
+  }
   if (route === '/client/documents' && method === 'GET') return handleClientDocuments(req, site, principal, cors);
   // item 179: the monthly reports that went out, for the client's Documents shelf
   if (route === '/client/reports' && method === 'GET') return (await import('./ops/monthly_report.ts')).handleClientReports(site, cors);
