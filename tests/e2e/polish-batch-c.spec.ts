@@ -108,13 +108,15 @@ test.describe('batch C — picking, confirming and focus', () => {
     await page.getByLabel('Select Acme website').check();
     const bar = page.getByRole('region', { name: 'Selected deals' });
     await bar.getByRole('button', { name: 'Mark as not a fit' }).click();
+    // builder item 75: the question also takes the reason, so focus starts on the reason
     const ask = bar.getByRole('group', { name: 'Mark 1 deal as not a fit?' });
-    await expect(ask.getByRole('button', { name: 'Cancel' })).toBeFocused();
+    await expect(ask.getByLabel('Why they weren’t a fit')).toBeFocused();
     await ask.getByRole('button', { name: 'Cancel' }).click();
     await expect(bar.getByRole('button', { name: 'Mark as not a fit' })).toBeFocused();
     expect(moved).toEqual([]);
     await bar.getByRole('button', { name: 'Mark as not a fit' }).click();
-    await bar.getByRole('button', { name: 'Yes, mark them' }).click();
+    await bar.getByLabel('Why they weren’t a fit').selectOption('Timing');
+    await bar.getByRole('button', { name: 'Mark them not a fit' }).click();
     await expect.poll(() => moved.length).toBe(1);
   });
 

@@ -819,7 +819,7 @@ export async function handleAdmin(req: Request, route: string, method: string, p
       if (!batchFilter) return json({ data: { batch_id: null, judgments: [] } }, 200, cors);
     }
     const statusFilter = status === 'all' ? '' : status === 'suppressed' ? '&status=eq.suppressed' : '&status=eq.active';
-    const rows = await svc(`presence_judgments?batch_id=eq.${batchFilter}${statusFilter}&select=judgment_hash,judgment_key,rule,category,priority,severity,confidence,reasoning,business_impact,customer_impact,timing,audience,status,suppression_reason,evidence_ids,evidence_count,first_seen_at,expires_at,created_at&order=priority.asc,rule.asc&limit=200`);
+    const rows = await svc(`presence_judgments?site_id=eq.${site.id}&batch_id=eq.${batchFilter}${statusFilter}&select=judgment_hash,judgment_key,rule,category,priority,severity,confidence,reasoning,business_impact,customer_impact,timing,audience,status,suppression_reason,evidence_ids,evidence_count,first_seen_at,expires_at,created_at&order=priority.asc,rule.asc&limit=200`);
     return json({ data: { batch_id: batchFilter, judgments: rows.json ?? [] } }, 200, cors);
   }
 
@@ -839,7 +839,7 @@ export async function handleAdmin(req: Request, route: string, method: string, p
       if (!batchFilter) return json({ data: { batch_id: null, recommendations: [] } }, 200, cors);
     }
     const statusFilter = status === 'all' ? '' : status === 'suppressed' ? '&status=eq.suppressed' : '&status=eq.active';
-    const rows = await svc(`presence_recommendations?batch_id=eq.${batchFilter}${statusFilter}&select=recommendation_hash,recommendation_key,rule,category,priority,action,title,description,reason,expected_benefit,value_dimensions,estimated_effort,estimated_risk,undoability,timing,audience,affected_resources,requires_ai,manual_available,approval_required,status,suppression_reason,supporting_judgment_ids,first_seen_at,expires_at,created_at&order=priority.asc,rule.asc&limit=200`);
+    const rows = await svc(`presence_recommendations?site_id=eq.${site.id}&batch_id=eq.${batchFilter}${statusFilter}&select=recommendation_hash,recommendation_key,rule,category,priority,action,title,description,reason,expected_benefit,value_dimensions,estimated_effort,estimated_risk,undoability,timing,audience,affected_resources,requires_ai,manual_available,approval_required,status,suppression_reason,supporting_judgment_ids,first_seen_at,expires_at,created_at&order=priority.asc,rule.asc&limit=200`);
     return json({ data: { batch_id: batchFilter, recommendations: rows.json ?? [] } }, 200, cors);
   }
 

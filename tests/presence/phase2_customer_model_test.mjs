@@ -25,7 +25,8 @@ ok('sales: add-customer (connect) links the contact', /const ct = await ensureCo
 ok('sales: add-customer (provision) links the contact', /\{ const ct = await ensureConnectContact\(site\.id, email, name, false\); await linkContactToCustomer\(site\.id, ct\?\.id, clientId\)/.test(sales));
 ok('sales: an enquiry converted this way is marked converted', /async function markSubmissionConverted/.test(sales) && (sales.match(/markSubmissionConverted\(site\.id, b\.source_submission_id\)/g) || []).length >= 2);
 // the read tolerates a database without the column
-ok('sales: contacts read selects client_id and retries narrow on 400', /company,client_id,updated_at/.test(sales) && /r\.status === 400\) r = await svc\(mkPath\('id,name,email,phone,company,updated_at'\)\)/.test(sales));
+// item 90: the select chain runs through pathFor (the page by offset, or by the ids a field filter kept)
+ok('sales: contacts read selects client_id and retries narrow on 400', /company,client_id,updated_at/.test(sales) && /r\.status === 400\) r = await svc\(pathFor\('id,name,email,phone,company,updated_at'\)\)/.test(sales));
 
 // search across everything
 // item 84: the search reads every place through one site constant (S = site.id) and one pattern (like = ilike.*q*)
@@ -37,7 +38,7 @@ ok('search: every result carries a kind', /kind: 'customer'/.test(crmRoute) && /
 
 // the record honours ?act=
 ok('crm.html: ?act=invoice opens Billing once the deal is in', /if\(act==='invoice'\|\|act==='deposit'\)DEAL_READY\.then/.test(crm));
-ok('crm.html: ?act=message brings the composer forward', /act==='message'\|\|act==='note'\|\|act==='task'\)setTimeout\(\(\)=>focusComposer\(act\)/.test(crm));
+ok('crm.html: ?act=message brings the composer forward (and ?act=email its Email tab, sales item 80)', /act==='message'\|\|act==='note'\|\|act==='task'\|\|act==='email'\)setTimeout\(\(\)=>focusComposer\(act\)/.test(crm));
 
 // the enquiry's one-step convert
 ok('inbox.html: Make customer posts /sales/customers with the enquiry id', /api\('\/sales\/customers','POST',\{email,name:l\.name\|\|'',business_name:biz,source_submission_id:id\}\)/.test(inbox) && /const l=it\.lead\|\|\{\},id=it\.lead_id;/.test(inbox));
