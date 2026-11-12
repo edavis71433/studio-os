@@ -1622,19 +1622,33 @@
   }
   // Studio level: the needs-you rows (one per thing, money first) + the feed's news.
   function studioBellRows(d, ny) {
-    var needs = (ny.rows || []).concat(ny.rest || []).map(function (n) {
-      return { id: 'need:' + String(n.key || ''), href: n.href || '/agency.html', title: (n.name ? n.name + ' — ' : '') + (n.what || ''), sub: n.when || '', tier: 'needs_you', priority: n.kind === 'money', clearable: false };
+    // builder list item 126: a client site's new enquiries fold into one line in the bell,
+    // naming the site, the number and one link ("3 new enquiries on Bacchus Kitchen");
+    // Home keeps a row for each, with its own Reply
+    var all = (ny.rows || []).concat(ny.rest || []), bySite = {}, folded = {}, needs = [];
+    all.forEach(function (n) { if (n && n.kind === 'enquiry' && n.site_id) (bySite[n.site_id] = bySite[n.site_id] || []).push(n); });
+    all.forEach(function (n) {
+      var g = n && n.kind === 'enquiry' && n.site_id ? bySite[n.site_id] : null;
+      if (g && g.length > 1) {
+        if (folded[n.site_id]) return;
+        folded[n.site_id] = true;
+        needs.push({ id: 'need:enquiries:' + n.site_id, href: '/inbox.html?client=' + encodeURIComponent(n.site_id) + '#enquiries', title: g.length + ' new enquiries on ' + (n.name || 'a client’s site'), sub: g[0].when ? 'The oldest: ' + String(g[0].when).replace(/^\w/, function (c) { return c.toLowerCase(); }) : '', go: 'Reply', tier: 'needs_you', priority: false, clearable: false });
+        return;
+      }
+      needs.push({ id: 'need:' + String(n.key || ''), href: n.href || '/agency.html', title: (n.name ? n.name + ' — ' : '') + (n.what || ''), sub: n.when || '', tier: 'needs_you', priority: n.kind === 'money', clearable: false });
     });
     var news = shapeBellRows({ notices: (d.notices || []).filter(function (n) { return n.tier === 'update'; }) }, false);
     // builder list item 47: news per client site, each naming the site and opening the right
-    // place inside it ("Bacchus Kitchen — Published 3 changes"); the server carries ?client=
+    // place inside it; the server carries ?client=. Item 126: the server folds repeats and
+    // words each line (title), and names its one link (link): "3 new bookings on Bacchus Kitchen"
     var perSite = (ny.news || []).map(function (n) {
-      return { id: 'news:' + String(n.id || n.site_id + ':' + n.kind), href: n.href || ('/today.html?client=' + encodeURIComponent(n.site_id)), title: (n.name ? n.name + ' — ' : '') + (n.headline || ''), sub: n.body || '', tier: 'update', priority: false, clearable: false };
+      return { id: 'news:' + String(n.id || n.site_id + ':' + n.kind), href: n.href || ('/today.html?client=' + encodeURIComponent(n.site_id)), title: n.title || ((n.name ? n.name + ' — ' : '') + (n.headline || '')), sub: n.title ? (n.sub || '') : (n.body || ''), go: n.link || '', tier: 'update', priority: false, clearable: false };
     });
     return needs.concat(perSite).concat(news);
   }
   function bellRowHtml(r, seen) {
-    return '<a class="row' + (r.priority ? ' pri' : '') + (seen ? ' seen' : '') + '" data-tier="' + r.tier + '" href="' + esc(r.href) + '"><b>' + esc(r.title) + '</b>' + (r.sub ? '<div class="sub">' + esc(r.sub) + '</div>' : '') + '</a>';
+    var sub = (r.sub ? esc(r.sub) : '') + (r.go ? (r.sub ? ' · ' : '') + '<span class="go">' + esc(r.go) + '</span>' : '');
+    return '<a class="row' + (r.priority ? ' pri' : '') + (seen ? ' seen' : '') + '" data-tier="' + r.tier + '" href="' + esc(r.href) + '"><b>' + esc(r.title) + '</b>' + (sub ? '<div class="sub">' + sub + '</div>' : '') + '</a>';
   }
   function paintBellRows() {
     if (!notif) return;

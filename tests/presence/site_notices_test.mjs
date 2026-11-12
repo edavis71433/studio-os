@@ -57,7 +57,10 @@ ok('news keeps the update kinds for named sites from the last fortnight', news.m
 ok('each row names the site', news[0].name === 'Harbor Dental' && news[1].name === 'Bacchus Kitchen');
 ok('each link carries the client’s scope and lands on the right page', news[0].href === '/analytics.html?client=s2' && news[1].href === '/presence.html?client=s1');
 ok('the news kinds include a review and a booking too', SITE_NEWS_KINDS.has('new_review') && SITE_NEWS_KINDS.has('new_booking') && !SITE_NEWS_KINDS.has('lead_followup'));
-ok('the cap holds', siteNews(Array.from({ length: 30 }, (_, i) => ({ id: 'x' + i, site_id: 's1', kind: 'site_published', period: 'pub:' + i, headline: 'P', body: '', created_at: '2026-11-10T0' + (i % 10) + ':00:00Z' })), names, NOW).length === 12);
+// item 126: one site's repeats fold into one line, so the cap is twelve lines across sites
+const many = Object.fromEntries(Array.from({ length: 30 }, (_, i) => ['m' + i, 'Site ' + i]));
+ok('the cap holds', siteNews(Array.from({ length: 30 }, (_, i) => ({ id: 'x' + i, site_id: 'm' + i, kind: 'site_published', period: 'pub:' + i, headline: 'P', body: '', created_at: '2026-11-10T0' + (i % 10) + ':00:00Z' })), many, NOW).length === 12);
+ok('one site’s thirty publishes are one line that counts them', (() => { const n = siteNews(Array.from({ length: 30 }, (_, i) => ({ id: 'x' + i, site_id: 's1', kind: 'site_published', period: 'pub:' + i, headline: 'P', body: '', created_at: '2026-11-10T0' + (i % 10) + ':00:00Z' })), names, NOW); return n.length === 1 && n[0].count === 30 && n[0].title === 'Bacchus Kitchen was published 30 times'; })());
 
 // the migration and the apply pack
 const mig = read('supabase/migrations/0147_site_notices.sql'), pack = read('docs/presence/APPLY-0147-prod.sql');
