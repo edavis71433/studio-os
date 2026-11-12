@@ -156,9 +156,11 @@ test.describe('Wave 2 bets', () => {
   });
 
   // ── 7 · AI shows its sources; drafts replies ──
-  test('7: chips name what the concierge drew on, plus an honest line on low confidence (Today and Help)', async ({ page }) => {
+  test('7: chips name what the concierge drew on, plus an honest line on low confidence (Today); Help asks the product helper and shows its links', async ({ page }) => {
     const answer = { data: { verb: 'explain', answer: 'Your Saturday hours are missing from the Contact page — add them and publish.', source_labels: ['Your hours are missing', 'No opening hours were found on the Contact page.'], low_confidence: true, grounded: true, sources: { moment_id: 'm1', recommendation_ids: [], evidence_count: 1 } } };
-    await installApp(page, { api: { '/concierge/ask': answer } });
+    // builder item 202: Help's own box asks /help/ask, the helper the ? panel asks
+    const helpAnswer = { data: { matched: true, id: 'hours', answer: 'Your hours live with the rest of your business info.', links: [{ href: '/presence.html#business', label: 'Open Business details' }], low_confidence: true } };
+    await installApp(page, { api: { '/concierge/ask': answer, '/help/ask': helpAnswer } });
     await page.goto('/today.html');
     await page.locator('#q').fill('What should I do first?');
     await page.locator('#askBtn').click();
@@ -170,8 +172,8 @@ test.describe('Wave 2 bets', () => {
     await page.getByLabel('Ask a question').fill('What should I do first?');
     await page.getByRole('button', { name: 'Ask' }).click();
     const ans = page.locator('#ans');
-    await expect(ans).toContainText('Your Saturday hours are missing');
-    await expect(ans.locator('.src')).toHaveCount(2);
+    await expect(ans).toContainText('Your hours live with the rest of your business info.');
+    await expect(ans.locator('.links a')).toHaveText(['Open Business details →']);
     await expect(ans.locator('.lowc')).toBeVisible();
   });
 
