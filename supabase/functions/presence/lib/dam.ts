@@ -251,6 +251,7 @@ const SECTION_NAMES: Record<string, string> = {
   gallery: 'Photo gallery', carousel: 'Carousel', before_after: 'Before & after', image: 'Image', image_text: 'Image + text',
   video: 'Video', team: 'Team', partners: 'Trusted by', map: 'Map & directions', download: 'Download', columns: 'Columns',
   cards: 'Feature cards', tabs: 'Tabs', freeform: 'Free-form', spotlight: 'Spotlight', features: 'Features', accordion: 'Accordion',
+  stack: 'Blocks',   // builder item 57: a Blocks section's photos, video pictures and map pictures
 };
 // page_seo's keys for the template's own pages (presence.html PG_SEO_KEY); the
 // owner's pages are "page:<slug>". The services page takes the industry's word.
@@ -311,7 +312,9 @@ export function settingsMediaUses(s: SettingsMedia | null | undefined, opts: { l
         continue;
       }
       const name = SECTION_NAMES[String(b.type || '')];
-      const title = clip(b.title);
+      // a Blocks section has no title of its own: its first heading names it (item 57)
+      const heading = b.type === 'stack' && Array.isArray(b.items) ? (b.items as Array<Record<string, unknown>>).find((it) => it && it.kind === 'heading' && it.text) : undefined;
+      const title = clip(b.title) || clip(heading?.text);
       const label = `${name ? `the ${name} section` : 'a section'}${title ? ` “${title}”` : ''} on ${where}`;
       for (const id of mediaIdsIn(b)) add(id, { surface: 'section', label, live: false });
     }

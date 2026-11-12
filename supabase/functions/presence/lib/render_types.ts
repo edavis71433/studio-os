@@ -275,6 +275,27 @@ export interface SiteBlockFreeformElement {
   button?: { label: string; url: string; style: 'primary' | 'outline' };
 }
 export interface SiteBlockFreeform { type: 'freeform'; id: string; title?: string; aspect: SiteBlockFreeformAspect; elements: SiteBlockFreeformElement[] }
+// ── Builder item 57 (Nov 2026): the Blocks section — small blocks stacked top to
+// bottom inside ONE section. No x/y (Eric, Nov 12: no free placement): the items are a
+// list, so a phone reads them in order and nothing can overlap. Validated, capped and
+// drawn by lib/site_blocks.ts like every section. An item that is empty for now (a
+// heading being typed, a photo not picked yet) keeps its place and draws nothing, so an
+// item's place is the same in storage, on the page and in the editor (data-dds-item).
+// Render-facing: photos arrive resolved to MediaRefs, or null when they can't be.
+export type SiteBlockStackKind = 'heading' | 'text' | 'image' | 'button' | 'video' | 'form' | 'spacer' | 'divider' | 'map';
+interface SiteBlockStackItemBase { align?: 'left' | 'center' | 'right'; hide_on_phone?: true }
+export type SiteBlockStackItem = SiteBlockStackItemBase & (
+  | { kind: 'heading'; text: string; size?: 'm' | 's' }   // Big (h2) when no size; Medium h3, Small h4
+  | { kind: 'text'; body: string; size?: 'l' }             // markdown; Large
+  | { kind: 'image'; image: MediaRef | null; alt?: string; caption?: string; link?: string; decorative?: true; width?: 's' | 'm' }
+  | { kind: 'button'; buttons: Array<{ label: string; url: string; style: 'primary' | 'outline' }> }
+  | { kind: 'video'; url: string; caption?: string; poster: MediaRef | null }
+  | { kind: 'form'; form?: FormDefinition }
+  | { kind: 'spacer'; size?: 's' | 'l' }
+  | { kind: 'divider'; width?: 's' }
+  | { kind: 'map'; address?: string; directions_url?: string; image: MediaRef | null }
+);
+export interface SiteBlockStack { type: 'stack'; items: SiteBlockStackItem[]; column?: 'narrow' | 'wide'; gap?: 'tight' | 'roomy' }
 export interface SiteBlockTitle { type: 'title'; title: string; subtitle?: string }
 export interface SiteBlockLinkList { type: 'link_list'; title?: string; links: Array<{ label: string; url: string }> }
 export interface SiteBlockTable { type: 'table'; title?: string; headers: string[]; rows: string[][] }
@@ -327,6 +348,7 @@ export type SiteBlock = WithLook<
   | SiteBlockColumns | SiteBlockCards | SiteBlockDownload | SiteBlockToc
   | SiteBlockTitle | SiteBlockLinkList | SiteBlockTable | SiteBlockSpotlight
   | SiteBlockFreeform
+  | SiteBlockStack
   | FormDefinition
 >;
 export type SiteBlockType = SiteBlock['type'];
