@@ -3,31 +3,30 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Developer Mode — Studio OS</title>
+<title>Developer tools — Studio OS</title>
 <meta name="robots" content="noindex, nofollow">
-<meta name="description" content="Customize the presentation of your site — theme, CSS and HTML — safely, published through your normal approval flow.">
+<meta name="description" content="Your site’s colors and type, your own styles and a block of your own HTML, kept as a draft until you publish.">
 <link rel="stylesheet" href="/fonts/brand.css">
 <style>
+  /* builder item 165 (Nov 2026): the shared look. This page wore the old cream of its own
+     (rgb 250,248,245, with a light and dark set to match); its names now point at the shell's
+     tokens, as Settings does, so it is the cool grey of every other page in both themes. */
   :root{
-    --bg:#faf8f5;--card:#fff;--ink:#1b1525;--soft:#6b6478;--faint:#6f677d;--line:#eee9e0;
-    --p:#5b3fa0;--p-deep:#2a1b4a;--p-soft:#efeafa;--good:#33664b;--good-soft:#e7f1ea;--warn:#775d31;--warn-soft:#f3ead9;--bad:#a3423a;
-    --code-bg:#f6f3ef;--code-ink:#2a2338;
-    --shadow:0 1px 2px rgba(27,21,37,.04),0 8px 24px rgba(27,21,37,.06);
-    --serif:'Fraunces',"Iowan Old Style",Georgia,serif;
-    --sans:'Inter',-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
-    --mono:"SF Mono",ui-monospace,"Cascadia Code","Fira Code",Menlo,Consolas,monospace;
+    --bg:var(--dds-bg,#f3f3f8);--card:var(--dds-card,#fff);--ink:var(--dds-ink,#171522);--soft:var(--dds-soft,#55526a);--faint:var(--dds-faint,#69667d);--line:var(--dds-line,#e7e6ef);
+    --p:var(--dds-p,#6d3fd4);--p-deep:var(--dds-p-deep,#3d2185);--p-soft:var(--dds-p-soft,#f0ebfd);--good:var(--dds-good,#11744a);--good-soft:var(--dds-good-soft,#e2f4ea);--warn:var(--dds-warn,#94530a);--warn-soft:var(--dds-warn-soft,#fcefdb);--bad:var(--dds-bad,#bf3535);
+    --code-bg:var(--dds-up,#f7f6fb);--code-ink:var(--dds-ink,#171522);
+    --shadow:var(--dds-shadow,0 1px 2px rgba(23,21,34,.05),0 8px 24px -8px rgba(23,21,34,.10));
+    --serif:var(--dds-serif,'Fraunces',Georgia,serif);
+    --sans:var(--dds-sans,'Inter',-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif);
+    --mono:var(--dds-mono,"SF Mono",ui-monospace,Menlo,Consolas,monospace);
   }
-  @media (prefers-color-scheme:dark){:root{--bg:#171320;--card:#1f1a2b;--ink:#efeaf7;--soft:#a79ebc;--faint:#948bad;--line:#2a2338;--p:#b79ceb;--p-soft:#241d38;--good:#8bbf9f;--good-soft:#1f2a24;--warn:#d3ac6e;--warn-soft:#2a2316;--bad:#e39a92;--code-bg:#181322;--code-ink:#d7cef0;--shadow:0 1px 2px rgba(0,0,0,.2),0 8px 24px rgba(0,0,0,.28)}}
-  :root[data-theme="light"]{--bg:#faf8f5;--card:#fff;--ink:#1b1525;--soft:#6b6478;--faint:#6f677d;--line:#eee9e0;--p:#5b3fa0;--p-soft:#efeafa;--code-bg:#f6f3ef;--code-ink:#2a2338}
-  :root[data-theme="dark"]{--bg:#171320;--card:#1f1a2b;--ink:#efeaf7;--soft:#a79ebc;--faint:#948bad;--line:#2a2338;--p:#b79ceb;--p-soft:#241d38;--code-bg:#181322;--code-ink:#d7cef0}
   *{box-sizing:border-box;margin:0}
   body{background:var(--bg);color:var(--ink);font-family:var(--sans);line-height:1.5;-webkit-font-smoothing:antialiased}
   .wrap{max-width:var(--dds-w-app,1280px);margin:0 auto;padding:var(--dds-s7,32px) var(--dds-s5,20px) 90px}
-  .rolebadge{display:inline-flex;align-items:center;gap:var(--dds-s2,8px);font-size:12px;font-weight:600;color:var(--p);background:var(--p-soft);border-radius:999px;padding:var(--dds-s1,4px) var(--dds-s3,12px)}
-  header{display:flex;align-items:baseline;justify-content:space-between;gap:var(--dds-s4,16px);flex-wrap:wrap;margin-bottom:6px}
-  header h1{font-family:var(--serif);font-weight:500;font-size:clamp(22px,4vw,28px);margin:var(--dds-s3,12px) 0 .1em;letter-spacing:-.01em}
-  header .sub{color:var(--soft);font-size:14px;margin:0}
-  .tmpl{font-family:var(--mono);font-size:12px;color:var(--faint)}
+  header{margin-bottom:6px}
+  header h1{font-family:var(--serif);font-weight:600;font-size:30px;line-height:1.15;margin:0 0 4px;letter-spacing:-.015em}
+  header .sub{color:var(--soft);font-size:14px;margin:0;max-width:72ch}
+  @media (max-width:760.98px){header h1{font-size:24px}}
   .grid{display:grid;grid-template-columns:220px 1fr;gap:var(--dds-s5,20px);margin-top:var(--dds-s6,24px);align-items:start}
   @media (max-width:820px){.grid{grid-template-columns:1fr}}
   .panel{background:var(--card);border:1px solid var(--line);border-radius:var(--dds-r-lg,10px);box-shadow:var(--shadow)}
@@ -61,6 +60,13 @@
   button.primary{background:var(--p);color:#fff;border-color:var(--p)} button.primary:hover{background:var(--p-deep);color:#fff}
   .save-note{font-size:12.5px;color:var(--soft)}
   .save-note.warn{color:var(--warn)}
+  /* item 165: one way to save — the editor saves as you go and says so beside the file name */
+  .fs{display:inline-flex;align-items:center;gap:4px;font-family:var(--sans);font-size:12px;font-weight:600;line-height:1.3}
+  .fs.ok{color:var(--good)}
+  .fs.ok::before{content:"";width:13px;height:13px;flex:0 0 auto;background:currentColor;-webkit-mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='m5 12.5 4.5 4.5L19 7.5' fill='none' stroke='black' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center/contain no-repeat;mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='m5 12.5 4.5 4.5L19 7.5' fill='none' stroke='black' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center/contain no-repeat}
+  .fs.bad{color:var(--bad)}
+  .fs .again{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:pointer;text-decoration:underline;text-underline-offset:2px;border-radius:0}
+  .fs .again:hover{color:inherit}
   /* preview */
   .preview{margin-top:var(--dds-s5,20px)}
   .preview h2,.readonly h2,.approval h2{font-size:12px;color:var(--faint);font-weight:500;margin:0 0 10px}
@@ -77,7 +83,6 @@
   .spin{width:22px;height:22px;border:2.5px solid var(--line);border-top-color:var(--p);border-radius:50%;animation:sp .8s linear infinite;margin:60px auto}
   .toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:var(--dds-s3,12px) var(--dds-s5,20px);border-radius:999px;font-size:14px;opacity:0;transition:var(--dds-t-base,200ms) var(--dds-ease,ease-out);pointer-events:none;max-width:90vw;text-align:center}
   .toast.show{opacity:1}
-  footer{margin-top:var(--dds-s8,40px);padding-top:var(--dds-s5,20px);border-top:1px solid var(--line);color:var(--faint);font-size:12.5px;text-align:center}
   @keyframes sp{to{transform:rotate(360deg)}}
   @media (prefers-reduced-motion:reduce){.spin{animation:none}}
 </style>
@@ -86,13 +91,12 @@
 <body>
 <div class="wrap">
   <div id="main"><div class="spin" role="status" aria-label="Loading"></div></div>
-  <footer>Studio OS · Developer Mode — customize safely. Every change publishes through your normal approval flow, is versioned, and can be rolled back.</footer>
 </div>
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
 <script src="/vendor/supabase-js-2.45.4.js"></script>
 <script>
-// Developer Mode (Phase B). A capability of Studio OS — reachable only by an
+// Developer tools (Phase B's "Developer Mode"; builder item 165 named it in plain words). A capability of Studio OS — reachable only by an
 // operator or a member with the developer capability (the server enforces it;
 // this page just presents it). It authors the SAFE presentation layer: theme
 // tokens + custom CSS + a sanitized HTML block. It NEVER executes developer code
@@ -112,7 +116,7 @@ sb.auth.onAuthStateChange((_e,s)=>{ if(s&&s.access_token) TOKEN=s.access_token; 
 const ownBusiness=()=>{const id=new URLSearchParams(location.search).get('client')||'';return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)&&window.ddsScopeInfo&&!window.ddsScopeInfo()?id:'';};
 async function businessKnown(){if(!new URLSearchParams(location.search).get('client'))return;if(document.readyState==='loading')await new Promise((r)=>document.addEventListener('DOMContentLoaded',r,{once:true}));if(window.ddsContext)await window.ddsContext().catch(()=>null);}
 const H=()=>({'Content-Type':'application/json','Authorization':'Bearer '+SUPABASE_KEY,'x-dds-user-jwt':TOKEN,'x-dds-scope-site':ownBusiness()});
-async function api(path,method,body){const r=await fetch(FN+path,{method:method||'GET',headers:H(),body:body?JSON.stringify(body):undefined});return{ok:r.ok,status:r.status,body:await r.json().catch(()=>({}))};}
+async function api(path,method,body){let r;try{r=await fetch(FN+path,{method:method||'GET',headers:H(),body:body?JSON.stringify(body):undefined});}catch(_){return{ok:false,status:0,body:{}};}return{ok:r.ok,status:r.status,body:await r.json().catch(()=>({}))};}   // a dropped connection answers as a failed save, never a throw
 function toast(m){const t=$('toast');t.textContent=m;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),3200);}
 
 // ── state ──
@@ -123,7 +127,7 @@ const TOKEN_META={accent:{label:'Accent',type:'color'},accent_soft:{label:'Accen
 function iconFor(kind){return kind==='theme'?'◆':kind==='css'?'{}':kind==='html'?'<>':kind==='template'?'⌘':'▤';}
 
 function fileList(){
-  const groups=[['Editable','theme|css|html|asset'],['Read-only (SDK / build-time)','template']];
+  const groups=[['Yours to change','theme|css|html|asset'],['Part of your template (read-only)','template']];
   let h='<div class="files">';
   for(const [title,kinds] of groups){
     const set=kinds.split('|');
@@ -163,29 +167,32 @@ function themeEditor(){
   // Styles panel already says; a colour set here saved without changing anything.
   const fixed=FIXED_COLOR_TEMPLATES.has(STATE.template.slug||'')
     ?`<p class="hint" id="fixedColors" style="margin-bottom:14px">Slate keeps its own dark colors, so the color tokens here don’t change your site. Fonts, text size, corners and spacing still do.</p>`:'';
-  return `<label class="fld" style="margin-bottom:12px">Theme tokens</label>
-    <p class="hint" style="margin-bottom:14px">Only these values can be set, and only in valid forms — a safety guarantee, not a limitation. Everything else lives in the template.</p>${fixed}
+  return `<label class="fld" style="margin-bottom:12px">Colors and type</label>
+    <p class="hint" style="margin-bottom:14px">Only these can be set here, each in a form that works everywhere; everything else comes from your template.</p>${fixed}
     <div class="tokens">${toks}</div>${previewBlock()}${approvalBlock()}`;
 }
 function cssEditor(){
-  return `<label class="fld">Custom CSS</label>
-    <p class="hint" style="margin-bottom:8px">Layered on top of the template. <code>@import</code>, <code>expression()</code> and code-bearing URLs are removed on save.</p>
+  return `<label class="fld" for="css">Your own styles (CSS)</label>
+    <p class="hint" style="margin-bottom:8px">They go on top of your template’s styles. Anything that would load or run outside code is taken out when it saves.</p>
     <textarea id="css" spellcheck="false" aria-label="Custom CSS" placeholder=".hero h1 { letter-spacing: -0.02em; }">${esc(STATE.cust.custom_css||'')}</textarea>${previewBlock()}${approvalBlock()}`;
 }
 function htmlEditor(){
-  return `<label class="fld">Custom HTML block</label>
-    <p class="hint" style="margin-bottom:8px">Inert markup for a designated slot. Scripts, event handlers, iframes and code-bearing URLs are stripped on save — this can never run code.</p>
+  return `<label class="fld" for="html">A block of your own HTML</label>
+    <p class="hint" style="margin-bottom:8px">It shows in one set place on your site. Scripts, embedded frames and anything else that could run code are taken out when it saves.</p>
     <textarea id="html" spellcheck="false" aria-label="Custom HTML block" placeholder="<p class=&quot;note&quot;>Family-owned since 1998.</p>">${esc(STATE.cust.custom_html||'')}</textarea>${previewBlock()}${approvalBlock()}`;
 }
 function assetView(){
-  return `<div class="readonly"><h2>Assets</h2><div class="box">Your photos and documents are managed in Files. <a class="link" href="/files.html">Open Files →</a><br><br>Developer Mode styles what the template does with those files; it doesn't replace Files.</div></div>`;
+  return `<div class="readonly"><h2>Photos and documents</h2><div class="box">Your photos and documents live in Files. <a class="link" href="/files.html">Open Files →</a><br><br>The styles here change how your site shows them; they don’t replace Files.</div></div>`;
 }
 function readonlyView(path){
-  return `<div class="readonly"><h2>Read-only — render code</h2>
-    <div class="box"><b>${esc(path)}</b><br><br>Template render logic is authored with the <b>Presence SDK</b> at build time and version-pinned to your site (currently <b>${esc(STATE.template.slug||'')}@${esc(STATE.template.version||'')}</b>). It is deployed with the platform — never edited or executed at runtime — which is what keeps every site deterministic and secure.<br><br>To change render logic, publish a new template version through the SDK. See the <a class="link" href="/docs/presence/DEVELOPER-MODE-GUIDE.md">Developer Guide</a>.</div></div>`;
+  // item 165: plain words (this said "Template render logic is authored with the Presence SDK…
+  // deterministic"), and the template named only when there is one (an empty one read "@")
+  const t=STATE.template||{};const which=t.slug?` (${esc(t.slug)}${t.version?', version '+esc(t.version):''})`:'';
+  return `<div class="readonly"><h2>Part of your template</h2>
+    <div class="box"><b>${esc(path)}</b><br><br>This file comes with your site’s template${which}, so it can’t be changed here. Templates are built and tested before they reach your site, which keeps every page working the same way. Your colors, styles and HTML go on top of it.</div></div>`;
 }
-function previewBlock(){return `<div class="preview"><h2 style="display:flex;align-items:center;justify-content:space-between;gap:10px"><span>Live preview <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--faint)">— sandboxed, no scripts run</span></span><button id="realpv" style="font-size:12px;padding:6px 12px">Preview real page →</button></h2><iframe class="pv" id="pv" title="Preview" sandbox=""></iframe><p class="hint" id="pvnote" style="margin-top:8px">Sample content with your theme applied. “Preview real page” saves, then renders your actual site through the same pipeline that publishes — pixel-identical to production except for unpublished changes.</p></div>`;}
-function approvalBlock(){return `<div class="approval"><b>Publishing:</b> Save keeps your work. It goes live only when you <b>Publish</b> from your workspace — through the same approval flow as any change, versioned and reversible. Nothing here bypasses approval.</div>`;}
+function previewBlock(){return `<div class="preview"><h2 style="display:flex;align-items:center;justify-content:space-between;gap:10px"><span>Preview <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--faint)">— nothing in it can run code</span></span><button id="realpv" style="font-size:12px;padding:6px 12px">Preview real page →</button></h2><iframe class="pv" id="pv" title="Preview" sandbox=""></iframe><p class="hint" id="pvnote" style="margin-top:8px">Sample content with your colors and styles. “Preview real page” shows your own home page with them, as it will look once you publish.</p></div>`;}
+function approvalBlock(){return `<div class="approval"><b>Publishing:</b> what you change here is kept as a draft as you go. It goes live only when you <b>Publish</b> from your workspace, like any other change, and every version can be undone.</div>`;}
 
 // gather current edits from the DOM (so preview + save use live values)
 function collect(){
@@ -205,36 +212,41 @@ function buildPreviewDoc(){
     .cta{display:inline-block;margin-top:16px;background:var(--accent,#5b3fa0);color:#fff;padding:10px 18px;border-radius:var(--radius,999px);text-decoration:none;font-weight:600;font-size:14px}
     .body{padding:22px 26px}`;
   const html=`<!doctype html><html><head><meta charset="utf-8"><style>${base}\n/* custom */\n${STATE.cust.custom_css||''}</style></head>
-    <body><div class="hero"><div class="k">Bacchus Kitchen</div><h1>Wood-fired, family-owned.</h1><p>A sample of your site with this theme applied.</p><a class="cta" href="#">Book a table</a></div>
+    <body><div class="hero"><div class="k">Your business</div><h1>Wood-fired, family-owned.</h1><p>A sample of your site with this theme applied.</p><a class="cta" href="#">Book a table</a></div>
     <div class="body">${STATE.cust.custom_html||'<p style="color:#938ba3">Your custom HTML block appears here.</p>'}</div></body></html>`;
   return html;
 }
 function refreshPreview(){const f=$('pv');if(f)f.srcdoc=buildPreviewDoc();}
 
+// Builder item 165 (Figma 296:5–296:12): "Developer tools", one line in plain words, and one way
+// to save. There were two Save buttons and a stray "@" in the corner (the template's slug and
+// version, empty); now a box saves when you leave it, a color when you pick it, and the file you
+// leave saves on the way out, with "Saved" (or "Couldn't save · Try again") beside its name.
+const EDITABLE=['theme/tokens.json','styles/custom.css','blocks/custom.html'];
 function paint(){
-  const editable=STATE.files.find(x=>x.path===STATE.active)?.editable;
-  const showSave=['theme/tokens.json','styles/custom.css','blocks/custom.html'].includes(STATE.active);
+  const showSaved=EDITABLE.includes(STATE.active);
   $('main').innerHTML=`
     <header>
-      <div><div class="rolebadge">● Developer Mode</div>
-        <h1>Developer Mode</h1>
-        <p class="sub">Customize how your site looks — safely, and always through approval. This is the <b>same site</b> as your no-code workspace: <a class="link" href="/today.html">switch back anytime →</a></p></div>
-      <div class="tmpl">${esc(STATE.template.slug||'')}@${esc(STATE.template.version||'')}</div>
+      <h1>Developer tools</h1>
+      <p class="sub">Your site’s colors and type, your own styles and a block of your own HTML. These are for you, not your clients. Changes save as you go.</p>
     </header>
     <div class="grid">
       <div class="panel">${fileList()}</div>
       <div class="panel edwrap">
-        <div class="edhead"><span class="path">${esc(STATE.active)}</span>${showSave?'<button class="primary" id="save">Save</button>':''}</div>
+        <div class="edhead"><span class="path">${esc(STATE.active)}</span>${showSaved?'<span class="fs" id="devSaved" role="status"></span>':''}</div>
         <div class="edbody">${editorFor(STATE.active)}
-          ${showSave?'<div class="bar"><button class="primary" id="save2">Save changes</button><span class="save-note" id="savenote">Saved changes stay as a draft until you publish.</span></div>':''}
+          ${showSaved?'<div class="bar"><span class="save-note" id="savenote">Changes save as a draft as you go. They go live when you publish.</span></div>':''}
         </div>
       </div>
     </div>`;
   wire();refreshPreview();
+  if(SAID)said(SAID.ok,SAID.words);   // a file switch keeps what the last save said
 }
 function wire(){
-  document.querySelectorAll('[data-path]').forEach(b=>b.addEventListener('click',()=>{collect();STATE.active=b.getAttribute('data-path');paint();}));
-  document.querySelectorAll('#save,#save2').forEach(b=>b.addEventListener('click',save));
+  // the file you leave saves on the way out (it saves when a box is left anyway)
+  document.querySelectorAll('[data-path]').forEach(b=>b.addEventListener('click',()=>{collect();save();STATE.active=b.getAttribute('data-path');paint();}));
+  // item 165: a box saves when you leave it, a color when you pick it
+  document.querySelectorAll('[data-tok],[data-tokcolor],#css,#html').forEach(el=>el.addEventListener('change',()=>{save();}));
   // color pickers ↔ text mirror
   document.querySelectorAll('[data-tokcolor]').forEach(c=>c.addEventListener('input',()=>{const k=c.getAttribute('data-tokcolor');const t=document.querySelector(`[data-tok="${k}"]`);if(t)t.value=c.value;collect();refreshPreview();}));
   document.querySelectorAll('[data-tok]').forEach(i=>i.addEventListener('input',()=>{const k=i.getAttribute('data-tok');const c=document.querySelector(`[data-tokcolor="${k}"]`);if(c&&/^#[0-9a-fA-F]{6}$/.test(i.value))c.value=i.value;collect();refreshPreview();}));
@@ -255,32 +267,55 @@ async function loadRealPreview(){
   }catch(_){if(note)note.textContent='Couldn’t render the real page just now.';}
   if(btn){btn.disabled=false;btn.textContent='Preview real page →';}
 }
+// what the server last kept, so a box left unchanged sends nothing
+let LAST='',SAVING=null,AGAIN=false,SAID=null;
+const sentOf=()=>({theme_tokens:STATE.cust.theme_tokens,custom_css:STATE.cust.custom_css,custom_html:STATE.cust.custom_html});
+function said(ok,words){
+  SAID=ok==null?null:{ok,words};
+  const slot=$('devSaved');if(!slot)return;
+  clearTimeout(slot._t);slot.className='fs';slot.textContent='';
+  if(ok===true){slot.className='fs ok';slot.textContent=words||'Saved';slot._t=setTimeout(()=>{if(slot.classList.contains('ok')){slot.className='fs';slot.textContent='';SAID=null;}},5000);}
+  else if(ok===false){slot.className='fs bad';slot.textContent='Couldn’t save · ';const b=document.createElement('button');b.type='button';b.className='again';b.textContent='Try again';b.addEventListener('click',()=>{LAST='';save();});slot.appendChild(b);}
+}
+// One save at a time; a change made while one is out goes next, with everything as it stands.
+// The boxes keep what you typed whatever the answer: nothing is redrawn under you.
 async function save(){
   collect();
-  const btns=document.querySelectorAll('#save,#save2');btns.forEach(b=>{b.disabled=true;});
-  const note=$('savenote');
-  const r=await api('/dev/customization','PUT',{theme_tokens:STATE.cust.theme_tokens,custom_css:STATE.cust.custom_css,custom_html:STATE.cust.custom_html});
-  btns.forEach(b=>{b.disabled=false;});
-  if(!r.ok){toast('That didn’t save — please try again.');return;}
-  const d=r.body.data||{};
-  if(d.saved){STATE.cust.theme_tokens=d.saved.theme_tokens;STATE.cust.custom_css=d.saved.custom_css;STATE.cust.custom_html=d.saved.custom_html;}
-  const adj=[];
-  if(d.rejected_tokens&&d.rejected_tokens.length)adj.push(`${d.rejected_tokens.length} theme value${d.rejected_tokens.length>1?'s':''} weren’t allowed`);
-  if(d.sanitized&&d.sanitized.html)adj.push('unsafe HTML was removed');
-  if(d.sanitized&&d.sanitized.css)adj.push('unsafe CSS was removed');
-  if(note){note.textContent=adj.length?('Saved — '+adj.join('; ')+'. Publish from your workspace to take it live.'):'Saved. Publish from your workspace to take it live.';note.className='save-note'+(adj.length?' warn':'');}
-  toast(adj.length?'Saved — some values were adjusted for safety.':'Saved.');
-  paint();
+  if(SAVING){AGAIN=true;return SAVING;}
+  const body=sentOf(),key=JSON.stringify(body);
+  if(key===LAST)return true;   // nothing changed since the last save
+  SAVING=(async()=>{
+    said(null);
+    const r=await api('/dev/customization','PUT',body);
+    if(!r.ok){said(false);return false;}
+    LAST=key;
+    const d=r.body.data||{};
+    // what the server kept, for the preview and the next save (a box being typed in keeps its words)
+    if(d.saved){STATE.cust.theme_tokens=d.saved.theme_tokens||{};STATE.cust.custom_css=d.saved.custom_css||'';STATE.cust.custom_html=d.saved.custom_html||'';LAST=JSON.stringify(sentOf());}
+    const adj=[];
+    if(d.rejected_tokens&&d.rejected_tokens.length)adj.push(`${d.rejected_tokens.length} color or type value${d.rejected_tokens.length>1?'s weren’t':' wasn’t'} allowed`);
+    if(d.sanitized&&d.sanitized.html)adj.push('HTML that could run code was taken out');
+    if(d.sanitized&&d.sanitized.css)adj.push('styles that could load outside code were taken out');
+    const note=$('savenote');
+    if(note){note.textContent=adj.length?('Saved, but '+adj.join('; ')+'. They go live when you publish.'):'Changes save as a draft as you go. They go live when you publish.';note.className='save-note'+(adj.length?' warn':'');}
+    said(true);
+    return true;
+  })();
+  const ok=await SAVING;SAVING=null;
+  // a change made while that save was out goes next — unless it is the very thing that just
+  // didn't save (leaving a box and its file at once asks twice): Try again sends that one
+  if(AGAIN){AGAIN=false;collect();if(ok||JSON.stringify(sentOf())!==key)return save();}
+  return ok;
 }
 
 function notEnabled(){
-  $('main').innerHTML=`<div class="center"><div class="rolebadge">● Restricted</div>
-    <h2 style="margin-top:14px">Developer Mode isn’t enabled for your account.</h2>
-    <p class="muted">It’s available to developers. Ask your studio to grant developer access, then reload.</p>
+  $('main').innerHTML=`<div class="center">
+    <h2>Developer tools aren’t on for your account.</h2>
+    <p class="muted">They’re for developers. Ask your studio to give you developer access, then reload this page.</p>
     <p style="margin-top:22px"><a class="link" href="/today.html">Back to your workspace →</a></p></div>`;
 }
-function signedOut(){$('main').innerHTML=`<div class="center"><h2>Sign in to open Developer Mode.</h2><p style="margin-top:20px"><a class="link" href="/studio.html">Sign in →</a></p></div>`;}
-function trouble(){$('main').innerHTML=`<div class="center"><h2>We couldn’t load Developer Mode just now.</h2><p class="muted" style="margin-bottom:16px">A brief hiccup — try again.</p><button id="retry">Try again</button></div>`;const rt=$('retry');if(rt)rt.addEventListener('click',()=>{load().catch(()=>trouble());});}   // Try again reloads in place (experience review #42)
+function signedOut(){$('main').innerHTML=`<div class="center"><h2>Sign in to open Developer tools.</h2><p style="margin-top:20px"><a class="link" href="/studio.html">Sign in →</a></p></div>`;}
+function trouble(){$('main').innerHTML=`<div class="center"><h2>We couldn’t load Developer tools just now.</h2><p class="muted" style="margin-bottom:16px">A brief hiccup — try again.</p><button id="retry">Try again</button></div>`;const rt=$('retry');if(rt)rt.addEventListener('click',()=>{load().catch(()=>trouble());});}   // Try again reloads in place (experience review #42)
 
 async function load(){
   const f=await api('/dev/files');
@@ -289,6 +324,7 @@ async function load(){
   STATE.files=f.body.data.files||[];STATE.template=f.body.data.template||{};
   const c=await api('/dev/customization');
   if(c.ok)STATE.cust={...STATE.cust,...(c.body.data||{})};
+  LAST=JSON.stringify(sentOf());   // what is saved: leaving a box untouched sends nothing
   STATE.active=(STATE.files.find(x=>x.editable)||{}).path||'theme/tokens.json';
   paint();
 }

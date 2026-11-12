@@ -230,7 +230,7 @@ test.describe('Settings — automations and the status lines (I3, I6, I7)', () =
     await deal.click();
     await expect.poll(() => answers.length).toBe(2);
     await answers[1]();                                         // the second answer lands first
-    await expect(page.locator('.dds-toast', { hasText: 'Saved.' }).first()).toBeVisible();
+    await expect(page.locator('#fs-row-deal')).toHaveText('Saved');   // builder item 165: the tick beside its row
     await expect(ack).toHaveAttribute('aria-checked', 'true');  // its own save is still out: it stays as pressed
     await expect(deal).toHaveAttribute('aria-checked', 'true');
     await answers[0]();                                         // then the first (it still says deal_nudges: false)

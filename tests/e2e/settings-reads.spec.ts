@@ -83,7 +83,7 @@ test.describe('Settings — the stalled-days boxes (bug hunt C3)', () => {
     await page.locator('#sw-deal').click();                // its answer will carry proposal: 7
     await page.locator('#st-proposal').fill('12');
     await page.locator('#st-proposal').press('Tab');
-    await expect(toast(page, 'Saved.')).toBeVisible();
+    await expect(page.locator('#fs-stage-proposal')).toHaveText('Saved');   // builder item 165: the tick beside the row
     releaseSwitch();
     await expect(page.locator('#sw-deal')).toHaveAttribute('aria-checked', 'true');
     await expect(page.locator('#st-proposal')).toHaveValue('12');
@@ -91,7 +91,7 @@ test.describe('Settings — the stalled-days boxes (bug hunt C3)', () => {
 });
 
 test.describe('Settings — a read that failed (bug hunt C4)', () => {
-  test('the details didn’t load: the card says so, Save is off, and Try again loads them', async ({ page }) => {
+  test('the details didn’t load: the card says so, nothing can be saved, and Try again loads them', async ({ page }) => {
     let fail = true; let puts = 0;
     await installApp(page, { api: API });
     await page.route((u) => u.pathname.endsWith('/presence/identity'), (route) => {
@@ -101,14 +101,17 @@ test.describe('Settings — a read that failed (bug hunt C4)', () => {
     await page.goto('/settings.html');
     const card = page.locator('#studio');
     await expect(card.locator('.unread')).toContainText('Your details couldn’t load just now. Saving is off until they do');
-    await expect(page.locator('#profileSave')).toBeDisabled();
+    await expect(page.locator('#profileSave')).toHaveCount(0);   // builder item 165: no Save button; the boxes save as you go
     await expect(page.locator('#profileForm')).toBeHidden();
     fail = false;
     await card.locator('.unread button').click();
     await expect(card.locator('.unread')).toHaveCount(0);
     await expect(page.locator('#f-name')).toHaveValue('Brightline Studio');
-    await expect(page.locator('#profileSave')).toBeEnabled();
     expect(puts).toBe(0);
+    await page.locator('#f-phone').fill('555 0199');                // loaded now, a box saves when it's left
+    await page.locator('#f-phone').press('Tab');
+    await expect(page.locator('#fs-f-phone')).toHaveText('Saved');
+    expect(puts).toBe(1);
   });
 
   test('/settings didn’t load: the automations and stalled days are held, nothing can be flipped', async ({ page }) => {
@@ -122,10 +125,11 @@ test.describe('Settings — a read that failed (bug hunt C4)', () => {
     await expect(page.locator('#automations .unread')).toContainText('Your automations couldn’t load just now.');
     await expect(page.locator('#sw-ack')).toBeHidden();
     await expect(page.locator('#stages .unread')).toContainText('couldn’t load just now');
-    await expect(page.locator('#staleRow')).toBeHidden();
-    await expect(page.locator('#stageNames')).toBeVisible();   // the names come from their own read, which answered
+    await expect(page.locator('#st-lead')).toBeHidden();         // the Stalled after column is held…
+    await expect(page.locator('#sth-stale')).toBeHidden();
+    await expect(page.locator('#sn-lead')).toBeVisible();        // …the names come from their own read, which answered
     await expect(page.locator('#studio .unread')).toBeVisible(); // the kind of business is a setting too
-    await expect(page.locator('#profileSave')).toBeDisabled();
+    await expect(page.locator('#profileForm')).toBeHidden();
     expect(puts).toBe(0);
   });
 
@@ -191,8 +195,8 @@ test.describe('Settings — the side list and its rows (bug hunt C16)', () => {
     await page.goto('/settings.html');
     await expect(page.locator('[data-card="stages"] .st')).toHaveText('4 stages');
     await page.locator('#sc-proposal').fill('60');
-    await page.locator('#scSave').click();
-    await expect(page.locator('#scMsg')).toContainText('Saved.');
+    await page.locator('#sc-proposal').press('Tab');                // builder item 165: it saves when it's left
+    await expect(page.locator('#fs-stage-proposal')).toHaveText('Saved');
     await expect(page.locator('[data-card="stages"] .st')).toHaveText('4 stages · chances set');
   });
 
@@ -225,7 +229,7 @@ test.describe('Settings — the side list and its rows (bug hunt C16)', () => {
     await page.goto('/settings.html');
     await page.locator('#sw-menu-sites').focus();
     await page.keyboard.press('Space');
-    await expect(page.locator('.dds-toast', { hasText: 'Hidden.' })).toBeVisible();
+    await expect(page.locator('#fs-menu-sites')).toHaveText('Saved');   // builder item 165: the tick beside it
     await expect(page.locator('#sw-menu-sites')).toHaveAttribute('aria-checked', 'false');
     await expect(page.locator('#sw-menu-sites')).toBeFocused();
   });
