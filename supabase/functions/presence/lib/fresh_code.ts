@@ -7,8 +7,12 @@
 //   transfer         handing a site to someone else (starting it, or the owner agreeing)
 //   domain_remove    removing the site's domain
 //   close_account    asking for the account to be closed
-// Someone with two-step sign-in on types the code from their authenticator app, and
-// Supabase Auth checks it (the factor's own challenge and verify, with their sign-in).
+// Someone with two-step sign-in on types the code from their authenticator app into the
+// page, which has Supabase Auth check it (mfa.challengeAndVerify). The sign-in that comes
+// back says when an app code was last typed (its amr claim) and rides in the request's body
+// as fresh_jwt; one typed within FRESH_APP_SECONDS counts. The check is never made from
+// here: Supabase answers a check by turning over the sign-in it was made with, and two
+// such turns before the browser's next refresh would sign the person out.
 // Everyone else is emailed a 6-digit code, kept here only as a keyed hash
 // (presence_fresh_codes, migration 0197): it works once, for FRESH_MINUTES, for that one
 // action, with FRESH_TRIES tries, and at most FRESH_SENDS are sent in ten minutes.
@@ -18,13 +22,15 @@
 // sheet (fresh-code.js) asks for it and sends the same request again with it.
 import { svc } from './db.ts';
 import { json } from '../../_shared/http.ts';
-import { authUser, type Principal } from '../../_shared/auth.ts';
+import { authUser, jwtClaims, type Principal } from '../../_shared/auth.ts';
 import { hmacHex, timingSafeEqual } from '../../_shared/hmac.ts';
 import { maskEmail } from '../../_shared/email_infra.ts';
 import { rateAllow } from './ratelimit.ts';
 
 export type FreshAction = 'invite_coowner' | 'transfer' | 'domain_remove' | 'close_account';
 export const FRESH_MINUTES = 10, FRESH_TRIES = 5, FRESH_SENDS = 3;
+/** How recently an app code must have been typed into a sign-in to count as fresh. */
+export const FRESH_APP_SECONDS = 300;
 
 /** What each action is, in a sentence, and what its button says once the code is in. Pure. */
 export const FRESH_WORDS: Record<FreshAction, { doing: string; go: string }> = {
@@ -35,8 +41,6 @@ export const FRESH_WORDS: Record<FreshAction, { doing: string; go: string }> = {
 };
 
 const signingKey = () => Deno.env.get('APPROVAL_SECRET') || Deno.env.get('SCHEDULER_SECRET') || Deno.env.get('SERVICE_ROLE_KEY') || Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
-const SB_URL = () => Deno.env.get('SUPABASE_URL') || '';
-const ANON = () => Deno.env.get('SUPABASE_ANON_KEY') || Deno.env.get('SERVICE_ROLE_KEY') || Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
 
 /** Six digits, every value equally likely. */
 export function newCode(): string {
@@ -52,6 +56,12 @@ export async function codeHash(id: string, code: string, key = signingKey()): Pr
 export function typedCode(v: unknown): string {
   const d = String(v ?? '').replace(/[\s-]/g, '');
   return /^\d{6}$/.test(d) ? d : '';
+}
+/** When an app code was last typed into a sign-in (Supabase stamps each check into the
+ *  token's amr claim), in seconds since 1970, or 0. Pure. */
+export function appCodeAt(claims: Record<string, unknown> | null | undefined): number {
+  const amr = Array.isArray(claims?.amr) ? claims!.amr as Array<{ method?: unknown; timestamp?: unknown }> : [];
+  return amr.reduce((at, a) => (a?.method === 'totp' && Number(a.timestamp) > at ? Number(a.timestamp) : at), 0);
 }
 /** A person's verified authenticator app (Supabase's TOTP factor), or null. Pure. */
 export function appFactor(user: { factors?: unknown } | null | undefined): string | null {
@@ -75,18 +85,9 @@ export function codeEmail(code: string, action: FreshAction, what: string): { su
 /** The outside calls; tests swap them. */
 export const freshDeps = {
   user: (jwt: string): Promise<{ id?: string; email?: string; factors?: unknown } | null> => authUser(jwt),
-  /** Supabase Auth checks an app code with the person's own sign-in: true, false (wrong), or null (couldn't ask). */
-  verifyApp: async (jwt: string, factorId: string, code: string): Promise<boolean | null> => {
-    try {
-      const h = { apikey: ANON(), Authorization: `Bearer ${jwt}`, 'Content-Type': 'application/json' };
-      const ch = await fetch(`${SB_URL()}/auth/v1/factors/${encodeURIComponent(factorId)}/challenge`, { method: 'POST', headers: h, body: '{}' });
-      const cj = await ch.json().catch(() => null);
-      if (!ch.ok || !cj?.id) return ch.status >= 500 ? null : false;
-      const v = await fetch(`${SB_URL()}/auth/v1/factors/${encodeURIComponent(factorId)}/verify`, { method: 'POST', headers: h, body: JSON.stringify({ challenge_id: cj.id, code }) });
-      await v.body?.cancel().catch(() => {});
-      return v.ok ? true : v.status >= 500 ? null : false;
-    } catch { return null; }
-  },
+  /** A sign-in's claims (read after Supabase Auth vouched for it). */
+  claims: (jwt: string): Record<string, unknown> | null => jwtClaims(jwt),
+  now: (): number => Date.now(),
   send: async (to: string, subject: string, html: string): Promise<boolean> => {
     const { sendEmail } = await import('../commerce/account.ts');   // lazy: account pulls in the email shell
     return await sendEmail(to, subject, html, undefined, { critical: true });
@@ -100,7 +101,7 @@ const refuse = (cors: Record<string, string>, status: number, body: Record<strin
 /** { way } when this request carries a good fresh code for `action` (and the email code is used
  *  up); otherwise the answer that asks for one, sending it by email when that is the way.
  *  `what` names the thing in the email and the sheet ("Alex Kim as Co-owner of Bloom Salon"). */
-export async function requireFresh(principal: Principal, body: { fresh_code?: unknown } | null | undefined, action: FreshAction, what: string, cors: Record<string, string>): Promise<Answer> {
+export async function requireFresh(principal: Principal, body: { fresh_code?: unknown; fresh_jwt?: unknown } | null | undefined, action: FreshAction, what: string, cors: Record<string, string>): Promise<Answer> {
   if (principal.kind === 'system') return { way: 'none' };   // the scheduler and the operator's own tools
   const jwt = principal.jwt || '';
   if (!jwt || !principal.userId) return refuse(cors, 401, { error: 'unauthorized', message: 'Please sign in again.' });
@@ -110,13 +111,15 @@ export async function requireFresh(principal: Principal, body: { fresh_code?: un
   const code = typedCode(body?.fresh_code);
   const factor = appFactor(user);
 
-  // ── their authenticator app ──
+  // ── their authenticator app: a sign-in whose app code was typed a moment ago ──
   if (factor) {
-    if (!code) return refuse(cors, 403, { error: 'fresh_code_needed', way: 'app', action, what, go, message: 'Type the 6-digit code from your authenticator app.' });
-    if (!(await rateAllow(`fresh:try:${user.id}:${action}`, FRESH_TRIES, FRESH_MINUTES * 60))) return refuse(cors, 429, { error: 'fresh_code_tries', way: 'app', action, what, go, message: `Too many tries. Wait ${FRESH_MINUTES} minutes, then use the newest code in your app.` });
-    const okApp = await freshDeps.verifyApp(jwt, factor, code);
-    if (okApp === null) return refuse(cors, 503, { error: 'fresh_code_unavailable', way: 'app', action, what, go, message: 'We couldn’t check that code just now. Try again in a moment.' });
-    return okApp ? { way: 'app' } : refuse(cors, 403, { error: 'fresh_code_wrong', way: 'app', action, what, go, message: 'That code isn’t right. Use the newest one in your app.' });
+    const now = Math.floor(freshDeps.now() / 1000);
+    const recent = (claims: Record<string, unknown> | null) => { const at = appCodeAt(claims); return at > 0 && now - at <= FRESH_APP_SECONDS && at - now <= 60; };
+    if (recent(freshDeps.claims(jwt))) return { way: 'app' };   // just signed in with it
+    const proof = typeof body?.fresh_jwt === 'string' ? body.fresh_jwt : '';
+    // Supabase Auth vouches for the proof (its signature), and it must be this same person's
+    if (proof && proof !== jwt && recent(freshDeps.claims(proof)) && (await freshDeps.user(proof))?.id === user.id) return { way: 'app' };
+    return refuse(cors, 403, { error: 'fresh_code_needed', way: 'app', factor_id: factor, action, what, go, message: 'Type the 6-digit code from your authenticator app.' });
   }
 
   // ── an emailed code ──

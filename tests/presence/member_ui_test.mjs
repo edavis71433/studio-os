@@ -69,7 +69,7 @@ const CONTROLS = [
   ['DELETE /offerings/:id', 'presence.html', 'api("DELETE", `/${rec.col}/${rec.id}`)', ['window.ddsLacks && window.ddsLacks("delete") ? null : { kind: "create"']],
 
   ['POST /foundations/domain', 'presence.html', `api("POST", "/foundations/domain", { domain })`, ['choose.dataset.needs = "configure"', 'havePanel.dataset.needs = "configure"', 'needPanel.dataset.needs = "configure"', 'btn.dataset.needs = "configure"; btn.textContent = "Connect your domain"']],
-  ['DELETE /foundations/domain', 'presence.html', `api("DELETE", "/foundations/domain", { confirm })`, ['rm.dataset.needs = "configure"']],   // item 163: the name typed back
+  ['DELETE /foundations/domain', 'presence.html', `api("DELETE", "/foundations/domain", { confirm, ...extra })`, ['rm.dataset.needs = "configure"']],   // item 163: the name typed back; item 191: and a fresh code
   ['POST /foundations/domain', 'presence.html', `api("POST", "/foundations/domain", { domain: ans.domain, keep_old: ans.keepOld })`, ['b.dataset.needs = "configure"; b.dataset.change = "domain"']],   // item 163: change to a different domain
   ['POST /foundations/prepare', 'presence.html', `api("POST", "/foundations/prepare", { goal: "email_auth" })`, ['acts.dataset.needs = "configure"', 'after.dataset.needs = "configure"']],
   ['POST /foundations/prepare', 'presence.html', `api("POST", "/foundations/prepare", { goal })`, ['mh.dataset.needs = "configure"']],

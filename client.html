@@ -684,6 +684,7 @@
 </div>
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
+<script src="/fresh-code.js?v=191"></script>
 <script src="/vendor/supabase-js-2.45.4.js"></script>
 <script>
 // The simplified Client Portal (A7.2). Consumes ONLY /portal/context + /portal/feed
@@ -2491,6 +2492,8 @@ function accountSectionHtml(canMessage){
     `<div class="acctid"><span class="acctav" aria-hidden="true">${esc(av)}</span><div class="acctwho"><strong>${name?esc(name):'Signed in'}</strong>${email?`<span class="muted">${esc(email)}</span>`:''}</div></div>`+
     `<div class="acctrow"><div class="acctlab"><strong>Appearance</strong><span class="muted">Light, dark, or match your device.</span></div><button id="appearance">${esc(themeLabel())}</button></div>`+
     (email?`<div class="acctrow"><div class="acctlab"><strong>Password</strong><span class="muted">We’ll email you a link to set a new one.</span></div><button id="chgpw">Change password</button></div>`:'')+
+    // builder item 191: two-step sign-in, the client's own (the set-up sheet is fresh-code.js, Figma B)
+    `<div class="acctrow" id="acctTwo"><div class="acctlab"><strong>Two-step sign-in</strong><span class="muted" id="acctTwoLine">Checking…</span></div><button id="twoStep" hidden>Turn on</button></div>`+
     `<div class="acctrow"><div class="acctlab"><strong>Session</strong><span class="muted">Signed in on this device.</span></div><button id="signout2">Sign out</button></div>`+
     businessesHtml()+
     (canMessage?`<p class="muted" style="font-size:12.5px;margin-top:10px">Need to change your name or email? Message your studio and they’ll update it.</p>`:'')+
@@ -2515,6 +2518,24 @@ function wireAccountSection(){
   const ap=$('appearance');if(ap)ap.addEventListener('click',()=>{cycleClientTheme();ap.textContent=themeLabel();});
   const cp=$('chgpw');if(cp)cp.addEventListener('click',async()=>{cp.disabled=true;try{await sb.auth.resetPasswordForEmail(email,{redirectTo:location.origin+'/set-password.html?next=/portal.html'});toast('Check your email for a link to set a new password.');}catch(_){toast('Couldn’t send that just now.');cp.disabled=false;}});
   const so=$('signout2');if(so)so.addEventListener('click',doSignOut);
+  paintTwoStep().catch(()=>{});
+}
+// Builder item 191: on, a code from an app on their phone is asked after the emailed code,
+// link or password. The studio can't turn it off for them; it checks it's them and asks us.
+async function paintTwoStep(){
+  const b=$('twoStep'),line=$('acctTwoLine');if(!b||!line)return;
+  if(!window.ddsFresh){line.textContent='Couldn’t check just now.';return;}
+  const st=await window.ddsFresh.status(sb);
+  if(!st.read){line.textContent='Whether it’s on couldn’t load just now.';b.hidden=true;return;}
+  const since=st.since?new Date(st.since):null,day=since&&!isNaN(since)?since.toLocaleDateString('en-US',{month:'short',day:'numeric'}):'';
+  line.textContent=st.on?`On${day?' since '+day:''}. Signing in on a new device asks for a code from your app.`:'Off. Turned on, signing in also asks for a 6-digit code from an app on your phone.';
+  b.textContent=st.on?'Turn off':'Turn on';b.hidden=false;
+  b.onclick=async()=>{
+    const who=studioBrand();
+    const r=st.on?await window.ddsFresh.turnOff(sb,st.factor,{lost:`Lost your phone? Ask ${who==='Your studio'?'your studio':who}. They check it’s you, then have it turned off.`})
+      :await window.ddsFresh.turnOn(sb,{issuer:who==='Your studio'?'Studio OS':who});
+    if(r.on||r.off){toast(r.on?'Two-step sign-in is on. Next time you sign in, have your phone ready.':'Two-step sign-in is off.');paintTwoStep().catch(()=>{});}
+  };
 }
 // The starter answers: how this portal works, true for every studio. Same markup as
 // the studio's own articles (lib/faq.ts renderFaq), so the search covers them too.

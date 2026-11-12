@@ -163,6 +163,18 @@
   .two .rcard{margin-bottom:0}
   /* the Ask box (moved here from today.html, sales review item 23) */
   .ask{margin-top:var(--dds-s7,32px);padding-top:var(--dds-s6,24px);border-top:1px solid var(--line)}
+  /* builder list item 191: the two-step sign-in nudge, drawn in Figma (B4) */
+  .tsnudge{display:flex;gap:20px;align-items:center;margin:var(--dds-s5,20px) 0;padding:22px 24px;border-radius:var(--dds-r-xl,20px);background:#241d38;color:#fff}
+  .tsnudge svg{flex:0 0 auto}
+  .tsn-words{flex:1;min-width:0}
+  .tsn-eye{margin:0 0 4px;font-size:11px;font-weight:600;letter-spacing:.8px;text-transform:uppercase;color:#b79ceb}
+  .tsnudge h2{margin:0;font-family:var(--dds-serif,'Fraunces',Georgia,serif);font-weight:400;font-size:26px;line-height:1.2;color:#fff}
+  .tsn-line{margin:6px 0 0;font-size:14px;line-height:1.5;color:#d9cdeb;max-width:62ch}
+  .tsn-acts{display:flex;flex-direction:column;align-items:center;gap:2px;flex:0 0 auto}
+  .tsn-on{display:inline-flex;align-items:center;justify-content:center;min-height:44px;padding:0 22px;border-radius:999px;background:#fff;color:#241d38;font-size:14px;font-weight:600;text-decoration:none}
+  .tsn-later{min-height:44px;padding:0 12px;border:0;background:none;color:#fff;font:inherit;font-size:13.5px;font-weight:600;cursor:pointer}
+  .tsn-on:focus-visible,.tsn-later:focus-visible{outline:2px solid #b79ceb;outline-offset:2px}
+  @media (max-width:640px){.tsnudge{flex-wrap:wrap;padding:20px}.tsnudge h2{font-size:22px}.tsn-acts{flex-direction:row;width:100%}.tsn-on{flex:1}}
   .ask h2{font-family:var(--sans);font-weight:600;font-size:17px;margin:0 0 var(--dds-s1,4px)}
   .ask p{margin:0 0 var(--dds-s3,12px);color:var(--soft);font-size:14px}
   .askbox{display:flex;gap:10px}
@@ -1416,6 +1428,7 @@ async function boot(){
     await studio;
     EARLY.clear();
     mountAsk();      // and the Ask box (sales review item 23)
+    mountTwoStepNudge().catch(()=>{});   // builder item 191
   }catch(_){EARLY.clear();trouble();}
 }
 boot();
@@ -1439,6 +1452,24 @@ async function ask(){
   try{const r=await apiSend('POST','/concierge/ask',{question});paintAnswer(box,r.ok?(r.body&&r.body.data):null,r.ok?'I don’t have anything measured on that yet — I’d rather say so than guess.':'I couldn’t answer just now — nothing’s wrong, please try again in a moment.');}
   catch(_){box.textContent='I couldn’t answer just now — nothing’s wrong, please try again in a moment.';}
   btn.disabled=false;btn.textContent='Ask';
+}
+// ── Builder list item 191: until this person's own sign-in has two-step sign-in on, Home
+// asks for it (Figma B4). "Not now" hides it for 14 days; it goes for good once it's on.
+// Only a studio's own people see this page, never a client. The sign-in kept on this
+// device says whether it's on (a verified factor), with no call.
+const NUDGE_KEY='dds-2step-nudge',NUDGE_DAYS=14;
+async function mountTwoStepNudge(){
+  try{const at=Number(localStorage.getItem(NUDGE_KEY)||0);if(at&&Date.now()-at<NUDGE_DAYS*86400000)return;}catch(_){}
+  const{data}=await sb.auth.getSession();const sess=data&&data.session;if(!sess)return;
+  if(((sess.user&&sess.user.factors)||[]).some(f=>f&&f.status==='verified')||$('tsNudge'))return;
+  const n=CLIENTS.length;
+  const sec=document.createElement('section');sec.className='tsnudge';sec.id='tsNudge';sec.setAttribute('aria-labelledby','tsNudgeHead');
+  sec.innerHTML=`<svg viewBox="0 0 24 24" width="44" height="44" aria-hidden="true" focusable="false"><path d="M12 2.5 4.5 5.5v6c0 4.6 3.1 8.6 7.5 10 4.4-1.4 7.5-5.4 7.5-10v-6L12 2.5Z" fill="none" stroke="#b79ceb" stroke-width="1.6" stroke-linejoin="round"/><rect x="8.6" y="10.6" width="6.8" height="5.4" rx="1.2" fill="none" stroke="#fff" stroke-width="1.6"/><path d="M10 10.6V9.2a2 2 0 0 1 4 0v1.4" fill="none" stroke="#fff" stroke-width="1.6" stroke-linecap="round"/></svg>`+
+    `<div class="tsn-words"><p class="tsn-eye">${esc(n?`Your studio looks after ${n} client${n===1?'':'s'}`:'Sign-in and security')}</p><h2 id="tsNudgeHead">Turn on two-step sign-in.</h2>`+
+    `<p class="tsn-line">With a code from your phone, a stolen password isn’t enough to get into your studio, your clients’ sites or their money.</p></div>`+
+    `<div class="tsn-acts"><a class="tsn-on" href="/settings.html#security" data-noscope="1">Turn it on</a><button type="button" class="tsn-later">Not now</button></div>`;
+  ($('needs')||$('top')).insertAdjacentElement('afterend',sec);
+  sec.querySelector('.tsn-later').addEventListener('click',()=>{try{localStorage.setItem(NUDGE_KEY,String(Date.now()));}catch(_){}sec.remove();});
 }
 function mountAsk(){
   const sec=$('askSec');if(!sec||sec.dataset.on)return;

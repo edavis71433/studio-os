@@ -71,7 +71,12 @@ const quiet = async (fn) => { const e = console.error, x = console.warn; console
 const jsonOf = async (res) => ({ status: res.status, body: await res.json() });
 const SITE = (custom) => ({ id: 'site1', client_id: 'c1', status: 'live', last_published_at: '2026-10-01T00:00:00Z', template_slug: 'business-classic', template_version: '1.0.0', custom_domain: custom, netlify_site_id: 'nf1', edition: 'presence' });
 const req = (method, body) => new Request('http://stub.local/functions/v1/presence/foundations/domain', { method, body: body === undefined ? undefined : JSON.stringify(body), headers: { 'Content-Type': 'application/json' } });
-const OWNER = { kind: 'client', userId: 'u1', email: 'owner@bistro.example' };
+// builder item 191: removing a domain asks for a fresh code; these people signed in with their
+// authenticator app's code a moment ago, so it counts (lib/fresh_code.ts)
+const { freshDeps } = await import(`${P}/lib/fresh_code.ts`);
+freshDeps.user = async (jwt) => ({ id: jwt === 'jwt-studio' ? 'u2' : 'u1', email: 'owner@bistro.example', factors: [{ id: 'f1', factor_type: 'totp', status: 'verified' }] });
+freshDeps.claims = () => ({ aal: 'aal2', amr: [{ method: 'totp', timestamp: Math.floor(Date.now() / 1000) }] });
+const OWNER = { kind: 'client', userId: 'u1', email: 'owner@bistro.example', jwt: 'jwt-owner' };
 
 world();
 ok('live, the first time: the owner and the studio are told, and it is remembered', await quiet(() => announceLiveOnce({ id: 'site1', client_id: 'c1' }, 'bistro.example', NOW)) === true && w.mails.length === 2 && w.mails.every((m) => m.subject === 'Your website is live at bistro.example') && w.live && w.live.domain === 'bistro.example', JSON.stringify(w.mails.map((m) => m.to)));

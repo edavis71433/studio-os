@@ -4,7 +4,8 @@
 // rule that a half-finished sign-in (password, no app code) isn't a sign-in. Part B drives
 // requireFresh (lib/fresh_code.ts) on a fake database: an emailed code works once, for ten
 // minutes, for its one action, with five tries and three sends; an app code is checked by
-// Supabase Auth. Part C: the owner's alert. Part D: each risky route asks before it writes,
+// Supabase Auth in the page, and the sign-in that comes back (fresh_jwt) counts while its
+// code is under five minutes old. Part C: the owner's alert. Part D: each risky route asks before it writes,
 // and every sign-in check in both functions applies the second-step rule.
 import { installFakePostgrest } from './fake_pgrst.mjs';
 
@@ -47,16 +48,22 @@ const { runRetentionSweep } = await import(`${P}/ops/retention.ts`);
   ok('two-step on, app code typed (aal2): signed in', secondStepMissing(withApp, tok({ sub: 'u1', aal: 'aal2' })) === false);
   ok('two-step off, or only being set up: signed in as before', secondStepMissing(user([]), tok({ aal: 'aal1' })) === false && secondStepMissing(user([{ status: 'unverified' }]), tok({ aal: 'aal1' })) === false && secondStepMissing(null, tok({})) === false);
   ok('a token’s claims are read, a broken one is nothing', jwtClaims(tok({ aal: 'aal2', sub: 'u1' }))?.aal === 'aal2' && jwtClaims('nope') === null);
+  ok('when the app’s code was last typed: the newest totp in the token’s amr, else 0', F.appCodeAt({ amr: [{ method: 'password', timestamp: 900 }, { method: 'totp', timestamp: 700 }, { method: 'totp', timestamp: 800 }] }) === 800 &&
+    F.appCodeAt({ amr: [{ method: 'password', timestamp: 900 }] }) === 0 && F.appCodeAt({}) === 0 && F.appCodeAt(null) === 0);
 }
 
 // ═══ B · requireFresh ═══
 const U = 'aaaaaaaa-1111-4111-8111-aaaaaaaaaaaa', U2 = 'bbbbbbbb-2222-4222-8222-bbbbbbbbbbbb';
-let users = {}, sent = [], appSays = true, appCalls = [];
+let users = {}, sent = [];
 F.freshDeps.user = async (jwt) => users[jwt] || null;
 F.freshDeps.send = async (to, subject, html) => { sent.push({ to, subject, html }); return true; };
-F.freshDeps.verifyApp = async (jwt, factor, code) => { appCalls.push({ jwt, factor, code }); return appSays === null ? null : appSays && code === '135790'; };
+const NOW = Date.UTC(2026, 10, 12, 15, 0, 0);
+F.freshDeps.now = () => NOW;
+// a sign-in token whose app code was typed `ago` seconds before NOW (null: never)
+let minted = 0;
+const tokenWithCode = (ago) => `x.${btoa(JSON.stringify({ jti: ++minted, aal: 'aal2', amr: ago === null ? [{ method: 'password', timestamp: NOW / 1000 - 3600 }] : [{ method: 'totp', timestamp: NOW / 1000 - ago }, { method: 'password', timestamp: NOW / 1000 - 3600 }] })).replace(/=+$/, '')}.y`;
 const who = (jwt, extra = {}) => ({ kind: 'client', userId: users[jwt]?.id || null, tenantId: null, role: 'client', email: users[jwt]?.email || null, jwt, requestId: 't', ...extra });
-const fresh = () => { db.reset({}); counts.clear(); sent = []; appCalls = []; appSays = true; users = {
+const fresh = () => { db.reset({}); counts.clear(); sent = []; users = {
   'jwt-email': { id: U, email: 'pat@studio.example', factors: [] },
   'jwt-other': { id: U2, email: 'lee@studio.example', factors: [] },
   'jwt-app': { id: U2, email: 'lee@studio.example', factors: [{ id: 'factor-1', factor_type: 'totp', status: 'verified' }] },
@@ -107,13 +114,37 @@ const rows = () => db.tables.presence_fresh_codes || [];
 }
 {
   fresh();
+  const appUser = users['jwt-app'];
+  const proof = (ago, who = appUser) => { const t = tokenWithCode(ago); users[t] = who; return t; };
+  const withProof = (jwt, fresh_jwt) => F.requireFresh(who(jwt), { fresh_jwt }, 'invite_coowner', 'alex@maple.example as Co-owner of Maple & Main Realty', {});
   const ask = await body(await go('jwt-app'));
-  ok('two-step on: asked for the app’s code, and nothing is emailed or stored', ask.status === 403 && ask.error === 'fresh_code_needed' && ask.way === 'app' && sent.length === 0 && rows().length === 0);
-  const no = await body(await go('jwt-app', '246802'));
-  ok('…a wrong app code is refused (Supabase Auth checked it with their own sign-in)', no.status === 403 && no.error === 'fresh_code_wrong' && appCalls.at(-1)?.jwt === 'jwt-app' && appCalls.at(-1)?.factor === 'factor-1');
-  ok('…the right one goes through', JSON.stringify(await go('jwt-app', '135790')) === JSON.stringify({ way: 'app' }));
-  appSays = null;
-  ok('…when Supabase can’t be asked, it waits and says so', (await body(await go('jwt-app', '135790'))).status === 503);
+  ok('two-step on: asked for the app’s code, named by its factor, and nothing is emailed or stored', ask.status === 403 && ask.error === 'fresh_code_needed' && ask.way === 'app' && ask.factor_id === 'factor-1' && sent.length === 0 && rows().length === 0);
+  ok('…a typed code is never checked here (Supabase turns over the sign-in a check is made with): still asked', (await body(await go('jwt-app', '135790'))).error === 'fresh_code_needed');
+  ok('…the sign-in that came back from the page’s check, code typed a moment ago: goes through', JSON.stringify(await withProof('jwt-app', proof(5))) === JSON.stringify({ way: 'app' }));
+  ok('…four minutes on, still', JSON.stringify(await withProof('jwt-app', proof(240))) === JSON.stringify({ way: 'app' }));
+  ok('…six minutes on, asked again', (await body(await withProof('jwt-app', proof(360)))).error === 'fresh_code_needed');
+  ok('…a sign-in with no app code in it: asked', (await body(await withProof('jwt-app', proof(null)))).error === 'fresh_code_needed');
+  ok('…a code dated in the future: asked', (await body(await withProof('jwt-app', proof(-600)))).error === 'fresh_code_needed');
+  ok('…someone else’s fresh sign-in: asked', (await body(await withProof('jwt-app', proof(5, users['jwt-email'])))).error === 'fresh_code_needed');
+  const forged = tokenWithCode(5);   // Supabase Auth doesn't vouch for it
+  ok('…a token Supabase Auth won’t vouch for: asked', (await body(await withProof('jwt-app', forged))).error === 'fresh_code_needed');
+  // just signed in with the app's code: the request's own sign-in counts
+  const justIn = tokenWithCode(30); users[justIn] = appUser;
+  ok('…signed in with the app’s code half a minute ago: not asked again', JSON.stringify(await go(justIn)) === JSON.stringify({ way: 'app' }));
+  const longIn = tokenWithCode(3600); users[longIn] = appUser;
+  ok('…signed in with it an hour ago: asked', (await body(await go(longIn))).error === 'fresh_code_needed');
+}
+
+// ═══ B2 · every page that asks hands the sheet its own sign-in ═══
+// The app's code is checked in the page with the page's own Supabase client (fresh-code.js),
+// so a page that left it out would leave someone with two-step sign-in stuck at the sheet.
+{
+  const read = (f) => Deno.readTextFileSync(new URL(`../../${f}`, import.meta.url));
+  const runs = { 'people.js': /F\.run\(function \(extra\) \{[^\n]*\}, \{ sb: me\.o\.sb \}\)/, 'presence.html': /ddsFresh\.run\(send, \{ sb \}\)/, 'settings.html': /ddsFresh\.run\(send, \{ sb \}\)/, 'transfer.html': /ddsFresh\.run\(send,\{sb\}\)/ };
+  for (const [f, re] of Object.entries(runs)) ok(`${f}: the code sheet gets the page’s own sign-in`, re.test(read(f)));
+  ok('the People sheet is handed the page’s sign-in on Sharing and on Sites', /ddsPeople\.mount\(\$\('peopleHost'\),\{siteName:who,sb,/.test(read('sharing.html')) && /view:view\|\|'people',sb,api:/.test(read('sites.html')));
+  const sheet = read('fresh-code.js');
+  ok('the sheet never sends an app’s code to the server: Supabase checks it, the fresh sign-in goes', /send\(\{ fresh_jwt: t \|\| '' \}\)/.test(sheet) && /verifyApp\(o\.sb, id, c\)/.test(sheet));
 }
 
 // ═══ C · the owner told ═══
