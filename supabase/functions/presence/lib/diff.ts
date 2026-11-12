@@ -42,6 +42,7 @@ export function describeChanges(draftC: SnapshotContent, liveC: SnapshotContent 
     if (d.offerings.length) out.push({ section: 'offerings', sentence: `${d.offerings.length} menu item${d.offerings.length > 1 ? 's' : ''} appear on your menu page.` });
     if (d.faqs.length) out.push({ section: 'faqs', sentence: `${d.faqs.length} answered question${d.faqs.length > 1 ? 's' : ''} appear on your FAQ page.` });
     if (d.testimonials.length) out.push({ section: 'testimonials', sentence: `${d.testimonials.length} kind word${d.testimonials.length > 1 ? 's' : ''} from guests appear.` });
+    if (d.locations[1]) out.push({ section: 'business', sentence: 'Your second location goes up beside the first.' });
     if (d.posts.length) out.push({ section: 'updates', sentence: `${d.posts.length} blog post${d.posts.length > 1 ? 's' : ''} appear on your Updates page.` });
     return { count: out.length, changes: out, first_publish: true };
   }
@@ -61,6 +62,7 @@ export function describeChanges(draftC: SnapshotContent, liveC: SnapshotContent 
     ['ordering_url', (_a, b) => b ? 'Your online-ordering link is updated.' : 'Your online-ordering link is removed.'],
     ['seo_title', () => 'Your search-listing title is updated.'],
     ['seo_description', () => 'Your search-listing description is updated.'],
+    ['short_description', (_a, b) => b ? 'Your short description, the line Google and AI assistants quote, is updated.' : 'Your short description is removed.'],   // builder list item 127
   ];
   for (const [f, s] of idPairs) {
     const a = String(li[f] ?? ''), b = String(di[f] ?? '');
@@ -89,6 +91,12 @@ export function describeChanges(draftC: SnapshotContent, liveC: SnapshotContent 
       out.push({ section: 'business', sentence: 'Your temporarily-closed notice is reworded.' });
     }
   }
+
+  // ── business: a second location (builder list item 127) ──
+  const d2 = d.locations[1] ?? null, l2 = l.locations[1] ?? null;
+  if (d2 && !l2) out.push({ section: 'business', sentence: `Your second location${d2.city ? ` in ${d2.city}` : ''} goes up beside the first.` });
+  else if (!d2 && l2) out.push({ section: 'business', sentence: 'Your second location comes off your site.' });
+  else if (d2 && l2 && !jeq(d2, l2)) out.push({ section: 'business', sentence: 'Your second location is updated.' });
 
   // ── offerings ──
   const lOff = new Map(l.offerings.map((o) => [o.id, o]));

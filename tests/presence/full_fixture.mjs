@@ -76,5 +76,16 @@ export function fullFixture(slug, words = (x) => x) {
         category: { id: 'events', name: words('Events') }, author: { id: 'sam-ortiz', name: words('Sam Ortiz') } },
     ];
   }
+  // Builder list item 127: a short description, and a second place with a name and its own
+  // week, so the footer, the Contact page and what Google reads all carry it. Plain words:
+  // render_test's hostile run draws the business details from the template's own sample,
+  // and business_details_127_test.mjs feeds hostile words through these.
+  const [main] = fx.content.locations || [];
+  if (main) {
+    fx.content.identity = { ...fx.content.identity, short_description: 'What we do, where we do it, and what we are known for, in one line.' };
+    fx.content.locations = [main, {
+      ...main, label: 'Glendale', address_line1: '410 Brand Blvd', address_line2: '', city: 'Glendale', postal_code: '91203', phone: '(555) 010-0199',
+      hours: (main.hours || []).map((d) => (d.day === 'mon' ? { day: 'mon', closed: true, intervals: [] } : d)), holiday_exceptions: [] }];
+  }
   return fx;
 }

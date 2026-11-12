@@ -140,15 +140,18 @@ export async function applySnapshotToDraft(
 
   // 3. identity (singleton upsert)
   const i = c.identity || ({} as SnapshotContent['identity']);
-  const identRes = await svc('presence_identity?on_conflict=site_id', {
-    method: 'POST', headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },
-    body: JSON.stringify({
-      site_id: site.id, business_name: i.business_name || '', description: i.description || '',
-      phone: i.phone || '', email: i.email || '', tagline: i.tagline || '', story: i.story || '',
-      service_area: i.service_area || '', booking_url: i.booking_url || '', ordering_url: i.ordering_url || '',
-      social: i.social || {}, seo_title: i.seo_title || '', seo_description: i.seo_description || '',
-    }),
+  const identBody = {
+    site_id: site.id, business_name: i.business_name || '', description: i.description || '',
+    phone: i.phone || '', email: i.email || '', tagline: i.tagline || '', story: i.story || '',
+    service_area: i.service_area || '', booking_url: i.booking_url || '', ordering_url: i.ordering_url || '',
+    social: i.social || {}, seo_title: i.seo_title || '', seo_description: i.seo_description || '',
+    short_description: i.short_description || '',   // builder list item 127 (0182)
+  };
+  const putIdent = (body: Record<string, unknown>) => svc('presence_identity?on_conflict=site_id', {
+    method: 'POST', headers: { Prefer: 'resolution=merge-duplicates,return=minimal' }, body: JSON.stringify(body),
   });
+  let identRes = await putIdent(identBody);
+  if (!identRes.ok && identRes.status === 400) { const { short_description: _s, ...old } = identBody; identRes = await putIdent(old); }   // before 0182
   if (!identRes.ok) return { ok: false, error: `identity: ${identRes.status}` };
   entities++;
 
@@ -156,16 +159,21 @@ export async function applySnapshotToDraft(
   const l = c.locations?.[0];
   if (l) {
     const existing = (await svc(`presence_locations?site_id=eq.${site.id}&select=id&limit=1`)).json?.[0];
-    const body = JSON.stringify({
+    // builder list item 127: the version's second location comes back too, or goes if it had none
+    const l2 = c.locations?.[1];
+    const fields: Record<string, unknown> = {
       site_id: site.id, address_line1: l.address_line1 || '', address_line2: l.address_line2 || '',
       city: l.city || '', region: l.region || '', postal_code: l.postal_code || '', country: l.country || 'US',
       phone: l.phone || '', timezone: l.timezone || 'America/Los_Angeles', hours: l.hours || [],
       holiday_exceptions: l.holiday_exceptions || [], temporarily_closed: !!l.temporarily_closed,
       temporarily_closed_note: l.temporarily_closed_note || '',
-    });
-    const r = existing
-      ? await svc(`presence_locations?id=eq.${existing.id}`, { method: 'PATCH', body })
-      : await svc('presence_locations', { method: 'POST', body });
+      second_location: l2 ? { label: l2.label || '', address_line1: l2.address_line1 || '', address_line2: l2.address_line2 || '', city: l2.city || '', region: l2.region || '', postal_code: l2.postal_code || '', phone: l2.phone || '', same_hours: l2.same_hours === true, hours: l2.same_hours === true ? [] : (l2.hours || []) } : null,
+    };
+    const write = (body: string) => existing
+      ? svc(`presence_locations?id=eq.${existing.id}`, { method: 'PATCH', body })
+      : svc('presence_locations', { method: 'POST', body });
+    let r = await write(JSON.stringify(fields));
+    if (!r.ok && r.status === 400) { const { second_location: _s, ...old } = fields; r = await write(JSON.stringify(old)); }   // before 0182
     if (!r.ok) return { ok: false, error: `location: ${r.status}` };
     entities++;
   }

@@ -21,6 +21,7 @@ import { componentsForIndustry } from '../lib/site_components.ts';
 import { listStarterLayouts, starterKeyFor } from '../lib/starter_layouts.ts';
 import { normalizeTags } from '../lib/search_index.ts';
 import { normalizeAuthors, normalizeCategories, scheduleProblem } from '../lib/blog.ts';
+import { normalizeSecondLocation } from '../lib/second_location.ts';
 import { detectPageRenames, duplicatePageInSettings, pageRefs, PAGE_SLUG_RE, type PageRename } from '../lib/page_ops.ts';
 import { lockedEdits, lockedMessage } from '../lib/section_lock.ts';
 import { publishActorKind } from '../lib/actor_kind.ts';
@@ -71,7 +72,7 @@ function clean(s: string): string {
   return out.trim();
 }
 
-type FieldRule = { max?: number; min?: number; required?: boolean; kind?: 'text' | 'bool' | 'int' | 'uuid' | 'date' | 'slug' | 'json' | 'tags' | 'stage_days' | 'google_tag' | 'meta_pixel' | 'ref' | 'post_status'; json?: JsonShape; blog?: 'categories' | 'authors' };
+type FieldRule = { max?: number; min?: number; required?: boolean; kind?: 'text' | 'bool' | 'int' | 'uuid' | 'date' | 'slug' | 'json' | 'tags' | 'stage_days' | 'google_tag' | 'meta_pixel' | 'ref' | 'post_status'; json?: JsonShape; blog?: 'categories' | 'authors'; place?: true };
 // Item 72: a JSON field's limits. Without them a 40 MB pages list was stored and then re-read
 // on every load, preview, publish, hash and sweep. The size is the saved text's length; the
 // shape checks only what every reader assumes (a list of objects, an object), never a
@@ -146,6 +147,8 @@ const LOCATION_FIELDS: Record<string, FieldRule> = {
   region: { max: 40 }, postal_code: { max: 16 }, country: { max: 2 }, phone: { max: 32 },
   timezone: { max: 60 }, hours: { kind: 'json', json: { bytes: 32 * KB, shape: 'list', items: 14 } }, holiday_exceptions: { kind: 'json', json: { bytes: 64 * KB, shape: 'list', items: 400 } },
   temporarily_closed: { kind: 'bool' }, temporarily_closed_note: { max: 200 },
+  // builder list item 127 (0182): a second location, made safe as it's saved; null removes it
+  second_location: { kind: 'json', json: { bytes: 8 * KB, shape: 'object' }, place: true },
 };
 const SETTINGS_FIELDS: Record<string, FieldRule> = {
   category_order: { kind: 'json', json: { bytes: 64 * KB, shape: 'list', items: 200 } }, cover_media_id: { kind: 'uuid' },
@@ -234,6 +237,8 @@ function validateFields(payload: Record<string, unknown>, spec: Record<string, F
       if (problem) { errors.push({ field: key, message: problem, plain: true }); continue; }
       // item 40: the blog's lists are made safe here, so only clean values are stored
       if (rule.blog) { cleanBody[key] = rule.blog === 'categories' ? normalizeCategories(v) : normalizeAuthors(v); fields.push(key); continue; }
+      // item 127: a second location needs a street and a town; anything less is no second location
+      if (rule.place) { cleanBody[key] = normalizeSecondLocation(v); fields.push(key); continue; }
       cleanBody[key] = v ?? (key === 'hours' || key === 'holiday_exceptions' || key === 'category_order' ? [] : null); fields.push(key); continue;
     }
     if (rule.kind === 'stage_days') {   // the per-stage "stale after N days" map (lib/sales_lifecycle.ts staleDaysFor): open stages only, whole days 1–365
@@ -433,7 +438,7 @@ async function singleton(req: Request, db: SiteDb, site: SiteRow, principal: Pri
 export const handleLocation = (req: Request, db: SiteDb, site: SiteRow, principal: Principal, cors: Record<string, string>) =>
   singleton(req, db, site, principal, cors, {
     table: 'presence_locations', entityType: 'location', noun: 'address & hours', fields: LOCATION_FIELDS,
-    select: 'id,address_line1,address_line2,city,region,postal_code,country,phone,timezone,hours,holiday_exceptions,temporarily_closed,temporarily_closed_note,updated_at',
+    select: 'id,address_line1,address_line2,city,region,postal_code,country,phone,timezone,hours,holiday_exceptions,temporarily_closed,temporarily_closed_note,updated_at,' + PLACE_SETTINGS_COLS,
     conflict: 'site_id', summary: 'Updated hours & location',
   });
 
@@ -458,9 +463,12 @@ const SEARCH_SETTINGS_COLS = 'search_hidden,llms_txt';
 const RECIPE_SETTINGS_COLS = 'auto_ack_message,enquiry_followups,enquiry_followup_1_days,enquiry_followup_2_days,enquiry_followup_1_message,enquiry_followup_2_message,invoice_overdue_repeat,quote_expiry_reminders';
 // The 0181 columns (builder list item 40's categories and authors).
 const BLOG_SETTINGS_COLS = 'post_categories,post_authors';
+// The 0182 column on presence_locations (builder list item 127's second location). The
+// location's read and save step down past it the same way.
+const PLACE_SETTINGS_COLS = 'second_location';
 // Newest apply pack first. A database without a pack's columns 400s the widened select,
 // so a read or a save steps down one pack at a time; Settings never goes dark ahead of one.
-const OPTIONAL_SETTINGS_COLS = [BLOG_SETTINGS_COLS, RECIPE_SETTINGS_COLS, SEARCH_SETTINGS_COLS, POPUP_SETTINGS_COLS, CRAWLER_SETTINGS_COLS, AD_SETTINGS_COLS, VISIT_SETTINGS_COLS, REVIEW_SETTINGS_COLS, AUTOMATION_SETTINGS_COLS];
+const OPTIONAL_SETTINGS_COLS = [PLACE_SETTINGS_COLS, BLOG_SETTINGS_COLS, RECIPE_SETTINGS_COLS, SEARCH_SETTINGS_COLS, POPUP_SETTINGS_COLS, CRAWLER_SETTINGS_COLS, AD_SETTINGS_COLS, VISIT_SETTINGS_COLS, REVIEW_SETTINGS_COLS, AUTOMATION_SETTINGS_COLS];
 function selectSteps(select: string): string[] {
   const out = [select];
   let s = select;

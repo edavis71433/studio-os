@@ -127,7 +127,7 @@ export async function handleFollowPut(req: Request, site: SiteRow, principal: Pr
 /** GET /visibility/llms-draft: a first llms.txt from the business details and pages. */
 export async function handleLlmsDraft(site: SiteRow, cors: Record<string, string>) {
   const [identQ, locQ, setQ] = await Promise.all([
-    safe(svc(`presence_identity?site_id=eq.${site.id}&select=business_name,seo_description,description,tagline,phone,email&limit=1`)),
+    safe(svc(`presence_identity?site_id=eq.${site.id}&select=*&limit=1`)),   // * so the short description is there once 0182 is
     safe(svc(`presence_locations?site_id=eq.${site.id}&select=address_line1,city,region,postal_code,phone&limit=1`)),
     safe(svc(`presence_settings?site_id=eq.${site.id}&select=pages,pages_noindex&limit=1`)),
   ]);
@@ -137,7 +137,8 @@ export async function handleLlmsDraft(site: SiteRow, cors: Record<string, string
     .filter((p: any) => p && p.slug && !hidden.has(`page:${p.slug}`))
     .map((p: any) => ({ title: String(p.title || p.slug), path: `/${String(p.slug).replace(/^\/|\/$/g, '')}/` }));
   const text = draftLlmsTxt({
-    name: String(ident.business_name || ''), origin: siteOrigin(site), description: ident.seo_description || ident.tagline || ident.description || null,
+    // builder list item 127: the short description is the line written for AI tools to quote, so it leads
+    name: String(ident.business_name || ''), origin: siteOrigin(site), description: ident.short_description || ident.seo_description || ident.tagline || ident.description || null,
     city: loc.city, region: loc.region, phone: ident.phone || loc.phone, email: ident.email, street: loc.address_line1, postal: loc.postal_code,
     pages: [{ title: 'Home', path: '/' }, ...own, { title: 'Contact', path: '/contact/' }],
   });
