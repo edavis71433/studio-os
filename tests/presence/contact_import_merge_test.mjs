@@ -80,6 +80,83 @@ const post = (b) => S.handleSalesContacts(req('POST', '/sales/contacts', b), sit
   const other = await res(await M.handleContactImportUndo(req('POST', '/sales/contacts/imports/bbbbbbbb-0000-4000-8000-000000000009/undo'), { ...site, id: '99999999-9999-4999-8999-999999999999' }, owner, 'bbbbbbbb-0000-4000-8000-000000000001', cors));
   ok('undo: another site’s import is not found', other.status === 404);
 }
+// ═══ sales item 122: the whole file in one go, and its Undo ═══
+{
+  db.reset({ presence_contacts: [contact(C1, { name: 'Ana Ruiz', email: 'ana@example.com', phone: '555-0101', notes: 'Met at the expo', tags: ['dental'] }), contact(C2, { name: 'Bo Reyes', email: 'Bo@Example.com' })], presence_deals: [], presence_contact_imports: [], presence_contact_import_rows: [], presence_sales_templates: [] });
+  const file = [{ name: 'Ana Ruiz', email: 'ANA@example.com', company: 'Bluebird Bakery', tags: ['referral'] }, { name: 'Bo Reyes', email: 'bo@example.com' }];
+  for (let i = 0; i < 250; i++) file.push({ name: `Person ${i}`, email: `P${i}@Example.com`, phone: `555-${1000 + i}`, address: { city: 'Burbank', state: 'CA' }, found_via: 'Google', tags: 'restaurant' });
+  file.push({ name: 'Person 3 again', email: 'p3@example.com' });   // the same email twice in one file is one person
+  file.push({ name: 'No Email' });                                   // a name alone is someone to add
+  file.push({ phone: '555-9999' });                                  // neither a name nor an email: nothing to keep
+  const before = db.log.length;
+  const r = await res(await M.handleContactImports(req('POST', '/sales/contacts/imports', { file_name: 'big.csv', on_existing: 'update', rows: file }), site, owner, cors));
+  const calls = db.log.slice(before);
+  const c = r.body?.data?.counts || {};
+  ok('item 122: one request takes the whole file and counts what each row did', r.status === 201 && c.added === 251 && c.updated === 1 && c.existed === 2 && c.failed === 1, JSON.stringify(r.body));
+  ok('item 122: …in a handful of database calls, not one or more per row', calls.length <= 15, `${calls.length} calls`);
+  console.log(`      (the ${file.length}-row file took ${calls.length} database calls)`);
+  const added = db.tables.presence_contacts.filter((x) => /^Person \d+$/.test(x.name));
+  ok('item 122: the new people are stored as one added by hand would be (email lower-cased, address in parts, tags, found via)', added.length === 250 && added.every((x) => x.email === x.email.toLowerCase()) && added[0].address?.city === 'Burbank' && JSON.stringify(added[0].tags) === JSON.stringify(['restaurant']) && added[0].found_via === 'Google');
+  ok('item 122: someone already here (capitals and all) is updated with what the file has', live(C1).company === 'Bluebird Bakery' && JSON.stringify(live(C1).tags) === JSON.stringify(['dental', 'referral']) && live(C1).phone === '555-0101');
+  ok('item 122: someone the file has nothing new for is left as they were', live(C2).name === 'Bo Reyes' && live(C2).email === 'Bo@Example.com');
+  ok('item 122: a second row for the same email is not a second person', db.tables.presence_contacts.filter((x) => x.email === 'p3@example.com').length === 1);
+  const IMP = r.body.data.id;
+  ok('item 122: the import is kept for Undo, with every row it touched', r.body.data.undo === true && db.tables.presence_contact_imports[0]?.on_existing === 'update' && db.tables.presence_contact_import_rows.filter((x) => x.action === 'added').length === 251 && db.tables.presence_contact_import_rows.filter((x) => x.action === 'updated').length === 1);
+  db.tables.presence_contact_imports[0].created_at = new Date().toISOString();
+  db.tables.presence_deals.push({ id: D1, site_id: SITE, contact_id: added[0].id, title: 'Person 0 — site', stage: 'lead', deleted_at: null });
+  const u0 = db.log.length;
+  const undo = await res(await M.handleContactImportUndo(req('POST', `/sales/contacts/imports/${IMP}/undo`), site, owner, IMP, cors));
+  const undoCalls = db.log.length - u0;
+  ok('item 122: Undo takes the added people off (one with a deal now stays) and puts the updated one back', undo.status === 200 && undo.body?.data?.removed === 250 && undo.body.data.restored === 1 && undo.body.data.kept === 1 && live(C1).company === '', JSON.stringify(undo.body));
+  ok('item 122: …in a handful of calls too', undoCalls <= 15, `${undoCalls} calls`);
+  console.log(`      (its Undo took ${undoCalls} database calls)`);
+}
+{
+  // a big "update" import's Undo reads back a hundred at a time and writes eight at a time
+  const people = []; for (let i = 0; i < 230; i++) people.push(contact(`aaaaaaaa-0000-4000-8000-${String(1000 + i).padStart(12, '0')}`, { name: `Up ${i}`, email: `up${i}@example.com` }));
+  db.reset({ presence_contacts: people, presence_deals: [], presence_contact_imports: [], presence_contact_import_rows: [], presence_sales_templates: [] });
+  const r = await res(await M.handleContactImports(req('POST', '/sales/contacts/imports', { file_name: 'u.csv', on_existing: 'update', rows: people.map((x) => ({ name: x.name, email: x.email, company: 'New Co' })) }), site, owner, cors));
+  ok('item 122: 230 people updated in one request', r.body?.data?.counts?.updated === 230 && people.every((x) => live(x.id).company === 'New Co'));
+  db.tables.presence_contact_imports[0].created_at = new Date().toISOString();
+  const before = db.log.length;
+  const undo = await res(await M.handleContactImportUndo(req('POST', `/sales/contacts/imports/${r.body.data.id}/undo`), site, owner, r.body.data.id, cors));
+  const reads = db.log.slice(before).filter((x) => x.method === 'GET' && x.url.startsWith('/rest/v1/presence_contacts?'));
+  ok('item 122: Undo of a 230-person update reads them back three times, not 230', undo.body?.data?.restored === 230 && reads.length === 3 && people.every((x) => live(x.id).company === ''), `${reads.length} reads, ${JSON.stringify(undo.body)}`);
+}
+{
+  // "Leave them as they are", an over-long file, and a file with no one in it
+  db.reset({ presence_contacts: [contact(C1, { name: 'Ana', email: 'ana@example.com' })], presence_contact_imports: [], presence_contact_import_rows: [], presence_sales_templates: [] });
+  const r = await res(await M.handleContactImports(req('POST', '/sales/contacts/imports', { on_existing: 'skip', rows: [{ name: 'Ana NEW', email: 'ana@example.com', company: 'X' }, { name: 'Cy', email: 'cy@example.com' }] }), site, owner, cors));
+  ok('item 122: skipping leaves someone already here exactly as they were', r.body?.data?.counts?.existed === 1 && r.body.data.counts.added === 1 && live(C1).name === 'Ana' && live(C1).company === '');
+  const big = await res(await M.handleContactImports(req('POST', '/sales/contacts/imports', { rows: Array.from({ length: 501 }, (_, i) => ({ name: 'P' + i })) }), site, owner, cors));
+  ok('item 122: more than 500 is refused with a sentence, nothing written', big.status === 413 && /500 people at a time/.test(big.body?.message || '') && db.tables.presence_contacts.length === 2);
+  const none = await res(await M.handleContactImports(req('POST', '/sales/contacts/imports', { rows: [] }), site, owner, cors));
+  ok('item 122: an empty file is refused plainly', none.status === 422);
+}
+{
+  // someone with one of the file's emails is added between the read and the write: that hundred goes again one by one
+  db.reset({ presence_contacts: [], presence_contact_imports: [], presence_contact_import_rows: [], presence_sales_templates: [] });
+  const real = globalThis.fetch; let raced = false;
+  globalThis.fetch = async (url, init = {}) => {
+    if (!raced && String(url).includes('/rest/v1/presence_contacts?columns=') && (init.method || 'GET') === 'POST') { raced = true; db.tables.presence_contacts.push(contact('aaaaaaaa-0000-4000-8000-00000000beef', { name: 'Already', email: 'race@example.com' })); }
+    return real(url, init);
+  };
+  const r = await res(await M.handleContactImports(req('POST', '/sales/contacts/imports', { rows: [{ name: 'One', email: 'one@example.com' }, { name: 'Race', email: 'RACE@example.com' }, { name: 'Two', email: 'two@example.com' }] }), site, owner, cors));
+  globalThis.fetch = real;
+  ok('item 122: a clash mid-file costs only that row: the rest still go in, and the one added meanwhile counts as already here', r.body?.data?.counts?.added === 2 && r.body.data.counts.existed === 1 && db.tables.presence_contacts.filter((x) => x.email === 'race@example.com').length === 1, JSON.stringify(r.body));
+}
+{
+  // the add form and a whole-file import store one person the same way
+  db.reset({ presence_contacts: [], presence_contact_imports: [], presence_contact_import_rows: [], presence_sales_templates: [] });
+  const person = { name: '  Dee Lane ', email: 'Dee@Example.com', phone: '555-0303', company: 'Lane Co', job_title: 'Owner', phone2: '555-0404', address: { street: '1 Elm', city: 'Glendale' }, tags: 'vip, restaurant', notes: 'Hi', found_via: 'referral' };
+  await post(person);
+  const one = { ...db.tables.presence_contacts[0] };
+  db.reset({ presence_contacts: [], presence_contact_imports: [], presence_contact_import_rows: [], presence_sales_templates: [] });
+  await M.handleContactImports(req('POST', '/sales/contacts/imports', { rows: [person] }), site, owner, cors);
+  const two = { ...db.tables.presence_contacts[0] };
+  const strip = (x) => { const o = { ...x }; for (const k of ['id', 'created_at', 'updated_at']) delete o[k]; return JSON.stringify(Object.keys(o).sort().map((k) => [k, o[k]])); };
+  ok('item 122: the same fields, cleaned the same way, by the one set of rules (lib/contact_row.ts)', strip(one) === strip(two), strip(one) + ' vs ' + strip(two));
+}
 {
   db.reset({ presence_contacts: [], presence_sales_templates: [] });
   db.fail.add('presence_contact_imports');

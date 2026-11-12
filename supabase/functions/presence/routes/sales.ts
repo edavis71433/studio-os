@@ -62,6 +62,7 @@ import { normEmail, emailMatch, isUniqueViolation } from '../lib/contact_email.t
 import { contactMoreFrom, cleanTag, CONTACT_MORE_COLS } from '../lib/contact_fields.ts';   // item 89: address, job title, second phone, tags
 import { normalizeListFilters, quietCutoff, contactedContactIds, owingContactIds, keepIds, type ListFilters } from '../lib/list_filters.ts';   // item 90: field filters
 import { liveImport, importUpdate, noteImportRow } from './contacts_more.ts';   // item 86: imports that update and can be undone
+import { CONTACT_FIELDS_NAME, loadContactFieldDefs, contactIn, newContactRow, importIncoming } from '../lib/contact_row.ts';   // item 122: one cleaning for the add form and a whole-file import
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;                       // expected_close: ISO date only
 const CONVERT_PLANS = new Set(['presence', 'cms_only', 'business_os_only', 'presence_monitor', 'presence_managed']);
@@ -72,12 +73,8 @@ const nowIso = () => new Date().toISOString();
 // this sentinel name) so it reuses the existing site-scoped, deny-all, function-
 // mediated sales-templates store with NO new migration. Hidden from the template list.
 const SERVICES_CATALOG_NAME = '__services_catalog__';
-// The site's contact custom-field DEFINITIONS (≤5 owner-defined labeled fields)
-// ride the same reserved-template store as the services catalog — a single row
-// (kind=proposal, this sentinel name) whose `body` holds the definitions JSON.
-// Site-scoped, deny-all, function-mediated — NO new migration for definitions.
-// (Per-contact VALUES live in presence_contacts.custom, migration 0097.)
-const CONTACT_FIELDS_NAME = '__crm_contact_fields__';
+// The site's contact custom-field DEFINITIONS: CONTACT_FIELDS_NAME and loadContactFieldDefs
+// live in lib/contact_row.ts (item 122), beside the cleaning an import shares with the add form.
 // the reserved store's rows (lib/reserved_store.ts) never show as templates either
 const NOT_RESERVED_STORE = Object.values(RESERVED_NAMES).map((n) => `&name=neq.${encodeURIComponent(n)}`).join('');
 /** Every Studio OS settings row is named __like_this__; no template may be. */
@@ -439,23 +436,22 @@ export async function handleSalesContacts(req: Request, site: SiteRow, principal
   }
   if (req.method === 'POST') {
     let b: any = {}; try { b = await req.json(); } catch { return json({ error: 'bad_json' }, 400, cors); }
-    const email = clean(b.email, 160).toLowerCase();
-    const name = clean(b.name, 120);
-    if (!name && !email) return json({ error: 'validation', message: 'A contact needs a name or an email.' }, 422, cors);
-    const phone = clean(b.phone, 40);
+    // item 122: cleaned by the one set of rules a whole-file import uses too (lib/contact_row.ts);
+    // your own fields (item 86: an import can fill them) are checked against their definitions
+    const c = contactIn(b, b.custom && typeof b.custom === 'object' ? await loadContactFieldDefs(site.id) : []);
+    if (!c) return json({ error: 'validation', message: 'A contact needs a name or an email.' }, 422, cors);
+    const { email, name, phone } = c;
     // duplicate protection: reuse an existing contact for this (site, email) — matched the
     // way the database's rule matches, whatever the capitals (item 110, K1)
     const sameEmail = () => svc(`presence_contacts?site_id=eq.${site.id}&${emailMatch(email)}&deleted_at=is.null&select=id,name,email,phone,company&limit=1`);
     // item 86: a row of an import carries its import's id; the import says whether someone
     // already here is updated with what the file has, and notes each row for its Undo
     const imp = b.import_id ? await liveImport(site.id, b.import_id) : null;
-    // your own fields (item 86: an import can fill them), checked against their definitions
-    const custom = b.custom && typeof b.custom === 'object' ? applyFieldValues(await loadContactFieldDefs(site.id), {}, b.custom) : null;
     if (email) {
       const existing = await sameEmail();
       if (existing.ok && rows(existing)[0]) {
         if (imp && imp.on_existing === 'update') {
-          const u = await importUpdate(site.id, imp.id, rows(existing)[0], { name, phone, company: clean(b.company, 120), notes: clean(b.notes, 2000), found_via: normalizeFoundVia(b.found_via), ...contactMoreFrom(b), ...(custom ? { custom } : {}) });
+          const u = await importUpdate(site.id, imp.id, rows(existing)[0], importIncoming(c));
           if (u) return json({ data: u.row, deduped: true, updated: u.updated }, 200, cors);
         }
         return json({ data: rows(existing)[0], deduped: true }, 200, cors);
@@ -474,9 +470,8 @@ export async function handleSalesContacts(req: Request, site: SiteRow, principal
       const matches = findPossibleDuplicates({ name, phone, email }, pool, 5);
       if (matches.length) return json({ error: 'possible_duplicate', matches, message: `This looks like someone you already have. Is it the same person?` }, 409, cors);
     }
-    const foundVia = normalizeFoundVia(b.found_via);   // item 69: "How did they find you?" ('' = not recorded)
-    const moreFields = contactMoreFrom(b);              // item 89: address, job title, second phone, tags
-    const ins = await insertWithFoundVia('presence_contacts', { site_id: site.id, name, email, phone, company: clean(b.company, 120), notes: clean(b.notes, 2000), ...(foundVia ? { found_via: foundVia } : {}), ...moreFields, ...(custom && Object.keys(custom).length ? { custom } : {}) });
+    // item 69: "How did they find you?" ('' = not recorded); item 89: address, job title, second phone, tags
+    const ins = await insertWithFoundVia('presence_contacts', newContactRow(site.id, c));
     // K6: two adds of one new person at once (two rows of one import file, two tabs) both pass
     // the check above; the database refuses the second, and that is the same person, not a failure
     if (!ins.ok && email && isUniqueViolation(ins)) {
@@ -524,11 +519,6 @@ async function insertWithFoundVia(table: string, row: Record<string, unknown>) {
 // holding the definitions JSON — reusing the site-scoped, deny-all, function-
 // mediated store exactly like the services catalog. Per-contact VALUES live in
 // presence_contacts.custom (migration 0097). Studio-gated & site-scoped.
-async function loadContactFieldDefs(siteId: string): Promise<CustomFieldDef[]> {
-  const row = rows(await svc(`presence_sales_templates?site_id=eq.${siteId}&kind=eq.proposal&name=eq.${encodeURIComponent(CONTACT_FIELDS_NAME)}&deleted_at=is.null&select=body&limit=1`))[0];
-  if (!row || !row.body) return [];
-  try { return normalizeFieldDefs(JSON.parse(row.body)); } catch { return []; }
-}
 export async function handleSalesContactFields(req: Request, site: SiteRow, principal: Principal, cors: Record<string, string>): Promise<Response> {
   if (req.method === 'GET') return json({ data: await loadContactFieldDefs(site.id) }, 200, cors);
   if (req.method === 'PUT') {
