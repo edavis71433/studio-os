@@ -34,6 +34,7 @@ import { captureDraftSnapshot } from '../lib/staging.ts';
 import { applySnapshotToDraft, snapshotForRestore, leftOffSentence } from '../lib/draft_writer.ts';
 import { lockedRestoreMessage } from '../lib/section_lock.ts';
 import { insertSnapshot as insertSnapshotRow, type DraftSettings } from '../lib/draft_settings.ts';
+import { readReservedJson, updateReservedJson, RESERVED_NAMES } from '../lib/reserved_store.ts';
 import { renderOfflinePage, offlineFileMap } from '../lib/offline_page.ts';
 import { loadEmailBrand } from '../lib/email_brand.ts';
 import { snapshotContentUsable } from '../lib/render_types.ts';
@@ -438,9 +439,41 @@ export async function publishHistoryRows(site: SiteRow) {
 }
 
 export async function handlePublishHistory(site: SiteRow, cors: Record<string, string>) {
-  const rows = await publishHistoryRows(site);
-  // keep the existing /publishes shape exactly (no snapshot_id in the response)
-  return json({ data: rows.map(({ snapshot_id: _s, ...pub }) => pub) }, 200, cors);
+  const [rows, stored] = await Promise.all([publishHistoryRows(site), readReservedJson(site.id, RESERVED_NAMES.versionStars)]);
+  // keep the existing /publishes shape exactly (no snapshot_id in the response); item 158 adds
+  // the starred versions beside it (publishes and checkpoints), a failed read none
+  return json({ data: rows.map(({ snapshot_id: _s, ...pub }) => pub), stars: normalizeStars(stored) }, 200, cors);
+}
+
+// ── Builder list item 158: star the versions that matter (Wix's Site History stars) ──
+// PUT /publishes/stars { id, starred } — any kept version, a publish or a saved checkpoint.
+// Kept once per site as reserved JSON (no migration), newest star first, at most 200.
+export const VERSION_STARS_MAX = 200;
+const STAR_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+/** The stored stars, cleaned: real ids, each once, at most 200. Pure. */
+export function normalizeStars(raw: unknown): string[] {
+  const list = raw && typeof raw === 'object' && Array.isArray((raw as { ids?: unknown }).ids) ? (raw as { ids: unknown[] }).ids : [];
+  return [...new Set(list.map((x) => String(x).toLowerCase()).filter((x) => STAR_ID.test(x)))].slice(0, VERSION_STARS_MAX);
+}
+/** Star or unstar one version; a new star goes first, and the oldest fall off past 200. Pure. */
+export function toggleStar(current: unknown, id: string, starred: boolean): { ids: string[] } {
+  const rest = normalizeStars(current).filter((x) => x !== id);
+  return { ids: starred ? [id, ...rest].slice(0, VERSION_STARS_MAX) : rest };
+}
+export async function handleVersionStar(req: Request, site: SiteRow, principal: Principal, cors: Record<string, string>) {
+  let body: any = null; try { body = await req.json(); } catch { /* */ }
+  const id = String(body?.id || '').toLowerCase();
+  if (!STAR_ID.test(id) || typeof body?.starred !== 'boolean') return json({ error: 'bad_request', message: 'Say which version, and whether to star it.' }, 400, cors);
+  // only a version this site keeps: one of its publishes, or one of its saved checkpoints
+  const [pub, cp] = await Promise.all([
+    svc(`presence_publishes?id=eq.${id}&site_id=eq.${site.id}&select=id&limit=1`),
+    svc(`presence_launches?id=eq.${id}&site_id=eq.${site.id}&status=eq.checkpoint&select=id&limit=1`),
+  ]);
+  const known = (pub.ok && Array.isArray(pub.json) && pub.json.length) || (cp.ok && Array.isArray(cp.json) && cp.json.length);
+  if (!known) return json({ error: 'not_found', message: 'That version isn’t in your list.' }, 404, cors);
+  const saved = await updateReservedJson(site.id, RESERVED_NAMES.versionStars, (cur) => toggleStar(cur, id, body.starred), principal.email || principal.userId || 'member');
+  if (!saved) return json({ error: 'write_failed', message: 'That didn’t save — please try again.' }, 502, cors);
+  return json({ data: { id, starred: body.starred, stars: saved.ids } }, 200, cors);
 }
 
 // ── Phase AA (FD-7): name a kept version ─────────────────────────────────────

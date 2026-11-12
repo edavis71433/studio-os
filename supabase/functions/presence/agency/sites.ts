@@ -304,7 +304,9 @@ export function domainStatus(d: DomainIn, nowIso: string): { key: string; words:
   if (d.edition !== 'monitor' && d.domain_serving === 'other') return is('other_site', 'Showing something else', 'bad');
   if (d.edition !== 'monitor' && Array.isArray(d.domain_checks) && d.domain_checks.some((c) => c && c.ok === false && c.key !== 'serving')) return is('partly', 'Not fully set up', 'warn');
   if (d.domain_serving === 'latest') return is('connected', 'Connected', 'good');
-  if (d.uptime_ok === true) return is('connected', 'Connected', 'good');
+  // Nov 12 review, finding 24: "something answered" isn't Connected. Until the page comparison
+  // has run (once a day, or Check now), the row says it hasn't been checked. A watched site on
+  // its own host has no page of ours to compare, and left above as "On their own host".
   return is('checking', 'Not checked yet', 'quiet');
 }
 /** Every custom domain with its status, provider and expiry, the most urgent

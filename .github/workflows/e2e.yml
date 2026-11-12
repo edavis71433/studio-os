@@ -100,6 +100,8 @@ jobs:
               supabase/functions/presence/lib/dev_html.ts) run=true ;;
               # notes-159.spec.ts draws the shared draft's feedback panel with this (builder item 159).
               supabase/functions/presence/lib/feedback_panel.ts) run=true ;;
+              # editor-comforts-158.spec.ts scrolls a page drawn with this (builder item 158).
+              supabase/functions/presence/lib/site_motion.ts) run=true ;;
               docs/*|supabase/*|runbooks/*|sql/*|templates/*) ;;
               tests/isolation/*|tests/presence/*|tests/smoke/*|tests/workflows/*) ;;
               .github/workflows/ci.yml|.github/workflows/deploy.yml|.github/workflows/rollback.yml|.github/workflows/schema-dump.yml) ;;

@@ -73,21 +73,15 @@ async function call(body: unknown, headers: Record<string, string> = {}) {
     r.status === 401 && r.json?.error === 'unauthorized', true);
 }
 
-// 4. client-emailing notify types are staff-gated (billing/messaging abuse guard)
-for (const t of ['invoice_reminder', 'approval_needed']) {
+// 4. builder item 213: kinds nothing sends any more fail closed like any unknown one,
+//    including the old client-emailing notices and the ones that could delete
+for (const t of ['invoice_reminder', 'approval_needed', 'invoice_paylink', 'client_purge', 'delete_client_cascade', 'contract_get', '_resolver_probe']) {
   const r = await call({ type: t, clientEmail: 'nobody@example.com', message: 'smoke' });
-  record(`billing/notify: '${t}' unauthenticated`, '401 unauthorized', `${r.status} ${r.json?.error ?? ''}`,
-    r.status === 401, true);
+  record(`gate: removed kind '${t}' fails closed`, '403 unknown_route', `${r.status} ${r.json?.error ?? ''}`,
+    r.status === 403 && r.json?.error === 'unknown_route', true);
 }
 
-// 5. billing: Stripe checkout-link route is staff-gated
-{
-  const r = await call({ type: 'invoice_paylink', invoiceId: '00000000-0000-0000-0000-000000000000' });
-  record('billing: invoice_paylink unauthenticated', '401 unauthorized', `${r.status} ${r.json?.error ?? ''}`,
-    r.status === 401, true);
-}
-
-// 6. CORS allowlist: real origin echoed, foreign origin NOT echoed
+// 5-6. CORS allowlist: real origin echoed, foreign origin NOT echoed
 {
   const good = await call({ type: 'version' }, { Origin: 'https://davisdigitalstudio.com' });
   const evil = await call({ type: 'version' }, { Origin: 'https://evil.example.com' });
@@ -99,23 +93,7 @@ for (const t of ['invoice_reminder', 'approval_needed']) {
     !!e && e !== 'https://evil.example.com', true);
 }
 
-// 7. public contract read (the B2 surface): published agreement present
-{
-  const r = await call({ type: 'contract_get' });
-  const v = r.json?.data?.version;
-  record('public: contract_get returns published agreement', '200 + data.version >= 1', `${r.status} version=${v}`,
-    r.status === 200 && Number(v) >= 1, true);
-}
-
-// 8. resolver probe (public identity seam)
-{
-  const r = await call({ type: '_resolver_probe' });
-  const kind = r.json?.data?.kind ?? r.json?.kind;
-  record('public: _resolver_probe anonymous → public principal', "200 + kind='public'", `${r.status} kind=${kind}`,
-    r.status === 200 && kind === 'public', true);
-}
-
-// 9. stripe-webhook rejects unsigned payloads (HMAC gate)
+// 7. stripe-webhook rejects unsigned payloads (HMAC gate)
 {
   const r = await fetch(WEBHOOK, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{"type":"smoke"}' });
   const text = await r.text();
@@ -123,13 +101,13 @@ for (const t of ['invoice_reminder', 'approval_needed']) {
     r.status === 400 && text.includes('invalid signature'), true);
 }
 
-// 10. deployed surfaces reachable (frontends ride the same release train)
+// 8. deployed surfaces reachable (frontends ride the same release train)
 for (const p of ['/portal.html', '/dds-studio-manage-9k2p.html']) {
   const r = await fetch(`${SITE}${p}`, { method: 'HEAD' });
   record(`deploy: ${p} reachable`, '200', String(r.status), r.status === 200, true);
 }
 
-// 11. presence function is up + its auth gate fails closed (M3)
+// 9. presence function is up + its auth gate fails closed (M3)
 {
   const r = await fetch(`${URL_}/functions/v1/presence/site`, { method: 'GET', headers: { 'Authorization': `Bearer ${ANON}` } });
   const j = await r.json().catch(() => null);
@@ -144,7 +122,7 @@ for (const p of ['/portal.html', '/dds-studio-manage-9k2p.html']) {
 // ═════════ AUTH TIER (SR_KEY required — local/staging only) ═════════
 
 if (!SR) {
-  console.log('\n(SR_KEY not set — auth-tier checks skipped: client_project, client_decisions, gp_workspace, messaging RLS, client-vs-staff boundary)');
+  console.log('\n(SR_KEY not set — auth-tier checks skipped: who-am-I as a client, messaging RLS, client-vs-staff boundary)');
 } else {
   const srH = { apikey: SR, Authorization: `Bearer ${SR}`, 'Content-Type': 'application/json' };
   // reset the dedicated test identity's password for this run
@@ -165,29 +143,14 @@ if (!SR) {
     if (jwt) {
       const cH = { 'x-dds-user-jwt': jwt };
 
-      // 11. journal/project behavior
+      // 11. who-am-I as a client: signed in, not on the studio team
       {
-        const r = await call({ type: 'client_project' }, cH);
-        record('client: client_project (journal/project)', '200 + data', `${r.status} data=${r.json?.data ? 'present' : 'missing'}`,
-          r.status === 200 && !!r.json?.data, false);
+        const r = await call({ type: 'whoami' }, cH);
+        record('client: whoami says not on the team', '200 + isTeam false', `${r.status} isTeam=${r.json?.isTeam}`,
+          r.status === 200 && r.json?.isTeam === false, false);
       }
 
-      // 12. client decisions (approvals brief)
-      {
-        const r = await call({ type: 'client_decisions' }, cH);
-        record('client: client_decisions (approvals brief)', '200 + data', `${r.status} data=${r.json?.data ? 'present' : 'missing'}`,
-          r.status === 200 && !!r.json?.data, false);
-      }
-
-      // 13. Growth Partnership workspace
-      {
-        const r = await call({ type: 'gp_workspace' }, cH);
-        const hasP = !!r.json?.data?.partnership;
-        record('growth: gp_workspace resolves partnership', '200 + data.partnership', `${r.status} partnership=${hasP}`,
-          r.status === 200 && hasP, false);
-      }
-
-      // 14. messaging: RLS-scoped read as the client (portal messaging path)
+      // 12. messaging: RLS-scoped read as the client (portal messaging path)
       {
         const r = await fetch(`${URL_}/rest/v1/messages?select=id,from_who&limit=5`, {
           headers: { apikey: ANON, Authorization: `Bearer ${jwt}` },
@@ -197,7 +160,7 @@ if (!SR) {
           r.status === 200 && Array.isArray(j), false);
       }
 
-      // 15. boundary: client JWT rejected from staff routes
+      // 13. boundary: client JWT rejected from staff routes
       {
         const r = await call({ type: 'admin_query', path: 'clients?select=id&limit=1' }, cH);
         record('auth: client JWT rejected from staff route', '401 unauthorized', `${r.status} ${r.json?.error ?? ''}`,
