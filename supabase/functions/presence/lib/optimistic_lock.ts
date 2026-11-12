@@ -102,7 +102,7 @@ export async function guardStaleDraft(req: Request, site: SiteRow, cors: Record<
 /** The routes whose writes move the draft version. The same list as the page's
  *  DRAFT_WRITE (presence.html), which sends these one at a time; optimistic_lock_test
  *  keeps the two in step. */
-export const DRAFT_WRITE = /^\/(?:settings|identity|location|offerings|testimonials|faqs|posts|pages\/duplicate|media|stock\/import|redirects|site\/template|content-library|dev\/customization|dev\/brand-kit|restore-to-draft)(?:[/?]|$)|^\/reviews\/[^/]+\/|^\/publishes\/checkpoints\/[^/]+\/restore$|^\/writer\/drafts\/[^/]+\/accept$/;
+export const DRAFT_WRITE = /^\/(?:settings|identity|location|offerings|testimonials|faqs|posts|pages\/duplicate|media|stock\/import|redirects|site\/template|content-library|dev\/customization|dev\/brand-kit|restore-to-draft)(?:[/?]|$)|^\/reviews\/[^/]+\/|^\/publishes\/checkpoints\/[^/]+\/restore$|^\/writer\/drafts\/[^/]+\/accept$|^\/pages\/deleted\/[^/]+\/restore$/;
 
 /** Does this request write the draft? Pure. */
 export function movesDraft(method: string, route: string): boolean {
