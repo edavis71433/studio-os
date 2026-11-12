@@ -35,6 +35,7 @@ export const RESERVED_NAMES = {
   projectTemplates: '__project_templates__',   // sales item 106: the studio's own project templates (lib/project_templates.ts)
   todoLists: '__todo_lists__',            // sales item 106: the studio's saved lists of deal to-dos (lib/todo_templates.ts)
   bookingBusy: '__booking_busy__',        // builder list item 149: the busy times last read from that calendar, and how the last read went (routes/booking.ts)
+  usableCheck: '__usable_check__',        // builder list item 150: the three ticks only a person can judge, and the last check's count and worst line (lib/usable_check.ts)
 } as const;
 
 const rowsOf = (r: { json?: unknown }) => (Array.isArray((r as any).json) ? (r as any).json : []) as any[];

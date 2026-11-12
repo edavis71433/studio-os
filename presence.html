@@ -247,6 +247,50 @@ button:disabled{opacity:.55;cursor:default}
 .hb-golive li[data-done="1"] b{color:var(--sage)}   /* list item 151 */
 /* item 183: Website health with a memory: the count, the weekly line, fixed and new, the headings */
 #healthCard.hm-wide{flex:1 1 100%}
+/* Builder list item 150: "Usable by everyone", the fix list (Figma "A · Accessibility check, with a fix list") */
+.ue-frame{position:fixed;left:-9999px;top:0;width:1200px;height:900px;border:0;visibility:hidden;pointer-events:none}
+dialog.ue-sheet{margin:auto;border:0;padding:0;width:min(440px,calc(100vw - 24px));max-height:min(88vh,860px);border-radius:20px;background:var(--sheet);color:var(--ink);box-shadow:var(--dds-shadow-pop)}
+dialog.ue-sheet[open]{display:flex;flex-direction:column}
+dialog.ue-sheet::backdrop{background:color-mix(in srgb,var(--scrim-ink) 42%,transparent)}
+.ue-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;padding:20px 20px 0;flex:none}
+.ue-head h2{margin:0;font-family:var(--serif);font-size:22px;font-weight:600;line-height:1.2;color:var(--ink)}
+.ue-head .pillbtn{flex:none;min-height:36px;border-radius:999px;padding:0 14px;font-weight:600}
+.ue-body{overflow:auto;padding:4px 20px 20px;-webkit-overflow-scrolling:touch}
+.ue-when{margin:4px 0 12px;font-size:13px;line-height:1.5;color:var(--ink-2)}
+.ue-chips{display:flex;flex-wrap:wrap;gap:6px}
+.ue-chips .hb-chip{font-weight:600;padding:2px 10px}
+.ue-h{margin:18px 0 8px;font-size:12px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-2)}
+.ue-list{list-style:none;margin:0;padding:0;display:grid;gap:8px}
+.ue-row{display:flex;gap:12px;padding:12px;border-radius:14px;background:var(--paper)}
+.ue-ic{flex:none;display:grid;place-items:center;width:30px;height:30px;border-radius:9px;background:var(--amber-soft);color:var(--amber)}
+.ue-ic svg,.ue-again svg,.ue-rit-ic svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.75;stroke-linecap:round;stroke-linejoin:round}
+.ue-t{min-width:0;display:grid;gap:2px;justify-items:start}
+.ue-t b{font-size:14px;font-weight:600;line-height:1.35;color:var(--ink)}
+.ue-where{font-size:12.5px;color:var(--plum);overflow-wrap:anywhere}
+.ue-why{font-size:12.5px;line-height:1.5;color:var(--ink-2)}
+.ue-t .pillbtn{margin-top:8px;min-height:36px;border-radius:999px;padding:0 14px;font-weight:600}
+.ue-none{padding:14px;border-radius:14px;background:var(--sage-soft);color:var(--ink);font-size:13.5px;font-weight:600}
+.ue-tick{display:flex;align-items:flex-start;gap:10px;min-height:44px;padding:6px 0;font-size:13.5px;line-height:1.45;color:var(--ink);cursor:pointer}
+.ue-tick input{flex:none;width:18px;height:18px;margin:1px 0 0;accent-color:var(--plum)}
+.ue-tick input:checked+span{color:var(--ink-2)}
+.ue-foot{display:flex;flex-wrap:wrap;align-items:center;gap:8px 16px;margin-top:12px}
+.ue-again{min-height:36px;border-radius:999px;padding:0 14px;font-weight:600}
+.ue-foot a{font-size:13px;font-weight:600;color:var(--plum);text-decoration:none;min-height:36px;display:inline-flex;align-items:center}
+.ue-foot a:hover{text-decoration:underline}
+.ue-rit .rit-msg{display:grid;gap:1px}
+.ue-rit .rit-msg small{font-size:12.5px;color:var(--ink-2)}
+.ue-health{margin-top:var(--dds-s4,16px);padding-top:var(--dds-s4,16px);border-top:1px solid var(--hair);display:grid;gap:8px;justify-items:start}
+.ue-health-h{display:flex;flex-wrap:wrap;align-items:center;gap:8px}
+.ue-health-h h3{margin:0;font-size:14px;font-weight:600;color:var(--ink)}
+.ue-health .note{margin:0}
+.ue-faint{margin:0 0 4px;padding:10px 12px;border-radius:12px;background:var(--amber-soft);color:var(--ink);font-size:12.5px;line-height:1.45;display:grid;gap:2px}
+.ue-faint b{font-size:13px}
+.ue-faint.ok{background:var(--sage-soft)}
+.ins-swatches.ue-rated{gap:10px 18px}
+.ins-swatches.ue-rated .ins-sw{margin-bottom:20px}
+.ins-sw[data-ratio]::before{content:attr(data-ratio);position:absolute;top:calc(100% + 4px);left:50%;transform:translateX(-50%);font-size:12px;line-height:1;font-weight:500;color:var(--ink-2);white-space:nowrap}
+.ins-sw[data-ratio][data-ok="1"]::before{color:var(--sage)}
+@media (max-width:560px){ dialog.ue-sheet{width:100vw;max-width:100vw;max-height:92vh;margin:auto 0 0;border-radius:20px 20px 0 0} }
 .hm-hacts{display:flex;align-items:center;gap:var(--dds-s2,8px);flex-wrap:wrap;justify-content:flex-end}
 .hm-row{display:grid;grid-template-columns:150px minmax(0,1fr) minmax(0,300px);gap:var(--dds-s5,20px);margin-top:var(--dds-s4,16px);align-items:start}
 .hm-count b{display:block;font-size:40px;line-height:1;font-weight:700;color:var(--ink);font-variant-numeric:tabular-nums}
@@ -6835,6 +6879,7 @@ function hbLoadBoardExtras(view) {
   if (view === "search" && !HB_ASKED.health) {
     HB_ASKED.health = true;
     api("GET", "/website-health").then((r) => { HB_HEALTH = r.data || null; renderHealthCard(); }).catch(() => {});
+    ueStored().then(() => renderHealthCard());   // item 150: what the last "Usable by everyone" check found
     api("GET", "/foundations/domain").then((r) => { HB_DOMAIN = (r && r.data) || null; renderDomainCard(); }).catch(() => { HB_DOMAIN = undefined; });
   }
   if (view === "history" && !HB_ASKED.timeline) {
@@ -7029,6 +7074,208 @@ function renderHealthCard() {
   } else if (h.ok_count) {
     card.appendChild(el("div", "note", `✓ ${h.ok_count} check${h.ok_count === 1 ? "" : "s"} pass.`));
   }
+  const usable = ueHealthBlock(); if (usable) card.appendChild(usable);   // item 150: the same list, from the last check
+}
+// ── Builder list item 150: "Usable by everyone" ─────────────────────────────
+// (Figma "A · Accessibility check, with a fix list".) The editor reads each page of the draft
+// as it is drawn (a11y-check.js, loaded when first needed) and lists what the owner can fix,
+// each row opening the card that fixes it. What only a person can judge is three ticks, kept
+// with the site, as is the last check's count, which Site health shows. The Publish card
+// says how many are left and never waits on them.
+const UE = { script: null, busy: null, result: null, hash: null, at: null, stored: null, storedP: null, faint: null };
+const UE_ICON = { photo: "image", faint: "contrast", name: "page", link: "link", heading: "heading", field: "clipboard" };
+function ueLoadScript() {
+  if (window.DDSA11Y) return Promise.resolve();
+  if (!UE.script) UE.script = new Promise((res, rej) => {
+    const sc = document.createElement("script"); sc.src = "/a11y-check.js?v=1";
+    sc.onload = () => res(); sc.onerror = () => { UE.script = null; sc.remove(); rej(new Error("The check didn’t load. Try again in a moment.")); };
+    document.head.appendChild(sc);
+  });
+  return UE.script;
+}
+function ueStored() {
+  if (!UE.storedP) UE.storedP = api("GET", "/site/usable").then((r) => (UE.stored = (r && r.data) || { ticks: {}, last: null })).catch(() => { UE.storedP = null; return UE.stored; });
+  return UE.storedP;
+}
+// One page of the draft, drawn out of sight and read. Its own scripts never run.
+function ueReadPage(html) {
+  return new Promise((resolve) => {
+    const f = document.createElement("iframe"); f.className = "ue-frame"; f.title = "Reading the draft"; f.tabIndex = -1;
+    f.setAttribute("aria-hidden", "true"); f.setAttribute("sandbox", "allow-same-origin");
+    let done = false;
+    const finish = () => {
+      if (done) return; done = true;
+      let found = null;
+      try { found = window.DDSA11Y.checkDocument(f.contentDocument, f.contentWindow); } catch (_) { /* a page that can't be read is said so, not guessed */ }
+      f.remove(); resolve(found);
+    };
+    f.addEventListener("load", () => setTimeout(finish, 50));
+    setTimeout(finish, 6000);   // slow photos don't hold the list up
+    f.srcdoc = html; document.body.appendChild(f);
+  });
+}
+const ueHash = () => S.draftHash || REVIEWED || "";
+function ueRun(force) {
+  if (!force && UE.result && UE.hash && UE.hash === ueHash()) return Promise.resolve(UE.result);
+  if (UE.busy) return UE.busy;
+  UE.busy = (async () => {
+    await ueLoadScript();
+    try { await dcSavePendingEdits(); } catch (_) { /* the draft as last saved is read */ }
+    const pages = [];
+    for (const pg of dcPageList().slice(0, 40)) {
+      let findings = null;
+      try { findings = await ueReadPage(await apiHtml("/preview?version=draft&page=" + encodeURIComponent(pg.slug ? "/" + pg.slug + "/" : "/"))); } catch (_) { /* counted as a page that couldn't be read */ }
+      pages.push({ slug: pg.slug, title: pg.title, findings });
+    }
+    const r = window.DDSA11Y.summarize(pages);
+    UE.result = r; UE.hash = ueHash(); UE.at = new Date();
+    if (r.unread < pages.length) api("PUT", "/site/usable", { last: { fix: r.fix, passed: r.passed, worst: r.worst } }).then((x) => { if (x && x.data) { UE.stored = x.data; renderHealthCard(); } }).catch(() => {});
+    return r;
+  })().finally(() => { UE.busy = null; });
+  return UE.busy;
+}
+const ueToCheck = () => { const t = (UE.stored && UE.stored.ticks) || {}; return (window.DDSA11Y ? window.DDSA11Y.TICKS : []).filter(([k]) => !t[k]).length; };
+function ueClose() { const d = $("ueSheet"); if (d && d.open) d.close(); }
+function openUsable(force) {
+  let dlg = $("ueSheet");
+  if (!dlg) {
+    dlg = el("dialog", "ue-sheet"); dlg.id = "ueSheet"; dlg.setAttribute("aria-labelledby", "ueTitle");
+    const head = el("div", "ue-head");
+    const h = el("h2", null, "Usable by everyone"); h.id = "ueTitle"; head.appendChild(h);
+    const done = el("button", "pillbtn", "Done"); done.type = "button"; done.id = "ueDone"; done.addEventListener("click", ueClose); head.appendChild(done);
+    dlg.appendChild(head);
+    const body = el("div", "ue-body"); body.id = "ueBody"; dlg.appendChild(body);
+    dlg.addEventListener("keydown", (e) => { if (e.key === "Escape") e.stopPropagation(); });   // Escape closes this card, not what's under it
+    dlg.addEventListener("click", (e) => { if (e.target === dlg) ueClose(); });
+    dlg.addEventListener("close", () => { const back = dlg._back; dlg._back = null; if (back && back.isConnected) { try { back.focus(); } catch (_) {} } });
+    document.body.appendChild(dlg);
+  }
+  if (!dlg.open) { dlg._back = document.activeElement; dlg.showModal(); }
+  const body = $("ueBody");
+  body.textContent = "";
+  const wait = el("p", "ue-when", "Reading your draft, page by page…"); wait.setAttribute("role", "status"); body.appendChild(wait); body.appendChild(el("div", "shimmer"));
+  Promise.all([ueRun(force), ueStored()]).then(([r]) => { if (dlg.open) ueRender(r); }).catch((err) => {
+    if (!dlg.open) return;
+    body.textContent = "";
+    const p2 = el("p", "ue-when", (err && err.message) || "The check didn’t finish. Try again in a moment."); p2.setAttribute("role", "alert"); body.appendChild(p2);
+    const again = el("button", "pillbtn ue-again", "Try again"); again.type = "button"; again.addEventListener("click", () => openUsable(true)); body.appendChild(again);
+  });
+}
+function ueRender(r) {
+  const body = $("ueBody"); if (!body) return;
+  const A = window.DDSA11Y;
+  body.textContent = "";
+  const at = (UE.at || new Date()).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" }).replace(/\s/g, "").toLowerCase();
+  body.appendChild(el("p", "ue-when", "Checked on your draft at " + at + ". Your live site changes when you publish."));
+  const chips = el("div", "ue-chips"); chips.id = "ueChips";
+  const paintChips = () => {
+    chips.textContent = "";
+    chips.appendChild(el("span", "hb-chip " + (r.fix ? "warn" : "good"), r.fix ? r.fix + " to fix" : "Nothing to fix"));
+    const n = ueToCheck(); if (n) chips.appendChild(el("span", "hb-chip", n + " for you to check"));
+    chips.appendChild(el("span", "hb-chip good", r.passed + " passed"));
+  };
+  paintChips(); body.appendChild(chips);
+  if (r.rows.length) {
+    body.appendChild(el("h3", "ue-h", "To fix"));
+    const ul = el("ul", "ue-list");
+    r.rows.forEach((row) => {
+      const li = el("li", "ue-row"); li.dataset.kind = row.kind;
+      const ic = el("span", "ue-ic"); ic.setAttribute("aria-hidden", "true"); ic.innerHTML = uiIcon(UE_ICON[row.kind] || "page", 16); li.appendChild(ic);
+      const t = el("div", "ue-t");
+      t.appendChild(el("b", null, row.title));
+      if (row.where) t.appendChild(el("span", "ue-where", row.where));
+      t.appendChild(el("span", "ue-why", row.why));
+      const b = el("button", "pillbtn", row.fix); b.type = "button"; b.setAttribute("aria-label", row.fix + ": " + row.title + (row.where ? ", " + row.where : ""));
+      b.addEventListener("click", () => ueFix(row)); t.appendChild(b);
+      li.appendChild(t); ul.appendChild(li);
+    });
+    body.appendChild(ul);
+  } else if (!r.unread) {
+    body.appendChild(el("h3", "ue-h", "To fix"));
+    body.appendChild(el("div", "ue-none", "Nothing to fix on any page of your draft."));
+  }
+  if (r.unread) body.appendChild(el("p", "ue-when", r.unread === 1 ? "One page couldn’t be read just now. Check again in a moment." : r.unread + " pages couldn’t be read just now. Check again in a moment."));
+  body.appendChild(el("h3", "ue-h", "Only you can check"));
+  const ticks = (UE.stored && UE.stored.ticks) || {};
+  A.TICKS.forEach(([key, words]) => {
+    const lab = el("label", "ue-tick"); const box = el("input"); box.type = "checkbox"; box.checked = !!ticks[key]; box.dataset.tick = key;
+    box.addEventListener("change", () => {
+      const want = box.checked;
+      api("PUT", "/site/usable", { ticks: { [key]: want } }).then((x) => { if (x && x.data) UE.stored = x.data; else UE.stored = { ...(UE.stored || {}), ticks: { ...ticks, [key]: want } }; paintChips(); renderHealthCard(); })
+        .catch((err) => { box.checked = !want; toast(nice(err), true); });
+    });
+    lab.appendChild(box); lab.appendChild(el("span", null, words)); body.appendChild(lab);
+  });
+  const foot = el("div", "ue-foot");
+  const again = el("button", "pillbtn ue-again"); again.type = "button"; again.id = "ueAgain"; again.innerHTML = uiIcon("refresh", 16); again.appendChild(document.createTextNode("Check again"));
+  again.addEventListener("click", () => openUsable(true)); foot.appendChild(again);
+  const live = typeof siteLiveUrl === "function" ? siteLiveUrl() : null;
+  if (live) { const a = el("a", null, "Your accessibility statement"); a.href = live.replace(/\/+$/, "") + "/accessibility/"; a.target = "_blank"; a.rel = "noopener"; foot.appendChild(a); }
+  body.appendChild(foot);
+}
+// A row's button: the page it's on, then the card that fixes it.
+async function ueFix(row) {
+  ueClose();
+  go("design");
+  if (!(await dcSwitchPage(row.slug))) return;
+  if (row.kind === "name") { pgOpenSettings({ href: "/" + row.slug + "/" }); return; }
+  if (row.src == null) { if (row.kind === "faint") { openSettingsPanel("styles"); stylesTab("colours"); } return; }
+  if (!BLOCKS_WORK || !BLOCKS_WORK[row.src]) { toast("That section has moved since the check. Check again to find it.", true); return; }
+  if (row.kind === "faint") { UE.faint = { slug: DC_PAGE, bi: row.src, fg: row.fg, bg: row.bg, min: row.min || 4.5 }; eeEditBlock(row.src, "style"); return; }
+  eeEditBlock(row.src, "content");
+}
+// The section's Style tab, opened from "Pick colours": the faint pair is said first, and each
+// background from the site's colours shows how well the words read on it.
+function ueFaintFor(idx) { const f = UE.faint; return f && f.slug === DC_PAGE && f.bi === idx ? f : null; }
+function ueFaintBanner(idx, st) {
+  const f = ueFaintFor(idx); if (!f) return null;
+  const fg = st.text_color || f.fg, bg = st.bg_color || f.bg;
+  let r = 0; try { r = ovContrast(fg, bg); } catch (_) { return null; }
+  const ok = r + 0.005 >= f.min;
+  const box = el("div", "ue-faint" + (ok ? " ok" : "")); box.setAttribute("role", "status");
+  box.appendChild(el("b", null, ok ? "These words read easily now" : "These words are too faint on this background"));
+  box.appendChild(el("span", null, r.toFixed(1) + " to 1 now." + (ok ? "" : " Any background below with a tick reads easily.")));
+  return box;
+}
+function ueRateSwatches(idx, st, row, shades) {
+  const f = ueFaintFor(idx); if (!f || !row) return;
+  const fg = st.text_color || f.fg;
+  row.classList.add("ue-rated");
+  shades.forEach((hex, i) => {
+    const b = row.children[i + 1]; if (!b) return;
+    let r = 0; try { r = ovContrast(fg, hex); } catch (_) { return; }
+    const ok = r + 0.005 >= f.min;
+    b.dataset.ratio = r.toFixed(1) + (ok ? " ✓" : ""); b.dataset.ok = ok ? "1" : "0";
+    b.setAttribute("aria-label", b.getAttribute("aria-label") + ", " + r.toFixed(1) + " to 1, " + (ok ? "easy to read" : "too faint"));
+  });
+}
+// The Publish card's row: how many are left, and the way to them. It never stops a publish.
+function ueRitualRow() {
+  const ul = $("ritBlockers") && $("ritBlockers").querySelector("ul.blocklist"); if (!ul) return;
+  const li = el("li", "ok ue-rit"); li.id = "ueRit";
+  const mark = el("i", "rit-ck ok ue-rit-ic"); mark.setAttribute("aria-hidden", "true"); mark.innerHTML = uiIcon("usable", 16); li.appendChild(mark);
+  const msg = el("span", "rit-msg"); msg.appendChild(document.createTextNode("Usable by everyone"));
+  const sub = el("small", null, "Checking your draft…"); msg.appendChild(sub); li.appendChild(msg);
+  const rev = el("button", "textact", "Review"); rev.type = "button"; rev.setAttribute("aria-label", "Review what would make the site usable by everyone");
+  rev.addEventListener("click", () => { closeRitual(); openUsable(); }); li.appendChild(rev);
+  ul.appendChild(li);
+  Promise.all([ueRun(), ueStored()]).then(([r]) => {
+    if (!li.isConnected) return;
+    sub.textContent = window.DDSA11Y.publishLine(r.fix, ueToCheck());
+    mark.className = "rit-ck ue-rit-ic " + (r.fix ? "bad" : "ok");
+  }).catch(() => { if (li.isConnected) sub.textContent = "The check didn’t finish. Review runs it again."; });
+}
+// Site health shows the same list, from the last check
+function ueHealthBlock() {
+  const st = UE.stored; if (!st) return null;
+  const box = el("div", "ue-health"); box.id = "ueHealth";
+  const h = el("div", "ue-health-h"); h.appendChild(el("h3", null, "Usable by everyone"));
+  const last = st.last;
+  if (last) h.appendChild(el("span", "hb-chip " + (last.fix ? "warn" : "good"), last.fix ? last.fix + " to fix" : "Nothing to fix"));
+  box.appendChild(h);
+  box.appendChild(el("div", "note", !last ? "Photos without a description, faint words, buttons that only say “Click here”. Not checked yet." : last.fix ? "Worst first: " + last.worst : "Nothing to fix when the draft was last checked."));
+  const b = el("button", "pillbtn sm", last ? "Open the check in the editor" : "Check now"); b.type = "button"; b.addEventListener("click", () => openUsable(!last)); box.appendChild(b);
+  return box;
 }
 function renderActivity() {
   const sec = $("activitySec"), list = $("activityList"), more = $("activityMore"); if (!sec || !list) return;
@@ -7755,6 +8002,7 @@ async function loadRitual(toSchedule) {
     } else if (c.count > 0 || c.first_publish) {
       $("ritBlockers").innerHTML = "";
       renderReadyList();
+      ueRitualRow();   // item 150: how many things are left to fix; it never stops a publish
       const btn = el("button", "pubbtn", c.first_publish ? "Publish my site" : `Publish ${c.count === 1 ? "this change" : "these " + c.count + " changes"}`);
       btn.addEventListener("click", () => runPublish(btn, c.first_publish));
       acts.appendChild(btn);
@@ -8106,6 +8354,7 @@ function togglePageInfoMenu() {
   });
   m.appendChild(propBtn); m.appendChild(grp);
   mi("Page settings…", () => pgOpenSettings({ href: DC_PAGE ? "/" + DC_PAGE + "/" : "/" }), { id: "piSearchShare", title: "This page’s name, address, place in the menu and how it shows on Google" });
+  mi("Usable by everyone…", () => openUsable(), { id: "piUsable", title: "Check the draft for photos without a description, faint words and buttons that only say “Click here”" });
   document.body.appendChild(m);
   // ≤760px: the bottom-sheet presentation the slide-over panels already use
   if (window.matchMedia && window.matchMedia("(max-width:760px)").matches) {
@@ -11917,7 +12166,10 @@ function blockStyleRow(idx, blk, sub, flat) {
       (o) => String(st.align || "") === o[1], (o) => setStyle({ align: o[1] }));
   };
   if (!flat) typeRows();
-  else det.appendChild(el("div", "ins-group", "Colours · from your site"));
+  else {
+    det.appendChild(el("div", "ins-group", "Colours · from your site"));
+    const faint = ueFaintBanner(idx, st); if (faint) det.appendChild(faint);   // item 150: opened from "Pick colours"
+  }
   // Three color wells — curated brand shades first, the Brand-Kit color-input+hex
   // pair behind "Custom…", and a "Default" clear chip each.
   const well = (label, key) => {
@@ -11925,6 +12177,7 @@ function blockStyleRow(idx, blk, sub, flat) {
     const shades = ovShades(key);
     if (flat) {   // round swatches from the site's own colours, the slashed circle for the default
       const row = insSwatches(det, label, [["", "Default"], ...shades.map((h) => [h, h])], cur, (v) => setStyle({ [key]: v }, true));
+      if (key === "bg_color") ueRateSwatches(idx, st, row, shades);   // item 150: which backgrounds keep the words easy to read
       const isCustom = !!cur && !shades.includes(cur);
       const cust = el("button", "ai-chip" + (isCustom ? " ai-main" : ""), "Custom…" + (isCustom ? " ✓" : "")); cust.type = "button"; row.appendChild(cust);
       const pairRow = el("div"); pairRow.style.cssText = "display:flex;align-items:center;gap:10px;flex:0 0 100%"; pairRow.hidden = !isCustom;
@@ -14623,6 +14876,10 @@ const BI_PATHS = {
   x: '<path d="M18 6L6 18M6 6l12 12"/>',
   chevron: '<path d="M6 9l6 6 6-6"/>',
   check: '<path d="M20 6L9 17l-5-5"/>',
+  // item 150: the fix list's own icons
+  contrast: '<circle cx="12" cy="12" r="9"/><path d="M12 3v18"/><path d="M12 8h6.5M12 12h9M12 16h6.5"/>',
+  refresh: '<path d="M20 11a8 8 0 1 0-2.3 5.7"/><path d="M20 4v7h-7"/>',
+  usable: '<circle cx="12" cy="4.5" r="1.8"/><path d="M4.5 8.5l7.5 1.5 7.5-1.5"/><path d="M12 10v5"/><path d="M12 15l-3.5 6M12 15l3.5 6"/>',
   up: '<path d="M12 19V5"/><path d="M5 12l7-7 7 7"/>',
   down: '<path d="M12 5v14"/><path d="M19 12l-7 7-7-7"/>',
 };

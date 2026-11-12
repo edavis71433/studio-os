@@ -169,6 +169,7 @@ const MEMBER_WRITES: Array<[MemberWriteNeed, string[]]> = [
     'POST /visibility/check',
     'PUT /visibility/follow',   // builder item 181: the searches the site follows on Google
     'PUT /visibility/phrases',   // builder item 160: the two or three phrases the business wants to be found for
+    'PUT /site/usable',   // builder item 150: the Usable by everyone ticks, and what its last check found
     'PUT /visibility/ai/questions',   // builder item 182: the questions its monthly AI check asks (the switch is configure)
     'POST /preview/(publish|share-link|section)',   // section: draws one unsaved section for the canvas, stores nothing
     'POST /publishes/checkpoints',

@@ -101,6 +101,7 @@ import { handleScopedCommerce } from './routes/commerce_scoped.ts';
 const { handleSystem } = lazyRoutes(() => import('./routes/system.ts'));
 const { handleVisibility, handleVisibilityCheck } = lazyRoutes(() => import('./routes/visibility.ts'));
 const { handleFollowGet, handleFollowPut, handleLlmsDraft, handlePhrasesGet, handlePhrasesPut } = lazyRoutes(() => import('./routes/search_tab.ts'));
+const { handleUsableGet, handleUsablePut } = lazyRoutes(() => import('./routes/usable.ts'));
 const { handleAiGet, handleAiQuestionsPut } = lazyRoutes(() => import('./routes/ai_answers.ts'));
 const { handleConnectionsList, handleConnectionProfile, handleConnectionConnect, handleConnectionCallback, handleConnectionRefresh, handleConnectionDisconnect, handleConnectionProperties, handleConnectionPropertySelect, handleWritePrepare, handleWriteList, handleWriteDecide, handleWriteExecute, handleWriteRollback, handleConnectionAsk, handleConnectionAskStatus } = lazyRoutes(() => import('./routes/connections.ts'));
 const { handleMarketplaceList, handleMarketplacePrepare, handleMarketplaceDecide, handleMarketplaceExecute, handleMarketplaceRollback, handleMarketplaceFeatures } = lazyRoutes(() => import('./routes/marketplace.ts'));
@@ -563,6 +564,8 @@ async function route_(req: Request, cors: Record<string, string>): Promise<Respo
   if (route === '/visibility/follow' && method === 'PUT') return handleFollowPut(req, site, principal, cors);
   if (route === '/visibility/phrases' && method === 'GET') return handlePhrasesGet(site, cors);             // item 160: what people type to find you
   if (route === '/visibility/phrases' && method === 'PUT') return handlePhrasesPut(req, site, principal, cors);
+  if (route === '/site/usable' && method === 'GET') return handleUsableGet(site, cors);                    // item 150: Usable by everyone, its ticks and the last check
+  if (route === '/site/usable' && method === 'PUT') return handleUsablePut(req, site, principal, cors);
   if (route === '/visibility/llms-draft' && method === 'GET') return handleLlmsDraft(site, cors);         // item 124
   if (route === '/visibility/ai' && method === 'GET') return handleAiGet(site, cors);                     // item 182
   if (route === '/visibility/ai/questions' && method === 'PUT') return handleAiQuestionsPut(req, site, principal, cors);
