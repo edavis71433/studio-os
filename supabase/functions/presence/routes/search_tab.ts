@@ -6,6 +6,9 @@
 //   PUT /visibility/follow     { terms: [...] } follow up to ten; a new one gets its
 //                              last six months from Search Console after the answer
 //   GET /visibility/llms-draft a first llms.txt from the business details
+//   GET /visibility/phrases    the two or three phrases the business wants to be found for
+//   PUT /visibility/phrases    { phrases: [...] } (builder list item 160); GET /visibility adds
+//                              them too, each with the page headline it's in, and ideas
 // Under /visibility for the reason routes/visibility.ts gives: search works whoever
 // hosts the site, and the /search segment is closed to a watch-only plan. Each read
 // here is best-effort and leaves its own part out when it fails.
@@ -16,6 +19,8 @@ import { runAfterResponse } from '../lib/after_response.ts';
 import { siteOrigin, type SiteRow } from '../lib/site.ts';
 import { readSearchPages } from './analytics.ts';
 import { searchTasks, pageMovers, normalizeFollowed, applyFollow, followedSeries, draftLlmsTxt, FOLLOW_MAX, LLMS_TXT_MAX, type SearchTask } from '../lib/search_tools.ts';
+import { applyPhrases, normalizePhrases, pageHeadlines, phraseFoundIn, phraseIdeas, PHRASES_MAX } from '../lib/search_phrases.ts';
+import { phraseTasks } from '../lib/search_tools.ts';
 import type { Principal } from '../../_shared/auth.ts';
 
 const rows = (r: unknown): any[] => { const j = (r as { json?: unknown } | null)?.json; return Array.isArray(j) ? j : []; };
@@ -39,9 +44,37 @@ async function searchSettings(siteId: string): Promise<{ row: Record<string, any
   return { row: rows(b)[0] || {}, ready: false };
 }
 
+/** The phrases the business wants to be found for (item 160), each with the page headline
+ *  it's in or null, and ideas from its services and area. Best-effort reads. */
+export async function phrasesView(site: SiteRow, stored?: unknown) {
+  const [raw, identQ, setQ, locQ, offQ] = await Promise.all([
+    stored !== undefined ? Promise.resolve(stored) : safe(readReservedJson(site.id, RESERVED_NAMES.searchPhrases)),
+    safe(svc(`presence_identity?site_id=eq.${site.id}&select=business_name,seo_title,service_area&limit=1`)),
+    safe(svc(`presence_settings?site_id=eq.${site.id}&select=page_seo,pages,pages_noindex,industry_key&limit=1`)),
+    safe(svc(`presence_locations?site_id=eq.${site.id}&select=city&limit=1`)),
+    safe(svc(`presence_offerings?site_id=eq.${site.id}&deleted_at=is.null&is_visible=is.true&select=name,category&limit=60`)),
+  ]);
+  const ident = rows(identQ)[0] || {}, set = rows(setQ)[0] || {}, loc = rows(locQ)[0] || {};
+  const { phrases } = normalizePhrases(raw);
+  const headlines = pageHeadlines({ name: String(ident.business_name || ''), seoTitle: ident.seo_title, industry: set.industry_key, pageSeo: set.page_seo, pages: set.pages, hidden: Array.isArray(set.pages_noindex) ? set.pages_noindex.map(String) : [] });
+  const list = phrases.map((phrase) => { const h = phraseFoundIn(phrase, headlines); return { phrase, found: h ? { key: h.key, label: h.label, title: h.title } : null }; });
+  return {
+    max: PHRASES_MAX,
+    list,
+    ideas: phraseIdeas({ industry: set.industry_key, offerings: rows(offQ), city: loc.city, serviceArea: ident.service_area, chosen: phrases }),
+    pages: headlines,   // every page's search headline now, for "Which page is about it?"
+    tasks: phraseTasks(list.map((p) => ({ phrase: p.phrase, found: !!p.found }))),
+  };
+}
+
+/** GET /visibility/phrases: the phrases view on its own, read again after a headline changes. */
+export async function handlePhrasesGet(site: SiteRow, cors: Record<string, string>) {
+  return json({ data: await phrasesView(site) }, 200, cors);
+}
+
 /** What GET /visibility adds for the new Search tab. */
 export async function searchTabExtras(site: SiteRow, i: { address: { url: string } | null; consoleConnected: boolean; listingConnected: boolean; period: string | null; review: { issues?: Array<{ title: string; priority: string; fix?: string }> } | null }) {
-  const [set, identQ, redirQ, followRaw, healthQ, nowPages, priorPages] = await Promise.all([
+  const [set, identQ, redirQ, followRaw, healthQ, nowPages, priorPages, phrases] = await Promise.all([
     searchSettings(site.id),
     safe(svc(`presence_identity?site_id=eq.${site.id}&select=seo_title,seo_description&limit=1`)),
     safe(svc(`presence_redirects?site_id=eq.${site.id}&select=id&limit=50`)),
@@ -49,6 +82,7 @@ export async function searchTabExtras(site: SiteRow, i: { address: { url: string
     safe(svc(`presence_health_days?site_id=eq.${site.id}&select=day,issues&order=day.desc&limit=1`)),
     i.period ? safe(readSearchPages(site.client_id, i.period, 25)) : Promise.resolve(null),
     i.period ? safe(readSearchPages(site.client_id, monthBefore(i.period), 25)) : Promise.resolve(null),
+    phrasesView(site),
   ]);
   const s = set.row, ident = rows(identQ)[0] || {};
   const followed = normalizeFollowed(followRaw).terms;
@@ -59,6 +93,7 @@ export async function searchTabExtras(site: SiteRow, i: { address: { url: string
     customDomain: !!site.custom_domain, hidden, console: i.consoleConnected, listing: i.listingConnected,
     title: !!String(ident.seo_title || '').trim(), description: !!String(ident.seo_description || '').trim(),
     llms: !!llms, followed: followed.length, issues, review: i.review?.issues || null,
+    phrases: phrases.list.map((p) => ({ phrase: p.phrase, found: !!p.found })),
   });
   const movers = i.period && nowPages && priorPages && priorPages.length ? { period: i.period, prior_period: monthBefore(i.period), ...pageMovers(nowPages, priorPages) } : null;
   const origin = i.address ? i.address.url.replace(/\/$/, '') : '';
@@ -74,7 +109,35 @@ export async function searchTabExtras(site: SiteRow, i: { address: { url: string
     tasks,
     movers,
     follow: { count: followed.length, max: FOLLOW_MAX },
+    phrases,
   };
+}
+
+/** PUT /visibility/phrases { phrases }: the two or three phrases, as asked (item 160). A new
+ *  one is also followed on Google when there's room, so the month-by-month place shows. */
+export async function handlePhrasesPut(req: Request, site: SiteRow, principal: Principal, cors: Record<string, string>) {
+  let body: any = {};
+  try { body = await req.json(); } catch { return json({ error: 'bad_json', message: 'That didn’t read right. Nothing changed.' }, 400, cors); }
+  const asked = applyPhrases(body?.phrases);
+  if ('error' in asked) return json({ error: 'validation', message: asked.error }, 422, cors);
+  const who = principal.email || principal.userId || 'owner';
+  const before = normalizePhrases(await safe(readReservedJson(site.id, RESERVED_NAMES.searchPhrases))).phrases;
+  const saved = await updateReservedJson(site.id, RESERVED_NAMES.searchPhrases, () => ({ phrases: asked.phrases }), who);
+  if (!saved) return json({ error: 'write_failed', message: 'That didn’t save. Nothing changed; try again.' }, 502, cors);
+  const fresh = asked.phrases.filter((p) => !before.includes(p));
+  if (fresh.length) {
+    let added: string[] = [];
+    await safe(updateReservedJson(site.id, RESERVED_NAMES.followedSearches, (cur) => {
+      const now = normalizeFollowed(cur);
+      const want = [...now.terms.map((t) => t.term), ...fresh.filter((p) => !now.terms.some((t) => t.term === p))].slice(0, FOLLOW_MAX);
+      const next = applyFollow(now, want, who, new Date().toISOString());
+      if ('error' in next) return cur;
+      added = next.added;
+      return { terms: next.terms };
+    }, who));
+    if (added.length) runAfterResponse(import('../ops/gsc_sync.ts').then((m) => m.backfillFollowed(site, added)).catch(() => 0));
+  }
+  return json({ data: await phrasesView(site, { phrases: asked.phrases }) }, 200, cors);
 }
 
 /** GET /visibility/follow: each followed search's months and its last two compared,
@@ -127,7 +190,7 @@ export async function handleFollowPut(req: Request, site: SiteRow, principal: Pr
 /** GET /visibility/llms-draft: a first llms.txt from the business details and pages. */
 export async function handleLlmsDraft(site: SiteRow, cors: Record<string, string>) {
   const [identQ, locQ, setQ] = await Promise.all([
-    safe(svc(`presence_identity?site_id=eq.${site.id}&select=business_name,seo_description,description,tagline,phone,email&limit=1`)),
+    safe(svc(`presence_identity?site_id=eq.${site.id}&select=*&limit=1`)),   // * so the short description is there once 0182 is
     safe(svc(`presence_locations?site_id=eq.${site.id}&select=address_line1,city,region,postal_code,phone&limit=1`)),
     safe(svc(`presence_settings?site_id=eq.${site.id}&select=pages,pages_noindex&limit=1`)),
   ]);
@@ -137,7 +200,8 @@ export async function handleLlmsDraft(site: SiteRow, cors: Record<string, string
     .filter((p: any) => p && p.slug && !hidden.has(`page:${p.slug}`))
     .map((p: any) => ({ title: String(p.title || p.slug), path: `/${String(p.slug).replace(/^\/|\/$/g, '')}/` }));
   const text = draftLlmsTxt({
-    name: String(ident.business_name || ''), origin: siteOrigin(site), description: ident.seo_description || ident.tagline || ident.description || null,
+    // builder list item 127: the short description is the line written for AI tools to quote, so it leads
+    name: String(ident.business_name || ''), origin: siteOrigin(site), description: ident.short_description || ident.seo_description || ident.tagline || ident.description || null,
     city: loc.city, region: loc.region, phone: ident.phone || loc.phone, email: ident.email, street: loc.address_line1, postal: loc.postal_code,
     pages: [{ title: 'Home', path: '/' }, ...own, { title: 'Contact', path: '/contact/' }],
   });

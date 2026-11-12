@@ -53,6 +53,7 @@ import { handleAssetsList, handleAssetsCollections, handleAssetsHealth, handleAs
 const { handleVisualKinds, handleVisualGenerate, handleVisualList, handleVisualGet, handleVisualVary, handleVisualEdit, handleVisualDecide } = lazyRoutes(() => import('./routes/visual.ts'));
 const { handleAdmin, handleDomain, handleDomainLookup, handleDomainForward } = lazyRoutes(() => import('./routes/admin.ts'));
 import { handleCollection, handleLocation, handleSettings, handleBlockSuggestions, handlePageDuplicate, handlePageRefs, SPECS } from './routes/content.ts';
+import { handlePostPublish, handlePostUnpublish, handlePostEmailDraft } from './routes/blog.ts';
 import { handleDeletedPages, handleDeletedPageRestore } from './routes/deleted_pages.ts';
 import { handlePageLockCreate, handlePageLockList } from './routes/page_locks.ts';
 import { handleHealth, handleChanges, handleContentTree, handleNotesList, handleNoteResolve, handleRestoreToDraft, handleMediaList } from './routes/room.ts';
@@ -99,7 +100,7 @@ import { handleCommerce, isPublicCommerceRoute } from './routes/commerce.ts';
 import { handleScopedCommerce } from './routes/commerce_scoped.ts';
 const { handleSystem } = lazyRoutes(() => import('./routes/system.ts'));
 const { handleVisibility, handleVisibilityCheck } = lazyRoutes(() => import('./routes/visibility.ts'));
-const { handleFollowGet, handleFollowPut, handleLlmsDraft } = lazyRoutes(() => import('./routes/search_tab.ts'));
+const { handleFollowGet, handleFollowPut, handleLlmsDraft, handlePhrasesGet, handlePhrasesPut } = lazyRoutes(() => import('./routes/search_tab.ts'));
 const { handleAiGet, handleAiQuestionsPut } = lazyRoutes(() => import('./routes/ai_answers.ts'));
 const { handleConnectionsList, handleConnectionProfile, handleConnectionConnect, handleConnectionCallback, handleConnectionRefresh, handleConnectionDisconnect, handleConnectionProperties, handleConnectionPropertySelect, handleWritePrepare, handleWriteList, handleWriteDecide, handleWriteExecute, handleWriteRollback, handleConnectionAsk, handleConnectionAskStatus } = lazyRoutes(() => import('./routes/connections.ts'));
 const { handleMarketplaceList, handleMarketplacePrepare, handleMarketplaceDecide, handleMarketplaceExecute, handleMarketplaceRollback, handleMarketplaceFeatures } = lazyRoutes(() => import('./routes/marketplace.ts'));
@@ -581,6 +582,8 @@ async function route_(req: Request, cors: Record<string, string>): Promise<Respo
   if (route === '/visibility/check' && method === 'POST') return handleVisibilityCheck(site, cors);
   if (route === '/visibility/follow' && method === 'GET') return handleFollowGet(site, cors);              // item 181
   if (route === '/visibility/follow' && method === 'PUT') return handleFollowPut(req, site, principal, cors);
+  if (route === '/visibility/phrases' && method === 'GET') return handlePhrasesGet(site, cors);             // item 160: what people type to find you
+  if (route === '/visibility/phrases' && method === 'PUT') return handlePhrasesPut(req, site, principal, cors);
   if (route === '/visibility/llms-draft' && method === 'GET') return handleLlmsDraft(site, cors);         // item 124
   if (route === '/visibility/ai' && method === 'GET') return handleAiGet(site, cors);                     // item 182
   if (route === '/visibility/ai/questions' && method === 'PUT') return handleAiQuestionsPut(req, site, principal, cors);
@@ -1030,6 +1033,10 @@ async function route_(req: Request, cors: Record<string, string>): Promise<Respo
   //    client + verifies a service_link before touching agency-site data. ──
   if (route === '/client/projects' && method === 'GET') return handleClientProjects(req, site, principal, cors);
   if (route === '/client/billing' && method === 'GET') return handleClientBilling(req, site, principal, cors);
+  { // sales item 117: the client cancels their own retainer (an owner's call: 'delete' in lib/site_roles.ts)
+    const m = route.match(/^\/client\/retainers\/([0-9a-f-]{36})\/cancel$/);
+    if (m && method === 'POST') return (await import('./routes/client_retainers.ts')).handleClientRetainerCancel(req, site, principal, m[1], cors);
+  }
   if (route === '/client/documents' && method === 'GET') return handleClientDocuments(req, site, principal, cors);
   // item 179: the monthly reports that went out, for the client's Documents shelf
   if (route === '/client/reports' && method === 'GET') return (await import('./ops/monthly_report.ts')).handleClientReports(site, cors);
@@ -1340,6 +1347,12 @@ async function route_(req: Request, cors: Record<string, string>): Promise<Respo
   if (route === '/page-locks' && method === 'POST') return handlePageLockCreate(req, site, principal, cors);
   if (route === '/page-locks' && method === 'GET') return handlePageLockList(site, cors);
   if (route === '/blocks/suggested' && method === 'GET') return handleBlockSuggestions(site, cors);   // FD-T4 vertical presets
+  {   // builder list items 40 and 160: one post live (or off) on its own, and the email it becomes
+    const bm = route.match(/^\/posts\/([0-9a-f-]{36})\/(publish|unpublish|email-draft)$/);
+    if (bm && bm[2] === 'publish' && method === 'POST') return handlePostPublish(site, principal, bm[1], cors);
+    if (bm && bm[2] === 'unpublish' && method === 'POST') return handlePostUnpublish(site, principal, bm[1], cors);
+    if (bm && bm[2] === 'email-draft' && method === 'GET') return handlePostEmailDraft(site, bm[1], cors);
+  }
   {
     const m = route.match(/^\/(offerings|testimonials|faqs|posts)(?:\/([0-9a-f-]{36}))?$/);
     if (m && m[1] in SPECS) { const r = await handleCollection(req, db, site, principal, m[1], m[2] ?? null, cors); if (r) return r; }

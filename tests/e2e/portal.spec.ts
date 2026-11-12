@@ -2229,6 +2229,70 @@ test.describe('PS2 — Invoices on the Documents shelf (B1, item 179 part four)'
     }
   };
 
+  // Sales item 117 (Nov 12 2026 review, finding 5): the retainer email says "you can cancel
+  // any time", and the portal showed no retainer and no way to cancel one.
+  const RETAINER = { id: '7a000000-0000-4000-8000-000000000001', name: 'Website care', amount: 500, interval: 'month', status: 'active', since: '2026-09-01T00:00:00Z', next_charge: '2026-12-01T00:00:00Z', canceled_at: null, approve_url: null, can_cancel: true,
+    charges: [{ at: '2026-11-01T09:00:00Z', amount: 500 }, { at: '2026-10-01T09:00:00Z', amount: 500 }] };
+  const retApi = (retainers: unknown[], invoices: unknown[] = INVOICES) => ({ ...CLIENT_API, '/client/billing': { data: { billing_type: 'service', invoices, retainers, summary: { open_count: 0, paid_count: 0 } } } });
+
+  test('a retainer shows above the invoices: how much, how often, the next charge, every charge so far', async ({ page }) => {
+    await installApp(page, { api: retApi([RETAINER]) });
+    await page.goto('/client.html');
+    await openInvoices(page);
+    const card = page.locator('#main .retcard');
+    await expect(card).toHaveCount(1);
+    await expect(card.locator('h3')).toHaveText('Website care');
+    await expect(card.locator('.fmeta')).toContainText('$500 every month');
+    await expect(card.locator('.fmeta')).toContainText('Next charge');
+    await expect(card.locator('.fst')).toHaveText('Active');
+    await expect(card.getByRole('list', { name: 'Charges so far' }).locator('li')).toHaveCount(2);
+    await expect(card.getByRole('button', { name: 'Cancel retainer' })).toBeVisible();
+    await expect(page.locator('#shelf .srow')).toHaveCount(3);   // the invoices are still there, under it
+    const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+    expect(overflow).toBeLessThanOrEqual(0);
+  });
+
+  test('Cancel retainer asks first, says nothing is refunded, and Keep it backs out', async ({ page }) => {
+    await installApp(page, { api: retApi([RETAINER]) });
+    const calls: string[] = [];
+    await page.route('**/functions/v1/presence/client/retainers/**', (route) => { calls.push(route.request().method() + ' ' + new URL(route.request().url()).pathname.split('/presence')[1]); return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: { canceled: true } }) }); });
+    await page.goto('/client.html');
+    await openInvoices(page);
+    const card = page.locator('#main .retcard');
+    await card.getByRole('button', { name: 'Cancel retainer' }).click();
+    await expect(card.getByRole('alert')).toHaveText('Cancel this retainer? It stops future charges. Charges already made are not refunded.');
+    expect(calls).toHaveLength(0);   // asking is not cancelling
+    await card.getByRole('button', { name: 'Keep it' }).click();
+    await expect(card.getByRole('button', { name: 'Cancel retainer' })).toBeFocused();
+    expect(calls).toHaveLength(0);
+    // …and yes cancels it: the page reads billing again and shows it cancelled
+    await card.getByRole('button', { name: 'Cancel retainer' }).click();
+    await page.route('**/functions/v1/presence/client/billing', (route) => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: { billing_type: 'service', invoices: [], retainers: [{ ...RETAINER, status: 'canceled', can_cancel: false, next_charge: null, canceled_at: '2026-11-12T10:00:00Z' }] } }) }));
+    await card.getByRole('button', { name: 'Yes, cancel it' }).click();
+    await expect.poll(() => calls).toEqual([`POST /client/retainers/${RETAINER.id}/cancel`]);
+    await expect(page.locator('#main .retcard .fst')).toHaveText('Cancelled');
+    await expect(page.locator('#main .retcard')).toContainText('It won’t charge again.');
+    await expect(page.locator('#main .retcard').getByRole('button', { name: 'Cancel retainer' })).toHaveCount(0);
+    await expect(page.locator('#main')).not.toContainText('No invoices yet');   // a retainer with no invoices is not an empty tab
+  });
+
+  test('a retainer waiting for approval offers its link; a refused cancel says so and changes nothing', async ({ page }) => {
+    await installApp(page, { api: retApi([{ ...RETAINER, status: 'pending', can_cancel: false, next_charge: null, charges: [], approve_url: 'https://pay.example/retainer' }, { ...RETAINER, id: '7a000000-0000-4000-8000-000000000002', name: 'SEO plan' }]) });
+    await page.route('**/functions/v1/presence/client/retainers/**', (route) => route.fulfill({ status: 502, contentType: 'application/json', body: JSON.stringify({ error: 'cancel_failed', message: 'We couldn’t cancel it just now, so nothing changed. Please try again, or message your studio.' }) }));
+    await page.goto('/client.html');
+    await openInvoices(page);
+    const waiting = page.locator('#main .retcard').filter({ hasText: 'Website care' });
+    await expect(waiting.locator('.fst')).toHaveText('Waiting for you to approve');
+    await expect(waiting.getByRole('link', { name: 'Set it up →' })).toHaveAttribute('href', 'https://pay.example/retainer');
+    await expect(waiting.getByRole('button', { name: 'Cancel retainer' })).toHaveCount(0);
+    const live = page.locator('#main .retcard').filter({ hasText: 'SEO plan' });
+    await live.getByRole('button', { name: 'Cancel retainer' }).click();
+    await live.getByRole('button', { name: 'Yes, cancel it' }).click();
+    await expect(page.locator('.dds-toast, #toast').filter({ hasText: 'We couldn’t cancel it just now, so nothing changed.' }).first()).toBeVisible();
+    await expect(live.locator('.fst')).toHaveText('Active');
+    await expect(live.getByRole('button', { name: 'Yes, cancel it' })).toBeEnabled();
+  });
+
   test('rows are shelf anatomy — receipt icon, name heading, "Invoice · amount · due <date>" meta — with Paid / Overdue (due-yesterday) / Upcoming (due-tomorrow) chips', async ({ page }) => {
     await installApp(page, { api: INV_API });
     await page.goto('/client.html');

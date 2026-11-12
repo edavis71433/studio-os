@@ -55,6 +55,18 @@
       var plain = document.getElementById('plain');
       if (plain) plain.style.display = 'none';
     })();
+    // Sales item 117: someone who has just approved a retainer was told their invoice was
+    // paid. Stripe sends them here with ?retainer=1, and the page says what they did.
+    (function () {
+      if (new URLSearchParams(location.search).get('retainer') !== '1') return;
+      var who = studioName();
+      document.title = 'Retainer set up' + (who ? ' | ' + who : '');
+      document.getElementById('h').textContent = 'Your retainer is set up. Thank you.';
+      document.getElementById('sub').textContent = (who ? who + ' is told right away. ' : '') + 'Stripe charges it on the same day each time and emails you a receipt for every charge. You can see it, and cancel it, under Invoices in your workspace.';
+      document.getElementById('cta').textContent = 'Sign in to see your retainer →';
+      var plain = document.getElementById('plain');
+      if (plain) plain.style.display = 'none';
+    })();
     (function () {
       if (new URLSearchParams(location.search).get('kind') !== 'audit') return;
       document.getElementById('h').textContent = 'Payment received — your audit is booked.';

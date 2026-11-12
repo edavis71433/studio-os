@@ -75,6 +75,7 @@ const WEBSITE = {
   logo_media_id: MEDIA[3], og_media_id: null, cover_media_id: MEDIA[0], icon_media_id: MEDIA[3],   // builder list item 158: the logo as the tab icon too
   announcement_text: 'Open late on Fridays', announcement_url: '', announcement_expires_at: null,
   page_seo: { 'page:our-team': { title: 'Meet the team', share_image: MEDIA[1] } }, pages_noindex: ['page:offers'],
+  post_categories: [{ id: 'news', name: 'News' }], post_authors: [{ id: 'sam', name: 'Sam', bio: 'Chef' }],   // builder list item 40: the blog's lists
   popup: { on: true, heading: 'Ten percent off on Tuesdays', text: 'Join our list for the code.', action: 'signup', buttons: [], after: 'seconds', seconds: 8, scroll: 50, pages: 'all', picked: [], again: 'week', phones: true, from: '', until: '' },   // builder list item 148
 };
 // account settings in the same row: a restore never touches them
@@ -97,6 +98,7 @@ const editSince = () => {
   s.nav = [{ label: 'Home', href: '/' }];
   s.nav_style = ''; s.hero_layout = ''; s.footer_hours = true; s.sections_hidden = [];
   s.announcement_text = ''; s.logo_media_id = null; s.cover_media_id = null; s.page_seo = {}; s.pages_noindex = []; s.popup = null; s.icon_media_id = null;
+  s.post_categories = []; s.post_authors = [{ id: 'new', name: 'Someone new' }];   // the blog's lists changed too
   s.google_site_verification = 'changed since';                                          // account settings move on their own
 };
 const saveCheckpoint = async (name) => {

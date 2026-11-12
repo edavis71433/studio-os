@@ -34,6 +34,7 @@ import { judgeSend, issueTicket, TICKET_MIN_AGE_S, markSender, spamLinkToken, re
 import { storeFormFiles, cleanFileName, filesOf, filePath, fileLink, type StoredFile } from '../lib/form_files.ts';
 import { approvalDetail, cleanNote } from '../lib/approval_page.ts';   // sales item 92
 import { wordsHtml, quoteBlock, followupPlan } from '../lib/follow_ups.ts';   // sales item 87
+import { readVisitStats } from '../lib/visit_stats.ts';
 
 const SB_URL = Deno.env.get('SUPABASE_URL') || '';
 const APPROVAL_SECRET = Deno.env.get('APPROVAL_SECRET') || Deno.env.get('SCHEDULER_SECRET') || '';
@@ -385,10 +386,12 @@ export async function handleFormAnswers(req: Request, site: SiteRow, cors: Recor
   }
   if (!def) return json({ error: 'not_found', message: 'That form isn’t on your site any more.' }, 404, cors);
   const since = new Date(Date.now() - 30 * 86400_000).toISOString();
-  const pathList = paths.flatMap((p) => (p === '/' ? ['/'] : [p, p.slice(0, -1)])).map((p) => `"${p.replace(/"/g, '')}"`).join(',');
+  const formPaths = paths.flatMap((p) => (p === '/' ? ['/'] : [p, p.slice(0, -1)])).map((p) => p.replace(/"/g, ''));
   const [ans, views] = await Promise.all([
     svc(`presence_form_submissions?site_id=eq.${site.id}&spam=eq.false&fields->>__form=eq.${encodeURIComponent(formId)}&select=id,created_at,status,name,email,phone,fields&order=created_at.desc&limit=${FORM_ANSWERS_MAX + 1}`),
-    svc(`presence_visits?site_id=eq.${site.id}&kind=eq.pageview&ts=gte.${encodeURIComponent(since)}&path=in.(${encodeURIComponent(pathList)})&select=visitor_hash&limit=20000`),
+    // item 207: the people who saw the form's pages, counted in the database (the row read
+    // this replaces stopped at 1,000 rows, whatever limit it asked for)
+    readVisitStats(site.id, { startMs: Date.parse(since), nowMs: Date.now(), paths: formPaths }).catch(() => null),
   ]);
   if (!ans.ok) return json({ error: 'read_failed', message: 'The answers couldn’t load just now. Try again in a moment.' }, 502, cors);
   const all = Array.isArray(ans.json) ? ans.json : [];
@@ -397,7 +400,7 @@ export async function handleFormAnswers(req: Request, site: SiteRow, cors: Recor
     values: Object.fromEntries(def!.fields.map((f) => [f.key, typeof fields?.[f.key] === 'string' ? fields[f.key] : ''])),
     files: filesOf(fields),
   }));
-  const seen = views.ok && Array.isArray(views.json) ? new Set(views.json.map((v: any) => String(v.visitor_hash || '')).filter(Boolean)).size : null;
+  const seen = views ? views.agg.visitors : null;
   return json({ data: {
     form: { id: def.id, title: def.title, kind: def.kind, fields: def.fields.map((f) => ({ key: f.key, label: f.label, type: f.type })) },
     rows, more: all.length > FORM_ANSWERS_MAX, new: rows.filter((r: any) => r.status === 'new').length,

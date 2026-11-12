@@ -24,8 +24,8 @@ import { signDocToken, type DocKind } from '../lib/documents.ts';
 import { proposalTotals } from '../lib/sales_lifecycle.ts';
 import { linkSecret, docViewerUrl } from './sales.ts';
 import { readGsc, readSearchTerms } from './analytics.ts';
-import { aggregateVisits, type VisitRow } from '../lib/visits.ts';
-import { dashRange, weeklyVisitors, sourceShares, DASH_WEEKS } from '../lib/analytics_dashboard.ts';
+import { readVisitStats } from '../lib/visit_stats.ts';
+import { dashRange, sourceShares, DASH_WEEKS } from '../lib/analytics_dashboard.ts';
 import type { SiteRow } from '../lib/site.ts';
 import { siteOrigin } from '../lib/site.ts';
 import type { Principal } from '../../_shared/auth.ts';
@@ -114,10 +114,14 @@ export async function handleClientBilling(_req: Request, site: SiteRow, _princip
     };
   }));
   const b = moneyBuckets(list, today);
+  // Sales item 117: the retainers their studio set up for them, with every charge and a
+  // way to cancel. The email said "you can cancel any time" and the portal showed nothing.
+  const retainers = await (await import('./client_retainers.ts')).clientRetainers(me);
   return json({ data: {
     billing_type: 'service',   // agency project work — SEPARATE from the software subscription
     note: 'These are invoices from your studio for project and service work. Your website subscription is billed separately.',
     invoices: list,
+    retainers,
     // open_count = still waiting on the client (upcoming + overdue); processing
     // money is neither open nor paid yet, so it gets its own count.
     summary: { open_count: b.upcoming.count + b.overdue.count, paid_count: b.paid.count, processing_count: b.processing.count, overdue_count: b.overdue.count, upcoming_count: b.upcoming.count },
@@ -850,34 +854,28 @@ export async function handleClientWebsiteStats(_req: Request, site: SiteRow, _pr
   if (!published) return json({ data: { published: false, month: null, search: null } }, 200, cors);
   const statNowIso = nowIso();
   const nowMs = Date.parse(statNowIso);
-  const { startMs, days } = dashRange('this_month', nowMs);
-  // one visits fetch serves the this-month numbers AND the 12-week line (the
-  // same shape handleAnalyticsDashboard uses)
-  const visitStartIso = new Date(Math.min(startMs, nowMs - DASH_WEEKS * 7 * 86_400_000)).toISOString();
+  const { startMs } = dashRange('this_month', nowMs);
+  // one visits read serves the this-month numbers AND the 12-week line (the same
+  // read handleAnalyticsDashboard uses). Item 207: counted in the database; the row
+  // read it replaces stopped at 1,000 rows, so a busier month was understated.
   const safe = async <T>(p: Promise<T>): Promise<T | null> => { try { return await p; } catch { return null; } };
-  const [visitsR, gsc] = await Promise.all([
-    safe(svc(`presence_visits?site_id=eq.${site.id}&ts=gte.${visitStartIso}&kind=not.in.(button,leave)&select=ts,kind,path,ref_host,utm_source,device,country,visitor_hash&order=ts.desc&limit=5000`)),
+  const [stats, gsc] = await Promise.all([
+    safe(readVisitStats(site.id, { startMs, weeks: DASH_WEEKS, nowMs })),
     safe(readGsc(site.client_id)),
   ]);
   let month: unknown = null;
-  const vRows = (visitsR && (visitsR as { ok?: boolean }).ok && Array.isArray((visitsR as { json?: unknown }).json))
-    ? (visitsR as { json: VisitRow[] }).json : null;
-  if (vRows) {
-    // EXACT calendar boundary (same fix as handleAnalyticsDashboard): intersect
-    // with the true month start before aggregating, so the ceil'd days window
-    // never bleeds prior-month rows into "this month" (worst on the 1st).
-    const periodRows = vRows.filter((v) => { const ms = Date.parse(String(v.ts || '')); return Number.isFinite(ms) && ms >= startMs; });
-    const agg = aggregateVisits(periodRows, nowMs, days);
+  if (stats) {
+    const agg = stats.agg;
     const sources = sourceShares(agg.topSources, agg.visitors);   // already ≤5, largest first
     month = {
       visitors: agg.visitors, pageviews: agg.pageviews,
       actions: agg.events.phone + agg.events.email + agg.events.cta,
       top_source: sources[0] || null,
-      weekly: weeklyVisitors(vRows, nowMs),   // 12 buckets, oldest first
+      weekly: stats.weekly || [],             // 12 buckets, oldest first
       top_pages: agg.topPages,                // ≤5
       sources,
       has_data: agg.hasData,
-      truncated: vRows.length >= 5000,        // hit the fetch cap → "based on recent activity"
+      truncated: stats.truncated,             // only before migration 0194, past 50,000 rows → "based on recent activity"
     };
   }
   // search: null = genuinely not connected; { unavailable: true } = the signals
