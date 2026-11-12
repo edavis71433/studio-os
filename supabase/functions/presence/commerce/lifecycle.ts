@@ -690,6 +690,10 @@ export async function automationSettingsFor(siteId: string, cache?: Map<string, 
 // gets no "before" leg (nobody set a date to warn about). Nothing fires on the
 // day the invoice was sent. The period `invremind:<id>:<slot>` is the dedupe
 // key; the legacy once-ever `invremind:<id>` counts as the after-leg done.
+// "Sent" is first_sent_at (sales item 118, migration 0188): the day it first went
+// to the client. It used to be the day the row was made, so an invoice made from
+// an estimate and sent two weeks later was "still unpaid" the next morning. A row
+// from before that column falls back to the day it was made.
 // Sales item 87 (the Wix recipe "two reminders a week apart for an overdue invoice"): with
 // invoice_overdue_repeat on, a fourth leg `again` goes a week after the after-leg, the last.
 export type InvoiceReminderSlot = 'before' | 'due' | 'after' | 'again';
@@ -698,9 +702,9 @@ export const UNDATED_INVOICE_DUE_DAYS = 7;
 export const INVOICE_AGAIN_DAYS = 7;
 const ymdOf = (x: unknown): string | null => { const m = /^(\d{4}-\d{2}-\d{2})/.exec(String(x || '')); return m ? m[1] : null; };
 const daysFromTo = (a: string, b: string): number => Math.round((Date.parse(b + 'T00:00:00Z') - Date.parse(a + 'T00:00:00Z')) / 86400_000);
-export function invoiceReminderSlot(inv: { due_date?: unknown; created_at?: unknown; status?: unknown; processing_since?: unknown; stripe_url?: unknown }, todayYmd: string, afterDays: number, again = false): InvoiceReminderSlot | null {
+export function invoiceReminderSlot(inv: { due_date?: unknown; created_at?: unknown; first_sent_at?: unknown; status?: unknown; processing_since?: unknown; stripe_url?: unknown }, todayYmd: string, afterDays: number, again = false): InvoiceReminderSlot | null {
   if (String(inv.status || 'open') !== 'open' || inv.processing_since || !inv.stripe_url) return null;   // nothing to pay, or already settling
-  const sent = ymdOf(inv.created_at);
+  const sent = ymdOf(inv.first_sent_at) || ymdOf(inv.created_at);
   if (!sent || sent >= todayYmd) return null;                       // never on the day it went out
   const n = Math.max(1, Math.trunc(Number(afterDays)) || AUTOMATION_DEFAULTS.invoice_remind_after_days);
   const explicitDue = ymdOf(inv.due_date);
@@ -730,13 +734,27 @@ export function invoiceReminderMore(docUrl: string | null | undefined, linkColor
   const view = typeof docUrl === 'string' && /^https:\/\//.test(docUrl) ? `<p style="margin-top:8px"><a href="${docUrl.replace(/"/g, '&quot;')}" style="color:${linkColor}">View the invoice →</a></p>` : '';
   return `${view}<p style="color:#6b6478;font-size:14px;margin-top:14px">Paid another way already, or have a question? Just reply to this email.</p>`;
 }
-export function invoiceReminderCopy(slot: InvoiceReminderSlot, what: 'deposit' | 'invoice', amount: string, title: string): { subject: string; line: string } {
+/** `undated` (sales item 118): an invoice with no due date said "due on receipt" in its
+ *  email, and a week later the reminder said "due today", a date nobody had set. */
+export function invoiceReminderCopy(slot: InvoiceReminderSlot, what: 'deposit' | 'invoice', amount: string, title: string, undated = false): { subject: string; line: string } {
   const name = title || what;
+  if (slot === 'due' && undated) return { subject: `A quick reminder — ${name} (${amount})`, line: `Just a friendly nudge: the ${what} for <strong>${amount}</strong> we sent last week is still open. The same secure link works whenever you're ready — nothing expires.` };
   if (slot === 'before') return { subject: `Coming up — ${name} (${amount})`, line: `A quick heads-up: the ${what} for <strong>${amount}</strong> is due in a few days. The same secure link works whenever you're ready — nothing expires.` };
   if (slot === 'due') return { subject: `Due today — ${name} (${amount})`, line: `Just a friendly nudge: the ${what} for <strong>${amount}</strong> is due today. The same secure link works whenever you're ready — nothing expires.` };
   if (slot === 'again') return { subject: `Still open — ${name} (${amount})`, line: `A second reminder, a week after the last: the ${what} for <strong>${amount}</strong> is still open. If something is holding it up, just reply and we’ll sort it out together.` };
   return { subject: `A gentle reminder — ${name} (${amount})`, line: `Just a friendly nudge: the ${what} for <strong>${amount}</strong> is still open. The same secure link works whenever you're ready — nothing expires.` };
 }
+/** What the studio reads on the after-leg. An invoice with a due date gets three
+ *  reminders and one without gets two, so "the third and last" was wrong for those. Pure. */
+export function invoiceReminderOperatorBody(slot: InvoiceReminderSlot, hasEmail: boolean, undated: boolean, again = false): string {
+  if (!hasEmail) return 'There’s no client email on this deal, so no automatic nudge went out — a personal note (or adding their email to the contact) is the way forward.';
+  if (slot === 'after') return `We nudged the client with the same secure link — the ${undated ? 'second' : 'third'} automatic reminder${again ? '. One more goes in a week if it stays unpaid' : ' and the last'}. If it stays quiet, a personal note usually lands best.`;
+  if (slot === 'again') return 'A second reminder went a week after the overdue one. It was the last automatic one.';
+  return `Automatic reminder sent (${slot === 'before' ? 'a week before the due date' : undated ? 'a week after it was sent' : 'on the due date'}).`;
+}
+/** The line a reminder that did NOT leave raises (sales item 118). Its own period, under
+ *  the invoice's reminder prefix, so paying or voiding the invoice takes it down too. */
+export const invoiceReminderFailedPeriod = (invoiceId: string, slot: InvoiceReminderSlot): string => `invremind:${invoiceId}:${slot}:failed`;
 
 // ── Deal nudge: "no next step for N days" (benchmark item 6, third switch) ───
 /** An OPEN deal is due a nudge when it has been quiet (no edit, no logged
@@ -987,14 +1005,31 @@ export async function runInvoiceReminders(limit = 20): Promise<{ reminded: numbe
   // A payment that is PROCESSING (ACH settling — processing_since, migration
   // 0132) is not unpaid: nudging that client would be wrong. Tolerant: before
   // the migration the filter 400s, so fall back to the pre-0132 query.
-  const TAIL = `&created_at=lt.${encodeURIComponent(today)}&select=id,site_id,deal_id,title,amount_cents,purpose,stripe_url,due_date,created_at,status&order=created_at.asc&limit=${limit * 10}`;
-  let q = await svc(`presence_invoices?status=eq.open&deleted_at=is.null&stripe_url=not.is.null&processing_since=is.null${TAIL}`);
-  if (!q.ok) q = await svc(`presence_invoices?status=eq.open&deleted_at=is.null&stripe_url=not.is.null${TAIL}`);
-  const candidates = (Array.isArray(q.json) ? q.json : []) as Array<{ id: string; site_id: string; deal_id: string | null; title?: string; amount_cents: number; purpose: string; stripe_url: string; due_date?: string | null; created_at: string; status?: string; processing_since?: string | null }>;
+  const COLS = 'id,site_id,deal_id,title,amount_cents,purpose,stripe_url,due_date,created_at,status';
+  const TAIL = `&created_at=lt.${encodeURIComponent(today)}&order=created_at.asc&limit=${limit * 10}`;
+  // Sales items 116 and 118 (migration 0188): first_sent_at is the day reminders count
+  // from, and an invoice whose link was cleared (link_gen > 0: a bounced bank payment,
+  // a part payment, an Undo) is still owed, so it stays in the sweep and gets its fresh
+  // link here if nothing made one yet. Before 0188 the read is refused → the old one.
+  let q = await svc(`presence_invoices?status=eq.open&deleted_at=is.null&payment_for=is.null&or=(stripe_url.not.is.null,link_gen.gt.0)&processing_since=is.null&select=${COLS},first_sent_at,link_gen,description,currency${TAIL}`);
+  if (!q.ok) q = await svc(`presence_invoices?status=eq.open&deleted_at=is.null&stripe_url=not.is.null&processing_since=is.null&select=${COLS}${TAIL}`);
+  if (!q.ok) q = await svc(`presence_invoices?status=eq.open&deleted_at=is.null&stripe_url=not.is.null&select=${COLS}${TAIL}`);
+  const candidates = (Array.isArray(q.json) ? q.json : []) as Array<{ id: string; site_id: string; deal_id: string | null; title?: string; description?: string; currency?: string; amount_cents: number; purpose: string; stripe_url: string | null; due_date?: string | null; created_at: string; first_sent_at?: string | null; link_gen?: number; status?: string; processing_since?: string | null }>;
+  // An owed invoice with no link gets one first, whatever the reminder switch says:
+  // the client's Pay button needs it too. (Normally the route that cleared the link
+  // made the new one there and then; this is the net under it.)
+  let minted = 0;
+  for (const inv of candidates) {
+    if (inv.stripe_url || minted >= limit) continue;
+    minted++;
+    const { mintPayLink } = await import('../lib/pay_link.ts');
+    inv.stripe_url = await mintPayLink(inv);
+  }
   const settingsCache = new Map<string, AutomationSettings>();
   // Which leg (if any) each invoice is on today — only for sites with the switch on.
   const due: Array<{ inv: typeof candidates[number]; slot: InvoiceReminderSlot }> = [];
   for (const inv of candidates) {
+    if (!inv.stripe_url) continue;
     const auto = await automationSettingsFor(inv.site_id, settingsCache);
     if (!auto.invoice_reminders) continue;
     const slot = invoiceReminderSlot(inv, today, auto.invoice_remind_after_days, auto.invoice_overdue_repeat);
@@ -1021,6 +1056,7 @@ export async function runInvoiceReminders(limit = 20): Promise<{ reminded: numbe
     if (!clientId) continue;
     const amount = '$' + ((Number(inv.amount_cents) || 0) / 100).toLocaleString('en-US', { minimumFractionDigits: 2 });
     const what: 'deposit' | 'invoice' = inv.purpose === 'deposit' ? 'deposit' : 'invoice';
+    const undated = !ymdOf(inv.due_date);
     // Discover the client email FIRST — the notice must tell the truth about
     // whether a nudge actually went out (and never burn the once-ever dedupe
     // on a claim that didn't happen). The client is the invoice's deal contact.
@@ -1036,27 +1072,36 @@ export async function runInvoiceReminders(limit = 20): Promise<{ reminded: numbe
     // hears — an active "Still unpaid" row on the bell, as before.
     const operatorHears = slot === 'after';
     if (!operatorHears && !email) continue;   // nothing to send and nobody to tell — wait for the after-leg
-    const noticeBody = email
-      ? (slot === 'after' ? 'We nudged the client with the same secure link — the third and last automatic reminder. If it stays quiet, a personal note usually lands best.'
-        : slot === 'again' ? 'A second reminder went a week after the overdue one. It was the last automatic one.'
-        : `Automatic reminder sent (${slot === 'before' ? 'a week before the due date' : 'on the due date'}).`)
-      : 'There’s no client email on this deal, so no automatic nudge went out — a personal note (or adding their email to the contact) is the way forward.';
-    const created = await raiseNotice({ siteId: inv.site_id, clientId, kind: 'deal_followup', period: invoiceReminderPeriod(inv.id, slot), headline: operatorHears ? `Still unpaid — ${inv.title || what} (${amount})` : `${slot === 'again' ? 'Second reminder sent' : 'Reminder sent'} — ${inv.title || what} (${amount})`, body: noticeBody, status: operatorHears ? 'active' : 'dismissed' });
+    const period = invoiceReminderPeriod(inv.id, slot);
+    const created = await raiseNotice({ siteId: inv.site_id, clientId, kind: 'deal_followup', period: invoiceReminderPeriod(inv.id, slot), headline: operatorHears ? `Still unpaid — ${inv.title || what} (${amount})` : `${slot === 'again' ? 'Second reminder sent' : 'Reminder sent'} — ${inv.title || what} (${amount})`, body: invoiceReminderOperatorBody(slot, !!email, undated, (await automationSettingsFor(inv.site_id, settingsCache)).invoice_overdue_repeat), status: operatorHears ? 'active' : 'dismissed' });
     if (!created) continue;   // this leg already went — never nag
-    reminded++;
-    if (email) {
-      try {
-        const brand = await loadEmailBrand(inv.site_id);
-        const copy = invoiceReminderCopy(slot, what, amount, String(inv.title || ''));
-        const btn = `<a href="${inv.stripe_url}" style="display:inline-block;margin-top:6px;background:${brand.accent};color:#fff;padding:9px 16px;border-radius:999px;text-decoration:none">Pay ${amount} securely →</a>`;
-        // Sales item 92: a reminder offers more than "pay": the invoice itself, and a reply
-        const { docLinkFor } = await import('../routes/sales.ts');
-        const doc = await docLinkFor('invoice', inv.id, inv.site_id).catch(() => null);
-        const more = invoiceReminderMore(doc, brand.accentDark);
-        // Sales item 74: money they owe always reaches them (critical, so no unsubscribe on it); their answer lands in the Inbox
-        sendEmail(email, copy.subject, `<p>${copy.line}</p><p class="cta">${btn}</p>${more}`, brand, { critical: true, asBusiness: true, siteId: inv.site_id }).catch(() => {});
-      } catch { /* the owner notice already carries it */ }
+    if (!email) { reminded++; continue; }   // the studio was told there is nobody to email
+    // Sales item 118: the row above is only the CLAIM (so two sweeps can't both email).
+    // The email is awaited, and a reminder counts as sent only once it left. It used to
+    // be fired and forgotten: a bounce or an outage still read "We nudged the client",
+    // and that reminder was never tried again.
+    let sent = false;
+    try {
+      const brand = await loadEmailBrand(inv.site_id);
+      const copy = invoiceReminderCopy(slot, what, amount, String(inv.title || ''), undated);
+      const btn = `<a href="${inv.stripe_url}" style="display:inline-block;margin-top:6px;background:${brand.accent};color:#fff;padding:9px 16px;border-radius:999px;text-decoration:none">Pay ${amount} securely →</a>`;
+      // Sales item 92: a reminder offers more than "pay": the invoice itself, and a reply
+      const { docLinkFor } = await import('../routes/sales.ts');
+      const doc = await docLinkFor('invoice', inv.id, inv.site_id).catch(() => null);
+      const more = invoiceReminderMore(doc, brand.accentDark);
+      // Sales item 74: money they owe always reaches them (critical, so no unsubscribe on it); their answer lands in the Inbox
+      sent = await sendEmail(email, copy.subject, `<p>${copy.line}</p><p class="cta">${btn}</p>${more}`, brand, { critical: true, asBusiness: true, siteId: inv.site_id }).catch(() => false);
+    } catch { sent = false; }
+    const failedPeriod = invoiceReminderFailedPeriod(inv.id, slot);
+    if (sent) {
+      reminded++;
+      await clearNotice(clientId, 'deal_followup', failedPeriod).catch(() => {});   // an earlier try that failed is history now
+      continue;
     }
+    // It did not leave: the claim comes off, so the next sweep tries this leg again,
+    // and the studio is told once, in words that are true.
+    await svc(`presence_plan_notices?client_id=eq.${encodeURIComponent(clientId)}&kind=eq.deal_followup&period=eq.${encodeURIComponent(period)}`, { method: 'DELETE' }).catch(() => {});
+    await raiseNotice({ siteId: inv.site_id, clientId, kind: 'deal_followup', period: invoiceReminderFailedPeriod(inv.id, slot), headline: `Reminder didn’t send — ${inv.title || what} (${amount})`, body: 'Our reminder email to the client didn’t go out. We’ll try again on the next run. If their address is wrong, fix it on the contact, or send them a personal note.' });
   }
   return { reminded };
 }

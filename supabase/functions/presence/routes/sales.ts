@@ -14,17 +14,18 @@ import { rateAllow, clientIp, tooMany } from '../lib/ratelimit.ts';
 import { resolveAgencyMember } from '../agency/auth.ts';
 import { isCustomerOfStudio, claimPortfolioSite, requestConnection } from '../lib/connect_requests.ts';
 import { ensureProjectForDeal, ensureBridge, linksForCustomer, emailOperator, tickChecklistForDeal } from '../lib/service_bridge.ts';
-import { loadEmailBrand, EMAIL_BRAND_DEFAULT } from '../lib/email_brand.ts';
+import { loadEmailBrand, EMAIL_BRAND_DEFAULT, emailBand, emailFacts } from '../lib/email_brand.ts';
 import { applyPlaceholders, buildPlaceholderValues, depositSplit } from '../lib/doc_placeholders.ts';
 import { raiseNotice, clearNotice, clearNoticePrefix, dealFollowupPeriodPrefix, dealFollowupLegacyPeriod } from '../lib/notice.ts';
 import { stripeConfigured, createServicePaymentLink, createServiceRetainerLink, deactivatePaymentLink, cancelSubscription } from '../commerce/stripe.ts';
+import { stampFirstSent } from '../lib/pay_link.ts';
 import { moneyState, moneyBuckets } from '../lib/money_state.ts';
 import { buildMyTasks, MY_TASKS_MAX } from '../lib/my_tasks.ts';
 import { revenueByMonth, dealsByStage, wonAndLost, enquiriesBySource, overdueInvoices, OPEN_STAGES as REPORT_OPEN_STAGES } from '../lib/sales_reports.ts';
 import { normalizeViews, normalizeViewList, isViewList } from '../lib/saved_views.ts';
 import { readReservedJsonOrThrow, writeReservedJson, updateReservedJson, RESERVED_NAMES } from '../lib/reserved_store.ts';
 import { normalizeStageNames, stageLabels, loadStageLabels, forgetStageLabels, renameMovedTo, DEFAULT_STAGE_LABEL, normalizeStageChances, stageChances, loadStageChances, forgetStageChances, expectedValue, DEFAULT_STAGE_CHANCE } from '../lib/stage_names.ts';
-import { validateRetainerInput, mergeRetainerState, type RetainerState } from '../commerce/retainers.ts';
+import { validateRetainerInput, mergeRetainerState, retainerSubscriptionIds, type RetainerState } from '../commerce/retainers.ts';
 import { leftToBill, reuseDecision, retainerPaid, linesFromProposal } from '../lib/invoice_billing.ts';   // sales items 107, 108, 81
 import { editionFor } from '../commerce/catalog.ts';
 import type { PlanKey } from '../commerce/catalog.ts';
@@ -32,6 +33,8 @@ import { hmacHex, timingSafeEqual } from '../../_shared/hmac.ts';
 import { signDocToken, readDocToken, lastingRecord, renderDocument, invoiceNo, dayLabel, type DocKind } from '../lib/documents.ts';
 import { documentPdf, pdfFileName } from '../lib/doc_pdf.ts';   // sales item 82: the same documents as real PDFs
 import { docContextFor } from '../lib/doc_context.ts';   // sales item 81: from, billed to, dates, part payments
+import { declineReason, declineWords, validSignerEmail, maskEmail, agreementHtml } from '../lib/agreement_layout.ts';   // sales item 88
+import { normalizeSchedule, scheduleView, signingPart, partsAtSigning, partsIntoAgreement, type SchedulePart } from '../lib/proposal_schedule.ts';   // sales item 106
 import {
   canTransition, undoLostAllowed, isStage, normalizeLineItems, canDecideProposal, contractHash,
   canSignContract, convertOutcome, clampLimit, type Stage,
@@ -152,10 +155,14 @@ async function flowDocuments(siteId: string, dealId: string): Promise<{ proposal
   // is between versions (Revise → v1 superseded, v2 still a draft), which must
   // read as PENDING, never as "no proposal". first_viewed_at/expires_at land
   // with migration 0107 — same tolerant read as the public view.
-  let pr = await svc(`presence_proposals?deal_id=eq.${dealId}&site_id=eq.${siteId}&deleted_at=is.null&select=id,title,line_items,subtotal_cents,currency,terms,status,first_viewed_at,expires_at&order=created_at.desc&limit=20`);
+  // sales item 88: sent_at and version too, for the page's "Prepared … · Version 2" line
+  let pr = await svc(`presence_proposals?deal_id=eq.${dealId}&site_id=eq.${siteId}&deleted_at=is.null&select=id,title,line_items,subtotal_cents,currency,terms,status,first_viewed_at,expires_at,sent_at,version&order=created_at.desc&limit=20`);
   if (!pr.ok) pr = await svc(`presence_proposals?deal_id=eq.${dealId}&site_id=eq.${siteId}&deleted_at=is.null&select=id,title,line_items,subtotal_cents,currency,terms,status&order=created_at.desc&limit=20`);
   const { proposal, pending } = currentProposal<any>(rows(pr));
-  const cons = rows(await svc(`presence_contracts?deal_id=eq.${dealId}&site_id=eq.${siteId}&deleted_at=is.null&select=id,title,body,content_hash,status,signed_at,signer_name&order=created_at.desc&limit=20`));
+  // sales item 88: the studio's countersignature lands with 0176 — tolerant read before it
+  let cr = await svc(`presence_contracts?deal_id=eq.${dealId}&site_id=eq.${siteId}&deleted_at=is.null&select=id,title,body,content_hash,status,signed_at,signer_name,signer_email,countersigned_name,countersigned_title,countersigned_at&order=created_at.desc&limit=20`);
+  if (!cr.ok) cr = await svc(`presence_contracts?deal_id=eq.${dealId}&site_id=eq.${siteId}&deleted_at=is.null&select=id,title,body,content_hash,status,signed_at,signer_name,signer_email&order=created_at.desc&limit=20`);
+  const cons = rows(cr);
   const contract = cons.find((c) => c.status === 'signed') || cons.find((c) => c.status === 'sent') || null;
   return { proposal, proposal_pending: pending, contract, contract_pending: !contract && cons.some((c) => c.status === 'draft') };
 }
@@ -1194,19 +1201,21 @@ export async function handleSalesDeal(req: Request, site: SiteRow, principal: Pr
       deal.contact_id ? svc(`presence_contacts?id=eq.${deal.contact_id}&site_id=eq.${site.id}&select=id,name,email,phone,company,notes,address&limit=1`).then((r) => r.ok ? r : svc(`presence_contacts?id=eq.${deal.contact_id}&site_id=eq.${site.id}&select=id,name,email,phone,company,notes&limit=1`)) : Promise.resolve({ json: [] }),
       // first_viewed_at/expires_at land with migration 0107 — tolerant fetch so the
       // proposals list never disappears if a deploy is ahead of the migration.
-      (async () => { let r = await svc(`presence_proposals?deal_id=eq.${id}&site_id=eq.${site.id}&deleted_at=is.null&select=id,title,line_items,subtotal_cents,currency,status,version,sent_at,decided_at,first_viewed_at,expires_at&order=created_at.desc`); if (!r.ok) r = await svc(`presence_proposals?deal_id=eq.${id}&site_id=eq.${site.id}&deleted_at=is.null&select=id,title,line_items,subtotal_cents,currency,status,version,sent_at,decided_at&order=created_at.desc`); return r; })(),
+      // sales item 88: why a client declined (decided_reason lands with 0176; the note was always there)
+      (async () => { let r = await svc(`presence_proposals?deal_id=eq.${id}&site_id=eq.${site.id}&deleted_at=is.null&select=id,title,line_items,subtotal_cents,currency,status,version,sent_at,decided_at,first_viewed_at,expires_at,decided_note,decided_reason&order=created_at.desc`); if (!r.ok) r = await svc(`presence_proposals?deal_id=eq.${id}&site_id=eq.${site.id}&deleted_at=is.null&select=id,title,line_items,subtotal_cents,currency,status,version,sent_at,decided_at,first_viewed_at,expires_at,decided_note&order=created_at.desc`); if (!r.ok) r = await svc(`presence_proposals?deal_id=eq.${id}&site_id=eq.${site.id}&deleted_at=is.null&select=id,title,line_items,subtotal_cents,currency,status,version,sent_at,decided_at&order=created_at.desc`); return r; })(),
       // `body` rides along so the deal page can run its editorial guard before
       // SENDING a draft: the per-package agreements ship with [BRACKETED] fill-in
       // points, and a client must never receive [LIST THE FIVE CORE PAGES]. It is
       // the same owner-scoped text the agreement form already holds — no new
       // exposure, and the deal read already carries proposals' full line_items.
-      svc(`presence_contracts?deal_id=eq.${id}&site_id=eq.${site.id}&deleted_at=is.null&select=id,title,body,status,signer_name,signed_at,version,terms_snapshot&order=created_at.desc`),
+      // sales item 88: the studio's countersignature (0176) — tolerant read before it
+      svc(`presence_contracts?deal_id=eq.${id}&site_id=eq.${site.id}&deleted_at=is.null&select=id,title,body,status,signer_name,signed_at,version,terms_snapshot,countersigned_name&order=created_at.desc`).then((r) => r.ok ? r : svc(`presence_contracts?deal_id=eq.${id}&site_id=eq.${site.id}&deleted_at=is.null&select=id,title,body,status,signer_name,signed_at,version,terms_snapshot&order=created_at.desc`)),
       svc(`presence_deal_events?deal_id=eq.${id}&site_id=eq.${site.id}&select=id,kind,from_stage,to_stage,detail,actor,created_at&order=created_at.desc&limit=80`),
       // processing_since lands with migration 0132 — tolerant fetch (same posture
       // as the proposals read above) so the record's Billing tab never blanks.
       // item 107: recurring_id rides along (0145) so the record can tell what's left of the proposal
       // sales items 77 and 81: the invoice's number and how a recorded payment came in (APPLY-0167)
-      (async () => { let r = await svc(`presence_invoices?deal_id=eq.${id}&site_id=eq.${site.id}&deleted_at=is.null&select=id,title,amount_cents,purpose,status,stripe_url,due_date,paid_at,created_at,processing_since,recurring_id,number,paid_method,paid_note,payment_for&order=due_date.asc.nullsfirst,created_at.asc`); if (!r.ok) r = await svc(`presence_invoices?deal_id=eq.${id}&site_id=eq.${site.id}&deleted_at=is.null&select=id,title,amount_cents,purpose,status,stripe_url,due_date,paid_at,created_at,processing_since,recurring_id&order=due_date.asc.nullsfirst,created_at.asc`); if (!r.ok) r = await svc(`presence_invoices?deal_id=eq.${id}&site_id=eq.${site.id}&deleted_at=is.null&select=id,title,amount_cents,purpose,status,stripe_url,due_date,paid_at,created_at,processing_since&order=due_date.asc.nullsfirst,created_at.asc`); if (!r.ok) r = await svc(`presence_invoices?deal_id=eq.${id}&site_id=eq.${site.id}&deleted_at=is.null&select=id,title,amount_cents,purpose,status,stripe_url,due_date,paid_at,created_at&order=due_date.asc.nullsfirst,created_at.asc`); return r; })(),
+      (async () => { let r = await svc(`presence_invoices?deal_id=eq.${id}&site_id=eq.${site.id}&deleted_at=is.null&select=id,title,amount_cents,purpose,status,stripe_url,due_date,paid_at,created_at,processing_since,recurring_id,number,paid_method,paid_note,payment_for,paid_private_note&order=due_date.asc.nullsfirst,created_at.asc`); /* before APPLY-0188: without the private note */ if (!r.ok) r = await svc(`presence_invoices?deal_id=eq.${id}&site_id=eq.${site.id}&deleted_at=is.null&select=id,title,amount_cents,purpose,status,stripe_url,due_date,paid_at,created_at,processing_since,recurring_id,number,paid_method,paid_note,payment_for&order=due_date.asc.nullsfirst,created_at.asc`); if (!r.ok) r = await svc(`presence_invoices?deal_id=eq.${id}&site_id=eq.${site.id}&deleted_at=is.null&select=id,title,amount_cents,purpose,status,stripe_url,due_date,paid_at,created_at,processing_since,recurring_id&order=due_date.asc.nullsfirst,created_at.asc`); if (!r.ok) r = await svc(`presence_invoices?deal_id=eq.${id}&site_id=eq.${site.id}&deleted_at=is.null&select=id,title,amount_cents,purpose,status,stripe_url,due_date,paid_at,created_at,processing_since&order=due_date.asc.nullsfirst,created_at.asc`); if (!r.ok) r = await svc(`presence_invoices?deal_id=eq.${id}&site_id=eq.${site.id}&deleted_at=is.null&select=id,title,amount_cents,purpose,status,stripe_url,due_date,paid_at,created_at&order=due_date.asc.nullsfirst,created_at.asc`); return r; })(),
       // item 47: the deal's estimates and recurring invoices — both [] before APPLY-0145
       import('./estimates.ts').then((m) => m.estimatesForDeal(site.id, id)).catch(() => []),
       import('./recurring_invoices.ts').then((m) => m.recurringForDeal(site.id, id)).catch(() => []),
@@ -1410,12 +1419,13 @@ export async function handleSalesTemplates(req: Request, site: SiteRow, principa
   if (isReservedName(name)) return json({ error: 'reserved_name', message: 'That name is kept for Studio OS’s own settings. Please choose another.' }, 422, cors);
   let title = clean(b.title, 200), body = '', line_items: unknown[] = [];
   if (UUID_RE.test(b.from_proposal_id || '')) {   // save an existing proposal as the template
-    const p = rows(await svc(`presence_proposals?id=eq.${b.from_proposal_id}&site_id=eq.${site.id}&deleted_at=is.null&select=title,line_items&limit=1`))[0];
+    const p = rows(await svc(`presence_proposals?id=eq.${b.from_proposal_id}&site_id=eq.${site.id}&deleted_at=is.null&select=title,line_items,terms&limit=1`))[0];
     if (!p) return json({ error: 'not_found', message: 'That proposal isn’t here.' }, 404, cors);
     // Keep the items + any discount/tax, but DROP the revise trail (revised_from/
-    // superseded_by) — a reusable template isn't a version of anything.
+    // superseded_by) — a reusable template isn't a version of anything. Sales item 106:
+    // its payment parts ride along, and its terms are kept in the template's body.
     const sp = splitLineItems(p.line_items);
-    title = title || p.title; line_items = packLineItems(sp.items, { discount: sp.meta.discount ?? null, tax_pct: sp.meta.tax_pct ?? null });
+    title = title || p.title; line_items = packLineItems(sp.items, { discount: sp.meta.discount ?? null, tax_pct: sp.meta.tax_pct ?? null, schedule: sp.meta.schedule ?? null }); body = clean(p.terms, 5000);
   } else if (UUID_RE.test(b.from_contract_id || '')) {   // save an existing contract as the template
     const c = rows(await svc(`presence_contracts?id=eq.${b.from_contract_id}&site_id=eq.${site.id}&deleted_at=is.null&select=title,body&limit=1`))[0];
     if (!c) return json({ error: 'not_found', message: 'That agreement isn’t here.' }, 404, cors);
@@ -1491,6 +1501,9 @@ async function fillPlaceholders(siteId: string, deal: any, text: string): Promis
   let studioName = '';
   try { if (deal.contact_id) contact = rows(await svc(`presence_contacts?id=eq.${deal.contact_id}&site_id=eq.${siteId}&select=name,company&limit=1`))[0] || null; } catch { /* best-effort */ }
   try { studioName = rows(await svc(`presence_identity?site_id=eq.${siteId}&select=business_name&limit=1`))[0]?.business_name || ''; } catch { /* best-effort */ }
+  // sales item 106: a proposal paid in parts rewrites the standard half-and-half passages
+  const plan = deal?.id ? await proposalSchedule(siteId, deal.id).catch(() => null) : null;
+  if (plan) text = partsIntoAgreement(text, plan.parts, plan.total_cents).text;
   return applyPlaceholders(text, buildPlaceholderValues({ deal, contact, studioName }));
 }
 
@@ -1503,7 +1516,9 @@ export async function handleSalesProposalCreate(req: Request, site: SiteRow, pri
   if (b.template_id) {   // one-tap: draft from a saved template
     const t = await loadTemplate(site.id, String(b.template_id), 'proposal');
     if (!t) return json({ error: 'not_found', message: 'That template isn’t here.' }, 404, cors);
-    b = { ...b, line_items: t.line_items, title: b.title || t.title || t.name };
+    // sales item 106: a template also brings its terms (kept in its body) and its payment parts (its meta)
+    // the editor may send its own (adjusted) lines with the template's id: those win
+    b = { ...b, line_items: b.line_items !== undefined ? b.line_items : t.line_items, title: b.title || t.title || t.name, terms: b.terms !== undefined ? b.terms : String(t.body || ''), ...(b.schedule === undefined ? { schedule: splitLineItems(t.line_items).meta.schedule ?? null } : {}) };
   }
   const norm = normalizeLineItems(b.line_items);
   if (!norm.ok) return json({ error: 'validation', message: norm.error }, 422, cors);
@@ -1511,7 +1526,10 @@ export async function handleSalesProposalCreate(req: Request, site: SiteRow, pri
   // brought in via its line_items (never the revise trail on a plain create).
   const bodyMeta = normalizeProposalMeta(b);
   const tplMeta = splitLineItems(b.line_items).meta;
-  const meta: ProposalMeta = { discount: bodyMeta.discount ?? tplMeta.discount ?? null, tax_pct: bodyMeta.tax_pct ?? tplMeta.tax_pct ?? null };
+  // sales item 106: paid in parts — the editor's parts win, else the template's
+  const sch = normalizeSchedule(b.schedule !== undefined ? b.schedule : (tplMeta.schedule ?? null));
+  if (!sch.ok) return json({ error: 'validation', message: sch.error }, 422, cors);
+  const meta: ProposalMeta = { discount: bodyMeta.discount ?? tplMeta.discount ?? null, tax_pct: bodyMeta.tax_pct ?? tplMeta.tax_pct ?? null, schedule: sch.parts };
   const ins = await svc('presence_proposals', { method: 'POST', headers: { Prefer: 'return=representation' },
     body: JSON.stringify({ site_id: site.id, deal_id: dealId, title: clean(b.title, 200) || 'Proposal',
       line_items: packLineItems(norm.items, meta), subtotal_cents: norm.subtotal_cents, currency: clean(b.currency, 8) || 'usd',
@@ -1542,10 +1560,13 @@ export async function handleSalesProposalRevise(req: Request, site: SiteRow, pri
   const norm = normalizeLineItems(rawItems);
   if (!norm.ok) return json({ error: 'validation', message: norm.error }, 422, cors);
   const bodyMeta = normalizeProposalMeta(b);
+  const sch = normalizeSchedule(b.schedule !== undefined ? b.schedule : (priorSplit.meta.schedule ?? null));   // sales item 106
+  if (!sch.ok) return json({ error: 'validation', message: sch.error }, 422, cors);
   const meta: ProposalMeta = {
     discount: (b.discount !== undefined) ? (bodyMeta.discount ?? null) : (priorSplit.meta.discount ?? null),
     tax_pct: (b.tax_pct !== undefined) ? (bodyMeta.tax_pct ?? null) : (priorSplit.meta.tax_pct ?? null),
     revised_from: id,
+    schedule: sch.parts,
   };
   const newVersion = (Math.trunc(Number(prior.version)) || 1) + 1;
   const title = clean(b.title, 200) || prior.title || 'Proposal';
@@ -1587,7 +1608,7 @@ async function emailSalesDoc(siteId: string, dealId: string | null, kind: 'propo
       : `${who} prepared a proposal for you. Take a look whenever you’re ready — nothing is final until you accept.`;
     const label = kind === 'contract' ? 'Review &amp; sign →' : 'Review the proposal →';
     const btn = `<a href="${url}" style="display:inline-block;margin-top:6px;background:${brand.accent};color:#fff;padding:9px 16px;border-radius:999px;text-decoration:none">${label}</a>`;
-    return await sendEmail(String(email), subject, `<p>${line}</p><p class="cta">${btn}</p>`, brand, { critical: true, asBusiness: true, siteId });   // a doc THEY are waiting to sign = transactional; their answer lands in the Inbox
+    return await sendEmail(String(email), subject, `${emailBand(kind === 'contract' ? 'Agreement' : 'Proposal', subject)}<p>${line}</p><p class="cta">${btn}</p>`, brand, { critical: true, asBusiness: true, siteId });   // a doc THEY are waiting to sign = transactional; their answer lands in the Inbox
   } catch { return false; }
 }
 
@@ -1611,7 +1632,7 @@ async function emailSalesFlow(siteId: string, dealId: string, url: string | null
         : `${who} has prepared your proposal. Take a look whenever you’re ready — nothing is final until you accept.`;
     const label = has.contract ? 'Review &amp; sign →' : 'Review the proposal →';
     const btn = `<a href="${url}" style="display:inline-block;margin-top:6px;background:${brand.accent};color:#fff;padding:9px 16px;border-radius:999px;text-decoration:none">${label}</a>`;
-    return await sendEmail(String(email), `Your ${what} from ${brand.name}`, `<p>${line}</p><p class="cta">${btn}</p>`, brand, { critical: true, asBusiness: true, siteId });   // a doc THEY are waiting to sign = transactional; their answer lands in the Inbox
+    return await sendEmail(String(email), `Your ${what} from ${brand.name}`, `${emailBand(what, has.contract ? 'Ready for you to review and sign' : 'Ready for you to review')}<p>${line}</p><p class="cta">${btn}</p>`, brand, { critical: true, asBusiness: true, siteId });   // a doc THEY are waiting to sign = transactional; their answer lands in the Inbox
   } catch { return false; }
 }
 
@@ -1645,7 +1666,7 @@ export async function emailInvoice(siteId: string, dealId: string, title: string
     const noteLine = note ? `<p>${escH(note)}</p>` : '';
     const pdf = row ? (() => { try { const { deal_id: _d, ...data } = row; return documentPdf('invoice', data, brand, ctx); } catch { return null; } })() : null;
     return await sendEmail(String(email), `${title}${no ? ' ' + no : ''} — ${amount}`,
-      `<p>${first ? `Hi ${escH(first)},` : 'Hi there,'}</p><p>${who ? `${who} has sent you` : 'Here is'} ${what} for <strong>${amount}</strong>, ${due}. You can pay securely here — nothing else needed.</p>${noteLine}<p class="cta">${btn}</p>${docLine}`,
+      `${emailBand(`${isDeposit ? 'Deposit request' : 'Invoice'}${no ? ' ' + no : ''}`, title)}<p>${first ? `Hi ${escH(first)},` : 'Hi there,'}</p><p>${who ? `${who} has sent you` : 'Here is'} ${what} for <strong>${amount}</strong>, ${due}. You can pay securely here — nothing else needed.</p>${noteLine}${emailFacts([['Due', row?.due_date ? dayLabel(row.due_date, ctx?.tz) : 'On receipt'], ['Amount due', amount]], { big: true })}<p class="cta">${btn}</p>${docLine}`,
       brand, { critical: true, asBusiness: true, siteId, ...(pdf ? { attachments: [{ filename: pdfFileName('invoice', row), content: pdf }] } : {}) });   // a payment link = transactional; their answer lands in the Inbox
   } catch { return false; }
 }
@@ -1747,7 +1768,7 @@ export async function handleSalesInvoice(req: Request, site: SiteRow, principal:
     try {
       // Use the STORED row's description so a retry sends Stripe identical params
       // under the per-row idempotency key (changed params + same key = hard error).
-      const link = await createServicePaymentLink({ amountCents: Number(inv.amount_cents), currency: 'usd', description: String(inv.description || description), invoiceId: inv.id });
+      const link = await createServicePaymentLink({ amountCents: Number(inv.amount_cents), currency: 'usd', description: String(inv.description || description), invoiceId: inv.id, gen: inv.link_gen });
       payUrl = link.url; repaired = true;
       await svc(`presence_invoices?id=eq.${inv.id}&site_id=eq.${site.id}`, { method: 'PATCH', body: JSON.stringify({ stripe_url: link.url, stripe_payment_link_id: link.id }) });
     } catch {
@@ -1760,6 +1781,7 @@ export async function handleSalesInvoice(req: Request, site: SiteRow, principal:
   const doubleTap = reused && !repaired && (Date.now() - lastTouch) < 120000;
   const emailed = doubleTap ? false : await emailInvoice(site.id, dealId, String(inv.title || title), payUrl, Number(inv.amount_cents), inv.id);
   if (!doubleTap) await svc(`presence_invoices?id=eq.${inv.id}&site_id=eq.${site.id}`, { method: 'PATCH', body: JSON.stringify({ updated_at: nowIso() }) }).catch(() => {});
+  await stampFirstSent(inv.id, site.id, nowIso());   // sales item 118: reminders count from the day it first went out
   // `repaired` = the FIRST attempt's link failed before its event could be
   // recorded — the retry that completes it must write the history line.
   if (!reused || repaired) await dealEvent(site.id, dealId, 'invoice_sent', principal, { detail: { invoice_id: inv.id, amount_cents: Number(inv.amount_cents), purpose } });
@@ -1830,6 +1852,7 @@ export async function handleSalesSchedule(req: Request, site: SiteRow, principal
       await svc(`presence_invoices?id=eq.${first.id}&site_id=eq.${site.id}`, { method: 'PATCH', body: JSON.stringify({ stripe_url: link.url, stripe_payment_link_id: link.id }) });
       first.stripe_url = link.url; linked = true;
       emailed = await emailInvoice(site.id, dealId, String(first.title), link.url, Number(first.amount_cents), first.id);
+      await stampFirstSent(first.id, site.id, nowIso());
       await dealEvent(site.id, dealId, 'invoice_sent', principal, { detail: { invoice_id: first.id, amount_cents: Number(first.amount_cents), purpose: first.purpose, schedule: true } });
     } catch { /* the plan is saved; the first stage's link can be generated later via Send */ }
   }
@@ -1856,7 +1879,7 @@ export async function handleSalesInvoiceSend(req: Request, site: SiteRow, princi
   let repaired = false;
   if (!payUrl) {
     try {
-      const link = await createServicePaymentLink({ amountCents: Number(inv.amount_cents), currency: 'usd', description: String(inv.description || inv.title || 'Invoice'), invoiceId: inv.id });
+      const link = await createServicePaymentLink({ amountCents: Number(inv.amount_cents), currency: 'usd', description: String(inv.description || inv.title || 'Invoice'), invoiceId: inv.id, gen: inv.link_gen });
       payUrl = link.url; repaired = true;
       await svc(`presence_invoices?id=eq.${inv.id}&site_id=eq.${site.id}`, { method: 'PATCH', body: JSON.stringify({ stripe_url: link.url, stripe_payment_link_id: link.id }) });
     } catch {
@@ -1869,6 +1892,7 @@ export async function handleSalesInvoiceSend(req: Request, site: SiteRow, princi
   const doubleTap = hadLink && !repaired && (Date.now() - lastTouch) < 120000;
   const emailed = doubleTap ? false : await emailInvoice(site.id, inv.deal_id, String(inv.title || 'Invoice'), payUrl!, Number(inv.amount_cents), inv.id);
   if (!doubleTap) await svc(`presence_invoices?id=eq.${inv.id}&site_id=eq.${site.id}`, { method: 'PATCH', body: JSON.stringify({ updated_at: nowIso() }) }).catch(() => {});
+  await stampFirstSent(inv.id, site.id, nowIso());   // a plan stage sent weeks after the plan was made counts from today (sales item 118)
   // First real send (or a link repair) writes the history line; a plain resend doesn't spam it.
   if ((!hadLink || repaired) && inv.deal_id) await dealEvent(site.id, inv.deal_id, 'invoice_sent', principal, { detail: { invoice_id: inv.id, amount_cents: Number(inv.amount_cents), purpose: inv.purpose } });
   return json({ data: { ...inv, stripe_url: payUrl }, url: payUrl, emailed, resent: hadLink && !repaired, double_tap: doubleTap }, 200, cors);
@@ -2024,7 +2048,7 @@ export async function handleSalesRetainer(req: Request, site: SiteRow, principal
   // Create the non-expiring recurring authorization link (client authorizes via Stripe).
   let link: { url: string; id: string; priceId: string };
   try {
-    link = await createServiceRetainerLink({ productName: `Retainer — ${deal.title || 'ongoing work'}`, amountCents: v.value.amount_cents, interval: v.value.interval, dealId, siteId: site.id });
+    link = await createServiceRetainerLink({ productName: `Retainer — ${deal.title || 'ongoing work'}`, amountCents: v.value.amount_cents, interval: v.value.interval, dealId, siteId: site.id, askedAt: now });
   } catch (e) {
     // Roll the pending marker back so the deal never shows a broken retainer.
     await svc(`presence_deals?id=eq.${dealId}&site_id=eq.${site.id}`, { method: 'PATCH', body: JSON.stringify({ retainer: prior && prior.status !== 'canceled' ? prior : null }) }).catch(() => {});
@@ -2044,15 +2068,21 @@ export async function handleSalesRetainerCancel(req: Request, site: SiteRow, pri
   const deal = await loadDeal(site.id, dealId);
   if (!deal) return json({ error: 'not_found' }, 404, cors);
   const prior: Partial<RetainerState> | null = (deal.retainer && typeof deal.retainer === 'object') ? deal.retainer : null;
-  if (!prior || prior.status === 'canceled') return json({ data: { retainer: prior || null, canceled: true, already: true } }, 200, cors);
+  // sales item 117: a retainer approved twice has more than one subscription, and Cancel
+  // stops every one of them (it used to stop the newest and leave the other charging)
+  const subs = retainerSubscriptionIds(prior);
+  const extras = (prior?.extra_subscription_ids || []).length;
+  if (!prior || (prior.status === 'canceled' && !extras)) return json({ data: { retainer: prior || null, canceled: true, already: true } }, 200, cors);
   const now = nowIso();
-  if (prior.stripe_subscription_id) {
-    const r = await cancelSubscription(String(prior.stripe_subscription_id));
-    if (!r.ok) return json({ error: 'cancel_failed', message: 'We couldn’t cancel the retainer with Stripe just now — please try again.', detail: r.error }, 502, cors);
+  if (subs.length) {
+    for (const id of subs) {
+      const r = await cancelSubscription(id);
+      if (!r.ok) return json({ error: 'cancel_failed', message: 'We couldn’t cancel the retainer with Stripe just now — please try again.', detail: r.error }, 502, cors);
+    }
   } else if (prior.stripe_payment_link_id) {
     await deactivatePaymentLink(String(prior.stripe_payment_link_id));   // pending: kill the link so no one authorizes it
   }
-  const next = mergeRetainerState(prior, { status: 'canceled', canceled_at: now }, now);
+  const next = { ...mergeRetainerState(prior, { status: 'canceled', canceled_at: prior.canceled_at || now }, now), extra_subscription_ids: [] };
   const up = await svc(`presence_deals?id=eq.${dealId}&site_id=eq.${site.id}&select=id`, { method: 'PATCH', headers: { Prefer: 'return=representation' }, body: JSON.stringify({ retainer: next }) });
   if (!up.ok || !rows(up)[0]) return json({ error: 'write_failed' }, 502, cors);
   return json({ data: { retainer: next, canceled: true } }, 200, cors);
@@ -2229,7 +2259,14 @@ export async function handleSalesProposalDecide(req: Request, id: string, cors: 
   if (decision === 'accepted' && p.expires_at && String(p.expires_at) < nowIso()) return json({ error: 'expired', message: 'This proposal has expired — ask your studio to send an updated one.' }, 409, cors);
   if (p.status === decision) return json({ data: { status: p.status }, already: true }, 200, cors); // idempotent
   if (!canDecideProposal(p.status, decision)) return json({ error: 'bad_state', message: 'This proposal can’t be updated.' }, 409, cors);
-  const up = await svc(`presence_proposals?id=eq.${id}&site_id=eq.${tok.site_id}&status=eq.sent&select=deal_id,status`, { method: 'PATCH', headers: { Prefer: 'return=representation' }, body: JSON.stringify({ status: decision, decided_at: nowIso(), decided_note: clean(b.note, 500) }) });
+  // Sales item 88: a decline can say why — one of the page's reasons and a note ("what would
+  // make this a yes?"). decided_reason lands with 0176; before it the reason rides the note.
+  const reason = decision === 'declined' ? declineReason(b.reason) : '';
+  const note = clean(b.note, 500);
+  const decidedAt = nowIso();
+  const patchUrl = `presence_proposals?id=eq.${id}&site_id=eq.${tok.site_id}&status=eq.sent&select=deal_id,status`;
+  let up = await svc(patchUrl, { method: 'PATCH', headers: { Prefer: 'return=representation' }, body: JSON.stringify({ status: decision, decided_at: decidedAt, decided_note: note, ...(reason ? { decided_reason: reason } : {}) }) });
+  if (!up.ok && reason) up = await svc(patchUrl, { method: 'PATCH', headers: { Prefer: 'return=representation' }, body: JSON.stringify({ status: decision, decided_at: decidedAt, decided_note: declineWords(reason, note).slice(0, 500) }) });
   if (!up.ok || !rows(up)[0]) return json({ error: 'conflict' }, 409, cors);
   const dealId = rows(up)[0].deal_id;
   const sys: Principal = { kind: 'public', userId: 'proposal-link', tenantId: null, role: null, email: null, jwt: null, requestId: 'proposal-decide' } as Principal;
@@ -2255,17 +2292,26 @@ export async function handleSalesProposalDecide(req: Request, id: string, cors: 
       }
     } catch { /* best-effort — the summary and placeholders just keep reading the stored value */ }
   }
-  await dealEvent(tok.site_id, dealId, 'proposal_decided', sys, { detail: { proposal_id: id, decision, ...(backfilledCents ? { value_backfilled_cents: backfilledCents } : {}) } });
+  await dealEvent(tok.site_id, dealId, 'proposal_decided', sys, { detail: { proposal_id: id, decision, ...(backfilledCents ? { value_backfilled_cents: backfilledCents } : {}), ...(decision === 'declined' && (reason || note) ? { reason, note } : {}) } });
   if (decision === 'accepted') {
     await advanceStage(tok.site_id, dealId, 'contract', ['lead', 'qualified', 'proposal'], sys);
     await raiseDealReady(tok.site_id, dealId, 'accepted', id);   // W1: tell the studio (and clear the proposal's reminder row)
   } else {
     // A decline deserves a heads-up too — silence here means the studio keeps
     // waiting on a deal that already said no. Best-effort, idempotent per deal.
+    // Sales item 88: it says what would make it a yes, and the studio gets it by email too.
     try {
       const st = rows(await svc(`presence_sites?id=eq.${tok.site_id}&select=client_id&limit=1`))[0];
       const title = rows(await svc(`presence_deals?id=eq.${dealId}&site_id=eq.${tok.site_id}&select=title&limit=1`))[0]?.title || 'a deal';
-      if (st?.client_id) await raiseNotice({ siteId: tok.site_id, clientId: st.client_id, kind: 'deal_followup', period: `declined:${dealId}`, headline: `They passed on the proposal — ${title}`, body: 'The client declined. A quick follow-up note often keeps the door open — or send an updated proposal.' });
+      const why = declineWords(reason, note);
+      const fresh = st?.client_id ? await raiseNotice({ siteId: tok.site_id, clientId: st.client_id, kind: 'deal_followup', period: `declined:${dealId}`, headline: `They passed on the proposal — ${title}`, body: why ? `What would make it a yes — ${why}. An updated proposal can answer it.` : 'The client declined. A quick follow-up note often keeps the door open — or send an updated proposal.' }) : false;
+      if (fresh) {
+        const base = (Deno.env.get('SITE_URL') || 'https://davisdigitalstudio.com').replace(/\/$/, '');
+        const e = (x: string) => x.replace(/[&<>"]/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[ch] as string));
+        await emailOperator(tok.site_id, `They passed on the proposal — ${title}`,
+          `<p>The client declined the proposal for <b>${e(String(title))}</b>.</p>${why ? `<p>What would make it a yes: ${e(why)}</p>` : '<p>They didn’t say why.</p>'}<p>Revise sends them an updated one on the same link.</p>`,
+          'proposal_declined', { label: 'Open the deal', href: `${base}/pipeline.html?deal=${dealId}` }).catch(() => {});
+      }
     } catch { /* non-fatal */ }
   }
   return json({ data: { status: decision } }, 200, cors);
@@ -2356,28 +2402,47 @@ export async function handleSalesContractCreate(req: Request, site: SiteRow, pri
  *  unpaid-reminder sweep picks it up like any open invoice. Best-effort: a mint
  *  failure never blocks the send; a link failure leaves the row for the
  *  drawer's Send button to repair (handleSalesInvoiceSend). */
+/** Sales item 106: the payment parts of the proposal an agreement goes with, when it is
+ *  paid in parts: the accepted one, else (unless `acceptedOnly`) the newest one sent or
+ *  drafted, since the proposal and the agreement often go out together on one link. */
+export async function proposalSchedule(siteId: string, dealId: string, acceptedOnly = false): Promise<{ parts: SchedulePart[]; total_cents: number } | null> {
+  const list = rows(await svc(`presence_proposals?deal_id=eq.${dealId}&site_id=eq.${siteId}&status=in.(accepted,sent,draft)&deleted_at=is.null&select=status,line_items&order=created_at.desc&limit=20`))
+    .filter((x: any) => !splitLineItems(x.line_items).meta.superseded_by);
+  const p = list.find((x: any) => x.status === 'accepted') || (acceptedOnly ? null : (list.find((x: any) => x.status === 'sent') || list.find((x: any) => x.status === 'draft')));
+  if (!p) return null;
+  const sch = normalizeSchedule(splitLineItems(p.line_items).meta.schedule ?? null);
+  if (!sch.ok || !sch.parts) return null;
+  return { parts: sch.parts, total_cents: proposalTotals(p.line_items).total_cents };
+}
 async function ensureDepositForContractSend(site: SiteRow, principal: Principal, contract: any): Promise<{ minted: boolean; amount_cents?: number; invoice_id?: string; warning?: string }> {
   try {
     const dealId = contract?.deal_id;
     if (!dealId) return { minted: false };
-    if (!/deposit/i.test(String(contract.body || ''))) return { minted: false };   // the document made no deposit promise
+    // Sales item 106: the proposal this agreement goes with is paid in parts. A first part
+    // "when you sign" is the deposit; a schedule without one has no deposit (signing makes
+    // every part), whatever the agreement's words say
+    const plan = await proposalSchedule(site.id, dealId).catch(() => null);
+    const first = plan ? signingPart(plan.parts, plan.total_cents) : null;
+    if (plan && !first) return { minted: false };
+    if (!first && !/deposit/i.test(String(contract.body || ''))) return { minted: false };   // the document made no deposit promise
     const deal = await loadDeal(site.id, dealId);
     if (!deal) return { minted: false };
-    const { deposit_cents } = depositSplit(deal.expected_value_cents);
+    const deposit_cents = first ? first.amount_cents : depositSplit(deal.expected_value_cents).deposit_cents;
     if (deposit_cents < 50) return { minted: false, warning: 'no_value' };         // the doc printed "[50% deposit]" — the deal needs a value
     if (!stripeConfigured()) return { minted: false };
     // AT MOST ONCE, EVER — any prior deposit row (open, paid, OR void) means the
     // deal's deposit story is already being told; never a second automatic one.
     const prior = rows(await svc(`presence_invoices?deal_id=eq.${dealId}&site_id=eq.${site.id}&purpose=eq.deposit&deleted_at=is.null&select=id,status&limit=1`));
     if (prior[0]) return { minted: false };
-    const description = `Deposit — ${deal.title || 'project'}`;
+    const description = `${first ? first.label : 'Deposit'} — ${deal.title || 'project'}`;
     const ins = await svc('presence_invoices', { method: 'POST', headers: { Prefer: 'return=representation' },
-      body: JSON.stringify({ site_id: site.id, deal_id: dealId, customer_client_id: deal.converted_client_id || null, customer_site_id: deal.converted_site_id || null, title: 'Deposit', description, amount_cents: deposit_cents, currency: 'usd', purpose: 'deposit', status: 'open', due_date: null, created_by: principal.email || principal.userId || 'system' }) });
+      body: JSON.stringify({ site_id: site.id, deal_id: dealId, customer_client_id: deal.converted_client_id || null, customer_site_id: deal.converted_site_id || null, title: first ? first.label : 'Deposit', description, amount_cents: deposit_cents, currency: 'usd', purpose: 'deposit', status: 'open', due_date: null, created_by: principal.email || principal.userId || 'system' }) });
     const inv = rows(ins)[0];
     if (!inv) return { minted: false };
     try {
       const link = await createServicePaymentLink({ amountCents: deposit_cents, currency: 'usd', description, invoiceId: inv.id });
       await svc(`presence_invoices?id=eq.${inv.id}&site_id=eq.${site.id}`, { method: 'PATCH', body: JSON.stringify({ stripe_url: link.url, stripe_payment_link_id: link.id }) });
+      await stampFirstSent(inv.id, site.id, nowIso());   // it goes out with the agreement
     } catch { /* the row stands; the drawer's Send repairs the link under the same idempotency key */ }
     await dealEvent(site.id, dealId, 'invoice_sent', principal, { detail: { invoice_id: inv.id, amount_cents: deposit_cents, purpose: 'deposit', auto: 'contract_send' } });
     return { minted: true, amount_cents: deposit_cents, invoice_id: inv.id };
@@ -2459,14 +2524,24 @@ export async function handleSalesContractSign(req: Request, id: string, cors: Re
   const signerName = clean(b.signer_name, 120);
   const signerEmail = clean(b.signer_email, 160).toLowerCase();
   if (!signerName) return json({ error: 'validation', message: 'Please type your name to sign.' }, 422, cors);
+  // sales item 88 (file 07 finding 9): the signed copy goes to the signer, so their email is required
+  if (!validSignerEmail(signerEmail)) return json({ error: 'email_needed', message: 'Type your email too, so your signed copy can reach you.' }, 422, cors);
   const signedAt = nowIso();   // ONE timestamp — the evidence, the stored row, and the emailed certificate all agree
   const evidence = { hash: c.content_hash, at: signedAt, token_exp: tok.exp, ip_hash: await hmacHex(secret, clientIp(req)) }; // R3: hashed signer IP for legal signing evidence
-  const up = await svc(`presence_contracts?id=eq.${id}&site_id=eq.${tok.site_id}&status=eq.sent&content_hash=eq.${c.content_hash}&select=deal_id`, { method: 'PATCH', headers: { Prefer: 'return=representation' },
-    body: JSON.stringify({ status: 'signed', signer_name: signerName, signer_email: signerEmail, signed_at: signedAt, signed_evidence: evidence }) });
+  // Sales item 88: signed by both sides. The studio's signature (Settings → who signs for the
+  // studio) is added in the SAME write as the client's, with the same moment — one person, no
+  // extra step. Before 0176 the columns aren't there and the client's signature still stands.
+  const { studioSigner } = await import('./proposal_answers.ts');
+  const counter = await studioSigner(tok.site_id).catch(() => null);
+  const signUrl = `presence_contracts?id=eq.${id}&site_id=eq.${tok.site_id}&status=eq.sent&content_hash=eq.${c.content_hash}&select=deal_id`;
+  const signed = { status: 'signed', signer_name: signerName, signer_email: signerEmail, signed_at: signedAt, signed_evidence: evidence };
+  let up = await svc(signUrl, { method: 'PATCH', headers: { Prefer: 'return=representation' },
+    body: JSON.stringify(counter && counter.name ? { ...signed, countersigned_name: counter.name, countersigned_title: counter.title, countersigned_at: signedAt } : signed) });
+  if (!up.ok && up.status === 400 && counter && counter.name) up = await svc(signUrl, { method: 'PATCH', headers: { Prefer: 'return=representation' }, body: JSON.stringify(signed) });
   if (!up.ok || !rows(up)[0]) return json({ error: 'conflict', message: 'This agreement changed — reload and sign again.' }, 409, cors); // hash guard in WHERE = version integrity
   const dealId = rows(up)[0].deal_id;
   const sys: Principal = { kind: 'public', userId: 'contract-link', tenantId: null, role: null, email: null, jwt: null, requestId: 'contract-sign' } as Principal;
-  await dealEvent(tok.site_id, dealId, 'contract_signed', sys, { detail: { contract_id: id, signer: signerName } });
+  await dealEvent(tok.site_id, dealId, 'contract_signed', sys, { detail: { contract_id: id, signer: signerName, ...(counter && counter.name ? { countersigned_by: counter.name } : {}) } });
   await advanceStage(tok.site_id, dealId, 'contract', ['lead', 'qualified', 'proposal'], sys);
   await clearStaleNextStep(tok.site_id, dealId, 'signed');   // Phase 3: "Sign contract" is done now
   // SIGNATURE MOVES THE DEAL (studio audit 2026-10, change 7). The leaders move
@@ -2515,6 +2590,11 @@ export async function handleSalesContractSign(req: Request, id: string, cors: Re
     } catch { /* the signature stands; its echo is best-effort */ }
   }
 
+  // Sales item 106: paid in parts — signing makes the later parts as invoices, each with its due
+  // date (a "days after you sign" part counts from today). They wait on the Billing tab for the
+  // studio's Send, like any open invoice. At most once: a deal that already has them is left.
+  await mintLaterParts(tok.site_id, dealId, signedAt.slice(0, 10)).catch(() => {});
+
   // The delivery checklist's step 1 is a FACT the system just established, so it
   // ticks itself rather than waiting for the studio to remember. A no-op when
   // the deal hasn't been converted yet — the usual order is sign THEN convert,
@@ -2548,12 +2628,15 @@ export async function handleSalesContractSign(req: Request, id: string, cors: Re
       } catch { signedPdf = null; }
       // Signature certificate: name · timestamp (UTC) · document fingerprint —
       // only facts this request already holds; deliberately no IP or device data.
+      // sales item 88: the agreement laid out with its headings and numbered sections, signed by both
+      const counterLine = counter && counter.name ? `Countersigned for ${escHtml(counter.business || 'the studio')} by: <strong>${escHtml(counter.name)}</strong>${counter.title ? ', ' + escHtml(counter.title) : ''}<br>` : '';
       copyEmailed = await sendEmail(to, `Your signed copy — ${c.title || 'Service agreement'}`,
-        `<p>Here's your copy of the agreement, exactly as signed. Keep this email — it's your record.</p>` +
-        `<div style="border:1px solid #e5e0d6;border-radius:12px;padding:16px 18px;margin:12px 0;white-space:pre-wrap;font-size:14px">${escHtml(String(c.body || ''))}</div>` +
+        emailBand('Signed agreement', 'Your signed copy') +
+        `<p>Here's your copy of the agreement, exactly as signed${counter && counter.name ? ' by both of you' : ''}. Keep this email — it's your record.</p>` +
+        `<div style="border:1px solid #e5e0d6;border-radius:12px;padding:16px 18px;margin:12px 0;font-size:14px">${agreementHtml(String(c.body || ''), { email: true, accent: brand.accentDark })}</div>` +
         `<p style="font-size:13px;color:#6b6478;margin:14px 0 4px"><strong>Signature certificate</strong></p>` +
         `<div style="border:1px solid #e5e0d6;border-radius:12px;padding:12px 18px;font-size:13px;color:#6b6478;line-height:1.7">` +
-        `Signed by: <strong>${escHtml(signerName)}</strong><br>` +
+        `Signed by: <strong>${escHtml(signerName)}</strong> (${escHtml(signerEmail)})<br>` + counterLine +
         `Signed at: ${signedAt.slice(0, 19).replace('T', ' ')} UTC<br>` +
         `Document fingerprint: <span style="font-family:ui-monospace,Menlo,Consolas,monospace;overflow-wrap:anywhere">${String(c.content_hash || '')}</span></div>` +
         docLine + (signedPdf ? `<p style="font-size:13px;color:#6b6478;margin:8px 0 0">The signed agreement is attached as a PDF.</p>` : ''),
@@ -2573,6 +2656,56 @@ export async function handleSalesContractSign(req: Request, id: string, cors: Re
     if (dep?.stripe_url) pay = { url: String(dep.stripe_url), amount_cents: Number(dep.amount_cents) || 0 };
   } catch { /* optional */ }
   return json({ data: { status: 'signed', pay_url: pay?.url || null, pay_amount_cents: pay?.amount_cents || null, copy_emailed: copyEmailed } }, 200, cors);
+}
+
+// Sales item 88: who signs for the studio, shown beside the client's signature before they
+// sign (and, once signed, the name that was stamped); and where an answer to a question goes.
+async function pageSigner(siteId: string, contract: any): Promise<{ name: string; title: string; business: string } | null> {
+  if (!contract) return null;
+  const { studioSigner } = await import('./proposal_answers.ts');
+  const now = await studioSigner(siteId).catch(() => null);
+  if (contract.status === 'signed' && contract.countersigned_name) return { name: String(contract.countersigned_name), title: String(contract.countersigned_title || ''), business: now?.business || '' };
+  return now;
+}
+// The deal's person, read once: where an answer to a question goes (masked), and who the
+// page is for ("Proposal for Corner Café", the agreement's two parties).
+async function pageContact(siteId: string, dealId: unknown): Promise<{ ask: { email: string; needs_email: boolean } | null; client: { name: string; business: string } | null }> {
+  if (!UUID_RE.test(String(dealId || ''))) return { ask: null, client: null };
+  try {
+    const deal = rows(await svc(`presence_deals?id=eq.${dealId}&site_id=eq.${siteId}&select=contact_id&limit=1`))[0];
+    const c = deal?.contact_id ? rows(await svc(`presence_contacts?id=eq.${deal.contact_id}&site_id=eq.${siteId}&select=name,email,company&limit=1`))[0] : null;
+    const email = String(c?.email || '');
+    const client = c ? { name: String(c.name || '').trim().slice(0, 120), business: String(c.company || '').trim().slice(0, 120) } : null;
+    return { ask: { email: maskEmail(email), needs_email: !email }, client: client && (client.name || client.business) ? client : null };
+  } catch { return { ask: null, client: null }; }
+}
+// A signed agreement's PDF, for the page's Download the PDF (the same document the signed-copy
+// email attaches). Opening it is not the emailed copy being opened, so no `e`.
+async function signedPdfUrl(siteId: string, contract: any): Promise<string | null> {
+  if (contract?.status !== 'signed' || !UUID_RE.test(String(contract?.id || ''))) return null;
+  const secret = linkSecret();
+  if (!secret) return null;
+  const token = await signDocToken({ t: 'doc', k: 'contract', id: String(contract.id), site_id: siteId, exp: Math.floor(Date.now() / 1000) + 90 * 86400 }, secret);
+  return `${fnBase()}/functions/v1/presence/sales/doc/${encodeURIComponent(token)}?format=pdf`;
+}
+
+/** Sales item 106: the parts of a paid-in-parts proposal after the first become invoices once
+ *  the agreement is signed. Idempotent: any invoice already titled "Part 2 of …" (or later)
+ *  on the deal means they were made. Best-effort; the signature never waits on it. */
+async function mintLaterParts(siteId: string, dealId: string, signedYmd: string): Promise<number> {
+  const plan = await proposalSchedule(siteId, dealId, true);
+  if (!plan) return 0;
+  const have = rows(await svc(`presence_invoices?deal_id=eq.${dealId}&site_id=eq.${siteId}&deleted_at=is.null&select=title,purpose,amount_cents&limit=100`));
+  if (have.some((i: any) => /^Part \d+ of /.test(String(i.title || '')) && !/^Part 1 of /.test(String(i.title || '')))) return 0;   // made already
+  // the deposit already on the deal decides: part 1 → the rest; none → every part; anything else → none
+  const stages = partsAtSigning(plan.parts, plan.total_cents, signedYmd, have.filter((i: any) => i.purpose === 'deposit'));
+  if (!stages.length) return 0;
+  const deal = await loadDeal(siteId, dealId);
+  if (!deal) return 0;
+  const ins = await svc('presence_invoices', { method: 'POST', headers: { Prefer: 'return=representation' },
+    body: JSON.stringify(stages.map((st) => ({ site_id: siteId, deal_id: dealId, customer_client_id: deal.converted_client_id || null, customer_site_id: deal.converted_site_id || null,
+      title: st.label, description: `${st.label} — ${deal.title || 'project'}`, amount_cents: st.amount_cents, currency: 'usd', purpose: st.purpose || 'service', status: 'open', due_date: st.due_date ?? null, created_by: 'payment-plan' }))) });
+  return rows(ins).length;
 }
 
 // ═══ PUBLIC VIEW (token) — a prospect reviews the proposal/contract before acting ═══
@@ -2604,24 +2737,36 @@ export async function handleSalesPublicView(req: Request, token: string, cors: R
     // never had one in play. Between versions (proposal_pending) it stays locked.
     const chosen = proposal ? proposal.status === 'accepted' : !proposal_pending;
     const contractOut = !contract ? null
-      : chosen ? { id: contract.id, title: contract.title, body: contract.body, content_hash: contract.content_hash, status: contract.status, signed_at: contract.signed_at, signer_name: contract.signer_name }
+      : chosen ? { id: contract.id, title: contract.title, body: contract.body, content_hash: contract.content_hash, status: contract.status, signed_at: contract.signed_at, signer_name: contract.signer_name,
+        ...(contract.status === 'signed' ? { signer_email: contract.signer_email || '', countersigned_name: contract.countersigned_name || '', countersigned_title: contract.countersigned_title || '', countersigned_at: contract.countersigned_at || null } : {}) }
       : { id: contract.id, title: contract.title, status: contract.status, locked: true };
     if (contract && chosen) opens.push(firstOpen('presence_contracts', contract.id, tok.site_id, tok.id, 'agreement'));
-    let deposit: { amount_cents: number; status: string; paid_at: string | null; url: string | null } | null = null;
+    let deposit: { amount_cents: number; status: string; paid_at: string | null; url: string | null; processing: boolean } | null = null;
     try {
-      const dep = rows(await svc(`presence_invoices?deal_id=eq.${tok.id}&site_id=eq.${tok.site_id}&purpose=eq.deposit&status=in.(open,paid)&deleted_at=is.null&select=id,amount_cents,status,stripe_url,paid_at&order=created_at.desc&limit=1`))[0];
-      if (dep) deposit = { amount_cents: Number(dep.amount_cents) || 0, status: String(dep.status), paid_at: dep.paid_at || null, url: (contract?.status === 'signed' && dep.status === 'open' && dep.stripe_url) ? String(dep.stripe_url) : null };
+      // Sales item 118: a deposit paid by bank transfer is SETTLING (processing_since,
+      // 0132). Its link took its one payment, so the page must say "Payment on its
+      // way" and offer no Pay button; it used to show "Amount due" and a button that
+      // opened a switched-off Stripe page. Before 0132 the wider read is refused.
+      const depQ = (cols: string) => svc(`presence_invoices?deal_id=eq.${tok.id}&site_id=eq.${tok.site_id}&purpose=eq.deposit&status=in.(open,paid)&deleted_at=is.null&select=${cols}&order=created_at.desc&limit=1`);
+      let depR = await depQ('id,amount_cents,status,stripe_url,paid_at,processing_since');
+      if (!depR.ok) depR = await depQ('id,amount_cents,status,stripe_url,paid_at');
+      const dep = rows(depR)[0];
+      const settling = !!dep && dep.status === 'open' && !!dep.processing_since;
+      if (dep) deposit = { amount_cents: Number(dep.amount_cents) || 0, status: String(dep.status), paid_at: dep.paid_at || null, processing: settling, url: (contract?.status === 'signed' && dep.status === 'open' && !settling && dep.stripe_url) ? String(dep.stripe_url) : null };
       if (dep && deposit?.url) opens.push(firstOpen('presence_invoices', String(dep.id), tok.site_id, tok.id, 'deposit'));   // the pay button is in front of them
     } catch { /* optional — the page says "nothing to pay right now" */ }
     await Promise.all(opens);
     const expired = !!(proposal?.expires_at && String(proposal.expires_at) < nowIso());
-    return json({ data: { kind: 'flow', brand, deal: { id: deal.id, title: deal.title }, proposal: proposal ? { ...proposal, expired } : null, proposal_pending, contract: contractOut, contract_pending, deposit } }, 200, cors);
+    const [signer, pc, pdfUrl] = await Promise.all([pageSigner(tok.site_id, contractOut), pageContact(tok.site_id, tok.id), signedPdfUrl(tok.site_id, contractOut)]);
+    // sales item 106: how they'll pay, part by part, when the proposal is paid in parts
+    const schedule = proposal ? scheduleView(splitLineItems(proposal.line_items).meta.schedule ?? null, proposalTotals(proposal.line_items).total_cents) : null;
+    return json({ data: { kind: 'flow', brand, deal: { id: deal.id, title: deal.title }, proposal: proposal ? { ...proposal, expired, schedule } : null, proposal_pending, contract: contractOut && pdfUrl ? { ...contractOut, pdf_url: pdfUrl } : contractOut, contract_pending, deposit, studio_signer: signer, ask: pc.ask, client: pc.client } }, 200, cors);
   }
   if (tok.t === 'proposal') {
     // first_viewed_at/expires_at land with migration 0107 — try the full select, fall
     // back to the pre-0107 shape so a deploy ahead of the migration never breaks the
     // public proposal view.
-    let pr = await svc(`presence_proposals?id=eq.${tok.id}&site_id=eq.${tok.site_id}&deleted_at=is.null&select=id,deal_id,title,line_items,subtotal_cents,currency,terms,status,first_viewed_at,expires_at&limit=1`);
+    let pr = await svc(`presence_proposals?id=eq.${tok.id}&site_id=eq.${tok.site_id}&deleted_at=is.null&select=id,deal_id,title,line_items,subtotal_cents,currency,terms,status,first_viewed_at,expires_at,sent_at,version&limit=1`);
     if (!pr.ok) pr = await svc(`presence_proposals?id=eq.${tok.id}&site_id=eq.${tok.site_id}&deleted_at=is.null&select=id,deal_id,title,line_items,subtotal_cents,currency,terms,status&limit=1`);
     const { deal_id: propDeal, ...p } = rows(pr)[0] || {} as any;
     if (!p.id) return json({ error: 'not_found' }, 404, cors);
@@ -2629,12 +2774,18 @@ export async function handleSalesPublicView(req: Request, token: string, cors: R
     // say so on the deal (best-effort; no-ops before the migration adds the column).
     if (!p.first_viewed_at) await firstOpen('presence_proposals', tok.id, tok.site_id, propDeal, 'proposal');
     const expired = !!(p.expires_at && String(p.expires_at) < nowIso());
-    return json({ data: { kind: 'proposal', brand, expired, ...p } }, 200, cors);
+    const schedule = scheduleView(splitLineItems(p.line_items).meta.schedule ?? null, proposalTotals(p.line_items).total_cents);   // sales item 106
+    const pc = await pageContact(tok.site_id, propDeal);
+    return json({ data: { kind: 'proposal', brand, expired, ...p, schedule, ask: pc.ask, client: pc.client } }, 200, cors);
   }
-  const { deal_id: conDeal, ...c } = rows(await svc(`presence_contracts?id=eq.${tok.id}&site_id=eq.${tok.site_id}&deleted_at=is.null&select=id,deal_id,title,body,content_hash,status,signed_at&limit=1`))[0] || {} as any;
+  // sales item 88: the countersignature (0176) — tolerant read before it
+  let cq = await svc(`presence_contracts?id=eq.${tok.id}&site_id=eq.${tok.site_id}&deleted_at=is.null&select=id,deal_id,title,body,content_hash,status,signed_at,signer_name,signer_email,countersigned_name,countersigned_title,countersigned_at&limit=1`);
+  if (!cq.ok) cq = await svc(`presence_contracts?id=eq.${tok.id}&site_id=eq.${tok.site_id}&deleted_at=is.null&select=id,deal_id,title,body,content_hash,status,signed_at&limit=1`);
+  const { deal_id: conDeal, ...c } = rows(cq)[0] || {} as any;
   if (!c.id) return json({ error: 'not_found' }, 404, cors);
   await firstOpen('presence_contracts', tok.id, tok.site_id, conDeal, 'agreement');   // item 69
-  return json({ data: { kind: 'contract', brand, ...c } }, 200, cors); // content_hash is presented back on sign (version integrity)
+  const [cSigner, cPc, cPdf] = await Promise.all([pageSigner(tok.site_id, c), pageContact(tok.site_id, conDeal), signedPdfUrl(tok.site_id, c)]);
+  return json({ data: { kind: 'contract', brand, ...c, ...(cPdf ? { pdf_url: cPdf } : {}), studio_signer: cSigner, ask: cPc.ask, client: cPc.client } }, 200, cors); // content_hash is presented back on sign (version integrity)
 }
 
 // ═══ BRANDED DOCUMENT OF RECORD (token) — a printable, keepable copy ═════════
@@ -2687,10 +2838,14 @@ export async function docRow(kind: DocKind, id: string, siteId: string): Promise
   if (kind === 'estimate') return (await one(`presence_estimates?id=eq.${id}&site_id=eq.${siteId}&deleted_at=is.null&select=id,deal_id,title,line_items,subtotal_cents,currency,terms,status,sent_at,expires_at,decided_at&limit=1`)) || null;
   if (kind === 'invoice') {
     const base = 'id,deal_id,title,description,amount_cents,currency,purpose,status,stripe_url,due_date,paid_at,created_at';
-    const full = await one(`presence_invoices?id=eq.${id}&site_id=eq.${siteId}&deleted_at=is.null&select=${base},number,paid_method,paid_note,payment_for,lines&limit=1`);
+    // processing_since (0132): the page says "Payment on its way" while a bank payment settles (sales item 118)
+    const full = await one(`presence_invoices?id=eq.${id}&site_id=eq.${siteId}&deleted_at=is.null&select=${base},number,paid_method,paid_note,payment_for,lines,processing_since&limit=1`);
     return full !== undefined ? full : ((await one(`presence_invoices?id=eq.${id}&site_id=eq.${siteId}&deleted_at=is.null&select=${base}&limit=1`)) || null);
   }
-  return (await one(`presence_contracts?id=eq.${id}&site_id=eq.${siteId}&deleted_at=is.null&select=id,deal_id,title,body,content_hash,status,signer_name,signer_email,signed_at,signed_evidence,sent_at,created_at&limit=1`)) || null;
+  // sales item 88: the studio's countersignature (APPLY-0176); before it the old shape
+  const cbase = 'id,deal_id,title,body,content_hash,status,signer_name,signer_email,signed_at,signed_evidence,sent_at,created_at';
+  const cfull = await one(`presence_contracts?id=eq.${id}&site_id=eq.${siteId}&deleted_at=is.null&select=${cbase},countersigned_name,countersigned_title,countersigned_at&limit=1`);
+  return cfull !== undefined ? cfull : ((await one(`presence_contracts?id=eq.${id}&site_id=eq.${siteId}&deleted_at=is.null&select=${cbase}&limit=1`)) || null);
 }
 
 // ═══ DOCUMENT LINK (authed) — mint the printable document URL for the CRM ════

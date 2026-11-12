@@ -62,11 +62,15 @@ test.describe('item 77 — record a payment on the record', () => {
     await expect(page.locator('#pf-rcpt')).toBeChecked();
     await expect(page.locator('#pf-go')).toHaveText('Mark #0013 paid');
     await expect(page.locator('#pf-what')).toContainText('switches its card link off');
+    // sales item 118: the note says where it goes, and a private one sits beside it
+    await expect(form.getByLabel('Note on their receipt (optional)')).toBeVisible();
+    await expect(page.locator('#pf-note-h')).toHaveText('Shown on their receipt: the client sees this note on the receipt, its PDF and the receipt email.');
     await page.locator('#pf-note').fill('Check #2207');
+    await form.getByLabel('Private note, only you see it (optional)').fill('Paid late, fee waived');
     await page.locator('#pf-go').click();
     await expect.poll(() => sent.length).toBe(1);
     expect(sent[0].url).toContain('/payment?today=' + TODAY);
-    expect(sent[0].body).toEqual({ amount_cents: 200000, paid_on: TODAY, method: 'check', note: 'Check #2207', email_receipt: true });
+    expect(sent[0].body).toEqual({ amount_cents: 200000, paid_on: TODAY, method: 'check', note: 'Check #2207', private_note: 'Paid late, fee waived', email_receipt: true });
     await expect(toastWith(page, 'Marked #0013 paid, by check. Receipt emailed to Ivy.')).toBeVisible();
   });
 
@@ -107,7 +111,7 @@ test.describe('item 77 — record a payment on the record', () => {
   test('a paid one says how, and Undo asks first then takes it back', async ({ page }) => {
     await installApp(page, { api: API() });
     const undone: string[] = [];
-    await page.route(`**/functions/v1/presence/sales/invoices/${PAID}/payment/undo`, (route) => { undone.push(route.request().method()); return route.fulfill(json({ data: { undone: true, part: false } })); });
+    await page.route(`**/functions/v1/presence/sales/invoices/${PAID}/payment/undo`, (route) => { undone.push(route.request().method()); return route.fulfill(json({ data: { undone: true, part: false, fresh_link: true, moved_back: 'contract' } })); });
     let asked = '';
     page.on('dialog', (d) => { asked = d.message(); d.accept(); });
     await recordBilling(page);
@@ -118,7 +122,8 @@ test.describe('item 77 — record a payment on the record', () => {
     await row.getByRole('button', { name: 'Undo' }).click();
     await expect.poll(() => undone.length).toBe(1);
     expect(asked).toContain('goes back to unpaid');
-    await expect(toastWith(page, 'Payment undone. #0012 is open again')).toBeVisible();
+    // sales items 116 + 118: it has a pay link again, and an undone deposit puts the deal back
+    await expect(toastWith(page, 'Payment undone. #0012 is open again. It has a fresh payment link, so its reminders carry on. The deal is back where it was.')).toBeVisible();
   });
 
   test('a part payment is its own paid row, under the invoice it went toward', async ({ page }) => {
@@ -201,9 +206,12 @@ test.describe('item 77 — on the deal and in Who owes you', () => {
     await expect(form).toBeVisible();
     await expect(form.getByRole('button', { name: 'Mark #0013 paid' })).toBeVisible();
     await form.getByText('Cash', { exact: true }).click();
+    await expect(form.getByLabel('Note on their receipt (optional)')).toBeVisible();
+    await expect(form).toContainText('Shown on their receipt');
+    await form.getByLabel('Private note, only you see it (optional)').fill('Counted twice');
     await form.getByRole('button', { name: 'Mark #0013 paid' }).click();
     await expect.poll(() => sent.length).toBe(1);
-    expect(sent[0]).toMatchObject({ amount_cents: 200000, method: 'cash', email_receipt: true });
+    expect(sent[0]).toMatchObject({ amount_cents: 200000, method: 'cash', private_note: 'Counted twice', email_receipt: true });
     await expect(page.getByText('Marked #0013 paid in cash.', { exact: false })).toBeVisible();
   });
 });

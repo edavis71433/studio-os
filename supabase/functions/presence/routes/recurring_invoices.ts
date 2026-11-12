@@ -23,6 +23,7 @@ import { json } from '../../_shared/http.ts';
 import { svc } from '../lib/db.ts';
 import { raiseNotice, clearNoticePrefix } from '../lib/notice.ts';
 import { stripeConfigured, createServicePaymentLink } from '../commerce/stripe.ts';
+import { stampFirstSent } from '../lib/pay_link.ts';
 import {
   localClock, sendDue, headsUpDue, twoUnpaidInARow, afterSend, resumeOn, nextOccurrence,
   validateRecurringStart, validateRecurringChange, recurringInvoiceTitle, monthLabel, dayLabel, addDays,
@@ -134,6 +135,7 @@ export async function sendRecurringNow(s: any, ctx: { localYmd: string; clientId
       const kind = s.every === 'year' ? 'yearly' : s.every === 'quarter' ? 'quarterly' : 'monthly';
       const due = inv.due_date ? ` It’s due ${dayLabel(String(inv.due_date))}.` : '';
       emailed = await emailInvoice(s.site_id, s.deal_id, String(inv.title), link.url, Number(inv.amount_cents), inv.id, `This is your ${kind} invoice for ${s.title}.${due}`);
+      if (emailed) await stampFirstSent(inv.id, s.site_id, new Date().toISOString());   // sales item 118: reminders count from the day it went out
       // "invoice sent" is written only when the email went. When it didn't, the
       // schedule still moves on (the invoice and its link exist), but the studio is
       // told, on the deal and in Needs you, so they can send it again by hand.

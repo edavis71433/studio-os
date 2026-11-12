@@ -1,0 +1,105 @@
+{
+  "about": "What's new (builder list item 128). One entry per change, written once: what changed for the reader, not how it was built. `who` says who reads it: studio (a studio, every entry), owner (a business running its own site), client (a client in the portal, in the entry's `client` words, which never name Studio OS or show studio screens). Pictures are taken on sample data, never a client's site, by scripts/whats-new/shoot.spec.ts (WHATS_NEW_SHOOT=1 npx playwright test -c scripts/whats-new/playwright.config.ts). Newest first; the panel groups them by week.",
+  "entries": [
+    {
+      "id": "blog",
+      "date": "2026-11-12",
+      "who": ["studio", "owner"],
+      "title": "A real blog, with its own writing screen",
+      "sentence": "Write a post on a screen that looks like your site, with photos, categories and authors. Publish it now, pick a day and time, or send it to your email list.",
+      "picture": "/thumbs/whats-new/blog.jpg",
+      "alt": "The writing screen on a sample restaurant’s post: the title, the author and the cover photo in the site’s own look, with Post settings beside it.",
+      "show": "/presence.html#updates"
+    },
+    {
+      "id": "business-details",
+      "date": "2026-11-12",
+      "who": ["studio", "owner"],
+      "title": "Business details say where each one shows",
+      "sentence": "A sentence under every field says where it appears on your site. New: a short description for Google and shared links, and a second location.",
+      "picture": "/thumbs/whats-new/business-details.jpg",
+      "alt": "Business details on a sample restaurant: a short description with its share preview, and a second location in Glendale.",
+      "show": "/presence.html#business"
+    },
+    {
+      "id": "search-phrases",
+      "date": "2026-11-12",
+      "who": ["studio", "owner"],
+      "title": "Tell Google what you want to be found for",
+      "sentence": "Pick two or three phrases on the Search tab. It checks each page’s headline, and with one tap writes a headline that has the phrase.",
+      "picture": "/thumbs/whats-new/search-phrases.jpg",
+      "alt": "The Search tab’s phrases card: one phrase found in the Home page’s headline, another ready to go on the Private events page.",
+      "show": "/presence.html#search"
+    },
+    {
+      "id": "search-todo",
+      "date": "2026-11-12",
+      "who": ["studio", "owner"],
+      "title": "Your Search tab is a to-do list",
+      "sentence": "What would help you show up on Google, most important first, with a dot to tick off each one.",
+      "picture": "/thumbs/whats-new/search-todo.jpg",
+      "alt": "The Search tab’s to-do list on a sample site: Connect Google Search Console and Add a search description marked High, two more marked Medium.",
+      "show": "/presence.html#search"
+    },
+    {
+      "id": "sites-numbers",
+      "date": "2026-11-12",
+      "who": ["studio"],
+      "title": "Every site’s numbers on Sites",
+      "sentence": "Each site shows its health, its visits and its Google clicks, with the change from last month. A drop is red.",
+      "picture": "/thumbs/whats-new/sites-numbers.jpg",
+      "alt": "The Sites table with three sample sites, each with its health score, visits and search clicks, and the change from last month.",
+      "show": "/sites.html"
+    },
+    {
+      "id": "portal-look",
+      "date": "2026-11-12",
+      "who": ["studio", "client"],
+      "title": "The client portal’s new look",
+      "sentence": "Your name and colours along the top, four tabs, the client’s to-dos in place, and every conversation behind one Messages door.",
+      "picture": "/thumbs/whats-new/portal-look.jpg",
+      "alt": "A sample client’s portal: the studio’s name along the top with Home, Messages, Documents and Help, and a welcome that says where everything lives.",
+      "show": "/presence.html#clientview",
+      "client": {
+        "title": "Every conversation with your studio is now in Messages",
+        "sentence": "Your to-dos sit at the top of your portal, and your documents, invoices and monthly reports are on one shelf.",
+        "alt": "Your portal: your studio’s name along the top with Home, Messages, Documents and Help, and a welcome that says where everything lives.",
+        "show": "/client.html"
+      }
+    },
+    {
+      "id": "phone-bar",
+      "date": "2026-11-11",
+      "who": ["studio", "client"],
+      "title": "A bar for phones",
+      "sentence": "On a phone, visitors can see Call, Directions, Hours and Email along the bottom of every page of a site. Switch it on in Edit site, under the footer.",
+      "picture": "/thumbs/whats-new/phone-bar.jpg",
+      "alt": "A sample restaurant’s website on a phone, with Call, Directions, Hours and Email along the bottom.",
+      "show": "/presence.html#design",
+      "client": {
+        "title": "A bar for phones on your website",
+        "sentence": "On a phone, your website can show Call, Directions, Hours and Email along the bottom of every page. Ask your studio to switch it on."
+      }
+    },
+    {
+      "id": "floating-editor",
+      "date": "2026-11-11",
+      "who": ["studio", "owner"],
+      "title": "Edit site has a new look",
+      "sentence": "One floating bar on top, your tools in a dock beside the page, and each section’s tools right beside it.",
+      "picture": "/thumbs/whats-new/floating-editor.jpg",
+      "alt": "Edit site on a sample restaurant’s website: one floating bar along the top, and the dock with Pages, Add, Styles, Photos, Notes and Find.",
+      "show": "/presence.html#design"
+    },
+    {
+      "id": "real-pictures",
+      "date": "2026-11-08",
+      "who": ["studio", "owner"],
+      "title": "Real pictures when you choose a template",
+      "sentence": "The template and section pickers show each one as it really looks, drawn on sample content.",
+      "picture": "/thumbs/whats-new/real-pictures.jpg",
+      "alt": "Three templates as the picker shows them, each drawn on the same sample restaurant.",
+      "show": "/presence.html#styles"
+    }
+  ]
+}

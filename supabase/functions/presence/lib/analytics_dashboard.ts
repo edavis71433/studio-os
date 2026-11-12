@@ -11,26 +11,67 @@ const DAY = 86_400_000;
 export const DASH_WEEKS = 12;                 // both line charts: weekly, last 12 weeks
 
 // ── period → range ──
-export type DashPeriod = 'this_month' | 'last_30' | 'quarter' | 'all';
-export const DASH_PERIODS: DashPeriod[] = ['this_month', 'last_30', 'quarter', 'all'];
+// Builder list item 175 (Nov 2026): Squarespace's date presets. The first four are the
+// segmented control's; the rest sit under More dates, with two dates picked by hand.
+export type DashPeriod = 'this_month' | 'last_30' | 'quarter' | 'all'
+  | 'today' | 'yesterday' | 'this_week' | 'last_week' | 'last_month' | 'this_year' | 'last_year' | 'custom';
+export const DASH_PERIODS: DashPeriod[] = ['this_month', 'last_30', 'quarter', 'all', 'today', 'yesterday', 'this_week', 'last_week', 'last_month', 'this_year', 'last_year', 'custom'];
 export const DASH_PERIOD_LABEL: Record<DashPeriod, string> = {
   this_month: 'This month', last_30: 'Last 30 days', quarter: 'This quarter', all: 'All time',
+  today: 'Today', yesterday: 'Yesterday', this_week: 'This week', last_week: 'Last week',
+  last_month: 'Last month', this_year: 'This year', last_year: 'Last year', custom: 'Dates you picked',
 };
+export const DASH_CUSTOM_MAX_DAYS = 3660;   // picked dates reach back ten years, like All time
 export function parseDashPeriod(raw: unknown): DashPeriod {
   return (DASH_PERIODS as string[]).includes(String(raw)) ? raw as DashPeriod : 'this_month';
 }
 
-/** The period's start (ms since epoch, UTC calendar boundaries) + its length in
- *  whole days (≥1 — a window of zero days would zero every aggregate on the 1st
- *  of the month). 'all' is honestly bounded at 10 years, not Infinity. */
-export function dashRange(period: DashPeriod, nowMs: number): { startMs: number; days: number } {
-  const d = new Date(nowMs);
-  if (period === 'last_30') return { startMs: nowMs - 30 * DAY, days: 30 };
-  if (period === 'all') return { startMs: nowMs - 3650 * DAY, days: 3650 };
-  const startMs = period === 'quarter'
-    ? Date.UTC(d.getUTCFullYear(), Math.floor(d.getUTCMonth() / 3) * 3, 1)
-    : Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), 1);
-  return { startMs, days: Math.max(1, Math.ceil((nowMs - startMs) / DAY)) };
+const ymd = (raw: unknown): [number, number, number] | null => {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(raw ?? ''));
+  if (!m) return null;
+  const y = +m[1], mo = +m[2], d = +m[3], t = new Date(Date.UTC(y, mo - 1, d));
+  return t.getUTCFullYear() === y && t.getUTCMonth() === mo - 1 && t.getUTCDate() === d ? [y, mo, d] : null;   // Feb 30 is not a day
+};
+/** The two dates picked by hand (YYYY-MM-DD, both days counted), or null when they don't
+ *  make a window: a date that doesn't exist, the end before the start, an end after today
+ *  on the caller's clock, or a start more than ten years back. Pure. */
+export function parseDashDates(from: unknown, to: unknown, nowMs: number, offsetMinutes: number | null = null): { from: string; to: string } | null {
+  const f = ymd(from), t = ymd(to);
+  if (!f || !t) return null;
+  const off = typeof offsetMinutes === 'number' && Number.isFinite(offsetMinutes) ? offsetMinutes : 0;
+  const wall = new Date(nowMs - off * 60_000);
+  const today = Date.UTC(wall.getUTCFullYear(), wall.getUTCMonth(), wall.getUTCDate());
+  const fd = Date.UTC(f[0], f[1] - 1, f[2]), td = Date.UTC(t[0], t[1] - 1, t[2]);
+  if (fd > td || td > today || today - fd > DASH_CUSTOM_MAX_DAYS * DAY) return null;
+  return { from: String(from), to: String(to) };
+}
+
+/** The window: its start, its end (now, for a window that runs to today), and its length
+ *  in whole days (≥1, as a window of zero days would zero every aggregate on the 1st of the
+ *  month). Calendar edges are midnights on the caller's clock when `offsetMinutes` is given
+ *  (getTimezoneOffset's minutes behind UTC, ?tzo=), else UTC; the offset is today's, so an
+ *  edge across a clock change can sit an hour out. Weeks start on Sunday, as US calendars
+ *  do. 'all' is honestly bounded at 10 years, not Infinity. 'custom' needs `from` and `to`
+ *  from parseDashDates; without them it is this month. */
+export function dashRange(period: DashPeriod, nowMs: number, o: { offsetMinutes?: number | null; from?: string; to?: string } = {}): { startMs: number; endMs: number; days: number } {
+  const off = typeof o.offsetMinutes === 'number' && Number.isFinite(o.offsetMinutes) ? o.offsetMinutes : 0;
+  const wall = new Date(nowMs - off * 60_000);   // the caller's wall clock, read with the UTC getters
+  const y = wall.getUTCFullYear(), m = wall.getUTCMonth(), d = wall.getUTCDate(), dow = wall.getUTCDay();
+  const at = (Y: number, M: number, D: number) => Date.UTC(Y, M, D) + off * 60_000;   // that midnight there, as an instant
+  const span = (startMs: number, endMs: number) => ({ startMs, endMs, days: Math.max(1, Math.ceil((endMs - startMs) / DAY)) });
+  if (period === 'last_30') return { startMs: nowMs - 30 * DAY, endMs: nowMs, days: 30 };
+  if (period === 'all') return { startMs: nowMs - 3650 * DAY, endMs: nowMs, days: 3650 };
+  if (period === 'today') return span(at(y, m, d), nowMs);
+  if (period === 'yesterday') return span(at(y, m, d - 1), at(y, m, d));
+  if (period === 'this_week') return span(at(y, m, d - dow), nowMs);
+  if (period === 'last_week') return span(at(y, m, d - dow - 7), at(y, m, d - dow));
+  if (period === 'last_month') return span(at(y, m - 1, 1), at(y, m, 1));
+  if (period === 'quarter') return span(at(y, Math.floor(m / 3) * 3, 1), nowMs);
+  if (period === 'this_year') return span(at(y, 0, 1), nowMs);
+  if (period === 'last_year') return span(at(y - 1, 0, 1), at(y, 0, 1));
+  const f = period === 'custom' ? ymd(o.from) : null, t = period === 'custom' ? ymd(o.to) : null;
+  if (f && t) return span(at(f[0], f[1] - 1, f[2]), Math.min(nowMs, at(t[0], t[1] - 1, t[2] + 1)));   // the end date is counted whole
+  return span(at(y, m, 1), nowMs);
 }
 
 /** An ISO stamp INSIDE the previous calendar month — feed it to summarizePipeline
@@ -93,10 +134,12 @@ export function sourceShares(
 // ── the period before this one (the "up 12%" on the Visitors tile) ──
 /** Where the comparison window starts: the same length of time, immediately before
  *  the current period, so the 5th of this month compares with the five days before
- *  it and never with a whole month. Null for 'all': nothing comes before it. */
-export function priorPeriodStart(period: DashPeriod, startMs: number, nowMs: number): number | null {
+ *  it and never with a whole month (and last week with the week before it). `endMs`
+ *  is the window's end: now, or where a past window stopped. Null for 'all': nothing
+ *  comes before it. */
+export function priorPeriodStart(period: DashPeriod, startMs: number, endMs: number): number | null {
   if (period === 'all') return null;
-  return startMs - Math.max(0, nowMs - startMs);
+  return startMs - Math.max(0, endMs - startMs);
 }
 
 /** Distinct visitors in [priorStartMs, startMs). The same counting as
@@ -126,8 +169,9 @@ export interface InvoiceBuckets {
 /** Bucket invoices for the donut. Paid = paid_at inside the period (period
  *  money, like the card's subtitle). Sent/overdue are POINT-IN-TIME (what's
  *  outstanding now): open + due_date before today = overdue, open otherwise =
- *  sent. Void rows are ignored. */
-export function invoiceBuckets(invoices: InvoiceRowForDash[], todayIsoDate: string, periodStartMs: number): InvoiceBuckets {
+ *  sent. Void rows are ignored. A window that ended (last month, say) passes its
+ *  end, so a payment after it isn't counted in it. */
+export function invoiceBuckets(invoices: InvoiceRowForDash[], todayIsoDate: string, periodStartMs: number, periodEndMs = Infinity): InvoiceBuckets {
   const out: InvoiceBuckets = { paid_cents: 0, sent_cents: 0, overdue_cents: 0, outstanding_cents: 0, paid_count: 0, sent_count: 0, overdue_count: 0 };
   for (const iv of invoices || []) {
     if (!iv || typeof iv !== 'object') continue;
@@ -135,7 +179,7 @@ export function invoiceBuckets(invoices: InvoiceRowForDash[], todayIsoDate: stri
     const status = String(iv.status || '');
     if (status === 'paid') {
       const t = Date.parse(String(iv.paid_at || ''));
-      if (Number.isFinite(t) && t >= periodStartMs) { out.paid_cents += amt; out.paid_count++; }
+      if (Number.isFinite(t) && t >= periodStartMs && t < periodEndMs) { out.paid_cents += amt; out.paid_count++; }
     } else if (status === 'open') {
       const overdue = !!iv.due_date && String(iv.due_date) < todayIsoDate;
       if (overdue) { out.overdue_cents += amt; out.overdue_count++; }
