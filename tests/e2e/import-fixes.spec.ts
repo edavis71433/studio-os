@@ -1,5 +1,6 @@
 import { test, expect, type Page } from '@playwright/test';
 import { installApp } from './helpers/app';
+import { headerAction } from './helpers/page-header';
 
 // List item 97 (Nov 10 bug hunt, B2 · B5 · B6 and two small ones): the CSV importers.
 // Contacts, Customers and Pipeline share one importer now (shell.js importPanel —
@@ -16,7 +17,7 @@ const toastWith = (page: Page, text: string) => page.locator('.dds-toast').filte
 const csvFile = (name: string, text: string) => ({ name, mimeType: 'text/csv', buffer: Buffer.from(text, 'utf8') });
 const openContactsImport = async (page: Page) => {
   await page.goto('/contacts.html');
-  await page.locator('#importCsv').click();
+  await (await headerAction(page, '#importCsv')).click();
   await expect(page.locator('#csvZone input[type=file]')).toBeVisible();
 };
 // POST /sales/contacts → a new contact each time (deduped:false). With a gate, every answer waits
@@ -114,11 +115,12 @@ test.describe('item 97 — Close stops a running import (B6)', () => {
     await page.locator('#csvZone').getByRole('button', { name: 'Import 40' }).click();
     await expect.poll(() => sent.length).toBe(5);                                                // five at a time, all five on their way
     await expect(page.locator('#csvZone input[type=file]')).toBeDisabled();                     // no second file under a running one
-    await page.locator('#importCsv').click();                                                    // Import CSV again: the running panel stays
+    await (await headerAction(page, '#importCsv')).click();                                                    // Import CSV again: the running panel stays
     await expect(page.locator('#csvZone .dds-csvgo')).toBeDisabled();
     await page.locator('#csvZone').getByRole('button', { name: 'Stop' }).click();
     await expect(page.locator('#csvZone input[type=file]')).toHaveCount(0);
-    await expect(page.locator('#importCsv')).toBeFocused();
+    // focus goes back to what opened it: Import CSV, or on a phone the header's ⋯ it sits behind (builder item 165)
+    await expect(page.locator((page.viewportSize()?.width || 0) < 761 ? 'header.dds-ph .dds-ph-dots' : '#importCsv')).toBeFocused();
     open();                                                                                      // the five on their way land
     await expect(toastWith(page, 'Stopped after 5 of 40 — 5 added.')).toBeVisible();
     await page.waitForTimeout(600);                                                              // a running import would have sent its next five by now

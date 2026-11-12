@@ -63,3 +63,17 @@ export async function expectOneHeader(page: Page, want: HeaderWant): Promise<voi
     await expect(head.locator('.dds-ph-more')).toBeHidden();
   }
 }
+
+/** Builder item 165: a header action other than the filled one sits in the header's row on a
+ *  computer and behind ⋯ on a phone. This opens ⋯ when the action is out of sight and hands
+ *  the action back, so a spec reaches it the way a person would on either screen. */
+export async function headerAction(page: Page, sel: string) {
+  const el = page.locator(sel).first();
+  await el.waitFor({ state: 'attached' });
+  if (!(await el.isVisible())) {
+    const dots = page.locator('header.dds-ph .dds-ph-dots');
+    const open = await page.locator('header.dds-ph .dds-ph-more').evaluate((m) => { try { return m.matches(':popover-open'); } catch { return false; } }).catch(() => false);
+    if (!open && await dots.isVisible()) await dots.click();
+  }
+  return page.locator(sel);
+}

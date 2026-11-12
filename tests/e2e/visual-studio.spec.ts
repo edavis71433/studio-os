@@ -1,6 +1,7 @@
 import { test, expect } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
 import { installApp } from './helpers/app';
+import { headerAction } from './helpers/page-header';
 
 // Visual Studio — the approved "make images" board over the EXISTING backend:
 // /visual/kinds (what you can make + whether it's switched on), /visual/generate,
@@ -30,7 +31,9 @@ test.describe('Visual Studio (the approved board)', () => {
     await expect(page.locator('#dds-shell .dds-nav')).toContainText('Files');
     await expect(page.getByRole('navigation', { name: 'Where this page is' }).getByRole('link', { name: 'Files' })).toHaveAttribute('href', '/files.html');   // builder item 165: the header's trail
     await expect(page.getByRole('heading', { level: 1, name: 'Visual Studio' })).toBeVisible();
+    await expect(await headerAction(page, '#uploadOwn')).toHaveText('Upload your own');   // builder item 165: the header's other action, behind ⋯ on a phone
     await expect(page.getByRole('link', { name: 'Upload your own' })).toHaveAttribute('href', '/files.html');
+    if (await page.locator('header.dds-ph .dds-ph-more').evaluate((m) => m.matches(':popover-open'))) await page.keyboard.press('Escape');
     // the pick cards ARE the server's kinds — label, purpose, aspect + size — as pressable buttons
     const kinds = page.locator('#kinds .kind');
     await expect(kinds).toHaveCount(4);

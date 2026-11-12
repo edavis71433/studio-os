@@ -332,6 +332,8 @@ const SUPABASE_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSI
 const FN=SUPABASE_URL+"/functions/v1/presence";
 const sb=supabase.createClient(SUPABASE_URL,SUPABASE_KEY,{auth:{storageKey:'dds-portal-auth',persistSession:true,autoRefreshToken:true}});
 const $=(id)=>document.getElementById(id);
+// builder item 165: on a phone the header's other actions sit in a sheet behind ⋯; picking one puts the sheet away
+document.addEventListener('click',(e)=>{const m=e.target&&e.target.closest?e.target.closest('.dds-ph-more'):null;if(!m||!e.target.closest('button,a'))return;try{if(m.matches(':popover-open'))m.hidePopover();}catch(_){/* no popover support: there is no sheet */}});
 const esc=(s)=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const scope=()=>new URLSearchParams(location.search).get('client')||'';
 let TOKEN="";

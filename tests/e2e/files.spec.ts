@@ -1,5 +1,6 @@
 import { test, expect, Page } from '@playwright/test';
 import { installApp } from './helpers/app';
+import { headerAction } from './helpers/page-header';
 
 // DAM-1 / Architecture v1.0 + SS1 (standards sweep) — the DAM presents as
 // "Files" and wears the one page header (builder item 165) with ↻ refresh, a
@@ -411,7 +412,7 @@ test.describe('Files (the DAM, customer-facing)', () => {
     await page.goto('/files.html');
     await expect(page.locator('.tscroll')).toBeVisible();
     await expect(page.locator('#dispTable')).toHaveAttribute('aria-pressed', 'true');
-    await page.locator('#dispGrid').click();
+    await (await headerAction(page, '#dispGrid')).click();
     await expect(page.locator('.grid')).toBeVisible();
     await expect(page.locator('.tscroll')).toHaveCount(0);
     await expect(page.locator('#dispGrid')).toHaveAttribute('aria-pressed', 'true');
@@ -519,7 +520,7 @@ test.describe('Files (the DAM, customer-facing)', () => {
     });
     await page.goto('/files.html');
     await expect(page.locator('#root')).toContainText('Logo');
-    await page.locator('#refreshBtn').click();
+    await (await headerAction(page, '#refreshBtn')).click();
     await page.waitForTimeout(300);   // give a wrong implementation time to wipe the page
     await expect(page.locator('#root')).toContainText('Logo');   // list kept
     await expect(page.locator('#root')).not.toContainText('We couldn’t load your files just now.');

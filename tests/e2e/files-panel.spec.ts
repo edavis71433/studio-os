@@ -1,6 +1,7 @@
 import { test, expect } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
 import { installApp } from './helpers/app';
+import { headerAction } from './helpers/page-header';
 
 // Bold redesign — Files, part 2 (Figma "11 · Files", Nov 2026): the open file.
 // On a computer it sits in a card beside the grid, not over it: the page makes
@@ -129,7 +130,7 @@ test.describe('Files — the open file (bold redesign, part 2)', () => {
     expect(reads).toBe(1);   // not twice (shell.js clicks role=button tiles on Enter too)
     await page.keyboard.press('Escape');
     await expect(tile).toBeFocused();
-    await page.locator('#selbtn').click();
+    await (await headerAction(page, '#selbtn')).click();
     const pick = page.locator(`.tile[data-pick="${TEAM.id}"]`);
     await pick.focus();
     await page.keyboard.press(' ');

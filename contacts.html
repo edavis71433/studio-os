@@ -387,6 +387,8 @@ const SUPABASE_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSI
 const FN=SUPABASE_URL+"/functions/v1/presence";
 const sb=supabase.createClient(SUPABASE_URL,SUPABASE_KEY,{auth:{storageKey:'dds-portal-auth',persistSession:true,autoRefreshToken:true}});
 const $=(id)=>document.getElementById(id);
+// builder item 165: on a phone the header's other actions sit in a sheet behind ⋯; picking one puts the sheet away
+document.addEventListener('click',(e)=>{const m=e.target&&e.target.closest?e.target.closest('.dds-ph-more'):null;if(!m||!e.target.closest('button,a'))return;try{if(m.matches(':popover-open'))m.hidePopover();}catch(_){/* no popover support: there is no sheet */}});
 const esc=(s)=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 let TOKEN="",ALL=[],Q="",LOADED_AT=0;
 // item 66: the roster comes 100 at a time (the server's page). TOTAL is how many it
@@ -1166,7 +1168,10 @@ function importTargets(){
 async function openImport(){
   const k=KIT(),z=$('csvZone');if(!k||!z)return;
   await loadFieldDefs().catch(()=>{});   // your own fields are columns an import can fill
-  k.importPanel(z,{back:'#importCsv',
+  // builder item 165: on a phone Import CSV sits in the header's ⋯ sheet, which closes once it is picked,
+  // so closing the panel gives focus back to the ⋯ that opened it
+  const inSheet=(()=>{try{return matchMedia('(max-width:760.98px)').matches&&CSS.supports('selector(:popover-open)');}catch(_){return false;}})();
+  k.importPanel(z,{back:inSheet?'header.dds-ph .dds-ph-dots':'#importCsv',
     title:'Import contacts from a CSV',
     help:'Export from anywhere (Google Contacts, Outlook, a spreadsheet, another tool). You pick where each column goes, and whether people already here (matched by email) are updated. An import can be undone for a day.',
     noun:'contact',

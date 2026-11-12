@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { installApp } from './helpers/app';
+import { headerAction } from './helpers/page-header';
 
 // Inbox — the split-view console (redesign slice 2). List pane of every
 // conversation (client messages · support · enquiries · approvals) with REAL
@@ -565,7 +566,7 @@ test.describe('Batch A regressions — inbox', () => {
     await expect(page.locator('#rows [role=option]').filter({ hasText: 'Sam Rivera' })).toBeVisible();
     // and a healthy load shows no notice
     await page.unroute('**/functions/v1/presence/portal/feed');
-    await page.locator('#refreshBtn').click();
+    await (await headerAction(page, '#refreshBtn')).click();
     await expect(notice).toBeHidden();
   });
 
@@ -845,7 +846,7 @@ test.describe('Inbox lenses — filter by client and by project without a profil
     expect(u.searchParams.get('client_id')).toBe('c-1');
     // the scoped read header still goes out with the scope on it
     const req = page.waitForRequest((r) => r.url().includes('/portal/feed'));
-    await page.locator('#refreshBtn').click();
+    await (await headerAction(page, '#refreshBtn')).click();
     expect((await req).headers()['x-dds-scope-site']).toBe('site-77');
     // clearing the lenses does not clear the tenant
     await page.locator('#fProject').selectOption(P1);

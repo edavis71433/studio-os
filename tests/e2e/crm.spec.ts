@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { installApp } from './helpers/app';
+import { headerAction } from './helpers/page-header';
 
 // CRM surfaces: website enquiries (the Inbox's Enquiries view) and the
 // relationship view (crm.html).
@@ -264,8 +265,8 @@ test.describe('Website enquiries (the Inbox’s Enquiries view)', () => {
     await expect(queue(page)).toContainText(['Boot Lead']);
     // two refreshes in quick succession: the FIRST response is delayed and lands
     // last — the page must keep the newest request's rows, not the stale ones
-    await page.locator('#refreshBtn').click();
-    await page.locator('#refreshBtn').click();
+    await (await headerAction(page, '#refreshBtn')).click();
+    await (await headerAction(page, '#refreshBtn')).click();
     await expect(queue(page)).toContainText(['Fresh Lead']);
     await page.waitForTimeout(900);   // let the stale response land
     await expect(queue(page)).toContainText(['Fresh Lead']);

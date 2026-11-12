@@ -1,5 +1,6 @@
 import { test, expect, type Page } from '@playwright/test';
 import { installApp, STUDIO_NAV, ALL_FEATURES } from './helpers/app';
+import { headerAction } from './helpers/page-header';
 
 // ── Sales list item 111: Projects and Analytics (bug hunt H1 to H11, I8, K7) ──
 // H2 + New project offers every customer on the studio's books. H3 a project's Support card
@@ -100,7 +101,7 @@ test.describe('Projects (item 111)', () => {
     await page.locator('#np-cancel').click();
     s.setCustomers([...roster(30), { client_id: C(99), name: 'Zed’s new shop', person_name: 'Zed', customer_site_id: null }]);
     if (await page.locator('.dds-ph-dots').isVisible() && !(await page.locator('#phMore').isVisible())) await page.locator('.dds-ph-dots').click();   // builder item 165: on a phone it waits behind ⋯
-    await page.locator('#refreshBtn').click();
+    await (await headerAction(page, '#refreshBtn')).click();
     await expect.poll(() => s.reads.filter((r) => r === '/studio/customers').length).toBe(2);
     await page.locator('#newProj, [data-new-project], button:has-text("New project")').first().click();
     await expect(opts).toHaveCount(32);
@@ -164,9 +165,9 @@ test.describe('Analytics (item 111)', () => {
     });
     await page.goto('/analytics.html');
     await expect(page.locator('#insightsBody')).toContainText('The first reading.');
-    await page.locator('#refreshBtn').click();
+    await (await headerAction(page, '#refreshBtn')).click();
     await expect(page.locator('#insightsBody')).toContainText('A newer reading.');
-    await page.locator('#refreshBtn').click();
+    await (await headerAction(page, '#refreshBtn')).click();
     await expect.poll(() => n).toBe(3);
     await expect(page.locator('#insightsBody')).toContainText('A newer reading.');   // kept, not "couldn't read"
   });
@@ -207,11 +208,11 @@ test.describe('Small ones (H11) and the add-a-customer dialog (K7)', () => {
       await installApp(page, { api: { '/portal/context': AGENCY_CTX, '/sales/contacts': { data: [], total: 0 } } });
       await page.route('**/presence/agency/kits', (route) => { kits++; return route.fulfill(json({ data: [{ id: 'k1', name: 'Restaurant kit' }] })); });
       await page.goto(pagePath);
-      const add = page.locator('#addCust').first();
-      await add.click();
+      // builder item 165: on Contacts + Add a customer waits behind the header's ⋯ on a phone
+      await (await headerAction(page, '#addCust')).first().click();
       await expect(page.locator('#cu-kit option')).toHaveCount(2);
       await page.keyboard.press('Escape');
-      await add.click();
+      await (await headerAction(page, '#addCust')).first().click();
       await expect(page.locator('#cu-kit option')).toHaveCount(2);
       expect(kits).toBe(1);
     });
