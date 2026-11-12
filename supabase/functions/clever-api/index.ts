@@ -6,7 +6,7 @@ import { corsFor, cors, CORS_ORIGINS } from '../_shared/cors.ts';
 import { json } from '../_shared/http.ts';
 import {
   verifyStaff, staffRevocation, atLeast, jwtIatMs,
-  resolvePrincipal, ROLE_RANK, type Principal, secondStepMissing,
+  resolvePrincipal, ROLE_RANK, type Principal,
 } from '../_shared/auth.ts';
 
 const RESEND_KEY = Deno.env.get('RESEND_KEY') || '';
