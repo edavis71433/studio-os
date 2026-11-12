@@ -153,7 +153,8 @@ async function flowDocuments(siteId: string, dealId: string): Promise<{ proposal
   // is between versions (Revise → v1 superseded, v2 still a draft), which must
   // read as PENDING, never as "no proposal". first_viewed_at/expires_at land
   // with migration 0107 — same tolerant read as the public view.
-  let pr = await svc(`presence_proposals?deal_id=eq.${dealId}&site_id=eq.${siteId}&deleted_at=is.null&select=id,title,line_items,subtotal_cents,currency,terms,status,first_viewed_at,expires_at&order=created_at.desc&limit=20`);
+  // sales item 88: sent_at and version too, for the page's "Prepared … · Version 2" line
+  let pr = await svc(`presence_proposals?deal_id=eq.${dealId}&site_id=eq.${siteId}&deleted_at=is.null&select=id,title,line_items,subtotal_cents,currency,terms,status,first_viewed_at,expires_at,sent_at,version&order=created_at.desc&limit=20`);
   if (!pr.ok) pr = await svc(`presence_proposals?deal_id=eq.${dealId}&site_id=eq.${siteId}&deleted_at=is.null&select=id,title,line_items,subtotal_cents,currency,terms,status&order=created_at.desc&limit=20`);
   const { proposal, pending } = currentProposal<any>(rows(pr));
   // sales item 88: the studio's countersignature lands with 0176 — tolerant read before it
@@ -2485,13 +2486,26 @@ async function pageSigner(siteId: string, contract: any): Promise<{ name: string
   if (contract.status === 'signed' && contract.countersigned_name) return { name: String(contract.countersigned_name), title: String(contract.countersigned_title || ''), business: now?.business || '' };
   return now;
 }
-async function askInfo(siteId: string, dealId: unknown): Promise<{ email: string; needs_email: boolean } | null> {
-  if (!UUID_RE.test(String(dealId || ''))) return null;
+// The deal's person, read once: where an answer to a question goes (masked), and who the
+// page is for ("Proposal for Corner Café", the agreement's two parties).
+async function pageContact(siteId: string, dealId: unknown): Promise<{ ask: { email: string; needs_email: boolean } | null; client: { name: string; business: string } | null }> {
+  if (!UUID_RE.test(String(dealId || ''))) return { ask: null, client: null };
   try {
     const deal = rows(await svc(`presence_deals?id=eq.${dealId}&site_id=eq.${siteId}&select=contact_id&limit=1`))[0];
-    const email = deal?.contact_id ? String(rows(await svc(`presence_contacts?id=eq.${deal.contact_id}&site_id=eq.${siteId}&select=email&limit=1`))[0]?.email || '') : '';
-    return { email: maskEmail(email), needs_email: !email };
-  } catch { return null; }
+    const c = deal?.contact_id ? rows(await svc(`presence_contacts?id=eq.${deal.contact_id}&site_id=eq.${siteId}&select=name,email,company&limit=1`))[0] : null;
+    const email = String(c?.email || '');
+    const client = c ? { name: String(c.name || '').trim().slice(0, 120), business: String(c.company || '').trim().slice(0, 120) } : null;
+    return { ask: { email: maskEmail(email), needs_email: !email }, client: client && (client.name || client.business) ? client : null };
+  } catch { return { ask: null, client: null }; }
+}
+// A signed agreement's PDF, for the page's Download the PDF (the same document the signed-copy
+// email attaches). Opening it is not the emailed copy being opened, so no `e`.
+async function signedPdfUrl(siteId: string, contract: any): Promise<string | null> {
+  if (contract?.status !== 'signed' || !UUID_RE.test(String(contract?.id || ''))) return null;
+  const secret = linkSecret();
+  if (!secret) return null;
+  const token = await signDocToken({ t: 'doc', k: 'contract', id: String(contract.id), site_id: siteId, exp: Math.floor(Date.now() / 1000) + 90 * 86400 }, secret);
+  return `${fnBase()}/functions/v1/presence/sales/doc/${encodeURIComponent(token)}?format=pdf`;
 }
 
 /** Sales item 106: the parts of a paid-in-parts proposal after the first become invoices once
@@ -2554,16 +2568,16 @@ export async function handleSalesPublicView(req: Request, token: string, cors: R
     } catch { /* optional — the page says "nothing to pay right now" */ }
     await Promise.all(opens);
     const expired = !!(proposal?.expires_at && String(proposal.expires_at) < nowIso());
-    const [signer, ask] = await Promise.all([pageSigner(tok.site_id, contractOut), askInfo(tok.site_id, tok.id)]);
+    const [signer, pc, pdfUrl] = await Promise.all([pageSigner(tok.site_id, contractOut), pageContact(tok.site_id, tok.id), signedPdfUrl(tok.site_id, contractOut)]);
     // sales item 106: how they'll pay, part by part, when the proposal is paid in parts
     const schedule = proposal ? scheduleView(splitLineItems(proposal.line_items).meta.schedule ?? null, proposalTotals(proposal.line_items).total_cents) : null;
-    return json({ data: { kind: 'flow', brand, deal: { id: deal.id, title: deal.title }, proposal: proposal ? { ...proposal, expired, schedule } : null, proposal_pending, contract: contractOut, contract_pending, deposit, studio_signer: signer, ask } }, 200, cors);
+    return json({ data: { kind: 'flow', brand, deal: { id: deal.id, title: deal.title }, proposal: proposal ? { ...proposal, expired, schedule } : null, proposal_pending, contract: contractOut && pdfUrl ? { ...contractOut, pdf_url: pdfUrl } : contractOut, contract_pending, deposit, studio_signer: signer, ask: pc.ask, client: pc.client } }, 200, cors);
   }
   if (tok.t === 'proposal') {
     // first_viewed_at/expires_at land with migration 0107 — try the full select, fall
     // back to the pre-0107 shape so a deploy ahead of the migration never breaks the
     // public proposal view.
-    let pr = await svc(`presence_proposals?id=eq.${tok.id}&site_id=eq.${tok.site_id}&deleted_at=is.null&select=id,deal_id,title,line_items,subtotal_cents,currency,terms,status,first_viewed_at,expires_at&limit=1`);
+    let pr = await svc(`presence_proposals?id=eq.${tok.id}&site_id=eq.${tok.site_id}&deleted_at=is.null&select=id,deal_id,title,line_items,subtotal_cents,currency,terms,status,first_viewed_at,expires_at,sent_at,version&limit=1`);
     if (!pr.ok) pr = await svc(`presence_proposals?id=eq.${tok.id}&site_id=eq.${tok.site_id}&deleted_at=is.null&select=id,deal_id,title,line_items,subtotal_cents,currency,terms,status&limit=1`);
     const { deal_id: propDeal, ...p } = rows(pr)[0] || {} as any;
     if (!p.id) return json({ error: 'not_found' }, 404, cors);
@@ -2572,7 +2586,8 @@ export async function handleSalesPublicView(req: Request, token: string, cors: R
     if (!p.first_viewed_at) await firstOpen('presence_proposals', tok.id, tok.site_id, propDeal, 'proposal');
     const expired = !!(p.expires_at && String(p.expires_at) < nowIso());
     const schedule = scheduleView(splitLineItems(p.line_items).meta.schedule ?? null, proposalTotals(p.line_items).total_cents);   // sales item 106
-    return json({ data: { kind: 'proposal', brand, expired, ...p, schedule, ask: await askInfo(tok.site_id, propDeal) } }, 200, cors);
+    const pc = await pageContact(tok.site_id, propDeal);
+    return json({ data: { kind: 'proposal', brand, expired, ...p, schedule, ask: pc.ask, client: pc.client } }, 200, cors);
   }
   // sales item 88: the countersignature (0176) — tolerant read before it
   let cq = await svc(`presence_contracts?id=eq.${tok.id}&site_id=eq.${tok.site_id}&deleted_at=is.null&select=id,deal_id,title,body,content_hash,status,signed_at,signer_name,signer_email,countersigned_name,countersigned_title,countersigned_at&limit=1`);
@@ -2580,8 +2595,8 @@ export async function handleSalesPublicView(req: Request, token: string, cors: R
   const { deal_id: conDeal, ...c } = rows(cq)[0] || {} as any;
   if (!c.id) return json({ error: 'not_found' }, 404, cors);
   await firstOpen('presence_contracts', tok.id, tok.site_id, conDeal, 'agreement');   // item 69
-  const [cSigner, cAsk] = await Promise.all([pageSigner(tok.site_id, c), askInfo(tok.site_id, conDeal)]);
-  return json({ data: { kind: 'contract', brand, ...c, studio_signer: cSigner, ask: cAsk } }, 200, cors); // content_hash is presented back on sign (version integrity)
+  const [cSigner, cPc, cPdf] = await Promise.all([pageSigner(tok.site_id, c), pageContact(tok.site_id, conDeal), signedPdfUrl(tok.site_id, c)]);
+  return json({ data: { kind: 'contract', brand, ...c, ...(cPdf ? { pdf_url: cPdf } : {}), studio_signer: cSigner, ask: cPc.ask, client: cPc.client } }, 200, cors); // content_hash is presented back on sign (version integrity)
 }
 
 // ═══ BRANDED DOCUMENT OF RECORD (token) — a printable, keepable copy ═════════

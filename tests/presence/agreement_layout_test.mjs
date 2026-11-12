@@ -9,6 +9,7 @@ import {
 import { renderContractDocument, signaturesHtml } from '../../supabase/functions/presence/lib/documents.ts';
 import { contractPdf } from '../../supabase/functions/presence/lib/doc_pdf.ts';
 import { describeSystemEvent } from '../../supabase/functions/presence/crm/deal_activity.ts';
+import { scheduleView, scheduleSummary, stagesAfterSigning } from '../../supabase/functions/presence/lib/proposal_schedule.ts';
 
 const ROOT = new URL('../../', import.meta.url);
 const read = (p) => Deno.readTextFileSync(new URL(p, ROOT));
@@ -117,13 +118,61 @@ Client:         Corner Café
   ok('decide: the studio is emailed once, with what would make it a yes', /const fresh = st\?\.client_id \? await raiseNotice\(/.test(sales) && /if \(fresh\) \{[\s\S]{0,400}await emailOperator\(tok\.site_id, `They passed on the proposal/.test(sales));
   ok('sign: the email is required', /if \(!validSignerEmail\(signerEmail\)\) return json\(\{ error: 'email_needed'/.test(sales));
   ok('sign: the countersignature goes in the same write, same moment; without 0176 the signature still stands', /countersigned_name: counter\.name, countersigned_title: counter\.title, countersigned_at: signedAt/.test(sales) && /if \(!up\.ok && up\.status === 400 && counter && counter\.name\) up = await svc\(signUrl/.test(sales));
-  ok('the page learns who signs for the studio, and where an answer goes', /studio_signer: signer, ask \}/.test(sales) && /studio_signer: cSigner, ask: cAsk/.test(sales));
+  ok('the page learns who signs for the studio, where an answer goes and who it is for', /studio_signer: signer, ask: pc\.ask, client: pc\.client \}/.test(sales) && /ask: pc\.ask, client: pc\.client \} \}, 200, cors\)/.test(sales) && /studio_signer: cSigner, ask: cPc\.ask, client: cPc\.client/.test(sales));
+  const contact = sales.slice(sales.indexOf('async function pageContact('), sales.indexOf('async function signedPdfUrl('));
+  ok('the deal\'s person is read once: their email masked, their name and business for the page', /select=name,email,company&limit=1/.test(contact) && /ask: \{ email: maskEmail\(email\), needs_email: !email \}/.test(contact) && !/askInfo/.test(sales));
+  const pdf = sales.slice(sales.indexOf('async function signedPdfUrl('), sales.indexOf('/** Sales item 106: the parts of a paid-in-parts'));
+  ok('a signed agreement brings its PDF link, and only a signed one', /if \(contract\?\.status !== 'signed'/.test(pdf) && /k: 'contract'/.test(pdf) && /\?format=pdf`/.test(pdf) && !/ e: 1/.test(pdf) && /pdf_url: pdfUrl/.test(sales) && /pdf_url: cPdf/.test(sales));
+  ok('the proposal brings when it was sent and its version ("Prepared … · Version 2")', /expires_at,sent_at,version&order=created_at\.desc&limit=20/.test(sales) && /first_viewed_at,expires_at,sent_at,version&limit=1/.test(sales));
   const ans = read('supabase/functions/presence/routes/proposal_answers.ts');
   ok('ask: rate-limited by address and by deal, a double tap lands once', /rateAllow\(`sales_ask:\$\{clientIp\(req\)\}`, 6, 600\)/.test(ans) && /rateAllow\(`sales_ask_deal:\$\{about\.dealId\}`, 12, 86400\)/.test(ans) && /isUniqueViolation\(ins\)\) return json\(\{ data: \{ sent: true, already: true \} \}/.test(ans));
   ok('ask: a support request from the deal\'s person, the deal\'s history, and the studio told', /requester: email, requester_kind: 'client'/.test(ans) && /dealEvent\(siteId, about\.dealId, 'client_question'/.test(ans) && /notifyStudioOfClientAction\(\{/.test(ans));
   ok('index.ts: POST /sales/ask is public, beside decide and sign', /if \(route === '\/sales\/ask' && method === 'POST'\) return \(await import\('\.\/routes\/proposal_answers\.ts'\)\)\.handleSalesAsk\(req, cors\);/.test(read('supabase/functions/presence/index.ts')));
   const mig = read('supabase/migrations/0176_proposal_answers_signed_by_both.sql');
   ok('0176: the columns, and the kind list carries 0167\'s plus client_question', /decided_reason text not null default ''/.test(mig) && /countersigned_at timestamptz/.test(mig) && /signs_as_name text not null default ''/.test(mig) && /'payment_undone',\s*-- added by 0176:\s*'client_question'/.test(mig));
+}
+
+// ═══ 7. the client's page (sign.html) lays it out the same way, and words it plainly ═══
+{
+  const page = read('sign.html');
+  const between = (a, b) => { const i = page.indexOf(a), j = page.indexOf(b, i); return i >= 0 && j > i ? page.slice(i, j) : ''; };
+  const mirrorsSrc = between('// ── mirrors of lib/agreement_layout.ts', '// ── end of the mirrors ──');
+  const wordsSrc = between('// ── the page\'s own words', '// ── end of the page\'s words ──');
+  ok('the page carries the mirrors and its own words, marked', !!mirrorsSrc && !!wordsSrc);
+  const P = new Function(`${wordsSrc}\n${mirrorsSrc}\nreturn { money, headingCase, pillHtml, laterWhen, railGroups, agreementBlocks, agreementContents, REASONS };`)();
+  const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+  const sample = `PROJECT AGREEMENT\n\n1. SCOPE OF WORK\nWords.\n\n2. PAYMENT TERMS\n(a) one\nb) two\n- three\n• four\n\n11. Severability.  If any provision is held invalid, the rest stands.\n\nTHE SITE BUILD\nStudio:   Brightline Studio\r\nClient:   Corner Café\n\n3. The client pays within 14 days.`;
+  ok('mirror: the same blocks as the server, the sample and the edges', [sample, '', null, 'Just words', '1. SCOPE\n\n(a) x', '\r\n\r\n'].every((b) => same(P.agreementBlocks(b), agreementBlocks(b))));
+  const pipe = read('pipeline.html');
+  const start = pipe.indexOf('const DDS_AGREEMENT_LEGAL=`');
+  const end = pipe.indexOf('\n', pipe.indexOf('Object.keys(DDS_AGREEMENT_PACKAGES).forEach'));
+  const PK = new Function(pipe.slice(start, end) + '\nreturn DDS_AGREEMENT_PACKAGES;')();
+  const legal = pipe.match(/const DDS_AGREEMENT_LEGAL=`([\s\S]*?)`;/)[1];
+  const bodies = [legal, ...Object.values(PK).map((p) => p.body)];
+  ok(`mirror: every one of the studio's ${bodies.length} agreements lays out exactly as the server lays it out`, bodies.length >= 4 && bodies.every((b) => same(P.agreementBlocks(b), agreementBlocks(b)) && same(P.agreementContents(P.agreementBlocks(b)), agreementContents(agreementBlocks(b)))));
+  ok('mirror: the four reasons, in order, as the server takes them', same(P.REASONS, Object.entries(DECLINE_REASONS)));
+  // the contents beside it: the scope's numbered sections, then the terms', each under its own name
+  const g = P.railGroups(P.agreementContents(P.agreementBlocks(PK.growth.body)));
+  ok('contents: a package reads as its scope of work, then its terms, numbered as written', g.length === 2 && g[0].label?.text === 'SCOPE OF WORK — GROWTH PACKAGE' && g[0].items.length === 11 && g[1].label?.text === 'PROJECT AGREEMENT' && g[1].items.length === 19 && g[1].items[0].n === '1', JSON.stringify(g.map((x) => [x.label?.text, x.items.length])));
+  const gl = P.railGroups(P.agreementContents(P.agreementBlocks(legal)));
+  ok('contents: the terms alone are one list with no heading of their own', gl.length === 1 && gl[0].label === null && gl[0].items.length === 19);
+  ok('contents: a text with no numbers lists its headings', same(P.railGroups([{ id: 's1', n: null, text: 'A' }]), [{ label: null, items: [{ id: 's1', n: null, text: 'A' }] }]) && same(P.railGroups([]), []));
+  ok('headings in capitals read as words, short names keep theirs', P.headingCase('SCOPE OF WORK') === 'Scope of work' && P.headingCase('SEO AND VISIBILITY') === 'SEO and visibility' && P.headingCase('THIRD-PARTY TOOLS & PLATFORMS') === 'Third-party tools & platforms' && P.headingCase("WHAT'S INCLUDED IN THIS PACKAGE") === "What's included in this package" && P.headingCase('Severability') === 'Severability' && P.headingCase('') === '');
+  ok('money: whole dollars without cents, the rest with', P.money(480000) === '$4,800' && P.money(123450) === '$1,234.50' && P.money(5) === '$0.05' && P.money(0) === '$0' && P.money('x') === '$0');
+  // sales item 106: the header's line under the total is the server's own summary
+  const rows = (parts, total) => scheduleView(parts, total);
+  const strip = (h) => h.replace(/<[^>]+>/g, '');
+  const thirds = rows([{ pct: 34, when: 'sign' }, { pct: 33, when: 'date', date: '2026-12-15' }, { pct: 33, when: 'done' }], 480000);
+  const later = rows([{ pct: 50, when: 'days', days: 30 }, { pct: 50, when: 'done' }], 480000);
+  ok('parts: "Paid in 3 parts · $1,632 when you sign", word for word the server\'s summary', strip(P.pillHtml(thirds)) === scheduleSummary(thirds, P.money) && strip(P.pillHtml(thirds)) === 'Paid in 3 parts · $1,632 when you sign' && strip(P.pillHtml(later)) === scheduleSummary(later, P.money) && P.pillHtml(null) === '');
+  const signedAt = '2026-11-11T23:42:00Z';
+  const minted = stagesAfterSigning([{ pct: 50, when: 'days', days: 30 }, { pct: 50, when: 'date', date: '2026-12-15' }], 480000, signedAt.slice(0, 10));
+  ok('parts: a part due days after signing is dated as the invoice is', P.laterWhen(later[0], signedAt) === 'by Dec 11, 2026' && minted[0].due_date === '2026-12-11' && P.laterWhen(thirds[1], signedAt) === 'by Dec 15, 2026' && P.laterWhen(thirds[2], signedAt) === 'when the work is done' && P.laterWhen(later[0], '') === '30 days after you sign');
+  // the page itself
+  ok('page: the decline sheet sends a reason and a note only when given', page.includes("const body={token:TOKEN,decision:'declined'};if(reason)body.reason=reason;if(note)body.note=note;"));
+  ok('page: a question goes to POST /sales/ask with the link, a once-only key and which document', page.includes("const payload={token:TOKEN,body:text,key,kind};if(em)payload.email=em;") && page.includes("api('/sales/ask','POST',payload)"));
+  ok('page: the studio\'s signature shows before they sign, and says it lands with theirs', page.includes('Signs automatically the moment you sign, with the same date and time. Nothing else to wait for.'));
+  ok('page: signed by both, the PDF to download, the fingerprint kept', page.includes("${both?'Signed by both of you':'Signed'} on ") && page.includes('Download the PDF') && page.includes('Fingerprint of the signed text'));
 }
 
 const passed = results.filter((r) => r.p).length;
