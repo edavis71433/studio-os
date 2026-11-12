@@ -124,6 +124,8 @@ function portalGreeting(h,name){const g=h<12?'Good morning':h<18?'Good afternoon
 function snapWaiting(s){return((s&&s.approvals)||[]).length+((s&&s.todos)||[]).length;}
 function fmtMoney(n){n=Number(n)||0;return'$'+n.toLocaleString('en-US',{minimumFractionDigits:Number.isInteger(n)?0:2,maximumFractionDigits:2});}
 function projectWord(s){s=String(s||'');return({active:'In progress',on_hold:'On hold',complete:'Done',archived:'Closed'})[s]||s.replace(/_/g,' ');}
+function todoKind(t){const k=String((t&&t.source)||'').replace(/^checklist:/,'');return k==='questionnaire_returned'?'questionnaire':k==='content_received'?'content':k==='client_review'?'review':'task';}
+function questionnaireOf(surveys){return (surveys||[]).find(s=>s&&/questionnaire|intake|brief/i.test(String(s.title||'')))||null;}
 // item 179 (direction A): the at-a-glance strip left Home — its numbers live in
 // the bell badge and the "Needs you · N" heading (the queue's own length), so
 // glanceData/glanceTiles are gone from client.html and from these mirrors.
@@ -133,8 +135,13 @@ function needsYouItems(feed,snaps,billing){
   for(const s of (snaps||[])){
     if(!s)continue;
     for(const a of (s.approvals||[]))items.push({kind:'approval',s,a});
-    if((s.todos||[]).length)items.push({kind:'todos',s});
-    for(const sv of (s.surveys||[]))items.push({kind:'survey',s,sv});
+    // item 179: one row per to-do, each with its own verb. A draft waiting for an OK
+    // stands in for "Review the design draft", and the questionnaire's survey rides
+    // on its to-do instead of being a second row.
+    const draftWaiting=(s.approvals||[]).some(a=>a&&a.subject_type==='website');
+    const q=(s.todos||[]).some(t=>todoKind(t)==='questionnaire')?questionnaireOf(s.surveys):null;
+    for(const t of (s.todos||[]))if(t&&!(draftWaiting&&todoKind(t)==='review'))items.push({kind:'todo',s,t});
+    for(const sv of (s.surveys||[]))if(sv&&!(q&&sv.id===q.id))items.push({kind:'survey',s,sv});
   }
   for(const i of unpaidInvoices(billing))items.push({kind:'invoice',i});
   return items;
@@ -271,9 +278,17 @@ ok('projectWord: every known status in words; unknown ones lose their underscore
 {
   const items=needsYouItems(FEED,SNAPS,BILLING);
   ok('needsYou: rows in queue order — feed approvals · per-project approvals/to-dos/surveys · unpaid invoices',
-    JSON.stringify(items.map(i=>i.kind))===JSON.stringify(['feed','approval','approval','todos','invoice','invoice']));
-  ok('needsYou: to-dos collapse to ONE row per project; surveys get a row each',
-    needsYouItems(null,[{approvals:[],todos:[1,2,3],surveys:[{id:'sv1'},{id:'sv2'}]}],null).map(i=>i.kind).join()==='todos,survey,survey');
+    JSON.stringify(items.map(i=>i.kind))===JSON.stringify(['feed','approval','approval','todo','invoice','invoice']));
+  ok('needsYou (item 179): each to-do is its own row with its own verb; surveys get a row each',
+    needsYouItems(null,[{approvals:[],todos:[{id:'t1'},{id:'t2'},{id:'t3'}],surveys:[{id:'sv1'},{id:'sv2'}]}],null).map(i=>i.kind).join()==='todo,todo,todo,survey,survey');
+  const REVIEW={id:'c3',source:'checklist:client_review'},QUEST={id:'c1',source:'checklist:questionnaire_returned'};
+  ok('needsYou (item 179): a draft waiting for an OK stands in for "Review the design draft"',
+    needsYouItems(null,[{approvals:[{id:'a9',subject_type:'website'}],todos:[REVIEW]}],null).map(i=>i.kind).join()==='approval'
+    && needsYouItems(null,[{approvals:[],todos:[REVIEW]}],null).map(i=>i.kind).join()==='todo');
+  ok('needsYou (item 179): the questionnaire\'s survey rides on its to-do, other surveys keep their rows',
+    needsYouItems(null,[{approvals:[],todos:[QUEST],surveys:[{id:'q1',title:'Project questionnaire'},{id:'s2',title:'How did we do?'}]}],null).map(i=>i.kind+':'+((i.t&&i.t.id)||(i.sv&&i.sv.id))).join()==='todo:c1,survey:s2');
+  ok('todoKind: the three checklist asks by their source, anything else a plain to-do',
+    [QUEST,{source:'checklist:content_received'},REVIEW,{source:'checklist:handover'},{source:'manual'},null].map(todoKind).join()==='questionnaire,content,review,task,task,task');
   ok('needsYou: paid/void/canceled invoices add no rows; billing=null adds none (the failed-read contract)',
     needsYouItems(null,[],{invoices:[{id:'x',status:'paid'},{id:'y',status:'void'}]}).length===0
     && needsYouItems(FEED,SNAPS,null).length===4);
@@ -307,8 +322,8 @@ for(const fn of ['greet','dateLine','monthTiles','monthTrend','siteYmd','todaySl
   ok(`mirror: today.html defines ${fn} verbatim`,today.includes(m));
 }
 ok('mirror: today.html defines money verbatim',today.includes(String(money)));
-for(const fn of ['portalGreeting','snapWaiting','fmtMoney','projectWord','needsYouItems','bellSinceLabel','momentIcon']){
-  const m=String({portalGreeting,snapWaiting,fmtMoney,projectWord,needsYouItems,bellSinceLabel,momentIcon}[fn]);
+for(const fn of ['portalGreeting','snapWaiting','fmtMoney','projectWord','todoKind','questionnaireOf','needsYouItems','bellSinceLabel','momentIcon']){
+  const m=String({portalGreeting,snapWaiting,fmtMoney,projectWord,todoKind,questionnaireOf,needsYouItems,bellSinceLabel,momentIcon}[fn]);
   ok(`mirror: client.html defines ${fn} verbatim`,portal.includes(m));
 }
 
@@ -353,7 +368,7 @@ ok('today: a late Waiting-on-clients card revives a collapsed rail',
   /host\.hidden=false;[\s\S]{0,200}getElementById\('col-rail'\)[\s\S]{0,120}classList\.remove\('norail'\)/.test(today));
 
 ok('portal: the Home headline is the time-of-day greeting, in the studio-coloured hero (item 179)',
-  portal.includes('portalGreeting(new Date().getHours(),firstName(USER))')
+  portal.includes('portalGreeting(new Date().getHours(),clientName())')
   && portal.includes('class="phero" id="home-hero"')
   && portal.includes('Here’s where your website and projects stand.')
   && portal.includes('Everything your studio shares with you, in one place.'));
@@ -419,9 +434,12 @@ ok('portal: a failed website-stats read is never cached (false sentinel + cleare
   && portal.includes('PORTAL.wstatsFetch=null;   // settled'));
 ok('portal: queue rows lead with an aria-hidden type icon (action-feed anatomy)',
   /<span class="qico[^"]*" aria-hidden="true">/.test(portal));
-ok('portal: explicit CTAs whose accessible names keep the row title',
-  portal.includes('aria-label="Approve — ') && portal.includes('aria-label="See it first — ') && portal.includes('aria-label="View &amp; pay — ')
-  && portal.includes('aria-label="Open to-dos — '));
+ok('portal: explicit CTAs whose accessible names keep the row title (item 179: one verb a row, and it opens the thing)',
+  portal.includes('aria-label="Open — ${esc(ttl)}">Open</button>') && portal.includes('aria-label="${verb} — ${esc(t.title||\'A to-do\')}">${verb}</button>')
+  && portal.includes('aria-label="Pay — ') && portal.includes('aria-label="Start — ')
+  && !portal.includes('data-qapr') && !portal.includes('Open to-dos'));
+ok('portal (item 179): the greeting uses the name on the studio\'s record before the sign-in\'s',
+  portal.includes("function clientName(){const n=PORTAL.ctx&&PORTAL.ctx.client_first_name;return (typeof n==='string'&&n.trim())?n.trim():firstName(USER);}"));
 // PS3 (D1a): the queue renders FROM needsYouItems — the same array whose
 // length the heading shows; the bell panel labels the badge's own number in words.
 ok('portal (D1a): queue rows come from needsYouItems',

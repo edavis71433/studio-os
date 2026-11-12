@@ -336,7 +336,7 @@ const subEvent = (id, over = {}) => ({ id, object: 'subscription', status: 'acti
   ok('index: the client cancel route', /\\\/client\\\/retainers\\\/\(\[0-9a-f-\]\{36\}\)\\\/cancel\$/.test(idx) && /handleClientRetainerCancel\(req, site, principal, m\[1\], cors\)/.test(idx));
   const page = read('client.html');
   ok('portal page: the retainer card, its charges, and a cancel that asks first and says nothing is refunded', /function retainerCardHtml\(r\)/.test(page) && /aria-label="Charges so far"/.test(page) && /data-ret-ask>Cancel retainer</.test(page) && /It stops future charges\. Charges already made are not refunded\./.test(page) && /api\('\/client\/retainers\/'\+encodeURIComponent\(id\)\+'\/cancel','POST',\{\}\)/.test(page));
-  ok('portal page: a retainer with no invoices is not "No invoices yet"', /html\+=rets\.length\?'':emptyCard\('No invoices yet\./.test(page));
+  ok('portal page: a retainer with no invoices is not "No invoices yet"', /if\(!list\.length&&!failed&&!rets\.length\)html\+=emptyCard\(/.test(page) && /const rets=shows\('invoices'\)&&!billFailed\?/.test(page));
 }
 
 // ═══ 118 · a reminder is sent only once the email left (finding 8) ═══

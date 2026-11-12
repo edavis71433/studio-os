@@ -99,10 +99,10 @@ const NO_CONTROL = {
   'DELETE /projects/:id/deliverables/:id2': /\/deliverables\/[^\n]*DELETE|DELETE[^\n]*\/deliverables\//,
 };
 // Sales item 117: the client portal has no shell and no data-needs marks. Its one owner-only
-// control, Cancel retainer, sits on the Invoices tab, which draws nothing of billing for anyone
+// control, Cancel retainer, sits on the Documents shelf, which draws nothing of billing for anyone
 // but the client themself; the server's gate refuses any other seat.
 const PORTAL_OWNER_ONLY = {
-  'POST /client/retainers/:id/cancel': { page: 'client.html', call: `api('/client/retainers/'+encodeURIComponent(id)+'/cancel','POST',{})`, guard: `if(PORTAL.persona!=='client'){ // reviewer: /client/billing is 403 server-side` },
+  'POST /client/retainers/:id/cancel': { page: 'client.html', call: `api('/client/retainers/'+encodeURIComponent(id)+'/cancel','POST',{})`, guard: `if(PORTAL.persona!=='client'){ // reviewer: /client/* is 403 server-side — the calm read-only state, NO fetches, never an error line; money lives with the account owner` },
 };
 const PAGES = [...Deno.readDirSync(ROOT)].filter((f) => f.isFile && /\.(html|js)$/.test(f.name)).map((f) => f.name);
 const SOURCE = Object.fromEntries(PAGES.map((p) => [p, read(p)]));
@@ -132,7 +132,7 @@ const SOURCE = Object.fromEntries(PAGES.map((p) => [p, read(p)]));
   const open = routes.filter((r) => !covered.has(r) && !NO_CONTROL[r] && !PORTAL_OWNER_ONLY[r]);
   for (const [route, c] of Object.entries(PORTAL_OWNER_ONLY)) {
     const src = SOURCE[c.page];
-    ok(`${route}: offered only inside the portal's client-only Invoices tab`, count(src, c.call) === 1 && src.indexOf(c.guard) > src.indexOf('async function renderInvoices(){') && src.indexOf(c.guard) < src.indexOf('const rets=((b&&b.retainers)||[])') && PAGES.filter((p) => SOURCE[p].includes('/client/retainers/')).join() === c.page);
+    ok(`${route}: offered only on the portal's client-only Documents shelf`, count(src, c.call) === 1 && src.indexOf(c.guard) > src.indexOf('async function renderDocuments(){') && src.indexOf(c.guard) < src.indexOf('  paintShelf();\n') && count(src, 'wireRetainers();') === 1 && src.indexOf('  wireRetainers();') > src.indexOf('function paintShelf(){') && PAGES.filter((p) => SOURCE[p].includes('/client/retainers/')).join() === c.page);
   }
   ok('every decided delete and configure route is accounted for here', open.length === 0, open.join(', '));
   for (const [route, rx] of Object.entries(NO_CONTROL)) {
