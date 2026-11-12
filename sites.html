@@ -1593,7 +1593,7 @@ $('invForm').onsubmit=async(e)=>{
   $('inv-fields').style.display='none';
   const done=$('inv-done');
   done.innerHTML=`<div class="done"><div class="tick" aria-hidden="true">✓</div><h3 style="margin:0 0 4px">${d.invited===false?'Their sign-in is ready':'Invitation sent'}</h3>`
-    +`<p>${d.invited===false?'Our email to '+esc(email)+' didn’t go out. Share their sign-in page with them instead.':esc(who)+' will get an email at '+esc(email)+' with a sign-in link to their client portal.'}</p><p>${esc(s.name||'This business')} is now one of your customers.</p></div>`
+    +`<p>${d.invited===false?'Our email to '+esc(email)+' didn’t go out. Share their sign-in page with them instead.'+(/^https:\/\//.test(d.portal_url||'')?' <a class="link" href="'+esc(d.portal_url)+'" target="_blank" rel="noopener">Their sign-in page →</a>':''):esc(who)+' will get an email at '+esc(email)+' with a sign-in link to their client portal.'}</p><p>${esc(s.name||'This business')} is now one of your customers.</p></div>`
     +'<div class="row2"><button type="button" class="btn" id="inv-close">Done</button></div>';
   done.style.display='';
   const cl=$('inv-close');cl.focus();cl.onclick=()=>$('invDlg').close();
