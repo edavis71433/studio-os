@@ -28,7 +28,7 @@ ok('setup: project created', proj.status === 201 && projectId);
 // ── deliverable: upload URL (reuses media store) → attach → bundle → download ──
 const pdf = new TextEncoder().encode('%PDF-1.4\n1 0 obj<<>>endobj\ntrailer<<>>\n%%EOF');
 const up = await A(`/projects/${projectId}/deliverables/upload-url`, 'POST', { mime: 'application/pdf', bytes: pdf.length, title: 'Proposal PDF' });
-ok('deliverable: relationship-gated upload URL minted (reuses presence_media)', up.ok && !!up.body?.data?.media_id && !!up.body?.data?.upload_url);
+ok('deliverable: relationship-gated upload URL minted (reuses presence_media)', up.ok && !!up.body?.data?.media_id && !!up.body?.data?.upload_url, `${up.status} ${JSON.stringify(up.body).slice(0, 200)}`);
 const mediaId = up.body?.data?.media_id;
 const storagePath = up.body?.data?.storage_path; // presence-media/{siteId}/{uuid}.pdf
 // Seed the object bytes so signDownload has a real object to sign. Prefer the

@@ -43,7 +43,7 @@ ok('3. an internal task is client_visible=false; a client-action task is shared'
 const up = await A(`/projects/${projectId}/deliverables/upload-url`, 'POST', { mime: 'application/pdf', bytes: pdf.length, title: 'Handoff.pdf' });
 await fetch(up.body?.data?.upload_url, { method: 'PUT', headers: { 'Content-Type': 'application/pdf', 'x-upsert': 'true' }, body: pdf }).catch(() => {});
 const deliverable = await A(`/projects/${projectId}/deliverables`, 'POST', { media_id: up.body?.data?.media_id, title: 'Handoff', status: 'shared' });
-ok('4. studio uploads + shares a client-visible file', deliverable.status === 201 && deliverable.body?.data?.status === 'shared');
+ok('4. studio uploads + shares a client-visible file', deliverable.status === 201 && deliverable.body?.data?.status === 'shared', `upload-url ${up.status} ${JSON.stringify(up.body).slice(0, 160)}; deliverable ${deliverable.status} ${JSON.stringify(deliverable.body).slice(0, 160)}`);
 
 // 5) the file is accessible via a signed URL
 const dl = await A(`/projects/${projectId}/deliverables/${deliverable.body?.data?.id}/download`);

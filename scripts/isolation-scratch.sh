@@ -73,6 +73,23 @@ eval "$(supabase status -o env 2>/dev/null | grep -E '^(API_URL|ANON_KEY|SERVICE
 echo "scratch API: $API_URL"
 
 # ── 2. The two servers, from this checkout ───────────────────────────────────────
+# Email goes to a stand-in on this machine that answers the way Resend does, so a
+# step that reports "the email went" is checked too; nothing leaves the runner. The
+# servers run inside Docker and reach this machine through the network's gateway.
+MAIL_PORT=54399
+"$DENO" run --allow-net - > "$WORK/mail.log" 2>&1 <<EOF &
+let n = 0;
+Deno.serve({ hostname: '0.0.0.0', port: $MAIL_PORT, onListen() { console.log('mail stand-in listening'); } }, async (req) => {
+  if (req.method !== 'POST' || new URL(req.url).pathname !== '/emails') return new Response('not found', { status: 404 });
+  const b = await req.json().catch(() => ({}));
+  n++; console.log('email ' + n + ': ' + String(b.subject || '').slice(0, 80));
+  return Response.json({ id: 'scratch-' + n });
+});
+EOF
+MAIL_PID=$!
+GATEWAY="$(docker network inspect "supabase_network_isolation-scratch" --format '{{range .IPAM.Config}}{{.Gateway}}{{end}}' 2>/dev/null | head -1)"
+[ -n "$GATEWAY" ] || fail "Couldn't find the scratch network's gateway for the email stand-in."
+
 # Link secrets are made up for this run, so the signed-link checks run too (a token
 # made for one studio's proposal must not open another's).
 LINK_SECRET="$(openssl rand -hex 32)"
@@ -82,12 +99,14 @@ LINK_SECRET="$(openssl rand -hex 32)"
   echo "SCHEDULER_SECRET=$(openssl rand -hex 32)"
   echo "SITE_URL=http://localhost:8788"
   echo "APP_URL=http://localhost:8788"
+  echo "RESEND_KEY=scratch-not-a-key"
+  echo "RESEND_API_URL=http://$GATEWAY:$MAIL_PORT/emails"
 } > "$WORK/functions.env"
 
 say "Serving presence and clever-api"
 supabase functions serve --no-verify-jwt --env-file "$WORK/functions.env" > "$LOG" 2>&1 &
 SERVE_PID=$!
-cleanup() { kill "$SERVE_PID" 2>/dev/null || true; }
+cleanup() { kill "$SERVE_PID" "$MAIL_PID" 2>/dev/null || true; }
 trap cleanup EXIT
 
 ready=""

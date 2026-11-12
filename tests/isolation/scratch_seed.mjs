@@ -6,8 +6,8 @@
 //     deno run --allow-net --allow-env tests/isolation/scratch_seed.mjs > seed.env
 //
 // A fresh database has the tables but no rows. This adds what production has had from
-// the start, the DDS tenant and its agency row (every client row points at them), then
-// two studios. Each studio is set up the way the Sites page and /admin/sites leave one:
+// the start, the DDS tenant and its agency row (every client row points at them) and the
+// two file buckets, then two studios. Each studio is set up the way the Sites page and /admin/sites leave one:
 // an owner who signs in, the business's client record carrying the owner's email, an
 // active Presence entitlement, a website and its business details. Hosting is the one
 // step left out: there is no Netlify here, and none of the suites publish.
@@ -47,6 +47,20 @@ for (const [table, row] of [
 ]) {
   const r = await rest(`${table}?on_conflict=id`, 'POST', row, 'resolution=ignore-duplicates,return=minimal');
   if (!r.ok) stop(`couldn't add the DDS ${table} row (${r.status})`, r.text.slice(0, 400));
+}
+// The two file buckets were made by hand on production, so no migration makes them. These are
+// production's settings, read Nov 12 2026: private, with its size limits and file types.
+const BUCKETS = [
+  { id: 'presence-media', file_size_limit: 10485760, allowed_mime_types: ['image/jpeg', 'image/png', 'image/webp', 'application/pdf'] },
+  { id: 'client-files', file_size_limit: 52428800, allowed_mime_types: ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'application/pdf',
+    'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'application/vnd.ms-powerpoint',
+    'application/vnd.openxmlformats-officedocument.presentationml.presentation', 'application/vnd.ms-excel',
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'text/plain', 'video/mp4', 'video/quicktime', 'application/zip'] },
+];
+for (const b of BUCKETS) {
+  const r = await fetch(`${API}/storage/v1/bucket`, { method: 'POST', headers: svcH, body: JSON.stringify({ ...b, name: b.id, public: false }) });
+  const text = await r.text();
+  if (!r.ok && !/already exists|Duplicate/i.test(text)) stop(`couldn't make the ${b.id} bucket (${r.status})`, text.slice(0, 400));
 }
 
 // ── two studios ──
