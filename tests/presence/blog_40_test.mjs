@@ -218,6 +218,33 @@ globalThis.fetch = async (input, init = {}) => {
 }
 
 globalThis.fetch = realFetch;
+
+// ═══ F. the live site: every template draws the list, a page per category and the post ═══
+{
+  const { fullFixture, TEMPLATES } = await import('./full_fixture.mjs');
+  const { renderSnapshot } = await import('../../supabase/functions/presence/lib/render.ts');
+  const SITE = { baseUrl: 'https://vermilionandvine.example' };
+  for (const slug of TEMPLATES) {
+    const files = await renderSnapshot(fullFixture(slug), SITE);
+    const list = String(files['updates/index.html'] || ''), post = String(files['updates/winter-menu-2026/index.html'] || ''), cat = String(files['updates/category/events/index.html'] || '');
+    ok(`F1 ${slug}: the list has All and each category as links, the current one marked`, /<nav class="post-cats" aria-label="Categories"><a href="\/updates\/" aria-current="page">All<\/a><a href="\/updates\/category\/events\/">Events<\/a><a href="\/updates\/category\/news\/">News<\/a><\/nav>/.test(list) || /<nav class="post-cats" aria-label="Categories"><a href="\/updates\/" aria-current="page">All<\/a><a href="\/updates\/category\/news\/">News<\/a><a href="\/updates\/category\/events\/">Events<\/a><\/nav>/.test(list));
+    ok(`F2 ${slug}: each post in the list says its category and who wrote it`, list.includes('<p class="post-kicker">Events</p>') && list.includes('By Sam Ortiz · <time'));
+    ok(`F3 ${slug}: a category's page lists only its posts, and marks itself`, cat.includes('<h1>Events</h1>') && cat.includes('Wine dinner on the patio') && !cat.includes('Winter menu is live') && cat.includes('href="/updates/category/events/" aria-current="page"'));
+    ok(`F4 ${slug}: the post: its category, byline, the photo in its text with its caption, and the author`, post.includes('<p class="post-kicker">News</p>') && post.includes('By Maria Lopez · <time') && /<figure class="post-fig">[\s\S]*?<figcaption>Before the doors open<\/figcaption><\/figure>/.test(post) && post.includes('<p class="post-author-name">Written by Maria Lopez</p>') && post.includes('More in News'));
+    ok(`F5 ${slug}: Google is told it's a blog post by its author`, /"@type":"BlogPosting"/.test(post) && /"author":\{"@type":"Person","name":"Maria Lopez"\}/.test(post) && /"articleSection":"News"/.test(post));
+    ok(`F6 ${slug}: the category pages are in the sitemap and the feed names the category`, String(files['sitemap.xml']).includes('/updates/category/news/</loc>') && /<category>News<\/category>/.test(String(files['feed.xml'])));
+  }
+  const fx = fullFixture('aurora');
+  fx.content.settings.pages_noindex = ['updates'];
+  const hidden = await renderSnapshot(fx, SITE);
+  ok('F7: with Updates hidden from search, its category pages are too', /noindex/.test(String(hidden['updates/category/news/index.html'])) && !String(hidden['sitemap.xml']).includes('/updates/category/'));
+  const plain = fullFixture('aurora');
+  plain.content.posts = plain.content.posts.map(({ category, author, images, ...rest }) => rest);
+  const pf = await renderSnapshot(plain, SITE);
+  ok('F8: posts without categories draw no category links and no category pages', !String(pf['updates/index.html']).includes('post-cats') && !Object.keys(pf).some((k) => k.startsWith('updates/category/')));
+  ok('F9: the post styles ship with every template', String(Object.entries(pf).find(([k]) => /^assets\/site-.*\.css$/.test(k))?.[1] || '').includes('.post-row{display:grid'));
+}
+
 const failed = results.filter((x) => !x).length;
 console.log(`\n${results.length - failed} passed, ${failed} failed`);
 if (failed) Deno.exit(1);

@@ -19,6 +19,8 @@ import { renderNavList, NAV_DROPDOWN_CSS } from '../../../lib/site_nav.ts';
 import { seoHead } from '../../../lib/seo_emit.ts';
 import { privacyBody, accessibilityBody, legalFooterLinks, notSentInner } from '../../../lib/legal_pages.ts';
 import { SEARCH_CSS, searchBoxHtml, searchPageBody, searchClientScript, searchIndexJson, normalizeTags, postTagsAttr, postTagsHtml, tagFilterBar, tagFilterScript } from '../../../lib/search_index.ts';
+import { postListBody, postPageBody, postLd, postCategories, categoryPath, POST_CSS, type PostDraw } from '../../../lib/post_render.ts';
+import type { PostCategory } from '../../../lib/blog.ts';
 import type { FileMap, HolidayException, HoursDay, LocationContent, MediaRef, RenderFn, Snapshot, SnapshotContent, SiteConfig } from '../../../lib/render_types.ts';
 
 const loc0 = (c: SnapshotContent): LocationContent | null => c.locations?.[0] ?? null;
@@ -472,23 +474,16 @@ function postDate(iso: string): string {
   return `${['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][d.getUTCMonth()]} ${d.getUTCDate()}, ${d.getUTCFullYear()}`;
 }
 
-function postIndexBody(c: SnapshotContent): string {
-  const posts = [...c.posts].sort((a, b) => b.published_at.localeCompare(a.published_at));
-  return `<section class="block wrap"><h1>Updates</h1>${tagFilterBar(posts, esc, attr)}<div class="post-list">${posts.map((p) => { const tags = normalizeTags(p.tags); return `
-<article${prE('post', p.id)}${postTagsAttr(tags, attr)}><h2><a href="/updates/${attr(p.slug)}/">${esc(p.title)}</a></h2>
-<p class="post-meta"><time datetime="${attr(p.published_at)}">${esc(postDate(p.published_at))}</time></p>
-${p.excerpt ? `<p>${esc(p.excerpt)}</p>` : ''}${postTagsHtml(tags, esc)}</article>`; }).join('')}
-${posts.length === 0 ? '<p>No updates yet — our news will land here.</p>' : ''}</div>${tagFilterScript(posts)}</section>`;
+// Builder list item 40: the list, a page per category and the post are drawn once for every
+// template (lib/post_render.ts); this template brings its photos, its dates and its cover's frame.
+function postDraw(): PostDraw { return { img, date: postDate, prE, frame: 'margin:20px 0;border:1px solid var(--line);overflow:hidden' }; }
+
+function postIndexBody(c: SnapshotContent, cat: PostCategory | null = null): string {
+  return postListBody(c, postDraw(), cat);
 }
 
 function postBody(c: SnapshotContent, p: SnapshotContent['posts'][number]): string {
-  return `<section class="block wrap"><article class="post prose">
-<h1>${esc(p.title)}</h1>
-<p class="post-meta"><time datetime="${attr(p.published_at)}">${esc(postDate(p.published_at))}</time></p>
-${p.hero ? `<div style="margin:20px 0;border:1px solid var(--line);overflow:hidden">${img(p.hero, '(max-width: 900px) 100vw, 860px', false)}</div>` : ''}
-${renderMarkdown(p.body_md)}
-${postTagsHtml(normalizeTags(p.tags), esc)}</article>
-<p style="margin-top:28px"><a href="/updates/">← All updates</a></p></section>`;
+  return postPageBody(c, p, postDraw());
 }
 
 // ═════════ the render function (the contract) ═════════
@@ -501,7 +496,7 @@ export const render: RenderFn = (snapshot: Snapshot, _manifest, site: SiteConfig
 
   // Append the dropdown-nav CSS only when the owner set a custom nav → sites without
   // one keep the exact same stylesheet + hash (byte-identical).
-  const effCss = CSS + (c.settings?.nav?.length ? '\n' + NAV_DROPDOWN_CSS : '');
+  const effCss = CSS + POST_CSS + (c.settings?.nav?.length ? '\n' + NAV_DROPDOWN_CSS : '');
   const cssPath = `/assets/site-${fnv(effCss)}.css`;
   files[`assets/site-${fnv(effCss)}.css`] = effCss;
 
@@ -576,10 +571,15 @@ export const render: RenderFn = (snapshot: Snapshot, _manifest, site: SiteConfig
   for (const p of c.posts) {
     page(`/updates/${p.slug}/`, {
       title: `${p.title} — ${i.business_name}`, description: p.excerpt || siteDesc,
-      ld: [ldCrumbs(site, [[i.business_name, '/'], ['Updates', '/updates/'], [p.title, `/updates/${p.slug}/`]])],
+      ld: [ldCrumbs(site, [[i.business_name, '/'], ['Updates', '/updates/'], [p.title, `/updates/${p.slug}/`]]), postLd(site, i.business_name, p)],
       ogImage: p.hero?.variants?.w1600, active: 'updates', body: postBody(c, p),
     });
     if (p.noindex) markNoindex(`updates/${p.slug}/index.html`);
+  }
+  // Builder list item 40: a page per category, listed like the Updates page
+  for (const cat of postCategories(c)) {
+    page(categoryPath(cat), { title: `${cat.name} — ${i.business_name}`, description: `${cat.name}: news and updates from ${i.business_name}.`, ld: [ldCrumbs(site, [[i.business_name, '/'], ['Updates', '/updates/'], [cat.name, categoryPath(cat)]])], active: 'updates', body: postIndexBody(c, cat) });
+    if (noidx.has('updates')) markNoindex(`${categoryPath(cat).slice(1)}index.html`);
   }
 
   // Multi-page: the owner's own pages, each rendered with the SAME shell/nav/footer
@@ -613,7 +613,7 @@ export const render: RenderFn = (snapshot: Snapshot, _manifest, site: SiteConfig
   // item 99: no page records when it last changed, so only a post (its own date) carries one
   const lastmod = '';
   const KEY_PATHS: Array<[string, string]> = [['offerings', v.offeringPath], ['about', '/about/'], ['faq', '/faq/'], ['contact', '/contact/'], ['updates', '/updates/']];
-  const urls: Array<{ loc: string; lastmod: string }> = [{ loc: '/', lastmod }, ...KEY_PATHS.filter(([k]) => !noidx.has(k)).map(([, p]) => ({ loc: p, lastmod })), { loc: '/privacy/', lastmod }, { loc: '/accessibility/', lastmod }, ...c.posts.filter((p) => !p.noindex).map((p) => ({ loc: `/updates/${p.slug}/`, lastmod: String(p.published_at || snapshot.created_at).slice(0, 10) })), ...(c.settings?.pages || []).filter((cp) => !noidx.has(`page:${cp.slug}`)).map((cp) => ({ loc: `/${cp.slug}/`, lastmod }))];
+  const urls: Array<{ loc: string; lastmod: string }> = [{ loc: '/', lastmod }, ...KEY_PATHS.filter(([k]) => !noidx.has(k)).map(([, p]) => ({ loc: p, lastmod })), { loc: '/privacy/', lastmod }, { loc: '/accessibility/', lastmod }, ...c.posts.filter((p) => !p.noindex).map((p) => ({ loc: `/updates/${p.slug}/`, lastmod: String(p.published_at || snapshot.created_at).slice(0, 10) })), ...(noidx.has('updates') ? [] : postCategories(c).map((cat) => ({ loc: categoryPath(cat), lastmod }))), ...(c.settings?.pages || []).filter((cp) => !noidx.has(`page:${cp.slug}`)).map((cp) => ({ loc: `/${cp.slug}/`, lastmod }))];
   files['sitemap.xml'] = `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls.map((u) => `<url><loc>${esc(site.baseUrl + u.loc)}</loc>${u.lastmod ? `<lastmod>${u.lastmod}</lastmod>` : ''}</url>`).join('\n')}\n</urlset>\n`;
   files['robots.txt'] = `User-agent: *\nAllow: /\nDisallow: /thanks/\nDisallow: /not-sent/\n\nSitemap: ${site.baseUrl}/sitemap.xml\n`;
   // RSS feed for /updates/ — subscribers + SEO (a WordPress default the SMB builders lack)
@@ -622,7 +622,7 @@ export const render: RenderFn = (snapshot: Snapshot, _manifest, site: SiteConfig
       const link = esc(site.baseUrl + `/updates/${p.slug}/`);
       const pub = p.published_at ? `<pubDate>${new Date(p.published_at).toUTCString()}</pubDate>` : '';
       const desc = p.excerpt ? `<description>${esc(p.excerpt)}</description>` : '';
-      const cats = normalizeTags(p.tags).map((t) => `<category>${esc(t)}</category>`).join('');
+      const cats = [...(p.category ? [p.category.name] : []), ...normalizeTags(p.tags)].map((t) => `<category>${esc(t)}</category>`).join('');
       return `<item><title>${esc(p.title || 'Update')}</title><link>${link}</link><guid>${link}</guid>${pub}${cats}${desc}</item>`;
     }).join('');
     files['feed.xml'] = `<?xml version="1.0" encoding="UTF-8"?>\n<rss version="2.0"><channel><title>${esc(i.business_name)} — Updates</title><link>${esc(site.baseUrl + '/updates/')}</link><description>${esc('Latest updates from ' + i.business_name)}</description>${feedItems}</channel></rss>\n`;

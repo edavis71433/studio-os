@@ -85,15 +85,40 @@ nav.primary a{display:inline-block;padding:8px 12px;text-decoration:none;color:#
 <main id="main">
 <section class="block wrap">
 <h1>Updates</h1>
+<nav class="post-cats" aria-label="Categories">
+<a href="/updates/" aria-current="page">All</a>
+<a href="/updates/category/news/">News</a>
+<a href="/updates/category/events/">Events</a>
+</nav>
 <div class="post-list">
-<article data-pr="post" data-pr-id="p1">
+<article data-pr="post" data-pr-id="p2" class="post-row no-thumb">
+<div class="post-text">
+<p class="post-kicker">Events</p>
+<h2>
+<a href="/updates/wine-dinner/">Wine dinner on the patio</a>
+</h2>
+<p class="post-meta">By Sam Ortiz · <time datetime="2026-02-02T18:00:00Z">Feb 2, 2026</time>
+</p>
+<p>Five courses, five wines, one long table.</p>
+</div>
+</article>
+<article data-pr="post" data-pr-id="p1" class="post-row">
+<a class="post-thumb" href="/updates/winter-menu-2026/" tabindex="-1" aria-hidden="true">
+<picture>
+<source type="image/avif" srcset="/img/winter-400.avif 400w, /img/winter-800.avif 800w, /img/winter-1600.avif 1600w" sizes="(max-width: 700px) 100vw, 240px">
+<source type="image/webp" srcset="/img/winter-400.webp 400w, /img/winter-800.webp 800w, /img/winter-1600.webp 1600w" sizes="(max-width: 700px) 100vw, 240px">
+<img src="/img/winter-800.webp" srcset="/img/winter-400.webp 400w, /img/winter-800.webp 800w, /img/winter-1600.webp 1600w" sizes="(max-width: 700px) 100vw, 240px" alt="Squash agnolotti in brown butter" width="1600" height="1067" loading="lazy" decoding="async">
+</picture>
+</a>
+<div class="post-text">
+<p class="post-kicker">News</p>
 <h2>
 <a href="/updates/winter-menu-2026/">Winter menu is live</a>
 </h2>
-<p class="post-meta">
-<time datetime="2026-01-12T18:00:00Z">Jan 12, 2026</time>
+<p class="post-meta">By Maria Lopez · <time datetime="2026-01-12T18:00:00Z">Jan 12, 2026</time>
 </p>
 <p>Six new plates, two returning favorites, and a mulled thing for the patio.</p>
+</div>
 </article>
 </div>
 </section>
