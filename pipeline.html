@@ -887,6 +887,34 @@ const foundOpts=(v)=>`<option value="">Not recorded</option>`+FOUND_VIA.map(x=>`
 // DEALS.length reaching this cap means the set may be INCOMPLETE (renderMeta
 // words itself accordingly).
 const FETCH_LIMIT=100;
+// Sales item 121: the board asks for the OPEN deals only, a page at a time, so an open deal
+// nobody has touched for months is never the one that drops off. It used to take the newest
+// 100 deals of every kind and hide the closed ones. Won and Not a fit counts come from the
+// summary (SUM_COUNTS), which totals every deal on the server.
+const BOARD_MAX_PAGES=10;
+let BOARD_OPEN_ONLY=false,BOARD_CAPPED=false,ANY_DEALS=false,SUM_COUNTS=null;
+async function loadBoardDeals(){
+  const all=[];let capped=false;
+  for(let n=0;n<BOARD_MAX_PAGES;n++){
+    const r=await api('/sales/deals?'+new URLSearchParams({limit:String(FETCH_LIMIT),offset:String(n*FETCH_LIMIT),open:'1'}).toString());
+    const page=(r&&r.data)||[];all.push(...page);
+    if(page.length<FETCH_LIMIT)break;
+    if(n===BOARD_MAX_PAGES-1)capped=true;
+  }
+  // nothing open: is there anything at all? The first-deal walkthrough is for an empty pipeline, not a finished one
+  let any=all.length>0;
+  if(!any){const r=await api('/sales/deals?limit=1');any=!!((r&&r.data)||[]).length;}
+  return {data:all,capped,any};
+}
+const closedCount=()=>BOARD_OPEN_ONLY?(SUM_COUNTS?Math.max(0,SUM_COUNTS.total-SUM_COUNTS.open):0):DEALS.length-boardOpen().length;
+const lostCount=()=>BOARD_OPEN_ONLY?(SUM_COUNTS?SUM_COUNTS.lost:0):DEALS.filter(d=>d.stage==='lost').length;
+const boardFootText=(t)=>t>0?t+' won or not-a-fit deal'+(t===1?'':'s')+' — see them in List view.':'';
+// the summary landed after the board drew: its counts go in place (never a redraw under an open menu)
+function paintBoardOutcomes(){
+  if(VIEW!=='board'||!BOARD_OPEN_ONLY)return;
+  const ln=$('lostN');if(ln){const n=lostCount();ln.textContent=String(n);ln.hidden=!n;}
+  const ft=$('boardFoot');if(ft){const t=closedCount();ft.textContent=boardFootText(t);ft.hidden=!t;}
+}
 let Q='';                    // the .lhead search query — client-side, across List/Board/Table
 let LOADED_AT=Date.now();    // when the roster last loaded (the .lmeta "Updated …" fact)
 let REQ_SEQ=0;               // roster-read generation: a slow response that resolves after a newer request started is DISCARDED
@@ -946,7 +974,11 @@ const toast=(m,bad)=>{ if(window.ddsToast) window.ddsToast(m,bad?'err':'ok'); };
 const nice=(e)=>{const m=e&&e.message?String(e.message):'';return /^[A-Z]/.test(m)&&m.length<160&&!/[{}<>]|_|\bsql\b|\bpostgres|^(Cannot|Unexpected|Failed to fetch)\b|is not a function|of (undefined|null)|TypeError/i.test(m)?m:'Something went wrong on our side — please try again.';};
 // "2026-08-01" → "Aug 1, 2026" — people read dates, not database strings
 const niceDay=(s)=>{const m=/^(\d{4})-(\d{2})-(\d{2})/.exec(String(s||''));return m?new Date(+m[1],+m[2]-1,+m[3]).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}):String(s||'');};
-const sourceWord=(s)=>({manual:'Added by you',enquiry:'From an enquiry',form:'From your website',import:'Imported'}[String(s||'').toLowerCase()]||String(s||''));
+// Sales item 121: where a deal came from, in words. Every source a deal is written with has one
+// (the Inbox writes website_form, Prospects prospecting, a free-tool lead free_tools); an unknown one
+// says nothing rather than show its code. Mirrors crm.html's SC_SOURCE (tests/presence/pipeline_fixes_121_test.mjs).
+const SOURCE_WORDS={manual:'Added by you',enquiry:'From your website',form:'From your website',website_form:'From your website',import:'Imported',referral:'From a referral',prospecting:'From Prospects',free_tools:'From a free tool',example:'Example deal'};
+const sourceWord=(s)=>SOURCE_WORDS[String(s||'').toLowerCase()]||'';
 
 async function api(path,method,body){
   const r=await fetch(FN+path,{method:method||'GET',headers:H(),body:body?JSON.stringify(body):undefined});
@@ -1782,11 +1814,13 @@ async function renderSummary(gen){
   const host=$('summary'); if(!host) return;
   let s;
   try{ const r=await api('/sales/summary?today='+localYmd()+'&tzo='+new Date().getTimezoneOffset()); s=r&&r.data; }   // item 65: the Outstanding tile's overdue on the local day; item 104: "Won this month" by the local month (tzo: minutes behind UTC)
-  catch(_){ if(gen===undefined||gen===REQ_SEQ)host.innerHTML=''; return; }   // never let the summary sink the page
+  catch(_){ if(gen===undefined||gen===REQ_SEQ){host.innerHTML='';if(!WON_MONTH){WON_FAILED=true;const wv=$('wonV');if(wv)wv.textContent='—';}} return; }   // never let the summary sink the page (item 121: the Won column says it couldn't tell)
   if(gen!==undefined&&gen!==REQ_SEQ)return;           // a newer roster read started — this strip is stale
+  if(s&&!s.total){SUM_COUNTS={total:0,open:0,lost:0};paintBoardOutcomes();}   // item 121
   if(!s||!s.total){ host.innerHTML=''; return; }        // empty pipeline → the list's own empty state says it
   const plur=(n,w)=>n+' '+w+(n===1?'':'s');
   const open=s.open||{count:0,value_cents:0}, wm=s.won_month||{count:0,value_cents:0}, wr=s.win_rate||{pct:null,won:0,lost:0};
+  SUM_COUNTS={total:Number(s.total)||0,open:Number(open.count)||0,lost:Number(wr.lost)||0};WON_FAILED=false;paintBoardOutcomes();   // item 121: the board's Won and Not a fit counts
   if(s.won_month){WON_MONTH=wm;const wc=$('wonCol');if(wc){wc.innerHTML=wonColInner();const sw=$('seeWon');if(sw)sw.addEventListener('click',()=>{FILTER='won';history.replaceState(null,'',listUrl());renderFilters();setView('list');});}}   // item 30: the Won column says the tile's number
   // visual refresh: four icon tiles (Open · Won this month · Win rate ·
   // Outstanding) in place of the one-line strip; the per-stage cells follow.
@@ -2022,11 +2056,13 @@ async function load(soft){
   try{
     // Board shows every open stage, so it ignores the list's stage filter.
     // limit = the server's MAX_PAGE (see FETCH_LIMIT) — never the 25-row default.
+    // item 121: the board reads the open deals only, every page of them (loadBoardDeals)
     const qs=new URLSearchParams({limit:String(FETCH_LIMIT)});
     if(!board&&FILTER)qs.set('stage',FILTER);
-    const [res]=await Promise.all([api('/sales/deals?'+qs.toString()),loadStaleDays(),board?ensureContactNames():null]);   // the board's stale threshold and its cards' people ride the same wave (best-effort; neither ever rejects)
+    const [res]=await Promise.all([board?loadBoardDeals():api('/sales/deals?'+qs.toString()),loadStaleDays(),board?ensureContactNames():null]);   // the board's stale threshold and its cards' people ride the same wave (best-effort; neither ever rejects)
     if(gen!==REQ_SEQ)return;   // a newer request started — this response is stale, never paint it
     DEALS=res.data||[];DEALS_LOADED=true;
+    BOARD_OPEN_ONLY=board;BOARD_CAPPED=!!(board&&res.capped);ANY_DEALS=board?!!res.any:DEALS.length>0;
     // item 66: a deal whose contact sits outside the newest 100 gets its name too
     if(CONTACT_NAME&&!CONTACT_FAILED)fillMissingNames().then(got=>{if(got&&gen===REQ_SEQ)renderCurrent();});
     // item 65: picks left over from another stage chip go (the bar said "2 selected" with nothing ticked)
@@ -2129,7 +2165,7 @@ function boardVisible(){return boardOpen().filter(d=>bchipMatch(BCHIP,d));}
 let BCHIP='all',STAGE_CHANCE={},BOARD_NAMES_ASKED=false,PSTAGE='',PSTAGE_PICKED=false;
 const BCHIPS=[['all','All open'],['nudge','Needs a nudge'],['closing','Closing this month'],['web','From your website']];
 const monthKey=()=>{const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');};
-const fromWeb=(d)=>/^(form|enquiry)$/i.test(String(d.source||''));
+const fromWeb=(d)=>/^(form|enquiry|website_form)$/i.test(String(d.source||''));   // item 121: the Inbox writes website_form
 function bchipMatch(k,d){
   if(k==='nudge')return dealStaleAfter(d,Date.now(),STALE_DAYS);
   if(k==='closing')return String(d.expected_close||'').slice(0,7)===monthKey();
@@ -2158,10 +2194,11 @@ function renderMeta(){
   // the sweep's wording). List/Table keep the full-fetched-set semantics.
   const list=board?boardVisible():visibleDeals();
   const sum=list.reduce((a,d)=>a+(d.expected_value_cents||0),0);
-  const n=list.length,atCap=DEALS.length>=FETCH_LIMIT;
+  const n=list.length,atCap=board?BOARD_CAPPED:DEALS.length>=FETCH_LIMIT;
   let m;
   if(board){
-    m=(atCap?n+' open of the latest '+FETCH_LIMIT+' deals':n+' open deal'+(n===1?'':'s'))+' · '+money0(sum)+' open · '+updatedLabel();
+    // item 121: the board holds every open deal; only past a thousand does it say it stopped
+    m=(atCap?n+' open deals shown, your newest '+(FETCH_LIMIT*BOARD_MAX_PAGES):n+' open deal'+(n===1?'':'s'))+' · '+money0(sum)+' open · '+updatedLabel();
   }else{
     const count=atCap
       ?(n===DEALS.length?'Latest '+FETCH_LIMIT+' deals':n+' of the latest '+FETCH_LIMIT+' deals')
@@ -2285,7 +2322,7 @@ function renderList(){
     const ns=step?`<div class="m">${ds==='overdue'?`<span class="step-due overdue" style="color:var(--bad,#a3423a);font-weight:600">Overdue: ${esc(step)} · ${esc(niceDay(d.next_step_at))}</span>`:ds==='today'?`<span class="step-due today" style="color:var(--warn,#775d31);font-weight:600">Due today: ${esc(step)}</span>`:`Next: ${esc(step)}${d.next_step_at?' · '+esc(niceDay(d.next_step_at)):''}`}</div>`:'';
     const lc=d.last_contacted_at?`<div class="m">Last contacted ${esc(ago(d.last_contacted_at))}</div>`:'';
     const cv=needsConvert(d)?`<div class="m conv">Not a customer yet — open to make them one</div>`:'';
-    return `<div class="card" data-id="${d.id}"${needsConvert(d)?' data-convert="1"':''} tabindex="0" role="button"><div><div class="t">${esc(d.title||'Untitled deal')}</div><div class="m">${esc(sourceWord(d.source))}${d.expected_close&&d.stage!=='won'&&d.stage!=='lost'?' · closes '+esc(niceDay(d.expected_close)):''}</div>${ns}${lc}${cv}</div><div style="text-align:right">${stageBadge(d.stage,d.agreement_signed)}<div class="val">${money(d.expected_value_cents)}</div></div></div>`;
+    return `<div class="card" data-id="${d.id}"${needsConvert(d)?' data-convert="1"':''} tabindex="0" role="button"><div><div class="t">${esc(d.title||'Untitled deal')}</div><div class="m">${esc([sourceWord(d.source),d.expected_close&&d.stage!=='won'&&d.stage!=='lost'?'closes '+niceDay(d.expected_close):''].filter(Boolean).join(' · '))}</div>${ns}${lc}${cv}</div><div style="text-align:right">${stageBadge(d.stage,d.agreement_signed)}<div class="val">${money(d.expected_value_cents)}</div></div></div>`;
   }).join('');
   host.querySelectorAll('.card').forEach(c=>{const open=()=>{if(c.dataset.convert)WANT_CONVERT_NEXT=true;openDeal(c.dataset.id);};c.onclick=open;c.onkeydown=(e)=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();open();}};});
 }
@@ -2704,25 +2741,21 @@ function boardCard(d,today){
   return `<article class="bcard${stale?' is-stale':''}" draggable="true" tabindex="0" role="button" aria-label="${esc(d.title||'Untitled deal')} — ${esc(stageLabel(d.stage))}${stale?' — stalled':''}" data-id="${d.id}" data-stage="${d.stage}"><div class="bc-t">${esc(d.title||'Untitled deal')}</div>${whoRow}${val?`<div class="bc-v">${val}</div>`:''}${due||(lc?`<div class="bc-m">${lc}</div>`:'')}${staleBadge}${web}<div class="bc-actions">${moveBtn}</div></article>`;
 }
 // Sales review item 30: the board keeps its outcomes in view. Won is collapsed to
-// this month's count and value (the summary's own number once it has loaded, the
-// same rule over the deals in hand until then) with a way to the won deals; Not
-// a fit is a drop zone (a drop there is the tap menu's "Mark as not a fit").
-let WON_MONTH=null;
-// item 104 (B14): this month and the month each deal was won are both the LOCAL month — the UTC
-// one turned over at 4pm in Los Angeles on the last day (the summary asks the same, with ?tzo=)
-function wonThisMonthLocal(){
-  const mk=localYmd().slice(0,7),wonMonth=(d)=>{const t=Date.parse(String(d.converted_at||d.updated_at||''));return Number.isFinite(t)?localYmd(t).slice(0,7):'';};
-  const ws=DEALS.filter(d=>(d.converted_client_id||d.stage==='won')&&wonMonth(d)===mk);
-  return{count:ws.length,value_cents:ws.reduce((a,d)=>a+(Number(d.expected_value_cents)||0),0)};
-}
+// this month's count and value with a way to the won deals; Not a fit is a drop zone
+// (a drop there is the tap menu's "Mark as not a fit").
+// Item 121: the board holds the open deals only, so both counts are the summary's, which
+// totals every deal on the server, on the LOCAL month (item 104: ?today= and ?tzo=). Until
+// it lands the Won column says "…", and "—" if it couldn't be read; never a made-up count.
+let WON_MONTH=null,WON_FAILED=false;
+const wonNow=()=>WON_MONTH||{count:0,value_cents:0};
 function wonColInner(){
-  const wm=WON_MONTH||wonThisMonthLocal();
-  return `<header class="col-h"><span class="col-t">Won</span><span class="col-n" id="wonN">${Number(wm.count)||0}</span></header><div class="col-tip mut">This month</div><div class="won-v" id="wonV">${wm.count?esc(money(wm.value_cents)||'$0'):'Nothing yet'}</div><button type="button" class="linkbtn" id="seeWon">See won deals →</button>`;
+  const wm=wonNow();
+  return `<header class="col-h"><span class="col-t">Won</span><span class="col-n" id="wonN">${Number(wm.count)||0}</span></header><div class="col-tip mut">This month</div><div class="won-v" id="wonV">${WON_MONTH?(wm.count?esc(money(wm.value_cents)||'$0'):'Nothing yet'):WON_FAILED?'—':'…'}</div><button type="button" class="linkbtn" id="seeWon">See won deals →</button>`;
 }
 function outcomeColsHtml(){
-  const lost=DEALS.filter(d=>d.stage==='lost').length;
+  const lost=lostCount();
   return `<section class="col col-out col-won${PSTAGE==='won'?' on':''}" data-col="won" id="wonCol" aria-label="Won column">${wonColInner()}</section>`
-    +`<section class="col col-out col-lost" id="lostCol" aria-label="Not a fit column"><header class="col-h"><span class="col-t">Not a fit</span>${lost?`<span class="col-n">${lost}</span>`:''}</header><div class="col-tip mut">Drag a deal here, or open it and choose Not a fit</div><div class="col-body lost-drop" data-drop="lost"><div class="bempty mut">Drop here</div></div></section>`;
+    +`<section class="col col-out col-lost" id="lostCol" aria-label="Not a fit column"><header class="col-h"><span class="col-t">Not a fit</span><span class="col-n" id="lostN"${lost?'':' hidden'}>${lost}</span></header><div class="col-tip mut">Drag a deal here, or open it and choose Not a fit</div><div class="col-body lost-drop" data-drop="lost"><div class="bempty mut">Drop here</div></div></section>`;
 }
 function renderBoard(){
   const host=$('board');
@@ -2732,7 +2765,8 @@ function renderBoard(){
   // minus outcomes — the SAME set renderMeta counts, by construction.
   const open=boardVisible();
   // a pipeline with no deals at all gets the walkthrough, not four empty columns (item 30/36)
-  if(!DEALS.length){if(window.ddsStudioLevel&&window.ddsStudioLevel(host,{noun:'Deals',lower:'deals and invoices'}))return;renderFirstDeal(host);return;}
+  // item 121: the board holds open deals only — a pipeline whose deals are all won or not a fit is not an empty one
+  if(!DEALS.length&&!(BOARD_OPEN_ONLY&&ANY_DEALS)){if(window.ddsStudioLevel&&window.ddsStudioLevel(host,{noun:'Deals',lower:'deals and invoices'}))return;renderFirstDeal(host);return;}
   // a phone shows one stage at a time: the one picked, else the first with deals in it
   if((!BOARD_STAGES.includes(PSTAGE)&&PSTAGE!=='won')||(PSTAGE!=='won'&&!open.some(d=>d.stage===PSTAGE)&&open.length&&!PSTAGE_PICKED))PSTAGE=(BOARD_STAGES.find(s2=>open.some(d=>d.stage===s2))||'lead');
   const cols=BOARD_STAGES.map(stg=>{
@@ -2742,17 +2776,17 @@ function renderBoard(){
     const ch=STAGE_CHANCE[stg];
     return `<section class="col${PSTAGE===stg?' on':''}" data-col="${stg}" aria-label="${esc(stageLabel(stg))} column"><header class="col-h"><span class="col-t">${esc(stageLabel(stg))}</span><span class="col-n">${ds.length}</span><span class="col-sub"><span class="col-ch" data-chance="${stg}" title="The chance a deal here closes (Settings)"${ch==null?' hidden':''}>${ch==null?'':ch+'%'}</span>${sum?`<span class="col-val">${money(sum)}</span>`:''}</span></header><div class="col-tip mut">${esc(guidanceFor(stg).action)}</div><div class="col-body" data-drop="${stg}">${cards}</div><div class="col-add" data-add="${stg}"><button type="button" class="col-addbtn" data-addbtn="${stg}">+ Add a deal</button></div></section>`;
   }).join('');
-  const all=boardOpen(),terminal=DEALS.length-all.length;   // a chip narrows the board, never the won/not-a-fit count
+  const all=boardOpen(),terminal=closedCount();   // a chip narrows the board, never the won/not-a-fit count (item 121: the summary's, on the board)
   // the person on each card: the names ride the deals read on a board load; switched to
   // from List or Table, they're asked once and filled into the cards in place (never a
   // redraw under an open menu or a half-typed "+ Add a deal")
   if(!CONTACT_NAME&&!BOARD_NAMES_ASKED){BOARD_NAMES_ASKED=true;ensureContactNames().then(paintWho);}
-  const wm=WON_MONTH||wonThisMonthLocal();
+  const wm=wonNow();
   const stabs=`<div class="stabs" role="group" aria-label="Stage">${BOARD_STAGES.map(stg=>{const n=open.filter(d=>d.stage===stg).length;return `<button type="button" class="stab" data-stab="${stg}" aria-pressed="${PSTAGE===stg?'true':'false'}">${esc(stageLabel(stg))} <span class="n">${n}</span></button>`;}).join('')}<button type="button" class="stab" data-stab="won" aria-pressed="${PSTAGE==='won'?'true':'false'}">Won <span class="n">${Number(wm.count)||0}</span></button></div>`;
   const qa=quickAddNow(host);   // B19: a half-typed "+ Add a deal" is put back after the redraw
   host.innerHTML=bchipsHtml()+stabs+`<div class="board-scroll"><div class="board with-out">${cols}${outcomeColsHtml()}</div></div>`
     +(open.length?'':`<div class="mut" style="margin-top:12px">${all.length?'Nothing here — try “All open”.':'No open deals yet. Add one to start the pipeline.'}</div>${all.length?'':'<p style="margin-top:12px"><button type="button" class="btn" data-first-deal>+ New deal</button></p>'}`)
-    +(terminal>0?`<div class="mut board-foot">${terminal} won or not-a-fit deal${terminal===1?'':'s'} — see them in List view.</div>`:'');
+    +`<div class="mut board-foot" id="boardFoot"${terminal>0?'':' hidden'}>${esc(boardFootText(terminal))}</div>`;
   wireBoard();
   if(qa)openQuickAdd(qa.stg,qa);
   const sw=$('seeWon');if(sw)sw.addEventListener('click',()=>{FILTER='won';history.replaceState(null,'',listUrl());renderFilters();setView('list');});
