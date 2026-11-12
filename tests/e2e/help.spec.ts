@@ -26,7 +26,7 @@ test.describe('Help (ask in your own words)', () => {
     await expect(cards.nth(6)).toHaveAttribute('href', '/connections.html');
     // the answers: one row each, folded, with the original copy inside
     const answers = page.locator('#answers details');
-    await expect(answers).toHaveCount(9);   // item 166 adds Running your clients’ sites, and Updates and estimates
+    await expect(answers).toHaveCount(11);   // item 166 adds Running your clients’ sites, and Updates and estimates; sales item 85 adds To-dos, invoices, and getting something back; item 80 adds Emailing someone from their record
     await expect(answers.nth(0)).not.toHaveAttribute('open', '');
     await answers.nth(0).locator('summary').click();
     await expect(answers.nth(0)).toHaveAttribute('open', '');

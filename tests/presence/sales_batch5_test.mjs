@@ -57,7 +57,9 @@ const idx = read('supabase/functions/presence/index.ts');
 ok('GET /sales/my-tasks sits with the other /sales routes (same gate)', /if \(route === '\/sales\/my-tasks' && method === 'GET'\) return handleSalesMyTasks\(req, site, principal, cors\);/.test(idx));
 const sales = read('supabase/functions/presence/routes/sales.ts');
 // item 46 (Nov 8) moved the reads into loadMyTasks, shared with the calendar link
-ok('it reads only the signed-in site\'s rows', (sales.match(/export async function loadMyTasks[\s\S]*?\n}\n/) || [''])[0].split('site_id=eq.${siteId}').length - 1 === 5 && /loadMyTasks\(site\.id, principal\.userId \|\| null\)/.test(sales));
+// item 85: six since to-dos can be for a person (their names are read on the site too); the customers'
+// names come from the platform's clients table, by the ids this site's own to-dos carry
+ok('it reads only the signed-in site\'s rows', (sales.match(/export async function loadMyTasks[\s\S]*?\n}\n/) || [''])[0].split('site_id=eq.${siteId}').length - 1 === 6 && /loadMyTasks\(site\.id, principal\.userId \|\| null\)/.test(sales));
 ok('a failed read says partial, never a false empty list', /if \(!r\.ok\) \{ partial = true; return \[\]; \}/.test(sales) && /items: all\.slice\(0, MY_TASKS_MAX\), total: all\.length, partial/.test(sales));
 const home = read('agency.html');
 ok('Done uses the route that owns each kind', /if\(t\.kind==='next_step'\)return\['PATCH','\/sales\/deals\/'\+encodeURIComponent\(t\.id\),\{next_step:'',next_step_at:''\}\];/.test(home)
