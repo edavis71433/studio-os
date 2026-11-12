@@ -140,6 +140,20 @@ test.describe('Merge two records for one person (items 86 + 105)', () => {
     void merge;
   });
 
+  test('item 121: notes too long to keep in full are said before the merge, and again after', async ({ page }, info) => {
+    await installApp(page, { api: { '/portal/context': STUDIO_CTX, '/sales/contacts': { data: PEOPLE, total: 2 } } });
+    await page.route('**/functions/v1/presence/sales/contacts/ct-1/merge', (route) => { const b = route.request().postDataJSON();
+      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(b.confirm ? { data: { merged: true, merged_away: { id: 'ct-2', name: 'Jordan Ellis' }, moved: { deals: 2, bookings: 1, reviews: 0 }, notes_cut: 340 } } : { data: { ...DRY.data, notes_cut: 340 } }) }); });
+    await page.goto('/contacts.html');
+    if (info.project.name === 'mobile') await page.locator('#dispCards').click().catch(() => {});
+    await page.locator('[data-merge="ct-1"]').first().click();
+    const dlg = page.locator('#mergeDlg');
+    await expect(dlg.locator('#mgCut')).toContainText('the last 340 characters won’t fit');
+    await expect(dlg.locator('#mgCut')).toContainText('The line with the old email address stays at the top');
+    await dlg.getByRole('button', { name: 'Merge into one' }).click();
+    await expect(page.locator('.dds-toast').filter({ hasText: 'Merged into one' })).toContainText('Their notes were cut by 340 characters to fit; Undo brings them back in full.');
+  });
+
   test('Edit can merge with anyone: pick the other record by searching', async ({ page }) => {
     await installApp(page, { api: { '/portal/context': STUDIO_CTX, '/sales/contacts': { data: PEOPLE, total: 2 } } });
     await page.route('**/functions/v1/presence/sales/contacts/ct-1', (route) => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: { contact: { ...PEOPLE[0], address: {}, custom: {} }, deals: [], timeline: [], custom_fields: [] } }) }));

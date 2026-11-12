@@ -17,6 +17,7 @@ import { loadMyTasks } from './sales.ts';
 import { customerOfThisStudio } from './crm.ts';
 import { isDealActivityKind, activityNeedsBody, cleanActivityBody, normalizeOccurredAt, type DealActivityKind } from '../crm/deal_activity.ts';
 import { missingInsertColumns } from '../lib/inbound_email.ts';
+import { teamOf, ownerToSet, isMine } from '../lib/team_owner.ts';   // item 37: owners and Mine
 
 const rows = (r: { json?: unknown }) => (Array.isArray((r as any).json) ? (r as any).json : []) as any[];
 const clean = (s: unknown, max = 500) => String(s ?? '').replace(/[\u0000-\u0008\u000B-\u001F\u007F]/g, '').trim().slice(0, max);
@@ -49,11 +50,14 @@ export async function resolveTarget(siteId: string, b: any): Promise<{ deal_id: 
 
 /** One to-do, for whoever resolveTarget found. A missing column (before APPLY-0173) is the
  *  update message, never a to-do filed against nobody. */
-export async function insertTodo(siteId: string, t: { deal_id: string | null; contact_id: string | null; client_id: string | null }, title: string, due: string | null): Promise<{ row?: any; status?: number; message?: string }> {
+export async function insertTodo(siteId: string, t: { deal_id: string | null; contact_id: string | null; client_id: string | null }, title: string, due: string | null, owner: string | null = null): Promise<{ row?: any; status?: number; message?: string }> {
   const row: Record<string, unknown> = { site_id: siteId, title, due_date: due, status: 'open', deal_id: t.deal_id };
   if (t.contact_id) row.contact_id = t.contact_id;
   if (t.client_id) row.client_id = t.client_id;
-  const ins = await svc('presence_deal_tasks', { method: 'POST', headers: { Prefer: 'return=representation' }, body: JSON.stringify(row) });
+  if (owner && UUID_RE.test(owner)) row.assigned_to = owner;   // item 37: whoever adds it owns it
+  let ins = await svc('presence_deal_tasks', { method: 'POST', headers: { Prefer: 'return=representation' }, body: JSON.stringify(row) });
+  // before APPLY-0199 the to-do saves without its owner
+  if (!ins.ok && 'assigned_to' in row && missingInsertColumns(ins.json, ins.text, ['assigned_to']).length) { delete row.assigned_to; ins = await svc('presence_deal_tasks', { method: 'POST', headers: { Prefer: 'return=representation' }, body: JSON.stringify(row) }); }
   if (ins.ok && rows(ins)[0]) return { row: rows(ins)[0] };
   // before APPLY-0173: no contact_id or client_id column, and deal_id may not be empty
   if (!t.deal_id && (missingInsertColumns(ins.json, ins.text, ['contact_id', 'client_id']).length || /deal_id|not-null|null value/i.test(String(ins.text || JSON.stringify(ins.json || ''))))) return { status: 409, message: NEEDS_UPDATE };
@@ -65,11 +69,15 @@ export async function handleSalesTasks(req: Request, site: SiteRow, principal: P
     // the whole open list (Home shows its first few), and what was done lately, newest first
     const since = encodeURIComponent(new Date(Date.now() - DONE_DAYS * 86_400_000).toISOString());
     const donePath = (cols: string) => `presence_deal_tasks?site_id=eq.${site.id}&status=eq.done&deleted_at=is.null&completed_at=gte.${since}&select=${cols}&order=completed_at.desc&limit=100`;
+    // item 37: mine=1 is your own (a to-do or deal with no owner is the business owner's); without it, the team's
+    const team = new URL(req.url).searchParams.get('mine') === '1' ? await teamOf(principal) : null;
     const [mine, doneR] = await Promise.all([
-      loadMyTasks(site.id, principal.userId || null),
-      svc(donePath('id,deal_id,contact_id,client_id,title,due_date,completed_at')).then((r) => r.ok ? r : svc(donePath('id,deal_id,title,due_date,completed_at'))).catch(() => null),
+      loadMyTasks(site.id, principal.userId || null, team),
+      // each done one's owner (0199) rides along, then the reads from before it
+      svc(donePath('id,deal_id,contact_id,client_id,title,due_date,completed_at,assigned_to')).then((r) => r.ok ? r : svc(donePath('id,deal_id,contact_id,client_id,title,due_date,completed_at')))
+        .then((r) => r.ok ? r : svc(donePath('id,deal_id,title,due_date,completed_at'))).catch(() => null),
     ]);
-    const done = doneR && doneR.ok ? rows(doneR) : [];
+    const done = (doneR && doneR.ok ? rows(doneR) : []).filter((t: any) => !team || team.ids.length < 2 || isMine(team, t.assigned_to));
     // what each done one was for, the way the open list says it
     const ids = (k: string) => [...new Set(done.map((t: any) => String(t[k] || '')).filter((x: string) => UUID_RE.test(x)))].slice(0, 100);
     const [deals, people, customers] = await Promise.all([
@@ -81,7 +89,7 @@ export async function handleSalesTasks(req: Request, site: SiteRow, principal: P
     const doneItems = done.map((t: any) => {
       const ctx = t.deal_id ? (nameOf(deals, t.deal_id, 'title') || 'A deal') : t.contact_id ? (nameOf(people, t.contact_id) || 'A contact') : t.client_id ? (nameOf(customers, t.client_id) || 'A customer') : 'Your own to-do';
       const href = t.deal_id ? `/pipeline.html?deal=${t.deal_id}` : t.contact_id ? `/crm.html?contact=${t.contact_id}` : t.client_id ? `/crm.html?client_id=${t.client_id}` : '/todos.html';
-      return { id: t.id, title: String(t.title || 'To-do'), context: ctx, href, completed_at: t.completed_at, due: t.due_date || null, for: t.deal_id ? 'deal' : t.contact_id ? 'person' : t.client_id ? 'customer' : 'me' };
+      return { id: t.id, title: String(t.title || 'To-do'), context: ctx, href, completed_at: t.completed_at, due: t.due_date || null, for: t.deal_id ? 'deal' : t.contact_id ? 'person' : t.client_id ? 'customer' : 'me', owner: t.assigned_to ? String(t.assigned_to) : null };
     });
     return json({ data: { items: mine.all, total: mine.all.length, done: doneItems, done_days: DONE_DAYS, partial: mine.partial || !(doneR && doneR.ok) } }, 200, cors);
   }
@@ -92,7 +100,10 @@ export async function handleSalesTasks(req: Request, site: SiteRow, principal: P
     const due = typeof b.due_date === 'string' && DAY_RE.test(b.due_date) ? b.due_date : null;
     const t = await resolveTarget(site.id, b);
     if ('error' in t) return json({ error: 'bad_target', message: t.error }, 422, cors);
-    const out = await insertTodo(site.id, t, title, due);
+    // item 37: whoever adds a to-do owns it, unless it names someone on the team
+    let owner: string | null = principal.userId || null;
+    if (b.assigned_to !== undefined) { const o = ownerToSet(await teamOf(principal), b.assigned_to); if (!o.ok) return json({ error: 'validation', message: 'That person isn’t on your team.' }, 422, cors); owner = o.value || principal.userId || null; }
+    const out = await insertTodo(site.id, t, title, due, owner);
     if (!out.row) return json({ error: out.status === 409 ? 'needs_update' : 'write_failed', message: out.message }, out.status || 502, cors);
     return json({ data: { ...out.row, for: t.deal_id ? 'deal' : t.contact_id ? 'person' : t.client_id ? 'customer' : 'me', context: t.name || 'Your own to-do' } }, 201, cors);
   }
@@ -122,7 +133,7 @@ export async function handlePeopleActivity(req: Request, site: SiteRow, principa
   let followUp: any = null;
   const fu = typeof b.follow_up === 'string' && DAY_RE.test(b.follow_up) ? b.follow_up : '';
   if (fu) {
-    const out = await insertTodo(site.id, t, clean(b.follow_up_title, 200) || (t.name ? `Follow up with ${t.name}` : 'Follow up'), fu);
+    const out = await insertTodo(site.id, t, clean(b.follow_up_title, 200) || (t.name ? `Follow up with ${t.name}` : 'Follow up'), fu, principal.userId || null);
     followUp = out.row || { error: out.message };
   }
   return json({ data: { item: rows(ins)[0], last_contacted_at: occurredAt, ...(followUp ? { follow_up: followUp } : {}) } }, 201, cors);

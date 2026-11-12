@@ -57,6 +57,7 @@ import { summarizeAttachments, attachmentWarning, duplicateHints, listSentence }
 import type { SiteRow } from '../lib/site.ts';
 import type { Principal } from '../../_shared/auth.ts';
 import { UUID_RE } from '../lib/uuid.ts';
+import { teamOf, isMine, mineFilter, ownerToSet, type Team } from '../lib/team_owner.ts';   // item 37: owners and Mine
 import { readCloseDates } from '../lib/deal_closes.ts';
 import { reopenEnquiry } from '../lib/enquiry_state.ts';
 import { normEmail, emailMatch, isUniqueViolation } from '../lib/contact_email.ts';   // item 110 (K1): one person, one email, whatever its capitals
@@ -943,21 +944,26 @@ export async function loadReceivables(site: SiteRow, todayYmd?: string) {
 // All reads/writes tolerate migration 0108 not being applied yet (degrade to empty).
 export async function handleDealTasksList(_req: Request, site: SiteRow, _principal: Principal, dealId: string, cors: Record<string, string>): Promise<Response> {
   if (!UUID_RE.test(dealId)) return json({ error: 'bad_request' }, 400, cors);
-  const r = await svc(`presence_deal_tasks?site_id=eq.${site.id}&deal_id=eq.${dealId}&deleted_at=is.null&select=id,title,due_date,status,completed_at,created_at&order=status.asc,due_date.asc.nullslast,created_at.asc&limit=200`);
+  const path = (cols: string) => `presence_deal_tasks?site_id=eq.${site.id}&deal_id=eq.${dealId}&deleted_at=is.null&select=${cols}&order=status.asc,due_date.asc.nullslast,created_at.asc&limit=200`;
+  let r = await svc(path('id,title,due_date,status,completed_at,created_at,assigned_to'));   // item 37: the owner (APPLY-0199)
+  if (!r.ok) r = await svc(path('id,title,due_date,status,completed_at,created_at'));
   if (!r.ok) return json({ data: [] }, 200, cors);   // table not migrated yet → empty, never breaks the deal
   return json({ data: rows(r) }, 200, cors);
 }
-export async function handleDealTaskCreate(req: Request, site: SiteRow, _principal: Principal, dealId: string, cors: Record<string, string>): Promise<Response> {
+export async function handleDealTaskCreate(req: Request, site: SiteRow, principal: Principal, dealId: string, cors: Record<string, string>): Promise<Response> {
   if (!UUID_RE.test(dealId)) return json({ error: 'bad_request' }, 400, cors);
   let b: any = {}; try { b = await req.json(); } catch { return json({ error: 'bad_json' }, 400, cors); }
   const title = clean(b.title, 200);
   if (!title) return json({ error: 'validation', message: 'Give the to-do a title.' }, 422, cors);
   const due = (typeof b.due_date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(b.due_date)) ? b.due_date : null;
-  const ins = await svc('presence_deal_tasks', { method: 'POST', headers: { Prefer: 'return=representation' }, body: JSON.stringify({ site_id: site.id, deal_id: dealId, title, due_date: due, status: 'open' }) });
+  // item 37: whoever adds a to-do owns it (before APPLY-0199 it saves without its owner)
+  const row: Record<string, unknown> = { site_id: site.id, deal_id: dealId, title, due_date: due, status: 'open', ...(principal.userId && UUID_RE.test(principal.userId) ? { assigned_to: principal.userId } : {}) };
+  let ins = await svc('presence_deal_tasks', { method: 'POST', headers: { Prefer: 'return=representation' }, body: JSON.stringify(row) });
+  if (!ins.ok && 'assigned_to' in row && missingInsertColumns(ins.json, ins.text, ['assigned_to']).length) { delete row.assigned_to; ins = await svc('presence_deal_tasks', { method: 'POST', headers: { Prefer: 'return=representation' }, body: JSON.stringify(row) }); }
   if (!ins.ok || !rows(ins)[0]) return json({ error: 'write_failed', message: 'Deal to-dos need a database update (migration 0108) before they can be saved.' }, 502, cors);
   return json({ data: rows(ins)[0] }, 201, cors);
 }
-export async function handleDealTaskUpdate(req: Request, site: SiteRow, _principal: Principal, taskId: string, cors: Record<string, string>): Promise<Response> {
+export async function handleDealTaskUpdate(req: Request, site: SiteRow, principal: Principal, taskId: string, cors: Record<string, string>): Promise<Response> {
   if (!UUID_RE.test(taskId)) return json({ error: 'bad_request' }, 400, cors);
   let b: any = {}; try { b = await req.json(); } catch { return json({ error: 'bad_json' }, 400, cors); }
   const patch: Record<string, unknown> = {};
@@ -972,6 +978,8 @@ export async function handleDealTaskUpdate(req: Request, site: SiteRow, _princip
   else if (b.status === 'done') { patch.status = 'done'; patch.completed_at = nowIso(); }
   else if (b.status === 'open') { patch.status = 'open'; patch.completed_at = null; }
   else if (b.title !== undefined) { const t = clean(b.title, 200); if (!t) return json({ error: 'validation' }, 422, cors); patch.title = t; }
+  // item 37: the owner is changed on the to-do, to someone on the team (empty = the business owner)
+  if (b.assigned_to !== undefined && !patch.deleted_at) { const o = ownerToSet(await teamOf(principal), b.assigned_to); if (!o.ok) return json({ error: 'validation', message: 'That person isn’t on your team.' }, 422, cors); patch.assigned_to = o.value; }
   if (!Object.keys(patch).length) return json({ error: 'bad_request' }, 400, cors);
   const up = await svc(`presence_deal_tasks?id=eq.${taskId}&site_id=eq.${site.id}`, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify(patch) });
   return up.ok ? json({ data: { ok: true } }, 200, cors) : json({ error: 'write_failed' }, 502, cors);
@@ -1039,14 +1047,17 @@ export async function handleSalesReports(_req: Request, site: SiteRow, _principa
 // best-effort: a failed slot contributes nothing and `partial` says so, never a
 // false "nothing to do". The rule lives in lib/my_tasks.ts.
 // Shared with the calendar link (item 46), which puts the dated ones in Google Calendar.
-export async function loadMyTasks(siteId: string, userId: string | null): Promise<{ all: ReturnType<typeof buildMyTasks>; partial: boolean }> {
+export async function loadMyTasks(siteId: string, userId: string | null, team: Team | null = null): Promise<{ all: ReturnType<typeof buildMyTasks>; partial: boolean }> {
   let partial = false;
   const read = async (path: string) => { try { const r = await svc(path); if (!r.ok) { partial = true; return []; } return rows(r); } catch { partial = true; return []; } };
   // item 85: a to-do may be for a person or a customer (APPLY-0173); before it, the older select
   const tasksPath = (cols: string) => `presence_deal_tasks?site_id=eq.${siteId}&status=eq.open&deleted_at=is.null&select=${cols}&order=due_date.asc.nullslast,created_at.asc&limit=200`;   // batch B: ordered, so the cap keeps the soonest
   const [deals, dealTasks, projectTasks] = await Promise.all([
-    read(`presence_deals?site_id=eq.${siteId}&deleted_at=is.null&stage=in.(lead,qualified,proposal,contract)&select=id,title,stage,next_step,next_step_at&order=updated_at.desc&limit=200`),
-    svc(tasksPath('id,deal_id,contact_id,client_id,title,due_date,status')).then((r) => r.ok ? rows(r) : read(tasksPath('id,deal_id,title,due_date,status'))).catch(() => read(tasksPath('id,deal_id,title,due_date,status'))),
+    read(`presence_deals?site_id=eq.${siteId}&deleted_at=is.null&stage=in.(lead,qualified,proposal,contract)&select=id,title,stage,next_step,next_step_at,assigned_to&order=updated_at.desc&limit=200`),
+    // item 37: each to-do's owner (APPLY-0199), then the item 85 select, then the oldest
+    svc(tasksPath('id,deal_id,contact_id,client_id,title,due_date,status,assigned_to'))
+      .then((r) => r.ok ? rows(r) : svc(tasksPath('id,deal_id,contact_id,client_id,title,due_date,status')).then((r2) => r2.ok ? rows(r2) : read(tasksPath('id,deal_id,title,due_date,status'))))
+      .catch(() => read(tasksPath('id,deal_id,title,due_date,status'))),
     read(`presence_tasks?site_id=eq.${siteId}&status=in.(todo,in_progress,blocked)&client_action_required=eq.false&deleted_at=is.null&select=id,project_id,title,status,due_date,assigned_to,client_action_required,sort_order&order=due_date.asc.nullslast,created_at.asc&limit=300`),   // batch B: ordered, so the cap keeps the soonest
   ]);
   const ids = (list: any[], k: string) => [...new Set(list.map((x) => String(x?.[k] || '')).filter((x) => UUID_RE.test(x)))];
@@ -1058,10 +1069,12 @@ export async function loadMyTasks(siteId: string, userId: string | null): Promis
     personIds.length ? read(`presence_contacts?id=in.(${personIds.join(',')})&site_id=eq.${siteId}&select=id,name,email,deleted_at`) : Promise.resolve([]),
     customerIds.length ? read(`clients?id=in.(${customerIds.join(',')})&select=id,name,email`) : Promise.resolve([]),
   ]);
-  return { all: buildMyTasks({ deals, dealTasks, taskDeals, projectTasks, projects, userId, people, customers }), partial };
+  // item 37: with a second person on the team, My tasks is yours (a deal or to-do with no owner is the business owner's)
+  const mine = team && team.ids.length > 1 ? (o: unknown) => isMine(team, o) : undefined;
+  return { all: buildMyTasks({ deals, dealTasks, taskDeals, projectTasks, projects, userId, people, customers, mine }), partial };
 }
 export async function handleSalesMyTasks(_req: Request, site: SiteRow, principal: Principal, cors: Record<string, string>): Promise<Response> {
-  const { all, partial } = await loadMyTasks(site.id, principal.userId || null);
+  const { all, partial } = await loadMyTasks(site.id, principal.userId || null, await teamOf(principal));
   return json({ data: { items: all.slice(0, MY_TASKS_MAX), total: all.length, partial } }, 200, cors);
 }
 
@@ -1077,12 +1090,21 @@ export async function handleSalesDeals(req: Request, site: SiteRow, principal: P
     // back to the pre-0089 shape so a deploy ahead of the migration never breaks
     // the pipeline list.
     // item 90: created_at rides along for the "Added this month" filter
-    const baseCols = 'id,title,stage,source,expected_value_cents,expected_close,contact_id,converted_client_id,updated_at,created_at';
-    const filters = `${stage && isStage(stage) ? `&stage=eq.${stage}` : ''}${q ? `&title.ilike.*${encodeURIComponent(q)}*` : ''}`;
+    // item 37: assigned_to (the owner, 0074) rides along, and mine=1 asks for the caller's own
+    const baseCols = 'id,title,stage,source,expected_value_cents,expected_close,contact_id,converted_client_id,assigned_to,updated_at,created_at';
+    const mine = u.searchParams.get('mine') === '1' ? mineFilter(await teamOf(principal)) : '';
+    // sales item 121: the board asks for the OPEN deals only (open=1), page by page, so an open deal
+    // nobody has touched for months never drops off behind a hundred newer won ones. And the name
+    // search is a filter PostgREST reads: `title=ilike.*q*` (it was `&title.ilike.*q*`, a part with no
+    // "=" that PostgREST quietly ignores, so + Create's search by deal name found only what was already loaded).
+    const openOnly = u.searchParams.get('open') === '1';
+    const filters = `${openOnly ? `&stage=in.(${REPORT_OPEN_STAGES.join(',')})&converted_client_id=is.null` : stage && isStage(stage) ? `&stage=eq.${stage}` : ''}${q ? `&title=ilike.*${encodeURIComponent(q)}*` : ''}${mine}`;
+    // id breaks ties in the order, so offset pages never repeat or skip a deal (item 66's rule for contacts)
+    const order = 'updated_at.desc,id.desc';
     // item 105: found_via (APPLY-0143) rides along for the list's "Where they came from" chart, then the same read without it.
-    let r = await svc(`presence_deals?site_id=eq.${site.id}&deleted_at=is.null&select=${baseCols},next_step,next_step_at,found_via&order=updated_at.desc&limit=${limit}&offset=${offset}${filters}`);
-    if (!r.ok) r = await svc(`presence_deals?site_id=eq.${site.id}&deleted_at=is.null&select=${baseCols},next_step,next_step_at&order=updated_at.desc&limit=${limit}&offset=${offset}${filters}`);
-    if (!r.ok) r = await svc(`presence_deals?site_id=eq.${site.id}&deleted_at=is.null&select=${baseCols}&order=updated_at.desc&limit=${limit}&offset=${offset}${filters}`);
+    let r = await svc(`presence_deals?site_id=eq.${site.id}&deleted_at=is.null&select=${baseCols},next_step,next_step_at,found_via&order=${order}&limit=${limit}&offset=${offset}${filters}`);
+    if (!r.ok) r = await svc(`presence_deals?site_id=eq.${site.id}&deleted_at=is.null&select=${baseCols},next_step,next_step_at&order=${order}&limit=${limit}&offset=${offset}${filters}`);
+    if (!r.ok) r = await svc(`presence_deals?site_id=eq.${site.id}&deleted_at=is.null&select=${baseCols}&order=${order}&limit=${limit}&offset=${offset}${filters}`);
     if (!r.ok) return json({ error: 'read_failed', message: 'We couldn’t load your pipeline just now.' }, 502, cors);
     const deals = rows(r);
     // "Last contacted" per card — ONE extra query over the manual activities
@@ -1173,7 +1195,15 @@ export async function handleSalesDeals(req: Request, site: SiteRow, principal: P
       const fr = await svc(`presence_contacts?id=eq.${contactId}&site_id=eq.${site.id}&select=found_via&limit=1`).catch(() => null);   // before APPLY-0143 this 400s: nothing to inherit
       foundVia = fr && fr.ok ? normalizeFoundVia(rows(fr)[0]?.found_via) : '';
     }
-    const ins = await insertWithFoundVia('presence_deals', { site_id: site.id, contact_id: contactId, title, stage: startStage,
+    // item 37: whoever adds a deal owns it; one made from a website enquiry starts with the business
+    // owner; a named owner must be on the team
+    let owner: string | null = principal.userId && UUID_RE.test(principal.userId) ? principal.userId : null;
+    if (srcSub || b.assigned_to !== undefined) {
+      const team = await teamOf(principal);
+      if (b.assigned_to !== undefined) { const o = ownerToSet(team, b.assigned_to); if (!o.ok) return json({ error: 'validation', message: 'That person isn’t on your team.' }, 422, cors); owner = o.value; }
+      else owner = team.owner || owner;
+    }
+    const ins = await insertWithFoundVia('presence_deals', { site_id: site.id, contact_id: contactId, title, stage: startStage, ...(owner ? { assigned_to: owner } : {}),
         source: clean(b.source, 40) || (srcSub ? 'website_form' : 'manual'), source_submission_id: srcSub,
         expected_value_cents: Math.min(1_000_000_00, Math.max(0, Math.trunc(Number(b.expected_value_cents)) || 0)), // R6: bounded like line items
         expected_close: closeDate || null, notes: clean(b.notes, 2000) || (enquiry ? clean(`Website enquiry: ${enquiry}`, 2000) : ''),
@@ -1259,7 +1289,8 @@ export async function handleSalesDeal(req: Request, site: SiteRow, principal: Pr
     if (b.notes !== undefined) patch.notes = clean(b.notes, 2000);
     if (b.expected_value_cents !== undefined) patch.expected_value_cents = Math.min(1_000_000_00, Math.max(0, Math.trunc(Number(b.expected_value_cents)) || 0));
     if (b.expected_close !== undefined) { const cd = b.expected_close ? clean(b.expected_close, 10) : ''; if (cd && !DATE_RE.test(cd)) return json({ error: 'validation', message: 'Expected close must be a date (YYYY-MM-DD).' }, 422, cors); patch.expected_close = cd || null; }
-    if (b.assigned_to !== undefined) patch.assigned_to = UUID_RE.test(b.assigned_to || '') ? b.assigned_to : null;
+    // item 37: the owner can be changed on the deal, to someone on the team (empty = the business owner)
+    if (b.assigned_to !== undefined) { const o = ownerToSet(await teamOf(principal), b.assigned_to); if (!o.ok) return json({ error: 'validation', message: 'That person isn’t on your team.' }, 422, cors); patch.assigned_to = o.value; }
     if (b.found_via !== undefined) patch.found_via = normalizeFoundVia(b.found_via);   // item 69: "How did they find you?"
     // The deal's CONTACT is editable AFTER creation. Both the name and the email
     // are optional on the create form, so a deal can start with contact_id null —

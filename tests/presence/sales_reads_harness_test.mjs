@@ -61,8 +61,10 @@ const world = () => ({
   await B.handleBroadcastListCreate(req('POST', '/broadcasts/lists', { name: 'Picked', people: [{ email: 'bo@example.com' }] }), site, owner, cors);
   await CAL.handleCalendarLink(req('GET', '/calendar/link'), site, owner, cors);
   const reads = db.log.filter((c) => c.method === 'GET');
-  // `clients` has no site: it is read only by the ids this studio's own links name
-  const stray = reads.filter((c) => !c.url.startsWith('/rest/v1/clients?') && !c.url.includes(`site_id=eq.${SITE}`));
+  // `clients` has no site: it is read only by the ids this studio's own links name. Sales item 37:
+  // My tasks asks who the caller is (/auth/v1/user, their own sign-in) and their team
+  // (presence_agency_members by the agency that sign-in belongs to), so it can show only theirs
+  const stray = reads.filter((c) => !c.url.startsWith('/rest/v1/clients?') && !c.url.startsWith('/auth/v1/user') && !c.url.startsWith('/rest/v1/presence_agency_members?agency_id=eq.') && !c.url.includes(`site_id=eq.${SITE}`));
   ok('1: every read of a studio table names this studio\'s site', reads.length > 10 && stray.length === 0, stray.map((c) => c.url.slice(0, 90)).join(' | '));
   const cl = reads.filter((c) => c.url.startsWith('/rest/v1/clients?'));
   ok('1: the client names are read only for this studio\'s own customers', cl.every((c) => c.url.includes(`id=in.(${CUST})`)), cl.map((c) => c.url).join(' | '));

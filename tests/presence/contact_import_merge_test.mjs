@@ -38,7 +38,8 @@ const post = (b) => S.handleSalesContacts(req('POST', '/sales/contacts', b), sit
   const m = L.mergeValues({ name: 'Jordan Ellis', email: 'jordan@ellis.example', phone: '', tags: ['referral'], notes: 'A', custom: { a: '1' } }, { name: 'J. Ellis', email: 'j.ellis@mail.example', phone: '555-0144', tags: ['dental'], notes: 'B', custom: { a: '2', b: '3' } }, { email: 'other' });
   ok('mergeValues: the picked email, the kept name, an empty phone filled from the other', m.values.email === 'j.ellis@mail.example' && m.values.name === 'Jordan Ellis' && m.values.phone === '555-0144');
   ok('mergeValues: tags from both, your own fields from both (kept wins)', JSON.stringify(m.values.tags) === JSON.stringify(['referral', 'dental']) && JSON.stringify(m.values.custom) === JSON.stringify({ a: '1', b: '3' }));
-  ok('mergeValues: notes from both, and the email not kept is noted', m.values.notes === 'A\n\nB\n\nAlso wrote from jordan@ellis.example');
+  // sales item 121: the line that keeps the old email findable goes first, so a cut never loses it
+  ok('mergeValues: notes from both, and the email not kept is noted first', m.values.notes === 'Also wrote from jordan@ellis.example\n\nA\n\nB' && m.notesCut === 0);
   ok('mergeValues: two different customers is a merge to refuse', L.mergeValues({ client_id: CUST }, { client_id: CUST2 }).conflict === 'different_customers' && L.mergeValues({ client_id: CUST }, { client_id: null }).values.client_id === CUST);
 }
 
@@ -105,6 +106,7 @@ const mergeWorld = () => ({
 {
   db.reset(mergeWorld());
   const dry = await res(await M.handleContactMerge(req('POST', `/sales/contacts/${C1}/merge`, { from: C2, pick: { email: 'other' } }), site, owner, C1, cors));
+  ok('item 121: the dry run says nothing would be cut from these short notes', dry.body?.data?.notes_cut === 0);
   ok('merge: without confirm it shows both records and what would move, and writes nothing', dry.status === 200 && dry.body?.data?.dry_run === true && dry.body.data.moves.deals === 1 && dry.body.data.moves.bookings === 1 && dry.body.data.result.email === 'j.ellis@mail.example' && db.log.filter((c) => c.method !== 'GET').length === 0);
   const go = await res(await M.handleContactMerge(req('POST', `/sales/contacts/${C1}/merge`, { from: C2, pick: { email: 'other' }, confirm: true }), site, owner, C1, cors));
   ok('merge: done, and says what moved', go.status === 200 && go.body?.data?.merged === true && go.body.data.moved.deals === 1 && go.body.data.moved.bookings === 1 && go.body.data.moved.reviews === 1, JSON.stringify(go.body));

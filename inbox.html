@@ -91,6 +91,10 @@
   .efilt .n{font-size:11px;font-weight:600;background:var(--card);color:var(--soft);border-radius:999px;padding:0 6px;min-width:18px;text-align:center;line-height:17px}
   .efilt button.on .n{background:var(--p);color:#fff}
   .ebar{display:flex;gap:6px;margin-top:var(--dds-s2,8px);flex-wrap:wrap;align-items:center}
+  /* sales item 121: free-tool leads live on Prospects; Enquiries says so */
+  .enqtool{margin:var(--dds-s2,8px) 0 0;font-size:13px;line-height:1.45;color:var(--soft)}
+  .enqtool b{color:var(--ink);font-weight:600}
+  .enqtool a{color:var(--p);font-weight:600;white-space:nowrap}
   .ebar select{flex:1 1 30%;min-width:0;font-size:13px;padding:6px var(--dds-s2,8px);border-radius:999px;background:var(--bg)}
   .ebar select[data-on="1"]{border-color:var(--p);color:var(--p);font-weight:700;background:var(--p-soft)}
   .ebar #newEnq{flex:0 0 auto;font-size:12.5px;border-radius:999px;padding:6px var(--dds-s3,12px)}
@@ -119,6 +123,16 @@
   @media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .prio.urgent{color:var(--bad)}}
   :root[data-theme="dark"] .prio.urgent{color:var(--bad)}
   .asg{flex:0 0 auto;font-size:12px;color:var(--soft);white-space:nowrap}
+  /* sales item 37: Mine / Everyone on Support, and each request's owner, with a second person on the team */
+  .asg.own{display:inline-flex;align-items:center;gap:5px;font-weight:600;background:var(--tag,#f1eff5);border-radius:999px;padding:1px 8px 1px 2px}
+  .asg.own::before{content:attr(data-ini);width:18px;height:18px;border-radius:50%;display:grid;place-items:center;font-size:9px;font-weight:700;color:#fff;background:#2f7d74}
+  .asg.own.me::before{background:var(--p)}
+  .supown{margin:6px 0 2px}
+  .owntog{display:inline-flex;gap:2px;padding:3px;border-radius:999px;background:color-mix(in srgb,var(--p) 12%,var(--card))}
+  .owntog button{font:inherit;font-size:13px;font-weight:600;border:none;border-radius:999px;padding:6px 12px;min-height:32px;background:none;color:var(--soft);cursor:pointer;display:inline-flex;gap:6px;align-items:center}
+  .owntog button[aria-pressed="true"]{background:var(--p);color:var(--dds-on-p,#fff)}
+  .owntog .n{font-size:12px;font-weight:700;opacity:.8}
+  @media (max-width:760.98px),(pointer:coarse){.owntog button{min-height:44px}}
   .triage{display:flex;flex-wrap:wrap;align-items:center;gap:var(--dds-s2,8px) var(--dds-s4,16px);margin-top:var(--dds-s3,12px);padding-top:var(--dds-s3,12px);border-top:1px solid var(--line);font-size:12.5px;color:var(--faint)}
   .triage label{display:inline-flex;align-items:center;gap:6px}
   .triage select{font:inherit;font-size:13px;color:var(--ink);background:var(--card);border:1px solid var(--line);border-radius:var(--dds-r,8px);padding:4px 8px;min-height:32px}
@@ -687,6 +701,7 @@ function renderConsole(){
         <div class="seg vseg" id="vseg" role="group" aria-label="Show"></div>
         <div class="lfilters" id="lfilters" hidden></div>
         ${VIEW==='enquiries'?enqToolbar():''}
+        ${VIEW==='support'?'<div class="supown" id="supOwn" hidden></div>':''}
         <div class="lmeta" id="lmeta"></div>
         <div class="lnotice" id="lnotice" role="status" hidden></div>
       </div>
@@ -749,7 +764,24 @@ function enqToolbar(){
       <select id="kindf" aria-label="Filter by kind" data-on="${KIND_F==='all'?'0':'1'}">${opt('all','All kinds',KIND_F)}${opt('quote','Quotes',KIND_F)}${opt('booking','Bookings',KIND_F)}${opt('contact','Messages',KIND_F)}</select>
       <select id="sortf" aria-label="Sort enquiries">${opt('newest','Newest',SORT)}${opt('oldest','Oldest',SORT)}</select>
       <button type="button" class="btnlink" id="newEnq" data-new>+ New enquiry</button>
-    </div>`;
+    </div>
+    <p class="enqtool" id="enqTool" hidden></p>`;
+}
+// ── Sales item 121 (Nov 2026, Eric's pick): free-tool leads stay on Prospects ──
+// People who run the free Site Review or AI Visibility check and leave their email are
+// the platform's own enquiries (GET /sales/tool-leads answers staff only). They're worked
+// on Prospects, so Enquiries points there, with how many are new. Anyone else gets a
+// 403 and sees nothing; so does one client's Inbox (?client=), whose enquiries are theirs.
+let TOOL_LEADS_P=null;
+function paintToolLeads(){
+  const host=$('enqTool');if(!host||new URLSearchParams(location.search).get('client'))return;
+  TOOL_LEADS_P=TOOL_LEADS_P||api('/sales/tool-leads').then(r=>r.ok&&Array.isArray(r.body&&r.body.data)?r.body.data:null).catch(()=>null);
+  TOOL_LEADS_P.then(list=>{
+    const h=$('enqTool');if(!h||!list)return;
+    const n=list.filter(l=>(l&&l.status||'new')==='new').length;
+    h.innerHTML=(n?`<b>${n} ${n===1?'person':'people'}</b> who ran your free Site Review or AI Visibility check ${n===1?'is':'are'} waiting on Prospects.`:'People who run your free Site Review or AI Visibility check show up on Prospects, not here.')+' <a href="/prospects.html">Open Prospects →</a>';
+    h.hidden=false;
+  });
 }
 function wireEnqToolbar(){
   const ef=$('efilt');if(!ef)return;
@@ -762,6 +794,7 @@ function wireEnqToolbar(){
   const kf=$('kindf');kf.addEventListener('change',()=>{KIND_F=kf.value;kf.setAttribute('data-on',KIND_F==='all'?'0':'1');narrowed();});
   const sf=$('sortf');sf.addEventListener('change',()=>{SORT=sf.value;narrowed();});
   $('newEnq').addEventListener('click',openNew);
+  paintToolLeads();   // item 121
 }
 // the queue's counts on the Open / New chips — every enquiry, before search
 function paintEnqCounts(){
@@ -897,7 +930,7 @@ function lensMatch(r){
 }
 // the Website view = what your site needs: approvals, its enquiries, and the site's own notices
 function visibleRows(){
-  const v=[...ITEMS.filter(viewMatch),...(VIEW==='everything'?SYSROWS:VIEW==='website'?SYSROWS.filter(r=>r.notice):[])].filter(lensMatch).filter(rowMatch).filter(enqMatch);
+  const v=[...ITEMS.filter(viewMatch),...(VIEW==='everything'?SYSROWS:VIEW==='website'?SYSROWS.filter(r=>r.notice):[])].filter(lensMatch).filter(rowMatch).filter(enqMatch).filter(ownMatch);
   // the Enquiries view can flip to oldest first (ITEMS are newest first)
   return (VIEW==='enquiries'&&SORT==='oldest')?v.sort((a,b)=>String(a.when).localeCompare(String(b.when))):v;
 }
@@ -924,6 +957,7 @@ function activateRow(it){if(it.sys){location.href=it.href||'/today.html';return;
 // ── the list pane rows (two-line, unread dot, channel chip) ──────────────────
 function renderList(){
   const rows=$('rows');if(!rows)return;
+  paintSupOwn();   // item 37
   const vis=visibleRows();
   const convs=vis.filter(r=>!r.sys);   // the meta counts what the list SHOWS (search included)
   const need=convs.filter(i=>i.unread||i.needs).length;
@@ -1284,7 +1318,8 @@ const SUPPORT_LABEL={open:'Open',in_progress:'In progress',resolved:'Resolved',c
 // (/agency/members, by the sign-in id each member's row learns): the assignee
 // picker shows only when a second person has signed in (decision 6).
 const PRIO_LABEL={low:'Low',normal:'Normal',high:'High',urgent:'Urgent'};
-let TEAM=null,TEAM_P=null;
+let TEAM=null,TEAM_P=null,SUP_MINE=true;
+try{SUP_MINE=localStorage.getItem('dds-inbox-sup-mine')!=='0';}catch(_){/* storage may be denied */}
 function loadTeam(){
   if(TEAM)return Promise.resolve(TEAM);
   if(TEAM_P)return TEAM_P;
@@ -1293,17 +1328,40 @@ function loadTeam(){
     const myId=(me.ok&&me.body.data&&me.body.data.member_id)||'';
     const myRow=list.find(m=>m.id===myId);
     const meUid=myRow&&myRow.user_id?String(myRow.user_id):'';
-    const people=list.filter(m=>m&&m.status!=='revoked'&&m.user_id).map(m=>({uid:String(m.user_id),label:String(m.user_id)===meUid?'You':(String(m.email||'').split('@')[0]||'A teammate')}));
-    TEAM={me:meUid,people};return TEAM;
-  }).catch(()=>{TEAM={me:'',people:[]};return TEAM;});
+    // item 37: active seats only (the server checks the same), and who the business owner is
+    const people=list.filter(m=>m&&(m.status||'active')==='active'&&m.user_id).map(m=>{const e=String(m.email||'').split('@')[0],l=e?e.charAt(0).toUpperCase()+e.slice(1):'A teammate';return{uid:String(m.user_id),label:String(m.user_id)===meUid?'You':l,ini:(l.split(/[._-]+/).filter(Boolean).map(x=>x[0]).join('').slice(0,2)||'?').toUpperCase()};});
+    const own=list.find(m=>m&&m.role==='owner'&&m.user_id&&(m.status||'active')==='active');
+    TEAM={me:meUid,owner:own?String(own.user_id):meUid,people};return TEAM;
+  }).catch(()=>{TEAM={me:'',owner:'',people:[]};return TEAM;});
   return TEAM_P;
 }
 function whoHas(uid){if(!uid)return'';const p=TEAM&&TEAM.people.find(x=>x.uid===uid);return p?p.label:(TEAM?'A teammate':'');}
+// ── Sales item 37: owners, and Mine on Support ────────────────────────────────
+// With a second person on the team, every request has an owner: whoever added it, the
+// business owner for one a client sends, or whoever it was handed to. One with no owner
+// (from before owners existed) is the business owner's. Support opens on Mine.
+const teamOn=()=>!!(TEAM&&TEAM.me&&TEAM.people.length>1);
+const reqOwner=(it)=>it&&it.assigned_to?String(it.assigned_to):(TEAM?TEAM.owner:'');
+const isMineReq=(it)=>!!TEAM&&reqOwner(it)===TEAM.me;
+const ownMatch=(r)=>!(VIEW==='support'&&SUP_MINE&&teamOn())||r.kind!=='support'||isMineReq(r);
+function paintSupOwn(){
+  const host=$('supOwn');if(!host)return;
+  if(VIEW!=='support'||!teamOn()){host.hidden=true;host.innerHTML='';return;}
+  const reqs=ITEMS.filter(x=>x.kind==='support'&&!x.queue).filter(lensMatch);
+  host.hidden=false;
+  host.innerHTML=`<div class="owntog" role="group" aria-label="Whose requests"><button type="button" data-supown="mine" aria-pressed="${SUP_MINE?'true':'false'}">Mine <span class="n">${reqs.filter(isMineReq).length}</span></button><button type="button" data-supown="all" aria-pressed="${SUP_MINE?'false':'true'}">Everyone <span class="n">${reqs.length}</span></button></div>`;
+  host.querySelectorAll('[data-supown]').forEach(b=>b.addEventListener('click',()=>{SUP_MINE=b.getAttribute('data-supown')==='mine';try{localStorage.setItem('dds-inbox-sup-mine',SUP_MINE?'1':'0');}catch(_){/* */}renderList();renderPane();const nb=host.querySelector(`[data-supown="${SUP_MINE?'mine':'all'}"]`);if(nb)nb.focus();}));
+}
 function supBadges(it){
   if(it.kind!=='support')return'';
   const p=String(it.priority||'normal');
+  const prio=p==='high'||p==='urgent'?`<span class="prio ${p}">${PRIO_LABEL[p]}</span>`:'';
+  if(teamOn()){   // item 37: every request has an owner, shown with their initials
+    const o=TEAM.people.find(x=>x.uid===reqOwner(it));
+    return prio+(o?`<span class="asg own${o.uid===TEAM.me?' me':''}" data-ini="${esc(o.ini)}" title="Owner: ${esc(o.label)}">${o.uid===TEAM.me?'Yours':esc(o.label)}</span>`:'');
+  }
   const who=whoHas(it.assigned_to);
-  return (p==='high'||p==='urgent'?`<span class="prio ${p}">${PRIO_LABEL[p]}</span>`:'')+(who?`<span class="asg">${who==='You'?'Yours':esc(who)}</span>`:'');
+  return prio+(who?`<span class="asg">${who==='You'?'Yours':esc(who)}</span>`:'');
 }
 async function setSupportField(it,field,value,ctl){
   const prev=field==='priority'?it.priority:it.assigned_to;
@@ -1312,7 +1370,7 @@ async function setSupportField(it,field,value,ctl){
   ctl.disabled=false;
   if(!r.ok){ctl.value=prev||'';toast((r.body&&r.body.message)||'That didn’t save — try again in a moment.');return;}
   if(field==='priority'){it.priority=value;toast('Priority: '+(PRIO_LABEL[value]||value)+'.');}
-  else{it.assigned_to=value||'';toast(value?(whoHas(value)==='You'?'It’s yours.':'Assigned to '+whoHas(value)+'.'):'Nobody has it now.');}
+  else{it.assigned_to=value||'';toast(value?(whoHas(value)==='You'?'It’s yours now.':whoHas(value)+' owns it now.'):'Nobody has it now.');}
   renderList();
 }
 // Oct 2026 review: ONE path for every status change — the select, the header's
@@ -1387,10 +1445,11 @@ async function paneSupport(host,it){
     if(seq!==PANE_SEQ)return;
     const w=$('supAsgWrap');if(!w)return;
     if(team.people.length>1){
-      const known=!it.assigned_to||team.people.some(p=>p.uid===it.assigned_to);
-      w.innerHTML=`<label>Assigned to <select id="supAsg"><option value="">Nobody</option>${team.people.map(p=>`<option value="${esc(p.uid)}"${p.uid===it.assigned_to?' selected':''}>${esc(p.label)}</option>`).join('')}${known?'':`<option value="${esc(it.assigned_to)}" selected>A teammate</option>`}</select></label>`;
+      // item 37: the owner (no owner = the business owner), changeable here; it tells nobody
+      const cur=reqOwner(it),known=team.people.some(p=>p.uid===cur);
+      w.innerHTML=`<label title="Changing the owner tells nobody; it moves the request into their Mine.">Owner <select id="supAsg">${team.people.map(p=>`<option value="${esc(p.uid)}"${p.uid===cur?' selected':''}>${esc(p.label)}</option>`).join('')}${known||!cur?'':`<option value="${esc(cur)}" selected>A teammate</option>`}</select></label>`;
       const as=$('supAsg');if(as)as.addEventListener('change',()=>setSupportField(it,'assigned_to',as.value,as));
-    }else if(it.assigned_to){w.textContent='Assigned to '+(whoHas(it.assigned_to)==='You'?'you':whoHas(it.assigned_to));}
+    }else if(it.assigned_to){w.textContent='Owner: '+(whoHas(it.assigned_to)==='You'?'you':whoHas(it.assigned_to));}
     if(ITEMS.some(x=>x.kind==='support'&&x.assigned_to))renderList();   // the row's "who has it" can name people now
   });
   const canResolve=cur==='open'||cur==='in_progress';
@@ -1730,7 +1789,7 @@ async function loadData(){
   ITEMS=buildItems(FEED,LEADS,NOTIFS);
   if(SPAM)ITEMS=ITEMS.concat(SPAM);   // item 140: the Spam chip's rows survive a refresh
   SYSROWS=buildSystem(FEED,NOTIFS);
-  if(!TEAM&&ITEMS.some(x=>x.kind==='support'&&x.assigned_to))loadTeam().then(()=>{if(seq===REQ_SEQ)renderList();});   // item 34: name who has each request
+  if(!TEAM&&ITEMS.some(x=>x.kind==='support'))loadTeam().then(()=>{if(seq===REQ_SEQ)renderList();});   // items 34 + 37: each request's owner, and Mine
   // the meta line's honesty: TOTAL counts what the Everything view actually
   // RENDERS (conversation items + system rows) — never raw feed rows, which
   // group and fold differently (one row per client; moments stay counted).

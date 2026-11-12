@@ -256,6 +256,7 @@ test.describe('item 104 — "Won this month" is your month (B14)', () => {
     const q = new URLSearchParams(asked[0]);
     expect(q.get('today')).toBe('2026-10-31');
     expect(q.get('tzo')).toBe('420');
-    await expect(page.locator('#wonN')).toHaveText('2');                   // the board's own count (the summary failed): both October wins — the UTC month said 1
+    // item 121: the board holds open deals only, so with the summary down the Won column says it can't tell — never a made-up count
+    await expect(page.locator('#wonV')).toHaveText('—');
   });
 });
