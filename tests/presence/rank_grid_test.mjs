@@ -71,8 +71,8 @@ const ME = 'ChIJ_copperline_plumbing_01';
 // ── the scripted world: Google and the database ──
 const SITE = '11111111-1111-4111-8111-111111111111';
 const CENTER = { lat: 34.18, lng: -118.33 };
-let google = [], googleDown = false, googleRefuses = false, rateOk = true;
-let grid = null, scans = [], patches = [], listingUri = null, pasted = null, failSpots = 0;
+let google = [], googleDown = false, googleRefuses = false, rateOk = true, quotaLeft = Infinity;
+let grid = null, scans = [], patches = [], listingUri = null, pasted = null, failSpots = 0, meHidden = false, noAddress = false;
 const reply = (b, s = 200) => new Response(JSON.stringify(b), { status: s, headers: { 'Content-Type': 'application/json' } });
 // at each spot the business comes up lower the farther the spot is from it: 1 at home, 6 a mile out, gone past four miles
 const distMiles = (lat, lng) => Math.hypot((lat - CENTER.lat) * 69.05, (lng - CENTER.lng) * 69.05 * Math.cos(CENTER.lat * Math.PI / 180));
@@ -81,6 +81,7 @@ const fakeGoogle = async (url, init = {}) => {
   google.push({ path: u.pathname, mask, key, method: init.method || 'GET', body: init.body ? JSON.parse(init.body) : null });
   if (googleDown) throw new TypeError('network down');
   if (googleRefuses) return reply({ error: { status: 'PERMISSION_DENIED' } }, 403);
+  if (u.pathname === '/v1/places:searchText' && quotaLeft-- <= 0) return reply({ error: { code: 429, status: 'RESOURCE_EXHAUSTED', message: "Quota exceeded for quota metric 'SearchTextRequest' and limit 'SearchTextRequest per day'" } }, 429);
   if (u.pathname === '/v1/places:searchText' && mask === 'places.id') {
     const at = JSON.parse(init.body).locationBias.circle.center;
     if (failSpots > 0) { failSpots--; return reply({ error: {} }, 500); }
@@ -89,9 +90,10 @@ const fakeGoogle = async (url, init = {}) => {
     if (rank <= 20) ids[rank - 1] = ME;
     return reply({ places: ids.map((id) => ({ id })) });
   }
+  if (u.pathname === '/v1/places:searchText' && mask === 'places.location') return reply({ places: JSON.parse(init.body).textQuery.includes('Burbank') ? [{ location: { latitude: CENTER.lat, longitude: CENTER.lng } }] : [] });
   if (u.pathname === '/v1/places:searchText') return reply({ places: [{ id: ME, displayName: { text: 'Copperline Plumbing' }, formattedAddress: '4410 W Olive Ave, Burbank, CA 91505', primaryTypeDisplayName: { text: 'Plumber' }, googleMapsUri: 'https://maps.google.com/?cid=1' }, { id: 'ChIJ_other_place_0002', displayName: { text: 'Copper Line Electric' }, formattedAddress: '233 E Magnolia Blvd, Burbank', primaryTypeDisplayName: { text: 'Electrician' } }] });
   const id = decodeURIComponent(u.pathname.replace('/v1/places/', ''));
-  if (mask === 'location') return id === ME ? reply({ location: { latitude: CENTER.lat, longitude: CENTER.lng } }) : reply({}, 404);
+  if (mask === 'location') return id === ME ? reply(meHidden ? {} : { location: { latitude: CENTER.lat, longitude: CENTER.lng } }) : reply({}, 404);   // a business that hides its address has no location
   if (mask === 'id,movedPlaceId') return id.startsWith('ChIJ_') ? reply(id === 'ChIJ_old_moved_place' ? { id, movedPlaceId: ME } : { id }) : reply({ error: {} }, 404);
   if (mask === 'displayName,shortFormattedAddress,googleMapsUri') return reply({ displayName: { text: `Name of ${id.slice(-3)}` }, shortFormattedAddress: '1 Main St, Burbank', googleMapsUri: `https://maps.google.com/?cid=${id.length}` });
   return reply({}, 400);
@@ -122,11 +124,11 @@ globalThis.fetch = async (url, init = {}) => {
   }
   if (table === 'presence_connected_data') return reply(listingUri ? [{ data: { listing_review_uri: listingUri } }] : []);
   if (table === 'presence_identity') return reply([{ business_name: 'Copperline Plumbing', google_place_id: pasted }]);
-  if (table === 'presence_locations') return reply([{ address_line1: '4410 W Olive Ave', city: 'Burbank', region: 'CA' }]);
+  if (table === 'presence_locations') return reply(noAddress ? [] : [{ address_line1: '4410 W Olive Ave', city: 'Burbank', region: 'CA', postal_code: '91505' }]);
   return reply([]);
 };
 let scansMissing = false;
-const reset = (s) => { grid = s ? { body: JSON.stringify(s), updated_at: 't0' } : null; scans = []; patches = []; google = []; googleDown = false; googleRefuses = false; rateOk = true; listingUri = null; pasted = null; failSpots = 0; scansMissing = false; Deno.env.set('PLACES_KEY', 'places-test-key'); };
+const reset = (s) => { grid = s ? { body: JSON.stringify(s), updated_at: 't0' } : null; scans = []; patches = []; google = []; googleDown = false; googleRefuses = false; rateOk = true; listingUri = null; pasted = null; failSpots = 0; scansMissing = false; meHidden = false; noAddress = false; quotaLeft = Infinity; Deno.env.set('PLACES_KEY', 'places-test-key'); };
 const stored = () => G.normalizeGridSetting(JSON.parse(grid.body));
 const ON = { enabled: true, phrases: ['plumber', 'emergency plumber'], size: 7, spacing: 1, place: { id: ME, source: 'listing', confirmed_by: 'e', confirmed_at: NOV }, month: '2026-10' };
 
@@ -138,10 +140,11 @@ const ON = { enabled: true, phrases: ['plumber', 'emergency plumber'], size: 7, 
   ok('scan: 49 spot searches and one location look-up, all with the key', r.ok && spotCalls.length === 49 && google.filter((g) => g.mask === 'location').length === 1 && google.every((g) => g.key === 'k'));
   ok('scan: every spot asks for place ids ONLY, the free level', spotCalls.every((g) => g.mask === 'places.id'));
   ok('scan: every spot leans on a circle around itself, for the words the customer types', spotCalls.every((g) => g.body.textQuery === 'plumber' && g.body.locationBias.circle.radius === 805 && g.body.pageSize === 20));
+  ok('scan: businesses that hide their address are asked for too (Text Search leaves them out otherwise)', spotCalls.every((g) => g.body.includePureServiceAreaBusinesses === true));
   const mid = r.points.find((p) => p.r === 3 && p.c === 3), corner = r.points.find((p) => p.r === 0 && p.c === 0);
   eq('scan: first at home; sixth a mile out; not in the top 20 at the far corner', [mid.rank, r.points.find((p) => p.r === 2 && p.c === 3).rank, corner.rank], [1, 6, null]);
   ok('scan: the first three ids at each spot are kept for who comes up ahead', r.points.every((p) => p.top.length === 3) && mid.top[0] === ME);
-  eq('scan: what it asked for', r.requests, { ids_only: 49, location: 1 });
+  eq('scan: what it asked for, centred on the business’s own pin', [r.requests, r.from], [{ ids_only: 49, location: 1, address: 0, from: 'place' }, 'place']);
   reset(); failSpots = 5;
   const holes = await G.scanGrid('k', { size: 7, spacing: 1, placeId: ME }, 'plumber');
   ok('scan: a few spots Google didn’t answer are marked, not guessed', holes.ok && holes.points.filter((p) => p.err).length === 5 && holes.points.filter((p) => p.err).every((p) => p.rank === null && p.top.length === 0));
@@ -149,6 +152,23 @@ const ON = { enabled: true, phrases: ['plumber', 'emergency plumber'], size: 7, 
   eq('scan: more than a quarter missing fails, rather than show a grid with holes', (await G.scanGrid('k', { size: 7, spacing: 1, placeId: ME }, 'plumber')).reason, 'too_many_gaps');
   reset(); googleDown = true;
   eq('scan: Google out of reach fails at the location look-up, with nothing else asked', [(await G.scanGrid('k', { size: 5, spacing: 1, placeId: ME }, 'plumber')).reason, google.length], ['google_unreachable', 1]);
+  // a business that hides its address on Google (a service-area business, like the studio's own listing)
+  reset(); meHidden = true;
+  const hid = await G.scanGrid('k', { size: 7, spacing: 1, placeId: ME }, 'plumber', { address: '4410 W Olive Ave, Burbank, CA 91505' });
+  const look = google.find((g) => g.mask === 'places.location');
+  ok('hidden address: the grid centres on the address in the business details, looked up once', hid.ok && hid.from === 'address' && hid.center.lat === CENTER.lat && look && look.body.textQuery === '4410 W Olive Ave, Burbank, CA 91505' && look.body.pageSize === 1);
+  eq('hidden address: what it asked for', hid.requests, { ids_only: 49, location: 1, address: 1, from: 'address' });
+  eq('hidden address: it costs about 3.7 cents', [G.scanCost(hid.requests), G.costWords(G.scanCost(hid.requests))], [0.037, '3½ cents']);
+  reset(); meHidden = true;
+  eq('hidden address, none on file: no centre, said so, nothing else asked', [(await G.scanGrid('k', { size: 7, spacing: 1, placeId: ME }, 'plumber')).reason, google.length], ['no_center', 1]);
+  reset(); meHidden = true;
+  eq('hidden address, an address Google can’t find: no centre', (await G.scanGrid('k', { size: 7, spacing: 1, placeId: ME }, 'plumber', { address: 'Nowhere at all' })).reason, 'no_center');
+  // Google's daily allowance for text searches (found Nov 12 2026 on the platform's own project)
+  reset(); quotaLeft = 10;
+  const q = await G.scanGrid('k', { size: 7, spacing: 1, placeId: ME }, 'plumber');
+  eq('daily limit: the scan stops at the first sign of it, told apart from a refusal', [q.reason, google.filter((g) => g.path === '/v1/places:searchText').length], ['google_quota', 14]);
+  reset(); googleRefuses = true;
+  eq('a refusal is still a refusal', (await G.searchIdsAt('k', 'plumber', CENTER, 805)).reason, 'google_refused');
 }
 
 // ── 5. the monthly job ──
@@ -160,10 +180,11 @@ const J = await import(`${P}/ops/rank_grid_scans.ts`);
   const r = await J.runRankGridScans(1, NOV);
   eq('job: one client, every search scanned and kept, the month handled', [r, scans.map((s) => [s.phrase, s.kind]), stored().month, stored().last_result.status], [{ scanned: 1, failed: 0, skipped: 0 }, [['plumber', 'monthly'], ['emergency plumber', 'monthly']], '2026-11', 'scanned']);
   const row = scans[0];
-  eq('job: a row holds ranks (0 = not in the top 20), the first three ids, the rivals by id and the cost', [row.ranks.length, row.ranks[24], row.ranks[0], row.tops.length, row.tops[24][0], row.cost_usd, row.requests], [49, 1, 0, 49, ME, 0.005, { ids_only: 49, location: 1 }]);
+  eq('job: a row holds ranks (0 = not in the top 20), the first three ids, the rivals by id and the cost', [row.ranks.length, row.ranks[24], row.ranks[0], row.tops.length, row.tops[24][0], row.cost_usd, row.requests], [49, 1, 0, 49, ME, 0.005, { ids_only: 49, location: 1, address: 0, from: 'place' }]);
   ok('job: no Google name or address is ever stored', !/displayName|formattedAddress|"name"|Copperline Plumbing|Burbank/.test(JSON.stringify(scans)));
   ok('job: the rivals are place ids with counts', row.rivals.length > 0 && row.rivals.every((x) => /^ChIJ_rival_/.test(x.id) && Number.isInteger(x.first) && Number.isInteger(x.top3)));
   ok('job: the summary columns match the ranks', row.total === 49 && row.found === row.ranks.filter((v) => v > 0).length && row.top3 === row.ranks.filter((v) => v >= 1 && v <= 3).length);
+  ok('job: no address is asked for while Google shows the business’s own pin', !google.some((g) => g.mask === 'places.location'));
   const asked = google.length;
   eq('job: run again the same month, nothing more is asked', [(await J.runRankGridScans(1, NOV)).scanned, google.length], [0, asked]);
   ok('job: every run clears the centre of scans older than 30 days (Google’s rule)', patches.length >= 2 && patches.every((p) => /scanned_at=lt\.2026-10-13T09:00:00\.000Z/.test(p.q) && /center_lat=not\.is\.null/.test(p.q) && p.body.center_lat === null && p.body.center_lng === null));
@@ -183,8 +204,19 @@ const J = await import(`${P}/ops/rank_grid_scans.ts`);
   scans.push({ id: '00000000-0000-4000-8000-0000000000aa', site_id: SITE, phrase: 'plumber', kind: 'monthly', scanned_at: '2026-11-01T08:00:00.000Z', top3: 9 });
   await J.runRankGridScans(1, NOV);
   eq('job: a search already scanned this month (a try that stopped halfway) isn’t scanned twice', scans.filter((s) => s.kind === 'monthly').map((s) => s.phrase), ['plumber', 'emergency plumber']);
+  reset(ON); meHidden = true;
+  await J.runRankGridScans(1, NOV);
+  eq('job: a business that hides its address scans from the address in its business details, and its cost says so', [scans.length, scans[0].requests.from, scans[0].cost_usd, google.find((g) => g.mask === 'places.location').body.textQuery], [2, 'address', 0.037, '4410 W Olive Ave, Burbank, CA 91505']);
+  reset(ON); quotaLeft = 3;
+  const tired = await J.runRankGridScans(1, NOV);
+  eq('job: Google’s daily limit rests the job: the month given back, no try counted, nothing failed', [tired, stored().month, stored().tries, scans.length], [{ scanned: 0, failed: 0, skipped: 0, resting: true }, '2026-10', null, 0]);
+  reset(ON); meHidden = true; noAddress = true;
+  const none = await J.runRankGridScans(1, NOV);
+  eq('job: …and with no address on file the month is given back, said as no centre', [none.failed, stored().tries.count, scans.length], [1, 1, 0]);
+  const blank = await J.addressOnFile(SITE); noAddress = false;
+  eq('address on file: the street, the town and the zip; nothing when there is none', [await J.addressOnFile(SITE), blank], ['4410 W Olive Ave, Burbank, CA 91505', '']);
   const { sweepIssues } = await import(`${P}/routes/system.ts`);
-  eq('tick: no key, not ready and quiet runs are not failures; a failed scan is', [sweepIssues({ rank_grids: { scanned: 0, failed: 0, skipped: 1, skipped_no_key: true } }), sweepIssues({ rank_grids: { scanned: 0, failed: 0, skipped: 0, not_ready: true } }), sweepIssues({ rank_grids: { scanned: 0, failed: 1, skipped: 0 } })], [[], [], ['rank_grids.failed=1']]);
+  eq('tick: no key, not ready, resting and quiet runs are not failures; a failed scan is', [sweepIssues({ rank_grids: { scanned: 0, failed: 0, skipped: 1, skipped_no_key: true } }), sweepIssues({ rank_grids: { scanned: 0, failed: 0, skipped: 0, not_ready: true } }), sweepIssues({ rank_grids: { scanned: 0, failed: 0, skipped: 0, resting: true } }), sweepIssues({ rank_grids: { scanned: 0, failed: 1, skipped: 0 } })], [[], [], [], ['rank_grids.failed=1']]);
 }
 
 // ── 6. the routes ──
@@ -204,7 +236,7 @@ const post = (body) => new Request('http://x/visibility/maps/scan', { method: 'P
   eq('get: the client sees nothing while it is off', off.body.data, { ready: true, studio: false, enabled: false });
   listingUri = `https://search.google.com/local/writereview?placeid=${ME}`;
   const setup = (await call(R.handleMapsGet, site, studio, {})).body.data;
-  eq('get: the studio sees it off, with the business suggested from the connected listing, and the price', [setup.enabled, setup.suggested, setup.key, setup.prices.scan_words, setup.today], [false, { id: ME, source: 'listing', maps: G.mapsPlaceUrl(ME) }, true, 'half a cent', { used: 0, cap: 3 }]);
+  eq('get: the studio sees it off, with the business suggested from the connected listing, and the price', [setup.enabled, setup.suggested, setup.key, setup.prices.scan_words, setup.prices.hidden_words, setup.today], [false, { id: ME, source: 'listing', maps: G.mapsPlaceUrl(ME) }, true, 'half a cent', '3½ cents', { used: 0, cap: 3 }]);
   listingUri = null; pasted = 'ChIJ_pasted_for_reviews_9';
   eq('get: …or from a place id pasted for reviews', (await call(R.handleMapsGet, site, staff, {})).body.data.suggested.source, 'pasted');
   for (const [who, p] of [['the owner', owner], ['a seat', seat]]) {
@@ -230,6 +262,7 @@ const post = (body) => new Request('http://x/visibility/maps/scan', { method: 'P
   const found = await call(R.handleMapsFind, new Request('http://x', { method: 'POST', body: '{}' }), site, studio, {});
   eq('find: starts from the name and address on file; Google’s Pro search; about 3 cents', [found.body.data.query, google[0].mask.split(',').sort().join(','), found.body.data.found.map((f) => f.name), found.body.data.cost_words], ['Copperline Plumbing, 4410 W Olive Ave, Burbank, CA', 'places.displayName,places.formattedAddress,places.googleMapsUri,places.id,places.primaryTypeDisplayName', ['Copperline Plumbing', 'Copper Line Electric'], '3 cents']);
   ok('find: what Google found is shown, never kept', !JSON.stringify(grid).includes('Copper Line Electric') && scans.length === 0);
+  ok('find: a business that hides its address can be found too', google[0].body.includePureServiceAreaBusinesses === true);
   rateOk = false;
   eq('find: ten a day', (await call(R.handleMapsFind, new Request('http://x', { method: 'POST', body: '{}' }), site, studio, {})).status, 429);
   rateOk = true; google = [];
@@ -263,6 +296,9 @@ const post = (body) => new Request('http://x/visibility/maps/scan', { method: 'P
   googleRefuses = true;
   const refusedNow = await call(R.handleMapsScan, post({ phrase: 'plumber' }), { ...site, id: '22222222-2222-4222-8222-222222222222' }, studio, {});
   ok('scan now: other sites keep their own three a day; Google’s refusal is said in words', refusedNow.status === 409 || refusedNow.status === 502);
+  googleRefuses = false; quotaLeft = 0; scans = []; grid = { body: JSON.stringify({ ...ON, phrases: ['plumber'] }), updated_at: 'tq' };
+  const limit = await call(R.handleMapsScan, post({ phrase: 'plumber' }), site, studio, {});
+  eq('scan now: Google’s daily limit is said as that, not as a fault', [limit.status, limit.body.error, /used up for the platform/.test(limit.body.message), scans.length], [429, 'google_quota', true, 0]);
 }
 
 // ── 7. wiring ──

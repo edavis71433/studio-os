@@ -43,7 +43,9 @@ export const SCAN_WORDS: Record<string, string> = {
   not_found: 'Google can’t find the business’s place any more. Find it again in the grid’s settings.',
   google_refused: 'Google turned the search down just now. Try again in a few minutes.',
   google_unreachable: 'Google couldn’t be reached just now. Try again in a few minutes.',
+  google_quota: 'Google’s daily allowance for these searches is used up for the platform. It starts again overnight; try tomorrow.',
   too_many_gaps: 'Google didn’t answer for enough of the spots. Try again in a few minutes.',
+  no_center: 'Google hides this business’s address, and its business details have no address or town to centre the grid on. Add one under Business details, then scan again.',
   not_ready: 'The map rank grid needs a one-time database update first.',
   not_kept: 'The scan ran but didn’t save. Try again.',
 };
@@ -148,7 +150,7 @@ export async function handleMapsGet(site: SiteRow, principal: Principal, cors: R
       suggested: s.place ? null : await suggestedPlace(site.id),
       last_result: s.last_result,
       today: { used: hist.filter((h) => h.kind === 'now' && Date.parse(String(h.scanned_at)) >= since).length, cap: GRID_NOW_PER_DAY },
-      prices: { as_of: PRICES.as_of, source: PRICES.source, scan_usd: scanCost({ location: 1 }), scan_words: costWords(scanCost({ location: 1 })), name_usd: PRICES.name, find_usd: PRICES.find },
+      prices: { as_of: PRICES.as_of, source: PRICES.source, scan_usd: scanCost({ location: 1 }), scan_words: costWords(scanCost({ location: 1 })), hidden_usd: scanCost({ location: 1, address: 1 }), hidden_words: costWords(scanCost({ location: 1, address: 1 })), name_usd: PRICES.name, find_usd: PRICES.find },
     });
   }
   return json({ data }, 200, cors);
@@ -246,6 +248,6 @@ export async function handleMapsScan(req: Request, site: SiteRow, principal: Pri
     return json({ error: 'too_many', message: `That’s ${GRID_NOW_PER_DAY} scans today for this client. The next can run tomorrow.` }, 429, cors);
   }
   const got = await scanAndKeep(site.id, s, phrase, 'now', principal.email || null);
-  if (!got.ok) return json({ error: got.reason, message: SCAN_WORDS[got.reason] || 'The scan didn’t run. Try again in a few minutes.' }, got.reason === 'not_ready' ? 503 : 502, cors);
+  if (!got.ok) return json({ error: got.reason, message: SCAN_WORDS[got.reason] || 'The scan didn’t run. Try again in a few minutes.' }, got.reason === 'not_ready' ? 503 : got.reason === 'google_quota' ? 429 : 502, cors);
   return json({ data: scanView(got.row, true, Date.now(), null) }, 201, cors);
 }

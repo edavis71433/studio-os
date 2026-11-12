@@ -10223,6 +10223,8 @@ function rgSpotAt(center, i, size, spacing) {
   return { lat: Math.round(lat * 1e6) / 1e6, lng: Math.round(lng * 1e6) / 1e6 };
 }
 const rgName = () => (S.identity && S.identity.business_name) || "the business";
+// did the newest scan centre on the business-details address, because Google hides the business's own?
+const RG_HIDDEN = () => Object.values((RG && RG.latest) || {}).some((s) => s && s.requests && s.requests.from === "address");
 async function rgNames(ids) {
   const want = [...new Set(ids.filter((id) => id && !RG_NAMES.has(id)))].slice(0, 6);
   if (!want.length || !RG || !RG.studio) return;
@@ -10394,8 +10396,10 @@ function renderRankGrid() {
   if (studio && !past && scan.cost_words) {
     const cost = el("div", "rg-cost");
     cost.appendChild(el("span", "rg-tag", "Only the studio sees this"));
-    const asked = (scan.requests && scan.requests.ids_only) || scan.total;
-    cost.appendChild(el("span", null, `This scan cost ${scan.cost_words} at Google’s prices: ${asked} searches that only list places, free, and one look-up of where the business is${g.prices ? ", " + rgCost(g.prices.scan_usd) : ""}. Google’s first 10,000 look-ups a month are free.`));
+    const req = scan.requests || {}, asked = req.ids_only || scan.total;
+    cost.appendChild(el("span", null, req.from === "address"
+      ? `This scan cost ${scan.cost_words} at Google’s prices: ${asked} searches that only list places, free, and a look-up of the address in the business details, as Google hides this business’s address. Google’s first 5,000 of those a month are free.`
+      : `This scan cost ${scan.cost_words} at Google’s prices: ${asked} searches that only list places, free, and one look-up of where the business is${g.prices ? ", " + rgCost(g.prices.scan_usd) : ""}. Google’s first 10,000 look-ups a month are free.`));
     body.appendChild(cost);
   }
 }
@@ -10467,6 +10471,7 @@ function rgBizBox(host, g, onChange) {
       const other = el("button", "sv-linkbtn", "Find it another way"); other.type = "button"; other.addEventListener("click", () => rgOpenFind(onChange));
       row.appendChild(yes); row.appendChild(other);
     }
+    if (g.place && RG_HIDDEN()) box.appendChild(el("span", "hint", "Google hides this business’s address, so the grid centres on the address in its business details."));
     rgNames([p.id]).then(() => show(p.id));
   } else {
     box.appendChild(el("span", null, "Not matched yet. Find the business on Google by its name and address, once."));
@@ -10515,7 +10520,8 @@ function rgOpenSettings() {
   const paintCost = () => {
     across.textContent = `Covers ${(draft.size - 1) * draft.spacing} miles across, centred on the business.`;
     const one = g.prices ? g.prices.scan_usd : 0.005, n = Math.max(1, draft.phrases.length);
-    costBox.innerHTML = `<b>What it costs</b>Each scan: ${draft.size * draft.size} searches that only list places, free, and one look-up of where the business is, ${esc(rgCost(one))}. ${n === 1 ? "One search" : n + " searches"} a month: ${esc(rgCost(one * n))}. Google’s price list, read ${esc(g.prices ? svWhen(g.prices.as_of + "T12:00:00Z") : "Nov 12, 2026")}.`;
+    const hidden = !!(RG_HIDDEN() && g.prices), each = hidden ? g.prices.hidden_usd : one;
+    costBox.innerHTML = `<b>What it costs</b>Each scan: ${draft.size * draft.size} searches that only list places, free, and one look-up of where the business is, ${esc(rgCost(one))}${g.prices ? `, or ${esc(rgCost(g.prices.hidden_usd))} for a business that hides its address on Google` : ""}. ${n === 1 ? "One search" : n + " searches"} a month: ${esc(rgCost(each * n))}. Google’s price list, read ${esc(g.prices ? svWhen(g.prices.as_of + "T12:00:00Z") : "Nov 12, 2026")}.`;
   };
   paintPh(); paintCost();
   if (!g.key) d.body.appendChild(el("p", "sv-problem", "Google isn’t connected for the platform yet: the Places key is needed before anything can scan."));

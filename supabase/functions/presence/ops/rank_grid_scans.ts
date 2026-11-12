@@ -36,10 +36,10 @@ export async function scanAndKeep(siteId: string, s: GridSetting, phrase: string
   const key = Deno.env.get('PLACES_KEY') || '';
   if (!key) return { ok: false, reason: 'places_not_configured' };
   if (!s.place) return { ok: false, reason: 'no_place' };
-  const got = await scanGrid(key, { size: s.size, spacing: s.spacing, placeId: s.place.id }, phrase);
+  const got = await scanGrid(key, { size: s.size, spacing: s.spacing, placeId: s.place.id }, phrase, { address: await addressOnFile(siteId) });
   if (!got.ok) return { ok: false, reason: got.reason };
   const sum = summarize(got.points);
-  const requests = { ids_only: got.requests.ids_only, location: got.requests.location };
+  const requests = { ...got.requests };
   const ins = await svc('presence_rank_grid_scans', {
     method: 'POST', headers: { Prefer: 'return=representation' },
     body: JSON.stringify({
@@ -56,6 +56,15 @@ export async function scanAndKeep(siteId: string, s: GridSetting, phrase: string
   return { ok: true, row };
 }
 
+/** The address in the business details, for a business that hides its address on Google:
+ *  the street when there is one, else the town. Empty when there is neither. */
+export async function addressOnFile(siteId: string): Promise<string> {
+  const r = await svc(`presence_locations?site_id=eq.${siteId}&select=address_line1,city,region,postal_code&limit=1`).catch(() => null);
+  const l = rows(r)[0] || {};
+  const town = [l.city, [l.region, l.postal_code].filter(Boolean).join(' ')].map((x) => String(x || '').trim()).filter(Boolean).join(', ');
+  return town ? [String(l.address_line1 || '').trim(), town].filter(Boolean).join(', ').slice(0, 200) : '';
+}
+
 /** Google keeps coordinates to 30 days: clear the centre of every older scan. */
 export async function clearOldCoordinates(nowIso: string): Promise<void> {
   const cutoff = new Date(Date.parse(nowIso) - COORDS_KEEP_DAYS * 86_400_000).toISOString();
@@ -65,8 +74,10 @@ export async function clearOldCoordinates(nowIso: string): Promise<void> {
 }
 
 /** The job. Counts clients: scanned, failed, skipped. `skipped_no_key` when Google's key
- *  isn't set (nothing claimed, nothing failed); `not_ready` before migration 0209. */
-export async function runRankGridScans(limit = 1, nowIso = new Date().toISOString()): Promise<{ scanned: number; failed: number; skipped: number; skipped_no_key?: true; not_ready?: true }> {
+ *  isn't set (nothing claimed, nothing failed); `not_ready` before migration 0209; `resting`
+ *  when Google's daily allowance for the platform is used up: the month is given back
+ *  without counting a try, and the next tick asks again. */
+export async function runRankGridScans(limit = 1, nowIso = new Date().toISOString()): Promise<{ scanned: number; failed: number; skipped: number; skipped_no_key?: true; not_ready?: true; resting?: true }> {
   const month = nowIso.slice(0, 7);
   await clearOldCoordinates(nowIso);
   const q = await svc(`presence_sales_templates?kind=eq.proposal&name=eq.${encodeURIComponent(RESERVED_NAMES.rankGrid)}&deleted_at=is.null&select=site_id,body&limit=500`).catch(() => null);
@@ -93,6 +104,10 @@ export async function runRankGridScans(limit = 1, nowIso = new Date().toISOStrin
       if (done.has(phrase.toLowerCase())) continue;
       const got = await scanAndKeep(r.site_id, claimed, phrase, 'monthly', null, nowIso);
       if (!got.ok) { why = got.reason; break; }
+    }
+    if (why === 'google_quota') {   // the platform's allowance, not this client: give the month back, untried, and rest
+      await SAVE(r.site_id, (s) => ({ ...s, month: s.month === month ? before : s.month })).catch(() => null);
+      return { scanned, failed, skipped, resting: true };
     }
     if (why) {
       failed++;

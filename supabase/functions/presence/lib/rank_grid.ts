@@ -18,7 +18,11 @@
 //   Place Details Essentials (IDs Only) free, no limit          checking a place id is real
 //   Place Details Essentials            $0.005, 10,000 free     where the business is, once a scan
 //   Place Details Pro                   $0.017, 5,000 free      a business's name
-//   Text Search Pro                     $0.032, 5,000 free      finding the business by name
+//   Text Search Pro                     $0.032, 5,000 free      finding the business by name, and
+//                                                               where an address is (see below)
+// A business that hides its address on Google (a "service-area business", like many trades
+// and the studio's own listing) has no location in Places. Its grid centres on the address in
+// its business details instead, looked up with Text Search: about 3.7 cents a scan.
 // The studio sees what each scan cost at these prices; the client never sees a cost.
 //
 // Everything here is pure except the four Google calls at the bottom, whose fetch tests
@@ -40,6 +44,7 @@ export const PRICES = {
   location: 0.005,          // Place Details Essentials
   name: 0.017,              // Place Details Pro
   find: 0.032,              // Text Search Pro
+  address: 0.032,           // Text Search Pro, the location of an address
 } as const;
 
 export type GridSize = typeof GRID_SIZES[number];
@@ -220,8 +225,8 @@ export function rivalsOf(points: GridPoint[], placeId: string, k = 3): Array<{ i
 }
 
 /** What a scan cost at Google's prices, in dollars to four places. Pure. */
-export function scanCost(n: { ids_only?: number; location?: number; names?: number; finds?: number }): number {
-  const usd = (n.ids_only || 0) * PRICES.ids_only + (n.location || 0) * PRICES.location + (n.names || 0) * PRICES.name + (n.finds || 0) * PRICES.find;
+export function scanCost(n: { ids_only?: number; location?: number; address?: number; names?: number; finds?: number }): number {
+  const usd = (n.ids_only || 0) * PRICES.ids_only + (n.location || 0) * PRICES.location + (n.address || 0) * PRICES.address + (n.names || 0) * PRICES.name + (n.finds || 0) * PRICES.find;
   return Math.round(usd * 10000) / 10000;
 }
 /** A cost in words for the studio: "Free", "half a cent", "2 cents", "$1.20". Pure. */
@@ -257,20 +262,27 @@ export function nextScanDay(nowIso: string): string {
 export const placesDeps: { fetch?: (url: string, init: RequestInit) => Promise<Response> } = {};
 const gfetch = (url: string, init: RequestInit) => (placesDeps.fetch || fetch)(url, init);
 const PLACES = 'https://places.googleapis.com/v1';
-export type PlacesFail = { ok: false; reason: 'google_refused' | 'google_unreachable' | 'not_found' };
+export type PlacesFail = { ok: false; reason: 'google_refused' | 'google_unreachable' | 'google_quota' | 'not_found' | 'no_location' };
+/** Google's 429: the platform's daily (or per-minute) allowance of this kind of search is
+ *  used up. Found Nov 12 2026: the project's "SearchTextRequest per day" cap. Not the
+ *  client's fault, and asking again only adds to the pile, so it is told apart. */
+const refusal = (status: number): PlacesFail => ({ ok: false, reason: status === 429 ? 'google_quota' : 'google_refused' });
 
 /** One spot: the place ids Google lists first for `phrase` leaning on a circle around
- *  the spot. Field mask places.id only, so Google bills it as IDs Only: free. */
+ *  the spot. Field mask places.id only, so Google bills it as IDs Only: free. Businesses
+ *  that hide their address are asked for too (includePureServiceAreaBusinesses): Text
+ *  Search leaves them out otherwise, and Google Maps doesn't. Found Nov 12 2026 on the
+ *  studio's own listing, which a search for its own name never returned without it. */
 export async function searchIdsAt(key: string, phrase: string, at: { lat: number; lng: number }, radius: number): Promise<{ ok: true; ids: string[] } | PlacesFail> {
   try {
     const r = await gfetch(`${PLACES}/places:searchText`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'X-Goog-Api-Key': key, 'X-Goog-FieldMask': 'places.id' },
-      body: JSON.stringify({ textQuery: phrase, pageSize: GRID_DEPTH, locationBias: { circle: { center: { latitude: at.lat, longitude: at.lng }, radius } } }),
+      body: JSON.stringify({ textQuery: phrase, pageSize: GRID_DEPTH, includePureServiceAreaBusinesses: true, locationBias: { circle: { center: { latitude: at.lat, longitude: at.lng }, radius } } }),
       signal: AbortSignal.timeout(8000),
     });
     const d = await r.json().catch(() => ({}));
-    if (!r.ok) return { ok: false, reason: 'google_refused' };
+    if (!r.ok) return refusal(r.status);
     const ids = (Array.isArray(d.places) ? d.places : []).map((p: any) => String(p?.id || '')).filter((id: string) => PLACE_ID_RE.test(id));
     return { ok: true, ids: ids.slice(0, GRID_DEPTH) };
   } catch { return { ok: false, reason: 'google_unreachable' }; }
@@ -283,9 +295,30 @@ export async function placeLocation(key: string, placeId: string): Promise<{ ok:
     const r = await gfetch(`${PLACES}/places/${encodeURIComponent(placeId)}`, { headers: { 'X-Goog-Api-Key': key, 'X-Goog-FieldMask': 'location' }, signal: AbortSignal.timeout(8000) });
     const d = await r.json().catch(() => ({}));
     if (r.status === 404 || r.status === 400) return { ok: false, reason: 'not_found' };
-    if (!r.ok) return { ok: false, reason: 'google_refused' };
-    const lat = Number(d?.location?.latitude), lng = Number(d?.location?.longitude);
-    if (!Number.isFinite(lat) || !Number.isFinite(lng) || Math.abs(lat) > 90 || Math.abs(lng) > 180) return { ok: false, reason: 'not_found' };
+    if (!r.ok) return refusal(r.status);
+    if (!d?.location) return { ok: false, reason: 'no_location' };   // a business that hides its address
+    const lat = Number(d.location.latitude), lng = Number(d.location.longitude);
+    if (!Number.isFinite(lat) || !Number.isFinite(lng) || Math.abs(lat) > 90 || Math.abs(lng) > 180) return { ok: false, reason: 'no_location' };
+    return { ok: true, lat, lng };
+  } catch { return { ok: false, reason: 'google_unreachable' }; }
+}
+
+/** Where an address is: Text Search with the location field only (Pro). For a business
+ *  that hides its address on Google, the grid centres on the address in its business
+ *  details. Asked fresh at each scan, like the business's own location. */
+export async function addressLocation(key: string, address: string): Promise<{ ok: true; lat: number; lng: number } | PlacesFail> {
+  try {
+    const r = await gfetch(`${PLACES}/places:searchText`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Goog-Api-Key': key, 'X-Goog-FieldMask': 'places.location' },
+      body: JSON.stringify({ textQuery: address, pageSize: 1 }),
+      signal: AbortSignal.timeout(8000),
+    });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok) return refusal(r.status);
+    const loc = Array.isArray(d.places) ? d.places[0]?.location : null;
+    const lat = Number(loc?.latitude), lng = Number(loc?.longitude);
+    if (!loc || !Number.isFinite(lat) || !Number.isFinite(lng) || Math.abs(lat) > 90 || Math.abs(lng) > 180) return { ok: false, reason: 'not_found' };
     return { ok: true, lat, lng };
   } catch { return { ok: false, reason: 'google_unreachable' }; }
 }
@@ -297,7 +330,7 @@ export async function checkPlaceId(key: string, placeId: string): Promise<{ ok: 
     const r = await gfetch(`${PLACES}/places/${encodeURIComponent(placeId)}`, { headers: { 'X-Goog-Api-Key': key, 'X-Goog-FieldMask': 'id,movedPlaceId' }, signal: AbortSignal.timeout(8000) });
     const d = await r.json().catch(() => ({}));
     if (r.status === 404 || r.status === 400) return { ok: false, reason: 'not_found' };
-    if (!r.ok) return { ok: false, reason: 'google_refused' };
+    if (!r.ok) return refusal(r.status);
     const id = String(d?.movedPlaceId || d?.id || '');
     return PLACE_ID_RE.test(id) ? { ok: true, id } : { ok: false, reason: 'not_found' };
   } catch { return { ok: false, reason: 'google_unreachable' }; }
@@ -325,11 +358,11 @@ export async function findPlaces(key: string, query: string): Promise<{ ok: true
     const r = await gfetch(`${PLACES}/places:searchText`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'X-Goog-Api-Key': key, 'X-Goog-FieldMask': 'places.id,places.displayName,places.formattedAddress,places.primaryTypeDisplayName,places.googleMapsUri' },
-      body: JSON.stringify({ textQuery: query, pageSize: 5 }),
+      body: JSON.stringify({ textQuery: query, pageSize: 5, includePureServiceAreaBusinesses: true }),
       signal: AbortSignal.timeout(10_000),
     });
     const d = await r.json().catch(() => ({}));
-    if (!r.ok) return { ok: false, reason: 'google_refused' };
+    if (!r.ok) return refusal(r.status);
     const found = (Array.isArray(d.places) ? d.places : []).map((p: any) => ({
       id: String(p?.id || ''), name: clean(p?.displayName?.text, 160), address: clean(p?.formattedAddress, 240),
       kind: clean(p?.primaryTypeDisplayName?.text, 80),
@@ -339,13 +372,20 @@ export async function findPlaces(key: string, query: string): Promise<{ ok: true
   } catch { return { ok: false, reason: 'google_unreachable' }; }
 }
 
-/** One scan: where the business is, then every spot, seven at a time, inside a time
- *  budget. Spots Google didn't answer for are marked; when more than a quarter are,
- *  the scan fails rather than show a grid with holes. */
-export async function scanGrid(key: string, s: Pick<GridSetting, 'size' | 'spacing'> & { placeId: string }, phrase: string, budgetMs = 40_000): Promise<{ ok: true; center: { lat: number; lng: number }; points: GridPoint[]; requests: { ids_only: number; location: number } } | PlacesFail | { ok: false; reason: 'too_many_gaps' }> {
-  const started = Date.now();
-  const loc = await placeLocation(key, s.placeId);
-  if (!loc.ok) return loc;
+/** One scan: where the business is (or, when Google hides its address, where the address
+ *  in its business details is), then every spot, seven at a time, inside a time budget.
+ *  Spots Google didn't answer for are marked; when more than a quarter are, the scan
+ *  fails rather than show a grid with holes. */
+export async function scanGrid(key: string, s: Pick<GridSetting, 'size' | 'spacing'> & { placeId: string }, phrase: string, opts: { address?: string; budgetMs?: number } = {}): Promise<{ ok: true; center: { lat: number; lng: number }; from: 'place' | 'address'; points: GridPoint[]; requests: { ids_only: number; location: number; address: number; from: 'place' | 'address' } } | PlacesFail | { ok: false; reason: 'too_many_gaps' | 'no_center' }> {
+  const started = Date.now(), budgetMs = opts.budgetMs ?? 40_000;
+  let loc = await placeLocation(key, s.placeId);
+  let from: 'place' | 'address' = 'place', addressAsked = 0;
+  if (!loc.ok && loc.reason === 'no_location') {
+    const address = String(opts.address || '').trim();
+    if (!address) return { ok: false, reason: 'no_center' };
+    loc = await addressLocation(key, address); addressAsked = 1; from = 'address';
+    if (!loc.ok) return loc.reason === 'not_found' ? { ok: false, reason: 'no_center' } : loc;
+  } else if (!loc.ok) return loc;
   const center = { lat: loc.lat, lng: loc.lng };
   const spots = gridPoints(center, s.size, s.spacing);
   const radius = biasRadius(s.spacing);
@@ -356,6 +396,8 @@ export async function scanGrid(key: string, s: Pick<GridSetting, 'size' | 'spaci
     const late = Date.now() - started > budgetMs;
     const got = late ? batch.map(() => null) : await Promise.all(batch.map((p) => searchIdsAt(key, phrase, p, radius)));
     if (!late) asked += batch.length;
+    // Google's allowance is used up: stop asking (each further ask only adds to the pile)
+    if (got.some((g) => g && !g.ok && g.reason === 'google_quota')) return { ok: false, reason: 'google_quota' };
     got.forEach((g, j) => {
       const p = batch[j];
       points[i + j] = g && g.ok ? { r: p.r, c: p.c, rank: rankIn(g.ids, s.placeId), top: g.ids.slice(0, 3) } : { r: p.r, c: p.c, rank: null, top: [], err: true };
@@ -363,5 +405,5 @@ export async function scanGrid(key: string, s: Pick<GridSetting, 'size' | 'spaci
   }
   const gaps = points.filter((p) => p.err).length;
   if (gaps * 4 > points.length) return { ok: false, reason: 'too_many_gaps' };
-  return { ok: true, center, points, requests: { ids_only: asked, location: 1 } };
+  return { ok: true, center, from, points, requests: { ids_only: asked, location: 1, address: addressAsked, from } };
 }
