@@ -88,7 +88,7 @@ const base = () => ({
     && by('broken:ev:s1:trust.ssl_missing').href === '/presence.html?client=s1#domain' && by('broken:conn:s1:google_search_console').what === 'Google Search Console connection has expired' && by('broken:conn:s1:google_search_console').href === '/connections.html?client=s1'
     && rows.filter((r) => r.kind === 'broken').every((r) => r.verb === 'Fix'));
   ok('seo evidence stays out even beside a critical ssl row', !rows.some((r) => /title/.test(r.what)));
-  ok('plan: approved-not-applied → Apply; a PROPOSED plan (waiting on the client) is not the studio’s work', by('plan:pl1').verb === 'Apply' && by('plan:pl1').href === '/presence.html?client=s2#foundations' && !by('plan:pl2'));
+  ok('plan: approved and not finished → Finish (the sheet has Mark as done); a PROPOSED plan (waiting on the client) is not the studio’s work', by('plan:pl1').verb === 'Finish' && by('plan:pl1').href === '/presence.html?client=s2#foundations' && !by('plan:pl2'));
   ok('publish: unpublished changes → Review', by('publish:s1').what === 'changes are sitting unpublished' && by('publish:s1').verb === 'Review' && by('publish:s1').href === '/presence.html?client=s1#publish');
   ok('every row names a customer, says what in plain words, and carries exactly one verb', rows.every((r) => r.name && r.what && r.verb && r.href && !/undefined|null/.test(r.what + r.when)));
   // the roster's Next: each client's FIRST row

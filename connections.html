@@ -189,6 +189,12 @@ const SCOPE = (new URLSearchParams(location.search).get('client')||'');
 // (scope.name — the same source the "Viewing client" bar paints); resolved once
 // before the first render, with a plain fallback if the shell has nothing.
 let CLIENT_NAME = '';
+// builder item 83: ?client= is also how someone with places in two businesses opens their second one.
+// That is their own business, so the rows speak to its owner, as at their first one. The context says
+// which, read once with the name below, as the shell's ddsScopeInfo reads it: a scope is a studio inside
+// a client, a business on the person's list is their own; else the businesses the shell remembers, else
+// the address, as before.
+let IN_CLIENT = !!SCOPE;
 // shell.js is deferred, so window.ddsContext may not exist yet when init() runs
 // — listen for the shell's own 'dds:context' event instead (2.5s cap, like it).
 function shellContext(){
@@ -201,7 +207,13 @@ function shellContext(){
 }
 async function resolveClientName(){
   if(!SCOPE) return '';
-  try { const c = await shellContext(); return (c && c.scope && c.scope.name) ? String(c.scope.name) : ''; }
+  try {
+    const c = await shellContext();
+    IN_CLIENT = (c && c.scope && c.scope.site_id) ? true
+      : (c && Array.isArray(c.businesses) && c.businesses.some((b) => b && b.site_id === SCOPE)) ? false
+      : !!(window.ddsScopeInfo && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(SCOPE) ? window.ddsScopeInfo() : true);
+    return (c && c.scope && c.scope.name) ? String(c.scope.name) : '';
+  }
   catch(_e){ return ''; }
 }
 const H = () => ({ 'Content-Type':'application/json', 'Authorization':'Bearer '+SUPABASE_KEY, 'x-dds-user-jwt':TOKEN,'x-dds-scope-site':SCOPE });
@@ -257,7 +269,7 @@ function statusOf(e){
   if(st==='connected' && hl!=='down' && hl!=='attention') return { label:'Connected', cls:'ok', connected:true };
   if(st==='connected') return { label:'Needs attention', cls:'attn', connected:true };
   // studio audit change 9: while scoped, a pending row means the studio asked the client (their email is out)
-  if(st==='pending') return { label: SCOPE ? 'Asked the client' : 'Waiting for your permission', cls:'wait', connected:false };
+  if(st==='pending') return { label: IN_CLIENT ? 'Asked the client' : 'Waiting for your permission', cls:'wait', connected:false };
   if(st==='expired'||st==='error'||hl==='attention'||hl==='down') return { label:'Needs a quick reconnect', cls:'attn', connected:false, reconnect:true };
   if(e.availability && e.availability!=='Read-only' && e.availability!=='Read/Write') return { label:'Not available yet', cls:'off', unavailable:true };
   return { label:'Not connected', cls:'off', connected:false };
@@ -380,7 +392,7 @@ function row(e){
       <p><b>What we read:</b></p><ul>${reads || '<li>your public details</li>'}</ul>
       <p><b>What we never change:</b> nothing — this is read-only. We never post, edit, or remove anything on ${esc(e.label)}, and nothing on your own website changes.</p>
       <p><b>Approval:</b> ${esc(e.approval || 'You approve access on the service’s own screen, and can revoke it any time.')}</p>
-      ${SCOPE
+      ${IN_CLIENT
         ? `<p><b>Whose account:</b> You connect this for ${esc(CLIENT_NAME || 'this client')} with a Google account that has access to their property. Studio OS only reads what that account allows, and either of you can disconnect any time with one tap. Their data at the service is untouched.</p>`
         : `<p><b>Who owns it:</b> you do. It’s your account and your permission — Studio OS just reads what you allow, and you can disconnect any time with one tap. Your data at the service is untouched.</p>`}
       <p><b>If you don’t connect:</b> nothing changes. Studio OS keeps working with what it already sees — connecting simply lets it be more sure and more helpful. You can connect any time later.</p>
@@ -518,7 +530,7 @@ async function paintAdTags(){
 let CAL = null, CAL_SHOWN = false;   // CAL_SHOWN: the #calSec deep link (Settings' Calendar row) scrolls here once
 async function calApi(method){ try { const r = await fetch(FN+'/calendar/link', { method, headers:H() }); const j = await r.json().catch(()=>({})); return { ok:r.ok, status:r.status, body:j }; } catch(_e){ return { ok:false, status:0, body:{} }; } }
 async function paintCalendar(){
-  const host = $('calSec'); if(!host || SCOPE) return;
+  const host = $('calSec'); if(!host || IN_CLIENT) return;
   if(!CAL){ const r = await calApi('GET'); const d = r.ok && r.body && r.body.data; if(!d || typeof d.can_manage !== 'boolean') return; CAL = d; }   // only an answer that is about the link
   const c = CAL; let inner;
   if(!c.can_manage){
@@ -562,7 +574,7 @@ async function paintCalendar(){
 let LOG = null;
 async function logApi(method){ try { const r = await fetch(FN+'/email/log-address', { method, headers:H() }); const j = await r.json().catch(()=>({})); return { ok:r.ok, status:r.status, body:j }; } catch(_e){ return { ok:false, status:0, body:{} }; } }
 async function paintEmailLog(){
-  const host = $('logSec'); if(!host || SCOPE) return;
+  const host = $('logSec'); if(!host || IN_CLIENT) return;
   if(!LOG){ const r = await logApi('GET'); const d = r.ok && r.body && r.body.data; if(!d || typeof d.can_manage !== 'boolean') return; LOG = d; }   // an older server: no card
   const c = LOG; let inner;
   if(!c.available){
@@ -610,7 +622,7 @@ const ASKABLE = ['google_search_console','google_analytics'];
 function paintAskClient(entries){
   const host = $('topActs'); if(!host) return;
   const open = entries.filter(e=>ASKABLE.includes(e.key) && !statusOf(e).connected && !statusOf(e).unavailable);
-  if(!SCOPE || !open.length){ host.innerHTML=''; return; }
+  if(!IN_CLIENT || !open.length){ host.innerHTML=''; return; }
   const asked = open.some(e=>(e.connection||{}).status==='pending');
   host.innerHTML = `<button type="button" class="btn" id="askClient">${asked?'Ask again':'Ask '+esc(CLIENT_NAME||'the client')+' to connect their Google'}</button>`;
   $('askClient').addEventListener('click', askClient);

@@ -49,7 +49,7 @@ ok('owed comes from the same open invoices as Who owes you', /api\('\/sales\/rec
 
 // ── 45 ──
 const crm = read('crm.html');
-ok('opened by the customer\'s site alone, the timeline starts beside the record read', /if\(q0\.get\('client'\)&&!q0\.get\('deal'\)&&!q0\.get\('project'\)&&!q0\.get\('contact'\)&&!q0\.get\('client_id'\)\) ACT_EARLY=api\('\/crm\/activity\?today='\+recTodayYmd\(\)\)/.test(crm));   // item 65: with the local day
+ok('opened by the customer\'s site alone, the timeline starts beside the record read', /if\(q0\.get\('client'\)&&studioScoped\(\)&&!q0\.get\('deal'\)&&!q0\.get\('project'\)&&!q0\.get\('contact'\)&&!q0\.get\('client_id'\)\) ACT_EARLY=api\('\/crm\/activity\?today='\+recTodayYmd\(\)\)/.test(crm));   // item 65: with the local day
 ok('…and the first timeline load uses that read', /const r=\(early&&scopedCustomer&&\(await early\)\)\|\|await api\('\/crm\/activity\?'\+q\.concat\('today='\+recTodayYmd\(\)\)\.join\('&'\)\);/.test(crm));
 
 console.log(`\n${pass} passed, ${fail} failed`);
