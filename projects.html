@@ -748,7 +748,10 @@ function visRows(){
 }
 function renderRoster(){
   const list=visRows();
+  // builder item 165: on a phone Board · List · Calendar and ↻ sit in the header's ⋯ sheet; a redraw keeps it open
+  let sheet=false;try{const m=$('phMore');sheet=!!(m&&m.matches(':popover-open'));}catch(_){/* an older browser: no sheet */}
   $('lhead').innerHTML=headerHtml(list);
+  if(sheet){try{$('phMore').showPopover();}catch(_){/* */}}
   renderFilters();
   if(!list.length){
     if(Q.trim())$('list').innerHTML='<p class="mut">No projects match “'+esc(Q)+'”.</p>';

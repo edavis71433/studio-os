@@ -99,6 +99,7 @@ test.describe('Projects (item 111)', () => {
     expect(dealsAsked).toBe(0);
     await page.locator('#np-cancel').click();
     s.setCustomers([...roster(30), { client_id: C(99), name: 'Zed’s new shop', person_name: 'Zed', customer_site_id: null }]);
+    if (await page.locator('.dds-ph-dots').isVisible() && !(await page.locator('#phMore').isVisible())) await page.locator('.dds-ph-dots').click();   // builder item 165: on a phone it waits behind ⋯
     await page.locator('#refreshBtn').click();
     await expect.poll(() => s.reads.filter((r) => r === '/studio/customers').length).toBe(2);
     await page.locator('#newProj, [data-new-project], button:has-text("New project")').first().click();

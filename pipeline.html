@@ -202,6 +202,9 @@ html.dds-embed #detailWrap{padding-top:0}
   .wrap{max-width:var(--dds-w-app,1280px);margin:0 auto;padding:var(--dds-s7,32px) var(--dds-s5,20px) 80px}
   /* ── builder item 165: the page header is the shared one (shell.css .dds-ph); the count/money line
         for what's on screen stays under it (#lmeta) ── */
+  /* builder item 165: beside a tablet's menu the header's actions wrap inside the row instead of pushing the page sideways
+     (shell.css .dds-ph-acts is flex:0 0 auto with no cap) */
+  header.dds-ph .dds-ph-acts{max-width:100%}
   .si{width:1.1em;height:1.1em;display:inline-block;vertical-align:-.18em;flex:0 0 auto}
   .lbtn{flex:0 0 auto;font:inherit;border:none;background:none;color:var(--soft);font-size:15px;border-radius:var(--dds-r,8px);padding:var(--dds-s1,4px) 10px;min-height:34px;cursor:pointer}
   .lbtn:hover{color:var(--p);background:var(--p-soft)}

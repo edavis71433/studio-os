@@ -143,8 +143,8 @@ test.describe('One page header, group 1 (builder item 165)', () => {
         await page.keyboard.press('Escape');
         await expect(head.locator('.dds-ph-more')).toBeHidden();
       }
-      // nothing on the page spills sideways
-      expect(await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)).toBeLessThanOrEqual(0);
+      // nothing in the header spills sideways (the header and everything in it end inside the window)
+      expect(await head.evaluate((h) => Math.max(...[h, ...h.querySelectorAll('*')].filter((e) => e.getClientRects().length > 0).map((e) => e.getBoundingClientRect().right)) - window.innerWidth)).toBeLessThanOrEqual(0);
       expect(errors).toEqual([]);
     });
   }

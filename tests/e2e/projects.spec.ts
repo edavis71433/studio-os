@@ -339,6 +339,7 @@ test.describe('Projects list view', () => {
     await page.locator('#q').fill('acme website');
     await expect(page.locator('tbody tr')).toHaveCount(1);
     const before = reportCalls.length;
+    if (await page.locator('.dds-ph-dots').isVisible() && !(await page.locator('#phMore').isVisible())) await page.locator('.dds-ph-dots').click();   // builder item 165: on a phone it waits behind ⋯
     await page.locator('#refreshBtn').click();                // reload with the search active
     await expect(page.locator('tbody tr')).toHaveCount(1);
     await expect.poll(() => reportCalls.length).toBeGreaterThan(before);
@@ -388,6 +389,7 @@ test.describe('Projects list view', () => {
     // project-name button — Enter opens the record (no tr tabindex hack)
     await page.locator('.crumbs .crumb').click();
     await expect(page.locator('#listWrap')).toBeVisible();
+    if (await page.locator('.dds-ph-dots').isVisible() && !(await page.locator('#phMore').isVisible())) await page.locator('.dds-ph-dots').click();   // builder item 165: on a phone it waits behind ⋯
     await page.locator('#dispTable').click();
     const rowBtn = page.locator('tbody tr[data-id="p1"] .rowlink');
     await expect(rowBtn).toHaveText('Acme website build');
@@ -405,6 +407,7 @@ test.describe('Projects list view', () => {
     await expect(page.locator('.tscroll')).toHaveCount(0);
     await expect(page.locator('#dispBoard')).toHaveAttribute('aria-pressed', 'true');
     // switching to Table sticks across a reload
+    if (await page.locator('.dds-ph-dots').isVisible() && !(await page.locator('#phMore').isVisible())) await page.locator('.dds-ph-dots').click();   // builder item 165: on a phone it waits behind ⋯
     await page.locator('#dispTable').click();
     await expect(page.locator('tbody tr')).toHaveCount(3);
     await page.goto('/projects.html');

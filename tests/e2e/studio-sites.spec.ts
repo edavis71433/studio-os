@@ -910,6 +910,7 @@ test.describe('Domains: the page does things (item 162)', () => {
 
   test('Download gives the list as a spreadsheet, in its order', async ({ page }) => {
     await openDomains(page);
+    if (await page.locator('.dds-ph-dots').isVisible()) await page.locator('.dds-ph-dots').click();   // builder item 165: on a phone Download waits behind ⋯
     const [dl] = await Promise.all([page.waitForEvent('download'), page.locator('#dlBtn').click()]);
     expect(dl.suggestedFilename()).toBe('domains.csv');
     const text = await new Promise<string>(async (resolve, reject) => { const s = await dl.createReadStream(); let b = ''; s.on('data', (c) => { b += c; }); s.on('end', () => resolve(b)); s.on('error', reject); });

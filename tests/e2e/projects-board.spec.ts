@@ -184,6 +184,7 @@ test.describe('Projects — the calendar (bold redesign)', () => {
   test('each project on its target date; the month steps and comes home; an entry opens the record', async ({ page }) => {
     await installApp(page, { api: CAL_API });
     await page.goto('/projects.html');
+    if (await page.locator('.dds-ph-dots').isVisible() && !(await page.locator('#phMore').isVisible())) await page.locator('.dds-ph-dots').click();   // builder item 165: on a phone it waits behind ⋯
     await page.locator('#dispCal').click();
     await expect(page.locator('#dispCal')).toHaveAttribute('aria-pressed', 'true');
     await expect(page.locator('#calTitle')).toHaveText(monthName(0));
@@ -210,6 +211,7 @@ test.describe('Projects — the calendar (bold redesign)', () => {
   test('the choice is remembered', async ({ page }) => {
     await installApp(page, { api: CAL_API });
     await page.goto('/projects.html');
+    if (await page.locator('.dds-ph-dots').isVisible() && !(await page.locator('#phMore').isVisible())) await page.locator('.dds-ph-dots').click();   // builder item 165: on a phone it waits behind ⋯
     await page.locator('#dispCal').click();
     await expect(page.locator('#calTitle')).toBeVisible();
     await page.reload();

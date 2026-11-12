@@ -50,7 +50,7 @@ test.describe('Prospects — find, keep, pitch (item 112)', () => {
     ] } } });
     await page.goto('/prospects.html');
     await expect(page.getByRole('heading', { name: 'No prospects yet' })).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Download CSV' })).toBeDisabled();
+    await expect(page.locator('#exportBtn')).toBeDisabled();   // builder item 165: in the page header, behind ⋯ on a phone
     await page.getByLabel('What kind of business').fill('barbers');
     await page.getByLabel('Where').fill('Burbank');
     await page.getByRole('button', { name: 'Find businesses' }).click();
