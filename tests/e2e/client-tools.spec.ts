@@ -314,8 +314,8 @@ async function openWeek(page: Page, body: unknown = WEEK) {
 test.describe('Plan my week (week.html, item 176)', () => {
   test('every client in the order they need you: late first, the first one marked, the studio’s own last', async ({ page }) => {
     await openWeek(page);
-    await expect(page.getByRole('heading', { level: 1, name: 'Your week' })).toBeVisible();
-    await expect(page.locator('.lmeta')).toContainText('5 things across 2 clients and your own · 2 late');
+    await expect(page.getByRole('heading', { level: 1, name: 'Plan my week' })).toBeVisible();   // builder item 165: the title says what the menu says
+    await expect(page.locator('#phLine')).toContainText('5 things across 2 clients and your own · 2 late');
     const cards = page.locator('.ccard');
     await expect(cards).toHaveCount(3);
     await expect(cards.nth(0)).toContainText('Maple & Main Realty');
@@ -336,6 +336,7 @@ test.describe('Plan my week (week.html, item 176)', () => {
     await expect(page.locator('.intro')).toContainText('Showing what’s late');
     await page.getByRole('link', { name: 'Show the whole week' }).click();
     await expect(page.locator('.thing')).toHaveCount(5);
+    if (await page.locator('.dds-ph-dots').isVisible()) await page.locator('.dds-ph-dots').click();   // on a phone it waits behind ⋯ (builder item 165)
     await page.getByRole('button', { name: 'Copy as a list' }).click();
     expect(await page.evaluate(() => (window as unknown as { __copied: string }).__copied)).toContain('Maple & Main Realty (first)');
   });

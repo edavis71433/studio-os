@@ -77,8 +77,8 @@ test.describe('item 97 — Google and Outlook files map the right columns (B2)',
     await page.route('**/functions/v1/presence/sales/contacts', (route) => { if (route.request().method() !== 'POST') return route.fallback(); contacts.push(route.request().postDataJSON()); return route.fulfill({ status: 201, contentType: 'application/json', body: JSON.stringify({ data: { id: 'ct-' + contacts.length } }) }); });
     await page.route('**/functions/v1/presence/sales/deals', (route) => { if (route.request().method() !== 'POST') return route.fallback(); deals.push(route.request().postDataJSON()); return route.fulfill({ status: 201, contentType: 'application/json', body: '{"data":{}}' }); });
     await page.goto('/pipeline.html');
-    if (await page.locator('#moreBtn').isVisible()) { await page.locator('#moreBtn').click(); await page.getByRole('menuitem', { name: 'Import CSV' }).click(); }
-    else await page.getByRole('button', { name: 'Import CSV' }).click();
+    if (await page.locator('.dds-ph-dots').isVisible()) await page.locator('.dds-ph-dots').click();   // builder item 165: on a phone Import CSV waits behind the header's ⋯
+    await page.getByRole('button', { name: 'Import CSV' }).click();
     await page.locator('#csvZone input[type=file]').setInputFiles(csvFile('deals.csv', 'Deal,First Name,Last Name,Last activity date,Account Name,Account Owner\nMenu redesign,Ana,Ruiz,2026-11-01,Harbor Lane Bakery,Sam\n'));
     await expect(page.locator('#csvZone')).toContainText('1 deal found');
     await page.locator('#csvZone').getByRole('button', { name: 'Import 1' }).click();

@@ -24,9 +24,7 @@
   *{box-sizing:border-box}
   body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);line-height:1.5;-webkit-font-smoothing:antialiased}
   .wrap{max-width:var(--dds-w-focus,760px);margin:0 auto;padding:48px var(--dds-s6,24px) 96px}
-  header .eyebrow{font-size:12.5px;color:var(--soft);font-weight:500}
-  header h1{font-family:var(--serif);font-weight:500;font-size:34px;line-height:1.12;margin:.35em 0 .1em;text-wrap:balance}
-  header .sub{color:var(--soft);font-size:15.5px;margin:0}
+  /* builder item 165: the header is the shared one (shell.css .dds-ph); the greeting and the date lead its line */
   .stack{display:flex;flex-direction:column;gap:var(--dds-s4,16px);margin-top:var(--dds-s7,32px)}
   .moment{background:var(--card);border:1px solid var(--line);border-radius:var(--dds-r-lg,10px);padding:var(--dds-s6,24px) var(--dds-s6,24px) var(--dds-s5,20px);box-shadow:var(--shadow);position:relative;overflow:hidden}
   /* visual refresh: no accent stripe — the row's icon tile carries the tone */
@@ -276,11 +274,11 @@
 </head>
 <body>
 <div class="wrap">
-  <header>
-    <div class="eyebrow" id="eyebrow">Your business</div>
-    <h1 id="greeting">Today</h1>
-    <p class="sub" id="sub">A calm look at what — if anything — needs you.</p>
-  </header>
+  <header class="dds-ph"><div class="dds-ph-row"><span class="dds-ph-ic" id="phIc" data-ic="today" aria-hidden="true"></span>
+    <div class="dds-ph-tt"><div class="dds-ph-tl"><h1 id="greeting">Today</h1></div>
+      <p class="dds-ph-line" id="sub">A calm look at what, if anything, needs you.</p></div></div></header>
+  <!-- inside a client this page is the client's Overview, as the menu says -->
+  <script>(function(){try{if(new URLSearchParams(location.search).get('client')){document.getElementById('greeting').textContent='Overview';document.getElementById('phIc').setAttribute('data-ic','overview');}}catch(_){}})();</script>
   <div id="main"><div class="spin" role="status" aria-label="Loading"></div></div>
 </div>
 <!-- PT-5: one-time contextual tip, taught where it's relevant, then gone forever -->
@@ -779,7 +777,6 @@ const NOTICE_FYI_KINDS = ['invoice_paid'];
 const SI={mail:'<rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 7l9 6 9-6"/>',message:'<path d="M21 12a8 8 0 0 1-8 8H8l-5 3 1.5-4.5A8 8 0 1 1 21 12z"/>',heart:'<path d="M12 21s-8-5.3-8-11a4.5 4.5 0 0 1 8-2.8A4.5 4.5 0 0 1 20 10c0 5.7-8 11-8 11z"/>',alert:'<path d="M12 3l10 18H2z"/><path d="M12 10v4M12 18h.01"/>',bell:'<path d="M6 16V11a6 6 0 0 1 12 0v5l2 2H4z"/><path d="M10 20a2 2 0 0 0 4 0"/>',thumbsup:'<path d="M7 11v10H3V11z"/><path d="M7 11l4-8a2.5 2.5 0 0 1 2.5 2.5V9h5a2 2 0 0 1 2 2.3l-1.2 7A2 2 0 0 1 17.3 20H7"/>',inbox:'<path d="M3 13l2-8h14l2 8v6H3z"/><path d="M3 13h5l1.5 3h5L16 13h5"/>'};
 const si=(k)=>`<svg class="si" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">${SI[k]||SI.dot}</svg>`;
 function render(moments, features, feed, ctx, dash, appts, deals, summary, rcv, customers, example, facts){
-  $('greeting').textContent = greet();
   // Phase 4 (onboarding cleanup): one card per thing — the same nudge raised
   // three times (three "Walk me through it" cards about one publish step)
   // collapses to the first; later duplicates are dropped by headline.
@@ -806,7 +803,7 @@ function render(moments, features, feed, ctx, dash, appts, deals, summary, rcv, 
   if(needs) subBits.push(needs === 1 ? 'one thing needs you' : `${needs} things need you`);
   if(items.length) subBits.push(items.length === 1 ? 'one more worth a look' : `${items.length} more worth a look`);
   if(!needs && !items.length) subBits.push('nothing needs you today');
-  $('sub').textContent = subBits.join(' · ') + '.';
+  $('sub').textContent = greet() + ' ' + subBits.join(' · ') + '.';   // builder item 165: the title stays Today; the greeting leads the line
 
   // ── the Needs-you action feed: one card, one row per item (icon · headline +
   //    meta · one CTA). Rows keep the .moment.todo identity — the attention

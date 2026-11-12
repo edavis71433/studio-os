@@ -261,7 +261,7 @@ test.describe('Project templates (sales item 106)', () => {
       return route.fulfill({ status: 201, contentType: 'application/json', body: JSON.stringify({ data: { id: P1 }, templated: true }) });
     });
     await page.goto('/projects.html');
-    await page.locator('.lhead #newProject').click();
+    await page.locator('header.dds-ph #newProject').click();
     const sel = page.locator('#np-template');
     await expect(sel.locator('optgroup[label="Your templates"] option')).toHaveText(['Our website way — 9 steps']);
     await page.locator('#np-name').fill('Corner Café website');

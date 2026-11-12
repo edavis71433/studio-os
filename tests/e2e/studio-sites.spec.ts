@@ -100,8 +100,8 @@ test.describe('Sites (builder list items 43 and 45)', () => {
     await expect(page.locator('h1')).toHaveCount(1);
     await expect(page.locator('.scard')).toHaveCount(3);
     await expect(page.locator('.lmeta')).toContainText('3 sites · Pinned first, then the ones you opened last');
-    await expect(page.locator('.tabs a[aria-current="page"]')).toHaveText('Sites');
-    await expect(page.locator('.tabs a[href="/domains.html"]')).toHaveText('Domains');
+    await expect(page.locator('.dds-ph-tabs a[aria-current="page"]')).toHaveText('Sites');
+    await expect(page.locator('.dds-ph-tabs a[href="/domains.html"]')).toHaveText('Domains');
     const isMobile = (page.viewportSize()?.width || 1280) < 761;
     if (!isMobile) await expect(page.locator('.dds-nav .sec.active > a[data-href="/sites.html"]')).toHaveAttribute('aria-current', 'page');
     expect(errors).toEqual([]);
@@ -688,7 +688,7 @@ test.describe('Domains (builder list item 52)', () => {
     await installApp(page, { api: { '/portal/context': studioContext, '/agency/domains': DOMAINS } });
     await page.goto('/domains.html');
     await expect(page.getByRole('heading', { level: 1, name: 'Domains' })).toBeVisible();
-    await expect(page.locator('.tabs a[aria-current="page"]')).toHaveText('Domains');
+    await expect(page.locator('.dds-ph-tabs a[aria-current="page"]')).toHaveText('Domains');
     await expect(page.locator('.lmeta')).toContainText('4 domains · 2 expiring or expired');
     const rows = page.locator('table[aria-label="Domains"] tbody tr');
     await expect(rows.locator('td:first-child .dom')).toHaveText(['gone.example', 'bistro.example', 'garage.example', 'mystudio.example']);
@@ -715,7 +715,7 @@ test.describe('Domains (builder list item 52)', () => {
     await expect(page.locator('table[aria-label="Domains"] tbody tr')).toHaveCount(1);
     await expect(page.locator('#search')).toBeFocused();
     await expect(page.locator('#search')).toHaveValue('registrar c');
-    await expect(page.locator('.tabs a[href="/sites.html"]')).toHaveText('Sites');
+    await expect(page.locator('.dds-ph-tabs a[href="/sites.html"]')).toHaveText('Sites');
   });
 
   test('no domains yet, a failed read, and a phone', async ({ page }) => {
