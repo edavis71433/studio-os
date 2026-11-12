@@ -161,6 +161,21 @@ html.dds-embed #detailWrap{padding-top:0}
   .pb-row{display:flex;justify-content:space-between;gap:12px;font-size:13px;padding:5px 0}
   .pb-row b{font-variant-numeric:tabular-nums;white-space:nowrap}
   .pb-total{border-top:1px solid var(--line);margin-top:4px;padding-top:8px;font-weight:700}
+  /* sales item 106: how they'll pay, in parts — the editor's rows and the preview's lines */
+  .pp-row{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin-top:6px}
+  .pp-row>*{flex:0 0 auto}
+  .pp-row .pp-n{font-size:12.5px;font-weight:600;min-width:52px}
+  #propForm .pp-row .pp-pct{width:64px}#propForm .pp-row .pp-days{width:72px}
+  #propForm .pp-row .pp-when{flex:1 1 170px;width:auto;min-width:150px}
+  #propForm .pp-row .pp-date{width:auto}
+  .pp-foot{margin-top:8px;align-items:center}
+  #ppSum.bad{color:var(--bad,#a3423a);font-weight:600}
+  .pb-parts-l{margin-top:12px}
+  .pb-part{font-size:12.5px;color:var(--soft)}
+  .tpl-cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:8px;margin-bottom:12px}
+  .tpl-card{display:flex;flex-direction:column;align-items:flex-start;gap:2px;text-align:left;padding:10px 12px;border:1px solid var(--line);border-radius:var(--dds-r-lg,12px);background:var(--card);cursor:pointer;font:inherit;min-height:44px}
+  .tpl-card b{font-size:13px;font-weight:600}.tpl-card span{font-size:12px;color:var(--soft)}
+  .tpl-card[aria-pressed="true"]{border-color:var(--p);box-shadow:0 0 0 2px color-mix(in srgb,var(--p) 25%,transparent)}
   .pb-total b{font-size:16px}
   .pb-cta{margin-top:12px;text-align:center;border-radius:999px;padding:10px;font-weight:600;font-size:13.5px;background:var(--dds-grad-btn,var(--p));color:var(--dds-on-p,#fff)}
   .pb-foot{font-size:12px;margin:8px 2px 0}
@@ -684,6 +699,22 @@ const money0=(c)=>{const v=(c||0)/100;return '$'+v.toLocaleString(undefined,Numb
 const PROP_META='__meta__';
 const splitPropLI=(raw)=>{const a=Array.isArray(raw)?raw:[];const items=a.filter(el=>!(el&&typeof el==='object'&&PROP_META in el));const me=a.find(el=>el&&typeof el==='object'&&PROP_META in el);return{items,meta:(me&&me[PROP_META])||{}};};
 const propTotals=(raw)=>{const {items,meta}=splitPropLI(raw);const sub=items.reduce((n,i)=>n+Math.max(0,Math.trunc(i.qty)||0)*Math.max(0,Math.trunc(i.unit_cents)||0),0);let disc=0;if(meta.discount){disc=meta.discount.mode==='percent'?Math.round(sub*Math.min(100,Math.max(0,meta.discount.value))/100):Math.trunc(meta.discount.value);}disc=Math.max(0,Math.min(disc,sub));const post=sub-disc;const tp=(meta.tax_pct!=null&&isFinite(+meta.tax_pct))?Math.min(100,Math.max(0,+meta.tax_pct)):0;const tax=Math.round(post*tp/100);return{items,meta,subtotal:sub,discount:disc,tax:tax,total:Math.max(0,post+tax)};};
+// sales item 106: a proposal paid in parts (mirrors lib/proposal_schedule.ts scheduleAmounts and partWhen by hand;
+// tests/presence/proposal_schedule_test.mjs runs both against each other)
+function schedAmounts(parts,total){const t=Math.max(0,Math.trunc(Number(total))||0);const out=parts.map(p=>Math.floor(t*p.pct/100));if(out.length)out[out.length-1]=t-out.slice(0,-1).reduce((n,x)=>n+x,0);return out;}
+const PART_MONTHS=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+function partWhen(p){if(p.when==='sign')return 'When you sign the agreement';if(p.when==='date'&&p.date){const [y,m,d]=p.date.split('-').map(Number);return 'Due '+PART_MONTHS[(m||1)-1]+' '+d+', '+y;}if(p.when==='days'&&p.days)return 'Due '+p.days+' day'+(p.days===1?'':'s')+' after you sign';return 'Due when the work is done';}
+const PAY_PRESETS={half:[{pct:50,when:'sign'},{pct:50,when:'done'}],thirds:[{pct:34,when:'sign'},{pct:33,when:'days',days:30},{pct:33,when:'done'}]};
+// sales item 106: the agreement says the same as the parts. Mirrors lib/proposal_schedule.ts partsIntoAgreement;
+// tests/presence/proposal_schedule_test.mjs runs both on every package and compares them.
+const HALF_PASSAGES={cover:'Payment:        50% deposit ({{deposit_amount}}) to begin · 50% ({{balance_amount}}) due before launch',table:'Deposit due at signing, 50 percent                      {{deposit_amount}}\nBalance due at launch, 50 percent                       {{balance_amount}}',fee:'The project fee of {{deal_value}} is paid in two parts. Fifty percent, or {{deposit_amount}} , is due at signing and before work begins. The remaining fifty percent, or {{balance_amount}} , is due at launch. The site goes live once the balance is received.',terms:'A non-refundable deposit of 50% of the total project fee is due before work begins. The remaining 50% is due upon project completion, prior to live site launch, DNS transfer, or handoff of final files.'};
+const HALF_AND_HALF_RE=/50% deposit|deposit of 50%|Fifty percent, or|Deposit due at signing, 50 percent|Balance due at launch, 50 percent/;
+function partPhrases(p){if(p.when==='sign')return{short:'when you sign',clause:'at signing and before work begins',terms:'upon signing'};if(p.when==='date'&&p.date){const d='by '+new Date(p.date+'T00:00:00Z').toLocaleDateString('en-US',{year:'numeric',month:'long',day:'numeric',timeZone:'UTC'});return{short:d,clause:d,terms:d};}if(p.when==='days'&&p.days){const n=p.days+' day'+(p.days===1?'':'s');return{short:n+' after you sign',clause:n+' after signing',terms:n+' after signing'};}return{short:'when the work is done',clause:'at launch',terms:'upon project completion, prior to live site launch, DNS transfer, or handoff of final files'};}
+function partsPassages(parts,totalCents){const total=Math.max(0,Math.trunc(Number(totalCents))||0);const amounts=schedAmounts(parts,total);const wc=[total,...amounts].some(c=>c%100!==0);const m=c=>docMoney(c,wc);const n=parts.length;const ph=parts.map(partPhrases);const pad=l=>l+' '.repeat(Math.max(2,56-l.length));const terms=parts.map((p,i)=>p.pct+'% '+ph[i].terms);const sep=terms.some(t=>t.includes(','))?'; ':', ';const words=['','one','two','three','four','five','six'];
+  return{cover:'Payment:        In '+n+' parts: '+parts.map((p,i)=>p.pct+'% ('+m(amounts[i])+') '+ph[i].short).join(' · '),table:parts.map((p,i)=>pad('Part '+(i+1)+' of '+n+', '+ph[i].short+', '+p.pct+' percent')+m(amounts[i])).join('\n'),fee:'The project fee of '+m(total)+' is paid in '+(words[n]||n)+' parts. '+parts.map((p,i)=>'Part '+(i+1)+', '+p.pct+' percent or '+m(amounts[i])+', is due '+ph[i].clause+'.').join(' ')+' The site goes live once every part due by launch is received.',terms:'The total project fee is paid in '+n+' parts: '+(n===2?terms.join(' and '):terms.slice(0,-1).join(sep)+sep+'and '+terms[n-1])+'.'+(parts[0].when==='sign'?' The first part is a non-refundable deposit due before work begins.':'')};}
+function partsIntoAgreement(text,parts,totalCents){let out=String(text==null?'':text);if(!parts||parts.length<2||!(Math.trunc(Number(totalCents))>0))return{text:out,changed:0,left:false};const next=partsPassages(parts,totalCents);let changed=0;for(const k of Object.keys(HALF_PASSAGES)){if(out.includes(HALF_PASSAGES[k])){out=out.split(HALF_PASSAGES[k]).join(next[k]);changed++;}}return{text:out,changed,left:HALF_AND_HALF_RE.test(out)};}
+// the parts of the proposal an agreement goes with: the accepted one, else the newest sent or drafted (the server's proposalSchedule)
+function dealParts(proposals){const list=(proposals||[]).filter(p=>!splitPropLI(p.line_items).meta.superseded_by).sort((a,b)=>String(b.created_at||'').localeCompare(String(a.created_at||'')));const p=list.find(x=>x.status==='accepted')||list.find(x=>x.status==='sent')||list.find(x=>x.status==='draft');const sch=p&&splitPropLI(p.line_items).meta.schedule;return Array.isArray(sch)&&sch.length>=2?{parts:sch,total:propTotals(p.line_items).total}:null;}
 const STAGES=['lead','qualified','proposal','contract','won','lost'];
 // calm, human stage labels (the raw enum never reaches the owner's eyes)
 const STAGE_LABEL={lead:'New lead',qualified:'Qualified',proposal:'Proposal sent',contract:'Agreement out',won:'Won',lost:'Not a fit'};
@@ -783,6 +814,9 @@ const boardCanMove=(from,to)=>from!==to&&to!=='won'&&(BOARD_NEXT[from]||[]).incl
 const PATH_STEPS=['lead','qualified','proposal','contract'];
 // calm, human labels for the deal's history strip (the raw event kinds stay backstage)
 const EVT_LABEL={created:'Deal created',stage_change:'Moved stage',note:'Note added',proposal_sent:'Proposal sent',proposal_decided:'Proposal decision',contract_sent:'Agreement sent',contract_signed:'Agreement signed',invoice_sent:'Invoice sent',invoice_paid:'Invoice paid',converted:'Converted to project',proposal_deleted:'Draft proposal removed',contract_deleted:'Draft agreement removed',invoice_voided:'Invoice voided'};
+// sales item 88: why a client declined (mirrors lib/agreement_layout.ts DECLINE_REASONS and declineWords by hand)
+const DECLINE_REASONS={price:'The price',timing:'The timing',scope:'What’s included',elsewhere:'We went another way'};
+function declineWords(reason,note){const r=DECLINE_REASONS[reason]||'';const n=String(note==null?'':note).trim();if(r&&n)return r+': “'+n+'”';return r||(n?'“'+n+'”':'');}
 // item 69: the client opened a document's page (mirrors crm/deal_activity.ts openedLine by hand)
 const OPENED_WHAT={proposal:'proposal',agreement:'agreement',invoice:'invoice',deposit:'deposit request',estimate:'estimate'};
 function evtLabel(e){
@@ -790,8 +824,10 @@ function evtLabel(e){
   if(e.kind==='stage_change'&&e.to_stage)return 'Moved to '+stageLabel(e.to_stage);
   // An accept that backfilled the deal value says so — the price change is part
   // of the record (value_backfilled_cents rides the proposal_decided detail).
-  if(e.kind==='proposal_decided'&&d.decision)return d.decision==='accepted'?('Proposal accepted'+(d.value_backfilled_cents?' — deal value set to '+money(d.value_backfilled_cents):'')):'Proposal declined';
-  if(e.kind==='contract_signed'&&d.signer)return 'Agreement signed — '+d.signer;
+  // sales item 88 (mirrors crm/deal_activity.ts): a decline says why; a signature names the countersigner; a question reads as one
+  if(e.kind==='proposal_decided'&&d.decision)return d.decision==='accepted'?('Proposal accepted'+(d.value_backfilled_cents?' — deal value set to '+money(d.value_backfilled_cents):'')):'Proposal declined'+(declineWords(d.reason,d.note)?' — '+declineWords(d.reason,d.note):'');
+  if(e.kind==='contract_signed'&&d.signer)return 'Agreement signed — '+d.signer+(d.countersigned_by?', countersigned by '+d.countersigned_by:'');
+  if(e.kind==='client_question')return 'They asked'+(d.on==='contract'?' about the agreement':d.on==='estimate'?' about the estimate':' about the proposal')+(d.text?': “'+String(d.text).slice(0,140)+(String(d.text).length>140?'…':'')+'”':'');
   if(e.kind==='invoice_sent'&&d.amount_cents&&d.recurring_id)return 'Recurring invoice sent — '+money(d.amount_cents)+(d.period?' ('+d.period+')':'');   // item 47
   if(e.kind==='invoice_sent'&&d.amount_cents)return (d.purpose==='deposit'?'Deposit requested':'Invoice sent')+' — '+money(d.amount_cents);
   if(e.kind==='invoice_paid'&&d.amount_cents)return (d.retainer?'Retainer payment':d.purpose==='deposit'?'Deposit paid':'Invoice paid')+' — '+money(d.amount_cents);
@@ -1694,6 +1730,14 @@ function confirmMoneyBlanks(text){
   return confirm('This agreement prints the project fee and deposit as unfilled brackets — the deal has no value set.\n\nSet the deal value in Details first (then re-draft or edit the amounts in), and the deposit request will make itself when you send. Send it with the blanks as written?');
 }
 
+// Sales item 106: the third guard. The proposal the agreement goes with is paid in parts,
+// and the invoices follow the parts, so an agreement still saying half and half would
+// promise the client something else. Same confirm idiom. Returns true when it's fine to send.
+function confirmHalfAndHalf(text,plan){
+  if(!plan||!HALF_AND_HALF_RE.test(String(text==null?'':text)))return true;
+  return confirm('The proposal is paid in '+plan.parts.length+' parts, but this agreement still says half to begin and half before launch.\n\nThe invoices will follow the '+plan.parts.length+' parts. Send the agreement as it stands?');
+}
+
 function renderFilters(){
   const opts=[['','All'],...STAGES.map(s=>[s,stageLabel(s)])];
   $('filters').innerHTML=opts.map(([v,l])=>`<button type="button" aria-pressed="${v===FILTER?'true':'false'}" class="chip${v===FILTER?' on':''}" data-stage="${v}">${esc(l)}</button>`).join('');
@@ -1775,6 +1819,37 @@ function wireWhatsNext(host,id){
   host.querySelectorAll('[data-next-todo]').forEach(b=>b.onclick=async()=>{b.disabled=true;try{await api('/sales/deals/'+id+'/tasks','POST',{title:b.getAttribute('data-next-todo')});toast('To-do added');loadDealTasks(id);}catch(e){toast(nice(e),true);b.disabled=false;}});
   const nc=$('nextCustom'); if(nc)nc.onclick=()=>{const p=$('whatsNext');if(p)p.remove();const t=$('dt-title');if(t)t.focus();};
 }
+// ── Sales item 106: saved lists of to-dos ─────────────────────────────────────
+// A deal's to-dos saved as a named list, then added to another deal in one go,
+// each due as many days after it's added as it was on the deal it came from
+// (routes/todo_templates.ts). They land as ordinary to-dos, editable as ever.
+let TODO_LISTS=null;
+const listDue=(d)=>d==null?'':d===0?' (same day)':d===1?' (next day)':' (in '+d+' days)';
+const todoCount=(n)=>n===1?'1 to-do':n+' to-dos';
+async function wireTodoLists(id){
+  const sel=$('dt-list'), pick=$('dt-list-pick'), save=$('dt-list-save');
+  if(!sel||!pick||!save)return;
+  save.onclick=()=>{pick.hidden=true;miniForm($('dtListForm'),[{name:'name',label:'Name this list',placeholder:'e.g. Website kickoff'}],async(v)=>{
+    if(!v.name){toast('Give the list a name.',true);return;}
+    const r=await api('/sales/todo-templates','POST',{name:v.name,from_deal_id:id});
+    $('dtListForm').innerHTML='';TODO_LISTS=null;
+    toast('Saved “'+v.name+'” with '+(r.data&&r.data.count?todoCount(r.data.count):'its to-dos')+'. Add it to any deal from its To-dos.');
+    wireTodoLists(id);
+  },{saveLabel:'Save the list'});};
+  if(!TODO_LISTS){try{const r=await api('/sales/todo-templates');TODO_LISTS=(r&&r.data)||[];}catch(_){TODO_LISTS=null;sel.hidden=true;return;}}
+  if(CURRENT_DEAL!==id||sel!==$('dt-list'))return;   // the drawer moved on
+  sel.innerHTML='<option value="">Add a saved list of to-dos…</option>'+TODO_LISTS.map(l=>`<option value="${esc(l.id)}">${esc(l.name)} — ${todoCount(l.count)}</option>`).join('');
+  sel.hidden=!TODO_LISTS.length; pick.hidden=true; pick.innerHTML='';
+  sel.onchange=()=>{
+    const L=TODO_LISTS.find(x=>x.id===sel.value); $('dtListForm').innerHTML='';
+    if(!L){pick.hidden=true;pick.innerHTML='';return;}
+    pick.innerHTML=`<p class="mut" style="font-size:12.5px;margin:6px 0 4px">${L.items.map(i=>esc(i.title)+listDue(i.days)).join(' · ')}</p><div class="row2"><button class="btn" id="dt-list-add">Add ${L.count===1?'this to-do':'these '+L.count+' to-dos'}</button><button class="btn ghost" data-needs="delete" data-del-ttpl="${esc(L.id)}">Remove this list</button></div>`;
+    pick.hidden=false;
+    const add=$('dt-list-add'); add.onclick=async()=>{add.disabled=true;try{const r=await api('/sales/deals/'+id+'/tasks/from-template?today='+localYmd(),'POST',{template_id:L.id});toast('Added '+todoCount((r.data&&r.data.added)||L.count)+' from “'+L.name+'”.');sel.value='';pick.hidden=true;loadDealTasks(id);}catch(e){toast(nice(e),true);add.disabled=false;}};
+    pick.querySelectorAll('[data-del-ttpl]').forEach(b=>b.onclick=async()=>{if(b.dataset.armed!=='1'){b.dataset.armed='1';b.textContent='Tap again to remove';return;}b.disabled=true;try{await api('/sales/todo-templates/'+b.dataset.delTtpl,'DELETE');TODO_LISTS=null;toast('List removed. To-dos already added from it stay.');wireTodoLists(id);}catch(e){toast(nice(e),true);b.disabled=false;}});
+  };
+}
+
 // ── Shared per-invoice actions: Send/Resend · Copy link · Void ───────────────
 // ONE wiring for every surface that renders invoice rows with these controls —
 // the deal drawer's "Invoice & deposit" list AND the "Who owes you" receivables
@@ -3105,7 +3180,10 @@ async function openDeal(id){
       const vbits=[];
       if(p.first_viewed_at)vbits.push(svgi('eye')+' Opened '+ago(p.first_viewed_at)); else if(p.status==='sent')vbits.push('Not opened yet');
       if(p.expires_at){const exp=new Date(p.expires_at);vbits.push(exp.getTime()<Date.now()?svgi('hourglass')+' Expired':'Expires '+exp.toLocaleDateString());}
-      const vnote=(vbits.length&&(p.status==='sent'||p.status==='declined'||p.status==='accepted'))?`<div class="mut" style="font-size:12px;margin-top:2px">${vbits.join(' · ')}</div>`:'';
+      // sales item 88: a decline says what would make it a yes (the client's own words, from their page)
+      if(p.status==='declined'&&declineWords(p.decided_reason,p.decided_note))vbits.push('Why: '+esc(declineWords(p.decided_reason,p.decided_note)));
+      {const sch=splitPropLI(p.line_items).meta.schedule;if(Array.isArray(sch)&&sch.length)vbits.push('Paid in '+sch.length+' parts');}   // sales item 106
+      const vnote=(vbits.length&&(p.status==='sent'||p.status==='declined'||p.status==='accepted'||p.status==='draft'))?`<div class="mut" style="font-size:12px;margin-top:2px">${vbits.join(' · ')}</div>`:'';
       return `<div class="row2 lr"><span class="mut">${esc(p.title||'Proposal')}${ver} — ${money0(T.total)} ${chip}</span><span>${act}${revise}<button class="btn ghost" data-doc-prop="${p.id}" title="Open a branded, printable copy (save as PDF)">View / print</button><button class="btn ghost" data-tpl-prop="${p.id}" title="Save these line items to reuse on future deals">Save as template</button>${del}</span>${vnote}${(p.status==='sent'&&!superseded)?linkNote('proposal',p.id,'link'):''}</div>`;
     }).join('')||'<div class="mut">No proposals yet.</div>';
     // item 47: estimates — a price before anything is agreed. Approve or Not now on
@@ -3144,7 +3222,7 @@ async function openDeal(id){
     const cons=(data.contracts||[]).map(k=>{
       const signed=k.status==='signed';
       const chip=signed?`<span class="stage won">Signed ✓</span>`:k.status==='sent'?`<span class="stage">Sent — awaiting signature</span>`:`<span class="stage lost">Draft — not sent yet</span>`;
-      const meta=signed&&k.signer_name?` — signed by ${esc(k.signer_name)}${k.signed_at?(' on '+esc(new Date(k.signed_at).toLocaleDateString())):''}`:'';
+      const meta=signed&&k.signer_name?` — signed by ${esc(k.signer_name)}${k.countersigned_name?' and by '+esc(k.countersigned_name)+' for you':''}${k.signed_at?(' on '+esc(new Date(k.signed_at).toLocaleDateString())):''}`:'';   // sales item 88: both signatures
       const act=k.status==='draft'?(SEND_BOTH?'':`<button class="${fillIf(BILL_PRIMARY==='con:'+k.id)}" data-send-contract="${k.id}">Send${forWhom} for signature →</button> `):k.status==='sent'?`<button class="btn ghost" data-link-contract="${k.id}">Copy signing link</button> `:'';
       const docBtn=`<button class="btn ghost" data-doc-con="${k.id}" title="Open a branded, printable copy (save as PDF)">${signed?'View / print signed copy':'View / print'}</button>`;
       // Same rule as the proposal, and it matters more here: sent means someone
@@ -3280,7 +3358,9 @@ async function openDeal(id){
                still fully editable before Add, and "Something else…" keeps the
                free-text path first-class. The POST is unchanged. -->
           <div class="row2" style="margin-top:8px"><select id="dt-preset" aria-label="Pick a to-do for this stage" style="flex:1;min-width:180px"><option value="">Pick a to-do for this stage…</option>${(guidanceFor(d.stage,{signed:signedNow,converted:!!d.converted_client_id}).todos||[]).map((t,i)=>`<option value="${i}">${esc(t)}</option>`).join('')}<option value="__custom__">Something else…</option></select></div>
-          <div class="row2" style="margin-top:6px"><input type="text" id="dt-title" placeholder="Add a to-do (e.g. Send the contract)" style="flex:1"><input type="date" id="dt-due" style="max-width:160px" aria-label="Due date"><button class="btn ghost" id="dt-add">Add</button></div></div>
+          <div class="row2" style="margin-top:6px"><input type="text" id="dt-title" placeholder="Add a to-do (e.g. Send the contract)" style="flex:1"><input type="date" id="dt-due" style="max-width:160px" aria-label="Due date"><button class="btn ghost" id="dt-add">Add</button></div>
+          <div class="row2 dt-lists" style="margin-top:6px"><select id="dt-list" aria-label="Add a saved list of to-dos" style="flex:1;min-width:180px" hidden></select><button class="btn ghost" id="dt-list-save">Save these as a list</button></div>
+          <div id="dt-list-pick" hidden></div><div id="dtListForm"></div></div>
         </div><aside class="dcol-rail">
           <div class="sec"><h3>Money<button type="button" class="hlink" data-goto-tab="billing">Billing →</button></h3><div class="dkv">${moneyKv.join('')}</div></div>
           <div class="sec"><h3>Latest<button type="button" class="hlink" data-goto-tab="activity">Activity →</button></h3>${latestHtml}</div>
@@ -3302,7 +3382,7 @@ async function openDeal(id){
             const st=invState(v);const waits=invWaits(v);const parent=v.payment_for?(data.invoices||[]).find(x=>x.id===v.payment_for):null;
             const name=v.payment_for?esc('Part payment'+(parent&&invNo(parent.number)?' toward '+invNo(parent.number):'')):(invNo(v.number)?esc(invNo(v.number))+' · ':'')+esc(v.title||(v.purpose==='deposit'?'Deposit':'Invoice'));
             const partPaid=(data.invoices||[]).filter(x=>x.payment_for===v.id&&x.status==='paid').reduce((a,b)=>a+(b.amount_cents||0),0);   // item 77
-            const when=st==='paid'?(v.paid_at?` · ${esc(PAY_WORDS[v.paid_method]||'paid')} ${esc(evtDate(v.paid_at))}`:'')+(v.paid_note?' · '+esc(v.paid_note):'')+(v.paid_private_note?' · <span title="Only you see this. It is not on their receipt.">private: '+esc(v.paid_private_note)+'</span>':''):st==='processing'?' · payment on its way':waits?(v.due_date?` · due ${esc(v.due_date)}`:' · due now')+(partPaid?` · ${money(partPaid)} paid so far`:'')+(v.stripe_url?'':(partPaid?' · send it for a link for what’s left':' · not sent yet')):'';
+            const when=st==='paid'?(v.paid_at?` · ${esc(PAY_WORDS[v.paid_method]||'paid')} ${esc(evtDate(v.paid_at))}`:'')+(v.paid_note?' · '+esc(v.paid_note):'')+(v.paid_private_note?' · <span title="Only you see this. It is not on their receipt.">private: '+esc(v.paid_private_note)+'</span>':''):st==='processing'?' · payment on its way':waits?(v.due_date?` · due ${esc(v.due_date)}`:/ · when the work is done$/.test(v.title||'')?'':' · due now')+(partPaid?` · ${money(partPaid)} paid so far`:'')+(v.stripe_url?'':(partPaid?' · send it for a link for what’s left':' · not sent yet')):'';
             const payBtn=waits?` <button class="btn ghost" data-pay-inv="${esc(JSON.stringify({id:v.id,amount_cents:v.amount_cents,number:v.number||null}))}" data-email="${c&&c.email?'1':''}" data-first="${esc((String(c&&c.name||'').trim().split(/\s+/)[0])||'')}" title="Paid by check, cash, bank transfer or Zelle? Mark it paid here">Record payment</button>`:'';
             const undoBtn=(st==='paid'&&v.paid_method)?` <button class="btn ghost" data-needs="delete" data-undo-pay="${v.id}" data-part="${v.payment_for?'1':''}" title="Recorded by mistake? The invoice goes back to unpaid" aria-label="Undo the payment on ${name}">Undo</button>`:'';
             const acts=undoBtn+payBtn+(waits?` <button class="btn ghost" data-send-inv="${v.id}">${v.stripe_url?'Resend':'Send'}</button>${v.stripe_url?` <button class="btn ghost" data-copy-pay="${esc(v.stripe_url)}">Copy link</button>`:''} <button class="btn ghost" data-needs="delete" data-void-inv="${v.id}" title="${v.stripe_url?'Withdraw this invoice — the payment link stops working and the unpaid reminder clears':'Withdraw this invoice — it was raised in error'}" aria-label="Void invoice ${name}">Void</button>`:'');
@@ -3474,6 +3554,7 @@ async function openDeal(id){
     const eds=$('ed-save'); if(eds) eds.onclick=async()=>{eds.disabled=true;try{const cnote=await saveContactPart();const v=$('ed-value').value.trim();await api('/sales/deals/'+id,'PATCH',{expected_value_cents:v?Math.round(parseFloat(v)*100):null,expected_close:$('ed-close').value||null,notes:edNotes.value.trim(),found_via:$('ed-found')?$('ed-found').value:undefined,next_step:$('ed-next')?$('ed-next').value.trim():undefined,next_step_at:$('ed-nextat')?($('ed-nextat').value||null):undefined});if(window.ddsDraftClear)window.ddsDraftClear(edNotes);toast(cnote||'Saved');openDeal(id);load();}catch(e){toast(nice(e),true);eds.disabled=false;}};
     // first-class deal to-dos (#203)
     loadDealTasks(id);
+    wireTodoLists(id);   // sales item 106: saved lists of to-dos
     // The stage's preset to-dos FILL the input — they never post on their own, so
     // every one is still editable (or datable) before Add. Same contract as the
     // proposal line-item picker: '' clears, '__custom__' hands over to free text.
@@ -3539,6 +3620,7 @@ async function openDeal(id){
       if(k&&typeof k.body==='string'){
         if(!confirmBlanks(k.body)){toast('Not sent — fill in the blanks, then send it.');return;}
         if(!confirmMoneyBlanks(k.body)){toast('Not sent — set the deal value in Details first.');return;}
+        if(!confirmHalfAndHalf(k.body,dealParts(data.proposals))){toast('Not sent — make the agreement’s payment wording match the parts first.');return;}
       }else if(!confirm('This agreement’s text isn’t loaded here, so its fill-in blanks can’t be checked.\n\nOpen it with View / print to read it first, or send it as it stands?')){
         toast('Not sent — open it with View / print to check it first.');return;
       }
@@ -3551,6 +3633,7 @@ async function openDeal(id){
       if(k&&typeof k.body==='string'){
         if(!confirmBlanks(k.body)){toast('Not sent — fill in the blanks, then send it.');return;}
         if(!confirmMoneyBlanks(k.body)){toast('Not sent — set the deal value in Details first.');return;}
+        if(!confirmHalfAndHalf(k.body,dealParts(data.proposals))){toast('Not sent — make the agreement’s payment wording match the parts first.');return;}
       }else if(!confirm('This agreement’s text isn’t loaded here, so its fill-in blanks can’t be checked.\n\nOpen it with View / print to read it first, or send it as it stands?')){
         toast('Not sent — open it with View / print to check it first.');return;
       }
@@ -3613,6 +3696,9 @@ async function openDeal(id){
       const sees=first?('What '+first+' sees'):'What they see';
       // Seed one row per prefilled item (revise/clone), else a single blank row.
       const seedRows=(pf&&pf.items&&pf.items.length)?pf.items.map(()=>rowHtml()).join(''):rowHtml();
+      // sales item 106: start from a saved proposal — its lines, discount, tax and parts fill the
+      // editor to adjust before saving (the deal's one-tap Use buttons still draft one as it is)
+      const tplStrip=(!est&&!rev&&propTpls.length)?`<p class="pb-l">Start from a saved proposal</p><div class="tpl-cards" role="group" aria-label="Saved proposals">${propTpls.map(t=>{const T2=propTotals(t.line_items||[]);const sp=splitPropLI(t.line_items||[]);const np=Array.isArray(sp.meta.schedule)?sp.meta.schedule.length:0;return `<button type="button" class="tpl-card" data-tpl-fill="${esc(t.id)}" aria-pressed="false"><b>${esc(t.name)}</b><span>${esc(money0(T2.total))} · ${sp.items.length} line${sp.items.length===1?'':'s'}${np?' · paid in '+np+' parts':''}</span></button>`;}).join('')}</div>`:'';
       const headNote=rev?`<div class="mut" style="margin-top:8px">Revising${opts.versionLabel?' — new '+esc(opts.versionLabel):''}. The original is kept and marked superseded.</div>`:est?`<div class="mut" style="margin-top:8px">They’ll see each line and the total, with Approve or Not now. Nothing is charged.</div>`:'';
       // Discount + tax: optional, plainly labelled, with a live breakdown so the
       // owner always sees subtotal → discount → tax → total before sending.
@@ -3622,8 +3708,11 @@ async function openDeal(id){
           <input type="number" step="0.01" id="plDiscVal" placeholder="0" aria-label="Discount amount" style="max-width:120px;display:none"></div>
         <div class="row2" style="margin-top:6px"><label class="mut" style="min-width:120px">Tax %</label>
           <input type="number" step="0.01" id="plTaxPct" placeholder="0" aria-label="Tax percent" style="max-width:120px"></div>
-        <div id="plBreak" class="mut" style="margin-top:8px"></div></div>`;
-      host.innerHTML=`<div class="pb"><div class="pb-edit">${headNote}${hint}${svcChips}${seedRows}<div class="row2" style="margin-top:8px"><button type="button" class="btn ghost" id="plMore">＋ another line</button></div>${pricingHtml}<div class="row2" style="margin-top:10px"><span style="flex:1"></span><button type="button" class="btn ghost" id="plSave">${rev?'Save revision':'Save draft'}</button><button type="button" class="btn" id="plSaveSend">${rev||!first?'Save & send →':'Send to '+esc(first)+' →'}</button></div></div><aside class="pb-view" aria-label="${esc(sees)}"><p class="pb-l">${esc(sees)}</p><div class="pb-card" id="plPreview"></div><p class="mut pb-foot">${est?'They can approve it or say not now. Nothing is charged.':'One link: they read it and accept it there.'}</p></aside></div>`;
+        <div id="plBreak" class="mut" style="margin-top:8px"></div>
+        ${est?'':`<div class="row2" style="margin-top:12px"><label class="mut" style="min-width:120px" for="plPay">How they’ll pay</label>
+          <select id="plPay"><option value="">In one payment</option><option value="half">Half when they sign, half when it’s done</option><option value="thirds">Three parts: a third now, in 30 days, and when it’s done</option><option value="custom">My own parts…</option></select></div>
+        <div id="plParts" class="pp" hidden></div>`}</div>`;
+      host.innerHTML=`<div class="pb"><div class="pb-edit">${headNote}${tplStrip}${hint}${svcChips}${seedRows}<div class="row2" style="margin-top:8px"><button type="button" class="btn ghost" id="plMore">＋ another line</button></div>${pricingHtml}<div class="row2" style="margin-top:10px"><span style="flex:1"></span><button type="button" class="btn ghost" id="plSave">${rev?'Save revision':'Save draft'}</button><button type="button" class="btn" id="plSaveSend">${rev||!first?'Save & send →':'Send to '+esc(first)+' →'}</button></div></div><aside class="pb-view" aria-label="${esc(sees)}"><p class="pb-l">${esc(sees)}</p><div class="pb-card" id="plPreview"></div><p class="mut pb-foot">${est?'They can approve it or say not now. Nothing is charged.':'One link: they read it and accept it there.'}</p></aside></div>`;
       const hintLink=$('plManageHint'); if(hintLink) hintLink.onclick=(e)=>{e.preventDefault();openManageServices();};
       const wirePick=(sel)=>{ if(!sel) return; const row=sel.closest('.prop-line'); const box=row.querySelector('.pl-custom'); const lab=row.querySelector('.pl-label'); const pr=row.querySelector('.pl-price');
         sel.onchange=()=>{ const v=sel.value;
@@ -3654,13 +3743,57 @@ async function openDeal(id){
       revealFilled();
       $('plDiscMode').onchange=()=>{$('plDiscVal').style.display=$('plDiscMode').value?'':'none';recalc();};
       $('plDiscVal').addEventListener('input',recalc); $('plTaxPct').addEventListener('input',recalc);
+      // sales item 106: paid in parts — a ready-made split, or the owner's own (whole percents, 2 to 6 parts)
+      // var, not let: a restored draft can redraw the preview (partsPreview) before this line runs
+      var PARTS=(pf&&Array.isArray(pf.schedule)&&pf.schedule.length)?pf.schedule.map(p=>({...p})):null;
+      const partRow=(p,i)=>`<div class="pp-row" data-pp="${i}"><span class="pp-n">Part ${i+1}</span><input type="number" class="pp-pct" min="1" max="99" step="1" value="${esc(p.pct)}" aria-label="Part ${i+1}, percent of the total"><span class="mut">%</span><select class="pp-when" aria-label="Part ${i+1}, when it’s paid">${[['sign','when they sign'],['date','on a date'],['days','days after they sign'],['done','when the work is done']].filter(([v])=>v!=='sign'||i===0).map(([v,l])=>`<option value="${v}"${p.when===v?' selected':''}>${l}</option>`).join('')}</select>${p.when==='date'?`<input type="date" class="pp-date" value="${esc(p.date||'')}" aria-label="Part ${i+1}, the date">`:''}${p.when==='days'?`<input type="number" class="pp-days" min="1" max="365" value="${esc(p.days||30)}" aria-label="Part ${i+1}, days after they sign"><span class="mut">days</span>`:''}${PARTS.length>2?`<button type="button" class="btn ghost pp-del" aria-label="Remove part ${i+1}">Remove</button>`:''}</div>`;
+      const partsSum=()=>(PARTS||[]).reduce((n,p)=>n+(Math.trunc(Number(p.pct))||0),0);
+      const paintParts=()=>{const box=$('plParts');if(!box)return;const sel=$('plPay');
+        if(!PARTS){box.hidden=true;box.innerHTML='';return;}
+        box.hidden=false;box.innerHTML=PARTS.map(partRow).join('')+`<div class="row2 pp-foot">${PARTS.length<6?'<button type="button" class="btn ghost" id="ppAdd">＋ another part</button>':''}<span class="mut" id="ppSum" role="status"></span></div>`;
+        const sum=partsSum();$('ppSum').textContent=sum===100?'Adds up to 100%':'Adds up to '+sum+'%. Make it 100%.';$('ppSum').classList.toggle('bad',sum!==100);
+        box.querySelectorAll('.pp-row').forEach((row)=>{const i=+row.dataset.pp,p=PARTS[i];
+          row.querySelector('.pp-pct').addEventListener('input',(e)=>{p.pct=Math.trunc(Number(e.target.value))||0;const s2=partsSum();$('ppSum').textContent=s2===100?'Adds up to 100%':'Adds up to '+s2+'%. Make it 100%.';$('ppSum').classList.toggle('bad',s2!==100);recalc();});
+          row.querySelector('.pp-when').addEventListener('change',(e)=>{p.when=e.target.value;if(p.when==='days'&&!p.days)p.days=30;if(sel)sel.value='custom';paintParts();recalc();});
+          const dt=row.querySelector('.pp-date');if(dt)dt.addEventListener('change',()=>{p.date=dt.value;recalc();});
+          const dy=row.querySelector('.pp-days');if(dy)dy.addEventListener('input',()=>{p.days=Math.trunc(Number(dy.value))||0;recalc();});
+          const del=row.querySelector('.pp-del');if(del)del.addEventListener('click',()=>{PARTS.splice(i,1);if(sel)sel.value='custom';paintParts();recalc();});
+        });
+        const add=$('ppAdd');if(add)add.addEventListener('click',()=>{PARTS.push({pct:0,when:'done'});if(sel)sel.value='custom';paintParts();recalc();const last=$('plParts').querySelector('.pp-row:last-of-type .pp-pct');if(last)last.focus();});
+      };
+      function partsPreview(total){if(!PARTS||!PARTS.length)return'';if(PARTS.reduce((n,p)=>n+(Math.trunc(Number(p.pct))||0),0)!==100)return'';const amts=schedAmounts(PARTS,total);return `<p class="pb-l pb-parts-l">How they’ll pay</p>`+PARTS.map((p,i)=>`<div class="pb-row pb-part"><span>Part ${i+1} of ${PARTS.length} · ${esc(partWhen(p).replace(/^Due /,''))}</span><b>${esc(money(amts[i])||'$0')}</b></div>`).join('');}
+      const pay=$('plPay');
+      if(pay){
+        if(PARTS){const k=Object.keys(PAY_PRESETS).find(k=>JSON.stringify(PAY_PRESETS[k])===JSON.stringify(PARTS));pay.value=k||'custom';}
+        pay.addEventListener('change',()=>{const v=pay.value;PARTS=v===''?null:v==='custom'?(PARTS||PAY_PRESETS.half.map(p=>({...p}))):PAY_PRESETS[v].map(p=>({...p}));paintParts();recalc();});
+        paintParts();
+      }
+      // a saved proposal fills the editor; Save sends its id so the title and terms come with it
+      var TPL_ID=null;
+      host.querySelectorAll('[data-tpl-fill]').forEach(b=>b.addEventListener('click',()=>{
+        const t=propTpls.find(x=>String(x.id)===b.getAttribute('data-tpl-fill'));if(!t)return;
+        const sp=splitPropLI(t.line_items||[]);
+        host.querySelectorAll('.prop-line').forEach((r,i)=>{if(i>0)r.remove();});
+        const first=host.querySelector('.prop-line');
+        sp.items.forEach((it,i)=>{let row=first;if(i>0){$('plMore').click();const all=host.querySelectorAll('.prop-line');row=all[all.length-1];}
+          const sel=row.querySelector('.pl-pick');if(sel)sel.value='__custom__';row.querySelector('.pl-custom').style.display='';
+          row.querySelector('.pl-label').value=it.label||'';row.querySelector('.pl-price').value=((it.unit_cents||0)/100);const q=row.querySelector('.pl-qty');if(q)q.value=Math.max(1,Math.trunc(it.qty)||1);delete row.dataset.seeded;});
+        const dm=sp.meta.discount;$('plDiscMode').value=dm?dm.mode:'';$('plDiscVal').style.display=dm?'':'none';$('plDiscVal').value=dm?(dm.mode==='percent'?dm.value:((dm.value||0)/100)):'';
+        $('plTaxPct').value=sp.meta.tax_pct!=null?sp.meta.tax_pct:'';
+        PARTS=Array.isArray(sp.meta.schedule)&&sp.meta.schedule.length?sp.meta.schedule.map(p=>({...p})):null;
+        if(pay){const k=PARTS?Object.keys(PAY_PRESETS).find(k=>JSON.stringify(PAY_PRESETS[k])===JSON.stringify(PARTS)):'';pay.value=PARTS?(k||'custom'):'';paintParts();}
+        TPL_ID=t.id;host.querySelectorAll('[data-tpl-fill]').forEach(x=>x.setAttribute('aria-pressed',x===b?'true':'false'));
+        recalc();toast('Filled from “'+t.name+'”. Change anything before you save.');
+      }));
+      // what Save sends: null for one payment (the owner's choice wins over a template's parts)
+      const collectSchedule=()=>PARTS?PARTS.map(p=>({pct:Math.trunc(Number(p.pct))||0,when:p.when,...(p.when==='date'?{date:p.date||''}:{}),...(p.when==='days'?{days:Math.trunc(Number(p.days))||0}:{})})):null;
       $('plMore').onclick=()=>{host.querySelector('#plMore').closest('.row2').insertAdjacentHTML('beforebegin',rowHtml());const rowsEls=host.querySelectorAll('.prop-line');wireRow(rowsEls[rowsEls.length-1]);restoreDrafts();recalc();};
       // hoisted on purpose: a restored draft can fire input (and so recalc) before this line runs
       var bizN='';
       function paintPreview(items,T){
         const pv=$('plPreview');if(!pv)return;
         const rows=items.map(it=>`<div class="pb-row"><span>${esc(it.label)}${it.qty>1?' × '+it.qty:''}</span><b>${esc(money(it.unit_cents*it.qty)||'$0')}</b></div>`).join('');
-        pv.innerHTML=`<div class="pb-biz"><span class="pb-mark" aria-hidden="true"></span><span>${esc(bizN||'Your studio')}</span></div><div class="pb-title">${est?'Estimate':'Proposal'}${forWho?' for '+esc(forWho):''}</div>${rows||'<p class="mut">Add a line and it shows here.</p>'}${T.discount>0?`<div class="pb-row mut"><span>Discount</span><b>−${esc(money(T.discount))}</b></div>`:''}${T.tax>0?`<div class="pb-row mut"><span>Tax</span><b>${esc(money(T.tax))}</b></div>`:''}<div class="pb-row pb-total"><span>Total</span><b>${esc(money(T.total)||'$0')}</b></div><div class="pb-cta" aria-hidden="true">${est?'Approve':'Accept proposal'}</div>`;
+        pv.innerHTML=`<div class="pb-biz"><span class="pb-mark" aria-hidden="true"></span><span>${esc(bizN||'Your studio')}</span></div><div class="pb-title">${est?'Estimate':'Proposal'}${forWho?' for '+esc(forWho):''}</div>${rows||'<p class="mut">Add a line and it shows here.</p>'}${T.discount>0?`<div class="pb-row mut"><span>Discount</span><b>−${esc(money(T.discount))}</b></div>`:''}${T.tax>0?`<div class="pb-row mut"><span>Tax</span><b>${esc(money(T.tax))}</b></div>`:''}<div class="pb-row pb-total"><span>Total</span><b>${esc(money(T.total)||'$0')}</b></div>${partsPreview(T.total)}<div class="pb-cta" aria-hidden="true">${est?'Approve':'Accept proposal'}</div>`;
         const lines=[...host.querySelectorAll('.prop-line')];
         host.querySelectorAll('[data-svc]').forEach(b=>{const i=b.getAttribute('data-svc'),sv=SERVICES[+i];const on=lines.some(r=>{const sel=r.querySelector('.pl-pick'),lab=r.querySelector('.pl-label');return (sel&&sel.value===i)||(!!sv&&!!lab&&lab.value.trim()===sv.name);});b.setAttribute('aria-pressed',on?'true':'false');});
       }
@@ -3684,7 +3817,9 @@ async function openDeal(id){
       const collectItems=()=>[...host.querySelectorAll('.prop-line')].map(r=>({label:r.querySelector('.pl-label').value.trim(),qty:Math.max(1,Math.trunc(parseFloat((r.querySelector('.pl-qty')||{}).value||'1'))||1),unit_cents:Math.round(parseFloat(r.querySelector('.pl-price').value||'0')*100)})).filter(i=>i.label);
       // Save writes the record (revise → vN+1 that supersedes the prior); Save &
       // send then immediately emails the review link.
-      const savePropProposal=async()=>{const items=collectItems();if(!items.length){toast('Add at least one line item.',true);return null;}const pr=collectPricing();const body={line_items:items,discount:pr.discount,tax_pct:pr.tax_pct};const path=est?('/sales/deals/'+id+'/estimates'):rev?('/sales/proposals/'+rev+'/revise'):('/sales/deals/'+id+'/proposals');const r=await api(path,'POST',body);clearPropDrafts();return r.data&&r.data.id;};
+      const savePropProposal=async()=>{const items=collectItems();if(!items.length){toast('Add at least one line item.',true);return null;}const pr=collectPricing();const body={line_items:items,discount:pr.discount,tax_pct:pr.tax_pct};
+        if(!est){if(PARTS&&partsSum()!==100){toast('The parts add up to '+partsSum()+'%. Make them 100%.',true);return null;}body.schedule=collectSchedule();if(TPL_ID&&!rev)body.template_id=TPL_ID;}   // sales item 106
+        const path=est?('/sales/deals/'+id+'/estimates'):rev?('/sales/proposals/'+rev+'/revise'):('/sales/deals/'+id+'/proposals');const r=await api(path,'POST',body);clearPropDrafts();return r.data&&r.data.id;};
       const busyProp=(x)=>{$('plSave').disabled=x;$('plSaveSend').disabled=x;};
       $('plSave').onclick=async()=>{busyProp(true);try{const pid=await savePropProposal();if(!pid){busyProp(false);return;}toast(est?'Estimate saved as a draft — send it when you’re ready.':rev?'Revision saved as a draft — send it when you’re ready.':'Proposal saved as a draft — send it when you’re ready.');openDeal(id);}catch(e){toast(nice(e),true);busyProp(false);}};
       // item 95 (B7): when the save worked and only the email failed, the draft is on the deal now with
@@ -3708,7 +3843,7 @@ async function openDeal(id){
     $('detailInner').querySelectorAll('[data-revise-prop]').forEach(b=>b.onclick=()=>{
       const p=(data.proposals||[]).find(x=>x.id===b.dataset.reviseProp); if(!p){toast('That proposal isn’t here.',true);return;}
       const S=splitPropLI(p.line_items);
-      openPropEditor({reviseOf:p.id,versionLabel:'v'+(((+p.version)||1)+1),prefill:{items:S.items,discount:S.meta.discount||null,tax_pct:(S.meta.tax_pct!=null?S.meta.tax_pct:null),title:p.title}});
+      openPropEditor({reviseOf:p.id,versionLabel:'v'+(((+p.version)||1)+1),prefill:{items:S.items,discount:S.meta.discount||null,tax_pct:(S.meta.tax_pct!=null?S.meta.tax_pct:null),title:p.title,schedule:S.meta.schedule||null}});
       const pf=$('propForm'); if(pf&&pf.scrollIntoView)pf.scrollIntoView({behavior:'smooth',block:'nearest'});
     });
     const addCon=$('addCon'); if(addCon) addCon.onclick=()=>{
@@ -3723,6 +3858,7 @@ async function openDeal(id){
         {saveLabel:'Save draft',alt:{label:'Save & send for signature →',run:async(v)=>{
           if(!confirmBlanks(v.body))throw new Error('Not sent — fill in the blanks, then send it.');
           if(!confirmMoneyBlanks(v.body))throw new Error('Not sent — set the deal value in Details first.');
+          if(!confirmHalfAndHalf(v.body,dealParts(data.proposals)))throw new Error('Not sent — make the agreement’s payment wording match the parts first.');
           const cid=await saveCon(v);await sendContractById(cid);}}});
       // An agreement form should never open as a blank page. PRECEDENCE:
       //   1. a restored draft — his own unsaved words always win (ddsDraftRestore
@@ -3740,13 +3876,17 @@ async function openDeal(id){
       // front of a client — so it defaults to the first package and he switches
       // in one click. Same idiom as the stage to-do presets and the convert plan.
       let PKG=DDS_PACKAGE_KEYS[0], SEEDED='', VALS=null;
+      // sales item 106: a proposal paid in parts rewrites the standard half-and-half wording
+      const CON_PLAN=dealParts(data.proposals);
+      const withParts=(raw)=>CON_PLAN?partsIntoAgreement(raw,CON_PLAN.parts,CON_PLAN.total).text:raw;
       if(form&&bodyEl){
         const lab=document.createElement('label'); lab.htmlFor='conPkg'; lab.textContent='Package — its scope of work is written into this agreement';
         const sel=document.createElement('select'); sel.id='conPkg';
         sel.innerHTML=DDS_PACKAGE_KEYS.map(k=>`<option value="${esc(k)}">${esc(DDS_AGREEMENT_PACKAGES[k].label)}</option>`).join('');
         sel.value=PKG;
         form.insertBefore(sel,form.firstChild); form.insertBefore(lab,sel);
-        const seedPkg=(k)=>{if(!VALS||!bodyEl)return;bodyEl.value=fillDocPlaceholders(DDS_AGREEMENT_PACKAGES[k].body,VALS);SEEDED=bodyEl.value;};
+        if(CON_PLAN){const note=document.createElement('p');note.className='mut';note.id='conParts';note.style.cssText='font-size:12.5px;margin:0 0 8px';note.textContent='The proposal is paid in '+CON_PLAN.parts.length+' parts, so the payment wording below says the same.';form.insertBefore(note,lab);}
+        const seedPkg=(k)=>{if(!VALS||!bodyEl)return;bodyEl.value=fillDocPlaceholders(withParts(DDS_AGREEMENT_PACKAGES[k].body),VALS);SEEDED=bodyEl.value;};
         sel.onchange=()=>{
           const k=sel.value;
           // Only his OWN words are worth a confirm — anything we seeded is ours
@@ -3766,11 +3906,11 @@ async function openDeal(id){
           if(bodyEl.value)return;
           if(conTpls.length){   // 2 — his own saved wording beats ours
             try{const r=await api('/sales/templates?with_body=contract');const t=(r.data||[])[0];
-              if(t&&t.body&&!bodyEl.value){bodyEl.value=fillDocPlaceholders(t.body,vals);SEEDED=bodyEl.value;return;}
+              if(t&&t.body&&!bodyEl.value){bodyEl.value=fillDocPlaceholders(withParts(t.body),vals);SEEDED=bodyEl.value;return;}
             }catch(e){/* fall through to the standard agreement */}
           }
           if(bodyEl.value)return;
-          bodyEl.value=fillDocPlaceholders(DDS_AGREEMENT_PACKAGES[PKG].body,vals);   // 3
+          bodyEl.value=fillDocPlaceholders(withParts(DDS_AGREEMENT_PACKAGES[PKG].body),vals);   // 3
           SEEDED=bodyEl.value;
         })();
       }else if(bodyEl){

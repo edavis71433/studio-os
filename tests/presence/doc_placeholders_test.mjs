@@ -155,7 +155,7 @@ const BARE = buildPlaceholderValues({ deal: {}, contact: null, studioName: '', n
       && /\nDavis Digital Studio +\[Client Name \/ Title\]/.test(dds));
   }
   ok('an empty agreement form prefers a SAVED template, then the CHOSEN package’s agreement',
-    /api\('\/sales\/templates\?with_body=contract'\)/.test(pipe) && /bodyEl\.value=fillDocPlaceholders\(DDS_AGREEMENT_PACKAGES\[PKG\]\.body,vals\)/.test(pipe));
+    /api\('\/sales\/templates\?with_body=contract'\)/.test(pipe) && /bodyEl\.value=fillDocPlaceholders\((?:withParts\(DDS_AGREEMENT_PACKAGES\[PKG\]\.body\)|DDS_AGREEMENT_PACKAGES\[PKG\]\.body),vals\)/.test(pipe));
   ok('the unreachable starterAgreement’s dead branch is gone', !/starterAgreement/.test(pipe));
   ok('the stale DDS-Contract-Custom-Package-SAMPLE.docx is gone from the repo root', (() => {
     try { Deno.statSync(new URL('../../DDS-Contract-Custom-Package-SAMPLE.docx', import.meta.url)); return false; } catch { return true; }

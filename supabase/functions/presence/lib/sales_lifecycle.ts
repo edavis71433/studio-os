@@ -89,6 +89,7 @@ export interface ProposalMeta {
   tax_pct?: number | null;        // flat % 0..100
   revised_from?: string | null;   // the proposal id THIS one revised
   superseded_by?: string | null;  // the proposal id that replaced this one
+  schedule?: Array<{ pct: number; when: string; date?: string; days?: number }> | null;   // sales item 106: paid in parts (lib/proposal_schedule.ts)
 }
 export interface ProposalTotals { subtotal_cents: number; discount_cents: number; tax_cents: number; total_cents: number; }
 
@@ -130,7 +131,7 @@ export function normalizeProposalMeta(b: unknown): ProposalMeta {
   return meta;
 }
 const metaHasContent = (m: ProposalMeta): boolean =>
-  !!(m && (m.discount || m.tax_pct != null || m.revised_from || m.superseded_by));
+  !!(m && (m.discount || m.tax_pct != null || m.revised_from || m.superseded_by || (Array.isArray(m.schedule) && m.schedule.length)));
 /** Re-assemble line_items for storage: the real items + (only if it carries
  *  anything) the reserved meta element. Pure. */
 export function packLineItems(items: Array<Partial<LineItem>>, meta: ProposalMeta): unknown[] {
@@ -139,6 +140,7 @@ export function packLineItems(items: Array<Partial<LineItem>>, meta: ProposalMet
   if (meta?.tax_pct != null) clean.tax_pct = meta.tax_pct;
   if (meta?.revised_from) clean.revised_from = meta.revised_from;
   if (meta?.superseded_by) clean.superseded_by = meta.superseded_by;
+  if (Array.isArray(meta?.schedule) && meta.schedule.length) clean.schedule = meta.schedule;   // sales item 106 (already normalized by the route)
   const packed: unknown[] = items.map((i) => ({ label: String(i?.label ?? ''), qty: Math.trunc(Number(i?.qty)) || 0, unit_cents: Math.trunc(Number(i?.unit_cents)) || 0 }));
   if (metaHasContent(clean)) packed.push({ [PROPOSAL_META_KEY]: clean });
   return packed;

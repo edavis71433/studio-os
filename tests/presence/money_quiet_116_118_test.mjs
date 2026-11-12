@@ -386,7 +386,8 @@ const subEvent = (id, over = {}) => ({ id, object: 'subscription', status: 'acti
   ok('the document read carries whether a payment is settling', /select=\$\{base\},number,paid_method,paid_note,payment_for,lines,processing_since&limit=1/.test(sales));
   ok('sign page read: a settling deposit is flagged and its link withheld', /const settling = !!dep && dep\.status === 'open' && !!dep\.processing_since;/.test(sales) && /processing: settling, url: \(contract\?\.status === 'signed' && dep\.status === 'open' && !settling && dep\.stripe_url\)/.test(sales));
   const sign = read('sign.html');
-  ok('sign page: "Payment on its way", checked before the Pay button', /else if\(dep&&dep\.processing\)\{[\s\S]*?Payment on its way\./.test(sign) && sign.indexOf('dep&&dep.processing') < sign.indexOf('}else if(dep&&dep.url){'));
+  // sales items 88 and 106 redrew the page: the next step is one card (payHtml), the settling check still first
+  ok('sign page: "Payment on its way", checked before the Pay button', /if\(dep&&dep\.processing\)return [\s\S]*?Payment on its way\./.test(sign) && sign.indexOf('if(dep&&dep.processing)return') < sign.indexOf('if(dep&&dep.url)return'));
 }
 
 // ═══ 118 · the receipt note, and a private note (finding 11) ═══
