@@ -211,7 +211,7 @@ async function resolveClientName(){
     const c = await shellContext();
     IN_CLIENT = (c && c.scope && c.scope.site_id) ? true
       : (c && Array.isArray(c.businesses) && c.businesses.some((b) => b && b.site_id === SCOPE)) ? false
-      : !!(window.ddsScopeInfo ? window.ddsScopeInfo() : true);
+      : !!(window.ddsScopeInfo && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(SCOPE) ? window.ddsScopeInfo() : true);
     return (c && c.scope && c.scope.name) ? String(c.scope.name) : '';
   }
   catch(_e){ return ''; }

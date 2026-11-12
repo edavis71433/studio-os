@@ -591,7 +591,7 @@ const scope=()=>new URLSearchParams(location.search).get('client')||'';
 // That is their own business, not a studio inside a client, and its deals live on its own site, so it
 // keeps the tools a client's pipeline hides. The shell tells the two apart (ddsScopeInfo: the context,
 // else the businesses it remembers from the last visit); before it has loaded, the address decides.
-const inClient=()=>!!scope()&&(window.ddsScopeInfo?!!window.ddsScopeInfo():true);
+const inClient=()=>!!scope()&&(window.ddsScopeInfo&&/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(scope())?!!window.ddsScopeInfo():true);
 // a converted deal's customer SITE (presence_deals.converted_site_id, on the deal
 // read) — the id "Manage their access" drills sharing.html into. UUID-shaped only.
 const SITE_UUID=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -3750,14 +3750,14 @@ function studioLevelTools(){
   api('/sales/stages').then(r=>{const l=r&&r.data&&r.data.labels;if(l&&STAGES.some(k=>l[k]&&l[k]!==STAGE_LABEL[k])){Object.assign(STAGE_LABEL,l);renderFilters();if(DEALS_LOADED)renderCurrent();if(CURRENT_DEAL&&!$('detailWrap').hidden)openDeal(CURRENT_DEAL);}}).catch(()=>{});
 }
 // builder item 83: under ?client= the page starts as a client's pipeline. One of your own businesses gets
-// its tools back as soon as the shell can tell, or when a context that lands later says so.
-let OWN_TOOLS=false;
+// its tools back as soon as the shell can tell, and a context that lands later has the last word.
+let OWN_TOOLS=false,OWN_WIRED=false;
 function ownBusinessTools(){
   const go=()=>{
-    if(OWN_TOOLS||inClient())return;OWN_TOOLS=true;
-    ['importDeals','pvBtn','chartsBtn','printBtn'].forEach(id=>{const n=$(id);if(n)n.hidden=false;});
-    const nd=$('newDeal');if(nd){nd.hidden=false;nd.onclick=openNewDeal;}
-    wireViews();studioLevelTools();
+    const own=!inClient();if(own===OWN_TOOLS)return;OWN_TOOLS=own;
+    ['importDeals','pvBtn','chartsBtn','printBtn'].forEach(id=>{const n=$(id);if(n)n.hidden=!own;});
+    const nd=$('newDeal');if(nd){nd.hidden=!own;nd.onclick=own?openNewDeal:null;}
+    if(own&&!OWN_WIRED){OWN_WIRED=true;wireViews();studioLevelTools();}
   };
   if(window.ddsScopeInfo)go();else document.addEventListener('DOMContentLoaded',go,{once:true});
   document.addEventListener('dds:context',go);

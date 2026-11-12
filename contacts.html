@@ -570,7 +570,7 @@ const scope=()=>new URLSearchParams(location.search).get('client')||'';
 // The shell tells the two apart (ddsScopeInfo: the context, else the businesses it remembers from the
 // last visit); before it has loaded, the address decides. A paint made before the context is in is
 // painted again if the context says otherwise.
-const inClient=()=>!!scope()&&(window.ddsScopeInfo?!!window.ddsScopeInfo():true);
+const inClient=()=>!!scope()&&(window.ddsScopeInfo&&/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(scope())?!!window.ddsScopeInfo():true);
 let PAINTED_IN=null;
 document.addEventListener('dds:context',()=>{if(PAINTED_IN!==null&&PAINTED_IN!==inClient()){render();loadSavedViews();loadImportStrip();}});
 const H=()=>({'Content-Type':'application/json','Authorization':'Bearer '+SUPABASE_KEY,'x-dds-user-jwt':TOKEN,'x-dds-scope-site':scope()});

@@ -44,6 +44,9 @@ const CASES = [
   { n: 'a context that names neither, and the shell remembers the business', client: SITE, ctx: { scope: null }, win: SHELL_HELD, want: false },
 ];
 const search = (c) => (c.client ? '?client=' + c.client : '');
+// a ?client= that is no real site id: the shell reads none (its answer is null, as for your own business),
+// and the pages keep what the address said before, a client
+const ODD = { n: 'a ?client= that is no real site id', client: 'site-acme', ctx: null, win: SHELL_HELD, want: true };
 // the shell's memory of your businesses (shell.js HELD_KEY), which two pages read before the shell has loaded
 const storage = (held) => ({ getItem: (k) => (k === 'dds-held-businesses' && held ? JSON.stringify(held) : null) });
 const EARLY = [
@@ -63,6 +66,7 @@ const settings = read('settings.html');
   const src = grab(settings, /function inClient\(\) \{[\s\S]*?\n\}/, 'settings inClient');
   const run = (SCOPE, CTX, win) => new Function('SCOPE', 'CTX', 'window', `${src}\nreturn inClient();`)(SCOPE, CTX, win);
   matrix('settings', (c) => run(c.client, c.ctx, { ...c.win }));
+  ok('settings: a ?client= that is no real site id is no client at all, as before', run('', null, { ...SHELL_HELD }) === false && /const SCOPE = \(function \(\) \{ const v = new URLSearchParams\(location\.search\)\.get\('client'\) \|\| ''; return UUID_RE\.test\(v\) \? v : ''; \}\)\(\);/.test(settings));
   matrix('settings (the context as the shell published it)', (c) => run(c.client, null, { ...c.win, __ddsContext: c.ctx || undefined }));
   ok('settings: the address still goes with every read and every link', /'x-dds-scope-site': SCOPE \}\)/.test(settings) && /const withClient = \(href\) => \{ if \(!SCOPE\) return href;/.test(settings));
   ok('settings: Deal stages, Automations and the plan are hidden, and the Monthly report shown, only inside a client',
@@ -94,7 +98,7 @@ const today = read('today.html');
 {
   const src = grab(today, /function studioInClient\(c\)\{[\s\S]*?\n\}/, 'today studioInClient');
   const run = (c, ctx) => new Function('location', 'window', 'ctx', 'localStorage', `${src}\nreturn studioInClient(ctx);`)({ search: search(c) }, { ...c.win }, ctx, storage(c.held));
-  matrix('today (first answer)', (c) => run(c, undefined), [...CASES.map((c) => (c.ctx ? { ...c, want: c.win === SHELL_STUDIO } : c)), ...EARLY]);
+  matrix('today (first answer)', (c) => run(c, undefined), [...CASES.map((c) => (c.ctx ? { ...c, want: c.win === SHELL_STUDIO } : c)), ...EARLY, ODD]);
   matrix('today (once the context is in)', (c) => run(c, c.ctx));
   ok('today: the context has the last word, and the four reads go again when it differs from the first answer',
     /const inFirst = studioInClient\(\);/.test(today) && /const inC = studioInClient\(c0\);/.test(today)
@@ -116,7 +120,7 @@ const crm = read('crm.html');
   const run = (c, url) => new Function('QP', 'SUPABASE_KEY', 'TOKEN', 'window', 'localStorage',
     `${head}${links}${rq}\nreturn { H, agHref, pinHref, recordQuery, studioScoped };`)(() => new URLSearchParams(url), 'K', 'T', { ...c.win }, storage(c.held));
   const studio = run(CASES[1], `?client=${SITE}&deal=${OTHER}`), held = run(CASES[2], `?client=${SITE}&deal=${OTHER}`), none = run(CASES[0], `?deal=${OTHER}`);
-  matrix('crm', (c) => run(c, search(c)).studioScoped(), [...SHELL_CASES_OF(CASES), ...EARLY]);
+  matrix('crm', (c) => run(c, search(c)).studioScoped(), [...SHELL_CASES_OF(CASES), ...EARLY, ODD]);
   ok('crm: inside a client the studio-level reads go unscoped and the links pin it off (as before)',
     !('x-dds-scope-site' in studio.H(false)) && studio.H(true)['x-dds-scope-site'] === SITE
     && studio.agHref('pipeline.html', 'deal=1') === '/pipeline.html?deal=1&client=' && studio.pinHref('/projects.html?project=1') === '/projects.html?project=1&client='
@@ -135,17 +139,17 @@ const analytics = read('analytics.html');
 {
   const src = grab(analytics, /const inClient=\(\)=>\{[^\n]*\};/, 'analytics inClient');
   const run = (c, CTX) => new Function('scope', 'CTX', 'window', `${src}\nreturn inClient();`)(() => c.client, CTX, { ...c.win });
-  matrix('analytics', (c) => run(c, c.ctx));
+  matrix('analytics', (c) => run(c, c.ctx), [...CASES, ODD]);
   matrix('analytics (its context read failed)', (c) => run(c, {}), CASES.map((c) => (c.ctx ? { ...c, want: c.win === SHELL_STUDIO } : c)));
   ok('analytics: the Reports section is left out only inside a client', /const reportsShell=\(\)=>inClient\(\)\?'':/.test(analytics));
   ok('analytics: the studio’s portfolio still needs the studio’s own level, no business picked', /if\(CTX&&CTX\.is_agency&&!scope\(\)\)\{await loadPortfolio\(\);return;\}/.test(analytics));
 }
 
 // ── contacts, pipeline, projects: the shell answers ──
-const SHELL_CASES = SHELL_CASES_OF(CASES);
+const SHELL_CASES = [...SHELL_CASES_OF(CASES), ODD];
 for (const page of ['contacts', 'pipeline', 'projects']) {
   const html = read(`${page}.html`);
-  const src = grab(html, /const inClient=\(\)=>!!scope\(\)&&\(window\.ddsScopeInfo\?!!window\.ddsScopeInfo\(\):true\);/, `${page} inClient`);
+  const src = grab(html, /const inClient=\(\)=>!!scope\(\)&&\(window\.ddsScopeInfo&&[^\n]*\?!!window\.ddsScopeInfo\(\):true\);/, `${page} inClient`);
   matrix(page, (c) => new Function('scope', 'window', `${src}\nreturn inClient();`)(() => c.client, { ...c.win }), SHELL_CASES);
   ok(`${page}: the address still goes with every read`, /'x-dds-scope-site':(AG_MODE\?'':)?scope\(\)\}\)/.test(html));
 }
@@ -156,7 +160,8 @@ ok('contacts: Save view, Add and Import are a client’s pipeline’s to hide; a
   && /function render\(\)\{\s*PAINTED_IN=inClient\(\);/.test(contacts) && /document\.addEventListener\('dds:context',\(\)=>\{if\(PAINTED_IN!==null&&PAINTED_IN!==inClient\(\)\)\{render\(\);loadSavedViews\(\);loadImportStrip\(\);\}\}\);/.test(contacts));
 ok('pipeline: the page starts as a client’s under ?client= and gives your own business its tools back once the shell can tell',
   /if\(scope\(\)\)\{\['importDeals','pvBtn','chartsBtn','printBtn'\][^\n]*wireMore\(\);ownBusinessTools\(\);\}/.test(pipeline)
-  && /if\(OWN_TOOLS\|\|inClient\(\)\)return;OWN_TOOLS=true;/.test(pipeline) && /nd\.hidden=false;nd\.onclick=openNewDeal;/.test(pipeline)
+  && /const own=!inClient\(\);if\(own===OWN_TOOLS\)return;OWN_TOOLS=own;/.test(pipeline) && /nd\.hidden=!own;nd\.onclick=own\?openNewDeal:null;/.test(pipeline)
+  && /if\(own&&!OWN_WIRED\)\{OWN_WIRED=true;wireViews\(\);studioLevelTools\(\);\}/.test(pipeline)
   && /document\.addEventListener\('dds:context',go\);/.test(pipeline) && /if\(VIEWS_ASKED\|\|inClient\(\)\)return;/.test(pipeline));
 ok('projects: your own business reads its own projects and can start one; a context that differs reads again',
   /LOADED_IN=inClient\(\);\s*\n\s*if\(LOADED_IN&&!AG_MODE\)\{const sc=await resolveScopedClient\(\);/.test(projects) && /NEW_OK=STUDIO&&!LOADED_IN;/.test(projects)
@@ -167,7 +172,7 @@ ok('projects: your own business reads its own projects and can start one; a cont
 const conn = read('connections.html');
 {
   const src = grab(conn, /async function resolveClientName\(\)\{[\s\S]*?\n\}/, 'resolveClientName');
-  const verdicts = await Promise.all(CASES.map(async (c) => {
+  const verdicts = await Promise.all([...CASES, ODD].map(async (c) => {
     const r = await new Function('SCOPE', 'shellContext', 'window', `let IN_CLIENT = !!SCOPE;\n${src}\nreturn resolveClientName().then((name) => ({ name, IN_CLIENT }));`)(c.client, async () => c.ctx, { ...c.win });
     return r.IN_CLIENT === c.want ? '' : c.n;
   }));
@@ -182,7 +187,7 @@ const conn = read('connections.html');
 const pres = read('presence.html');
 {
   const src = grab(pres, /function studioInClient\(\) \{[\s\S]*?\n\}/, 'presence studioInClient');
-  matrix('website editor', (c) => new Function('location', 'S', 'window', `${src}\nreturn studioInClient();`)({ search: search(c) }, { ctx: c.ctx }, { ...c.win }));
+  matrix('website editor', (c) => new Function('location', 'S', 'window', `${src}\nreturn studioInClient();`)({ search: search(c) }, { ctx: c.ctx }, { ...c.win }), [...CASES, ODD]);
   ok('website editor: the setup list, the welcome, the plan notice and the version words follow it',
     /function setupScoped\(\) \{ return studioInClient\(\); \}/.test(pres) && /if \(!studioInClient\(\)\) \{\s*renderFirstRun\(\);\s*renderPlanNotice\(\);/.test(pres)
     && /const scoped = studioInClient\(\);\n  if \(p\.by_kind === "client"\)/.test(pres) && /const forClient = studioInClient\(\);/.test(pres));
@@ -198,7 +203,7 @@ for (const page of ['developer', 'get-started']) {
   const html = read(`${page}.html`);
   const src = grab(html, /const ownBusiness=\(\)=>\{[^\n]*\};/, `${page} ownBusiness`);
   const sent = (c) => new Function('location', 'window', `${src}\nreturn ownBusiness();`)({ search: search(c) }, { ...c.win });
-  const wrong = CASES.filter((c) => sent(c) !== (c.client && c.win === SHELL_HELD ? c.client : '')).map((c) => c.n);
+  const wrong = [...CASES, ODD].filter((c) => sent(c) !== (c.client && c !== ODD && c.win === SHELL_HELD ? c.client : '')).map((c) => c.n);
   ok(`${page}: sends your own business with every read and save, a client’s never`, wrong.length === 0, wrong.join('; '));
   ok(`${page}: waits for the context before its first read when ?client= is there`, /'x-dds-scope-site':ownBusiness\(\)\}\);/.test(html) && /await businessKnown\(\);/.test(html)
     && /async function businessKnown\(\)\{if\(!new URLSearchParams\(location\.search\)\.get\('client'\)\)return;[^\n]*await window\.ddsContext\(\)\.catch\(\(\)=>null\);\}/.test(html));

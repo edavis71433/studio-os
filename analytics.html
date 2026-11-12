@@ -318,7 +318,7 @@ let TOKEN="", PERIOD='this_month', CTX=null, DASH=null;
 // The context says which, as the shell's ddsScopeInfo reads it: a scope is a studio inside a client, a
 // business on the person's list is their own; else the shell's memory of the person's businesses, else
 // the address, as before.
-const inClient=()=>{const id=scope();if(!id)return false;if(CTX&&CTX.scope&&CTX.scope.site_id)return true;if(CTX&&Array.isArray(CTX.businesses)&&CTX.businesses.some((b)=>b&&b.site_id===id))return false;return window.ddsScopeInfo?!!window.ddsScopeInfo():true;};
+const inClient=()=>{const id=scope();if(!id)return false;if(CTX&&CTX.scope&&CTX.scope.site_id)return true;if(CTX&&Array.isArray(CTX.businesses)&&CTX.businesses.some((b)=>b&&b.site_id===id))return false;return window.ddsScopeInfo&&/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)?!!window.ddsScopeInfo():true;};
 // C8: the sign-in pass is renewed about every hour; keep the renewed one, as the other
 // pages do, or Refresh after an hour is refused and reads as "Sign in"
 sb.auth.onAuthStateChange(function(_e,s){if(s&&s.access_token)TOKEN=s.access_token;});

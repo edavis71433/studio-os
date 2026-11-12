@@ -322,7 +322,7 @@ function studioInClient(c){
   const id=new URLSearchParams(location.search).get('client');if(!id)return false;
   if(c&&c.scope&&c.scope.site_id)return true;
   if(c&&Array.isArray(c.businesses)&&c.businesses.some((b)=>b&&b.site_id===id))return false;
-  if(window.ddsScopeInfo)return !!window.ddsScopeInfo();
+  if(window.ddsScopeInfo&&/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id))return !!window.ddsScopeInfo();   // the shell reads only a real site id
   try{const held=JSON.parse(localStorage.getItem('dds-held-businesses')||'[]');if(Array.isArray(held)&&held.indexOf(id)>=0)return false;}catch(_){/* storage may be denied */}
   return true;
 }

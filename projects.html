@@ -411,7 +411,7 @@ let AG_MODE=false,SCOPED_CLIENT=null,OPENED_ONCE=false;
 // hand, and it can start one. The shell tells the two apart (ddsScopeInfo: the context, else the
 // businesses it remembers from the last visit); before it has loaded, the address decides. A context
 // that lands after the first read and says otherwise reads the page again.
-const inClient=()=>!!scope()&&(window.ddsScopeInfo?!!window.ddsScopeInfo():true);
+const inClient=()=>!!scope()&&(window.ddsScopeInfo&&/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(scope())?!!window.ddsScopeInfo():true);
 let LOADED_IN=null;
 document.addEventListener('dds:context',()=>{if(LOADED_IN===null||LOADED_IN===inClient())return;AG_MODE=false;SCOPED_CLIENT=null;CUSTMAP=null;CUSTTRIED=false;load(true);});
 const H=()=>({'Content-Type':'application/json','Authorization':'Bearer '+SUPABASE_KEY,'x-dds-user-jwt':TOKEN,'x-dds-scope-site':AG_MODE?'':scope()});

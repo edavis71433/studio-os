@@ -7147,7 +7147,7 @@ function studioInClient() {
   const c = S.ctx || window.__ddsContext;
   if (c && c.scope && c.scope.site_id) return true;
   if (c && Array.isArray(c.businesses) && c.businesses.some((b) => b && b.site_id === id)) return false;
-  return window.ddsScopeInfo ? !!window.ddsScopeInfo() : true;
+  return window.ddsScopeInfo && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id) ? !!window.ddsScopeInfo() : true;   // the shell reads only a real site id
 }
 // "Marlow’s Kitchen’s" — a name already ending in s takes the bare apostrophe.
 function possessive(name) { return /s$/i.test(name) ? name + "’" : name + "’s"; }

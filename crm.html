@@ -440,7 +440,7 @@ const scopeParam=()=>QP().get('client')||'';
 // reads below go to that business too. The shell tells the two apart (ddsScopeInfo: the context,
 // else the businesses it remembers from the last visit); before it has loaded, what it remembers
 // (shell.js HELD_KEY), else the address, as before.
-const studioScoped=()=>{const id=scopeParam();if(!id)return false;if(window.ddsScopeInfo)return !!window.ddsScopeInfo();try{const held=JSON.parse(localStorage.getItem('dds-held-businesses')||'[]');if(Array.isArray(held)&&held.indexOf(id)>=0)return false;}catch(_){/* storage may be denied */}return true;};
+const studioScoped=()=>{const id=scopeParam();if(!id)return false;if(window.ddsScopeInfo&&/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id))return !!window.ddsScopeInfo();try{const held=JSON.parse(localStorage.getItem('dds-held-businesses')||'[]');if(Array.isArray(held)&&held.indexOf(id)>=0)return false;}catch(_){/* storage may be denied */}return true;};
 const ownBusiness=()=>studioScoped()?'':scopeParam();   // the business ?client= picked, when it is no client of a studio
 const H=(scoped)=>{const h={'Content-Type':'application/json','Authorization':'Bearer '+SUPABASE_KEY,'x-dds-user-jwt':TOKEN};if(scoped)h['x-dds-scope-site']=scopeParam();else if(ownBusiness())h['x-dds-scope-site']=ownBusiness();return h;};
 // api() = scoped to the record's customer site (/crm/*, the reply routes).
