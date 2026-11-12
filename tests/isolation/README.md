@@ -75,9 +75,24 @@ parts.
 
 - Before Nov 2026: by hand on the staging project `wjlpursnwbmlcdwbeowv`, last on
   2026-07-05, 22 of 22 passed. That project no longer exists.
-- First run on a scratch database: see below. Every later run is on the Actions tab
+- First full run on a scratch database: 2026-11-12, all 204 checks passed (GitHub
+  Actions run 43218372665, commit c757c85). Every later run is on the Actions tab
   under "Walls between studios (scratch database)", and each run's summary says how
   many checks passed, the date and the commit.
+
+Getting there found four things, all fixed in the same change:
+
+- two signed-link refusals in `sales_closing_isolation_e2e` had passed on a broken
+  token since Oct 2026 (the suite read the old link shape). With a real token they
+  are refused as they should be, and the suite now also checks the token opens its
+  own proposal first and that the other studio's proposal is left unchanged;
+- signing has needed the signer's email since sales item 88, support links open
+  inside the project since Jul 11, and a project made from a deal starts with the
+  delivery checklist: three suites were brought up to date;
+- two comments read like imports of missing files, which stopped the local
+  `supabase functions serve`;
+- presence's email sender now reads `RESEND_API_URL` (default unchanged), so the run
+  can point it at a stand-in.
 
 ## Next
 
