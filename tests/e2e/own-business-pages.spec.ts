@@ -68,6 +68,7 @@ test('Settings: your second business shows the same cards as your first, each ke
   expect(first).not.toContain('report');
   expect(first).not.toContain('replies');   // a client's Enquiry replies card
   const firstProfile = await page.locator('#profileHead').textContent();
+  await expect(page.locator('#f-signer')).toBeVisible();   // who signs their agreements
 
   rec.reset();
   await open(page, SECOND, '/settings.html', SETTINGS_API);
@@ -84,6 +85,13 @@ test('Settings: your second business shows the same cards as your first, each ke
   expect(rec.asked('/commerce/subscription').map((s) => s.scope)).toEqual([B2]);
   expect(rec.asked('/identity').every((s) => s.scope === B2)).toBe(true);
   expect(rec.asked('/report/monthly')).toEqual([]);
+  await expect(page.locator('#f-signer')).toBeVisible();   // they sign this business's agreements too
+  const put = page.waitForRequest((r) => r.method() === 'PUT' && new URL(r.url()).pathname.endsWith('/presence/settings'));
+  await page.locator('#f-signer').fill('Robin Park');
+  await page.locator('#profileSave').click();
+  const sent = await put;
+  expect(sent.postDataJSON()).toEqual({ signs_as_name: 'Robin Park' });
+  expect(sent.headers()['x-dds-scope-site']).toBe(B2);
 
   rec.reset();
   await open(page, STUDIO, '/settings.html', SETTINGS_API);
@@ -93,6 +101,8 @@ test('Settings: your second business shows the same cards as your first, each ke
   expect(inClient).toContain('replies');
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('Settings — Marlow’s Kitchen');
   await expect(page.locator('#profileHead')).toHaveText('Marlow’s Kitchen’s profile');
+  await expect(page.locator('#f-name')).toBeVisible();
+  await expect(page.locator('#f-signer')).toBeHidden();   // the studio signs, never from a client's profile
   await expect(page.locator('[data-card="dev"]')).toHaveAttribute('href', '/developer.html');
   await expect(page.locator('[data-card="dev"]')).toHaveAttribute('data-noscope', '1');
   expect(rec.asked('/commerce/subscription')).toEqual([]);

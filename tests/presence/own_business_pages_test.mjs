@@ -96,6 +96,10 @@ const settings = read('settings.html');
     && card(SITE, false, conn).includes(`href="/connections.html?client=${SITE}"`) && card(SITE, false, stages).includes('href="#stages"'));
   ok('settings: with no business picked the cards are as before', plainDev.includes('href="/developer.html"') && plainDev.includes('data-noscope="1"') && card('', false, conn).includes('href="/connections.html"'));
   ok('settings: the studio look waits for the context before it decides', /async function loadStudioLook\(\) \{\s*if \(SCOPE\) await CTX_IN;[^\n]*\n\s*if \(inClient\(\)\) return;/.test(settings) && /CTX = \(r\.ok && r\.body && r\.body\.data\) \|\| null; \}\s*\n\s*ctxIn\(\);/.test(settings));
+  ok('settings: who signs agreements shows and saves in your own second business, never inside a client, and is decided again once the context is in',
+    /const signer = \(\) => document\.querySelectorAll\('\[data-signer\]'\)\.forEach\(\(el\) => \{ el\.hidden = inClient\(\); \}\);/.test(settings)
+    && /signer\(\); if \(SCOPE\) CTX_IN\.then\(signer\);/.test(settings)
+    && /if \(mayConfigure && !inClient\(\)\) \{\s*const sn = \$\('f-signer'\)/.test(settings));
 }
 
 // ── today.html: a first answer from the shell, the context's answer once in ──

@@ -877,7 +877,8 @@ async function loadProfile() {
   $('f-area').value = d.service_area || '';
   const ind = $('f-industry'); ind.value = (SETTINGS && SETTINGS.industry_key) || 'generic'; if (ind.selectedIndex < 0) ind.value = 'generic';
   $('f-signer').value = (SETTINGS && SETTINGS.signs_as_name) || ''; $('f-signer-title').value = (SETTINGS && SETTINGS.signs_as_title) || '';   // sales item 88
-  document.querySelectorAll('[data-signer]').forEach((el) => { el.hidden = !!SCOPE; });   // the studio signs, never a client's settings
+  const signer = () => document.querySelectorAll('[data-signer]').forEach((el) => { el.hidden = inClient(); });   // the studio signs, never a client's settings
+  signer(); if (SCOPE) CTX_IN.then(signer);   // the profile can land before the context, which decides it again (your own second business signs for itself)
   $('studio').hidden = false;
   holdUnread();
   return d;
@@ -946,8 +947,8 @@ async function saveProfile() {
   // the select is gone for a role without configure, and it can still read differently from an unset row
   const mayConfigure = !(window.ddsLacks && window.ddsLacks('configure'));
   if (mayConfigure && (!SETTINGS || SETTINGS.industry_key !== industry)) setPatch.industry_key = industry;
-  // sales item 88: who signs agreements, studio level only
-  if (mayConfigure && !SCOPE) {
+  // sales item 88: who signs agreements, never from inside a client
+  if (mayConfigure && !inClient()) {
     const sn = $('f-signer').value.trim(), stt = $('f-signer-title').value.trim();
     if ((SETTINGS && SETTINGS.signs_as_name || '') !== sn) setPatch.signs_as_name = sn;
     if ((SETTINGS && SETTINGS.signs_as_title || '') !== stt) setPatch.signs_as_title = stt;
