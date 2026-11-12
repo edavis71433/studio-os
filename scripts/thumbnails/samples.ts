@@ -72,4 +72,10 @@ export const SAMPLE_BLOCKS: Record<string, Record<string, unknown>> = {
     { label: 'Price list', url: 'https://example.com/prices' }, { label: 'Warranty', url: 'https://example.com/warranty' }, { label: 'Careers', url: 'https://example.com/jobs' }] },
   table: { type: 'table', title: 'Opening hours', headers: ['Day', 'Hours'], rows: [['Monday to Friday', '8am to 6pm'], ['Saturday', '9am to 2pm'], ['Sunday', 'Closed']] },
   spotlight: { type: 'spotlight', title: 'Something worth highlighting', eyebrow: 'New this month', body: 'Free safety check with every repair, through the end of the month.', button: { label: 'Book yours', url: 'https://example.com/book' } },
+  // builder item 57: last, so the photo ids above keep their numbers
+  stack: { type: 'stack', items: [
+    { kind: 'heading', text: 'Built your way' },
+    { kind: 'text', body: 'A heading, a few words, a photo and a button, **stacked** top to bottom.' },
+    { kind: 'button', buttons: [{ label: 'Book a visit', url: 'https://example.com/book', style: 'primary' }, { label: 'See our work', url: '/our-work/', style: 'outline' }] },
+    { kind: 'image', image_id: uuid(), caption: 'Our workshop in Burbank' }] },
 };
