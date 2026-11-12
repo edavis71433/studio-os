@@ -52,7 +52,7 @@ test.describe('Switch business (builder item 83)', () => {
     await expect(rows).toHaveCount(3);
     await expect(rows.nth(0)).toContainText('Maple & Main Realty');
     await expect(rows.nth(0)).toContainText('You’re Staff · here now');
-    await expect(rows.nth(0)).toHaveAttribute('aria-current', 'true');
+    await expect(rows.nth(0).getByRole('link')).toHaveAttribute('aria-current', 'true');   // builder item 201: each row is a link in a list item
     await expect(rows.nth(1)).toContainText('You’re Co-owner');
     await expect(rows.nth(2)).toContainText('You review its work · opens the client view');
     await page.keyboard.press('Escape');

@@ -26,7 +26,7 @@ for (const [who, nav] of Object.entries(navs)) {
   const missing = labels.filter((l) => !words.includes(l));
   ok(`help: every ${who} menu label is named in Help`, labels.length > 4 && missing.length === 0, missing.join(', '));
 }
-ok('help: a Client sites topic that opens Sites', /<a class="setcard" href="\/sites\.html">[\s\S]*?<b>Client sites<\/b>/.test(help));
+ok('help: a Client sites topic that opens Sites', /<a class="setcard" href="\/sites\.html"[^>]*>[\s\S]*?<b>Client sites<\/b>/.test(help));
 ok('help: what shipped for client sites is answered', ['+ New site', 'Invite the owner', 'Pin', 'Duplicate', 'Save as a template', 'Templates tab', 'Domains tab', 'Switch site', 'Move to trash', 'Restore', 'Put back', 'Ask for their content', 'Hand-over kit', 'Plan my week'].every((w) => words.includes(w)));   // item 176's three tools too
 ok('help: updates and estimates are answered', /id="a-updates"/.test(help) && ['Send an update', 'An estimate', 'A recurring invoice'].every((w) => words.includes(w)));
 ok('help: the tour no longer walks "through Today" (a studio starts at Home)', !/walk through Today/.test(help) && /walk through your home page/.test(help));

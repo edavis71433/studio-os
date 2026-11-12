@@ -158,6 +158,10 @@
     var a = e.target && e.target.closest ? e.target.closest('a[href]') : null;
     if (!a || a.target === '_blank') return;
     var href = a.getAttribute('href') || '';
+    // builder item 201: at studio level a link into the builder asks which client first (openWhichClient)
+    if (!e.defaultPrevented && !e.button && !(e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) && !a.hasAttribute('data-own-site') && whichClientWanted(href)) {
+      e.preventDefault(); e.stopPropagation(); openWhichClient(href, a); return;
+    }
     var isEdit = a.hasAttribute('data-dds-editor') || a.classList.contains('edit') || /\/presence\.html#[a-z]/i.test(href);
     if (!isEdit) return;
     e.preventDefault();
@@ -530,9 +534,12 @@
         var done = false;
         function finish(v) {
           if (done) return; done = true;
+          // builder item 201: focus goes back to the button that asked, after Yes as well as
+          // Cancel. Removing the box took the focused Yes with it, so focus fell to the page's top
+          // (Safari doesn't focus a clicked button at all, so this never asks where focus was).
           if (box.isConnected) box.remove();
           anchor.hidden = false; resolve(v);
-          if (!v && anchor.isConnected && anchor.focus) try { anchor.focus(); } catch (_) { /* */ }
+          if (anchor.isConnected && anchor.focus) try { anchor.focus(); } catch (_) { /* */ }
         }
         box.querySelector('.go').addEventListener('click', function () { finish(true); });
         box.querySelector('.no').addEventListener('click', function () { finish(false); });
@@ -580,7 +587,8 @@
           if (done) return; done = true;
           if (box.isConnected) box.remove();
           anchor.hidden = false; resolve(v);
-          if (v === null && anchor.isConnected && anchor.focus) try { anchor.focus(); } catch (_) { /* */ }
+          // item 201: as confirmIn, after an answer as well as Cancel, so focus never falls to the page's top
+          if (anchor.isConnected && anchor.focus) try { anchor.focus(); } catch (_) { /* */ }
         }
         go.addEventListener('click', function () {
           var vals = inputs.map(function (el) { return String(el.value || '').trim(); });
@@ -1002,6 +1010,8 @@
     loadWhatsNew().then(function (W) { W.open({ who: who, opener: opener, onSeen: function () { setWhatsNewDot(false); } }); })['catch'](function () { /* a press retries */ });
   }
   function bellInner(n) { return icon('bell') + (n > 0 ? '<span class="dot">' + (n > 9 ? '9+' : n) + '</span>' : ''); }
+  // builder item 201: the bell says its number ("Notifications, 3 need you"), not only shows it
+  function bellLabel(n) { return n > 0 ? 'Notifications, ' + n + (n === 1 ? ' needs you' : ' need you') : 'Notifications'; }
 
   // ── "+ Create" (sales list item 70, the bold redesign, Nov 2026) ─────────────
   // Timed against Salesforce, every everyday job (log a call, a new deal, an
@@ -1111,6 +1121,10 @@
     // lib/shell.ts stays byte-identical.
     var secKey = activeSectionKey(nav, activeKey);
     DESTS = flatten(nav);                          // ⌘K reaches EVERY capability (primary + utility)
+    // builder item 202: search lists only what this person can open. Settings hides the plan from
+    // anyone but the account's owner (data-needs="owner"), so a team member's "plan" found nothing
+    // there; the server stops sending it too, this covers an older one.
+    if (window.ddsLacks && window.ddsLacks('owner')) DESTS = DESTS.filter(function (d) { return d.key !== 'plan'; });
     if (canCreate()) DESTS = DESTS.concat(CREATE_DESTS);
     // item 84: two Settings cards by name ("deal stages", "automations"), for whoever can change them
     if ((CTX && CTX.nav || []).some(function (s) { return s.key === 'settings'; }) && !(CTX.scope && CTX.scope.site_id) && !(window.ddsLacks && window.ddsLacks('configure')))
@@ -1169,7 +1183,7 @@
       '<nav class="dds-nav" aria-label="Workspace">' + navHtml + '</nav>' +
       '<div class="dds-search" id="dds-search" role="button" tabindex="0" aria-label="Search"><span>' + icon('search', 'nic') + '</span><span>Search</span><kbd>' + (/Mac|iPhone|iPad/.test(navigator.platform || '') ? '⌘K' : 'Ctrl K') + '</kbd></div>' +
       '<div class="dds-right">' +
-        '<button class="dds-ic" id="dds-bell" aria-label="Notifications" aria-haspopup="true" aria-expanded="false">' + bellInner(att) + '</button>' +
+        '<button class="dds-ic" id="dds-bell" aria-label="' + esc(bellLabel(att)) + '" aria-haspopup="true" aria-expanded="false">' + bellInner(att) + '</button>' +
         (whatsNewWho() ? '<button class="dds-ic" id="dds-new" aria-label="What’s new" aria-haspopup="dialog">' + icon('spark') + '</button>' : '') +
         '<a class="dds-ic" href="/help.html" id="dds-help" aria-label="Help — how do I…?" aria-haspopup="true" aria-expanded="false">' + icon('help') + '</a>' +
         '<button class="dds-ic" id="dds-profile" aria-label="Account" aria-haspopup="true" aria-expanded="false">' + icon('account') + '</button>' +
@@ -1299,8 +1313,9 @@
     var rows = (CTX.businesses || []).filter(function (b) { return !q || String(b.name || '').toLowerCase().indexOf(q) >= 0; });
     if (!rows.length) { box.innerHTML = '<div class="muted">No business matches that.</div>'; return; }
     box.innerHTML = rows.map(function (b) {
-      return '<a class="row site' + (b.current ? ' now' : '') + '" role="listitem" href="#" data-biz="' + esc(b.site_id) + '" data-noscope="1"' + (b.current ? ' aria-current="true"' : '') + '>' +
-        '<span class="av" aria-hidden="true">' + esc(bizInitials(b.name)) + '</span><span class="tx"><span class="n">' + esc(b.name) + '</span><span class="sub">' + esc(bizRoleLine(b)) + (b.current ? ' · here now' : '') + '</span></span></a>';
+      // builder item 201: each row is a link inside a list item, so it is read as a link
+      return '<div role="listitem"><a class="row site' + (b.current ? ' now' : '') + '" href="#" data-biz="' + esc(b.site_id) + '" data-noscope="1"' + (b.current ? ' aria-current="true"' : '') + '>' +
+        '<span class="av" aria-hidden="true">' + esc(bizInitials(b.name)) + '</span><span class="tx"><span class="n">' + esc(b.name) + '</span><span class="sub">' + esc(bizRoleLine(b)) + (b.current ? ' · here now' : '') + '</span></span></a></div>';
     }).join('');
     [].forEach.call(box.querySelectorAll('[data-biz]'), function (a) { a.addEventListener('click', function (e) { e.preventDefault(); openBusiness(a.getAttribute('data-biz')); }); });
   }
@@ -1393,12 +1408,90 @@
     list.innerHTML = rows.map(function (x) {
       var now = x.site_id === here;
       var ini = String(x.name || '?').trim().charAt(0).toUpperCase();
-      return '<a class="row site' + (now ? ' now' : '') + '" role="listitem" href="/today.html?client=' + encodeURIComponent(x.site_id) + '" data-noscope="1"' + (now ? ' aria-current="true"' : '') + '>' +
-        '<span class="av" aria-hidden="true">' + esc(ini) + '</span><span class="tx"><span class="n">' + esc(x.name || '(unnamed)') + '</span><span class="sub">' + esc(host(x.address) || x.domain || 'No address yet') + (x.state_words ? ' · ' + esc(x.state_words) : '') + (now ? ' · here now' : '') + '</span></span></a>';
+      // builder item 201: a link inside a list item, read as a link (it was announced as a list item only)
+      return '<div role="listitem"><a class="row site' + (now ? ' now' : '') + '" href="/today.html?client=' + encodeURIComponent(x.site_id) + '" data-noscope="1"' + (now ? ' aria-current="true"' : '') + '>' +
+        '<span class="av" aria-hidden="true">' + esc(ini) + '</span><span class="tx"><span class="n">' + esc(x.name || '(unnamed)') + '</span><span class="sub">' + esc(host(x.address) || x.domain || 'No address yet') + (x.state_words ? ' · ' + esc(x.state_words) : '') + (now ? ' · here now' : '') + '</span></span></a></div>';
     }).join('');
   }
   document.addEventListener('click', function () { if (siteSwitchPop()) closeSiteSwitch(false); });
   window.addEventListener('resize', function () { var b = document.getElementById('dds-site-switch'), p = siteSwitchPop(); if (b && p) placeSiteSwitch(b, p); });
+
+  // ── builder item 201 (Nov 12 review, finding 66): "Which client?" ──────────────
+  // At studio level a link into the website builder opened the studio's OWN site, an empty
+  // placeholder while that site isn't live here (Nov 9 took "Your website" out of the menu for
+  // that reason). Settings' Domain & email, Help's Your website, the ? panel's answers and search
+  // results like Publish or Domain still led there. Such a link now asks which client's website
+  // first, from the same rows as Switch site; a pick opens that client's page at the same place.
+  // The studio's own site stays one quiet row at the foot. Drawn in Figma (307:8560).
+  var WHICH_PLACES = { domain: 'Domain & email', publish: 'Publishing', business: 'Business details', design: 'Editing pages', addpage: 'Adding a page', history: 'Versions', search: 'The health check', export: 'The website’s export', bookings: 'Bookings', reviews: 'Reviews', media: 'Photos', settings: 'The website’s settings' };
+  function whichClientWanted(href) {
+    if (!CTX || !CTX.is_agency || CTX.site_live !== false || (CTX.scope && CTX.scope.site_id) || scopeId()) return false;
+    var h = String(href || '');
+    return SAFE_HREF.test(h) && !/[?&]client=/.test(h) && normalizePath(h) === '/presence';
+  }
+  var whichOpener = null;
+  function whichPop() { return document.getElementById('dds-which'); }
+  function closeWhich(refocus) {
+    var pop = whichPop(), dim = document.getElementById('dds-which-dim');
+    if (pop) pop.remove(); if (dim) dim.remove();
+    var back = whichOpener; whichOpener = null;
+    if (refocus && back && back.isConnected && back.focus) try { back.focus(); } catch (_) { /* */ }
+  }
+  function atClient(href, id) {
+    var i = href.indexOf('#'), h = i >= 0 ? href.slice(0, i) : href, hash = i >= 0 ? href.slice(i) : '';
+    return h + (h.indexOf('?') >= 0 ? '&' : '?') + 'client=' + encodeURIComponent(id) + hash;
+  }
+  function openWhichClient(href, opener) {
+    closeAllLayers(); closePalette(); closeWhich(false);
+    whichOpener = opener || document.activeElement || null;
+    var m = /#([a-z]+)/.exec(href), place = (m && WHICH_PLACES[m[1]]) || 'Editing a website';
+    var dim = el('<div id="dds-which-dim" aria-hidden="true"></div>');
+    var pop = el('<div class="dds-pop dds-sites-pop dds-which open" id="dds-which" role="dialog" aria-labelledby="dds-which-h" aria-describedby="dds-which-p">' +
+      '<h2 id="dds-which-h">Which client’s website?</h2><p id="dds-which-p">' + esc(place) + ' is part of each client’s website. Pick one and it opens there.</p>' +
+      '<input type="search" class="q" id="dds-which-q" placeholder="Find a client…" aria-label="Find a client" autocomplete="off">' +
+      '<div class="list" id="dds-which-list" role="list"><div class="muted">Loading your clients’ sites…</div></div>' +
+      '<div class="wfoot"><a class="row all" href="/sites.html" data-noscope="1">All sites →</a><a class="row all" href="/sites.html#new" data-noscope="1">+ New site</a></div>' +
+      '<a class="row own" href="' + esc(href) + '" data-own-site="1">Your studio’s own site (not live yet)</a></div>');
+    document.body.appendChild(dim); document.body.appendChild(pop);
+    dim.addEventListener('click', function () { closeWhich(true); });
+    pop.addEventListener('click', function (e) { e.stopPropagation(); });
+    // beside what was pressed on a computer; a phone (CSS) or a press with nothing to hang from gets the sheet / the middle
+    var r = whichOpener && whichOpener.getClientRects && whichOpener.getClientRects().length && whichOpener !== document.body ? whichOpener.getBoundingClientRect() : null;
+    if (r && window.matchMedia && window.matchMedia('(min-width:761px)').matches) {
+      var left = r.right + 12 + pop.offsetWidth <= window.innerWidth - 8 ? r.right + 12 : Math.max(8, Math.min(window.innerWidth - pop.offsetWidth - 8, r.left));
+      pop.style.left = left + 'px';
+      pop.style.top = Math.max(8, Math.min(window.innerHeight - pop.offsetHeight - 8, r.top)) + 'px';
+    } else pop.classList.add('mid');
+    var q = pop.querySelector('#dds-which-q'); q.focus();
+    pop.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape') { e.stopPropagation(); closeWhich(true); return; }
+      var rows = [].slice.call(pop.querySelectorAll('.list a.row'));
+      var i = rows.indexOf(document.activeElement);
+      if (e.key === 'ArrowDown') { e.preventDefault(); (rows[i + 1] || rows[0] || q).focus(); }
+      if (e.key === 'ArrowUp') { e.preventDefault(); (i > 0 ? rows[i - 1] : q).focus(); }
+    });
+    q.addEventListener('input', function () { paintWhichRows(pop, href, q.value); });
+    siteRows().then(function (rows) {
+      if (whichPop() !== pop) return;
+      if (rows === null) { pop.querySelector('#dds-which-list').innerHTML = '<div class="muted">Couldn’t load your clients’ sites just now.</div>'; return; }
+      paintWhichRows(pop, href, q.value);
+    });
+  }
+  function paintWhichRows(pop, href, query) {
+    var list = pop.querySelector('#dds-which-list'); if (!list) return;
+    var q = String(query || '').trim().toLowerCase();
+    var host = function (u) { return String(u || '').replace(/^https?:\/\//, '').replace(/\/.*$/, ''); };
+    var rows = (SWITCH_ROWS || []).filter(function (x) {
+      return !q || [x.name, x.domain, host(x.address), (x.tags || []).join(' ')].some(function (v) { return String(v || '').toLowerCase().indexOf(q) >= 0; });
+    });
+    if (!rows.length) { list.innerHTML = '<div class="muted">' + (SWITCH_ROWS && SWITCH_ROWS.length ? 'No client matches that.' : 'No client sites yet. + New site makes the first.') + '</div>'; return; }
+    list.innerHTML = rows.map(function (x) {
+      var ini = String(x.name || '?').trim().charAt(0).toUpperCase();
+      return '<div role="listitem"><a class="row site" href="' + esc(atClient(href, x.site_id)) + '" data-noscope="1">' +
+        '<span class="av" aria-hidden="true">' + esc(ini) + '</span><span class="tx"><span class="n">' + esc(x.name || '(unnamed)') + '</span><span class="sub">' + esc(host(x.address) || x.domain || 'No address yet') + (x.state_words ? ' · ' + esc(x.state_words) : '') + '</span></span></a></div>';
+    }).join('');
+  }
+  document.addEventListener('click', function () { if (whichPop()) closeWhich(false); });
 
   // ── mobile bottom bar (≤760px): the daily loop in one tap — Today · Inbox ·
   //    Menu. presence.html keeps its own dock, so we stay out of its way. ──
@@ -1549,9 +1642,9 @@
       document.addEventListener('click', closeMenus);
       document.addEventListener('keydown', function (e) { if ((e.metaKey || e.ctrlKey) && (e.key === 'k' || e.key === 'K')) { e.preventDefault(); openPalette(); } });
     }
-    // bell + profile
-    document.getElementById('dds-bell').addEventListener('click', function (e) { e.stopPropagation(); toggleNotifications(); });
-    document.getElementById('dds-profile').addEventListener('click', function (e) { e.stopPropagation(); toggleProfile(); });
+    // bell + profile. Builder item 201: opened from the keyboard (e.detail 0), focus moves into the panel
+    document.getElementById('dds-bell').addEventListener('click', function (e) { e.stopPropagation(); toggleNotifications(e.detail === 0); });
+    document.getElementById('dds-profile').addEventListener('click', function (e) { e.stopPropagation(); toggleProfile(e.detail === 0); });
     var newTrig = document.getElementById('dds-new');
     if (newTrig) {
       newTrig.addEventListener('click', function (e) { e.stopPropagation(); closeMenus(); openWhatsNew(newTrig); });
@@ -1594,6 +1687,7 @@
   function closeAllLayers() {
     closeMenus(); closeNotifications(); closeProfile(); closeHelp(); closeDrawer(); closeShortcuts();
     if (siteSwitchPop()) closeSiteSwitch(false);   // bug hunt A11: Switch site is one of the layers too
+    if (whichPop()) closeWhich(false);             // builder item 201: and Which client?
   }
 
   // ── command palette ──
@@ -1624,6 +1718,8 @@
         // Shift+Enter on a website row opens the site itself (its "Open website")
         if (e.key === 'Enter' && sel && e.shiftKey && sel.querySelector('[data-alt-href]')) { e.preventDefault(); window.open(sel.querySelector('[data-alt-href]').getAttribute('data-alt-href'), '_blank', 'noopener'); return; }
         if (e.key === 'Enter' && sel) {
+          // builder item 201: a website place at studio level asks which client first
+          if (!sel.hasAttribute('data-own-site') && whichClientWanted(sel.getAttribute('href'))) { e.preventDefault(); openWhichClient(sel.getAttribute('href'), null); return; }
           if (sel.hasAttribute('data-rec-label')) pushRecent(sel.getAttribute('data-rec-label'), sel.getAttribute('data-rec-href'));
           location.href = sel.getAttribute('href');
         }
@@ -1676,6 +1772,7 @@
     var sel = selFirst ? ' sel' : '';
     var attrs = o.rec ? ' data-rec-label="' + esc(o.label) + '" data-rec-href="' + esc(o.href) + '"' : '';
     if (o.create) attrs += ' data-create="' + esc(o.create) + '"';
+    if (o.own) attrs += ' data-own-site="1"';   // item 201: "Your studio’s own site" opens it, never asks which client
     var href = o.raw ? o.href : (/[?&]client=/.test(o.href) ? o.href : withScope(o.href));
     var alt = o.alt && o.alt.href ? '<span class="alt" data-alt-href="' + esc(o.alt.href) + '" title="Opens the website itself (Shift+Enter)">' + esc(o.alt.label || 'Open website') + '</span>' : '';
     return '<a class="res' + sel + '" id="dds-res-' + n + '" role="option" aria-selected="' + (selFirst ? 'true' : 'false') + '" href="' + esc(href) + '"' + attrs + '>'
@@ -1705,7 +1802,7 @@
     var qq = String(q || '').trim().toLowerCase();
     var list = qq ? DESTS.filter(function (d) { return d.label.toLowerCase().indexOf(qq) >= 0 || d.section.toLowerCase().indexOf(qq) >= 0 || (d.desc && d.desc.toLowerCase().indexOf(qq) >= 0); }) : DESTS;
     var box = pal.querySelector('.results');
-    var places = list.map(function (d) { return { kind: d.create ? 'action' : 'place', label: d.label, sub: d.section, href: d.href, create: d.create || '', raw: !!d.create }; });
+    var places = list.map(function (d) { return { kind: d.create ? 'action' : 'place', label: d.label, sub: d.section, href: d.href, create: d.create || '', raw: !!d.create, own: d.key === 'content' }; });
     var placesHtml = palGroups([['places', places]], q);
     box.innerHTML = placesHtml;
     var inp0 = pal.querySelector('input'); if (inp0) inp0.setAttribute('aria-activedescendant', placesHtml ? 'dds-res-0' : '');
@@ -1776,7 +1873,7 @@
   function markAttentionFresh() { lastAttentionAt = Date.now(); }
   function paintBell() {
     var b = document.getElementById('dds-bell');
-    if (b) b.innerHTML = bellInner(badgeCount());
+    if (b) { b.innerHTML = bellInner(badgeCount()); b.setAttribute('aria-label', bellLabel(badgeCount())); }
     paintMobileInboxDot();
   }
   // bug hunt A7: the phone bar's Inbox number was drawn once at boot; it follows the bell now
@@ -1864,6 +1961,18 @@
     return (m && typeof m.count === 'number' && m.count === n) ? 0 : n;
   }
   function setExpanded(id, open) { var b = document.getElementById(id); if (b) b.setAttribute('aria-expanded', open ? 'true' : 'false'); }
+  // Builder item 201: the bell and account panels sit at the end of the page, so Tab from the
+  // last control (or Shift+Tab from the first) closes the panel and puts focus back on its button,
+  // instead of walking off the page.
+  function tabOutCloses(pop, close, triggerId) {
+    pop.addEventListener('keydown', function (e) {
+      if (e.key !== 'Tab') return;
+      var f = [].filter.call(pop.querySelectorAll('a[href],button:not([disabled]),input:not([disabled])'), function (n) { return n.tabIndex >= 0 && n.getClientRects().length; });
+      if (!f.length || document.activeElement !== (e.shiftKey ? f[0] : f[f.length - 1])) return;
+      e.preventDefault(); close();
+      var b = document.getElementById(triggerId); if (b) b.focus();
+    });
+  }
   // one row shape for every kind of feed item the bell draws
   function shapeBellRows(d, revr) {
     var out = [];
@@ -1952,7 +2061,7 @@
       else if (window.ddsToast) window.ddsToast('Couldn’t clear those just now — try again in a moment.', 'err');
     });
   }
-  function toggleNotifications() {
+  function toggleNotifications(viaKey) {
     if (notif && notif.classList.contains('open')) { notif.classList.remove('open'); setExpanded('dds-bell', false); return; }
     closeAllLayers();
     if (!notif) {
@@ -1974,9 +2083,11 @@
       });
       notif.querySelector('#dds-bell-read').addEventListener('click', markBellRead);
       notif.querySelector('#dds-bell-clear').addEventListener('click', clearBell);
+      tabOutCloses(notif, closeNotifications, 'dds-bell');
     }
     notif.classList.add('open');
     setExpanded('dds-bell', true);
+    if (viaKey) { var tab0 = notif.querySelector('.tabs [role=tab][aria-selected="true"]') || notif.querySelector('.tabs [role=tab]'); if (tab0) tab0.focus(); }
     // Sales review item 11: at STUDIO level the badge is the studio's one
     // needs-you list, so the Needs-you tab lists exactly those rows (the same
     // read Home heads its list with); Updates keeps the news from the feed.
@@ -2008,7 +2119,8 @@
       var old = notif.querySelector('.foot'); if (old) old.remove();
       var foot = revr
         ? '<a class="row foot" href="/client.html" style="text-align:center;font-weight:600;color:var(--dds-accent,#5b3fa0)">See all your updates →</a>'
-        : '<a class="row foot" href="' + esc(withScope('/inbox.html')) + '" style="text-align:center;font-weight:600;color:var(--dds-accent,#5b3fa0)">See everything in your Inbox →</a>';
+        // builder item 202: inside a client that page is their Messages, the name their menu uses
+        : '<a class="row foot" href="' + esc(withScope('/inbox.html')) + '" style="text-align:center;font-weight:600;color:var(--dds-accent,#5b3fa0)">' + (CTX && CTX.scope && CTX.scope.name ? 'See everything in Messages →' : 'See everything in your Inbox →') + '</a>';
       notif.appendChild(el(foot));
     });
   }
@@ -2035,13 +2147,15 @@
       help.addEventListener('click', function (e) { e.stopPropagation(); });
       var inp = help.querySelector('#dds-help-q'); var deb;
       inp.addEventListener('input', function () { clearTimeout(deb); var v = inp.value; deb = setTimeout(function () { askHelp(v); }, 250); });
-      inp.addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); clearTimeout(deb); askHelp(inp.value); } else if (e.key === 'Escape') { closeHelp(); var t = document.getElementById('dds-help'); if (t) t.focus(); } });
+      inp.addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); clearTimeout(deb); askHelp(inp.value); } else if (e.key === 'Escape') { closeHelp(); var t = helpButton(); if (t) t.focus(); } });
     }
     help.classList.add('open'); setExpanded('dds-help', true);
     helpSuggest();
     setTimeout(function () { var i = help.querySelector('#dds-help-q'); if (i) i.focus(); }, 20);
   }
   function closeHelp() { if (help) help.classList.remove('open'); setExpanded('dds-help', false); }
+  // where focus goes back to: the ? button, or on a phone (no room for it) the account menu that holds Help
+  function helpButton() { var t = document.getElementById('dds-help'); return (t && t.getClientRects().length) ? t : document.getElementById('dds-profile'); }
   function helpSuggest() {
     var body = help.querySelector('#dds-help-body');
     var qs = ['Change my hours', 'Publish my changes', 'Set up booking', 'Send an update', 'Connect a service'];
@@ -2074,10 +2188,10 @@
 
   // ── profile / context menu (role, edition, agency, sign out) ──
   var prof;
-  function toggleProfile() {
+  function toggleProfile(viaKey) {
     if (prof && prof.classList.contains('open')) { prof.classList.remove('open'); setExpanded('dds-profile', false); return; }
     closeAllLayers();
-    if (!prof) { prof = el('<div class="dds-pop" role="region" aria-label="Account menu"></div>'); document.body.appendChild(prof); prof.addEventListener('click', function (e) { e.stopPropagation(); }); }
+    if (!prof) { prof = el('<div class="dds-pop" role="region" aria-label="Account menu"></div>'); document.body.appendChild(prof); prof.addEventListener('click', function (e) { e.stopPropagation(); }); tabOutCloses(prof, closeProfile, 'dds-profile'); }
     setExpanded('dds-profile', true);
     var email = (sb && sb.__email) || 'Signed in';
     var role = (CTX && CTX.site_role) || '';
@@ -2085,7 +2199,9 @@
     var ROLE_WORDS = { business_owner: 'Owner', business_staff: 'Team member', client_reviewer: 'Client', developer: 'Developer' };
     var roleWord = ROLE_WORDS[role] || (role ? role.replace(/_/g, ' ').replace(/^\w/, function (c) { return c.toUpperCase(); }) : '');
     var plan = (CTX && CTX.edition_name && role !== 'client_reviewer') ? CTX.edition_name + ' plan' : '';
-    var rows = '';
+    // builder item 201: Help first. A phone (under 420px) has no room for the ? button, and the
+    // first-day tour has always said help lives in this menu.
+    var rows = '<a class="row" href="/help.html" id="dds-help-row">Help<span class="sub">Ask how to do something, or open Help</span></a>';
     if (CTX && CTX.is_agency) rows += '<a class="row" href="/agency.html">Studio</a>' +
       // item 44: the Sites page in one click, from anywhere
       '<a class="row" href="/sites.html" id="dds-all-sites">All sites<span class="sub">Every website you look after</span></a>';
@@ -2114,6 +2230,9 @@
     rows += '<a class="row" href="#" id="dds-signout">Sign out</a>';
     prof.innerHTML = '<div class="who"><div class="n">' + esc(email) + '</div><div class="r">' + esc([roleWord, plan].filter(Boolean).join(' · ')) + '</div></div>' + rows;
     prof.classList.add('open');
+    if (viaKey) { var r0 = prof.querySelector('a.row'); if (r0) r0.focus(); }
+    var hr = document.getElementById('dds-help-row');
+    if (hr) hr.addEventListener('click', function (e) { e.preventDefault(); closeProfile(); toggleHelp(); });
     if (document.getElementById('dds-health-row')) api('/admin/health-center').then(function (r) {
       var sub = document.getElementById('dds-health-sub'); if (!sub || !r.ok) return;
       var areas = (r.body && r.body.data && Array.isArray(r.body.data.areas)) ? r.body.data.areas : [];
@@ -2152,8 +2271,9 @@
     if (openSec) { var sb0 = openSec.querySelector('button[data-sec]'); closeMenus(); if (sb0) sb0.focus(); }
     if (notif && notif.classList.contains('open')) { closeNotifications(); var b1 = document.getElementById('dds-bell'); if (b1) b1.focus(); }
     if (prof && prof.classList.contains('open')) { closeProfile(); var b2 = document.getElementById('dds-profile'); if (b2) b2.focus(); }
-    if (help && help.classList.contains('open')) { closeHelp(); var b3 = document.getElementById('dds-help'); if (b3) b3.focus(); }
+    if (help && help.classList.contains('open')) { closeHelp(); var b3 = helpButton(); if (b3) b3.focus(); }
     if (keys && keys.classList.contains('open')) closeShortcuts();
+    if (whichPop()) closeWhich(true);   // builder item 201
     // ⌘K palette too — its input handles Escape while focused, but the dialog must
     // also close when focus is elsewhere (closePalette returns focus to its trigger).
     if (pal && pal.classList.contains('open')) closePalette();
@@ -2236,8 +2356,8 @@
       .then(function (s) { pushOn = !!s; }).catch(function () { pushOn = false; });
   }
   function togglePush() {
-    if (!('serviceWorker' in navigator)) return;
-    navigator.serviceWorker.ready.then(function (reg) {
+    if (!('serviceWorker' in navigator)) return Promise.resolve(false);
+    return navigator.serviceWorker.ready.then(function (reg) {
       return reg.pushManager.getSubscription().then(function (existing) {
         if (existing) {
           // turn OFF
@@ -2263,8 +2383,21 @@
             });
           });
       });
-    }).catch(function () { window.ddsToast && window.ddsToast('Couldn’t change notifications just now.', 'err'); });
+    }).catch(function () { window.ddsToast && window.ddsToast('Couldn’t change notifications just now.', 'err'); }).then(function () { return pushOn; });
   }
+  // builder item 202: Settings' Notifications holds the same switch as the account menu's row
+  window.ddsPush = {
+    supported: function () { return !isReviewerCtx() && 'serviceWorker' in navigator && 'PushManager' in window; },
+    // the browser's own answer, else (no worker within a moment) what this tab last knew
+    state: function () {
+      if (!('serviceWorker' in navigator) || !navigator.serviceWorker.ready) return Promise.resolve(pushOn);
+      return Promise.race([
+        navigator.serviceWorker.ready.then(function (reg) { return reg.pushManager.getSubscription(); }).then(function (s) { pushOn = !!s; return pushOn; }, function () { return pushOn; }),
+        new Promise(function (r) { setTimeout(function () { r(pushOn); }, 1500); }),
+      ]);
+    },
+    toggle: togglePush,
+  };
 
   // ── the App Launcher panel (also the mobile nav sheet) ──────────────────────
   // ONE element serves both: ≥761px it is the waffle's click-invoked popover

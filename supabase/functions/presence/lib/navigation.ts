@@ -129,11 +129,12 @@ export function buildNav(c: NavContext): NavSection[] {
     // the desc keeps "schedule" findable from ⌘K, which matches on desc).
     if (canPublish(c)) items.push(hid('publish', 'Publish', '/presence.html#publish', 'Publish now, or schedule it to go live on its own — and see or cancel what’s scheduled.'));
     if (canPublish(c)) items.push(hid('history', 'Versions', '/presence.html#history'));
+    // builder item 202: ⌘K "health" opens the health check where it lives now, the website's Search tab
+    // (item 184 moved it there from the Overview, whose description still sent "health" to it)
+    items.push(hid('site_health', 'Health check', '/presence.html#search', 'Is the site healthy: what’s broken or missing, and its address. On the website’s Search tab (health).'));
     return items;
   };
-  // the desc keeps "health" findable from ⌘K (website-health.html retired; the
-  // Health check is a card on this overview — Oct 2026 audit, gap 3).
-  const WEBSITE_DESC = 'Your site at a glance: what’s live, the health check and recent activity.';
+  const WEBSITE_DESC = 'Your site at a glance: the draft, what’s live, and what’s left before it can go live.';
 
   // ── Inside a client: the client's six ──────────────────────────────────────
   if (clientScoped) {
@@ -288,7 +289,9 @@ export function buildNav(c: NavContext): NavSection[] {
   const settings: NavItem[] = [{ key: 'settings', label: 'Settings', href: '/settings.html' }];
   // Oct 2026 audit bug 10: ⌘K "plan" and "team" each find their card on Settings
   // (Plan & billing is the owner's / the studio's own; Team is the studio's seats).
-  settings.push(hid('plan', 'Your plan', '/settings.html#billing', 'Your Studio OS plan, when it renews, and how to change it — not the invoices you send.'));
+  // Builder item 202: only for whoever Settings shows the plan to (the account's owner; staff see all),
+  // so a team member's "plan" never lands on Settings with the card hidden
+  if (c.role === 'business_owner' || c.isOperator) settings.push(hid('plan', 'Your plan', '/settings.html#billing', 'Your Studio OS plan, when it renews, and how to change it — not the invoices you send.'));
   if (studioLevel) settings.push(hid('team', 'Team', '/settings.html#team', 'Who is on your studio’s team, their roles, and the seats your plan covers.'));
   // sales item 83: ⌘K "deleted", "restore" or "trash" finds the one place deleted deals, contacts and to-dos wait
   if (studioLevel && f.hasRelationship) settings.push(hid('deleted', 'Recently deleted', '/recently-deleted.html', 'Deals, contacts and to-dos deleted in the last 30 days, each with Restore (trash, undo).'));
