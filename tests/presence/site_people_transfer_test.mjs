@@ -189,7 +189,7 @@ const clientRow = () => DB.clients.find((c) => c.id === CLIENT);
 // ═══ 2. invites by role ═══
 {
   reset();
-  const dup = await quiet(() => addSiteMember(SITE, 'Dana@Maple.example', 'developer', 'x', { ownerEmails: ['sam@maple.example'] }));
+  const dup = await quiet(() => addSiteMember(SITE, 'Dana@Maple.example', 'client_reviewer', 'x', { ownerEmails: ['sam@maple.example'] }));
   ok('invite: an email already here is pointed at, whatever its capitals, and keeps its role', !dup.ok && dup.error === 'already_member' && dup.member.role === 'business_staff' && seat('dana@maple.example').role === 'business_staff');
   const own = await quiet(() => addSiteMember(SITE, 'sam@maple.example', 'business_staff', 'x', { ownerEmails: ['sam@maple.example'] }));
   ok('invite: the owner\'s own email is never made a seat', !own.ok && own.error === 'is_owner' && !seat('sam@maple.example'));
@@ -198,15 +198,23 @@ const clientRow = () => DB.clients.find((c) => c.id === CLIENT);
   const restored = await quiet(() => addSiteMember(SITE, 'gone@maple.example', 'business_staff', 'x', { restore: true }));
   ok('invite: …and on purpose, with the role named again', restored.ok && restored.restored && seat('gone@maple.example').status === 'active' && seat('gone@maple.example').role === 'business_staff');
   const sent = emails.length;
-  const fresh = await quiet(() => addSiteMember(SITE, 'alex@maple.example', 'developer', 'x', {}));
-  ok('invite: a new person gets a seat with the role picked, and a sign-in email', fresh.ok && fresh.member.role === 'developer' && seat('alex@maple.example').status === 'active' && emails.length === sent + 1);
+  const fresh = await quiet(() => addSiteMember(SITE, 'alex@maple.example', 'business_owner', 'x', {}));
+  ok('invite: a new person gets a seat with the role picked, and a sign-in email', fresh.ok && fresh.member.role === 'business_owner' && seat('alex@maple.example').status === 'active' && emails.length === sent + 1);
+  // Developer is paused (DEVELOPER_PAUSED): its custom HTML goes through a cleaner that isn't a parser yet
+  const paused = await quiet(() => addSiteMember(SITE, 'dev@maple.example', 'developer', 'x', {}));
+  ok('developer paused: an owner or studio can\'t make a Developer seat, and nothing is written or sent', !paused.ok && paused.error === 'role_paused' && !seat('dev@maple.example') && emails.length === sent + 1);
+  const staffDev = await quiet(() => addSiteMember(SITE, 'dev@maple.example', 'developer', 'x', { allowDeveloper: true }));
+  ok('developer paused: platform staff still can (the narrow way the cleaner\'s note allows)', staffDev.ok && seat('dev@maple.example').role === 'developer');
   ok('invite: a full-workspace seat\'s link lands on the studio door', minted.some((m) => m.email === 'alex@maple.example' && /\/studio\.html$/.test(m.redirect_to)));
   DB.presence_service_links.push({ agency_site_id: SITE, status: 'active', id: 'l1' });
   const rev = await quiet(() => addSiteMember(SITE, 'look@maple.example', 'client_reviewer', 'x', {}));
   ok('invite: still no reviewer seat on a studio\'s shared site (review finding 5)', !rev.ok && rev.error === 'shared_site');
   DB.presence_service_links = [];
-  const role = await changeSiteMemberRole(SITE, uuid('2'), 'developer');
-  ok('role: a seat\'s role changes by its own route', role.ok && seat('dana@maple.example').role === 'developer');
+  const role = await changeSiteMemberRole(SITE, uuid('2'), 'client_reviewer');
+  ok('role: a seat\'s role changes by its own route', role.ok && seat('dana@maple.example').role === 'client_reviewer');
+  const toDev = await changeSiteMemberRole(SITE, uuid('2'), 'developer');
+  ok('developer paused: no seat is changed to Developer either', !toDev.ok && toDev.error === 'role_paused' && seat('dana@maple.example').role === 'client_reviewer');
+  ok('developer paused: …unless platform staff ask', (await changeSiteMemberRole(SITE, uuid('2'), 'developer', { allowDeveloper: true })).ok && seat('dana@maple.example').role === 'developer');
   const badRole = await changeSiteMemberRole(SITE, uuid('2'), 'owner');
   ok('role: only the four seat roles; "owner" is not one', !badRole.ok && badRole.error === 'bad_role');
   DB.presence_site_members.find((m) => m.email === 'dana@maple.example').status = 'revoked';
@@ -220,7 +228,13 @@ const clientRow = () => DB.clients.find((c) => c.id === CLIENT);
 // ═══ 3. the routes for people ═══
 {
   reset();
-  const dup = await answer(await quiet(async () => handleMemberAdd(req('POST', { email: 'dana@maple.example', role: 'developer' }), 'jwt-owner', SITE_ROW, owner(), cors)));
+  const devAsk = await answer(await quiet(async () => handleMemberAdd(req('POST', { email: 'new.dev@maple.example', role: 'developer' }), 'jwt-owner', SITE_ROW, owner(), cors)));
+  ok('route: an owner asking for a Developer is told it is paused, in words', devAsk.status === 409 && devAsk.body.error === 'role_paused' && /paused/.test(devAsk.body.message) && !seat('new.dev@maple.example'));
+  const devStaff = await answer(await quiet(async () => handleMemberAdd(req('POST', { email: 'new.dev@maple.example', role: 'developer' }), 'jwt-stranger', SITE_ROW, platform(), cors)));
+  ok('route: platform staff can still make one', devStaff.status === 200 && seat('new.dev@maple.example')?.role === 'developer');
+  const devRole = await answer(await quiet(async () => handleMemberRole(req('POST', { role: 'developer' }), 'jwt-owner', SITE_ROW, uuid('2'), owner(), cors)));
+  ok('route: …and an owner can\'t change someone to Developer', devRole.status === 409 && devRole.body.error === 'role_paused');
+  const dup = await answer(await quiet(async () => handleMemberAdd(req('POST', { email: 'dana@maple.example', role: 'client_reviewer' }), 'jwt-owner', SITE_ROW, owner(), cors)));
   ok('route: inviting someone already here answers 409 with their row and a sentence', dup.status === 409 && dup.body.error === 'already_member' && dup.body.member.role === 'business_staff' && /already here as Staff/.test(dup.body.message));
   const own = await answer(await quiet(async () => handleMemberAdd(req('POST', { email: 'SAM@maple.example', role: 'business_staff' }), 'jwt-owner', SITE_ROW, owner(), cors)));
   ok('route: the owner\'s own email, read from the client record, is refused', own.status === 409 && own.body.error === 'is_owner');

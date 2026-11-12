@@ -2,7 +2,9 @@
 // One list of what the studio itself has to do, for Home: the next step on each
 // OPEN deal, every open to-do on a deal that is not lost, and every studio-side
 // task (not a client to-do) on an active or on-hold project that is unassigned
-// or assigned to the person asking. Pure: the route reads the rows, this decides.
+// or assigned to the person asking. Sales item 85: and every open to-do for a
+// person, a customer or nobody (your own), from the same to-dos table, so Home's
+// Done works the same way for it. Pure: the route reads the rows, this decides.
 
 export type MyTaskKind = 'next_step' | 'deal_task' | 'project_task';
 export interface MyTask {
@@ -16,6 +18,7 @@ export interface MyTask {
   blocked: boolean;      // a blocked project task cannot be ticked done from Home
   later: boolean;        // item 53: an undated project step behind that project's next open step
   order: number | null;  // a project step's place on its checklist (sort_order), so Home can move the next one up
+  for?: 'deal' | 'person' | 'customer' | 'me';   // item 85: whose a to-do (deal_task) is
 }
 export const MY_TASKS_OPEN_STAGES = ['lead', 'qualified', 'proposal', 'contract'];
 export const MY_TASKS_MAX = 50;
@@ -29,6 +32,8 @@ export function buildMyTasks(input: {
   projectTasks: any[];     // open studio-side project tasks
   projects: any[];         // the projects those belong to (id, name, status)
   userId: string | null;
+  people?: any[];          // item 85: the people to-dos are for (id, name, email, deleted_at)
+  customers?: any[];       // …and the customers (id, name, email)
 }): MyTask[] {
   const out: MyTask[] = [];
   for (const d of input.deals || []) {
@@ -38,13 +43,29 @@ export function buildMyTasks(input: {
     out.push({ kind: 'next_step', id: String(d.id), parent_id: String(d.id), title: t, due: ymd(d.next_step_at), context: String(d.title || 'A deal'), href: `/pipeline.html?deal=${d.id}`, blocked: false, later: false, order: null });
   }
   const dealById = new Map((input.taskDeals || []).filter((d) => d && d.id).map((d) => [String(d.id), d]));
+  const personById = new Map((input.people || []).filter((c) => c && c.id).map((c) => [String(c.id), c]));
+  const customerById = new Map((input.customers || []).filter((c) => c && c.id).map((c) => [String(c.id), c]));
   for (const t of input.dealTasks || []) {
     if (!t || !t.id || String(t.status || 'open') !== 'open') continue;
-    const d = dealById.get(String(t.deal_id || ''));
-    if (!d || String(d.stage) === 'lost') continue;   // a deleted deal, or one marked not a fit
     const title = String(t.title || '').trim();
     if (!title) continue;
-    out.push({ kind: 'deal_task', id: String(t.id), parent_id: String(d.id), title, due: ymd(t.due_date), context: String(d.title || 'A deal'), href: `/pipeline.html?deal=${d.id}`, blocked: false, later: false, order: null });
+    if (t.deal_id) {
+      const d = dealById.get(String(t.deal_id));
+      if (!d || String(d.stage) === 'lost') continue;   // a deleted deal, or one marked not a fit
+      out.push({ kind: 'deal_task', id: String(t.id), parent_id: String(d.id), title, due: ymd(t.due_date), context: String(d.title || 'A deal'), href: `/pipeline.html?deal=${d.id}`, blocked: false, later: false, order: null, for: 'deal' });
+      continue;
+    }
+    // item 85: a to-do for a person or a customer opens their record; one for nobody is your own
+    if (t.contact_id) {
+      const c = personById.get(String(t.contact_id));
+      if (!c || c.deleted_at) continue;   // a person taken off the list takes their to-dos with them (Recently deleted brings both back)
+      out.push({ kind: 'deal_task', id: String(t.id), parent_id: String(c.id), title, due: ymd(t.due_date), context: String(c.name || c.email || 'A contact'), href: `/crm.html?contact=${c.id}`, blocked: false, later: false, order: null, for: 'person' });
+    } else if (t.client_id) {
+      const k = customerById.get(String(t.client_id));
+      out.push({ kind: 'deal_task', id: String(t.id), parent_id: String(t.client_id), title, due: ymd(t.due_date), context: String((k && (k.name || k.email)) || 'A customer'), href: `/crm.html?client_id=${t.client_id}`, blocked: false, later: false, order: null, for: 'customer' });
+    } else {
+      out.push({ kind: 'deal_task', id: String(t.id), parent_id: '', title, due: ymd(t.due_date), context: 'Your own to-do', href: '/todos.html', blocked: false, later: false, order: null, for: 'me' });
+    }
   }
   const projById = new Map((input.projects || []).filter((p) => p && p.id).map((p) => [String(p.id), p]));
   // Second walk (Nov 8, item 53): Home listed 20 undated project steps — every
