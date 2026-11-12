@@ -22,6 +22,7 @@ import { kitFromSite, applyKitTo, layoutFromSite } from './kit_io.ts';
 import { layoutCounts } from '../lib/site_layout.ts';
 import { removeTemplatePhotos } from '../lib/media.ts';
 import { handleAgencySites } from './sites.ts';
+import { handleSiteFolders } from './site_folders.ts';   // builder list item 176
 import { handleClientTools } from './client_tools.ts';
 import { handleSiteNumbers } from './site_numbers.ts';
 import { handleDoNext } from './do_next.ts';
@@ -260,6 +261,12 @@ async function handleAgencyInner(req: Request, route: string, method: string, me
   {
     const jwt = req.headers.get('x-dds-user-jwt') || '';
     const r = await handleDoNext(req, route, method, member, principal, cors, { needs: () => computeStudioNeeds(member, principal, jwt, now) });
+    if (r) return r;
+  }
+
+  // ── builder list item 176: folders, tags and saved views on Sites ──
+  {
+    const r = await handleSiteFolders(req, route, method, member, cors, { ownSite: () => ownSiteOf(req.headers.get('x-dds-user-jwt') || '', principal) });
     if (r) return r;
   }
 
