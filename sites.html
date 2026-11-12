@@ -74,6 +74,7 @@
   .fpill{font:inherit;font-size:12.5px;font-weight:600;border:1px solid var(--line);border-radius:999px;background:var(--card);color:var(--ink);padding:6px 12px;cursor:pointer;min-height:36px}
   .fpill:hover{border-color:var(--p);color:var(--p)} .fpill[aria-pressed="true"]{background:var(--p);border-color:var(--p);color:var(--dds-on-p,#fff)}
   .fpill .c{opacity:.75;font-weight:500;margin-left:3px}
+  .fpill[aria-pressed="true"] .c{opacity:1}   /* white at .75 on the purple was under 4.5:1 */
   .frow .search{flex:1 1 220px;min-width:0;margin:0;padding:8px 14px;font-size:14px;border-radius:999px}
   @media (max-width:767px){.fpill{min-height:44px}.frow .search{flex-basis:100%;order:-1}}
 
@@ -264,6 +265,86 @@
   .spin{width:22px;height:22px;border:2.5px solid var(--line);border-top-color:var(--p);border-radius:50%;animation:sp .8s linear infinite;margin:var(--dds-s8,40px) auto}
   @keyframes sp{to{transform:rotate(360deg)}}
   @media (prefers-reduced-motion:reduce){.spin{animation:none}}
+
+  /* ── builder list item 176 (Nov 2026, drawn in Figma and agreed): folders across the top, saved
+     views and a tag picker on the filter row, tags under each card's address, tick boxes in the table ── */
+  .fstrip{display:flex;gap:10px;margin:0 0 var(--dds-s4,16px);overflow-x:auto;scrollbar-width:none;padding:2px 2px 6px;align-items:stretch}
+  .fstrip::-webkit-scrollbar{display:none}
+  .ftile{font:inherit;display:flex;align-items:center;gap:12px;flex:0 0 auto;min-height:60px;padding:10px 18px 10px 12px;border-radius:16px;border:1px solid var(--line);background:var(--card);color:var(--ink);cursor:pointer;text-align:left;box-shadow:var(--shadow)}
+  .ftile:hover{border-color:var(--p)}
+  .ftile[aria-pressed="true"]{background:var(--p-soft);border:2px solid var(--p);padding:9px 17px 9px 11px}
+  .ftile .fg{width:38px;height:38px;border-radius:11px;display:grid;place-items:center;flex:0 0 auto}
+  .ftile .fg svg{width:20px;height:20px;display:block}
+  .ftile .fw{display:flex;flex-direction:column;min-width:0}
+  .ftile .fw b{font-size:14px;font-weight:600;white-space:nowrap}
+  .ftile .fw span{font-size:12px;color:var(--soft);white-space:nowrap}
+  .ftile[aria-pressed="true"] .fw b{color:var(--p-deep);font-weight:700} .ftile[aria-pressed="true"] .fw span{color:var(--p)}
+  .ftile.add{border-style:dashed;box-shadow:none;background:transparent;color:var(--soft)}
+  .fmanage{font:inherit;font-size:12.5px;font-weight:600;color:var(--p);background:none;border:none;cursor:pointer;flex:0 0 auto;align-self:center;padding:6px 4px;min-height:36px;white-space:nowrap}
+  .fmanage:hover{text-decoration:underline}
+  .vbtn{font:inherit;display:inline-flex;align-items:center;gap:7px;font-size:13px;font-weight:600;border:1.5px solid color-mix(in srgb,var(--p) 35%,var(--line));border-radius:999px;background:var(--card);color:var(--ink);padding:6px 14px;cursor:pointer;min-height:36px;max-width:100%}
+  .vbtn .pre{font-weight:400;color:var(--soft)} .vbtn .car{font-size:10px;color:var(--soft)}
+  .vbtn .vname{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:220px}
+  .vbtn.save{color:var(--p)}
+  .vbtn[aria-expanded="true"],.vbtn:hover{border-color:var(--p)}
+  .vbtn.on{background:var(--p-soft)}
+  .vdiv{width:1px;height:24px;background:var(--line);flex:0 0 auto}
+  .stags{display:flex;flex-wrap:wrap;gap:6px;align-items:center;min-height:22px}
+  .stags .tagchip,.stags .fchip{margin:0;font:inherit;display:inline-flex;align-items:center;gap:5px;font-size:11.5px;font-weight:600;border:none;border-radius:6px;padding:2px 8px;cursor:pointer}
+  .stags .tagchip{color:var(--p);background:var(--p-soft)}
+  .stags .fchip{color:var(--soft);background:var(--bg)}
+  .stags .fchip svg{width:12px;height:12px;display:block}
+  .stags .tagchip:hover,.stags .fchip:hover{text-decoration:underline}
+  .stags .addtag{font:inherit;font-size:11.5px;font-weight:600;color:var(--faint);background:none;border:none;padding:2px 4px;cursor:pointer}
+  .stags .addtag:hover{color:var(--p)}
+  .pbar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;background:var(--dds-ink,#1e1a2b);color:var(--dds-card,#fff);border-radius:16px;padding:10px 10px 10px 18px;margin-bottom:var(--dds-s3,12px)}
+  .pbar b{font-size:14px;margin-right:auto}
+  .pbar button{font:inherit;font-size:13px;font-weight:600;border:none;border-radius:999px;padding:8px 14px;cursor:pointer;background:color-mix(in srgb,currentColor 14%,transparent);color:inherit;min-height:36px}
+  .pbar button.go{background:var(--p);color:#fff}
+  .pbar button:hover{background:color-mix(in srgb,currentColor 22%,transparent)} .pbar button.go:hover{filter:brightness(1.08);background:var(--p)}
+  .pbar :focus-visible{outline:2px solid currentColor;outline-offset:2px}
+  @media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .pbar button.go{color:#171320}}
+  :root[data-theme="dark"] .pbar button.go{color:#171320}
+  .tscroll td.pick,.tscroll th.pick{width:44px;padding-right:0}
+  .tscroll tbody td.pick{padding-top:0;padding-bottom:0}
+  .tscroll .pk{display:inline-grid;place-items:center;width:36px;height:36px;margin-left:-8px;border-radius:8px;cursor:pointer}
+  .tscroll .pk:hover{background:var(--p-soft)}
+  .tscroll .pk .pkw{display:none}
+  .tscroll td.pick input,.tscroll th.pick input{width:18px;height:18px;margin:0;accent-color:var(--p);cursor:pointer}
+  /* a phone: the row's tick box sits top left, like its ⋯ top right; the header's says All */
+  @media (max-width:760px){
+    .tscroll thead th.pick{display:flex;align-items:center;width:auto;padding:0}
+    .tscroll thead th.pick .pk{display:inline-flex;gap:7px;width:auto;height:auto;min-height:44px;margin:0;padding:0 14px 0 11px;border:1px solid var(--line);border-radius:999px;background:var(--card);font-size:12.5px;font-weight:500;color:var(--soft)}
+    .tscroll thead th.pick .pkw{display:inline}
+    .tscroll tbody td.pick{position:absolute;top:4px;left:4px;width:auto;padding:0}
+    .tscroll tbody td.pick .pk{width:44px;height:44px;margin:0}
+    .tscroll tbody tr:has(td.pick) td.name{padding-left:42px}
+  }
+  .tscroll tr.picked{background:color-mix(in srgb,var(--p-soft) 55%,transparent)}
+  .fline{display:flex;align-items:center;gap:5px;font-size:12px;color:var(--soft);margin-bottom:3px;white-space:nowrap}
+  .fline svg{width:13px;height:13px;flex:0 0 auto}
+  .rowmenu .hd{font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--faint);padding:6px 10px 2px}
+  .rowmenu .sep{height:1px;background:var(--line);margin:6px 4px}
+  .rowmenu [aria-checked="true"]{font-weight:600;color:var(--p)}
+  .rowmenu [aria-checked="true"]::after{content:"";display:inline-block;width:12px;height:12px;margin-left:8px;vertical-align:-1px;background:var(--p);-webkit-mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='m5 12.5 4.5 4.5L19 7.5' fill='none' stroke='black' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center/contain no-repeat;mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='m5 12.5 4.5 4.5L19 7.5' fill='none' stroke='black' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center/contain no-repeat}
+  .rowmenu .vsave{color:var(--p);font-weight:600}
+  .rowmenu .soft{color:var(--soft)}
+  .fopts{display:grid;gap:8px;margin-top:6px}
+  .fopt{display:flex;align-items:center;gap:12px;border:1px solid var(--line);border-radius:12px;padding:10px 12px;cursor:pointer;font-size:14px}
+  .fopt:has(input:checked){border:2px solid var(--p);background:var(--p-soft);padding:9px 11px}
+  .fopt input{accent-color:var(--p);width:18px;height:18px;margin:0;flex:0 0 auto}
+  .fopt .fg{width:20px;height:20px;flex:0 0 auto} .fopt .now{margin-left:auto;font-size:12px;color:var(--p)}
+  .tsug{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+  .tsug button{font:inherit;font-size:12.5px;font-weight:600;border:1px solid var(--line);border-radius:999px;background:var(--card);color:var(--soft);padding:4px 10px;cursor:pointer;min-height:32px}
+  .tsug button:hover{border-color:var(--p);color:var(--p)}
+  .tsug .keep{font-size:12.5px;font-weight:600;border-radius:7px;background:var(--bg);color:var(--ink);padding:4px 10px}
+  .mrow{display:flex;align-items:center;gap:8px;margin-top:8px}
+  .mrow input{flex:1;min-width:0}
+  .mrow select{font:inherit;font-size:13px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink);padding:6px 8px;min-height:40px}
+  .mrow .ib{font:inherit;width:36px;height:36px;border:1px solid var(--line);border-radius:8px;background:var(--card);color:var(--soft);cursor:pointer;flex:0 0 auto}
+  .mrow .ib:hover{color:var(--p);border-color:var(--p)}
+  .mrow .ib:disabled{opacity:.4;cursor:default}
+  @media (max-width:767px){.ftile{min-height:52px;padding:8px 14px 8px 10px}.ftile[aria-pressed="true"]{padding:7px 13px 7px 9px}.ftile .fg{width:32px;height:32px}.vbtn,.fmanage,.pbar button,.tsug button,.mrow .ib{min-height:44px}.mrow .ib{width:44px}.stags .tagchip,.stags .fchip,.stags .addtag{min-height:32px}.vdiv{display:none}.frow .vbtn{flex:1 1 auto}}
   :focus-visible{outline:2px solid var(--p);outline-offset:2px}
 </style>
 <link rel="stylesheet" href="/shell.css"><script src="/shell.js" defer></script>
@@ -273,6 +354,7 @@
   <div id="main"><div class="spin" role="status" aria-label="Loading"></div></div>
 </div>
 <div id="rowMenuHost"></div>
+<div id="orgMenuHost"></div>
 <!-- Duplicate site (item 45): a new customer, set up the way Add a customer does it,
      whose site then starts from this one's setup (POST /agency/sites/:id/duplicate) -->
 <dialog id="dupDlg" aria-labelledby="dupHead">
@@ -353,6 +435,58 @@
   </form>
 </dialog>
 
+<!-- builder list item 176: one site or several into a folder, or out of all (POST /agency/sites/folders/move) -->
+<dialog id="folderDlg" aria-labelledby="folderHead">
+  <form id="folderForm" class="dbody">
+    <h3 id="folderHead">Move to</h3>
+    <div class="fopts" id="folderOpts" role="radiogroup" aria-labelledby="folderHead"></div>
+    <label for="folder-new">Or a new folder</label>
+    <input id="folder-new" maxlength="40" placeholder="New folder…" autocomplete="off">
+    <div class="row2"><button type="button" class="btn ghost" id="folder-cancel">Cancel</button><button type="submit" class="btn" id="folder-go">Move</button></div>
+  </form>
+</dialog>
+<!-- builder list item 176: one site's tags (PATCH /agency/clients/:id) -->
+<dialog id="tagDlg" aria-labelledby="tagHead">
+  <form id="tagForm" class="dbody">
+    <h3 id="tagHead">Tags</h3>
+    <label for="tag-in">Tags</label>
+    <div id="tagBox"></div>
+    <div id="tagSugWrap" hidden><span class="lab">Used on your other sites</span><div class="tsug" id="tagSug"></div></div>
+    <p class="note">Tags cross folders: a kind of business, a town, “upsell next”. Tap a tag on any card to see every site with it.</p>
+    <div class="row2"><button type="button" class="btn ghost" id="tag-cancel">Cancel</button><button type="submit" class="btn" id="tag-save">Done</button></div>
+  </form>
+</dialog>
+<!-- builder list item 176: save what's on screen as a view for the whole studio (PUT /agency/sites/views) -->
+<dialog id="svDlg" aria-labelledby="svHead">
+  <form id="svForm" class="dbody">
+    <h3 id="svHead">Save this view</h3>
+    <label for="sv-name">Name</label>
+    <input id="sv-name" maxlength="60" autocomplete="off" placeholder="Retainers that dropped">
+    <span class="lab">It keeps</span>
+    <div class="tsug" id="svKeeps"></div>
+    <p class="note">Everyone in your studio sees it in the View picker.</p>
+    <div class="row2"><button type="button" class="btn ghost" id="sv-cancel">Cancel</button><button type="submit" class="btn" id="sv-save">Save view</button></div>
+  </form>
+</dialog>
+<!-- builder list item 176: rename, recolour, reorder or remove folders (PUT /agency/sites/folders) -->
+<dialog id="mfDlg" aria-labelledby="mfHead">
+  <form id="mfForm" class="dbody">
+    <h3 id="mfHead">Your folders</h3>
+    <div id="mfRows"></div>
+    <p class="note">Removing a folder moves its sites to No folder. No site is changed.</p>
+    <div class="row2"><button type="button" class="btn ghost" id="mf-cancel">Cancel</button><button type="submit" class="btn" id="mf-save">Save folders</button></div>
+  </form>
+</dialog>
+<!-- builder list item 176: rename or remove saved views (PUT /agency/sites/views) -->
+<dialog id="mvDlg" aria-labelledby="mvHead">
+  <form id="mvForm" class="dbody">
+    <h3 id="mvHead">Your saved views</h3>
+    <div id="mvRows"></div>
+    <p class="note">Saved views belong to the whole studio.</p>
+    <div class="row2"><button type="button" class="btn ghost" id="mv-cancel">Cancel</button><button type="submit" class="btn" id="mv-save">Save views</button></div>
+  </form>
+</dialog>
+
 <script src="/vendor/supabase-js-2.45.4.js"></script>
 <script src="/sites-tools.js?v=176b"></script>
 <script src="/people.js?v=53"></script>
@@ -400,6 +534,15 @@ let SORT=null;   // null = the server's order (pinned, then last opened); else {
 // builder list items 129 and 180: each site's visitors, Google clicks and health, last month
 // against the month before (GET /agency/site-numbers), read after the cards are up
 let NUMS={},NUM_HEAD=null;
+// builder list item 176 (Nov 2026, drawn in Figma and agreed): folders, tags and saved views,
+// borrowed from Wix Studio's Sites list. Folders and views are the studio's, shared by the team
+// (GET /agency/sites/organize); a site's tags are its own (PATCH /agency/clients/:id). One folder
+// a site. The folder you're in is remembered on this computer; a saved view sets the folder, the
+// tag, the filter, the search, the sort and Cards or Table at once.
+let ORG={folders:[],views:[],can_change:false,read:false};   // read=false: an older server, or the read failed — none of it shows
+const FOLDER_KEY='dds-sites-folder';
+let FOLDER=(function(){try{return localStorage.getItem(FOLDER_KEY)||'';}catch(_){return'';}})();   // '' every site · 'none' no folder · a folder's id
+let TAG='',CURVIEW='',PICKED=new Set(),ORG_BUSY=false,OMENU=null,OMENU_BTN=null;
 
 // ── the words on a card ──
 function statusOf(s){
@@ -445,6 +588,7 @@ function cardHtml(s,i){
     <div class="sbody">
       <div class="shead"><h2 class="sname">${META.can_open?`<a href="${esc(homeOf(s))}">${esc(s.name||'(unnamed)')}</a>`:esc(s.name||'(unnamed)')}</h2>${menuBtnHtml(s)}</div>
       <div class="saddr">${addr}</div>
+      <div class="stags" data-tags="${esc(s.site_id)}"${tagsHtml(s)?'':' hidden'}>${tagsHtml(s)}</div>
       <div class="sline warn" data-why="${esc(s.site_id)}"${st.why?'':' hidden'}>${st.why?`<a href="${esc(st.href)}">Needs you: ${esc(st.why)}</a>`:''}</div>
       <div class="sline" data-tools="${esc(s.site_id)}" hidden></div>
       ${s.state==='not_live'?`<div class="launch"><b>Not published yet</b>${s.unpublished_changes?'There is work on it. Open Website to finish and publish.':'Open Website to build and publish it.'}</div>`:''}
@@ -545,7 +689,7 @@ const COLS=[
   ['plan','Plan',(s)=>String((s.plan&&s.plan.words)||'').toLowerCase()],
   ['people','People',(s)=>(s.team||[]).filter(t=>t.side==='client').length],
   ['updated','Last updated',(s)=>s.updated_at||''],
-  ['tags','Tags',(s)=>(s.tags||[]).join(',').toLowerCase()],
+  ['tags','Tags',(s)=>(((folderOf(s.site_id)||{}).name||'~')+'|'+(s.tags||[]).join(',')).toLowerCase()],   // item 176
 ];
 const DROP_SORT=['drop','Biggest drop first',(s)=>dropOf(s)];
 function avatars(team){
@@ -561,9 +705,12 @@ function peopleCell(s){
   return META.can_people?`<button type="button" class="lnk" data-people="${esc(s.site_id)}" aria-label="People on ${esc(s.name||'this site')}">${n?n+(n===1?' person':' people'):'Only your studio'}</button>`:esc(n?n+(n===1?' person':' people'):'Only your studio');
 }
 function tableHtml(list){
+  const pick=ORG.read&&ORG.can_change;   // item 176: tick boxes, to move or tag several at once
   const cap=NUM_HEAD?`<div class="tcap"><span>${esc(NUM_HEAD.month_label)}, compared with ${esc(NUM_HEAD.prior_label)}. A drop is red.</span><button type="button" class="lnk" data-sort="drop" aria-pressed="${SORT&&SORT.key==='drop'?'true':'false'}">Biggest drop first</button></div>`:'';
-  const ths=COLS.map(([k,label])=>{const on=SORT&&SORT.key===k;return `<th scope="col"${['owner','plan','people','updated','tags'].includes(k)?' class="wide"':''}${on?` aria-sort="${SORT.dir>0?'ascending':'descending'}"`:''}><button type="button" class="thb" data-sort="${k}">${esc(label)}${on?`<span class="arrow" aria-hidden="true">${SORT.dir>0?'▲':'▼'}</span>`:''}</button></th>`;}).join('')+'<th scope="col" class="acts"><span class="sr-only">Actions</span></th>';
-  const trs=list.map(s=>{const st=statusOf(s);return `<tr${META.can_open?` data-row="${esc(s.site_id)}" tabindex="0" aria-label="Open ${esc(s.name||'(unnamed)')}’s website"`:''}>
+  const allOn=pick&&list.length&&list.every(s=>PICKED.has(s.site_id));
+  const ths=(pick?`<th scope="col" class="pick"><label class="pk"><input type="checkbox" id="pickAll" aria-label="Pick every site shown"${allOn?' checked':''}><span class="pkw" aria-hidden="true">All</span></label></th>`:'')+COLS.map(([k,label])=>{const on=SORT&&SORT.key===k;if(k==='tags'&&ORG.read&&ORG.folders.length)label='Folder · Tags';return `<th scope="col"${['owner','plan','people','updated','tags'].includes(k)?' class="wide"':''}${on?` aria-sort="${SORT.dir>0?'ascending':'descending'}"`:''}><button type="button" class="thb" data-sort="${k}">${esc(label)}${on?`<span class="arrow" aria-hidden="true">${SORT.dir>0?'▲':'▼'}</span>`:''}</button></th>`;}).join('')+'<th scope="col" class="acts"><span class="sr-only">Actions</span></th>';
+  const trs=list.map(s=>{const st=statusOf(s);const on=PICKED.has(s.site_id);return `<tr${META.can_open?` data-row="${esc(s.site_id)}" tabindex="0" aria-label="Open ${esc(s.name||'(unnamed)')}’s website"`:''}${on?' class="picked"':''}>
+    ${pick?`<td class="pick"><label class="pk"><input type="checkbox" data-pick="${esc(s.site_id)}" aria-label="${esc('Pick '+(s.name||'this site'))}"${on?' checked':''}></label></td>`:''}
     <td class="name"><span class="n">${s.pinned?'<span aria-label="Pinned" title="Pinned">📌 </span>':''}${esc(s.name||'(unnamed)')}</span><div class="sub">${esc(s.domain||hostOf(s.address)||'No address yet')} · <span class="pill ${st.cls}">${esc(st.w)}</span>${s.no_owner?' · No owner yet':''}</div></td>
     <td class="wide">${ownerCell(s)}</td>
     <td class="num" data-label="Health"><div class="nv">${healthCell(s)}</div></td>
@@ -572,11 +719,11 @@ function tableHtml(list){
     <td class="wide">${esc((s.plan&&s.plan.words)||'')}</td>
     <td class="wide">${peopleCell(s)}</td>
     <td class="when wide">${s.updated_at?esc(day(s.updated_at)):'—'}</td>
-    <td class="wide">${(s.tags||[]).map(t=>`<span class="tagchip">${esc(t)}</span>`).join('')||'<span class="muted">—</span>'}</td>
+    <td class="wide">${(()=>{const f=ORG.read?folderOf(s.site_id):null;return (f?`<div class="fline">${folderSvg(FCOLOR[f.color]||FCOLOR.violet)}${esc(f.name)}</div>`:'')+((s.tags||[]).map(t=>`<span class="tagchip">${esc(t)}</span>`).join('')||(f?'':'<span class="muted">—</span>'));})()}</td>
     <td class="acts">${menuBtnHtml(s)}</td></tr>`;}).join('');
   // item 53: the studio's role is the same on every site, so the table says it once
   const role=list.length?`<div class="trole"><span>You are <b>${esc(META.studio_role||'Website manager')}</b> on ${list.length===1?'this site':'all '+list.length+' sites'}. Each business owns its own site.</span></div>`:'';
-  return `<div class="tscroll">${role}${cap}<table aria-label="Sites"><thead><tr>${ths}</tr></thead><tbody>${trs}</tbody></table></div>`;
+  return `${pick&&PICKED.size?pickBarHtml():''}<div class="tscroll">${role}${cap}<table aria-label="Sites"><thead><tr>${ths}</tr></thead><tbody>${trs}</tbody></table></div>`;
 }
 
 // ── the filters (the band's numbers and the pills share them) and the search ──
@@ -591,8 +738,8 @@ const FILTERS={
   domains:{label:'Domain renews soon',test:(s)=>{const d=domainDays(s);return d!=null&&d<=30;}},
   drops:{label:'Dropped this month',test:(s)=>dropOf(s)<0},   // items 129 and 180
 };
-const countOf=(k)=>SITES.filter(FILTERS[k].test).length;
-const matches=(s)=>{if(!FILTERS[FILTER].test(s))return false;const q=Q.trim().toLowerCase();if(!q)return true;return [s.name,s.domain,hostOf(s.address),(s.tags||[]).join(' '),(s.team||[]).map(t=>t.who).join(' ')].some(x=>String(x||'').toLowerCase().includes(q));};
+const countOf=(k)=>scopedSites().filter(FILTERS[k].test).length;   // item 176: the counts are the folder's
+const matches=(s)=>{if(!inFolder(s)||(TAG&&!(s.tags||[]).includes(TAG)))return false;if(!FILTERS[FILTER].test(s))return false;const q=Q.trim().toLowerCase();if(!q)return true;return [s.name,s.domain,hostOf(s.address),(s.tags||[]).join(' '),(s.team||[]).map(t=>t.who).join(' ')].some(x=>String(x||'').toLowerCase().includes(q));};
 // the server's order (pinned in pin order, then last opened, then name), or a column's
 function ordered(){
   const list=SITES.slice();
@@ -619,13 +766,15 @@ function headHtml(shown){
 }
 // the band: the facts the server already knows, across every site; each number filters the cards
 function bandHtml(){
-  const n=SITES.length,live=countOf('live'),needs=countOf('needs'),changes=countOf('changes'),doms=countOf('domains');
-  const soon=SITES.filter(FILTERS.domains.test).map(s=>({s,d:domainDays(s)})).sort((a,b)=>a.d-b.d)[0];
-  const down=SITES.filter(s=>s.state==='down'||s.state==='offline').length;
+  const list=scopedSites();   // item 176: inside a folder the band counts that folder
+  const n=list.length,live=countOf('live'),needs=countOf('needs'),changes=countOf('changes'),doms=countOf('domains');
+  const soon=list.filter(FILTERS.domains.test).map(s=>({s,d:domainDays(s)})).sort((a,b)=>a.d-b.d)[0];
+  const down=list.filter(s=>s.state==='down'||s.state==='offline').length;
+  const lead=FOLDER===''?['Across your sites',`${n} site${n===1?'':'s'} you look after`]:FOLDER==='none'?['Not in a folder',`${n} site${n===1?'':'s'} in no folder`]:['In this folder',`${n} site${n===1?'':'s'} in ${folderName()}`];
   const sub=[`${live} live`,needs?`${needs} need${needs===1?'s':''} you`:'nothing needs you',down?`${down} not answering`:(live?'all answering':'')].filter(Boolean).join(' · ');
   const kpi=(k,label,value,note,cls)=>`<button type="button" class="kpi${cls?' '+cls:''}" data-filter="${k}" aria-pressed="${FILTER===k?'true':'false'}"><span class="l">${esc(label)}</span><span class="v">${esc(value)}</span><span class="n">${esc(note)}</span></button>`;
-  return `<section class="sband" aria-label="Across your sites">
-    <div class="lead"><span class="eyebrow">Across your sites</span><h2 class="hi">${n} site${n===1?'':'s'} you look after</h2><span class="hsub">${esc(sub)}</span></div>
+  return `<section class="sband" aria-label="${esc(lead[0])}">
+    <div class="lead"><span class="eyebrow">${esc(lead[0])}</span><h2 class="hi">${esc(lead[1])}</h2><span class="hsub">${esc(sub)}</span></div>
     ${kpi('live','Live',String(live),`of ${n} site${n===1?'':'s'}`,live&&!down?'ok':'')}
     ${kpi('needs','Needs you',String(needs),needs?'from Home’s own list':'nothing waiting')}
     ${kpi('changes','Changes waiting',String(changes),changes?'to be published':'everything published')}
@@ -652,7 +801,7 @@ function setFilter(k){if(!FILTERS[k])return;FILTER=FILTER===k&&k!=='all'?'all':k
 function lmetaText(shown){
   const m=Math.floor((Date.now()-LOADED_AT)/60000);
   const sorted=SORT?(SORT.key==='drop'?'Biggest drop first':`Sorted by ${(COLS.find(c=>c[0]===SORT.key)||COLS[0])[1]}`):'Pinned first, then the ones you opened last';
-  return `${shown} site${shown===1?'':'s'} · ${esc(sorted)} · ${m<1?'Updated just now':'Updated '+m+' min ago'}`;
+  return `${shown} site${shown===1?'':'s'}${FOLDER==='none'?' in no folder':FOLDER?' in '+esc(folderName()):''}${TAG?' tagged '+esc(TAG):''} · ${esc(sorted)} · ${m<1?'Updated just now':'Updated '+m+' min ago'}`;
 }
 
 // render: the frame (header, search, the two views) once per load; after that
@@ -666,9 +815,10 @@ function render(){
   if(!SITES.length){
     h+=`<div class="center"><p class="muted">No client sites yet.</p>${META.can_create?'<p style="margin-top:14px"><button type="button" class="btn" id="newSiteEmpty">+ New site</button></p><p class="muted" style="margin-top:10px;font-size:13px">Build it in private, then invite the owner when it’s ready.</p>':''}</div>`;
   }else{
-    h+=bandHtml();
+    h+=`<div id="stripHost">${stripHtml()}</div>`;   // item 176: the folders, under the tabs
+    h+=`<div id="bandHost">${bandHtml()}</div>`;
     h+=`<div id="needsHost">${needsHtml()}</div>`;
-    h+=`<div class="frow"><div id="fpills" style="display:contents">${pillsHtml()}</div>${searchHtml}</div>`;
+    h+=`<div class="frow"><span id="viewHost" style="display:contents">${viewRowHtml()}</span><div id="fpills" style="display:contents">${pillsHtml()}</div><span id="tagHost" style="display:contents">${tagBtnHtml()}</span>${searchHtml}</div>`;
     h+=`<div class="grid" id="grid"${DISPLAY==='cards'?'':' hidden'}>${SITES.map(cardHtml).join('')}</div>`;
     h+=`<div id="tableHost"${DISPLAY==='table'?'':' hidden'}></div>`;
     h+=`<div class="center" id="noMatch" hidden><p class="muted">No sites match that.</p></div>`;
@@ -679,7 +829,10 @@ function render(){
   applyView();
 }
 function applyView(){
+  if(CURVIEW){const v=ORG.views.find(x=>x.id===CURVIEW);if(!v||!sameAsNow(v))CURVIEW='';}   // item 176: a saved view is on while nothing has changed
+  paintViewRow();
   const list=ordered(),shown=list.filter(matches);
+  for(const id of [...PICKED])if(!shown.some(s=>s.site_id===id))PICKED.delete(id);   // a picked site that left the view is let go
   const grid=$('grid');
   if(grid){
     list.forEach((s,i)=>{const c=grid.querySelector('[data-site="'+CSS.escape(s.site_id)+'"]');if(c){c.style.order=String(i);c.hidden=!matches(s);}});
@@ -687,7 +840,7 @@ function applyView(){
   }
   const th=$('tableHost');
   if(th&&DISPLAY==='table'){th.innerHTML=tableHtml(shown);wireTable();}
-  const nm=$('noMatch');if(nm){nm.hidden=!(SITES.length&&!shown.length);nm.innerHTML=FILTER==='all'?'<p class="muted">No sites match that.</p>':`<p class="muted">No sites under “${esc(FILTERS[FILTER].label)}”${Q.trim()?' match that':''}.</p><p style="margin-top:10px"><button type="button" class="fpill" data-filter="all">Show all sites</button></p>`;}
+  const nm=$('noMatch');if(nm){nm.hidden=!(SITES.length&&!shown.length);nm.innerHTML=FOLDER==='none'&&!scopedSites().length?'<p class="muted">Every site is in a folder.</p>':FOLDER&&!scopedSites().length?`<p class="muted">No sites in ${esc(folderName())} yet.${ORG.can_change?' Move one here from its ⋯ menu.':''}</p>`:TAG&&FILTER==='all'?`<p class="muted">No sites here are tagged “${esc(TAG)}”.</p><p style="margin-top:10px"><button type="button" class="fpill" data-tagpick="${esc(TAG)}">Any tag</button></p>`:FILTER==='all'?'<p class="muted">No sites match that.</p>':`<p class="muted">No sites under “${esc(FILTERS[FILTER].label)}”${Q.trim()?' match that':''}.</p><p style="margin-top:10px"><button type="button" class="fpill" data-filter="all">Show all sites</button></p>`;}
   if(th)th.hidden=DISPLAY!=='table'||!shown.length;
   const lm=$('lmeta');if(lm)lm.innerHTML=lmetaText(shown.length);
   paintMenu();
@@ -695,7 +848,18 @@ function applyView(){
 function wireFrame(){
   const s=$('search');if(s)s.addEventListener('input',()=>{Q=s.value;MENU_OPEN=null;applyView();});
   // bug hunt A1: #main outlives every render, so its listener is added ONCE; one per load piled up and a click toggled the filter on and straight off
-  const mn=$('main');if(mn&&!mn.dataset.filterWired){mn.dataset.filterWired='1';mn.addEventListener('click',(e)=>{const f=e.target.closest('[data-filter]');if(f){setFilter(f.getAttribute('data-filter'));}});}
+  const mn=$('main');if(mn&&!mn.dataset.filterWired){mn.dataset.filterWired='1';mn.addEventListener('click',(e)=>{const f=e.target.closest('[data-filter]');if(f){setFilter(f.getAttribute('data-filter'));return;}
+    // item 176: folders, tags and saved views
+    const ft=e.target.closest('[data-ftile]');if(ft){e.stopPropagation();setFolder(ft.getAttribute('data-ftile'));return;}
+    const tp=e.target.closest('[data-tagpick]');if(tp){e.stopPropagation();setTag(tp.getAttribute('data-tagpick'));return;}
+    const te=e.target.closest('[data-tagedit]');if(te){e.stopPropagation();openTagDlg(te.getAttribute('data-tagedit'),te);return;}
+    const nf=e.target.closest('#newFolderBtn');if(nf){e.stopPropagation();newFolder(nf);return;}
+    if(e.target.closest('#manageFolders')){e.stopPropagation();openManageFolders();return;}
+    const vb=e.target.closest('#viewBtn');if(vb){e.stopPropagation();toggleViewMenu(vb);return;}
+    if(e.target.closest('#saveViewBtn')){e.stopPropagation();openSaveView();return;}
+    const tb=e.target.closest('#tagBtn');if(tb){e.stopPropagation();toggleTagMenu(tb);return;}
+    const bk=e.target.closest('[data-bulk]');if(bk){e.stopPropagation();bulk(bk.getAttribute('data-bulk'),bk);}});
+    mn.addEventListener('change',onPick);}
   const dc=$('dispCards'),dt=$('dispTable');
   const setD=(v)=>{if(DISPLAY===v)return;DISPLAY=v;try{localStorage.setItem(DISPLAY_KEY,v);}catch(_){/* */}
     $('dispCards').setAttribute('aria-pressed',v==='cards'?'true':'false');$('dispTable').setAttribute('aria-pressed',v==='table'?'true':'false');
@@ -723,12 +887,345 @@ function wireTable(){
   }));
   document.querySelectorAll('#tableHost [data-people]').forEach(b=>b.addEventListener('click',(e)=>{e.stopPropagation();openPeople(b.getAttribute('data-people'),'people');}));
   document.querySelectorAll('#tableHost tr[data-row]').forEach(tr=>{
-    const go=(e)=>{if(e.target.closest('button,a'))return;location.href=scoped('/presence.html',tr.getAttribute('data-row'));};
+    const go=(e)=>{if(e.target.closest('button,a,input,label,td.pick'))return;location.href=scoped('/presence.html',tr.getAttribute('data-row'));};   // item 176: a tick box is not a way in
     tr.addEventListener('click',go);
-    tr.addEventListener('keydown',(e)=>{if((e.key==='Enter'||e.key===' ')&&!e.target.closest('button,a')){e.preventDefault();go(e);}});
+    tr.addEventListener('keydown',(e)=>{if((e.key==='Enter'||e.key===' ')&&!e.target.closest('button,a,input')){e.preventDefault();go(e);}});
   });
   document.querySelectorAll('#tableHost [data-menu]').forEach(b=>b.addEventListener('click',(e)=>{e.stopPropagation();toggleMenu(b.getAttribute('data-menu'));}));
 }
+
+// ── builder list item 176: folders, tags and saved views ──
+const KIT=()=>window.ddsListKit||null;
+const FCOLOR={violet:'#6d3fd4',amber:'#b86a00',teal:'#127e8a',green:'#2f7d4f',rose:'#c2416b',blue:'#2a6fb5',slate:'#5f6577'};
+const FCOLOR_WORDS={violet:'Purple',amber:'Amber',teal:'Teal',green:'Green',rose:'Rose',blue:'Blue',slate:'Grey'};
+const NOFOLDER='#8a8796';
+const folderSvg=(c)=>`<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M3 7a2 2 0 0 1 2-2h4.2l2 2H19a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z" fill="${c}"/></svg>`;
+const GRID_SVG='<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="3" y="3" width="8" height="8" rx="2" fill="currentColor"/><rect x="13" y="3" width="8" height="8" rx="2" fill="currentColor"/><rect x="3" y="13" width="8" height="8" rx="2" fill="currentColor"/><rect x="13" y="13" width="8" height="8" rx="2" fill="currentColor"/></svg>';
+const PLUS_SVG='<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" fill="none"/></svg>';
+const folderById=(id)=>ORG.folders.find(f=>f.id===id)||null;
+const folderOf=(siteId)=>ORG.folders.find(f=>(f.sites||[]).includes(siteId))||null;
+const inFolder=(s)=>FOLDER===''?true:FOLDER==='none'?!folderOf(s.site_id):!!(folderById(FOLDER)&&folderById(FOLDER).sites.includes(s.site_id));
+const scopedSites=()=>SITES.filter(inFolder);
+const folderName=()=>FOLDER==='none'?'No folder':(folderById(FOLDER)||{name:''}).name;
+function tagsInUse(){const m=new Map();for(const x of SITES)for(const t of (x.tags||[]))m.set(t,(m.get(t)||0)+1);return [...m.entries()].sort((a,b)=>b[1]-a[1]||a[0].localeCompare(b[0]));}
+const sameSort=(a,b)=>(!a&&!b)||(!!a&&!!b&&a.key===b.key&&a.dir===b.dir);
+const sameAsNow=(v)=>v.folder===FOLDER&&v.tag===TAG&&v.filter===FILTER&&v.q===Q.trim()&&sameSort(v.sort,SORT)&&v.display===DISPLAY;
+// the folders across the top: every site, each folder (its sites, and how many need you), no folder, a new one
+function stripHtml(){
+  if(!ORG.read||(!ORG.folders.length&&!ORG.can_change))return '';
+  const many=(n)=>n+' site'+(n===1?'':'s');
+  const tile=(key,name,sub,glyph,bg)=>`<button type="button" class="ftile" data-ftile="${esc(key)}" aria-pressed="${FOLDER===key?'true':'false'}"><span class="fg" style="background:${bg}">${glyph}</span><span class="fw"><b>${esc(name)}</b><span>${esc(sub)}</span></span></button>`;
+  let h=tile('','All sites',many(SITES.length),`<span style="color:var(--ink);display:grid">${GRID_SVG}</span>`,'var(--bg)');
+  for(const f of ORG.folders){
+    const list=SITES.filter(x=>f.sites.includes(x.site_id)),nd=list.filter(x=>NEXT[x.site_id]).length,c=FCOLOR[f.color]||FCOLOR.violet;
+    h+=tile(f.id,f.name,many(list.length)+(nd?' · '+nd+' need'+(nd===1?'s':'')+' you':''),folderSvg(c),`color-mix(in srgb,${c} 14%,transparent)`);
+  }
+  if(ORG.folders.length)h+=tile('none','No folder',many(SITES.filter(x=>!folderOf(x.site_id)).length),folderSvg(NOFOLDER),`color-mix(in srgb,${NOFOLDER} 14%,transparent)`);
+  if(ORG.can_change)h+=`<button type="button" class="ftile add" id="newFolderBtn"><span class="fg">${PLUS_SVG}</span><span class="fw"><b>New folder</b></span></button>`;
+  if(ORG.can_change&&ORG.folders.length)h+=`<button type="button" class="fmanage" id="manageFolders">Rename or remove…</button>`;
+  return `<div class="fstrip" role="group" aria-label="Folders">${h}</div>`;
+}
+// the View picker and Save view, first on the filter row; the Tag picker before the search
+function viewRowHtml(){
+  if(!ORG.read)return '';
+  const v=ORG.views.find(x=>x.id===CURVIEW);
+  return `<button type="button" class="vbtn${v?' on':''}" id="viewBtn" aria-haspopup="menu" aria-expanded="${OMENU==='view'?'true':'false'}"><span aria-hidden="true">☰</span><span class="pre">View:</span><span class="vname">${esc(v?v.name:'Everything')}</span><span class="car" aria-hidden="true">▾</span></button>`
+    +(ORG.can_change?'<button type="button" class="vbtn save" id="saveViewBtn"><span aria-hidden="true">☆</span>Save view</button>':'')
+    +'<span class="vdiv" aria-hidden="true"></span>';
+}
+function tagBtnHtml(){
+  if(!tagsInUse().length&&!TAG)return '';
+  return `<button type="button" class="vbtn${TAG?' on':''}" id="tagBtn" aria-haspopup="menu" aria-expanded="${OMENU==='tag'?'true':'false'}"><span aria-hidden="true">#</span><span class="vname">${esc(TAG||'Any tag')}</span><span class="car" aria-hidden="true">▾</span></button>`;
+}
+// a card's line under its address: its folder (on All sites), its tags, and + Tag
+function tagsHtml(x){
+  const f=ORG.read&&FOLDER===''?folderOf(x.site_id):null;
+  return (f?`<button type="button" class="fchip" data-ftile="${esc(f.id)}" aria-label="${esc('In '+f.name+': show that folder')}">${folderSvg(FCOLOR[f.color]||FCOLOR.violet)}${esc(f.name)}</button>`:'')
+    +(x.tags||[]).map(t=>`<button type="button" class="tagchip" data-tagpick="${esc(t)}" aria-label="${esc('Tagged '+t+': show every site with it')}">${esc(t)}</button>`).join('')
+    +(ORG.read&&ORG.can_change?`<button type="button" class="addtag" data-tagedit="${esc(x.site_id)}" aria-label="${esc('Tags for '+(x.name||'this site'))}">+ Tag</button>`:'');
+}
+function paintTags(){
+  document.querySelectorAll('[data-tags]').forEach(el=>{const x=SITES.find(y=>y.site_id===el.getAttribute('data-tags'));if(!x)return;const h=tagsHtml(x);el.innerHTML=h;el.hidden=!h;});
+}
+function paintViewRow(){
+  const a=document.activeElement,had=a&&/^(viewBtn|saveViewBtn|tagBtn)$/.test(a.id)?a.id:'';
+  const vh=$('viewHost');if(vh){const h=viewRowHtml();if(vh.innerHTML!==h)vh.innerHTML=h;}
+  const th=$('tagHost');if(th){const h=tagBtnHtml();if(th.innerHTML!==h)th.innerHTML=h;}
+  if(had&&document.activeElement!==$(had)){const n=$(had);if(n)n.focus();}
+}
+// everything the folder changes: the tiles, the band, the pills, the cards' lines
+// the tiles again, keeping the one in focus in focus (their counts change under it)
+function paintStrip(){
+  const sh=$('stripHost');if(!sh)return;
+  const a=document.activeElement,k=a&&sh.contains(a)?(a.getAttribute('data-ftile')??a.id):null;
+  sh.innerHTML=stripHtml();
+  if(k!==null){const n=sh.querySelector(k&&/^(newFolderBtn|manageFolders)$/.test(k)?'#'+k:'[data-ftile="'+CSS.escape(k)+'"]');if(n)n.focus();}
+}
+function paintOrg(){
+  paintStrip();
+  const bh=$('bandHost');if(bh)bh.innerHTML=bandHtml();
+  paintFilters();paintTags();paintViewRow();
+}
+function setFolder(k){
+  if(k&&k!=='none'&&!folderById(k))k='';
+  FOLDER=k;try{localStorage.setItem(FOLDER_KEY,k);}catch(_){/* storage may be denied */}
+  MENU_OPEN=null;closeOrgMenu(false);paintOrg();applyView();
+  const t=document.querySelector('[data-ftile="'+CSS.escape(k)+'"].ftile');if(t)t.focus();
+}
+function setTag(t){TAG=TAG===t?'':t;closeOrgMenu(false);paintViewRow();applyView();}
+function applySavedView(v){
+  FOLDER=v.folder&&(v.folder==='none'||folderById(v.folder))?v.folder:'';try{localStorage.setItem(FOLDER_KEY,FOLDER);}catch(_){/* */}
+  TAG=v.tag||'';FILTER=FILTERS[v.filter]?v.filter:'all';Q=v.q||'';SORT=v.sort||null;
+  const se=$('search');if(se)se.value=Q;
+  if(v.display!==DISPLAY){DISPLAY=v.display;try{localStorage.setItem(DISPLAY_KEY,DISPLAY);}catch(_){/* */}
+    const dc=$('dispCards'),dt=$('dispTable');if(dc)dc.setAttribute('aria-pressed',DISPLAY==='cards'?'true':'false');if(dt)dt.setAttribute('aria-pressed',DISPLAY==='table'?'true':'false');
+    const g=$('grid');if(g)g.hidden=DISPLAY!=='cards';}
+  CURVIEW=v.id;MENU_OPEN=null;paintOrg();applyView();
+}
+// the small menus (views, tags, a tag to take off): under their button, one at a time
+function closeOrgMenu(focus){
+  if(!OMENU)return;const b=OMENU_BTN;OMENU=null;OMENU_BTN=null;$('orgMenuHost').innerHTML='';
+  if(b&&b.isConnected){b.setAttribute('aria-expanded','false');if(focus)b.focus();}
+}
+function openOrgMenu(kind,btn,html,wire){
+  if(OMENU===kind){closeOrgMenu(true);return;}
+  closeOrgMenu(false);MENU_OPEN=null;paintMenu();
+  OMENU=kind;OMENU_BTN=btn;const host=$('orgMenuHost');host.innerHTML=html;const m=host.firstElementChild;
+  const r=btn.getBoundingClientRect();
+  const bar=document.getElementById('dds-mbar'),br=bar?bar.getBoundingClientRect():null,barTop=br&&br.height>0&&br.top>0?br.top:window.innerHeight;
+  const below=r.bottom+4+m.offsetHeight<=Math.min(window.innerHeight,barTop)-8;
+  m.style.top=(below?r.bottom+4:Math.max(8,r.top-4-m.offsetHeight))+'px';
+  m.style.left=Math.max(8,Math.min(window.innerWidth-m.offsetWidth-8,r.left))+'px';
+  btn.setAttribute('aria-expanded','true');
+  m.addEventListener('click',(e)=>e.stopPropagation());
+  m.addEventListener('keydown',(e)=>{
+    if(e.key==='Escape'){e.stopPropagation();closeOrgMenu(true);return;}
+    const items=[...m.querySelectorAll('[role^="menuitem"]')],i=items.indexOf(document.activeElement);
+    if(e.key==='ArrowDown'||e.key==='ArrowUp'){e.preventDefault();const n=items[(i+(e.key==='ArrowDown'?1:-1)+items.length)%items.length];if(n)n.focus();}
+  });
+  wire(m);
+  const first=m.querySelector('[aria-checked="true"]')||m.querySelector('[role^="menuitem"]');if(first)first.focus();
+}
+function toggleViewMenu(btn){
+  const v=ORG.views.find(x=>x.id===CURVIEW);
+  const html=`<div class="rowmenu" role="menu" aria-label="Saved views"><div class="hd" role="presentation">Views</div>
+    <button type="button" role="menuitemradio" data-vpick="" aria-checked="${v?'false':'true'}">Everything</button>
+    ${ORG.views.map(x=>`<button type="button" role="menuitemradio" data-vpick="${esc(x.id)}" aria-checked="${v&&v.id===x.id?'true':'false'}">${esc(x.name)}</button>`).join('')}
+    ${ORG.can_change?`<div class="sep" role="presentation"></div><button type="button" role="menuitem" class="vsave" data-vsave="1">Save this view…</button>${ORG.views.length?'<button type="button" role="menuitem" class="soft" data-vmanage="1">Rename or delete a view…</button>':''}`:''}</div>`;
+  openOrgMenu('view',btn,html,(m)=>{
+    m.querySelectorAll('[data-vpick]').forEach(b=>b.addEventListener('click',()=>{
+      const id=b.getAttribute('data-vpick');closeOrgMenu(false);
+      if(!id){FOLDER='';try{localStorage.setItem(FOLDER_KEY,'');}catch(_){/* */}TAG='';FILTER='all';Q='';SORT=null;CURVIEW='';const se=$('search');if(se)se.value='';paintOrg();applyView();}
+      else{const x=ORG.views.find(y=>y.id===id);if(x)applySavedView(x);}
+      const nb=$('viewBtn');if(nb)nb.focus();
+    }));
+    const sv=m.querySelector('[data-vsave]');if(sv)sv.addEventListener('click',()=>{closeOrgMenu(false);openSaveView();});
+    const mv=m.querySelector('[data-vmanage]');if(mv)mv.addEventListener('click',()=>{closeOrgMenu(false);openManageViews();});
+  });
+}
+function toggleTagMenu(btn){
+  const html=`<div class="rowmenu" role="menu" aria-label="Tags"><button type="button" role="menuitemradio" data-tpick="" aria-checked="${TAG?'false':'true'}">Any tag</button>
+    ${tagsInUse().map(([t,n])=>`<button type="button" role="menuitemradio" data-tpick="${esc(t)}" aria-checked="${TAG===t?'true':'false'}">${esc(t)} <span class="soft">· ${n}</span></button>`).join('')}</div>`;
+  openOrgMenu('tag',btn,html,(m)=>m.querySelectorAll('[data-tpick]').forEach(b=>b.addEventListener('click',()=>{const t=b.getAttribute('data-tpick');TAG=t;closeOrgMenu(false);paintViewRow();applyView();const nb=$('tagBtn');if(nb)nb.focus();})));
+}
+// a dialog's Cancel, Escape and the way back to where it was opened from. A save can paint
+// that button again (a card's tags, the table), so a button gone is found again by what it is for
+function dlgBack(d,back){
+  const at=back&&back.getAttribute?['data-menu','data-tagedit','data-bulk'].find(a=>back.hasAttribute(a)):null;
+  const key=at?'['+at+'="'+CSS.escape(back.getAttribute(at))+'"]':back&&back.id?'#'+CSS.escape(back.id):'';
+  d.addEventListener('close',()=>{
+    let b=back&&back.isConnected?back:null;
+    if(!b&&key)b=[...document.querySelectorAll(key)].find(x=>x.getClientRects().length)||null;
+    if(!b&&at==='data-bulk')b=$('pickAll');   // the picked sites left the view, and the bar with them
+    if(b)b.focus();
+  },{once:true});
+}
+async function saveFolders(next){
+  const r=await apiSend('PUT','/agency/sites/folders',{folders:next});
+  if(!r.ok){toast((r.body&&r.body.message)||'That didn’t save. Nothing changed; try again.',true);return null;}
+  ORG.folders=(r.body.data&&r.body.data.folders)||ORG.folders;return ORG.folders;
+}
+// + New folder: a name, then it's there, empty, ready for sites
+async function newFolder(btn){
+  const k=KIT();if(!k||ORG_BUSY)return;
+  const name=await k.ask({title:'New folder',label:'Folder name',ok:'Make folder',back:btn});
+  if(!name)return;
+  ORG_BUSY=true;const got=await saveFolders(ORG.folders.map(f=>({id:f.id,name:f.name,color:f.color})).concat([{name}]));ORG_BUSY=false;
+  if(!got)return;
+  const made=ORG.folders.find(f=>f.name.toLowerCase()===name.trim().toLowerCase());
+  toast(`“${name.trim()}” is made. Move sites into it from their ⋯ menu, or tick them in the table.`);
+  if(made)setFolder(made.id);else paintOrg();
+}
+// Move to folder: one site from its ⋯ menu, or the sites ticked in the table
+let MOVE_IDS=[],MOVE_BACK=null;
+function openFolderDlg(ids,back){
+  if(!ORG.read)return;
+  MOVE_IDS=ids.slice();MOVE_BACK=back||document.activeElement;
+  const one=ids.length===1?SITES.find(x=>x.site_id===ids[0]):null,cur=one?folderOf(one.site_id):null;
+  $('folderHead').textContent=one?'Move '+(one.name||'this site')+' to':'Move '+ids.length+' sites to';
+  const opt=(id,name,c,on)=>`<label class="fopt"><input type="radio" name="fold" value="${esc(id)}"${on?' checked':''}><span class="fg">${folderSvg(c)}</span><span>${esc(name)}</span>${on&&one?' <span class="now">now</span>':''}</label>`;
+  $('folderOpts').innerHTML=ORG.folders.map(f=>opt(f.id,f.name,FCOLOR[f.color]||FCOLOR.violet,cur&&cur.id===f.id)).join('')+opt('none','No folder',NOFOLDER,!!one&&!cur);
+  $('folder-new').value='';$('folder-go').disabled=false;
+  const d=$('folderDlg');dlgBack(d,MOVE_BACK);d.showModal();
+  const f=$('folderOpts').querySelector('input:checked')||$('folderOpts').querySelector('input')||$('folder-new');if(f)f.focus();
+}
+async function submitMove(e){
+  e.preventDefault();if(ORG_BUSY)return;
+  const typed=$('folder-new').value.trim(),pick=($('folderOpts').querySelector('input:checked')||{}).value;
+  if(!typed&&!pick){toast('Pick a folder, or name a new one.',true);return;}
+  ORG_BUSY=true;$('folder-go').disabled=true;
+  let target=pick==='none'?null:pick;
+  if(typed){
+    const have=ORG.folders.find(f=>f.name.toLowerCase()===typed.toLowerCase());
+    if(have)target=have.id;
+    else{const got=await saveFolders(ORG.folders.map(f=>({id:f.id,name:f.name,color:f.color})).concat([{name:typed}]));if(!got){ORG_BUSY=false;$('folder-go').disabled=false;return;}target=(ORG.folders.find(f=>f.name.toLowerCase()===typed.toLowerCase())||{}).id||null;}
+  }
+  const r=await apiSend('POST','/agency/sites/folders/move',{site_ids:MOVE_IDS,folder:target});
+  ORG_BUSY=false;$('folder-go').disabled=false;
+  if(!r.ok){toast((r.body&&r.body.message)||'That didn’t move. Nothing changed; try again.',true);return;}
+  ORG.folders=(r.body.data&&r.body.data.folders)||ORG.folders;
+  const n=MOVE_IDS.length,where=target?(folderById(target)||{name:'the folder'}).name:'No folder';
+  $('folderDlg').close();
+  paintOrg();applyView();
+  toast((n===1?'Moved':n+' sites moved')+' to '+where+'.');
+}
+// one site's tags: chips with ✕, typed ones, and the ones the studio already uses
+let TAG_SITE=null,TAG_BOX=null;
+function openTagDlg(id,back){
+  const x=SITES.find(y=>y.site_id===id),k=KIT();if(!x||!k||!ORG.read)return;
+  TAG_SITE=id;$('tagHead').textContent='Tags for '+(x.name||'this site');
+  TAG_BOX=k.tagInput($('tagBox'),x.tags||[],{id:'tag-in',placeholder:'Add a tag…',label:'Tags'});
+  const sug=tagsInUse().map(([t])=>t).filter(t=>!(x.tags||[]).includes(t)).slice(0,8);
+  $('tagSug').innerHTML=sug.map(t=>`<button type="button" data-tsug="${esc(t)}">+ ${esc(t)}</button>`).join('');
+  $('tagSugWrap').hidden=!sug.length;$('tag-save').disabled=false;
+  const d=$('tagDlg');dlgBack(d,back||document.activeElement);d.showModal();$('tag-in').focus();
+}
+async function submitTags(e){
+  e.preventDefault();if(ORG_BUSY||!TAG_BOX)return;
+  const x=SITES.find(y=>y.site_id===TAG_SITE);if(!x)return;
+  const all=TAG_BOX.get(),tags=all.slice(0,10);
+  if(all.length>10){toast('Up to ten tags a site. Take '+(all.length-10)+' off, then save.',true);return;}
+  ORG_BUSY=true;$('tag-save').disabled=true;
+  const r=await apiSend('PATCH','/agency/clients/'+encodeURIComponent(TAG_SITE),{tags});
+  ORG_BUSY=false;$('tag-save').disabled=false;
+  if(!r.ok){toast((r.body&&r.body.message)||'The tags didn’t save. Nothing changed; try again.',true);return;}
+  x.tags=Array.isArray(r.body.data&&r.body.data.tags)?r.body.data.tags:tags;
+  $('tagDlg').close();
+  paintTags();paintViewRow();applyView();
+  toast(tags.length?'Tags saved.':'Tags taken off.');
+}
+// Save this view: what's on screen, named, for the whole studio
+function keepWords(){
+  const k=[];
+  if(FOLDER)k.push('Folder: '+folderName());
+  if(TAG)k.push('Tag: '+TAG);
+  if(FILTER!=='all')k.push(FILTERS[FILTER].label);
+  if(Q.trim())k.push('Search: “'+Q.trim()+'”');
+  if(SORT)k.push(SORT.key==='drop'?'Biggest drop first':'Sorted by '+(COLS.find(c=>c[0]===SORT.key)||COLS[0])[1]);
+  k.push(DISPLAY==='table'?'Table':'Cards');
+  return k;
+}
+function openSaveView(){
+  const v=ORG.views.find(x=>x.id===CURVIEW);
+  $('sv-name').value=v?v.name:'';
+  $('svKeeps').innerHTML=keepWords().map(w=>`<span class="keep">${esc(w)}</span>`).join('');
+  $('sv-save').disabled=false;
+  const d=$('svDlg');dlgBack(d,$('saveViewBtn')||$('viewBtn'));d.showModal();$('sv-name').focus();$('sv-name').select();
+}
+async function putViews(views){
+  const r=await apiSend('PUT','/agency/sites/views',{views});
+  if(!r.ok){toast((r.body&&r.body.message)||'Your view didn’t save. Try again.',true);return null;}
+  ORG.views=(r.body.data&&r.body.data.views)||ORG.views;return ORG.views;
+}
+async function submitSaveView(e){
+  e.preventDefault();if(ORG_BUSY)return;
+  const name=$('sv-name').value.trim();
+  if(!name){toast('Give the view a name.',true);$('sv-name').focus();return;}
+  const same=ORG.views.find(x=>x.name.toLowerCase()===name.toLowerCase());
+  const view={...(same?{id:same.id}:{}),name,folder:FOLDER,tag:TAG,filter:FILTER,q:Q.trim(),sort:SORT,display:DISPLAY};
+  ORG_BUSY=true;$('sv-save').disabled=true;
+  const got=await putViews(ORG.views.filter(x=>!same||x.id!==same.id).concat([view]));
+  ORG_BUSY=false;$('sv-save').disabled=false;
+  if(!got)return;
+  CURVIEW=(got.find(x=>x.name.toLowerCase()===name.toLowerCase())||{}).id||'';
+  $('svDlg').close();paintViewRow();
+  toast(same?'“'+name+'” is updated for your studio.':'“'+name+'” is saved. Everyone in your studio sees it in the View picker.');
+}
+// rename or delete saved views; rename, recolour, reorder or remove folders
+function openManageViews(){
+  $('mvRows').innerHTML=ORG.views.map((v,i)=>`<div class="mrow" data-mv="${esc(v.id)}"><label class="sr-only" for="mv-${i}">Name of view ${i+1}</label><input id="mv-${i}" maxlength="60" value="${esc(v.name)}"><button type="button" class="ib" data-mvdel="${esc(v.id)}" aria-label="${esc('Delete '+v.name)}">✕</button></div>`).join('');
+  $('mv-save').disabled=false;
+  const d=$('mvDlg');dlgBack(d,$('viewBtn'));d.showModal();const f=$('mvRows').querySelector('input');if(f)f.focus();
+}
+async function submitManageViews(e){
+  e.preventDefault();if(ORG_BUSY)return;
+  const rows=[...$('mvRows').querySelectorAll('[data-mv]')].filter(r=>!r.hidden);
+  const next=rows.map(r=>{const v=ORG.views.find(x=>x.id===r.getAttribute('data-mv'));return v?{...v,name:r.querySelector('input').value.trim()||v.name}:null;}).filter(Boolean);
+  ORG_BUSY=true;$('mv-save').disabled=true;const got=await putViews(next);ORG_BUSY=false;$('mv-save').disabled=false;
+  if(!got)return;
+  $('mvDlg').close();applyView();toast('Your saved views are updated.');
+}
+function mfRowHtml(f,i,n){
+  return `<div class="mrow" data-mf="${esc(f.id)}"><span class="fg" style="width:22px;height:22px;flex:0 0 auto">${folderSvg(FCOLOR[f.color]||FCOLOR.violet)}</span><label class="sr-only" for="mf-${i}">Name of folder ${i+1}</label><input id="mf-${i}" maxlength="40" value="${esc(f.name)}">
+    <label class="sr-only" for="mfc-${i}">Colour of folder ${i+1}</label><select id="mfc-${i}">${Object.keys(FCOLOR).map(c=>`<option value="${c}"${f.color===c?' selected':''}>${FCOLOR_WORDS[c]}</option>`).join('')}</select>
+    <button type="button" class="ib" data-mfup="${esc(f.id)}" aria-label="${esc('Move '+f.name+' up')}"${i===0?' disabled':''}>↑</button><button type="button" class="ib" data-mfdel="${esc(f.id)}" aria-label="${esc('Remove '+f.name)}">✕</button></div>`;
+}
+function openManageFolders(){
+  $('mfRows').innerHTML=ORG.folders.map((f,i)=>mfRowHtml(f,i)).join('');
+  $('mf-save').disabled=false;
+  const d=$('mfDlg');dlgBack(d,$('manageFolders'));d.showModal();const f=$('mfRows').querySelector('input');if(f)f.focus();
+}
+async function submitManageFolders(e){
+  e.preventDefault();if(ORG_BUSY)return;
+  const next=[...$('mfRows').querySelectorAll('[data-mf]')].map(r=>({id:r.getAttribute('data-mf'),name:r.querySelector('input').value.trim(),color:r.querySelector('select').value}));
+  if(next.some(f=>!f.name)){toast('Give each folder a name.',true);return;}
+  ORG_BUSY=true;$('mf-save').disabled=true;const got=await saveFolders(next);ORG_BUSY=false;$('mf-save').disabled=false;
+  if(!got)return;
+  if(FOLDER&&FOLDER!=='none'&&!folderById(FOLDER)){FOLDER='';try{localStorage.setItem(FOLDER_KEY,'');}catch(_){/* */}}
+  if(FOLDER==='none'&&!ORG.folders.length)FOLDER='';
+  $('mfDlg').close();paintOrg();applyView();toast('Your folders are saved.');
+}
+// the table's picked bar: move them, tag them, untag them
+function pickedTags(){const m=new Set();for(const id of PICKED){const x=SITES.find(y=>y.site_id===id);for(const t of ((x&&x.tags)||[]))m.add(t);}return [...m].sort();}
+function pickBarHtml(){
+  const n=PICKED.size;
+  return `<div class="pbar" role="region" aria-label="Picked sites"><b>${n} site${n===1?'':'s'} picked</b><button type="button" class="go" data-bulk="move">Move to folder</button><button type="button" data-bulk="addtag">Add a tag</button>${pickedTags().length?'<button type="button" data-bulk="rmtag" aria-haspopup="menu" aria-expanded="false">Remove a tag ▾</button>':''}<button type="button" data-bulk="clear">Clear</button></div>`;
+}
+async function bulkTag(body,words){
+  if(ORG_BUSY)return;ORG_BUSY=true;
+  const r=await apiSend('POST','/agency/sites/tags',{site_ids:[...PICKED],...body});
+  ORG_BUSY=false;
+  const done=(r.body&&r.body.data&&r.body.data.sites)||[];
+  for(const d of done){const x=SITES.find(y=>y.site_id===d.site_id);if(x)x.tags=d.tags;}
+  paintTags();paintViewRow();applyView();
+  if(!r.ok){toast((r.body&&r.body.message)||'That didn’t save. Try again.',true);return;}
+  toast(words);
+}
+async function bulk(kind,btn){
+  if(kind==='clear'){PICKED.clear();applyView();const pa=$('pickAll');if(pa)pa.focus();return;}
+  if(kind==='move'){openFolderDlg([...PICKED],btn);return;}
+  if(kind==='addtag'){
+    const k=KIT();if(!k)return;
+    const t=await k.ask({title:'Add a tag to '+PICKED.size+' site'+(PICKED.size===1?'':'s'),label:'Tag',ok:'Add tag',back:btn});
+    const tag=t&&k.cleanTag(t);if(!tag)return;
+    await bulkTag({add:tag},'“'+tag+'” is on '+PICKED.size+' site'+(PICKED.size===1?'':'s')+'.');return;
+  }
+  if(kind==='rmtag'){
+    const html=`<div class="rowmenu" role="menu" aria-label="Tag to take off">${pickedTags().map(t=>`<button type="button" role="menuitem" data-rmt="${esc(t)}">${esc(t)}</button>`).join('')}</div>`;
+    openOrgMenu('rmtag',btn,html,(m)=>m.querySelectorAll('[data-rmt]').forEach(b=>b.addEventListener('click',async()=>{const t=b.getAttribute('data-rmt');closeOrgMenu(false);await bulkTag({remove:t},'“'+t+'” is off the '+PICKED.size+' site'+(PICKED.size===1?'':'s')+' picked.');})));
+  }
+}
+function onPick(e){
+  const t=e.target;if(!(t instanceof HTMLInputElement))return;
+  if(t.id==='pickAll'){const shown=ordered().filter(matches);if(t.checked)shown.forEach(x=>PICKED.add(x.site_id));else PICKED.clear();}
+  else if(t.hasAttribute('data-pick')){const id=t.getAttribute('data-pick');if(t.checked)PICKED.add(id);else PICKED.delete(id);}
+  else return;
+  const keep=t.id==='pickAll'?'#pickAll':'[data-pick="'+CSS.escape(t.getAttribute('data-pick'))+'"]';
+  applyView();const nb=document.querySelector('#tableHost '+keep);if(nb)nb.focus();
+  const k=KIT();if(k&&k.announce)k.announce(PICKED.size?PICKED.size+' site'+(PICKED.size===1?'':'s')+' picked':'None picked');
+}
+document.addEventListener('click',(e)=>{if(OMENU&&!(e.target instanceof Element&&e.target.closest('#orgMenuHost')))closeOrgMenu(false);});
+window.addEventListener('resize',()=>closeOrgMenu(false));
 
 // ── the live pictures: on screen only, two at a time, once per visit ──
 const THUMBS=new Map();          // site id → {html, at}
@@ -778,6 +1275,7 @@ function menuHtml(s){
   const live=s.address&&s.state!=='not_live';
   return `<div class="rowmenu" role="menu" data-menufor="${esc(s.site_id)}" aria-label="More for ${esc(s.name||'this site')}">
     ${META.can_pin?`<button type="button" role="menuitem" data-pin="${esc(s.site_id)}">${s.pinned?'Unpin':'Pin to top'}</button>`:''}
+    ${ORG.read&&ORG.can_change?`<button type="button" role="menuitem" data-mvfolder="${esc(s.site_id)}">Move to folder…</button><button type="button" role="menuitem" data-tagsfor="${esc(s.site_id)}">Tags…</button>`:''}
     ${META.can_duplicate&&s.thumb?`<button type="button" role="menuitem" data-dup="${esc(s.site_id)}">Duplicate site</button>`:''}
     ${META.can_duplicate&&s.thumb?`<button type="button" role="menuitem" data-tpl="${esc(s.site_id)}">Save as a template</button>`:''}
     ${META.can_create&&s.no_owner?`<button type="button" role="menuitem" data-invite="${esc(s.site_id)}">Invite the owner</button>`:''}
@@ -806,6 +1304,8 @@ function paintMenu(){
   m.addEventListener('keydown',(e)=>{if(e.key==='Escape'){e.stopPropagation();const id=MENU_OPEN;MENU_OPEN=null;paintMenu();const b=visibleMenuBtn(id);if(b)b.focus();}});
   if(window.ClientTools)ClientTools.wireMenu(m,s,()=>{MENU_OPEN=null;paintMenu();});   // item 176: Ask for their content · Hand-over kit (sites-tools.js)
   const pb=m.querySelector('[data-pin]');if(pb)pb.addEventListener('click',()=>togglePin(s.site_id));
+  const mvf=m.querySelector('[data-mvfolder]');if(mvf)mvf.addEventListener('click',()=>{MENU_OPEN=null;paintMenu();openFolderDlg([s.site_id],visibleMenuBtn(s.site_id));});   // item 176
+  const tgf=m.querySelector('[data-tagsfor]');if(tgf)tgf.addEventListener('click',()=>{MENU_OPEN=null;paintMenu();openTagDlg(s.site_id,visibleMenuBtn(s.site_id));});
   const db=m.querySelector('[data-dup]');if(db)db.addEventListener('click',()=>{MENU_OPEN=null;paintMenu();openDuplicate(s.site_id);});
   const tb=m.querySelector('[data-tpl]');if(tb)tb.addEventListener('click',()=>{MENU_OPEN=null;paintMenu();openTemplate(s.site_id);});
   const ib=m.querySelector('[data-invite]');if(ib)ib.addEventListener('click',()=>{MENU_OPEN=null;paintMenu();openInvite(s.site_id);});
@@ -1106,6 +1606,7 @@ async function mountNeeds(){
   NEXT=r.body.data.next_by_site||{};NEEDS_ROWS=Array.isArray(r.body.data.rows)?r.body.data.rows:[];
   const nh=$('needsHost');if(nh)nh.innerHTML=needsHtml();
   const band=document.querySelector('.sband');if(band)band.outerHTML=bandHtml();
+  paintStrip();   // item 176: each folder says how many in it need you
   paintFilters();
   for(const s of SITES){
     const st=statusOf(s);
@@ -1161,8 +1662,13 @@ function trouble(){
 // soft=true (↻, or after a change): a failure keeps the cards and says so
 async function load(soft){
   const gen=++REQ_SEQ;
-  let r;try{r=await api('/agency/sites');}catch(_){r={ok:false,status:0,body:{}};}
+  let r,o;try{[r,o]=await Promise.all([api('/agency/sites'),api('/agency/sites/organize').catch(()=>({ok:false,status:0,body:{}}))]);}catch(_){r={ok:false,status:0,body:{}};}
   if(gen!==REQ_SEQ)return;   // a newer load started; this answer is stale
+  // item 176: the studio's folders and views; an older server or a failed read shows none of it
+  const od=o&&o.ok&&o.body&&o.body.data;
+  if(od&&Array.isArray(od.folders))ORG={folders:od.folders,views:Array.isArray(od.views)?od.views:[],can_change:!!od.can_change,read:true};
+  else if(!(soft&&ORG.read))ORG={folders:[],views:[],can_change:false,read:false};
+  if(FOLDER&&(FOLDER==='none'?!ORG.folders.length:!folderById(FOLDER)))FOLDER='';
   if(!r.ok){
     if(soft&&LOADED_AT){toast('Couldn’t refresh just now.',true);return;}
     if(r.status===401){signedOut();return;}
@@ -1179,6 +1685,28 @@ async function load(soft){
   if(window.ClientTools)ClientTools.mount();   // item 176: each card's content form and kit line
   mountNumbers();
 }
+// item 176: the dialogs are wired once
+(function wireOrgDialogs(){
+  $('folderForm').addEventListener('submit',submitMove);
+  $('folder-cancel').addEventListener('click',()=>$('folderDlg').close());
+  $('folder-new').addEventListener('input',()=>{if($('folder-new').value.trim())$('folderOpts').querySelectorAll('input').forEach(i=>{i.checked=false;});});
+  $('tagForm').addEventListener('submit',submitTags);
+  $('tag-cancel').addEventListener('click',()=>$('tagDlg').close());
+  $('tagSug').addEventListener('click',(e)=>{const b=e.target.closest('[data-tsug]');if(!b||!TAG_BOX)return;TAG_BOX.set(TAG_BOX.get().concat([b.getAttribute('data-tsug')]));b.remove();if(!$('tagSug').children.length)$('tagSugWrap').hidden=true;$('tag-in').focus();});
+  $('svForm').addEventListener('submit',submitSaveView);
+  $('sv-cancel').addEventListener('click',()=>$('svDlg').close());
+  $('mvForm').addEventListener('submit',submitManageViews);
+  $('mv-cancel').addEventListener('click',()=>$('mvDlg').close());
+  $('mvRows').addEventListener('click',(e)=>{const b=e.target.closest('[data-mvdel]');if(!b)return;const row=b.closest('[data-mv]');row.hidden=true;const nx=row.nextElementSibling&&row.nextElementSibling.querySelector('input');(nx||$('mv-save')).focus();});
+  $('mfForm').addEventListener('submit',submitManageFolders);
+  $('mf-cancel').addEventListener('click',()=>$('mfDlg').close());
+  // the rows' labels and the first row's ↑ follow each row's place
+  const renumber=()=>[...$('mfRows').children].forEach((r,i)=>{const ls=r.querySelectorAll('label');if(ls[0])ls[0].textContent='Name of folder '+(i+1);if(ls[1])ls[1].textContent='Colour of folder '+(i+1);const b=r.querySelector('[data-mfup]');if(b)b.disabled=i===0;});
+  $('mfRows').addEventListener('click',(e)=>{
+    const up=e.target.closest('[data-mfup]');if(up){const row=up.closest('[data-mf]'),prev=row.previousElementSibling;if(prev){row.parentNode.insertBefore(row,prev);renumber();const nb=row.querySelector('[data-mfup]');(nb&&!nb.disabled?nb:row.querySelector('input')).focus();}return;}
+    const del=e.target.closest('[data-mfdel]');if(del){const row=del.closest('[data-mf]'),nx=row.nextElementSibling||row.previousElementSibling;row.remove();renumber();(nx?nx.querySelector('input'):$('mf-save')).focus();}
+  });
+})();
 async function boot(){
   try{const{data}=await sb.auth.getSession();TOKEN=(data&&data.session&&data.session.access_token)||"";
     if(!TOKEN){signedOut();return;}
