@@ -59,8 +59,17 @@ function shelfDate(s){s=String(s||'');const m=/^(\d{4})-(\d{2})-(\d{2})$/.exec(s
 function shelfDay(s,now){const d=shelfDate(s);if(!d)return'';return d.toLocaleDateString('en-US',d.getFullYear()===now.getFullYear()?{month:'short',day:'numeric'}:{month:'short',day:'numeric',year:'numeric'});}
 function shelfMonth(s,now){const d=shelfDate(s);if(!d)return'Earlier';return d.toLocaleDateString('en-US',d.getFullYear()===now.getFullYear()?{month:'long'}:{month:'long',year:'numeric'});}
 function shelfUrl(u){u=String(u||'');return /^(https:\/\/|\/(?!\/))/i.test(u)?u:'';}
-function shelfRows(invoices,docs,snaps,todayYmd,pending,now){
+function shelfRows(invoices,docs,snaps,reports,todayYmd,pending,now){
   const rows=[];
+  let newest=true;
+  for(const rp of (reports||[])){
+    const m=/^(\d{4})-(0[1-9]|1[0-2])$/.exec(String((rp&&rp.month)||''));if(!m)continue;
+    const y=+m[1],mo=+m[2];
+    const name=new Date(y,mo-1,1).toLocaleDateString('en-US',y===now.getFullYear()?{month:'long'}:{month:'long',year:'numeric'});
+    const out=(mo===12?(y+1)+'-01':y+'-'+String(mo+1).padStart(2,'0'))+'-01';
+    rows.push({cat:'reports',kind:'Monthly report',title:name+' report',info:'PDF · visitors, searches and what changed',when:out,chip:newest&&!rp.opened?'New':'',tone:'',act:{verb:'Open',rep:m[0]}});
+    newest=false;
+  }
   for(const i of (invoices||[])){
     if(!i||!i.id)continue;
     const st=moneyState(i,todayYmd,pending);const amt=i.amount?fmtMoney(i.amount):'';
@@ -124,7 +133,7 @@ const row = (rows, title) => rows.find((r) => r.title === title);
     { id: 'i8', name: 'No link, a copy', amount: 30, status: 'open', due_date: '2026-12-01', created_at: '2026-09-03T15:00:00Z', pay_url: 'http://pay.example/plain', view_url: '/doc.html?t=8' },
     { id: 'i9', name: 'No link, no copy', amount: 30, status: 'open', due_date: '2026-12-01', created_at: '2026-09-04T15:00:00Z' },
   ];
-  const r = shelfRows(invs, [], [], TODAY, ['i4'], NOW);
+  const r = shelfRows(invs, [], [], [], TODAY, ['i4'], NOW);
   const a = row(r, 'Second half');
   ok('invoice: waiting → Upcoming, Pay in this tab, "$450 · due Nov 14"', a.chip === 'Upcoming' && a.tone === '' && a.act.verb === 'Pay' && a.act.pay === true && a.act.href === 'https://pay.example/i1' && a.info === '$450 · due Nov 14' && a.kind === 'Invoice' && a.cat === 'invoices');
   ok('invoice: past due → Overdue (the warning tone), still Pay', row(r, 'Late one').chip === 'Overdue' && row(r, 'Late one').tone === 'od' && row(r, 'Late one').act.verb === 'Pay');
@@ -149,7 +158,7 @@ const row = (rows, title) => rows.find((r) => r.title === title);
     { kind: 'estimate', id: 'e2', title: 'Logo', status: 'approved', amount: 300, created_at: '2026-10-22T15:00:00Z', view_url: 'https://app.example/doc.html?t=e2' },
     { kind: 'estimate', id: 'e3', title: 'Signage', status: 'declined', amount: 80, created_at: '2026-10-23T15:00:00Z' },
   ];
-  const r = shelfRows([], docs, [], TODAY, [], NOW);
+  const r = shelfRows([], docs, [], [], TODAY, [], NOW);
   const s1 = row(r, 'Website agreement'), s2 = row(r, 'Care agreement');
   ok('agreement: signed → Signed, View, "signed Sep 3"', s1.cat === 'agreements' && s1.kind === 'Agreement' && s1.chip === 'Signed' && s1.tone === 'sig' && s1.act.verb === 'View' && s1.info === 'signed Sep 3');
   ok('agreement: waiting → Your signature, Look', s2.chip === 'Your signature' && s2.tone === 'ask' && s2.act.verb === 'Look' && s2.info === 'waiting for your signature');
@@ -168,7 +177,7 @@ const row = (rows, title) => rows.find((r) => r.title === title);
     ] },
     { id: 'p2', name: 'Broken', failed: true, approvals: [], deliverables: [{ id: 'fx', title: 'never shown' }] },
   ];
-  const r = shelfRows([], [], snaps, TODAY, [], NOW);
+  const r = shelfRows([], [], snaps, [], TODAY, [], NOW);
   ok('file: from the studio → Save (download)', row(r, 'Homepage mockup.png').kind === 'File from your studio' && row(r, 'Homepage mockup.png').act.verb === 'Save' && row(r, 'Homepage mockup.png').act.dl === 'f1' && row(r, 'Homepage mockup.png').chip === '');
   ok('file: one you sent → "File you sent", You shared', row(r, 'Kitchen photos.jpg').kind === 'File you sent' && row(r, 'Kitchen photos.jpg').chip === 'You shared');
   ok('file: waiting for your OK → Your OK, Look opens the approval in place', row(r, 'Logo options.pdf').chip === 'Your OK' && row(r, 'Logo options.pdf').act.apr === 'ap1' && row(r, 'Logo options.pdf').act.pid === 'p1');
@@ -179,12 +188,26 @@ const row = (rows, title) => rows.find((r) => r.title === title);
     [{ id: 'i1', name: 'Nov invoice', amount: 10, status: 'open', due_date: '2026-11-30', created_at: '2026-11-04T15:00:00Z' }],
     [{ kind: 'proposal', id: 'p', title: 'Sep proposal', status: 'sent', created_at: '2026-09-03T15:00:00Z' }, { kind: 'proposal', id: 'q', title: 'Last year', status: 'sent', created_at: '2025-12-20T15:00:00Z' }],
     [{ id: 'p1', name: 'P', approvals: [], deliverables: [{ id: 'f', title: 'Oct file', created_at: '2026-10-05T15:00:00Z' }, { id: 'g', title: 'Undated file' }] }],
-    TODAY, [], NOW);
+    [], TODAY, [], NOW);
   ok('order: newest first across kinds, undated last', r.map((x) => x.title).join('|') === 'Nov invoice|Oct file|Sep proposal|Last year|Undated file');
   const g = shelfGroups(r, NOW);
   ok('months: this year by name, another year with its year, undated under Earlier', g.map((x) => x.month).join('|') === 'November|October|September|December 2025|Earlier' && g[0].rows.length === 1);
   const c = shelfCounts(r);
   ok('counts: per filter and in all', c.all === 5 && c.invoices === 1 && c.proposals === 2 && c.files === 2 && c.agreements === 0);
+}
+{
+  // item 179: the monthly reports that went out, newest first from the server
+  const reps = [{ month: '2026-10', label: 'October 2026', opened: false }, { month: '2026-09', label: 'September 2026', opened: false }, { month: '2025-12', label: 'December 2025', opened: false }, { month: 'soon' }];
+  const r = shelfRows([], [], [], reps, TODAY, [], NOW);
+  const oct = row(r, 'October report');
+  ok('report: named for its month, filed under the month it went out, Open to download', oct && oct.cat === 'reports' && oct.kind === 'Monthly report' && oct.when === '2026-11-01' && oct.act.verb === 'Open' && oct.act.rep === '2026-10' && oct.info === 'PDF · visitors, searches and what changed');
+  ok('report: only the newest says New, and only until it’s opened', oct.chip === 'New' && row(r, 'September report').chip === '' && shelfRows([], [], [], [{ month: '2026-10', opened: true }], TODAY, [], NOW)[0].chip === '');
+  const dec = row(r, 'December 2025 report');
+  ok('report: another year’s month names its year; December went out in January', !!dec && dec.when === '2026-01-01');
+  ok('report: something that isn’t a month adds nothing', r.length === 3);
+  const g = shelfGroups(r, NOW);
+  ok('report: October’s report sits under November', g[0].month === 'November' && g[0].rows[0].title === 'October report');
+  ok('report: counted under its own filter', shelfCounts(r).reports === 3);
 }
 {
   ok('owe: nothing unpaid → no card', shelfOwe([]) === null && shelfOwe(null) === null && shelfOwe([{ id: 'z', amount: 0 }]) === null);

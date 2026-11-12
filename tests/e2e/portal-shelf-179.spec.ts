@@ -48,6 +48,7 @@ const API = {
   [`/client/projects/${PID}/messages`]: { data: [] },
   '/client/documents': { data: { documents: DOCS } },
   '/client/billing': { data: { invoices: INVOICES } },
+  '/client/reports': { data: { reports: [] } },
   '/client/support': { data: [] },
   '/client/faq': { data: { html: '', faq: { items: [] } } },
   '/client/kit': { data: null },
@@ -192,6 +193,46 @@ test.describe('Client portal part four — the papers shelf (item 179)', () => {
     await expect(page.locator('#main')).toContainText('Open Documents: what you owe is at the top, with Pay.');
     await expect(page.locator('#main')).not.toContainText('Open Files');
     await expect(page.locator('#main')).not.toContainText('Open Invoices');
+  });
+
+  test('monthly reports: the ones that went out, under the month they arrived; Open downloads the PDF with the sign-in and the New goes', async ({ page }) => {
+    await start(page, { '/client/reports': { data: { reports: [{ month: '2026-10', label: 'October 2026' }, { month: '2026-09', label: 'September 2026' }] } } });
+    await page.route('**/functions/v1/presence/client/reports/2026-10/pdf', (route) => route.fulfill({ status: 200, contentType: 'application/pdf',
+      headers: { 'Content-Disposition': 'attachment; filename="Report - October 2026.pdf"', 'Access-Control-Expose-Headers': 'Content-Disposition' }, body: Buffer.from('%PDF-1.4 test') }));
+    await page.goto('/client.html');
+    await openShelf(page);
+    const oct = row(page, 'October report');
+    await expect(oct.locator('.fmeta')).toHaveText('Monthly report · PDF · visitors, searches and what changed');
+    await expect(oct.locator('.fst')).toHaveText('New');                      // the newest, not opened yet
+    await expect(oct.locator('.fst')).toBeVisible();                            // on a phone too, beside Open (as drawn)
+    await expect(row(page, 'September report').locator('.fst')).toHaveText('');
+    // filed under the month it went out: October's report arrived in November
+    const nov = page.locator('#shelf .shelfgroup', { has: page.locator('.shelfmonth', { hasText: 'November' }) });
+    await expect(nov.getByRole('heading', { name: 'October report', exact: true })).toBeVisible();
+    // its own filter, first in the list
+    await expect(page.locator('#shelf .shelfnav [data-shelf]').nth(1)).toHaveAttribute('data-shelf', 'reports');
+    await page.locator('#shelf [data-shelf="reports"]').click();
+    await expect(page.locator('#shelf .srow .fname')).toHaveText(['October report', 'September report']);
+    // Open: a fetch with the sign-in, saved as a download
+    const req = page.waitForRequest((r) => r.url().includes('/client/reports/2026-10/pdf'));
+    await page.getByRole('button', { name: 'Open — October report' }).click();
+    expect((await req).headers()['authorization'] || '').toMatch(/^Bearer /);
+    await expect(page.locator('#toast')).toContainText('Downloaded Report - October 2026.pdf.');
+    await expect(row(page, 'October report').locator('.fst')).toHaveText('');   // opened: the New goes
+    await expect(page.locator('#shelf [data-shelf="reports"]')).toHaveAttribute('aria-pressed', 'true');   // and the filter stays
+  });
+
+  test('monthly reports: a failed read says so; a server without the read yet says nothing', async ({ page }) => {
+    await start(page);
+    await page.route('**/functions/v1/presence/client/reports', (route) => route.fulfill({ status: 500, contentType: 'application/json', body: '{"error":"boom"}' }));
+    await page.goto('/client.html');
+    await openShelf(page);
+    await expect(page.getByText('We couldn’t load your monthly reports just now — please try again in a moment.')).toBeVisible();
+    await page.unroute('**/functions/v1/presence/client/reports');
+    await page.route('**/functions/v1/presence/client/reports', (route) => route.fulfill({ status: 404, contentType: 'application/json', body: '{"error":"not_found"}' }));
+    await page.locator('#tabnav [data-tab="home"]').click();
+    await openShelf(page);
+    await expect(page.getByText('monthly reports', { exact: false })).toHaveCount(0);
   });
 
   test('phone: a row shows its one button or a chip, and nothing runs off the screen', async ({ page }, testInfo) => {

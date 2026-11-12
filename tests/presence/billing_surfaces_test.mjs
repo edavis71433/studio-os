@@ -43,9 +43,9 @@ ok('studio: labels it billing_type saas (the customer software subscription, not
 // ensureBilling), dropping the row builder, or unwiring the invoice rows from the
 // shelf's paint must each redden here.
 ok('client app: fetches /client/billing (ensureBilling) and renders it through the shelf’s rows',
-  /api\('\/client\/billing'\)/.test(clientHtml) && /function shelfRows\(invoices,docs,snaps,todayYmd,pending,now\)/.test(clientHtml)
-  && /const \[snaps,docsRes,b\]=await Promise\.all\(\[ensureSnaps\(\),api\('\/client\/documents'\)\.catch\(\(\)=>null\),ensureBilling\(\)\]\);/.test(clientHtml)
-  && /const rows=shelfRows\(\(d\.b&&d\.b\.invoices\)\|\|\[\],docs,d\.snaps,today,PAID_PENDING,now\);/.test(clientHtml));
+  /api\('\/client\/billing'\)/.test(clientHtml) && /function shelfRows\(invoices,docs,snaps,reports,todayYmd,pending,now\)/.test(clientHtml)
+  && /const \[snaps,docsRes,b,repRes\]=await Promise\.all\(\[ensureSnaps\(\),api\('\/client\/documents'\)\.catch\(\(\)=>null\),ensureBilling\(\),api\('\/client\/reports'\)\.catch\(\(\)=>null\)\]\);/.test(clientHtml)
+  && /const rows=shelfRows\(\(d\.b&&d\.b\.invoices\)\|\|\[\],docs,d\.snaps,reports,today,PAID_PENDING,now\);/.test(clientHtml));
 ok('client app: states the software subscription is billed separately', /billed separately/i.test(clientHtml));
 // the Pay action exists ONLY past the paid, processing and void/canceled guards,
 // opens the server's pay_url in THIS tab (Nov 10 review, G9: a new tab left the
