@@ -205,6 +205,12 @@ export function buildNav(c: NavContext): NavSection[] {
   // Studio level: Home · Inbox · Customers (the approved order). Owner: Today · Website · Customers · … · Inbox.
   if (studioLevel) sections.push({ key: 'inbox', label: 'Inbox', items: inbox });
 
+  // To-dos — sales item 85 (Nov 2026): a page of its own, for everything the studio has to do,
+  // for anyone (a person, a customer, a deal or nobody). Home's card stays the short version.
+  if (f.hasRelationship) sections.push({ key: 'todos', label: 'To-dos', items: [
+    { key: 'todos', label: 'To-dos', href: '/todos.html', desc: 'Everything you have to do, for anyone: a person, a customer or a deal. Overdue, today, this week, later.' },
+  ] });
+
   // Customers — the relationship area (internally: the CRM): the roster with its
   // People tab and its + Add button. FIX 6: the item opens the ROSTER
   // (customers.html), never the single-client record; a customer opens crm.html.
@@ -223,6 +229,11 @@ export function buildNav(c: NavContext): NavSection[] {
     { key: 'pipeline', label: 'Pipeline', href: '/pipeline.html', desc: 'Deals by stage — proposals, agreements and payments move through here.' },
     // Oct 2026 audit bug 10: ⌘K "billing" lands on money — Pipeline's Outstanding ("who owes you"), never on Customers
     hid('billing', 'Who owes you', '/pipeline.html#outstanding', 'Invoices not paid yet, deposits and payment schedules: money owed to you (billing).'),
+  ] });
+
+  // Invoices — sales item 85 (Nov 2026): every invoice sent, with what's owed, overdue and paid.
+  if (f.hasRelationship) sections.push({ key: 'invoices', label: 'Invoices', items: [
+    { key: 'invoices', label: 'Invoices', href: '/invoices.html', desc: 'Every invoice you have sent: what is owed to you, what is overdue, what is paid (billing, money).' },
   ] });
 
   // Prospects — the step before the pipeline (Semrush review item 112). Its own
@@ -277,6 +288,8 @@ export function buildNav(c: NavContext): NavSection[] {
   // (Plan & billing is the owner's / the studio's own; Team is the studio's seats).
   settings.push(hid('plan', 'Your plan', '/settings.html#billing', 'Your Studio OS plan, when it renews, and how to change it — not the invoices you send.'));
   if (studioLevel) settings.push(hid('team', 'Team', '/settings.html#team', 'Who is on your studio’s team, their roles, and the seats your plan covers.'));
+  // sales item 83: ⌘K "deleted", "restore" or "trash" finds the one place deleted deals, contacts and to-dos wait
+  if (studioLevel && f.hasRelationship) settings.push(hid('deleted', 'Recently deleted', '/recently-deleted.html', 'Deals, contacts and to-dos deleted in the last 30 days, each with Restore (trash, undo).'));
   if (f.hasClientPortal && has(c, 'invite')) settings.push(hid('sharing', 'Sharing & access', '/sharing.html', 'Who can sign in — your team, what clients can see, reviewer links.'));
   if (f.hasDeveloper && has(c, 'use_developer_mode')) settings.push(hid('developer', 'Developer Mode', '/developer.html'));
   // Oct 2026 audit change 11: the Health Center's door — a status line on the studio's

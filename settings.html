@@ -113,6 +113,26 @@
   .stale.snames input{width:150px}
   .stale{display:flex;flex-wrap:wrap;gap:10px var(--dds-s5,20px);margin-top:10px} .stale label{font-size:13px;color:var(--soft);display:flex;align-items:center;gap:6px} .stale input{width:56px;height:28px;border:1px solid var(--line);border-radius:var(--dds-r,8px);padding:0 var(--dds-s2,8px);font:inherit;font-size:13.5px;text-align:center;background:var(--card);color:var(--ink)}
   @media (prefers-reduced-motion:reduce){.sw,.sw::after{transition:none}}
+  /* sales item 87: ready-made recipes over the switches, and the owner's own words */
+  .recipes{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:10px;margin:var(--dds-s3,12px) 0 var(--dds-s2,8px)}
+  .recipe{position:relative;display:flex;flex-direction:column;gap:6px;padding:16px 14px 12px;border:1px solid var(--line);border-radius:var(--dds-r-lg,14px);background:var(--card);box-shadow:var(--dds-shadow);overflow:hidden}
+  .recipe::before{content:"";position:absolute;inset:0 0 auto 0;height:4px;background:var(--dds-grad-brand)}
+  .recipe[data-on="1"]{border-color:var(--p)}
+  .recipe b{font-size:13.5px;font-weight:650;line-height:1.35}
+  .recipe .rl{font-size:12.5px;color:var(--soft);flex:1}
+  .recipe .ra{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:2px}
+  .recipe .ron{display:inline-flex;align-items:center;font-size:12px;font-weight:700;color:var(--good);background:var(--good-soft);border-radius:999px;padding:3px 10px}
+  .recipe .rgo{font:inherit;font-size:12.5px;font-weight:600;color:var(--p);background:none;border:none;padding:6px 0;cursor:pointer;min-height:32px}
+  .swrow .t .wl{display:block;font-size:12.5px;font-weight:600;color:var(--soft);margin:10px 0 4px}
+  .swrow .t .words{width:100%;font:inherit;font-size:14px;border:1px solid var(--line);background:var(--bg);color:var(--ink);border-radius:var(--dds-r,8px);padding:8px 12px;resize:vertical}
+  .swrow .t .say .sayq{display:block;margin-top:4px;font-size:12px;color:var(--faint);font-style:italic}
+  .swrow .subrow{display:flex;gap:var(--dds-s3,12px);align-items:flex-start;margin-top:12px;padding-top:12px;border-top:1px dashed var(--line)}
+  .swrow .subrow b{display:block;font-weight:600;font-size:14px}
+  .swrow .subrow .how{font-size:12.5px;color:var(--faint);margin-top:2px}
+  #automations .swrow[hidden]{display:none}   /* a client's settings show only their website's two rows */
+  .swrow.flash{animation:rowflash 1.4s ease-out}
+  @keyframes rowflash{from{background:var(--dds-p-soft)}to{background:transparent}}
+  @media (prefers-reduced-motion:reduce){.swrow.flash{animation:none}}
   .center{text-align:center;padding:56px var(--dds-s5,20px);color:var(--soft)}
   .center h2{font-family:var(--serif);font-weight:500;font-size:22px;margin:0 0 var(--dds-s2,8px);color:var(--ink)}
   a.link{color:var(--p);text-decoration:none;font-weight:500} a.link:hover{text-decoration:underline}
@@ -282,26 +302,47 @@
     <div class="how" id="menuNote" style="margin-top:10px">Home and Settings always stay. The menu changes the next time a page opens.</div>
   </section>
   <section class="card" id="automations" aria-labelledby="autoHead" hidden data-needs="configure">
-    <div class="card-h"><h2 id="autoHead" tabindex="-1">Automations</h2><span class="hint">Four switches. Each saves as you flip it.</span></div>
-    <div class="swrow">
+    <div class="card-h"><h2 id="autoHead" tabindex="-1">Automations</h2><span class="hint" id="autoHint">Ready-made recipes, and the switches behind them. Each saves as you flip it.</span></div>
+    <!-- sales item 87: Wix-style recipes, each one tap; it switches on the rows below -->
+    <div class="recipes" id="recipes" role="list" aria-label="Ready-made recipes"></div>
+    <div class="swrow" id="row-ack" data-scoped="1">
       <button type="button" class="sw" role="switch" id="sw-ack" aria-checked="false" aria-labelledby="sw-ack-l"></button>
       <div class="t"><b id="sw-ack-l">Acknowledge new enquiries within a minute</b>
-        <div class="how">Someone who writes in through your website gets one short reply right away, on your brand. You still answer them yourself.</div>
-        <div class="say"><span class="lbl">What they’ll read</span><span id="say-ack">Thanks for getting in touch — we’ve got your message and will reply within one business day.</span></div></div>
+        <div class="how">Someone who writes in through your website gets one short reply right away, on your brand, with a copy of what they wrote. You still answer them yourself. A new website starts with this on.</div>
+        <label class="wl" for="w-ack">In your own words <span class="muted">(optional)</span></label>
+        <textarea id="w-ack" class="words" maxlength="1200" rows="2" placeholder="Thanks for getting in touch — we’ve got your message and will reply within one business day."></textarea>
+        <div class="say"><span class="lbl">What they’ll read</span><span id="say-ack">Thanks for getting in touch — we’ve got your message and will reply within one business day.</span><span class="sayq">…then a copy of what they wrote.</span></div></div>
     </div>
-    <div class="swrow">
+    <div class="swrow" id="row-fu" data-scoped="1">
+      <button type="button" class="sw" role="switch" id="sw-fu" aria-checked="false" aria-labelledby="sw-fu-l"></button>
+      <div class="t"><b id="sw-fu-l">Follow up quiet enquiries after <input type="number" id="n-fu1" min="1" max="14" value="3" aria-label="Days before the first follow-up"> and <input type="number" id="n-fu2" min="3" max="30" value="7" aria-label="Days before the second follow-up"> days</b>
+        <div class="how">Two short emails in your name if they go quiet. They stop the moment they write back, book, or you mark the enquiry in your Inbox (Not a fit, or made a deal) or press Stop follow-ups there. Each one has an unsubscribe link.</div>
+        <label class="wl" for="w-fu1">The first one, in your own words <span class="muted">(optional)</span></label>
+        <textarea id="w-fu1" class="words" maxlength="1200" rows="2" placeholder="Just checking in on your message. If you still need a hand, reply to this email and we’ll pick it up straight away."></textarea>
+        <label class="wl" for="w-fu2">The second and last one <span class="muted">(optional)</span></label>
+        <textarea id="w-fu2" class="words" maxlength="1200" rows="2" placeholder="One last note from us about your message. If the timing isn’t right, no problem at all. Whenever you’re ready, just reply."></textarea></div>
+    </div>
+    <div class="swrow" id="row-inv">
       <button type="button" class="sw" role="switch" id="sw-inv" aria-checked="false" aria-labelledby="sw-inv-l"></button>
       <div class="t"><b id="sw-inv-l">Remind unpaid invoices <input type="number" id="n-inv" min="1" max="90" value="2" aria-label="Days after the due date"> days after they’re due, at most once a day</b>
         <div class="how">A week before the due date, on the due date, and once more <span id="n-inv-echo">2</span> days after — three reminders at most, with the same secure payment link, to the deal’s contact. An invoice with no due date counts as due a week after it was sent.</div>
-        <div class="say"><span class="lbl">What they’ll read</span><span id="say-inv">Just a friendly nudge: the invoice for $1,250.00 is still open. The same secure link works whenever you’re ready — nothing expires.</span></div></div>
+        <div class="say"><span class="lbl">What they’ll read</span><span id="say-inv">Just a friendly nudge: the invoice for $1,250.00 is still open. The same secure link works whenever you’re ready — nothing expires.</span></div>
+        <div class="subrow"><button type="button" class="sw" role="switch" id="sw-inv2" aria-checked="false" aria-labelledby="sw-inv2-l"></button>
+          <div><b id="sw-inv2-l">Then one more, a week later</b><div class="how">Two reminders a week apart once it’s overdue. That one is the last; nothing else goes on its own.</div></div></div></div>
     </div>
-    <div class="swrow">
+    <div class="swrow" id="row-exp">
+      <button type="button" class="sw" role="switch" id="sw-exp" aria-checked="false" aria-labelledby="sw-exp-l"></button>
+      <div class="t"><b id="sw-exp-l">Remind them a week before a proposal or estimate runs out</b>
+        <div class="how">A proposal is good for 30 days after you send it, an estimate until the date you set. One note with a fresh link, never on the day another reminder went, and never for a proposal you replaced.</div>
+        <div class="say"><span class="lbl">What they’ll read</span><span id="say-exp">A quick note: your proposal for Website refresh is good until December 11, a week from now. Here’s the link if you’d like another look.</span></div></div>
+    </div>
+    <div class="swrow" id="row-deal">
       <button type="button" class="sw" role="switch" id="sw-deal" aria-checked="false" aria-labelledby="sw-deal-l"></button>
       <div class="t"><b id="sw-deal-l">Nudge me when a deal has had no next step for <input type="number" id="n-deal" min="1" max="90" value="3" aria-label="Quiet days before a nudge"> days</b>
         <div class="how">An open deal with no edit, no logged contact and nothing scheduled for that long rings your bell and emails you — once a week while it stays quiet.</div>
         <div class="say"><span class="lbl">What you’ll read</span><span id="say-deal">This deal has had no next step for 3 days — a quick follow-up keeps it moving.</span></div></div>
     </div>
-    <div class="swrow">
+    <div class="swrow" id="row-rev">
       <button type="button" class="sw" role="switch" id="sw-rev" aria-checked="false" aria-labelledby="sw-rev-l"></button>
       <div class="t"><b id="sw-rev-l">Ask for a review <input type="number" id="n-rev" min="1" max="90" value="3" aria-label="Days after a project is done"> days after a project is done</b>
         <div class="how">When you mark a project complete, its client gets one email <span id="n-rev-echo">3</span> days later with a link to your review page — the same email as a request you send by hand. Once per project. Every client is asked, whatever they said in the quick survey: asking only happy clients breaks Google’s rules on reviews.</div>
@@ -384,6 +425,7 @@ const nice = (b, fallback) => (b && typeof b.message === 'string' && /^[A-Z]/.te
 //    the caller's plan or role doesn't include is left out, never shown dead. ──
 const IC = {
   studio: '<path d="M3 21h18"/><path d="M5 21V7l7-4 7 4v14"/><path d="M9 21v-6h6v6"/>',
+  deleted: '<path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5"/>',   // sales item 83: a way back
   team: '<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0"/><circle cx="17" cy="9" r="2.5"/><path d="M15.5 14.5A5 5 0 0 1 21.5 20"/>',
   agency_team: '<circle cx="8" cy="8" r="3"/><circle cx="16" cy="8" r="3"/><path d="M2 20a6 6 0 0 1 12 0"/><path d="M10 20a6 6 0 0 1 12 0"/>',
   billing: '<path d="M12 3v18"/><path d="M17 7.5c0-1.9-2.2-3-5-3s-5 1.1-5 3 2.2 2.5 5 3 5 1.1 5 3-2.2 3-5 3-5-1.1-5-3"/>',
@@ -402,7 +444,9 @@ const CARDS = [
   // the studio's own switches — never a client's (the invoices and deals are the studio's book)
   // Bold redesign (Nov 2026): the deal stages are a section of their own (the studio's book, like Automations)
   { key: 'stages', href: '#stages', title: 'Deal stages', desc: 'Your names for the four open stages, the chance each one closes, and when a deal counts as stalled.', words: 'pipeline deals stalled chance close', studioOnly: true, needs: 'configure' },
-  { key: 'auto', href: '#automations', title: 'Automations', desc: 'Four switches: acknowledge enquiries, remind unpaid invoices, nudge quiet deals, ask for a review when a project is done. Each shows the sentence it sends.', words: 'automatic reminders emails nudge review request unpaid', studioOnly: true, needs: 'configure' },
+  { key: 'auto', href: '#automations', title: 'Automations', desc: 'Ready-made recipes: answer and follow up enquiries, remind unpaid invoices and quotes about to run out, nudge quiet deals, ask for a review. Each shows what it sends.', words: 'automatic reminders emails nudge review request unpaid recipes follow up quote expires auto reply', studioOnly: true, needs: 'configure' },
+  // sales item 87: inside a client, the replies THEIR website sends: the acknowledgement and the follow-ups
+  { key: 'replies', icon: 'auto', href: '#automations', title: 'Enquiry replies', desc: 'The reply their website visitors get right away, and two follow-ups if an enquiry goes quiet. In your words or theirs.', words: 'auto reply acknowledgement follow up enquiry automatic email', scopedOnly: true, feature: 'website', needs: 'configure' },
   // the agency's own team: seats and roles (agency members at studio level only — never a client's settings)
   { key: 'agency_team', href: '#team', title: 'Team', desc: 'Who is on your studio’s team, their roles, and the seats your plan covers.', words: 'people seats roles members invite staff', agencyOnly: true },
   // builder list item 58 (Nov 2026): the client's monthly report email, set once per client (inside a client only)
@@ -411,6 +455,8 @@ const CARDS = [
   { key: 'menu', icon: 'studio', href: '#menu', title: 'Your menu', desc: 'Hide the areas your studio doesn’t use. A hidden area keeps its page and stays one search away.', words: 'hide areas navigation sidebar', agencyOnly: true, cap: 'configure' },
   { key: 'billing', href: '#billing', title: 'Your plan', desc: 'Your Studio OS plan, how to change it, and closing your account.', words: 'plan billing subscription payment card cancel close delete account export download data', ownerOnly: true, needs: 'owner' },   // item 166: "Plan" alone for the studio's own subscription (billing stays a search word)
   { key: 'money', href: '/pipeline.html?services=1', title: 'Invoices & agreements', desc: 'Your services and prices (they fill proposals), the agreement every deal starts from, deposits.', words: 'services prices proposals deposits contracts tax', feature: 'relationship' },
+  // sales item 83 (Nov 2026): one place for what was deleted lately, with Restore
+  { key: 'deleted', href: '/recently-deleted.html', title: 'Recently deleted', desc: 'Deals, contacts and to-dos you deleted in the last 30 days. Bring any of them back.', words: 'trash bin undo restore deleted removed recover', feature: 'relationship', studioOnly: true },
   // Bold redesign (Nov 2026): the private calendar link (sales review item 46) has its own row — it lives on Connections
   { key: 'calendar', href: '/connections.html#calSec', title: 'Calendar', desc: 'Your bookings and dated tasks in Google Calendar, Apple Calendar or Outlook, through a private link.', words: 'ical google outlook apple bookings', feature: 'connected', studioOnly: true },
   { key: 'connections', href: '/connections.html', title: 'Connections', desc: 'Google Analytics, Search Console, Business Profile, email sending.', words: 'google analytics search console business profile email sending integrations', feature: 'connected', scoped: true },
@@ -466,7 +512,7 @@ function renderCards() {
   if (sc) sc.addEventListener('click', (e) => { e.preventDefault(); reveal('studio', 'f-name'); });
   const bc = $('cards').querySelector('[data-card="billing"]');
   if (bc) bc.addEventListener('click', (e) => { e.preventDefault(); reveal('billing', 'billingHead'); });
-  const ac = $('cards').querySelector('[data-card="auto"]');
+  const ac = $('cards').querySelector('[data-card="auto"]') || $('cards').querySelector('[data-card="replies"]');
   if (ac) ac.addEventListener('click', (e) => { e.preventDefault(); reveal('automations', 'autoHead'); });
   const tc = $('cards').querySelector('[data-card="agency_team"]');
   if (tc) tc.addEventListener('click', (e) => { e.preventDefault(); reveal('team', 'teamHead'); });
@@ -831,7 +877,7 @@ async function retryReads(e) {
   const b = e && e.currentTarget; if (b) b.disabled = true;
   await loadProfile();   // a part that loads lets go of its notice (holdUnread)
   renderSubline();
-  if (!SCOPE && SETTINGS_READ) paintAutomations();
+  if (SETTINGS_READ && automationsHere()) paintAutomations();
   if (b && b.isConnected) { b.disabled = false; toast('Still couldn’t load — try again in a moment.', true); }
 }
 async function saveProfile() {
@@ -858,6 +904,28 @@ async function saveProfile() {
 //    loadProfile fetched; every control writes itself the moment it changes. ──
 const STAGE_KEYS = ['lead', 'qualified', 'proposal', 'contract'];
 const reviewAskSentence = (biz) => `Thanks for choosing ${biz || 'us'}. If you have a moment, we’d love a quick review — it really helps.`;   // mirrors routes/reviews.ts sendReviewAsk
+// sales item 87: the acknowledgement in the owner's words, else the standard sentence (lib/commercial.ts
+// enquiryAckCopy adds "Hi Sam," before either when the visitor gave a name)
+const ACK_SENTENCE = 'Thanks for getting in touch — we’ve got your message and will reply within one business day.';
+const ackPreview = (words) => String(words || '').trim() || ACK_SENTENCE;
+// Automations show at the studio's own level, and inside a client only the two enquiry rows
+// (their website's replies): the invoices, deals and reviews are the studio's book.
+const automationsHere = () => !SCOPE || (hasFeature('website') && hasCap('configure'));
+// The recipes: one tap switches on the rows they name (a row's own switch turns it off again).
+const RECIPES = [
+  { key: 'ack', title: 'Answer every enquiry within a minute', line: 'A short reply on your brand, with a copy of what they wrote.', on: (st) => st.auto_ack_enquiries === true, patch: { auto_ack_enquiries: true }, row: 'row-ack', scoped: true },
+  { key: 'fu', title: 'Follow up a quiet enquiry', line: 'Two short emails in your words, on day 3 and day 7. They stop when they write back or book.', on: (st) => st.enquiry_followups === true, patch: { enquiry_followups: true }, row: 'row-fu', scoped: true },
+  { key: 'inv', title: 'Two reminders a week apart for an overdue invoice', line: 'Before and on the due date, then twice once it’s overdue, a week apart.', on: (st) => st.invoice_reminders === true && st.invoice_overdue_repeat === true, patch: { invoice_reminders: true, invoice_overdue_repeat: true }, row: 'row-inv' },
+  { key: 'exp', title: 'Your quote runs out in a week', line: 'One note a week before a proposal or estimate runs out, with a fresh link.', on: (st) => st.quote_expiry_reminders === true, patch: { quote_expiry_reminders: true }, row: 'row-exp' },
+  { key: 'rev', title: 'Ask for a review when a project is done', line: 'One email with your review link, a few days after you mark it complete.', on: (st) => st.review_requests === true, patch: { review_requests: true }, row: 'row-rev' },
+  { key: 'deal', title: 'Tell me when a deal goes quiet', line: 'Your bell rings when an open deal has had no next step for a few days.', on: (st) => st.deal_nudges === true, patch: { deal_nudges: true }, row: 'row-deal' },
+];
+function paintRecipes() {
+  const st = SETTINGS || {};
+  const list = RECIPES.filter((r) => !SCOPE || r.scoped);
+  $('recipes').innerHTML = list.map((r) => { const on = r.on(st); return `<div class="recipe" role="listitem" data-recipe="${esc(r.key)}"${on ? ' data-on="1"' : ''}><b>${esc(r.title)}</b><span class="rl">${esc(r.line)}</span><span class="ra">${on ? '<span class="ron">On</span><button type="button" class="rgo" data-recipe-go="' + esc(r.key) + '">Change it</button>' : '<button type="button" class="btn sm primary" data-recipe-on="' + esc(r.key) + '">Turn on</button>'}</span></div>`; }).join('');
+}
+function goRow(id) { const row = $(id); if (!row) return; row.scrollIntoView({ behavior: 'smooth', block: 'center' }); row.classList.remove('flash'); void row.offsetWidth; row.classList.add('flash'); const sw = row.querySelector('.sw'); if (sw) sw.focus({ preventScroll: true }); }
 const dealNudgeSentence = (n) => `This deal has had no next step for ${n === 1 ? 'a day' : n + ' days'} — a quick follow-up keeps it moving.`;   // mirrors commerce/lifecycle.ts dealNudgeCopy (qualified)
 function paintAutomations() {
   const st = SETTINGS || {};
@@ -866,16 +934,28 @@ function paintAutomations() {
   const typing = document.activeElement;
   const setVal = (id, v, key) => { const el = $(id); if (el !== typing && !AUTO_FLIGHT[key]) el.value = v; };
   const setSw = (id, key) => { if (!AUTO_FLIGHT[key]) $(id).setAttribute('aria-checked', st[key] === true ? 'true' : 'false'); };
+  // the sentence beside a days box follows the box, so it is left alone while that box is typed in
+  const echoes = (id, key) => $(id) !== typing && !AUTO_FLIGHT[key];
   setSw('sw-ack', 'auto_ack_enquiries'); setSw('sw-inv', 'invoice_reminders'); setSw('sw-deal', 'deal_nudges'); setSw('sw-rev', 'review_requests');
+  setSw('sw-fu', 'enquiry_followups'); setSw('sw-inv2', 'invoice_overdue_repeat'); setSw('sw-exp', 'quote_expiry_reminders');   // item 87
+  setVal('w-ack', String(st.auto_ack_message || ''), 'auto_ack_message'); setVal('w-fu1', String(st.enquiry_followup_1_message || ''), 'enquiry_followup_1_message'); setVal('w-fu2', String(st.enquiry_followup_2_message || ''), 'enquiry_followup_2_message');
+  setVal('n-fu1', String(Number(st.enquiry_followup_1_days) >= 1 ? Math.trunc(Number(st.enquiry_followup_1_days)) : 3), 'enquiry_followup_1_days');
+  setVal('n-fu2', String(Number(st.enquiry_followup_2_days) >= 3 ? Math.trunc(Number(st.enquiry_followup_2_days)) : 7), 'enquiry_followup_2_days');
+  if (!AUTO_FLIGHT.auto_ack_message && document.activeElement !== $('w-ack')) $('say-ack').textContent = ackPreview(st.auto_ack_message);
+  paintRecipes();
+  // inside a client only their website's two rows; the studio's book stays out
+  $('automations').querySelectorAll('.swrow').forEach((row) => { row.hidden = !!SCOPE && !row.hasAttribute('data-scoped'); });
+  $('autoHint').textContent = SCOPE ? 'What ' + possessive(scopeName() || 'this client') + ' website sends when someone writes in. Each saves as you flip it.' : 'Ready-made recipes, and the switches behind them. Each saves as you flip it.';
   const nRev = Number(st.review_request_after_days) >= 1 ? Math.trunc(Number(st.review_request_after_days)) : 3;
-  setVal('n-rev', String(nRev), 'review_request_after_days'); if (!AUTO_FLIGHT.review_request_after_days) $('n-rev-echo').textContent = String(nRev);
+  setVal('n-rev', String(nRev), 'review_request_after_days'); if (echoes('n-rev', 'review_request_after_days')) $('n-rev-echo').textContent = String(nRev);
   $('say-rev').textContent = reviewAskSentence(IDENT && IDENT.business_name);
   const nInv = Number(st.invoice_remind_after_days) >= 1 ? Math.trunc(Number(st.invoice_remind_after_days)) : 2;
   const nDeal = Number(st.deal_nudge_days) >= 1 ? Math.trunc(Number(st.deal_nudge_days)) : 3;
-  setVal('n-inv', String(nInv), 'invoice_remind_after_days'); if (!AUTO_FLIGHT.invoice_remind_after_days) $('n-inv-echo').textContent = String(nInv);
-  setVal('n-deal', String(nDeal), 'deal_nudge_days'); if (!AUTO_FLIGHT.deal_nudge_days) $('say-deal').textContent = dealNudgeSentence(nDeal);
+  setVal('n-inv', String(nInv), 'invoice_remind_after_days'); if (echoes('n-inv', 'invoice_remind_after_days')) $('n-inv-echo').textContent = String(nInv);
+  setVal('n-deal', String(nDeal), 'deal_nudge_days'); if (echoes('n-deal', 'deal_nudge_days')) $('say-deal').textContent = dealNudgeSentence(nDeal);
   if (!STALE_SAVING) paintStaleDays();   // C3: never under a change still waiting to save
   $('automations').hidden = false;
+  if (SCOPE) return;   // the studio's own sections stay out of a client's settings
   $('stages').hidden = false;
   loadStageNames();
   loadMenu();
@@ -1130,6 +1210,22 @@ function wireAutomations() {
   const sc = $('scSave'); if (sc) sc.addEventListener('click', saveStageChances);   // item 69
   const flip = (id, key) => { const b = $(id); b.addEventListener('click', () => { const on = b.getAttribute('aria-checked') !== 'true'; b.setAttribute('aria-checked', on ? 'true' : 'false'); saveAutomation({ [key]: on }, () => b.setAttribute('aria-checked', on ? 'false' : 'true')); }); };   // the undo only serves C4's "couldn't load" refusal
   flip('sw-ack', 'auto_ack_enquiries'); flip('sw-inv', 'invoice_reminders'); flip('sw-deal', 'deal_nudges'); flip('sw-rev', 'review_requests');
+  flip('sw-fu', 'enquiry_followups'); flip('sw-inv2', 'invoice_overdue_repeat'); flip('sw-exp', 'quote_expiry_reminders');   // item 87
+  // item 87: the owner's own words save when the box is left; blank keeps the standard words
+  const words = (id, key) => { const t = $(id); t.addEventListener('change', () => saveAutomation({ [key]: t.value.trim() })); };
+  words('w-ack', 'auto_ack_message'); words('w-fu1', 'enquiry_followup_1_message'); words('w-fu2', 'enquiry_followup_2_message');
+  $('w-ack').addEventListener('input', () => { $('say-ack').textContent = ackPreview($('w-ack').value); });
+  // the two follow-up days: the second at least two days after the first (lib/follow_ups.ts followupDays)
+  const fuDays = () => { let a = Math.trunc(Number($('n-fu1').value)); let b = Math.trunc(Number($('n-fu2').value)); if (!Number.isFinite(a) || a < 1) a = 3; if (a > 14) a = 14; if (!Number.isFinite(b)) b = 7; b = Math.min(30, Math.max(a + 2, b)); $('n-fu1').value = String(a); $('n-fu2').value = String(b); saveAutomation({ enquiry_followup_1_days: a, enquiry_followup_2_days: b }); };
+  $('n-fu1').addEventListener('change', fuDays); $('n-fu2').addEventListener('change', fuDays);
+  // a recipe's Turn on switches its rows on in one save; Change it goes to the row
+  $('recipes').addEventListener('click', async (e) => {
+    const go = e.target.closest('[data-recipe-go]'); if (go) { const r = RECIPES.find((x) => x.key === go.getAttribute('data-recipe-go')); if (r) goRow(r.row); return; }
+    const b = e.target.closest('[data-recipe-on]'); if (!b) return;
+    const r = RECIPES.find((x) => x.key === b.getAttribute('data-recipe-on')); if (!r) return;
+    b.disabled = true;
+    if (await saveAutomation(r.patch)) goRow(r.row); else b.disabled = false;
+  });
   const days = (id, key, min, max, fallback) => { const i = $(id); i.addEventListener('change', () => { let n = Math.trunc(Number(i.value)); if (!Number.isFinite(n) || n < min) n = fallback; if (n > max) n = max; i.value = String(n); saveAutomation({ [key]: n }); }); };
   days('n-inv', 'invoice_remind_after_days', 1, 90, 2); days('n-deal', 'deal_nudge_days', 1, 90, 3); days('n-rev', 'review_request_after_days', 1, 90, 3);
   $('n-rev').addEventListener('input', () => { $('n-rev-echo').textContent = $('n-rev').value || '3'; });
@@ -1245,11 +1341,11 @@ function holdAnchor(sec) {
     { const dl = $('dlData'); if (dl) dl.addEventListener('click', downloadMyData); }   // item 69: Download my data
     await profile.catch(() => { $('studio').hidden = false; toast('Couldn’t load your studio details just now.', true); });
     renderSubline();
-    if (!SCOPE) { wireAutomations(); paintAutomations(); }
+    if (automationsHere()) { wireAutomations(); paintAutomations(); }
     if (location.hash === '#team') holdAnchor($('team'));
     if (location.hash === '#studio') { const n = $('f-name'); if (n) n.focus(); }
     if (location.hash === '#billing' && !SCOPE) holdAnchor($('billing'));   // I7: billing is the studio's own, never a client's (a client's "Update payment" link lands at the top)
-    if (location.hash === '#automations' && !SCOPE) holdAnchor($('automations'));
+    if (location.hash === '#automations' && automationsHere()) holdAnchor($('automations'));
     if (location.hash === '#stages' && !SCOPE) holdAnchor($('stages'));
     spySections();
   } catch (_) {

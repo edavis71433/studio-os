@@ -1,15 +1,18 @@
 // ── Saved list views and picked lists (sales review items 31 and 39, Nov 2026) ─
 // Pure normalizers for two small studio-level settings:
 //   • saved views on Customers, Contacts and Pipeline: a name, the fixed view it
-//     starts from, the search text, the columns shown and the sort.
+//     starts from, the search text, the columns shown and the sort (and, item 90,
+//     the field filters it was saved with: lib/list_filters.ts).
 //   • picked lists for Send an update: a name and the people (email + name)
 //     chosen from a list, so an update can go to them now and again later.
 // Both are stored as reserved JSON rows (lib/reserved_store.ts). Everything that
 // arrives from a page goes through these first: bounded, de-duplicated, typed.
 
+import { normalizeListFilters, hasListFilters, type ListFilters } from './list_filters.ts';
+
 export const VIEW_LISTS = ['customers', 'contacts', 'pipeline'] as const;
 export type ViewList = typeof VIEW_LISTS[number];
-export interface SavedView { id: string; name: string; base: string; q: string; cols: string[]; sort: { key: string; dir: 1 | -1 } | null }
+export interface SavedView { id: string; name: string; base: string; q: string; cols: string[]; sort: { key: string; dir: 1 | -1 } | null; filters?: ListFilters }
 export type SavedViews = Record<ViewList, SavedView[]>;
 export const MAX_VIEWS = 20;
 export const MAX_COLS = 12;
@@ -39,7 +42,9 @@ export function normalizeView(raw: unknown): SavedView | null {
   // final pass (Nov 8, batch D): "desc" and "asc" are understood — "desc" read as NaN and sorted ascending
   const desc = s && (String(s.dir).trim().toLowerCase() === 'desc' || Number(s.dir) < 0);
   const sort = s && KEY_RE.test(String(s.key || '')) ? { key: String(s.key), dir: (desc ? -1 : 1) as 1 | -1 } : null;
-  return { id, name, base, q: str(r.q, 80), cols, sort };
+  // item 90: the field filters ride along only when there are any, so a view without them reads as before
+  const filters = normalizeListFilters(r.filters);
+  return { id, name, base, q: str(r.q, 80), cols, sort, ...(hasListFilters(filters) ? { filters } : {}) };
 }
 
 /** One list's views: valid ones only, unique ids and names (the later duplicate name wins), capped. */

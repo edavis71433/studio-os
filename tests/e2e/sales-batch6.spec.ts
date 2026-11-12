@@ -74,8 +74,10 @@ test.describe('item 31 — Customers: saved views, columns, pick and act', () =>
     await expect(bar).toContainText('2 selected');
     await bar.getByLabel('Mark the selected customers as').selectOption('on_hold');
     await bar.getByRole('button', { name: 'Yes, mark them' }).click();   // final pass, batch C: it asks first
-    await expect.poll(() => marks.length).toBe(2);
-    expect(marks).toEqual([['p1', { to: 'on_hold' }], ['p3', { to: 'on_hold' }]]);
+    // builder item 75: one already on hold is left as it is (and says so), so Undo has only real changes to put back
+    await expect.poll(() => marks.length).toBe(1);
+    expect(marks).toEqual([['p1', { to: 'on_hold' }]]);
+    await expect(page.locator('.dds-toast', { hasText: '1 marked on hold · 1 already on hold.' })).toBeVisible();
     await expect(page.getByRole('region', { name: 'Selected customers' })).toHaveCount(0);   // done: the picks clear
     await page.getByLabel('Select Acme Bakery').check();
     await page.getByLabel('Select Zeta Gym').check();                                   // Zeta has no email: left out
@@ -175,7 +177,9 @@ test.describe('item 31 — Pipeline: views and pick-and-act in the Table', () =>
     const bar = page.getByRole('region', { name: 'Selected deals' });
     await expect(bar).toContainText('2 selected');
     await bar.getByRole('button', { name: 'Mark as not a fit' }).click();
-    await bar.getByRole('button', { name: 'Yes, mark them' }).click();   // final pass, batch C: it asks first
+    // final pass, batch C: it asks first; builder item 75: and takes the reason
+    await bar.getByLabel('Why they weren’t a fit').selectOption('No reply');
+    await bar.getByRole('button', { name: 'Mark them not a fit' }).click();
     await expect(page.getByRole('region', { name: 'Selected deals' })).toHaveCount(0);   // the picks clear the moment it starts
     await expect.poll(() => moved).toEqual([OPEN]);
     await expect(page.locator('#table tbody tr').filter({ hasText: 'Acme website' })).toContainText('Not a fit');   // the reload has painted the move (one word: Not a fit, never Lost)
@@ -199,7 +203,8 @@ test.describe('item 31 — Pipeline: views and pick-and-act in the Table', () =>
     await dlg.getByLabel('Name').fill('Acme proposals');
     await dlg.getByRole('button', { name: 'Save view' }).click();
     await expect.poll(() => puts.length).toBe(1);
-    expect(puts[0]).toMatchObject({ list: 'pipeline', views: [{ name: 'Acme proposals', base: 'proposal', q: 'acme', cols: ['title', 'contact', 'stage', 'value', 'next', 'last'], sort: { key: 'next', dir: 1 } }] });
+    // sales item 90 added the Close date column (it shows unless hidden)
+    expect(puts[0]).toMatchObject({ list: 'pipeline', views: [{ name: 'Acme proposals', base: 'proposal', q: 'acme', cols: ['title', 'contact', 'stage', 'value', 'close', 'next', 'last'], sort: { key: 'next', dir: 1 } }] });
     await expect(page.locator('#pvBtn')).toContainText('Acme proposals');
   });
 });

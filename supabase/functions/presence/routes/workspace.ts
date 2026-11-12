@@ -102,6 +102,16 @@ async function requireManager(jwt: string, site: SiteRow, principal: Principal, 
   return { role };
 }
 
+/** A managed client's first name as their studio has it (lib/customer_names.ts:
+ *  the contact behind the customer, else the record's own name). '' when unknown. */
+async function clientGreetingName(agencySiteId: string, clientId: string, siteId: string): Promise<string> {
+  const { loadCustomerNames, greetingName } = await import('../lib/customer_names.ts');
+  const read = async (p: string) => { const r = await svc(p); return r.ok && Array.isArray(r.json) ? r.json : []; };
+  const c = (await read(`clients?id=eq.${clientId}&select=name&limit=1`))[0];
+  const named = await loadCustomerNames(agencySiteId, [{ clientId, clientName: c?.name, customerSiteId: siteId }], read);
+  return greetingName(named[clientId]);
+}
+
 export async function handlePortalContext(jwt: string, site: SiteRow, principal: Principal, cors: Record<string, string>, scopedName?: string | null) {
   const role = await resolveSiteRoleCached(principal, jwt, site.id);
   const isOperator = principal.kind === 'staff' || principal.kind === 'system';
@@ -182,7 +192,12 @@ export async function handlePortalContext(jwt: string, site: SiteRow, principal:
   const isManagedClient = !!(customerLinks && customerLinks.length > 0);
   // builder list item 59: a managed client's pages carry their studio's name and logo (routes/studio_brand.ts)
   const studioSiteId = isManagedClient ? String(customerLinks![0]?.agency_site_id || '') : '';
-  const studio = studioSiteId ? await import('./studio_brand.ts').then((m) => m.studioBrandOf(studioSiteId)).catch(() => null) : null;
+  // builder list item 179: and the client's own first name, from the studio's record
+  // of them, so Home greets the person and not their sign-in. Read beside the brand.
+  const [studio, clientFirstName] = await Promise.all([
+    studioSiteId ? import('./studio_brand.ts').then((m) => m.studioBrandOf(studioSiteId)).catch(() => null) : Promise.resolve(null),
+    studioSiteId && site.client_id ? clientGreetingName(studioSiteId, String(site.client_id), site.id).catch(() => '') : Promise.resolve(''),
+  ]);
 
   // Phase D: resolve the FEATURE edition from the licensed plan (falls back to
   // the site edition when no entitlement plan is recorded). Navigation adapts to
@@ -283,6 +298,7 @@ export async function handlePortalContext(jwt: string, site: SiteRow, principal:
     site_role: role,
     capabilities: caps,
     studio,                              // builder list item 59: { name, logo_url, accent } for a managed client, else null
+    client_first_name: clientFirstName || null,   // builder list item 179: the name on the studio's record of this client
     edition: site.edition,               // 'monitor' | 'presence' (site hosting dimension)
     site_live: !!siteLive,               // sales review item 24: the client Overview's Website tile (hosted elsewhere · live · not live yet)
     edition_key: editionKey,             // Phase D: the FEATURE edition (cms_only … enterprise)
@@ -773,7 +789,8 @@ export async function handleMembersList(jwt: string, site: SiteRow, principal: P
 
 const ADD_WORDS: Record<string, [number, string]> = {
   bad_email: [400, 'That doesn’t look like an email address.'],
-  bad_role: [400, 'Pick a role: Co-owner, Staff, Developer or Reviewer.'],
+  bad_role: [400, 'Pick a role: Co-owner, Staff or Reviewer.'],
+  role_paused: [409, 'Developer access is paused while custom code gets a stronger safety check. Pick Staff for now.'],
   shared_site: [400, 'This is your studio’s own site, which holds every client’s files, so a reviewer here would see them all. Open that client and invite the reviewer there instead.'],
   check_failed: [502, 'We couldn’t check this site just now, so nobody was added. Try again in a moment.'],
   is_owner: [409, 'That’s the owner’s own email. The owner already has everything.'],
@@ -791,7 +808,8 @@ export async function handleMemberAdd(req: Request, jwt: string, site: SiteRow, 
   }
   const { ownerFacts, ownerEmailsOf } = await import('../lib/site_transfer.ts');
   const ownerEmails = ownerEmailsOf(await ownerFacts(site.id).catch(() => null));
-  const res = await addSiteMember(site.id, String(body?.email || ''), body?.role, principal.userId || 'owner', { restore: body?.restore === true, ownerEmails });
+  // platform staff alone may still make a Developer seat (lib/workspace.ts DEVELOPER_PAUSED)
+  const res = await addSiteMember(site.id, String(body?.email || ''), body?.role, principal.userId || 'owner', { restore: body?.restore === true, ownerEmails, allowDeveloper: principal.kind === 'staff' });
   if (!res.ok) {
     const m = res.member, words = m ? (SEAT_ROLE_WORDS[m.role as SiteRole] || m.role) : '';
     // bug hunt I1's rule, here too: someone already here is pointed at, never invited again
@@ -812,7 +830,7 @@ export async function handleMemberAdd(req: Request, jwt: string, site: SiteRow, 
 export async function handleMemberRole(req: Request, jwt: string, site: SiteRow, memberId: string, principal: Principal, cors: Record<string, string>) {
   const g = await requireManager(jwt, site, principal, cors); if (g instanceof Response) return g;
   let body: any = {}; try { body = await req.json(); } catch { /* */ }
-  const res = await changeSiteMemberRole(site.id, memberId, body?.role);
+  const res = await changeSiteMemberRole(site.id, memberId, body?.role, { allowDeveloper: principal.kind === 'staff' });
   if (!res.ok) {
     if (res.error === 'not_found') return json({ error: 'not_found', message: 'That person isn’t on this site any more.' }, 404, cors);
     const [status, message] = ADD_WORDS[res.error || 'write_failed'] || ADD_WORDS.write_failed;
