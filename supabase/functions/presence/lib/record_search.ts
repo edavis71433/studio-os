@@ -44,6 +44,22 @@ export function phoneDigits(q: string): string {
   return d.length >= 4 ? d.slice(0, 15) : '';
 }
 
+/** An invoice asked for by its number (sales item 120, code pass finding 55). A client
+ *  calls about "invoice #0013": "#0013", "#13", "0013", "invoice 13", "inv #0013" and
+ *  "invoice no. 13" all mean invoice 13, and none of them is an amount ("0013" was read
+ *  as $13.00). Plain digits ("13") might be either, so `only` is false and the caller
+ *  looks for the amount too. null when the words aren't a number. */
+export function invoiceNumberQuery(q: string): { number: number; only: boolean } | null {
+  const s = String(q || '').trim().toLowerCase();
+  const said = /^(?:inv|invoice)\.?\s*(?:no\.?|number|#)?\s*#?\s*(\d{1,9})$/.exec(s) || /^#\s*(\d{1,9})$/.exec(s);
+  const zero = said ? null : /^(0\d{0,8})$/.exec(s);
+  const plain = said || zero ? null : /^(\d{1,7})$/.exec(s);
+  const m = said || zero || plain;
+  if (!m) return null;
+  const n = Number(m[1]);
+  return Number.isSafeInteger(n) && n > 0 ? { number: n, only: !plain } : null;
+}
+
 /** A loose ilike pattern for those digits in a stored number, whatever is
  *  written between them ("5*5*5*0*1*0" finds "(555) 010-…"). The route checks
  *  each hit again by its digits, so a number whose digits only happen to come

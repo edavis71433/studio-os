@@ -18,17 +18,23 @@ function shiftMonth(key: string, by: number): string {
 }
 
 // ── 1. revenue by month: the last twelve months against the same months a year before ──
-export interface RevenueMonth { month: string; label: string; this_year: number; last_year: number }
-export function revenueByMonth(paid: Array<{ amount_cents?: unknown; paid_at?: unknown }>, nowIso: string) {
-  const byMonth = new Map<string, number>();
-  for (const p of paid || []) { const k = ym(p?.paid_at); if (/^\d{4}-\d{2}$/.test(k)) byMonth.set(k, (byMonth.get(k) || 0) + n(p.amount_cents)); }
+export interface RevenueMonth { month: string; label: string; this_year: number; last_year: number; retainer: number }
+/** `retainer`: retainer charges as payments (lib/invoice_billing.ts retainerPayments). A
+ *  retainer is money in like a paid invoice, but it is only ever a deal event, so revenue
+ *  left it out while the record counted it in Paid (sales item 120, code pass finding 54).
+ *  Each month says how much of it was retainer. */
+export function revenueByMonth(paid: Array<{ amount_cents?: unknown; paid_at?: unknown }>, nowIso: string, retainer: Array<{ amount_cents?: unknown; paid_at?: unknown }> = []) {
+  const byMonth = new Map<string, number>(), retByMonth = new Map<string, number>();
+  const add = (into: Map<string, number>, p: { amount_cents?: unknown; paid_at?: unknown }) => { const k = ym(p?.paid_at); if (/^\d{4}-\d{2}$/.test(k)) into.set(k, (into.get(k) || 0) + n(p.amount_cents)); };
+  for (const p of paid || []) add(byMonth, p);
+  for (const p of retainer || []) { add(byMonth, p); add(retByMonth, p); }
   const end = ym(nowIso);
   const months: RevenueMonth[] = [];
   for (let i = 11; i >= 0; i--) {
     const k = shiftMonth(end, -i);
-    months.push({ month: k, label: `${MONTH[Number(k.slice(5)) - 1]} ${k.slice(0, 4)}`, this_year: byMonth.get(k) || 0, last_year: byMonth.get(shiftMonth(k, -12)) || 0 });
+    months.push({ month: k, label: `${MONTH[Number(k.slice(5)) - 1]} ${k.slice(0, 4)}`, this_year: byMonth.get(k) || 0, last_year: byMonth.get(shiftMonth(k, -12)) || 0, retainer: retByMonth.get(k) || 0 });
   }
-  return { months, total_this_year: months.reduce((a, m) => a + m.this_year, 0), total_last_year: months.reduce((a, m) => a + m.last_year, 0) };
+  return { months, total_this_year: months.reduce((a, m) => a + m.this_year, 0), total_last_year: months.reduce((a, m) => a + m.last_year, 0), retainer_this_year: months.reduce((a, m) => a + m.retainer, 0) };
 }
 
 // ── 2. open deals by stage, with how long they have sat there ──
