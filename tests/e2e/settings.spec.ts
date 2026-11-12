@@ -178,7 +178,7 @@ test.describe('Settings page', () => {
     // the cards that act on a site carry the client
     await expect(page.locator('[data-card="team"]')).toHaveAttribute('href', '/sharing.html?client=' + CLIENT);
     await expect(page.locator('[data-card="connections"]')).toHaveAttribute('href', '/connections.html?client=' + CLIENT);
-    await expect(page.locator('[data-card="notify"]')).toHaveAttribute('href', '/inbox.html?client=' + CLIENT);
+    await expect(page.locator('[data-card="notify"]')).toHaveAttribute('href', '#notify');   // item 126: a studio's Notifications is a part of this page, for this client's site
     await expect(page.locator('[data-card="domains"]')).toHaveAttribute('href', '/presence.html?client=' + CLIENT + '#domain');
     for (const k of ['team', 'connections', 'notify', 'domains']) await expect(page.locator(`[data-card="${k}"]`)).not.toHaveAttribute('data-noscope', /./);
     // the developer tools are the studio's: the card stays unscoped and says so
