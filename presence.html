@@ -346,6 +346,7 @@ h1.doc{font-family:var(--serif);font-weight:500;font-size:24px;letter-spacing:-.
 .pg-pw{display:flex;flex-direction:column;gap:8px;margin:0 0 8px}
 .pg-pw .field{margin:0}
 .pg-pw .pc-acts{margin:0;align-items:center}
+.pg-pw .pg-unset{margin:0;font-size:12.5px;line-height:1.45;color:var(--ink);background:var(--amber-soft);border-radius:var(--dds-r,10px);padding:8px 10px}   /* item 196: a copied page with no password here */
 .pg-saved{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:0 0 8px}
 .pg-lrow{display:flex;align-items:baseline;justify-content:space-between;gap:10px;margin-bottom:var(--dds-s1,4px)}
 .pg-lrow label{flex:none;margin:0}
@@ -6685,6 +6686,9 @@ function pgAccessGroup(slug) {
     const page = dcPageObj(slug); if (!page) return;
     const now = page.access === "password" || page.access === "private" ? page.access : "everyone";
     const shown = asking ? "password" : now;
+    // Item 196 (review finding 30): a page copied from another site keeps its setting, never its
+    // password, so it said "Password saved" and was quietly left off the live site. It asks for one.
+    const unset = now === "password" && (!page.lock || (PG_LOCKS && !PG_LOCKS.has(String(page.lock))));
     g.textContent = "";
     g.appendChild(el("h4", "pg-h", "Who can see it"));
     const row = el("div", "pg-access"); row.setAttribute("role", "group"); row.setAttribute("aria-label", "Who can see it");
@@ -6697,7 +6701,7 @@ function pgAccessGroup(slug) {
     });
     g.appendChild(row);
     g.appendChild(el("p", "pg-says", PG_ACCESS.find((a) => a[0] === shown)[3]));
-    if (shown === "password" && !asking) {
+    if (shown === "password" && !asking && !unset) {
       const saved = el("div", "pg-saved");
       const chip = el("span", "hb-chip good"); chip.appendChild(el("i", "d")); chip.appendChild(document.createTextNode("Password saved"));
       const change = el("button", "dc-modal-cancel", "Change password"); change.type = "button";
@@ -6717,8 +6721,9 @@ function pgAccessGroup(slug) {
         g.appendChild(pgField(label, inp, hint));
       });
     }
-    if (asking) {
+    if (asking || unset) {
       const box = el("div", "pg-pw");
+      if (unset && !asking) box.appendChild(el("p", "pg-unset", "This page asks for a password, but none is set on this site yet, so it can’t go live. Set one, or choose who can see it."));
       const pw = el("input"); pw.type = "password"; pw.maxLength = 100; pw.autocomplete = "new-password"; pw.placeholder = "At least 4 letters or numbers";
       box.appendChild(pgField("Password", pw, "Tell it to the people who should see the page. Changing it later asks everyone again."));
       const err = el("div", "hint pg-err"); err.setAttribute("role", "alert"); err.hidden = !msg; err.textContent = msg; box.appendChild(err);
@@ -6731,7 +6736,7 @@ function pgAccessGroup(slug) {
       const go = () => savePassword(pw.value, save);
       save.addEventListener("click", go);
       pw.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); go(); } });
-      acts.append(save, show, cancel); box.appendChild(acts);
+      acts.append(save, show); if (asking) acts.append(cancel); box.appendChild(acts);   // with no password yet there's nothing to go back to
       g.appendChild(box);
       if (focusOn === "pw") setTimeout(() => { try { pw.focus({ preventScroll: true }); box.scrollIntoView({ block: "nearest" }); } catch (_) {} }, 0);
     }
@@ -6765,6 +6770,8 @@ function pgAccessGroup(slug) {
     } catch (err) { msg = nice(err); draw("pw"); }
   };
   draw();
+  const first = dcPageObj(slug);
+  if (!PG_LOCKS && first && first.access === "password") pgLocksRead().then(() => { if (g.isConnected && !asking) draw(); });   // item 196: is its password this site's?
   return g;
 }
 function pgChromeGroup(slug) {
@@ -7773,7 +7780,7 @@ function openRitual(opts) {
 // the one-sentence fallback above.
 function blockerTarget(field) {
   const [head, sub] = String(field || "").split(".");
-  const view = { identity: "business", location: "business", locations: "business", redirects: "business", offerings: "offerings", faqs: "faqs", testimonials: "testimonials", posts: "updates" }[head] || "business";
+  const view = { identity: "business", location: "business", locations: "business", redirects: "business", offerings: "offerings", faqs: "faqs", testimonials: "testimonials", posts: "updates", copied: "design" }[head] || "business";
   let focus = null;
   if (head === "identity" && sub) focus = "f-" + sub;
   else if (head === "location") focus = sub === "hours" ? "hoursGrid" : "f-" + (sub || "address_line1");
@@ -7788,10 +7795,14 @@ function renderBlockerList(list) {
   box.appendChild(el("p", "blockprose", uniq.length === 1 ? "One thing to finish before this can publish:" : `${uniq.length} things to finish before this can publish:`));
   const ul = el("ul", "blocklist");
   uniq.forEach((b) => {
-    const li = el("li"); li.appendChild(ritMark(false)); li.appendChild(el("span", "rit-msg", b.message));
+    const copied = b.field === "copied", studio = copied && studioInClient();
+    // item 196: Keep is the studio's; a client is told who can keep them
+    const li = el("li"); li.appendChild(ritMark(false)); li.appendChild(el("span", "rit-msg", copied && !studio ? b.message + " Or ask your studio to keep them as they are." : b.message));
     const fix = el("button", "textact", "Fix"); fix.type = "button";
     fix.setAttribute("aria-label", "Fix: " + b.message);
+    if (studio) li.appendChild(keepCopiedButton());
     fix.addEventListener("click", () => {
+      if (blockerOpen(b)) return;
       const t = blockerTarget(b.field);
       closeRitual(); go(t.view);
       if (t.focus) setTimeout(() => {
@@ -7804,6 +7815,39 @@ function renderBlockerList(list) {
     li.appendChild(fix); ul.appendChild(li);
   });
   box.appendChild(ul);
+}
+// Item 196 (review finding 32): the copied-words item's Fix opened Business details, which has
+// nothing to do with copied sections; it opens the first of them now. A page's missing password
+// opens that page's settings, where it is set.
+function blockerOpen(b) {
+  const f = String(b.field || "");
+  if (f === "copied" && b.at && Number.isInteger(b.at.index)) {
+    const slug = String(b.at.page || ""), i = b.at.index;
+    closeRitual(); go("design");
+    Promise.resolve(slug === DC_PAGE || dcSwitchPage(slug)).then((ok) => {
+      if (!ok) return;
+      if (!BLOCKS_WORK) BLOCKS_WORK = currentBlocks();   // Edit opened just now: its list, as the section card would load it
+      if (BLOCKS_WORK[i]) eeEditBlock(i);
+    });
+    return true;
+  }
+  if (f.indexOf("page_lock.") === 0) {
+    closeRitual(); go("design");
+    setTimeout(() => pgOpenSettings({ href: "/" + f.slice(10) + "/" }), 80);
+    return true;
+  }
+  return false;
+}
+// The studio's "keep them as they are", here where publishing waits on it, not only on Sites
+function keepCopiedButton() {
+  const keep = el("button", "textact", "Keep them"); keep.type = "button";
+  keep.setAttribute("aria-label", "Keep the copied words and photos as they are");
+  keep.addEventListener("click", async () => {
+    keep.disabled = true;
+    try { await api("POST", "/agency/sites/" + encodeURIComponent(S.site.id) + "/copied", { keep: true }); toast("Kept as they are. They can go live now."); loadRitual(); }
+    catch (err) { keep.disabled = false; toast(nice(err), true); }
+  });
+  return keep;
 }
 // the checklist's marks: amber for a real blocker, green for what is in place (item 35)
 function ritMark(ok) { const i = el("i", "rit-ck " + (ok ? "ok" : "bad")); i.innerHTML = uiIcon(ok ? "check" : "x", 12); i.setAttribute("aria-hidden", "true"); return i; }
@@ -7934,14 +7978,24 @@ async function runPublish(btn, firstPublish) {
   } catch (err) {
     $("ritBody").innerHTML = pipeHtml(-1);
     $("ritTitle").textContent = "That didn’t go through.";
-    $("ritSub").textContent = "Your live site is unchanged and nothing was lost. The version is kept — try again whenever you’re ready.";
+    // Item 196 (review finding 31): the server says why (publish again in about N seconds, the site
+    // is paused, another publish is running), and that shows now. Try again waits as long as it
+    // was asked to, and isn't offered when only the studio can change the answer.
+    const code = (err && err.stale) ? "stale_draft" : (err && err.body && err.body.error) || "";
+    const why = code === "stale_draft" ? "Your draft changed since you looked it over. Take another look, then publish."
+      : code && code !== "validation_failed" && err.body && err.body.message ? nice(err) : "";
+    $("ritSub").textContent = why ? why + " Your live site is unchanged." : "Your live site is unchanged and nothing was lost. The version is kept — try again whenever you’re ready.";
     if (err.body && err.body.fields) {
       $("ritBlockers").innerHTML = `<p class="blockprose">${(err.body.fields || []).map((f) => esc(typeof f === "string" ? f : f.message || "")).join("<br>")}</p>`;
     }
     $("ritActions").innerHTML = "";
-    const retry = el("button", "pubbtn", "Try again");
-    retry.addEventListener("click", () => loadRitual());
-    $("ritActions").appendChild(retry);
+    if (code !== "site_paused" && code !== "lifecycle_blocked") {
+      const retry = el("button", "pubbtn", code === "stale_draft" ? "Take another look" : "Try again");
+      retry.addEventListener("click", () => loadRitual());
+      const wait = code === "cooldown" ? Math.min(120, Math.max(1, Number(err.body.retry_after) || 60)) : 0;
+      if (wait) { retry.disabled = true; setTimeout(() => { retry.disabled = false; }, wait * 1000); }
+      $("ritActions").appendChild(retry);
+    }
     const ny = el("button", "notyet", "Back to your website");
     ny.addEventListener("click", closeRitual);
     $("ritActions").appendChild(ny);
@@ -14743,11 +14797,14 @@ function dcPageStatus(chip) {
   const pg = [...m.menu.map((e) => e.pg), ...m.unlinked].find((p) => p && p.view === "design" && (p.slug || "") === DC_PAGE);
   let word = "Live", tone = "good", says = "Nothing on this page is waiting: your live site shows it as it is here";
   const tp = pg ? hbTreePage(pg) : null;
+  const acc = (pg && pg.slug && (dcPageObj(pg.slug) || {}).access) || "";   // item 196: a private or password page isn't plainly "Live"
   if (tp && HB_TREE_FLAG[tp.status]) { word = tp.status_label; tone = HB_TREE_FLAG[tp.status]; says = tp.status_label; }
+  else if (acc === "private") { word = "Private"; tone = ""; says = "Kept in your draft: it isn’t on your live site or in its menu"; }
   else if (!ctx.siteLive || ctx.firstPublish) { word = "Not live yet"; tone = ""; says = "Your site goes live the first time you publish"; }
   else {
     const n = pg ? ctx.changes.filter((ch) => pcChangeOn(ch, pg)).length : 0;
     if (n) { word = n + (n === 1 ? " change" : " changes"); tone = "warn"; says = n + (n === 1 ? " change on this page is" : " changes on this page are") + " waiting to go live"; }
+    else if (acc === "password") { word = "Password"; tone = ""; says = "On your live site: visitors type its password to open it"; }
   }
   chip.textContent = word; chip.className = "dc-chip" + (tone ? " " + tone : ""); chip.title = says;
 }

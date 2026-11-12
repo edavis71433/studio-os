@@ -8,11 +8,12 @@ import { json } from '../../_shared/http.ts';
 import { svc } from '../lib/db.ts';
 import { runPipeline } from './publish.ts';
 import { writeChangeEvent } from '../lib/provenance.ts';
-import { PUBLISH_BLOCKED_STATES } from '../lib/lifecycle.ts';
+import { PUBLISH_BLOCKED_STATES, publishRefusal } from '../lib/lifecycle.ts';
 import { captureDraftSnapshot, loadStagedSnapshot } from '../lib/staging.ts';
 import { renderSnapshot } from '../lib/render.ts';
 import { previewUrlMap } from '../lib/media.ts';
 import { snapshotContentUsable } from '../lib/render_types.ts';
+import { liveContent } from '../lib/page_access.ts';
 import { injectPreviewBadge, hashPreviewPassword, verifyPreviewPassword, mintPreviewPass, verifyPreviewPass, draftLinkUrl, newPreviewToken, shapePreviewStatus, signPreviewImages, absoluteLibraryFonts } from '../lib/preview_env.ts';
 import { rateAllow, clientIp } from '../lib/ratelimit.ts';
 import { previewCache, previewCacheKey } from '../lib/preview_cache.ts';
@@ -84,6 +85,8 @@ export async function handlePreviewPublish(site: SiteRow, principal: Principal, 
 
 // ── POST /preview/promote — promote the Preview snapshot to Live (one pipeline) ─
 export async function handlePreviewPromote(site: SiteRow, principal: Principal, cors: Record<string, string>) {
+  const refused = publishRefusal(site.status, principal.kind);   // item 196: it goes live, so Publish's rules
+  if (refused) return json(refused, 409, cors);
   const p = await previewRow(site.id);
   if (!p || !p.snapshot_id) return json({ error: 'no_preview', message: 'There’s no preview to promote — update your preview first.' }, 409, cors);
   const loaded = await loadStagedSnapshot(p.snapshot_id);
@@ -113,8 +116,12 @@ export async function handlePreviewSettings(req: Request, site: SiteRow, princip
 // signed image URLs, link rewrite, badge) are always re-applied → a cache hit
 // never serves an expired signed URL. Internal links go to `navBase` + the page,
 // which is the draft viewer on the app (draft.html), the door the visitor came by.
-async function stagedPreviewHtml(siteId: string, snapshotId: string, page: string, navBase: string, decorate?: (html: string) => string): Promise<{ status: number; html: string }> {
-  const key = previewCacheKey(siteId, 'snap', snapshotId);
+// Builder item 196 (review finding 34): only Publish applied the page locks, so anyone with a
+// shared draft link could open a password or private page. A link that anyone can be given
+// (`shared`) leaves both out: no page, no menu link, as the live site leaves out a private one.
+// The client's own portal view of their draft keeps them.
+async function stagedPreviewHtml(siteId: string, snapshotId: string, page: string, navBase: string, decorate?: (html: string) => string, shared = false): Promise<{ status: number; html: string }> {
+  const key = previewCacheKey(siteId, 'snap', shared ? `${snapshotId}:shared` : snapshotId);
   let hit = previewCache.get(key);
   if (!hit) {
     const loaded = await loadStagedSnapshot(snapshotId);
@@ -122,8 +129,9 @@ async function stagedPreviewHtml(siteId: string, snapshotId: string, page: strin
     const site = await svc(`presence_sites?id=eq.${siteId}&select=id,custom_domain,netlify_site_id&limit=1`);
     const s = site.json?.[0] || {};
     const baseUrl = siteOrigin(s) || 'https://preview.invalid';
+    const snap = shared ? { ...loaded.snapshot, content: liveContent(loaded.snapshot.content, new Set()).content } : loaded.snapshot;
     let fileMap: Record<string, string | Uint8Array>;
-    try { fileMap = await renderSnapshot(loaded.snapshot, { baseUrl }); } catch { return { status: 500, html: shell('We couldn’t draw this preview.') }; }
+    try { fileMap = await renderSnapshot(snap, { baseUrl }); } catch { return { status: 500, html: shell('We couldn’t draw this preview.') }; }
     hit = { fileMap, mediaManifest: loaded.mediaManifest, blockers: 0, warnings: 0, businessName: (loaded.snapshot.content as any)?.identity?.business_name || '' };
     previewCache.set(key, hit);
   }
@@ -214,7 +222,7 @@ export async function handlePublicPreviewOpen(req: Request, token: string, cors:
     }
   }
   const page = cleanPage(b.page);
-  const out = await stagedPreviewHtml(row.site_id, row.snapshot_id, page, `${draftLinkUrl(appUrl(), 't', token)}&page=`);
+  const out = await stagedPreviewHtml(row.site_id, row.snapshot_id, page, `${draftLinkUrl(appUrl(), 't', token)}&page=`, undefined, true);
   return json({ data: { html: out.html, ...(pass ? { pass } : {}) } }, out.status, { ...cors, 'Cache-Control': 'no-store' });
 }
 
@@ -239,7 +247,7 @@ export async function handleSignedPreview(req: Request, token: string, cors: Rec
   // comment boxes fed by /p/s/:token/sections and posted to /p/s/:token/comments,
   // both authorized by THIS same signed token. The opaque door is untouched.
   const pfx = `${fnBase()}/functions/v1/presence/p/s/${token}`;
-  const out = await stagedPreviewHtml(v.payload.site_id, snapId, page, `${draftLinkUrl(appUrl(), 's', token)}&page=`, (h) => injectFeedbackPanel(h, { pfx, page }));
+  const out = await stagedPreviewHtml(v.payload.site_id, snapId, page, `${draftLinkUrl(appUrl(), 's', token)}&page=`, (h) => injectFeedbackPanel(h, { pfx, page }), true);
   return htmlResp(cors, out.html, out.status);
 }
 

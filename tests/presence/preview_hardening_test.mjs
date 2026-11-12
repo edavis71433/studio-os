@@ -138,7 +138,8 @@ ok('ttl-clamp: in range → honored', clampTtlSeconds(3600) === 3600);
   ok('SAFETY: the publish renderer never injects the preview badge (watermark can’t reach a live deploy)', !/presence-preview-badge/.test(render) && !/injectPreviewBadge/.test(render));
 
   const penv = read('supabase/functions/presence/routes/preview_env.ts');
-  ok('wiring: shared public renderer caches by snapshot id', /previewCacheKey\(siteId, 'snap', snapshotId\)/.test(penv));
+  // item 196: a link anyone can be given is drawn without password and private pages, so it has its own cache entry
+  ok('wiring: shared public renderer caches by snapshot id', /previewCacheKey\(siteId, 'snap', shared \? `\$\{snapshotId\}:shared` : snapshotId\)/.test(penv));
   ok('wiring: signed preview handler verifies + fails closed on missing secret', /verifyPreviewToken\(/.test(penv) && /previewLinkSecret\(\)/.test(penv) && /fail closed/.test(penv));
   ok('wiring: mint route is site-scoped to the caller’s site', /signPreviewToken\(\{ site_id: site\.id/.test(penv));
 
