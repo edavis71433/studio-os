@@ -1886,7 +1886,7 @@ test.describe('Client portal — Documents shelf: files and documents (slice 12,
     const h1 = await page.locator('#main h1').boundingBox();
     expect(btn!.y).toBeGreaterThan(h1!.y + h1!.height - 1);              // on the line under the title…
     expect(btn!.y).toBeGreaterThan(bell!.y + bell!.height);              // …so the floating bell never covers it
-    await expect(page.locator('#fchoose')).toHaveText('Send a file');   // the short words on a phone
+    await expect.poll(() => page.locator('#fchoose').innerText()).toBe('Send a file');   // the short words on a phone (innerText: what's shown, not the hidden "your studio")
     await expect(shelfRow(page, 'Kitchen photos.zip')).toBeVisible();
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
     expect(overflow).toBeLessThanOrEqual(1);
