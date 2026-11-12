@@ -137,6 +137,35 @@ footer.site{background:#fff;color:#000}
 .post-tags li{font-size:.78rem;font-weight:600;color:var(--accent);background:var(--wash,var(--paper,#f2f4f2));border-radius:999px;padding:3px 10px}
 @media (max-width:640px){.sitesearch{max-width:150px}
 }
+.post-row{display:grid;grid-template-columns:220px 1fr;gap:24px;align-items:start}
+.post-row.no-thumb{grid-template-columns:1fr}
+.post-row[hidden]{display:none}
+.post-thumb{display:block;border-radius:var(--radius,12px);overflow:hidden}
+.post-thumb img{display:block;width:100%;height:auto;aspect-ratio:3/2;object-fit:cover}
+.post-text h2{margin:0}
+.post-text h2 a{color:var(--ink);text-decoration:none}
+.post-text h2 a:hover{text-decoration:underline}
+.post-cover img{display:block;width:100%;height:auto}
+.post-kicker{color:var(--accent-dark,var(--accent));font-size:.75rem;font-weight:700;letter-spacing:.12em;text-transform:uppercase;margin:0 0 6px}
+.post-cats{display:flex;flex-wrap:wrap;gap:8px;margin:14px 0 8px}
+.post-cats a{display:inline-flex;align-items:center;min-height:44px;padding:0 18px;border:1px solid var(--line);border-radius:999px;color:var(--ink);text-decoration:none}
+.post-cats a:hover{border-color:var(--ink)}
+.post-cats a[aria-current="page"]{background:var(--ink);border-color:var(--ink);color:var(--card,#fff)}
+.post-fig{margin:24px 0}
+.post-fig img{display:block;width:100%;height:auto;border-radius:var(--radius,12px)}
+.post-fig figcaption{color:var(--soft);font-size:.9rem;font-style:italic;margin-top:8px}
+.post-author{display:flex;gap:14px;align-items:center;border:1px solid var(--line);border-radius:var(--radius,14px);padding:16px 18px;margin:32px 0 0}
+.post-author-photo{display:block;width:56px;height:56px;border-radius:999px;object-fit:cover}
+.post-author-mark{flex:0 0 auto;display:inline-grid;place-items:center;width:56px;height:56px;border-radius:999px;background:var(--line);color:var(--ink);font-weight:700}
+.post-author-name{font-weight:700;margin:0}
+.post-author-bio{color:var(--soft);margin:2px 0 0}
+.post-more{display:flex;flex-wrap:wrap;gap:8px 24px;margin-top:28px}
+@media (max-width:700px){.post-row{grid-template-columns:1fr;gap:12px}
+}
+
+address.place2{margin-top:14px}
+.place2-same{color:var(--soft)}
+
 nav.primary li.has-sub{position:relative}
 nav.primary .sub-caret{font-size:.7em;margin-left:4px;opacity:.75}
 nav.primary ul.subnav{position:absolute;left:0;top:100%;min-width:190px;margin:0;padding:6px;list-style:none;background:var(--sheet,var(--card,#fff));border:1px solid var(--line,#e6e6e6);border-radius:10px;box-shadow:0 12px 32px rgba(0,0,0,.14);display:none;z-index:60}

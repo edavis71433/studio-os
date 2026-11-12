@@ -495,7 +495,7 @@ test.describe('a tab opens on its title', () => {
     await mount(page, '/presence.html#updates');
     const sub = page.locator('#view-updates > .docsub');
     const help = page.locator('#view-updates > .tabhelp');
-    await expect(page.locator('#view-updates > h1.doc')).toHaveText('Updates');
+    await expect(page.locator('#view-updates > h1.doc')).toHaveText('Blog');
     await expect(sub).toBeHidden();
     await expect(help).toHaveAttribute('aria-expanded', 'false');
     await help.click();

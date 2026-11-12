@@ -37,6 +37,9 @@ export interface LocationContent {
   postal_code: string; country: string; phone?: string; timezone: string;
   hours: HoursDay[]; holiday_exceptions?: HolidayException[];
   temporarily_closed?: boolean; temporarily_closed_note?: string;
+  /** Builder list item 127 (0182): a second location's name for itself ("Glendale"), and
+   *  true when it keeps the main location's hours. Only ever on locations[1]. */
+  label?: string; same_hours?: true;
 }
 
 export interface SnapshotContent {
@@ -46,9 +49,13 @@ export interface SnapshotContent {
     booking_url?: string; ordering_url?: string;
     social?: Record<string, string>;
     seo_title?: string; seo_description?: string;
+    /** Builder list item 127 (0182): one sentence, 150 characters at most, the line Google, AI
+     *  assistants and directories quote. Only present when set. */
+    short_description?: string;
   };
   /** M7 (reconciliation §9): locations is a LIST — v1 carries exactly one.
-   *  Multi-location becomes an additive change, not a contract major. */
+   *  Multi-location becomes an additive change, not a contract major. Builder list item
+   *  127: a second location, when the business has one, is locations[1]. */
   locations: LocationContent[];
   /** M7: presentation settings — offering section (category) display order.
    *  Phase V (additive, all optional): logo (header/favicon/OG fallback), the
@@ -131,7 +138,11 @@ export interface SnapshotContent {
   offerings: Array<{ id: string; name: string; category: string; description?: string; price_text?: string; media?: MediaRef | null; sort_order?: number; is_visible?: boolean }>;
   testimonials: Array<{ id: string; quote: string; author: string; source?: string; quote_date?: string; sort_order?: number }>;
   faqs: Array<{ id: string; question: string; answer: string; sort_order?: number }>;
-  posts: Array<{ id: string; title: string; slug: string; body_md: string; excerpt?: string; hero?: MediaRef | null; published_at: string; noindex?: boolean; tags?: string[] }>;
+  /** Builder list item 40 (0181), all optional: the post's category and author, resolved
+   *  from the site's lists, and the photos its text shows on lines of their own, by id
+   *  (lib/blog.ts). A post without them is unchanged. */
+  posts: Array<{ id: string; title: string; slug: string; body_md: string; excerpt?: string; hero?: MediaRef | null; published_at: string; noindex?: boolean; tags?: string[];
+    category?: { id: string; name: string }; author?: { id: string; name: string; bio?: string; photo?: MediaRef }; images?: Record<string, MediaRef> }>;
   redirects: Array<{ from_path: string; to_path: string }>;
   // voice is present in the snapshot but marked private — the renderer MUST NOT read it.
 }

@@ -58,6 +58,43 @@ export function cleanCommentBody(raw: unknown):
   return { ok: true, body: s };
 }
 
+// ── Builder list item 159: a name on shared-draft feedback, and one picture a note ──
+export const AUTHOR_NAME_MAX = 60;
+/** The name someone typed with their feedback: control characters out, spaces folded,
+ *  at most 60 characters. '' when none (the note is still welcome without one). Pure. */
+export function cleanAuthorName(raw: unknown): string {
+  let s = '';
+  for (const ch of String(raw ?? '')) { const c = ch.codePointAt(0)!; if (c >= 32 && c !== 127) s += ch; }
+  return s.replace(/\s+/g, ' ').trim().slice(0, AUTHOR_NAME_MAX).trim();
+}
+
+/** One picture a note: a JPEG, PNG or WebP the page has already made small, sent as a
+ *  data: address. At most 3 MB once decoded; its kind comes from its first bytes. */
+export const COMMENT_IMAGE_MAX = 3 * 1024 * 1024;
+export function decodeCommentImage(raw: unknown): { ok: true; bytes: Uint8Array; type: string } | { ok: false; error: 'not_image' | 'too_large' } | null {
+  if (raw === undefined || raw === null || raw === '') return null;   // no picture: fine
+  const m = /^data:(image\/(?:jpeg|png|webp));base64,([A-Za-z0-9+/=\s]+)$/.exec(String(raw));
+  if (!m) return { ok: false, error: 'not_image' };
+  const b64 = m[2].replace(/\s+/g, '');
+  if (b64.length > Math.ceil(COMMENT_IMAGE_MAX / 3) * 4 + 4) return { ok: false, error: 'too_large' };
+  let bin: string;
+  try { bin = atob(b64); } catch { return { ok: false, error: 'not_image' }; }
+  const bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  if (bytes.length > COMMENT_IMAGE_MAX) return { ok: false, error: 'too_large' };
+  const at = (i: number, ...v: number[]) => v.every((x, k) => bytes[i + k] === x);
+  const type = bytes.length >= 3 && at(0, 0xff, 0xd8, 0xff) ? 'image/jpeg'
+    : bytes.length >= 8 && at(0, 0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a) ? 'image/png'
+    : bytes.length >= 12 && at(0, 0x52, 0x49, 0x46, 0x46) && at(8, 0x57, 0x45, 0x42, 0x50) ? 'image/webp' : null;
+  if (!type) return { ok: false, error: 'not_image' };
+  return { ok: true, bytes, type };
+}
+/** A picture's dimensions as the page measured them, kept only when they're sane. */
+export function pictureSize(w: unknown, h: unknown): { w: number; h: number } | null {
+  const a = Math.round(Number(w)), b = Math.round(Number(h));
+  return a > 0 && b > 0 && a <= 10000 && b <= 10000 ? { w: a, h: b } : null;
+}
+
 /** Normalize a page reference — accepts a slug ("about") or a public path form
  *  ("/", "/about/"). '' = the home page. Returns null on anything that isn't a
  *  safe slug (fail closed — never a traversal or a raw key). Pure. */
@@ -109,6 +146,9 @@ export function sectionsForContent(content: unknown, pageSlug: string): Array<{ 
 export interface CommentRow {
   id: string; page_slug: string; block_id: string | null; author_kind: string;
   body: string; status: string; created_at: string; resolved_at?: string | null;
+  /** item 159: the name typed with shared-draft feedback, and the note's picture (a
+   *  ten-minute link, never the stored path) */
+  author_name?: string | null; picture?: { url: string; w?: number; h?: number } | null;
 }
 export interface CommentThread { page_slug: string; block_id: string; open_count: number; comments: CommentRow[] }
 
@@ -137,106 +177,6 @@ export function groupThreads(rows: CommentRow[]): CommentThread[] {
 export function canResolve(status: unknown): boolean { return status === 'open'; }
 
 // ── The "Leave feedback" panel on the shared draft (/p/s/:token) ──────────────
-// Self-contained (inline CSS/JS, zero external assets — fits inside the
-// published-site CSP), theme-neutral, and blind to operator data: it reads ONLY
-// the {id,name} sections route and writes ONLY the token comments route — both
-// authorized by the SAME signed token the visitor arrived with.
-const FEEDBACK_MARKER = 'id="presence-feedback-panel"';
-
-/** Escape a string for safe embedding inside an inline <script> as a JS string
- *  literal (JSON + unicode-escape of anything that could close the tag). Pure. */
-function jsStr(s: string): string {
-  return JSON.stringify(String(s ?? '')).replace(/</g, '\\u003c').replace(/>/g, '\\u003e');
-}
-
-/** Inject the fixed "Leave feedback" panel before </body>. `pfx` is the signed
- *  door's own URL (…/p/s/<token>) — sections + comments are fetched under it, so
- *  the panel holds no authority beyond the link the visitor already has.
- *  Idempotent; pure. */
-export function injectFeedbackPanel(html: string, opts: { pfx: string; page: string }): string {
-  if (typeof html !== 'string' || html.includes(FEEDBACK_MARKER)) return html;
-  const P = jsStr(opts.pfx);
-  const PG = jsStr(opts.page || '/');
-  const panel = `
-<div id="presence-feedback-panel">
-<style>
-#presence-feedback-panel{position:fixed;right:16px;bottom:56px;z-index:2147483646;font:14px/1.5 system-ui,-apple-system,'Segoe UI',sans-serif;color:#1b1525}
-#pfb-open{font:inherit;font-weight:700;font-size:13.5px;padding:10px 16px;border:none;border-radius:999px;background:#5b3fa0;color:#fff;cursor:pointer;box-shadow:0 4px 18px rgba(0,0,0,.22)}
-#pfb-card{display:none;width:320px;max-width:calc(100vw - 32px);max-height:min(70vh,520px);overflow-y:auto;background:#fff;border:1px solid #e2dcee;border-radius:14px;box-shadow:0 10px 40px rgba(0,0,0,.25);padding:14px 14px 10px;margin-bottom:10px}
-#presence-feedback-panel.open #pfb-card{display:block}
-#pfb-card h2{font-size:15px;margin:0 0 2px;color:#3a2470}
-#pfb-card .pfb-sub{font-size:12px;color:#6b6478;margin:0 0 10px}
-.pfb-row{border-top:1px solid #efeaf7;padding:7px 0}
-.pfb-name{font-weight:600;font-size:13px}
-.pfb-add{font:inherit;font-size:12px;color:#5b3fa0;background:none;border:none;cursor:pointer;padding:2px 0;text-decoration:underline}
-.pfb-box{width:100%;box-sizing:border-box;font:inherit;font-size:13px;border:1px solid #d9d2e8;border-radius:8px;padding:7px;margin-top:6px;min-height:56px;resize:vertical}
-.pfb-send{font:inherit;font-size:12.5px;font-weight:700;margin-top:6px;padding:6px 14px;border:none;border-radius:999px;background:#5b3fa0;color:#fff;cursor:pointer}
-.pfb-send[disabled]{opacity:.5;cursor:default}
-.pfb-done{font-size:12.5px;color:#1f7a4d;font-weight:600;padding:6px 0}
-.pfb-err{font-size:12px;color:#a3423a;padding:4px 0}
-</style>
-<div id="pfb-card" role="dialog" aria-label="Leave feedback on this draft">
-  <h2>Leave feedback</h2>
-  <p class="pfb-sub">Your notes go straight to the studio — nothing shows on the website.</p>
-  <div id="pfb-sections"></div>
-</div>
-<button type="button" id="pfb-open" aria-expanded="false">&#128172; Leave feedback</button>
-<script>
-(function(){
-  var PFX=${P},PAGE=${PG};
-  var root=document.getElementById('presence-feedback-panel');
-  var btn=document.getElementById('pfb-open');
-  var host=document.getElementById('pfb-sections');
-  var loaded=false;
-  function boxRow(name,blockId,open){
-    var row=document.createElement('div');row.className='pfb-row';
-    var nm=document.createElement('div');nm.className='pfb-name';nm.textContent=name;row.appendChild(nm);
-    var wrap=document.createElement('div');row.appendChild(wrap);
-    function showBox(){
-      wrap.textContent='';
-      var ta=document.createElement('textarea');ta.className='pfb-box';ta.maxLength=2000;
-      ta.placeholder='What should change here?';wrap.appendChild(ta);
-      var send=document.createElement('button');send.type='button';send.className='pfb-send';send.textContent='Send';
-      wrap.appendChild(send);
-      var err=document.createElement('div');err.className='pfb-err';wrap.appendChild(err);
-      send.addEventListener('click',function(){
-        var body=(ta.value||'').trim();
-        if(!body){err.textContent='Write a note first.';return;}
-        send.disabled=true;send.textContent='Sending\\u2026';err.textContent='';
-        fetch(PFX+'/comments',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({page:PAGE,block_id:blockId,body:body})})
-          .then(function(r){return r.json().catch(function(){return {};}).then(function(j){return {ok:r.ok,j:j};});})
-          .then(function(res){
-            if(res.ok){wrap.textContent='';var d=document.createElement('div');d.className='pfb-done';d.textContent='\\u2713 Thanks \\u2014 sent to the studio.';wrap.appendChild(d);}
-            else{send.disabled=false;send.textContent='Send';err.textContent=(res.j&&res.j.message)||'That didn\\u2019t send \\u2014 please try again.';}
-          })
-          .catch(function(){send.disabled=false;send.textContent='Send';err.textContent='That didn\\u2019t send \\u2014 please try again.';});
-      });
-      ta.focus();
-    }
-    if(open){showBox();}
-    else{var add=document.createElement('button');add.type='button';add.className='pfb-add';add.textContent='Add a note';
-      add.addEventListener('click',function(){add.remove();showBox();});wrap.appendChild(add);}
-    return row;
-  }
-  function load(){
-    if(loaded)return;loaded=true;
-    host.textContent='';
-    host.appendChild(boxRow('This whole page','',true));
-    fetch(PFX+'/sections?page='+encodeURIComponent(PAGE))
-      .then(function(r){return r.ok?r.json():null;})
-      .then(function(j){
-        var secs=(j&&j.data&&j.data.sections)||[];
-        secs.forEach(function(s){if(s&&s.id&&s.name)host.appendChild(boxRow(String(s.name),String(s.id),false));});
-      })
-      .catch(function(){/* the whole-page box still works */});
-  }
-  btn.addEventListener('click',function(){
-    var open=root.classList.toggle('open');
-    btn.setAttribute('aria-expanded',String(open));
-    if(open)load();
-  });
-})();
-</script>
-</div>`;
-  return html.includes('</body>') ? html.replace('</body>', `${panel}</body>`) : `${html}${panel}`;
-}
+// Item 159: it lives in lib/feedback_panel.ts, which imports nothing, so a browser
+// spec can draw the real panel (notes-159.spec.ts); re-exported here for its callers.
+export { injectFeedbackPanel } from './feedback_panel.ts';

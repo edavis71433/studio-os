@@ -145,6 +145,8 @@
   /* bold redesign: + Booking link and + Image (Figma section 10) */
   .varnote{font-size:12.5px;color:var(--soft);margin:8px 2px 0;line-height:1.45}
   .varnote a{color:var(--p);font-weight:600}
+  .frompost{display:flex;gap:8px;align-items:flex-start;background:var(--p-soft,#f0ebfd);color:var(--p-deep,#3d2185);border-radius:12px;padding:10px 12px;margin:0 0 12px;font-size:13px;line-height:1.45}
+  .frompost .ic{flex:0 0 auto;margin-top:1px}
   .mail-cta{margin:2px 0 10px}
   .mail-cta span{display:inline-block;background:var(--p);color:var(--dds-on-p,#fff);padding:7px 15px;border-radius:999px;font-weight:600;font-size:12.5px}
   .mail-img{margin:2px 0 10px}
@@ -232,6 +234,7 @@ const $=(id)=>document.getElementById(id);
 const whenLabel=(iso)=>{const d=new Date(iso);return isFinite(d)?d.toLocaleString('en-US',{month:'short',day:'numeric',year:'numeric',hour:'numeric',minute:'2-digit'}):String(iso||'');};
 const esc=(s)=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 let TOKEN="",SEGMENTS=[],BROADCASTS=[],SEL='contacts',DRAFT=null,BUSY=false;
+let FROM_POST='';   // builder list item 160: the blog post this update was started from (?post=<id>)
 let REQ_SEQ=0;      // request-generation guard: a slow response that resolves after a newer request started is DISCARDED
 let DET_SEQ=0;      // same guard for the per-row drill-in read
 let LOADED_AT=Date.now();
@@ -324,6 +327,7 @@ function render(){
     </section>
     <section class="card up-write" aria-labelledby="writeH">
       <div class="card-h"><span class="cic" aria-hidden="true">${IC.pen}</span><h2 id="writeH">Your message</h2></div>
+      ${FROM_POST?`<p class="frompost" role="status">${IC.mail}<span>Started from your post “${esc(FROM_POST)}”. Change anything you like before it goes.</span></p>`:''}
       <label for="subj">Subject</label>
       <input type="text" id="subj" maxlength="200" placeholder="A quick update from us" value="${esc(DRAFT&&DRAFT.subject||'')}">
       <label for="bodytx">Message</label>
@@ -380,8 +384,9 @@ let BIZ='';   // the name the email signs with (GET /identity, best-effort)
 let BOOK_URL='';   // Business details' booking link (https only), the "Book a time" button's address
 let PHOTOS=null,THUMBS={},PHOTOS_TRIED=false;   // the studio's shared photos (GET /assets) and their thumbnails
 // a line of its own: {{booking_link}} is the "Book a time" button, ![words](media:<id>) a photo
-// from Files (lib/update_media.ts renders both the same way in the email)
-const BOOK_LINE=/^\{\{\s*booking_link\s*\}\}$/i,IMG_LINE=/^!\[([^\]\n]{0,200})\]\(media:([0-9a-f-]{36})\)$/i;
+// from Files, and an https link a button with its words (lib/update_media.ts renders them
+// the same way in the email; a blog post's photo may carry a caption, which the email leaves off)
+const BOOK_LINE=/^\{\{\s*booking_link\s*\}\}$/i,IMG_LINE=/^!\[([^\]\n]{0,200})\]\(media:([0-9a-f-]{36})(?:\s+"[^"\n]{0,200}")?\)$/i,LINK_LINE=/^\[([^\]\n]{1,80})\]\((https:\/\/[^\s)]+)\)$/i;
 const fillTokens=(t)=>String(t||'').replace(/\{\{\s*first_name\s*\}\}/g,'there').replace(/\{\{\s*business_name\s*\}\}/g,BIZ||'your business');
 function mdLite(src){
   const inline=(t)=>esc(t).replace(/\*\*([^*]+)\*\*/g,'<b>$1</b>').replace(/\*([^*]+)\*/g,'<i>$1</i>').replace(/\[([^\]]+)\]\(([^)\s]+)\)/g,'<u>$1</u>');
@@ -397,6 +402,8 @@ function liveBody(src){
   for(const line of String(src||'').replace(/\r/g,'').split('\n')){
     const t=line.trim();
     if(BOOK_LINE.test(t)){flush();if(BOOK_URL)out.push('<p class="mail-cta"><span>Book a time</span></p>');continue;}
+    const lk=t.match(LINK_LINE);
+    if(lk){flush();out.push(`<p class="mail-cta"><span>${esc(lk[1])}</span></p>`);continue;}
     const m=t.match(IMG_LINE);
     if(m){
       flush();const th=THUMBS[m[2].toLowerCase()];
@@ -624,6 +631,22 @@ async function openPhotos(){
   }));
   const first=d.querySelector('[data-pick]');if(first)first.focus();
 }
+// A blog post's "Email it to your list" (builder list item 160): ?post=<id> starts the
+// message from that post, its title, cover, first lines and a link to it, read from the
+// server (GET /posts/:id/email-draft), which only offers a post that is live
+async function takePost(){
+  const id=String(new URLSearchParams(location.search).get('post')||'').toLowerCase();
+  if(!/^[0-9a-f-]{36}$/.test(id))return;
+  try{const u=new URL(location.href);u.searchParams.delete('post');history.replaceState(null,'',u.toString());}catch(_){/* */}
+  const r=await api('/posts/'+id+'/email-draft');
+  const d=r.ok&&r.body&&r.body.data;
+  if(!d){toast((r.body&&r.body.message)||'That post couldn’t be read just now.');return;}
+  if(!d.live){toast(d.message||'Publish the post first.');return;}
+  syncDraftFromForm();
+  if(DRAFT&&(DRAFT.subject||'').trim()&&(DRAFT.body||'').trim())return;   // never over words already written
+  DRAFT={subject:d.subject||'',body:d.body||''};FROM_POST=d.subject||'';
+  render();paintLive();
+}
 // Files' "Use in an update" (bold redesign): ?photo=<id> puts that photo in the message
 // on a line of its own — only a shared, live image of the studio's own, the + Image
 // sheet's own rule; anything else says so and adds nothing
@@ -799,7 +822,7 @@ async function doSend(id){
     // the fields still hold, and a still-populated form would resurrect an
     // id-less twin of a broadcast that was just SENT (the next Preview would
     // POST a duplicate draft). The composer must end genuinely empty.
-    DRAFT=null;SEL='contacts';
+    DRAFT=null;SEL='contacts';FROM_POST='';
     const s=$('subj');if(s)s.value='';
     const t=$('bodytx');if(t)t.value='';
   }
@@ -856,7 +879,7 @@ async function load(soft){
 }
 (async function(){try{const{data}=await sb.auth.getSession();TOKEN=(data&&data.session&&data.session.access_token)||"";if(!TOKEN){signedOut();return;}
   ID_READY=api('/identity').then((r)=>{const d=r&&r.ok&&r.body&&r.body.data;if(!d)return;if(d.business_name)BIZ=String(d.business_name);const u=String(d.booking_url||'').trim();BOOK_URL=/^https:\/\/\S+$/i.test(u)?u:'';paintLive();}).catch(()=>{});   // best-effort: the live preview signs with it
-  await load();takePhoto();}catch(_){trouble();}})();
+  await load();await takePost();takePhoto();}catch(_){trouble();}})();
 </script>
 </body>
 </html>
