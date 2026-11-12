@@ -9,6 +9,8 @@
 import { svc } from './db.ts';
 import type { MediaManifestEntry } from './serializer.ts';
 import { magicMatchesMime, stripJpegExif, mediaQuota, quotaExceeded } from './media_guard.ts';
+import { fewAtATime } from './few_at_a_time.ts';
+import type { KnownFile } from './netlify.ts';
 
 const SB_URL = Deno.env.get('SUPABASE_URL') || '';
 const SB_SERVICE = Deno.env.get('SERVICE_ROLE_KEY') || Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
@@ -132,7 +134,9 @@ export async function deleteMedia(siteId: string, mediaId: string) {
     // drops it from every page — gone for good after the media_gc window.
     // Item 115: and the owner's own pages, each page's share image, the Brand Kit
     // logo, and the saved sections a page can link to.
-    svc(`presence_settings?site_id=eq.${siteId}&select=logo_media_id,og_media_id,cover_media_id,blocks,pages,page_seo,brand_kit&limit=1`),
+    // item 158 (0184): with the site icon; a database without it reads the rest
+    svc(`presence_settings?site_id=eq.${siteId}&select=logo_media_id,og_media_id,cover_media_id,icon_media_id,blocks,pages,page_seo,brand_kit&limit=1`)
+      .then((r) => (r.ok ? r : svc(`presence_settings?site_id=eq.${siteId}&select=logo_media_id,og_media_id,cover_media_id,blocks,pages,page_seo,brand_kit&limit=1`))),
     svc(`presence_content_library?site_id=eq.${siteId}&select=name,payload&limit=500`),
   ]);
   // Builder list item 40: a photo inside a post's text, and an author's photo. Read on their
@@ -147,6 +151,7 @@ export async function deleteMedia(siteId: string, mediaId: string) {
     if (s.logo_media_id === mediaId) siteRefs.push('your logo');
     if (s.og_media_id === mediaId) siteRefs.push('your social-share image');
     if (s.cover_media_id === mediaId) siteRefs.push('your cover photo');
+    if (s.icon_media_id === mediaId) siteRefs.push('your site icon');   // item 158
     // blocks is a JSON column; media ids live inside it as UUID strings (exact,
     // 36-char — no false substring match between distinct UUIDs).
     if (s.blocks && JSON.stringify(s.blocks).includes(mediaId)) siteRefs.push('a section on your website');
@@ -181,14 +186,23 @@ export async function deleteMedia(siteId: string, mediaId: string) {
  *  contract below. */
 export const WIDTH_ONLY_RESIZE = 'contain';
 
+/** How many photo sizes a publish makes at once. */
+export const VARIANTS_AT_ONCE = 8;
+
 /** PUBLISH: fetch every required variant via the transform endpoint (EXIF
  *  stripped, resized, encoded to the variant's format — webp AND avif) and return
  *  bytes keyed by output path. The manifest now carries a format per variant, so a
- *  single pass generates both the WebP and the AVIF file at each width. */
-export async function fetchVariants(manifest: MediaManifestEntry[]): Promise<{ files: Record<string, Uint8Array>; failed: string[] }> {
-  const files: Record<string, Uint8Array> = {};
+ *  single pass generates both the WebP and the AVIF file at each width.
+ *
+ *  Item 208: `known` is the files the live site went up with (path → SHA-1). A variant's
+ *  path is fixed by its stored file, and a stored file never changes (every upload and
+ *  every edit makes a new one), so a path the live site has is named by that digest and
+ *  made again only if the host asks for it. A few are made at a time. */
+export async function fetchVariants(manifest: MediaManifestEntry[], known: Record<string, string> | null = null): Promise<{ files: Record<string, Uint8Array | KnownFile>; failed: string[]; reused: number }> {
+  const files: Record<string, Uint8Array | KnownFile> = {};
   const failed: string[] = [];
-  await Promise.all(manifest.flatMap((m) => m.variants.map(async (v) => {
+  let reused = 0;
+  const fetchOne = async (m: MediaManifestEntry, v: MediaManifestEntry['variants'][number]): Promise<Uint8Array | null> => {
     const objectPath = m.storage_path.replace(`${BUCKET}/`, '');
     // DL-FILES: a NON-image original (e.g. a PDF Download) is fetched VERBATIM from
     // storage — never through the image transform (which can't process a document
@@ -196,14 +210,22 @@ export async function fetchVariants(manifest: MediaManifestEntry[]): Promise<{ f
     const url = v.format === 'original'
       ? `${SB_URL}/storage/v1/object/authenticated/${BUCKET}/${objectPath}`
       : `${SB_URL}/storage/v1/render/image/authenticated/${BUCKET}/${objectPath}?width=${v.width}&resize=${WIDTH_ONLY_RESIZE}&format=${v.format}&quality=80`;
-    const label = v.format === 'original' ? `${m.storage_path} (original)` : `${m.storage_path} @${v.width}.${v.format}`;
     try {
       const r = await fetch(url, { headers: { Authorization: `Bearer ${SB_SERVICE}`, apikey: SB_SERVICE } });
-      if (!r.ok) { failed.push(label); return; }
-      files[v.output_path.replace(/^\//, '')] = new Uint8Array(await r.arrayBuffer());
-    } catch { failed.push(label); }
-  })));
-  return { files, failed };
+      return r.ok ? new Uint8Array(await r.arrayBuffer()) : null;
+    } catch { return null; }
+  };
+  const todo: Array<[MediaManifestEntry, MediaManifestEntry['variants'][number]]> = [];
+  for (const m of manifest) for (const v of m.variants) {
+    const sha = known ? known['/' + v.output_path.replace(/^\//, '')] : undefined;
+    if (sha) { files[v.output_path.replace(/^\//, '')] = { sha, load: () => fetchOne(m, v) }; reused++; } else todo.push([m, v]);
+  }
+  await fewAtATime(todo, VARIANTS_AT_ONCE, async ([m, v]) => {
+    const bytes = await fetchOne(m, v);
+    if (bytes) files[v.output_path.replace(/^\//, '')] = bytes;
+    else failed.push(v.format === 'original' ? `${m.storage_path} (original)` : `${m.storage_path} @${v.width}.${v.format}`);
+  });
+  return { files, failed, reused };
 }
 
 // ── The transform contract ───────────────────────────────────────────────────

@@ -16,7 +16,7 @@
 // Pure: the dates are checked in the visitor's browser, so a pop-up starts and stops on
 // its days without a republish; the drawing reads only the snapshot.
 import { esc, attr, safeHref } from './markdown.ts';
-import { renderForm, type FormDefinition } from './forms.ts';
+import { renderForm, formsIn, type FormDefinition } from './forms.ts';
 import { popupTags, POPUP_STYLE, POPUP_CLOSE, FORM_LINK_SCRIPT, type PopupSettings } from './site_send.ts';
 export { POPUP_AGAIN_DAYS, type PopupSettings } from './site_send.ts';
 import { vocabFor } from './industry_vocab.ts';
@@ -77,7 +77,7 @@ export function injectPopup(fileMap: FileMap, content: PopupContent | null | und
   const p = normalizePopup(content?.settings?.popup);
   const forms = new Map<string, FormDefinition>();
   for (const list of [content?.settings?.blocks || [], ...(content?.settings?.pages || []).map((pg) => pg?.blocks || [])]) {
-    for (const b of list as any[]) if (b && b.type === 'form' && typeof b.id === 'string' && Array.isArray(b.fields) && !forms.has(b.id)) forms.set(b.id, b as FormDefinition);
+    for (const f of formsIn(list)) if (!forms.has(f.id)) forms.set(f.id, f);   // a Form block inside a Blocks section too (item 57)
   }
   const pages = Object.keys(fileMap).filter((k) => k.endsWith('.html') && !NEVER.has(k) && typeof fileMap[k] === 'string' && !(fileMap[k] as string).includes('http-equiv="refresh"'));
   const onPop = p ? popupFiles(p, pages, vocabFor(content?.settings?.industry).offeringPath) : new Set<string>();

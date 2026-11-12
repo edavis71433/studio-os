@@ -695,10 +695,28 @@ export async function seedProjectChecklist(siteId: string, projectId: string): P
     // call applyTemplate makes).
     const ins = await svc('presence_tasks', { method: 'POST', headers: { Prefer: 'return=representation' }, body: JSON.stringify(body) });
     if (!ins.ok) { console.warn(`[checklist] seed failed for project ${projectId}: ${ins.status} (non-fatal)`); return 0; }
+    await seedStarterQuestionnaire(siteId, projectId);   // item 179: the questionnaire step opens real questions
     return rows(ins).length;
   } catch (e) {
     console.warn(`[checklist] seed threw for project ${projectId}: ${String((e as Error)?.message || e)} (non-fatal)`);
     return 0;
+  }
+}
+
+/** Item 179: give a project the starter questionnaire, unless it already has one
+ *  (any survey whose title says questionnaire, deleted ones included: a studio that
+ *  threw it away meant it). Best-effort, never throws. */
+export async function seedStarterQuestionnaire(siteId: string, projectId: string): Promise<boolean> {
+  try {
+    const { STARTER_QUESTIONNAIRE_TITLE, isQuestionnaireTitle, starterQuestions } = await import('./starter_questionnaire.ts');
+    const have = rows(await svc(`presence_surveys?project_id=eq.${projectId}&site_id=eq.${siteId}&select=title&limit=100`));
+    if (have.some((r) => isQuestionnaireTitle(r.title))) return false;
+    const ins = await svc('presence_surveys', { method: 'POST', headers: { Prefer: 'return=minimal' },
+      body: JSON.stringify({ site_id: siteId, project_id: projectId, title: STARTER_QUESTIONNAIRE_TITLE, questions: starterQuestions(), status: 'active', client_visible: true }) });
+    return ins.ok;
+  } catch (e) {
+    console.warn(`[checklist] questionnaire seed threw for project ${projectId}: ${String((e as Error)?.message || e)} (non-fatal)`);
+    return false;
   }
 }
 

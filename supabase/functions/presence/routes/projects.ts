@@ -70,25 +70,30 @@ export async function loadProject(siteId: string, id: string) {
 /** A4: seed a fresh project's milestones + tasks from a starter template. Inserts
  *  directly (no per-item activity events — this is the initial scaffold, not a
  *  stream of "a task was added" notifications to the customer). Best-effort per
- *  row; a hiccup on one task never blocks the project being usable. */
+ *  row; a hiccup on one task never blocks the project being usable.
+ *  Item 209 (review file 06, finding 88): two writes, the milestones and then the
+ *  steps, instead of one per row; a batch the database refuses goes again row by
+ *  row, so one bad row still costs only itself. */
 async function applyTemplate(siteId: string, projectId: string, tmpl: ProjectTemplate | SavedProjectTemplate, startDate: string | null = null): Promise<void> {
-  let mOrder = 0, tOrder = 0;
-  for (const m of tmpl.milestones) {
-    let milestoneId: string | null = null;
-    try {
-      const mi = rows(await svc('presence_milestones', { method: 'POST', headers: { Prefer: 'return=representation' },
-        body: JSON.stringify({ site_id: siteId, project_id: projectId, title: m.title, status: 'open', due_date: null, sort_order: mOrder, client_visible: true }) }))[0];
-      milestoneId = mi?.id || null;
-    } catch { /* skip a milestone that won't insert */ }
-    mOrder += 10;
-    for (const t of (m.tasks || [])) {
-      const clientAction = t.client_action_required === true;
-      await svc('presence_tasks', { method: 'POST', headers: { Prefer: 'return=minimal' },
-        // sales item 106: a saved template's step is due N days after the project's start
-        body: JSON.stringify({ site_id: siteId, project_id: projectId, milestone_id: milestoneId, title: t.title, detail: '', status: 'todo', priority: 'normal', client_visible: clientAction, client_action_required: clientAction, due_date: dueFromStart(startDate, (t as { due_days?: number }).due_days), sort_order: tOrder, source: 'template' }) }).catch(() => {});
-      tOrder += 10;
-    }
+  const milestones = tmpl.milestones.map((m, i) => ({ site_id: siteId, project_id: projectId, title: m.title, status: 'open', due_date: null, sort_order: i * 10, client_visible: true }));
+  const idByOrder = new Map<number, string>();
+  const keep = (made: any[]) => { for (const r of made) if (r?.id && Number.isFinite(Number(r.sort_order))) idByOrder.set(Number(r.sort_order), String(r.id)); };
+  if (milestones.length) {
+    const all = await svc('presence_milestones', { method: 'POST', headers: { Prefer: 'return=representation' }, body: JSON.stringify(milestones) }).catch(() => null);
+    if (all?.ok) keep(rows(all));
+    else for (const m of milestones) keep(rows((await svc('presence_milestones', { method: 'POST', headers: { Prefer: 'return=representation' }, body: JSON.stringify(m) }).catch(() => null)) ?? { json: [] }));   // skip a milestone that won't insert
   }
+  let tOrder = 0;
+  const tasks = tmpl.milestones.flatMap((m, i) => (m.tasks || []).map((t) => {
+    const clientAction = t.client_action_required === true;
+    // sales item 106: a saved template's step is due N days after the project's start
+    const row = { site_id: siteId, project_id: projectId, milestone_id: idByOrder.get(i * 10) ?? null, title: t.title, detail: '', status: 'todo', priority: 'normal', client_visible: clientAction, client_action_required: clientAction, due_date: dueFromStart(startDate, (t as { due_days?: number }).due_days), sort_order: tOrder, source: 'template' };
+    tOrder += 10;
+    return row;
+  }));
+  if (!tasks.length) return;
+  const all = await svc('presence_tasks', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify(tasks) }).catch(() => null);
+  if (!all?.ok) for (const t of tasks) await svc('presence_tasks', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify(t) }).catch(() => {});
 }
 
 // ═══ PROJECT TEMPLATES (sales item 106) ═══

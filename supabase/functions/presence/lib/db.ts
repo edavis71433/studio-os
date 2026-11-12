@@ -101,6 +101,19 @@ export async function svcPages(path: string, orderCol: string, pageSize = 1000, 
   return { rows, truncated: true };
 }
 
+/** Item 209 (review file 06, finding 63): a scheduled job's rows a page at a time, in a
+ *  set order, for a job that stops once it has done enough. Each page is yielded as it
+ *  arrives; the walk ends at a short page, a failed one, or `maxPages`. */
+export async function* svcPaged(path: string, order: string, pageSize = 100, maxPages = 20): AsyncGenerator<any[]> {
+  for (let p = 0; p < maxPages; p++) {
+    const sep = path.includes('?') ? '&' : '?';
+    const r = await svc(`${path}${sep}order=${order}&limit=${pageSize}&offset=${p * pageSize}`).catch(() => null);
+    if (!r || !r.ok || !Array.isArray(r.json)) return;
+    if (r.json.length) yield r.json;
+    if (r.json.length < pageSize) return;
+  }
+}
+
 export async function asUser(jwt: string, path: string, init: RequestInit = {}) {
   noteWrite(path, init);
   const r = await fetch(`${REST}/${path}`, {

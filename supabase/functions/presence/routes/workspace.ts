@@ -28,6 +28,7 @@ import { resolveSiteRoleCached, listSiteMembers, addSiteMember, changeSiteMember
 import { loadThreadMarks, newestClientMessageAt, threadUnread } from '../lib/thread_reads.ts';
 import { shapeClientConversations, studioBellCount, noticeDismissible, NOTICE_ACCOUNT_KINDS, freshEnquiries, invoiceReminderIds, renderableNotices, noticeTier, noticePriority } from '../lib/inbox_feed.ts';
 import { clearNotice } from '../lib/notice.ts';
+import { unfinishedSectionsOf } from '../lib/unfinished.ts';
 import { healSupportOwners } from '../lib/service_bridge.ts';
 import { supportActivityAt } from '../lib/support_activity.ts';
 
@@ -436,12 +437,11 @@ export async function buildPortalFeed(jwt: string, site: SiteRow, principal: Pri
   const filesHidden = role === 'client_reviewer' ? (await isSharedStudioSite(site.id)) !== false : false;
   const noEnq = Promise.resolve({ ok: true, json: [] as any[] });
   const swallow = () => ({ ok: false, json: [] as any[] });   // best-effort slots must never sink the whole feed
-  // FIX 4: kick off the Content Tree read CONCURRENTLY with the feed's own queries
-  // (owner-only, best-effort) so surfacing missing-required content adds no serial
-  // latency to this bell hot path. Dynamic import avoids any top-level import cycle.
-  const treeP: Promise<any> = seesFull
-    ? import('./room.ts').then((m) => m.siteContentTree(site)).catch(() => null)
-    : Promise.resolve(null);
+  // FIX 4: the sections that need filling in before a publish, read CONCURRENTLY with the
+  // feed's own queries (owner-only, best-effort). Item 209: the count kept on the site,
+  // worked out again only after a change (lib/unfinished.ts), instead of the whole draft
+  // rebuilt and compared with the live one on every open.
+  const unfinishedP: Promise<number | null> = seesFull ? unfinishedSectionsOf(site).catch(() => null) : Promise.resolve(null);
   // ONE initial wave: shares + the feed's own queries + every independent
   // owner-only read the sections below consume (bridge links, support requests,
   // message events, agency links). Predicates unchanged — a reviewer never
@@ -557,15 +557,14 @@ export async function buildPortalFeed(jwt: string, site: SiteRow, principal: Pri
     });
 
     // FIX 4: a section that BLOCKS publishing (missing required content) should show
-    // in the main Inbox/bell, not only the Attention Center. Reuse the Content Tree's
-    // existing missing_required signal (no new store); the read was started above,
+    // in the main Inbox/bell, not only the Attention Center. The Content Tree's
+    // missing_required count (item 209: kept on the site); the read was started above,
     // concurrently — awaiting it here adds no serial latency. Best-effort.
     try {
-      const tree = await treeP;
-      const missing = tree ? tree.pages.flatMap((p: any) => p.sections.filter((s: any) => s.status === 'missing_required')) : [];
-      if (missing.length > 0) notices.push({
+      const missing = (await unfinishedP) ?? 0;
+      if (missing > 0) notices.push({
         id: 'missing-required', kind: 'missing_required', period: null, dismissible: false, tier: 'needs_you', priority: false,
-        headline: missing.length === 1 ? 'A section needs filling in before you can publish' : `${missing.length} sections need filling in before you can publish`,
+        headline: missing === 1 ? 'A section needs filling in before you can publish' : `${missing} sections need filling in before you can publish`,
         body: 'Add the missing details and your website is ready to go live.',
         href: noticeHref('missing_required'),
       });

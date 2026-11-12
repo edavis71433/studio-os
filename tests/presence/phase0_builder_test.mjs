@@ -48,7 +48,7 @@ ok('a form submit looks through the custom pages too', /select=blocks,pages/.tes
 const page = read('presence.html');
 ok('no emoji left as a builder control', !/[\u{1F4AC}\u{1F5D1}\u{1F648}\u{1F3E0}\u{1F4C4}\u{1F4CB}\u{1F517}\u{1F512}\u{1F5BC}\u{2728}]/u.test(page.replace(/\/\/[^\n]*/g, '')));
 ok('the icon helper has its own name: `bi` is a section index all over the canvas', /function uiIcon\(/.test(page) && !/function bi\(/.test(page));
-ok('account notices stay out of a client view', /get\("client"\)\) \{\s*renderFirstRun\(\);\s*renderPlanNotice\(\);/.test(page));
+ok('account notices stay out of a client view', /if \(!studioInClient\(\)\) \{\s*renderFirstRun\(\);\s*renderPlanNotice\(\);/.test(page));
 
 const failed = results.filter((r) => !r).length;
 console.log(`\n${results.length - failed}/${results.length} passed`);

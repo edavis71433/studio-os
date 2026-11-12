@@ -207,7 +207,7 @@ test.describe('CMS workspace', () => {
   });
 
   test('Search: a connected, healthy domain says so — no Connect button', async ({ page }) => {
-    await installApp(page, { api: { ...BOARD_API, ...EXTRAS, '/foundations/domain': { data: { custom_domain: 'marlows.example', health: 'ok' } } } });
+    await installApp(page, { api: { ...BOARD_API, ...EXTRAS, '/foundations/domain': { data: { custom_domain: 'marlows.example', health: 'ok', all_ok: true, checklist: [{ key: 'serving', ok: true, words: 'Showing your latest site' }] } } } });
     await page.goto('/presence.html#search');
     await expect(page.locator('#domainCard')).toContainText('marlows.example is live and secure.');
     await expect(page.locator('#domainCard').getByRole('button', { name: 'Connect your domain' })).toHaveCount(0);

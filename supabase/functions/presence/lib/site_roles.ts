@@ -64,6 +64,7 @@ export function seesFullWorkspace(role: SiteRole): boolean {
 // needs 'configure'.
 export const SETTINGS_CONTENT_FIELDS: ReadonlySet<string> = new Set([
   'category_order', 'cover_media_id', 'logo_media_id', 'og_media_id',
+  'icon_media_id',   // builder list item 158: the site's own small icon, part of the look like the logo
   'announcement_text', 'announcement_url', 'announcement_expires_at',
   'popup',   // builder list item 148: the site's pop-up is content, like the announcement bar
   'hero_layout', 'nav_style', 'sections_hidden', 'sections_order', 'footer_hours', 'footer_social',
@@ -125,6 +126,8 @@ const MEMBER_WRITES: Array<[MemberWriteNeed, string[]]> = [
     '(POST|DELETE) /calendar/link',   // sales review item 46: making or turning off the private calendar link is a setting
     '(POST|DELETE) /email/log-address',   // sales review item 69: the private log-this-email address is a setting too
     'POST /reviews/google-link',   // sales review item 115: where Google review requests send people is a setting
+    'POST /sales/setup',   // sales item 105: hiding Home's setup strip is the studio's setting
+    'PUT /sales/goal-ai',   // sales item 94: the month's goal is the studio's setting (the AI help switch in it is the owner's alone, said by the route)
     'PUT /report/monthly', 'POST /report/monthly/preview',   // builder list item 58: the client's monthly report is a setting; its preview emails the caller
     '(POST|DELETE) /foundations/domain',
     '(POST|DELETE) /foundations/domain/forward',   // builder list item 174: another domain forwarding here is a domain setting
@@ -176,6 +179,7 @@ const MEMBER_WRITES: Array<[MemberWriteNeed, string[]]> = [
     'POST /page-locks',   // builder items 48 and 120: a page's password, as editing the page's settings is
     `POST /publishes/checkpoints/${ID}/restore`,
     `POST /publishes/${ID}/label`,
+    'PUT /publishes/stars',   // builder item 158: star a version, as naming one is
     'POST /restore-to-draft',
     'POST /launches',
     `POST /launches/${ID}/(recapture|cancel)`,
@@ -190,7 +194,6 @@ const MEMBER_WRITES: Array<[MemberWriteNeed, string[]]> = [
     `POST /assets/${ID}/(replace|rollback|duplicate|suggest|remove-background|cutout)`,
     'POST /visual/generate',
     `POST /visual/plans/${ID}/(vary|edit)`,
-    `POST /notes/${ID}/(dismiss|accept)`,
     `POST /moments/${ID}/dismiss`,
     'POST /broadcasts',
     'POST /broadcasts/lists',   // sales review items 31 + 39: keep the people picked for an update
@@ -199,9 +202,12 @@ const MEMBER_WRITES: Array<[MemberWriteNeed, string[]]> = [
     `PATCH /broadcasts/${ID}`,
     `POST /broadcasts/${ID}/cancel`,
     `POST /broadcasts/${ID}/test`,   // bold redesign: "Send me a test" — only ever to the member's own address, so edit, not publish
+    'POST /sales/invoices/test',   // builder item 175: a sample invoice email to the member's own address; nothing is made or charged
     'POST /sales/(contacts|customers|deals|templates)',
     'POST /sales/(tasks|people/activity)',   // sales items 85 and 106: a to-do for anyone, a call logged for a person with no deal
     'POST /sales/email',   // sales item 80: one email to one person on file, like the Inbox's reply to an enquiry
+    'POST /sales/ai/(draft|summary)',   // sales item 94: a draft only fills the box (nothing sends); a summary is kept on the record. Each costs about 1 cent
+    'POST /handover/notify',   // sales item 93: the studio tells a business its hand-over pack is ready (the route itself refuses anyone but the studio)
     'POST /sales/contacts/imports',   // sales review item 86: starting an import (each row is a POST /sales/contacts)
     'POST /sales/prospects(/discover)?',   // sales review item 112: find businesses, save the ticked ones
     `POST /sales/prospects/${ID}/(convert|draft|pack)`,   // item 112: start the deal; a draft only returns words — nothing sends; item 113: pack builds a share link
@@ -255,6 +261,8 @@ const MEMBER_WRITES: Array<[MemberWriteNeed, string[]]> = [
     'PUT /site/template',
     // sales review final pass (S1): only the site's owner answers a studio's request; the route refuses anyone else and says why
     `POST /portal/studio-requests/${ID}/(accept|decline)`,
+    // builder item 193: only the studio marks an approved plan finished; the route refuses anyone else and says why
+    `POST /foundations/plans/${ID}/done`,
     'POST /crm/notes',
     `POST /crm/notes/${ID}/pin`,
     `DELETE /crm/notes/${ID}`,

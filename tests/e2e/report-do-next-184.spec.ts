@@ -34,19 +34,21 @@ test.describe('Settings › Monthly report: what it holds, the PDF copy (builder
   }
   const okPdf = (route: Route) => route.fulfill({ status: 200, contentType: 'application/pdf', headers: { 'Content-Disposition': 'attachment; filename="Maple-Street-Studio-October-2026.pdf"', 'Access-Control-Expose-Headers': 'Content-Disposition' }, body: '%PDF-1.4\n%%EOF\n' });
 
-  test('the parts of the report as chips; AI answers says off until its check is on', async ({ page }) => {
+  test('the parts of the report as buttons; AI answers says off until its check is on', async ({ page }) => {
     await openReport(page, okPdf);
     const sec = page.locator('#report');
     await expect(sec.locator('#reportInL')).toHaveText('In the report:');
-    await expect(sec.locator('#reportIn li')).toHaveText(['Visits', 'Enquiries', 'On Google', 'AI answers, off', 'Reviews', 'Website health', 'What changed']);
-    await expect(sec.locator('#reportIn li').nth(3)).toHaveClass(/off/);
+    // items 160 and 176: each part is a button that leaves it in or out; Most read pages is its own part now
+    await expect(sec.locator('#reportIn button')).toHaveText(['Visits', 'Enquiries', 'On Google', 'On Google Maps, off', 'AI answers, off', 'Reviews', 'Website health', 'Most read pages', 'What changed']);   // item 185: the map part waits for its grid, like AI answers
+    await expect(sec.locator('#reportIn button').nth(3)).toHaveClass(/off/);
+    await expect(sec.locator('#reportIn button').nth(4)).toHaveClass(/off/);
     await expect(sec).toContainText('how their website did, each part when there’s something to say');
-    // as drawn: the report's switch, the PDF copy, then the AI check, then what the report holds
-    const order = await sec.locator('#sw-report, #sw-pdf, #sw-ai, #reportIn').evaluateAll((els) => els.map((e) => e.id));
-    expect(order).toEqual(['sw-report', 'sw-pdf', 'sw-ai', 'reportIn']);
+    // as drawn for items 160 and 176: the report's switch, who gets it (a copy, a quiet month), what it says, then the PDF copy and the AI check
+    const order = await sec.locator('#sw-report, #sw-copy, #sw-quiet, #reportIn, #sw-pdf, #sw-ai').evaluateAll((els) => els.map((e) => e.id));
+    expect(order).toEqual(['sw-report', 'sw-copy', 'sw-quiet', 'reportIn', 'sw-pdf', 'sw-ai']);
     await sec.locator('#sw-ai').click();
-    await expect(sec.locator('#reportIn li').nth(3)).toHaveText('AI answers');
-    await expect(sec.locator('#reportIn li').nth(3)).not.toHaveClass(/off/);
+    await expect(sec.locator('#reportIn button').nth(4)).toHaveText('AI answers');
+    await expect(sec.locator('#reportIn button').nth(4)).not.toHaveClass(/off/);
   });
 
   test('Attach a PDF copy: on by default, saves as it flips', async ({ page }) => {
@@ -109,9 +111,9 @@ test.describe('Settings › Monthly report: what it holds, the PDF copy (builder
     await expect(sec.getByRole('button', { name: 'Download October’s PDF' })).toBeEnabled();
   });
 
-  test('phone width: the chips wrap, nothing wider than the screen', async ({ page }) => {
+  test('phone width: the parts wrap, nothing wider than the screen', async ({ page }) => {
     await openReport(page, okPdf);
-    await expect(page.locator('#reportIn li').first()).toBeVisible();
+    await expect(page.locator('#reportIn button').first()).toBeVisible();
     await noSideScroll(page);
   });
 });

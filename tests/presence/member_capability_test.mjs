@@ -163,6 +163,8 @@ const DECIDED = {
     'POST /email/log-address', 'DELETE /email/log-address',
     'PUT /report/monthly', 'POST /report/monthly/preview',   // builder list item 58
     'POST /reviews/google-link',   // sales review item 115: where Google review requests send people is a setting
+    'POST /sales/setup',   // sales item 105: hiding Home's setup strip
+    'PUT /sales/goal-ai',   // sales item 94: the month's goal (the AI help switch in it is the owner's alone, said by the route)
   ],
   approve: [
     'POST /approvals/:id/decide', 'POST /assets/:id/status', 'POST /client/approvals/:id/decide',
@@ -197,16 +199,18 @@ const DECIDED = {
     'POST /bookings/appointments/:id/confirm', 'POST /bookings/appointments/:id/no_show', 'POST /bookings/types',
     'POST /brand/reports/:id/dismiss', 'POST /brand/review', 'POST /broadcasts', 'POST /broadcasts/lists', 'POST /broadcasts/:id/cancel',
     'POST /broadcasts/:id/test',   // bold redesign: "Send me a test" goes only to the member's own address
+    'POST /sales/invoices/test',   // builder list item 175: a sample invoice email to the member's own address; nothing is made or charged
     'POST /broadcasts/draft-assist', 'POST /client/projects/:id/tasks/:id2/done',
     'POST /client/projects/:id/upload-url', 'POST /client/projects/:id/uploads',
     'POST /coach/opportunities/:id/decide', 'POST /coach/run', 'POST /content-library', 'POST /editor/improve',
     'POST /forms/inbox/:id', 'POST /forms/inbox/:id/reply', 'POST /knowledge/import', 'POST /launches',
     'POST /launches/:id/cancel', 'POST /launches/:id/recapture', 'POST /media/upload-url',
-    'POST /moments/:id/dismiss', 'POST /notes/:id/accept', 'POST /notes/:id/dismiss', 'POST /preview/publish',
+    'POST /moments/:id/dismiss', 'POST /preview/publish',
     'POST /preview/section', 'POST /preview/share-link', 'POST /projects', 'POST /projects/:id/approvals', 'POST /projects/:id/checklist',
     'POST /projects/:id/deliverables', 'POST /projects/:id/deliverables/upload-url', 'POST /projects/:id/milestones',
     'POST /projects/:id/status', 'POST /projects/:id/surveys', 'POST /projects/:id/tasks',
     'POST /publishes/:id/label', 'POST /publishes/checkpoints', 'POST /publishes/checkpoints/:id/restore',
+    'PUT /publishes/stars',   // builder item 158: starring a version is edit, as naming one is
     'POST /page-locks',   // builder items 48 and 120: a page's password, as editing the page's settings is
     'POST /redirects', 'POST /restore-to-draft', 'POST /review/reports/:id/dismiss', 'POST /review/run',
     'POST /reviews/:id/approve', 'POST /reviews/:id/hide', 'POST /reviews/:id/reply', 'POST /sales/contacts',
@@ -214,6 +218,8 @@ const DECIDED = {
     'POST /sales/customers', 'POST /sales/deals', 'POST /sales/deals/:id/activity',
     'POST /sales/tasks', 'POST /sales/people/activity',   // sales items 85 and 106: to-dos and calls for anyone
     'POST /sales/email',   // sales item 80: an email from the record, like the reply to an enquiry
+    'POST /handover/notify',   // sales item 93: the hand-over pack email (only a studio scoped in gets past the route)
+    'POST /sales/ai/draft', 'POST /sales/ai/summary',   // sales item 94: a draft only fills the box; a summary is kept on the record
     'POST /sales/deals/:id/contracts', 'POST /sales/deals/:id/convert', 'POST /sales/deals/:id/invoice',
     'POST /sales/deals/:id/proposals', 'POST /sales/deals/:id/resend-invite', 'POST /sales/deals/:id/retainer',
     'POST /sales/deals/:id/schedule', 'POST /sales/deals/:id/send', 'POST /sales/deals/:id/stage',
@@ -243,6 +249,7 @@ const DECIDED = {
     // builder item 53: a seat's role changes like the invite (the route asks for the invite capability);
     // only the owner, or their studio asking the owner, can start or stop a transfer (the route refuses anyone else)
     'POST /portal/members/:id/role', 'POST /portal/transfer', 'POST /portal/transfer/cancel',
+    'POST /foundations/plans/:id/done',   // builder item 193: studio-only, checked by the route itself
   ],
 };
 const ALL = Object.entries(DECIDED).flatMap(([need, names]) => names.map((name) => ({ name, need })));
@@ -353,6 +360,8 @@ const CHANGED = [
   { name: 'POST /email/log-address', run: (r, p) => handleEmailLogAddress(r, A, p, cors) },     // sales review item 69
   { name: 'DELETE /email/log-address', run: (r, p) => handleEmailLogAddress(r, A, p, cors) },
   { name: 'POST /reviews/google-link', body: { place_id: 'ChIJTestPlace_1234' }, run: (r, p) => handleReviewGoogleLink(r, A, p, cors) },     // sales review item 115
+  { name: 'POST /sales/setup', body: { hidden: true }, run: async (r, p) => (await import('../../supabase/functions/presence/routes/setup_strip.ts')).handleSetupStrip(r, A, p, cors) },     // sales item 105: hiding Home's setup strip
+  { name: 'PUT /sales/goal-ai', body: { goal_cents: 800000 }, run: async (r, p) => (await import('../../supabase/functions/presence/routes/sales_ai.ts')).handleGoalAi(r, p.jwt || '', A, p, cors) },     // sales item 94: the month's goal
   { name: 'PUT /report/monthly', body: { note: 'A line for the client' }, run: (r, p) => handleReportPut(r, A, p, cors) },     // builder list item 58 (a line, not the switch: this stub answers every read with a row, which reads as a do-not-send entry)
   { name: 'POST /report/monthly/preview', fx: { only: ['clients'] }, run: (r, p) => handleReportPreview(A, p, cors) },   // with every read answering a row the address reads as suppressed; the send is the write
   { name: 'POST /site/offline', run: (r, p) => handleTakeOffline(A, p, cors) },
@@ -470,7 +479,7 @@ const WRITE_HANDLERS = [
   'handleLaunchRecapture', 'handleLaunchRollback', 'handleLaunchSchedule', 'handleLocation', 'handleMediaDelete',
   'handleMediaUpdate', 'handleMediaUpload', 'handleMemberAdd', 'handleMemberRevoke', 'handleMessages',
   'handleMilestone', 'handleMilestonesCreate', 'handleMomentDismiss', 'handleMonitorConnect',
-  'handleMonitorDisconnect', 'handleMonitorVerify', 'handleNoteResolve', 'handleNotificationsRead',
+  'handleMonitorDisconnect', 'handleMonitorVerify', 'handleNotificationsRead',
   'handlePageDuplicate', 'handleDeletedPageRestore', 'handlePageLockCreate', 'handlePreviewPromote', 'handlePreviewPublish', 'handlePreviewSection', 'handlePreviewSettings',   // item 154: putting a deleted page back is an edit (contentWriteNeeds)
   'handlePreviewShareLink', 'handleProject', 'handleProjectChecklist', 'handleProjectStatus', 'handleProjectSurveys',
   'handleProjects', 'handleProjectTemplates', 'handleTodoTemplates', 'handleDealTasksFromTemplate', 'handlePublish', 'handlePutIdentity', 'handlePutTemplate', 'handleRedirectCreate',
@@ -501,16 +510,25 @@ const WRITE_HANDLERS = [
   // no member list (an unlisted write refuses every seat — asserted above), and the handlers
   // themselves refuse anyone who isn't platform staff (tool_leads_routes_test.mjs proves it).
   'handleToolLead', 'handleToolLeadConvert',
+  // builder list item 185: the map rank grid spends the platform's Google key, so it is the studio's
+  // alone. Its writes are on no member list (every seat is refused at the gate), and the handlers
+  // refuse anyone who isn't platform staff or a studio scoped in (rank_grid_test.mjs proves it).
+  'handleMapsPut', 'handleMapsPlace', 'handleMapsFind', 'handleMapsScan',
   'handleStudioRequests',   // final pass S1: POST /portal/studio-requests/:id/(accept|decline) are open; the route answers the owner only
   'handleMemberRole', 'handleTransferStart', 'handleTransferCancel',   // builder item 53: open on the member list; each route checks the role itself
+  'handleFoundationsPlanDone',   // builder item 193: open on the member list; the route answers the studio only
   'handleSitePassword',   // builder list item 175: POST /site/password needs configure
+  'handleSampleInvoice',   // builder list item 175: POST /sales/invoices/test is edit, like Send me a test on an update
   'handlePostPublish', 'handlePostUnpublish',   // builder list item 40: POST /posts/:id/(publish|unpublish) need publish
   'handleScheduleCancel', 'handleScheduleCreate', 'handleSettings', 'handleShareSet', 'handleStockImport',
   'handleSupport', 'handleSupportMessage', 'handleSupportOne', 'handleSurveyRespond', 'handleTakeOffline',
-  'handleTask', 'handleTasksCreate', 'handleThreadRead', 'handleVersionLabel', 'handleVisualDecide',
+  'handleTask', 'handleTasksCreate', 'handleThreadRead', 'handleVersionLabel', 'handleVersionStar', 'handleVisualDecide',
   'handleVisualEdit', 'handleVisualGenerate', 'handleVisualVary', 'handleWriteDecide',
   'handleWriteExecute', 'handleWritePrepare', 'handleWriteRollback', 'handleWriterAccept', 'handleWriterDiscard',
   'handleWriterGenerate', 'handleWriterRewrite',
+  'handleSetupStrip',   // sales item 105: POST hides Home's setup strip (configure)
+  'handleHandoverPack',   // sales item 93: POST /handover/notify (edit; the route refuses anyone but the studio)
+  'handleGoalAi', 'handleAiDraft', 'handleAiSummary',   // sales item 94: PUT /sales/goal-ai (configure; the switch is the owner's), POST /sales/ai/(draft|summary) (edit)
 ];
 {
   const idx = read('supabase/functions/presence/index.ts');
@@ -530,7 +548,7 @@ const WRITE_HANDLERS = [
   ok('index: its refusal returns', /const refused = await memberWriteGate\(req, route, method, principal\.member, cors\);\s*if \(refused\) return refused;/.test(idx));
   ok('index: a seat is stamped for a client caller alone, so staff and a scoped studio never meet the gate', idx.includes("if (principal.kind === 'client') principal.member = seated.member;") && idx.split('principal.member =').length === 2);
   const beforeGate = idx.slice(idx.indexOf('async function route_'), at('if (principal.member && isWrite) {'));
-  ok('index: the routes that run before the gate are the public, operator and account ones', ['/system', '/agency', '/commerce', '/admin', '/marketplace', '/enterprise', '/push/subscribe', '/help/ask'].every((r) => beforeGate.includes(`'${r}`)));
+  ok('index: the routes that run before the gate are the public, operator and account ones', ['/system', '/agency', '/commerce', '/admin', '/marketplace', '/push/subscribe', '/help/ask'].every((r) => beforeGate.includes(`'${r}`)));
 
   const direct = [...Deno.readDirSync(new URL('supabase/functions/presence/routes/', ROOT))].filter((f) => f.name.endsWith('.ts') && /\bresolveSiteRole\(/.test(read(`supabase/functions/presence/routes/${f.name}`))).map((f) => f.name);
   ok('routes: none asks resolveSiteRole directly, so the seat always outranks a failed read', direct.length === 0, direct.join(', '));

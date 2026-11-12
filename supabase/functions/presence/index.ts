@@ -46,17 +46,17 @@ import { handleMessages, handleNotifications, handleNotificationsRead, handlePro
 import { handleProjectSurveys, handleSurvey, handleSurveyRespond, handleSupport, handleSupportOne, handleSupportMessage } from './routes/service_intake.ts';
 import { handleClientProjects, handleClientProject, handleClientReport, handleClientMessages, handleClientDeliverableDownload, handleClientApprovalDecide, handleClientSurvey, handleClientSurveyRespond, handleClientNotifications, handleClientNotificationsRead, handleClientSupport, handleClientSupportOne, handleClientSupportMessage, handleClientBilling, handleClientDocuments, handleClientBook, handleClientTaskDone, handleClientUploadUrl, handleClientUploadCreate, handleClientServices, handleClientWebsiteStats, handleClientWebsiteThumb, handleStudioCustomers } from './routes/client_delivery.ts';
 import { handleSavedReplies, handleFaqAdmin, handleClientFaq } from './routes/service_edges.ts';
-import { handlePublish, handleRestore, handlePublishHistory, handleVersionLabel, handleCompareVersions, handleTimewarp, handleCheckpointList, handleCheckpointSave, handleCheckpointRestore, handleCheckpointDelete, handleTakeOffline, handleBackOnline, handleSitePassword } from './routes/publish.ts';
+import { handlePublish, handleRestore, handlePublishHistory, handleVersionStar, handleVersionLabel, handleCompareVersions, handleTimewarp, handleCheckpointList, handleCheckpointSave, handleCheckpointRestore, handleCheckpointDelete, handleTakeOffline, handleBackOnline, handleSitePassword } from './routes/publish.ts';
 const { handleLaunchList, handleLaunchCreate, handleLaunchGet, handleLaunchRecapture, handleLaunchDecide, handleLaunchSchedule, handleLaunchPromote, handleLaunchRollback, handleLaunchCancel } = lazyRoutes(() => import('./routes/launches.ts'));
 import { handleMediaUpload, handleMediaUpdate, handleMediaDelete } from './routes/media.ts';
 import { handleAssetsList, handleAssetsCollections, handleAssetsHealth, handleAssetsBulk, handleAssetsMatch, handleAssetsFolderMove, handleAssetUpdate, handleAssetStatus, handleAssetDelete, handleAssetDetail, handleAssetDownload, handleAssetReplace, handleAssetRollback, handleAssetDuplicate, handleAssetSuggest, handleAssetSocial, handleAssetCards, handleAssetRemoveBackground, handleAssetCutout, handleCutoutJob } from './routes/assets.ts';
 const { handleVisualKinds, handleVisualGenerate, handleVisualList, handleVisualGet, handleVisualVary, handleVisualEdit, handleVisualDecide } = lazyRoutes(() => import('./routes/visual.ts'));
-const { handleAdmin, handleDomain, handleDomainLookup, handleDomainForward } = lazyRoutes(() => import('./routes/admin.ts'));
+const { handleAdmin, handleDomain, handleDomainLookup, handleDomainForward, handleClientDomain } = lazyRoutes(() => import('./routes/admin.ts'));
 import { handleCollection, handleLocation, handleSettings, handleBlockSuggestions, handlePageDuplicate, handlePageRefs, SPECS } from './routes/content.ts';
 import { handlePostPublish, handlePostUnpublish, handlePostEmailDraft } from './routes/blog.ts';
 import { handleDeletedPages, handleDeletedPageRestore } from './routes/deleted_pages.ts';
 import { handlePageLockCreate, handlePageLockList } from './routes/page_locks.ts';
-import { handleHealth, handleChanges, handleContentTree, handleNotesList, handleNoteResolve, handleRestoreToDraft, handleMediaList } from './routes/room.ts';
+import { handleHealth, handleChanges, handleContentTree, handleRestoreToDraft, handleMediaList } from './routes/room.ts';
 const { handleWebsiteTimeline } = lazyRoutes(() => import('./routes/timeline.ts'));
 const { handleWebsiteHealth, handleWebsiteHealthPdf } = lazyRoutes(() => import('./routes/health_page.ts'));
 const { handleBusinessInsights } = lazyRoutes(() => import('./routes/insights_page.ts'));
@@ -92,7 +92,7 @@ import { noteVisitSource } from './routes/visit_source.ts';
 import { runAfterResponse } from './lib/after_response.ts';
 const { handleKnowledgeImport, handleKnowledgeList, handleKnowledgeDelete } = lazyRoutes(() => import('./routes/knowledge.ts'));
 import { handleMonitorGet, handleMonitorConnect, handleMonitorVerify, handleMonitorDisconnect } from './routes/monitor.ts';
-const { handleFoundationsGet, handleFoundationsPrepare, handleFoundationsPlans, handleFoundationsDecide } = lazyRoutes(() => import('./routes/foundations.ts'));
+const { handleFoundationsGet, handleFoundationsPrepare, handleFoundationsPlans, handleFoundationsDecide, handleFoundationsPlanDone } = lazyRoutes(() => import('./routes/foundations.ts'));
 const { handleExport, handleLaunch } = lazyRoutes(() => import('./routes/services.ts'));
 import { resolveAgencyMember } from './agency/auth.ts';
 import { handleAgency } from './agency/routes.ts';
@@ -102,9 +102,9 @@ const { handleSystem } = lazyRoutes(() => import('./routes/system.ts'));
 const { handleVisibility, handleVisibilityCheck } = lazyRoutes(() => import('./routes/visibility.ts'));
 const { handleFollowGet, handleFollowPut, handleLlmsDraft, handlePhrasesGet, handlePhrasesPut } = lazyRoutes(() => import('./routes/search_tab.ts'));
 const { handleAiGet, handleAiQuestionsPut } = lazyRoutes(() => import('./routes/ai_answers.ts'));
+const { handleMapsGet, handleMapsPut, handleMapsPlace, handleMapsFind, handleMapsNames, handleMapsScan } = lazyRoutes(() => import('./routes/rank_grid.ts'));
 const { handleConnectionsList, handleConnectionProfile, handleConnectionConnect, handleConnectionCallback, handleConnectionRefresh, handleConnectionDisconnect, handleConnectionProperties, handleConnectionPropertySelect, handleWritePrepare, handleWriteList, handleWriteDecide, handleWriteExecute, handleWriteRollback, handleConnectionAsk, handleConnectionAskStatus } = lazyRoutes(() => import('./routes/connections.ts'));
 const { handleMarketplaceList, handleMarketplacePrepare, handleMarketplaceDecide, handleMarketplaceExecute, handleMarketplaceRollback, handleMarketplaceFeatures } = lazyRoutes(() => import('./routes/marketplace.ts'));
-const { handleEnterpriseOverview, handleEnterpriseLocations, handleEnterpriseLocationConfig, handleEnterpriseRolloutPrepare, handleEnterpriseDecide, handleEnterpriseExecute, handleEnterpriseRollback, handleEnterpriseAudit } = lazyRoutes(() => import('./routes/enterprise.ts'));
 
 // path after the function name: /functions/v1/presence/site -> "/site"
 function routeOf(url: string): string {
@@ -321,28 +321,6 @@ async function route_(req: Request, cors: Record<string, string>): Promise<Respo
       const mp = route.match(/^\/marketplace\/([a-z0-9_]+)\/prepare$/);
       if (mp && method === 'POST') return handleMarketplacePrepare(req, mp[1], principal, cors);
     }
-  }
-
-  // ── L5.6: Enterprise & Multi-Location — OPERATOR/agency management. Operators
-  //    own no site; handled BEFORE the caller-site gate. Every org-wide change is
-  //    an Approved Plan (lib/approved_plan.ts). One org, many locations.
-  if (route === '/enterprise' || route.startsWith('/enterprise/')) {
-    const eo = route.match(/^\/enterprise\/operations\/([0-9a-f-]{36})\/(decide|execute|rollback)$/);
-    if (eo && method === 'POST') {
-      if (eo[2] === 'decide') return handleEnterpriseDecide(req, eo[1], principal, cors);
-      if (eo[2] === 'execute') return handleEnterpriseExecute(eo[1], principal, cors);
-      if (eo[2] === 'rollback') return handleEnterpriseRollback(eo[1], principal, cors);
-    }
-    const cfg = route.match(/^\/enterprise\/([0-9a-f-]{36})\/locations\/([0-9a-f-]{36})\/config$/);
-    if (cfg && method === 'GET') return handleEnterpriseLocationConfig(cfg[1], cfg[2], principal, cors);
-    const locs = route.match(/^\/enterprise\/([0-9a-f-]{36})\/locations$/);
-    if (locs && method === 'GET') return handleEnterpriseLocations(locs[1], principal, cors);
-    const rp = route.match(/^\/enterprise\/([0-9a-f-]{36})\/rollout\/prepare$/);
-    if (rp && method === 'POST') return handleEnterpriseRolloutPrepare(req, rp[1], principal, cors);
-    const au = route.match(/^\/enterprise\/([0-9a-f-]{36})\/audit$/);
-    if (au && method === 'GET') return handleEnterpriseAudit(au[1], principal, cors);
-    const ov = route.match(/^\/enterprise\/([0-9a-f-]{36})$/);
-    if (ov && method === 'GET') return handleEnterpriseOverview(ov[1], principal, cors);
   }
 
   // Web Push: the VAPID public key is public by design (the browser needs it to
@@ -592,6 +570,12 @@ async function route_(req: Request, cors: Record<string, string>): Promise<Respo
   if (route === '/visibility/llms-draft' && method === 'GET') return handleLlmsDraft(site, cors);         // item 124
   if (route === '/visibility/ai' && method === 'GET') return handleAiGet(site, cors);                     // item 182
   if (route === '/visibility/ai/questions' && method === 'PUT') return handleAiQuestionsPut(req, site, principal, cors);
+  if (route === '/visibility/maps' && method === 'GET') return handleMapsGet(site, principal, cors);                  // item 185: the map rank grid (the writes are the studio's only)
+  if (route === '/visibility/maps' && method === 'PUT') return handleMapsPut(req, site, principal, cors);
+  if (route === '/visibility/maps/place' && method === 'PUT') return handleMapsPlace(req, site, principal, cors);
+  if (route === '/visibility/maps/find' && method === 'POST') return handleMapsFind(req, site, principal, cors);
+  if (route === '/visibility/maps/names' && method === 'GET') return handleMapsNames(req, site, principal, cors);
+  if (route === '/visibility/maps/scan' && method === 'POST') return handleMapsScan(req, site, principal, cors);
   if (route === '/redirects' && method === 'GET') return handleRedirectsList(site, cors);                 // Phase SD
   if (route === '/redirects' && method === 'POST') return handleRedirectCreate(req, site, principal, cors);
   if (route === '/redirects/suggest' && method === 'GET') return handleRedirectSuggest(req, site, cors);   // item 156: the old site's pages, matched
@@ -618,6 +602,7 @@ async function route_(req: Request, cors: Record<string, string>): Promise<Respo
   if (route === '/site/online' && method === 'POST') return handleBackOnline(site, principal, cors);
   if (route === '/site/password' && method === 'POST') return handleSitePassword(req, site, principal, cors);   // list item 175
   if (route === '/publishes' && method === 'GET') return handlePublishHistory(site, cors);
+  if (route === '/publishes/stars' && method === 'PUT') return handleVersionStar(req, site, principal, cors);   // item 158: star the versions that matter
   // ── Version tools: compare any two versions · Timewarp · draft checkpoints ──
   // (all under /publishes/* so featureForRoute maps them to the 'website' area).
   if (route === '/publishes/compare' && method === 'GET') return handleCompareVersions(req, site, cors);
@@ -735,11 +720,6 @@ async function route_(req: Request, cors: Record<string, string>): Promise<Respo
   if (route === '/website-health' && method === 'GET') return handleWebsiteHealth(site, cors);
   if (route === '/website-health/pdf' && method === 'GET') return handleWebsiteHealthPdf(site, cors);   // item 183
   if (route === '/business-insights' && method === 'GET') return handleBusinessInsights(site, cors);
-  if (route === '/notes' && method === 'GET') return handleNotesList(site, cors);
-  {
-    const m = route.match(/^\/notes\/([0-9a-f-]{36})\/(dismiss|accept)$/);
-    if (m && method === 'POST') return handleNoteResolve(site, principal, m[1], m[2] === 'accept' ? 'accepted' : 'dismissed', cors);
-  }
   if (route === '/restore-to-draft' && method === 'POST') return handleRestoreToDraft(req, site, principal, cors);
   // ── G11: per-section review comments on the draft (operator side). Site-scoped
   //    like the sibling site routes; the reviewer boundary above already refuses a
@@ -824,6 +804,13 @@ async function route_(req: Request, cors: Record<string, string>): Promise<Respo
   if (route === '/sales/stages' && (method === 'GET' || method === 'PUT')) return handleSalesStages(req, site, principal, cors);   // sales review item 38: rename the open stages
   if (route === '/email/sending' && method === 'GET') return handleEmailSending(cors);
   if (route === '/sales/export' && method === 'GET') return handleSalesExport(site, principal, cors);   // sales review item 69: one zip of CSVs
+  if ((route === '/handover/pack' && method === 'GET') || (route === '/handover/notify' && method === 'POST')) return (await import('./routes/handover_pack.ts')).handleHandoverPack(req, site, principal, cors);   // sales item 93: the hand-over pack for a client who leaves
+  if (route === '/sales/setup' && (method === 'GET' || method === 'POST')) return (await import('./routes/setup_strip.ts')).handleSetupStrip(req, site, principal, cors);   // sales item 105: Home's setup strip
+  if (route === '/sales/export/accounting' && method === 'GET') return (await import('./routes/accounting_export.ts')).handleAccountingExport(req, site, principal, cors);   // sales item 105: the export for a bookkeeper
+  // sales item 94: the month's goal and the AI help switch, and AI help's two presses (lazy: most requests never use them)
+  if (route === '/sales/goal-ai' && (method === 'GET' || method === 'PUT')) return (await import('./routes/sales_ai.ts')).handleGoalAi(req, jwt, site, principal, cors);
+  if (route === '/sales/ai/draft' && method === 'POST') return (await import('./routes/sales_ai.ts')).handleAiDraft(req, jwt, site, principal, cors);
+  if (route === '/sales/ai/summary' && (method === 'GET' || method === 'POST')) return (await import('./routes/sales_ai.ts')).handleAiSummary(req, jwt, site, principal, cors);
   // ── Prospects — the lead list (Semrush review, sales item 112). Lazy: most days nobody prospects. ──
   if (route.startsWith('/sales/prospects')) {
     const px = await import('./routes/prospects.ts');
@@ -901,6 +888,9 @@ async function route_(req: Request, cors: Record<string, string>): Promise<Respo
     // Studio-gated & site-scoped like every authed /sales/* route.
     m = route.match(/^\/sales\/invoices\/([0-9a-f-]{36})\/void$/);
     if (m && method === 'POST') return handleSalesInvoiceVoid(site, principal, m[1], cors);
+    // Builder list item 175: "Send a test invoice to myself", the email and PDF a customer
+    // gets, with sample lines, to the person asking only. Nothing is made; nothing can be paid.
+    if (route === '/sales/invoices/test' && method === 'POST') return (await import('./routes/sample_invoice.ts')).handleSampleInvoice(site, principal, cors);
     // Sales item 77: a payment that came in outside Stripe (check, cash, bank transfer,
     // Zelle): all of the invoice or part of it, and Undo for one recorded by mistake.
     m = route.match(/^\/sales\/invoices\/([0-9a-f-]{36})\/payment(\/undo)?$/);
@@ -1063,6 +1053,7 @@ async function route_(req: Request, cors: Record<string, string>): Promise<Respo
   if (route === '/client/services' && method === 'GET') return handleClientServices(req, site, principal, cors);   // R2: the studio's service catalog
   if (route === '/client/website-stats' && method === 'GET') return handleClientWebsiteStats(req, site, principal, cors);   // slice 8b: the portal Home's "Your website" card
   if (route === '/client/website-thumb' && method === 'GET') return handleClientWebsiteThumb(req, site, principal, cors);   // item 179: the card's picture of the site itself
+  if (route === '/client/domain' && method === 'GET') return handleClientDomain(site, cors);   // builder item 194: the portal shows the domain's records and a Check button
   if (route === '/client/support' && (method === 'GET' || method === 'POST')) return handleClientSupport(req, site, principal, cors);
   if (route === '/client/faq' && method === 'GET') return handleClientFaq(req, site, principal, cors);   // service edge #5: the studio's FAQ in the portal
   if (route === '/client/kit' && method === 'GET') return (await import('./routes/client_kit.ts')).handleClientKit(req, site, principal, cors);   // builder list item 176: the hand-over kit under Help
@@ -1101,7 +1092,7 @@ async function route_(req: Request, cors: Record<string, string>): Promise<Respo
   if (route === '/portal/context' && method === 'GET') return handlePortalContext(jwt, site, principal, cors, scopedName);
   if (route === '/portal/feed' && method === 'GET') return handlePortalFeed(jwt, site, principal, cors);
   // Final pass (Nov 8, S1): a studio asked to work with this website's owner; the owner answers
-  if (route === '/portal/studio-requests' || /^\/portal\/studio-requests\/[0-9a-f-]{36}\/(accept|decline)$/.test(route)) {
+  if (/^\/portal\/studio-requests\/[0-9a-f-]{36}\/(accept|decline)$/.test(route)) {
     const { handleStudioRequests } = await import('./routes/connect_requests.ts');
     return handleStudioRequests(req, route, site, principal, cors);
   }
@@ -1265,6 +1256,9 @@ async function route_(req: Request, cors: Record<string, string>): Promise<Respo
   {
     const m = route.match(/^\/foundations\/plans\/([0-9a-f-]{36})\/decide$/);
     if (m && method === 'POST') return handleFoundationsDecide(req, site, m[1], principal, cors);
+    // Nov 12 review, finding 13: the studio marks an approved plan finished
+    const d = route.match(/^\/foundations\/plans\/([0-9a-f-]{36})\/done$/);
+    if (d && method === 'POST') return handleFoundationsPlanDone(site, d[1], principal, cors);
   }
   // ── M11: Presence Monitor connection (read-only observation of an existing website) ──
   if (route === '/monitor/connection' && method === 'GET') return handleMonitorGet(jwt, site, cors);
@@ -1318,7 +1312,7 @@ async function route_(req: Request, cors: Record<string, string>): Promise<Respo
     }
   }
   // ── Builder list item 58: the monthly report email to this client (ops/monthly_report.ts) ──
-  if (route === '/report/monthly' && method === 'GET') return (await import('./ops/monthly_report.ts')).handleReportGet(site, cors);
+  if (route === '/report/monthly' && method === 'GET') return (await import('./ops/monthly_report.ts')).handleReportGet(site, principal, cors);
   if (route === '/report/monthly' && method === 'PUT') return (await import('./ops/monthly_report.ts')).handleReportPut(req, site, principal, cors);
   if (route === '/report/monthly/preview' && method === 'POST') return (await import('./ops/monthly_report.ts')).handleReportPreview(site, principal, cors);
   if (route === '/report/monthly/pdf' && method === 'GET') return (await import('./ops/monthly_report.ts')).handleReportPdf(site, cors);   // item 184
