@@ -3,10 +3,10 @@
 // to 5,000 visit rows and counted them in code. One read returns 1,000 rows at most, so
 // past 1,000 rows in the window the numbers were understated, the older weeks of the
 // chart fell toward zero, and the "cut short" note (set at 5,000) could never show.
-// presence_visit_stats (migration 0191) counts in the database, the way the Sites page
+// presence_visit_stats (migration 0194) counts in the database, the way the Sites page
 // has since item 180; this module asks it and hands back the shapes the pages already
 // use (aggregateVisits' VisitAgg, the weekly line, the period before).
-// Before 0191 the function isn't there: the rows are read a page at a time and counted by
+// Before 0194 the function isn't there: the rows are read a page at a time and counted by
 // the same pure functions as before, right up to 50,000 rows and marked cut short past it.
 import { svc, svcPages } from './db.ts';
 import { aggregateVisits, aiAssistantOf, AI_SOURCE, sourceLabel, type VisitAgg, type VisitRow } from './visits.ts';
@@ -74,7 +74,7 @@ export function statsFromDb(j: Record<string, unknown> | null | undefined, weeks
   };
 }
 
-/** The same numbers from the rows themselves: the path before migration 0191. Pure. */
+/** The same numbers from the rows themselves: the path before migration 0194. Pure. */
 export function statsFromRows(rows: VisitRow[], w: VisitWindow, truncated = false): VisitStats {
   const end = w.endMs ?? Infinity;
   const inWindow = rows.filter((v) => { const ms = Date.parse(String(v.ts || '')); return Number.isFinite(ms) && ms >= w.startMs && ms < end; });
@@ -108,7 +108,7 @@ export async function readVisitStats(siteId: string, w: VisitWindow): Promise<Vi
   }).catch(() => null);
   if (r && r.ok && r.json && typeof r.json === 'object' && 'visitors' in r.json) return statsFromDb(r.json as Record<string, unknown>, w.weeks || 0);
   if (!r || !missing(r)) return null;
-  // before 0191: every row, a page at a time
+  // before 0194: every row, a page at a time
   const until = w.endMs === null || w.endMs === undefined ? '' : `&ts=lt.${iso(w.endMs)}`;
   const paths = w.paths && w.paths.length ? `&path=in.(${encodeURIComponent(w.paths.map((p) => `"${p.replace(/"/g, '')}"`).join(','))})` : '';
   const pages = await svcPages(`presence_visits?site_id=eq.${siteId}&ts=gte.${iso(firstMs(w))}${until}${paths}&kind=in.(pageview,phone,email,cta,download)&select=ts,kind,path,ref_host,utm_source,device,country,visitor_hash`, 'ts');

@@ -80,7 +80,7 @@ export function installFakePostgrest(opts = {}) {
     if (u.pathname.startsWith('/auth/v1/admin/users/')) { const id = u.pathname.split('/').pop(); const x = Object.values(users).find((y) => y.id === id); return x ? reply(x) : reply({}, 404); }
     if (!u.pathname.startsWith('/rest/v1/')) return reply({}, 404);
     const table = u.pathname.slice('/rest/v1/'.length);
-    // a database before migration 0191: the visit-count functions aren't there, as PostgREST says it
+    // a database before migration 0194: the visit-count functions aren't there, as PostgREST says it
     if (table === 'rpc/presence_visit_stats' || table === 'rpc/presence_sites_visitors') return reply({ code: 'PGRST202', message: `Could not find the function public.${table.slice(4)}` }, 404);
     if (db.fail.has(table) || db.failMethod.get(table) === method) return reply({ message: 'boom' }, 500);
     const params = [...u.searchParams.entries()];

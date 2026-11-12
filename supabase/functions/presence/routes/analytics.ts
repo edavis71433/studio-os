@@ -108,7 +108,7 @@ const periodDays = (p: Period) => (p === 'week' ? 7 : 30);
  *  with a 5,000 cap that one read can't reach (1,000 come back), so a site with more
  *  than 1,000 rows in the two spans was understated with nothing to say so.
  *  A failed read is an empty result, as before: those pages then say nothing of visits.
- *  `truncated` is only ever true before migration 0191, past 50,000 rows; consumers
+ *  `truncated` is only ever true before migration 0194, past 50,000 rows; consumers
  *  drop the trend clause then rather than state one from a short count (AN-4). */
 export async function loadVisitAgg(siteId: string, period: Period, nowMs: number): Promise<VisitAgg> {
   const span = periodDays(period) * 86_400_000;
@@ -170,7 +170,7 @@ export async function handleAnalyticsPortfolio(jwt: string, cors: Record<string,
   // Bug hunt H7 (Nov 10): the reads that need only the site ids go together, then the two
   // that need the client ids. They used to run one after another, six round trips in a row.
   const [vr, sitesR, gscConnR, extR, failedR] = await Promise.all([
-    // item 207: counted in the database; before migration 0191 (null) the capped read below stands in
+    // item 207: counted in the database; before migration 0194 (null) the capped read below stands in
     readSitesVisitors(siteIds, sinceIso).then((counted) => counted
       ? { ok: true, counted, json: null as unknown }
       : svc(`presence_visits?site_id=in.(${siteIds.join(',')})&kind=eq.pageview&ts=gte.${sinceIso}&select=site_id,visitor_hash&order=ts.desc&limit=${PORTFOLIO_VISITS_CAP}`)
@@ -497,7 +497,7 @@ export async function handleAnalyticsDashboard(req: Request, site: SiteRow, cors
     const agg = visits.agg;
     traffic = {
       visitors: agg.visitors, pageviews: agg.pageviews,
-      // null = no honest comparison exists (all time, or, before migration 0191 only, a
+      // null = no honest comparison exists (all time, or, before migration 0194 only, a
       // read cut short, where the older window is the part that fell off). The page then says nothing.
       prior_visitors: priorStartMs === null ? null : visits.priorVisitors,
       actions: agg.events.phone + agg.events.email + agg.events.cta,

@@ -5,7 +5,7 @@
 // site with more than that in the window was understated, the older weeks of the chart
 // fell to zero, and the "cut short" note waited for 5,000 rows that never came. Here a
 // stand-in database holds 1,500 visitors this month and hands back 1,000 rows a read, as
-// production does. The pages must say 1,500: from the database's count (migration 0191),
+// production does. The pages must say 1,500: from the database's count (migration 0194),
 // and, before that migration, from reading every page of rows. No Supabase is touched.
 for (const [k, v] of Object.entries({ SUPABASE_URL: 'http://stub.local', SERVICE_ROLE_KEY: 'SERVICE-KEY', SUPABASE_ANON_KEY: 'ANON-KEY' })) Deno.env.set(k, v);
 
@@ -39,7 +39,7 @@ rows.push({ ...rows[0], site_id: OTHER, visitor_hash: 'elsewhere' });
 const world = { hasFunction: true, seen: [], failVisits: false };
 const reply = (body, status = 200) => new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
 const distinct = (xs) => new Set(xs.filter(Boolean)).size;
-function dbStats(b) {   // what migration 0191's function answers, worked out the plain way
+function dbStats(b) {   // what migration 0194's function answers, worked out the plain way
   const t = (r) => RealDate.parse(r.ts), start = RealDate.parse(b.p_start), now = RealDate.parse(b.p_now), end = b.p_end ? RealDate.parse(b.p_end) : Infinity;
   const mine = rows.filter((r) => r.site_id === b.p_site_id && t(r) < end && (!b.p_paths || b.p_paths.includes(r.path)));
   const pv = mine.filter((r) => r.kind === 'pageview' && t(r) >= start);
@@ -92,7 +92,7 @@ const weeks = (w) => w.reduce((a, b) => a + b, 0);
 // ── 1. the client portal: 1,500 visitors is 1,500 ──
 for (const hasFunction of [true, false]) {
   world.hasFunction = hasFunction; world.seen = [];
-  const when = hasFunction ? 'counted in the database' : 'before 0191, every page of rows';
+  const when = hasFunction ? 'counted in the database' : 'before 0194, every page of rows';
   const m = (await (await handleClientWebsiteStats(new Request('https://fn.test/x'), site, {}, cors)).json()).data.month;
   eq(`portal, ${when}: this month's visitors and page views are all there, not the first 1,000 rows`, [m.visitors, m.pageviews], [1500, 1800]);
   eq(`portal, ${when}: the 12-week line reaches back, older weeks aren't zero`, [m.weekly.length, m.weekly.slice(0, 6), m.weekly.slice(6).every((n) => n > 0)], [12, [100, 100, 100, 100, 100, 100], true]);
@@ -106,7 +106,7 @@ for (const hasFunction of [true, false]) {
 // ── 2. Analytics: the same numbers, and the period before ──
 for (const hasFunction of [true, false]) {
   world.hasFunction = hasFunction;
-  const when = hasFunction ? 'counted in the database' : 'before 0191, every page of rows';
+  const when = hasFunction ? 'counted in the database' : 'before 0194, every page of rows';
   const d = (await (await AN.handleAnalyticsDashboard(new Request('https://fn.test/functions/v1/presence/analytics/dashboard?period=this_month&tzo=0'), site, cors)).json()).data;
   const t = d.website?.traffic || d.traffic || d.website;
   eq(`Analytics, ${when}: visitors, page views and the period before`, [t.visitors, t.pageviews, t.prior_visitors, t.truncated], [1500, 1800, 400, false]);
@@ -137,7 +137,7 @@ world.hasFunction = true;
   ok('a form\'s pages: the paths ride along', world.seen.some((x) => x.includes('rpc/presence_visit_stats')));
   eq('client list: visitors per site in one question', await V.readSitesVisitors([SITE, OTHER], new RealDate(NOW - 7 * DAY).toISOString()), { [SITE]: distinct(rows.filter((r) => r.site_id === SITE && r.kind === 'pageview' && RealDate.parse(r.ts) >= NOW - 7 * DAY).map((r) => r.visitor_hash)), [OTHER]: 0 });
   world.hasFunction = false;
-  eq('client list before 0191: null, and the route falls back to its old read', await V.readSitesVisitors([SITE], new RealDate(NOW - 7 * DAY).toISOString()), null);
+  eq('client list before 0194: null, and the route falls back to its old read', await V.readSitesVisitors([SITE], new RealDate(NOW - 7 * DAY).toISOString()), null);
   world.hasFunction = true;
   const an = read(`${P}/routes/analytics.ts`), com = read(`${P}/routes/commercial.ts`);
   ok('client list: the stand-in read says "cut short" at a full page of 1,000, not at a cap it can never reach', /truncated: truncated \|\| arr\(vr\)\.length >= 1000/.test(an));
@@ -160,7 +160,7 @@ world.hasFunction = true;
 
 // ── 6. the migration and the pack ──
 {
-  const migration = read('../../supabase/migrations/0191_visit_stats.sql'), pack = read('../../docs/presence/APPLY-0191-prod.sql');
+  const migration = read('../../supabase/migrations/0194_visit_stats.sql'), pack = read('../../docs/presence/APPLY-0194-prod.sql');
   const SIG = 'uuid, timestamptz, timestamptz, timestamptz, timestamptz, int, text\\[\\]';
   for (const [name, sql] of [['migration', migration], ['pack', pack]]) {
     ok(`${name}: both functions, for the function's key only`, new RegExp(`grant execute on function public\\.presence_visit_stats\\(${SIG}\\) to service_role`).test(sql) && new RegExp(`revoke all on function public\\.presence_visit_stats\\(${SIG}\\) from public, anon, authenticated`).test(sql)

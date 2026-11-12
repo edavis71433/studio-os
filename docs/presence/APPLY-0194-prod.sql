@@ -1,5 +1,5 @@
 -- ===========================================================================
---  APPLY PACK - migration 0191  (owner-apply, prod)
+--  APPLY PACK - migration 0194  (owner-apply, prod)
 -- ===========================================================================
 --  Run this ONCE (Supabase -> SQL Editor, or the Supabase connector), BEFORE or
 --  WITH the deploy.yml run that ships item 207. ADDITIVE and IDEMPOTENT
@@ -19,7 +19,7 @@
 --    drop function if exists public.presence_visit_stats(uuid, timestamptz, timestamptz, timestamptz, timestamptz, int, text[]);
 --    drop function if exists public.presence_sites_visitors(uuid[], timestamptz);
 --
---  Covers: supabase/migrations/0191_visit_stats.sql
+--  Covers: supabase/migrations/0194_visit_stats.sql
 -- ===========================================================================
 
 create or replace function public.presence_visit_stats(

@@ -860,7 +860,7 @@ export async function handleClientWebsiteStats(_req: Request, site: SiteRow, _pr
       top_pages: agg.topPages,                // ≤5
       sources,
       has_data: agg.hasData,
-      truncated: stats.truncated,             // only before migration 0191, past 50,000 rows → "based on recent activity"
+      truncated: stats.truncated,             // only before migration 0194, past 50,000 rows → "based on recent activity"
     };
   }
   // search: null = genuinely not connected; { unavailable: true } = the signals
