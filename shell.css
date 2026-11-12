@@ -209,6 +209,7 @@ html.dds-has-shell.dds-has-ctxbar body{padding-top:calc(var(--dds-shell-h) + var
 .dds-pop .row{padding:var(--dds-s2) 10px;border-radius:var(--dds-r);font-size:13.5px;color:var(--dds-ink);display:block;text-decoration:none}
 .dds-pop .row:hover{background:var(--dds-p-soft)}
 .dds-pop .row .sub{color:var(--dds-soft);font-size:12.5px;margin-top:1px}
+.dds-pop .row .sub .go{color:var(--dds-p);font-weight:600;white-space:nowrap}   /* item 126: the line's one link, named */
 .dds-pop .muted{color:var(--dds-soft);font-size:13px;padding:var(--dds-s3) 10px;text-align:center}
 .dds-pop .who{padding:10px;border-bottom:1px solid var(--dds-line);margin-bottom:6px}
 .dds-pop .who .n{font-weight:600;font-size:14px}
