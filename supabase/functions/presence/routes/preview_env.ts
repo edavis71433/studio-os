@@ -150,6 +150,13 @@ async function stagedPreviewHtml(siteId: string, snapshotId: string, page: strin
 
 // The page a viewer asked for: a site path like "/" or "/menu/", nothing else.
 const cleanPage = (raw: unknown): string => { const p = String(raw ?? '/'); return /^\/[a-z0-9/_-]{0,120}$/i.test(p) ? p : '/'; };
+/** Builder list item 179, part two: one page of a staged snapshot, drawn exactly as
+ *  the shared-draft link draws it (the same cache, signed photos, inlined styles and
+ *  the draft badge), for the client portal's draft view (routes/client_drafts.ts).
+ *  Internal links point at `navBase` + the page. */
+export function renderSnapshotPage(siteId: string, snapshotId: string, page: string, navBase: string): Promise<{ status: number; html: string }> {
+  return stagedPreviewHtml(siteId, snapshotId, cleanPage(page), navBase);
+}
 const htmlResp = (cors: Record<string, string>, body: string, status = 200) => new Response(body, { status, headers: { ...cors, 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store', 'X-Robots-Tag': 'noindex, nofollow' } });
 // Supabase serves an HTML answer from the function's own address as plain text, so a
 // visitor who opens a door directly is sent on to the viewer, which asks for the page.

@@ -170,6 +170,12 @@
   .unread{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:var(--dds-s3,12px);padding:10px 12px;border:1px solid var(--line);border-radius:var(--dds-r,8px);background:var(--bg);font-size:13.5px;color:var(--soft)}
   [data-held]{display:none!important}   /* C4: the rows a failed read feeds (their own display rules would beat [hidden]) */
   .sw[aria-disabled="true"]{opacity:.5;cursor:not-allowed}
+  /* item 126: a client site's two channels under its switch, and the Saved tick */
+  .chans{display:flex;flex-wrap:wrap;gap:6px 18px;margin-top:8px}
+  .chan{display:inline-flex;align-items:center;gap:8px;font-size:13.5px;color:var(--ink);cursor:pointer;min-height:32px}
+  .chan input{width:18px;height:18px;margin:0;accent-color:var(--p);cursor:pointer}
+  .chans[aria-disabled="true"] .chan{color:var(--faint);cursor:not-allowed}
+  .nsaved{font-size:12px;font-weight:600;color:var(--good,#11744a);margin-left:6px}
 </style>
 </head>
 <body>
@@ -307,6 +313,16 @@
     <div id="menuRows"></div>
     <div class="how" id="menuNote" style="margin-top:10px">Home and Settings always stay. The menu changes the next time a page opens.</div>
   </section>
+  <!-- builder list item 126 (Nov 2026): one notifications switch per client site, with a
+       Dashboard channel (Home and the bell) and an Email channel (your copies of the site's
+       emails). Agency members only; at studio level every client site, inside a client that
+       one. Kept once per studio (GET /agency/notify, PUT /agency/notify/:site). Each switch
+       saves as you flip it. -->
+  <section class="card" id="notify" aria-labelledby="notifyHead" hidden>
+    <div class="card-h"><h2 id="notifyHead" tabindex="-1">Notifications</h2><span class="hint">What you hear about each client’s site, and how. Each switch saves as you flip it.</span></div>
+    <div id="notifyRows"></div>
+    <div class="how" id="notifyNote" style="margin-top:10px">Money owed, something broken and messages from your clients always reach you. The emails your clients get never change.</div>
+  </section>
   <section class="card" id="automations" aria-labelledby="autoHead" hidden data-needs="configure">
     <div class="card-h"><h2 id="autoHead" tabindex="-1">Automations</h2><span class="hint" id="autoHint">Ready-made recipes, and the switches behind them. Each saves as you flip it.</span></div>
     <!-- sales item 87: Wix-style recipes, each one tap; it switches on the rows below -->
@@ -431,6 +447,7 @@ const nice = (b, fallback) => (b && typeof b.message === 'string' && /^[A-Z]/.te
 //    the caller's plan or role doesn't include is left out, never shown dead. ──
 const IC = {
   studio: '<path d="M3 21h18"/><path d="M5 21V7l7-4 7 4v14"/><path d="M9 21v-6h6v6"/>',
+  deleted: '<path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5"/>',   // sales item 83: a way back
   team: '<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0"/><circle cx="17" cy="9" r="2.5"/><path d="M15.5 14.5A5 5 0 0 1 21.5 20"/>',
   agency_team: '<circle cx="8" cy="8" r="3"/><circle cx="16" cy="8" r="3"/><path d="M2 20a6 6 0 0 1 12 0"/><path d="M10 20a6 6 0 0 1 12 0"/>',
   billing: '<path d="M12 3v18"/><path d="M17 7.5c0-1.9-2.2-3-5-3s-5 1.1-5 3 2.2 2.5 5 3 5 1.1 5 3-2.2 3-5 3-5-1.1-5-3"/>',
@@ -460,6 +477,8 @@ const CARDS = [
   { key: 'menu', icon: 'studio', href: '#menu', title: 'Your menu', desc: 'Hide the areas your studio doesn’t use. A hidden area keeps its page and stays one search away.', words: 'hide areas navigation sidebar', agencyOnly: true, cap: 'configure' },
   { key: 'billing', href: '#billing', title: 'Your plan', desc: 'Your Studio OS plan, how to change it, and closing your account.', words: 'plan billing subscription payment card cancel close delete account export download data', ownerOnly: true, needs: 'owner' },   // item 166: "Plan" alone for the studio's own subscription (billing stays a search word)
   { key: 'money', href: '/pipeline.html?services=1', title: 'Invoices & agreements', desc: 'Your services and prices (they fill proposals), the agreement every deal starts from, deposits.', words: 'services prices proposals deposits contracts tax', feature: 'relationship' },
+  // sales item 83 (Nov 2026): one place for what was deleted lately, with Restore
+  { key: 'deleted', href: '/recently-deleted.html', title: 'Recently deleted', desc: 'Deals, contacts and to-dos you deleted in the last 30 days. Bring any of them back.', words: 'trash bin undo restore deleted removed recover', feature: 'relationship', studioOnly: true },
   // Bold redesign (Nov 2026): the private calendar link (sales review item 46) has its own row — it lives on Connections
   { key: 'calendar', href: '/connections.html#calSec', title: 'Calendar', desc: 'Your bookings and dated tasks in Google Calendar, Apple Calendar or Outlook, through a private link.', words: 'ical google outlook apple bookings', feature: 'connected', studioOnly: true },
   { key: 'connections', href: '/connections.html', title: 'Connections', desc: 'Google Analytics, Search Console, Business Profile, email sending.', words: 'google analytics search console business profile email sending integrations', feature: 'connected', scoped: true },
@@ -470,7 +489,8 @@ const CARDS = [
   { key: 'domains_all', icon: 'domains', href: '/admin-health.html', title: 'Every site’s domains', desc: 'Domains, email records and padlocks across the platform, in the Health Center. Staff only.', operatorOnly: true },
   { key: 'team', href: '/sharing.html', title: 'Team & access', desc: 'Who can sign in, what clients can see, reviewer links.', words: 'sharing access reviewer client portal invite people', feature: 'client_portal', cap: 'invite', scoped: true,
     agencyTitle: 'Sharing & access', agencyDesc: 'What your clients can see in their portal, and reviewer links.' },
-  { key: 'notify', href: '/inbox.html', title: 'Notifications', desc: 'Enquiries, approvals and support requests ring the bell and land in the Inbox; the email digest follows the same list.', words: 'notifications bell digest alerts emails', scoped: true },
+  { key: 'notify', href: '/inbox.html', title: 'Notifications', desc: 'Enquiries, approvals and support requests ring the bell and land in the Inbox; the email digest follows the same list.', words: 'notifications bell digest alerts emails mute quiet', scoped: true,
+    agencyHref: '#notify', agencyDesc: 'One switch for each client’s site, then the bell and email: what you hear about it, and how.', scopedTitle: () => 'Notifications', scopedDesc: 'What you hear about this client’s site: on Home and in the bell, and by email.' },   // item 126
   // the developer tools are the STUDIO's, never a client's — the card stays unscoped and says so while drilled in
   { key: 'dev', href: '/developer.html', title: 'Developer', desc: 'API keys, webhooks, the schema dump. For you, not clients.', words: 'api keys webhooks schema developer code', feature: 'developer', cap: 'use_developer_mode',
     scopedTitle: () => 'Your studio’s developer tools', scopedDesc: 'API keys, webhooks, the schema dump — your studio’s own, not this client’s. Opening it leaves the client.' },
@@ -489,7 +509,8 @@ function hasCap(c) { const list = CTX && CTX.capabilities; return !Array.isArray
 // domain desk of the site in scope.
 function cardHtml(c, status) {
   const who = scopeName() || 'this client';
-  const href = (SCOPE && c.scoped) ? withClient(c.href) : c.href;
+  const inPage = !!(CTX && CTX.is_agency) && c.agencyHref;   // item 126: a studio's Notifications is a part of this page, inside a client too
+  const href = inPage ? c.agencyHref : (SCOPE && c.scoped) ? withClient(c.href) : c.href;
   const agency = !!(CTX && CTX.is_agency) && !SCOPE;
   const title = (SCOPE && c.scopedTitle) ? c.scopedTitle(who) : (agency && c.agencyTitle) ? c.agencyTitle : c.title;
   const desc = (SCOPE && c.scopedDesc) ? c.scopedDesc : (agency && c.agencyDesc) ? c.agencyDesc : c.desc;
@@ -523,6 +544,14 @@ function renderCards() {
   if (rc) rc.addEventListener('click', (e) => { e.preventDefault(); reveal('report', 'reportHead'); });
   const mc = $('cards').querySelector('[data-card="menu"]');
   if (mc) mc.addEventListener('click', (e) => { e.preventDefault(); reveal('menu', 'menuHead'); });
+  const nc = $('cards').querySelector('[data-card="notify"][href="#notify"]');
+  if (nc) nc.addEventListener('click', (e) => {
+    e.preventDefault();
+    loadNotify().then(() => {
+      if (NOTIFY && notifyRows().length) reveal('notify', 'notifyHead');
+      else toast(NOTIFY ? 'This client’s site isn’t one your studio looks after.' : 'Your notification choices couldn’t load just now. Try again in a moment.', true);   // never an empty part
+    });
+  });
   const gc = $('cards').querySelector('[data-card="stages"]');
   if (gc) gc.addEventListener('click', (e) => { e.preventDefault(); reveal('stages', 'stagesHead'); });
   markCurrent(CURRENT);
@@ -536,7 +565,7 @@ function markCurrent(id) {
 }
 function spySections() {
   if (!('IntersectionObserver' in window)) return;
-  const ids = ['studio', 'stages', 'report', 'menu', 'automations', 'team', 'billing'];   // C16: a client's Monthly report too
+  const ids = ['studio', 'stages', 'report', 'menu', 'notify', 'automations', 'team', 'billing'];   // C16: a client's Monthly report too; item 126: Notifications
   // C16: the band (15–30% down the screen) never reaches the last part when the page ends
   // first, so Plan & billing never lit up; at the very bottom the last part shown is marked
   const atBottom = () => window.scrollY > 0 && window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 2;
@@ -1135,6 +1164,65 @@ async function toggleMenu(key) {
   try { if (window.ddsContextForget) window.ddsContextForget(); } catch (_) { /* */ }   // the next page asks for the menu again
   toast(hidden.includes(key) ? 'Hidden. The menu changes the next time a page opens.' : 'Back in the menu from the next page on.');
 }
+// ── item 126: one notifications switch per client site (GET /agency/notify, PUT /agency/notify/:site) ──
+// The site's switch first, then its two channels; a channel waits while the switch is off.
+// Every change saves as it's made, says Saved beside the site, and puts back what was there
+// when it doesn't save. A failed read leaves the part away: never a switch that lies.
+let NOTIFY = null, NOTIFY_ASKED = null;
+const NOTIFY_BUSY = new Set(), NOTIFY_SAVED = new Set();
+function loadNotify() {
+  if (!(CTX && CTX.is_agency)) return Promise.resolve();
+  if (NOTIFY_ASKED) return NOTIFY_ASKED;
+  NOTIFY_ASKED = api('/agency/notify', 'GET').then((r) => {
+    if (!r.ok || !r.body || !r.body.data) { NOTIFY_ASKED = null; return; }
+    NOTIFY = r.body.data;
+    if (!notifyRows().length) return;   // inside a client the studio doesn't look after: nothing to switch
+    paintNotify();
+    $('notify').hidden = false;
+  }).catch(() => { NOTIFY_ASKED = null; });
+  return NOTIFY_ASKED;
+}
+const notifyLocked = () => !!(NOTIFY && NOTIFY.can_edit === false);
+function notifyRows() { const all = (NOTIFY && NOTIFY.sites) || []; return SCOPE ? all.filter((x) => x.site_id === SCOPE.toLowerCase()) : all; }
+function paintNotify() {
+  const had = document.activeElement && document.activeElement.id;
+  const locked = notifyLocked();
+  $('notifyRows').innerHTML = notifyRows().map((x) => {
+    const id = esc(x.site_id), off = locked || NOTIFY_BUSY.has(x.site_id);
+    const how = !x.on ? 'Off. Nothing about this site reaches you, apart from money owed, something broken or a message from your client.'
+      : !x.dashboard && !x.email ? 'On, with both ways off: you won’t be told about this site.'
+      : !x.dashboard ? 'Not on Home or in the bell: its news and its visitors’ enquiries stay away.'
+      : !x.email ? 'No emails to you about this site; Home and the bell still tell you.'
+      : 'Its news and its visitors’ enquiries on Home and in the bell, and your copies of its emails.';
+    const chanOff = off || !x.on;
+    return `<div class="swrow" data-notify-site="${id}">
+      <button type="button" class="sw" role="switch" id="sw-n-${id}" data-notify-on="${id}" aria-checked="${x.on ? 'true' : 'false'}" aria-labelledby="sw-n-${id}-l"${off ? ' aria-disabled="true"' : ''}></button>
+      <div class="t"><b id="sw-n-${id}-l">${esc(x.name)}${NOTIFY_SAVED.has(x.site_id) ? '<span class="nsaved" role="status">Saved</span>' : ''}</b><div class="how">${esc(how)}</div>
+        <div class="chans" role="group" aria-label="${esc('How you hear about ' + x.name)}"${chanOff ? ' aria-disabled="true"' : ''}>
+          <label class="chan"><input type="checkbox" id="ch-d-${id}" data-notify-chan="dashboard" data-site="${id}"${x.dashboard ? ' checked' : ''}${chanOff ? ' disabled' : ''}>On Home and in the bell</label>
+          <label class="chan"><input type="checkbox" id="ch-e-${id}" data-notify-chan="email" data-site="${id}"${x.email ? ' checked' : ''}${chanOff ? ' disabled' : ''}>By email</label>
+        </div></div>
+    </div>`;
+  }).join('');
+  $('notifyRows').querySelectorAll('[data-notify-on]').forEach((b) => b.addEventListener('click', () => { const sid = b.getAttribute('data-notify-on'); const x = notifyRows().find((r) => r.site_id === sid); if (x) saveNotify(sid, { on: !x.on }); }));
+  $('notifyRows').querySelectorAll('[data-notify-chan]').forEach((c) => c.addEventListener('change', () => saveNotify(c.getAttribute('data-site'), { [c.getAttribute('data-notify-chan')]: c.checked })));
+  if (had) { const n = $(had); if (n) n.focus(); }   // the redraw keeps your place
+  $('notifyNote').textContent = notifyLocked() ? 'Your role can see these but not change them. Your studio’s owner, an admin or an account manager can.' : 'Money owed, something broken and messages from your clients always reach you. The emails your clients get never change.';
+}
+async function saveNotify(siteId, patch) {
+  if (!NOTIFY || notifyLocked() || NOTIFY_BUSY.has(siteId)) return;
+  const i = NOTIFY.sites.findIndex((x) => x.site_id === siteId); if (i < 0) return;
+  const before = NOTIFY.sites[i];
+  NOTIFY_BUSY.add(siteId); NOTIFY_SAVED.delete(siteId);
+  NOTIFY.sites[i] = { ...before, ...patch }; paintNotify();
+  const r = await api('/agency/notify/' + encodeURIComponent(siteId), 'PUT', patch);
+  NOTIFY_BUSY.delete(siteId);
+  if (!r.ok || !r.body || !r.body.data) { NOTIFY.sites[i] = before; paintNotify(); toast(nice(r.body, 'That didn’t save. It’s as it was.'), true); return; }
+  const d = r.body.data;
+  NOTIFY.sites[i] = { ...before, on: d.on, dashboard: d.dashboard, email: d.email };
+  NOTIFY_SAVED.add(siteId); paintNotify();
+  try { if (window.ddsBellRefresh) window.ddsBellRefresh(); } catch (_) { /* the bell asks again on its next look */ }
+}
 // I3 (bug hunt, Nov 10): answers can come back in any order. Each field counts the saves it
 // has on their way, and a repaint leaves a field alone while one is out; an answer older than
 // one already taken for the field is not taken (the newest save is the one the server keeps).
@@ -1350,6 +1438,7 @@ function holdAnchor(sec) {
     loadTeam().catch(() => {});
     if (!SCOPE) { loadStageNames(); loadMenu(); }   // with the rest, not after the studio details
     else { wireReport(); loadReport(); }
+    loadNotify();   // item 126: a studio's notifications per client site (agency members only)
     wireDeletion();
     { const dl = $('dlData'); if (dl) dl.addEventListener('click', downloadMyData); }   // item 69: Download my data
     await profile.catch(() => { $('studio').hidden = false; toast('Couldn’t load your studio details just now.', true); });
@@ -1360,6 +1449,7 @@ function holdAnchor(sec) {
     if (location.hash === '#billing' && !SCOPE) holdAnchor($('billing'));   // I7: billing is the studio's own, never a client's (a client's "Update payment" link lands at the top)
     if (location.hash === '#automations' && automationsHere()) holdAnchor($('automations'));
     if (location.hash === '#stages' && !SCOPE) holdAnchor($('stages'));
+    if (location.hash === '#notify') loadNotify().then(() => { if (!$('notify').hidden) holdAnchor($('notify')); });
     spySections();
   } catch (_) {
     $('main').innerHTML = '<div class="center"><h2>We couldn’t load your settings just now.</h2><p>Nothing’s wrong with your account — refresh to try again.</p></div>';

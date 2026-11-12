@@ -74,6 +74,7 @@
   .fpill{font:inherit;font-size:12.5px;font-weight:600;border:1px solid var(--line);border-radius:999px;background:var(--card);color:var(--ink);padding:6px 12px;cursor:pointer;min-height:36px}
   .fpill:hover{border-color:var(--p);color:var(--p)} .fpill[aria-pressed="true"]{background:var(--p);border-color:var(--p);color:var(--dds-on-p,#fff)}
   .fpill .c{opacity:.75;font-weight:500;margin-left:3px}
+  .fpill[aria-pressed="true"] .c{opacity:.9}   /* builder item 150: on the filled pill, .75 fell under 4.5:1 */
   .frow .search{flex:1 1 220px;min-width:0;margin:0;padding:8px 14px;font-size:14px;border-radius:999px}
   @media (max-width:767px){.fpill{min-height:44px}.frow .search{flex-basis:100%;order:-1}}
 
@@ -111,6 +112,19 @@
   .hring .trk{fill:none;stroke:var(--line);stroke-width:3.5}
   .hring .arc{fill:none;stroke-width:3.5;stroke-linecap:round} .hring .arc.good{stroke:var(--good)} .hring .arc.fair{stroke:var(--warn)} .hring .arc.poor{stroke:var(--bad)}
   .hring text{font:700 11px var(--sans);fill:var(--ink)}
+  /* builder list item 53: who owns the site, and what you are on it (Wix's "Agency · Website Manager") */
+  .who{background:var(--bg);border-radius:var(--dds-r,10px);padding:10px;display:flex;flex-direction:column;gap:8px;min-width:0}
+  .who .wl{display:flex;align-items:center;gap:8px;min-width:0;font-size:12.5px;color:var(--soft)}
+  .who .wl .tx{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .who .wl b{color:var(--ink);font-weight:600}
+  .who .oav{width:24px;height:24px;border-radius:50%;display:grid;place-items:center;font-size:10px;font-weight:700;background:var(--p-soft);color:var(--p);flex:0 0 auto}
+  .who .sav{width:24px;height:24px;border-radius:7px;display:grid;place-items:center;font-size:10px;font-weight:700;background:var(--p);color:var(--dds-on-p,#fff);flex:0 0 auto}
+  .who .ochip{font-size:11px;font-weight:600;border-radius:999px;padding:2px 8px;background:var(--good-soft);color:var(--good);flex:0 0 auto}
+  .who .plink{font:inherit;font-size:12.5px;font-weight:600;color:var(--p);background:none;border:none;padding:4px 0;cursor:pointer;flex:0 0 auto;min-height:32px}
+  .who .plink:hover{text-decoration:underline}
+  .who .handing{background:var(--warn-soft);color:var(--warn);border-radius:8px;padding:6px 8px;font-size:12px;font-weight:500;line-height:1.35}
+  @media (max-width:767px){.who .plink{min-height:44px}}
+  .trole{padding:10px var(--dds-s4,16px);border-bottom:1px solid var(--line);font-size:12.5px;color:var(--soft);background:var(--card)}
   .sfoot{display:flex;align-items:center;gap:var(--dds-s2,8px);margin-top:auto;padding-top:var(--dds-s3,12px);border-top:1px solid var(--line)}
   .sfoot .avs{flex:0 0 auto} .sfoot .when{font-size:12px;color:var(--soft);flex:1;min-width:0;line-height:1.35}
   .sfoot .sacts{margin-top:0;padding-top:0;flex-wrap:nowrap}
@@ -342,6 +356,7 @@
 
 <script src="/vendor/supabase-js-2.45.4.js"></script>
 <script src="/sites-tools.js?v=176b"></script>
+<script src="/people.js?v=53"></script>
 <script>
 // ── Sites (builder list items 43 and 45, Nov 2026) ───────────────────────────
 // Every client's website, the way Squarespace's dashboard and Wix's Sites table
@@ -434,16 +449,17 @@ function cardHtml(s,i){
       <div class="sline warn" data-why="${esc(s.site_id)}"${st.why?'':' hidden'}>${st.why?`<a href="${esc(st.href)}">Needs you: ${esc(st.why)}</a>`:''}</div>
       <div class="sline" data-tools="${esc(s.site_id)}" hidden></div>
       ${s.state==='not_live'?`<div class="launch"><b>Not published yet</b>${s.unpublished_changes?'There is work on it. Open Website to finish and publish.':'Open Website to build and publish it.'}</div>`:''}
-      ${s.unpublished_changes&&s.state!=='not_live'?'<div class="sline warn">Changes waiting to be published</div>':''}
+      ${changesWaiting(s)?'<div class="sline warn">Changes waiting to be published</div>':''}
       ${s.billing_issue?'<div class="sline warn">Their billing needs a look</div>':''}
       ${copiedHtml(s)}
       ${ownerRowHtml(s)}
+      ${whoHtml(s)}
       <div class="snums" data-nums="${esc(s.site_id)}"${s.state==='not_live'||!NUM_HEAD?' hidden':''}>${s.state==='not_live'?'':numsHtml(s)}</div>
       <div class="sstats">
         <div class="sst"><span class="l">Plan</span><div class="sline">${planLine(s.plan)}</div></div>
         <div class="sst"><span class="l">Domain</span>${dom||`<div class="sline">${s.domain?esc(s.domain):'None connected'}</div>`}</div>
       </div>
-      <div class="sfoot">${avatars(s.team)}<span class="when" title="${esc((s.team||[]).map(whoLabel).join('\n'))}">Can edit: ${esc(teamWords(s.team))}${when?' · '+esc(when):''}</span></div>
+      ${when?`<div class="sfoot"><span class="when">${esc(when)}</span></div>`:''}
       <div class="sacts">${doorsHtml(s)}</div>
     </div>
   </article>`;
@@ -452,6 +468,20 @@ function cardHtml(s,i){
 function copiedHtml(s){
   if(!s.copied||s.copied.kept||s.state!=='not_live')return'';
   return `<div class="copied" data-copied="${esc(s.site_id)}"><b>Started from ${esc(s.copied.from)}’s pages</b>Change what belongs to them before you publish. Publishing lists what’s still as copied.${META.can_duplicate?`<br><button type="button" class="sbtn" data-keep="${esc(s.site_id)}">Keep them as they are</button>`:''}</div>`;
+}
+// builder list item 53: who owns it and what you are on it, said plainly; a handover waiting, in amber
+const firstName=(n)=>{const t=String(n||'').trim();return /@/.test(t)?t:(t.split(/\s+/)[0]||t);};
+const twoInitials=(n)=>String(n||'?').replace(/@.*$/,'').split(/[\s._-]+/).filter(Boolean).slice(0,2).map(w=>w.charAt(0).toUpperCase()).join('')||'?';
+function handingWords(s){
+  const t=s.transfer;if(!t)return'';
+  const to=t.to_email?'Handing over to '+t.to_email+'. ':'A handover is waiting. ';
+  return to+(t.status==='asked_owner'?'Waiting for '+(s.owner?firstName(s.owner.name):'the owner')+' to agree.':'Waiting for the new owner to accept.');
+}
+function whoHtml(s){
+  const own=s.owner?`<div class="wl"><span class="oav" aria-hidden="true">${esc(twoInitials(s.owner.name))}</span><span class="tx"><b>${esc(s.owner.name)}</b> owns it</span><span class="ochip">Owner</span></div>`:'';
+  const hand=s.transfer?`<div class="handing">${esc(handingWords(s))}</div>`:'';
+  const link=META.can_people?`<button type="button" class="plink" data-people="${esc(s.site_id)}" aria-label="People on ${esc(s.name||'this site')}">People ›</button>`:'';
+  return `<div class="who">${own}${hand}<div class="wl"><span class="sav" aria-hidden="true">${esc(twoInitials(META.studio_name||'Studio'))}</span><span class="tx">You: <b>${esc(META.studio_role||'Website manager')}</b></span>${link}</div></div>`;
 }
 // item 135: made with + New site and nobody invited yet — the next step, on the card
 function ownerRowHtml(s){
@@ -509,10 +539,12 @@ const numSort=(f)=>(s)=>{const v=f(NUMS[s.site_id]);return v==null?-Infinity:v;}
 // ── the table: columns that sort; re-rendered freely (it has no pictures) ──
 const COLS=[
   ['name','Site',(s)=>String(s.name||'').toLowerCase()],
+  ['owner','Owner',(s)=>String((s.owner&&s.owner.name)||'~').toLowerCase()],   // item 53: no owner yet sorts last
   ['health','Health',numSort((n)=>n&&n.health?n.health.score:null)],
   ['visitors','Visits',numSort((n)=>n&&n.visitors?n.visitors.value:null)],
   ['search','Search clicks',numSort((n)=>n&&n.search?n.search.value:null)],
   ['plan','Plan',(s)=>String((s.plan&&s.plan.words)||'').toLowerCase()],
+  ['people','People',(s)=>(s.team||[]).filter(t=>t.side==='client').length],
   ['updated','Last updated',(s)=>s.updated_at||''],
   ['tags','Tags',(s)=>(s.tags||[]).join(',').toLowerCase()],
 ];
@@ -521,30 +553,45 @@ function avatars(team){
   const t=team||[];const shown=t.slice(0,5);
   return `<div class="avs">${shown.map(m=>`<span class="av${m.side==='client'?' client':''}" title="${esc(whoLabel(m))}">${esc(m.me?'Y':initial(m.who))}</span>`).join('')}${t.length>5?`<span class="av more" title="${esc(t.slice(5).map(whoLabel).join('\n'))}">+${t.length-5}</span>`:''}</div><span class="sr-only">${esc(t.map(whoLabel).join('; ')||'No one yet')}</span>`;
 }
+function ownerCell(s){
+  if(!s.owner)return s.no_owner?'<span class="muted">No owner yet</span>':'<span class="muted">—</span>';
+  return `<span class="n">${esc(s.owner.name)}</span>${s.transfer?`<div class="sub" style="color:var(--warn)">${esc(s.transfer.to_email?'Handing over to '+s.transfer.to_email:'Handover waiting')}</div>`:''}`;
+}
+function peopleCell(s){
+  const n=(s.team||[]).filter(t=>t.side==='client').length;
+  return META.can_people?`<button type="button" class="lnk" data-people="${esc(s.site_id)}" aria-label="People on ${esc(s.name||'this site')}">${n?n+(n===1?' person':' people'):'Only your studio'}</button>`:esc(n?n+(n===1?' person':' people'):'Only your studio');
+}
 function tableHtml(list){
   const cap=NUM_HEAD?`<div class="tcap"><span>${esc(NUM_HEAD.month_label)}, compared with ${esc(NUM_HEAD.prior_label)}. A drop is red.</span><button type="button" class="lnk" data-sort="drop" aria-pressed="${SORT&&SORT.key==='drop'?'true':'false'}">Biggest drop first</button></div>`:'';
-  const ths=COLS.map(([k,label])=>{const on=SORT&&SORT.key===k;return `<th scope="col"${['plan','updated','tags'].includes(k)?' class="wide"':''}${on?` aria-sort="${SORT.dir>0?'ascending':'descending'}"`:''}><button type="button" class="thb" data-sort="${k}">${esc(label)}${on?`<span class="arrow" aria-hidden="true">${SORT.dir>0?'▲':'▼'}</span>`:''}</button></th>`;}).join('')+'<th scope="col" class="acts"><span class="sr-only">Actions</span></th>';
+  const ths=COLS.map(([k,label])=>{const on=SORT&&SORT.key===k;return `<th scope="col"${['owner','plan','people','updated','tags'].includes(k)?' class="wide"':''}${on?` aria-sort="${SORT.dir>0?'ascending':'descending'}"`:''}><button type="button" class="thb" data-sort="${k}">${esc(label)}${on?`<span class="arrow" aria-hidden="true">${SORT.dir>0?'▲':'▼'}</span>`:''}</button></th>`;}).join('')+'<th scope="col" class="acts"><span class="sr-only">Actions</span></th>';
   const trs=list.map(s=>{const st=statusOf(s);return `<tr${META.can_open?` data-row="${esc(s.site_id)}" tabindex="0" aria-label="Open ${esc(s.name||'(unnamed)')}’s website"`:''}>
     <td class="name"><span class="n">${s.pinned?'<span aria-label="Pinned" title="Pinned">📌 </span>':''}${esc(s.name||'(unnamed)')}</span><div class="sub">${esc(s.domain||hostOf(s.address)||'No address yet')} · <span class="pill ${st.cls}">${esc(st.w)}</span>${s.no_owner?' · No owner yet':''}</div></td>
+    <td class="wide">${ownerCell(s)}</td>
     <td class="num" data-label="Health"><div class="nv">${healthCell(s)}</div></td>
     <td class="num" data-label="Visits"><div class="nv">${visitorsCell(s)}</div></td>
     <td class="num" data-label="Clicks"><div class="nv">${searchCell(s)}</div></td>
     <td class="wide">${esc((s.plan&&s.plan.words)||'')}</td>
+    <td class="wide">${peopleCell(s)}</td>
     <td class="when wide">${s.updated_at?esc(day(s.updated_at)):'—'}</td>
     <td class="wide">${(s.tags||[]).map(t=>`<span class="tagchip">${esc(t)}</span>`).join('')||'<span class="muted">—</span>'}</td>
     <td class="acts">${menuBtnHtml(s)}</td></tr>`;}).join('');
-  return `<div class="tscroll">${cap}<table aria-label="Sites"><thead><tr>${ths}</tr></thead><tbody>${trs}</tbody></table></div>`;
+  // item 53: the studio's role is the same on every site, so the table says it once
+  const role=list.length?`<div class="trole"><span>You are <b>${esc(META.studio_role||'Website manager')}</b> on ${list.length===1?'this site':'all '+list.length+' sites'}. Each business owns its own site.</span></div>`:'';
+  return `<div class="tscroll">${role}${cap}<table aria-label="Sites"><thead><tr>${ths}</tr></thead><tbody>${trs}</tbody></table></div>`;
 }
 
 // ── the filters (the band's numbers and the pills share them) and the search ──
 const domainDays=(s)=>s.domain&&s.domain_expires_at?Math.round((new Date(s.domain_expires_at)-Date.now())/86400000):null;
+// Item 173: a site hosted elsewhere has nothing here to publish, so it never says
+// "Changes waiting" (three such cards did, and the band counted them).
+const changesWaiting=(s)=>!!s.unpublished_changes&&s.state!=='not_live'&&s.state!=='elsewhere';
 const FILTERS={
   all:{label:'All',test:()=>true},
   needs:{label:'Needs you',test:(s)=>!!NEXT[s.site_id]},
   live:{label:'Live',test:(s)=>s.state==='live'},
   notlive:{label:'Not published',test:(s)=>s.state==='not_live'},
   elsewhere:{label:'Hosted elsewhere',test:(s)=>s.state==='elsewhere'},
-  changes:{label:'Changes waiting',test:(s)=>!!s.unpublished_changes&&s.state!=='not_live'},
+  changes:{label:'Changes waiting',test:changesWaiting},
   domains:{label:'Domain renews soon',test:(s)=>{const d=domainDays(s);return d!=null&&d<=30;}},
   drops:{label:'Dropped this month',test:(s)=>dropOf(s)<0},   // items 129 and 180
 };
@@ -666,7 +713,8 @@ function wireFrame(){
   if(grid){
     grid.addEventListener('click',(e)=>{const mb=e.target.closest('[data-menu]');if(mb){e.stopPropagation();toggleMenu(mb.getAttribute('data-menu'));return;}
       const kb=e.target.closest('[data-keep]');if(kb){e.stopPropagation();keepCopied(kb);return;}
-      const ib=e.target.closest('[data-invite]');if(ib){e.stopPropagation();openInvite(ib.getAttribute('data-invite'));}});
+      const ib=e.target.closest('[data-invite]');if(ib){e.stopPropagation();openInvite(ib.getAttribute('data-invite'));return;}
+      const pb=e.target.closest('[data-people]');if(pb){e.stopPropagation();openPeople(pb.getAttribute('data-people'),'people');}});
     sizeThumbs(grid);
   }
 }
@@ -677,6 +725,7 @@ function wireTable(){
     SORT=k==='drop'?(SORT&&SORT.key==='drop'?null:{key:'drop',dir:1}):SORT&&SORT.key===k?{key:k,dir:-SORT.dir}:{key:k,dir:(k==='updated'||k==='health'||k==='visitors'||k==='search')?-1:1};
     applyView();const nb=document.querySelector('#tableHost [data-sort="'+k+'"]');if(nb)nb.focus();
   }));
+  document.querySelectorAll('#tableHost [data-people]').forEach(b=>b.addEventListener('click',(e)=>{e.stopPropagation();openPeople(b.getAttribute('data-people'),'people');}));
   document.querySelectorAll('#tableHost tr[data-row]').forEach(tr=>{
     const go=(e)=>{if(e.target.closest('button,a'))return;location.href=scoped('/presence.html',tr.getAttribute('data-row'));};
     tr.addEventListener('click',go);
@@ -736,6 +785,8 @@ function menuHtml(s){
     ${META.can_duplicate&&s.thumb?`<button type="button" role="menuitem" data-dup="${esc(s.site_id)}">Duplicate site</button>`:''}
     ${META.can_duplicate&&s.thumb?`<button type="button" role="menuitem" data-tpl="${esc(s.site_id)}">Save as a template</button>`:''}
     ${META.can_create&&s.no_owner?`<button type="button" role="menuitem" data-invite="${esc(s.site_id)}">Invite the owner</button>`:''}
+    ${META.can_people?`<button type="button" role="menuitem" data-people="${esc(s.site_id)}">People and roles</button>`:''}
+    ${META.can_people&&s.owner&&!s.transfer?`<button type="button" role="menuitem" data-handover="${esc(s.site_id)}">Transfer ownership</button>`:''}
     ${live?`<a role="menuitem" href="${esc(s.address)}" target="_blank" rel="noopener">View live site</a>`:''}
     ${window.ClientTools?ClientTools.menuHtml(s):''}
     ${META.can_open?`<a role="menuitem" href="${esc(scoped('/crm.html',s.site_id))}">Open record</a>`:''}
@@ -762,6 +813,8 @@ function paintMenu(){
   const db=m.querySelector('[data-dup]');if(db)db.addEventListener('click',()=>{MENU_OPEN=null;paintMenu();openDuplicate(s.site_id);});
   const tb=m.querySelector('[data-tpl]');if(tb)tb.addEventListener('click',()=>{MENU_OPEN=null;paintMenu();openTemplate(s.site_id);});
   const ib=m.querySelector('[data-invite]');if(ib)ib.addEventListener('click',()=>{MENU_OPEN=null;paintMenu();openInvite(s.site_id);});
+  const pp=m.querySelector('[data-people]');if(pp)pp.addEventListener('click',()=>{MENU_OPEN=null;paintMenu();openPeople(s.site_id,'people');});
+  const ho=m.querySelector('[data-handover]');if(ho)ho.addEventListener('click',()=>{MENU_OPEN=null;paintMenu();openPeople(s.site_id,'transfer');});
   const trb=m.querySelector('[data-trash]');if(trb)trb.addEventListener('click',()=>{MENU_OPEN=null;paintMenu();openTrash(s.site_id);});
 }
 const isShown=(el)=>!!(el&&el.offsetParent!==null);
@@ -1041,7 +1094,7 @@ $('invForm').onsubmit=async(e)=>{
   $('inv-fields').style.display='none';
   const done=$('inv-done');
   done.innerHTML=`<div class="done"><div class="tick" aria-hidden="true">✓</div><h3 style="margin:0 0 4px">${d.invited===false?'Their sign-in is ready':'Invitation sent'}</h3>`
-    +`<p>${d.invited===false?'Our email to '+esc(email)+' didn’t go out. Share their sign-in page with them instead.':esc(who)+' will get an email at '+esc(email)+' with a sign-in link to their client portal.'}</p><p>${esc(s.name||'This business')} is now one of your customers.</p></div>`
+    +`<p>${d.invited===false?'Our email to '+esc(email)+' didn’t go out. Share their sign-in page with them instead.'+(/^https:\/\//.test(d.portal_url||'')?' <a class="link" href="'+esc(d.portal_url)+'" target="_blank" rel="noopener">Their sign-in page →</a>':''):esc(who)+' will get an email at '+esc(email)+' with a sign-in link to their client portal.'}</p><p>${esc(s.name||'This business')} is now one of your customers.</p></div>`
     +'<div class="row2"><button type="button" class="btn" id="inv-close">Done</button></div>';
   done.style.display='';
   const cl=$('inv-close');cl.focus();cl.onclick=()=>$('invDlg').close();
@@ -1084,6 +1137,26 @@ async function mountNumbers(){
 
 function notAgency(){$('main').innerHTML=`<div class="center"><h2>This isn’t an agency account.</h2><p class="muted">Sites lists the websites a studio looks after for its clients.</p><p style="margin-top:20px"><a class="link" href="/presence.html">Open your website →</a></p></div>`;}
 function signedOut(){$('main').innerHTML=`<div class="center"><h2>Sign in to your studio.</h2><p style="margin-top:20px"><a class="link" href="/studio.html">Sign in →</a></p></div>`;}
+// builder list item 53: the People sheet for one client's site. Every request names the site
+// (x-dds-scope-site), as the client's own pages do; a change re-reads the list so the
+// card's owner line and any waiting handover follow at once.
+function scopedApi(siteId){
+  return async(path,method,body)=>{try{const r=await fetch(FN+path,{method:method||'GET',headers:{...H(),'x-dds-scope-site':siteId},body:body?JSON.stringify(body):undefined});return{ok:r.ok,status:r.status,body:await r.json().catch(()=>({}))};}catch(_){return{ok:false,status:0,body:{}};}};
+}
+let PEOPLE_DIRTY=false,PEOPLE_FOR='';
+function openPeople(id,view){
+  const s=SITES.find(x=>x.site_id===id);if(!s||!window.ddsPeople)return;
+  PEOPLE_DIRTY=false;PEOPLE_FOR=id;
+  // opened from the menu, which is gone now: the sheet hands focus back to the site's ⋯ button
+  const ae=document.activeElement;if(!ae||ae===document.body||!document.contains(ae)){const b=visibleMenuBtn(id);if(b)b.focus();}
+  ddsPeople.open({siteName:s.name||'',address:s.domain||hostOf(s.address),view:view||'people',api:scopedApi(id),onChanged:()=>{PEOPLE_DIRTY=true;}});
+  const dlg=document.getElementById('dds-people');
+  if(dlg&&!dlg.dataset.sitesWired){dlg.dataset.sitesWired='1';dlg.addEventListener('close',()=>{
+    if(!PEOPLE_DIRTY)return;PEOPLE_DIRTY=false;const was=PEOPLE_FOR;
+    // the cards are drawn again from the new list; focus goes back to the same site's People
+    load(true).then(()=>{const b=[...document.querySelectorAll('[data-people="'+CSS.escape(was)+'"]')].find(isShown);if(b)b.focus();});
+  });}
+}
 function trouble(){
   $('main').innerHTML=`<div class="center"><h2>We couldn’t load your sites just now.</h2><p class="muted" style="margin-bottom:16px">A brief hiccup — it usually passes.</p><button id="retry" class="btn">Try again</button></div>`;
   const rt=$('retry');if(rt)rt.addEventListener('click',()=>boot());
@@ -1101,7 +1174,8 @@ async function load(soft){
     trouble();return;
   }
   SITES=Array.isArray(r.body.data)?r.body.data:[];
-  META={can_open:r.body.can_open!==false,can_pin:!!r.body.can_pin,can_duplicate:!!r.body.can_duplicate,can_create:!!r.body.can_create,can_trash:!!r.body.can_trash,partial:!!r.body.partial};
+  META={can_open:r.body.can_open!==false,can_pin:!!r.body.can_pin,can_duplicate:!!r.body.can_duplicate,can_create:!!r.body.can_create,can_trash:!!r.body.can_trash,partial:!!r.body.partial,
+    can_people:!!r.body.can_people,studio_role:String(r.body.studio_role||'Website manager'),studio_name:String(r.body.studio_name||'')};   // item 53
   TRASH=Array.isArray(r.body.trash)?r.body.trash:[];TRASH_DAYS=Number(r.body.trash_days)||90;
   LOADED_AT=Date.now();MENU_OPEN=null;
   render();

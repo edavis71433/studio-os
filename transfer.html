@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Transfer ownership</title>
+<meta name="robots" content="noindex, nofollow">
+<link rel="stylesheet" href="/fonts/brand.css">
+<style>
+  :root{
+    --bg:#f4f3f9;--card:#fff;--ink:#171522;--soft:#55526a;--faint:#69667d;--line:#e7e6ef;
+    --p:#6d3fd4;--p-deep:#40297f;--p-soft:#efeafa;--good:#11744a;--good-soft:#e6f5ec;--warn:#975208;--warn-soft:#fdf2e2;--bad:#b32929;
+    --shadow:0 12px 40px rgba(26,13,64,.14);
+    --serif:'Fraunces',"Iowan Old Style",Georgia,serif;
+    --sans:'Inter',-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  }
+  @media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#171320;--card:#1f1a2b;--ink:#efeaf7;--soft:#a79ebc;--faint:#948bad;--line:#2a2338;--p:#b79ceb;--p-deep:#d9c9fb;--p-soft:#241d38;--good:#8bbf9f;--good-soft:#1f2a24;--warn:#e5b56f;--warn-soft:#2c2416;--shadow:0 12px 40px rgba(0,0,0,.45)}}
+  :root[data-theme="dark"]{--bg:#171320;--card:#1f1a2b;--ink:#efeaf7;--soft:#a79ebc;--faint:#948bad;--line:#2a2338;--p:#b79ceb;--p-deep:#d9c9fb;--p-soft:#241d38;--good:#8bbf9f;--good-soft:#1f2a24;--warn:#e5b56f;--warn-soft:#2c2416}
+  *{box-sizing:border-box;margin:0}
+  body{background:var(--bg);color:var(--ink);font-family:var(--sans);line-height:1.5;-webkit-font-smoothing:antialiased;min-height:100vh;display:grid;place-items:center;padding:24px 16px}
+  .box{max-width:560px;width:100%;background:var(--card);border:1px solid var(--line);border-radius:22px;box-shadow:var(--shadow);padding:30px 32px;display:flex;flex-direction:column;gap:16px}
+  @media (max-width:520px){.box{padding:24px 18px}}
+  .brand{display:inline-flex;align-items:center;gap:10px;font-weight:600;font-size:14px}
+  .brand .m{width:30px;height:30px;border-radius:9px;background:var(--p);color:#fff;display:grid;place-items:center;font-size:12px;font-weight:700}
+  h1{font-family:var(--serif);font-weight:600;font-size:26px;line-height:1.25;letter-spacing:-.01em}
+  h1:focus{outline:none}   /* focused for screen readers when the step changes; it isn't a control */
+  .hand{display:flex;align-items:center;gap:14px;background:var(--bg);border-radius:14px;padding:14px 16px;flex-wrap:wrap}
+  .hand .side{display:flex;align-items:center;gap:10px;flex:1 1 160px;min-width:0}
+  .hand .av{width:36px;height:36px;border-radius:50%;display:grid;place-items:center;font-size:12px;font-weight:700;flex:0 0 auto;background:var(--p-soft);color:var(--p)}
+  .hand .av.new{background:var(--good-soft);color:var(--good)}
+  .hand .n{font-weight:600;font-size:13.5px;overflow-wrap:anywhere}.hand .s{font-size:12px;color:var(--soft)}
+  .hand .arr{color:var(--p);font-weight:600;font-size:20px}
+  p{color:var(--soft);font-size:14.5px}
+  .row{display:flex;gap:10px;flex-wrap:wrap}
+  button,.btn{font-family:inherit;font-size:14.5px;font-weight:600;border-radius:999px;border:1px solid var(--line);background:var(--card);color:var(--ink);padding:11px 18px;min-height:44px;cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;justify-content:center}
+  button:hover,.btn:hover{border-color:var(--p);color:var(--p)} button:disabled{opacity:.55;cursor:default}
+  button.pri,.btn.pri{background:var(--p);border-color:var(--p);color:#fff}button.pri:hover,.btn.pri:hover{background:var(--p-deep);color:#fff}
+  :root[data-theme="dark"] button.pri{color:#171320}
+  @media (prefers-color-scheme:dark){:root:not([data-theme="light"]) button.pri,:root:not([data-theme="light"]) .btn.pri{color:#171320}}
+  .foot{font-size:12.5px;color:var(--faint)}
+  .err{background:var(--warn-soft);color:var(--warn);border-radius:12px;padding:12px 14px;font-size:13.5px;font-weight:500}
+  .ok{width:44px;height:44px;border-radius:50%;display:grid;place-items:center;background:var(--good-soft);color:var(--good);font-weight:700;font-size:18px}
+  label{font-weight:600;font-size:13px}
+  input[type=email]{width:100%;font:inherit;font-size:15px;padding:11px 14px;border:1.5px solid var(--line);border-radius:12px;background:var(--card);color:var(--ink)}
+  input[type=email]:focus{outline:none;border-color:var(--p);box-shadow:0 0 0 3px var(--p-soft)}
+  .also{border-top:1px solid var(--line);padding-top:12px;font-size:13px;color:var(--soft)}.also a{color:var(--p);font-weight:600}
+  .spin{width:26px;height:26px;border:3px solid var(--line);border-top-color:var(--p);border-radius:50%;animation:sp .8s linear infinite;margin:24px auto}
+  @keyframes sp{to{transform:rotate(360deg)}}
+  @media (prefers-reduced-motion:reduce){.spin{animation:none}}
+  .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+</style>
+</head>
+<body>
+<main class="box" id="box" aria-live="polite"><div class="spin" role="status" aria-label="Loading"></div></main>
+<script src="/vendor/supabase-js-2.45.4.js"></script>
+<script>
+// ── Transfer ownership: the page the emails open (builder list item 53, Nov 2026) ─
+// A transfer waits on one person at a time: the owner agrees to a request their
+// studio started, then the new owner accepts. The email's link signs that person in
+// here (the client door's session, 'dds-client-auth', so "Open it" afterwards needs no
+// second sign-in for a studio's client), and GET /transfers says what is waiting on
+// them. Nothing changes until the new owner presses Accept; the server checks every
+// rule again then (routes/site_transfer.ts).
+const SUPABASE_URL="https://qksstlqzbhesadrrofgn.supabase.co";
+const SUPABASE_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFrc3N0bHF6Ymhlc2FkcnJvZmduIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE5NzMwMDMsImV4cCI6MjA5NzU0OTAwM30.4V94Ua7z5cntPWtvtqN24TUnfY5A6K6-zCxY0iEcgYo";
+const FN=SUPABASE_URL+"/functions/v1/presence";
+const $=(id)=>document.getElementById(id);
+const esc=(s)=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const initials=(s)=>{const w=String(s||'?').replace(/@.*$/,'').split(/[\s._-]+/).filter(Boolean);return((w[0]||'?').charAt(0)+(w[1]?w[1].charAt(0):'')).toUpperCase();};
+const first=(s)=>{const n=String(s||'').trim();return /@/.test(n)?n:(n.split(/\s+/)[0]||n);};
+const day=(iso)=>{if(!iso)return'';const d=new Date(iso);return isNaN(d)?'':d.toLocaleDateString('en-US',{month:'short',day:'numeric'});};
+const WANT=(()=>{try{const v=new URLSearchParams(location.search).get('id')||'';return /^[0-9a-f-]{36}$/i.test(v)?v:'';}catch(_){return'';}})();
+let sb=null,TOKEN='',EMAIL='',LIST=[];
+try{sb=supabase.createClient(SUPABASE_URL,SUPABASE_KEY,{auth:{storageKey:'dds-client-auth',persistSession:true,autoRefreshToken:true}});}catch(_){sb=null;}
+const H=()=>({'Content-Type':'application/json','Authorization':'Bearer '+SUPABASE_KEY,'x-dds-user-jwt':TOKEN});
+async function api(path,method,body){try{const r=await fetch(FN+path,{method:method||'GET',headers:H(),body:body?JSON.stringify(body):undefined});return{ok:r.ok,status:r.status,body:await r.json().catch(()=>({}))};}catch(_){return{ok:false,status:0,body:{}};}}
+const box=()=>$('box');
+function paint(html){box().innerHTML=html;const h=box().querySelector('h1');if(h){h.setAttribute('tabindex','-1');h.focus();}}
+const brand=(t)=>`<div class="brand"><span class="m" aria-hidden="true">${esc(initials(t.studio||t.business))}</span>${esc(t.studio||t.business)}</div>`;
+const hand=(t,toWho)=>`<div class="hand" aria-label="From ${esc(t.owner_name)} to ${esc(toWho)}"><span class="side"><span class="av" aria-hidden="true">${esc(initials(t.owner_name))}</span><span><span class="n">${esc(t.owner_name)}</span><br><span class="s">owner today</span></span></span><span class="arr" aria-hidden="true">→</span><span class="side"><span class="av new" aria-hidden="true">${esc(initials(t.to_email))}</span><span><span class="n">${esc(toWho==='you'?t.to_email:toWho)}</span><br><span class="s">${toWho==='you'?'you':'new owner'}</span></span></span></div>`;
+
+function signInPanel(note){
+  paint(`<h1>Sign in to answer</h1><p>${esc(note||'This page answers a request to hand a website to a new owner. Sign in with the email it was sent to.')}</p>
+    <form id="f" class="row" style="flex-direction:column;gap:8px"><label for="em">Your email</label><input type="email" id="em" autocomplete="email" required><button type="submit" class="pri" id="go">Email me a sign-in link</button></form><p class="foot" id="sent" hidden></p>`);
+  $('f').addEventListener('submit',async(e)=>{e.preventDefault();const em=$('em').value.trim();if(!em)return;$('go').disabled=true;
+    try{await sb.auth.signInWithOtp({email:em,options:{shouldCreateUser:false,emailRedirectTo:location.origin+'/transfer.html'+(WANT?'?id='+WANT:'')}});}catch(_){/* the same calm answer either way */}
+    const s=$('sent');s.hidden=false;s.textContent='If '+em+' has an account, a sign-in link is on its way. Open it on this device.';$('go').disabled=false;});
+}
+function nothing(){paint(`<h1>Nothing is waiting on you</h1><p>It may have been answered already, stopped, or have lapsed after 14 days. If you expected one, ask whoever sent it to start it again.</p><p class="foot">Signed in as ${esc(EMAIL)}</p><div class="row"><a class="btn" href="/portal.html">Go to your account</a></div>`);}
+function trouble(msg){paint(`<h1>That didn’t load</h1><p>${esc(msg||'It’s probably the connection. Try again in a moment.')}</p><div class="row"><button type="button" class="pri" id="again">Try again</button></div>`);$('again').addEventListener('click',load);}
+function also(t){const rest=LIST.filter(x=>x.id!==t.id);return rest.length?`<div class="also">Also waiting on you: ${rest.map(x=>`<a href="/transfer.html?id=${encodeURIComponent(x.id)}">${esc(x.business)}</a>`).join(', ')}</div>`:'';}
+
+function show(t){
+  if(t.step==='agree'){
+    const keep=t.keep_old?'You stay on as Co-owner.':'You won’t have access to it afterwards.';
+    paint(`${brand(t)}<h1>${esc(t.studio?'Your studio asks':'You’re asked')} to hand ${esc(t.business)} to ${esc(t.to_email)}</h1>${hand(t,t.to_email)}
+      <p>They would become the owner: they sign in as the owner and decide who else gets in. Your website, its pages and its plan stay as they are. ${esc(keep)}</p>
+      <div id="msg"></div><div class="row"><button type="button" class="pri" data-do="agree">Agree</button><button type="button" data-do="decline">Say no</button></div>
+      <p class="foot">Only you can agree, because you own ${esc(t.business)}. If you didn’t expect this, say no and call your studio. It lapses on ${esc(day(t.expires_at))}.</p>${also(t)}`);
+  } else {
+    const keep=t.keep_old?` ${first(t.owner_name)} stays on as Co-owner until you say otherwise.`:'';
+    paint(`${brand(t)}<h1>${esc(t.owner_name)} wants you to own ${esc(t.business)}</h1>${hand(t,'you')}
+      <p>Accepting makes you the owner of the website and its account.${t.studio?' '+esc(t.studio)+' keeps working on it as Website manager.':''}${esc(keep)}</p>
+      <div id="msg"></div><div class="row"><button type="button" class="pri" data-do="accept">Accept and become the owner</button><button type="button" data-do="decline">Not me</button></div>
+      <p class="foot">Signed in as ${esc(EMAIL)}. Nothing changes unless you accept; it lapses on ${esc(day(t.expires_at))}.</p>${also(t)}`);
+  }
+  box().querySelectorAll('[data-do]').forEach(b=>b.addEventListener('click',()=>answer(t,b.getAttribute('data-do'))));
+}
+async function answer(t,verb){
+  box().querySelectorAll('[data-do]').forEach(b=>{b.disabled=true;});
+  const r=await api('/transfers/'+encodeURIComponent(t.id)+'/'+verb,'POST',{});
+  if(!r.ok){const m=$('msg');if(m)m.innerHTML=`<div class="err" role="alert">${esc((r.body&&r.body.message)||'That didn’t go through. Nothing changed; try again.')}</div>`;box().querySelectorAll('[data-do]').forEach(b=>{b.disabled=false;});return;}
+  const d=r.body.data||{};
+  if(verb==='accept'){paint(`<span class="ok" aria-hidden="true">✓</span><h1>${esc(t.business)} is yours now</h1><p>${esc(first(t.owner_name))}${t.studio?' and your studio':''} got an email saying so. You’ll find the people and the plan in Settings.</p><div class="row"><a class="btn pri" href="/portal.html">Open ${esc(t.business)}</a></div>`);return;}
+  if(verb==='agree'){paint(`<span class="ok" aria-hidden="true">✓</span><h1>Thanks, that’s agreed</h1><p>${esc(d.message||('We’ve emailed '+t.to_email+' to accept. Nothing changes until they do.'))}</p><div class="row"><a class="btn" href="/portal.html">Go to your account</a></div>`);return;}
+  paint(`<h1>Done. Nothing changes.</h1><p>${esc(t.business)} stays with its owner.${t.step==='agree'?' Your studio has been told.':''}</p><div class="row"><a class="btn" href="/portal.html">Go to your account</a></div>`);
+}
+async function load(){
+  box().innerHTML='<div class="spin" role="status" aria-label="Loading"></div>';
+  const r=await api('/transfers');
+  if(r.status===401){signInPanel();return;}
+  if(!r.ok||!r.body||!Array.isArray(r.body.data)){trouble(r.body&&r.body.message);return;}
+  LIST=r.body.data;
+  if(!LIST.length){nothing();return;}
+  show(LIST.find(x=>x.id===WANT)||LIST[0]);
+}
+(async function(){
+  if(!sb){trouble('Connection problem. Check your internet and refresh this page.');return;}
+  try{const{data}=await sb.auth.getSession();TOKEN=(data&&data.session&&data.session.access_token)||'';EMAIL=(data&&data.session&&data.session.user&&data.session.user.email)||'';}catch(_){TOKEN='';}
+  if(!TOKEN){signInPanel();return;}
+  load();
+})();
+</script>
+</body>
+</html>

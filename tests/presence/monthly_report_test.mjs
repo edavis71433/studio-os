@@ -8,6 +8,7 @@ import {
   normalizeReportSetting, lastMonth, reportDueNow, foldReport, reportHtml, REPORT_NOTE_MAX, REPORT_SEND_DAYS,
   applyReportChange, blockedReason, afterFailure, REPORT_MAX_TRIES, BLOCK_WORDS,
   reportZone, monthNow, anyZoneInSendDays, REPORT_DEFAULT_TZ,
+  sentMonthsOf, withSentMonth, monthWindow, REPORT_KEEP_MONTHS,
 } from '../../supabase/functions/presence/ops/monthly_report.ts';
 import { RESERVED_NAMES } from '../../supabase/functions/presence/lib/reserved_store.ts';
 
@@ -17,7 +18,7 @@ const read = (p) => Deno.readTextFileSync(new URL('../../' + p, import.meta.url)
 
 // the setting
 ok('the reserved row has a name', RESERVED_NAMES.monthlyReport === '__monthly_report__');
-ok('an empty row reads as off with no line', JSON.stringify(normalizeReportSetting(null)) === JSON.stringify({ enabled: false, note: '', last_month: null, last_result: null, tries: null, updated_by: null, updated_at: null, pdf: true, ai_checks: false, ai_month: null, ai_result: null, ai_tries: null }));   // item 182: the AI check is off too; item 184: the PDF copy is on
+ok('an empty row reads as off with no line', JSON.stringify(normalizeReportSetting(null)) === JSON.stringify({ enabled: false, note: '', last_month: null, last_result: null, tries: null, updated_by: null, updated_at: null, sent_months: [], pdf: true, ai_checks: false, ai_month: null, ai_result: null, ai_tries: null }));   // item 182: the AI check is off too; item 184: the PDF copy is on; item 179: no report sent yet
 ok('what happened last is kept when well formed, dropped when not', normalizeReportSetting({ last_result: { month: '2026-10', status: 'skipped', reason: 'no_email', at: 'x' } }).last_result?.reason === 'no_email' && normalizeReportSetting({ last_result: { month: '2026-10', status: 'lost' } }).last_result === null && normalizeReportSetting({ last_result: { month: 'Oct', status: 'sent' } }).last_result === null);
 ok('only true turns it on', normalizeReportSetting({ enabled: 'yes' }).enabled === false && normalizeReportSetting({ enabled: true }).enabled === true);
 ok('the line is capped', normalizeReportSetting({ note: 'x'.repeat(REPORT_NOTE_MAX + 50) }).note.length === REPORT_NOTE_MAX);
@@ -144,6 +145,25 @@ ok('switching on for a client who can’t be emailed is refused with the reason'
   ok('D7: "the last on …" names the day it was published there', /the last on October 20\./.test(reportHtml(pub, { studioName: 'S', note: '' }).html) && /the last on October 21\./.test(reportHtml({ ...pub, timeZone: undefined }, { studioName: 'S', note: '' }).html));
   ok('D7: on a day no clock is in its first days the job reads nothing; on the 30th Kiritimati is already on the 1st', !anyZoneInSendDays('2026-11-15T00:00:00.000Z') && anyZoneInSendDays('2026-11-30T12:00:00.000Z') && anyZoneInSendDays('2026-12-04T11:00:00.000Z') && !anyZoneInSendDays('2026-12-05T00:00:00.000Z'));
   ok('D7: with no zone given, the UTC clock, as before', lastMonth('2026-11-02T03:00:00.000Z').startIso === '2026-10-01T00:00:00.000Z' && monthNow('2026-11-01T01:00:00.000Z') === '2026-11');
+}
+
+// ── item 179: the months that went out, for the client's Documents shelf ──
+ok('sent months: real months only, each once, newest first', JSON.stringify(sentMonthsOf(['2026-09', '2026-11', 'Oct', '2026-13', '2026-09', 7, null, '2026-10'])) === JSON.stringify(['2026-11', '2026-10', '2026-09']));
+ok('sent months: anything that isn’t a list reads as none', sentMonthsOf(null).length === 0 && sentMonthsOf('2026-11').length === 0 && normalizeReportSetting({ sent_months: 'x' }).sent_months.length === 0);
+{
+  const many = Array.from({ length: REPORT_KEEP_MONTHS }, (_, i) => { const d = new Date(Date.UTC(2026, 9 - i, 1)); return d.toISOString().slice(0, 7); });
+  const after = withSentMonth(many, '2026-11');
+  ok('sent months: a new month goes first and the oldest falls off at 24', REPORT_KEEP_MONTHS === 24 && after.length === 24 && after[0] === '2026-11' && after[23] === many[22] && !after.includes(many[23]));
+  ok('sent months: the same month twice is listed once', JSON.stringify(withSentMonth(['2026-11', '2026-10'], '2026-11')) === JSON.stringify(['2026-11', '2026-10']));
+}
+ok('sent months: a switch change keeps them (applyReportChange spreads the setting)', JSON.stringify(applyReportChange(normalizeReportSetting({ sent_months: ['2026-10'] }), { note: 'Hi' }, 'a@b.c', '2026-11-05T00:00:00Z').sent_months) === JSON.stringify(['2026-10']));
+{
+  const w = monthWindow('2026-10', 'America/Los_Angeles');
+  ok('month window: October on Los Angeles time starts and ends at its midnights', w.startIso === '2026-10-01T07:00:00.000Z' && w.endIso === '2026-11-01T07:00:00.000Z' && w.label === 'October 2026' && w.month === '2026-10');
+  const d = monthWindow('2026-12', 'UTC');
+  ok('month window: December runs into the next year', d.startIso === '2026-12-01T00:00:00.000Z' && d.endIso === '2027-01-01T00:00:00.000Z');
+  ok('month window: last month’s window is lastMonth’s', JSON.stringify(monthWindow(lastMonth('2026-11-02T12:00:00Z', 'America/New_York').month, 'America/New_York')) === JSON.stringify(lastMonth('2026-11-02T12:00:00Z', 'America/New_York')));
+  ok('month window: something that isn’t a month is null', monthWindow('2026-13') === null && monthWindow('Oct') === null && monthWindow('') === null);
 }
 
 const passed = results.filter((r) => r.p).length;

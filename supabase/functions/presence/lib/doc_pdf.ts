@@ -134,14 +134,15 @@ export function invoicePdf(v: any, brandIn?: Partial<DocBrand> | null, ctx?: Doc
   const label = invoiceDocLabel(v), no = invoiceNo(v?.number);
   const title = String(v?.title || (v?.purpose === 'deposit' ? 'Deposit' : 'Invoice'));
   const pdf = newPdf(`${label}${no ? ' ' + no : ''} — ${title}`);
-  const f = head(pdf, brand, { label, no, state: paid ? 'PAID' : voided ? 'VOIDED' : 'AMOUNT DUE', stateColor: paid ? GOOD : voided ? SOFT : WARN, from: fromLines(ctx) });
+  const settling = !paid && !voided && !!v?.processing_since;   // sales item 118: a bank payment on its way, no pay link
+  const f = head(pdf, brand, { label, no, state: paid ? 'PAID' : voided ? 'VOIDED' : settling ? 'PAYMENT ON ITS WAY' : 'AMOUNT DUE', stateColor: paid ? GOOD : voided ? SOFT : WARN, from: fromLines(ctx) });
   f.para(ctx?.forWhat ? `For ${ctx.forWhat}` : label, { font: 'B', size: 8.5, color: SOFT });
   f.para(title, { font: 'B', size: 16, lead: 22 });
   f.gap(8);
   const details: string[] = [];
   if (no) details.push(`${paid ? 'Receipt for invoice' : 'Invoice no.'} ${no}`);
   if (v?.created_at) details.push('Issued ' + dayLabel(v.created_at, tz));
-  if (!paid && !voided) details.push(v?.due_date ? 'Due ' + dayLabel(v.due_date, tz) : 'Due on receipt');
+  if (!paid && !voided) details.push(settling ? 'Payment on its way' : v?.due_date ? 'Due ' + dayLabel(v.due_date, tz) : 'Due on receipt');
   if (paid) details.push(paidLine(v, tz));
   if (voided) details.push('Voided: no longer payable');
   boxes(f, [{ title: 'Billed to', lines: partyLines(ctx?.billTo) }, { title: 'Details', lines: details }]);
@@ -154,11 +155,11 @@ export function invoicePdf(v: any, brandIn?: Partial<DocBrand> | null, ctx?: Doc
   // a part payment reads under the total it came off: Total, Paid Nov 8 by Zelle, Amount due
   const totals = [
     ...(payments.length && !paid ? [{ label: 'Total', amount: money(billed, currency) }, ...payments.map((p) => ({ label: paidLine(p, tz), amount: fmt(-Math.round(Number(p.amount_cents) || 0)) }))] : []),
-    { label: paid ? 'Total paid' : voided ? 'Total (voided)' : 'Amount due', amount: money(paid ? billed : amount, currency), bold: true },
+    { label: paid ? 'Total paid' : voided ? 'Total (voided)' : settling ? 'Payment on its way' : 'Amount due', amount: money(paid ? billed : amount, currency), bold: true },
   ];
   table(f, rows, totals);
   if (paid) panel(f, [paidLine(v, tz), ...payments.map((p) => 'Earlier part payment: ' + paidLine(p, tz))], { bg: GOOD_BG, color: GOOD, bold: true });
-  if (!paid && !voided && v?.stripe_url) {
+  if (!paid && !voided && !settling && v?.stripe_url) {
     const url = String(v.stripe_url);
     f.para('Pay securely online:', { font: 'B', size: 10 });
     const before = f.y;

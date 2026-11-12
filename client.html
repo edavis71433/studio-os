@@ -140,9 +140,9 @@
     .chipbar{top:52px}
     section[id^="sec-"],#sec-overview{scroll-margin-top:118px}
   }
-  /* ── slice 12: the Files tab — share card (dashed) + document/file list views.
-     All class names are f-prefixed and unique to this tab (the slice-9 .sec
-     lesson: no generic names that could bleed into other views). ── */
+  /* ── slice 12: the share card (dashed, on a project page) + the file rows the
+     project page and the papers shelf draw. All class names are f-prefixed (the
+     slice-9 .sec lesson: no generic names that could bleed into other views). ── */
   .fshare{background:var(--card);border:1.5px dashed var(--p);border-radius:16px;padding:18px 20px;box-shadow:var(--shadow);margin:4px 0 8px;display:flex;gap:14px;align-items:center;flex-wrap:wrap}
   .fshare-i{width:42px;height:42px;border-radius:12px;background:var(--p-soft);display:grid;place-items:center;font-size:20px;flex:0 0 auto}
   .fshare-m{flex:1 1 220px;min-width:0}
@@ -190,16 +190,75 @@
   .finote.fconf{color:var(--good);display:inline-flex;align-items:center;gap:6px}
   .finote.fconf .fchk{display:inline-grid;place-items:center;width:16px;height:16px;border-radius:50%;background:var(--good);color:#fff;font-size:10px;font-weight:700;flex:0 0 auto}
   .finote.fconf.stale{color:var(--faint)} .finote.fconf.stale .fchk{background:var(--faint)}
-  .invtotal{font-size:14px;color:var(--soft);margin:0 0 12px}
-  .invtotal strong{color:var(--ink)}
-  @media (max-width:719px){
-    .frow.inv{flex-wrap:wrap}
-    .frow.inv .fmain{min-width:58%}
-    .frow.inv .finote,.frow.inv a.fbtn{margin-left:46px} /* stacked under the name, aligned past the 34px icon + 12px gap */
+  @media (max-width:999px){   /* a shelf row with a note (a payment confirming) stacks it under the name */
+    .srow.acts:not(.fresh) .fst:not(.od){display:none}   /* a phone row shows its one button OR a chip (the line under the name already says the state); Overdue and a new report's New always show */
+    .srow.noted{flex-wrap:wrap}
+    .srow.noted .finote{flex:0 0 100%;margin-left:46px} /* aligned past the 34px icon + 12px gap */
   }
   .fbtn,a.fbtn{flex:0 0 auto;display:inline-flex;align-items:center;font-size:12.5px;font-weight:600;border:1px solid var(--line);background:transparent;color:var(--ink);border-radius:999px;padding:7px 14px;cursor:pointer;text-decoration:none;white-space:nowrap;transition:.15s}
-  a.fbtn.pay{background:var(--p);border-color:var(--p);color:#fff} /* paying is the Invoices tab's one next action (Oct 2026 experience review) */
   .fbtn:hover,a.fbtn:hover{border-color:var(--p);color:var(--p)}
+  /* sales item 117: the client's retainer, on the shelf above their invoices */
+  .retwrap{margin:14px 0 4px}
+  .retcard{margin-bottom:12px}
+  .rethead{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
+  .rethead .fname{margin:0 0 2px}
+  .retcharges{list-style:none;margin:12px 0 0;padding:0;border-top:1px solid var(--line)}
+  .retcharges li{display:flex;justify-content:space-between;gap:12px;padding:8px 0;border-bottom:1px solid var(--line);font-size:13.5px}
+  .retcard a.fbtn,.retact{margin-top:14px}
+  .retcard a.fbtn.pay{background:var(--p);border-color:var(--p);color:#fff}
+  .retact .fbtn{min-height:40px}
+  .retsure{margin:0 0 10px;font-size:13.5px;color:var(--ink)}
+  /* ── item 179 part four: the papers shelf. On a phone each paper is one row with a
+     line under its name and the filters are chips; from 1000px the filters become a
+     rail with counts and the row splits into columns: what it is · amount or state ·
+     date · chip · the one thing to do. What you owe sits on top. ── */
+  /* the send button sits on the line under the title, clear of a phone's floating bell */
+  .shelfhead{display:grid;grid-template-columns:minmax(0,1fr) auto;grid-template-areas:"t t" "s b";column-gap:14px;align-items:center}
+  .shelfhead h1{grid-area:t}
+  .shelfhead .sub{grid-area:s}
+  .shelfsend{grid-area:b;justify-self:end;display:inline-flex;align-items:center;gap:6px;font-size:13px;font-weight:600;padding:7px 14px;border-radius:999px;border:1.5px dashed var(--p);background:var(--card);color:var(--p);cursor:pointer;white-space:nowrap}
+  .shelfsend svg{width:15px;height:15px;display:block}
+  .shelfsend:hover{background:var(--p-soft);color:var(--p);border-color:var(--p)}
+  .shelfsend .lg,.owebtn .lg{display:none}
+  .shelfform{margin:12px 0 4px;background:var(--card);border:1px solid var(--line);border-radius:16px;padding:14px 16px;box-shadow:var(--shadow)}
+  .owe{display:flex;align-items:center;gap:14px;background:var(--card);border:1px solid var(--line);border-radius:16px;padding:16px 18px;box-shadow:var(--shadow);margin:0 0 4px}
+  .owe.late{border-color:var(--dds-bad,#c43c3c)}
+  .owem{flex:1 1 auto;min-width:0}
+  .owet{margin:0;font-family:var(--serif);font-size:21px;line-height:1.2;color:var(--ink)}
+  .owes{margin:3px 0 0;font-size:12.5px;color:var(--soft)}
+  a.owebtn{flex:0 0 auto;text-decoration:none;display:inline-flex;align-items:center}
+  button.owebtn{flex:0 0 auto}
+  .shelfnav{display:flex;gap:8px;overflow-x:auto;scrollbar-width:none;margin:16px 0 2px;padding-bottom:2px}
+  .shelfnav::-webkit-scrollbar{display:none}
+  .shelfnav .sl,.shelfnav .sc{display:none}
+  .shelfbody>.owe{margin-top:14px}
+  .shelfmonth{font-family:inherit;font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--faint);margin:18px 0 8px}
+  .shelfbody .fload{margin:12px 0 0}
+  .shelfnote{font-size:12.5px;margin:2px 0 0}
+  .srow .sinfo,.srow .sdate,.srow .fst.none{display:none}
+  .fico.invoices{background:var(--good-soft);color:var(--good)}
+  .fico.ask,.fst.ask{background:var(--warn-soft);color:var(--warn)}
+  .fst.mute{background:var(--bg);color:var(--faint)}
+  @media (min-width:640px){.shelfsend .lg,.owebtn .lg{display:inline}}
+  @media (min-width:1000px){
+    .shelf{display:grid;grid-template-columns:210px minmax(0,1fr);gap:0 26px;align-items:start;margin-top:18px}
+    .shelfnav{flex-direction:column;gap:2px;margin:0;overflow:visible;position:sticky;top:84px}
+    .shelfnav .chip{display:flex;justify-content:space-between;align-items:center;gap:10px;border:0;background:transparent;border-radius:10px;padding:9px 12px;font-weight:500;color:var(--soft);text-align:left;width:100%}
+    .shelfnav .chip:hover{background:var(--bg);color:var(--ink)}
+    .shelfnav .chip[aria-pressed="true"]{background:var(--p-soft);color:var(--p);font-weight:600}
+    .shelfnav .sl,.shelfnav .sc{display:inline}
+    .shelfnav .ss{display:none}
+    .shelfnav .sc{font-size:12px;color:var(--faint);font-weight:500}
+    .shelfbody>.owe:first-child,.shelfbody>.shelfgroup:first-child .shelfmonth{margin-top:0}
+    .srow{display:grid;grid-template-columns:34px minmax(0,1.5fr) minmax(0,1.3fr) 60px 124px 84px;gap:12px;align-items:center}
+    .srow .sline{display:none}
+    .srow .sinfo{display:block;font-size:12.5px;color:var(--soft);min-width:0}
+    .srow .sdate{display:block;font-size:12.5px;color:var(--faint)}
+    .srow .fst{justify-self:start}
+    .srow .fst.none{display:block;visibility:hidden}
+    .srow .fbtn,.srow .finote{justify-self:end}
+    .srow.noted .finote{grid-column:2 / -1;justify-self:start}   /* a payment confirming reads under the name, not squeezed into the last column */
+  }
   .fload{margin:0 0 14px;font-size:14px}
   /* ── milestone Path (Lightning chevron geometry — read-only, informational) ── */
   .tl-here{display:inline-block;font-size:10.5px;font-weight:700;color:var(--p);background:var(--p-soft);border-radius:999px;padding:2px 8px;text-transform:uppercase;letter-spacing:.05em;vertical-align:middle}
@@ -298,7 +357,7 @@
   .mrow .kchip{flex:0 0 auto;white-space:nowrap}
   .mrow .rtxt{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13px;color:var(--soft)}
   .mempty{padding:24px 16px;color:var(--soft);font-size:14px;text-align:center}
-  .mpane{display:flex;flex-direction:column;min-width:0;background:var(--bg)}
+  .mpane{display:flex;flex-direction:column;min-width:0;background:var(--bg);margin-top:0}   /* a <section>, so it must opt out of the page's 34px section gap: the conversation's head sits at the top, as drawn */
   .mphead{display:flex;align-items:center;gap:10px;padding:13px 16px;border-bottom:1px solid var(--line);background:var(--card);flex:0 0 auto}
   .mpname{font-family:var(--serif);font-weight:500;font-size:18px;line-height:1.2;min-width:0}
   .mpsub{display:flex;align-items:center;gap:9px;flex-wrap:wrap;font-size:12.5px;color:var(--soft);margin-top:2px}
@@ -321,6 +380,8 @@
     .mconsole.pane-open .mlist{display:none}
     .mconsole.pane-open .mpane{display:flex;min-height:70vh}
     .mback{display:inline-flex}
+    .mphead{flex-wrap:wrap;align-items:flex-start;row-gap:10px}   /* item 179 part three: ← Messages on its own line, the conversation's name full width under it */
+    .mphead>div{flex:1 1 100%}
   }
   .acard{padding:14px 16px}
   .pcompose{margin-top:14px;padding-top:12px;border-top:1px solid var(--line)}
@@ -445,43 +506,159 @@
     body.homeview #main>#home-updates{grid-column:2}
     body.homeview #main>#home-projects{grid-column:1}
   }
-  /* ── slice 11: the Requests tab — quick-action tiles · service card grid ·
-     the "Your requests" list view with Open/All filter chips ── */
-  .acttiles{display:grid;grid-template-columns:1fr 1fr;gap:14px}
-  .acttile{display:flex;align-items:center;gap:13px;text-align:left;background:var(--card);border:1px solid var(--line);border-radius:16px;padding:16px 18px;box-shadow:var(--shadow);cursor:pointer;font-weight:400;transition:border-color .15s,box-shadow .15s,transform .15s}
-  .acttile:hover{border-color:var(--p);box-shadow:var(--shadow-lift);transform:translateY(-1px)}
-  .acttile .at-ico{flex:0 0 auto;width:38px;height:38px;border-radius:11px;background:var(--p-soft);display:grid;place-items:center;font-size:18px}
-  .acttile .at-main{flex:1 1 auto;min-width:0}
-  .acttile .at-t{display:block;font-family:var(--serif);font-weight:500;font-size:17px;color:var(--ink);letter-spacing:-.01em;line-height:1.25}
-  .acttile .at-d{display:block;font-size:13px;color:var(--soft);margin-top:2px}
-  .acttile .at-chev{flex:0 0 auto;color:var(--faint);font-size:18px;margin-left:auto}
+  /* ── slice 11, now Ask for a service inside Messages (item 179 part three):
+     the service card grid and the conversation status chip ── */
   .svcgrid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
   .svcgrid .card{margin-bottom:0;display:flex;flex-direction:column;align-items:flex-start}
   .svccat{margin-bottom:8px}
   .svcfoot{display:flex;align-items:center;justify-content:space-between;gap:10px 14px;width:100%;margin-top:auto;padding-top:14px;flex-wrap:wrap}
   .svcfoot button{font-size:13px;padding:7px 15px}
-  /* the catalog's Request this buttons are outlined — the tab has no one filled verb,
+  /* the catalog's Ask for this buttons are outlined — the page has no one filled verb,
      and three filled buttons made the catalog shout (experience review #37) */
   .svcfoot button.approve{background:transparent;color:var(--p);border-color:var(--p);box-shadow:none;font-weight:600}
   .svcfoot button.approve:hover{background:var(--p-soft);color:var(--p);border-color:var(--p)}
   .svcprice{font-size:13.5px;font-weight:600;color:var(--ink)}
-  @media (max-width:719px){.acttiles,.svcgrid{grid-template-columns:1fr}}
-  @media (prefers-reduced-motion:reduce){.acttile,.acttile:hover{transition:none;transform:none}}
-  .reqfilter{display:flex;gap:8px;margin-bottom:12px}
+  @media (max-width:719px){.svcgrid{grid-template-columns:1fr}}
   .chip[aria-pressed="true"]{background:var(--p-soft);border-color:var(--p);color:var(--p)}   /* a filter reads pressed, not filled (experience review #37) */
-  .reqlist{padding:5px 18px}
-  .reqrow{display:flex;align-items:center;gap:12px;width:100%;text-align:left;background:transparent;border:0;border-radius:0;border-top:1px solid var(--line);padding:13px 2px;cursor:pointer;font-weight:400}
-  .reqrow:first-child{border-top:0}
-  .reqrow:hover{background:var(--bg);color:inherit;border-color:var(--line)}   /* the global button:hover purple must never tint the row's top divider */
-  .reqrow .qico{align-self:center;margin-top:0}   /* Home rows top-align the icon; these rows center vertically */
   .qico.done{background:var(--good-soft)}
-  .reqmain{flex:1 1 auto;min-width:0}
-  .reqsubj{display:block;font-weight:600;font-size:14.5px;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-  .reqmeta{display:block;font-size:12.5px;color:var(--soft);margin-top:1px}
   .schip{flex:0 0 auto;display:inline-flex;align-items:center;font-size:10.5px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;border-radius:999px;padding:3px 10px;background:var(--p-soft);color:var(--p);white-space:nowrap}
   .schip.done{background:var(--good-soft);color:var(--good)}
-  .reqchev{flex:0 0 auto;color:var(--faint);font-size:17px}
-  .reqnone{padding:14px 0;margin:0;font-size:13.5px}
+  /* ── item 179 part two: each to-do and approval opens the thing itself (Figma page
+     "Client portal — parts 2 to 4"). A phone stacks the ask, the thing and your
+     answer; ≥1000px puts the thing on the left and the ask and answer on the right. ── */
+  .sheetback{margin:0}
+  .sheetmeta{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:14px}
+  .sheetmeta .tag{margin:0}
+  .sheetmeta .sm{font-size:12.5px;color:var(--faint)}
+  .tag.todo{background:var(--warn-soft);color:var(--warn)}
+  .sheet h1{font-family:var(--serif);font-weight:500;font-size:clamp(26px,5vw,34px);margin:8px 0 .2em;letter-spacing:-.02em;line-height:1.1}
+  .sheet .sub{color:var(--soft);font-size:15px;margin:0}
+  .sheetcols{display:flex;flex-direction:column}
+  .sheetcols>*{min-width:0}
+  @media (min-width:1000px){
+    .sheetcols{display:grid;grid-template-columns:minmax(0,3fr) minmax(0,2fr);grid-template-rows:auto 1fr;grid-template-areas:"thing ask" "thing answer";gap:0 24px;align-items:start}
+    .sheetcols.headtop{grid-template-rows:auto auto;grid-template-areas:"ask ask" "thing answer"}
+    .sheetcols.solo{grid-template-columns:minmax(0,1fr);grid-template-areas:"ask" "answer";max-width:660px}
+    .sheetcols .s-ask{grid-area:ask}.sheetcols .s-thing{grid-area:thing}.sheetcols .s-answer{grid-area:answer}
+    .sheetcols .s-thing>.card:first-child,.sheetcols .s-thing>.dropbox:first-child,.sheetcols.headtop .s-answer>section:first-child{margin-top:14px}
+  }
+  .askcard{display:flex;gap:10px;align-items:flex-start;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:12px 14px;margin-top:14px}
+  .askav{flex:0 0 auto;width:28px;height:28px;border-radius:50%;background:#5b3fa0;color:#fff;display:grid;place-items:center;font-size:12px;font-weight:700}   /* the brand mark's purple in both themes, as .phero .ph-mark */
+  .askwho{display:block;font-size:12.5px;font-weight:600;color:var(--ink)}
+  .askq{display:block;font-size:14px;color:var(--soft);margin-top:2px;overflow-wrap:anywhere}
+  .draftcard{padding:0;overflow:hidden;margin:14px 0 0}
+  .dstrip{display:flex;align-items:center;gap:6px;padding:8px 12px;background:var(--bg);border-bottom:1px solid var(--line);font-size:11.5px;color:var(--faint);overflow:hidden;white-space:nowrap}
+  .dstrip i{width:7px;height:7px;border-radius:50%;background:var(--line);flex:0 0 auto}
+  .dpic{position:relative;aspect-ratio:4/3;overflow:hidden;background:var(--p-soft)}
+  .dpic iframe{position:absolute;top:0;left:0;width:1280px;height:960px;border:0;transform-origin:0 0;transform:scale(var(--dk,.27));pointer-events:none;background:#fff}
+  .dpic .dwait{position:absolute;inset:0;display:grid;place-items:center;color:var(--faint);font-size:13px;padding:16px;text-align:center}
+  .dpages{display:flex;align-items:center;gap:6px;flex-wrap:wrap;padding:10px 12px;border-top:1px solid var(--line)}
+  .dpages button{font-size:12.5px;padding:5px 11px}
+  .dpages button[aria-pressed="true"]{background:var(--p-soft);border-color:var(--p);color:var(--p)}
+  .dpages .dfullbtn{margin-left:auto;border-color:transparent;color:var(--p);padding:5px 4px}
+  .apimg{display:block;width:100%;height:auto;border-bottom:1px solid var(--line)}
+  .apacts{display:flex;flex-direction:column;gap:10px;margin-top:16px}
+  .apacts button{width:100%;justify-content:center;display:inline-flex;padding:11px 18px}
+  @media (min-width:1000px){.apacts{flex-direction:row}.apacts button{flex:1 1 0;width:auto}}
+  .notecard{margin-top:16px}
+  .notecard .nhead{display:block;font-size:14px;font-weight:600;color:var(--ink);margin:0 0 10px}
+  .notecard .nlabel{display:block;font-size:13px;font-weight:600;color:var(--soft);margin:0 0 5px}
+  .fieldin{width:100%;font:inherit;font-size:14px;border:1px solid var(--line);border-radius:10px;padding:9px 11px;background:var(--card);color:var(--ink)}
+  textarea.fieldin{min-height:66px;resize:vertical;margin-top:10px}
+  .notelist{list-style:none;margin:0;padding:0}
+  .notelist li{display:flex;gap:10px;align-items:flex-start;justify-content:space-between;padding:11px 0;border-top:1px solid var(--line)}
+  .notelist li:first-child{border-top:0;padding-top:2px}
+  .notelist .nwhere{display:block;font-size:12px;font-weight:600;color:var(--faint)}
+  .notelist .nbody{display:block;font-size:14px;color:var(--ink);overflow-wrap:anywhere;margin-top:2px}
+  .histline{display:flex;gap:6px;align-items:center;font-size:12.5px;color:var(--good);margin-top:14px}
+  .thanks{text-align:center;padding:28px 22px;margin-top:16px}
+  .thanks .tick{width:56px;height:56px;border-radius:50%;background:var(--good-soft);color:var(--good);display:grid;place-items:center;margin:0 auto 12px;font-size:24px}
+  .thanks.chg .tick{background:var(--p-soft);color:var(--p)}
+  .thanks h1{font-family:var(--serif);font-weight:500;font-size:26px;margin:0 0 6px;letter-spacing:-.01em}
+  .thanks .row{justify-content:center}
+  .dropbox{display:flex;flex-direction:column;align-items:center;gap:10px;text-align:center;background:var(--card);border:1.5px dashed var(--p);border-radius:16px;padding:22px 18px;margin-top:16px}
+  .dropbox .di{width:44px;height:44px;border-radius:12px;background:var(--p-soft);color:var(--p);display:grid;place-items:center;font-size:20px}
+  .dropbox .dt{font-weight:600;font-size:15px;margin:0;color:var(--ink)}
+  .dropbox .dd{font-size:13px;color:var(--faint);margin:0;max-width:40ch}
+  .dropbox.over{background:var(--p-soft)}
+  .dropbox .dprog{font-size:13px;color:var(--soft);margin:0}
+  .helps{padding:4px 16px}
+  .helps .hrow{display:flex;gap:10px;align-items:flex-start;padding:10px 0;border-top:1px solid var(--line)}
+  .helps .hrow:first-child{border-top:0}
+  .helps .hck{flex:0 0 auto;width:22px;height:22px;border-radius:50%;background:var(--p-soft);color:var(--p);display:grid;place-items:center;font-size:12px}
+  .helps strong{display:block;font-size:14px;color:var(--ink)}
+  .helps .hsub{display:block;font-size:13px;color:var(--soft)}
+  .donebtn{width:100%;justify-content:center;display:inline-flex;margin-top:16px;padding:11px 18px}
+  .qprog{margin:16px 0 0;font-size:12.5px;font-weight:600;color:var(--faint)}
+  .qsteps{display:flex;gap:6px;margin-top:8px}
+  .qsteps i{flex:1 1 0;height:6px;border-radius:999px;background:var(--line)}
+  .qsteps i.on{background:var(--p)}
+  .qcardq{margin-top:14px}
+  .qcardq label{display:block;font-family:var(--serif);font-size:18px;line-height:1.3;margin-bottom:12px;color:var(--ink)}
+  .qnav{display:flex;gap:10px;margin-top:14px}
+  .qnav .approve{flex:1 1 auto;justify-content:center;display:inline-flex}
+  .qkeep{font-size:12.5px;color:var(--faint);margin-top:10px}
+  /* the draft, full screen: the whole page at its own size, still inside the portal */
+  .dfull{position:fixed;inset:0;z-index:60;background:var(--bg);display:flex;flex-direction:column}
+  .dfull[hidden]{display:none}
+  .dfullbar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:10px 14px;padding-top:calc(10px + env(safe-area-inset-top));background:var(--chrome);color:var(--on-chrome)}
+  .dfullbar button{color:var(--on-chrome);border-color:rgba(255,255,255,.25);font-size:13px;padding:6px 12px}
+  .dfullbar button:hover{border-color:var(--chrome-accent);color:var(--on-chrome)}
+  .dfullbar button[aria-pressed="true"]{background:rgba(255,255,255,.14);border-color:var(--chrome-accent)}
+  .dfullbar .dfname{font-family:var(--serif);font-size:15px;margin-right:auto}
+  .dfull iframe{flex:1 1 auto;width:100%;border:0;background:#fff}
+  /* ── item 179 part three: one door for messages (Figma page "Client portal —
+     parts 2 to 4", part 3): Write, Book a call and Ask for a service at the top of
+     the list, every conversation in plain words, each read like a chat. ── */
+  .mnew.approve{padding:7px 15px}
+  .mlsub{margin:6px 0 0;font-size:13.5px;color:var(--soft)}
+  .mtiles{display:flex;gap:8px;margin-top:12px}
+  .mtile{flex:1 1 0;min-width:0;display:flex;align-items:center;gap:8px;text-align:left;background:var(--p-soft);border:1px solid transparent;border-radius:12px;padding:9px 11px;color:var(--p);font-size:13px;font-weight:600;cursor:pointer}
+  .mtile:hover{border-color:var(--p);color:var(--p)}
+  .mtile .mti{flex:0 0 auto;display:inline-flex}
+  .mtile .mtd{display:none}
+  .mlcount{font-size:11.5px;letter-spacing:.08em;text-transform:uppercase;font-weight:650;margin-top:14px}
+  @media (max-width:719px){
+    .mtile{flex-direction:column;align-items:flex-start;gap:6px;background:var(--card);border-color:var(--line);border-radius:16px;padding:14px;box-shadow:var(--shadow);color:var(--ink);font-weight:400}
+    .mtile .mti{width:34px;height:34px;border-radius:10px;background:var(--p-soft);color:var(--p);align-items:center;justify-content:center}
+    .mtile .mtt{font-family:var(--serif);font-weight:500;font-size:16.5px}
+    .mtile .mtd{display:block;font-size:12.5px;color:var(--soft)}
+  }
+  .mrow{display:flex;gap:11px;align-items:flex-start}
+  .mav{flex:0 0 auto;width:32px;height:32px;border-radius:50%;background:#5b3fa0;color:#fff;display:grid;place-items:center;font-size:12px;font-weight:700}   /* the brand mark's purple in both themes */
+  .mav.svc{background:var(--p-soft);color:var(--p);font-size:13px}
+  .rbody{flex:1 1 auto;min-width:0}
+  .mrow .rprev .schip{padding:2px 8px;font-size:10px}
+  .chat{display:flex;flex-direction:column;gap:12px}
+  .cday{display:flex;align-items:center;gap:8px;font-size:11px;font-weight:650;letter-spacing:.07em;text-transform:uppercase;color:var(--faint)}
+  .cday::before,.cday::after{content:"";flex:1;height:1px;background:var(--line)}
+  .cmsg{display:flex;gap:8px;align-items:flex-end}
+  .cmsg.me{justify-content:flex-end}
+  .cmsg .mav{width:26px;height:26px;font-size:11px}
+  .cb{max-width:min(80%,440px);background:var(--card);border:1px solid var(--line);border-radius:16px 16px 16px 4px;padding:10px 13px;font-size:14px;line-height:1.45;color:var(--ink);white-space:pre-wrap;overflow-wrap:anywhere}
+  .cmsg.me .cb{background:var(--p);border-color:var(--p);color:var(--on-p);border-radius:16px 16px 4px 16px}
+  .cb .cw{display:block;font-size:11px;color:var(--faint);margin-top:4px;white-space:normal}
+  .cmsg.me .cb .cw{color:var(--on-p);opacity:.8}
+  .csys{display:flex;justify-content:center;align-items:center;gap:6px;margin:0;font-size:12px;color:var(--good);text-align:center}
+  .csys.n{color:var(--faint)}
+  .mpcomposer{display:flex;align-items:flex-end;gap:10px}
+  .mpcomposer textarea{flex:1 1 auto;width:auto;min-height:42px;border-radius:21px;resize:none;padding:10px 14px}
+  .msendbtn,.mattach{flex:0 0 auto;width:42px;height:42px;padding:0;border-radius:50%;display:grid;place-items:center}
+  .msendbtn{background:var(--p);border-color:var(--p);color:var(--on-p)}
+  .msendbtn:hover{background:var(--p-deep);border-color:var(--p-deep);color:var(--on-p)}
+  .mattach{color:var(--soft);border-color:transparent}
+  .msendbtn .si,.mattach .si{width:19px;height:19px}
+  .selse{display:flex;align-items:center;gap:12px;margin-top:16px;background:var(--p-soft);border-color:transparent;box-shadow:none}
+  .selse>div{flex:1 1 auto;min-width:0}
+  .selse strong{display:block;font-size:14.5px}
+  .selse .muted{display:block;font-size:13px}
+  .bkdays{display:flex;gap:8px;overflow-x:auto;scrollbar-width:none;padding-bottom:2px}
+  .bkdays::-webkit-scrollbar{display:none}
+  .bkdays button{flex:1 0 54px;display:flex;flex-direction:column;align-items:center;gap:1px;border-radius:12px;padding:8px 0;font-weight:600}
+  .bkdays button span{font-size:11.5px;color:var(--faint)}
+  .bkdays button b{font-size:17px}
+  .bkdays button[aria-pressed="true"]{background:var(--p);border-color:var(--p);color:var(--on-p)}
+  .bkdays button[aria-pressed="true"] span{color:var(--on-p);opacity:.8}
 </style>
 <script>
 // Self-contained client portal: the operator shell (shell.css/shell.js) is
@@ -525,22 +702,23 @@ function rel(iso){const t=Date.parse(iso);if(!isFinite(t))return'';const s=Math.
 let USER=null; // the signed-in session user (for name/email in the welcome + settings cards)
 
 // ── PURE UX helpers (mirrored 1:1 in tests/presence/portal_ux_test.mjs) ──
-// Which in-project section chips have content worth an anchor. Messages + Support
-// always exist (composer / open-a-request CTA); the rest are content-gated.
+// Which in-project section chips have content worth an anchor. Messages always
+// exists (the composer); the rest are content-gated. Requests live in Messages
+// since item 179 part three, so a record has no Support section.
 function chipsFor(d){
   d=d||{};const chips=[];
   if(d.hasOverview)chips.push({id:'sec-overview',label:'Overview'});
   if((d.approvals||[]).filter(a=>a&&a.status==='pending').length)chips.push({id:'sec-approvals',label:'Approvals'});
   if((d.deliverables||[]).length)chips.push({id:'sec-files',label:'Files'});
   if(d.hasMessages)chips.push({id:'sec-messages',label:'Messages'});
-  if(d.hasSupport)chips.push({id:'sec-support',label:'Support'});
   return chips;
 }
 // Calm recency buckets for the What's-new panel.
 function notifBucket(iso,nowMs){const t=Date.parse(iso);if(!isFinite(t))return'Earlier';const days=Math.floor((nowMs-t)/86400000);if(days<=0)return'Today';if(days<7)return'This week';return'Earlier';}
 function groupNotifs(items,nowMs){const order=['Today','This week','Earlier'];const map={};for(const it of(items||[])){const b=notifBucket(it&&it.created_at,nowMs);(map[b]=map[b]||[]).push(it);}return order.filter(b=>map[b]&&map[b].length).map(b=>({bucket:b,items:map[b]}));}
-// Map a notification's anchor (#approvals, #task-…, #support-…) to a chip section id.
-function sectionForAnchor(a){a=String(a||'').replace(/^#/,'');if(a.indexOf('approval')===0)return'sec-approvals';if(a.indexOf('file')===0||a.indexOf('deliverable')===0)return'sec-files';if(a.indexOf('message')===0)return'sec-messages';if(a.indexOf('support')===0)return'sec-support';if(a.indexOf('survey')===0)return'sec-surveys';if(a.indexOf('milestone')===0)return'sec-milestones';if(a.indexOf('task')===0)return'sec-todos';return'sec-overview';}
+// Map a notification's anchor (#approvals, #task-…, #files) to a chip section id.
+// A #support anchor never reaches here: navFromHref sends it to Messages.
+function sectionForAnchor(a){a=String(a||'').replace(/^#/,'');if(a.indexOf('approval')===0)return'sec-approvals';if(a.indexOf('file')===0||a.indexOf('deliverable')===0)return'sec-files';if(a.indexOf('message')===0)return'sec-messages';if(a.indexOf('survey')===0)return'sec-surveys';if(a.indexOf('milestone')===0)return'sec-milestones';if(a.indexOf('task')===0)return'sec-todos';return'sec-overview';}
 // A friendly first name from the session user, or '' — never guessy. One letter is
 // an initial, not a name (the Nov 10 walk read "Good morning, j."), so it falls
 // through to the email; an all-lowercase name gets its capital.
@@ -550,6 +728,9 @@ function firstName(u){if(!u)return'';const cap=(p)=>p.charAt(0).toUpperCase()+p.
 // tests/presence/today_home_test.mjs; keep both copies in sync). ──
 // Time-of-day greeting, with the client's first name when we truly know it.
 function portalGreeting(h,name){const g=h<12?'Good morning':h<18?'Good afternoon':'Good evening';return g+(name?', '+name:'')+'.';}
+// item 179: the client's own name, from the studio's record of them (/portal/context
+// client_first_name), else what their sign-in knows (firstName)
+function clientName(){const n=PORTAL.ctx&&PORTAL.ctx.client_first_name;return (typeof n==='string'&&n.trim())?n.trim():firstName(USER);}
 // ONE definition of "needs your OK" per project snapshot — pending approvals +
 // to-dos flagged for the client. Each project card's "N things need your OK"
 // line uses it, so Home can never show two contradictory counts on one render.
@@ -567,6 +748,13 @@ const TASK_WORD={todo:'To do',in_progress:'In progress',blocked:'Waiting on some
 // a project's status in words (the Nov 10 walk found the raw "active" on a Home tile,
 // the project card and the record's chip); mirrored in tests/presence/today_home_test.mjs
 function projectWord(s){s=String(s||'');return({active:'In progress',on_hold:'On hold',complete:'Done',archived:'Closed'})[s]||s.replace(/_/g,' ');}
+// item 179 part two: which of the studio's asks a to-do is, and the one verb its
+// row says (mirrored 1:1 in tests/presence/today_home_test.mjs). The three
+// checklist asks each open their own thing; any other to-do opens its own page.
+function todoKind(t){const k=String((t&&t.source)||'').replace(/^checklist:/,'');return k==='questionnaire_returned'?'questionnaire':k==='content_received'?'content':k==='client_review'?'review':'task';}
+const TODO_VERB={questionnaire:'Start',content:'Send',review:'Open',task:'Open'};
+// the studio's questionnaire, when it sent one as a survey
+function questionnaireOf(surveys){return (surveys||[]).find(s=>s&&/questionnaire|intake|brief/i.test(String(s.title||'')))||null;}
 // PS2: the ONE portal money formatter — the Needs-you invoice row, the Invoices
 // rows and the tab's unpaid-total line all render the same cents the same way
 // ($1,200, $1,234.50 — never a bare $1200 drifting between surfaces). Server
@@ -586,8 +774,13 @@ function needsYouItems(feed,snaps,billing){
   for(const s of (snaps||[])){
     if(!s)continue;
     for(const a of (s.approvals||[]))items.push({kind:'approval',s,a});
-    if((s.todos||[]).length)items.push({kind:'todos',s});
-    for(const sv of (s.surveys||[]))items.push({kind:'survey',s,sv});
+    // item 179: one row per to-do, each with its own verb. A draft waiting for an OK
+    // stands in for "Review the design draft", and the questionnaire's survey rides
+    // on its to-do instead of being a second row.
+    const draftWaiting=(s.approvals||[]).some(a=>a&&a.subject_type==='website');
+    const q=(s.todos||[]).some(t=>todoKind(t)==='questionnaire')?questionnaireOf(s.surveys):null;
+    for(const t of (s.todos||[]))if(t&&!(draftWaiting&&todoKind(t)==='review'))items.push({kind:'todo',s,t});
+    for(const sv of (s.surveys||[]))if(sv&&!(q&&sv.id===q.id))items.push({kind:'survey',s,sv});
   }
   for(const i of unpaidInvoices(billing))items.push({kind:'invoice',i});
   return items;
@@ -601,7 +794,7 @@ function bellSinceLabel(unread){unread=Math.max(0,unread|0);return unread+' upda
 // unknown/absent types keep the neutral sparkle. Informational rows stay
 // unactionable — the icon narrates tone, never a to-do.
 // ── one icon set (Oct 2026 experience review): the shell's 2px-stroke SVGs, never an emoji as a control's icon ──
-const SI={home:'<path d="M3 11l9-8 9 8v9a2 2 0 0 1-2 2h-4v-7H9v7H5a2 2 0 0 1-2-2z"/>',message:'<path d="M21 12a8 8 0 0 1-8 8H8l-5 3 1.5-4.5A8 8 0 1 1 21 12z"/>',folder:'<path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>',receipt:'<path d="M5 3h14v18l-3-2-3 2-3-2-3 2z"/><path d="M9 8h6M9 12h6"/>',sparkles:'<path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8z"/><path d="M19 17l.7 2 2 .7-2 .7-.7 2-.7-2-2-.7 2-.7z"/>',help:'<circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.7.3-1 .8-1 1.5"/><path d="M12 17h.01"/>',bell:'<path d="M6 16V11a6 6 0 0 1 12 0v5l2 2H4z"/><path d="M10 20a2 2 0 0 0 4 0"/>',thumbsup:'<path d="M7 11v10H3V11z"/><path d="M7 11l4-8a2.5 2.5 0 0 1 2.5 2.5V9h5a2 2 0 0 1 2 2.3l-1.2 7A2 2 0 0 1 17.3 20H7"/>',link:'<path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1"/><path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/>',check:'<path d="M5 12l5 5 9-10"/>',clipboard:'<rect x="6" y="4" width="12" height="17" rx="2"/><path d="M9 4V2.5h6V4"/><path d="M9 10h6M9 14h6"/>',pencil:'<path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/>',file:'<path d="M6 3h8l5 5v13H6z"/><path d="M14 3v5h5"/>',image:'<rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="1.5"/><path d="M21 16l-5-5-8 8"/>',upload:'<path d="M12 16V4"/><path d="M6 10l6-6 6 6"/><path d="M4 20h16"/>',calendar:'<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/>',paperclip:'<path d="M21 11.5l-9 9a5.5 5.5 0 0 1-7.8-7.8l9-9a3.5 3.5 0 0 1 5 5l-9 9a1.5 1.5 0 0 1-2.1-2.1l8.5-8.5"/>',cog:'<circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1L7 17M17 7l2.1-2.1"/>'};
+const SI={chart:'<path d="M3 20h18M7 16v-5M12 16V6M17 16v-8"/>',home:'<path d="M3 11l9-8 9 8v9a2 2 0 0 1-2 2h-4v-7H9v7H5a2 2 0 0 1-2-2z"/>',message:'<path d="M21 12a8 8 0 0 1-8 8H8l-5 3 1.5-4.5A8 8 0 1 1 21 12z"/>',folder:'<path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>',receipt:'<path d="M5 3h14v18l-3-2-3 2-3-2-3 2z"/><path d="M9 8h6M9 12h6"/>',sparkles:'<path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8z"/><path d="M19 17l.7 2 2 .7-2 .7-.7 2-.7-2-2-.7 2-.7z"/>',help:'<circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.7.3-1 .8-1 1.5"/><path d="M12 17h.01"/>',bell:'<path d="M6 16V11a6 6 0 0 1 12 0v5l2 2H4z"/><path d="M10 20a2 2 0 0 0 4 0"/>',thumbsup:'<path d="M7 11v10H3V11z"/><path d="M7 11l4-8a2.5 2.5 0 0 1 2.5 2.5V9h5a2 2 0 0 1 2 2.3l-1.2 7A2 2 0 0 1 17.3 20H7"/>',link:'<path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1"/><path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/>',check:'<path d="M5 12l5 5 9-10"/>',clipboard:'<rect x="6" y="4" width="12" height="17" rx="2"/><path d="M9 4V2.5h6V4"/><path d="M9 10h6M9 14h6"/>',pencil:'<path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/>',file:'<path d="M6 3h8l5 5v13H6z"/><path d="M14 3v5h5"/>',image:'<rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="1.5"/><path d="M21 16l-5-5-8 8"/>',upload:'<path d="M12 16V4"/><path d="M6 10l6-6 6 6"/><path d="M4 20h16"/>',calendar:'<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/>',paperclip:'<path d="M21 11.5l-9 9a5.5 5.5 0 0 1-7.8-7.8l9-9a3.5 3.5 0 0 1 5 5l-9 9a1.5 1.5 0 0 1-2.1-2.1l8.5-8.5"/>',cog:'<circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1L7 17M17 7l2.1-2.1"/>',send:'<path d="M12 19V5"/><path d="M6 11l6-6 6 6"/>'};
 const si=(k)=>`<svg class="si" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">${SI[k]||SI.dot}</svg>`;
 function momentIcon(t){return({good_news:'🎉',celebration:'🎉',needs_attention:'⚠️',reminder:'⏰',opportunity:'💡',seasonal:'🍂',business_health:'📈',learning:'📚'})[String(t||'')]||'✨';}
 // Nov 10 walk: the website coach writes its asks for whoever runs the site ("…then
@@ -678,13 +871,14 @@ function scrollToSection(id){const el=document.getElementById(id);if(el)el.scrol
 function skeleton(){return'<div class="skel"><div class="l w40"></div><div class="l w80"></div></div><div class="skel"><div class="l w60"></div><div class="l"></div><div class="l w80"></div></div><div class="skel"><div class="l w40"></div><div class="l w60"></div></div>';}
 // Route a notification's href to the right in-portal view (no full navigation).
 // Support links land in the Messages tab's reading pane (slice 5) — the same
-// place the ?support= deep link and the Requests tab's "View & reply" go.
+// place the ?support= deep link and a service ask's "it's sent" screen go.
 // PS3 (D4a): '#support-<rid>' hrefs (project events) land there too — ONE
 // honest destination per thread, never a second one on the record page.
 function navFromHref(href){
   href=String(href||'');
   const sup=href.match(/support=([0-9a-f-]{8,})/i)||href.match(/#support-([0-9a-f-]{8,})/i);
   if(sup){openMessagesTo(sup[1]);return;}
+  if(/#support$/i.test(href)){showTab('messages');return;}   // a request with no id: the Messages list holds them all
   const pm=href.match(/\/projects\/([0-9a-f-]{8,})(#[a-z0-9-]+)?/i);
   if(pm){openProject(pm[1],pm[2]||null);return;}
   // PS3: no notification click is ever dead — anything unroutable lands Home,
@@ -711,7 +905,14 @@ let CURRENT_TAB='home';
 // capture it at entry and re-check before painting, so a late fetch can never
 // clobber a newer view (a CURRENT_TAB check alone misses the drill-ins).
 let VIEW_SEQ=0;
-const TABS=[['home',si('home'),'Home'],['messages',si('message'),'Messages'],['files',si('folder'),'Files'],['invoices',si('receipt'),'Invoices'],['requests',si('sparkles'),'Requests'],['help',si('help'),'Help']];
+// item 179 part three: Requests and Support folded into Messages — one door, five tabs.
+// An old #requests link (an email, a bookmark) lands in Messages.
+const TABS=[['home',si('home'),'Home'],['messages',si('message'),'Messages'],['documents',si('folder'),'Documents'],['help',si('help'),'Help']];
+// item 179 part four: Files and Invoices folded into Documents — an old #files or
+// #invoices link opens the shelf on that filter.
+const TAB_ALIAS={requests:'messages',files:'documents',invoices:'documents'};
+const SHELF_FROM_TAB={files:'files',invoices:'invoices'};
+const tabOf=(t)=>TAB_ALIAS[t]||t;
 // The context bar's "app name" is the studio's identity. Builder list item 59:
 // /portal/context carries `studio` ({ name, logo_url, accent }) for a managed
 // client, read from the studio's own site (its name, colour and Files › Set as
@@ -722,7 +923,7 @@ function studioLogo(){const s=PORTAL.ctx&&PORTAL.ctx.studio;return (s&&typeof s.
 function rememberStudio(){try{const s=PORTAL.ctx&&PORTAL.ctx.studio;if(s&&s.name)localStorage.setItem('dds-studio-brand',JSON.stringify({name:s.name,logo_url:studioLogo()||null,accent:s.accent||''}));}catch(_){}}
 function showNav(){
   const nav=$('tabnav');if(!nav)return;
-  const acct=(((firstName(USER)||((USER&&USER.email)||''))||'').charAt(0)||'•').toUpperCase();
+  const acct=(((clientName()||((USER&&USER.email)||''))||'').charAt(0)||'•').toUpperCase();
   const badge=PORTAL.unread?`<span class="badge on" aria-hidden="true">${PORTAL.unread>9?'9+':PORTAL.unread}</span>`:'<span class="badge" aria-hidden="true"></span>';
   nav.innerHTML=`<div class="tabnav-inner">`+
     `<span class="cb-brand">${studioLogo()?`<img class="cb-logo" src="${esc(studioLogo())}" alt="">`:`<span class="cb-mark" aria-hidden="true">✦</span>`}<span class="cb-name">${esc(studioBrand())}</span></span>`+
@@ -755,13 +956,13 @@ function setActiveTab(tab){const nav=$('tabnav');if(!nav)return;nav.querySelecto
 // console's own wrap class (renderMessages re-adds it for the split view).
 function setWide(on){try{document.body.classList.toggle('wide',!!on);document.body.classList.remove('msgsview');document.body.classList.remove('homeview');}catch(_){}}
 function showTab(tab){
+  const named=String(tab||'');tab=tabOf(named);
+  if(tab==='documents')SHELF_CAT=SHELF_FROM_TAB[named]||'all';   // the tab itself opens on All; an old name opens its filter
   VIEW_SEQ++;   // this tab owns #main now — invalidate any in-flight view render
   CURRENT_TAB=tab;setActiveTab(tab);setWide(false);try{window.scrollTo(0,0);}catch(_){}
-  try{document.title=({home:'Home',messages:'Messages',files:'Files',invoices:'Invoices',requests:'Requests',help:'Help'}[tab]||'Home')+' — '+studioBrand();}catch(_){}   // the walk found "Your updates" on every tab
+  try{document.title=({home:'Home',messages:'Messages',documents:'Documents',help:'Help'}[tab]||'Home')+' — '+studioBrand();}catch(_){}   // the walk found "Your updates" on every tab
   if(tab==='messages')return renderMessages();
-  if(tab==='files')return renderFiles();
-  if(tab==='invoices')return renderInvoices();
-  if(tab==='requests')return renderRequests();
+  if(tab==='documents')return renderDocuments();
   if(tab==='help')return renderHelp();
   return renderHome();
 }
@@ -913,7 +1114,7 @@ function renderHome(){
   let html=`<header class="phero" id="home-hero">`+
     `<div class="ph-brand">${logo?`<img class="ph-logo" src="${esc(logo)}" alt="">`:`<span class="ph-mark" aria-hidden="true">${esc((studioBrand().charAt(0)||'✦').toUpperCase())}</span>`}<span class="ph-name">${esc(studioBrand())}</span></div>`+
     `<div class="rolebadge">● ${P.persona==='client'?'Your workspace':'Client view'}</div>`+   // persona, not projects.length — a failed projects read must not demote a client's badge
-    `<h1>${esc(portalGreeting(new Date().getHours(),firstName(USER)))}</h1>`+
+    `<h1>${esc(portalGreeting(new Date().getHours(),clientName()))}</h1>`+
     `<p class="sub">${P.persona==='client'?'Here’s where your website and projects stand.':'Everything your studio shares with you, in one place.'}</p>`+
   `</header>`;
   html+=welcomeCardHtml();
@@ -968,10 +1169,13 @@ async function buildNeedsYou(){
   const seen=unreadKeysFrom(PORTAL.notifs);
   // unread rows carry an sr-only "New — " prefix (the dot is a bare pseudo-element);
   // action buttons get aria-labels that include the row title so repeated
-  // "Review & approve" / "Open to-dos" names stay distinguishable to a screen
-  // reader. Slice 10: each row leads with a type icon (action-feed anatomy).
-  const QICO={Approval:si('thumbsup'),Connected:si('link'),'To-do':si('check'),Survey:si('clipboard'),Invoice:si('receipt')};
-  const row=(kind,cls,unread,title,sub,acts)=>`<div class="qrow${unread?' unread':''}"><span class="qico${cls?' '+cls:''}" aria-hidden="true">${QICO[kind]||si('bell')}</span><div class="qmain"><span class="kchip${cls?' '+cls:''}">${kind}</span><h3>${unread?'<span class="sr-only sr-new">New — </span>':''}${title}</h3>${sub?`<p>${sub}</p>`:''}</div><div class="qact">${acts}</div></div>`;
+  // "Open" / "Start" names stay distinguishable to a screen reader.
+  // Slice 10: each row leads with a type icon (action-feed anatomy).
+  const QICO={Approval:si('thumbsup'),Draft:si('image'),Connected:si('link'),'To-do':si('check'),Survey:si('clipboard'),Invoice:si('receipt')};
+  const row=(kind,cls,unread,title,sub,acts,ico)=>`<div class="qrow${unread?' unread':''}"><span class="qico${cls?' '+cls:''}" aria-hidden="true">${ico||QICO[kind]||si('bell')}</span><div class="qmain"><span class="kchip${cls?' '+cls:''}">${kind}</span><h3>${unread?'<span class="sr-only sr-new">New — </span>':''}${title}</h3>${sub?`<p>${sub}</p>`:''}</div><div class="qact">${acts}</div></div>`;
+  // item 179 part two: each row has one verb, and it opens the thing itself
+  const TODO_ICO={questionnaire:si('clipboard'),content:si('upload'),review:si('image'),task:si('check')};
+  const TODO_SUB={questionnaire:'A short questionnaire',content:'Your logo, photos and any words for the site',review:'Your studio shares the draft here for your OK'};
   // PS3 (D1a): the rows come from needsYouItems — the SAME array whose length
   // the "Needs you · N" heading shows, so the two numbers agree by construction.
   const nyToday=portalTodayYmd();
@@ -982,23 +1186,25 @@ async function buildNeedsYou(){
     if(it.kind==='feed'){const p=it.p;
       return row(p.kind==='connected'?'Connected':'Approval','',false,esc(p.title||'A change is ready'),esc(p.summary||''),
         `<button class="${top}" data-approve="${esc(p.decide_path)}" aria-label="Approve — ${esc(p.title||'A change is ready')}">Approve</button><button data-decline="${esc(p.decide_path)}" aria-label="Not yet — ${esc(p.title||'A change is ready')}">Not yet</button>`);}
-    if(it.kind==='approval'){const s=it.s,a=it.a;
-      // approve right here (the row names the change and its summary); "See it first" opens the record
-      return row('Approval','',seen.has('approval-'+a.id),esc(a.title||'A change is ready'),esc(s.name)+(a.summary?` · ${esc(a.summary)}`:''),
-        `<button class="${top}" data-qapr="${esc(a.id)}" data-qah="${esc(a.content_hash||'')}" data-qproj="${esc(s.id)}" aria-label="Approve — ${esc(a.title||'A change is ready')}">Approve</button><button data-open-proj="${esc(s.id)}" data-open-sec="sec-approvals" aria-label="See it first — ${esc(a.title||'A change is ready')}">See it first</button>`);}
-    if(it.kind==='todos'){const s=it.s;
-      return row('To-do','todo',s.todos.some(t=>t&&seen.has('task-'+t.id))||seen.has('todos-'+s.id),`${s.todos.length} to-do${s.todos.length===1?'':'s'} for you`,esc(s.name),
-        `<button class="${top}" data-open-proj="${esc(s.id)}" data-open-sec="sec-todos" aria-label="Open to-dos — ${esc(s.name)}">Open to-dos</button>`);}
+    if(it.kind==='approval'){const s=it.s,a=it.a;const draft=a.subject_type==='website';
+      const ttl=a.title||(draft?'Your website draft':'A change is ready');
+      // the row says what's asked; Open shows the thing itself, with Approve on it
+      const sub=a.summary?(draft?`${esc(studioBrand())} asked: “${esc(a.summary)}”`:`${esc(s.name)} · ${esc(a.summary)}`):esc(s.name);
+      return row(draft?'Draft':'Approval','',seen.has('approval-'+a.id),esc(ttl),sub,
+        `<button class="${top}" data-open-apr="${esc(a.id)}" data-apr-proj="${esc(s.id)}" aria-label="Open — ${esc(ttl)}">Open</button>`);}
+    if(it.kind==='todo'){const s=it.s,t=it.t;const k=todoKind(t);const verb=TODO_VERB[k];
+      return row('To-do','todo',seen.has('task-'+t.id)||seen.has('todos-'+s.id),esc(t.title||'A to-do'),esc(TODO_SUB[k]?TODO_SUB[k]+' · '+s.name:s.name),
+        `<button class="${top}" data-open-todo="${esc(t.id)}" data-todo-proj="${esc(s.id)}" aria-label="${verb} — ${esc(t.title||'A to-do')}">${verb}</button>`,TODO_ICO[k]);}
     if(it.kind==='survey'){const s=it.s,sv=it.sv;
       return row('Survey','',seen.has('surveys-'+s.id),esc(sv.title||'A quick survey'),esc(s.name),
-        `<button class="${top}" data-open-survey="${esc(sv.id)}" data-survey-proj="${esc(s.id)}" aria-label="Answer — ${esc(sv.title||'A quick survey')}">Answer →</button>`);}
+        `<button class="${top}" data-open-survey="${esc(sv.id)}" data-survey-proj="${esc(s.id)}" aria-label="Start — ${esc(sv.title||'A quick survey')}">Start</button>`);}
     const i=it.i;
     // the SAME state word the Invoices tab chips print (one formula, item 2) —
     // the two surfaces must never disagree about the same invoice
     const stWord=(MONEY_WORD[moneyState(i,nyToday,PAID_PENDING)]||'').toLowerCase();
-    const nyPay=i.pay_url&&/^https:\/\//.test(i.pay_url)?i.pay_url:null;   // https-only (invoiceRowHtml's rule)
+    const nyPay=i.pay_url&&/^https:\/\//.test(i.pay_url)?i.pay_url:null;   // https-only (the shelf's rule)
     return row('Invoice','invoice',false,esc(i.name||'Invoice'),`${i.amount?esc(fmtMoney(i.amount))+' · ':''}${esc(stWord)}${i.due_date?` · due ${esc(invDueLabel(i.due_date)||i.due_date)}`:''}`,
-      nyPay?`<a class="${top||'link'}" data-pay href="${esc(nyPay)}" aria-label="View &amp; pay — ${esc(i.name||'Invoice')}">View &amp; pay</a>`:`<button class="${top}" data-tab-go="invoices" aria-label="View invoice — ${esc(i.name||'Invoice')}">View invoice</button>`);
+      nyPay?`<a class="${top||'link'}" data-pay href="${esc(nyPay)}" aria-label="Pay — ${esc(i.name||'Invoice')}">Pay</a>`:`<button class="${top}" data-tab-go="invoices" aria-label="View invoice — ${esc(i.name||'Invoice')}">View invoice</button>`);
   });
   // item 179: the heading carries the queue's count — the SAME array whose rows
   // render below it, so the two can never disagree (the old strip's D1a rule).
@@ -1018,17 +1224,10 @@ async function buildNeedsYou(){
   if(!items.length)return;   // nothing to wire — only the honest lines rendered
   body.querySelectorAll('[data-approve]').forEach(b=>b.addEventListener('click',()=>decideFeed(b.getAttribute('data-approve'),'approve',b)));
   body.querySelectorAll('[data-decline]').forEach(b=>b.addEventListener('click',()=>decideFeed(b.getAttribute('data-decline'),'abandon',b)));
-  body.querySelectorAll('[data-open-proj]').forEach(b=>b.addEventListener('click',()=>openProject(b.getAttribute('data-open-proj'),b.getAttribute('data-open-sec'))));
-  // inline approve of a project approval — the SAME decide call (and 409 honesty) as the record page
-  body.querySelectorAll('[data-qapr]').forEach(b=>b.addEventListener('click',async()=>{
-    b.disabled=true;
-    const r=await api('/client/approvals/'+b.getAttribute('data-qapr')+'/decide','POST',{decision:'approved',presented_hash:b.getAttribute('data-qah'),note:''});
-    if(r.ok){PORTAL.snaps=null;toast('Approved — thank you.');buildNeedsYou();return;}
-    toast((r.body&&r.body.message)||'That didn’t go through — please try again.');
-    if(r.status===409){PORTAL.snaps=null;buildNeedsYou();return;}
-    b.disabled=false;
-  }));
-  body.querySelectorAll('[data-open-survey]').forEach(b=>b.addEventListener('click',()=>openSurvey(b.getAttribute('data-open-survey'),b.getAttribute('data-survey-proj'),b)));
+  // item 179 part two: the thing itself — the approval with its draft or file, the to-do's own page
+  body.querySelectorAll('[data-open-apr]').forEach(b=>b.addEventListener('click',()=>openApproval(b.getAttribute('data-apr-proj'),b.getAttribute('data-open-apr'))));
+  body.querySelectorAll('[data-open-todo]').forEach(b=>b.addEventListener('click',()=>openTodo(b.getAttribute('data-todo-proj'),b.getAttribute('data-open-todo'))));
+  body.querySelectorAll('[data-open-survey]').forEach(b=>b.addEventListener('click',()=>openSurvey(b.getAttribute('data-open-survey'),b.getAttribute('data-survey-proj'),b,'home')));
   body.querySelectorAll('[data-tab-go]').forEach(b=>b.addEventListener('click',()=>showTab(b.getAttribute('data-tab-go'))));
 }
 // ── slice 8b: the "Your website" card — plain-English site stats, in place ──
@@ -1159,8 +1358,9 @@ async function loadWebsiteThumb(){
 // the key ABSENT (not fetched: beyond the preview cap, or the fetch failed).
 // Only a fetched-and-empty thread may claim "No messages yet"; unfetched rows
 // get a neutral preview and sort after fetched ones — they can claim nothing.
-function convRows(projects,support,latest){
+function convRows(projects,support,latest,studio){
   const names={};for(const p of (projects||[]))if(p&&p.id)names[p.id]=p.name;
+  const who=String(studio||'').trim()||'Your studio';
   const rows=[];
   for(const p of (projects||[])){
     if(!p||!p.id)continue;
@@ -1168,16 +1368,21 @@ function convRows(projects,support,latest){
     const lm=fetched?(latest||{})[p.id]:null;
     rows.push({id:'proj:'+p.id,kind:'project',pid:p.id,title:p.name||'Project',when:(lm&&lm.created_at)||'',
       preview:lm?(lm.body||''):(fetched?'No messages yet — say hello any time.':'Open this conversation'),
-      unfetched:!fetched,chip:'Message',chipCls:'',unreadKey:'msgs-'+p.id});
+      unfetched:!fetched,chip:'',chipCls:'',unreadKey:'msgs-'+p.id});
   }
   for(const rq of (support||[])){
     if(!rq||!rq.id)continue;
-    const status=String(rq.status||'open');
-    // recency prefers last_activity_at (new function builds — replies only INSERT
-    // and never bump updated_at) with the updated_at fallback for old builds.
-    rows.push({id:'sup:'+rq.id,kind:'support',sid:rq.id,pid:rq.project_id||'',title:rq.subject||'Support request',
-      when:rq.last_activity_at||rq.updated_at||'',preview:rq.last_message&&rq.last_message.text?((rq.last_message.from==='you'?'You: ':'')+rq.last_message.text):(rq.project_id?(names[rq.project_id]||'A project request'):'A conversation with your studio'),
-      chip:'Support · '+status.replace(/_/g,' '),chipCls:'support',status,unreadKey:'support-'+rq.id});
+    const status=String(rq.status||'open');const done=status==='resolved'||status==='closed';
+    // item 179 part three: one door — a question, a request and a service ask are all
+    // conversations, in plain words: a service ask reads as the service ("Asked" until
+    // it's handled), anything handled says Done, and each line says who wrote it.
+    // Recency prefers last_activity_at (replies only INSERT and never bump
+    // updated_at) with the updated_at fallback for old builds.
+    const subj=String(rq.subject||'');const service=subj.indexOf('Service request: ')===0;
+    const lm=rq.last_message&&rq.last_message.text?rq.last_message:null;
+    rows.push({id:'sup:'+rq.id,kind:service?'service':'support',sid:rq.id,pid:rq.project_id||'',title:(service?subj.slice(17):subj)||'Support request',
+      when:rq.last_activity_at||rq.updated_at||'',preview:lm?((lm.from==='you'?'You: ':who+': ')+lm.text):(rq.project_id?(names[rq.project_id]||'A project request'):'A conversation with your studio'),
+      chip:done?'Done':service?'Asked':'',chipCls:done?'done':'',status,unreadKey:'support-'+rq.id});
   }
   rows.sort(convCompare);
   return rows;
@@ -1216,9 +1421,12 @@ function subjectFromMessage(v){return (String(v==null?'':v).split('\n')[0]||'').
 const MC={rows:[],sel:'',compose:false,activeId:'',unread:new Set(),cache:{},seq:0,supFailed:false,projFailed:false};
 const mid=(s)=>String(s).replace(/[^a-zA-Z0-9_-]/g,'_');
 // route straight into the Messages tab with a support thread opened in its pane
-// (the ?support= deep link, bell items, and the Requests tab's "View & reply").
+// (the ?support= deep link, bell items, and a request just sent from Ask for a service).
 function openMessagesTo(sid){CURRENT_TAB='messages';setActiveTab('messages');setWide(false);try{window.scrollTo(0,0);}catch(_){}return renderMessages(sid);}
-async function renderMessages(focusSup){
+// item 179 part three: Help's "Write to your studio" opens Messages with the
+// writing pane already open
+function openMessagesCompose(){CURRENT_TAB='messages';setActiveTab('messages');setWide(false);try{window.scrollTo(0,0);}catch(_){}return renderMessages(null,{compose:true});}
+async function renderMessages(focusSup,opts){
   const view=++VIEW_SEQ;   // this render owns #main until something newer bumps the token
   MC.sel='';MC.compose=false;MC.activeId='';
   MC.cache={};   // fresh per tab ENTRY — the bundle/message cache lives for one tab visit
@@ -1250,7 +1458,7 @@ async function renderMessages(focusSup){
     if(r&&r.ok){const d=r.body&&r.body.data;latest[p.id]=(Array.isArray(d)?d:[])[0]||null;}   // null = fetched, confirmed empty; a failed fetch leaves the key ABSENT
   }catch(_){}}));
   if(view!==VIEW_SEQ)return;   // re-check before every paint of #main
-  MC.rows=convRows(PORTAL.projects,support,latest);
+  MC.rows=convRows(PORTAL.projects,support,latest,studioBrand());
   MC.unread=unreadKeysFrom(PORTAL.notifs);
   MC.supFailed=supFailed;
   // PS6 (PS1 residual): a failed boot /client/projects read means every project
@@ -1260,12 +1468,18 @@ async function renderMessages(focusSup){
   $('main').innerHTML=
     `<div class="mconsole" id="mconsole">`+
       `<aside class="mlist" aria-label="Conversation list">`+
-        `<div class="mlhead"><div class="mlrow1"><h1>Messages</h1><button type="button" id="mnew" class="mnew">Message your studio</button></div><p class="mlmeta" id="mlmeta"></p>${supFailed?`<p class="mlmeta fload">We couldn’t check on support requests just now — please try again in a moment.</p>`:''}${MC.projFailed?`<p class="mlmeta fload">We couldn’t check on your project conversations just now — please try again in a moment.</p>`:''}<p class="mlmeta">Talk to your studio — they usually reply within a day.</p></div>`+
+        // item 179 part three: one door. Write, Book a call and Ask for a service all start here.
+        `<div class="mlhead"><div class="mlrow1"><h1>Messages</h1><button type="button" id="mnew" class="mnew approve" aria-label="Write to ${esc(studioBrand())}">Write</button></div>`+
+          `<p class="mlsub">Talk to ${esc(studioBrand())}. They usually reply within a day.</p>`+
+          `<div class="mtiles" role="group" aria-label="Book or ask"><button type="button" class="mtile" id="mbook"><span class="mti" aria-hidden="true">${si('calendar')}</span><span class="mtt">Book a call</span><span class="mtd">Pick a time to talk</span></button><button type="button" class="mtile" id="msvc"><span class="mti" aria-hidden="true">${si('sparkles')}</span><span class="mtt">Ask for a service</span><span class="mtd">See what they offer</span></button></div>`+
+          `${supFailed?`<p class="mlmeta fload">We couldn’t check on your requests just now — please try again in a moment.</p>`:''}${MC.projFailed?`<p class="mlmeta fload">We couldn’t check on your project conversations just now — please try again in a moment.</p>`:''}<p class="mlmeta mlcount" id="mlmeta"></p></div>`+
         `<ul id="mrows" role="listbox" aria-label="Conversations" tabindex="0"></ul>`+
       `</aside>`+
       `<section class="mpane" id="mpane" aria-label="Conversation"></section>`+
     `</div>`;
   $('mnew').addEventListener('click',openComposePane);
+  $('mbook').addEventListener('click',()=>openBooking());
+  $('msvc').addEventListener('click',()=>openServices());
   // keyboard listbox (inbox.html's contract): arrows rove, Enter AND Space open.
   // Focusing the listbox with no active row defaults to the selected row (or the
   // first) so Enter works immediately — no Arrow press required first.
@@ -1289,24 +1503,28 @@ async function renderMessages(focusSup){
   renderMRows();
   if(focusSup&&MC.rows.some(r=>r.id==='sup:'+focusSup))openConv('sup:'+focusSup);
   else if(focusSup)openSupportThread(focusSup,null);   // an id not in the list (stale link) — the legacy full view degrades gracefully
+  else if(opts&&opts.compose)openComposePane();
   else renderMPane();
 }
 function renderMRows(){
   const rows=$('mrows');if(!rows)return;
-  const meta=$('mlmeta');if(meta)meta.textContent=`${MC.rows.length} conversation${MC.rows.length===1?'':'s'} · newest first`;
+  const meta=$('mlmeta');if(meta)meta.textContent=`Conversations · ${MC.rows.length}`;
   // "No conversations yet" is a claim only an all-sources-ok read may make —
   // with the support OR projects read failed an empty list is UNKNOWN, not empty
   // (B5 + the PS1-residual projects gate)
   if(!MC.rows.length){rows.innerHTML=(MC.supFailed||MC.projFailed)
     ?`<li class="mempty" role="presentation">We couldn’t check just now — try again in a moment.</li>`
-    :`<li class="mempty" role="presentation">No conversations yet — “Message your studio” starts one.</li>`;return;}
+    :`<li class="mempty" role="presentation">No conversations yet — Write starts one.</li>`;return;}
+  const initial=esc((studioBrand().charAt(0)||'S').toUpperCase());
   rows.innerHTML=MC.rows.map((r)=>{
     const unread=MC.unread.has(r.unreadKey);
     // the dot is a bare pseudo-element — unread rows carry an sr-only "New — "
     // text alternative (the slice-4 pattern); aria-selected marks the open row.
+    // item 179 part three: the studio's initial leads a conversation, a sparkle a service ask
     return `<li class="mrow${unread?' unread':''}" id="mrow-${mid(r.id)}" role="option" aria-selected="${MC.sel===r.id?'true':'false'}" data-mrow="${esc(r.id)}">`+
+      `<span class="mav${r.kind==='service'?' svc':''}" aria-hidden="true">${r.kind==='service'?'✦':initial}</span><span class="rbody">`+
       `<span class="rtop"><span class="rname">${unread?'<span class="sr-only sr-new">New — </span>':''}${esc(r.title)}</span>${r.when?`<span class="rwhen">${esc(rel(r.when))}</span>`:''}</span>`+
-      `<span class="rprev"><span class="kchip${r.chipCls?' '+r.chipCls:''}">${esc(r.chip)}</span><span class="rtxt">${esc(r.preview)}</span></span></li>`;
+      `<span class="rprev">${r.chip?`<span class="schip${r.chipCls?' '+r.chipCls:''}">${esc(r.chip)}</span>`:''}<span class="rtxt">${esc(r.preview)}</span></span></span></li>`;
   }).join('');
   rows.querySelectorAll('.mrow').forEach((el)=>el.addEventListener('click',()=>{MC.activeId=el.getAttribute('data-mrow');rows.classList.remove('kbd');openConv(el.getAttribute('data-mrow'));}));
   paintMActive();   // innerHTML rebuilds dropped .kfocus + aria-activedescendant — re-apply them
@@ -1359,8 +1577,8 @@ function renderMPane(){
     host.innerHTML=MC.rows.length
       ?`<div class="center" style="margin:auto"><span aria-hidden="true" style="font-size:26px;display:block;margin-bottom:8px">🗂</span><h2>Pick a conversation</h2><p class="muted">Choose one on the left — it opens right here.</p></div>`
       :(MC.supFailed||MC.projFailed)   // B5 + PS1 residual: an empty list on a failed support OR projects read is UNKNOWN, never "No conversations yet"
-      ?`<div class="center" style="margin:auto"><span aria-hidden="true" style="font-size:26px;display:block;margin-bottom:8px">💬</span><h2>We couldn’t check just now</h2><p class="muted">Please try again in a moment — “Message your studio” still works.</p></div>`
-      :`<div class="center" style="margin:auto"><span aria-hidden="true" style="font-size:26px;display:block;margin-bottom:8px">💬</span><h2>No conversations yet</h2><p class="muted">“Message your studio” starts the first one.</p></div>`;
+      ?`<div class="center" style="margin:auto"><span aria-hidden="true" style="font-size:26px;display:block;margin-bottom:8px">💬</span><h2>We couldn’t check just now</h2><p class="muted">Please try again in a moment — Write still works.</p></div>`
+      :`<div class="center" style="margin:auto"><span aria-hidden="true" style="font-size:26px;display:block;margin-bottom:8px">💬</span><h2>No conversations yet</h2><p class="muted">Write starts the first one.</p></div>`;
     return;
   }
   if(row.kind==='project')return void paneProject(host,row);
@@ -1392,7 +1610,7 @@ function focusMPane(){
 // page and is left alone.
 async function paneProject(host,row){
   const seq=++MC.seq;
-  host.innerHTML=mpaneHead(row.title,`<span class="kchip">Message</span><a class="link" href="#" id="mopenproj">Open project →</a>`)+
+  host.innerHTML=mpaneHead(row.title,`<span>With ${esc(studioBrand())} · they usually reply within a day</span><a class="link" href="#" id="mopenproj">Open the project →</a>`)+
     `<div class="mpbody" id="mpbody">${skeleton()}</div><div class="mpcomposer" id="mpcomp"></div>`;
   wireMBack();
   const op=$('mopenproj');if(op)op.addEventListener('click',(e)=>{e.preventDefault();openProject(row.pid);});
@@ -1408,7 +1626,19 @@ async function paneProject(host,row){
   }
   paintProjThread(c);
   const pc=$('mpcomp');if(!pc)return;
-  pc.innerHTML=`<textarea id="mmsg" rows="2" aria-label="Message your studio" placeholder="Message your studio…"></textarea><div class="row" style="margin-top:8px"><button class="approve" id="msend">Send</button></div>`;
+  // item 179 part three: the write box — a paperclip sends files into the project, then the round Send
+  pc.innerHTML=`<button type="button" class="mattach" id="mattach" aria-label="Send a file to ${esc(studioBrand())}">${si('paperclip')}</button><input type="file" id="mfiles" class="fshare-file" accept="${SHARE_ACCEPT}" multiple aria-hidden="true" tabindex="-1">`+
+    `<textarea id="mmsg" rows="1" aria-label="Write to ${esc(studioBrand())}" placeholder="Write to ${esc(studioBrand())}…"></textarea><button class="msendbtn" id="msend" aria-label="Send">${si('send')}</button>`;
+  $('mattach').addEventListener('click',()=>$('mfiles').click());
+  $('mfiles').addEventListener('change',async()=>{
+    const inp=$('mfiles');const files=[...(inp.files||[])];if(!files.length)return;
+    const sendSeq=MC.seq,sendSel=MC.sel;const at=$('mattach');if(at)at.disabled=true;
+    const res=await sendFilesTo(row.pid,files);
+    if(res.sent)toast(res.sent===1?'Sent to your studio ✓':`${res.sent} files sent to your studio ✓`);
+    if(res.failed.length)toast(res.failed.length===1?`${res.failed[0].name}: ${res.failed[0].msg}`:`${res.failed.length} files didn’t send. Please try those again.`);
+    if(res.sent){PORTAL.snaps=null;delete MC.cache[row.pid];row.when=new Date().toISOString();resortMRows();if(sendSeq===MC.seq&&sendSel===MC.sel)return paneProject($('mpane'),row);}
+    const at2=$('mattach');if(at2)at2.disabled=false;if(inp)inp.value='';
+  });
   $('msend').addEventListener('click',async()=>{
     const btn=$('msend'),ta=$('mmsg');const v=(ta.value||'').trim();if(!v)return;
     btn.disabled=true;
@@ -1443,18 +1673,49 @@ function keepSent(fresh,sentList){
   for(const s of (sentList||[])){if(!s)continue;const seen=out.some(m=>m&&(m.id===s.id||(m.body===s.body&&m.author_kind!=='staff'&&m.author_kind!=='system')));if(!seen)out.unshift(s);}
   return out;
 }
-function paintProjThread(c){
-  const pb=$('mpbody');if(!pb)return;
-  const fromById=msgFromMap(c.events);
-  const items=[];for(const m of c.msgs){const it=projMsgItem(m,fromById);if(it)items.push(it);}
-  items.sort((a,b)=>a.at<b.at?1:a.at>b.at?-1:0);
-  pb.innerHTML=items.length?`<div class="tlhost">${tlItemsHtml(items)}</div>`:emptyCard('No messages yet — say hello any time.','💬');
+// ── item 179 part three: a conversation reads like a chat ──
+// Your studio on the left, you on the right in purple, oldest first with the day
+// marked, and what happened (an approval, a file) as a quiet line between.
+function dayWord(iso){const t=Date.parse(iso);if(!isFinite(t))return'';const d=new Date(t),n=new Date();const k=(x)=>x.getFullYear()+'-'+x.getMonth()+'-'+x.getDate();if(k(d)===k(n))return'Today';const y=new Date(n);y.setDate(n.getDate()-1);if(k(d)===k(y))return'Yesterday';return d.toLocaleDateString('en-US',(n-d)<6*86400000?{weekday:'long'}:{month:'short',day:'numeric',year:d.getFullYear()===n.getFullYear()?undefined:'numeric'});}
+function chatTime(iso){const t=Date.parse(iso);return isFinite(t)?new Date(t).toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'}):'';}
+function chatHtml(items){
+  const list=(items||[]).filter(i=>i&&i.at).slice().sort((a,b)=>a.at<b.at?-1:a.at>b.at?1:0);
+  const who=studioBrand(),av=esc((who.charAt(0)||'S').toUpperCase());
+  let h='',day='';
+  for(const it of list){
+    const dw=dayWord(it.at);if(dw&&dw!==day){day=dw;h+=`<div class="cday">${esc(dw)}</div>`;}
+    if(it.sys){h+=`<p class="csys${it.good?'':' n'}">${it.good?'<span aria-hidden="true">✓</span>':''}${esc(it.sys)}</p>`;continue;}
+    h+=it.me?`<div class="cmsg me"><div class="cb"><span class="sr-only">You: </span>${esc(it.body)}<span class="cw">${esc(chatTime(it.at))}</span></div></div>`
+      :`<div class="cmsg"><span class="mav" aria-hidden="true">${av}</span><div class="cb"><span class="sr-only">${esc(who)}: </span>${esc(it.body)}<span class="cw">${esc(chatTime(it.at))}</span></div></div>`;
+  }
+  return `<div class="chat">${h}</div>`;
 }
+// a project's messages (attributed through the bundle's events, msgFromMap) and the
+// few events worth a line: what you decided, the files that changed hands
+function projChatItems(c){
+  const fromById=msgFromMap(c.events);const out=[];
+  for(const m of (c.msgs||[])){const it=projMsgItem(m,fromById);if(it)out.push({me:it.title.indexOf('You ')===0,body:it.body,at:it.at});}
+  for(const e of (c.events||[])){
+    if(!e||!e.created_at)continue;const dd=e.detail||{};
+    if(e.kind==='approval_decided'&&dd.from==='client')out.push({sys:dd.decision==='approved'?'You approved a change':dd.decision==='changes_requested'?'You asked for changes':'You declined a change',good:dd.decision==='approved',at:e.created_at});
+    else if(e.kind==='deliverable_added')out.push({sys:`${studioBrand()} shared a file${dd.title?': '+dd.title:''}`,at:e.created_at});
+    else if(e.kind==='client_upload')out.push({sys:`You sent a file${dd.title?': '+dd.title:''}`,at:e.created_at});
+  }
+  return out;
+}
+// a request: its opening words and every reply (supportThreadItems decides who wrote each)
+function supportChatItems(rq,msgs){return supportThreadItems(rq,msgs).map(it=>({me:it.title.indexOf('You ')===0,body:it.body,at:it.at}));}
+function paintChat(items,emptyMsg){
+  const pb=$('mpbody');if(!pb)return;
+  pb.innerHTML=items.length?chatHtml(items):emptyCard(emptyMsg,'💬');
+  pb.scrollTop=pb.scrollHeight;   // a chat opens on its newest line
+}
+function paintProjThread(c){paintChat(projChatItems(c),'No messages yet — say hello any time.');}
 // A support thread: the request body + replies as timeline items, a status
 // chip, and a reply composer unless resolved/closed (read-only lock preserved).
 async function paneSupport(host,row){
   const seq=++MC.seq;
-  host.innerHTML=mpaneHead(row.title,`<span class="tag" id="msupstatus">${esc(String(row.status||'open').replace(/_/g,' '))}</span>${row.pid&&row.preview?`<span>${esc(row.preview)}</span>`:''}`)+
+  host.innerHTML=mpaneHead(row.title,`<span class="schip${row.chipCls?' '+row.chipCls:''}" id="msupstatus">${esc(supportWord(row.status,row.kind))}</span><span>With ${esc(studioBrand())}</span>`)+
     `<div class="mpbody" id="mpbody">${skeleton()}</div><div class="mpcomposer" id="mpcomp"></div>`;
   wireMBack();
   let r=null;try{r=await api('/client/support/'+row.sid);}catch(_){}
@@ -1462,12 +1723,11 @@ async function paneSupport(host,row){
   const pb=$('mpbody'),pc=$('mpcomp');if(!pb||!pc)return;
   if(!r||!r.ok){pb.innerHTML=emptyCard('That request isn’t available right now.','💬');pc.innerHTML='';return;}
   const d=(r.body&&r.body.data)||{};const rq=d.request||{};const msgs=d.messages||[];
-  const st=$('msupstatus');if(st)st.textContent=String(rq.status||row.status||'open').replace(/_/g,' ');
-  const items=supportThreadItems(rq,msgs);
-  pb.innerHTML=items.length?`<div class="tlhost">${tlItemsHtml(items)}</div>`:emptyCard('No replies yet — your studio usually replies within a day.','💬');
+  const st=$('msupstatus');if(st)st.textContent=supportWord(rq.status||row.status,row.kind);
+  paintChat(supportChatItems(rq,msgs),'No replies yet — your studio usually replies within a day.');
   const resolved=rq.status==='resolved'||rq.status==='closed';
-  if(resolved){pc.innerHTML=`<p class="muted" style="font-size:13px">This request is resolved. Open a new one if you need anything else.</p>`;return;}
-  pc.innerHTML=`<textarea id="smsg" rows="2" aria-label="Add to this request" placeholder="Add to this request…"></textarea><div class="row" style="margin-top:8px"><button class="approve" id="ssend">Send</button></div>`;
+  if(resolved){paintSupportDone(pc);return;}
+  pc.innerHTML=`<textarea id="smsg" rows="1" aria-label="Write to ${esc(studioBrand())}" placeholder="Write to ${esc(studioBrand())}…"></textarea><button class="msendbtn" id="ssend" aria-label="Send">${si('send')}</button>`;
   $('ssend').addEventListener('click',async()=>{
     const btn=$('ssend'),ta=$('smsg');const v=(ta.value||'').trim();if(!v)return;
     btn.disabled=true;
@@ -1487,10 +1747,9 @@ async function paneSupport(host,row){
     if(fd){
       const rq2=fd.request||{};const msgs2=Array.isArray(fd.messages)?fd.messages:[];
       row.status=String(rq2.status||row.status||'open');
-      const st2=$('msupstatus');if(st2)st2.textContent=row.status.replace(/_/g,' ');
-      const pb2=$('mpbody');
-      if(pb2){const items2=supportThreadItems(rq2,msgs2);pb2.innerHTML=items2.length?`<div class="tlhost">${tlItemsHtml(items2)}</div>`:emptyCard('No replies yet — your studio usually replies within a day.','💬');}
-      if(row.status==='resolved'||row.status==='closed'){const pc2=$('mpcomp');if(pc2)pc2.innerHTML=`<p class="muted" style="font-size:13px">This request is resolved. Open a new one if you need anything else.</p>`;return;}
+      const st2=$('msupstatus');if(st2)st2.textContent=supportWord(row.status,row.kind);
+      paintChat(supportChatItems(rq2,msgs2),'No replies yet — your studio usually replies within a day.');
+      if(row.status==='resolved'||row.status==='closed'){const pc2=$('mpcomp');if(pc2)paintSupportDone(pc2);return;}
     }else{
       // the reply DID send — a failed refetch keeps the thread we have (no error card, no lost composer)
       toast('Sent — this thread will catch up shortly.');
@@ -1498,6 +1757,10 @@ async function paneSupport(host,row){
     btn.disabled=false;
   });
 }
+// a request's state in plain words (the walk read "SUPPORT · CLOSED")
+function supportWord(status,kind){const s=String(status||'open');return s==='resolved'||s==='closed'?'Done':kind==='service'?'Asked':s==='in_progress'?'Being worked on':'Open';}
+// a finished request stays readable; Write starts a new conversation
+function paintSupportDone(pc){pc.innerHTML=`<p class="muted" style="font-size:13px;flex:1 1 auto">This one is done. Write to start a new conversation.</p><button type="button" id="sdonewrite">Write</button>`;const b=$('sdonewrite');if(b)b.addEventListener('click',openComposePane);}
 // NEW conversation (persona client only): compose in the reading pane — the
 // general composer is CONVERSATIONAL (comms routing F2):
 //   • ≥1 ACTIVE project → the message goes to the NEWEST active project's
@@ -1506,7 +1769,7 @@ async function paneSupport(host,row){
 //   • project-less → POST /client/support {subject, body} (first line = the
 //     subject) — the SERVER appends to the requester's newest open project-less
 //     request, so repeated messages stay ONE conversation (append-or-create).
-// The Requests tab (openServiceRequest) is untouched: service requests are
+// Ask for a service (openServiceRequest) is untouched: service requests are
 // genuinely tickets and keep minting distinct requests.
 function composeTarget(){
   const p=(PORTAL.projects||[]).find(x=>x&&x.id&&String(x.status||'')==='active');
@@ -1519,9 +1782,9 @@ function openComposePane(){
 }
 function paneCompose(host){
   const pid=composeTarget();
-  host.innerHTML=mpaneHead('Message your studio','')+
-    `<div class="mpbody"><div class="card"><label for="gmsg" style="display:block;font-weight:600;margin-bottom:6px">Send your studio a message</label>`+
-    `<textarea id="gmsg" rows="4" aria-label="Message your studio" style="width:100%;font:inherit;border:1px solid var(--line);border-radius:10px;padding:9px;background:var(--card);color:var(--ink)" placeholder="Type your message…"></textarea>`+
+  host.innerHTML=mpaneHead('Write to '+studioBrand(),'')+
+    `<div class="mpbody"><div class="card"><label for="gmsg" style="display:block;font-weight:600;margin-bottom:6px">What would you like to say?</label>`+
+    `<textarea id="gmsg" rows="4" class="fieldin" style="margin-top:0" placeholder="Type your message…"></textarea>`+
     `<p class="muted" style="font-size:12.5px;margin-top:8px">${pid?'Goes straight to your project conversation.':'The first line becomes the subject.'}</p>`+
     `<div class="row"><button class="approve" id="gsend">Send</button></div></div></div>`;
   wireMBack();
@@ -1590,20 +1853,8 @@ function fileRowHtml(f,ap){
     `<span class="fmeta">${mine?'Sent to your studio':'Shared by your studio'}${when?` · ${esc(when)}`:''}${due}</span></span>`+
     `<button class="fbtn" data-dl="${esc(f.id)}" aria-label="Download — ${esc(f.title)}">Download</button>${acts}</div>`;
 }
-// Documents (proposals, agreements & estimates): a Signed chip is the good/green
-// state; everything else stays purple. Meta = kind · signed/sent <date>.
-function docRowHtml(d){
-  const contract=d.kind==='contract';const signed=!!(contract&&d.signed_at);const est=d.kind==='estimate';
-  const status=contract?(signed?'Signed':'Awaiting signature'):est?(d.status==='approved'?'Approved':d.status==='declined'?'Not now':'Sent'):(d.status==='accepted'?'Accepted':d.status==='declined'?'Declined':'Sent');
-  const when=signed?fdate(d.signed_at):fdate(d.created_at);
-  const meta=(contract?'Agreement':est?'Estimate':'Proposal')+(when?` · ${signed?'signed':'sent'} ${when}`:'');
-  const view=d.view_url?`<a class="fbtn" href="${esc(d.view_url)}" target="_blank" rel="noopener" aria-label="View — ${esc(d.title)}">View</a>`:'';
-  return `<div class="frow"><span class="fico" aria-hidden="true">${contract?si('pencil'):si('file')}</span>`+
-    `<span class="fmain"><span class="fname">${esc(d.title)}</span><span class="fmeta">${esc(meta)}</span></span>`+
-    `<span class="fst${signed?' sig':''}">${esc(status)}</span>${view}</div>`;
-}
 // The client→studio share card (uploads are PER-PROJECT: hidden entirely with
-// zero projects; a reviewer never reaches any of this — renderFiles' persona
+// zero projects; a reviewer never reaches any of this — renderDocuments' persona
 // gate returns the calm read-only state before any share UI or /client/* read).
 // Type/size honesty up front: the ONE media store accepts JPEG/PNG/WebP images
 // up to 10MB and PDF documents up to 25MB (lib/media.ts MIME_ALLOW / MAX_BYTES /
@@ -1674,6 +1925,8 @@ async function shareCompose(file){
   const multi=list.length>1;
   host.hidden=false;
   host.innerHTML=`<p class="fsel">${esc(file.name)}</p>`+
+    // the shelf's send button has no card around it to name the limits, so its form does
+    (host.classList.contains('shelfform')?`<p class="fshare-d">JPEG, PNG or WebP images up to 10MB, or PDFs up to 25MB. It lands in your project’s files right away.</p>`:'')+
     (multi?`<label class="fld" for="fproj">Which project is this for?</label><select id="fproj" class="fin">${list.map(p=>`<option value="${esc(p.id)}"${p.id===SHARE_CTX.pid?' selected':''}>${esc(p.name)}</option>`).join('')}</select>`:'')+
     `<label class="fld" for="ftitle">Title <span class="muted" style="font-weight:400">(optional)</span></label><input id="ftitle" class="fin" type="text" value="${esc(file.name)}">`+
     `<div class="row" style="margin-top:14px"><button type="submit" class="approve" id="fgo">Send to your studio</button><button type="button" id="fno">Cancel</button></div>`;
@@ -1728,49 +1981,238 @@ async function shareSend(file){
     // back to the share card's button.
     if(view===VIEW_SEQ){
       if(SHARE_CTX.ondone)SHARE_CTX.ondone();
-      else renderFiles().then(()=>{const c=$('fchoose');if(c)c.focus();});
+      else renderDocuments().then(()=>{const c=$('fchoose');if(c)c.focus();});
     }
   }catch(_){fail('The upload didn’t finish — please try again.');}
 }
-async function renderFiles(){
+// ── DOCUMENTS: the papers shelf (item 179 part four, Figma "Client portal — parts 2
+// to 4", part 4). Files and Invoices fold into one shelf: every paper the studio
+// sent (invoices, proposals and estimates, agreements, files), newest first by
+// month, each with the one thing to do, and what you owe on top with the one
+// filled button. On a phone the filters are chips over the list; from 1000px a
+// rail with counts. The pure helpers are mirrored in tests/presence/portal_shelf_test.mjs. ──
+const SHELF_CATS=[['reports','Monthly reports','Reports'],['invoices','Invoices','Invoices'],['proposals','Proposals and estimates','Proposals'],['agreements','Agreements','Agreements'],['files','Files','Files']];
+let SHELF_CAT='all',SHELF_DATA=null;
+// a date on the client's own calendar: a bare YYYY-MM-DD is that day, a timestamp is
+// read in local time (a UTC slice would file a late-evening paper under tomorrow)
+function shelfDate(s){s=String(s||'');const m=/^(\d{4})-(\d{2})-(\d{2})$/.exec(s);if(m)return new Date(+m[1],+m[2]-1,+m[3]);const t=Date.parse(s);return isFinite(t)?new Date(t):null;}
+function shelfDay(s,now){const d=shelfDate(s);if(!d)return'';return d.toLocaleDateString('en-US',d.getFullYear()===now.getFullYear()?{month:'short',day:'numeric'}:{month:'short',day:'numeric',year:'numeric'});}
+function shelfMonth(s,now){const d=shelfDate(s);if(!d)return'Earlier';return d.toLocaleDateString('en-US',d.getFullYear()===now.getFullYear()?{month:'long'}:{month:'long',year:'numeric'});}
+// a link the shelf may open: the studio's own https pages (or a same-site path), nothing else
+function shelfUrl(u){u=String(u||'');return /^(https:\/\/|\/(?!\/))/i.test(u)?u:'';}
+// One row per paper: {cat, kind, title, info, when, chip, tone, act}. act is a link
+// ({verb, href}, Pay in this tab), a file to save ({verb, dl}), an OK asked of you
+// opened in place ({verb, apr, pid}), a monthly report to download ({verb, rep}), or
+// a note ({note}). A report is filed under the month it went out (the first days of
+// the next month), and says New until it's opened on this device.
+function shelfRows(invoices,docs,snaps,reports,todayYmd,pending,now){
+  const rows=[];
+  let newest=true;
+  for(const rp of (reports||[])){
+    const m=/^(\d{4})-(0[1-9]|1[0-2])$/.exec(String((rp&&rp.month)||''));if(!m)continue;
+    const y=+m[1],mo=+m[2];
+    const name=new Date(y,mo-1,1).toLocaleDateString('en-US',y===now.getFullYear()?{month:'long'}:{month:'long',year:'numeric'});
+    const out=(mo===12?(y+1)+'-01':y+'-'+String(mo+1).padStart(2,'0'))+'-01';
+    rows.push({cat:'reports',kind:'Monthly report',title:name+' report',info:'PDF · visitors, searches and what changed',when:out,chip:newest&&!rp.opened?'New':'',tone:'',act:{verb:'Open',rep:m[0]}});
+    newest=false;
+  }
+  for(const i of (invoices||[])){
+    if(!i||!i.id)continue;
+    const st=moneyState(i,todayYmd,pending);const amt=i.amount?fmtMoney(i.amount):'';
+    const pay=(st==='upcoming'||st==='overdue')&&/^https:\/\//.test(String(i.pay_url||''))?i.pay_url:'';
+    const view=shelfUrl(i.view_url);
+    const info=[amt,st==='paid'?(i.paid_at?'paid '+shelfDay(i.paid_at,now):'paid'):st==='processing'?'':st?(i.due_date?'due '+shelfDay(i.due_date,now):''):'withdrawn'].filter(Boolean).join(' · ');
+    const act=st==='paid'?(view?{verb:'Receipt',href:view}:null):st==='processing'?{note:'processing',inv:i}:!st?null:pay?{verb:'Pay',href:pay,pay:true}:view?{verb:'View',href:view}:{note:'details'};
+    rows.push({cat:'invoices',kind:'Invoice',title:i.name||'Invoice',info,when:String(i.created_at||i.due_date||''),chip:st?MONEY_WORD[st]:'Voided',tone:st==='paid'?'sig':st==='overdue'?'od':st==='processing'?'pr':st?'':'mute',act});
+  }
+  for(const d of (docs||[])){
+    if(!d||!d.id)continue;
+    const view=shelfUrl(d.view_url);const amt=d.amount?fmtMoney(d.amount):'';
+    if(d.kind==='contract'){
+      const signed=!!d.signed_at||d.status==='signed';
+      rows.push({cat:'agreements',kind:'Agreement',title:d.title||'Agreement',info:signed?'signed '+shelfDay(d.signed_at||d.created_at,now):'waiting for your signature',when:String(d.created_at||''),
+        chip:signed?'Signed':'Your signature',tone:signed?'sig':'ask',act:view?{verb:signed?'View':'Look',href:view}:null});
+      continue;
+    }
+    const est=d.kind==='estimate';const st=String(d.status||'sent');
+    const yes=est?st==='approved':st==='accepted',no=st==='declined',old=st==='superseded',open=!yes&&!no&&!old;
+    rows.push({cat:'proposals',kind:est?'Estimate':'Proposal',title:d.title||(est?'Estimate':'Proposal'),
+      info:[amt,yes?(est?'approved':'accepted'):no?(est?'not now':'declined'):old?'replaced by a newer one':'waiting for your OK'].filter(Boolean).join(' · '),when:String(d.created_at||''),
+      chip:yes?(est?'Approved':'Accepted'):no?(est?'Not now':'Declined'):old?'Replaced':'Your OK',tone:yes?'sig':open?'ask':'mute',act:view?{verb:open?'Look':'View',href:view}:null});
+  }
+  for(const sn of (snaps||[])){
+    if(!sn||sn.failed)continue;
+    for(const f of (sn.deliverables||[])){
+      if(!f||!f.id)continue;
+      const mine=isClientUpload(f);const ap=approvalForFile(sn.approvals,f.id);   // a snapshot keeps only the approvals still waiting
+      rows.push({cat:'files',kind:mine?'File you sent':'File from your studio',title:f.title||'File',info:mine?'You sent this':'From your studio',when:String(f.created_at||''),
+        chip:ap?'Your OK':mine?'You shared':'',tone:ap?'ask':'you',act:ap?{verb:'Look',apr:ap.id,pid:sn.id}:{verb:'Save',dl:f.id}});
+    }
+  }
+  rows.sort((a,b)=>b.when.localeCompare(a.when));   // newest first, across kinds
+  return rows;
+}
+// the rows under each month's heading, in order (the rows arrive newest first)
+function shelfGroups(rows,now){const out=[];let cur=null;for(const r of (rows||[])){const m=shelfMonth(r.when,now);if(!cur||cur.month!==m){cur={month:m,rows:[]};out.push(cur);}cur.rows.push(r);}return out;}
+function shelfCounts(rows){const c={all:0,invoices:0,proposals:0,agreements:0,files:0};for(const r of (rows||[])){c.all++;c[r.cat]=(c[r.cat]||0)+1;}return c;}
+// what you owe: the unpaid total, how many, and the one due first
+function shelfOwe(unpaid){
+  const due=(unpaid||[]).filter(i=>i&&(Number(i.amount)||0)>0);if(!due.length)return null;
+  const next=due.slice().sort((a,b)=>String(a.due_date||'9999').localeCompare(String(b.due_date||'9999')))[0];
+  return {total:due.reduce((a,i)=>a+(Number(i.amount)||0),0),count:due.length,next};
+}
+function shelfOweHtml(o,cat){
+  if(!o)return'';
+  const n=o.next,one=o.count===1,late=invState(n)==='overdue';
+  const pay=one&&/^https:\/\//.test(String(n.pay_url||''))?n.pay_url:'';
+  const day=(ymd)=>{const d=shelfDate(ymd);return d?d.toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric'}):'';};
+  const when=n.due_date?` · ${late?'was due':'due'} ${day(n.due_date)}`:'';
+  const sub=one?`${n.name||'Invoice'}${when}`:`${o.count} invoices · the next${when?when.slice(2):' has no due date'}`;
+  const btn=pay?`<a class="approve owebtn" href="${esc(pay)}" aria-label="Pay ${esc(fmtMoney(o.total))} — ${esc(n.name||'Invoice')}"><span>Pay<span class="lg"> ${esc(fmtMoney(o.total))}</span></span></a>`
+    :(!one&&cat!=='invoices')?`<button type="button" class="approve owebtn" data-shelf-go="invoices">See invoices</button>`:'';
+  return `<div class="owe${late?' late':''}" id="inv-unpaid"><span class="fico invoices" aria-hidden="true">${si('receipt')}</span><div class="owem"><p class="owet">You owe ${esc(fmtMoney(o.total))}</p><p class="owes">${esc(sub)}</p></div>${btn}</div>`;
+}
+function shelfRowHtml(r,now){
+  const a=r.act;let act='';
+  if(a&&a.href)act=`<a class="fbtn" href="${esc(a.href)}"${a.pay?'':' target="_blank" rel="noopener"'} aria-label="${esc(a.verb)} — ${esc(r.title)}">${esc(a.verb)}</a>`;   // Pay stays in this tab (G9); the studio's copies open beside it
+  else if(a&&a.dl)act=`<button class="fbtn" data-dl="${esc(a.dl)}" aria-label="Save — ${esc(r.title)}">Save</button>`;
+  else if(a&&a.apr)act=`<button class="fbtn" data-shelf-apr="${esc(a.apr)}" data-shelf-pid="${esc(a.pid)}" aria-label="Look — ${esc(r.title)}">Look</button>`;
+  else if(a&&a.rep)act=`<button class="fbtn" data-shelf-rep="${esc(a.rep)}" aria-label="Open — ${esc(r.title)}">Open</button>`;
+  else if(a&&a.note==='processing')act=paidConfirmNote(a.inv);
+  else if(a&&a.note==='details')act=`<span class="finote">Your studio will send payment details.</span>`;
+  const day=shelfDay(r.when,now);
+  // a phone reads one line under the name ("Invoice · $450 · due Nov 14"); a computer
+  // splits it into columns (what it is · amount or state · date · chip · the one thing to do)
+  const line=r.cat==='files'?(day?' · '+day:''):(r.info?' · '+r.info:'');
+  return `<div class="frow srow${a&&a.note?' noted':act?' acts':''}${r.chip==='New'?' fresh':''}" role="listitem"><span class="fico ${esc(r.cat)}${r.tone==='ask'?' ask':''}" aria-hidden="true">${r.cat==='invoices'?si('receipt'):r.cat==='agreements'?si('pencil'):r.cat==='files'?fileIcon(r.title):r.cat==='reports'?si('chart'):si('file')}</span>`+
+    `<div class="fmain"><h3 class="fname">${esc(r.title)}</h3><span class="fmeta">${esc(r.kind)}<span class="sline">${esc(line)}</span></span></div>`+
+    `<span class="sinfo">${esc(r.info)}</span><span class="sdate">${esc(day)}</span>`+
+    `${r.chip?`<span class="fst${r.tone?' '+r.tone:''}">${esc(r.chip)}</span>`:'<span class="fst none"></span>'}${act}</div>`;
+}
+// ── Sales item 117: the client's retainer, its charges, and a way to cancel ──
+// The retainer email says "you can cancel any time"; until now the portal showed
+// no retainer at all. Cancel asks once, in place (no pop-up), and stops future
+// charges only: the words say nothing is refunded.
+function retainerCardHtml(r){
+  const per=r.interval==='year'?'year':'month';
+  const st=String(r.status||'');
+  const word=st==='active'?'Active':st==='past_due'?'Payment didn’t go through':st==='pending'?'Waiting for you to approve':'Cancelled';
+  const cls=st==='active'?' sig':st==='past_due'?' od':'';
+  const day=(v)=>v?invDueLabel(String(v).slice(0,10)):'';
+  const when=st==='active'&&r.next_charge?'Next charge '+day(r.next_charge):st==='canceled'&&r.canceled_at?'Cancelled '+day(r.canceled_at)+'. It won’t charge again.':st==='past_due'?'Stripe will try the card again. Message your studio if the card has changed.':'';
+  const charges=Array.isArray(r.charges)?r.charges:[];
+  const list=charges.length?`<ul class="retcharges" aria-label="Charges so far">${charges.slice(0,12).map(c=>`<li><span>${esc(day(c.at))}</span><span>${esc(fmtMoney(c.amount))}</span></li>`).join('')}</ul>`+(charges.length>12?`<p class="muted" style="margin:6px 0 0">And ${charges.length-12} earlier.</p>`:''):(st==='pending'?'':'<p class="muted" style="margin:8px 0 0">No charges yet.</p>');
+  const approve=st==='pending'&&r.approve_url&&/^https:\/\//.test(r.approve_url)?`<a class="fbtn pay" href="${esc(r.approve_url)}">Set it up →</a>`:'';
+  const cancel=r.can_cancel?`<div class="retact" data-ret="${esc(r.id)}"><button type="button" class="fbtn" data-ret-ask>Cancel retainer</button></div>`:'';
+  return `<div class="card retcard"><div class="rethead"><div><h3 class="fname">${esc(r.name||'Retainer')}</h3><span class="fmeta">${esc(fmtMoney(r.amount))} every ${per}${when?' · '+esc(when):''}</span></div><span class="fst${cls}">${esc(word)}</span></div>${list}${approve}${cancel}</div>`;
+}
+function wireRetainers(){
+  document.querySelectorAll('#main .retact').forEach(box=>{
+    const id=box.getAttribute('data-ret');
+    const ask=()=>{box.innerHTML='<button type="button" class="fbtn" data-ret-ask>Cancel retainer</button>';box.querySelector('[data-ret-ask]').addEventListener('click',sure);};
+    const sure=()=>{
+      box.innerHTML='<p class="retsure" role="alert">Cancel this retainer? It stops future charges. Charges already made are not refunded.</p><button type="button" class="fbtn" data-ret-yes>Yes, cancel it</button> <button type="button" class="fbtn" data-ret-no>Keep it</button>';
+      box.querySelector('[data-ret-no]').addEventListener('click',()=>{ask();box.querySelector('[data-ret-ask]').focus();});
+      const yes=box.querySelector('[data-ret-yes]');
+      yes.addEventListener('click',async()=>{
+        yes.disabled=true;
+        const r=await api('/client/retainers/'+encodeURIComponent(id)+'/cancel','POST',{});
+        if(r.ok){toast('Your retainer is cancelled. It won’t charge again.');PORTAL.billing=null;renderDocuments();}
+        else{toast((r.body&&r.body.message)||'We couldn’t cancel it just now. Please try again.');yes.disabled=false;}
+      });
+      yes.focus();
+    };
+    box.querySelector('[data-ret-ask]').addEventListener('click',sure);
+  });
+}
+function studioMid(){const s=studioBrand();return s==='Your studio'?'your studio':s;}
+async function renderDocuments(){
   const view=++VIEW_SEQ;   // this render owns #main until something newer bumps the token (renderMessages' contract)
-  if(PORTAL.persona!=='client'){ // reviewer: /client/* is 403 server-side — the calm read-only state, NO fetches, never an error line (renderMessages' contract)
-    $('main').innerHTML=portalHeader('Files & documents','Everything your studio has shared — files, proposals, and agreements.')+
-      emptyCard('Your studio’s files and documents will appear here once they’ve set up your account.','📁');
+  if(PORTAL.persona!=='client'){ // reviewer: /client/* is 403 server-side — the calm read-only state, NO fetches, never an error line; money lives with the account owner
+    $('main').innerHTML=portalHeader('Documents','Everything your studio shares with this account, in one place.')+
+      emptyCard('Your studio’s files and documents will appear here once they’ve set up your account. Invoices go to the account owner — there’s nothing here for you to pay.','📁');
     return;
   }
+  setWide(true);
   $('main').innerHTML=spinnerHtml();
-  // persona is 'client' past the gate above (the load() derivation makes a
-  // reviewer-with-projects unrepresentable), so sharing depends only on having
-  // a project to attach the file to.
+  // persona is 'client' past the gate above, so sending a file depends only on
+  // having a project to attach it to (uploads are project-scoped)
   const canShare=PORTAL.projects.length>0;
-  const [snaps,docsRes]=await Promise.all([ensureSnaps(),api('/client/documents').catch(()=>null)]);
+  const [snaps,docsRes,b,repRes]=await Promise.all([ensureSnaps(),api('/client/documents').catch(()=>null),ensureBilling(),api('/client/reports').catch(()=>null)]);
   if(view!==VIEW_SEQ)return;   // the user moved on mid-fetch — never paint over the newer view
-  const docsFailed=!(docsRes&&docsRes.ok);
-  const docs=(!docsFailed&&docsRes.body.data&&docsRes.body.data.documents)||[];
-  let html=portalHeader('Files & documents',canShare
-    ?'Everything your studio has shared — and anything you want to send them.'
-    :'Everything your studio has shared — files, proposals, and agreements.');
-  if(canShare)html+=shareCardHtml();
-  // Documents: proposals & agreements the client can re-open any time. A FAILED
-  // read says so — it must never masquerade as "no documents".
-  if(docsFailed)html+=`<section><h2>Documents</h2><p class="muted fload">We couldn’t load your documents just now — please try again in a moment.</p></section>`;
-  else if(docs.length)html+=`<section><h2>Documents</h2><div class="flv" id="fdocs">${docs.map(docRowHtml).join('')}</div></section>`;
-  const withFiles=snaps.filter(s=>s&&!s.failed&&s.deliverables&&s.deliverables.length);
-  const failedSnaps=snaps.filter(s=>s&&s.failed);
-  for(const s of withFiles)html+=`<section><h2>${esc(s.name)}</h2><div class="flv">${s.deliverables.map(f=>fileRowHtml(f)).join('')}</div></section>`;
-  // per-project read failures get their own honest line — never the empty copy
-  for(const s of failedSnaps)html+=`<section><h2>${esc(s.name)}</h2><p class="muted fload">We couldn’t load this project’s files just now — please try again in a moment.</p></section>`;
-  // PS6 (PS1 residual): a failed PROJECTS read left every project section silently
-  // absent — say so, and never let "No files yet" masquerade over it below
-  if(PORTAL.projectsFailed)html+=`<section><h2>Project files</h2><p class="muted fload">We couldn’t load your project files just now — please try again in a moment.</p></section>`;
-  if(!docsFailed&&!docs.length&&!withFiles.length&&!failedSnaps.length&&!PORTAL.projectsFailed)html+=emptyCard('No files yet. When your studio shares a document, design, or download, it’ll appear here.','📁');
-  $('main').innerHTML=html;
-  wireDownloads(document);
+  SHELF_DATA={snaps,docsRes,b,repRes};
+  $('main').innerHTML=`<header class="shelfhead"><h1 tabindex="-1">Documents</h1><p class="sub">Everything ${esc(studioMid())} has sent you, in one place.</p>`+
+    (canShare?`<button type="button" class="shelfsend" id="fchoose" aria-label="Send your studio a file"><span aria-hidden="true">${si('upload')}</span><span>Send<span class="lg"> your studio</span> a file</span></button><input type="file" id="ffile" class="fshare-file" accept="${SHARE_ACCEPT}" aria-hidden="true" tabindex="-1">`:'')+
+    `</header>${canShare?`<form class="fsend shelfform" id="fsend" aria-live="polite" hidden></form>`:''}<div class="shelf" id="shelf"></div>`;
+  paintShelf();
   if(canShare)wireShareCard();
 }
+// the list and its filters repaint without a refetch, and never touch the header's send form
+function paintShelf(){
+  const host=$('shelf'),d=SHELF_DATA;if(!host||!d)return;
+  const now=new Date(),today=portalTodayYmd();
+  const docsFailed=!(d.docsRes&&d.docsRes.ok);
+  const docs=(!docsFailed&&d.docsRes.body&&d.docsRes.body.data&&d.docsRes.body.data.documents)||[];
+  const billFailed=!!(d.b&&d.b.failed);
+  // a 404 is a server without the reports read yet (a deploy in flight): no reports, said nowhere
+  const repFailed=!(d.repRes&&(d.repRes.ok||d.repRes.status===404));
+  const reports=((d.repRes&&d.repRes.ok&&d.repRes.body&&d.repRes.body.data&&d.repRes.body.data.reports)||[]).map(r=>({...r,opened:reportOpened(r&&r.month)}));
+  const rows=shelfRows((d.b&&d.b.invoices)||[],docs,d.snaps,reports,today,PAID_PENDING,now);
+  const counts=shelfCounts(rows);
+  const cat=SHELF_CAT==='all'||SHELF_CATS.some(c=>c[0]===SHELF_CAT)?SHELF_CAT:'all';
+  const shows=(c)=>cat==='all'||cat===c;
+  const chip=(id,label,short,n)=>`<button type="button" class="chip" data-shelf="${id}" aria-pressed="${cat===id?'true':'false'}"><span class="sl">${esc(label)}</span><span class="ss">${esc(short)}</span><span class="sc">${n}</span></button>`;
+  // a filter shows only when it holds something (or is the one you're on)
+  let html=`<nav class="shelfnav" aria-label="Show">${chip('all','All','All',counts.all)}${SHELF_CATS.filter(c=>counts[c[0]]||cat===c[0]).map(c=>chip(c[0],c[1],c[2],counts[c[0]])).join('')}</nav><div class="shelfbody">`;
+  if(shows('invoices')&&!billFailed)html+=shelfOweHtml(shelfOwe(unpaidInvoices(d.b)),cat);
+  // sales item 117: a retainer sits with the invoices, above the papers
+  const rets=shows('invoices')&&!billFailed?((d.b&&d.b.retainers)||[]).filter(r=>r&&r.id):[];
+  if(rets.length)html+=`<section class="retwrap" aria-label="Your retainer">${rets.map(retainerCardHtml).join('')}</section>`;
+  // a failed read says so, on the filters it feeds — never the empty story
+  if(shows('invoices')&&billFailed)html+=`<p class="muted fload">We couldn’t load your invoices just now — please try again in a moment.</p>`;
+  if((shows('proposals')||shows('agreements'))&&docsFailed)html+=`<p class="muted fload">We couldn’t load your documents just now — please try again in a moment.</p>`;
+  if(shows('reports')&&repFailed)html+=`<p class="muted fload">We couldn’t load your monthly reports just now — please try again in a moment.</p>`;
+  if(shows('files')){
+    for(const sn of (d.snaps||[]).filter(x=>x&&x.failed))html+=`<p class="muted fload">We couldn’t load the files from ${esc(sn.name||'a project')} just now — please try again in a moment.</p>`;
+    if(PORTAL.projectsFailed)html+=`<p class="muted fload">We couldn’t load your project files just now — please try again in a moment.</p>`;
+  }
+  const list=rows.filter(r=>shows(r.cat));
+  for(const g of shelfGroups(list,now))html+=`<section class="shelfgroup"><h2 class="shelfmonth">${esc(g.month)}</h2><div class="flv" role="list">${g.rows.map(r=>shelfRowHtml(r,now)).join('')}</div></section>`;
+  if(cat==='invoices'&&!billFailed&&list.length)html+=`<p class="muted shelfnote">Your website subscription is billed separately.</p>`;
+  const failed=billFailed||docsFailed||repFailed||PORTAL.projectsFailed||(d.snaps||[]).some(x=>x&&x.failed);
+  if(!list.length&&!failed&&!rets.length)html+=emptyCard(({
+    invoices:'No invoices yet. When your studio bills you for project or service work, it’ll show up here. (Your website subscription is billed separately.)',
+    proposals:'No proposals or estimates yet.',agreements:'No agreements yet.',reports:'No monthly reports yet.',
+    files:'No files yet. When your studio shares a document, design, or download, it’ll appear here.',
+  })[cat]||'Nothing here yet. When your studio sends you an invoice, a proposal or a file, you’ll find it here.','📁');
+  host.innerHTML=html+`</div>`;
+  wireRetainers();
+  wireDownloads(host);
+  host.querySelectorAll('[data-shelf]').forEach(b=>b.addEventListener('click',()=>{SHELF_CAT=b.getAttribute('data-shelf');paintShelf();const nb=$('shelf')&&$('shelf').querySelector(`[data-shelf="${SHELF_CAT}"]`);if(nb)nb.focus();}));
+  host.querySelectorAll('[data-shelf-go]').forEach(b=>b.addEventListener('click',()=>{SHELF_CAT=b.getAttribute('data-shelf-go');paintShelf();const nb=$('shelf')&&$('shelf').querySelector(`[data-shelf="${SHELF_CAT}"]`);if(nb)nb.focus();}));
+  host.querySelectorAll('[data-shelf-apr]').forEach(b=>b.addEventListener('click',()=>openApproval(b.getAttribute('data-shelf-pid'),b.getAttribute('data-shelf-apr'),'documents')));
+  host.querySelectorAll('[data-shelf-rep]').forEach(b=>b.addEventListener('click',()=>openReport(b.getAttribute('data-shelf-rep'),b)));
+}
+// a report opened on this device loses its New
+function reportOpened(month){try{return localStorage.getItem('dds-report-opened:'+month)==='1';}catch(_){return false;}}
+// the month's report as a file: a fetch with the sign-in, saved as a download (the
+// studio's Settings card does the same). Only a month that went out is ever served.
+async function openReport(month,btn){
+  if(btn)btn.disabled=true;
+  try{
+    const r=await fetch(FN+'/client/reports/'+encodeURIComponent(month)+'/pdf',{headers:H()});
+    if(!r.ok)throw new Error('pdf');
+    const blob=await r.blob();
+    const name=(/filename="([^"]+)"/.exec(r.headers.get('Content-Disposition')||'')||[])[1]||('monthly-report-'+month+'.pdf');
+    const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;
+    document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),5000);
+    try{localStorage.setItem('dds-report-opened:'+month,'1');}catch(_){}
+    toast('Downloaded '+name+'.');
+    if(CURRENT_TAB==='documents'&&$('shelf'))paintShelf();   // the New chip goes
+  }catch(_){toast('The report didn’t download. Please try again.');if(btn)btn.disabled=false;}
+}
 // ── INVOICES (PS2, B1) — the studio's service invoices (separate from the SaaS
-// subscription), as .frow list rows to fileRowHtml's anatomy. ──
+// subscription); the papers shelf draws them as .frow rows. ──
 // Invoice due_date is a DATE-ONLY string (YYYY-MM-DD). Date.parse would read it
 // as UTC midnight and shift a day west of Greenwich, so BOTH the display label
 // and the overdue math work in the client's LOCAL calendar: the string's own
@@ -1807,37 +2249,6 @@ function moneyBuckets(list,todayYmd,pending){
 }
 // the portal's own state call: local today + the just-paid ids
 function invState(i){return moneyState(i,portalTodayYmd(),PAID_PENDING);}
-// One invoice row: 🧾 + name (a REAL h3 heading — screen readers navigate the
-// money surface by invoice name) + "amount · due <date>" meta + status chip +
-// the row action. Chip: Paid (green) / Overdue (derived, warn) / the server's
-// own word (sent, open …) — never an invented state. Action: an unpaid invoice
-// with a pay link gets Pay, in THIS tab (Nov 10 review, G9: a new tab left this
-// one saying Pay after Stripe came back in a second copy); a paid one says thank you;
-// an unpaid one without a link says the studio will send payment details;
-// void/canceled rows get no action at all (there is nothing to do or await).
-function invoiceRowHtml(i,todayYmd){
-  const st=moneyState(i,todayYmd,PAID_PENDING);
-  const dead=!st;   // void/canceled — no money state, nothing to do or await
-  const due=invDueLabel(i.due_date)||String(i.due_date||'');
-  const meta=[i.amount?fmtMoney(i.amount):'',due?'due '+due:''].filter(Boolean).join(' · ');
-  const chip=dead?'Voided':MONEY_WORD[st];
-  const cls=st==='paid'?' sig':st==='overdue'?' od':st==='processing'?' pr':'';
-  // https-only pay links (defense-in-depth on the money surface): the server
-  // only ever writes Stripe https URLs, so anything else is treated as absent.
-  // A processing row never offers Pay, whatever the server shipped: the client
-  // already paid, and a second charge on a settling payment is a double-pay.
-  const pay=st!=='processing'&&i.pay_url&&/^https:\/\//.test(i.pay_url)?i.pay_url:null;
-  const paidOn=i.paid_at?invDueLabel(String(i.paid_at).slice(0,10)):'';
-  const act=st==='paid'?`<span class="finote">Paid${paidOn?' '+esc(paidOn):''} — thank you.</span>`
-    :dead?''
-    :st==='processing'?paidConfirmNote(i)
-    :pay?`<a class="fbtn pay" href="${esc(pay)}" aria-label="Pay — ${esc(i.name||'Invoice')}">Pay →</a>`
-    :`<span class="finote">Your studio will send payment details.</span>`;
-  return `<div class="frow inv" role="listitem"><span class="fico" aria-hidden="true">${si('receipt')}</span>`+
-    `<div class="fmain"><h3 class="fname">${esc(i.name||'Invoice')}</h3>`+
-    `${meta?`<span class="fmeta">${esc(meta)}</span>`:''}</div>`+
-    `<span class="fst${cls}">${esc(chip)}</span>${act}</div>`;
-}
 // ── Oct 2026 benchmark (item 1): the moment after a client pays ──────────────
 // Stripe's Payment Link sends the payer back to /client.html?paid=<invoice id>.
 // Until the webhook flips the row the server still says open — so the row
@@ -1867,7 +2278,7 @@ function paidBegin(id,at){
   PAID_PENDING=[String(id)];PAID_SINCE=at||Date.now();PAID_STALE=Date.now()-PAID_SINCE>=PAID_POLL_LIMIT_MS;
   if(PAID_TIMER)clearTimeout(PAID_TIMER);PAID_TIMER=setTimeout(paidPoll,PAID_POLL_MS);
 }
-function paidRepaint(){if(CURRENT_TAB==='invoices')renderInvoices();else if(CURRENT_TAB==='home')renderHome();}
+function paidRepaint(){if(CURRENT_TAB==='documents')renderDocuments();else if(CURRENT_TAB==='home')renderHome();}
 async function paidPoll(){
   PAID_TIMER=null;if(!PAID_PENDING.length)return;
   PORTAL.billing=null;   // bypass the per-load cache — a fresh read is the whole point
@@ -1884,137 +2295,35 @@ async function paidPoll(){
 // tab by hand) reaches this one through the shared ten-minute note, so this tab
 // stops offering Pay too
 window.addEventListener('storage',(e)=>{if(e.key!=='dds-paid-pending'||!PORTAL.ready)return;const v=paidStored();if(v&&PAID_PENDING.indexOf(String(v.id))<0){paidBegin(v.id,+v.at||Date.now());paidRepaint();}});
-async function renderInvoices(){
-  const view=++VIEW_SEQ;   // this render owns #main until something newer bumps the token (renderMessages' contract)
-  if(PORTAL.persona!=='client'){ // reviewer: /client/billing is 403 server-side — the calm read-only state, ZERO fetches, in the account-owner voice (never the client-shaped "No invoices yet")
-    $('main').innerHTML=portalHeader('Invoices','Billing lives with the account owner.')+
-      emptyCard('Invoices for this work go to the account owner — there’s nothing here for you to pay.','🧾');
-    return;
-  }
-  $('main').innerHTML=spinnerHtml();
-  const b=await ensureBilling();
+// ── ASK FOR A SERVICE (item 179 part three: the old Requests tab, now a door in
+// Messages). The studio's offers meant for this client (lib/portal_services.ts
+// filters them server-side); Ask for this opens a short brief that becomes a
+// conversation in Messages. Nothing is ever charged or ordered automatically —
+// every ask is reviewed first (the moat). Something else? is Write.
+async function openServices(){
+  if(PORTAL.persona!=='client')return showTab('messages');
+  const view=++VIEW_SEQ;   // this drill-in owns #main now — a late tab render must not clobber it
+  setWide(false);try{window.scrollTo(0,0);}catch(_){}
+  $('main').innerHTML=skeleton();
+  const back={label:'Messages',go:()=>showTab('messages')};
+  let r=null;try{r=await api('/client/services');}catch(_){}
   if(view!==VIEW_SEQ)return;   // the user moved on mid-fetch — never paint over the newer view
-  const inv=(b&&b.invoices)||[];
-  let html=portalHeader('Invoices',inv.length?'Invoices from your studio for project and service work.':'');
-  // a FAILED read says so — never the "No invoices yet" story (and ensureBilling
-  // didn't cache it, so coming back to this tab retries the read)
-  if(b&&b.failed){html+=`<div class="card"><p class="muted">We couldn’t load your invoices just now — please try again in a moment.</p></div>`;$('main').innerHTML=html;return;}
-  if(!inv.length){html+=emptyCard('No invoices yet. When your studio bills you for project or service work, it’ll show up here. (Your website subscription is billed separately.)','🧾');$('main').innerHTML=html;return;}
-  const today=portalTodayYmd();
-  // the ONE formula over the same unpaidInvoices Home's queue counts — the
-  // tab's total and Home can never disagree (one formula, one formatter)…
-  const total=unpaidInvoices(b).reduce((a,i)=>a+(Number(i&&i.amount)||0),0);
-  html+=`<p class="muted" style="margin:0 0 14px">Your website subscription is billed separately.</p>`;   // 0-top: the legacy -14px was tuned for a sub-less header and overlapped the sub line
-  // …and the line only exists when something truly is unpaid — never a fake $0
-  if(total>0)html+=`<p class="invtotal" id="inv-unpaid">Unpaid right now: <strong>${esc(fmtMoney(total))}</strong></p>`;
-  html+=`<div class="flv" role="list" aria-label="Invoices">${inv.map(i=>invoiceRowHtml(i,today)).join('')}</div>`;
+  // failure ≠ absence (slice 10's Home rule): only a genuine {data:[]} earns the empty card
+  const d=r&&r.ok&&r.body&&r.body.data;
+  const services=Array.isArray(d)?d.filter(x=>x&&x.id):null;
+  let html=sheetBackHtml(back)+`<header class="sheet"><h1 tabindex="-1">Ask for a service</h1><p class="sub">Nothing is charged until ${esc(studioBrand())} replies with a price.</p></header>`;
+  if(!services)html+=`<div class="card" style="margin-top:16px"><p class="muted">We couldn’t load your studio’s services just now — please try again in a moment.</p></div>`;
+  else if(!services.length)html+=`<div style="margin-top:16px">${emptyCard('Your studio hasn’t listed services here yet. You can still ask for anything below.')}</div>`;
+  else html+=`<div class="svcgrid" style="margin-top:16px">`+services.map(svc=>`<div class="card">`+
+    `${svc.category?`<span class="kchip svccat">${esc(svc.category)}</span>`:''}`+
+    `<h3>${esc(svc.name)}</h3>${svc.description?`<p>${esc(svc.description)}</p>`:''}`+
+    `<div class="svcfoot">${svc.price?`<span class="svcprice">${esc(svc.price)}</span>`:'<span></span>'}<button class="approve" data-svc="${esc(svc.id)}" aria-label="Ask for this — ${esc(svc.name)}">Ask for this</button></div></div>`).join('')+`</div>`;
+  html+=`<div class="card selse"><div><strong>Something else?</strong><span class="muted">Say what you need in your own words.</span></div><button class="approve" id="svcwrite" aria-label="Write to ${esc(studioBrand())}">Write</button></div>`;
   $('main').innerHTML=html;
+  wireSheet(back);
+  $('svcwrite').addEventListener('click',()=>openSupport(null,'services'));   // its own subject, a NEW request (the Nov 8 walk), never folded into an older one
+  document.querySelectorAll('[data-svc]').forEach(b=>b.addEventListener('click',()=>{const svc=(services||[]).find(x=>x.id===b.getAttribute('data-svc'));if(svc)openServiceRequest(svc);}));
 }
-// ── REQUESTS (R2, slice 11 layout) — quick-action tiles, the studio's service
-// catalog as a card grid, and "Your requests" as a list view with Open/All
-// filter chips. Pick a service → a structured brief → a PENDING request the
-// studio reviews. Nothing is ever charged or ordered automatically (the moat).
-// A reviewer (canMessage false) sees no action tiles and no Request buttons —
-// just the calm empty states, never an error.
-// One request row: icon + subject + "Updated <rel>" meta + status chip +
-// chevron; the WHOLE row is the button (opens the thread in Messages). The
-// list payload carries no last-actor field, so the meta stays a plain honest
-// "Updated …" — never a guessed "your studio replied".
-function reqRowHtml(rq){
-  const s=String(rq.status||'open');const done=s==='resolved'||s==='closed';
-  const when=rq.last_activity_at||rq.updated_at;
-  return `<button class="reqrow" data-sup="${esc(rq.id)}">`+
-    `<span class="qico${done?' done':''}" aria-hidden="true">${done?si('check'):si('message')}</span>`+
-    `<span class="reqmain"><span class="reqsubj">${esc(rq.subject||'Request')}</span>`+
-    `<span class="reqmeta">${when?`Updated ${esc(rel(when))}`:'Sent to your studio'}</span></span>`+
-    `<span class="schip${done?' done':''}">${esc(s.replace(/_/g,' '))}</span>`+
-    `<span class="reqchev" aria-hidden="true">›</span></button>`;
-}
-async function renderRequests(){
-  const view=++VIEW_SEQ;   // this render owns #main until something newer bumps the token (renderMessages' contract)
-  const canMessage=PORTAL.persona==='client';
-  if(!canMessage){ // reviewer: /client/* is 403 server-side — the calm read-only state, NO fetches, never the couldn't-load cards (renderMessages' contract)
-    $('main').innerHTML=portalHeader('Requests','Browse what your studio offers and ask for what you need.')+
-      emptyCard('Your studio’s services will appear here once they’ve set up your account.','🛎️');
-    return;
-  }
-  $('main').innerHTML=spinnerHtml();
-  // Per-read failure honesty (slice 10's Home rule): a FAILED read renders a calm
-  // couldn't-load line, never the empty-state copy — only a genuine {data:[]}
-  // earns the honest empty states below.
-  let list=[],services=[],listFailed=false,svcFailed=false;
-  const [sr,svr]=await Promise.all([api('/client/support').catch(()=>null),api('/client/services').catch(()=>null)]);
-  if(view!==VIEW_SEQ)return;   // the user moved on mid-fetch — never paint over the newer view
-  if(sr&&sr.ok){const d=sr.body&&sr.body.data;list=(Array.isArray(d)?d:[]).filter(x=>x&&x.id);}else listFailed=true;
-  if(svr&&svr.ok){const d=svr.body&&svr.body.data;services=(Array.isArray(d)?d:[]).filter(x=>x&&x.id);}else svcFailed=true;
-  // freshest activity first — the SAME recency each row displays (last_activity_at
-  // with the updated_at fallback), so the order can never contradict the meta.
-  // The backend's updated_at-desc order would sink a request with a fresh studio
-  // reply below one merely touched later — and disagree with the Messages tab.
-  const reqWhen=(r)=>String(r.last_activity_at||r.updated_at||'');
-  list.sort((a,b)=>reqWhen(b).localeCompare(reqWhen(a)));
-  let html=portalHeader('Requests','Browse what your studio offers and ask for what you need. Nothing is charged automatically — every request is reviewed first.');
-  // ── quick actions: book a call (self-schedule) · a free-form message ──
-  if(canMessage)html+=`<section class="acttiles" aria-label="Quick actions">`+
-    `<button class="acttile" id="bookCall"><span class="at-ico" aria-hidden="true">${si('calendar')}</span><span class="at-main"><span class="at-t">Book a call</span><span class="at-d">Grab a time to talk with your studio.</span></span><span class="at-chev" aria-hidden="true">›</span></button>`+
-    `<button class="acttile" id="newReq"><span class="at-ico" aria-hidden="true">${si('message')}</span><span class="at-main"><span class="at-t">Something else?</span><span class="at-d">Tell your studio what you have in mind — they’ll reply with next steps.</span></span><span class="at-chev" aria-hidden="true">›</span></button>`+
-    `</section>`;
-  // ── service catalog — a two-column card grid (one column on phones) ──
-  html+=`<section><h2>Request a service</h2>`;
-  if(svcFailed)html+=`<div class="card"><p class="muted">We couldn’t load your studio’s services just now — please try again in a moment.</p></div>`;
-  else if(!services.length)html+=emptyCard(canMessage?'Your studio hasn’t listed services here yet — you can still message them for anything you need with “Something else?” above.':'Your studio hasn’t listed services here yet.');
-  else{
-    html+=`<div class="svcgrid">`;
-    for(const svc of services){
-      html+=`<div class="card">`+
-        `${svc.category?`<span class="kchip svccat">${esc(svc.category)}</span>`:''}`+
-        `<h3>${esc(svc.name)}</h3>`+
-        `${svc.description?`<p>${esc(svc.description)}</p>`:''}`+
-        `<div class="svcfoot">${svc.price?`<span class="svcprice">${esc(svc.price)}</span>`:'<span></span>'}`+
-        `${canMessage?`<button class="approve" data-svc="${esc(svc.id)}" aria-label="Request this — ${esc(svc.name)}">Request this</button>`:''}</div>`+
-        `</div>`;
-    }
-    html+=`</div>`;
-  }
-  html+=`</section>`;
-  // ── your requests — a list view with Open/All filter chips ──
-  const openList=list.filter(r=>!(r.status==='resolved'||r.status==='closed'));
-  html+=`<section><h2>Your requests</h2>`;
-  if(listFailed)html+=`<div class="card"><p class="muted">We couldn’t load your requests just now — please try again in a moment.</p></div>`;
-  else if(!list.length)html+=emptyCard('You haven’t made any requests yet. When you ask your studio for something, you’ll be able to track it here.');
-  else html+=`<div class="reqfilter" role="group" aria-label="Filter requests">`+
-    `<button class="chip" id="reqFilterOpen" aria-pressed="false">Open</button>`+
-    `<button class="chip" id="reqFilterAll" aria-pressed="false">All</button></div>`+
-    `<div class="card reqlist" id="reqlist"></div>`;
-  html+=`</section>`;
-  $('main').innerHTML=html;
-  const bc=$('bookCall');if(bc)bc.addEventListener('click',openBooking);
-  const nr=$('newReq');if(nr)nr.addEventListener('click',()=>openSupport(null,'requests'));
-  document.querySelectorAll('[data-svc]').forEach(b=>b.addEventListener('click',()=>{const id=b.getAttribute('data-svc');const svc=services.find(x=>x.id===id);if(svc)openServiceRequest(svc);}));
-  // A request row opens its thread where conversations now live: the Messages
-  // tab's reading pane (slice 5). The drill-in's Support section keeps
-  // openSupportThread — it stays as the project-scoped fallback view.
-  if(list.length){
-    // default Open (what still needs attention); when EVERYTHING is resolved,
-    // default to All so the list is never mysteriously empty. An explicit chip
-    // choice persists for the session (REQ_FILTER) — tab-away/back and the
-    // post-send re-render keep the filter the client picked.
-    let mode=(REQ_FILTER==='open'||REQ_FILTER==='all')?REQ_FILTER:(openList.length?'open':'all');
-    const paint=()=>{
-      const shown=mode==='open'?openList:list;
-      $('reqFilterOpen').setAttribute('aria-pressed',String(mode==='open'));
-      $('reqFilterAll').setAttribute('aria-pressed',String(mode==='all'));
-      $('reqlist').innerHTML=shown.length?shown.map(reqRowHtml).join(''):`<p class="reqnone muted">No open requests — everything’s been handled. Switch to All to see past requests.</p>`;
-      $('reqlist').querySelectorAll('[data-sup]').forEach(b=>b.addEventListener('click',()=>openMessagesTo(b.getAttribute('data-sup'))));
-    };
-    $('reqFilterOpen').addEventListener('click',()=>{mode='open';REQ_FILTER='open';paint();});
-    $('reqFilterAll').addEventListener('click',()=>{mode='all';REQ_FILTER='all';paint();});
-    paint();
-  }
-}
-// The session-scoped Open/All choice ('' until the client picks — first visit
-// still gets the sensible default above).
-let REQ_FILTER='';
 // ── Book a call — self-schedule with the studio via the public /book/* engine ──
 // The #1 forgotten portal gap. Resolves the studio site (/client/book), lists
 // services, reads open slots for a chosen day, and books — all grounded on the
@@ -2046,8 +2355,8 @@ function bookFocusH1(){const h=document.querySelector('#main h1');if(h){h.setAtt
 async function openBooking(){
   const view=++VIEW_SEQ;   // this drill-in owns #main now — a late tab render must not clobber it
   $('main').innerHTML=spinnerHtml();
-  const back=`<p><a class="link" href="#" id="bk-back">← Back to requests</a></p>`;
-  const backReq=()=>{const b=$('bk-back');if(b)b.addEventListener('click',(e)=>{e.preventDefault();showTab('requests');});};
+  const back=`<p><a class="link" href="#" id="bk-back">‹ Messages</a></p>`;   // item 179 part three: booking is a door in Messages
+  const backReq=()=>{const b=$('bk-back');if(b)b.addEventListener('click',(e)=>{e.preventDefault();showTab('messages');});};
   // a transient failure must never masquerade as "not set up" — the honest
   // couldn't-check card, with a retry that re-runs this step
   const failCard=()=>{$('main').innerHTML=back+`<div class="card"><p class="muted">We couldn’t check on booking just now — please try again in a moment.</p><div class="row"><button id="bk-retry">Try again</button></div></div>`;backReq();const rb=$('bk-retry');if(rb)rb.addEventListener('click',()=>openBooking());};
@@ -2056,7 +2365,7 @@ async function openBooking(){
   if(!(siteRes&&siteRes.ok)){failCard();return;}
   const site=(siteRes.body&&siteRes.body.data&&siteRes.body.data.site_id)||'';
   // portal walk (Nov 8): both "no times" ends hand over the next step — ask for a call, prefilled
-  const askCall=(msg)=>{$('main').innerHTML=back+emptyCard(msg)+`<div class="row" style="justify-content:center;margin-top:-4px"><button class="approve" id="bk-ask">Ask for a call</button></div>`;backReq();const a=$('bk-ask');if(a)a.addEventListener('click',()=>openSupport(null,'requests',{subject:'A call',body:'I’d like to book a call. Times that work for me: '}));};
+  const askCall=(msg)=>{$('main').innerHTML=back+emptyCard(msg)+`<div class="row" style="justify-content:center;margin-top:-4px"><button class="approve" id="bk-ask">Ask for a call</button></div>`;backReq();const a=$('bk-ask');if(a)a.addEventListener('click',()=>openSupport(null,'messages',{subject:'A call',body:'I’d like to book a call. Times that work for me: '}));};
   if(!site){askCall('Online booking isn’t set up yet — ask for a call and your studio will find a time with you.');return;}
   let typesRes=null;try{typesRes=await api('/book/'+site+'/types');}catch(_){}
   if(view!==VIEW_SEQ)return;   // re-check before every paint of #main
@@ -2077,10 +2386,18 @@ function bookPickDate(t){
   // item 65 (deep pass 6.2): days counted on the client's local calendar; the UTC
   // slice offered the day after tomorrow as the earliest day from 5pm in Los Angeles
   const iso=(n)=>{const d=new Date();d.setDate(d.getDate()+n);return d.getFullYear()+'-'+('0'+(d.getMonth()+1)).slice(-2)+'-'+('0'+d.getDate()).slice(-2);};const min=iso(1),max=iso(BOOK.maxDays||30);
-  $('main').innerHTML=`<p><a class="link" href="#" id="bk-back">← Back</a></p><header><h1>${esc(t.name)}</h1><p class="sub">Pick a day, then a time.</p></header><section><div class="card"><label for="bk-date" style="display:block;font-weight:600;margin-bottom:6px">Day</label><input id="bk-date" type="date" min="${min}" max="${max}" value="${min}" ${bkInput}><div id="bk-slots" style="margin-top:14px"></div></div></section>`;
+  // item 179 part three: the next days as buttons (drawn in Figma), the date box kept for any later day
+  const days=[];for(let n=1;n<=Math.min(7,BOOK.maxDays||30);n++)days.push(iso(n));
+  const dayChip=(ymd)=>{const m=/^(\d{4})-(\d{2})-(\d{2})/.exec(ymd);const dt=new Date(+m[1],+m[2]-1,+m[3]);return `<button type="button" data-bkday="${ymd}" aria-pressed="${ymd===min?'true':'false'}" aria-label="${esc(dt.toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric'}))}"><span>${esc(dt.toLocaleDateString('en-US',{weekday:'short'}))}</span><b>${dt.getDate()}</b></button>`;};
+  $('main').innerHTML=`<p><a class="link" href="#" id="bk-back">‹ Back</a></p><header><h1>${esc(t.name)}</h1><p class="sub">Pick a day, then a time.</p></header><section><div class="card"><div class="bkdays" role="group" aria-label="The next few days">${days.map(dayChip).join('')}</div><label for="bk-date" style="display:block;font-weight:600;margin:14px 0 6px">Or another day</label><input id="bk-date" type="date" min="${min}" max="${max}" value="${min}" ${bkInput}><div id="bk-slots" style="margin-top:14px"></div></div></section>`;
   const bb=$('bk-back');if(bb)bb.addEventListener('click',(e)=>{e.preventDefault();openBooking();});
   bookFocusH1();
-  const dt=$('bk-date');const load=()=>bookLoadSlots(dt.value);dt.addEventListener('change',load);load();
+  const dt=$('bk-date');
+  const press=()=>document.querySelectorAll('[data-bkday]').forEach(b=>b.setAttribute('aria-pressed',b.getAttribute('data-bkday')===dt.value?'true':'false'));
+  const load=()=>{press();bookLoadSlots(dt.value);};
+  dt.addEventListener('change',load);
+  document.querySelectorAll('[data-bkday]').forEach(b=>b.addEventListener('click',()=>{dt.value=b.getAttribute('data-bkday');load();}));
+  load();
 }
 async function bookLoadSlots(date){
   const host=$('bk-slots');if(!host)return;host.innerHTML='<p class="muted">Finding open times…</p>';
@@ -2102,7 +2419,7 @@ function bookConfirm(slot){
   BOOK.slot=slot;
   // D5a: the portal knows who's signed in — prefill, keep editable (booking on
   // someone else's behalf stays one edit away)
-  const meName=firstName(USER),meEmail=(USER&&USER.email)?USER.email:'';
+  const meName=clientName(),meEmail=(USER&&USER.email)?USER.email:'';
   // the summary names the DAY, not just the time — what the client confirms
   // must name the day they're booking (the race fix's visible partner)
   const day=bookDayLabel(slot);
@@ -2119,7 +2436,7 @@ async function submitBooking(){
   const view=VIEW_SEQ;   // captured — the success takeover must not paint over a newer view
   let r=null;try{r=await api('/book/'+BOOK.site,'POST',{type_id:BOOK.type.id,slot_start:BOOK.slot,name,email});}catch(_){}
   if(view!==VIEW_SEQ)return;   // the user moved on mid-POST — the confirm UI is gone; never repaint #main
-  if(r&&r.ok&&r.body&&r.body.data&&r.body.data.ok!==false){const day=bookDayLabel(BOOK.slot);$('main').innerHTML=`<header><h1>You’re booked 🎉</h1><p class="sub">${esc(BOOK.type.name)} · ${day?esc(day)+' · ':''}${esc(bookLabel(BOOK.slot))}. Your studio will confirm by email.</p></header><p><a class="link" href="#" id="bk-done">← Back to requests</a></p>`;const d=$('bk-done');if(d)d.addEventListener('click',(e)=>{e.preventDefault();showTab('requests');});bookFocusH1();}
+  if(r&&r.ok&&r.body&&r.body.data&&r.body.data.ok!==false){const day=bookDayLabel(BOOK.slot);$('main').innerHTML=`<header><h1>You’re booked 🎉</h1><p class="sub">${esc(BOOK.type.name)} · ${day?esc(day)+' · ':''}${esc(bookLabel(BOOK.slot))}. Your studio will confirm by email.</p></header><p><a class="link" href="#" id="bk-done">‹ Messages</a></p>`;const d=$('bk-done');if(d)d.addEventListener('click',(e)=>{e.preventDefault();showTab('messages');});bookFocusH1();}
   else{toast((r&&r.body&&r.body.message)||'Couldn’t book that time — try another.');btn.disabled=false;}
 }
 // Client file upload — signed-URL flow (mirrors the studio deliverable upload):
@@ -2133,7 +2450,7 @@ async function submitBooking(){
 async function openServiceRequest(svc){
   VIEW_SEQ++;   // this drill-in owns #main now — a late guarded render must not clobber (and wipe) the half-typed brief
   const box='style="width:100%;font:inherit;padding:9px;border:1px solid var(--line);border-radius:10px;background:var(--card);color:var(--ink)"';
-  let html=`<p><a class="link" href="#" id="back">← Back to requests</a></p><header><h1>Request: ${esc(svc.name)}</h1><p class="sub">Tell your studio a little about what you need. They’ll review and reply with next steps — nothing is charged and nothing is ordered automatically.</p></header><section><div class="card">`+
+  let html=`<p><a class="link" href="#" id="back">‹ Ask for a service</a></p><header><h1>Request: ${esc(svc.name)}</h1><p class="sub">Tell your studio a little about what you need. They’ll review and reply with next steps — nothing is charged and nothing is ordered automatically.</p></header><section><div class="card">`+
     `<label for="sr-need" style="display:block;font-weight:600;margin-bottom:6px">What do you need?</label><textarea id="sr-need" rows="3" ${box} placeholder="A short description of what you’re looking for…"></textarea>`+
     `<label for="sr-time" style="display:block;font-weight:600;margin:12px 0 6px">Ideal timeline <span class="muted" style="font-weight:400">(optional)</span></label><input id="sr-time" type="text" ${box} placeholder="e.g. in the next month, no rush…">`+
     `<label for="sr-budget" style="display:block;font-weight:600;margin:12px 0 6px">Budget range <span class="muted" style="font-weight:400">(optional)</span></label><input id="sr-budget" type="text" ${box} placeholder="e.g. around \$500, not sure yet…">`+
@@ -2141,25 +2458,25 @@ async function openServiceRequest(svc){
     `<div class="row"><button class="approve" id="sr-send">Send request</button></div></div></section>`;
   $('main').innerHTML=html;
   {const f=$('sr-need');if(f)f.focus();}   // entry focus on the first field (shareCompose's pattern)
-  $('back').addEventListener('click',(e)=>{e.preventDefault();renderRequests();});
+  $('back').addEventListener('click',(e)=>{e.preventDefault();openServices();});
   $('sr-send').addEventListener('click',async()=>{
     const btn=$('sr-send');const need=$('sr-need').value.trim();
     if(!need){toast('Tell your studio what you need first.');return;}
     btn.disabled=true;
     const r=await api('/client/support','POST',{subject:'Service request: '+svc.name,service:svc.id,brief:{need,timeline:$('sr-time').value.trim(),budget:$('sr-budget').value.trim()}});
-    if(r.ok&&r.body&&r.body.data&&r.body.data.id){toast('Sent — your studio will review and get back to you with next steps. Nothing’s charged.');renderRequests();}
+    if(r.ok&&r.body&&r.body.data&&r.body.data.id){toast('Sent — your studio will review and get back to you with next steps. Nothing’s charged.');openMessagesTo(r.body.data.id);}
     else{toast('That didn’t send — please try again.');btn.disabled=false;}
   });
 }
 // ── HELP — the studio's FAQ (searchable/expandable) + a way to reach a human ──
 // PS4 (B2): the reviewer is persona-gated BEFORE the fetch (zero /client/*
-// reads — the renderMessages/renderFiles contract; Help was the last tab still
+// reads — the renderMessages/renderDocuments contract; Help was the last tab still
 // firing a doomed 403 read), the FAQ read is three-way honest (failed ≠ empty ≠
 // loaded, and a failure is never cached — tab re-entry retries free), and the
 // account card is a proper profile section whose "message your studio" pointers
 // only render for a persona that CAN message.
 function accountSectionHtml(canMessage){
-  const name=firstName(USER);
+  const name=clientName();
   const email=(USER&&USER.email)?USER.email:'';
   const av=((name||email||'').charAt(0)||'•').toUpperCase();
   return `<section id="sec-you"><h2>Your account</h2><div class="card">`+
@@ -2167,8 +2484,23 @@ function accountSectionHtml(canMessage){
     `<div class="acctrow"><div class="acctlab"><strong>Appearance</strong><span class="muted">Light, dark, or match your device.</span></div><button id="appearance">${esc(themeLabel())}</button></div>`+
     (email?`<div class="acctrow"><div class="acctlab"><strong>Password</strong><span class="muted">We’ll email you a link to set a new one.</span></div><button id="chgpw">Change password</button></div>`:'')+
     `<div class="acctrow"><div class="acctlab"><strong>Session</strong><span class="muted">Signed in on this device.</span></div><button id="signout2">Sign out</button></div>`+
+    businessesHtml()+
     (canMessage?`<p class="muted" style="font-size:12.5px;margin-top:10px">Need to change your name or email? Message your studio and they’ll update it.</p>`:'')+
     `</div></section>`;
+}
+// Builder item 83: someone with a place in two or more businesses switches here. The
+// context lists them (each with the role in words); the one the server opens unasked
+// needs no ?client=. A business seen through this portal opens here; one where they
+// work in the full workspace opens through the studio door, which asks them to sign in
+// there once.
+function businessesHtml(){
+  const list=Array.isArray(PORTAL.ctx&&PORTAL.ctx.businesses)?PORTAL.ctx.businesses:[];
+  if(list.length<2)return'';
+  const href=(b)=>{const door=b.role==='client_reviewer'?'/client.html':'/studio.html';return b['default']?door:door+'?client='+encodeURIComponent(b.site_id);};
+  const role=(b)=>b.role==='client_reviewer'?'You review its work':b.role_words==='Owner'?'You own it':'You’re '+b.role_words;
+  return `<div class="acctrow" id="acctBiz"><div class="acctlab"><strong>Your businesses</strong><span class="muted">Each keeps its own pages, people and settings.</span>`+
+    list.map(b=>b.current?`<span class="muted" aria-current="true">${esc(b.name)} · ${esc(role(b))} · here now</span>`:`<a class="link" href="${esc(href(b))}">${esc(b.name)}</a><span class="muted">${esc(role(b))}</span>`).join('')+
+    `</div></div>`;
 }
 function wireAccountSection(){
   const email=(USER&&USER.email)?USER.email:'';
@@ -2179,10 +2511,10 @@ function wireAccountSection(){
 // The starter answers: how this portal works, true for every studio. Same markup as
 // the studio's own articles (lib/faq.ts renderFaq), so the search covers them too.
 const STARTER_FAQ=[
-  ['How do I send my studio a file?','Open Files and press Choose a file. Photos (JPEG, PNG or WebP) up to 10MB and PDFs up to 25MB go straight to your studio.'],
+  ['How do I send my studio a file?','Open Documents and press Send a file. Photos (JPEG, PNG or WebP) up to 10MB and PDFs up to 25MB go straight to your studio.'],
   ['How do I approve something?','Anything waiting for your OK is at the top of Home, under Needs you, and in your project. Press Approve, or Request changes to say what you’d like different. Nothing changes until you approve.'],
-  ['How do I pay an invoice?','Open Invoices and press Pay. You pay on Stripe’s secure page and come straight back here, where the invoice shows Processing and then Paid.'],
-  ['How do I ask for something new?','Open Requests to book a call, ask for one of your studio’s services, or press Something else? and say what you need. Nothing is charged until your studio replies.'],
+  ['How do I pay an invoice?','Open Documents: what you owe is at the top, with Pay. You pay on Stripe’s secure page and come straight back here, where the invoice shows Processing and then Paid.'],
+  ['How do I ask for something new?','Open Messages to book a call, ask for one of your studio’s services, or press Write and say what you need. Nothing is charged until your studio replies.'],
   ['How do I change my password?','Under Your account, further down this page, press Change password and we’ll email you a link to set a new one.'],
 ];
 // Builder list item 176: the hand-over kit the studio wrote for this client (GET
@@ -2229,10 +2561,10 @@ async function renderHelp(){
     html+=`<div id="faqBody">${faqHtml||`<p class="faq-intro" id="faqStarter">Your studio hasn’t added its own help articles yet, so here are the basics.</p>${starterFaqHtml()}`}</div>`;
     html+=`<p id="faqNone" class="muted" hidden style="padding:4px 2px">No answers match that. Try fewer words, or message your studio below.</p>`;
   }
-  html+=`<div class="card"><h3>Still need help?</h3><p class="muted">Can’t find what you’re looking for? Send your studio a message and they’ll get back to you.</p><div class="row"><button class="approve" id="helpMsg">Message your studio</button></div></div>`;
+  html+=`<div class="card"><h3>Still need help?</h3><p class="muted">Can’t find what you’re looking for? Send your studio a message and they’ll get back to you.</p><div class="row"><button class="approve" id="helpMsg">Write to your studio</button></div></div>`;
   html+=accountSectionHtml(true);
   $('main').innerHTML=html;
-  const hm=$('helpMsg');if(hm)hm.addEventListener('click',()=>openSupport(null));
+  const hm=$('helpMsg');if(hm)hm.addEventListener('click',openMessagesCompose);   // item 179 part three: one door
   wireAccountSection();
   const search=$('faqSearch');
   if(search)search.addEventListener('input',()=>{
@@ -2274,23 +2606,21 @@ async function askConnect(key,label,btn){
 }
 function welcomeCardHtml(){
   if(welcomed()&&!WELCOME_THIS_VISIT)return'';
-  // PS3: the tour names Messages/Files/Invoices/Requests — tabs a reviewer's
+  // PS3: the tour names Messages/Files/Invoices — tabs a reviewer's
   // persona renders as calm empty states. Don't tour what they can't use.
   if(PORTAL.persona!=='client')return'';
   // Oct 2026 audit change 4: shown on the first visit only — marked seen now, so
   // the next visit opens on Needs you instead of the tour (× still dismisses now)
   WELCOME_THIS_VISIT=true;
   try{localStorage.setItem(WELCOME_KEY,'1');}catch(_){}
-  const n=firstName(USER);
+  const n=clientName();
   const step=(tab,icon,label,desc)=>`<button class="wl-step" data-wtab="${tab}" style="display:flex;gap:10px;align-items:flex-start;text-align:left;width:100%;border:none;background:none;padding:9px 0;cursor:pointer;border-top:1px solid var(--line)"><span aria-hidden="true" style="font-size:18px;line-height:1.3">${icon}</span><span><span style="font-weight:600;display:block">${label}</span><span class="muted" style="font-size:13px">${desc}</span></span></button>`;
   // First-run orientation — names every destination, not just approve/download/message.
   return `<div class="card welcome" id="welcome" role="note"><button class="x" id="welcomeX" aria-label="Dismiss welcome">×</button>`+
     `<h3>Welcome${n?`, ${esc(n)}`:''}</h3>`+
     `<p>This is your workspace with your studio — here's where everything lives:</p>`+
-    step('messages',si('message'),'Messages','Talk to your studio any time.')+
-    step('files',si('folder'),'Files & documents','Download what they share; find your proposals & agreements.')+
-    step('invoices',si('receipt'),'Invoices','See and pay what you owe.')+
-    step('requests',si('sparkles'),'Requests &amp; booking','Ask for more work, or book a call.')+
+    step('messages',si('message'),'Messages','Talk to your studio, book a call or ask for a service.')+
+    step('documents',si('folder'),'Documents','Monthly reports, invoices, proposals and files, in one place. Pay what you owe there.')+
     `</div>`;
 }
 function wireWelcome(){
@@ -2398,14 +2728,332 @@ function todoAskHtml(t,data,aps){
   const key=String((t&&t.source)||'').replace(/^checklist:/,'');
   const tick='<p class="muted tdnote">Your studio marks this one off once it arrives.</p>';
   const go=(to,label)=>`<div class="row"><button data-todo-go="${to}">${label}</button></div>`;
-  if(key==='content_received')return go('share','Share a file')+tick;
+  // item 179 part two: each ask opens its own page, with the thing to do right there
+  const open=(label)=>`<div class="row"><button data-todo-open="${esc(t.id)}">${label}</button></div>`;
+  if(key==='content_received')return open('Send files')+tick;
   if(key==='questionnaire_returned'){
-    const sv=((data&&data.surveys)||[]).find(s=>s&&/questionnaire|intake|brief/i.test(String(s.title||'')));
+    const sv=questionnaireOf(data&&data.surveys);
     return sv?`<div class="row"><button data-survey="${esc(sv.id)}">Open the questionnaire</button></div>${tick}`
-      :`<p class="muted tdnote">Your studio sends the questionnaire by email. Filled it in already? Share it with the file box below, and your studio marks this one off.</p>${go('share','Share a file')}`;
+      :`<p class="muted tdnote">Your studio sends the questionnaire by email. Filled it in already? Send it here, and your studio marks this one off.</p>${open('Send it here')}`;
   }
-  if(key==='client_review')return (aps||[]).length?go('review','Review it')+tick:'<p class="muted tdnote">Your studio will share the draft here for your OK. Nothing to do until then.</p>';
+  if(key==='client_review'){
+    const wa=(aps||[]).find(a=>a&&a.subject_type==='website');
+    if(wa)return `<div class="row"><button data-apr-open="${esc(wa.id)}">See the draft</button></div>`+tick;
+    return (aps||[]).length?go('review','Review it')+tick:'<p class="muted tdnote">Your studio will share the draft here for your OK. Nothing to do until then.</p>';
+  }
   return tick;
+}
+// ── item 179 part two: the thing itself, opened in place ─────────────────────
+// Drawn in Figma first (page "Client portal — parts 2 to 4", part 2): a to-do or
+// an approval opens as its own page. A phone stacks the ask, the thing and your
+// answer; ≥1000px puts the thing on the left and the ask and answer on the right.
+// Back returns to where it was opened from: Home, or the project it came from.
+const AP_KIND={deliverable:'File',task:'Task',project:'Project',custom:'Request',website:'Draft'};
+const AP_DONE={approved:['✓ Approved','ok'],rejected:['Declined',''],changes_requested:['✎ Changes requested','chg']};
+function sheetBack(from){return from&&from.pid?{label:from.name||'Back to the project',go:()=>openProject(from.pid)}:from==='documents'?{label:'Documents',go:()=>showTab('documents')}:{label:'Home',go:goHome};}
+function sheetBackHtml(back){return `<p class="sheetback"><a class="link" href="#" id="sheetBack">‹ ${esc(back.label)}</a></p>`;}
+function sheetHead(chips,title,sub){return `<header class="sheet"><div class="sheetmeta">${chips}</div><h1 tabindex="-1">${esc(title)}</h1>${sub?`<p class="sub">${esc(sub)}</p>`:''}</header>`;}
+function wireSheet(back,focusSel){
+  const b=$('sheetBack');if(b)b.addEventListener('click',(e)=>{e.preventDefault();back.go();});
+  const f=(focusSel&&document.querySelector(focusSel))||$('main').querySelector('h1');if(f)f.focus({preventScroll:true});   // the drill-in says where you are
+}
+function sheetCantLoad(back){$('main').innerHTML=sheetBackHtml(back)+emptyCard('We couldn’t load this just now — please try again in a moment.','✋');wireSheet(back);}
+// a to-do or approval page reads the project's bundle; anything but OK leaves calmly
+async function sheetBundle(pid,view,back){
+  const r=await api('/client/projects/'+pid);
+  if(view!==VIEW_SEQ)return null;
+  if(r.ok)return (r.body&&r.body.data)||{};
+  if(r.offline)sheetCantLoad(back);else{toast('That isn’t here any more.');back.go();}
+  return null;
+}
+// the website's address for the draft's strip, from the website card's read when it had one
+function draftHost(){const s=wsSiteInfo(PORTAL.wstats);return s.host||'Your website';}
+// which deliverables draw inline — fileIcon's own image rule
+function apIsImage(title){return /\.(png|jpe?g|webp)$/i.test(String(title||''));}
+// A drawn page sits in a srcdoc frame, whose links resolve against the PORTAL's
+// address: a tap on the draft's own "#dds-draft-page=…" link would load the portal
+// inside the frame. A base of about:srcdoc keeps those links inside the drawn page
+// (its photos and fonts are full addresses, its styles inlined), and every other
+// link opens a new window, which the frame's sandbox refuses: it does nothing.
+function draftDoc(html){const b='<base href="about:srcdoc" target="_blank">';html=String(html).replace(/href="#dds-draft-page=/g,'target="_self" href="#dds-draft-page=');return /<head[^>]*>/i.test(html)?html.replace(/<head([^>]*)>/i,(m,a)=>'<head'+a+'>'+b):b+html;}
+// the slug a "#dds-draft-page=%2Fmenu%2F" link names ('' = Home)
+function draftSlugOf(h){return decodeURIComponent(String(h||'').slice(16)).replace(/^\/+|\/+$/g,'');}
+
+// ── the website draft, drawn page by page (GET /client/approvals/:id/draft) ──
+const DRAFT={aid:'',page:'',pages:[],sections:{},notes:[],notesRead:false,cache:new Map(),seq:0};
+async function draftPage(aid,slug){
+  const key=String(slug||'');
+  if(DRAFT.aid===aid&&DRAFT.cache.has(key))return DRAFT.cache.get(key);
+  const r=await api('/client/approvals/'+aid+'/draft?page='+encodeURIComponent(key));
+  const d=r.ok&&r.body&&r.body.data;
+  if(!d||typeof d.html!=='string')return null;
+  if(DRAFT.aid===aid)DRAFT.cache.set(key,d);
+  return d;
+}
+async function showDraftPage(view,a,slug){
+  const box=$('dpic'),pages=$('dpages');if(!box||!pages)return;
+  const seq=++DRAFT.seq;
+  box.innerHTML='<span class="dwait">Drawing the draft…</span>';
+  const d=await draftPage(a.id,slug);
+  if(view!==VIEW_SEQ||seq!==DRAFT.seq)return;
+  if(!d){box.innerHTML='<span class="dwait">The draft couldn’t be drawn just now. Please try again in a moment.</span>';return;}
+  DRAFT.page=d.page||'';DRAFT.pages=Array.isArray(d.pages)?d.pages:[];DRAFT.sections[DRAFT.page]=Array.isArray(d.sections)?d.sections:[];
+  if(!DRAFT.notesRead){DRAFT.notes=Array.isArray(d.notes)?d.notes:[];DRAFT.notesRead=true;}
+  // scripts stay off (no allow-scripts): the draft can't run code, count a visit or send a form
+  const f=document.createElement('iframe');
+  f.setAttribute('sandbox','allow-same-origin');f.setAttribute('tabindex','-1');f.setAttribute('aria-hidden','true');f.setAttribute('referrerpolicy','no-referrer');
+  f.title='Picture of the draft';f.srcdoc=draftDoc(d.html);
+  box.innerHTML='';box.appendChild(f);
+  box.style.setProperty('--dk',String((box.clientWidth||345)/1280));
+  pages.innerHTML=(DRAFT.pages.length>1?DRAFT.pages.map(p=>`<button type="button" data-dpage="${esc(p.slug)}" aria-pressed="${p.slug===DRAFT.page?'true':'false'}">${esc(p.title)}</button>`).join(''):'')+
+    `<button type="button" class="dfullbtn" id="dfullopen">Full screen ↗</button>`;
+  pages.querySelectorAll('[data-dpage]').forEach(b=>b.addEventListener('click',()=>showDraftPage(view,a,b.getAttribute('data-dpage'))));
+  $('dfullopen').addEventListener('click',(e)=>openDraftFull(a,e.currentTarget));
+  paintNotePicker();paintDraftNotes();
+}
+// Full screen: the page at its own size in an overlay. Links between the draft's
+// pages come back as #dds-draft-page=<path> (routes/client_drafts.ts DRAFT_NAV);
+// a click on one turns the page here, and any other link goes nowhere.
+function openDraftFull(a,from){
+  const opener=from||document.activeElement;   // Safari doesn't focus a button on a tap: the button is handed in
+  let ov=$('dfull');
+  if(!ov){ov=document.createElement('div');ov.id='dfull';ov.className='dfull';ov.setAttribute('role','dialog');ov.setAttribute('aria-modal','true');document.body.appendChild(ov);}
+  ov.setAttribute('aria-label',(a.title||'Your website draft')+', full screen');
+  ov.hidden=false;document.documentElement.style.overflow='hidden';
+  let watch=0;   // WebKit runs no outside click handler in a scripts-off frame: a page link shows up as the frame's own address instead
+  const close=()=>{clearInterval(watch);ov.hidden=true;ov.innerHTML='';document.documentElement.style.overflow='';document.removeEventListener('keydown',onKey);if(opener&&opener.focus&&document.contains(opener))opener.focus();};
+  const onKey=(e)=>{if(e.key==='Escape'){e.preventDefault();close();}};
+  document.addEventListener('keydown',onKey);
+  let seq=0;   // a slow page read must never draw over a page picked after it
+  const go=(slug)=>{if(DRAFT.pages.some(x=>x.slug===slug))paint(slug);};
+  const paint=async(slug)=>{
+    const my=++seq;clearInterval(watch);
+    ov.innerHTML=`<div class="dfullbar"><span class="dfname">${esc(a.title||'Your website draft')}</span>`+
+      (DRAFT.pages.length>1?DRAFT.pages.map(p=>`<button type="button" data-fpage="${esc(p.slug)}" aria-pressed="${p.slug===slug?'true':'false'}">${esc(p.title)}</button>`).join(''):'')+
+      `<button type="button" id="dfullclose">Close</button></div><iframe title="The draft, ${esc((DRAFT.pages.find(p=>p.slug===slug)||{}).title||'Home')}" sandbox="allow-same-origin" referrerpolicy="no-referrer"></iframe>`;
+    $('dfullclose').addEventListener('click',close);
+    ov.querySelectorAll('[data-fpage]').forEach(b=>b.addEventListener('click',()=>paint(b.getAttribute('data-fpage'))));
+    $('dfullclose').focus();
+    const d=await draftPage(a.id,slug);
+    const f=ov.querySelector('iframe');if(!f||ov.hidden||my!==seq)return;
+    if(!d){f.srcdoc='<p style="font:15px system-ui;padding:24px;color:#6b6478">This page couldn’t be drawn just now.</p>';return;}
+    // the frame first loads about:blank, then the drawn page: hook the drawn page's own document, once
+    const hook=()=>{try{
+      const doc=f.contentDocument;if(!doc||doc.URL!=='about:srcdoc'||doc.ddsHooked)return;doc.ddsHooked=true;
+      doc.addEventListener('click',(e)=>{
+        const l=e.target&&e.target.closest?e.target.closest('a'):null;if(!l)return;
+        e.preventDefault();
+        const h=l.getAttribute('href')||'';
+        if(h.indexOf('#dds-draft-page=')===0)go(draftSlugOf(h));
+      });
+    }catch(_){}};
+    f.addEventListener('load',hook);
+    f.srcdoc=draftDoc(d.html);
+    watch=setInterval(()=>{try{const h=(f.contentWindow&&f.contentWindow.location.hash)||'';if(h.indexOf('#dds-draft-page=')===0){clearInterval(watch);go(draftSlugOf(h));}}catch(_){}},200);
+  };
+  paint(DRAFT.page);
+}
+function paintNotePicker(){
+  const sel=$('npart');if(!sel)return;
+  const page=DRAFT.pages.find(p=>p.slug===DRAFT.page)||{title:'Home'};
+  sel.innerHTML=`<option value="">The whole page (${esc(page.title)})</option>`+(DRAFT.sections[DRAFT.page]||[]).map(s=>`<option value="${esc(s.id)}">${esc(s.name)}</option>`).join('');
+}
+function paintDraftNotes(){
+  const host=$('draftnotes'),list=$('notelist');if(!host||!list)return;
+  const ns=DRAFT.notes||[];host.hidden=!ns.length;
+  const h=host.querySelector('h2');if(h)h.textContent='Your notes on this draft · '+ns.length;
+  list.innerHTML=ns.map(n=>`<li><span><span class="nwhere">${esc(n.page_title||'A page')} · ${esc(n.part||'The whole page')}${n.created_at?' · '+esc(rel(n.created_at)):''}</span><span class="nbody">“${esc(n.body)}”</span></span><span class="schip${n.status==='done'?' done':''}">${n.status==='done'?'Done':'Open'}</span></li>`).join('');
+}
+
+// ── one approval, seen and answered in place ──
+async function openApproval(pid,aid,from){
+  if(PORTAL.persona!=='client')return goHome();
+  const view=++VIEW_SEQ;   // this drill-in owns #main now — a late tab render must not clobber it
+  const back=sheetBack(from);
+  setWide(true);try{window.scrollTo(0,0);}catch(_){}
+  $('main').innerHTML=skeleton();
+  const data=await sheetBundle(pid,view,back);if(!data)return;
+  const proj=data.project||{};
+  const a=(data.approvals||[]).find(x=>x&&x.id===aid);
+  if(!a){toast('That request isn’t here any more.');return back.go();}
+  const draft=a.subject_type==='website';
+  const pending=a.status==='pending';
+  const f=a.subject_type==='deliverable'?((data.deliverables||[]).find(d=>d&&d.id===a.subject_id)||null):null;
+  if(draft&&DRAFT.aid!==aid)Object.assign(DRAFT,{aid,page:'',pages:[],sections:{},notes:[],notesRead:false,cache:new Map()});
+  const ttl=a.title||(draft?'Your website draft':'A change is ready');
+  const chips=`<span class="tag">${esc(AP_KIND[a.subject_type]||'Approval')}</span><span class="sm">${draft?'Not live yet · ':''}${esc(proj.name||'')}</span>`;
+  let ask=sheetHead(chips,ttl,'');
+  if(a.summary)ask+=`<div class="askcard"><span class="askav" aria-hidden="true">${esc((studioBrand().charAt(0)||'S').toUpperCase())}</span><span><span class="askwho">${esc(studioBrand())} asked</span><span class="askq">“${esc(a.summary)}”</span></span></div>`;
+  let thing='';
+  if(draft)thing=`<div class="card draftcard"><div class="dstrip"><i></i><i></i><i></i><span>${esc(draftHost())} · draft, not live yet</span></div><div class="dpic" id="dpic"><span class="dwait">Drawing the draft…</span></div><div class="dpages" id="dpages" role="group" aria-label="Pages in the draft"></div></div>`;
+  else if(f)thing=`<div class="card draftcard">${apIsImage(f.title)?`<div id="apimg" class="dpic" style="aspect-ratio:auto;min-height:120px"><span class="dwait">Fetching the picture…</span></div>`:''}<div class="frow"><span class="fico" aria-hidden="true">${fileIcon(f.title)}</span><span class="fmain"><span class="fname">${esc(f.title)}</span><span class="fmeta">Shared by ${esc(studioBrand())}${f.created_at?' · '+esc(fdate(f.created_at)):''}</span></span><button class="fbtn" data-dl="${esc(f.id)}" aria-label="Open full size — ${esc(f.title)}">Open full size</button></div></div>`;
+  let answer='';
+  if(a.due_date&&pending)answer+=`<p class="apdue${approvalOverdue(a)?' late':''}" style="margin-top:14px">${approvalOverdue(a)?'Overdue — your answer was due '+esc(niceDay(a.due_date))+'. Nothing moves until you decide.':'Please answer by '+esc(niceDay(a.due_date))+'.'}</p>`;
+  if(pending)answer+=`<div class="apacts"><button class="approve" id="apok">Looks good — approve</button><button id="apchg" aria-expanded="false" aria-controls="apchgbox">Ask for a change</button></div>`+
+    `<div class="card notecard" id="apchgbox" hidden><label class="nhead" for="apchgt">What would you like changed?</label><textarea id="apchgt" class="fieldin" rows="3" placeholder="This goes straight to ${esc(studioBrand())}."></textarea><p class="muted" style="font-size:12.5px;margin-top:8px">Nothing changes until you approve. This just tells your studio what to adjust.</p><div class="row"><button class="approve" id="apchgsend">Send request</button></div></div>`;
+  else{const d=AP_DONE[a.status]||[String(a.status||'').replace(/_/g,' '),''];answer+=`<div class="card" style="margin-top:16px"><ul class="hist"><li><span class="ht">Your answer</span><span class="hs ${d[1]}">${esc(d[0])}${a.decided_at?` · ${esc(rel(a.decided_at))}`:''}</span></li></ul></div>`;}
+  if(draft&&(pending||a.status==='changes_requested'))answer+=`<div class="card notecard" id="notecard"><span class="nhead">Or leave a note on one part</span><label class="nlabel" for="npart">Which part?</label><select id="npart" class="fieldin"><option value="">The whole page</option></select><textarea id="nbody" class="fieldin" rows="3" aria-label="Your note" placeholder="Tell ${esc(studioBrand())} what you’d change…"></textarea><div class="row"><button id="nsend">Send note</button></div><p class="muted" style="font-size:12.5px;margin-top:8px">Nothing goes live until you approve. Your studio sees each note pinned to that part of the draft.</p></div>`;
+  if(draft)answer+=`<section id="draftnotes" hidden style="margin-top:22px"><h2>Your notes on this draft</h2><div class="card"><ul class="notelist" id="notelist"></ul></div></section>`;
+  const prior=(data.approvals||[]).filter(x=>x&&x.id!==aid&&x.status==='approved'&&x.decided_at).sort((x,y)=>String(y.decided_at).localeCompare(String(x.decided_at)))[0];
+  if(prior)answer+=`<p class="histline"><span aria-hidden="true">✓</span>You approved ${esc(prior.title||'a change')} · ${esc(rel(prior.decided_at))}</p>`;
+  $('main').innerHTML=sheetBackHtml(back)+`<div class="sheetcols${thing?'':' solo'}"><div class="s-ask">${ask}</div>${thing?`<div class="s-thing">${thing}</div>`:''}<div class="s-answer">${answer}</div></div>`;
+  wireSheet(back);
+  wireDownloads($('main'));
+  if(draft){
+    const box=$('dpic');
+    const fit=()=>{if(box&&box.clientWidth)box.style.setProperty('--dk',String(box.clientWidth/1280));};
+    if(box&&'ResizeObserver' in window)new ResizeObserver(fit).observe(box);
+    showDraftPage(view,a,DRAFT.page||'');
+    const ns=$('nsend');
+    if(ns)ns.addEventListener('click',async()=>{
+      const ta=$('nbody');const v=(ta.value||'').trim();
+      if(!v){toast('Write a note first.');ta.focus();return;}
+      ns.disabled=true;
+      const r=await api('/client/approvals/'+aid+'/notes','POST',{page:DRAFT.page,block_id:($('npart')&&$('npart').value)||'',body:v});
+      if(view!==VIEW_SEQ)return;
+      ns.disabled=false;
+      if(r.ok&&r.body&&r.body.data){ta.value='';DRAFT.notes=[r.body.data].concat(DRAFT.notes||[]);paintDraftNotes();toast('Your note went to '+studioBrand()+'.');}
+      else toast((r.body&&r.body.message)||'That note didn’t send. Please try again.');
+    });
+  }
+  // a file's picture: the same signed download Open full size uses; any failure keeps the quiet line
+  if(f&&apIsImage(f.title))(async()=>{
+    const rr=await api('/client/deliverables/'+f.id+'/download');
+    if(view!==VIEW_SEQ)return;
+    const box=$('apimg');if(!box)return;
+    const url=rr.ok&&rr.body&&rr.body.data&&String(rr.body.data.url||'');
+    if(!url||!/^https:\/\//.test(url)){box.innerHTML='<span class="dwait">The picture couldn’t load here. Use Open full size.</span>';return;}
+    const im=new Image();im.alt=f.title||'The file';im.className='apimg';
+    im.addEventListener('load',()=>{if(view===VIEW_SEQ){box.style.minHeight='';box.innerHTML='';box.appendChild(im);}});
+    im.addEventListener('error',()=>{if(view===VIEW_SEQ)box.innerHTML='<span class="dwait">The picture couldn’t load here. Use Open full size.</span>';});
+    im.src=url;
+  })();
+  if(!pending)return;
+  // the decide call is the record page's exact contract: presented_hash + the 409 re-read
+  const decide=async(decision,note,btn)=>{
+    btn.disabled=true;
+    const r=await api('/client/approvals/'+aid+'/decide','POST',{decision,presented_hash:a.content_hash||'',note:note||''});
+    if(view!==VIEW_SEQ)return;
+    if(r.ok){PORTAL.snaps=null;return paintApprovalDone(back,decision,draft);}
+    toast((r.body&&r.body.message)||'That didn’t go through — please try again.');
+    if(r.status===409){PORTAL.snaps=null;return openApproval(pid,aid,from);}   // it changed under you — re-read, never decide blind
+    btn.disabled=false;
+  };
+  $('apok').addEventListener('click',()=>decide('approved','',$('apok')));
+  $('apchg').addEventListener('click',()=>{const box=$('apchgbox');const open=box.hidden;box.hidden=!open;$('apchg').setAttribute('aria-expanded',open?'true':'false');if(open)$('apchgt').focus();});
+  $('apchgsend').addEventListener('click',()=>{const v=($('apchgt').value||'').trim();if(!v){toast('Say what you’d like changed.');$('apchgt').focus();return;}decide('changes_requested',v,$('apchgsend'));});
+}
+// one clear answer after the tap; the row has left Needs you
+function paintApprovalDone(back,decision,draft){
+  const ok=decision==='approved';
+  $('main').innerHTML=sheetBackHtml(back)+`<div class="card thanks${ok?'':' chg'}" role="status"><span class="tick" aria-hidden="true">${ok?'✓':'✎'}</span>`+
+    `<h1 tabindex="-1">${ok?'Approved — thank you.':'Sent — your studio will take a look.'}</h1>`+
+    `<p class="muted">${ok?(draft?`${esc(studioBrand())} has been told. They’ll put it live and let you know here.`:`${esc(studioBrand())} has been told and will take it from here.`):'Nothing changes until you approve the next version.'}</p>`+
+    `<div class="row"><button class="approve" id="thxback">Back to ${esc(back.label==='Home'?'Home':'the project')}</button></div></div>`+
+    (ok?`<p class="muted" style="text-align:center;font-size:13px;margin-top:12px">Changed your mind? Message your studio and they’ll hold off.</p>`:'');
+  wireSheet(back);
+  $('thxback').addEventListener('click',back.go);
+}
+
+// ── a to-do, opened ──
+const HELPS=[['Your logo','The best file you have; your studio tidies it.'],['5 to 10 photos','Your work, your place, your team.'],['A few lines about you','In your own words. Your studio polishes them.']];
+async function openTodo(pid,tid,from){
+  if(PORTAL.persona!=='client')return goHome();
+  const view=++VIEW_SEQ;
+  const back=sheetBack(from);
+  setWide(true);try{window.scrollTo(0,0);}catch(_){}
+  $('main').innerHTML=skeleton();
+  const data=await sheetBundle(pid,view,back);if(!data)return;
+  const proj=data.project||{};
+  const t=(data.tasks||[]).find(x=>x&&x.id===tid);
+  if(!t){toast('That to-do isn’t here any more.');return back.go();}
+  const k=todoKind(t);
+  // the draft and the questionnaire are the things themselves
+  if(k==='review'){const wa=(data.approvals||[]).find(a=>a&&a.status==='pending'&&a.subject_type==='website');if(wa)return openApproval(pid,wa.id,from);}
+  if(k==='questionnaire'){const sv=questionnaireOf(data.surveys);if(sv)return openSurvey(sv.id,pid,null,from||'home');}
+  const done=t.status==='done';
+  const chips=`<span class="tag todo">To-do</span><span class="sm">For ${esc(proj.name||'your project')}</span>`;
+  const subs={content:'Your studio ticks this off once everything has arrived.',questionnaire:'Your studio sends the questionnaire by email. Filled it in already? Send it here, and your studio ticks this off.'};
+  if(k==='content'||k==='questionnaire'){
+    const mine=(data.deliverables||[]).filter(isClientUpload);
+    const sent=`<section style="margin-top:22px"><h2>Sent so far · ${mine.length}</h2>${mine.length?`<div class="flv">${mine.map(fx=>fileRowHtml(fx)).join('')}</div>`:emptyCard('Nothing yet. What you send shows up here.')}</section>`;
+    const drop=`<div class="dropbox" id="dropbox"><span class="di" aria-hidden="true">${si('upload')}</span><p class="dt">${k==='content'?'Choose photos or a PDF':'Choose your filled-in questionnaire'}</p><p class="dd">JPEG, PNG or WebP images up to 10MB, or PDFs up to 25MB. Pick several at once.</p><p class="dprog" id="dprog" aria-live="polite"></p><button class="approve" id="dchoose">Choose files</button><input type="file" id="dfiles" class="fshare-file" accept="${SHARE_ACCEPT}" multiple aria-hidden="true" tabindex="-1"></div>`;
+    const helps=k==='content'?`<section style="margin-top:22px"><h2>What helps most</h2><div class="card helps">${HELPS.map(h=>`<div class="hrow"><span class="hck" aria-hidden="true">✓</span><span><strong>${esc(h[0])}</strong><span class="hsub">${esc(h[1])}</span></span></div>`).join('')}</div></section>`:'';
+    const tell=done?`<p class="histline"><span aria-hidden="true">✓</span>Done — your studio has ticked this off.</p>`:`<button class="donebtn" id="tdone">I’ve sent everything — tell my studio</button><p class="muted" style="font-size:12.5px;margin-top:8px">This writes to ${esc(studioBrand())} in your project’s conversation, so they can check and tick it off.</p>`;
+    $('main').innerHTML=sheetBackHtml(back)+`<div class="sheetcols headtop"><div class="s-ask">${sheetHead(chips,t.title||'Send your files',subs[k])}</div><div class="s-thing">${drop}${sent}</div><div class="s-answer">${helps}${tell}</div></div>`;
+    wireSheet(back);
+    wireDownloads($('main'));
+    const inp=$('dfiles'),choose=$('dchoose'),box=$('dropbox');
+    const go=async(files)=>{
+      files=[...(files||[])];if(!files.length)return;
+      choose.disabled=true;
+      const res=await sendFilesTo(pid,files,(i,n)=>{const pr=$('dprog');if(pr&&view===VIEW_SEQ)pr.textContent=n>1?`Sending ${i} of ${n}…`:'Sending…';});
+      if(view!==VIEW_SEQ)return;
+      PORTAL.snaps=null;
+      if(res.sent)toast(res.sent===1?'Sent to your studio ✓':`${res.sent} files sent to your studio ✓`);
+      if(res.failed.length)toast(res.failed.length===1?`${res.failed[0].name}: ${res.failed[0].msg}`:`${res.failed.length} files didn’t send. Please try those again.`);
+      if(res.sent)return openTodo(pid,tid,from);
+      choose.disabled=false;const pr=$('dprog');if(pr)pr.textContent='';
+    };
+    choose.addEventListener('click',()=>inp.click());
+    inp.addEventListener('change',()=>go(inp.files));
+    box.addEventListener('dragover',(e)=>{e.preventDefault();box.classList.add('over');});
+    box.addEventListener('dragleave',()=>box.classList.remove('over'));
+    box.addEventListener('drop',(e)=>{e.preventDefault();box.classList.remove('over');go(e.dataTransfer&&e.dataTransfer.files);});
+    const td=$('tdone');
+    if(td)td.addEventListener('click',async()=>{
+      td.disabled=true;
+      const r=await api('/client/projects/'+pid+'/messages','POST',{body:`I’ve sent everything for “${t.title||'my to-do'}”.`});
+      if(view!==VIEW_SEQ)return;
+      if(r.ok){delete MC.cache[pid];td.textContent='Your studio has been told ✓';toast('Sent — your studio will check and tick it off.');}
+      else{td.disabled=false;toast('That didn’t send — please try again.');}
+    });
+    return;
+  }
+  // the draft's to-do before there's a draft, and every other to-do: its own words, and Mark done when it's yours to tick
+  const due=t.due_date?`<p class="apdue${t.derived&&t.derived.overdue?' late':''}" style="margin-top:14px">${t.derived&&t.derived.overdue?'Overdue — this was due ':'Due '}${esc(niceDay(t.due_date))}.</p>`:'';
+  let body='';
+  if(k==='review'){
+    const other=(data.approvals||[]).some(a=>a&&a.status==='pending');
+    body=`<div class="card" style="margin-top:16px"><p>${other?'Something is waiting for your OK on this project.':'Your studio will share the draft here for your OK. Nothing to do until then.'}</p>${other?`<div class="row"><button class="approve" id="tseeaps">See what’s waiting</button></div>`:''}</div>`;
+  }else{
+    body=`<div class="card" style="margin-top:16px">${t.detail?`<p style="white-space:pre-wrap">${esc(t.detail)}</p>`:`<p>${esc(TASK_WORD[t.status]||String(t.status||'').replace(/_/g,' '))}</p>`}`+
+      (done?`<p class="histline"><span aria-hidden="true">✓</span>Done</p>`:clientMayTick(t)?`<div class="row"><button class="approve" id="tmark">Mark done</button></div>`:`<p class="muted tdnote" style="margin-top:10px">Your studio marks this one off once it’s done.</p>`)+`</div>`;
+  }
+  $('main').innerHTML=sheetBackHtml(back)+`<div class="sheetcols solo"><div class="s-ask">${sheetHead(chips,t.title||'A to-do','')}</div><div class="s-answer">${due}${body}</div></div>`;
+  wireSheet(back);
+  const sa=$('tseeaps');if(sa)sa.addEventListener('click',()=>openProject(pid,'sec-approvals'));
+  const tm=$('tmark');
+  if(tm)tm.addEventListener('click',async()=>{
+    tm.disabled=true;
+    const r=await api('/client/projects/'+pid+'/tasks/'+tid+'/done','POST',{});
+    if(view!==VIEW_SEQ)return;
+    if(r&&r.ok){PORTAL.snaps=null;toast('Marked done — your studio will see it.');return back.go();}
+    toast((r&&r.body&&r.body.message)||'Couldn’t update that.');tm.disabled=false;
+  });
+}
+// Several files at once, each through the ONE upload backend (upload-url → PUT →
+// record), named by its own file name. Each is checked before anything is sent; a
+// record step that fails for a passing reason is tried once more, since the bytes
+// are already up. Returns how many went and which didn't, in words.
+async function sendFilesTo(pid,files,onStep){
+  let sent=0;const failed=[];
+  for(let i=0;i<files.length;i++){
+    const file=files[i];if(onStep)onStep(i+1,files.length,file);
+    const bad=sharePreflight(file);if(bad){failed.push({name:file.name,msg:bad});continue;}
+    try{
+      const up=await api('/client/projects/'+pid+'/upload-url','POST',{mime:file.type||'application/octet-stream',bytes:file.size,title:file.name});
+      const d=up.ok&&up.body&&up.body.data;
+      if(!d||!d.upload_url){failed.push({name:file.name,msg:shareServerMsg(up.body&&up.body.message,file)||'Uploads aren’t available right now.'});continue;}
+      const put=await fetch(d.upload_url,{method:'PUT',headers:{'Content-Type':file.type||'application/octet-stream','x-upsert':'true'},body:file});
+      if(!put.ok){failed.push({name:file.name,msg:'The upload didn’t finish.'});continue;}
+      let rec=await api('/client/projects/'+pid+'/uploads','POST',{media_id:d.media_id,title:file.name});
+      if(!rec.ok&&rec.status!==422)rec=await api('/client/projects/'+pid+'/uploads','POST',{media_id:d.media_id,title:file.name});
+      if(!rec.ok){failed.push({name:file.name,msg:shareServerMsg(rec.body&&rec.body.message,file)||'Couldn’t save that file.'});continue;}
+      sent++;
+    }catch(_){failed.push({name:file.name,msg:'The upload didn’t finish.'});}
+  }
+  return {sent,failed};
 }
 let PROJ_EVENTS=[],PROJ_MSGS=[];   // the open project's timeline inputs
 let PROJ_MSGS_FAILED=false;   // PS6: a failed messages read renders ITS calm line in the rail — never the "say hello" empty copy
@@ -2417,7 +3065,7 @@ async function openProject(id,focusSection){
   const view=++VIEW_SEQ;   // this drill-in owns #main now — a late tab render must not clobber it
   setWide(false);
   $('main').innerHTML=skeleton();
-  let d,rep,supRes,msgRes;
+  let d,rep,msgRes;
   // network down mid-read — a calm couldn't-load card with a way back, never a
   // skeleton stuck forever, and never "isn't available" for a project that is
   const cantLoad=()=>{
@@ -2426,10 +3074,9 @@ async function openProject(id,focusSection){
     const pb=$('projBack');if(pb)pb.addEventListener('click',(e)=>{e.preventDefault();backHome(id);});
   };
   try{
-    [d,rep,supRes,msgRes]=await Promise.all([
+    [d,rep,msgRes]=await Promise.all([
       api('/client/projects/'+id),
       api('/client/projects/'+id+'/report').catch(()=>null),
-      api('/client/support').catch(()=>null),
       api('/client/projects/'+id+'/messages').catch(()=>null),
     ]);
   }catch(_){
@@ -2446,13 +3093,12 @@ async function openProject(id,focusSection){
   PROJ_MSGS=Array.isArray(msgData)?msgData.slice():[];   // shape-guarded — a non-array payload must never throw the whole record
   PROJ_MSGS_FAILED=!(msgRes&&msgRes.ok);   // failed ≠ empty: the rail says so instead of "say hello"
   const hasOverview=!!(s&&s.progress&&s.milestones);
-  const AKIND={deliverable:'File',task:'Task',project:'Project',custom:'Request'};
   const aps=(data.approvals||[]).filter(a=>a.status==='pending');
   const acts=(data.tasks||[]).filter(t=>t.client_action_required);
   let html=`<p><a class="link" href="/client.html" id="projBack">← Back to home</a></p><header><div class="phead"><h1>${esc(p.name)}</h1><span class="statuschip">${esc(projectWord(p.status))}</span></div></header>`;
   // slim sticky chip bar — anchors within this one screen (no new pages); only
   // sections that actually have content get a chip.
-  const chips=chipsFor({hasOverview,approvals:data.approvals,deliverables:data.deliverables,hasMessages:true,hasSupport:true});
+  const chips=chipsFor({hasOverview,approvals:data.approvals,deliverables:data.deliverables,hasMessages:true});
   if(chips.length>1)html+=`<nav class="chipbar" aria-label="Jump to a section">${chips.map(c=>`<button class="chip" data-chip="${esc(c.id)}">${esc(c.label)}</button>`).join('')}</nav>`;
   // highlights tiles (label-over-value) — only the facts this project has
   const prog=(s&&s.progress)||data.progress||null;
@@ -2473,7 +3119,7 @@ async function openProject(id,focusSection){
   // approvals that need the client — per-kind tag, per-card id (notification
   // anchors emit #approval-<id>), and a helper line so "request changes" is
   // clearly safe. Decided ones form a paper-trail section below.
-  if(aps.length){html+=`<section id="sec-approvals"><h2>Needs your OK</h2>`;for(const a of aps){html+=`<div class="card approve" id="approval-${esc(a.id)}"><span class="tag">${esc(AKIND[a.subject_type]||'Approval')}</span><h3>${esc(a.title)}</h3><p>${esc(a.summary||'')}</p>${a.due_date?`<p class="apdue${approvalOverdue(a)?' late':''}">${approvalOverdue(a)?'Overdue — your answer was due '+esc(niceDay(a.due_date))+'. Nothing moves until you decide.':'Please answer by '+esc(niceDay(a.due_date))+'.'}</p>`:''}<div class="row"><button class="approve" data-adec="${esc(a.id)}" data-ah="${esc(a.content_hash)}">Approve</button><button data-areq="${esc(a.id)}">Request changes</button></div><div id="note-${esc(a.id)}" style="display:none;margin-top:12px"><textarea id="nt-${esc(a.id)}" rows="2" aria-label="What would you like changed?" style="width:100%;font:inherit;border:1px solid var(--line);border-radius:10px;padding:9px;background:var(--card);color:var(--ink)" placeholder="What would you like changed? This goes straight to your studio."></textarea><p class="muted" style="font-size:12.5px;margin-top:6px">Nothing changes until you approve — this just tells your studio what to adjust.</p><div class="row"><button class="approve" data-asend="${esc(a.id)}" data-ah="${esc(a.content_hash)}">Send request</button><button data-acancel="${esc(a.id)}">Cancel</button></div></div></div>`;}html+=`</section>`;}
+  if(aps.length){html+=`<section id="sec-approvals"><h2>Needs your OK</h2>`;for(const a of aps){html+=`<div class="card approve" id="approval-${esc(a.id)}"><span class="tag">${esc(AP_KIND[a.subject_type]||'Approval')}</span><h3>${esc(a.title)}</h3><p>${esc(a.summary||'')}</p>${a.due_date?`<p class="apdue${approvalOverdue(a)?' late':''}">${approvalOverdue(a)?'Overdue — your answer was due '+esc(niceDay(a.due_date))+'. Nothing moves until you decide.':'Please answer by '+esc(niceDay(a.due_date))+'.'}</p>`:''}<div class="row">${a.subject_type==='website'?`<button data-apr-open="${esc(a.id)}" aria-label="See the draft — ${esc(a.title||'Your website draft')}">See the draft</button>`:''}<button class="approve" data-adec="${esc(a.id)}" data-ah="${esc(a.content_hash)}">Approve</button><button data-areq="${esc(a.id)}">Request changes</button></div><div id="note-${esc(a.id)}" style="display:none;margin-top:12px"><textarea id="nt-${esc(a.id)}" rows="2" aria-label="What would you like changed?" style="width:100%;font:inherit;border:1px solid var(--line);border-radius:10px;padding:9px;background:var(--card);color:var(--ink)" placeholder="What would you like changed? This goes straight to your studio."></textarea><p class="muted" style="font-size:12.5px;margin-top:6px">Nothing changes until you approve — this just tells your studio what to adjust.</p><div class="row"><button class="approve" data-asend="${esc(a.id)}" data-ah="${esc(a.content_hash)}">Send request</button><button data-acancel="${esc(a.id)}">Cancel</button></div></div></div>`;}html+=`</section>`;}
   const decided=(data.approvals||[]).filter(a=>a.status==='approved'||a.status==='rejected'||a.status==='changes_requested');
   if(decided.length){const DLBL={approved:['✓ Approved','ok'],rejected:['Declined',''],changes_requested:['✎ Changes requested','chg']};
     html+=`<section><h2>Decided</h2><div class="card"><ul class="hist">${decided.map(a=>{const d=DLBL[a.status];return`<li id="approval-${esc(a.id)}"><span class="ht">${esc(a.title)}</span><span class="hs ${d[1]}">${esc(d[0])}${a.decided_at?` · ${esc(rel(a.decided_at))}`:''}</span></li>`;}).join('')}</ul></div></section>`;}
@@ -2492,23 +3138,11 @@ async function openProject(id,focusSection){
   html+=shareCardHtml()+`</section>`;
   // surveys
   if((data.surveys||[]).length){html+=`<section id="sec-surveys"><h2>A quick survey</h2>`;for(const sv of data.surveys){html+=`<div class="card"><h3>${esc(sv.title)}</h3><div class="row"><a class="link" href="#" data-survey="${esc(sv.id)}">Open survey →</a></div></div>`;}html+=`</section>`;}
-  // support — the client can now SEE their requests + the studio's replies, not just fire one off.
-  // A FAILED read says so calmly (the CTA below stays) — an ok-empty read renders no rows, honestly.
-  const supFailed=!(supRes&&supRes.ok);
-  const sup=((!supFailed&&supRes.body&&supRes.body.data)||[]).filter(r=>r&&r.id&&(!r.project_id||r.project_id===id));
-  // the Requests tab's exact queue-row anatomy AND its exact recency:
-  // last_activity_at (replies only INSERT — they never bump updated_at) with
-  // the updated_at fallback, so the order can never contradict each row's own
-  // "Updated …" meta or the tab's list.
-  const supWhen=(r)=>String(r.last_activity_at||r.updated_at||'');
-  sup.sort((a,b)=>supWhen(b).localeCompare(supWhen(a)));
-  html+=`<section id="sec-support"><h2>Support</h2>`;
-  if(supFailed)html+=`<p class="muted fload">We couldn’t check on support requests just now — please try again in a moment.</p>`;
-  else if(sup.length)html+=`<div class="card reqlist">${sup.map(reqRowHtml).join('')}</div>`;
-  html+=`<div class="card"><p class="muted">${sup.length?'Need something else?':'Have a question for your studio?'} Open a support request.</p><div class="row"><button id="newSupport">Open a support request</button></div></div></section>`;
+  // item 179 part three: no Support box here any more — this project's conversation is
+  // the rail beside, and every question, request and service ask lives in Messages
   html+=`</div>`;   // /pleft
   // the activity rail — the project's client-visible timeline, composer below it
-  html+=`<aside class="prail"><section id="sec-messages"><h2>Messages &amp; activity</h2><p class="muted" style="margin:-6px 0 12px;font-size:13px">Your studio usually replies within a day.</p><div class="card acard"><div id="ptl" class="tlhost"></div><div class="pcompose"><textarea id="msg" rows="2" aria-label="Message your studio" style="width:100%;font:inherit;border:1px solid var(--line);border-radius:10px;padding:9px;background:var(--card);color:var(--ink)" placeholder="Message your studio…"></textarea><div class="row"><button class="approve" id="send">Send</button></div></div></div></section></aside></div>`;
+  html+=`<aside class="prail"><section id="sec-messages"><h2>Messages &amp; activity</h2><p class="muted" style="margin:-6px 0 12px;font-size:13px">Your studio usually replies within a day. <a class="link" href="#" id="toMessages">All your conversations →</a></p><div class="card acard"><div id="ptl" class="tlhost"></div><div class="pcompose"><textarea id="msg" rows="2" aria-label="Message your studio" style="width:100%;font:inherit;border:1px solid var(--line);border-radius:10px;padding:9px;background:var(--card);color:var(--ink)" placeholder="Message your studio…"></textarea><div class="row"><button class="approve" id="send">Send</button></div></div></div></section></aside></div>`;
   $('main').innerHTML=html;
   // Oct 2026 audit change 4: one filled button on the record — the first Approve,
   // else the first Mark done; Send / Choose a file / the rest step back to outlined
@@ -2548,18 +3182,21 @@ async function openProject(id,focusSection){
   document.querySelectorAll('[data-areq]').forEach(b=>b.addEventListener('click',()=>{const n=noteBox(b,'data-areq');if(n){n.style.display='block';const t=noteText(b,'data-areq');if(t)t.focus();}}));
   document.querySelectorAll('[data-acancel]').forEach(b=>b.addEventListener('click',()=>{const n=noteBox(b,'data-acancel');if(n)n.style.display='none';}));
   document.querySelectorAll('[data-asend]').forEach(b=>b.addEventListener('click',()=>{const t=noteText(b,'data-asend');adec(b.getAttribute('data-asend'),b.getAttribute('data-ah'),'changes_requested',t?t.value.trim():'',b);}));
-  document.querySelectorAll('[data-sup]').forEach(b=>b.addEventListener('click',()=>openSupportThread(b.getAttribute('data-sup'),id)));
   document.querySelectorAll('[data-taskdone]').forEach(b=>b.addEventListener('click',async()=>{b.disabled=true;const r=await api('/client/projects/'+id+'/tasks/'+b.getAttribute('data-taskdone')+'/done','POST',{});if(r&&r.ok){toast('Marked done — your studio will see it.');PORTAL.snaps=null;openProject(id,'sec-todos');}else{toast((r&&r.body&&r.body.message)||'Couldn’t update that.');b.disabled=false;}}));   // re-focus the acted-on section
   // the share card, in drill-in context: compose preselects THIS project, and a
   // successful send re-opens the record at its Files section (view-guarded in
   // shareSend — a client who moved on mid-send is never yanked back)
   wireShareCard({pid:id,ondone:()=>openProject(id,'sec-files')});
   wireDownloads(document);
-  document.querySelectorAll('[data-survey]').forEach(a=>a.addEventListener('click',(e)=>{e.preventDefault();openSurvey(a.getAttribute('data-survey'),id,a);}));
+  // item 179 part two: a to-do, the draft and the questionnaire open their own pages, with the way back to this record
+  const fromHere={pid:id,name:p.name};
+  document.querySelectorAll('[data-survey]').forEach(a=>a.addEventListener('click',(e)=>{e.preventDefault();openSurvey(a.getAttribute('data-survey'),id,a,fromHere);}));
+  document.querySelectorAll('[data-todo-open]').forEach(b=>b.addEventListener('click',()=>openTodo(id,b.getAttribute('data-todo-open'),fromHere)));
+  document.querySelectorAll('[data-apr-open]').forEach(b=>b.addEventListener('click',()=>openApproval(id,b.getAttribute('data-apr-open'),fromHere)));
   // a to-do's "Share a file" / "Review it" jump to the place on this page where it's done
   document.querySelectorAll('[data-todo-go]').forEach(b=>b.addEventListener('click',()=>{const share=b.getAttribute('data-todo-go')==='share';scrollToSection(share?'sec-files':'sec-approvals');const t=share?$('fchoose'):document.querySelector('#sec-approvals [data-adec]');if(t)t.focus({preventScroll:true});}));
   const pb=$('projBack');if(pb)pb.addEventListener('click',(e)=>{e.preventDefault();backHome(id);});
-  $('newSupport').addEventListener('click',()=>openSupport(id));
+  const tm=$('toMessages');if(tm)tm.addEventListener('click',(e)=>{e.preventDefault();showTab('messages');});
   $('send').addEventListener('click',async()=>{const b=$('send');const v=$('msg').value.trim();if(!v)return;b.disabled=true;const r=await api('/client/projects/'+id+'/messages','POST',{body:v});if(r.ok){$('msg').value='';PROJ_MSGS=[sentMessage(r,v)].concat(PROJ_MSGS);renderProjTimeline();loadThread(id);}else toast('That didn’t send.');b.disabled=false;});   // the sent message shows at once; loadThread confirms it (experience review #44)
 }
 // re-fetch the thread and repaint the rail (a sent message appears as a timeline item)
@@ -2702,7 +3339,7 @@ function paintSThread(rq,msgs){
   const items=supportThreadItems(rq,msgs);
   host.innerHTML=items.length?`<div class="tlhost">${tlItemsHtml(items)}</div>`:emptyCard('No replies yet — your studio usually replies within a day.','💬');
 }
-async function openSurvey(sid,pid,ctrl){
+async function openSurvey(sid,pid,ctrl,from){
   const view=++VIEW_SEQ;   // this drill-in paints #main on success — a late tab render must not clobber it
   // busy state on the INVOKING control — a slow read is never a dead click, and
   // the current view (often the wide record page) stays put until the survey
@@ -2715,31 +3352,53 @@ async function openSurvey(sid,pid,ctrl){
   if(view!==VIEW_SEQ){busy(false);return;}   // the user moved on mid-fetch — never paint over the newer view (and un-busy the control)
   if(!r||!r.ok){toast(r&&r.offline?OFFLINE_MSG:'That survey isn’t available.');busy(false);return;}   // the current view stays intact
   busy(false);
-  setWide(false);   // only collapse the wide layout once the survey actually renders
+  setWide(false);try{window.scrollTo(0,0);}catch(_){}   // only collapse the wide layout once the survey actually renders
+  // item 179 part two: back goes where it was opened from ('home', or {pid,name} for
+  // the project); a caller that names neither keeps the old way back, to the project
+  const back=from?sheetBack(from):{label:'Back to the project',go:()=>openProject(pid)};
   const sv=r.body.data.survey||{}; const done=r.body.data.my_response&&r.body.data.my_response.status==='submitted';
-  let html=`<p><a class="link" href="#" id="back">← Back to project</a></p><header><h1 tabindex="-1">${esc(sv.title||'Survey')}</h1></header><section>`;
-  if(done){html+=`<div class="card"><p class="muted">Thanks — you’ve already answered this survey.</p></div></section>`;$('main').innerHTML=html;const h=$('main').querySelector('h1');if(h)h.focus({preventScroll:true});$('back').addEventListener('click',(e)=>{e.preventDefault();openProject(pid);});return;}
-  let qi=0;
-  for(const q of (sv.questions||[])){
-    // Each generated field gets a real id so its label's `for` associates it
-    // (q.key is server data — an index-based id is guaranteed attribute-safe).
-    // Fields carry font:inherit + the card/ink tokens (white-on-dark before).
-    const fid=`svq-${++qi}`;
-    const box=`id="${fid}" style="width:100%;font:inherit;padding:9px;border:1px solid var(--line);border-radius:10px;background:var(--card);color:var(--ink)"`;
-    let field;
-    if(q.type==='rating') field=`<select data-q="${esc(q.key)}" ${box}><option value="" disabled selected>Choose a rating (1–5)…</option>${[1,2,3,4,5].map(n=>`<option>${n}</option>`).join('')}</select>`;
-    else if(q.type==='choice') field=`<select data-q="${esc(q.key)}" ${box}><option value="" disabled selected>Choose…</option>${(q.choices||[]).map(c=>`<option>${esc(c)}</option>`).join('')}</select>`;
-    else field=`<input data-q="${esc(q.key)}" type="text" ${box}>`;
-    html+=`<div class="card"><label for="${fid}" style="display:block;font-weight:600;margin-bottom:6px">${esc(q.label)}</label>${field}</div>`;
+  const qs=(Array.isArray(sv.questions)?sv.questions:[]).filter(q=>q&&q.key);
+  const chips=`<span class="tag todo">${/questionnaire|intake|brief/i.test(String(sv.title||''))?'To-do':'Survey'}</span><span class="sm">${qs.length} question${qs.length===1?'':'s'}</span>`;
+  if(done||!qs.length){
+    $('main').innerHTML=sheetBackHtml(back)+sheetHead(chips,sv.title||'Survey','')+`<div class="card" style="margin-top:16px"><p class="muted">${done?'Thanks — you’ve already answered this survey.':'This survey has no questions yet.'}</p></div>`;
+    wireSheet(back);return;
   }
-  html+=`<div class="row"><button class="approve" id="subSurvey">Send your answers</button></div></section>`;
-  $('main').innerHTML=html;
-  const h1=$('main').querySelector('h1');if(h1)h1.focus({preventScroll:true});   // entry focus — the drill-in says where you are
-  $('back').addEventListener('click',(e)=>{e.preventDefault();openProject(pid);});
-  $('subSurvey').addEventListener('click',async()=>{const b=$('subSurvey');b.disabled=true;const answers={};document.querySelectorAll('[data-q]').forEach(el=>{answers[el.getAttribute('data-q')]=el.value;});const rr=await api('/client/surveys/'+sid+'/respond','POST',{answers});if(rr.ok){toast('Thank you!');openProject(pid);}else{toast('That didn’t send — please try again.');b.disabled=false;}});
+  // one question to a screen, with a progress line; the answers stay on this device
+  // until they're sent, so a client can stop and come back
+  const KEY='dds-survey-draft:'+sid;
+  let answers={};try{const v=JSON.parse(localStorage.getItem(KEY)||'{}');if(v&&typeof v==='object')answers=v;}catch(_){}
+  const keep=()=>{try{localStorage.setItem(KEY,JSON.stringify(answers));}catch(_){}};
+  let i=0;
+  const paint=(focusField)=>{
+    const q=qs[i];const last=i===qs.length-1;const val=answers[q.key]==null?'':String(answers[q.key]);
+    // q.key is server data — the field's id is fixed and its key rides in data-q
+    let field;
+    if(q.type==='rating')field=`<select id="svq" class="fieldin" data-q="${esc(q.key)}"><option value="" disabled${val?'':' selected'}>Choose a rating (1–5)…</option>${[1,2,3,4,5].map(n=>`<option${String(n)===val?' selected':''}>${n}</option>`).join('')}</select>`;
+    else if(q.type==='choice')field=`<select id="svq" class="fieldin" data-q="${esc(q.key)}"><option value="" disabled${val?'':' selected'}>Choose…</option>${(q.choices||[]).map(c=>`<option${String(c)===val?' selected':''}>${esc(c)}</option>`).join('')}</select>`;
+    else field=`<textarea id="svq" class="fieldin" rows="4" data-q="${esc(q.key)}" style="margin-top:0">${esc(val)}</textarea>`;
+    $('main').innerHTML=sheetBackHtml(back)+sheetHead(chips,sv.title||'Survey','')+
+      `<p class="qprog" id="qprog">Question ${i+1} of ${qs.length}</p><div class="qsteps" aria-hidden="true">${qs.map((_,j)=>`<i class="${j<=i?'on':''}"></i>`).join('')}</div>`+
+      `<div class="card qcardq"><label for="svq">${esc(q.label||'Your answer')}</label>${field}</div>`+
+      `<div class="qnav"><button class="approve" id="${last?'subSurvey':'qnext'}">${last?'Send your answers':'Next'}</button>${i>0?'<button id="qback">Back</button>':''}</div>`+
+      `<p class="qkeep">Your answers stay on this device until you send them, so you can stop and come back.</p>`;
+    wireSheet(back,focusField?'#svq':null);
+    const fld=$('svq');const save=()=>{answers[q.key]=fld.value;keep();};
+    fld.addEventListener('input',save);fld.addEventListener('change',save);
+    const qb=$('qback');if(qb)qb.addEventListener('click',()=>{save();i--;paint(true);});
+    const qn=$('qnext');if(qn)qn.addEventListener('click',()=>{save();i++;paint(true);});
+    const sb=$('subSurvey');
+    if(sb)sb.addEventListener('click',async()=>{
+      save();sb.disabled=true;
+      const rr=await api('/client/surveys/'+sid+'/respond','POST',{answers:Object.fromEntries(qs.map(x=>[x.key,answers[x.key]==null?'':String(answers[x.key])]))});
+      if(view!==VIEW_SEQ)return;
+      if(rr.ok){try{localStorage.removeItem(KEY);}catch(_){}PORTAL.snaps=null;toast('Thank you!');back.go();}
+      else{toast('That didn’t send — please try again.');sb.disabled=false;}
+    });
+  };
+  paint(false);
 }
 // `ret` names the view to return to on back/success when there's no project —
-// the Requests tab passes 'requests' so its "Something else?" round-trips home
+// booking's "Ask for a call" passes 'messages' so it round-trips to Messages
 // to the tab (and the fresh request), not to the Home feed. Other callers keep
 // the old default (project → the project; otherwise the client home).
 async function openSupport(pid,ret,prefill){
@@ -2753,10 +3412,10 @@ async function openSupport(pid,ret,prefill){
   {const f=prefill&&prefill.body?$('sup-body'):$('sup-subj');if(f){f.focus();if(prefill&&prefill.body&&f.setSelectionRange)f.setSelectionRange(f.value.length,f.value.length);}}   // entry focus on the first field (shareCompose's pattern); a prefilled ask lands at its end
   // No project yet? Back and success return to the client home (load), not a
   // missing project — so a managed client with zero projects never hits a dead end.
-  const backTo=()=>{if(pid)return openProject(pid);if(ret==='requests')return showTab('requests');load();};
+  const backTo=()=>{if(pid)return openProject(pid);if(ret==='services')return openServices();if(ret==='messages')return showTab('messages');load();};
   $('back').addEventListener('click',(e)=>{e.preventDefault();backTo();});
   // a form with its own subject is a new request — never folded into an older conversation (portal walk, Nov 8)
-  $('sup-send').addEventListener('click',async()=>{const b=$('sup-send');const subject=$('sup-subj').value.trim();if(!subject){toast('Add a subject.');return;}b.disabled=true;const r=await api('/client/support','POST',{subject,body:$('sup-body').value.trim(),project_id:pid,new_request:true});if(r.ok){toast('Sent — your studio will get back to you.');backTo();}else{toast('That didn’t send.');b.disabled=false;}});
+  $('sup-send').addEventListener('click',async()=>{const b=$('sup-send');const subject=$('sup-subj').value.trim();if(!subject){toast('Add a subject.');return;}b.disabled=true;const r=await api('/client/support','POST',{subject,body:$('sup-body').value.trim(),project_id:pid,new_request:true});if(r.ok){toast('Sent — your studio will get back to you.');const nid=r.body&&r.body.data&&r.body.data.id;if(!pid&&nid&&(ret==='messages'||ret==='services'))openMessagesTo(nid);else backTo();}else{toast('That didn’t send.');b.disabled=false;}});
 }
 
 // Nov 10 review (G2): an email button ("Open your project", a reply to a request)
@@ -2770,8 +3429,9 @@ function keepReturn(q){
   try{
     const v={},id=(k)=>{const x=q.get(k)||'';return /^[0-9a-zA-Z-]{1,64}$/.test(x)?x:'';};
     if(id('project'))v.project=id('project');
+    if(id('approval'))v.approval=id('approval');   // item 179: an ask's email opens the approval itself
     if(id('support'))v.support=id('support');
-    const t=String(location.hash||'').slice(1);if(TAB_IDS.indexOf(t)>=0)v.tab=t;
+    const t=String(location.hash||'').slice(1);if(TAB_IDS.indexOf(tabOf(t))>=0)v.tab=t;   // the name as written: #invoices keeps its filter
     if(!Object.keys(v).length)return;
     v.at=Date.now();localStorage.setItem(RETURN_KEY,JSON.stringify(v));
   }catch(_){}
@@ -2799,8 +3459,10 @@ async function load(){
   const kept=first?takeReturn():null;
   const fromUrl=!!(params.get('support')||params.get('project'));
   const dsup=fromUrl?params.get('support'):((kept&&kept.support)||''); const deep=fromUrl?params.get('project'):((kept&&kept.project)||'');
+  // item 179: "Needs your OK" emails carry the approval too — it opens in place, the project stays the fallback
+  const dapr=String((fromUrl?params.get('approval'):(kept&&kept.approval))||'');
   // a tab named in the address (#invoices: the cancelled-payment page's way back), first load only
-  const hashTab=first&&TAB_IDS.indexOf(String(location.hash||'').slice(1))>=0?String(location.hash).slice(1):'';
+  const hashTab=first&&TAB_IDS.indexOf(tabOf(String(location.hash||'').slice(1)))>=0?String(location.hash).slice(1):'';   // showTab resolves an old name to its tab and filter
   const wantTab=hashTab||(kept&&kept.tab)||'';
   // studio audit change 9: the studio's "connect your Google" email lands here with
   // ?connect=<signed token>; a sign-in on the way stashes it (see the boot below)
@@ -2860,6 +3522,7 @@ async function load(){
   // deep links open the relevant drill-down; the nav stays visible around it.
   // ?support= now opens the Messages tab with that thread in the reading pane.
   if(dsup){await openMessagesTo(dsup);if(PORTAL.persona==='client')api('/client/notifications/read','POST',{}).catch(()=>{});return;}   // PS3: the mark-read POST is /client/* — client persona only
+  if(deep&&/^[0-9a-f-]{36}$/i.test(dapr)){await openApproval(deep,dapr);if(PORTAL.persona==='client')api('/client/notifications/read','POST',{}).catch(()=>{});return;}
   if(deep){await openProject(deep);if(PORTAL.persona==='client')api('/client/notifications/read','POST',{}).catch(()=>{});return;}
   // item 1: the just-paid invoice — from the URL (the Stripe return: open the
   // Invoices tab and say thank you) or from the ten-minute memory (a sign-in or

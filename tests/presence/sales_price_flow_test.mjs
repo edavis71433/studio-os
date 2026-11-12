@@ -98,7 +98,7 @@ const pipe = read('pipeline.html');
 {
   const view = sales.slice(sales.indexOf('export async function handleSalesPublicView'), sales.indexOf('export async function handleSalesDocument'));
   const sign = read('sign.html');
-  ok('flow view: the deposit’s pay URL rides back ONLY for a signed agreement with an open deposit', /url: \(contract\?\.status === 'signed' && dep\.status === 'open' && dep\.stripe_url\)/.test(view));
+  ok('flow view: the deposit’s pay URL rides back ONLY for a signed agreement with an open deposit', /url: \(contract\?\.status === 'signed' && dep\.status === 'open' && !settling && dep\.stripe_url\)/.test(view));   // sales item 118: …and not while a bank payment is settling
   ok('flow view: a paid deposit still shows (status paid) so the page can say "deposit paid"', /purpose=eq\.deposit&status=in\.\(open,paid\)/.test(view));
   ok('flow view: the agreement’s body + content_hash are withheld until the proposal is accepted (locked: true)', /chosen \? \{ id: contract\.id, title: contract\.title, body: contract\.body, content_hash: contract\.content_hash/.test(view) && /\{ id: contract\.id, title: contract\.title, status: contract\.status, locked: true \}/.test(view));
   ok('flow view: chosen = accepted, or never had a proposal in play — between versions it stays locked', /const chosen = proposal \? proposal\.status === 'accepted' : !proposal_pending/.test(view) && /proposal_pending, contract: contractOut, contract_pending, deposit/.test(view));

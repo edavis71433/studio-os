@@ -154,7 +154,8 @@ export async function handleCrmSearch(req: Request, jwt: string, site: SiteRow, 
     read(`presence_proposals?site_id=eq.${S}&deleted_at=is.null&title=${like}&select=id,deal_id,title,status,created_at&order=created_at.desc&limit=4`),
     read(`presence_estimates?site_id=eq.${S}&deleted_at=is.null&title=${like}&select=id,deal_id,title,status,created_at&order=created_at.desc&limit=4`),
     read(`presence_contracts?site_id=eq.${S}&deleted_at=is.null&title=${like}&select=id,deal_id,title,status,created_at&order=created_at.desc&limit=4`),
-    read(`presence_deal_tasks?site_id=eq.${S}&deleted_at=is.null&title=${like}&select=id,deal_id,title,due_date,status&order=created_at.desc&limit=4`),
+    // item 85: a to-do may be for a person or a customer (APPLY-0173); before it, the older select
+    svc(`presence_deal_tasks?site_id=eq.${S}&deleted_at=is.null&title=${like}&select=id,deal_id,contact_id,client_id,title,due_date,status&order=created_at.desc&limit=4`).then((r) => r.ok ? arr(r) : read(`presence_deal_tasks?site_id=eq.${S}&deleted_at=is.null&title=${like}&select=id,deal_id,title,due_date,status&order=created_at.desc&limit=4`)).catch(() => read(`presence_deal_tasks?site_id=eq.${S}&deleted_at=is.null&title=${like}&select=id,deal_id,title,due_date,status&order=created_at.desc&limit=4`)),
     read(`presence_tasks?site_id=eq.${S}&deleted_at=is.null&title=${like}&select=id,project_id,title,due_date,status&order=created_at.desc&limit=4`),
     deep ? read(`presence_support_requests?site_id=eq.${S}&deleted_at=is.null&or=(subject.${like},body.${like})&select=id,subject,body,created_at&order=created_at.desc&limit=4`) : none,
     deep ? read(`presence_support_messages?site_id=eq.${S}&deleted_at=is.null&body=${like}&select=id,request_id,body,created_at&order=created_at.desc&limit=4`) : none,
@@ -206,7 +207,8 @@ export async function handleCrmSearch(req: Request, jwt: string, site: SiteRow, 
   if (moneyWord) add({ kind: 'page', group: 'money', label: 'Who owes you', sub: 'Pipeline · outstanding invoices', href: '/pipeline.html#outstanding' });
   for (const p of projects) add({ kind: 'project', group: 'projects', label: String(p.name || 'Project'), sub: 'Project', href: `/crm.html?project=${p.id}&tab=delivery` });
   const todoSub = (t: any, word: string) => [word, t.status === 'done' ? 'done' : t.due_date ? 'due ' + shortDate(t.due_date) : ''].filter(Boolean).join(' · ');
-  for (const t of dealTasks) add({ kind: 'todo', group: 'todos', label: String(t.title || 'To-do'), sub: todoSub(t, 'To-do'), href: dealHref(t.deal_id) });
+  // item 85: a to-do for a person or a customer opens their record; one of your own, the To-dos page
+  for (const t of dealTasks) add({ kind: 'todo', group: 'todos', label: String(t.title || 'To-do'), sub: todoSub(t, 'To-do'), href: t.deal_id ? dealHref(t.deal_id) : t.contact_id ? `/crm.html?contact=${t.contact_id}` : t.client_id ? `/crm.html?client_id=${t.client_id}` : '/todos.html' });
   for (const t of projectTasks) add({ kind: 'todo', group: 'todos', label: String(t.title || 'Task'), sub: todoSub(t, 'Project task'), href: `/crm.html?project=${t.project_id}&tab=delivery` });
   for (const m of support) add({ kind: 'message', group: 'messages', label: hit(m.subject) ? String(m.subject) : quoteOf(snippet(m.body, q, 80)), sub: ['Support request', shortDate(m.created_at)].filter(Boolean).join(' · '), href: `/inbox.html#support?sel=sup:${m.id}` });
   for (const m of supportReplies) add({ kind: 'message', group: 'messages', label: quoteOf(snippet(m.body, q, 80)), sub: ['Support reply', shortDate(m.created_at)].filter(Boolean).join(' · '), href: `/inbox.html#support?sel=sup:${m.request_id}` });
@@ -278,7 +280,7 @@ async function relationshipScope(jwt: string, site: SiteRow, principal: Principa
 }
 /** Unscoped: a customer id only counts when it is this studio's — an active
  *  link from this site, or a deal on this site that became them. */
-async function customerOfThisStudio(studioSiteId: string, clientId: string): Promise<{ ok: boolean; customerSiteId: string }> {
+export async function customerOfThisStudio(studioSiteId: string, clientId: string): Promise<{ ok: boolean; customerSiteId: string }> {
   if (!studioSiteId || !UUID_RE.test(clientId)) return { ok: false, customerSiteId: '' };
   const lk = one(await svc(`presence_service_links?agency_site_id=eq.${studioSiteId}&customer_client_id=eq.${clientId}&status=eq.active&select=customer_site_id&order=created_at.desc&limit=1`));
   if (lk) return { ok: true, customerSiteId: String(lk.customer_site_id || '') };
@@ -429,7 +431,8 @@ async function collectClientConversation(u: URL, rs: RelScope): Promise<{
       const d = (ev.detail && typeof ev.detail === 'object') ? ev.detail : {};
       if (ev.kind === 'note' && ['call', 'email', 'meeting', 'note'].includes(String(d.activity_kind))) {
         // item 107 (J8): who logged it rides along, so a teammate's call is theirs on the record
-        items.push({ id: ev.id, kind: 'activity', activity_kind: String(d.activity_kind), from: 'studio', actor: String(ev.actor || ''), body: String(d.body || ''), created_at: String(d.occurred_at || ev.created_at) });
+        // item 80: an email sent from Studio OS (via 'app') carries its subject
+        items.push({ id: ev.id, kind: 'activity', activity_kind: String(d.activity_kind), from: 'studio', actor: String(ev.actor || ''), body: String(d.body || ''), created_at: String(d.occurred_at || ev.created_at), via: String(d.via || ''), subject: String(d.subject || '') });
       } else if (SYS.includes(String(ev.kind))) {
         items.push({ id: ev.id, kind: 'activity', activity_kind: String(ev.kind), from: 'studio', body: '', created_at: ev.created_at });
       }
@@ -441,6 +444,28 @@ async function collectClientConversation(u: URL, rs: RelScope): Promise<{
     items.sort((a, b) => String(a.created_at).localeCompare(String(b.created_at)));
     return { items, projectId, clientId, dealId, agencySiteId: AS, replySupportTo, deal: dealRow, dealEvents };
   }
+}
+
+/** Sales items 85 and 80: a person's or a customer's own history, beside any deal's: the calls,
+ *  emails, meetings and notes logged for them with no deal (and emails sent to them from Studio
+ *  OS), and their to-dos that aren't on a deal. The contact must be on this studio's site; the
+ *  customer is the one the collector already proved is this studio's. Before APPLY-0173 there
+ *  is nothing to read, and nothing is shown. */
+export async function personActivity(AS: string, contactParam: string | null, clientId: string): Promise<{ events: any[]; tasks: any[] }> {
+  if (!AS) return { events: [], tasks: [] };
+  const contactId = UUID_RE.test(String(contactParam || '')) ? String(contactParam) : '';
+  const mine = contactId ? !!one(await svc(`presence_contacts?id=eq.${contactId}&site_id=eq.${AS}&select=id&limit=1`).catch(() => ({ json: [] }))) : false;
+  const ors = [...(mine ? [`contact_id.eq.${contactId}`] : []), ...(UUID_RE.test(String(clientId || '')) ? [`client_id.eq.${clientId}`] : [])];
+  if (!ors.length) return { events: [], tasks: [] };
+  const or = `or=(${ors.join(',')})`;
+  const [ev, tk] = await Promise.all([
+    svc(`presence_person_events?site_id=eq.${AS}&deleted_at=is.null&${or}&select=id,kind,body,subject,occurred_at,via,actor,created_at&order=occurred_at.desc&limit=200`).then(arr).catch(() => [] as any[]),
+    svc(`presence_deal_tasks?site_id=eq.${AS}&deleted_at=is.null&deal_id=is.null&${or}&select=id,title,due_date,status,completed_at,created_at&order=due_date.asc.nullslast,created_at.asc&limit=200`).then(arr).catch(() => [] as any[]),
+  ]);
+  return {
+    events: ev.map((e: any) => ({ id: e.id, kind: 'activity', activity_kind: String(e.kind), from: 'studio', actor: String(e.actor || ''), body: String(e.body || ''), created_at: String(e.occurred_at || e.created_at), via: String(e.via || ''), subject: String(e.subject || '') })),
+    tasks: tk,
+  };
 }
 
 /** ── /crm/activity — the record page's ONE timeline (Salesforce anatomy) ─────
@@ -472,6 +497,9 @@ export async function handleCrmActivity(req: Request, jwt: string, site: SiteRow
     const AS = conv.agencySiteId;
     const dealId = conv.dealId;
     const now = new Date().toISOString();
+    // sales items 85 and 80: what was logged for the person or the customer themselves (not on a
+    // deal), and their own to-dos, on every record they are on, a deal's included
+    const personP = personActivity(AS, new URL(req.url).searchParams.get('contact'), conv.clientId);
 
     // deal extras — each channel best-effort (crm.ts:104 doctrine). The deal row
     // and the deal-event window come FROM the collector: one 200-row window feeds
@@ -487,15 +515,18 @@ export async function handleCrmActivity(req: Request, jwt: string, site: SiteRow
       if (!ir.ok) ir = await svc(`presence_invoices?site_id=eq.${AS}&${invFilter}&status=eq.open&deleted_at=is.null&select=id,title,amount_cents,due_date,status,deal_id&limit=100`);
       return arr(ir);
     };
-    const [stageNames, tasks, invoices, siteEvents] = await Promise.all([
+    const [stageNames, dealTasks, invoices, siteEvents, person] = await Promise.all([
       dealEvents.length ? stageNamesP : Promise.resolve(null),   // item 38: the studio's own stage names
       dealId ? svc(`presence_deal_tasks?site_id=eq.${AS}&deal_id=eq.${dealId}&deleted_at=is.null&select=id,title,due_date,status,completed_at,created_at&order=due_date.asc.nullslast,created_at.asc&limit=200`).then(arr).catch(() => [] as any[]) : Promise.resolve([] as any[]),
       (dealId || conv.clientId) ? readInvoices().catch(() => [] as any[]) : Promise.resolve([] as any[]),
       siteEventsP,
+      personP,
     ]);
+    const tasks = [...dealTasks, ...person.tasks];
 
     const items = mergeActivity([
       conv.items.map((m: any) => mapConversationItem(m, principal.email || '')),   // item 107 (J8): "You" only for the reader's own
+      person.events.map((m: any) => mapConversationItem(m, principal.email || '')),   // item 85
       dealEvents.map((e) => { const it = mapDealEvent(e, dealId); return it && stageNames ? { ...it, title: renameMovedTo(it.title, stageNames) } : it; }),   // item 38
       tasks.map((t) => mapDoneTask(t, dealId)),
       siteEvents,

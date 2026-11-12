@@ -18,13 +18,14 @@ import { loadEmailBrand, EMAIL_BRAND_DEFAULT } from '../lib/email_brand.ts';
 import { applyPlaceholders, buildPlaceholderValues, depositSplit } from '../lib/doc_placeholders.ts';
 import { raiseNotice, clearNotice, clearNoticePrefix, dealFollowupPeriodPrefix, dealFollowupLegacyPeriod } from '../lib/notice.ts';
 import { stripeConfigured, createServicePaymentLink, createServiceRetainerLink, deactivatePaymentLink, cancelSubscription } from '../commerce/stripe.ts';
+import { stampFirstSent } from '../lib/pay_link.ts';
 import { moneyState, moneyBuckets } from '../lib/money_state.ts';
 import { buildMyTasks, MY_TASKS_MAX } from '../lib/my_tasks.ts';
 import { revenueByMonth, dealsByStage, wonAndLost, enquiriesBySource, overdueInvoices, OPEN_STAGES as REPORT_OPEN_STAGES } from '../lib/sales_reports.ts';
 import { normalizeViews, normalizeViewList, isViewList } from '../lib/saved_views.ts';
 import { readReservedJsonOrThrow, writeReservedJson, updateReservedJson, RESERVED_NAMES } from '../lib/reserved_store.ts';
 import { normalizeStageNames, stageLabels, loadStageLabels, forgetStageLabels, renameMovedTo, DEFAULT_STAGE_LABEL, normalizeStageChances, stageChances, loadStageChances, forgetStageChances, expectedValue, DEFAULT_STAGE_CHANCE } from '../lib/stage_names.ts';
-import { validateRetainerInput, mergeRetainerState, type RetainerState } from '../commerce/retainers.ts';
+import { validateRetainerInput, mergeRetainerState, retainerSubscriptionIds, type RetainerState } from '../commerce/retainers.ts';
 import { leftToBill, reuseDecision, retainerPaid, linesFromProposal } from '../lib/invoice_billing.ts';   // sales items 107, 108, 81
 import { editionFor } from '../commerce/catalog.ts';
 import type { PlanKey } from '../commerce/catalog.ts';
@@ -34,7 +35,7 @@ import { documentPdf, pdfFileName } from '../lib/doc_pdf.ts';   // sales item 82
 import { docContextFor } from '../lib/doc_context.ts';   // sales item 81: from, billed to, dates, part payments
 import { declineReason, declineWords, validSignerEmail, maskEmail, agreementHtml } from '../lib/agreement_layout.ts';   // sales item 88
 import {
-  canTransition, isStage, normalizeLineItems, canDecideProposal, contractHash,
+  canTransition, undoLostAllowed, isStage, normalizeLineItems, canDecideProposal, contractHash,
   canSignContract, convertOutcome, clampLimit, type Stage,
   buildPaymentSchedule, depositBalanceStages, equalInstallmentStages, type StageInput,
   summarizePipeline, ALL_TIME_WINDOW_DAYS, nextStepStaleAfter,
@@ -58,6 +59,7 @@ import { readCloseDates } from '../lib/deal_closes.ts';
 import { reopenEnquiry } from '../lib/enquiry_state.ts';
 import { normEmail, emailMatch, isUniqueViolation } from '../lib/contact_email.ts';   // item 110 (K1): one person, one email, whatever its capitals
 import { contactMoreFrom, cleanTag, CONTACT_MORE_COLS } from '../lib/contact_fields.ts';   // item 89: address, job title, second phone, tags
+import { normalizeListFilters, quietCutoff, contactedContactIds, owingContactIds, keepIds, type ListFilters } from '../lib/list_filters.ts';   // item 90: field filters
 import { liveImport, importUpdate, noteImportRow } from './contacts_more.ts';   // item 86: imports that update and can be undone
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;                       // expected_close: ISO date only
@@ -216,6 +218,73 @@ export async function handleSalesContactRestore(site: SiteRow, id: string, cors:
   return json({ data: { ok: true, restored: true, id: row.id, name: String(row.name || row.email || 'Contact') } }, 200, cors);
 }
 
+// ═══ RECENTLY DELETED (sales item 83) ═══
+// One place for what was deleted in the last 30 days: deals, contacts and to-dos. Each was a
+// soft delete (deleted_at), so bringing one back is that same one-column write the other way.
+// A contact merged into another is left out: its own Undo (unmerge) puts it back with what moved.
+// Every read is best-effort and says when it failed (never a false "nothing deleted").
+export const DELETED_DAYS = 30;
+export async function handleSalesDeleted(site: SiteRow, cors: Record<string, string>): Promise<Response> {
+  const since = encodeURIComponent(new Date(Date.now() - DELETED_DAYS * 86_400_000).toISOString());
+  const failed: string[] = [];
+  const read = async (key: string, ...paths: string[]): Promise<any[]> => {
+    for (const p of paths) { const r = await svc(p).catch(() => null); if (r && r.ok) return rows(r); if (r && r.status !== 400) break; }
+    failed.push(key); return [];
+  };
+  const labelsP = loadStageLabels(site.id).catch(() => null);
+  const [deals, contacts, todos] = await Promise.all([
+    read('deals', `presence_deals?site_id=eq.${site.id}&deleted_at=gte.${since}&select=id,title,stage,expected_value_cents,contact_id,deleted_at&order=deleted_at.desc&limit=200`),
+    // merged_into lands with APPLY-0168; before it, every removed contact is a plain delete
+    read('contacts', `presence_contacts?site_id=eq.${site.id}&deleted_at=gte.${since}&merged_into=is.null&select=id,name,email,company,deleted_at&order=deleted_at.desc&limit=200`,
+      `presence_contacts?site_id=eq.${site.id}&deleted_at=gte.${since}&select=id,name,email,company,deleted_at&order=deleted_at.desc&limit=200`),
+    // item 85: a to-do may be for a person or a customer (APPLY-0173); before it, the older select
+    read('todos', `presence_deal_tasks?site_id=eq.${site.id}&deleted_at=gte.${since}&select=id,title,deal_id,contact_id,client_id,due_date,deleted_at&order=deleted_at.desc&limit=200`,
+      `presence_deal_tasks?site_id=eq.${site.id}&deleted_at=gte.${since}&select=id,title,deal_id,due_date,deleted_at&order=deleted_at.desc&limit=200`),
+  ]);
+  // who a deal was with, and which deal a to-do was on (deleted ones too: they label history)
+  const ids = (list: any[], k: string) => [...new Set(list.map((x) => String(x?.[k] || '')).filter((x) => UUID_RE.test(x)))].slice(0, 200);
+  const personIds = [...new Set([...ids(deals, 'contact_id'), ...ids(todos, 'contact_id')])];
+  const [people, todoDeals, customers] = await Promise.all([
+    personIds.length ? read('names', `presence_contacts?site_id=eq.${site.id}&id=in.(${personIds.join(',')})&select=id,name,email`) : Promise.resolve([] as any[]),
+    ids(todos, 'deal_id').length ? read('names', `presence_deals?site_id=eq.${site.id}&id=in.(${ids(todos, 'deal_id').join(',')})&select=id,title,deleted_at`) : Promise.resolve([] as any[]),
+    ids(todos, 'client_id').length ? read('names', `clients?id=in.(${ids(todos, 'client_id').join(',')})&select=id,name,email`) : Promise.resolve([] as any[]),
+  ]);
+  const who = new Map(people.map((c: any) => [String(c.id), String(c.name || c.email || '')]));
+  const customer = new Map(customers.map((k: any) => [String(k.id), String(k.name || k.email || '')]));
+  const onDeal = new Map(todoDeals.map((d: any) => [String(d.id), d]));
+  const labels = await labelsP;
+  return json({ data: {
+    days: DELETED_DAYS,
+    deals: deals.map((d: any) => ({ id: d.id, title: String(d.title || 'Untitled deal'), stage: d.stage, stage_label: (labels && labels[d.stage]) || DEFAULT_STAGE_LABEL[d.stage as Stage] || d.stage, value_cents: Number(d.expected_value_cents) || 0, person: who.get(String(d.contact_id || '')) || '', deleted_at: d.deleted_at })),
+    contacts: contacts.map((c: any) => ({ id: c.id, name: String(c.name || c.email || 'Contact'), email: String(c.email || ''), company: String(c.company || ''), deleted_at: c.deleted_at })),
+    // item 85: a to-do for a person or a customer names them and opens their record; one of your own, the To-dos page
+    todos: todos.map((t: any) => { const d = onDeal.get(String(t.deal_id || '')); return { id: t.id, title: String(t.title || 'To-do'), due_date: t.due_date || null, deal_id: t.deal_id || null, deal_title: d ? String(d.title || '') : '', deal_gone: !!(d && d.deleted_at),
+      for_name: t.deal_id ? (d ? String(d.title || '') : '') : t.contact_id ? (who.get(String(t.contact_id)) || '') : t.client_id ? (customer.get(String(t.client_id)) || '') : 'yourself',
+      href: t.deal_id ? `/pipeline.html?deal=${t.deal_id}` : t.contact_id ? `/crm.html?contact=${t.contact_id}` : t.client_id ? `/crm.html?client_id=${t.client_id}` : '/todos.html', deleted_at: t.deleted_at }; }),
+    partial: failed,
+  } }, 200, cors);
+}
+
+// Sales item 83: a deleted deal comes back, as it was. The website enquiry it came from went back
+// to the queue when it was deleted; it is this deal's again, unless the enquiry has become
+// another deal since (one enquiry, one deal: then this one comes back without the link).
+export async function handleSalesRestoreDeal(site: SiteRow, id: string, cors: Record<string, string>): Promise<Response> {
+  if (!UUID_RE.test(id)) return json({ error: 'bad_request' }, 400, cors);
+  const cur = await svc(`presence_deals?id=eq.${id}&site_id=eq.${site.id}&deleted_at=not.is.null&select=id,source_submission_id&limit=1`);
+  if (!cur.ok) return json({ error: 'read_failed', message: 'We couldn’t bring that deal back just now — please try again.' }, 502, cors);
+  const was = rows(cur)[0];
+  if (!was) return json({ error: 'not_found', message: 'That deal isn’t in Recently deleted. Refresh to see what’s there.' }, 404, cors);
+  const sub = UUID_RE.test(String(was.source_submission_id || '')) ? String(was.source_submission_id) : '';
+  const other = sub ? rows(await svc(`presence_deals?site_id=eq.${site.id}&source_submission_id=eq.${sub}&deleted_at=is.null&id=neq.${id}&select=id&limit=1`))[0] : null;
+  const patch: Record<string, unknown> = { deleted_at: null, ...(other ? { source_submission_id: null } : {}) };
+  const r = await svc(`presence_deals?id=eq.${id}&site_id=eq.${site.id}&deleted_at=not.is.null&select=id,title`, { method: 'PATCH', headers: { Prefer: 'return=representation' }, body: JSON.stringify(patch) });
+  if (!r.ok) return json({ error: 'write_failed', message: 'We couldn’t bring that deal back just now — please try again.' }, 502, cors);
+  const row = rows(r)[0];
+  if (!row) return json({ error: 'not_found', message: 'That deal isn’t in Recently deleted. Refresh to see what’s there.' }, 404, cors);
+  if (sub && !other) await markSubmissionConverted(site.id, sub);
+  return json({ data: { ok: true, restored: true, id: row.id, title: String(row.title || 'Deal') } }, 200, cors);
+}
+
 // Phase 3 (stage-aware): a free-text next step that names a thing that has now
 // happened ("Sign contract" after the signature, "Request the deposit" once the
 // deal is won) is cleared, so the record never shows an overdue step for work
@@ -243,6 +312,46 @@ export function contactsOrder(sort: unknown, dir: unknown): string {
   const k = String(sort ?? '');
   if (!CONTACT_SORTS.has(k)) return 'updated_at.desc,id.desc';
   return `${k}.${dir === 'desc' ? 'desc' : 'asc'},id.desc`;
+}
+// item 90: the people a worked-out filter keeps, in the list's order. Their deals (deleted ones
+// too: a call logged on a deal since deleted was still a call) name whose activity is whose; the
+// calls, emails and meetings since the cutoff say who was contacted; the invoices still waiting
+// say who owes you. null = a read failed (the page says so, never a wrong list).
+const CONTACT_FILTER_CAP = 5000;
+async function contactFilterIds(siteId: string, more: string, order: string, lf: ListFilters, nowMs: number): Promise<{ ids: string[]; partial: boolean } | null> {
+  const ok = (r: { ok: boolean }) => r.ok;
+  const cutoff = lf.quiet ? quietCutoff(lf.quiet, nowMs) : '';
+  const [dealsR, eventsR, invR, orderedR, personR] = await Promise.all([
+    svc(`presence_deals?site_id=eq.${siteId}&contact_id=not.is.null&select=id,contact_id,deleted_at&limit=${CONTACT_FILTER_CAP}`),
+    lf.quiet ? svc(`presence_deal_events?site_id=eq.${siteId}&kind=eq.note&created_at=gte.${encodeURIComponent(cutoff)}&select=deal_id,detail,created_at&limit=${CONTACT_FILTER_CAP}`) : Promise.resolve(null),
+    lf.owes ? svc(`presence_invoices?site_id=eq.${siteId}&status=eq.open&deleted_at=is.null&select=deal_id,customer_client_id,status,processing_since&limit=2000`)
+      .then((r) => r.ok ? r : svc(`presence_invoices?site_id=eq.${siteId}&status=eq.open&deleted_at=is.null&select=deal_id,customer_client_id,status&limit=2000`)) : Promise.resolve(null),
+    svc(`presence_contacts?site_id=eq.${siteId}${more}&select=id&order=${order}&limit=${CONTACT_FILTER_CAP}`),
+    // item 85: a call, email or meeting logged for the person with no deal counts too (APPLY-0173;
+    // before it there is no such table, and nothing to count)
+    lf.quiet ? svc(`presence_person_events?site_id=eq.${siteId}&deleted_at=is.null&contact_id=not.is.null&occurred_at=gte.${encodeURIComponent(cutoff)}&select=contact_id&limit=${CONTACT_FILTER_CAP}`).catch(() => null) : Promise.resolve(null),
+  ]);
+  if (!ok(dealsR) || (eventsR && !ok(eventsR)) || (invR && !ok(invR)) || !ok(orderedR)) return null;
+  const deals = rows(dealsR);
+  const dealContact = new Map<string, string>(deals.map((d: any) => [String(d.id), String(d.contact_id)]));
+  const not: Array<Set<string>> = [];
+  if (lf.nodeal) not.push(new Set(deals.filter((d: any) => !d.deleted_at).map((d: any) => String(d.contact_id))));
+  if (lf.quiet && eventsR) not.push(contactedContactIds(rows(eventsR), dealContact, cutoff));
+  if (lf.quiet && personR && personR.ok) not.push(new Set(rows(personR).map((e: any) => String(e.contact_id))));
+  let only: Set<string> | null = null;
+  if (lf.owes && invR) {
+    const invoices = rows(invR);
+    const clientIds = [...new Set(invoices.map((i: any) => String(i.customer_client_id || '')).filter((x: string) => UUID_RE.test(x)))].slice(0, 200);
+    const clientContacts = new Map<string, string[]>();
+    if (clientIds.length) {
+      const cr = await svc(`presence_contacts?site_id=eq.${siteId}&deleted_at=is.null&client_id=in.(${clientIds.join(',')})&select=id,client_id&limit=1000`);
+      if (!cr.ok && cr.status !== 400) return null;   // 400 = no client_id column yet: nobody is a customer's person
+      for (const c of rows(cr)) { const k = String(c.client_id); clientContacts.set(k, [...(clientContacts.get(k) || []), String(c.id)]); }
+    }
+    only = owingContactIds(invoices, dealContact, clientContacts);
+  }
+  const ordered = rows(orderedR).map((r: any) => String(r.id));
+  return { ids: keepIds(ordered, only, not), partial: ordered.length >= CONTACT_FILTER_CAP };
 }
 export async function handleSalesContacts(req: Request, site: SiteRow, principal: Principal, cors: Record<string, string>): Promise<Response> {
   if (req.method === 'GET') {
@@ -276,22 +385,44 @@ export async function handleSalesContacts(req: Request, site: SiteRow, principal
     // item 89: tag=restaurant lists everyone with that tag (tags @> '{restaurant}', presence_contacts_tags_idx)
     const tag = cleanTag(u.searchParams.get('tag'));
     if (tag) more += `&tags=cs.${encodeURIComponent(`{"${tag.replace(/["\\]/g, '')}"}`)}`;
+    // item 90: field filters. How they found you (via=) and when they were added (created_since=,
+    // the start of the page's own month) are plain filters; "not contacted in N days" (quiet=),
+    // "owes you money" (owes=1) and "no deal yet" (nodeal=1) are worked out from their deals and
+    // invoices below (lib/list_filters.ts), then the page is cut from what is left
+    const lf = normalizeListFilters({ quiet: u.searchParams.get('quiet'), owes: u.searchParams.get('owes'), nodeal: u.searchParams.get('nodeal'), via: u.searchParams.get('via') });
+    if (lf.via) more += `&found_via=eq.${encodeURIComponent(lf.via)}`;
+    const added = String(u.searchParams.get('created_since') || '');
+    if (/^\d{4}-\d{2}-\d{2}(T[\d:.]+Z?)?$/.test(added) && Number.isFinite(Date.parse(added))) more += `&created_at=gte.${encodeURIComponent(added)}`;
+    const computed = !!(lf.quiet || lf.owes || lf.nodeal) && !ids.length && !withDeleted;
     const order = contactsOrder(u.searchParams.get('sort'), u.searchParams.get('dir'));
     // item 66: id breaks ties in the order, so offset pages never repeat or skip a person
     const mkPath = (cols: string) => `presence_contacts?site_id=eq.${site.id}${more}&select=${cols}${withDeleted ? ',deleted_at' : ''}&order=${order}&limit=${limit}&offset=${offset}`;
+    // item 90: with a worked-out filter, the page is the people kept, read by id in their order
+    let pageIds: string[] | null = null, keptTotal: number | null = null, partial = false;
+    if (computed) {
+      const cut = await contactFilterIds(site.id, more, order, lf, Date.now());
+      if (!cut) return json({ error: 'read_failed', message: 'We couldn’t work out that filter just now. Try again in a moment.' }, 502, cors);
+      pageIds = cut.ids.slice(offset, offset + limit); keptTotal = cut.ids.length; partial = cut.partial;
+    }
+    const byIds = (cols: string) => `presence_contacts?site_id=eq.${site.id}&deleted_at=is.null&id=in.(${(pageIds || []).join(',')})&select=${cols}`;
+    const pathFor = (cols: string) => pageIds ? byIds(cols) : mkPath(cols);
     // item 66: total=1 asks how many match in all (one HEAD count beside the page
     // read, so every page costs the same two reads at any roster size). The pages
     // that list people ask for it to say "Showing 100 of N"; nobody else pays.
-    const totalP = u.searchParams.get('total') === '1' ? svcCount(`presence_contacts?site_id=eq.${site.id}${more}`).catch(() => null) : Promise.resolve(undefined);
+    const totalP = keptTotal !== null ? Promise.resolve(keptTotal) : u.searchParams.get('total') === '1' ? svcCount(`presence_contacts?site_id=eq.${site.id}${more}`).catch(() => null) : Promise.resolve(undefined);
     // item 89: the row shows a job title and tags, and a second phone to call; before APPLY-0166 the older select.
     // item 105: found_via rides along for the list's "How they found you" chart (APPLY-0143; without it, every
     // contact counts as not recorded).
-    let r = await svc(mkPath(`id,name,email,phone,company,client_id,updated_at,found_via,${CONTACT_MORE_COLS.join(',')}`));
-    if (!r.ok && r.status === 400) r = await svc(mkPath('id,name,email,phone,company,client_id,updated_at,found_via'));
-    if (!r.ok && r.status === 400) r = await svc(mkPath('id,name,email,phone,company,client_id,updated_at'));
-    if (!r.ok && r.status === 400) r = await svc(mkPath('id,name,email,phone,company,updated_at'));
-    if (!r.ok) return json({ error: 'read_failed', message: 'We couldn’t load your contacts just now.' }, 502, cors);
-    const list = rows(r);
+    let list: any[] = [];
+    if (!pageIds || pageIds.length) {
+      let r = await svc(pathFor(`id,name,email,phone,company,client_id,updated_at,found_via,${CONTACT_MORE_COLS.join(',')}`));
+      if (!r.ok && r.status === 400) r = await svc(pathFor('id,name,email,phone,company,client_id,updated_at,found_via'));
+      if (!r.ok && r.status === 400) r = await svc(pathFor('id,name,email,phone,company,client_id,updated_at'));
+      if (!r.ok && r.status === 400) r = await svc(pathFor('id,name,email,phone,company,updated_at'));
+      if (!r.ok) return json({ error: 'read_failed', message: 'We couldn’t load your contacts just now.' }, 502, cors);
+      list = rows(r);
+      if (pageIds) { const at = new Map(pageIds.map((id, i) => [id, i])); list.sort((a, b) => (at.get(String(a.id)) ?? 0) - (at.get(String(b.id)) ?? 0)); }
+    }
     // dupes=1: the roster's quiet "possible duplicate" hint. Same normalisation
     // the CREATE-time prompt uses (phoneKey → "5550102468" === "(555) 010-2468";
     // nameSimilarity → "Jordan" ≈ "Jordon"), just run across the page instead of
@@ -301,7 +432,8 @@ export async function handleSalesContacts(req: Request, site: SiteRow, principal
     const total = await totalP;
     // total: the count when asked for (null when the count failed: the page then
     // offers "Show more" while a page comes back full, and never claims a number)
-    return json({ data: list, limit, offset, ...(total === undefined ? {} : { total }) }, 200, cors);
+    // partial (item 90): a worked-out filter looked through the first CONTACT_FILTER_CAP people only
+    return json({ data: list, limit, offset, ...(total === undefined ? {} : { total }), ...(partial ? { partial: true } : {}) }, 200, cors);
   }
   if (req.method === 'POST') {
     let b: any = {}; try { b = await req.json(); } catch { return json({ error: 'bad_json' }, 400, cors); }
@@ -823,6 +955,13 @@ export async function handleDealTaskUpdate(req: Request, site: SiteRow, _princip
   if (!UUID_RE.test(taskId)) return json({ error: 'bad_request' }, 400, cors);
   let b: any = {}; try { b = await req.json(); } catch { return json({ error: 'bad_json' }, 400, cors); }
   const patch: Record<string, unknown> = {};
+  // sales item 83: a deleted to-do comes back from Recently deleted (404 when it isn't there)
+  if (b.restore === true) {
+    const up = await svc(`presence_deal_tasks?id=eq.${taskId}&site_id=eq.${site.id}&deleted_at=not.is.null&select=id,title`, { method: 'PATCH', headers: { Prefer: 'return=representation' }, body: JSON.stringify({ deleted_at: null }) });
+    if (!up.ok) return json({ error: 'write_failed', message: 'We couldn’t bring that to-do back just now — please try again.' }, 502, cors);
+    const row = rows(up)[0];
+    return row ? json({ data: { ok: true, restored: true, id: row.id, title: String(row.title || 'To-do') } }, 200, cors) : json({ error: 'not_found', message: 'That to-do isn’t in Recently deleted. Refresh to see what’s there.' }, 404, cors);
+  }
   if (b.delete === true) patch.deleted_at = nowIso();
   else if (b.status === 'done') { patch.status = 'done'; patch.completed_at = nowIso(); }
   else if (b.status === 'open') { patch.status = 'open'; patch.completed_at = null; }
@@ -892,18 +1031,23 @@ export async function handleSalesReports(_req: Request, site: SiteRow, _principa
 export async function loadMyTasks(siteId: string, userId: string | null): Promise<{ all: ReturnType<typeof buildMyTasks>; partial: boolean }> {
   let partial = false;
   const read = async (path: string) => { try { const r = await svc(path); if (!r.ok) { partial = true; return []; } return rows(r); } catch { partial = true; return []; } };
+  // item 85: a to-do may be for a person or a customer (APPLY-0173); before it, the older select
+  const tasksPath = (cols: string) => `presence_deal_tasks?site_id=eq.${siteId}&status=eq.open&deleted_at=is.null&select=${cols}&order=due_date.asc.nullslast,created_at.asc&limit=200`;   // batch B: ordered, so the cap keeps the soonest
   const [deals, dealTasks, projectTasks] = await Promise.all([
     read(`presence_deals?site_id=eq.${siteId}&deleted_at=is.null&stage=in.(lead,qualified,proposal,contract)&select=id,title,stage,next_step,next_step_at&order=updated_at.desc&limit=200`),
-    read(`presence_deal_tasks?site_id=eq.${siteId}&status=eq.open&deleted_at=is.null&select=id,deal_id,title,due_date,status&order=due_date.asc.nullslast,created_at.asc&limit=200`),   // batch B: ordered, so the cap keeps the soonest
+    svc(tasksPath('id,deal_id,contact_id,client_id,title,due_date,status')).then((r) => r.ok ? rows(r) : read(tasksPath('id,deal_id,title,due_date,status'))).catch(() => read(tasksPath('id,deal_id,title,due_date,status'))),
     read(`presence_tasks?site_id=eq.${siteId}&status=in.(todo,in_progress,blocked)&client_action_required=eq.false&deleted_at=is.null&select=id,project_id,title,status,due_date,assigned_to,client_action_required,sort_order&order=due_date.asc.nullslast,created_at.asc&limit=300`),   // batch B: ordered, so the cap keeps the soonest
   ]);
   const ids = (list: any[], k: string) => [...new Set(list.map((x) => String(x?.[k] || '')).filter((x) => UUID_RE.test(x)))];
   const dealIds = ids(dealTasks, 'deal_id'), projIds = ids(projectTasks, 'project_id');
-  const [taskDeals, projects] = await Promise.all([
+  const personIds = ids(dealTasks, 'contact_id'), customerIds = ids(dealTasks, 'client_id');
+  const [taskDeals, projects, people, customers] = await Promise.all([
     dealIds.length ? read(`presence_deals?id=in.(${dealIds.join(',')})&site_id=eq.${siteId}&deleted_at=is.null&select=id,title,stage`) : Promise.resolve([]),
     projIds.length ? read(`presence_projects?id=in.(${projIds.join(',')})&site_id=eq.${siteId}&deleted_at=is.null&select=id,name,status`) : Promise.resolve([]),
+    personIds.length ? read(`presence_contacts?id=in.(${personIds.join(',')})&site_id=eq.${siteId}&select=id,name,email,deleted_at`) : Promise.resolve([]),
+    customerIds.length ? read(`clients?id=in.(${customerIds.join(',')})&select=id,name,email`) : Promise.resolve([]),
   ]);
-  return { all: buildMyTasks({ deals, dealTasks, taskDeals, projectTasks, projects, userId }), partial };
+  return { all: buildMyTasks({ deals, dealTasks, taskDeals, projectTasks, projects, userId, people, customers }), partial };
 }
 export async function handleSalesMyTasks(_req: Request, site: SiteRow, principal: Principal, cors: Record<string, string>): Promise<Response> {
   const { all, partial } = await loadMyTasks(site.id, principal.userId || null);
@@ -921,7 +1065,8 @@ export async function handleSalesDeals(req: Request, site: SiteRow, principal: P
     // next_step/next_step_at land with migration 0089 — try the full select, fall
     // back to the pre-0089 shape so a deploy ahead of the migration never breaks
     // the pipeline list.
-    const baseCols = 'id,title,stage,source,expected_value_cents,expected_close,contact_id,converted_client_id,updated_at';
+    // item 90: created_at rides along for the "Added this month" filter
+    const baseCols = 'id,title,stage,source,expected_value_cents,expected_close,contact_id,converted_client_id,updated_at,created_at';
     const filters = `${stage && isStage(stage) ? `&stage=eq.${stage}` : ''}${q ? `&title.ilike.*${encodeURIComponent(q)}*` : ''}`;
     // item 105: found_via (APPLY-0143) rides along for the list's "Where they came from" chart, then the same read without it.
     let r = await svc(`presence_deals?site_id=eq.${site.id}&deleted_at=is.null&select=${baseCols},next_step,next_step_at,found_via&order=updated_at.desc&limit=${limit}&offset=${offset}${filters}`);
@@ -953,6 +1098,17 @@ export async function handleSalesDeals(req: Request, site: SiteRow, principal: P
         const signed = new Set(rows(await svc(`presence_contracts?site_id=eq.${site.id}&status=eq.signed&deal_id=in.(${ids.join(',')})&deleted_at=is.null&select=deal_id`)).map((c: any) => c.deal_id));
         for (const d of deals) d.agreement_signed = signed.has(d.id);
       } catch { /* badge falls back to the plain stage label */ }
+      // item 90: what each deal is still owed (open invoices, not a payment already on its way),
+      // for the list's "Owes you money" filter. null = couldn't tell (the filter then says so)
+      try {
+        const ids = deals.map((d: any) => d.id).filter(Boolean);
+        let ir = await svc(`presence_invoices?site_id=eq.${site.id}&status=eq.open&deleted_at=is.null&deal_id=in.(${ids.join(',')})&select=deal_id,amount_cents,status,processing_since&limit=1000`);
+        if (!ir.ok) ir = await svc(`presence_invoices?site_id=eq.${site.id}&status=eq.open&deleted_at=is.null&deal_id=in.(${ids.join(',')})&select=deal_id,amount_cents,status&limit=1000`);
+        if (!ir.ok) throw new Error('invoices');
+        const owed: Record<string, number> = {};
+        for (const i of rows(ir)) if (!i.processing_since) owed[i.deal_id] = (owed[i.deal_id] || 0) + (Number(i.amount_cents) || 0);
+        for (const d of deals) d.owes_cents = owed[d.id] || 0;
+      } catch { for (const d of deals) d.owes_cents = null; }
     }
     // Sales review B4: a closed deal whose next step names work that is behind
     // it ("Sign Contract" on a Won deal) read as overdue in red. The page hides
@@ -1057,7 +1213,7 @@ export async function handleSalesDeal(req: Request, site: SiteRow, principal: Pr
       // as the proposals read above) so the record's Billing tab never blanks.
       // item 107: recurring_id rides along (0145) so the record can tell what's left of the proposal
       // sales items 77 and 81: the invoice's number and how a recorded payment came in (APPLY-0167)
-      (async () => { let r = await svc(`presence_invoices?deal_id=eq.${id}&site_id=eq.${site.id}&deleted_at=is.null&select=id,title,amount_cents,purpose,status,stripe_url,due_date,paid_at,created_at,processing_since,recurring_id,number,paid_method,paid_note,payment_for&order=due_date.asc.nullsfirst,created_at.asc`); if (!r.ok) r = await svc(`presence_invoices?deal_id=eq.${id}&site_id=eq.${site.id}&deleted_at=is.null&select=id,title,amount_cents,purpose,status,stripe_url,due_date,paid_at,created_at,processing_since,recurring_id&order=due_date.asc.nullsfirst,created_at.asc`); if (!r.ok) r = await svc(`presence_invoices?deal_id=eq.${id}&site_id=eq.${site.id}&deleted_at=is.null&select=id,title,amount_cents,purpose,status,stripe_url,due_date,paid_at,created_at,processing_since&order=due_date.asc.nullsfirst,created_at.asc`); if (!r.ok) r = await svc(`presence_invoices?deal_id=eq.${id}&site_id=eq.${site.id}&deleted_at=is.null&select=id,title,amount_cents,purpose,status,stripe_url,due_date,paid_at,created_at&order=due_date.asc.nullsfirst,created_at.asc`); return r; })(),
+      (async () => { let r = await svc(`presence_invoices?deal_id=eq.${id}&site_id=eq.${site.id}&deleted_at=is.null&select=id,title,amount_cents,purpose,status,stripe_url,due_date,paid_at,created_at,processing_since,recurring_id,number,paid_method,paid_note,payment_for,paid_private_note&order=due_date.asc.nullsfirst,created_at.asc`); /* before APPLY-0188: without the private note */ if (!r.ok) r = await svc(`presence_invoices?deal_id=eq.${id}&site_id=eq.${site.id}&deleted_at=is.null&select=id,title,amount_cents,purpose,status,stripe_url,due_date,paid_at,created_at,processing_since,recurring_id,number,paid_method,paid_note,payment_for&order=due_date.asc.nullsfirst,created_at.asc`); if (!r.ok) r = await svc(`presence_invoices?deal_id=eq.${id}&site_id=eq.${site.id}&deleted_at=is.null&select=id,title,amount_cents,purpose,status,stripe_url,due_date,paid_at,created_at,processing_since,recurring_id&order=due_date.asc.nullsfirst,created_at.asc`); if (!r.ok) r = await svc(`presence_invoices?deal_id=eq.${id}&site_id=eq.${site.id}&deleted_at=is.null&select=id,title,amount_cents,purpose,status,stripe_url,due_date,paid_at,created_at,processing_since&order=due_date.asc.nullsfirst,created_at.asc`); if (!r.ok) r = await svc(`presence_invoices?deal_id=eq.${id}&site_id=eq.${site.id}&deleted_at=is.null&select=id,title,amount_cents,purpose,status,stripe_url,due_date,paid_at,created_at&order=due_date.asc.nullsfirst,created_at.asc`); return r; })(),
       // item 47: the deal's estimates and recurring invoices — both [] before APPLY-0145
       import('./estimates.ts').then((m) => m.estimatesForDeal(site.id, id)).catch(() => []),
       import('./recurring_invoices.ts').then((m) => m.recurringForDeal(site.id, id)).catch(() => []),
@@ -1185,7 +1341,13 @@ export async function handleSalesDealActivity(req: Request, site: SiteRow, princ
   if (!ins.ok || !rows(ins)[0]) return json({ error: 'write_failed', message: 'That didn’t save — please try again.' }, 502, cors);
   // Bump the deal so a freshly-contacted deal rises in the pipeline list (best-effort).
   await svc(`presence_deals?id=eq.${id}&site_id=eq.${site.id}`, { method: 'PATCH', body: JSON.stringify({ updated_at: nowIso() }) }).catch(() => {});
-  return json({ data: { item: rows(ins)[0], last_contacted_at: occurredAt } }, 201, cors);
+  // sales item 85: "Follow up on [day]" in the same step adds a to-do on the deal, due that day
+  let followUp: any = null;
+  if (typeof b.follow_up === 'string' && DATE_RE.test(b.follow_up)) {
+    const t = await svc('presence_deal_tasks', { method: 'POST', headers: { Prefer: 'return=representation' }, body: JSON.stringify({ site_id: site.id, deal_id: id, title: clean(b.follow_up_title, 200) || 'Follow up', due_date: b.follow_up, status: 'open' }) });
+    followUp = t.ok && rows(t)[0] ? rows(t)[0] : { error: 'That follow-up to-do didn’t save. Add it from the To-do tab.' };
+  }
+  return json({ data: { item: rows(ins)[0], last_contacted_at: occurredAt, ...(followUp ? { follow_up: followUp } : {}) } }, 201, cors);
 }
 
 export async function handleSalesDealStage(req: Request, site: SiteRow, principal: Principal, id: string, cors: Record<string, string>): Promise<Response> {
@@ -1196,12 +1358,21 @@ export async function handleSalesDealStage(req: Request, site: SiteRow, principa
   const deal = await loadDeal(site.id, id);
   if (!deal) return json({ error: 'not_found' }, 404, cors);
   if (deal.stage === to) return json({ data: deal }, 200, cors); // idempotent no-op
-  if (!canTransition(deal.stage, to)) return json({ error: 'invalid_transition', message: `A deal can’t move from ${deal.stage} to ${to}.` }, 409, cors);
+  // builder item 75: Undo, after "Mark as not a fit" (one deal or many), puts the deal back where
+  // it was. The ladder only reopens a Not a fit deal as a new lead, so the way back is allowed only
+  // as that Undo: the deal is still Not a fit, and its newest move was into Not a fit from that
+  // very stage, a short while ago. The reason it was given goes with it.
+  const undo = b.undo === true && deal.stage === 'lost' && to !== 'won' && to !== 'lost';
+  if (undo) {
+    const last = rows(await svc(`presence_deal_events?deal_id=eq.${id}&site_id=eq.${site.id}&kind=eq.stage_change&select=from_stage,to_stage,created_at&order=created_at.desc&limit=1`))[0];
+    if (!undoLostAllowed(last, to, Date.now())) return json({ error: 'undo_expired', message: 'That can’t be undone any more. Open the deal and reopen it instead.' }, 409, cors);
+  } else if (!canTransition(deal.stage, to)) return json({ error: 'invalid_transition', message: `A deal can’t move from ${deal.stage} to ${to}.` }, 409, cors);
   const patch: Record<string, unknown> = { stage: to };
   if (to === 'lost') patch.lost_reason = clean(b.reason, 200);
+  if (undo) patch.lost_reason = '';
   const up = await svc(`presence_deals?id=eq.${id}&site_id=eq.${site.id}&stage=eq.${deal.stage}&select=*`, { method: 'PATCH', headers: { Prefer: 'return=representation' }, body: JSON.stringify(patch) });
   if (!up.ok || !rows(up)[0]) return json({ error: 'conflict', message: 'That deal just changed — refresh and try again.' }, 409, cors); // optimistic: stage guard in WHERE
-  await dealEvent(site.id, id, 'stage_change', principal, { from_stage: deal.stage, to_stage: to });
+  await dealEvent(site.id, id, 'stage_change', principal, { from_stage: deal.stage, to_stage: to, ...(undo ? { detail: { undo: true } } : {}) });
   // Sales review B4: moving to Won by hand never retired "Sign contract" (only
   // the signature and convert paths did), so a won deal kept a red overdue step.
   if (to === 'won') { await clearStaleNextStep(site.id, id, 'won'); const fresh = await loadDeal(site.id, id); if (fresh) return json({ data: fresh }, 200, cors); }
@@ -1583,7 +1754,7 @@ export async function handleSalesInvoice(req: Request, site: SiteRow, principal:
     try {
       // Use the STORED row's description so a retry sends Stripe identical params
       // under the per-row idempotency key (changed params + same key = hard error).
-      const link = await createServicePaymentLink({ amountCents: Number(inv.amount_cents), currency: 'usd', description: String(inv.description || description), invoiceId: inv.id });
+      const link = await createServicePaymentLink({ amountCents: Number(inv.amount_cents), currency: 'usd', description: String(inv.description || description), invoiceId: inv.id, gen: inv.link_gen });
       payUrl = link.url; repaired = true;
       await svc(`presence_invoices?id=eq.${inv.id}&site_id=eq.${site.id}`, { method: 'PATCH', body: JSON.stringify({ stripe_url: link.url, stripe_payment_link_id: link.id }) });
     } catch {
@@ -1596,6 +1767,7 @@ export async function handleSalesInvoice(req: Request, site: SiteRow, principal:
   const doubleTap = reused && !repaired && (Date.now() - lastTouch) < 120000;
   const emailed = doubleTap ? false : await emailInvoice(site.id, dealId, String(inv.title || title), payUrl, Number(inv.amount_cents), inv.id);
   if (!doubleTap) await svc(`presence_invoices?id=eq.${inv.id}&site_id=eq.${site.id}`, { method: 'PATCH', body: JSON.stringify({ updated_at: nowIso() }) }).catch(() => {});
+  await stampFirstSent(inv.id, site.id, nowIso());   // sales item 118: reminders count from the day it first went out
   // `repaired` = the FIRST attempt's link failed before its event could be
   // recorded — the retry that completes it must write the history line.
   if (!reused || repaired) await dealEvent(site.id, dealId, 'invoice_sent', principal, { detail: { invoice_id: inv.id, amount_cents: Number(inv.amount_cents), purpose } });
@@ -1666,6 +1838,7 @@ export async function handleSalesSchedule(req: Request, site: SiteRow, principal
       await svc(`presence_invoices?id=eq.${first.id}&site_id=eq.${site.id}`, { method: 'PATCH', body: JSON.stringify({ stripe_url: link.url, stripe_payment_link_id: link.id }) });
       first.stripe_url = link.url; linked = true;
       emailed = await emailInvoice(site.id, dealId, String(first.title), link.url, Number(first.amount_cents), first.id);
+      await stampFirstSent(first.id, site.id, nowIso());
       await dealEvent(site.id, dealId, 'invoice_sent', principal, { detail: { invoice_id: first.id, amount_cents: Number(first.amount_cents), purpose: first.purpose, schedule: true } });
     } catch { /* the plan is saved; the first stage's link can be generated later via Send */ }
   }
@@ -1692,7 +1865,7 @@ export async function handleSalesInvoiceSend(req: Request, site: SiteRow, princi
   let repaired = false;
   if (!payUrl) {
     try {
-      const link = await createServicePaymentLink({ amountCents: Number(inv.amount_cents), currency: 'usd', description: String(inv.description || inv.title || 'Invoice'), invoiceId: inv.id });
+      const link = await createServicePaymentLink({ amountCents: Number(inv.amount_cents), currency: 'usd', description: String(inv.description || inv.title || 'Invoice'), invoiceId: inv.id, gen: inv.link_gen });
       payUrl = link.url; repaired = true;
       await svc(`presence_invoices?id=eq.${inv.id}&site_id=eq.${site.id}`, { method: 'PATCH', body: JSON.stringify({ stripe_url: link.url, stripe_payment_link_id: link.id }) });
     } catch {
@@ -1705,6 +1878,7 @@ export async function handleSalesInvoiceSend(req: Request, site: SiteRow, princi
   const doubleTap = hadLink && !repaired && (Date.now() - lastTouch) < 120000;
   const emailed = doubleTap ? false : await emailInvoice(site.id, inv.deal_id, String(inv.title || 'Invoice'), payUrl!, Number(inv.amount_cents), inv.id);
   if (!doubleTap) await svc(`presence_invoices?id=eq.${inv.id}&site_id=eq.${site.id}`, { method: 'PATCH', body: JSON.stringify({ updated_at: nowIso() }) }).catch(() => {});
+  await stampFirstSent(inv.id, site.id, nowIso());   // a plan stage sent weeks after the plan was made counts from today (sales item 118)
   // First real send (or a link repair) writes the history line; a plain resend doesn't spam it.
   if ((!hadLink || repaired) && inv.deal_id) await dealEvent(site.id, inv.deal_id, 'invoice_sent', principal, { detail: { invoice_id: inv.id, amount_cents: Number(inv.amount_cents), purpose: inv.purpose } });
   return json({ data: { ...inv, stripe_url: payUrl }, url: payUrl, emailed, resent: hadLink && !repaired, double_tap: doubleTap }, 200, cors);
@@ -1860,7 +2034,7 @@ export async function handleSalesRetainer(req: Request, site: SiteRow, principal
   // Create the non-expiring recurring authorization link (client authorizes via Stripe).
   let link: { url: string; id: string; priceId: string };
   try {
-    link = await createServiceRetainerLink({ productName: `Retainer — ${deal.title || 'ongoing work'}`, amountCents: v.value.amount_cents, interval: v.value.interval, dealId, siteId: site.id });
+    link = await createServiceRetainerLink({ productName: `Retainer — ${deal.title || 'ongoing work'}`, amountCents: v.value.amount_cents, interval: v.value.interval, dealId, siteId: site.id, askedAt: now });
   } catch (e) {
     // Roll the pending marker back so the deal never shows a broken retainer.
     await svc(`presence_deals?id=eq.${dealId}&site_id=eq.${site.id}`, { method: 'PATCH', body: JSON.stringify({ retainer: prior && prior.status !== 'canceled' ? prior : null }) }).catch(() => {});
@@ -1880,15 +2054,21 @@ export async function handleSalesRetainerCancel(req: Request, site: SiteRow, pri
   const deal = await loadDeal(site.id, dealId);
   if (!deal) return json({ error: 'not_found' }, 404, cors);
   const prior: Partial<RetainerState> | null = (deal.retainer && typeof deal.retainer === 'object') ? deal.retainer : null;
-  if (!prior || prior.status === 'canceled') return json({ data: { retainer: prior || null, canceled: true, already: true } }, 200, cors);
+  // sales item 117: a retainer approved twice has more than one subscription, and Cancel
+  // stops every one of them (it used to stop the newest and leave the other charging)
+  const subs = retainerSubscriptionIds(prior);
+  const extras = (prior?.extra_subscription_ids || []).length;
+  if (!prior || (prior.status === 'canceled' && !extras)) return json({ data: { retainer: prior || null, canceled: true, already: true } }, 200, cors);
   const now = nowIso();
-  if (prior.stripe_subscription_id) {
-    const r = await cancelSubscription(String(prior.stripe_subscription_id));
-    if (!r.ok) return json({ error: 'cancel_failed', message: 'We couldn’t cancel the retainer with Stripe just now — please try again.', detail: r.error }, 502, cors);
+  if (subs.length) {
+    for (const id of subs) {
+      const r = await cancelSubscription(id);
+      if (!r.ok) return json({ error: 'cancel_failed', message: 'We couldn’t cancel the retainer with Stripe just now — please try again.', detail: r.error }, 502, cors);
+    }
   } else if (prior.stripe_payment_link_id) {
     await deactivatePaymentLink(String(prior.stripe_payment_link_id));   // pending: kill the link so no one authorizes it
   }
-  const next = mergeRetainerState(prior, { status: 'canceled', canceled_at: now }, now);
+  const next = { ...mergeRetainerState(prior, { status: 'canceled', canceled_at: prior.canceled_at || now }, now), extra_subscription_ids: [] };
   const up = await svc(`presence_deals?id=eq.${dealId}&site_id=eq.${site.id}&select=id`, { method: 'PATCH', headers: { Prefer: 'return=representation' }, body: JSON.stringify({ retainer: next }) });
   if (!up.ok || !rows(up)[0]) return json({ error: 'write_failed' }, 502, cors);
   return json({ data: { retainer: next, canceled: true } }, 200, cors);
@@ -2230,6 +2410,7 @@ async function ensureDepositForContractSend(site: SiteRow, principal: Principal,
     try {
       const link = await createServicePaymentLink({ amountCents: deposit_cents, currency: 'usd', description, invoiceId: inv.id });
       await svc(`presence_invoices?id=eq.${inv.id}&site_id=eq.${site.id}`, { method: 'PATCH', body: JSON.stringify({ stripe_url: link.url, stripe_payment_link_id: link.id }) });
+      await stampFirstSent(inv.id, site.id, nowIso());   // it goes out with the agreement
     } catch { /* the row stands; the drawer's Send repairs the link under the same idempotency key */ }
     await dealEvent(site.id, dealId, 'invoice_sent', principal, { detail: { invoice_id: inv.id, amount_cents: deposit_cents, purpose: 'deposit', auto: 'contract_send' } });
     return { minted: true, amount_cents: deposit_cents, invoice_id: inv.id };
@@ -2490,10 +2671,18 @@ export async function handleSalesPublicView(req: Request, token: string, cors: R
         ...(contract.status === 'signed' ? { signer_email: contract.signer_email || '', countersigned_name: contract.countersigned_name || '', countersigned_title: contract.countersigned_title || '', countersigned_at: contract.countersigned_at || null } : {}) }
       : { id: contract.id, title: contract.title, status: contract.status, locked: true };
     if (contract && chosen) opens.push(firstOpen('presence_contracts', contract.id, tok.site_id, tok.id, 'agreement'));
-    let deposit: { amount_cents: number; status: string; paid_at: string | null; url: string | null } | null = null;
+    let deposit: { amount_cents: number; status: string; paid_at: string | null; url: string | null; processing: boolean } | null = null;
     try {
-      const dep = rows(await svc(`presence_invoices?deal_id=eq.${tok.id}&site_id=eq.${tok.site_id}&purpose=eq.deposit&status=in.(open,paid)&deleted_at=is.null&select=id,amount_cents,status,stripe_url,paid_at&order=created_at.desc&limit=1`))[0];
-      if (dep) deposit = { amount_cents: Number(dep.amount_cents) || 0, status: String(dep.status), paid_at: dep.paid_at || null, url: (contract?.status === 'signed' && dep.status === 'open' && dep.stripe_url) ? String(dep.stripe_url) : null };
+      // Sales item 118: a deposit paid by bank transfer is SETTLING (processing_since,
+      // 0132). Its link took its one payment, so the page must say "Payment on its
+      // way" and offer no Pay button; it used to show "Amount due" and a button that
+      // opened a switched-off Stripe page. Before 0132 the wider read is refused.
+      const depQ = (cols: string) => svc(`presence_invoices?deal_id=eq.${tok.id}&site_id=eq.${tok.site_id}&purpose=eq.deposit&status=in.(open,paid)&deleted_at=is.null&select=${cols}&order=created_at.desc&limit=1`);
+      let depR = await depQ('id,amount_cents,status,stripe_url,paid_at,processing_since');
+      if (!depR.ok) depR = await depQ('id,amount_cents,status,stripe_url,paid_at');
+      const dep = rows(depR)[0];
+      const settling = !!dep && dep.status === 'open' && !!dep.processing_since;
+      if (dep) deposit = { amount_cents: Number(dep.amount_cents) || 0, status: String(dep.status), paid_at: dep.paid_at || null, processing: settling, url: (contract?.status === 'signed' && dep.status === 'open' && !settling && dep.stripe_url) ? String(dep.stripe_url) : null };
       if (dep && deposit?.url) opens.push(firstOpen('presence_invoices', String(dep.id), tok.site_id, tok.id, 'deposit'));   // the pay button is in front of them
     } catch { /* optional — the page says "nothing to pay right now" */ }
     await Promise.all(opens);
@@ -2575,7 +2764,8 @@ export async function docRow(kind: DocKind, id: string, siteId: string): Promise
   if (kind === 'estimate') return (await one(`presence_estimates?id=eq.${id}&site_id=eq.${siteId}&deleted_at=is.null&select=id,deal_id,title,line_items,subtotal_cents,currency,terms,status,sent_at,expires_at,decided_at&limit=1`)) || null;
   if (kind === 'invoice') {
     const base = 'id,deal_id,title,description,amount_cents,currency,purpose,status,stripe_url,due_date,paid_at,created_at';
-    const full = await one(`presence_invoices?id=eq.${id}&site_id=eq.${siteId}&deleted_at=is.null&select=${base},number,paid_method,paid_note,payment_for,lines&limit=1`);
+    // processing_since (0132): the page says "Payment on its way" while a bank payment settles (sales item 118)
+    const full = await one(`presence_invoices?id=eq.${id}&site_id=eq.${siteId}&deleted_at=is.null&select=${base},number,paid_method,paid_note,payment_for,lines,processing_since&limit=1`);
     return full !== undefined ? full : ((await one(`presence_invoices?id=eq.${id}&site_id=eq.${siteId}&deleted_at=is.null&select=${base}&limit=1`)) || null);
   }
   // sales item 88: the studio's countersignature (APPLY-0176); before it the old shape
@@ -2709,7 +2899,7 @@ export async function handleSalesConvert(req: Request, site: SiteRow, principal:
       method: 'PATCH', body: JSON.stringify({ customer_client_id: clientId, customer_site_id: acct.siteId || null }),
     });
   } catch { /* best-effort — the studio-side record is already correct */ }
-  return json({ data: { converted: true, client_id: clientId, site_id: acct.siteId, project_id: handoff.project?.id || null, hosted: acct.hosted, invited, managed, plan, onboarding: '/get-started.html' } }, 200, cors);
+  return json({ data: { converted: true, client_id: clientId, site_id: acct.siteId, project_id: handoff.project?.id || null, hosted: acct.hosted, invited, portal_url: `${siteUrl()}/portal.html?studio=${site.id}`, managed, plan, onboarding: '/get-started.html' } }, 200, cors);
 }
 
 /** Re-send the welcome / sign-in email to an already-converted customer —
@@ -2882,6 +3072,12 @@ async function linkAgencyPortfolio(principal: Principal, siteId: string | undefi
  *  can be minted, a signed set-password link is the fallback; if neither can, the
  *  plain portal door (one-time code). Best-effort — never blocks the set-up.
  *
+ *  Answers TRUE ONLY WHEN THE EMAIL LEFT (builder item 192). It used to send without
+ *  waiting and answer true whatever happened, so "Invitation sent" showed for an
+ *  address on the bounce list, with the mail service down, or with no mail key at
+ *  all. Every caller hands the answer to its page as `invited`, and the pages
+ *  already say "our email didn't go out, share their sign-in page" for false.
+ *
  *  ON THE STUDIO'S BRAND, in the studio's voice — never the platform's. The
  *  client just signed with THEIR studio; a "welcome to Studio OS" from an
  *  unknown sender reads like phishing and breaks the same secrecy rule
@@ -2918,7 +3114,7 @@ export async function sendCustomerInvite(siteId: string, email: string, _isNewLo
     : link
     ? `<p class="cta"><a href="${link}" style="${btnStyle}">Create your password &amp; sign in →</a></p>`
     : `<p class="cta"><a href="${base}/portal.html?studio=${siteId}" style="${btnStyle}">Sign in at your portal →</a></p><p style="font-size:13px;color:#6b6478">No password needed — we’ll email you a one-time code.</p>`;
-  sendEmail(email, `Your client portal is ready${studioName ? ` — ${studioName}` : ''}`,
+  const left = await sendEmail(email, `Your client portal is ready${studioName ? ` — ${studioName}` : ''}`,
     `<p>Welcome — your client portal is ready. It’s the one place where we work together from here:</p>` +
     `<ul style="margin:8px 0;padding-left:20px">` +
     `<li>watch your project’s progress as it happens</li>` +
@@ -2928,8 +3124,8 @@ export async function sendCustomerInvite(siteId: string, email: string, _isNewLo
     `</ul>` +
     cta +
     `<p style="font-size:13px;color:#6b6478">You can sign in any time at <a href="${base}/portal.html?studio=${siteId}">your portal</a>. If anything looks off, just reply to this email.</p>`,   // builder list item 59: the sign-in page shows the studio's name and logo
-  brand, { critical: true, asBusiness: true, siteId }).catch(() => {});   // login access = transactional; a message to the studio — their answer lands in the Inbox
-  return true;
+  brand, { critical: true, asBusiness: true, siteId }).catch(() => false);   // login access = transactional; a message to the studio — their answer lands in the Inbox
+  return left === true;
 }
 
 /** Form the Agency–Client Bridge for a customer that has NO originating deal (a

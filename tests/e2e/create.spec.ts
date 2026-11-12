@@ -186,27 +186,39 @@ test.describe('+ Create', () => {
     expect(calls.find((c) => c.method === 'PATCH')!.body).toEqual({ next_step: 'Send the logo', next_step_at: friday() });
   });
 
-  test('a person with no deal: the button says one starts, and pressing again after a failure never starts a second', async ({ page }) => {
+  // sales item 85: a call for someone with no deal is kept on them — no deal starts for it
+  test('a person with no deal: the call stays on them, and pressing again after a failure logs it once', async ({ page }) => {
     await installApp(page, { api: FIXTURES });
     const calls = await salesServer(page, { failActivityOnce: true });
     await page.goto('/agency.html');
     await openForm(page, 'Log a call');
     await dlg(page).locator('#cr-who').fill('sam');
     await option(page, 'Sam Lee').click();
-    await expect(dlg(page).locator('#cr-picked')).toContainText('No deal yet — one starts for them');
-    await expect(dlg(page).locator('.cr-go')).toHaveText('Start a deal and log the call');
+    await expect(dlg(page).locator('#cr-picked')).toContainText('No deal yet — kept on them');
+    await expect(dlg(page).locator('.cr-go')).toHaveText('Log call');
     await dlg(page).locator('.cr-go').click();
-    // the deal started, the call didn't save: said in the form, which stays open
+    // the call didn't save: said in the form, which stays open
     await expect(dlg(page).locator('.cr-err')).toHaveText('That didn’t save just now — please try again.');
     await expect(dlg(page)).toBeVisible();
     await expect(dlg(page).locator('.cr-go')).toBeEnabled();
-    await expect(dlg(page).locator('.cr-go')).toHaveText('Log call');                     // the pick is that deal now
-    await expect(dlg(page).locator('#cr-picked')).toContainText('Sam Lee — project · New lead');
+    await dlg(page).locator('.cr-go').click();
+    await expect(page.locator('.dds-toast').last()).toContainText('Call logged — Sam Lee');
+    expect(writes(calls)).toEqual(['POST /sales/people/activity', 'POST /sales/people/activity']);   // no deal was started
+    expect(calls.filter((c) => c.method === 'POST')[1].body).toMatchObject({ kind: 'call', contact_id: 'c3' });
+    expect(calls.filter((c) => c.path === '/sales/contacts/c3')).toHaveLength(1);       // their deals were checked once
+  });
+
+  test('a server without the person routes yet: the call starts a deal for them, as before', async ({ page }) => {
+    await installApp(page, { api: FIXTURES });
+    const calls = await salesServer(page);
+    await page.route(/\/functions\/v1\/presence\/sales\/people\/activity$/, (route) => { calls.push({ method: route.request().method(), path: '/sales/people/activity', search: '', body: null }); return route.fulfill({ status: 404, contentType: 'application/json', body: '{"error":"not_found"}' }); });
+    await page.goto('/agency.html');
+    await openForm(page, 'Log a call');
+    await dlg(page).locator('#cr-who').fill('sam');
+    await option(page, 'Sam Lee').click();
     await dlg(page).locator('.cr-go').click();
     await expect(page.locator('.dds-toast').last()).toContainText('Call logged — Sam Lee — project');
-    expect(writes(calls)).toEqual(['POST /sales/deals', `POST /sales/deals/${NEW_DEAL}/activity`, `POST /sales/deals/${NEW_DEAL}/activity`]);
-    expect(calls.find((c) => c.method === 'POST' && c.path === '/sales/deals')!.body).toEqual({ title: 'Sam Lee — project', contact_id: 'c3' });
-    expect(calls.filter((c) => c.path === '/sales/contacts/c3')).toHaveLength(1);       // their deals were checked once
+    expect(writes(calls)).toEqual(['POST /sales/people/activity', 'POST /sales/deals', `POST /sales/deals/${NEW_DEAL}/activity`]);
   });
 
   test('someone past the first 100: typing asks the server, and their own deal is used — none is started', async ({ page }) => {

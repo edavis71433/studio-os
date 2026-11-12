@@ -326,3 +326,17 @@ test.describe('sign.html — one page from proposal to deposit', () => {
     }
   });
 });
+
+// Sales item 118 (Nov 12 2026 review, finding 10): a deposit paid by bank transfer takes
+// days to arrive. Its pay link took its one payment, so coming back to the sign link used
+// to show a Pay button that opened a switched-off Stripe page.
+test.describe('sign.html — a bank payment that is settling', () => {
+  test('says "Payment on its way" and offers no Pay button', async ({ page }) => {
+    await serve(page, { view: () => flow({ proposal: { ...PROPOSAL, status: 'accepted' }, contract: AGREEMENT_SIGNED, deposit: { amount_cents: 250000, status: 'open', paid_at: null, url: null, processing: true } }) });
+    await open(page);
+    await expect(page.locator('#step-pay')).toContainText('Payment on its way. Your $2,500.00 bank payment takes a few days to arrive.');
+    await expect(page.locator('#pay')).toHaveCount(0);
+    await expect(page.locator('#step-pay a')).toHaveCount(0);
+    await expect(page.locator('#step-pay')).not.toContainText('being set up');
+  });
+});
