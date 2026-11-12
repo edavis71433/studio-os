@@ -260,7 +260,7 @@ const coverAndScopeOf = (k) => PKGS[k].body.slice(0, PKGS[k].body.indexOf('PROJE
 {
   ok('the agreement form offers a package chooser', /id\s*=\s*'conPkg'/.test(pipe) && /DDS_PACKAGE_KEYS\.map/.test(pipe));
   ok('precedence is unchanged: restored draft → saved template → the chosen package’s body',
-    /api\('\/sales\/templates\?with_body=contract'\)/.test(pipe) && /fillDocPlaceholders\(DDS_AGREEMENT_PACKAGES\[/.test(pipe));
+    /api\('\/sales\/templates\?with_body=contract'\)/.test(pipe) && /fillDocPlaceholders\((?:withParts\()?DDS_AGREEMENT_PACKAGES\[/.test(pipe));   // sales item 106: a proposal paid in parts rewrites the payment wording first
   ok('the send paths run the unfilled-blanks guard', (pipe.match(/confirmBlanks\(/g) || []).length >= 3);
   ok('the guard is a confirm, never a hard block', /function confirmBlanks\(/.test(pipe) && /confirm\(/.test(pipe.slice(pipe.indexOf('function confirmBlanks('), pipe.indexOf('function confirmBlanks(') + 900)));
   ok('the retired single-template const is gone', !/DDS_CONTRACT_TEMPLATE/.test(pipe));

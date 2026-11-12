@@ -1709,10 +1709,12 @@ document.addEventListener('drop',(e)=>{if(!S.canEdit)return;e.preventDefault();c
 $('scrim').onclick=closeDetail;
 // Bug hunt D9: Escape closes one thing at a time. While a question, the photo editor or a
 // menu of the shell's is open, the key is theirs and the open file stays where it is.
-// (This listener runs before shell.js's, which is deferred, so its menus are still open here.)
-function escapeIsTaken(e){
-  return e.defaultPrevented||!!document.querySelector('dialog[open],.dds-pop.open,.dds-palette.open,.dds-drawer.open,.dds-nav .sec.open');
-}
+// What is open is read as the key goes down, before anything shuts: the shell's search box
+// and help box close themselves from their own listeners, which run ahead of this one.
+const ESC_LAYERS='dialog[open],.dds-pop.open,.dds-palette.open,.dds-drawer.open,.dds-nav .sec.open';
+let escLayerOpen=false;
+document.addEventListener('keydown',(e)=>{if(e.key==='Escape')escLayerOpen=!!document.querySelector(ESC_LAYERS);},true);
+function escapeIsTaken(e){return e.defaultPrevented||escLayerOpen||!!document.querySelector(ESC_LAYERS);}
 document.addEventListener('keydown',(e)=>{if(e.key==='Escape'&&!escapeIsTaken(e))closeDetail();});
 // deep link: /files.html?focus=<id> (from ⌘K)
 function focusParam(){return new URLSearchParams(location.search).get('focus')||'';}

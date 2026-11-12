@@ -119,6 +119,9 @@ html.dds-embed #detailWrap{padding-top:0}
   .rhead h1{font-family:var(--serif);font-weight:500;font-size:clamp(24px,4vw,32px);letter-spacing:-.01em;margin:0;line-height:1.2;overflow-wrap:anywhere}
   .rec-sub{color:var(--soft);font-size:14px;margin-top:var(--dds-s1,4px);display:flex;flex-wrap:wrap;gap:6px var(--dds-s3,12px);align-items:center}
   .rhead-acts{display:flex;gap:var(--dds-s2,8px);align-items:center;flex-wrap:wrap}
+  /* sales item 106: the studio's own project templates in New project */
+  .np-tpls{margin-top:8px;font-size:13px}
+  .np-tpl{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:4px 0;border-top:1px solid var(--line)}
   /* Status ▾ dropdown — the slice-2 popup contract (aria-expanded · Escape
      returns focus · outside click via the ONE document-level delegated closer) */
   .statusdd{position:relative}
@@ -378,6 +381,8 @@ html.dds-embed #detailWrap{padding-top:0}
     <select id="np-customer"><option value="">Just my studio (internal)</option></select>
     <label for="np-template" style="margin-top:10px">Start from</label>
     <select id="np-template"><option value="">Empty project</option><option value="website">Website build — a ready-made checklist</option></select>
+    <!-- sales item 106: the studio's own saved templates (Save as a template on any project) -->
+    <div id="np-tpls" class="np-tpls" hidden></div>
     <div class="row2" style="justify-content:flex-end;margin-top:14px">
       <button type="button" class="btn ghost" id="np-cancel">Cancel</button>
       <button type="submit" class="btn">Create project</button>
@@ -913,7 +918,21 @@ async function loadCustomerOptions(){
   sel.innerHTML='<option value="">Just my studio (internal)</option>'+rows.map(c=>`<option value="${esc(c.client_id)}">${esc(c.name||'Customer')}</option>`).join('');
   if(keep&&rows.some(c=>String(c.client_id)===keep))sel.value=keep;
 }
-function openNew(){ $('np-name').value='';$('np-desc').value='';$('np-target').value='';if($('np-customer'))$('np-customer').value='';if($('np-template'))$('np-template').value=''; $('newDlg').showModal(); loadCustomerOptions(); setTimeout(()=>$('np-name').focus(),20); }
+function openNew(){ $('np-name').value='';$('np-desc').value='';$('np-target').value='';if($('np-customer'))$('np-customer').value='';if($('np-template'))$('np-template').value=''; $('newDlg').showModal(); loadCustomerOptions(); loadTemplateOptions(); setTimeout(()=>$('np-name').focus(),20); }
+// sales item 106: the studio's own project templates in the Start from list, each removable
+let TPLS=null;
+async function loadTemplateOptions(){
+  const sel=$('np-template');if(!sel)return;
+  if(!TPLS){try{const r=await api('/projects/templates');TPLS=(r.data&&r.data.saved)||[];}catch(_){TPLS=null;return;}}
+  const keep=sel.value;
+  sel.innerHTML='<option value="">Empty project</option><option value="website">Website build — a ready-made checklist</option>'+(TPLS.length?'<optgroup label="Your templates">'+TPLS.map(t=>`<option value="${esc(t.id)}">${esc(t.name)} — ${Number(t.steps||0)} step${Number(t.steps)===1?'':'s'}</option>`).join('')+'</optgroup>':'');
+  sel.value=keep;
+  const box=$('np-tpls');
+  box.hidden=!TPLS.length;
+  box.innerHTML=TPLS.length?`<p class="mut">Your templates (Save as a template on any project makes one):</p>`+TPLS.map(t=>`<div class="np-tpl"><span>${esc(t.name)}</span><button type="button" class="btn ghost sm" data-needs="delete" data-del-ptpl="${esc(t.id)}" aria-label="Remove the template ${esc(t.name)}">Remove</button></div>`).join(''):'';
+  // two deliberate taps, no browser dialog: the first asks, the second removes (projects started from it are untouched)
+  box.querySelectorAll('[data-del-ptpl]').forEach(b=>b.onclick=async()=>{if(b.dataset.armed!=='1'){b.dataset.armed='1';b.textContent='Tap again to remove';return;}b.disabled=true;try{await api('/projects/templates/'+b.dataset.delPtpl,'DELETE');TPLS=null;toast('Template removed. Projects already started from it are untouched.');loadTemplateOptions();}catch(e){toast(nice(e),true);b.disabled=false;b.dataset.armed='0';b.textContent='Remove';}});
+}
 $('np-cancel').onclick=()=>$('newDlg').close();
 $('newForm').onsubmit=async(e)=>{
   e.preventDefault();
@@ -922,7 +941,7 @@ $('newForm').onsubmit=async(e)=>{
   const body={name,description:$('np-desc').value.trim(),target_date:$('np-target').value||undefined};
   const cust=$('np-customer')&&$('np-customer').value; if(cust)body.customer_client_id=cust;
   const tmpl=$('np-template')&&$('np-template').value; if(tmpl)body.template=tmpl;
-  try{ const r=await api('/projects','POST',body); $('newDlg').close(); toast(r.templated?'Project created with a starter checklist':'Project created'); await load(); openProject(r.data.id); }
+  try{ const r=await api('/projects','POST',body); $('newDlg').close(); toast(r.templated?(tmpl==='website'?'Project created with a starter checklist':'Project created from your template'):'Project created'); await load(); openProject(r.data.id); }
   catch(err){ toast(nice(err),true); } finally{ if(btn)btn.disabled=false; }
 };
 
@@ -1113,7 +1132,8 @@ async function openProject(id,opts){
     // Phase 1 overhaul: the project links straight to its customer's record hub
     // (deal · billing · files · messages) — billing is never more than a click away.
     const recLink=(STUDIO&&p.client_id)?`<a class="btn ghost sm" href="/crm.html?project=${encodeURIComponent(p.id)}&client_id=${encodeURIComponent(p.client_id)}&tab=billing" data-noscope="1" style="text-decoration:none">Customer record →</a>`:'';
-    const acts=STUDIO?`<div class="rhead-acts">${statusDd}${recLink}<button class="btn ghost sm" id="renameProj">Rename</button><button class="btn ghost sm" id="quickTask">+ Task</button></div>`:'';
+    // sales item 106: Save as a template — this project's milestones and steps, dated from its start
+    const acts=STUDIO?`<div class="rhead-acts">${statusDd}${recLink}<button class="btn ghost sm" id="renameProj">Rename</button><button class="btn ghost sm" id="quickTask">+ Task</button><button class="btn ghost sm" id="saveTpl" title="Start future projects from this one's milestones and steps">Save as a template</button></div>`:'';
 
     // ── highlights: Customer · Target date · Progress · Waiting on them · Files
     //    (+ the old overview's remaining stats: open client actions when any
@@ -1191,6 +1211,7 @@ async function openProject(id,opts){
         </div>
         ${acts}
       </div>
+      <div id="tplForm"></div>
       ${hlHtml}
       ${pathHtml(data.milestones||[])}
       <div class="dbody"><div class="dgrid">
@@ -1243,6 +1264,13 @@ async function openProject(id,opts){
       $('renCancel').onclick=()=>reopen();
       $('renSave').onclick=once($('renSave'),async()=>{const v=($('renInput').value||'').trim();if(!v){toast('Give the project a name.');$('renSave').disabled=false;return;}await api('/projects/'+id,'PATCH',{name:v});toast('Renamed');reopen();});
     };
+    // sales item 106: save this project as a template; the steps' dates are kept as days from its start
+    if(STUDIO&&$('saveTpl'))$('saveTpl').onclick=()=>miniForm($('tplForm'),[{name:'name',label:'Template name',placeholder:'e.g. Website build, our way'}],async v=>{
+      if(!v.name){toast('Give the template a name.',true);return;}
+      const r=await api('/projects/templates','POST',{name:v.name,from_project_id:id});
+      $('tplForm').innerHTML='';TPLS=null;
+      toast('Saved “'+((r.data&&r.data.name)||v.name)+'” with '+((r.data&&r.data.steps)||0)+' steps. Pick it under Start from on + New project.');
+    });
     // + Task (highlights action) opens the same add form as the Tasks card
     const taskForm=()=>miniForm($('tsForm'),[{name:'title',label:'Task title'},{name:'due_date',label:'Due date (optional)',type:'date'},{name:'client_action_required',label:'Needs the client to act (shares it with them)',type:'checkbox'}],async v=>{await api('/projects/'+id+'/tasks','POST',{title:v.title,due_date:v.due_date||undefined,client_action_required:!!v.client_action_required});reopen();});
     if($('addTask'))$('addTask').onclick=taskForm;

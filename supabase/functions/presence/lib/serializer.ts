@@ -20,10 +20,12 @@ import { aggregateApproved, shapeReviewsForDisplay } from './reviews.ts';
 import { normalizeTags } from './search_index.ts';
 import { UUID_RE as SHARE_UUID_RE, UUID_PATTERN } from './uuid.ts';
 import { draftSettingsOf, type DraftSettings } from './draft_settings.ts';
+import { normalizeAuthors, normalizeCategories, postExtras, type PostAuthor, type PostCategory } from './blog.ts';
+import { secondLocationContent } from './second_location.ts';
 
 export const CONTENT_CONTRACT_VERSION = 1;
 
-interface MediaRow { id: string; storage_path: string; alt_text: string; mime?: string | null; width: number | null; height: number | null; focal_x?: number | null; focal_y?: number | null }
+export interface MediaRow { id: string; storage_path: string; alt_text: string; mime?: string | null; width: number | null; height: number | null; focal_x?: number | null; focal_y?: number | null }
 
 // deterministic variant output path: /img/<fnv(storage_path)>-<width>.<format>
 function fnv(s: string): string {
@@ -95,6 +97,19 @@ function toRef(m: MediaRow | undefined, manifest: TemplateManifest): MediaRef | 
     // Phase CP-2: focal point (0-100 %) — consumed wherever a template crops
     ...(Number.isFinite(Number(m.focal_x)) && Number.isFinite(Number(m.focal_y)) ? { focal: { x: Math.min(100, Math.max(0, Number(m.focal_x))), y: Math.min(100, Math.max(0, Number(m.focal_y))) } } : {}),
   };
+}
+
+/** Media rows → the ref() a snapshot uses and the manifest of what it used, the same pair
+ *  buildSnapshot makes. For a post published on its own (lib/post_publish.ts). Pure. */
+export function mediaResolver(media: MediaRow[], manifest: TemplateManifest): { ref: (id: string | null | undefined) => MediaRef | null; used: () => MediaManifestEntry[] } {
+  const byId = new Map<string, MediaRow>(media.map((m) => [String(m.id).toLowerCase(), m]));
+  const seen = new Set<string>();
+  const ref = (id: string | null | undefined): MediaRef | null => {
+    const m = id ? byId.get(String(id).toLowerCase()) : undefined;
+    if (m) seen.add(String(m.id).toLowerCase());
+    return toRef(m, manifest);
+  };
+  return { ref, used: () => [...seen].sort().map((id) => manifestEntry(byId.get(id)!, manifest)) };
 }
 
 /** Build the sanitized dev layer from the raw row, or null when there's nothing
@@ -209,6 +224,25 @@ export async function serializeDraft(siteId: string, manifest: TemplateManifest,
   return buildSnapshot(await readDraftRows(siteId), manifest, opts);
 }
 
+/** The draft's locations: each row as the contract carries it, then (builder list item 127)
+ *  the first row's second location, when it has one. Pure. */
+function locationsOf(mapped: SnapshotContent['locations'], rows: Array<{ second_location?: unknown }>): SnapshotContent['locations'] {
+  const second = mapped.length ? secondLocationContent(rows[0]?.second_location, mapped[0]) : null;
+  return second ? [...mapped, second] : mapped;
+}
+
+/** The blog's two lists from a settings row (builder list item 40); empty before 0181. Pure. */
+export function blogListsOf(settings: Record<string, unknown> | null | undefined): { categories: PostCategory[]; authors: PostAuthor[] } {
+  return { categories: normalizeCategories(settings?.post_categories), authors: normalizeAuthors(settings?.post_authors) };
+}
+
+/** One published post as a snapshot carries it. The ONE shape: the draft's serializer and
+ *  a post published on its own (lib/post_publish.ts) both use it, so the two agree to the
+ *  byte and the changes list never shows a post as changed when it isn't. Pure. */
+export function postEntry(p: any, lists: { categories: PostCategory[]; authors: PostAuthor[] }, ref: (id: string | null | undefined) => MediaRef | null): SnapshotContent['posts'][number] {
+  return { id: p.id, title: p.title, slug: p.slug, body_md: p.body_md, excerpt: p.excerpt || '', hero: ref(p.hero_media_id), published_at: p.published_at || p.updated_at, noindex: p.noindex === true, tags: normalizeTags(p.tags), ...postExtras(p, lists, ref) };
+}
+
 /** Build the snapshot from a draft's rows (readDraftRows), with the website's settings as
  *  stored beside it (lib/draft_settings.ts), which a snapshot keeps for a restore. Pure. */
 export function buildSnapshot(rows: DraftRows, manifest: TemplateManifest, opts: { templateSlug: string; templateVersion: string; now: string }): { snapshot: Snapshot; mediaManifest: MediaManifestEntry[]; draftSettings: DraftSettings } {
@@ -299,15 +333,18 @@ export function buildSnapshot(rows: DraftRows, manifest: TemplateManifest, opts:
       story: ident.story || '', service_area: ident.service_area || '',
       booking_url: ident.booking_url || '', ordering_url: ident.ordering_url || '',
       social: ident.social || {}, seo_title: ident.seo_title || '', seo_description: ident.seo_description || '',
+      // builder list item 127 (0182): only when set, so a business without one is unchanged
+      ...(String(ident.short_description || '').trim() ? { short_description: String(ident.short_description).trim().slice(0, 150) } : {}),
     },
-    // locations is a LIST by contract (reconciliation §9) — v1 carries one
-    locations: (locArr as any[]).map((loc) => ({
+    // locations is a LIST by contract (reconciliation §9) — v1 carries one; builder list item
+    // 127: the main row's second location follows it (locationsOf)
+    locations: locationsOf((locArr as any[]).map((loc) => ({
       address_line1: loc.address_line1 || '', address_line2: loc.address_line2 || '',
       city: loc.city || '', region: loc.region || '', postal_code: loc.postal_code || '',
       country: loc.country || 'US', phone: loc.phone || '', timezone: loc.timezone || 'America/Los_Angeles',
       hours: loc.hours || [], holiday_exceptions: loc.holiday_exceptions || [],
       temporarily_closed: !!loc.temporarily_closed, temporarily_closed_note: loc.temporarily_closed_note || '',
-    })),
+    })), locArr as any[]),
     settings: {
       category_order: Array.isArray(settings.category_order) ? settings.category_order : [],
       industry: String(settings.industry_key || 'generic'),   // Phase T3: templates read vocabFor(industry)
@@ -363,7 +400,9 @@ export function buildSnapshot(rows: DraftRows, manifest: TemplateManifest, opts:
     faqs: faqs.map((f: any) => ({ id: f.id, question: f.question, answer: f.answer, sort_order: f.sort_order })),
     // Phase SEARCH: flat tags on updates. normalizeTags is the ONE gate; deploy-order
     // tolerant — pre-0102 the `tags` column is absent → p.tags is undefined → [].
-    posts: posts.map((p: any) => ({ id: p.id, title: p.title, slug: p.slug, body_md: p.body_md, excerpt: p.excerpt || '', hero: ref(p.hero_media_id), published_at: p.published_at || p.updated_at, noindex: p.noindex === true, tags: normalizeTags(p.tags) })),
+    // Builder list item 40 (0181): each post's category, author and the photos inside it,
+    // resolved from the site's lists; a post without them is unchanged (postEntry).
+    posts: posts.map((p: any) => postEntry(p, blogListsOf(settings), ref)),
     redirects: redirects.map((r: any) => ({ from_path: r.from_path, to_path: r.to_path })),
   };
 

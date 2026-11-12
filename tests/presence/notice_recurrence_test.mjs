@@ -90,6 +90,10 @@ const TERMINAL_OK = [
   { kind: 'publish_failed', marker: 'pub:', why: 'each publish attempt has its own pubId — a new failure is a new event id' },
   { kind: 'domain_expiry', marker: 'domainExpiryPeriod(', why: 'exp:<domain>:<expiry date>:<rung> (builder list item 133) — each rung of ONE expiry is said once; a renewal moves the date, so the next expiry gets new keys and the ladder starts again' },
   { kind: 'deal_followup', marker: 'invoiceReminderPeriod(', why: 'invremind:<id>:<leg> — an invoice settles exactly once (paid or voided); each of the three legs (−7 · due · +N) sends once by design (Oct 2026 studio audit, change 10)' },
+  // sales items 116 to 118 (Nov 12 2026 review)
+  { kind: 'deal_followup', marker: 'invoiceReminderFailedPeriod(', why: 'invremind:<id>:<leg>:failed — one row per reminder leg whose email did not leave; the leg sending (or the invoice being paid or voided) takes it down, and a leg sends once' },
+  { kind: 'retainer_status', marker: 'retainerTwicePeriod(', why: 'retainer:<deal>:twice:<subscription> — one row per extra Stripe subscription; another second approval is another subscription id' },
+  { kind: 'retainer_status', marker: 'clientcancel:', why: 'retainer:<deal>:clientcancel:<day> — a client cancels a retainer once; one set up again and cancelled later is on a later day' },
   { kind: 'deal_followup', marker: 'recuremail:', why: 'one row per invoice DATE whose email failed; that invoice is resent by hand, and next month’s has a new date, so a new key' },
   { kind: 'deal_followup', marker: 'remind:', why: 'the unsigned-doc reminder is deliberately once-ever (a silent ledger row)' },
   { kind: 'deal_followup', marker: 'declined:', why: 'a proposal is declined once; period is per-deal — see the adjacent-finding note' },

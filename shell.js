@@ -949,6 +949,7 @@
     settings: '<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/>',
     bell: '<path d="M6 16V11a6 6 0 0 1 12 0v5l2 2H4z"/><path d="M10 20a2 2 0 0 0 4 0"/>',
     search: '<circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/>',
+    spark: '<path d="M12 3.5l1.9 5.6 5.6 1.9-5.6 1.9L12 18.5l-1.9-5.6L4.5 11l5.6-1.9z"/><path d="M19 3v3.5M17.25 4.75h3.5"/>',
     help: '<circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.7.3-1 .8-1 1.5"/><path d="M12 17h.01"/>',
     account: '<circle cx="12" cy="9" r="3.5"/><path d="M5 20a7 7 0 0 1 14 0"/>',
     plus: '<path d="M12 5v14M5 12h14"/>',
@@ -964,6 +965,42 @@
     phone: '<path d="M5 3h4l2 5-2.5 1.5a11 11 0 0 0 6 6L16 13l5 2v4a2 2 0 0 1-2 2A17 17 0 0 1 3 5a2 2 0 0 1 2-2z"/>'
   };
   function icon(key, cls) { return '<svg class="' + (cls || 'nic') + '" viewBox="0 0 24 24" aria-hidden="true" focusable="false">' + (ICON[key] || ICON.dot) + '</svg>'; }
+  // ── What's new (builder list item 128) ─────────────────────────────────────
+  // Beside the bell: each week's changes to the tools, a picture and a sentence each
+  // (whats-new.js reads /whats-new.json). A studio reads every entry, a business running
+  // its own site the ones that touch a website; a client in the portal finds it in Help
+  // instead, since the portal's bell is already its news. A dot says there is something
+  // this device hasn't seen; nothing opens by itself.
+  function whatsNewWho() {
+    if (!CTX || CTX.is_client_portal || isReviewerCtx()) return '';   // a studio's client reads it in the portal's Help
+    return CTX.is_agency ? 'studio' : 'owner';
+  }
+  var WN_LOAD = null;
+  function loadWhatsNew() {
+    if (window.DDSWhatsNew) return Promise.resolve(window.DDSWhatsNew);
+    if (!WN_LOAD) WN_LOAD = new Promise(function (res, rej) {
+      var s = document.createElement('script'); s.src = '/whats-new.js?v=1';
+      s.onload = function () { res(window.DDSWhatsNew); };
+      s.onerror = function () { WN_LOAD = null; rej(new Error('whats-new')); };
+      document.head.appendChild(s);
+    });
+    return WN_LOAD;
+  }
+  function setWhatsNewDot(on) {
+    var b = document.getElementById('dds-new'); if (!b) return;
+    var d = b.querySelector('.wn-dot');
+    if (on && !d) b.insertAdjacentHTML('beforeend', '<span class="dot wn-dot" aria-hidden="true"></span>');
+    if (!on && d) d.remove();
+    b.setAttribute('aria-label', on ? 'What’s new, with something you haven’t seen' : 'What’s new');
+  }
+  function paintWhatsNewDot() {
+    var who = whatsNewWho(); if (!who) return;
+    loadWhatsNew().then(function (W) { return W.hasNew(who); }).then(setWhatsNewDot)['catch'](function () { /* no dot */ });
+  }
+  function openWhatsNew(opener) {
+    var who = whatsNewWho(); if (!who) return;
+    loadWhatsNew().then(function (W) { W.open({ who: who, opener: opener, onSeen: function () { setWhatsNewDot(false); } }); })['catch'](function () { /* a press retries */ });
+  }
   function bellInner(n) { return icon('bell') + (n > 0 ? '<span class="dot">' + (n > 9 ? '9+' : n) + '</span>' : ''); }
 
   // ── "+ Create" (sales list item 70, the bold redesign, Nov 2026) ─────────────
@@ -1133,6 +1170,7 @@
       '<div class="dds-search" id="dds-search" role="button" tabindex="0" aria-label="Search"><span>' + icon('search', 'nic') + '</span><span>Search</span><kbd>' + (/Mac|iPhone|iPad/.test(navigator.platform || '') ? '⌘K' : 'Ctrl K') + '</kbd></div>' +
       '<div class="dds-right">' +
         '<button class="dds-ic" id="dds-bell" aria-label="Notifications" aria-haspopup="true" aria-expanded="false">' + bellInner(att) + '</button>' +
+        (whatsNewWho() ? '<button class="dds-ic" id="dds-new" aria-label="What’s new" aria-haspopup="dialog">' + icon('spark') + '</button>' : '') +
         '<a class="dds-ic" href="/help.html" id="dds-help" aria-label="Help — how do I…?" aria-haspopup="true" aria-expanded="false">' + icon('help') + '</a>' +
         '<button class="dds-ic" id="dds-profile" aria-label="Account" aria-haspopup="true" aria-expanded="false">' + icon('account') + '</button>' +
       '</div>';
@@ -1514,6 +1552,11 @@
     // bell + profile
     document.getElementById('dds-bell').addEventListener('click', function (e) { e.stopPropagation(); toggleNotifications(); });
     document.getElementById('dds-profile').addEventListener('click', function (e) { e.stopPropagation(); toggleProfile(); });
+    var newTrig = document.getElementById('dds-new');
+    if (newTrig) {
+      newTrig.addEventListener('click', function (e) { e.stopPropagation(); closeMenus(); openWhatsNew(newTrig); });
+      (window.requestIdleCallback || function (f) { return setTimeout(f, 1200); })(paintWhatsNewDot);
+    }
     // in-app help (HELP-1): the "?" opens a grounded "how do I…?" panel; the href
     // stays a real fallback to the full Help page if JS is off.
     var helpTrig = document.getElementById('dds-help');
@@ -2066,6 +2109,7 @@
     rows += '<a class="row" href="#" id="dds-theme-toggle">' + esc(themeLabel()) + '</a>';
     // Re-take the first-login tour any time (it marks itself seen on finish/skip)
     if (tourAvailable()) rows += '<a class="row" href="#" id="dds-tour-again">Show me around</a>';
+    if (whatsNewWho()) rows += '<a class="row" href="#" id="dds-new-row">What’s new<span class="sub">Changes to your tools, week by week</span></a>';
     rows += '<a class="row" href="mailto:support@davisdigitalstudio.com">Support</a>';
     rows += '<a class="row" href="#" id="dds-signout">Sign out</a>';
     prof.innerHTML = '<div class="who"><div class="n">' + esc(email) + '</div><div class="r">' + esc([roleWord, plan].filter(Boolean).join(' · ')) + '</div></div>' + rows;
@@ -2080,6 +2124,8 @@
     if (nt) nt.addEventListener('click', function (e) { e.preventDefault(); togglePush(); });
     var th = document.getElementById('dds-theme-toggle');
     if (th) th.addEventListener('click', function (e) { e.preventDefault(); cycleTheme(); th.textContent = themeLabel(); });
+    var wr = document.getElementById('dds-new-row');
+    if (wr) wr.addEventListener('click', function (e) { e.preventDefault(); var op = document.getElementById('dds-profile'); closeProfile(); openWhatsNew(op); });
     var ta = document.getElementById('dds-tour-again');
     if (ta) ta.addEventListener('click', function (e) { e.preventDefault(); var op = document.getElementById('dds-profile'); closeProfile(); try { startTour(op); } catch (_) { /* */ } });
     var so = document.getElementById('dds-signout');
