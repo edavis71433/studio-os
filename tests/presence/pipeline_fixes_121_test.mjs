@@ -99,5 +99,14 @@ const deal = (i, extra = {}) => ({ id: n(i), site_id: SITE, title: `Deal ${i}`, 
   ok('short notes are never cut, and say so with 0', small.notesCut === 0 && small.values.notes === 'A\n\nB');
 }
 
+// ═══ free-tool leads stay on Prospects; Enquiries says so (Eric's pick, Nov 12) ═══
+{
+  const inbox = Deno.readTextFileSync(new URL('../../inbox.html', import.meta.url));
+  ok('Enquiries points to Prospects for free-tool leads, with how many are new', /api\('\/sales\/tool-leads'\)/.test(inbox) && /waiting on Prospects\./.test(inbox) && /<a href="\/prospects\.html">Open Prospects →<\/a>/.test(inbox) && /\(l&&l\.status\|\|'new'\)==='new'/.test(inbox));
+  ok('…only when that staff-only read answers (anyone else gets a 403 and sees nothing)', /r\.ok&&Array\.isArray\(r\.body&&r\.body\.data\)\?r\.body\.data:null/.test(inbox) && /const h=\$\('enqTool'\);if\(!h\|\|!list\)return;/.test(inbox));
+  ok('…and never in one client’s Inbox', /if\(!host\|\|new URLSearchParams\(location\.search\)\.get\('client'\)\)return;/.test(inbox));
+  ok('the pointer is painted each time the Enquiries toolbar is', /\$\('newEnq'\)\.addEventListener\('click',openNew\);\s*paintToolLeads\(\);/.test(inbox));
+}
+
 console.log(`\n${pass} passed, ${fail} failed`);
 if (fail) Deno.exit(1);

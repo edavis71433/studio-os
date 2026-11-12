@@ -91,6 +91,10 @@
   .efilt .n{font-size:11px;font-weight:600;background:var(--card);color:var(--soft);border-radius:999px;padding:0 6px;min-width:18px;text-align:center;line-height:17px}
   .efilt button.on .n{background:var(--p);color:#fff}
   .ebar{display:flex;gap:6px;margin-top:var(--dds-s2,8px);flex-wrap:wrap;align-items:center}
+  /* sales item 121: free-tool leads live on Prospects; Enquiries says so */
+  .enqtool{margin:var(--dds-s2,8px) 0 0;font-size:13px;line-height:1.45;color:var(--soft)}
+  .enqtool b{color:var(--ink);font-weight:600}
+  .enqtool a{color:var(--p);font-weight:600;white-space:nowrap}
   .ebar select{flex:1 1 30%;min-width:0;font-size:13px;padding:6px var(--dds-s2,8px);border-radius:999px;background:var(--bg)}
   .ebar select[data-on="1"]{border-color:var(--p);color:var(--p);font-weight:700;background:var(--p-soft)}
   .ebar #newEnq{flex:0 0 auto;font-size:12.5px;border-radius:999px;padding:6px var(--dds-s3,12px)}
@@ -749,7 +753,24 @@ function enqToolbar(){
       <select id="kindf" aria-label="Filter by kind" data-on="${KIND_F==='all'?'0':'1'}">${opt('all','All kinds',KIND_F)}${opt('quote','Quotes',KIND_F)}${opt('booking','Bookings',KIND_F)}${opt('contact','Messages',KIND_F)}</select>
       <select id="sortf" aria-label="Sort enquiries">${opt('newest','Newest',SORT)}${opt('oldest','Oldest',SORT)}</select>
       <button type="button" class="btnlink" id="newEnq" data-new>+ New enquiry</button>
-    </div>`;
+    </div>
+    <p class="enqtool" id="enqTool" hidden></p>`;
+}
+// ── Sales item 121 (Nov 2026, Eric's pick): free-tool leads stay on Prospects ──
+// People who run the free Site Review or AI Visibility check and leave their email are
+// the platform's own enquiries (GET /sales/tool-leads answers staff only). They're worked
+// on Prospects, so Enquiries points there, with how many are new. Anyone else gets a
+// 403 and sees nothing; so does one client's Inbox (?client=), whose enquiries are theirs.
+let TOOL_LEADS_P=null;
+function paintToolLeads(){
+  const host=$('enqTool');if(!host||new URLSearchParams(location.search).get('client'))return;
+  TOOL_LEADS_P=TOOL_LEADS_P||api('/sales/tool-leads').then(r=>r.ok&&Array.isArray(r.body&&r.body.data)?r.body.data:null).catch(()=>null);
+  TOOL_LEADS_P.then(list=>{
+    const h=$('enqTool');if(!h||!list)return;
+    const n=list.filter(l=>(l&&l.status||'new')==='new').length;
+    h.innerHTML=(n?`<b>${n} ${n===1?'person':'people'}</b> who ran your free Site Review or AI Visibility check ${n===1?'is':'are'} waiting on Prospects.`:'People who run your free Site Review or AI Visibility check show up on Prospects, not here.')+' <a href="/prospects.html">Open Prospects →</a>';
+    h.hidden=false;
+  });
 }
 function wireEnqToolbar(){
   const ef=$('efilt');if(!ef)return;
@@ -762,6 +783,7 @@ function wireEnqToolbar(){
   const kf=$('kindf');kf.addEventListener('change',()=>{KIND_F=kf.value;kf.setAttribute('data-on',KIND_F==='all'?'0':'1');narrowed();});
   const sf=$('sortf');sf.addEventListener('change',()=>{SORT=sf.value;narrowed();});
   $('newEnq').addEventListener('click',openNew);
+  paintToolLeads();   // item 121
 }
 // the queue's counts on the Open / New chips — every enquiry, before search
 function paintEnqCounts(){
