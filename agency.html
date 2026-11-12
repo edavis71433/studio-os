@@ -132,6 +132,25 @@
   .need .qmore{margin:var(--dds-s2,8px) 0 0}
   .linkbtn{font:inherit;font-size:12.5px;font-weight:500;color:var(--p);background:none;border:none;padding:0;cursor:pointer}
   .linkbtn:hover{text-decoration:underline}
+  /* sales item 105: the setup strip under the greeting */
+  .setup{margin:0 0 16px;padding:18px 20px 20px;border-radius:18px;border:1px solid color-mix(in srgb,var(--p) 22%,var(--line));background:linear-gradient(135deg,var(--p-soft),var(--card) 70%);box-shadow:var(--shadow)}
+  .setup .shead{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:14px}
+  .setup h2{margin:0;font-size:19px;font-weight:700;color:var(--ink)}
+  .setup .sprog{font-size:12.5px;font-weight:600;color:var(--p);background:var(--card);border-radius:999px;padding:3px 10px}
+  .setup .sbar{flex:0 1 160px;height:8px;border-radius:4px;background:color-mix(in srgb,var(--p) 18%,transparent);overflow:hidden}
+  .setup .sbar span{display:block;height:100%;background:var(--p);border-radius:4px}
+  .setup .shide{margin-left:auto;font-size:13px;color:var(--soft);min-height:44px;padding:0 6px}
+  .setup .ssteps{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
+  .setup .sstep{display:flex;flex-direction:column;gap:6px;align-items:flex-start;background:var(--card);border:1px solid color-mix(in srgb,var(--p) 25%,var(--line));border-radius:14px;padding:12px 14px}
+  .setup .sstep.done{border-color:var(--line);opacity:.85}
+  .setup .smark{width:28px;height:28px;border-radius:999px;display:grid;place-items:center;font-size:13px;font-weight:700;background:var(--p-soft);color:var(--p)}
+  .setup .sstep.done .smark{background:var(--good-soft,#e6f5ec);color:var(--good,#11744a)}
+  .setup .smark svg{width:14px;height:14px}
+  .setup .sstep b{font-size:14px;color:var(--ink)}
+  .setup .swhy{font-size:12.5px;color:var(--soft);line-height:1.4;flex:1 1 auto}
+  .setup .sdone{font-size:12.5px;font-weight:600;color:var(--good,#11744a)}
+  .setup .sstep .btn{font-size:13px;padding:8px 14px;min-height:40px;display:inline-flex;align-items:center;text-decoration:none}
+  @media (max-width:640px){.setup{padding:16px}.setup .shead{gap:8px;margin-bottom:12px}.setup h2{font-size:17px}.setup .sbar{display:none}.setup .ssteps{grid-template-columns:1fr;gap:8px}.setup .sstep{flex-direction:row;flex-wrap:wrap;align-items:center}.setup .sstep b{flex:1 1 50%}.setup .swhy{flex:1 1 100%;order:3;margin-left:38px}.setup .sstep .btn,.setup .sdone{order:2}.setup .sstep.done{padding:8px 12px}.setup .sstep.done .swhy{display:none}}   /* a phone: the count says how far, a done step is one line */
   .need .pnote{font-size:12px;color:var(--faint);margin:var(--dds-s2,8px) 0 0}
   .need .qold{font-size:12.5px;color:var(--soft);margin:0 0 var(--dds-s2,8px)}   /* item 96: the over-a-month line and its Clear */
   /* status words on the roster: Live · Not live yet · Needs you · Archived */
@@ -473,6 +492,8 @@
   <!-- the top row, Needs you and the studio strip live OUTSIDE #main: the roster
        re-renders #main.innerHTML per keystroke and must never wipe them -->
   <div id="top"></div>
+  <!-- sales item 105: the setup strip, until its steps are done or someone hides it -->
+  <section id="setup" class="setup" aria-labelledby="setupHead" hidden data-needs="configure"></section>
   <!-- the bold redesign (sales item 70): what needs you comes first, as one list
        with its actions on each row; the numbers and the pipeline follow -->
   <section id="needs" aria-label="Needs you" hidden></section>
@@ -1406,6 +1427,7 @@ async function boot(){
     ME=me.body.data||{};
     renderTop();
     openFromHash();   // ⌘K → /agency.html#add (or #kits)
+    loadSetup();     // sales item 105: the setup strip reads on its own; nothing waits on it
     const needs=mountNeeds();   // what needs the studio — reads alongside the roster; re-paints Status/Next when it lands
     // final pass (Nov 8, batch B): the studio strip reads alongside the roster and
     // Needs you too — it uses neither, and Home's last answer waited on Needs you
@@ -1419,6 +1441,37 @@ async function boot(){
   }catch(_){EARLY.clear();trouble();}
 }
 boot();
+// ── sales item 105: the setup strip. What a studio sets up once, each step checked against
+// the real thing; it goes by itself once all are done, and Hide puts it away for the studio.
+let SETUP=null;
+async function loadSetup(){
+  if(new URLSearchParams(location.search).get('client'))return;   // a client's own Home isn't the studio's setup
+  let r;try{r=await api('/sales/setup');}catch(_){return;}
+  if(!r||!r.ok||!r.body||!r.body.data)return;   // a server without it, or a failed read: no strip, said nowhere
+  SETUP=r.body.data;paintSetup();
+}
+const SETUP_TICK='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>';
+function paintSetup(){
+  const host=$('setup');if(!host)return;
+  const d=SETUP,steps=d&&Array.isArray(d.steps)?d.steps:[];
+  // item 91 (Menus session): a brand-new studio's greeting points here while it shows; it hears each paint
+  const said=(shows)=>{try{document.dispatchEvent(new CustomEvent('dds:setup',{detail:{shows:shows}}));}catch(_){}};
+  if(!d||!d.shows||!steps.length){host.hidden=true;host.innerHTML='';said(false);return;}
+  const done=steps.filter(s=>s.done).length,next=steps.findIndex(s=>!s.done);
+  host.innerHTML=`<div class="shead"><h2 id="setupHead">Finish setting up</h2><span class="sprog">${done} of ${steps.length} done</span><span class="sbar" aria-hidden="true"><span style="width:${Math.round(100*done/steps.length)}%"></span></span><button type="button" class="linkbtn shide" id="setupHide" data-needs="configure">Hide</button></div>`
+    +`<ol class="ssteps">${steps.map((s,i)=>`<li class="sstep${s.done?' done':''}"><span class="smark" aria-hidden="true">${s.done?SETUP_TICK:i+1}</span><b>${esc(s.title)}</b><span class="swhy">${esc(s.why)}</span>${s.done?'<span class="sdone">Done</span>':`<a class="btn${i===next?'':' ghost'}" href="${esc(s.href)}">${esc(s.act)}</a>`}</li>`).join('')}</ol>`;
+  host.hidden=false;
+  $('setupHide').addEventListener('click',()=>setSetupHidden(true));
+  said(true);
+}
+async function setSetupHidden(hidden){
+  const b=$('setupHide');if(b)b.disabled=true;
+  const r=await apiSend('POST','/sales/setup',{hidden});
+  if(!r.ok){if(b)b.disabled=false;toast((r.body&&r.body.message)||'That didn’t save just now. Try again.',true);return;}
+  if(!hidden){loadSetup();return;}
+  SETUP={...SETUP,hidden:true,shows:false};paintSetup();
+  if(window.ddsToast)window.ddsToast('Setup steps hidden. Each one stays where it lives: Settings, Files, Pipeline and Contacts.','ok',{label:'Undo',onClick:()=>setSetupHidden(false)});
+}
 // + Create (the sidebar button, the phone's +, the c key) made a deal, logged a
 // call, sent an invoice or added a to-do: the numbers, My to-dos and Needs you
 // catch up without a reload

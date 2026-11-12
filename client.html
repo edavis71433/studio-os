@@ -2695,8 +2695,10 @@ async function renderHelp(){
     html+=`<p id="faqNone" class="muted" hidden style="padding:4px 2px">No answers match that. Try fewer words, or message your studio below.</p>`;
   }
   html+=`<div class="card"><h3>Still need help?</h3><p class="muted">Can’t find what you’re looking for? Send your studio a message and they’ll get back to you.</p><div class="row"><button class="approve" id="helpMsg">Write to your studio</button></div></div>`;
+  html+=packCardHtml();   // sales item 93: everything, to keep
   html+=accountSectionHtml(true);
   $('main').innerHTML=html;
+  wirePackCard();
   const hm=$('helpMsg');if(hm)hm.addEventListener('click',openMessagesCompose);   // item 179 part three: one door
   wireWhatsNewDoor();   // item 128
   wireAccountSection();
@@ -2705,6 +2707,29 @@ async function renderHelp(){
     const q=search.value.trim().toLowerCase();const items=document.querySelectorAll('#faqBody .faq-item');let shown=0;
     items.forEach(it=>{const hit=!q||(it.textContent||'').toLowerCase().indexOf(q)>=0;it.hidden=!hit;if(hit)shown++;});
     const none=$('faqNone');if(none)none.hidden=!(q&&shown===0);
+  });
+}
+// ── Sales item 93: the hand-over pack. The business's owner can take everything with
+// them whenever they like: the website as plain files, photos and files, the domain and
+// its records, their customers' enquiries, bookings and reviews, and their invoices. The
+// studio's email when a client leaves points here. Owner only (the server checks too).
+function packCardHtml(){
+  const role=PORTAL.ctx&&PORTAL.ctx.site_role;
+  if(PORTAL.persona!=='client'||(role&&role!=='business_owner'))return'';
+  return `<div class="card" id="packCard"><h3>Take everything with you</h3><p class="muted">One download with your website as plain files, your photos and files, your domain and its records, your customers’ enquiries, bookings and reviews, and your invoices. Yours to keep, whenever you like.</p><p class="muted" id="packErr" role="alert" hidden></p><div class="row"><button class="approve" id="packGet">Download your hand-over pack</button></div></div>`;
+}
+function wirePackCard(){
+  const b=$('packGet');if(!b)return;
+  b.addEventListener('click',async()=>{
+    const e=$('packErr');e.hidden=true;b.disabled=true;b.textContent='Gathering everything…';
+    try{
+      const r=await fetch(FN+'/handover/pack',{headers:H()});
+      if(!r.ok||!/zip/.test(r.headers.get('Content-Type')||'')){const j=await r.json().catch(()=>({}));throw new Error((j&&j.message)||(r.status===404?'This arrives with the next update. Please try again later.':'The download didn’t start. Please try again.'));}
+      const blob=await r.blob();const name=(/filename="([^"]+)"/.exec(r.headers.get('Content-Disposition')||'')||[])[1]||('hand-over-pack-'+portalTodayYmd()+'.zip');
+      const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove();},0);
+      toast('Downloaded '+name+'.');
+    }catch(x){e.textContent=x&&x.message?x.message:'The download didn’t start. Please try again.';e.hidden=false;}
+    finally{if(b.isConnected){b.disabled=false;b.textContent='Download your hand-over pack';}}
   });
 }
 // First-run welcome — calm, one-time, dismissible (no modal, no tour).
