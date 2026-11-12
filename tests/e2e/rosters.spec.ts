@@ -35,8 +35,8 @@ test.describe('Customers list view', () => {
     await page.goto('/customers.html');
     // header: object icon + view-name dropdown + meta + refresh
     await expect(page.locator('#viewBtn')).toContainText('All customers');
-    await expect(page.locator('.lmeta')).toContainText('3 customers');
-    await expect(page.locator('.lmeta')).toContainText('Updated just now');
+    await expect(page.locator('#lmeta')).toContainText('3 customers');
+    await expect(page.locator('#lmeta')).toContainText('Updated just now');
     await expect(page.locator('#refreshBtn')).toBeVisible();
     // table: th scope=col + default Name-ascending sort (aria-sort)
     await expect(page.locator('th[scope="col"]').first()).toBeVisible();
@@ -57,7 +57,7 @@ test.describe('Customers list view', () => {
     await expect(page.locator('th[aria-sort="descending"]')).toContainText('Name');
     await expect(page.locator('tbody tr td:nth-child(2)').first()).toContainText('Zeta Gym');
     // meta mirrors the sort header
-    await expect(page.locator('.lmeta')).toContainText('Sorted by Name — descending');
+    await expect(page.locator('#lmeta')).toContainText('Sorted by Name — descending');
     // a different column starts ascending
     await page.locator('[data-sort="open_support"]').click();
     await expect(page.locator('th[aria-sort="ascending"]')).toContainText('Requests');   // final pass, batch C: it counts requests
@@ -73,7 +73,7 @@ test.describe('Customers list view', () => {
     await expect(page.locator('#viewBtn')).toContainText('Needs you');   // Home's word for it (bold redesign, part 2)
     await expect(page.locator('tbody tr')).toHaveCount(1);
     await expect(page.locator('tbody tr').first()).toContainText('Acme Bakery');
-    await expect(page.locator('.lmeta')).toContainText('1 customer');
+    await expect(page.locator('#lmeta')).toContainText('1 customer');
     // Complete / Archived view
     await page.locator('#viewBtn').click();
     await page.locator('#viewMenu [data-view="done"]').click();
@@ -106,10 +106,9 @@ test.describe('Customers list view', () => {
     await expect(page.locator('#viewMenu')).toBeVisible();
     await expect(page.locator('#viewBtn')).toHaveAttribute('aria-expanded', 'true');
     // outside click → the ONE document-level delegated closer (ported from
-    // inbox.html). Click the space beside the title: it sits RIGHT of the
-    // dropdown on the title's line, so the open menu (below the title) never
-    // covers it (at phone widths the menu overlaps .lmeta).
-    await page.locator('.lrow1 .sp').click();
+    // inbox.html). Click the page's title: the picker sits beside it (builder
+    // item 165) and its menu opens below, so the menu never covers the title.
+    await page.locator('header.dds-ph h1').click();
     await expect(page.locator('#viewMenu')).toBeHidden();
     await expect(page.locator('#viewBtn')).toHaveAttribute('aria-expanded', 'false');
     // Escape closes and hands focus back to the trigger
@@ -161,7 +160,7 @@ test.describe('Contacts list view', () => {
     await installApp(page, { api: { '/sales/contacts': CONTACTS } });
     await page.goto('/contacts.html');
     await expect(page.locator('#viewBtn')).toContainText('All contacts');
-    await expect(page.locator('.lmeta')).toContainText('2 contacts');
+    await expect(page.locator('#lmeta')).toContainText('2 contacts');
     // columns: Name · Company · Email · Phone · Updated (sortable, aria-sort)
     await expect(page.locator('th[aria-sort="ascending"]')).toContainText('Name');
     await expect(page.locator('tbody tr').first()).toContainText('Dana Lee');
@@ -201,16 +200,16 @@ test.describe('Contacts list view', () => {
     await page.locator('[data-sort="updated_at"]').click();
     await expect(page.locator('th[aria-sort="descending"]')).toContainText('Updated');
     await expect(page.locator('tbody tr').first()).toContainText('Sam Rivera');   // 2 days ago outranks 90
-    await expect(page.locator('.lmeta')).toContainText('Sorted by Updated — descending');
+    await expect(page.locator('#lmeta')).toContainText('Sorted by Updated — descending');
     // the second click flips to oldest-first
     await page.locator('[data-sort="updated_at"]').click();
     await expect(page.locator('th[aria-sort="ascending"]')).toContainText('Updated');
     await expect(page.locator('tbody tr').first()).toContainText('Dana Lee');
     // the same delegated closer guards this page's dropdown too (click the
-    // object icon — left of the dropdown, never covered by the open menu)
+    // header's icon — left of the title and its picker, never covered by the open menu)
     await page.locator('#viewBtn').click();
     await expect(page.locator('#viewMenu')).toBeVisible();
-    await page.locator('.obj-ic').click();
+    await page.locator('header.dds-ph .dds-ph-ic').click();
     await expect(page.locator('#viewMenu')).toBeHidden();
     await expect(page.locator('#viewBtn')).toHaveAttribute('aria-expanded', 'false');
   });
@@ -282,7 +281,7 @@ test.describe('Customers — SS6 quick wins', () => {
     await expect(page.locator('tbody tr').first()).toContainText('Acme Bakery');
     expect(await q.evaluate((el) => (el as HTMLElement).dataset.marker)).toBe('kept');
     await expect(q).toBeFocused();
-    await expect(page.locator('.lmeta')).toContainText('1 customer');
+    await expect(page.locator('#lmeta')).toContainText('1 customer');
   });
 
   test('REQ_SEQ — a slow superseded /studio/customers load never paints over the newest one', async ({ page }) => {
@@ -352,7 +351,7 @@ test.describe('Contacts — SS6 quick wins', () => {
     expect(await q.evaluate((el) => (el as HTMLElement).dataset.marker)).toBe('kept');
     await expect(q).toBeFocused();
     // the meta count follows the filter
-    await expect(page.locator('.lmeta')).toContainText('1 contact');
+    await expect(page.locator('#lmeta')).toContainText('1 contact');
     await q.fill('');
     await expect(page.locator('tbody tr')).toHaveCount(2);
   });

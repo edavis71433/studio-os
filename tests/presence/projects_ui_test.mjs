@@ -46,12 +46,15 @@ ok('slice 9: tasks are a checkbox list (done ⇄ todo) that keeps the other ladd
 ok('slice 9: friendly empty states (surveys check-in nudge)', /No surveys yet — /.test(h) && /send a check-in →/.test(h) && /No milestones yet/.test(h) && /No tasks yet/.test(h));
 
 // ── anti-drift: the shared list-view anatomy has TEETH ──────────────────────
-// customers.html / contacts.html / projects.html carry the SAME core
-// .lhead/.lrow1/.obj-ic/.lbtn/.lmeta block ("kept in sync by hand" — this pin
-// makes the hand honest). leads.html drifts intentionally (its .lhead margin
-// variant + wider .lrow1 gap) and inbox.html is a narrower pane header — both
-// excluded on purpose.
-const CORE_SELECTORS = ['.lhead', '.lrow1', '.obj-ic', '.lbtn', '.lbtn:hover', '.lmeta'];
+// customers.html / contacts.html carry the SAME core .lbtn block ("kept in sync
+// by hand" — this pin makes the hand honest). Builder item 165: their headers
+// are the one page header now (shell.css .dds-ph), so .lhead/.lrow1/.obj-ic/.lmeta
+// are gone from both — and must stay gone, rather than drift back in one of them.
+const CORE_SELECTORS = ['.lbtn', '.lbtn:hover'];
+for (const n of ['customers.html', 'contacts.html']) {
+  const src = read(n);
+  ok(`builder item 165: ${n} draws the one page header, not the old list header`, /<header class="dds-ph">/.test(src) && !/class="(lhead|lrow1|obj-ic|lmeta)"/.test(src) && !/^\s*\.(lhead|lrow1|obj-ic|lmeta)\{/m.test(src));
+}
 const coreBlock = (src) => CORE_SELECTORS.map((sel) => {
   const m = src.match(new RegExp('^\\s*' + sel.replace(/[.:]/g, '\\$&') + '\\{[^}]*\\}', 'm'));
   return m ? m[0].trim() : 'MISSING ' + sel;
@@ -59,7 +62,7 @@ const coreBlock = (src) => CORE_SELECTORS.map((sel) => {
 // builder item 165: projects.html left the group for the one page header (shell.css .dds-ph)
 const blocks = { 'customers.html': coreBlock(read('customers.html')), 'contacts.html': coreBlock(read('contacts.html')) };
 const drifted = Object.entries(blocks).filter(([, b]) => b !== blocks['customers.html']).map(([n]) => n);
-ok('anti-drift: core .lhead/.lrow1/.obj-ic/.lbtn/.lmeta CSS identical across customers/contacts', drifted.length === 0,
+ok('anti-drift: core .lbtn CSS identical across customers/contacts', drifted.length === 0,
   'drifted: ' + drifted.join(', ') + '\n' + Object.entries(blocks).map(([n, b]) => n + ':\n' + b).join('\n\n'));
 
 const passed = results.filter((r) => r.p).length;

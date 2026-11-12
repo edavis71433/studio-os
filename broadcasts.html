@@ -32,14 +32,7 @@
   svg.ic{width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round;flex:0 0 auto}
   :focus-visible{outline:2px solid var(--p);outline-offset:2px}
 
-  /* ── breadcrumb + page head ── */
-  .crumbs{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--faint);margin:0 0 var(--dds-s4,16px);flex-wrap:wrap}
-  .crumbs a{color:var(--faint);text-decoration:none;display:inline-flex;align-items:center;gap:var(--dds-s1,4px);padding:2px 6px 2px 2px;border-radius:var(--dds-r-sm,6px)}
-  .crumbs a:hover{color:var(--p);background:var(--p-soft)}
-  .crumbs .sep{color:var(--line-strong)}
-  .crumbs [aria-current="page"]{color:var(--ink);font-weight:500}
-  header h1{font-family:var(--serif);font-weight:500;font-size:28px;line-height:1.15;letter-spacing:-.01em;margin:0}
-  header .sub{color:var(--soft);font-size:14.5px;margin:6px 0 0;max-width:62ch}
+  /* ── the page header is the shared one (shell.css .dds-ph, builder item 165), Inbox in its trail ── */
 
   /* ── cards ── */
   .card{background:var(--card);border:1px solid var(--line);border-radius:var(--dds-r-lg,10px);padding:var(--dds-s5,20px) var(--dds-s5,20px);box-shadow:var(--shadow);margin-top:var(--dds-s4,16px)}
@@ -303,7 +296,6 @@ function when(iso){if(!iso)return'';const d=Math.floor((Date.now()-Date.parse(is
 function segCount(k){const s=SEGMENTS.find(x=>x.key===k);return s?s.count:0;}
 
 const IC={
-  back:'<svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="width:14px;height:14px"><path d="M15 6l-6 6 6 6"/></svg>',
   users:'<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0"/><circle cx="17" cy="9" r="2.5"/><path d="M15.5 14.5A5 5 0 0 1 21.5 20"/></svg>',
   pen:'<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4l10-10-4-4L4 16z"/><path d="M13 7l4 4"/></svg>',
   mail:'<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 7l9 6 9-6"/></svg>',
@@ -316,8 +308,12 @@ const IC={
   tag:'<svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="width:13px;height:13px"><path d="M3 12V4h8l10 10-8 8z"/><circle cx="7.5" cy="8.5" r="1"/></svg>',
 };
 function render(){
-  let h=`<nav class="crumbs" aria-label="Breadcrumb"><a href="/inbox.html">${IC.back}Inbox</a><span class="sep" aria-hidden="true">›</span><span aria-current="page">Send an update</span></nav>
-    <header><h1 id="pagehead" tabindex="-1">Send an update</h1><p class="sub">One email to many people. You see it before it goes, each person can unsubscribe, and nothing ever goes out on its own.</p></header>
+  // builder item 165: the one page header; it opens from the Inbox, so the trail says Inbox.
+  // Write an update is its one filled action: it takes you to the message (Send stays with it).
+  let h=`<header class="dds-ph"><nav class="dds-ph-trail" aria-label="Where this page is"><a href="/inbox.html">Inbox</a><span aria-hidden="true">›</span></nav>
+    <div class="dds-ph-row"><span class="dds-ph-ic" data-ic="update" aria-hidden="true"></span>
+      <div class="dds-ph-tt"><div class="dds-ph-tl"><h1 id="pagehead" tabindex="-1">Send an update</h1></div><p class="dds-ph-line">One email to many people. You see it before it goes, each person can unsubscribe, and nothing ever goes out on its own.</p></div>
+      <div class="dds-ph-acts"><button type="button" class="primary dds-ph-fill" id="writeJump">Write an update</button></div></div></header>
     <div class="up">
     <section class="card up-who" aria-labelledby="whoH">
       <div class="card-h"><span class="cic" aria-hidden="true">${IC.users}</span><h2 id="whoH">Who gets it</h2></div>
@@ -484,6 +480,7 @@ function wire(){
   document.querySelectorAll('[data-edit]').forEach(b=>b.addEventListener('click',()=>editDraft(b.getAttribute('data-edit'))));
   document.querySelectorAll('[data-resched]').forEach(b=>b.addEventListener('click',()=>reschedule(b.getAttribute('data-resched'))));
   document.querySelectorAll('[data-open]').forEach(b=>b.addEventListener('click',()=>toggleRow(b.getAttribute('data-open'),b)));
+  const wj=$('writeJump');if(wj)wj.addEventListener('click',()=>{const s=$('subj');if(s){s.scrollIntoView({block:'center'});s.focus();}});
   const rf=$('bcRefresh');if(rf)rf.addEventListener('click',()=>load(true).then(()=>{const nr=$('bcRefresh');if(nr)nr.focus();}));
   // notice retries are SOFT — retrying ONE section must not let a transient
   // failure of the OTHER section tear down its last-good render (the ↻ contract)

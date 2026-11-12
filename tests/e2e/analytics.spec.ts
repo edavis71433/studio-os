@@ -791,7 +791,7 @@ test.describe('Analytics (Agency portfolio lens)', () => {
     // and the destination is the scoped Business dashboard (no rollup, no "All clients"), scope carried
     await expect(page.getByText('$12,400', { exact: true })).toBeVisible();
     await expect(page.locator('.tscroll')).toHaveCount(0);
-    await expect(page.locator('.subline .chip')).toHaveCount(0);
+    await expect(page.locator('#phLine .chip')).toHaveCount(0);
   });
 
   test('a failed portfolio read is the TROUBLE state — never the all-quiet card', async ({ page }) => {

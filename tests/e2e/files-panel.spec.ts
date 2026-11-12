@@ -85,9 +85,11 @@ test.describe('Files — the open file (bold redesign, part 2)', () => {
       await page.goto('/files.html');
       await open(page, 'Shopfront at dusk');
       const panel = (await page.locator('#panel').boundingBox())!;
-      const [add, make, h1] = await Promise.all(['#add', '#makeImage', '#pagehead'].map((s) => page.locator(s).boundingBox()));
+      const [add, make, row] = await Promise.all(['#add', '#makeImage', 'header.dds-ph .dds-ph-row'].map((s) => page.locator(s).boundingBox()));
       expect(add!.height, `+ Add files on one line at ${width}`).toBeLessThan(50);
-      expect(Math.abs(add!.y + add!.height / 2 - (h1!.y + h1!.height / 2)), `+ Add files beside the title at ${width}`).toBeLessThan(12);
+      // builder item 165: the one page header keeps its actions on the right, beside the title where
+      // they fit and under it where they don't — never squeezed
+      expect(Math.abs(add!.x + add!.width - (row!.x + row!.width)), `+ Add files at the header's right at ${width}`).toBeLessThan(2);
       for (const b of [add!, make!]) expect(b.x + b.width, `clear of the panel at ${width}`).toBeLessThanOrEqual(panel.x);
       await page.keyboard.press('Escape');
     }

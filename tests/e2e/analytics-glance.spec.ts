@@ -58,7 +58,7 @@ test.describe('Analytics — the studio’s numbers lead (bold redesign)', () =>
     await installApp(page, { api: API });
     await page.goto('/analytics.html');
     await expect(page.getByRole('heading', { level: 1, name: 'Analytics' })).toBeVisible();
-    await expect(page.locator('.subline')).toContainText('How the studio is doing — in plain numbers.');
+    await expect(page.locator('#phLine')).toContainText('How the studio is doing — in plain numbers.');
     await expect(nums(page)).toHaveCount(4);
     await expect(nums(page).nth(0)).toContainText('Revenue · Nov');
     await expect(nums(page).nth(0).locator('.num-v')).toHaveText('$1,950');

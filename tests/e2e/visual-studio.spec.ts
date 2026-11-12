@@ -28,7 +28,7 @@ test.describe('Visual Studio (the approved board)', () => {
     await installApp(page, { api: { '/visual/kinds': KINDS, '/visual/plans': { data: [] }, '/brand/profile': { data: { personality: 'Warm, local', voice_characteristics: ['plain-spoken'] } } } });
     await page.goto('/visual-studio.html');
     await expect(page.locator('#dds-shell .dds-nav')).toContainText('Files');
-    await expect(page.getByRole('navigation', { name: 'Breadcrumb' }).getByRole('link', { name: 'Files' })).toHaveAttribute('href', '/files.html');
+    await expect(page.getByRole('navigation', { name: 'Where this page is' }).getByRole('link', { name: 'Files' })).toHaveAttribute('href', '/files.html');   // builder item 165: the header's trail
     await expect(page.getByRole('heading', { level: 1, name: 'Visual Studio' })).toBeVisible();
     await expect(page.getByRole('link', { name: 'Upload your own' })).toHaveAttribute('href', '/files.html');
     // the pick cards ARE the server's kinds — label, purpose, aspect + size — as pressable buttons

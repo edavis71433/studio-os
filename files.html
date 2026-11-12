@@ -27,7 +27,7 @@
   body{background:var(--bg);color:var(--ink);font-family:var(--sans);line-height:1.5;-webkit-font-smoothing:antialiased}
   .wrap{max-width:var(--dds-w-data,1600px);margin:0 auto;padding:var(--dds-s7,32px) var(--dds-s5,20px) 90px}
   /* minmax(0,1fr): the wide table must scroll INSIDE .tscroll, never blow the
-     column (and the .lhead row) open past the viewport */
+     column (and the page header) open past the viewport */
   /* bold redesign (Figma "11 · Files"): no second column. The kinds of file sit in
      one row beside the search, and folders and clients become a strip of cards
      under it. The hooks stay what they were: [data-col] · [data-folder] ·
@@ -87,20 +87,15 @@
   .btn.primary:hover{filter:brightness(1.06)}
   .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
 
-  /* ── list-view header (SLDS list-view anatomy, dds skin) — the same .lhead/
-        .lrow1/.obj-ic/.lbtn/.lmeta treatment as customers.html / leads.html ── */
-  .lhead{background:var(--card);border:1px solid var(--line);border-radius:var(--dds-r-lg,10px);box-shadow:var(--shadow);padding:var(--dds-s3,12px) var(--dds-s4,16px) 10px;margin-bottom:var(--dds-s4,16px)}
-  .lrow1{display:flex;align-items:center;gap:10px}
-  .obj-ic{width:34px;height:34px;border-radius:var(--dds-r,8px);background:var(--p);color:var(--on-p);display:grid;place-items:center;font-size:16px;flex:0 0 auto}
-  .lhead h1{font-family:var(--sans);font-weight:600;font-size:20px;margin:0;letter-spacing:-.01em;flex:1 1 auto;min-width:max-content}
+  /* ── the page header is the shared one (shell.css .dds-ph, builder item 165): + Add files is
+        its one filled action; Table/Grid, Make an image, ↻ and Select are its others ── */
   .lbtn{flex:0 0 auto;font:inherit;border:none;background:none;color:var(--soft);font-size:15px;border-radius:var(--dds-r,8px);padding:var(--dds-s1,4px) var(--dds-s2,8px);cursor:pointer}
   .lbtn:hover{color:var(--p);background:var(--p-soft)}
   /* Oct 2026 nav cut: Visual Studio left the menu — "Make an image" lives here, on Files */
-  a.lmake{flex:0 0 auto;font-size:12.5px;font-weight:600;color:var(--p);text-decoration:none;border:1px solid var(--line);border-radius:999px;padding:var(--dds-s1,4px) var(--dds-s3,12px);white-space:nowrap}
+  a.lmake{flex:0 0 auto;display:inline-flex;align-items:center;font-size:12.5px;font-weight:600;color:var(--p);text-decoration:none;border:1px solid var(--line);border-radius:999px;padding:var(--dds-s1,4px) var(--dds-s3,12px);white-space:nowrap}
   a.lmake:hover{background:var(--p-soft);border-color:var(--p)}
-  /* narrow rows (phones, and tablets beside the sidebar): the row wraps and the pill takes the second line, so the h1 keeps its width */
-  @media (max-width:900px){.lrow1{flex-wrap:wrap} a.lmake{order:9;margin-left:auto}}
-  .lmeta{margin-top:6px;font-size:12px;color:var(--faint)}
+  /* the storage meter sits under the header */
+  .dds-ph + .store{margin:calc(-1 * var(--dds-s2,8px)) 0 var(--dds-s4,16px)}
   .seg{display:inline-flex;border:1px solid var(--line);border-radius:var(--dds-r,8px);overflow:hidden;flex:0 0 auto}
   .seg button{border:none;border-radius:0;padding:6px var(--dds-s3,12px);font-size:12.5px;background:transparent;color:var(--soft);font-family:inherit;font-weight:500;cursor:pointer}
   .seg button[aria-pressed="true"]{background:var(--p-soft);color:var(--p)}
@@ -245,12 +240,7 @@
     html.files-docked .wrap{padding-right:calc(380px + 40px)}
     html.files-docked .panel{top:16px;right:16px;bottom:16px;width:380px;border:1px solid var(--line);border-radius:var(--dds-r-xl,20px);background:var(--card);box-shadow:0 24px 60px -24px rgba(23,21,34,.35)}
     html.files-docked .scrim{display:none}
-    /* the header beside the panel wraps rather than squeezing a button, and below
-       1,320px (under ~600px of room; the whole row needs ~585) Make an image takes
-       the second line, as on a narrow screen */
-    html.files-docked .lrow1{flex-wrap:wrap}
   }
-  @media (min-width:1180px) and (max-width:1319.98px){html.files-docked a.lmake{order:9;margin-left:auto}}
   @media (max-width:760px){
     .panel{top:auto;left:0;right:0;bottom:0;width:100%;max-height:88dvh;border-left:0;border-top:1px solid var(--line);border-radius:20px 20px 0 0;background:var(--card);transform:translateY(100%)}   /* the card the computer's panel is, so its edge shows in dark too */
     .panel.on{transform:none}
@@ -324,7 +314,7 @@
 </head>
 <body>
 <div class="wrap">
-  <!-- the h1 lives in the rendered .lhead (leads.html's pattern) — one h1 per page -->
+  <!-- the h1 lives in the rendered page header (shell.css .dds-ph) — one h1 per page -->
   <div id="root"><div class="spin" role="status" aria-label="Loading"></div></div>
   <footer>Studio OS · Files — your business library, safely organized.</footer>
 </div>
@@ -733,8 +723,7 @@ function renderTrouble(a){
     ?`<div class="empty"><h2>${/plan|includ/i.test((a.body&&a.body.message)||"")?"Not part of your plan yet.":"Files live in your full workspace."}</h2><p>${esc((a.body&&a.body.message)||"")||"Your client view shows what you’ve chosen to share."}</p></div>`
     :`<div class="empty"><h2>We couldn’t load your files just now.</h2><p>A brief hiccup — it usually passes.</p><p style="margin-top:16px"><button class="btn primary" id="retry">Try again</button></p></div>`;
   $('root').innerHTML=`<div class="layout"><div>
-    <header class="lhead"><div class="lrow1"><span class="obj-ic" aria-hidden="true">🗂</span><h1 id="pagehead" tabindex="-1">Files</h1><button class="lbtn" id="refreshBtn" aria-label="Refresh" title="Refresh">↻</button></div>
-    <div class="lmeta">Couldn’t load just now</div></header>${filtersHtml('','')}${inner}</div></div>`;
+    ${filesHead('Couldn’t load just now','')}${filtersHtml('','')}${inner}</div></div>`;
   wireRail();
   const rt=$('retry');if(rt)rt.addEventListener('click',()=>load());
   const rf=$('refreshBtn');if(rf)rf.addEventListener('click',()=>load());
@@ -843,8 +832,7 @@ function renderStock(){
     : `<div class="empty" style="grid-column:1/-1"><h2>${S.stockQ?'No photos match that search.':'Find a professional photo.'}</h2><p>Try “office”, “coffee”, “construction”, “salon”…</p></div>`;
   const note = S.stockLicense ? `Royalty-free from ${esc(S.stockProvider)} · ${esc(S.stockLicense)} · added to your Files and hosted on your own site.` : 'Professional royalty-free photos, added straight to your Files.';
   $('root').innerHTML=`<div class="layout"><div>
-    <header class="lhead"><div class="lrow1"><span class="obj-ic" aria-hidden="true">🗂</span><h1 id="pagehead" tabindex="-1">Files</h1><button class="lbtn" id="refreshBtn" aria-label="Refresh" title="Refresh">↻</button></div>
-    <div class="lmeta">Stock Library — professional royalty-free photos</div></header>
+    ${filesHead('Stock Library — professional royalty-free photos','')}
     ${filtersHtml(`<div class="search">${svg(IC.search)}<input id="sq" type="search" aria-label="Search stock photos" placeholder="Search stock photos — try “office”" value="${esc(S.stockQ||'')}" autocomplete="off"></div>`,'')}
     <p style="margin:2px 0 12px;color:var(--faint);font-size:12.5px">${note}</p>
     <div class="grid">${grid}</div></div></div>`;
@@ -894,21 +882,24 @@ function sortRows(rows){
   r.sort((a,b)=>{const av=col[2](a),bv=col[2](b);return av<bv?-SORT.dir:av>bv?SORT.dir:0;});
   return r;
 }
+// Builder item 165: the one page header (shell.css .dds-ph). `others` go behind ⋯ on a phone
+// (with ↻ always last), `fill` is the one filled action; the line counts the files listed.
+function filesHead(line,others,fill){
+  return `<header class="dds-ph"><div class="dds-ph-row"><span class="dds-ph-ic" data-ic="files" aria-hidden="true"></span>
+    <div class="dds-ph-tt"><div class="dds-ph-tl"><h1 id="pagehead" tabindex="-1">Files</h1></div><p class="dds-ph-line" id="phLine">${esc(line)}</p></div>
+    <div class="dds-ph-acts"><button type="button" class="dds-ph-dots" popovertarget="phMore" aria-label="More actions" title="More actions">⋯</button>
+      <div class="dds-ph-more" id="phMore" popover>${others||''}<button class="lbtn" id="refreshBtn" aria-label="Refresh" title="Refresh">↻<span class="dds-ph-say" aria-hidden="true">Refresh</span></button></div>${fill||''}</div>
+  </div></header>`;
+}
 function lheadHtml(shown){
   const sortCol=activeSortCol();
-  return `<header class="lhead">
-    <div class="lrow1">
-      <span class="obj-ic" aria-hidden="true">🗂</span>
-      <h1 id="pagehead" tabindex="-1">Files</h1>
-      <div class="seg" role="group" aria-label="Display as"><button id="dispTable" aria-pressed="${DISPLAY==='table'?'true':'false'}">Table</button><button id="dispGrid" aria-pressed="${DISPLAY==='grid'?'true':'false'}">Grid</button></div>
+  const priv=(S.full||[]).filter(r=>r.client_private).length;
+  return filesHead(`${shown} file${shown===1?'':'s'}${priv?` · ${priv} private to a client`:''} · ${updatedLabel()}${DISPLAY==='table'?` · Sorted by ${sortCol[1]} — ${SORT.dir>0?'ascending':'descending'}`:''}`,
+    `<div class="seg" role="group" aria-label="Display as"><button id="dispTable" aria-pressed="${DISPLAY==='table'?'true':'false'}">Table</button><button id="dispGrid" aria-pressed="${DISPLAY==='grid'?'true':'false'}">Grid</button></div>
       <a class="lmake" id="makeImage" href="/visual-studio.html" title="Make an image with Visual Studio">Make an image</a>
-      <button class="lbtn" id="refreshBtn" aria-label="Refresh" title="Refresh">↻</button>
-      ${S.canEdit&&DISPLAY==='grid'&&S.assets.length?`<button class="btn" id="selbtn">${S.selectMode?'Done':'Select'}</button>`:''}
-      ${S.canEdit?`<button class="btn primary" id="add">＋ Add files</button>`:''}
-    </div>
-    <div class="lmeta">${shown} file${shown===1?'':'s'}${(()=>{const n=(S.full||[]).filter(r=>r.client_private).length;return n?` · ${n} private to a client`:'';})()} · ${esc(updatedLabel())}${DISPLAY==='table'?` · Sorted by ${esc(sortCol[1])} — ${SORT.dir>0?'ascending':'descending'}`:''}</div>
-    ${storageHtml()}
-  </header>`;
+      ${S.canEdit&&DISPLAY==='grid'&&S.assets.length?`<button class="btn" id="selbtn">${S.selectMode?'Done':'Select'}</button>`:''}`,
+    S.canEdit?`<button class="btn primary dds-ph-fill" id="add">+ Add files</button>`:'')
+    +storageHtml();
 }
 // ── items 56 + 115: how much space is used ───────────────────────────────────
 // The server counts what the upload door refuses on: every live file (archived

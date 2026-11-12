@@ -422,11 +422,12 @@ test.describe('SS6 — inbox console quick wins', () => {
     await page.locator('#rows [role=option]').filter({ hasText: 'Sent you a message' }).first().click();
     const pane = page.locator('#rpane');
     await expect(pane.locator('select[aria-label="Insert a saved reply"] option')).toContainText(['Insert a saved reply…', 'Opening hours']);
-    // edit the reply via the manager (⋯ → Saved replies) and save (PUT ok);
-    // mobile stacks the panes, so step back to the list where ⋯ lives
+    // edit the reply via the manager (Saved replies, the page header's other action — behind ⋯ on a
+    // phone, builder item 165) and save (PUT ok); mobile stacks the panes, so step back to the list
     const back = page.locator('#paneBack');
     if (await back.isVisible()) await back.click();
-    await page.locator('#ovfBtn').click();
+    const dots = page.locator('header.dds-ph .dds-ph-dots');
+    if (await dots.isVisible()) await dots.click();
     await page.locator('#ovfSaved').click();
     await expect(page.locator('#sheet-list [data-f=title]')).toHaveValue('Opening hours');
     await page.locator('#sheet-list [data-f=title]').fill('Opening hours (rewritten)');

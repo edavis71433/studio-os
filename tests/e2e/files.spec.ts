@@ -2,7 +2,7 @@ import { test, expect, Page } from '@playwright/test';
 import { installApp } from './helpers/app';
 
 // DAM-1 / Architecture v1.0 + SS1 (standards sweep) — the DAM presents as
-// "Files" and wears the roster anatomy: shared .lhead with ↻ refresh, a
+// "Files" and wears the one page header (builder item 165) with ↻ refresh, a
 // persisted Table ⇄ Grid toggle (customers.html .tscroll table), server ?q=
 // search behind a REQ_SEQ stale-response guard, and honest per-read states.
 const NOW = new Date().toISOString();
@@ -49,7 +49,7 @@ const LIST_RE = /\/functions\/v1\/presence\/assets(\?|$)/;   // the list read ON
 const ok = (body: unknown) => ({ status: 200, contentType: 'application/json', body: JSON.stringify(body) });
 
 test.describe('Files (the DAM, customer-facing)', () => {
-  test('mounts under the shell with the .lhead roster header — zero console errors on boot', async ({ page }) => {
+  test('mounts under the shell with the one page header — zero console errors on boot', async ({ page }) => {
     const errors: string[] = [];
     page.on('pageerror', (e) => errors.push(String(e)));
     page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
@@ -57,8 +57,11 @@ test.describe('Files (the DAM, customer-facing)', () => {
     await page.goto('/files.html');
     await expect(page.locator('#dds-shell .dds-nav')).toContainText('Files');
     await expect(page.getByRole('heading', { level: 1, name: 'Files' })).toBeVisible();
-    await expect(page.locator('.lhead .lmeta')).toContainText('2 files · Updated just now');
+    await expect(page.locator('#phLine')).toContainText('2 files · Updated just now');
+    const dots = page.locator('header.dds-ph .dds-ph-dots');   // on a phone ↻ waits behind ⋯
+    if (await dots.isVisible()) await dots.click();
     await expect(page.locator('#refreshBtn')).toBeVisible();
+    if (await dots.isVisible()) await page.keyboard.press('Escape');
     // bold redesign: the kinds sit in one row beside the search (#filters), folders and clients in the strip (.rail)
     await expect(page.locator('#filters')).toContainText('All files');
     await expect(page.locator('#filters')).toContainText('Documents');
@@ -185,7 +188,7 @@ test.describe('Files (the DAM, customer-facing)', () => {
   //    step and nothing is archived; Client when no file belongs to one). The
   //    sort used to fall back to Added incidentally, leaving the header with no
   //    arrow at all. Make the revert explicit and total. ──────────────────────
-  test('a sort on a column that VANISHES reverts to Added explicitly — header, order and .lmeta all agree', async ({ page }) => {
+  test('a sort on a column that VANISHES reverts to Added explicitly — header, order and the line all agree', async ({ page }) => {
     await pinTable(page);
     const ARCH = { ...CONTRACT, id: 'dddddddd-4444-4444-8444-dddddddddddd', name: 'Old flyer', state: 'archived', asset_status: 'archived' };
     await installApp(page, { api: filesApi });
@@ -200,13 +203,13 @@ test.describe('Files (the DAM, customer-facing)', () => {
     await expect(table.locator('thead')).toContainText('Status');
     await table.locator('[data-sort="state"]').click();
     await expect(table.locator('thead th', { hasText: 'Status' })).toHaveAttribute('aria-sort', 'ascending');
-    await expect(page.locator('.lhead .lmeta')).toContainText('Sorted by Status — ascending');
+    await expect(page.locator('#phLine')).toContainText('Sorted by Status — ascending');
     await page.locator('#q').fill('logo');
     await expect(table.locator('thead')).not.toContainText('Status');
     // the revert is REAL, not incidental: Added carries the arrow again and the
-    // .lmeta line describes the order the rows are actually in
+    // the header's line describes the order the rows are actually in
     await expect(table.locator('thead th', { hasText: 'Added' })).toHaveAttribute('aria-sort', 'descending');
-    await expect(page.locator('.lhead .lmeta')).toContainText('Sorted by Added — descending');
+    await expect(page.locator('#phLine')).toContainText('Sorted by Added — descending');
   });
 
   // WHERE USED reads exactly four website surfaces (logo, share image, service
@@ -370,14 +373,14 @@ test.describe('Files (the DAM, customer-facing)', () => {
     await expect(logoRow.locator('.fromclient')).toHaveCount(0);   // studio uploads carry no chip
   });
 
-  test('sorting: header clicks toggle order with aria-sort; the lmeta names the sort', async ({ page }) => {
+  test('sorting: header clicks toggle order with aria-sort; the header’s line names the sort', async ({ page }) => {
     await pinTable(page);
     await installApp(page, { api: filesApi });
     await page.goto('/files.html');
     // default: Added, newest first (Logo is newer than Contract)
     await expect(page.locator('th[aria-sort="descending"]')).toContainText('Added');
     await expect(page.locator('tbody tr').first()).toContainText('Logo');
-    await expect(page.locator('.lmeta')).toContainText('Sorted by Added — descending');
+    await expect(page.locator('#phLine')).toContainText('Sorted by Added — descending');
     await page.locator('.thb', { hasText: 'Name' }).click();
     await expect(page.locator('th[aria-sort="ascending"]')).toContainText('Name');
     await expect(page.locator('tbody tr').first()).toContainText('Contract');   // C before L
@@ -820,7 +823,7 @@ test.describe('Files — client-private files (0131)', () => {
     const body = page.locator('.tscroll tbody');
     await expect(body.locator('tr')).toHaveCount(5);
     await expect(body).not.toContainText('Login credentials');
-    await expect(page.locator('.lmeta')).toContainText('1 private to a client');
+    await expect(page.locator('#phLine')).toContainText('1 private to a client');
     const filters = page.locator('#filters');
     await expect(filters.locator('[data-col="all"] .n')).toHaveText('5');
     await expect(filters.locator('[data-col="photos"] .n')).toHaveText('4');
