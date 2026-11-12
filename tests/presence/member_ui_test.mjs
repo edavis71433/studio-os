@@ -87,6 +87,10 @@ const CONTROLS = [
   ['PUT /sales/stages', 'settings.html', `api('/sales/stages', 'PUT', { names })`, ['id="automations" aria-labelledby="autoHead" hidden data-needs="configure"']],
   ['POST /sales/setup', 'agency.html', `apiSend('POST','/sales/setup',{hidden})`, ['id="setup" class="setup" aria-labelledby="setupHead" hidden data-needs="configure"', 'id="setupHide" data-needs="configure"']],   // sales item 105: Home's setup strip, and its Hide
   ['PUT /sales/goal-ai', 'settings.html', `api('/sales/goal-ai', 'PUT', patch)`, ['id="goal" aria-labelledby="goalHead" hidden data-needs="configure"']],   // sales item 94: the month's goal and the AI help switch (the switch is the owner's alone: the route says so)
+  // sales item 124: a stage's "what to do now" note, from Settings and from the note under the stage bar
+  ['PUT /sales/stages', 'settings.html', `api('/sales/stages', 'PUT', { note })`, ['id="stages" aria-labelledby="stagesHead" hidden data-needs="configure"']],
+  ['PUT /sales/stages', 'crm.html', `apiAg('/sales/stages','PUT',{note:{stage,text}})`, ['id="snEdit" data-needs="configure"']],
+  ['PUT /sales/stages', 'pipeline.html', `api('/sales/stages','PUT',{note:{stage,text}})`, ['id="snEdit" data-needs="configure"']],
   ['PUT /report/monthly', 'settings.html', `api('/report/monthly', 'PUT', patch)`, ['id="report" aria-labelledby="reportHead" hidden data-needs="configure"']],   // builder list item 58
   ['POST /report/monthly/preview', 'settings.html', `api('/report/monthly/preview', 'POST', {})`, ['id="report" aria-labelledby="reportHead" hidden data-needs="configure"']],
   ['DELETE /broadcasts/lists/:id', 'broadcasts.html', `api('/broadcasts/lists/'+encodeURIComponent(SEL.slice(5)),'DELETE')`, ['id="dropList" data-needs="delete"']],

@@ -672,9 +672,16 @@ test.describe('SS5 polish (menu focusout + open-stage landings)', () => {
   });
 });
 
+// sales item 124: the studio's "what to do now" note for each stage (GET /sales/stages notes)
+const STAGES_124 = { data: {
+  labels: { lead: 'New lead', qualified: 'Qualified', proposal: 'Proposal sent', contract: 'Agreement out', won: 'Won', lost: 'Not a fit' }, custom: {},
+  chances: { lead: 10, qualified: 25, proposal: 50, contract: 75, won: 100, lost: 0 },
+  notes: { lead: 'Reply the same day.', qualified: 'Send the proposal while it is fresh.', proposal: 'Follow up two days after it goes out.\nAsk what they’d change.', contract: 'Check they’ve signed, and nudge them after two days.\nAsk for the deposit as soon as it is signed.', won: 'Send the welcome and the kickoff details.', lost: 'Note why it didn’t fit.' },
+  notes_custom: { proposal: 'Follow up two days after it goes out.\nAsk what they’d change.' },
+} };
 test.describe('Deal drawer Path', () => {
-  test('the Path chevron bar renders with guidance tip AND action (suggested_action fix)', async ({ page }) => {
-    await installApp(page, { api: API });
+  test('the Path chevron bar renders, with the stage’s “what to do now” note under it (item 124)', async ({ page }) => {
+    await installApp(page, { api: { ...API, '/sales/stages': STAGES_124 } });
     await page.goto(`/pipeline.html?deal=${DEAL}`);
     await expect(page.locator('#detailWrap')).toBeVisible();
     // four chevron steps: done ✓ · current · todo
@@ -685,10 +692,13 @@ test.describe('Deal drawer Path', () => {
     // ONLY the current step and the one legal back-target are interactive
     await expect(page.locator('#pathHost .pstep[aria-disabled="true"]')).toHaveCount(2); // lead (not a legal back-move) + contract (todo)
     await expect(page.locator('#pathHost .pstep.canback')).toHaveCount(1);     // qualified — the one BOARD_NEXT back-target
-    // the guidance strip renders BOTH halves — the g.suggested_action bug is dead
-    const guide = page.locator('#pathHost .path-guide');
-    await expect(guide).toContainText('Your proposal is with them — a gentle nudge often seals it.');   // tip
-    await expect(guide).toContainText('Follow up, then send the agreement once they say yes');          // action
+    // item 124: the studio's own note for the stage replaced the one-line tip strip
+    const note = page.locator('#pathHost .stage-note');
+    await expect(note.getByRole('heading', { name: 'What to do now' })).toBeVisible();
+    await expect(note.locator('.sn-chip')).toHaveText('Proposal sent');
+    await expect(note.locator('.sn-steps li')).toHaveText(['Follow up two days after it goes out.', 'Ask what they’d change.']);
+    await expect(note.locator('.sn-foot')).toContainText('Your studio’s note for every deal at Proposal sent.');
+    await expect(page.locator('#pathHost .path-guide')).toHaveCount(0);
     // forward is the brand "Mark stage complete" button (sentence case, Oct 2026 experience review)
     await expect(page.locator('#markComplete')).toContainText('Mark stage complete');
     // "Mark as not a fit" stays the separate quiet action, outside the Path (batch C: "lost" retired)
@@ -696,13 +706,13 @@ test.describe('Deal drawer Path', () => {
   });
 
   test('the current chevron toggles the guidance; the back-target asks before moving', async ({ page }) => {
-    await installApp(page, { api: API });
+    await installApp(page, { api: { ...API, '/sales/stages': STAGES_124 } });
     await page.goto(`/pipeline.html?deal=${DEAL}`);
-    await expect(page.locator('#pathHost .path-guide')).toBeVisible();
-    await page.locator('#pathHost .pstep.current').click();                    // toggle guidance off
-    await expect(page.locator('#pathHost .path-guide')).toHaveCount(0);
+    await expect(page.locator('#pathHost .stage-note')).toBeVisible();
+    await page.locator('#pathHost .pstep.current').click();                    // toggle the note off
+    await expect(page.locator('#pathHost .stage-note')).toHaveCount(0);
     await page.locator('#pathHost .pstep.current').click();                    // and back on
-    await expect(page.locator('#pathHost .path-guide')).toBeVisible();
+    await expect(page.locator('#pathHost .stage-note')).toBeVisible();
     await page.locator('#pathHost .pstep.canback').click();                    // one-back needs a confirm
     await expect(page.locator('#pathHost .path-confirm')).toContainText('Move this deal back to');
     await page.locator('#backNo').click();
@@ -1410,17 +1420,18 @@ const contractDeal = (contract: Record<string, unknown>, dealExtras: Record<stri
   proposals: [], contracts: [contract], events: [], timeline: [], invoices: [], last_contacted_at: null,
 } });
 const conApi = (contract: Record<string, unknown>, dealExtras: Record<string, unknown> = {}) =>
-  ({ ...API, [`/sales/deals/${DEAL7}`]: contractDeal(contract, dealExtras), [`/sales/deals/${DEAL7}/tasks`]: { data: [] } });
+  ({ ...API, [`/sales/deals/${DEAL7}`]: contractDeal(contract, dealExtras), [`/sales/deals/${DEAL7}/tasks`]: { data: [] }, '/sales/stages': STAGES_124 });
 const SIGNED_NO_TERM = { id: 'k-sg', title: 'Service agreement', status: 'signed', signer_name: 'Sam Rivera', signed_at: '2026-07-15T10:00:00.000Z', version: 1, terms_snapshot: null, body: 'A non-refundable deposit of 50% of the total project fee is due before work begins.' };
 
 test.describe('deal drawer — signed fact, renewal hint, deposit mint', () => {
   test('a SIGNED deal’s guidance says convert — never "Get it signed" — and deep-links the button', async ({ page }) => {
     await installApp(page, { api: conApi(SIGNED_NO_TERM) });
     await page.goto(`/pipeline.html?deal=${DEAL7}`);
-    const guide = page.locator('#pathHost .path-guide');
-    await expect(guide).toContainText('They’ve signed — convert them to open their portal and start the project.');
+    // item 124: the fact the deal knows rides above the studio's note
+    const guide = page.locator('#pathHost .stage-note .sn-fact');
+    await expect(guide).toContainText('They’ve signed.');
     await expect(guide).toContainText('Convert them to a customer');
-    await expect(guide).not.toContainText('Get it signed');                      // the contradiction is dead
+    await expect(page.locator('#pathHost .stage-note')).not.toContainText('Get it signed');   // the contradiction is dead
     // the "Do next" is a live deep-link straight to the convert button
     await page.locator('#guideConvert').click();
     await expect(page.locator('#convert')).toBeFocused();
@@ -1431,7 +1442,8 @@ test.describe('deal drawer — signed fact, renewal hint, deposit mint', () => {
   test('an UNSIGNED sent agreement keeps the current copy', async ({ page }) => {
     await installApp(page, { api: conApi({ ...SIGNED_NO_TERM, id: 'k-un', status: 'sent', signer_name: null, signed_at: null }) });
     await page.goto(`/pipeline.html?deal=${DEAL7}`);
-    await expect(page.locator('#pathHost .path-guide')).toContainText('Get it signed');
+    await expect(page.locator('#pathHost .stage-note .sn-steps')).toContainText('Check they’ve signed');   // item 124: the studio's note for the stage
+    await expect(page.locator('#pathHost .stage-note .sn-fact')).toHaveCount(0);                            // nothing signed: no "convert" line
   });
 
   test('a signed agreement missing its renewal date says the reminder can’t arm (no invented default)', async ({ page }) => {
