@@ -18,11 +18,11 @@ import { TYPE_TITLES, STATE_TYPES } from './health_score.ts';
 // health findings that are a site's state or our own reading of it, never work to offer a client
 const NOT_WORK = new Set([...STATE_TYPES, 'website.live_fetch_failed', 'seo.noindex']);
 
-export const REPORT_PARTS = ['visits', 'enquiries', 'google', 'ai', 'reviews', 'health', 'pages', 'changes'] as const;
+export const REPORT_PARTS = ['visits', 'enquiries', 'google', 'ai', 'reviews', 'health', 'speed', 'pages', 'changes'] as const;
 export type ReportPart = typeof REPORT_PARTS[number];
 export const REPORT_PART_WORDS: Record<ReportPart, string> = {
   visits: 'Visits', enquiries: 'Enquiries', google: 'On Google', ai: 'AI answers',
-  reviews: 'Reviews', health: 'Website health', pages: 'Most read pages', changes: 'What changed',
+  reviews: 'Reviews', health: 'Website health', speed: 'How fast it loads', pages: 'Most read pages', changes: 'What changed',
 };
 export const REPORT_CC_MAX = 4;
 export const QUIET_DEFAULT = 30;

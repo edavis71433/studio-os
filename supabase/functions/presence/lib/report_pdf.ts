@@ -7,6 +7,7 @@
 import { PdfDoc, rgb, wrapText, type PdfFont, type Rgb } from './pdf.ts';
 import type { ReportData } from '../ops/monthly_report.ts';
 import type { ReportPart } from './report_choices.ts';
+import { speedWords } from './visits.ts';
 
 const INK: Rgb = [0.09, 0.082, 0.133], SOFT: Rgb = [0.333, 0.322, 0.416], LINE: Rgb = [0.906, 0.902, 0.937];
 const GOOD: Rgb = [0.067, 0.455, 0.29], BAD: Rgb = [0.749, 0.208, 0.208], PANEL: Rgb = [0.965, 0.961, 0.98];
@@ -94,6 +95,8 @@ export function reportPdf(d: ReportData, o: { studioName: string; accent?: strin
     const n = d.health.n;
     para(`${n === 0 ? 'Nothing to look at' : `${n} thing${n === 1 ? '' : 's'} to look at`}${d.health.then !== null ? (d.health.then === n ? ', the same as a month ago' : `, ${Math.abs(d.health.then - n)} ${d.health.then > n ? 'fewer' : 'more'} than a month ago`) : ''}${d.health.fixed ? `. ${d.health.fixed} fixed this month` : ''}.`);
   }
+  const fast = speedWords(d.speed);   // builder list item 211
+  if (fast && on('speed')) { head('How fast it loads'); para(fast); }
   if (d.topPages.length && on('pages')) {
     head('What people read most');
     d.topPages.forEach((p, i) => para(`${i + 1}. ${p.path === '/' ? 'Home page' : p.path} · ${n1(p.views)} view${p.views === 1 ? '' : 's'}`, 10, 'R', INK, 8));

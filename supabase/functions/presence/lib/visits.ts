@@ -198,6 +198,23 @@ export function speedOf(rows: SpeedRow[]): Speed {
   return { samples: phones.length + computers.length, ...g, pages: pageRows, verdict, sentence };
 }
 
+// ── Builder list item 211: how fast the site loaded, for the monthly report (pure) ──
+/** A month's speed as the report keeps it: null when too few visits reported one. */
+export interface ReportSpeed { phones_ms: number | null; computers_ms: number | null; verdict: 'fast' | 'a_little_slow' | 'slow'; sentence: string }
+export function reportSpeed(rows: SpeedRow[] | null): ReportSpeed | null {
+  if (!rows) return null;
+  const s = speedOf(rows);
+  return s.verdict && s.sentence ? { phones_ms: s.phones?.p75_ms ?? null, computers_ms: s.computers?.p75_ms ?? null, verdict: s.verdict, sentence: s.sentence } : null;
+}
+/** The report's sentence: three visitors in four saw a page that fast or faster (Google's
+ *  own measure), then whether that is fast, and the slowest page when it isn't. */
+export function speedWords(s: ReportSpeed | null): string | null {
+  if (!s || (s.phones_ms === null && s.computers_ms === null)) return null;
+  const sec = (ms: number) => `${(Math.round(ms / 100) / 10).toFixed(1)} seconds`;
+  const where = [s.phones_ms !== null ? `${sec(s.phones_ms)} on phones` : '', s.computers_ms !== null ? `${sec(s.computers_ms)} on computers` : ''].filter(Boolean).join(' and ');
+  return `Three visitors in four saw your pages within ${where}. ${s.verdict === 'fast' ? `That’s fast: Google counts under ${SPEED_GOOD_MS / 1000} seconds as good.` : s.sentence}`;
+}
+
 // ── List item 157: which buttons get pressed, and how long pages stay open (pure) ──
 export interface EngagementRow { kind: string; path: string; label?: string | null; ms?: number | null; visitor_hash?: string }
 export interface Engagement {
