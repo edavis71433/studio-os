@@ -1084,11 +1084,18 @@ export async function handleSalesDeals(req: Request, site: SiteRow, principal: P
     // item 37: assigned_to (the owner, 0074) rides along, and mine=1 asks for the caller's own
     const baseCols = 'id,title,stage,source,expected_value_cents,expected_close,contact_id,converted_client_id,assigned_to,updated_at,created_at';
     const mine = u.searchParams.get('mine') === '1' ? mineFilter(await teamOf(principal)) : '';
-    const filters = `${stage && isStage(stage) ? `&stage=eq.${stage}` : ''}${q ? `&title.ilike.*${encodeURIComponent(q)}*` : ''}${mine}`;
+    // sales item 121: the board asks for the OPEN deals only (open=1), page by page, so an open deal
+    // nobody has touched for months never drops off behind a hundred newer won ones. And the name
+    // search is a filter PostgREST reads: `title=ilike.*q*` (it was `&title.ilike.*q*`, a part with no
+    // "=" that PostgREST quietly ignores, so + Create's search by deal name found only what was already loaded).
+    const openOnly = u.searchParams.get('open') === '1';
+    const filters = `${openOnly ? `&stage=in.(${REPORT_OPEN_STAGES.join(',')})&converted_client_id=is.null` : stage && isStage(stage) ? `&stage=eq.${stage}` : ''}${q ? `&title=ilike.*${encodeURIComponent(q)}*` : ''}${mine}`;
+    // id breaks ties in the order, so offset pages never repeat or skip a deal (item 66's rule for contacts)
+    const order = 'updated_at.desc,id.desc';
     // item 105: found_via (APPLY-0143) rides along for the list's "Where they came from" chart, then the same read without it.
-    let r = await svc(`presence_deals?site_id=eq.${site.id}&deleted_at=is.null&select=${baseCols},next_step,next_step_at,found_via&order=updated_at.desc&limit=${limit}&offset=${offset}${filters}`);
-    if (!r.ok) r = await svc(`presence_deals?site_id=eq.${site.id}&deleted_at=is.null&select=${baseCols},next_step,next_step_at&order=updated_at.desc&limit=${limit}&offset=${offset}${filters}`);
-    if (!r.ok) r = await svc(`presence_deals?site_id=eq.${site.id}&deleted_at=is.null&select=${baseCols}&order=updated_at.desc&limit=${limit}&offset=${offset}${filters}`);
+    let r = await svc(`presence_deals?site_id=eq.${site.id}&deleted_at=is.null&select=${baseCols},next_step,next_step_at,found_via&order=${order}&limit=${limit}&offset=${offset}${filters}`);
+    if (!r.ok) r = await svc(`presence_deals?site_id=eq.${site.id}&deleted_at=is.null&select=${baseCols},next_step,next_step_at&order=${order}&limit=${limit}&offset=${offset}${filters}`);
+    if (!r.ok) r = await svc(`presence_deals?site_id=eq.${site.id}&deleted_at=is.null&select=${baseCols}&order=${order}&limit=${limit}&offset=${offset}${filters}`);
     if (!r.ok) return json({ error: 'read_failed', message: 'We couldn’t load your pipeline just now.' }, 502, cors);
     const deals = rows(r);
     // "Last contacted" per card — ONE extra query over the manual activities
