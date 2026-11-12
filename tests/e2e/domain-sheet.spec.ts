@@ -208,8 +208,8 @@ test.describe('Domain & email sheet: clearer messages (item 164)', () => {
     await expect(steps.nth(0)).toHaveText(/^✓ Connected here · Nov \d+, \d+:\d\d [AP]M$/);
     await expect(steps.nth(1)).toHaveText('• Records found · not yet, we looked just now');
     await expect(steps.nth(2)).toHaveText('• Padlock on · comes after the records');
-    await expect(steps.nth(3)).toHaveText('• Live · we’ll email you the moment it is');
-    await expect(page.locator('[data-wait="steps"]')).toContainText('Usually live within an hour of adding the records, sometimes a day or two');
+    await expect(steps.nth(3)).toHaveText('• Live · we’ll email you when a check sees it. We look once a day, and each time this opens');   // item 194: the email goes when a check sees it, not "the moment"
+    await expect(page.locator('[data-wait="time"]')).toHaveText('Usually within an hour of adding the records, sometimes a day or two.');
     await expect(page.locator('[data-step="main"]')).toHaveText('Visitors who type bistro.example or www.bistro.example end up on bistro.example.');
     await expect(page.locator('#deskResults')).not.toContainText('usually within an hour');
   });
@@ -217,7 +217,7 @@ test.describe('Domain & email sheet: clearer messages (item 164)', () => {
   test('records in, padlock coming: said without the hosting company’s words', async ({ page }) => {
     await installApp(page, { api: { ...BASE, '/foundations/domain': { data: { ...ATTACHED.data, health: 'ssl_pending' } } } });
     await page.goto('/presence.html#domain');
-    await expect(page.locator('#deskResults')).toContainText('bistro.example: your records are in. The padlock is being switched on, usually within a few minutes.');
+    await expect(page.locator('#deskResults')).toContainText('bistro.example: your records are in. The padlock is being switched on. Nothing for you to do.');   // item 194: one wait time on the sheet, not three
     const steps = page.locator('[data-wait="steps"] p');
     await expect(steps.nth(1)).toHaveText('✓ Records found');
     await expect(steps.nth(2)).toHaveText('• Padlock on · being switched on');
@@ -364,5 +364,82 @@ test.describe('Domain & email sheet: it tells the truth (item 193)', () => {
     await expect(page.locator('#deskResults')).toContainText('where your site lives');
     await expect(page.locator('#deskResults [data-plan]')).toHaveCount(0);
     await expect(page.locator('#deskResults').getByRole('button', { name: 'Set up email protection' })).toHaveCount(1);
+  });
+});
+
+// Builder list item 194 (Nov 12 review, code findings 18 to 26): the smaller fixes on the sheet.
+test.describe('Domain & email sheet: the smaller fixes (item 194)', () => {
+  const WAIT = 'Usually within an hour of adding the records, sometimes a day or two.';
+  const PAIR = [{ type: 'A', host: '@', name: 'bistro.example', value: '75.2.60.5' }, { type: 'CNAME', host: 'www', name: 'www.bistro.example', value: 'bistro.netlify.app' }];
+
+  test('one checklist: the launch list is gone from the sheet, and it is never asked for', async ({ page }) => {
+    let launchAsked = 0;
+    await installApp(page, { api: { ...BASE, '/foundations/domain': LIVE } });
+    await page.route(/\/functions\/v1\/presence\/launch$/, (route: Route) => { launchAsked++; return route.fulfill(json({ data: { launched: false, sentence: 'Getting there.', items: [{ step: 'DNS answering', state: 'done', how: 'The domain resolves.' }] } })); });
+    await page.goto('/presence.html#domain');
+    const desk = page.locator('#deskResults');
+    await expect(desk.locator('[data-domain="live"]')).toBeVisible();
+    await expect(desk).not.toContainText('DNS answering');
+    await expect(desk).not.toContainText('getting launched');
+    expect(launchAsked).toBe(0);
+  });
+
+  test('a sub-name gets one record for itself, never "@" and "www"', async ({ page }) => {
+    const sub = { data: { ...ATTACHED.data, custom_domain: 'shop.bistro.example', shape: 'sub', records: [{ type: 'CNAME', host: 'shop', name: 'shop.bistro.example', value: 'bistro.netlify.app' }], names: [{ name: 'shop.bistro.example', points: false, leftovers: [] }] } };
+    await installApp(page, { api: { ...BASE, '/foundations/domain': sub } });
+    await page.goto('/presence.html#domain');
+    const desk = page.locator('#deskResults');
+    await expect(desk.locator('[data-step="records"]')).toHaveText('2. Add this one record exactly — tap Copy so there are no typos:');
+    await expect(desk.locator('.dnsrec')).toHaveCount(1);
+    await expect(desk.locator('.dnsrec-v')).toHaveText('CNAME   shop   →   bistro.netlify.app');
+    await expect(desk).not.toContainText('A   @');
+  });
+
+  test('every Copy button says what it copies, and the domain box has a name', async ({ page }) => {
+    await installApp(page, { api: { ...BASE, '/foundations/domain': { data: { ...ATTACHED.data, records: PAIR } } } });
+    await page.goto('/presence.html#domain');
+    const desk = page.locator('#deskResults');
+    await expect(desk.getByRole('button', { name: 'Copy the value of the A record for @: 75.2.60.5' })).toBeVisible();
+    await expect(desk.getByRole('button', { name: 'Copy the value of the CNAME record for www: bistro.netlify.app' })).toBeVisible();
+    await expect(desk.getByRole('button', { name: 'Copy', exact: true })).toHaveCount(0);
+    await installApp(page, { api: { ...BASE, '/foundations/domain': { data: null } } });
+    await page.goto('/presence.html#domain');
+    await expect(page.getByRole('textbox', { name: 'Your domain' })).toBeFocused();
+  });
+
+  test('records in for one name only: it shows the one still missing instead of “nothing for you to do”', async ({ page }) => {
+    const half = { data: { ...ATTACHED.data, health: 'ssl_pending', records: PAIR, wait: WAIT, names: [{ name: 'bistro.example', points: true, leftovers: [] }, { name: 'www.bistro.example', points: false, leftovers: [] }] } };
+    await installApp(page, { api: { ...BASE, '/foundations/domain': half } });
+    await page.goto('/presence.html#domain');
+    const desk = page.locator('#deskResults');
+    await expect(desk.locator('[data-domain="one-more"]')).toHaveText('bistro.example: its record is in. One more to add, for www.bistro.example:');
+    await expect(desk.locator('.dnsrec-v')).toHaveText('CNAME   www   →   bistro.netlify.app');
+    await expect(desk).not.toContainText('Nothing for you to do');
+    await expect(desk.locator('[data-wait="time"]')).toHaveText(WAIT);
+    await expect(desk).not.toContainText('a few minutes');
+  });
+
+  test('a forwarded domain says waiting and shows its records until a check has seen them', async ({ page }) => {
+    const fwd = { data: { ...LIVE.data, forwards: ['old.example', 'www.old.example', 'seen.example'],
+      forward_checks: [{ name: 'old.example', points: false, records: [{ type: 'A', host: '@', name: 'old.example', value: '75.2.60.5' }] }, { name: 'www.old.example', points: false, records: [{ type: 'CNAME', host: 'www', name: 'www.old.example', value: 'bistro.netlify.app' }] }, { name: 'seen.example', points: true, records: [] }] } };
+    await installApp(page, { api: { ...BASE, '/foundations/domain': fwd } });
+    await page.goto('/presence.html#domain');
+    const box = page.locator('[data-forwards="domain"]');
+    await expect(box.locator('[data-forward="old.example"]')).toHaveAttribute('data-state', 'waiting');
+    await expect(box.locator('[data-forward="old.example"]')).toContainText('old.example is waiting for its records. It sends visitors to bistro.example once they point here:');
+    await expect(box.locator('.dnsrec-v')).toHaveText(['A   @   →   75.2.60.5', 'CNAME   www   →   bistro.netlify.app']);
+    await expect(box.locator('[data-forward="seen.example"]')).toHaveAttribute('data-state', 'sending');
+    await expect(box.locator('[data-forward="seen.example"]')).toContainText('seen.example sends visitors to bistro.example');
+  });
+
+  test('email records in a plan are shown the way the provider’s form wants them', async ({ page }) => {
+    const plan = { id: 'p1', kind: 'email_auth', title: 'Protect email sent from @bistro.example', summary: 'A few small records.', risk: 'Low.', status: 'proposed',
+      steps: [{ what: 'Add the records', automated: false, records: [{ type: 'TXT', name: 'bistro.example', value: 'v=spf1 include:spf.protection.outlook.com ~all' }, { type: 'TXT', name: '_dmarc.bistro.example', value: 'v=DMARC1; p=none' }] }] };
+    await installApp(page, { api: { ...BASE, '/foundations/plans': { data: [plan] }, '/foundations/domain': LIVE } });
+    await page.goto('/presence.html#domain');
+    const card = page.locator('#deskResults [data-plan="proposed"]');
+    await expect(card.locator('.dnsrec-v')).toHaveText(['TXT   @   →   v=spf1 include:spf.protection.outlook.com ~all', 'TXT   _dmarc   →   v=DMARC1; p=none']);
+    await expect(card).not.toContainText('_dmarc.bistro.example');
+    await expect(card.getByRole('button', { name: 'Copy the value of the TXT record for _dmarc: v=DMARC1; p=none' })).toBeVisible();
   });
 });

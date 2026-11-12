@@ -56,7 +56,7 @@ const NOW = '2026-11-11T12:00:00.000Z';
   ok('"Showing something else" for a parking page or old host', one({ domain_serving: 'other' }).status_words === 'Showing something else');
   ok('"Not fully set up" when a name or the padlock still needs doing', one({ domain_serving: 'latest', domain_checks: [{ key: 'points:www.bistro.example', ok: false, words: 'www.bistro.example doesn’t point here yet' }] }).status_words === 'Not fully set up');
   ok('the lines travel for the row', one({ domain_checks: [{ key: 'x', ok: false, words: 'W' }] }).checks.length === 1);
-  ok('not checked yet, uptime still decides (no false alarm before the first daily check)', one({}).status === 'connected');
+  ok('not checked yet says so: an answer alone is not Connected (builder item 194)', one({}).status === 'checking' && one({}).status_words === 'Not checked yet');
   ok('a site on its own host is never judged by our page', one({ edition: 'monitor', domain_serving: 'other' }).status === 'elsewhere');
   const rank = buildDomains([{ ...base, site_id: 'a', custom_domain: 'a.example', domain_serving: 'latest' }, { ...base, site_id: 'b', custom_domain: 'b.example', domain_serving: 'old_copy' }], NOW).domains.map((d) => d.domain);
   ok('an old copy sorts above a healthy domain', rank[0] === 'b.example');

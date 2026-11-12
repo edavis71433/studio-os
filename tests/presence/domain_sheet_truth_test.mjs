@@ -113,7 +113,7 @@ globalThis.fetch = async (url, init = {}) => {
     return reply({ Status: 0, Answer: answers(n, t) });
   }
   if (u.hostname === 'api.netlify.com') {
-    if (w.truthFails && method === 'GET' && !u.pathname.endsWith('/ssl')) { w.netlifyGets = (w.netlifyGets || 0) + 1; if (w.netlifyGets > 2) throw new Error('hosting is slow'); }
+    if (w.truthFails && method === 'GET' && !u.pathname.endsWith('/ssl')) { w.netlifyGets = (w.netlifyGets || 0) + 1; throw new Error('hosting is slow'); }
     if (u.pathname.endsWith('/ssl')) return method === 'POST' ? reply({}) : reply({ state: w.ssl, domains: ['bistro.example', 'www.bistro.example'], expires_at: '2027-02-01T00:00:00Z' });
     return reply({ id: 'nf1', name: 'bistro', default_domain: 'presence-abc.netlify.app', custom_domain: 'bistro.example', domain_aliases: [], state: 'current', ssl_url: null });
   }
@@ -254,7 +254,8 @@ const LIVE_DNS = { 'bistro.example': { A: [NETLIFY_APEX_IP] }, 'www.bistro.examp
 world({ dns: LIVE_DNS, truthFails: true });
 {
   const r = await quiet(async () => jsonOf(await handleDomain(new Request('http://stub.local/functions/v1/presence/foundations/domain'), 'GET', SITE('bistro.example'), OWNER, {})));
-  ok('when the full check can’t run, the answer says so and carries no checklist', r.status === 200 && r.body.data.health === 'ok' && r.body.data.check_failed === true && r.body.data.checklist === undefined && r.body.data.all_ok === undefined, JSON.stringify(r.body.data).slice(0, 300));
+  // builder item 194 asks the hosting company once per open, so a slow answer now shows as a comparison that couldn't be made
+  ok('when the hosting company can’t be asked, nothing is claimed: the comparison is a line that isn’t passed', r.status === 200 && r.body.data.all_ok !== true && (r.body.data.check_failed === true || (r.body.data.checklist || []).some((l) => l.key === 'serving' && !l.ok && /couldn’t compare/.test(l.words))), JSON.stringify(r.body.data).slice(0, 300));
 }
 world({ dns: LIVE_DNS });
 {
