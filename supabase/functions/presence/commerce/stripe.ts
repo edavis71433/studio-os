@@ -102,14 +102,27 @@ export async function createSubscriptionCheckout(p: CheckoutParams): Promise<{ i
  *  whenever. Inline price_data → no pre-created Price needed. The webhook flips the
  *  invoice to paid via metadata.presence_invoice_id, threaded onto both the link and
  *  the PaymentIntent (payment_intent.succeeded + checkout.session.completed).
- *  Idempotent per invoice (re-sending returns the same price + link). */
-export async function createServicePaymentLink(p: { amountCents: number; currency?: string; description: string; invoiceId: string }): Promise<{ url: string; id: string }> {
+ *  Idempotent per invoice (re-sending returns the same price + link).
+ *
+ *  `gen` (sales item 116) is presence_invoices.link_gen: which link the invoice is
+ *  on. Stripe hands the SAME link back for the same key, so a link that is spent
+ *  (it takes one payment; a bank payment that bounced used it up) or was made for
+ *  another amount (a part payment, an Undo) could never be replaced, and the same
+ *  key with a new amount is refused outright. Whoever clears the stored link adds
+ *  one to link_gen; a link made under the new number is a new one. 0 keeps the
+ *  keys every invoice had before, so a retry of an old send still lands on its link. */
+export const payLinkKey = (invoiceId: string, gen?: unknown): string => {
+  const g = Math.max(0, Math.trunc(Number(gen) || 0));
+  return g ? `${invoiceId}-g${g}` : invoiceId;
+};
+export async function createServicePaymentLink(p: { amountCents: number; currency?: string; description: string; invoiceId: string; gen?: unknown }): Promise<{ url: string; id: string }> {
   if (!STRIPE_SECRET) throw new Error('not_configured');
+  const key = payLinkKey(p.invoiceId, p.gen);
   const price = await stripeReq('prices', {
     'unit_amount': String(Math.max(1, Math.round(p.amountCents))),
     'currency': (p.currency || 'usd').toLowerCase(),
     'product_data[name]': (p.description || 'Invoice').slice(0, 250),
-  }, `price-${p.invoiceId}`);
+  }, `price-${key}`);
   const link = await stripeReq('payment_links', {
     'line_items[0][price]': String(price.id),
     'line_items[0][quantity]': '1',
@@ -133,7 +146,7 @@ export async function createServicePaymentLink(p: { amountCents: number; currenc
     // redirect (Stripe does not re-read the function) — see the PR's steps.
     'after_completion[type]': 'redirect',
     'after_completion[redirect][url]': `${SITE_URL}/client.html?paid=${encodeURIComponent(p.invoiceId)}`,
-  }, `plink-${p.invoiceId}`);
+  }, `plink-${key}`);
   return { url: String(link.url), id: String(link.id) };
 }
 
@@ -144,11 +157,18 @@ export async function createServicePaymentLink(p: { amountCents: number; currenc
  *  and metadata.purpose='service_retainer' on BOTH the link and the subscription
  *  so the ONE webhook routes every later customer.subscription.* / invoice.* by
  *  purpose to the service rail and NEVER to SaaS entitlement. Inline recurring
- *  price_data → no pre-created Price. Idempotent per (deal, amount, interval): a
- *  re-request returns the same price + link; a changed amount mints a fresh one. */
-export async function createServiceRetainerLink(p: { productName: string; amountCents: number; interval: 'month' | 'year'; dealId: string; siteId: string; successUrl?: string }): Promise<{ url: string; id: string; priceId: string }> {
+ *  price_data → no pre-created Price. Idempotent per (deal, amount, interval, the
+ *  moment this retainer was asked for): a retry of the same request returns the
+ *  same price + link; a changed amount, or a retainer set up again after a cancel,
+ *  mints a fresh one (the cancelled one's link is switched off, and Stripe would
+ *  otherwise hand that dead link straight back).
+ *
+ *  ONE approval per link (sales item 117): it had no limit, so a client who opened
+ *  the email twice started two monthly charges. */
+export async function createServiceRetainerLink(p: { productName: string; amountCents: number; interval: 'month' | 'year'; dealId: string; siteId: string; successUrl?: string; askedAt?: string }): Promise<{ url: string; id: string; priceId: string }> {
   if (!STRIPE_SECRET) throw new Error('not_configured');
-  const key = `${p.dealId}-${Math.max(1, Math.round(p.amountCents))}-${p.interval}`;
+  const asked = Date.parse(String(p.askedAt || ''));
+  const key = `${p.dealId}-${Math.max(1, Math.round(p.amountCents))}-${p.interval}${Number.isFinite(asked) ? '-' + asked : ''}`;
   const price = await stripeReq('prices', {
     'unit_amount': String(Math.max(1, Math.round(p.amountCents))),
     'currency': 'usd',
@@ -167,8 +187,10 @@ export async function createServiceRetainerLink(p: { productName: string; amount
     'subscription_data[metadata][kind]': 'service_retainer',
     'subscription_data[metadata][deal_id]': p.dealId,
     'subscription_data[metadata][site_id]': p.siteId,
+    'restrictions[completed_sessions][limit]': '1',
     'after_completion[type]': 'redirect',
-    'after_completion[redirect][url]': `${p.successUrl || `${SITE_URL}/payment-success.html`}`,
+    // its own thank-you: the page used to tell someone who had just approved a retainer that their invoice was paid
+    'after_completion[redirect][url]': `${p.successUrl || `${SITE_URL}/payment-success.html?retainer=1`}`,
   }, `retainer-plink-${key}`);
   return { url: String(link.url), id: String(link.id), priceId: String(price.id) };
 }

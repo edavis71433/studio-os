@@ -15,6 +15,7 @@
 // validation + escaping, the merge of activities + system events into ONE
 // reverse-chronological timeline, and the "last contacted" derivation. Tested in
 // isolation (tests/presence/deal_activity_test.mjs).
+import { declineWords } from '../lib/agreement_layout.ts';   // sales item 88
 import { humanWhen } from './contract.ts';
 import { estimateEventLine } from '../lib/estimates.ts';            // item 47
 import { recurringEventLine } from '../lib/recurring_invoices.ts';
@@ -94,8 +95,10 @@ export function describeSystemEvent(row: any): string {
   const d = (row && typeof row.detail === 'object' && row.detail) || {};
   const k = row?.kind;
   if (k === 'stage_change' && row?.to_stage) return 'Moved to ' + (STAGE_LABEL[row.to_stage] || row.to_stage);
-  if (k === 'proposal_decided' && d.decision) return d.decision === 'accepted' ? 'Proposal accepted' : 'Proposal declined';
-  if (k === 'contract_signed' && d.signer) return 'Agreement signed — ' + d.signer;
+  // sales item 88: a decline says what would make it a yes; a signature names the studio's countersigner too
+  if (k === 'proposal_decided' && d.decision) return d.decision === 'accepted' ? 'Proposal accepted' : 'Proposal declined' + (declineWords(d.reason, d.note) ? ' — ' + declineWords(d.reason, d.note) : '');
+  if (k === 'contract_signed' && d.signer) return 'Agreement signed — ' + d.signer + (d.countersigned_by ? ', countersigned by ' + d.countersigned_by : '');
+  if (k === 'client_question') return 'They asked' + (d.on === 'contract' ? ' about the agreement' : d.on === 'estimate' ? ' about the estimate' : ' about the proposal') + (d.text ? ': “' + String(d.text).slice(0, 140) + (String(d.text).length > 140 ? '…' : '') + '”' : '');
   if (k === 'invoice_sent' && d.amount_cents && d.recurring_id) return 'Recurring invoice sent' + (usd(d.amount_cents) ? ' — ' + usd(d.amount_cents) : '') + (d.period ? ` (${d.period})` : '');   // item 47
   if (k === 'invoice_sent' && d.amount_cents) return (d.purpose === 'deposit' ? 'Deposit requested' : 'Invoice sent') + (usd(d.amount_cents) ? ' — ' + usd(d.amount_cents) : '');
   // item 108 (J4): a retainer charge writes no invoice — it is a retainer payment, not "Invoice paid"

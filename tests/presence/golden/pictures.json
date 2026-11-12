@@ -1,182 +1,182 @@
 {
  "sections/accordion.jpg": {
-  "page": "e718ae01fe70dda2085e47245f553e3d3e042af0f1261ea36d27a79d52334e72",
+  "page": "c28d16c1036358783f72589fe9ede5cb628c0a768b852fce62c3771ecbc93603",
   "picture": "4f884865b52f5b4d91359a009c175aa169aae86a46df47f7a8bd9a6a10b78507"
  },
  "sections/appointment.jpg": {
-  "page": "e275c07832632d12cd868cbfdc8a73e49125850fbff43b58deb3d93e4802d593",
+  "page": "a6c40248f8e80c0b11dcb605a5ccfcda9fc84e65a2a2d57b4f5b56deb64568dc",
   "picture": "683616b814b11b9266ac26fb901d8f183d7ed9067d3fc77d81c893f0c4adcfac"
  },
  "sections/before_after.jpg": {
-  "page": "d56e28ce1c081702811dc60473cfb2afa011f8943ffd3076747eecb88431c5f0",
+  "page": "d529044d98fae164bfa74ba0ef45215700c1bf6a0314d080765398a28274a63b",
   "picture": "123c6e698e8ef42f19ccc8d5ae6bb86fe827ad6060f59dea450b550106ee7618"
  },
  "sections/booking.jpg": {
-  "page": "e59969347574c04ed2d2509bbb6b56f3f75a34b24c2f45ae33489a5bc76e05f2",
+  "page": "4ad09f5b602ce2b8233c713c434a0bbcf2ea3c0fd733629a8238d2d471cb9f4a",
   "picture": "7158c89de34cb914fcdb19985b309b5f3d327fbe0b485b84e3d17c610cf27b77"
  },
  "sections/buttons.jpg": {
-  "page": "f0306fde81af660cd0ed0470af08f9005f22fcb57a0b181ad13d246b94f65ced",
+  "page": "a2cc60407ce26fc7649dda4fd66abb470328378cff41f0531bdb1acef934a155",
   "picture": "508a3a788d07a780c81ab8c2e75e916a937cddc4c8b907f9d743f5ac9ea4ab45"
  },
  "sections/cards.jpg": {
-  "page": "cff4d08cf7ed7d7c9b554d47930ad50d7576239a55a141035f302698b2df9569",
+  "page": "0313d42562859b5cf1be611b28a53a19b99455229e7bfb2bb0130870492e0a7c",
   "picture": "0fddfcfe17abc494cce879970776cb6ed8fd79bd16a3c9d7c8aeafa6928a2424"
  },
  "sections/carousel.jpg": {
-  "page": "f23608c050decddb28b8ffac6c0ea8800b2b87ebd58a237643b448509c13612c",
+  "page": "61bb8392ee4dec6ade060f43507f50ad6c2f1090f6545e90fdbe506951cc9b93",
   "picture": "fa35a3bb1fba23d0661e8dcccc020112540ad0023bac25a093220381a83a5700"
  },
  "sections/certifications.jpg": {
-  "page": "31a1967aa4f64afed7141bff1aa976ba1a9ff6a96a12f0dfaccd60dde7dfcbb0",
+  "page": "823e7e7e4045704f65dd0d6c9f502498df57f1334de394cd2d6a71615f376f8c",
   "picture": "d183b493a26fc8754076c1dd30a39b1022fba143c7991d1bc1b230731652d38e"
  },
  "sections/columns.jpg": {
-  "page": "9a389fa5f729fac525a6393c097a047c54cde38dcf43f6d6215c91e655470235",
+  "page": "476c49bf370f3ea29dc99061b6c4a1edb598b09bc2b2f3893f03034e9f0ab7ee",
   "picture": "6e02731213bcbfc85879a2b3f0261032c04da725bce9a4e81ab118f67a159fac"
  },
  "sections/cta.jpg": {
-  "page": "ec16771fbbfd36cfc51599e090f9f2d2a6c71405ef09069cec447075f465ee70",
+  "page": "d2534b6d8d5d75a3af5d2447f4161db5a5089ae3dcb3bc64c9f0f1f7fe8f25d2",
   "picture": "3e14da4a41a4f56c6e523184a5b171978774a8fc466b649496f982dbda901eb8"
  },
  "sections/divider.jpg": {
-  "page": "56989d5137f22a33f8095fe43398849a2702c0ecf8149835e3d15d0abfec9546",
+  "page": "a27f5f41e9cf0894a4f2e4cb28c29c69fcf7c8bac4786edae63f326485516646",
   "picture": "6a721f30643ded1e8fb19596317c9c995ca1291595ecabac70cdc6ac382d51b4"
  },
  "sections/download.jpg": {
-  "page": "2886930aa5d00633fa3c2f66472ddbd8146bb4d07f46388b1aa75825ed86d5ae",
+  "page": "92d805b38941882904a727174c1778c42de8b2d79e87e05fdfe04d2c22b4f8fd",
   "picture": "6ac2760f802337374f28b037edf8d26b721ecbe329c5b8fed6a94fea72e8d2d1"
  },
  "sections/events.jpg": {
-  "page": "750b671aaa5da8357219090cafa9481e674c92a59474f1e5b88687cebb5b2c2e",
+  "page": "1be7df428bef2bee3bac090084e01753cf3941928b815848acf6e359b3b03186",
   "picture": "f321392519a8d69865efb9b18e9c0eaf9d9c80b8353aff805d69161940ee8c17"
  },
  "sections/features.jpg": {
-  "page": "6a92fcdc304f35a310d440c0d0117b11caf6c005f73ae059885a9b95b8a24556",
+  "page": "21ff65e5806e0552e5e1f1e11e799c18cde436fde93bc34087572c772ca32018",
   "picture": "8e320f39328a9e35744418d3716df798a87ef41e3f2a90838440f75794664dfe"
  },
  "sections/gallery.jpg": {
-  "page": "facb884b63416987dc53ccf259a87f4dd763c7ddafb236de9fedbf0eceb7e26d",
+  "page": "64b2fbd17662c43fbcb154d162d5c887dc4621d2f43a56513a5338f43fe91163",
   "picture": "11dc5c0e6f4d75049d9a68eecdd8ddd59cb4d2337985d1aad5c4ac8c2b18d7ae"
  },
  "sections/image.jpg": {
-  "page": "8fde5188914b45330eb742c4b3615f0c88a58bd3f6b6ae60d73d141b5b501a52",
+  "page": "6c34c84a43bc5bc38304876941d64d1f383a4572eb72d532489605555e13d491",
   "picture": "036435c407e05e84b27d37b76300aff369e61a62f4a4d4a94458f15cbe85f855"
  },
  "sections/image_text.jpg": {
-  "page": "99bced727c52d7db631cae3c2f42ccf49d6659c9932917b60447966b74c37074",
+  "page": "bc6811bed431d2e45465f4a3bef0f53ddb3dd4131c3ff90602c139c6bee5a995",
   "picture": "44116b5791ef1f43c93ab0c3c2c6a4b68b3d4eadb572bfcc9e06e65b29dec879"
  },
  "sections/link_list.jpg": {
-  "page": "68e6c80e293e9b897817cc46f61f589f0b854fd42e99e2463db340fd2da84e12",
+  "page": "5b1fca227b1f7d2fc374458df8398af0977233298d4ec236af35c37529093e7b",
   "picture": "e9e17c439d6a646c229d239736ac857426e051d1f5bdeee272d5deb5cebbd1b3"
  },
  "sections/map.jpg": {
-  "page": "ea4fc271f4c936a2b502a65ba526d36dab25c1e79bbf8c25f39c546162a0f194",
+  "page": "5480eeb87f08d2af66ab3a8b3b56c9f711fd02fb8ae95c484ff2793aab1067a4",
   "picture": "3e1e230d088ebb40de6e29e84ec4d9ff4a85cf02a406afae2c47af6b179b573c"
  },
  "sections/newsletter.jpg": {
-  "page": "06002fbfc0e8e94384aa5e87a38a29b6fd69da13bbcfae8bf806924a3cd3adc0",
+  "page": "15bd6d0775ae29979a73333c4060e6185f3bf8fb16ef0193dd1f84f9171f7af4",
   "picture": "986545acf019ed64e6d1167c5614f22c7311470a74464c14db3167bd2e53f36d"
  },
  "sections/partners.jpg": {
-  "page": "045a08266b0e0ae257fcc41ea09f1aa5065a188ff4af541ec1eca0a7b014afdc",
+  "page": "402f184eccf5775df55e697c821fb7ee925797f494a4fb4b2aa446dae771c4eb",
   "picture": "fe89d661ca6a6c28806a7de309da599d693adf1890b304d2383f803794b499b5"
  },
  "sections/pricing.jpg": {
-  "page": "32243c25f4e3d0e5683cb873a5b418e71fb8551541b5286785f4cd911aef8782",
+  "page": "e44236f05ce5a7c28d2d712a78451ee19fcefda082d9f42c4ed15669f8ca6e12",
   "picture": "e65f3fbb83ea7cb6dd1c286439a253adbea2148f61d12618d567b596b93affe7"
  },
  "sections/process.jpg": {
-  "page": "74e2b7969f73ea598259ebd161d3832218e9a6d94496462c9e3ff287e460c053",
+  "page": "567588639402e2934f4465d36485898b86852287162bcd62f10e78825ed5dd6a",
   "picture": "f20cf12c92df8f9641beb93d2ad2cac1491323f7dce9190ac5abaf5aef334953"
  },
  "sections/progress.jpg": {
-  "page": "44fb1a7411a0ae2447625c13541c55e95369d5113a76bfd6b77458b4c4561948",
+  "page": "14f01601cf6bc10a6faaff3773b6cff1866b1acf7757eb0b85308349d6ccb3fb",
   "picture": "4c8c35c8c53e07a743ee97b45bcbf4a339162a5ebd71ddd5e3ad5bc0a0edca81"
  },
  "sections/reviews.jpg": {
-  "page": "7ca76ba0925efa01dc55346f6141e8f59073b389dd92c3ab65163b8615b201ff",
+  "page": "7b3aa8e27b288a98a73d1300bb36952ee0ec56a4ecb261f41222976f060b9dda",
   "picture": "1e84e63171a3d2b55ae53ff50c94f5feb872766cc9d54a496206578592ac8613"
  },
  "sections/reviews_wall.jpg": {
-  "page": "b3773ba5a7fa3c651dd86cd1eff149d1b8cd55e4ca0e691974b74bdf8e9f6fa6",
+  "page": "846dbd923bf7d5ece6351cbd6bca18c708de8c1409fe600047191c596b176027",
   "picture": "2ab4274b01de44f34e995666ad0c60f4ee283304a41942e56fa55b8c94656fee"
  },
  "sections/richtext.jpg": {
-  "page": "6aed707fa967d9ccbe7b6dc2eb66443087504a8484522f2b2edcaabd0a1ce7a6",
+  "page": "08601e579a7a331bcb02231041b94463604ec24c457e338abfa3c6d5519c97b6",
   "picture": "bbfa942de42a7c441b74a243b7e82f6edf20d8810ec5ca6d727b522277be7f92"
  },
  "sections/service_areas.jpg": {
-  "page": "d1205ff989cab93b5882bad85b7a7c6163b7b394ef602ded7f842d97f89554ef",
+  "page": "f7e6d63afaafcc9fb946e7e84c243fa03ba80a78b7e02378574824fa081a1be6",
   "picture": "ee32afcac48b441f7a9738106ef563dc567f0470ce361f40270ba8daf3d454b9"
  },
  "sections/social.jpg": {
-  "page": "643aaa3ee6058df35f0d790619dc990696d2bcc1577366e72f8012db463a64f7",
+  "page": "fe1dcf007ece825b184f6d96632b5b5603cace648120e6e7a1e9049929ba36d7",
   "picture": "e9981d9801f501717a4dc06de5260741ecb75948e3dc42a4b99781cc933d57e4"
  },
  "sections/spotlight.jpg": {
-  "page": "20b3f2aa6265337dcbdf46482d8099f9ba465419931cf88bd9265c3e4418133e",
+  "page": "35f92460fbb3e57aff2c370d171abc1c92c7a4a6acde7c0a03e7d6a0a3cc5fed",
   "picture": "43938ebdde70df22214f391f9fd78b9ce140e728065229057d71a5bc1cf9675e"
  },
  "sections/stats.jpg": {
-  "page": "411abe091df0496efea10fdfcb7faa4726c96619f7259d210469598bf0432e1b",
+  "page": "68a650fa0ea571e12690f040deffe13e4e2160de18aa4362c830916e6cf187d1",
   "picture": "9e27b186a7461659efb01890f1c6d92c9cd9015598d3c4c8353a7dca533dfe36"
  },
  "sections/table.jpg": {
-  "page": "5abbb78cccbdd0bca3febe495d637ae57f3690d5a5c30d3ae611253a8496212b",
+  "page": "89dd236322fc046e58bb81668f153ccec8f3f8714d00162de426ba5f27cd5ef2",
   "picture": "baa4e4b87ae5ad6a756da0d35ed8c85063b9979f5a57d5c4a09892671bcda75b"
  },
  "sections/tabs.jpg": {
-  "page": "870a9605abec7b26beb2c9d42f9b346eafaca92cfd6ec238561aa6ca7d3f9728",
+  "page": "c38545b13db8956848b999d17170f3647061ccc5fbd5e46b6525a30acb211e76",
   "picture": "9db3f4a39017a1e2738bdd62f8a601b6c858472e8a543f835c33ad4acb36be26"
  },
  "sections/team.jpg": {
-  "page": "f5fd93bea90c8a6de9064f7ff0dfb4e3b56cf3f9c63cf25123c0cafaa561f19a",
+  "page": "c54666fca48b0943c2e8d9b7e2687ee40c60b9bd24d9451873a745ba4fe8383e",
   "picture": "305dd8bde2f3bb08bad8cd789320499483efde9322dfc34107d35a23bc23218c"
  },
  "sections/title.jpg": {
-  "page": "88eec54825c4489c3c5780d64082bd2ca604e16bec38fb203ad834bcbaf4a0b4",
+  "page": "5575d10f75ce74dc522555729397574088228f57bf32141a09b2dbf33b759ffc",
   "picture": "44a312dc83eb271a4e8bf80b173e44ed42c4099005eb234c1a8d5e1d07cca47a"
  },
  "sections/toc.jpg": {
-  "page": "e7119cf96c84fa373ef332ce33ee3a116505624d4a4660ae5442b62ba7c1cbc7",
+  "page": "1b2d601f9ee90d85de836417f339c5e500b34be6abef15fb5d4623dbc6320378",
   "picture": "99c34439be8c5076ab95a80364764f2dfa6984056d16cd9b223756c8b51c5415"
  },
  "sections/video.jpg": {
-  "page": "a5759e41cc75034fd134cdce948948171155ee10b1a3f9be4844a0427f73d698",
+  "page": "92e37d4245b78cc66f7a7fd5cd8701d8613a8b6cd7ffc5e95634ed104f5e93e5",
   "picture": "77ae08f814de5975e280c4a43d0aa76e62f07961ab2c9d25af2888d8cfb5bd1e"
  },
  "templates/atelier.jpg": {
-  "page": "fcb3e1d74b748f02d8edb6b569e9b629fc034ca59e1d7db07babfaff28948c28",
+  "page": "41972d45a909cceac0d424f7d017038465643c3b38ceb2e4d79c4026805b43c1",
   "picture": "85f9448368ead3d0fa1ca51cb63b4f095325eefed2a04acf2743bf9a18595448"
  },
  "templates/aurora.jpg": {
-  "page": "e3de0d5289db176373062a474fcc473dc16ec01efad421308908cea1aa35da30",
+  "page": "2b575a371d77ec36820f257a3e774a993888337398de25bcc39d3c4cfb8312f8",
   "picture": "839ba4009c919d81b9b10ed5762fef05aa311d3b5a55a3cb5567f0f20dea2377"
  },
  "templates/business-classic.jpg": {
-  "page": "ab2cb50023310525503f9489047a77ebaa200d7b65b18b7fc83a8e962097bfbe",
+  "page": "4549887ae1d8aec33dabe6d46f7f7ea01d043732c840088301a76a4502d08c1c",
   "picture": "7fbc1de4fbc2142f2be0ac506bc296e779617fadeace943a6871c3a5c284cf95"
  },
  "templates/editorial.jpg": {
-  "page": "1a94709fbd8b22b2043d959780425c9f9233f51e4fc6b0d89ae7e1e431f43e10",
+  "page": "9bce51e9540b75c320d044934996eb2e0fada91e8773f9fb75ab1ed0f9ea2103",
   "picture": "2686f0013de4b4d3ea18657f3de63e41384bbaa6bbcf454741d935eaa4add5ea"
  },
  "templates/harbor.jpg": {
-  "page": "20fe2a42dfd558b469fe69ad90888ed927ad4692c5691cbea06507b3a916d878",
+  "page": "461da1d8049bc15832011bfb90ac25265413568f14de68e5d994bdc99e0fea4a",
   "picture": "ac190f7501db8ed09756df424cf6f3c9d9a8d33623f9e8b29850a78a499b14d3"
  },
  "templates/meadow.jpg": {
-  "page": "2f70871fba60ef878aafb27c44fed7bccfa14f37b8164749e1bea13cddfd3fb2",
+  "page": "8894fff2bcd4b990f595e0adfe1712e1c8500ca0de75aa356d0663e938e65e5c",
   "picture": "f0358ae3fa43582fce69f5b1d875245e77e5972400ec26a69b3890fcb6ff4d53"
  },
  "templates/restaurant-classic.jpg": {
-  "page": "3e2b622a552d97cbd6ae9e5415c5d3fa0cb27cb9d5b78d38392b6faf992c7f85",
+  "page": "0abe9ce0d38207ef4917ebf7ed997500ad484a17c88c82ad6ad1a8bb98f09d4a",
   "picture": "b91054e28dcfb8c8363e117de20020c37f21b59232f4bc4519b7fa02a87c571f"
  },
  "templates/slate.jpg": {
-  "page": "4afa33c756eeaacb74e205c5181acf073f423c4709d3670b7985d73b4d4f0c23",
+  "page": "87c56ef43be4ee0ff3f63c893d2f3d1983faf7857132533c73d4838756e8daab",
   "picture": "3a62f0f3d474de94d092a8ecf68290cff37581ba3d3860e96966828591d88c1c"
  }
 }

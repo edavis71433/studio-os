@@ -58,11 +58,12 @@ export function retainerPaid(events: unknown): { cents: number; count: number; l
 export const PAY_METHODS = ['check', 'cash', 'bank_transfer', 'zelle', 'other'] as const;
 export type PayMethod = typeof PAY_METHODS[number];
 export const PAY_METHOD_LABEL: Record<PayMethod, string> = { check: 'Check', cash: 'Cash', bank_transfer: 'Bank transfer', zelle: 'Zelle', other: 'Other' };
-export interface RecordedPayment { amount_cents: number; paid_on: string; method: PayMethod; note: string; part: boolean; left_cents: number }
+export interface RecordedPayment { amount_cents: number; paid_on: string; method: PayMethod; note: string; private_note: string; part: boolean; left_cents: number }
 /** Check a payment the studio records by hand against the invoice it pays.
  *  Whole or part: never more than is due, never a day after today (the caller's
  *  day, so a check banked this evening in Los Angeles is "today"), one of the
- *  five ways. The note is the studio's own words ("Check #1042"). Pure. */
+ *  five ways. The note is printed on the client's receipt ("Check #1042"); the
+ *  private note (sales item 118) is the studio's own and never is. Pure. */
 export function validatePayment(b: any, inv: { status?: unknown; amount_cents?: unknown; processing_since?: unknown; payment_for?: unknown } | null, todayYmd: string): { ok: true; value: RecordedPayment } | { ok: false; error: string; message: string } {
   if (!inv) return { ok: false, error: 'not_found', message: 'That invoice is no longer here.' };
   if (inv.payment_for) return { ok: false, error: 'bad_state', message: 'That’s a payment, not an invoice.' };
@@ -79,8 +80,8 @@ export function validatePayment(b: any, inv: { status?: unknown; amount_cents?: 
   if (on > todayYmd) return { ok: false, error: 'validation', message: 'The day you were paid can’t be in the future.' };
   const method = String(b?.method || '') as PayMethod;
   if (!(PAY_METHODS as readonly string[]).includes(method)) return { ok: false, error: 'validation', message: 'Pick how they paid: check, cash, bank transfer, Zelle or other.' };
-  const note = String(b?.note ?? '').replace(/[\u0000-\u001F\u007F]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 300);
-  return { ok: true, value: { amount_cents: amount, paid_on: on, method, note, part: amount < due, left_cents: due - amount } };
+  const tidy = (v: unknown) => String(v ?? '').replace(/[\u0000-\u001F\u007F]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 300);
+  return { ok: true, value: { amount_cents: amount, paid_on: on, method, note: tidy(b?.note), private_note: tidy(b?.private_note), part: amount < due, left_cents: due - amount } };
 }
 /** The moment a recorded day is stored as: its noon in UTC, which is that same
  *  day from Hawaii to New Zealand, so the money reports file it on the right day. Pure. */

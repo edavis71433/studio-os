@@ -226,7 +226,7 @@ test.describe('The client\'s estimate page (item 47)', () => {
     await expect(page.getByRole('heading', { level: 1, name: 'Spring refresh' })).toBeVisible();
     await expect(page.getByText('Prepared by Example Studio')).toBeVisible();
     await expect(page.getByText('This is an estimate — a price before anything is agreed. Nothing is charged.')).toBeVisible();
-    await expect(page.locator('tr.total')).toContainText('$1,170.00');
+    await expect(page.locator('tr.total')).toContainText('$1,170');   // whole dollars read without cents (sales item 88)
     await expect(page.getByText('Discount (10%)')).toBeVisible();
     await expect(page.getByText('Good until December 31, 2026.', { exact: false })).toBeVisible();
     await expect(page).toHaveTitle('Your estimate — Example Studio');

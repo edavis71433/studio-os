@@ -40,7 +40,7 @@ import { handlePreview, handlePreviewSection } from './routes/preview.ts';
 import { handlePreviewStatus, handlePreviewPublish, handlePreviewPromote, handlePreviewSettings, handlePublicPreview, handlePublicPreviewOpen, handleSignedPreview, handlePreviewShareLink } from './routes/preview_env.ts';
 import { handleDealTasksList, handleDealTaskCreate, handleDealTaskUpdate, handleSalesDeleted, handleSalesRestoreDeal } from './routes/sales.ts';
 import { handleSalesSummary, handleSalesMyTasks, handleSalesReports, handleSalesViews, handleSalesStages, handleSalesReceivables, handleSalesContacts, handleSalesContact, handleSalesContactRestore, handleSalesContactFields, handleSalesDeals, handleSalesDeal, handleSalesDealStage, handleSalesDealActivity, handleSalesProposalCreate, handleSalesProposalSend, handleSalesDealSend, handleSalesProposalRevise, handleSalesProposalDecide, handleSalesProposalDelete, handleSalesContractCreate, handleSalesContractSend, handleSalesContractSign, handleSalesContractDelete, handleSalesConvert, handleSalesResendInvite, handleSalesAddCustomer, handleSalesInvoice, handleSalesSchedule, handleSalesInvoiceSend, handleSalesInvoiceVoid, handleSalesRetainer, handleSalesRetainerCancel, handleSalesContractTerm, handleSalesTemplates, handleSalesTemplateDelete, handleSalesServices, handleSalesPublicView, handleSalesDocument, handleSalesDocumentLink } from './routes/sales.ts';
-import { handleProjects, handleProject, handleProjectReport, handleProjectsProgress, handleProjectStatus, handleTasksCreate, handleTask, handleProjectChecklist, handleMilestonesCreate, handleMilestone } from './routes/projects.ts';
+import { handleProjects, handleProject, handleProjectReport, handleProjectsProgress, handleProjectStatus, handleTasksCreate, handleTask, handleProjectChecklist, handleMilestonesCreate, handleMilestone, handleProjectTemplates } from './routes/projects.ts';
 import { handleDeliverableUploadUrl, handleDeliverablesCreate, handleDeliverable, handleDeliverableDownload, handleApprovalsCreate, handleApprovalDecide } from './routes/project_delivery.ts';
 import { handleMessages, handleNotifications, handleNotificationsRead, handleProjectClientMessages, handleThreadRead } from './routes/project_comms.ts';
 import { handleProjectSurveys, handleSurvey, handleSurveyRespond, handleSupport, handleSupportOne, handleSupportMessage } from './routes/service_intake.ts';
@@ -53,6 +53,7 @@ import { handleAssetsList, handleAssetsCollections, handleAssetsHealth, handleAs
 const { handleVisualKinds, handleVisualGenerate, handleVisualList, handleVisualGet, handleVisualVary, handleVisualEdit, handleVisualDecide } = lazyRoutes(() => import('./routes/visual.ts'));
 const { handleAdmin, handleDomain, handleDomainLookup, handleDomainForward } = lazyRoutes(() => import('./routes/admin.ts'));
 import { handleCollection, handleLocation, handleSettings, handleBlockSuggestions, handlePageDuplicate, handlePageRefs, SPECS } from './routes/content.ts';
+import { handlePostPublish, handlePostUnpublish, handlePostEmailDraft } from './routes/blog.ts';
 import { handleDeletedPages, handleDeletedPageRestore } from './routes/deleted_pages.ts';
 import { handlePageLockCreate, handlePageLockList } from './routes/page_locks.ts';
 import { handleHealth, handleChanges, handleContentTree, handleNotesList, handleNoteResolve, handleRestoreToDraft, handleMediaList } from './routes/room.ts';
@@ -99,7 +100,7 @@ import { handleCommerce, isPublicCommerceRoute } from './routes/commerce.ts';
 import { handleScopedCommerce } from './routes/commerce_scoped.ts';
 const { handleSystem } = lazyRoutes(() => import('./routes/system.ts'));
 const { handleVisibility, handleVisibilityCheck } = lazyRoutes(() => import('./routes/visibility.ts'));
-const { handleFollowGet, handleFollowPut, handleLlmsDraft } = lazyRoutes(() => import('./routes/search_tab.ts'));
+const { handleFollowGet, handleFollowPut, handleLlmsDraft, handlePhrasesGet, handlePhrasesPut } = lazyRoutes(() => import('./routes/search_tab.ts'));
 const { handleAiGet, handleAiQuestionsPut } = lazyRoutes(() => import('./routes/ai_answers.ts'));
 const { handleConnectionsList, handleConnectionProfile, handleConnectionConnect, handleConnectionCallback, handleConnectionRefresh, handleConnectionDisconnect, handleConnectionProperties, handleConnectionPropertySelect, handleWritePrepare, handleWriteList, handleWriteDecide, handleWriteExecute, handleWriteRollback, handleConnectionAsk, handleConnectionAskStatus } = lazyRoutes(() => import('./routes/connections.ts'));
 const { handleMarketplaceList, handleMarketplacePrepare, handleMarketplaceDecide, handleMarketplaceExecute, handleMarketplaceRollback, handleMarketplaceFeatures } = lazyRoutes(() => import('./routes/marketplace.ts'));
@@ -252,6 +253,8 @@ async function route_(req: Request, cors: Record<string, string>): Promise<Respo
     if (m && method === 'POST') return handleSalesProposalDecide(req, m[1], cors);
     m = route.match(/^\/sales\/contracts\/([0-9a-f-]{36})\/sign$/);
     if (m && method === 'POST') return handleSalesContractSign(req, m[1], cors);
+    // sales item 88: Ask a question from the proposal or agreement page — the page's own signed link
+    if (route === '/sales/ask' && method === 'POST') return (await import('./routes/proposal_answers.ts')).handleSalesAsk(req, cors);
     // item 47: the client's Approve / Not now on an estimate — the estimate's own signed link
     m = route.match(/^\/sales\/estimates\/([0-9a-f-]{36})\/decide$/);
     if (m && method === 'POST') return handleEstimateDecide(req, m[1], cors);
@@ -581,6 +584,8 @@ async function route_(req: Request, cors: Record<string, string>): Promise<Respo
   if (route === '/visibility/check' && method === 'POST') return handleVisibilityCheck(site, cors);
   if (route === '/visibility/follow' && method === 'GET') return handleFollowGet(site, cors);              // item 181
   if (route === '/visibility/follow' && method === 'PUT') return handleFollowPut(req, site, principal, cors);
+  if (route === '/visibility/phrases' && method === 'GET') return handlePhrasesGet(site, cors);             // item 160: what people type to find you
+  if (route === '/visibility/phrases' && method === 'PUT') return handlePhrasesPut(req, site, principal, cors);
   if (route === '/visibility/llms-draft' && method === 'GET') return handleLlmsDraft(site, cors);         // item 124
   if (route === '/visibility/ai' && method === 'GET') return handleAiGet(site, cors);                     // item 182
   if (route === '/visibility/ai/questions' && method === 'PUT') return handleAiQuestionsPut(req, site, principal, cors);
@@ -914,6 +919,12 @@ async function route_(req: Request, cors: Record<string, string>): Promise<Respo
     if (route === '/sales/templates' && (method === 'GET' || method === 'POST')) return handleSalesTemplates(req, site, principal, cors);
     m = route.match(/^\/sales\/templates\/([0-9a-f-]{36})$/);
     if (m && method === 'DELETE') return handleSalesTemplateDelete(site, m[1], cors);
+    // sales item 106: saved to-do lists, and adding one to a deal
+    if (route === '/sales/todo-templates') return (await import('./routes/todo_templates.ts')).handleTodoTemplates(req, site, principal, null, cors);
+    m = route.match(/^\/sales\/todo-templates\/([0-9a-f-]{36})$/);
+    if (m) return (await import('./routes/todo_templates.ts')).handleTodoTemplates(req, site, principal, m[1], cors);
+    m = route.match(/^\/sales\/deals\/([0-9a-f-]{36})\/tasks\/from-template$/);
+    if (m && method === 'POST') return (await import('./routes/todo_templates.ts')).handleDealTasksFromTemplate(req, site, principal, m[1], cors);
     m = route.match(/^\/sales\/proposals\/([0-9a-f-]{36})\/send$/);
     if (m && method === 'POST') return handleSalesProposalSend(req, site, principal, m[1], cors);
     // ONE LINK (benchmark 2026-10, item 5): send the proposal AND the agreement
@@ -960,6 +971,9 @@ async function route_(req: Request, cors: Record<string, string>): Promise<Respo
   //    manages; the client side reads only client_visible rows (enforced in the
   //    handlers). All access is site_id-scoped for tenant isolation. ──
   if (route === '/projects') return handleProjects(req, jwt, site, principal, cors);
+  // sales item 106: the studio's own project templates (GET and POST; DELETE one by its id)
+  if (route === '/projects/templates') return handleProjectTemplates(req, jwt, site, principal, null, cors);
+  { const m = route.match(/^\/projects\/templates\/([0-9a-f-]{36})$/); if (m) return handleProjectTemplates(req, jwt, site, principal, m[1], cors); }
   if (route === '/projects/progress' && method === 'GET') return handleProjectsProgress(req, jwt, site, principal, cors);   // item 86: one read for many
   {
     let m = route.match(/^\/projects\/([0-9a-f-]{36})$/);
@@ -1032,6 +1046,10 @@ async function route_(req: Request, cors: Record<string, string>): Promise<Respo
   //    client + verifies a service_link before touching agency-site data. ──
   if (route === '/client/projects' && method === 'GET') return handleClientProjects(req, site, principal, cors);
   if (route === '/client/billing' && method === 'GET') return handleClientBilling(req, site, principal, cors);
+  { // sales item 117: the client cancels their own retainer (an owner's call: 'delete' in lib/site_roles.ts)
+    const m = route.match(/^\/client\/retainers\/([0-9a-f-]{36})\/cancel$/);
+    if (m && method === 'POST') return (await import('./routes/client_retainers.ts')).handleClientRetainerCancel(req, site, principal, m[1], cors);
+  }
   if (route === '/client/documents' && method === 'GET') return handleClientDocuments(req, site, principal, cors);
   // item 179: the monthly reports that went out, for the client's Documents shelf
   if (route === '/client/reports' && method === 'GET') return (await import('./ops/monthly_report.ts')).handleClientReports(site, cors);
@@ -1342,6 +1360,12 @@ async function route_(req: Request, cors: Record<string, string>): Promise<Respo
   if (route === '/page-locks' && method === 'POST') return handlePageLockCreate(req, site, principal, cors);
   if (route === '/page-locks' && method === 'GET') return handlePageLockList(site, cors);
   if (route === '/blocks/suggested' && method === 'GET') return handleBlockSuggestions(site, cors);   // FD-T4 vertical presets
+  {   // builder list items 40 and 160: one post live (or off) on its own, and the email it becomes
+    const bm = route.match(/^\/posts\/([0-9a-f-]{36})\/(publish|unpublish|email-draft)$/);
+    if (bm && bm[2] === 'publish' && method === 'POST') return handlePostPublish(site, principal, bm[1], cors);
+    if (bm && bm[2] === 'unpublish' && method === 'POST') return handlePostUnpublish(site, principal, bm[1], cors);
+    if (bm && bm[2] === 'email-draft' && method === 'GET') return handlePostEmailDraft(site, bm[1], cors);
+  }
   {
     const m = route.match(/^\/(offerings|testimonials|faqs|posts)(?:\/([0-9a-f-]{36}))?$/);
     if (m && m[1] in SPECS) { const r = await handleCollection(req, db, site, principal, m[1], m[2] ?? null, cors); if (r) return r; }

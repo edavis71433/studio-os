@@ -136,7 +136,9 @@
     <label for="payOn">The day you were paid</label><input id="payOn" type="date">
     <label for="payHow">How they paid</label>
     <select id="payHow"><option value="">Pick one…</option><option value="check">Check</option><option value="cash">Cash</option><option value="bank_transfer">Bank transfer</option><option value="zelle">Zelle</option><option value="other">Other</option></select>
-    <label for="payNote">Note (optional)</label><input id="payNote" maxlength="300" placeholder="Check #1042">
+    <label for="payNote">Note on their receipt (optional)</label><input id="payNote" maxlength="300" placeholder="Check #1042" aria-describedby="payNoteH">
+    <p class="muted" id="payNoteH" style="margin:4px 0 0">Shown on their receipt: the client sees this note on the receipt, its PDF and the receipt email.</p>
+    <label for="payPrivate">Private note, only you see it (optional)</label><input id="payPrivate" maxlength="300" placeholder="Paid late, waived the fee">
     <p class="err" id="payErr" role="alert" hidden></p>
     <div class="row2"><button type="button" class="pill" id="payCancel">Cancel</button><button type="submit" class="pill go" id="payGo">Record payment</button></div>
   </form>
@@ -285,7 +287,7 @@ function openMenu(btn){
 function openPay(i,back){
   PAYING={i,back};
   $('payWhat').textContent=[i.number_label,i.business||i.person,i.title,money(i.amount_cents)+' due'].filter(Boolean).join(' · ');
-  $('payAmt').value=((Number(i.amount_cents)||0)/100).toFixed(2);$('payOn').value=ymd();$('payOn').max=ymd();$('payHow').value='';$('payNote').value='';$('payErr').hidden=true;
+  $('payAmt').value=((Number(i.amount_cents)||0)/100).toFixed(2);$('payOn').value=ymd();$('payOn').max=ymd();$('payHow').value='';$('payNote').value='';$('payPrivate').value='';$('payErr').hidden=true;
   $('payDlg').showModal();$('payAmt').focus();$('payAmt').select();
 }
 $('payCancel').addEventListener('click',()=>{$('payDlg').close();});
@@ -298,7 +300,7 @@ $('payForm').addEventListener('submit',async(e)=>{
   if(!$('payHow').value)return err('Pick how they paid.');
   const go=$('payGo');go.disabled=true;
   const i=PAYING.i;
-  const r=await api('/sales/invoices/'+encodeURIComponent(i.id)+'/payment?today='+ymd(),'POST',{amount_cents:cents,paid_on:$('payOn').value||ymd(),method:$('payHow').value,note:$('payNote').value.trim()});
+  const r=await api('/sales/invoices/'+encodeURIComponent(i.id)+'/payment?today='+ymd(),'POST',{amount_cents:cents,paid_on:$('payOn').value||ymd(),method:$('payHow').value,note:$('payNote').value.trim(),private_note:$('payPrivate').value.trim()});
   go.disabled=false;
   if(!r.ok)return err((r.body&&r.body.message)||'That payment didn’t save. Nothing changed. Try again.');
   $('payDlg').close();

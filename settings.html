@@ -85,6 +85,8 @@
   .form2 input,.form2 select{width:100%;height:34px;border:1px solid var(--line);border-radius:var(--dds-r,8px);padding:0 10px;font:inherit;font-size:13.5px;background:var(--card);color:var(--ink)}
   .form2 input:focus,.form2 select:focus{outline:2px solid var(--p);outline-offset:1px;border-color:var(--p)}
   .form2 .full{grid-column:1/-1}
+  .form2 .how{font-size:12.5px;color:var(--faint);margin-top:-4px}   /* sales item 88: under who signs */
+  .form2 [data-signer][hidden]{display:none}
   .form2 .note{grid-column:1/-1;font-size:12.5px;color:var(--faint)}
   .btn{display:inline-flex;align-items:center;gap:var(--dds-s2,8px);height:32px;padding:0 var(--dds-s3,12px);border-radius:var(--dds-r,8px);border:1px solid var(--line);background:var(--card);color:var(--ink);font:inherit;font-size:13px;font-weight:500;cursor:pointer;white-space:nowrap}
   .btn:hover{border-color:var(--dds-line-strong,#d2d2db)} .btn:disabled{opacity:.55;cursor:default}
@@ -198,6 +200,10 @@
       <div><label for="f-email">Email</label><input id="f-email" type="email" maxlength="160" autocomplete="email"></div>
       <div><label for="f-phone">Phone</label><input id="f-phone" type="tel" maxlength="40" placeholder="Optional" autocomplete="tel"></div>
       <div class="full"><label for="f-area">Where you work from</label><input id="f-area" maxlength="160" placeholder="e.g. Burbank, CA"></div>
+      <!-- sales item 88: who signs agreements for the studio; added beside the client's signature, at the same moment -->
+      <div data-needs="configure" data-signer><label for="f-signer">Who signs your agreements</label><input id="f-signer" maxlength="120" placeholder="Your name" autocomplete="name"></div>
+      <div data-needs="configure" data-signer><label for="f-signer-title">Their title <span class="muted">(optional)</span></label><input id="f-signer-title" maxlength="80" placeholder="e.g. Owner"></div>
+      <div class="full how" data-needs="configure" data-signer id="signerHow">Added beside the client’s signature, with the same date and time, the moment they sign. Left blank, it’s your account’s name.</div>
       <!-- builder list item 59: what clients see of this studio (GET /brand/studio). The logo is the
            site's own, set in Files with Set as logo; this only shows it and says where to change it. -->
       <div class="full" id="studioLook" hidden>
@@ -850,6 +856,8 @@ async function loadProfile() {
   $('f-phone').value = d.phone || '';
   $('f-area').value = d.service_area || '';
   const ind = $('f-industry'); ind.value = (SETTINGS && SETTINGS.industry_key) || 'generic'; if (ind.selectedIndex < 0) ind.value = 'generic';
+  $('f-signer').value = (SETTINGS && SETTINGS.signs_as_name) || ''; $('f-signer-title').value = (SETTINGS && SETTINGS.signs_as_title) || '';   // sales item 88
+  document.querySelectorAll('[data-signer]').forEach((el) => { el.hidden = !!SCOPE; });   // the studio signs, never a client's settings
   $('studio').hidden = false;
   holdUnread();
   return d;
@@ -914,15 +922,23 @@ async function saveProfile() {
   const identity = { business_name: name, email: $('f-email').value.trim(), phone: $('f-phone').value.trim(), service_area: $('f-area').value.trim() };
   const industry = $('f-industry').value || 'generic';
   const writes = [api('/identity', 'PUT', identity)];
+  const setPatch = {};
   // the select is gone for a role without configure, and it can still read differently from an unset row
   const mayConfigure = !(window.ddsLacks && window.ddsLacks('configure'));
-  if (mayConfigure && (!SETTINGS || SETTINGS.industry_key !== industry)) writes.push(api('/settings', 'PUT', { industry_key: industry }));
+  if (mayConfigure && (!SETTINGS || SETTINGS.industry_key !== industry)) setPatch.industry_key = industry;
+  // sales item 88: who signs agreements, studio level only
+  if (mayConfigure && !SCOPE) {
+    const sn = $('f-signer').value.trim(), stt = $('f-signer-title').value.trim();
+    if ((SETTINGS && SETTINGS.signs_as_name || '') !== sn) setPatch.signs_as_name = sn;
+    if ((SETTINGS && SETTINGS.signs_as_title || '') !== stt) setPatch.signs_as_title = stt;
+  }
+  if (Object.keys(setPatch).length) writes.push(api('/settings', 'PUT', setPatch));
   const rs = await Promise.all(writes);
   b.disabled = false;
   const bad = rs.find((r) => !r.ok);
   if (bad) { toast(nice(bad.body, bad.status === 422 ? 'Some fields need a second look.' : 'That didn’t save — nothing was changed.'), true); return; }
   IDENT = (rs[0].body && rs[0].body.data) || { ...(IDENT || {}), ...identity };
-  if (rs[1]) SETTINGS = { ...(SETTINGS || {}), industry_key: (rs[1].body && rs[1].body.data && rs[1].body.data.industry_key) || industry };   // C3: only the field it wrote
+  if (rs[1]) { const got = (rs[1].body && rs[1].body.data) || {}; SETTINGS = { ...(SETTINGS || {}) }; for (const k of Object.keys(setPatch)) SETTINGS[k] = k in got ? got[k] : setPatch[k]; }   // C3: only the fields it wrote
   toast('Saved.');
   renderSubline();
 }

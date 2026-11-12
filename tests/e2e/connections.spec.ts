@@ -144,15 +144,17 @@ test.describe('Connections — the refreshed page says what is connected, and wh
     await expect(page.locator('#cask')).toHaveText('Ask');
   });
 
-  test('no serious/critical axe violations (desktop)', async ({ page }, testInfo) => {
+  // builder list item 150: light and dark both
+  for (const scheme of ['light', 'dark'] as const) test(`no serious/critical axe violations (desktop, ${scheme})`, async ({ page }, testInfo) => {
     test.skip(testInfo.project.name !== 'desktop-chromium', 'axe once, on desktop');
+    await page.emulateMedia({ colorScheme: scheme });
     await installApp(page, { api: { '/connections': MIXED() } });
     await page.goto('/connections.html');
     await page.waitForLoadState('networkidle');
     await expect(page.locator('#svc-google_analytics')).toBeVisible();
     const results = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa']).analyze();
     const serious = results.violations.filter((v) => v.impact === 'critical' || v.impact === 'serious');
-    expect(serious.map((v) => `${v.id} (${v.nodes.length})`)).toEqual([]);
+    expect(serious.map((v) => `${v.id} (${v.nodes.length}): ${v.nodes.map((n) => n.target.join(' ')).join(' | ')}`)).toEqual([]);
   });
 });
 
