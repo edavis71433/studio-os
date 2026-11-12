@@ -200,10 +200,12 @@ const quiet = async (fn) => { const e = console.error, w = console.warn; console
   const c = await ctxOf(principalOf('jwt-dana', { member: { site_id: MAPLE, role: 'business_staff' } }), maple);
   ok('context: the businesses, with the role in words and the current one marked', c.businesses.length === 3 && c.businesses.map((b) => b.role_words).join(',') === 'Staff,Co-owner,Reviewer' && c.businesses[0].current === true && c.businesses.filter((b) => b.current).length === 1);
   ok('context: …and which business this is', c.business && c.business.site_id === MAPLE && c.business.name === 'Maple & Main Realty' && c.business.role_words === 'Staff');
+  ok('context: the first is the one the server opens when nothing is picked (the oldest seat here), so it needs no ?client=', c.businesses.map((b) => b.default).join(',') === 'true,false,false');
   ok('context: a held business is never a studio scope', c.scope === null);
   const juniper = DB.presence_sites.find((s) => s.id === JUNIPER);
   const m = await ctxOf(principalOf('jwt-mia'), juniper);
   ok('context: the owner reads "Owner" on what they own', m.business?.role_words === 'Owner' && m.businesses.find((b) => b.site_id === MAPLE)?.role_words === 'Staff');
+  ok('context: …and what they own is the default, ahead of their seats', m.businesses[0].site_id === JUNIPER && m.businesses[0].default === true);
   const solo = await ctxOf(principalOf('jwt-solo'), maple);
   ok('context: someone with one business gets an empty list and no business line', Array.isArray(solo.businesses) && solo.businesses.length === 0 && solo.business === null);
   const studio = await ctxOf(principalOf('jwt-studio', { scope: { site_id: CLIENT_OF_STUDIO, name: 'Client' } }), DB.presence_sites.find((s) => s.id === CLIENT_OF_STUDIO), 'Client');

@@ -168,14 +168,39 @@ if (!sb) err("Connection problem — check your internet and refresh this page."
 function withTimeout(p, ms){ return Promise.race([p, new Promise(function(_,rej){ setTimeout(function(){ rej(new Error('timeout')); }, ms); })]); }
 function panel(msg){ if (msg) $('nwMsg').textContent = msg; show('noWorkspace'); }
 
+// Builder item 83: someone with places in two businesses comes back to one. A link may
+// name it (?client=<site id>, from Switch business); else the last one they used on this
+// device, if it was theirs (dds-last-business, written by the shell). The context is
+// asked for it first; if it isn't one of theirs any more, the usual landing stands.
+function pickedBusiness(token){
+  var UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  try { var q = new URLSearchParams(location.search).get('client') || ''; if (UUID.test(q)) return q; } catch (e) {}
+  try {
+    var sub = JSON.parse(atob(String(token).split('.')[1].replace(/-/g, '+').replace(/_/g, '/'))).sub;
+    var last = JSON.parse(localStorage.getItem('dds-last-business') || 'null');
+    if (last && last.uid && last.uid === sub && UUID.test(String(last.site_id || ''))) return String(last.site_id);
+  } catch (e) {}
+  return '';
+}
+// the landing for the business in hand: the one the server opens unasked needs no ?client=
+function landingFor(d, picked){
+  var land = d.landing;
+  var held = picked && d.business && d.business.site_id === picked && !d.business['default'];
+  var studio = picked && d.scope && d.scope.site_id === picked;
+  if (!held && !studio) return land;
+  return land + (land.indexOf('?') >= 0 ? '&' : '?') + 'client=' + encodeURIComponent(picked);
+}
 async function route(token){
   show('routing');
   var networkTrouble = false;
   // 1) the unified workspace — /portal/context knows role, tier, and landing
   try {
-    var r = await withTimeout(fetch(FN + "/presence/portal/context", {
-      headers: { "Content-Type":"application/json", "Authorization":"Bearer " + SUPABASE_KEY, "x-dds-user-jwt": token }
-    }), 9000);
+    var picked = pickedBusiness(token);
+    var ask = function(scope){ return withTimeout(fetch(FN + "/presence/portal/context", {
+      headers: { "Content-Type":"application/json", "Authorization":"Bearer " + SUPABASE_KEY, "x-dds-user-jwt": token, "x-dds-scope-site": scope }
+    }), 9000); };
+    var r = await ask(picked);
+    if (picked && !r.ok) { picked = ''; r = await ask(''); }   // not one of theirs (any more): the usual landing
     var j = await r.json().catch(function(){ return {}; });
     if (r.ok && j && j.data && j.data.landing) {
       var d = j.data;
@@ -190,7 +215,7 @@ async function route(token){
       if (d.landing === '/client.html' && operatorCapable) {
         location.href = d.is_agency ? '/agency.html' : '/today.html'; return;
       }
-      location.href = d.landing; return;
+      location.href = landingFor(d, picked); return;
     }
     // Honest states — a paused/lapsed account gets the server's own words, not a wrong door.
     if (r.status === 403 && j && j.message) { panel(j.message); return; }

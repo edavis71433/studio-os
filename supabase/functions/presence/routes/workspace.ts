@@ -277,7 +277,8 @@ export async function handlePortalContext(jwt: string, site: SiteRow, principal:
   // its own site, which is the site in hand when nothing is scoped). A failed read hides nothing.
   const hiddenSections = (isAgency && !scopedName) ? normalizeHidden(await readReservedJson(site.id, RESERVED_NAMES.navHidden)) : [];
   const navCtx = { role, edition: site.edition, capabilities: caps, isAgency, isOperator, editionKey, isManagedClient, scoped: !!scopedName, siteLive, hiddenSections };
-  const businesses = (await businessesP).map((b) => ({ site_id: b.site_id, name: b.name, role: b.role, role_words: b.owned ? 'Owner' : (SEAT_ROLE_WORDS[b.role] || b.role), current: b.site_id === site.id }));
+  // `default`: the one the server opens when nothing is picked (owned first, else the oldest seat), so a page can open it with no ?client=
+  const businesses = (await businessesP).map((b, i) => ({ site_id: b.site_id, name: b.name, role: b.role, role_words: b.owned ? 'Owner' : (SEAT_ROLE_WORDS[b.role] || b.role), current: b.site_id === site.id, default: i === 0 }));
   return json({ data: {
     site_role: role,
     capabilities: caps,

@@ -930,6 +930,10 @@
   // quiet: the studio-level and client-level pages look identical otherwise.
   function mountContextBar(scope) {
     var old = document.getElementById('dds-ctxbar'); if (old) old.remove();
+    closeBizSwitch(false);
+    // builder item 83: someone with a place in two or more businesses sees which one this is, and can switch
+    var biz = !(scope && scope.name) ? businessInHand() : null;
+    if (biz) { mountBusinessBar(biz); return; }
     if (!scope || !scope.name || !CTX || !CTX.is_agency) { document.documentElement.classList.remove('dds-has-ctxbar'); return; }
     // Oct 2026 nav cut: the card carries WHO (initials + name) and the way out.
     // Their record, Today and website are the client's own menu items now
@@ -952,6 +956,111 @@
     root.appendChild(bar);
     document.documentElement.classList.add('dds-has-ctxbar');
   }
+
+  // ── builder item 83 (Nov 2026): one person, two businesses ─────────────────────
+  // /portal/context lists `businesses` only for someone invited somewhere with two or
+  // more, each with their role in words, the one in hand marked `current` and the one
+  // the server opens unasked marked `default`. The bar says which business this is
+  // ("You’re Staff"); Switch business lists them. A pick opens that business's own
+  // first page: the default one with no ?client=, any other with ?client=<its id>,
+  // which every page already sends, and which the server reads as one of the person's
+  // own businesses, never as a studio inside a client. A business seen through the
+  // client portal opens at the client door. The last one used is remembered, so the
+  // sign-in doors open it next time.
+  var HELD_KEY = 'dds-held-businesses', LAST_KEY = 'dds-last-business';
+  function businessInHand() {
+    if (!CTX || (CTX.scope && CTX.scope.site_id) || !CTX.business) return null;
+    return Array.isArray(CTX.businesses) && CTX.businesses.length > 1 ? CTX.business : null;
+  }
+  function rememberBusinesses() {
+    try {
+      var list = CTX && Array.isArray(CTX.businesses) ? CTX.businesses : [];
+      if (list.length > 1) localStorage.setItem(HELD_KEY, JSON.stringify(list.map(function (b) { return b.site_id; })));
+      else localStorage.removeItem(HELD_KEY);
+      if (list.length > 1 && CTX.business && ctxUid) localStorage.setItem(LAST_KEY, JSON.stringify({ uid: ctxUid, site_id: CTX.business.site_id }));
+    } catch (_) { /* storage may be denied: the bar still works, nothing is remembered */ }
+  }
+  // the URL scope is one of this person's own businesses (known before the context lands, from the last visit)
+  function heldBusinessId(id) {
+    if (!id) return false;
+    if (CTX && Array.isArray(CTX.businesses) && CTX.businesses.some(function (b) { return b.site_id === id; })) return true;
+    try { var held = JSON.parse(localStorage.getItem(HELD_KEY) || '[]'); return Array.isArray(held) && held.indexOf(id) >= 0; } catch (_) { return false; }
+  }
+  function bizInitials(name) { return String(name || '?').split(/\s+/).filter(Boolean).slice(0, 2).map(function (w) { return w.charAt(0).toUpperCase(); }).join('') || 'B'; }
+  function bizRoleLine(b) {
+    if (b.role === 'client_reviewer') return 'You review its work · opens the client view';
+    return b.role_words === 'Owner' ? 'You own it' : 'You’re ' + b.role_words;
+  }
+  function mountBusinessBar(b) {
+    var bar = el('<div id="dds-ctxbar" class="biz" role="region" aria-label="Your business">' +
+      '<span class="lbl">' + esc(b.role_words === 'Owner' ? 'You own it' : 'You’re ' + b.role_words) + '</span>' +
+      '<span class="who"><span class="av" aria-hidden="true">' + esc(bizInitials(b.name)) + '</span><strong>' + esc(b.name) + '</strong></span>' +
+      '<span class="acts"><button type="button" class="switch" id="dds-biz-switch" aria-haspopup="dialog" aria-expanded="false" aria-controls="dds-biz-pop">Switch business</button></span></div>');
+    bar.querySelector('#dds-biz-switch').addEventListener('click', function (e) { e.stopPropagation(); toggleBizSwitch(); });
+    root.appendChild(bar);
+    document.documentElement.classList.add('dds-has-ctxbar');
+  }
+  function bizPop() { return document.getElementById('dds-biz-pop'); }
+  function closeBizSwitch(refocus) {
+    var pop = bizPop(); if (pop) pop.remove();
+    var b = document.getElementById('dds-biz-switch'); if (b) { b.setAttribute('aria-expanded', 'false'); if (refocus) b.focus(); }
+  }
+  function toggleBizSwitch() {
+    if (bizPop()) { closeBizSwitch(true); return; }
+    var btn = document.getElementById('dds-biz-switch'); if (!btn || !CTX) return;
+    [].forEach.call(document.querySelectorAll('.dds-pop.open'), function (o) { o.classList.remove('open'); });
+    var list = CTX.businesses || [];
+    var pop = el('<div class="dds-pop dds-sites-pop open" id="dds-biz-pop" role="dialog" aria-label="Your businesses">' +
+      '<div class="n" style="font-weight:600;padding:4px 6px 8px">Your businesses</div>' +
+      (list.length > 6 ? '<input type="search" class="q" id="dds-biz-q" placeholder="Find a business…" aria-label="Find a business" autocomplete="off">' : '') +
+      '<div class="list" id="dds-biz-list" role="list"></div>' +
+      '<div class="sub" style="font-size:12px;color:var(--dds-faint);padding:8px 6px 2px">Each business keeps its own pages, people and settings. Next time you sign in, you come back to the last one you used.</div></div>');
+    document.body.appendChild(pop);
+    btn.setAttribute('aria-expanded', 'true');
+    paintBizRows(pop, '');
+    placeSiteSwitch(btn, pop);
+    var q = pop.querySelector('#dds-biz-q');
+    var firstRow = pop.querySelector('.list a.row');
+    (q || firstRow || btn).focus();
+    pop.addEventListener('click', function (e) { e.stopPropagation(); });
+    pop.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape') { e.stopPropagation(); closeBizSwitch(true); return; }
+      var rows = [].slice.call(pop.querySelectorAll('.list a.row'));
+      var i = rows.indexOf(document.activeElement);
+      if (e.key === 'ArrowDown') { e.preventDefault(); (rows[i + 1] || rows[0] || q).focus(); }
+      if (e.key === 'ArrowUp') { e.preventDefault(); (i > 0 ? rows[i - 1] : (q || rows[rows.length - 1])).focus(); }
+    });
+    if (q) q.addEventListener('input', function () { paintBizRows(pop, q.value); });
+  }
+  function paintBizRows(pop, query) {
+    var box = pop.querySelector('#dds-biz-list'); if (!box) return;
+    var q = String(query || '').trim().toLowerCase();
+    var rows = (CTX.businesses || []).filter(function (b) { return !q || String(b.name || '').toLowerCase().indexOf(q) >= 0; });
+    if (!rows.length) { box.innerHTML = '<div class="muted">No business matches that.</div>'; return; }
+    box.innerHTML = rows.map(function (b) {
+      return '<a class="row site' + (b.current ? ' now' : '') + '" role="listitem" href="#" data-biz="' + esc(b.site_id) + '" data-noscope="1"' + (b.current ? ' aria-current="true"' : '') + '>' +
+        '<span class="av" aria-hidden="true">' + esc(bizInitials(b.name)) + '</span><span class="tx"><span class="n">' + esc(b.name) + '</span><span class="sub">' + esc(bizRoleLine(b)) + (b.current ? ' · here now' : '') + '</span></span></a>';
+    }).join('');
+    [].forEach.call(box.querySelectorAll('[data-biz]'), function (a) { a.addEventListener('click', function (e) { e.preventDefault(); openBusiness(a.getAttribute('data-biz')); }); });
+  }
+  // a business's own first page, as the server says for that business (a studio's client lands in the portal)
+  function openBusiness(id) {
+    var b = (CTX && CTX.businesses || []).filter(function (x) { return x.site_id === id; })[0];
+    if (!b) return;
+    if (b.current) { closeBizSwitch(true); return; }
+    try { if (ctxUid) localStorage.setItem(LAST_KEY, JSON.stringify({ uid: ctxUid, site_id: id })); } catch (_) { /* */ }
+    var withId = function (path) { return b['default'] ? path : path + (path.indexOf('?') >= 0 ? '&' : '?') + 'client=' + encodeURIComponent(id); };
+    if (b.role === 'client_reviewer') { location.href = withId('/portal.html'); return; }
+    fetch(FN + '/portal/context', { headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + SUPABASE_KEY, 'x-dds-user-jwt': TOKEN, 'x-dds-scope-site': b['default'] ? '' : id } })
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (j) {
+        var land = j && j.data && j.data.landing;
+        if (!land || !SAFE_HREF.test(land)) { if (window.ddsToast) window.ddsToast('That business wouldn’t open just now. Try again in a moment.', 'err'); return; }
+        location.href = land === '/client.html' ? withId('/portal.html') : withId(land);
+      })['catch'](function () { if (window.ddsToast) window.ddsToast('That business wouldn’t open just now. Try again in a moment.', 'err'); });
+  }
+  document.addEventListener('click', function () { if (bizPop()) closeBizSwitch(false); });
+  window.addEventListener('resize', function () { var b = document.getElementById('dds-biz-switch'), p = bizPop(); if (b && p) placeSiteSwitch(b, p); });
 
   // ── item 44 (Nov 9 2026): the site switcher. "Switch site" on the client card
   // opens a small panel with a search box and every site the studio looks after
@@ -2257,6 +2366,7 @@
   window.ddsScopeInfo = function () {
     var s = CTX && CTX.scope, id = scopeId();
     if (s && s.site_id) return { id: s.site_id, name: s.name || '' };
+    if (heldBusinessId(id)) return null;   // builder item 83: one of the person's own businesses, not a studio inside a client
     return id ? { id: id, name: '' } : null;
   };
   window.ddsStudioLevel = function (host, opts) {
@@ -2427,6 +2537,7 @@
   function useContext(data, uid, keptAt) {
     CTX = data; ctxUid = uid; ctxKeptAt = keptAt || Date.now(); markRoleLimits(CTX); render();
     try { paintStudioRequests(); } catch (_) { /* a request banner must never break the shell */ }
+    rememberBusinesses();   // builder item 83
     // B4: a fresh read IS the endpoint's read, so the 60s throttle window starts
     // here; a kept copy starts it when it was read
     if (keptAt) lastAttentionAt = keptAt; else markAttentionFresh();
@@ -2454,6 +2565,7 @@
         if (pageSetBell) { next.attention_count = CTX.attention_count; next.attention_stale = CTX.attention_stale; }   // Home's own number stands
         CTX = next; markRoleLimits(CTX); render();
         try { paintStudioRequests(); } catch (_) { /* */ }
+        rememberBusinesses();   // builder item 83
         try { window.__ddsContext = CTX; document.dispatchEvent(new CustomEvent('dds:context', { detail: CTX })); } catch (_) { /* */ }
       } else if (!pageSetBell) {
         CTX.attention_stale = next.attention_stale;
