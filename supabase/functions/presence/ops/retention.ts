@@ -60,6 +60,13 @@ export async function runRetentionSweep(now: Date = new Date()): Promise<Record<
   // A lead that hasn't turned into a conversation in a year has no basis left.
   await prune('audit_leads', `audit_leads?created_at=lt.${daysAgo(365)}`);
 
+  // Builder item 191: a fresh code is good for ten minutes; a day on, it goes. Before
+  // migration 0197 there is no table (404): that is a skip, not a failure.
+  try {
+    const r = await svc(`presence_fresh_codes?expires_at=lt.${daysAgo(1)}`, { method: 'DELETE', headers: { Prefer: 'return=minimal' } });
+    if (r.status === 404) out.skipped_fresh_codes = true; else out.fresh_codes = r.ok;
+  } catch { out.fresh_codes = false; }
+
   // Health by day (0170): a pre-0170 environment 404s → recorded false, never throws.
   await prune('health_days', `presence_health_days?day=lt.${daysAgo(HEALTH_DAYS).slice(0, 10)}`);
 

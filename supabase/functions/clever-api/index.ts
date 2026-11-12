@@ -7,7 +7,7 @@ import { json } from '../_shared/http.ts';
 import { checkDiscoverability, socialProfiles } from '../_shared/site_discovery.ts';
 import {
   verifyStaff, verifyAdminJwt, staffRevocation, atLeast, jwtIatMs,
-  resolvePrincipal, ROLE_RANK, TENANT_ID, type Principal,
+  resolvePrincipal, ROLE_RANK, TENANT_ID, type Principal, secondStepMissing,
 } from '../_shared/auth.ts';
 
 const RESEND_KEY = Deno.env.get('RESEND_KEY') || '';
@@ -4920,6 +4920,7 @@ serveWithRequestCors(async (req) => {
       });
       if (!uRes.ok) return json({ error: 'unauthorized' }, 401, reqCors);
       const user = await uRes.json();
+      if (secondStepMissing(user, jwt)) return json({ error: 'unauthorized' }, 401, reqCors);   // builder item 191: the app's code is part of signing in
       const email = (user && user.email ? String(user.email) : '').toLowerCase();
       const uid = user && user.id ? String(user.id) : '';
       if (!email && !uid) return json({ error: 'unauthorized' }, 401, reqCors);
@@ -5126,6 +5127,7 @@ serveWithRequestCors(async (req) => {
       const uRes = await fetch(`${SB_URL}/auth/v1/user`, { headers: { apikey: SB_SERVICE, Authorization: `Bearer ${jwt}` } });
       if (!uRes.ok) return json({ error: 'unauthorized' }, 401, reqCors);
       const user = await uRes.json();
+      if (secondStepMissing(user, jwt)) return json({ error: 'unauthorized' }, 401, reqCors);   // builder item 191: the app's code is part of signing in
       const uid = user?.id ? String(user.id) : '';
       const email = (user?.email ? String(user.email) : '').toLowerCase();
       if (!uid && !email) return json({ error: 'unauthorized' }, 401, reqCors);
@@ -5237,6 +5239,7 @@ serveWithRequestCors(async (req) => {
       const uRes = await fetch(`${SB_URL}/auth/v1/user`, { headers: { apikey: SB_SERVICE, Authorization: `Bearer ${jwt}` } });
       if (!uRes.ok) return json({ error: 'unauthorized' }, 401, reqCors);
       const user = await uRes.json();
+      if (secondStepMissing(user, jwt)) return json({ error: 'unauthorized' }, 401, reqCors);   // builder item 191: the app's code is part of signing in
       const uid = user?.id ? String(user.id) : '';
       const email = (user?.email ? String(user.email) : '').toLowerCase();
       if (!uid && !email) return json({ error: 'unauthorized' }, 401, reqCors);
@@ -5273,6 +5276,7 @@ serveWithRequestCors(async (req) => {
       const uRes = await fetch(`${SB_URL}/auth/v1/user`, { headers: { apikey: SB_SERVICE, Authorization: `Bearer ${jwt}` } });
       if (!uRes.ok) return json({ error: 'unauthorized' }, 401, reqCors);
       const user = await uRes.json();
+      if (secondStepMissing(user, jwt)) return json({ error: 'unauthorized' }, 401, reqCors);   // builder item 191: the app's code is part of signing in
       const uid = user?.id ? String(user.id) : '';
       const email = (user?.email ? String(user.email) : '').toLowerCase();
       if (!uid && !email) return json({ error: 'unauthorized' }, 401, reqCors);
@@ -5315,6 +5319,7 @@ serveWithRequestCors(async (req) => {
       const uRes = await fetch(`${SB_URL}/auth/v1/user`, { headers: { apikey: SB_SERVICE, Authorization: `Bearer ${jwt}` } });
       if (!uRes.ok) return json({ error: 'unauthorized' }, 401, reqCors);
       const user = await uRes.json();
+      if (secondStepMissing(user, jwt)) return json({ error: 'unauthorized' }, 401, reqCors);   // builder item 191: the app's code is part of signing in
       const uid = user?.id ? String(user.id) : '';
       const email = (user?.email ? String(user.email) : '').toLowerCase();
       if (!uid && !email) return json({ error: 'unauthorized' }, 401, reqCors);
@@ -5351,6 +5356,7 @@ serveWithRequestCors(async (req) => {
       const uRes = await fetch(`${SB_URL}/auth/v1/user`, { headers: { apikey: SB_SERVICE, Authorization: `Bearer ${jwt}` } });
       if (!uRes.ok) return json({ error: 'unauthorized' }, 401, reqCors);
       const user = await uRes.json();
+      if (secondStepMissing(user, jwt)) return json({ error: 'unauthorized' }, 401, reqCors);   // builder item 191: the app's code is part of signing in
       const uid = user?.id ? String(user.id) : '';
       const email = (user?.email ? String(user.email) : '').toLowerCase();
       if (!uid && !email) return json({ error: 'unauthorized' }, 401, reqCors);
@@ -5413,6 +5419,7 @@ serveWithRequestCors(async (req) => {
       const uRes = await fetch(`${SB_URL}/auth/v1/user`, { headers: { apikey: SB_SERVICE, Authorization: `Bearer ${jwt}` } });
       if (!uRes.ok) return json({ error: 'unauthorized' }, 401, reqCors);
       const user = await uRes.json();
+      if (secondStepMissing(user, jwt)) return json({ error: 'unauthorized' }, 401, reqCors);   // builder item 191: the app's code is part of signing in
       const uid = user?.id ? String(user.id) : '';
       const email = (user?.email ? String(user.email) : '').toLowerCase();
       if (!uid && !email) return json({ error: 'unauthorized' }, 401, reqCors);
@@ -11153,6 +11160,7 @@ if (type === 'gp_workspace') {
   const uRes = await fetch(`${SB_URL}/auth/v1/user`, { headers: { apikey: SB_SERVICE, Authorization: `Bearer ${jwt}` } });
   if (!uRes.ok) return json({ error: 'unauthorized' }, 401, reqCors);
   const user = await uRes.json();
+  if (secondStepMissing(user, jwt)) return json({ error: 'unauthorized' }, 401, reqCors);   // builder item 191: the app's code is part of signing in
   const uid = user?.id ? String(user.id) : '';
   const email = (user?.email ? String(user.email) : '').toLowerCase();
   if (!uid && !email) return json({ error: 'unauthorized' }, 401, reqCors);
@@ -11275,6 +11283,7 @@ if (type === 'gp_submit_request') {
   const uRes = await fetch(`${SB_URL}/auth/v1/user`, { headers: { apikey: SB_SERVICE, Authorization: `Bearer ${jwt}` } });
   if (!uRes.ok) return json({ error: 'unauthorized' }, 401, reqCors);
   const user = await uRes.json();
+  if (secondStepMissing(user, jwt)) return json({ error: 'unauthorized' }, 401, reqCors);   // builder item 191: the app's code is part of signing in
   const uid = user?.id ? String(user.id) : '';
   const email = (user?.email ? String(user.email) : '').toLowerCase();
 
@@ -11313,6 +11322,7 @@ if (type === 'gp_rec_respond') {
   const uRes = await fetch(`${SB_URL}/auth/v1/user`, { headers: { apikey: SB_SERVICE, Authorization: `Bearer ${jwt}` } });
   if (!uRes.ok) return json({ error: 'unauthorized' }, 401, reqCors);
   const user = await uRes.json();
+  if (secondStepMissing(user, jwt)) return json({ error: 'unauthorized' }, 401, reqCors);   // builder item 191: the app's code is part of signing in
   const uid = user?.id ? String(user.id) : '';
   const email = (user?.email ? String(user.email) : '').toLowerCase();
 
@@ -11355,6 +11365,7 @@ async function gpResolveCaller(req: Request): Promise<{ contactId: string; partn
   const uRes = await fetch(`${SB_URL}/auth/v1/user`, { headers: { apikey: SB_SERVICE, Authorization: `Bearer ${jwt}` } });
   if (!uRes.ok) return null;
   const user = await uRes.json();
+  if (secondStepMissing(user, jwt)) return null;   // builder item 191: the app's code is part of signing in
   const uid = user?.id ? String(user.id) : '';
   const email = (user?.email ? String(user.email) : '').toLowerCase();
   if (!uid && !email) return null;

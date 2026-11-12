@@ -46,6 +46,7 @@ import { isServiceRetainerMeta, applyRetainerSync } from '../commerce/retainers.
 import { checkAiCeiling } from '../commerce/metering.ts';
 import { UUID_RE } from '../lib/uuid.ts';
 import { emailMatch } from '../lib/contact_email.ts';
+import { requireFresh } from '../lib/fresh_code.ts';   // builder item 191
 
 const TRIAL_DAYS = 14;
 
@@ -703,6 +704,10 @@ export async function handleCommerce(req: Request, route: string, method: string
     const jwt = req.headers.get('x-dds-user-jwt') || '';
     const site = jwt ? await resolveSite(jwt) : null;
     if (!site || !site.client_id) return json({ error: 'unauthorized', message: 'Please sign in.' }, 401, cors);
+    // builder item 191: closing the account asks for a fresh code first (their app's, or one we email them)
+    let cb: { fresh_code?: unknown } = {}; try { cb = await req.json(); } catch { /* none sent */ }
+    const fresh = await requireFresh(principal, cb, 'close_account', await businessNameFor(site.client_id).catch(() => ''), cors);
+    if (fresh instanceof Response) return fresh;
     const days = coolingOffDays();
     const reqd = await requestDeletion(site.client_id, site.id, 'customer');
     // ── THE WRITE HAS TO HAVE HAPPENED ──────────────────────────────────────

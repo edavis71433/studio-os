@@ -44,6 +44,15 @@ const USERS = {
   'jwt-stranger': { id: uuid('8'), email: 'someone@else.example' },
   'jwt-busy': { id: uuid('9'), email: 'busy@owns.example' },
 };
+// builder item 191: the risky ones ask for a fresh code. Here everyone has an authenticator app,
+// and the requests below carry its code unless a test leaves it off on purpose (bare).
+const { freshDeps } = await import(`${P}/lib/fresh_code.ts`);
+const { alertDeps } = await import(`${P}/lib/security_alerts.ts`);
+const APP_CODE = '135790';
+freshDeps.user = async (jwt) => (USERS[jwt] ? { ...USERS[jwt], factors: [{ id: 'factor-1', factor_type: 'totp', status: 'verified' }] } : null);
+freshDeps.verifyApp = async (_jwt, _factor, code) => code === APP_CODE;
+let alerts = [];
+alertDeps.send = async (to, subject) => { alerts.push({ to, subject }); return true; };
 const principalOf = (jwt, extra = {}) => ({ kind: 'client', userId: USERS[jwt].id, tenantId: null, role: 'client', email: USERS[jwt].email, jwt, requestId: 'test', ...extra });
 const owner = () => principalOf('jwt-owner');
 const studio = () => principalOf('jwt-studio', { scope: { site_id: SITE, name: 'Maple & Main Realty' } });
@@ -80,7 +89,7 @@ function reset() {
     presence_service_links: [],
     presence_change_events: [],
   };
-  emails = []; minted = []; transfersMissing = false;
+  emails = []; minted = []; transfersMissing = false; alerts = [];
 }
 const splitTop = (s) => { const out = []; let depth = 0, q = false, cur = ''; for (let i = 0; i < s.length; i++) { const c = s[i]; if (c === '"' && s[i - 1] !== '\\') q = !q; if (!q && c === '(') depth++; if (!q && c === ')') depth--; if (!q && depth === 0 && c === ',') { out.push(cur); cur = ''; } else cur += c; } if (cur) out.push(cur); return out; };
 const unq = (v) => (v.startsWith('"') && v.endsWith('"') ? v.slice(1, -1).replace(/\\"/g, '"').replace(/\\\\/g, '\\') : v);
@@ -152,7 +161,8 @@ globalThis.fetch = async (url, init = {}) => {
   return reply({}, 405);
 };
 const quiet = async (fn) => { const e = console.error, w = console.warn; console.error = () => {}; console.warn = () => {}; try { return await fn(); } finally { console.error = e; console.warn = w; } };
-const req = (method, body) => new Request('http://stub.local/functions/v1/presence/x', { method, body: body === undefined ? undefined : JSON.stringify(body), headers: { 'Content-Type': 'application/json' } });
+const bare = (method, body) => new Request('http://stub.local/functions/v1/presence/x', { method, body: body === undefined ? undefined : JSON.stringify(body), headers: { 'Content-Type': 'application/json' } });
+const req = (method, body) => (method === 'POST' ? bare(method, { fresh_code: APP_CODE, ...(body || {}) }) : bare(method, body));
 const answer = async (res) => ({ status: res.status, body: await res.json().catch(() => null) });
 const cors = {};
 const seat = (email) => DB.presence_site_members.find((m) => m.email === email);
@@ -376,6 +386,42 @@ const clientRow = () => DB.clients.find((c) => c.id === CLIENT);
   ok('card: a site with no owner yet has none, and says so', by.s2.owner === null && by.s2.no_owner === true);
   ok('card: a contact holding the business name shows the email instead', by.s3.owner.name === 'lena@bluebird.example');
   ok('card: a waiting transfer rides on its site only', by.s3.transfer?.to_email === 'ana@bluebird.example' && by.s1.transfer === null && by.s2.transfer === null);
+}
+
+// ═══ 9. builder item 191: a fresh code first, and the owner told ═══
+{
+  reset();
+  const noCode = await answer(await quiet(async () => handleMemberAdd(bare('POST', { email: 'alex@maple.example', role: 'business_owner' }), 'jwt-studio', SITE_ROW, studio(), cors)));
+  ok('191: inviting a co-owner with no code asks for the app’s, and adds nobody', noCode.status === 403 && noCode.body.error === 'fresh_code_needed' && noCode.body.way === 'app' && !seat('alex@maple.example') && alerts.length === 0);
+  const wrong = await answer(await quiet(async () => handleMemberAdd(bare('POST', { email: 'alex@maple.example', role: 'business_owner', fresh_code: '000000' }), 'jwt-studio', SITE_ROW, studio(), cors)));
+  ok('191: …a wrong code adds nobody', wrong.status === 403 && wrong.body.error === 'fresh_code_wrong' && !seat('alex@maple.example'));
+  const staffSeat = await answer(await quiet(async () => handleMemberAdd(bare('POST', { email: 'kim@maple.example', role: 'business_staff' }), 'jwt-owner', SITE_ROW, owner(), cors)));
+  ok('191: inviting Staff needs no code', staffSeat.status === 200 && seat('kim@maple.example')?.role === 'business_staff');
+  const made = await answer(await quiet(async () => handleMemberAdd(req('POST', { email: 'alex@maple.example', role: 'business_owner' }), 'jwt-studio', SITE_ROW, studio(), cors)));
+  ok('191: with the code, the co-owner is added, and the owner is told who, by whom', made.status === 200 && seat('alex@maple.example')?.role === 'business_owner' && alerts.length === 1 && alerts[0].to === 'sam@maple.example' && alerts[0].subject === 'alex@maple.example is now a co-owner of Maple & Main Realty', JSON.stringify(alerts));
+  const promote = await answer(await quiet(async () => handleMemberRole(bare('POST', { role: 'business_owner' }), 'jwt-owner', SITE_ROW, uuid('2'), owner(), cors)));
+  ok('191: making Staff a co-owner asks for a code too, and changes nothing without it', promote.status === 403 && promote.body.error === 'fresh_code_needed' && seat('dana@maple.example').role === 'business_staff');
+  const promoted = await answer(await quiet(async () => handleMemberRole(req('POST', { role: 'business_owner' }), 'jwt-owner', SITE_ROW, uuid('2'), owner(), cors)));
+  ok('191: …with it, the role changes and the owner is told', promoted.status === 200 && seat('dana@maple.example').role === 'business_owner' && alerts.some((a) => a.subject === 'dana@maple.example is now a co-owner of Maple & Main Realty'));
+}
+{
+  reset();
+  const noCode = await answer(await quiet(async () => handleTransferStart(bare('POST', { email: 'ana@maple.example' }), 'jwt-owner', SITE_ROW, owner(), cors)));
+  ok('191: starting a handover with no code: asked for one, nothing started, nobody emailed', noCode.status === 403 && noCode.body.error === 'fresh_code_needed' && open().length === 0 && emails.length === 0);
+  const start = await answer(await quiet(async () => handleTransferStart(req('POST', { email: 'ana@maple.example' }), 'jwt-owner', SITE_ROW, owner(), cors)));
+  ok('191: with it, it starts, and the owner who started it gets the alert, in case it wasn’t them', start.status === 201 && open().length === 1 && alerts.length === 1 && alerts[0].to === 'sam@maple.example' && alerts[0].subject === 'Maple & Main Realty is being handed to ana@maple.example');
+}
+{
+  reset();
+  await quiet(async () => handleTransferStart(req('POST', { email: 'ana@maple.example' }), 'jwt-studio', SITE_ROW, studio(), cors));
+  const t = open()[0];
+  ok('191: when the studio starts it, the owner’s email asking them to agree is the news (no second alert)', t?.status === 'asked_owner' && alerts.length === 0 && emails.some((e) => e.to === 'sam@maple.example'));
+  const noCode = await answer(await quiet(async () => handleTransferAnswer(bare('POST'), t.id, 'agree', owner(), cors)));
+  ok('191: the owner agreeing asks for a code first, and nothing moves without it', noCode.status === 403 && noCode.body.error === 'fresh_code_needed' && t.status === 'asked_owner');
+  const agreed = await answer(await quiet(async () => handleTransferAnswer(req('POST'), t.id, 'agree', owner(), cors)));
+  ok('191: …with it, it moves on to the new owner', agreed.status === 200 && t.status === 'asked_new');
+  const declined = await answer(await quiet(async () => handleTransferAnswer(bare('POST'), t.id, 'decline', principalOf('jwt-new'), cors)));
+  ok('191: saying no needs no code', declined.status === 200 && t.status === 'declined');
 }
 
 // ═══ 8. wiring ═══
