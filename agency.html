@@ -1454,12 +1454,15 @@ const SETUP_TICK='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" str
 function paintSetup(){
   const host=$('setup');if(!host)return;
   const d=SETUP,steps=d&&Array.isArray(d.steps)?d.steps:[];
-  if(!d||!d.shows||!steps.length){host.hidden=true;host.innerHTML='';return;}
+  // item 91 (Menus session): a brand-new studio's greeting points here while it shows; it hears each paint
+  const said=(shows)=>{try{document.dispatchEvent(new CustomEvent('dds:setup',{detail:{shows:shows}}));}catch(_){}};
+  if(!d||!d.shows||!steps.length){host.hidden=true;host.innerHTML='';said(false);return;}
   const done=steps.filter(s=>s.done).length,next=steps.findIndex(s=>!s.done);
   host.innerHTML=`<div class="shead"><h2 id="setupHead">Finish setting up</h2><span class="sprog">${done} of ${steps.length} done</span><span class="sbar" aria-hidden="true"><span style="width:${Math.round(100*done/steps.length)}%"></span></span><button type="button" class="linkbtn shide" id="setupHide" data-needs="configure">Hide</button></div>`
     +`<ol class="ssteps">${steps.map((s,i)=>`<li class="sstep${s.done?' done':''}"><span class="smark" aria-hidden="true">${s.done?SETUP_TICK:i+1}</span><b>${esc(s.title)}</b><span class="swhy">${esc(s.why)}</span>${s.done?'<span class="sdone">Done</span>':`<a class="btn${i===next?'':' ghost'}" href="${esc(s.href)}">${esc(s.act)}</a>`}</li>`).join('')}</ol>`;
   host.hidden=false;
   $('setupHide').addEventListener('click',()=>setSetupHidden(true));
+  said(true);
 }
 async function setSetupHidden(hidden){
   const b=$('setupHide');if(b)b.disabled=true;

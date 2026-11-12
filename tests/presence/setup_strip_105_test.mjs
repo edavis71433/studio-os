@@ -64,6 +64,7 @@ ok('route: a hide that can\'t be read never brings the strip back', r.d.hidden =
 // ═══ 3. Home draws it ═══
 const home = Deno.readTextFileSync(new URL('../../agency.html', import.meta.url));
 ok('agency.html: the strip sits under the greeting, for those who may change settings', /<div id="top"><\/div>\s*<!--[^>]*-->\s*<section id="setup" class="setup"[^>]*data-needs="configure"/.test(home));
+ok('agency.html: each paint says whether the strip shows (dds:setup), for the greeting that points at it', /dispatchEvent\(new CustomEvent\('dds:setup',\{detail:\{shows:shows\}\}\)\)/.test(home) && /said\(true\)/.test(home) && /said\(false\);return;/.test(home));
 ok('agency.html: Hide asks the server, and Undo puts it back', home.includes("apiSend('POST','/sales/setup',{hidden})") && /label:'Undo',onClick:\(\)=>setSetupHidden\(false\)/.test(home));
 
 console.log(`\n════ SALES ITEM 105 (setup strip): ${pass}/${pass + fail} PASSED ════`);
