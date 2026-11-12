@@ -25,7 +25,7 @@ import {
 } from '../lib/commercial.ts';
 import { validateBlocks } from '../lib/site_blocks.ts';
 import { SIGNUP_CONSENT } from '../lib/site_send.ts';
-import { validateFormValues, type FormDefinition } from '../lib/forms.ts';
+import { validateFormValues, formsIn, type FormDefinition } from '../lib/forms.ts';
 import { notSentReason } from '../lib/legal_pages.ts';
 import { enquiryState, customerEmails } from '../lib/enquiry_state.ts';
 import { normEmail, emailMatch, isUniqueViolation } from '../lib/contact_email.ts';
@@ -175,13 +175,14 @@ export async function handleFormSubmit(req: Request, siteId: string, cors: Recor
 
   const formId = String((rawMap as any)?.form_id ?? b?.form_id ?? '').trim();
   if (formId) {
-    // A form can sit on the home page or on any of the owner's own pages.
+    // A form can sit on the home page or on any of the owner's own pages, as a Form section
+    // or as a Form block inside a Blocks section (builder item 57).
     const settings = await svc(`presence_settings?site_id=eq.${siteId}&select=blocks,pages&limit=1`);
     const stored = settings.json?.[0];
     const lists = [stored?.blocks, ...(Array.isArray(stored?.pages) ? stored.pages.map((p: any) => p?.blocks) : [])];
     let def: FormDefinition | undefined;
     for (const list of lists) {
-      def = validateBlocks(list).find((bl: any) => bl.type === 'form' && bl.id === formId) as FormDefinition | undefined;
+      def = formsIn(validateBlocks(list)).find((f) => f.id === formId);
       if (def) break;
     }
     if (!def) {   // unknown form — treat as a plain contact fallback (never leak internals)
@@ -379,7 +380,7 @@ export async function handleFormAnswers(req: Request, site: SiteRow, cors: Recor
   let def: FormDefinition | undefined;
   const paths: string[] = [];
   for (const w of where) {
-    const d = validateBlocks(w.blocks).find((bl: any) => bl.type === 'form' && bl.id === formId) as FormDefinition | undefined;
+    const d = formsIn(validateBlocks(w.blocks)).find((f) => f.id === formId);
     if (!d) continue;
     paths.push(w.path);
     if (!def || (page ? w.path === `/${page}/` : w.path === '/')) def = d;

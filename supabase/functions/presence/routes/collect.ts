@@ -5,7 +5,7 @@
 // returns 204, never blocks the visitor. Reuses the public-insert + rate-limit +
 // salted-hash pattern from the lead form; adds no new infrastructure.
 import { svc } from '../lib/db.ts';
-import { rateAllow, clientIp } from '../lib/ratelimit.ts';
+import { rateAllowBoth, clientIp } from '../lib/ratelimit.ts';
 import { parseUA, refHost, cleanPath, cleanUtms, visitorDayHash, isVisitKind, cleanLabel, cleanMs, cleanLcp } from '../lib/visits.ts';
 
 // exported for routes/visit_source.ts, which rebuilds a visitor's daily hash to find their page views (item 89)
@@ -18,8 +18,8 @@ export async function handleCollect(req: Request, siteId: string, cors: Record<s
   if ((req.headers.get('dnt') || '') === '1') return noContent(cors);         // respect Do-Not-Track server-side too
 
   const ip = clientIp(req);
-  // generous caps for real traffic; a runaway source is still bounded
-  if (!(await rateAllow(`px:ip:${ip}`, 120, 60)) || !(await rateAllow(`px:site:${siteId}`, 1200, 60))) return noContent(cors);
+  // generous caps for real traffic; a runaway source is still bounded (item 209: both in one call)
+  if (!(await rateAllowBoth({ bucket: `px:ip:${ip}`, max: 120 }, { bucket: `px:site:${siteId}`, max: 1200 }, 60))) return noContent(cors);
 
   let b: any = {};
   try { const t = await req.text(); if (t && t.length < 2000) b = JSON.parse(t); } catch { return noContent(cors); }

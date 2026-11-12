@@ -206,6 +206,7 @@ const DECIDED = {
     'POST /projects/:id/deliverables', 'POST /projects/:id/deliverables/upload-url', 'POST /projects/:id/milestones',
     'POST /projects/:id/status', 'POST /projects/:id/surveys', 'POST /projects/:id/tasks',
     'POST /publishes/:id/label', 'POST /publishes/checkpoints', 'POST /publishes/checkpoints/:id/restore',
+    'PUT /publishes/stars',   // builder item 158: starring a version is edit, as naming one is
     'POST /page-locks',   // builder items 48 and 120: a page's password, as editing the page's settings is
     'POST /redirects', 'POST /restore-to-draft', 'POST /review/reports/:id/dismiss', 'POST /review/run',
     'POST /reviews/:id/approve', 'POST /reviews/:id/hide', 'POST /reviews/:id/reply', 'POST /sales/contacts',
@@ -242,6 +243,7 @@ const DECIDED = {
     // builder item 53: a seat's role changes like the invite (the route asks for the invite capability);
     // only the owner, or their studio asking the owner, can start or stop a transfer (the route refuses anyone else)
     'POST /portal/members/:id/role', 'POST /portal/transfer', 'POST /portal/transfer/cancel',
+    'POST /foundations/plans/:id/done',   // builder item 193: studio-only, checked by the route itself
   ],
 };
 const ALL = Object.entries(DECIDED).flatMap(([need, names]) => names.map((name) => ({ name, need })));
@@ -500,12 +502,13 @@ const WRITE_HANDLERS = [
   'handleToolLead', 'handleToolLeadConvert',
   'handleStudioRequests',   // final pass S1: POST /portal/studio-requests/:id/(accept|decline) are open; the route answers the owner only
   'handleMemberRole', 'handleTransferStart', 'handleTransferCancel',   // builder item 53: open on the member list; each route checks the role itself
+  'handleFoundationsPlanDone',   // builder item 193: open on the member list; the route answers the studio only
   'handleSitePassword',   // builder list item 175: POST /site/password needs configure
   'handleSampleInvoice',   // builder list item 175: POST /sales/invoices/test is edit, like Send me a test on an update
   'handlePostPublish', 'handlePostUnpublish',   // builder list item 40: POST /posts/:id/(publish|unpublish) need publish
   'handleScheduleCancel', 'handleScheduleCreate', 'handleSettings', 'handleShareSet', 'handleStockImport',
   'handleSupport', 'handleSupportMessage', 'handleSupportOne', 'handleSurveyRespond', 'handleTakeOffline',
-  'handleTask', 'handleTasksCreate', 'handleThreadRead', 'handleVersionLabel', 'handleVisualDecide',
+  'handleTask', 'handleTasksCreate', 'handleThreadRead', 'handleVersionLabel', 'handleVersionStar', 'handleVisualDecide',
   'handleVisualEdit', 'handleVisualGenerate', 'handleVisualVary', 'handleWriteDecide',
   'handleWriteExecute', 'handleWritePrepare', 'handleWriteRollback', 'handleWriterAccept', 'handleWriterDiscard',
   'handleWriterGenerate', 'handleWriterRewrite',

@@ -46,12 +46,12 @@ import { handleMessages, handleNotifications, handleNotificationsRead, handlePro
 import { handleProjectSurveys, handleSurvey, handleSurveyRespond, handleSupport, handleSupportOne, handleSupportMessage } from './routes/service_intake.ts';
 import { handleClientProjects, handleClientProject, handleClientReport, handleClientMessages, handleClientDeliverableDownload, handleClientApprovalDecide, handleClientSurvey, handleClientSurveyRespond, handleClientNotifications, handleClientNotificationsRead, handleClientSupport, handleClientSupportOne, handleClientSupportMessage, handleClientBilling, handleClientDocuments, handleClientBook, handleClientTaskDone, handleClientUploadUrl, handleClientUploadCreate, handleClientServices, handleClientWebsiteStats, handleClientWebsiteThumb, handleStudioCustomers } from './routes/client_delivery.ts';
 import { handleSavedReplies, handleFaqAdmin, handleClientFaq } from './routes/service_edges.ts';
-import { handlePublish, handleRestore, handlePublishHistory, handleVersionLabel, handleCompareVersions, handleTimewarp, handleCheckpointList, handleCheckpointSave, handleCheckpointRestore, handleCheckpointDelete, handleTakeOffline, handleBackOnline, handleSitePassword } from './routes/publish.ts';
+import { handlePublish, handleRestore, handlePublishHistory, handleVersionStar, handleVersionLabel, handleCompareVersions, handleTimewarp, handleCheckpointList, handleCheckpointSave, handleCheckpointRestore, handleCheckpointDelete, handleTakeOffline, handleBackOnline, handleSitePassword } from './routes/publish.ts';
 const { handleLaunchList, handleLaunchCreate, handleLaunchGet, handleLaunchRecapture, handleLaunchDecide, handleLaunchSchedule, handleLaunchPromote, handleLaunchRollback, handleLaunchCancel } = lazyRoutes(() => import('./routes/launches.ts'));
 import { handleMediaUpload, handleMediaUpdate, handleMediaDelete } from './routes/media.ts';
 import { handleAssetsList, handleAssetsCollections, handleAssetsHealth, handleAssetsBulk, handleAssetsMatch, handleAssetsFolderMove, handleAssetUpdate, handleAssetStatus, handleAssetDelete, handleAssetDetail, handleAssetDownload, handleAssetReplace, handleAssetRollback, handleAssetDuplicate, handleAssetSuggest, handleAssetSocial, handleAssetCards, handleAssetRemoveBackground, handleAssetCutout, handleCutoutJob } from './routes/assets.ts';
 const { handleVisualKinds, handleVisualGenerate, handleVisualList, handleVisualGet, handleVisualVary, handleVisualEdit, handleVisualDecide } = lazyRoutes(() => import('./routes/visual.ts'));
-const { handleAdmin, handleDomain, handleDomainLookup, handleDomainForward } = lazyRoutes(() => import('./routes/admin.ts'));
+const { handleAdmin, handleDomain, handleDomainLookup, handleDomainForward, handleClientDomain } = lazyRoutes(() => import('./routes/admin.ts'));
 import { handleCollection, handleLocation, handleSettings, handleBlockSuggestions, handlePageDuplicate, handlePageRefs, SPECS } from './routes/content.ts';
 import { handlePostPublish, handlePostUnpublish, handlePostEmailDraft } from './routes/blog.ts';
 import { handleDeletedPages, handleDeletedPageRestore } from './routes/deleted_pages.ts';
@@ -92,7 +92,7 @@ import { noteVisitSource } from './routes/visit_source.ts';
 import { runAfterResponse } from './lib/after_response.ts';
 const { handleKnowledgeImport, handleKnowledgeList, handleKnowledgeDelete } = lazyRoutes(() => import('./routes/knowledge.ts'));
 import { handleMonitorGet, handleMonitorConnect, handleMonitorVerify, handleMonitorDisconnect } from './routes/monitor.ts';
-const { handleFoundationsGet, handleFoundationsPrepare, handleFoundationsPlans, handleFoundationsDecide } = lazyRoutes(() => import('./routes/foundations.ts'));
+const { handleFoundationsGet, handleFoundationsPrepare, handleFoundationsPlans, handleFoundationsDecide, handleFoundationsPlanDone } = lazyRoutes(() => import('./routes/foundations.ts'));
 const { handleExport, handleLaunch } = lazyRoutes(() => import('./routes/services.ts'));
 import { resolveAgencyMember } from './agency/auth.ts';
 import { handleAgency } from './agency/routes.ts';
@@ -592,6 +592,7 @@ async function route_(req: Request, cors: Record<string, string>): Promise<Respo
   if (route === '/site/online' && method === 'POST') return handleBackOnline(site, principal, cors);
   if (route === '/site/password' && method === 'POST') return handleSitePassword(req, site, principal, cors);   // list item 175
   if (route === '/publishes' && method === 'GET') return handlePublishHistory(site, cors);
+  if (route === '/publishes/stars' && method === 'PUT') return handleVersionStar(req, site, principal, cors);   // item 158: star the versions that matter
   // ── Version tools: compare any two versions · Timewarp · draft checkpoints ──
   // (all under /publishes/* so featureForRoute maps them to the 'website' area).
   if (route === '/publishes/compare' && method === 'GET') return handleCompareVersions(req, site, cors);
@@ -1035,6 +1036,7 @@ async function route_(req: Request, cors: Record<string, string>): Promise<Respo
   if (route === '/client/services' && method === 'GET') return handleClientServices(req, site, principal, cors);   // R2: the studio's service catalog
   if (route === '/client/website-stats' && method === 'GET') return handleClientWebsiteStats(req, site, principal, cors);   // slice 8b: the portal Home's "Your website" card
   if (route === '/client/website-thumb' && method === 'GET') return handleClientWebsiteThumb(req, site, principal, cors);   // item 179: the card's picture of the site itself
+  if (route === '/client/domain' && method === 'GET') return handleClientDomain(site, cors);   // builder item 194: the portal shows the domain's records and a Check button
   if (route === '/client/support' && (method === 'GET' || method === 'POST')) return handleClientSupport(req, site, principal, cors);
   if (route === '/client/faq' && method === 'GET') return handleClientFaq(req, site, principal, cors);   // service edge #5: the studio's FAQ in the portal
   if (route === '/client/kit' && method === 'GET') return (await import('./routes/client_kit.ts')).handleClientKit(req, site, principal, cors);   // builder list item 176: the hand-over kit under Help
@@ -1235,6 +1237,9 @@ async function route_(req: Request, cors: Record<string, string>): Promise<Respo
   {
     const m = route.match(/^\/foundations\/plans\/([0-9a-f-]{36})\/decide$/);
     if (m && method === 'POST') return handleFoundationsDecide(req, site, m[1], principal, cors);
+    // Nov 12 review, finding 13: the studio marks an approved plan finished
+    const d = route.match(/^\/foundations\/plans\/([0-9a-f-]{36})\/done$/);
+    if (d && method === 'POST') return handleFoundationsPlanDone(site, d[1], principal, cors);
   }
   // ── M11: Presence Monitor connection (read-only observation of an existing website) ──
   if (route === '/monitor/connection' && method === 'GET') return handleMonitorGet(jwt, site, cors);

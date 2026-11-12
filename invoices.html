@@ -154,6 +154,10 @@ const esc=(s)=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;
 let TOKEN="",DATA=null,SHOW='all',Q='',MONTH='',LIMIT=50,PAYING=null;
 sb.auth.onAuthStateChange(function(_e,s){if(s&&s.access_token)TOKEN=s.access_token;});
 const scope=()=>new URLSearchParams(location.search).get('client')||'';
+// builder item 83: ?client= is also how someone with places in two businesses opens their second one. That is
+// their own business, not a studio inside a client, so its own invoices show here. The shell tells the two apart
+// (ddsScopeInfo, once its context is in); without it, the address decides, as before.
+async function inClientNow(){const id=scope();if(!id)return false;if(document.readyState==='loading')await new Promise((r)=>document.addEventListener('DOMContentLoaded',r,{once:true}));if(window.ddsContext)await window.ddsContext().catch(()=>null);return window.ddsScopeInfo&&/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)?!!window.ddsScopeInfo():true;}
 const H=()=>({'Content-Type':'application/json','Authorization':'Bearer '+SUPABASE_KEY,'x-dds-user-jwt':TOKEN,'x-dds-scope-site':scope()});
 async function api(path,method,body){let r;try{r=await fetch(FN+path,{method:method||'GET',headers:H(),body:body?JSON.stringify(body):undefined});}catch(_){return{ok:false,status:0,body:{}};}return{ok:r.ok,status:r.status,body:await r.json().catch(()=>({}))};}
 function toast(m,bad,action){if(window.ddsToast)return void ddsToast(m,bad?'err':'ok',action);}
@@ -330,7 +334,7 @@ function downloadCsv(){
   const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([lines.join('\n')+'\n'],{type:'text/csv'}));a.download='invoices-'+today+'.csv';document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove();},0);
 }
 async function load(){
-  if(scope()){$('main').innerHTML=`<div class="center"><h2>Invoices live at the studio level.</h2><p class="muted">You’re looking at one client. Their invoices are on their record’s Billing tab.</p><p style="margin-top:16px"><a class="link" data-noscope href="/invoices.html">Leave this client and open Invoices →</a></p></div>`;return;}
+  if(await inClientNow()){$('main').innerHTML=`<div class="center"><h2>Invoices live at the studio level.</h2><p class="muted">You’re looking at one client. Their invoices are on their record’s Billing tab.</p><p style="margin-top:16px"><a class="link" data-noscope href="/invoices.html">Leave this client and open Invoices →</a></p></div>`;return;}
   const r=await api('/sales/invoices?today='+ymd());
   if(r.status===401){signedOut();return;}
   if(r.status===404&&!(r.body&&r.body.data)){$('main').innerHTML=`<div class="center"><h2>Invoices is on its way.</h2><p class="muted">This page arrives with an update that’s being rolled out. Your invoices are on Pipeline’s Who owes you meanwhile.</p><p style="margin-top:16px"><a class="link" href="/pipeline.html#outstanding">Open Who owes you →</a></p></div>`;return;}
