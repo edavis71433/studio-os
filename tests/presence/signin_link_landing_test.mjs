@@ -43,7 +43,8 @@ globalThis.fetch = async (url, init = {}) => {
     const asked = typeof body.redirect_to === 'string' && ALLOWED.some((a) => a.test(body.redirect_to)) ? body.redirect_to : `${SITE_URL}/`;
     return reply({ action_link: `http://stub.local/auth/v1/verify?type=${body.type}&redirect_to=${encodeURIComponent(asked)}` });
   }
-  if (u.pathname === '/rest/v1/presence_site_members') { seats.push(body); return reply(null, 201); }
+  // item 53: an invite reads whether the email is already here, then inserts the row and reads it back
+  if (u.pathname === '/rest/v1/presence_site_members') { if ((init.method || 'GET') === 'GET') return reply([]); seats.push(body); return reply([{ id: 'seat-' + seats.length, ...body }], 201); }
   if (u.pathname.startsWith('/rest/v1/')) return reply([]);
   return reply({}, 404);
 };

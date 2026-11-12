@@ -97,11 +97,13 @@
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
 <script src="/vendor/supabase-js-2.45.4.js"></script>
+<script src="/people.js?v=53"></script>
 <script>
-// Sharing & access (A7.2). The owner invites a client reviewer and chooses what
-// the client sees. Consumes /portal/context + /portal/members + /portal/shares
-// (owner/operator only, enforced server-side). Internal notes are private by
-// default and only shared here on purpose.
+// Sharing & access (A7.2). The owner chooses who can get in, each with a role
+// (builder list item 53: the People sheet, people.js, shared with the Sites page),
+// and what a client reviewer sees. Consumes /portal/context + /portal/members +
+// /portal/shares (owner/operator only, enforced server-side). Internal notes are
+// private by default and only shared here on purpose.
 const SUPABASE_URL="https://qksstlqzbhesadrrofgn.supabase.co";
 const SUPABASE_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFrc3N0bHF6Ymhlc2FkcnJvZmduIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE5NzMwMDMsImV4cCI6MjA5NzU0OTAwM30.4V94Ua7z5cntPWtvtqN24TUnfY5A6K6-zCxY0iEcgYo";
 const FN=SUPABASE_URL+"/functions/v1/presence";
@@ -161,19 +163,13 @@ document.addEventListener('dds:context',paintScope);
 // item 136: at studio level the picker's way back is Settings, where the page is opened from
 document.addEventListener('dds:context',()=>{const c=window.__ddsContext;if(scopeId()||!(c&&c.is_agency))return;const a=document.querySelector('.crumbs a.back');if(a&&!a.dataset.settings){a.dataset.settings='1';a.setAttribute('href','/settings.html');a.lastChild.textContent='Settings';}});
 
-function render(members){
+function render(){
   const who=scopeName();
-  let html=`<header class="phead"><div class="ptitle"><h1 id="pagehead" tabindex="-1">Sharing & access${who?' — '+esc(who):''}</h1><p class="sub">Invite a client to review, and choose exactly what they see. They can review and approve — never edit, publish, or connect. Internal notes stay private unless you share them.</p></div>${ILLO}</header>`;
-  // invite + members
-  html+=`<section class="card pad" aria-labelledby="inviteH"><h2 id="inviteH">Invite a client</h2>
-    <div class="invite"><input id="email" type="email" placeholder="client@theirbusiness.com" aria-label="Client email" autocomplete="off">
-      <input type="hidden" id="role" value="client_reviewer">
-      <button class="pri" id="add" type="button">Send invite</button></div>
-    <p class="hint">They join as a reviewer: they can look and approve, never edit, publish or connect. They’ll get an email with a secure link.</p>`;
-  if(members.length){html+=`<div class="people">`;for(const m of members){html+=`<div class="rowitem"><span class="grow"><span class="t">${esc(m.email)}</span><span class="d">${esc(String(m.role||'').replace('_',' '))} · ${esc(m.status||'')}</span></span>${m.role!=='business_owner'?`<span class="acts"><button class="sm" data-resend="${esc(m.email)}" data-role="${esc(m.role)}">Resend invite</button> <button class="sm" data-revoke="${esc(m.id)}">Remove</button></span>`:''}</div>`;}html+=`</div>`;}
-  html+=`</section>`;
+  let html=`<header class="phead"><div class="ptitle"><h1 id="pagehead" tabindex="-1">Sharing & access${who?' — '+esc(who):''}</h1><p class="sub">Choose who can get in, each with a role, and exactly what a reviewer sees. Internal notes stay private unless you share them.</p></div>${ILLO}</header>`;
+  // builder item 53: the owner, the studio, and the people with a role each (people.js)
+  html+=`<section class="card pad" id="peopleCard" aria-labelledby="pp-title"><div id="peopleHost"></div></section>`;
   // shares
-  html+=`<h2 class="seclab" id="seesH">What clients see</h2><div class="card" role="group" aria-labelledby="seesH">`;
+  html+=`<h2 class="seclab" id="seesH">What a reviewer sees</h2><div class="card" role="group" aria-labelledby="seesH">`;
   for(const s of SURFACES){const on=(SHARES[s.k+':*']!=null)?SHARES[s.k+':*']:s.def;/* switch gets an accessible name below */
     html+=`<div class="rowitem${s.internal?' locked':''}"><span class="tile ${s.tone}" aria-hidden="true">${svg(s.ic)}</span><span class="grow"><span class="t">${esc(s.t)}${s.internal?' <span class="pill">Private by default</span>':''}</span><span class="d">${esc(s.d)}</span></span>
       <button class="sw" role="switch" aria-label="Share ${esc(s.t)} with clients" aria-checked="${on}" data-surface="${esc(s.k)}"></button><span class="state${on?' on':''}" data-state="${esc(s.k)}">${on?'Visible':'Hidden'}</span></div>`;}
@@ -181,19 +177,11 @@ function render(members){
   // (Developer Mode is fully built and appears under Settings when the account has
   //  that capability — no "coming soon" placeholder belongs here.)
   $('main').innerHTML=html;wire();
+  if(window.ddsPeople)ddsPeople.mount($('peopleHost'),{siteName:who,api:(path,method,body)=>api(path,method,body)});
 }
 function wire(){
-  const add=$('add');if(add)add.addEventListener('click',invite);
-  const em=$('email');if(em)em.addEventListener('keydown',(e)=>{if(e.key==='Enter'){e.preventDefault();invite();}});
-  document.querySelectorAll('[data-revoke]').forEach(b=>b.addEventListener('click',()=>revoke(b.getAttribute('data-revoke'))));
-  document.querySelectorAll('[data-resend]').forEach(b=>b.addEventListener('click',async()=>{b.disabled=true;const r=await api('/portal/members','POST',{email:b.getAttribute('data-resend'),role:b.getAttribute('data-role')||'client_reviewer'});toast((r.ok&&r.body.data&&r.body.data.message)||'Invite re-sent.');b.disabled=false;}));
   document.querySelectorAll('[data-surface]').forEach(b=>b.addEventListener('click',()=>toggle(b)));
 }
-async function invite(){const e=($('email').value||'').trim();if(!e){toast('Enter their email.');return;}
-  const role=($('role')&&$('role').value)||'client_reviewer';
-  const r=await api('/portal/members','POST',{email:e,role});
-  if(r.ok){toast((r.body&&r.body.data&&r.body.data.message)||'Invited.');return load();}toast((r.body&&r.body.message)||'That didn’t save.');}
-async function revoke(id){if(!confirm('Remove their access?'))return;const r=await api('/portal/members/'+id+'/revoke','POST',{});if(r.ok){toast('Removed.');return load();}toast('That didn’t work.');}
 // the Visible/Hidden word beside a switch follows its aria-checked state
 function paintState(surface,on){const el=document.querySelector('[data-state="'+surface+'"]');if(!el)return;el.textContent=on?'Visible':'Hidden';el.classList.toggle('on',!!on);}
 async function toggle(btn){const surface=btn.getAttribute('data-surface');const next=btn.getAttribute('aria-checked')!=='true';
@@ -214,7 +202,8 @@ async function pickClient(){
   {const a=document.querySelector('.crumbs a.back');if(a&&!a.dataset.settings){a.dataset.settings='1';a.setAttribute('href','/settings.html');a.lastChild.textContent='Settings';}}
   $('main').innerHTML=`<header class="phead"><div class="ptitle"><h1 id="pagehead" tabindex="-1">Sharing &amp; access</h1><p class="sub">Each client has their own reviewers and their own switches for what they see. Choose the client.</p></div></header><div class="card" id="pickList"><div class="spin" role="status" aria-label="Loading"></div></div>`;
   const r=await api('/agency/sites').catch(()=>({ok:false}));
-  const list=(r.ok&&r.body&&r.body.data&&Array.isArray(r.body.data.sites))?r.body.data.sites.filter(x=>x&&x.site_id&&!x.own):null;
+  const rows=r.ok&&r.body?(Array.isArray(r.body.data)?r.body.data:(r.body.data&&Array.isArray(r.body.data.sites)?r.body.data.sites:null)):null;   // GET /agency/sites answers {data:[rows]}
+  const list=rows?rows.filter(x=>x&&x.site_id&&!x.own):null;
   const box=$('pickList');if(!box)return;
   if(!list){box.innerHTML=`<p class="muted" style="padding:var(--dds-s4,16px)">Your clients wouldn’t load just now. Refresh to try again.</p>`;return;}
   if(!list.length){box.innerHTML=`<p class="muted" style="padding:var(--dds-s4,16px)">No clients yet. Once you add one, their sharing is set here.</p>`;return;}
@@ -230,10 +219,11 @@ async function load(){
   CTX=ctx.body.data||null;
   if(!(ctx.body.data&&ctx.body.data.sees_full_workspace)){notOwner();return;}
   if(!scopeId()&&CTX&&CTX.is_agency){await pickClient();return;}   // item 136: a studio chooses the client first
-  const [mem,sh]=await Promise.all([api('/portal/members'),api('/portal/shares')]);
-  if(mem.status===403){notOwner();return;}
+  if(!((CTX&&CTX.capabilities)||[]).includes('invite')){notOwner();return;}   // managing people is the invite capability (staff and developers don't have it)
+  const sh=await api('/portal/shares');
+  if(sh.status===403){notOwner();return;}
   SHARES={};if(sh.ok&&sh.body.data&&sh.body.data.shares)for(const s of sh.body.data.shares)SHARES[s.surface+':'+(s.item_id||'*')]=s.shared;
-  render((mem.ok&&Array.isArray(mem.body.data)&&mem.body.data)||[]);
+  render();
 }
 (async function(){try{const{data}=await sb.auth.getSession();TOKEN=(data&&data.session&&data.session.access_token)||"";if(!TOKEN){signedOut();return;}await load();}catch(_){trouble();}})();
 </script>

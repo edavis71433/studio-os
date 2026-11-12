@@ -25,7 +25,8 @@ globalThis.fetch = async (url, init = {}) => {
   if (method !== 'GET') writes.push(`${method} ${table}`);
   if (table === 'presence_service_links') return shared === 'fail' ? reply({ message: 'boom' }, 500) : reply(shared === 'yes' ? [{ id: 'l1' }] : []);
   if (table === 'presence_media') return reply(method === 'GET' ? [{ id: FILE, site_id: SITE, asset_status: 'pending', metadata: {} }] : [{ id: FILE }]);
-  if (table === 'presence_site_members') return reply([]);
+  // item 53: an invite reads whether the email is already here, then inserts the row and reads it back
+  if (table === 'presence_site_members') return reply(method === 'POST' ? [{ id: 'seat-1', ...JSON.parse(init.body || '{}') }] : []);
   return reply([]);
 };
 

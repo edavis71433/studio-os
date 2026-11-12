@@ -104,6 +104,8 @@
   Cache-Control: no-cache, must-revalidate
 /approve
   Cache-Control: no-cache, must-revalidate
+/transfer
+  Cache-Control: no-cache, must-revalidate
 /leads
   Cache-Control: no-cache, must-revalidate
 /schedule

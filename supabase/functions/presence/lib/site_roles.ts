@@ -235,7 +235,8 @@ const MEMBER_WRITES: Array<[MemberWriteNeed, string[]]> = [
     'POST /concierge/ask',
     // these check the role themselves: the owner, a developer, or a studio
     'POST /portal/(members|shares)',
-    `POST /portal/members/${ID}/revoke`,
+    `POST /portal/members/${ID}/(revoke|role)`,   // builder item 53: changing a seat's role is managing people, like the invite
+    'POST /portal/transfer(/cancel)?',   // builder item 53: only the owner, or their studio asking the owner; the route refuses anyone else and says why
     'PUT /dev/(customization|brand-kit)',
     'POST /dev/brand-kit/apply',
     'PUT /site/template',
