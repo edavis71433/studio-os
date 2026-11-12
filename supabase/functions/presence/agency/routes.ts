@@ -264,6 +264,13 @@ async function handleAgencyInner(req: Request, route: string, method: string, me
     if (r) return r;
   }
 
+  // ── builder list item 160: every client's monthly report on one card (the studio's Settings);
+  //    loaded only when asked for, as the report job's own module is ──
+  if (route === '/agency/monthly-reports') {
+    const r = await (await import('./monthly_reports.ts')).handleMonthlyReports(route, method, member, cors);
+    if (r) return r;
+  }
+
   // ── builder list item 176: folders, tags and saved views on Sites ──
   {
     const r = await handleSiteFolders(req, route, method, member, cors, { ownSite: () => ownSiteOf(req.headers.get('x-dds-user-jwt') || '', principal) });
