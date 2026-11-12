@@ -6,7 +6,8 @@
 // customer was a write and the table's touch trigger moved updated_at. A
 // request's time is now what people did (opened, wrote, resolved), the bell
 // tells the client about the studio's replies and resolutions only, and the
-// Requests tab's "Something else?" opens its own request.
+// services page's "Something else?" (inside Messages since item 179 part three)
+// opens its own request.
 const A = await import('../../supabase/functions/presence/lib/support_activity.ts');
 let pass = 0, fail = 0; const failed = [];
 const ok = (n, c) => { if (c) { pass++; console.log('PASS ', n); } else { fail++; failed.push(n); console.log('FAIL ', n); } };
@@ -47,12 +48,13 @@ const ws = read('supabase/functions/presence/routes/workspace.ts');
 ok('the studio\'s Inbox times support rows by real activity too', /created_at: supWhen\(r\), thread_key: tk,/.test(ws) && /const supWhen = \(r: any\): string => supportActivityAt\(r, supAnyAt\[String\(r\.id\)\] \|\| null\) \|\| String\(r\.updated_at \|\| ''\);/.test(ws));
 const cl = read('client.html');
 ok('"Something else?" sends new_request', /\{subject,body:\$\('sup-body'\)\.value\.trim\(\),project_id:pid,new_request:true\}/.test(cl));
+ok('"Something else?" opens that subject form, not the general Write pane (which appends to an open conversation)', cl.includes("$('svcwrite').addEventListener('click',()=>openSupport(null,'services'));"));
 ok('a to-do\'s status in words', /const TASK_WORD=\{todo:'To do',in_progress:'In progress',blocked:'Waiting on something',done:'Done'\};/.test(cl));
 // item 179: each to-do is its own Needs-you row now; the project card still counts them in words
 ok('to-dos are called to-dos; approvals need your OK', /to-do\$\{nt===1\?'':'s'\} for you/.test(cl) && /need\$\{na===1\?'s':''\} your OK/.test(cl));
-ok('a paid invoice says when', /Paid\$\{paidOn\?' '\+esc\(paidOn\):''\} — thank you\./.test(cl));
-ok('no booking times → Ask for a call, prefilled', /openSupport\(null,'requests',\{subject:'A call',body:'I’d like to book a call\. Times that work for me: '\}\)/.test(cl));
-ok('each tab names itself', /document\.title=\(\{home:'Home',messages:'Messages',files:'Files',invoices:'Invoices',requests:'Requests',help:'Help'\}\[tab\]\|\|'Home'\)\+' — '\+studioBrand\(\)/.test(cl));   // builder list item 59: the studio's own name when there is one
+ok('a paid invoice says when', /st==='paid'\?\(i\.paid_at\?'paid '\+shelfDay\(i\.paid_at,now\):'paid'\)/.test(cl));   // item 179 part four: "$600 · paid Oct 2" on the shelf
+ok('no booking times → Ask for a call, prefilled', /openSupport\(null,'messages',\{subject:'A call',body:'I’d like to book a call\. Times that work for me: '\}\)/.test(cl));
+ok('each tab names itself', /document\.title=\(\{home:'Home',messages:'Messages',documents:'Documents',help:'Help'\}\[tab\]\|\|'Home'\)\+' — '\+studioBrand\(\)/.test(cl));   // builder list item 59: the studio's own name when there is one
 // item 179: the at-a-glance strip left Home (its count lives in the "Needs you · N"
 // heading), so only the mid-width tab rule remains pinned here.
 ok('mid widths fit all six tabs', /@media \(min-width:720px\) and \(max-width:920px\)\{\.tab \.ti\{display:none\}/.test(cl));

@@ -60,7 +60,9 @@ test.describe('G2 — an email button keeps where it was going through the sign-
     await expect(page.getByText('Sign in to see your updates.')).toBeVisible();
     await signIn(page);
     await page.goto('/client.html');
-    await expect(page.locator('#main').getByRole('heading', { name: 'Invoices', exact: true })).toBeVisible();
+    // item 179 part four: invoices live on the Documents shelf — the address opens its Invoices filter
+    await expect(page.locator('#main').getByRole('heading', { name: 'Documents', exact: true })).toBeVisible();
+    await expect(page.locator('#shelf [data-shelf="invoices"]')).toHaveAttribute('aria-pressed', 'true');
     await page.evaluate(() => localStorage.setItem('dds-portal-return', JSON.stringify({ tab: 'invoices', at: Date.now() - 31 * 60000 })));
     await page.goto('/client.html');
     await expect(page.getByRole('heading', { name: 'Needs you' })).toBeVisible();
@@ -242,7 +244,7 @@ test.describe('G9 — after paying, the portal doesn’t still say Pay', () => {
   test('Pay opens Stripe in the same tab (no second copy of the portal)', async ({ page }) => {
     await installApp(page, { api: CLIENT_API });
     await page.goto('/client.html');
-    await tab(page, 'invoices');
+    await tab(page, 'documents');
     const pay = page.getByRole('link', { name: 'Pay — Deposit' });
     await expect(pay).toHaveAttribute('href', 'https://pay.example/inv-1');
     expect(await pay.getAttribute('target')).toBeNull();
@@ -252,7 +254,7 @@ test.describe('G9 — after paying, the portal doesn’t still say Pay', () => {
   test('a payment finished in another tab turns this tab’s Pay into “confirming”', async ({ page, context }) => {
     await installApp(page, { api: CLIENT_API });
     await page.goto('/client.html');
-    await tab(page, 'invoices');
+    await tab(page, 'documents');
     await expect(page.getByRole('link', { name: 'Pay — Deposit' })).toBeVisible();
     const other = await context.newPage();
     await other.goto('/payment-canceled.html');
@@ -265,7 +267,8 @@ test.describe('G9 — after paying, the portal doesn’t still say Pay', () => {
     await installApp(page, { api: CLIENT_API });
     await page.goto('/payment-canceled.html');
     await page.getByRole('link', { name: 'Back to your invoices →' }).click();
-    await expect(page.locator('#main').getByRole('heading', { name: 'Invoices', exact: true })).toBeVisible();
+    await expect(page.locator('#main').getByRole('heading', { name: 'Documents', exact: true })).toBeVisible();
+    await expect(page.locator('#shelf [data-shelf="invoices"]')).toHaveAttribute('aria-pressed', 'true');
     await expect(page).toHaveURL(/\/client\.html$/);
   });
 });
