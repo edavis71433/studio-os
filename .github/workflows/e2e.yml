@@ -96,6 +96,8 @@ jobs:
               supabase/functions/presence/lib/site_header.ts) run=true ;;
               # builder-phone-bar.spec.ts opens a page drawn with this on a phone (builder item 122).
               supabase/functions/presence/lib/phone_bar.ts) run=true ;;
+              # dev-html-clean.spec.ts hands this cleaner's result to a real browser (builder item 190).
+              supabase/functions/presence/lib/dev_html.ts) run=true ;;
               # notes-159.spec.ts draws the shared draft's feedback panel with this (builder item 159).
               supabase/functions/presence/lib/feedback_panel.ts) run=true ;;
               docs/*|supabase/*|runbooks/*|sql/*|templates/*) ;;

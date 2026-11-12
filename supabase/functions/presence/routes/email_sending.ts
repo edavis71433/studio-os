@@ -38,10 +38,13 @@ async function providerDomains(): Promise<ProviderDomain[] | null> {
   } catch { return null; }
 }
 
+/** The address every email goes out from (commerce/account.ts EMAIL_FROM). */
+export const sendingFrom = (): string => parseAddress(Deno.env.get('EMAIL_FROM') || 'Davis Digital Studio <eric@davisdigitalstudio.com>').email;
+
 /** GET /email/sending → { from, domain, sending, replies, reply_domain, receiving } */
 export async function handleEmailSending(cors: Record<string, string>): Promise<Response> {
   // the same sender every email uses (commerce/account.ts EMAIL_FROM)
-  const from = parseAddress(Deno.env.get('EMAIL_FROM') || 'Davis Digital Studio <eric@davisdigitalstudio.com>').email;
+  const from = sendingFrom();
   const domain = from.includes('@') ? from.slice(from.lastIndexOf('@') + 1) : '';
   const inbound = (Deno.env.get('RESEND_INBOUND_DOMAIN') || '').trim().toLowerCase();
   const domains = await providerDomains();

@@ -108,12 +108,20 @@ const msg = (over = {}) => ({
     ['failing the sender check (DMARC fail)', { authentication: { spf: 'pass', dkim: 'pass', dmarc: 'fail' } }, TOKEN],
     ['with no sender check at all', { authentication: null }, TOKEN],
     ['to nobody the studio knows', { to: ['unknown@elsewhere.test'] }, TOKEN],
-    ['to a contact with no deal', { to: ['nodeal@example.org'] }, TOKEN],
     ['to an address that was turned off', {}, 'ffffffffffffffffffffffff'],
   ]) {
     db.reset(world());
     const rr = await ER.handleLoggedEmail(msg(over), tok);
     ok(`nothing is logged for an email ${label} (acknowledged, so Resend stops)`, rr.status === 200 && logged().length === 0);
+  }
+  // sales item 85: an email to someone with no deal lands on their own record, once
+  {
+    db.reset(world({ presence_person_events: [] }));
+    const rr = await ER.handleLoggedEmail(msg({ to: ['nodeal@example.org'], message_id: '<nd-1@example.com>' }), TOKEN);
+    const person = () => db.writes('presence_person_events').filter((w) => w.method === 'POST').map((w) => w.body);
+    ok('an email to a contact with no deal is kept on their record, not on a deal', rr.status === 200 && logged().length === 0 && person().length === 1 && person()[0].contact_id === CT2 && person()[0].kind === 'email' && person()[0].via === 'bcc', JSON.stringify(person()));
+    await ER.handleLoggedEmail(msg({ to: ['nodeal@example.org'], message_id: '<nd-1@example.com>' }), TOKEN);
+    ok('…and a redelivery never doubles it', person().length === 1);
   }
   db.reset(world()); db.fail.add('presence_contacts');
   ok('a read that fails asks Resend to try again (502), nothing half-logged', (await ER.handleLoggedEmail(msg(), TOKEN)).status === 502 && logged().length === 0);

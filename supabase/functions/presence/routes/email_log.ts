@@ -139,18 +139,34 @@ export async function handleLoggedEmail(data: any, token: string): Promise<Respo
   if (!dealsR.ok) return retry();
   const deals = rows(dealsR);
   const targets = new Set<string>();
+  // sales item 85: someone with no deal still gets the email, on their own record (person events, 0173)
+  const loose: Array<{ contact_id: string | null; client_id: string | null }> = [];
   for (const e of people) {
     const cIds = new Set(contacts.filter((c) => String(c.email).toLowerCase() === e).map((c) => String(c.id)));
     const kIds = new Set(clients.filter((c) => [c.email, c.contact_email].some((x) => String(x || '').toLowerCase() === e)).map((c) => String(c.id)));
     const d = pickDeal(deals.filter((x) => cIds.has(String(x.contact_id)) || kIds.has(String(x.converted_client_id))));
     if (d) targets.add(String(d.id));
+    else if (cIds.size || kIds.size) loose.push({ contact_id: [...cIds][0] || null, client_id: [...kIds][0] || null });
   }
-  if (!targets.size) return dropAck('log_no_deal', from_email);
+  if (!targets.size && !loose.length) return dropAck('log_no_deal', from_email);
 
   // 5. one "You logged an email" per deal, once per message (a redelivery never doubles it)
   const said = splitQuotedReply(text).text;
   const occurred = (() => { const t = Date.parse(String(data.created_at || '')); return Number.isFinite(t) && t <= Date.now() ? new Date(t).toISOString() : new Date().toISOString(); })();
   const msgId = String(message_id || '').slice(0, 300);
+  for (const p of loose) {
+    const who = [...(p.contact_id ? [`contact_id.eq.${p.contact_id}`] : []), ...(p.client_id ? [`client_id.eq.${p.client_id}`] : [])].join(',');
+    if (msgId) {
+      const seen = await svc(`presence_person_events?site_id=eq.${siteId}&message_id=eq.${encodeURIComponent(msgId)}&or=(${who})&select=id&limit=1`);
+      if (seen.ok && rows(seen)[0]) continue;
+      if (!seen.ok) { console.warn('[inbound] log: person events unavailable (APPLY-0173?)'); break; }   // before 0173: nowhere to put it
+    }
+    const ins = await svc('presence_person_events', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({
+      site_id: siteId, contact_id: p.contact_id, client_id: p.client_id, kind: 'email', body: loggedEmailBody(subject, said), subject: String(subject || '').slice(0, 200),
+      occurred_at: occurred, via: 'bcc', message_id: msgId, actor: from_email, actor_kind: 'client',
+    }) });
+    if (!ins.ok) return json({ error: 'write_failed' }, 502);   // Resend redelivers; the message-id check stops a double
+  }
   for (const dealId of targets) {
     if (msgId) {
       const seen = await svc(`presence_deal_events?deal_id=eq.${dealId}&site_id=eq.${siteId}&kind=eq.note&detail->>message_id=eq.${encodeURIComponent(msgId)}&select=id&limit=1`);
@@ -164,6 +180,6 @@ export async function handleLoggedEmail(data: any, token: string): Promise<Respo
     if (!ins.ok) return json({ error: 'write_failed' }, 502);   // Resend redelivers; the message-id check stops a double
     await svc(`presence_deals?id=eq.${dealId}&site_id=eq.${siteId}`, { method: 'PATCH', body: JSON.stringify({ updated_at: new Date().toISOString() }) }).catch(() => {});
   }
-  console.log(`[inbound] log: ${targets.size} deal(s) got an email from ${maskEmail(from_email)}`);
+  console.log(`[inbound] log: ${targets.size} deal(s) and ${loose.length} person(s) got an email from ${maskEmail(from_email)}`);
   return ack();
 }
