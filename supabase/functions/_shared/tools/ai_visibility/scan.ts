@@ -67,13 +67,13 @@ export async function runAiVisibility(inp: VisibilityInput, deps: AiScanDeps): P
   const engines = deps.engines || enabledEngines();
   if (!engines.length) return { ok: false, error: 'engines_failed', message: "The AI check isn't available right now. Try again later, or book a call and I'll run it by hand.", costUsd: 0 };
 
-  if (!inp.detail) {
+  if (!inp.detail && !inp.questions?.length) {
     const amb = await checkAmbiguous(inp.businessName, inp.city, 5000, aiFetch);
     cost += amb.costUsd;
     if (amb.ambiguous) return { ok: false, error: 'ambiguous', message: `There may be more than one "${inp.businessName}" around ${inp.city}. Add the street or neighborhood so we check the right one.`, costUsd: cost };
   }
 
-  const prompts = buildPrompts(inp);
+  const prompts = inp.questions?.length ? inp.questions : buildPrompts(inp);
   const jobs = engines.flatMap((e) => prompts.map((p) => ({ e, p })));
   const readinessP: Promise<ReadinessResult> = checkReadiness(inp.url, inp, { guard: deps.guard, fetchImpl: deps.siteFetch }, 25_000).catch(() => ({ checked: false, reason: 'unreachable' } as const));
 

@@ -22,6 +22,7 @@ import { readProvider } from '../connected/adapters.ts';
 import { connectionReason } from '../connected/contract.ts';
 import { providerByKey } from '../connected/providers.ts';
 import type { SiteRow } from '../lib/site.ts';
+import { searchTabExtras } from './search_tab.ts';
 
 // Overridable for tests: the network-facing pieces of a check.
 export const checkDeps: Partial<ScanDeps> = {};
@@ -90,6 +91,9 @@ export async function handleVisibility(site: SiteRow, cors: Record<string, strin
   const [terms, pages] = gsc?.hasData
     ? await Promise.all([safe(readSearchTerms(site.client_id, gsc.period)), safe(readSearchPages(site.client_id, gsc.period, 5))])
     : [null, null];
+  const reviewSummary = scoreSummary(review, TOOLS_BASE_URL);
+  // items 124 and 181: the tools row, the ranked to-do list and the pages that moved most
+  const extras = await safe(searchTabExtras(site, { address, consoleConnected: gscConn?.status === 'connected', listingConnected: gbpConn?.status === 'connected', period: gsc?.hasData ? gsc.period : null, review: reviewSummary }));
   const readiness = searchReadinessState({
     hosted: site.edition !== 'monitor', lastPublishedAt: site.last_published_at, externalDomain: ext,
     gscConnected: gscConn?.status === 'connected', hasData: !!gsc?.hasData,
@@ -98,7 +102,7 @@ export async function handleVisibility(site: SiteRow, cors: Record<string, strin
   return json({ data: {
     state: visibilityState(site, address),
     address,
-    score: scoreSummary(review, TOOLS_BASE_URL),
+    score: reviewSummary,
     ai: aiSummary(ai, TOOLS_BASE_URL),
     ai_check_url: `${TOOLS_BASE_URL}/ai-visibility`,
     console: {
@@ -120,6 +124,7 @@ export async function handleVisibility(site: SiteRow, cors: Record<string, strin
         : null,
       data: gbpData ? { ...gbpData.data, as_of: gbpData.fetched_at } : null,
     },
+    ...(extras || {}),
   } }, 200, cors);
 }
 

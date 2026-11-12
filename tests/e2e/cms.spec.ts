@@ -126,7 +126,7 @@ test.describe('CMS workspace', () => {
     await installApp(page, { api: { ...BOARD_API, ...EXTRAS } });
     await page.goto('/presence.html#search');
     const card = page.locator('#healthCard');
-    await expect(card.getByRole('heading', { name: 'Health check' })).toBeVisible();
+    await expect(card.getByRole('heading', { name: 'Website health' })).toBeVisible();
     await expect(card).toContainText('1 to look at');
     await expect(card).toContainText('Your site has a description for Google');
     await expect(card.getByRole('link', { name: 'Add one' })).toHaveAttribute('href', '/presence.html#search');
@@ -200,7 +200,7 @@ test.describe('CMS workspace', () => {
   test('the Domain, Health check and Recent activity cards render even when /health has no facts', async ({ page }) => {
     await installApp(page, { api: { ...BOARD_API, ...EXTRAS, '/health': { data: { state: 'healthy', sentence: 'Your website is live and up to date.' } } } });
     await page.goto('/presence.html#search');
-    await expect(page.locator('#healthCard').getByRole('heading', { name: 'Health check' })).toBeVisible();
+    await expect(page.locator('#healthCard').getByRole('heading', { name: 'Website health' })).toBeVisible();
     await expect(page.locator('#domainCard')).toContainText('built-in address');
     await page.evaluate(() => (window as any).go('history'));
     await expect(page.locator('#activitySec').getByRole('heading', { name: 'Recent activity' })).toBeVisible();

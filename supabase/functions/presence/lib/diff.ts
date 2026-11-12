@@ -156,6 +156,15 @@ export function describeChanges(draftC: SnapshotContent, liveC: SnapshotContent 
       ? 'AI assistants like ChatGPT, Claude and Perplexity are asked not to read your site. Google and Bing search are not affected.'
       : 'AI assistants can read your site again.' });
   }
+  // ── Hide from search and llms.txt (item 124) ──
+  if ((d.settings?.search_hidden === true) !== (l.settings?.search_hidden === true)) {
+    out.push({ section: 'site', sentence: d.settings?.search_hidden === true
+      ? 'Your site is hidden from search engines: every page asks Google and Bing not to list it.'
+      : 'Search engines can list your site again.' });
+  }
+  if (String(d.settings?.llms_txt || '') !== String(l.settings?.llms_txt || '')) {
+    out.push({ section: 'site', sentence: d.settings?.llms_txt ? 'Your llms.txt for AI tools is updated.' : 'Your llms.txt is taken down.' });
+  }
   // ── ad tags (item 152): the cookie notice and the privacy page change with them ──
   if (JSON.stringify(d.settings?.ad_tags || null) !== JSON.stringify(l.settings?.ad_tags || null)) {
     const t = d.settings?.ad_tags || {};

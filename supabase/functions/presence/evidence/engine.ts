@@ -6,7 +6,9 @@
 import { svc } from '../lib/db.ts';
 import { collect } from './collect.ts';
 import { PROVIDERS, runProviders } from './providers.ts';
+import type { EvidenceItem } from './contract.ts';
 import type { SiteRow } from '../lib/site.ts';
+import { healthOf } from '../lib/health_score.ts';
 
 export interface RunSummary {
   ok: boolean;
@@ -58,6 +60,7 @@ export async function runEvidence(site: SiteRow, trigger: 'operator' | 'schedule
         },
       }),
     });
+    await recordHealthDay(site, runId, items, new Date().toISOString()).catch(() => {});
     return { ok: true, run_id: runId, item_count: items.length, providers: record, ms: Date.now() - t0 };
   } catch (e) {
     const msg = (e as Error)?.message?.slice(0, 300) || 'run_failed';
@@ -66,4 +69,18 @@ export async function runEvidence(site: SiteRow, trigger: 'operator' | 'schedule
     });
     return { ok: false, run_id: runId, item_count: 0, providers: [], ms: Date.now() - t0, error: msg };
   }
+}
+
+/** Builder list items 129, 180 and 183: the day's health, from this run (the last run
+ *  of a day wins), kept in presence_health_days so the Sites page can show the change
+ *  from last month and Website health can draw its line and say what was fixed.
+ *  Best-effort: before migration 0170 the table isn't there and nothing is kept. */
+export async function recordHealthDay(site: SiteRow, runId: string, items: EvidenceItem[], nowIso: string): Promise<boolean> {
+  const live = site.edition === 'monitor' || site.status === 'live' || !!site.last_published_at;
+  const h = healthOf(items, { live });
+  const r = await svc('presence_health_days?on_conflict=site_id,day', {
+    method: 'POST', headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },
+    body: JSON.stringify({ site_id: site.id, day: nowIso.slice(0, 10), score: h.score, critical: h.critical, warning: h.warning, issues: h.issues, fingerprints: h.fingerprints, run_id: runId, checked_at: nowIso }),
+  });
+  return r.ok;
 }

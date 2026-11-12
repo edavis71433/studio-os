@@ -101,6 +101,13 @@
   .sw:focus-visible{outline:2px solid var(--p);outline-offset:2px}
   .swrow .t{flex:1;min-width:0} .swrow .t b{display:block;font-weight:600} .swrow .t b input{width:56px;height:28px;border:1px solid var(--line);border-radius:var(--dds-r,8px);padding:0 var(--dds-s2,8px);font:inherit;font-size:13.5px;text-align:center;margin:0 2px;background:var(--card);color:var(--ink)}
   .swrow .t .how{font-size:12.5px;color:var(--faint);margin-top:2px}
+  /* builder list item 184: what the monthly report holds, as chips */
+  .swrow.rp-in{flex-wrap:wrap;align-items:center;gap:6px}
+  .rp-in ul{display:flex;flex-wrap:wrap;gap:6px;margin:0;padding:0;list-style:none;flex:1 1 280px;min-width:0}   /* beside the label when there's room, as drawn */
+  .rp-in .lbl{font-size:12.5px;color:var(--faint);margin-right:2px}
+  .rp-in li{font-size:12px;font-weight:500;border-radius:999px;padding:3px 9px;border:1px solid var(--line);background:var(--card);color:var(--ink)}
+  .rp-in li::before{content:"✓ ";color:var(--good)}
+  .rp-in li.off{background:var(--bg);color:var(--faint);border-style:dashed} .rp-in li.off::before{content:""}
   .swrow .t .say{margin-top:var(--dds-s2,8px);font-size:13px;color:var(--soft);border-left:3px solid var(--line);padding:6px 10px;border-radius:0 var(--dds-r,8px) var(--dds-r,8px) 0;background:var(--bg)}
   .swrow .t .say .lbl{display:block;font-size:11.5px;color:var(--faint);text-transform:uppercase;letter-spacing:.04em;margin-bottom:2px}
   .stale.snames input{width:150px}
@@ -240,15 +247,30 @@
     <div class="swrow" id="reportSwRow">
       <button type="button" class="sw" role="switch" id="sw-report" aria-checked="false" aria-labelledby="sw-report-l"></button>
       <div class="t"><b id="sw-report-l">Send this client a monthly report</b>
-        <div class="how">In the first days of each month: visitors and pages viewed, enquiries, the pages people read most, and what changed. Sent to the email on their record, from your studio, with a reply address that reaches you.</div>
+        <div class="how">In the first days of each month: how their website did, each part when there’s something to say. Sent to the email on their record, from your studio, with a reply address that reaches you.</div>
         <div class="how" id="reportLast"></div>
         <div class="how" id="reportWarn" role="status" hidden style="color:var(--bad,#b3261e)"></div></div>
     </div>
+    <!-- builder list item 184: the same report as a PDF on the email, and to download any time -->
+    <div class="swrow" id="reportPdfRow">
+      <button type="button" class="sw" role="switch" id="sw-pdf" aria-checked="true" aria-labelledby="sw-pdf-l" aria-describedby="pdfHow"></button>
+      <div class="t"><b id="sw-pdf-l">Attach a PDF copy</b>
+        <div class="how" id="pdfHow">The same report as a file they can keep or print, on your brand. Download last month’s below to see it.</div></div>
+    </div>
+    <!-- builder list item 182: the monthly AI check, off until switched on because it costs money -->
+    <div class="swrow" id="reportAiRow">
+      <button type="button" class="sw" role="switch" id="sw-ai" aria-checked="false" aria-labelledby="sw-ai-l" aria-describedby="aiHow aiCost"></button>
+      <div class="t"><b id="sw-ai-l">Check AI answers every month</b>
+        <div class="how" id="aiHow">On the 1st of each month, asks Claude this client’s questions with a web search and keeps what it said, for their Search tab and their report. Nothing runs while this is off.</div>
+        <div class="how" id="aiCost"></div>
+        <div class="how" id="aiLast"></div></div>
+    </div>
+    <div class="swrow rp-in" id="reportInRow"><span class="lbl" id="reportInL">In the report:</span><ul id="reportIn" aria-labelledby="reportInL"></ul></div>
     <div class="swrow" style="display:block" id="reportLineRow">
       <b style="font-weight:600">A line from you</b>
       <div class="how">Goes at the top of every report, in your words. Written once; change it any time.</div>
       <textarea id="report-note" maxlength="600" rows="3" placeholder="e.g. Thanks for a great month. The new photos are bringing people to the Services page." style="width:100%;margin-top:8px;font:inherit;font-size:14px;border:1px solid var(--line);background:var(--bg);color:var(--ink);border-radius:var(--dds-r,8px);padding:8px 12px;resize:vertical"></textarea>
-      <div style="margin-top:10px;display:flex;align-items:center;gap:10px;flex-wrap:wrap"><button type="button" class="btn" id="reportSave">Save the line</button><button type="button" class="btn ghost" id="reportPreview">Send me a preview</button><span class="how" id="reportMsg" role="status"></span></div>
+      <div style="margin-top:10px;display:flex;align-items:center;gap:10px;flex-wrap:wrap"><button type="button" class="btn" id="reportSave">Save the line</button><button type="button" class="btn ghost" id="reportPreview">Send me a preview</button><button type="button" class="btn ghost" id="reportPdf">Download last month’s PDF</button><span class="how" id="reportMsg" role="status"></span></div>
     </div>
   </section>
   <!-- builder list item 54 (Nov 2026): the menu areas a studio hides. Agency members at
@@ -774,7 +796,7 @@ const UNREAD = {
   studio: { rows: ['profileForm'], off: ['profileSave'], words: 'Your details couldn’t load just now. Saving is off until they do, so nothing you had is written over.' },
   automations: { rows: [], words: 'Your automations couldn’t load just now. They can’t be changed until they do; nothing is switched on or off meanwhile.' },
   stages: { rows: ['staleRow'], words: 'When a deal counts as stalled couldn’t load just now. It can’t be changed until it does.' },
-  report: { rows: ['reportSwRow', 'reportLineRow'], words: 'This client’s monthly report couldn’t load just now. It can’t be changed until it does, so nothing saved is written over.', retry: () => retryReport() },
+  report: { rows: ['reportSwRow', 'reportPdfRow', 'reportAiRow', 'reportInRow', 'reportLineRow'], words: 'This client’s monthly report couldn’t load just now. It can’t be changed until it does, so nothing saved is written over.', retry: () => retryReport() },
 };
 function holdUnread() {
   const held = { studio: !IDENT_READ || !SETTINGS_READ, automations: !SETTINGS_READ, stages: !SETTINGS_READ, report: REPORT_TRIED && !REPORT_READ };
@@ -880,10 +902,23 @@ function paintReport() {
   paintReportBusy();
   if (document.activeElement !== $('report-note')) $('report-note').value = d.note || '';
   $('reportLast').textContent = reportStatusLine(d);
+  // item 182: the monthly AI check, its cost in words, and how the last one went
+  $('sw-ai').setAttribute('aria-checked', d.ai_checks ? 'true' : 'false');
+  $('aiCost').textContent = d.ai_cost ? d.ai_cost + '.' : '';
+  $('aiLast').textContent = aiStatusLine(d);
+  // item 184: the PDF switch, and what the report holds (AI answers only with the check on)
+  $('sw-pdf').setAttribute('aria-checked', d.pdf === false ? 'false' : 'true');
+  const lm = monthBefore(d.next_month);
+  $('reportPdf').textContent = lm ? 'Download ' + new Date(Date.UTC(+lm.slice(0, 4), +lm.slice(5, 7) - 1, 1)).toLocaleDateString('en-US', { month: 'long', timeZone: 'UTC' }) + '’s PDF' : 'Download last month’s PDF';
+  $('reportIn').innerHTML = REPORT_PARTS.map(([k, w]) => {
+    const off = k === 'ai' && !d.ai_checks;
+    return '<li' + (off ? ' class="off"' : '') + '>' + esc(w) + (off ? ', off' : '') + '</li>';
+  }).join('');
   // Nov 2026 review (finding 2): a client who can't be emailed is said so on the card, never a silent "On"
   const warn = d.blocked ? 'This client can’t get the report: ' + (REPORT_BLOCK_WORDS[d.blocked] || 'they can’t be emailed') + '.' + (d.blocked === 'no_email' ? ' Add their email on their record.' : '') : '';
   $('reportWarn').textContent = warn; $('reportWarn').hidden = !warn;
 }
+const REPORT_PARTS = [['visits', 'Visits'], ['enquiries', 'Enquiries'], ['google', 'On Google'], ['ai', 'AI answers'], ['reviews', 'Reviews'], ['health', 'Website health'], ['changes', 'What changed']];
 const REPORT_BLOCK_WORDS = { no_email: 'there’s no email on their record', unsubscribed: 'they unsubscribed from emails', bounced: 'emails to them bounce' };
 // what happened last, in words: sent, skipped (why) or failed; `last_month` alone only means "handled"
 function reportStatusLine(d) {
@@ -896,12 +931,18 @@ function reportStatusLine(d) {
   }
   return d.enabled ? 'Nothing sent yet; the first report goes out in the first days of next month.' : '';
 }
+function aiStatusLine(d) {
+  const r = d.ai_result;
+  if (r && r.month) return r.status === 'checked' ? 'Last checked: ' + monthWords(r.month) + '.' : 'The ' + monthWords(r.month) + ' check didn’t finish after three tries. The next one runs as usual.';
+  return d.ai_checks ? 'The first check runs soon, then on the 1st of each month.' : '';
+}
+function monthBefore(ym) { const m = /^(\d{4})-(\d{2})$/.exec(String(ym || '')); if (!m) return null; const y = +m[1], n = +m[2]; return n === 1 ? (y - 1) + '-12' : y + '-' + String(n - 1).padStart(2, '0'); }
 function monthWords(ym) { const m = /^(\d{4})-(\d{2})$/.exec(String(ym || '')); if (!m) return ym; return new Date(Date.UTC(+m[1], +m[2] - 1, 1)).toLocaleDateString('en-US', { month: 'long', year: 'numeric', timeZone: 'UTC' }); }
 // Item 101 (C16's last line): one save at a time. While one saves, the switch is greyed and
 // "Save the line" is off, the way Your menu does it. A second press used to show the switch
 // flipped while nothing was sent, and a line saved during a switch save was dropped unsaid.
 function paintReportBusy() {
-  const sw = $('sw-report'); if (REPORT_BUSY) sw.setAttribute('aria-disabled', 'true'); else sw.removeAttribute('aria-disabled');
+  for (const id of ['sw-report', 'sw-pdf', 'sw-ai']) { const sw = $(id); if (REPORT_BUSY) sw.setAttribute('aria-disabled', 'true'); else sw.removeAttribute('aria-disabled'); }   // items 182 and 184: the AI and PDF switches wait their turn too
   $('reportSave').disabled = REPORT_BUSY;
 }
 async function saveReport(patch) {
@@ -923,6 +964,32 @@ function wireReport() {
     const next = !(REPORT && REPORT.enabled === true);
     $('sw-report').setAttribute('aria-checked', next ? 'true' : 'false');
     if (await saveReport({ enabled: next })) toast(next ? 'On. The first report goes out in the first days of next month.' : 'Off. No more reports to this client.');
+  });
+  $('sw-ai').addEventListener('click', async () => {
+    if (REPORT_BUSY || !REPORT_READ) return;   // one save at a time, like the report switch (item 101)
+    const next = !(REPORT && REPORT.ai_checks === true);
+    $('sw-ai').setAttribute('aria-checked', next ? 'true' : 'false');
+    if (await saveReport({ ai_checks: next })) toast(next ? 'On. The first check runs soon, then on the 1st of each month.' : 'Off. No more AI checks for this client.');
+  });
+  $('sw-pdf').addEventListener('click', async () => {
+    if (REPORT_BUSY || !REPORT_READ) return;   // one save at a time, like the report switch (item 101)
+    const next = !!(REPORT && REPORT.pdf === false);
+    $('sw-pdf').setAttribute('aria-checked', next ? 'true' : 'false');
+    if (await saveReport({ pdf: next })) toast(next ? 'On. The report goes with a PDF copy.' : 'Off. The report goes without a PDF.');
+  });
+  // GET /report/monthly/pdf: last month's report as a file (a fetch with the sign-in, saved as a download)
+  $('reportPdf').addEventListener('click', async () => {
+    const b = $('reportPdf'); b.disabled = true; $('reportMsg').textContent = 'Making the PDF…';
+    try {
+      const r = await fetch(FN + '/report/monthly/pdf', { headers: H() });
+      if (!r.ok) throw new Error('pdf');
+      const blob = await r.blob();
+      const name = (/filename="([^"]+)"/.exec(r.headers.get('Content-Disposition') || '') || [])[1] || 'monthly-report.pdf';
+      const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name;
+      document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+      $('reportMsg').textContent = 'Downloaded ' + name + '.';
+    } catch (_) { $('reportMsg').textContent = ''; toast('The PDF didn’t download. Nothing changed; try again.', true); }
+    b.disabled = false;
   });
   $('reportSave').addEventListener('click', async () => { if (await saveReport({ note: $('report-note').value })) { $('reportMsg').textContent = 'Saved.'; setTimeout(() => { $('reportMsg').textContent = ''; }, 2500); } });
   $('reportPreview').addEventListener('click', async () => {

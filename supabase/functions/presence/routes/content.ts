@@ -152,6 +152,7 @@ const SETTINGS_FIELDS: Record<string, FieldRule> = {
   review_requests: { kind: 'bool' }, review_request_after_days: { kind: 'int', min: 1, max: 90 },   // list item 29 (0137)
   visit_counter: { kind: 'bool' },   // list item 61 (0139): the published site's visit counter, on unless switched off
   ai_crawlers: { kind: 'bool' },     // list item 175 (0159): let AI assistants read the published site, on unless switched off
+  search_hidden: { kind: 'bool' }, llms_txt: { max: 4000 },   // list item 124 (0171): hide the site from search; the owner's llms.txt
   google_tag_id: { kind: 'google_tag' }, meta_pixel_id: { kind: 'meta_pixel' },   // list item 152 (0155): ad tags, behind a cookie notice; empty = none
   stage_stale_days: { kind: 'stage_days' },   // { lead?: 1–365, qualified?: …, proposal?: …, contract?: … } — a shaped map, not free json
   google_site_verification: { max: 100 }, bing_site_verification: { max: 100 },   // Phase Z: Search Console / Bing ownership
@@ -404,9 +405,11 @@ const AD_SETTINGS_COLS = 'google_tag_id,meta_pixel_id';
 const CRAWLER_SETTINGS_COLS = 'ai_crawlers';
 // The 0161 column (builder list item 148's pop-up).
 const POPUP_SETTINGS_COLS = 'popup';
+// The 0171 columns (list item 124's Hide from search and llms.txt).
+const SEARCH_SETTINGS_COLS = 'search_hidden,llms_txt';
 // Newest apply pack first. A database without a pack's columns 400s the widened select,
 // so a read or a save steps down one pack at a time; Settings never goes dark ahead of one.
-const OPTIONAL_SETTINGS_COLS = [POPUP_SETTINGS_COLS, CRAWLER_SETTINGS_COLS, AD_SETTINGS_COLS, VISIT_SETTINGS_COLS, REVIEW_SETTINGS_COLS, AUTOMATION_SETTINGS_COLS];
+const OPTIONAL_SETTINGS_COLS = [SEARCH_SETTINGS_COLS, POPUP_SETTINGS_COLS, CRAWLER_SETTINGS_COLS, AD_SETTINGS_COLS, VISIT_SETTINGS_COLS, REVIEW_SETTINGS_COLS, AUTOMATION_SETTINGS_COLS];
 function selectSteps(select: string): string[] {
   const out = [select];
   let s = select;
@@ -420,7 +423,7 @@ function selectSteps(select: string): string[] {
 const SETTINGS_CFG = {
   table: 'presence_settings', entityType: 'settings', noun: 'site settings', fields: SETTINGS_FIELDS,
   select: 'site_id,category_order,cover_media_id,logo_media_id,og_media_id,announcement_text,announcement_url,announcement_expires_at,industry_key,google_site_verification,bing_site_verification,hero_layout,nav_style,sections_hidden,sections_order,footer_hours,footer_social,pages_noindex,page_seo,blocks,pages,nav,updated_at'
-    + ',' + AUTOMATION_SETTINGS_COLS + ',' + REVIEW_SETTINGS_COLS + ',' + VISIT_SETTINGS_COLS + ',' + AD_SETTINGS_COLS + ',' + CRAWLER_SETTINGS_COLS + ',' + POPUP_SETTINGS_COLS,
+    + ',' + AUTOMATION_SETTINGS_COLS + ',' + REVIEW_SETTINGS_COLS + ',' + VISIT_SETTINGS_COLS + ',' + AD_SETTINGS_COLS + ',' + CRAWLER_SETTINGS_COLS + ',' + POPUP_SETTINGS_COLS + ',' + SEARCH_SETTINGS_COLS,
   conflict: 'site_id', summary: 'Updated site settings',
 } as const;
 

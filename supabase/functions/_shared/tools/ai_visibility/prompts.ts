@@ -7,7 +7,12 @@
 
 export type PromptKind = 'unbranded' | 'branded';
 export interface Prompt { id: string; kind: PromptKind; text: string }
-export interface VisibilityInput { businessName: string; city: string; businessType: string; searchPhrases: string; url: string | null; detail: string }
+export interface VisibilityInput {
+  businessName: string; city: string; businessType: string; searchPhrases: string; url: string | null; detail: string;
+  /** Builder list item 182: a client's own questions, asked in place of the seven. The
+   *  studio set the client up, so the name isn't checked for namesakes first. */
+  questions?: Prompt[];
+}
 
 // How each business type is said in a sentence ("a salon", "salons").
 const NOUN: Record<string, string> = {
