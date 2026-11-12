@@ -163,8 +163,8 @@ test.describe('Settings › Monthly report: what to suggest next (builder list i
     await expect(sec.locator('#sug-text')).toBeFocused();
     await expect(sec.locator('#sug-text')).toHaveValue(AIQ.text);
     await sec.locator('#sug-text').fill('A spring open-house page, live before April.');
-    await sec.getByRole('button', { name: 'Save the suggestion' }).click();
-    await expect(toast(page)).toContainText('Saved. It goes in every report until you change it.');
+    await sec.locator('#sug-text').press('Tab');                    // builder item 165: it saves when the box is left
+    await expect(sec.locator('#fs-sug')).toHaveText('Saved');
     await expect(sec.getByRole('radio', { name: 'My own words' })).toHaveAttribute('aria-checked', 'true');
     await sec.getByRole('radio', { name: 'Leave it out' }).click();
     await expect(toast(page)).toContainText('Off. The report goes without a suggestion.');
@@ -180,14 +180,15 @@ test.describe('Settings › Monthly report: what to suggest next (builder list i
     await expect(sec.getByRole('radio', { name: 'My own words' })).toBeFocused();
   });
 
-  test('my own words with nothing written yet waits for the button, and an empty one is refused', async ({ page }) => {
+  test('my own words with nothing written yet sends nothing, and an empty one says so beside it', async ({ page }) => {
     const puts = await openCard(page);
     const sec = page.locator('#report');
     await sec.getByRole('radio', { name: 'My own words' }).click();
     await expect(sec.locator('#sug-text')).toBeFocused();
     expect(puts).toEqual([]);
-    await sec.getByRole('button', { name: 'Save the suggestion' }).click();
-    await expect(toast(page)).toContainText('Write the suggestion, or pick one of ours.');
+    await sec.locator('#sug-text').fill(' ');
+    await sec.locator('#sug-text').press('Tab');                    // left with nothing in it
+    await expect(sec.locator('#fs-sug')).toHaveText('Write the suggestion, or pick one of ours');
     expect(puts).toEqual([]);
   });
 });
@@ -211,7 +212,7 @@ test.describe('Settings › Monthly report: one save at a time, and a read that 
     fail = true;
     await page.reload();
     await expect(page.locator('#report .unread')).toContainText('This client’s monthly report couldn’t load just now.');
-    for (const id of ['#reportTo', '#sw-copy', '#sw-quiet', '#reportIn', '#sugModes', '#reportSave']) await expect(page.locator(id)).toBeHidden();
+    for (const id of ['#reportTo', '#sw-copy', '#sw-quiet', '#reportIn', '#sugModes', '#report-note']) await expect(page.locator(id)).toBeHidden();
   });
 });
 

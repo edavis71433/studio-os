@@ -477,9 +477,9 @@
         <div class="how" id="aiLast"></div></div>
     </div>
     <div class="swrow rp-block" id="reportLineRow">
-      <b style="font-weight:600">A line from you, at the top</b>
+      <b style="font-weight:600" id="report-note-l">A line from you, at the top</b> <span class="fs" id="fs-report-note" role="status"></span>
       <div class="how">Goes at the top of every report, in your words. Written once; change it any time.</div>
-      <textarea id="report-note" maxlength="600" rows="3" placeholder="e.g. Thanks for a great month. The new photos are bringing people to the Services page." style="width:100%;margin-top:8px;font:inherit;font-size:14px;border:1px solid var(--line);background:var(--bg);color:var(--ink);border-radius:var(--dds-r,8px);padding:8px 12px;resize:vertical"></textarea>
+      <textarea id="report-note" aria-labelledby="report-note-l" aria-describedby="fs-report-note" maxlength="600" rows="3" placeholder="e.g. Thanks for a great month. The new photos are bringing people to the Services page." style="width:100%;margin-top:8px;font:inherit;font-size:14px;border:1px solid var(--line);background:var(--bg);color:var(--ink);border-radius:var(--dds-r,8px);padding:8px 12px;resize:vertical"></textarea>
     </div>
     <h3 class="rp-h" id="reportSugH">What to suggest next</h3>
     <div class="swrow rp-block" id="reportSugRow">
@@ -493,12 +493,12 @@
       </div>
       <div class="rp-own" id="sugOwn" hidden>
         <label class="sr-only" for="sug-text">Your suggestion</label>
-        <textarea id="sug-text" maxlength="400" rows="3" placeholder="e.g. A page for your spring menu, ready before Easter. We can have it live in a week."></textarea>
-        <div class="rp-ownb"><button type="button" class="btn primary" id="sugSave">Save the suggestion</button><span class="how">Goes in every report until you change it.</span></div>
+        <textarea id="sug-text" aria-describedby="fs-sug" maxlength="400" rows="3" placeholder="e.g. A page for your spring menu, ready before Easter. We can have it live in a week."></textarea>
+        <div class="rp-ownb"><span class="fs" id="fs-sug" role="status"></span><span class="how">Goes in every report until you change it. It saves when you leave the box.</span></div>
       </div>
       <div class="how">One suggestion a month, in plain words, ending “Reply to this email and we’ll set it up”. It’s picked from this client’s Do next list (Growth Coach ideas, searches they miss, AI answers that skip them), never repeats within three months, and shows here and in the preview before it goes. A reply lands in your Inbox.</div>
     </div>
-    <div class="rp-actions" id="reportActRow"><button type="button" class="btn primary" id="reportSave">Save the line</button><button type="button" class="btn ghost" id="reportPreview">Send me a preview</button><button type="button" class="btn ghost" id="reportPdf">Download last month’s PDF</button><span class="how" id="reportMsg" role="status"></span></div>
+    <div class="rp-actions" id="reportActRow"><button type="button" class="btn ghost" id="reportPreview">Send me a preview</button><button type="button" class="btn ghost" id="reportPdf">Download last month’s PDF</button><span class="how" id="reportMsg" role="status"></span></div>
   </section>
   <!-- builder list item 160 (Nov 2026): every client's monthly report on one card, the studio's own
        Settings only (GET /agency/monthly-reports). Each switch is that client's own switch
@@ -1332,7 +1332,7 @@ let CC_OPEN = false, SUG_EDITING = false, SUG_MENU = false;
 function paintReport() {
   const d = REPORT || {};
   $('sw-report').setAttribute('aria-checked', d.enabled ? 'true' : 'false');
-  if (document.activeElement !== $('report-note')) $('report-note').value = d.note || '';
+  if (document.activeElement !== $('report-note') && !REPORT_KEEP.note) $('report-note').value = d.note || '';   // item 165: a line that didn't save keeps your words
   $('reportLast').textContent = reportStatusLine(d);
   const n = reportPeople(d);
   $('reportNext').textContent = d.enabled && d.next_month ? 'Next one: ' + monthAfter(d.next_month) + ' 1 · to ' + n + (n === 1 ? ' person' : ' people') : '';
@@ -1462,20 +1462,35 @@ function monthWords(ym) { const m = /^(\d{4})-(\d{2})$/.exec(String(ym || '')); 
 // switch flipped while nothing was sent, and a line saved during a switch save was dropped unsaid.
 function paintReportBusy() {
   for (const id of ['sw-report', 'sw-pdf', 'sw-ai', 'sw-copy', 'sw-quiet']) { const sw = $(id); if (REPORT_BUSY) sw.setAttribute('aria-disabled', 'true'); else sw.removeAttribute('aria-disabled'); }   // items 160, 182 and 184: every switch waits its turn
-  for (const id of ['reportSave', 'ccSave', 'sugSave', 'n-quiet']) { const el = $(id); if (el) el.disabled = REPORT_BUSY; }
+  for (const id of ['ccSave', 'n-quiet']) { const el = $(id); if (el) el.disabled = REPORT_BUSY; }   // item 165: the line and the suggestion wait their turn instead (saveReportBox)
   // greyed, not disabled: a control pressed with the keyboard keeps its focus while it saves
   $('report').querySelectorAll('.rpart, .rp-x, .rp-add, #sugModes [data-mode], #sugMenu [data-pick], #sugPick, #sugEdit').forEach((b) => { if (REPORT_BUSY) b.setAttribute('aria-disabled', 'true'); else b.removeAttribute('aria-disabled'); });
 }
-async function saveReport(patch) {
+// Builder item 165: the line and your own suggestion save when you leave their box, after any
+// save already on its way (item 101's one at a time), with the tick beside them. One that
+// doesn't go says so there and keeps your words.
+const REPORT_KEEP = {};
+async function saveReportBox(patch, slot, keep, again) {
+  if (!REPORT_READ) return false;
+  while (REPORT_BUSY) await new Promise((r) => setTimeout(r, 120));
+  saidNothing(slot);
+  const ok = await saveReport(patch, { slot, keep, again });
+  if (ok) saidSaved(slot);
+  return ok;
+}
+async function saveReport(patch, box) {
   if (REPORT_BUSY || !REPORT_READ) return false;   // I4: never written over what couldn't be read
   REPORT_BUSY = true; paintReportBusy();
   const r = await api('/report/monthly', 'PUT', patch);
   REPORT_BUSY = false;
   if (!r.ok) {
     if (r.body && r.body.blocked) REPORT = { ...(REPORT || {}), blocked: r.body.blocked };   // the warning line names why
-    paintReport();   // back to what is saved
-    toast(nice(r.body, 'That didn’t save — nothing was changed.'), true); return false;
+    if (box && box.keep) REPORT_KEEP[box.keep] = true;
+    paintReport();   // back to what is saved (a box being saved keeps your words)
+    if (box && box.slot) saidRefused(box.slot, r, box.again); else toast(nice(r.body, 'That didn’t save — nothing was changed.'), true);
+    return false;
   }
+  if (box && box.keep) delete REPORT_KEEP[box.keep];
   REPORT = { ...(REPORT || {}), ...(r.body.data || patch) }; paintReport();   // keeps what only GET answers (blocked, who, the suggestion)
   return true;
 }
@@ -1550,11 +1565,15 @@ function wireReport() {
     SUG_EDITING = true; paintSuggest(REPORT || {});
     $('sug-text').value = next ? next.text : ''; $('sug-text').focus();
   });
-  $('sugSave').addEventListener('click', async () => {
-    const text = $('sug-text').value.trim();
-    if (!text) { toast('Write the suggestion, or pick one of ours.', true); $('sug-text').focus(); return; }
-    if (await saveReport({ propose: { mode: 'own', text } })) { SUG_EDITING = false; paintSuggest(REPORT || {}); toast('Saved. It goes in every report until you change it.'); }
-  });
+  // item 165: your own suggestion saves when you leave its box (it had a Save the suggestion button)
+  const saveSug = async () => {
+    const text = $('sug-text').value.trim(), slot = fsSlot('sug');
+    if (!text) { markBad($('sug-text'), true); saidFailed(slot, null, 'Write the suggestion, or pick one of ours'); return; }
+    markBad($('sug-text'), false);
+    if (await saveReportBox({ propose: { mode: 'own', text } }, slot, null, saveSug)) { SUG_EDITING = false; paintSuggest(REPORT || {}); }
+    else markBad($('sug-text'), true);   // the box stays open with your words (still being edited)
+  };
+  $('sug-text').addEventListener('change', saveSug);
   // GET /report/monthly/pdf: last month's report as a file (a fetch with the sign-in, saved as a download)
   $('reportPdf').addEventListener('click', async () => {
     const b = $('reportPdf'); b.disabled = true; $('reportMsg').textContent = 'Making the PDF…';
@@ -1569,7 +1588,9 @@ function wireReport() {
     } catch (_) { $('reportMsg').textContent = ''; toast('The PDF didn’t download. Nothing changed; try again.', true); }
     b.disabled = false;
   });
-  $('reportSave').addEventListener('click', async () => { if (await saveReport({ note: $('report-note').value })) { $('reportMsg').textContent = 'Saved.'; setTimeout(() => { $('reportMsg').textContent = ''; }, 2500); } });
+  // item 165: the line saves when you leave its box (it had a Save the line button)
+  const saveNote = async () => { const ok = await saveReportBox({ note: $('report-note').value }, fsSlot('report-note'), 'note', saveNote); markBad($('report-note'), !ok); };
+  $('report-note').addEventListener('change', saveNote);
   $('reportPreview').addEventListener('click', async () => {
     const b = $('reportPreview'); b.disabled = true; $('reportMsg').textContent = 'Sending…';
     const r = await api('/report/monthly/preview', 'POST', {});

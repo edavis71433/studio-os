@@ -312,10 +312,10 @@ test.describe('Settings page', () => {
     await expect(page.locator('.dds-toast').last()).toContainText('On. The first report goes out in the first days of next month.');
     await expect(sec.locator('#reportLast')).toContainText('Nothing sent yet');
     expect(puts).toEqual([{ enabled: true }]);
-    await sec.locator('#report-note').fill('Thanks for a great month.');
-    await sec.locator('#reportSave').click();
-    await expect(sec.locator('#reportMsg')).toHaveText('Saved.');
-    expect(puts[1]).toEqual({ note: 'Thanks for a great month.' });
+    await sec.locator('#report-note').fill('Thanks for a great month!');
+    await sec.locator('#report-note').press('Tab');                 // builder item 165: the line saves when it's left
+    await expect(sec.locator('#fs-report-note')).toHaveText('Saved');
+    expect(puts[1]).toEqual({ note: 'Thanks for a great month!' });
     await sec.locator('#reportPreview').click();
     await expect(sec.locator('#reportMsg')).toContainText('Sent to eric@example.com');
     expect(previews).toBe(1);
