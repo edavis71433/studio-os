@@ -11,12 +11,15 @@
 //   logged   on the deal when there is one (a deal event: activity_kind email, via 'app'), else on
 //            the person or the customer (presence_person_events, APPLY-0173). The email still goes
 //            before that update; the answer then says it couldn't be kept on the timeline.
+//   GET /sales/email?deal_id= | contact_id= | client_id= is what the Email box reads before it
+//            draws: who it goes to, whether that address still takes email, who it goes out as
+//            and where a reply comes back. A missing or stopped address is said up front.
 import { json } from '../../_shared/http.ts';
 import { svc } from '../lib/db.ts';
 import type { SiteRow } from '../lib/site.ts';
 import type { Principal } from '../../_shared/auth.ts';
 import { UUID_RE } from '../lib/uuid.ts';
-import { sendEmail } from '../commerce/account.ts';
+import { sendEmail, replyToFor } from '../commerce/account.ts';
 import { loadEmailBrand } from '../lib/email_brand.ts';
 import { rateAllow } from '../lib/ratelimit.ts';
 import { leadReplyHtml } from './commercial.ts';
@@ -51,6 +54,28 @@ export async function recipientFor(siteId: string, b: any): Promise<{ email: str
     return { email: String((k && (k.contact_email || k.email)) || '').trim(), name: String((k && k.name) || ''), deal_id: null, contact_id: null, client_id: clientId };
   }
   return { status: 422, error: 'validation', message: 'Who is it to? Open their record and write it there.' };
+}
+
+/** GET /sales/email → { to: { name, email }, stopped, unsubscribed, as, from, replies, reply_to } */
+export async function handleRecordEmailInfo(req: Request, site: SiteRow, cors: Record<string, string>): Promise<Response> {
+  const q = new URL(req.url).searchParams;
+  const to = await recipientFor(site.id, { deal_id: q.get('deal_id'), contact_id: q.get('contact_id'), client_id: q.get('client_id') });
+  if ('status' in to) return json({ error: to.error, message: to.message }, to.status, cors);
+  const has = EMAIL_RE.test(to.email);
+  const { suppressionDetail } = await import('./email_infra.ts');
+  const sup = has ? await suppressionDetail(to.email).catch(() => null) : null;
+  const brand = await loadEmailBrand(site.id);
+  const { sendingFrom } = await import('./email_sending.ts');
+  // the Reply-To the send will carry: the studio's inbound address (its Inbox) when that is set up
+  const replyTo = replyToFor({ siteId: site.id });
+  return json({ data: {
+    to: { name: to.name, email: has ? to.email : '' },
+    // what the send refuses (a bounce or a spam report); an unsubscribe still lets one written email through
+    stopped: sup && sup.reason !== 'opt_out' ? String(sup.reason) : null,
+    unsubscribed: !!(sup && sup.reason === 'opt_out'),
+    as: brand.name, from: sendingFrom(),
+    replies: replyTo.toLowerCase().startsWith(`${site.id}@`) ? 'inbox' : 'mailbox', reply_to: replyTo,
+  } }, 200, cors);
 }
 
 export async function handleRecordEmail(req: Request, site: SiteRow, principal: Principal, cors: Record<string, string>): Promise<Response> {

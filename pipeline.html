@@ -99,7 +99,12 @@ html.dds-embed #detailWrap{padding-top:0}
   .dp-step span{color:var(--soft);font-size:12px}
   .dp-step.late{color:var(--bad)}
   .dp-l{font-family:var(--dds-sans,inherit);font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--faint);margin:16px 0 6px}
-  .dp-acts{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+  .dp-acts{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+  .dp-acts button.on{background:var(--p-soft);border-color:transparent;color:var(--p)}
+  /* sales item 80 (Figma 264:1604): the deal card's Email box, under the quick actions */
+  .dp-mail{margin:12px 0 2px;padding:14px;border:1px solid var(--dds-line-strong,var(--line));border-radius:16px;background:var(--card)}
+  .dpm-h{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:-4px -6px 8px 0}.dpm-h h3{margin:0;font-size:14.5px;font-weight:650;color:var(--ink)}
+  .dpm-h .dp-x{width:32px;height:32px;font-size:19px}
   .dp-acts button{font:inherit;font-size:12.5px;font-weight:600;padding:10px 6px;border-radius:var(--dds-r,12px);background:var(--card);color:var(--ink);border:1px solid var(--dds-line-strong,var(--line));cursor:pointer}
   .dp-acts button:hover{border-color:var(--p);color:var(--p)}
   /* item 89: tap to call from the preview (a phone opens its dialler; back here, shell.js offers to log it) */
@@ -134,7 +139,8 @@ html.dds-embed #detailWrap{padding-top:0}
     .bchips{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none}
     .bchips::-webkit-scrollbar{display:none}
   }
-  @media (pointer:coarse){.dp-x{width:44px;height:44px}.dp-acts button,.dp-open,.dp-next,.dp-call{min-height:44px}}
+  @media (pointer:coarse){.dp-x,.dpm-h .dp-x{width:44px;height:44px}.dp-acts button,.dp-open,.dp-next,.dp-call{min-height:44px}}
+  @media (max-width:360px){.dp-acts{grid-template-columns:repeat(2,1fr)}}
   @media (prefers-reduced-motion:reduce){dialog.dprev{animation:none}}
 
   /* ══ Bold redesign — the one-screen proposal: services as chips, the lines,
@@ -891,6 +897,8 @@ async function api(path,method,body){
   if(!r.ok){const e=new Error((b&&b.message)||'That didn’t go through.');e.status=r.status;e.body=b;throw e;}
   return b;
 }
+// shell.js's Email box (item 80) takes a request that answers {ok, status, body} and never throws
+const apiR=(p,m,b)=>api(p,m,b).then(body=>({ok:true,status:200,body}),e=>({ok:false,status:(e&&e.status)||0,body:(e&&e.body)||{}}));
 
 // The studio's own name (for the starter agreement's sign-off) — fetched once,
 // best-effort; scope-aware because H() carries x-dds-scope-site, so a scoped
@@ -2668,6 +2676,9 @@ function dpMount(){
     else if(k==='open'){closeDealPreview(false);openDeal(id);}
     else if(k==='win'){closeDealPreview(false);WANT_CONVERT_NEXT=true;openDeal(id);}
     else if(k==='proposal')location.assign('/pipeline.html?deal='+encodeURIComponent(id)+'&dtab=billing&compose=proposal');
+    // item 80: Email opens its box in the card; × (or Email again) puts it away
+    else if(k==='email'){DP.mail=DP.mail?null:{};dpPaint();}
+    else if(k==='mailx'){DP.mail=null;dpPaint();const e=$('dprev').querySelector('[data-dp="email"]');if(e)e.focus({preventScroll:true});}
     else if(k==='call'||k==='invoice'){
       // + Create's form (PR 206), started on this deal; without + Create, the full deal
       const ok=typeof window.ddsOpenCreate==='function'&&window.ddsOpenCreate(k,b,false,{deal_id:id});
@@ -2699,6 +2710,8 @@ function dpPaint(){
   const box=$('dprev');if(!box||!DP)return;
   const d=DEALS.find(x=>String(x.id)===DP.id);if(!d){closeDealPreview();return;}
   const fk=box.contains(document.activeElement)?(document.activeElement.getAttribute('data-k')||''):'';
+  // item 80: the Email box keeps its own node through a repaint, with what's typed and where the caret was
+  const mail=DP.mail,mAe=mail&&mail.el&&mail.el.contains(document.activeElement)?document.activeElement:null,mSel=mAe&&typeof mAe.selectionStart==='number'?[mAe.selectionStart,mAe.selectionEnd]:null;
   const who=(d.contact_id&&CONTACT_NAME&&CONTACT_NAME[d.contact_id])||'';
   const ch=STAGE_CHANCE[d.stage],at=DP_PATH.indexOf(d.stage);
   const nxt=d.stage==='contract'?'won':BOARD_STAGES[BOARD_STAGES.indexOf(d.stage)+1];
@@ -2720,12 +2733,19 @@ function dpPaint(){
       ${nextBtn}${step}
       ${(()=>{const ph=d.contact_id&&CONTACT_PHONE[d.contact_id];return ph?callLink(ph,d.id,who,'dp-call'):'';})()}
       <h3 class="dp-l">Quick actions</h3>
-      <div class="dp-acts" role="group" aria-label="Quick actions"><button type="button" data-dp="call" data-k="call">Log a call</button><button type="button" data-dp="proposal" data-k="proposal">Proposal</button><button type="button" data-dp="invoice" data-k="invoice">Invoice</button></div>
+      <div class="dp-acts" role="group" aria-label="Quick actions"><button type="button" data-dp="call" data-k="call">Log a call</button><button type="button" data-dp="email" data-k="email" aria-expanded="${mail?'true':'false'}"${mail?' class="on"':''}>Email</button><button type="button" data-dp="proposal" data-k="proposal">Proposal</button><button type="button" data-dp="invoice" data-k="invoice">Invoice</button></div>
+      ${mail?`<section class="dp-mail" aria-labelledby="dpm-h"><div class="dpm-h"><h3 id="dpm-h">Email ${esc(who?who.trim().split(/\s+/)[0]:'them')}</h3><button type="button" class="dp-x" data-dp="mailx" data-k="mailx" aria-label="Put the email away">×</button></div><div data-mail-slot></div></section>`:''}
       <h3 class="dp-l">Latest</h3>
       ${latest}
     </div>
     <div class="dp-foot"><button type="button" class="dp-open" data-dp="open" data-k="open">Open full deal <span aria-hidden="true">→</span></button></div>`;
   if(fk){const n=box.querySelector(`[data-k="${fk}"]`)||$('dprev-h');if(n)n.focus({preventScroll:true});}
+  const slot=mail&&box.querySelector('[data-mail-slot]');
+  if(slot&&mail.el){slot.replaceWith(mail.el);if(mAe){mAe.focus({preventScroll:true});if(mSel)try{mAe.setSelectionRange(mSel[0],mSel[1]);}catch(_){}}}
+  else if(slot&&window.ddsEmailBox){
+    mail.el=slot;slot.removeAttribute('data-mail-slot');const pid=DP.id;
+    window.ddsEmailBox.open(slot,{req:apiR,ids:{deal_id:pid},idp:'dpm',focus:true,onSent:(r,first)=>{toast(r&&r.logged===false?(r.message||'Sent.'):'Email sent to '+(first||'them')+'.');if(DP&&DP.id===pid){DP.mail=null;dpPaint();dpActivity();const e=$('dprev').querySelector('[data-dp="email"]');if(e)e.focus({preventScroll:true});}}});
+  }
 }
 function closeDealPreview(restore){
   if(!DP)return;

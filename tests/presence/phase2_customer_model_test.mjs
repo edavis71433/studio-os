@@ -38,7 +38,7 @@ ok('search: every result carries a kind', /kind: 'customer'/.test(crmRoute) && /
 
 // the record honours ?act=
 ok('crm.html: ?act=invoice opens Billing once the deal is in', /if\(act==='invoice'\|\|act==='deposit'\)DEAL_READY\.then/.test(crm));
-ok('crm.html: ?act=message brings the composer forward', /act==='message'\|\|act==='note'\|\|act==='task'\)setTimeout\(\(\)=>focusComposer\(act\)/.test(crm));
+ok('crm.html: ?act=message brings the composer forward (and ?act=email its Email tab, sales item 80)', /act==='message'\|\|act==='note'\|\|act==='task'\|\|act==='email'\)setTimeout\(\(\)=>focusComposer\(act\)/.test(crm));
 
 // the enquiry's one-step convert
 ok('inbox.html: Make customer posts /sales/customers with the enquiry id', /api\('\/sales\/customers','POST',\{email,name:l\.name\|\|'',business_name:biz,source_submission_id:id\}\)/.test(inbox) && /const l=it\.lead\|\|\{\},id=it\.lead_id;/.test(inbox));

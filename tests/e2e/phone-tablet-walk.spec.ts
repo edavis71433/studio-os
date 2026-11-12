@@ -126,7 +126,7 @@ test.describe('Phone and tablet walk (sales list item 43)', () => {
     await installApp(page, { api: RECORD });
     await page.goto(`/crm.html?client=${CLIENT}`);
     await expect(page.locator('#act-invoice')).toBeVisible();
-    const controls = ['#act-invoice', '#act-message', '#act-log', '.composer-tabs [role=tab]', '[id^=tab-]', '#dds-bell'];
+    const controls = ['#act-invoice', '#act-message', '#act-email', '#act-log', '.composer-tabs [role=tab]', '[id^=tab-]', '#dds-bell'];
     if (await coarse(page)) {
       for (const sel of controls) {
         for (const el of await page.locator(sel).all()) {

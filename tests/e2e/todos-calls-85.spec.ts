@@ -40,7 +40,7 @@ test.describe('Calls and to-dos for someone with no deal (item 85)', () => {
     await installApp(page, { api: { '/portal/context': STUDIO_CTX, '/crm/record': CONTACT_RECORD, '/crm/activity': { data: { items: [], upcoming: [] } } } });
     await spy(page, sent, /\/sales\/(people\/activity|tasks)$/, (s) => s.path.endsWith('/activity') ? { data: { item: { id: 'pe-1' }, last_contacted_at: new Date().toISOString(), follow_up: s.body?.follow_up ? { id: 't-1' } : undefined } } : { data: { id: 't-2' } });
     await openActivity(page);
-    await expect(page.locator('#composer [data-ct]')).toHaveText(['Message', 'Log a call', 'To-do']);
+    await expect(page.locator('#composer [data-ct]')).toHaveText(['Email', 'Message', 'Log a call', 'To-do']);   // item 80: Email first when there's an address
     await page.locator('#composer [data-ct="logcall"]').click();
     await page.locator('#logBody').fill('Talked about the spring menu');
     await page.locator('#composer [data-fu="7"]').click();

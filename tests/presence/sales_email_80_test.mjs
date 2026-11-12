@@ -9,6 +9,7 @@
 //   4  a bounced or spam-reported address is refused first; an unsubscribe doesn't stop it;
 //      a send that fails says nothing went out and logs nothing
 //   5  the route and its role
+//   6  what the Email box reads before it draws (GET /sales/email), and where the box lives
 import { installFakePostgrest } from './fake_pgrst.mjs';
 Deno.env.set('RESEND_KEY', 'test-resend-key');
 Deno.env.set('RESEND_INBOUND_DOMAIN', 'reply.example.test');
@@ -124,10 +125,46 @@ const letter = { subject: 'Your quote', body: 'Hi Avery,\n\nHere is the quote we
   ok('before APPLY-0173: sent, and says it couldn\'t be kept on the timeline', r.status === 200 && sent.length === 1 && r.body.data.logged === false && /couldn.t be kept on their timeline/.test(r.body.data.message), JSON.stringify(r));
 }
 
+// ═══ 6. what the Email box reads before it draws ═══
+{
+  db.reset(world()); sent.length = 0;
+  const info = async (q) => res(await E.handleRecordEmailInfo(new Request('https://fn.test/functions/v1/presence/sales/email?' + q), site, cors));
+  let r = await info('deal_id=' + DEAL);
+  ok('a deal: its person, the studio as the sender, the sending address, replies to the Inbox', r.status === 200 && r.body.data.to.email === 'avery@example.com' && r.body.data.to.name === 'Avery Stone' && r.body.data.as === 'Bright Pixel Studio' && r.body.data.from === 'hello@example.test' && r.body.data.replies === 'inbox' && r.body.data.reply_to === `${SITE}@reply.example.test` && r.body.data.stopped === null && r.body.data.unsubscribed === false, JSON.stringify(r));
+  r = await info('contact_id=' + cid(2));
+  ok('no address on file: said before anything is written', r.status === 200 && r.body.data.to.email === '' && r.body.data.to.name === 'No Email', JSON.stringify(r));
+  r = await info('contact_id=' + cid(4));
+  ok('a bounced address: stopped up front', r.body.data.stopped === 'bounce' && r.body.data.to.email === 'ben@example.com');
+  r = await info('contact_id=' + cid(6));
+  ok('a spam report: stopped up front', r.body.data.stopped === 'complaint');
+  r = await info('contact_id=' + cid(5));
+  ok('an unsubscribe: still writable, and said', r.body.data.stopped === null && r.body.data.unsubscribed === true);
+  r = await info('contact_id=' + cid(3));
+  ok('another studio\'s person: 404, and nothing about them', r.status === 404 && !JSON.stringify(r.body).includes('else@example.com'));
+  r = await info('client_id=' + CUST);
+  ok('a customer: their contact address', r.status === 200 && r.body.data.to.email === 'jordan@larkspur.example');
+  r = await info('');
+  ok('nobody named: 422', r.status === 422);
+  ok('reading it sends nothing and logs nothing', sent.length === 0 && db.tables.presence_deal_events.length === 0 && db.tables.presence_person_events.length === 0);
+  ok('the Settings card and the box read one sending address', read('supabase/functions/presence/routes/email_sending.ts').includes('const from = sendingFrom();'));
+}
+{
+  const shell = read('shell.js'), crm = read('crm.html'), pipe = read('pipeline.html'), help = read('help.html');
+  ok('one Email box (shell.js): it reads who and how first, then sends', shell.includes('window.ddsEmailBox = (function () {') && shell.includes("req('/sales/email?' + k)") && shell.includes("req('/sales/email', 'POST', payload)"));
+  ok('…an older server, a stopped address and no address are each said, not a form', shell.includes('Email from here arrives with an update that’s on its way.') && shell.includes('marked an earlier email as spam') && shell.includes('There’s no email address on file for '));
+  ok('…dark text on its filled button in the dark theme, 16px type on a phone', shell.includes(':root[data-theme="dark"] .dm-go,:root[data-theme="dark"] .dm-av{color:#171320}') && shell.includes('@media (max-width:767px){.dm-s,.dm-b{font-size:16px}'));
+  ok('the record: an Email tab first when there is an address, on the studio\'s own site', crm.includes("const tabs=canEmail()?[['email','Email'],['message','Message']]:[['message','Message']];") && crm.includes("emailBoxInto(eb,{req:apiAg,ids:mailIds(),idp:'em'"));
+  ok('…Email stands in front in the header; ?act=email opens it; what is typed survives a redraw', crm.includes("const FRONT=['act-log',canEmail()&&!ids.project?'act-email':'act-message',both?'act-send-both':'act-invoice'];") && crm.includes("act==='email')setTimeout(()=>focusComposer(act),300)") && crm.includes("'noteBody','emSubject','emBody']"));
+  ok('…with no project or support thread the record opens on Email', crm.includes("if(!COMPOSER_PICKED&&COMPOSER==='message'&&!(ACT&&(ACT.reply_to||ACT.reply_support_to))&&tabs.some(t=>t[0]==='email'))COMPOSER='email';"));
+  ok('Pipeline\'s deal card: Email beside Log a call, its box keeps its node through a repaint', pipe.includes('data-dp="email" data-k="email"') && pipe.includes("window.ddsEmailBox.open(slot,{req:apiR,ids:{deal_id:pid},idp:'dpm'") && pipe.includes('slot.replaceWith(mail.el)'));
+  ok('Help says how', help.includes('id="a-email"') && help.includes('the reply comes back to your Inbox'));
+}
+
 // ═══ 5. route and role ═══
 {
   const idx = read('supabase/functions/presence/index.ts');
   ok('routed under the /sales gate', idx.includes("if (route === '/sales/email' && method === 'POST') return (await import('./routes/record_email.ts')).handleRecordEmail(req, site, principal, cors);"));
+  ok('…and its read beside it', idx.includes("if (route === '/sales/email' && method === 'GET') return (await import('./routes/record_email.ts')).handleRecordEmailInfo(req, site, cors);"));
   ok('an edit, like the Inbox\'s reply to an enquiry', R.memberWriteNeeds('/sales/email', 'POST') === 'edit' && R.memberWriteNeeds('/forms/inbox/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa/reply', 'POST') === 'edit');
 }
 
