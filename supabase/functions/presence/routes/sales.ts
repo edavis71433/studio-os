@@ -232,22 +232,30 @@ export async function handleSalesDeleted(site: SiteRow, cors: Record<string, str
     // merged_into lands with APPLY-0168; before it, every removed contact is a plain delete
     read('contacts', `presence_contacts?site_id=eq.${site.id}&deleted_at=gte.${since}&merged_into=is.null&select=id,name,email,company,deleted_at&order=deleted_at.desc&limit=200`,
       `presence_contacts?site_id=eq.${site.id}&deleted_at=gte.${since}&select=id,name,email,company,deleted_at&order=deleted_at.desc&limit=200`),
-    read('todos', `presence_deal_tasks?site_id=eq.${site.id}&deleted_at=gte.${since}&select=id,title,deal_id,due_date,deleted_at&order=deleted_at.desc&limit=200`),
+    // item 85: a to-do may be for a person or a customer (APPLY-0173); before it, the older select
+    read('todos', `presence_deal_tasks?site_id=eq.${site.id}&deleted_at=gte.${since}&select=id,title,deal_id,contact_id,client_id,due_date,deleted_at&order=deleted_at.desc&limit=200`,
+      `presence_deal_tasks?site_id=eq.${site.id}&deleted_at=gte.${since}&select=id,title,deal_id,due_date,deleted_at&order=deleted_at.desc&limit=200`),
   ]);
   // who a deal was with, and which deal a to-do was on (deleted ones too: they label history)
   const ids = (list: any[], k: string) => [...new Set(list.map((x) => String(x?.[k] || '')).filter((x) => UUID_RE.test(x)))].slice(0, 200);
-  const [people, todoDeals] = await Promise.all([
-    ids(deals, 'contact_id').length ? read('names', `presence_contacts?site_id=eq.${site.id}&id=in.(${ids(deals, 'contact_id').join(',')})&select=id,name,email`) : Promise.resolve([] as any[]),
+  const personIds = [...new Set([...ids(deals, 'contact_id'), ...ids(todos, 'contact_id')])];
+  const [people, todoDeals, customers] = await Promise.all([
+    personIds.length ? read('names', `presence_contacts?site_id=eq.${site.id}&id=in.(${personIds.join(',')})&select=id,name,email`) : Promise.resolve([] as any[]),
     ids(todos, 'deal_id').length ? read('names', `presence_deals?site_id=eq.${site.id}&id=in.(${ids(todos, 'deal_id').join(',')})&select=id,title,deleted_at`) : Promise.resolve([] as any[]),
+    ids(todos, 'client_id').length ? read('names', `clients?id=in.(${ids(todos, 'client_id').join(',')})&select=id,name,email`) : Promise.resolve([] as any[]),
   ]);
   const who = new Map(people.map((c: any) => [String(c.id), String(c.name || c.email || '')]));
+  const customer = new Map(customers.map((k: any) => [String(k.id), String(k.name || k.email || '')]));
   const onDeal = new Map(todoDeals.map((d: any) => [String(d.id), d]));
   const labels = await labelsP;
   return json({ data: {
     days: DELETED_DAYS,
     deals: deals.map((d: any) => ({ id: d.id, title: String(d.title || 'Untitled deal'), stage: d.stage, stage_label: (labels && labels[d.stage]) || DEFAULT_STAGE_LABEL[d.stage as Stage] || d.stage, value_cents: Number(d.expected_value_cents) || 0, person: who.get(String(d.contact_id || '')) || '', deleted_at: d.deleted_at })),
     contacts: contacts.map((c: any) => ({ id: c.id, name: String(c.name || c.email || 'Contact'), email: String(c.email || ''), company: String(c.company || ''), deleted_at: c.deleted_at })),
-    todos: todos.map((t: any) => { const d = onDeal.get(String(t.deal_id || '')); return { id: t.id, title: String(t.title || 'To-do'), due_date: t.due_date || null, deal_id: t.deal_id || null, deal_title: d ? String(d.title || '') : '', deal_gone: !!(d && d.deleted_at), deleted_at: t.deleted_at }; }),
+    // item 85: a to-do for a person or a customer names them and opens their record; one of your own, the To-dos page
+    todos: todos.map((t: any) => { const d = onDeal.get(String(t.deal_id || '')); return { id: t.id, title: String(t.title || 'To-do'), due_date: t.due_date || null, deal_id: t.deal_id || null, deal_title: d ? String(d.title || '') : '', deal_gone: !!(d && d.deleted_at),
+      for_name: t.deal_id ? (d ? String(d.title || '') : '') : t.contact_id ? (who.get(String(t.contact_id)) || '') : t.client_id ? (customer.get(String(t.client_id)) || '') : 'yourself',
+      href: t.deal_id ? `/pipeline.html?deal=${t.deal_id}` : t.contact_id ? `/crm.html?contact=${t.contact_id}` : t.client_id ? `/crm.html?client_id=${t.client_id}` : '/todos.html', deleted_at: t.deleted_at }; }),
     partial: failed,
   } }, 200, cors);
 }

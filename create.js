@@ -118,9 +118,10 @@
   // What the main button says, so starting a deal is never a surprise
   function crGoLabel(kind, cand) {
     var needsDeal = !!(cand && cand.kind === 'contact');
-    if (kind === 'call') return needsDeal ? 'Start a deal and log the call' : 'Log call';
+    // sales item 85: a call or a to-do for someone with no deal stays on them; an invoice still needs a deal
+    if (kind === 'call') return 'Log call';
     if (kind === 'invoice') return needsDeal ? 'Start a deal and send' : 'Send invoice';
-    if (kind === 'todo') return needsDeal ? 'Start a deal and add it' : 'Add to-do';
+    if (kind === 'todo') return 'Add to-do';
     if (kind === 'proposal') return 'Open the proposal';
     if (kind === 'deal') return 'Add deal';
     return 'Save';
@@ -498,7 +499,7 @@
   }
   function paintPicked() {
     var c = S && S.pick, picked = dlg && dlg.querySelector('#cr-picked'); if (!c || !picked) return;
-    var sub = c.kind === 'contact' ? (S.kind === 'deal' ? (c.email || 'Contact') : 'No deal yet — one starts for them') : (c.name ? c.title + ' · ' : '') + (STAGE[c.stage] || c.stage);
+    var sub = c.kind === 'contact' ? (S.kind === 'deal' ? (c.email || 'Contact') : S.kind === 'invoice' ? 'No deal yet — one starts for them' : 'No deal yet — kept on them') : (c.name ? c.title + ' · ' : '') + (STAGE[c.stage] || c.stage);
     picked.innerHTML = '<span class="cr-av" aria-hidden="true">' + esc(initials(c.name || c.title)) + '</span>' +
       '<span class="cr-ot"><b>' + esc(c.name ? c.name + (c.company ? ' · ' + c.company : '') : c.title) + '</b><small>' + esc(sub) + '</small></span>' +
       '<button type="button" class="cr-change">Change</button>';
@@ -530,9 +531,9 @@
     var n = dlg && dlg.querySelector('#cr-note'); if (!n || !S) return;
     var c = S.pick;
     var t = '';
-    if (S.kind === 'call') t = c ? (c.kind === 'contact' ? 'Starts a deal for ' + (c.name || 'them') + ', then saves the call on it' : 'Saved on this deal') : 'Pick who you talked to';
+    if (S.kind === 'call') t = c ? (c.kind === 'contact' ? 'Saved on ' + (c.name || 'them') + ', with no deal needed' : 'Saved on this deal') : 'Pick who you talked to';
     else if (S.kind === 'invoice') t = c ? (c.kind === 'contact' ? 'Starts a deal for ' + (c.name || 'them') + '; the invoice is saved on it' : 'Saved on this deal, under Billing') : 'Pick who it’s for';
-    else if (S.kind === 'todo') t = c ? 'Shows in My to-dos on Home' : 'Pick the deal it’s for';
+    else if (S.kind === 'todo') t = c ? 'Shows in your To-dos and on Home' : 'Pick who it’s for';
     else if (S.kind === 'proposal') t = c ? 'Opens the deal with a new proposal' : 'Pick an open deal';
     else if (S.kind === 'deal') t = 'Starts as a new lead';
     n.textContent = t;
@@ -567,6 +568,20 @@
       return c.kind === 'deal' ? c.deal_id : '';
     }, function () { c._look = null; return Promise.reject('Couldn’t check their deals just now — please try again.'); });
     return c._look;
+  }
+  // sales item 85: a call or to-do for a person. Their own deal, when they have one, still takes it
+  // (as before); with none it is kept on them. A server without the person routes yet (404) or
+  // before its database update (409) answers null, and the caller falls back to starting a deal.
+  function onPerson(c, write, finish) {
+    return lookDeal(c).then(function (have) {
+      if (have) return Promise.reject({ useDeal: true });
+      return write().then(function (r) {
+        if (r.status === 404 || (r.status === 409 && r.body && r.body.error === 'needs_update')) return Promise.reject({ useDeal: true });
+        if (!r.ok) return Promise.reject(msg(r, 'That didn’t save — please try again.'));
+        DATA_AT = 0;
+        finish(r);
+      });
+    });
   }
   function ensureDeal(c) {
     if (c.kind === 'deal') return Promise.resolve(c.deal_id);
@@ -606,7 +621,7 @@
     var val = function (id) { var el = f.querySelector('#' + id); return el ? String(el.value || '').trim() : ''; };
     var need = function (msgText, focusSel) { fail(msgText); var el = focusSel && f.querySelector(focusSel); if (el) el.focus(); };
     var k = S.kind, c = S.pick;
-    if (k !== 'deal' && !c) return need(k === 'call' ? 'Pick who you talked to.' : k === 'invoice' ? 'Pick who the invoice is for.' : k === 'proposal' ? 'Pick the deal.' : 'Pick the deal it’s for.', '#cr-who');
+    if (k !== 'deal' && !c) return need(k === 'call' ? 'Pick who you talked to.' : k === 'invoice' ? 'Pick who the invoice is for.' : k === 'proposal' ? 'Pick the deal.' : 'Pick who it’s for.', '#cr-who');
     if (k === 'deal' && !val('cr-title')) return need('Give the deal a name.', '#cr-title');
     // item 97: a value that isn't a number is said, never saved as no value
     if (k === 'deal' && val('cr-value') && !crCents(val('cr-value'))) return need('Write the value as a number, like 2500 or 2.5k.', '#cr-value');
@@ -619,7 +634,17 @@
       var body = crCallBody(S.outcome, val('cr-notes'));
       var when = val('cr-when');
       var next = val('cr-next');
-      p = ensureDeal(c).then(function (id) {
+      // sales item 85: someone with no deal keeps the call on their own record; "next" becomes a to-do for them
+      if (c.kind === 'contact') {
+        p = onPerson(c, function () {
+          return api('/sales/people/activity', { method: 'POST', body: { kind: 'call', body: body, contact_id: c.id, occurred_at: when && when !== nowTodayYmd() ? when : undefined, follow_up: next ? crDue(S.nextDue) || undefined : undefined, follow_up_title: next || undefined } });
+        }, function (r) {
+          var fu = r.body && r.body.data && r.body.data.follow_up;
+          if (next && !(fu && fu.id)) done('The call is logged, but the to-do didn’t save — add it from To-dos.', '/crm.html?contact=' + encodeURIComponent(c.id), 'err');
+          else done('Call logged — ' + (c.name || 'them'), '/crm.html?contact=' + encodeURIComponent(c.id));
+        });
+      }
+      var viaDeal = function () { return ensureDeal(c).then(function (id) {
         return api('/sales/deals/' + encodeURIComponent(id) + '/activity', { method: 'POST', body: { kind: 'call', body: body, occurred_at: when && when !== nowTodayYmd() ? when : undefined } }).then(function (r) {
           if (!r.ok) return Promise.reject(msg(r, 'That call didn’t save — please try again.'));
           if (!next) return { id: id, nextOk: true };
@@ -631,7 +656,9 @@
         var href = '/crm.html?deal=' + encodeURIComponent(res.id) + '&tab=deal';
         if (!res.nextOk) done('The call is logged, but the next step didn’t save — add it on the deal.', href, 'err');
         else done('Call logged' + (c.title ? ' — ' + c.title : ''), href);
-      });
+      }); };
+      // their own deal, or a server without the person routes yet: the deal path, as before
+      p = p ? p.catch(function (e) { return e && e.useDeal ? viaDeal() : Promise.reject(e); }) : viaDeal();
     } else if (k === 'deal') {
       var title = val('cr-title'), cents = crCents(val('cr-value'));
       var person = S.someoneNew ? { name: val('cr-pname'), email: val('cr-pemail') } : null;
@@ -672,12 +699,19 @@
       });
     } else if (k === 'todo') {
       var what2 = val('cr-what'), due = crDue(S.due);
-      p = ensureDeal(c).then(function (id) {
+      // sales item 85: a to-do for someone with no deal is theirs; no deal starts for it
+      if (c.kind === 'contact') {
+        p = onPerson(c, function () {
+          return api('/sales/tasks', { method: 'POST', body: due ? { title: what2, due_date: due, contact_id: c.id } : { title: what2, contact_id: c.id } });
+        }, function () { done('To-do added — ' + (c.name || 'them'), '/crm.html?contact=' + encodeURIComponent(c.id)); });
+      }
+      var todoViaDeal = function () { return ensureDeal(c).then(function (id) {
         return api('/sales/deals/' + encodeURIComponent(id) + '/tasks', { method: 'POST', body: due ? { title: what2, due_date: due } : { title: what2 } }).then(function (r) {
           if (!r.ok) return Promise.reject(msg(r, 'That to-do didn’t save — please try again.'));
           done('To-do added' + (c.title ? ' — ' + c.title : ''), '/crm.html?deal=' + encodeURIComponent(id) + '&tab=deal');
         });
-      });
+      }); };
+      p = p ? p.catch(function (e) { return e && e.useDeal ? todoViaDeal() : Promise.reject(e); }) : todoViaDeal();
     }
     if (p) p.catch(function (e) { fail(typeof e === 'string' ? e : 'Something went wrong — please try again.'); });
   }
