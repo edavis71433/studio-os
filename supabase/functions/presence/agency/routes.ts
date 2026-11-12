@@ -27,7 +27,8 @@ import { handleClientTools } from './client_tools.ts';
 import { handleSiteNumbers } from './site_numbers.ts';
 import { handleDoNext } from './do_next.ts';
 import { HIDEABLE_SECTIONS, normalizeHidden } from '../lib/navigation.ts';
-import { readReservedJsonOrThrow, writeReservedJson, RESERVED_NAMES } from '../lib/reserved_store.ts';
+import { readReservedJsonOrThrow, writeReservedJson, updateReservedJson, RESERVED_NAMES } from '../lib/reserved_store.ts';
+import { readNotify, normalizeNotify, prefFor, quietSites, applyNotifyChange, pickFlags, isSiteId, foldNews } from '../lib/site_notify.ts';
 import { sendInviteLink } from '../lib/workspace.ts';
 import { emailMatch, isUniqueViolation } from '../lib/contact_email.ts';
 import { brandFromKit } from '../lib/email_brand.ts';
@@ -213,6 +214,40 @@ async function handleAgencyInner(req: Request, route: string, method: string, me
     catch { return json({ error: 'read_failed', message: 'Your menu couldn’t load just now.' }, 502, cors); }
     // C16: the page shows the switches by the same rule this PUT keeps (manage_clients)
     return json({ data: { hidden: normalizeHidden(stored), choices: HIDEABLE_SECTIONS, can_edit: can(member.role, 'manage_clients') } }, 200, cors);
+  }
+
+  // ── builder list item 126: one notifications switch per client site, with a Dashboard
+  //    channel and an Email channel. Kept once per studio on its own site, like the menu.
+  //    GET lists every client site with what the studio hears about it; PUT changes one. ──
+  if (route === '/agency/notify' && method === 'GET') {
+    if (!can(member.role, 'read')) return forbid(cors);
+    const own = await ownSiteOf(req.headers.get('x-dds-user-jwt') || '', principal);
+    if (!own) return json({ error: 'no_studio_site', message: 'Notifications are kept on your studio’s own site, and this sign-in doesn’t have one.' }, 409, cors);
+    let stored: unknown;
+    try { stored = await readReservedJsonOrThrow(own.id, RESERVED_NAMES.siteNotify); }
+    catch { return json({ error: 'read_failed', message: 'Your notification choices couldn’t load just now.' }, 502, cors); }   // never a list of switches that lies
+    const store = normalizeNotify(stored);
+    const input = await sharedGather(member.agency_id, now);
+    const sites = input.links.filter((l) => l.status === 'active')
+      .map((l) => ({ site_id: l.site_id, name: input.clientNames[l.site_id] || 'A client site', ...prefFor(store, l.site_id) }))
+      .sort((a, b) => a.name.localeCompare(b.name, 'en', { sensitivity: 'base' }));
+    return json({ data: { sites, can_edit: can(member.role, 'manage_clients') } }, 200, cors);
+  }
+  {
+    const nm = route.match(/^\/agency\/notify\/([^/]+)$/);
+    if (nm && method === 'PUT') {
+      if (!can(member.role, 'manage_clients')) return forbid(cors);
+      const siteId = decodeURIComponent(nm[1]).toLowerCase();
+      const change = pickFlags(await body());
+      if (!isSiteId(siteId) || !Object.keys(change).length) return json({ error: 'bad_request', message: 'Say which site, and turn on or off its notifications, the bell or email.' }, 400, cors);
+      const own = await ownSiteOf(req.headers.get('x-dds-user-jwt') || '', principal);
+      if (!own) return json({ error: 'no_studio_site', message: 'Notifications are kept on your studio’s own site, and this sign-in doesn’t have one.' }, 409, cors);
+      const input = await sharedGather(member.agency_id, now);
+      if (!input.links.some((l) => l.site_id === siteId && l.status === 'active')) return json({ error: 'not_found', message: 'That site isn’t one of your clients’.' }, 404, cors);
+      const saved = await updateReservedJson(own.id, RESERVED_NAMES.siteNotify, (cur) => applyNotifyChange(normalizeNotify(cur), siteId, change), member.email);
+      if (!saved) return json({ error: 'write_failed', message: 'That didn’t save.' }, 502, cors);
+      return json({ data: { site_id: siteId, ...prefFor(saved, siteId) } }, 200, cors);
+    }
   }
 
   // ── builder list items 129 and 180: each site's visitors, Google clicks and health,
@@ -773,7 +808,7 @@ async function runStudioNeeds(member: AgencyMember, principal: Principal, jwt: s
     const none = Promise.resolve({ ok: true, json: [] as unknown[] });
     const swallow = () => ({ ok: false, json: null as unknown });
     const todayStart = now.slice(0, 10) + 'T00:00:00Z';
-    const [recv, supQ, slinkQ, dealsQ, pubQ, connQ, remQ, snQ] = await Promise.all([
+    const [recv, supQ, slinkQ, dealsQ, pubQ, connQ, remQ, snQ, notify] = await Promise.all([
       own ? loadReceivables(own).catch(() => null) : Promise.resolve(null),
       // client_id + requester (sales review B2): name a project-less request; the
       // narrow select is the fallback for a database without 0115's column
@@ -787,6 +822,8 @@ async function runStudioNeeds(member: AgencyMember, principal: Principal, jwt: s
       own ? svc(`presence_plan_notices?site_id=eq.${own.id}&kind=eq.deal_followup&period=like.invremind:*&created_at=gte.${todayStart}&select=period,created_at&limit=500`).catch(swallow) : none,
       // item 70: what's snoozed (APPLY-0146); before the table exists the read fails and nothing is held back
       svc(`presence_needs_snoozes?agency_id=eq.${member.agency_id}&until=gt.${encodeURIComponent(now)}&select=row_key,until,created_at&limit=500`).catch(swallow),
+      // item 126: the client sites whose news and visitor enquiries the studio turned off (a failed read hears everything)
+      readNotify(own?.id),
     ]);
     const rowsOf = <T,>(q: { ok: boolean; json: unknown }): T[] => (q.ok && Array.isArray(q.json) ? (q.json as T[]) : []);
     // Sales review B2: a request with no stamp and no project names its customer
@@ -837,6 +874,7 @@ async function runStudioNeeds(member: AgencyMember, principal: Principal, jwt: s
       own: ownFeed ? { site_id: own?.id || null, enquiries: ownFeed.enquiries || [], messages: ownFeed.client_messages || [], notices: ownFeed.notices || [], deals: ownDeals } : undefined,
       snoozed: Object.fromEntries(rowsOf<{ row_key: string; until: string }>(snQ).map((x) => [String(x.row_key), String(x.until)])),
       snoozedAt: Object.fromEntries(rowsOf<{ row_key: string; created_at?: string | null }>(snQ).filter((x) => x.created_at).map((x) => [String(x.row_key), String(x.created_at)])),   // bug hunt A2: news after the snooze wakes the row
+      quiet: [...quietSites(notify)],   // item 126
     });
     // partial = a slot could not be read (the list may be missing rows, never wrong ones); own_site=false = no studio site to read money/support/deals from
     const partial = !own || !recv || !ownFeed || [supQ, slinkQ, dealsQ, pubQ, connQ, remQ].some((q) => !q.ok);
@@ -846,22 +884,25 @@ async function runStudioNeeds(member: AgencyMember, principal: Principal, jwt: s
     const update_notices = ownFeed ? (ownFeed.notices || []).filter((n: { tier?: string }) => n && n.tier === 'update') : [];
     // builder list item 47: news per client site for the bell's Updates tab, each naming the
     // site and opening the right place inside it (?client= carries the scope)
-    const news = siteNews(input.notices || [], input.clientNames, now);
+    // item 126: repeats fold into one line, and a site the studio turned off stays out
+    const news = siteNews(input.notices || [], input.clientNames, now, 12, quietSites(notify));
     return { ...payload, partial, own_site: !!own, update_notices, news, snooze_ready: !!snQ.ok };
 }
 
 /** Item 47 (pure): the update-tier notices across client sites from the last fourteen days,
  *  newest first, at most twelve, each with the site's name and a link that carries the
- *  client's scope: "Bacchus Kitchen — Published 3 changes · View". */
+ *  client's scope: "Bacchus Kitchen — Published 3 changes · View".
+ *  Item 126: repeats fold into one line per site and kind ("3 new bookings on Bacchus
+ *  Kitchen", with how many in `count`, the line in `title` and its one link's words in
+ *  `link`), and a site the studio turned off (`quiet`) leaves no news at all. */
 export const SITE_NEWS_KINDS: ReadonlySet<string> = new Set(['site_published', 'traffic_spike', 'domain_expiry', 'new_review', 'new_booking']);
-export function siteNews(notices: Array<{ id?: string; site_id: string; kind: string; period?: string; headline?: string; body?: string; created_at?: string }>, names: Record<string, string>, nowIso: string, cap = 12) {
+export function siteNews(notices: Array<{ id?: string; site_id: string; kind: string; period?: string; headline?: string; body?: string; created_at?: string }>, names: Record<string, string>, nowIso: string, cap = 12, quiet: ReadonlySet<string> = new Set()) {
   const since = new Date(Date.parse(nowIso) - 14 * 86_400_000).toISOString();
-  return notices
-    .filter((n) => SITE_NEWS_KINDS.has(String(n.kind)) && String(n.created_at || '') >= since && names[n.site_id])
-    .sort((a, b) => String(b.created_at || '').localeCompare(String(a.created_at || '')))
-    .slice(0, cap)
+  const items = notices
+    .filter((n) => SITE_NEWS_KINDS.has(String(n.kind)) && String(n.created_at || '') >= since && names[n.site_id] && !quiet.has(String(n.site_id).toLowerCase()))
     .map((n) => ({ id: n.id || null, site_id: n.site_id, name: names[n.site_id], kind: n.kind, headline: String(n.headline || ''), body: String(n.body || ''), at: n.created_at || null,
       href: withClient(noticeHrefFor({ kind: String(n.kind), period: n.period }), n.site_id), tier: noticeTier(n.kind) }));
+  return foldNews(items).slice(0, cap);
 }
 const withClient = (href: string, siteId: string) => { const [p, h] = href.split('#'); return p + (p.includes('?') ? '&' : '?') + 'client=' + encodeURIComponent(siteId) + (h ? '#' + h : ''); };
 

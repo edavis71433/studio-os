@@ -592,7 +592,7 @@ function cardHtml(s,i){
       <div class="sline warn" data-why="${esc(s.site_id)}"${st.why?'':' hidden'}>${st.why?`<a href="${esc(st.href)}">Needs you: ${esc(st.why)}</a>`:''}</div>
       <div class="sline" data-tools="${esc(s.site_id)}" hidden></div>
       ${s.state==='not_live'?`<div class="launch"><b>Not published yet</b>${s.unpublished_changes?'There is work on it. Open Website to finish and publish.':'Open Website to build and publish it.'}</div>`:''}
-      ${s.unpublished_changes&&s.state!=='not_live'?'<div class="sline warn">Changes waiting to be published</div>':''}
+      ${changesWaiting(s)?'<div class="sline warn">Changes waiting to be published</div>':''}
       ${s.billing_issue?'<div class="sline warn">Their billing needs a look</div>':''}
       ${copiedHtml(s)}
       ${ownerRowHtml(s)}
@@ -728,13 +728,16 @@ function tableHtml(list){
 
 // ── the filters (the band's numbers and the pills share them) and the search ──
 const domainDays=(s)=>s.domain&&s.domain_expires_at?Math.round((new Date(s.domain_expires_at)-Date.now())/86400000):null;
+// Item 173: a site hosted elsewhere has nothing here to publish, so it never says
+// "Changes waiting" (three such cards did, and the band counted them).
+const changesWaiting=(s)=>!!s.unpublished_changes&&s.state!=='not_live'&&s.state!=='elsewhere';
 const FILTERS={
   all:{label:'All',test:()=>true},
   needs:{label:'Needs you',test:(s)=>!!NEXT[s.site_id]},
   live:{label:'Live',test:(s)=>s.state==='live'},
   notlive:{label:'Not published',test:(s)=>s.state==='not_live'},
   elsewhere:{label:'Hosted elsewhere',test:(s)=>s.state==='elsewhere'},
-  changes:{label:'Changes waiting',test:(s)=>!!s.unpublished_changes&&s.state!=='not_live'},
+  changes:{label:'Changes waiting',test:changesWaiting},
   domains:{label:'Domain renews soon',test:(s)=>{const d=domainDays(s);return d!=null&&d<=30;}},
   drops:{label:'Dropped this month',test:(s)=>dropOf(s)<0},   // items 129 and 180
 };

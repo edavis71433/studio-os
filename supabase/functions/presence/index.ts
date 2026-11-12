@@ -34,7 +34,7 @@ import { checkEntitlement } from './middleware/entitlement.ts';
 import { featureForRoute, requireFeature, loadEdition } from './middleware/feature.ts';
 import { loadPlan, draftingDenial } from './commerce/enforce.ts';
 import { handleGetSite, handleTemplatesList, handlePutTemplate } from './routes/site.ts';
-import { handleSearchHealth, handleRedirectsList, handleRedirectCreate, handleRedirectDelete } from './routes/search.ts';
+import { handleSearchHealth, handleRedirectsList, handleRedirectCreate, handleRedirectSuggest, handleRedirectDelete } from './routes/search.ts';
 import { handleGetIdentity, handlePutIdentity } from './routes/identity.ts';
 import { handlePreview, handlePreviewSection } from './routes/preview.ts';
 import { handlePreviewStatus, handlePreviewPublish, handlePreviewPromote, handlePreviewSettings, handlePublicPreview, handlePublicPreviewOpen, handleSignedPreview, handlePreviewShareLink } from './routes/preview_env.ts';
@@ -586,6 +586,7 @@ async function route_(req: Request, cors: Record<string, string>): Promise<Respo
   if (route === '/visibility/ai/questions' && method === 'PUT') return handleAiQuestionsPut(req, site, principal, cors);
   if (route === '/redirects' && method === 'GET') return handleRedirectsList(site, cors);                 // Phase SD
   if (route === '/redirects' && method === 'POST') return handleRedirectCreate(req, site, principal, cors);
+  if (route === '/redirects/suggest' && method === 'GET') return handleRedirectSuggest(req, site, cors);   // item 156: the old site's pages, matched
   {
     const rm = route.match(/^\/redirects\/([0-9a-f-]{36})$/);
     if (rm && method === 'DELETE') return handleRedirectDelete(site, principal, rm[1], cors);
