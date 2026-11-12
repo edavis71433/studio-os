@@ -255,5 +255,9 @@
 # on every visit to the builder.
 /fonts/library/*
   Cache-Control: public, max-age=2592000
+# Builder item 190: the editor's Preview draws a page in a frame with no origin, which asks for
+# its fonts the way another website would. The fonts are public files, so anyone may read them.
+/fonts/*
+  Access-Control-Allow-Origin: *
 /thumbs/*
   Cache-Control: public, max-age=86400

@@ -2385,7 +2385,7 @@ html.bs-open .scrim{z-index:96}   /* Files and the categories card open over the
             <div id="designPreviewWrap">
               <div class="dp-stage" id="dpStage">
                 <div class="dp-frame">
-                  <iframe id="designPreview" title="Live design preview of your draft home page" aria-hidden="true"></iframe>
+                  <iframe id="designPreview" title="Live design preview of your draft home page" aria-hidden="true" sandbox="allow-same-origin allow-scripts"></iframe>
                   <div id="dcZoomNote" role="status">The whole page · back to full size when you leave Looks</div>
                   <div id="designPreviewEmpty" hidden>
                     <p class="eq" id="dpEmptyTitle">Your preview appears once your pages have content.</p>
@@ -2629,7 +2629,7 @@ html.bs-open .scrim{z-index:96}   /* Files and the categories card open over the
       <button data-dev="mobile">Phone</button>
     </div>
   </div>
-  <div class="stagewrap"><div class="proof" id="proofFrame"><iframe id="previewFrame" title="Preview of your website"></iframe></div></div>
+  <div class="stagewrap"><div class="proof" id="proofFrame"><iframe id="previewFrame" title="Preview of your website" sandbox="allow-scripts allow-popups allow-popups-to-escape-sandbox"></iframe></div></div>
 </div>
 
 <div class="toasts" id="toasts" aria-live="polite"></div>
@@ -7223,7 +7223,7 @@ function loadSiteStage(force) {
   apiHtml("/preview?version=draft&page=" + encodeURIComponent(SS_PATH)).finally(() => { if (seq === SS_SEQ) SS_PENDING = false; }).then((html) => {
     if (seq !== SS_SEQ) return;
     SS_LOADED = true; SS_STALE = false;
-    SS_FRAME.write(html);
+    SS_FRAME.write(frameWall(html));   // item 190
     const note = $("ssNote"); if (note) { note.hidden = true; note.textContent = ""; }
     document.documentElement.classList.remove("ss-noplan");
   }).catch((err) => {
@@ -7543,6 +7543,7 @@ $("verSeg").addEventListener("click", (e) => { const b = e.target.closest("butto
 $("devSeg").addEventListener("click", (e) => { const b = e.target.closest("button"); if (!b) return; PV.dev = b.dataset.dev; syncStageChrome(); });
 $("pageWords").addEventListener("click", (e) => { const b = e.target.closest("button"); if (!b) return; PV.page = b.dataset.page; syncStageChrome(); loadPreview(); });
 window.addEventListener("message", (e) => {
+  if (e.source !== $("previewFrame").contentWindow) return;   // item 190: only the Preview page speaks here
   if (e.data && e.data.presenceNav) { PV.page = e.data.presenceNav; syncStageChrome(); loadPreview(); }
   if (e.data && e.data.presenceRetry && $("stage").classList.contains("on")) loadPreview();   // the proof's own Try again (experience review #13)
 });
@@ -7555,18 +7556,48 @@ function previewIfOpen() { if ($("stage") && $("stage").classList.contains("on")
 // browser dropped the page. The Overview's frame did the same between two quick draws. So a
 // frame's writes go through frameWriter: each is numbered, and a frame that finishes loading an
 // older one is given the newest again (twice in a row at most, so nothing can loop).
+// Item 190: Preview's frame has no origin (frameWall below), so its page can't be read from
+// here; it says which write it shows in a message. The others are read directly, as before.
 function frameWriter(frame) {
   const w = { count: 0, doc: "", redos: 0 };
-  w.write = (doc) => { w.doc = doc ? doc + `<!--dds-proof ${++w.count}-->` : ""; w.redos = 0; frame.srcdoc = w.doc; };
-  frame.addEventListener("load", () => {
+  const sb = frame.getAttribute("sandbox"), sealed = sb !== null && !/\ballow-same-origin\b/.test(sb);
+  const stamp = (n) => (sealed ? `<script>parent.postMessage({ ddsProof: ${n} }, "*")<\/script>` : `<!--dds-proof ${n}-->`);
+  w.write = (doc) => { w.doc = doc ? doc + stamp(++w.count) : ""; w.redos = 0; frame.srcdoc = w.doc; };
+  const shows = (shown) => {
+    if (!w.doc) return;
+    if (shown === w.count) w.redos = 0;
+    else if (shown && shown < w.count && w.redos++ < 2) frame.srcdoc = w.doc;
+  };
+  if (sealed) window.addEventListener("message", (e) => { if (e.source === frame.contentWindow && e.data && Number.isInteger(e.data.ddsProof)) shows(e.data.ddsProof); });
+  else frame.addEventListener("load", () => {
     const d = frame.contentDocument;
     if (!w.doc || !d) return;
     const walk = d.createTreeWalker(d, NodeFilter.SHOW_COMMENT); let n, shown = 0;
     while ((n = walk.nextNode())) { const m = /^dds-proof (\d+)$/.exec(n.data); if (m) shown = +m[1]; }
-    if (shown === w.count) w.redos = 0;
-    else if (shown && shown < w.count && w.redos++ < 2) frame.srcdoc = w.doc;
+    shows(shown);
   });
   return w;
+}
+// ── Item 190 (review file 06, finding 1): the editor's page frames are walled off from the app ──
+// A page the editor draws is the site's own HTML, which a Developer seat can shape (custom HTML,
+// cleaned on the server by lib/dev_html.ts). Drawn in a frame of the app's own origin, a script
+// that got through would run as whoever has the editor open. So:
+// · Edit's canvas (#designPreview) and the Overview (#siteFrame) stay same-origin, because the
+//   editor works inside them (its section tools are drawn in the page and it listens there), but
+//   every page they draw carries a rule that runs none of its own scripts: no <script>, no on…
+//   attribute, no javascript: link. The editor's listeners are the app's own code and still run.
+//   (A sandbox without allow-scripts walls a page off as well in Chromium, but WebKit then drops
+//   the editor's listeners too, so the iPad and iPhone couldn't edit.)
+// · Preview (#previewFrame) is a visitor's view, so the page's own scripts run there (the phone
+//   menu, the hours line, a pop-up), in a frame with no origin, which can't reach the app at all
+//   and speaks to it only by message.
+const FRAME_RULE = `<meta http-equiv="Content-Security-Policy" content="script-src 'none'; object-src 'none'">`;
+function frameWall(html) {
+  const s = String(html || "");
+  const h = /<head\b[^>]*>/i.exec(s);
+  if (h) return s.slice(0, h.index + h[0].length) + FRAME_RULE + s.slice(h.index + h[0].length);
+  const d = /^\s*<!doctype[^>]*>/i.exec(s);   // before anything else, but after the doctype, so the page keeps its mode
+  return d ? d[0] + FRAME_RULE + s.slice(d[0].length) : FRAME_RULE + s;
 }
 // An answer to an older ask (another page or version picked meanwhile, or Preview closed) is
 // dropped, as the Overview's are.
@@ -14177,7 +14208,7 @@ async function dcTimewarpGo() {
       const html = await apiHtml(`/preview?publish_id=${encodeURIComponent(d.publish_id)}&page=${encodeURIComponent(path)}`);
       if (seq !== DC_TW_SEQ || DC_MODE !== "timewarp") return;
       DP_PAINT_OPEN = DC_PAGE_OPENS;
-      frame.srcdoc = html;
+      frame.srcdoc = frameWall(html);   // item 190
     }
     DC_TW_LOADED = true;
     const when = new Date(dt.value + "T12:00:00").toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" });
@@ -16039,7 +16070,7 @@ function refreshDesignPreview() {
       if (DC_MODE === "timewarp" && DC_TW_LOADED) return;
       if (dpHoldRepaint()) return;   // a session may have opened while that read was in flight
       DP_PAINT_OPEN = opened; DP_READ_PAINTED = read;
-      frame.srcdoc = html;
+      frame.srcdoc = frameWall(html);   // item 190
       const box = $("designPreviewEmpty"); if (box) { box.hidden = true; box.classList.remove("plan"); }
     } catch (err) {
       if (opened !== DC_PAGE_OPENS || read < DP_READ_PAINTED) return;
