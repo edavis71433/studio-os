@@ -1,4 +1,5 @@
 import { test, expect, Page, Route } from '@playwright/test';
+import AxeBuilder from '@axe-core/playwright';
 import { installApp, STUDIO_LEVEL_NAV, ALL_FEATURES } from './helpers/app';
 
 // Builder list items 43, 45 and 52 (Nov 2026): the studio's Sites page (every client
@@ -1052,4 +1053,30 @@ test.describe('Domains: borrowed from Namecheap and Squarespace (item 174)', () 
     await expect.poll(() => calls.length).toBe(1);
     expect(calls[0]).toEqual({ body: { goal: 'email_setup', provider: 'google_workspace', preview: true }, scope: 's1' });
   });
+});
+
+// Builder list item 150 (review file 05, finding 18): Sites and Domains in the accessibility
+// scan, light and dark, with the cards' pictures and the table drawn.
+test.describe('Sites and Domains accessibility (builder list item 150)', () => {
+  test.beforeEach(({}, testInfo) => { test.skip(testInfo.project.name !== 'desktop-chromium', 'axe once, on desktop'); });
+  const scan = async (page: Page) => {
+    await page.waitForLoadState('networkidle');
+    const r = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa']).analyze();
+    return r.violations.filter((v) => v.impact === 'serious' || v.impact === 'critical').map((v) => `${v.id} (${v.nodes.length}): ${v.nodes.map((n) => n.target.join(' ') + ' ' + String(n.any[0]?.message || '').slice(0, 170)).join(' | ')}`);
+  };
+  for (const scheme of ['light', 'dark'] as const) {
+    test(`no serious/critical axe violations on Sites (${scheme})`, async ({ page }) => {
+      await page.emulateMedia({ colorScheme: scheme });
+      await openSites(page);
+      await expect(page.locator('.scard')).toHaveCount(3);
+      expect(await scan(page)).toEqual([]);
+    });
+    test(`no serious/critical axe violations on Domains (${scheme})`, async ({ page }) => {
+      await page.emulateMedia({ colorScheme: scheme });
+      await installApp(page, { api: { '/portal/context': studioContext, '/agency/domains': DOMAINS } });
+      await page.goto('/domains.html');
+      await expect(page.locator('table[aria-label="Domains"] tbody tr')).toHaveCount(4);
+      expect(await scan(page)).toEqual([]);
+    });
+  }
 });

@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import AxeBuilder from '@axe-core/playwright';
 import { installApp, STUDIO_NAV, ALL_FEATURES } from './helpers/app';
 
 // ── Sharing & access (sharing.html) ──────────────────────────────────────────
@@ -376,4 +377,22 @@ test.describe('Sharing & access — a studio picks the client first (item 136)',
     await page.goto('/sharing.html');
     await expect(page.locator('#pickList')).toContainText('Your clients wouldn’t load just now.');
   });
+});
+
+// Builder list item 150 (review file 05, finding 18): Sharing & access in the accessibility
+// scan, light and dark, with people on the list.
+test.describe('Sharing & access accessibility (builder list item 150)', () => {
+  test.beforeEach(({}, testInfo) => { test.skip(testInfo.project.name !== 'desktop-chromium', 'axe once, on desktop'); });
+  for (const scheme of ['light', 'dark'] as const) {
+    test(`no serious/critical axe violations (${scheme})`, async ({ page }) => {
+      await page.emulateMedia({ colorScheme: scheme });
+      await installApp(page, { api: { '/portal/members': people({ data: [DANA, JO] }), '/portal/shares': SHARES_NONE } });
+      await page.goto('/sharing.html');
+      await expect(peopleCard(page)).toContainText('dana@example.com');
+      await page.waitForLoadState('networkidle');
+      const r = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa']).analyze();
+      const bad = r.violations.filter((v) => v.impact === 'serious' || v.impact === 'critical');
+      expect(bad.map((v) => `${v.id} (${v.nodes.length}): ${v.nodes.map((n) => n.target.join(' ') + ' ' + String(n.any[0]?.message || '').slice(0, 170)).join(' | ')}`)).toEqual([]);
+    });
+  }
 });

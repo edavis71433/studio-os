@@ -688,16 +688,20 @@ test.describe('Project record page', () => {
 test.describe('Projects accessibility', () => {
   test.beforeEach(({}, testInfo) => { test.skip(testInfo.project.name !== 'desktop-chromium', 'axe once, on desktop'); });
 
-  test('no serious/critical axe violations on the roster (table view)', async ({ page }) => {
-    await pinTable(page);
-    await installApp(page, { api: API });
-    await page.goto('/projects.html');
-    await expect(page.locator('tbody tr')).toHaveCount(3);
-    await page.waitForLoadState('networkidle');
-    const results = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa']).analyze();
-    const serious = results.violations.filter((v) => v.impact === 'critical' || v.impact === 'serious');
-    expect(serious.map((v) => `${v.id} (${v.nodes.length})`)).toEqual([]);
-  });
+  // builder list item 150: light and dark both
+  for (const scheme of ['light', 'dark'] as const) {
+    test(`no serious/critical axe violations on the roster (table view, ${scheme})`, async ({ page }) => {
+      await page.emulateMedia({ colorScheme: scheme });
+      await pinTable(page);
+      await installApp(page, { api: API });
+      await page.goto('/projects.html');
+      await expect(page.locator('tbody tr')).toHaveCount(3);
+      await page.waitForLoadState('networkidle');
+      const results = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa']).analyze();
+      const serious = results.violations.filter((v) => v.impact === 'critical' || v.impact === 'serious');
+      expect(serious.map((v) => `${v.id} (${v.nodes.length}): ${v.nodes.map((n) => n.target.join(' ')).join(' | ')}`)).toEqual([]);
+    });
+  }
 
   test('no serious/critical axe violations on the record page (Status menu open)', async ({ page }) => {
     await installApp(page, { api: API });
