@@ -2021,8 +2021,8 @@ serveWithRequestCors(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: reqCors });
 
   try {
-    // Most routes are POST with a JSON body. OAuth redirects (e.g. Google) arrive
-    // as GET with ?type=...&code=...&state=... and no body — handle both.
+    // Routes are POST with a JSON body; a GET with ?type=... is read the same way
+    // (the Google OAuth redirect that needed it left with builder item 213).
     let body: any = {};
     const _url = new URL(req.url);
     if (req.method === 'GET') {
@@ -2050,8 +2050,6 @@ serveWithRequestCors(async (req) => {
     //  Runs once, up front. Privileged routes (ROUTE_MIN_ROLE) require a real
     //  membership row AND sufficient role. Everything else falls through to its
     //  own handling (public routes, client-portal routes, secret-gated jobs).
-    //  The inline `verifyAdminJwt` checks still present in routes below are now
-    //  redundant but harmless; they delegate to the same fail-closed logic.
     // ═══════════════════════════════════════════════════════════════════════
     {
       const minRole = ROUTE_MIN_ROLE[type as string];
@@ -2092,9 +2090,6 @@ serveWithRequestCors(async (req) => {
     }
 
 
-    // ═══════════════════════════════════════════════════════════════════════
-    //  END EVENT SPINE ROUTES
-    // ═══════════════════════════════════════════════════════════════════════
 
     if (RATE_LIMITED_TYPES.has(type)) {
       // Durable, tenant/IP-keyed limiter; fall back to the in-memory per-IP
