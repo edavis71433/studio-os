@@ -63,9 +63,11 @@ ok('FIX3: when the bell rings but nothing is renderable inline, Today points to 
   /if\(shown === 0 && bellCount > 0\)\{[\s\S]*?\/inbox\.html/.test(today));
 
 // ── FIX 4: missing-required content shows in the main feed, not only Attention Center
-ok('FIX4: the feed emits a missing_required row reusing the Content Tree signal',
-  /siteContentTree/.test(workspace) && /kind: 'missing_required'/.test(workspace) &&
-  /status === 'missing_required'/.test(workspace));
+// item 209: the Content Tree's count is kept on the site (lib/unfinished.ts), not rebuilt per open
+const unfinished = read('supabase/functions/presence/lib/unfinished.ts');
+ok('FIX4: the feed emits a missing_required row from the Content Tree signal',
+  /unfinishedSectionsOf\(site\)/.test(workspace) && /kind: 'missing_required'/.test(workspace) &&
+  /buildContentTree\(/.test(unfinished) && /status === 'missing_required'/.test(unfinished));
 ok('FIX4: missing_required has a NOTICE_HREF (the overview\'s Pages — content-tree.html retired)', /missing_required: '\/presence\.html#pages'/.test(workspace));
 
 // ── moat: still ONE model — no new table/store/engine introduced here ────────

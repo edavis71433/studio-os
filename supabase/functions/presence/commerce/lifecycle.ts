@@ -996,6 +996,8 @@ export async function runSupportAging(limit = 20): Promise<{ nudged: number }> {
 // ever swept them — an unpaid deposit simply sat. One reminder per invoice
 // (send-once via the notices dedupe), re-using the stored Stripe link, to the
 // deal's contact; the owner gets the notice on the same rail.
+/** Item 209: how many open invoices the reminder sweep reads at once, and at most how many pages a run. */
+export const INVOICE_PAGE = 200, INVOICE_PAGES = 25;
 export async function runInvoiceReminders(limit = 20): Promise<{ reminded: number }> {
   // Studio audit 2026-10, change 10: three reminders per invoice (−7 · due · +N),
   // behind the per-site switch "Remind unpaid invoices …" (benchmark item 6),
@@ -1006,102 +1008,118 @@ export async function runInvoiceReminders(limit = 20): Promise<{ reminded: numbe
   // 0132) is not unpaid: nudging that client would be wrong. Tolerant: before
   // the migration the filter 400s, so fall back to the pre-0132 query.
   const COLS = 'id,site_id,deal_id,title,amount_cents,purpose,stripe_url,due_date,created_at,status';
-  const TAIL = `&created_at=lt.${encodeURIComponent(today)}&order=created_at.asc&limit=${limit * 10}`;
+  // Item 209 (review file 06, finding 63): the open invoices a page at a time, oldest
+  // first, until `limit` reminders were tried or every one was looked at. One read of
+  // 200 used to be all of it, so an old invoice that had had all its reminders kept its
+  // place at the front for good, and a newer one past the 200th was never reminded.
+  const TAIL = (page: number) => `&created_at=lt.${encodeURIComponent(today)}&order=created_at.asc,id.asc&limit=${INVOICE_PAGE}&offset=${page * INVOICE_PAGE}`;
   // Sales items 116 and 118 (migration 0188): first_sent_at is the day reminders count
   // from, and an invoice whose link was cleared (link_gen > 0: a bounced bank payment,
   // a part payment, an Undo) is still owed, so it stays in the sweep and gets its fresh
   // link here if nothing made one yet. Before 0188 the read is refused → the old one.
-  let q = await svc(`presence_invoices?status=eq.open&deleted_at=is.null&payment_for=is.null&or=(stripe_url.not.is.null,link_gen.gt.0)&processing_since=is.null&select=${COLS},first_sent_at,link_gen,description,currency${TAIL}`);
-  if (!q.ok) q = await svc(`presence_invoices?status=eq.open&deleted_at=is.null&stripe_url=not.is.null&processing_since=is.null&select=${COLS}${TAIL}`);
-  if (!q.ok) q = await svc(`presence_invoices?status=eq.open&deleted_at=is.null&stripe_url=not.is.null&select=${COLS}${TAIL}`);
-  const candidates = (Array.isArray(q.json) ? q.json : []) as Array<{ id: string; site_id: string; deal_id: string | null; title?: string; description?: string; currency?: string; amount_cents: number; purpose: string; stripe_url: string | null; due_date?: string | null; created_at: string; first_sent_at?: string | null; link_gen?: number; status?: string; processing_since?: string | null }>;
-  // An owed invoice with no link gets one first, whatever the reminder switch says:
-  // the client's Pay button needs it too. (Normally the route that cleared the link
-  // made the new one there and then; this is the net under it.)
-  let minted = 0;
-  for (const inv of candidates) {
-    if (inv.stripe_url || minted >= limit) continue;
-    minted++;
-    const { mintPayLink } = await import('../lib/pay_link.ts');
-    inv.stripe_url = await mintPayLink(inv);
-  }
+  const READS = [
+    `presence_invoices?status=eq.open&deleted_at=is.null&payment_for=is.null&or=(stripe_url.not.is.null,link_gen.gt.0)&processing_since=is.null&select=${COLS},first_sent_at,link_gen,description,currency`,
+    `presence_invoices?status=eq.open&deleted_at=is.null&stripe_url=not.is.null&processing_since=is.null&select=${COLS}`,
+    `presence_invoices?status=eq.open&deleted_at=is.null&stripe_url=not.is.null&select=${COLS}`,
+  ];
+  type Candidate = { id: string; site_id: string; deal_id: string | null; title?: string; description?: string; currency?: string; amount_cents: number; purpose: string; stripe_url: string | null; due_date?: string | null; created_at: string; first_sent_at?: string | null; link_gen?: number; status?: string; processing_since?: string | null };
+  let read = 0, minted = 0, tried = 0, reminded = 0;
   const settingsCache = new Map<string, AutomationSettings>();
-  // Which leg (if any) each invoice is on today — only for sites with the switch on.
-  const due: Array<{ inv: typeof candidates[number]; slot: InvoiceReminderSlot }> = [];
-  for (const inv of candidates) {
-    if (!inv.stripe_url) continue;
-    const auto = await automationSettingsFor(inv.site_id, settingsCache);
-    if (!auto.invoice_reminders) continue;
-    const slot = invoiceReminderSlot(inv, today, auto.invoice_remind_after_days, auto.invoice_overdue_repeat);
-    if (slot) due.push({ inv, slot });
-  }
-  // Drop already-sent legs up front (the wide window + filter avoids the
-  // starvation the old once-ever sweep had). The legacy once-ever key
-  // `invremind:<id>` counts as the after-leg done. The again-leg (item 87) also
-  // reads the after-leg's row: it goes a week after that one went, and when the
-  // after-leg never went (the switch came on late) that one goes first.
-  let fresh = due;
-  if (due.length) {
-    const periods = due.map(({ inv, slot }) => `"${invoiceReminderPeriod(inv.id, slot)}"${slot === 'after' || slot === 'again' ? `,"invremind:${inv.id}","${invoiceReminderPeriod(inv.id, 'after')}"` : ''}`).join(',');
-    const seen = await svc(`presence_plan_notices?kind=eq.deal_followup&period=in.(${periods})&select=period,created_at&limit=${due.length * 4}`);
-    const doneAt = new Map(((seen.json as Array<{ period: string; created_at?: string }>) || []).map((r) => [r.period, String(r.created_at || '')]));
-    fresh = due.map(({ inv, slot }) => ({ inv, slot: legToSend(slot, doneAt.get(invoiceReminderPeriod(inv.id, 'after')) ?? doneAt.get(`invremind:${inv.id}`) ?? null, Date.now()) }))
-      .filter((x): x is { inv: typeof candidates[number]; slot: InvoiceReminderSlot } => x.slot !== null)
-      .filter(({ inv, slot }) => !doneAt.has(invoiceReminderPeriod(inv.id, slot)) && !(slot === 'after' && doneAt.has(`invremind:${inv.id}`))).slice(0, limit);
-  }
-  let reminded = 0;
-  for (const { inv, slot } of fresh) {
-    const siteQ = await svc(`presence_sites?id=eq.${inv.site_id}&select=client_id&limit=1`);
-    const clientId = siteQ.json?.[0]?.client_id;
-    if (!clientId) continue;
-    const amount = '$' + ((Number(inv.amount_cents) || 0) / 100).toLocaleString('en-US', { minimumFractionDigits: 2 });
-    const what: 'deposit' | 'invoice' = inv.purpose === 'deposit' ? 'deposit' : 'invoice';
-    const undated = !ymdOf(inv.due_date);
-    // Discover the client email FIRST — the notice must tell the truth about
-    // whether a nudge actually went out (and never burn the once-ever dedupe
-    // on a claim that didn't happen). The client is the invoice's deal contact.
-    let email = '';
-    try {
-      if (inv.deal_id) {
-        const deal = (await svc(`presence_deals?id=eq.${inv.deal_id}&site_id=eq.${inv.site_id}&select=contact_id&limit=1`)).json?.[0];
-        email = deal?.contact_id ? String((await svc(`presence_contacts?id=eq.${deal.contact_id}&site_id=eq.${inv.site_id}&select=email&limit=1`)).json?.[0]?.email || '') : '';
-      }
-    } catch { /* treated as no email on file */ }
-    // The earlier legs are the CLIENT's business: a silent ledger row (the
-    // send-once gate) and the email. The after-leg is the one the OPERATOR
-    // hears — an active "Still unpaid" row on the bell, as before.
-    const operatorHears = slot === 'after';
-    if (!operatorHears && !email) continue;   // nothing to send and nobody to tell — wait for the after-leg
-    const period = invoiceReminderPeriod(inv.id, slot);
-    const created = await raiseNotice({ siteId: inv.site_id, clientId, kind: 'deal_followup', period: invoiceReminderPeriod(inv.id, slot), headline: operatorHears ? `Still unpaid — ${inv.title || what} (${amount})` : `${slot === 'again' ? 'Second reminder sent' : 'Reminder sent'} — ${inv.title || what} (${amount})`, body: invoiceReminderOperatorBody(slot, !!email, undated, (await automationSettingsFor(inv.site_id, settingsCache)).invoice_overdue_repeat), status: operatorHears ? 'active' : 'dismissed' });
-    if (!created) continue;   // this leg already went — never nag
-    if (!email) { reminded++; continue; }   // the studio was told there is nobody to email
-    // Sales item 118: the row above is only the CLAIM (so two sweeps can't both email).
-    // The email is awaited, and a reminder counts as sent only once it left. It used to
-    // be fired and forgotten: a bounce or an outage still read "We nudged the client",
-    // and that reminder was never tried again.
-    let sent = false;
-    try {
-      const brand = await loadEmailBrand(inv.site_id);
-      const copy = invoiceReminderCopy(slot, what, amount, String(inv.title || ''), undated);
-      const btn = `<a href="${inv.stripe_url}" style="display:inline-block;margin-top:6px;background:${brand.accent};color:#fff;padding:9px 16px;border-radius:999px;text-decoration:none">Pay ${amount} securely →</a>`;
-      // Sales item 92: a reminder offers more than "pay": the invoice itself, and a reply
-      const { docLinkFor } = await import('../routes/sales.ts');
-      const doc = await docLinkFor('invoice', inv.id, inv.site_id).catch(() => null);
-      const more = invoiceReminderMore(doc, brand.accentDark);
-      // Sales item 74: money they owe always reaches them (critical, so no unsubscribe on it); their answer lands in the Inbox
-      sent = await sendEmail(email, copy.subject, `<p>${copy.line}</p><p class="cta">${btn}</p>${more}`, brand, { critical: true, asBusiness: true, siteId: inv.site_id }).catch(() => false);
-    } catch { sent = false; }
-    const failedPeriod = invoiceReminderFailedPeriod(inv.id, slot);
-    if (sent) {
-      reminded++;
-      await clearNotice(clientId, 'deal_followup', failedPeriod).catch(() => {});   // an earlier try that failed is history now
-      continue;
+  // one page: a link made where one is missing, then the legs due today, sent
+  const sweep = async (candidates: Candidate[]) => {
+    // An owed invoice with no link gets one first, whatever the reminder switch says:
+    // the client's Pay button needs it too. (Normally the route that cleared the link
+    // made the new one there and then; this is the net under it.)
+    for (const inv of candidates) {
+      if (inv.stripe_url || minted >= limit) continue;
+      minted++;
+      const { mintPayLink } = await import('../lib/pay_link.ts');
+      inv.stripe_url = await mintPayLink(inv);
     }
-    // It did not leave: the claim comes off, so the next sweep tries this leg again,
-    // and the studio is told once, in words that are true.
-    await svc(`presence_plan_notices?client_id=eq.${encodeURIComponent(clientId)}&kind=eq.deal_followup&period=eq.${encodeURIComponent(period)}`, { method: 'DELETE' }).catch(() => {});
-    await raiseNotice({ siteId: inv.site_id, clientId, kind: 'deal_followup', period: invoiceReminderFailedPeriod(inv.id, slot), headline: `Reminder didn’t send — ${inv.title || what} (${amount})`, body: 'Our reminder email to the client didn’t go out. We’ll try again on the next run. If their address is wrong, fix it on the contact, or send them a personal note.' });
+    // Which leg (if any) each invoice is on today — only for sites with the switch on.
+    const due: Array<{ inv: typeof candidates[number]; slot: InvoiceReminderSlot }> = [];
+    for (const inv of candidates) {
+      if (!inv.stripe_url) continue;
+      const auto = await automationSettingsFor(inv.site_id, settingsCache);
+      if (!auto.invoice_reminders) continue;
+      const slot = invoiceReminderSlot(inv, today, auto.invoice_remind_after_days, auto.invoice_overdue_repeat);
+      if (slot) due.push({ inv, slot });
+    }
+    // Drop already-sent legs up front (the wide window + filter avoids the
+    // starvation the old once-ever sweep had). The legacy once-ever key
+    // `invremind:<id>` counts as the after-leg done. The again-leg (item 87) also
+    // reads the after-leg's row: it goes a week after that one went, and when the
+    // after-leg never went (the switch came on late) that one goes first.
+    let fresh = due;
+    if (due.length) {
+      const periods = due.map(({ inv, slot }) => `"${invoiceReminderPeriod(inv.id, slot)}"${slot === 'after' || slot === 'again' ? `,"invremind:${inv.id}","${invoiceReminderPeriod(inv.id, 'after')}"` : ''}`).join(',');
+      const seen = await svc(`presence_plan_notices?kind=eq.deal_followup&period=in.(${periods})&select=period,created_at&limit=${due.length * 4}`);
+      const doneAt = new Map(((seen.json as Array<{ period: string; created_at?: string }>) || []).map((r) => [r.period, String(r.created_at || '')]));
+      fresh = due.map(({ inv, slot }) => ({ inv, slot: legToSend(slot, doneAt.get(invoiceReminderPeriod(inv.id, 'after')) ?? doneAt.get(`invremind:${inv.id}`) ?? null, Date.now()) }))
+        .filter((x): x is { inv: typeof candidates[number]; slot: InvoiceReminderSlot } => x.slot !== null)
+        .filter(({ inv, slot }) => !doneAt.has(invoiceReminderPeriod(inv.id, slot)) && !(slot === 'after' && doneAt.has(`invremind:${inv.id}`))).slice(0, limit - tried);
+    }
+    tried += fresh.length;
+    for (const { inv, slot } of fresh) {
+      const siteQ = await svc(`presence_sites?id=eq.${inv.site_id}&select=client_id&limit=1`);
+      const clientId = siteQ.json?.[0]?.client_id;
+      if (!clientId) continue;
+      const amount = '$' + ((Number(inv.amount_cents) || 0) / 100).toLocaleString('en-US', { minimumFractionDigits: 2 });
+      const what: 'deposit' | 'invoice' = inv.purpose === 'deposit' ? 'deposit' : 'invoice';
+      const undated = !ymdOf(inv.due_date);
+      // Discover the client email FIRST — the notice must tell the truth about
+      // whether a nudge actually went out (and never burn the once-ever dedupe
+      // on a claim that didn't happen). The client is the invoice's deal contact.
+      let email = '';
+      try {
+        if (inv.deal_id) {
+          const deal = (await svc(`presence_deals?id=eq.${inv.deal_id}&site_id=eq.${inv.site_id}&select=contact_id&limit=1`)).json?.[0];
+          email = deal?.contact_id ? String((await svc(`presence_contacts?id=eq.${deal.contact_id}&site_id=eq.${inv.site_id}&select=email&limit=1`)).json?.[0]?.email || '') : '';
+        }
+      } catch { /* treated as no email on file */ }
+      // The earlier legs are the CLIENT's business: a silent ledger row (the
+      // send-once gate) and the email. The after-leg is the one the OPERATOR
+      // hears — an active "Still unpaid" row on the bell, as before.
+      const operatorHears = slot === 'after';
+      if (!operatorHears && !email) continue;   // nothing to send and nobody to tell — wait for the after-leg
+      const period = invoiceReminderPeriod(inv.id, slot);
+      const created = await raiseNotice({ siteId: inv.site_id, clientId, kind: 'deal_followup', period: invoiceReminderPeriod(inv.id, slot), headline: operatorHears ? `Still unpaid — ${inv.title || what} (${amount})` : `${slot === 'again' ? 'Second reminder sent' : 'Reminder sent'} — ${inv.title || what} (${amount})`, body: invoiceReminderOperatorBody(slot, !!email, undated, (await automationSettingsFor(inv.site_id, settingsCache)).invoice_overdue_repeat), status: operatorHears ? 'active' : 'dismissed' });
+      if (!created) continue;   // this leg already went — never nag
+      if (!email) { reminded++; continue; }   // the studio was told there is nobody to email
+      // Sales item 118: the row above is only the CLAIM (so two sweeps can't both email).
+      // The email is awaited, and a reminder counts as sent only once it left. It used to
+      // be fired and forgotten: a bounce or an outage still read "We nudged the client",
+      // and that reminder was never tried again.
+      let sent = false;
+      try {
+        const brand = await loadEmailBrand(inv.site_id);
+        const copy = invoiceReminderCopy(slot, what, amount, String(inv.title || ''), undated);
+        const btn = `<a href="${inv.stripe_url}" style="display:inline-block;margin-top:6px;background:${brand.accent};color:#fff;padding:9px 16px;border-radius:999px;text-decoration:none">Pay ${amount} securely →</a>`;
+        // Sales item 92: a reminder offers more than "pay": the invoice itself, and a reply
+        const { docLinkFor } = await import('../routes/sales.ts');
+        const doc = await docLinkFor('invoice', inv.id, inv.site_id).catch(() => null);
+        const more = invoiceReminderMore(doc, brand.accentDark);
+        // Sales item 74: money they owe always reaches them (critical, so no unsubscribe on it); their answer lands in the Inbox
+        sent = await sendEmail(email, copy.subject, `<p>${copy.line}</p><p class="cta">${btn}</p>${more}`, brand, { critical: true, asBusiness: true, siteId: inv.site_id }).catch(() => false);
+      } catch { sent = false; }
+      const failedPeriod = invoiceReminderFailedPeriod(inv.id, slot);
+      if (sent) {
+        reminded++;
+        await clearNotice(clientId, 'deal_followup', failedPeriod).catch(() => {});   // an earlier try that failed is history now
+        continue;
+      }
+      // It did not leave: the claim comes off, so the next sweep tries this leg again,
+      // and the studio is told once, in words that are true.
+      await svc(`presence_plan_notices?client_id=eq.${encodeURIComponent(clientId)}&kind=eq.deal_followup&period=eq.${encodeURIComponent(period)}`, { method: 'DELETE' }).catch(() => {});
+      await raiseNotice({ siteId: inv.site_id, clientId, kind: 'deal_followup', period: invoiceReminderFailedPeriod(inv.id, slot), headline: `Reminder didn’t send — ${inv.title || what} (${amount})`, body: 'Our reminder email to the client didn’t go out. We’ll try again on the next run. If their address is wrong, fix it on the contact, or send them a personal note.' });
+    }
+  };
+  for (let page = 0; page < INVOICE_PAGES && tried < limit; page++) {
+    let q = await svc(READS[read] + TAIL(page));
+    while (!q.ok && page === 0 && read < READS.length - 1) q = await svc(READS[++read] + TAIL(page));
+    if (!q.ok || !Array.isArray(q.json)) break;
+    await sweep(q.json as Candidate[]);
+    if (q.json.length < INVOICE_PAGE) break;
   }
   return { reminded };
 }
