@@ -216,6 +216,7 @@ ok('truncated month → the card carries the "based on recent activity" note; un
 const ROOT=new URL('../../',import.meta.url);
 const read=(p)=>Deno.readTextFileSync(new URL(p,ROOT));
 const cd=read('supabase/functions/presence/routes/client_delivery.ts');
+const vs=read('supabase/functions/presence/lib/visit_stats.ts');
 const idx=read('supabase/functions/presence/index.ts');
 const page=read('client.html');
 
@@ -223,14 +224,13 @@ ok('route: handleClientWebsiteStats exists with the standard client-handler sign
   /export async function handleClientWebsiteStats\(_req: Request, site: SiteRow, _principal: Principal, cors: Record<string, string>\)/.test(cd));
 ok('route: unpublished sites short-circuit to published:false (the portal hides the card)',
   /const published = site\.status === 'live' \|\| !!site\.last_published_at;\s*\n\s*if \(!published\) return json\(\{ data: \{ published: false/.test(cd));
-ok('route: the visits read is scoped to the caller\'s OWN site (site_id=eq.${site.id})',
-  /presence_visits\?site_id=eq\.\$\{site\.id\}&ts=gte\./.test(cd));
-ok('route: reuses the slice-8 pure helpers (dashRange · weeklyVisitors · sourceShares · aggregateVisits)',
+ok('route: the visits read is scoped to the caller\'s OWN site, and counted in the database (item 207)',
+  /readVisitStats\(site\.id, \{ startMs, weeks: DASH_WEEKS, nowMs \}\)/.test(cd) && !/presence_visits\?/.test(cd.slice(cd.indexOf('export async function handleClientWebsiteStats'), cd.indexOf('// search: null = genuinely not connected'))));
+ok('route: reuses the slice-8 pure helpers (dashRange · sourceShares) and the dashboard\'s own visits read',
   /from '\.\.\/lib\/analytics_dashboard\.ts'/.test(cd) && /dashRange\('this_month', nowMs\)/.test(cd)
-  && /weeklyVisitors\(vRows, nowMs\)/.test(cd) && /sourceShares\(agg\.topSources, agg\.visitors\)/.test(cd));
-ok('route: exact calendar boundary — visits are intersected with the true month start before aggregating',
-  /const periodRows = vRows\.filter\(\(v\) => \{ const ms = Date\.parse\(String\(v\.ts \|\| ''\)\); return Number\.isFinite\(ms\) && ms >= startMs; \}\);/.test(cd)
-  && /aggregateVisits\(periodRows, nowMs, days\)/.test(cd));
+  && /weekly: stats\.weekly \|\| \[\]/.test(cd) && /sourceShares\(agg\.topSources, agg\.visitors\)/.test(cd));
+ok('route: exact calendar boundary — the count starts at the true month start, in the database and on the row path',
+  /p_start: iso\(w\.startMs\)/.test(vs) && /ms >= w\.startMs && ms < end/.test(vs) && /ts >= p_start/.test(read('supabase/migrations/0194_visit_stats.sql')));
 ok('route: reuses the dashboard\'s GSC reads (readGsc + readSearchTerms from routes/analytics.ts)',
   /import \{ readGsc, readSearchTerms \} from '\.\/analytics\.ts';/.test(cd)
   && /readSearchTerms\(site\.client_id \|\| '', gsc\.period\)/.test(cd));
@@ -238,10 +238,10 @@ ok('route: a FAILED GSC read is distinguishable from not-connected (unavailable:
   cd.includes('if (!gsc || !gsc.ok) search = { unavailable: true };') && cd.includes('else if (gsc.hasData)'));
 ok('route: the portal search payload names its period (same string the studio shows)',
   /clicks: gsc\.clicks, impressions: gsc\.impressions, period: gsc\.period/.test(cd));
-ok('route: the month payload carries the truncation flag when the visits read hit its cap',
-  /truncated: vRows\.length >= 5000/.test(cd));
+ok('route: the month payload carries the truncation flag (only the row path before 0194 can set it)',
+  /truncated: stats\.truncated/.test(cd));
 ok('route: tolerant reads — each section null on failure, never a 500 for the card',
-  /const safe = async <T>\(p: Promise<T>\): Promise<T \| null>[\s\S]*?safe\(svc\(`presence_visits/.test(cd)
+  /const safe = async <T>\(p: Promise<T>\): Promise<T \| null>[\s\S]*?safe\(readVisitStats\(/.test(cd)
   && /let month: unknown = null;/.test(cd) && /let search: unknown = null;/.test(cd));
 ok('wiring: GET /client/website-stats dispatched beside the other client routes',
   /route === '\/client\/website-stats' && method === 'GET'\) return handleClientWebsiteStats\(req, site, principal, cors\)/.test(idx));

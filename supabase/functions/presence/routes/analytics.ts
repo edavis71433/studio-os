@@ -16,14 +16,15 @@ import {
   portfolioInsights, websiteRows, foldPortfolioVisitors, PORTFOLIO_VISITS_CAP,
   searchReadinessState, hostingSurface, type Period,
 } from '../analytics/compose.ts';
-import { aggregateVisits, engagementOf, speedOf, type VisitRow, type Engagement } from '../lib/visits.ts';
+import { engagementOf, speedOf, type Engagement, type VisitAgg } from '../lib/visits.ts';
+import { readSitesVisitors, readVisitStats, statsFromDb } from '../lib/visit_stats.ts';
 import { agencySearchState, type GscMetrics } from '../analytics/search_perf.ts';
 import { summarizePipeline, callerOffsetMinutes } from '../lib/sales_lifecycle.ts';
 import { readCloseDates } from '../lib/deal_closes.ts';
 import { UUID_RE } from '../lib/uuid.ts';
 import {
-  parseDashPeriod, dashRange, priorMonthIso, weeklyBuckets, weeklyVisitors, sourceShares,
-  invoiceBuckets, recentWins, oldestAgeDays, priorPeriodVisitors, priorPeriodStart, searchPagePath, DASH_WEEKS,
+  parseDashPeriod, dashRange, priorMonthIso, weeklyBuckets, sourceShares,
+  invoiceBuckets, recentWins, oldestAgeDays, priorPeriodStart, searchPagePath, DASH_WEEKS,
 } from '../lib/analytics_dashboard.ts';
 
 /** AN-3.1: top queries + pages for a period (from presence_search_terms).
@@ -101,19 +102,18 @@ export async function readGa4Signals(clientId: string | null | undefined): Promi
 }
 
 const periodDays = (p: Period) => (p === 'week' ? 7 : 30);
-/** Load recent visit rows for a site over the current + prior window (for trend).
- *  TRUTHFULNESS (AN-4): the 5000-row cap, ordered ts.desc, truncates the PRIOR
- *  window first — a busy site would silently show an inflated "up from N" trend
- *  built on an undercounted prior period. At the cap we mark the result
- *  truncated; consumers suppress the trend clause rather than fabricate one.
- *  (The health and insights pages read it; the old /analytics home did too.) */
-export type VisitRows = VisitRow[] & { truncated?: boolean };
-export async function loadVisits(siteId: string, period: Period, nowMs: number): Promise<VisitRows> {
-  const startIso = new Date(nowMs - 2 * periodDays(period) * 86_400_000).toISOString();
-  const r = await svc(`presence_visits?site_id=eq.${siteId}&ts=gte.${startIso}&kind=not.in.(button,leave)&select=ts,kind,path,ref_host,utm_source,device,country,visitor_hash&order=ts.desc&limit=5000`);   // item 157's rows never crowd visits out
-  const rows = (Array.isArray((r as any).json) ? (r as any).json : []) as VisitRows;
-  if (rows.length >= 5000) rows.truncated = true;
-  return rows;
+/** A site's visit numbers over the last week or 30 days, with the same span before it
+ *  (for the trend). The health and insights pages read it.
+ *  Item 207: counted in the database (lib/visit_stats.ts). It used to fetch the rows
+ *  with a 5,000 cap that one read can't reach (1,000 come back), so a site with more
+ *  than 1,000 rows in the two spans was understated with nothing to say so.
+ *  A failed read is an empty result, as before: those pages then say nothing of visits.
+ *  `truncated` is only ever true before migration 0194, past 50,000 rows; consumers
+ *  drop the trend clause then rather than state one from a short count (AN-4). */
+export async function loadVisitAgg(siteId: string, period: Period, nowMs: number): Promise<VisitAgg> {
+  const span = periodDays(period) * 86_400_000;
+  const stats = await readVisitStats(siteId, { startMs: nowMs - span, priorStartMs: nowMs - 2 * span, nowMs }).catch(() => null);
+  return (stats || statsFromDb(null)).agg;
 }
 
 const arr = (r: { json?: unknown }): any[] => (Array.isArray((r as { json?: unknown[] }).json) ? (r as { json: any[] }).json : []);
@@ -170,13 +170,21 @@ export async function handleAnalyticsPortfolio(jwt: string, cors: Record<string,
   // Bug hunt H7 (Nov 10): the reads that need only the site ids go together, then the two
   // that need the client ids. They used to run one after another, six round trips in a row.
   const [vr, sitesR, gscConnR, extR, failedR] = await Promise.all([
-    svc(`presence_visits?site_id=in.(${siteIds.join(',')})&kind=eq.pageview&ts=gte.${sinceIso}&select=site_id,visitor_hash&order=ts.desc&limit=${PORTFOLIO_VISITS_CAP}`),
+    // item 207: counted in the database; before migration 0194 (null) the capped read below stands in
+    readSitesVisitors(siteIds, sinceIso).then((counted) => counted
+      ? { ok: true, counted, json: null as unknown }
+      : svc(`presence_visits?site_id=in.(${siteIds.join(',')})&kind=eq.pageview&ts=gte.${sinceIso}&select=site_id,visitor_hash&order=ts.desc&limit=${PORTFOLIO_VISITS_CAP}`)
+        .then((r) => ({ ok: r.ok, counted: null as Record<string, number> | null, json: r.json as unknown }))),
     svc(`presence_sites?id=in.(${siteIds.join(',')})&select=id,client_id,last_published_at,edition`),
     svc(`presence_connections?site_id=in.(${siteIds.join(',')})&provider_key=eq.google_search_console&select=site_id,status`),
     svc(`presence_monitor_connections?site_id=in.(${siteIds.join(',')})&select=site_id,domain`),
     svc(`presence_publishes?site_id=in.(${siteIds.join(',')})&status=eq.failed&completed_at=gte.${sinceIso}&select=site_id&limit=2000`),
   ]);
-  const { visitorsBySite: perSiteVisitors, truncated: visitorsTruncated } = foldPortfolioVisitors(arr(vr));
+  // The stand-in read returns 1,000 rows at most, so its cap (20,000) could never be met:
+  // a full page is what says "cut short" there. The database's count is never cut short.
+  const { visitorsBySite: perSiteVisitors, truncated: visitorsTruncated } = vr.counted
+    ? { visitorsBySite: vr.counted, truncated: false }
+    : (({ visitorsBySite, truncated }) => ({ visitorsBySite, truncated: truncated || arr(vr).length >= 1000 }))(foldPortfolioVisitors(arr(vr)));
   const { headline, insights } = portfolioInsights(
     // truncated ⇒ per-site attribution is unknown — visitor-derived insight
     // cards ("Getting visitors" / "Traffic, no inquiries") are SUPPRESSED via
@@ -356,11 +364,10 @@ export async function handleAnalyticsDashboard(req: Request, site: SiteRow, cors
   const tzo = callerOffsetMinutes(new URL(req.url).searchParams.get('tzo'));
   const nowIso = new Date().toISOString();
   const nowMs = Date.parse(nowIso);
-  const { startMs, days } = dashRange(period, nowMs);
-  // one visits fetch serves the KPIs (period window), the 12-week line AND the
+  const { startMs } = dashRange(period, nowMs);
+  // one visits read serves the KPIs (period window), the 12-week line AND the
   // period before this one, for "up 12% on the period before"
   const priorStartMs = priorPeriodStart(period, startMs, nowMs);
-  const visitStartIso = new Date(Math.min(priorStartMs ?? startMs, startMs, nowMs - DASH_WEEKS * 7 * 86_400_000)).toISOString();
 
   const safe = async <T>(p: Promise<T>): Promise<T | null> => { try { return await p; } catch { return null; } };
   const stageNamesP = loadStageLabels(site.id).catch(() => null);   // item 38 names; batch B: read with the others, not after
@@ -424,7 +431,9 @@ export async function handleAnalyticsDashboard(req: Request, site: SiteRow, cors
     safe(svc(`presence_form_submissions?site_id=eq.${site.id}&spam=is.false&select=created_at,status&order=created_at.desc&limit=1000`)),
     safe(svc(`presence_support_requests?site_id=eq.${site.id}&deleted_at=is.null&status=in.(open,in_progress)&select=created_at&order=created_at.asc&limit=500`)),
     safe(svc(invoicesQuery)),
-    safe(svc(`presence_visits?site_id=eq.${site.id}&ts=gte.${visitStartIso}&kind=not.in.(button,leave)&select=ts,kind,path,ref_host,utm_source,device,country,visitor_hash&order=ts.desc&limit=5000`)),
+    // item 207: the period's numbers, the period before and the 12-week line, counted in the
+    // database. The row read this replaces stopped at 1,000 rows and never said so.
+    safe(readVisitStats(site.id, { startMs, priorStartMs, weeks: DASH_WEEKS, nowMs })),
     safe(readGsc(site.client_id)),
     // list item 157: the presses with words and the pages' times, read on their own so they
     // never crowd visits out of the read above. Before migration 0156 this read fails, and
@@ -482,20 +491,15 @@ export async function handleAnalyticsDashboard(req: Request, site: SiteRow, cors
   const invoices = invs ? invoiceBuckets(invs, nowIso.slice(0, 10), startMs) : null;
 
   // ── Website band ──
-  const visits = okRows(visitsR) as VisitRow[] | null;
+  const visits = visitsR;   // item 207: counted in the database for exactly this window (lib/visit_stats.ts)
   let traffic: unknown = null;
   if (visits) {
-    // EXACT calendar boundary: aggregateVisits rebuilds its window as
-    // nowMs − days·DAY, which (days being a ceil) can bleed up to ~24h of the
-    // prior period into "This month" — worst on the 1st. Intersect with the
-    // true period start first; the days arg then only bounds, never widens.
-    const periodRows = visits.filter((v) => { const ms = Date.parse(String(v.ts || '')); return Number.isFinite(ms) && ms >= startMs; });
-    const agg = aggregateVisits(periodRows, nowMs, days);
+    const agg = visits.agg;
     traffic = {
       visitors: agg.visitors, pageviews: agg.pageviews,
-      // null = no honest comparison exists (all time, or the read hit its cap and
-      // the older window is the part that fell off). The page then says nothing.
-      prior_visitors: priorStartMs === null || visits.length >= 5000 ? null : priorPeriodVisitors(visits, priorStartMs, startMs),
+      // null = no honest comparison exists (all time, or, before migration 0194 only, a
+      // read cut short, where the older window is the part that fell off). The page then says nothing.
+      prior_visitors: priorStartMs === null ? null : visits.priorVisitors,
       actions: agg.events.phone + agg.events.email + agg.events.cta,
       top_pages: agg.topPages,
       pages: agg.pages,
@@ -503,9 +507,9 @@ export async function handleAnalyticsDashboard(req: Request, site: SiteRow, cors
       ai_sources: agg.aiAssistants,   // list item 153: who the "AI assistants" row is
       ...engagementFrom(engageR, startMs),   // list item 157: buttons, and time on page
       ...(speedR && (speedR as { ok?: boolean }).ok ? { speed: (({ sentence, pages }) => ({ sentence, pages }))(speedOf(arr(speedR as { json?: unknown }))) } : {}),   // list item 151
-      weekly: weeklyVisitors(visits, nowMs),
+      weekly: visits.weekly || [],
       has_data: agg.hasData,
-      truncated: visits.length >= 5000,
+      truncated: visits.truncated,
     };
   }
   // search states, in the order they actually happen:
