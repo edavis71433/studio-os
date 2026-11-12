@@ -255,7 +255,7 @@ test.describe('Sites (builder list items 43 and 45)', () => {
     expect(overflow).toBeLessThanOrEqual(0);
   });
 
-  test('a card: address, status, plan and renewal, domain renewal, who can edit, and the three doors into that client', async ({ page }) => {
+  test('a card: address, status, plan and renewal, domain renewal, what you are on it, and the three doors into that client', async ({ page }) => {
     await openSites(page);
     const card = page.locator('.scard[data-site="s1"]');
     await expect(card.locator('.sname')).toHaveText('Bistro Nine');
@@ -264,7 +264,8 @@ test.describe('Sites (builder list items 43 and 45)', () => {
     await expect(card.locator('.pill')).toHaveText('Live');
     await expect(card).toContainText('Website + tools · Monthly · Renews Dec 1');
     await expect(card).toContainText('Domain renews Nov 20');
-    await expect(card).toContainText('Can edit: You + 1 in your studio · 1 on their side');
+    await expect(card.locator('.who')).toContainText('You: Website manager');   // builder item 53: who owns it, said plainly (this one has no owner on file)
+    await expect(card.locator('.sfoot')).toHaveText('Edited Oct 5');
     await expect(card.locator('.sacts a')).toHaveText(['Website', 'Analytics', 'Settings']);
     await expect(card.locator('.sacts a').nth(0)).toHaveAttribute('href', '/presence.html?client=s1');
     await expect(card.locator('.sacts a').nth(1)).toHaveAttribute('href', '/analytics.html?client=s1');
@@ -327,11 +328,11 @@ test.describe('Sites (builder list items 43 and 45)', () => {
 
   // items 129 and 180 (Nov 11): Health, Visits and Search clicks join the table, and Team and
   // Published leave it (who can edit stays on each card); sites-numbers.spec.ts covers the numbers
-  test('table: Site · Health · Visits · Search clicks · Plan · Last updated · Tags, sortable, and the choice is remembered', async ({ page }) => {
+  test('table: Site · Owner · Health · Visits · Search clicks · Plan · People · Last updated · Tags, sortable, and the choice is remembered', async ({ page }) => {
     await openSites(page);
     await page.locator('#dispTable').click();
     const table = page.locator('#tableHost table');
-    await expect(table.locator('thead .thb')).toHaveText(['Site', 'Health', 'Visits', 'Search clicks', 'Plan', 'Last updated', 'Tags']);
+    await expect(table.locator('thead .thb')).toHaveText(['Site', 'Owner', 'Health', 'Visits', 'Search clicks', 'Plan', 'People', 'Last updated', 'Tags']);   // builder item 53: Owner and People
     await expect(table.locator('tbody tr')).toHaveCount(3);
     await expect(page.locator('#grid')).toBeHidden();               // one view at a time: no cards above the table
     await expect(page.locator('.scard:visible')).toHaveCount(0);
