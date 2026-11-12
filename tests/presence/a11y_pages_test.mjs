@@ -4,7 +4,7 @@
 // weren't among them. Each now has a scan in light and dark beside its own fixtures, in
 // its own browser spec. This keeps it so: a page whose spec loses its scan, or its dark
 // one, fails here, and so does a page added to the list without one.
-const PAGES = ['sites', 'domains', 'files', 'analytics', 'projects', 'broadcasts', 'settings', 'connections', 'sharing'];
+const PAGES = ['sites', 'domains', 'files', 'analytics', 'projects', 'broadcasts', 'settings', 'connections', 'sharing', 'usage'];
 // and the eight from before, which a11y.spec.ts and the pages' own specs scan in light
 const BEFORE = ['today', 'contacts', 'customers', 'inbox', 'pipeline', 'presence', 'help', 'client'];
 

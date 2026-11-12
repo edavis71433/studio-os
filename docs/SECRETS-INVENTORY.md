@@ -25,7 +25,7 @@ production run identical code with different values for the rows below.
 | `GOOGLE_CLIENT_SECRET` | GA4/GSC/GBP OAuth | if integrations on | 180 days | |
 | `GOOGLE_REFRESH_TOKEN` | `gsc_ingest` service account flow | if GSC ingest on | on revocation | |
 | `GOOGLE_REVIEW_LINK` | review-ask emails | optional | n/a | Plain URL, not a secret |
-| `PLACES_KEY` | prospect discovery | optional | 180 days | Falls back to `PSI_KEY` |
+| `PLACES_KEY` | prospect discovery, the map rank grid (item 185) | optional | 180 days | Falls back to `PSI_KEY` |
 | `CALENDLY_TOKEN` | today's bookings | optional | 180 days | Personal access token |
 
 ## stripe-webhook function secrets
