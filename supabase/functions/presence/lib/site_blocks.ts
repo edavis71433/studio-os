@@ -28,6 +28,7 @@ import type {
   SiteBlockColumns, SiteBlockCards, SiteBlockDownload, SiteBlockToc,
   SiteBlockTitle, SiteBlockLinkList, SiteBlockTable, SiteBlockSpotlight,
   SiteBlockFreeform, SiteBlockFreeformAspect, SiteBlockFreeformElement,
+  SiteBlockStack, SiteBlockStackItem,
   BlockLook,
 } from './render_types.ts';
 import { renderMarkdown } from './markdown.ts';
@@ -49,13 +50,14 @@ export const REALIZED_BLOCK_TYPES: readonly SiteBlockType[] = [
   'columns', 'cards', 'download', 'toc',
   'title', 'link_list', 'table', 'spotlight',
   'freeform',
+  'stack',
 ];
 
 // Per-block item caps — bounded content, never unbounded. Total blocks capped too.
 // Most types are one-instance-per-site; the MULTI set (form/columns/cards) may repeat,
 // so the total cap is generous headroom rather than the realized-type count.
 const MAX_BLOCKS = 32;
-const CAP = { features: 8, stats: 6, team: 12, process: 10, pricing: 4, certifications: 12, service_areas: 40, tierFeatures: 8, gallery: 16, beforeAfter: 8, partners: 12, social: 8, events: 12, accordion: 10, tabs: 6, carousel: 12, progress: 8, buttons: 3, columns: 6, cards: 8, linkList: 16, tableCols: 6, tableRows: 24, freeformElements: 12, freeformSections: 4 };
+const CAP = { features: 8, stats: 6, team: 12, process: 10, pricing: 4, certifications: 12, service_areas: 40, tierFeatures: 8, gallery: 16, beforeAfter: 8, partners: 12, social: 8, events: 12, accordion: 10, tabs: 6, carousel: 12, progress: 8, buttons: 3, columns: 6, cards: 8, linkList: 16, tableCols: 6, tableRows: 24, freeformElements: 12, freeformSections: 4, stackItems: 20, stackForms: 2 };
 // Layout Container: a column's optional width on a 12-unit responsive grid (AEM's
 // snap-to-grid column span). Absent = equal widths (the original 2–3 col behavior).
 const clampSpan = (v: unknown): number | undefined => {
@@ -90,7 +92,8 @@ const SINGLETON = new Set<string>(['toc', 'reviews_wall']);
 // G25: `freeform` joins the set BOTH directions — a canvas never nests inside a
 // columns cell, and no block ever nests inside a canvas (its elements are the
 // curated kinds only; there is no container channel — design doc §2/§7).
-const NOT_IN_CELL = new Set<string>(['columns', 'cards', 'form', 'toc', 'freeform']);
+// Item 57: the Blocks section joins it too: a column cell is one small stack already.
+const NOT_IN_CELL = new Set<string>(['columns', 'cards', 'form', 'toc', 'freeform', 'stack']);
 
 const s = (x: unknown, max: number): string => String(x ?? '').replace(/\s+/g, ' ').trim().slice(0, max);
 // Prose sanitizer: like s() but PRESERVES newlines (markdown structure) — collapses
@@ -273,6 +276,20 @@ interface StoredFreeformElement {
   button?: { label: string; url: string; style: 'primary' | 'outline' };
 }
 interface StoredFreeform { type: 'freeform'; id: string; title?: string; aspect: SiteBlockFreeformAspect; elements: StoredFreeformElement[] }
+// Item 57 · the Blocks section, stored shape: photos by id (resolveBlockMedia turns them
+// into MediaRefs through the one ref() pipeline), a form as its whole definition.
+type StoredStackItem = { align?: 'left' | 'center' | 'right'; hide_on_phone?: true } & (
+  | { kind: 'heading'; text: string; size?: 'm' | 's' }
+  | { kind: 'text'; body: string; size?: 'l' }
+  | { kind: 'image'; image_id?: string; alt?: string; caption?: string; link?: string; decorative?: true; width?: 's' | 'm' }
+  | { kind: 'button'; buttons: Array<{ label: string; url: string; style: 'primary' | 'outline' }> }
+  | { kind: 'video'; url: string; caption?: string; poster_id?: string }
+  | { kind: 'form'; form?: FormDefinition }
+  | { kind: 'spacer'; size?: 's' | 'l' }
+  | { kind: 'divider'; width?: 's' }
+  | { kind: 'map'; address?: string; directions_url?: string; image_id?: string }
+);
+interface StoredStack { type: 'stack'; items: StoredStackItem[]; column?: 'narrow' | 'wide'; gap?: 'tight' | 'roomy' }
 interface StoredCarousel { type: 'carousel'; title?: string; slides: Array<{ image_id: string; caption?: string }> }
 interface StoredDownload { type: 'download'; title?: string; file_id?: string; label?: string }
 // Same distributive WithLook as render_types: the owner-chosen per-section style
@@ -291,8 +308,52 @@ export type StoredBlock = WithLook<
   | StoredColumns | StoredCards | StoredDownload | SiteBlockToc
   | SiteBlockTitle | SiteBlockLinkList | SiteBlockTable | SiteBlockSpotlight
   | StoredFreeform
+  | StoredStack
   | FormDefinition
 >;
+
+// Item 57: one block of a Blocks section, validated by its kind with the same caps and
+// link rules as the section it's a small version of (links go through safeHref at render).
+// Returns null only for a kind that doesn't exist. An empty block comes back empty, so it
+// keeps its place: the editor's item numbers on the page never shift under the owner.
+function stackItem(it: Record<string, any>): StoredStackItem | null {
+  const base = {
+    ...(it.align === 'left' || it.align === 'center' || it.align === 'right' ? { align: it.align as 'left' | 'center' | 'right' } : {}),
+    ...(it.hide_on_phone === true ? { hide_on_phone: true as const } : {}),
+  };
+  const http = (v: unknown, max: number): string => { const u = s(v, max); return /^https?:\/\//i.test(u) ? u : ''; };
+  switch (String(it.kind || '')) {
+    case 'heading':
+      return { kind: 'heading', text: s(it.text, 160), ...(it.size === 'm' || it.size === 's' ? { size: it.size as 'm' | 's' } : {}), ...base };
+    case 'text':
+      return { kind: 'text', body: ml(it.body, 4000), ...(it.size === 'l' ? { size: 'l' as const } : {}), ...base };
+    case 'image': {
+      const image_id = uid(it.image_id), caption = s(it.caption, 200), alt = s(it.alt, 200), link = s(it.link, 300);
+      return { kind: 'image', ...(image_id ? { image_id } : {}), ...(alt ? { alt } : {}), ...(caption ? { caption } : {}), ...(link ? { link } : {}),
+        ...(it.decorative === true ? { decorative: true as const } : {}), ...(it.width === 's' || it.width === 'm' ? { width: it.width as 's' | 'm' } : {}), ...base };
+    }
+    case 'button':   // one to three in a row; a half-made one keeps its place (it draws nothing)
+      return { kind: 'button', buttons: arr(it.buttons).filter((bt) => bt && typeof bt === 'object').slice(0, CAP.buttons)
+        .map((bt) => ({ label: s(bt.label, 40), url: s(bt.url, 300), style: bt.style === 'outline' ? 'outline' as const : 'primary' as const })), ...base };
+    case 'video': {   // a link out to the video, never a player from another company (constitution Part 4)
+      const caption = s(it.caption, 200), poster_id = uid(it.poster_id);
+      return { kind: 'video', url: http(it.url, 400), ...(caption ? { caption } : {}), ...(poster_id ? { poster_id } : {}), ...base };
+    }
+    case 'form': {   // the whole definition, through the same gate as a Form section
+      const r = it.form && typeof it.form === 'object' ? normalizeFormDefinition(it.form) : null;
+      return { kind: 'form', ...(r && r.ok ? { form: r.form } : {}), ...base };
+    }
+    case 'spacer':
+      return { kind: 'spacer', ...(it.size === 's' || it.size === 'l' ? { size: it.size as 's' | 'l' } : {}), ...base };
+    case 'divider':
+      return { kind: 'divider', ...(it.width === 's' ? { width: 's' as const } : {}), ...base };
+    case 'map': {   // the owner's own picture, the address, a directions link out: no map from another company
+      const address = s(it.address, 200), directions_url = http(it.directions_url, 400), image_id = uid(it.image_id);
+      return { kind: 'map', ...(address ? { address } : {}), ...(directions_url ? { directions_url } : {}), ...(image_id ? { image_id } : {}), ...base };
+    }
+  }
+  return null;
+}
 
 /** Validate a raw stored blocks value into safe, capped, typed instances.
  *  Deterministic: drops anything malformed/empty, keeps the FIRST instance of each
@@ -712,6 +773,29 @@ function validateBlocksTracked(raw: unknown): { blocks: StoredBlock[]; src: numb
         }
         break;
       }
+      case 'stack': {   // item 57 · blocks stacked top to bottom inside one section (stackItem
+        // above). Up to 20; a kind that doesn't exist is left out. A form keeps an id unique on
+        // the page, shared with the page's Form sections; past two forms, a form block stays
+        // in its place empty. No blocks at all, no section.
+        const items: StoredStackItem[] = [];
+        let forms = 0;
+        for (const raw of arr((b as any).items)) {
+          if (items.length >= CAP.stackItems) break;
+          if (!raw || typeof raw !== 'object') continue;
+          const it = stackItem(raw);
+          if (!it) continue;
+          if (it.kind === 'form' && it.form) {
+            if (forms >= CAP.stackForms) delete it.form;
+            else { forms++; it.form = { ...it.form, id: uniqueId('form', it.form.id, 'form') }; }
+          }
+          items.push(it);
+        }
+        if (items.length) {
+          const col = (b as any).column, gap = (b as any).gap;
+          block = { type: 'stack', items, ...(col === 'narrow' || col === 'wide' ? { column: col } : {}), ...(gap === 'tight' || gap === 'roomy' ? { gap } : {}) } as StoredStack;
+        }
+        break;
+      }
     }
     if (block) {
       const look = parseLook(b);   // Phase T-STYLE: attach validated per-section style (or nothing)
@@ -875,6 +959,16 @@ export function resolveBlockMedia(blocks: StoredBlock[], ref: (id: string) => Me
         if (elements.length) out.push({ type: 'freeform', id: b.id, title: b.title, aspect: b.aspect, elements, ...lk(b) });
         break;
       }
+      case 'stack':   // item 57: each photo resolves through the same ref(); one that can't
+        // leaves its block empty, in its place, so the blocks never renumber. A photo's own
+        // description folds into it, the free-form way, and stays on the block for the way back.
+        out.push({ type: 'stack', items: b.items.map((it): SiteBlockStackItem => {
+          if (it.kind === 'image') { const { image_id, ...rest } = it; const m = image_id ? ref(image_id) : null; return { ...rest, image: m && it.alt ? { ...m, alt: it.alt } : m }; }
+          if (it.kind === 'video') { const { poster_id, ...rest } = it; return { ...rest, poster: poster_id ? ref(poster_id) : null }; }
+          if (it.kind === 'map') { const { image_id, ...rest } = it; return { ...rest, image: image_id ? ref(image_id) : null }; }
+          return it;
+        }), ...(b.column ? { column: b.column } : {}), ...(b.gap ? { gap: b.gap } : {}), ...lk(b) });
+        break;
       default:
         out.push(b);
     }
@@ -982,6 +1076,14 @@ export function unresolveBlockMedia(blocks: unknown, idOf: (m: MediaRef) => stri
         out.push({ type: 'freeform', id: b.id, title: b.title, aspect: b.aspect, elements, ...lk(b) });
         break;
       }
+      case 'stack':   // a block's photo goes back to its id; one that's gone leaves the block empty, in its place
+        out.push({ type: 'stack', items: arr(b.items).filter((it) => it && typeof it === 'object').map((it) => {
+          if (it.kind === 'image') { const { image, ...rest } = it; return { ...rest, ...put('image_id', image) }; }
+          if (it.kind === 'video') { const { poster, ...rest } = it; return { ...rest, ...put('poster_id', poster) }; }
+          if (it.kind === 'map') { const { image, ...rest } = it; return { ...rest, ...put('image_id', image) }; }
+          return { ...it };
+        }), ...(b.column ? { column: b.column } : {}), ...(b.gap ? { gap: b.gap } : {}), ...lk(b) } as StoredBlock);
+        break;
       default:
         out.push({ ...b });
     }
@@ -1171,6 +1273,7 @@ const MANDATORY_H2: Record<string, string> = {
 function effHeading(b: SiteBlock): string | null {
   if (Object.prototype.hasOwnProperty.call(MANDATORY_H2, b.type)) return (b as { title?: string }).title || MANDATORY_H2[b.type];
   if (b.type === 'cta' || b.type === 'divider' || b.type === 'toc') return null;
+  if (b.type === 'stack') { const h = b.items.find((it) => it.kind === 'heading' && it.text); return h && h.kind === 'heading' ? h.text : null; }   // item 57: its first heading names it
   return (b as { title?: string }).title || null;   // title-optional blocks
 }
 /** A stable, human-ish anchor slug (deterministic — same text → same id). */
@@ -1313,6 +1416,68 @@ export function renderSiteBlocks(blocks: SiteBlock[] | undefined, ctx: BlockRend
   const signupHtml = (b: SiteBlockNewsletter, n: number): string =>
     `<section class="block wrap block-newsletter">${h2(b.title, 'Get updates from us', 'title')}${b.text ? `<p class="nl-text"${dds('text')}>${esc(b.text)}</p>` : ''}` +
     `${signupForm(`nl-${n}`, ctx.formEndpoint, b.button || 'Sign up', dds('button'))}</section>`;
+  // Item 57: one block of a Blocks section. Its root carries its place in the section
+  // (data-dds-item, the editor's handle for the block toolbar and Layers) and the same field
+  // stamps as the section it's a small version of, so typing on the page works the same way.
+  // An empty block (no words yet, a photo that can't be found) draws nothing.
+  const stackItemHtml = (it: SiteBlockStackItem, i: number, col?: 'narrow' | 'wide'): string => {
+    const at = ctx.noDds ? '' : ` data-dds-item="${i}"`;
+    // A block may also link to a page of the site itself ("/menu/", "/contact/#hours"):
+    // a path on the same site, never "//" (another site). Other sections keep safeHref alone.
+    const go = (u: string): string | null => (/^\/(?!\/)[A-Za-z0-9\-._~/#?=&%+]*$/.test(u) ? u : safeHref(u));
+    const cls = (own: string) => `stk-b ${own}${it.align ? ` stk-a${it.align[0]}` : ''}${it.hide_on_phone ? ' stk-hide-m' : ''}`;
+    const f = `items.${i}.`;
+    const wide = col === 'wide' ? '1100px' : col === 'narrow' ? '620px' : '820px';
+    switch (it.kind) {
+      case 'heading': {
+        if (!it.text) return '';
+        const tag = it.size === 's' ? 'h4' : it.size === 'm' ? 'h3' : 'h2';
+        return `<${tag} class="${cls('stk-h')}"${at}${dds(f + 'text')}>${esc(it.text)}</${tag}>`;
+      }
+      case 'text': {
+        const prose = it.body ? renderMarkdown(it.body) : '';
+        return prose ? `<div class="${cls(`prose stk-text${it.size === 'l' ? ' stk-lg' : ''}`)}"${at}${dds(f + 'body', true)}>${prose}</div>` : '';
+      }
+      case 'image': {
+        const pic = it.image ? blockImg(it.image, esc, attr, `(max-width:620px) 100vw, ${it.width === 's' ? '320px' : it.width === 'm' ? '520px' : wide}`, it.decorative ? { decorative: true } : undefined) : '';
+        if (!pic) return '';
+        const href = it.link ? go(it.link) : null;
+        const cap = it.caption ? `<figcaption${dds(f + 'caption')}>${esc(it.caption)}</figcaption>` : '';
+        return `<figure class="${cls(`stk-img${it.width ? ` stk-w${it.width}` : ''}`)}"${at}>${href ? `<a class="img-link" href="${attr(href)}" rel="noopener">${pic}</a>` : pic}${cap}</figure>`;
+      }
+      case 'button': {
+        const btns = it.buttons.map((bt, k) => {
+          const href = bt.label ? go(bt.url) : null;
+          return href ? `<a class="btn${bt.style === 'outline' ? ' btn-outline' : ''}" href="${attr(href)}" rel="noopener"${dds(`${f}buttons.${k}.label`)}>${esc(bt.label)}</a>` : '';
+        }).filter(Boolean);
+        return btns.length ? `<p class="${cls('stk-btns')}"${at}>${btns.join('')}</p>` : '';
+      }
+      case 'video': {   // a poster and a link out, as the Video section draws it
+        const href = it.url ? safeHref(it.url) : null;
+        if (!href) return '';
+        const label = it.caption || 'Watch the video';
+        const inner = it.poster
+          ? `<span class="v-poster">${blockImg(it.poster, esc, attr, `(max-width:620px) 100vw, ${wide}`)}<span class="v-play" aria-hidden="true">▶</span></span>`
+          : `<span class="v-textlink">▶ ${esc(label)}</span>`;
+        return `<div class="${cls('stk-video')}"${at}><a class="v-link" href="${attr(href)}" rel="noopener" aria-label="${attr('Watch: ' + label)}">${inner}</a>${it.caption ? `<p class="v-cap"${dds(f + 'caption')}>${esc(it.caption)}</p>` : ''}</div>`;
+      }
+      case 'form':
+        return it.form ? `<div class="${cls('stk-form')}"${at}>${renderForm(it.form, { esc, attr, safeHref, formEndpoint: ctx.formEndpoint })}</div>` : '';
+      case 'spacer':
+        return `<div class="${cls(`stk-space stk-space-${it.size || 'm'}`)}"${at} aria-hidden="true"></div>`;
+      case 'divider':
+        return `<hr class="${cls(`stk-hr${it.width === 's' ? ' stk-short' : ''}`)}"${at}>`;
+      case 'map': {   // as the Map section draws it: the owner's picture, the address, a directions link out
+        const dirHref = it.directions_url ? safeHref(it.directions_url)
+          : (it.address ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(it.address)}` : null);
+        const img = it.image ? `<div class="map-img">${blockImg(it.image, esc, attr, `(max-width:620px) 100vw, ${wide}`)}</div>` : '';
+        const addr = it.address ? `<p class="map-addr"${dds(f + 'address')}>${esc(it.address)}</p>` : '';
+        const dir = dirHref ? `<p class="map-dir"><a href="${attr(dirHref)}" rel="noopener" target="_blank">Get directions →</a></p>` : '';
+        return img || addr ? `<div class="${cls('stk-map')}"${at}>${img}${addr}${dir}</div>` : '';
+      }
+    }
+    return '';
+  };
 
   const list = blocks || [];
   for (let bi = 0; bi < list.length; bi++) {
@@ -1754,6 +1919,11 @@ export function renderSiteBlocks(blocks: SiteBlock[] | undefined, ctx: BlockRend
         if (els.length) html = `<section class="block wrap block-freeform">${b.title ? h2(b.title, '') : ''}<div class="ff-canvas ff-aspect-${b.aspect}">${els.join('')}</div></section>`;
         break;
       }
+      case 'stack': {   // item 57 · blocks stacked top to bottom in one column (stackItemHtml above)
+        const items = b.items.map((it, i) => stackItemHtml(it, i, b.column)).filter(Boolean);
+        if (items.length) html = `<section class="block wrap block-stack${b.column ? ` stk-${b.column}` : ''}${b.gap ? ` stk-gap-${b.gap}` : ''}"><div class="stk">${items.join('')}</div></section>`;
+        break;
+      }
       case 'toc':   // deferred — rendered after anchors are assigned (needs sibling headings)
         html = '';
         break;
@@ -1845,7 +2015,7 @@ const TINT_FALLBACK = brandTint('#5b3fa0');
 // only these: :where() adds no weight, so inside a section the rules still win by coming
 // last, and a template's own words (a post, the about story, an answer) keep the template's
 // spacing. A new section that draws .prose joins the list (section_styles_test checks it).
-export const SECTION_PROSE_TYPES = ['block-richtext', 'block-accordion', 'block-tabs', 'block-columns', 'block-spotlight'];
+export const SECTION_PROSE_TYPES = ['block-richtext', 'block-accordion', 'block-tabs', 'block-columns', 'block-spotlight', 'block-stack'];
 const SP = `:where(${SECTION_PROSE_TYPES.map((c) => '.' + c).join(',')}) .prose`;
 
 /** The extra CSS the block sections need — appended once to a template's stylesheet,
@@ -2239,7 +2409,45 @@ table.site-table tbody tr:last-child td{border-bottom:none}
 .ff-image picture,.ff-image img{display:block;width:100%;height:100%}
 .ff-image img{object-fit:cover;border-radius:10px}
 a.ff-el.btn{display:inline-flex;align-items:center;justify-content:center;text-align:center}
-@media(max-width:620px){.ff-canvas{aspect-ratio:auto}.ff-canvas .ff-el{position:static;width:auto!important;height:auto!important;margin:12px 0}.ff-canvas .ff-image img{height:auto}.ff-canvas .ff-hide-phone{display:none!important}}`;
+@media(max-width:620px){.ff-canvas{aspect-ratio:auto}.ff-canvas .ff-el{position:static;width:auto!important;height:auto!important;margin:12px 0}.ff-canvas .ff-image img{height:auto}.ff-canvas .ff-hide-phone{display:none!important}}
+/* item 57 · the Blocks section: its blocks stack in one column, in reading order, on every
+   screen. The column is 820px, 620px when Narrow, the page's width when Wide; the section's
+   colour theme, spacing and line-up are the usual section looks. */
+.block-stack .stk{max-width:820px}
+.block-stack.stk-narrow .stk{max-width:620px}
+.block-stack.stk-wide .stk{max-width:none}
+.block-stack.block--align-center .stk,.block-stack.ov-align-center .stk{margin-left:auto;margin-right:auto}
+.block-stack.ov-align-right .stk{margin-left:auto}
+.stk>.stk-b{margin-top:0;margin-bottom:0}
+.stk>.stk-b+.stk-b{margin-top:var(--stk-gap,22px)}
+.block-stack.stk-gap-tight{--stk-gap:10px}
+.block-stack.stk-gap-roomy{--stk-gap:40px}
+.block-stack.block--align-center .stk-b,.block-stack.block--align-center .stk-b.prose{text-align:center}
+.stk .stk-al{text-align:left}.stk .stk-ac{text-align:center}.stk .stk-ar{text-align:right}
+.stk h3.stk-h{font-size:1.35rem}.stk h4.stk-h{font-size:1.1rem}
+.stk-text{max-width:68ch}
+.stk-text.stk-lg{font-size:1.15rem;line-height:1.55}
+.block-stack.block--align-center .stk-text,.stk .stk-text.stk-ac{margin-left:auto;margin-right:auto}
+.stk .stk-text.stk-ar{margin-left:auto}
+.stk-img{margin-left:0;margin-right:0}
+.stk-img img{width:100%;border-radius:12px;display:block}
+.stk-img figcaption{font-size:.9rem;color:var(--soft);margin-top:6px}
+.stk-img .img-link{display:block;text-decoration:none;color:inherit}
+.stk-img.stk-ws{max-width:320px}.stk-img.stk-wm{max-width:520px}
+.block-stack.block--align-center .stk-img,.stk .stk-img.stk-ac{margin-left:auto;margin-right:auto}
+.stk .stk-img.stk-ar{margin-left:auto}
+.stk-btns{display:flex;flex-wrap:wrap;gap:12px}
+.block-stack.block--align-center .stk-btns,.stk .stk-btns.stk-ac{justify-content:center}
+.stk .stk-btns.stk-al{justify-content:flex-start}.stk .stk-btns.stk-ar{justify-content:flex-end}
+.stk-video .v-link{margin-top:0}
+.stk-space-s{height:12px}.stk-space-m{height:32px}.stk-space-l{height:72px}
+.stk-hr{border:0;border-top:1px solid var(--line);height:0;width:100%}
+.stk-hr.stk-short{width:96px}
+.block-stack.block--align-center .stk-hr.stk-short,.stk .stk-hr.stk-short.stk-ac{margin-left:auto;margin-right:auto}
+.stk .stk-hr.stk-short.stk-ar{margin-left:auto}
+.stk-map .map-img img{width:100%;border-radius:12px;display:block}
+.block-stack.block--align-center .stk-form .presence-form,.stk .stk-form.stk-ac .presence-form{margin-left:auto;margin-right:auto;text-align:left}
+@media(max-width:620px){.stk-hide-m{display:none!important}}`;
 
 // ── Item 106 · a site ships only the section styles it uses ──
 // BLOCK_CSS is read once into its rules. A site keeps a rule when one of its selectors can
