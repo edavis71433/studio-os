@@ -7,6 +7,7 @@
 // so a picture of a page that no longer draws that way fails here (list item 110).
 import { SAMPLE_BLOCKS } from '../../scripts/thumbnails/samples.ts';
 import { allPages, pictureSources, drew, TEMPLATES } from '../../scripts/thumbnails/pages.ts';
+import { listReadyPages } from '../../supabase/functions/presence/lib/page_layouts.ts';
 
 const results = [];
 const ok = (n, p, note = '') => { results.push({ n, p }); console.log(`${p ? 'PASS' : 'FAIL'}  ${n}${note ? ' — ' + note : ''}`); };
@@ -29,6 +30,18 @@ ok('no sample for a type the builder no longer offers', extra.length === 0, extr
 const noTemplatePic = TEMPLATES.filter((t) => !jpeg(`thumbs/templates/${t}.jpg`));
 ok('every template has its picture', TEMPLATES.length >= 8 && noTemplatePic.length === 0, noTemplatePic.join(', '));
 
+// item 216: every ready-made page in Add a page has its picture, and each draws every section it brings
+{
+  const ready = listReadyPages();
+  const noPagePic = ready.filter((p) => !jpeg(`thumbs/pages/${p.key}.jpg`)).map((p) => p.key);
+  ok('every ready-made page has its picture', ready.length >= 24 && noPagePic.length === 0, noPagePic.join(', '));
+  const heavy = ready.filter((p) => { try { return Deno.statSync(new URL(`thumbs/pages/${p.key}.jpg`, ROOT)).size > 20000; } catch { return false; } }).map((p) => p.key);
+  ok('each page picture stays small, under 20 KB', heavy.length === 0, heavy.join(', '));
+  const pages = (await allPages()).pages;
+  const short = ready.filter((p) => (String(pages[p.key]?.['index.html'] || '').match(/ data-dds-key="block_/g) || []).length < p.blocks.length).map((p) => p.key);
+  ok('each ready-made page draws all of its sections in its picture', short.length === 0, short.join(', '));
+}
+
 // every sample still draws through the real renderer
 {
   const pages = (await allPages()).sections;
@@ -40,7 +53,7 @@ ok('every template has its picture', TEMPLATES.length >= 8 && noTemplatePic.leng
 {
   let record = {};
   try { record = JSON.parse(Deno.readTextFileSync(new URL('tests/presence/golden/pictures.json', ROOT))); } catch { /* absent */ }
-  const onDisk = ['templates', 'sections'].flatMap((d) => [...Deno.readDirSync(new URL(`thumbs/${d}/`, ROOT))].filter((e) => e.name.endsWith('.jpg')).map((e) => `${d}/${e.name}`)).sort();
+  const onDisk = ['templates', 'sections', 'pages'].flatMap((d) => [...Deno.readDirSync(new URL(`thumbs/${d}/`, ROOT))].filter((e) => e.name.endsWith('.jpg')).map((e) => `${d}/${e.name}`)).sort();
   const listed = Object.keys(record).sort();
   const unrecorded = onDisk.filter((k) => !listed.includes(k)), gone = listed.filter((k) => !onDisk.includes(k));
   ok('the record lists every picture, and only them', !unrecorded.length && !gone.length, [unrecorded.length ? `not recorded: ${unrecorded.slice(0, 4).join(', ')}` : '', gone.length ? `recorded, no picture: ${gone.join(', ')}` : ''].filter(Boolean).join('; '));

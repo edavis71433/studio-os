@@ -23,6 +23,7 @@ import { layoutCounts } from '../lib/site_layout.ts';
 import { removeTemplatePhotos } from '../lib/media.ts';
 import { handleAgencySites } from './sites.ts';
 import { handleSiteFolders } from './site_folders.ts';   // builder list item 176
+import { handleSavedPages } from './saved_pages.ts';   // builder list item 216
 import { handleClientTools } from './client_tools.ts';
 import { handleSiteNumbers } from './site_numbers.ts';
 import { handleUsage } from './usage.ts';
@@ -539,6 +540,14 @@ async function handleAgencyInner(req: Request, route: string, method: string, me
       const kitName = String(kq.json[0].name || '');
       return json({ data: await applyKitTo(kit, siteId, principal, `Applied the “${kitName}” ${kit.layout ? 'template' : 'starter kit'}`, { label: `your “${kitName}” template` }) }, 200, cors);
     }
+  }
+
+  // ── Builder list item 216: pages saved to the studio, to add to any client's site (Add a
+  //    page). The list, save, rename and remove; adding one is a site route (it writes that
+  //    site's draft). ──
+  {
+    const r = await handleSavedPages(req, route, method, member, cors, { ownSite: () => ownSiteOf(req.headers.get('x-dds-user-jwt') || '', principal) });
+    if (r) return r;
   }
 
   // ── team management ──

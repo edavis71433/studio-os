@@ -262,6 +262,8 @@ const MEMBER_WRITES: Array<[MemberWriteNeed, string[]]> = [
     `POST /portal/studio-requests/${ID}/(accept|decline)`,
     // builder item 193: only the studio marks an approved plan finished; the route refuses anyone else and says why
     `POST /foundations/plans/${ID}/done`,
+    // builder item 216: only the studio adds one of its saved pages; the route refuses anyone else and says why
+    'POST /pages/from-saved',
     'POST /crm/notes',
     `POST /crm/notes/${ID}/pin`,
     `DELETE /crm/notes/${ID}`,

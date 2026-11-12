@@ -151,6 +151,8 @@ const SOURCE = Object.fromEntries(PAGES.map((p) => [p, read(p)]));
     ...CONTROLS.filter((c) => c[1] === page).map((c) => c[2]),
     // these answer to other capabilities: connect, and the studio-only note routes
     'api("DELETE", "/monitor/connection")', `api('/crm/notes/'+b.getAttribute('data-delnote'),'DELETE')`,
+    // builder list item 216: removing one of the studio's own saved pages answers to the studio's roles (agency/saved_pages.ts), not a seat
+    'api("DELETE", "/agency/pages/" + it.id)',
   ];
   // both spellings the pages use: api("DELETE", route) and api(route, 'DELETE')
   const deletes = /\bapi\(\s*"DELETE"\s*,[^)\n]*\)|\b(?:api|apiAg)\(['`][^;\n]*?,\s*'DELETE'\)/g;
@@ -162,7 +164,7 @@ const SOURCE = Object.fromEntries(PAGES.map((p) => [p, read(p)]));
   // crm.html: 4 — the record's two note removals are one removeNote since item 98 (it asks first now); item 108 added the draft estimate's
   // contacts.html: 3 since item 90 (Delete for the people picked sends the confirmed call too)
   // pipeline.html: 6 since sales item 106 added removing a saved to-do list
-  ok('tripwire: the DELETE scan found the calls it is meant to find', sent('pipeline.html').length === 6 && sent('presence.html').length === 13 && sent('contacts.html').length === 3 && sent('crm.html').length === 4 && sent('files.html').length === 1);
+  ok('tripwire: the DELETE scan found the calls it is meant to find', sent('pipeline.html').length === 6 && sent('presence.html').length === 14 && sent('contacts.html').length === 3 && sent('crm.html').length === 4 && sent('files.html').length === 1);
 
   const CONFIG = /\/(?:foundations\/(?:domain|prepare)|preview\/settings|site\/(?:offline|online)|bookings\/settings|sales\/contacts\/fields)\b/;
   const writes = new RegExp(`(?:api\\(\\s*["'](?:POST|PUT|DELETE)["']\\s*,\\s*["'\`]|act\\(["']|siteSetState\\(["'])${CONFIG.source}|api\\(["'\`]${CONFIG.source}["'\`]\\s*,\\s*["'](?:POST|PUT|DELETE)["']`, 'g');

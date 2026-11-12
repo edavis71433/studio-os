@@ -7,6 +7,7 @@ import { renderSnapshot, listTemplates } from '../../supabase/functions/presence
 import { composeBlocks } from '../../supabase/functions/presence/lib/serializer.ts';
 import type { Snapshot, FileMap } from '../../supabase/functions/presence/lib/render_types.ts';
 import { SAMPLE_BLOCKS, FILE_ID } from './samples.ts';
+import { listReadyPages } from '../../supabase/functions/presence/lib/page_layouts.ts';
 
 const ROOT = new URL('../../', import.meta.url);
 const SITE = { baseUrl: 'https://example.com' };
@@ -77,6 +78,26 @@ export async function sectionPages(): Promise<Record<string, FileMap>> {
   }
   return out;
 }
+/** Builder list item 216: each ready-made page in Add a page (lib/page_layouts.ts), its sections on
+ *  Business Classic under the site's header, with the built-in sections hidden. A photo section
+ *  arrives empty for the owner's own photos; its picture shows it with the soft placeholders, as the
+ *  section pictures do. */
+const PHOTO_FILL: Record<string, Record<string, unknown>> = { gallery: { image_ids: SAMPLE_BLOCKS.gallery.image_ids }, before_after: { items: SAMPLE_BLOCKS.before_after.items } };
+export async function readyPages(): Promise<Record<string, FileMap>> {
+  const out: Record<string, FileMap> = {};
+  for (const p of listReadyPages()) {
+    const page = fixture('business-classic');
+    const raw = p.blocks.map((b) => { const t = String((b as { type?: string }).type); return PHOTO_FILL[t] ? { ...b, ...PHOTO_FILL[t] } : b; });
+    const composed = composeBlocks(raw, () => null, ref as never, { reviewsWall: reviews as never });
+    page.content.settings = {
+      ...(page.content.settings || {}),
+      blocks: composed.blocks, blocks_src: composed.src,
+      sections: { hidden: ['hero', 'about', 'offerings', 'testimonials', 'faqs'], order: [] },
+    } as never;
+    out[p.key] = await renderSnapshot(page, SITE);
+  }
+  return out;
+}
 /** Whether a section page drew its section. */
 export const drew = (type: string, files: FileMap) => new RegExp(` data-dds-key="block_${type}`).test(String(files['index.html']));
 /** The placeholder pictures a page set refers to. */
@@ -89,14 +110,15 @@ export function placeholderFiles(): Record<string, string> {
 /** Every page set, in the one order that numbers the placeholders the same way each time. */
 export async function allPages() {
   media.clear();
-  const templates = await templatePages(), sections = await sectionPages();
-  return { templates, sections, ph: placeholderFiles() };
+  // the ready-made pages come last, so the pictures before them keep their placeholder numbers
+  const templates = await templatePages(), sections = await sectionPages(), pages = await readyPages();
+  return { templates, sections, pages, ph: placeholderFiles() };
 }
 
 /** What each picture shows, as a digest: its page, the stylesheet and the placeholders the
  *  page loads. shoot.mjs records it beside the picture; the test compares it with today's. */
 export async function pictureSources(): Promise<Record<string, string>> {
-  const { templates, sections, ph } = await allPages();
+  const { templates, sections, pages, ph } = await allPages();
   const sha = async (s: string) => [...new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(s)))].map((b) => b.toString(16).padStart(2, '0')).join('');
   const shown = async (files: FileMap) => {
     const page = String(files['index.html']);
@@ -107,5 +129,6 @@ export async function pictureSources(): Promise<Record<string, string>> {
   const out: Record<string, string> = {};
   for (const [slug, files] of Object.entries(templates)) out[`templates/${slug}.jpg`] = await shown(files);
   for (const [type, files] of Object.entries(sections)) out[`sections/${type}.jpg`] = await shown(files);
+  for (const [key, files] of Object.entries(pages)) out[`pages/${key}.jpg`] = await shown(files);
   return out;
 }
