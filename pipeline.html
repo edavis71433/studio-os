@@ -1791,6 +1791,37 @@ function wireWhatsNext(host,id){
   host.querySelectorAll('[data-next-todo]').forEach(b=>b.onclick=async()=>{b.disabled=true;try{await api('/sales/deals/'+id+'/tasks','POST',{title:b.getAttribute('data-next-todo')});toast('To-do added');loadDealTasks(id);}catch(e){toast(nice(e),true);b.disabled=false;}});
   const nc=$('nextCustom'); if(nc)nc.onclick=()=>{const p=$('whatsNext');if(p)p.remove();const t=$('dt-title');if(t)t.focus();};
 }
+// ── Sales item 106: saved lists of to-dos ─────────────────────────────────────
+// A deal's to-dos saved as a named list, then added to another deal in one go,
+// each due as many days after it's added as it was on the deal it came from
+// (routes/todo_templates.ts). They land as ordinary to-dos, editable as ever.
+let TODO_LISTS=null;
+const listDue=(d)=>d==null?'':d===0?' (same day)':d===1?' (next day)':' (in '+d+' days)';
+const todoCount=(n)=>n===1?'1 to-do':n+' to-dos';
+async function wireTodoLists(id){
+  const sel=$('dt-list'), pick=$('dt-list-pick'), save=$('dt-list-save');
+  if(!sel||!pick||!save)return;
+  save.onclick=()=>{pick.hidden=true;miniForm($('dtListForm'),[{name:'name',label:'Name this list',placeholder:'e.g. Website kickoff'}],async(v)=>{
+    if(!v.name){toast('Give the list a name.',true);return;}
+    const r=await api('/sales/todo-templates','POST',{name:v.name,from_deal_id:id});
+    $('dtListForm').innerHTML='';TODO_LISTS=null;
+    toast('Saved “'+v.name+'” with '+(r.data&&r.data.count?todoCount(r.data.count):'its to-dos')+'. Add it to any deal from its To-dos.');
+    wireTodoLists(id);
+  },{saveLabel:'Save the list'});};
+  if(!TODO_LISTS){try{const r=await api('/sales/todo-templates');TODO_LISTS=(r&&r.data)||[];}catch(_){TODO_LISTS=null;sel.hidden=true;return;}}
+  if(CURRENT_DEAL!==id||sel!==$('dt-list'))return;   // the drawer moved on
+  sel.innerHTML='<option value="">Add a saved list of to-dos…</option>'+TODO_LISTS.map(l=>`<option value="${esc(l.id)}">${esc(l.name)} — ${todoCount(l.count)}</option>`).join('');
+  sel.hidden=!TODO_LISTS.length; pick.hidden=true; pick.innerHTML='';
+  sel.onchange=()=>{
+    const L=TODO_LISTS.find(x=>x.id===sel.value); $('dtListForm').innerHTML='';
+    if(!L){pick.hidden=true;pick.innerHTML='';return;}
+    pick.innerHTML=`<p class="mut" style="font-size:12.5px;margin:6px 0 4px">${L.items.map(i=>esc(i.title)+listDue(i.days)).join(' · ')}</p><div class="row2"><button class="btn" id="dt-list-add">Add ${L.count===1?'this to-do':'these '+L.count+' to-dos'}</button><button class="btn ghost" data-needs="delete" data-del-ttpl="${esc(L.id)}">Remove this list</button></div>`;
+    pick.hidden=false;
+    const add=$('dt-list-add'); add.onclick=async()=>{add.disabled=true;try{const r=await api('/sales/deals/'+id+'/tasks/from-template?today='+localYmd(),'POST',{template_id:L.id});toast('Added '+todoCount((r.data&&r.data.added)||L.count)+' from “'+L.name+'”.');sel.value='';pick.hidden=true;loadDealTasks(id);}catch(e){toast(nice(e),true);add.disabled=false;}};
+    pick.querySelectorAll('[data-del-ttpl]').forEach(b=>b.onclick=async()=>{if(b.dataset.armed!=='1'){b.dataset.armed='1';b.textContent='Tap again to remove';return;}b.disabled=true;try{await api('/sales/todo-templates/'+b.dataset.delTtpl,'DELETE');TODO_LISTS=null;toast('List removed. To-dos already added from it stay.');wireTodoLists(id);}catch(e){toast(nice(e),true);b.disabled=false;}});
+  };
+}
+
 // ── Shared per-invoice actions: Send/Resend · Copy link · Void ───────────────
 // ONE wiring for every surface that renders invoice rows with these controls —
 // the deal drawer's "Invoice & deposit" list AND the "Who owes you" receivables
@@ -3156,7 +3187,9 @@ async function openDeal(id){
                still fully editable before Add, and "Something else…" keeps the
                free-text path first-class. The POST is unchanged. -->
           <div class="row2" style="margin-top:8px"><select id="dt-preset" aria-label="Pick a to-do for this stage" style="flex:1;min-width:180px"><option value="">Pick a to-do for this stage…</option>${(guidanceFor(d.stage,{signed:signedNow,converted:!!d.converted_client_id}).todos||[]).map((t,i)=>`<option value="${i}">${esc(t)}</option>`).join('')}<option value="__custom__">Something else…</option></select></div>
-          <div class="row2" style="margin-top:6px"><input type="text" id="dt-title" placeholder="Add a to-do (e.g. Send the contract)" style="flex:1"><input type="date" id="dt-due" style="max-width:160px" aria-label="Due date"><button class="btn ghost" id="dt-add">Add</button></div></div>
+          <div class="row2" style="margin-top:6px"><input type="text" id="dt-title" placeholder="Add a to-do (e.g. Send the contract)" style="flex:1"><input type="date" id="dt-due" style="max-width:160px" aria-label="Due date"><button class="btn ghost" id="dt-add">Add</button></div>
+          <div class="row2 dt-lists" style="margin-top:6px"><select id="dt-list" aria-label="Add a saved list of to-dos" style="flex:1;min-width:180px" hidden></select><button class="btn ghost" id="dt-list-save">Save these as a list</button></div>
+          <div id="dt-list-pick" hidden></div><div id="dtListForm"></div></div>
         </div><aside class="dcol-rail">
           <div class="sec"><h3>Money<button type="button" class="hlink" data-goto-tab="billing">Billing →</button></h3><div class="dkv">${moneyKv.join('')}</div></div>
           <div class="sec"><h3>Latest<button type="button" class="hlink" data-goto-tab="activity">Activity →</button></h3>${latestHtml}</div>
@@ -3339,6 +3372,7 @@ async function openDeal(id){
     const eds=$('ed-save'); if(eds) eds.onclick=async()=>{eds.disabled=true;try{const cnote=await saveContactPart();const v=$('ed-value').value.trim();await api('/sales/deals/'+id,'PATCH',{expected_value_cents:v?Math.round(parseFloat(v)*100):null,expected_close:$('ed-close').value||null,notes:edNotes.value.trim(),found_via:$('ed-found')?$('ed-found').value:undefined,next_step:$('ed-next')?$('ed-next').value.trim():undefined,next_step_at:$('ed-nextat')?($('ed-nextat').value||null):undefined});if(window.ddsDraftClear)window.ddsDraftClear(edNotes);toast(cnote||'Saved');openDeal(id);load();}catch(e){toast(nice(e),true);eds.disabled=false;}};
     // first-class deal to-dos (#203)
     loadDealTasks(id);
+    wireTodoLists(id);   // sales item 106: saved lists of to-dos
     // The stage's preset to-dos FILL the input — they never post on their own, so
     // every one is still editable (or datable) before Add. Same contract as the
     // proposal line-item picker: '' clears, '__custom__' hands over to free text.

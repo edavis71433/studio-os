@@ -40,6 +40,7 @@ const CONTROLS = [
   ['DELETE /sales/contracts/:id', 'pipeline.html', `api('/sales/contracts/'+b.dataset.delCon,'DELETE')`, ['data-needs="delete" data-del-con=']],
   ['DELETE /sales/templates/:id', 'pipeline.html', `api('/sales/templates/'+b.dataset.delTpl,'DELETE')`, ['data-needs="delete" data-del-tpl=']],
   ['DELETE /projects/templates/:id', 'projects.html', `api('/projects/templates/'+b.dataset.delPtpl,'DELETE')`, ['data-needs="delete" data-del-ptpl=']],   // sales item 106
+  ['DELETE /sales/todo-templates/:id', 'pipeline.html', `api('/sales/todo-templates/'+b.dataset.delTtpl,'DELETE')`, ['data-needs="delete" data-del-ttpl=']],   // sales item 106: a saved to-do list
   ['POST /sales/invoices/:id/void', 'pipeline.html', `api('/sales/invoices/'+b.dataset.voidInv+'/void','POST',{})`, ['data-needs="delete" data-void-inv="${esc(i.id)}"', 'data-needs="delete" data-void-inv="${v.id}"']],
   ['POST /sales/invoices/:id/void', 'crm.html', `apiAg('/sales/invoices/'+b.getAttribute('data-void-inv')+'/void','POST',{})`, ['data-void-inv="${esc(v.id)}" data-needs="delete"']],
   ['POST /sales/deals/:id/retainer/cancel', 'pipeline.html', `api('/sales/deals/'+id+'/retainer/cancel','POST',{})`, ['id="cancelRetainer" data-needs="delete"']],
@@ -121,7 +122,7 @@ const SOURCE = Object.fromEntries(PAGES.map((p) => [p, read(p)]));
   const decided = read('tests/presence/member_capability_test.mjs');
   const listed = (name) => [...decided.split('const DECIDED = {')[1].split(`\n  ${name}: [`)[1].split('\n  ],')[0].matchAll(/'((?:DELETE|POST|PUT|PATCH) [^']+)'/g)].map((m) => m[1]);
   const routes = [...listed('delete'), ...listed('configure')];
-  ok('the decided delete and configure lists were read', routes.length === 44, String(routes.length));   // item 47 added two; item 104 took away the seven DNS document and zone writes; item 58 added two; item 112 added the prospect delete; item 115 added the Google review link; item 175 the visitor password; item 77 the payment undo; item 174 added the two domain forwards; items 86 + 105 added three (import undo, merge, unmerge); item 106 the project template removal
+  ok('the decided delete and configure lists were read', routes.length === 45, String(routes.length));   // item 47 added two; item 104 took away the seven DNS document and zone writes; item 58 added two; item 112 added the prospect delete; item 115 added the Google review link; item 175 the visitor password; item 77 the payment undo; item 174 added the two domain forwards; items 86 + 105 added three (import undo, merge, unmerge); item 106 the project template removal
   const covered = new Set(CONTROLS.map(([r]) => r));
   const open = routes.filter((r) => !covered.has(r) && !NO_CONTROL[r]);
   ok('every decided delete and configure route is accounted for here', open.length === 0, open.join(', '));
@@ -146,7 +147,8 @@ const SOURCE = Object.fromEntries(PAGES.map((p) => [p, read(p)]));
     ok(`${page}: every DELETE it sends is decided`, fresh.length === 0, fresh.join(' | '));
   }
   // crm.html: 4 — the record's two note removals are one removeNote since item 98 (it asks first now); item 108 added the draft estimate's
-  ok('tripwire: the DELETE scan found the calls it is meant to find', sent('pipeline.html').length === 5 && sent('presence.html').length === 13 && sent('contacts.html').length === 2 && sent('crm.html').length === 4 && sent('files.html').length === 1);
+  // pipeline.html: 6 since sales item 106 added removing a saved to-do list
+  ok('tripwire: the DELETE scan found the calls it is meant to find', sent('pipeline.html').length === 6 && sent('presence.html').length === 13 && sent('contacts.html').length === 2 && sent('crm.html').length === 4 && sent('files.html').length === 1);
 
   const CONFIG = /\/(?:foundations\/(?:domain|prepare)|preview\/settings|site\/(?:offline|online)|bookings\/settings|sales\/contacts\/fields)\b/;
   const writes = new RegExp(`(?:api\\(\\s*["'](?:POST|PUT|DELETE)["']\\s*,\\s*["'\`]|act\\(["']|siteSetState\\(["'])${CONFIG.source}|api\\(["'\`]${CONFIG.source}["'\`]\\s*,\\s*["'](?:POST|PUT|DELETE)["']`, 'g');

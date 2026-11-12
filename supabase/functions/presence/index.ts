@@ -883,6 +883,12 @@ async function route_(req: Request, cors: Record<string, string>): Promise<Respo
     if (route === '/sales/templates' && (method === 'GET' || method === 'POST')) return handleSalesTemplates(req, site, principal, cors);
     m = route.match(/^\/sales\/templates\/([0-9a-f-]{36})$/);
     if (m && method === 'DELETE') return handleSalesTemplateDelete(site, m[1], cors);
+    // sales item 106: saved to-do lists, and adding one to a deal
+    if (route === '/sales/todo-templates') return (await import('./routes/todo_templates.ts')).handleTodoTemplates(req, site, principal, null, cors);
+    m = route.match(/^\/sales\/todo-templates\/([0-9a-f-]{36})$/);
+    if (m) return (await import('./routes/todo_templates.ts')).handleTodoTemplates(req, site, principal, m[1], cors);
+    m = route.match(/^\/sales\/deals\/([0-9a-f-]{36})\/tasks\/from-template$/);
+    if (m && method === 'POST') return (await import('./routes/todo_templates.ts')).handleDealTasksFromTemplate(req, site, principal, m[1], cors);
     m = route.match(/^\/sales\/proposals\/([0-9a-f-]{36})\/send$/);
     if (m && method === 'POST') return handleSalesProposalSend(req, site, principal, m[1], cors);
     // ONE LINK (benchmark 2026-10, item 5): send the proposal AND the agreement

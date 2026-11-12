@@ -145,6 +145,72 @@ test.describe('The agreement says the same as the parts (sales item 106)', () =>
   });
 });
 
+// ── saved to-do lists ──
+const LIST = { id: 'aaaaaaaa-2222-4333-8444-555555555555', name: 'Website kickoff', count: 3, created_at: '2026-11-11T00:00:00Z',
+  items: [{ title: 'Send the contract', days: 2 }, { title: 'Collect the logins', days: null }, { title: 'Book the kickoff call', days: 0 }] };
+const TODO_API = (lists: unknown[]) => ({ ...API(), [`/sales/deals/${DEAL}/tasks`]: { data: [{ id: 't1', title: 'Send the brief', due_date: null, status: 'open', created_at: '2026-11-10T00:00:00Z' }] }, '/sales/todo-templates': { data: lists } });
+
+test.describe('Saved to-do lists (sales item 106)', () => {
+  test('pick a saved list, see its to-dos, and add them all in one go', async ({ page }) => {
+    await installApp(page, { api: TODO_API([LIST]) });
+    let added: { url: string; body: unknown } | null = null;
+    await page.route('**/functions/v1/presence/sales/deals/*/tasks/from-template*', (route) => {
+      added = { url: route.request().url(), body: route.request().postDataJSON() };
+      return route.fulfill({ status: 201, contentType: 'application/json', body: JSON.stringify({ data: { added: 3, list: LIST.name } }) });
+    });
+    await page.goto(`/pipeline.html?deal=${DEAL}`);
+    const sel = page.locator('#dt-list');
+    await expect(sel).toBeVisible();
+    await expect(sel.locator('option').nth(1)).toHaveText('Website kickoff — 3 to-dos');
+    await sel.selectOption(LIST.id);
+    const pick = page.locator('#dt-list-pick');
+    await expect(pick).toContainText('Send the contract (in 2 days) · Collect the logins · Book the kickoff call (same day)');
+    await pick.locator('#dt-list-add').click();
+    await expect.poll(() => added).not.toBeNull();
+    expect((added as unknown as { body: unknown }).body).toEqual({ template_id: LIST.id });
+    expect((added as unknown as { url: string }).url).toMatch(/from-template\?today=\d{4}-\d{2}-\d{2}$/);
+    await expect(page.locator('.dds-toast, #toast').filter({ hasText: 'Added 3 to-dos from “Website kickoff”.' }).first()).toBeVisible();
+    await expect(pick).toBeHidden();
+  });
+
+  test('Save these as a list sends a name and this deal; Remove takes two taps', async ({ page }) => {
+    await installApp(page, { api: TODO_API([LIST]) });
+    let saved: unknown = null, removed = '';
+    await page.route('**/functions/v1/presence/sales/todo-templates', (route) => {
+      if (route.request().method() !== 'POST') return route.fallback();
+      saved = route.request().postDataJSON();
+      return route.fulfill({ status: 201, contentType: 'application/json', body: JSON.stringify({ data: { ...LIST, id: 'bbbbbbbb-2222-4333-8444-555555555555', name: 'Our kickoff', count: 1 } }) });
+    });
+    await page.route('**/functions/v1/presence/sales/todo-templates/*', (route) => {
+      if (route.request().method() !== 'DELETE') return route.fallback();
+      removed = new URL(route.request().url()).pathname.split('/').pop() || '';
+      return route.fulfill({ status: 200, contentType: 'application/json', body: '{"data":{"ok":true}}' });
+    });
+    await page.goto(`/pipeline.html?deal=${DEAL}`);
+    await page.locator('#dt-list-save').click();
+    await page.locator('#dtListForm input').fill('Our kickoff');
+    await page.locator('#dtListForm button[type="submit"]').click();
+    await expect.poll(() => saved).toEqual({ name: 'Our kickoff', from_deal_id: DEAL });
+    await expect(page.locator('.dds-toast, #toast').filter({ hasText: 'Saved “Our kickoff” with 1 to-do.' }).first()).toBeVisible();
+    await page.locator('#dt-list').selectOption(LIST.id);
+    const rm = page.locator('#dt-list-pick [data-del-ttpl]');
+    await rm.click();
+    await expect(rm).toHaveText('Tap again to remove');
+    expect(removed).toBe('');
+    await rm.click();
+    await expect.poll(() => removed).toBe(LIST.id);
+  });
+
+  test('with no saved lists only Save these as a list shows, and it fits a phone', async ({ page }) => {
+    await installApp(page, { api: TODO_API([]) });
+    await page.goto(`/pipeline.html?deal=${DEAL}`);
+    await expect(page.locator('#dt-list-save')).toBeVisible();
+    await expect(page.locator('#dt-list')).toBeHidden();
+    const over = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+    expect(over).toBeLessThanOrEqual(0);
+  });
+});
+
 // ── project templates ──
 const P1 = 'bbbbbbbb-0000-4000-8000-000000000001';
 const PROJ_API = (saved: unknown[] = []) => ({
