@@ -108,6 +108,7 @@ const MEMBER_WRITES: Array<[MemberWriteNeed, string[]]> = [
     `DELETE /(media|assets|redirects|content-library|publishes/checkpoints|bookings/types|knowledge/docs)/${ID}`,
     `DELETE /sales/(contacts|deals|proposals|contracts|templates|estimates)/${ID}`,
     `DELETE /sales/prospects/${ID}`,   // sales review item 112: taking a prospect off the list
+    `DELETE /forms/inbox/${ID}`,   // builder list item 203: an enquiry and its files go for good
     `DELETE /projects/${ID}/deliverables/${ID}`,
     `DELETE /projects/templates/${ID}`,   // sales item 106: removing a saved project template, like a saved proposal template
     `DELETE /sales/todo-templates/${ID}`,   // sales item 106: removing a saved to-do list, the same

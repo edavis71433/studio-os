@@ -140,7 +140,7 @@ test.describe('the Inbox’s Spam filter', () => {
     const held = rows.getByRole('option').filter({ hasText: 'Rank Booster' });
     await expect(held).toBeVisible();
     await expect(rows.getByRole('option').filter({ hasText: 'Sam Rivera' })).toHaveCount(0);
-    await expect(page.locator('#lmeta')).toHaveText('1 in Spam, from the last 30 days');
+    await expect(page.locator('#lmeta')).toHaveText('1 in Spam, from the last 30 days. After that it goes for good, with any files.');   // item 203
     await held.click();
     await expect(page.locator('#rpane')).toContainText('It was full of web links.');
     await page.getByRole('button', { name: 'Not spam' }).click();

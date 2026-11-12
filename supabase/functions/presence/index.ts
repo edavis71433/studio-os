@@ -73,7 +73,7 @@ import { handleRecurringStart, handleRecurringChange, handleRecurringAction } fr
 import { handleInvoicePayment, handleInvoicePaymentUndo } from './routes/invoice_payments.ts';   // sales review item 77
 import { handleEmailLogAddress } from './routes/email_log.ts';   // sales review item 69: the log-this-email address   // sales review item 69: the sending-domain line
 const { handleBroadcastsList, handleBroadcastCreate, handleBroadcastListCreate, handleBroadcastListDelete, handleBroadcastSegments, handleBroadcastGet, handleBroadcastUpdate, handleBroadcastSend, handleBroadcastCancel, handleBroadcastDraftAssist, handleBroadcastTest } = lazyRoutes(() => import('./routes/broadcasts.ts'));
-import { handleScheduleCreate, handleScheduleList, handleScheduleCancel, handleFormSubmit, handleFormInbox, handleFormStatus, handleFormReply, handleApproveSend, handleApproveGet, handleApprovePost, handleSendTicket, handleSpamLinkGet, handleSpamLinkPost, handleFormFile, handleFormAnswers } from './routes/commercial.ts';
+import { handleScheduleCreate, handleScheduleList, handleScheduleCancel, handleFormSubmit, handleFormInbox, handleFormStatus, handleFormReply, handleApproveSend, handleApproveGet, handleApprovePost, handleSendTicket, handleSpamLinkGet, handleSpamLinkPost, handleFormFile, handleFormAnswers, handleFormDelete, handleJoinGet, handleJoinPost } from './routes/commercial.ts';
 const { handleBookingTypes, handleBookingSlots, handleBookingCreate, handleManageGet, handleManagePost, handleManageSlots, handleManageIcs, handleBookingSettingsGet, handleBookingSettingsPut, handleBookingTypesList, handleBookingTypeCreate, handleBookingTypeUpdate, handleBookingTypeDelete, handleBookingAppointments, handleBookingConfirm, handleBookingCancel, handleBookingMark } = lazyRoutes(() => import('./routes/booking.ts'));
 const { handleReviewPage, handleReviewSubmit, handleReviewsList, handleReviewApprove, handleReviewHide, handleReviewReply, handleReviewRequest, handleReviewGoogleLink } = lazyRoutes(() => import('./routes/reviews.ts'));
 const { handleCommentsList, handleCommentCreate, handleCommentResolve, handleCommentDelete, handleTokenSections, handleTokenComment } = lazyRoutes(() => import('./routes/comments.ts'));
@@ -200,6 +200,9 @@ async function route_(req: Request, cors: Record<string, string>): Promise<Respo
     // item 140: the "This was spam" link in the owner's alert email (spam.html asks, then marks)
     if (route === '/forms/spam' && method === 'GET') return handleSpamLinkGet(req, cors);
     if (route === '/forms/spam' && method === 'POST') return handleSpamLinkPost(req, cors);
+    // item 203: the "Yes, add me" link of Join our list (join.html shows who, then adds them)
+    if (route === '/join' && method === 'GET') return handleJoinGet(req, cors);
+    if (route === '/join' && method === 'POST') return handleJoinPost(req, cors);
   }
   // ── Phase BK: PUBLIC native booking — a website visitor lists services, reads
   //    open slots, and books an appointment. No session; authorized by the site id
@@ -1157,6 +1160,8 @@ async function route_(req: Request, cors: Record<string, string>): Promise<Respo
   {
     const m = route.match(/^\/forms\/inbox\/([0-9a-f-]{36})$/);
     if (m && method === 'POST') return handleFormStatus(req, site, m[1], cors);
+    // item 203: delete an enquiry for good, with the files that came with it
+    if (m && method === 'DELETE') return handleFormDelete(site, m[1], cors);
   }
   {
     const m = route.match(/^\/forms\/inbox\/([0-9a-f-]{36})\/reply$/);
