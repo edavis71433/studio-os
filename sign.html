@@ -8,74 +8,239 @@
 <title>Review &amp; sign</title>
 <link rel="stylesheet" href="/fonts/brand.css">
 <style>
-  :root{--bg:#faf8f5;--card:#fff;--ink:#1b1525;--soft:#6b6478;--line:#eee9e0;--p:#5b3fa0;--p-deep:#2a1b4a;--btn-ink:#fff;--good:#33664b;--good-soft:#e7f1ea;
-    --serif:'Fraunces',"Iowan Old Style",Georgia,serif;--sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif}
+  /* Sales items 88 and 106: the client's proposal and agreement page, as drawn in Figma
+     (file HSP7ScFSz2mg1xGzHRrEZi, page 257:4330): a header band in the studio's colour,
+     the three steps, the proposal beside its answer, the agreement as a document with
+     its contents and both signatures, and what is paid when. */
+  :root{--bg:#f7f5f1;--card:#fff;--ink:#1b1525;--soft:#6b6478;--line:#ebe6dd;--p:#5b3fa0;--pt:#5b3fa0;--brand:#5b3fa0;--btn-ink:#fff;--good:#2f6b4a;--good-soft:#e6f1ea;--good-ink:#fff;--lilac:#f0eafb;--lilac-ink:#5b3fa0;--pale-ink:#7d64b8;--err:#a3423a;
+    --serif:'Fraunces',"Iowan Old Style",Georgia,serif;--sans:'Inter',-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;--mono:'Geist Mono',ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
   /* dark mode: the accent lifts to #b79ceb, so filled controls need dark ink (#fff on #b79ceb fails contrast) */
-  @media (prefers-color-scheme:dark){:root{--bg:#171320;--card:#1f1a2b;--ink:#efeaf7;--soft:#a79ebc;--line:#2a2338;--p:#b79ceb;--btn-ink:#171320;--good:#8bbf9f;--good-soft:#1f2a24;--err:#e08b83}}
+  @media (prefers-color-scheme:dark){:root{--bg:#171320;--card:#1f1a2b;--ink:#efeaf7;--soft:#a79ebc;--line:#2d2640;--p:#b79ceb;--pt:#c9b6f2;--btn-ink:#171320;--good:#8bbf9f;--good-soft:#1f2a24;--good-ink:#171320;--lilac:#29213b;--lilac-ink:#cdb8f5;--pale-ink:#b9a5e6;--err:#e08b83}}
+  /* the soft tints follow the studio's own colour where the browser can mix one */
+  @supports (color:color-mix(in srgb,red 50%,white)){
+    :root{--lilac:color-mix(in srgb,var(--p) 11%,#fff);--lilac-ink:var(--pt);--pale-ink:color-mix(in srgb,var(--pt) 74%,#fff)}
+    @media (prefers-color-scheme:dark){:root{--lilac:color-mix(in srgb,var(--p) 16%,#1f1a2b);--lilac-ink:var(--pt);--pale-ink:color-mix(in srgb,var(--pt) 82%,#1f1a2b)}}
+  }
   *{box-sizing:border-box;margin:0}
-  body{background:var(--bg);color:var(--ink);font-family:var(--sans);line-height:1.6;-webkit-font-smoothing:antialiased}
+  body{background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:16px;line-height:1.55;-webkit-font-smoothing:antialiased}
+  .in{max-width:1200px;margin:0 auto;padding:0 40px}
   .wrap{max-width:640px;margin:0 auto;padding:44px 20px 90px}
-  h1{font-family:var(--serif);font-weight:500;font-size:clamp(24px,5vw,32px);margin:6px 0 4px}
-  .sub{color:var(--soft);font-size:15px;margin:0 0 22px}
-  .card{background:var(--card);border:1px solid var(--line);border-radius:15px;padding:22px;box-shadow:0 1px 2px rgba(27,21,37,.04),0 8px 24px rgba(27,21,37,.06);margin-bottom:14px}
-  .body{white-space:pre-wrap;font-size:15px;overflow-wrap:anywhere}
-  table{width:100%;border-collapse:collapse;font-size:14.5px}
-  td{padding:8px 4px;border-bottom:1px solid var(--line)} td:last-child{text-align:right;white-space:nowrap}
-  .total td{font-weight:700;border-bottom:none}
-  label{display:block;font-size:13px;font-weight:600;color:var(--soft);margin:12px 0 5px}
-  input,textarea{width:100%;font:inherit;font-size:16px;border:1px solid var(--line);background:var(--bg);color:var(--ink);border-radius:10px;padding:10px 12px;outline:none}
-  textarea{min-height:76px;resize:vertical}
-  input:focus,textarea:focus{border-color:var(--p)}
-  .row{display:flex;gap:10px;margin-top:18px;flex-wrap:wrap}
-  button{font-family:inherit;font-size:15px;font-weight:600;border-radius:999px;border:1px solid var(--p);background:var(--p);color:var(--btn-ink);padding:11px 22px;cursor:pointer}
-  button.ghost{background:transparent;color:var(--ink);border-color:var(--line)}
-  .paybtn{display:inline-block;background:var(--p);color:var(--btn-ink);font-weight:600;padding:11px 22px;border-radius:999px;text-decoration:none}
-  button:disabled{opacity:.5;cursor:default}
-  .ok{background:var(--good-soft);color:var(--good);border-radius:12px;padding:14px 16px;font-weight:600;margin-top:14px}
-  .muted{color:var(--soft);font-size:13.5px;margin-top:14px}
+  .sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+  .eyebrow{font-size:12px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:var(--soft)}
+  .muted{color:var(--soft);font-size:14.5px;margin-top:12px}
+  .fine{color:var(--soft);font-size:13.5px;line-height:1.5;margin-top:14px}
+  .sub{color:var(--soft);font-size:15.5px;margin:0 0 18px}
   .center{text-align:center;padding:56px 20px}
-  .spin{width:22px;height:22px;border:2.5px solid var(--line);border-top-color:var(--p);border-radius:50%;animation:sp .8s linear infinite;margin:50px auto}
+  .center h1{font-family:var(--serif);font-weight:500;font-size:clamp(26px,5vw,34px);margin:6px 0 8px}
+  .spin{width:22px;height:22px;border:2.5px solid var(--line);border-top-color:var(--p);border-radius:50%;animation:sp .8s linear infinite;margin:80px auto}
   @keyframes sp{to{transform:rotate(360deg)}}
   @media (prefers-reduced-motion:reduce){.spin{animation:none}}
-  /* signature certificate — the calm proof block shown after signing */
-  .cert .kv{display:flex;justify-content:space-between;gap:14px;padding:7px 0;border-bottom:1px solid var(--line);font-size:14px}
-  .cert .kv span:first-child{color:var(--soft);white-space:nowrap}
-  .cert .kv:last-of-type{border-bottom:none}
-  .mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12px;overflow-wrap:anywhere;text-align:right}
-  .sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
-  /* the one-page flow (choose → sign → pay): a three-step strip, the done steps
-     collapsed above, the next step open, the ones after it locked */
-  .steps{display:flex;gap:6px;list-style:none;padding:0;margin:0 0 20px}
-  .steps li{flex:1;display:flex;align-items:center;gap:8px;min-height:40px;padding:6px 10px;border-radius:10px;border:1px solid var(--line);background:var(--card);font-size:13.5px;font-weight:600;color:var(--soft)}
-  .steps .n{width:22px;height:22px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:12px;border:1.5px solid currentColor;flex:none}
-  .steps li.done{color:var(--good);background:var(--good-soft);border-color:var(--good-soft)}
-  .steps li.now{color:var(--p);border-color:var(--p)}
-  .steps li.now .n{background:var(--p);color:var(--btn-ink);border-color:var(--p)}
-  h2{font-family:var(--serif);font-weight:500;font-size:20px;margin:22px 0 8px}
-  h2 .k{color:var(--soft);font-family:var(--sans);font-size:13px;font-weight:600;margin-right:6px}
+  label{display:block;font-size:13.5px;font-weight:600;color:var(--soft);margin:14px 0 6px}
+  input,textarea{width:100%;font:inherit;font-size:16px;border:1.5px solid var(--line);background:var(--bg);color:var(--ink);border-radius:12px;padding:12px 14px;outline:none}
+  textarea{min-height:84px;resize:vertical}
+  input:focus,textarea:focus{border-color:var(--p);background:var(--card);box-shadow:0 0 0 3px rgba(91,63,160,.16)}
+  input:focus-visible,textarea:focus-visible{outline:none}
+  button,.paybtn{font-family:inherit;font-size:16px;font-weight:600;line-height:1.2;border-radius:999px;border:1.5px solid var(--p);background:var(--p);color:var(--btn-ink);padding:14px 26px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:8px;text-decoration:none;text-align:center}
+  button.ghost{background:transparent;color:var(--pt)}
+  button.link{background:none;border:none;padding:6px 8px;color:var(--ink);font-weight:500;font-size:15px;text-decoration:underline;text-underline-offset:3px}
+  button.danger{background:transparent;color:var(--err);border-color:var(--line)}
+  button:disabled{opacity:.5;cursor:default}
+  :focus-visible{outline:3px solid var(--p);outline-offset:2px}
+  .row{display:flex;gap:12px;margin-top:22px;flex-wrap:wrap}
+  .ok{background:var(--good-soft);color:var(--good);border-radius:12px;padding:14px 16px;font-weight:600;margin-top:14px}
+  .err{color:var(--err);font-size:14.5px;margin-top:12px}
+  /* the header band: who it's from, what it is, what it costs */
+  .hero{background:var(--brand);background:linear-gradient(100deg,color-mix(in srgb,var(--brand) 30%,#130a22) 0%,color-mix(in srgb,var(--brand) 62%,#130a22) 48%,var(--brand) 100%);color:#fff}
+  .hero .in{display:grid;grid-template-columns:minmax(0,1fr) auto;grid-template-areas:"who who" "eye tot" "h1 tot" "meta tot";column-gap:32px;padding-top:38px;padding-bottom:46px;align-items:end}
+  .hero .who{grid-area:who;display:flex;align-items:center;gap:10px;font-weight:600;font-size:15px;margin-bottom:28px}
+  .hero .mk{width:30px;height:30px;border-radius:8px;background:rgba(255,255,255,.16);display:inline-flex;align-items:center;justify-content:center;font-size:12.5px;font-weight:700}
+  .hero .eyebrow{grid-area:eye;color:rgba(255,255,255,.82)}
+  .hero h1{grid-area:h1;font-family:var(--serif);font-weight:500;font-size:clamp(34px,5vw,54px);line-height:1.08;letter-spacing:-.01em;margin:8px 0 12px;overflow-wrap:anywhere}
+  .hero h1 .dot{opacity:.8;margin:0 .15em}
+  .hero .meta{grid-area:meta;color:rgba(255,255,255,.82);font-size:14.5px}
+  .hero .meta span+span::before{content:'·';margin:0 .6em}
+  .hero .tot{grid-area:tot;text-align:right}
+  .hero .tot .lbl{font-size:14px;color:rgba(255,255,255,.82)}
+  .hero .tot .amt{font-family:var(--serif);font-weight:600;font-size:clamp(40px,5vw,60px);line-height:1.05;margin:2px 0 8px}
+  .pill{display:inline-block;background:rgba(255,255,255,.16);border-radius:999px;padding:5px 13px;font-size:13.5px;font-weight:500}
+  /* the three steps */
+  .stepbar{background:var(--card);border-bottom:1px solid var(--line)}
+  .stepbar .in{display:flex;align-items:center;justify-content:space-between;gap:16px;min-height:64px;flex-wrap:wrap}
+  .steps{display:flex;align-items:center;list-style:none;padding:0;margin:0;gap:12px}
+  .steps li{display:flex;align-items:center;gap:10px;font-size:15px;font-weight:600;color:var(--soft)}
+  .steps li:not(:last-child)::after{content:'';display:block;width:88px;height:2px;border-radius:2px;background:var(--line);margin-left:6px}
+  .steps .n{width:28px;height:28px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:12.5px;font-weight:700;border:1.5px solid var(--line);background:var(--card);flex:none}
+  .steps li.now{color:var(--pt)}
+  .steps li.now .n{background:var(--p);border-color:var(--p);color:var(--btn-ink)}
+  .steps li.done{color:var(--good)}
+  .steps li.done .n{background:var(--good);border-color:var(--good);color:var(--good-ink)}
+  .stepbar .note{color:var(--soft);font-size:14.5px}
+  /* the page under them */
+  .page{padding:36px 0 72px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:20px;padding:36px;box-shadow:0 1px 2px rgba(27,21,37,.04),0 12px 32px rgba(27,21,37,.06)}
   .card.locked{border-style:dashed;box-shadow:none;background:transparent}
-  .card.locked h2{margin-top:0;color:var(--soft)}
-  details.done{padding:0}
-  details.done summary{cursor:pointer;list-style:none;padding:16px 22px;font-weight:600;color:var(--good);display:flex;flex-wrap:wrap;gap:4px 10px;align-items:baseline}
+  .notice h2{font-family:var(--serif);font-weight:500;font-size:24px;margin-bottom:4px}
+  .stack>*+*{margin-top:20px}
+  .sec{margin:34px 0 12px}
+  .sec:first-child{margin-top:0}
+  .grid2{display:grid;grid-template-columns:minmax(0,1fr) 356px;gap:28px;align-items:start}
+  table{width:100%;border-collapse:collapse}
+  .items td{padding:15px 0;border-bottom:1px solid var(--line);vertical-align:top;font-size:15.5px}
+  .items td+td{text-align:right;white-space:nowrap;padding-left:18px;font-weight:500}
+  .items .lbl{font-weight:600}
+  .items .q{color:var(--soft);font-weight:500}
+  .items tr.sub td{padding:6px 0;border-bottom:none;color:var(--soft);font-size:14.5px;font-weight:400}
+  .items tr.sub.first td{padding-top:14px}
+  .items tr.total td{border-bottom:none;padding-top:14px;font-weight:700;font-size:17px}
+  .items tr.total td+td{font-family:var(--serif);font-size:23px;font-weight:600}
+  .parts{list-style:none;padding:0;margin:0}
+  .parts li{display:grid;grid-template-columns:30px minmax(0,1fr) auto;gap:16px;position:relative;padding-bottom:24px}
+  .parts li:last-child{padding-bottom:0}
+  .parts li:not(:last-child)::before{content:'';position:absolute;left:14px;top:34px;bottom:4px;width:2px;background:var(--line)}
+  .parts .pn{width:30px;height:30px;border-radius:50%;background:var(--lilac);color:var(--lilac-ink);display:inline-flex;align-items:center;justify-content:center;font-size:13px;font-weight:700}
+  .parts li.first .pn{background:var(--p);color:var(--btn-ink)}
+  .parts .pt{font-weight:600;font-size:15.5px;padding-top:3px}
+  .parts .ps{color:var(--soft);font-size:14px;margin-top:2px}
+  .parts .pa{font-weight:600;font-size:15.5px;white-space:nowrap;padding-top:3px}
+  .terms{white-space:pre-wrap;font-size:15.5px;line-height:1.6;overflow-wrap:anywhere}
+  .side{position:sticky;top:24px;padding:28px}
+  .side .lbl{font-size:14px;color:var(--soft)}
+  .side .big{font-family:var(--serif);font-size:44px;font-weight:600;line-height:1.1;margin:4px 0 10px}
+  .side .why{color:var(--soft);font-size:15px;margin-bottom:20px}
+  .acts{display:flex;flex-direction:column;gap:12px}
+  .acts button{width:100%}
+  .side .link{display:block;margin:10px auto 0}
+  .side .fine{border-top:1px solid var(--line);padding-top:14px}
+  .sm{display:none}
+  /* the agreement: its contents beside it, the document, then both signatures */
+  .agree{display:grid;grid-template-columns:200px minmax(0,1fr);gap:40px;align-items:start}
+  .agree.solo{grid-template-columns:minmax(0,1fr)}
+  .rail{position:sticky;top:24px;max-height:calc(100vh - 48px);overflow:auto;padding:4px 4px 12px 0}
+  .rail ol,.toc ol{list-style:none;padding:0;margin:10px 0 0}
+  .grp{font-size:11.5px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--soft);margin:16px 0 4px}
+  .rail a,.toc a{display:flex;gap:10px;padding:6px 10px;border-radius:8px;color:var(--ink);text-decoration:none;font-size:14px;line-height:1.35}
+  .rail a .rn,.toc a .rn{color:var(--pt);font-weight:600;min-width:16px}
+  .rail a:hover,.rail a.on,.toc a:hover{background:var(--lilac);color:var(--lilac-ink)}
+  .rail .rail-sig{margin-top:14px;border:1.5px solid var(--p);color:var(--pt);font-weight:600}
+  .toc{display:none;border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin:6px 0 4px}
+  .toc summary{cursor:pointer;font-weight:600;font-size:14.5px}
+  .doc-t{font-family:var(--serif);font-weight:500;font-size:clamp(26px,3.4vw,34px);line-height:1.15;margin:10px 0 22px}
+  .parties{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:8px}
+  .party{background:var(--bg);border:1px solid var(--line);border-radius:12px;padding:14px 16px}
+  .party .pn{font-weight:600;margin-top:4px}
+  .party .ps{color:var(--soft);font-size:14px}
+  .agreement{font-size:15.5px;line-height:1.65}
+  .ag-h{display:flex;align-items:baseline;gap:14px;font-family:var(--serif);font-weight:500;font-size:23px;line-height:1.25;margin:34px 0 10px;scroll-margin-top:20px}
+  .ag-h.plain{font-size:19px}
+  .ag-n{color:var(--pt);font-size:30px;min-width:24px}
+  .ag-p{white-space:pre-wrap;margin:0 0 12px 38px;overflow-wrap:anywhere}
+  .ag-item{display:flex;gap:10px;margin:0 0 8px 38px}
+  .ag-mark{color:var(--pt);font-weight:600;flex:none}
+  .sigs{border-top:1px solid var(--line);margin-top:36px;padding-top:30px;scroll-margin-top:20px}
+  .sec-t{font-family:var(--serif);font-weight:500;font-size:26px;margin-bottom:18px}
+  .sigrow{display:grid;grid-template-columns:1fr 1fr;gap:18px;align-items:start}
+  .sig{border:1px solid var(--line);border-radius:16px;padding:20px 20px 18px}
+  .sig.studio{background:var(--lilac);border-color:transparent}
+  .sig label{color:var(--ink)}
+  .sig .ink{font-family:var(--serif);font-style:italic;font-weight:400;font-size:30px;line-height:1.25;min-height:52px;padding:8px 2px 4px;border-bottom:1.5px solid var(--line);margin-top:16px;overflow-wrap:anywhere}
+  .sig.studio .ink{color:var(--pale-ink);border-color:var(--pale-ink)}
+  .sig .hint{color:var(--soft);font-size:13px;margin-top:6px}
+  .sig .who2{color:var(--soft);font-size:14px;margin-top:8px}
+  .sig .auto{color:var(--lilac-ink);font-size:14px;margin-top:12px;line-height:1.5}
+  /* signed: the news, both signatures, what's next */
+  .banner{display:flex;align-items:center;gap:16px;background:var(--good-soft);border-radius:16px;padding:18px 22px;margin-bottom:22px}
+  .banner .bc{width:34px;height:34px;border-radius:50%;background:var(--good);color:var(--good-ink);display:inline-flex;align-items:center;justify-content:center;font-weight:700;flex:none}
+  .banner .bt{font-family:var(--serif);font-weight:500;font-size:22px;color:var(--good)}
+  .banner .bs{color:var(--good);font-size:14.5px}
+  .banner .btn-w{margin-left:auto;display:inline-flex;align-items:center;justify-content:center;border-radius:999px;background:var(--card);color:var(--ink);border:1px solid var(--line);font-family:inherit;font-size:15px;font-weight:600;line-height:1.2;padding:10px 18px;text-decoration:none;cursor:pointer}
+  .grid-signed{display:grid;grid-template-columns:minmax(0,1fr) 380px;gap:24px;align-items:start}
+  .sigcard{padding:28px}
+  .fp{font-family:var(--mono);font-size:12.5px;color:var(--soft);margin-top:18px;overflow-wrap:anywhere}
+  .next{padding:28px}
+  .next .eyebrow{color:var(--pt)}
+  .next h3{font-family:var(--serif);font-weight:500;font-size:26px;margin:6px 0 2px}
+  .next .big{font-family:var(--serif);font-size:44px;font-weight:600;line-height:1.1;margin:4px 0 16px}
+  .next .paybtn{width:100%}
+  details.done{padding:0;margin-top:20px}
+  details.done summary{cursor:pointer;list-style:none;padding:18px 24px;font-weight:600;color:var(--good);display:flex;flex-wrap:wrap;gap:4px 10px;align-items:baseline}
   details.done summary::-webkit-details-marker{display:none}
-  details.done summary .tog{color:var(--soft);font-weight:500;font-size:13px;margin-left:auto}
+  details.done summary .tog{color:var(--soft);font-weight:500;font-size:13.5px;margin-left:auto}
   details.done summary .tog::after{content:'Show details'}
   details.done[open] summary .tog::after{content:'Hide details'}
-  details.done summary:focus-visible{outline:2px solid var(--p);outline-offset:-2px;border-radius:15px}
-  details.done .inner{padding:0 22px 20px}
-  @media print{details.done .inner{display:block}.steps,.card.locked{display:none!important}}
-  /* print: the certificate + the agreement, cleanly — no buttons, no celebration */
+  details.done summary:focus-visible{outline:2px solid var(--p);outline-offset:-2px;border-radius:20px}
+  details.done .inner{padding:0 24px 24px}
+  .cert{margin-top:24px;border-top:1px solid var(--line);padding-top:18px}
+  .cert .ct{font-weight:600;margin-bottom:8px}
+  .cert .kv{display:flex;justify-content:space-between;gap:14px;padding:7px 0;border-bottom:1px solid var(--line);font-size:14px}
+  .cert .kv span:first-child{color:var(--soft);white-space:nowrap}
+  .mono{font-family:var(--mono);font-size:12px;overflow-wrap:anywhere;text-align:right}
+  .foot{text-align:center;color:var(--soft);font-size:14px;padding:0 16px 40px}
+  /* the two answers that open over the page: a question, a decline */
+  dialog.sheet{border:none;padding:0;margin:auto;border-radius:22px;max-width:520px;width:calc(100% - 32px);background:var(--card);color:var(--ink);box-shadow:0 24px 64px rgba(19,10,34,.35)}
+  dialog.sheet::backdrop{background:rgba(19,10,34,.55)}
+  .sheet-in{padding:28px}
+  .sheet-in h2{font-family:var(--serif);font-weight:500;font-size:28px;margin-bottom:8px}
+  .sheet-in .sub{margin-bottom:16px}
+  .sheet-in textarea{min-height:110px}
+  .grab{display:none}
+  .chips{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:14px}
+  .chip{background:var(--card);color:var(--ink);border:1.5px solid var(--line);font-weight:500;font-size:15px;padding:9px 16px}
+  .chip[aria-pressed="true"]{background:var(--lilac);border-color:var(--p);color:var(--lilac-ink)}
+  .stackb{display:flex;flex-direction:column;gap:12px;margin-top:18px}
+  .stackb button{width:100%}
+  @media (max-width:1100px){.agree{grid-template-columns:minmax(0,1fr)}.rail{display:none}.toc{display:block}}
+  @media (max-width:900px){
+    .grid2,.grid-signed{grid-template-columns:minmax(0,1fr)}
+    .side{position:static}
+    .side .lbl,.side .big{display:none}
+    .acts.bar{position:fixed;left:0;right:0;bottom:0;z-index:30;flex-direction:row-reverse;gap:10px;padding:12px 16px calc(12px + env(safe-area-inset-bottom,0px));background:var(--card);border-top:1px solid var(--line);box-shadow:0 -8px 24px rgba(27,21,37,.08)}
+    .acts.bar button{width:auto;padding:13px 22px}
+    .acts.bar #accept{flex:1}
+    .acts.bar .lg{display:none}.acts.bar .sm{display:inline}
+    body.has-bar .page{padding-bottom:110px}
+    .banner{flex-wrap:wrap}.banner .btn-w{margin-left:0}
+  }
+  @media (max-width:760px){.sigrow,.parties{grid-template-columns:minmax(0,1fr)}}
+  @media (max-width:640px){
+    .in{padding:0 16px}
+    .hero .in{grid-template-columns:minmax(0,1fr);grid-template-areas:"who" "eye" "h1" "tot" "meta";padding-top:20px;padding-bottom:24px}
+    .hero .who{margin-bottom:20px}
+    .hero h1{font-size:34px;margin:6px 0 10px}
+    .hero .tot{text-align:left;display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:6px}
+    .hero .tot .lbl{display:none}
+    .hero .tot .amt{font-size:34px;margin:0}
+    .pill .lg{display:none}
+    .stepbar .in{min-height:52px}
+    .steps{gap:8px}.steps li{font-size:13.5px;gap:7px}.steps li:not(:last-child)::after{width:18px;margin-left:2px}.steps .n{width:22px;height:22px;font-size:11px}
+    .stepbar .note{display:none}
+    .page{padding:16px 0 48px}
+    .card,.side,.sigcard,.next{padding:20px;border-radius:16px}
+    .items td{padding:12px 0;font-size:15px}
+    .parts li{gap:12px;padding-bottom:16px}
+    .parts .pt .sep,.parts .ps{display:none}
+    .parts .pt .w{display:block;font-weight:400;color:var(--soft);font-size:14px}
+    .ag-h{font-size:20px;gap:10px;margin-top:26px}.ag-n{font-size:24px;min-width:18px}
+    .ag-p,.ag-item{margin-left:0}
+    #signRow{flex-direction:column}#signRow button{width:100%}
+    .banner{display:grid;grid-template-columns:34px minmax(0,1fr);gap:12px;align-items:start}.banner .bt{font-size:19px}.banner .btn-w{grid-column:1/-1;justify-self:start}
+    dialog.sheet{margin:auto 0 0;max-width:none;width:100%;border-radius:22px 22px 0 0}
+    .sheet-in{padding:14px 20px calc(20px + env(safe-area-inset-bottom,0px))}
+    .grab{display:block;width:44px;height:5px;border-radius:3px;background:var(--line);margin:0 auto 16px}
+  }
+  /* print: the signed agreement and its certificate, cleanly, with no buttons */
   @media print{
     body{background:#fff}
-    .no-print,.row,button,.spin,.sub{display:none!important}
-    .wrap{max-width:100%;padding:0}
+    .no-print,.stepbar,.row,button,.paybtn,.spin,.rail,.toc,.acts,dialog{display:none!important}
+    .hero{background:#fff!important;color:#000}
+    .hero .eyebrow,.hero .meta,.hero .tot .lbl{color:#444}
     .card{box-shadow:none;border:1px solid #bbb}
-    .cert{page-break-inside:avoid;break-inside:avoid}
+    .grid2,.grid-signed,.agree{display:block}
+    .cert{break-inside:avoid}
   }
 </style>
 </head>
 <body>
-<div class="wrap"><div id="main"><div class="spin" role="status" aria-label="Loading"></div></div><div id="sr-status" role="status" aria-live="polite" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)"></div></div>
+<div id="main"><div class="spin" role="status" aria-label="Loading"></div></div><div id="sr-status" role="status" aria-live="polite" class="sr"></div>
 <script>
 // The public review & sign page. The email's "Review & sign" link lands here with
 // ?t=<signed token>. Reads the proposal/contract via the token-gated public view,
@@ -84,16 +249,18 @@
 // Two shapes of link land here:
 //   • a deal-bound `flow` token (every send since Oct 2026): ONE page that walks
 //     choose → sign → pay — the proposal, then the agreement unlocks, then the
-//     deposit. Done steps collapse above; the next step is open; the rest are
-//     locked (the server locks them too — see handleSalesPublicView).
+//     deposit. Done steps collapse below; the open step is the page; the rest
+//     wait in the strip (the server locks them too — see handleSalesPublicView).
 //   • a per-document `proposal`/`contract` token (links sent before): the single
-//     document, exactly as before, so an old email keeps working.
+//     document, so an old email keeps working.
 const FN="https://qksstlqzbhesadrrofgn.supabase.co/functions/v1/presence";
 const KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFrc3N0bHF6Ymhlc2FkcnJvZmduIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE5NzMwMDMsImV4cCI6MjA5NzU0OTAwM30.4V94Ua7z5cntPWtvtqN24TUnfY5A6K6-zCxY0iEcgYo";
 const $=(id)=>document.getElementById(id);
 const esc=(s)=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
-const money=(c)=>'$'+((Number(c)||0)/100).toLocaleString('en-US',{minimumFractionDigits:2});
 const TOKEN=new URLSearchParams(location.search).get('t')||'';
+const DARK=!!(window.matchMedia&&matchMedia('(prefers-color-scheme: dark)').matches);
+let STUDIO='';     // the studio's name, from the link's brand
+let ASK=null;      // where an answer to a question goes: { email (masked), needs_email }
 // Nov 10 review (G3): no answer at all (no signal) used to THROW out of here: Accept,
 // Sign, Approve and Not now stayed grey with nothing said, and a link opened with no
 // signal waited forever. No answer is now an ordinary failure with a plain message
@@ -108,18 +275,21 @@ async function api(path,method,body){
   catch(_){return{ok:false,status:0,offline:true,body:{message:OFFLINE_MSG}};}
   finally{if(t)clearTimeout(t);}
 }
+// every view paints through here, so the phone's answer bar follows the page
+function paint(html){$('main').innerHTML=html;document.body.classList.toggle('has-bar',!!document.querySelector('#main .acts.bar'));}
 // the first read had no answer: the link may be fine, so say so and offer a retry
-function offline(){$('main').innerHTML=`<div class="center"><h1>We couldn’t load this just now</h1><p class="sub">${esc(OFFLINE_MSG)} Nothing is lost.</p><div class="row" style="justify-content:center"><button id="retryLoad">Try again</button></div></div>`;const b=$('retryLoad');if(b)b.onclick=()=>{$('main').innerHTML='<div class="spin" role="status" aria-label="Loading"></div>';load();};}
-function fail(msg){$('main').innerHTML=`<div class="center"><h1>This link isn’t working</h1><p class="sub">${esc(msg||'It may have expired (links last 30 days). Ask your studio to send a fresh one — nothing is lost.')}</p><p class="muted">Stuck? Just reply to the email this link came from.</p></div>`;}
+function offline(){paint(`<div class="wrap center"><h1>We couldn’t load this just now</h1><p class="sub">${esc(OFFLINE_MSG)} Nothing is lost.</p><div class="row" style="justify-content:center"><button id="retryLoad">Try again</button></div></div>`);const b=$('retryLoad');if(b)b.onclick=()=>{paint('<div class="spin" role="status" aria-label="Loading"></div>');load();};}
+function fail(msg){paint(`<div class="wrap center"><h1>This link isn’t working</h1><p class="sub">${esc(msg||'It may have expired (links last 30 days). Ask your studio to send a fresh one — nothing is lost.')}</p><p class="muted">Stuck? Just reply to the email this link came from.</p></div>`);}
 // A RECOVERABLE problem (version changed, too many tries) keeps the page — the
 // person shouldn't lose the document they just read over a retryable hiccup.
 function softFail(msg,near){
   const m=msg||'That didn’t go through — give it another try in a moment.';
   let n=$('softErr');
-  if(!n){n=document.createElement('p');n.id='softErr';n.className='muted';n.setAttribute('role','alert');n.style.color='var(--err,#a3423a)';}
+  if(!n){n=document.createElement('p');n.id='softErr';n.className='err';n.setAttribute('role','alert');}
   // the message lands next to the control that failed (the flow page has several rows)
   if(near&&near.parentNode)near.parentNode.insertBefore(n,near.nextSibling);else if(!n.parentNode)$('main').appendChild(n);
   n.textContent=m;
+  try{n.scrollIntoView({block:'nearest'});}catch(_){/* on a phone the answer bar sits apart from its row */}
   // A version change can NEVER succeed on retry — swap the actions for a reload.
   if(/reload|updated/i.test(m)){
     const row=near||document.querySelector('.row');
@@ -128,11 +298,9 @@ function softFail(msg,near){
     return;
   }
   document.querySelectorAll('button:disabled').forEach(b=>b.disabled=false);
-  // Disarm a half-armed decline so the label matches reality again.
-  const dd=$('decline'); if(dd&&dd.dataset.armed==='1'){dd.dataset.armed='0';dd.textContent='Decline this proposal';}
 }
 function announce(t){try{$('sr-status').textContent=t;}catch(_){/* */}}
-function thanks(t,s){$('main').innerHTML=`<div class="center"><h1>${esc(t)}</h1><p class="sub">${esc(s)}</p></div>`;announce(t);}
+function thanks(t,s){paint(`<div class="wrap center"><h1>${esc(t)}</h1><p class="sub">${esc(s)}</p></div>`);announce(t);}
 // `after` is what just happened on the one-page flow (an accept, a signature):
 // the page re-reads the deal so the next step unlocks from the server's truth,
 // then scrolls to it. Null on a plain visit.
@@ -153,13 +321,232 @@ async function load(after){
     // A custom brand accent replaces --p in BOTH themes, so the dark-mode
     // dark-ink swap (tuned to the default lilac lift) no longer applies —
     // keep the original white ink on the studio's own accent.
-    if(d.brand.accent){document.documentElement.style.setProperty('--p',d.brand.accent);document.documentElement.style.setProperty('--btn-ink','#fff');}
+    if(d.brand.accent){const s=document.documentElement.style;s.setProperty('--p',d.brand.accent);s.setProperty('--brand',d.brand.accent);s.setProperty('--btn-ink','#fff');if(!DARK)s.setProperty('--pt',d.brand.accent);}
     if(d.brand.name)document.title=`Review & sign — ${d.brand.name}`;
     window.__brandName=d.brand.name||'';
   }
+  STUDIO=(d.brand&&d.brand.name)||'';
+  ASK=d.ask||null;
   if(d.kind==='flow')renderFlow(d,after||null);
   else if(d.kind==='proposal')renderProposal(d);else if(d.kind==='estimate')renderEstimate(d);else renderContract(d);
 }
+
+// ── the page's own words (tests/presence/agreement_layout_test.mjs runs these) ──
+// Whole amounts read "$4,800", the rest "$4,800.50" (the studio's own pages use the same rule)
+const money=(c)=>{const v=(Number(c)||0)/100;return '$'+v.toLocaleString('en-US',Number.isInteger(v)?{maximumFractionDigits:0}:{minimumFractionDigits:2,maximumFractionDigits:2});};
+const dayOf=(iso)=>{const d=new Date(iso);return isNaN(d)?'':d.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});};
+const momentOf=(iso)=>{const d=new Date(iso);return isNaN(d)?'':d.toLocaleString('en-US',{month:'short',day:'numeric',year:'numeric',hour:'numeric',minute:'2-digit'});};
+const ymdWords=(s)=>{const m=/^(\d{4})-(\d{2})-(\d{2})$/.exec(String(s||''));return m?new Date(+m[1],+m[2]-1,+m[3]).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}):'';};
+const andList=(a)=>a.length<2?(a[0]||''):a.slice(0,-1).join(', ')+' and '+a[a.length-1];
+// An agreement's headings are often typed in capitals ("SCOPE OF WORK"); the page shows
+// them as "Scope of work". Only the showing: the signed text keeps every character, and
+// short names like SEO or LLC keep their capitals.
+const KEEP_CAPS=new Set(['SEO','SSL','DNS','API','LLC','LLP','INC','CMS','AI','URL','URLS','HTML','CSS','PDF','US','USA','UK','ADA','GDPR','CCPA','HIPAA','PCI','IP','FAQ','ID','CRM','SMS','UX','UI','W-9']);
+function headingCase(t){
+  const s=String(t==null?'':t);const L=s.replace(/[^A-Za-z]/g,'');
+  if(!L||L!==L.toUpperCase())return s;
+  const low=s.toLowerCase().replace(/[a-z][a-z0-9-]*/g,(w)=>KEEP_CAPS.has(w.toUpperCase())?w.toUpperCase():w);
+  return low.charAt(0).toUpperCase()+low.slice(1);
+}
+// sales item 106: the server lays the parts out (scheduleView); the page words them.
+// "Paid in 3 parts · $1,600 when you sign", as lib/proposal_schedule.ts scheduleSummary says it.
+function pillHtml(rows){if(!rows||!rows.length)return '';const f=rows[0];return `<span class="lg">Paid in </span>${rows.length} parts`+(f.when==='sign'?` · ${money(f.amount_cents)} when you sign`:'');}
+// When a later part is due, once the agreement is signed (the server dates "days after"
+// parts from the day of signing, as here)
+function laterWhen(r,signedAt){
+  if(r.when==='date'&&r.date)return 'by '+ymdWords(r.date);
+  if(r.when==='days'&&r.days){const base=String(signedAt||'').slice(0,10);if(/^\d{4}-\d{2}-\d{2}$/.test(base))return 'by '+ymdWords(new Date(Date.parse(base+'T00:00:00Z')+r.days*86400000).toISOString().slice(0,10));return `${r.days} day${r.days===1?'':'s'} after you sign`;}
+  if(r.when==='sign')return 'when you sign';
+  return 'when the work is done';
+}
+// The contents beside the agreement: its numbered sections, grouped where the numbering
+// starts again (a package's scope of work, then the terms).
+function railGroups(heads){
+  if(!heads.some(h=>h.n))return heads.length?[{label:null,items:heads}]:[];
+  const groups=[];let cur=null,lastPlain=null;
+  for(const h of heads){
+    if(!h.n){lastPlain=h;continue;}
+    if(!cur||h.n==='1'){cur={label:lastPlain,items:[]};groups.push(cur);}
+    cur.items.push(h);lastPlain=null;
+  }
+  if(groups.length===1)groups[0].label=null;
+  return groups;
+}
+// ── end of the page's words ──
+
+// ── mirrors of lib/agreement_layout.ts (tests/presence/agreement_layout_test.mjs runs them against it) ──
+const isCapsLine=(s)=>{const L=s.replace(/[^A-Za-z]/g,'');return L.length>=3&&s.length<=90&&L===L.toUpperCase()&&!/[.:;,]$/.test(s.trim());};
+function agreementBlocks(body){
+  const lines=String(body==null?'':body).replace(/\r\n?/g,'\n').split('\n');
+  const out=[];let para=[];let hn=0;
+  const flush=()=>{if(para.length){out.push({t:'para',text:para.join('\n')});para=[];}};
+  const heading=(n,text)=>{hn++;out.push({t:'heading',n,text,id:'s'+hn});};
+  for(const raw of lines){
+    const line=raw.replace(/\s+$/,'');
+    const s=line.trim();
+    if(!s){flush();continue;}
+    if(!out.length&&!para.length&&isCapsLine(s)&&!/^\d{1,2}\.\s/.test(s)){out.push({t:'title',text:s});continue;}
+    let m=/^(\d{1,2})\.\s+(.+)$/.exec(s);
+    if(m){
+      const rest=m[2].trim();
+      if(isCapsLine(rest)){flush();heading(m[1],rest);continue;}
+      const named=/^([A-Z][A-Za-z ,&'’()\/-]{1,60}?)\.\s+(\S.*)$/.exec(rest);
+      if(named){flush();heading(m[1],named[1]);para.push(named[2]);continue;}
+      if(rest.length<=70&&!/[.;:]$/.test(rest)){flush();heading(m[1],rest);continue;}
+    }
+    if(isCapsLine(s)&&!/^\(?[a-z0-9]{1,3}\)/i.test(s)){flush();heading(null,s);continue;}
+    m=/^\(([a-z0-9]{1,3})\)\s+(.+)$/i.exec(s)||/^([a-z])\)\s+(.+)$/.exec(s);
+    if(m){flush();out.push({t:'item',mark:`(${m[1]})`,text:m[2]});continue;}
+    m=/^[-•*]\s+(.+)$/.exec(s);
+    if(m){flush();out.push({t:'item',mark:'•',text:m[1]});continue;}
+    para.push(line);
+  }
+  flush();
+  return out;
+}
+const agreementContents=(blocks)=>blocks.filter(b=>b.t==='heading').map(b=>({id:b.id,n:b.n,text:b.text}));
+// why a client declines, as lib/agreement_layout.ts DECLINE_REASONS lists them
+const REASONS=[['price','The price'],['timing','The timing'],['scope','What’s included'],['elsewhere','We went another way']];
+// ── end of the mirrors ──
+
+// The proposal's discount/tax + trail ride ONE reserved element in line_items
+// (see lib/sales_lifecycle.ts). Split it out, then mirror computeProposalTotals so
+// the client sees the exact same honest breakdown the studio and the document do.
+function splitProposalLI(raw){const a=Array.isArray(raw)?raw:[];const M='__meta__';const items=a.filter(el=>!(el&&typeof el==='object'&&M in el));const me=a.find(el=>el&&typeof el==='object'&&M in el);return{items,meta:(me&&me[M])||{}};}
+// Nov 10 review (G11): each line's amount by the SAME rule as the total (quantity ×
+// unit price, whole numbers, never below zero). A quantity-0 line used to show its
+// unit price while the total counted nothing for it; it now reads "× 0" and $0.
+const lineCents=(i)=>Math.max(0,Math.trunc(i.qty)||0)*Math.max(0,Math.trunc(i.unit_cents)||0);
+function proposalTotals(raw){const {items,meta}=splitProposalLI(raw);const sub=items.reduce((n,i)=>n+lineCents(i),0);let disc=0;if(meta.discount){disc=meta.discount.mode==='percent'?Math.round(sub*Math.min(100,Math.max(0,meta.discount.value))/100):Math.trunc(meta.discount.value);}disc=Math.max(0,Math.min(disc,sub));const post=sub-disc;const tp=(meta.tax_pct!=null&&isFinite(+meta.tax_pct))?Math.min(100,Math.max(0,+meta.tax_pct)):0;const tax=Math.round(post*tp/100);return{items,meta,subtotal:sub,discount:disc,tax:tax,total:Math.max(0,post+tax)};}
+
+// ── the pieces every view is built from ──
+function heroHtml(o){
+  const mk=STUDIO?`<p class="who"><span class="mk" aria-hidden="true">${esc(STUDIO.trim().charAt(0).toUpperCase())}</span><span>${esc(STUDIO)}</span></p>`:'';
+  const meta=(o.meta||[]).filter(Boolean);
+  return `<header class="hero"><div class="in">${mk}${o.eyebrow?`<p class="eyebrow">${esc(o.eyebrow)}</p>`:''}<h1>${o.titleHtml||esc(o.title)}</h1>${meta.length?`<p class="meta">${meta.map(m=>`<span>${esc(m)}</span>`).join('')}</p>`:''}${o.total!=null?`<div class="tot"><p class="lbl">${esc(o.totalLabel||'Your total')}</p><p class="amt">${money(o.total)}</p>${o.pill?`<p><span class="pill">${o.pill}</span></p>`:''}</div>`:''}</div></header>`;
+}
+const DONE_WORD={choose:'Chosen',sign:'Signed',pay:'Paid'};
+function stripHtml(steps,note){
+  return `<nav class="stepbar" aria-label="Your steps"><div class="in"><ol class="steps">${steps.map((s,i)=>`<li class="${s.state}"${s.state==='now'?' aria-current="step"':''}><span class="n" aria-hidden="true">${s.state==='done'?'✓':i+1}</span><span>${s.state==='done'?DONE_WORD[s.key]:s.label}</span><span class="sr">${s.state==='done'?' — done':s.state==='locked'?' — not yet':' — this step'}</span></li>`).join('')}</ol>${note?`<p class="note">${esc(note)}</p>`:''}</div></nav>`;
+}
+const footHtml=()=>`<footer class="foot">${STUDIO?`Prepared by ${esc(STUDIO)}. `:''}This link is just for you.</footer>`;
+const pageHtml=(body)=>`<main class="page"><div class="in">${body}</div></main>`;
+const forWhom=(client)=>client?(client.business||client.name||''):'';
+const betweenLine=(client)=>STUDIO&&forWhom(client)?`Between ${STUDIO} and ${forWhom(client)}`:'';
+const proposalMeta=(p)=>[p.sent_at?'Prepared '+dayOf(p.sent_at):'',p.expires_at?'Good until '+dayOf(p.expires_at):'',Number(p.version)>1?'Version '+Number(p.version):''];
+function itemsHtml(T,totalWord){
+  const rows=T.items.map(i=>{const q=Math.max(0,Math.trunc(i.qty)||0);return `<tr><td><span class="lbl">${esc(i.label)}</span>${q!==1?`<span class="q"> × ${q}</span>`:''}</td><td>${money(lineCents(i))}</td></tr>`;}).join('');
+  const dLbl=(T.meta.discount&&T.meta.discount.mode==='percent')?`Discount (${+T.meta.discount.value}%)`:'Discount';
+  const tLbl=(T.meta.tax_pct!=null)?`Tax (${+T.meta.tax_pct}%)`:'Tax';
+  const bd=(T.discount>0||T.tax>0)?`<tr class="sub first"><td>Subtotal</td><td>${money(T.subtotal)}</td></tr>${T.discount>0?`<tr class="sub"><td>${esc(dLbl)}</td><td>−${money(T.discount)}</td></tr>`:''}${T.tax>0?`<tr class="sub"><td>${esc(tLbl)}</td><td>+${money(T.tax)}</td></tr>`:''}`:'';
+  return `<table class="items">${rows}${bd}<tr class="total"><td>${esc(totalWord||'Total')}</td><td>${money(T.total)}</td></tr></table>`;
+}
+// sales item 106: how they'll pay, part by part
+function partsHtml(rows,flow){
+  if(!rows||!rows.length)return '';
+  return `<h2 class="eyebrow sec">How you’ll pay</h2><ol class="parts">${rows.map((r,i)=>`<li${i===0?' class="first"':''}><span class="pn" aria-hidden="true">${r.n}</span><div><p class="pt"><span>Part ${r.n} of ${r.of}</span><span class="sep" aria-hidden="true"> · </span><span class="w">${esc(r.words)}</span></p><p class="ps">${r.when==='sign'?(flow?'Paid on this page, right after you sign':'Paid right after you sign'):'Comes with its own invoice'}</p></div><p class="pa">${money(r.amount_cents)}</p></li>`).join('')}</ol>`;
+}
+const scheduleOf=(p)=>p&&Array.isArray(p.schedule)&&p.schedule.length?p.schedule:null;
+const termsHtml=(t)=>t?`<h2 class="eyebrow sec">Good to know</h2><p class="terms">${esc(t)}</p>`:'';
+// The proposal and its answer: what's included and how it's paid, beside the total,
+// Accept, Ask a question and Decline (on a phone the first two ride a bar at the bottom).
+function chooseHtml(p,o){
+  const T=proposalTotals(p.line_items);
+  const rows=scheduleOf(p);
+  const first=rows&&rows[0];
+  const why=rows?`Paid in ${rows.length} parts. The first, ${money(first.amount_cents)}, ${first.when==='sign'?'when you sign the agreement':laterWhen(first,'')}.`:(o.dep&&o.dep.amount_cents?`A ${money(o.dep.amount_cents)} deposit is due when you sign the agreement.`:'');
+  let side;
+  if(o.state)side=o.state;
+  else if(p.status==='declined')side=`<p class="muted">You declined this proposal. Changed your mind? Ask your studio to send a fresh one.</p>`;
+  else if(p.expired)side=`<p class="muted">This proposal has expired — ask your studio to send an updated one. Nothing is lost.</p><div class="acts"><button class="ghost" id="askBtn" type="button">Ask for an updated one</button></div>`;
+  else side=`<div class="acts bar" id="chooseRow"><button id="accept" type="button"><span class="lg">Accept this proposal</span><span class="sm">Accept · ${money(T.total)}</span></button><button class="ghost" id="askBtn" type="button"><span class="lg">Ask a question</span><span class="sm">Ask</span></button></div><button class="link" id="decline" type="button">Decline this proposal</button><p class="fine">Nothing is final until you accept.${o.flow?' Accepting opens the agreement to sign, right here.':''}</p>`;
+  return `<section id="step-choose" class="grid2" aria-label="Your proposal"><article class="card doc"><h2 class="eyebrow sec">What’s included</h2>${itemsHtml(T)}${partsHtml(rows,o.flow)}${termsHtml(p.terms)}</article><aside class="card side"><p class="lbl">Your total</p><p class="big">${money(T.total)}</p>${why&&!o.state&&p.status!=='declined'?`<p class="why">${esc(why)}</p>`:''}${side}</aside></section>`;
+}
+const acceptedHtml=(p,T,rows)=>`<details class="card done" id="step-choose"><summary>✓ Proposal accepted — ${money(T.total)} total<span class="tog"></span></summary><div class="inner">${itemsHtml(T)}${partsHtml(rows,true)}${termsHtml(p.terms)}</div></details>`;
+// the agreement's words as blocks: numbered headings, paragraphs, lettered items
+function blocksHtml(blocks){
+  return blocks.map(b=>{
+    if(b.t==='title')return '';   // shown above the title instead
+    if(b.t==='heading')return `<h3 class="ag-h${b.n?'':' plain'}" id="ag-${b.id}">${b.n?`<span class="ag-n">${esc(b.n)}</span>`:''}<span>${esc(headingCase(b.text))}</span></h3>`;
+    if(b.t==='item')return `<p class="ag-item"><span class="ag-mark">${esc(b.mark)}</span><span>${esc(b.text)}</span></p>`;
+    return `<p class="ag-p">${esc(b.text)}</p>`;
+  }).join('');
+}
+const groupsHtml=(groups)=>groups.map(g=>`${g.label?`<p class="grp">${esc(headingCase(g.label.text))}</p>`:''}<ol>${g.items.map(h=>`<li><a href="#ag-${h.id}" data-for="ag-${h.id}"><span class="rn">${esc(h.n||'')}</span><span>${esc(headingCase(h.text))}</span></a></li>`).join('')}</ol>`).join('');
+function partiesHtml(signer,client){
+  const them=forWhom(client);
+  if(!STUDIO||!them)return '';
+  const sLine=signer&&signer.name?signer.name+(signer.title?', '+signer.title:''):'';
+  const cLine=client.business&&client.name?client.name:'';
+  return `<div class="parties"><div class="party"><p class="eyebrow">The studio</p><p class="pn">${esc(STUDIO)}</p>${sLine?`<p class="ps">${esc(sLine)}</p>`:''}</div><div class="party"><p class="eyebrow">The client</p><p class="pn">${esc(them)}</p>${cLine?`<p class="ps">${esc(cLine)}</p>`:''}</div></div>`;
+}
+// Their signature, typed, beside the studio's, which lands in the same moment (sales item 88)
+function signFormHtml(signer,client){
+  const them=forWhom(client);
+  const s=signer&&signer.name?signer:null;
+  return `<section class="sigs" id="signatures" aria-labelledby="sigT"><h3 class="sec-t" id="sigT">Signatures</h3><div class="sigrow">
+    <div class="sig you"><p class="eyebrow">${them?'For '+esc(them):'Your signature'}</p><label for="nm">Type your full name</label><input id="nm" autocomplete="name" placeholder="Your full name"><p class="ink" id="ink" aria-hidden="true"></p><p class="hint">Your signature, as you type it</p><label for="em">Your email, for your signed copy</label><input id="em" type="email" autocomplete="email" required placeholder="you@business.com"></div>
+    ${s?`<div class="sig studio"><p class="eyebrow">For ${esc(STUDIO||s.business||'the studio')}</p><p class="ink" aria-hidden="true">${esc(s.name)}</p><p class="who2">${esc(s.name)}${s.title?', '+esc(s.title):''}</p><p class="auto">Signs automatically the moment you sign, with the same date and time. Nothing else to wait for.</p></div>`:''}
+  </div></section>`;
+}
+function agreementStep(c,o){
+  const blocks=agreementBlocks(c.body);
+  const groups=railGroups(agreementContents(blocks));
+  const count=groups.reduce((n,g)=>n+g.items.length,0);
+  const t=blocks.find(b=>b.t==='title');
+  const rail=count?`<nav class="rail" aria-label="In this agreement"><p class="eyebrow">In this agreement</p>${groupsHtml(groups)}<a class="rail-sig" href="#signatures">Signatures</a></nav>`:'';
+  const toc=count?`<details class="toc"><summary>In this agreement · ${count} section${count===1?'':'s'}</summary>${groupsHtml(groups)}</details>`:'';
+  const rows=o.rows,dep=o.dep;
+  const p1=rows&&rows[0]&&rows[0].when==='sign'&&dep&&rows[0].amount_cents===dep.amount_cents;
+  const payHint=o.flow&&dep&&dep.status!=='paid'?(p1?` Signing opens Part 1 of ${rows.length}, ${money(dep.amount_cents)}, to pay right here.`:` Signing opens your ${money(dep.amount_cents)} deposit to pay, right here.`):'';
+  return `<section id="step-sign" class="agree${rail?'':' solo'}">${rail}<article class="card doc"><p class="eyebrow">${esc(t?t.text:'Agreement')}</p><h2 class="doc-t">${esc(c.title||'Your agreement')}</h2>${partiesHtml(o.signer,o.client)}${toc}<div class="body agreement">${blocksHtml(blocks)}</div>${signFormHtml(o.signer,o.client)}<div class="row" id="signRow"><button id="sign" type="button">Sign the agreement</button><button class="ghost" id="askSign" type="button">Ask a question</button></div><p class="fine">Typing your name here counts as your signature. Your signed copy comes to you by email, with the PDF attached.${payHint}</p></article></section>`;
+}
+// what's next once it's signed: the part or deposit to pay, or that nothing is due yet
+function payHtml(dep,rows,c,paid){
+  const p1=rows&&rows[0]&&rows[0].when==='sign'&&dep&&rows[0].amount_cents===dep.amount_cents;
+  const later=p1?rows.slice(1).map(r=>`${money(r.amount_cents)} ${laterWhen(r,c.signed_at)}`):[];
+  const then=later.length?`Then ${andList(later)}. Each comes with its own invoice.`:'';
+  const head=p1?`Part 1 of ${rows.length}`:'Your deposit';
+  if(paid)return `<div class="card next" id="step-pay"><p class="eyebrow">${esc(head)}</p><div class="ok">✓ ${p1?'Part 1 paid':'Deposit paid'} — thank you. Your studio has been told and will kick things off.</div>${then?`<p class="fine">${esc(then)}</p>`:''}</div>`;
+  // sales item 118: a bank payment takes days to arrive; its link is used up, so no Pay button
+  if(dep&&dep.processing)return `<div class="card next" id="step-pay"><p class="eyebrow">${esc(head)}</p><div class="ok">Payment on its way. Your ${money(dep.amount_cents)} bank payment takes a few days to arrive. There’s nothing more to do, and you’ll get a receipt when it lands.</div>${then?`<p class="fine">${esc(then)}</p>`:''}</div>`;
+  if(dep&&dep.url)return `<div class="card next no-print" id="step-pay"><p class="eyebrow">Next step</p><h3>${esc(head)}</h3><p class="big">${money(dep.amount_cents)}</p><a class="paybtn" id="pay" href="${esc(dep.url)}">Pay ${money(dep.amount_cents)} securely</a><p class="fine">${esc(then||'Prefer later? This page keeps the link — come back any time.')}</p></div>`;
+  if(dep)return `<div class="card next" id="step-pay"><p class="eyebrow">Next step</p><h3>${esc(head)}</h3><p class="muted">Your ${money(dep.amount_cents)} deposit is being set up — your studio will send the payment link. Nothing to do now.</p></div>`;
+  return `<div class="card next" id="step-pay"><p class="eyebrow">Next step</p><h3>All set for now</h3><p class="muted">Nothing to pay right now — your studio has been told you signed and will send an invoice when it’s time.</p></div>`;
+}
+// Signed: the news with the copy to keep, both signatures, and what's next
+function signedHtml(c,o){
+  const when=c.signed_at||new Date().toISOString();
+  const both=!!c.countersigned_name;
+  const fresh=o.after&&o.after.kind==='signed';
+  const em=c.signer_email||'';
+  const sub=fresh?(o.after.copy_emailed?`Your signed copy is on its way to ${em||'your email'}, with the PDF attached.`:'Your signed agreement stays on this page. Keep a copy with the button here.'):'Your signed agreement stays on this page whenever you need it.';
+  const keep=c.pdf_url?`<a class="btn-w" id="pdf" href="${esc(c.pdf_url)}">Download the PDF</a>`:`<button class="btn-w" type="button" data-print>Print / save a copy</button>`;
+  const banner=`<div class="banner"><span class="bc" aria-hidden="true">✓</span><div><h2 class="bt">${both?'Signed by both of you':'Signed'} on ${esc(dayOf(when))}</h2><p class="bs">${esc(sub)}</p></div>${keep}</div>`;
+  const them=forWhom(o.client);
+  const you=`<div class="sig"><p class="eyebrow">${them?'For '+esc(them):'Your signature'}</p><p class="ink">${esc(c.signer_name||'')}</p><p class="who2">${esc(c.signer_name||'')} · ${esc(momentOf(when))}</p>${em?`<p class="who2">${esc(em)}</p>`:''}</div>`;
+  const studio=both?`<div class="sig"><p class="eyebrow">For ${esc(STUDIO||'the studio')}</p><p class="ink">${esc(c.countersigned_name)}</p><p class="who2">${esc(c.countersigned_name)}${c.countersigned_title?', '+esc(c.countersigned_title):''} · ${esc(momentOf(c.countersigned_at||when))}</p><p class="who2">Countersigned when ${esc(c.signer_name||'you')} signed.</p></div>`:'';
+  const hash=String(c.content_hash||'');
+  const fp=hash?`<p class="fp">Fingerprint of the signed text: <span title="${esc(hash)}">${esc(hash.length>14?hash.slice(0,6)+'…'+hash.slice(-4):hash)}</span>. It changes if even one character does.</p>`:'';
+  const sigs=`<section class="card sigcard" aria-labelledby="sgT"><h2 class="sec-t" id="sgT">Signatures</h2><div class="sigrow">${you}${studio}</div>${fp}</section>`;
+  const pay=o.payCard===false?'':payHtml(o.dep,o.rows,c,o.paid);
+  return banner+(pay?`<div class="grid-signed">${sigs}${pay}</div>`:sigs);
+}
+// the signed agreement itself, folded away, with its certificate for the record
+function signedDocHtml(c){
+  const blocks=agreementBlocks(c.body);
+  const t=blocks.find(b=>b.t==='title');
+  const when=c.signed_at||new Date().toISOString();
+  const counter=c.countersigned_name?`<div class="kv"><span>Countersigned by</span><span>${esc(c.countersigned_name)}${c.countersigned_title?', '+esc(c.countersigned_title):''}${STUDIO?' for '+esc(STUDIO):''}</span></div>`:'';
+  return `<details class="card done" id="step-sign"><summary>✓ ${esc(c.title||'Your agreement')}, signed ${esc(dayOf(when))}<span class="tog"></span></summary><div class="inner"><p class="eyebrow">${esc(t?t.text:'Agreement')}</p><div class="body agreement">${blocksHtml(blocks)}</div>
+    <div class="cert"><p class="ct">Signature certificate</p>
+      <div class="kv"><span>Signed by</span><span>${esc(c.signer_name||'')}</span></div>${counter}
+      <div class="kv"><span>Signed at</span><span>${esc(momentOf(when))}</span></div>
+      <div class="kv"><span>Document fingerprint</span><span class="mono">${esc(c.content_hash||'')}</span></div>
+      <p class="muted">The fingerprint identifies the exact text you signed — it changes if even one character does.</p>
+      <div class="row"><button class="ghost" type="button" data-print>Print / save a copy</button></div></div></div></details>`;
+}
+
 // ── The one-page flow: choose → sign → pay ──────────────────────────────────
 function renderFlow(d,after){
   const p=d.proposal,c=d.contract,dep=d.deposit;
@@ -168,6 +555,8 @@ function renderFlow(d,after){
   const signed=!!(c&&c.status==='signed');
   const paid=!!(dep&&dep.status==='paid');
   const T=p?proposalTotals(p.line_items):null;
+  const rows=scheduleOf(p);
+  const client=d.client||null;
   // the strip: every step the deal has, with its state
   const steps=[];
   if(p||pending)steps.push({key:'choose',label:'Choose',state:(p&&p.status==='accepted')?'done':'now'});
@@ -175,139 +564,143 @@ function renderFlow(d,after){
   steps.push({key:'pay',label:'Pay',state:paid?'done':signed?'now':'locked'});
   // only the FIRST open step is "now" — the ones after it wait their turn
   let seenNow=false;steps.forEach(s=>{if(s.state==='now'){if(seenNow)s.state='locked';seenNow=true;}});
-  const strip=`<ol class="steps" aria-label="Your steps">${steps.map((s,i)=>`<li class="${s.state}"${s.state==='now'?' aria-current="step"':''}><span class="n" aria-hidden="true">${s.state==='done'?'✓':i+1}</span><span>${s.label}</span><span class="sr">${s.state==='done'?' — done':s.state==='locked'?' — not yet':' — this step'}</span></li>`).join('')}</ol>`;
   const title=(d.deal&&d.deal.title)||'Your proposal and agreement';
-  const sub=signed?(paid?'All signed and paid — thank you.':'All signed.'):(chosen&&c&&!c.locked)?'One typed name signs the agreement — nothing is final until you do.':!chosen?'Take your time — nothing is final until you accept.':'';
-  let h=`<h1>${esc(title)}</h1>${preparedBy()}${sub?`<p class="sub">${sub}</p>`:''}${strip}`;
-  let k=0;
-  // ── 1 · Choose ──
-  if(p){
-    k++;
-    const items=lineRowsHtml(T.items);
-    const hasB=T.discount>0||T.tax>0;
-    const dLbl=(T.meta.discount&&T.meta.discount.mode==='percent')?`Discount (${+T.meta.discount.value}%)`:'Discount';
-    const tLbl=(T.meta.tax_pct!=null)?`Tax (${+T.meta.tax_pct}%)`:'Tax';
-    const bd=hasB?`<tr class="muted"><td>Subtotal</td><td>${money(T.subtotal)}</td></tr>${T.discount>0?`<tr class="muted"><td>${esc(dLbl)}</td><td>−${money(T.discount)}</td></tr>`:''}${T.tax>0?`<tr class="muted"><td>${esc(tLbl)}</td><td>+${money(T.tax)}</td></tr>`:''}`:'';
-    const table=`<table>${items}${bd}<tr class="total"><td>Total</td><td>${money(T.total)}</td></tr></table>${p.terms?`<p class="muted">${esc(p.terms)}</p>`:''}`;
-    if(p.status==='accepted'){
-      h+=`<details class="card done" id="step-choose"><summary>✓ Proposal accepted — ${money(T.total)} total<span class="tog"></span></summary><div class="inner">${table}</div></details>`;
-    }else{
-      h+=`<section id="step-choose"><h2><span class="k">Step ${k}</span>${esc(p.title||'Your proposal')}</h2><div class="card">${table}</div>`;
-      if(p.status==='declined')h+=`<p class="muted">You declined this proposal. Changed your mind? Ask your studio to send a fresh one.</p>`;
-      else if(p.expired)h+=`<p class="muted">This proposal has expired — ask your studio to send an updated one. Nothing is lost.</p>`;
-      else h+=`<div class="row" id="chooseRow"><button id="accept">Accept this proposal</button><button class="ghost" id="decline">Decline this proposal</button></div><p class="muted">Accepting unlocks the agreement to sign, right here.</p>`;
-      h+=`</section>`;
-    }
-  }
-  else if(pending){
-    k++;
-    h+=`<div class="card locked" id="step-choose"><h2><span class="k">Step ${k}</span>Your proposal</h2><p class="muted" style="margin-top:0">Your studio is updating the proposal — you’ll get an email when the new version is ready. Nothing to do now.</p></div>`;
-  }
-  // ── 2 · Sign ──
-  k++;
+  const agreementTitle=`Agreement <span class="dot" aria-hidden="true">·</span> ${esc(title)}`;
+  let hero,note='',body;
   if(!chosen){
-    h+=`<div class="card locked" id="step-sign"><h2><span class="k">Step ${k}</span>Sign the agreement</h2><p class="muted" style="margin-top:0">${pending?'Unlocks once you accept the updated proposal.':'Unlocks once you accept the proposal above.'}</p></div>`;
+    // ── 1 · Choose ──
+    hero=heroHtml({eyebrow:forWhom(client)?`Proposal for ${forWhom(client)}`:'Proposal',title,meta:p?proposalMeta(p):[],total:p?T.total:null,pill:pillHtml(rows)});
+    if(p&&p.status==='sent'&&!p.expired)note='Take your time. Nothing is final until you accept.';
+    body=p?chooseHtml(p,{flow:true,dep}):`<div class="stack"><div class="card locked notice" id="step-choose"><h2>Your proposal</h2><p class="muted">Your studio is updating the proposal — you’ll get an email when the new version is ready. Nothing to do now.</p></div><div class="card locked notice" id="step-sign"><h2>Then the agreement</h2><p class="muted">Unlocks once you accept the updated proposal.</p></div></div>`;
   }else if(!c){
-    h+=`<div class="card locked" id="step-sign"><h2><span class="k">Step ${k}</span>Sign the agreement</h2><p class="muted" style="margin-top:0">${p?'You’ve accepted — your studio has been told and is preparing the agreement. You’ll get an email when it’s ready to sign; nothing to do now.':'Your studio is preparing the agreement. You’ll get an email when it’s ready to sign.'}</p></div>`;
-  }else if(signed){
-    const fresh=after&&after.kind==='signed';
-    const when=c.signed_at?new Date(c.signed_at):new Date();
-    const copyLine=fresh?(after.copy_emailed?'A copy of your signed agreement is on its way to your email.':'Your signed agreement stays on this page — use “Print / save a copy” to keep your record, or ask your studio any time.'):'';
-    h+=`${fresh?`<div class="center no-print" style="padding:8px 0 4px"><h1>Signed — welcome aboard! 🎉</h1><p class="sub">${esc(copyLine)}</p></div>`:''}
-      <details class="card done" id="step-sign"${fresh?' open':''}><summary>✓ Signed by ${esc(c.signer_name||'you')} on ${esc(when.toLocaleDateString(undefined,{dateStyle:'long'}))}<span class="tog"></span></summary><div class="inner">
-      <p style="font-weight:600;margin-bottom:8px">${esc(c.title||'Your agreement')}</p><div class="body">${esc(c.body)}</div>
-      <div class="cert" style="margin-top:18px"><p style="font-weight:600;margin-bottom:8px">Signature certificate</p>
-        <div class="kv"><span>Signed by</span><span>${esc(c.signer_name||'')}</span></div>
-        <div class="kv"><span>Signed at</span><span>${esc(when.toLocaleString(undefined,{dateStyle:'long',timeStyle:'short'}))}</span></div>
-        <div class="kv"><span>Document fingerprint</span><span class="mono">${esc(c.content_hash||'')}</span></div>
-        <p class="muted">The fingerprint identifies the exact text you signed — it changes if even one character does.</p>
-        <div class="row"><button class="ghost" onclick="window.print()">Print / save a copy</button></div></div></div></details>`;
+    // accepted, and the agreement is on its way
+    hero=heroHtml({eyebrow:'Agreement',title,meta:[betweenLine(client)]});
+    body=`<div class="card notice" id="step-sign"><h2>The agreement is on its way</h2><p class="muted">${p?'You’ve accepted — your studio has been told and is preparing the agreement. You’ll get an email when it’s ready to sign; nothing to do now.':'Your studio is preparing the agreement. You’ll get an email when it’s ready to sign.'}</p></div>${p?acceptedHtml(p,T,rows):''}`;
+  }else if(!signed){
+    // ── 2 · Sign ──
+    hero=heroHtml({titleHtml:agreementTitle,meta:[betweenLine(client)]});
+    note='One typed name signs it. Nothing is final until you do.';
+    body=agreementStep(c,{signer:d.studio_signer,client,dep,rows,flow:true})+(p?acceptedHtml(p,T,rows):'');
   }else{
-    h+=`<section id="step-sign"><h2><span class="k">Step ${k}</span>${esc(c.title||'Your agreement')}</h2><p class="sub">Read it through — signing takes one typed name, and nothing is final until you do.</p>
-      <div class="card"><div class="body">${esc(c.body)}</div></div>
-      <div class="card"><label for="nm">Type your full name to sign</label><input id="nm" autocomplete="name" placeholder="Your full name">
-      <label for="em">Your email, for your signed copy</label><input id="em" type="email" autocomplete="email" required placeholder="you@business.com">
-      <div class="row" id="signRow"><button id="sign">Sign the agreement</button></div>
-      <p class="muted">Typing your name here counts as your signature. You’ll always be able to ask your studio for a copy.</p></div></section>`;
+    // ── 3 · Pay, and after ──
+    hero=heroHtml({titleHtml:agreementTitle,meta:[betweenLine(client),c.signed_at?'Signed '+dayOf(c.signed_at):'']});
+    body=signedHtml(c,{client,dep,rows,after,paid})+signedDocHtml(c)+(p?acceptedHtml(p,T,rows):'');
   }
-  // ── 3 · Pay ──
-  k++;
-  if(!signed){
-    h+=`<div class="card locked" id="step-pay"><h2><span class="k">Step ${k}</span>${dep?`Pay the ${money(dep.amount_cents)} deposit`:'Pay the deposit'}</h2><p class="muted" style="margin-top:0">Unlocks once you’ve signed.</p></div>`;
-  }else if(paid){
-    h+=`<div class="card" id="step-pay"><h2 style="margin-top:0"><span class="k">Step ${k}</span>Your deposit</h2><div class="ok" style="margin-top:0">✓ Deposit paid — thank you. Your studio has been told and will kick things off.</div></div>`;
-  }else if(dep&&dep.processing){
-    // sales item 118: a bank payment takes days to arrive; its link is used up, so no Pay button
-    h+=`<div class="card" id="step-pay"><h2 style="margin-top:0"><span class="k">Step ${k}</span>Your deposit</h2><div class="ok" style="margin-top:0">Payment on its way. Your ${money(dep.amount_cents)} bank payment takes a few days to arrive. There’s nothing more to do, and you’ll get a receipt when it lands.</div></div>`;
-  }else if(dep&&dep.url){
-    h+=`<div class="card no-print" id="step-pay"><h2 style="margin-top:0"><span class="k">Step ${k}</span>One more step to lock in your start</h2>
-      <p class="muted" style="margin-top:0">Your ${money(dep.amount_cents)} deposit is ready — paying it now locks in your start.</p>
-      <div class="row"><a class="paybtn" id="pay" href="${esc(dep.url)}">Pay the ${money(dep.amount_cents)} deposit →</a></div>
-      <p class="muted">Prefer later? This page keeps the link — come back any time.</p></div>`;
-  }else if(dep){
-    h+=`<div class="card" id="step-pay"><h2 style="margin-top:0"><span class="k">Step ${k}</span>Your deposit</h2><p class="muted" style="margin-top:0">Your ${money(dep.amount_cents)} deposit is being set up — your studio will send the payment link. Nothing to do now.</p></div>`;
-  }else{
-    h+=`<div class="card" id="step-pay"><h2 style="margin-top:0"><span class="k">Step ${k}</span>Your deposit</h2><p class="muted" style="margin-top:0">Nothing to pay right now — your studio has been told you signed and will send an invoice when it’s time.</p></div>`;
-  }
-  $('main').innerHTML=h;
+  paint(hero+stripHtml(steps,note)+pageHtml(body)+footHtml());
   // ── actions ──
   const a=$('accept');if(a)a.onclick=async()=>{a.disabled=true;const r=await api('/sales/proposals/'+p.id+'/decide','POST',{token:TOKEN,decision:'accepted'});
     if(r.ok){announce('Accepted — thank you. Next: sign the agreement.');await load({kind:'accepted'});}
     else softFail(r.body&&r.body.message,$('chooseRow'));};
-  // Declining is final (a fresh proposal needs a fresh link) — so it takes two
-  // deliberate taps, and the label says exactly what it does.
-  const dd=$('decline');if(dd)dd.onclick=async()=>{
-    if(dd.dataset.armed!=='1'){dd.dataset.armed='1';dd.textContent='Tap again to decline — this is final';announce('Tap again to confirm declining — this is final');return;}
-    dd.disabled=true;const r=await api('/sales/proposals/'+p.id+'/decide','POST',{token:TOKEN,decision:'declined'});
-    if(r.ok){announce('Declined. Your studio has been told.');await load({kind:'declined'});}else softFail(r.body&&r.body.message,$('chooseRow'));};
-  const s=$('sign');if(s)s.onclick=async()=>{const nm=$('nm').value.trim();
-    if(!nm){softFail('Type your full name in the box above — that’s your signature.',$('signRow'));$('nm').focus();return;}
-    // sales item 88: the signed copy goes to them, so their email is needed (the server asks the same)
-    if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test($('em').value.trim())){softFail('Type your email too, so your signed copy can reach you.',$('signRow'));$('em').focus();return;}
-    s.disabled=true;
-    const r=await api('/sales/contracts/'+c.id+'/sign','POST',{token:TOKEN,signer_name:nm,signer_email:$('em').value.trim(),presented_hash:c.content_hash});
-    if(r.ok){announce('Signed — welcome aboard.');await load({kind:'signed',copy_emailed:!!(r.body&&r.body.data&&r.body.data.copy_emailed)});}
-    else softFail(r.body&&r.body.message,$('signRow'));};
+  // Declining is final for this version, so it opens its own sheet: what would make it a yes, then Decline
+  const dd=$('decline');if(dd)dd.onclick=()=>openDecline(p,dd,async()=>{announce('Declined. Your studio has been told.');await load({kind:'declined'});});
+  const ab=$('askBtn');if(ab)ab.onclick=()=>openAsk('proposal',ab);
+  wireSign(c,async(r)=>{announce('Signed — welcome aboard.');await load({kind:'signed',copy_emailed:!!(r.body&&r.body.data&&r.body.data.copy_emailed)});});
+  watchRail();
   // after a step, land on the next one
   if(after){
-    const next=after.kind==='accepted'?$('step-sign'):after.kind==='signed'?$('step-pay'):null;
-    if(next){next.scrollIntoView({block:'start',behavior:'smooth'});const f=next.querySelector('input,a.paybtn');if(f&&after.kind==='accepted')f.focus({preventScroll:true});}
+    if(after.kind==='accepted'){const next=$('step-sign');if(next){next.scrollIntoView({block:'start',behavior:'smooth'});const f=$('nm');if(f)f.focus({preventScroll:true});}}
+    else window.scrollTo({top:0,behavior:'smooth'});
   }
 }
-function preparedBy(){return window.__brandName?`<p class="muted" style="margin-top:2px">Prepared by ${esc(window.__brandName)}</p>`:'';}
-// The proposal's discount/tax + trail ride ONE reserved element in line_items
-// (see lib/sales_lifecycle.ts). Split it out, then mirror computeProposalTotals so
-// the client sees the exact same honest breakdown the studio and the document do.
-function splitProposalLI(raw){const a=Array.isArray(raw)?raw:[];const M='__meta__';const items=a.filter(el=>!(el&&typeof el==='object'&&M in el));const me=a.find(el=>el&&typeof el==='object'&&M in el);return{items,meta:(me&&me[M])||{}};}
-// Nov 10 review (G11): each line's amount by the SAME rule as the total (quantity ×
-// unit price, whole numbers, never below zero). A quantity-0 line used to show its
-// unit price while the total counted nothing for it; it now reads "× 0" and $0.00.
-const lineCents=(i)=>Math.max(0,Math.trunc(i.qty)||0)*Math.max(0,Math.trunc(i.unit_cents)||0);
-function lineRowsHtml(items){return items.map(i=>{const q=Math.max(0,Math.trunc(i.qty)||0);return`<tr><td>${esc(i.label)}${q!==1?' × '+q:''}</td><td>${money(lineCents(i))}</td></tr>`;}).join('');}
-function proposalTotals(raw){const {items,meta}=splitProposalLI(raw);const sub=items.reduce((n,i)=>n+lineCents(i),0);let disc=0;if(meta.discount){disc=meta.discount.mode==='percent'?Math.round(sub*Math.min(100,Math.max(0,meta.discount.value))/100):Math.trunc(meta.discount.value);}disc=Math.max(0,Math.min(disc,sub));const post=sub-disc;const tp=(meta.tax_pct!=null&&isFinite(+meta.tax_pct))?Math.min(100,Math.max(0,+meta.tax_pct)):0;const tax=Math.round(post*tp/100);return{items,meta,subtotal:sub,discount:disc,tax:tax,total:Math.max(0,post+tax)};}
+// the typed name signs: their name and email, and the version they read (content_hash)
+function wireSign(c,onSigned){
+  const s=$('sign');if(!s)return;
+  const nm=$('nm'),ink=$('ink');
+  if(nm&&ink)nm.addEventListener('input',()=>{ink.textContent=nm.value;});
+  const ak=$('askSign');if(ak)ak.onclick=()=>openAsk('contract',ak);
+  s.onclick=async()=>{const name=nm.value.trim(),em=$('em').value.trim();
+    if(!name){softFail('Type your full name in the box above — that’s your signature.',$('signRow'));nm.focus();return;}
+    // sales item 88: the signed copy goes to them, so their email is needed (the server asks the same)
+    if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(em)){softFail('Type your email too, so your signed copy can reach you.',$('signRow'));$('em').focus();return;}
+    s.disabled=true;
+    const r=await api('/sales/contracts/'+c.id+'/sign','POST',{token:TOKEN,signer_name:name,signer_email:em,presented_hash:c.content_hash});
+    if(r.ok)await onSigned(r,name,em);
+    else softFail(r.body&&r.body.message,$('signRow'));};
+}
+// the contents beside the agreement follow the reading
+function watchRail(){
+  if(window.__railIO){window.__railIO.disconnect();window.__railIO=null;}
+  const links=[...document.querySelectorAll('.rail a[data-for]')];
+  if(!links.length||!('IntersectionObserver' in window))return;
+  const byId=new Map(links.map(x=>[x.dataset.for,x]));
+  const io=new IntersectionObserver((es)=>{es.forEach(e=>{if(!e.isIntersecting)return;links.forEach(x=>x.classList.remove('on'));const x=byId.get(e.target.id);if(x)x.classList.add('on');});},{rootMargin:'0px 0px -70% 0px'});
+  byId.forEach((_,id)=>{const h=document.getElementById(id);if(h)io.observe(h);});
+  window.__railIO=io;
+}
+
+// ── the two answers that open over the page (sales item 88) ──
+function sheet(id,html,opener){
+  const old=$(id);if(old)old.remove();
+  const d=document.createElement('dialog');d.id=id;d.className='sheet';d.setAttribute('aria-labelledby',id+'-t');
+  d.innerHTML=`<div class="sheet-in">${html}</div>`;
+  document.body.appendChild(d);
+  d.addEventListener('close',()=>{d.remove();if(opener&&opener.isConnected)opener.focus();});
+  d.addEventListener('click',(e)=>{if(e.target===d)d.close();});   // a tap outside the sheet closes it
+  if(typeof d.showModal==='function')d.showModal();else d.setAttribute('open','');
+  return d;
+}
+function sheetErr(d,msg){let n=d.querySelector('.err');if(!n){n=document.createElement('p');n.className='err';n.setAttribute('role','alert');const row=d.querySelector('.row,.stackb');row.parentNode.insertBefore(n,row);}n.textContent=msg;}
+// A question goes straight to the studio's Inbox; they answer by email (POST /sales/ask)
+function openAsk(kind,opener,draft){
+  const who=STUDIO||'your studio';
+  const doc=kind==='contract'?'agreement':'proposal';
+  const needEm=!!(ASK&&ASK.needs_email);
+  const d=sheet('askSheet',`<div class="grab" aria-hidden="true"></div><h2 id="askSheet-t">Ask ${esc(who)}</h2><p class="sub">Your question goes straight to them. They answer by email, and the ${doc} stays open while you wait.</p><label class="sr" for="askBody">Your question</label><textarea id="askBody" maxlength="2000" rows="4" autofocus>${esc(draft||'')}</textarea>${needEm?`<label for="askEm">Your email, for the answer</label><input id="askEm" type="email" autocomplete="email" placeholder="you@business.com">`:(ASK&&ASK.email?`<p class="fine">Answer to ${esc(ASK.email)}</p>`:'')}<div class="row" id="askRow"><button class="ghost" id="askCancel" type="button">Cancel</button><button id="askSend" type="button">Send question</button></div>`,opener);
+  const key=Math.random().toString(36).slice(2,10)+Date.now().toString(36);   // a double tap lands once
+  $('askCancel').onclick=()=>d.close();
+  const send=$('askSend');send.onclick=async()=>{
+    const text=$('askBody').value.trim();
+    if(!text){sheetErr(d,'Write your question first.');$('askBody').focus();return;}
+    const emBox=$('askEm');const em=emBox?emBox.value.trim():'';
+    if(emBox&&!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(em)){sheetErr(d,'Add your email so the answer can reach you.');emBox.focus();return;}
+    send.disabled=true;
+    const payload={token:TOKEN,body:text,key,kind};if(em)payload.email=em;
+    const r=await api('/sales/ask','POST',payload);
+    if(r.ok){
+      const to=em||(ASK&&ASK.email)||'';
+      d.querySelector('.sheet-in').innerHTML=`<div class="grab" aria-hidden="true"></div><h2 id="askSheet-t">Sent</h2><p class="sub">${esc(who)} will answer by email${to?' at '+esc(to):''}. The ${doc} stays open while you wait.</p><div class="row"><button id="askDone" type="button">Close</button></div>`;
+      $('askDone').onclick=()=>d.close();$('askDone').focus();announce('Your question was sent.');
+      return;
+    }
+    send.disabled=false;
+    // the deal has no address after all: ask for one, keeping what they wrote
+    if(r.body&&r.body.error==='email_needed'&&!emBox){ASK={email:'',needs_email:true};d.close();openAsk(kind,opener,text);return;}
+    sheetErr(d,(r.body&&r.body.message)||'That didn’t send. Try again in a moment.');
+  };
+}
+// Before a decline: what would make it a yes (a reason and a note, both optional)
+function openDecline(p,opener,done){
+  const who=STUDIO||'your studio';
+  const d=sheet('declineSheet',`<div class="grab" aria-hidden="true"></div><h2 id="declineSheet-t">Before you decline</h2><p class="sub">What would make this a yes? Optional, and it only goes to ${esc(who)}.</p><div class="chips" role="group" aria-label="What would make this a yes">${REASONS.map(([k,l])=>`<button type="button" class="chip" aria-pressed="false" data-reason="${k}">${esc(l)}</button>`).join('')}</div><label class="sr" for="decNote">A note for ${esc(who)}</label><textarea id="decNote" maxlength="500" rows="3" placeholder="Anything else they should know"></textarea><div class="stackb" id="declineRow"><button type="button" id="keepOpen">Keep it open</button><button type="button" class="danger" id="declineGo">Decline the proposal</button></div><p class="fine">Declining is final for this version. ${esc(who)} sees your note and can send an updated one.</p>`,opener);
+  let reason='';
+  d.querySelectorAll('.chip').forEach(ch=>{ch.onclick=()=>{const on=ch.getAttribute('aria-pressed')!=='true';d.querySelectorAll('.chip').forEach(x=>x.setAttribute('aria-pressed','false'));ch.setAttribute('aria-pressed',on?'true':'false');reason=on?ch.dataset.reason:'';};});
+  $('keepOpen').onclick=()=>d.close();
+  const go=$('declineGo');go.onclick=async()=>{
+    go.disabled=true;
+    const note=$('decNote').value.trim();
+    const body={token:TOKEN,decision:'declined'};if(reason)body.reason=reason;if(note)body.note=note;
+    const r=await api('/sales/proposals/'+p.id+'/decide','POST',body);
+    if(r.ok){d.close();await done();return;}
+    go.disabled=false;sheetErr(d,(r.body&&r.body.message)||'That didn’t go through — give it another try in a moment.');
+  };
+}
+// printing shows the folded-away documents too
+window.addEventListener('beforeprint',()=>{document.querySelectorAll('details.done').forEach(x=>{x.dataset.shut=x.open?'':'1';x.open=true;});});
+window.addEventListener('afterprint',()=>{document.querySelectorAll('details.done').forEach(x=>{if(x.dataset.shut==='1')x.open=false;delete x.dataset.shut;});});
+document.addEventListener('click',(e)=>{const b=e.target&&e.target.closest&&e.target.closest('[data-print]');if(b)window.print();});
+
+// ── An old per-document link: the proposal on its own ──
 function renderProposal(p){
   const T=proposalTotals(p.line_items);
-  const items=lineRowsHtml(T.items);
-  const hasB=T.discount>0||T.tax>0;
-  const dLbl=(T.meta.discount&&T.meta.discount.mode==='percent')?`Discount (${+T.meta.discount.value}%)`:'Discount';
-  const tLbl=(T.meta.tax_pct!=null)?`Tax (${+T.meta.tax_pct}%)`:'Tax';
-  const bd=hasB?`<tr class="muted"><td>Subtotal</td><td>${money(T.subtotal)}</td></tr>${T.discount>0?`<tr class="muted"><td>${esc(dLbl)}</td><td>−${money(T.discount)}</td></tr>`:''}${T.tax>0?`<tr class="muted"><td>${esc(tLbl)}</td><td>+${money(T.tax)}</td></tr>`:''}`:'';
-  let h=`<h1>${esc(p.title||'Your proposal')}</h1>${preparedBy()}<p class="sub">Take your time — nothing is final until you accept.</p>
-  <div class="card"><table>${items}${bd}<tr class="total"><td>Total</td><td>${money(T.total)}</td></tr></table>${p.terms?`<p class="muted">${esc(p.terms)}</p>`:''}</div>`;
+  const client=p.client||null;
   // A revised proposal's old link can't be accepted (the studio replaced it) —
   // say so plainly instead of offering an Accept button that would just error.
-  if(T.meta&&T.meta.superseded_by){h+=`<p class="muted">Your studio sent an updated version of this proposal — please use the latest link they gave you.</p>`;}
-  else if(p.status==='accepted'){h+=`<div class="ok">✓ You’ve accepted this proposal — your studio has been told.</div>`;}
-  else if(p.status==='declined'){h+=`<p class="muted">You declined this proposal. Changed your mind? Ask your studio to send a fresh one.</p>`;}
-  else h+=`<div class="row"><button id="accept">Accept this proposal</button><button class="ghost" id="decline">Decline this proposal</button></div>`;
-  $('main').innerHTML=h;
-  const a=$('accept');if(a)a.onclick=async()=>{a.disabled=true;const r=await api('/sales/proposals/'+p.id+'/decide','POST',{token:TOKEN,decision:'accepted'});if(r.ok)thanks('Accepted — thank you!','Your studio has been told and will take it from here. Next up: the agreement to sign.');else{softFail(r.body&&r.body.message);}};
-  // Declining is final (a fresh proposal needs a fresh link) — so it takes two
-  // deliberate taps, and the label says exactly what it does.
-  const dd=$('decline');if(dd)dd.onclick=async()=>{
-    if(dd.dataset.armed!=='1'){dd.dataset.armed='1';dd.textContent='Tap again to decline — this is final';announce('Tap again to confirm declining — this is final');return;}
-    dd.disabled=true;const r=await api('/sales/proposals/'+p.id+'/decide','POST',{token:TOKEN,decision:'declined'});
-    if(r.ok)thanks('No problem.','Your studio has been told. If anything changes, they can send an updated proposal any time.');else softFail(r.body&&r.body.message);};
+  const state=(T.meta&&T.meta.superseded_by)?`<p class="muted">Your studio sent an updated version of this proposal — please use the latest link they gave you.</p>`
+    :p.status==='accepted'?`<div class="ok">✓ You’ve accepted this proposal — your studio has been told.</div>`:null;
+  paint(heroHtml({eyebrow:forWhom(client)?`Proposal for ${forWhom(client)}`:'Proposal',title:p.title||'Your proposal',meta:proposalMeta(p),total:T.total,pill:pillHtml(scheduleOf(p))})+pageHtml(chooseHtml(p,{flow:false,dep:null,state}))+footHtml());
+  const a=$('accept');if(a)a.onclick=async()=>{a.disabled=true;const r=await api('/sales/proposals/'+p.id+'/decide','POST',{token:TOKEN,decision:'accepted'});if(r.ok)thanks('Accepted — thank you!','Your studio has been told and will take it from here. Next up: the agreement to sign.');else{softFail(r.body&&r.body.message,$('chooseRow'));}};
+  const dd=$('decline');if(dd)dd.onclick=()=>openDecline(p,dd,()=>thanks('No problem.','Your studio has been told. If anything changes, they can send an updated proposal any time.'));
+  const ab=$('askBtn');if(ab)ab.onclick=()=>openAsk('proposal',ab);
 }
 // ── An estimate (item 47): a price before anything is agreed. Approve or Not
 // now, with an optional note — nothing is charged, and approving only tells the
@@ -315,76 +708,43 @@ function renderProposal(p){
 function renderEstimate(e){
   if(window.__brandName)document.title=`Your estimate — ${window.__brandName}`;
   const T=proposalTotals(e.line_items);
-  const items=lineRowsHtml(T.items);
-  const hasB=T.discount>0||T.tax>0;
-  const dLbl=(T.meta.discount&&T.meta.discount.mode==='percent')?`Discount (${+T.meta.discount.value}%)`:'Discount';
-  const tLbl=(T.meta.tax_pct!=null)?`Tax (${+T.meta.tax_pct}%)`:'Tax';
-  const bd=hasB?`<tr class="muted"><td>Subtotal</td><td>${money(T.subtotal)}</td></tr>${T.discount>0?`<tr class="muted"><td>${esc(dLbl)}</td><td>−${money(T.discount)}</td></tr>`:''}${T.tax>0?`<tr class="muted"><td>${esc(tLbl)}</td><td>+${money(T.tax)}</td></tr>`:''}`:'';
   const until=e.expires_at?new Date(e.expires_at).toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'}):'';
-  let h=`<h1>${esc(e.title&&e.title!=='Estimate'?e.title:'Your estimate')}</h1>${preparedBy()}<p class="sub">This is an estimate — a price before anything is agreed. Nothing is charged.</p>
-  <div class="card"><table>${items}${bd}<tr class="total"><td>Estimated total</td><td>${money(T.total)}</td></tr></table>${e.terms?`<p class="muted">${esc(e.terms)}</p>`:''}</div>`;
-  if(e.status==='approved')h+=`<div class="ok">✓ You approved this estimate — your studio has been told.</div>`;
-  else if(e.status==='declined')h+=`<p class="muted">You said not now. Changed your mind? Ask your studio to send a fresh one.</p>`;
-  else if(e.expired)h+=`<p class="muted">This estimate has expired — ask your studio for an updated one. Nothing is lost.</p>`;
-  else h+=`<div class="card"><label for="note">Anything you’d like to add? (optional)</label><textarea id="note" maxlength="500" placeholder="A question, or what you’d change"></textarea>
-    <div class="row"><button id="approve">Approve this estimate</button><button class="ghost" id="notnow">Not now</button></div>
-    <p class="muted">${until?`Good until ${esc(until)}. `:''}Approving tells your studio to go ahead with the next step — you’ll get the proposal or the invoice before anything is final.</p></div>`;
-  $('main').innerHTML=h;
+  let side;
+  if(e.status==='approved')side=`<div class="ok">✓ You approved this estimate — your studio has been told.</div>`;
+  else if(e.status==='declined')side=`<p class="muted">You said not now. Changed your mind? Ask your studio to send a fresh one.</p>`;
+  else if(e.expired)side=`<p class="muted">This estimate has expired — ask your studio for an updated one. Nothing is lost.</p>`;
+  else side=`<label for="note">Anything you’d like to add? (optional)</label><textarea id="note" maxlength="500" placeholder="A question, or what you’d change"></textarea>
+    <div class="acts row"><button id="approve" type="button">Approve this estimate</button><button class="ghost" id="notnow" type="button">Not now</button></div>
+    <p class="fine">${until?`Good until ${esc(until)}. `:''}Approving tells your studio to go ahead with the next step — you’ll get the proposal or the invoice before anything is final.</p>`;
+  paint(heroHtml({eyebrow:'Estimate',title:e.title&&e.title!=='Estimate'?e.title:'Your estimate',meta:['This is an estimate — a price before anything is agreed. Nothing is charged.'],total:T.total,totalLabel:'Estimated total'})
+    +pageHtml(`<section class="grid2" aria-label="Your estimate"><article class="card doc"><h2 class="eyebrow sec">What’s included</h2>${itemsHtml(T,'Estimated total')}${termsHtml(e.terms)}</article><aside class="card side"><p class="lbl">Estimated total</p><p class="big">${money(T.total)}</p>${side}</aside></section>`)+footHtml());
   const note=()=>{const n=$('note');return n?n.value.trim():'';};
   const a=$('approve');if(a)a.onclick=async()=>{a.disabled=true;const r=await api('/sales/estimates/'+e.id+'/decide','POST',{token:TOKEN,decision:'approved',note:note()});
-    if(r.ok)thanks('Approved — thank you!','Your studio has been told and will send you the next step.');else softFail(r.body&&r.body.message,a.closest('.row'));};
+    if(r.ok)thanks('Approved — thank you!','Your studio has been told and will send you the next step.');else softFail(r.body&&r.body.message,a.closest('.acts'));};
   // Not now can't be undone from this link, so it takes two deliberate taps.
   const nn=$('notnow');if(nn)nn.onclick=async()=>{
     if(nn.dataset.armed!=='1'){nn.dataset.armed='1';nn.textContent='Tap again to say not now';announce('Tap again to confirm: not now');return;}
     nn.disabled=true;const r=await api('/sales/estimates/'+e.id+'/decide','POST',{token:TOKEN,decision:'declined',note:note()});
     if(r.ok)thanks('Thanks for letting us know.','Your studio has been told. If anything changes, they can send an updated estimate any time.');
-    else{nn.dataset.armed='0';nn.textContent='Not now';softFail(r.body&&r.body.message,nn.closest('.row'));}};
+    else{nn.dataset.armed='0';nn.textContent='Not now';softFail(r.body&&r.body.message,nn.closest('.acts'));}};
 }
+// ── An old per-document link: the agreement on its own ──
 function renderContract(c){
-  let h=`<h1>${esc(c.title||'Your agreement')}</h1>${preparedBy()}<p class="sub">Read it through — signing takes one typed name, and nothing is final until you do.</p>
-  <div class="card"><div class="body">${esc(c.body)}</div></div>`;
-  if(c.status==='signed'){h+=`<div class="ok">✓ Signed${c.signed_at?' on '+esc(new Date(c.signed_at).toLocaleDateString()):''} — you’re all set.</div><div class="row"><button class="ghost" onclick="window.print()">Print / save a copy</button></div>`;}
-  else h+=`<div class="card"><label for="nm">Type your full name to sign</label><input id="nm" autocomplete="name" placeholder="Your full name">
-    <label for="em">Your email, for your signed copy</label><input id="em" type="email" autocomplete="email" required placeholder="you@business.com">
-    <div class="row"><button id="sign">Sign the agreement</button></div>
-    <p class="muted">Typing your name here counts as your signature. You’ll always be able to ask your studio for a copy.</p></div>`;
-  $('main').innerHTML=h;
-  const s=$('sign');if(s)s.onclick=async()=>{const nm=$('nm').value.trim();
-    if(!nm){softFail('Type your full name in the box above — that’s your signature.');$('nm').focus();return;}
-    if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test($('em').value.trim())){softFail('Type your email too, so your signed copy can reach you.');$('em').focus();return;}   // sales item 88
-    s.disabled=true;
-    const r=await api('/sales/contracts/'+c.id+'/sign','POST',{token:TOKEN,signer_name:nm,signer_email:$('em').value.trim(),presented_hash:c.content_hash});
-    if(r.ok){
-      const pay=r.body&&r.body.data&&r.body.data.pay_url;
-      const amt=r.body&&r.body.data&&r.body.data.pay_amount_cents;
-      const copySent=!!(r.body&&r.body.data&&r.body.data.copy_emailed);
-      const copyLine=copySent?'A copy of your signed agreement is on its way to your email.':'Your signed agreement stays below — use “Print / save a copy” to keep your record, or ask your studio any time.';
-      // Keep the AGREEMENT in the DOM: "Print / save a copy" must print the
-      // document that was signed, not a confirmation screen. Replace only the
-      // sign-form card with the success block.
-      // The signature certificate: name, when (their local time), and the document
-      // fingerprint — everything the page already knows, nothing collected extra.
-      const cert=`<div class="card cert"><p style="font-weight:600;margin-bottom:8px">Signature certificate</p>
-          <div class="kv"><span>Signed by</span><span>${esc(nm)}</span></div>
-          <div class="kv"><span>Signed at</span><span>${esc(new Date().toLocaleString(undefined,{dateStyle:'long',timeStyle:'short'}))}</span></div>
-          <div class="kv"><span>Document fingerprint</span><span class="mono">${esc(c.content_hash||'')}</span></div>
-          <p class="muted">The fingerprint identifies the exact text you signed — it changes if even one character does.</p>
-          <div class="row"><button class="ghost" onclick="window.print()">Print / save a copy</button></div></div>`;
-      const success=pay
-        ?`<div class="center no-print" style="padding:24px 0 8px"><h1>Signed — welcome aboard! 🎉</h1><p class="sub">${copyLine}</p></div>
-          <div class="card no-print" style="text-align:left"><p style="font-weight:600;margin-bottom:6px">One more step to lock in your start</p>
-          <p class="muted" style="margin-top:0">Your ${money(amt)} deposit is ready — paying it now locks in your start.</p>
-          <div class="row"><a class="paybtn" href="${esc(pay)}">Pay the ${money(amt)} deposit →</a></div>
-          <p class="muted">Prefer later? The same secure link is in your email — nothing expires today.</p></div>
-          ${cert}`
-        :`<div class="center no-print" style="padding:24px 0 8px"><h1>Signed — welcome aboard! 🎉</h1><p class="sub">${copyLine} Your studio has been told and will kick things off.</p></div>
-          ${cert}`;
-      const formCard=s.closest('.card'); if(formCard)formCard.remove();
-      $('main').insertAdjacentHTML('afterbegin',success);
-      window.scrollTo({top:0,behavior:'smooth'});
-      announce(pay?'Signed. Your deposit link is ready.':'Signed — welcome aboard');
-    }
-    else{softFail(r.body&&r.body.message);}};
+  const o={signer:c.studio_signer||null,client:c.client||null};
+  const hero=(signedAt)=>heroHtml({eyebrow:'Agreement',title:c.title||'Your agreement',meta:[betweenLine(o.client),signedAt?'Signed '+dayOf(signedAt):'']});
+  if(c.status==='signed'){paint(hero(c.signed_at)+pageHtml(signedHtml(c,{client:o.client,payCard:false})+signedDocHtml(c))+footHtml());return;}
+  paint(hero(null)+pageHtml(agreementStep(c,{signer:o.signer,client:o.client,dep:null,rows:null,flow:false}))+footHtml());
+  watchRail();
+  wireSign(c,async(r,name,em)=>{
+    const data=(r.body&&r.body.data)||{};
+    const now=new Date().toISOString();
+    // the signature stands; the page shows it from what it knows (this link reads no deposit)
+    const done={...c,status:'signed',signed_at:now,signer_name:name,signer_email:em,...(o.signer&&o.signer.name?{countersigned_name:o.signer.name,countersigned_title:o.signer.title||'',countersigned_at:now}:{})};
+    const dep=data.pay_url?{amount_cents:data.pay_amount_cents||0,status:'open',url:data.pay_url}:null;
+    paint(hero(now)+pageHtml(signedHtml(done,{client:o.client,dep,rows:null,after:{kind:'signed',copy_emailed:!!data.copy_emailed},paid:false,payCard:!!dep})+signedDocHtml(done))+footHtml());
+    window.scrollTo({top:0,behavior:'smooth'});
+    announce(dep?'Signed. Your deposit link is ready.':'Signed — welcome aboard');
+  });
 }
 load();
 </script>
