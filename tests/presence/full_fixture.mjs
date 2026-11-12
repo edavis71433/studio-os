@@ -61,5 +61,31 @@ export function fullFixture(slug, words = (x) => x) {
       { label: words('Contact'), href: '/contact/' },
     ],
   };
+  // Builder list item 40: a post with a category, an author with a photo and a photo in its
+  // text, and a second post in another category, so the list, the category pages, the byline,
+  // the figure and the author's line are all drawn.
+  const [first] = fx.content.posts || [];
+  if (first) {
+    const PIC = '00000000-0000-4000-8000-0000000000a8';
+    fx.content.posts = [
+      { ...first, category: { id: 'news', name: words('News') },
+        author: { id: 'maria-lopez', name: words('Maria Lopez'), bio: words('Owner and head chef'), photo: ref('00000000-0000-4000-8000-0000000000a7') },
+        body_md: `${first.body_md}\n\n![${words('The room on a quiet night')}](media:${PIC} "${words('Before the doors open')}")\n\n${words('See you soon.')}`,
+        images: { [PIC]: ref(PIC) } },
+      { id: 'p2', title: words('Wine dinner on the patio'), slug: 'wine-dinner', body_md: words('Five courses, five wines, one long table.'), excerpt: '', published_at: '2026-02-02T18:00:00Z',
+        category: { id: 'events', name: words('Events') }, author: { id: 'sam-ortiz', name: words('Sam Ortiz') } },
+    ];
+  }
+  // Builder list item 127: a short description, and a second place with a name and its own
+  // week, so the footer, the Contact page and what Google reads all carry it. Plain words:
+  // render_test's hostile run draws the business details from the template's own sample,
+  // and business_details_127_test.mjs feeds hostile words through these.
+  const [main] = fx.content.locations || [];
+  if (main) {
+    fx.content.identity = { ...fx.content.identity, short_description: 'What we do, where we do it, and what we are known for, in one line.' };
+    fx.content.locations = [main, {
+      ...main, label: 'Glendale', address_line1: '410 Brand Blvd', address_line2: '', city: 'Glendale', postal_code: '91203', phone: '(555) 010-0199',
+      hours: (main.hours || []).map((d) => (d.day === 'mon' ? { day: 'mon', closed: true, intervals: [] } : d)), holiday_exceptions: [] }];
+  }
   return fx;
 }

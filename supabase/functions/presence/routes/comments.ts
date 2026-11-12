@@ -23,13 +23,52 @@ import { rateAllow, clientIp, tooMany } from '../lib/ratelimit.ts';
 import {
   cleanCommentBody, normalizePageSlug, normalizeBlockId, groupThreads, canResolve,
   sectionsForContent, COMMENT_BODY_MAX, MAX_OPEN_CLIENT_COMMENTS,
+  cleanAuthorName, decodeCommentImage, pictureSize,
 } from '../lib/section_comments.ts';
+import { BUCKET } from '../lib/media.ts';
+import { fileLink } from '../lib/form_files.ts';
 import type { CommentRow } from '../lib/section_comments.ts';
 import type { SiteRow } from '../lib/site.ts';
 import type { Principal } from '../../_shared/auth.ts';
 import { UUID_RE } from '../lib/uuid.ts';
 
 const SELECT = 'id,page_slug,block_id,author_kind,body,status,created_at,resolved_at';
+// item 159 (0183): the name typed with shared-draft feedback and the note's picture. A
+// database without 0183 refuses these columns, so every read and write falls back to
+// the old ones: notes keep working, without a name or a picture, until the pack runs.
+const SELECT_159 = SELECT + ',author_name,attachment';
+
+// ── item 159: one picture a note, in the media library's private bucket ──────
+const SB_URL = Deno.env.get('SUPABASE_URL') || '';
+const SB_SERVICE = Deno.env.get('SERVICE_ROLE_KEY') || Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
+const EXT: Record<string, string> = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp' };
+type PutImage = (path: string, bytes: Uint8Array, type: string) => Promise<boolean>;
+let putImage: PutImage = async (path, bytes, type) => {
+  const r = await fetch(`${SB_URL}/storage/v1/object/${BUCKET}/${path}`, {
+    method: 'POST', headers: { Authorization: `Bearer ${SB_SERVICE}`, apikey: SB_SERVICE, 'Content-Type': type, 'x-upsert': 'false' }, body: bytes as unknown as BodyInit,
+  }).catch(() => null);
+  return !!r?.ok;
+};
+/** Tests stand in for the storage write. */
+export function setCommentImageStore(fn: PutImage | null) { putImage = fn || putImage; }
+/** The picture sent with a note: checked by its first bytes and kept under comments/<site>/.
+ *  null when none was sent; a Response when it can't be taken (said plainly). */
+async function notePicture(body: Record<string, unknown>, siteId: string, cors: Record<string, string>): Promise<{ path: string; type: string; size: number; w?: number; h?: number } | null | Response> {
+  const img = decodeCommentImage(body?.image);
+  if (img === null) return null;
+  if (!img.ok) return json({ error: 'bad_picture', message: img.error === 'too_large' ? 'That picture is too big. Try a smaller screenshot.' : 'That picture couldn’t be read. Send a JPEG, PNG or WebP.' }, 422, cors);
+  const path = `comments/${siteId}/${crypto.randomUUID()}.${EXT[img.type]}`;
+  if (!(await putImage(path, img.bytes, img.type))) return json({ error: 'write_failed', message: 'The picture didn’t upload. Try again, or send the note without it.' }, 502, cors);
+  return { path, type: img.type, size: img.bytes.length, ...(pictureSize(body?.w, body?.h) || {}) };
+}
+/** Insert a note with the 0183 columns, or without them on a database that doesn't have them yet. */
+async function insertNote(row: Record<string, unknown>, prefer: string) {
+  const extra = row.author_name !== undefined || row.attachment !== undefined;
+  const first = await svc('presence_section_comments', { method: 'POST', headers: { Prefer: prefer }, body: JSON.stringify(row) });
+  if (first.ok || !extra) return first;
+  const { author_name: _n, attachment: _a, ...old } = row;
+  return await svc('presence_section_comments', { method: 'POST', headers: { Prefer: prefer }, body: JSON.stringify(old) });
+}
 
 function badBody(v: { error: 'empty' | 'too_long' }, cors: Record<string, string>): Response {
   return json({
@@ -47,10 +86,18 @@ export async function handleCommentsList(req: Request, site: SiteRow, cors: Reco
     if (slug === null) return json({ error: 'bad_request', message: 'That page reference isn’t valid.' }, 400, cors);
     filter = `&page_slug=eq.${encodeURIComponent(slug)}`;
   }
-  const r = await svc(`presence_section_comments?site_id=eq.${site.id}&deleted_at=is.null${filter}&select=${SELECT}&order=created_at.desc&limit=500`);
+  const q = (sel: string) => svc(`presence_section_comments?site_id=eq.${site.id}&deleted_at=is.null${filter}&select=${sel}&order=created_at.desc&limit=500`);
+  let r = await q(SELECT_159);
+  if (!r.ok) r = await q(SELECT);   // item 159: before 0183, the old columns
   // Deploy-order tolerance: a database without 0112 applied serves an empty,
   // honest list — the builder simply shows no feedback yet.
-  const rows: CommentRow[] = (r.ok && Array.isArray(r.json)) ? r.json as CommentRow[] : [];
+  const raw = (r.ok && Array.isArray(r.json)) ? r.json as Array<CommentRow & { attachment?: { path?: string; type?: string; w?: number; h?: number } | null }> : [];
+  // item 159: a picture leaves as a ten-minute link, never its stored path
+  const rows: CommentRow[] = await Promise.all(raw.map(async ({ attachment, ...c }) => {
+    const path = attachment && typeof attachment.path === 'string' && attachment.path.startsWith(`comments/${site.id}/`) ? attachment.path : null;
+    const url = path ? await fileLink(path, 'picture', String(attachment!.type || 'image/jpeg')) : null;
+    return { ...c, author_name: c.author_name || null, picture: url ? { url, w: Number(attachment!.w) || undefined, h: Number(attachment!.h) || undefined } : null };
+  }));
   const threads = groupThreads(rows);
   const total_open = threads.reduce((n, t) => n + t.open_count, 0);
   return json({ data: { threads, total_open } }, 200, cors);
@@ -65,14 +112,13 @@ export async function handleCommentCreate(req: Request, site: SiteRow, principal
   if (blockId === null) return json({ error: 'bad_request', message: 'That section reference isn’t valid.' }, 400, cors);
   const v = cleanCommentBody(body?.body);
   if (!v.ok) return badBody(v, cors);
-  const ins = await svc('presence_section_comments', {
-    method: 'POST', headers: { Prefer: 'return=representation' },
-    body: JSON.stringify({
-      site_id: site.id, page_slug: slug, block_id: blockId || null,
-      author_kind: 'operator', author_key: principal.userId || principal.email || 'operator',
-      body: v.body, status: 'open',
-    }),
-  });
+  const pic = await notePicture(body, site.id, cors);   // item 159: a picture with the note
+  if (pic instanceof Response) return pic;
+  const ins = await insertNote({
+    site_id: site.id, page_slug: slug, block_id: blockId || null,
+    author_kind: 'operator', author_key: principal.userId || principal.email || 'operator',
+    body: v.body, status: 'open', ...(pic ? { attachment: pic } : {}),
+  }, 'return=representation');
   const row = ins.ok && Array.isArray(ins.json) ? ins.json[0] : null;
   if (!row) return json({ error: 'write_failed', message: 'That didn’t save — please try again.' }, 502, cors);
   await writeChangeEvent({ siteId: site.id, entityType: 'site', entityId: null, action: 'update', summary: 'Left a review note on the draft', principal, provenance: 'human' });
@@ -171,14 +217,15 @@ export async function handleTokenComment(req: Request, token: string, cors: Reco
   if ((open ?? 0) >= MAX_OPEN_CLIENT_COMMENTS) {
     return json({ error: 'feedback_full', message: 'This draft already has a lot of open feedback — the studio needs to review it before more can be added.' }, 429, cors);
   }
-  const ins = await svc('presence_section_comments', {
-    method: 'POST', headers: { Prefer: 'return=minimal' },
-    body: JSON.stringify({
-      site_id: t.siteId, page_slug: slug, block_id: blockId || null,
-      author_kind: 'client', author_key: null,   // no PII stored for the client
-      body: v.body, status: 'open',
-    }),
-  });
+  // item 159: the name they chose to give (kept as typed, nothing else about them), and a picture
+  const name = cleanAuthorName(body?.name);
+  const pic = await notePicture(body, t.siteId, cors);
+  if (pic instanceof Response) return pic;
+  const ins = await insertNote({
+    site_id: t.siteId, page_slug: slug, block_id: blockId || null,
+    author_kind: 'client', author_key: null,   // no account, no address: only the name they typed
+    body: v.body, status: 'open', ...(name ? { author_name: name } : {}), ...(pic ? { attachment: pic } : {}),
+  }, 'return=minimal');
   if (!ins.ok) return json({ error: 'write_failed', message: 'That didn’t send — please try again.' }, 502, cors);
   // Provenance: the timeline shows THAT feedback arrived, never the words
   // (detail carries field names only — contract G1 §14). Best-effort.

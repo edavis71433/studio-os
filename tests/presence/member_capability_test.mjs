@@ -173,6 +173,7 @@ const DECIDED = {
     'POST /broadcasts/:id/send', 'POST /launches/:id/promote', 'POST /launches/:id/rollback',
     'POST /launches/:id/schedule', 'POST /preview/promote', 'POST /publish', 'POST /restore', 'POST /schedule',
     'POST /schedule/:id/cancel',
+    'POST /posts/:id/publish', 'POST /posts/:id/unpublish',   // builder list item 40: one blog post onto (or off) the live site
   ],
   comment: [
     'POST /client/projects/:id/messages', 'POST /client/support', 'POST /client/support/:id/messages',
@@ -184,7 +185,7 @@ const DECIDED = {
     'PATCH /assets/:id', 'PATCH /bookings/types/:id', 'PATCH /broadcasts/:id', 'PATCH /projects/:id',
     'PATCH /projects/:id/deliverables/:id2', 'PATCH /projects/:id/milestones/:id2', 'PATCH /projects/:id/tasks/:id2',
     'PATCH /sales/contacts/:id', 'PATCH /sales/deal-tasks/:id', 'PATCH /sales/deals/:id', 'PATCH /support/:id',
-    'POST /visibility/check', 'PUT /visibility/follow', 'PUT /visibility/ai/questions', 'POST /approve/send', 'POST /assets/:id/duplicate', 'POST /assets/:id/remove-background', 'POST /assets/:id/cutout',
+    'POST /visibility/check', 'PUT /visibility/follow', 'PUT /visibility/phrases', 'PUT /visibility/ai/questions', 'POST /approve/send', 'POST /assets/:id/duplicate', 'POST /assets/:id/remove-background', 'POST /assets/:id/cutout',
     'POST /assets/:id/replace', 'POST /assets/:id/rollback', 'POST /assets/:id/suggest', 'POST /assets/bulk', 'POST /assets/folders/move',
     'POST /bookings/appointments/:id/cancel', 'POST /bookings/appointments/:id/complete',
     'POST /bookings/appointments/:id/confirm', 'POST /bookings/appointments/:id/no_show', 'POST /bookings/types',
@@ -434,7 +435,7 @@ const CHANGED = [
 // A new write handler fails here until someone decides what it needs in lib/site_roles.ts
 // and adds it to DECIDED and to this list. At runtime an unlisted write is refused anyway.
 const WRITE_HANDLERS = [
-  'handleVisibilityCheck', 'handleFollowPut', 'handleAiQuestionsPut', 'handleApprovalDecide', 'handleApprovalsCreate', 'handleApproveSend', 'handleAssetDelete', 'handleAssetDuplicate',
+  'handleVisibilityCheck', 'handleFollowPut', 'handlePhrasesPut', 'handleAiQuestionsPut', 'handleApprovalDecide', 'handleApprovalsCreate', 'handleApproveSend', 'handleAssetDelete', 'handleAssetDuplicate',
   'handleAssetRemoveBackground', 'handleAssetCutout', 'handleAssetReplace', 'handleAssetRollback', 'handleAssetStatus',
   'handleAssetSuggest', 'handleAssetUpdate', 'handleAssetsBulk', 'handleAssetsFolderMove', 'handleBackOnline', 'handleBookingCancel',
   'handleBookingConfirm', 'handleBookingMark', 'handleBookingSettingsPut', 'handleBookingTypeCreate',
@@ -491,6 +492,7 @@ const WRITE_HANDLERS = [
   'handleStudioRequests',   // final pass S1: POST /portal/studio-requests/:id/(accept|decline) are open; the route answers the owner only
   'handleMemberRole', 'handleTransferStart', 'handleTransferCancel',   // builder item 53: open on the member list; each route checks the role itself
   'handleSitePassword',   // builder list item 175: POST /site/password needs configure
+  'handlePostPublish', 'handlePostUnpublish',   // builder list item 40: POST /posts/:id/(publish|unpublish) need publish
   'handleScheduleCancel', 'handleScheduleCreate', 'handleSettings', 'handleShareSet', 'handleStockImport',
   'handleSupport', 'handleSupportMessage', 'handleSupportOne', 'handleSurveyRespond', 'handleTakeOffline',
   'handleTask', 'handleTasksCreate', 'handleThreadRead', 'handleVersionLabel', 'handleVisualDecide',

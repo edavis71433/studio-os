@@ -68,6 +68,7 @@ export const SETTINGS_CONTENT_FIELDS: ReadonlySet<string> = new Set([
   'popup',   // builder list item 148: the site's pop-up is content, like the announcement bar
   'hero_layout', 'nav_style', 'sections_hidden', 'sections_order', 'footer_hours', 'footer_social',
   'pages_noindex', 'page_seo', 'blocks', 'pages', 'nav',
+  'post_categories', 'post_authors',   // builder list item 40: the blog's categories and authors are content
 ]);
 
 /** The capability this write needs, or null when it isn't a write on the content
@@ -147,6 +148,7 @@ const MEMBER_WRITES: Array<[MemberWriteNeed, string[]]> = [
   ]],
   ['publish', [
     'POST /(publish|restore|preview/promote|schedule)',
+    `POST /posts/${ID}/(publish|unpublish)`,   // builder list item 40: one blog post onto (or off) the live site, on its own
     `POST /schedule/${ID}/cancel`,
     `POST /launches/${ID}/(schedule|promote|rollback)`,
     `POST /broadcasts/${ID}/send`,
@@ -164,6 +166,7 @@ const MEMBER_WRITES: Array<[MemberWriteNeed, string[]]> = [
     'POST /redirects',
     'POST /visibility/check',
     'PUT /visibility/follow',   // builder item 181: the searches the site follows on Google
+    'PUT /visibility/phrases',   // builder item 160: the two or three phrases the business wants to be found for
     'PUT /visibility/ai/questions',   // builder item 182: the questions its monthly AI check asks (the switch is configure)
     'POST /preview/(publish|share-link|section)',   // section: draws one unsaved section for the canvas, stores nothing
     'POST /publishes/checkpoints',

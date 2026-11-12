@@ -20,14 +20,14 @@
 //
 // Pure decision logic + copy up top (tested); the impure runner below.
 import { svc } from './db.ts';
-import { renderMarkdown } from './markdown.ts';
+import { renderMarkdown, safeHref } from './markdown.ts';
 import { sendEmail, validEmail } from '../commerce/account.ts';
 import { openPixelTag, openPixelUrl } from './email_engagement.ts';
 import { loadEmailBrand, type EmailBrand } from './email_brand.ts';
 import { isSuppressed } from '../routes/email_infra.ts';
 import { normalizeLists } from './saved_views.ts';
 import { readReservedJson, RESERVED_NAMES } from './reserved_store.ts';
-import { BOOKING_TOKEN_RE, BOOKING_LINE_RE, IMAGE_LINE_RE, bookingHref, bookingButton, imageBlock, loadUpdateExtras, type UpdateExtras } from './update_media.ts';
+import { BOOKING_TOKEN_RE, BOOKING_LINE_RE, IMAGE_LINE_RE, LINK_LINE_RE, bookingHref, bookingButton, linkButton, imageBlock, loadUpdateExtras, type UpdateExtras } from './update_media.ts';
 
 const rows = (r: { json?: unknown }) => (Array.isArray((r as any).json) ? (r as any).json : []) as any[];
 
@@ -108,8 +108,9 @@ export function renderSubject(subject: unknown, tokens: MergeTokens): string {
 
 /** The email BODY HTML fragment (sendEmail wraps it in the branded shell): merge
  *  tokens then render markdown (escape-first ⇒ XSS-safe). A line that is only
- *  {{booking_link}} becomes the "Book a time" button and a photo line its image
- *  (lib/update_media.ts); every other line renders exactly as before, and the
+ *  {{booking_link}} becomes the "Book a time" button, a photo line its image, and a
+ *  line that is only an https link a button with its words (lib/update_media.ts, item
+ *  160); every other line renders exactly as before, and the
  *  booking link inside a sentence reads "book a time". With no booking link saved,
  *  or a photo that isn't the site's own, that part renders nothing. Pure. */
 export function buildEmailHtml(bodyMarkdown: unknown, tokens: MergeTokens, extras: { images?: Record<string, string>; accent?: string } = {}): string {
@@ -124,6 +125,8 @@ export function buildEmailHtml(bodyMarkdown: unknown, tokens: MergeTokens, extra
     if (BOOKING_LINE_RE.test(t)) { flush(); if (booking) out.push(bookingButton(booking, extras.accent || '')); continue; }
     const im = t.match(IMAGE_LINE_RE);
     if (im) { flush(); const src = images[im[2].toLowerCase()]; if (src) out.push(imageBlock(src, im[1])); continue; }
+    const lk = t.match(LINK_LINE_RE);
+    if (lk && safeHref(lk[2])) { flush(); out.push(linkButton(lk[1], lk[2], extras.accent || '')); continue; }
     chunk.push(line.replace(BOOKING_TOKEN_RE, inlineBooking));
   }
   flush();
