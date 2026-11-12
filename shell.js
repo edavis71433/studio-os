@@ -535,11 +535,11 @@
         function finish(v) {
           if (done) return; done = true;
           // builder item 201: focus goes back to the button that asked, after Yes as well as
-          // Cancel. Removing the box took the focused Yes with it, so focus fell to the page's top.
-          var had = box.contains(document.activeElement);
+          // Cancel. Removing the box took the focused Yes with it, so focus fell to the page's top
+          // (Safari doesn't focus a clicked button at all, so this never asks where focus was).
           if (box.isConnected) box.remove();
           anchor.hidden = false; resolve(v);
-          if ((!v || had) && anchor.isConnected && anchor.focus) try { anchor.focus(); } catch (_) { /* */ }
+          if (anchor.isConnected && anchor.focus) try { anchor.focus(); } catch (_) { /* */ }
         }
         box.querySelector('.go').addEventListener('click', function () { finish(true); });
         box.querySelector('.no').addEventListener('click', function () { finish(false); });
@@ -585,10 +585,10 @@
         var done = false;
         function finish(v) {
           if (done) return; done = true;
-          var had = box.contains(document.activeElement);   // item 201: as confirmIn, focus never falls to the page's top
           if (box.isConnected) box.remove();
           anchor.hidden = false; resolve(v);
-          if ((v === null || had) && anchor.isConnected && anchor.focus) try { anchor.focus(); } catch (_) { /* */ }
+          // item 201: as confirmIn, after an answer as well as Cancel, so focus never falls to the page's top
+          if (anchor.isConnected && anchor.focus) try { anchor.focus(); } catch (_) { /* */ }
         }
         go.addEventListener('click', function () {
           var vals = inputs.map(function (el) { return String(el.value || '').trim(); });
