@@ -136,14 +136,14 @@ test.describe('sign.html — no signal, and the zero-quantity line', () => {
     await expect(page.locator('#step-choose')).toBeVisible();
   });
 
-  test('G11: a quantity-0 line reads × 0 and $0.00, and the lines add up to the total', async ({ page }) => {
+  test('G11: a quantity-0 line reads × 0 and $0, and the lines add up to the total', async ({ page }) => {
     await serveSign(page);
     await page.goto(`/sign.html?t=${TOKEN}`);
     const rows = page.locator('#step-choose table tr');
-    await expect(rows.filter({ hasText: 'Logo' })).toHaveText(/Logo × 0\s*\$0\.00/);
-    await expect(rows.filter({ hasText: 'Pages' })).toHaveText(/Pages × 3\s*\$300\.00/);
+    await expect(rows.filter({ hasText: 'Logo' })).toHaveText(/Logo × 0\s*\$0$/);   // sales item 88: whole dollars read without cents
+    await expect(rows.filter({ hasText: 'Pages' })).toHaveText(/Pages × 3\s*\$300$/);
     await expect(rows.filter({ hasText: 'Build' })).not.toContainText('×');
-    await expect(rows.filter({ hasText: 'Total' })).toContainText('$450.00');
+    await expect(rows.filter({ hasText: 'Total' })).toContainText('$450');
   });
 });
 
