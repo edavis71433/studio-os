@@ -401,6 +401,14 @@
   /* ── FAQ / Help ── */
   .faq{margin:0}
   .faq-intro{color:var(--soft);font-size:14.5px;margin:0 0 12px}
+  /* item 128: New in your portal, the door to what changed lately */
+  .wn-door{display:flex;align-items:center;gap:12px;width:100%;margin:0 0 14px;padding:14px 16px;border:1px solid var(--line);border-radius:14px;background:var(--p-soft);color:var(--ink);font:inherit;text-align:left;cursor:pointer}
+  .wn-door:hover{border-color:var(--p)}
+  .wn-door:focus-visible{outline:2px solid var(--p);outline-offset:2px}
+  .wn-door .wn-ic{display:inline-grid;place-items:center;flex:none;width:32px;height:32px;border-radius:999px;background:var(--card);color:var(--p)}
+  .wn-door b{display:block;color:var(--p);font-size:14.5px}
+  .wn-door .muted{display:block;font-size:13px}
+  .wn-door .wn-new{margin-left:auto;padding:2px 9px;border-radius:999px;background:var(--p);color:var(--on-p);font-size:11.5px;font-weight:700}
   details.faq-item{background:var(--card);border:1px solid var(--line);border-radius:13px;box-shadow:var(--shadow);margin-bottom:10px;overflow:hidden}
   details.faq-item[hidden]{display:none}
   details.faq-item>summary{cursor:pointer;list-style:none;padding:14px 18px;font-weight:600;font-size:15.5px;color:var(--ink)}
@@ -2535,6 +2543,23 @@ function kitHtml(kr){
   return `<section id="sec-kit" class="kit"><h2>Your website kit · from ${esc(studioBrand())}</h2><div class="card">${who}${site}${guides}${videos}${files}</div></section>`;
 }
 function starterFaqHtml(){return `<section class="faq">${STARTER_FAQ.map(([q,a])=>`<details class="faq-item"><summary>${esc(q)}</summary><div class="faq-answer"><p>${esc(a)}</p></div></details>`).join('')}</section>`;}
+// Item 128: New in your portal. The portal's bell is already its news, so what changed in
+// the portal lives here, at the top of Help: entries written for clients, a picture and a
+// sentence each (whats-new.js reads /whats-new.json). A "New" mark says there's one this
+// device hasn't opened; nothing opens by itself.
+let WN_LOAD=null;
+function loadWhatsNew(){
+  if(window.DDSWhatsNew)return Promise.resolve(window.DDSWhatsNew);
+  if(!WN_LOAD)WN_LOAD=new Promise((res,rej)=>{const s=document.createElement('script');s.src='/whats-new.js?v=1';s.onload=()=>res(window.DDSWhatsNew);s.onerror=()=>{WN_LOAD=null;rej(new Error('whats-new'));};document.head.appendChild(s);});
+  return WN_LOAD;
+}
+function whatsNewDoorHtml(){return `<button type="button" class="wn-door" id="helpWhatsNew"><span class="wn-ic" aria-hidden="true">✦</span><span><b>New in your portal</b><span class="muted">What changed lately, a picture and a sentence each</span></span></button>`;}
+function wireWhatsNewDoor(){
+  const b=$('helpWhatsNew');if(!b)return;
+  const mark=(on)=>{const m=b.querySelector('.wn-new');if(on&&!m)b.insertAdjacentHTML('beforeend','<span class="wn-new">New</span>');if(!on&&m)m.remove();};
+  b.addEventListener('click',()=>loadWhatsNew().then((W)=>W.open({who:'client',opener:b,onSeen:()=>mark(false)})).catch(()=>{}));
+  loadWhatsNew().then((W)=>W.hasNew('client')).then(mark).catch(()=>{});
+}
 async function renderHelp(){
   const view=++VIEW_SEQ;   // this render owns #main until something newer bumps the token (renderMessages' contract)
   const canMessage=PORTAL.persona==='client';
@@ -2550,7 +2575,7 @@ async function renderHelp(){
   if(view!==VIEW_SEQ)return;   // the user moved on mid-fetch — never paint over the newer view
   const faqFailed=!(r&&r.ok);
   const faqHtml=(!faqFailed&&r.body&&r.body.data&&r.body.data.html)||'';
-  let html=portalHeader('Help','Quick answers from your studio.')+kitHtml(kr);
+  let html=portalHeader('Help','Quick answers from your studio.')+whatsNewDoorHtml()+kitHtml(kr);
   // failed ≠ empty: a failed read says so calmly (nothing was cached, so coming
   // back to the tab retries) — only a genuine ok-empty earns the no-articles copy
   if(faqFailed)html+=`<div class="card"><p class="muted">We couldn’t load help articles just now — please try again in a moment.</p></div>`;
@@ -2565,6 +2590,7 @@ async function renderHelp(){
   html+=accountSectionHtml(true);
   $('main').innerHTML=html;
   const hm=$('helpMsg');if(hm)hm.addEventListener('click',openMessagesCompose);   // item 179 part three: one door
+  wireWhatsNewDoor();   // item 128
   wireAccountSection();
   const search=$('faqSearch');
   if(search)search.addEventListener('input',()=>{
