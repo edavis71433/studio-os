@@ -144,9 +144,11 @@ const rows = () => db.tables.presence_fresh_codes || [];
   ok('closing the account asks before the request is recorded', at(com, "requireFresh(principal, cb, 'close_account'", "const reqd = await requestDeletion(site.client_id, site.id, 'customer');"));
   const auth = read('supabase/functions/_shared/auth.ts');
   ok('the one sign-in check refuses a half-finished sign-in', /const user = await uRes\.json\(\);\n\s*if \(!user \|\| !user\.id\) return null;\n\s*if \(secondStepMissing\(user, jwt\)\) return null;/.test(auth));
+  // the older function reads sign-ins only through the shared check (item 213 removed its own reads);
+  // one it reads by itself again must apply the rule too
   const clever = read('supabase/functions/clever-api/index.ts');
   const reads = clever.split('auth/v1/user`').length - 1, guarded = clever.split('if (secondStepMissing(user, jwt)) return').length - 1;
-  ok('…and so does every one of the older function’s own sign-in reads', reads === 11 && guarded === 11, `${guarded} of ${reads}`);
+  ok('…and so would any sign-in read the older function makes by itself', reads === guarded && /from '\.\.\/_shared\/auth\.ts'/.test(clever), `${guarded} of ${reads}`);
   const mig = read('supabase/migrations/0197_fresh_codes.sql'), pack = read('docs/presence/APPLY-0197-prod.sql');
   const table = (x) => x.slice(x.indexOf('create table if not exists public.presence_fresh_codes'), x.indexOf("'Builder item 191"));
   ok('0197: the migration and its production pack make the same table, service role only', table(mig).length > 300 && table(mig) === table(pack) && mig.includes('enable row level security') && pack.includes('-- Check:'));
