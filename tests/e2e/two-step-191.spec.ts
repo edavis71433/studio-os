@@ -145,7 +145,7 @@ test.describe('Two-step sign-in (builder item 191)', () => {
     await page.locator('#pw').fill('a long password');
     await page.getByRole('button', { name: 'Sign in', exact: true }).click();
     // A1: the step, who is signing in, and the band's words for it
-    await expect(page.getByRole('heading', { level: 1, name: 'One more step.' })).toBeVisible();
+    await expect(page.getByRole('heading', { level: 2, name: 'One more step.' })).toBeVisible();
     await expect(page.locator('#stepPill')).toHaveText('Step 2 of 2 · Signed in as owner@example.com');
     await expect(page.locator('.side .s2 .lede')).toHaveText('Keep your studio yours.');
     await expect(page.locator('.side .s1')).toBeHidden();
@@ -172,7 +172,7 @@ test.describe('Two-step sign-in (builder item 191)', () => {
     await installApp(page, {});
     await twoStep(page, { signedIn: true, aal: 'aal1', factors: [ON_FACTOR] });
     await page.goto('/studio.html');                                        // already signed in, code still owed
-    await expect(page.getByRole('heading', { level: 1, name: 'One more step.' })).toBeVisible();
+    await expect(page.getByRole('heading', { level: 2, name: 'One more step.' })).toBeVisible();
     await page.getByRole('button', { name: 'Sign in as someone else →' }).click();
     await expect(page.getByRole('heading', { level: 1, name: 'Welcome back.' })).toBeVisible();
     await expect(page.locator('#em')).toBeFocused();
@@ -184,7 +184,7 @@ test.describe('Two-step sign-in (builder item 191)', () => {
     await twoStep(page, { signedIn: true, aal: 'aal1', factors: [ON_FACTOR] });
     await page.goto('/settings.html');
     await page.waitForURL(/\/studio\.html$/);
-    await expect(page.getByRole('heading', { level: 1, name: 'One more step.' })).toBeVisible();
+    await expect(page.getByRole('heading', { level: 2, name: 'One more step.' })).toBeVisible();
     await typeCode(page, '#stepPanel', GOOD);
     await page.waitForURL(/\/settings\.html$/);
     await expect(page.locator('#security #tsPill')).toHaveText(/^On since /);

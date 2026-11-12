@@ -78,6 +78,7 @@
   .steppill{display:inline-block;max-width:100%;margin:0 0 14px;padding:4px 12px;border-radius:12px;background:#ece6f7;color:#5b3fa0;font-size:10.5px;font-weight:600;letter-spacing:.2px;line-height:1.5;text-transform:uppercase;overflow-wrap:anywhere}
   @media (prefers-color-scheme:dark){.steppill{background:#2a2338;color:#d9cdeb}}
   #stepPanel .sub{margin-bottom:20px}
+  .panel h2.steph{font-size:30px;line-height:1.15;letter-spacing:-.3px}   /* the page keeps one h1 (Welcome back.); this panel looks like it */
   #stepPanel .ddsf-code{max-width:none}
   #stepPanel .ddsf-boxes span{max-width:none;background:var(--card);border-color:var(--line);color:var(--ink)}
   #stepPanel .ddsf-code.on .ddsf-boxes span.at{border-color:var(--p)}
@@ -153,7 +154,7 @@
   <!-- SECOND STEP (builder list item 191): two-step sign-in is on for this person -->
   <div id="stepPanel" class="panel">
     <p class="steppill" id="stepPill">Step 2 of 2</p>
-    <h1 id="stepHead" tabindex="-1">One more step.</h1>
+    <h2 id="stepHead" class="steph" tabindex="-1">One more step.</h2>
     <p class="sub" id="stepHow">Open your authenticator app and type the 6-digit code it shows for Studio OS.</p>
     <div id="stepBox"></div>
     <button id="stepGo" type="button">Confirm</button>

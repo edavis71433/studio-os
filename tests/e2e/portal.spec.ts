@@ -2908,10 +2908,11 @@ test.describe('PS4 — Help tab (B2)', () => {
     // identity: who is signed in — first name + email + the workspace relationship
     await expect(you.locator('.acctid')).toContainText('Maria');
     await expect(you.locator('.acctid')).toContainText('maria@example.com');
-    // structured rows: Appearance / Password / Sign out, each labeled, handlers intact
-    await expect(you.locator('.acctrow')).toHaveCount(3);
+    // structured rows: Appearance / Password / Two-step sign-in (builder item 191) / Sign out, each labeled, handlers intact
+    await expect(you.locator('.acctrow')).toHaveCount(4);
     await expect(you.locator('#appearance')).toBeVisible();
     await expect(you.locator('#chgpw')).toBeVisible();
+    await expect(you.locator('#acctTwo strong')).toHaveText('Two-step sign-in');
     await expect(you.locator('#signout2')).toBeVisible();
     // the client CAN message — the name/email-change pointer stays for them
     await expect(you.getByText('Message your studio and they’ll update it', { exact: false })).toBeVisible();
