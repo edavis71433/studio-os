@@ -312,6 +312,20 @@ function toneClass(t){ if(t==='good_news'||t==='celebration'||t==='celebratory'|
 // carry the agency ?client= scope onto every same-origin hub link, so an operator
 // scoped into a client never silently loses that context (one connected system).
 function scopeHref(base){const _c=new URLSearchParams(location.search).get('client');if(!_c||!base||base.charAt(0)!=='/')return base;const h=base.split('#');return h[0]+(h[0].indexOf('?')>=0?'&':'?')+'client='+encodeURIComponent(_c)+(h[1]?'#'+h[1]:'');}
+// builder item 83: ?client= is also how someone with places in two businesses opens their second one.
+// That is their own business, not a studio inside a client: links keep it (scopeHref), and the page is
+// the same Today their first one shows. A context (c) says which, as the shell's ddsScopeInfo reads it:
+// a scope is a studio inside a client, a business on the person's list is their own; else the shell
+// (its context, or the businesses it remembers from the last visit); before it has loaded, what it
+// remembers (shell.js HELD_KEY), so the reads below go out right the first time; else the address.
+function studioInClient(c){
+  const id=new URLSearchParams(location.search).get('client');if(!id)return false;
+  if(c&&c.scope&&c.scope.site_id)return true;
+  if(c&&Array.isArray(c.businesses)&&c.businesses.some((b)=>b&&b.site_id===id))return false;
+  if(window.ddsScopeInfo)return !!window.ddsScopeInfo();
+  try{const held=JSON.parse(localStorage.getItem('dds-held-businesses')||'[]');if(Array.isArray(held)&&held.indexOf(id)>=0)return false;}catch(_){/* storage may be denied */}
+  return true;
+}
 
 // ── slice 10 pure helpers (mirrored 1:1 in tests/presence/today_home_test.mjs) ──
 // The greeting's date line — "Friday, July 18".
@@ -1115,23 +1129,35 @@ const SHELL_READY = document.readyState === 'loading' ? new Promise((r)=>documen
       if(yes) location.replace(studioDest);
     });
     let feedFailed = false;
-    const [moments, features, ctx, feed, bridged, dash, appts, deals, summary, rcv, customers, example, rec] = await Promise.all([
+    // builder item 83: four reads differ for a studio inside a client. The first answer sends them with the
+    // rest; the context, once in, has the last word, and they go again if it says otherwise.
+    const inFirst = studioInClient();
+    const scopedReads = (inC)=>[
+      (inC?Promise.resolve(null):apiGet('/client/projects').catch(()=>null)),   // bridge: work a studio is doing FOR you (never for a drilled-in operator)
+      (inC?Promise.resolve(null):apiGet('/studio/customers').catch(()=>null)),   // the Customers card — the studio's own roster, never for a drilled-in operator (D7: the scope header would blank it)
+      (inC?Promise.resolve(null):apiGet('/commerce/example-data').catch(()=>null)),   // benchmark 12: are the trial's example rows still here? (never for a drilled-in operator; hidden on a failed/404 read)
+      (inC?apiGet('/crm/record?client='+encodeURIComponent(new URLSearchParams(location.search).get('client'))).catch(()=>null):Promise.resolve(null)),   // item 24: a client's Overview leads with their facts (studio only — anyone else gets a 403 → null)
+    ];
+    const [rBridged, rCustomers, rExample, rRec] = scopedReads(inFirst);
+    let [moments, features, ctx, feed, bridged, dash, appts, deals, summary, rcv, customers, example, rec] = await Promise.all([
       apiGet('/moments').catch(()=>({data:[]})),
       apiGet('/marketplace/features').catch(()=>({data:{features:[]}})),
       ctxRead,   // PERF: reuse the shell's /portal/context (window.ddsContext) — fall back to our own read
       apiGet('/portal/feed').catch(()=>{feedFailed=true;return null;}),
-      (new URLSearchParams(location.search).get('client')?Promise.resolve(null):apiGet('/client/projects').catch(()=>null)),   // bridge: work a studio is doing FOR you (never for a drilled-in operator)
+      rBridged,
       apiGet('/analytics/dashboard').catch(()=>null),        // "This month" — hidden if the route 404s (deploy-order tolerance)
       apiGet('/bookings/appointments').catch((e)=>e===404||e===403?'dormant':null),   // "Today's schedule" — 404/403 = bookings dormant (no card); else an honest couldn't-check line
       apiGet('/sales/deals?limit=100').catch(()=>null),      // "Key deals" (C6) — hidden entirely on empty/403/failure, never an empty card. ?limit=100 (the route's MAX_PAGE): the default page is only the 25 most-recently-UPDATED deals, which could hide a big open deal from the top-5 window
       apiGet('/sales/summary').catch(()=>null),              // the stat strip — its three money tiles drop on a failed/403 read, never fake zeros
       apiGet('/sales/receivables').catch(()=>null),          // the money band — hidden on a failed read (a 5xx must never paint "nothing is due")
-      (new URLSearchParams(location.search).get('client')?Promise.resolve(null):apiGet('/studio/customers').catch(()=>null)),   // the Customers card — the studio's own roster, never for a drilled-in operator (D7: the scope header would blank it)
-      (new URLSearchParams(location.search).get('client')?Promise.resolve(null):apiGet('/commerce/example-data').catch(()=>null)),   // benchmark 12: are the trial's example rows still here? (never for a drilled-in operator; hidden on a failed/404 read)
-      (new URLSearchParams(location.search).get('client')?apiGet('/crm/record?client='+encodeURIComponent(new URLSearchParams(location.search).get('client'))).catch(()=>null):Promise.resolve(null)),   // item 24: a client's Overview leads with their facts (studio only — anyone else gets a 403 → null)
+      rCustomers,
+      rExample,
+      rRec,
     ]);
     const c0 = ctx && ctx.data;
     if(studioHome(c0)) return;   // on its way Home (above)
+    const inC = studioInClient(c0);
+    if(inC!==inFirst) [bridged, customers, example, rec] = await Promise.all(scopedReads(inC));
     const list = Array.isArray(moments?.data) ? moments.data : (moments?.data?.moments || moments?.data || []);
     const apptList = appts==='dormant' ? 'dormant' : ((appts && appts.data && Array.isArray(appts.data.appointments)) ? appts.data.appointments : null);
     let facts = null;
@@ -1143,8 +1169,8 @@ const SHELL_READY = document.readyState === 'loading' ? new Promise((r)=>documen
     render(list, features?.data || {}, feed && feed.data, ctx && ctx.data, dash && dash.data, apptList, deals && deals.data, summary && summary.data, rcv && rcv.data, customers && customers.data, example && example.data, facts);
     // A failed feed must NOT masquerade as "all clear" — say we couldn't check.
     if(feedFailed){ const h=document.getElementById('main'); if(h){ const n=document.createElement('div'); n.style.cssText='margin:0 0 14px;padding:11px 16px;border-radius:12px;background:var(--warn-soft,#f3ead9);color:var(--warn,#775d31);font-size:13.5px'; n.textContent='We couldn’t load what needs you just now — refresh to try again.'; h.insertBefore(n,h.firstChild);} }
-    studioProjectCard(bridged && bridged.data);
-    if(c0 && (c0.is_agency || c0.is_operator) && new URLSearchParams(location.search).get('client')) mountSiteDeck().finally(mountDoNext);   // item 184: the Do next list under their website
+    studioProjectCard(bridged && bridged.data, inC);
+    if(c0 && (c0.is_agency || c0.is_operator) && inC) mountSiteDeck().finally(mountDoNext);   // item 184: the Do next list under their website
     orientationCard(ctx && ctx.data);
     planCard(ctx && ctx.data);
     healthLine();
@@ -1156,16 +1182,17 @@ const SHELL_READY = document.readyState === 'loading' ? new Promise((r)=>documen
 // ── Bridge discovery: a converted customer has a studio building FOR them, but
 // nothing used to point at that delivery view — they could sign in and never
 // find their own project. One calm card, only when a linked project exists. ──
-function studioProjectCard(d){
+function studioProjectCard(d, inC){
   try{
     // Operators drilled into a client (?client=) see the client's OWN Today —
     // the delivery view belongs to the customer; showing it scoped is confusing.
-    if(new URLSearchParams(location.search).get('client')) return;
+    // In one of your own businesses (builder item 83) it is that business's card.
+    if(inC) return;
     const projects = (d && (d.projects || d)) || [];
     if(!Array.isArray(projects) || !projects.length) return;
     const host = document.getElementById('col-main') || document.getElementById('main') || document.body;
     const card = document.createElement('a');
-    card.href = '/client.html';
+    card.href = scopeHref('/client.html');   // builder item 83: the portal of the business in hand
     card.style.cssText = 'display:block;padding:16px 20px;border:1px solid var(--accent-soft,#e5ddf5);border-radius:14px;background:var(--card,#fff);font-size:14px;color:inherit;text-decoration:none';
     const live = projects.find(p=>p.status==='active')||projects[0];
     const name = live && (live.title || live.name) || 'Your project';

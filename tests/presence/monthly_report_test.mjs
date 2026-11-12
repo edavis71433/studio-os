@@ -108,7 +108,7 @@ ok('the job runs in the hygiene group and the default chain', (system.match(/run
 const index = read('supabase/functions/presence/index.ts');
 ok('the three site routes are registered', /'\/report\/monthly' && method === 'GET'/.test(index) && /'\/report\/monthly' && method === 'PUT'/.test(index) && /'\/report\/monthly\/preview' && method === 'POST'/.test(index));
 const settings = read('settings.html');
-ok('the Settings card is inside a client only and needs configure', /key: 'report'[^\n]*scopedOnly: true[^\n]*cap: 'configure'/.test(settings) && /c\.scopedOnly && !SCOPE/.test(settings));
+ok('the Settings card is inside a client only and needs configure', /key: 'report'[^\n]*scopedOnly: true[^\n]*cap: 'configure'/.test(settings) && /c\.scopedOnly && !inC/.test(settings));
 ok('the card reads what happened last, not the bare month mark', /function reportStatusLine\(d\)/.test(settings) && !/d\.last_month \? 'Last sent/.test(settings));
 const mr = read('supabase/functions/presence/ops/monthly_report.ts');
 ok('the job claims the month before it sends', mr.indexOf('const claimed = await SAVE(') > 0 && mr.indexOf('const claimed = await SAVE(') < mr.indexOf('await sendReport(site, win, claimedSetting'));

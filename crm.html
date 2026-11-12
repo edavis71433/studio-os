@@ -435,7 +435,14 @@ let TOKEN="";
 sb.auth.onAuthStateChange(function(_e,s){if(s&&s.access_token)TOKEN=s.access_token;});
 const QP=()=>new URLSearchParams(location.search);
 const scopeParam=()=>QP().get('client')||'';
-const H=(scoped)=>{const h={'Content-Type':'application/json','Authorization':'Bearer '+SUPABASE_KEY,'x-dds-user-jwt':TOKEN};if(scoped)h['x-dds-scope-site']=scopeParam();return h;};
+// builder item 83: ?client= is also how someone with places in two businesses opens their second
+// one. That is their own book, not a client's record: it is no record key, and the studio-level
+// reads below go to that business too. The shell tells the two apart (ddsScopeInfo: the context,
+// else the businesses it remembers from the last visit); before it has loaded, what it remembers
+// (shell.js HELD_KEY), else the address, as before.
+const studioScoped=()=>{const id=scopeParam();if(!id)return false;if(window.ddsScopeInfo)return !!window.ddsScopeInfo();try{const held=JSON.parse(localStorage.getItem('dds-held-businesses')||'[]');if(Array.isArray(held)&&held.indexOf(id)>=0)return false;}catch(_){/* storage may be denied */}return true;};
+const ownBusiness=()=>studioScoped()?'':scopeParam();   // the business ?client= picked, when it is no client of a studio
+const H=(scoped)=>{const h={'Content-Type':'application/json','Authorization':'Bearer '+SUPABASE_KEY,'x-dds-user-jwt':TOKEN};if(scoped)h['x-dds-scope-site']=scopeParam();else if(ownBusiness())h['x-dds-scope-site']=ownBusiness();return h;};
 // api() = scoped to the record's customer site (/crm/*, the reply routes).
 // apiAg() = UNSCOPED on purpose: deal/contact/project rows live on the operator's
 // own agency site, so /sales/* + /projects/* must resolve against that site (the
@@ -450,11 +457,11 @@ async function apiAg(path,method,body){let r;try{r=await fetch(FN+path,{method:m
 // Same doctrine for the outbound pipeline/projects links: the trailing `client=`
 // is deliberate — it pins these links UNSCOPED so shell.js's scope-carry
 // (carryScopeGlobally) doesn't rewrite them onto the customer's site.
-const agHref=(page,params)=>'/'+page+'?'+params+'&client=';
+const agHref=(page,params)=>'/'+page+'?'+params+'&client='+encodeURIComponent(ownBusiness());   // in one of your own businesses, that business
 // Server-fed hrefs (timeline items, Upcoming rows) are scope-agnostic on purpose;
 // pin any pipeline/projects target the same way agHref does at RENDER time, so
 // carryScopeGlobally can't rewrite it onto the customer's own site.
-const pinHref=(h)=>{h=String(h||'');return (/^\/(pipeline|projects)\.html/.test(h)&&h.indexOf('client=')<0)?h+(h.indexOf('?')>=0?'&':'?')+'client=':h;};
+const pinHref=(h)=>{h=String(h||'');return (/^\/(pipeline|projects)\.html/.test(h)&&h.indexOf('client=')<0)?h+(h.indexOf('?')>=0?'&':'?')+'client='+encodeURIComponent(ownBusiness()):h;};
 function toast(m,k){if(window.ddsToast)return void ddsToast(m,k);const t=$('toast');t.textContent=m;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2800);}
 // item 65: "today" / "yesterday" are local calendar days, not 24-hour spans (a call
 // at 10pm read "today" until 10pm the next day)
@@ -573,7 +580,7 @@ const TAB_ALIAS={activity:'activity',overview:'details',messages:'activity',deal
 // Build the query for /crm/record from whatever the URL carries.
 function recordQuery(){
   const q=QP(); const parts=[];
-  for(const k of ['client','client_id','deal','contact','project']){const v=q.get(k); if(v)parts.push(k+'='+encodeURIComponent(v));}
+  for(const k of ['client','client_id','deal','contact','project']){if(k==='client'&&!studioScoped())continue;const v=q.get(k); if(v)parts.push(k+'='+encodeURIComponent(v));}
   return parts.length?('?'+parts.join('&')):'';
 }
 function idParams(){ // the identity keys carried onto sub-requests / links
@@ -602,7 +609,7 @@ let ACT_EARLY=null;
 async function loadRecord(){
   const rq=recordQuery();
   if(!rq){ picker(); return; }
-  { const q0=QP(); if(q0.get('client')&&!q0.get('deal')&&!q0.get('project')&&!q0.get('contact')&&!q0.get('client_id')) ACT_EARLY=api('/crm/activity?today='+recTodayYmd()).catch(()=>null); }
+  { const q0=QP(); if(q0.get('client')&&studioScoped()&&!q0.get('deal')&&!q0.get('project')&&!q0.get('contact')&&!q0.get('client_id')) ACT_EARLY=api('/crm/activity?today='+recTodayYmd()).catch(()=>null); }
   const r=await api('/crm/record'+rq);
   if(r.status===403){ $('main').innerHTML=`<div class="center"><h2>This lives in your studio workspace.</h2><p class="muted">${esc((r.body&&r.body.message)||'Only your studio can open a client record.')}</p></div>`; return; }
   if(!r.ok){ trouble(); return; }
@@ -617,7 +624,8 @@ async function loadRecord(){
   // it) — the short address alone opens the customer's NEWEST deal, so an older deal's link landed
   // on another deal. ?act= rides along too, or the ⌘K "Send invoice to …" form never opened.
   const canon=REC.canonical||{};
-  if(canon.key==='client' && canon.value && QP().get('client')!==canon.value){
+  // builder item 83: in one of your own businesses ?client= names that business, so the record keeps its address
+  if(canon.key==='client' && canon.value && QP().get('client')!==canon.value && !ownBusiness()){
     const q0=QP(), id=REC.identity||{}, to=new URLSearchParams({client:canon.value});
     if(q0.get('deal')||q0.get('project')){if(id.deal_id)to.set('deal',id.deal_id);if(id.project_id)to.set('project',id.project_id);}
     const t=q0.get('tab')||REC.default_tab||''; if(t)to.set('tab',t);
