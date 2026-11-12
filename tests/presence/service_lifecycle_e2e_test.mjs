@@ -29,6 +29,9 @@ const deal = await A('/sales/deals', 'POST', { title: `${tag} engagement`, conta
 const proj = await A('/projects', 'POST', { deal_id: deal.body?.data?.id });
 const projectId = proj.body?.data?.id;
 ok('1. a converted deal has a project (handoff)', proj.status === 201 && projectId && proj.body?.data?.deal_id === deal.body?.data?.id);
+// A project made from a deal starts with the delivery checklist (Nov 2026), so step 14 counts
+// what the steps below add to the report as it stands now.
+const before = (await A(`/projects/${projectId}/report`)).body?.data?.summary || {};
 
 // 2) studio assigns tasks + milestones
 const ms = await A(`/projects/${projectId}/milestones`, 'POST', { title: 'Launch' });
@@ -92,7 +95,11 @@ ok('13. studio resolves the support request', resolve.ok && resolve.body?.data?.
 // 14) client reporting reflects the authoritative activity
 const report = await A(`/projects/${projectId}/report`);
 const s = report.body?.data?.summary;
-ok('14. reporting reflects authoritative data (tasks, milestone, files, approvals)', report.ok && s?.progress?.total === 2 && s?.milestones?.total === 1 && s?.shared_files === 1 && s?.open_client_actions === 1, JSON.stringify(s).slice(0, 200));
+const n0 = (v) => Number(v) || 0;
+ok('14. reporting reflects authoritative data (tasks, milestone, files, approvals)', report.ok
+  && s?.progress?.total === n0(before.progress?.total) + 2 && s?.milestones?.total === n0(before.milestones?.total) + 1
+  && s?.shared_files === n0(before.shared_files) + 1 && s?.open_client_actions === n0(before.open_client_actions) + 1,
+  `before ${JSON.stringify(before).slice(0, 150)} after ${JSON.stringify(s).slice(0, 150)}`);
 
 // 15) retried actions do not create duplicates
 const reproj = await A('/projects', 'POST', { deal_id: deal.body?.data?.id });
