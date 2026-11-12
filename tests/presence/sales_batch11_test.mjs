@@ -90,7 +90,8 @@ ok('a site we host, never published, is still getting set up', C.deriveClientHea
 ok('the record says "Hosted elsewhere" in all three places', /const siteWord=\(p\)=>p\.live\?'Live':\(p\.edition==='monitor'\?'Hosted elsewhere'/.test(page) && (page.match(/siteWord\(p\)/g) || []).length >= 3);
 
 // ── item 52: the tip reads the project ──
-ok('the won tip reads the project\'s progress', /function guideNow\(stage\)/.test(page) && /Their project is \$\{pct\}% along\./.test(page) && /const g=guideNow\(stage\);/.test(page));
+// sales item 124: the stage note took the tip strip's place; the project's progress is its fact line
+ok('the won tip reads the project\'s progress', /function stageFact\(stage,d,signed\)/.test(page) && /Their project is \$\{pct\}% along\./.test(page) && /fact=stageFact\(stage,d,signed\)/.test(page));
 
 // ── item 53: My tasks ──
 const P1 = 'aaaaaaaa-0000-4000-8000-000000000001';

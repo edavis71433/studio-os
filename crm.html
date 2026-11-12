@@ -112,6 +112,27 @@
   .path-side{display:flex;align-items:center;gap:10px;flex:0 0 auto}
   .path-guide{margin-top:10px;font-size:13.5px;color:var(--soft)}
   .path-guide b{color:var(--ink);font-weight:600}
+  /* sales item 124: what to do now, under the stage bar (the same block as pipeline.html's) */
+  .stage-note{display:flex;gap:18px;align-items:flex-start;margin-top:12px;padding:18px 22px 18px 24px;border-radius:16px;background:var(--p-soft);border-left:5px solid var(--p);box-shadow:0 6px 18px -6px rgba(27,21,37,.08)}
+  .stage-note .sn-ic{flex:0 0 auto;width:44px;height:44px;border-radius:12px;display:grid;place-items:center;color:#fff;background:linear-gradient(135deg,#7a5bd6,var(--p))}
+  .stage-note .sn-body{flex:1;min-width:0}
+  .stage-note .sn-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+  .stage-note h3{font-family:var(--serif);font-weight:600;font-size:19px;line-height:1.25;margin:0;color:var(--ink)}
+  .stage-note .sn-chip{font-size:12px;font-weight:600;color:var(--p);background:var(--card);border-radius:999px;padding:3px 10px}
+  .stage-note .sn-fact{margin:10px 0 0;padding:9px 12px;border-radius:10px;background:var(--good-soft);color:var(--good);font-size:14px}
+  .stage-note .sn-fact b{font-weight:600}
+  .stage-note .sn-steps{list-style:none;margin:10px 0 0;padding:0;display:flex;flex-direction:column;gap:8px}
+  .stage-note .sn-steps li{display:flex;gap:10px;align-items:flex-start;font-size:14.5px;line-height:1.45;color:var(--ink)}
+  .stage-note .sn-ck{flex:0 0 auto;margin-top:1px;color:var(--p)}
+  .stage-note .sn-foot{margin:10px 0 0;font-size:12.5px;color:var(--faint)}
+  .stage-note .sn-edit{flex:0 0 auto;font:inherit;font-size:13px;font-weight:600;border:1px solid var(--dds-line-strong,#d6d4e2);background:var(--card);color:var(--ink);border-radius:999px;padding:7px 14px;min-height:36px;cursor:pointer}
+  .stage-note .sn-edit:hover{background:var(--card);border-color:var(--p)}
+  .stage-note .sn-text{display:block;width:100%;box-sizing:border-box;font:inherit;font-size:14.5px;line-height:1.6;padding:12px 14px;margin-top:10px;border:2px solid color-mix(in srgb,var(--p) 45%,transparent);border-radius:10px;background:var(--card);color:var(--ink);resize:vertical}
+  .stage-note .sn-text:focus{outline:2px solid var(--p);outline-offset:1px}
+  .stage-note .sn-help{font-size:12.5px;color:var(--soft);margin:8px 0 0}
+  .stage-note .sn-acts{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:10px}
+  .stage-note .sn-reset{margin-left:auto;font:inherit;font-size:13px;font-weight:600;color:var(--p);background:none;border:none;padding:6px 0;cursor:pointer}
+  @media (max-width:640px){.stage-note{flex-wrap:wrap;gap:12px;padding:16px}.stage-note .sn-ic{width:36px;height:36px}.stage-note .sn-edit{width:100%;min-height:44px}.stage-note .sn-reset{margin-left:0}}
   .path-confirm{margin-top:10px;display:flex;gap:var(--dds-s2,8px);align-items:center;font-size:13.5px;flex-wrap:wrap}
   .terminal-chip{font-size:12px;font-weight:700;border-radius:999px;padding:var(--dds-s1,4px) var(--dds-s3,12px)}
   .terminal-chip.won{background:var(--good-soft);color:var(--good)}
@@ -566,6 +587,8 @@ const PATH_STEPS=['lead','qualified','proposal','contract'];   // won/lost are t
 let REC=null, TAB='', PROFILE=null, DEAL=null, PROJ=null, DETAIL=null, STAGE_NAMES_ASKED=false;
 let ACT={items:[],upcoming:[],reply_to:null,reply_support_to:null,failed:false};
 let FILTER='all', COMPOSER='message', LOGKIND='call', NEWAUD='internal', FOCUS_COMPOSER=false, PENDING_BACK='', GUIDE_OPEN=true;
+// sales item 124: each stage's "what to do now" note (GET /sales/stages notes; null until read, or when it couldn't be)
+let STAGE_NOTES=null, STAGE_NOTES_CUSTOM={}, NOTE_EDIT=false;
 const EXPANDED=new Set();
 // Phase 1 overhaul: the record is THE hub. Billing (proposals · agreement ·
 // invoices · retainer, with their actions) lives here now; Delivery reads as
@@ -617,7 +640,7 @@ async function loadRecord(){
   if(!r.ok){ trouble(); return; }
   REC=r.body.data||{};
   // sales review item 38: the studio's own stage names, read at studio level (they live on the studio's site)
-  if(!STAGE_NAMES_ASKED){STAGE_NAMES_ASKED=true;apiAg('/sales/stages').then(s=>{const chs=s.ok&&s.body&&s.body.data&&s.body.data.chances;if(chs&&typeof chs==='object'){STAGE_CHANCE=chs;try{renderHighlights();renderSummaryCards();}catch(_){}}const l=s.ok&&s.body&&s.body.data&&s.body.data.labels;if(l&&Object.keys(l).some(k=>l[k]!==STAGE_LABEL[k])){Object.assign(STAGE_LABEL,l);try{renderPath();if(TAB)showTab(TAB,true);}catch(_){}}}).catch(()=>{});}
+  if(!STAGE_NAMES_ASKED){STAGE_NAMES_ASKED=true;apiAg('/sales/stages').then(s=>{const nts=s.ok&&s.body&&s.body.data&&s.body.data.notes;if(nts&&typeof nts==='object'){STAGE_NOTES=nts;STAGE_NOTES_CUSTOM=s.body.data.notes_custom||{};try{renderPath();}catch(_){}}const chs=s.ok&&s.body&&s.body.data&&s.body.data.chances;if(chs&&typeof chs==='object'){STAGE_CHANCE=chs;try{renderHighlights();renderSummaryCards();}catch(_){}}const l=s.ok&&s.body&&s.body.data&&s.body.data.labels;if(l&&Object.keys(l).some(k=>l[k]!==STAGE_LABEL[k])){Object.assign(STAGE_LABEL,l);try{renderPath();if(TAB)showTab(TAB,true);}catch(_){}}}).catch(()=>{});}
   // Canonical addressing: a converted customer is addressed by their SITE so the
   // scope (x-dds-scope-site) is right for the profile + notes + activity. If we
   // arrived by ?deal=/?contact= but the canonical key is the customer site and it
@@ -980,6 +1003,55 @@ function renderHighlights(){
   });
 }
 
+// ── Sales item 124: what to do now, under the stage bar ─────────────────────
+// The studio's own note for the deal's stage (a starter note until it writes one), with
+// the one line the deal itself knows above it: signed, declined, expired, a project under
+// way. Edit note changes it for every deal at that stage (PUT /sales/stages { note }, a
+// setting, so data-needs="configure"). Tapping the current stage hides it, as the tip
+// strip did. Kept in step with pipeline.html's deal (stageNoteHtml there).
+const SN_FLAG='<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><path d="M4 22v-7"/></svg>';
+const SN_CK='<svg class="sn-ck" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="9.5"/><path d="m8.5 12 2.5 2.5 4.5-5"/></svg>';
+function stageFact(stage,d,signed){
+  const out=(stage!=='won'&&stage!=='lost')?proposalOutcome():null;
+  if(out)return out.state==='declined'?{tip:'They declined your proposal.',action:'Revise it and send it again, or mark the deal not a fit.'}:{tip:'Your proposal expired before they answered.',action:'Revise it and send it again.'};
+  if(stage==='contract'&&signed&&!d.converted_client_id)return{tip:'They’ve signed.',action:'Convert them to a customer to start the project.'};
+  if(stage==='won'){
+    const proj=(PROJ&&PROJ.project)||null, pct=Number(PROJ&&PROJ.progress&&PROJ.progress.pct)||0;
+    if(proj&&proj.status==='complete')return{tip:'Their project is done.',action:'Check in with them, or ask for a review.'};
+    if(proj&&pct>0)return{tip:`Their project is ${pct}% along.`,action:'Open their project to see what’s left.'};
+  }
+  return null;
+}
+function stageNoteHtml(stage,d,signed){
+  const text=STAGE_NOTES&&STAGE_NOTES[stage];
+  if(!text)return'';
+  const label=stageLabel(stage), mine=!!(STAGE_NOTES_CUSTOM&&STAGE_NOTES_CUSTOM[stage]), fact=stageFact(stage,d,signed);
+  const body=NOTE_EDIT
+    ?`<label class="sr-only" for="snText">What to do now at ${esc(label)}, one step a line</label><textarea id="snText" class="sn-text" rows="${Math.min(9,Math.max(3,text.split('\n').length+1))}">${esc(text)}</textarea>
+      <p class="sn-help">One step a line, up to eight. Everyone on your team sees this on every deal at ${esc(label)}.</p>
+      <div class="sn-acts"><button type="button" class="primary" id="snSave">Save for every deal</button><button type="button" id="snCancel">Cancel</button>${mine?'<button type="button" class="sn-reset" id="snReset">Put back the starter note</button>':''}</div>`
+    :`<ul class="sn-steps">${text.split('\n').map(l=>`<li>${SN_CK}<span>${esc(l)}</span></li>`).join('')}</ul>
+      <p class="sn-foot">${mine?'Your studio’s note':'A starter note'} for every deal at ${esc(label)}. Tap ${esc(label)} on the bar to hide it.</p>`;
+  return `<section class="stage-note" aria-labelledby="snHead"><span class="sn-ic">${SN_FLAG}</span><div class="sn-body"><div class="sn-head"><h3 id="snHead">What to do now</h3><span class="sn-chip">${esc(label)}</span></div>${fact?`<p class="sn-fact"><b>${esc(fact.tip)}</b> ${esc(fact.action)}</p>`:''}${body}</div>${NOTE_EDIT?'':'<button type="button" class="sn-edit" id="snEdit" data-needs="configure">Edit note</button>'}</section>`;
+}
+async function saveStageNote(stage,text,btn){
+  if(btn)btn.disabled=true;
+  const r=await apiAg('/sales/stages','PUT',{note:{stage,text}});
+  if(!r.ok){if(btn)btn.disabled=false;toast((r.body&&r.body.message)||'That note didn’t save — please try again.');return;}
+  const dd=(r.body&&r.body.data)||{};
+  if(dd.notes){STAGE_NOTES=dd.notes;STAGE_NOTES_CUSTOM=dd.notes_custom||{};}
+  NOTE_EDIT=false;renderPath();
+  toast(String(text||'').trim()?'Saved for every deal at '+stageLabel(stage)+'.':'The starter note is back.');
+  const e=$('snEdit');if(e)e.focus();
+}
+function wireStageNote(stage){
+  const ed=$('snEdit');if(ed)ed.addEventListener('click',()=>{NOTE_EDIT=true;renderPath();const t=$('snText');if(t){t.focus();t.setSelectionRange(t.value.length,t.value.length);}});
+  const cancel=()=>{NOTE_EDIT=false;renderPath();const e=$('snEdit');if(e)e.focus();};
+  const cn=$('snCancel');if(cn)cn.addEventListener('click',cancel);
+  const sv=$('snSave');if(sv)sv.addEventListener('click',()=>saveStageNote(stage,$('snText').value,sv));
+  const rs=$('snReset');if(rs)rs.addEventListener('click',()=>saveStageNote(stage,'',rs));
+  const tx=$('snText');if(tx)tx.addEventListener('keydown',(e)=>{if(e.key==='Escape'){e.preventDefault();cancel();}else if(e.key==='Enter'&&(e.metaKey||e.ctrlKey)){e.preventDefault();if(sv)sv.click();}});
+}
 // ── Path: the chevron stage bar (only when the record has a deal) ───────────
 // Does the Path (renderPath) draw a filled action for this deal — Mark stage
 // complete, or Convert to customer at contract+signed? When it does, it is the
@@ -1025,7 +1097,6 @@ function renderPath(){
     if(stage==='lost')return '';
     return mk('Won',won?'done':'')+mk('Project',projDone?'done':projCur?'current':'')+mk('Growth',projDone?'current':'');
   })();
-  const g=guideNow(stage);
   // the right-side action: forward = "Mark Stage as Complete" (BOARD_NEXT[stage][0]
   // when it's a forward move); at contract+signed it becomes Convert (won is
   // convert-only — the heavy machinery stays on pipeline.html, we don't rebuild it).
@@ -1046,8 +1117,7 @@ function renderPath(){
       <div class="path-side">${side}</div>
     </div>
     ${PENDING_BACK?`<div class="path-confirm">Move this deal back to <b>${esc(stageLabel(PENDING_BACK))}</b>?<button class="primary" id="backGo">Move back</button><button id="backNo">Cancel</button></div>`:''}
-    ${GUIDE_OPEN?`<div class="path-guide"><b>Tip:</b> ${esc(g.tip)} · <b>Do next:</b> ${esc(g.action)}</div>`:''}
-  </div>`;
+  </div>${GUIDE_OPEN?stageNoteHtml(stage,d,signed):''}`;
   // item 57: on a phone the strip scrolls sideways — open it on the current
   // stage, not on a cut-off "New lead" with the current one out of sight
   const pth=host.querySelector('.path'),curStep=host.querySelector('.path .pstep.current');
@@ -1058,7 +1128,8 @@ function renderPath(){
     PENDING_BACK=b.getAttribute('data-stage'); renderPath();   // only the honest one-back move renders interactive
   }));
   const cur=host.querySelector('.pstep.current');
-  if(cur)cur.addEventListener('click',()=>{GUIDE_OPEN=!GUIDE_OPEN;renderPath();});
+  if(cur)cur.addEventListener('click',()=>{GUIDE_OPEN=!GUIDE_OPEN;NOTE_EDIT=false;renderPath();});
+  wireStageNote(stage);   // sales item 124
   const bg=$('backGo'); if(bg)bg.addEventListener('click',()=>{const to=PENDING_BACK;PENDING_BACK='';moveStage(to,bg);});
   const bn=$('backNo'); if(bn)bn.addEventListener('click',()=>{PENDING_BACK='';renderPath();});
 }
@@ -1069,6 +1140,7 @@ async function moveStage(to,btn){
   if(r.ok){
     DEAL.deal=r.body.data||DEAL.deal;
     PENDING_BACK='';   // any pending back-confirm strip is now against the OLD stage — drop it
+    NOTE_EDIT=false;   // item 124: a half-written note was for the stage it left
     toast('Moved to '+stageLabel(to)+'.');
     renderHighlights();renderPath();renderSummaryCards();   // B12: the Deal card beside it kept the old stage and chance
     if(TAB==='deal')showTab(TAB,true);   // the Deal pane shows stage/next-step — keep it honest

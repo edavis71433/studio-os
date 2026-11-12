@@ -148,6 +148,18 @@
   .rp-boxt p{margin:4px 0 6px;font-size:14px;font-weight:500;color:var(--ink);line-height:1.45}
   .rp-from{display:flex;flex-wrap:wrap;gap:4px 14px;align-items:center;font-size:12.5px;color:var(--faint)}
   .linkbtn{font:inherit;font-size:12.5px;font-weight:600;color:var(--p);background:none;border:none;padding:2px 0;cursor:pointer}
+  /* sales item 124: what to do now at each stage, one row a stage, opened to edit */
+  .sn-list{display:flex;flex-direction:column;gap:8px;margin-top:10px}
+  .sn-row{border:1px solid var(--line);border-radius:12px;padding:10px 14px;background:var(--card)}
+  .sn-row.open{border:2px solid color-mix(in srgb,var(--p) 45%,transparent);background:var(--p-soft)}
+  .sn-top{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+  .sn-top b{font-weight:600;font-size:14px}
+  .sn-kind{font-size:12px;font-weight:600;border-radius:999px;padding:2px 9px;background:var(--bg);color:var(--soft)}
+  .sn-kind.mine{background:var(--p-soft);color:var(--p)}
+  .sn-prev{flex:1 1 200px;min-width:0;font-size:13px;color:var(--soft);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .sn-row textarea{display:block;width:100%;box-sizing:border-box;margin-top:8px;font:inherit;font-size:14px;line-height:1.55;padding:10px 12px;border:1px solid var(--dds-line-strong,#d6d4e2);border-radius:10px;background:var(--card);color:var(--ink);resize:vertical}
+  .sn-bot{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:8px}
+  .sn-bot .linkbtn{margin-left:auto}
   .linkbtn:hover{text-decoration:underline}
   .rp-pickw{position:relative}
   .rp-menu{position:absolute;left:0;top:calc(100% + 6px);z-index:20;width:min(360px,80vw);background:var(--card);border:1px solid var(--line);border-radius:12px;box-shadow:var(--dds-shadow-pop,var(--dds-shadow));padding:6px;display:flex;flex-direction:column;gap:2px}
@@ -338,6 +350,13 @@
         <label><span data-stage-label="contract">Agreement out</span> <input type="number" id="sc-contract" min="0" max="100" step="1" placeholder="75" aria-label="Chance a deal at Agreement out closes, in percent"> %</label>
       </div>
       <div style="margin-top:10px;display:flex;align-items:center;gap:10px"><button type="button" class="btn" id="scSave">Save percents</button><span class="how" id="scMsg" role="status" style="margin:0"></span></div>
+    </div>
+    <!-- sales item 124: the note under the stage bar on every deal, one per stage (Won and Not a fit too) -->
+    <div class="swrow" style="display:block" id="stageNotes" hidden>
+      <b style="font-weight:600">What to do now at each stage</b>
+      <div class="how">A short note under the stage bar on every deal. Each stage has a starter note until you change it.</div>
+      <div class="sn-list" id="snList"></div>
+      <span class="how" id="snNoteMsg" role="status" style="margin:6px 0 0;display:block"></span>
     </div>
   </section>
   <!-- Benchmark 2026-10, item 6: three switches, not a workflow builder. Each
@@ -1633,8 +1652,44 @@ async function loadStageNames() {
   if (STAGE_NAMES_ASKED) return; STAGE_NAMES_ASKED = true;
   const r = await api('/sales/stages').catch(() => null);
   if (r && r.ok) { paintStageNames(r.body && r.body.data); paintStageChances(r.body && r.body.data);
-    stagesStatus(r.body && r.body.data); }
-  else { for (const id of ['stageNames', 'stageChances']) { const box = $(id); if (box) box.hidden = true; } }   // no sales area (or a failed read): the blocks hide, never a dead form
+    stagesStatus(r.body && r.body.data); paintStageNotes(r.body && r.body.data); }
+  else { for (const id of ['stageNames', 'stageChances', 'stageNotes']) { const box = $(id); if (box) box.hidden = true; } }   // no sales area (or a failed read): the blocks hide, never a dead form
+}
+// ── sales item 124: what to do now at each stage (PUT /sales/stages { note }) ──
+// One row a stage with its first step; Edit opens the note, Save keeps it for every deal at
+// that stage, and Put back the starter note brings the starter back. A failed read of the
+// notes (notes: null) hides the block rather than show the starters as if they were yours.
+const NOTE_STAGES = ['lead', 'qualified', 'proposal', 'contract', 'won', 'lost'];
+let SNOTES = null, SNOTES_MINE = {}, SNOTE_LABELS = {}, SNOTE_OPEN = '';
+function paintStageNotes(d) {
+  if (d) { SNOTES = d.notes || null; SNOTES_MINE = d.notes_custom || {}; SNOTE_LABELS = d.labels || SNOTE_LABELS; }
+  const box = $('stageNotes'), list = $('snList'); if (!box || !list) return;
+  if (!SNOTES) { box.hidden = true; return; }
+  box.hidden = false;
+  list.innerHTML = NOTE_STAGES.map((k) => {
+    const label = SNOTE_LABELS[k] || k, text = SNOTES[k] || '', mine = !!SNOTES_MINE[k], open = SNOTE_OPEN === k;
+    return `<div class="sn-row${open ? ' open' : ''}" data-sn="${k}"><div class="sn-top"><b>${esc(label)}</b><span class="sn-kind${mine ? ' mine' : ''}">${mine ? 'Your note' : 'Starter note'}</span>`
+      + (open ? '</div>' + `<label class="sr-only" for="snt-${k}">What to do now at ${esc(label)}, one step a line</label><textarea id="snt-${k}" rows="${Math.min(9, Math.max(3, text.split('\n').length + 1))}">${esc(text)}</textarea>`
+        + `<div class="sn-bot"><span class="how" style="margin:0">One step a line, up to eight.</span><button type="button" class="btn" data-sn-save="${k}">Save note</button><button type="button" class="btn ghost" data-sn-cancel="${k}">Cancel</button>${mine ? `<button type="button" class="linkbtn" data-sn-reset="${k}">Put back the starter note</button>` : ''}</div>`
+        : `<span class="sn-prev">${esc(text.split('\n')[0] || '')}</span><button type="button" class="linkbtn" data-sn-edit="${k}" aria-label="Edit the note for ${esc(label)}">Edit</button></div>`)
+      + '</div>';
+  }).join('');
+  list.querySelectorAll('[data-sn-edit]').forEach((b) => b.addEventListener('click', () => { SNOTE_OPEN = b.getAttribute('data-sn-edit'); paintStageNotes(); const t = $('snt-' + SNOTE_OPEN); if (t) t.focus(); }));
+  list.querySelectorAll('[data-sn-cancel]').forEach((b) => b.addEventListener('click', () => { const k = b.getAttribute('data-sn-cancel'); SNOTE_OPEN = ''; paintStageNotes(); const e = list.querySelector(`[data-sn-edit="${k}"]`); if (e) e.focus(); }));
+  list.querySelectorAll('[data-sn-save]').forEach((b) => b.addEventListener('click', () => { const k = b.getAttribute('data-sn-save'); saveStageNote(k, ($('snt-' + k) || {}).value || '', b); }));
+  list.querySelectorAll('[data-sn-reset]').forEach((b) => b.addEventListener('click', () => saveStageNote(b.getAttribute('data-sn-reset'), '', b)));
+}
+async function saveStageNote(k, text, btn) {
+  const msg = $('snNoteMsg'); if (msg) msg.textContent = '';
+  btn.disabled = true;
+  const note = { stage: k, text };
+  const r = await api('/sales/stages', 'PUT', { note });
+  btn.disabled = false;
+  if (!r.ok) { toast(nice(r.body, 'That note didn’t save — nothing was changed.'), true); return; }
+  SNOTE_OPEN = ''; paintStageNotes(r.body && r.body.data);
+  const label = SNOTE_LABELS[k] || k;
+  if (msg) msg.textContent = String(text).trim() ? `Saved. Every deal at ${label} shows it.` : `The starter note is back for ${label}.`;
+  const e = $('snList').querySelector(`[data-sn-edit="${k}"]`); if (e) e.focus();
 }
 // C16: the Deal stages row says "chances set" only when a percent differs from its usual
 // one (the server always sends every percent), and it follows each save

@@ -62,6 +62,7 @@ import { normEmail, emailMatch, isUniqueViolation } from '../lib/contact_email.t
 import { contactMoreFrom, cleanTag, CONTACT_MORE_COLS } from '../lib/contact_fields.ts';   // item 89: address, job title, second phone, tags
 import { normalizeListFilters, quietCutoff, contactedContactIds, owingContactIds, keepIds, type ListFilters } from '../lib/list_filters.ts';   // item 90: field filters
 import { liveImport, importUpdate, noteImportRow } from './contacts_more.ts';   // item 86: imports that update and can be undone
+import { stageNotes, normalizeStageNotes, withStageNote, isNoteStage, STAGE_NOTE_DEFAULTS } from '../lib/stage_notes.ts';   // item 124: what to do now at each stage
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;                       // expected_close: ISO date only
 const CONVERT_PLANS = new Set(['presence', 'cms_only', 'business_os_only', 'presence_monitor', 'presence_managed']);
@@ -554,9 +555,18 @@ export async function handleSalesContactFields(req: Request, site: SiteRow, prin
 // item 69) }; PUT { names?, chances? } replaces whichever it is given (an empty
 // name, or a percent back at its default, puts the default back). A PUT with
 // only names never touches the percents, and the other way round.
+// Sales item 124: each stage's "what to do now" note rides along: GET adds `notes` (all
+// six, the studio's own or the starter), `notes_custom` and `note_defaults`; PUT { note:
+// { stage, text } } changes ONE stage's note on what is kept now (a teammate's edit of
+// another stage is never written over), and an empty note or the starter note puts the
+// starter back. A failed read of the notes answers `notes: null`, never the starters
+// pretending to be the studio's.
 export async function handleSalesStages(req: Request, site: SiteRow, principal: Principal, cors: Record<string, string>): Promise<Response> {
-  const payload = (custom: Record<string, string>, chancesCustom: Record<string, number>) =>
-    ({ labels: stageLabels(custom), custom, defaults: DEFAULT_STAGE_LABEL, chances: stageChances(chancesCustom), chance_defaults: DEFAULT_STAGE_CHANCE });
+  // no row yet is every starter note ({}); a read that failed is null
+  const notesP = (): Promise<unknown | null> => readReservedJsonOrThrow(site.id, RESERVED_NAMES.stageNotes).then((v) => v ?? {}).catch(() => null);
+  const notesOf = (raw: unknown | null) => raw === null ? { notes: null, notes_custom: null } : { notes: stageNotes(raw), notes_custom: normalizeStageNotes(raw) };
+  const payload = (custom: Record<string, string>, chancesCustom: Record<string, number>, notesRaw: unknown | null = null) =>
+    ({ labels: stageLabels(custom), custom, defaults: DEFAULT_STAGE_LABEL, chances: stageChances(chancesCustom), chance_defaults: DEFAULT_STAGE_CHANCE, ...notesOf(notesRaw), note_defaults: STAGE_NOTE_DEFAULTS });
   // bug hunt C4: a read that failed is not "nothing renamed, every percent as usual" —
   // the page showed the defaults, and the next save wrote them over the real ones. Both
   // reads are strict: the GET says it couldn't load (Settings then hides the blocks),
@@ -564,14 +574,24 @@ export async function handleSalesStages(req: Request, site: SiteRow, principal: 
   const readBoth = () => Promise.all([readReservedJsonOrThrow(site.id, RESERVED_NAMES.stageNames), readReservedJsonOrThrow(site.id, RESERVED_NAMES.stageChances)]);
   if (req.method === 'GET') {
     let names: unknown, chances: unknown;
+    const notes = notesP();
     try { [names, chances] = await readBoth(); }
     catch { return json({ error: 'read_failed', message: 'Your deal stages couldn’t load just now.' }, 502, cors); }
-    return json({ data: payload(normalizeStageNames(names), normalizeStageChances(chances)) }, 200, cors);
+    return json({ data: payload(normalizeStageNames(names), normalizeStageChances(chances), await notes) }, 200, cors);
   }
   if (req.method === 'PUT') {
     let b: any = {}; try { b = await req.json(); } catch { return json({ error: 'bad_json' }, 400, cors); }
     const by = principal.email || principal.userId || 'system';
     const hasNames = !!b && typeof b === 'object' && 'names' in b, hasChances = !!b && typeof b === 'object' && 'chances' in b;
+    // item 124: one stage's note, written on what is kept now (compare-and-swap)
+    if (b && typeof b === 'object' && b.note && typeof b.note === 'object' && !hasNames && !hasChances) {
+      if (!isNoteStage(b.note.stage)) return json({ error: 'validation', message: 'Which stage is this note for?' }, 422, cors);
+      const kept = await updateReservedJson(site.id, RESERVED_NAMES.stageNotes, (cur) => withStageNote(cur, b.note.stage, b.note.text), by);
+      if (!kept) return json({ error: 'write_failed', message: 'That note didn’t save — please try again.' }, 502, cors);
+      let names: unknown, chances: unknown;
+      try { [names, chances] = await readBoth(); } catch { names = {}; chances = {}; }
+      return json({ data: payload(normalizeStageNames(names), normalizeStageChances(chances), kept) }, 200, cors);
+    }
     if (!hasNames && !hasChances) return json({ error: 'validation', message: 'Nothing to save.' }, 422, cors);
     let curNames: unknown, curChances: unknown;
     try { [curNames, curChances] = await readBoth(); }
@@ -582,7 +602,7 @@ export async function handleSalesStages(req: Request, site: SiteRow, principal: 
     const okChances = hasChances ? await writeReservedJson(site.id, RESERVED_NAMES.stageChances, chancesCustom, by) : true;
     forgetStageLabels(site.id); forgetStageChances(site.id);   // batch B: what was kept goes at once
     if (!okNames || !okChances) return json({ error: 'write_failed', message: `Your ${!okNames && !okChances ? 'stage names and percents' : !okNames ? 'stage names' : 'stage percents'} didn’t save — please try again.` }, 502, cors);
-    return json({ data: payload(custom, chancesCustom) }, 200, cors);
+    return json({ data: payload(custom, chancesCustom, await notesP()) }, 200, cors);
   }
   return json({ error: 'method_not_allowed' }, 405, cors);
 }

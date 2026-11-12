@@ -85,6 +85,10 @@ const CONTROLS = [
   ['PUT /bookings/settings', 'presence.html', `api("PUT", "/bookings/settings", payload)`, ['c1.dataset.needs = "configure"', 'c2.dataset.needs = "configure"']],
   ['PUT /sales/contacts/fields', 'contacts.html', `api('/sales/contacts/fields','PUT',{fields})`, ['id="manageFields" data-needs="configure"']],
   ['PUT /sales/stages', 'settings.html', `api('/sales/stages', 'PUT', { names })`, ['id="automations" aria-labelledby="autoHead" hidden data-needs="configure"']],
+  // sales item 124: a stage's "what to do now" note, from Settings and from the note under the stage bar
+  ['PUT /sales/stages', 'settings.html', `api('/sales/stages', 'PUT', { note })`, ['id="stages" aria-labelledby="stagesHead" hidden data-needs="configure"']],
+  ['PUT /sales/stages', 'crm.html', `apiAg('/sales/stages','PUT',{note:{stage,text}})`, ['id="snEdit" data-needs="configure"']],
+  ['PUT /sales/stages', 'pipeline.html', `api('/sales/stages','PUT',{note:{stage,text}})`, ['id="snEdit" data-needs="configure"']],
   ['PUT /report/monthly', 'settings.html', `api('/report/monthly', 'PUT', patch)`, ['id="report" aria-labelledby="reportHead" hidden data-needs="configure"']],   // builder list item 58
   ['POST /report/monthly/preview', 'settings.html', `api('/report/monthly/preview', 'POST', {})`, ['id="report" aria-labelledby="reportHead" hidden data-needs="configure"']],
   ['DELETE /broadcasts/lists/:id', 'broadcasts.html', `api('/broadcasts/lists/'+encodeURIComponent(SEL.slice(5)),'DELETE')`, ['id="dropList" data-needs="delete"']],
