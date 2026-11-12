@@ -38,7 +38,14 @@
   .lhead{background:var(--card);border:1px solid var(--line);border-radius:var(--dds-r-lg,10px);box-shadow:var(--shadow);padding:var(--dds-s3,12px) var(--dds-s4,16px) 10px;margin-bottom:var(--dds-s4,16px)}
   .lrow1{display:flex;align-items:center;gap:10px}
   .obj-ic{width:34px;height:34px;border-radius:var(--dds-r,8px);background:var(--p);color:#fff;display:grid;place-items:center;font-size:16px;flex:0 0 auto}
-  .lhead h1{font-family:var(--sans);font-weight:600;font-size:20px;margin:0;letter-spacing:-.01em;flex:1;min-width:0}
+  .lhead h1,.lhead h2{font-family:var(--sans);font-weight:600;font-size:20px;margin:0;letter-spacing:-.01em;flex:1;min-width:0}
+  .hometitle{font-family:var(--serif);font-weight:600;font-size:30px;line-height:1.1;letter-spacing:-.02em;margin:0 0 var(--dds-s4,16px);color:var(--ink)}
+  .hometitle:focus{outline:none}
+  .lhead .allc{font-size:13.5px;font-weight:600;color:var(--p);text-decoration:none;white-space:nowrap}
+  .hchip.start{background:#fff;color:#3d2185;border-color:#fff;font-weight:600;text-decoration:none;cursor:pointer}
+  #needsEmpty .firsts{display:flex;flex-wrap:wrap;gap:10px;margin-top:12px}
+  #needsEmpty .firsts .btn{text-decoration:none;display:inline-flex;align-items:center;min-height:40px}
+  @media (max-width:760px){.hometitle{font-size:24px;margin-bottom:12px}}
   .lbtn{flex:0 0 auto;font:inherit;border:none;background:none;color:var(--soft);font-size:15px;border-radius:var(--dds-r,8px);padding:var(--dds-s1,4px) var(--dds-s2,8px);cursor:pointer}
   .lbtn:hover{color:var(--p);background:var(--p-soft)}
   .lmeta{margin-top:6px;font-size:12px;color:var(--faint)}
@@ -472,6 +479,8 @@
 <div class="wrap">
   <!-- the top row, Needs you and the studio strip live OUTSIDE #main: the roster
        re-renders #main.innerHTML per keystroke and must never wipe them -->
+  <!-- sales item 91: the page's title sits at the top, like every other page (it headed the table, two screens down) -->
+  <h1 id="pagehead" class="hometitle" tabindex="-1">Home</h1>
   <div id="top"></div>
   <!-- the bold redesign (sales item 70): what needs you comes first, as one list
        with its actions on each row; the numbers and the pipeline follow -->
@@ -680,14 +689,15 @@ function lheadHtml(shown){
   return `<header class="lhead">
     <div class="lrow1">
       <span class="obj-ic" aria-hidden="true">🗂</span>
-      <h1 id="pagehead" tabindex="-1">Home</h1>
+      <h2 id="custHead">Customers</h2>
+      <a class="allc" href="/customers.html">All customers →</a>
       <div class="seg" role="group" aria-label="Display as">
         <button id="dispTable" aria-pressed="${DISPLAY==='table'?'true':'false'}">Table</button>
         <button id="dispCards" aria-pressed="${DISPLAY==='cards'?'true':'false'}">Cards</button>
       </div>
       <button class="lbtn" id="refreshBtn" aria-label="Refresh" title="Refresh">↻</button>
     </div>
-    <div class="lmeta">${shown} business${shown===1?'':'es'} · ${esc(updatedLabel())}${DISPLAY==='table'?` · Sorted by ${esc(sortCol[1])} — ${SORT.dir>0?'ascending':'descending'}`:''}</div>
+    <div class="lmeta">${shown} customer${shown===1?'':'s'} · ${esc(updatedLabel())}${DISPLAY==='table'?` · Sorted by ${esc(sortCol[1])} — ${SORT.dir>0?'ascending':'descending'}`:''}</div>
   </header>`;
 }
 function chipsHtml(){
@@ -745,7 +755,7 @@ function render(){
   const list=sortedRows();
   let h=lheadHtml(list.length);
   h+=chipsHtml();
-  h+=`<input class="search" id="search" aria-label="Search clients" placeholder="Search clients…" value="${esc(Q)}">`;
+  h+=`<input class="search" id="search" aria-label="Search customers" placeholder="Search customers…" value="${esc(Q)}">`;
   if(CUST_FAILED)h+=`<div class="notice">Some delivery details wouldn’t load just now — client records still open.</div>`;
   if(VIEWNAME==='archived'&&ARCH_STATE!=='ok'){
     h+=`<div class="center"><p class="muted">${ARCH_STATE==='failed'?'Archived clients wouldn’t load just now.':'Loading archived clients…'}</p>${ARCH_STATE==='failed'?'<p style="margin-top:12px"><button type="button" class="btn ghost" id="archRetry">Try again</button></p>':''}</div>`;
@@ -1019,6 +1029,7 @@ async function load(soft){
   if(AR_ITEMS){paintToday();if(NEEDS||NEEDS_FAILED||MYTASKS)paintNeeds();}   // item 70: Today and Waiting on them read the same invoices
   applyOwed();
   LOADED_ONCE=true;LOADED_AT=Date.now();
+  if(!CLIENTS.length&&NEEDS)paintNeeds();   // sales item 91: an empty studio's greeting and Needs you say where to start
   render();
   paintHero();
 }
@@ -1050,9 +1061,26 @@ function renderTop(){
 // Item 70: the greeting says how many things need you and how many are money,
 // each kind is a chip that narrows the list below to it, and "Go through them"
 // opens the list one at a time.
+// Sales item 91: a brand-new studio (no customers yet, nothing needing it) is told where to start,
+// never "All caught up". The setup steps are sales item 105's strip (#setup; it paints after the
+// greeting and says so with 'dds:setup', so the greeting repaints then);
+// while it shows, the chip leads there, and Needs you offers the first two things to make.
+function brandNew(){return LOADED_ONCE&&!CLIENTS.length&&!(ARCHIVED&&ARCHIVED.length)&&!!NEEDS&&!Number(NEEDS.total||0)&&!needAll().length;}
+function setupStrip(){const el=document.getElementById('setup');return el&&!el.hidden&&el.getClientRects().length?el:null;}
+document.addEventListener('dds:setup',()=>{if(brandNew())paintHero();});
 function paintHero(){
   const sub=$('heroSub'),chips=$('heroChips');if(!sub||!chips)return;
   if(!NEEDS){sub.textContent=NEEDS_FAILED?'':'Checking what needs you…';chips.innerHTML='';return;}
+  const hi=document.querySelector('.hero .hi');
+  if(brandNew()){
+    if(hi)hi.textContent='Welcome to Studio OS';
+    sub.textContent='Nothing needs you yet. Here’s where to start.';
+    chips.innerHTML=setupStrip()?'<a class="hchip start" id="startHere" href="#setup">Start here ↓</a>':'<a class="hchip start" id="startHere" href="#add">Start here: add your first customer</a>';
+    const sh=$('startHere');
+    if(sh)sh.addEventListener('click',(e)=>{e.preventDefault();const st=setupStrip();if(st){st.scrollIntoView({behavior:'smooth',block:'start'});const f=st.querySelector('a[href],button');if(f)f.focus({preventScroll:true});}else openAddCustomer();});
+    return;
+  }
+  if(hi&&hi.textContent==='Welcome to Studio OS')hi.textContent=greetWord();
   const total=Number(NEEDS.total||0),all=needAll();
   const money=all.filter(r=>r.kind==='money').length;
   sub.textContent=total?(total+(total===1?' thing needs you':' things need you')+(money&&all.length>=total?'. '+(money===total?(total===1?'It’s money.':'All of them are money.'):money+(money===1?' is':' are')+' money.'):'.')):'Nothing needs you right now.';
@@ -1507,6 +1535,8 @@ function needsPanelHtml(){
   if(!NEEDS)return NEEDS_FAILED?`<div class="qfail">Needs you wouldn’t load just now.<button id="needsRetry" type="button">Try again</button></div>`:'<p class="quiet">Checking what needs you…</p>';
   const rows=NEEDS.rows||[],rest=NEEDS.rest||[],more=Number(NEEDS.more||0);
   const partial=NEEDS.partial?`<p class="pnote">Some of this couldn’t be checked just now — ↻ tries again.</p>`:'';
+  // sales item 91: day one, the first two things to make
+  if(!rows.length&&brandNew())return `<div class="rcard need" id="needsEmpty"><p class="nn">Nothing needs you yet. Your first customer is the place to start.</p><div class="firsts"><button type="button" class="btn" id="firstCust">+ Add a customer</button><a class="btn ghost" href="/sites.html#new">+ New site</a></div>${partial}</div>`;
   if(!rows.length)return `<div class="rcard need" id="needsEmpty"><p class="nn">Nothing needs you.</p><p class="quiet" style="margin:0">${esc(NEEDS.empty_line||'')}</p>${partial}</div>`;
   let shown=NEEDS_EXPANDED?rows.concat(rest):rows;
   if(QKIND)shown=rows.concat(rest).filter(r=>heroKind(r.kind)===QKIND);
@@ -1559,6 +1589,7 @@ function wireQueue(){
   });
   const off=$('qfilterOff');if(off)off.addEventListener('click',()=>{QKIND='';NEEDS_EXPANDED=false;paintNeeds();const t=$('qt-needs');if(t)t.focus();});
   const qr=$('needsRetry');if(qr)qr.addEventListener('click',()=>mountNeeds());
+  const fc=$('firstCust');if(fc)fc.addEventListener('click',openAddCustomer);
   const mb=$('needsMore');if(mb)mb.addEventListener('click',()=>{const n=(NEEDS.rows||[]).length;NEEDS_EXPANDED=true;paintNeeds();const l=$('needsList');if(l){const a=l.querySelector('div.row:nth-of-type('+(n+1)+') a');if(a)a.focus();}});
   const cb=$('needsClearOld');if(cb)cb.addEventListener('click',()=>clearOld(cb));
   host.querySelectorAll('[data-snooze]').forEach(b=>b.addEventListener('click',()=>snoozeRow(b.getAttribute('data-snooze'),b)));

@@ -124,6 +124,7 @@
     if (kind === 'todo') return 'Add to-do';
     if (kind === 'proposal') return 'Open the proposal';
     if (kind === 'deal') return 'Add deal';
+    if (kind === 'project') return 'Create project';
     return 'Save';
   }
   /* create-pure:end */
@@ -135,9 +136,19 @@
     { kind: 'proposal', icon: 'doc', label: 'Send a proposal', sub: 'Pick the deal; it opens ready to fill', key: 'p' },
     { kind: 'customer', icon: 'customers', label: 'Add a customer', sub: 'Their workspace and sign-in', key: 'c' },
     { kind: 'todo', icon: 'check', label: 'Add a to-do', sub: 'For you, with a date', key: 't' },
+    // sales item 91: Create knew sales but not projects or websites
+    { kind: 'project', icon: 'folder', label: 'New project', sub: 'A checklist for a customer’s work', key: 'j' },
+    { kind: 'site', icon: 'globe', label: 'New site', sub: 'A client’s website, built in private', key: 's' },
     { kind: 'update', icon: 'megaphone', label: 'Send an update', sub: 'One email to a list of people', key: 'u' },
   ];
-  var LINKS = { customer: '/agency.html#add', update: '/broadcasts.html' };
+  var LINKS = { customer: '/agency.html#add', update: '/broadcasts.html', site: '/sites.html#new' };
+  // Sales item 91: inside a client, Create is for that client. CLIENT = { site_id, name } while a
+  // studio is inside one (shell.js hands it over on each open). The menu offers what can be made
+  // for them, each form opens with them already picked, every read and write goes to the studio's
+  // own book (no client in the request), and what was made opens on their record, inside the client.
+  var CLIENT = null;
+  var CLIENT_KINDS = ['call', 'invoice', 'proposal', 'todo', 'project', 'deal'];
+  var CLIENT_SUBS = { call: 'With them — jot what you said', invoice: 'On their deal; they get a Pay button', proposal: 'Opens on their deal, ready to fill', todo: 'For them, with a date', project: 'A checklist for their work', deal: 'Another piece of work with them' };
   var STAGE = { lead: 'New lead', qualified: 'Qualified', proposal: 'Proposal sent', contract: 'Agreement out', won: 'Won', lost: 'Not a fit' };
   var PATHS = {
     phone: '<path d="M5 3h4l2 5-2.5 1.5a11 11 0 0 0 6 6L16 13l5 2v4a2 2 0 0 1-2 2A17 17 0 0 1 3 5a2 2 0 0 1 2-2z"/>',
@@ -147,12 +158,32 @@
     customers: '<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0"/><circle cx="17" cy="9" r="2.5"/><path d="M15.5 14.5A5 5 0 0 1 21.5 20"/>',
     check: '<path d="M5 12l5 5 9-10"/>',
     megaphone: '<path d="M3 11v2a1 1 0 0 0 1 1h3l6 4V6L7 10H4a1 1 0 0 0-1 1z"/><path d="M17 9a4 4 0 0 1 0 6"/>',
+    folder: '<path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>',
+    globe: '<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/>',
     x: '<path d="M6 6l12 12M18 6L6 18"/>',
   };
   var svg = function (k) { return '<svg class="cr-ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false">' + (PATHS[k] || '') + '</svg>'; };
   var esc = function (s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); };
   var initials = function (s) { return String(s || '').split(/[\s—–-]+/).filter(function (w) { return /^[A-Za-z0-9]/.test(w); }).slice(0, 2).map(function (w) { return w.charAt(0).toUpperCase(); }).join('') || '•'; };
-  var api = function (path, opts) { return window.ddsApi(path, opts); };
+  // inside a client the studio's book is asked without the client (opts.scope ''), as crm.html's apiAg does
+  var api = function (path, opts) { return window.ddsApi(path, CLIENT ? Object.assign({ scope: '' }, opts || {}) : opts); };
+  // who the client is on the studio's book: their deal, their person, their customer record (asked WITH the client)
+  var WHO_IS = {};
+  function clientIdentity() {
+    if (!CLIENT) return Promise.resolve(null);
+    var id = CLIENT.site_id;
+    if (!WHO_IS[id]) WHO_IS[id] = window.ddsApi('/crm/record?client=' + encodeURIComponent(id)).then(function (r) {
+      var d = r && r.ok && r.body && r.body.data && r.body.data.identity;
+      if (!d) { delete WHO_IS[id]; return null; }
+      return d;
+    }, function () { delete WHO_IS[id]; return null; });
+    return WHO_IS[id];
+  }
+  // where "Open" goes after making something: their record inside the client, else the studio's page
+  function hrefFor(dealId, tab, contactId) {
+    if (CLIENT) return '/crm.html?client=' + encodeURIComponent(CLIENT.site_id) + (dealId ? '&deal=' + encodeURIComponent(dealId) : '') + (tab ? '&tab=' + tab : '');
+    return dealId ? '/crm.html?deal=' + encodeURIComponent(dealId) + (tab ? '&tab=' + tab : '') : '/crm.html?contact=' + encodeURIComponent(contactId);
+  }
   var toast = function (m, k, a) { return window.ddsToast ? window.ddsToast(m, k, a) : null; };
   var phone = function () { return !!(window.matchMedia && window.matchMedia('(max-width:760.98px)').matches); };
   var rowsOf = function (r) { var d = r && r.ok && r.body && r.body.data; return Array.isArray(d) ? d : []; };   // a list, or nothing
@@ -230,18 +261,20 @@
     mode = 'menu';
     show('menu');
     var tiles = phone();
+    var list = CLIENT ? CLIENT_KINDS.map(function (k) { return ITEMS.filter(function (x) { return x.kind === k; })[0]; }) : ITEMS;
     dlg.innerHTML =
       '<div class="cr-menu' + (tiles ? ' tiles' : '') + '" tabindex="-1">' +
         (tiles ? '<div class="cr-grab" aria-hidden="true"></div>' : '') +
-        '<h2 id="dds-cr-title" class="cr-h' + (tiles ? '' : ' sr-only') + '">Create</h2>' +
+        (CLIENT ? '<div class="cr-for"><span class="cr-av" aria-hidden="true">' + esc(initials(CLIENT.name)) + '</span><span class="cr-ot"><b id="dds-cr-title">Create for ' + esc(CLIENT.name) + '</b><small>Each one opens with them already picked</small></span></div>'
+          : '<h2 id="dds-cr-title" class="cr-h' + (tiles ? '' : ' sr-only') + '">Create</h2>') +
         '<div class="cr-items" role="menu" aria-labelledby="dds-cr-title">' +
-          ITEMS.map(function (it) {
+          list.map(function (it) {
             return '<button type="button" role="menuitem" class="cr-item" data-kind="' + it.kind + '">' +
               '<span class="cr-tile">' + svg(it.icon) + '</span>' +
-              '<span class="cr-tx"><b>' + esc(it.label) + '</b>' + (tiles ? '' : '<small>' + esc(it.sub) + '</small>') + '</span>' +
+              '<span class="cr-tx"><b>' + esc(it.label) + '</b>' + (tiles ? '' : '<small>' + esc(CLIENT ? CLIENT_SUBS[it.kind] : it.sub) + '</small>') + '</span>' +
               (tiles ? '' : '<kbd aria-hidden="true">' + it.key.toUpperCase() + '</kbd>') + '</button>';
           }).join('') +
-        '</div></div>';
+        '</div>' + (CLIENT ? '<p class="cr-else">Something for someone else? Back to studio first.</p>' : '') + '</div>';
     if (!tiles) place();
     var items = [].slice.call(dlg.querySelectorAll('.cr-item'));
     items.forEach(function (b) { b.addEventListener('click', function () { pick(b.getAttribute('data-kind')); }); });
@@ -251,7 +284,7 @@
       if (e.key === 'Home') { e.preventDefault(); items[0].focus(); return; }
       if (e.key === 'End') { e.preventDefault(); items[items.length - 1].focus(); return; }
       if (e.key.length === 1 && !e.metaKey && !e.ctrlKey && !e.altKey) {
-        var it = ITEMS.filter(function (x) { return x.key === e.key.toLowerCase(); })[0];
+        var it = list.filter(function (x) { return x.key === e.key.toLowerCase(); })[0];
         if (it) { e.preventDefault(); pick(it.kind); }
       }
     });
@@ -281,12 +314,13 @@
     invoice: ['Send an invoice', 'They get an email with a Pay button — card or bank'],
     todo: ['Add a to-do', 'It shows in My to-dos on Home'],
     proposal: ['Send a proposal', 'Pick the deal; its proposal opens ready to fill'],
+    project: ['New project', 'A checklist for the work you do for a customer'],
   };
   var WHO_LABEL = { call: 'Who did you talk to?', invoice: 'Who is it for?', todo: 'Which deal is it for?', proposal: 'Which deal?' };
   function openForm(kind, preset) {
     if (!TITLES[kind]) kind = 'call';
     mode = kind;
-    S = { kind: kind, pick: null, q: '', active: -1, outcome: 'talked', due: kind === 'invoice' ? '14' : kind === 'todo' ? 'tomorrow' : '', nextDue: 'tomorrow', busy: false, someoneNew: false };
+    S = { kind: kind, pick: null, q: '', active: -1, outcome: 'talked', due: kind === 'invoice' ? '14' : kind === 'todo' ? 'tomorrow' : '', nextDue: 'tomorrow', busy: false, someoneNew: false, tpl: 'website' };
     show('form');
     dlg.style.left = ''; dlg.style.top = '';
     var t = TITLES[kind];
@@ -309,7 +343,8 @@
     if (kind === 'deal') wireDeal(f);
     if (WHO_LABEL[kind] || kind === 'deal') wireWho(f);
     if (kind === 'invoice') wireInvoice(f);
-    var first = f.querySelector(kind === 'deal' ? '#cr-title' : '#cr-who');
+    if (kind === 'project') wireProject(f);
+    var first = f.querySelector(kind === 'deal' ? '#cr-title' : kind === 'project' ? '#cr-pjname' : '#cr-who');
     setTimeout(function () { if (first) first.focus(); }, 0);
     if (WHO_LABEL[kind] || kind === 'deal') {
       if (DATA) paintWho(); else loadWho();
@@ -317,6 +352,22 @@
     }
     note();
     if (preset && preset.deal_id && WHO_LABEL[kind]) presetPick(String(preset.deal_id));
+    else if (CLIENT && (WHO_LABEL[kind] || kind === 'deal')) presetClient();
+  }
+  // sales item 91: inside a client the form starts on them: their deal, else their person
+  function presetClient() {
+    var mine = S;
+    clientIdentity().then(function (who) {
+      if (!who || S !== mine || !dlg || !dlg.open || S.pick) return;
+      if (who.deal_id && S.kind !== 'deal') return presetPick(String(who.deal_id));
+      if (!who.contact_id || S.kind === 'proposal') return;
+      return api('/sales/contacts/' + encodeURIComponent(who.contact_id)).then(function (r) {
+        var d = r.ok && r.body && r.body.data, c = d && (d.contact || d);
+        if (!c || !c.id || S !== mine || !dlg.open || S.pick) return;
+        var cand = { kind: 'contact', id: c.id, deal_id: '', title: '', stage: '', open: false, value_cents: 0, name: String(c.name || c.email || 'Someone'), pname: String(c.name || ''), company: String(c.company || ''), email: String(c.email || '') };
+        SHOWN = [cand]; choose(0);
+      });
+    }, function () { /* the search still works */ });
   }
   // a page that already knows the deal (the Customers preview) starts the form on
   // it: from the first read, else that one deal by id (it may be past the first 200)
@@ -380,7 +431,47 @@
       '<input id="cr-what" class="cr-in" maxlength="200" required placeholder="e.g. Call about the homepage photos">' +
       '<span class="cr-l">Due</span>' + chips('due', 'When is it due?', [['today', 'Today'], ['tomorrow', 'Tomorrow'], ['friday', 'Friday'], ['nextweek', 'Next week'], ['', 'No date']], 'tomorrow') +
       whoHtml(kind);
+    if (kind === 'project') return '<label class="cr-l" for="cr-pjname">Project name</label>' +
+      '<input id="cr-pjname" class="cr-in" maxlength="200" required placeholder="e.g. Blue Finch — website build">' +
+      '<label class="cr-l" for="cr-cust">For</label>' +
+      '<div class="cr-picked" id="cr-custcard" hidden></div>' +
+      '<select id="cr-cust" class="cr-in"><option value="">Just my studio (internal)</option></select>' +
+      '<p class="cr-sub" id="cr-custnote">A customer sees their project in their portal.</p>' +
+      '<span class="cr-l">Start from</span>' + chips('tpl', 'Start from', [['website', 'Website build · a ready-made checklist'], ['', 'Empty']], 'website') +
+      '<select id="cr-tpl" class="cr-in" aria-label="Your templates" hidden></select>' +
+      '<label class="cr-l" for="cr-target">Target date <span class="cr-opt">optional</span></label>' +
+      '<input id="cr-target" class="cr-in cr-date" type="date">';
     return whoHtml(kind);   // proposal: just the deal
+  }
+  // sales item 91: New project. The customer list is the studio's roster (the one projects.html's
+  // own dialog reads); inside a client theirs is picked, shown as a card with Change.
+  function wireProject(f) {
+    var sel = f.querySelector('#cr-cust'), card = f.querySelector('#cr-custcard'), tpl = f.querySelector('#cr-tpl'), mine = S;
+    var showCard = function (name) {
+      card.innerHTML = '<span class="cr-av" aria-hidden="true">' + esc(initials(name)) + '</span><span class="cr-ot"><b>' + esc(name) + '</b><small>They’ll see it in their portal</small></span><button type="button" class="cr-change">Change</button>';
+      card.hidden = false; sel.hidden = true; f.querySelector('#cr-custnote').hidden = true;
+      card.querySelector('.cr-change').addEventListener('click', function () { card.hidden = true; sel.hidden = false; sel.focus(); });
+    };
+    Promise.all([api('/studio/customers'), clientIdentity()]).then(function (res) {
+      if (S !== mine) return;
+      var d = res[0].ok && res[0].body && res[0].body.data, rows = Array.isArray(d) ? d : (d && Array.isArray(d.customers) ? d.customers : []);
+      rows = rows.filter(function (c) { return c && c.client_id; }).sort(function (a, b) { return String(a.name || '').localeCompare(String(b.name || '')); });
+      sel.innerHTML = '<option value="">Just my studio (internal)</option>' + rows.map(function (c) { return '<option value="' + esc(c.client_id) + '">' + esc(c.name || 'Customer') + '</option>'; }).join('');
+      var who = res[1];
+      if (who && who.client_id) {
+        if (!rows.some(function (c) { return String(c.client_id) === String(who.client_id); })) sel.insertAdjacentHTML('beforeend', '<option value="' + esc(who.client_id) + '">' + esc(CLIENT.name) + '</option>');
+        sel.value = who.client_id; showCard(CLIENT.name);
+      }
+    }, function () { /* internal stays the choice */ });
+    api('/projects/templates').then(function (r) {
+      var saved = r.ok && r.body && r.body.data && r.body.data.saved;
+      if (S !== mine || !Array.isArray(saved) || !saved.length) return;
+      tpl.innerHTML = '<option value="">Your templates…</option>' + saved.map(function (t) { return '<option value="' + esc(t.id) + '">' + esc(t.name) + ' · ' + Number(t.steps || 0) + ' step' + (Number(t.steps) === 1 ? '' : 's') + '</option>'; }).join('');
+      tpl.hidden = false;
+      tpl.addEventListener('change', function () {   // a saved template takes over from the chips
+        [].slice.call(f.querySelectorAll('[data-chips=tpl] .cr-chip')).forEach(function (x) { var on = !tpl.value && x.getAttribute('data-v') === S.tpl; x.classList.toggle('on', on); x.setAttribute('aria-pressed', on ? 'true' : 'false'); });
+      });
+    }, function () { /* the two built-in starts remain */ });
   }
   function wireChips(f) {
     [].slice.call(f.querySelectorAll('[data-chips]')).forEach(function (g) {
@@ -392,6 +483,7 @@
         if (name === 'outcome') S.outcome = v;
         else if (name === 'nextDue') S.nextDue = v;
         else if (name === 'due') S.due = v;
+        else if (name === 'tpl') { S.tpl = v; var ts = f.querySelector('#cr-tpl'); if (ts) ts.value = ''; }
         else if (name === 'dealWho') { S.someoneNew = v === 'new'; f.querySelector('#cr-existing').hidden = S.someoneNew; f.querySelector('#cr-new').hidden = !S.someoneNew; if (S.someoneNew) { var n = f.querySelector('#cr-pname'); if (n) n.focus(); } }
         if (S.kind === 'invoice') preview();
       });
@@ -536,6 +628,7 @@
     else if (S.kind === 'todo') t = c ? 'Shows in your To-dos and on Home' : 'Pick who it’s for';
     else if (S.kind === 'proposal') t = c ? 'Opens the deal with a new proposal' : 'Pick an open deal';
     else if (S.kind === 'deal') t = 'Starts as a new lead';
+    else if (S.kind === 'project') t = 'It opens on Projects when it’s made';
     n.textContent = t;
   }
   function failForm(msg) {
@@ -621,7 +714,8 @@
     var val = function (id) { var el = f.querySelector('#' + id); return el ? String(el.value || '').trim() : ''; };
     var need = function (msgText, focusSel) { fail(msgText); var el = focusSel && f.querySelector(focusSel); if (el) el.focus(); };
     var k = S.kind, c = S.pick;
-    if (k !== 'deal' && !c) return need(k === 'call' ? 'Pick who you talked to.' : k === 'invoice' ? 'Pick who the invoice is for.' : k === 'proposal' ? 'Pick the deal.' : 'Pick who it’s for.', '#cr-who');
+    if (k === 'project' && !val('cr-pjname')) return need('A project needs a name.', '#cr-pjname');
+    if (k !== 'deal' && k !== 'project' && !c) return need(k === 'call' ? 'Pick who you talked to.' : k === 'invoice' ? 'Pick who the invoice is for.' : k === 'proposal' ? 'Pick the deal.' : 'Pick who it’s for.', '#cr-who');
     if (k === 'deal' && !val('cr-title')) return need('Give the deal a name.', '#cr-title');
     // item 97: a value that isn't a number is said, never saved as no value
     if (k === 'deal' && val('cr-value') && !crCents(val('cr-value'))) return need('Write the value as a number, like 2500 or 2.5k.', '#cr-value');
@@ -640,8 +734,8 @@
           return api('/sales/people/activity', { method: 'POST', body: { kind: 'call', body: body, contact_id: c.id, occurred_at: when && when !== nowTodayYmd() ? when : undefined, follow_up: next ? crDue(S.nextDue) || undefined : undefined, follow_up_title: next || undefined } });
         }, function (r) {
           var fu = r.body && r.body.data && r.body.data.follow_up;
-          if (next && !(fu && fu.id)) done('The call is logged, but the to-do didn’t save — add it from To-dos.', '/crm.html?contact=' + encodeURIComponent(c.id), 'err');
-          else done('Call logged — ' + (c.name || 'them'), '/crm.html?contact=' + encodeURIComponent(c.id));
+          if (next && !(fu && fu.id)) done('The call is logged, but the to-do didn’t save — add it from To-dos.', hrefFor('', '', c.id), 'err');
+          else done('Call logged — ' + (c.name || 'them'), hrefFor('', '', c.id));
         });
       }
       var viaDeal = function () { return ensureDeal(c).then(function (id) {
@@ -653,7 +747,7 @@
           }, function () { return { id: id, nextOk: false }; });
         });
       }).then(function (res) {
-        var href = '/crm.html?deal=' + encodeURIComponent(res.id) + '&tab=deal';
+        var href = hrefFor(res.id, 'deal');
         if (!res.nextOk) done('The call is logged, but the next step didn’t save — add it on the deal.', href, 'err');
         else done('Call logged' + (c.title ? ' — ' + c.title : ''), href);
       }); };
@@ -673,7 +767,7 @@
         var id = r.ok && r.body && r.body.data && r.body.data.id;
         if (!id) return Promise.reject(msg(r, r.status === 403 ? 'Deals are part of your plan’s business tools — an upgrade adds them.' : 'That deal didn’t save — please try again.'));
         DATA_AT = 0;
-        done('Deal added — ' + title, '/pipeline.html?deal=' + encodeURIComponent(id));
+        done('Deal added — ' + title, CLIENT ? hrefFor(id, 'deal') : '/pipeline.html?deal=' + encodeURIComponent(id));
       });
     } else if (k === 'invoice') {
       var amt = crCents(val('cr-amt')), what = val('cr-what');
@@ -687,7 +781,7 @@
             return Promise.reject(msg(r, 'There’s already an open invoice for a different amount on this deal.'));
           }
           if (!r.ok) return Promise.reject(msg(r, r.status === 409 ? 'There’s already an open invoice for a different amount on this deal — open the deal to send or void it.' : 'That invoice didn’t send — please try again.'));
-          var b2 = r.body || {}, url = b2.url || '', href = '/crm.html?deal=' + encodeURIComponent(id) + '&tab=billing';
+          var b2 = r.body || {}, url = b2.url || '', href = hrefFor(id, 'billing');
           if (b2.warning === 'link_failed' || !url) return Promise.reject(b2.message || 'The invoice saved, but its payment link didn’t generate — press Send invoice again to finish it.');
           if (b2.emailed) { done('Invoice sent — emailed to ' + (c.name || 'them'), href); return; }
           var copy = navigator.clipboard && navigator.clipboard.writeText ? navigator.clipboard.writeText(url).then(function () { return true; }, function () { return false; }) : Promise.resolve(false);
@@ -703,21 +797,38 @@
       if (c.kind === 'contact') {
         p = onPerson(c, function () {
           return api('/sales/tasks', { method: 'POST', body: due ? { title: what2, due_date: due, contact_id: c.id } : { title: what2, contact_id: c.id } });
-        }, function () { done('To-do added — ' + (c.name || 'them'), '/crm.html?contact=' + encodeURIComponent(c.id)); });
+        }, function () { done('To-do added — ' + (c.name || 'them'), hrefFor('', '', c.id)); });
       }
       var todoViaDeal = function () { return ensureDeal(c).then(function (id) {
         return api('/sales/deals/' + encodeURIComponent(id) + '/tasks', { method: 'POST', body: due ? { title: what2, due_date: due } : { title: what2 } }).then(function (r) {
           if (!r.ok) return Promise.reject(msg(r, 'That to-do didn’t save — please try again.'));
-          done('To-do added' + (c.title ? ' — ' + c.title : ''), '/crm.html?deal=' + encodeURIComponent(id) + '&tab=deal');
+          done('To-do added' + (c.title ? ' — ' + c.title : ''), hrefFor(id, 'deal'));
         });
       }); };
       p = p ? p.catch(function (e) { return e && e.useDeal ? todoViaDeal() : Promise.reject(e); }) : todoViaDeal();
+    }
+    else if (k === 'project') {
+      var pj = { name: val('cr-pjname') }, cust = val('cr-cust'), tplv = val('cr-tpl') || S.tpl, target = val('cr-target');
+      if (cust) pj.customer_client_id = cust;
+      if (tplv) pj.template = tplv;
+      if (target) pj.target_date = target;
+      p = api('/projects', { method: 'POST', body: pj }).then(function (r) {
+        var id = r.ok && r.body && r.body.data && r.body.data.id;
+        if (!id) return Promise.reject(msg(r, r.status === 403 ? 'Projects are part of your plan’s business tools — an upgrade adds them.' : 'That project didn’t save — please try again.'));
+        // inside a client their Project page shows it; else the studio's Projects opens it
+        done('Project created — ' + pj.name, CLIENT && cust ? '/projects.html?client=' + encodeURIComponent(CLIENT.site_id) : '/projects.html?project=' + encodeURIComponent(id));
+      });
     }
     if (p) p.catch(function (e) { fail(typeof e === 'string' ? e : 'Something went wrong — please try again.'); });
   }
 
   window.ddsCreate = {
-    open: function (kind, from, viaKey, preset) {
+    open: function (kind, from, viaKey, preset, client) {
+      // sales item 91: the client a studio is inside, or null; a change of client drops what was read
+      var next = client && client.site_id ? { site_id: String(client.site_id), name: String(client.name || 'this client') } : null;
+      if ((next && next.site_id) !== (CLIENT && CLIENT.site_id)) { DATA = null; DATA_AT = 0; }
+      CLIENT = next;
+      if (CLIENT && kind && CLIENT_KINDS.indexOf(kind) < 0) kind = '';
       KEYS = !!viaKey;
       opener = from || document.activeElement || null;
       if (opener && opener.setAttribute) opener.setAttribute('aria-expanded', 'true');
