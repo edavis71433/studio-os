@@ -1077,6 +1077,33 @@ html.plan-watch .ss-bar,html.plan-watch [data-grp="Content"],html.plan-watch .na
 .sv-head{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:var(--dds-s2,8px)}
 .sv-head h3{margin:0}
 .sv-headn{font-size:12.5px;color:var(--ink-2);margin-right:auto}
+/* item 160: what people type to find you */
+.sv-phrases{margin:0 0 var(--dds-s4,16px)}
+.sv-phrases h3{font:600 19px/1.25 var(--serif)}
+.sv-card p.sv-ph-intro{font-size:13px;color:var(--ink-2);max-width:72ch}
+.sv-ph-row{display:flex;align-items:center;gap:8px 10px;flex-wrap:wrap;padding:8px 8px 8px 10px;border-radius:var(--r-lg);background:var(--paper);margin:0 0 8px}
+.sv-ph-q{display:inline-flex;align-items:center;gap:6px;min-height:32px;padding:0 12px;border-radius:999px;background:var(--sheet);border:1px solid var(--hair);font-weight:600;font-size:13px;color:var(--ink);overflow-wrap:anywhere}
+.sv-ph-st{display:inline-flex;align-items:center;gap:5px;padding:3px 9px;border-radius:999px;font:600 11.5px/1.4 var(--sans)}
+.sv-ph-st.ok{background:var(--sage-soft);color:var(--sage)}
+.sv-ph-st.no{background:var(--amber-soft);color:var(--amber-text)}
+.sv-ph-add{margin-left:auto;min-height:36px;padding:0 14px;border:0;border-radius:999px;background:var(--plum-soft);color:var(--plum);font:600 12.5px/1 var(--sans);cursor:pointer}
+.sv-ph-x{display:inline-grid;place-items:center;min-width:36px;min-height:36px;border:0;border-radius:999px;background:none;color:var(--ink-2);cursor:pointer}
+.sv-ph-st.ok~.sv-ph-x{margin-left:auto}
+.sv-ph-x:hover{background:var(--sheet);color:var(--ink)}
+.sv-ph-new{display:flex;gap:8px;margin:4px 0 10px;max-width:520px}
+.sv-ph-new input{flex:1;min-width:0;font:inherit;font-size:14px;min-height:40px;padding:0 12px;border:1px solid var(--hair);border-radius:var(--r);background:var(--sheet);color:var(--ink)}
+.sv-ph-ideas{display:flex;flex-wrap:wrap;align-items:center;gap:6px;font-size:12.5px;color:var(--ink-2)}
+.sv-ph-idea{min-height:32px;padding:0 11px;border:0;border-radius:999px;background:var(--plum-soft);color:var(--plum);font:600 12px/1 var(--sans);cursor:pointer}
+.sv-ph-pick{margin:0 0 10px;padding:14px;border:1px solid var(--plum-line);border-radius:var(--r-lg);background:var(--sheet)}
+.sv-ph-pick h4{margin:0 0 10px;font:600 16px/1.3 var(--serif);color:var(--ink)}
+.sv-ph-page{display:block;width:100%;margin:0 0 6px;padding:9px 12px;border:1px solid var(--hair);border-radius:var(--r);background:var(--paper);color:var(--ink);font:inherit;text-align:left;cursor:pointer}
+.sv-ph-page[aria-pressed="true"]{border-color:var(--plum);background:var(--plum-tint);color:var(--plum)}
+.sv-ph-page b{display:block;font-size:13px}
+.sv-ph-page span{font-size:12px;color:var(--ink-2)}
+.sv-ph-out{margin:10px 0}
+.sv-ph-out label{display:block;margin-bottom:6px;font:600 10.5px/1 var(--sans);letter-spacing:.08em;text-transform:uppercase;color:var(--ink-3)}
+.sv-ph-out input{width:100%;box-sizing:border-box;min-height:40px;padding:0 12px;border:1px solid var(--hair);border-radius:var(--r);background:var(--sheet);color:var(--ink);font:600 14px/1.3 var(--sans)}
+.sv-ph-acts{display:flex;flex-wrap:wrap;gap:8px;margin:10px 0 6px}
 .sv-fol{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,440px);gap:var(--dds-s5,20px);align-items:start}
 .sv-fol table{width:100%;border-collapse:collapse;font-size:13.5px}
 .sv-fol th{text-align:left;font-size:12px;font-weight:600;color:var(--ink-2);padding:6px 8px;white-space:nowrap}
@@ -2005,6 +2032,7 @@ html.bs-open .scrim{z-index:96}   /* Files and the categories card open over the
       <section class="view" id="view-search">
         <h1 class="doc" role="heading" aria-level="2">Search</h1>
         <p class="docsub">How people find you on Google and in AI answers, and what would help. Checking and connecting never change your website.</p>
+        <section class="sv-card sv-phrases" aria-labelledby="svPhrasesH" id="svPhrasesCard" hidden><div class="sv-head"><h3 id="svPhrasesH">What people type to find you</h3><span class="sv-headn" id="svPhrasesN"></span></div><div id="svPhrases"></div></section>
         <div class="sv-tools" id="svTools" role="group" aria-label="Search tools" hidden></div>
         <div class="sv-sum" id="svNums" hidden></div>
         <div class="sv-grid sv-top">
@@ -2041,7 +2069,7 @@ html.bs-open .scrim{z-index:96}   /* Files and the categories card open over the
           <p class="hint" style="margin:0 0 12px">Your answers write a search headline, a description and your “Where you work” line. Nothing goes live until you publish.</p>
           <div class="field"><label for="sw-name">What is your business called?</label><input type="text" id="sw-name" maxlength="120"></div>
           <div class="field"><label for="sw-places">Where do you serve customers?</label><input type="text" id="sw-places" maxlength="200" placeholder="Burbank, Glendale"><div class="hint">One or more places, separated by commas.</div></div>
-          <div class="field"><label for="sw-words">Which words would a customer search for?</label><input type="text" id="sw-words" maxlength="200" placeholder="Italian restaurant, catering, private events"><div class="hint">Up to three, separated by commas.</div></div>
+          <div class="field"><label for="sw-words">Which words would a customer search for?</label><input type="text" id="sw-words" maxlength="200" placeholder="Italian restaurant, catering, private events"><div class="hint">Up to three, separated by commas. They’re kept as what people type to find you, at the top of this tab.</div></div>
           <div class="hint" style="margin-top:0">This is what Save writes:</div>
           <div class="srp" id="swOut" aria-live="polite">
             <div class="srp-site"><span class="srp-fav" id="swFav" aria-hidden="true">?</span><div><div class="srp-name" id="swName"></div><div class="srp-url" id="swUrl"></div></div></div>
@@ -8964,7 +8992,7 @@ function openSeoSetup() {
   $("sw-name").value = val("f-business_name") || i.business_name || "";
   const area = val("f-service_area").replace(/^serving\s+/i, "").replace(/\s+and\s+/gi, ", ");
   $("sw-places").value = area || loc.city || "";
-  $("sw-words").value = "";
+  $("sw-words").value = ((SV && SV.phrases && SV.phrases.list) || []).map((x) => x.phrase).join(", ");   // item 160: the phrases kept
   const own = !!(val("f-seo_title") || val("f-seo_description"));
   $("swReplaceWrap").hidden = !own; $("swReplace").checked = false;
   p.hidden = false; renderSeoSetupOut();
@@ -8997,10 +9025,15 @@ async function saveSeoSetup() {
   if ((replace || !val("f-seo_title")) && s.title) body.seo_title = s.title;
   if ((replace || !val("f-seo_description")) && s.description) body.seo_description = s.description;
   if (s.service_area && !val("f-service_area")) body.service_area = s.service_area;
-  if (!Object.keys(body).length) { toast("Nothing to change — your search setup already says this."); closeSeoSetup(); return; }
+  // item 160: the words are kept as what people type to find you, up to three
+  const had = ((SV && SV.phrases && SV.phrases.list) || []).map((x) => x.phrase);
+  const words = String(a.words || "").split(",").map((x) => x.replace(/\s+/g, " ").trim().toLowerCase()).filter(Boolean).filter((x, n, all) => all.indexOf(x) === n).slice(0, 3);
+  const phrases = words.length && words.join("|") !== had.join("|") ? words : null;
+  if (!Object.keys(body).length && !phrases) { toast("Nothing to change — your search setup already says this."); closeSeoSetup(); return; }
   btn.disabled = true; btn.textContent = "Saving…"; whisper("save-identity", "saving"); whisper("topWhisper", "saving");
   try {
-    const r = await api("PUT", "/identity", body);
+    const r = Object.keys(body).length ? await api("PUT", "/identity", body) : null;
+    if (phrases) svPhrasesTake((await api("PUT", "/visibility/phrases", { phrases })).data);
     const saved = (r && r.data && typeof r.data.business_name === "string") ? r.data : {};
     S.identity = { ...i, ...body, ...saved };
     const ids = { business_name: "f-business_name", seo_title: "f-seo_title", seo_description: "f-seo_description", service_area: "f-service_area" };
@@ -9288,6 +9321,7 @@ async function loadSearch() {
   if (!$("view-search").classList.contains("on")) return;
   renderSvScore(); renderSvFix(); renderSvConsole(); renderSvListing(); renderSvAi(); renderSeoTasks();
   renderSvTools(); renderSvNums(); renderSvMovers();   // item 124
+  renderSvPhrases();   // item 160
   if (SV && SV.follow && SV.console && SV.console.status === "connected") loadSvFollow(); else { SV_FOLLOW = null; renderSvFollow(); }   // item 181
   loadSvAiWatch();   // item 182
 }
@@ -9611,7 +9645,7 @@ function renderSvNums() {
   host.hidden = !tiles.length;
   host.innerHTML = tiles.join("");
 }
-const SV_GO_WORD = { publish: "Publish", "tool:hide": "Open", health: "See it", "connect:console": "Connect", domain: "Connect", wording: "Write", pages: "Open Pages", review: "Read it", "connect:listing": "Connect", files: "Open Files", "tool:llms": "Write", follow: "Follow", monitor: "Add it" };
+const SV_GO_WORD = { phrases: "Pick a page", publish: "Publish", "tool:hide": "Open", health: "See it", "connect:console": "Connect", domain: "Connect", wording: "Write", pages: "Open Pages", review: "Read it", "connect:listing": "Connect", files: "Open Files", "tool:llms": "Write", follow: "Follow", monitor: "Add it" };
 function svTodoGo(t) {
   const g = String(t.go || "");
   const toCard = (id) => { const n = $(id); if (n) { n.hidden = false; n.scrollIntoView({ behavior: "smooth", block: "center" }); } };
@@ -9626,7 +9660,130 @@ function svTodoGo(t) {
   if (g === "connect:console") return toCard("svConsoleCard");
   if (g === "connect:listing") return toCard("svListingCard");
   if (g === "follow") return svOpenFollow();
+  if (g === "phrases") { const ph = String(t.key).replace(/^phrase:/, ""); SV_PH_PICK = { phrase: ph, key: null, title: svPhraseTitle(ph) }; renderSvPhrases(); return toCard("svPhrasesCard"); }
   if (g.startsWith("tool:")) return svOpenTool(g.slice(5));
+}
+/* ── item 160: what people type to find you ── */
+// The two or three phrases the business wants to be found for, each checked against every
+// page's search headline (lib/search_phrases.ts). GET /visibility brings them; a change
+// saves the list and answers with the new view, and the checklist's phrase tasks follow it.
+// A missing one gets Add it to a page: pick the page that is about it, and its search
+// headline gets the phrase, saved to the draft like any other wording.
+let SV_PH_PICK = null;   // { phrase, key, title } while "Which page is about it?" is open
+function svPhraseTitle(phrase) {
+  const name = String((S.identity && S.identity.business_name) || "").trim();
+  const lead = phrase.charAt(0).toUpperCase() + phrase.slice(1);
+  const t = name && !phrase.toLowerCase().includes(name.toLowerCase()) ? `${lead} — ${name}` : lead;
+  return t.length > SEO_TITLE_MAX ? lead : t;
+}
+function svPhrasesTake(view) {
+  if (!SV || !view) return;
+  SV.phrases = view;
+  if (Array.isArray(SV.tasks) && Array.isArray(view.tasks)) {
+    // the phrase tasks sit where the server ranks them, after the headline's own
+    const rest = SV.tasks.filter((t) => !String(t.key).startsWith("phrase:"));
+    const at = rest.findIndex((t) => t.key === "title") + 1;
+    const all = at > 0 ? [...rest.slice(0, at), ...view.tasks, ...rest.slice(at)] : rest.concat(view.tasks);
+    const rank = { critical: 0, high: 1, medium: 2 };
+    SV.tasks = all.map((t, n) => [t, n]).sort((a, b) => Number(a[0].done) - Number(b[0].done) || (rank[a[0].priority] ?? 3) - (rank[b[0].priority] ?? 3) || a[1] - b[1]).map(([t]) => t);
+  }
+  renderSvPhrases(); renderSeoTasks();
+}
+async function svPhrasesSave(list, btn) {
+  if (btn) btn.disabled = true;
+  try { svPhrasesTake((await api("PUT", "/visibility/phrases", { phrases: list })).data); return true; }
+  catch (err) { if (btn) btn.disabled = false; toast(nice(err), true); return false; }
+}
+function renderSvPhrases() {
+  const card = $("svPhrasesCard"), host = $("svPhrases"); if (!card || !host) return;
+  const v = SV && SV.phrases;
+  card.hidden = !v;
+  if (!v) return;
+  const list = v.list || [], max = v.max || 3;
+  if (SV_PH_PICK && !list.some((x) => x.phrase === SV_PH_PICK.phrase && !x.found)) SV_PH_PICK = null;
+  $("svPhrasesN").textContent = `${list.length} of ${max}`;
+  host.innerHTML = "";
+  host.appendChild(el("p", "sv-ph-intro", "Two to four words each, the way a customer would type them into Google. We check that each one is in the search headline of one of your pages, the line Google shows in bold."));
+  list.forEach((x) => {
+    const row = el("div", "sv-ph-row"); row.dataset.phrase = x.phrase;
+    const q = el("span", "sv-ph-q"); q.innerHTML = uiIcon("search", 13); q.appendChild(document.createTextNode(x.phrase)); row.appendChild(q);
+    const st = el("span", "sv-ph-st " + (x.found ? "ok" : "no")); st.innerHTML = uiIcon(x.found ? "check" : "clock", 12);
+    st.appendChild(document.createTextNode(x.found ? `In your ${x.found.label} page’s search headline` : "Not in any page’s search headline yet"));
+    row.appendChild(st);
+    if (!x.found) {
+      const add = el("button", "sv-ph-add", "Add it to a page"); add.type = "button";
+      add.addEventListener("click", () => { SV_PH_PICK = { phrase: x.phrase, key: null, title: svPhraseTitle(x.phrase) }; renderSvPhrases(); const first = host.querySelector(".sv-ph-page"); if (first) first.focus(); });
+      row.appendChild(add);
+    }
+    const off = el("button", "sv-ph-x"); off.type = "button"; off.innerHTML = uiIcon("x", 14); off.setAttribute("aria-label", `Take “${x.phrase}” off`);
+    off.addEventListener("click", () => svPhrasesSave(list.map((y) => y.phrase).filter((y) => y !== x.phrase), off));
+    row.appendChild(off);
+    host.appendChild(row);
+    if (SV_PH_PICK && SV_PH_PICK.phrase === x.phrase) host.appendChild(svPhrasePicker(v, x));
+  });
+  if (list.length >= max) return;
+  const form = el("form", "sv-ph-new");
+  const inp = el("input"); inp.type = "text"; inp.maxLength = 60; inp.id = "svPhraseNew";
+  inp.placeholder = ["Add a phrase, the way a customer would type it", "Add a second phrase", "Add a third phrase"][list.length] || "Add a phrase";
+  inp.setAttribute("aria-label", inp.placeholder);
+  const addBtn = el("button", "pillbtn", "Add"); addBtn.type = "submit";
+  form.append(inp, addBtn);
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const words = inp.value.trim(); if (!words) { inp.focus(); return; }
+    if (await svPhrasesSave([...list.map((y) => y.phrase), words], addBtn)) { const n = $("svPhraseNew"); if (n) n.focus(); }
+  });
+  host.appendChild(form);
+  const ideas = (v.ideas || []).filter((i) => !list.some((y) => y.phrase === i));
+  if (!ideas.length) return;
+  const row = el("div", "sv-ph-ideas"); row.appendChild(el("span", null, "✦ Ideas from your services and area:"));
+  ideas.forEach((i) => { const c = el("button", "sv-ph-idea", "+ " + i); c.type = "button"; c.setAttribute("aria-label", `Add “${i}”`); c.addEventListener("click", () => svPhrasesSave([...list.map((y) => y.phrase), i], c)); row.appendChild(c); });
+  host.appendChild(row);
+}
+function svPhrasePicker(v, x) {
+  const box = el("div", "sv-ph-pick"); box.setAttribute("role", "group"); box.setAttribute("aria-labelledby", "svPhPickH");
+  const h = el("h4", null, `Which page is about “${x.phrase}”?`); h.id = "svPhPickH"; box.appendChild(h);
+  (v.pages || []).forEach((pg) => {
+    const b = el("button", "sv-ph-page"); b.type = "button"; b.setAttribute("aria-pressed", SV_PH_PICK.key === pg.key ? "true" : "false");
+    b.append(el("b", null, pg.label), el("span", null, "Now: " + pg.title));
+    b.addEventListener("click", () => { SV_PH_PICK.key = pg.key; renderSvPhrases(); const n = $("svPhraseTitle"); if (n) n.focus(); });
+    box.appendChild(b);
+  });
+  if (SV_PH_PICK.key) {
+    const out = el("div", "sv-ph-out");
+    const lab = el("label", null, "New search headline"); lab.setAttribute("for", "svPhraseTitle");
+    const inp = el("input"); inp.type = "text"; inp.id = "svPhraseTitle"; inp.maxLength = 120; inp.value = SV_PH_PICK.title;
+    inp.addEventListener("input", () => { SV_PH_PICK.title = inp.value; });
+    out.append(lab, inp); box.appendChild(out);
+  }
+  const acts = el("div", "sv-ph-acts");
+  const use = el("button", "pillbtn inked", "Use this headline"); use.type = "button"; use.disabled = !SV_PH_PICK.key;
+  use.addEventListener("click", () => svPhraseUse(use));
+  const not = el("button", "pillbtn", "Not now"); not.type = "button";
+  not.addEventListener("click", () => { SV_PH_PICK = null; renderSvPhrases(); });
+  acts.append(use, not); box.appendChild(acts);
+  box.appendChild(el("p", "hint", "It saves to your draft and reaches Google when you publish."));
+  return box;
+}
+async function svPhraseUse(btn) {
+  const pick = SV_PH_PICK; if (!pick || !pick.key) return;
+  const title = String(pick.title || "").replace(/\s+/g, " ").trim();
+  if (!title) { const n = $("svPhraseTitle"); if (n) n.focus(); return; }
+  btn.disabled = true; btn.textContent = "Saving…";
+  try {
+    if (pick.key === "home") {
+      await api("PUT", "/identity", { seo_title: title });
+      S.identity = { ...(S.identity || {}), seo_title: title };
+      const f = $("f-seo_title"); if (f) f.value = title;
+      renderSearchPreview();
+    } else {
+      await settingsPut(() => { const map = { ...((S.settings && S.settings.page_seo) || {}) }; map[pick.key] = { ...(map[pick.key] || {}), title }; return { page_seo: map }; });
+    }
+    scheduleChangesRefresh();
+    SV_PH_PICK = null;
+    toast("Saved — publish to apply");
+    svPhrasesTake((await api("GET", "/visibility/phrases")).data);
+  } catch (err) { btn.disabled = false; btn.textContent = "Use this headline"; toast(nice(err), true); }
 }
 const SV_TODO = { show: "all", done: false };
 const SV_PRI_WORD = { critical: "Critical", high: "High", medium: "Medium" };
