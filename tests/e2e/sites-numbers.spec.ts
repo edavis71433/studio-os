@@ -30,7 +30,7 @@ const SITES_NAV = [STUDIO_LEVEL_NAV[0], { key: 'sites', label: 'Sites', items: [
 const studioContext = { data: { site_role: 'business_owner', edition: 'presence', edition_key: 'agency', edition_name: 'Agency', edition_features: ALL_FEATURES, is_agency: true, is_operator: false, sees_full_workspace: true, is_client_portal: false, capabilities: ['edit', 'publish', 'invite', 'configure', 'view_all'], landing: '/agency.html', attention_count: 0, nav: SITES_NAV, plan_key: 'agency', upsell: null } };
 const json = (body: unknown, status = 200) => ({ status, contentType: 'application/json', body: JSON.stringify(body) });
 
-async function openSites(page: Page, o: { numbers?: unknown; status?: number; delay?: number; display?: 'cards' | 'table' } = {}) {
+async function openSites(page: Page, o: { numbers?: unknown; status?: number; held?: Promise<void>; display?: 'cards' | 'table' } = {}) {
   const errors: string[] = [];
   page.on('pageerror', (e) => errors.push(String(e)));
   page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
@@ -41,7 +41,7 @@ async function openSites(page: Page, o: { numbers?: unknown; status?: number; de
   } as never });
   await page.route(/\/functions\/v1\/presence\/agency\/sites\/[^/]+\/thumb/, (route: Route) => route.fulfill(json({ data: { html: '<h1>Home</h1>', version: 'live' } })));
   await page.route(/\/functions\/v1\/presence\/agency\/site-numbers$/, async (route: Route) => {
-    if (o.delay) await new Promise((r) => setTimeout(r, o.delay));
+    if (o.held) await o.held;   // the test lets the numbers through when it is ready, never on a timer
     await route.fulfill(json(o.numbers ?? NUMBERS, o.status ?? 200));
   });
   if (o.display) await page.addInitScript((v) => { try { localStorage.setItem('dds-display:sites', v); } catch { /* */ } }, o.display);
@@ -115,8 +115,12 @@ test.describe('Sites numbers (builder list items 129 and 180)', () => {
   });
 
   test('the numbers come after the cards; a failed read leaves the page as it was', async ({ page }) => {
-    const errors = await openSites(page, { display: 'cards', delay: 600 });
-    await expect(page.locator('.scard[data-site="s1"] .snums')).toBeHidden();     // the cards don't wait
+    let release: () => void = () => {};
+    const held = new Promise<void>((r) => { release = r; });
+    const errors = await openSites(page, { display: 'cards', held });
+    await expect(page.locator('.scard[data-site="s1"]')).toBeVisible();           // the cards don't wait…
+    await expect(page.locator('.scard[data-site="s1"] .snums')).toBeHidden();     // …for the numbers
+    release();
     await expect(page.locator('.scard[data-site="s1"] .snums')).toBeVisible();
     expect(errors).toEqual([]);
   });
