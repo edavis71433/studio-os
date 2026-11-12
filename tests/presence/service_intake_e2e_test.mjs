@@ -56,7 +56,9 @@ ok('support: list filters by status', list.ok && (list.body?.data || []).some((x
 const notifs = await A('/notifications?limit=50');
 const kinds = new Set((notifs.body?.data || []).map((n) => n.kind));
 ok('activity: survey + support events reach notifications', kinds.has('survey_requested') && kinds.has('support_opened') && kinds.has('support_resolved'));
-ok('activity: a support notification deep-links to /support', (notifs.body?.data || []).some((n) => typeof n.href === 'string' && n.href.startsWith('/support')));
+// Support lives inside the project view; there has been no standalone /support page since
+// Jul 11 2026 (lib/notifications.ts notifHref), so the link opens the project at the request.
+ok('activity: a support notification deep-links to the request in its project', (notifs.body?.data || []).some((n) => /^support_/.test(String(n.kind)) && /^\/projects\/[0-9a-f-]{36}#support(-[0-9a-f-]{36})?$/.test(String(n.href))));
 
 // ── tenant isolation ──
 if (JWT2) {

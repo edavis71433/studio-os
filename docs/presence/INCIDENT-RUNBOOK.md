@@ -50,7 +50,7 @@ Fastest kill: delete `RESEND_KEY` from the presence AND clever-api function secr
 
 - **Data restore**: `docs/presence/DISASTER-RECOVERY.md` (RPO/RTO + step-by-step). Verify migrations with `scripts/dr-verify.mjs` after any restore.
 - **Supabase support**: dashboard → Support (paid plan SLA).
-- **Never**: reset the yahoo login (edavis7143@yahoo.com — no admin role by design), hand-run DELETEs on presence tables during an incident, or push code as a "fix" without the CI gates.
+- **Never**: reset the owner's own test sign-in (the Eric Test account, no admin role by design), hand-run DELETEs on presence tables during an incident, or push code as a "fix" without the CI gates.
 
 ## 4. After the incident
 

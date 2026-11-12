@@ -6,6 +6,8 @@
 //
 // The token lives ONLY as this function's secret. It never reaches builds,
 // clients, or any other function.
+import { fewAtATime } from './few_at_a_time.ts';
+
 const NETLIFY_TOKEN = Deno.env.get('NETLIFY_AUTH_TOKEN') || '';
 const API = 'https://api.netlify.com/api/v1';
 
@@ -29,27 +31,49 @@ async function sha1Hex(data: Uint8Array): Promise<string> {
 const enc = new TextEncoder();
 const toBytes = (v: string | Uint8Array): Uint8Array => (typeof v === 'string' ? enc.encode(v) : v);
 
+// ── Item 208 (review file 06, finding 84): only what changed is made and sent ────────
+// A photo the live site already has is named by the digest it went up with, and its
+// bytes are made only if the host asks for them. The host asks for what it lacks, and
+// those go up a few at a time instead of one by one.
+/** A file named by its digest; `load` makes its bytes if the host asks for them. */
+export interface KnownFile { sha: string; load: () => Promise<Uint8Array | null> }
+export type DeployFile = string | Uint8Array | KnownFile;
+const isKnown = (v: DeployFile): v is KnownFile => typeof v === 'object' && !(v instanceof Uint8Array);
+/** How many files go up to the host at once. */
+export const UPLOADS_AT_ONCE = 4;
+
+/** Every file's SHA-1, by its /-prefixed path: what a deploy is asked for with. */
+export async function digestFiles(fileMap: Record<string, DeployFile>): Promise<Record<string, string>> {
+  const digests: Record<string, string> = {};
+  for (const [p, v] of Object.entries(fileMap)) digests[p.startsWith('/') ? p : `/${p}`] = isKnown(v) ? v.sha : await sha1Hex(toBytes(v));
+  return digests;
+}
+
+/** Two deploys' files are the same paths with the same digests. Pure. */
+export function sameFiles(a: Record<string, string> | null | undefined, b: Record<string, string> | null | undefined): boolean {
+  if (!a || !b) return false;
+  const ka = Object.keys(a);
+  return ka.length === Object.keys(b).length && ka.every((k) => b[k] === a[k]);
+}
+
 export interface DeployResult {
   ok: boolean;
   deployId?: string;
   state?: string;
   uploaded?: number;
   totalFiles?: number;
+  files?: Record<string, string>; // item 208: every file's digest, by path, as sent
   error?: string; // operator-facing only
 }
 
 /** Create a content-addressed deploy of fileMap onto netlifySiteId and poll briefly. */
-export async function deployFileMap(netlifySiteId: string, fileMap: Record<string, string | Uint8Array>, opts: { title?: string; pollMs?: number } = {}): Promise<DeployResult> {
+export async function deployFileMap(netlifySiteId: string, fileMap: Record<string, DeployFile>, opts: { title?: string; pollMs?: number; digests?: Record<string, string> } = {}): Promise<DeployResult> {
   if (!NETLIFY_TOKEN) return { ok: false, error: 'NETLIFY_AUTH_TOKEN not configured' };
 
-  // 1. digest every file (path must be /-prefixed for the API)
-  const bytes: Record<string, Uint8Array> = {};
-  const digests: Record<string, string> = {};
-  for (const [p, v] of Object.entries(fileMap)) {
-    const path = p.startsWith('/') ? p : `/${p}`;
-    bytes[path] = toBytes(v);
-    digests[path] = await sha1Hex(bytes[path]);
-  }
+  // 1. digest every file (path must be /-prefixed for the API); a caller that has them passes them
+  const digests = opts.digests ?? await digestFiles(fileMap);
+  const files: Record<string, DeployFile> = {};
+  for (const [p, v] of Object.entries(fileMap)) files[p.startsWith('/') ? p : `/${p}`] = v;
 
   // 2. create deploy — Netlify replies with `required` = digests it lacks
   const create = await nf(`/sites/${netlifySiteId}/deploys`, {
@@ -60,11 +84,17 @@ export async function deployFileMap(netlifySiteId: string, fileMap: Record<strin
   const deployId = String(create.json.id);
   const required: string[] = Array.isArray(create.json.required) ? create.json.required : [];
 
-  // 3. upload only missing files (by digest match)
-  const need = new Set(required);
-  let uploaded = 0;
-  for (const [path, digest] of Object.entries(digests)) {
-    if (!need.has(digest)) continue;
+  // 3. upload only missing files (by digest match): identical files share a digest, and
+  // one upload satisfies all of them. A few at a time; the first failure stops the rest.
+  const pathOf = new Map<string, string>();
+  for (const [path, digest] of Object.entries(digests)) if (!pathOf.has(digest)) pathOf.set(digest, path);
+  const todo = [...new Set(required)].filter((d) => pathOf.has(d)).map((d) => pathOf.get(d)!);
+  let uploaded = 0, failure: string | null = null;
+  await fewAtATime(todo, UPLOADS_AT_ONCE, async (path) => {
+    if (failure) return;
+    const v = files[path];
+    const body = isKnown(v) ? await v.load().catch(() => null) : toBytes(v);
+    if (!body) { failure ??= `upload failed for ${path}: its file couldn't be made`; return; }
     // one transient-failure retry per file (M6 §7); a second failure aborts the
     // deploy — Netlify only flips the live site on completion, so nothing is
     // ever partially updated
@@ -73,16 +103,16 @@ export async function deployFileMap(netlifySiteId: string, fileMap: Record<strin
       up = await fetch(`${API}/deploys/${deployId}/files${path.split('/').map(encodeURIComponent).join('/')}`, {
         method: 'PUT',
         headers: { Authorization: `Bearer ${NETLIFY_TOKEN}`, 'Content-Type': 'application/octet-stream' },
-        body: bytes[path] as unknown as BodyInit,
-      });
-      if (up.ok) break;
-      await up.text();
+        body: body as unknown as BodyInit,
+      }).catch(() => null);
+      if (up?.ok) break;
+      await up?.text().catch(() => '');
       if (attempt === 0) await new Promise((r) => setTimeout(r, 800));
     }
-    if (!up || !up.ok) return { ok: false, deployId, error: `upload failed for ${path}: ${up?.status ?? 'network'} (after retry)` };
+    if (!up || !up.ok) { failure ??= `upload failed for ${path}: ${up?.status ?? 'network'} (after retry)`; return; }
     uploaded++;
-    need.delete(digest); // identical files share a digest; one upload satisfies all
-  }
+  });
+  if (failure) return { ok: false, deployId, error: failure };
 
   // 4. bounded poll (M5: deterministic timeout, configurable via DEPLOY_POLL_MS).
   // On timeout the record stays `deploying` and the reconcile process finalizes
@@ -92,12 +122,12 @@ export async function deployFileMap(netlifySiteId: string, fileMap: Record<strin
   while (Date.now() < deadline) {
     const d = await nf(`/deploys/${deployId}`);
     state = String(d.json?.state || 'unknown');
-    if (state === 'ready') return { ok: true, deployId, state, uploaded, totalFiles: Object.keys(digests).length };
+    if (state === 'ready') return { ok: true, deployId, state, uploaded, totalFiles: Object.keys(digests).length, files: digests };
     if (state === 'error') return { ok: false, deployId, state, error: `deploy state=error: ${String(d.json?.error_message || '').slice(0, 200)}` };
     await new Promise((r) => setTimeout(r, 1500));
   }
   // not an error: still deploying — status-driven record reconciles later
-  return { ok: true, deployId, state, uploaded, totalFiles: Object.keys(digests).length };
+  return { ok: true, deployId, state, uploaded, totalFiles: Object.keys(digests).length, files: digests };
 }
 
 export async function deployState(deployId: string): Promise<string | null> {
@@ -118,6 +148,7 @@ export interface NetlifySiteInfo {
   state: string;
   ssl_url: string | null;
   domain_aliases?: string[];    // item 163: extra names on the site (an old domain kept forwarding)
+  published_deploy_id?: string | null;   // item 208: the deploy visitors see now
 }
 
 function toSiteInfo(j: any): NetlifySiteInfo {
@@ -127,6 +158,7 @@ function toSiteInfo(j: any): NetlifySiteInfo {
     custom_domain: j.custom_domain ? String(j.custom_domain) : null,
     state: String(j.state || 'unknown'), ssl_url: j.ssl_url ? String(j.ssl_url) : null,
     domain_aliases: Array.isArray(j.domain_aliases) ? j.domain_aliases.map((a: unknown) => String(a)) : [],
+    published_deploy_id: j.published_deploy?.id ? String(j.published_deploy.id) : null,
   };
 }
 
