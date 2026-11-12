@@ -2973,7 +2973,15 @@ function nice(e) {
 /* ── API: identical calls to M7 ── */
 // G7 provenance, one wording: WHO last moved the draft, in plain words. Used by
 // the 409 stale_draft message AND the Page ▾ menu's passive "Last edit" line.
-const lcWho = (lc) => lc ? (lc.actor_kind === "staff" ? "your studio" : lc.actor_kind === "system" ? "an automatic update" : "someone else on your account") : "someone else";
+// Item 197 (review finding 38): the studio working inside a client's site is the "operator" kind,
+// which read as "someone else on your account", a stranger to the client. Seen from inside a
+// client, the owner's own change is their client's.
+const lcWho = (lc) => {
+  if (!lc) return "someone else";
+  if (lc.actor_kind === "staff" || lc.actor_kind === "operator") return "your studio";
+  if (lc.actor_kind === "system") return "an automatic update";
+  return studioInClient() ? "your client" : "someone else on your account";
+};
 // The draft version is a hash of the whole draft, so any of these moves it, whether or
 // not the server checks that route against it. One at a time, in order: a write that goes
 // out while another is on its way names a version that one is about to move, and is
@@ -2982,7 +2990,7 @@ const lcWho = (lc) => lc ? (lc.actor_kind === "staff" ? "your studio" : lc.actor
 // the same version and hears the same. Everything else stays out of the line, so a slow
 // ask (an AI draft) can't hold up a save, and /publish still names the version that was
 // reviewed. The server keeps the same list (lib/optimistic_lock.ts).
-const DRAFT_WRITE = /^\/(?:settings|identity|location|offerings|testimonials|faqs|posts|pages\/duplicate|media|stock\/import|redirects|site\/template|content-library|dev\/customization|dev\/brand-kit|restore-to-draft)(?:[/?]|$)|^\/reviews\/[^/]+\/|^\/publishes\/checkpoints\/[^/]+\/restore$|^\/writer\/drafts\/[^/]+\/accept$/;
+const DRAFT_WRITE = /^\/(?:settings|identity|location|offerings|testimonials|faqs|posts|pages\/duplicate|media|stock\/import|redirects|site\/template|content-library|dev\/customization|dev\/brand-kit|restore-to-draft)(?:[/?]|$)|^\/reviews\/[^/]+\/|^\/publishes\/checkpoints\/[^/]+\/restore$|^\/writer\/drafts\/[^/]+\/accept$|^\/pages\/deleted\/[^/]+\/restore$/;
 let DRAFT_LINE = Promise.resolve(), DRAFT_WRITES_OUT = 0;
 let WRITES_ANSWERED = 0;   // readChanges: has a write been answered since this read left?
 const READS_BY_POST = /^\/preview\/section$/;   // sent by POST for its body, but moves nothing
@@ -8662,8 +8670,13 @@ async function renderDeletedPages() {
       if (back.disabled) return;
       back.disabled = true; back.textContent = "Putting back…";
       try {
-        const r = (await api("POST", `/pages/deleted/${p.id}/restore`, {})).data || {};
-        toast("“" + (r.title || p.title) + "” is back in your pages" + (r.moved ? " as /" + r.slug + "/" : ""));
+        // Item 197 (review finding 40): it ran beside the editor's saves, so it could cross one still
+        // waiting. It goes after them now, in the same line, and says when the menu doesn't show it.
+        if (!(await dcSavePendingEdits())) { back.disabled = false; back.textContent = "Put back"; return; }
+        const r = (await settingsTurn(() => api("POST", `/pages/deleted/${p.id}/restore`, {}))).data || {};
+        const href = "/" + (r.slug || p.slug) + "/", nav = (S.settings && S.settings.nav) || [];
+        const listed = !pgHasCustomNav() || nav.some((it) => it && (it.href === href || (it.children || []).some((k) => k && k.href === href)));
+        toast("“" + (r.title || p.title) + "” is back in your pages" + (r.moved ? " as /" + r.slug + "/" : "") + (listed ? "" : ". It isn’t in your menu yet: add it from Pages."));
         await refreshAll(); renderDeletedPages();
       } catch (err) { toast(nice(err), true); back.disabled = false; back.textContent = "Put back"; }
     });
@@ -10902,7 +10915,8 @@ async function mountBrandKitCard() {
   try { kit = (await api("GET", "/dev/brand-kit")).data.brand_kit; } catch (_) { return; } // not owner/dev → no card
   const T = DESIGN_TOKENS || {};
   const st = {
-    logo_media_id: (kit && kit.logo_media_id) || (S.settings && S.settings.logo_media_id) || null,
+    // item 197: the site's logo is the one its settings hold (a saved kit can hold an older one)
+    logo_media_id: S.settings && "logo_media_id" in S.settings ? (S.settings.logo_media_id || null) : ((kit && kit.logo_media_id) || null),
     primary: normHexJs((kit && kit.primary) || T.accent) || "#5b3fa0",
   };
   // Item 94: type and corners are set in one place, Colors and fonts below. This card showed
@@ -10918,7 +10932,20 @@ async function mountBrandKitCard() {
   const logoWrap = el("span"); const paintLogo = () => { logoWrap.textContent = ""; if (st.logo_media_id) logoWrap.appendChild(mediaThumb(st.logo_media_id)); };
   paintLogo();
   const logoBtn = el("button", null, st.logo_media_id ? "Change logo" : "Choose logo"); logoBtn.type = "button"; logoBtn.style.cssText = miniBtn;
-  logoBtn.addEventListener("click", () => openPicker((id) => { st.logo_media_id = id || null; paintLogo(); logoBtn.textContent = id ? "Change logo" : "Choose logo"; }));
+  const showLogo = () => { paintLogo(); logoBtn.textContent = st.logo_media_id ? "Change logo" : "Choose logo"; };
+  // Item 197 (review finding 39): a picked logo showed here and was saved only by "Build & apply
+  // brand kit", so the Header card's "Add a logo", which comes here, lost it without a word. It saves now.
+  logoBtn.addEventListener("click", () => openPicker(async (id) => {
+    const was = st.logo_media_id;
+    st.logo_media_id = id || null; showLogo();
+    if (st.logo_media_id === ((S.settings && S.settings.logo_media_id) || null)) return;
+    try {
+      await settingsPut({ logo_media_id: st.logo_media_id });
+      toast(id ? "Logo saved. Publish to show it on your live site." : "Logo taken off. Publish to take it off your live site.");
+      scheduleChangesRefresh(); refreshDesignPreview();
+      if ($("hfCard") && $("hfCard").dataset.which === "header") renderHFCard("header");
+    } catch (err) { st.logo_media_id = was; showLogo(); toast(nice(err), true); }
+  }));
   logoRow.append(logoWrap, logoBtn); card.appendChild(logoRow);
   // brand colour
   const colorRow = el("div"); colorRow.style.cssText = "display:flex;align-items:center;gap:10px;margin-top:10px";
@@ -11762,6 +11789,9 @@ async function dcSavePageName(slug, title, addr) {
       if (pseo["page:" + slug]) { const map = { ...pseo }; map["page:" + newSlug] = map["page:" + slug]; delete map["page:" + slug]; body.page_seo = map; }
       const nix = (S.settings && S.settings.pages_noindex) || [];
       if (nix.includes("page:" + slug)) body.pages_noindex = nix.map((k) => (k === "page:" + slug ? "page:" + newSlug : k));
+      // item 197 (review finding 37): a pop-up set to show on "these pages" kept the old address and stopped showing there
+      const pop = S.settings && S.settings.popup;
+      if (pop && Array.isArray(pop.picked) && pop.picked.includes("page:" + slug)) body.popup = { ...pop, picked: pop.picked.map((k) => (k === "page:" + slug ? "page:" + newSlug : k)) };
     }
     return body;
   };
