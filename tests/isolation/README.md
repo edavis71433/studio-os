@@ -1,60 +1,84 @@
-# Tenant isolation suite
+# Walls between studios
 
-The acceptance gate for the tenancy work (Build Brief §15). Proves, with REAL
-JWTs and RLS-enforced queries, that tenants cannot reach each other's data and
-that the request pipeline contract holds. **Must be green before the
-service-role → caller-JWT cutover proceeds**, and re-run on every deploy.
+The suites that prove one studio can't read or change another's data. They need a
+real database: real sign-ins, the real row rules and the real servers. Builder item
+212 (Nov 2026) made them run before every release, on a scratch database made for
+the run and thrown away after it.
 
-## What it asserts (22 checks)
+## How they run
 
-- **Staff cross-tenant (RLS, JWT + anon key):** tenant A staff cannot read /
-  insert / update / delete tenant B rows, and vice versa; each staff user still
-  sees its own tenant (sanity).
-- **Client-scoped (RLS):** a client sees only its own client's rows
-  (`my_client_ids`); no cross-tenant invoice access.
-- **Role:** client users are rejected from staff-gated routes.
-- **Pipeline contract (edge function):** missing token → 401; insufficient role
-  → 403; suspended tenant → 403 `tenant_suspended`; stale/revoked membership →
-  401 `membership_revoked`; over-limit → 429.
-- **Audit:** a rejection writes exactly one `audit_log` row with the correct
-  `event_type`, `route`, and a valid uuid `request_id`.
-- **Rate buckets:** staff routes use a `t:<tenant>` bucket; public routes use an
-  `ip:<addr>` bucket.
+`.github/workflows/isolation.yml` runs `scripts/isolation-scratch.sh` on a GitHub
+runner. The script:
 
-## Design
+1. starts a scratch Supabase with Docker, made by the CLI version `deploy.yml`
+   deploys with, and applies every migration production has. 0003 to 0005 are left
+   out because production never applied them (they are fenced; ci.yml checks they
+   stay in the folder);
+2. serves `presence` and `clever-api` from the commit being checked, with made-up
+   link secrets and no real keys;
+3. seeds the DDS tenant and two studios (`scratch_seed.mjs`). Each studio has an
+   owner who signs in, a client record with the owner's email, an active Presence
+   entitlement, a website and its business details, the way the Sites page leaves a
+   new one. The seed checks that each owner's sign-in opens their own website and not
+   the other's before any suite runs;
+4. runs the suites below. A suite that fails, skips itself, skips one of its checks,
+   or never reports a pass fails the run: a skip means a suite didn't get what it
+   needed, so it can't count as a pass.
 
-Self-contained and additive. It creates its OWN fixtures — a second tenant B
-plus a fresh staff and client user in each of tenant A and tenant B, with owned
-client/invoice rows — runs the assertions under those users' real JWTs, then
-tears everything down. It changes NO application code and touches only its own
-test rows (all tagged with a per-run marker). Staging only.
+It reads no repository secret. The keys are the scratch database's own and exist only
+on that runner.
 
-Isolation is tested at the RLS layer (anon key + each caller's JWT), because RLS
-is the real enforcement mechanism. The edge function's own service-role data
-path is NOT what this proves — this proves the isolation the service-role cutover
-will rely on.
+## When they run
 
-## Running (secrets via env — never commit them)
+- Before every production deploy: `deploy.yml` calls `isolation.yml` beside the
+  pull request checks and the browser gate, and nothing deploys unless it passed. It
+  takes about ten minutes and runs while the browser gate waits, so a deploy takes no
+  longer.
+- On a pull request that changes the workflow, the script or this folder.
+- By hand: Actions, "Walls between studios (scratch database)", Run workflow.
 
-```
-export STAGING_URL="https://<staging-ref>.supabase.co"
-export ANON_KEY="<staging anon key>"
-export SERVICE_KEY="<staging service_role key>"   # needed to seed/teardown fixtures
-deno run --allow-net --allow-env tests/isolation/isolation_test.ts
-```
+Locally, with Docker running: `SUPABASE_CLI_VERSION=2.122.0 bash scripts/isolation-scratch.sh`.
 
-Exit code 0 = all passed; 1 = a failure (names printed); 2 = missing env.
-Never run against production — it creates and deletes auth users, tenants, and
-rows. `SERVICE_KEY` must be the STAGING service_role key.
+## What runs
+
+- `isolation_test.ts`, the tenant suite. Two tenants, a staff member and a client in
+  each, with real sign-ins and the row rules: no reading, adding, changing or deleting
+  across tenants; a client sees only their own invoices; leads stay in their tenant;
+  clients can't use staff routes. Then the old server's door: no sign-in is refused,
+  a staff member is refused an owner's route, a suspended tenant and a sign-in older
+  than a role change are refused, the rate limit holds, each refusal writes one audit
+  row, and staff and public traffic are counted in separate buckets. Since item 213
+  it calls only request kinds a page still sends.
+- Twelve suites in `tests/presence`, run as studio one and studio two against the
+  presence server:
+  - the three that exist for the walls: `sales_tenant_isolation_e2e`,
+    `sales_closing_isolation_e2e`, `projects_isolation_e2e`. One studio can't read,
+    change, move or attach to another's deals, contacts, proposals, contracts,
+    projects, tasks or milestones, and a signed link made for one studio's proposal
+    can't open another record;
+  - nine end-to-end suites whose last checks are also cross-studio:
+    `sales_e2e`, `sales_foundation_e2e`, `sales_closing_e2e`, `projects_e2e`,
+    `project_comms_e2e`, `project_delivery_e2e`, `project_report_e2e`,
+    `service_intake_e2e`, `service_lifecycle_e2e`.
+
+## Left out on purpose
+
+Five suites in `tests/presence` still need a live project and still skip in the pure
+sweep: `admin_test`, `pipeline_test`, `room_test`, `service_test` and the optional
+live tier of `evidence_test`. They walk publishing and hosting journeys (provision a
+site on Netlify, publish, restore, change domains), and the scratch database has no
+hosting. None of them is a wall between studios. They wait for a test copy of the
+hosting service; until then their checks run only in the pure sweep's fixture-based
+parts.
 
 ## Last run
 
-2026-07-05: **22/22 passed** on staging (`wjlpursnwbmlcdwbeowv`). Fixtures torn
-down clean; smoke matrix green; production untouched.
+- Before Nov 2026: by hand on the staging project `wjlpursnwbmlcdwbeowv`, last on
+  2026-07-05, 22 of 22 passed. That project no longer exists.
+- First run on a scratch database: see below. Every later run is on the Actions tab
+  under "Walls between studios (scratch database)", and each run's summary says how
+  many checks passed, the date and the commit.
 
-## Next (not part of this suite)
+## Next
 
-This suite is the gate for the service-role → caller-JWT cutover: convert
-handlers to RLS-scoped reads module-by-module, re-running this suite green after
-each module. The suite will also gain storage-path assertions when the Files
-module (step 7) lands tenant-prefixed paths.
+The suite will gain storage-path checks when files move to studio-prefixed paths.
