@@ -17,6 +17,7 @@ import { can, agencySiteIds } from './auth.ts';
 import type { AgencyMember } from './auth.ts';
 import { monthsCompared } from './site_numbers.ts';
 import { UUID_LOWER_RE as UUID_RE } from '../lib/uuid.ts';
+import { mediaQuota } from '../lib/media_guard.ts';
 
 /** About what one deploy costs at Netlify, in cents (15 credits; $10 buys 1,500). */
 export const PUBLISH_COST_CENTS = 10;
@@ -106,7 +107,7 @@ export async function handleUsage(req: Request, route: string, method: string, m
   if (!can(member.role, 'read')) return json({ error: 'forbidden', message: 'Your role can’t see this.' }, 403, cors);
   const um = usageMonth(new URL(req.url).searchParams.get('month'), nowIso);
   const vm = monthsCompared(nowIso);   // visits: the last whole month against the one before, as Sites shows them
-  const head = { month: um.month, month_label: um.label, visits_month: vm.month, visits_label: vm.label, prior_label: vm.priorLabel, plan: { publishes: PLAN_PUBLISHES, cost_cents: PUBLISH_COST_CENTS } };
+  const head = { month: um.month, month_label: um.label, visits_month: vm.month, visits_label: vm.label, prior_label: vm.priorLabel, plan: { publishes: PLAN_PUBLISHES, cost_cents: PUBLISH_COST_CENTS }, storage_limit: mediaQuota().maxBytes };
   const ids = (await agencySiteIds(member.agency_id)).filter((x) => UUID_RE.test(String(x)));
   if (!ids.length) return json({ data: {}, totals: null, days: [], ...head, partial: false }, 200, cors);
   const IN = `in.(${ids.join(',')})`;

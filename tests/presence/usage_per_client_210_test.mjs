@@ -86,7 +86,7 @@ const { usageMonth, burstOf, foldUsage, handleUsage, PUBLISH_COST_CENTS, PLAN_PU
   ok('route: this month’s publishes and their cost, a restore counted, a skip apart, last month left out', d1.publishes === 8 && d1.skipped === 1 && d1.cost_cents === 80 && d2.publishes === 1 && d2.restores === 1, JSON.stringify({ d1, d2 }));
   ok('route: eight in one hour on Nov 9 is named', d1.burst && d1.burst.count === 8 && d1.burst.day === '2026-11-09');
   ok('route: storage and last month’s visits', d1.storage.bytes === 340e6 && d1.visits.value === 389 && d2.visits.prior === 990);
-  ok('route: the month, the visits month, the plan', body.month === '2026-11' && body.visits_month === '2026-10' && body.visits_label === 'October' && body.plan.publishes === 330 && body.plan.cost_cents === 10 && body.totals.publishes === 9 && !body.partial, JSON.stringify({ m: body.month, t: body.totals, p: body.partial }));
+  ok('route: the month, the visits month, the plan', body.month === '2026-11' && body.visits_month === '2026-10' && body.visits_label === 'October' && body.plan.publishes === 330 && body.plan.cost_cents === 10 && body.storage_limit === 1024 ** 3 && body.totals.publishes === 9 && !body.partial, JSON.stringify({ m: body.month, t: body.totals, p: body.partial }));
   ok('route: someone without read is refused', (await handleUsage(new Request('http://x/agency/usage'), '/agency/usage', 'GET', { ...member, role: 'none' }, {})).status === 403);
   ok('route: another route is not its business', (await handleUsage(new Request('http://x/agency/sites'), '/agency/sites', 'GET', member, {})) === null);
 
