@@ -40,10 +40,12 @@ import { emailOperator, emailBridgedCustomer, ownerReplyTo } from '../lib/servic
 import { approvalReminderDue, approvalReminderCopy, approvalOverduePeriod, approvalOverdueCopy } from '../lib/approvals.ts';
 import { loadEmailBrand } from '../lib/email_brand.ts';
 import { raiseNotice, clearNotice, dealFollowupPeriod, leadFollowupPeriod, noticeWeekBucket } from '../lib/notice.ts';
-import { summarizePipeline } from '../lib/sales_lifecycle.ts';
+import { summarizePipeline, splitLineItems } from '../lib/sales_lifecycle.ts';
+import { emailMatch } from '../lib/contact_email.ts';
 import { agreementRenewalWindow, agreementRenewalPeriod, agreementRenewalCopy } from './retainers.ts';
 import { planReminder, noShowNudgeDue, humanSlot, priceText, REMINDER_DAY_HRS } from '../lib/booking.ts';
 import { bookingMail, bookingBits } from '../lib/booking_links.ts';
+import { FOLLOWUP_DEFAULT_DAYS, followupDays, followupWords, followupStepDue, followupStopReason, followupEmail, quoteExpiryDue, quoteExpiryCopy, type FollowupSettings } from '../lib/follow_ups.ts';
 
 export type LifecycleKind = 'trial_ending' | 'trial_ended' | 'payment_trouble' | 'account_lapsed' | 'search_setup' | 'winddown_reminder' | 'win_back' | 'welcome_back';
 
@@ -478,7 +480,10 @@ export async function runDomainWatch(limit = 10): Promise<{ checked: number; war
 // ONE calm notice + email per lead (period = the lead id → exactly once, ever),
 // for non-spam leads 1–7 days old still marked 'new'. Same 15-min sweep, same
 // notices rail, same send-once semantics as every other lifecycle touch.
-export async function runLeadFollowups(limit = 20): Promise<{ nudged: number }> {
+export async function runLeadFollowups(limit = 20): Promise<{ nudged: number; followups: number }> {
+  // Sales item 87 rides this registered step (the runDealTaskReminders idiom), so the
+  // quiet-enquiry follow-ups need no new /system/run wiring — same cadence.
+  const followups = (await runEnquiryFollowups(limit).catch(() => ({ sent: 0 }))).sent;
   const nowIso = new Date().toISOString();
   const from = new Date(Date.now() - 7 * 86400_000).toISOString();   // still fresh (<1 week)
   const to = new Date(Date.now() - 24 * 3600_000).toISOString();     // aged at least a day
@@ -505,7 +510,102 @@ export async function runLeadFollowups(limit = 20): Promise<{ nudged: number }> 
       emailOperator(lead.site_id, copy.subject, `<p>${esc(who)} reached out through your website about a day ago and hasn’t heard back yet.</p><p class="cta"><a href="${base}/inbox.html#enquiries" style="display:inline-block;margin-top:6px;background:${brand.accent};color:#fff;padding:9px 16px;border-radius:999px;text-decoration:none">Reply now →</a></p><p style="color:#938ba3;font-size:13px">A quick response keeps them warm.</p>`, 'lead_followup').catch(() => {});
     }
   }
-  return { nudged };
+  return { nudged, followups };
+}
+
+// ── QUIET ENQUIRIES: two follow-ups in the owner's words (sales item 87) ──────
+// File 01 finding 6. Behind the site's "Follow up quiet enquiries" switch (0175),
+// off until the owner turns it on. The pure rules live in lib/follow_ups.ts: which
+// one is due (followupStepDue) and what stops the series (followupStopReason). Sent
+// in the business's name with its own reply address (the auto-reply's rule, item 72);
+// NOT critical, so it carries the unsubscribe header and link, and an unsubscribe
+// stops it. Send-once: the ledger row `enqfollow:<enquiry>:<n>` (a silent
+// lead_followup notice) is written before the email, so no tick can send it twice.
+const DAY_MS = 86_400_000;
+/** What each enquiry already got, from the ledger: { <id>: { 1?: at, 2?: at } }. */
+async function followupsSent(ids: string[]): Promise<Map<string, { 1?: string; 2?: string }>> {
+  const out = new Map<string, { 1?: string; 2?: string }>();
+  if (!ids.length) return out;
+  const periods = ids.flatMap((id) => [`"enqfollow:${id}:1"`, `"enqfollow:${id}:2"`]).join(',');
+  const r = await svc(`presence_plan_notices?kind=eq.lead_followup&period=in.(${periods})&select=period,created_at&limit=${ids.length * 2}`);
+  for (const row of (Array.isArray(r.json) ? r.json : []) as Array<{ period: string; created_at?: string }>) {
+    const m = /^enqfollow:([0-9a-f-]{36}):([12])$/.exec(row.period || '');
+    if (!m) continue;
+    const cur = out.get(m[1]) || {};
+    cur[m[2] === '1' ? 1 : 2] = String(row.created_at || new Date().toISOString());
+    out.set(m[1], cur);
+  }
+  return out;
+}
+/** What the person did since they wrote: another enquiry, a booking, or a message
+ *  that reached the Inbox (a reply to the studio's answer comes back as one). */
+async function followupSignals(sub: { id: string; site_id: string; email: string; created_at: string }): Promise<{ laterEnquiry: boolean; booked: boolean; wroteBack: boolean }> {
+  const since = encodeURIComponent(sub.created_at);
+  const one = async (path: string) => { try { const r = await svc(path); return r.ok && Array.isArray(r.json) && r.json.length > 0; } catch { return false; } };
+  const [laterEnquiry, booked, wroteBack] = await Promise.all([
+    one(`presence_form_submissions?site_id=eq.${sub.site_id}&${emailMatch(sub.email)}&created_at=gt.${since}&id=neq.${sub.id}&select=id&limit=1`),
+    one(`presence_appointments?site_id=eq.${sub.site_id}&${emailMatch(sub.email, 'customer_email')}&created_at=gt.${since}&select=id&limit=1`),
+    one(`presence_support_requests?site_id=eq.${sub.site_id}&${emailMatch(sub.email, 'requester')}&updated_at=gt.${since}&select=id&limit=1`),
+  ]);
+  return { laterEnquiry, booked, wroteBack };
+}
+/** The enquiry keeps its own list of the follow-ups that went (fields.__followups),
+ *  so the Inbox can show "Follow-up 1 sent". The ledger above is what gates a send. */
+async function noteFollowupOnEnquiry(siteId: string, id: string, step: 1 | 2, at: string): Promise<void> {
+  try {
+    const cur = await svc(`presence_form_submissions?id=eq.${id}&site_id=eq.${siteId}&select=fields&limit=1`);
+    const fields = (Array.isArray(cur.json) && cur.json[0]?.fields && typeof cur.json[0].fields === 'object') ? cur.json[0].fields : {};
+    const list = Array.isArray(fields.__followups) ? fields.__followups.filter((x: any) => x && x.n !== step) : [];
+    await svc(`presence_form_submissions?id=eq.${id}&site_id=eq.${siteId}`, { method: 'PATCH', body: JSON.stringify({ fields: { ...fields, __followups: list.concat([{ n: step, at }]) } }) });
+  } catch { /* the ledger already holds it */ }
+}
+export async function runEnquiryFollowups(limit = 20): Promise<{ sent: number }> {
+  const now = Date.now();
+  // the widest window any site can ask for: a second follow-up on day 30, for a week
+  const from = new Date(now - 37 * DAY_MS).toISOString();
+  const to = new Date(now - 1 * DAY_MS).toISOString();
+  const q = await svc(`presence_form_submissions?spam=is.false&status=in.(new,read,replied)&created_at=gte.${encodeURIComponent(from)}&created_at=lte.${encodeURIComponent(to)}&select=id,site_id,form_kind,name,email,message,status,spam,created_at,fields&order=created_at.desc&limit=${limit * 10}`);
+  if (!q.ok) return { sent: 0 };
+  const cache = new Map<string, AutomationSettings>();
+  type Sub = { id: string; site_id: string; form_kind?: string; name?: string; email?: string; message?: string; status?: string; spam?: boolean; created_at: string; fields?: any };
+  const candidates: Array<{ sub: Sub; cfg: FollowupSettings }> = [];
+  for (const sub of (Array.isArray(q.json) ? q.json : []) as Sub[]) {
+    if (!sub.email) continue;
+    const cfg = followupSettingsOf(await automationSettingsFor(sub.site_id, cache));
+    if (cfg.on) candidates.push({ sub, cfg });
+  }
+  if (!candidates.length) return { sent: 0 };
+  const sentMap = await followupsSent(candidates.map((c) => c.sub.id));
+  const siteClient = new Map<string, string>();
+  let sent = 0;
+  for (const { sub, cfg } of candidates) {
+    if (sent >= limit) break;
+    const done = sentMap.get(sub.id) || {};
+    const step = followupStepDue(sub, now, cfg, done);
+    if (!step) continue;
+    const off = !!(sub.fields && typeof sub.fields === 'object' && sub.fields.__followups_off === true);
+    if (followupStopReason(sub, { off, ...(await followupSignals({ id: sub.id, site_id: sub.site_id, email: String(sub.email), created_at: sub.created_at })) })) continue;
+    if (!siteClient.has(sub.site_id)) siteClient.set(sub.site_id, String((await svc(`presence_sites?id=eq.${sub.site_id}&select=client_id&limit=1`)).json?.[0]?.client_id || ''));
+    const clientId = siteClient.get(sub.site_id) || '';
+    if (!clientId) continue;
+    const who = String(sub.name || sub.email || 'Someone').slice(0, 80);
+    const fresh = await raiseNotice({ siteId: sub.site_id, clientId, kind: 'lead_followup', period: `enqfollow:${sub.id}:${step}`, status: 'dismissed',
+      headline: `Follow-up ${step} sent — ${who}`, body: step === 1 ? 'Their enquiry went quiet, so the first follow-up went out in your words.' : 'The second and last follow-up went out. Nothing more goes on its own.' });
+    if (!fresh) continue;   // this one already went: never twice
+    try {
+      const [ident, brand, replyTo] = await Promise.all([
+        svc(`presence_identity?site_id=eq.${sub.site_id}&select=business_name&limit=1`),
+        loadEmailBrand(sub.site_id),
+        ownerReplyTo(sub.site_id),
+      ]);
+      const business = String(ident.json?.[0]?.business_name || '').trim() || brand.name;
+      const mail = followupEmail(step, { name: sub.name, business, words: cfg.words[step - 1], message: sub.message });
+      // a follow-up is an ask, not a receipt: not critical, so it carries the unsubscribe and an unsubscribe stops it
+      const ok = await sendEmail(String(sub.email), mail.subject, mail.html, brand, { asBusiness: true, siteId: sub.site_id, replyTo });
+      if (ok) { sent++; await noteFollowupOnEnquiry(sub.site_id, sub.id, step, new Date().toISOString()); }
+    } catch { /* the ledger row stands: a failed send is never retried into a double */ }
+  }
+  return { sent };
 }
 
 // ── Three switches, not a workflow builder (benchmark 2026-10, item 6) ───────
@@ -522,14 +622,26 @@ export interface AutomationSettings {
   deal_nudge_days: number;             // quiet for this many days → one nudge a week
   review_requests: boolean;            // list item 29 (migration 0137): ask a project's client for a review
   review_request_after_days: number;   // this many days after the project is marked complete
+  // sales item 87 (migration 0175): the recipes — see lib/follow_ups.ts
+  auto_ack_message: string;            // the owner's own words for the acknowledgement ('' = ENQUIRY_ACK_SENTENCE)
+  enquiry_followups: boolean;          // two follow-ups to a quiet enquiry
+  enquiry_followup_1_days: number;
+  enquiry_followup_2_days: number;
+  enquiry_followup_1_message: string;  // '' = FOLLOWUP_WORDS[0]
+  enquiry_followup_2_message: string;
+  invoice_overdue_repeat: boolean;     // a second reminder a week after the overdue one
+  quote_expiry_reminders: boolean;     // one note a week before a proposal or estimate runs out
 }
-export const AUTOMATION_DEFAULTS: AutomationSettings = { auto_ack_enquiries: false, invoice_reminders: false, invoice_remind_after_days: 2, deal_nudges: false, deal_nudge_days: 3, review_requests: false, review_request_after_days: 3 };
+export const AUTOMATION_DEFAULTS: AutomationSettings = { auto_ack_enquiries: false, invoice_reminders: false, invoice_remind_after_days: 2, deal_nudges: false, deal_nudge_days: 3, review_requests: false, review_request_after_days: 3,
+  auto_ack_message: '', enquiry_followups: false, enquiry_followup_1_days: FOLLOWUP_DEFAULT_DAYS[0], enquiry_followup_2_days: FOLLOWUP_DEFAULT_DAYS[1], enquiry_followup_1_message: '', enquiry_followup_2_message: '', invoice_overdue_repeat: false, quote_expiry_reminders: false };
 export const AUTOMATION_COLS_0134 = 'auto_ack_enquiries,invoice_reminders,invoice_remind_after_days,deal_nudges,deal_nudge_days';
 export const AUTOMATION_COLS = AUTOMATION_COLS_0134 + ',review_requests,review_request_after_days';
-/** Normalise a settings row (or nothing) into the five values. Pure. */
+export const AUTOMATION_COLS_0175 = AUTOMATION_COLS + ',auto_ack_message,enquiry_followups,enquiry_followup_1_days,enquiry_followup_2_days,enquiry_followup_1_message,enquiry_followup_2_message,invoice_overdue_repeat,quote_expiry_reminders';
+/** Normalise a settings row (or nothing) into the values. Pure. */
 export function automationSettings(row: Record<string, unknown> | null | undefined): AutomationSettings {
   const r = row && typeof row === 'object' ? row : {};
   const days = (v: unknown, d: number) => { const n = Math.trunc(Number(v)); return Number.isFinite(n) && n >= 1 && n <= 90 ? n : d; };
+  const [f1, f2] = followupDays(r.enquiry_followup_1_days, r.enquiry_followup_2_days);
   return {
     auto_ack_enquiries: r.auto_ack_enquiries === true,
     invoice_reminders: r.invoice_reminders === true,
@@ -538,13 +650,27 @@ export function automationSettings(row: Record<string, unknown> | null | undefin
     deal_nudge_days: days(r.deal_nudge_days, AUTOMATION_DEFAULTS.deal_nudge_days),
     review_requests: r.review_requests === true,
     review_request_after_days: days(r.review_request_after_days, AUTOMATION_DEFAULTS.review_request_after_days),
+    auto_ack_message: followupWords(r.auto_ack_message),
+    enquiry_followups: r.enquiry_followups === true,
+    enquiry_followup_1_days: f1,
+    enquiry_followup_2_days: f2,
+    enquiry_followup_1_message: followupWords(r.enquiry_followup_1_message),
+    enquiry_followup_2_message: followupWords(r.enquiry_followup_2_message),
+    invoice_overdue_repeat: r.invoice_overdue_repeat === true,
+    quote_expiry_reminders: r.quote_expiry_reminders === true,
   };
 }
+/** The follow-up series' settings in lib/follow_ups.ts's shape. Pure. */
+export const followupSettingsOf = (a: AutomationSettings): FollowupSettings => ({
+  on: a.enquiry_followups, days: [a.enquiry_followup_1_days, a.enquiry_followup_2_days], words: [a.enquiry_followup_1_message, a.enquiry_followup_2_message],
+});
 export async function automationSettingsFor(siteId: string, cache?: Map<string, AutomationSettings>): Promise<AutomationSettings> {
   if (cache?.has(siteId)) return cache.get(siteId)!;
   let out = AUTOMATION_DEFAULTS;
   try {
-    let r = await svc(`presence_settings?site_id=eq.${encodeURIComponent(siteId)}&select=${AUTOMATION_COLS}&limit=1`);
+    // newest columns first; a database a pack behind answers 400 and the read steps down
+    let r = await svc(`presence_settings?site_id=eq.${encodeURIComponent(siteId)}&select=${AUTOMATION_COLS_0175}&limit=1`);
+    if (!r.ok) r = await svc(`presence_settings?site_id=eq.${encodeURIComponent(siteId)}&select=${AUTOMATION_COLS}&limit=1`);
     // pre-0137: the review columns aren't there; the other three switches still hold
     if (!r.ok) r = await svc(`presence_settings?site_id=eq.${encodeURIComponent(siteId)}&select=${AUTOMATION_COLS_0134}&limit=1`);
     if (r.ok) out = automationSettings(Array.isArray(r.json) ? r.json[0] : null);   // a 400 (pre-0134) = all off
@@ -563,12 +689,15 @@ export async function automationSettingsFor(siteId: string, cache?: Map<string, 
 // gets no "before" leg (nobody set a date to warn about). Nothing fires on the
 // day the invoice was sent. The period `invremind:<id>:<slot>` is the dedupe
 // key; the legacy once-ever `invremind:<id>` counts as the after-leg done.
-export type InvoiceReminderSlot = 'before' | 'due' | 'after';
+// Sales item 87 (the Wix recipe "two reminders a week apart for an overdue invoice"): with
+// invoice_overdue_repeat on, a fourth leg `again` goes a week after the after-leg, the last.
+export type InvoiceReminderSlot = 'before' | 'due' | 'after' | 'again';
 export const INVOICE_REMIND_BEFORE_DAYS = 7;
 export const UNDATED_INVOICE_DUE_DAYS = 7;
+export const INVOICE_AGAIN_DAYS = 7;
 const ymdOf = (x: unknown): string | null => { const m = /^(\d{4}-\d{2}-\d{2})/.exec(String(x || '')); return m ? m[1] : null; };
 const daysFromTo = (a: string, b: string): number => Math.round((Date.parse(b + 'T00:00:00Z') - Date.parse(a + 'T00:00:00Z')) / 86400_000);
-export function invoiceReminderSlot(inv: { due_date?: unknown; created_at?: unknown; status?: unknown; processing_since?: unknown; stripe_url?: unknown }, todayYmd: string, afterDays: number): InvoiceReminderSlot | null {
+export function invoiceReminderSlot(inv: { due_date?: unknown; created_at?: unknown; status?: unknown; processing_since?: unknown; stripe_url?: unknown }, todayYmd: string, afterDays: number, again = false): InvoiceReminderSlot | null {
   if (String(inv.status || 'open') !== 'open' || inv.processing_since || !inv.stripe_url) return null;   // nothing to pay, or already settling
   const sent = ymdOf(inv.created_at);
   if (!sent || sent >= todayYmd) return null;                       // never on the day it went out
@@ -576,12 +705,22 @@ export function invoiceReminderSlot(inv: { due_date?: unknown; created_at?: unkn
   const explicitDue = ymdOf(inv.due_date);
   const due = explicitDue || new Date(Date.parse(sent + 'T00:00:00Z') + UNDATED_INVOICE_DUE_DAYS * 86400_000).toISOString().slice(0, 10);
   const d = daysFromTo(due, todayYmd);                               // days past due (negative = before)
+  if (again && d >= n + INVOICE_AGAIN_DAYS) return 'again';          // the runner sends it only a week after the after-leg went
   if (d >= n) return 'after';
   if (d >= 0) return 'due';
   if (explicitDue && d >= -INVOICE_REMIND_BEFORE_DAYS) return 'before';
   return null;
 }
 export const invoiceReminderPeriod = (invoiceId: string, slot: InvoiceReminderSlot): string => `invremind:${invoiceId}:${slot}`;
+/** Item 87: which leg actually goes today. The again-leg waits until a week after the
+ *  after-leg went (`afterAt`, when its ledger row was written); with no after-leg yet,
+ *  that one goes first. Every other leg goes as the schedule says. Pure. */
+export function legToSend(slot: InvoiceReminderSlot, afterAt: string | null, nowMs: number): InvoiceReminderSlot | null {
+  if (slot !== 'again') return slot;
+  if (afterAt === null) return 'after';
+  const at = Date.parse(afterAt);
+  return Number.isFinite(at) && nowMs - at >= INVOICE_AGAIN_DAYS * 86400_000 - 12 * 3600_000 ? 'again' : null;
+}
 /** Sales item 92: under a reminder's button, the way to answer it. Reminders used to offer
  *  only "Pay"; someone who paid another way, or has a question, can reply (it lands in the
  *  Inbox), and an invoice reminder links the invoice itself. Pure. */
@@ -594,6 +733,7 @@ export function invoiceReminderCopy(slot: InvoiceReminderSlot, what: 'deposit' |
   const name = title || what;
   if (slot === 'before') return { subject: `Coming up — ${name} (${amount})`, line: `A quick heads-up: the ${what} for <strong>${amount}</strong> is due in a few days. The same secure link works whenever you're ready — nothing expires.` };
   if (slot === 'due') return { subject: `Due today — ${name} (${amount})`, line: `Just a friendly nudge: the ${what} for <strong>${amount}</strong> is due today. The same secure link works whenever you're ready — nothing expires.` };
+  if (slot === 'again') return { subject: `Still open — ${name} (${amount})`, line: `A second reminder, a week after the last: the ${what} for <strong>${amount}</strong> is still open. If something is holding it up, just reply and we’ll sort it out together.` };
   return { subject: `A gentle reminder — ${name} (${amount})`, line: `Just a friendly nudge: the ${what} for <strong>${amount}</strong> is still open. The same secure link works whenever you're ready — nothing expires.` };
 }
 
@@ -840,18 +980,22 @@ export async function runInvoiceReminders(limit = 20): Promise<{ reminded: numbe
   for (const inv of candidates) {
     const auto = await automationSettingsFor(inv.site_id, settingsCache);
     if (!auto.invoice_reminders) continue;
-    const slot = invoiceReminderSlot(inv, today, auto.invoice_remind_after_days);
+    const slot = invoiceReminderSlot(inv, today, auto.invoice_remind_after_days, auto.invoice_overdue_repeat);
     if (slot) due.push({ inv, slot });
   }
   // Drop already-sent legs up front (the wide window + filter avoids the
   // starvation the old once-ever sweep had). The legacy once-ever key
-  // `invremind:<id>` counts as the after-leg done.
+  // `invremind:<id>` counts as the after-leg done. The again-leg (item 87) also
+  // reads the after-leg's row: it goes a week after that one went, and when the
+  // after-leg never went (the switch came on late) that one goes first.
   let fresh = due;
   if (due.length) {
-    const periods = due.map(({ inv, slot }) => `"${invoiceReminderPeriod(inv.id, slot)}"${slot === 'after' ? `,"invremind:${inv.id}"` : ''}`).join(',');
-    const seen = await svc(`presence_plan_notices?kind=eq.deal_followup&period=in.(${periods})&select=period&limit=${due.length * 2}`);
-    const done = new Set(((seen.json as Array<{ period: string }>) || []).map((r) => r.period));
-    fresh = due.filter(({ inv, slot }) => !done.has(invoiceReminderPeriod(inv.id, slot)) && !(slot === 'after' && done.has(`invremind:${inv.id}`))).slice(0, limit);
+    const periods = due.map(({ inv, slot }) => `"${invoiceReminderPeriod(inv.id, slot)}"${slot === 'after' || slot === 'again' ? `,"invremind:${inv.id}","${invoiceReminderPeriod(inv.id, 'after')}"` : ''}`).join(',');
+    const seen = await svc(`presence_plan_notices?kind=eq.deal_followup&period=in.(${periods})&select=period,created_at&limit=${due.length * 4}`);
+    const doneAt = new Map(((seen.json as Array<{ period: string; created_at?: string }>) || []).map((r) => [r.period, String(r.created_at || '')]));
+    fresh = due.map(({ inv, slot }) => ({ inv, slot: legToSend(slot, doneAt.get(invoiceReminderPeriod(inv.id, 'after')) ?? doneAt.get(`invremind:${inv.id}`) ?? null, Date.now()) }))
+      .filter((x): x is { inv: typeof candidates[number]; slot: InvoiceReminderSlot } => x.slot !== null)
+      .filter(({ inv, slot }) => !doneAt.has(invoiceReminderPeriod(inv.id, slot)) && !(slot === 'after' && doneAt.has(`invremind:${inv.id}`))).slice(0, limit);
   }
   let reminded = 0;
   for (const { inv, slot } of fresh) {
@@ -877,9 +1021,10 @@ export async function runInvoiceReminders(limit = 20): Promise<{ reminded: numbe
     if (!operatorHears && !email) continue;   // nothing to send and nobody to tell — wait for the after-leg
     const noticeBody = email
       ? (slot === 'after' ? 'We nudged the client with the same secure link — the third and last automatic reminder. If it stays quiet, a personal note usually lands best.'
+        : slot === 'again' ? 'A second reminder went a week after the overdue one. It was the last automatic one.'
         : `Automatic reminder sent (${slot === 'before' ? 'a week before the due date' : 'on the due date'}).`)
       : 'There’s no client email on this deal, so no automatic nudge went out — a personal note (or adding their email to the contact) is the way forward.';
-    const created = await raiseNotice({ siteId: inv.site_id, clientId, kind: 'deal_followup', period: invoiceReminderPeriod(inv.id, slot), headline: operatorHears ? `Still unpaid — ${inv.title || what} (${amount})` : `Reminder sent — ${inv.title || what} (${amount})`, body: noticeBody, status: operatorHears ? 'active' : 'dismissed' });
+    const created = await raiseNotice({ siteId: inv.site_id, clientId, kind: 'deal_followup', period: invoiceReminderPeriod(inv.id, slot), headline: operatorHears ? `Still unpaid — ${inv.title || what} (${amount})` : `${slot === 'again' ? 'Second reminder sent' : 'Reminder sent'} — ${inv.title || what} (${amount})`, body: noticeBody, status: operatorHears ? 'active' : 'dismissed' });
     if (!created) continue;   // this leg already went — never nag
     reminded++;
     if (email) {
@@ -1023,10 +1168,12 @@ export async function runApprovalReminders(limit = 50): Promise<{ reminded: numb
 // Capped at one-ever per document via the notices dedupe; respects nothing older
 // than 21 days (a dead deal shouldn't get a ghost nudge). An estimate (item 47)
 // gets the same one reminder with its own link and words, unless it has expired.
-export async function runSalesDocReminders(limit = 20): Promise<{ reminded: number }> {
+export async function runSalesDocReminders(limit = 20): Promise<{ reminded: number; expiry: number }> {
+  // Sales item 87 rides this registered step: the week-before-it-runs-out note
+  const expiry = (await runQuoteExpiryReminders(limit).catch(() => ({ reminded: 0 }))).reminded;
   const { linkSecret, signSalesToken } = await import('../routes/sales.ts');
   const secret = linkSecret();
-  if (!secret) return { reminded: 0 };
+  if (!secret) return { reminded: 0, expiry };
   const from = new Date(Date.now() - 21 * 86400_000).toISOString();
   const to = new Date(Date.now() - 3 * 86400_000).toISOString();
   const base = (Deno.env.get('SITE_URL') || 'https://davisdigitalstudio.com').replace(/\/$/, '');
@@ -1077,6 +1224,61 @@ export async function runSalesDocReminders(limit = 20): Promise<{ reminded: numb
         sendEmail(email, `Still there for you — ${doc.title || `your ${what}`}`, `<p>${line}</p><p class="cta">${btn}</p>${REPLY_LINE}`, brand, { siteId: doc.site_id, asBusiness: true }).catch(() => {});
         reminded++;
       } catch { /* the owner notice already recorded the attempt */ }
+    }
+  }
+  return { reminded, expiry };
+}
+
+// ── A WEEK LEFT: one note before a proposal or estimate runs out (sales item 87) ─
+// The Wix recipe "remind a customer their price quote expires in a week". Behind the
+// site's switch (0175), off until the owner turns it on. A sent proposal is good for
+// 30 days (markProposalSent), an estimate until the date the studio set. One note per
+// document, ever (`expiry:<doc>` in the ledger), never on the day its "still there for
+// you" reminder went, and never for a proposal that was replaced. Not critical (an
+// unsubscribe stops it); the answer lands in the Inbox like the document's own email.
+export async function runQuoteExpiryReminders(limit = 20): Promise<{ reminded: number }> {
+  const { linkSecret, signSalesToken } = await import('../routes/sales.ts');
+  const secret = linkSecret();
+  if (!secret) return { reminded: 0 };
+  const now = Date.now();
+  const nowIso = new Date(now).toISOString();
+  const until = new Date(now + 7 * DAY_MS).toISOString();
+  const base = (Deno.env.get('SITE_URL') || 'https://davisdigitalstudio.com').replace(/\/$/, '');
+  const cache = new Map<string, AutomationSettings>();
+  let reminded = 0;
+  for (const kind of ['proposal', 'estimate'] as const) {
+    const table = kind === 'estimate' ? 'presence_estimates' : 'presence_proposals';
+    const q = await svc(`${table}?status=eq.sent&deleted_at=is.null&expires_at=gt.${encodeURIComponent(nowIso)}&expires_at=lte.${encodeURIComponent(until)}&select=id,site_id,deal_id,title,status,expires_at${kind === 'proposal' ? ',line_items' : ''}&order=expires_at.asc&limit=${limit}`);
+    if (!q.ok) continue;   // before 0107 / 0145 there is nothing to remind
+    for (const doc of (Array.isArray(q.json) ? q.json : []) as Array<{ id: string; site_id: string; deal_id: string; title?: string; status: string; expires_at: string; line_items?: unknown }>) {
+      if (reminded >= limit) break;
+      if (!(await automationSettingsFor(doc.site_id, cache)).quote_expiry_reminders) continue;
+      const superseded = kind === 'proposal' && !!splitLineItems(doc.line_items).meta.superseded_by;
+      if (!quoteExpiryDue({ status: doc.status, expires_at: doc.expires_at, superseded }, now)) continue;
+      // not on the same day as the document's own reminder: wait a day, the week has room
+      const recent = await svc(`presence_plan_notices?kind=eq.deal_followup&period=eq.${encodeURIComponent('remind:' + doc.id)}&created_at=gt.${encodeURIComponent(new Date(now - DAY_MS).toISOString())}&select=id&limit=1`).catch(() => ({ json: [] as unknown[] }));
+      if (Array.isArray(recent.json) && recent.json.length) continue;
+      let email = '';
+      try {
+        const deal = (await svc(`presence_deals?id=eq.${doc.deal_id}&site_id=eq.${doc.site_id}&deleted_at=is.null&select=contact_id&limit=1`)).json?.[0];
+        email = deal?.contact_id ? String((await svc(`presence_contacts?id=eq.${deal.contact_id}&site_id=eq.${doc.site_id}&select=email&limit=1`)).json?.[0]?.email || '') : '';
+      } catch { /* no email */ }
+      if (!email) continue;   // nobody to tell: the ledger isn't spent on it
+      const clientId = String((await svc(`presence_sites?id=eq.${doc.site_id}&select=client_id&limit=1`)).json?.[0]?.client_id || '');
+      if (!clientId) continue;
+      const what = kind === 'estimate' ? 'estimate' : 'proposal';
+      const fresh = await raiseNotice({ siteId: doc.site_id, clientId, kind: 'deal_followup', period: `expiry:${doc.id}`, status: 'dismissed',
+        headline: `Reminder sent — ${doc.title || `the ${what}`} is good for one more week`, body: `They were told the ${what} runs out in a week, with a fresh link.` });
+      if (!fresh) continue;
+      try {
+        const token = kind === 'estimate'
+          ? await signSalesToken({ t: 'estimate', id: doc.id, site_id: doc.site_id, exp: Math.floor(new Date(doc.expires_at).getTime() / 1000) + 86400 }, secret)
+          : await signSalesToken({ t: 'flow', id: doc.deal_id, site_id: doc.site_id, exp: Math.floor(Date.now() / 1000) + 30 * 86400 }, secret);
+        const [brand, tz] = await Promise.all([loadEmailBrand(doc.site_id), svc(`presence_locations?site_id=eq.${doc.site_id}&select=timezone&limit=1`).then((r) => String(r.json?.[0]?.timezone || '') || null).catch(() => null)]);
+        const copy = quoteExpiryCopy(kind, doc.title, doc.expires_at, tz);
+        const btn = `<a href="${base}/sign.html?t=${encodeURIComponent(token)}" style="display:inline-block;margin-top:6px;background:${brand.accent};color:#fff;padding:9px 16px;border-radius:999px;text-decoration:none">${kind === 'estimate' ? 'See the estimate' : 'Review the proposal'} →</a>`;
+        if (await sendEmail(email, copy.subject, `<p>${copy.line}</p><p class="cta">${btn}</p>${REPLY_LINE}`, brand, { siteId: doc.site_id, asBusiness: true })) reminded++;
+      } catch { /* the ledger row stands: never twice */ }
     }
   }
   return { reminded };

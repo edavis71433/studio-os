@@ -220,12 +220,17 @@ export async function verifyApprovalToken(token: string, secret: string, nowSec:
 // (the preview under the switch), tests/presence/money_signature_test.mjs pins
 // the two copies against each other. Pure.
 export const ENQUIRY_ACK_SENTENCE = 'Thanks for getting in touch — we’ve got your message and will reply within one business day.';
-export function enquiryAckCopy(opts: { name?: unknown; studio?: unknown }): { subject: string; sentence: string; footer: string } {
+// Sales item 87 (file 07 finding 14): the owner can say it in their own words
+// (presence_settings.auto_ack_message, 0175); blank keeps this sentence. Their words
+// open with "Hi Sam," on a line of its own rather than being spliced into a sentence.
+export function enquiryAckCopy(opts: { name?: unknown; studio?: unknown; words?: unknown }): { subject: string; sentence: string; footer: string } {
   const studio = String(opts.studio || '').trim();
   const first = String(opts.name || '').trim().split(/\s+/)[0] || '';
+  const words = String(opts.words ?? '').trim();
   return {
     subject: studio ? `We got your message — ${studio}` : 'We got your message',
-    sentence: first ? `Hi ${first} — ${ENQUIRY_ACK_SENTENCE.charAt(0).toLowerCase()}${ENQUIRY_ACK_SENTENCE.slice(1)}` : ENQUIRY_ACK_SENTENCE,
+    sentence: words ? (first ? `Hi ${first},\n\n${words}` : words)
+      : first ? `Hi ${first} — ${ENQUIRY_ACK_SENTENCE.charAt(0).toLowerCase()}${ENQUIRY_ACK_SENTENCE.slice(1)}` : ENQUIRY_ACK_SENTENCE,
     footer: 'This is an automatic acknowledgement; a person will follow up.',
   };
 }
