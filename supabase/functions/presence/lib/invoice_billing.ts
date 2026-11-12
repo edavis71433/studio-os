@@ -37,21 +37,56 @@ export function reuseDecision(open: { amount_cents?: unknown; stripe_url?: unkno
   return (nowMs - lastTouch) < DOUBLE_TAP_MS ? 'double_tap' : 'ask';
 }
 
-/** Retainer payments on a deal. A retainer charge settles in Stripe and writes
- *  only a deal event (`invoice_paid` with detail.retainer), never an invoice row,
- *  so the record's Paid left it out (item 108, J4). Pure. */
-export function retainerPaid(events: unknown): { cents: number; count: number; last_at: string | null } {
-  let cents = 0, count = 0; let last: string | null = null;
+/** Each retainer charge as a payment: { amount_cents, paid_at } per charge. A retainer
+ *  charge settles in Stripe and writes only a deal event (`invoice_paid` with
+ *  detail.retainer), never an invoice row, so anything that adds up invoices leaves it
+ *  out unless it asks for these too: the record's Paid did (item 108, J4) and revenue by
+ *  month did (sales item 120, code pass finding 54). Pure. */
+export function retainerPayments(events: unknown): Array<{ amount_cents: number; paid_at: string }> {
+  const out: Array<{ amount_cents: number; paid_at: string }> = [];
   for (const e of (Array.isArray(events) ? events : []) as any[]) {
     const d = e && typeof e.detail === 'object' && e.detail ? e.detail : null;
     if (!e || e.kind !== 'invoice_paid' || !d || d.retainer !== true) continue;
     const amt = Math.round(Number(d.amount_cents) || 0);
     if (amt <= 0) continue;
-    cents += amt; count++;
-    const at = String(e.created_at || '');
-    if (at && (!last || at > last)) last = at;
+    out.push({ amount_cents: amt, paid_at: String(e.created_at || '') });
+  }
+  return out;
+}
+
+/** Retainer payments on a deal, for the record's Paid. Pure. */
+export function retainerPaid(events: unknown): { cents: number; count: number; last_at: string | null } {
+  let cents = 0, count = 0; let last: string | null = null;
+  for (const p of retainerPayments(events)) {
+    cents += p.amount_cents; count++;
+    if (p.paid_at && (!last || p.paid_at > last)) last = p.paid_at;
   }
   return { cents, count, last_at: last };
+}
+
+/** A client's invoice rows with each part payment under the invoice it paid toward (sales
+ *  item 120, code pass finding 56). A part payment is its own paid row (`payment_for`, item
+ *  77) and the invoice's amount drops by it, so a list of rows showed a second paid
+ *  "invoice" beside one that had shrunk. Each invoice with parts gets `parts` (oldest first),
+ *  `paid_so_far_cents` and `total_cents` (what is left or was paid last, plus the parts). A
+ *  part whose invoice isn't in the list (removed) stays a row of its own, so money paid is
+ *  never hidden. Order is kept. Pure. */
+export function nestPartPayments<T extends { id?: unknown; payment_for?: unknown; amount_cents?: unknown; paid_at?: unknown }>(list: T[]): Array<T & { parts?: T[]; paid_so_far_cents?: number; total_cents?: number }> {
+  const rows = (Array.isArray(list) ? list : []).filter(Boolean);
+  const ids = new Set(rows.map((i) => String(i.id)));
+  const isPart = (i: T) => !!i.payment_for && String(i.payment_for) !== String(i.id) && ids.has(String(i.payment_for));
+  const partsOf = new Map<string, T[]>();
+  for (const i of rows) if (isPart(i)) { const k = String(i.payment_for); partsOf.set(k, [...(partsOf.get(k) || []), i]); }
+  const cents = (v: unknown) => Math.max(0, Math.round(Number(v) || 0));
+  const out: Array<T & { parts?: T[]; paid_so_far_cents?: number; total_cents?: number }> = [];
+  for (const i of rows) {
+    if (isPart(i)) continue;
+    const parts = (partsOf.get(String(i.id)) || []).slice().sort((a, b) => String(a.paid_at || '').localeCompare(String(b.paid_at || '')));
+    if (!parts.length) { out.push(i); continue; }
+    const paid = parts.reduce((a, p) => a + cents(p.amount_cents), 0);
+    out.push({ ...i, parts, paid_so_far_cents: paid, total_cents: cents(i.amount_cents) + paid });
+  }
+  return out;
 }
 
 // ── Sales item 77: a payment that came in outside Stripe ─────────────────────

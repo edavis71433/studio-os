@@ -194,6 +194,9 @@
     .srow.acts:not(.fresh) .fst:not(.od){display:none}   /* a phone row shows its one button OR a chip (the line under the name already says the state); Overdue and a new report's New always show */
     .srow.noted{flex-wrap:wrap}
     .srow.noted .finote{flex:0 0 100%;margin-left:46px} /* aligned past the 34px icon + 12px gap */
+    .srow.parted{flex-wrap:wrap}
+    .srow.parted .fmain{flex:1 1 0}   /* the name keeps its line beside the icon and the button; only the parts wrap */
+    .srow.parted .fparts{flex:0 0 calc(100% - 46px);margin-left:46px}
   }
   .fbtn,a.fbtn{flex:0 0 auto;display:inline-flex;align-items:center;font-size:12.5px;font-weight:600;border:1px solid var(--line);background:transparent;color:var(--ink);border-radius:999px;padding:7px 14px;cursor:pointer;text-decoration:none;white-space:nowrap;transition:.15s}
   .fbtn:hover,a.fbtn:hover{border-color:var(--p);color:var(--p)}
@@ -236,6 +239,11 @@
   .shelfbody .fload{margin:12px 0 0}
   .shelfnote{font-size:12.5px;margin:2px 0 0}
   .srow .sinfo,.srow .sdate,.srow .fst.none{display:none}
+  /* sales item 120: a part payment sits under the invoice it paid toward */
+  .fparts{list-style:none;margin:0;padding:2px 0 0;display:grid;gap:4px;font-size:12.5px;color:var(--soft)}
+  .fparts li{display:flex;flex-wrap:wrap;align-items:center;gap:2px 12px}
+  .fparts a{color:var(--p);font-weight:600;text-decoration:none;padding:6px 0}
+  .fparts a:hover{text-decoration:underline}
   .fico.invoices{background:var(--good-soft);color:var(--good)}
   .fico.ask,.fst.ask{background:var(--warn-soft);color:var(--warn)}
   .fst.mute{background:var(--bg);color:var(--faint)}
@@ -258,6 +266,7 @@
     .srow .fst.none{display:block;visibility:hidden}
     .srow .fbtn,.srow .finote{justify-self:end}
     .srow.noted .finote{grid-column:2 / -1;justify-self:start}   /* a payment confirming reads under the name, not squeezed into the last column */
+    .srow .fparts{grid-column:2 / -1}
   }
   .fload{margin:0 0 14px;font-size:14px}
   /* ── milestone Path (Lightning chevron geometry — read-only, informational) ── */
@@ -1211,7 +1220,7 @@ async function buildNeedsYou(){
     // the two surfaces must never disagree about the same invoice
     const stWord=(MONEY_WORD[moneyState(i,nyToday,PAID_PENDING)]||'').toLowerCase();
     const nyPay=i.pay_url&&/^https:\/\//.test(i.pay_url)?i.pay_url:null;   // https-only (the shelf's rule)
-    return row('Invoice','invoice',false,esc(i.name||'Invoice'),`${i.amount?esc(fmtMoney(i.amount))+' · ':''}${esc(stWord)}${i.due_date?` · due ${esc(invDueLabel(i.due_date)||i.due_date)}`:''}`,
+    return row('Invoice','invoice',false,esc(i.name||'Invoice'),`${i.number?esc(i.number)+' · ':''}${i.amount?esc(fmtMoney(i.amount))+' · ':''}${esc(stWord)}${i.due_date?` · due ${esc(invDueLabel(i.due_date)||i.due_date)}`:''}`,
       nyPay?`<a class="${top||'link'}" data-pay href="${esc(nyPay)}" aria-label="Pay — ${esc(i.name||'Invoice')}">Pay</a>`:`<button class="${top}" data-tab-go="invoices" aria-label="View invoice — ${esc(i.name||'Invoice')}">View invoice</button>`);
   });
   // item 179: the heading carries the queue's count — the SAME array whose rows
@@ -2026,12 +2035,18 @@ function shelfRows(invoices,docs,snaps,reports,todayYmd,pending,now){
   }
   for(const i of (invoices||[])){
     if(!i||!i.id)continue;
-    const st=moneyState(i,todayYmd,pending);const amt=i.amount?fmtMoney(i.amount):'';
+    const st=moneyState(i,todayYmd,pending);
+    // sales item 120: paid in parts, the row says what is left of the whole (or the whole, once paid)
+    // and each part sits under it with its own receipt
+    const parts=Array.isArray(i.payments)?i.payments.filter(p=>p&&p.id):[];
+    const whole=parts.length&&Number(i.total)>0?Number(i.total):0;
+    const amt=whole?(st==='paid'?fmtMoney(whole):st?fmtMoney(i.amount)+' left of '+fmtMoney(whole):fmtMoney(i.amount)):i.amount?fmtMoney(i.amount):'';
     const pay=(st==='upcoming'||st==='overdue')&&/^https:\/\//.test(String(i.pay_url||''))?i.pay_url:'';
     const view=shelfUrl(i.view_url);
     const info=[amt,st==='paid'?(i.paid_at?'paid '+shelfDay(i.paid_at,now):'paid'):st==='processing'?'':st?(i.due_date?'due '+shelfDay(i.due_date,now):''):'withdrawn'].filter(Boolean).join(' · ');
     const act=st==='paid'?(view?{verb:'Receipt',href:view}:null):st==='processing'?{note:'processing',inv:i}:!st?null:pay?{verb:'Pay',href:pay,pay:true}:view?{verb:'View',href:view}:{note:'details'};
-    rows.push({cat:'invoices',kind:'Invoice',title:i.name||'Invoice',info,when:String(i.created_at||i.due_date||''),chip:st?MONEY_WORD[st]:'Voided',tone:st==='paid'?'sig':st==='overdue'?'od':st==='processing'?'pr':st?'':'mute',act});
+    rows.push({cat:'invoices',kind:i.number?'Invoice '+i.number:'Invoice',title:i.name||'Invoice',info,when:String(i.created_at||i.due_date||''),chip:st?MONEY_WORD[st]:'Voided',tone:st==='paid'?'sig':st==='overdue'?'od':st==='processing'?'pr':st?'':'mute',act,
+      parts:parts.map(p=>({amount:Number(p.amount)||0,paid_at:p.paid_at,method:String(p.method||''),view:shelfUrl(p.view_url)}))});
   }
   for(const d of (docs||[])){
     if(!d||!d.id)continue;
@@ -2075,7 +2090,7 @@ function shelfOweHtml(o,cat){
   const pay=one&&/^https:\/\//.test(String(n.pay_url||''))?n.pay_url:'';
   const day=(ymd)=>{const d=shelfDate(ymd);return d?d.toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric'}):'';};
   const when=n.due_date?` · ${late?'was due':'due'} ${day(n.due_date)}`:'';
-  const sub=one?`${n.name||'Invoice'}${when}`:`${o.count} invoices · the next${when?when.slice(2):' has no due date'}`;
+  const sub=one?`${n.name||'Invoice'}${n.number?' '+n.number:''}${when}`:`${o.count} invoices · the next${when?when.slice(2):' has no due date'}`;
   const btn=pay?`<a class="approve owebtn" href="${esc(pay)}" aria-label="Pay ${esc(fmtMoney(o.total))} — ${esc(n.name||'Invoice')}"><span>Pay<span class="lg"> ${esc(fmtMoney(o.total))}</span></span></a>`
     :(!one&&cat!=='invoices')?`<button type="button" class="approve owebtn" data-shelf-go="invoices">See invoices</button>`:'';
   return `<div class="owe${late?' late':''}" id="inv-unpaid"><span class="fico invoices" aria-hidden="true">${si('receipt')}</span><div class="owem"><p class="owet">You owe ${esc(fmtMoney(o.total))}</p><p class="owes">${esc(sub)}</p></div>${btn}</div>`;
@@ -2092,10 +2107,12 @@ function shelfRowHtml(r,now){
   // a phone reads one line under the name ("Invoice · $450 · due Nov 14"); a computer
   // splits it into columns (what it is · amount or state · date · chip · the one thing to do)
   const line=r.cat==='files'?(day?' · '+day:''):(r.info?' · '+r.info:'');
-  return `<div class="frow srow${a&&a.note?' noted':act?' acts':''}${r.chip==='New'?' fresh':''}" role="listitem"><span class="fico ${esc(r.cat)}${r.tone==='ask'?' ask':''}" aria-hidden="true">${r.cat==='invoices'?si('receipt'):r.cat==='agreements'?si('pencil'):r.cat==='files'?fileIcon(r.title):r.cat==='reports'?si('chart'):si('file')}</span>`+
+  // sales item 120: what was paid toward an invoice, under it, each with its receipt
+  const parts=(r.parts||[]).length?`<ul class="fparts" aria-label="Paid toward this invoice">${r.parts.map(p=>`<li><span>Part payment · ${esc(fmtMoney(p.amount))}${p.paid_at?' · paid '+esc(shelfDay(p.paid_at,now)):''}${p.method?' · '+esc(p.method.toLowerCase()):''}</span>${p.view?`<a href="${esc(p.view)}" target="_blank" rel="noopener" aria-label="Receipt for the part payment of ${esc(fmtMoney(p.amount))}">Receipt</a>`:''}</li>`).join('')}</ul>`:'';
+  return `<div class="frow srow${a&&a.note?' noted':act?' acts':''}${parts?' parted':''}${r.chip==='New'?' fresh':''}" role="listitem"><span class="fico ${esc(r.cat)}${r.tone==='ask'?' ask':''}" aria-hidden="true">${r.cat==='invoices'?si('receipt'):r.cat==='agreements'?si('pencil'):r.cat==='files'?fileIcon(r.title):r.cat==='reports'?si('chart'):si('file')}</span>`+
     `<div class="fmain"><h3 class="fname">${esc(r.title)}</h3><span class="fmeta">${esc(r.kind)}<span class="sline">${esc(line)}</span></span></div>`+
     `<span class="sinfo">${esc(r.info)}</span><span class="sdate">${esc(day)}</span>`+
-    `${r.chip?`<span class="fst${r.tone?' '+r.tone:''}">${esc(r.chip)}</span>`:'<span class="fst none"></span>'}${act}</div>`;
+    `${r.chip?`<span class="fst${r.tone?' '+r.tone:''}">${esc(r.chip)}</span>`:'<span class="fst none"></span>'}${act}${parts}</div>`;
 }
 // ── Sales item 117: the client's retainer, its charges, and a way to cancel ──
 // The retainer email says "you can cancel any time"; until now the portal showed
