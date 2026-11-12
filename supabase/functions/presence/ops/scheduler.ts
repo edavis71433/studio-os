@@ -44,7 +44,8 @@ export interface CycleResult {
 // Item 206: only the sites that are DUE. The mark doubles as "last checked": a site
 // is due when it has none (new, or a publish just emptied it) or when it is a day
 // old (lib/check_soon.ts). Every tick used to take every site, 96 times a day.
-async function activeSites(limit: number, nowMs = Date.now()): Promise<SiteRow[]> {
+// `dueOnly: false` is the coach run, which is asked for by hand and takes every site.
+async function activeSites(limit: number, nowMs = Date.now(), dueOnly = true): Promise<SiteRow[]> {
   // svcAll, not a bare select: PostgREST's max-rows cap would silently truncate
   // a NONDETERMINISTIC subset of active clients (~1000), dropping their sites
   // out of observation with zero signal. Paged + ordered + logged at the bound.
@@ -52,7 +53,7 @@ async function activeSites(limit: number, nowMs = Date.now()): Promise<SiteRow[]
   const er = await svcAll('presence_entitlements?product=eq.presence&status=eq.active&select=client_id', 'client_id');
   const activeClients = new Set(er.map((r: any) => String(r.client_id)));
   if (!activeClients.size) return [];
-  let sr = await svc(`presence_sites?status=in.(ready,live)&or=(last_observed_at.is.null,last_observed_at.lt.${checkDueBefore(nowMs)})&select=${SITE_COLS}&order=last_observed_at.asc.nullsfirst&limit=${limit * 3}`);
+  let sr = await svc(`presence_sites?status=in.(ready,live)${dueOnly ? `&or=(last_observed_at.is.null,last_observed_at.lt.${checkDueBefore(nowMs)})` : ''}&select=${SITE_COLS}&order=last_observed_at.asc.nullsfirst&limit=${limit * 3}`);
   if (!sr.ok) sr = await svc(`presence_sites?status=in.(ready,live)&select=${SITE_COLS}&order=updated_at.asc&limit=${limit * 3}`);
   const fetched = (sr.ok && Array.isArray(sr.json) ? sr.json : []) as SiteRow[];
   const sites = fetched.filter((s: any) => activeClients.has(String(s.client_id))).slice(0, limit);
@@ -275,7 +276,7 @@ async function ledgerClose(id: string | null, ok: boolean, result: unknown, erro
 export async function runOperationsCycle(opts: { limit?: number; withCoach?: boolean } = {}): Promise<CycleResult> {
   const limit = opts.limit ?? DEFAULT_LIMIT;
   const withCoach = opts.withCoach ?? false;
-  const sites = await activeSites(limit);
+  const sites = await activeSites(limit, Date.now(), !withCoach);
   const results: SiteRunResult[] = [];
   for (const site of sites) {
     const runId = await ledgerOpen('cycle', site.id);

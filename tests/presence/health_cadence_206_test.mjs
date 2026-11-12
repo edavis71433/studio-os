@@ -99,6 +99,9 @@ const checksOf = (id) => world.checks.filter((c) => c.site === id).length;
   for (let t = 0; t < 8; t++) { await S.runOperationsCycle({}); now += 15 * MIN; }   // two hours
   eq('a failing site: tried once an hour', checksOf(A), 2);
   world.failEvidenceFor = new Set();
+  const before = checksOf(A);
+  await S.runOperationsCycle({ withCoach: true });
+  eq('the coach run, asked for by hand, takes every site whether or not it is due', checksOf(A), before + 1);
   eq('the constants: a little under a day, and an hour', [K.CHECK_EVERY_MS < DAY && K.CHECK_EVERY_MS > DAY - 15 * MIN, K.CHECK_RETRY_MS], [true, HOUR]);
 }
 
