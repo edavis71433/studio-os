@@ -14,7 +14,7 @@
   :root{
     --bg:var(--dds-bg,#faf8f5);--card:var(--dds-card,#fff);--ink:var(--dds-ink,#1b1525);--soft:var(--dds-soft,#6b6478);--faint:var(--dds-faint,#746b8a);--line:var(--dds-line,#eee9e0);
     --p:var(--dds-p,#5b3fa0);--p-deep:var(--dds-p-deep,#2a1b4a);--p-soft:var(--dds-p-soft,#efeafa);
-    --good:var(--dds-good,#33664b);--good-soft:var(--dds-good-soft,#e7f1ea);--warn:var(--dds-warn,#775d31);--warn-soft:var(--dds-warn-soft,#f3ead9);--bad:var(--dds-bad,#9a4242);
+    --good:var(--dds-good,#33664b);--good-soft:var(--dds-good-soft,#e7f1ea);--warn:var(--dds-warn,#775d31);--warn-soft:var(--dds-warn-soft,#f3ead9);--bad:var(--dds-bad,#9a4242);--bad-soft:var(--dds-bad-soft,#fdeaea);
     --shadow:var(--dds-shadow,0 1px 2px rgba(27,21,37,.04),0 8px 24px rgba(27,21,37,.06));
     --serif:'Fraunces',"Iowan Old Style",Georgia,serif;
     --sans:'Inter',-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
@@ -96,6 +96,21 @@
   .sst{background:var(--bg);border-radius:var(--dds-r,10px);padding:8px 10px;min-width:0}
   .sst .l{display:block;font-size:10.5px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:var(--faint);margin-bottom:2px}
   .sst .sline{font-size:12.5px;line-height:1.35}
+  /* builder list items 129 and 180: last month's numbers on each card and in the table */
+  .snums{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:var(--dds-s2,8px);margin-top:2px}
+  .snum{background:var(--bg);border-radius:var(--dds-r,10px);padding:8px 10px;min-width:0}
+  .snum .l{display:block;font-size:11px;font-weight:600;color:var(--faint);margin-bottom:3px;line-height:1.25}
+  .nv{display:flex;align-items:center;gap:6px;flex-wrap:wrap;min-width:0}
+  .nv b{font-size:16px;font-weight:700;color:var(--ink);font-variant-numeric:tabular-nums}
+  .nv .why{font-size:12px;color:var(--soft);line-height:1.3}
+  .dchip{display:inline-flex;align-items:center;font-size:11.5px;font-weight:600;border-radius:999px;padding:1px 6px;white-space:nowrap;background:var(--bg);color:var(--soft)}
+  .dchip.up{background:var(--good-soft);color:var(--good)} .dchip.down{background:var(--bad-soft);color:var(--bad)}
+  .snum .dchip{background:var(--card);white-space:normal} .snum .dchip.up{background:var(--good-soft)} .snum .dchip.down{background:var(--bad-soft)}
+  .nochg{font-size:11.5px;color:var(--soft);line-height:1.3}
+  .hring{flex:0 0 auto;display:block}
+  .hring .trk{fill:none;stroke:var(--line);stroke-width:3.5}
+  .hring .arc{fill:none;stroke-width:3.5;stroke-linecap:round} .hring .arc.good{stroke:var(--good)} .hring .arc.fair{stroke:var(--warn)} .hring .arc.poor{stroke:var(--bad)}
+  .hring text{font:700 11px var(--sans);fill:var(--ink)}
   .sfoot{display:flex;align-items:center;gap:var(--dds-s2,8px);margin-top:auto;padding-top:var(--dds-s3,12px);border-top:1px solid var(--line)}
   .sfoot .avs{flex:0 0 auto} .sfoot .when{font-size:12px;color:var(--soft);flex:1;min-width:0;line-height:1.35}
   .sfoot .sacts{margin-top:0;padding-top:0;flex-wrap:nowrap}
@@ -157,6 +172,30 @@
   .tscroll td .sub{font-size:12px;color:var(--faint);margin-top:1px}
   .tscroll td.when{white-space:nowrap;font-size:13px;color:var(--soft)}
   .tscroll th.acts,.tscroll td.acts{width:1%;white-space:nowrap;text-align:right}
+  .tscroll td.num .nv{flex-wrap:nowrap} .tscroll td.num .nv b{font-size:15px}
+  .tcap{display:flex;align-items:center;gap:var(--dds-s2,8px);flex-wrap:wrap;padding:10px var(--dds-s4,16px);border-bottom:1px solid var(--line);font-size:12.5px;color:var(--soft);background:var(--p-soft)}
+  .tcap span{flex:1;min-width:0}
+  .tcap .lnk{font:inherit;font-weight:600;color:var(--p);background:none;border:none;padding:4px 0;cursor:pointer}
+  .tcap .lnk[aria-pressed="true"]{text-decoration:underline}
+  /* a phone: each site is a block, its three numbers side by side; the rest is on its card */
+  @media (max-width:760px){
+    .tscroll{overflow-x:visible}
+    .tscroll table{min-width:0}
+    .tscroll thead,.tscroll thead tr{display:flex;flex-wrap:wrap;gap:6px}
+    .tscroll thead tr{padding:10px 12px;border-bottom:1px solid var(--line)}
+    .tscroll thead th,html.dds-app .tscroll thead tr th{border:none;background:none}
+    .tscroll thead th.wide,.tscroll thead th.acts{display:none}
+    .tscroll thead th .thb{padding:6px 11px;min-height:36px;border:1px solid var(--line);border-radius:999px;background:var(--card);font-size:12.5px;width:auto}
+    .tscroll tbody tr{position:relative;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;padding:12px;border-bottom:1px solid var(--line)}
+    .tscroll tbody tr:last-child{border-bottom:none}
+    .tscroll tbody td{display:block;padding:0;border:none;min-width:0}
+    .tscroll tbody td.name{grid-column:1/-1;grid-row:1;padding-right:44px}
+    .tscroll tbody td.acts{position:absolute;top:6px;right:6px;width:auto}
+    .tscroll tbody td.num{grid-row:2;background:var(--bg);border-radius:10px;padding:7px 9px}
+    .tscroll tbody td.num::before{content:attr(data-label);display:block;font-size:11px;font-weight:600;color:var(--faint);margin-bottom:2px}
+    .tscroll tbody td.num .nv{flex-wrap:wrap}
+    .tscroll tbody td.wide{display:none}
+  }
   .avs{display:flex;flex-wrap:wrap;gap:3px}
   .av{width:26px;height:26px;border-radius:50%;display:grid;place-items:center;font-size:11px;font-weight:700;background:var(--p-soft);color:var(--p)}
   .av.client{background:var(--good-soft);color:var(--good)}
@@ -344,6 +383,9 @@ let FILTER='all';            // all · needs · live · notlive · elsewhere · 
 const DISPLAY_KEY='dds-display:sites';
 let DISPLAY=(function(){try{const v=localStorage.getItem(DISPLAY_KEY);if(v==='table'||v==='cards')return v;}catch(_){/* storage may be denied */}return'cards';})();
 let SORT=null;   // null = the server's order (pinned, then last opened); else {key,dir}
+// builder list items 129 and 180: each site's visitors, Google clicks and health, last month
+// against the month before (GET /agency/site-numbers), read after the cards are up
+let NUMS={},NUM_HEAD=null;
 
 // ── the words on a card ──
 function statusOf(s){
@@ -396,6 +438,7 @@ function cardHtml(s,i){
       ${s.billing_issue?'<div class="sline warn">Their billing needs a look</div>':''}
       ${copiedHtml(s)}
       ${ownerRowHtml(s)}
+      <div class="snums" data-nums="${esc(s.site_id)}"${s.state==='not_live'||!NUM_HEAD?' hidden':''}>${s.state==='not_live'?'':numsHtml(s)}</div>
       <div class="sstats">
         <div class="sst"><span class="l">Plan</span><div class="sline">${planLine(s.plan)}</div></div>
         <div class="sst"><span class="l">Domain</span>${dom||`<div class="sline">${s.domain?esc(s.domain):'None connected'}</div>`}</div>
@@ -422,30 +465,75 @@ function doorsHtml(s){
 }
 function menuBtnHtml(s){return `<button type="button" class="more" data-menu="${esc(s.site_id)}" aria-haspopup="menu" aria-expanded="false" aria-label="More for ${esc(s.name||'this site')}" title="Pin, duplicate, save as a template, invite, open">⋯</button>`;}
 
+// ── the numbers (items 129 and 180): a value, its change on the month before, or why there is none ──
+const NUM_WHY={no_counter:'No counter',counter_off:'Counter off',not_live:'After it goes live',not_ready:'Coming soon',unavailable:'Couldn’t read',not_connected:'Not connected',waiting:'Not in yet',not_checked:'Not checked yet'};
+const n1=(n)=>Number(n||0).toLocaleString('en-US');
+const priorWord=()=>(NUM_HEAD&&NUM_HEAD.prior_label)||'the month before';
+// a percent change; a first month is "New"; both empty says nothing
+function pctChip(v,p){
+  if(p==null||v==null)return'';
+  if(!p)return v?'<span class="dchip">New</span>':'';
+  const pct=Math.round((v-p)/p*100),w=pct===0?'the same as '+priorWord():(pct>0?'up ':'down ')+Math.abs(pct)+'% on '+priorWord();
+  return `<span class="dchip${pct>0?' up':pct<0?' down':''}" title="${esc(w[0].toUpperCase()+w.slice(1))}"><span aria-hidden="true">${pct===0?'Same':(pct>0?'▲ ':'▼ ')+Math.abs(pct)+'%'}</span><span class="sr-only">${esc(w)}</span></span>`;
+}
+function ptsChip(v,p){
+  if(p==null)return'<span class="nochg" title="No reading from a month ago yet">No change yet</span>';
+  const d=v-p,w=d===0?'the same as a month ago':(d>0?'up ':'down ')+Math.abs(d)+' since a month ago';
+  return `<span class="dchip${d>0?' up':d<0?' down':''}" title="${esc(w[0].toUpperCase()+w.slice(1))}"><span aria-hidden="true">${d===0?'Same':(d>0?'▲ ':'▼ ')+Math.abs(d)}</span><span class="sr-only">${esc(w)}</span></span>`;
+}
+// the studio's 0 to 100 number (Law 13: never shown to a client; Sites is studio-only)
+function ringHtml(score){
+  const sc=Math.max(0,Math.min(100,Math.round(Number(score)||0))),c=97.39,tone=sc>=85?'good':sc>=65?'fair':'poor';
+  return `<svg class="hring" viewBox="0 0 36 36" width="34" height="34" role="img" aria-label="Health ${sc} out of 100"><circle class="trk" cx="18" cy="18" r="15.5"/><circle class="arc ${tone}" cx="18" cy="18" r="15.5" stroke-dasharray="${(c*sc/100).toFixed(2)} ${c}" transform="rotate(-90 18 18)"/><text x="18" y="22" text-anchor="middle">${sc}</text></svg>`;
+}
+// bug hunt H5: the counter knows a person for one day only, so a month's count is visits, as Analytics says
+const VISIT_WORDS='A person counts once a day: someone who comes back on three days is three visits.';
+const whyHtml=(w)=>`<span class="why">${esc(NUM_WHY[w]||'—')}</span>`;
+function visitorsCell(s){const n=NUMS[s.site_id];if(!n)return whyHtml(null);return n.visitors?`<b>${n1(n.visitors.value)}</b>${pctChip(n.visitors.value,n.visitors.prior)}`:whyHtml(n.visitors_why);}
+function searchCell(s){const n=NUMS[s.site_id];if(!n)return whyHtml(null);return n.search?`<b>${n1(n.search.value)}</b>${pctChip(n.search.value,n.search.prior)}`:whyHtml(n.search_why);}
+function healthCell(s){const n=NUMS[s.site_id];if(s.state==='not_live')return whyHtml('not_live');if(!n)return whyHtml(null);return n.health?`${ringHtml(n.health.score)}${ptsChip(n.health.score,n.health.prior)}`:whyHtml(n.health_why);}
+function numsHtml(s){
+  const m=NUM_HEAD?String(NUM_HEAD.month_label||'').slice(0,3):'';
+  return `<div class="snum"><span class="l" title="${VISIT_WORDS}">Visits${m?' · '+esc(m):''}</span><div class="nv">${visitorsCell(s)}</div></div>`
+    +`<div class="snum"><span class="l">Search clicks</span><div class="nv">${searchCell(s)}</div></div>`
+    +`<div class="snum"><span class="l">Health</span><div class="nv">${healthCell(s)}</div></div>`;
+}
+// a drop: fewer visits or clicks than the month before, or a lower health number than a month ago
+function dropOf(s){
+  const n=NUMS[s.site_id];if(!n)return 0;
+  const pct=(o)=>o&&o.prior?(o.value-o.prior)/o.prior*100:0;
+  return Math.min(0,pct(n.visitors),pct(n.search),n.health&&n.health.prior!=null?n.health.score-n.health.prior:0);
+}
+const numSort=(f)=>(s)=>{const v=f(NUMS[s.site_id]);return v==null?-Infinity:v;};
+
 // ── the table: columns that sort; re-rendered freely (it has no pictures) ──
 const COLS=[
-  ['name','Name',(s)=>String(s.name||'').toLowerCase()],
-  ['team','Team',(s)=>(s.team||[]).length],
+  ['name','Site',(s)=>String(s.name||'').toLowerCase()],
+  ['health','Health',numSort((n)=>n&&n.health?n.health.score:null)],
+  ['visitors','Visits',numSort((n)=>n&&n.visitors?n.visitors.value:null)],
+  ['search','Search clicks',numSort((n)=>n&&n.search?n.search.value:null)],
   ['plan','Plan',(s)=>String((s.plan&&s.plan.words)||'').toLowerCase()],
-  ['published','Published',(s)=>s.published_at||''],
   ['updated','Last updated',(s)=>s.updated_at||''],
   ['tags','Tags',(s)=>(s.tags||[]).join(',').toLowerCase()],
 ];
+const DROP_SORT=['drop','Biggest drop first',(s)=>dropOf(s)];
 function avatars(team){
   const t=team||[];const shown=t.slice(0,5);
   return `<div class="avs">${shown.map(m=>`<span class="av${m.side==='client'?' client':''}" title="${esc(whoLabel(m))}">${esc(m.me?'Y':initial(m.who))}</span>`).join('')}${t.length>5?`<span class="av more" title="${esc(t.slice(5).map(whoLabel).join('\n'))}">+${t.length-5}</span>`:''}</div><span class="sr-only">${esc(t.map(whoLabel).join('; ')||'No one yet')}</span>`;
 }
 function tableHtml(list){
-  const ths=COLS.map(([k,label])=>{const on=SORT&&SORT.key===k;return `<th scope="col"${on?` aria-sort="${SORT.dir>0?'ascending':'descending'}"`:''}><button type="button" class="thb" data-sort="${k}">${esc(label)}${on?`<span class="arrow" aria-hidden="true">${SORT.dir>0?'▲':'▼'}</span>`:''}</button></th>`;}).join('')+'<th scope="col" class="acts"><span class="sr-only">Actions</span></th>';
+  const cap=NUM_HEAD?`<div class="tcap"><span>${esc(NUM_HEAD.month_label)}, compared with ${esc(NUM_HEAD.prior_label)}. A drop is red.</span><button type="button" class="lnk" data-sort="drop" aria-pressed="${SORT&&SORT.key==='drop'?'true':'false'}">Biggest drop first</button></div>`:'';
+  const ths=COLS.map(([k,label])=>{const on=SORT&&SORT.key===k;return `<th scope="col"${['plan','updated','tags'].includes(k)?' class="wide"':''}${on?` aria-sort="${SORT.dir>0?'ascending':'descending'}"`:''}><button type="button" class="thb" data-sort="${k}">${esc(label)}${on?`<span class="arrow" aria-hidden="true">${SORT.dir>0?'▲':'▼'}</span>`:''}</button></th>`;}).join('')+'<th scope="col" class="acts"><span class="sr-only">Actions</span></th>';
   const trs=list.map(s=>{const st=statusOf(s);return `<tr${META.can_open?` data-row="${esc(s.site_id)}" tabindex="0" aria-label="Open ${esc(s.name||'(unnamed)')}’s website"`:''}>
-    <td><span class="n">${s.pinned?'<span aria-label="Pinned" title="Pinned">📌 </span>':''}${esc(s.name||'(unnamed)')}</span><div class="sub">${esc(s.domain||hostOf(s.address)||'No address yet')} · <span class="pill ${st.cls}">${esc(st.w)}</span>${s.no_owner?' · No owner yet':''}</div></td>
-    <td>${avatars(s.team)}</td>
-    <td>${esc((s.plan&&s.plan.words)||'')}</td>
-    <td class="when">${s.published_at?esc(day(s.published_at)):'<span class="muted">Not yet</span>'}</td>
-    <td class="when">${s.updated_at?esc(day(s.updated_at)):'—'}</td>
-    <td>${(s.tags||[]).map(t=>`<span class="tagchip">${esc(t)}</span>`).join('')||'<span class="muted">—</span>'}</td>
+    <td class="name"><span class="n">${s.pinned?'<span aria-label="Pinned" title="Pinned">📌 </span>':''}${esc(s.name||'(unnamed)')}</span><div class="sub">${esc(s.domain||hostOf(s.address)||'No address yet')} · <span class="pill ${st.cls}">${esc(st.w)}</span>${s.no_owner?' · No owner yet':''}</div></td>
+    <td class="num" data-label="Health"><div class="nv">${healthCell(s)}</div></td>
+    <td class="num" data-label="Visits"><div class="nv">${visitorsCell(s)}</div></td>
+    <td class="num" data-label="Clicks"><div class="nv">${searchCell(s)}</div></td>
+    <td class="wide">${esc((s.plan&&s.plan.words)||'')}</td>
+    <td class="when wide">${s.updated_at?esc(day(s.updated_at)):'—'}</td>
+    <td class="wide">${(s.tags||[]).map(t=>`<span class="tagchip">${esc(t)}</span>`).join('')||'<span class="muted">—</span>'}</td>
     <td class="acts">${menuBtnHtml(s)}</td></tr>`;}).join('');
-  return `<div class="tscroll"><table aria-label="Sites"><thead><tr>${ths}</tr></thead><tbody>${trs}</tbody></table></div>`;
+  return `<div class="tscroll">${cap}<table aria-label="Sites"><thead><tr>${ths}</tr></thead><tbody>${trs}</tbody></table></div>`;
 }
 
 // ── the filters (the band's numbers and the pills share them) and the search ──
@@ -458,13 +546,14 @@ const FILTERS={
   elsewhere:{label:'Hosted elsewhere',test:(s)=>s.state==='elsewhere'},
   changes:{label:'Changes waiting',test:(s)=>!!s.unpublished_changes&&s.state!=='not_live'},
   domains:{label:'Domain renews soon',test:(s)=>{const d=domainDays(s);return d!=null&&d<=30;}},
+  drops:{label:'Dropped this month',test:(s)=>dropOf(s)<0},   // items 129 and 180
 };
 const countOf=(k)=>SITES.filter(FILTERS[k].test).length;
 const matches=(s)=>{if(!FILTERS[FILTER].test(s))return false;const q=Q.trim().toLowerCase();if(!q)return true;return [s.name,s.domain,hostOf(s.address),(s.tags||[]).join(' '),(s.team||[]).map(t=>t.who).join(' ')].some(x=>String(x||'').toLowerCase().includes(q));};
 // the server's order (pinned in pin order, then last opened, then name), or a column's
 function ordered(){
   const list=SITES.slice();
-  if(SORT){const col=COLS.find(c=>c[0]===SORT.key)||COLS[0];list.sort((a,b)=>{const av=col[2](a),bv=col[2](b);return av<bv?-SORT.dir:av>bv?SORT.dir:0;});}
+  if(SORT){const col=SORT.key==='drop'?DROP_SORT:COLS.find(c=>c[0]===SORT.key)||COLS[0];list.sort((a,b)=>{const av=col[2](a),bv=col[2](b);return av<bv?-SORT.dir:av>bv?SORT.dir:0;});}
   return list;
 }
 
@@ -508,7 +597,7 @@ function needsHtml(){
   <div class="nstrip">${rows.slice(0,3).map(r=>`<div class="task"><span class="av" aria-hidden="true">${esc(initial(r.name))}</span><div class="tx"><div class="tn">${esc(r.name)}</div><div class="tw" title="${esc(r.what)}">${esc(r.what)}</div></div><a class="sbtn main" href="${esc(/^\//.test(String(r.href||''))?r.href:'/agency.html')}">${esc(r.verb||'Open')}</a></div>`).join('')}</div>`;
 }
 function pillsHtml(){
-  const keys=['all','needs','live','notlive','elsewhere'].filter(k=>k==='all'||countOf(k)||FILTER===k);
+  const keys=['all','needs','live','notlive','elsewhere','drops'].filter(k=>k==='all'||countOf(k)||FILTER===k);
   if(!keys.includes(FILTER))keys.push(FILTER);
   return keys.map(k=>`<button type="button" class="fpill" data-filter="${k}" aria-pressed="${FILTER===k?'true':'false'}">${esc(FILTERS[k].label)}<span class="c">· ${countOf(k)}</span></button>`).join('');
 }
@@ -519,7 +608,7 @@ function paintFilters(){
 function setFilter(k){if(!FILTERS[k])return;FILTER=FILTER===k&&k!=='all'?'all':k;MENU_OPEN=null;paintFilters();applyView();}
 function lmetaText(shown){
   const m=Math.floor((Date.now()-LOADED_AT)/60000);
-  const sorted=SORT?`Sorted by ${(COLS.find(c=>c[0]===SORT.key)||COLS[0])[1]}`:'Pinned first, then the ones you opened last';
+  const sorted=SORT?(SORT.key==='drop'?'Biggest drop first':`Sorted by ${(COLS.find(c=>c[0]===SORT.key)||COLS[0])[1]}`):'Pinned first, then the ones you opened last';
   return `${shown} site${shown===1?'':'s'} · ${esc(sorted)} · ${m<1?'Updated just now':'Updated '+m+' min ago'}`;
 }
 
@@ -584,7 +673,8 @@ function wireFrame(){
 function wireTable(){
   document.querySelectorAll('#tableHost [data-sort]').forEach(b=>b.addEventListener('click',()=>{
     const k=b.getAttribute('data-sort');
-    SORT=SORT&&SORT.key===k?{key:k,dir:-SORT.dir}:{key:k,dir:(k==='published'||k==='updated'||k==='team')?-1:1};
+    // numbers sort biggest first; "Biggest drop first" turns off when pressed again
+    SORT=k==='drop'?(SORT&&SORT.key==='drop'?null:{key:'drop',dir:1}):SORT&&SORT.key===k?{key:k,dir:-SORT.dir}:{key:k,dir:(k==='updated'||k==='health'||k==='visitors'||k==='search')?-1:1};
     applyView();const nb=document.querySelector('#tableHost [data-sort="'+k+'"]');if(nb)nb.focus();
   }));
   document.querySelectorAll('#tableHost tr[data-row]').forEach(tr=>{
@@ -976,6 +1066,22 @@ async function mountNeeds(){
   applyView();
 }
 
+// ── items 129 and 180: the numbers, best-effort: without them the cards and the table stand as they were ──
+let NUMSEQ=0;
+async function mountNumbers(){
+  const gen=++NUMSEQ;
+  let r;try{r=await api('/agency/site-numbers');}catch(_){return;}
+  if(gen!==NUMSEQ||!r.ok||!r.body||!r.body.data)return;
+  NUMS=r.body.data||{};NUM_HEAD={month_label:String(r.body.month_label||''),prior_label:String(r.body.prior_label||'')};
+  if(NUM_HEAD.month_label)FILTERS.drops.label='Dropped in '+NUM_HEAD.month_label;
+  for(const s of SITES){
+    const box=document.querySelector('[data-nums="'+CSS.escape(s.site_id)+'"]');
+    if(box&&s.state!=='not_live'){box.innerHTML=numsHtml(s);box.hidden=false;}
+  }
+  paintFilters();
+  applyView();
+}
+
 function notAgency(){$('main').innerHTML=`<div class="center"><h2>This isn’t an agency account.</h2><p class="muted">Sites lists the websites a studio looks after for its clients.</p><p style="margin-top:20px"><a class="link" href="/presence.html">Open your website →</a></p></div>`;}
 function signedOut(){$('main').innerHTML=`<div class="center"><h2>Sign in to your studio.</h2><p style="margin-top:20px"><a class="link" href="/studio.html">Sign in →</a></p></div>`;}
 function trouble(){
@@ -1001,6 +1107,7 @@ async function load(soft){
   render();
   openNewFromHash();
   if(window.ClientTools)ClientTools.mount();   // item 176: each card's content form and kit line
+  mountNumbers();
 }
 async function boot(){
   try{const{data}=await sb.auth.getSession();TOKEN=(data&&data.session&&data.session.access_token)||"";

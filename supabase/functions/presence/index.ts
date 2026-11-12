@@ -57,7 +57,7 @@ import { handleDeletedPages, handleDeletedPageRestore } from './routes/deleted_p
 import { handlePageLockCreate, handlePageLockList } from './routes/page_locks.ts';
 import { handleHealth, handleChanges, handleContentTree, handleNotesList, handleNoteResolve, handleRestoreToDraft, handleMediaList } from './routes/room.ts';
 const { handleWebsiteTimeline } = lazyRoutes(() => import('./routes/timeline.ts'));
-const { handleWebsiteHealth } = lazyRoutes(() => import('./routes/health_page.ts'));
+const { handleWebsiteHealth, handleWebsiteHealthPdf } = lazyRoutes(() => import('./routes/health_page.ts'));
 const { handleBusinessInsights } = lazyRoutes(() => import('./routes/insights_page.ts'));
 const { handleMomentsList, handleMomentDismiss } = lazyRoutes(() => import('./routes/moments.ts'));
 import { handlePortalContext, handlePortalFeed, handleMembersList, handleMemberAdd, handleMemberRevoke, handleSharesList, handleShareSet, reviewerAllowed, memberWriteGate } from './routes/workspace.ts';
@@ -98,6 +98,8 @@ import { handleCommerce, isPublicCommerceRoute } from './routes/commerce.ts';
 import { handleScopedCommerce } from './routes/commerce_scoped.ts';
 const { handleSystem } = lazyRoutes(() => import('./routes/system.ts'));
 const { handleVisibility, handleVisibilityCheck } = lazyRoutes(() => import('./routes/visibility.ts'));
+const { handleFollowGet, handleFollowPut, handleLlmsDraft } = lazyRoutes(() => import('./routes/search_tab.ts'));
+const { handleAiGet, handleAiQuestionsPut } = lazyRoutes(() => import('./routes/ai_answers.ts'));
 const { handleConnectionsList, handleConnectionProfile, handleConnectionConnect, handleConnectionCallback, handleConnectionRefresh, handleConnectionDisconnect, handleConnectionProperties, handleConnectionPropertySelect, handleWritePrepare, handleWriteList, handleWriteDecide, handleWriteExecute, handleWriteRollback, handleConnectionAsk, handleConnectionAskStatus } = lazyRoutes(() => import('./routes/connections.ts'));
 const { handleMarketplaceList, handleMarketplacePrepare, handleMarketplaceDecide, handleMarketplaceExecute, handleMarketplaceRollback, handleMarketplaceFeatures } = lazyRoutes(() => import('./routes/marketplace.ts'));
 const { handleEnterpriseOverview, handleEnterpriseLocations, handleEnterpriseLocationConfig, handleEnterpriseRolloutPrepare, handleEnterpriseDecide, handleEnterpriseExecute, handleEnterpriseRollback, handleEnterpriseAudit } = lazyRoutes(() => import('./routes/enterprise.ts'));
@@ -559,6 +561,11 @@ async function route_(req: Request, cors: Record<string, string>): Promise<Respo
   if (route === '/search/health' && method === 'GET') return handleSearchHealth(site, cors);              // Phase SD
   if (route === '/visibility' && method === 'GET') return handleVisibility(site, cors);                   // the Search tab
   if (route === '/visibility/check' && method === 'POST') return handleVisibilityCheck(site, cors);
+  if (route === '/visibility/follow' && method === 'GET') return handleFollowGet(site, cors);              // item 181
+  if (route === '/visibility/follow' && method === 'PUT') return handleFollowPut(req, site, principal, cors);
+  if (route === '/visibility/llms-draft' && method === 'GET') return handleLlmsDraft(site, cors);         // item 124
+  if (route === '/visibility/ai' && method === 'GET') return handleAiGet(site, cors);                     // item 182
+  if (route === '/visibility/ai/questions' && method === 'PUT') return handleAiQuestionsPut(req, site, principal, cors);
   if (route === '/redirects' && method === 'GET') return handleRedirectsList(site, cors);                 // Phase SD
   if (route === '/redirects' && method === 'POST') return handleRedirectCreate(req, site, principal, cors);
   {
@@ -699,6 +706,7 @@ async function route_(req: Request, cors: Record<string, string>): Promise<Respo
   if (route === '/content-tree' && method === 'GET') return handleContentTree(site, cors);
   if (route === '/website-timeline' && method === 'GET') return handleWebsiteTimeline(site, cors);
   if (route === '/website-health' && method === 'GET') return handleWebsiteHealth(site, cors);
+  if (route === '/website-health/pdf' && method === 'GET') return handleWebsiteHealthPdf(site, cors);   // item 183
   if (route === '/business-insights' && method === 'GET') return handleBusinessInsights(site, cors);
   if (route === '/notes' && method === 'GET') return handleNotesList(site, cors);
   {
@@ -1244,6 +1252,7 @@ async function route_(req: Request, cors: Record<string, string>): Promise<Respo
   if (route === '/report/monthly' && method === 'GET') return (await import('./ops/monthly_report.ts')).handleReportGet(site, cors);
   if (route === '/report/monthly' && method === 'PUT') return (await import('./ops/monthly_report.ts')).handleReportPut(req, site, principal, cors);
   if (route === '/report/monthly/preview' && method === 'POST') return (await import('./ops/monthly_report.ts')).handleReportPreview(site, principal, cors);
+  if (route === '/report/monthly/pdf' && method === 'GET') return (await import('./ops/monthly_report.ts')).handleReportPdf(site, cors);   // item 184
   // ── AN-1: Analytics — plain-English understanding composed from stored signals
   //    (no new engine, no new AI, no fabricated numbers). Site-scoped surfaces.
   // Slice 8: the Business dashboard summary (analytics.html's two-band board)
