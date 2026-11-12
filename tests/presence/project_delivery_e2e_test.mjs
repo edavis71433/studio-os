@@ -35,7 +35,11 @@ const storagePath = up.body?.data?.storage_path; // presence-media/{siteId}/{uui
 // signed upload URL (the real client path); fall back to a service-role seed.
 const SR = Deno.env.get('SALES_E2E_SR'); const STORAGE = Deno.env.get('SALES_E2E_STORAGE');
 let putOk = false;
-try { const r = await fetch(up.body?.data?.upload_url, { method: 'PUT', headers: { 'Content-Type': 'application/pdf', 'x-upsert': 'true' }, body: pdf }); putOk = r.ok; } catch { /* */ }
+// The upload link names the project's address as the server sees it. On production that is the
+// target's own address; on a scratch database it is the address inside Docker, which this machine
+// can't reach, so the same path and token are sent to the target's address.
+const atTarget = (u) => (typeof u === 'string' && u ? new URL(TARGET).origin + u.replace(/^https?:\/\/[^/]+/, '') : u);
+try { const r = await fetch(atTarget(up.body?.data?.upload_url), { method: 'PUT', headers: { 'Content-Type': 'application/pdf', 'x-upsert': 'true' }, body: pdf }); putOk = r.ok; } catch { /* */ }
 if (!putOk && SR && STORAGE && storagePath) {
   try { const r = await fetch(`${STORAGE}/object/${storagePath}`, { method: 'PUT', headers: { Authorization: 'Bearer ' + SR, apikey: SR, 'Content-Type': 'application/pdf', 'x-upsert': 'true' }, body: pdf }); putOk = r.ok; } catch { /* */ }
 }

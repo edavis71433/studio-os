@@ -62,15 +62,16 @@ if (conSent.body?.url) {
   ok('6d. contract signed with the correct version', sign.ok, why(sign));
 } else { ok('6c/d. sign link (skipped — no signing secret)', true); }
 
-// 7-10. convert once → customer/workspace + onboarding handoff
-const conv = await call(`/sales/deals/${dealId}/convert`, 'POST', {});
+// 7-10. convert once → customer/workspace + onboarding handoff. business_os_only, as in
+// sales_closing_e2e: it skips the hosting step, which a scratch database doesn't have.
+const conv = await call(`/sales/deals/${dealId}/convert`, 'POST', { plan: 'business_os_only' });
 ok('7. deal converted once', conv.ok && conv.body?.data?.converted, why(conv));
 ok('8. a customer + workspace/site was created', !!conv.body?.data?.client_id && !!conv.body?.data?.site_id);
 ok('9. the customer receives access (invited to set a login)', conv.body?.data?.invited === true || conv.body?.data?.idempotent === true, why(conv));
 ok('10. lands in the existing onboarding', conv.body?.data?.onboarding === '/get-started.html' || conv.body?.data?.idempotent);
 
 // 11. retry convert → no duplicate
-const conv2 = await call(`/sales/deals/${dealId}/convert`, 'POST', {});
+const conv2 = await call(`/sales/deals/${dealId}/convert`, 'POST', { plan: 'business_os_only' });
 ok('11. retrying convert is idempotent (same client_id, no dup)', conv2.ok && conv2.body?.data?.idempotent === true && conv2.body?.data?.client_id === conv.body?.data?.client_id, why(conv2));
 
 // 12. cross-tenant isolation (best-effort: a random other site id must not be readable via our scope)

@@ -33,7 +33,14 @@ async function P(path, method, body) { // public (token) call — no session
   let b = {}; try { b = await r.json(); } catch { /* */ }
   return { status: r.status, ok: r.ok, body: b };
 }
-const tokenOf = (url) => (typeof url === 'string' && url ? url.split('/').pop() : null);
+// Since Oct 2026 a send answers the deal's one link, sign.html?t=<token>; older links ended
+// in /<token>. Reading the old shape from a new link gave a token that was never valid, so
+// every check below that expected a refusal passed whatever the server did (found Nov 12 2026).
+const tokenOf = (url) => {
+  if (typeof url !== 'string' || !url) return null;
+  const t = url.split('?t=')[1];
+  return t ? decodeURIComponent(t.split('&')[0]) : url.split('/').pop();
+};
 const tag = 'close-' + Date.now();
 
 // ═══ PART A — authed closing path (no link secret needed): reach contract via the
