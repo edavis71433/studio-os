@@ -71,12 +71,15 @@ const settings = read('settings.html');
   ok('settings: a ?client= that is no real site id is no client at all, as before', run('', null, { ...SHELL_HELD }) === false && /const SCOPE = \(function \(\) \{ const v = new URLSearchParams\(location\.search\)\.get\('client'\) \|\| ''; return UUID_RE\.test\(v\) \? v : ''; \}\)\(\);/.test(settings));
   matrix('settings (the context as the shell published it)', (c) => run(c.client, null, { ...c.win, __ddsContext: c.ctx || undefined }));
   ok('settings: the address still goes with every read and every link', /'x-dds-scope-site': SCOPE \}\)/.test(settings) && /const withClient = \(href\) => \{ if \(!SCOPE\) return href;/.test(settings));
-  ok('settings: Deal stages, Automations and the plan are hidden, and the Monthly report shown, only inside a client',
+  ok('settings: Deal stages, the studio’s Automations and the plan are kept out, and the Monthly report and Enquiry replies shown, only inside a client',
     /const inC = inClient\(\);\n  const show = CARDS\.filter\([^\n]*!\(c\.ownerOnly && inC\) && !\(c\.studioOnly && inC\) && !\(c\.scopedOnly && !inC\)/.test(settings)
     && /async function loadPlan\(\) \{\s*if \(inClient\(\)\) return;/.test(settings)
     && /async function loadReport\(\) \{\s*if \(!inClient\(\) \|\|/.test(settings)
     && /if \(!inClient\(\)\) \{ loadStageNames\(\); loadMenu\(\); \}[^\n]*\n\s*else \{ wireReport\(\); loadReport\(\); \}/.test(settings)
-    && /if \(!inClient\(\)\) \{ wireAutomations\(\); paintAutomations\(\); \}/.test(settings));
+    && /const automationsHere = \(\) => !inClient\(\) \|\| \(hasFeature\('website'\) && hasCap\('configure'\)\);/.test(settings)
+    && /if \(automationsHere\(\)\) \{ wireAutomations\(\); paintAutomations\(\); \}/.test(settings)
+    && /RECIPES\.filter\(\(r\) => !inClient\(\) \|\| r\.scoped\)/.test(settings) && /row\.hidden = inClient\(\) && !row\.hasAttribute\('data-scoped'\)/.test(settings)
+    && /\$\('autoHint'\)\.textContent = inClient\(\) \?/.test(settings) && /if \(inClient\(\)\) return;   \/\/ the studio's own sections stay out of a client's settings/.test(settings));
   ok('settings: the studio’s own cards (Team, Your menu) still need the studio’s own level, no business picked',
     /!\(c\.agencyOnly && !\(CTX && CTX\.is_agency && !SCOPE\)\)/.test(settings) && /if \(SCOPE \|\| !\(CTX && CTX\.is_agency\)\) return;/.test(settings));
   // the cards' links: inside a client only the scoped cards carry it; in your own business every one keeps it

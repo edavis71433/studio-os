@@ -58,6 +58,7 @@ const SETTINGS_API = {
 const cardKeys = (page: Page) => page.locator('#cards .setcard').evaluateAll((els) => els.map((e) => e.getAttribute('data-card')));
 
 test('Settings: your second business shows the same cards as your first, each keeping the business; a client’s shows the client’s', async ({ page }) => {
+  test.slow();   // three pages opened in turn
   const errors = errorsOf(page);
   const rec = recorder(page);
   await open(page, FIRST, '/settings.html', SETTINGS_API);
@@ -65,6 +66,7 @@ test('Settings: your second business shows the same cards as your first, each ke
   const first = await cardKeys(page);
   expect(first).toEqual(expect.arrayContaining(['stages', 'auto', 'billing', 'calendar']));
   expect(first).not.toContain('report');
+  expect(first).not.toContain('replies');   // a client's Enquiry replies card
   const firstProfile = await page.locator('#profileHead').textContent();
 
   rec.reset();
@@ -88,6 +90,7 @@ test('Settings: your second business shows the same cards as your first, each ke
   await expect(page.locator('[data-card="report"]')).toBeVisible();
   const inClient = await cardKeys(page);
   for (const k of ['stages', 'auto', 'billing', 'calendar']) expect(inClient).not.toContain(k);
+  expect(inClient).toContain('replies');
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('Settings — Marlow’s Kitchen');
   await expect(page.locator('#profileHead')).toHaveText('Marlow’s Kitchen’s profile');
   await expect(page.locator('[data-card="dev"]')).toHaveAttribute('href', '/developer.html');
@@ -105,6 +108,7 @@ const TODAY_API = {
 const studioCard = (page: Page) => page.locator('a', { hasText: 'your studio is on it' });
 
 test('Today: your second business reads and shows what your first does; a client’s Overview reads the client’s record', async ({ page }) => {
+  test.slow();   // three pages opened in turn
   const errors = errorsOf(page);
   const rec = recorder(page);
   await open(page, FIRST, '/today.html', TODAY_API);
@@ -145,6 +149,7 @@ const PIPE_API = { '/sales/deals': { data: [] }, '/sales/stages': { data: { labe
 const hiddenProp = (page: Page, id: string) => page.locator('#' + id).evaluate((n) => (n as HTMLElement).hidden);
 
 test('Pipeline: your second business keeps New deal, Import, Views, Charts and Print; a client’s hides them', async ({ page }) => {
+  test.slow();   // three pages opened in turn
   const errors = errorsOf(page);
   const rec = recorder(page);
   for (const who of [FIRST, SECOND]) {
@@ -166,6 +171,7 @@ test('Pipeline: your second business keeps New deal, Import, Views, Charts and P
 
 // ── Contacts ──────────────────────────────────────────────────────────────────
 test('Contacts: your second business can add, import and save views as at your first; a client’s says contacts live at the studio level', async ({ page }) => {
+  test.slow();   // three pages opened in turn
   const errors = errorsOf(page);
   for (const who of [FIRST, SECOND]) {
     await open(page, who, '/contacts.html', { '/sales/contacts': { data: [] } });
@@ -182,6 +188,7 @@ test('Contacts: your second business can add, import and save views as at your f
 
 // ── Projects ──────────────────────────────────────────────────────────────────
 test('Projects: your second business reads its own projects and can start one; a client’s reads the studio’s, without New project', async ({ page }) => {
+  test.slow();   // three pages opened in turn
   const errors = errorsOf(page);
   const rec = recorder(page);
   const PROJ_API = { '/projects': { data: [], is_studio_view: true }, '/studio/customers': { data: [] } };
@@ -211,6 +218,7 @@ const CONN_API = {
 };
 
 test('Connections: your second business speaks to its owner and keeps its calendar link; a client’s offers to ask the client', async ({ page }) => {
+  test.slow();   // three pages opened in turn
   const errors = errorsOf(page);
   for (const who of [FIRST, SECOND]) {
     await open(page, who, '/connections.html', CONN_API);
@@ -232,6 +240,7 @@ const ANALYTICS_API = {
 };
 
 test('Analytics: your second business keeps its Reports; a client’s leaves them out', async ({ page }) => {
+  test.slow();   // three pages opened in turn
   const errors = errorsOf(page);
   for (const who of [FIRST, SECOND]) {
     await open(page, who, '/analytics.html', ANALYTICS_API);
@@ -252,6 +261,7 @@ const DEV_API = {
 };
 
 test('Developer and Get started: your second business reads its own; a studio inside a client works on its own site, as before', async ({ page }) => {
+  test.slow();   // six pages opened in turn
   const errors = errorsOf(page);
   const rec = recorder(page);
   for (const who of [FIRST, SECOND, STUDIO]) {
@@ -271,6 +281,7 @@ test('Developer and Get started: your second business reads its own; a studio in
 const FIRST_RUN = { '/commerce/first-run': { data: { dismissed: false, complete: false, done: 0, total: 1, steps: [{ key: 'details', title: 'Add your business details', done: false }] } } };
 
 test('Website editor: your second business gets its owner’s welcome and plan reads; a client’s never asks for them', async ({ page }) => {
+  test.slow();   // three pages opened in turn
   const rec = recorder(page);
   for (const who of [FIRST, SECOND]) {
     rec.reset();
