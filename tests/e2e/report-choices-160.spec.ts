@@ -136,8 +136,8 @@ test.describe('Settings › Monthly report: what it says (builder list item 160)
     await expect(sec.getByRole('button', { name: 'What changed' })).toHaveAttribute('aria-pressed', 'true');
     // with the AI check off, AI answers can't go in yet
     await sec.locator('#sw-ai').click();
-    await expect(sec.locator('#reportIn button').nth(3)).toHaveText('AI answers, off');
-    await sec.locator('#reportIn button').nth(3).click();
+    await expect(sec.locator('#reportIn button').nth(4)).toHaveText('AI answers, off');   // item 185: On Google Maps sits before it
+    await sec.locator('#reportIn button').nth(4).click();
     await expect(toast(page)).toContainText('Switch on “Check AI answers every month” below');
   });
 });
