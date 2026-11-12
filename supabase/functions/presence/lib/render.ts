@@ -26,6 +26,7 @@ import { applyHeaderScroll } from './site_header.ts';
 import { applyPhoneBar } from './phone_bar.ts';
 import { applyMotion } from './site_motion.ts';
 import { applySiteIcon } from './site_icon.ts';
+import { applyButtonStyles } from './site_buttons.ts';
 
 // ── FD-T2: indexed template registry; each template's code loads on first use ──
 // slug → version → { manifest, code loader }. Render resolution goes through this
@@ -210,8 +211,11 @@ export async function renderSnapshot(snapshot: Snapshot, site: SiteConfig, opts:
   // item 158: sections fade up as they scroll into view, when switched on (never on the builder's
   // canvas), and the tab shows the site's own icon when the owner picked one
   const moved = applySiteIcon(opts.allSectionStyles ? drawn : applyMotion(drawn, tokens?.motion), (snapshot.content as SnapshotContent)?.settings?.icon);
+  // item 217: the button set and form style, when one is picked, in the canvas too; before the
+  // developer layer, so a developer's own CSS still has the last word
+  const buttoned = applyButtonStyles(moved, tokens, FIXED_COLOR_TEMPLATES.has(snapshot.template_slug));
   // List item 124: hidden from search, every page says noindex; the owner's llms.txt is written.
-  const searched = withSearchChoices(moved, (snapshot.content as SnapshotContent)?.settings);
+  const searched = withSearchChoices(buttoned, (snapshot.content as SnapshotContent)?.settings);
   // item 122: Call, Directions, Hours and Email along the bottom of every page on a phone, when turned on
   // (after the page's own header and footer choice, so a page that hides its footer has no bar either)
   const barred = applyPhoneBar(searched, tokens?.phone_bar, snapshot.content as SnapshotContent, tokens?.accent);
