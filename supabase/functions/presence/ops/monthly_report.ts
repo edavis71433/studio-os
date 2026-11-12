@@ -45,6 +45,10 @@ export interface ReportSetting {
   enabled: boolean; note: string; last_month: string | null;
   last_result: ReportResult | null; tries: { month: string; count: number } | null;
   updated_by: string | null; updated_at: string | null;
+  /** Builder list item 179: the months whose report really went out (YYYY-MM, newest
+   *  first, the last 24), so the client's Documents shelf lists exactly those. Written
+   *  only when the monthly job's send succeeds: a preview or a skip never counts. */
+  sent_months: string[];
   /** Builder list item 182: the monthly AI check for this client (it costs money, so off
    *  until the studio switches it on), the month it last handled, how that went, and
    *  its tries this month (ops/ai_checks.ts). */
@@ -53,10 +57,6 @@ export interface ReportSetting {
   ai_checks: boolean; ai_month: string | null;
   ai_result: { month: string; status: 'checked' | 'failed'; reason: string | null; at: string } | null;
   ai_tries: { month: string; count: number } | null;
-  /** Builder list item 179: the months whose report really went out (YYYY-MM, newest
-   *  first, the last 24), so the client's Documents shelf lists exactly those. Written
-   *  only when the monthly job's send succeeds: a preview or a skip never counts. */
-  sent_months: string[];
 }
 /** Why a client can't be emailed, in the words the card uses. */
 export const BLOCK_WORDS: Record<string, string> = {
@@ -98,12 +98,12 @@ export function normalizeReportSetting(raw: unknown): ReportSetting {
     tries: r.tries && typeof r.tries === 'object' && typeof (r.tries as any).month === 'string' && Number.isFinite((r.tries as any).count) ? { month: String((r.tries as any).month), count: Math.max(0, Math.floor(Number((r.tries as any).count))) } : null,
     updated_by: typeof r.updated_by === 'string' ? r.updated_by : null,
     updated_at: typeof r.updated_at === 'string' ? r.updated_at : null,
+    sent_months: sentMonthsOf(r.sent_months),
     pdf: r.pdf !== false,
     ai_checks: r.ai_checks === true,
     ai_month: typeof r.ai_month === 'string' && /^\d{4}-\d{2}$/.test(r.ai_month) ? r.ai_month : null,
     ai_result: normalizeAiResult(r.ai_result),
     ai_tries: r.ai_tries && typeof r.ai_tries === 'object' && typeof (r.ai_tries as any).month === 'string' && Number.isFinite((r.ai_tries as any).count) ? { month: String((r.ai_tries as any).month), count: Math.max(0, Math.floor(Number((r.ai_tries as any).count))) } : null,
-    sent_months: sentMonthsOf(r.sent_months),
   };
 }
 
