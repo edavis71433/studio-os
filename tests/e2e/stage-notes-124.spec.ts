@@ -113,6 +113,20 @@ test.describe('item 124 — what to do now, under the stage bar', () => {
     await expect(page.locator('#snNoteMsg')).toHaveText('Saved. Every deal at Proposal sent shows it.');
   });
 
+  test('when the notes can’t be read, what the deal knows still shows (they signed: convert them), with no Edit note', async ({ page }) => {
+    const signed = { ...PIPE_API,
+      [`/sales/deals/${DEAL}`]: { data: { ...PIPE_API[`/sales/deals/${DEAL}`].data, deal: { ...PIPE_API[`/sales/deals/${DEAL}`].data.deal, stage: 'contract' }, contracts: [{ id: 'k-1', title: 'Service agreement', status: 'signed', signed_at: past(1), version: 1 }] } },
+      '/sales/stages': { data: { labels: LABELS, custom: {}, defaults: LABELS, chances: { lead: 10, qualified: 25, proposal: 50, contract: 75, won: 100, lost: 0 }, chance_defaults: {} } },   // an older server: no notes
+    };
+    await installApp(page, { api: signed });
+    await page.goto(`/pipeline.html?deal=${DEAL}`);
+    const note = page.locator('#pathHost .stage-note');
+    await expect(note.locator('.sn-fact')).toContainText('They’ve signed.');
+    await expect(note.locator('#guideConvert')).toBeVisible();
+    await expect(note.locator('.sn-steps')).toHaveCount(0);
+    await expect(note.getByRole('button', { name: 'Edit note' })).toHaveCount(0);
+  });
+
   test('on a phone the note sits under the stage bar and Edit note is a full-width button', async ({ page }, info) => {
     test.skip(info.project.name !== 'mobile', 'phone layout');
     await installApp(page, { api: PIPE_API });

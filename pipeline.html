@@ -919,15 +919,15 @@ const SN_CK='<svg class="sn-ck" viewBox="0 0 24 24" width="18" height="18" fill=
 // itself knows above it (signed, so convert). Kept in step with crm.html's stageNoteHtml.
 function stageNoteHtml(stage,fact){
   const text=STAGE_NOTES&&STAGE_NOTES[stage];
-  if(!text)return'';
+  if(!text&&!fact)return'';   // the deal's own fact (signed: convert them) shows even when the notes couldn't be read
   const label=stageLabel(stage),mine=!!(STAGE_NOTES_CUSTOM&&STAGE_NOTES_CUSTOM[stage]);
-  const body=NOTE_EDIT
+  const body=!text?'':NOTE_EDIT
     ?`<label class="sr-only" for="snText">What to do now at ${esc(label)}, one step a line</label><textarea id="snText" class="sn-text" rows="${Math.min(9,Math.max(3,text.split('\n').length+1))}">${esc(text)}</textarea>
       <p class="sn-help">One step a line, up to eight. Everyone on your team sees this on every deal at ${esc(label)}.</p>
       <div class="sn-acts"><button type="button" class="btn" id="snSave">Save for every deal</button><button type="button" class="btn ghost" id="snCancel">Cancel</button>${mine?'<button type="button" class="sn-reset" id="snReset">Put back the starter note</button>':''}</div>`
     :`<ul class="sn-steps">${text.split('\n').map(l=>`<li>${SN_CK}<span>${esc(l)}</span></li>`).join('')}</ul>
       <p class="sn-foot">${mine?'Your studio’s note':'A starter note'} for every deal at ${esc(label)}. Tap ${esc(label)} on the bar to hide it.</p>`;
-  return `<section class="stage-note" aria-labelledby="snHead"><span class="sn-ic">${SN_FLAG}</span><div class="sn-body"><div class="sn-head"><h3 id="snHead">What to do now</h3><span class="sn-chip">${esc(label)}</span></div>${fact?`<p class="sn-fact"><b>${esc(fact.tip)}</b> ${fact.convert?`<a href="#" id="guideConvert" style="color:var(--p);font-weight:600">${esc(fact.action)} ↓</a>`:esc(fact.action)}</p>`:''}${body}</div>${NOTE_EDIT?'':'<button type="button" class="sn-edit" id="snEdit" data-needs="configure">Edit note</button>'}</section>`;
+  return `<section class="stage-note" aria-labelledby="snHead"><span class="sn-ic">${SN_FLAG}</span><div class="sn-body"><div class="sn-head"><h3 id="snHead">What to do now</h3><span class="sn-chip">${esc(label)}</span></div>${fact?`<p class="sn-fact"><b>${esc(fact.tip)}</b> ${fact.convert?`<a href="#" id="guideConvert" style="color:var(--p);font-weight:600">${esc(fact.action)} ↓</a>`:esc(fact.action)}</p>`:''}${body}</div>${NOTE_EDIT||!text?'':'<button type="button" class="sn-edit" id="snEdit" data-needs="configure">Edit note</button>'}</section>`;
 }
 async function saveStageNote(stage,text,btn){
   if(btn)btn.disabled=true;
