@@ -763,6 +763,117 @@
     return { use: function (fn) { REQ = fn; }, views: views, saveViews: saveViews, ask: ask, columnsMenu: columnsMenu, sendTo: sendTo, parseCsv: parseCsv, importPanel: importPanel, style: style, fit: fit, confirmIn: confirmIn, askIn: askIn, filterChips: filterChips, undoToast: undoToast, announce: announce, tagInput: tagInput, cleanTag: cleanTag, charts: charts, chartTips: chartTips, printList: printList };
   })();
 
+  // ── The Email box (sales item 80, Nov 2026; drawn in Figma 264:1136, 264:1604 and 265:1452):
+  //    email one person from their record or their deal, with or without a project. GET
+  //    /sales/email says who it goes to (the address on file, never one typed here), who it goes
+  //    out as and where a reply comes back, so a missing or stopped address is said before a word
+  //    is written; POST /sales/email sends it and keeps it on their timeline. One box, two homes:
+  //    the record's composer and Pipeline's deal card. The page hands over its own request
+  //    function (the record asks the studio's own site, even from inside a client). ──
+  window.ddsEmailBox = (function () {
+    var INFO = {}, SR = null, styled = false, seq = 0;
+    var NOT_YET = 'Email from here arrives with an update that’s on its way. Try again a little later.';
+    var MAIL = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3.5 6.5l8.5 6 8.5-6"/></svg>';
+    function esc3(v) { return String(v == null ? '' : v).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
+    function first(n) { return String(n || '').trim().split(/\s+/)[0] || ''; }
+    function initials(n) { var w = String(n || '').trim().split(/\s+/).filter(Boolean); return (Array.from(w[0] || '?')[0] + (w.length > 1 ? Array.from(w[w.length - 1])[0] : '')).toUpperCase(); }
+    function key(ids) { var k = ['deal_id', 'contact_id', 'client_id']; for (var i = 0; i < k.length; i++) if (ids && ids[k[i]]) return k[i] + '=' + encodeURIComponent(ids[k[i]]); return ''; }
+    function style() {
+      if (styled) return; styled = true;
+      var st = document.createElement('style');
+      st.textContent = '.dm{display:flex;flex-direction:column;gap:10px;margin:0}'
+        + '.dm-r{display:flex;align-items:center;gap:12px;min-width:0}.dm-l{flex:0 0 56px;font-size:13px;color:var(--soft,#5c5468)}'
+        + '.dm-to{display:inline-flex;align-items:center;gap:8px;min-width:0;max-width:100%;padding:4px 14px 4px 4px;border-radius:999px;background:var(--p-soft,#efe9fa);font-size:14px;color:var(--ink,#1b1525)}'
+        + '.dm-to b{font-weight:600;white-space:nowrap}.dm-a{color:var(--soft,#5c5468);font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}'
+        + '.dm-av{flex:0 0 auto;width:26px;height:26px;border-radius:50%;display:inline-grid;place-items:center;font-size:11px;font-weight:700;letter-spacing:.02em;background:var(--p,#5b3fa0);color:#fff}'
+        + '.dm-s{flex:1;min-width:0;font:inherit;font-size:14.5px;padding:9px 12px;min-height:40px;box-sizing:border-box;border:1px solid var(--line,#e6e1ee);border-radius:10px;background:var(--card,#fff);color:var(--ink,#1b1525)}'
+        + '.dm-b{display:block;width:100%;box-sizing:border-box;min-height:150px;resize:vertical;font:inherit;font-size:14.5px;line-height:1.5;padding:12px 14px;border:1px solid var(--line,#e6e1ee);border-radius:12px;background:var(--card,#fff);color:var(--ink,#1b1525)}'
+        + '.dm-sr{align-self:flex-start;max-width:100%;font:inherit;font-size:13px;color:var(--ink,#1b1525);background:var(--card,#fff);border:1px solid var(--line,#e6e1ee);border-radius:999px;padding:6px 12px;min-height:32px;cursor:pointer}'
+        + '.dm-f{display:flex;align-items:center;gap:10px 14px;flex-wrap:wrap}'
+        + '.dm-n{flex:1 1 220px;margin:0;display:flex;gap:8px;align-items:flex-start;font-size:12.5px;line-height:1.45;color:var(--soft,#5c5468)}.dm-n svg{flex:0 0 auto;margin-top:1px}.dm-n span{overflow-wrap:anywhere}'
+        + '.dm-go{font:inherit;font-size:14px;font-weight:600;border:0;border-radius:999px;padding:10px 22px;min-height:40px;background:var(--p,#5b3fa0);color:#fff;cursor:pointer;margin-left:auto}.dm-go:disabled{opacity:.65;cursor:default}'
+        + '.dm-err{margin:0;font-size:13px;color:var(--bad,#a3423a)}.dm-err:empty{display:none}.dm-hint{margin:0;font-size:12.5px;color:var(--soft,#5c5468)}'
+        + '.dm-say{margin:0;font-size:13.5px;line-height:1.5;color:var(--soft,#5c5468)}.dm-say button{font:inherit;font-size:13px;font-weight:600;margin-left:6px;border:1px solid var(--line,#e6e1ee);border-radius:999px;padding:4px 12px;min-height:32px;background:var(--card,#fff);color:var(--ink,#1b1525);cursor:pointer}'
+        // white on the dark theme's light purple reads 2.3:1: dark text on the filled parts
+        + '@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .dm-go,:root:not([data-theme="light"]) .dm-av{color:#171320}}'
+        + ':root[data-theme="dark"] .dm-go,:root[data-theme="dark"] .dm-av{color:#171320}'
+        // a phone: 16px type, so focusing a field never zooms the page, and finger-sized controls
+        + '@media (max-width:767px){.dm-s,.dm-b{font-size:16px}.dm-s,.dm-sr,.dm-go,.dm-say button{min-height:44px}.dm-l{flex-basis:50px}.dm-go{flex:1 1 auto}}'
+        + '@media (pointer:coarse){.dm-s,.dm-sr,.dm-go,.dm-say button{min-height:44px}}';
+      document.head.appendChild(st);
+    }
+    // host: where the box draws. o: { req(path, method, body) → {ok, status, body}, ids: one of
+    // {deal_id} {contact_id} {client_id}, idp: the field ids' start (idp+'Subject', idp+'Body'),
+    // values: {subject, body} typed before, focus: put the caret in it once drawn, onSent(data, firstName) }
+    function open(host, o) {
+      style(); o = o || {};
+      var req = o.req || function (p, m, b) { return window.ddsApi(p, { method: m, body: b }); };
+      var k = key(o.ids), mine = String(++seq);
+      host.setAttribute('data-dm', mine);
+      var live = function () { return host.isConnected && host.getAttribute('data-dm') === mine; };
+      if (!k) { host.innerHTML = '<p class="dm-say">Open their record to email them.</p>'; return; }
+      var c = INFO[k];
+      if (c && c.r) { draw(c.r); return; }   // read before: drawn at once, so a redraw keeps what's typed
+      if (!c) c = INFO[k] = { p: Promise.resolve(req('/sales/email?' + k)).then(function (r) { if (r && r.ok && r.body && r.body.data) c.r = r; else delete INFO[k]; return r; }, function () { delete INFO[k]; return { ok: false, status: 0, body: {} }; }) };
+      host.innerHTML = '<p class="dm-say" role="status">Getting the email ready…</p>';
+      c.p.then(function (r) { if (live()) draw(r); });
+      function draw(r) {
+        var d = r && r.body && r.body.data;
+        if (!r || !r.ok || !d) {
+          // pages go live before the server's update: an older server has no /sales/email yet
+          if (r && r.status === 404 && !(r.body && r.body.message)) { host.innerHTML = '<p class="dm-say">' + esc3(NOT_YET) + '</p>'; return; }
+          host.innerHTML = '<p class="dm-say">' + esc3((r && r.body && r.body.message) || (r && r.status === 0 ? 'You look offline. Try again when you’re back online.' : 'We couldn’t get the email ready just now.')) + '<button type="button" class="dm-retry">Try again</button></p>';
+          host.querySelector('.dm-retry').onclick = function () { open(host, o); };
+          return;
+        }
+        var to = d.to || {}, nm = to.name || to.email || 'them', fn = first(to.name) || nm;
+        if (!to.email) { host.innerHTML = '<p class="dm-say">There’s no email address on file for ' + esc3(nm) + '. Add one on their details first.</p>'; return; }
+        if (d.stopped) { host.innerHTML = '<p class="dm-say">' + esc3(d.stopped === 'complaint' ? fn + ' marked an earlier email as spam, so no more email goes to them from here.' : 'Email to ' + to.email + ' bounced, so it can’t be sent there. Check the address on their details.') + '</p>'; return; }
+        var idp = o.idp || ('dm' + mine), v = o.values || {};
+        var back = d.replies === 'inbox' ? 'Replies come to your Inbox' : 'Replies go to ' + (d.reply_to || 'your email');
+        host.innerHTML = '<form class="dm" novalidate>'
+          + '<div class="dm-r"><span class="dm-l">To</span><span class="dm-to"><span class="dm-av" aria-hidden="true">' + esc3(initials(to.name || to.email)) + '</span><b>' + esc3(to.name || to.email) + '</b>' + (to.name ? '<span class="dm-a">' + esc3(to.email) + '</span>' : '') + '</span></div>'
+          + '<div class="dm-r"><label class="dm-l" for="' + idp + 'Subject">Subject</label><input id="' + idp + 'Subject" class="dm-s" type="text" maxlength="200" autocomplete="off" value="' + esc3(v.subject || '') + '"></div>'
+          + '<textarea id="' + idp + 'Body" class="dm-b" rows="7" maxlength="8000" placeholder="Write your email…" aria-label="Your email to ' + esc3(fn) + '">' + esc3(v.body || '') + '</textarea>'
+          + (d.unsubscribed ? '<p class="dm-hint">' + esc3(fn) + ' unsubscribed from your updates. An email you write to just them still reaches them.</p>' : '')
+          + '<div class="dm-f"><p class="dm-n">' + MAIL + '<span>Sent as <b>' + esc3(d.as || 'your studio') + '</b>' + (d.from ? ' from ' + esc3(d.from) : '') + ' · ' + esc3(back) + '</span></p><button type="submit" class="dm-go">Send email</button></div>'
+          + '<p class="dm-err" role="alert"></p></form>';
+        var form = host.querySelector('form'), subj = form.querySelector('.dm-s'), body = form.querySelector('.dm-b'), go = form.querySelector('.dm-go'), errEl = form.querySelector('.dm-err');
+        // saved replies, when there are any (read once a page)
+        if (!SR) SR = Promise.resolve(req('/service/saved-replies')).then(function (r) { return (r && r.ok && r.body && r.body.data && r.body.data.replies) || []; }, function () { return []; });
+        SR.then(function (list) {
+          if (!list.length || !body.isConnected || form.querySelector('.dm-sr')) return;
+          var map = {}; list.forEach(function (x) { map[x.id] = x.body; });
+          var sel = document.createElement('select'); sel.className = 'dm-sr'; sel.setAttribute('aria-label', 'Insert a saved reply');
+          sel.innerHTML = '<option value="">Insert a saved reply…</option>' + list.map(function (x) { return '<option value="' + esc3(x.id) + '">' + esc3(x.title) + '</option>'; }).join('');
+          sel.onchange = function () { var b = map[sel.value]; if (b) { var cur = body.value; body.value = cur ? cur.replace(/\s*$/, '') + '\n\n' + b : b; body.dispatchEvent(new Event('input', { bubbles: true })); body.focus(); } sel.value = ''; };
+          body.parentNode.insertBefore(sel, body);
+        });
+        function err(m) { errEl.textContent = m || ''; }
+        function ready() { go.disabled = false; go.textContent = 'Send email'; }
+        form.addEventListener('input', function () { if (errEl.textContent) err(''); });
+        body.addEventListener('keydown', function (e) { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); send(); } });
+        form.addEventListener('submit', function (e) { e.preventDefault(); send(); });
+        if (o.focus) (subj.value ? body : subj).focus({ preventScroll: true });
+        function send() {
+          if (go.disabled) return;
+          var s = subj.value.trim(), b = body.value.trim();
+          if (!s) { err('Give the email a subject.'); subj.focus(); return; }
+          if (!b) { err('Write your message first.'); body.focus(); return; }
+          go.disabled = true; go.textContent = 'Sending…'; err('');
+          var payload = {}; for (var x in o.ids) if (o.ids[x]) payload[x] = o.ids[x];
+          payload.subject = s; payload.body = b;
+          Promise.resolve(req('/sales/email', 'POST', payload)).then(function (r) {
+            ready();
+            if (r && r.ok && r.body && r.body.data && r.body.data.sent) { subj.value = ''; body.value = ''; if (o.onSent) o.onSent(r.body.data, fn); return; }
+            err(r && r.status === 404 && !(r.body && r.body.message) ? NOT_YET : (r && r.body && r.body.message) || (r && r.status === 0 ? 'You look offline. Nothing was sent.' : 'That didn’t send, and nothing went out. Try again in a moment.'));
+          }, function () { ready(); err('That didn’t send, and nothing went out. Try again in a moment.'); });
+        }
+      }
+    }
+    return { open: open };
+  })();
+
   // ── DOM ──
   var root, sb, CTX = null, DESTS = [];
   function el(html) { var d = document.createElement('div'); d.innerHTML = html.trim(); return d.firstChild; }
