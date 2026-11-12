@@ -111,6 +111,7 @@ const SAFE = {
   'lib/media.ts': [2, 'our own storage: a signed upload address and the image transform'],
   'lib/stock/pexels.ts': [1, 'a photo address the Pexels API answered with'],
   'routes/assets.ts': [3, 'our own storage’s signed links, and Replicate’s delivery host (readPrediction)'],
+  'routes/handover_pack.ts': [1, 'our own storage: a file the hand-over pack carries, read by its stored path'],
   'visual/model.ts': [2, 'the image model’s endpoint, from the platform’s own settings'],
   // scripts drawn into pages: the visitor's browser runs these, never the server
   'lib/documents.ts': [1, 'a page script'], 'lib/feedback_panel.ts': [2, 'a page script'], 'lib/search_index.ts': [1, 'a page script'],
