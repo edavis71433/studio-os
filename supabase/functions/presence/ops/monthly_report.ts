@@ -374,8 +374,8 @@ export function reportHtml(d: ReportData, o: { studioName: string; note: string;
     const h = d.health;
     parts.push(`<p style="margin:14px 0 6px"><strong>Website health</strong></p><p style="margin:0 0 8px">${h.n === 0 ? 'Nothing to look at' : `${h.n} thing${h.n === 1 ? '' : 's'} to look at`}${h.then !== null ? (h.then === h.n ? ', the same as a month ago' : `, ${Math.abs(h.then - h.n)} ${h.then > h.n ? 'fewer' : 'more'} than a month ago`) : ''}${h.fixed ? `. ${h.fixed} fixed this month` : ''}.</p>`);
   }
-  const fast = speedWords(d.speed);
-  if (fast && on('speed')) parts.push(`<p style="margin:14px 0 6px"><strong>How fast it loads</strong></p><p style="margin:0 0 8px">${esc(fast)}</p>`);
+  const fast = speedWords(d.speed);   // builder list item 211: rides the Website health switch
+  if (fast && on('health')) parts.push(`<p style="margin:14px 0 6px"><strong>How fast it loads</strong></p><p style="margin:0 0 8px">${esc(fast)}</p>`);
   if (!on('pages')) { /* left out */ }
   else if (d.topPages.length) {
     parts.push(`<p style="margin:10px 0 6px"><strong>What people read most</strong></p><ol style="margin:0 0 14px;padding-left:20px">${d.topPages.map((p) => `<li>${esc(pageName(p.path))} <span style="color:#6b6478">· ${n1(p.views)} view${p.views === 1 ? '' : 's'}</span></li>`).join('')}</ol>`);

@@ -3,7 +3,7 @@
 // the client should hear it. The report gains a part, "How fast it loads", from the speed each
 // visitor's browser reported as they left a page (list item 151, 0160): three visitors in four
 // saw a page that fast or faster, Google's own measure. Left out when too few visits reported
-// one, and when the studio switched the part off (item 160).
+// one. It rides the Website health part, so switching that off (item 160) leaves both out.
 //
 //   deno run --allow-read --allow-env tests/presence/report_speed_211_test.mjs
 const R = await import('../../supabase/functions/presence/ops/monthly_report.ts');
@@ -26,30 +26,27 @@ const rows = (device, ms, n, path = '/') => Array.from({ length: n }, (_, i) => 
   ok('one kind of screen only: just that one', one && V.speedWords(one) === 'Three visitors in four saw your pages within 1.2 seconds on computers. That’s fast: Google counts under 2.5 seconds as good.', V.speedWords(one));
   ok('too few visits to judge: nothing said, never a guess', V.reportSpeed(rows('mobile', 900, 5)) === null && V.speedWords(null) === null && V.reportSpeed(null) === null);
 }
-// ── a part of the report the studio can switch off ──
+// ── under Website health, on its switch ──
 {
-  ok('the part: "How fast it loads", after Website health', C.REPORT_PARTS.includes('speed') && C.REPORT_PARTS.indexOf('speed') === C.REPORT_PARTS.indexOf('health') + 1 && C.REPORT_PART_WORDS.speed === 'How fast it loads');
-  ok('the part can be switched off like the others', JSON.stringify(C.normalizePartsOff(['speed', 'nope'])) === '["speed"]');
+  ok('no new part: the eight parts stay as they are', !C.REPORT_PARTS.includes('speed') && C.REPORT_PARTS.includes('health'));
   const D = { month: '2026-10', monthLabel: 'October 2026', visitors: 812, pageviews: 2104, truncated: false, enquiries: 3, topPages: [{ path: '/listings', views: 402 }],
     publishes: 2, lastPublishedAt: '2026-10-24T17:00:00Z', address: 'https://maple.example', siteName: 'Maple & Main Realty', priorLabel: 'September', priorVisitors: 690,
     search: null, followed: [], ai: null, reviews: null, health: { n: 3, then: 5, fixed: 2 },
     speed: { phones_ms: 900, computers_ms: 600, verdict: 'fast', sentence: 'Loads fast for most visitors.' } };
   const on = R.reportHtml(D, { studioName: 'Brightline Studio', note: '' }).html;
-  const off = R.reportHtml(D, { studioName: 'Brightline Studio', note: '', off: ['speed'] }).html;
+  const off = R.reportHtml(D, { studioName: 'Brightline Studio', note: '', off: ['health'] }).html;
   const none = R.reportHtml({ ...D, speed: null }, { studioName: 'Brightline Studio', note: '' }).html;
-  ok('email: the part, after Website health', /How fast it loads<\/strong><\/p><p[^>]*>Three visitors in four saw your pages within 0\.9 seconds on phones/.test(on) && on.indexOf('How fast it loads') > on.indexOf('Website health'));
-  ok('email: switched off, or nothing to say, it is left out', !/How fast it loads/.test(off) && !/How fast it loads/.test(none) && /Website health/.test(off));
+  ok('email: the speed line, right after Website health', /How fast it loads<\/strong><\/p><p[^>]*>Three visitors in four saw your pages within 0\.9 seconds on phones/.test(on) && on.indexOf('How fast it loads') > on.indexOf('Website health'));
+  ok('email: with Website health switched off, or nothing to say, it is left out', !/How fast it loads/.test(off) && !/Website health/.test(off) && !/How fast it loads/.test(none) && /Website health/.test(none));
   const text = (bytes) => new TextDecoder('latin1').decode(bytes);
   const pdf = text(reportPdf(D, { studioName: 'Brightline Studio', siteName: 'Maple & Main Realty' }));
-  const pdfOff = text(reportPdf(D, { studioName: 'Brightline Studio', siteName: 'Maple & Main Realty', off: ['speed'] }));
-  ok('PDF: the same part, and switched off it stays out', /How fast it loads/.test(pdf) && /Three visitors in four/.test(pdf) && !/How fast it loads/.test(pdfOff));
+  const pdfOff = text(reportPdf(D, { studioName: 'Brightline Studio', siteName: 'Maple & Main Realty', off: ['health'] }));
+  ok('PDF: the same, and with Website health off it stays out', /How fast it loads/.test(pdf) && /Three visitors in four/.test(pdf) && !/How fast it loads/.test(pdfOff));
 }
 // ── the read ──
 {
   const src = read('supabase/functions/presence/ops/monthly_report.ts');
   ok('the month’s speed rows are read every one, a page at a time', /svcPages\(`presence_visits\?site_id=eq\.\$\{site\.id\}&ts=gte\.\$\{win\.startIso\}&ts=lt\.\$\{win\.endIso\}&kind=eq\.leave&lcp_ms=not\.is\.null&select=path,device,lcp_ms`, 'ts', VISITS_PAGE, 5\)/.test(src) && /speed: reportSpeed\(sq \? sq\.rows as SpeedRow\[\] : null\)/.test(src));
-  const page = read('settings.html');
-  ok('settings: a part the server adds is named in its own words', /d\.parts\.map\(\(p\) => \[p\.key, p\.words\]\) : REPORT_PARTS\)\.find\(\(p\) => p\[0\] === k\)/.test(page));
 }
 
 const failed = results.filter((r) => !r.p);

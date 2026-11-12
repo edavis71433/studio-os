@@ -1234,7 +1234,7 @@ async function togglePart(k) {
   const words = (Array.isArray(d.parts) && d.parts.length ? d.parts.map((p) => p.key) : REPORT_PARTS.map((p) => p[0]));
   if (off.has(k)) off.delete(k); else off.add(k);
   if (words.every((w) => off.has(w))) { toast('Leave at least one part in the report.', true); return; }
-  const name = ((Array.isArray(d.parts) && d.parts.length ? d.parts.map((p) => [p.key, p.words]) : REPORT_PARTS).find((p) => p[0] === k) || [k, k])[1];   // item 211: a part the server added has its own words
+  const name = (REPORT_PARTS.find((p) => p[0] === k) || [k, k])[1];
   REPORT = { ...d, parts_off: words.filter((w) => off.has(w)) }; paintParts(REPORT);
   if (await saveReport({ parts_off: REPORT.parts_off })) toast(off.has(k) ? name + ' is left out of the report.' : name + ' is back in the report.');
 }
