@@ -557,6 +557,13 @@ html.dc-edit:not(.plan-watch) #pcBody{padding:0 20px 20px}
 .pc-mrow .t b{font-size:14px;font-weight:600;line-height:1.25}
 .pc-mrow .t span{font-size:12px;color:var(--ink-2);line-height:1.3;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .pc-mrow .chev{flex:none;color:var(--ink-3)}
+/* item 158: everything on every page, in one place */
+.pc-every{padding:12px 0;border-top:1px solid var(--line)}
+.pc-every:first-of-type{border-top:none}
+.pc-every-h{display:flex;align-items:center;gap:8px;justify-content:space-between}
+.pc-every-h b{font-size:14px}
+.pc-every-st{font-size:12px;font-weight:700;padding:2px 9px;border-radius:999px;background:var(--wash,#f4f0fb);color:var(--ink-2)}
+.pc-every-st.on{background:var(--sage-soft,#e2f4ea);color:var(--sage,#11744a)}
 #pcPane[hidden],#pcList[hidden]{display:none}
 .pc-back{display:inline-flex;align-items:center;gap:4px;margin:0 0 12px -6px;padding:6px 10px 6px 6px;border:0;border-radius:999px;background:none;color:var(--plum);font:600 13px/1 var(--sans);cursor:pointer}
 .pc-back:hover{background:var(--plum-soft)}
@@ -1780,7 +1787,7 @@ body.pd-dragging *{cursor:grabbing !important}
   h1.doc{font-size:24px}
   .hdate{width:84px}
   .hentry{flex-wrap:wrap}
-  .hacts{padding-left:106px;flex-wrap:wrap;gap:var(--dds-s2,8px) 14px}   /* four actions fit a phone's width, or wrap, never off the edge */
+  .hacts{padding-left:106px;flex-wrap:wrap;gap:var(--dds-s2,8px) 14px;flex:1 1 100%;min-width:0}   /* the actions (five with item 158's star) wrap inside a phone's width, never off the edge */
   .deskprivacy{display:none}
   .pagewords{display:none} /* pages travel by tapping links inside the proof */
 }
@@ -1834,6 +1841,23 @@ body.pd-dragging *{cursor:grabbing !important}
 .rdx-table tr.skip td{color:var(--warn,#94530a)}
 .rdx-table tr.same td{color:var(--ink-3)}
 .rdx-more{font:inherit;font-size:12px;font-weight:600;color:var(--plum);background:none;border:none;padding:4px 0;cursor:pointer;text-decoration:underline}
+/* item 158: the site icon in a pretend browser tab, and its two buttons */
+.si-row{margin-top:14px}
+.si-row .si-lbl{font-size:12px;font-weight:600;margin-bottom:6px}
+.si-tab{display:inline-flex;align-items:center;gap:8px;max-width:100%;padding:7px 14px 7px 10px;border-radius:10px 10px 0 0;background:var(--wash,#f4f0fb);border:1px solid var(--line);border-bottom:none;font-size:12.5px;color:var(--ink)}
+.si-tab img,.si-tab .si-letter{width:18px;height:18px;border-radius:4px;flex:none;object-fit:cover}
+.si-tab .si-letter{display:inline-flex;align-items:center;justify-content:center;background:var(--plum);color:var(--on-p,#fff);font-size:12px;font-weight:700}   /* the editor's 12-pixel floor (builder item 34) */
+.si-tab .si-name{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:180px}
+.si-acts{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
+.si-acts button{font:inherit;font-size:12px;padding:5px 11px;border-radius:8px;border:1px solid var(--line);background:transparent;color:inherit;cursor:pointer;min-height:32px}
+/* item 158: star the versions that matter, and show only those */
+.ver-show{display:inline-flex;gap:2px;padding:3px;margin:0 0 10px;border-radius:999px;background:var(--wash,#f4f0fb)}
+.ver-show button{font:inherit;font-size:12px;font-weight:600;min-height:30px;padding:0 12px;border:none;border-radius:999px;background:transparent;color:var(--ink-2);cursor:pointer}
+.ver-show button[aria-pressed="true"]{background:var(--card,#fff);color:var(--ink);box-shadow:0 1px 2px rgba(23,21,34,.12)}
+.ver-star{display:inline-flex;align-items:center;gap:5px;font:inherit;font-size:12.5px;font-weight:600;border:none;background:none;color:var(--ink-2);cursor:pointer;padding:4px 6px;min-height:32px;border-radius:6px}
+.ver-star[aria-pressed="true"] svg{fill:currentColor}   /* the editor's own star, filled when starred */
+.ver-star[aria-pressed="true"]{color:var(--amber,#94530a)}
+.ver-star:focus-visible{outline:2px solid var(--plum);outline-offset:1px}
 /* ── Blog (builder list item 40): the posts as cards with where each stands, the filters,
    and the categories and authors sheet. The writing screen brings its own styles
    (blog-studio.js); while it's open the app's own bars step aside, as in Edit mode. ── */
@@ -2301,6 +2325,7 @@ html.bs-open .scrim{z-index:96}   /* Files and the categories card open over the
                 </div>
                 <p class="pc-none" id="pcNone" role="status" hidden></p>
                 <div class="pc-more">
+                  <button type="button" class="pc-mrow" id="pcEvery"><span class="ic"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l9 5-9 5-9-5z"/><path d="M3 13l9 5 9-5"/></svg></span><span class="t"><b>On every page</b><span id="pcEverySub">Announcement bar, pop-up, phone bar</span></span><svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></button>
                   <button type="button" class="pc-mrow" id="pcHeadFoot"><span class="ic"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h10"/></svg></span><span class="t"><b>Header and footer</b><span>On every page</span></span><svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></button>
                   <button type="button" class="pc-mrow" id="pcNotFound"><span class="ic"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 5h18l-7 8v6l-4-2v-4z"/></svg></span><span class="t"><b>Not found page</b><span>Sends visitors back to Home</span></span><svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></button>
                   <button type="button" class="pc-mrow" id="pcSearchLook"><span class="ic"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg></span><span class="t"><b>Search appearance</b><span>Titles and descriptions</span></span><svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></button>
@@ -5571,6 +5596,7 @@ function mediaCell(grid, m, manage, onPick) {
     row.appendChild(mkAssign("logo_media_id", "Logo", "Set as logo"));
     row.appendChild(mkAssign("cover_media_id", "Hero photo", "Set as hero image"));
     row.appendChild(mkAssign("og_media_id", "Share image", "Use when shared"));
+    row.appendChild(mkAssign("icon_media_id", "Site icon", "Use as site icon"));   // item 158
     // Phase O: edit the photo description (alt text) after upload — a11y/SEO
     const ed = el("button", null, "Edit description");
     ed.type = "button";
@@ -6154,6 +6180,7 @@ function pgRow(entry, ctx) {
 // The Pages tab's two lists, and the same model drawn into the editor's Pages card.
 function renderPagesList() {
   if (PG_DRAG) { PG_DRAG.stale = true; return; }   // a refresh waits for the drop, so it can't pull the row out of someone's hand
+  pcEverySub();   // item 158: the On every page row says what's on
   const ctx = {
     live: !!(S.health && S.health.facts && S.health.facts.website.state !== "none"),
     changes: (S.changes && S.changes.changes) || [],
@@ -8646,8 +8673,9 @@ async function loadHistory() {
   list.innerHTML = `<div class="loadline"><div class="lq">Loading versions…</div><div class="shimmer"></div></div>`;
   S.publishesRead = false;
   try {
-    const pubs = (await api("GET", "/publishes")).data;
+    const got = await api("GET", "/publishes"), pubs = got.data;
     S.publishes = pubs; S.versionsErr = null;
+    S.stars = new Set(got.stars || []);   // item 158: the versions starred
     renderVersionTools();   // compare any two versions + Timewarp (needs S.publishes)
   } catch (err) { S.publishes = null; S.versionsErr = nice(err); }
   S.publishesRead = true;   // saved checkpoints may land before or after: whichever is last draws the list
@@ -8665,18 +8693,52 @@ const VERSIONS_SHOWN = 10;
 const verWhen = (at) => { const d = new Date(at); return d.toLocaleDateString("en-US", { month: "short", day: "numeric" }) + " · " + d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" }); };
 // the date cell leads with what the row is: Published (a filled dot), Saved (a hollow one, never live)
 function verDate(kind, word, at) { const w = el("span", "hdate"); w.appendChild(el("span", "ver-kind " + kind, word)); w.appendChild(document.createTextNode(verWhen(at))); return w; }
+// Item 158: a star on any kept version, a publish or a checkpoint, and the list can show
+// all of them, the publishes only, or only the starred ones.
+function verStar(p) {
+  const on = !!(S.stars && S.stars.has(p.id));
+  const b = el("button", "ver-star"); b.type = "button";
+  b.innerHTML = uiIcon("star", 14) + (on ? "Starred" : "Star");   // one icon set (builder item 34), not typed stars
+  b.setAttribute("aria-pressed", String(on)); b.title = on ? "Take the star off this version" : "Star this version, to find it again";
+  b.addEventListener("click", async () => {
+    const next = !on;
+    try {
+      const d = (await api("PUT", "/publishes/stars", { id: p.id, starred: next })).data || {};
+      S.stars = new Set(d.stars || []);
+      renderVersionList();
+      // the press keeps its place; a row the filter now hides hands it to the filter
+      const nb = $("pubList").querySelector('[data-ver="' + p.id + '"] .ver-star') || $("pubList").querySelector('[data-ver-show="' + (S.verShow || "all") + '"]'); if (nb) nb.focus();
+      toast(next ? "Starred" : "Star taken off");
+    } catch (err) { toast(nice(err), true); }
+  });
+  return b;
+}
 function renderVersionList() {
   const list = $("pubList"); if (!list) return;
   const pubs = S.publishes || [];
-  const all = [...pubs, ...(S.checkpoints || []).map((c) => ({ ...c, saved: true, at: c.at || c.created_at }))].sort((a, b) => new Date(b.at) - new Date(a.at));
+  const every = [...pubs, ...(S.checkpoints || []).map((c) => ({ ...c, saved: true, at: c.at || c.created_at }))].sort((a, b) => new Date(b.at) - new Date(a.at));
+  const show = S.verShow || "all", stars = S.stars || new Set();
+  const all = every.filter((p) => show === "all" || (show === "published" ? !p.saved : stars.has(p.id)));
   list.innerHTML = "";
+  if (every.length) {
+    const seg = el("div", "ver-show"); seg.setAttribute("role", "group"); seg.setAttribute("aria-label", "Show versions");
+    const starredN = every.filter((p) => stars.has(p.id)).length;
+    [["all", "All"], ["published", "Published"], ["starred", "Starred (" + starredN + ")"]].forEach(([k, label]) => {
+      const b = el("button", null, label); b.type = "button"; b.dataset.verShow = k; b.setAttribute("aria-pressed", String(show === k));
+      b.addEventListener("click", () => { S.verShow = k; renderVersionList(); const nb = $("pubList").querySelector('[data-ver-show="' + k + '"]'); if (nb) nb.focus(); });
+      seg.appendChild(b);
+    });
+    list.appendChild(seg);
+    if (!all.length) list.appendChild(el("div", "hint", show === "starred" ? "No starred versions yet. Star the ones you’ll want again: a big launch, a season’s look." : "Nothing to show here yet."));
+  }
   if (S.versionsErr) list.insertAdjacentHTML("beforeend", `<div class="estate"><div class="eq">Your versions couldn’t load just now.</div><div class="eh">${esc(S.versionsErr)}</div></div>`);
-  if (!all.length) { if (!S.versionsErr) list.innerHTML = `<div class="estate"><div class="eq">No versions yet.</div><div class="eh">Each time you publish, a version is saved here. You can look at any of them or restore one.</div></div>`; return; }
+  if (!every.length) { if (!S.versionsErr) list.innerHTML = `<div class="estate"><div class="eq">No versions yet.</div><div class="eh">Each time you publish, a version is saved here. You can look at any of them or restore one.</div></div>`; return; }
+  if (!all.length) return;   // item 158: the filter shows nothing; its own line says so
   const liveId = (pubs.find((p) => p.status === "live") || {}).id;
   const shown = S.versionsAll ? all : all.slice(0, VERSIONS_SHOWN);
   shown.forEach((p) => {
     if (p.saved) { list.appendChild(versionSavedRow(p)); return; }
-    const row = el("div", "hentry" + (p.status === "failed" ? " hfail" : ""));
+    const row = el("div", "hentry" + (p.status === "failed" ? " hfail" : "")); row.dataset.ver = p.id;
     row.appendChild(p.status === "failed" ? verDate("fail", "Not published", p.at) : verDate("pub", "Published", p.at));
     const body = el("div", "hbody");
     const sum = el("div", "hsum");
@@ -8693,6 +8755,7 @@ function renderVersionList() {
       : (p.kind === "restore" ? "A restored version · " : "") + (who ? "Published by " + who : "Published")));
     row.appendChild(body);
     const acts = el("div", "hacts");
+    if (p.status === "live") acts.appendChild(verStar(p));   // item 158
     if (p.status === "live") {
       // Phase AA (FD-7): name (or rename) any kept version — inline, no dialog
       const nameBtn = el("button", "quietact", p.label ? "Rename" : "Name it");
@@ -8749,13 +8812,14 @@ function renderVersionList() {
 // A saved checkpoint in the list: View, Restore (the same sheet as a publish) and, with the
 // right to delete, Remove.
 function versionSavedRow(c) {
-  const row = el("div", "hentry ver-saved");
+  const row = el("div", "hentry ver-saved"); row.dataset.ver = c.id;
   row.appendChild(verDate("save", "Saved", c.at));
   const body = el("div", "hbody");
   body.appendChild(el("div", "hsum", "“" + c.name + "”"));
   body.appendChild(el("div", "hmeta", "A checkpoint of your draft. It was never on your live site."));
   row.appendChild(body);
   const acts = el("div", "hacts");
+  acts.appendChild(verStar(c));   // item 158
   const view = el("button", "quietact", "View"); view.addEventListener("click", () => openLaunchPreview(c.id)); acts.appendChild(view);
   const res = el("button", "textact", "Restore");
   res.addEventListener("click", () => { S.restoreTarget = c; $("resSheetSub").textContent = `“${c.name}”, saved ${fmtDate(c.at)}.`; openSheet("restoreScrim"); });
@@ -10618,6 +10682,11 @@ async function mountDesignCard(fresh = true) {
   stab(pillRow(card, "Front-page layout", heroRow, (o) => String((S.settings && S.settings.hero_layout) || "") === o[1],
     async (o) => { try { await settingsPut({ hero_layout: o[1] }); const c2 = $("designCard"); if (c2) c2.remove(); mountDesignCard(); toast("Layout: " + o[0] + " — publish to apply"); scheduleChangesRefresh(); refreshDesignPreview(); } catch (err) { toast(nice(err), true); } }), "looks");
   stab(navStyleRow(card), "looks");
+  // item 158: a gentle "appear on scroll" (lib/site_motion.ts), and the site's own small icon (lib/site_icon.ts)
+  stab(pillRow(card, "Motion", [["Still", ""], ["Gentle motion", "gentle"]], (o) => String(T.motion || "") === o[1],
+    (o) => saveTokens({ motion: o[1] }, o[1] ? "Gentle motion: sections fade up as visitors scroll" : "Motion: still")), "looks");
+  card.appendChild(el("div", "hint", "Gentle motion fades each section up as visitors scroll to it. Anyone whose device asks for less motion sees it still, and nothing waits to show.")).dataset.stab = "looks";
+  card.appendChild(siteIconRow());
   // DS-8: suggest for my business (deterministic; owner approves by clicking Apply)
   const ik = (S.settings && S.settings.industry_key) || "generic";
   const sug = SUGGEST[ik];
@@ -10793,6 +10862,41 @@ const CORE_SECTIONS = [
   ["Testimonials", "testimonials"], ["FAQ", "faqs"], ["Updates", "updates"],
   ["Hours", "business"], ["Location", "business"], ["Contact", "business"],
 ];
+// Item 158: the site's own small icon, shown the way a browser tab shows it. With none, the
+// template's letter in the site's colour; "Choose a picture" opens Photos, and the letter
+// comes back with one press. It's a page setting like the logo, so it goes live on publish.
+function siteIconRow() {
+  const row = el("div", "si-row"); row.dataset.stab = "looks"; row.id = "siteIconRow";
+  const paint = () => {
+    row.textContent = "";
+    row.appendChild(el("div", "si-lbl", "Site icon"));
+    const id = S.settings && S.settings.icon_media_id, m = id && (S.media || []).find((x) => x.id === id);
+    const name = String((S.identity && S.identity.business_name) || "").trim() || "Your website", letter = name.charAt(0).toUpperCase();
+    const tab = el("div", "si-tab"); tab.setAttribute("role", "img");
+    tab.setAttribute("aria-label", "How your site shows in a browser tab: " + (m && m.thumb ? "your picture" : "the letter " + letter) + " and " + name);
+    if (m && m.thumb) { const im = el("img"); im.src = m.thumb; im.alt = ""; tab.appendChild(im); }
+    else tab.appendChild(el("span", "si-letter", letter));
+    tab.appendChild(el("span", "si-name", name));
+    row.appendChild(tab);
+    row.appendChild(el("div", "hint", id ? "Your picture, in every browser tab and on a phone’s home screen. A square picture with little detail shows best." : "Now: the first letter of your business name, in your colour. Pick a square picture with little detail for a sharper mark."));
+    const acts = el("div", "si-acts");
+    const choose = el("button", null, id ? "Choose another picture" : "Choose a picture"); choose.type = "button";
+    choose.addEventListener("click", () => openPicker((pick) => { if (pick) setSiteIcon(pick, paint); }));
+    acts.appendChild(choose);
+    if (id) { const back = el("button", null, "Use the letter"); back.type = "button"; back.addEventListener("click", () => setSiteIcon(null, paint)); acts.appendChild(back); }
+    row.appendChild(acts);
+  };
+  paint();
+  return row;
+}
+async function setSiteIcon(id, after) {
+  try {
+    await settingsPut({ icon_media_id: id });
+    S.settings = { ...(S.settings || {}), icon_media_id: id };
+    toast(id ? "Site icon set — publish to apply" : "Back to the letter — publish to apply"); scheduleChangesRefresh();
+    if (after) after();
+  } catch (err) { toast(nice(err), true); }
+}
 function mediaThumb(id) {
   const m = (S.media || []).find((x) => x.id === id);
   const wrap = el("span"); wrap.style.cssText = "display:inline-block;width:52px;height:52px;border-radius:8px;overflow:hidden;background:var(--wash,#eee);vertical-align:middle";
@@ -14225,6 +14329,50 @@ function pcPane(id, label) {
 const pcDone = (close) => { const f = el("div", "pg-foot"); const d = el("button", "dc-modal-cancel pg-done", "Done"); d.type = "button"; d.addEventListener("click", () => close()); f.appendChild(d); return f; };
 // Out of Edit mode to another tab, everything saved first, as Exit does.
 function pcLeaveTo(view) { closePagesCard(false); exitEditMode(view); }
+// Item 158 (review file 03, finding 14): everything that sits on every page, in one place.
+// Each line says whether it's on, and leads to where it's changed; the phone bar's three
+// choices are right here. What each one is stays where it was built.
+function pcEveryState() {
+  const st = S.settings || {}, pop = st.popup && typeof st.popup === "object" ? st.popup : null;
+  const until = st.announcement_expires_at ? new Date(st.announcement_expires_at) : null;
+  const annOn = !!String(st.announcement_text || "").trim() && !(until && until < new Date());
+  const pb = pbNow();
+  const tags = !!(st.google_tag_id || st.meta_pixel_id);
+  return { annOn, ann: String(st.announcement_text || "").trim(), popOn: !!(pop && pop.on === true && String(pop.heading || "").trim()), pb, tags };   // the pop-up shows only switched on and with a heading (lib/popup.ts)
+}
+function pcEverySub() {
+  const x = pcEveryState(), on = [];
+  if (x.annOn) on.push("announcement bar"); if (x.popOn) on.push("pop-up"); if (x.pb) on.push("phone bar"); if (x.tags) on.push("cookie notice");
+  const t = $("pcEverySub"); if (t) t.textContent = on.length ? "On now: " + on.join(", ") : "Announcement bar, pop-up, phone bar: all off";
+}
+function pcEvery() {
+  const { box, close } = pcPane("pcEveryPane", "On every page");
+  const paint = () => {
+    box.textContent = "";
+    const x = pcEveryState();
+    box.appendChild(el("h3", "dc-modal-h", "On every page"));
+    box.appendChild(el("p", "dc-modal-sub", "What sits on top of every page of your website, in one place. Changes go live when you publish."));
+    const line = (id, title, state, says, go, goLabel) => {
+      const r = el("div", "pc-every"); r.id = id;
+      const h = el("div", "pc-every-h"); h.append(el("b", null, title), el("span", "pc-every-st" + (state === "On" ? " on" : ""), state)); r.appendChild(h);
+      if (says) r.appendChild(el("p", "pc-note", says));
+      if (go) { const b = el("button", "dc-modal-cancel", goLabel || "Change it"); b.type = "button"; b.addEventListener("click", go); const a = el("div", "pc-acts"); a.appendChild(b); r.appendChild(a); }
+      box.appendChild(r);
+      return r;
+    };
+    const toUpdates = (cardId) => () => { pcLeaveTo("updates"); setTimeout(() => { const c = $(cardId); if (c) { c.scrollIntoView({ block: "start", behavior: "smooth" }); const f = c.querySelector("input,button,textarea,select"); if (f) try { f.focus({ preventScroll: true }); } catch (_) {} } }, 350); };
+    line("pcEveryAnn", "Announcement bar", x.annOn ? "On" : "Off", x.annOn ? "“" + x.ann + "”" : "One short notice across the top of every page, like a holiday closure.", toUpdates("annCard"), x.annOn ? "Change it" : "Add one");
+    line("pcEveryPop", "Pop-up", x.popOn ? "On" : "Off", x.popOn ? "Shows to visitors by the rules you set." : "One calm pop-up with timing rules: a welcome offer or a sign-up box.", toUpdates("popCard"), x.popOn ? "Change it" : "Set one up");
+    const pbBox = line("pcEveryPb", "Phone bar", x.pb ? "On" : "Off", "", null);
+    pbPart(pbBox);
+    pbBox.addEventListener("click", (e) => { if (e.target.closest("#pbSeg button")) setTimeout(() => { pcEverySub(); if (PC_PANE && PC_PANE.box === box) paint(); }, 50); });
+    if (x.tags) line("pcEveryCookie", "Cookie notice", "On", "Your ad tags ask visitors first; the notice shows until they answer.", () => { closePagesCard(false); location.assign("/connections.html" + (location.search || "")); }, "Open ad tags");
+    line("pcEveryHF", "Header and footer", "On", "Your name or logo and the menu on top; your details at the foot.", () => pcHeadFoot(), "Open");
+    line("pcEveryNF", "Not found page", "On", "What someone sees after a broken or old link.", () => pcNotFound(), "Open");
+    box.appendChild(pcDone(close));
+  };
+  paint();
+}
 // Header and footer: the same on every page. The header's arrangement is chosen here; the
 // logo is in Styles and the footer's words are the business details.
 function pcHeadFoot() {
@@ -14370,6 +14518,7 @@ const KEY_MAC = /Mac|iPhone|iPad|iPod/.test(navigator.platform || navigator.user
   on("btnPcLink", () => pgOpenLink(null)); on("btnPcFolder", () => pgOpenFolder(null)); on("btnPcAuto", pgResetNav);
   on("pcBack", () => { if (PC_PANE) PC_PANE.close(); });
   on("pcHeadFoot", pcHeadFoot); on("pcNotFound", pcNotFound); on("pcSearchLook", pcSearchLook);
+  on("pcEvery", pcEvery);   // item 158
   const find = $("pcFind"); if (find) find.addEventListener("input", pcFilter);
   on("dkPhotos", () => toggleTray("files"));
   on("dkFind", () => { dcDockMore(false); openTrayPanel("add", true); });   // opens the library with its search box focused
