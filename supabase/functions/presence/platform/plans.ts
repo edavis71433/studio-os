@@ -44,11 +44,11 @@ export function planConnectDomain(domain: string, target: string | null): InfraP
   return {
     kind: 'connect_domain',
     title: `Point ${domain} at your website`,
-    summary: `Two DNS records route ${domain} (and www.${domain}) to your site. Email, and everything else on the domain, is untouched. Visitors may see the change settle over a few hours.`,
+    summary: `Two records send ${domain} (and www.${domain}) to your site. Email, and everything else on the domain, is untouched. ${'Usually within an hour of adding the records, sometimes a day or two.'}`,
     steps: [
-      step(`Add these records at your DNS host`, 'They tell the internet where your website lives now.', false, records),
-      step('The platform attaches the domain and provisions the security certificate', 'HTTPS certificates are issued and renewed automatically once the records answer.', true),
-      step('The platform verifies the domain answers with your site over HTTPS', 'Trust, but verify — the change isn’t done until it’s observed working.', true),
+      step('Add these records where your domain’s settings are kept', 'They tell the internet where your website lives now.', false, records),
+      step('We switch the padlock on', 'It comes by itself once the records point here, and renews itself.', true),
+      step('We check the domain shows your site', 'It isn’t done until we’ve seen it working.', true),
     ],
     risk: 'Low. The old records keep working until you change them; nothing is deleted by this plan.',
     reversible: true,

@@ -40,6 +40,13 @@ async function siteDomain(site: SiteRow): Promise<string | null> {
   return c.json?.[0]?.domain ?? null;
 }
 
+/** A date the way a person writes it: February 12, 2027 (Nov 12 review, finding 18: the sheet
+ *  showed 2027-02-12). Empty when there is none to show. */
+export function plainDate(iso: string | null | undefined): string {
+  const d = iso ? new Date(iso) : null;
+  return d && !isNaN(d.getTime()) ? d.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric', timeZone: 'UTC' }) : '';
+}
+
 export async function handleFoundationsGet(site: SiteRow, cors: Record<string, string>) {
   const now = new Date().toISOString();
   const domain = await siteDomain(site);
@@ -47,9 +54,15 @@ export async function handleFoundationsGet(site: SiteRow, cors: Record<string, s
   // "www." as the main name the read used to ask about www.x.com, where mail never lives.
   const bare = domain ? bareDomain(domain) : null;
   const zone = bare ? await readZone(bare, now) : null;
+  // Nov 12 review, finding 25: one picture of the records a day. Every open used to save a row,
+  // and nothing ever cleared them.
   if (zone) {
-    await svc('presence_zone_snapshots', { method: 'POST', headers: { Prefer: 'return=minimal' },
-      body: JSON.stringify({ site_id: site.id, domain: zone.domain, records: zone.records, taken_at: now }) });
+    const today = await svc(`presence_zone_snapshots?site_id=eq.${site.id}&taken_at=gte.${now.slice(0, 10)}T00:00:00Z&select=id&limit=1`).catch(() => null);
+    const have = !!(today && today.ok && Array.isArray(today.json) && today.json.length);
+    if (!have && today && today.ok) {
+      await svc('presence_zone_snapshots', { method: 'POST', headers: { Prefer: 'return=minimal' },
+        body: JSON.stringify({ site_id: site.id, domain: zone.domain, records: zone.records, taken_at: now }) });
+    }
   }
   const host = hostFor('netlify');
   const ssl = site.netlify_site_id ? await host.ssl(site.netlify_site_id) : null;
@@ -72,29 +85,33 @@ export async function handleFoundationsGet(site: SiteRow, cors: Record<string, s
     dns: zone ? {
       record_count: zone.records.length,
       records: zone.records.map((r) => ({ ...r, plain: explainRecord(r) })),
-      sentence: `${zone.records.length} records answer for ${domain} right now — each explained below in plain words. Changes always arrive as a plan you approve first.`,
-    } : { record_count: 0, records: [], sentence: 'Nothing to read yet — DNS appears here once a domain is connected.' },
+      sentence: `${zone.records.length} records answer for ${bare} right now, each said below in plain words. Changes always arrive as steps you approve first.`,
+    } : { record_count: 0, records: [], sentence: 'Nothing to read yet. The domain’s records show here once a domain is connected.' },
     ssl: ssl ? {
       state: ssl.state,
       sentence: ssl.state === 'issued' || ssl.state === 'renewed'
-        ? `The security certificate is healthy${ssl.expires_at ? ` and renews itself before ${ssl.expires_at.slice(0, 10)}` : ' and renews itself automatically'}. Nothing for you to do — ever.`
-        : 'The security certificate is being arranged — this settles on its own once the domain answers.',
-    } : { state: 'n/a', sentence: site.edition === 'monitor' ? 'Your current host manages the certificate; the observer checks it stays healthy.' : 'Certificates are provisioned automatically when hosting attaches.' },
+        ? `The padlock is on${plainDate(ssl.expires_at) ? ` and renews itself before ${plainDate(ssl.expires_at)}` : ' and renews itself'}. Nothing for you to do.`
+        : 'The padlock is being switched on. It comes by itself once the domain’s records point here.',
+    } : { state: 'n/a', sentence: site.edition === 'monitor' ? 'The company that hosts your site looks after the padlock. We check it stays on.' : 'The padlock comes by itself once your site is set up here.' },
     email: {
       has_mail: mail.hasMail, spf, dmarc,
       // finding 14: who runs the email, so the protection offered is that company's
       provider: mail.provider ? mail.provider.name : null,
-      sentence: !mail.hasMail ? 'No email runs on this domain — nothing to protect.'
-        : spf && dmarc ? 'Email from your domain is authenticated — inboxes can trust it.'
-        : 'Email runs on this domain but isn’t fully protected yet — a small plan fixes that.',
+      // finding 23: the card names the missing record
+      missing: !mail.hasMail ? [] : [...(spf ? [] : ['sender']), ...(dmarc ? [] : ['fakes'])],
+      sentence: !mail.hasMail ? 'No email runs on this domain, so there is nothing to protect.'
+        : spf && dmarc ? 'Email from your domain is protected. Inboxes can trust it.'
+        : !spf && !dmarc ? 'Email runs on this domain, and two records are missing: the one that lists who may send as you, and the one that tells inboxes what to do with fakes.'
+        : !spf ? 'Email runs on this domain, and one record is missing: the one that lists who may send as you.'
+        : 'Email runs on this domain, and one record is missing: the one that tells inboxes what to do with fakes.',
     },
     hosting: {
       managed: !!site.netlify_site_id,
       sentence: site.netlify_site_id
-        ? 'Hosting, the CDN, deploys, backups, and restores are managed here — every published version is kept and restorable.'
+        ? 'Your site is hosted here. Every published version is kept, and any of them can be put back.'
         : site.edition === 'monitor'
-          ? 'Your website stays on its current hosting; the platform observes it and prepares guidance. Managed hosting comes with an upgrade, whenever you want it.'
-          : 'Hosting attaches when the site is provisioned.',
+          ? 'Your website stays where it is hosted now. We watch it and tell you what we find.'
+          : 'Your site is hosted here once it is set up.',
     },
     cleared_plans: cleared,
   } }, 200, cors);
@@ -160,7 +177,7 @@ export async function handleFoundationsPrepare(req: Request, site: SiteRow, prin
       extra = { content_mapping: mp.content_mapping, redirects: mp.redirects, launch_checks: mp.launch_checks, post_launch_qa: mp.post_launch_qa };
       plan = mp;
     } else {
-      return json({ error: 'bad_goal', message: 'Plans exist for: connect_domain, email_auth, email_setup, registrar_care, hosting_restore, migration, transfer_in, transfer_out, dns_repair.' }, 400, cors);
+      return json({ error: 'bad_goal', message: 'That isn’t something we have steps for yet.' }, 400, cors);
     }
   } catch (e) {
     return json({ error: 'plan_failed', message: (e as Error)?.message?.slice(0, 200) || 'The plan couldn’t be prepared.' }, 502, cors);
