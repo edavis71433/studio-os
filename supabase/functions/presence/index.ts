@@ -56,7 +56,7 @@ import { handleCollection, handleLocation, handleSettings, handleBlockSuggestion
 import { handlePostPublish, handlePostUnpublish, handlePostEmailDraft } from './routes/blog.ts';
 import { handleDeletedPages, handleDeletedPageRestore } from './routes/deleted_pages.ts';
 import { handlePageLockCreate, handlePageLockList } from './routes/page_locks.ts';
-import { handleHealth, handleChanges, handleContentTree, handleNotesList, handleNoteResolve, handleRestoreToDraft, handleMediaList } from './routes/room.ts';
+import { handleHealth, handleChanges, handleContentTree, handleRestoreToDraft, handleMediaList } from './routes/room.ts';
 const { handleWebsiteTimeline } = lazyRoutes(() => import('./routes/timeline.ts'));
 const { handleWebsiteHealth, handleWebsiteHealthPdf } = lazyRoutes(() => import('./routes/health_page.ts'));
 const { handleBusinessInsights } = lazyRoutes(() => import('./routes/insights_page.ts'));
@@ -104,7 +104,6 @@ const { handleFollowGet, handleFollowPut, handleLlmsDraft, handlePhrasesGet, han
 const { handleAiGet, handleAiQuestionsPut } = lazyRoutes(() => import('./routes/ai_answers.ts'));
 const { handleConnectionsList, handleConnectionProfile, handleConnectionConnect, handleConnectionCallback, handleConnectionRefresh, handleConnectionDisconnect, handleConnectionProperties, handleConnectionPropertySelect, handleWritePrepare, handleWriteList, handleWriteDecide, handleWriteExecute, handleWriteRollback, handleConnectionAsk, handleConnectionAskStatus } = lazyRoutes(() => import('./routes/connections.ts'));
 const { handleMarketplaceList, handleMarketplacePrepare, handleMarketplaceDecide, handleMarketplaceExecute, handleMarketplaceRollback, handleMarketplaceFeatures } = lazyRoutes(() => import('./routes/marketplace.ts'));
-const { handleEnterpriseOverview, handleEnterpriseLocations, handleEnterpriseLocationConfig, handleEnterpriseRolloutPrepare, handleEnterpriseDecide, handleEnterpriseExecute, handleEnterpriseRollback, handleEnterpriseAudit } = lazyRoutes(() => import('./routes/enterprise.ts'));
 
 // path after the function name: /functions/v1/presence/site -> "/site"
 function routeOf(url: string): string {
@@ -318,28 +317,6 @@ async function route_(req: Request, cors: Record<string, string>): Promise<Respo
       const mp = route.match(/^\/marketplace\/([a-z0-9_]+)\/prepare$/);
       if (mp && method === 'POST') return handleMarketplacePrepare(req, mp[1], principal, cors);
     }
-  }
-
-  // ── L5.6: Enterprise & Multi-Location — OPERATOR/agency management. Operators
-  //    own no site; handled BEFORE the caller-site gate. Every org-wide change is
-  //    an Approved Plan (lib/approved_plan.ts). One org, many locations.
-  if (route === '/enterprise' || route.startsWith('/enterprise/')) {
-    const eo = route.match(/^\/enterprise\/operations\/([0-9a-f-]{36})\/(decide|execute|rollback)$/);
-    if (eo && method === 'POST') {
-      if (eo[2] === 'decide') return handleEnterpriseDecide(req, eo[1], principal, cors);
-      if (eo[2] === 'execute') return handleEnterpriseExecute(eo[1], principal, cors);
-      if (eo[2] === 'rollback') return handleEnterpriseRollback(eo[1], principal, cors);
-    }
-    const cfg = route.match(/^\/enterprise\/([0-9a-f-]{36})\/locations\/([0-9a-f-]{36})\/config$/);
-    if (cfg && method === 'GET') return handleEnterpriseLocationConfig(cfg[1], cfg[2], principal, cors);
-    const locs = route.match(/^\/enterprise\/([0-9a-f-]{36})\/locations$/);
-    if (locs && method === 'GET') return handleEnterpriseLocations(locs[1], principal, cors);
-    const rp = route.match(/^\/enterprise\/([0-9a-f-]{36})\/rollout\/prepare$/);
-    if (rp && method === 'POST') return handleEnterpriseRolloutPrepare(req, rp[1], principal, cors);
-    const au = route.match(/^\/enterprise\/([0-9a-f-]{36})\/audit$/);
-    if (au && method === 'GET') return handleEnterpriseAudit(au[1], principal, cors);
-    const ov = route.match(/^\/enterprise\/([0-9a-f-]{36})$/);
-    if (ov && method === 'GET') return handleEnterpriseOverview(ov[1], principal, cors);
   }
 
   // Web Push: the VAPID public key is public by design (the browser needs it to
@@ -732,11 +709,6 @@ async function route_(req: Request, cors: Record<string, string>): Promise<Respo
   if (route === '/website-health' && method === 'GET') return handleWebsiteHealth(site, cors);
   if (route === '/website-health/pdf' && method === 'GET') return handleWebsiteHealthPdf(site, cors);   // item 183
   if (route === '/business-insights' && method === 'GET') return handleBusinessInsights(site, cors);
-  if (route === '/notes' && method === 'GET') return handleNotesList(site, cors);
-  {
-    const m = route.match(/^\/notes\/([0-9a-f-]{36})\/(dismiss|accept)$/);
-    if (m && method === 'POST') return handleNoteResolve(site, principal, m[1], m[2] === 'accept' ? 'accepted' : 'dismissed', cors);
-  }
   if (route === '/restore-to-draft' && method === 'POST') return handleRestoreToDraft(req, site, principal, cors);
   // ── G11: per-section review comments on the draft (operator side). Site-scoped
   //    like the sibling site routes; the reviewer boundary above already refuses a
@@ -1101,7 +1073,7 @@ async function route_(req: Request, cors: Record<string, string>): Promise<Respo
   if (route === '/portal/context' && method === 'GET') return handlePortalContext(jwt, site, principal, cors, scopedName);
   if (route === '/portal/feed' && method === 'GET') return handlePortalFeed(jwt, site, principal, cors);
   // Final pass (Nov 8, S1): a studio asked to work with this website's owner; the owner answers
-  if (route === '/portal/studio-requests' || /^\/portal\/studio-requests\/[0-9a-f-]{36}\/(accept|decline)$/.test(route)) {
+  if (/^\/portal\/studio-requests\/[0-9a-f-]{36}\/(accept|decline)$/.test(route)) {
     const { handleStudioRequests } = await import('./routes/connect_requests.ts');
     return handleStudioRequests(req, route, site, principal, cors);
   }
