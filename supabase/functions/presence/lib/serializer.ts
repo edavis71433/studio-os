@@ -333,6 +333,9 @@ export function buildSnapshot(rows: DraftRows, manifest: TemplateManifest, opts:
       ...(settings.visit_counter === false ? { visit_counter: false } : {}),
       // List item 175 (0159): only present when AI assistants are switched off, the same way.
       ...(settings.ai_crawlers === false ? { ai_crawlers: false } : {}),
+      // List item 124 (0171): only present when set, so a site without them is unchanged.
+      ...(settings.search_hidden === true ? { search_hidden: true } : {}),
+      ...(String(settings.llms_txt || '').trim() ? { llms_txt: String(settings.llms_txt).trim().slice(0, 4000) } : {}),
       // List item 152 (0155): only present when an ad tag is set, so a site without one is unchanged.
       ...(settings.google_tag_id || settings.meta_pixel_id ? { ad_tags: { ...(settings.google_tag_id ? { google: String(settings.google_tag_id) } : {}), ...(settings.meta_pixel_id ? { meta: String(settings.meta_pixel_id) } : {}) } } : {}),
       // Phase SD: per-page search visibility + overrides

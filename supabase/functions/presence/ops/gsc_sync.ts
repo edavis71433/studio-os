@@ -18,7 +18,9 @@
 import { svc } from '../lib/db.ts';
 import { loadTokens, saveTokens, markStatus } from '../connected/store.ts';
 import { refreshTokens } from '../connected/auth.ts';
-import { propertyCandidates, gscQueryBody, gscMonthWindow, gscBackMonths, noPropertySentence, parseTotals, parseTermRows, signalRowsFor, gscDomainFor, type GscTotals } from '../lib/gsc.ts';
+import { propertyCandidates, gscQueryBody, gscMonthWindow, gscBackMonths, noPropertySentence, parseTotals, parseTermRows, signalRowsFor, gscDomainFor, gscTermBody, foldDaysToMonths, type GscTotals } from '../lib/gsc.ts';
+import { readReservedJson, RESERVED_NAMES } from '../lib/reserved_store.ts';
+import { normalizeFollowed } from '../lib/search_tools.ts';
 
 const PROVIDER = 'google_search_console';
 const arr = (r: { json?: unknown }): any[] => (Array.isArray((r as { json?: unknown[] }).json) ? (r as { json: any[] }).json : []);
@@ -110,6 +112,7 @@ export async function syncGscForSite(site: { id: string; client_id: string; cust
     if (!res.ok) continue;
     const terms = parseTermRows(res.json, 25).map((t) => ({ client_id: site.client_id, period, dimension: dim, key: t.key, clicks: t.clicks, impressions: t.impressions, position: t.position }));
     if (terms.length) await svc('presence_search_terms?on_conflict=client_id,period,dimension,key', { method: 'POST', headers: { Prefer: 'resolution=merge-duplicates,return=minimal' }, body: JSON.stringify(terms) }).catch(() => {});
+    if (dim === 'query') await syncFollowed(site, prop, startDate, endDate, period, new Set(terms.map((t) => t.key)), tokenState).catch(() => {});
   }
 
   if (opts.backfill) {
@@ -128,6 +131,48 @@ export async function syncGscForSite(site: { id: string; client_id: string; cust
 
   await markStatus(site.id, PROVIDER, 'connected', 'ok').catch(() => {});
   return { ok: true, note: `synced ${period} (${totals.impressions} impressions)`, totals };
+}
+
+/** Builder list item 181: the month's line for each search this site follows that
+ *  isn't already among the month's top 25, asked for by name (one small query each,
+ *  ten at most). A search nobody used that month gets no line, never a zero place. */
+async function syncFollowed(site: { id: string; client_id: string }, prop: string, startDate: string, endDate: string, period: string, have: Set<string>, tokenState: { access: string; refresh: string | null }) {
+  const { terms } = normalizeFollowed(await readReservedJson(site.id, RESERVED_NAMES.followedSearches));
+  for (const t of terms) {
+    if (have.has(t.term)) continue;
+    const res = await query(site.id, prop, gscTermBody(startDate, endDate, t.term, ['query'], 1), tokenState);
+    if (!res.ok) break;
+    const row = parseTermRows(res.json, 1)[0];
+    if (row && row.impressions > 0) await svc('presence_search_terms?on_conflict=client_id,period,dimension,key', { method: 'POST', headers: { Prefer: 'resolution=merge-duplicates,return=minimal' }, body: JSON.stringify([{ client_id: site.client_id, period, dimension: 'query', key: t.term, clicks: row.clicks, impressions: row.impressions, position: row.position }]) }).catch(() => {});
+  }
+}
+
+/** Builder list item 181: when a search is first followed, its last six whole months,
+ *  from one query by day, so its chart has a past on the day it's added. Months
+ *  already kept (the month's top 25) are left as they are. Best-effort. */
+export async function backfillFollowed(site: { id: string; client_id: string; custom_domain: string | null; netlify_site_id: string | null; edition?: string | null }, terms: string[], now: Date = new Date()): Promise<number> {
+  if (!terms.length) return 0;
+  const bundle = await loadTokens(site.id, PROVIDER);
+  if (!bundle?.access_token) return 0;
+  const tokenState = { access: bundle.access_token, refresh: bundle.refresh_token || null };
+  const picked = gscDomainFor(site, await externalDomainFor(site.id));
+  if (!picked) return 0;
+  const last = gscMonthWindow(now), first = gscBackMonths(now, 5).slice(-1)[0] || last;
+  let prop = '';
+  for (const cand of propertyCandidates(picked.domain)) {
+    const res = await query(site.id, cand, gscQueryBody(last.startDate, last.endDate, [], 1), tokenState);
+    if (res.ok) { prop = cand; break; }
+    if (res.status !== 403 && res.status !== 404) return 0;
+  }
+  if (!prop) return 0;
+  let kept = 0;
+  for (const term of terms.slice(0, 10)) {
+    const res = await query(site.id, prop, gscTermBody(first.startDate, last.endDate, term, ['date'], 250), tokenState);
+    if (!res.ok) break;
+    const rows = foldDaysToMonths(res.json).map((m) => ({ client_id: site.client_id, dimension: 'query', key: term, ...m }));
+    if (rows.length) { await svc('presence_search_terms?on_conflict=client_id,period,dimension,key', { method: 'POST', headers: { Prefer: 'resolution=ignore-duplicates,return=minimal' }, body: JSON.stringify(rows) }).catch(() => {}); kept += rows.length; }
+  }
+  return kept;
 }
 
 /** Scheduled sync across every connected GSC site. Secret-gated via /system/run. */

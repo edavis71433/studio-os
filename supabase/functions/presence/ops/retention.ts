@@ -13,6 +13,7 @@ const SCHEDULED_RUNS_DAYS = 90; // presence_scheduled_runs — ops forensics win
 const OPS_ERRORS_DAYS = 90;     // ops_errors — request-path error ledger
 const RATE_LIMIT_DAYS = 1;      // rate_limit_state — windows are minutes; a day is generous
 const EVIDENCE_DAYS = 180;      // presence_evidence_runs — readers only use the latest per site
+const HEALTH_DAYS = 400;        // presence_health_days — one small row per site per day; a year of trend lines
 
 export async function runRetentionSweep(now: Date = new Date()): Promise<Record<string, boolean | number | null>> {
   const out: Record<string, boolean | number | null> = {};
@@ -56,6 +57,9 @@ export async function runRetentionSweep(now: Date = new Date()): Promise<Record<
   // "cleared out periodically" — this is the mechanism behind that sentence.
   // A lead that hasn't turned into a conversation in a year has no basis left.
   await prune('audit_leads', `audit_leads?created_at=lt.${daysAgo(365)}`);
+
+  // Health by day (0170): a pre-0170 environment 404s → recorded false, never throws.
+  await prune('health_days', `presence_health_days?day=lt.${daysAgo(HEALTH_DAYS).slice(0, 10)}`);
 
   // Evidence: needs "all but each site's latest run" — SQL, not REST (0091 RPC).
   // presence_evidence cascades from runs. A pre-0091 environment 404s → recorded
