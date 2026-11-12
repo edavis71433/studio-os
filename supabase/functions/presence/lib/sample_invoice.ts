@@ -6,7 +6,9 @@
 // Stripe link), so nothing can be paid: the pay button is drawn but leads nowhere, and
 // the line under it says what a real one does. The words follow emailInvoice in
 // routes/sales.ts; tests/presence/sample_invoice_test.mjs holds the two side by side
-// so they don't drift apart. Pure.
+// so they don't drift apart. Pure. Since sales item 125 it wears the same new look: the
+// band in the studio's colour on top, and the box with the due date and the amount.
+import { emailBand, emailFacts } from './email_brand.ts';
 
 export const SAMPLE_INVOICE_DUE_DAYS = 14;
 
@@ -33,8 +35,8 @@ export const SAMPLE_BILL_TO = { name: 'Your customer’s name', company: 'Their 
 const escH = (t: string) => t.replace(/[&<>"]/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[ch] as string));
 const dollars = (cents: number) => '$' + (cents / 100).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
-/** The email, as emailInvoice writes it for a customer, with a note on top saying it is a
- *  test and a pay button that is drawn but goes nowhere. `studioName` is '' when the
+/** The email, as emailInvoice writes it for a customer, with a note under the band saying it
+ *  is a test and a pay button that is drawn but goes nowhere. `studioName` is '' when the
  *  studio has no name of its own yet (no "Studio OS" stand-in, as sales item 92 has it). Pure. */
 export function sampleInvoiceEmail(o: { studioName: string; accent: string; amountCents: number; dueLabel: string; title: string; pdf: boolean }): { subject: string; html: string } {
   const amount = dollars(o.amountCents);
@@ -46,6 +48,7 @@ export function sampleInvoiceEmail(o: { studioName: string; accent: string; amou
   const docLine = o.pdf ? `<p style="margin-top:6px">The invoice is attached as a PDF.</p>` : '';
   return {
     subject: `[Test] ${o.title} — ${amount}`,
-    html: `${note}<p>Hi there,</p><p>${who ? `${who} has sent you` : 'Here is'} an invoice (${escH(o.title)}) for <strong>${amount}</strong>, ${due}. You can pay securely here — nothing else needed.</p><p class="cta">${btn}</p>${how}${docLine}`,
+    // the band has to come first: the email frame only reads it at the very start
+    html: `${emailBand('Invoice', o.title)}${note}<p>Hi there,</p><p>${who ? `${who} has sent you` : 'Here is'} an invoice (${escH(o.title)}) for <strong>${amount}</strong>, ${due}. You can pay securely here — nothing else needed.</p>${emailFacts([['Due', o.dueLabel || 'On receipt'], ['Amount due', amount]], { big: true })}<p class="cta">${btn}</p>${how}${docLine}`,
   };
 }

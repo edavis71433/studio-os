@@ -34,7 +34,8 @@ const read = (p) => Deno.readTextFileSync(new URL('../../' + p, import.meta.url)
 {
   const e = sampleInvoiceEmail({ studioName: 'Brightline Studio', accent: '#5b3fa0', amountCents: 45000, dueLabel: 'Nov 25, 2026', title: 'Test invoice', pdf: true });
   ok('email: the subject says it is a test, then reads like the real one', e.subject === '[Test] Test invoice — $450.00', e.subject);
-  ok('email: the note on top says it went to you only and nothing can be paid', e.html.startsWith('<p') && e.html.includes('<strong>This is a test.</strong>') && e.html.includes('sent only to you') && e.html.includes('nothing can be paid'));
+  ok('email: the band first (the frame reads it only there), then the note: it went to you only and nothing can be paid', e.html.startsWith('<!--band:Invoice\u001fTest invoice-->') && e.html.indexOf('<strong>This is a test.</strong>') < e.html.indexOf('Hi there') && e.html.includes('sent only to you') && e.html.includes('nothing can be paid'));
+  ok('email: the box of facts says when it is due and how much, the amount large', e.html.includes('>Due</td>') && e.html.includes('>Nov 25, 2026</td>') && e.html.includes('>Amount due</td>') && /font-size:22px;font-weight:600">\$450\.00<\/td>/.test(e.html));
   ok('email: the pay button is drawn but leads nowhere', e.html.includes('Pay $450.00 securely →') && !/<a\s/i.test(e.html));
   ok('email: a line under it says what a real one does', e.html.includes('this button opens Stripe’s secure page for the amount'));
   ok('email: the studio’s name, the amount and the due date', e.html.includes('Brightline Studio has sent you an invoice (Test invoice) for <strong>$450.00</strong>, due Nov 25, 2026.'));
@@ -48,6 +49,7 @@ const read = (p) => Deno.readTextFileSync(new URL('../../' + p, import.meta.url)
   ok('mirror: the real email still ends its sentence the same way', real.includes('. You can pay securely here — nothing else needed.</p>') && e.html.includes('. You can pay securely here — nothing else needed.</p>'));
   ok('mirror: the real button still reads "Pay … securely →"', real.includes('>Pay ${amount} securely →</a>'));
   ok('mirror: the real email is still transactional, from the studio in its name', /critical: true, asBusiness: true, siteId/.test(real));
+  ok('mirror: the real email still opens with the band and carries the Due and Amount due box (sales item 125)', /\$\{emailBand\(`\$\{isDeposit \? 'Deposit request' : 'Invoice'\}/.test(real) && /emailFacts\(\[\['Due', [^\]]+\], \['Amount due', amount\]\], \{ big: true \}\)/.test(real));
 }
 
 // ── the route ──
