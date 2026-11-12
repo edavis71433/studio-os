@@ -37,6 +37,7 @@ import { lockedRestoreMessage } from '../lib/section_lock.ts';
 import { insertSnapshot as insertSnapshotRow, type DraftSettings } from '../lib/draft_settings.ts';
 import { readReservedJson, updateReservedJson, RESERVED_NAMES } from '../lib/reserved_store.ts';
 import { renderOfflinePage, offlineFileMap } from '../lib/offline_page.ts';
+import { normalizeComingSoon, renderComingSoonPage, comingSoonFileMap } from '../lib/coming_soon.ts';
 import { loadEmailBrand } from '../lib/email_brand.ts';
 import { snapshotContentUsable } from '../lib/render_types.ts';
 import type { SnapshotContent } from '../lib/render_types.ts';
@@ -749,6 +750,63 @@ export async function handleBackOnline(site: SiteRow, principal: Principal, cors
   const snapshot: Snapshot = { content: s.content, content_contract_version: s.content_contract_version, template_slug: s.template_slug, template_version: s.template_version, created_at: s.created_at, dev_customization: s.dev_customization ?? null };
   // runPipeline clears offline_at the moment the deploy goes live — one invariant, one place.
   return runPipeline(site, principal, 'restore', { snapshot, snapshotId: row.snapshot_id, mediaManifest: s.media_manifest || [] }, 'Brought the website back online', cors);
+}
+
+// ── Builder list item 158 · A Coming soon page, before the first publish ───────
+// Before a site's first publish its address can show something on purpose: the business's
+// name, one line, its phone and email, and an optional list box. It goes up through the same
+// deploy Take offline uses (lib/coming_soon.ts draws it; noindex, robots shut), the draft is
+// never touched, and the first publish replaces it. Its words and switches, and when it went
+// up, are kept on the site (reserved JSON), so "Change the page…" opens on them.
+
+/** GET /site/coming-soon — the page's words and switches, and the phone and email it would show. */
+export async function handleComingSoonRead(site: SiteRow, cors: Record<string, string>) {
+  const [stored, ident, live] = await Promise.all([
+    readReservedJson(site.id, RESERVED_NAMES.comingSoon),
+    svc(`presence_identity?site_id=eq.${site.id}&select=phone,email&limit=1`),
+    svc(`presence_publishes?site_id=eq.${site.id}&status=eq.live&select=id&limit=1`),
+  ]);
+  const published = !!(live.ok && Array.isArray(live.json) && live.json.length);
+  const cs = normalizeComingSoon(stored);
+  const id0 = ident.json?.[0] || {};
+  return json({ data: { coming_soon: { ...cs, up_at: published ? null : cs.up_at }, published, contact: { phone: id0.phone || '', email: id0.email || '' } } }, 200, cors);
+}
+
+/** POST /site/coming-soon { line, phone, email, list } — put the page up, or change it while it's up. */
+export async function handleComingSoon(req: Request, site: SiteRow, principal: Principal, cors: Record<string, string>) {
+  let body: unknown = {}; try { body = await req.json(); } catch { /* an empty body is a missing line */ }
+  const cs = normalizeComingSoon(body);
+  if (!cs.line) return json({ error: 'line_required', message: 'Write one line for the page first, like when you open.' }, 400, cors);
+  if (PUBLISH_BLOCKED_STATES.includes(site.status)) return json({ error: 'lifecycle_blocked', message: 'This site is archived and can’t be changed. Contact your studio to reactivate it.' }, 409, cors);
+  if (site.status === 'paused' && principal.kind !== 'staff' && principal.kind !== 'system') return json({ error: 'site_paused', message: 'Your site is currently paused. Contact your studio first.' }, 409, cors);
+  if (!site.netlify_site_id || !netlifyConfigured()) return json({ error: 'config', message: 'Hosting isn’t connected for this site yet.' }, 409, cors);
+  // only before the first publish: once the real site is live, there is nothing to stand in for
+  const live = await svc(`presence_publishes?site_id=eq.${site.id}&status=eq.live&select=id&limit=1`);
+  if (live.ok && Array.isArray(live.json) && live.json.length) return json({ error: 'already_live', message: 'Your site is already live, so it doesn’t need a Coming soon page.' }, 409, cors);
+  const inflight = await svc(`presence_publishes?site_id=eq.${site.id}&status=in.(queued,deploying)&select=id&limit=1`);
+  if (Array.isArray(inflight.json) && inflight.json.length) return json({ error: 'publish_in_progress', message: 'Your site is being published right now, so it won’t need a Coming soon page.' }, 409, cors);
+  const [ident, brand] = await Promise.all([
+    svc(`presence_identity?site_id=eq.${site.id}&select=business_name,email,phone&limit=1`),
+    loadEmailBrand(site.id),
+  ]);
+  const id0 = ident.json?.[0] || {};
+  const fnBase = (Deno.env.get('SUPABASE_URL') || '').replace(/\/$/, '');
+  const html = renderComingSoonPage({
+    businessName: id0.business_name, accent: brand.accent, line: cs.line,
+    phone: cs.phone ? id0.phone : '', email: cs.email ? id0.email : '',
+    list: cs.list, formEndpoint: fnBase ? `${fnBase}/functions/v1/presence/forms/${site.id}/submit` : null,
+  });
+  const dep = await deployFileMap(site.netlify_site_id, comingSoonFileMap(html), { title: 'coming soon page' });
+  if (!dep.ok) return json({ error: 'deploy_failed', message: 'That didn’t go through, and nothing changed. Please try again.' }, 502, cors);
+  const upAt = new Date().toISOString();
+  const saved = await updateReservedJson(site.id, RESERVED_NAMES.comingSoon, (cur) => ({ ...cs, up_at: normalizeComingSoon(cur).up_at || upAt }), principal.email || principal.userId || 'member');
+  if (!saved) {
+    console.log(JSON.stringify({ evt: 'coming_soon_mark_failed', site_id: site.id }));
+    return json({ error: 'write_failed', message: 'The Coming soon page may be up, but we couldn’t record it. Please try again.' }, 502, cors);
+  }
+  await writeChangeEvent({ siteId: site.id, entityType: 'site', entityId: null, action: 'update', summary: 'Put up a Coming soon page: visitors see it until the first publish. The draft is unchanged.', principal, provenance: 'human' });
+  console.log(JSON.stringify({ evt: 'coming_soon_up', site_id: site.id, deploy_id: dep.deployId || null }));
+  return json({ data: { ok: true, coming_soon: saved, message: 'Your Coming soon page is up. Publishing puts your real site there instead.' } }, 200, cors);
 }
 
 // ── List item 175 · Site availability: public, a visitor password, or offline ───
