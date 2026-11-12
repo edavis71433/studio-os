@@ -794,6 +794,10 @@ html.dds-app[data-theme="dark"] .seg button[aria-pressed="true"],html.dds-app[da
   #dds-mbar.plus{align-items:center}
   #dds-mbar > a,#dds-mbar > button:not(.mplus){min-width:0}
   #dds-mbar .mlbl{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  /* the count sits on the icon's corner, so five places keep their words whole on a 360-wide
+     phone ("Messages 3" was cut short inside a client with the + in the bar) */
+  #dds-mbar > a{position:relative}
+  #dds-mbar .mlbl .mdot{position:absolute;top:2px;left:calc(50% + 5px);margin:0;vertical-align:0}
   #dds-mbar .mplus{flex:0 0 auto;width:54px;height:54px;margin:-20px 6px 0;padding:0;border-radius:50%;display:grid;place-items:center;
     background:var(--dds-grad-btn);color:var(--dds-on-p);box-shadow:0 0 0 4px var(--dds-card),0 12px 24px -10px color-mix(in srgb,var(--dds-p) 80%,transparent)}
   #dds-mbar .mplus .nic{width:26px;height:26px;stroke-width:2.4}

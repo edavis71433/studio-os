@@ -103,15 +103,46 @@ test.describe('Websites on a phone, without the App Launcher (builder item 165)'
     await page.waitForURL(/\/customers\.html/);
   });
 
-  test('inside a client: Overview · Website · Messages · Menu, and Menu holds the client’s places', { tag: '@layout' }, async ({ page }) => {
+  // Whether Create shows inside a client is canCreate()'s to say (sales item 91 turns it on there);
+  // the bar puts the + in the middle either way: Overview · Website · (+) · Messages · Menu
+  test('inside a client: Overview · Website · Messages · Menu, the + in the middle when Create shows there', { tag: '@layout' }, async ({ page }) => {
     test.skip(!isPhone(page), 'the bottom bar is phones-only');
     await installApp(page, { api: { ...API, '/portal/context': studio({ nav: CLIENT_NAV, scope: { site_id: CLIENT, name: 'Joe’s Plumbing' } }) } });
     await page.goto(`/today.html?client=${CLIENT}`);
-    expect(await barItems(page)).toEqual(['Overview', 'Website', 'Messages', 'dds-mbar-menu']);
     await expect(page.locator('#dds-mbar a[data-mbar="website"]')).toHaveAttribute('href', `/presence.html?client=${CLIENT}`);
-    await expect(page.locator('#dds-mbar-create')).toHaveCount(0);   // no Create inside a client
+    const plus = (await page.locator('#dds-mbar-create').count()) > 0;
+    expect(await barItems(page)).toEqual(plus ? ['Overview', 'Website', 'dds-mbar-create', 'Messages', 'dds-mbar-menu'] : ['Overview', 'Website', 'Messages', 'dds-mbar-menu']);
     await page.locator('#dds-mbar-menu').click();
     await expect(page.locator('#dds-drawer .g a')).toHaveText(['Overview', 'Website', 'Record', 'Project', 'Messages', 'Files']);
+  });
+
+  test('inside a client with the + too, the five places fit a small phone', { tag: '@layout' }, async ({ page }) => {
+    test.skip(!isPhone(page), 'the bottom bar is phones-only');
+    await page.setViewportSize({ width: 360, height: 740 });
+    await installApp(page, { api: { ...API, '/portal/context': studio({ nav: CLIENT_NAV, scope: { site_id: CLIENT, name: 'Joe’s Plumbing' } }) } });
+    await page.goto(`/today.html?client=${CLIENT}`);
+    await expect(page.locator('#dds-mbar a[data-mbar="website"]')).toBeVisible();
+    // the bar as mountMobileBar draws it when canCreate() is true there: the same + between Website and Messages
+    await page.evaluate(() => {
+      const bar = document.getElementById('dds-mbar')!;
+      if (!document.getElementById('dds-mbar-create')) {
+        const plus = document.createElement('button');
+        plus.type = 'button'; plus.id = 'dds-mbar-create'; plus.className = 'mplus'; plus.setAttribute('aria-label', 'Create');
+        plus.innerHTML = '<svg class="nic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>';
+        bar.insertBefore(plus, bar.querySelector('a[data-mbar="inbox"]'));
+        bar.className = 'plus';
+      }
+    });
+    expect(await barItems(page)).toEqual(['Overview', 'Website', 'dds-mbar-create', 'Messages', 'dds-mbar-menu']);
+    const vw = page.viewportSize()!.width;
+    for (const b of await page.locator('#dds-mbar > a, #dds-mbar > button').all()) {
+      const box = (await b.boundingBox())!;
+      expect(box.x).toBeGreaterThanOrEqual(0);
+      expect(box.x + box.width).toBeLessThanOrEqual(vw + 0.5);
+    }
+    // every word whole: no label cut short at 360 wide
+    const cut = await page.locator('#dds-mbar .mlbl').evaluateAll((els) => els.filter((e) => e.scrollWidth > e.clientWidth + 1).map((e) => e.textContent));
+    expect(cut).toEqual([]);
   });
 
   test('an owner running their own site: Home · Website · Inbox · Menu', { tag: '@layout' }, async ({ page }) => {
