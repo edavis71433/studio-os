@@ -42,6 +42,8 @@ const CASES = [
   { n: 'before the shell has loaded', client: SITE, ctx: null, win: NO_SHELL, want: true },
   { n: 'a context that names neither (an older server): the shell decides', client: SITE, ctx: { scope: null }, win: SHELL_STUDIO, want: true },
   { n: 'a context that names neither, and the shell remembers the business', client: SITE, ctx: { scope: null }, win: SHELL_HELD, want: false },
+  { n: 'the page’s own context lists the business before the shell knows it', client: SITE, ctx: HELD_CTX, win: SHELL_STUDIO, want: false },
+  { n: 'the context says a studio inside a client, though the shell still remembers the business', client: SITE, ctx: STUDIO_CTX, win: SHELL_HELD, want: true },
 ];
 const search = (c) => (c.client ? '?client=' + c.client : '');
 // a ?client= that is no real site id: the shell reads none (its answer is null, as for your own business),
