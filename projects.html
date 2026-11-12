@@ -421,7 +421,7 @@ async function resolveScopedClient(){
     const r=await fetch(FN+'/studio/customers',{headers:{...H(),'x-dds-scope-site':''}});
     const b=await r.json().catch(()=>({}));
     const rows=Array.isArray(b&&b.data)?b.data:[];
-    if(r.ok)takeCustomers(rows);   // H9: the same roster names the customers, so it isn't asked for twice
+    if(r.ok&&inClient())takeCustomers(rows);   // H9: the same roster names the customers, so it isn't asked for twice (unless the context said meanwhile it's your own business, item 83)
     const hit=rows.find(c=>c&&String(c.customer_site_id||'')===site&&c.client_id);
     return hit?{client_id:String(hit.client_id),name:String(hit.name||'')}:null;
   }catch(_){return null;}

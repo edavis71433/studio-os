@@ -160,7 +160,8 @@ ok('pipeline: the page starts as a client’s under ?client= and gives your own 
   && /document\.addEventListener\('dds:context',go\);/.test(pipeline) && /if\(VIEWS_ASKED\|\|inClient\(\)\)return;/.test(pipeline));
 ok('projects: your own business reads its own projects and can start one; a context that differs reads again',
   /LOADED_IN=inClient\(\);\s*\n\s*if\(LOADED_IN&&!AG_MODE\)\{const sc=await resolveScopedClient\(\);/.test(projects) && /NEW_OK=STUDIO&&!LOADED_IN;/.test(projects)
-  && /if\(LOADED_IN===null\|\|LOADED_IN===inClient\(\)\)return;AG_MODE=false;SCOPED_CLIENT=null;CUSTMAP=null;CUSTTRIED=false;load\(true\);/.test(projects));
+  && /if\(LOADED_IN===null\|\|LOADED_IN===inClient\(\)\)return;AG_MODE=false;SCOPED_CLIENT=null;CUSTMAP=null;CUSTTRIED=false;load\(true\);/.test(projects)
+  && /if\(r\.ok&&inClient\(\)\)takeCustomers\(rows\);/.test(projects));   // a studio's roster that lands after the context said "your own" names nothing
 
 // ── connections.html: decided with the client's name, before the first paint ──
 const conn = read('connections.html');
