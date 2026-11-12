@@ -51,6 +51,22 @@ html.dds-embed #detailWrap{padding-top:0}
   .bc-av{flex:0 0 auto;width:20px;height:20px;border-radius:50%;display:grid;place-items:center;font-size:9.5px;font-weight:700;color:#fff;background:var(--dds-grad-brand,var(--p))}
   .bc-v{color:var(--ink);font-weight:600}
   .bc-src{display:inline-block;margin-top:6px;font-size:11.5px;font-weight:600;color:var(--p);background:var(--p-soft);border-radius:999px;padding:1px 8px}
+  /* sales item 37: Everyone / Mine, and each deal's owner (only with a second person on the team) */
+  .filtrow{display:flex;align-items:center;gap:8px 10px;flex-wrap:wrap;margin-bottom:var(--dds-s4,16px)}
+  .filtrow>#filters{margin-bottom:0;flex:1 1 320px;min-width:0}
+  .ownbar{margin:0}
+  .owntog{display:inline-flex;gap:2px;padding:3px;border-radius:999px;background:color-mix(in srgb,var(--p) 12%,var(--card))}
+  .owntog button{font:inherit;font-size:13.5px;font-weight:600;border:none;border-radius:999px;padding:7px 13px;min-height:36px;background:none;color:var(--soft);cursor:pointer;display:inline-flex;gap:6px;align-items:center}
+  .owntog button[aria-pressed="true"]{background:var(--p);color:var(--dds-on-p,#fff);box-shadow:0 4px 10px -4px color-mix(in srgb,var(--p) 60%,transparent)}
+  .owntog .n{font-size:12px;font-weight:700;opacity:.8}
+  .own-b{position:absolute;right:10px;bottom:10px;width:22px;height:22px;border-radius:50%;display:grid;place-items:center;font-size:9.5px;font-weight:700;letter-spacing:.02em;color:#fff;background:var(--p);box-shadow:0 0 0 2px var(--card)}
+  .own-b.mate{background:#2f7d74}
+  .own-sel{font:inherit;font-size:13px;font-weight:600;border:1px solid var(--dds-line-strong,#d6d4e2);border-radius:999px;padding:4px 10px;background:var(--card);color:var(--ink);min-height:32px}
+  .dp-owner{display:flex;align-items:center;gap:10px;margin:0 0 12px}
+  .dp-owner span{font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--faint)}
+  .dh-own{display:inline-flex;align-items:center;gap:6px}
+  @media (max-width:760.98px),(pointer:coarse){.owntog button,.own-sel{min-height:44px}}
+  @media (max-width:760.98px){.filtrow>.ownbar{flex-basis:100%}}
   .col-add{margin-top:6px}
   .col-addbtn{width:100%;font:inherit;font-size:12.5px;font-weight:600;color:var(--soft);background:transparent;border:1px dashed var(--dds-line-strong,var(--line));border-radius:var(--dds-r,8px);padding:8px;cursor:pointer;text-align:left}
   .col-addbtn:hover{color:var(--p);border-color:var(--p)}
@@ -569,7 +585,10 @@ html.dds-embed #detailWrap{padding-top:0}
   <input class="search" id="dealSearch" type="search" autocomplete="off" aria-label="Search deals" placeholder="Search deals — title, company, or contact…">
   <div class="summary" id="summary" aria-live="polite"></div>
   <!-- not tabs — chips that filter/switch in place, so: role=group + aria-pressed -->
+  <div class="filtrow">   <!-- sales item 37: Everyone / Mine sits in front of the stage chips, with a second person on the team -->
+  <div class="ownbar" id="ownerBar" hidden></div>
   <div class="bar" id="filters" role="group" aria-label="Filter by stage"></div>
+  </div>
   <!-- sales item 90: field filters (not contacted in N days, owes money…), List and Table only -->
   <div id="fchips"></div>
   <!-- "Manage services" also lives here: it used to be reachable ONLY from
@@ -2065,13 +2084,72 @@ async function fillMissingNames(){
 // first time a query needs it, degrading to title-only until it lands). The
 // input is STATIC markup: only the list re-renders, so focus + caret survive
 // every keystroke by construction (the contacts.html list-only-re-render idiom).
+// ── Sales item 37: owners, and Everyone / Mine ────────────────────────────────
+// With a second person on the team (/agency/members: the people who have signed in), each
+// deal shows its owner and Pipeline gets Everyone / Mine in front of the filters. Whoever adds a
+// deal owns it; one with no owner (from before owners existed) is the business owner's. The
+// choice is remembered on this device. With one person, nothing shows and nothing filters.
+let TEAM=null,MINE=false;
+try{MINE=localStorage.getItem('dds-pipeline-mine')==='1';}catch(_){/* storage may be denied */}
+const teamOn=()=>!!(TEAM&&TEAM.people.length>1);
+const ownerOf=(d)=>d&&d.assigned_to?String(d.assigned_to):(TEAM?TEAM.owner:'');
+const isMineDeal=(d)=>!!TEAM&&ownerOf(d)===TEAM.me;
+const personOf=(uid)=>(TEAM&&TEAM.people.find(p=>p.uid===uid))||null;
+async function loadTeam(){
+  try{
+    const [me,mem]=await Promise.all([api('/agency/me'),api('/agency/members')]);
+    const list=Array.isArray(mem&&mem.data)?mem.data:[];
+    const myRow=list.find(m=>m.id===(me&&me.data&&me.data.member_id));
+    const meUid=myRow&&myRow.user_id?String(myRow.user_id):'';
+    const nameOf=(m)=>{const l=String(m.email||'').split('@')[0]||'Teammate';return l.charAt(0).toUpperCase()+l.slice(1);};
+    const people=list.filter(m=>m&&(m.status||'active')==='active'&&m.user_id).map(m=>({uid:String(m.user_id),label:String(m.user_id)===meUid?'You':nameOf(m),ini:dealIni(nameOf(m)),me:String(m.user_id)===meUid}));
+    const own=list.find(m=>m.role==='owner'&&m.user_id);
+    TEAM=meUid?{me:meUid,owner:own?String(own.user_id):meUid,people}:null;
+  }catch(_){TEAM=null;}   // not a studio team (or it couldn't be read): no owners shown, nothing filtered
+  if(!teamOn())MINE=false;
+  if(DEALS_LOADED)renderCurrent();else paintOwnerBar();
+  paintDrawerOwner();if(DP)dpPaint();
+}
+function paintOwnerBar(){
+  const bar=$('ownerBar');if(!bar)return;
+  if(!teamOn()){bar.hidden=true;bar.innerHTML='';return;}
+  const pool=VIEW==='board'?DEALS.filter(d=>BOARD_STAGES.includes(d.stage)&&!d.converted_client_id):DEALS;
+  bar.hidden=false;
+  bar.innerHTML=`<div class="owntog" role="group" aria-label="Whose deals"><button type="button" data-own="all" aria-pressed="${MINE?'false':'true'}">Everyone <span class="n">${pool.length}</span></button><button type="button" data-own="mine" aria-pressed="${MINE?'true':'false'}">Mine <span class="n">${pool.filter(isMineDeal).length}</span></button></div>`;
+  bar.querySelectorAll('[data-own]').forEach(b=>b.onclick=()=>{MINE=b.dataset.own==='mine';try{localStorage.setItem('dds-pipeline-mine',MINE?'1':'0');}catch(_){/* */}renderCurrent();const nb=bar.querySelector(`[data-own="${MINE?'mine':'all'}"]`);if(nb)nb.focus();});
+}
+const ownBadge=(d)=>{if(!teamOn())return'';const p=personOf(ownerOf(d));return p?`<span class="own-b${p.me?'':' mate'}" title="Owner: ${esc(p.label)}" aria-label="Owner: ${esc(p.label)}">${esc(p.ini)}</span>`:'';};
+const ownerOptions=(d)=>{const cur=ownerOf(d);return TEAM.people.map(p=>`<option value="${esc(p.uid)}"${p.uid===cur?' selected':''}>${esc(p.label)}</option>`).join('');};
+const OWN_HINT='Changing the owner tells nobody; it moves the deal into their Mine.';
+// The open deal's owner, in its header; painted again when the team arrives after the deal
+let DRAWER_OWN=null;
+function paintDrawerOwner(d){
+  if(d)DRAWER_OWN=d;
+  const slot=$('dOwnSlot'),dd=DRAWER_OWN;if(!slot||!dd)return;
+  if(!teamOn()){slot.hidden=true;slot.innerHTML='';return;}
+  slot.hidden=false;
+  slot.innerHTML=`<label for="dOwner">Owner</label><select class="own-sel" id="dOwner" title="${esc(OWN_HINT)}">${ownerOptions(dd)}</select>`;
+  const sel=$('dOwner');sel.onchange=()=>setDealOwner(dd.id,sel.value,sel);
+}
+async function setDealOwner(id,uid,sel){
+  if(sel)sel.disabled=true;
+  try{await api('/sales/deals/'+encodeURIComponent(id),'PATCH',{assigned_to:uid||null});}
+  catch(e){if(sel){sel.disabled=false;const d0=DEALS.find(x=>String(x.id)===String(id));if(d0)sel.value=ownerOf(d0);}toast(nice(e),true);return;}
+  const d=DEALS.find(x=>String(x.id)===String(id));if(d)d.assigned_to=uid||null;
+  if(DRAWER_OWN&&String(DRAWER_OWN.id)===String(id))DRAWER_OWN.assigned_to=uid||null;
+  if(sel)sel.disabled=false;
+  const p=personOf(uid);toast(p?(p.me?'It’s yours now.':p.label+' owns it now.'):'Owner cleared.');
+  renderCurrent();
+}
 function visibleDeals(){
   const q=Q.trim().toLowerCase();
   // sales item 90: the field filters narrow the list and the table (the board keeps its own chips)
   const fl=VIEW!=='board'&&anyFilter()?(d)=>fMatch(FFILT,d):null;
-  if(!q)return fl?DEALS.filter(fl):DEALS;
+  // sales item 37: Mine narrows every view
+  const base=MINE&&teamOn()?DEALS.filter(isMineDeal):DEALS;
+  if(!q)return fl?base.filter(fl):base;
   if(!CONTACT_TEXT&&!CONTACT_LOADING)ensureContactNames().then(()=>{if(Q.trim())renderCurrent();});
-  return DEALS.filter(d=>{
+  return base.filter(d=>{
     const ct=(CONTACT_TEXT&&d.contact_id&&CONTACT_TEXT[d.contact_id])||'';
     return (String(d.title||'').toLowerCase()+' '+ct).includes(q)&&(!fl||fl(d));
   });
@@ -2219,6 +2297,7 @@ function renderFirstDeal(host){
 // ONE re-render for whatever display is active — the search, refresh, and sort
 // paths all come through here so the meta line never drifts from the list.
 function renderCurrent(){
+  paintOwnerBar();   // sales item 37
   renderMeta();
   paintFchips();
   if(VIEW==='board'){renderBoard();return;}
@@ -2669,7 +2748,7 @@ function boardCard(d,today){
   const web=fromWeb(d)?'<span class="bc-src">From your website</span>':'';
   const canMove=boardMoveTargets(d.stage).length>0;
   const moveBtn=canMove?`<button class="bc-move" data-move="${d.id}" aria-haspopup="menu" aria-expanded="false" title="Move this deal to another stage">Move →</button>`:'';
-  return `<article class="bcard${stale?' is-stale':''}" draggable="true" tabindex="0" role="button" aria-label="${esc(d.title||'Untitled deal')} — ${esc(stageLabel(d.stage))}${stale?' — stalled':''}" data-id="${d.id}" data-stage="${d.stage}"><div class="bc-t">${esc(d.title||'Untitled deal')}</div>${whoRow}${val?`<div class="bc-v">${val}</div>`:''}${due||(lc?`<div class="bc-m">${lc}</div>`:'')}${staleBadge}${web}<div class="bc-actions">${moveBtn}</div></article>`;
+  return `<article class="bcard${stale?' is-stale':''}" draggable="true" tabindex="0" role="button" aria-label="${esc(d.title||'Untitled deal')} — ${esc(stageLabel(d.stage))}${stale?' — stalled':''}" data-id="${d.id}" data-stage="${d.stage}"><div class="bc-t">${esc(d.title||'Untitled deal')}</div>${whoRow}${val?`<div class="bc-v">${val}</div>`:''}${due||(lc?`<div class="bc-m">${lc}</div>`:'')}${staleBadge}${web}<div class="bc-actions">${moveBtn}</div>${ownBadge(d)}</article>`;
 }
 // Sales review item 30: the board keeps its outcomes in view. Won is collapsed to
 // this month's count and value (the summary's own number once it has loaded, the
@@ -2806,6 +2885,7 @@ function dpPaint(){
     :'<p class="dp-none">Nothing yet — a call, a message or a proposal shows up here.</p>';
   box.innerHTML=`<div class="dp-head"><span class="dp-av" aria-hidden="true">${esc(dealIni(who||d.title))}</span><div class="dp-t"><h2 id="dprev-h" tabindex="-1" data-k="h">${esc(d.title||'Untitled deal')}</h2><p>${esc([who,sourceWord(d.source)].filter(Boolean).join(' · '))}</p></div><button type="button" class="dp-x" data-dp="close" data-k="x" aria-label="Close">×</button></div>
     <div class="dp-body">
+      ${teamOn()?`<div class="dp-owner"><span id="dpOwnL">Owner</span><select class="own-sel" data-own-sel data-k="own" aria-labelledby="dpOwnL" title="${esc(OWN_HINT)}">${ownerOptions(d)}</select></div>`:''}
       <div class="dp-tiles"><div><span>Value</span><b>${money(d.expected_value_cents)||'—'}</b></div><div><span>Chance</span><b>${ch!=null?ch+'%':'—'}</b></div><div><span>Closes</span><b>${d.expected_close?esc(dpDay(d.expected_close)):'—'}</b></div></div>
       <p class="dp-stage"><b>${esc(stageLabel(d.stage))}</b>${at>=0&&d.stage!=='won'?` · step ${at+1} of ${DP_PATH.length}`:''}</p>
       <div class="dp-path" aria-hidden="true">${DP_PATH.map((s2,k)=>`<span class="${at>=0&&k<=at?'on':''}"></span>`).join('')}</div>
@@ -2818,6 +2898,7 @@ function dpPaint(){
       ${latest}
     </div>
     <div class="dp-foot"><button type="button" class="dp-open" data-dp="open" data-k="open">Open full deal <span aria-hidden="true">→</span></button></div>`;
+  const osel=box.querySelector('[data-own-sel]');if(osel)osel.onchange=()=>setDealOwner(d.id,osel.value,osel);   // sales item 37
   if(fk){const n=box.querySelector(`[data-k="${fk}"]`)||$('dprev-h');if(n)n.focus({preventScroll:true});}
   const slot=mail&&box.querySelector('[data-mail-slot]');
   if(slot&&mail.el){slot.replaceWith(mail.el);if(mAe){mAe.focus({preventScroll:true});if(mSel)try{mAe.setSelectionRange(mSel[0],mSel[1]);}catch(_){}}}
@@ -3314,6 +3395,7 @@ async function openDeal(id){
             ${d.expected_close&&d.stage!=='won'&&d.stage!=='lost'?`<span class="fact">Closes <strong>${esc(niceDay(d.expected_close))}</strong></span>`:''}
             ${(()=>{const open=(data.invoices||[]).find(v=>v.status==='open');const paid=(data.invoices||[]).find(v=>v.status==='paid');return open?`<span style="color:var(--warn,#775d31);font-weight:600">${money(open.amount_cents)} ${open.purpose==='deposit'?'deposit':'invoice'} awaiting payment</span>`:paid?`<span style="color:var(--good,#33664b);font-weight:600">${money(paid.amount_cents)} paid ✓</span>`:'';})()}
             ${data.last_contacted_at?`<span>Last contacted ${esc(ago(data.last_contacted_at))}</span>`:''}
+            <span class="fact dh-own" id="dOwnSlot" hidden></span>
           </div></div></div>
       ${(d.stage==='won'||d.converted_client_id)?`<div class="row2 dh-acts" style="padding:0 22px 14px"><button${d.converted_client_id?' data-primary-for="overview billing"':''} class="${fillIf(!!d.converted_client_id)}" id="wonInvoice">Send invoice</button>${d.created_project_id?`<a class="btn ghost" href="/projects.html?project=${esc(d.created_project_id)}&client=" data-noscope="1" style="text-decoration:none">Open project</a>`:''}<a class="btn ghost" href="/crm.html?deal=${esc(id)}&client=" data-noscope="1" style="text-decoration:none">Customer record</a></div>`:''}
       <div class="dbody">
@@ -3419,6 +3501,7 @@ async function openDeal(id){
         ${(d.converted_client_id||d.stage==='converted')?'':`<div class="sec" data-needs="delete" style="border-top:1px solid var(--line);padding-top:14px;margin-top:8px"><button class="btn ghost" id="delDeal" style="border-color:transparent;color:var(--bad,#a3423a);font-size:13px">Delete this deal</button></div>`}
       </div>`;
     $('closeD').onclick=closeDealDetail;
+    paintDrawerOwner(d);   // sales item 37: who owns it, changeable here
     // ── tabs: show the requested one (a ?dtab= deep link, a refresh's current
     //    tab, else Overview); clicks + the record tablist's arrow-key contract ──
     showDealTab(DTAB);
@@ -4087,7 +4170,7 @@ async function boot(){
     renderFilters();
     // item 31/32: saved views, columns and the import are studio-level tools (deals live on the studio's site)
     if(scope()){['importDeals','pvBtn','chartsBtn','printBtn'].forEach(id=>{const n=$(id);if(n)n.hidden=true;});wireMore();}
-    else{wireViews();wireMore();loadSavedViews();
+    else{wireViews();wireMore();loadSavedViews();loadTeam();   // loadTeam: sales item 37
       // sales review item 38: the studio's own names for its open stages (Settings → Name your deal stages)
       api('/sales/stages').then(r=>{const l=r&&r.data&&r.data.labels;if(l&&STAGES.some(k=>l[k]&&l[k]!==STAGE_LABEL[k])){Object.assign(STAGE_LABEL,l);renderFilters();if(DEALS_LOADED)renderCurrent();if(CURRENT_DEAL&&!$('detailWrap').hidden)openDeal(CURRENT_DEAL);}}).catch(()=>{});}
     if(VIEW!=='list')setView(VIEW); else await load();   // restore the display (syncs the toggle; the board unless List was chosen), else plain load

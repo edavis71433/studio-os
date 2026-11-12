@@ -751,7 +751,9 @@ export async function handleClientSupport(req: Request, site: SiteRow, principal
   // clients.id) so read paths never re-derive it by string-matching requester
   // keys. Pre-0115 degrade: on the precise missing-column signal, retry once in
   // the old insert shape (never on any other failure).
-  const reqRow = { site_id: s, project_id: projectId, subject, body, status: 'open', priority, requester: readerKey(principal), requester_kind: principal.kind };
+  // sales item 37: a request a client sends starts with the studio's business owner
+  const owner = await import('../lib/team_owner.ts').then((m) => m.studioOwnerOfSite(s)).catch(() => null);
+  const reqRow = { site_id: s, project_id: projectId, subject, body, status: 'open', priority, requester: readerKey(principal), requester_kind: principal.kind, ...(owner ? { assigned_to: owner } : {}) };
   let ins = await svc('presence_support_requests', { method: 'POST', headers: { Prefer: 'return=representation' },
     body: JSON.stringify({ ...reqRow, client_id: me }) });
   if ((!ins.ok || !rows(ins)[0]) && missingColumnSignal((ins as any).json, (ins as any).text, 'client_id')) {

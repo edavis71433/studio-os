@@ -33,6 +33,7 @@ async function ackSupportRequester(siteId: string, toEmail: string, subject: str
 import type { SiteRow } from '../lib/site.ts';
 import type { Principal } from '../../_shared/auth.ts';
 import { UUID_RE } from '../lib/uuid.ts';
+import { teamOf, mineFilter, ownerToSet, studioOwnerOfSite } from '../lib/team_owner.ts';   // sales item 37: owners and Mine
 
 const clean = (s: unknown, max = 500) => String(s ?? '').replace(/[\u0000-\u0008\u000B-\u001F\u007F]/g, '').trim().slice(0, max);
 const nowIso = () => new Date().toISOString();
@@ -119,7 +120,10 @@ export async function handleSupport(req: Request, jwt: string, site: SiteRow, pr
     // read the studio's newest 25 and kept this project's, so an older request dropped off
     const projectId = u.searchParams.get('project_id') || '';
     if (UUID_RE.test(projectId)) path += `&project_id=eq.${projectId}`;
-    if (q) path += `&subject.ilike.*${encodeURIComponent(q)}*`;
+    // sales item 121's lesson: PostgREST ignores a part written without "=", so this search filtered nothing
+    if (q) path += `&subject=ilike.*${encodeURIComponent(q)}*`;
+    // sales item 37: the studio's own requests (one with no owner is the business owner's)
+    if (studio && u.searchParams.get('mine') === '1') path += mineFilter(await teamOf(principal));
     const r = await svc(path);
     return r.ok ? json({ data: rows(r), limit, offset, is_studio_view: studio }, 200, cors) : json({ error: 'read_failed' }, 502, cors);
   }
@@ -138,7 +142,9 @@ export async function handleSupport(req: Request, jwt: string, site: SiteRow, pr
     const { missingColumnSignal } = await import('../lib/inbound_email.ts');
     const clientId = (principal.kind === 'staff' || principal.kind === 'system') ? null
       : await clientIdForRequester(site.id, { userId: (principal as any).userId, email: principal.email }).catch(() => null);
-    const reqRow = { site_id: site.id, project_id: projectId, subject, body: clean(b.body, 5000), status: 'open', priority, requester: readerKey(principal), requester_kind: principal.kind };
+    // sales item 37: the studio adds one, it's theirs; a client sends one, it starts with the studio's business owner
+    const owner = studio ? (principal.userId && UUID_RE.test(principal.userId) ? principal.userId : null) : await studioOwnerOfSite(site.id).catch(() => null);
+    const reqRow = { site_id: site.id, project_id: projectId, subject, body: clean(b.body, 5000), status: 'open', priority, requester: readerKey(principal), requester_kind: principal.kind, ...(owner ? { assigned_to: owner } : {}) };
     let ins = await svc('presence_support_requests', { method: 'POST', headers: { Prefer: 'return=representation' },
       body: JSON.stringify(clientId ? { ...reqRow, client_id: clientId } : reqRow) });
     if ((!ins.ok || !rows(ins)[0]) && clientId && missingColumnSignal(ins.json, ins.text, 'client_id')) {
@@ -179,7 +185,8 @@ export async function handleSupportOne(req: Request, jwt: string, site: SiteRow,
     let resolvedNow = false;
     let clearedNow = false;   // resolved OR closed — the two transitions that END the wait
     if (b.priority !== undefined) { if (!isSupportPriority(b.priority)) return json({ error: 'validation', message: 'Invalid priority.' }, 422, cors); patch.priority = b.priority; }
-    if (b.assigned_to !== undefined) patch.assigned_to = UUID_RE.test(b.assigned_to || '') ? b.assigned_to : null;
+    // sales item 37: the owner is someone on the studio's team (empty = the business owner)
+    if (b.assigned_to !== undefined) { const o = ownerToSet(await teamOf(principal), b.assigned_to); if (!o.ok) return json({ error: 'validation', message: 'That person isn’t on your team.' }, 422, cors); patch.assigned_to = o.value; }
     if (b.resolution !== undefined) patch.resolution = clean(b.resolution, 2000);
     if (b.status !== undefined) {
       if (!isSupportStatus(b.status)) return json({ error: 'bad_status' }, 422, cors);

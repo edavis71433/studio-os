@@ -90,7 +90,8 @@ const pre = idx.indexOf("const calFeed = route.match(/^\\/calendar\\/feed\\/([0-
 ok('the feed is served before the sign-in gate; the link route after it', pre > 0 && gate > pre && idx.indexOf("route === '/calendar/link'") > gate);
 ok('making or turning off the link is a setting', /'\(POST\|DELETE\) \/calendar\/link',/.test(read('supabase/functions/presence/lib/site_roles.ts')));
 ok('the link lives in a reserved row', /calendarFeed: '__calendar_feed__'/.test(read('supabase/functions/presence/lib/reserved_store.ts')));
-ok('My tasks and the calendar share one reader', /export async function loadMyTasks\(siteId: string, userId: string \| null\)/.test(read('supabase/functions/presence/routes/sales.ts')) && /loadMyTasks\(siteId, owner\)/.test(read('supabase/functions/presence/routes/calendar.ts')));
+// sales item 37 added the team (Mine) as a third, optional input; the calendar passes none, so it lists everything
+ok('My tasks and the calendar share one reader', /export async function loadMyTasks\(siteId: string, userId: string \| null(, team: Team \| null = null)?\)/.test(read('supabase/functions/presence/routes/sales.ts')) && /loadMyTasks\(siteId, owner\)/.test(read('supabase/functions/presence/routes/calendar.ts')));
 const cx = read('connections.html');
 ok('Connections: the Calendar card, not while a client is in view', /async function paintCalendar\(\)\{\n  const host = \$\('calSec'\); if\(!host \|\| SCOPE\) return;/.test(cx) && /id="calSec" hidden/.test(cx));
 ok('Connections: the steps for Google Calendar are spelled out', cx.includes('Next to <b>Other calendars</b>, choose <b>+</b>, then <b>From URL</b>.'));

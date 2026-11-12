@@ -19,6 +19,7 @@ export interface MyTask {
   later: boolean;        // item 53: an undated project step behind that project's next open step
   order: number | null;  // a project step's place on its checklist (sort_order), so Home can move the next one up
   for?: 'deal' | 'person' | 'customer' | 'me';   // item 85: whose a to-do (deal_task) is
+  owner?: string | null;   // item 37: who owns the deal or to-do (their sign-in id); null = the business owner
 }
 export const MY_TASKS_OPEN_STAGES = ['lead', 'qualified', 'proposal', 'contract'];
 export const MY_TASKS_MAX = 50;
@@ -34,37 +35,41 @@ export function buildMyTasks(input: {
   userId: string | null;
   people?: any[];          // item 85: the people to-dos are for (id, name, email, deleted_at)
   customers?: any[];       // …and the customers (id, name, email)
+  mine?: (assignedTo: unknown) => boolean;   // item 37: with a team, only your deals' next steps and your to-dos
 }): MyTask[] {
   const out: MyTask[] = [];
+  const yours = (o: unknown) => !input.mine || input.mine(o);
   for (const d of input.deals || []) {
     if (!d || !d.id || !MY_TASKS_OPEN_STAGES.includes(String(d.stage))) continue;
+    if (!yours(d.assigned_to)) continue;   // item 37: a teammate's deal is theirs to follow up
     const t = String(d.next_step || '').trim();
     if (!t) continue;
-    out.push({ kind: 'next_step', id: String(d.id), parent_id: String(d.id), title: t, due: ymd(d.next_step_at), context: String(d.title || 'A deal'), href: `/pipeline.html?deal=${d.id}`, blocked: false, later: false, order: null });
+    out.push({ owner: d.assigned_to ? String(d.assigned_to) : null, kind: 'next_step', id: String(d.id), parent_id: String(d.id), title: t, due: ymd(d.next_step_at), context: String(d.title || 'A deal'), href: `/pipeline.html?deal=${d.id}`, blocked: false, later: false, order: null });
   }
   const dealById = new Map((input.taskDeals || []).filter((d) => d && d.id).map((d) => [String(d.id), d]));
   const personById = new Map((input.people || []).filter((c) => c && c.id).map((c) => [String(c.id), c]));
   const customerById = new Map((input.customers || []).filter((c) => c && c.id).map((c) => [String(c.id), c]));
   for (const t of input.dealTasks || []) {
     if (!t || !t.id || String(t.status || 'open') !== 'open') continue;
+    if (!yours(t.assigned_to)) continue;   // item 37: a teammate's to-do
     const title = String(t.title || '').trim();
     if (!title) continue;
     if (t.deal_id) {
       const d = dealById.get(String(t.deal_id));
       if (!d || String(d.stage) === 'lost') continue;   // a deleted deal, or one marked not a fit
-      out.push({ kind: 'deal_task', id: String(t.id), parent_id: String(d.id), title, due: ymd(t.due_date), context: String(d.title || 'A deal'), href: `/pipeline.html?deal=${d.id}`, blocked: false, later: false, order: null, for: 'deal' });
+      out.push({ owner: t.assigned_to ? String(t.assigned_to) : null, kind: 'deal_task', id: String(t.id), parent_id: String(d.id), title, due: ymd(t.due_date), context: String(d.title || 'A deal'), href: `/pipeline.html?deal=${d.id}`, blocked: false, later: false, order: null, for: 'deal' });
       continue;
     }
     // item 85: a to-do for a person or a customer opens their record; one for nobody is your own
     if (t.contact_id) {
       const c = personById.get(String(t.contact_id));
       if (!c || c.deleted_at) continue;   // a person taken off the list takes their to-dos with them (Recently deleted brings both back)
-      out.push({ kind: 'deal_task', id: String(t.id), parent_id: String(c.id), title, due: ymd(t.due_date), context: String(c.name || c.email || 'A contact'), href: `/crm.html?contact=${c.id}`, blocked: false, later: false, order: null, for: 'person' });
+      out.push({ owner: t.assigned_to ? String(t.assigned_to) : null, kind: 'deal_task', id: String(t.id), parent_id: String(c.id), title, due: ymd(t.due_date), context: String(c.name || c.email || 'A contact'), href: `/crm.html?contact=${c.id}`, blocked: false, later: false, order: null, for: 'person' });
     } else if (t.client_id) {
       const k = customerById.get(String(t.client_id));
-      out.push({ kind: 'deal_task', id: String(t.id), parent_id: String(t.client_id), title, due: ymd(t.due_date), context: String((k && (k.name || k.email)) || 'A customer'), href: `/crm.html?client_id=${t.client_id}`, blocked: false, later: false, order: null, for: 'customer' });
+      out.push({ owner: t.assigned_to ? String(t.assigned_to) : null, kind: 'deal_task', id: String(t.id), parent_id: String(t.client_id), title, due: ymd(t.due_date), context: String((k && (k.name || k.email)) || 'A customer'), href: `/crm.html?client_id=${t.client_id}`, blocked: false, later: false, order: null, for: 'customer' });
     } else {
-      out.push({ kind: 'deal_task', id: String(t.id), parent_id: '', title, due: ymd(t.due_date), context: 'Your own to-do', href: '/todos.html', blocked: false, later: false, order: null, for: 'me' });
+      out.push({ owner: t.assigned_to ? String(t.assigned_to) : null, kind: 'deal_task', id: String(t.id), parent_id: '', title, due: ymd(t.due_date), context: 'Your own to-do', href: '/todos.html', blocked: false, later: false, order: null, for: 'me' });
     }
   }
   const projById = new Map((input.projects || []).filter((p) => p && p.id).map((p) => [String(p.id), p]));

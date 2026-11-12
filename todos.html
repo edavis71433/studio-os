@@ -52,6 +52,16 @@
   .stat[aria-pressed="true"] b{color:inherit}
   @media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .stat[aria-pressed="true"],:root:not([data-theme="light"]) .addgo{color:#171320}}
   :root[data-theme="dark"] .stat[aria-pressed="true"],:root[data-theme="dark"] .addgo{color:#171320}
+  /* sales item 37: Mine / Everyone, with a second person on the team; each to-do's owner in Everyone */
+  .owntog{display:inline-flex;gap:2px;padding:3px;border-radius:999px;background:color-mix(in srgb,var(--p) 12%,var(--card))}
+  .owntog button{font:inherit;font-size:14px;font-weight:600;border:none;border-radius:999px;padding:7px 14px;min-height:34px;background:none;color:var(--soft);cursor:pointer;display:inline-flex;gap:6px;align-items:center}
+  .owntog button[aria-pressed="true"]{background:var(--p);color:var(--dds-on-p,#fff)}
+  .owntog .n{font-size:12.5px;font-weight:700;opacity:.8}
+  .ownc{display:inline-flex;align-items:center;gap:6px;font-size:12.5px;font-weight:600;color:var(--soft);background:var(--tag);border-radius:999px;padding:2px 10px 2px 3px;white-space:nowrap}
+  .ownc::before{content:attr(data-ini);width:20px;height:20px;border-radius:50%;display:grid;place-items:center;font-size:9.5px;font-weight:700;color:#fff;background:#2f7d74}
+  .ownc.me::before{background:var(--p)}
+  @media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .owntog button[aria-pressed="true"]{color:#171320}}
+  :root[data-theme="dark"] .owntog button[aria-pressed="true"]{color:#171320}
   /* add one, for anyone */
   .add{display:flex;gap:10px;align-items:center;flex-wrap:wrap;background:var(--card);border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow);padding:12px 14px;margin-bottom:16px}
   .add input[type=text]{flex:1 1 260px;min-width:0;font:inherit;font-size:15px;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:10px 14px;min-height:44px}
@@ -94,6 +104,7 @@
     .wrap{padding:16px 16px 100px}
     h1{font-size:26px}
     .tools{width:100%}.forpick{flex:1 1 auto;max-width:none;min-height:44px}.pill{min-height:44px}
+    .owntog{flex:1 1 100%}.owntog button{flex:1 1 0;justify-content:center;min-height:44px}
     .stats{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;margin:12px -16px;padding:2px 16px 8px}
     .stats::-webkit-scrollbar{display:none}
     .stat{flex:0 0 auto;min-height:44px}
@@ -125,7 +136,37 @@ const FN=SUPABASE_URL+"/functions/v1/presence";
 const sb=supabase.createClient(SUPABASE_URL,SUPABASE_KEY,{auth:{storageKey:'dds-portal-auth',persistSession:true,autoRefreshToken:true}});
 const $=(id)=>document.getElementById(id);
 const esc=(s)=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
-let TOKEN="",DATA=null,SHOW='open',WHO='',OPENED=new Set(),PICK=null,DRAFT={title:'',due:'',for:''};
+let TOKEN="",DATA=null,SHOW='open',WHO='',OPENED=new Set(),PICK=null,DRAFT={title:'',due:'',for:'',owner:''};
+// ── Sales item 37: Mine and Everyone ──────────────────────────────────────────
+// With a second person on the team (/agency/members: the people who have signed in),
+// To-dos opens on Mine: your to-dos and the next steps of your deals. Everyone shows
+// the team's, each with its owner. A to-do or deal with no owner is the business
+// owner's; a project step on this list is always yours or nobody's. The choice is
+// remembered on this device. With one person, nothing changes.
+let TEAM=null,MINE=true;
+try{MINE=localStorage.getItem('dds-todos-mine')!=='0';}catch(_){/* storage may be denied */}
+const teamOn=()=>!!(TEAM&&TEAM.people.length>1);
+const ownerOfItem=(t)=>t&&t.owner?String(t.owner):(TEAM?TEAM.owner:'');
+const mineItem=(t)=>!teamOn()||t.kind==='project_task'||ownerOfItem(t)===TEAM.me;
+const iniOf=(s)=>{const w=String(s||'').trim().split(/[\s._-]+/).filter(Boolean);return w.length?(w[0][0]+(w[1]?w[1][0]:'')).toUpperCase():'?';};
+let TEAM_P=null;
+const teamOnce=()=>TEAM_P||(TEAM_P=loadTeam().catch(()=>{TEAM=null;}));
+async function loadTeam(){
+  const [me,mem]=await Promise.all([api('/agency/me'),api('/agency/members')]);
+  const list=mem.ok&&mem.body&&Array.isArray(mem.body.data)?mem.body.data:[];
+  const myId=(me.ok&&me.body&&me.body.data&&me.body.data.member_id)||'';
+  const myRow=list.find(m=>m.id===myId),meUid=myRow&&myRow.user_id?String(myRow.user_id):'';
+  if(!meUid){TEAM=null;return;}
+  const nameOf=(m)=>{const l=String(m.email||'').split('@')[0]||'Teammate';return l.charAt(0).toUpperCase()+l.slice(1);};
+  const people=list.filter(m=>m&&(m.status||'active')==='active'&&m.user_id).map(m=>({uid:String(m.user_id),label:String(m.user_id)===meUid?'You':nameOf(m),ini:iniOf(nameOf(m)),me:String(m.user_id)===meUid}));
+  const own=list.find(m=>m.role==='owner'&&m.user_id&&(m.status||'active')==='active');
+  TEAM={me:meUid,owner:own?String(own.user_id):meUid,people};
+}
+function ownChip(t){
+  if(!teamOn()||MINE||t.kind==='project_task')return'';
+  const p=TEAM.people.find(x=>x.uid===ownerOfItem(t));if(!p)return'';
+  return `<span class="ownc${p.me?' me':''}" data-ini="${esc(p.ini)}" title="Owner: ${esc(p.label)}">${p.me?'Yours':esc(p.label)}</span>`;
+}
 sb.auth.onAuthStateChange(function(_e,s){if(s&&s.access_token)TOKEN=s.access_token;});
 const scope=()=>new URLSearchParams(location.search).get('client')||'';
 const H=()=>({'Content-Type':'application/json','Authorization':'Bearer '+SUPABASE_KEY,'x-dds-user-jwt':TOKEN,'x-dds-scope-site':scope()});
@@ -152,16 +193,18 @@ const keyOf=(t)=>t.kind+':'+t.id;
 const GROUPS=[['over','Overdue'],['today','Today'],['week','This week'],['later','Later'],['nodate','No date']];
 const SHOW_AT=5;   // a group shows its first five; the rest wait behind "Show N more"
 function whoKey(t){return t.for==='me'?'me':(t.kind==='project_task'?'project':t.for||'deal')+':'+t.parent_id;}
-function visible(){const items=(DATA&&DATA.items)||[];return WHO?items.filter(t=>whoKey(t)===WHO):items;}
+function visible(){let items=(DATA&&DATA.items)||[];if(MINE&&teamOn())items=items.filter(mineItem);return WHO?items.filter(t=>whoKey(t)===WHO):items;}
 function render(focusSel){
   const today=ymd(),items=visible(),whoName=WHO&&WHO!=='me'?((DATA.items||[]).find(t=>whoKey(t)===WHO)||{}).context:'';
-  const done=(DATA.done||[]).filter(t=>!WHO||(WHO==='me'?t.for==='me':t.context===whoName));
+  const done=(DATA.done||[]).filter(t=>(!MINE||mineItem(t))&&(!WHO||(WHO==='me'?t.for==='me':t.context===whoName)));
   const by={};for(const [g] of GROUPS)by[g]=[];for(const t of items)by[groupOf(t,today)].push(t);
   const counts={open:items.length,over:by.over.length,today:by.today.length,week:by.week.length,later:by.later.length+by.nodate.length,done:done.length};
   // who the list can be narrowed to: everyone it names
   const whos=[...new Map(((DATA&&DATA.items)||[]).filter(t=>t.for!=='me').map(t=>[whoKey(t),t.context])).entries()].sort((a,b)=>a[1].localeCompare(b[1]));
-  let h=`<div class="head"><div class="grow"><h1>To-dos</h1><p class="lede">Everything you have to do, for anyone: a person, a customer or a deal. Home’s My tasks shows the next few.</p></div>
-    <div class="tools"><label class="sr-only" for="forFilter">Show the to-dos for</label><select id="forFilter" class="forpick"><option value="">For: Everyone</option>${((DATA.items||[]).some(t=>t.for==='me')?'<option value="me"'+(WHO==='me'?' selected':'')+'>For: Just me</option>':'')}${whos.map(([k,n])=>`<option value="${esc(k)}"${WHO===k?' selected':''}>For: ${esc(n)}</option>`).join('')}</select>
+  const all=(DATA&&DATA.items)||[];
+  const tog=teamOn()?`<div class="owntog" role="group" aria-label="Whose to-dos"><button type="button" data-own="mine" aria-pressed="${MINE?'true':'false'}">Mine <span class="n">${all.filter(mineItem).length}</span></button><button type="button" data-own="all" aria-pressed="${MINE?'false':'true'}">Everyone <span class="n">${all.length}</span></button></div>`:'';
+  let h=`<div class="head"><div class="grow"><h1>To-dos</h1><p class="lede">${teamOn()?'Everything you have to do, for anyone. Mine shows yours; Everyone, the team’s.':'Everything you have to do, for anyone: a person, a customer or a deal. Home’s My tasks shows the next few.'}</p></div>
+    <div class="tools">${tog}<label class="sr-only" for="forFilter">Show the to-dos for</label><select id="forFilter" class="forpick"><option value="">For: Everyone</option>${((DATA.items||[]).some(t=>t.for==='me')?'<option value="me"'+(WHO==='me'?' selected':'')+'>For: Just me</option>':'')}${whos.map(([k,n])=>`<option value="${esc(k)}"${WHO===k?' selected':''}>For: ${esc(n)}</option>`).join('')}</select>
     <button type="button" class="pill" id="printBtn">${svg('print')} Print</button></div></div>`;
   h+=`<div class="stats" role="group" aria-label="Show">`+[['open','All open',''],['over','Overdue','over'],['today','Today','today'],['week','This week',''],['later','Later',''],['done','Done · last 30 days','done']].map(([k,l,c])=>`<button type="button" class="stat ${c}" data-show="${k}" aria-pressed="${SHOW===k?'true':'false'}"><b>${counts[k]}</b><span>${l}</span></button>`).join('')+`</div>`;
   h+=addHtml();
@@ -191,12 +234,13 @@ function render(focusSel){
 function rowHtml(t,today,g){
   const tag=KIND_TAG[t.kind]?`<span class="kind">${KIND_TAG[t.kind]}</span>`:'';
   const block=t.blocked?'<span class="kind">Blocked</span>':'';
-  return `<div class="trow" data-row="${esc(keyOf(t))}" data-group="${g}"><button type="button" class="tick" data-done="${esc(keyOf(t))}" aria-label="Done: ${esc(t.title)}"${t.blocked?' disabled title="Unblock it on the project first"':''}></button><div class="tmain"><span class="ttl">${esc(t.title)}</span><span class="chips">${whoChip(t)}${tag}${block}</span></div>${dueChip(t,today)}</div>`;
+  return `<div class="trow" data-row="${esc(keyOf(t))}" data-group="${g}"><button type="button" class="tick" data-done="${esc(keyOf(t))}" aria-label="Done: ${esc(t.title)}"${t.blocked?' disabled title="Unblock it on the project first"':''}></button><div class="tmain"><span class="ttl">${esc(t.title)}</span><span class="chips">${whoChip(t)}${tag}${block}${ownChip(t)}</span></div>${dueChip(t,today)}</div>`;
 }
 function addHtml(){
   return `<form class="add" id="addForm" aria-label="Add a to-do"><label class="sr-only" for="addTitle">What needs doing?</label><input type="text" id="addTitle" maxlength="200" autocomplete="off" placeholder="+ What needs doing?" value="${esc(DRAFT.title)}">
     <label class="sr-only" for="addDue">Due date (optional)</label><input type="date" id="addDue" value="${esc(DRAFT.due)}">
     <label class="sr-only" for="addFor">Who it’s for</label><select id="addFor">${forOptions()}</select>
+    ${teamOn()?`<label class="sr-only" for="addOwner">Whose to-do it is</label><select id="addOwner">${TEAM.people.map(p=>`<option value="${esc(p.uid)}"${(DRAFT.owner||TEAM.me)===p.uid?' selected':''}>${p.me?'Yours':esc(p.label)}</option>`).join('')}</select>`:''}
     <button type="submit" class="addgo" id="addGo">Add to-do</button></form>`;
 }
 function forOptions(){
@@ -233,6 +277,8 @@ function wire(){
   const f=$('addForm');if(f)f.addEventListener('submit',add);
   const ti=$('addTitle');if(ti){ti.addEventListener('input',()=>{DRAFT.title=ti.value;});ti.addEventListener('focus',loadPick,{once:true});}
   const du=$('addDue');if(du)du.addEventListener('change',()=>{DRAFT.due=du.value;});
+  document.querySelectorAll('[data-own]').forEach(b=>b.addEventListener('click',()=>{MINE=b.getAttribute('data-own')==='mine';try{localStorage.setItem('dds-todos-mine',MINE?'1':'0');}catch(_){/* */}render('[data-own="'+(MINE?'mine':'all')+'"]');}));
+  const ow=$('addOwner');if(ow)ow.addEventListener('change',()=>{DRAFT.owner=ow.value;});
   const fo=$('addFor');if(fo){fo.addEventListener('change',()=>{DRAFT.for=fo.value;});fo.addEventListener('focus',loadPick);fo.addEventListener('pointerdown',loadPick);}
 }
 // Done: the route that owns each kind (Home's card does the same), then Undo
@@ -271,11 +317,13 @@ async function add(e){
   const due=$('addDue').value||'';const fv=$('addFor').value||'';
   const body={title,...(due?{due_date:due}:{})};
   if(fv.startsWith('contact:'))body.contact_id=fv.slice(8);else if(fv.startsWith('client:'))body.client_id=fv.slice(7);else if(fv.startsWith('deal:'))body.deal_id=fv.slice(5);
+  const ow=$('addOwner');if(ow&&ow.value&&TEAM&&ow.value!==TEAM.me)body.assigned_to=ow.value;   // item 37: yours unless you pick a teammate
   const go=$('addGo');go.disabled=true;
   const r=await api('/sales/tasks','POST',body);
   if(!r.ok){go.disabled=false;toast((r.body&&r.body.message)||'That to-do didn’t save. Try again in a moment.',true);return;}
-  DRAFT={title:'',due:'',for:DRAFT.for};
-  toast('Added: '+title);
+  DRAFT={title:'',due:'',for:DRAFT.for,owner:DRAFT.owner};
+  const forMate=body.assigned_to&&TEAM&&TEAM.people.find(x=>x.uid===body.assigned_to);
+  toast(forMate?'Added for '+forMate.label+': '+title:'Added: '+title);
   await load();
   const ti=$('addTitle');if(ti)ti.focus();
 }
@@ -288,7 +336,7 @@ function printTodos(){
 }
 async function load(){
   if(scope()){$('main').innerHTML=`<div class="center"><h2>To-dos live at the studio level.</h2><p class="muted">You’re looking at one client. Your to-dos are your studio’s, for every client.</p><p style="margin-top:16px"><a class="link" data-noscope href="/todos.html">Leave this client and open To-dos →</a></p></div>`;return;}
-  const r=await api('/sales/tasks');
+  const [r]=await Promise.all([api('/sales/tasks'),teamOnce()]);
   if(r.status===401){signedOut();return;}
   // pages go live before the server's update: an older server has no /sales/tasks yet
   if(r.status===404&&!(r.body&&r.body.data)){$('main').innerHTML=`<div class="center"><h2>To-dos is on its way.</h2><p class="muted">This page arrives with an update that’s being rolled out. Each deal’s to-dos are on Pipeline meanwhile.</p><p style="margin-top:16px"><a class="link" href="/pipeline.html">Open Pipeline →</a></p></div>`;return;}

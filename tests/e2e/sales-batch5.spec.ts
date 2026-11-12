@@ -207,13 +207,15 @@ test.describe('item 34 — a support request\'s priority and who has it', () => 
     page.on('request', (r) => { if (r.method() === 'PATCH' && r.url().includes(`/support/${SUP}`)) patches.push(r.postDataJSON()); });
     await installApp(page, { api: inboxApi(TEAM, DANA_UID) });
     await page.goto('/inbox.html#support');
+    // item 37: with a team, Support opens on Mine, and this one is Dana's
+    await page.locator('#supOwn').getByRole('button', { name: /^Everyone/ }).click();
     const row = page.locator('#rows').getByRole('option').filter({ hasText: 'Maple Street Studio' });
     await expect(row.locator('.prio')).toHaveText('Urgent');
-    await expect(row.locator('.asg')).toHaveText('dana');
+    await expect(row.locator('.asg')).toHaveText('Dana');   // item 37: names start with a capital, as on Pipeline and To-dos
     await row.click();
     const prio = page.getByLabel('Priority');
     await expect(prio).toHaveValue('urgent');
-    const asg = page.getByLabel('Assigned to');
+    const asg = page.getByRole('combobox', { name: /^Owner/ });   // item 37 renamed it from Assigned to (the label wraps the picker, so its name carries the choice)
     await expect(asg).toHaveValue(DANA_UID);
     await prio.selectOption('high');
     await expect.poll(() => patches.length).toBe(1);
@@ -234,6 +236,6 @@ test.describe('item 34 — a support request\'s priority and who has it', () => 
     await expect(row.locator('.prio')).toHaveCount(0);
     await row.click();
     await expect(page.getByLabel('Priority')).toBeVisible();
-    await expect(page.locator('#supTriage')).not.toContainText('Assigned to');
+    await expect(page.locator('#supTriage')).not.toContainText('Owner');
   });
 });
