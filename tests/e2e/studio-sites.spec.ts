@@ -324,20 +324,21 @@ test.describe('Sites (builder list items 43 and 45)', () => {
     expect(t.thumbs.length).toBe(asked);
   });
 
-  test('table: Name · Team · Plan · Published · Last updated · Tags, sortable, and the choice is remembered', async ({ page }) => {
+  // items 129 and 180 (Nov 11): Health, Visits and Search clicks join the table, and Team and
+  // Published leave it (who can edit stays on each card); sites-numbers.spec.ts covers the numbers
+  test('table: Site · Health · Visits · Search clicks · Plan · Last updated · Tags, sortable, and the choice is remembered', async ({ page }) => {
     await openSites(page);
     await page.locator('#dispTable').click();
     const table = page.locator('#tableHost table');
-    await expect(table.locator('thead .thb')).toHaveText(['Name', 'Team', 'Plan', 'Published', 'Last updated', 'Tags']);
+    await expect(table.locator('thead .thb')).toHaveText(['Site', 'Health', 'Visits', 'Search clicks', 'Plan', 'Last updated', 'Tags']);
     await expect(table.locator('tbody tr')).toHaveCount(3);
     await expect(page.locator('#grid')).toBeHidden();               // one view at a time: no cards above the table
     await expect(page.locator('.scard:visible')).toHaveCount(0);
     const bistro = table.locator('tbody tr', { hasText: 'Bistro Nine' });
-    await expect(bistro.locator('.av')).toHaveCount(3);
     await expect(bistro).toContainText('Website + tools');
-    await expect(bistro).toContainText('Oct 1');
+    await expect(bistro).toContainText('Oct 5');
     await expect(bistro.locator('.tagchip')).toHaveText('restaurant');
-    await expect(table.locator('tbody tr', { hasText: 'Cafe Eleven' })).toContainText('Not yet');
+    await expect(table.locator('tbody tr', { hasText: 'Cafe Eleven' })).toContainText('Not live yet');
     await table.locator('[data-sort="name"]').click();
     await expect(table.locator('tbody tr td:first-child .n')).toHaveText(['Bistro Nine', 'Cafe Eleven', 'Garage Ten']);
     await expect(table.locator('th[aria-sort="ascending"]')).toHaveCount(1);
@@ -502,6 +503,25 @@ test.describe('Sites (builder list items 43 and 45)', () => {
     await expect(page.locator('.sband .kpi')).toHaveCount(4);   // two by two on a phone
     const ks = await page.locator('.sband .kpi').evaluateAll((els) => els.map((e) => Math.round(e.getBoundingClientRect().left)));
     expect(new Set(ks).size).toBe(2);
+  });
+
+  // Nov 11 2026: on a phone the h1 gave its width up to the buttons beside it and "Sites"
+  // was drawn over the Cards/Table switch. The letters spill out of a squeezed h1, so its
+  // own box isn't enough: the words are measured too.
+  test('phone width: the title and the Cards/Table switch never overlap', async ({ page }) => {
+    await page.setViewportSize({ width: 375, height: 812 });
+    await openSites(page);
+    await expect(page.locator('.lhead .seg')).toBeVisible();
+    const b = await page.evaluate(() => {
+      const box = (r: DOMRect) => ({ left: r.left, right: r.right, top: r.top, bottom: r.bottom });
+      const h1 = document.getElementById('pagehead')!, words = document.createRange();
+      words.selectNodeContents(h1);
+      return { h1: box(h1.getBoundingClientRect()), words: box(words.getBoundingClientRect()), seg: box(document.querySelector('.lhead .seg')!.getBoundingClientRect()) };
+    });
+    const apart = (a: typeof b.seg, z: typeof b.seg) => a.right <= z.left || z.right <= a.left || a.bottom <= z.top || z.bottom <= a.top;
+    expect(apart(b.h1, b.seg)).toBe(true);
+    expect(apart(b.words, b.seg)).toBe(true);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)).toBeLessThanOrEqual(0);
   });
 });
 

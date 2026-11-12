@@ -23,6 +23,8 @@ import { layoutCounts } from '../lib/site_layout.ts';
 import { removeTemplatePhotos } from '../lib/media.ts';
 import { handleAgencySites } from './sites.ts';
 import { handleClientTools } from './client_tools.ts';
+import { handleSiteNumbers } from './site_numbers.ts';
+import { handleDoNext } from './do_next.ts';
 import { HIDEABLE_SECTIONS, normalizeHidden } from '../lib/navigation.ts';
 import { readReservedJsonOrThrow, writeReservedJson, RESERVED_NAMES } from '../lib/reserved_store.ts';
 import { sendInviteLink } from '../lib/workspace.ts';
@@ -210,6 +212,20 @@ async function handleAgencyInner(req: Request, route: string, method: string, me
     catch { return json({ error: 'read_failed', message: 'Your menu couldn’t load just now.' }, 502, cors); }
     // C16: the page shows the switches by the same rule this PUT keeps (manage_clients)
     return json({ data: { hidden: normalizeHidden(stored), choices: HIDEABLE_SECTIONS, can_edit: can(member.role, 'manage_clients') } }, 200, cors);
+  }
+
+  // ── builder list items 129 and 180: each site's visitors, Google clicks and health,
+  //    with the change from last month, read after the Sites cards are up ──
+  {
+    const r = await handleSiteNumbers(route, method, member, cors, now);
+    if (r) return r;
+  }
+
+  // ── builder list item 184: one Do next list per client, with Done and Not relevant ──
+  {
+    const jwt = req.headers.get('x-dds-user-jwt') || '';
+    const r = await handleDoNext(req, route, method, member, principal, cors, { needs: () => computeStudioNeeds(member, principal, jwt, now) });
+    if (r) return r;
   }
 
   // ── the Sites and Domains pages, Pin and Duplicate (builder list items 43, 45, 52) ──

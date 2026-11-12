@@ -17,6 +17,7 @@ import { trackerScript } from './visits.ts';
 import { injectSender } from './site_send.ts';
 import { injectPopup } from './popup.ts';
 import { withAiCrawlerChoice } from './ai_crawlers.ts';
+import { withSearchChoices } from './search_tools.ts';
 import { injectAdTags } from './ad_tags.ts';
 import { sanitizeDevHtml, sanitizeDevCss } from './devmode.ts';
 import { BLOCK_CSS, sectionStyles, pageClasses } from './site_blocks.ts';
@@ -204,9 +205,11 @@ export async function renderSnapshot(snapshot: Snapshot, site: SiteConfig, opts:
   // items 50 and 123: the header scrolls away, stays on top, hides or fades, as the owner chose
   // List item 175: switched off, AI assistants are asked to stay out in robots.txt.
   const drawn = withAiCrawlerChoice(applyHeaderScroll(tintFavicon(applyPageChrome(await t.render(snapshot, t.manifest, site), pages), tokens?.accent, snapshot.template_slug), tokens?.header_scroll), (snapshot.content as SnapshotContent)?.settings);
+  // List item 124: hidden from search, every page says noindex; the owner's llms.txt is written.
+  const searched = withSearchChoices(drawn, (snapshot.content as SnapshotContent)?.settings);
   // item 122: Call, Directions, Hours and Email along the bottom of every page on a phone, when turned on
   // (after the page's own header and footer choice, so a page that hides its footer has no bar either)
-  const barred = applyPhoneBar(drawn, tokens?.phone_bar, snapshot.content as SnapshotContent, tokens?.accent);
+  const barred = applyPhoneBar(searched, tokens?.phone_bar, snapshot.content as SnapshotContent, tokens?.accent);
   // item 121: the owner's own page answers a broken link, when they've picked one (its copy keeps the bar)
   const found = applyNotFoundPage(barred, pages);
   // item 148: the pop-up and any form a "#form-<id>" link opens (lib/popup.ts), then item 131:

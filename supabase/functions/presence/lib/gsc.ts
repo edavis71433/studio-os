@@ -130,3 +130,29 @@ export function signalRowsFor(clientId: string, period: string, t: GscTotals): A
   if (t.position !== null) rows.push({ ...base, metric: 'avg_position', value: Math.round(t.position * 10) / 10 });
   return rows;
 }
+
+// ── Builder list item 181: searches a client follows ──
+/** One search's numbers, asked for by name: Google filters the rows to that exact
+ *  query, so a search outside the month's top 25 still gets its own line. `dims`
+ *  ['query'] for a month's total, ['date'] for its days. */
+export function gscTermBody(startDate: string, endDate: string, term: string, dims: string[] = ['query'], rowLimit = 1) {
+  return { ...gscQueryBody(startDate, endDate, dims, rowLimit), dimensionFilterGroups: [{ filters: [{ dimension: 'query', operator: 'equals', expression: term }] }] };
+}
+
+/** Days of one search (dimensions ['date']) folded into whole months: clicks and
+ *  impressions added up, the place averaged by impressions, as Google averages it.
+ *  A month with no impressions is left out, never a zero place. Pure. */
+export function foldDaysToMonths(resp: any): Array<{ period: string; clicks: number; impressions: number; position: number | null }> {
+  const by = new Map<string, { clicks: number; impressions: number; weighted: number }>();
+  for (const r of (resp && Array.isArray(resp.rows) ? resp.rows : [])) {
+    const day = String((r.keys && r.keys[0]) || '');
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) continue;
+    const m = by.get(day.slice(0, 7)) || { clicks: 0, impressions: 0, weighted: 0 };
+    const imp = Number(r.impressions) || 0;
+    m.clicks += Number(r.clicks) || 0; m.impressions += imp;
+    if (typeof r.position === 'number') m.weighted += r.position * imp;
+    by.set(day.slice(0, 7), m);
+  }
+  return [...by.entries()].filter(([, m]) => m.impressions > 0).sort(([a], [b]) => a.localeCompare(b))
+    .map(([period, m]) => ({ period, clicks: m.clicks, impressions: m.impressions, position: m.weighted ? Math.round((m.weighted / m.impressions) * 10) / 10 : null }));
+}
