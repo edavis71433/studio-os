@@ -168,9 +168,11 @@
     window.ddsOpenEditor(a.href);
   }, true);
 
+  // opts.scope: '' sends a request without the client in the address (sales item 91: the studio's
+  // own book, read and written from inside a client, as crm.html's apiAg does)
   window.ddsApi = function (path, opts) {
     opts = opts || {};
-    var init = { method: opts.method || 'GET', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + SUPABASE_KEY, 'x-dds-user-jwt': TOKEN, 'x-dds-scope-site': scopeId() } };
+    var init = { method: opts.method || 'GET', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + SUPABASE_KEY, 'x-dds-user-jwt': TOKEN, 'x-dds-scope-site': opts.scope !== undefined ? opts.scope : scopeId() } };
     if (opts.body !== undefined) init.body = typeof opts.body === 'string' ? opts.body : JSON.stringify(opts.body);
     return fetch(FN + path, init)
       .then(function (r) { return r.json().then(function (b) { return { ok: r.ok, status: r.status, body: b }; }).catch(function () { return { ok: r.ok, status: r.status, body: {} }; }); })
@@ -535,11 +537,11 @@
         function finish(v) {
           if (done) return; done = true;
           // builder item 201: focus goes back to the button that asked, after Yes as well as
-          // Cancel. Removing the box took the focused Yes with it, so focus fell to the page's top.
-          var had = box.contains(document.activeElement);
+          // Cancel. Removing the box took the focused Yes with it, so focus fell to the page's top
+          // (Safari doesn't focus a clicked button at all, so this never asks where focus was).
           if (box.isConnected) box.remove();
           anchor.hidden = false; resolve(v);
-          if ((!v || had) && anchor.isConnected && anchor.focus) try { anchor.focus(); } catch (_) { /* */ }
+          if (anchor.isConnected && anchor.focus) try { anchor.focus(); } catch (_) { /* */ }
         }
         box.querySelector('.go').addEventListener('click', function () { finish(true); });
         box.querySelector('.no').addEventListener('click', function () { finish(false); });
@@ -585,10 +587,10 @@
         var done = false;
         function finish(v) {
           if (done) return; done = true;
-          var had = box.contains(document.activeElement);   // item 201: as confirmIn, focus never falls to the page's top
           if (box.isConnected) box.remove();
           anchor.hidden = false; resolve(v);
-          if ((v === null || had) && anchor.isConnected && anchor.focus) try { anchor.focus(); } catch (_) { /* */ }
+          // item 201: as confirmIn, after an answer as well as Cancel, so focus never falls to the page's top
+          if (anchor.isConnected && anchor.focus) try { anchor.focus(); } catch (_) { /* */ }
         }
         go.addEventListener('click', function () {
           var vals = inputs.map(function (el) { return String(el.value || '').trim(); });
@@ -1013,6 +1015,144 @@
   // builder item 201: the bell says its number ("Notifications, 3 need you"), not only shows it
   function bellLabel(n) { return n > 0 ? 'Notifications, ' + n + (n === 1 ? ' needs you' : ' need you') : 'Notifications'; }
 
+  // ── Due today, from any page (sales item 123, drawn in Figma 307:8568) ────────
+  // Salesforce docks a to-do list on every page. Here a small "3 due today" sits in the frame
+  // (under Search in the sidebar, in the top bar on a phone), counted from the same list as
+  // To-dos and Home's My to-dos (GET /sales/my-tasks) in your own day: red, late first, when
+  // anything is late; gone when nothing is due. It opens the day's to-dos where you are: tick
+  // one done (Undo in the message after), open what it's for, or go to To-dos. The count is
+  // read behind the page and kept two minutes, so moving between pages asks nothing; leaving
+  // a page where to-dos get ticked drops the kept copy.
+  var DUE = null, DUE_AT = 0, DUE_LOADING = null, DUE_FRESH_MS = 120000;
+  function dueWanted() {
+    if (!CTX || !TOKEN || isReviewerCtx()) return false;
+    if (CTX.is_agency && CTX.scope && CTX.scope.site_id) return true;   // inside a client it's still the studio's day
+    return (CTX.nav || []).some(function (s) { return s.key === 'todos'; });
+  }
+  function localYmd(d) { d = d || new Date(); var m = d.getMonth() + 1, day = d.getDate(); return d.getFullYear() + '-' + (m < 10 ? '0' : '') + m + '-' + (day < 10 ? '0' : '') + day; }
+  // the day's to-dos from My tasks' items: dated ones only, late first, then today's
+  function dueOf(items, today) {
+    var late = [], now = [];
+    (items || []).forEach(function (t) { if (!t || !t.due) return; if (t.due < today) late.push(t); else if (t.due === today) now.push(t); });
+    return { late: late.length, today: now.length, items: late.concat(now) };
+  }
+  window.ddsDueOf = dueOf;   // read by tests
+  // the studio's own book: inside a client the read goes without the client, as Create's do
+  function bookApi(path, opts) { return window.ddsApi(path, Object.assign({}, opts || {}, CTX && CTX.scope && CTX.scope.site_id ? { scope: '' } : {})); }
+  function dueKey() { return 'dds-due:' + (ctxUid || '-') + ':' + (CTX && CTX.scope ? '-' : (scopeId() || '-')); }
+  function dropDue() { try { sessionStorage.removeItem(dueKey()); } catch (_) { /* */ } }
+  function readDue(fresh) {
+    if (!dueWanted()) return Promise.resolve(null);
+    if (!fresh) {
+      try {
+        var k = JSON.parse(sessionStorage.getItem(dueKey()) || 'null');
+        if (k && k.day === localYmd() && Date.now() - k.at < DUE_FRESH_MS) { DUE = k.d; DUE_AT = k.at; paintDue(); return Promise.resolve(DUE); }
+      } catch (_) { /* storage may be denied: read it */ }
+    }
+    if (DUE_LOADING) return DUE_LOADING;
+    DUE_LOADING = bookApi('/sales/my-tasks').then(function (r) {
+      DUE_LOADING = null;
+      var d = r && r.ok && r.body && r.body.data;
+      if (!d || !Array.isArray(d.items)) return DUE;   // a failed read keeps what is shown, never "nothing due"
+      DUE = dueOf(d.items, localYmd());
+      DUE.capped = d.items.length >= 50 && DUE.items.length === d.items.length;   // the read stops at 50
+      DUE_AT = Date.now();
+      try { sessionStorage.setItem(dueKey(), JSON.stringify({ at: DUE_AT, day: localYmd(), d: DUE })); } catch (_) { /* */ }
+      paintDue(); paintDuePop();
+      return DUE;
+    }, function () { DUE_LOADING = null; return DUE; });
+    return DUE_LOADING;
+  }
+  window.ddsDueRefresh = function () { return readDue(true); };
+  function dueWords(d) { var p = d.capped ? '+' : ''; return d.late ? d.late + p + ' late' + (d.today ? ' · ' + d.today + ' today' : '') : d.today + p + ' due today'; }
+  function paintDue() {
+    var b = document.getElementById('dds-due'); if (!b) return;
+    var n = DUE ? DUE.late + DUE.today : 0;
+    if (!n || !dueWanted()) { b.hidden = true; return; }
+    b.hidden = false; b.classList.toggle('late', DUE.late > 0);
+    b.innerHTML = icon('overview') + '<span class="dw">' + esc(dueWords(DUE)) + '</span><span class="dn" aria-hidden="true">' + (n > 9 ? '9+' : n) + '</span><span class="car" aria-hidden="true">›</span>';
+    b.setAttribute('aria-label', 'To-dos: ' + dueWords(DUE).replace(' · ', ', '));
+  }
+  var duePop = null;
+  function closeDue(refocus) {
+    if (!duePop || !duePop.classList.contains('open')) return;
+    duePop.classList.remove('open'); setExpanded('dds-due', false);
+    if (refocus) { var b = document.getElementById('dds-due'); if (b) b.focus(); }
+  }
+  // what ticking does, the same requests To-dos and Home send (and their Undo)
+  function dueDoneReq(t, back) {
+    if (t.kind === 'next_step') return ['PATCH', '/sales/deals/' + encodeURIComponent(t.id), back ? { next_step: t.title, next_step_at: t.due || null } : { next_step: '', next_step_at: '' }];
+    if (t.kind === 'deal_task') return ['PATCH', '/sales/deal-tasks/' + encodeURIComponent(t.id), { status: back ? 'open' : 'done' }];
+    return ['PATCH', '/projects/' + encodeURIComponent(t.parent_id) + '/tasks/' + encodeURIComponent(t.id), { status: back ? 'todo' : 'done' }];
+  }
+  function dueWhen(t, today) {
+    if (t.due === today) return 'Today';
+    var a = new Date(t.due + 'T12:00:00'), b = new Date(today + 'T12:00:00'), n = Math.round((b - a) / 86400000);
+    return n === 1 ? 'Yesterday' : n + ' days late';
+  }
+  function paintDuePop() {
+    if (!duePop) return;
+    var d = DUE || { late: 0, today: 0, items: [] }, today = localYmd();
+    var inClient = !!(CTX && CTX.scope && CTX.scope.site_id);   // the studio's pages, never re-scoped onto the client
+    var ns = inClient ? ' data-noscope="1"' : '';
+    duePop.querySelector('.dc').innerHTML = (d.late ? '<span class="late">' + d.late + ' late</span>' : '') + (d.today ? '<span class="now">' + d.today + ' today</span>' : '');
+    var body = duePop.querySelector('.body');
+    if (!d.items.length) { body.innerHTML = '<p class="muted">Nothing is due today.</p>'; return; }
+    body.innerHTML = '<div role="list">' + d.items.slice(0, 8).map(function (t, i) {
+      var late = t.due !== today;
+      return '<div class="drow" role="listitem"><button type="button" class="tick" data-i="' + i + '"' + (t.blocked ? ' disabled title="Blocked, so it can’t be ticked here"' : '') + ' aria-label="' + esc('Mark done: ' + t.title) + '"></button>' +
+        '<div class="dt"><a href="' + esc(t.href || '/todos.html') + '"' + ns + '>' + esc(t.title) + '</a><span class="dm"><span class="who">' + esc(t.context || '') + '</span><span class="when' + (late ? ' late' : '') + '">' + esc(dueWhen(t, today)) + '</span></span></div></div>';
+    }).join('') + '</div>' + (d.items.length > 8 ? '<p class="more">' + (d.items.length - 8) + ' more on To-dos</p>' : '');
+    var foot = duePop.querySelector('.dfoot a'); if (foot) { if (inClient) foot.setAttribute('data-noscope', '1'); else foot.removeAttribute('data-noscope'); }
+  }
+  function tickDue(i) {
+    if (!DUE || !DUE.items[i]) return;
+    var t = DUE.items[i], late = t.due !== localYmd();
+    DUE.items.splice(i, 1); if (late) DUE.late--; else DUE.today--;
+    paintDue(); paintDuePop(); dropDue();
+    var f = duePop && duePop.querySelector('.tick'); if (f) f.focus(); else { var a = duePop && duePop.querySelector('.dfoot a'); if (a) a.focus(); }
+    var q = dueDoneReq(t, false);
+    bookApi(q[1], { method: q[0], body: q[2] }).then(function (r) {
+      if (!r || !r.ok) {   // put it back where it was, and say so
+        DUE.items.splice(i, 0, t); if (late) DUE.late++; else DUE.today++;
+        paintDue(); paintDuePop();
+        if (window.ddsToast) window.ddsToast('That didn’t save. It’s still on your list.', 'err');
+        return;
+      }
+      if (window.ddsToast) window.ddsToast('Done — ' + t.title, 'ok', { label: 'Undo', onClick: function () {
+        var u = dueDoneReq(t, true);
+        bookApi(u[1], { method: u[0], body: u[2] }).then(function () { readDue(true); });
+      } });
+    });
+  }
+  function toggleDue(viaKey) {
+    if (duePop && duePop.classList.contains('open')) { closeDue(false); return; }
+    closeAllLayers();
+    if (!duePop) {
+      duePop = el('<div class="dds-pop dds-due-pop" id="dds-due-pop" role="dialog" aria-labelledby="dds-due-h">' +
+        '<div class="dh"><h2 id="dds-due-h">Due today</h2><span class="dc"></span></div><div class="body"></div>' +
+        '<div class="dfoot"><span>Tick one to mark it done</span><a href="/todos.html">Open To-dos →</a></div></div>');
+      document.body.appendChild(duePop);
+      duePop.addEventListener('click', function (e) {
+        e.stopPropagation();
+        var t = e.target && e.target.closest ? e.target.closest('.tick') : null;
+        if (t && !t.disabled) tickDue(Number(t.getAttribute('data-i')));
+      });
+      tabOutCloses(duePop, function () { closeDue(false); }, 'dds-due');
+    }
+    paintDuePop();
+    duePop.classList.add('open'); setExpanded('dds-due', true);
+    var b = document.getElementById('dds-due');
+    if (b && sidebarMode()) placeSiteSwitch(b, duePop); else { duePop.style.left = ''; duePop.style.top = ''; }
+    if (viaKey) { var f = duePop.querySelector('.tick:not([disabled]), .dt a'); if (f) f.focus(); }
+    readDue(true);   // the list you open is today's, not the kept count's
+  }
+  document.addEventListener('click', function () { closeDue(false); });
+  document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'visible' && CTX && Date.now() - DUE_AT > 60000) readDue(true); });
+  window.addEventListener('dds:created', function () { readDue(true); });   // Create made a to-do, a call's next step, a deal
+  // leaving a page where to-dos get ticked: the next page reads the count afresh
+  window.addEventListener('pagehide', function () { if (/^\/(todos|agency|today|pipeline|crm|projects)$/.test(normalizePath(location.pathname))) dropDue(); });
+
   // ── "+ Create" (sales list item 70, the bold redesign, Nov 2026) ─────────────
   // Timed against Salesforce, every everyday job (log a call, a new deal, an
   // invoice, a proposal, a to-do) began by finding the customer and opening
@@ -1021,9 +1161,12 @@
   // sidebar, the middle of the phone bar, "c", ⌘K ("log a call") and any
   // "#create:<kind>" link. create.js draws the forms; it loads while the
   // browser is idle, so the first press opens at once.
+  // Sales item 91: Create stays inside a client (it used to vanish there, just when "send this
+  // client an invoice" is the job), opening for that client. Their menu carries Pipeline as a
+  // search-only item under Studio, so it is found by item as well as by section.
   function canCreate() {
-    if (!CTX || !CTX.is_agency || (CTX.scope && CTX.scope.name) || isReviewerCtx()) return false;
-    return (CTX.nav || []).some(function (s) { return s.key === 'pipeline'; });
+    if (!CTX || !CTX.is_agency || isReviewerCtx()) return false;
+    return (CTX.nav || []).some(function (s) { return s.key === 'pipeline' || (s.items || []).some(function (i) { return i && i.key === 'pipeline'; }); });
   }
   var createP = null;
   function loadCreate() {
@@ -1043,7 +1186,8 @@
   function openCreate(kind, from, viaKey, preset) {
     if (!canCreate()) return false;
     closeAllLayers(); closePalette();
-    loadCreate().then(function (c) { c.open(kind || '', from || null, !!viaKey, preset || null); }, function () {
+    var inC = CTX && CTX.scope && CTX.scope.site_id ? { site_id: CTX.scope.site_id, name: CTX.scope.name || '' } : null;   // sales item 91
+    loadCreate().then(function (c) { c.open(kind || '', from || null, !!viaKey, preset || null, inC); }, function () {
       if (window.ddsToast) window.ddsToast('Create didn’t load — check your connection and try again.', 'err');
     });
     return true;
@@ -1094,6 +1238,7 @@
     { key: 'create_invoice', create: 'invoice', label: 'Send an invoice', section: 'Create', desc: 'new invoice bill' },
     { key: 'create_proposal', create: 'proposal', label: 'Send a proposal', section: 'Create', desc: 'new proposal quote' },
     { key: 'create_todo', create: 'todo', label: 'Add a to-do', section: 'Create', desc: 'new task reminder' },
+    { key: 'create_project', create: 'project', label: 'New project', section: 'Create', desc: 'add a project checklist work' },   // sales item 91
   ].map(function (d) { d.href = '#create:' + d.create; return d; });
   var SETTINGS_DESTS = [
     { key: 'set_stages', label: 'Deal stages', section: 'Settings', desc: 'stage names rename pipeline chance', href: '/settings.html#stages' },
@@ -1101,7 +1246,7 @@
   ];
   // "#create" or "#create:call" in the address (a link from another page, a
   // bookmark) opens it once; the hash is cleared so a reload doesn't reopen it
-  var CREATE_HASH = /^#create(?::(call|deal|invoice|proposal|todo|customer|update))?$/;
+  var CREATE_HASH = /^#create(?::(call|deal|invoice|proposal|todo|project|site|customer|update))?$/;
   function createFromHash() {
     var m = CREATE_HASH.exec(location.hash || '');
     if (!m || !canCreate()) return;
@@ -1182,6 +1327,8 @@
       (canCreate() ? '<button type="button" class="dds-create" id="dds-create" aria-haspopup="dialog" aria-expanded="false" aria-keyshortcuts="c">' + icon('plus') + '<span class="lbl">Create</span><kbd aria-hidden="true">C</kbd></button>' : '') +
       '<nav class="dds-nav" aria-label="Workspace">' + navHtml + '</nav>' +
       '<div class="dds-search" id="dds-search" role="button" tabindex="0" aria-label="Search"><span>' + icon('search', 'nic') + '</span><span>Search</span><kbd>' + (/Mac|iPhone|iPad/.test(navigator.platform || '') ? '⌘K' : 'Ctrl K') + '</kbd></div>' +
+      // sales item 123: "3 due today", drawn only when something is due (paintDue)
+      '<button type="button" class="dds-due" id="dds-due" aria-haspopup="dialog" aria-expanded="false" aria-controls="dds-due-pop" hidden></button>' +
       '<div class="dds-right">' +
         '<button class="dds-ic" id="dds-bell" aria-label="' + esc(bellLabel(att)) + '" aria-haspopup="true" aria-expanded="false">' + bellInner(att) + '</button>' +
         (whatsNewWho() ? '<button class="dds-ic" id="dds-new" aria-label="What’s new" aria-haspopup="dialog">' + icon('spark') + '</button>' : '') +
@@ -1190,6 +1337,7 @@
       '</div>';
 
     wire(nav);
+    paintDue(); readDue(false);   // sales item 123
     mountMobileBar(nav, activeKey, att);
     mountContextBar(scope);
     if (canCreate()) {
@@ -1633,6 +1781,8 @@
     });
     var cr = document.getElementById('dds-create');
     if (cr) cr.addEventListener('click', function (e) { e.stopPropagation(); openCreate('', cr, e.detail === 0); });
+    var due = document.getElementById('dds-due');
+    if (due) due.addEventListener('click', function (e) { e.stopPropagation(); toggleDue(e.detail === 0); });
     // search
     var s = document.getElementById('dds-search');
     s.addEventListener('click', openPalette);
@@ -1688,6 +1838,7 @@
     closeMenus(); closeNotifications(); closeProfile(); closeHelp(); closeDrawer(); closeShortcuts();
     if (siteSwitchPop()) closeSiteSwitch(false);   // bug hunt A11: Switch site is one of the layers too
     if (whichPop()) closeWhich(false);             // builder item 201: and Which client?
+    closeDue(false);                               // sales item 123: and Due today
   }
 
   // ── command palette ──
@@ -2274,6 +2425,7 @@
     if (help && help.classList.contains('open')) { closeHelp(); var b3 = helpButton(); if (b3) b3.focus(); }
     if (keys && keys.classList.contains('open')) closeShortcuts();
     if (whichPop()) closeWhich(true);   // builder item 201
+    if (duePop && duePop.classList.contains('open')) closeDue(true);   // sales item 123
     // ⌘K palette too — its input handles Escape while focused, but the dialog must
     // also close when focus is elsewhere (closePalette returns focus to its trigger).
     if (pal && pal.classList.contains('open')) closePalette();
@@ -2323,7 +2475,7 @@
       keys.querySelector('#dds-keys-close').addEventListener('click', closeShortcuts);
     }
     var rows = [[/Mac|iPhone|iPad/.test(navigator.platform || '') ? '⌘K' : 'Ctrl K', 'Search Studio OS'], ['/', 'Search'], ['n', 'New — the page’s + button'], ['?', 'These shortcuts'], ['Esc', 'Close whatever is open']];
-    if (canCreate()) rows.splice(3, 0, ['c', 'Create — log a call, a deal, an invoice…']);
+    if (canCreate()) rows.splice(3, 0, ['c', 'Create — log a call, a deal, an invoice, a project…']);
     var html = rows.map(keyRow).join('');
     if (normalizePath(location.pathname) === '/inbox') html += '<div class="grp">In the Inbox</div>' + INBOX_KEYS.map(keyRow).join('');
     keys.querySelector('.body').innerHTML = html;
@@ -2641,6 +2793,8 @@
       { sel: ['#dds-create', '#dds-mbar-create'], title: 'Create', text: 'Log a call, add a deal, send an invoice or a proposal — from any page. You pick who inside the form, so there’s no hunting for their page first.' },
       { sel: ['.dds-nav .sec > button[data-sec="website"]', '.dds-nav .sec > [data-href^="/presence"]', '#dds-mbar-menu'], title: 'Your website', text: 'Everything about your website lives behind this one door — edit pages, update business info, and publish. Nothing goes live without your OK.', mtext: 'On a phone, Menu holds the rest — your Website (edit and publish) and your Customers live in there. Nothing goes live without your OK.' },
       { sel: ['.dds-nav .sec > button[data-sec="customers"]', '.dds-nav .sec > [data-href^="/customers"]'], title: 'Customers', text: 'Your customers and the people behind them — their deal, billing, project, files and messages on one record.' },
+      // sales item 91: a studio's tour stops at Sites too
+      { sel: ['.dds-nav .sec > [data-href^="/sites"]'], title: 'Sites', text: 'Every client’s website is a card here. + New site starts one in private; nobody is emailed until you invite the owner.' },
       { sel: ['#dds-waffle'], title: 'App Launcher', text: 'Every part of your studio, one tap — the full list of destinations, grouped and always within reach.' },
       { sel: ['#dds-bell'], title: 'The bell', text: 'The bell gathers what needs you — approvals, new enquiries, anything worth a look. Quiet means you’re all caught up.' },
       { sel: ['#dds-profile'], title: 'Your account', text: 'Notifications, light or dark appearance, settings, and help live here — and you can take this tour again any time.' }

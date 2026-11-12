@@ -102,7 +102,8 @@ ok('"copied" is said only when the copy worked', /return copy\.then\(function \(
 
 // ── shell.js: who gets it, where it is ──
 const canCreate = (shell.match(/function canCreate\(\) \{[\s\S]*?\n  \}/) || [''])[0];
-ok('only a studio, at studio level, with Pipeline in its menu', /!CTX\.is_agency \|\| \(CTX\.scope && CTX\.scope\.name\) \|\| isReviewerCtx\(\)\) return false;/.test(canCreate) && /s\.key === 'pipeline'/.test(canCreate));
+// sales item 91: Create stays inside a client (it opens for that client), so the scope no longer rules it out
+ok('only a studio, with Pipeline in its menu or its search', /if \(!CTX \|\| !CTX\.is_agency \|\| isReviewerCtx\(\)\) return false;/.test(canCreate) && /s\.key === 'pipeline' \|\| \(s\.items \|\| \[\]\)\.some/.test(canCreate));
 ok('the sidebar button only when it applies', /\(canCreate\(\) \? '<button type="button" class="dds-create" id="dds-create"/.test(shell));
 ok('create.js loads on idle, from the site itself', /sc\.src = '\/create\.js';/.test(shell) && /requestIdleCallback \|\| function \(f\) \{ return setTimeout\(f, 1500\); \}\)\(function \(\) \{ loadCreate\(\)/.test(shell));
 ok('a failed load says so (and the next press retries)', /sc\.onerror = function \(\) \{ createP = null;/.test(shell) && /Create didn’t load — check your connection and try again\./.test(shell));
@@ -113,7 +114,7 @@ ok('the phone bar: Home · Inbox · + · Pipeline · Customers', order.every((x,
 ok('…and everyone else keeps Home · Inbox · Menu, with the + when they may create', /bar\.innerHTML = homeA \+ inboxA \+\s*\(plusHere \? '<button type="button" id="dds-mbar-create"[^\n]*: ''\) \+\s*'<button type="button" id="dds-mbar-menu"/.test(shell) && /var plusHere = canCreate\(\);/.test(shell));
 ok('"c" opens it, never while typing or under a modal', /else if \(e\.key === 'c' && !e\.shiftKey && canCreate\(\)\) \{ if \(modalOpen\(\)\) return;/.test(shell) && /tour \|\| \(window\.ddsCreate && window\.ddsCreate\.isOpen\(\)\)\); \}/.test(shell));
 ok('⌘K lists the five, last, and opens them in place (no hash for a page to trip on)', /if \(canCreate\(\)\) DESTS = DESTS\.concat\(CREATE_DESTS\);/.test(shell) && /closest\('a\.res\[data-create\]'\)/.test(shell) && /sel\.hasAttribute\('data-create'\)\) \{ e\.preventDefault\(\); openCreate\(/.test(shell));
-ok('"#create:<kind>" opens it once and clears itself', /var CREATE_HASH = \/\^#create\(\?::\(call\|deal\|invoice\|proposal\|todo\|customer\|update\)\)\?\$\/;/.test(shell) && /history\.replaceState\(history\.state, '', location\.pathname \+ location\.search\)/.test(shell));
+ok('"#create:<kind>" opens it once and clears itself', /var CREATE_HASH = \/\^#create\(\?::\(call\|deal\|invoice\|proposal\|todo\|project\|site\|customer\|update\)\)\?\$\/;/.test(shell) && /history\.replaceState\(history\.state, '', location\.pathname \+ location\.search\)/.test(shell));
 ok('the n key never picks the shell’s Create button (it isn’t the page’s +)', /n\.closest\('#dds-shell, \.dds-pop, \.dds-palette, \.dds-drawer, #dds-mbar'\)/.test(shell));
 
 // ── shell.css ──
