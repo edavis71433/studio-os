@@ -113,13 +113,13 @@ test.describe('Sharing & access', () => {
     await card.getByRole('button', { name: '+ Invite someone' }).click();
     await expect(card.getByRole('heading', { name: 'Invite someone' })).toBeVisible();
     const roles = card.getByRole('radio');
-    await expect(roles).toHaveCount(4);
+    await expect(roles).toHaveCount(3);   // Developer is paused (DEVELOPER_PAUSED) while custom code gets a stronger safety check
+    await expect(card.getByRole('radio', { name: /Developer/ })).toHaveCount(0);
     await expect(card.getByRole('radio', { name: /Staff/ })).toBeChecked();
     await expect(card.locator('.pp-role').filter({ hasText: 'Co-owner' })).toContainText('Everything you can do, except hand the site to someone else.');
     await expect(card.locator('.pp-role').filter({ hasText: 'Reviewer' }).locator('.pp-can')).toContainText('✓ Approve');
     const tile = (name: string) => card.locator('.pp-role').filter({ has: page.locator('.nm', { hasText: new RegExp('^' + name + '$') }) });
     await expect(tile('Staff').locator('.pp-can .y')).toHaveText(['✓ Edit pages', '✓ Publish']);
-    await expect(tile('Developer').locator('.pp-can .y')).toHaveText(['✓ Edit pages', '✓ Publish', '✓ Settings']);
     await expect(tile('Co-owner').locator('.pp-can .y')).toHaveCount(5);
     let posts = 0;
     page.on('request', (r) => { if (r.method() === 'POST' && r.url().includes('/portal/members')) posts++; });
@@ -127,15 +127,15 @@ test.describe('Sharing & access', () => {
     await expect(card.locator('.pp-err')).toHaveText('Type their email first.');
     expect(posts).toBe(0);
     await page.route(/\/presence\/portal\/members$/, (route) => route.request().method() === 'POST'
-      ? route.fulfill(json({ data: { ok: true, emailed: true, message: 'Invited as Developer — we’ve emailed them a sign-in link.' } }))
-      : route.fulfill(json(people({ data: [{ ...DANA, id: 'm-9', email: 'alex@example.com', role: 'developer', role_words: 'Developer', joined: false }] }))));
+      ? route.fulfill(json({ data: { ok: true, emailed: true, message: 'Invited as Co-owner — we’ve emailed them a sign-in link.' } }))
+      : route.fulfill(json(people({ data: [{ ...DANA, id: 'm-9', email: 'alex@example.com', role: 'business_owner', role_words: 'Co-owner', joined: false }] }))));
     await card.locator('#pp-email').fill('alex@example.com');
-    await card.getByRole('radio', { name: /Developer/ }).check();
+    await card.getByRole('radio', { name: /Co-owner/ }).check();
     const posted = page.waitForRequest((r) => r.method() === 'POST' && r.url().endsWith('/portal/members'));
     await card.getByRole('button', { name: 'Send invite' }).click();
-    expect((await posted).postDataJSON()).toEqual({ email: 'alex@example.com', role: 'developer' });
-    await expect(page.locator('.dds-toast').filter({ hasText: 'Invited as Developer' })).toBeVisible();
-    await expect(card.getByRole('combobox', { name: 'Role for alex@example.com' })).toHaveValue('developer');
+    expect((await posted).postDataJSON()).toEqual({ email: 'alex@example.com', role: 'business_owner' });
+    await expect(page.locator('.dds-toast').filter({ hasText: 'Invited as Co-owner' })).toBeVisible();
+    await expect(card.getByRole('combobox', { name: 'Role for alex@example.com' })).toHaveValue('business_owner');
   });
 
   test('someone already here is pointed at, not invited twice; someone removed comes back only on purpose', async ({ page }) => {
@@ -170,8 +170,10 @@ test.describe('Sharing & access', () => {
     await page.goto('/sharing.html');
     const card = peopleCard(page);
     const role = page.waitForRequest((r) => r.method() === 'POST' && r.url().endsWith('/portal/members/m-1/role'));
-    await card.getByRole('combobox', { name: 'Role for dana@example.com' }).selectOption('developer');
-    expect((await role).postDataJSON()).toEqual({ role: 'developer' });
+    const pick = card.getByRole('combobox', { name: 'Role for dana@example.com' });
+    await expect(pick.locator('option')).toHaveText(['Co-owner', 'Staff', 'Reviewer']);   // Developer is paused: not a choice
+    await pick.selectOption('client_reviewer');
+    expect((await role).postDataJSON()).toEqual({ role: 'client_reviewer' });
     let revokes = 0;
     page.on('request', (r) => { if (r.url().endsWith('/portal/members/m-2/revoke')) revokes++; });
     const jo = card.locator('[data-seat="m-2"]');
@@ -185,6 +187,15 @@ test.describe('Sharing & access', () => {
     const again = page.waitForRequest((r) => r.method() === 'POST' && r.url().endsWith('/portal/members') && r.postDataJSON()?.resend === true);
     await card.locator('[data-seat="m-2"]').getByRole('button', { name: 'Send it again' }).click();
     expect((await again).postDataJSON()).toEqual({ email: 'jo@example.com', resend: true });
+  });
+
+  test('a seat that already holds Developer keeps it, and still reads Developer in its list', async ({ page }) => {
+    const DEV = { ...DANA, id: 'm-7', email: 'dev@example.com', role: 'developer', role_words: 'Developer' };
+    await installApp(page, { api: { '/portal/members': people({ data: [DEV] }), '/portal/shares': SHARES_NONE } });
+    await page.goto('/sharing.html');
+    const pick = peopleCard(page).getByRole('combobox', { name: 'Role for dev@example.com' });
+    await expect(pick).toHaveValue('developer');
+    await expect(pick.locator('option')).toHaveText(['Co-owner', 'Staff', 'Developer', 'Reviewer']);
   });
 
   test('transfer ownership: the owner names the new owner, keeps a Co-owner place by default, and can stop it while it waits', async ({ page }) => {
