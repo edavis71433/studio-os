@@ -1272,7 +1272,7 @@ async function route_(req: Request, cors: Record<string, string>): Promise<Respo
     }
   }
   // ── Builder list item 58: the monthly report email to this client (ops/monthly_report.ts) ──
-  if (route === '/report/monthly' && method === 'GET') return (await import('./ops/monthly_report.ts')).handleReportGet(site, cors);
+  if (route === '/report/monthly' && method === 'GET') return (await import('./ops/monthly_report.ts')).handleReportGet(site, principal, cors);
   if (route === '/report/monthly' && method === 'PUT') return (await import('./ops/monthly_report.ts')).handleReportPut(req, site, principal, cors);
   if (route === '/report/monthly/preview' && method === 'POST') return (await import('./ops/monthly_report.ts')).handleReportPreview(site, principal, cors);
   if (route === '/report/monthly/pdf' && method === 'GET') return (await import('./ops/monthly_report.ts')).handleReportPdf(site, cors);   // item 184
