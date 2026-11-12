@@ -160,7 +160,7 @@ const brandOf = (b?: Partial<DocBrand> | null): DocBrand => ({
 });
 
 // ── the ONE branded print-ready shell every document is wrapped in ────────────
-// Sales item 124: the documents wear the product's new look. A band in the studio's
+// Sales item 125: the documents wear the product's new look. A band in the studio's
 // own colour opens the page with its logo or mark, its name, a large title and the
 // number that matters; below it white cards sit on cream, like the sales pages and
 // the client portal. Self-contained apart from the app host's own font file (a

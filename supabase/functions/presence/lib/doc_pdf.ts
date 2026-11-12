@@ -1,6 +1,6 @@
 // ── The documents as real PDFs (sales item 82) ───────────────────────────────
 // The same invoice, receipt, proposal, estimate and agreement lib/documents.ts
-// draws as a page, laid out on US Letter with lib/pdf.ts. Sales item 124, the new
+// draws as a page, laid out on US Letter with lib/pdf.ts. Sales item 125, the new
 // look: a band in the studio's colour opens the first page with its mark and name,
 // the title and the number that matters; then who it's from and who it's billed to,
 // the lines and totals, and for a signed agreement the signatures and the
@@ -21,7 +21,6 @@ const LINE: Rgb = [0.914, 0.894, 0.863];
 const PANEL: Rgb = [0.965, 0.957, 0.945];
 const GOOD: Rgb = [0.173, 0.361, 0.259];
 const GOOD_BG: Rgb = [0.906, 0.945, 0.918];
-const WARN: Rgb = [0.467, 0.365, 0.192];
 const L = 54, R = 558, W = R - L, TOP = 736, BOTTOM = 72;
 
 /** A cursor that flows down the page and starts a new one when it runs out. */
@@ -274,6 +273,7 @@ export function contractPdf(c: any, brandIn?: Partial<DocBrand> | null, ctx?: Do
     if (c?.countersigned_name) cols.push({ k: `For ${brand.name}`, name: String(c.countersigned_name), who: [c?.countersigned_title ? String(c.countersigned_title) : '', `${dayLabel(c?.countersigned_at || c?.signed_at, tz)} (countersigned)`].filter(Boolean).join(' · ') });
     f.need(84); f.rule(); f.gap(14);
     f.para('SIGNATURES', { font: 'B', size: 8.5, color: SOFT });
+    f.gap(6);
     const colW = (W - 24) / 2, top = f.y;
     cols.forEach((col, i) => {
       const x = L + i * (colW + 24);
