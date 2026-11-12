@@ -1637,13 +1637,117 @@ html.dc-edit:not(.plan-watch) .scrim{z-index:96}
 .dc-modal{background:var(--sheet,#fff);border-radius:var(--dds-r-xl,14px);max-width:600px;width:100%;max-height:86vh;overflow:auto;padding:var(--dds-s6,24px);box-shadow:0 24px 60px rgba(0,0,0,.3)}
 .dc-modal-h{font-size:18px;font-weight:700;margin:0 0 var(--dds-s1,4px)}
 .dc-modal-sub{font-size:13px;color:var(--ink-2,#8a8172);margin:0 0 var(--dds-s4,16px);line-height:1.5}
-.dc-layout-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
-.dc-layout-card{text-align:left;border:1px solid var(--line,#ddd);border-radius:var(--r-lg);padding:var(--dds-s4,16px);background:var(--sheet,#fff);cursor:pointer}
-.dc-layout-card:hover,.dc-layout-card:focus-visible{border-color:var(--plum,#5b3fa0);background:var(--wash,#f8f6fc);outline:none}
-.dc-layout-card .dl-t{font-weight:700;font-size:14px;margin-bottom:var(--dds-s1,4px)}
-.dc-layout-card .dl-d{font-size:12px;color:var(--ink-2,#8a8172);line-height:1.4}
 .dc-modal-cancel{margin-top:var(--dds-s4,16px);font:inherit;font-size:13px;font-weight:500;padding:var(--dds-s2,8px) var(--dds-s4,16px);border-radius:var(--r);border:1px solid var(--line,#ddd);background:transparent;cursor:pointer}
-@media(max-width:560px){.dc-layout-grid{grid-template-columns:1fr}}
+/* ── Builder list item 216: Add a page, a picture of every ready-made page by what it is for ── */
+.ap-dlg{border:none;padding:0;margin:auto;width:min(1220px,calc(100vw - 48px));height:min(900px,calc(100vh - 48px));height:min(900px,calc(100dvh - 48px));max-width:none;max-height:none;border-radius:24px;background:var(--sheet);color:var(--ink);box-shadow:var(--dds-shadow-pop);overflow:hidden}
+.ap-dlg[open]{display:flex;flex-direction:column}
+.ap-dlg::backdrop,.ap-save::backdrop{background:color-mix(in srgb,var(--scrim-ink) 42%,transparent)}
+.ap-head{flex:none;display:flex;align-items:center;gap:16px;padding:22px 28px 16px;border-bottom:1px solid var(--hair)}
+.ap-tt{flex:1;min-width:0}
+.ap-h{margin:0;font-family:var(--serif);font-size:28px;font-weight:600;letter-spacing:-.01em;line-height:1.15}
+.ap-sub{margin:4px 0 0;font-size:13.5px;color:var(--ink-2);line-height:1.45}
+.ap-name{display:flex;flex-direction:column;gap:6px;font-size:12.5px;font-weight:500;color:var(--ink-2)}
+.ap-name input{width:250px;box-sizing:border-box;font:inherit;font-size:15px;color:var(--ink);padding:10px 14px;border:1px solid var(--hair-2);border-radius:12px;background:var(--paper)}
+.ap-name input:focus-visible{outline:2px solid var(--plum);outline-offset:1px}
+.ap-size{flex:none;display:flex;gap:2px;padding:4px;border-radius:999px;background:var(--paper)}
+.ap-size button{font:inherit;font-size:12.5px;font-weight:500;color:var(--ink-2);padding:0 13px;min-height:32px;border-radius:999px;border:0;background:transparent;cursor:pointer}
+.ap-size button[aria-pressed="true"]{background:var(--sheet);color:var(--ink);font-weight:600;box-shadow:0 1px 3px color-mix(in srgb,var(--ink) 12%,transparent)}
+.ap-close{flex:none;min-height:36px}
+.ap-body{flex:1;min-height:0;display:flex}
+.ap-nav{flex:none;width:236px;box-sizing:border-box;overflow:auto;padding:16px 14px 16px 18px;background:var(--paper);display:flex;flex-direction:column;gap:2px}
+.ap-nb{display:flex;align-items:center;gap:8px;width:100%;text-align:left;font:inherit;font-size:13.5px;color:var(--ink);padding:8px 10px;min-height:36px;border:0;border-radius:10px;background:transparent;cursor:pointer}
+.ap-nb:hover{background:var(--sheet)}
+.ap-nb.strong{font-weight:600}
+.ap-nb.on{background:var(--plum-soft);color:var(--plum);font-weight:600}
+.ap-nbt{flex:1;min-width:0}
+.ap-cnt{flex:none;font-size:12px;font-weight:600;color:var(--ink-2);background:var(--sheet);border-radius:999px;padding:1px 8px}
+.ap-gl{margin:14px 10px 4px;font-size:12px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-3)}
+.ap-chips{display:none}
+.ap-grid{flex:1;min-width:0;overflow:auto;padding:20px 28px 28px}
+.ap-grp{margin-bottom:26px;scroll-margin-top:12px}
+.ap-gh{margin:0;font-family:var(--serif);font-size:21px;font-weight:600}
+.ap-gline{margin:3px 0 14px;font-size:13px;color:var(--ink-2)}
+.ap-cards{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}
+.ap-dlg.small .ap-cards{grid-template-columns:repeat(5,minmax(0,1fr));gap:12px}
+.ap-card{display:flex;flex-direction:column;gap:8px;min-width:0;text-align:left;font:inherit;color:var(--ink);padding:8px 8px 12px;border:1px solid var(--hair);border-radius:16px;background:var(--sheet);cursor:pointer}
+.ap-card:hover{border-color:var(--hair-2)}
+.ap-card:focus-visible,.ap-nb:focus-visible,.ap-chip:focus-visible,.ap-pill:focus-visible,.ap-size button:focus-visible{outline:2px solid var(--plum);outline-offset:2px}
+.ap-card.on{border-color:var(--plum);box-shadow:0 0 0 2px var(--plum)}
+.ap-pic{display:block;width:100%;height:auto;aspect-ratio:440/460;object-fit:cover;object-position:top;border-radius:10px;background:var(--paper)}
+.ap-pic.gone{visibility:hidden}
+.ap-stack{display:flex;flex-direction:column;gap:3px;aspect-ratio:440/460;overflow:hidden;padding:5px;box-sizing:border-box;border-radius:10px;background:var(--paper)}
+.ap-stack img{display:block;flex:none;width:100%;height:auto;aspect-ratio:440/248;object-fit:cover;object-position:top;border-radius:5px}
+.ap-cname{display:flex;flex-wrap:wrap;align-items:center;gap:4px 8px;padding:0 4px;font-size:14.5px;font-weight:600}
+.ap-cn{flex:1;min-width:0}
+.ap-picked,.ap-sugg{flex:none;font-size:12px;font-weight:600;border-radius:999px;padding:2px 9px}
+.ap-picked{display:none;color:var(--plum);background:var(--plum-soft)}
+.ap-card.on .ap-picked{display:inline-block}
+.ap-card.on .ap-sugg{display:none}
+.ap-sugg{color:var(--sage);background:var(--sage-soft)}
+.ap-cline{padding:0 4px;font-size:12.5px;color:var(--ink-2);line-height:1.4;white-space:pre-line}
+.ap-dlg.small .ap-cline{display:none}
+.ap-saved-wrap{display:flex;gap:20px;align-items:flex-start}
+.ap-saved-wrap>.ap-cards{flex:1;min-width:0;grid-template-columns:repeat(2,minmax(0,1fr))}
+.ap-dlg.small .ap-saved-wrap>.ap-cards{grid-template-columns:repeat(3,minmax(0,1fr))}
+.ap-side{flex:none;width:300px;box-sizing:border-box;display:flex;flex-direction:column;gap:10px;padding:18px;border:1px solid var(--hair);border-radius:16px;background:var(--paper);font-size:13px}
+.ap-side[hidden]{display:none}
+.ap-sh{margin:0;font-family:var(--serif);font-size:20px;font-weight:600}
+.ap-side ul{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px;line-height:1.4;color:var(--ink-2)}
+.ap-side li{display:flex;gap:8px}
+.ap-side li b{flex:none}
+.ap-side li.yes b{color:var(--sage)}
+.ap-side li.no b{color:var(--clay)}
+.ap-note{margin:0;font-size:12.5px;line-height:1.45;color:var(--amber-text);background:var(--amber-soft);border-radius:12px;padding:10px 12px}
+.ap-acts2{display:flex;flex-wrap:wrap;gap:14px}
+.ap-acts2 .textact{min-height:32px}
+.ap-acts2 .danger{color:var(--clay)}
+.ap-empty{margin:0;font-size:13px;color:var(--ink-2)}
+.ap-foot{flex:none;display:flex;align-items:center;gap:12px;padding:14px 28px 16px;border-top:1px solid var(--hair)}
+.ap-line{flex:1;margin:0;font-size:13px;color:var(--ink-2);line-height:1.4}
+.ap-foot .pillbtn{height:40px;padding:0 16px;font-size:13.5px;font-weight:600}
+.ap-go[disabled]{opacity:.5;cursor:not-allowed}
+@media (max-width:1180px){
+  .ap-cards{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .ap-dlg.small .ap-cards{grid-template-columns:repeat(3,minmax(0,1fr))}
+  .ap-saved-wrap{flex-direction:column}
+  .ap-side{width:auto;align-self:stretch}
+  .ap-name input{width:200px}
+  .ap-nav{width:200px}
+}
+/* a phone: a sheet from the bottom, the groups as chips, two pictures to a row, the button in reach */
+@media (max-width:620px){
+  .ap-dlg{width:100vw;height:auto;max-height:92vh;max-height:92dvh;margin:auto 0 0;border-radius:24px 24px 0 0}
+  .ap-head{flex-wrap:wrap;gap:10px;padding:14px 16px 10px}
+  .ap-tt{flex:1 1 60%}
+  .ap-h{font-size:24px}
+  .ap-sub,.ap-size,.ap-nav,.ap-cline,.ap-cancel{display:none}
+  .ap-name{order:3;flex:1 1 100%}
+  .ap-name input{width:100%}
+  .ap-body{flex-direction:column}
+  .ap-chips{display:flex;flex:none;gap:8px;overflow-x:auto;padding:10px 16px 6px}
+  .ap-chip{flex:none;font:inherit;font-size:13px;font-weight:600;color:var(--ink);padding:0 14px;min-height:36px;border-radius:999px;border:0;background:var(--paper);cursor:pointer}
+  .ap-chip.on{background:var(--ink);color:var(--sheet)}
+  .ap-grid{padding:8px 16px 16px}
+  .ap-cards,.ap-dlg.small .ap-cards,.ap-saved-wrap>.ap-cards,.ap-dlg.small .ap-saved-wrap>.ap-cards{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+  .ap-foot{flex-wrap:wrap;padding:10px 16px calc(12px + env(safe-area-inset-bottom))}
+  .ap-line{flex:1 1 100%;font-size:12.5px}
+  .ap-go{flex:1}
+}
+/* ★ Save to your studio */
+.ap-save{border:none;padding:0;margin:auto;width:min(440px,calc(100vw - 32px));max-height:calc(100dvh - 32px);overflow:auto;border-radius:20px;background:var(--sheet);color:var(--ink);box-shadow:var(--dds-shadow-pop)}
+.ap-save form{display:flex;flex-direction:column;gap:14px;padding:22px}
+.ap-save .ap-h{font-size:24px}
+.ap-save .ap-name input{width:100%}
+.ap-plbl{display:block;font-size:12.5px;font-weight:500;color:var(--ink-2);margin-bottom:8px}
+.ap-pills{display:flex;flex-wrap:wrap;gap:8px}
+.ap-pill{font:inherit;font-size:13px;font-weight:600;color:var(--ink);padding:0 14px;min-height:36px;border-radius:999px;border:1px solid var(--hair-2);background:var(--paper);cursor:pointer}
+.ap-pill[aria-checked="true"]{background:var(--plum);border-color:var(--plum);color:var(--fill-ink)}
+.ap-hint{margin:8px 0 0;font-size:12.5px;color:var(--ink-2)}
+.ap-stay{background:var(--paper);border-radius:12px;padding:12px 14px;font-size:12.5px;line-height:1.45;color:var(--ink-2)}
+.ap-stay strong{display:block;color:var(--ink);margin-bottom:2px}
+.ap-stay p{margin:0}
+.ap-acts{display:flex;justify-content:flex-end;gap:10px}
+.ap-acts .pillbtn{height:38px;padding:0 16px;font-weight:600}
 .dc-actbtn:focus-visible{outline:2px solid var(--plum,#5b3fa0);outline-offset:2px}
 /* the prominent floating "add section" affordance over the canvas */
 .dc-fab{position:absolute;right:20px;bottom:22px;z-index:40;font:inherit;font-size:13.5px;font-weight:600;padding:10px var(--dds-s4,16px);border-radius:var(--r);border:1px solid var(--plum,#5b3fa0);background:var(--sheet,#fff);color:var(--plum,#5b3fa0);cursor:pointer;box-shadow:0 6px 20px rgba(91,63,160,.18);display:inline-flex;align-items:center;gap:var(--dds-s2,8px)}
@@ -2982,7 +3086,7 @@ const lcWho = (lc) => lc ? (lc.actor_kind === "staff" ? "your studio" : lc.actor
 // the same version and hears the same. Everything else stays out of the line, so a slow
 // ask (an AI draft) can't hold up a save, and /publish still names the version that was
 // reviewed. The server keeps the same list (lib/optimistic_lock.ts).
-const DRAFT_WRITE = /^\/(?:settings|identity|location|offerings|testimonials|faqs|posts|pages\/duplicate|media|stock\/import|redirects|site\/template|content-library|dev\/customization|dev\/brand-kit|restore-to-draft)(?:[/?]|$)|^\/reviews\/[^/]+\/|^\/publishes\/checkpoints\/[^/]+\/restore$|^\/writer\/drafts\/[^/]+\/accept$/;
+const DRAFT_WRITE = /^\/(?:settings|identity|location|offerings|testimonials|faqs|posts|pages\/(?:duplicate|from-saved)|media|stock\/import|redirects|site\/template|content-library|dev\/customization|dev\/brand-kit|restore-to-draft)(?:[/?]|$)|^\/reviews\/[^/]+\/|^\/publishes\/checkpoints\/[^/]+\/restore$|^\/writer\/drafts\/[^/]+\/accept$/;
 let DRAFT_LINE = Promise.resolve(), DRAFT_WRITES_OUT = 0;
 let WRITES_ANSWERED = 0;   // readChanges: has a write been answered since this read left?
 const READS_BY_POST = /^\/preview\/section$/;   // sent by POST for its body, but moves nothing
@@ -7789,10 +7893,10 @@ function renderBlockerList(list) {
   const ul = el("ul", "blocklist");
   uniq.forEach((b) => {
     const li = el("li"); li.appendChild(ritMark(false)); li.appendChild(el("span", "rit-msg", b.message));
-    const fix = el("button", "textact", "Fix"); fix.type = "button";
-    fix.setAttribute("aria-label", "Fix: " + b.message);
+    const fix = el("button", "textact", b.field === "copied" ? "Change them" : "Fix"); fix.type = "button";
+    fix.setAttribute("aria-label", (b.field === "copied" ? "Change them: " : "Fix: ") + b.message);
     fix.addEventListener("click", () => {
-      const t = blockerTarget(b.field);
+      const t = b.field === "copied" ? { view: "design", focus: null } : blockerTarget(b.field);   // item 216: copied sections are changed on the page
       closeRitual(); go(t.view);
       if (t.focus) setTimeout(() => {
         const n = $(t.focus); if (!n) return;
@@ -7801,7 +7905,18 @@ function renderBlockerList(list) {
         if (tgt) tgt.focus();
       }, 80);
     });
-    li.appendChild(fix); ul.appendChild(li);
+    li.appendChild(fix);
+    // items 145 and 216: the studio has looked at what a template, Duplicate or a saved page copied, and it may publish as it is
+    if (b.field === "copied" && S.isStudio && S.site) {
+      const keep = el("button", "textact", "Keep them as they are"); keep.type = "button";
+      keep.addEventListener("click", async () => {
+        if (!(await askYes("Keep the copied sections and photos as they are? They can then publish without changes.", { ok: "Keep them" }))) return;
+        try { await api("POST", "/agency/sites/" + encodeURIComponent(S.site.id) + "/copied", { keep: true }); toast("Kept as they are. They can publish now."); loadRitual(false); }
+        catch (err) { toast(nice(err), true); }
+      });
+      li.appendChild(keep);
+    }
+    ul.appendChild(li);
   });
   box.appendChild(ul);
 }
@@ -11573,18 +11688,255 @@ async function dcSwitchPage(slug) {
   toast("Now editing: " + dcPageTitle(DC_PAGE));
   return to === slug;
 }
+// ── Builder list item 216: Add a page with a picture of every ready-made page ──
+// Grouped by what the page is for (GET /pages/ready, lib/page_layouts.ts; the pictures are
+// thumbs/pages, made by scripts/thumbnails), and the studio's own saved pages on top
+// (GET /agency/pages). A saved page lands with its photos copied into this site
+// (POST /pages/from-saved). One native <dialog>: the page behind is inert, Escape closes it
+// and focus goes back where it was. On a phone it is a sheet, the groups chips along the top.
+let AP_READY = null;     // { groups, pages, recommended } once read
+let AP_SAVED = null;     // the studio's saved pages once read
+let AP_SAVED_ON = false; // the studio's list answered (before the backend deploy it can't)
+let AP_SMALL = false;    // the Small pictures switch, for this visit
+async function apReady() {
+  if (AP_READY) return AP_READY;
+  try {
+    const d = (await api("GET", "/pages/ready")).data;
+    if (d && Array.isArray(d.pages) && d.pages.length) { AP_READY = d; return d; }
+  } catch (_) { /* a server from before item 216: its home layouts, below */ }
+  if (BLOCK_SUGGEST === null || BLOCK_SUGGEST === undefined) { try { BLOCK_SUGGEST = (await api("GET", "/blocks/suggested")).data || false; } catch (_) { BLOCK_SUGGEST = false; } }
+  const starters = (BLOCK_SUGGEST && Array.isArray(BLOCK_SUGGEST.starters)) ? BLOCK_SUGGEST.starters : [];
+  return { groups: [{ key: "home", name: "Home pages", line: "Whole front pages, laid out for a kind of business." }],
+    pages: starters.map((s) => ({ ...s, group: "home", title: "Welcome", slug: "welcome" })), recommended: BLOCK_SUGGEST ? BLOCK_SUGGEST.recommendedStarter : null };
+}
+async function apSaved(fresh) {
+  if (!S.isStudio) return [];
+  if (AP_SAVED && !fresh) return AP_SAVED;
+  try {
+    const r = await api("GET", "/agency/pages");
+    AP_SAVED = Array.isArray(r && r.data) ? r.data : [];
+    AP_SAVED_ON = !!r && r.available !== false;
+  } catch (_) { AP_SAVED = []; AP_SAVED_ON = false; }   // before the deploy, or unreadable: no Saved group, quietly
+  return AP_SAVED;
+}
+const apSlug = (t) => String(t || "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 40) || "page";
+const apCount = (n, one) => n + " " + one + (n === 1 ? "" : "s");
+const apDate = (iso) => { const d = new Date(iso); return isNaN(d) ? "" : d.toLocaleDateString("en-US", { month: "short", day: "numeric" }); };
+// The dialog. "add" (＋ Add page) names the new page and offers the studio's saved pages;
+// "apply" (an empty page's Choose a template) drops a layout onto the page on the canvas.
+// Resolves null (closed), or { kind: "blank" | "ready" | "saved", name, blocks, slug, saved }.
+async function dcChoosePageLayout(opts) {
+  opts = opts || {};
+  const add = opts.mode !== "apply";
+  const opener = document.activeElement;
+  const [ready, saved] = await Promise.all([apReady(), add ? apSaved() : Promise.resolve([])]);
+  const toName = (S.identity && S.identity.business_name) || "";
+  return new Promise((resolve) => {
+    const dlg = el("dialog", "ap-dlg" + (AP_SMALL ? " small" : "")); dlg.setAttribute("aria-labelledby", "apTitle");
+    const head = el("div", "ap-head"), tt = el("div", "ap-tt");
+    const h = el("h2", "ap-h", add ? "Add a page" : "Choose a layout for “" + (opts.title || "this page") + "”"); h.id = "apTitle";
+    tt.append(h, el("p", "ap-sub", add ? "Pick a page by how it looks. It arrives as sections you can change, with words for you to replace." : "Pick a layout by how it looks. It arrives on this page as sections you can change."));
+    head.appendChild(tt);
+    let nameIn = null, typed = false;
+    if (add) {
+      const lab = el("label", "ap-name"); lab.appendChild(el("span", null, "Page name"));
+      nameIn = el("input"); nameIn.type = "text"; nameIn.maxLength = 60; nameIn.autocomplete = "off"; nameIn.placeholder = "e.g. Services, Gallery, Pricing";
+      nameIn.addEventListener("input", () => { typed = !!nameIn.value.trim(); sync(); });
+      nameIn.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); goNow(); } });
+      lab.appendChild(nameIn); head.appendChild(lab);
+    }
+    const size = el("div", "ap-size"); size.setAttribute("role", "group"); size.setAttribute("aria-label", "Picture size");
+    [["Big pictures", false], ["Small", true]].forEach(([label, small]) => {
+      const b = el("button", null, label); b.type = "button"; b.setAttribute("aria-pressed", String(AP_SMALL === small));
+      b.addEventListener("click", () => { AP_SMALL = small; dlg.classList.toggle("small", small); size.querySelectorAll("button").forEach((x) => x.setAttribute("aria-pressed", String(x === b))); });
+      size.appendChild(b);
+    });
+    head.appendChild(size);
+    const close = el("button", "pillbtn ap-close", "Close"); close.type = "button"; close.addEventListener("click", () => finish(null));
+    head.appendChild(close);
+    const body = el("div", "ap-body");
+    const nav = el("nav", "ap-nav"); nav.setAttribute("aria-label", "Kinds of page");
+    const chips = el("div", "ap-chips"); chips.setAttribute("role", "group"); chips.setAttribute("aria-label", "Kinds of page");
+    const grid = el("div", "ap-grid");
+    body.append(nav, chips, grid);
+    const foot = el("div", "ap-foot");
+    const line = el("p", "ap-line"); line.setAttribute("aria-live", "polite");
+    const cancel = el("button", "pillbtn ap-cancel", "Cancel"); cancel.type = "button"; cancel.addEventListener("click", () => finish(null));
+    const go = el("button", "pillbtn inked ap-go"); go.type = "button"; go.addEventListener("click", () => goNow());
+    foot.append(line, cancel, go);
+    dlg.append(head, body, foot);
+
+    let pick = null;                 // { kind, item }
+    const cards = [];                // { btn, item }
+    const BLANK = { key: "_blank", name: "Blank page", blocks: [] };
+    const sections = {};             // group key → its <section>
+    const toGroup = (key) => { const s = sections[key]; if (s) { s.scrollIntoView({ block: "start" }); chips.querySelectorAll(".ap-chip").forEach((c) => c.classList.toggle("on", c.dataset.group === key)); } };
+    const navItem = (label, key, onClick, o) => {
+      const b = el("button", "ap-nb" + (o && o.strong ? " strong" : "")); b.type = "button"; if (key) b.dataset.key = key;
+      b.appendChild(el("span", "ap-nbt", label));
+      if (o && o.count !== undefined) b.appendChild(el("span", "ap-cnt", String(o.count)));
+      b.addEventListener("click", onClick); nav.appendChild(b); return b;
+    };
+    const chip = (label, group, onClick) => { const b = el("button", "ap-chip", label); b.type = "button"; b.dataset.group = group; b.addEventListener("click", onClick); chips.appendChild(b); return b; };
+    const choose = (kind, item, scroll) => {
+      pick = { kind, item };
+      cards.forEach((c) => { const on = c.item === item; c.btn.classList.toggle("on", on); c.btn.setAttribute("aria-pressed", String(on)); });
+      nav.querySelectorAll(".ap-nb[data-key]").forEach((b) => b.classList.toggle("on", b.dataset.key === (item.key || item.id)));
+      if (nameIn && !typed) nameIn.value = kind === "ready" ? (item.title || item.name) : kind === "saved" ? item.name : "";
+      if (scroll) { const c = cards.find((x) => x.item === item); if (c) c.btn.scrollIntoView({ block: "nearest" }); }
+      sideFor(kind === "saved" ? item : null);
+      sync();
+    };
+    const card = (kind, item, recommended) => {
+      const b = el("button", "ap-card"); b.type = "button"; b.setAttribute("aria-pressed", "false"); b.dataset.key = item.key || item.id;
+      if (kind === "ready") {
+        const img = el("img", "ap-pic"); img.src = "/thumbs/pages/" + item.key + ".jpg"; img.alt = ""; img.loading = "lazy"; img.width = 440; img.height = 460;
+        img.addEventListener("error", () => img.classList.add("gone"));
+        b.appendChild(img);
+      } else {
+        // a saved page's picture: its own sections' pictures, in order
+        const st = el("span", "ap-stack"); st.setAttribute("aria-hidden", "true");
+        (Array.isArray(item.outline) ? item.outline : []).slice(0, 5).forEach((t) => { const im = el("img"); im.src = "/thumbs/sections/" + t + ".jpg"; im.alt = ""; im.loading = "lazy"; im.addEventListener("error", () => im.remove()); st.appendChild(im); });
+        b.appendChild(st);
+      }
+      const nm = el("span", "ap-cname"); nm.appendChild(el("span", "ap-cn", item.name));
+      if (recommended) nm.appendChild(el("span", "ap-sugg", "Suggested"));
+      nm.appendChild(el("span", "ap-picked", "✓ Picked"));
+      b.appendChild(nm);
+      const sum = item.summary || {};
+      b.appendChild(el("span", "ap-cline", kind === "ready" ? (item.description || "")
+        : ((item.from_name ? "From " + item.from_name : "Saved") + (item.created_at ? " · " + apDate(item.created_at) : "") + "\n" + apCount(sum.sections || 0, "section") + (sum.photos ? " · " + apCount(sum.photos, "photo") : ""))));
+      b.addEventListener("click", () => choose(kind, item));
+      b.addEventListener("dblclick", () => { choose(kind, item); goNow(); });
+      cards.push({ btn: b, item });
+      return b;
+    };
+    const group = (key, name, lineText) => {
+      const sec = el("section", "ap-grp"); sec.dataset.group = key; sec.setAttribute("aria-labelledby", "apG-" + key);
+      const gh = el("h3", "ap-gh", name); gh.id = "apG-" + key;
+      sec.append(gh, el("p", "ap-gline", lineText));
+      grid.appendChild(sec); sections[key] = sec;
+      return sec;
+    };
+    // the studio's saved pages, and what comes across with the picked one
+    let side = null;
+    const sideFor = (it) => {
+      if (!side) return;
+      side.hidden = !it; side.innerHTML = "";
+      if (!it) return;
+      const sum = it.summary || {};
+      side.appendChild(el("h4", "ap-sh", it.name));
+      side.appendChild(el("strong", null, "What comes across"));
+      const ul = el("ul");
+      const li = (yes, text) => { const x = el("li", yes ? "yes" : "no"); x.appendChild(el("b", null, yes ? "✓" : "✕")); x.appendChild(el("span", null, text)); ul.appendChild(x); };
+      li(true, apCount(sum.sections || 0, "section") + ", with their words and layout");
+      if (sum.photos) li(true, apCount(sum.photos, "photo") + ", copied into this site’s Files");
+      if (it.from_name && toName && it.from_name !== toName) li(true, "“" + it.from_name + "” in the words becomes “" + toName + "”");
+      li(false, "Never: business details, hours, reviews, or links to the old business’s pages");
+      side.appendChild(ul);
+      if (S.ctx && S.ctx.scope) side.appendChild(el("p", "ap-note", "Until each copied section is changed, Publish lists it as copied from another site, so nothing goes live by accident. One press keeps them as they are."));
+      const acts = el("div", "ap-acts2");
+      const ren = el("button", "textact", "Rename"); ren.type = "button";
+      ren.addEventListener("click", async () => {
+        const name = await askText("Rename this saved page", { value: it.name, ok: "Rename" });
+        if (!name || !name.trim() || name.trim() === it.name) return;
+        try { await api("PATCH", "/agency/pages/" + it.id, { name: name.trim() }); it.name = name.trim(); const c = cards.find((x) => x.item === it); if (c) c.btn.querySelector(".ap-cn").textContent = it.name; if (nameIn && !typed) nameIn.value = it.name; sideFor(it); sync(); toast("Renamed."); }
+        catch (err) { toast(nice(err), true); }
+      });
+      const rm = el("button", "textact danger", "Remove from studio"); rm.type = "button";
+      rm.addEventListener("click", async () => {
+        if (!(await askYes("Remove “" + it.name + "” from your studio? Sites it was added to keep their page.", { ok: "Remove", danger: true }))) return;
+        try {
+          await api("DELETE", "/agency/pages/" + it.id);
+          AP_SAVED = (AP_SAVED || []).filter((x) => x !== it);
+          const c = cards.find((x) => x.item === it); if (c) { c.btn.remove(); cards.splice(cards.indexOf(c), 1); }
+          const cnt = nav.querySelector(".ap-nb[data-group='saved'] .ap-cnt"); if (cnt) cnt.textContent = String(AP_SAVED.length);
+          pick = null; sideFor(null); sync(); toast("Removed from your studio.");
+        } catch (err) { toast(nice(err), true); }
+      });
+      acts.append(ren, rm); side.appendChild(acts);
+    };
+    if (add) {
+      navItem("＋  Blank page", "_blank", () => choose("blank", BLANK), { strong: true });
+      chip("Blank", "_blank", () => choose("blank", BLANK));
+      if (S.isStudio && AP_SAVED_ON) {
+        const sb = navItem("★  Saved by your studio", null, () => toGroup("saved"), { strong: true, count: saved.length }); sb.dataset.group = "saved";
+        chip("Saved", "saved", () => toGroup("saved"));
+        const sec = group("saved", "Saved by your studio", "Pages you saved from any client’s site. Only your studio sees this group; clients never do.");
+        if (!saved.length) sec.appendChild(el("p", "ap-empty", "Nothing saved yet. Open a page’s ⋯ menu and choose Save to your studio."));
+        else {
+          const wrap = el("div", "ap-saved-wrap"), list = el("div", "ap-cards");
+          saved.forEach((it) => list.appendChild(card("saved", it)));
+          side = el("aside", "ap-side"); side.hidden = true; side.setAttribute("aria-label", "What comes across");
+          wrap.append(list, side); sec.appendChild(wrap);
+        }
+      }
+    }
+    const groups = Array.isArray(ready.groups) ? ready.groups : [];
+    groups.forEach((g) => {
+      const pages = (ready.pages || []).filter((p) => p.group === g.key);
+      if (!pages.length) return;
+      const lbl = el("div", "ap-gl", g.name); nav.appendChild(lbl);
+      if (g.key === "home") navItem(apCount(pages.length, "home page"), null, () => toGroup("home"), { count: pages.length });
+      else pages.forEach((p) => navItem(p.name, p.key, () => choose("ready", p, true)));
+      chip(g.key === "home" ? "Home" : g.name, g.key, () => toGroup(g.key));
+      const sec = group(g.key, g.name, g.line || "");
+      const list = el("div", "ap-cards");
+      // the home layout this kind of business suits comes first
+      const ordered = g.key === "home" && ready.recommended ? [...pages.filter((p) => p.key === ready.recommended), ...pages.filter((p) => p.key !== ready.recommended)] : pages;
+      ordered.forEach((p) => list.appendChild(card("ready", p, g.key === "home" && p.key === ready.recommended)));
+      sec.appendChild(list);
+    });
+    if (!cards.length && !add) grid.appendChild(el("p", "ap-empty", "No ready-made layouts could be read just now. Add sections to this page from Add."));
+    function sync() {
+      const nm = nameIn ? nameIn.value.trim() : "";
+      if (!pick) {
+        line.textContent = add ? "Pick a page, or start with a blank one." : "Pick a layout for this page.";
+        go.textContent = add ? "Add the page" : "Use this layout"; go.disabled = true; return;
+      }
+      const it = pick.item, sum = it.summary || {};
+      line.textContent = pick.kind === "blank" ? "A blank page. Add sections to it once it’s made."
+        : pick.kind === "ready" ? it.name + " comes in with " + apCount((it.blocks || []).length, "section") + ". Its words are examples to replace; nothing is live until you publish."
+        : it.name + " comes in as a new page with " + apCount(sum.sections || 0, "section") + (sum.photos ? " and " + apCount(sum.photos, "photo") : "") + ". Nothing is live until you publish.";
+      if (add && !nm) line.textContent += " Give it a name first.";
+      go.textContent = !add ? "Use this layout" : pick.kind === "saved" ? "Add " + (nm || it.name) + " to this site" : "Add the " + (nm || "new") + " page";
+      go.disabled = add && !nm;
+    }
+    function goNow() {
+      if (!pick || go.disabled) return;
+      const nm = nameIn ? nameIn.value.trim().slice(0, 60) : "";
+      const it = pick.item;
+      if (pick.kind === "saved") finish({ kind: "saved", name: nm, saved: it });
+      else finish({ kind: pick.kind, name: nm, blocks: it.blocks || [], slug: pick.kind === "ready" && (!typed || nm === (it.title || it.name)) ? it.slug : null });
+    }
+    let done = false;
+    function finish(v) {
+      if (done) return; done = true;
+      try { dlg.close(); } catch (_) {}
+      dlg.remove();
+      // back where it was; ＋ Add page closes the Pages card first, so its switch takes the focus then
+      const back = [opener, opts.returnTo].find((n) => n && n !== document.body && n.isConnected && n.getClientRects().length > 0 && !n.closest("[aria-hidden='true'],[inert]"));
+      try { if (back) back.focus({ preventScroll: true }); } catch (_) {}
+      resolve(v);
+    }
+    dlg.addEventListener("cancel", (e) => { e.preventDefault(); finish(null); });
+    document.body.appendChild(dlg);
+    sync();
+    dlg.showModal();
+    setTimeout(() => { try { (nameIn || (cards[0] && cards[0].btn) || close).focus({ preventScroll: true }); } catch (_) {} }, 20);
+  });
+}
 async function dcAddPage() {
-  const name = await askText("Name your new page", { value: "", placeholder: "e.g. Services, Gallery, Pricing", ok: "Next: pick a layout" });
-  if (!name || !name.trim()) return;
-  const title = name.trim().slice(0, 60);
-  const base = title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 40) || "page";
+  const pick = await dcChoosePageLayout({ mode: "add", returnTo: $("dcPageSwitch") });
+  if (!pick) return;
+  const title = String(pick.name || "").trim().slice(0, 60);
+  if (!title) return;
+  const base = pick.slug && /^[a-z0-9]+(-[a-z0-9]+)*$/.test(pick.slug) ? pick.slug.slice(0, 40) : apSlug(title);
   const taken = new Set(dcPagesArr().map((p) => p.slug));
   let slug = base, n = 1; while (taken.has(slug) || DC_PAGE_RESERVED.has(slug)) slug = base + "-" + (++n);
-  // AEM "Create Page" wizard: choose a starting layout (or blank) for the new page.
-  const chosen = await dcChoosePageLayout(title);
-  if (chosen === null) return;   // cancelled
+  if (pick.kind === "saved") return dcAddSavedPage(pick.saved, title, slug);
   if (!(await dcSavePendingEdits())) return;
-  const blocks = JSON.parse(JSON.stringify(chosen)).map((b) => { if (b && b.id) b.id = uniqueBlockId(b.type + "_" + b.id); return b; });
+  const blocks = JSON.parse(JSON.stringify(pick.blocks || [])).map((b) => { if (b && b.id) b.id = uniqueBlockId(b.type + "_" + b.id); return b; });
   try {
     await settingsPut(() => {
       const body = { pages: [...dcPagesArr(), { slug, title, blocks }] };
@@ -11594,41 +11946,92 @@ async function dcAddPage() {
     if (!(await dcSavePendingEdits())) { renderPagesBar(); return; }   // anything typed during that write stays on its own page
     dcOpenPage(slug);
     renderPagesBar(); renderBlocksCard(); refreshDesignPreview();
-    toast("Page “" + title + "” created — edit any section, then publish");
+    toast("Page “" + title + "” created. Change its words, then publish.");
   } catch (err) { toast(nice(err), true); }
 }
-// Apply a chosen template/layout to the CURRENT (empty) page — the empty-canvas
-// "Choose a template" entry point. Blank = leave it empty.
+// A page saved to the studio lands here: the server copies its photos and saved sections into
+// this site and rewrites the page list from what it has stored, so this takes a turn too.
+async function dcAddSavedPage(saved, title, slug) {
+  if (!(await dcSavePendingEdits())) return;
+  try {
+    const d = await settingsTurn(async () => {
+      const r = await api("POST", "/pages/from-saved", { saved_id: saved.id, title, slug });
+      const got = (r && r.data) || {};
+      S.settings = { ...(S.settings || {}), pages: Array.isArray(got.pages) ? got.pages : dcPagesArr(), ...(Array.isArray(got.nav) ? { nav: got.nav } : {}) };
+      return got;
+    });
+    CL_ITEMS = null;   // the saved sections it links to are this site's own now
+    if (!(await dcSavePendingEdits())) { renderPagesBar(); return; }
+    if (d.slug) dcOpenPage(d.slug);
+    renderPagesBar(); renderBlocksCard(); refreshDesignPreview();
+    api("GET", "/media").then((m) => { if (m && Array.isArray(m.data)) S.media = m.data; }).catch(() => {});   // its photos are in Files now
+    toast("“" + (d.title || title) + "” added from your studio. Change its words for this business, then publish." + (d.photos_failed ? " " + apCount(d.photos_failed, "photo") + " couldn’t be copied." : ""));
+  } catch (err) { toast(nice(err), true); }
+}
+// Apply a chosen layout to the CURRENT (empty) page: the empty canvas's "Choose a template".
 async function dcPickAndApplyLayout() {
-  const chosen = await dcChoosePageLayout(dcPageTitle(DC_PAGE) || "this page");
-  if (!chosen || !chosen.length) return;
-  BLOCKS_WORK = JSON.parse(JSON.stringify(chosen)).map((b) => { if (b && b.id) b.id = uniqueBlockId(b.type + "_" + b.id); return b; });
+  const pick = await dcChoosePageLayout({ mode: "apply", title: dcPageTitle(DC_PAGE) || "this page" });
+  if (!pick || !pick.blocks || !pick.blocks.length) return;
+  BLOCKS_WORK = JSON.parse(JSON.stringify(pick.blocks)).map((b) => { if (b && b.id) b.id = uniqueBlockId(b.type + "_" + b.id); return b; });
   BLOCK_FOCUS = 0; dcCaptureScroll(); renderBlocksCard(); saveBlocks();
 }
-// The template/layout picker — ALL ready-made layouts (generic + industry) or blank.
-// Scrollable; used by ＋ Page and the empty-canvas "Choose a template".
-async function dcChoosePageLayout(title) {
-  if (BLOCK_SUGGEST === null || BLOCK_SUGGEST === undefined) { try { BLOCK_SUGGEST = (await api("GET", "/blocks/suggested")).data || false; } catch (_) { BLOCK_SUGGEST = false; } }
-  const starters = (BLOCK_SUGGEST && Array.isArray(BLOCK_SUGGEST.starters)) ? BLOCK_SUGGEST.starters : [];
-  return new Promise((resolve) => {
-    const scrim = el("div", "dc-modal-scrim");
-    const box = el("div", "dc-modal");
-    box.appendChild(el("h3", "dc-modal-h", "Choose a template for “" + title + "”"));
-    box.appendChild(el("p", "dc-modal-sub", "Every ready-made layout (generic and industry) — pick one and it drops in as editable sections. Or start blank. You can change everything afterwards."));
-    const grid = el("div", "dc-layout-grid");
-    const opt = (t, d, blocks) => { const c = el("button", "dc-layout-card"); c.type = "button"; c.appendChild(el("div", "dl-t", t)); c.appendChild(el("div", "dl-d", d)); c.addEventListener("click", () => { cleanup(); resolve(blocks); }); grid.appendChild(c); };
-    opt("Blank page", "Start empty and add your own sections.", []);
-    starters.forEach((s) => opt(s.name || "Layout", s.description || "", s.blocks || []));
-    box.appendChild(grid);
-    const cancel = el("button", "dc-modal-cancel", "Cancel"); cancel.type = "button"; cancel.addEventListener("click", () => { cleanup(); resolve(null); });
-    box.appendChild(cancel);
-    scrim.appendChild(box); document.body.appendChild(scrim);
-    function cleanup() { scrim.remove(); document.removeEventListener("keydown", onKey, true); }
-    function onKey(e) { if (e.key === "Escape") { cleanup(); resolve(null); } }
-    document.addEventListener("keydown", onKey, true);
-    scrim.addEventListener("click", (e) => { if (e.target === scrim) { cleanup(); resolve(null); } });
-    setTimeout(() => { try { box.querySelector(".dc-layout-card").focus(); } catch (_) {} }, 30);
+// ★ Save to your studio (item 216, the studio only): this page, with its sections and copies of
+// its photos, kept by the studio to add to any client's site from Add a page.
+const AP_PURPOSES = [["introduce", "Introduce"], ["sell", "Sell"], ["show", "Show"], ["home", "Home page"]];
+function apGuessPurpose(slug, title) {
+  if (!slug) return "home";
+  const t = (String(title || "") + " " + slug).toLowerCase();
+  if (/servic|price|menu|book|shop|order|product|offer|package|rate/.test(t)) return "sell";
+  if (/galler|work|portfolio|review|event|before|project|photo|testimonial/.test(t)) return "show";
+  return "introduce";
+}
+async function dcSavePageToStudio(slug) {
+  const p = slug ? dcPageObj(slug) : null;
+  const title = slug ? String((p && p.title) || slug) : "Home";
+  const biz = (S.identity && S.identity.business_name) || "This business";
+  const opener = document.activeElement;
+  const ans = await new Promise((resolve) => {
+    const dlg = el("dialog", "ap-save"); dlg.setAttribute("aria-labelledby", "apSaveH");
+    const form = el("form");
+    const h = el("h2", "ap-h", "Save to your studio"); h.id = "apSaveH";
+    form.append(h, el("p", "ap-sub", "Saved with its sections and copies of its photos, so it stays even if this site closes. Add it to any client’s site from Add a page."));
+    const lab = el("label", "ap-name"); lab.appendChild(el("span", null, "Name"));
+    const nm = el("input"); nm.type = "text"; nm.maxLength = 80; nm.value = title; nm.autocomplete = "off"; lab.appendChild(nm); form.appendChild(lab);
+    const pf = el("div", "ap-purpose"), pl = el("span", "ap-plbl", "What is it for?"); pl.id = "apPurposeL"; pf.appendChild(pl);
+    const pills = el("div", "ap-pills"); pills.setAttribute("role", "radiogroup"); pills.setAttribute("aria-labelledby", "apPurposeL");
+    let purpose = apGuessPurpose(slug, title);
+    const pickPurpose = (k, focus) => { purpose = k; pills.querySelectorAll(".ap-pill").forEach((x) => { const on = x.dataset.purpose === k; x.setAttribute("aria-checked", String(on)); x.tabIndex = on ? 0 : -1; if (on && focus) x.focus(); }); };
+    AP_PURPOSES.forEach(([k, label]) => {
+      const b = el("button", "ap-pill", label); b.type = "button"; b.dataset.purpose = k; b.setAttribute("role", "radio");
+      b.addEventListener("click", () => pickPurpose(k));
+      b.addEventListener("keydown", (e) => {
+        const i = AP_PURPOSES.findIndex((x) => x[0] === k), step = e.key === "ArrowRight" || e.key === "ArrowDown" ? 1 : e.key === "ArrowLeft" || e.key === "ArrowUp" ? -1 : 0;
+        if (step) { e.preventDefault(); pickPurpose(AP_PURPOSES[(i + step + AP_PURPOSES.length) % AP_PURPOSES.length][0], true); }
+      });
+      pills.appendChild(b);
+    });
+    pickPurpose(purpose);
+    pf.append(pills, el("p", "ap-hint", "It shows in that group of Add a page, beside the ready-made pages."));
+    form.appendChild(pf);
+    const stay = el("div", "ap-stay"); stay.append(el("strong", null, "What stays behind"), el("p", null, biz + "’s business details, hours, reviews and contact details never travel. Its name in the words is swapped for the next business’s name."));
+    form.appendChild(stay);
+    const row = el("div", "ap-acts"), c = el("button", "pillbtn", "Cancel"), ok = el("button", "pillbtn inked", "Save to studio");
+    c.type = "button"; ok.type = "submit"; row.append(c, ok); form.appendChild(row);
+    dlg.appendChild(form); document.body.appendChild(dlg);
+    let done = false;
+    const finish = (v) => { if (done) return; done = true; try { dlg.close(); } catch (_) {} dlg.remove(); try { if (opener && opener.isConnected && opener.focus) opener.focus({ preventScroll: true }); } catch (_) {} resolve(v); };
+    c.addEventListener("click", () => finish(null));
+    form.addEventListener("submit", (e) => { e.preventDefault(); const name = nm.value.trim(); if (!name) { nm.focus(); return; } finish({ name, purpose }); });
+    dlg.addEventListener("cancel", (e) => { e.preventDefault(); finish(null); });
+    dlg.showModal(); setTimeout(() => { try { nm.focus(); nm.select(); } catch (_) {} }, 20);
   });
+  if (!ans) return;
+  if (!(await dcSavePendingEdits())) return;   // the studio keeps the page as saved, so what was just typed goes first
+  try {
+    await api("POST", "/agency/pages", { site_id: S.site && S.site.id, slug: slug || "", name: ans.name, purpose: ans.purpose });
+    AP_SAVED = null;
+    toast("Saved to your studio. Add it to any client’s site from Add a page.");
+  } catch (err) { toast(nice(err), true); }
 }
 // ── Editable GLOBAL top menu (header + footer are global — ONE edit changes every
 //    page). A small structured editor: order items, rename them, point each at one of
@@ -11672,6 +12075,8 @@ function dcPageMenuItems(slug, close) {
   }
   // G7: duplicate any page (Home too) — a full copy you then edit independently
   mk("Duplicate page", () => dcDuplicatePage(slug));
+  // item 216: the studio keeps this page to add to any client's site from Add a page
+  if (S.isStudio) mk("★ Save to your studio…", () => dcSavePageToStudio(slug));
   // Clear the template/sections off the canvas → a blank page (works on Home too)
   mk("Clear page (start blank)", () => dcClearPage(slug));
   if (!isHome) mk("Delete page", () => dcDeletePage(slug), { danger: true });

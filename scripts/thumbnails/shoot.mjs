@@ -3,6 +3,7 @@
 // Serves what render.ts wrote and saves small JPEGs the builder shows:
 //   thumbs/templates/<slug>.jpg  — the top of each template's sample home page, 640×440
 //   thumbs/sections/<type>.jpg   — each section type on its own, 440×248
+//   thumbs/pages/<key>.jpg       — the top of each ready-made page in Add a page, 440×460 (item 216)
 // and, once every picture is taken, tests/presence/golden/pictures.json: each picture's
 // digest beside the digest of the page it shows. thumbnails_test.mjs fails when a page no
 // longer draws what its picture shows. Re-run both steps then, and commit.
@@ -65,14 +66,31 @@ for (const type of sections) {
     clip: { x: 0, y: Math.max(0, box.y - 8), width: 1100, height: 620 } });
   await page.close();
 }
+// Ready-made pages (item 216): the top of the page, its header and first sections, as Add a page shows it.
+const pages = await readdir(join(src, 'pages')).catch(() => []);
+await mkdir(join(ROOT, 'thumbs/pages'), { recursive: true });
+for (const key of pages) {
+  const page = await browser.newPage({ viewport: { width: 1100, height: 1400 }, deviceScaleFactor: 0.4 });
+  await page.route('**/*', (route) => {
+    const u = new URL(route.request().url());
+    if (u.origin !== base) return route.abort();
+    return route.continue({ url: `${base}/pages/${key}${u.pathname.replace(`/pages/${key}`, '')}` });
+  });
+  await page.goto(`${base}/pages/${key}/`, { waitUntil: 'networkidle' });
+  await page.addStyleTag({ content: '.skip,.strip,#presence-preview-badge{display:none!important}html{scroll-behavior:auto!important}' });
+  await page.evaluate(() => window.scrollTo(0, 0));
+  await page.waitForTimeout(150);
+  await page.screenshot({ path: join(ROOT, `thumbs/pages/${key}.jpg`), type: 'jpeg', quality: 70, clip: { x: 0, y: 0, width: 1100, height: 1150 } });
+  await page.close();
+}
 await browser.close();
 server.close();
 
 // The record: what each picture shows (render.ts's digest of its page) and the picture itself.
 const sources = JSON.parse(await readFile(join(src, 'sources.json'), 'utf8'));
 const record = {};
-for (const name of [...templates.map((s) => `templates/${s}.jpg`), ...sections.map((t) => `sections/${t}.jpg`)].sort()) {
+for (const name of [...templates.map((s) => `templates/${s}.jpg`), ...sections.map((t) => `sections/${t}.jpg`), ...pages.map((k) => `pages/${k}.jpg`)].sort()) {
   record[name] = { page: sources[name], picture: createHash('sha256').update(await readFile(join(ROOT, 'thumbs', name))).digest('hex') };
 }
 await writeFile(join(ROOT, 'tests/presence/golden/pictures.json'), JSON.stringify(record, null, 1) + '\n');
-console.log(`shot ${templates.length} templates and ${sections.length} sections`);
+console.log(`shot ${templates.length} templates, ${sections.length} sections and ${pages.length} pages`);

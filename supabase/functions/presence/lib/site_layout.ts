@@ -169,6 +169,15 @@ export function printSections(content: unknown): PrintedSection[] {
   return out;
 }
 
+/** The prints of one page's sections ('' = Home), as printSections makes them: what a
+ *  saved page brought when it landed (builder list item 216). Pure. */
+export function printPageSections(content: unknown, slug: string): string[] {
+  const settings = isObj(content) && isObj(content.settings) ? content.settings : {};
+  const page: unknown = slug === '' ? null : (Array.isArray(settings.pages) ? settings.pages : []).find((p) => isObj(p) && p.slug === slug);
+  const blocks = slug === '' ? settings.blocks : isObj(page) ? page.blocks : undefined;
+  return (Array.isArray(blocks) ? blocks : []).filter((b) => isObj(b) && !NOTHING_OF_THEIRS.has(String(b.type))).map((b) => print53(canon(b)));
+}
+
 /** What is still exactly as it was copied: the sections whose print hasn't
  *  changed, and the copied photos still in use. Nothing once the studio kept
  *  them. Pure. */
@@ -192,7 +201,7 @@ export function copiedBlocker(left: { sections: PrintedSection[]; photos: number
   for (const s of left.sections) byPage.set(s.page, [...(byPage.get(s.page) || []), s.title]);
   const where = [...byPage].slice(0, 4).map(([page, titles]) => `${page}: ${titles.slice(0, 3).join(', ')}${titles.length > 3 ? '…' : ''}`).join('; ');
   const what = [n ? `${n} section${n === 1 ? '' : 's'}${where ? ` (${where}${byPage.size > 4 ? '; …' : ''})` : ''}` : '', p ? `${p} photo${p === 1 ? '' : 's'}` : ''].filter(Boolean).join(' and ');
-  return { field: 'copied', message: `Still exactly as copied from another site: ${what}. Change them for this business, or press Keep on this site’s card in Sites.` };
+  return { field: 'copied', message: `Still exactly as copied from another site: ${what}. Change them for this business, or press “Keep them as they are”.` };
 }
 
 /** A stored record, read safely: anything malformed is no record. Pure. */

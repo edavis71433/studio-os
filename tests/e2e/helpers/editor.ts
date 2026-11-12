@@ -428,11 +428,18 @@ export async function moveThenWrite(page: Page, frame: Frame, puts: Mounted['put
   return { moved, count: puts.length };
 }
 
+// ＋ Add page, blank and named (builder list item 216: the name and the pictures are one dialog;
+// on a phone the groups are chips, so whichever Blank is showing is pressed).
+export async function addBlankPage(page: Page, name: string) {
+  await openPages(page); await page.locator('#pagesCard .page-add').click();
+  const dlg = page.locator('dialog.ap-dlg');
+  await expect(dlg).toBeVisible();
+  await dlg.locator('.ap-nb[data-key="_blank"]:visible, .ap-chip[data-group="_blank"]:visible').first().click();
+  await dlg.getByPlaceholder('e.g. Services, Gallery, Pricing').fill(name);
+  await dlg.getByRole('button', { name: `Add the ${name} page` }).click();
+}
 // ＋ Page with a blank layout, leaving the person on the new page.
 export async function addGallery(page: Page) {
-  await openPages(page); await page.locator('#pagesCard .page-add').click();
-  await page.getByPlaceholder('e.g. Services, Gallery, Pricing').fill('Gallery');
-  await page.getByRole('button', { name: 'Next: pick a layout' }).click();
-  await page.locator('.dc-layout-card', { hasText: 'Blank page' }).click();
+  await addBlankPage(page, 'Gallery');
   await expect(onPill(page)).toHaveText('Gallery');
 }

@@ -267,7 +267,7 @@ const ALL = Object.entries(DECIDED).flatMap(([need, names]) => names.map((name) 
   ok('decided: removing a draft estimate is delete; sending one and turning it into a draft proposal or invoice is edit', has('delete', 'DELETE /sales/estimates/:id') && has('edit', 'POST /sales/estimates/:id/send', 'POST /sales/estimates/:id/proposal', 'POST /sales/estimates/:id/invoice'));
   ok('decided: staff can still send what they can\'t withdraw', has('edit', 'POST /sales/deals/:id/invoice', 'POST /sales/invoices/:id/send') && has('publish', 'POST /broadcasts/:id/send'));
 
-  const CONTENT = [['PUT', '/identity'], ['PUT', '/location'], ['PUT', '/settings'], ['PUT', '/brand/profile'], ['POST', '/pages/duplicate'], ['POST', `/pages/deleted/${ROW}/restore`], ['POST', '/offerings'], ['PUT', `/posts/${ROW}`], ['DELETE', `/faqs/${ROW}`]];
+  const CONTENT = [['PUT', '/identity'], ['PUT', '/location'], ['PUT', '/settings'], ['PUT', '/brand/profile'], ['POST', '/pages/duplicate'], ['POST', '/pages/from-saved'], ['POST', `/pages/deleted/${ROW}/restore`], ['POST', '/offerings'], ['PUT', `/posts/${ROW}`], ['DELETE', `/faqs/${ROW}`]];
   ok('list: the content routes answer from contentWriteNeeds, and only there', CONTENT.every(([m, r]) => contentWriteNeeds(r, m) !== null && memberWriteNeeds(r, m) === null));
   ok('list: nothing here is on the content path', ALL.every(({ name }) => contentWriteNeeds(pathOf(name), methodOf(name)) === null));
   ok('list: a read is not its business', memberWriteNeeds('/media', 'GET') === null && memberWriteNeeds('/export', 'GET') === null);
@@ -476,7 +476,7 @@ const WRITE_HANDLERS = [
   'handleMediaUpdate', 'handleMediaUpload', 'handleMemberAdd', 'handleMemberRevoke', 'handleMessages',
   'handleMilestone', 'handleMilestonesCreate', 'handleMomentDismiss', 'handleMonitorConnect',
   'handleMonitorDisconnect', 'handleMonitorVerify', 'handleNotificationsRead',
-  'handlePageDuplicate', 'handleDeletedPageRestore', 'handlePageLockCreate', 'handlePreviewPromote', 'handlePreviewPublish', 'handlePreviewSection', 'handlePreviewSettings',   // item 154: putting a deleted page back is an edit (contentWriteNeeds)
+  'handlePageDuplicate', 'handlePageFromSaved', 'handleDeletedPageRestore', 'handlePageLockCreate', 'handlePreviewPromote', 'handlePreviewPublish', 'handlePreviewSection', 'handlePreviewSettings',   // item 154: putting a deleted page back is an edit (contentWriteNeeds); item 216: adding a page saved to the studio is too, and the route admits the studio alone
   'handlePreviewShareLink', 'handleProject', 'handleProjectChecklist', 'handleProjectStatus', 'handleProjectSurveys',
   'handleProjects', 'handleProjectTemplates', 'handleTodoTemplates', 'handleDealTasksFromTemplate', 'handlePublish', 'handlePutIdentity', 'handlePutTemplate', 'handleRedirectCreate',
   'handleRedirectDelete', 'handleRestore', 'handleRestoreToDraft', 'handleReviewApprove', 'handleReviewDismiss',

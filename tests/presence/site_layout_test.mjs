@@ -62,7 +62,7 @@ const read = (p) => Deno.readTextFileSync(new URL('../../' + p, import.meta.url)
   ok('left: untouched sections are listed with their pages (case doesn\'t matter for photos)', all.sections.length === 3 && all.photos === 2);
   ok('left: nothing once kept, or with no record', L.copiedLeftovers({ ...rec, kept: true }, base, ['m-1']).sections.length === 0 && L.copiedLeftovers(null, base, []).photos === 0);
   const b = L.copiedBlocker(all);
-  ok('blocker: one thing to finish that names the pages and sections, and how to clear it', b.field === 'copied' && b.message === 'Still exactly as copied from another site: 3 sections (Home: About, Image; Team: Our team) and 2 photos. Change them for this business, or press Keep on this site’s card in Sites.');
+  ok('blocker: one thing to finish that names the pages and sections, and how to clear it', b.field === 'copied' && b.message === 'Still exactly as copied from another site: 3 sections (Home: About, Image; Team: Our team) and 2 photos. Change them for this business, or press “Keep them as they are”.');
   ok('blocker: never names the other business (the site\'s owner may read it)', !/Bistro/.test(b.message));
   ok('blocker: none when nothing is left', L.copiedBlocker({ sections: [], photos: 0 }) === null && L.copiedBlocker({ sections: [], photos: 1 }).message.includes('1 photo.'));
   ok('record: anything malformed is no record', L.normalizeCopied(null) === null && L.normalizeCopied('x') === null && L.normalizeCopied({ from: 'X', sections: 'no', media: [1], kept: 'yes' }).kept === false);
