@@ -1944,8 +1944,9 @@ function holdAnchor(sec) {
     }).catch(() => {});
     loadPlan().catch(() => {});
     loadTeam().catch(() => {});
-    if (!inClient()) { loadStageNames(); loadMenu(); loadGoalAi(); loadReports(); $('reportsAll').addEventListener('click', switchOnTheRest); }   // with the rest, not after the studio details; item 160: every client's report, which loadReports keeps to the studio's own level
+    if (!inClient()) { loadStageNames(); loadMenu(); loadReports(); $('reportsAll').addEventListener('click', switchOnTheRest); }   // with the rest, not after the studio details; item 160: every client's report, which loadReports keeps to the studio's own level
     else { wireReport(); loadReport(); }
+    if (!inClient()) loadGoalAi();   // sales item 94: Goal and AI help, the studio's own like Deal stages
     loadNotify();   // item 126: a studio's notifications per client site (agency members only)
     wireDeletion();
     { const dl = $('dlData'); if (dl) dl.addEventListener('click', downloadMyData); }   // item 69: Download my data
