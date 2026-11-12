@@ -7,6 +7,7 @@
 import { svc } from '../lib/db.ts';
 import type { SiteRow } from '../lib/site.ts';
 import type { ExtractedKnowledge } from './knowledge.ts';
+import { guardedFetch } from '../../_shared/tools/url_guard.ts';   // builder item 204
 
 export interface OptDns { apex: boolean; www: boolean; mx: boolean; spf: boolean; dmarc: boolean; caa: boolean }
 export interface OptInput {
@@ -62,7 +63,8 @@ async function probeRdap(domain: string): Promise<string | null> {
 async function probeHttp(domain: string): Promise<OptInput['httpProbe']> {
   let url = `http://${domain}/`, hops = 0, redirectsToHttps = false, status = 0;
   for (; hops < 5; hops++) {
-    const r = await fetch(url, { method: 'HEAD', redirect: 'manual', signal: timed(5000) });
+    // builder item 204: each hop is guarded (no private or internal address); this probe walks the hops itself
+    const r = await guardedFetch(url, { method: 'HEAD', signal: timed(5000) }, { follow: false });
     status = r.status;
     const loc = r.headers.get('location');
     if (status >= 300 && status < 400 && loc) {
@@ -77,7 +79,7 @@ async function probeHttp(domain: string): Promise<OptInput['httpProbe']> {
 
 async function probeHome(liveUrl: string): Promise<OptInput['homeProbe']> {
   const t0 = Date.now();
-  const r = await fetch(liveUrl, { headers: { 'accept-encoding': 'gzip, br' }, signal: timed(8000) });
+  const r = await guardedFetch(liveUrl, { headers: { 'accept-encoding': 'gzip, br' }, signal: timed(8000) });
   const ms = Date.now() - t0;
   await r.body?.cancel();
   // CDN fingerprint: the vendor-specific headers a CDN edge adds. Presence of ANY
@@ -95,8 +97,8 @@ async function probeHome(liveUrl: string): Promise<OptInput['homeProbe']> {
 }
 
 async function fetchText(url: string, cap = 100_000): Promise<string | null> {
-  const r = await fetch(url, { signal: timed(5000) });
-  if (!r.ok) return null;
+  const r = await guardedFetch(url, { signal: timed(5000) });
+  if (!r.ok) { await r.body?.cancel().catch(() => {}); return null; }
   return (await r.text()).slice(0, cap);
 }
 

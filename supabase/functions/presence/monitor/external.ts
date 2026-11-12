@@ -11,28 +11,17 @@
 // logic is testable without a network.
 import type { LiveFetch } from '../evidence/collect.ts';
 import { detectPlatform } from './adapters.ts';
-import { assertPublicHttpUrl } from '../../_shared/tools/url_guard.ts';
+import { assertPublicHttpUrl, guardedFetch } from '../../_shared/tools/url_guard.ts';
 
 const timed = (ms: number) => AbortSignal.timeout(ms);
 
 /** Item 71: every fetch of a watched website passes the public-address guard the Free Tools
  *  use, on the first address and on every redirect hop. An owner types this address, so
  *  without it the server could be pointed at a private or internal one: the cloud's metadata
- *  service, the database, a local network. Throws on a refused address. */
-export async function fetchPublicPage(url: string, init: RequestInit = {}, guard: (u: string) => Promise<unknown> = assertPublicHttpUrl, doFetch: Fetcher = fetch): Promise<Response> {
-  let current = url;
-  for (let hop = 0; hop <= 3; hop++) {
-    await guard(current);
-    const r = await doFetch(current, { ...init, redirect: 'manual' });
-    const loc = r.headers.get('location');
-    if (r.status >= 300 && r.status < 400 && loc) {
-      try { await r.body?.cancel(); } catch { /* the next hop goes ahead either way */ }
-      current = new URL(loc, current).href;
-      continue;
-    }
-    return r;
-  }
-  throw new Error('too_many_redirects');
+ *  service, the database, a local network. Throws on a refused address. Item 204: the one
+ *  guarded fetcher (_shared/tools/url_guard.ts guardedFetch) does it. */
+export function fetchPublicPage(url: string, init: RequestInit = {}, guard: (u: string) => Promise<unknown> = assertPublicHttpUrl, doFetch: Fetcher = fetch): Promise<Response> {
+  return guardedFetch(url, init, { guard, fetchImpl: doFetch });
 }
 const fence = async <T>(p: Promise<T>): Promise<T | null> => { try { return await p; } catch { return null; } };
 

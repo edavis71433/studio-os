@@ -6555,8 +6555,9 @@ function pgAccessGroup(slug) {
     }
     if (asking) {
       const box = el("div", "pg-pw");
-      const pw = el("input"); pw.type = "password"; pw.maxLength = 100; pw.autocomplete = "new-password"; pw.placeholder = "At least 4 letters or numbers";
-      box.appendChild(pgField("Password", pw, "Tell it to the people who should see the page. Changing it later asks everyone again."));
+      const pw = el("input"); pw.type = "password"; pw.maxLength = 100; pw.autocomplete = "new-password"; pw.placeholder = "At least 8 letters or numbers";
+      // item 204: the page travels to every visitor's browser, locked, so a short password can be guessed there
+      box.appendChild(pgField("Password", pw, "At least 8 letters or numbers. It keeps casual visitors out, not secrets: don’t put anything on the page you couldn’t afford to have shared. Tell it to the people who should see the page. Changing it later asks everyone again."));
       const err = el("div", "hint pg-err"); err.setAttribute("role", "alert"); err.hidden = !msg; err.textContent = msg; box.appendChild(err);
       const acts = el("div", "pc-acts");
       const save = el("button", "dc-modal-cancel pg-done", "Save password"); save.type = "button";
@@ -6590,7 +6591,7 @@ function pgAccessGroup(slug) {
   };
   const savePassword = async (value, btn) => {
     const pw = String(value || "").trim();
-    if (pw.length < 4) { msg = "Use at least 4 letters or numbers."; draw("pw"); return; }
+    if (pw.length < 8) { msg = "Use at least 8 letters or numbers."; draw("pw"); return; }   // item 204: as lib/page_gate.ts PASSWORD_MIN
     btn.disabled = true;
     try {
       const r = await api("POST", "/page-locks", { password: pw });

@@ -11,6 +11,9 @@
 //     site that isn't live, a live site taken offline, a failed take-down that leaves
 //     everything as it was), the Trash on Sites and its absence from Home, Restore;
 //   · the daily job that empties the trash after 90 days, and what it never touches;
+//     item 204 (Nov 12 review, finding 94): only a site nobody owns is deleted for good;
+//     a site with an owner is let go of, kept whole, and its owner is emailed, as they
+//     are when it goes in the trash;
 //   · Versions' deleted pages: the list and Put back;
 //   · the wiring: the job in both sweeps, the migration and its pack, the member gate.
 //   deno run --allow-read --allow-env tests/presence/site_trash_test.mjs
@@ -18,6 +21,7 @@ Deno.env.set('SUPABASE_URL', 'http://stub.local');
 Deno.env.set('SERVICE_ROLE_KEY', 'service-key');
 Deno.env.set('NETLIFY_AUTH_TOKEN', 'netlify-test');
 Deno.env.set('DEPLOY_POLL_MS', '50');
+Deno.env.set('RESEND_KEY', 'test-resend-key');   // item 204: the owner's emails are the outside calls that prove they were told
 const T_ = await import('../../supabase/functions/presence/lib/site_trash.ts');
 const { handleAgency } = await import('../../supabase/functions/presence/agency/routes.ts');
 const { runSiteTrashPurge } = await import('../../supabase/functions/presence/ops/site_trash.ts');
@@ -54,9 +58,10 @@ const UID = '99999999-0000-4000-8000-000000000009';
 const LIVE = 'a1a1a1a1-a1a1-4a1a-8a1a-a1a1a1a1a1a1', DRAFT = 'b2b2b2b2-b2b2-4b2b-8b2b-b2b2b2b2b2b2', OLD = 'c3c3c3c3-c3c3-4c3c-8c3c-c3c3c3c3c3c3', OLD2 = 'c4c4c4c4-c4c4-4c4c-8c4c-c4c4c4c4c4c4', FRESH = 'c5c5c5c5-c5c5-4c5c-8c5c-c5c5c5c5c5c5';
 const OWN = 'e5e5e5e5-e5e5-4e5e-8e5e-e5e5e5e5e5e5', STRANGER = '0a0a0a0a-0a0a-4a0a-8a0a-0a0a0a0a0a0a';
 const CL = 'c1000000-0000-4000-8000-000000000001', CD = 'c1000000-0000-4000-8000-000000000002', CO1 = 'c1000000-0000-4000-8000-000000000003', CO2 = 'c1000000-0000-4000-8000-000000000004', CF = 'c1000000-0000-4000-8000-000000000005', COWN = 'c1000000-0000-4000-8000-000000000006';
-let T, writes, netlify, opts;
+let T, writes, netlify, opts, mails = [];
 function reset(o = {}) {
-  opts = { noTrashState: false, deployFails: false, deleteFails: false, noDeletedPages: false, ...o };
+  opts = { noTrashState: false, deployFails: false, deleteFails: false, noDeletedPages: false, ownerReadFails: false, ...o };
+  mails = [];
   const link = (site_id, over = {}) => ({ site_id, agency_id: AG, status: 'active', tags: [], owner_email: '', assigned: [], notes: '', onboarded_at: '2026-01-01T00:00:00Z', trashed_at: null, trashed_by: null, trashed_was_live: false, ...over });
   const site = (id, client, over = {}) => ({ id, client_id: client, edition: 'presence', status: 'ready', last_published_at: null, custom_domain: null, netlify_site_id: null, template_slug: 'business-classic', template_version: '1.0.0', offline_at: null, ...over });
   T = {
@@ -69,6 +74,7 @@ function reset(o = {}) {
       site(OLD, CO1, { netlify_site_id: 'nf-old', custom_domain: 'old.example', offline_at: ago(91) }), site(OLD2, CO2, { netlify_site_id: 'nf-old2' }), site(FRESH, CF, { netlify_site_id: 'nf-fresh' }), site(OWN, COWN, { status: 'live' }), site(STRANGER, 'c-x')],
     clients: [{ id: CL, name: 'Live Bakery', email: 'owner@live.example' }, { id: CD, name: 'Draft Florist', email: null }, { id: CO1, name: 'Old Photography', email: 'old@photo.example', contact_id: 'k1' }, { id: CO2, name: 'Never Invited', email: null, contact_email: null, contact_id: null }, { id: CF, name: 'Fresh Trash', email: null }],
     presence_identity: [{ site_id: LIVE, business_name: 'Live Bakery', email: 'hi@live.example', phone: '555' }],
+    presence_agencies: [{ id: AG, name: 'Bright Studio' }],   // item 204: the studio's name in the owner's email
     presence_publishes: [{ id: 'p1', site_id: LIVE, status: 'live', created_at: '2026-10-01T00:00:00Z' }],
     presence_deleted_pages: [
       { id: 'dddddddd-0000-4000-8000-000000000001', site_id: DRAFT, slug: 'gallery', title: 'Gallery', page: { slug: 'gallery', title: 'Gallery', blocks: [{ type: 'richtext', body: 'Our work' }] }, deleted_at: ago(1) },
@@ -96,6 +102,7 @@ globalThis.fetch = async (url, init = {}) => {
   const method = (init.method || 'GET').toUpperCase();
   const body = init.body ? (typeof init.body === 'string' ? (() => { try { return JSON.parse(init.body); } catch { return init.body; } })() : init.body) : null;
   const reply = (b, status = 200) => new Response(b === null ? null : JSON.stringify(b), { status, headers: { 'Content-Type': 'application/json' } });
+  if (u.host === 'api.resend.com') { mails.push(JSON.parse(String(init.body))); return new Response(JSON.stringify({ id: `e${mails.length}` }), { status: 200, headers: { 'Content-Type': 'application/json' } }); }
   if (u.host === 'api.netlify.com') {
     netlify.push({ method, path: u.pathname });
     if (/\/sites\/[^/]+\/deploys$/.test(u.pathname) && method === 'POST') return opts.deployFails ? reply({ message: 'boom' }, 500) : reply({ id: 'dep-1', required: [] });
@@ -110,6 +117,7 @@ globalThis.fetch = async (url, init = {}) => {
   if (table === 'presence_deleted_pages' && opts.noDeletedPages) return reply({ code: '42P01', message: 'relation "public.presence_deleted_pages" does not exist' }, 404);
   if (method === 'GET') {
     if (table === 'presence_agency_clients' && opts.noTrashState && /trashed/.test(u.search)) return reply({ code: '42703', message: 'column presence_agency_clients.trashed_at does not exist' }, 400);
+    if (table === 'clients' && opts.ownerReadFails) return reply({ message: 'boom' }, 503);
     return reply(rowsFor(table, u.searchParams));
   }
   writes.push({ table, method, body, query: u.search });
@@ -155,6 +163,11 @@ const linkOf = (id) => T.presence_agency_clients.find((l) => l.site_id === id);
   const site = T.presence_sites.find((s) => s.id === LIVE);
   ok('trash: a live site is taken offline first (the holding page goes up) and the trash remembers it was live', l.status === 200 && l.body.data.was_live === true && l.body.data.offline === true && netlify.some((n) => n.method === 'POST' && n.path === '/api/v1/sites/nf-live/deploys') && !!site.offline_at && linkOf(LIVE).trashed_was_live === true);
   ok('trash: the studio\'s history says so', T.presence_change_events.some((e) => e.site_id === OWN && e.summary === 'Moved a client site to the trash and took it offline'));
+  // item 204: LIVE's owner signs in (Live Bakery, owner@live.example); DRAFT has no owner
+  const toOwner = mails.filter((m) => (Array.isArray(m.to) ? m.to[0] : m.to) === 'owner@live.example');
+  ok('trash (item 204): a site with an owner: they are emailed, once, that it is in the trash, offline, and nothing is deleted', l.body.data.owner_told === true && toOwner.length === 1 && toOwner[0].subject === 'Bright Studio moved Live Bakery to its trash' && /moved your website, Live Bakery, to its trash in Studio OS and took it offline\./.test(toOwner[0].html) && /Nothing has been deleted\./.test(toOwner[0].html) && /your website, your sign-in and your files stay yours/.test(toOwner[0].html), JSON.stringify(mails.map((m) => [m.to, m.subject])));
+  ok('trash (item 204): …and their own history says so too, not only the studio\'s', T.presence_change_events.some((e) => e.site_id === LIVE && e.summary === 'Bright Studio moved this site to their trash and took it offline'));
+  ok('trash (item 204): a site with no owner emails nobody', d.body.data.owner_told === false && mails.length === 1);
   const list = await call(asMember(), 'GET', '/agency/sites');
   const ids = (list.body.data || []).map((x) => x.site_id);
   ok('Sites: trashed sites leave the cards and the table', !ids.includes(DRAFT) && !ids.includes(LIVE));
@@ -188,8 +201,13 @@ const linkOf = (id) => T.presence_agency_clients.find((l) => l.site_id === id);
 {
   reset();
   const res = await runSiteTrashPurge(10);
-  ok('purge: the two sites past 90 days go; the one trashed 10 days ago and the active ones stay', res.due === 2 && res.deleted === 2 && res.failed === 0 && !linkOf(OLD) && !linkOf(OLD2) && linkOf(FRESH)?.status === 'trashed' && linkOf(LIVE)?.status === 'active');
-  ok('purge: each website comes down — hosting deleted, then the site marked deleting with no host and no domain', ['/api/v1/sites/nf-old', '/api/v1/sites/nf-old2'].every((p) => netlify.some((n) => n.method === 'DELETE' && n.path === p)) && ['deleting'].includes(T.presence_sites.find((s) => s.id === OLD).status) && T.presence_sites.find((s) => s.id === OLD).netlify_site_id === null && T.presence_sites.find((s) => s.id === OLD).custom_domain === null);
+  ok('purge: the two sites past 90 days leave the studio; the one trashed 10 days ago and the active ones stay', res.due === 2 && res.deleted === 1 && res.kept === 1 && res.failed === 0 && !linkOf(OLD) && !linkOf(OLD2) && linkOf(FRESH)?.status === 'trashed' && linkOf(LIVE)?.status === 'active');
+  ok('purge: a site nobody owns comes down for good: hosting deleted, then the site marked deleting with no host and no domain', netlify.some((n) => n.method === 'DELETE' && n.path === '/api/v1/sites/nf-old2') && T.presence_sites.find((s) => s.id === OLD2).status === 'deleting' && T.presence_sites.find((s) => s.id === OLD2).netlify_site_id === null);
+  // item 204: OLD has an owner who signs in (an email and a contact): it is theirs, so nothing on it is deleted
+  const old = T.presence_sites.find((s) => s.id === OLD);
+  ok('purge (item 204): a site with an owner keeps its hosting, its domain and its state; only the studio lets go', !netlify.some((n) => n.method === 'DELETE' && n.path === '/api/v1/sites/nf-old') && old.netlify_site_id === 'nf-old' && old.custom_domain === 'old.example' && old.status !== 'deleting');
+  const told = mails.filter((m) => (Array.isArray(m.to) ? m.to[0] : m.to) === 'old@photo.example');
+  ok('purge (item 204): …and its owner is emailed that it is still theirs, once', told.length === 1 && told[0].subject === 'Bright Studio no longer looks after Old Photography' && /Nothing was deleted: your website, your sign-in and your files are still yours\. The website is offline\./.test(told[0].html) && mails.length === 1, JSON.stringify(mails.map((m) => [m.to, m.subject])));
   const dels = T.presence_account_deletions || [];
   ok('purge: a site whose owner was never invited takes its account with it; an owner who signs in keeps theirs', dels.length === 1 && dels[0].client_id === CO2 && dels[0].status === 'pending' && !dels.some((d) => d.client_id === CO1));
   ok('purge: nothing outside the trash was touched', !netlify.some((n) => /nf-live|nf-fresh/.test(n.path)) && T.presence_sites.find((s) => s.id === FRESH).status === 'ready');
@@ -197,7 +215,13 @@ const linkOf = (id) => T.presence_agency_clients.find((l) => l.site_id === id);
 {
   reset({ deleteFails: true });
   const res = await runSiteTrashPurge(10);
-  ok('purge: if the hosting won\'t come down, nothing else happens and the next run tries again (and the sweep reports it)', res.deleted === 0 && res.failed === 2 && linkOf(OLD)?.status === 'trashed' && T.presence_sites.find((s) => s.id === OLD).netlify_site_id === 'nf-old' && !(T.presence_account_deletions || []).length);
+  ok('purge: if the hosting won\'t come down, nothing else happens to that site and the next run tries again (and the sweep reports it)', res.deleted === 0 && res.failed === 1 && linkOf(OLD2)?.status === 'trashed' && T.presence_sites.find((s) => s.id === OLD2).netlify_site_id === 'nf-old2' && !(T.presence_account_deletions || []).length);
+  ok('purge (item 204): an owned site needs no take-down, so it is let go of all the same', res.kept === 1 && !linkOf(OLD));
+}
+{
+  reset({ ownerReadFails: true });
+  const res = await runSiteTrashPurge(10);
+  ok('purge (item 204): when it can\'t be told whose a site is, nothing happens to it: no take-down, no deletion, still in the trash', res.failed === 2 && res.deleted === 0 && res.kept === 0 && !netlify.some((n) => n.method === 'DELETE') && linkOf(OLD)?.status === 'trashed' && linkOf(OLD2)?.status === 'trashed' && !(T.presence_account_deletions || []).length && mails.length === 0);
 }
 {
   reset({ noTrashState: true });

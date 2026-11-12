@@ -10,7 +10,11 @@ type FileMap = Record<string, string | Uint8Array>;
 /** PBKDF2 rounds for a page key: slow enough to make guessing a password from the published
  *  file expensive, quick enough for an older phone to open the page in about a second. */
 export const LOCK_ITERATIONS = 310_000;
-export const PASSWORD_MIN = 4, PASSWORD_MAX = 100;
+/** Item 204 (Nov 12 review, finding 95): the locked page goes to every visitor and opens in
+ *  their browser, so its password can be guessed there with no limit on tries; four characters
+ *  fell in minutes. Eight, and the editor says a page password keeps casual visitors out, not
+ *  secrets. A page locked before keeps its password until it is changed. */
+export const PASSWORD_MIN = 8, PASSWORD_MAX = 100;
 
 /** Every template draws the site's header and footer as these. */
 export const SITE_HEADER_RE = /<header class="site"[^>]*>[\s\S]*?<\/header>\n?/;

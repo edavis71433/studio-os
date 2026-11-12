@@ -14,6 +14,7 @@ import { resolveIndustryKey } from '../industry/registry.ts';
 import type { OptInput } from '../optimization/collect.ts';
 import type { SnapshotContent } from '../lib/render_types.ts';
 import type { SiteRow } from '../lib/site.ts';
+import { guardedFetch } from '../../_shared/tools/url_guard.ts';
 
 export interface LiveFetch {
   attempted: boolean;
@@ -121,7 +122,8 @@ export async function collect(site: SiteRow): Promise<ObservationInput> {
       try {
         const ctrl = new AbortController();
         const timer = setTimeout(() => ctrl.abort(), 8000);
-        const r = await fetch(url, { redirect: 'follow', signal: ctrl.signal });
+        // builder item 204: the site's own address is typed by its owner, so it goes through the guarded fetcher
+        const r = await guardedFetch(url, { signal: ctrl.signal });
         clearTimeout(timer);
         await r.body?.cancel();
         liveFetch.ok = r.ok; liveFetch.status = r.status; liveFetch.https = r.url.startsWith('https://');

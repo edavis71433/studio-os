@@ -12,6 +12,7 @@ import { buildExport } from '../platform/exporter.ts';
 import { buildLaunchChecklist } from '../platform/launch.ts';
 import type { SiteRow } from '../lib/site.ts';
 import type { Principal } from '../../_shared/auth.ts';
+import { guardedFetch } from '../../_shared/tools/url_guard.ts';   // builder item 204
 
 const fence = async <T>(p: Promise<T>): Promise<T | null> => { try { return await p; } catch { return null; } };
 
@@ -50,8 +51,9 @@ export async function siteLaunchChecklist(site: SiteRow) {
   }
   const liveUrl = domain ? `https://${domain}` : null;
   const [httpsOk, sitemapOk] = await Promise.all([
-    liveUrl ? fence((async () => (await fetch(liveUrl, { method: 'HEAD', signal: AbortSignal.timeout(6000) })).ok)()) : Promise.resolve(null),
-    liveUrl ? fence((async () => (await fetch(liveUrl + '/sitemap.xml', { method: 'HEAD', signal: AbortSignal.timeout(6000) })).ok)()) : Promise.resolve(null),
+    // builder item 204: the domain is typed, so both checks go through the guarded fetcher
+    liveUrl ? fence((async () => (await guardedFetch(liveUrl, { method: 'HEAD', signal: AbortSignal.timeout(6000) })).ok)()) : Promise.resolve(null),
+    liveUrl ? fence((async () => (await guardedFetch(liveUrl + '/sitemap.xml', { method: 'HEAD', signal: AbortSignal.timeout(6000) })).ok)()) : Promise.resolve(null),
   ]);
   const rec = zone?.records ?? [];
   return buildLaunchChecklist({
