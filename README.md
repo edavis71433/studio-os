@@ -41,6 +41,8 @@ Postgres (row-level security)  +  Storage  +  Auth  +  pg_cron
         └── Stripe · Resend · Netlify · Google · Anthropic API
 ```
 
+Beside `presence` run a few smaller functions: `stripe-webhook` takes Stripe's payment events; `site-review`, `ai-visibility`, `tool-report`, `unlock-report` and `send-lead-alert` run the free tools at tools.davisdigitalstudio.com; and `clever-api`, the older back office, which only the Growth page, the contact form, the project survey, the help chat and one nightly job still use.
+
 **Design decisions worth calling out:**
 
 - **Every request answers for one site.** The router resolves the caller's site once — their own under row-level security, or a client's when a studio's scope is re-checked against its membership — and every route works inside it. A refused scope never falls back to another site.
@@ -59,10 +61,10 @@ Postgres (row-level security)  +  Storage  +  Auth  +  pg_cron
 
 ## Testing & CI
 
-As of November 2026:
+As of mid-November 2026:
 
-- **64 Playwright specs** across desktop, tablet and phone, against stubbed backends (no secrets, no live data)
-- **327 Deno suites** for the server and the pages' logic, plus a typecheck of the whole function
+- **About 190 Playwright spec files** across desktop, tablet and phone, against stubbed backends (no secrets, no live data)
+- **About 440 Deno suites** for the server and the pages' logic, plus a typecheck of every function
 - **Accessibility assertions** via `@axe-core/playwright` on key pages
 - **Five GitHub Actions workflows**: `ci`, `e2e`, `deploy` (by hand, after the checks), `rollback`, `schema-dump`
 
@@ -77,7 +79,7 @@ DENO=deno bash scripts/ci-pure-tests.sh   # the Deno suites, as CI runs them
 
 ```
 *.html, *.css, *.js       the app's pages, the marketing site and the free tools
-supabase/functions/       edge functions — presence is the app's whole API
+supabase/functions/       edge functions — presence is the app's API; the others are listed above
 supabase/migrations/      forward-only numbered migrations
 supabase/ops/             hand-run SQL for the scheduled jobs
 tests/                    e2e (Playwright), presence (Deno), workflows, isolation, smoke

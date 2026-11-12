@@ -202,7 +202,7 @@ const NUL = String.fromCharCode(0), DEL = String.fromCharCode(127);
   const roster = [
     { id: 'c1', name: 'Jordan Ellis', email: 'jordan.ellis@example.com', phone: '(555) 010-2468' },
     { id: 'c2', name: 'Jordon Ellis', email: '', phone: '5550102468' },
-    { id: 'c3', name: 'Eric Test', email: 'edavis7143@yahoo.com', phone: '' },
+    { id: 'c3', name: 'Eric Test', email: 'eric.test@example.com', phone: '' },
     { id: 'c4', name: 'Marigold Smith', email: 'marigold@example.com', phone: '(310) 555-0134' },
     { id: 'c5', name: 'Maurice Tobin', email: 'maurice@example.com', phone: '' },
   ];
