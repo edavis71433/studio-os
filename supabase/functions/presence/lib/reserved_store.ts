@@ -25,6 +25,7 @@ export const RESERVED_NAMES = {
   followedSearches: '__followed_searches__',   // builder list item 181: the searches a client follows on Google, ten at most (lib/search_tools.ts)
   searchPhrases: '__search_phrases__',    // builder list item 160: the two or three phrases the business wants to be found for (lib/search_phrases.ts)
   aiQuestions: '__ai_questions__',        // builder list item 182: the questions a client's monthly AI check asks, ten at most (lib/ai_watch.ts)
+  rankGrid: '__rank_grid__',              // builder list item 185: the map rank grid: on or off, the business on Google, the searches, the grid, the month scanned (lib/rank_grid.ts)
   doNext: '__do_next__',                  // builder list item 184: what the studio marked Done or Not relevant on a client's Do next list (lib/do_next.ts)
   copiedFrom: '__copied_from__',          // builder list item 145: what Duplicate or a template copied onto a new site, until changed or kept (lib/site_layout.ts)
   domainNotes: '__domain_notes__',        // builder list item 162: the studio's notes on a client's domain (whose account, renews by itself, a note) (agency/sites.ts)
