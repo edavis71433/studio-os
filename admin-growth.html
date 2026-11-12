@@ -203,14 +203,10 @@ select.in{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns=
       </svg>
     </a>
     <span class="eyebrow" style="justify-content:center;margin-top:18px">Studio OS · Growth</span>
-    <h1>Sign in</h1>
-    <p class="s">Team access only.</p>
-    <form id="loginForm" autocomplete="on">
-      <div class="field"><label for="email">Email</label><input id="email" class="in" type="email" autocomplete="email" required></div>
-      <div class="field"><label for="password">Password</label><input id="password" class="in" type="password" autocomplete="current-password" required></div>
-      <button id="loginBtn" type="submit" class="btn btn-primary btn-block mt-s">Sign in</button>
-      <div id="gateMsg" class="lg-msg"></div>
-    </form>
+    <h1>Sign in to your studio</h1>
+    <p class="s">Growth uses your studio sign-in. Sign in once and you come straight back here.</p>
+    <a id="gateSignIn" href="/studio.html" class="btn btn-primary btn-block mt-s">Sign in</a>
+    <div id="gateMsg" class="lg-msg" role="status"></div>
   </div>
 </div>
 
@@ -256,10 +252,12 @@ const CONFIG = {
   FN: 'https://qksstlqzbhesadrrofgn.supabase.co/functions/v1/clever-api',
 };
 
+// Builder item 213: Growth uses the studio's sign-in. The same storage key as every
+// studio page ('dds-portal-auth', studio.html), so signing in or out there counts here.
 let sb = null;
 try {
   sb = window.supabase.createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_ANON_KEY, {
-    auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true },
+    auth: { storageKey: 'dds-portal-auth', persistSession: true, autoRefreshToken: true },
   });
 } catch (e) { console.error('Supabase init failed', e); }
 
@@ -306,7 +304,12 @@ function shortDate(iso) { if (!iso) return ''; const d = new Date(iso); if (isNa
 function isoDate(iso) { if (!iso) return ''; const d = new Date(iso); if (isNaN(d)) return ''; return d.toISOString().slice(0,10); }
 function daysUntil(iso) { if (!iso) return null; const d = new Date(iso); if (isNaN(d)) return null; return Math.ceil((d.getTime()-Date.now())/86400000); }
 
-function showGate() { $('#app').classList.add('hide'); $('#gate').classList.remove('hide'); }
+// Nobody signed in (or the sign-in ran out): leave this page's address for the studio's
+// sign-in page, which brings you back here once you're in (builder item 192, studio.html).
+function showGate() {
+  try { localStorage.setItem('dds-studio-return', JSON.stringify({ path: location.pathname + location.search + location.hash, at: Date.now() })); } catch (_) {}
+  $('#app').classList.add('hide'); $('#gate').classList.remove('hide');
+}
 function showApp() { $('#gate').classList.add('hide'); $('#app').classList.remove('hide'); }
 
 /* ── app state ── */
@@ -1109,26 +1112,12 @@ function wireNav(){
   $('#signOutM').addEventListener('click',doSignOut);
 }
 
-async function doSignOut(){ await sb.auth.signOut(); STATE.me=null; location.reload(); }
+// One sign-in: signing out here signs you out of the studio too.
+async function doSignOut(){ try { await sb.auth.signOut(); } catch (_) {} STATE.me=null; location.href='/studio.html'; }
 
 /* ============================================================================
    AUTH + BOOT  (role-gated: staff and up only)
    ============================================================================ */
-$('#loginForm').addEventListener('submit', async (e)=>{
-  e.preventDefault();
-  const msg=$('#gateMsg'); msg.className='lg-msg'; msg.textContent='';
-  const btn=$('#loginBtn'); btn.disabled=true; btn.textContent='Signing in…';
-  try {
-    const { error } = await sb.auth.signInWithPassword({ email:$('#email').value.trim(), password:$('#password').value });
-    if(error) throw error;
-    await boot();
-  } catch(err){
-    msg.className='lg-msg err';
-    msg.textContent=/invalid/i.test(err.message||'')?'That email and password don’t match.':(err.message||'Could not sign in.');
-    btn.disabled=false; btn.textContent='Sign in';
-  }
-});
-
 async function boot(){
   if(!sb){ $('#gateMsg').className='lg-msg err'; $('#gateMsg').textContent='Sign-in isn’t configured (missing key).'; return; }
   const { data:{ session } } = await sb.auth.getSession();
@@ -1136,12 +1125,24 @@ async function boot(){
   // role check: only team members (staff+) get in
   let who;
   try { who = await api('whoami'); }
-  catch(e){ showGate(); return; }
+  catch(e){
+    showGate();
+    // a dropped connection isn't a sign-in problem: say so rather than ask for a sign-in
+    if (e && e.message !== 'no session' && e.message !== 'unauthorized') {
+      $('#gateMsg').className='lg-msg err';
+      $('#gateMsg').textContent='We couldn’t reach the studio just now. Check the connection and try again.';
+    }
+    return;
+  }
   if(!who || !who.isTeam){
+    // signed in, but not on the studio team: say so, and leave the shared sign-in alone.
+    // No return address here: the studio's sign-in page would only send them back.
+    showGate();
+    try { localStorage.removeItem('dds-studio-return'); } catch (_) {}
     $('#gateMsg').className='lg-msg err';
-    $('#gateMsg').textContent='This account isn’t on the team. Client logins use the portal.';
-    await sb.auth.signOut();
-    showGate(); return;
+    $('#gateMsg').textContent='This page is for the studio team, and this account isn’t on it.';
+    $('#gateSignIn').textContent='Go to your workspace';
+    return;
   }
   STATE.me = who.email; STATE.role = who.role;
   $('#whoEmail').textContent = who.email||'';

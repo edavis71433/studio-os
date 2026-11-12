@@ -49,7 +49,8 @@ const ok = (n, p, note = '') => { results.push({ n, p }); console.log(`${p ? 'PA
     /forgeries/.test(explainRecord({ type: 'TXT', name: 'x.com', value: 'v=spf1 ~all' })));
   const tpl = templateRecords('point_domain', { domain: 'marlows.example' });
   ok('templates: goals become exact, valid records', tpl.length === 2 && tpl.every((r) => validateRecord(r).ok));
-  ok('templates: DKIM is named but the key is NEVER invented', templateRecords('email_auth', { domain: 'x.com' }).some((r) => /copy the key/.test(r.value)));
+  // builder item 193: email protection has no fixed template any more (it was Google's for everyone)
+  ok('templates: an ownership check is one TXT record carrying the token', templateRecords('verify_ownership', { domain: 'x.com', token: 'tok' })[0].value === 'tok');
 }
 
 // ═══ 3. plans — exact steps, honest risk, rollback, approval constant ═══
@@ -57,9 +58,10 @@ const ok = (n, p, note = '') => { results.push({ n, p }); console.log(`${p ? 'PA
   const p1 = planConnectDomain('marlows.example', null);
   ok('connect_domain: exact records + why + what stays untouched', p1.steps[0].records.length === 2 && /Email.*untouched/i.test(p1.summary) && p1.steps[0].explain.length === 2);
   ok('connect_domain: automation honestly split — DNS guided, SSL/verification automatic', p1.steps[0].automated === false && p1.steps[1].automated === true);
+  // builder item 193 (Nov 12 review, finding 14): with nothing known about who runs the email, no sender record is guessed
   const p2 = planEmailAuth('marlows.example');
-  ok('email_auth: SPF+DMARC prepared; DKIM deferred to the mail provider, honestly', p2.steps[0].records.length === 2 && /never invents the key/.test(p2.steps[1].why));
-  ok('email_auth: defaults to monitor-only DMARC — tightening is a separate decision', /p=none/.test(p2.risk));
+  ok('email_auth: with nothing read, only the provider-independent record is prepared; the sender record is asked for, never invented', p2.steps.flatMap((s) => s.records || []).length === 1 && /We don’t guess/.test(p2.steps[0].why));
+  ok('email_auth: the watching-only record is the default, and the risk says nothing about delivery changes', /p=none/.test(p2.steps.flatMap((s) => s.records || [])[0].value) && /Low/.test(p2.risk));
   const p3 = planRegistrarCare('marlows.example', (a, d) => manualRegistrar.guide(a, d));
   ok('registrar_care: the two disaster-prevention switches, guided', p3.steps.length === 3 && /auto-renew/i.test(p3.steps[0].what) && /privacy/i.test(p3.steps[1].what));
   const p4 = planHostingRestore('abc12345deploy', 'Summer menu launch');

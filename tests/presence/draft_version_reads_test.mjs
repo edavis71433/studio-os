@@ -143,7 +143,7 @@ const DRAFT_READ = {
   presence_testimonials: /^site_id=eq\.[^&]+&deleted_at=is\.null&is_visible=is\.true&order=sort_order\.asc,created_at\.asc$/,
   presence_faqs: /^site_id=eq\.[^&]+&deleted_at=is\.null&is_visible=is\.true&order=sort_order\.asc,created_at\.asc$/,
   presence_posts: /^site_id=eq\.[^&]+&deleted_at=is\.null&status=eq\.published&order=published_at\.desc$/,
-  presence_media: /^site_id=eq\.[^&]+&deleted_at=is\.null&select=id,storage_path,alt_text,mime,width,height,focal_x,focal_y$/,
+  presence_media: /^site_id=eq\.[^&]+&deleted_at=is\.null&id=in\.\([^)]*\)&select=id,storage_path,alt_text,mime,width,height,focal_x,focal_y$/,   // item 208: by id
   presence_redirects: /^site_id=eq\.[^&]+&order=from_path\.asc&select=from_path,to_path$/,
   presence_settings: /^site_id=eq\.[^&]+&limit=1$/,
   presence_dev_customizations: /^site_id=eq\.[^&]+&select=theme_tokens,custom_css,custom_html&limit=1$/,

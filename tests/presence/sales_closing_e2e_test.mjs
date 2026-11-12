@@ -33,7 +33,14 @@ async function P(path, method, body) { // public (token) call — no session
   let b = {}; try { b = await r.json(); } catch { /* */ }
   return { status: r.status, ok: r.ok, body: b };
 }
-const tokenOf = (url) => (typeof url === 'string' && url ? url.split('/').pop() : null);
+// Since Oct 2026 a send answers the deal's one link, sign.html?t=<token>; older links ended
+// in /<token>. Reading the old shape from a new link gave a token that was never valid, so
+// every check below that expected a refusal passed whatever the server did (found Nov 12 2026).
+const tokenOf = (url) => {
+  if (typeof url !== 'string' || !url) return null;
+  const t = url.split('?t=')[1];
+  return t ? decodeURIComponent(t.split('&')[0]) : url.split('/').pop();
+};
 const tag = 'close-' + Date.now();
 
 // ═══ PART A — authed closing path (no link secret needed): reach contract via the
@@ -63,7 +70,7 @@ const conv1 = await A(`/sales/deals/${deal1}/convert`, 'POST', { plan: 'business
 ok('convert: contract-stage deal converts → customer + workspace', conv1.ok && conv1.body?.data?.converted === true && !!conv1.body?.data?.client_id, JSON.stringify(conv1.body));
 const clientId1 = conv1.body?.data?.client_id;
 ok('convert: hands off to the EXISTING guided onboarding (/get-started.html)', conv1.body?.data?.onboarding === '/get-started.html');
-ok('convert: a brand-new customer is invited to set a login', conv1.body?.data?.invited === true);
+ok('convert: a brand-new customer is invited to set a login', conv1.body?.data?.invited === true, JSON.stringify(conv1.body).slice(0, 200));
 const conv1b = await A(`/sales/deals/${deal1}/convert`, 'POST', { plan: 'business_os_only' });
 ok('convert: idempotent — re-convert returns the SAME customer, no duplicate', conv1b.ok && conv1b.body?.data?.client_id === clientId1 && conv1b.body?.data?.idempotent === true);
 const dealWon = await A(`/sales/deals/${deal1}`);
@@ -94,11 +101,11 @@ if (!secretPresent) {
   ok('public: re-send is idempotent (already_sent)', resend3.ok && resend3.body?.already_sent === true);
   const view3 = await P(`/sales/p/${propToken}`);
   // Oct 2026: a send mints the deal's ONE link (kind 'flow', the proposal nested); a pre-flow proposal token still answers kind 'proposal'
-  ok('public: prospect can VIEW the proposal by token', view3.ok && ((view3.body?.data?.kind === 'flow' && view3.body?.data?.proposal?.subtotal_cents === 250000) || (view3.body?.data?.kind === 'proposal' && view3.body?.data?.subtotal_cents === 250000)));
+  ok('public: prospect can VIEW the proposal by token', view3.ok && ((view3.body?.data?.kind === 'flow' && view3.body?.data?.proposal?.subtotal_cents === 250000) || (view3.body?.data?.kind === 'proposal' && view3.body?.data?.subtotal_cents === 250000)), `${view3.status} ${JSON.stringify(view3.body).slice(0, 200)}`);
   const accept3 = await P(`/sales/proposals/${prop3Id}/decide`, 'POST', { decision: 'accepted', token: propToken });
-  ok('public: prospect ACCEPTS via token → deal advances to contract', accept3.ok && accept3.body?.data?.status === 'accepted');
+  ok('public: prospect ACCEPTS via token → deal advances to contract', accept3.ok && accept3.body?.data?.status === 'accepted', `${accept3.status} ${JSON.stringify(accept3.body).slice(0, 200)}`);
   const reaccept3 = await P(`/sales/proposals/${prop3Id}/decide`, 'POST', { decision: 'accepted', token: propToken });
-  ok('public: re-accept is idempotent', reaccept3.ok && reaccept3.body?.already === true);
+  ok('public: re-accept is idempotent', reaccept3.ok && reaccept3.body?.already === true, `${reaccept3.status} ${JSON.stringify(reaccept3.body).slice(0, 200)}`);
 
   const con3 = await A(`/sales/deals/${deal3}/contracts`, 'POST', { title: 'Agreement', body: 'The agreed terms of engagement.', proposal_id: prop3Id });
   const con3Id = con3.body?.data?.id;
@@ -107,11 +114,11 @@ if (!secretPresent) {
   const conHash = sendC3.body?.content_hash;
   ok('public: contract share link + hash minted', sendC3.ok && !!conToken && /^[0-9a-f]{64}$/.test(conHash || ''));
   const badSign = await P(`/sales/contracts/${con3Id}/sign`, 'POST', { token: conToken, presented_hash: 'f'.repeat(64), signer_name: 'Mallory' });
-  ok('integrity: signing a STALE/edited version is refused (version_mismatch)', badSign.status === 409 && badSign.body?.error === 'version_mismatch');
+  ok('integrity: signing a STALE/edited version is refused (version_mismatch)', badSign.status === 409 && badSign.body?.error === 'version_mismatch', `${badSign.status} ${JSON.stringify(badSign.body).slice(0, 200)}`);
   const sign3 = await P(`/sales/contracts/${con3Id}/sign`, 'POST', { token: conToken, presented_hash: conHash, signer_name: 'Dana Prospect', signer_email: `${tag}-b@example.com` });
-  ok('public: prospect SIGNS with the matching hash → signed', sign3.ok && sign3.body?.data?.status === 'signed');
+  ok('public: prospect SIGNS with the matching hash → signed', sign3.ok && sign3.body?.data?.status === 'signed', `${sign3.status} ${JSON.stringify(sign3.body).slice(0, 200)}`);
   const resign3 = await P(`/sales/contracts/${con3Id}/sign`, 'POST', { token: conToken, presented_hash: conHash, signer_name: 'Dana Prospect' });
-  ok('public: re-sign is idempotent', resign3.ok && resign3.body?.already === true);
+  ok('public: re-sign is idempotent', resign3.ok && resign3.body?.already === true, `${resign3.status} ${JSON.stringify(resign3.body).slice(0, 200)}`);
 
   const detail3 = await A(`/sales/deals/${deal3}`);
   const kinds = new Set((detail3.body?.data?.events || []).map((e) => e.kind));
