@@ -438,6 +438,8 @@
   .acctlab{display:flex;flex-direction:column;min-width:0}
   .acctlab .muted{font-size:12.5px}
   .acctrow button{flex:0 0 auto;white-space:nowrap}
+  /* builder item 194: the domain card's record list */
+  .domrecs{list-style:none;padding:0;margin:8px 0}.domrecs li{margin:6px 0}.domrecs code{word-break:break-all}
   /* ── slice 8b: the "Your website" card (Home, between "Needs you" and projects) ── */
   .wscard .wslead{color:var(--soft);font-size:14.5px;line-height:1.55}
   .wscard .wslead b{color:var(--ink)}
@@ -1130,6 +1132,8 @@ function renderHome(){
   // item 179: the "Your website" card leads Home — the thing they pay for,
   // first. Filled by loadWebsiteCard (hidden for a reviewer / unpublished site).
   html+=`<section id="home-website" hidden></section>`;
+  // builder item 194: a domain that isn't live yet shows its records, where to add them and Check
+  html+=`<section id="home-domain" hidden></section>`;
   html+=`<section id="home-needs"><h2 id="needs-h">Needs you</h2><div id="needs-body"><div class="skel"><div class="l w60"></div><div class="l w40"></div></div></div></section>`;
   // Oct 2026 audit change 4: what your studio just did sits right under what needs you
   html+=`<section id="home-updates"><h2>From your studio</h2>`;
@@ -1157,6 +1161,7 @@ function renderHome(){
   if(location.hash==='#connections'){try{history.replaceState(null,'','/client.html');}catch(_){}const hc=$('home-connect');if(hc)setTimeout(()=>hc.scrollIntoView({block:'start'}),0);}
   buildNeedsYou();
   loadWebsiteCard();
+  loadDomainCard();
 }
 // Fill glances + mini Paths + the aggregated "Needs you" QUEUE — one list-view
 // card of two-line rows (kind chip · title · context · inline action) from feed
@@ -1288,6 +1293,42 @@ function wsCardHtml(d){
 // full load (like billing); a reviewer never fetches (no website of their own).
 // The in-flight promise is cached too, so Home→away→Home never refires a
 // request that's already running (at most one fetch per load).
+// Builder item 194 (Nov 12 review, finding 22): the client is often the only person who can sign in
+// where the domain is kept, and the portal never mentioned a domain. While one is connected and not
+// live yet, Home shows the records still to add, the company that keeps them and a Check button.
+// GET /client/domain runs the live check, so Check just asks again. Pure: the card's HTML.
+function domainCardHtml(d){
+  if(!d||!d.domain||d.state==='live')return'';
+  const dom=esc(d.domain),recs=Array.isArray(d.records)?d.records:[];
+  const where=d.where&&d.where.company?'at '+esc(d.where.company):'where your domain’s settings are kept (usually the company you bought it from)';
+  const signIn=d.where&&d.where.company&&/^https:\/\//.test(d.where.sign_in||'')?` <a href="${esc(d.where.sign_in)}" target="_blank" rel="noopener">Sign in to ${esc(d.where.company)} ↗</a>`:'';
+  let body;
+  if(d.state==='records'&&recs.length)body=`<p><b>${dom}</b> isn’t live yet. Add ${recs.length===1?'this record':'these '+(recs.length===2?'two':recs.length)+' records'} ${where}.${signIn}</p>`+
+    `<ul class="domrecs">${recs.map(r=>`<li><code>${esc(r.type)} &nbsp; ${esc(r.host)} &nbsp; → &nbsp; ${esc(r.value)}</code> <button class="fbtn" data-copy-rec="${esc(r.value)}" aria-label="Copy the value of the ${esc(r.type)} record for ${esc(r.host)}: ${esc(r.value)}">Copy</button></li>`).join('')}</ul>`+
+    `<p class="muted">Leave anything marked MX or Mail alone: that’s your email. ${esc(d.wait||'')}</p>`;
+  else if(d.state==='padlock')body=`<p><b>${dom}</b>: your records are in. The padlock is being switched on. Nothing for you to do.</p><p class="muted">${esc(d.wait||'')}</p>`;
+  else if(d.state==='left')body=`<p><b>${dom}</b> is connected, with something left to finish:</p><ul class="domrecs">${(d.left||[]).map(w=>`<li>${esc(w)}</li>`).join('')}</ul>`;
+  else body=`<p>We couldn’t check <b>${dom}</b> just now.</p>`;
+  return `<h2>Your domain</h2><div class="card" data-domain-state="${esc(d.state)}">${body}<button class="approve" id="domcheck">${d.state==='unchecked'?'Check again':'Check if it’s ready'}</button> <span id="domcheck-note" class="muted" role="status"></span></div>`;
+}
+async function loadDomainCard(checked){
+  if(PORTAL.persona!=='client')return;
+  const r=await api('/client/domain').catch(()=>null);
+  const host=document.getElementById('home-domain');if(!host)return;   // the user moved on mid-fetch
+  if(!r||!r.ok){const n=document.getElementById('domcheck-note');if(n&&checked)n.textContent='We couldn’t check just now. Try again in a minute.';return;}
+  const d=(r.body&&r.body.data)||null;
+  const h=domainCardHtml(d);
+  if(!h){   // no domain, or live: nothing to do here (after a Check, say it once)
+    if(checked&&d&&d.state==='live'){host.innerHTML=`<h2>Your domain</h2><div class="card" data-domain-state="live"><p>✓ <b>${esc(d.domain)}</b> is live.</p></div>`;host.hidden=false;}
+    else{host.innerHTML='';host.hidden=true;}
+    return;
+  }
+  host.innerHTML=h;host.hidden=false;
+  if(checked){const n=document.getElementById('domcheck-note');if(n)n.textContent='Checked just now.';}
+  host.querySelectorAll('[data-copy-rec]').forEach(b=>b.addEventListener('click',()=>{if(navigator.clipboard)navigator.clipboard.writeText(b.getAttribute('data-copy-rec')).then(()=>{b.textContent='Copied';setTimeout(()=>{b.textContent='Copy';},1500);}).catch(()=>{});}));
+  const c=document.getElementById('domcheck');
+  if(c)c.addEventListener('click',()=>{c.disabled=true;c.textContent='Checking…';loadDomainCard(true);});
+}
 async function loadWebsiteCard(){
   if(PORTAL.persona!=='client')return;
   if(PORTAL.wstats===undefined){

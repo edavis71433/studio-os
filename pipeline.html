@@ -649,6 +649,11 @@ const sb=supabase.createClient(SUPABASE_URL,SUPABASE_KEY,{auth:{storageKey:'dds-
 const $=(id)=>document.getElementById(id);
 const esc=(s)=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const scope=()=>new URLSearchParams(location.search).get('client')||'';
+// builder item 83: ?client= is also how someone with places in two businesses opens their second one.
+// That is their own business, not a studio inside a client, and its deals live on its own site, so it
+// keeps the tools a client's pipeline hides. The shell tells the two apart (ddsScopeInfo: the context,
+// else the businesses it remembers from the last visit); before it has loaded, the address decides.
+const inClient=()=>!!scope()&&(window.ddsScopeInfo&&/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(scope())?!!window.ddsScopeInfo():true);
 // a converted deal's customer SITE (presence_deals.converted_site_id, on the deal
 // read) — the id "Manage their access" drills sharing.html into. UUID-shaped only.
 const SITE_UUID=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -2338,7 +2343,7 @@ function setFilters(next,key){
 }
 function paintFchips(){
   const host=$('fchips'),k=KIT();if(!host)return;
-  host.hidden=VIEW==='board'||!k||!!scope()||!DEALS.length;
+  host.hidden=VIEW==='board'||!k||inClient()||!DEALS.length;   // builder item 83: your own second business keeps the chips
   if(host.hidden){host.innerHTML='';return;}
   // each chip says how many of the deals in view it would keep on its own (the search applied)
   const q=Q.trim().toLowerCase(),base=q?DEALS.filter(d=>(String(d.title||'').toLowerCase()+' '+((CONTACT_TEXT&&d.contact_id&&CONTACT_TEXT[d.contact_id])||'')).includes(q)):DEALS;
@@ -2614,7 +2619,7 @@ function importDeals(){
 }
 let VIEWS_ASKED=false;
 function loadSavedViews(){
-  if(VIEWS_ASKED||scope())return;
+  if(VIEWS_ASKED||inClient())return;
   const go=()=>{const k=KIT();if(!k)return;VIEWS_ASKED=true;k.use(kitReq);k.views('pipeline').then(v=>{if(Array.isArray(v)){SAVED=v;paintViewsMenu();}});};
   if(KIT())go();else document.addEventListener('DOMContentLoaded',go,{once:true});
 }
@@ -4125,6 +4130,25 @@ async function openDeal(id){
   }catch(e){ if(dgen!==DET_SEQ)return; $('detailInner').innerHTML='<div class="backbar"><button class="btn ghost" id="closeD">← Back to pipeline</button></div><div class="dbody mut">'+esc(nice(e))+'</div>'; const b=$('closeD'); if(b)b.onclick=closeDealDetail; }
 }
 
+// sales review item 38: the studio's own names for its open stages (Settings → Name your deal stages)
+function studioLevelTools(){
+  loadSavedViews();
+  // item 124: the same read carries each stage's "what to do now" note
+  api('/sales/stages').then(r=>{const nts=r&&r.data&&r.data.notes;if(nts&&typeof nts==='object'){STAGE_NOTES=nts;STAGE_NOTES_CUSTOM=r.data.notes_custom||{};if(DRAWER_PATH_REPAINT&&!$('detailWrap').hidden)DRAWER_PATH_REPAINT();}const l=r&&r.data&&r.data.labels;if(l&&STAGES.some(k=>l[k]&&l[k]!==STAGE_LABEL[k])){Object.assign(STAGE_LABEL,l);renderFilters();if(DEALS_LOADED)renderCurrent();if(CURRENT_DEAL&&!$('detailWrap').hidden)openDeal(CURRENT_DEAL);}}).catch(()=>{});
+}
+// builder item 83: under ?client= the page starts as a client's pipeline. One of your own businesses gets
+// its tools back as soon as the shell can tell, and a context that lands later has the last word.
+let OWN_TOOLS=false,OWN_WIRED=false;
+function ownBusinessTools(){
+  const go=()=>{
+    const own=!inClient();if(own===OWN_TOOLS)return;OWN_TOOLS=own;
+    ['importDeals','pvBtn','chartsBtn','printBtn'].forEach(id=>{const n=$(id);if(n)n.hidden=!own;});
+    const nd=$('newDeal');if(nd){nd.hidden=!own;nd.onclick=own?openNewDeal:null;}
+    if(own&&!OWN_WIRED){OWN_WIRED=true;wireViews();studioLevelTools();}
+  };
+  if(window.ddsScopeInfo)go();else document.addEventListener('DOMContentLoaded',go,{once:true});
+  document.addEventListener('dds:context',go);
+}
 // Boot honesty: a failed boot renders real trouble WITH a Try again that
 // re-runs the whole boot in place (session + load — a bare load() couldn't
 // paint without the token the failed boot never got). Markup is hand-rolled
@@ -4145,10 +4169,8 @@ async function boot(){
     if(urlStage&&STAGES.includes(urlStage)){FILTER=urlStage;if(urlStage==='won'||urlStage==='lost')VIEW='list';}
     renderFilters();
     // item 31/32: saved views, columns and the import are studio-level tools (deals live on the studio's site)
-    if(scope()){['importDeals','pvBtn','chartsBtn','printBtn'].forEach(id=>{const n=$(id);if(n)n.hidden=true;});wireMore();}
-    else{wireViews();wireMore();loadSavedViews();
-      // sales review item 38: the studio's own names for its open stages (Settings → Name your deal stages)
-      api('/sales/stages').then(r=>{const nts=r&&r.data&&r.data.notes;if(nts&&typeof nts==='object'){STAGE_NOTES=nts;STAGE_NOTES_CUSTOM=r.data.notes_custom||{};if(DRAWER_PATH_REPAINT&&!$('detailWrap').hidden)DRAWER_PATH_REPAINT();}const l=r&&r.data&&r.data.labels;if(l&&STAGES.some(k=>l[k]&&l[k]!==STAGE_LABEL[k])){Object.assign(STAGE_LABEL,l);renderFilters();if(DEALS_LOADED)renderCurrent();if(CURRENT_DEAL&&!$('detailWrap').hidden)openDeal(CURRENT_DEAL);}}).catch(()=>{});}
+    if(scope()){['importDeals','pvBtn','chartsBtn','printBtn'].forEach(id=>{const n=$(id);if(n)n.hidden=true;});wireMore();ownBusinessTools();}
+    else{wireViews();wireMore();studioLevelTools();}
     if(VIEW!=='list')setView(VIEW); else await load();   // restore the display (syncs the toggle; the board unless List was chosen), else plain load
     const deep=new URLSearchParams(location.search).get('deal'); if(deep) openDeal(deep);
     // ⌘K "billing" lands here as #outstanding (lib/navigation.ts): open "Who owes you"

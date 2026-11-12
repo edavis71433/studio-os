@@ -385,6 +385,23 @@ export interface FormRenderCtx { esc: (s: string) => string; attr: (s: string) =
 // niceties. Zero external assets.
 const FORM_CSS = `<style>.presence-form{max-width:560px}.presence-form .ff{margin:0}.presence-form .ff[hidden]{display:none}.presence-form .ff-req{color:#b42318}.presence-form .ff-help{display:block;font-size:.85rem;color:var(--soft,#666);margin-top:4px}.presence-form fieldset.ff-group{border:1px solid var(--line,#ddd);border-radius:9px;padding:12px 14px;margin-bottom:14px}.presence-form .ff-group legend{font-weight:600;font-size:.94rem;padding:0 6px}.presence-form .ff-opt{display:flex;align-items:center;gap:8px;font-weight:400;margin-top:6px}.presence-form .ff-opt input{width:auto;margin:0}.presence-form .ff-rating .ff-opt{display:inline-flex;margin-right:14px}.presence-form .ff-consent label{display:flex;align-items:flex-start;gap:8px;font-weight:400}.presence-form .ff-consent input{width:auto;margin-top:4px}.presence-form .hp{position:absolute;left:-9999px;height:1px;overflow:hidden}.presence-form .ff-step[hidden]{display:none}.presence-form .ff-step-title{font-weight:600;font-size:1.02rem;margin:0 0 10px}.presence-form .ff-progress{font-size:.85rem;color:var(--soft,#666);font-weight:600;margin:0 0 8px}.presence-form .ff-bar{display:block;height:5px;border-radius:999px;background:var(--line,#e5e5e5);overflow:hidden;margin:0 0 16px}.presence-form .ff-bar-in{display:block;height:100%;width:0;background:var(--accent,#5b3fa0);transition:width .2s ease}.presence-form .ff-nav{display:flex;gap:10px;margin-top:2px}</style>`;
 
+/** Builder item 57: every form a page's section list holds, in page order: its Form
+ *  sections and the Form blocks inside its Blocks sections. Reads a stored, validated or
+ *  published list alike (they share the keys), so the form sender, the answers page and
+ *  the pop-ups find a form wherever the owner put it. Pure. */
+export function formsIn(list: unknown): FormDefinition[] {
+  const out: FormDefinition[] = [];
+  const isForm = (f: unknown): f is FormDefinition => !!f && typeof f === 'object' && typeof (f as FormDefinition).id === 'string' && Array.isArray((f as FormDefinition).fields);
+  for (const b of Array.isArray(list) ? list : []) {
+    if (!b || typeof b !== 'object') continue;
+    if ((b as { type?: unknown }).type === 'form') { if (isForm(b)) out.push(b); continue; }
+    if ((b as { type?: unknown }).type !== 'stack') continue;
+    const items = (b as { items?: unknown }).items;
+    for (const it of Array.isArray(items) ? items : []) if (it && typeof it === 'object' && (it as { kind?: unknown }).kind === 'form' && isForm((it as { form?: unknown }).form)) out.push((it as { form: FormDefinition }).form);
+  }
+  return out;
+}
+
 export function renderForm(def: FormDefinition, ctx?: FormRenderCtx): string {
   const E = ctx?.esc || esc; const A = ctx?.attr || attr;
   const dom = `presence-form-${def.id}`;

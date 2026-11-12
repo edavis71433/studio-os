@@ -38,6 +38,25 @@ export async function rateAllow(bucket: string, max: number, windowSec: number):
   }
 }
 
+/** Item 209 (review file 06, finding 88): two limits in one call, as rateAllow(first)
+ *  then rateAllow(second) would: the second is counted only when the first allows the
+ *  hit, so a sender over its own limit never uses up the second one. One trip to the
+ *  database (rate_hit_both, migration 0206) instead of two in a row; before 0206, the
+ *  two calls. Fail-open, like rateAllow. */
+export async function rateAllowBoth(first: { bucket: string; max: number }, second: { bucket: string; max: number }, windowSec: number): Promise<boolean> {
+  try {
+    const r = await svc('rpc/rate_hit_both', {
+      method: 'POST',
+      body: JSON.stringify({ p_first: first.bucket.slice(0, 200), p_first_max: first.max, p_second: second.bucket.slice(0, 200), p_second_max: second.max, p_window: windowStart(windowSec) }),
+    });
+    if (r.ok) return r.json === true || r.json === null;
+    if (r.status !== 404) return true;             // limiter unavailable → allow
+  } catch {
+    return true;                                   // fail open
+  }
+  return (await rateAllow(first.bucket, first.max, windowSec)) && (await rateAllow(second.bucket, second.max, windowSec));
+}
+
 /** Standard 429 body — calm, honest, matches the platform's voice. */
 export function tooMany(cors: Record<string, string>, retryAfterSec = 60): Response {
   return new Response(JSON.stringify({ error: 'rate_limited', message: 'That’s a lot of requests in a short time — please wait a minute and try again.' }), {
