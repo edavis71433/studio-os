@@ -6723,7 +6723,6 @@ function pgAccessGroup(slug) {
     }
     if (asking || unset) {
       const box = el("div", "pg-pw");
-      if (unset && !asking) box.appendChild(el("p", "pg-unset", "This page asks for a password, but none is set on this site yet, so it can’t go live. Set one, or choose who can see it."));
       const pw = el("input"); pw.type = "password"; pw.maxLength = 100; pw.autocomplete = "new-password"; pw.placeholder = "At least 4 letters or numbers";
       box.appendChild(pgField("Password", pw, "Tell it to the people who should see the page. Changing it later asks everyone again."));
       const err = el("div", "hint pg-err"); err.setAttribute("role", "alert"); err.hidden = !msg; err.textContent = msg; box.appendChild(err);
@@ -6737,6 +6736,7 @@ function pgAccessGroup(slug) {
       save.addEventListener("click", go);
       pw.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); go(); } });
       acts.append(save, show); if (asking) acts.append(cancel); box.appendChild(acts);   // with no password yet there's nothing to go back to
+      if (unset && !asking) box.insertBefore(el("p", "pg-unset", "This page asks for a password, but none is set on this site yet, so it can’t go live. Set one, or choose who can see it."), box.firstChild);
       g.appendChild(box);
       if (focusOn === "pw") setTimeout(() => { try { pw.focus({ preventScroll: true }); box.scrollIntoView({ block: "nearest" }); } catch (_) {} }, 0);
     }
