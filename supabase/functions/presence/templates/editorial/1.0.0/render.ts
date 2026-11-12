@@ -18,6 +18,7 @@ import { seoHead } from '../../../lib/seo_emit.ts';
 import { privacyBody, accessibilityBody, legalFooterLinks, notSentInner } from '../../../lib/legal_pages.ts';
 import { SEARCH_CSS, searchBoxHtml, searchPageBody, searchClientScript, searchIndexJson, normalizeTags, postTagsAttr, postTagsHtml, tagFilterBar, tagFilterScript } from '../../../lib/search_index.ts';
 import { postListBody, postPageBody, postLd, postCategories, categoryPath, POST_CSS, type PostDraw } from '../../../lib/post_render.ts';
+import { contactPlace, footerPlace, ldPlaces, PLACE_CSS } from '../../../lib/place_render.ts';
 import type { PostCategory } from '../../../lib/blog.ts';
 import type { FileMap, HolidayException, HoursDay, LocationContent, MediaRef, RenderFn, Snapshot, SnapshotContent, SiteConfig } from '../../../lib/render_types.ts';
 
@@ -232,7 +233,7 @@ function ldBusiness(c: SnapshotContent, site: SiteConfig, schemaType: string, of
     : { '@type': 'OpeningHoursSpecification', validFrom: e.date, validThrough: e.date, opens: e.intervals?.[0]?.open, closes: e.intervals?.[0]?.close });
   return {
     '@context': 'https://schema.org', '@type': schemaType,
-    name: c.identity.business_name, description: c.identity.description, url: site.baseUrl,
+    name: c.identity.business_name, description: c.identity.short_description || c.identity.description, url: site.baseUrl,
     telephone: l?.phone || c.identity.phone || undefined, email: c.identity.email || undefined,
     address: l ? { '@type': 'PostalAddress', streetAddress: [l.address_line1, l.address_line2].filter(Boolean).join(', '), addressLocality: l.city, addressRegion: l.region, postalCode: l.postal_code, addressCountry: l.country } : undefined,
     openingHoursSpecification: spec, specialOpeningHoursSpecification: special.length ? special : undefined,
@@ -308,7 +309,7 @@ ${o.body}
 </main>
 <footer class="site"><div class="wrap">
   <div class="cols">
-    <div><h2>${esc(i.business_name)}</h2>${addr ? `<address>${addr}</address>` : ''}<p>${[tel, mail].filter(Boolean).join('<br>')}</p>${(c.settings?.footer?.social !== false) && social ? `<p>${social}</p>` : ''}</div>
+    <div><h2>${esc(i.business_name)}</h2>${addr ? `<address>${addr}</address>` : ''}<p>${[tel, mail].filter(Boolean).join('<br>')}</p>${footerPlace(c)}${(c.settings?.footer?.social !== false) && social ? `<p>${social}</p>` : ''}</div>
     <div>${(c.settings?.footer?.hours !== false) && loc0(c) ? hoursTable(c, 'Hours') : ''}</div>
   </div>
   <div class="credit"><span>© ${esc(i.business_name)}</span><span>${legalFooterLinks()}</span>${credit}</div>
@@ -437,7 +438,7 @@ function contactBody(c: SnapshotContent, site: SiteConfig): string {
   return `<section class="block wrap"><h1>Contact &amp; hours</h1>
 <div class="cards" style="margin-top:8px">
   <div class="card"><h2>Reach us</h2>${addr ? `<address>${addr}</address>` : ''}<p>${[tel, mail].filter(Boolean).join('<br>')}</p>${maps ? `<p><a href="${attr(maps)}" rel="noopener">Get directions</a></p>` : ''}</div>
-  <div class="card">${loc0(c) ? hoursTable(c, 'Hours') : ''}</div>
+  <div class="card">${loc0(c) ? hoursTable(c, 'Hours') : ''}</div>${contactPlace(c, hoursTable)}
 </div>${form}</section>`;
 }
 
@@ -468,12 +469,12 @@ export const render: RenderFn = (snapshot: Snapshot, _manifest, site: SiteConfig
 
   // Append the dropdown-nav CSS only when the owner set a custom nav → sites without
   // one keep the exact same stylesheet + hash (byte-identical).
-  const effCss = CSS + POST_CSS + (c.settings?.nav?.length ? '\n' + NAV_DROPDOWN_CSS : '');
+  const effCss = CSS + POST_CSS + PLACE_CSS + (c.settings?.nav?.length ? '\n' + NAV_DROPDOWN_CSS : '');
   const cssPath = `/assets/site-${fnv(effCss)}.css`;
   files[`assets/site-${fnv(effCss)}.css`] = effCss;
 
   const siteTitle = i.seo_title || i.business_name;
-  const siteDesc = i.seo_description || i.description;
+  const siteDesc = i.seo_description || i.short_description || i.description;   // item 127
   const ogImg = c.settings?.og_image?.variants?.w1600
     || c.settings?.cover?.variants?.w1600   // item 67: the owner's chosen cover photo before any auto-pick
     || (bySort(c.offerings).find((o) => o.media)?.media?.variants?.w1600)
@@ -520,14 +521,14 @@ export const render: RenderFn = (snapshot: Snapshot, _manifest, site: SiteConfig
   // only) onto the ONE business node — home only, where the reviews_wall is visible.
   const rSchema = reviewsSchema(c.settings?.blocks, snapshot.created_at);
   const ldBizHome = rSchema ? { ...ldBiz, ...rSchema } : ldBiz;
-  page('/', { title: siteTitle, description: siteDesc, ld: [ldBizHome, ldSite(c, site), ...blocks.flatMap((b) => (b.ld ? [b.ld] : []))], ogImage: ogImg, active: 'home', body: homeBody(c, site, v, blocks) });
+  page('/', { title: siteTitle, description: siteDesc, ...(i.short_description ? { shareDescription: i.short_description } : {}), ld: [ldBizHome, ...ldPlaces(c, site, v.schemaType), ldSite(c, site), ...blocks.flatMap((b) => (b.ld ? [b.ld] : []))], ogImage: ogImg, active: 'home', body: homeBody(c, site, v, blocks) });
   page(v.offeringPath, { ...seoOv('offerings', `${v.offeringLabel} — ${i.business_name}`, `${v.offeringLabel} from ${i.business_name}.`), ld: [ldOfferings(c, site, v)], ogImage: ogImg, active: 'offerings', body: offeringsBody(c, v) });
   if (noidx.has('offerings')) markNoindex(`${v.offeringPath.replace(/^\/|\/$/g, '')}/index.html`);
   page('/about/', { ...seoOv('about', `About — ${i.business_name}`, siteDesc), ld: [ldCrumbs(site, [[i.business_name, '/'], ['About', '/about/']])], active: 'about', body: aboutBody(c) });
   if (noidx.has('about')) markNoindex('about/index.html');
   page('/faq/', { ...seoOv('faq', `FAQ — ${i.business_name}`, `Answers to common questions about ${i.business_name}.`), ld: c.faqs.length ? [ldFaq(c)] : [], active: 'faq', body: faqBody(c) });
   if (noidx.has('faq')) markNoindex('faq/index.html');
-  page('/contact/', { ...seoOv('contact', `Contact & Hours — ${i.business_name}`, `Address, phone, and hours for ${i.business_name}.`), ld: [ldBiz], active: 'contact', body: contactBody(c, site) });
+  page('/contact/', { ...seoOv('contact', `Contact & Hours — ${i.business_name}`, `Address, phone, and hours for ${i.business_name}.`), ld: [ldBiz, ...ldPlaces(c, site, v.schemaType)], active: 'contact', body: contactBody(c, site) });
   if (noidx.has('contact')) markNoindex('contact/index.html');
   page('/thanks/', { title: `Thank you — ${i.business_name}`, description: `Your message to ${i.business_name} was sent.`, ld: [], active: 'contact', body: `<section class="hero wrap"><h1>Thank you — your message was sent.</h1><p class="tagline">${esc(i.business_name)} will get back to you soon.</p><div class="cta-row"><a class="btn" href="/">Back to the site</a></div></section>` });
   files['thanks/index.html'] = (files['thanks/index.html'] as string).replace('</title>', '</title>\n<meta name="robots" content="noindex">');

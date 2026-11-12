@@ -3,7 +3,9 @@
 // The 150-character line AI tools and directories quote, and a second place with its own
 // address, phone and hours. Part A: the pure rules. Part B: the snapshot (unchanged for a
 // business with neither). Part C: the routes save and step down before APPLY-0182. Part D:
-// the publish checks, the changes list, a restore, the migration and its pack.
+// the publish checks, the changes list, a restore, the migration and its pack. Part E: the
+// live site in all eight templates: the footer, the Contact page, what Google and a link
+// preview read, and hostile words.
 const ROOT = new URL('../../', import.meta.url);
 const read = (p) => Deno.readTextFileSync(new URL(p, ROOT));
 const results = [];
@@ -107,6 +109,51 @@ const MAIN = { address_line1: '12 Main St', address_line2: '', city: 'Burbank', 
   for (const [name, sql] of [['migration', read('supabase/migrations/0182_short_description_second_location.sql')], ['pack', read('docs/presence/APPLY-0182-prod.sql')]]) {
     ok(`D7 ${name}: an empty short description capped at 150, re-runnable`, /add column if not exists short_description text not null default ''/.test(sql) && /drop constraint if exists presence_identity_short_description_len;/.test(sql) && /check \(char_length\(short_description\) <= 150\)/.test(sql));
     ok(`D8 ${name}: a second location, none by default`, /alter table public\.presence_locations\s+add column if not exists second_location jsonb;/.test(sql));
+  }
+}
+
+// ═══ E. the live site, all eight templates ═══
+{
+  const { renderSnapshot } = await import('../../supabase/functions/presence/lib/render.ts');
+  const { TEMPLATES, fullFixture } = await import('./full_fixture.mjs');
+  const SITE = { baseUrl: 'https://marlows.example', brand: { credit: 'Site by Davis Digital Studio' } };
+  const SHORT = 'What we do, where we do it, and what we are known for, in one line.';
+  const lds = (html) => [...String(html).matchAll(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/g)].map((m) => JSON.parse(m[1]));
+  const meta = (html, attr, name) => (String(html).match(new RegExp(`<meta ${attr}="${name}" content="([^"]*)"`)) || [])[1];
+  for (const slug of TEMPLATES) {
+    const fx = fullFixture(slug);
+    const files = await renderSnapshot(fx, SITE);
+    const pages = Object.entries(files).filter(([k, v]) => k.endsWith('.html') && /<footer/.test(String(v)) && !k.startsWith('_plain'));
+    const noPlace = pages.filter(([, v]) => !String(v).includes('<address class="place2"><strong>Glendale</strong><br>410 Brand Blvd<br>Glendale, ')).map(([k]) => k);
+    ok(`E1 [${slug}]: every page's footer names the second place under the main address`, pages.length > 3 && noPlace.length === 0, noPlace.slice(0, 3).join(', '));
+    const contact = String(files['contact/index.html']);
+    ok(`E2 [${slug}]: the Contact page gives it a card with its own Get directions link and its own week`,
+      /<div class="card place2"><h2>Glendale<\/h2><address>410 Brand Blvd<br>Glendale, /.test(contact) && /maps\/search\/\?api=1&amp;query=[^"]*410%20Brand%20Blvd/.test(contact)
+      && /<div class="card place2">[\s\S]*?<table class="hours"/.test(contact));
+    const home = String(files['index.html']);
+    const placeLd = (html) => lds(html).find((j) => j.parentOrganization && j.address?.streetAddress === '410 Brand Blvd');
+    const p2 = placeLd(home);
+    ok(`E3 [${slug}]: Google reads the second place on the home and Contact pages: its name, address, phone and hours, part of the business`,
+      !!p2 && !!placeLd(contact) && p2.name.endsWith('(Glendale)') && p2.telephone === '(555) 010-0199' && p2.address.addressLocality === 'Glendale'
+      && Array.isArray(p2.openingHoursSpecification) && !p2.openingHoursSpecification.some((h) => h.dayOfWeek === 'Monday') && p2['@type'] === lds(home)[0]['@type']);
+    const seo = fx.content.identity.seo_description;
+    ok(`E4 [${slug}]: a link preview carries the short description, and Google does when there's no search description`,
+      meta(home, 'property', 'og:description') === SHORT && meta(home, 'name', 'description') === (seo || SHORT) && lds(home)[0].description === SHORT);
+    const same = fullFixture(slug); same.content.locations[1] = { ...same.content.locations[1], same_hours: true, hours: same.content.locations[0].hours };
+    const sameContact = String((await renderSnapshot(same, SITE))['contact/index.html']);
+    ok(`E5 [${slug}]: with the same hours it says so instead of drawing the week twice`,
+      /<div class="card place2">[\s\S]*?<p class="place2-same">Open the same hours as our [^<]+ location\.<\/p><\/div>/.test(sameContact) && !/<div class="card place2">(?:(?!<\/div>)[\s\S])*<table/.test(sameContact));
+    const none = fullFixture(slug); none.content.locations = none.content.locations.slice(0, 1); delete none.content.identity.short_description;
+    const plain = await renderSnapshot(none, SITE);
+    const leaks = Object.entries(plain).filter(([k, v]) => k.endsWith('.html') && /class="(?:card )?place2"|parentOrganization/.test(String(v))).map(([k]) => k);
+    ok(`E6 [${slug}]: a business with one place and no short description draws neither`, leaks.length === 0, leaks.slice(0, 3).join(', '));
+    const HOSTILE = ['<script>alert(1)</script>', '" onmouseover="alert(1)" x="', 'javascript:alert(1)', '<img src=x onerror=alert(1)>'];
+    const bad = fullFixture(slug);
+    bad.content.identity.short_description = HOSTILE[1];
+    bad.content.locations[1] = { ...bad.content.locations[1], label: HOSTILE[0], address_line1: HOSTILE[2], city: HOSTILE[3], region: HOSTILE[1], postal_code: HOSTILE[0], phone: HOSTILE[2] };
+    const hr = await renderSnapshot(bad, SITE);
+    const live = Object.entries(hr).filter(([k, v]) => k.endsWith('.html') && (/<script>alert\(1\)|<img src=x onerror| onmouseover="alert\(1\)"/.test(String(v)) || /(?:href|src)\s*=\s*"(?:javascript|data):/i.test(String(v)))).map(([k]) => k);
+    ok(`E7 [${slug}]: hostile words in the second place and the short description stay words`, live.length === 0 && String(hr['contact/index.html']).includes('&lt;script&gt;alert(1)&lt;/script&gt;'), live.slice(0, 3).join(', '));
   }
 }
 

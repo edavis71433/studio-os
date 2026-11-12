@@ -162,6 +162,9 @@ header.site{position:static}
 @media (max-width:700px){.post-row{grid-template-columns:1fr;gap:12px}
 }
 
+address.place2{margin-top:14px}
+.place2-same{color:var(--soft)}
+
 nav.primary li.has-sub{position:relative}
 nav.primary .sub-caret{font-size:.7em;margin-left:4px;opacity:.75}
 nav.primary ul.subnav{position:absolute;left:0;top:100%;min-width:190px;margin:0;padding:6px;list-style:none;background:var(--sheet,var(--card,#fff));border:1px solid var(--line,#e6e6e6);border-radius:10px;box-shadow:0 12px 32px rgba(0,0,0,.14);display:none;z-index:60}
