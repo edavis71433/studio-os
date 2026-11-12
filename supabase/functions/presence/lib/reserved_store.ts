@@ -11,6 +11,8 @@ export const RESERVED_NAMES = {
   handoverKit: '__handover_kit__',        // builder list item 176: the client's hand-over kit (lib/handover_kit.ts)
   savedViews: '__saved_views__',          // sales review item 31
   sitePins: '__site_pins__',              // builder list item 45: each member's pinned sites (agency/sites.ts)
+  siteFolders: '__site_folders__',        // builder list item 176: the studio's folders on Sites and the sites in each (agency/site_folders.ts)
+  siteViews: '__site_views__',            // builder list item 176: the studio's saved views on Sites (agency/site_folders.ts)
   broadcastLists: '__broadcast_lists__',  // sales review items 31 + 39
   stageNames: '__stage_names__',          // sales review item 38
   stageChances: '__stage_chances__',      // sales review item 69: the chance each open stage closes
