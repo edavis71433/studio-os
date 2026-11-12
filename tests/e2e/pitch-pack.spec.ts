@@ -139,6 +139,21 @@ test.describe('Pitch pack — build and share (item 113)', () => {
     await expect(page.locator('.sub').first()).not.toContainText('nearby');
   });
 
+  test('item 211: how fast it shows on a phone, theirs from Google beside what ours weigh', async ({ page }) => {
+    const timed = { ...PACK, you: { ...PACK.you, summary: { ...PACK.you.summary, phone_lcp_ms: 4630, phone_lcp_status: 'poor' } }, ours: { typical_kb: 30, limit_kb: 100 } };
+    await page.route(`**/functions/v1/presence/sales/pack/${TOKEN}`, (r) => r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: timed }) }));
+    await page.goto(`/pitch.html?t=${TOKEN}`);
+    const card = page.locator('section.card').filter({ has: page.getByRole('heading', { name: 'How fast it shows on a phone' }) });
+    await expect(card).toContainText('On a phone, the main part of your homepage takes 4.6 seconds to show. Google counts over 4 seconds as slow.');
+    await expect(card).toContainText('A page we build weighs about 30 kB, and never more than 100 kB, so it shows quickly on a phone.');
+    // without Google's time (an older pack, or the check didn't run): only ours, never a made-up number
+    await page.route(`**/functions/v1/presence/sales/pack/${TOKEN}`, (r) => r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: PACK }) }));
+    await page.reload();
+    const plain = page.locator('section.card').filter({ has: page.getByRole('heading', { name: 'How fast it shows on a phone' }) });
+    await expect(plain).toContainText('A page we build weighs about 30 kB');
+    await expect(plain).not.toContainText('seconds to show');
+  });
+
   test('a dead or rebuilt link says so kindly', async ({ page }) => {
     await page.route('**/functions/v1/presence/sales/pack/**', (r) => r.fulfill({ status: 404, contentType: 'application/json', body: JSON.stringify({ error: 'not_found' }) }));
     await page.goto('/pitch.html?t=deadbeefdeadbeefdeadbeefdeadbeef');
