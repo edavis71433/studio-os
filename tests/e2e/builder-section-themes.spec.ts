@@ -146,7 +146,7 @@ test.describe('a section’s colours and layouts (builder items 49 and 118)', ()
     const pics = page.locator('#settingsPanel .ins-pic');
     expect(await pics.evaluateAll((n) => n.map((x) => (x as HTMLElement).dataset.pic))).toEqual(['cta:default', 'cta:card', 'width:normal', 'width:full']);
     await expect(page.locator('#settingsPanel .ins-pic[data-pic="cta:card"] i.k')).toHaveCount(1);   // the card's button is drawn
-    await page.locator('#settingsPanel .ins-tile').filter({ hasText: 'Card' }).click();
+    await page.locator('#settingsPanel .ins-live-tile').filter({ hasText: /^Card$/ }).click();   // item 224: the arrangements are live tiles (a sketch until drawn)
     await expect.poll(() => blocksWrite(writes)?.[2]?.variant, { timeout: 8000 }).toBe('card');
   });
 

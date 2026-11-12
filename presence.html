@@ -771,6 +771,30 @@ html.dc-zoomout .dp-stage:not(.dev-tablet):not(.dev-phone) .dp-frame iframe{heig
 html.dc-zoomout .dp-stage:not(.dev-tablet):not(.dev-phone) #dcZoomNote{display:block}
 .ins-tile.on .ins-tile-l{color:var(--plum);font-weight:600}
 .ins-tile:focus-visible .ins-tile-pic{outline:2px solid var(--plum);outline-offset:2px}
+/* item 224: the Layout tab draws this section's own words and photos in each arrangement it can take */
+.ins-live{display:flex;flex-direction:column;gap:10px}
+/* a tile is the picture and, under it, the button that names it; the button reaches over the whole
+   tile, so the picture takes the tap without a frame sitting inside a button */
+.ins-live-item{position:relative;display:flex;flex-direction:column;gap:6px;padding:5px 5px 8px;border:1px solid var(--hair);border-radius:14px;background:var(--dc-raised,var(--paper))}
+.ins-live-item:hover{border-color:var(--hair-2)}
+.ins-live-item:has(.ins-live-tile[aria-pressed=true]){border:2.5px solid var(--plum);padding:3.5px 3.5px 6.5px}
+.ins-live-item:has(.ins-live-tile:focus-visible){outline:2px solid var(--plum);outline-offset:2px}
+.ins-live-tile{display:block;width:100%;margin:0;padding:0;border:0;background:transparent;color:var(--ink);font:inherit;text-align:left;cursor:pointer}
+.ins-live-tile:focus-visible{outline:none}
+.ins-live-tile::after{content:"";position:absolute;inset:0;border-radius:inherit}
+.ins-live-win{position:relative;height:var(--h,88px);overflow:hidden;border-radius:9px;background:var(--paper)}
+.ins-live-win .ins-tile-pic{height:100%;box-sizing:border-box;border:0;border-radius:9px}
+.ins-live-win iframe{position:absolute;left:0;top:0;width:800px;height:var(--fh,600px);border:0;transform:scale(var(--k,.4));transform-origin:0 0;pointer-events:none;opacity:0;transition:opacity var(--dur) var(--ease)}
+.ins-live-win.on iframe{opacity:1}
+.ins-live-win.on .ins-tile-pic{visibility:hidden}
+.ins-live-name{display:flex;align-items:center;gap:8px;min-height:20px;padding:0 4px;font-size:12.5px;font-weight:500;color:var(--ink)}
+.ins-live-tile[aria-pressed=true] .ins-live-name{color:var(--plum);font-weight:600}
+.ins-live-chip{margin-left:auto;padding:2px 8px;border-radius:999px;background:var(--plum-soft);color:var(--plum);font-size:12px;font-weight:600}
+@media (prefers-reduced-motion:reduce){.ins-live-win iframe{transition:none}}
+.ins-pic[data-pic^="image_text:"]{grid-template-columns:1fr 1fr;grid-template-rows:repeat(3,1fr);column-gap:8px;align-items:center}
+.ins-pic[data-pic^="image_text:"] i.p{grid-row:1/4;grid-column:1;align-self:stretch;border-radius:4px}
+.ins-pic[data-pic="image_text:right"] i.p{grid-column:2}
+.ins-pic[data-pic^="image_text:"] i:not(.p){height:4px}
 .ins-swatches{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
 .ins-sw{width:32px;height:32px;border-radius:50%;border:1px solid var(--hair-2);cursor:pointer;padding:0;flex:none;position:relative}
 .ins-sw.on{box-shadow:0 0 0 2px var(--sheet),0 0 0 4px var(--plum)}
@@ -12333,18 +12357,18 @@ function wLook(idx, o) { const p = BLOCKS_WORK[idx]; if (p && p.look) o.look = p
 // NO `variant` key, so untouched sections stay byte-identical.
 const BLOCK_VARIANT_OPTS = {
   reviews_wall: [["Cards", ""], ["Big quotes", "quotes"], ["Compact strip", "strip"]],
-  accordion: [["Accordion", ""], ["Open Q&A columns", "two-column"]],
+  accordion: [["Accordion", ""], ["Open, in two columns", "two-column"]],
   cta: [["Banner", ""], ["Card", "card"]],
   pricing: [["Cards", ""], ["Price list", "list"]],
-  gallery: [["Grid", ""], ["Masonry", "masonry"], ["Filmstrip", "filmstrip"]],
+  gallery: [["Grid", ""], ["Mosaic", "masonry"], ["Filmstrip", "filmstrip"]],
 };
 // A "Style" pill row inside the block editor (reuses the Design Studio pillRow).
 // Writes block.variant into the working copy — saved by the existing "Save sections".
 function blockVariantRow(idx, blk, sub) {
+  if (sub.classList && sub.classList.contains("ins-pane")) { insLiveLayouts(sub, idx, blk); return; }   // the inspector: each arrangement drawn live (item 224)
   const opts = BLOCK_VARIANT_OPTS[blk && blk.type]; if (!opts) return;
   const isOn = (o) => String((BLOCKS_WORK[idx] && BLOCKS_WORK[idx].variant) || "") === o[1];
   const pick = (o) => { const b = { ...BLOCKS_WORK[idx] }; if (o[1]) b.variant = o[1]; else delete b.variant; BLOCKS_WORK[idx] = b; renderBlocksCard(); dcLiveFromPanel(); };
-  if (sub.classList && sub.classList.contains("ins-pane")) { insTiles(sub, "Layout", opts, isOn, pick, (o) => blk.type + ":" + (o[1] || "default")); return; }   // the inspector: each layout drawn as itself
   pillRow(sub, "Style", opts, isOn, pick);
 }
 // A calm, collapsed "Look of this section" control row — plain words, smart defaults,
@@ -12863,8 +12887,11 @@ function renderBlocksCard() {
       const commit = () => { const o = { type: "image_text", title: ti.value.trim(), image_id: BLOCKS_WORK[idx].image_id || undefined, body: ta.value.trim(), side: side.value === "right" ? "right" : "left" }; const L = bl.value.trim(), U = bu.value.trim(); if (L && U) o.button = { label: L, url: U }; BLOCKS_WORK[idx] = wLook(idx, o); };
       [ta, side, bl, bu].forEach((inp) => inp.addEventListener("change", commit));
       pick.addEventListener("click", () => { commit(); openPicker((id) => { BLOCKS_WORK[idx].image_id = id || undefined; renderBlocksCard(); }); });
-      picRow.appendChild(pick); sub.appendChild(picRow); sub.append(ta, aiField(ta, {}), sideWrap, bl, bu);
-      sub.appendChild(el("div", "hint", "On phones the image and text stack automatically."));
+      // item 224: in the inspector the photo's side is an arrangement on the Layout tab; the
+      // select stays behind the scenes so a Content edit keeps the side that was picked there
+      const inPane = sub.classList && sub.classList.contains("ins-pane");
+      picRow.appendChild(pick); sub.appendChild(picRow); sub.append(ta, aiField(ta, {}), ...(inPane ? [] : [sideWrap]), bl, bu);
+      sub.appendChild(el("div", "hint", inPane ? "Which side the photo sits on is under Layout. On phones the image and text stack automatically." : "On phones the image and text stack automatically."));
     } else if (def.dividerSimple) {
       const styWrap = el("label", "hint", "Style "); const sty = el("select");
       [["line", "A line"], ["space", "Empty space"]].forEach(([v, l]) => { const o = el("option", null, l); o.value = v; if ((blk.style || "line") === v) o.selected = true; sty.appendChild(o); });
@@ -14479,6 +14506,7 @@ function insTab(name) {
   insSyncSeg();
   setTimeout(dcColourAids, 0);   // the tab's panes swap first
   document.querySelectorAll("#blocksCard .ins-pane").forEach((p) => { p.hidden = p.dataset.pane !== INS_TAB; });
+  if (INS_TAB === "layout") insLiveWake();   // item 224: the arrangements' pictures are asked for when Layout shows
 }
 function insPanes(box) {
   const panes = {};
@@ -14580,6 +14608,7 @@ const INS_PIC_PARTS = {
   "accordion:default": 3, "accordion:two-column": 10,
   "cta:default": ["", "k"], "cta:card": ["", "", "k"],
   "pricing:default": 3, "pricing:list": 3,
+  "image_text:left": ["p", "h", "", ""], "image_text:right": ["p", "h", "", ""],
   "width:normal": 1, "width:full": 1,
 };
 function insPic(key) {
@@ -14587,6 +14616,128 @@ function insPic(key) {
   const pic = el("span", "ins-pic"); pic.dataset.pic = key; pic.setAttribute("aria-hidden", "true");
   (Array.isArray(parts) ? parts : Array.from({ length: parts }, () => "")).forEach((cls) => pic.appendChild(el("i", cls || null)));
   return pic;
+}
+// ── Item 224: the Layout tab draws this section's own words and photos in each arrangement ──
+// A section that can be arranged more than one way (BLOCK_VARIANT_OPTS, and a photo beside words
+// on either side) shows each way as a small picture of itself: the server draws the section that
+// way (POST /preview/section, as the canvas's live redraw does), the drawing goes in a little frame
+// with the canvas's own styles, and the frame is shrunk to the tile. The tile is the button; the
+// frame never takes a click, the focus or a script. Until a picture comes, and when it can't
+// (offline, a server from before the route), the tile keeps its sketch. Pictures are kept by what
+// they show, so the card's next redraw or a tab switch finds them at once.
+const IMAGE_TEXT_SIDES = [["Photo on the left", "left"], ["Photo on the right", "right"]];
+const LIVE_PIC_W = 800;              // each arrangement is drawn this wide, then shrunk to its tile
+const LIVE_PIC_AGE = 10 * 60e3;      // a drawing's photos have signed addresses: draw it again after a while
+const LIVE_PICS = new Map();         // what a picture shows → { html, at }, or the promise of one on its way
+let LIVE_PIC_RUNNING = 0;
+const LIVE_PIC_QUEUE = [];           // a few asks at a time; the rest wait their turn
+const LIVE_PIC_RO = typeof ResizeObserver === "function" ? new ResizeObserver((es) => es.forEach((e) => livePicFit(e.target))) : null;
+const LIVE_PIC_WHAT = { reviews_wall: "reviews", gallery: "photos", pricing: "prices", accordion: "questions", cta: "words", image_text: "photo and words" };
+// the same JSON whatever order a block's keys were written in, so one picture has one name
+const stableJson = (v) => JSON.stringify(v, (k, x) => (x && typeof x === "object" && !Array.isArray(x) ? Object.keys(x).sort().reduce((o, kk) => { o[kk] = x[kk]; return o; }, {}) : x));
+// the ways one section can be arranged: the choices, which one it has, and the section each way
+function insArrangements(blk) {
+  if (blk && blk.type === "image_text") return { opts: IMAGE_TEXT_SIDES, isOn: (o) => (blk.side === "right" ? "right" : "left") === o[1], with: (o) => ({ ...blk, side: o[1] }), pic: (o) => "image_text:" + o[1] };
+  const opts = blk && BLOCK_VARIANT_OPTS[blk.type]; if (!opts) return null;
+  return { opts, isOn: (o) => String(blk.variant || "") === o[1], with: (o) => { const b = { ...blk }; if (o[1]) b.variant = o[1]; else delete b.variant; return b; }, pic: (o) => blk.type + ":" + (o[1] || "default") };
+}
+function livePicAsk(job) {
+  return new Promise((resolve, reject) => {
+    const go = () => { LIVE_PIC_RUNNING++; job().then(resolve, reject).finally(() => { LIVE_PIC_RUNNING--; const next = LIVE_PIC_QUEUE.shift(); if (next) next(); }); };
+    if (LIVE_PIC_RUNNING < 3) go(); else LIVE_PIC_QUEUE.push(go);
+  });
+}
+// one arrangement of one section, drawn by the server from the page's list as it stands
+function livePicDraw(idx, b, key) {
+  const had = LIVE_PICS.get(key);
+  if (had && (had.then || Date.now() - had.at < LIVE_PIC_AGE)) return had.then ? had : Promise.resolve(had);
+  const list = JSON.parse(JSON.stringify(BLOCKS_WORK)); list[idx] = b;
+  const p = livePicAsk(() => api("POST", "/preview/section", { blocks: list, index: idx })).then((r) => {
+    const html = r && r.data && r.data.html;
+    if (typeof html !== "string" || !html.trim()) throw new Error("no drawing");   // a server from before the route, or a section that draws nothing
+    const got = { html, at: Date.now() };
+    LIVE_PICS.set(key, got);
+    return got;
+  });
+  p.catch(() => { if (LIVE_PICS.get(key) === p) LIVE_PICS.delete(key); });   // the next card asks again
+  LIVE_PICS.set(key, p);
+  if (LIVE_PICS.size > 60) LIVE_PICS.delete(LIVE_PICS.keys().next().value);   // the oldest go first
+  return p;
+}
+// a small page holding just the section, with the canvas's own styles (never the editor's tools)
+function livePicDoc(doc, html) {
+  const keep = (n, names) => names.filter((a) => n && n.hasAttribute(a)).map((a) => " " + a + '="' + esc(n.getAttribute(a)) + '"').join("");
+  const styles = [...doc.querySelectorAll('head style, head link[rel~="stylesheet"]')].filter((n) => !/^dds-dc-/.test(n.id || "")).map((n) => n.outerHTML).join("");
+  return "<!doctype html><html" + keep(doc.documentElement, ["lang", "class"]) + '><head><meta charset="utf-8">' + styles
+    + "<style>html,body{overflow:hidden!important}body{margin:0!important;padding-top:0!important;padding-bottom:0!important;min-height:0!important}</style></head><body"
+    + keep(doc.body, ["class"]) + '><main id="main"' + keep(doc.getElementById("main"), ["class"]) + ">" + html + "</main></body></html>";
+}
+function livePicPaint(win, html) {
+  const doc = dcFrameDoc(); if (!doc || !doc.head || !win.isConnected) return;   // no canvas to take the styles from: the sketch stays
+  const old = win.querySelector("iframe"); if (old) old.remove();
+  const fr = document.createElement("iframe");
+  fr.setAttribute("sandbox", "allow-same-origin");   // nothing in it runs; the tile only reads its height
+  fr.setAttribute("aria-hidden", "true"); fr.setAttribute("tabindex", "-1"); fr.inert = true; fr.title = "A small picture of this arrangement";
+  fr.addEventListener("load", () => {
+    let h = 0;
+    try { const m = fr.contentDocument && fr.contentDocument.getElementById("main"); h = m ? Math.ceil(m.getBoundingClientRect().height) : 0; } catch (_) { /* unreadable: keep the sketch */ }
+    if (h < 8) return;
+    win.dataset.fh = String(h); win.style.setProperty("--fh", h + "px");
+    livePicFit(win); win.classList.add("on");
+  }, { once: true });
+  fr.srcdoc = livePicDoc(doc, html);
+  win.appendChild(fr);
+}
+// the drawing shrunk to the tile's width, showing at most its first 150 pixels
+function livePicFit(win) {
+  if (!win.isConnected) { if (LIVE_PIC_RO) LIVE_PIC_RO.unobserve(win); return; }   // a card drawn again lets its old tiles go
+  const w = win.clientWidth, h = Number(win.dataset.fh) || 0; if (!w || !h) return;
+  const k = w / LIVE_PIC_W;
+  win.style.setProperty("--k", String(Math.round(k * 1000) / 1000));
+  win.style.setProperty("--h", Math.round(Math.max(64, Math.min(150, h * k))) + "px");
+}
+// ask for the pictures of the tiles under `scope` that haven't asked yet (only while Layout shows)
+function insLiveStart(scope) {
+  if (!scope) return;
+  scope.querySelectorAll(".ins-live-win:not([data-asked])").forEach((win) => {
+    const job = win._live; if (!job) return;
+    win.dataset.asked = "1";
+    if (LIVE_PIC_RO) LIVE_PIC_RO.observe(win);
+    livePicDraw(job.idx, job.b, job.key).then((got) => { if (win.isConnected) livePicPaint(win, got.html); }).catch(() => { /* the sketch stays */ });
+  });
+}
+function insLiveWake() { insLiveStart(document.querySelector('#blocksCard .ins-pane[data-pane="layout"]:not([hidden])')); }
+function insLiveLayouts(host, idx, blk) {
+  const arr = insArrangements(blk); if (!arr) return;
+  const wrap = el("div", "ins-field"); wrap.dataset.group = "arrangement";
+  wrap.appendChild(el("div", "ins-lbl", "Layout"));
+  wrap.appendChild(el("p", "ins-says", "Your own " + (LIVE_PIC_WHAT[blk.type] || "words") + ", drawn each way this section can go. Tap one to use it; Undo brings the last one back."));
+  const list = el("div", "ins-live"); wrap.appendChild(list);
+  const pick = (o) => {
+    const now = insArrangements(BLOCKS_WORK[idx]);   // from the section as it is now, with any edit made since this card was drawn
+    if (!now || now.isOn(o)) return;
+    BLOCKS_WORK[idx] = now.with(o);
+    renderBlocksCard(); dcLiveFromPanel();
+  };
+  arr.opts.forEach((o) => {
+    const on = arr.isOn(o);
+    const item = el("div", "ins-live-item");
+    const win = el("div", "ins-live-win"), sketch = el("div", "ins-tile-pic"), pic = insPic(arr.pic(o));
+    win.setAttribute("aria-hidden", "true");
+    if (pic) sketch.appendChild(pic);
+    win.appendChild(sketch);
+    const shown = arr.with(o);
+    win._live = { idx, b: shown, key: DC_PAGE + "|" + idx + "|" + stableJson(shown) };
+    const b = el("button", "ins-live-tile"); b.type = "button"; b.setAttribute("aria-pressed", String(on));
+    const nm = el("span", "ins-live-name"); nm.appendChild(el("span", null, o[0]));
+    if (on) { const chip = el("span", "ins-live-chip", "In use"); chip.setAttribute("aria-hidden", "true"); nm.appendChild(chip); }   // pressed already says it
+    b.appendChild(nm);
+    b.addEventListener("click", () => pick(o));
+    item.append(win, b);
+    list.appendChild(item);
+  });
+  host.insertBefore(wrap, host.firstChild);   // the arrangement leads the tab, as drawn
+  if (INS_TAB === "layout") insLiveStart(list);
 }
 // ── Item 118: the canvas names each section's colour theme while colours are being chosen ──
 // While Styles is on Colours, or one section's card is on Style, every section on the page
