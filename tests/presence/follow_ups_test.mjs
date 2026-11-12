@@ -108,7 +108,7 @@ const ago = (d) => new Date(NOW - d * DAY).toISOString();
   ok('settings: six recipes, two of them a client\'s too', (st.match(/\{ key: '(ack|fu|inv|exp|rev|deal)', title:/g) || []).length === 6 && (st.match(/row: 'row-(ack|fu)', scoped: true \}/g) || []).length === 2);
   ok('settings: each new switch saves its own column', ["flip('sw-fu', 'enquiry_followups')", "flip('sw-inv2', 'invoice_overdue_repeat')", "flip('sw-exp', 'quote_expiry_reminders')"].every((x) => st.includes(x)));
   const content = read('supabase/functions/presence/routes/content.ts');
-  ok('content.ts: PUT /settings takes the 0175 fields, and reads step down past them', /enquiry_followup_1_days: \{ kind: 'int', min: 1, max: 14 \}/.test(content) && /const OPTIONAL_SETTINGS_COLS = \[RECIPE_SETTINGS_COLS,/.test(content));
+  ok('content.ts: PUT /settings takes the 0175 fields, and reads step down past them', /enquiry_followup_1_days: \{ kind: 'int', min: 1, max: 14 \}/.test(content) && /const OPTIONAL_SETTINGS_COLS = \[(?:[A-Z_]+, )*RECIPE_SETTINGS_COLS,/.test(content));
   const inbox = read('inbox.html');
   ok('inbox: the follow-ups show on the enquiry, with Stop follow-ups', /function followupHtml\(l\)/.test(inbox) && /\$\{followupHtml\(l\)\}/.test(inbox) && /api\('\/forms\/inbox\/'\+encodeURIComponent\(it\.lead_id\),'POST',\{followups:'off'\}\)/.test(inbox));
   const life = read('supabase/functions/presence/commerce/lifecycle.ts');

@@ -757,6 +757,9 @@ const boardCanMove=(from,to)=>from!==to&&to!=='won'&&(BOARD_NEXT[from]||[]).incl
 const PATH_STEPS=['lead','qualified','proposal','contract'];
 // calm, human labels for the deal's history strip (the raw event kinds stay backstage)
 const EVT_LABEL={created:'Deal created',stage_change:'Moved stage',note:'Note added',proposal_sent:'Proposal sent',proposal_decided:'Proposal decision',contract_sent:'Agreement sent',contract_signed:'Agreement signed',invoice_sent:'Invoice sent',invoice_paid:'Invoice paid',converted:'Converted to project',proposal_deleted:'Draft proposal removed',contract_deleted:'Draft agreement removed',invoice_voided:'Invoice voided'};
+// sales item 88: why a client declined (mirrors lib/agreement_layout.ts DECLINE_REASONS and declineWords by hand)
+const DECLINE_REASONS={price:'The price',timing:'The timing',scope:'What’s included',elsewhere:'We went another way'};
+function declineWords(reason,note){const r=DECLINE_REASONS[reason]||'';const n=String(note==null?'':note).trim();if(r&&n)return r+': “'+n+'”';return r||(n?'“'+n+'”':'');}
 // item 69: the client opened a document's page (mirrors crm/deal_activity.ts openedLine by hand)
 const OPENED_WHAT={proposal:'proposal',agreement:'agreement',invoice:'invoice',deposit:'deposit request',estimate:'estimate'};
 function evtLabel(e){
@@ -764,8 +767,10 @@ function evtLabel(e){
   if(e.kind==='stage_change'&&e.to_stage)return 'Moved to '+stageLabel(e.to_stage);
   // An accept that backfilled the deal value says so — the price change is part
   // of the record (value_backfilled_cents rides the proposal_decided detail).
-  if(e.kind==='proposal_decided'&&d.decision)return d.decision==='accepted'?('Proposal accepted'+(d.value_backfilled_cents?' — deal value set to '+money(d.value_backfilled_cents):'')):'Proposal declined';
-  if(e.kind==='contract_signed'&&d.signer)return 'Agreement signed — '+d.signer;
+  // sales item 88 (mirrors crm/deal_activity.ts): a decline says why; a signature names the countersigner; a question reads as one
+  if(e.kind==='proposal_decided'&&d.decision)return d.decision==='accepted'?('Proposal accepted'+(d.value_backfilled_cents?' — deal value set to '+money(d.value_backfilled_cents):'')):'Proposal declined'+(declineWords(d.reason,d.note)?' — '+declineWords(d.reason,d.note):'');
+  if(e.kind==='contract_signed'&&d.signer)return 'Agreement signed — '+d.signer+(d.countersigned_by?', countersigned by '+d.countersigned_by:'');
+  if(e.kind==='client_question')return 'They asked'+(d.on==='contract'?' about the agreement':d.on==='estimate'?' about the estimate':' about the proposal')+(d.text?': “'+String(d.text).slice(0,140)+(String(d.text).length>140?'…':'')+'”':'');
   if(e.kind==='invoice_sent'&&d.amount_cents&&d.recurring_id)return 'Recurring invoice sent — '+money(d.amount_cents)+(d.period?' ('+d.period+')':'');   // item 47
   if(e.kind==='invoice_sent'&&d.amount_cents)return (d.purpose==='deposit'?'Deposit requested':'Invoice sent')+' — '+money(d.amount_cents);
   if(e.kind==='invoice_paid'&&d.amount_cents)return (d.retainer?'Retainer payment':d.purpose==='deposit'?'Deposit paid':'Invoice paid')+' — '+money(d.amount_cents);
@@ -2934,6 +2939,8 @@ async function openDeal(id){
       const vbits=[];
       if(p.first_viewed_at)vbits.push(svgi('eye')+' Opened '+ago(p.first_viewed_at)); else if(p.status==='sent')vbits.push('Not opened yet');
       if(p.expires_at){const exp=new Date(p.expires_at);vbits.push(exp.getTime()<Date.now()?svgi('hourglass')+' Expired':'Expires '+exp.toLocaleDateString());}
+      // sales item 88: a decline says what would make it a yes (the client's own words, from their page)
+      if(p.status==='declined'&&declineWords(p.decided_reason,p.decided_note))vbits.push('Why: '+esc(declineWords(p.decided_reason,p.decided_note)));
       const vnote=(vbits.length&&(p.status==='sent'||p.status==='declined'||p.status==='accepted'))?`<div class="mut" style="font-size:12px;margin-top:2px">${vbits.join(' · ')}</div>`:'';
       return `<div class="row2 lr"><span class="mut">${esc(p.title||'Proposal')}${ver} — ${money0(T.total)} ${chip}</span><span>${act}${revise}<button class="btn ghost" data-doc-prop="${p.id}" title="Open a branded, printable copy (save as PDF)">View / print</button><button class="btn ghost" data-tpl-prop="${p.id}" title="Save these line items to reuse on future deals">Save as template</button>${del}</span>${vnote}${(p.status==='sent'&&!superseded)?linkNote('proposal',p.id,'link'):''}</div>`;
     }).join('')||'<div class="mut">No proposals yet.</div>';
@@ -2973,7 +2980,7 @@ async function openDeal(id){
     const cons=(data.contracts||[]).map(k=>{
       const signed=k.status==='signed';
       const chip=signed?`<span class="stage won">Signed ✓</span>`:k.status==='sent'?`<span class="stage">Sent — awaiting signature</span>`:`<span class="stage lost">Draft — not sent yet</span>`;
-      const meta=signed&&k.signer_name?` — signed by ${esc(k.signer_name)}${k.signed_at?(' on '+esc(new Date(k.signed_at).toLocaleDateString())):''}`:'';
+      const meta=signed&&k.signer_name?` — signed by ${esc(k.signer_name)}${k.countersigned_name?' and by '+esc(k.countersigned_name)+' for you':''}${k.signed_at?(' on '+esc(new Date(k.signed_at).toLocaleDateString())):''}`:'';   // sales item 88: both signatures
       const act=k.status==='draft'?(SEND_BOTH?'':`<button class="${fillIf(BILL_PRIMARY==='con:'+k.id)}" data-send-contract="${k.id}">Send${forWhom} for signature →</button> `):k.status==='sent'?`<button class="btn ghost" data-link-contract="${k.id}">Copy signing link</button> `:'';
       const docBtn=`<button class="btn ghost" data-doc-con="${k.id}" title="Open a branded, printable copy (save as PDF)">${signed?'View / print signed copy':'View / print'}</button>`;
       // Same rule as the proposal, and it matters more here: sent means someone

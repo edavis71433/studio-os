@@ -161,10 +161,22 @@ test.describe('sign.html — one page from proposal to deposit', () => {
     await expect(page.locator('#sign')).toBeEnabled();
   });
 
+  test('sales item 88: a name without an email is refused before any request goes out', async ({ page }) => {
+    const served = await serve(page, { start: 'accepted' });
+    await open(page);
+    await expect(page.locator('label[for="em"]')).toHaveText('Your email, for your signed copy');
+    await page.locator('#nm').fill('Sam Rivera');
+    await page.locator('#sign').click();
+    await expect(page.locator('#softErr')).toHaveText('Type your email too, so your signed copy can reach you.');
+    await expect(page.locator('#em')).toBeFocused();
+    expect(served.posts).toEqual([]);
+  });
+
   test('a stale version (409) keeps the agreement on screen and swaps the action for "Load the latest version"', async ({ page }) => {
     await serve(page, { start: 'accepted', sign: { status: 409, body: { error: 'version_mismatch', message: 'This agreement was updated — please reload the latest version before signing.' } } });
     await open(page);
     await page.locator('#nm').fill('Sam Rivera');
+    await page.locator('#em').fill('sam@example.com');   // sales item 88: the signer's email is needed
     await page.locator('#sign').click();
     await expect(page.locator('#softErr')).toContainText('reload the latest version');
     await expect(page.locator('#reloadBtn')).toBeVisible();
@@ -176,6 +188,7 @@ test.describe('sign.html — one page from proposal to deposit', () => {
     await serve(page, { start: 'accepted', sign: { status: 409, body: { error: 'accept_first', message: 'Accept the proposal first — the agreement unlocks right after.' } } });
     await open(page);
     await page.locator('#nm').fill('Sam Rivera');
+    await page.locator('#em').fill('sam@example.com');   // sales item 88: the signer's email is needed
     await page.locator('#sign').click();
     await expect(page.locator('#softErr')).toHaveText('Accept the proposal first — the agreement unlocks right after.');
     await expect(page.locator('#sign')).toBeEnabled();
@@ -285,6 +298,7 @@ test.describe('sign.html — one page from proposal to deposit', () => {
     await open(page);
     await expect(page.locator('.steps')).toHaveCount(0);
     await page.locator('#nm').fill('Sam Rivera');
+    await page.locator('#em').fill('sam@example.com');   // sales item 88: the signer's email is needed
     await page.locator('#sign').click();
     await expect(page.locator('.paybtn')).toHaveAttribute('href', STRIPE);
     await expect(page.locator('.cert')).toContainText('Signature certificate');

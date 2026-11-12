@@ -10,6 +10,7 @@ import {
   type DocBrand, type DocContext, type DocKind,
 } from './documents.ts';
 import { splitLineItems, computeProposalTotals, subtotalOf } from './sales_lifecycle.ts';
+import { agreementBlocks } from './agreement_layout.ts';   // sales item 88: the agreement as a document
 
 const INK: Rgb = [0.106, 0.082, 0.145];
 const SOFT: Rgb = [0.42, 0.392, 0.471];
@@ -219,12 +220,37 @@ export function contractPdf(c: any, brandIn?: Partial<DocBrand> | null, ctx?: Do
   f.para(title, { font: 'B', size: 16, lead: 22 });
   f.para(signed ? 'Executed copy: this is the signed document of record.' : c?.status === 'sent' ? 'Sent for signature, not yet signed.' : 'Draft, not yet sent for signature.', { size: 9.5, color: SOFT });
   f.gap(10); f.rule(); f.gap(12);
-  f.para(String(c?.body || ''), { size: 10, lead: 15 });
+  // sales item 88: a title, numbered headings, paragraphs and list items (lib/agreement_layout.ts)
+  const accent = rgb(brand.accentDark, rgb(brand.accent));
+  for (const b of agreementBlocks(c?.body)) {
+    if (b.t === 'title') { f.para(b.text, { font: 'B', size: 12.5, lead: 18, color: accent }); f.gap(4); continue; }
+    if (b.t === 'heading') { f.need(44); f.gap(6); f.para((b.n ? b.n + '. ' : '') + b.text, { font: 'B', size: 11, lead: 16 }); f.gap(2); continue; }
+    if (b.t === 'item') { f.para(b.mark + '  ' + b.text, { size: 10, lead: 15, indent: 14 }); continue; }
+    for (const line of b.text.split('\n')) f.para(line, { size: 10, lead: 15 });
+    f.gap(5);
+  }
   f.gap(10);
   if (signed) {
+    // both signatures, side by side: the client's as they typed it, the studio's added at the same moment
+    const tz = ctx?.tz || null;
+    const clientName = String(ctx?.billTo?.company || ctx?.billTo?.name || '').trim();
+    const cols: Array<{ k: string; name: string; who: string }> = [{ k: clientName ? `For ${clientName}` : 'For the client', name: String(c?.signer_name || ''), who: [c?.signer_email ? String(c.signer_email) : '', dayLabel(c?.signed_at, tz)].filter(Boolean).join(' · ') }];
+    if (c?.countersigned_name) cols.push({ k: `For ${brand.name}`, name: String(c.countersigned_name), who: [c?.countersigned_title ? String(c.countersigned_title) : '', `${dayLabel(c?.countersigned_at || c?.signed_at, tz)} (countersigned)`].filter(Boolean).join(' · ') });
+    f.need(84); f.rule(); f.gap(14);
+    f.para('SIGNATURES', { font: 'B', size: 8.5, color: SOFT });
+    const colW = (W - 24) / 2, top = f.y;
+    cols.forEach((col, i) => {
+      const x = L + i * (colW + 24);
+      pdf.text(x, top - 10, col.k.toUpperCase(), { font: 'B', size: 8, color: SOFT });
+      pdf.text(x, top - 32, wrapText(col.name, 'B', 15, colW)[0] || '', { font: 'B', size: 15, color: accent });
+      pdf.line(x, top - 38, x + colW, top - 38, INK, 0.75);
+      pdf.text(x, top - 50, wrapText(col.who, 'R', 8.5, colW)[0] || '', { size: 8.5, color: SOFT });
+    });
+    f.y = top - 66;
     const ev = (c?.signed_evidence && typeof c.signed_evidence === 'object') ? c.signed_evidence : {};
     const rows: string[] = [`Signed by: ${String(c?.signer_name || '')}`];
     if (c?.signer_email) rows.push(`Signer email: ${String(c.signer_email)}`);
+    if (c?.countersigned_name) rows.push(`Countersigned by: ${String(c.countersigned_name)}${c?.countersigned_title ? ', ' + String(c.countersigned_title) : ''} for ${brand.name}`);
     rows.push(`Signed at: ${utcStamp(c?.signed_at || ev?.at)}`);
     rows.push(`Document fingerprint (SHA-256): ${String(c?.content_hash || ev?.hash || '')}`);
     if (ev?.ip_hash) rows.push(`Signing evidence (hashed IP): ${String(ev.ip_hash)}`);

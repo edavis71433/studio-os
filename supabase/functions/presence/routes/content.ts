@@ -156,6 +156,8 @@ const SETTINGS_FIELDS: Record<string, FieldRule> = {
   enquiry_followup_1_days: { kind: 'int', min: 1, max: 14 }, enquiry_followup_2_days: { kind: 'int', min: 3, max: 30 },
   enquiry_followup_1_message: { max: 1200 }, enquiry_followup_2_message: { max: 1200 },
   invoice_overdue_repeat: { kind: 'bool' }, quote_expiry_reminders: { kind: 'bool' },
+  // sales item 88 (0176): who signs agreements for the studio — added beside the client's signature
+  signs_as_name: { max: 120 }, signs_as_title: { max: 80 },
   visit_counter: { kind: 'bool' },   // list item 61 (0139): the published site's visit counter, on unless switched off
   ai_crawlers: { kind: 'bool' },     // list item 175 (0159): let AI assistants read the published site, on unless switched off
   search_hidden: { kind: 'bool' }, llms_txt: { max: 4000 },   // list item 124 (0171): hide the site from search; the owner's llms.txt
@@ -415,9 +417,11 @@ const POPUP_SETTINGS_COLS = 'popup';
 const SEARCH_SETTINGS_COLS = 'search_hidden,llms_txt';
 // The 0175 columns (sales item 87's recipes).
 const RECIPE_SETTINGS_COLS = 'auto_ack_message,enquiry_followups,enquiry_followup_1_days,enquiry_followup_2_days,enquiry_followup_1_message,enquiry_followup_2_message,invoice_overdue_repeat,quote_expiry_reminders';
+// The 0176 columns (sales item 88: who signs agreements for the studio).
+const SIGNER_SETTINGS_COLS = 'signs_as_name,signs_as_title';
 // Newest apply pack first. A database without a pack's columns 400s the widened select,
 // so a read or a save steps down one pack at a time; Settings never goes dark ahead of one.
-const OPTIONAL_SETTINGS_COLS = [RECIPE_SETTINGS_COLS, SEARCH_SETTINGS_COLS, POPUP_SETTINGS_COLS, CRAWLER_SETTINGS_COLS, AD_SETTINGS_COLS, VISIT_SETTINGS_COLS, REVIEW_SETTINGS_COLS, AUTOMATION_SETTINGS_COLS];
+const OPTIONAL_SETTINGS_COLS = [SIGNER_SETTINGS_COLS, RECIPE_SETTINGS_COLS, SEARCH_SETTINGS_COLS, POPUP_SETTINGS_COLS, CRAWLER_SETTINGS_COLS, AD_SETTINGS_COLS, VISIT_SETTINGS_COLS, REVIEW_SETTINGS_COLS, AUTOMATION_SETTINGS_COLS];
 function selectSteps(select: string): string[] {
   const out = [select];
   let s = select;
@@ -431,7 +435,7 @@ function selectSteps(select: string): string[] {
 const SETTINGS_CFG = {
   table: 'presence_settings', entityType: 'settings', noun: 'site settings', fields: SETTINGS_FIELDS,
   select: 'site_id,category_order,cover_media_id,logo_media_id,og_media_id,announcement_text,announcement_url,announcement_expires_at,industry_key,google_site_verification,bing_site_verification,hero_layout,nav_style,sections_hidden,sections_order,footer_hours,footer_social,pages_noindex,page_seo,blocks,pages,nav,updated_at'
-    + ',' + AUTOMATION_SETTINGS_COLS + ',' + REVIEW_SETTINGS_COLS + ',' + VISIT_SETTINGS_COLS + ',' + AD_SETTINGS_COLS + ',' + CRAWLER_SETTINGS_COLS + ',' + POPUP_SETTINGS_COLS + ',' + SEARCH_SETTINGS_COLS + ',' + RECIPE_SETTINGS_COLS,
+    + ',' + AUTOMATION_SETTINGS_COLS + ',' + REVIEW_SETTINGS_COLS + ',' + VISIT_SETTINGS_COLS + ',' + AD_SETTINGS_COLS + ',' + CRAWLER_SETTINGS_COLS + ',' + POPUP_SETTINGS_COLS + ',' + SEARCH_SETTINGS_COLS + ',' + RECIPE_SETTINGS_COLS + ',' + SIGNER_SETTINGS_COLS,
   conflict: 'site_id', summary: 'Updated site settings',
 } as const;
 
