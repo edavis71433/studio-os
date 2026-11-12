@@ -197,7 +197,7 @@ const MEMBER_WRITES: Array<[MemberWriteNeed, string[]]> = [
     `POST /sales/prospects/${ID}/(convert|draft|pack)`,   // item 112: start the deal; a draft only returns words — nothing sends; item 113: pack builds a share link
     `PATCH /sales/prospects/${ID}`,
     `PATCH /sales/(contacts|deals|deal-tasks)/${ID}`,
-    `POST /sales/contacts/${ID}/restore`,
+    `POST /sales/(contacts|deals)/${ID}/restore`,   // sales item 83: bringing back a deleted deal loses nothing, like a contact
     'PUT /sales/services',
     `POST /sales/deals/${ID}/(stage|activity|tasks|proposals|contracts|convert|resend-invite|invoice|schedule|retainer|send|estimates|recurring)`,
     `POST /sales/estimates/${ID}/(send|proposal|invoice)`,   // sales review item 47: send an estimate, or turn it into a proposal or an invoice (drafts)

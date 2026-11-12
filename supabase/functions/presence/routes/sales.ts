@@ -213,6 +213,65 @@ export async function handleSalesContactRestore(site: SiteRow, id: string, cors:
   return json({ data: { ok: true, restored: true, id: row.id, name: String(row.name || row.email || 'Contact') } }, 200, cors);
 }
 
+// ═══ RECENTLY DELETED (sales item 83) ═══
+// One place for what was deleted in the last 30 days: deals, contacts and to-dos. Each was a
+// soft delete (deleted_at), so bringing one back is that same one-column write the other way.
+// A contact merged into another is left out: its own Undo (unmerge) puts it back with what moved.
+// Every read is best-effort and says when it failed (never a false "nothing deleted").
+export const DELETED_DAYS = 30;
+export async function handleSalesDeleted(site: SiteRow, cors: Record<string, string>): Promise<Response> {
+  const since = encodeURIComponent(new Date(Date.now() - DELETED_DAYS * 86_400_000).toISOString());
+  const failed: string[] = [];
+  const read = async (key: string, ...paths: string[]): Promise<any[]> => {
+    for (const p of paths) { const r = await svc(p).catch(() => null); if (r && r.ok) return rows(r); if (r && r.status !== 400) break; }
+    failed.push(key); return [];
+  };
+  const labelsP = loadStageLabels(site.id).catch(() => null);
+  const [deals, contacts, todos] = await Promise.all([
+    read('deals', `presence_deals?site_id=eq.${site.id}&deleted_at=gte.${since}&select=id,title,stage,expected_value_cents,contact_id,deleted_at&order=deleted_at.desc&limit=200`),
+    // merged_into lands with APPLY-0168; before it, every removed contact is a plain delete
+    read('contacts', `presence_contacts?site_id=eq.${site.id}&deleted_at=gte.${since}&merged_into=is.null&select=id,name,email,company,deleted_at&order=deleted_at.desc&limit=200`,
+      `presence_contacts?site_id=eq.${site.id}&deleted_at=gte.${since}&select=id,name,email,company,deleted_at&order=deleted_at.desc&limit=200`),
+    read('todos', `presence_deal_tasks?site_id=eq.${site.id}&deleted_at=gte.${since}&select=id,title,deal_id,due_date,deleted_at&order=deleted_at.desc&limit=200`),
+  ]);
+  // who a deal was with, and which deal a to-do was on (deleted ones too: they label history)
+  const ids = (list: any[], k: string) => [...new Set(list.map((x) => String(x?.[k] || '')).filter((x) => UUID_RE.test(x)))].slice(0, 200);
+  const [people, todoDeals] = await Promise.all([
+    ids(deals, 'contact_id').length ? read('names', `presence_contacts?site_id=eq.${site.id}&id=in.(${ids(deals, 'contact_id').join(',')})&select=id,name,email`) : Promise.resolve([] as any[]),
+    ids(todos, 'deal_id').length ? read('names', `presence_deals?site_id=eq.${site.id}&id=in.(${ids(todos, 'deal_id').join(',')})&select=id,title,deleted_at`) : Promise.resolve([] as any[]),
+  ]);
+  const who = new Map(people.map((c: any) => [String(c.id), String(c.name || c.email || '')]));
+  const onDeal = new Map(todoDeals.map((d: any) => [String(d.id), d]));
+  const labels = await labelsP;
+  return json({ data: {
+    days: DELETED_DAYS,
+    deals: deals.map((d: any) => ({ id: d.id, title: String(d.title || 'Untitled deal'), stage: d.stage, stage_label: (labels && labels[d.stage]) || DEFAULT_STAGE_LABEL[d.stage as Stage] || d.stage, value_cents: Number(d.expected_value_cents) || 0, person: who.get(String(d.contact_id || '')) || '', deleted_at: d.deleted_at })),
+    contacts: contacts.map((c: any) => ({ id: c.id, name: String(c.name || c.email || 'Contact'), email: String(c.email || ''), company: String(c.company || ''), deleted_at: c.deleted_at })),
+    todos: todos.map((t: any) => { const d = onDeal.get(String(t.deal_id || '')); return { id: t.id, title: String(t.title || 'To-do'), due_date: t.due_date || null, deal_id: t.deal_id || null, deal_title: d ? String(d.title || '') : '', deal_gone: !!(d && d.deleted_at), deleted_at: t.deleted_at }; }),
+    partial: failed,
+  } }, 200, cors);
+}
+
+// Sales item 83: a deleted deal comes back, as it was. The website enquiry it came from went back
+// to the queue when it was deleted; it is this deal's again, unless the enquiry has become
+// another deal since (one enquiry, one deal: then this one comes back without the link).
+export async function handleSalesRestoreDeal(site: SiteRow, id: string, cors: Record<string, string>): Promise<Response> {
+  if (!UUID_RE.test(id)) return json({ error: 'bad_request' }, 400, cors);
+  const cur = await svc(`presence_deals?id=eq.${id}&site_id=eq.${site.id}&deleted_at=not.is.null&select=id,source_submission_id&limit=1`);
+  if (!cur.ok) return json({ error: 'read_failed', message: 'We couldn’t bring that deal back just now — please try again.' }, 502, cors);
+  const was = rows(cur)[0];
+  if (!was) return json({ error: 'not_found', message: 'That deal isn’t in Recently deleted. Refresh to see what’s there.' }, 404, cors);
+  const sub = UUID_RE.test(String(was.source_submission_id || '')) ? String(was.source_submission_id) : '';
+  const other = sub ? rows(await svc(`presence_deals?site_id=eq.${site.id}&source_submission_id=eq.${sub}&deleted_at=is.null&id=neq.${id}&select=id&limit=1`))[0] : null;
+  const patch: Record<string, unknown> = { deleted_at: null, ...(other ? { source_submission_id: null } : {}) };
+  const r = await svc(`presence_deals?id=eq.${id}&site_id=eq.${site.id}&deleted_at=not.is.null&select=id,title`, { method: 'PATCH', headers: { Prefer: 'return=representation' }, body: JSON.stringify(patch) });
+  if (!r.ok) return json({ error: 'write_failed', message: 'We couldn’t bring that deal back just now — please try again.' }, 502, cors);
+  const row = rows(r)[0];
+  if (!row) return json({ error: 'not_found', message: 'That deal isn’t in Recently deleted. Refresh to see what’s there.' }, 404, cors);
+  if (sub && !other) await markSubmissionConverted(site.id, sub);
+  return json({ data: { ok: true, restored: true, id: row.id, title: String(row.title || 'Deal') } }, 200, cors);
+}
+
 // Phase 3 (stage-aware): a free-text next step that names a thing that has now
 // happened ("Sign contract" after the signature, "Request the deposit" once the
 // deal is won) is cleared, so the record never shows an overdue step for work
@@ -879,6 +938,13 @@ export async function handleDealTaskUpdate(req: Request, site: SiteRow, _princip
   if (!UUID_RE.test(taskId)) return json({ error: 'bad_request' }, 400, cors);
   let b: any = {}; try { b = await req.json(); } catch { return json({ error: 'bad_json' }, 400, cors); }
   const patch: Record<string, unknown> = {};
+  // sales item 83: a deleted to-do comes back from Recently deleted (404 when it isn't there)
+  if (b.restore === true) {
+    const up = await svc(`presence_deal_tasks?id=eq.${taskId}&site_id=eq.${site.id}&deleted_at=not.is.null&select=id,title`, { method: 'PATCH', headers: { Prefer: 'return=representation' }, body: JSON.stringify({ deleted_at: null }) });
+    if (!up.ok) return json({ error: 'write_failed', message: 'We couldn’t bring that to-do back just now — please try again.' }, 502, cors);
+    const row = rows(up)[0];
+    return row ? json({ data: { ok: true, restored: true, id: row.id, title: String(row.title || 'To-do') } }, 200, cors) : json({ error: 'not_found', message: 'That to-do isn’t in Recently deleted. Refresh to see what’s there.' }, 404, cors);
+  }
   if (b.delete === true) patch.deleted_at = nowIso();
   else if (b.status === 'done') { patch.status = 'done'; patch.completed_at = nowIso(); }
   else if (b.status === 'open') { patch.status = 'open'; patch.completed_at = null; }

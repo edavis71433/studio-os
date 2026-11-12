@@ -252,6 +252,8 @@ https://app.davisdigitalstudio.com/report.html           https://tools.davisdigi
 /contacts                    /contacts.html        200
 /prospects.html               /prospects           301!
 /prospects                   /prospects.html       200
+/recently-deleted.html        /recently-deleted    301!
+/recently-deleted            /recently-deleted.html 200
 /pitch.html                   /pitch               301!
 /pitch                       /pitch.html           200
 /intake.html                  /intake              301!
