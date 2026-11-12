@@ -1726,6 +1726,26 @@ body.pd-dragging *{cursor:grabbing !important}
 :root[data-theme="dark"] .dds-hint .x{background:rgba(23,19,32,.12);color:#171320}
 :root[data-theme="dark"] .dds-hint .x:hover{background:rgba(23,19,32,.22)}
 :root[data-theme="dark"] .dds-hint .x:focus-visible{outline-color:#171320}
+/* item 156: a whole list of old addresses at once, under the forwards */
+.rdx-open{font:inherit;font-size:12.5px;font-weight:600;color:var(--plum);background:none;border:none;padding:6px 0;cursor:pointer;text-decoration:underline;text-underline-offset:3px}
+.rdx{margin-top:8px;padding:12px;border:1px solid var(--line);border-radius:12px;background:var(--bg-2,var(--bg));display:grid;gap:8px}
+.rdx[hidden]{display:none}
+.rdx-row{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.rdx-row input[type=text]{flex:1;min-width:140px;padding:7px 9px;font:inherit;font-size:12.5px;border:1px solid var(--line);border-radius:8px;background:var(--card,#fff);color:inherit}
+.rdx textarea{width:100%;box-sizing:border-box;min-height:120px;padding:8px 10px;font:12.5px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;border:1px solid var(--line);border-radius:8px;background:var(--card,#fff);color:inherit;resize:vertical}
+.rdx button.rdx-b{font:inherit;font-size:12px;font-weight:600;padding:6px 12px;border-radius:999px;border:1px solid var(--line);background:var(--card,#fff);color:inherit;cursor:pointer;min-height:32px}
+.rdx button.rdx-go{background:var(--plum);border-color:var(--plum);color:var(--on-p,#fff)}
+.rdx button[disabled]{opacity:.55;cursor:default}
+.rdx-file{font-size:12.5px;font-weight:600;cursor:pointer;display:inline-flex;align-items:center;gap:6px;min-height:32px}
+.rdx-file input{font-size:12px;max-width:210px}
+.rdx-sum{font-size:12.5px;line-height:1.5}
+.rdx-tw{max-height:260px;overflow:auto;border:1px solid var(--line);border-radius:8px;background:var(--card,#fff)}
+.rdx-table{width:100%;border-collapse:collapse;font-size:12px}
+.rdx-table th,.rdx-table td{text-align:left;padding:5px 8px;border-bottom:1px solid var(--line);vertical-align:top;overflow-wrap:anywhere}
+.rdx-table th{font-weight:600;color:var(--ink-2);position:sticky;top:0;background:var(--card,#fff)}
+.rdx-table tr.skip td{color:var(--warn,#94530a)}
+.rdx-table tr.same td{color:var(--ink-3)}
+.rdx-more{font:inherit;font-size:12px;font-weight:600;color:var(--plum);background:none;border:none;padding:4px 0;cursor:pointer;text-decoration:underline}
 </style>
 </head>
 <body>
@@ -8969,10 +8989,12 @@ function redirectsManager() {
   add.style.cssText = "font:inherit;font-size:12px;padding:6px 12px;border-radius:999px;border:1px solid var(--line,#ddd);background:transparent;cursor:pointer";
   form.append(fi, tiR, add); box.appendChild(form);
   box.appendChild(el("div", "hint", "Anyone visiting the old address lands on the new one — and Google follows along. Applies when you publish."));
+  let showAll = false;
   async function loadRedirects() {
     try {
-      const r = await api("GET", "/redirects"); const rows = r.data || [];
-      list.innerHTML = rows.length ? "" : "No forwards yet.";
+      const r = await api("GET", "/redirects"); const all = r.data || [];
+      list.innerHTML = all.length ? "" : "No forwards yet.";
+      const rows = showAll ? all : all.slice(0, 20);   // item 156: an imported site can have hundreds
       rows.forEach((row) => {
         const line2 = el("div"); line2.style.cssText = "display:flex;gap:8px;align-items:center;font-size:12.5px;padding:3px 0";
         line2.appendChild(el("span", null, row.from_path + " → " + row.to_path));
@@ -8981,14 +9003,105 @@ function redirectsManager() {
         x.addEventListener("click", async () => { try { await api("DELETE", "/redirects/" + row.id); loadRedirects(); toast("Forward removed — publish to apply"); scheduleChangesRefresh(); } catch (err) { toast(nice(err), true); } });
         line2.appendChild(x); list.appendChild(line2);
       });
+      if (all.length > rows.length) {
+        const more = el("button", "rdx-more", `Show all ${all.length} forwards`); more.type = "button";
+        more.addEventListener("click", () => { showAll = true; loadRedirects(); });
+        list.appendChild(more);
+      }
     } catch (_) { list.textContent = "Forwards couldn’t load just now."; }
   }
   add.addEventListener("click", async () => {
     try { await api("POST", "/redirects", { from_path: fi.value, to_path: tiR.value }); fi.value = ""; tiR.value = ""; loadRedirects(); toast("Forward added — publish to apply"); scheduleChangesRefresh(); }
     catch (err) { toast(nice(err), true); }
   });
+  box.appendChild(redirectsImport(() => { showAll = false; loadRedirects(); }));
   loadRedirects();
   return box;
+}
+// Item 156: a whole list of old addresses at once, when a client moves from another website.
+// Paste the lines (or choose a spreadsheet saved as CSV), or read the old site's own page
+// list for suggestions; Check the list says what each line will do, and nothing is saved
+// until Bring them in. The server keeps publishing's rules: 500 at most, no chains, no loops.
+let RDX_SEQ = 0;
+function redirectsImport(onDone) {
+  const n = ++RDX_SEQ;
+  const wrap = el("div");
+  const open = el("button", "rdx-open", "Bring in a whole list…"); open.type = "button";
+  open.setAttribute("aria-expanded", "false"); open.setAttribute("aria-controls", "rdx-" + n);
+  const panel = el("div", "rdx"); panel.id = "rdx-" + n; panel.hidden = true;
+  panel.appendChild(el("div", "hint", "Moving a client from another website? Bring in all their old addresses at once: one per line, the old address and then where it goes now. A spreadsheet saved as CSV works too, and so does reading the old site’s own list of pages."));
+  const oldRow = el("div", "rdx-row");
+  const oldSite = el("input"); oldSite.type = "text"; oldSite.placeholder = "oldsite.com"; oldSite.setAttribute("aria-label", "The old website’s address");
+  const read = el("button", "rdx-b", "Read its pages"); read.type = "button";
+  oldRow.append(oldSite, read);
+  const ta = el("textarea"); ta.rows = 6; ta.setAttribute("aria-label", "Addresses to bring in, one per line");
+  ta.placeholder = "/about-us  /about/\n/our-menu  /menu/\nhttps://oldsite.com/contact-us  /contact/";
+  const fileRow = el("div", "rdx-row");
+  const fl = el("label", "rdx-file", "Choose a spreadsheet (CSV)"); const file = el("input"); file.type = "file"; file.accept = ".csv,text/csv,text/plain"; fl.appendChild(file);
+  const check = el("button", "rdx-b", "Check the list"); check.type = "button";
+  fileRow.append(fl, check);
+  const out = el("div"); out.setAttribute("role", "status");
+  const go = el("button", "rdx-b rdx-go", "Bring them in"); go.type = "button"; go.hidden = true;
+  panel.append(oldRow, ta, fileRow, out, go);
+  wrap.append(open, panel);
+  let checked = null;   // the text the shown plan is for; editing it asks for a new check
+  const reset = () => { checked = null; out.textContent = ""; go.hidden = true; };
+  open.addEventListener("click", () => { const on = panel.hidden; panel.hidden = !on; open.setAttribute("aria-expanded", String(on)); if (on) ta.focus(); });
+  ta.addEventListener("input", reset);
+  file.addEventListener("change", async () => {
+    const f = file.files && file.files[0]; if (!f) return;
+    if (f.size > 512 * 1024) { toast("That file is too big. A list of up to 1,000 lines fits.", true); file.value = ""; return; }
+    ta.value = await f.text(); file.value = ""; reset(); ta.focus();
+  });
+  read.addEventListener("click", async () => {
+    const v = oldSite.value.trim(); if (!v) { oldSite.focus(); return; }
+    read.disabled = true; read.textContent = "Reading…";
+    try {
+      const d = (await api("GET", "/redirects/suggest?from=" + encodeURIComponent(v))).data || {};
+      const lines = d.lines || [];
+      ta.value = lines.map((l) => l.from + "  " + l.to).join("\n");
+      reset();
+      const unsure = lines.length - (d.sure || 0);
+      out.appendChild(el("div", "rdx-sum", `Found ${d.found} pages on ${d.host}. ${lines.length ? `${lines.length} need a forward${unsure ? `; ${unsure} ${unsure === 1 ? "has" : "have"} no close match here and go to your home page, so check ${unsure === 1 ? "it" : "them"}` : ""}. Change any line, then Check the list.` : "Each one already has the same address here, so none needs a forward."}`));
+    } catch (err) { toast(nice(err), true); }
+    read.disabled = false; read.textContent = "Read its pages";
+  });
+  const say = (v, r) => v === "add" ? (r.note ? "New. " + r.note : "New") : v === "replace" ? r.note : v === "same" ? "Already there" : "Skipped: " + r.reason;
+  check.addEventListener("click", async () => {
+    const text = ta.value; if (!text.trim()) { ta.focus(); return; }
+    check.disabled = true;
+    try {
+      const plan = (await api("POST", "/redirects", { list: text, dry_run: true })).data || {};
+      out.textContent = ""; checked = text;
+      const lines = (plan.rows || []).length;
+      const parts = [plan.add ? `${plan.add} new forward${plan.add === 1 ? "" : "s"}` : "", plan.replace ? `${plan.replace} replace${plan.replace === 1 ? "s" : ""} one you had` : "", plan.same ? `${plan.same} already there` : "", plan.skipped ? `${plan.skipped} skipped` : ""].filter(Boolean);
+      out.appendChild(el("div", "rdx-sum", `${lines} line${lines === 1 ? "" : "s"}: ${parts.join(", ") || "nothing to bring in"}. Nothing is saved until you bring them in.${(plan.repoint || []).length ? ` ${plan.repoint.length} older forward${plan.repoint.length === 1 ? "" : "s"} will go straight to the final page.` : ""}`));
+      const tw = el("div", "rdx-tw"), tb = el("table", "rdx-table");
+      tb.innerHTML = "<thead><tr><th scope=\"col\">Line</th><th scope=\"col\">Old address</th><th scope=\"col\">Goes to</th><th scope=\"col\">What happens</th></tr></thead>";
+      const body = el("tbody");
+      (plan.rows || []).forEach((r) => {
+        const tr = el("tr", r.verdict);
+        [String(r.line), r.from, r.to, say(r.verdict, r)].forEach((t) => tr.appendChild(el("td", null, t || "")));
+        body.appendChild(tr);
+      });
+      tb.appendChild(body); tw.appendChild(tb); out.appendChild(tw);
+      const k = (plan.add || 0) + (plan.replace || 0);
+      go.hidden = !k; go.textContent = `Bring in ${k} forward${k === 1 ? "" : "s"}`;
+    } catch (err) { toast(nice(err), true); }
+    check.disabled = false;
+  });
+  go.addEventListener("click", async () => {
+    if (checked === null || checked !== ta.value) { reset(); toast("The list changed: check it again first.", true); return; }
+    go.disabled = true;
+    try {
+      const plan = (await api("POST", "/redirects", { list: checked })).data || {};
+      toast(`${plan.add || 0} forward${plan.add === 1 ? "" : "s"} brought in${plan.replace ? `, ${plan.replace} replaced` : ""} — publish to apply`);
+      ta.value = ""; reset(); panel.hidden = true; open.setAttribute("aria-expanded", "false");
+      scheduleChangesRefresh(); onDone();
+    } catch (err) { toast(nice(err), true); }
+    go.disabled = false;
+  });
+  return wrap;
 }
 // ── items 124 and 181 (Nov 2026): the Search tab's tools row, this month's numbers, the ranked
 // to-do list, the pages that moved most, and the searches a client follows. GET /visibility

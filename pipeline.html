@@ -1728,7 +1728,7 @@ async function renderSummary(gen){
   // Its own tile on a computer or tablet; on a phone the four tiles keep their one row (item 58), so it rides under Open.
   const ex=(s.expected&&open.count)?s.expected:null;
   const expSub=ex?`<span class="exp-sub"><span class="exp-sep"> · </span>${money(ex.value_cents)||'$0'} expected</span>`:'';
-  const openT=open.count?tile('Open',money(open.value_cents)||'$0',`<span class="across">across ${plur(open.count,'deal')}</span>`+expSub,'open','','',ex?'has-exp':''):tile('Open','$0','no open deals yet','open','');
+  const openT=open.count?tile('Open',money(open.value_cents)||'$0',`<span class="across">across ${plur(open.count,'deal')}</span>`+expSub,'open','','',ex?'has-exp':''):tile('Open','$0','nothing open right now','open','');   // item 173: the strip shows only when there are deals, so "yet" read wrong when all are closed
   const expT=ex?tile('Expected',money(ex.value_cents)||'$0','at each stage’s chance','rate','info','','st-exp'):'';
   const wonT=wm.count?tile('Won this month',money(wm.value_cents)||'$0',plur(wm.count,'deal'),'won','good'):tile('Won this month','—','none yet','won','good');
   const winT=(wr.pct===null||wr.pct===undefined)?tile('Win rate','—','nothing won or ruled out yet','rate','info')

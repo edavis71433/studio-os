@@ -34,7 +34,7 @@ import { checkEntitlement } from './middleware/entitlement.ts';
 import { featureForRoute, requireFeature, loadEdition } from './middleware/feature.ts';
 import { loadPlan, draftingDenial } from './commerce/enforce.ts';
 import { handleGetSite, handleTemplatesList, handlePutTemplate } from './routes/site.ts';
-import { handleSearchHealth, handleRedirectsList, handleRedirectCreate, handleRedirectDelete } from './routes/search.ts';
+import { handleSearchHealth, handleRedirectsList, handleRedirectCreate, handleRedirectSuggest, handleRedirectDelete } from './routes/search.ts';
 import { handleGetIdentity, handlePutIdentity } from './routes/identity.ts';
 import { handlePreview, handlePreviewSection } from './routes/preview.ts';
 import { handlePreviewStatus, handlePreviewPublish, handlePreviewPromote, handlePreviewSettings, handlePublicPreview, handlePublicPreviewOpen, handleSignedPreview, handlePreviewShareLink } from './routes/preview_env.ts';
@@ -586,6 +586,7 @@ async function route_(req: Request, cors: Record<string, string>): Promise<Respo
   if (route === '/visibility/ai/questions' && method === 'PUT') return handleAiQuestionsPut(req, site, principal, cors);
   if (route === '/redirects' && method === 'GET') return handleRedirectsList(site, cors);                 // Phase SD
   if (route === '/redirects' && method === 'POST') return handleRedirectCreate(req, site, principal, cors);
+  if (route === '/redirects/suggest' && method === 'GET') return handleRedirectSuggest(req, site, cors);   // item 156: the old site's pages, matched
   {
     const rm = route.match(/^\/redirects\/([0-9a-f-]{36})$/);
     if (rm && method === 'DELETE') return handleRedirectDelete(site, principal, rm[1], cors);
@@ -1029,6 +1030,12 @@ async function route_(req: Request, cors: Record<string, string>): Promise<Respo
   if (route === '/client/projects' && method === 'GET') return handleClientProjects(req, site, principal, cors);
   if (route === '/client/billing' && method === 'GET') return handleClientBilling(req, site, principal, cors);
   if (route === '/client/documents' && method === 'GET') return handleClientDocuments(req, site, principal, cors);
+  // item 179: the monthly reports that went out, for the client's Documents shelf
+  if (route === '/client/reports' && method === 'GET') return (await import('./ops/monthly_report.ts')).handleClientReports(site, cors);
+  {
+    const m = route.match(/^\/client\/reports\/(\d{4}-\d{2})\/pdf$/);
+    if (m && method === 'GET') return (await import('./ops/monthly_report.ts')).handleClientReportPdf(site, m[1], cors);
+  }
   if (route === '/client/book' && method === 'GET') return handleClientBook(req, site, principal, cors);
   if (route === '/client/notifications' && method === 'GET') return handleClientNotifications(req, site, principal, cors);
   if (route === '/client/notifications/read' && method === 'POST') return handleClientNotificationsRead(req, site, principal, cors);
@@ -1055,6 +1062,11 @@ async function route_(req: Request, cors: Record<string, string>): Promise<Respo
     if (m && method === 'GET') return handleClientDeliverableDownload(req, site, principal, m[1], cors);
     m = route.match(/^\/client\/approvals\/([0-9a-f-]{36})\/decide$/);
     if (m && method === 'POST') return handleClientApprovalDecide(req, site, principal, m[1], cors);
+    // builder list item 179, part two: the website draft sent for an OK, drawn in the portal, and notes on its parts
+    m = route.match(/^\/client\/approvals\/([0-9a-f-]{36})\/draft$/);
+    if (m && method === 'GET') return (await import('./routes/client_drafts.ts')).handleClientDraft(req, site, principal, m[1], cors);
+    m = route.match(/^\/client\/approvals\/([0-9a-f-]{36})\/notes$/);
+    if (m && method === 'POST') return (await import('./routes/client_drafts.ts')).handleClientDraftNote(req, site, principal, m[1], cors);
     m = route.match(/^\/client\/surveys\/([0-9a-f-]{36})$/);
     if (m && method === 'GET') return handleClientSurvey(req, site, principal, m[1], cors);
     m = route.match(/^\/client\/surveys\/([0-9a-f-]{36})\/respond$/);

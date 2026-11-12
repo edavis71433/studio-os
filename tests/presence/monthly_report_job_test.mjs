@@ -79,6 +79,7 @@ reset({ enabled: true, note: 'Thanks', last_month: '2026-10' });
   const s = stored();
   ok('a due report is sent once', r.sent === 1 && sends.length === 1, JSON.stringify(r));
   ok('…and recorded as sent for November, the gate set', s.last_month === '2026-11' && s.last_result?.status === 'sent' && s.last_result?.month === '2026-11');
+  ok('…and November joins the months the client’s shelf lists (item 179)', JSON.stringify(s.sent_months) === JSON.stringify(['2026-11']), JSON.stringify(s.sent_months));
   ok('replies go to the studio’s site, not the client’s', sends[0].reply_to === `${STUDIO_SITE}@reply.example.com`, String(sends[0].reply_to));
   ok('the next run sends nothing', (await quiet(() => runMonthlyReports(20, DEC2))).sent === 0 && sends.length === 1);
 }
@@ -122,6 +123,7 @@ clientEmail = null;
   const s = stored();
   ok('a client with no email is skipped, not a failure', r.failures === 0 && r.unreachable === 1 && sends.length === 0, JSON.stringify(r));
   ok('…with the reason saved for the card', s.last_result?.status === 'skipped' && s.last_result?.reason === 'no_email' && s.last_month === '2026-11');
+  ok('…and a skipped month never reaches the client’s shelf', !(s.sent_months || []).length);
   ok('…and not tried again every tick', (await quiet(() => runMonthlyReports(20, DEC2))).unreachable === 0);
 }
 
@@ -188,6 +190,33 @@ visitsPages = Array.from({ length: 2500 }, (_, i) => ({ i }));
   visitsFail = true;
   ok('…and answers nothing when a page fails, never a part', (await quiet(() => svcPages('presence_visits?site_id=eq.x', 'ts', 1000, 50))) === null);
   visitsFail = false;
+}
+
+// ── item 179: the client's own reports, for the Documents shelf ──
+reset({ enabled: true, note: '', last_month: '2026-10', sent_months: ['2026-10', '2026-09'] });
+resendOk = false;
+await quiet(() => runMonthlyReports(20, DEC2));
+ok('a send that fails adds nothing to the shelf', JSON.stringify(stored().sent_months) === JSON.stringify(['2026-10', '2026-09']));
+resendOk = true;
+reset({ enabled: true, note: '', last_month: '2026-10', sent_months: ['2026-10', '2026-09'] });
+await quiet(() => runMonthlyReports(20, DEC2));
+ok('a sent month goes on top of the earlier ones', JSON.stringify(stored().sent_months) === JSON.stringify(['2026-11', '2026-10', '2026-09']), JSON.stringify(stored().sent_months));
+{
+  const MR = await import(`${P}/ops/monthly_report.ts`);
+  const SITE = { id: CLIENT_SITE, client_id: CLIENT_ID, status: 'live', edition: 'presence' };
+  const list = await quiet(() => MR.handleClientReports(SITE, {}));
+  const lb = await list.json();
+  ok('the client’s list is exactly the months that went out, newest first, named', list.status === 200 && JSON.stringify(lb.data.reports) === JSON.stringify([{ month: '2026-11', label: 'November 2026' }, { month: '2026-10', label: 'October 2026' }, { month: '2026-09', label: 'September 2026' }]), JSON.stringify(lb));
+  zone = 'America/New_York'; visitReads.length = 0;
+  const pdf = await quiet(() => MR.handleClientReportPdf(SITE, '2026-10', {}));
+  const bytes = new Uint8Array(await pdf.arrayBuffer());
+  ok('a listed month comes back as its PDF, named for download', pdf.status === 200 && pdf.headers.get('Content-Type') === 'application/pdf' && /attachment; filename=".+\.pdf"/.test(pdf.headers.get('Content-Disposition') || '') && /Content-Disposition/.test(pdf.headers.get('Access-Control-Expose-Headers') || '') && new TextDecoder().decode(bytes.slice(0, 5)) === '%PDF-');
+  ok('…drawn from October on the site’s own clock', visitReads.some((q) => q.includes('2026-10-01T04:00:00.000Z') && q.includes('2026-11-01T04:00:00.000Z')), visitReads.join(' | ').slice(0, 300));
+  zone = null;
+  const notSent = await quiet(() => MR.handleClientReportPdf(SITE, '2026-08', {}));
+  ok('a month that never went out is not drawn (404) — the shelf is no way to make new reports', notSent.status === 404);
+  const bad = await quiet(() => MR.handleClientReportPdf(SITE, '2026-13', {}));
+  ok('something that isn’t a month is refused (400)', bad.status === 400);
 }
 
 // the busy-day check

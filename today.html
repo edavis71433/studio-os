@@ -528,7 +528,7 @@ function siteDeckHtml(s){
       <span class="weye">Their website</span>
       <h2 class="wname">${s.address?`<a href="${esc(s.address)}" target="_blank" rel="noopener">${esc(wHost(s.address))}</a>`:esc(s.name||'Their website')}</h2>
       <div class="wline"><span class="wpill ${tone}" id="wstate">${esc(s.state_words||'')}</span>${when?`<span>${esc(when)}</span>`:''}</div>
-      ${s.unpublished_changes&&s.state!=='not_live'?'<div class="wline warn">Changes waiting to be published</div>':''}
+      ${s.unpublished_changes&&s.state!=='not_live'&&s.state!=='elsewhere'?'<div class="wline warn">Changes waiting to be published</div>':''}
       ${s.state==='not_live'?'<div class="wline">Nothing is public yet. Open the editor to finish it and publish.</div>':''}
       <div class="wacts">${acts}</div>
     </div>

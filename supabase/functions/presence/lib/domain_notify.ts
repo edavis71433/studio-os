@@ -13,6 +13,7 @@
 //   once, with the old values to put back.
 import { svc } from './db.ts';
 import { emailOperator } from './service_bridge.ts';
+import { studioWantsEmail } from './site_notify.ts';
 import { loadEmailBrand } from './email_brand.ts';
 
 const first = (r: unknown) => ((r && Array.isArray((r as { json?: unknown }).json) ? ((r as { json: unknown[] }).json[0]) : null) || null) as Record<string, unknown> | null;
@@ -87,7 +88,8 @@ export async function tellOwnerAndStudio(site: { id: string; client_id?: string 
       out.client = await sendEmail(to, mail.subject.slice(0, 180), mail.html, await loadEmailBrand(site.id), { critical: true }).catch(() => false);
     }
     const studioSite = first(linkQ)?.agency_site_id;
-    if (studioSite) out.studio = await emailOperator(String(studioSite), mail.subject, mail.html + (opts.studioNote ? `<p>${opts.studioNote}</p>` : ''), what);
+    // item 126: the studio's copy only while it still hears about this site by email
+    if (studioSite && await studioWantsEmail(String(studioSite), site.id)) out.studio = await emailOperator(String(studioSite), mail.subject, mail.html + (opts.studioNote ? `<p>${opts.studioNote}</p>` : ''), what);
   } catch { /* telling is best-effort: the change itself already happened */ }
   return out;
 }

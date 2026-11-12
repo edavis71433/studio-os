@@ -153,6 +153,7 @@ const MEMBER_WRITES: Array<[MemberWriteNeed, string[]]> = [
   ['comment', [
     'POST /comments',
     `POST /comments/${ID}/resolve`,
+    `POST /client/approvals/${ID}/notes`,   // builder list item 179: a note on one part of the website draft
     `POST /(client/)?projects/${ID}/messages`,
     `POST /(client/)?support/${ID}/messages`,
     'POST /client/support',
