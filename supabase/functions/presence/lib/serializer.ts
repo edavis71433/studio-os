@@ -169,7 +169,8 @@ function resolvePageSeoShare(rawPageSeo: unknown, ref: (id: string | null | unde
 }
 
 // The ONE list of what a draft is read from: each table, and its read for one site. They
-// all go at once; the library rows its linked sections name are read after them.
+// all go at once; the library rows its linked sections name, and the photos the draft
+// names (readDraftPhotos), are read after them.
 const DRAFT_READS: Record<string, (siteId: string) => string> = {
   presence_identity: (s) => `presence_identity?site_id=eq.${s}&limit=1`,
   presence_locations: (s) => `presence_locations?site_id=eq.${s}&order=created_at.asc`,
@@ -177,7 +178,6 @@ const DRAFT_READS: Record<string, (siteId: string) => string> = {
   presence_testimonials: (s) => `presence_testimonials?site_id=eq.${s}&deleted_at=is.null&is_visible=is.true&order=sort_order.asc,created_at.asc`,
   presence_faqs: (s) => `presence_faqs?site_id=eq.${s}&deleted_at=is.null&is_visible=is.true&order=sort_order.asc,created_at.asc`,
   presence_posts: (s) => `presence_posts?site_id=eq.${s}&deleted_at=is.null&status=eq.published&order=published_at.desc`,
-  presence_media: (s) => `presence_media?site_id=eq.${s}&deleted_at=is.null&select=id,storage_path,alt_text,mime,width,height,focal_x,focal_y`,
   presence_redirects: (s) => `presence_redirects?site_id=eq.${s}&order=from_path.asc&select=from_path,to_path`,
   presence_settings: (s) => `presence_settings?site_id=eq.${s}&limit=1`,
   presence_dev_customizations: (s) => `presence_dev_customizations?site_id=eq.${s}&select=theme_tokens,custom_css,custom_html&limit=1`,
@@ -188,7 +188,62 @@ const DRAFT_READS: Record<string, (siteId: string) => string> = {
 };
 
 /** Every table a draft is built from. */
-export const DRAFT_TABLES: readonly string[] = [...Object.keys(DRAFT_READS), 'presence_content_library'];
+export const DRAFT_TABLES: readonly string[] = [...Object.keys(DRAFT_READS), 'presence_media', 'presence_content_library'];
+
+// ── Item 208 (review file 06, finding 81): only the photos the draft names ────────
+// The draft used to read every live file of the site, with no order. Past the 1,000 rows
+// one read returns, a photo the site used could be left out of a publish, and which one
+// changed from one publish to the next. Every place a draft names a photo (a section, a
+// menu item, a post and the photos in its text, the logo, a page's share image, an
+// author) holds its id, so the ids are taken from the other rows and only those are read.
+export const MEDIA_COLS = 'id,storage_path,alt_text,mime,width,height,focal_x,focal_y';
+const UUID_ALL = new RegExp(UUID_PATTERN, 'gi');
+/** At most this many ids in one read, so the address stays well under the gateway's limit. */
+export const MEDIA_IDS_PER_READ = 100;
+
+/** The ids a draft's rows could name a photo by: every id written anywhere in them, less
+ *  the rows' own ids and the site's. More than the photos (a section's own id, a person),
+ *  never fewer; the read keeps only the site's live files among them. Pure. */
+export function mediaIdsIn(rows: DraftRows, siteId: string): string[] {
+  const own = new Set<string>([String(siteId).toLowerCase()]);
+  const found = new Set<string>();
+  for (const [table, list] of Object.entries(rows)) {
+    if (table === 'presence_media' || !Array.isArray(list)) continue;
+    for (const row of list) {
+      if (row && typeof row === 'object' && typeof row.id === 'string') own.add(row.id.toLowerCase());
+      for (const id of JSON.stringify(row ?? null).match(UUID_ALL) || []) found.add(id.toLowerCase());
+    }
+  }
+  return [...found].filter((id) => !own.has(id)).sort();
+}
+
+/** Read the site's live files with these ids, a few reads side by side. */
+export async function readMediaByIds(siteId: string, ids: string[], cols = MEDIA_COLS): Promise<any[]> {
+  if (!ids.length) return [];
+  const parts: string[][] = [];
+  for (let i = 0; i < ids.length; i += MEDIA_IDS_PER_READ) parts.push(ids.slice(i, i + MEDIA_IDS_PER_READ));
+  const read = await Promise.all(parts.map((p) => svc(`presence_media?site_id=eq.${siteId}&deleted_at=is.null&id=in.(${p.join(',')})&select=${cols}`)
+    .then((r) => (Array.isArray(r.json) ? r.json : []))));
+  return read.flat();
+}
+
+// The saved sections are read beside the photos, so the ids are taken in two parts: the
+// draft's other rows, then the library rows. A read is compared with an earlier one the same way.
+const LIBRARY = 'presence_content_library';
+const libraryIdsIn = (rows: DraftRows, siteId: string) => mediaIdsIn({ [LIBRARY]: rows[LIBRARY] || [] }, siteId);
+const askedIn = (rows: DraftRows, siteId: string) => new Set([...mediaIdsIn({ ...rows, [LIBRARY]: [] }, siteId), ...libraryIdsIn(rows, siteId)]);
+
+/** The photos the draft's rows other than the library name: all read again when `fresh`;
+ *  otherwise `prev`'s, with any id `prev` didn't name read and added. `asked`: every id
+ *  looked up, for the library's to be compared with. */
+async function readDraftPhotos(siteId: string, rows: DraftRows, prev: DraftRows | undefined, fresh: boolean): Promise<{ photos: any[]; asked: Set<string> }> {
+  const ids = mediaIdsIn({ ...rows, [LIBRARY]: [] }, siteId);
+  if (fresh || !prev || !Array.isArray(prev.presence_media)) return { photos: await readMediaByIds(siteId, ids), asked: new Set(ids) };
+  const asked = askedIn(prev, siteId);
+  const more = ids.filter((id) => !asked.has(id));
+  for (const id of more) asked.add(id);
+  return { photos: more.length ? [...prev.presence_media, ...await readMediaByIds(siteId, more)] : prev.presence_media, asked };
+}
 /** A draft's rows, by table (DRAFT_TABLES). */
 export type DraftRows = Record<string, any[]>;
 
@@ -204,7 +259,8 @@ function linkedIdsIn(settings: any): string[] {
 /** Read a site's draft rows. Given `prev`, an earlier read, and `only`, read just the
  *  tables in `only` again and keep the rest of `prev`. The library rows follow the
  *  sections that link to them, so they're read again with the settings, or when the
- *  library itself was written. */
+ *  library itself was written. The photos follow every row that names one (item 208):
+ *  read again when the files were written, and otherwise only an id not named before. */
 export async function readDraftRows(siteId: string, prev?: DraftRows, only?: ReadonlySet<string>): Promise<DraftRows> {
   const q = (p: string) => svc(p).then((r) => (Array.isArray(r.json) ? r.json : []));
   const again = (table: string) => !prev || !only || only.has(table);
@@ -212,11 +268,19 @@ export async function readDraftRows(siteId: string, prev?: DraftRows, only?: Rea
   const read = await Promise.all(tables.map((t) => q(DRAFT_READS[t](siteId))));
   const rows: DraftRows = { ...prev };
   tables.forEach((t, i) => { rows[t] = read[i]; });
-  if (again('presence_settings') || again('presence_content_library')) {
+  const libraryAgain = again('presence_settings') || again('presence_content_library');
+  const refIds = libraryAgain ? linkedIdsIn(rows.presence_settings[0] || {}) : [];
+  // the library and the photos named so far go side by side; a linked section's own photos
+  // are in its library row, so any of those not read yet follow it
+  const [lib, { photos, asked }] = await Promise.all([
     // CL-LINK: no links → no query, byte-identical to before.
-    const refIds = linkedIdsIn(rows.presence_settings[0] || {});
-    rows.presence_content_library = refIds.length ? await q(`presence_content_library?site_id=eq.${siteId}&id=in.(${refIds.join(',')})&select=id,payload`) : [];
-  }
+    libraryAgain ? (refIds.length ? q(`presence_content_library?site_id=eq.${siteId}&id=in.(${refIds.join(',')})&select=id,payload`) : Promise.resolve([])) : Promise.resolve(rows.presence_content_library ?? []),
+    readDraftPhotos(siteId, rows, prev, again('presence_media')),
+  ]);
+  rows.presence_content_library = lib;
+  rows.presence_media = photos;
+  const more = libraryIdsIn(rows, siteId).filter((id) => !asked.has(id));
+  if (more.length) rows.presence_media = [...photos, ...await readMediaByIds(siteId, more)];
   return rows;
 }
 
@@ -387,6 +451,7 @@ export function buildSnapshot(rows: DraftRows, manifest: TemplateManifest, opts:
         : {}),
       // Phase V no-code essentials — through ref() so variants land in the media manifest
       logo: ref(settings.logo_media_id),
+      ...(settings.icon_media_id ? { icon: ref(settings.icon_media_id) } : {}),   // builder list item 158 (0184): absent = byte-identical
       og_image: ref(settings.og_media_id),
       cover: ref(settings.cover_media_id),   // the owner's chosen hero image (preferred over an auto-pick)
       ...(String(settings.announcement_text || '').trim()

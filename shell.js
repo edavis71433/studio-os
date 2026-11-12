@@ -789,6 +789,7 @@
         + '.dm-s{flex:1;min-width:0;font:inherit;font-size:14.5px;padding:9px 12px;min-height:40px;box-sizing:border-box;border:1px solid var(--line,#e6e1ee);border-radius:10px;background:var(--card,#fff);color:var(--ink,#1b1525)}'
         + '.dm-b{display:block;width:100%;box-sizing:border-box;min-height:150px;resize:vertical;font:inherit;font-size:14.5px;line-height:1.5;padding:12px 14px;border:1px solid var(--line,#e6e1ee);border-radius:12px;background:var(--card,#fff);color:var(--ink,#1b1525)}'
         + '.dm-sr{align-self:flex-start;max-width:100%;font:inherit;font-size:13px;color:var(--ink,#1b1525);background:var(--card,#fff);border:1px solid var(--line,#e6e1ee);border-radius:999px;padding:6px 12px;min-height:32px;cursor:pointer}'
+        + '.dm-t{display:flex;align-items:center;gap:8px 10px;flex-wrap:wrap;min-width:0}.dm-t .dm-sr{align-self:auto}'
         + '.dm-f{display:flex;align-items:center;gap:10px 14px;flex-wrap:wrap}'
         + '.dm-n{flex:1 1 220px;margin:0;display:flex;gap:8px;align-items:flex-start;font-size:12.5px;line-height:1.45;color:var(--soft,#5c5468)}.dm-n svg{flex:0 0 auto;margin-top:1px}.dm-n span{overflow-wrap:anywhere}'
         + '.dm-go{font:inherit;font-size:14px;font-weight:600;border:0;border-radius:999px;padding:10px 22px;min-height:40px;background:var(--p,#5b3fa0);color:#fff;cursor:pointer;margin-left:auto}.dm-go:disabled{opacity:.65;cursor:default}'
@@ -804,7 +805,8 @@
     }
     // host: where the box draws. o: { req(path, method, body) → {ok, status, body}, ids: one of
     // {deal_id} {contact_id} {client_id}, idp: the field ids' start (idp+'Subject', idp+'Body'),
-    // values: {subject, body} typed before, focus: put the caret in it once drawn, onSent(data, firstName) }
+    // values: {subject, body} typed before, focus: put the caret in it once drawn, onSent(data, firstName),
+    // tools(row, {body, subj, form, go}): a page's own controls beside the saved replies (sales item 94's Draft it for me) }
     function open(host, o) {
       style(); o = o || {};
       var req = o.req || function (p, m, b) { return window.ddsApi(p, { method: m, body: b }); };
@@ -839,6 +841,10 @@
           + '<div class="dm-f"><p class="dm-n">' + MAIL + '<span>Sent as <b>' + esc3(d.as || 'your studio') + '</b>' + (d.from ? ' from ' + esc3(d.from) : '') + ' · ' + esc3(back) + '</span></p><button type="submit" class="dm-go">Send email</button></div>'
           + '<p class="dm-err" role="alert"></p></form>';
         var form = host.querySelector('form'), subj = form.querySelector('.dm-s'), body = form.querySelector('.dm-b'), go = form.querySelector('.dm-go'), errEl = form.querySelector('.dm-err');
+        // one row above the message for the saved replies and a page's own tools, made when either needs it
+        var tools = null;
+        function toolsRow() { if (!tools) { tools = document.createElement('div'); tools.className = 'dm-t'; body.parentNode.insertBefore(tools, body); } return tools; }
+        if (o.tools) o.tools(toolsRow(), { body: body, subj: subj, form: form, go: go });
         // saved replies, when there are any (read once a page)
         if (!SR) SR = Promise.resolve(req('/service/saved-replies')).then(function (r) { return (r && r.ok && r.body && r.body.data && r.body.data.replies) || []; }, function () { return []; });
         SR.then(function (list) {
@@ -847,7 +853,7 @@
           var sel = document.createElement('select'); sel.className = 'dm-sr'; sel.setAttribute('aria-label', 'Insert a saved reply');
           sel.innerHTML = '<option value="">Insert a saved reply…</option>' + list.map(function (x) { return '<option value="' + esc3(x.id) + '">' + esc3(x.title) + '</option>'; }).join('');
           sel.onchange = function () { var b = map[sel.value]; if (b) { var cur = body.value; body.value = cur ? cur.replace(/\s*$/, '') + '\n\n' + b : b; body.dispatchEvent(new Event('input', { bubbles: true })); body.focus(); } sel.value = ''; };
-          body.parentNode.insertBefore(sel, body);
+          var row = toolsRow(); row.insertBefore(sel, row.firstChild);
         });
         function err(m) { errEl.textContent = m || ''; }
         function ready() { go.disabled = false; go.textContent = 'Send email'; }

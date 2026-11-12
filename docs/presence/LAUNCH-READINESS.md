@@ -56,7 +56,7 @@ Strong foundation: M8 shipped a real trust/a11y layer (focus capture/return, liv
 
 **Strong:** deny-all RLS on every table, function-mediated access, AES-256-GCM tokens that fail closed, `requires_approval` as DB CHECK constants across five surfaces, tenant/org/location isolation, signed OAuth state, atomic execution claims, and the invariants suite. **Concerns to close before launch:**
 - **Operator-auth path** for marketplace/enterprise (above) — currently no clean privileged caller.
-- **Secret hygiene** — a temp password and the Netlify token were shown in chat historically; confirm rotation; never reset `edavis7143@yahoo.com`.
+- **Secret hygiene** — rotate any credential that has ever been handled outside the secrets store; never reset the owner's own test sign-in (the Eric Test account).
 - **Global sentinels** — the all-zero `site_id` for global marketplace/org ops is a convention, not a guarded scope; confirm no cross-tenant read via it.
 - **Service-role breadth** — `svc()` uses the service role for all function I/O; a single missing site/tenant filter would bypass RLS. Worth a targeted audit of every `svc()` query that takes an id from the request.
 - A dedicated penetration test of the connect → write → disconnect and the approval lifecycles.

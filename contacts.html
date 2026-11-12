@@ -137,6 +137,7 @@
   .center{text-align:center;padding:56px var(--dds-s5,20px)}
   .center h2{font-family:var(--serif);font-weight:500;font-size:22px;margin:0 0 var(--dds-s2,8px)}
   a.link{color:var(--p);text-decoration:none;font-weight:500}
+  button.link{background:none;border:0;padding:8px 6px;min-height:44px;font:inherit;color:var(--p);font-weight:500;cursor:pointer}
   /* item 66: "Showing 100 of 240 · Show more" under the list */
   .more-line{margin:var(--dds-s4,16px) 0 var(--dds-s1,4px);text-align:center;font-size:13px;color:var(--faint)}
   .more-line .morebtn{background:none;border:0;color:var(--p);font:inherit;font-weight:600;cursor:pointer;padding:var(--dds-s2,8px) var(--dds-s3,12px);min-height:44px}
@@ -616,12 +617,20 @@ async function bulkSend(){
 }
 let VIEWS_ASKED=false;
 function loadSavedViews(){
-  if(VIEWS_ASKED||scope())return;
+  if(VIEWS_ASKED||inClient())return;
   const go=()=>{const k=KIT();if(!k)return;VIEWS_ASKED=true;k.use(api);k.views('contacts').then(v=>{if(Array.isArray(v)&&v.length){SAVED=v;render();}});};
   if(KIT())go();else document.addEventListener('DOMContentLoaded',go,{once:true});
 }
 const updatedLabel=()=>{const m=Math.floor((Date.now()-LOADED_AT)/60000);return m<1?'Updated just now':'Updated '+m+' min ago';};
 const scope=()=>new URLSearchParams(location.search).get('client')||'';
+// builder item 83: ?client= is also how someone with places in two businesses opens their second one.
+// That is their own business, not a studio inside a client, so it keeps the tools their first one has.
+// The shell tells the two apart (ddsScopeInfo: the context, else the businesses it remembers from the
+// last visit); before it has loaded, the address decides. A paint made before the context is in is
+// painted again if the context says otherwise.
+const inClient=()=>!!scope()&&(window.ddsScopeInfo&&/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(scope())?!!window.ddsScopeInfo():true);
+let PAINTED_IN=null;
+document.addEventListener('dds:context',()=>{if(PAINTED_IN!==null&&PAINTED_IN!==inClient()){render();loadSavedViews();loadImportStrip();}});
 const H=()=>({'Content-Type':'application/json','Authorization':'Bearer '+SUPABASE_KEY,'x-dds-user-jwt':TOKEN,'x-dds-scope-site':scope()});
 async function api(path,method,body){const r=await fetch(FN+path,{method:method||'GET',headers:H(),body:body?JSON.stringify(body):undefined});return{ok:r.ok,status:r.status,body:await r.json().catch(()=>({}))};}
 function toast(m){if(window.ddsToast)return void ddsToast(m);const t=$('toast');t.textContent=m;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2600);}
@@ -655,7 +664,7 @@ function headerHtml(count){
       <button class="lbtn" id="refreshBtn" aria-label="Refresh" title="Refresh">↻</button>
     </div>
     <div class="lmeta" id="lmeta">${esc(lmetaText(count))}</div>${TAG?`<div class="lmeta"><span class="tagfilter">Tagged <b>${esc(TAG)}</b><button type="button" id="tagOff" aria-label="Show everyone, not only ${esc(TAG)}">✕ Clear</button></span></div>`:''}
-    ${scope()?'':`<div class="ltools"><button class="lbtn txt" id="saveView" type="button">Save view</button>${CURVIEW?'<button class="lbtn txt" id="dropView" type="button">Remove view</button>':''}${DISPLAY==='table'?'<span class="colsdd"><button class="lbtn txt" id="colsBtn" type="button" aria-haspopup="true" aria-expanded="false">Columns</button></span>':''}<button class="lbtn txt" id="chartsBtn" type="button" aria-pressed="${CHARTS?'true':'false'}" aria-controls="charts">Charts</button><button class="lbtn txt" id="printBtn" type="button">Print</button></div>`}
+    ${inClient()?'':`<div class="ltools"><button class="lbtn txt" id="saveView" type="button">Save view</button>${CURVIEW?'<button class="lbtn txt" id="dropView" type="button">Remove view</button>':''}${DISPLAY==='table'?'<span class="colsdd"><button class="lbtn txt" id="colsBtn" type="button" aria-haspopup="true" aria-expanded="false">Columns</button></span>':''}<button class="lbtn txt" id="chartsBtn" type="button" aria-pressed="${CHARTS?'true':'false'}" aria-controls="charts">Charts</button><button class="lbtn txt" id="printBtn" type="button">Print</button></div>`}
   </div>`;
 }
 // The quiet "possible duplicate" note. The server annotates the roster read
@@ -734,8 +743,9 @@ function listHtml(rows){
   // but contacts live on the STUDIO's site, so the list can only ever be empty
   // and "Add someone" would file them against the wrong tenant. data-noscope on
   // the exit: carryScopeGlobally would otherwise re-scope it straight back in.
-  if(!ALL.length&&scope())return `<div class="center"><h2>Contacts live at the studio level.</h2><p class="muted">You’re looking at one client. Your contacts belong to your studio, not to a single client, so there’s nothing here to show — and nothing you could usefully add from inside a client.</p><p style="margin-top:16px"><a class="link" data-noscope href="/contacts.html">Leave this client and open Contacts →</a></p></div>`;
-  if(!ALL.length&&!anyFilter())return `<div class="center"><h2>No contacts yet.</h2><p class="muted">Add someone, or they’ll appear here automatically when a website enquiry or a new deal comes in.</p><p style="margin-top:16px"><a class="link" href="/pipeline.html">Open Pipeline →</a></p></div>`;
+  if(!ALL.length&&inClient())return `<div class="center"><h2>Contacts live at the studio level.</h2><p class="muted">You’re looking at one client. Your contacts belong to your studio, not to a single client, so there’s nothing here to show — and nothing you could usefully add from inside a client.</p><p style="margin-top:16px"><a class="link" data-noscope href="/contacts.html">Leave this client and open Contacts →</a></p></div>`;
+  // sales item 105: the empty list offers the first thing to do, the same add as the toolbar's
+  if(!ALL.length&&!anyFilter())return `<div class="center"><h2>No contacts yet.</h2><p class="muted">Add someone, or they’ll appear here automatically when a website enquiry or a new deal comes in.</p><p style="margin-top:16px"><button type="button" class="btn" data-first="new">+ Add a contact</button></p><p style="margin-top:10px"><button type="button" class="link" data-first="importCsv">or import a list</button></p></div>`;
   if(!rows.length&&anyFilter()&&!Q.trim())return `<p class="muted" style="text-align:center;padding:30px">Nobody matches these filters. Turn one off, or clear them above.</p>`+moreHtml();
   if(!rows.length)return `<p class="muted" style="text-align:center;padding:30px">${Q?(Q.trim()&&!haveAll()&&!srchNow()?(SRCH_ERR===Q.trim()?'We couldn’t search all your contacts just now. These are the ones loaded so far.':'Looking through all your contacts…'):'No contacts match “'+esc(Q)+'”.'):'Nothing in this view — try “All contacts”.'}</p>`+moreHtml();
   return (DISPLAY==='table'?bulkHtml()+tableHtml(rows):cardsHtml(rows))+moreHtml();
@@ -805,13 +815,16 @@ async function searchServer(){
 // item 110 (K3): inside a client the page reads that client's site, where your contacts don't
 // live — an add or an import there was filed under the client and never reached your list.
 // So the add, import and fields buttons only show at the studio level.
+// sales item 105: the empty list's buttons press the toolbar's own (one way to do each thing)
+document.addEventListener('click',(e)=>{const x=e.target&&e.target.closest?e.target.closest('[data-first]'):null;if(!x)return;const t=$(x.getAttribute('data-first'));if(t)t.click();});
 function addButtons(){
   return `<button class="btn" id="new">+ Add a contact</button><button class="btn ghost" id="addCust" title="Set up an existing customer with their own workspace and a sign-in invitation">+ Add a customer</button><button class="btn ghost" id="importCsv" title="Bring your existing contact list — a CSV export from anywhere">Import CSV</button><button class="btn ghost" id="manageFields" data-needs="configure" title="Define up to 5 of your own fields — they show on every contact’s record">Manage fields</button>`;
 }
 function render(){
+  PAINTED_IN=inClient();
   const rows=sortedRows();
   let h=headerHtml(rows.length)
-    +`<div class="bar"><input class="search" id="q" type="search" aria-label="Search contacts" placeholder="Search name, email, or company…" value="${esc(Q)}">${scope()?'':addButtons()}</div><div id="fchips"></div><div id="csvZone"></div><div id="importStrip"></div>`
+    +`<div class="bar"><input class="search" id="q" type="search" aria-label="Search contacts" placeholder="Search name, email, or company…" value="${esc(Q)}">${inClient()?'':addButtons()}</div><div id="fchips"></div><div id="csvZone"></div><div id="importStrip"></div>`
     +`<section class="dds-charts" id="charts" aria-label="Charts" hidden></section><div id="listZone">${listHtml(rows)}</div>`;
   // Any re-render (sort, view, display, refresh) must not destroy an open — or
   // in-flight — CSV import panel: carry the LIVE #csvZone node (its handlers,
@@ -911,7 +924,7 @@ function wireList(){
 // item 90: the field filter chips, under the search. A change asks the server for the people it keeps.
 function paintFchips(){
   const host=$('fchips'),k=KIT();if(!host)return;
-  host.hidden=!k||!!scope();
+  host.hidden=!k||inClient();   // builder item 83: your own second business keeps the chips
   if(host.hidden){host.innerHTML='';return;}
   k.filterChips(host,{value:FFILT,offer:['quiet','owes','nodeal','added','via'],vias:FOUND_VIA,onChange:(next,key)=>{FFILT=next;PICKED.clear();SRCH=null;reorder(key&&key!=='clear'?'#fchips [data-fchip="'+key+'"]':'#fchips [data-fchip]');}});
 }
@@ -1186,7 +1199,7 @@ async function openImport(){
 //    list with what it did and one button that takes it back. ──
 let IMPORT=null,IMPORT_ASKED=false;
 async function loadImportStrip(){
-  if(scope())return;
+  if(inClient())return;
   let r;try{r=await api('/sales/contacts/imports');}catch(_){return;}
   const d=r.ok&&r.body&&r.body.data;   // the latest import, or nothing; anything else paints no strip
   IMPORT=(d&&!Array.isArray(d)&&d.id&&isFinite(Date.parse(d.created_at))&&!d.undone_at)?d:null;
@@ -1513,7 +1526,10 @@ async function load(){
   if(Q.trim())searchServer();   // item 66: a search still in the box looks past the loaded pages again
   if(!IMPORT_ASKED){IMPORT_ASKED=true;loadImportStrip();}   // item 86: the newest import of the day, with its Undo
 }
-(async function(){try{const{data}=await sb.auth.getSession();TOKEN=(data&&data.session&&data.session.access_token)||"";if(!TOKEN){signedOut();return;}await load();}catch(_){trouble();}})();
+// sales item 105: ?add=1 (an empty People list's button on Customers) opens Add a contact once the list is in
+(async function(){try{const{data}=await sb.auth.getSession();TOKEN=(data&&data.session&&data.session.access_token)||"";if(!TOKEN){signedOut();return;}await load();
+  if(new URLSearchParams(location.search).get('add')==='1'){try{history.replaceState(null,'',location.pathname);}catch(_){}const nb=$('new');if(nb)nb.click();}
+}catch(_){trouble();}})();
 </script>
 </body>
 </html>

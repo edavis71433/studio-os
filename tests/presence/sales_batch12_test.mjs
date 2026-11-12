@@ -92,7 +92,7 @@ ok('making or turning off the link is a setting', /'\(POST\|DELETE\) \/calendar\
 ok('the link lives in a reserved row', /calendarFeed: '__calendar_feed__'/.test(read('supabase/functions/presence/lib/reserved_store.ts')));
 ok('My tasks and the calendar share one reader', /export async function loadMyTasks\(siteId: string, userId: string \| null\)/.test(read('supabase/functions/presence/routes/sales.ts')) && /loadMyTasks\(siteId, owner\)/.test(read('supabase/functions/presence/routes/calendar.ts')));
 const cx = read('connections.html');
-ok('Connections: the Calendar card, not while a client is in view', /async function paintCalendar\(\)\{\n  const host = \$\('calSec'\); if\(!host \|\| SCOPE\) return;/.test(cx) && /id="calSec" hidden/.test(cx));
+ok('Connections: the Calendar card, not while a client is in view', /async function paintCalendar\(\)\{\n  const host = \$\('calSec'\); if\(!host \|\| IN_CLIENT\) return;/.test(cx) && /id="calSec" hidden/.test(cx));
 ok('Connections: the steps for Google Calendar are spelled out', cx.includes('Next to <b>Other calendars</b>, choose <b>+</b>, then <b>From URL</b>.'));
 
 // ── item 49, the rest ──

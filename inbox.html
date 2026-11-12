@@ -359,7 +359,7 @@
   .deal-explain b{font-weight:700}
   #leadSendDeal{border-radius:999px;font-weight:600}
   .lead-hint{font-size:12px;color:var(--faint);margin:6px 2px 0}
-  #leadDraft::before{content:"✦ ";color:var(--p)}
+  .ai-row{display:flex;align-items:center;gap:8px 10px;flex-wrap:wrap;margin:0 0 8px}.ai-row .sr-pick{margin:0}
   /* ══ Bold redesign — the Inbox list: Needs reply · Enquiries · Support · All
      under the search, one segmented row, each with its count ══ */
   .lhead .vseg{display:flex;width:100%;margin-top:var(--dds-s2,8px);gap:2px}
@@ -368,7 +368,7 @@
   .lhead .vseg button[aria-pressed="true"] .n{color:var(--p)}
   @media (pointer:coarse){.lhead .vseg button{min-height:40px}}
 </style>
-<link rel="stylesheet" href="/shell.css"><script src="/shell.js" defer></script>
+<link rel="stylesheet" href="/shell.css"><script src="/shell.js" defer></script><script src="/sales-ai.js" defer></script>
 </head>
 <body>
 <div id="main"><div class="spin" role="status" aria-label="Loading"></div></div>
@@ -1162,40 +1162,35 @@ function insertSavedReplies(taId){
   SR_FETCH.then((replies)=>{
     const cur=$(taId);
     if(!replies.length||cur!==ta)return;   // nothing saved / the pane re-rendered under us
-    if(ta.previousElementSibling&&ta.previousElementSibling.classList.contains('sr-pick'))return;
+    if(ta.parentNode.querySelector('.sr-pick'))return;
     const map={};replies.forEach(x=>{map[x.id]=x.body;});
     const sel=document.createElement('select');
     sel.className='sr-pick';sel.setAttribute('aria-label','Insert a saved reply');
     sel.style.cssText='display:block;margin-bottom:6px;max-width:100%';
     sel.innerHTML='<option value="">Insert a saved reply…</option>'+replies.map(x=>`<option value="${esc(x.id)}">${esc(x.title)}</option>`).join('');
     sel.onchange=()=>{const b=map[sel.value];if(b){const v=ta.value;ta.value=v?(v.replace(/\s*$/,'')+'\n\n'+b):b;ta.focus();}sel.value='';};
-    ta.parentNode.insertBefore(sel,ta);
+    const row=ta.previousElementSibling&&ta.previousElementSibling.classList.contains('ai-row')?ta.previousElementSibling:null;
+    if(row){sel.style.cssText='max-width:100%';row.insertBefore(sel,row.firstChild);}else ta.parentNode.insertBefore(sel,ta);   // sales item 94: beside Draft a reply
   });
 }
-// ── Draft a reply (benchmark 7): the EXISTING /writer/rewrite (action 'write')
-// drafts from the person's own message + the studio's fact sheet; the draft
-// lands in the textarea for editing and NOTHING is sent — Send stays the
-// operator's click. A quiet note says it was drafted by AI until they edit.
-// A plan without drafting (403) or a writer that's off (503) answers with the
-// server's own sentence; the manual path is always the product. ──
-async function draftReply(taId, prompt, btn){
-  const ta=$(taId);if(!ta||!btn)return;
-  const was=btn.textContent;btn.disabled=true;btn.textContent='Drafting…';
-  let r;
-  try{r=await api('/writer/rewrite','POST',{action:'write',field:'answer',prompt:String(prompt||'').slice(0,400)});}
-  catch(_){r={ok:false,body:{}};}
-  btn.disabled=false;btn.textContent=was;
-  const cur=$(taId);if(cur!==ta)return;   // the pane re-rendered under us
-  const text=r.ok&&r.body&&r.body.data&&String(r.body.data.text||'').trim();
-  if(!text){toast((r.body&&r.body.message)||'The draft didn’t come through — nothing changed. Write it by hand or try again.');return;}
-  const v=String(ta.value||'').replace(/\s+$/,'');
-  ta.value=v?(v+'\n\n'+text):text;
-  let note=ta.parentNode.querySelector('.ai-note');
-  if(!note){note=document.createElement('div');note.className='ai-note';note.setAttribute('role','note');ta.insertAdjacentElement('afterend',note);}
-  note.textContent='Drafted by AI — edit before sending.';
-  ta.addEventListener('input',()=>{const n=ta.parentNode.querySelector('.ai-note');if(n)n.remove();},{once:true});
-  ta.focus();
+// ── Draft a reply (sales item 94; benchmark 7 before it): AI help drafts from the whole
+// conversation, or the enquiry and the studio's services (/sales/ai/draft, the same press as
+// Email on a record). The draft lands in the box for editing and NOTHING is sent: Send stays
+// the operator's click, and waits while it writes; Undo draft puts their words back. AI help
+// is off until the studio's owner switches it on (Settings, Goal and AI help), and the
+// server's own sentence says so. sales-ai.js draws the pill and its notes. ──
+function aiDraftInto(taId,btnId,o){
+  const go=()=>{
+    const ta=$(taId);if(!ta||!window.ddsSalesAi||ta.parentNode.querySelector('.ai-row'))return;
+    const row=document.createElement('div');row.className='ai-row';ta.parentNode.insertBefore(row,ta);
+    const pick=row.previousElementSibling;if(pick&&pick.classList.contains('sr-pick')){pick.style.cssText='max-width:100%';row.appendChild(pick);}   // the saved replies, when they came first, share the row
+    const sends=ta.form?[...ta.form.querySelectorAll('button.primary,button[type=submit]')]:[];
+    const p=window.ddsSalesAi.pill(row,{req:api,ta,go:sends,label:'Draft a reply',hint:o.hint,sendLabel:o.sendLabel||'Send',payload:o.payload,writing:o.writing});
+    p.button.id=btnId;
+  };
+  if(window.ddsSalesAi||document.readyState!=='loading')go();else document.addEventListener('DOMContentLoaded',go,{once:true});
 }
+const firstOf=(n)=>String(n||'').trim().split(/\s+/)[0]||'';
 function snapComposer(){const s={sel:SEL,vals:{},focus:''};for(const id of COMPOSER_FIELDS){const el=$(id);if(el&&el.value)s.vals[id]=el.value;}const ae=document.activeElement;if(ae&&COMPOSER_FIELDS.includes(ae.id))s.focus=ae.id;return s;}
 function restoreComposer(it){const s=DRAFT;if(!s||s.sel!==it.id)return;DRAFT=null;for(const id in s.vals){const el=$(id);if(el)el.value=s.vals[id];}if(s.focus){const el=$(s.focus);if(el)el.focus();}}
 async function paneMessage(host,it){
@@ -1232,10 +1227,9 @@ async function paneMessage(host,it){
   if(reply){
     pc.innerHTML=`<form id="msgForm"><label for="msgBody" style="font-size:12.5px;color:var(--faint)">Reply to the client</label>
       <textarea id="msgBody" placeholder="Write a message…" aria-label="Reply to the client"></textarea>
-      <div class="crow"><button type="button" id="msgDraft">Draft a reply</button><span class="spacer"></span><button class="primary" type="submit">Send</button></div></form>`;
-    // the newest thing the CLIENT said is what a draft answers (convItem titles the studio's own as "You …")
-    const lastClient=items.find(x=>x&&x.type==='message'&&!/^You\b/.test(String(x.title||'')));
-    $('msgDraft').addEventListener('click',()=>draftReply('msgBody',`A short, friendly reply from the studio to ${it.client||'the client'}'s message: "${String((lastClient&&lastClient.body)||'they asked how the project is going').slice(0,280)}"`,$('msgDraft')));
+      <div class="crow"><span class="spacer"></span><button class="primary" type="submit">Send</button></div></form>`;
+    // sales item 94: the draft reads the whole conversation, as the record does
+    aiDraftInto('msgBody','msgDraft',{hint:'AI help · about 1¢ a draft · reads this conversation',payload:()=>({kind:'record',client_id:it.client_id||undefined,project:it.project_id||undefined}),writing:()=>`Writing a draft from ${firstOf(it.client)?firstOf(it.client)+'’s':'their'} messages…`});
     $('msgForm').onsubmit=async(e)=>{
       e.preventDefault();
       const ta=$('msgBody');const body=(ta.value||'').trim();if(!body)return;
@@ -1424,9 +1418,8 @@ async function paneSupport(host,it){
   const canResolve=cur==='open'||cur==='in_progress';
   $('pcomposer').innerHTML=`<form id="supForm"><label for="supBody" style="font-size:12.5px;color:var(--faint)">Reply</label>
     <textarea id="supBody" placeholder="Write a reply…" aria-label="Reply to this request"></textarea>
-    <div class="crow"><span class="muted" style="font-size:12px">${replyReach(it)}</span><button type="button" id="supDraft">Draft a reply</button><span class="spacer"></span>${canResolve?'<button type="button" id="supReplyResolve">Reply and resolve</button>':''}<button class="primary" type="submit">Send</button></div></form>`;
-  const lastClientMsg=[...msgs].reverse().find(m=>m.author_kind==='client'||m.author_kind==='customer');
-  $('supDraft').addEventListener('click',()=>draftReply('supBody',`A short, friendly reply from the studio to a support request "${String(req.subject||'Support request').slice(0,80)}": "${String((lastClientMsg&&lastClientMsg.body)||req.body||'').slice(0,240)}"`,$('supDraft')));
+    <div class="crow"><span class="muted" style="font-size:12px">${replyReach(it)}</span><span class="spacer"></span>${canResolve?'<button type="button" id="supReplyResolve">Reply and resolve</button>':''}<button class="primary" type="submit">Send</button></div></form>`;
+  aiDraftInto('supBody','supDraft',{hint:'AI help · about 1¢ a draft · reads this request',payload:()=>({kind:'support',id:it.support_id}),writing:()=>'Writing a draft from this request…'});   // sales item 94
   // one send path: post the reply; "Reply and resolve" then ends the wait too
   const sendReply=async(andResolve)=>{
     const ta=$('supBody');const body=(ta.value||'').trim();if(!body){ta.focus();return;}
@@ -1533,7 +1526,7 @@ function paneLead(host,it){
     </div></div>
     ${l.email?`<div class="pcomposer"><form id="leadForm"><label for="leadBody" style="font-size:12.5px;color:var(--faint)">Reply to ${esc(l.name||l.email)} — sent by email from your studio</label>
       <textarea id="leadBody" aria-label="Reply to ${esc(l.name||l.email)}">${esc(leadGreeting(l))}</textarea>
-      <div class="crow"><button type="button" id="leadDraft">Draft a reply</button><a class="link" id="leadMailto" href="${leadReplyHref(l)}" style="font-size:12.5px">Use your email app instead</a><span class="spacer"></span><button class="${inPipe?'primary':''}" type="submit" id="leadSend">Send reply</button>${inPipe?'':'<button class="primary" type="button" id="leadSendDeal">Reply &amp; make it a deal</button>'}</div><p class="lead-hint">${esc(String(l.name||'They').split(' ')[0])} gets this by email · their reply comes back here</p></form></div>`
+      <div class="crow"><a class="link" id="leadMailto" href="${leadReplyHref(l)}" style="font-size:12.5px">Use your email app instead</a><span class="spacer"></span><button class="${inPipe?'primary':''}" type="submit" id="leadSend">Send reply</button>${inPipe?'':'<button class="primary" type="button" id="leadSendDeal">Reply &amp; make it a deal</button>'}</div><p class="lead-hint">${esc(String(l.name||'They').split(' ')[0])} gets this by email · their reply comes back here</p></form></div>`
     :`<p class="muted" style="margin:12px 16px;font-size:12.5px">They left no email — ${l.phone?'call them on '+esc(l.phone)+'.':'there’s no way to reply.'}</p>`}`;
   wireBack();
   // item 28: the studio's private note (saved on the enquiry; the status is left as it is)
@@ -1582,7 +1575,7 @@ function paneLead(host,it){
     const sd=$('leadSendDeal');
     if(sd)sd.addEventListener('click',async()=>{if(await sendLeadReply(sd,'Reply & make it a deal'))createDeal(it,sd);});
     insertSavedReplies('leadBody');   // C3: the saved-reply picker, when any exist
-    const ld=$('leadDraft');if(ld)ld.addEventListener('click',()=>draftReply('leadBody',`A short, friendly reply from the studio to ${l.name||'someone'} who sent a ${KIND[l.form_kind]?KIND[l.form_kind].toLowerCase():'message'} through the website: "${String(l.message||'they left their details without a message').slice(0,280)}". Continue after the greeting already written; do not repeat it.`,ld));
+    aiDraftInto('leadBody','leadDraft',{hint:'AI help · about 1¢ a draft · reads this enquiry and your services',sendLabel:'Send reply',payload:()=>({kind:'enquiry',id:it.lead_id}),writing:()=>`Writing a draft from ${firstOf(l.name)?firstOf(l.name)+'’s':'their'} enquiry and your services…`});   // sales item 94
   }
   restoreComposer(it);   // item 65: also for an enquiry with no email (its note is a composer field too)
   const mr=$('leadRead');if(mr)mr.addEventListener('click',()=>setLeadStatus(it,'read',mr));

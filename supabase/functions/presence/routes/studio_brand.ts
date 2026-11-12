@@ -8,6 +8,7 @@
 import { json } from '../../_shared/http.ts';
 import { loadEmailBrand, EMAIL_BRAND_DEFAULT } from '../lib/email_brand.ts';
 import type { SiteRow } from '../lib/site.ts';
+import { svc } from '../lib/db.ts';
 
 export interface StudioBrand { name: string; logo_url: string | null; accent: string; is_default: boolean }
 
@@ -16,7 +17,28 @@ const PAGE_LOGO_TTL = 60 * 60;
 /** The studio's name, colour and logo for a page. Never throws; the default when a read fails. */
 export async function studioBrandOf(siteId: string): Promise<StudioBrand> {
   const b = await loadEmailBrand(siteId, { logoTtl: PAGE_LOGO_TTL }).catch(() => EMAIL_BRAND_DEFAULT);
-  return { name: b.name, logo_url: b.logoUrl || null, accent: b.accent, is_default: b.name === EMAIL_BRAND_DEFAULT.name && !b.logoUrl };
+  // item 179: a studio that never filled in Business details still has a name, the one
+  // on its account. Its clients see that, never the platform's.
+  const named = b.name !== EMAIL_BRAND_DEFAULT.name;
+  const name = named ? b.name : (await accountNameOf(siteId)) || b.name;
+  return { name, logo_url: b.logoUrl || null, accent: b.accent, is_default: name === EMAIL_BRAND_DEFAULT.name && !b.logoUrl };
+}
+
+/** The business name on a site's account (clients.name), '' when there is none or the read fails. */
+export async function accountNameOf(siteId: string): Promise<string> {
+  try {
+    if (!/^[0-9a-f-]{36}$/.test(siteId)) return '';
+    const s = await svc(`presence_sites?id=eq.${siteId}&select=client_id&limit=1`);
+    const clientId = s.ok && Array.isArray(s.json) ? String(s.json[0]?.client_id || '') : '';
+    if (!/^[0-9a-f-]{36}$/.test(clientId)) return '';
+    const c = await svc(`clients?id=eq.${clientId}&select=name&limit=1`);
+    return accountNameFrom(c.ok && Array.isArray(c.json) ? c.json[0]?.name : '');
+  } catch { return ''; }
+}
+/** A name fit to show: trimmed, at most 80 characters, never the platform's own. Pure. */
+export function accountNameFrom(raw: unknown): string {
+  const n = String(raw ?? '').replace(/\s+/g, ' ').trim().slice(0, 80);
+  return n && n !== EMAIL_BRAND_DEFAULT.name ? n : '';
 }
 
 /** GET /public/studio/:siteId/brand, before sign-in: the sign-in page's header. */

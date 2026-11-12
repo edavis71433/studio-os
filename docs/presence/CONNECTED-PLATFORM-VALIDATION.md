@@ -151,7 +151,7 @@ Verified: the ownership answer is the customer's account + authorization on ever
 - [x] Connected intelligence strengthens only; no duplicates, no contradictions, edition-aware
 - [x] Customer experience is plain-language and calm; no jargon leaks
 - [x] Deployed to staging + prod; migration history intact
-- [ ] **Owner setup before real external activity:** register provider apps + write scopes (dashboard steps); rotate any credentials shown in chat; confirm prices/nav before go-live push (standing gate)
+- [ ] **Owner setup before real external activity:** register provider apps + write scopes (dashboard steps); rotate any credential that has ever been handled outside the secrets store; confirm prices/nav before go-live push (standing gate)
 
 ---
 
