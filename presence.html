@@ -2000,6 +2000,58 @@ html.bs-open .scrim{z-index:96}   /* Files and the categories card open over the
 .bl-empty{font-size:13px;color:var(--soft);margin:0 0 8px}
 .bs-addline{display:inline-block;margin:2px 0 4px;min-height:36px}
 @media (max-width:760px){.bl-head{justify-content:stretch}.bl-head .pillbtn{flex:1}.bl-lists{margin-left:0}.bl-grid{grid-template-columns:1fr}.bl-row{flex-wrap:wrap}}
+/* item 57 · blocks inside a section: Add a block, a block's card, its rows in Layers, the phone's block bar */
+.stk-kind,.stk-li-main{display:flex;align-items:center;gap:12px;width:100%;padding:8px 10px;border:0;border-radius:var(--dds-r,12px);background:transparent;color:inherit;font:inherit;text-align:left;cursor:pointer}
+.stk-kind:hover,.stk-li-main:hover{background:var(--dc-raised)}
+.stk-kind:focus-visible,.stk-li-main:focus-visible,.stk-back:focus-visible,.stk-addbtn:focus-visible,.stk-tree-add:focus-visible,.stk-li-b:focus-visible,.stk-q-rm:focus-visible{outline:2px solid var(--plum);outline-offset:2px}
+.stk-kind-ico{flex:none;width:36px;height:36px;border-radius:10px;background:var(--plum-soft);color:var(--plum);display:flex;align-items:center;justify-content:center}
+.stk-kind-ico svg{width:20px;height:20px}
+.stk-li .stk-kind-ico{width:32px;height:32px}.stk-li .stk-kind-ico svg{width:18px;height:18px}
+.stk-kind-t{display:flex;flex-direction:column;gap:2px;min-width:0}
+.stk-kind-t b{font-size:13.5px;font-weight:600;color:var(--ink)}
+.stk-kind-t span{font-size:12.5px;color:var(--ink-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.stk-away{display:flex;flex-direction:column;gap:6px;margin:0 var(--dds-s3,12px) 10px;padding:12px 14px;border-radius:12px;background:var(--plum-soft);color:var(--ink)}
+.stk-away b{color:var(--plum);font-size:13.5px}
+.stk-away span{font-size:12.5px;color:var(--ink-2)}
+#designBlockAdd{padding:0 0 var(--dds-s6,24px)}
+#designBlockAdd .stk-grp{padding:0 var(--dds-s3,12px)}
+html.dc-edit:not(.plan-watch) #trayPanel[data-tab="blocks"] .dc-tabs{display:none}
+.stk-first{margin-bottom:6px}
+.stk-new{margin-left:auto;padding:3px 8px;border-radius:999px;background:var(--plum-soft);color:var(--plum);font:600 12px/1 var(--sans)}
+.stk-list{display:flex;flex-direction:column;gap:2px}
+.stk-li{display:flex;align-items:center;gap:2px;border-radius:var(--dds-r,12px)}
+.stk-li:hover{background:var(--dc-raised)}
+.stk-li .stk-li-main{flex:1 1 auto;min-width:0}
+.stk-li-b{flex:none;width:32px;height:32px;border:0;border-radius:8px;background:transparent;color:var(--ink-2);display:flex;align-items:center;justify-content:center;cursor:pointer}
+.stk-li-b:hover{background:var(--sheet);color:var(--ink)}
+.stk-li-b:disabled{opacity:.35;cursor:default}
+.stk-addbtn,.stk-tree-add{display:inline-flex;align-items:center;gap:6px;margin-top:8px;padding:9px 14px;border:0;border-radius:999px;background:var(--plum-soft);color:var(--plum);font:600 13px/1 var(--sans);cursor:pointer}
+.stk-addbtn:disabled{opacity:.45;cursor:default}
+.stk-tree-add{margin:2px 0 6px 32px;background:transparent;padding:7px 10px}
+.stk-tree-add:hover{background:var(--plum-soft)}
+.dc-tree-row.stk-row{margin-left:32px}
+.stk-back{display:inline-flex;align-items:center;gap:6px;margin:0 0 12px;padding:7px 12px 7px 9px;border:0;border-radius:999px;background:var(--dc-raised);color:var(--ink-2);font:600 12.5px/1 var(--sans);cursor:pointer}
+.stk-back svg{transform:rotate(-90deg)}
+.stk-in{width:100%;padding:9px 12px;border:1px solid var(--hair-2);border-radius:10px;background:var(--sheet);color:var(--ink);font:inherit;font-size:14px;box-sizing:border-box}
+.stk-in:focus{outline:2px solid var(--plum);outline-offset:0;border-color:transparent}
+.stk-in:disabled{opacity:.5}
+textarea.stk-in{line-height:1.55;resize:vertical}
+.stk-check{display:flex;align-items:center;gap:8px;margin:10px 0;font-size:13px;color:var(--ink)}
+.stk-check input{width:18px;height:18px;margin:0;accent-color:var(--plum)}
+.stk-photo{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.stk-btnbox{margin:0 0 12px;padding:12px;border:1px solid var(--hair);border-radius:12px}
+.stk-btnbox-h{font-size:12px;font-weight:600;color:var(--ink-2);margin-bottom:6px}
+.stk-q{display:flex;align-items:center;gap:8px;margin-bottom:6px}
+.stk-q .stk-in{flex:1 1 auto;min-width:0}
+.stk-q-req{display:flex;align-items:center;gap:4px;font-size:12px;color:var(--ink-2);white-space:nowrap}
+.stk-q-req input{accent-color:var(--plum)}
+.stk-q-rm{flex:none;width:32px;height:32px;border:0;border-radius:8px;background:transparent;color:var(--ink-2);cursor:pointer;display:flex;align-items:center;justify-content:center}
+.stk-q-add{display:flex;gap:8px;align-items:center;margin-top:6px}
+.stk-q-add .stk-in{width:auto;flex:1 1 auto}
+#settingsPanel[data-blk] #inspectorSeg [data-itab="layout"],#settingsPanel[data-blk] #inspectorSeg [data-itab="when"]{display:none}
+.dc-blkbar[hidden]{display:none}
+.dc-blkbar .stk-del{color:var(--clay)}
+@media(max-width:760px){html.dc-edit.dc-blkpick:not(.plan-watch) #dcDock{visibility:hidden}}
 </style>
 </head>
 <body>
@@ -2360,6 +2412,7 @@ html.bs-open .scrim{z-index:96}   /* Files and the categories card open over the
           <button type="button" class="dc-dk" id="btnSettingsOpen" data-needs="configure" data-ico="spark" aria-haspopup="dialog" aria-controls="settingsPanel" title="Styles: how the whole site looks"><span class="dc-dk-l">Styles</span></button>
           <button type="button" class="dc-dk" id="dkPhotos" data-ico="image" aria-haspopup="dialog" aria-controls="trayPanel" title="Your photos and files"><span class="dc-dk-l">Photos</span></button>
           <div class="dc-dock-more" id="dcDockMore">
+            <button type="button" class="dc-dk" id="dkLayers" data-ico="layers" aria-haspopup="dialog" aria-controls="trayPanel" title="Layers: every section on this page, and the blocks inside each"><span class="dc-dk-l">Layers</span></button>
             <div id="dcModeSeg" class="dc-dkgrp" role="group" aria-label="Canvas mode">
               <button type="button" class="dc-dk" data-dcmode="comments" id="btnComments" data-ico="message" aria-pressed="false" title="Notes on this draft, from you and your client, section by section"><span class="dc-dk-l">Notes</span></button>
               <button type="button" class="dc-dk" data-dcmode="timewarp" data-ico="clock" aria-pressed="false" title="See your site as it looked on any past date"><span class="dc-dk-l">Versions</span></button>
@@ -2369,6 +2422,8 @@ html.bs-open .scrim{z-index:96}   /* Files and the categories card open over the
           </div>
           <button type="button" class="dc-dk dc-dk-phone" id="dkMore" data-ico="more" aria-expanded="false" aria-controls="dcDockMore" title="More tools"><span class="dc-dk-l">More</span></button>
         </nav>
+        <!-- item 57: on a phone, a picked block's tools take the dock's place -->
+        <nav id="dcBlkBar" class="dc-dock dc-blkbar" aria-label="This block’s tools" hidden></nav>
         <!-- #2 CANVAS-DOMINANT workspace: the live canvas fills the screen; the add
              tray and the styles open ON DEMAND (slide-over panels below). -->
         <div class="designstudio">
@@ -2445,11 +2500,13 @@ html.bs-open .scrim{z-index:96}   /* Files and the categories card open over the
             <div class="dc-tabs" role="tablist" aria-label="Page rail">
               <button type="button" class="dc-tab" id="tabAdd" role="tab" aria-selected="false" data-tab="add">Blocks</button>
               <button type="button" class="dc-tab" id="tabFiles" role="tab" aria-selected="false" data-tab="files">Files</button>
-              <button type="button" class="dc-tab on" id="tabContents" role="tab" aria-selected="true" data-tab="contents">Content tree</button>
+              <button type="button" class="dc-tab on" id="tabContents" role="tab" aria-selected="true" data-tab="contents">Layers</button>
             </div>
             <div id="designTray" class="dc-tabpanel" role="tabpanel" aria-labelledby="tabAdd" hidden></div>
             <div id="designFilesWrap" class="dc-tabpanel" role="tabpanel" aria-labelledby="tabFiles" hidden></div>
             <div id="designTreeWrap" class="dc-tabpanel" role="tabpanel" aria-labelledby="tabContents"><div class="dc-tree-back"><button type="button" class="textact" id="btnTreeBack">← Add a section</button></div><div id="designTreeList"></div></div>
+            <!-- item 57: Add a block, opened from a Blocks section (its pill, a block's More, Layers) -->
+            <div id="designBlockAdd" class="dc-tabpanel" role="region" aria-label="Add a block" hidden></div>
           </aside>
           <!-- on-demand DESIGN SETTINGS (right slide-over with a scrim); cards mount
                into #designHost, id preserved -->
@@ -7646,6 +7703,7 @@ function ddsKeyFor(bi) {
 }
 // ── actions (all REUSE the existing editor logic) ──
 function eeEditBlock(bi, tab) {                  // open this one section's editor, on one of its tabs
+  STK_ITEM = null;   // item 57: the section's card, not one of its blocks'
   closePreview(); go("design");
   if (!$("blocksCard")) mountBlocksCard();
   const blk = BLOCKS_WORK && BLOCKS_WORK[bi];
@@ -11264,6 +11322,8 @@ async function mountDevCssCard() {
 //    (one storage, one pipeline). Local working copy → explicit Save, so a half-filled
 //    block isn't stripped mid-edit. Media blocks (FD-T17) render read-only notes here. ──
 const BLOCK_DEFS = [
+  // item 57: a section built from blocks (a heading, words, photos, buttons…) stacked top to bottom
+  { type: "stack", name: "Blocks", stackSimple: true, hint: "Build your own section: a heading, words, photos, buttons and more, stacked top to bottom." },
   { type: "features", name: "Features / highlights", field: "items", hint: "One per line:  Title | short description | icon (optional emoji, e.g. ✅ 🚚 ⭐)",
     parse: (p) => ({ title: p[0] || "", text: p[1] || "", icon: p[2] || "" }), fmt: (o) => { const c = [o.title, o.text || "", o.icon || ""]; while (c.length && !c[c.length - 1]) c.pop(); return c.join(" | "); } },
   { type: "stats", name: "Numbers that build trust", field: "items", hint: "One per line:  Value | Label   (e.g.  15 | Years in business)",
@@ -11330,13 +11390,14 @@ const SECTION_GROUPS = [
   { label: "Get customers to act", note: "Clear next steps — book, sign up, find you, or grab a file.",
     types: ["cta", "spotlight", "buttons", "booking", "appointment", "newsletter", "download", "map"] },
   { label: "Text & layout", note: "Your own words, columns, expandable details, and spacing.",
-    types: ["title", "richtext", "columns", "tabs", "accordion", "table", "link_list", "divider", "toc"] },
+    types: ["stack", "title", "richtext", "columns", "tabs", "accordion", "table", "link_list", "divider", "toc"] },
   { label: "Info & updates", note: "Where you work, what's coming, and where to follow.",
     types: ["service_areas", "events", "social"] },
 ];
 // A muted secondary label shown only where the common word differs from ours —
 // display-only; the stored block.type never changes.
 const SECTION_ALIAS = {
+  stack: "build your own: heading, text, photo, button",
   gallery: "carousel / grid", before_after: "before/after slider", video: "embed",
   team: "staff / about us", partners: "logo cloud / clients",
   features: "highlights / icon grid", stats: "counters / metrics", reviews: "star rating",
@@ -11875,6 +11936,7 @@ const MEDIA_FILL_TYPES = new Set(["image", "gallery", "carousel", "video", "befo
 // edits the words — the same "never a cold start" idea as the starter layouts.
 function emptyBlock(def) {
   const b = { type: def.type };
+  if (def.stackSimple) { b.items = [{ kind: "heading", text: "Your heading" }, { kind: "text", body: "Say a little more here: who you help and how." }, { kind: "button", buttons: [{ label: "Get in touch", url: "/contact/" }] }]; return b; }   // item 57
   if (def.structured === "columns") { b.id = uniqueBlockId("columns"); b.columns = [{ body: "**Column one**\n\nA little about this." }, { body: "**Column two**\n\nAnd a little about this." }]; return b; }
   if (def.structured === "cards") { b.id = uniqueBlockId("cards"); b.cards = [{ heading: "A highlight", text: "A short line about it." }, { heading: "Another", text: "One more short line." }]; return b; }
   if (def.downloadSimple) { return b; }   // file_id set by the picker
@@ -12174,7 +12236,7 @@ let LIVE_WANTED = false;   // the panel has edits the canvas should show; a list
 // saved list, as after a full redraw.
 let LIVE_DRAWN = null;
 function dcLiveFromPanel() { LIVE_WANTED = true; dcLiveSoon(); }
-const LIVE_TYPE_OK = new Set(["title", "richtext", "cta", "booking", "appointment", "newsletter", "spotlight", "table", "image_text", "video", "map",
+const LIVE_TYPE_OK = new Set(["stack", "title", "richtext", "cta", "booking", "appointment", "newsletter", "spotlight", "table", "image_text", "video", "map",
   "features", "stats", "process", "pricing", "certifications", "events", "social", "link_list", "service_areas"]);
 function dcLiveSoon() { clearTimeout(LIVE_T); LIVE_T = setTimeout(dcLiveNow, 200); }   // only the section panel asks (dcLiveFromPanel)
 async function dcLiveNow() {
@@ -12645,6 +12707,8 @@ function renderBlocksCard() {
   blocksSaveSoon();  // every change to the list comes through here: save it if it differs
   const focusIdx = BLOCK_FOCUS; BLOCK_FOCUS = null;   // FD-T-LIB: consume the one-shot focus target
   const solo = PANEL_MODE === "section" && BLOCK_SOLO != null && BLOCKS_WORK[BLOCK_SOLO] ? BLOCK_SOLO : null;
+  if (STK_ITEM != null && !(solo !== null && (stkItems(solo) || [])[STK_ITEM])) STK_ITEM = null;   // item 57: a block's card, while its block is there
+  { const sp = $("settingsPanel"); if (sp) { if (STK_ITEM != null) sp.dataset.blk = "1"; else delete sp.dataset.blk; } }
   // CL-LINK: a linked section needs the saved-items list to show its name + let it be
   // edited. Lazy-load it once when any placement is a link (or being edited from one).
   if (CL_ITEMS === null && !CL_LOADING && BLOCKS_WORK.some((b) => b && (b.type === "linked" || b._clEdit))) {
@@ -12726,6 +12790,8 @@ function renderBlocksCard() {
     // already moves, duplicates and deletes, so the row of small buttons stays with the list.
     else if (solo !== null) head.remove();
     const panes = solo !== null ? insPanes(box) : null;
+    // item 57: a block of a Blocks section has a card of its own, Content and Style, nothing of the section's
+    if (panes && def.stackSimple && STK_ITEM != null) { stkItemCard(idx, STK_ITEM, panes); card.appendChild(box); return; }
     if (panes) {   // Layout keeps the two arrows: a keyboard's way to move, and the list's own pair
       const pos = el("div", "ins-field"); pos.appendChild(el("div", "ins-lbl", "Position on the page"));
       const row = el("div", "ins-swatches"); up.className = dn.className = "dc-actbtn"; up.style.cssText = dn.style.cssText = ""; up.title = "Move this section up"; dn.title = "Move this section down";
@@ -12737,12 +12803,14 @@ function renderBlocksCard() {
     if (panes) insHead(blk, def);
     const ti = el("input"); ti.type = "text"; ti.placeholder = "Section heading (optional)"; ti.value = blk.title || ""; ti.style.cssText = inputCss;
     ti.addEventListener("change", () => { BLOCKS_WORK[idx] = { ...BLOCKS_WORK[idx], title: ti.value.trim() }; if (panes) insHead(BLOCKS_WORK[idx], def); });
-    if (panes) { const f = el("div", "ins-field"); ti.id = "insTitle-" + idx; const l = el("label", "ins-lbl", "Heading"); l.htmlFor = ti.id; f.append(l, ti); sub.appendChild(f); }
+    if (def.stackSimple) { /* item 57: a Blocks section's heading is one of its blocks */ }
+    else if (panes) { const f = el("div", "ins-field"); ti.id = "insTitle-" + idx; const l = el("label", "ins-lbl", "Heading"); l.htmlFor = ti.id; f.append(l, ti); sub.appendChild(f); }
     else sub.appendChild(ti);
     // "Write with AI" on the section heading itself — covers headings everywhere
     // (a divider/auto table-of-contents has no heading to write).
-    if (!def.dividerSimple && !def.tocSimple) sub.appendChild(aiField(ti, { field: "heading" }));
-    if (def.ctaSimple) {
+    if (!def.dividerSimple && !def.tocSimple && !def.stackSimple) sub.appendChild(aiField(ti, { field: "heading" }));
+    if (def.stackSimple) stkSectionCard(idx, sub, panes);
+    else if (def.ctaSimple) {
       const t = el("input"), bt = el("input"), u = el("input");
       t.placeholder = "Banner text"; t.value = blk.text || ""; bt.placeholder = "Button label (optional)"; bt.value = blk.button || ""; u.placeholder = "Where the button goes (optional link)"; u.value = blk.url || "";
       [t, bt, u].forEach((inp) => { inp.type = "text"; inp.style.cssText = inputCss; });
@@ -14212,9 +14280,9 @@ function closeTrayPanel() {
 // Slice C: the left rail has THREE tabs — Blocks (the add-section palette),
 // Files (a compact asset browser) and Content tree (the page's component tree) —
 // mirroring AEM's Components + Assets + Content Tree rails.
-function dcRailTabName(name) { return (name === "add" || name === "files") ? name : "contents"; }
+function dcRailTabName(name) { return (name === "add" || name === "files" || name === "blocks") ? name : "contents"; }
 // the card's title and the quiet line under it, per tab (the floating studio, part two)
-const TRAY_WORDS = { add: ["Add a section", "Drag a tile onto the page, or tap it"], files: ["Photos", "Tap one to place it in the section"], contents: ["Page outline", "Every section on this page, in order"] };
+const TRAY_WORDS = { add: ["Add a section", "Drag a tile onto the page, or tap it"], files: ["Photos", "Tap one to place it in the section"], contents: ["Layers", "Every section on this page, and the blocks inside each"], blocks: ["Add a block", "Goes at the end of the section"] };
 function dcRailTab(name) {
   DC_RAIL_TAB = dcRailTabName(name);
   const w = TRAY_WORDS[DC_RAIL_TAB], tt = $("trayTitle"), ts = $("traySub"), tp = $("trayPanel");
@@ -14224,13 +14292,15 @@ function dcRailTab(name) {
   dcLeftSync();
   [["add", $("tabAdd"), $("designTray")],
    ["files", $("tabFiles"), $("designFilesWrap")],
-   ["contents", $("tabContents"), $("designTreeWrap")]].forEach(([key, tab, panel]) => {
+   ["contents", $("tabContents"), $("designTreeWrap")],
+   ["blocks", null, $("designBlockAdd")]].forEach(([key, tab, panel]) => {
     const on = DC_RAIL_TAB === key;
     if (tab) { tab.classList.toggle("on", on); tab.setAttribute("aria-selected", String(on)); }
     if (panel) panel.hidden = !on;
   });
   if (DC_RAIL_TAB === "add") mountBlockTray();
   else if (DC_RAIL_TAB === "files") mountPanelFiles();
+  else if (DC_RAIL_TAB === "blocks") stkRenderAdd();
   else dcRefreshTree();
 }
 function openTrayPanel(tab, find) {   // find: the dock's Find, which wants the search box even on a phone
@@ -14251,6 +14321,7 @@ function openTrayPanel(tab, find) {   // find: the dock's Find, which wants the 
   setTimeout(() => { try {
     (want === "add" ? (typeNow && p.querySelector("#designTray .tray-search") || $("btnTrayClose"))
       : want === "files" ? (typeNow && $("pfSearch") || $("btnTrayClose"))
+      : want === "blocks" ? (typeNow && p.querySelector("#designBlockAdd .tray-search") || $("btnTrayClose"))
       : $("tabContents")).focus({ preventScroll: true });
   } catch (_) {} }, 40);
 }
@@ -14267,7 +14338,7 @@ function closeSettingsPanel() {
   dcColourAids();
   if (sc) { sc.classList.remove("on"); sc.hidden = true; }
   if (PANEL_MODE === "section") {   // back to the full list, so a later "All sections" isn't one block
-    PANEL_MODE = "styles"; BLOCK_SOLO = null; p.dataset.mode = "styles";
+    PANEL_MODE = "styles"; BLOCK_SOLO = null; STK_ITEM = null; p.dataset.mode = "styles";
     if (typeof blocksSaveSoon === "function") blocksSaveSoon(0);
     if ($("blocksCard")) renderBlocksCard();
   }
@@ -14489,7 +14560,8 @@ function insPanes(box) {
 function insHead(blk, def) {
   const t = $("settingsTitle"), sb = $("settingsSub"), p = $("settingsPanel");
   const kind = (def && def.name) || "Section";
-  const name = String((blk && blk.title) || "").trim() || kind;
+  const head = blk && blk.type === "stack" ? (blk.items || []).find((it) => it && it.kind === "heading" && it.text) : blk;   // a Blocks section goes by its first heading
+  const name = String((head && (head.title || head.text)) || "").trim() || kind;
   if (t) t.textContent = name;
   if (sb) { sb.textContent = kind + " · on " + (typeof dcPageTitle === "function" ? dcPageTitle(DC_PAGE) : "Home"); sb.hidden = false; }
   if (p) p.setAttribute("aria-label", name);
@@ -15015,6 +15087,7 @@ const KEY_MAC = /Mac|iPhone|iPad|iPod/.test(navigator.platform || navigator.user
   on("pcEvery", pcEvery);   // item 158
   const find = $("pcFind"); if (find) find.addEventListener("input", pcFilter);
   on("dkPhotos", () => toggleTray("files"));
+  on("dkLayers", () => { dcDockMore(false); toggleTray("contents"); });   // item 57
   on("dkFind", () => { dcDockMore(false); openTrayPanel("add", true); });   // opens the library with its search box focused
   on("dkPreview", () => { dcDockMore(false); dcOpenPreview(); });
   on("dkMore", () => dcDockMore());
@@ -15268,6 +15341,12 @@ const BI_PATHS = {
   check: '<path d="M20 6L9 17l-5-5"/>',
   up: '<path d="M12 19V5"/><path d="M5 12l7-7 7 7"/>',
   down: '<path d="M12 5v14"/><path d="M19 12l-7 7-7-7"/>',
+  // item 57: Blocks, Layers and the block toolbar
+  layers: '<path d="M12 3l9 5-9 5-9-5 9-5z"/><path d="M3 12.5l9 5 9-5"/><path d="M3 17l9 5 9-5"/>',
+  spacer: '<path d="M12 5v14"/><path d="M8 8l4-4 4 4"/><path d="M8 16l4 4 4-4"/>',
+  form: '<rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/>',
+  alignl: '<path d="M4 6h16M4 12h10M4 18h14"/>',
+  alignc: '<path d="M4 6h16M7 12h10M5 18h14"/>',
 };
 function uiIcon(name, size) {
   const s = size || 16;
@@ -15280,7 +15359,7 @@ const TRAY_TYPE_ICON_NAME = {
   features: "spark", stats: "chart", cards: "cards", reviews_wall: "star", reviews: "star", certifications: "badge", pricing: "price", process: "steps",
   cta: "megaphone", buttons: "button", booking: "calendar", appointment: "calendar", newsletter: "mail", download: "download", map: "pin",
   richtext: "text", columns: "columns", accordion: "chevrons", tabs: "tabs", carousel: "carousel", progress: "progress", divider: "divider", toc: "list", service_areas: "pin", events: "calendar", social: "share",
-  title: "heading", link_list: "link", table: "table", spotlight: "spark",
+  title: "heading", link_list: "link", table: "table", spotlight: "spark", stack: "layers",
 };
 const trayIcon = (type) => uiIcon(TRAY_TYPE_ICON_NAME[type] || "section");
 // PURE + self-contained (no globals) so it can be unit-tested by extraction: does a
@@ -15316,9 +15395,15 @@ function renderBlockTray() {
   host.appendChild(chips);
   const present = new Set((BLOCKS_WORK || []).map((b) => b && b.type));
   let shown = 0;
+  // item 57: Blocks leads the list, a section built from any of the blocks
+  const stack = BLOCK_DEFS.find((d) => d.type === "stack");
+  if (stack && (!TRAY_GROUP || TRAY_GROUP === "Text & layout") && trayItemMatches(stack.name, SECTION_ALIAS.stack, "stack", TRAY_QUERY)) {
+    const wrap = el("div", "tray-grp shots stk-first"), ti = trayItem(stack);
+    ti.appendChild(el("span", "stk-new", "New")); wrap.appendChild(ti); host.appendChild(wrap); shown++;
+  }
   SECTION_GROUPS.forEach((grp) => {
     if (TRAY_GROUP && grp.label !== TRAY_GROUP) return;
-    const defs = grp.types
+    const defs = grp.types.filter((ty) => ty !== "stack")
       .map((ty) => BLOCK_DEFS.find((d) => d.type === ty))
       .filter((d) => d && !(BLOCK_SINGLETON.has(d.type) && present.has(d.type)))
       .filter((d) => trayItemMatches(d.name, SECTION_ALIAS[d.type], d.type, TRAY_QUERY));
@@ -16385,6 +16470,7 @@ const IPE_CAPS = {
   table: { 'headers.N': 80, 'rows.N.N': 200 },
   spotlight: { title: 120, eyebrow: 60, body: 800, 'button.label': 40 },
   toc: { title: 80 },
+  stack: { 'items.N.text': 160, 'items.N.body': 4000, 'items.N.caption': 200, 'items.N.buttons.N.label': 40, 'items.N.address': 200 },   // item 57
 };
 // The cap for one stored field — numeric path segments normalize to N. null =
 // no client cap (unknown type/field): the server still enforces its own bounds.
@@ -17158,6 +17244,30 @@ function dcInjectCanvas(doc, main, live) {
       // "Add section" pill on it. Clicking one opens the section picker AT that spot; it's
       // also the drop target the drag ghost snaps to. Purely an editing overlay — never served.
       "#presence-preview-badge{display:none!important}" +
+      // item 57: a Blocks section's blocks: outlined under the pointer, picked with a click, and their toolbar
+      ".block-stack [data-dds-item]{cursor:pointer}" +
+      ".block-stack [data-dds-item]:hover{outline:1px dashed rgba(var(--ddsdc-p-rgb),.55);outline-offset:4px}" +
+      ".block-stack .dc-blk-on,.block-stack .dc-blk-on:hover{outline:2px solid var(--ddsdc-p)!important;outline-offset:4px}" +
+      "#dds-dc-blk{position:absolute;z-index:2147483000;display:none;align-items:center;gap:2px;padding:4px;background:var(--ddsdc-card);border:1px solid rgba(var(--ddsdc-p-rgb),.08);border-radius:999px;box-shadow:var(--ddsdc-shadow);font-family:var(--ddsdc-sans)}" +
+      "#dds-dc-blk.on{display:flex}" +
+      "#dds-dc-blk .dc-blk-name{padding:0 6px 0 10px;font:600 12.5px/1 var(--ddsdc-sans);color:var(--ddsdc-ink);white-space:nowrap}" +
+      "#dds-dc-blk .dc-blk-sep{width:1px;height:22px;background:var(--ddsdc-line);margin:0 2px}" +
+      "#dds-dc-blk .dc-b{position:relative;width:32px;height:32px;padding:0;border:0;border-radius:10px;background:transparent;color:var(--ddsdc-soft);display:inline-flex;align-items:center;justify-content:center;cursor:pointer;font:inherit}" +
+      "#dds-dc-blk .dc-b svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.75;stroke-linecap:round;stroke-linejoin:round;display:block}" +
+      "#dds-dc-blk .dc-b:hover{background:var(--ddsdc-up);color:var(--ddsdc-ink)}" +
+      "#dds-dc-blk .dc-b.dc-on,#dds-dc-blk .dc-b[aria-expanded=\"true\"]{background:var(--ddsdc-p-soft);color:var(--ddsdc-p)}" +
+      "#dds-dc-blk .dc-danger{color:var(--ddsdc-bad)}#dds-dc-blk .dc-danger:hover{background:var(--ddsdc-bad-soft);color:var(--ddsdc-bad)}" +
+      "#dds-dc-blk .dc-b:focus-visible{outline:2px solid var(--ddsdc-p);outline-offset:1px}" +
+      "#dds-dc-blk .dc-off{opacity:.4;pointer-events:none}" +
+      "#dds-dc-blkmore{position:absolute;z-index:2147483001;display:none;flex-direction:column;min-width:210px;padding:6px;background:var(--ddsdc-card);border:1px solid rgba(var(--ddsdc-p-rgb),.08);border-radius:14px;box-shadow:var(--ddsdc-shadow);font-family:var(--ddsdc-sans)}" +
+      "#dds-dc-blkmore.on{display:flex}" +
+      "#dds-dc-blkmore .dc-mi{display:flex;align-items:center;gap:10px;height:36px;padding:0 10px;border:0;border-radius:10px;background:transparent;color:var(--ddsdc-ink);font:500 13px/1 var(--ddsdc-sans);text-align:left;white-space:nowrap;cursor:pointer}" +
+      "#dds-dc-blkmore .dc-mi svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.75;stroke-linecap:round;stroke-linejoin:round;color:var(--ddsdc-soft)}" +
+      "#dds-dc-blkmore .dc-mi:hover{background:var(--ddsdc-up)}#dds-dc-blkmore .dc-mi:focus-visible{outline:2px solid var(--ddsdc-p);outline-offset:-2px}" +
+      "#dds-dc-bar .dc-addblk{width:auto;padding:0 12px 0 9px;gap:6px;border-radius:999px;background:var(--ddsdc-p-soft);color:var(--ddsdc-p)}" +
+      "#dds-dc-bar .dc-addblk:hover{background:var(--ddsdc-p-soft);color:var(--ddsdc-p);filter:brightness(.97)}" +
+      "#dds-dc-bar .dc-addblk svg{width:16px;height:16px}" +
+      "#dds-dc-bar .dc-addblk-l{font:600 12px/1 var(--ddsdc-sans);white-space:nowrap}" +
       ".dc-ins{position:relative;height:16px;margin:0;display:flex;align-items:center;justify-content:center;cursor:pointer;font-family:var(--ddsdc-sans)}" +
       ".dc-ins::before{content:'';position:absolute;left:0;right:0;top:50%;height:0;border-top:2px solid rgba(var(--ddsdc-p-rgb),.35);transform:translateY(-50%);transition:border-color var(--dds-t-fast,120ms) var(--dds-ease,ease-out)}" +
       ".dc-ins:hover::before,.dc-ins:focus-within::before{border-top-color:var(--ddsdc-p)}" +
@@ -17303,6 +17413,13 @@ function dcInjectCanvas(doc, main, live) {
         // the parent for the ghost + drop-line). Resolves to one list index via dcMove.
         grip.addEventListener("pointerdown", (e) => { e.preventDefault(); e.stopPropagation(); pdStart(e, { kind: "move", from: bi, iframeLocal: true, label: (BLOCKS_WORK[bi] && (BLOCK_DEFS.find((x) => x.type === BLOCKS_WORK[bi].type) || {}).name) || "Section", icon: "⠿" }, grip); });
         bar.appendChild(grip);
+        // item 57: a Blocks section takes new blocks here and shows them in Layers; a simple one turns into blocks first
+        if (b.type === "stack" || STK_TURNS.has(b.type)) {
+          const ab = mkBtn("Add block", b.type === "stack" ? "Add a block to this section" : "Add a block: this section becomes a Blocks section, its words and photos as they are", () => { if (b.type === "stack" || stkTurn(bi)) stkOpenAdd(bi); }, { cls: "dc-addblk", icon: "plus" });
+          ab.lastChild.className = "dc-addblk-l";
+          bar.appendChild(ab);
+          if (b.type === "stack") bar.appendChild(mkBtn("Layers", "Layers: the blocks in this section", () => openTrayPanel("contents"), { icon: "layers" }));
+        }
         bar.appendChild(mkBtn("Edit", "Edit this section", () => eeEditBlock(bi), { icon: "pencil" }));
         bar.appendChild(mkBtn("Duplicate", "Duplicate this section", () => dcDuplicate(bi), { icon: "copy" }));
         bar.appendChild(mkBtn("Style", "Style this section — its colours, type and layout", () => eeEditBlock(bi, "style"), { icon: "spark" }));
@@ -17458,6 +17575,7 @@ function dcInjectCanvas(doc, main, live) {
   // expose a selector so the content-tree rows can flash + select a section on click
   DC_SHOWBAR = (elx) => { try { showBar(elx); } catch (_) {} };
   DC_HIDEBAR = () => { try { hideBar(); } catch (_) {} };
+  try { stkInject(doc, main, live); } catch (_) {}   // item 57: the blocks inside Blocks sections, and their toolbar
   // Items 41, 50 and 123: a press on the header or footer (not on a link, the menu or words
   // being typed) opens its card; its chip says it's on every page, and is the way in by keyboard.
   try {
@@ -17574,6 +17692,692 @@ function dcOpenInsertFromCanvas(gap, anchorInFrame) {
   openInsertMenu(gap, null, rect);
 }
 
+// ═══ Builder item 57 · blocks inside a section (the Blocks section) ═══════════════
+// A Blocks section (stored type "stack", shown as "Blocks") holds small blocks stacked top
+// to bottom, with no free placement (Eric, Nov 12 2026; Figma node 324:789). The server draws
+// each block with data-dds-item, its place in the section, and the usual field stamps, so a
+// double-click types into a block as into any section (ipeStart). This part adds the nine
+// kinds, picking a block on the page with its toolbar (on a phone, a bar in the dock's
+// place), Add a block, a block's own card (Content and Style), the blocks' rows in Layers,
+// and turning a simple section into blocks. Every change is a change to the page's section
+// list, so it saves, redraws and undoes like any section edit.
+const STK_KINDS = [
+  { kind: "heading", name: "Heading", hint: "A big line of words", icon: "heading", group: "Words", words: "title" },
+  { kind: "text", name: "Text", hint: "Paragraphs, lists and links", icon: "text", group: "Words", words: "paragraph writing words" },
+  { kind: "image", name: "Image", hint: "One photo, with a caption", icon: "image", group: "Photos and video", words: "photo picture" },
+  { kind: "video", name: "Video", hint: "YouTube or Vimeo, with your own picture", icon: "video", group: "Photos and video", words: "youtube vimeo film" },
+  { kind: "button", name: "Button", hint: "One button, or up to three in a row", icon: "button", group: "Get in touch", words: "link call book" },
+  { kind: "form", name: "Form", hint: "Name, email and a message, sent to you", icon: "form", group: "Get in touch", words: "contact enquiry quote" },
+  { kind: "spacer", name: "Spacer", hint: "Empty room between blocks", icon: "spacer", group: "Space", words: "space gap" },
+  { kind: "divider", name: "Divider", hint: "A thin line across", icon: "divider", group: "Space", words: "line rule" },
+  { kind: "map", name: "Map", hint: "Your address and a Get directions link", icon: "pin", group: "Find us", words: "address directions location" },
+];
+const STK_GROUPS = ["Words", "Photos and video", "Get in touch", "Space", "Find us"];
+// "embed" and its cousins: nothing from another company goes on a client's page
+const STK_AWAY = /\b(embed|iframe|html|code|script|widget|instagram|facebook|tiktok|calendly|opentable|spotify)\b/i;
+const stkKind = (k) => STK_KINDS.find((x) => x.kind === k) || { kind: k, name: "Block", icon: "section", hint: "", words: "" };
+const STK_TURNS = new Set(["richtext", "title", "image", "buttons", "video", "divider"]);   // the simple sections Add block turns into blocks
+const STK_FILL = new Set(["image", "video", "map"]);   // a new one waits for its card: it draws nothing until then
+const STK_MAX = 20;   // the server keeps up to 20 blocks in one section
+let STK_ITEM = null;    // the block whose card is open, in BLOCK_SOLO's Blocks section
+let STK_PICK = null;    // the block picked on the page: { bi, j }
+let STK_FOCUS = null;   // a block just added, moved or copied: picked again once the page redraws
+let STK_ADD = null;     // where Add a block puts the new one: { bi, at }
+let STK_QUERY = "";
+const stkItems = (bi) => { const b = (BLOCKS_WORK || [])[bi]; return b && b.type === "stack" && Array.isArray(b.items) ? b.items : null; };
+function stkName(bi) { const h = (stkItems(bi) || []).find((it) => it && it.kind === "heading" && it.text); return h ? h.text : "Blocks"; }
+// a few words about a block, for its row in Layers and in its section's card
+function stkSay(it) {
+  if (!it) return "";
+  const plain = (v) => String(v || "").replace(/[*_#>`[\]()]/g, "").replace(/^\s*[-+]\s+/gm, "").replace(/\s+/g, " ").trim();
+  switch (it.kind) {
+    case "heading": return plain(it.text) || "No words yet";
+    case "text": return plain(it.body) || "No words yet";
+    case "image": return it.alt || it.caption || (it.image_id ? "A photo" : "No photo yet");
+    case "button": return (it.buttons || []).map((b) => b && b.label).filter(Boolean).join(" · ") || "No words yet";
+    case "video": return it.caption || (it.url ? String(it.url).replace(/^https?:\/\/(www\.)?/i, "") : "No video link yet");
+    case "form": return (it.form && it.form.title) || "A form";
+    case "spacer": return it.size === "s" ? "Small space" : it.size === "l" ? "Large space" : "Medium space";
+    case "divider": return it.width === "s" ? "A short line" : "A line across";
+    case "map": return it.address || "No address yet";
+  }
+  return "";
+}
+// Every form id on the site, Form sections and Form blocks alike: a published form posts only its id.
+function stkFormIds() {
+  const ids = allFormIds();
+  const walk = (list) => (Array.isArray(list) ? list : []).forEach((b) => { if (b && b.type === "stack") (b.items || []).forEach((it) => { if (it && it.form && it.form.id) ids.add(it.form.id); }); });
+  walk(BLOCKS_WORK); walk(S.settings && S.settings.blocks); dcPagesArr().forEach((p) => walk(p && p.blocks));
+  return ids;
+}
+function stkNewForm(key) {
+  const p = FORM_PRESETS_UI.find((x) => x.key === key) || FORM_PRESETS_UI[0];
+  const f = JSON.parse(JSON.stringify(p.def)); f.id = ffUniqueId(f.id, stkFormIds());
+  return f;
+}
+// a new block, filled in so it shows at once; a photo, a video or a map waits for its card
+function stkNew(kind) {
+  switch (kind) {
+    case "heading": return { kind, text: "A new heading" };
+    case "text": return { kind, body: "Write a few words here." };
+    case "button": return { kind, buttons: [{ label: "Get in touch", url: "/contact/" }] };
+    case "form": return { kind, form: stkNewForm("contact") };
+    case "video": return { kind, url: "" };
+    case "map": return { kind, address: "" };
+  }
+  return { kind };
+}
+
+// ── changing a section's blocks ──
+// The section with its new list of blocks: its card and Layers redraw, and the list saves as
+// any section edit does (at once for a move, a copy, an add or a delete).
+function stkWrite(bi, items, now) {
+  const b = (BLOCKS_WORK || [])[bi]; if (!b) return;
+  BLOCKS_WORK[bi] = { ...b, items };
+  dcCaptureScroll();
+  renderBlocksCard();
+  dcRefreshTree();
+  if (now) saveBlocks();
+}
+// one block's fields, from its card; a key given as undefined comes off the block
+function stkSet(bi, j, patch) {
+  const items = (stkItems(bi) || []).slice(); if (!items[j]) return;
+  const next = { ...items[j], ...patch };
+  Object.keys(patch).forEach((k) => { if (patch[k] === undefined) delete next[k]; });
+  items[j] = next;
+  BLOCKS_WORK[bi] = { ...BLOCKS_WORK[bi], items };
+}
+function stkMove(bi, j, d) {
+  const items = (stkItems(bi) || []).slice(), k = j + d;
+  if (!items[j] || k < 0 || k >= items.length || lockStop(bi)) return;
+  const t = items[j]; items[j] = items[k]; items[k] = t;
+  if (STK_ITEM === j) STK_ITEM = k;
+  STK_FOCUS = { bi, j: k };
+  stkWrite(bi, items, true);
+}
+function stkCopy(bi, j) {
+  const items = (stkItems(bi) || []).slice(); if (!items[j] || lockStop(bi)) return;
+  if (items.length >= STK_MAX) { toast("A Blocks section holds up to " + STK_MAX + " blocks. Add another Blocks section for more."); return; }
+  const copy = JSON.parse(JSON.stringify(items[j]));
+  if (copy.form) copy.form.id = ffUniqueId(copy.form.id, stkFormIds());
+  items.splice(j + 1, 0, copy);
+  STK_FOCUS = { bi, j: j + 1 };
+  stkWrite(bi, items, true);
+}
+function stkDelete(bi, j) {
+  const items = (stkItems(bi) || []).slice(); if (!items[j] || lockStop(bi)) return;
+  if (items.length === 1) { stkUnpick(); dcDelete(bi); return; }   // the last block: the section goes, after the section's own question
+  const word = stkKind(items[j].kind).name;
+  items.splice(j, 1);
+  if (STK_ITEM === j) STK_ITEM = null; else if (STK_ITEM != null && STK_ITEM > j) STK_ITEM--;
+  stkUnpick();
+  stkWrite(bi, items, true);
+  toastAction(word + " deleted", "Undo", dcUndo, 8000);
+}
+function stkAlign(bi, j, how) {
+  if (lockStop(bi)) return;
+  const it = (stkItems(bi) || [])[j]; if (!it) return;
+  stkSet(bi, j, { align: it.align === how ? undefined : how });
+  STK_FOCUS = { bi, j };
+  stkWrite(bi, stkItems(bi), true);
+}
+function stkPhone(bi, j) {   // hide on phones, or show again
+  if (lockStop(bi)) return;
+  const it = (stkItems(bi) || [])[j]; if (!it) return;
+  stkSet(bi, j, { hide_on_phone: it.hide_on_phone ? undefined : true });
+  STK_FOCUS = { bi, j };
+  stkWrite(bi, stkItems(bi), true);
+  toast(it.hide_on_phone ? "Shows on phones again" : "Hidden on phones: it still shows on bigger screens");
+}
+function stkAdd(bi, at, kind) {
+  const items = (stkItems(bi) || []).slice(); if (!stkItems(bi) || lockStop(bi)) return;
+  if (items.length >= STK_MAX) { toast("A Blocks section holds up to " + STK_MAX + " blocks. Add another Blocks section for more."); return; }
+  const j = Math.max(0, Math.min(at == null ? items.length : at, items.length));
+  items.splice(j, 0, stkNew(kind));
+  closeTrayPanel(); STK_ADD = null;
+  STK_FOCUS = { bi, j };
+  if (!STK_FILL.has(kind)) { stkWrite(bi, items, true); return; }
+  BLOCKS_WORK[bi] = { ...BLOCKS_WORK[bi], items };
+  stkEdit(bi, j, "content");
+  if (kind === "image") stkPhotoPick(bi, j, "image_id");
+}
+// ── Text, Title, Image, Buttons, Video and Divider sections turn into blocks as they are:
+// the same words, photos and looks, now blocks that more can join ──
+function stkFrom(b) {
+  const items = [];
+  const head = (t) => { if (t) items.push({ kind: "heading", text: t }); };
+  switch (b.type) {
+    case "richtext": head(b.title); items.push({ kind: "text", body: b.body || "" }); break;
+    case "title": items.push({ kind: "heading", text: b.title || "" }); if (b.subtitle) items.push({ kind: "text", body: b.subtitle, size: "l" }); break;
+    case "image": head(b.title); items.push({ kind: "image", image_id: b.image_id, alt: b.alt, caption: b.caption, link: b.link, decorative: b.decorative || undefined }); break;
+    case "buttons": head(b.title); items.push({ kind: "button", buttons: (b.buttons || []).map((x) => ({ label: x.label, url: x.url, ...(x.style === "outline" ? { style: "outline" } : {}) })) }); break;
+    case "video": head(b.title || "Video"); items.push({ kind: "video", url: b.url || "", poster_id: b.poster_id, caption: b.caption }); break;
+    case "divider": items.push(b.style === "space" ? { kind: "spacer", size: b.size === "small" ? "s" : b.size === "large" ? "l" : undefined } : { kind: "divider" }); break;
+    default: return null;
+  }
+  const out = { type: "stack", items: JSON.parse(JSON.stringify(items)) };   // drops the keys left undefined
+  ["look", "style", "show_from", "show_until"].forEach((k) => { if (b[k]) out[k] = b[k]; });
+  return out;
+}
+function stkTurn(bi) {
+  const b = (BLOCKS_WORK || [])[bi]; if (!b || !STK_TURNS.has(b.type) || lockStop(bi)) return false;
+  const next = stkFrom(b); if (!next) return false;
+  const def = BLOCK_DEFS.find((x) => x.type === b.type);
+  dcSoloEnd();
+  BLOCKS_WORK[bi] = next;
+  dcCaptureScroll(); renderBlocksCard(); saveBlocks();
+  const nm = stkName(bi) !== "Blocks" ? stkName(bi) : ((def && def.name) || "This section");
+  toastAction("“" + nm + "” is made of blocks now", "Undo", dcUndo, 10000);
+  return true;
+}
+
+// ── Add a block: a card beside the dock, like Add a section (the tray's "blocks" tab) ──
+function stkOpenAdd(bi, at) {
+  if (!stkItems(bi) || lockStop(bi)) return;
+  STK_ADD = { bi, at: at == null ? stkItems(bi).length : at };
+  STK_QUERY = "";
+  openTrayPanel("blocks");
+}
+function stkRenderAdd() {
+  const host = $("designBlockAdd"); if (!host) return;
+  host.textContent = "";
+  const a = STK_ADD, items = a ? stkItems(a.bi) : null;
+  if (!items) { host.appendChild(el("div", "tray-empty", "Pick a Blocks section on the page first.")); return; }
+  const ts = $("traySub");
+  if (ts) { const before = items[a.at - 1]; ts.textContent = before ? "Goes under " + stkKind(before.kind).name + ", in " + stkName(a.bi) : "Goes at the top of " + stkName(a.bi); ts.hidden = false; }
+  const sw = el("div", "tray-searchwrap"); sw.insertAdjacentHTML("afterbegin", uiIcon("search", 18));
+  const search = el("input", "tray-search"); search.type = "search"; search.placeholder = "Find a block: heading, photo, form…"; search.value = STK_QUERY; search.setAttribute("aria-label", "Search blocks to add");
+  search.addEventListener("input", () => { STK_QUERY = search.value; stkRenderAdd(); const s2 = $("designBlockAdd") && $("designBlockAdd").querySelector(".tray-search"); if (s2) { s2.focus(); s2.setSelectionRange(STK_QUERY.length, STK_QUERY.length); } });
+  sw.appendChild(search); host.appendChild(sw);
+  const q = STK_QUERY.trim(), away = !!q && STK_AWAY.test(q);
+  if (away) {   // the drawing's answer to "embed": what does the usual job instead
+    const n = el("div", "stk-away"); n.setAttribute("role", "status");
+    n.appendChild(el("b", null, "Code from other websites can’t go on your page"));
+    n.appendChild(el("span", null, "Your site loads nothing from other companies. That keeps it fast and private, with no cookie banner. These do the usual jobs instead:"));
+    host.appendChild(n);
+  }
+  let shown = 0;
+  STK_GROUPS.forEach((g) => {
+    const kinds = STK_KINDS.filter((k) => k.group === g && (away ? (k.kind === "video" || k.kind === "map") : trayItemMatches(k.name, k.hint + " " + k.words, k.kind, q)));
+    if (!kinds.length) return;
+    const wrap = el("div", "tray-grp stk-grp");
+    if (!away) wrap.appendChild(el("div", "tray-grp-h", g));
+    kinds.forEach((k) => {
+      const b = el("button", "stk-kind"); b.type = "button"; b.dataset.kind = k.kind;
+      b.appendChild(Object.assign(el("span", "stk-kind-ico"), { innerHTML: uiIcon(k.icon, 20) }));
+      const t = el("span", "stk-kind-t"); t.appendChild(el("b", null, k.name)); t.appendChild(el("span", null, k.hint)); b.appendChild(t);
+      b.addEventListener("click", () => stkAdd(a.bi, a.at, k.kind));
+      wrap.appendChild(b); shown++;
+    });
+    host.appendChild(wrap);
+  });
+  if (!shown) host.appendChild(el("div", "tray-empty", "No blocks match “" + q + "”."));
+}
+
+// ── a block's own card: the inspector with Content and Style (Layout and When are the section's) ──
+function stkEdit(bi, j, tab) {
+  if (!(stkItems(bi) || [])[j]) return;
+  closePreview(); go("design");
+  if (!$("blocksCard")) mountBlocksCard();
+  BLOCK_SOLO = bi; STK_ITEM = j;
+  INS_TAB = tab === "style" ? "style" : "content";
+  openSettingsPanel("section", stkKind(stkItems(bi)[j].kind).name);
+  BLOCK_FOCUS = bi; renderBlocksCard();
+  dcRevealAbove(bi);
+}
+function stkHead(bi, j) {
+  const t = $("settingsTitle"), sb = $("settingsSub"), p = $("settingsPanel"), it = (stkItems(bi) || [])[j];
+  const name = stkKind(it && it.kind).name;
+  if (t) t.textContent = name;
+  if (sb) { sb.textContent = "Block in " + stkName(bi) + " · on " + dcPageTitle(DC_PAGE); sb.hidden = false; }
+  if (p) p.setAttribute("aria-label", name);
+}
+// chips from a fixed list; the card saves and redraws the section
+function stkPills(host, label, opts, cur, onPick) {
+  pillRow(host, label, opts, (o) => o[1] === cur, (o) => { onPick(o[1]); renderBlocksCard(); dcLiveFromPanel(); });
+}
+function stkCheck(host, words, on, onChange) {
+  const lab = el("label", "stk-check"); const cb = el("input"); cb.type = "checkbox"; cb.checked = !!on;
+  lab.append(cb, document.createTextNode(words)); host.appendChild(lab);
+  cb.addEventListener("change", () => onChange(cb.checked));
+  return cb;
+}
+let STK_FIELD_N = 0;
+function stkField(host, label, input, hint) {
+  const f = el("div", "ins-field"); input.id = "stkf-" + (++STK_FIELD_N);
+  const l = el("label", "ins-lbl", label); l.htmlFor = input.id;
+  f.append(l, input); if (hint) f.appendChild(el("div", "hint", hint));
+  host.appendChild(f);
+  return input;
+}
+function stkInput(value, max, placeholder) {
+  const i = el("input", "stk-in"); i.type = "text"; i.value = value || "";
+  if (max) i.maxLength = max; if (placeholder) i.placeholder = placeholder;
+  return i;
+}
+// a link box that offers the site's own pages: the menu's addresses and the owner's pages
+function stkLinkInput(value) {
+  let dl = $("stkPages");
+  if (!dl) { dl = el("datalist"); dl.id = "stkPages"; document.body.appendChild(dl); }
+  dl.textContent = "";
+  const seen = new Set();
+  const add = (href, name) => { if (!href || seen.has(href)) return; seen.add(href); const o = el("option"); o.value = href; o.label = name || href; dl.appendChild(o); };
+  add("/", "Home");
+  (S.settings && Array.isArray(S.settings.nav) ? S.settings.nav : []).forEach((n) => { if (n && /^\/(?!\/)/.test(String(n.href || ""))) add(n.href, n.label); (n && Array.isArray(n.children) ? n.children : []).forEach((c) => { if (c && /^\/(?!\/)/.test(String(c.href || ""))) add(c.href, c.label); }); });
+  dcPagesArr().forEach((p) => { if (p && p.slug) add("/" + p.slug + "/", p.title); });
+  add("/contact/", "Contact");
+  const i = stkInput(value, 300, "/contact/, tel:+15550100, or https://…");
+  i.setAttribute("list", "stkPages");
+  return i;
+}
+function stkPhotoField(host, bi, j, it, key, label) {
+  const f = el("div", "ins-field");
+  f.appendChild(el("div", "ins-lbl", label));
+  const row = el("div", "stk-photo");
+  if (it[key]) row.appendChild(mediaThumb(it[key]));
+  const pick = el("button", "dc-actbtn", it[key] ? "Replace" : "Choose a photo"); pick.type = "button";
+  pick.addEventListener("click", () => stkPhotoPick(bi, j, key));
+  row.appendChild(pick);
+  if (it[key]) {
+    const rm = el("button", "dc-actbtn dc-ghost", "Remove"); rm.type = "button";
+    rm.addEventListener("click", () => { stkSet(bi, j, { [key]: undefined }); renderBlocksCard(); dcLiveFromPanel(); });
+    row.appendChild(rm);
+  }
+  f.appendChild(row); host.appendChild(f);
+}
+function stkPhotoPick(bi, j, key) {
+  openPicker((id) => { if (!id || !(stkItems(bi) || [])[j]) return; stkSet(bi, j, { [key]: id }); STK_FOCUS = { bi, j }; renderBlocksCard(); dcLiveFromPanel(); });
+}
+function stkButtons(host, bi, j, it) {
+  const list = (Array.isArray(it.buttons) && it.buttons.length ? it.buttons : [{ label: "", url: "" }]).map((b) => ({ ...b }));
+  const put = () => stkSet(bi, j, { buttons: list.map((b) => ({ label: b.label || "", url: b.url || "", ...(b.style === "outline" ? { style: "outline" } : {}) })) });
+  const nth = ["First button", "Second button", "Third button"];
+  list.forEach((b, k) => {
+    const box = el("div", "stk-btnbox");
+    if (list.length > 1) box.appendChild(el("div", "stk-btnbox-h", nth[k]));
+    const w = stkField(box, "Words on the button", stkInput(b.label, 40, "Get in touch"));
+    w.addEventListener("change", () => { b.label = w.value.trim(); put(); });
+    const u = stkField(box, "Goes to", stkLinkInput(b.url), "A page of your site, a phone number (tel:), an email (mailto:) or a web address.");
+    u.addEventListener("change", () => { b.url = u.value.trim(); put(); });
+    stkPills(box, "Look", [["Main", ""], ["Outline", "outline"]], b.style === "outline" ? "outline" : "", (v) => { b.style = v || undefined; put(); });
+    if (list.length > 1) {
+      const rm = el("button", "dc-actbtn dc-ghost", "Remove this button"); rm.type = "button";
+      rm.addEventListener("click", () => { list.splice(k, 1); put(); renderBlocksCard(); dcLiveFromPanel(); });
+      box.appendChild(rm);
+    }
+    host.appendChild(box);
+  });
+  if (list.length < 3) {
+    const more = el("button", "stk-addbtn", list.length === 1 ? "＋ Add a second button" : "＋ Add a third button"); more.type = "button";
+    more.addEventListener("click", () => { list.push({ label: "Call us", url: "tel:", style: "outline" }); put(); renderBlocksCard(); });
+    host.appendChild(more);
+  }
+}
+// A Form block's form: a ready-made one to start from, its questions, its button and thank-you.
+// Answers go to the Inbox like every form (the server finds Form blocks too: formsIn).
+const STK_Q_TYPES = [["text", "Short answer"], ["textarea", "Long answer"], ["email", "Email"], ["phone", "Phone"], ["date", "Date"], ["select", "Choose one"]];
+function stkFormEditor(host, bi, j, it) {
+  const f = it.form ? JSON.parse(JSON.stringify(it.form)) : stkNewForm("contact");
+  const put = () => stkSet(bi, j, { form: JSON.parse(JSON.stringify(f)) });
+  const now = FORM_PRESETS_UI.find((p) => p.key !== "blank" && p.def.title === f.title && p.def.kind === f.kind);
+  stkPills(host, "Start from", FORM_PRESETS_UI.filter((p) => p.key !== "blank").map((p) => [p.name, p.key]), now ? now.key : "", (key) => {
+    const nf = stkNewForm(key); nf.id = f.id;   // the same id, so answers already sent stay with it
+    stkSet(bi, j, { form: nf });
+  });
+  const nm = stkField(host, "Its name in your Inbox", stkInput(f.title, 80, "Contact us"));
+  nm.addEventListener("change", () => { f.title = nm.value.trim() || "Form"; put(); });
+  const qf = el("div", "ins-field"); qf.appendChild(el("div", "ins-lbl", "Questions"));
+  (f.fields || []).forEach((q, k) => {
+    const row = el("div", "stk-q");
+    const lab = stkInput(q.label, 120, "Question"); lab.setAttribute("aria-label", "Question " + (k + 1));
+    lab.addEventListener("change", () => { q.label = lab.value.trim() || q.label; put(); });
+    const req = el("label", "stk-q-req"); const cb = el("input"); cb.type = "checkbox"; cb.checked = !!q.required; req.append(cb, document.createTextNode("Needed"));
+    cb.addEventListener("change", () => { if (cb.checked) q.required = true; else delete q.required; put(); });
+    const rm = icoBtn("x", "Remove this question", "stk-q-rm", 14);
+    rm.addEventListener("click", () => {
+      const left = f.fields.filter((x, n) => n !== k);
+      if (!left.some((x) => x.type === "email" || x.type === "phone")) { toast("Keep an email or a phone question, so the answer can reach the person who asked."); return; }
+      f.fields = left; put(); renderBlocksCard(); dcLiveFromPanel();
+    });
+    row.append(lab, req, rm); qf.appendChild(row);
+  });
+  const addRow = el("div", "stk-q-add");
+  const ty = el("select", "stk-in"); ty.setAttribute("aria-label", "Kind of question");
+  STK_Q_TYPES.forEach(([v, l]) => { const o = el("option", null, l); o.value = v; ty.appendChild(o); });
+  const add = el("button", "dc-actbtn", "Add a question"); add.type = "button";
+  add.addEventListener("click", () => {
+    const taken = new Set((f.fields || []).map((x) => x.key));
+    let key = ty.value === "textarea" ? "details" : ty.value, n = 1;
+    while (taken.has(key)) key = (ty.value === "textarea" ? "details" : ty.value) + "_" + (++n);
+    const q = { key, label: "New question", type: ty.value };
+    if (ty.value === "select") q.choices = ["Option one", "Option two"];
+    f.fields = (f.fields || []).concat([q]); put(); renderBlocksCard(); dcLiveFromPanel();
+  });
+  addRow.append(ty, add); qf.appendChild(addRow);
+  host.appendChild(qf);
+  const sb = stkField(host, "Words on its button", stkInput(f.submit_label, 40, "Send message"));
+  sb.addEventListener("change", () => { f.submit_label = sb.value.trim() || undefined; put(); });
+  const ok = stkField(host, "Thank-you message", stkInput(f.confirmation_text, 300, "Thanks, we’ll be in touch soon."));
+  ok.addEventListener("change", () => { f.confirmation_text = ok.value.trim() || undefined; put(); });
+  host.appendChild(el("div", "hint", "Answers go to your Inbox, like every form on your site."));
+}
+// The card itself. renderBlocksCard hands it the panes when a block of a Blocks section is open.
+function stkItemCard(bi, j, panes) {
+  const it = stkItems(bi)[j], c = panes.content, s = panes.style;
+  stkHead(bi, j);
+  [c, s].forEach((pane) => {
+    const back = el("button", "stk-back"); back.type = "button";
+    back.innerHTML = uiIcon("up", 14); back.appendChild(el("span", null, "All blocks in " + stkName(bi)));
+    back.addEventListener("click", () => { STK_ITEM = null; renderBlocksCard(); });
+    pane.appendChild(back);
+  });
+  const set = (patch) => stkSet(bi, j, patch);   // the card's change listener saves and redraws
+  if (lockedForMe(BLOCKS_WORK[bi]) && !(BLOCKS_WORK[bi].lock && BLOCKS_WORK[bi].lock.words)) { c.appendChild(el("div", "ins-note", LOCK_SAY)); return; }
+  switch (it.kind) {
+    case "heading": {
+      const w = stkField(c, "Words", stkInput(it.text, 160));
+      w.addEventListener("change", () => set({ text: w.value.trim() }));
+      c.appendChild(aiField(w, { field: "heading" }));
+      break;
+    }
+    case "text": {
+      const ta = el("textarea", "stk-in"); ta.value = it.body || ""; ta.rows = Math.max(5, String(it.body || "").split("\n").length + 1);
+      ta.setAttribute("data-k", "body_md");   // the rich-text toolbar attaches itself
+      stkField(c, "Words", ta, "You can also type straight onto the page: double-click the words.");
+      ta.addEventListener("change", () => set({ body: ta.value }));
+      c.appendChild(aiField(ta, {}));
+      break;
+    }
+    case "image": {
+      stkPhotoField(c, bi, j, it, "image_id", "Photo");
+      const alt = stkField(c, "Describe the photo", stkInput(it.alt, 200), "Read aloud for people who can’t see it, and read by Google.");
+      alt.disabled = !!it.decorative;
+      alt.addEventListener("change", () => set({ alt: alt.value.trim() || undefined }));
+      stkCheck(c, "Only decoration: screen readers skip it", it.decorative, (on) => { set({ decorative: on || undefined }); renderBlocksCard(); });
+      const cap = stkField(c, "Caption", stkInput(it.caption, 200, "Add a caption (optional)"));
+      cap.addEventListener("change", () => set({ caption: cap.value.trim() || undefined }));
+      const lk = stkField(c, "When someone taps it", stkLinkInput(it.link), "Leave it empty and a tap does nothing.");
+      lk.addEventListener("change", () => set({ link: lk.value.trim() || undefined }));
+      break;
+    }
+    case "button": stkButtons(c, bi, j, it); break;
+    case "video": {
+      const u = stkField(c, "Video link", stkInput(it.url, 400, "https://www.youtube.com/watch?v=…"), "A YouTube or Vimeo address. Your page shows your picture, and a tap opens the video: nothing from YouTube loads on your page.");
+      u.addEventListener("change", () => set({ url: u.value.trim() }));
+      stkPhotoField(c, bi, j, it, "poster_id", "Picture over the video");
+      const cap = stkField(c, "Caption", stkInput(it.caption, 200, "A few words under the video (optional)"));
+      cap.addEventListener("change", () => set({ caption: cap.value.trim() || undefined }));
+      break;
+    }
+    case "form": stkFormEditor(c, bi, j, it); break;
+    case "spacer": stkPills(c, "Size", [["Small", "s"], ["Medium", ""], ["Large", "l"]], it.size || "", (v) => set({ size: v || undefined })); break;
+    case "divider": stkPills(c, "Width", [["Short", "s"], ["Full width", ""]], it.width || "", (v) => set({ width: v || undefined })); break;
+    case "map": {
+      const ad = stkField(c, "Address", stkInput(it.address, 200, "12 Olive Ave, Burbank"), "Your page shows it with a Get directions link. No map from Google loads on your page.");
+      ad.addEventListener("change", () => set({ address: ad.value.trim() || undefined }));
+      const dir = stkField(c, "Directions link (optional)", stkInput(it.directions_url, 400, "Made from the address when it’s empty"));
+      dir.addEventListener("change", () => set({ directions_url: dir.value.trim() || undefined }));
+      stkPhotoField(c, bi, j, it, "image_id", "A photo of the place (optional)");
+      break;
+    }
+  }
+  // Style: its size, its line-up, and phones. Colours stay the section's.
+  if (it.kind === "heading") stkPills(s, "Size", [["Big", ""], ["Medium", "m"], ["Small", "s"]], it.size || "", (v) => set({ size: v || undefined }));
+  if (it.kind === "text") stkPills(s, "Size", [["Normal", ""], ["Large", "l"]], it.size || "", (v) => set({ size: v || undefined }));
+  if (it.kind === "image") stkPills(s, "Width", [["Small", "s"], ["Medium", "m"], ["Full", ""]], it.width || "", (v) => set({ width: v || undefined }));
+  if (it.kind !== "spacer") stkPills(s, "Line up", [["As the section", ""], ["Left", "left"], ["Centre", "center"], ["Right", "right"]], it.align || "", (v) => set({ align: v || undefined }));
+  stkCheck(s, "Hide on phones", it.hide_on_phone, (on) => set({ hide_on_phone: on || undefined }));
+  s.appendChild(el("div", "ins-note", "Colours come from the section’s colour theme, so the words stay readable on it. The section’s own card has it, on its Style tab."));
+}
+// The Blocks section's own card: its blocks on Content, how they line up on Layout.
+function stkSectionCard(bi, sub, panes) {
+  const items = stkItems(bi) || [], held = lockedForMe(BLOCKS_WORK[bi]);
+  const list = el("div", "stk-list"); list.setAttribute("role", "list"); list.setAttribute("aria-label", "Blocks in this section");
+  items.forEach((it, j) => {
+    const k = stkKind(it.kind);
+    const row = el("div", "stk-li"); row.setAttribute("role", "listitem");
+    const open = el("button", "stk-li-main"); open.type = "button"; open.title = "Edit this block";
+    open.appendChild(Object.assign(el("span", "stk-kind-ico"), { innerHTML: uiIcon(k.icon, 18) }));
+    const t = el("span", "stk-kind-t"); t.appendChild(el("b", null, k.name)); t.appendChild(el("span", null, stkSay(it))); open.appendChild(t);
+    open.addEventListener("click", () => stkEdit(bi, j, "content"));
+    row.appendChild(open);
+    if (!held) {
+      const up = icoBtn("up", "Move this block up", "stk-li-b", 14), dn = icoBtn("down", "Move this block down", "stk-li-b", 14), rm = icoBtn("trash", "Delete this block", "stk-li-b", 14);
+      up.disabled = j === 0; dn.disabled = j === items.length - 1;
+      up.addEventListener("click", () => stkMove(bi, j, -1)); dn.addEventListener("click", () => stkMove(bi, j, 1)); rm.addEventListener("click", () => stkDelete(bi, j));
+      row.append(up, dn, rm);
+    }
+    list.appendChild(row);
+  });
+  const f = el("div", "ins-field"); f.appendChild(el("div", "ins-lbl", "Blocks in this section")); f.appendChild(list);
+  if (!held) {
+    const add = el("button", "stk-addbtn", "＋ Add a block"); add.type = "button";
+    add.disabled = items.length >= STK_MAX;
+    add.addEventListener("click", () => stkOpenAdd(bi, items.length));
+    f.appendChild(add);
+  }
+  sub.appendChild(f);
+  if (!panes || held) return;
+  const b = BLOCKS_WORK[bi];
+  pillRow(panes.layout, "Width of the blocks", [["Narrow", "narrow"], ["Normal", ""], ["Wide", "wide"]], (o) => (b.column || "") === o[1], (o) => { const n = { ...BLOCKS_WORK[bi] }; if (o[1]) n.column = o[1]; else delete n.column; BLOCKS_WORK[bi] = n; renderBlocksCard(); dcLiveFromPanel(); });
+  pillRow(panes.layout, "Space between blocks", [["Tight", "tight"], ["Normal", ""], ["Roomy", "roomy"]], (o) => (b.gap || "") === o[1], (o) => { const n = { ...BLOCKS_WORK[bi] }; if (o[1]) n.gap = o[1]; else delete n.gap; BLOCKS_WORK[bi] = n; renderBlocksCard(); dcLiveFromPanel(); });
+  panes.layout.appendChild(el("div", "ins-note", "Blocks always stack top to bottom, so the section fits every screen by itself."));
+}
+
+// ── picking a block on the page, and its toolbar ──
+// A click picks a block (a tap, on a phone): it's outlined, and its tools sit just above it,
+// or under it when there's no room. On a phone the same tools take the dock's place instead
+// (stkPhoneBar). A double-click still types into a block's words; on a block without words
+// (a photo, a space) it opens the block's card.
+function stkFind(doc, bi, j) {
+  const main = doc && doc.getElementById("main"); if (!main) return null;
+  const hit = dcBlockSections(main).find((x) => x.bi === bi);
+  const node = hit && hit.el.classList.contains("block-stack") ? hit.el.querySelector('[data-dds-item="' + j + '"]') : null;
+  return node ? { sec: hit.el, el: node } : null;
+}
+function stkInject(doc, main, live) {
+  let tb = doc.getElementById("dds-dc-blk");
+  if (!tb) { tb = doc.createElement("div"); tb.id = "dds-dc-blk"; tb.setAttribute("role", "toolbar"); tb.setAttribute("aria-label", "Edit this block"); doc.body.appendChild(tb); }
+  let more = doc.getElementById("dds-dc-blkmore");
+  if (!more) { more = doc.createElement("div"); more.id = "dds-dc-blkmore"; more.setAttribute("role", "menu"); more.setAttribute("aria-label", "More for this block"); doc.body.appendChild(more); }
+  Array.prototype.forEach.call(main.querySelectorAll(":scope > section.block-stack"), (sec) => {
+    Array.prototype.forEach.call(sec.querySelectorAll("[data-dds-item]"), (node) => {
+      if (node.hasAttribute("data-dc-blk")) return;
+      node.setAttribute("data-dc-blk", "1");
+      if (node.tabIndex < 0) node.setAttribute("tabindex", "0");
+      node.addEventListener("click", (e) => {
+        if (DC_MODE !== "edit" || (IPE && IPE.el && IPE.el.contains(e.target)) || (IDE && IDE.el.contains(e.target))) return;
+        if (e.target.closest && e.target.closest("a, button")) e.preventDefault();   // a link or a form on the page doesn't leave the editor
+        const c = eeClassify(sec); if (c.kind !== "block") return;
+        const j = Number(node.getAttribute("data-dds-item"));
+        const touch = Date.now() - (doc.__dcTouchAt || 0) < 900;
+        const again = STK_PICK && STK_PICK.bi === c.bi && STK_PICK.j === j;
+        const f = e.target.closest ? e.target.closest("[data-dds-field]") : null;
+        e.stopPropagation();   // the section's own tap (select the section) stands aside
+        if (again && touch && f && node.contains(f)) { stkUnpick(); ipeStart(doc, f, sec); return; }   // a second tap on its words: type into them
+        if (DC_HIDEBAR && touch) DC_HIDEBAR();
+        stkPick(doc, node, c.bi, j);
+      });
+      node.addEventListener("dblclick", (e) => {
+        if (DC_MODE !== "edit") return;
+        if (e.target.closest && e.target.closest("[data-dds-field]")) return;   // the section's double-click types into the words
+        e.preventDefault(); e.stopPropagation();
+        const c = eeClassify(sec); if (c.kind === "block") stkEdit(c.bi, Number(node.getAttribute("data-dds-item")), "content");
+      });
+      node.addEventListener("keydown", (e) => {
+        if (DC_MODE !== "edit" || IPE || e.target !== node || node.hasAttribute("data-dds-field")) return;   // a block's words take Enter to type into them
+        if (e.key !== "Enter" && e.key !== " ") return;
+        e.preventDefault();
+        const c = eeClassify(sec); if (c.kind !== "block") return;
+        stkPick(doc, node, c.bi, Number(node.getAttribute("data-dds-item")));
+        const first = doc.querySelector("#dds-dc-blk button"); if (first) { try { first.focus({ preventScroll: true }); } catch (_) {} }
+      });
+    });
+  });
+  if (!doc.body.hasAttribute("data-dc-blkoff")) {
+    doc.body.setAttribute("data-dc-blkoff", "1");
+    // a press anywhere off the picked block and its tools puts them away
+    doc.addEventListener("pointerdown", (e) => { if (STK_PICK && !(e.target.closest && e.target.closest("[data-dds-item], #dds-dc-blk, #dds-dc-blkmore, #dds-ipe-bar"))) stkUnpick(); }, true);
+    doc.addEventListener("keydown", (e) => { if (e.key === "Escape" && STK_PICK && !IPE) stkUnpick(); });
+  }
+  // after a redraw, the block just added, moved or copied is picked again, and the picked one stays picked
+  const focus = STK_FOCUS, want = focus || STK_PICK;
+  if (!want) return;
+  const hit = stkFind(doc, want.bi, want.j);
+  if (hit) {
+    stkPick(doc, hit.el, want.bi, want.j);
+    if (focus) { try { hit.el.scrollIntoView({ block: "center", behavior: pdReducedMotion() ? "auto" : "smooth" }); } catch (_) {} }
+  } else if (!live) stkUnpick();
+}
+function stkPick(doc, node, bi, j) {
+  STK_PICK = { bi, j }; STK_FOCUS = null;   // a block picked before the redraw lands wins over the one the last step meant to show
+  Array.prototype.forEach.call(doc.querySelectorAll(".dc-blk-on"), (n) => n.classList.remove("dc-blk-on"));
+  node.classList.add("dc-blk-on");
+  stkTreeMark(bi, j);
+  if (window.innerWidth <= 760) { const tb = doc.getElementById("dds-dc-blk"); if (tb) tb.classList.remove("on"); stkPhoneBar(bi, j); return; }
+  stkToolbar(doc, node, bi, j);
+}
+function stkUnpick() {
+  STK_PICK = null;
+  const doc = dcFrameDoc();
+  if (doc) {
+    Array.prototype.forEach.call(doc.querySelectorAll(".dc-blk-on"), (n) => n.classList.remove("dc-blk-on"));
+    ["dds-dc-blk", "dds-dc-blkmore"].forEach((id) => { const n = doc.getElementById(id); if (n) n.classList.remove("on"); });
+  }
+  stkPhoneBar(null);
+  stkTreeMark(null);
+}
+function stkToolbar(doc, node, bi, j) {
+  const tb = doc.getElementById("dds-dc-blk"), more = doc.getElementById("dds-dc-blkmore"); if (!tb) return;
+  const items = stkItems(bi) || [], it = items[j]; if (!it) return;
+  const held = lockedForMe(BLOCKS_WORK[bi]);
+  tb.textContent = ""; more.textContent = ""; more.classList.remove("on");
+  const btn = (icon, label, fn, cls) => {
+    const b = doc.createElement("button"); b.type = "button"; b.className = "dc-b" + (cls ? " " + cls : "");
+    b.innerHTML = uiIcon(icon, 18) + '<span class="dc-sr"></span>'; b.lastChild.textContent = label;
+    b.setAttribute("aria-label", label); b.title = label;
+    b.addEventListener("click", (e) => { e.preventDefault(); e.stopPropagation(); fn(); });
+    return b;
+  };
+  const sep = () => { const n = doc.createElement("span"); n.className = "dc-blk-sep"; n.setAttribute("aria-hidden", "true"); return n; };
+  const nm = doc.createElement("span"); nm.className = "dc-blk-name"; nm.textContent = stkKind(it.kind).name; tb.appendChild(nm);
+  if (!held) {
+    tb.appendChild(sep());
+    tb.appendChild(btn("up", "Move this block up", () => stkMove(bi, j, -1), j <= 0 ? "dc-off" : ""));
+    tb.appendChild(btn("down", "Move this block down", () => stkMove(bi, j, 1), j >= items.length - 1 ? "dc-off" : ""));
+    tb.appendChild(sep());
+  }
+  if (!held || (BLOCKS_WORK[bi].lock && BLOCKS_WORK[bi].lock.words)) tb.appendChild(btn("pencil", "Edit this block", () => stkEdit(bi, j, "content")));
+  if (!held) {
+    tb.appendChild(btn("spark", "Style this block: its size and line-up", () => stkEdit(bi, j, "style")));
+    if (it.kind !== "spacer") {
+      tb.appendChild(btn("alignl", "Line up on the left", () => stkAlign(bi, j, "left"), it.align === "left" ? "dc-on" : ""));
+      tb.appendChild(btn("alignc", "Line up in the centre", () => stkAlign(bi, j, "center"), it.align === "center" ? "dc-on" : ""));
+    }
+    tb.appendChild(sep());
+    tb.appendChild(btn("copy", "Copy this block", () => stkCopy(bi, j)));
+    tb.appendChild(btn("trash", "Delete this block", () => stkDelete(bi, j), "dc-danger"));
+    const mb = btn("more", "More", () => {
+      const on = !more.classList.contains("on"); more.classList.toggle("on", on); mb.setAttribute("aria-expanded", String(on));
+      if (!on) return;
+      const r = tb.getBoundingClientRect(), win = doc.defaultView;
+      more.style.setProperty("top", (r.bottom + win.scrollY + 6) + "px");
+      more.style.setProperty("left", Math.max(win.scrollX + 8, r.right + win.scrollX - (more.offsetWidth || 220)) + "px");
+      const f = more.querySelector("button"); if (f) { try { f.focus({ preventScroll: true }); } catch (_) {} }
+    });
+    mb.setAttribute("aria-haspopup", "menu"); mb.setAttribute("aria-expanded", "false");
+    tb.appendChild(mb);
+    const item = (icon, label, fn) => {
+      const b = doc.createElement("button"); b.type = "button"; b.className = "dc-mi"; b.setAttribute("role", "menuitem");
+      b.innerHTML = uiIcon(icon, 16) + "<span></span>"; b.lastChild.textContent = label;
+      b.addEventListener("click", (e) => { e.preventDefault(); e.stopPropagation(); more.classList.remove("on"); fn(); });
+      more.appendChild(b);
+    };
+    item("plus", "Add a block above", () => stkOpenAdd(bi, j));
+    item("plus", "Add a block below", () => stkOpenAdd(bi, j + 1));
+    item("eyeoff", it.hide_on_phone ? "Show on phones again" : "Hide on phones", () => stkPhone(bi, j));
+  }
+  tb.classList.add("on");
+  stkPlace(doc, node);
+}
+function stkPlace(doc, node) {
+  const win = doc.defaultView, tb = doc.getElementById("dds-dc-blk"); if (!tb || !node.isConnected) return;
+  const r = node.getBoundingClientRect(), h = tb.offsetHeight || 40, w = tb.offsetWidth || 0, ins = dcChromeInsets();
+  const vw = doc.documentElement.clientWidth;
+  const y = r.top - h - 10 >= 8 ? r.top + win.scrollY - h - 10 : r.bottom + win.scrollY + 10;   // above it, or under it when the top has no room
+  const x = Math.max(win.scrollX + 8 + ins.left, Math.min(r.left + win.scrollX - 6, win.scrollX + vw - ins.right - w - 8));
+  tb.style.setProperty("left", x + "px"); tb.style.setProperty("top", y + "px");
+}
+// On a phone the picked block's tools take the dock's place, a word under each.
+function stkPhoneBar(bi, j) {
+  const bar = $("dcBlkBar"); if (!bar) return;
+  const items = bi == null ? null : stkItems(bi);
+  const on = !!(items && items[j]) && window.innerWidth <= 760;
+  document.documentElement.classList.toggle("dc-blkpick", on);
+  bar.hidden = !on; bar.textContent = "";
+  if (!on) return;
+  const held = lockedForMe(BLOCKS_WORK[bi]);
+  const tool = (icon, word, label, fn, off, cls) => {
+    const b = el("button", "dc-dk" + (cls ? " " + cls : "")); b.type = "button";
+    b.innerHTML = uiIcon(icon, 20); b.appendChild(el("span", "dc-dk-l", word));
+    b.setAttribute("aria-label", label); b.title = label;
+    if (off) b.disabled = true; else b.addEventListener("click", fn);
+    bar.appendChild(b);
+  };
+  if (!held) {
+    tool("up", "Up", "Move this block up", () => stkMove(bi, j, -1), j <= 0);
+    tool("down", "Down", "Move this block down", () => stkMove(bi, j, 1), j >= items.length - 1);
+  }
+  tool("pencil", "Edit", "Edit this block", () => stkEdit(bi, j, "content"), held && !(BLOCKS_WORK[bi].lock && BLOCKS_WORK[bi].lock.words));
+  if (!held) {
+    tool("spark", "Style", "Style this block", () => stkEdit(bi, j, "style"));
+    tool("copy", "Copy", "Copy this block", () => stkCopy(bi, j));
+    tool("trash", "Delete", "Delete this block", () => stkDelete(bi, j), false, "stk-del");
+  }
+}
+// ── the blocks' rows in Layers, under their section ──
+function stkTreeRows(host, bi) {
+  const items = stkItems(bi) || [], held = lockedForMe(BLOCKS_WORK[bi]);
+  items.forEach((it, j) => {
+    const k = stkKind(it.kind);
+    const row = el("div", "dc-tree-row child under-page stk-row"); row.dataset.stk = bi + ":" + j;
+    if (STK_PICK && STK_PICK.bi === bi && STK_PICK.j === j) row.classList.add("sel");
+    const btn = el("button", "dc-tree-main"); btn.type = "button"; btn.title = "Pick this block on the page";
+    btn.appendChild(Object.assign(el("span", "dc-tree-ico"), { innerHTML: uiIcon(k.icon) }));
+    const txt = el("span", "dc-tree-txt"); txt.appendChild(el("span", "dc-tree-name", k.name)); txt.appendChild(el("span", "dc-tree-meta", stkSay(it)));
+    btn.appendChild(txt);
+    btn.addEventListener("click", () => stkPickFromTree(bi, j));
+    row.appendChild(btn);
+    if (!CM_ON) {
+      const acts = el("span", "dc-tree-acts");
+      const a = (icon, label, fn, off) => { const b = el("button"); b.type = "button"; b.innerHTML = uiIcon(icon, 14); b.title = label; b.setAttribute("aria-label", label); if (off) b.disabled = true; else b.addEventListener("click", (e) => { e.stopPropagation(); fn(); }); acts.appendChild(b); };
+      a("up", held ? LOCK_SAY : "Move this block up", () => stkMove(bi, j, -1), held || j <= 0);
+      a("down", held ? LOCK_SAY : "Move this block down", () => stkMove(bi, j, 1), held || j >= items.length - 1);
+      a("cog", "Edit this block", () => stkEdit(bi, j, "content"));
+      a("trash", held ? LOCK_SAY : "Delete this block", () => stkDelete(bi, j), held);
+      row.appendChild(acts);
+    }
+    host.appendChild(row);
+  });
+  if (!CM_ON && !held && items.length < STK_MAX) {
+    const add = el("button", "stk-tree-add under-page", "＋ Add a block"); add.type = "button";
+    add.addEventListener("click", () => stkOpenAdd(bi, items.length));
+    host.appendChild(add);
+  }
+}
+function stkPickFromTree(bi, j) {
+  const doc = dcFrameDoc(), hit = doc && stkFind(doc, bi, j);
+  if (!hit) { stkEdit(bi, j, "content"); return; }   // a block that draws nothing yet (no words, no photo): its card
+  try { hit.el.scrollIntoView({ behavior: pdReducedMotion() ? "auto" : "smooth", block: "center" }); } catch (_) {}
+  stkPick(doc, hit.el, bi, j);
+}
+function stkTreeMark(bi, j) {
+  const host = $("designTreeList"); if (!host) return;
+  Array.prototype.forEach.call(host.querySelectorAll(".stk-row.sel"), (n) => n.classList.remove("sel"));
+  if (bi == null) return;
+  const r = host.querySelector('.stk-row[data-stk="' + bi + ":" + j + '"]'); if (r) r.classList.add("sel");
+}
+
 // ── CONTENT TREE (left rail) — AEM's Content Tree: every component on the page,
 // top-to-bottom, each with its own settings ("meta"), reorder + hide/remove, and
 // click-to-select on the canvas. Built fresh from the rendered sections each load
@@ -17627,6 +18431,7 @@ function dcTreeSectionRows(host, main) {
   Array.prototype.forEach.call(secs, (el2) => {
     const c = eeClassify(el2);
     const row = dcTreeRow(el2, c); row.classList.add("under-page"); host.appendChild(row);
+    if (c && c.kind === "block" && el2.classList.contains("block-stack")) stkTreeRows(host, c.bi);   // item 57: its blocks, under it
     // a Columns container expands to reveal its columns (each selectable)
     if (c && c.kind === "block" && el2.classList.contains("block-columns")) {
       const b = BLOCKS_WORK[c.bi];
