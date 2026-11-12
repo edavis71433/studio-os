@@ -1,16 +1,17 @@
 import { test, expect, type Page, type Route } from '@playwright/test';
 import { mkdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { installApp, STUDIO_LEVEL_NAV, ALL_FEATURES } from './helpers/app';
+import { installApp, STUDIO_LEVEL_NAV, ALL_FEATURES } from '../../tests/e2e/helpers/app';
 import { applyPhoneBar } from '../../supabase/functions/presence/lib/phone_bar';
 
 // ── What's new's pictures (builder list item 128, Nov 2026) ──
 // Every entry in whats-new.json carries a picture of what changed, taken here on sample
-// data, never a client's site: the same hermetic pages the other specs draw, and the
-// sample restaurant's own page from the template picture record (tests/presence/golden).
-// It only runs when asked, so the suite never rewrites the pictures:
-//   WHATS_NEW_SHOOT=1 npx playwright test whats-new-pictures --project=desktop-chromium
-// and writes thumbs/whats-new/<id>.jpg at 1280×720, which the panel shows at 16:9.
+// data, never a client's site: the same hermetic pages the browser suite draws (its
+// helper, tests/e2e/helpers/app.ts), and the sample restaurant's own page from the template
+// picture record (tests/presence/golden). A tool beside scripts/thumbnails, not part of the
+// browser suite, and it only runs when asked, so nothing rewrites the pictures by accident:
+//   WHATS_NEW_SHOOT=1 npx playwright test -c scripts/whats-new/playwright.config.ts
+// It writes thumbs/whats-new/<id>.jpg at 1280×720, which the panel shows at 16:9.
 test.skip(!process.env.WHATS_NEW_SHOOT, 'takes the pictures only when asked');
 test.use({ viewport: { width: 1280, height: 720 }, deviceScaleFactor: 1 });
 

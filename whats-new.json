@@ -1,5 +1,5 @@
 {
-  "about": "What's new (builder list item 128). One entry per change, written once: what changed for the reader, not how it was built. `who` says who reads it: studio (a studio, every entry), owner (a business running its own site), client (a client in the portal, in the entry's `client` words, which never name Studio OS or show studio screens). Pictures are taken on sample data, never a client's site, by tests/e2e/whats-new-pictures.spec.ts (run with WHATS_NEW_SHOOT=1). Newest first; the panel groups them by week.",
+  "about": "What's new (builder list item 128). One entry per change, written once: what changed for the reader, not how it was built. `who` says who reads it: studio (a studio, every entry), owner (a business running its own site), client (a client in the portal, in the entry's `client` words, which never name Studio OS or show studio screens). Pictures are taken on sample data, never a client's site, by scripts/whats-new/shoot.spec.ts (WHATS_NEW_SHOOT=1 npx playwright test -c scripts/whats-new/playwright.config.ts). Newest first; the panel groups them by week.",
   "entries": [
     {
       "id": "search-todo",
