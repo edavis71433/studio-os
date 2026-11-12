@@ -225,10 +225,10 @@ test.describe('sales item 94 — AI help and the month’s goal', () => {
     await expect(sec.locator('#goalEx')).toHaveText('No goal yet, so Home and Pipeline show none.');
     await sec.getByLabel('Monthly sales goal').fill('8,000');
     await expect(sec.locator('#goalEx')).toHaveText('This month so far: $1,950 won · $4,180 still expected · $1,870 left to find');
-    await sec.getByRole('button', { name: 'Save' }).click();
+    await sec.getByLabel('Monthly sales goal').press('Tab');   // builder item 165: it saves when it's left
+    await expect(sec.locator('#fs-goal')).toHaveText('Saved');
     await expect.poll(() => puts.length).toBe(1);
     expect(puts[0]).toEqual({ goal_cents: 800000 });
-    await expect(page.locator('.dds-toast, .toast').filter({ hasText: 'Home and Pipeline show this month against $8,000' }).first()).toBeVisible();
     const sw = sec.getByRole('switch', { name: 'AI help: draft a reply, and sum a person up' });
     await expect(sw).toHaveAttribute('aria-checked', 'false');
     await sw.click();

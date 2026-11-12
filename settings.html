@@ -398,11 +398,11 @@
        off for every studio until its owner switches it on). GET/PUT /sales/goal-ai: the goal
        saves with its button, the switch as it flips, and only the studio's owner may flip it. -->
   <section class="card" id="goal" aria-labelledby="goalHead" hidden data-needs="configure">
-    <div class="card-h"><h2 id="goalHead" tabindex="-1">Goal and AI help</h2><span class="hint">Your number for the month, and AI help that drafts and sums up</span></div>
+    <div class="card-h"><h2 id="goalHead" tabindex="-1">Goal and AI help</h2><span class="hint">Your number for the month, and AI help that drafts and sums up. Changes save as you go.</span></div>
     <div class="swrow goalrow">
-      <div class="t"><b id="goalL">Monthly sales goal</b>
+      <div class="t"><b id="goalL">Monthly sales goal</b> <span class="fs" id="fs-goal" role="status"></span>
         <div class="how" id="goalHow">Home and Pipeline show this month against it: what you’ve won, what open deals should still bring at each stage’s chance, and what’s left to find. Leave it empty and nothing shows.</div>
-        <div class="goalin"><span class="cur" aria-hidden="true">$</span><input id="goalAmt" type="text" inputmode="decimal" autocomplete="off" maxlength="12" placeholder="8,000" aria-labelledby="goalL" aria-describedby="goalHow goalEx"><span class="per">a month</span><button type="button" class="btn sm primary" id="goalSave">Save</button></div>
+        <div class="goalin"><span class="cur" aria-hidden="true">$</span><input id="goalAmt" type="text" inputmode="decimal" autocomplete="off" maxlength="12" placeholder="8,000" aria-labelledby="goalL" aria-describedby="goalHow goalEx"><span class="per">a month</span></div>
         <div class="how" id="goalEx"></div></div>
     </div>
     <div class="swrow" id="aiRow">
@@ -1729,27 +1729,32 @@ async function loadGoalAi() {
   ]);
   const sd = s && s.ok && s.body && s.body.data;
   if (sd) GOAL_MONTH = { won: Number(sd.won_month && sd.won_month.value_cents) || 0, expected: Number(sd.expected && sd.expected.value_cents) || 0 };
-  if (!r || !r.ok || !r.body || !r.body.data) { $('goalSave').disabled = true; $('sw-aihelp').setAttribute('aria-disabled', 'true'); $('goalEx').textContent = (r && r.body && r.body.message) || 'The goal and AI help couldn’t load just now. Refresh to try again.'; return; }
+  if (!r || !r.ok || !r.body || !r.body.data) { $('goalAmt').disabled = true; $('sw-aihelp').setAttribute('aria-disabled', 'true'); $('goalEx').textContent = (r && r.body && r.body.message) || 'The goal and AI help couldn’t load just now. Refresh to try again.'; return; }
   GOALAI = r.body.data; paintGoalAi();
 }
-async function saveGoalAi(patch) {
+async function saveGoalAi(patch, slot, again) {
   if (GOAL_BUSY) return null; GOAL_BUSY = true;
   try {
     const r = await api('/sales/goal-ai', 'PUT', patch).catch(() => null);
-    if (!r || !r.ok) { toast((r && r.body && r.body.message) || 'That didn’t save just now. Try again.', true); return null; }
+    if (!r || !r.ok) { if (slot) saidRefused(slot, r, again); else toast((r && r.body && r.body.message) || 'That didn’t save just now. Try again.', true); return null; }   // item 165: a box says so beside itself
     GOALAI = Object.assign({}, GOALAI, r.body.data); paintGoalAi(); return GOALAI;
   } finally { GOAL_BUSY = false; }
 }
 (function wireGoalAi() {
   const amt = $('goalAmt'); if (!amt) return;
   amt.addEventListener('input', paintGoalEx);
-  amt.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); $('goalSave').click(); } });
-  $('goalSave').addEventListener('click', async () => {
-    const c = goalCentsOf(amt.value);
-    if (Number.isNaN(c)) { toast('Enter the goal in dollars, like 8,000.', true); amt.focus(); return; }
-    const d = await saveGoalAi({ goal_cents: c });
-    if (d) toast(d.goal_cents ? `Saved. Home and Pipeline show this month against ${usd0(d.goal_cents)}.` : 'Goal cleared. Home and Pipeline show none.');
-  });
+  // builder item 165: the goal saves when you leave its box (or press Enter); no Save button
+  const saveGoal = async () => {
+    const c = goalCentsOf(amt.value), slot = fsSlot('goal');
+    if (Number.isNaN(c)) { markBad(amt, true); saidFailed(slot, null, 'Enter the goal in dollars, like 8,000'); return; }
+    if (GOALAI && (GOALAI.goal_cents || 0) === (c || 0) && amt.getAttribute('aria-invalid') !== 'true') return;   // nothing changed
+    while (GOAL_BUSY) await new Promise((r) => setTimeout(r, 120));
+    saidNothing(slot);
+    const d = await saveGoalAi({ goal_cents: c }, slot, saveGoal);
+    markBad(amt, !d); if (d) saidSaved(slot);
+  };
+  amt.addEventListener('change', saveGoal);
+  amt.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); saveGoal(); } });
   $('sw-aihelp').addEventListener('click', async () => {
     if (!GOALAI) return;
     if (!GOALAI.can_switch) { toast('Only the studio’s owner can switch AI help on or off.', true); return; }
