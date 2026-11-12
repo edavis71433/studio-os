@@ -228,7 +228,9 @@ const pinned = (c, site) => c.query.includes(`site_id=eq.${site}`) || c.body?.si
   const FIELDS_IN_SOURCE = [...read('supabase/functions/presence/routes/content.ts').split('const SETTINGS_FIELDS')[1].split('\n};')[0].matchAll(/(?<!kind: 'json', )\b([a-z_]+): \{/g)].map((m) => m[1]);   // a JSON field's own limits (json: {…}) aren't a field
   const CONFIG = ['industry_key', 'auto_ack_enquiries', 'invoice_reminders', 'invoice_remind_after_days', 'deal_nudges', 'deal_nudge_days', 'review_requests', 'review_request_after_days', 'visit_counter', 'ai_crawlers', 'search_hidden', 'llms_txt', 'google_tag_id', 'meta_pixel_id', 'stage_stale_days', 'google_site_verification', 'bing_site_verification',
     // sales item 87 (0175): the recipes are automations, so they need configure like the switches above
-    'auto_ack_message', 'enquiry_followups', 'enquiry_followup_1_days', 'enquiry_followup_2_days', 'enquiry_followup_1_message', 'enquiry_followup_2_message', 'invoice_overdue_repeat', 'quote_expiry_reminders'];
+    'auto_ack_message', 'enquiry_followups', 'enquiry_followup_1_days', 'enquiry_followup_2_days', 'enquiry_followup_1_message', 'enquiry_followup_2_message', 'invoice_overdue_repeat', 'quote_expiry_reminders',
+    // sales item 88 (0176): who signs agreements for the studio
+    'signs_as_name', 'signs_as_title'];
   ok('fields: the settings field list was read', FIELDS_IN_SOURCE.length >= 25, FIELDS_IN_SOURCE.join(','));
   ok('fields: every settings field is on one side, and the audited split still holds',
     FIELDS_IN_SOURCE.every((f) => SETTINGS_CONTENT_FIELDS.has(f) !== CONFIG.includes(f)), FIELDS_IN_SOURCE.filter((f) => SETTINGS_CONTENT_FIELDS.has(f) === CONFIG.includes(f)).join(','));

@@ -11,10 +11,15 @@ import { guardStaleDraft } from '../lib/optimistic_lock.ts';
 import type { SiteRow } from '../lib/site.ts';
 import type { Principal } from '../../_shared/auth.ts';
 
-const SELECT = 'site_id,business_name,tagline,description,phone,email,story,service_area,booking_url,ordering_url,social,seo_title,seo_description,updated_at';
+// Builder list item 127 (0182). Before the apply pack a read that names it 400s; it's asked
+// again without it, so Business details never goes dark ahead of the pack.
+const SHORT_COL = ',short_description';
+const SELECT = 'site_id,business_name,tagline,description,phone,email,story,service_area,booking_url,ordering_url,social,seo_title,seo_description,updated_at' + SHORT_COL;
+const OLD_SELECT = () => SELECT.replace(SHORT_COL, '');
 
 export async function handleGetIdentity(db: SiteDb, site: SiteRow, cors: Record<string, string>) {
-  const r = await db(`presence_identity?site_id=eq.${site.id}&select=${SELECT}&limit=1`);
+  let r = await db(`presence_identity?site_id=eq.${site.id}&select=${SELECT}&limit=1`);
+  if (!r.ok && r.status === 400) r = await db(`presence_identity?site_id=eq.${site.id}&select=${OLD_SELECT()}&limit=1`);
   if (!r.ok) return json({ error: 'read_failed', message: 'We couldn’t load your business details just now.' }, 502, cors);
   const row = Array.isArray(r.json) && r.json.length ? r.json[0] : null;
   return json({ data: row }, 200, cors);
@@ -34,11 +39,13 @@ export async function handlePutIdentity(req: Request, db: SiteDb, site: SiteRow,
   // Upsert the singleton: for an owner RLS with-check enforces that this site
   // belongs to the caller; for a scope, siteDb's pin does. site_id is the conflict target.
   const body = { site_id: site.id, ...v.clean };
-  const w = await db(`presence_identity?on_conflict=site_id&select=${SELECT}`, {
+  const upsert = (select: string) => db(`presence_identity?on_conflict=site_id&select=${select}`, {
     method: 'POST',
     headers: { Prefer: 'resolution=merge-duplicates,return=representation' },
     body: JSON.stringify(body),
   });
+  let w = await upsert(SELECT);
+  if (!w.ok && w.status === 400 && !('short_description' in body)) w = await upsert(OLD_SELECT());   // before 0182
   if (!w.ok || !Array.isArray(w.json) || w.json.length === 0) {
     return json({ error: 'write_failed', message: 'That didn’t save — nothing was changed. Please try again.' }, w.status === 403 || w.status === 401 ? 403 : 502, cors);
   }

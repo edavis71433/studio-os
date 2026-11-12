@@ -99,7 +99,7 @@
         "timezone",
         "hours"
       ],
-      "max": 1
+      "max": 2
     }
   },
   "image_variants": {

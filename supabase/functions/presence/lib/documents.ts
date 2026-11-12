@@ -20,6 +20,8 @@ import { esc } from './markdown.ts';
 import { splitLineItems, computeProposalTotals, subtotalOf, type LineItem } from './sales_lifecycle.ts';
 import { hmacHex, timingSafeEqual } from '../../_shared/hmac.ts';
 import { UUID_RE } from './uuid.ts';
+import { agreementHtml } from './agreement_layout.ts';   // sales item 88: headings and numbered sections
+import { scheduleView } from './proposal_schedule.ts';   // sales item 106: paid in parts
 
 // ── the studio's identity on the page (structurally the EmailBrand shape) ─────
 export interface DocBrand { name: string; accent: string; accentDark: string }
@@ -214,6 +216,21 @@ function shell(o: { title: string; brand: DocBrand; docLabel: string; heading: s
   td.qty,th.qty{text-align:right;width:56px;color:var(--soft)}
   tr.less td{color:var(--soft)}
   .paidbox{background:#e7f1ea;border:1px solid #cfe4d6;color:#2c5c42;border-radius:12px;padding:12px 16px;margin-top:14px;font-size:14px}
+  /* sales item 88: the agreement as a document — a title, numbered headings, paragraphs, list items — and both signatures */
+  .agreement{font-size:14.5px;line-height:1.7;overflow-wrap:anywhere}
+  .agreement .ag-title{font-family:var(--serif);font-size:20px;font-weight:600;letter-spacing:.02em;margin:0 0 12px}
+  .agreement .ag-h{font-size:15px;font-weight:700;margin:22px 0 6px;break-after:avoid;page-break-after:avoid}
+  .agreement .ag-n{font-family:var(--serif);color:var(--accent);margin-right:8px}
+  .agreement .ag-p{margin:0 0 10px;white-space:pre-wrap}
+  .agreement .ag-item{margin:4px 0 4px 20px}
+  .agreement .ag-mark{color:var(--accent);font-weight:600;margin-right:6px}
+  .sigh{font-size:15px;font-weight:700;margin:0 0 10px}
+  .sigs{display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-bottom:6px}
+  .sig .k{text-transform:uppercase;letter-spacing:.08em;font-size:11px;font-weight:700;color:var(--soft)}
+  .sig .sgn{font-family:var(--serif);font-style:italic;font-size:26px;color:var(--accent-deep);line-height:1.3;margin-top:4px;overflow-wrap:anywhere}
+  .sig .line{height:1.5px;background:rgba(27,21,37,.35);margin:2px 0 6px}
+  .sig .who{font-size:12.5px;color:var(--soft);overflow-wrap:anywhere}
+  @media (max-width:560px){.sigs{grid-template-columns:1fr}}
   @media (max-width:560px){.parties{grid-template-columns:1fr}.inner{padding:24px 20px 28px}.docno{text-align:left}}
   footer{color:var(--soft);font-size:12px;text-align:center;margin-top:22px;line-height:1.5}
   @media print{
@@ -293,8 +310,12 @@ function renderLineItemsDocument(p: any, brandIn: Partial<DocBrand> | null | und
       <tr class="sub"><td style="color:var(--soft)">Subtotal</td><td style="color:var(--soft)">${esc(money(t.subtotal_cents, currency))}</td></tr>
       ${t.discount_cents > 0 ? `<tr class="sub"><td style="color:var(--soft)">${esc(discLabel)}</td><td style="color:var(--soft)">−${esc(money(t.discount_cents, currency))}</td></tr>` : ''}
       ${t.tax_cents > 0 ? `<tr class="sub"><td style="color:var(--soft)">${esc(taxLabel)}</td><td style="color:var(--soft)">+${esc(money(t.tax_cents, currency))}</td></tr>` : ''}` : '';
+  // sales item 106: how they'll pay, part by part (an estimate never has parts)
+  const parts = scheduleView(meta.schedule ?? null, t.total_cents);
+  const partsHtml = parts ? `<div class="hr"></div><div class="doclabel" style="margin-top:0">How you’ll pay</div><table><tbody>${parts.map((r) => `<tr><td>Part ${r.n} of ${r.of} · ${esc(r.words)}</td><td>${esc(money(r.amount_cents, currency))}</td></tr>`).join('')}</tbody></table>` : '';
   const body = `
     <table><tbody>${rows}${breakdown}<tr class="total"><td>Total</td><td>${esc(money(t.total_cents, currency))}</td></tr></tbody></table>
+    ${partsHtml}
     ${p?.terms ? `<div class="hr"></div><p class="terms">${esc(p.terms)}</p>` : ''}
     <p class="note">${esc(o.note)}</p>`;
   return shell({ title: `${o.heading} — ${brand.name}`, brand, docLabel: o.docLabel, heading: o.heading, sub: undefined, bodyHtml: body, pdfUrl: ctx?.pdfUrl, pdfName: ctx?.pdfName });
@@ -319,7 +340,7 @@ export function renderInvoiceDocument(v: any, brandIn?: Partial<DocBrand> | null
   const docLabel = invoiceDocLabel(v);
   const heading = String(v?.title || (isDeposit ? 'Deposit' : 'Invoice'));
   const no = invoiceNo(v?.number);
-  const pill = paid ? '<span class="pill paid">Paid</span>' : voided ? '<span class="pill void">Voided</span>' : '<span class="pill due">Amount due</span>';
+  const pill = paid ? '<span class="pill paid">Paid</span>' : voided ? '<span class="pill void">Voided</span>' : v?.processing_since ? '<span class="pill due">Payment on its way</span>' : '<span class="pill due">Amount due</span>';
   // the head: who it's from on the left, what it is and its number on the right
   const from = partyLines(ctx?.studio ? { ...ctx.studio, name: '' } : null);
   const headHtml = `<div class="head"><div><div class="wordmark">${esc(brand.name)}</div>${from.length ? `<div class="from">${from.map(esc).join('<br>')}</div>` : ''}</div>
@@ -330,7 +351,10 @@ export function renderInvoiceDocument(v: any, brandIn?: Partial<DocBrand> | null
   const details: string[] = [];
   if (no) details.push(`${paid ? 'Receipt for invoice' : 'Invoice no.'} ${no}`);
   if (v?.created_at) details.push('Issued ' + dayLabel(v.created_at, tz));
-  if (!paid && !voided) details.push(v?.due_date ? 'Due ' + dayLabel(v.due_date, tz) : 'Due on receipt');
+  // Sales item 118: a bank payment that is settling. The link took its one payment, so
+  // "Amount due" and a Pay button (which opened a switched-off Stripe page) were both wrong.
+  const settling = !paid && !voided && !!v?.processing_since;
+  if (!paid && !voided) details.push(settling ? 'Payment on its way' : v?.due_date ? 'Due ' + dayLabel(v.due_date, tz) : 'Due on receipt');
   if (paid) details.push(paidLine(v, tz));
   if (voided) details.push('Voided — no longer payable');
   const box = (k: string, lines: string[]) => `<div class="party"><div class="k">${esc(k)}</div>${lines.map((l, i) => i === 0 ? `<div class="first">${esc(l)}</div>` : `<div>${esc(l)}</div>`).join('')}</div>`;
@@ -343,16 +367,17 @@ export function renderInvoiceDocument(v: any, brandIn?: Partial<DocBrand> | null
   const lines = invoiceLines(v, billed);
   const rows = lines.map((l) => `<tr${l.amount_cents < 0 ? ' class="less"' : ''}><td>${esc(l.label)}</td><td class="qty">${l.qty !== 1 ? esc(String(l.qty)) : ''}</td><td>${esc(l.amount_cents < 0 ? '−' + money(-l.amount_cents, currency) : money(l.amount_cents, currency))}</td></tr>`).join('');
   const partRows = payments.map((p) => `<tr class="less"><td>${esc(paidLine(p, tz))}</td><td class="qty"></td><td>−${esc(money(p.amount_cents, currency))}</td></tr>`).join('');
-  const totalLabel = paid ? 'Total paid' : voided ? 'Total (voided)' : 'Amount due';
+  const totalLabel = paid ? 'Total paid' : voided ? 'Total (voided)' : settling ? 'Payment on its way' : 'Amount due';
   const totalCents = paid ? billed : amount;
   const table = `<table><thead><tr><th>Description</th><th class="qty">Qty</th><th>Amount</th></tr></thead><tbody>${rows}${payments.length && !paid ? `<tr><td style="color:var(--soft)">Total</td><td class="qty"></td><td style="color:var(--soft)">${esc(money(billed, currency))}</td></tr>` + partRows : ''}<tr class="total"><td>${esc(totalLabel)}</td><td class="qty"></td><td>${esc(money(totalCents, currency))}</td></tr></tbody></table>`;
   const paidBox = paid ? `<div class="paidbox">${esc(paidLine(v, tz))}${payments.length ? ` · with ${payments.length} earlier part payment${payments.length === 1 ? '' : 's'}: ${esc(payments.map((p) => paidLine(p, tz)).join('; '))}` : ''}</div>` : '';
   // A live pay link is an ACTION, not part of the printed record → no-print.
-  const pay = (!paid && !voided && v?.stripe_url)
+  const pay = (!paid && !voided && !settling && v?.stripe_url)
     ? `<p class="no-print" style="margin-top:16px"><a class="paylink" href="${esc(String(v.stripe_url))}">Pay ${esc(money(v?.amount_cents, currency))} securely →</a></p>`
     : '';
   const note = paid ? 'Thank you — this is your receipt of payment.'
     : voided ? 'This request was voided and is no longer payable.'
+    : settling ? 'Your payment is on its way. A bank payment takes a few days to arrive, and there is nothing more to do. You’ll get a receipt when it lands.'
     : `Payment is processed securely.${no ? ` Please quote ${no} with any payment by check or transfer.` : ''} This document is your copy of the request.`;
   const body = `${parties}${table}${paidBox}${pay}<p class="note">${esc(note)}</p>`;   // the table's bold total is the amount (the old amount box said it twice)
   return shell({ title: `${heading}${no ? ' ' + no : ''} — ${brand.name}`, brand, docLabel, heading, sub: undefined, bodyHtml: body, pdfUrl: ctx?.pdfUrl, pdfName: ctx?.pdfName, headHtml, lasting: paid });
@@ -373,6 +398,7 @@ export function renderContractDocument(c: any, brandIn?: Partial<DocBrand> | nul
     const rows: string[] = [];
     rows.push(`<div class="kv"><span class="k">Signed by</span><span>${esc(String(c?.signer_name || ''))}</span></div>`);
     if (c?.signer_email) rows.push(`<div class="kv"><span class="k">Signer email</span><span>${esc(String(c.signer_email))}</span></div>`);
+    if (c?.countersigned_name) rows.push(`<div class="kv"><span class="k">Countersigned by</span><span>${esc(String(c.countersigned_name))}${c?.countersigned_title ? ', ' + esc(String(c.countersigned_title)) : ''} for ${esc(brand.name)}</span></div>`);   // sales item 88
     rows.push(`<div class="kv"><span class="k">Signed at</span><span>${esc(utcStamp(c?.signed_at || ev?.at))}</span></div>`);
     rows.push(`<div class="kv"><span class="k">Document fingerprint (SHA-256)</span><span class="mono">${esc(hash)}</span></div>`);
     if (ev?.ip_hash) rows.push(`<div class="kv"><span class="k">Signing evidence (hashed IP)</span><span class="mono">${esc(String(ev.ip_hash))}</span></div>`);
@@ -382,8 +408,24 @@ export function renderContractDocument(c: any, brandIn?: Partial<DocBrand> | nul
   const statusSub = signed ? 'Executed copy — this is the signed document of record.'
     : c?.status === 'sent' ? 'Sent for signature — not yet signed.'
     : 'Draft — not yet sent for signature.';
-  const body = `<div class="body">${esc(String(c?.body || ''))}</div>${cert}${signed ? '' : `<p class="note">This copy is not an executed agreement until it is signed.</p>`}`;
+  // sales item 88: the text laid out as a document (the signed characters unchanged), then both signatures
+  const sigs = signed ? `<div class="hr"></div><h2 class="sigh">Signatures</h2>${signaturesHtml(c, brand, ctx)}` : '';
+  const body = `<div class="agreement">${agreementHtml(String(c?.body || ''))}</div>${sigs}${cert}${signed ? '' : `<p class="note">This copy is not an executed agreement until it is signed.</p>`}`;
   return shell({ title: `${c?.title || 'Agreement'} — ${brand.name}`, brand, docLabel: signed ? 'Signed agreement' : 'Agreement', heading: String(c?.title || 'Service agreement'), sub: statusSub, bodyHtml: body, pdfUrl: ctx?.pdfUrl, pdfName: ctx?.pdfName, lasting: signed });
+}
+
+/** Sales item 88: the two signatures on a signed agreement — the client's, typed by
+ *  them, and the studio's, added at the same moment. Pure. */
+export function signaturesHtml(c: any, brand: DocBrand, ctx?: DocContext | null): string {
+  const tz = ctx?.tz || null;
+  const day = dayLabel(c?.signed_at, tz);
+  const clientName = String(ctx?.billTo?.company || ctx?.billTo?.name || '').trim();
+  const one = (k: string, name: string, who: string) => `<div class="sig"><div class="k">${esc(k)}</div><div class="sgn">${esc(name)}</div><div class="line"></div><div class="who">${esc(who)}</div></div>`;
+  const client = one(clientName ? `For ${clientName}` : 'For the client', String(c?.signer_name || ''), [String(c?.signer_name || ''), String(c?.signer_email || ''), day].filter(Boolean).join(' · '));
+  const studio = c?.countersigned_name
+    ? one(`For ${brand.name}`, String(c.countersigned_name), [String(c.countersigned_name) + (c?.countersigned_title ? ', ' + String(c.countersigned_title) : ''), dayLabel(c?.countersigned_at || c?.signed_at, tz) + ' (countersigned)'].filter(Boolean).join(' · '))
+    : '';
+  return `<div class="sigs">${client}${studio}</div>`;
 }
 
 /** Dispatch by kind. `data` is an already-loaded, site-scoped row. Pure. */
