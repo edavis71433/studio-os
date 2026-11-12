@@ -55,14 +55,18 @@ const isObj = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 
 
 /** The menu as it travels: links to the site's own pages only. A link to
  *  another website, an email address or a phone number belongs to the old
- *  business, so it stays behind (and a dropdown keeps only its own pages). Pure. */
+ *  business, so it stays behind (and a dropdown keeps only its own pages).
+ *  A menu folder (builder item 48) has no page of its own: it travels with the
+ *  pages in it, and only when one is left (item 196). Pure. */
 export function menuForCopy(nav: unknown): unknown[] {
   const own = (href: unknown) => { const v = String(href ?? '').trim(); return v === '/' || /^\/[a-z0-9][a-z0-9-]*\/$/.test(v); };
   const out: unknown[] = [];
   for (const it of Array.isArray(nav) ? nav : []) {
-    if (!isObj(it) || !own(it.href)) continue;
+    const folder = isObj(it) && it.folder === true;
+    if (!isObj(it) || (!folder && !own(it.href))) continue;
     const kids = Array.isArray(it.children) ? it.children.filter((c) => isObj(c) && own(c.href)) : [];
     const { children: _drop, ...top } = it;
+    if (folder && !kids.length) continue;
     out.push(kids.length ? { ...top, children: kids } : top);
   }
   return out;
@@ -151,21 +155,22 @@ export function print53(s: string): string {
   h2 = Math.imul(h2 ^ (h2 >>> 16), 2246822507) ^ Math.imul(h1 ^ (h1 >>> 13), 3266489909);
   return (4294967296 * (2097151 & h2) + (h1 >>> 0)).toString(16);
 }
-export interface PrintedSection { print: string; page: string; title: string }
+// `slug` and `index` say where the section sits ('' is Home), so the publish item can open it (item 196)
+export interface PrintedSection { print: string; page: string; title: string; slug: string; index: number }
 const SECTION_WORD: Record<string, string> = { richtext: 'Text', image_text: 'Image and text', image: 'Image', gallery: 'Gallery', carousel: 'Slideshow', team: 'Team', cards: 'Cards', columns: 'Columns', features: 'Features', stats: 'Numbers', process: 'Steps', pricing: 'Prices', faq: 'FAQ', accordion: 'Questions', tabs: 'Tabs', cta: 'Call to action', title: 'Title', video: 'Video', map: 'Map', events: 'Events', social: 'Social links', partners: 'Logos', before_after: 'Before and after', spotlight: 'Spotlight', form: 'Form', booking: 'Booking', appointment: 'Appointments', newsletter: 'Newsletter', certifications: 'Credentials', service_areas: 'Service areas', reviews: 'Rating', progress: 'Progress', buttons: 'Buttons', download: 'Download', link_list: 'Links', table: 'Table', freeform: 'Free-form', stack: 'Blocks' };
 /** Every section of a snapshot, printed, with its page and a name for it. Pure. */
 export function printSections(content: unknown): PrintedSection[] {
   const settings = isObj(content) && isObj(content.settings) ? content.settings : {};
   const out: PrintedSection[] = [];
-  const add = (blocks: unknown, page: string) => {
-    for (const b of Array.isArray(blocks) ? blocks : []) {
-      if (!isObj(b) || NOTHING_OF_THEIRS.has(String(b.type))) continue;
+  const add = (blocks: unknown, page: string, slug: string) => {
+    (Array.isArray(blocks) ? blocks : []).forEach((b, index) => {
+      if (!isObj(b) || NOTHING_OF_THEIRS.has(String(b.type))) return;
       const title = String(b.title || '').replace(/\s+/g, ' ').trim().slice(0, 40) || SECTION_WORD[String(b.type)] || 'A section';
-      out.push({ print: print53(canon(b)), page, title });
-    }
+      out.push({ print: print53(canon(b)), page, title, slug, index });
+    });
   };
-  add(settings.blocks, 'Home');
-  for (const p of Array.isArray(settings.pages) ? settings.pages : []) if (isObj(p)) add(p.blocks, String(p.title || p.slug || 'A page').slice(0, 40));
+  add(settings.blocks, 'Home', '');
+  for (const p of Array.isArray(settings.pages) ? settings.pages : []) if (isObj(p)) add(p.blocks, String(p.title || p.slug || 'A page').slice(0, 40), String(p.slug || ''));
   return out;
 }
 
@@ -184,15 +189,19 @@ export function copiedLeftovers(record: CopiedRecord | null | undefined, content
 
 /** The one thing to finish before publishing while copied words or photos are
  *  untouched — never naming the other business, since the site's owner may read
- *  it too. Null when nothing is left. Pure. */
-export function copiedBlocker(left: { sections: PrintedSection[]; photos: number }): { field: string; message: string } | null {
+ *  it too. Null when nothing is left. `at` is the first such section, which the
+ *  editor's Fix opens; the studio's Keep sits beside it there, and a client is
+ *  told to ask their studio (item 196: the old words sent a client to Sites, a
+ *  page only the studio has). Pure. */
+export function copiedBlocker(left: { sections: PrintedSection[]; photos: number }): { field: string; message: string; at?: { page: string; index: number } } | null {
   const n = left.sections.length, p = left.photos;
   if (!n && !p) return null;
   const byPage = new Map<string, string[]>();
   for (const s of left.sections) byPage.set(s.page, [...(byPage.get(s.page) || []), s.title]);
   const where = [...byPage].slice(0, 4).map(([page, titles]) => `${page}: ${titles.slice(0, 3).join(', ')}${titles.length > 3 ? '…' : ''}`).join('; ');
   const what = [n ? `${n} section${n === 1 ? '' : 's'}${where ? ` (${where}${byPage.size > 4 ? '; …' : ''})` : ''}` : '', p ? `${p} photo${p === 1 ? '' : 's'}` : ''].filter(Boolean).join(' and ');
-  return { field: 'copied', message: `Still exactly as copied from another site: ${what}. Change them for this business, or press Keep on this site’s card in Sites.` };
+  const first = left.sections[0];
+  return { field: 'copied', message: `Still exactly as copied from another site: ${what}. Change them for this business before publishing.`, ...(first ? { at: { page: first.slug, index: first.index } } : {}) };
 }
 
 /** A stored record, read safely: anything malformed is no record. Pure. */

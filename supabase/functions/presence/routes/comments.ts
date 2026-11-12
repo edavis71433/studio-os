@@ -31,6 +31,7 @@ import type { CommentRow } from '../lib/section_comments.ts';
 import type { SiteRow } from '../lib/site.ts';
 import type { Principal } from '../../_shared/auth.ts';
 import { UUID_RE } from '../lib/uuid.ts';
+import { liveContent } from '../lib/page_access.ts';
 
 const SELECT = 'id,page_slug,block_id,author_kind,body,status,created_at,resolved_at';
 // item 159 (0183): the name typed with shared-draft feedback and the note's picture. A
@@ -190,8 +191,9 @@ export async function handleTokenSections(req: Request, token: string, cors: Rec
   if (!snapId) return json({ error: 'not_found', message: 'This preview isn’t available yet.' }, 404, cors);
   const loaded = await loadStagedSnapshot(snapId);
   if (!loaded) return json({ error: 'not_found', message: 'This preview isn’t available yet.' }, 404, cors);
-  // ONLY {id, name} pairs leave this route — no titles, bodies, media, or settings.
-  return json({ data: { page_slug: slug, sections: sectionsForContent(loaded.snapshot.content, slug) } }, 200, cors);
+  // ONLY {id, name} pairs leave this route — no titles, bodies, media, or settings. A password
+  // or private page isn't on the shared draft (item 196), so it has no sections here either.
+  return json({ data: { page_slug: slug, sections: sectionsForContent(liveContent(loaded.snapshot.content, new Set()).content, slug) } }, 200, cors);
 }
 
 // ── POST /p/s/:token/comments — the client leaves feedback (rate-limited) ─────

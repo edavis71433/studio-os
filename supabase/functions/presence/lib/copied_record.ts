@@ -32,7 +32,7 @@ export async function keepCopied(siteId: string, by: string): Promise<CopiedReco
 /** The one thing to finish before publishing while copied words or photos are
  *  untouched (routes/room.ts and routes/publish.ts), or null. A failed read is
  *  no record: the check never blocks a site it can't read. */
-export async function copiedBlockerFor(siteId: string, content: unknown, mediaManifest: MediaManifestEntry[] | null | undefined): Promise<{ field: string; message: string } | null> {
+export async function copiedBlockerFor(siteId: string, content: unknown, mediaManifest: MediaManifestEntry[] | null | undefined): Promise<{ field: string; message: string; at?: { page: string; index: number } } | null> {
   const rec = await readCopied(siteId).catch(() => null);
   if (!rec || rec.kept) return null;
   return copiedBlocker(copiedLeftovers(rec, content, (mediaManifest || []).map((m) => m.media_id)));
