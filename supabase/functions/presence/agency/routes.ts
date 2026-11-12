@@ -25,6 +25,7 @@ import { handleAgencySites } from './sites.ts';
 import { handleSiteFolders } from './site_folders.ts';   // builder list item 176
 import { handleClientTools } from './client_tools.ts';
 import { handleSiteNumbers } from './site_numbers.ts';
+import { handleUsage } from './usage.ts';
 import { handleDoNext } from './do_next.ts';
 import { HIDEABLE_SECTIONS, normalizeHidden } from '../lib/navigation.ts';
 import { readReservedJsonOrThrow, writeReservedJson, updateReservedJson, RESERVED_NAMES } from '../lib/reserved_store.ts';
@@ -254,6 +255,12 @@ async function handleAgencyInner(req: Request, route: string, method: string, me
   //    with the change from last month, read after the Sites cards are up ──
   {
     const r = await handleSiteNumbers(route, method, member, cors, now);
+    if (r) return r;
+  }
+
+  // ── builder list item 210: what each client uses (publishes and their cost, storage, visits) ──
+  {
+    const r = await handleUsage(req, route, method, member, cors, now);
     if (r) return r;
   }
 
