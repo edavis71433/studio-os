@@ -86,6 +86,7 @@ const CONTROLS = [
   ['PUT /sales/contacts/fields', 'contacts.html', `api('/sales/contacts/fields','PUT',{fields})`, ['id="manageFields" data-needs="configure"']],
   ['PUT /sales/stages', 'settings.html', `api('/sales/stages', 'PUT', { names })`, ['id="automations" aria-labelledby="autoHead" hidden data-needs="configure"']],
   ['POST /sales/setup', 'agency.html', `apiSend('POST','/sales/setup',{hidden})`, ['id="setup" class="setup" aria-labelledby="setupHead" hidden data-needs="configure"', 'id="setupHide" data-needs="configure"']],   // sales item 105: Home's setup strip, and its Hide
+  ['PUT /sales/goal-ai', 'settings.html', `api('/sales/goal-ai', 'PUT', patch)`, ['id="goal" aria-labelledby="goalHead" hidden data-needs="configure"']],   // sales item 94: the month's goal and the AI help switch (the switch is the owner's alone: the route says so)
   ['PUT /report/monthly', 'settings.html', `api('/report/monthly', 'PUT', patch)`, ['id="report" aria-labelledby="reportHead" hidden data-needs="configure"']],   // builder list item 58
   ['POST /report/monthly/preview', 'settings.html', `api('/report/monthly/preview', 'POST', {})`, ['id="report" aria-labelledby="reportHead" hidden data-needs="configure"']],
   ['DELETE /broadcasts/lists/:id', 'broadcasts.html', `api('/broadcasts/lists/'+encodeURIComponent(SEL.slice(5)),'DELETE')`, ['id="dropList" data-needs="delete"']],
@@ -130,7 +131,7 @@ const SOURCE = Object.fromEntries(PAGES.map((p) => [p, read(p)]));
   const decided = read('tests/presence/member_capability_test.mjs');
   const listed = (name) => [...decided.split('const DECIDED = {')[1].split(`\n  ${name}: [`)[1].split('\n  ],')[0].matchAll(/'((?:DELETE|POST|PUT|PATCH) [^']+)'/g)].map((m) => m[1]);
   const routes = [...listed('delete'), ...listed('configure')];
-  ok('the decided delete and configure lists were read', routes.length === 47, String(routes.length));   // sales item 105 added Home's setup strip; item 47 added two; item 104 took away the seven DNS document and zone writes; item 58 added two; item 112 added the prospect delete; item 115 added the Google review link; item 175 the visitor password; item 77 the payment undo; item 174 added the two domain forwards; items 86 + 105 added three (import undo, merge, unmerge); item 106 the project template and saved to-do list removals; sales item 117 the client's retainer cancel
+  ok('the decided delete and configure lists were read', routes.length === 48, String(routes.length));   // sales item 94 added the month's goal; sales item 105 added Home's setup strip; item 47 added two; item 104 took away the seven DNS document and zone writes; item 58 added two; item 112 added the prospect delete; item 115 added the Google review link; item 175 the visitor password; item 77 the payment undo; item 174 added the two domain forwards; items 86 + 105 added three (import undo, merge, unmerge); item 106 the project template and saved to-do list removals; sales item 117 the client's retainer cancel
   const covered = new Set(CONTROLS.map(([r]) => r));
   const open = routes.filter((r) => !covered.has(r) && !NO_CONTROL[r] && !PORTAL_OWNER_ONLY[r]);
   for (const [route, c] of Object.entries(PORTAL_OWNER_ONLY)) {

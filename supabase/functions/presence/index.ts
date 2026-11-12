@@ -804,6 +804,10 @@ async function route_(req: Request, cors: Record<string, string>): Promise<Respo
   if ((route === '/handover/pack' && method === 'GET') || (route === '/handover/notify' && method === 'POST')) return (await import('./routes/handover_pack.ts')).handleHandoverPack(req, site, principal, cors);   // sales item 93: the hand-over pack for a client who leaves
   if (route === '/sales/setup' && (method === 'GET' || method === 'POST')) return (await import('./routes/setup_strip.ts')).handleSetupStrip(req, site, principal, cors);   // sales item 105: Home's setup strip
   if (route === '/sales/export/accounting' && method === 'GET') return (await import('./routes/accounting_export.ts')).handleAccountingExport(req, site, principal, cors);   // sales item 105: the export for a bookkeeper
+  // sales item 94: the month's goal and the AI help switch, and AI help's two presses (lazy: most requests never use them)
+  if (route === '/sales/goal-ai' && (method === 'GET' || method === 'PUT')) return (await import('./routes/sales_ai.ts')).handleGoalAi(req, jwt, site, principal, cors);
+  if (route === '/sales/ai/draft' && method === 'POST') return (await import('./routes/sales_ai.ts')).handleAiDraft(req, jwt, site, principal, cors);
+  if (route === '/sales/ai/summary' && (method === 'GET' || method === 'POST')) return (await import('./routes/sales_ai.ts')).handleAiSummary(req, jwt, site, principal, cors);
   // ── Prospects — the lead list (Semrush review, sales item 112). Lazy: most days nobody prospects. ──
   if (route.startsWith('/sales/prospects')) {
     const px = await import('./routes/prospects.ts');
