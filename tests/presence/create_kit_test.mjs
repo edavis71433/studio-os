@@ -93,7 +93,7 @@ ok('past the first 100, typing asks the server too', /api\('\/sales\/contacts\?l
 
 // ── the button says what it will do ──
 eq('the main button, for a deal and for a person with none', [K.crGoLabel('call', { kind: 'deal' }), K.crGoLabel('call', { kind: 'contact' }), K.crGoLabel('invoice', { kind: 'contact' }), K.crGoLabel('todo', null), K.crGoLabel('deal', null), K.crGoLabel('proposal', null)],
-  ['Log call', 'Start a deal and log the call', 'Start a deal and send', 'Add to-do', 'Add deal', 'Open the proposal']);
+  ['Log call', 'Log call', 'Start a deal and send', 'Add to-do', 'Add deal', 'Open the proposal']);   // sales item 85: a call for someone with no deal stays on them
 
 // ── the routes it calls exist ──
 for (const [what, re] of [['activity', /\^\\\/sales\\\/deals\\\/\(\[0-9a-f-\]\{36\}\)\\\/activity\$/], ['tasks', /\^\\\/sales\\\/deals\\\/\(\[0-9a-f-\]\{36\}\)\\\/tasks\$/], ['invoice', /handleSalesInvoice\(req, site, principal, m\[1\], cors\)/], ['contacts', /route === '\/sales\/contacts'\) return handleSalesContacts/]]) ok(`the server has the ${what} route`, re.test(index));

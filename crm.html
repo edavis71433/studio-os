@@ -1904,6 +1904,7 @@ function renderRail(){
 // sales item 85: calls and to-dos are for anyone: on the deal when there is one, else on the person or customer
 const personIds=()=>{const id=(REC&&REC.identity)||{};return{contact_id:id.contact_id||null,client_id:id.client_id||null};};
 const hasPerson=()=>{const p=personIds();return!!(p.contact_id||p.client_id);};
+const NOT_YET='Calls and to-dos for someone without a deal arrive with an update that’s on its way. Try again a little later.';
 function composerTabs(){
   const s=(REC&&REC.sections)||{}; const hasDeal=!!idParams().deal;
   const tabs=[['message','Message']];
@@ -1988,6 +1989,7 @@ async function logActivity(){
   const base={kind:LOGKIND,body,occurred_at:recDayAtNoon($('logDate')&&$('logDate').value),...(fu?{follow_up:fu,follow_up_title:'Follow up'+(who?' with '+who:'')}:{})};
   const r=deal?await apiAg('/sales/deals/'+encodeURIComponent(deal)+'/activity','POST',base):await apiAg('/sales/people/activity','POST',{...base,...personIds()});
   const f=r.ok&&r.body&&r.body.data&&r.body.data.follow_up;
+  if(!deal&&r.status===404){toast(NOT_YET);btn.disabled=false;return;}   // an older server: pages go live before the server's update
   if(r.ok){clearDraft('logBody');clearDraft('logDate');clearDraft('logFollow');toast(fu?(f&&f.id?'Logged, and a to-do to follow up on '+dueLabel(fu)+'.':'Logged. The follow-up to-do didn’t save: add it from the To-do tab.'):'Logged.');
     // B4: "Last talked" moves at once (the server answers with the day just logged; an older day doesn't win)
     const at=r.body&&r.body.data&&r.body.data.last_contacted_at;if(at&&DEAL&&!DEAL.error&&!(Date.parse(DEAL.last_contacted_at)>Date.parse(at))){DEAL.last_contacted_at=at;renderHighlights();if(TAB==='deal')showTab(TAB,true);}
@@ -2002,6 +2004,7 @@ async function addTask(){
   const due=($('taskDue')&&$('taskDue').value)||'';
   // item 85: on the deal when there is one, else a to-do for the person (or the customer) themselves
   const r=deal?await apiAg('/sales/deals/'+encodeURIComponent(deal)+'/tasks','POST',due?{title,due_date:due}:{title}):await apiAg('/sales/tasks','POST',{title,...(due?{due_date:due}:{}),...personIds()});
+  if(!deal&&r.status===404){toast(NOT_YET);btn.disabled=false;return;}
   if(r.ok){clearDraft('taskTitle');clearDraft('taskDue');toast('Added.');await loadActivity();}
   else{toast((r.body&&r.body.message)||'That didn’t save.');btn.disabled=false;}
 }

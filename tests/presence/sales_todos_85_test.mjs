@@ -231,5 +231,36 @@ const world = () => ({
   ok('record and deal: "Follow up on" with Tomorrow and Next week', crm.includes('id="logFollow"') && crm.includes('data-fu="7">Next week') && pipe.includes('id="qlFollow"') && pipe.includes("follow_up:fu,follow_up_title:'Follow up'+(who?' with '+who:'')"));
 }
 
+// ═══ 9. the two pages, the menu, Home and + Create ═══
+{
+  const NAV = await import('../../supabase/functions/presence/lib/navigation.ts');
+  const caps = ['view_all', 'edit', 'publish', 'connect', 'configure', 'invite'];
+  const studio = NAV.buildNav({ role: 'business_owner', edition: 'presence', capabilities: caps, isAgency: true, isOperator: false, siteLive: true });
+  const keys = studio.filter((x) => !x.utility).map((x) => x.key);
+  ok('the menu: To-dos right after Inbox, Invoices right after Pipeline', keys.indexOf('todos') === keys.indexOf('inbox') + 1 && keys.indexOf('invoices') === keys.indexOf('pipeline') + 1, keys.join(' · '));
+  const item = (k) => studio.flatMap((x) => x.items).find((i) => i.key === k);
+  ok('…each opens its page', item('todos').href === '/todos.html' && item('invoices').href === '/invoices.html' && !item('todos').hidden && !item('invoices').hidden);
+  const headers = read('_headers'), redirects = read('_redirects');
+  ok('clean addresses for both, never cached stale', ['/todos', '/invoices'].every((u) => headers.includes(`${u}\n  Cache-Control: no-cache, must-revalidate`)) && redirects.includes('/todos.html                   /todos               301!') && redirects.includes('/invoices.html                /invoices            301!'));
+  const todos = read('todos.html'), invoices = read('invoices.html'), home = read('agency.html'), create = read('create.js'), shell = read('shell.js');
+  ok('To-dos reads the whole list and makes one for anyone', todos.includes("api('/sales/tasks')") && todos.includes("api('/sales/tasks','POST',body)") && todos.includes("body.contact_id=fv.slice(8)") && todos.includes("body.client_id=fv.slice(7)"));
+  ok('To-dos: Done uses the route that owns each kind, and each has its way back', todos.includes("['PATCH','/sales/deal-tasks/'+encodeURIComponent(t.id),{status:back?'open':'done'}]") && todos.includes("{next_step:t.title,next_step_at:t.due||null}") && todos.includes("{status:back?'todo':'done'}"));
+  ok('Invoices: the read, the PDF, and a payment by hand through the deal page\'s own route', invoices.includes("api('/sales/invoices?today='+ymd())") && invoices.includes("'/sales/invoices/'+encodeURIComponent(i.id)+'/document'") && invoices.includes("'/sales/invoices/'+encodeURIComponent(i.id)+'/payment?today='+ymd()"));
+  ok('Invoices: an older server says the page is on its way, and opens Pipeline\'s Who owes you', invoices.includes('Invoices is on its way.') && invoices.includes('href="/pipeline.html#outstanding"'));
+  ok('To-dos: an older server says the page is on its way too', todos.includes('To-dos is on its way.') && todos.includes("r.status===404&&!(r.body&&r.body.data)"));
+  ok('Home\'s to-do card opens the whole list', home.includes('<a href="/todos.html" data-noscope="1">All to-dos →</a>'));
+  ok('the menu has an icon for each', /todos: '<path/.test(shell) && /invoices: '<path/.test(shell));
+  ok('+ Create: a call or a to-do for someone with no deal stays on them, and an older server falls back to starting a deal', create.includes("api('/sales/people/activity'") && create.includes("api('/sales/tasks'") && create.includes("if (r.status === 404 || (r.status === 409 && r.body && r.body.error === 'needs_update')) return Promise.reject({ useDeal: true });") && create.includes("p = p ? p.catch(function (e) { return e && e.useDeal ? viaDeal() : Promise.reject(e); }) : viaDeal();"));
+}
+// a deleted to-do for a person names them on Recently deleted
+{
+  const w = world();
+  w.presence_deal_tasks.push({ id: tid(8), site_id: SITE, deal_id: null, contact_id: cid(1), title: 'Old reminder', status: 'open', deleted_at: ago(1) });
+  db.reset(w);
+  const r = await res(await S.handleSalesDeleted(site, cors));
+  const t = r.body.data.todos.find((x) => x.title === 'Old reminder');
+  ok('Recently deleted names who a deleted to-do was for, and opens their record', t && t.for_name === 'Avery Stone' && t.href === `/crm.html?contact=${cid(1)}`, JSON.stringify(t));
+}
+
 console.log(`\n${pass} passed, ${fail} failed`);
 if (fail) { console.log('Failed:\n  ' + failed.join('\n  ')); Deno.exit(1); }
