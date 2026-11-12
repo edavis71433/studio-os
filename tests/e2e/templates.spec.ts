@@ -38,7 +38,7 @@ test.describe('Templates (builder list item 166)', () => {
     await openTemplates(page);
     await expect(page.getByRole('heading', { level: 1, name: 'Templates' })).toBeVisible();
     await expect(page.locator('#phLine')).toHaveText('1 template · 1 starter kit · newest first');   // builder item 165: the header's line
-    await expect(page.locator('.dds-ph-tabs a')).toHaveText(['Sites', 'Domains', 'Templates', 'Usage'])   // item 210: the Usage tab;
+    await expect(page.locator('.dds-ph-tabs a')).toHaveText(['Sites', 'Domains', 'Templates', 'Usage']);   // item 210: the Usage tab
     await expect(page.locator('.dds-ph-tabs a[aria-current="page"]')).toHaveText('Templates');
     const rows = page.locator('.krow');
     await expect(rows).toHaveCount(2);

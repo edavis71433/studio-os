@@ -37,7 +37,7 @@ test.describe('Invoices: send a test to myself (builder list item 175)', () => {
     const hold = new Promise<void>((r) => { release = r; });
     const sent = await openInvoices(page, { status: 200, body: { data: { sent_to: 'owner@studio.example', stripe: true } } }, hold);
     // builder item 165: the page header's actions — the test first, Send an invoice the one filled; on a phone the first two wait behind ⋯
-    await expect(page.locator('header.dds-ph .dds-ph-acts button:not(.dds-ph-dots)')).toHaveText(['Send a test to myself', 'Download CSV', 'For your bookkeeper', 'Send an invoice']   // sales item 105 added the bookkeeper's export);
+    await expect(page.locator('header.dds-ph .dds-ph-acts button:not(.dds-ph-dots)')).toHaveText(['Send a test to myself', 'Download CSV', 'For your bookkeeper', 'Send an invoice']);   // sales item 105 added the bookkeeper's export
     const btn = page.getByRole('button', { name: 'Send a test to myself' });
     await btn.click();
     await expect(page.locator('#testInvBtn')).toHaveText('Sending…');
