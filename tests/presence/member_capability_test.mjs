@@ -177,6 +177,7 @@ const DECIDED = {
     'POST /client/projects/:id/messages', 'POST /client/support', 'POST /client/support/:id/messages',
     'POST /client/surveys/:id/respond', 'POST /comments', 'POST /comments/:id/resolve',
     'POST /projects/:id/messages', 'POST /support/:id/messages', 'POST /surveys/:id/respond',
+    'POST /client/approvals/:id/notes',   // builder list item 179: a note on one part of the website draft
   ],
   edit: [
     'PATCH /assets/:id', 'PATCH /bookings/types/:id', 'PATCH /broadcasts/:id', 'PATCH /projects/:id',
@@ -441,6 +442,7 @@ const WRITE_HANDLERS = [
   'handleCheckpointDelete', 'handleCheckpointRestore', 'handleCheckpointSave', 'handleClientApprovalDecide',
   'handleClientMessages', 'handleClientNotificationsRead', 'handleClientSupport', 'handleClientSupportMessage',
   'handleClientSurveyRespond', 'handleClientTaskDone', 'handleClientUploadCreate', 'handleClientUploadUrl',
+  'handleClientDraftNote',   // builder list item 179: POST /client/approvals/:id/notes needs comment
   'handleCoachDecide', 'handleCoachRun', 'handleCollection', 'handleCommentCreate', 'handleCommentDelete',
   'handleCommentResolve', 'handleConciergeAsk', 'handleConnectionAsk', 'handleConnectionCallback',
   'handleConnectionConnect', 'handleConnectionDisconnect', 'handleConnectionPropertySelect',

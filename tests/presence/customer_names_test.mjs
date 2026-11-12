@@ -18,6 +18,15 @@ eq('a site name that repeats the contact is not a business', N.customerNames({ c
 eq('a business on the site, a different name on the customer, no contact: that name is the person', N.customerNames({ clientName: 'Dana Lee', siteBusinessName: 'Willow Day Spa' }), { name: 'Willow Day Spa', business_name: 'Willow Day Spa', person_name: 'Dana Lee' });
 eq('nothing known', N.customerNames({}), { name: 'Customer', business_name: '', person_name: '' });
 
+// builder list item 179: the portal greets the person by their first name, from the studio's record
+eq('greeting: the person on the record, first name only', N.greetingName(N.customerNames({ clientName: 'Jordan Ellis', siteBusinessName: 'Larkspur Kitchen', contactName: 'Jordan Ellis' })), 'Jordan');
+eq('greeting: a record named for a person, with no business, is that person', N.greetingName(N.customerNames({ clientName: 'eric test' })), 'Eric');
+eq('greeting: a business with no person behind it gets no name (Home just says good afternoon)', N.greetingName(N.customerNames({ clientName: 'Northside Dental', siteBusinessName: 'Northside Dental' })), '');
+eq('greeting: an initial, an address or nothing is never a name', [N.greetingName({ person_name: 'j. smith' }), N.greetingName({ person_name: 'maria@example.com' }), N.greetingName({ name: 'Customer' }), N.greetingName(null)], ['', '', '', '']);
+eq('greeting: a name already in capitals keeps them', N.greetingName({ person_name: 'McKenna Ruiz' }), 'McKenna');
+const ws = read('supabase/functions/presence/routes/workspace.ts');
+ok('greeting: /portal/context reads it beside the studio brand and hands it over', /const \[studio, clientFirstName\] = await Promise\.all\(/.test(ws) && /client_first_name: clientFirstName \|\| null/.test(ws) && /loadCustomerNames\(agencySiteId, \[\{ clientId, clientName: c\?\.name, customerSiteId: siteId \}\], read\)/.test(ws));
+
 const cd = read('supabase/functions/presence/routes/client_delivery.ts');
 // item 49 moved the reads into lib/customer_names.ts (loadCustomerNames) — see sales_batch11_test.mjs
 ok('Customers reads the names through the shared reader and serves both', /loadCustomerNames\(String\(site\.id\)/.test(cd) && /business_name: clean\(names\.business_name, 200\),\s*person_name: clean\(names\.person_name, 200\),/.test(cd));

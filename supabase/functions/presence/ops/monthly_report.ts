@@ -43,6 +43,7 @@ export const REPORT_NOTE_MAX = 600;
 export const REPORT_SEND_DAYS = 3;   // the report goes out on the 1st, 2nd or 3rd of the month
 
 export const REPORT_MAX_TRIES = 3;   // a send that fails is tried again on the next tick, up to this many times a month
+export const REPORT_KEEP_MONTHS = 24;   // item 179: the months the client's Documents shelf lists, newest first
 
 /** What happened to the last month handled: sent, skipped (why: no_email, unsubscribed,
  *  bounced, or quiet for a month under the studio's number), or failed for good. `cc` is
@@ -53,6 +54,10 @@ export interface ReportSetting {
   enabled: boolean; note: string; last_month: string | null;
   last_result: ReportResult | null; tries: { month: string; count: number } | null;
   updated_by: string | null; updated_at: string | null;
+  /** Builder list item 179: the months whose report really went out (YYYY-MM, newest
+   *  first, the last 24), so the client's Documents shelf lists exactly those. Written
+   *  only when the monthly job's send succeeds: a preview or a skip never counts. */
+  sent_months: string[];
   /** Builder list item 182: the monthly AI check for this client (it costs money, so off
    *  until the studio switches it on), the month it last handled, how that went, and
    *  its tries this month (ops/ai_checks.ts). */
@@ -106,6 +111,7 @@ export function normalizeReportSetting(raw: unknown): ReportSetting {
     tries: r.tries && typeof r.tries === 'object' && typeof (r.tries as any).month === 'string' && Number.isFinite((r.tries as any).count) ? { month: String((r.tries as any).month), count: Math.max(0, Math.floor(Number((r.tries as any).count))) } : null,
     updated_by: typeof r.updated_by === 'string' ? r.updated_by : null,
     updated_at: typeof r.updated_at === 'string' ? r.updated_at : null,
+    sent_months: sentMonthsOf(r.sent_months),
     pdf: r.pdf !== false,
     ai_checks: r.ai_checks === true,
     ai_month: typeof r.ai_month === 'string' && /^\d{4}-\d{2}$/.test(r.ai_month) ? r.ai_month : null,
@@ -114,6 +120,16 @@ export function normalizeReportSetting(raw: unknown): ReportSetting {
     parts_off: normalizePartsOff(r.parts_off), cc: normalizeCc(r.cc), copy_to: normalizeCopyTo(r.copy_to),
     quiet_min: normalizeQuiet(r.quiet_min), propose: normalizePropose(r.propose),
   };
+}
+
+/** The sent months, cleaned: real YYYY-MM months, each once, newest first, the last 24. Pure. */
+export function sentMonthsOf(raw: unknown): string[] {
+  const ok = (Array.isArray(raw) ? raw : []).filter((m): m is string => typeof m === 'string' && /^\d{4}-(0[1-9]|1[0-2])$/.test(m));
+  return [...new Set(ok)].sort().reverse().slice(0, REPORT_KEEP_MONTHS);
+}
+/** The list after a month's report went out. Pure. */
+export function withSentMonth(list: string[], month: string): string[] {
+  return sentMonthsOf([month, ...(list || [])]);
 }
 
 function normalizeAiResult(raw: unknown): ReportSetting['ai_result'] {
@@ -213,6 +229,21 @@ export function lastMonth(nowIso: string, tz = 'UTC'): { month: string; startIso
     startIso: new Date(zoneMidnight(py, pm, 1, zone)).toISOString(),
     endIso: new Date(zoneMidnight(y, m, 1, zone)).toISOString(),
     label: new Date(Date.UTC(py, pm - 1, 1)).toLocaleDateString('en-US', { month: 'long', year: 'numeric', timeZone: 'UTC' }),
+  };
+}
+/** Any month's bounds on the `tz` clock, as lastMonth gives last month's; null for
+ *  something that isn't a YYYY-MM month (item 179: an older report on the shelf). Pure. */
+export function monthWindow(month: string, tz = 'UTC'): { month: string; startIso: string; endIso: string; label: string } | null {
+  const mm = /^(\d{4})-(0[1-9]|1[0-2])$/.exec(String(month || ''));
+  if (!mm) return null;
+  const zone = reportZone(tz, 'UTC');
+  const y = Number(mm[1]), m = Number(mm[2]);
+  const ny = m === 12 ? y + 1 : y, nm = m === 12 ? 1 : m + 1;
+  return {
+    month: mm[0],
+    startIso: new Date(zoneMidnight(y, m, 1, zone)).toISOString(),
+    endIso: new Date(zoneMidnight(ny, nm, 1, zone)).toISOString(),
+    label: new Date(Date.UTC(y, m - 1, 1)).toLocaleDateString('en-US', { month: 'long', year: 'numeric', timeZone: 'UTC' }),
   };
 }
 /** The month `nowIso` is in on the `tz` clock, as YYYY-MM. Pure. */
@@ -533,7 +564,8 @@ export async function runMonthlyReports(limit = 20, nowIso = new Date().toISOStr
       let cc = 0;
       for (const to of setting.cc) if (await sendReport(site, win, setting, to, { timeZone: tz, data, proposal: proposal?.text ?? null }).catch(() => false)) cc++;
       if (setting.copy_to) await sendReport(site, win, setting, setting.copy_to, { copy: true, clientName: reach.name, timeZone: tz, data, proposal: proposal?.text ?? null }).catch(() => false);
-      await SAVE(site.id, (s) => ({ ...s, tries: null, last_result: { month: win.month, status: 'sent', reason: null, at: nowIso, ...(cc ? { cc } : {}) }, propose: afterProposal(s.propose, win.month, proposal) })).catch(() => null);
+      // item 179: the month joins the client's shelf only now, when it really went out
+      await SAVE(site.id, (s) => ({ ...s, tries: null, last_result: { month: win.month, status: 'sent', reason: null, at: nowIso, ...(cc ? { cc } : {}) }, propose: afterProposal(s.propose, win.month, proposal), sent_months: withSentMonth(s.sent_months, win.month) })).catch(() => null);
     } else {
       failures++;
       await SAVE(site.id, (s) => afterFailure(s, win.month, before, nowIso)).catch(() => null);
@@ -609,6 +641,34 @@ export async function handleReportPdf(site: SiteRow, cors: Record<string, string
   // Expose-Headers: the page is on another host, and can't read the file's name otherwise
   return new Response(bytes, { status: 200, headers: { ...cors, 'Content-Type': 'application/pdf', 'Content-Disposition': `attachment; filename="${file}"`, 'Access-Control-Expose-Headers': 'Content-Disposition', 'Cache-Control': 'no-store' } });
 }
+
+// ── item 179: the client's own reports, for the Documents shelf in their portal ──
+// GET /client/reports lists the months that really went out (the caller's own site's
+// setting); GET /client/reports/:month/pdf draws one of them. Only a month on that list:
+// the shelf never becomes a way to draw reports nobody sent. An older month's numbers
+// are read as they stand today, so the shelf calls it "the report for October", never
+// a copy of the email. A client_reviewer never gets here (index.ts' reviewer boundary).
+export async function handleClientReports(site: SiteRow, cors: Record<string, string>) {
+  const s = await readReportSetting(site.id);
+  const reports = s.sent_months.map((month) => {
+    const w = monthWindow(month, 'UTC');
+    return { month, label: w ? w.label : month };
+  });
+  return json({ data: { reports } }, 200, cors);
+}
+export async function handleClientReportPdf(site: SiteRow, month: string, cors: Record<string, string>) {
+  if (!monthWindow(month)) return json({ error: 'bad_request', message: 'That isn’t a month.' }, 400, cors);
+  const s = await readReportSetting(site.id);
+  if (!s.sent_months.includes(month)) return json({ error: 'not_found', message: 'There’s no report for that month.' }, 404, cors);
+  const [studio, tz] = await Promise.all([studioSiteOf(site.id), zoneOfSite(site.id)]);
+  const win = monthWindow(month, tz) as NonNullable<ReturnType<typeof monthWindow>>;   // the month on the site's clock, as the email had it
+  const [data, brand, client] = await Promise.all([loadReportData(site, win, tz), studio ? loadEmailBrand(studio, { logoTtl: 600 }) : Promise.resolve(EMAIL_BRAND_DEFAULT), clientOf(site).catch(() => ({ email: null, name: null }))]);
+  const file = reportFileName(data.siteName, data.monthLabel);
+  // items 160 and 176: the parts the studio left out stay out; a month's suggestion went in the email only
+  const bytes = reportPdf(data, { studioName: brand.name, accent: brand.accent, clientName: client.name, siteName: data.siteName || 'Your website', off: s.parts_off });
+  return new Response(bytes, { status: 200, headers: { ...cors, 'Content-Type': 'application/pdf', 'Content-Disposition': `attachment; filename="${file}"`, 'Access-Control-Expose-Headers': 'Content-Disposition', 'Cache-Control': 'no-store' } });
+}
+
 
 /** A preview of last month's report to the caller, now: exactly what the client would
  *  get, with the parts and the suggestion as they stand (items 160 and 176). */
