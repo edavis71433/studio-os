@@ -804,6 +804,9 @@ async function route_(req: Request, cors: Record<string, string>): Promise<Respo
   // the site's deals — computed server-side because the list below is paged.
   if (route === '/sales/summary' && method === 'GET') return handleSalesSummary(req, site, principal, cors);
   if (route === '/sales/my-tasks' && method === 'GET') return handleSalesMyTasks(req, site, principal, cors);   // sales review item 29: Home's My tasks
+  // sales items 85 and 106: to-dos for anyone (the To-dos page reads every one), and a call logged for a person with no deal
+  if (route === '/sales/tasks' && (method === 'GET' || method === 'POST')) return (await import('./routes/todos.ts')).handleSalesTasks(req, site, principal, cors);
+  if (route === '/sales/people/activity' && method === 'POST') return (await import('./routes/todos.ts')).handlePeopleActivity(req, site, principal, cors);
   if (route === '/sales/reports' && method === 'GET') return handleSalesReports(req, site, principal, cors);   // sales review item 33: Analytics' fixed reports
   if (route === '/sales/views' && (method === 'GET' || method === 'PUT')) return handleSalesViews(req, site, principal, cors);   // sales review item 31: saved list views
   if (route === '/sales/stages' && (method === 'GET' || method === 'PUT')) return handleSalesStages(req, site, principal, cors);   // sales review item 38: rename the open stages
@@ -840,6 +843,7 @@ async function route_(req: Request, cors: Record<string, string>): Promise<Respo
     return handleCalendarLink(req, site, principal, cors);
   }
   if (route === '/sales/receivables' && method === 'GET') return handleSalesReceivables(req, site, principal, cors);
+  if (route === '/sales/invoices' && method === 'GET') return (await import('./routes/invoices_list.ts')).handleSalesInvoicesList(req, site, cors);   // sales item 85: the Invoices page
   if (route === '/sales/deals') return handleSalesDeals(req, site, principal, cors);
   if (route === '/sales/deleted' && method === 'GET') return handleSalesDeleted(site, cors);   // sales item 83: Recently deleted
   {

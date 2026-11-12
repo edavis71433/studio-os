@@ -109,6 +109,8 @@ export function mapConversationItem(m: any, viewer = ''): ActivityItem | null {
         meeting: { type: 'call', title: `${who} logged a meeting`, meta: 'Meeting' },
         note: { type: 'note', title: `${who} added a note`, meta: 'Note' },
       };
+      // item 80: an email sent from Studio OS is sent, not logged, and names its subject
+      if (ak === 'email' && str(m.via) === 'app') map.email = { type: 'email', title: `${who} sent an email${m.subject ? ` — ${str(m.subject)}` : ''}`, meta: 'Email' };
       const t = map[ak] || { type: 'note' as ActivityType, title: `${who} logged an activity`, meta: 'Activity' };
       return { id, kind: 'activity', type: t.type, title: t.title, body, at, meta: t.meta, href: null };
     }

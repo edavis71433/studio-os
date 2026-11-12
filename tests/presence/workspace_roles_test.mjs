@@ -91,7 +91,7 @@ const ok = (n, p, note = '') => { results.push({ n, p }); console.log(`${p ? 'PA
   ok('nav: Analytics is a first-class outcome (not a utility)', owner.some(s=>s.key==='analytics' && !s.utility && s.items[0].href==='/analytics.html'));
   ok('nav: utilities (Connections/Settings/Help) live in the overflow (utility:true)', ['connections','settings','help'].every(k=>{const s=owner.find(x=>x.key===k);return !!s && s.utility===true;}));
   const primaryItems = owner.filter(s=>!s.utility);
-  ok('nav: the PRIMARY bar is outcomes only', primaryItems.length > 0 && primaryItems.every(s=>['today','home','overview','website','customers','record','project','messages','pipeline','projects','files','analytics','inbox','studio'].includes(s.key)));
+  ok('nav: the PRIMARY bar is outcomes only', primaryItems.length > 0 && primaryItems.every(s=>['today','home','overview','website','customers','record','project','messages','pipeline','projects','files','analytics','inbox','studio','todos','invoices'].includes(s.key)));   // sales item 85: To-dos and Invoices are outcomes too
   // FIX 6: the primary "Customers" item opens the ROSTER (customers.html), not the
   // single-client CRM detail (which un-scoped showed the owner his OWN profile).
   ok('nav: Customers opens the roster (customers.html), not the single-client detail', owner.find(s=>s.key==='customers').items[0].href==='/customers.html');
@@ -133,8 +133,8 @@ const ok = (n, p, note = '') => { results.push({ n, p }); console.log(`${p ? 'PA
   // Nov 9 2026: "Your website" is drawn only once the studio's own site is live here; an
   // unpublished placeholder behind it was taken for a client's site
   const agencyLive = buildNav(ctx({ isAgency:true, capabilities: caps('business_owner'), siteLive: true }));
-  ok('nav: studio level (its own site live) draws exactly Home · Sites · Inbox · Customers · Pipeline · Prospects · Projects · Files · Analytics · Your website · Settings', drawnKeys(agencyLive).join(',')==='home,sites,inbox,customers,pipeline,prospects,projects,files,analytics,website,settings');   // item 112 added Prospects
-  ok('nav: studio level (no live site of its own) draws the same without Your website', drawnKeys(agency).join(',')==='home,sites,inbox,customers,pipeline,prospects,projects,files,analytics,settings');
+  ok('nav: studio level (its own site live) draws exactly Home · Sites · Inbox · To-dos · Customers · Pipeline · Invoices · Prospects · Projects · Files · Analytics · Your website · Settings', drawnKeys(agencyLive).join(',')==='home,sites,inbox,todos,customers,pipeline,invoices,prospects,projects,files,analytics,website,settings');   // item 112 added Prospects; sales item 85 To-dos and Invoices
+  ok('nav: studio level (no live site of its own) draws the same without Your website', drawnKeys(agency).join(',')==='home,sites,inbox,todos,customers,pipeline,invoices,prospects,projects,files,analytics,settings');
   ok('nav cut: studio level — Your website and Settings are the utilities (foot of the sidebar), each a plain item', drawn(agencyLive).filter(s=>s.utility).map(s=>s.label).join('·')==='Your website·Settings' && drawn(agencyLive).every(s=>s.items.filter(i=>!i.hidden).length===1) && drawn(agency).filter(s=>s.utility).map(s=>s.label).join('·')==='Settings');
   ok('nav cut: nothing is deleted — Contacts, Broadcasts, Visual Studio, Analytics, Add a customer, the builder pages, Sharing, Help stay as ⌘K entries', ['/contacts.html','/broadcasts.html','/visual-studio.html','/agency.html#add','/presence.html#business','/presence.html#design','/presence.html#addpage','/presence.html#domain','/presence.html#publish','/presence.html#history','/sharing.html','/help.html'].every(h=>hiddenHrefs(agency).includes(h)));
   ok('nav cut: no page is reachable from two menu entries (drawn hrefs are unique)', (()=>{const hs=drawn(agency).map(s=>s.items.find(i=>!i.hidden).href);return new Set(hs).size===hs.length;})());
@@ -156,7 +156,7 @@ const ok = (n, p, note = '') => { results.push({ n, p }); console.log(`${p ? 'PA
   ok('nav: a studio is never offered the Get started wizard: its own draft is a practice site', !studioNotLive.some(s=>s.key==='get_started'));
   ok('nav cut: "Get started" is a drawn utility only while the site is not live', drawn(notLive).some(s=>s.key==='get_started' && s.utility && s.items[0].href==='/get-started.html') && !live.some(s=>s.key==='get_started') && !agency.some(s=>s.key==='get_started'));
   // the plain owner keeps the outcome areas; the same merges apply (Contacts → Customers, Visual Studio → Files, Broadcasts → Inbox)
-  ok('nav cut: plain owner draws Today · Website · Customers · Pipeline · Projects · Inbox · Files · Analytics · Settings', drawnKeys(owner).join(',')==='today,website,customers,pipeline,projects,inbox,files,analytics,settings');
+  ok('nav cut: plain owner draws Today · Website · To-dos · Customers · Pipeline · Invoices · Projects · Inbox · Files · Analytics · Settings', drawnKeys(owner).join(',')==='today,website,todos,customers,pipeline,invoices,projects,inbox,files,analytics,settings');   // sales item 85 added To-dos and Invoices
 
   const dev = buildNav(ctx({ role:'developer', capabilities: caps('developer') }));
   ok('nav: developer sees the Developer Mode entry under Settings', dev.find(s=>s.key==='settings').items.some(i=>i.key==='developer'));
