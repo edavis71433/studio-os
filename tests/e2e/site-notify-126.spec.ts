@@ -106,11 +106,16 @@ test.describe('item 126 — one notifications switch per client site', () => {
     await expect(page.locator('#notify')).toBeHidden();
   });
 
-  test('a business owner’s Notifications card still opens the Inbox', async ({ page }) => {
+  // builder item 202: it opened the Inbox, where there is nothing to switch; now this device's switch
+  test('a business owner’s Notifications card opens this device’s switch, with no per-site rows', async ({ page }) => {
     await installApp(page, { api: SETTINGS_API });
     await page.goto('/settings.html');
-    await expect(page.locator('[data-card="notify"]')).toHaveAttribute('href', '/inbox.html');
+    await expect(page.locator('[data-card="notify"]')).toHaveAttribute('href', '#notify');
     await expect(page.locator('#notify')).toBeHidden();
+    await page.locator('[data-card="notify"]').click();
+    await expect(page.locator('#notify')).toBeVisible();
+    await expect(page.getByRole('switch', { name: 'Ring this device' })).toBeVisible();
+    await expect(page.locator('#notifyRows [data-notify-site]')).toHaveCount(0);
   });
 });
 
