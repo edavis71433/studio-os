@@ -9,6 +9,10 @@
 // what is counted; the week is read in full pages (a cut-off or failed read says
 // nothing); and the check runs only in the first hour of the UTC day, since
 // "yesterday" doesn't change during the day (it used to re-read a week 96 times).
+// Nov 12 2026: the tick's sweepIssues reads ANY false value as a failure, so the
+// result's informational flags are `skipped_*` and only ever true, and a read that
+// fails is counted in `failures`. A bare `truncated: false` had marked every tick
+// since Nov 10 failed (the digest's `sent: false` bug again).
 import { svc, svcPages } from '../lib/db.ts';
 import { raiseNotice } from '../lib/notice.ts';
 import { siteOrigin } from '../lib/site.ts';
@@ -62,19 +66,20 @@ export function spikeWords(sp: Spike, host: string | null): { headline: string; 
 }
 
 /** The daily job. Yesterday in UTC; sites that are live and hosted here. */
-export async function runTrafficSpikes(limit = 200, nowIso = new Date().toISOString()): Promise<{ sites: number; spikes: number; truncated: boolean; not_due?: boolean; read_failed?: boolean }> {
-  if (new Date(nowIso).getUTCHours() >= SPIKE_RUN_HOURS) return { sites: 0, spikes: 0, truncated: false, not_due: true };
+export async function runTrafficSpikes(limit = 200, nowIso = new Date().toISOString()): Promise<{ sites: number; spikes: number; skipped_not_due?: true; skipped_truncated?: true; failures?: number }> {
+  if (new Date(nowIso).getUTCHours() >= SPIKE_RUN_HOURS) return { sites: 0, spikes: 0, skipped_not_due: true };
   const day = daysBefore(dayOf(nowIso), 1);
   const sitesQ = await svc(`presence_sites?status=eq.live&edition=neq.monitor&client_id=not.is.null&select=id,client_id,custom_domain,netlify_site_id&order=last_published_at.desc.nullslast&limit=${limit}`);
   const sites = (Array.isArray(sitesQ.json) ? sitesQ.json : []) as Array<{ id: string; client_id: string; custom_domain: string | null; netlify_site_id: string | null }>;
-  if (!sites.length) return { sites: 0, spikes: 0, truncated: false };
+  if (!sites.length) return { sites: 0, spikes: 0 };
   const from = daysBefore(day, 7) + 'T00:00:00Z', to = day + 'T23:59:59.999Z';
   const ids = sites.map((s) => s.id).join(',');
   const vq = await svcPages(`presence_visits?site_id=in.(${ids})&kind=eq.pageview&ts=gte.${from}&ts=lte.${to}&select=site_id,ts`, 'ts', VISITS_PAGE, VISITS_PAGES);
   // a failed page, or past the bound, means some days are missing, so "usual" would
-  // read wrong and ordinary days could look busy: say nothing rather than something wrong
-  if (!vq) return { sites: sites.length, spikes: 0, truncated: false, read_failed: true };
-  if (vq.truncated) return { sites: sites.length, spikes: 0, truncated: true };
+  // read wrong and ordinary days could look busy: say nothing rather than something wrong.
+  // A failed read is a real fault the watchdog should see; a cut-off read is only too much to count.
+  if (!vq) return { sites: sites.length, spikes: 0, failures: 1 };
+  if (vq.truncated) return { sites: sites.length, spikes: 0, skipped_truncated: true };
   const rows = vq.rows as VisitRow[];
   let spikes = 0;
   for (const sp of spikeSites(rows, day)) {
@@ -84,5 +89,5 @@ export async function runTrafficSpikes(limit = 200, nowIso = new Date().toISOStr
     const fresh = await raiseNotice({ siteId: site.id, clientId: site.client_id, kind: 'traffic_spike', period: `day:${day}`, headline: w.headline, body: w.body, push: false });
     if (fresh) spikes++;
   }
-  return { sites: sites.length, spikes, truncated: false };
+  return { sites: sites.length, spikes };
 }

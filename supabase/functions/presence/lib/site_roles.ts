@@ -191,7 +191,6 @@ const MEMBER_WRITES: Array<[MemberWriteNeed, string[]]> = [
     `POST /assets/${ID}/(replace|rollback|duplicate|suggest|remove-background|cutout)`,
     'POST /visual/generate',
     `POST /visual/plans/${ID}/(vary|edit)`,
-    `POST /notes/${ID}/(dismiss|accept)`,
     `POST /moments/${ID}/dismiss`,
     'POST /broadcasts',
     'POST /broadcasts/lists',   // sales review items 31 + 39: keep the people picked for an update
@@ -200,6 +199,7 @@ const MEMBER_WRITES: Array<[MemberWriteNeed, string[]]> = [
     `PATCH /broadcasts/${ID}`,
     `POST /broadcasts/${ID}/cancel`,
     `POST /broadcasts/${ID}/test`,   // bold redesign: "Send me a test" — only ever to the member's own address, so edit, not publish
+    'POST /sales/invoices/test',   // builder item 175: a sample invoice email to the member's own address; nothing is made or charged
     'POST /sales/(contacts|customers|deals|templates)',
     'POST /sales/(tasks|people/activity)',   // sales items 85 and 106: a to-do for anyone, a call logged for a person with no deal
     'POST /sales/email',   // sales item 80: one email to one person on file, like the Inbox's reply to an enquiry
@@ -256,6 +256,8 @@ const MEMBER_WRITES: Array<[MemberWriteNeed, string[]]> = [
     'PUT /site/template',
     // sales review final pass (S1): only the site's owner answers a studio's request; the route refuses anyone else and says why
     `POST /portal/studio-requests/${ID}/(accept|decline)`,
+    // builder item 193: only the studio marks an approved plan finished; the route refuses anyone else and says why
+    `POST /foundations/plans/${ID}/done`,
     'POST /crm/notes',
     `POST /crm/notes/${ID}/pin`,
     `DELETE /crm/notes/${ID}`,

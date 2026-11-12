@@ -6,7 +6,7 @@
 // the old plain-English home (GET /analytics) is gone, as no page has called it
 // since this dashboard (bug hunt H10, Nov 10).
 import {
-  parseDashPeriod, dashRange, priorMonthIso, weeklyBuckets, weeklyVisitors,
+  parseDashPeriod, parseDashDates, dashRange, priorMonthIso, weeklyBuckets, weeklyVisitors,
   sourceShares, invoiceBuckets, recentWins, oldestAgeDays, priorPeriodStart, priorPeriodVisitors, searchPagePath, DASH_WEEKS,
 } from '../../supabase/functions/presence/lib/analytics_dashboard.ts';
 import { aggregateVisits } from '../../supabase/functions/presence/lib/visits.ts';
@@ -40,6 +40,54 @@ eq('period: missing falls back to this_month', parseDashPeriod(null), 'this_mont
   ok('range all: bounded (10y), not Infinity', a.days === 3650 && Number.isFinite(a.startMs));
   const first = dashRange('this_month', Date.parse('2026-07-01T00:00:00Z'));
   ok('range: 1st of the month still ≥1 day (never a zero window)', first.days >= 1);
+  ok('range: a window that runs to today ends now', m.endMs === NOW && t.endMs === NOW && a.endMs === NOW);
+}
+
+// ── builder list item 175: the date presets and picked dates ──
+{
+  const iso = (ms) => new Date(ms).toISOString();
+  // NOW is Friday Jul 17 2026, 15:30 UTC
+  eq('preset: new values pass through', ['today', 'yesterday', 'this_week', 'last_week', 'last_month', 'this_year', 'last_year', 'custom'].map(parseDashPeriod), ['today', 'yesterday', 'this_week', 'last_week', 'last_month', 'this_year', 'last_year', 'custom']);
+  const td = dashRange('today', NOW);
+  eq('today: from midnight to now', [iso(td.startMs), td.endMs === NOW, td.days], ['2026-07-17T00:00:00.000Z', true, 1]);
+  const yd = dashRange('yesterday', NOW);
+  eq('yesterday: the whole day before, then it stops', [iso(yd.startMs), iso(yd.endMs), yd.days], ['2026-07-16T00:00:00.000Z', '2026-07-17T00:00:00.000Z', 1]);
+  const tw = dashRange('this_week', NOW);
+  eq('this week: from Sunday', iso(tw.startMs), '2026-07-12T00:00:00.000Z');
+  const lw = dashRange('last_week', NOW);
+  eq('last week: Sunday to Sunday, seven days', [iso(lw.startMs), iso(lw.endMs), lw.days], ['2026-07-05T00:00:00.000Z', '2026-07-12T00:00:00.000Z', 7]);
+  const lm = dashRange('last_month', NOW);
+  eq('last month: June, whole', [iso(lm.startMs), iso(lm.endMs), lm.days], ['2026-06-01T00:00:00.000Z', '2026-07-01T00:00:00.000Z', 30]);
+  eq('last month in January: the December before', [iso(dashRange('last_month', Date.parse('2026-01-09T12:00:00Z')).startMs)], ['2025-12-01T00:00:00.000Z']);
+  const ty = dashRange('this_year', NOW);
+  eq('this year: from January 1', [iso(ty.startMs), ty.endMs === NOW], ['2026-01-01T00:00:00.000Z', true]);
+  const ly = dashRange('last_year', NOW);
+  eq('last year: 2025, whole', [iso(ly.startMs), iso(ly.endMs), ly.days], ['2025-01-01T00:00:00.000Z', '2026-01-01T00:00:00.000Z', 365]);
+  // the caller's clock: Los Angeles in summer is 420 minutes behind UTC
+  const la = { offsetMinutes: 420 };
+  eq('clock: this month starts at midnight in Los Angeles', iso(dashRange('this_month', NOW, la).startMs), '2026-07-01T07:00:00.000Z');
+  eq('clock: today in Los Angeles at 1:00 UTC is still yesterday there', iso(dashRange('today', Date.parse('2026-07-18T01:00:00Z'), la).startMs), '2026-07-17T07:00:00.000Z');
+  eq('clock: last month in Los Angeles', [iso(dashRange('last_month', NOW, la).startMs), iso(dashRange('last_month', NOW, la).endMs)], ['2026-06-01T07:00:00.000Z', '2026-07-01T07:00:00.000Z']);
+  eq('clock: without an offset, UTC as before', iso(dashRange('quarter', NOW).startMs), '2026-07-01T00:00:00.000Z');
+  // picked dates
+  eq('dates: a real window passes', parseDashDates('2026-06-03', '2026-06-17', NOW), { from: '2026-06-03', to: '2026-06-17' });
+  eq('dates: one day is a window', parseDashDates('2026-07-17', '2026-07-17', NOW), { from: '2026-07-17', to: '2026-07-17' });
+  ok('dates: the end before the start is refused', parseDashDates('2026-06-17', '2026-06-03', NOW) === null);
+  ok('dates: an end after today is refused', parseDashDates('2026-07-01', '2026-07-18', NOW) === null);
+  ok('dates: a day that does not exist is refused', parseDashDates('2026-02-30', '2026-03-02', NOW) === null);
+  ok('dates: junk is refused', parseDashDates('yesterday', '2026-07-01', NOW) === null && parseDashDates(null, null, NOW) === null);
+  ok('dates: more than ten years back is refused', parseDashDates('2015-01-01', '2016-01-01', NOW) === null);
+  ok('dates: today on the caller’s clock (Los Angeles is still on the 17th at 1:00 UTC on the 18th)', parseDashDates('2026-07-17', '2026-07-18', Date.parse('2026-07-18T01:00:00Z'), 420) === null && !!parseDashDates('2026-07-17', '2026-07-18', Date.parse('2026-07-18T08:00:00Z'), 420));
+  const cr = dashRange('custom', NOW, { from: '2026-06-03', to: '2026-06-17' });
+  eq('custom: both days counted whole', [iso(cr.startMs), iso(cr.endMs), cr.days], ['2026-06-03T00:00:00.000Z', '2026-06-18T00:00:00.000Z', 15]);
+  eq('custom ending today: stops at now, not at midnight', dashRange('custom', NOW, { from: '2026-07-10', to: '2026-07-17' }).endMs, NOW);
+  eq('custom without dates: this month', iso(dashRange('custom', NOW).startMs), '2026-07-01T00:00:00.000Z');
+  // the period before a window that ended: the same length, just before it
+  ok('prior: last week compares with the week before it', priorPeriodStart('last_week', lw.startMs, lw.endMs) === lw.startMs - 7 * DAY);
+  // a payment after a past window isn't counted in it
+  const paidIn = invoiceBuckets([{ status: 'paid', amount_cents: 100, paid_at: '2026-06-10T00:00:00Z' }, { status: 'paid', amount_cents: 500, paid_at: '2026-07-02T00:00:00Z' }], '2026-07-17', lm.startMs, lm.endMs);
+  eq('invoices: only what was paid inside last month', [paidIn.paid_cents, paidIn.paid_count], [100, 1]);
+  eq('invoices: no end given, everything since the start (as before)', invoiceBuckets([{ status: 'paid', amount_cents: 500, paid_at: '2026-07-02T00:00:00Z' }], '2026-07-17', lm.startMs).paid_cents, 500);
 }
 
 // ── priorMonthIso ──
@@ -149,6 +197,12 @@ eq('oldest: none → null (never a fake 0)', oldestAgeDays([], NOW), null);
   ok('H10: the old home (GET /analytics, no caller) is gone, route and handler', !idx.includes(`route === '/analytics' &&`) && !/handleAnalyticsHome/.test(idx) && !route.includes('function handleAnalyticsHome'));
   ok('routes/analytics.ts exports handleAnalyticsDashboard', route.includes('export async function handleAnalyticsDashboard'));
   ok('dashboard reuses the pure lib (no forked math in the route)', /from '\.\.\/lib\/analytics_dashboard\.ts'/.test(route) && /summarizePipeline/.test(route));
+  // builder list item 175: windows on the caller's clock, and a past window's reads stop at its end
+  ok('item 175: the window is worked out on the caller’s clock, with the picked dates', /dashRange\(period, nowMs, \{ offsetMinutes: tzo, \.\.\.\(dates \|\| \{\}\) \}\)/.test(route) && /parseDashDates\(sp\.get\('from'\), sp\.get\('to'\), nowMs, tzo\)/.test(route));
+  ok('item 175: picked dates that make no window are this month', /if \(period === 'custom' && !dates\) period = 'this_month';/.test(route));
+  ok('item 175: every visit read stops at a past window’s end (the counted one, item 207, and the two row reads)', /readVisitStats\(site\.id, \{ startMs, endMs: closed \? endMs : null, priorStartMs, weeks: DASH_WEEKS, nowMs: endMs \}\)/.test(route) && (route.match(/\$\{until\}&kind=/g) || []).length === 2);
+  ok('item 175: the answer says where the window starts and ends', /window: \{ start: new Date\(startMs\)\.toISOString\(\), end: new Date\(endMs\)\.toISOString\(\), closed/.test(route));
+  ok('item 175: enquiries, invoices and the lines keep to the window', /count: subs\.filter\(\(s\) => inWindow\(/.test(route) && /invoiceBuckets\(invs, nowIso\.slice\(0, 10\), startMs, closed \? endMs : Infinity\)/.test(route) && /weekly: visits\.weekly \|\| \[\]/.test(route));   // the 12-week line ends at nowMs: endMs (item 207's reader)
 }
 
 // ── the period before this one + the per-page table ──

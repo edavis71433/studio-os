@@ -383,7 +383,7 @@ test.describe('The builder', () => {
 
     test(`${p.who}: a connected domain's Remove, and email protection`, async ({ page }) => {
       await openBuilder(page, p, '#domain', {
-        '/foundations/domain': { data: { custom_domain: 'marlows.example', health: 'ok' } },
+        '/foundations/domain': { data: { custom_domain: 'marlows.example', health: 'ok', all_ok: true, checklist: [{ key: 'serving', ok: true, words: 'Showing your latest site' }] } },
       });
       await expect(page.getByText('marlows.example is live and secure.').locator('visible=true').first()).toBeVisible();
       await expectControls(page, p, [

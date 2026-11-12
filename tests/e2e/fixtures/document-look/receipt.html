@@ -1,0 +1,159 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow"><meta name="referrer" content="no-referrer">
+<title>Website refresh, part 2 of 3 #0013 — Brightline Studio</title>
+<link rel="stylesheet" href="/fonts/brand.css">
+<style>
+  :root{--accent:#b4532a;--accent-deep:#8a3d1d;--band-a:#672e1e;--band-b:#b4532a;--tint:#f8eeea;--ink:#1b1525;--soft:#6b6478;--line:#eee9e0;--bg:#faf8f5;--panel:#f6f3ee;--card:#fff;--good:#2f6a4a;--good-bg:#e7f1ea;
+    --serif:"Fraunces","Iowan Old Style","Palatino Linotype",Palatino,Georgia,serif;--sans:"Inter",-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}
+  *{box-sizing:border-box;margin:0}
+  html{scroll-behavior:smooth}
+  body{background:var(--bg);color:var(--ink);font-family:var(--sans);line-height:1.6;-webkit-font-smoothing:antialiased}
+  .wrap{max-width:1180px;margin:0 auto;padding:0 40px}
+  /* the band */
+  .band{background:var(--band-b);background:linear-gradient(100deg,var(--band-a),var(--band-b));color:#fff;padding:26px 0 42px;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  .bandtop{display:flex;justify-content:space-between;align-items:center;gap:16px;min-height:40px}
+  .studio{display:flex;align-items:center;gap:10px;min-width:0}
+  .mark{flex:none;width:30px;height:30px;border-radius:9px;background:rgba(255,255,255,.18);display:grid;place-items:center;font-weight:700;font-size:14px}
+  .logochip{flex:none;background:#fff;border-radius:10px;padding:5px 9px;display:flex;align-items:center}
+  .logochip img{display:block;height:26px;width:auto;max-width:150px}
+  .wordmark{font-weight:600;font-size:15px;letter-spacing:-.005em;overflow-wrap:anywhere}
+  .toolbar{display:flex;gap:10px;flex:none}
+  .toolbar button{font-family:inherit;font-size:13.5px;font-weight:600;border-radius:999px;border:1.5px solid #fff;background:#fff;color:var(--band-a);padding:9px 18px;min-height:40px;cursor:pointer}
+  .toolbar .ghost{background:transparent;color:#fff;border-color:rgba(255,255,255,.55)}
+  .toolbar button:focus-visible,.btn:focus-visible,.paylink:focus-visible,.rail a:focus-visible{outline:3px solid #fff;outline-offset:2px;box-shadow:0 0 0 5px var(--band-a)}
+  .bandmain{display:flex;justify-content:space-between;align-items:flex-end;gap:28px;margin-top:34px;flex-wrap:wrap}
+  .bandtitle{min-width:0;flex:1 1 420px}
+  .kicker{display:flex;flex-wrap:wrap;gap:0 8px;text-transform:uppercase;letter-spacing:.09em;font-size:11.5px;font-weight:700;color:rgba(255,255,255,.78);margin-bottom:8px}
+  .doclabel{text-transform:uppercase;letter-spacing:.09em;font-size:11.5px;font-weight:700}
+  h1{font-family:var(--serif);font-weight:400;font-size:clamp(28px,4.6vw,42px);line-height:1.14;letter-spacing:-.01em;margin:0;overflow-wrap:anywhere}
+  .sub{color:rgba(255,255,255,.84);font-size:14.5px;margin:8px 0 0}
+  .figure{text-align:right;flex:none;max-width:100%}
+  .figure .flbl{font-size:13px;color:rgba(255,255,255,.8)}
+  .figure .n{font-family:var(--serif);font-weight:600;font-size:clamp(38px,6vw,52px);line-height:1.1;letter-spacing:-.01em}
+  .pill{display:inline-block;font-size:12.5px;font-weight:600;padding:5px 12px;border-radius:999px;margin-top:6px}
+  .pill.paid{background:#fff;color:var(--good)}.pill.due{background:rgba(255,255,255,.18);color:#fff}.pill.void{background:rgba(255,255,255,.18);color:#fff}
+  /* the body: cards on cream */
+  .body{padding-top:34px;padding-bottom:26px;display:grid;gap:22px;grid-template-columns:minmax(0,1fr)}
+  .body.cols{grid-template-columns:minmax(0,1fr) 340px;align-items:start}
+  .body.railed{grid-template-columns:200px minmax(0,1fr);align-items:start}
+  .banner{grid-column:1/-1;display:flex;gap:14px;align-items:center;background:var(--good-bg);color:var(--good);border-radius:16px;padding:16px 22px;font-size:14px}
+  .banner .dot{flex:none;width:34px;height:34px;border-radius:50%;background:var(--good);color:#fff;display:grid;place-items:center;font-weight:700}
+  .banner b{display:block;font-family:var(--serif);font-weight:400;font-size:20px;line-height:1.3}
+  .paper,.aside{background:var(--card);border-radius:20px;box-shadow:0 1px 2px rgba(27,21,37,.04),0 10px 30px rgba(27,21,37,.07)}
+  .inner{padding:32px 36px 34px}
+  .aside{padding:26px 26px 28px;position:sticky;top:20px}
+  .aside .lbl,.lbl{text-transform:uppercase;letter-spacing:.08em;font-size:11px;font-weight:700;color:var(--soft)}
+  .aside .n{font-family:var(--serif);font-weight:600;font-size:38px;line-height:1.2;margin:4px 0 6px;letter-spacing:-.01em}
+  .aside .n.struck{text-decoration:line-through;color:var(--soft)}
+  .aside p{font-size:13.5px;color:var(--soft);line-height:1.5;margin:0 0 14px}
+  .aside .row{display:flex;justify-content:space-between;gap:12px;font-size:14px;padding:8px 0}
+  .aside .row small{display:block;color:var(--soft);font-size:12.5px}
+  .aside .sum{display:flex;justify-content:space-between;align-items:center;gap:12px;background:var(--good-bg);color:var(--good);border-radius:14px;padding:12px 16px;font-weight:600;margin:10px 0 14px}
+  .aside .sum span:last-child{font-family:var(--serif);font-size:22px}
+  .aside hr{border:0;border-top:1px solid var(--line);margin:14px 0}
+  .btn,.paylink{display:block;width:100%;text-align:center;font-family:inherit;font-size:15px;font-weight:600;border-radius:999px;padding:13px 22px;min-height:48px;cursor:pointer;text-decoration:none}
+  .paylink{background:var(--accent);color:#fff;border:1.5px solid var(--accent);margin:0 0 12px}
+  .btn{background:transparent;color:var(--accent-deep);border:1.5px solid var(--accent)}
+  .btn.solid{background:var(--accent);color:#fff}
+  .hr{height:1px;background:var(--line);margin:24px 0}
+  table{width:100%;border-collapse:collapse;font-size:15px}
+  td{padding:14px 2px;border-bottom:1px solid var(--line);vertical-align:top}
+  td:last-child{text-align:right;white-space:nowrap}
+  tr.sub td,tr.less td{color:var(--soft);font-size:14px;padding:9px 2px;border-bottom:none}
+  tr.total td{font-weight:600;font-size:16px;border-bottom:none;padding-top:14px}
+  tr.total td:last-child{font-family:var(--serif);font-size:24px;font-weight:600;line-height:1.2}
+  th{font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--soft);text-align:left;font-weight:700;padding:0 2px 10px;border-bottom:1px solid var(--line)}
+  th:last-child{text-align:right}
+  td.qty,th.qty{text-align:right;width:56px;color:var(--soft)}
+  .body .doclabel{color:var(--soft);font-size:11px;letter-spacing:.08em;margin:0 0 8px}
+  .terms{color:var(--soft);font-size:14px;white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.6}
+  .note{color:var(--accent-deep);background:var(--tint);border-radius:14px;padding:13px 16px;font-size:13.5px;margin-top:22px;line-height:1.5}
+  .parties{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:22px 28px;margin:0 0 24px;padding-bottom:24px;border-bottom:1px solid var(--line)}
+  .party{font-size:14px;line-height:1.55;color:var(--soft);overflow-wrap:anywhere}
+  .party .k{text-transform:uppercase;letter-spacing:.08em;font-size:11px;font-weight:700;color:var(--soft);margin-bottom:6px}
+  .party .first{font-weight:600;color:var(--ink)}
+  .paidbox{display:none}
+  /* sales item 88: the agreement as a document — a title, numbered headings, paragraphs, list items — and both signatures */
+  .agreement{font-size:15px;line-height:1.7;overflow-wrap:anywhere}
+  .agreement .ag-title{text-transform:uppercase;letter-spacing:.08em;font-size:11px;font-weight:700;color:var(--soft);margin:0 0 14px}
+  .agreement .ag-h{font-family:var(--serif);font-size:18px;font-weight:600;margin:26px 0 6px;scroll-margin-top:20px;break-after:avoid;page-break-after:avoid}
+  .agreement .ag-n{font-weight:400;font-size:24px;color:var(--accent);margin-right:12px}
+  .agreement .ag-p{margin:0 0 10px;white-space:pre-wrap}
+  .agreement .ag-item{margin:4px 0 4px 20px}
+  .agreement .ag-mark{color:var(--accent);font-weight:600;margin-right:6px}
+  .sigh{font-family:var(--serif);font-size:20px;font-weight:600;margin:0 0 14px;scroll-margin-top:20px}
+  .sigs{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-bottom:6px}
+  .sig{border:1px solid var(--line);border-radius:16px;padding:16px 20px 14px;break-inside:avoid}
+  .sig .k{text-transform:uppercase;letter-spacing:.08em;font-size:11px;font-weight:700;color:var(--soft)}
+  .sig .sgn{font-family:var(--serif);font-style:italic;font-size:30px;color:var(--accent-deep);line-height:1.3;margin-top:6px;overflow-wrap:anywhere}
+  .sig .line{height:1.5px;background:rgba(27,21,37,.55);margin:2px 0 8px}
+  .sig .who{font-size:12.5px;color:var(--soft);overflow-wrap:anywhere}
+  .cert{border-radius:18px;padding:22px 26px;margin-top:22px;background:var(--band-a);color:#fff;scroll-margin-top:20px;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  .cert h2{font-family:var(--serif);font-size:20px;font-weight:400;margin:0}
+  .cert .certsub{font-size:13px;color:rgba(255,255,255,.74);margin:0 0 12px}
+  .kv{display:flex;justify-content:space-between;gap:16px;padding:10px 0;border-top:1px solid rgba(255,255,255,.16);font-size:13.5px}
+  .kv .k{color:rgba(255,255,255,.74);white-space:nowrap}
+  .kv span:last-child{text-align:right;overflow-wrap:anywhere}
+  .mono{font-family:"Geist Mono",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12px}
+  .cert .note{background:none;color:rgba(255,255,255,.74);padding:0;margin-top:6px;font-size:12.5px}
+  /* the contents list beside an agreement */
+  .rail{position:sticky;top:20px;font-size:13px}
+  .rail a{display:block;color:var(--soft);text-decoration:none;padding:6px 10px;border-radius:8px;overflow-wrap:anywhere}
+  .rail a:hover{background:var(--tint);color:var(--accent-deep)}
+  .rail a b{font-weight:600;margin-right:8px}
+  footer{color:var(--soft);font-size:12.5px;text-align:center;padding:0 20px 36px;line-height:1.5}
+  .paybar{display:none}
+  @media (max-width:980px){
+    .body.cols,.body.railed{grid-template-columns:minmax(0,1fr)}
+    .rail{display:none}.aside{position:static}
+  }
+  @media (max-width:640px){
+    .wrap{padding:0 16px}
+    .band{padding:18px 0 30px}.bandmain{margin-top:22px;gap:14px;align-items:flex-start;flex-direction:column}
+    .bandtitle{flex:none}.figure{text-align:left;display:flex;flex-wrap:wrap;align-items:center;gap:4px 12px}.figure .flbl{flex-basis:100%}.pill{margin-top:0}
+    .toolbar .ghost{display:none}
+    .body{padding-top:20px;gap:14px}.inner{padding:22px 20px 24px}.aside{padding:22px 20px}
+    .sigs{grid-template-columns:1fr}
+    .cert{padding:20px}.kv{flex-direction:column;gap:2px}.kv span:last-child{text-align:left}
+    .has-paybar{padding-bottom:92px}
+    .has-paybar .aside{display:none}
+    .paybar{display:flex;gap:10px;position:fixed;left:0;right:0;bottom:0;background:var(--card);border-top:1px solid var(--line);padding:12px 16px calc(12px + env(safe-area-inset-bottom));z-index:5}
+    .paybar .paylink{margin:0;flex:1}.paybar .btn{width:auto;flex:none}
+  }
+  @media print{
+    @page{margin:12mm}
+    body{background:#fff}
+    .no-print,.toolbar,.aside,.rail,.paybar{display:none!important}
+    .wrap{max-width:100%;padding:0}
+    .band{padding:8mm 8mm 9mm;border-radius:4mm}.bandmain{margin-top:6mm}
+    .body,.body.cols,.body.railed{display:block;padding:8mm 0 0}
+    .banner{margin-bottom:6mm;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+    .paper{box-shadow:none;border-radius:0}
+    .inner{padding:0}
+    .has-paybar{padding-bottom:0}
+    .cert,.sig,tr,.note{page-break-inside:avoid;break-inside:avoid}
+    footer{padding:8mm 0 0}
+  }
+</style></head>
+<body>
+<header class="band"><div class="wrap">
+  <div class="bandtop"><div class="studio"><span class="mark" aria-hidden="true">B</span><span class="wordmark">Brightline Studio</span></div>
+    <div class="toolbar no-print"><button type="button" class="ghost" onclick="window.print()">Print</button><button type="button" data-dlpdf id="dlpdf">Download PDF</button></div></div>
+  <div class="bandmain"><div class="bandtitle">
+    <div class="kicker"><div class="doclabel">Receipt #0013</div><span>· For Corner Café</span></div>
+    <h1>Website refresh, part 2 of 3</h1>
+    <p class="sub">Issued Nov 4, 2026 · Paid Nov 11, 2026</p></div>
+    <div class="figure"><div class="flbl">Total paid</div><div class="n">$1,476.00</div><div><span class="pill paid">✓ Paid in full</span></div></div>
+  </div>
+</div></header>
+<main class="wrap body cols">
+  <div class="banner"><span class="dot" aria-hidden="true">✓</span><div><b>Paid in full. Thank you.</b>Paid Nov 11, 2026 by check · Check #1042 · with 1 earlier part payment: Paid Nov 8, 2026 by Zelle · ref 8841</div></div>
+  <div class="paper"><div class="inner">
+    <div class="parties"><div class="party"><div class="k">From</div><div class="first">Brightline Studio</div><div>12 Harbor Street</div><div>Portland, OR 97204</div><div>hello@brightline.example</div></div><div class="party"><div class="k">Paid by</div><div class="first">Sam Lee</div><div>Corner Café</div><div>88 Oak Avenue</div></div><div class="party"><div class="k">Details</div><div class="first">Receipt for invoice #0013</div><div>Issued Nov 4, 2026</div><div>Paid Nov 11, 2026 by check · Check #1042</div><div>For Website refresh</div></div></div><table><thead><tr><th>Description</th><th class="qty">Qty</th><th>Amount</th></tr></thead><tbody><tr><td>Website refresh, part 2 of 3</td><td class="qty"></td><td>$1,476.00</td></tr><tr class="total"><td>Total paid</td><td class="qty"></td><td>$1,476.00</td></tr></tbody></table><p class="note">Thank you — this is your receipt of payment.</p>
+  </div></div>
+  <aside class="aside no-print"><div class="lbl">How it was paid</div><div class="row"><span>Nov 8, 2026<small>Zelle · ref 8841</small></span><span>$501.00</span></div><div class="row"><span>Nov 11, 2026<small>Check · Check #1042</small></span><span>$975.00</span></div><div class="sum"><span>Total paid</span><span>$1,476.00</span></div><button type="button" class="btn solid" data-dlpdf>Download the receipt</button></aside>
+</main>
+<footer>Prepared by Brightline Studio. Keep this for your records: this link keeps working, and Download PDF saves a copy.</footer>
+<script>(function(){var u="https://example.supabase.co/x?format=pdf";Array.prototype.forEach.call(document.querySelectorAll('[data-dlpdf]'),function(b){var label=b.textContent;b.addEventListener('click',async function(){b.disabled=true;b.textContent='Preparing…';try{var r=await fetch(u);if(!r.ok)throw new Error(String(r.status));var blob=new Blob([await r.arrayBuffer()],{type:'application/pdf'});var a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download="x.pdf";document.body.appendChild(a);a.click();setTimeout(function(){URL.revokeObjectURL(a.href);a.remove();},5000);b.textContent=label;}catch(e){b.textContent='Couldn’t download — try again';}b.disabled=false;});});})();</script>
+</body></html>

@@ -31,7 +31,14 @@ async function pub(path, method, body) {
   let b = {}; try { b = await r.json(); } catch { /* */ }
   return { status: r.status, ok: r.ok, body: b };
 }
-const tokenOf = (url) => (typeof url === 'string' && url ? url.split('/').pop() : null);
+// Since Oct 2026 a send answers the deal's one link, sign.html?t=<token>; older links ended
+// in /<token>. Reading the old shape from a new link gave a token that was never valid, so
+// every check below that expected a refusal passed whatever the server did (found Nov 12 2026).
+const tokenOf = (url) => {
+  if (typeof url !== 'string' || !url) return null;
+  const t = url.split('?t=')[1];
+  return t ? decodeURIComponent(t.split('&')[0]) : url.split('/').pop();
+};
 const tag = 'clsiso-' + Date.now();
 
 // Tenant A builds a full closing chain on its own deal.
@@ -68,17 +75,27 @@ if (!tokA) {
   skip('token: A’s proposal link is bound to that one proposal id (no replay)');
   skip('token: A’s proposal link cannot decide a foreign proposal id');
 } else {
+  // control: A's link opens A's own proposal, so the refusals below are the binding, not a bad token
+  const own = await pub(`/sales/p/${encodeURIComponent(tokA)}`);
+  ok('control: A’s link opens A’s own proposal', own.ok && ['flow', 'proposal'].includes(own.body?.data?.kind), `${own.status} ${JSON.stringify(own.body).slice(0, 160)}`);
   // reuse A's token but point the path at a different (random) proposal id → invalid_link
   const foreignId = '00000000-0000-4000-8000-000000000000';
   const replay = await pub(`/sales/proposals/${foreignId}/decide`, 'POST', { decision: 'accepted', token: tokA });
-  ok('token: A’s proposal link cannot decide a foreign proposal id (403 invalid_link)', replay.status === 403 && replay.body?.error === 'invalid_link');
+  // Since Oct 2026 the link names A's deal, not one proposal: a record outside A's studio is
+  // not found (404), and one in A's studio but another deal is refused as invalid_link (403).
+  ok('token: A’s proposal link cannot decide a foreign proposal id (refused)', [403, 404].includes(replay.status) && !replay.ok, `${replay.status} ${JSON.stringify(replay.body).slice(0, 160)}`);
   // and B minting its own token cannot act on A’s proposal
   const dB = await call(JWTB, SITEB, '/sales/deals', 'POST', { title: `${tag} B-deal` });
   const pB = await call(JWTB, SITEB, `/sales/deals/${dB.body?.data?.id}/proposals`, 'POST', { line_items: [{ label: 'y', qty: 1, unit_cents: 1 }] });
   const sendB = await call(JWTB, SITEB, `/sales/proposals/${pB.body?.data?.id}/send`, 'POST', {});
   const tokB = tokenOf(sendB.body?.url);
+  const ownB = await pub(`/sales/p/${encodeURIComponent(tokB || '')}`);
+  ok('control: B’s link opens B’s own proposal', ownB.ok && ['flow', 'proposal'].includes(ownB.body?.data?.kind), `${ownB.status} ${JSON.stringify(ownB.body).slice(0, 160)}`);
   const cross = await pub(`/sales/proposals/${propA}/decide`, 'POST', { decision: 'accepted', token: tokB });
-  ok('token: B’s link cannot decide A’s proposal (403 invalid_link)', cross.status === 403 && cross.body?.error === 'invalid_link');
+  ok('token: B’s link cannot decide A’s proposal (refused)', [403, 404].includes(cross.status) && !cross.ok, `${cross.status} ${JSON.stringify(cross.body).slice(0, 160)}`);
+  const aAfter = await call(JWTA, SITEA, `/sales/deals/${dealA}`);
+  const propAfter = (aAfter.body?.data?.proposals || []).find((x) => x.id === propA);
+  ok('…and A’s proposal is still waiting on A’s client', propAfter?.status === 'sent', JSON.stringify(propAfter || aAfter.body).slice(0, 160));
 }
 
 const passed = results.filter((r) => r.p).length;

@@ -91,7 +91,7 @@ const ago = (d) => new Date(Date.now() - d * 86400_000).toISOString();
   const idx = read('supabase/functions/presence/index.ts');
   ok('H10: GET /analytics, with no caller, is gone', !idx.includes(`route === '/analytics' &&`) && !route.includes('handleAnalyticsHome'));
   const page = read('analytics.html');
-  ok('H1: the page sends its clock with the dashboard read', /api\('\/analytics\/dashboard\?period='\+encodeURIComponent\(period\)\+'&tzo='\+new Date\(\)\.getTimezoneOffset\(\)\)/.test(page));
+  ok('H1: the page sends its clock with the dashboard read', /api\('\/analytics\/dashboard\?period='\+encodeURIComponent\(period\)\+.*'&tzo='\+new Date\(\)\.getTimezoneOffset\(\)\)/.test(page));   // item 175: picked dates ride between
   ok('H6: Refresh marks Insights to be read again, and a failed re-read keeps the last good ones', /REP_STALE=true;INS_STALE=true;loadDash\(true\)/.test(page) && /if\(!r\.ok&&INSIGHTS\)\{INS_STALE=false;\}/.test(page));
   ok('H5: our counter’s numbers are called visits, and say a person counts once a day', /title:measuring\?'Visits':'Visitors'/.test(page) && /'Visits over time'/.test(page) && /name:'Visits',title:'Visits that opened this page\. '\+VISIT_WORDS/.test(page) && /Visits \(7 days\)/.test(page) && !/name:'People',title:'Different people who opened this page'/.test(page));
 }
@@ -127,7 +127,7 @@ const ago = (d) => new Date(Date.now() - d * 86400_000).toISOString();
   ok('H2: a customer who isn’t the studio’s is still refused', stranger.status === 422);
   const pageP = read('projects.html');
   ok('H2: the picker is built from the customer roster, not the pipeline’s newest 25', /async function loadCustomerOptions\(\)\{[\s\S]*?await ensureCustomers\(\);[\s\S]*?CUSTROWS/.test(pageP) && !/api\('\/sales\/deals'\)/.test(pageP));
-  ok('H9: one roster read when scoped (the scope check names the customers too), and Refresh reads it again', /if\(r\.ok\)takeCustomers\(rows\);/.test(pageP) && /CUST_STALE=true;return load\(true\)/.test(pageP) && !/dataset\.loaded/.test(pageP));
+  ok('H9: one roster read when scoped (the scope check names the customers too), and Refresh reads it again', /if\(r\.ok&&inClient\(\)\)takeCustomers\(rows\);/.test(pageP) && /CUST_STALE=true;return load\(true\)/.test(pageP) && !/dataset\.loaded/.test(pageP));
   ok('H4: + Share keeps Save off while the file goes up', /const save=host\.querySelector\('form button\[type="submit"\]'\);/.test(pageP) && /if\(save\)save\.disabled=true;/.test(pageP));
   ok('H8: an action re-reads the record and report; the side lists stay unless still loading', /const reopen=\(\)=>openProject\(id,\{keepSides:true\}\);/.test(pageP) && /if\(!\(kept&&kept\.support\)\)loadSupport\(id\);/.test(pageP) && !/openProject\(id\);/.test(pageP));
   ok('H8: a kept message form reads its own "internal note" box, wherever it now sits', /const internal=e\.currentTarget\.querySelector\('#mm-internal'\)/.test(pageP));

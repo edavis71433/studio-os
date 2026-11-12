@@ -33,6 +33,7 @@ const SETTINGS = {
   PREVIEW_CACHE_MAX: 'drawn previews kept (64)',
   PREVIEW_CACHE_TTL_MS: 'how long a drawn preview is kept (5 min)',
   PRIVACY_VERSION: 'the privacy policy version people accept',
+  RESEND_API_URL: 'the email service’s address (Resend’s; a scratch run points it at a stand-in)',
   TERMS_VERSION: 'the terms version people accept',
   SNAPSHOT_KEEP_RECENT: 'published versions kept',
   STOCK_PROVIDER: 'which stock photo service (pexels)',
