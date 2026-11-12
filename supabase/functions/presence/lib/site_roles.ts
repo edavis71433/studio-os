@@ -189,7 +189,6 @@ const MEMBER_WRITES: Array<[MemberWriteNeed, string[]]> = [
     `POST /assets/${ID}/(replace|rollback|duplicate|suggest|remove-background|cutout)`,
     'POST /visual/generate',
     `POST /visual/plans/${ID}/(vary|edit)`,
-    `POST /notes/${ID}/(dismiss|accept)`,
     `POST /moments/${ID}/dismiss`,
     'POST /broadcasts',
     'POST /broadcasts/lists',   // sales review items 31 + 39: keep the people picked for an update
