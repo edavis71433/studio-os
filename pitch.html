@@ -81,6 +81,16 @@ const scoreCol=(who,tag,piece)=>{
        :`<div class="score na">${esc(none)}</div>`}
   </div>`;
 };
+// builder list item 211: how fast their homepage shows on a phone (Google's own check, from the
+// Site Review), beside what a page we build weighs. Their number only when the check ran.
+const secs=(ms)=>(Math.round(ms/100)/10).toFixed(1);
+function speedCard(d,you){
+  if(you.no_site)return '';
+  const s=you.summary||{}, ours=d.ours||{typical_kb:30,limit_kb:100};
+  const theirs=typeof s.phone_lcp_ms==='number'
+    ?`<p class="sub">On a phone, the main part of your homepage takes <strong>${esc(secs(s.phone_lcp_ms))} seconds</strong> to show. ${s.phone_lcp_status==='good'?'Google counts that as good.':s.phone_lcp_status==='poor'?'Google counts over 4 seconds as slow.':'Google counts under 2.5 seconds as good.'}</p>`:'';
+  return `<section class="card"><h2>How fast it shows on a phone</h2>${theirs}<p class="sub">A page we build weighs about ${esc(ours.typical_kb)} kB, and never more than ${esc(ours.limit_kb)} kB, so it shows quickly on a phone.</p></section>`;
+}
 async function load(){
   const t=new URLSearchParams(location.search).get('t')||'';
   let r=null;
@@ -102,6 +112,7 @@ async function load(){
       ${rivals.map(rv=>scoreCol(rv.name,'rival',rv)).join('')}
     </div>
     ${issues.length?`<section class="card"><h2>What we’d fix first on your site</h2><ul class="iss">${issues.map(i=>`<li>${esc(i)}</li>`).join('')}</ul></section>`:''}
+    ${speedCard(d,you)}
     ${you.no_site?`<section class="card"><h2>About your website</h2><p class="sub">We couldn’t find a working website for ${esc(d.business_name)}. Most people look a business up online before they call, so that’s where we’d start.</p></section>`:''}
     ${aiS?`<section class="card"><h2>When people ask AI for a recommendation</h2>
       <div class="aiwrap"><span class="aiscore">${esc(aiS.overall)}<span style="font-size:15px;color:var(--faint)"> / 100</span></span><span class="sub">${esc(aiS.label||'')} — how often AI assistants mention ${esc(d.business_name)} when asked for ${d.industry?esc(d.industry.toLowerCase())+'s':'businesses like yours'}${d.town?` in ${esc(d.town)}`:''}.</span></div>
