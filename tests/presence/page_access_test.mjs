@@ -34,7 +34,7 @@ ok('access keeps password and private only', pageShowFields({ access: 'password'
 ok('a lock is a uuid or nothing', pageShowFields({ lock: LOCK.toUpperCase() }).lock === LOCK && pageShowFields({ lock: 'x' }).lock === undefined && pageShowFields({ lock: 7 }).lock === undefined);
 ok('header and footer flags are true or absent', pageShowFields({ noHeader: true, noFooter: 'yes' }).noHeader === true && !('noFooter' in pageShowFields({ noHeader: true, noFooter: 'yes' })));
 ok('a page that never used them carries nothing new', JSON.stringify(pageShowFields({ slug: 'a', title: 'A', blocks: [] })) === '{}');
-ok('a password needs at least 4 characters, at most 100', passwordProblem('abc') && !passwordProblem(' abcd ') && passwordProblem('x'.repeat(101)) && passwordProblem(undefined));
+ok('a password needs at least 8 characters, at most 100 (item 204)', passwordProblem('abc') && passwordProblem('letmein') && passwordProblem('  abcdefg  ') && !passwordProblem(' abcdefgh ') && passwordProblem('x'.repeat(101)) && passwordProblem(undefined));
 
 // ── header and footer, on every template ──
 const PAGES = [

@@ -29,6 +29,39 @@ export function trashDue(nowIso: string, trashedAt: string | null | undefined): 
   return !!end && Date.parse(end) <= Date.parse(nowIso);
 }
 
+// ── Item 204: the owner is told (Nov 12 review, finding 94) ──
+// A studio's Move to trash took a client's live site offline, and 90 days later its hosting
+// was deleted, even when the client had their own sign-in; nobody told them. Now the owner
+// of a site with an owner gets an email when it goes in the trash, and the 90-day job only
+// lets go of it: the site, the sign-in and the files stay the owner's, and they get a
+// second email. Only a site with no owner (made with "+ New site", never invited) is
+// deleted for good by itself (ops/site_trash.ts).
+const esc = (s: unknown) => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+const longDate = (iso: string | null | undefined) => { const t = Date.parse(String(iso || '')); return Number.isFinite(t) ? new Date(t).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric', timeZone: 'UTC' }) : ''; };
+
+/** The owner's email when their studio moves the site to its trash. Pure. */
+export function trashedEmail(o: { studio: string; site: string; wasLive: boolean; goesAt: string | null; studioEmail?: string }): { subject: string; html: string } {
+  const when = longDate(o.goesAt);
+  return {
+    subject: `${o.studio} moved ${o.site} to its trash`,
+    html: `<p>${esc(o.studio)} moved your website, ${esc(o.site)}, to its trash in Studio OS${o.wasLive ? ' and took it offline' : ''}.</p>` +
+      `<p>Nothing has been deleted. ${esc(o.studio)} can bring it back with one click${when ? ` until ${esc(when)}` : ''}.</p>` +
+      `<p>${when ? `After that, ${esc(o.studio)}` : `Later, ${esc(o.studio)}`} stops looking after it, but your website, your sign-in and your files stay yours. Nothing of yours is deleted without you.</p>` +
+      `<p>Didn’t expect this? Ask ${esc(o.studio)}${o.studioEmail ? ` at ${esc(o.studioEmail)}` : ''}, or reply to this email.</p>`,
+  };
+}
+
+/** The owner's email when, 90 days on, the studio lets go of the site. Pure. */
+export function letGoEmail(o: { studio: string; site: string; wasLive: boolean; since: string | null }): { subject: string; html: string } {
+  const since = longDate(o.since);
+  return {
+    subject: `${o.studio} no longer looks after ${o.site}`,
+    html: `<p>${esc(o.studio)} put your website, ${esc(o.site)}, in its trash${since ? ` on ${esc(since)}` : ''} and didn’t bring it back, so it no longer looks after it.</p>` +
+      `<p>Nothing was deleted: your website, your sign-in and your files are still yours.${o.wasLive ? ' The website is offline.' : ''}</p>` +
+      `<p>To put it back online or take it somewhere else, reply to this email and we’ll help.</p>`,
+  };
+}
+
 export interface TrashLink { site_id: string; trashed_at?: string | null; trashed_by?: string | null; trashed_was_live?: boolean | null }
 /** The Trash at the foot of Sites: newest first, each with its day of going and
  *  the days left. Pure. */

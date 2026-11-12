@@ -6,6 +6,7 @@
 // address comes from the ONE constant (platform/dns.ts), never a second literal.
 import { getSite, sslStatus } from './netlify.ts';
 import { NETLIFY_APEX_IP } from '../platform/dns.ts';
+import { guardedFetch } from '../../_shared/tools/url_guard.ts';
 
 const NETLIFY_APEX_IPS = new Set([NETLIFY_APEX_IP]);
 
@@ -207,7 +208,8 @@ export const checklistOk = (lines: CheckLine[]) => lines.length > 0 && lines.eve
 
 async function pageHash(url: string): Promise<{ ok: boolean; server: string; hash: string | null }> {
   try {
-    const r = await fetch(url, { redirect: 'follow', signal: AbortSignal.timeout(8000), headers: { 'Cache-Control': 'no-cache', 'User-Agent': 'StudioOS-DomainCheck/1.0' } });
+    // builder item 204: a typed domain is fetched through the guarded fetcher (no private or internal address, on any hop)
+    const r = await guardedFetch(url, { signal: AbortSignal.timeout(8000), headers: { 'Cache-Control': 'no-cache', 'User-Agent': 'StudioOS-DomainCheck/1.0' } });
     if (!r.ok) { await r.body?.cancel().catch(() => {}); return { ok: false, server: String(r.headers.get('server') || ''), hash: null }; }
     const buf = new Uint8Array(await r.arrayBuffer());
     const dig = new Uint8Array(await crypto.subtle.digest('SHA-256', buf));
