@@ -3,9 +3,9 @@
 // agreed. Now joining sends one email to that address, from the business, with a
 // "Yes, add me" link; only pressing the button on join.html adds them, with the day
 // they said yes. Nothing is kept before that: the link carries the site, the address
-// and the page they joined on, signed and good for JOIN_LINK_DAYS. The email counts as
-// the site's one automatic reply that day to that address (lib/auto_reply.ts), so the
-// box can't be used to send a stranger mail over and over.
+// and the page they joined on, signed and good for JOIN_LINK_DAYS. One such email a day
+// goes to an address (lib/auto_reply.ts), so the box can't be used to send a stranger
+// mail over and over.
 import { hmacHex, timingSafeEqual } from '../../_shared/hmac.ts';
 
 export const JOIN_LINK_DAYS = 7;

@@ -360,7 +360,7 @@ export async function handleBookingCreate(req: Request, siteId: string, cors: Re
   // Item 203: the confirmation is a site's automatic reply, so one a day to an address and
   // none to the do-not-send list; the page shows the booking's links either way. It is the
   // customer's own appointment, so it still goes when the day's count can't be read.
-  const mailed = !!appt.customer_email && await autoReplyVerdict(siteId, String(appt.customer_email), { failOpen: true }) === 'send';
+  const mailed = !!appt.customer_email && await autoReplyVerdict('booking', siteId, String(appt.customer_email), { failOpen: true }) === 'send';
   if (mailed) notifyCustomer(siteId, appt, status).catch(() => {});
   notifyOwnerOfBooking(siteId, appt, status).catch(() => {});
 

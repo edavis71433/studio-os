@@ -271,7 +271,7 @@ export async function handleFormSubmit(req: Request, siteId: string, cors: Recor
 // (lib/join_confirm.ts), and only pressing it on join.html makes them a contact of the
 // site with subscribed_at and a note of what they agreed to, where and when they said
 // yes (migration 0157). The box gives the same answer whoever typed the address, and
-// the email counts as the site's one automatic reply that day to that address. A robot
+// only one such email a day goes to an address (lib/auto_reply.ts). A robot
 // is thanked and nothing is sent. A sign-up never lifts an unsubscribe: the one
 // suppression list still decides who gets mail, and gets no "Yes, add me" email.
 export { JOINED, JOIN_CHECK_EMAIL };
@@ -286,7 +286,7 @@ async function joinList(siteId: string, raw: Record<string, unknown>): Promise<{
   const found = await svc(`presence_contacts?site_id=eq.${siteId}&deleted_at=is.null&${emailMatch(email)}&select=id,subscribed_at&limit=1`);
   if (!found.ok) return { ok: false, error: 'write_failed', message: 'That didn’t go through. Please try again in a minute.' };
   if (Array.isArray(found.json) && found.json[0]?.subscribed_at) return { ok: true };
-  if (await autoReplyVerdict(siteId, email) !== 'send') return { ok: true };
+  if (await autoReplyVerdict('join', siteId, email) !== 'send') return { ok: true };
   const t = await joinLinkToken(siteId, email, page);
   if (!t) return { ok: false, error: 'write_failed', message: 'That didn’t go through. Please try again in a minute.' };
   const [brand, replyTo] = await Promise.all([loadEmailBrand(siteId), ownerReplyTo(siteId)]);
@@ -691,8 +691,8 @@ async function acknowledgeEnquiry(siteId: string, sub: { name: string; email: st
   const { automationSettingsFor } = await import('../commerce/lifecycle.ts');   // lazy: lifecycle pulls in the whole sweep
   const auto = await automationSettingsFor(siteId);
   if (!auto.auto_ack_enquiries) return false;
-  // item 203: one automatic reply a day to an address, and none to the do-not-send list
-  if (await autoReplyVerdict(siteId, sub.email) !== 'send') return false;
+  // item 203: one acknowledgement a day to an address, and none to the do-not-send list
+  if (await autoReplyVerdict('enquiry', siteId, sub.email) !== 'send') return false;
   const [ident, brand, replyTo] = await Promise.all([
     svc(`presence_identity?site_id=eq.${siteId}&select=business_name&limit=1`),
     loadEmailBrand(siteId),

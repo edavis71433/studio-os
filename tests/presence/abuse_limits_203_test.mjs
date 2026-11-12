@@ -1,6 +1,6 @@
 // ── Builder list item 203: a stranger can't make a business send email, or fill its storage ──
 //   deno run --allow-read --allow-env --allow-net tests/presence/abuse_limits_203_test.mjs
-// Part A: one automatic reply a day per address per site, none to the do-not-send list
+// Part A: each kind of automatic reply once a day per address per site, none to the do-not-send list
 // (lib/auto_reply.ts). Part B drives the real routes on a fake database, mail service
 // and store: a second enquiry or booking from the same address the same day gets no
 // second email, an unsubscribed address gets none; "Join our list" adds nobody until
@@ -62,26 +62,27 @@ const clear = () => { counts.clear(); mail.length = 0; stored.length = 0; remove
 
 // ═══ A · one automatic reply a day ═══
 {
-  ok('one automatic reply a day to an address', AUTO_REPLIES_PER_DAY === 1);
+  ok('one automatic reply of each kind a day to an address', AUTO_REPLIES_PER_DAY === 1);
   ok('the day is the UTC day', dayWindow(Date.parse('2026-11-12T23:59:59Z')) === '2026-11-12T00:00:00.000Z' && dayWindow(Date.parse('2026-11-13T00:00:01Z')) === '2026-11-13T00:00:00.000Z');
-  const [b1, b2, b3] = await Promise.all([autoReplyBucket(SID, 'Sam@Customer.example'), autoReplyBucket(SID, ' sam@customer.example '), autoReplyBucket(OTHER, 'sam@customer.example')]);
-  ok('the count is kept under a hash: no address in it, capitals and spaces don’t matter, each site its own', b1 === b2 && b1 !== b3 && b1.startsWith(`autoreply:${SID}:`) && !/sam|customer/.test(b1));
+  const [b1, b2, b3, b4] = await Promise.all([autoReplyBucket('enquiry', SID, 'Sam@Customer.example'), autoReplyBucket('enquiry', SID, ' sam@customer.example '), autoReplyBucket('enquiry', OTHER, 'sam@customer.example'), autoReplyBucket('booking', SID, 'sam@customer.example')]);
+  ok('the count is kept under a hash: no address in it, capitals and spaces don’t matter, each site and each kind its own', b1 === b2 && b1 !== b3 && b1 !== b4 && b1.startsWith(`autoreply:enquiry:${SID}:`) && !/sam|customer/.test(b1));
   db.reset({ suppressed_emails: [{ email: 'gone@customer.example', reason: 'opt_out' }, { email: 'dead@customer.example', reason: 'bounce' }] }); clear();
-  ok('the first reply of the day goes', await autoReplyVerdict(SID, 'sam@customer.example') === 'send');
-  ok('…a second the same day is held back, whatever the capitals', await autoReplyVerdict(SID, 'Sam@Customer.example') === 'sent_today');
-  ok('…another site has its own one', await autoReplyVerdict(OTHER, 'sam@customer.example') === 'send');
+  ok('the first reply of the day goes', await autoReplyVerdict('enquiry', SID, 'sam@customer.example') === 'send');
+  ok('…a second the same day is held back, whatever the capitals', await autoReplyVerdict('enquiry', SID, 'Sam@Customer.example') === 'sent_today');
+  ok('…another site has its own one', await autoReplyVerdict('enquiry', OTHER, 'sam@customer.example') === 'send');
+  ok('…and each kind its own: their booking’s confirmation still goes that day', await autoReplyVerdict('booking', SID, 'sam@customer.example') === 'send' && await autoReplyVerdict('booking', SID, 'sam@customer.example') === 'sent_today');
   const before = counts.size;
-  ok('someone who unsubscribed gets none, and nothing is counted for them', await autoReplyVerdict(SID, 'gone@customer.example') === 'unsubscribed' && counts.size === before);
-  ok('…nor does an address that bounced', await autoReplyVerdict(SID, 'dead@customer.example') === 'unsubscribed');
+  ok('someone who unsubscribed gets none, and nothing is counted for them', await autoReplyVerdict('enquiry', SID, 'gone@customer.example') === 'unsubscribed' && counts.size === before);
+  ok('…nor does an address that bounced', await autoReplyVerdict('booking', SID, 'dead@customer.example') === 'unsubscribed');
   const now = autoReplyDeps.now;
   autoReplyDeps.now = () => Date.now() + 86_400_000;
-  ok('the next day, one more', await autoReplyVerdict(SID, 'sam@customer.example') === 'send');
+  ok('the next day, one more', await autoReplyVerdict('enquiry', SID, 'sam@customer.example') === 'send');
   autoReplyDeps.now = now;
   rateDown = true;
-  ok('when the count can’t be read, an optional reply waits', await autoReplyVerdict(SID, 'new@customer.example') === 'unchecked');
-  ok('…and a booking’s confirmation still goes (failOpen)', await autoReplyVerdict(SID, 'new@customer.example', { failOpen: true }) === 'send');
+  ok('when the count can’t be read, an optional reply waits', await autoReplyVerdict('enquiry', SID, 'new@customer.example') === 'unchecked');
+  ok('…and a booking’s confirmation still goes (failOpen)', await autoReplyVerdict('booking', SID, 'new@customer.example', { failOpen: true }) === 'send');
   rateDown = false;
-  ok('not an address: nothing is sent or counted', await autoReplyVerdict(SID, 'not an address') === 'unchecked');
+  ok('not an address: nothing is sent or counted', await autoReplyVerdict('enquiry', SID, 'not an address') === 'unchecked');
 }
 
 // ═══ B · the routes ═══
@@ -140,6 +141,12 @@ const book = (slot, email) => handleBookingCreate(new Request(`${FN}/book/${SID}
   await book('10:00', 'kim@customer.example');
   await settle(2);
   ok('…when the day’s count can’t be read, the confirmation still goes (it is their appointment)', sentTo('kim@customer.example').length === 1);
+  seed();
+  await enquire({ name: 'Lee', email: 'lee@customer.example', message: 'Do you have Saturdays?' });
+  await settle(2);
+  await book('12:00', 'lee@customer.example');
+  await settle(4);
+  ok('someone who writes in and then books the same day gets the acknowledgement and the booking’s confirmation', sentTo('lee@customer.example').length === 2 && sentTo('lee@customer.example').some((e) => /^We got your message/.test(e.subject)) && sentTo('lee@customer.example').some((e) => /Haircut/.test(e.subject)), JSON.stringify(sentTo('lee@customer.example').map((e) => e.subject)));
 }
 
 // Join our list
@@ -181,7 +188,7 @@ const joinPost = (t) => handleJoinPost(new Request(`${FN}/join`, { method: 'POST
   await join({ email: 'ana@customer.example' });
   await join({ email: 'ana@customer.example', source_page: '/' });
   await settle(2, 400);
-  ok('joining twice the same day: one email (the site’s one automatic reply that day)', sentTo('ana@customer.example').length === 1);
+  ok('joining twice the same day: one email', sentTo('ana@customer.example').length === 1);
 }
 {
   seed({ suppressed_emails: [{ email: 'gone@customer.example', reason: 'opt_out' }] });
@@ -288,7 +295,7 @@ const SITE = { id: SID };
   const page = read('join.html');
   ok('join.html: asks before adding, then says so; no address in the page’s own words', page.includes("b.textContent='Yes, add me'") && page.includes("call('POST',{t:t})") && page.includes('You’re on the list. Thank you!') && page.includes('<meta name="robots" content="noindex,nofollow">') && page.includes('<meta name="referrer" content="no-referrer">'));
   const commercial = read('supabase/functions/presence/routes/commercial.ts');
-  ok('the acknowledgement asks for the day’s reply before it sends', /if \(!auto\.auto_ack_enquiries\) return false;\n\s*\/\/ item 203[^\n]*\n\s*if \(await autoReplyVerdict\(siteId, sub\.email\) !== 'send'\) return false;/.test(commercial));
+  ok('the acknowledgement asks for the day’s reply before it sends', /if \(!auto\.auto_ack_enquiries\) return false;\n\s*\/\/ item 203[^\n]*\n\s*if \(await autoReplyVerdict\('enquiry', siteId, sub\.email\) !== 'send'\) return false;/.test(commercial));
 }
 
 const passed = results.filter(Boolean).length;
