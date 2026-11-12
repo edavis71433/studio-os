@@ -83,6 +83,9 @@
   .pf-chip input:focus-visible+span{outline:2px solid var(--p);outline-offset:2px}
   .pf-rcpt{display:flex;align-items:center;gap:8px;margin-top:12px;font-size:13.5px;color:var(--ink);white-space:normal}
   .pf-rcpt input{width:18px;height:18px;accent-color:var(--p)}
+  .pf-note-h{font-size:12.5px;margin:6px 0 0}
+  .pf-private{display:block;margin-top:10px;font-size:13px}
+  .pf-private input{display:block;width:100%;margin-top:4px}
   .pf-what{font-size:12.5px;margin:10px 0 0;white-space:normal}
   .btable tr.paying td{background:var(--p-soft)}
   @media (max-width:640px){.pf-chip span{min-height:44px}}
@@ -1307,7 +1310,7 @@ function renderBillingTab(host){
     let state, acts='', due='', dueCls='';
     // item 77: a payment recorded by hand says how it came in, and can be undone (it changes the books, so delete)
     if(st==='paid'){state=`<span class="schip good">Paid</span>`;due=v.paid_at?esc(atLabel(v.paid_at)):'';
-      sub=(sub?sub+' · ':'')+esc(PAY_WORDS[v.paid_method]||'Paid online')+(v.paid_note?' · '+esc(v.paid_note):'');
+      sub=(sub?sub+' · ':'')+esc(PAY_WORDS[v.paid_method]||'Paid online')+(v.paid_note?' · '+esc(v.paid_note):'')+(v.paid_private_note?' · <span title="Only you see this. It is not on their receipt.">Private: '+esc(v.paid_private_note)+'</span>':'');
       if(v.paid_method)acts+=act(`data-undo-pay="${esc(v.id)}" data-needs="delete"`,'Undo','Recorded by mistake? The invoice goes back to unpaid');}
     else if(!st){state=`<span class="schip" style="background:var(--bg);color:var(--faint)">Voided</span>`;}
     else if(st==='processing'){state=`<span class="schip info">Processing</span>`;sub=(sub?sub+' · ':'')+'Payment on its way';due=v.due_date?esc(dueLabel(v.due_date)):'';}   // the client paid — nothing to resend or void
@@ -1461,7 +1464,8 @@ function wireBilling(host,d){
     const id=b.getAttribute('data-undo-pay'); const v=((DEAL&&DEAL.invoices)||[]).find(x=>x.id===id)||{}; const no=invNo(v.number)||'the invoice';
     if(!confirm(v.payment_for?`Undo this ${fmtC(v.amount_cents)} part payment? Its amount goes back on the invoice as due.`:`Undo this payment? ${no} goes back to unpaid (${fmtC(v.amount_cents)} due) and its reminders can start again. Use this only for a payment recorded by mistake.`))return;
     b.disabled=true; const r=await apiAg('/sales/invoices/'+encodeURIComponent(id)+'/payment/undo','POST',{});
-    if(r.ok){toast(v.payment_for?'Part payment undone. Its amount is due again.':`Payment undone. ${no} is open again; send it again for a fresh payment link.`);reloadDeal();}
+    if(r.ok){const x=(r.body&&r.body.data)||{};const link=x.fresh_link===false?' A new payment link couldn’t be made just now: press Send on the invoice to make one.':' It has a fresh payment link, so its reminders carry on.';
+      toast((v.payment_for?'Part payment undone. Its amount is due again.':`Payment undone. ${no} is open again.`)+link+(x.moved_back?' The deal is back where it was.':''));reloadDeal();}
     else{toast((r.body&&r.body.message)||'Couldn’t undo it.');b.disabled=false;}}));
   const ea=host.querySelector('[data-edit-address]'); if(ea)ea.addEventListener('click',()=>{WANT_EDIT='ec-address';showTab('details');});   // item 81
   host.querySelectorAll('[data-send-inv]').forEach(b=>b.addEventListener('click',async()=>{b.disabled=true;const r=await billingSend('/sales/invoices/'+b.getAttribute('data-send-inv')+'/send',(b.textContent==='Resend'?'Invoice re-sent':'Invoice sent'));if(r)reloadDeal();else b.disabled=false;}));
@@ -1553,7 +1557,9 @@ function payForm(row,v){
   const due=Number(v.amount_cents)||0; const no=invNo(v.number)||'this invoice';
   row.classList.add('paying');
   host.innerHTML=`<div class="bform payform" role="group" aria-labelledby="pf-h" data-for="${esc(v.id)}"><p class="pf-h" id="pf-h">Record a payment for ${esc(no)}${v.title?' · '+esc(v.title):''}</p>
-    <div class="brow2"><label>Amount received (USD)<input type="number" id="pf-amt" inputmode="decimal" step="0.01" min="0.01" max="${(due/100).toFixed(2)}" value="${(due/100).toFixed(2)}"></label><label>Paid on<input type="date" id="pf-on" max="${today}" value="${today}"></label><label>Note (optional)<input type="text" id="pf-note" maxlength="120" placeholder="e.g. Check #1042"></label></div>
+    <div class="brow2"><label>Amount received (USD)<input type="number" id="pf-amt" inputmode="decimal" step="0.01" min="0.01" max="${(due/100).toFixed(2)}" value="${(due/100).toFixed(2)}"></label><label>Paid on<input type="date" id="pf-on" max="${today}" value="${today}"></label><label>Note on their receipt (optional)<input type="text" id="pf-note" maxlength="120" placeholder="e.g. Check #1042" aria-describedby="pf-note-h"></label></div>
+    <p class="muted pf-note-h" id="pf-note-h">Shown on their receipt: the client sees this note on the receipt, its PDF and the receipt email.</p>
+    <label class="pf-private">Private note, only you see it (optional)<input type="text" id="pf-private" maxlength="300" placeholder="e.g. Paid late, waived the fee"></label>
     <fieldset class="pf-how"><legend>How they paid</legend>${[['check','Check'],['cash','Cash'],['bank_transfer','Bank transfer'],['zelle','Zelle'],['other','Other']].map(([k,l],i)=>`<label class="pf-chip"><input type="radio" name="pf-how" value="${k}"${i===0?' checked':''}><span>${l}</span></label>`).join('')}</fieldset>
     ${c.email?`<label class="pf-rcpt"><input type="checkbox" id="pf-rcpt" checked> Email ${esc(first||'them')} a receipt (the PDF is attached)</label>`:''}
     <p class="muted pf-what" id="pf-what" aria-live="polite"></p>
@@ -1562,7 +1568,7 @@ function payForm(row,v){
   const amt=$('pf-amt'), go=$('pf-go');
   const cents=()=>Math.round((parseFloat(amt.value)||0)*100);
   const say=()=>{const a=cents();
-    if(a>0&&a<due){go.textContent='Record '+fmtC(a)+' part payment';$('pf-what').textContent=`${fmtC(due-a)} stays due on ${no}. Its card link is switched off, and the next Send makes one for what’s left.`;}
+    if(a>0&&a<due){go.textContent='Record '+fmtC(a)+' part payment';$('pf-what').textContent=`${fmtC(due-a)} stays due on ${no}. Its card link is switched off and a fresh one is made for what’s left, so reminders and their Pay button keep working.`;}
     else{go.textContent='Mark '+(invNo(v.number)||'it')+' paid';$('pf-what').textContent=`This marks ${no} paid, stops its reminders and switches its card link off, so it can’t be paid twice. It counts in Paid and in your money reports.`;}};
   say(); amt.addEventListener('input',say);
   $('pf-cancel').addEventListener('click',()=>{clear();row.querySelector('[data-pay-inv]')&&row.querySelector('[data-pay-inv]').focus();});
@@ -1576,12 +1582,13 @@ function payForm(row,v){
     if(on>today){toast('The day you were paid can’t be in the future.');$('pf-on').focus();return;}
     go.disabled=true;
     const rc=$('pf-rcpt');
-    const r=await apiAg('/sales/invoices/'+encodeURIComponent(v.id)+'/payment?today='+today,'POST',{amount_cents:a,paid_on:on,method:how,note:$('pf-note').value.trim(),email_receipt:!!(rc&&rc.checked)});
+    const r=await apiAg('/sales/invoices/'+encodeURIComponent(v.id)+'/payment?today='+today,'POST',{amount_cents:a,paid_on:on,method:how,note:$('pf-note').value.trim(),private_note:$('pf-private').value.trim(),email_receipt:!!(rc&&rc.checked)});
     if(!r.ok){toast((r.body&&r.body.message)||'That didn’t go through.');go.disabled=false;return;}
     const x=(r.body&&r.body.data)||{}; const live=x.link_deactivated===false;
     let m=x.part?`Recorded a ${fmtC(a)} part payment. ${fmtC(x.left_cents)} is still due on ${no}.`:`Marked ${no} paid, ${(PAY_WORDS[how]||'paid').replace(/^Paid /,'')}.`;
     if(x.receipt_emailed)m+=` Receipt emailed to ${first||'them'}.`;
     if(live)m+=' Its card link may still be live, so switch it off in Stripe.';
+    if(x.part&&x.fresh_link===false)m+=' A new payment link couldn’t be made just now: press Send on the invoice to make one.';
     toast(m,live?'err':undefined);
     reloadDeal();
   });

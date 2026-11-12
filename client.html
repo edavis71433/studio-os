@@ -199,6 +199,16 @@
   }
   .fbtn,a.fbtn{flex:0 0 auto;display:inline-flex;align-items:center;font-size:12.5px;font-weight:600;border:1px solid var(--line);background:transparent;color:var(--ink);border-radius:999px;padding:7px 14px;cursor:pointer;text-decoration:none;white-space:nowrap;transition:.15s}
   a.fbtn.pay{background:var(--p);border-color:var(--p);color:#fff} /* paying is the Invoices tab's one next action (Oct 2026 experience review) */
+  /* sales item 117: the client's retainer, above their invoices */
+  .retwrap{margin:0 0 18px}
+  .retcard{margin-bottom:12px}
+  .rethead{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
+  .rethead .fname{margin:0 0 2px}
+  .retcharges{list-style:none;margin:12px 0 0;padding:0;border-top:1px solid var(--line)}
+  .retcharges li{display:flex;justify-content:space-between;gap:12px;padding:8px 0;border-bottom:1px solid var(--line);font-size:13.5px}
+  .retcard a.fbtn,.retact{margin-top:14px}
+  .retact .fbtn{min-height:40px}
+  .retsure{margin:0 0 10px;font-size:13.5px;color:var(--ink)}
   .fbtn:hover,a.fbtn:hover{border-color:var(--p);color:var(--p)}
   .fload{margin:0 0 14px;font-size:14px}
   /* ── milestone Path (Lightning chevron geometry — read-only, informational) ── */
@@ -1895,11 +1905,13 @@ async function renderInvoices(){
   const b=await ensureBilling();
   if(view!==VIEW_SEQ)return;   // the user moved on mid-fetch — never paint over the newer view
   const inv=(b&&b.invoices)||[];
+  const rets=((b&&b.retainers)||[]).filter(r=>r&&r.id);   // sales item 117
   let html=portalHeader('Invoices',inv.length?'Invoices from your studio for project and service work.':'');
   // a FAILED read says so — never the "No invoices yet" story (and ensureBilling
   // didn't cache it, so coming back to this tab retries the read)
   if(b&&b.failed){html+=`<div class="card"><p class="muted">We couldn’t load your invoices just now — please try again in a moment.</p></div>`;$('main').innerHTML=html;return;}
-  if(!inv.length){html+=emptyCard('No invoices yet. When your studio bills you for project or service work, it’ll show up here. (Your website subscription is billed separately.)','🧾');$('main').innerHTML=html;return;}
+  if(rets.length)html+=`<section class="retwrap" aria-label="Your retainer">${rets.map(retainerCardHtml).join('')}</section>`;
+  if(!inv.length){html+=rets.length?'':emptyCard('No invoices yet. When your studio bills you for project or service work, it’ll show up here. (Your website subscription is billed separately.)','🧾');$('main').innerHTML=html;wireRetainers();return;}
   const today=portalTodayYmd();
   // the ONE formula over the same unpaidInvoices Home's queue counts — the
   // tab's total and Home can never disagree (one formula, one formatter)…
@@ -1909,6 +1921,43 @@ async function renderInvoices(){
   if(total>0)html+=`<p class="invtotal" id="inv-unpaid">Unpaid right now: <strong>${esc(fmtMoney(total))}</strong></p>`;
   html+=`<div class="flv" role="list" aria-label="Invoices">${inv.map(i=>invoiceRowHtml(i,today)).join('')}</div>`;
   $('main').innerHTML=html;
+  wireRetainers();
+}
+// ── Sales item 117: the client's retainer, its charges, and a way to cancel ──
+// The retainer email says "you can cancel any time"; until now this page showed
+// no retainer at all. Cancel asks once, in place (no pop-up), and stops future
+// charges only: the words say nothing is refunded.
+function retainerCardHtml(r){
+  const per=r.interval==='year'?'year':'month';
+  const st=String(r.status||'');
+  const word=st==='active'?'Active':st==='past_due'?'Payment didn’t go through':st==='pending'?'Waiting for you to approve':'Cancelled';
+  const cls=st==='active'?' sig':st==='past_due'?' od':'';
+  const day=(v)=>v?invDueLabel(String(v).slice(0,10)):'';
+  const when=st==='active'&&r.next_charge?'Next charge '+day(r.next_charge):st==='canceled'&&r.canceled_at?'Cancelled '+day(r.canceled_at)+'. It won’t charge again.':st==='past_due'?'Stripe will try the card again. Message your studio if the card has changed.':'';
+  const charges=Array.isArray(r.charges)?r.charges:[];
+  const list=charges.length?`<ul class="retcharges" aria-label="Charges so far">${charges.slice(0,12).map(c=>`<li><span>${esc(day(c.at))}</span><span>${esc(fmtMoney(c.amount))}</span></li>`).join('')}</ul>`+(charges.length>12?`<p class="muted" style="margin:6px 0 0">And ${charges.length-12} earlier.</p>`:''):(st==='pending'?'':'<p class="muted" style="margin:8px 0 0">No charges yet.</p>');
+  const approve=st==='pending'&&r.approve_url&&/^https:\/\//.test(r.approve_url)?`<a class="fbtn pay" href="${esc(r.approve_url)}">Set it up →</a>`:'';
+  const cancel=r.can_cancel?`<div class="retact" data-ret="${esc(r.id)}"><button type="button" class="fbtn" data-ret-ask>Cancel retainer</button></div>`:'';
+  return `<div class="card retcard"><div class="rethead"><div><h3 class="fname">${esc(r.name||'Retainer')}</h3><span class="fmeta">${esc(fmtMoney(r.amount))} every ${per}${when?' · '+esc(when):''}</span></div><span class="fst${cls}">${esc(word)}</span></div>${list}${approve}${cancel}</div>`;
+}
+function wireRetainers(){
+  document.querySelectorAll('#main .retact').forEach(box=>{
+    const id=box.getAttribute('data-ret');
+    const ask=()=>{box.innerHTML='<button type="button" class="fbtn" data-ret-ask>Cancel retainer</button>';box.querySelector('[data-ret-ask]').addEventListener('click',sure);};
+    const sure=()=>{
+      box.innerHTML='<p class="retsure" role="alert">Cancel this retainer? It stops future charges. Charges already made are not refunded.</p><button type="button" class="fbtn" data-ret-yes>Yes, cancel it</button> <button type="button" class="fbtn" data-ret-no>Keep it</button>';
+      box.querySelector('[data-ret-no]').addEventListener('click',()=>{ask();box.querySelector('[data-ret-ask]').focus();});
+      const yes=box.querySelector('[data-ret-yes]');
+      yes.addEventListener('click',async()=>{
+        yes.disabled=true;
+        const r=await api('/client/retainers/'+encodeURIComponent(id)+'/cancel','POST',{});
+        if(r.ok){toast('Your retainer is cancelled. It won’t charge again.');PORTAL.billing=null;renderInvoices();}
+        else{toast((r.body&&r.body.message)||'We couldn’t cancel it just now. Please try again.');yes.disabled=false;}
+      });
+      yes.focus();
+    };
+    box.querySelector('[data-ret-ask]').addEventListener('click',sure);
+  });
 }
 // ── REQUESTS (R2, slice 11 layout) — quick-action tiles, the studio's service
 // catalog as a card grid, and "Your requests" as a list view with Open/All

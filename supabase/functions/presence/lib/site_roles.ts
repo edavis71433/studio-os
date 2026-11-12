@@ -102,6 +102,7 @@ const ID = '[0-9a-f-]{36}';
 const KEY = '[a-z0-9_]+';
 const MEMBER_WRITES: Array<[MemberWriteNeed, string[]]> = [
   ['delete', [
+    `POST /client/retainers/${ID}/cancel`,   // sales item 117: stopping the business's own recurring payment is the owner's call
     `DELETE /(media|assets|redirects|content-library|publishes/checkpoints|bookings/types|knowledge/docs)/${ID}`,
     `DELETE /sales/(contacts|deals|proposals|contracts|templates|estimates)/${ID}`,
     `DELETE /sales/prospects/${ID}`,   // sales review item 112: taking a prospect off the list

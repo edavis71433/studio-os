@@ -18,13 +18,14 @@ import { loadEmailBrand, EMAIL_BRAND_DEFAULT } from '../lib/email_brand.ts';
 import { applyPlaceholders, buildPlaceholderValues, depositSplit } from '../lib/doc_placeholders.ts';
 import { raiseNotice, clearNotice, clearNoticePrefix, dealFollowupPeriodPrefix, dealFollowupLegacyPeriod } from '../lib/notice.ts';
 import { stripeConfigured, createServicePaymentLink, createServiceRetainerLink, deactivatePaymentLink, cancelSubscription } from '../commerce/stripe.ts';
+import { stampFirstSent } from '../lib/pay_link.ts';
 import { moneyState, moneyBuckets } from '../lib/money_state.ts';
 import { buildMyTasks, MY_TASKS_MAX } from '../lib/my_tasks.ts';
 import { revenueByMonth, dealsByStage, wonAndLost, enquiriesBySource, overdueInvoices, OPEN_STAGES as REPORT_OPEN_STAGES } from '../lib/sales_reports.ts';
 import { normalizeViews, normalizeViewList, isViewList } from '../lib/saved_views.ts';
 import { readReservedJsonOrThrow, writeReservedJson, updateReservedJson, RESERVED_NAMES } from '../lib/reserved_store.ts';
 import { normalizeStageNames, stageLabels, loadStageLabels, forgetStageLabels, renameMovedTo, DEFAULT_STAGE_LABEL, normalizeStageChances, stageChances, loadStageChances, forgetStageChances, expectedValue, DEFAULT_STAGE_CHANCE } from '../lib/stage_names.ts';
-import { validateRetainerInput, mergeRetainerState, type RetainerState } from '../commerce/retainers.ts';
+import { validateRetainerInput, mergeRetainerState, retainerSubscriptionIds, type RetainerState } from '../commerce/retainers.ts';
 import { leftToBill, reuseDecision, retainerPaid, linesFromProposal } from '../lib/invoice_billing.ts';   // sales items 107, 108, 81
 import { editionFor } from '../commerce/catalog.ts';
 import type { PlanKey } from '../commerce/catalog.ts';
@@ -1051,7 +1052,7 @@ export async function handleSalesDeal(req: Request, site: SiteRow, principal: Pr
       // as the proposals read above) so the record's Billing tab never blanks.
       // item 107: recurring_id rides along (0145) so the record can tell what's left of the proposal
       // sales items 77 and 81: the invoice's number and how a recorded payment came in (APPLY-0167)
-      (async () => { let r = await svc(`presence_invoices?deal_id=eq.${id}&site_id=eq.${site.id}&deleted_at=is.null&select=id,title,amount_cents,purpose,status,stripe_url,due_date,paid_at,created_at,processing_since,recurring_id,number,paid_method,paid_note,payment_for&order=due_date.asc.nullsfirst,created_at.asc`); if (!r.ok) r = await svc(`presence_invoices?deal_id=eq.${id}&site_id=eq.${site.id}&deleted_at=is.null&select=id,title,amount_cents,purpose,status,stripe_url,due_date,paid_at,created_at,processing_since,recurring_id&order=due_date.asc.nullsfirst,created_at.asc`); if (!r.ok) r = await svc(`presence_invoices?deal_id=eq.${id}&site_id=eq.${site.id}&deleted_at=is.null&select=id,title,amount_cents,purpose,status,stripe_url,due_date,paid_at,created_at,processing_since&order=due_date.asc.nullsfirst,created_at.asc`); if (!r.ok) r = await svc(`presence_invoices?deal_id=eq.${id}&site_id=eq.${site.id}&deleted_at=is.null&select=id,title,amount_cents,purpose,status,stripe_url,due_date,paid_at,created_at&order=due_date.asc.nullsfirst,created_at.asc`); return r; })(),
+      (async () => { let r = await svc(`presence_invoices?deal_id=eq.${id}&site_id=eq.${site.id}&deleted_at=is.null&select=id,title,amount_cents,purpose,status,stripe_url,due_date,paid_at,created_at,processing_since,recurring_id,number,paid_method,paid_note,payment_for,paid_private_note&order=due_date.asc.nullsfirst,created_at.asc`); /* before APPLY-0188: without the private note */ if (!r.ok) r = await svc(`presence_invoices?deal_id=eq.${id}&site_id=eq.${site.id}&deleted_at=is.null&select=id,title,amount_cents,purpose,status,stripe_url,due_date,paid_at,created_at,processing_since,recurring_id,number,paid_method,paid_note,payment_for&order=due_date.asc.nullsfirst,created_at.asc`); if (!r.ok) r = await svc(`presence_invoices?deal_id=eq.${id}&site_id=eq.${site.id}&deleted_at=is.null&select=id,title,amount_cents,purpose,status,stripe_url,due_date,paid_at,created_at,processing_since,recurring_id&order=due_date.asc.nullsfirst,created_at.asc`); if (!r.ok) r = await svc(`presence_invoices?deal_id=eq.${id}&site_id=eq.${site.id}&deleted_at=is.null&select=id,title,amount_cents,purpose,status,stripe_url,due_date,paid_at,created_at,processing_since&order=due_date.asc.nullsfirst,created_at.asc`); if (!r.ok) r = await svc(`presence_invoices?deal_id=eq.${id}&site_id=eq.${site.id}&deleted_at=is.null&select=id,title,amount_cents,purpose,status,stripe_url,due_date,paid_at,created_at&order=due_date.asc.nullsfirst,created_at.asc`); return r; })(),
       // item 47: the deal's estimates and recurring invoices — both [] before APPLY-0145
       import('./estimates.ts').then((m) => m.estimatesForDeal(site.id, id)).catch(() => []),
       import('./recurring_invoices.ts').then((m) => m.recurringForDeal(site.id, id)).catch(() => []),
@@ -1577,7 +1578,7 @@ export async function handleSalesInvoice(req: Request, site: SiteRow, principal:
     try {
       // Use the STORED row's description so a retry sends Stripe identical params
       // under the per-row idempotency key (changed params + same key = hard error).
-      const link = await createServicePaymentLink({ amountCents: Number(inv.amount_cents), currency: 'usd', description: String(inv.description || description), invoiceId: inv.id });
+      const link = await createServicePaymentLink({ amountCents: Number(inv.amount_cents), currency: 'usd', description: String(inv.description || description), invoiceId: inv.id, gen: inv.link_gen });
       payUrl = link.url; repaired = true;
       await svc(`presence_invoices?id=eq.${inv.id}&site_id=eq.${site.id}`, { method: 'PATCH', body: JSON.stringify({ stripe_url: link.url, stripe_payment_link_id: link.id }) });
     } catch {
@@ -1590,6 +1591,7 @@ export async function handleSalesInvoice(req: Request, site: SiteRow, principal:
   const doubleTap = reused && !repaired && (Date.now() - lastTouch) < 120000;
   const emailed = doubleTap ? false : await emailInvoice(site.id, dealId, String(inv.title || title), payUrl, Number(inv.amount_cents), inv.id);
   if (!doubleTap) await svc(`presence_invoices?id=eq.${inv.id}&site_id=eq.${site.id}`, { method: 'PATCH', body: JSON.stringify({ updated_at: nowIso() }) }).catch(() => {});
+  await stampFirstSent(inv.id, site.id, nowIso());   // sales item 118: reminders count from the day it first went out
   // `repaired` = the FIRST attempt's link failed before its event could be
   // recorded — the retry that completes it must write the history line.
   if (!reused || repaired) await dealEvent(site.id, dealId, 'invoice_sent', principal, { detail: { invoice_id: inv.id, amount_cents: Number(inv.amount_cents), purpose } });
@@ -1660,6 +1662,7 @@ export async function handleSalesSchedule(req: Request, site: SiteRow, principal
       await svc(`presence_invoices?id=eq.${first.id}&site_id=eq.${site.id}`, { method: 'PATCH', body: JSON.stringify({ stripe_url: link.url, stripe_payment_link_id: link.id }) });
       first.stripe_url = link.url; linked = true;
       emailed = await emailInvoice(site.id, dealId, String(first.title), link.url, Number(first.amount_cents), first.id);
+      await stampFirstSent(first.id, site.id, nowIso());
       await dealEvent(site.id, dealId, 'invoice_sent', principal, { detail: { invoice_id: first.id, amount_cents: Number(first.amount_cents), purpose: first.purpose, schedule: true } });
     } catch { /* the plan is saved; the first stage's link can be generated later via Send */ }
   }
@@ -1686,7 +1689,7 @@ export async function handleSalesInvoiceSend(req: Request, site: SiteRow, princi
   let repaired = false;
   if (!payUrl) {
     try {
-      const link = await createServicePaymentLink({ amountCents: Number(inv.amount_cents), currency: 'usd', description: String(inv.description || inv.title || 'Invoice'), invoiceId: inv.id });
+      const link = await createServicePaymentLink({ amountCents: Number(inv.amount_cents), currency: 'usd', description: String(inv.description || inv.title || 'Invoice'), invoiceId: inv.id, gen: inv.link_gen });
       payUrl = link.url; repaired = true;
       await svc(`presence_invoices?id=eq.${inv.id}&site_id=eq.${site.id}`, { method: 'PATCH', body: JSON.stringify({ stripe_url: link.url, stripe_payment_link_id: link.id }) });
     } catch {
@@ -1699,6 +1702,7 @@ export async function handleSalesInvoiceSend(req: Request, site: SiteRow, princi
   const doubleTap = hadLink && !repaired && (Date.now() - lastTouch) < 120000;
   const emailed = doubleTap ? false : await emailInvoice(site.id, inv.deal_id, String(inv.title || 'Invoice'), payUrl!, Number(inv.amount_cents), inv.id);
   if (!doubleTap) await svc(`presence_invoices?id=eq.${inv.id}&site_id=eq.${site.id}`, { method: 'PATCH', body: JSON.stringify({ updated_at: nowIso() }) }).catch(() => {});
+  await stampFirstSent(inv.id, site.id, nowIso());   // a plan stage sent weeks after the plan was made counts from today (sales item 118)
   // First real send (or a link repair) writes the history line; a plain resend doesn't spam it.
   if ((!hadLink || repaired) && inv.deal_id) await dealEvent(site.id, inv.deal_id, 'invoice_sent', principal, { detail: { invoice_id: inv.id, amount_cents: Number(inv.amount_cents), purpose: inv.purpose } });
   return json({ data: { ...inv, stripe_url: payUrl }, url: payUrl, emailed, resent: hadLink && !repaired, double_tap: doubleTap }, 200, cors);
@@ -1854,7 +1858,7 @@ export async function handleSalesRetainer(req: Request, site: SiteRow, principal
   // Create the non-expiring recurring authorization link (client authorizes via Stripe).
   let link: { url: string; id: string; priceId: string };
   try {
-    link = await createServiceRetainerLink({ productName: `Retainer — ${deal.title || 'ongoing work'}`, amountCents: v.value.amount_cents, interval: v.value.interval, dealId, siteId: site.id });
+    link = await createServiceRetainerLink({ productName: `Retainer — ${deal.title || 'ongoing work'}`, amountCents: v.value.amount_cents, interval: v.value.interval, dealId, siteId: site.id, askedAt: now });
   } catch (e) {
     // Roll the pending marker back so the deal never shows a broken retainer.
     await svc(`presence_deals?id=eq.${dealId}&site_id=eq.${site.id}`, { method: 'PATCH', body: JSON.stringify({ retainer: prior && prior.status !== 'canceled' ? prior : null }) }).catch(() => {});
@@ -1874,15 +1878,21 @@ export async function handleSalesRetainerCancel(req: Request, site: SiteRow, pri
   const deal = await loadDeal(site.id, dealId);
   if (!deal) return json({ error: 'not_found' }, 404, cors);
   const prior: Partial<RetainerState> | null = (deal.retainer && typeof deal.retainer === 'object') ? deal.retainer : null;
-  if (!prior || prior.status === 'canceled') return json({ data: { retainer: prior || null, canceled: true, already: true } }, 200, cors);
+  // sales item 117: a retainer approved twice has more than one subscription, and Cancel
+  // stops every one of them (it used to stop the newest and leave the other charging)
+  const subs = retainerSubscriptionIds(prior);
+  const extras = (prior?.extra_subscription_ids || []).length;
+  if (!prior || (prior.status === 'canceled' && !extras)) return json({ data: { retainer: prior || null, canceled: true, already: true } }, 200, cors);
   const now = nowIso();
-  if (prior.stripe_subscription_id) {
-    const r = await cancelSubscription(String(prior.stripe_subscription_id));
-    if (!r.ok) return json({ error: 'cancel_failed', message: 'We couldn’t cancel the retainer with Stripe just now — please try again.', detail: r.error }, 502, cors);
+  if (subs.length) {
+    for (const id of subs) {
+      const r = await cancelSubscription(id);
+      if (!r.ok) return json({ error: 'cancel_failed', message: 'We couldn’t cancel the retainer with Stripe just now — please try again.', detail: r.error }, 502, cors);
+    }
   } else if (prior.stripe_payment_link_id) {
     await deactivatePaymentLink(String(prior.stripe_payment_link_id));   // pending: kill the link so no one authorizes it
   }
-  const next = mergeRetainerState(prior, { status: 'canceled', canceled_at: now }, now);
+  const next = { ...mergeRetainerState(prior, { status: 'canceled', canceled_at: prior.canceled_at || now }, now), extra_subscription_ids: [] };
   const up = await svc(`presence_deals?id=eq.${dealId}&site_id=eq.${site.id}&select=id`, { method: 'PATCH', headers: { Prefer: 'return=representation' }, body: JSON.stringify({ retainer: next }) });
   if (!up.ok || !rows(up)[0]) return json({ error: 'write_failed' }, 502, cors);
   return json({ data: { retainer: next, canceled: true } }, 200, cors);
@@ -2208,6 +2218,7 @@ async function ensureDepositForContractSend(site: SiteRow, principal: Principal,
     try {
       const link = await createServicePaymentLink({ amountCents: deposit_cents, currency: 'usd', description, invoiceId: inv.id });
       await svc(`presence_invoices?id=eq.${inv.id}&site_id=eq.${site.id}`, { method: 'PATCH', body: JSON.stringify({ stripe_url: link.url, stripe_payment_link_id: link.id }) });
+      await stampFirstSent(inv.id, site.id, nowIso());   // it goes out with the agreement
     } catch { /* the row stands; the drawer's Send repairs the link under the same idempotency key */ }
     await dealEvent(site.id, dealId, 'invoice_sent', principal, { detail: { invoice_id: inv.id, amount_cents: deposit_cents, purpose: 'deposit', auto: 'contract_send' } });
     return { minted: true, amount_cents: deposit_cents, invoice_id: inv.id };
@@ -2437,10 +2448,18 @@ export async function handleSalesPublicView(req: Request, token: string, cors: R
       : chosen ? { id: contract.id, title: contract.title, body: contract.body, content_hash: contract.content_hash, status: contract.status, signed_at: contract.signed_at, signer_name: contract.signer_name }
       : { id: contract.id, title: contract.title, status: contract.status, locked: true };
     if (contract && chosen) opens.push(firstOpen('presence_contracts', contract.id, tok.site_id, tok.id, 'agreement'));
-    let deposit: { amount_cents: number; status: string; paid_at: string | null; url: string | null } | null = null;
+    let deposit: { amount_cents: number; status: string; paid_at: string | null; url: string | null; processing: boolean } | null = null;
     try {
-      const dep = rows(await svc(`presence_invoices?deal_id=eq.${tok.id}&site_id=eq.${tok.site_id}&purpose=eq.deposit&status=in.(open,paid)&deleted_at=is.null&select=id,amount_cents,status,stripe_url,paid_at&order=created_at.desc&limit=1`))[0];
-      if (dep) deposit = { amount_cents: Number(dep.amount_cents) || 0, status: String(dep.status), paid_at: dep.paid_at || null, url: (contract?.status === 'signed' && dep.status === 'open' && dep.stripe_url) ? String(dep.stripe_url) : null };
+      // Sales item 118: a deposit paid by bank transfer is SETTLING (processing_since,
+      // 0132). Its link took its one payment, so the page must say "Payment on its
+      // way" and offer no Pay button; it used to show "Amount due" and a button that
+      // opened a switched-off Stripe page. Before 0132 the wider read is refused.
+      const depQ = (cols: string) => svc(`presence_invoices?deal_id=eq.${tok.id}&site_id=eq.${tok.site_id}&purpose=eq.deposit&status=in.(open,paid)&deleted_at=is.null&select=${cols}&order=created_at.desc&limit=1`);
+      let depR = await depQ('id,amount_cents,status,stripe_url,paid_at,processing_since');
+      if (!depR.ok) depR = await depQ('id,amount_cents,status,stripe_url,paid_at');
+      const dep = rows(depR)[0];
+      const settling = !!dep && dep.status === 'open' && !!dep.processing_since;
+      if (dep) deposit = { amount_cents: Number(dep.amount_cents) || 0, status: String(dep.status), paid_at: dep.paid_at || null, processing: settling, url: (contract?.status === 'signed' && dep.status === 'open' && !settling && dep.stripe_url) ? String(dep.stripe_url) : null };
       if (dep && deposit?.url) opens.push(firstOpen('presence_invoices', String(dep.id), tok.site_id, tok.id, 'deposit'));   // the pay button is in front of them
     } catch { /* optional — the page says "nothing to pay right now" */ }
     await Promise.all(opens);
@@ -2517,7 +2536,8 @@ export async function docRow(kind: DocKind, id: string, siteId: string): Promise
   if (kind === 'estimate') return (await one(`presence_estimates?id=eq.${id}&site_id=eq.${siteId}&deleted_at=is.null&select=id,deal_id,title,line_items,subtotal_cents,currency,terms,status,sent_at,expires_at,decided_at&limit=1`)) || null;
   if (kind === 'invoice') {
     const base = 'id,deal_id,title,description,amount_cents,currency,purpose,status,stripe_url,due_date,paid_at,created_at';
-    const full = await one(`presence_invoices?id=eq.${id}&site_id=eq.${siteId}&deleted_at=is.null&select=${base},number,paid_method,paid_note,payment_for,lines&limit=1`);
+    // processing_since (0132): the page says "Payment on its way" while a bank payment settles (sales item 118)
+    const full = await one(`presence_invoices?id=eq.${id}&site_id=eq.${siteId}&deleted_at=is.null&select=${base},number,paid_method,paid_note,payment_for,lines,processing_since&limit=1`);
     return full !== undefined ? full : ((await one(`presence_invoices?id=eq.${id}&site_id=eq.${siteId}&deleted_at=is.null&select=${base}&limit=1`)) || null);
   }
   return (await one(`presence_contracts?id=eq.${id}&site_id=eq.${siteId}&deleted_at=is.null&select=id,deal_id,title,body,content_hash,status,signer_name,signer_email,signed_at,signed_evidence,sent_at,created_at&limit=1`)) || null;

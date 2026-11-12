@@ -11,11 +11,13 @@
 //   part of it   the payment gets a paid row of its own (payment_for = the invoice), and
 //                the invoice drops by the same amount, so everything that totals invoice
 //                rows stays right without knowing about part payments. The old card link
-//                was for the old amount: it is switched off, and the next Send makes one
-//                for what's left.
+//                was for the old amount: it is switched off, and a fresh one is made for
+//                what's left there and then (sales item 116), so the reminders and the
+//                client's Pay button keep working. It used to wait for the next Send.
 //   by mistake   Undo puts it back: the invoice is open again (a part payment's amount
-//                goes back on it); its card link is made fresh on the next Send. The
-//                deal's history keeps both lines.
+//                goes back on it) with a fresh card link for what is owed now. An undone
+//                deposit also unticks "Deposit paid" and puts the deal back where it was
+//                (sales item 118). The deal's history keeps both lines.
 // Optionally the client gets a receipt by email, the PDF attached.
 // Studio-gated and site-scoped like every authed /sales/* route; record is an
 // 'edit' write and undo a 'delete' one (lib/site_roles.ts).
@@ -25,6 +27,7 @@ import { sendEmail } from '../commerce/account.ts';
 import { loadEmailBrand, EMAIL_BRAND_DEFAULT } from '../lib/email_brand.ts';
 import { clearNotice, clearNoticePrefix } from '../lib/notice.ts';
 import { deactivatePaymentLink } from '../commerce/stripe.ts';
+import { mintPayLink } from '../lib/pay_link.ts';
 import { validatePayment, paidAtOf } from '../lib/invoice_billing.ts';
 import { callerToday, stageAfterDepositPaid } from '../lib/sales_lifecycle.ts';
 import { invoiceNo, dayLabel, payMethodWords } from '../lib/documents.ts';
@@ -40,7 +43,7 @@ const rows = (r: { json?: unknown }) => (Array.isArray((r as any)?.json) ? (r as
 const nowIso = () => new Date().toISOString();
 const usd = (c: unknown) => '$' + ((Number(c) || 0) / 100).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const escH = (t: string) => t.replace(/[&<>"]/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[ch] as string));
-const INV_COLS = 'id,site_id,deal_id,customer_client_id,customer_site_id,title,description,amount_cents,currency,purpose,status,stripe_url,stripe_payment_link_id,due_date,paid_at,processing_since,created_at,updated_at,number,paid_method,paid_note,payment_for';
+const INV_COLS = 'id,site_id,deal_id,customer_client_id,customer_site_id,title,description,amount_cents,currency,purpose,status,stripe_url,stripe_payment_link_id,due_date,paid_at,processing_since,created_at,updated_at,number,paid_method,paid_note,payment_for,link_gen,paid_private_note';
 const unavailable = (cors: Record<string, string>) => json({ error: 'unavailable', message: 'Recording a payment needs a quick database update first. Nothing changed.' }, 503, cors);
 
 async function loadInvoice(siteId: string, id: string): Promise<{ ok: boolean; row: any | null }> {
@@ -53,6 +56,8 @@ async function clearReminders(site: SiteRow, id: string): Promise<void> {
   await clearNotice(site.client_id, 'deal_followup', `invremind:${id}`).catch(() => {});
   await clearNoticePrefix(site.client_id, 'deal_followup', `invremind:${id}:`).catch(() => {});
 }
+/** The next pay link's number: whoever clears the stored link adds one (see lib/pay_link.ts). */
+const nextGen = (row: any) => (Math.max(0, Math.trunc(Number(row?.link_gen) || 0))) + 1;
 /** The card link stops taking money: true done, false it may still be live, null there was none. */
 async function linkOff(row: any): Promise<boolean | null> {
   return row?.stripe_payment_link_id ? await deactivatePaymentLink(String(row.stripe_payment_link_id)).catch(() => false) : null;
@@ -62,7 +67,7 @@ export async function handleInvoicePayment(req: Request, site: SiteRow, principa
   if (!UUID_RE.test(id)) return json({ error: 'bad_request' }, 400, cors);
   let b: any = {}; try { b = await req.json(); } catch { return json({ error: 'bad_json' }, 400, cors); }
   const got = await loadInvoice(site.id, id);
-  if (!got.ok) return unavailable(cors);   // before APPLY-0167 the columns aren't there
+  if (!got.ok) return unavailable(cors);   // before APPLY-0167 and APPLY-0188 the columns aren't there
   const inv = got.row;
   // the caller's own day (the page sends ?today=), so this evening in Los Angeles is "today"
   const today = callerToday(new URL(req.url).searchParams.get('today'), nowIso());
@@ -76,8 +81,8 @@ export async function handleInvoicePayment(req: Request, site: SiteRow, principa
   if (!p.part) {
     // all of it: the guard in the WHERE means a card payment landing this second wins, never both
     const up = await svc(`presence_invoices?id=eq.${id}&site_id=eq.${site.id}&status=eq.open&processing_since=is.null&deleted_at=is.null&select=${INV_COLS}`,
-      { method: 'PATCH', headers: { Prefer: 'return=representation' }, body: JSON.stringify({ status: 'paid', paid_at: paidAt, paid_method: p.method, paid_note: p.note, updated_at: nowIso() }) });
-    if (!up.ok) return missingInsertColumns(up.json, up.text, ['paid_method', 'paid_note']).length ? unavailable(cors) : json({ error: 'conflict', message: 'Couldn’t record it just now. Nothing changed. Try again.' }, 409, cors);
+      { method: 'PATCH', headers: { Prefer: 'return=representation' }, body: JSON.stringify({ status: 'paid', paid_at: paidAt, paid_method: p.method, paid_note: p.note, paid_private_note: p.private_note, updated_at: nowIso() }) });
+    if (!up.ok) return missingInsertColumns(up.json, up.text, ['paid_method', 'paid_note', 'paid_private_note']).length ? unavailable(cors) : json({ error: 'conflict', message: 'Couldn’t record it just now. Nothing changed. Try again.' }, 409, cors);
     updated = rows(up)[0] || null;
     if (!updated) {
       const now = (await loadInvoice(site.id, id)).row;
@@ -91,12 +96,12 @@ export async function handleInvoicePayment(req: Request, site: SiteRow, principa
       title: `Part payment — ${String(inv.title || 'Invoice')}`.slice(0, 200),
       description: `Part payment toward ${inv.purpose === 'deposit' ? 'deposit request' : 'invoice'} ${invoiceNo(inv.number)}`.trim(),
       amount_cents: p.amount_cents, currency: inv.currency || 'usd', purpose: 'service', status: 'paid', paid_at: paidAt,
-      paid_method: p.method, paid_note: p.note, payment_for: id, created_by: who,
+      paid_method: p.method, paid_note: p.note, paid_private_note: p.private_note, payment_for: id, created_by: who,
     }) });
     payment = rows(ins)[0] || null;
-    if (!ins.ok || !payment) return missingInsertColumns(ins.json, ins.text, ['paid_method', 'paid_note', 'payment_for']).length ? unavailable(cors) : json({ error: 'write_failed', message: 'That payment didn’t save. Nothing changed. Try again.' }, 502, cors);
+    if (!ins.ok || !payment) return missingInsertColumns(ins.json, ins.text, ['paid_method', 'paid_note', 'payment_for', 'paid_private_note']).length ? unavailable(cors) : json({ error: 'write_failed', message: 'That payment didn’t save. Nothing changed. Try again.' }, 502, cors);
     const up = await svc(`presence_invoices?id=eq.${id}&site_id=eq.${site.id}&status=eq.open&processing_since=is.null&amount_cents=eq.${Number(inv.amount_cents)}&deleted_at=is.null&select=${INV_COLS}`,
-      { method: 'PATCH', headers: { Prefer: 'return=representation' }, body: JSON.stringify({ amount_cents: p.left_cents, stripe_url: null, stripe_payment_link_id: null, updated_at: nowIso() }) });
+      { method: 'PATCH', headers: { Prefer: 'return=representation' }, body: JSON.stringify({ amount_cents: p.left_cents, stripe_url: null, stripe_payment_link_id: null, link_gen: nextGen(inv), updated_at: nowIso() }) });
     updated = up.ok ? (rows(up)[0] || null) : null;
     if (!updated) {
       // the invoice moved (paid, voided, another payment): take the payment back off
@@ -106,6 +111,10 @@ export async function handleInvoicePayment(req: Request, site: SiteRow, principa
   }
   // its card link was for the old amount (or is paid now): it stops taking money
   const linkDeactivated = await linkOff(inv);
+  // …and what is left gets a link of its own now, not at the next Send: reminders and
+  // the client's Pay button both need one (sales item 116)
+  let payUrl: string | null = null;
+  if (p.part) { payUrl = await mintPayLink(updated); if (payUrl) updated = { ...updated, stripe_url: payUrl }; }
   if (!p.part) await clearReminders(site, id);
   if (inv.deal_id) await dealEvent(site.id, inv.deal_id, 'invoice_paid', principal, { detail: { invoice_id: id, amount_cents: p.amount_cents, purpose: String(inv.purpose || 'service'), method: p.method, recorded: true, ...(p.part ? { part: true, left_cents: p.left_cents } : {}) } });
   // a deposit paid in full does what a card deposit does: the checklist step, and a signed deal is won
@@ -120,12 +129,13 @@ export async function handleInvoicePayment(req: Request, site: SiteRow, principa
       if (to) {
         const up = await svc(`presence_deals?id=eq.${inv.deal_id}&site_id=eq.${site.id}&stage=in.(lead,qualified,proposal,contract)&select=id`, { method: 'PATCH', headers: { Prefer: 'return=representation' }, body: JSON.stringify({ stage: to }) });
         moved = up.ok && rows(up).length > 0;
-        if (moved) { if (to === 'won') await clearStaleNextStep(site.id, String(inv.deal_id), 'won').catch(() => {}); await dealEvent(site.id, String(inv.deal_id), 'stage_change', principal, { to_stage: to, detail: { because: 'deposit_paid' } }); }
+        // from + invoice_id: so an Undo of this payment can put the deal back where it was (sales item 118)
+        if (moved) { if (to === 'won') await clearStaleNextStep(site.id, String(inv.deal_id), 'won').catch(() => {}); await dealEvent(site.id, String(inv.deal_id), 'stage_change', principal, { to_stage: to, detail: { because: 'deposit_paid', from: String(deal.stage || ''), invoice_id: id } }); }
       }
     } catch { /* the payment stands; the checklist and the stage are best-effort */ }
   }
-  const receipt = b.email_receipt === false ? false : await emailReceipt(site.id, payment || updated, inv, p.part ? p.left_cents : 0).catch(() => false);
-  return json({ data: { invoice: updated, payment, part: p.part, left_cents: p.left_cents, link_deactivated: linkDeactivated, receipt_emailed: receipt, moved } }, 200, cors);
+  const receipt = b.email_receipt === false ? false : await emailReceipt(site.id, payment || updated, inv, p.part ? p.left_cents : 0, payUrl).catch(() => false);
+  return json({ data: { invoice: updated, payment, part: p.part, left_cents: p.left_cents, link_deactivated: linkDeactivated, fresh_link: p.part ? !!payUrl : null, receipt_emailed: receipt, moved } }, 200, cors);
 }
 
 /** Undo a payment recorded by mistake. On the invoice: it is open again. On a part
@@ -144,27 +154,53 @@ export async function handleInvoicePaymentUndo(req: Request, site: SiteRow, prin
     const gone = await svc(`presence_invoices?id=eq.${id}&site_id=eq.${site.id}&status=eq.paid&deleted_at=is.null&select=id`, { method: 'PATCH', headers: { Prefer: 'return=representation' }, body: JSON.stringify({ deleted_at: nowIso() }) });
     if (!gone.ok || !rows(gone)[0]) return json({ error: 'conflict', message: 'That changed just now. Reload and take another look.' }, 409, cors);
     const back = await svc(`presence_invoices?id=eq.${parent.id}&site_id=eq.${site.id}&status=eq.open&amount_cents=eq.${Number(parent.amount_cents)}&select=${INV_COLS}`,
-      { method: 'PATCH', headers: { Prefer: 'return=representation' }, body: JSON.stringify({ amount_cents: Number(parent.amount_cents) + Number(row.amount_cents), stripe_url: null, stripe_payment_link_id: null, updated_at: nowIso() }) });
+      { method: 'PATCH', headers: { Prefer: 'return=representation' }, body: JSON.stringify({ amount_cents: Number(parent.amount_cents) + Number(row.amount_cents), stripe_url: null, stripe_payment_link_id: null, link_gen: nextGen(parent), updated_at: nowIso() }) });
     if (!back.ok || !rows(back)[0]) {
       await svc(`presence_invoices?id=eq.${id}&site_id=eq.${site.id}`, { method: 'PATCH', body: JSON.stringify({ deleted_at: null }) }).catch(() => {});
       return json({ error: 'conflict', message: 'That invoice changed just now. Nothing was undone. Reload and take another look.' }, 409, cors);
     }
     const linkDeactivated = await linkOff(parent);   // its link was for the lower amount
+    const fresh = await mintPayLink(rows(back)[0]);    // …and the whole amount gets its own (sales item 116)
     if (parent.deal_id) await dealEvent(site.id, parent.deal_id, 'payment_undone', principal, { detail: { invoice_id: parent.id, payment_id: id, amount_cents: Number(row.amount_cents) || 0, method: row.paid_method, part: true } });
-    return json({ data: { invoice: rows(back)[0], undone: true, part: true, link_deactivated: linkDeactivated } }, 200, cors);
+    return json({ data: { invoice: { ...rows(back)[0], ...(fresh ? { stripe_url: fresh } : {}) }, undone: true, part: true, link_deactivated: linkDeactivated, fresh_link: !!fresh } }, 200, cors);
   }
   // the whole invoice: open again. Its card link was switched off when it was marked
-  // paid, so the next Send makes a fresh one.
+  // paid, so it gets a fresh one here: the question said "its reminders can start
+  // again", and without a link they never did (sales item 116).
   const up = await svc(`presence_invoices?id=eq.${id}&site_id=eq.${site.id}&status=eq.paid&paid_method=neq.&deleted_at=is.null&select=${INV_COLS}`,
-    { method: 'PATCH', headers: { Prefer: 'return=representation' }, body: JSON.stringify({ status: 'open', paid_at: null, paid_method: '', paid_note: '', stripe_url: null, stripe_payment_link_id: null, updated_at: nowIso() }) });
+    { method: 'PATCH', headers: { Prefer: 'return=representation' }, body: JSON.stringify({ status: 'open', paid_at: null, paid_method: '', paid_note: '', paid_private_note: '', stripe_url: null, stripe_payment_link_id: null, link_gen: nextGen(row), updated_at: nowIso() }) });
   if (!up.ok || !rows(up)[0]) return json({ error: 'conflict', message: 'That changed just now. Reload and take another look.' }, 409, cors);
+  const fresh = await mintPayLink(rows(up)[0]);
   if (row.deal_id) await dealEvent(site.id, row.deal_id, 'payment_undone', principal, { detail: { invoice_id: id, amount_cents: Number(row.amount_cents) || 0, method: row.paid_method, title: String(row.title || '') } });
-  return json({ data: { invoice: rows(up)[0], undone: true, part: false } }, 200, cors);
+  const back = row.purpose === 'deposit' && row.deal_id ? await undoDepositEffects(site, principal, row).catch(() => ({ unticked: false, moved_back: null })) : { unticked: false, moved_back: null };
+  return json({ data: { invoice: { ...rows(up)[0], ...(fresh ? { stripe_url: fresh } : {}) }, undone: true, part: false, fresh_link: !!fresh, ...back } }, 200, cors);
+}
+
+/** Recording a deposit ticks "Deposit paid" and wins a signed deal; Undo used to put
+ *  the invoice back and leave both standing (sales item 118). With no other paid
+ *  deposit on the deal, the step is unticked, and a deal this payment moved goes back
+ *  to the stage it was on, if it is still where the payment put it. */
+async function undoDepositEffects(site: SiteRow, principal: Principal, row: any): Promise<{ unticked: boolean; moved_back: string | null }> {
+  const dealId = String(row.deal_id);
+  const other = rows(await svc(`presence_invoices?deal_id=eq.${dealId}&site_id=eq.${site.id}&purpose=eq.deposit&status=eq.paid&payment_for=is.null&deleted_at=is.null&select=id&limit=1`));
+  if (other.length) return { unticked: false, moved_back: null };   // another deposit is paid: the step and the stage still hold
+  const { untickChecklistForDeal } = await import('../lib/service_bridge.ts');
+  const unticked = await untickChecklistForDeal(site.id, dealId, 'deposit_paid', principal.email || principal.userId || 'system', 'operator').catch(() => false);
+  // the move this payment made: the newest "because the deposit was paid" line that names
+  // this invoice (one written before item 118 names none, and a signed deal came from Contract)
+  const evs = rows(await svc(`presence_deal_events?deal_id=eq.${dealId}&site_id=eq.${site.id}&kind=eq.stage_change&select=to_stage,detail,created_at&order=created_at.desc&limit=20`));
+  const ev = evs.find((e: any) => e?.detail?.because === 'deposit_paid' && (!e.detail.invoice_id || String(e.detail.invoice_id) === String(row.id)));
+  if (!ev || !ev.to_stage) return { unticked, moved_back: null };
+  const from = ['lead', 'qualified', 'proposal', 'contract'].includes(String(ev.detail.from)) ? String(ev.detail.from) : 'contract';
+  const up = await svc(`presence_deals?id=eq.${dealId}&site_id=eq.${site.id}&stage=eq.${encodeURIComponent(String(ev.to_stage))}&select=id`, { method: 'PATCH', headers: { Prefer: 'return=representation' }, body: JSON.stringify({ stage: from }) });
+  if (!up.ok || !rows(up)[0]) return { unticked, moved_back: null };   // moved on since: left where it is
+  await dealEvent(site.id, dealId, 'stage_change', principal, { to_stage: from, detail: { because: 'payment_undone', invoice_id: String(row.id) } });
+  return { unticked, moved_back: from };
 }
 
 /** The client's receipt for a payment recorded by hand: what, how much, when and how,
  *  with the receipt as a PDF. Sent only when the deal's person has an email. */
-async function emailReceipt(siteId: string, paidRow: any, inv: any, leftCents: number): Promise<boolean> {
+async function emailReceipt(siteId: string, paidRow: any, inv: any, leftCents: number, payUrl: string | null = null): Promise<boolean> {
   if (!paidRow || !UUID_RE.test(String(inv?.deal_id || ''))) return false;
   const deal = rows(await svc(`presence_deals?id=eq.${inv.deal_id}&site_id=eq.${siteId}&select=contact_id&limit=1`))[0];
   const contact = deal?.contact_id ? rows(await svc(`presence_contacts?id=eq.${deal.contact_id}&site_id=eq.${siteId}&select=name,email&limit=1`))[0] : null;
@@ -185,7 +221,7 @@ async function emailReceipt(siteId: string, paidRow: any, inv: any, leftCents: n
   try { pdf = documentPdf('invoice', data, brand, ctx); } catch { pdf = null; }
   const html = `<p>${first ? `Hi ${escH(first)},` : 'Hi there,'}</p>`
     + `<p>Thank you. ${studio === 'your studio' ? 'We have' : studio + ' has'} recorded your payment of <strong>${usd(row.amount_cents)}</strong>${how ? ' ' + how : ''}${day ? ' on ' + day : ''} for ${what}.</p>`
-    + (leftCents > 0 ? `<p>${usd(leftCents)} is still due on it.</p>` : `<p>${inv.purpose === 'deposit' ? 'Your deposit is in.' : 'The invoice is paid in full.'} Nothing else is needed from you.</p>`)
+    + (leftCents > 0 ? `<p>${usd(leftCents)} is still due on it.</p>` + (payUrl && /^https:\/\//.test(payUrl) ? `<p class="cta"><a href="${escH(payUrl)}" style="display:inline-block;margin-top:6px;background:${brand.accent};color:#fff;padding:9px 16px;border-radius:999px;text-decoration:none">Pay ${usd(leftCents)} securely →</a></p>` : '') : `<p>${inv.purpose === 'deposit' ? 'Your deposit is in.' : 'The invoice is paid in full.'} Nothing else is needed from you.</p>`)
     + `<p style="margin-top:6px">Your receipt is attached as a PDF.${link ? ` <a href="${link}" style="color:${brand.accentDark}">View it online →</a>` : ''}</p>`;
   return await sendEmail(String(contact.email), `Receipt${no ? ' for ' + no : ''} — ${usd(row.amount_cents)} received, thank you`, html, brand,
     { critical: true, asBusiness: true, siteId, ...(pdf ? { attachments: [{ filename: pdfFileName('invoice', row), content: pdf }] } : {}) });   // their own payment = transactional; an answer lands in the Inbox

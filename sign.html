@@ -236,6 +236,9 @@ function renderFlow(d,after){
     h+=`<div class="card locked" id="step-pay"><h2><span class="k">Step ${k}</span>${dep?`Pay the ${money(dep.amount_cents)} deposit`:'Pay the deposit'}</h2><p class="muted" style="margin-top:0">Unlocks once you’ve signed.</p></div>`;
   }else if(paid){
     h+=`<div class="card" id="step-pay"><h2 style="margin-top:0"><span class="k">Step ${k}</span>Your deposit</h2><div class="ok" style="margin-top:0">✓ Deposit paid — thank you. Your studio has been told and will kick things off.</div></div>`;
+  }else if(dep&&dep.processing){
+    // sales item 118: a bank payment takes days to arrive; its link is used up, so no Pay button
+    h+=`<div class="card" id="step-pay"><h2 style="margin-top:0"><span class="k">Step ${k}</span>Your deposit</h2><div class="ok" style="margin-top:0">Payment on its way. Your ${money(dep.amount_cents)} bank payment takes a few days to arrive. There’s nothing more to do, and you’ll get a receipt when it lands.</div></div>`;
   }else if(dep&&dep.url){
     h+=`<div class="card no-print" id="step-pay"><h2 style="margin-top:0"><span class="k">Step ${k}</span>One more step to lock in your start</h2>
       <p class="muted" style="margin-top:0">Your ${money(dep.amount_cents)} deposit is ready — paying it now locks in your start.</p>

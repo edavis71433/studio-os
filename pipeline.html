@@ -425,6 +425,8 @@ html.dds-embed #detailWrap{padding-top:0}
   .payform .pf-chip input:checked+span{background:var(--p-soft,#f0ebfd);border-color:var(--p,#6d3fd4);color:var(--p,#6d3fd4);font-weight:600}
   .payform .pf-chip input:focus-visible+span{outline:2px solid var(--p,#6d3fd4);outline-offset:2px}
   .payform .pf-rcpt{display:flex;align-items:center;gap:8px;font-size:13.5px}
+  .payform .pf-private{display:block;font-size:13px}
+  .payform .pf-private input{display:block;width:100%;margin-top:4px}
   @media (max-width:640px){.payform .pf-chip span{min-height:44px}}
   @media(max-width:560px){#detailInner .dhead,#detailInner .dbody{padding-left:16px;padding-right:16px}#detailInner #dtitle{font-size:24px}}
   /* ── Oct 2026 review: the deal page in the record's idiom. The lifecycle bar
@@ -1767,7 +1769,9 @@ function openPayForm(rowEl,inv,refresh,who){
   const today=localYmd(); const due=Number(inv.amount_cents)||0; const no=invNo(inv.number)||'this invoice';
   const f=document.createElement('form'); f.className='mini payform'; f.setAttribute('data-for',inv.id); f.setAttribute('aria-label','Record a payment for '+no);
   f.innerHTML=`<strong style="font-size:14px">Record a payment for ${esc(no)}</strong>
-    <div class="pf-grid"><label>Amount received (USD)<input type="number" name="amt" inputmode="decimal" step="0.01" min="0.01" max="${(due/100).toFixed(2)}" value="${(due/100).toFixed(2)}"></label><label>Paid on<input type="date" name="on" max="${today}" value="${today}"></label><label>Note (optional)<input type="text" name="note" maxlength="120" placeholder="e.g. Check #1042"></label></div>
+    <div class="pf-grid"><label>Amount received (USD)<input type="number" name="amt" inputmode="decimal" step="0.01" min="0.01" max="${(due/100).toFixed(2)}" value="${(due/100).toFixed(2)}"></label><label>Paid on<input type="date" name="on" max="${today}" value="${today}"></label><label>Note on their receipt (optional)<input type="text" name="note" maxlength="120" placeholder="e.g. Check #1042" aria-describedby="pf-note-h-${esc(inv.id)}"></label></div>
+    <div class="mut" id="pf-note-h-${esc(inv.id)}" style="font-size:12.5px">Shown on their receipt: the client sees this note on the receipt, its PDF and the receipt email.</div>
+    <label class="pf-private">Private note, only you see it (optional)<input type="text" name="private_note" maxlength="300" placeholder="e.g. Paid late, waived the fee"></label>
     <fieldset><legend>How they paid</legend>${[['check','Check'],['cash','Cash'],['bank_transfer','Bank transfer'],['zelle','Zelle'],['other','Other']].map(([k,l],i)=>`<label class="pf-chip"><input type="radio" name="how" value="${k}"${i===0?' checked':''}><span>${l}</span></label>`).join('')}</fieldset>
     ${who&&who.email?`<label class="pf-rcpt"><input type="checkbox" name="rcpt" checked> Email ${esc(who.first||'them')} a receipt (the PDF is attached)</label>`:''}
     <div class="mut" data-pf-what aria-live="polite" style="font-size:12.5px"></div>
@@ -1775,7 +1779,7 @@ function openPayForm(rowEl,inv,refresh,who){
   rowEl.after(f);
   const amt=f.elements.amt, go=f.querySelector('button[type=submit]'), what=f.querySelector('[data-pf-what]');
   const cents=()=>Math.round((parseFloat(amt.value)||0)*100);
-  const say=()=>{const a=cents();if(a>0&&a<due){go.textContent='Record '+money(a)+' part payment';what.textContent=money(due-a)+' stays due on '+no+'. Its card link is switched off, and the next Send makes one for what’s left.';}else{go.textContent='Mark '+(invNo(inv.number)||'it')+' paid';what.textContent='This marks '+no+' paid, stops its reminders and switches its card link off, so it can’t be paid twice. It counts in Paid and in your money reports.';}};
+  const say=()=>{const a=cents();if(a>0&&a<due){go.textContent='Record '+money(a)+' part payment';what.textContent=money(due-a)+' stays due on '+no+'. Its card link is switched off and a fresh one is made for what’s left, so reminders and their Pay button keep working.';}else{go.textContent='Mark '+(invNo(inv.number)||'it')+' paid';what.textContent='This marks '+no+' paid, stops its reminders and switches its card link off, so it can’t be paid twice. It counts in Paid and in your money reports.';}};
   say(); amt.addEventListener('input',say);
   f.querySelector('[data-pf-cancel]').onclick=()=>f.remove();
   setTimeout(()=>{amt.focus({preventScroll:true});amt.select();},50);
@@ -1785,9 +1789,9 @@ function openPayForm(rowEl,inv,refresh,who){
     if(a>due){toast('That’s more than the '+money(due)+' due. Record what’s due here.',true);return;}
     if(!on||on>today){toast(on?'The day you were paid can’t be in the future.':'Enter the day you were paid.',true);return;}
     go.disabled=true;
-    try{const r=await api('/sales/invoices/'+inv.id+'/payment?today='+today,'POST',{amount_cents:a,paid_on:on,method:how,note:f.elements.note.value.trim(),email_receipt:!!(f.elements.rcpt&&f.elements.rcpt.checked)});
+    try{const r=await api('/sales/invoices/'+inv.id+'/payment?today='+today,'POST',{amount_cents:a,paid_on:on,method:how,note:f.elements.note.value.trim(),private_note:f.elements.private_note.value.trim(),email_receipt:!!(f.elements.rcpt&&f.elements.rcpt.checked)});
       const x=r.data||{}; const live=x.link_deactivated===false;
-      toast((x.part?'Recorded a '+money(a)+' part payment. '+money(x.left_cents)+' is still due on '+no+'.':'Marked '+no+' '+(PAY_WORDS[how]||'paid')+'.')+(x.receipt_emailed?' Receipt emailed.':'')+(live?' Its card link may still be live, so switch it off in Stripe.':''),live);
+      toast((x.part?'Recorded a '+money(a)+' part payment. '+money(x.left_cents)+' is still due on '+no+'.':'Marked '+no+' '+(PAY_WORDS[how]||'paid')+'.')+(x.receipt_emailed?' Receipt emailed.':'')+(live?' Its card link may still be live, so switch it off in Stripe.':'')+(x.part&&x.fresh_link===false?' A new payment link couldn’t be made just now: press Send on the invoice to make one.':''),live);
       refresh();
     }catch(e){toast(nice(e),true);go.disabled=false;}};
 }
@@ -1812,7 +1816,7 @@ function wireInvoiceActions(root,refresh){
   // a clean success: the link they emailed the client may still take money.
   // item 77: Record a payment (it opens under the row) and Undo for one recorded by mistake
   root.querySelectorAll('[data-pay-inv]').forEach(b=>b.onclick=()=>{const row=b.closest('.lr,.rcv-row');let inv={};try{inv=JSON.parse(b.dataset.payInv);}catch(_){return;}if(row)openPayForm(row,inv,refresh,{email:b.dataset.email||'',first:b.dataset.first||''});});
-  root.querySelectorAll('[data-undo-pay]').forEach(b=>b.onclick=async()=>{const part=b.dataset.part==='1';if(!confirm(part?'Undo this part payment? Its amount goes back on the invoice as due.':'Undo this payment? The invoice goes back to unpaid and its reminders can start again. Use this only for a payment recorded by mistake.'))return;b.disabled=true;try{await api('/sales/invoices/'+b.dataset.undoPay+'/payment/undo','POST',{});toast(part?'Part payment undone. Its amount is due again.':'Payment undone. The invoice is open again; send it again for a fresh payment link.');refresh();}catch(e){toast(nice(e),true);b.disabled=false;}});
+  root.querySelectorAll('[data-undo-pay]').forEach(b=>b.onclick=async()=>{const part=b.dataset.part==='1';if(!confirm(part?'Undo this part payment? Its amount goes back on the invoice as due.':'Undo this payment? The invoice goes back to unpaid and its reminders can start again. Use this only for a payment recorded by mistake.'))return;b.disabled=true;try{const r=await api('/sales/invoices/'+b.dataset.undoPay+'/payment/undo','POST',{});const x=(r&&r.data)||{};toast((part?'Part payment undone. Its amount is due again.':'Payment undone. The invoice is open again.')+(x.fresh_link===false?' A new payment link couldn’t be made just now: press Send on the invoice to make one.':' It has a fresh payment link, so its reminders carry on.')+(x.moved_back?' The deal is back where it was.':''));refresh();}catch(e){toast(nice(e),true);b.disabled=false;}});
   root.querySelectorAll('[data-void-inv]').forEach(b=>b.onclick=async()=>{if(!confirm('Void this invoice? It stops being payable — we switch its payment link off and the “still unpaid” reminder clears. It stays on the deal, marked Voided.'))return;b.disabled=true;try{const r=await api('/sales/invoices/'+b.dataset.voidInv+'/void','POST',{});const linkLive=!r.already&&!!r.data&&r.data.link_deactivated===false;toast(linkLive?'Invoice voided — but its payment link may still be live. Open the invoice in Stripe and switch the link off there.':r.already?'Already voided':'Invoice voided',linkLive);refresh();}catch(e){toast(nice(e),true);b.disabled=false;}});
 }
 // "Who owes you" — the receivables list behind the AR strip (open invoices across
@@ -3131,7 +3135,7 @@ async function openDeal(id){
             const st=invState(v);const waits=invWaits(v);const parent=v.payment_for?(data.invoices||[]).find(x=>x.id===v.payment_for):null;
             const name=v.payment_for?esc('Part payment'+(parent&&invNo(parent.number)?' toward '+invNo(parent.number):'')):(invNo(v.number)?esc(invNo(v.number))+' · ':'')+esc(v.title||(v.purpose==='deposit'?'Deposit':'Invoice'));
             const partPaid=(data.invoices||[]).filter(x=>x.payment_for===v.id&&x.status==='paid').reduce((a,b)=>a+(b.amount_cents||0),0);   // item 77
-            const when=st==='paid'?(v.paid_at?` · ${esc(PAY_WORDS[v.paid_method]||'paid')} ${esc(evtDate(v.paid_at))}`:'')+(v.paid_note?' · '+esc(v.paid_note):''):st==='processing'?' · payment on its way':waits?(v.due_date?` · due ${esc(v.due_date)}`:' · due now')+(partPaid?` · ${money(partPaid)} paid so far`:'')+(v.stripe_url?'':(partPaid?' · send it for a link for what’s left':' · not sent yet')):'';
+            const when=st==='paid'?(v.paid_at?` · ${esc(PAY_WORDS[v.paid_method]||'paid')} ${esc(evtDate(v.paid_at))}`:'')+(v.paid_note?' · '+esc(v.paid_note):'')+(v.paid_private_note?' · <span title="Only you see this. It is not on their receipt.">private: '+esc(v.paid_private_note)+'</span>':''):st==='processing'?' · payment on its way':waits?(v.due_date?` · due ${esc(v.due_date)}`:' · due now')+(partPaid?` · ${money(partPaid)} paid so far`:'')+(v.stripe_url?'':(partPaid?' · send it for a link for what’s left':' · not sent yet')):'';
             const payBtn=waits?` <button class="btn ghost" data-pay-inv="${esc(JSON.stringify({id:v.id,amount_cents:v.amount_cents,number:v.number||null}))}" data-email="${c&&c.email?'1':''}" data-first="${esc((String(c&&c.name||'').trim().split(/\s+/)[0])||'')}" title="Paid by check, cash, bank transfer or Zelle? Mark it paid here">Record payment</button>`:'';
             const undoBtn=(st==='paid'&&v.paid_method)?` <button class="btn ghost" data-needs="delete" data-undo-pay="${v.id}" data-part="${v.payment_for?'1':''}" title="Recorded by mistake? The invoice goes back to unpaid" aria-label="Undo the payment on ${name}">Undo</button>`:'';
             const acts=undoBtn+payBtn+(waits?` <button class="btn ghost" data-send-inv="${v.id}">${v.stripe_url?'Resend':'Send'}</button>${v.stripe_url?` <button class="btn ghost" data-copy-pay="${esc(v.stripe_url)}">Copy link</button>`:''} <button class="btn ghost" data-needs="delete" data-void-inv="${v.id}" title="${v.stripe_url?'Withdraw this invoice — the payment link stops working and the unpaid reminder clears':'Withdraw this invoice — it was raised in error'}" aria-label="Void invoice ${name}">Void</button>`:'');

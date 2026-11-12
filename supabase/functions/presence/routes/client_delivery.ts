@@ -107,10 +107,14 @@ export async function handleClientBilling(_req: Request, site: SiteRow, _princip
     };
   });
   const b = moneyBuckets(list, today);
+  // Sales item 117: the retainers their studio set up for them, with every charge and a
+  // way to cancel. The email said "you can cancel any time" and the portal showed nothing.
+  const retainers = await (await import('./client_retainers.ts')).clientRetainers(me);
   return json({ data: {
     billing_type: 'service',   // agency project work — SEPARATE from the software subscription
     note: 'These are invoices from your studio for project and service work. Your website subscription is billed separately.',
     invoices: list,
+    retainers,
     // open_count = still waiting on the client (upcoming + overdue); processing
     // money is neither open nor paid yet, so it gets its own count.
     summary: { open_count: b.upcoming.count + b.overdue.count, paid_count: b.paid.count, processing_count: b.processing.count, overdue_count: b.overdue.count, upcoming_count: b.upcoming.count },
