@@ -12,7 +12,7 @@
 //   POST /sales/prospects           — save the ticked finds (dedupes)
 //   PATCH /sales/prospects/:id      — status / notes
 //   DELETE /sales/prospects/:id     — take one off the list (soft)
-//   POST /sales/prospects/:id/convert — start the deal (once)
+//   POST /sales/prospects/:id/convert — start the deal and its contact (once)
 //   POST /sales/prospects/:id/draft — a first-email draft, never sent
 //   GET  /sales/prospects/export    — the list as a CSV
 //
@@ -28,6 +28,11 @@ import { dealEvent } from './sales.ts';
 import type { SiteRow } from '../lib/site.ts';
 import type { Principal } from '../../_shared/auth.ts';
 import { emailMatch } from '../lib/contact_email.ts';
+import { townOf, addressParts } from '../lib/town.ts';
+import { packNotes } from '../lib/pitch_notes.ts';
+import { normalizeAddress } from '../lib/contact_fields.ts';
+import { digitsOf, phonePattern } from '../lib/record_search.ts';
+import { missingInsertColumns } from '../lib/inbound_email.ts';
 
 const rows = (r: { json?: unknown }) => (Array.isArray((r as any).json) ? (r as any).json : []) as any[];
 const clean = (s: unknown, max = 200) => String(s ?? '').replace(/[\u0000-\u0008\u000B-\u001F\u007F]/g, '').trim().slice(0, max);
@@ -125,10 +130,11 @@ export async function handleProspects(req: Request, site: SiteRow, _principal: P
     const r = await svc(`presence_prospects?site_id=eq.${site.id}&deleted_at=is.null&select=${COLS}&order=score.desc.nullslast,created_at.desc&limit=500`).catch(() => null);
     if (!r || !(r as any).ok) return r && tableMissing(r as any) ? needsUpdate(cors) : json({ error: 'read_failed', message: 'We couldn’t load your prospects just now.' }, 502, cors);
     // item 113: each row knows its pitch pack (one read; before APPLY-0150 there are simply none)
+    // item 119: and the studio's notes on it (what it couldn't check), which the public pack never shows
     const packs = new Map<string, any>();
-    const pk = await svc(`presence_pitch_packs?site_id=eq.${site.id}&select=prospect_id,token,status&limit=1000`).catch(() => null);
+    const pk = await svc(`presence_pitch_packs?site_id=eq.${site.id}&select=prospect_id,token,status,pieces&limit=1000`).catch(() => null);
     if (pk && (pk as any).ok) for (const row of rows(pk)) packs.set(String(row.prospect_id), row);
-    return json({ data: rows(r).map((p: any) => { const k = packs.get(String(p.id)); return { ...withWord(p), pack_status: k?.status || null, pack_url: k?.status === 'ready' ? `/pitch.html?t=${k.token}` : null }; }) }, 200, cors);
+    return json({ data: rows(r).map((p: any) => { const k = packs.get(String(p.id)); const ready = k?.status === 'ready'; return { ...withWord(p), pack_status: k?.status || null, pack_url: ready ? `/pitch.html?t=${k.token}` : null, pack_notes: ready ? packNotes(k.pieces) : [] }; }) }, 200, cors);
   }
   if (req.method === 'POST') {
     let b: any = {}; try { b = await req.json(); } catch { return json({ error: 'bad_json' }, 400, cors); }
@@ -193,6 +199,34 @@ export async function handleProspect(req: Request, site: SiteRow, _principal: Pr
 }
 
 // ── "→ Deal": at most one deal per prospect, like an enquiry's convert ───────
+// Sales item 119: the deal is WITH someone. The business becomes a contact that
+// carries its phone, website and address, so calling, logging a call or sending
+// a proposal needs no retyping (the free-tool convert below always did this).
+// A contact already holding the same phone number is used instead of a second one.
+async function contactForProspect(siteId: string, p: any): Promise<{ id: string; name: string; reused: boolean } | null> {
+  const digits = digitsOf(p.phone);
+  if (digits.length >= 7) {
+    const same = rows(await svc(`presence_contacts?site_id=eq.${siteId}&deleted_at=is.null&phone=ilike.${encodeURIComponent(phonePattern(digits))}&select=id,name,phone&limit=20`).catch(() => null) || { json: [] });
+    const last10 = digits.slice(-10);
+    const hit = same.find((c: any) => digitsOf(c.phone).slice(-10) === last10);
+    if (hit) return { id: String(hit.id), name: String(hit.name || p.business_name), reused: true };
+  }
+  const notes = [
+    p.search_query ? `Found on Prospects by searching “${clean(p.search_query, 160)}”.` : 'Found on Prospects.',
+    p.website ? `Website: ${clean(p.website, 300)}` : 'No website found.',
+  ].join('\n');
+  const address = normalizeAddress(addressParts(p.address));
+  const row: Record<string, unknown> = { site_id: siteId, name: clean(p.business_name, 120), email: '', phone: clean(p.phone, 40), company: '', notes, ...(Object.keys(address).length ? { address } : {}) };
+  let ins = await svc('presence_contacts', { method: 'POST', headers: { 'Prefer': 'return=representation' }, body: JSON.stringify(row) }).catch(() => null);
+  // before APPLY-0166 the address column isn't there yet: the contact saves without it
+  if (ins && !(ins as any).ok && 'address' in row && missingInsertColumns((ins as any).json, (ins as any).text, ['address']).length) {
+    delete row.address;
+    ins = await svc('presence_contacts', { method: 'POST', headers: { 'Prefer': 'return=representation' }, body: JSON.stringify(row) }).catch(() => null);
+  }
+  const c = ins && (ins as any).ok ? rows(ins)[0] : null;
+  return c ? { id: String(c.id), name: String(c.name || p.business_name), reused: false } : null;
+}
+
 export async function handleProspectConvert(_req: Request, site: SiteRow, principal: Principal, id: string, cors: Record<string, string>): Promise<Response> {
   const p = await loadProspect(site.id, id);
   if (!p) return json({ error: 'not_found', message: 'That prospect isn’t on your list.' }, 404, cors);
@@ -205,14 +239,20 @@ export async function handleProspectConvert(_req: Request, site: SiteRow, princi
     p.address ? `Address: ${p.address}` : '', p.industry ? `Trade: ${p.industry}` : '',
     p.search_query ? `Found by searching: ${p.search_query}` : '',
   ].filter(Boolean).join('\n');
+  const contact = await contactForProspect(site.id, p);
+  if (!contact) return json({ error: 'write_failed', message: 'That contact didn’t save, so no deal was started. Please try again.' }, 502, cors);
   const ins = await svc('presence_deals', { method: 'POST', headers: { 'Prefer': 'return=representation' }, body: JSON.stringify({
-    site_id: site.id, title: p.business_name, stage: 'lead', source: 'prospecting', notes: `Prospecting find.\n${facts}`.slice(0, 2000),
+    site_id: site.id, contact_id: contact.id, title: p.business_name, stage: 'lead', source: 'prospecting', notes: `Prospecting find.\n${facts}`.slice(0, 2000),
   }) }).catch(() => null);
   const deal = ins && (ins as any).ok ? rows(ins)[0] : null;
-  if (!deal) return json({ error: 'write_failed', message: 'That deal didn’t save — please try again.' }, 502, cors);
-  await dealEvent(site.id, deal.id, 'created', principal, { to_stage: 'lead', detail: { prospect_id: p.id } }).catch(() => {});
+  if (!deal) {
+    // a contact made just now for a deal that didn't save goes again, so a retry doesn't leave two
+    if (!contact.reused) await svc(`presence_contacts?id=eq.${contact.id}&site_id=eq.${site.id}`, { method: 'PATCH', body: JSON.stringify({ deleted_at: new Date().toISOString() }) }).catch(() => {});
+    return json({ error: 'write_failed', message: 'That deal didn’t save — please try again.' }, 502, cors);
+  }
+  await dealEvent(site.id, deal.id, 'created', principal, { to_stage: 'lead', detail: { prospect_id: p.id, contact_id: contact.id } }).catch(() => {});
   await svc(`presence_prospects?id=eq.${p.id}&site_id=eq.${site.id}`, { method: 'PATCH', body: JSON.stringify({ deal_id: deal.id, status: 'In pipeline', updated_at: new Date().toISOString() }) }).catch(() => {});
-  return json({ data: deal }, 201, cors);
+  return json({ data: deal, contact }, 201, cors);
 }
 
 // ── "Draft a first email": words to copy. NOTHING here sends — by design. ────
@@ -221,7 +261,7 @@ export async function handleProspectDraft(_req: Request, site: SiteRow, _princip
   if (!p) return json({ error: 'not_found', message: 'That prospect isn’t on your list.' }, 404, cors);
   const identR = await svc(`presence_identity?site_id=eq.${site.id}&select=business_name&limit=1`).catch(() => null);
   const studio = clean(identR && (identR as any).ok ? rows(identR)[0]?.business_name : '', 120) || 'our studio';
-  const town = p.address ? clean(String(p.address).split(',').slice(-3, -2).join('').trim(), 60) : '';
+  const town = townOf(p);   // item 119: the same reader as the pitch pack (Google's addresses end with the country)
   const near = town ? ` here in ${town}` : ' nearby';
   const opening: Record<string, string> = {
     no_website: `I looked for ${p.business_name} online and couldn’t find a website — just your listing. These days most people check a business out online before they call, so that’s likely costing you work.`,

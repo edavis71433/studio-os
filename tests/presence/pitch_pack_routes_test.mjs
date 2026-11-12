@@ -70,7 +70,9 @@ PP.packDeps.ai = { engines: [] };   // the AI check is "not switched on" unless 
   ok('the two rivals are the best nearby sites, best first', pk.pieces.rivals.map((r) => r.name).join('·') === 'Shiny Dental·Brand New Bakery'
     && pk.pieces.rivals[0].summary.overall === 82 && pk.pieces.rivals[1].summary.overall === 74, JSON.stringify(pk.pieces.rivals));
   ok('a rival is named, never linked', pk.pieces.rivals.every((r) => !('website' in r)));
-  ok('the AI piece says plainly it is not switched on', pk.pieces.ai.summary === null && /isn’t switched on/.test(pk.pieces.ai.note));
+  ok('the AI piece keeps its reason: not switched on', pk.pieces.ai.summary === null && pk.pieces.ai.why === 'ai_unavailable');
+  ok('item 119: the finished build tells the STUDIO what the pack left out', Array.isArray(last.notes) && last.notes.some((n) => /AI check isn’t switched on/.test(n)), JSON.stringify(last.notes));
+  ok('item 119: no studio note is written into the pieces the public read serves', !JSON.stringify(pk.pieces).includes('"note"'));
 }
 
 // ═══ the public read: the token is the whole key ═══
@@ -78,7 +80,10 @@ PP.packDeps.ai = { engines: [] };   // the AI check is "not switched on" unless 
   const pk = packs()[0];
   const r = await res(await PP.handlePackPublic(pk.token, cors));
   ok('the pack reads publicly by its token', r.status === 200 && r.body.data.business_name === 'Old Diner' && r.body.data.town === 'Burbank');
-  ok('it carries you, two rivals and the AI note', r.body.data.you.summary.overall === 41 && r.body.data.rivals.length === 2 && r.body.data.ai.summary === null);
+  ok('it carries you and two rivals; an AI check that didn’t run is simply left out', r.body.data.you.summary.overall === 41 && r.body.data.rivals.length === 2 && r.body.data.ai === null);
+  const pub = JSON.stringify(r.body.data);
+  ok('item 119: the public read carries no reason and no note meant for the studio', !/"why"|"note"|rivals_note|switched on|budget|[Rr]ebuild|your list/.test(pub), pub);
+  ok('item 119: a rival is a name and a score, nothing more', r.body.data.rivals.every((x) => Object.keys(x).sort().join(',') === 'name,summary'));
   ok('and the studio brand rides along', !!r.body.data.brand && typeof r.body.data.brand.name === 'string');
   const bad = await res(await PP.handlePackPublic('f'.repeat(32), cors));
   ok('a made-up token is nothing', bad.status === 404);
@@ -108,8 +113,30 @@ PP.packDeps.ai = { engines: [] };   // the AI check is "not switched on" unless 
   let last = null;
   for (let i = 0; i < 6; i++) { const r = await res(await PP.handleProspectPack(req({}), site, owner, P_FADES, cors)); last = r.body.data; if (last.state === 'ready') break; }
   const pk = packs()[0];
-  ok('a prospect with no website gets a finished pack', last.state === 'ready' && pk.pieces.you.summary === null);
-  ok('…whose note IS the pitch', /no working website — which is the whole story/.test(pk.pieces.you.note));
+  ok('a prospect with no website gets a finished pack', last.state === 'ready' && pk.pieces.you.summary === null && pk.pieces.you.why === 'no_site');
+  ok('item 119: the studio reads why, on its own side', last.notes.some((n) => /no working website/.test(n)));
+  const r = await res(await PP.handlePackPublic(pk.token, cors));
+  ok('item 119: the prospect’s page is told only that no website was found', r.body.data.you.no_site === true && !/"why"|"note"|whole story/.test(JSON.stringify(r.body.data)), JSON.stringify(r.body.data.you));
+}
+
+// ═══ item 119: no rivals saved yet — the studio is told, the prospect never sees a note ═══
+{
+  world({ presence_prospects: [prospect(P_DINER)] });
+  let last = null;
+  for (let i = 0; i < 6; i++) { const r = await res(await PP.handleProspectPack(req({}), site, owner, P_DINER, cors)); last = r.body.data; if (last.state === 'ready') break; }
+  const pk = packs()[0];
+  ok('item 119: the studio hears to save rivals and rebuild', last.state === 'ready' && last.notes.some((n) => /No nearby rivals on your list yet/.test(n)), JSON.stringify(last));
+  const r = await res(await PP.handlePackPublic(pk.token, cors));
+  ok('item 119: the public pack has no rivals and no rivals_note', Array.isArray(r.body.data.rivals) && r.body.data.rivals.length === 0 && !('rivals_note' in r.body.data));
+}
+
+// ═══ item 119: a Google address reads its real town, everywhere the pack uses it ═══
+{
+  world({ presence_prospects: [prospect(P_DINER, { address: '2 Main St, Burbank, CA 91501, USA' })] });
+  let last = null;
+  for (let i = 0; i < 6; i++) { const r = await res(await PP.handleProspectPack(req({}), site, owner, P_DINER, cors)); last = r.body.data; if (last.state === 'ready') break; }
+  const r = await res(await PP.handlePackPublic(packs()[0].token, cors));
+  ok('item 119: the town is Burbank, not CA', r.body.data.town === 'Burbank', r.body.data.town);
 }
 
 // ═══ a stale report is not reused: the real engine runs on faked fetchers ═══
