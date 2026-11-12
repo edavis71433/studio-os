@@ -75,13 +75,14 @@ const settings = read('settings.html');
     /const inC = inClient\(\);\n  const show = CARDS\.filter\([^\n]*!\(c\.ownerOnly && inC\) && !\(c\.studioOnly && inC\) && !\(c\.scopedOnly && !inC\)/.test(settings)
     && /async function loadPlan\(\) \{\s*if \(inClient\(\)\) return;/.test(settings)
     && /async function loadReport\(\) \{\s*if \(!inClient\(\) \|\|/.test(settings)
-    && /if \(!inClient\(\)\) \{ loadStageNames\(\); loadMenu\(\); \}[^\n]*\n\s*else \{ wireReport\(\); loadReport\(\); \}/.test(settings)
+    && /if \(!inClient\(\)\) \{ loadStageNames\(\); loadMenu\(\); loadReports\(\); \$\('reportsAll'\)\.addEventListener\('click', switchOnTheRest\); \}[^\n]*\n\s*else \{ wireReport\(\); loadReport\(\); \}/.test(settings)
     && /const automationsHere = \(\) => !inClient\(\) \|\| \(hasFeature\('website'\) && hasCap\('configure'\)\);/.test(settings)
     && /if \(automationsHere\(\)\) \{ wireAutomations\(\); paintAutomations\(\); \}/.test(settings)
     && /RECIPES\.filter\(\(r\) => !inClient\(\) \|\| r\.scoped\)/.test(settings) && /row\.hidden = inClient\(\) && !row\.hasAttribute\('data-scoped'\)/.test(settings)
     && /\$\('autoHint'\)\.textContent = inClient\(\) \?/.test(settings) && /if \(inClient\(\)\) return;   \/\/ the studio's own sections stay out of a client's settings/.test(settings));
-  ok('settings: the studio’s own cards (Team, Your menu) still need the studio’s own level, no business picked',
-    /!\(c\.agencyOnly && !\(CTX && CTX\.is_agency && !SCOPE\)\)/.test(settings) && /if \(SCOPE \|\| !\(CTX && CTX\.is_agency\)\) return;/.test(settings));
+  ok('settings: the studio’s own cards (Team, Your menu, every client’s Monthly reports) still need the studio’s own level, no business picked',
+    /!\(c\.agencyOnly && !\(CTX && CTX\.is_agency && !SCOPE\)\)/.test(settings) && /if \(SCOPE \|\| !\(CTX && CTX\.is_agency\)\) return;/.test(settings)
+    && /async function loadReports\(again\) \{\s*const agency = !!\(CTX && CTX\.is_agency\) && !SCOPE;\s*if \(!agency/.test(settings));
   // the cards' links: inside a client only the scoped cards carry it; in your own business every one keeps it
   const cardSrc = grab(settings, /function cardHtml\(c, status\) \{[\s\S]*?\n\}/, 'cardHtml');
   const withClientSrc = grab(settings, /const withClient = \(href\) => \{[^\n]*\};/, 'withClient');

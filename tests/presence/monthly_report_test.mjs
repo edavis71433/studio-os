@@ -18,7 +18,7 @@ const read = (p) => Deno.readTextFileSync(new URL('../../' + p, import.meta.url)
 
 // the setting
 ok('the reserved row has a name', RESERVED_NAMES.monthlyReport === '__monthly_report__');
-ok('an empty row reads as off with no line', JSON.stringify(normalizeReportSetting(null)) === JSON.stringify({ enabled: false, note: '', last_month: null, last_result: null, tries: null, updated_by: null, updated_at: null, sent_months: [], pdf: true, ai_checks: false, ai_month: null, ai_result: null, ai_tries: null }));   // item 182: the AI check is off too; item 184: the PDF copy is on; item 179: no report sent yet
+ok('an empty row reads as off with no line', JSON.stringify(normalizeReportSetting(null)) === JSON.stringify({ enabled: false, note: '', last_month: null, last_result: null, tries: null, updated_by: null, updated_at: null, sent_months: [], pdf: true, ai_checks: false, ai_month: null, ai_result: null, ai_tries: null, parts_off: [], cc: [], copy_to: null, quiet_min: null, propose: { mode: 'off', text: '', pick: null, log: [] } }));   // item 182: the AI check is off too; item 184: the PDF copy is on; item 179: no report sent yet; items 160 and 176: every part in, nobody else, no quiet rule, no suggestion
 ok('what happened last is kept when well formed, dropped when not', normalizeReportSetting({ last_result: { month: '2026-10', status: 'skipped', reason: 'no_email', at: 'x' } }).last_result?.reason === 'no_email' && normalizeReportSetting({ last_result: { month: '2026-10', status: 'lost' } }).last_result === null && normalizeReportSetting({ last_result: { month: 'Oct', status: 'sent' } }).last_result === null);
 ok('only true turns it on', normalizeReportSetting({ enabled: 'yes' }).enabled === false && normalizeReportSetting({ enabled: true }).enabled === true);
 ok('the line is capped', normalizeReportSetting({ note: 'x'.repeat(REPORT_NOTE_MAX + 50) }).note.length === REPORT_NOTE_MAX);
@@ -112,7 +112,7 @@ const settings = read('settings.html');
 ok('the Settings card is inside a client only and needs configure', /key: 'report'[^\n]*scopedOnly: true[^\n]*cap: 'configure'/.test(settings) && /c\.scopedOnly && !inC/.test(settings));
 ok('the card reads what happened last, not the bare month mark', /function reportStatusLine\(d\)/.test(settings) && !/d\.last_month \? 'Last sent/.test(settings));
 const mr = read('supabase/functions/presence/ops/monthly_report.ts');
-ok('the job claims the month before it sends', mr.indexOf('const claimed = await SAVE(') > 0 && mr.indexOf('const claimed = await SAVE(') < mr.indexOf('await sendReport(site, win, claimedSetting'));
+ok('the job claims the month before it sends', mr.indexOf('const claimed = await SAVE(') > 0 && mr.indexOf('const claimed = await SAVE(') < mr.indexOf('await sendReport(site, win, setting, reach.email'));
 ok('the visits are read in full pages, not one capped read', /svcPages\(`presence_visits\?site_id=eq\./.test(mr) && !/limit=\$\{VISITS_CAP\}/.test(mr));
 ok('switching on for a client who can’t be emailed is refused with the reason', /error: 'cannot_send', blocked: reach\.blocked/.test(mr));
 

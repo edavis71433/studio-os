@@ -110,6 +110,80 @@
   .rp-in li{font-size:12px;font-weight:500;border-radius:999px;padding:3px 9px;border:1px solid var(--line);background:var(--card);color:var(--ink)}
   .rp-in li::before{content:"✓ ";color:var(--good)}
   .rp-in li.off{background:var(--bg);color:var(--faint);border-style:dashed} .rp-in li.off::before{content:""}
+  /* builder list items 160 and 176 (Nov 2026, as drawn): who gets it, what it says, what to suggest next */
+  .rp-next{font-size:12.5px;font-weight:600;color:var(--p);text-align:right}
+  .rp-h{display:flex;align-items:center;gap:10px;margin:var(--dds-s3,12px) 0 0;padding-top:var(--dds-s3,12px);border-top:1px solid var(--line);font-size:11.5px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--faint)}
+  .rp-h+.swrow{border-top:none;padding-top:10px}
+  .swrow.rp-block{display:block}
+  .rp-to{display:flex;flex-wrap:wrap;gap:8px;margin:0;padding:0;list-style:none}
+  .rp-to li{display:inline-flex;align-items:center;gap:6px;min-height:32px;font-size:13px;font-weight:500;border-radius:999px;padding:3px 4px 3px 12px;border:1px solid var(--line);background:var(--card);color:var(--ink);max-width:100%}
+  .rp-to li.main{background:var(--bg);border-color:transparent;padding-right:12px}
+  .rp-to li .sub{color:var(--faint);font-size:12px;font-weight:400;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .rp-to li.blocked{border-color:color-mix(in srgb,var(--warn) 45%,var(--line));color:var(--warn)}
+  .rp-to li.nomail{color:var(--warn)}
+  .rp-x{width:26px;height:26px;border-radius:50%;border:none;background:transparent;color:var(--soft);font:inherit;font-size:15px;line-height:1;cursor:pointer;flex:0 0 auto}
+  .rp-x:hover{background:var(--bg);color:var(--ink)}
+  .rp-add{display:inline-flex;align-items:center;gap:6px;min-height:32px;font:inherit;font-size:13px;font-weight:600;color:var(--p);background:transparent;border:1px dashed color-mix(in srgb,var(--p) 45%,var(--line));border-radius:999px;padding:3px 12px;cursor:pointer}
+  .rp-add:hover{background:var(--p-soft)}
+  .rp-ccform{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:10px}
+  .rp-ccform input{flex:1 1 220px;min-width:0;height:34px;border:1px solid var(--line);border-radius:var(--dds-r,8px);padding:0 10px;font:inherit;font-size:14px;background:var(--bg);color:var(--ink)}
+  .rp-warn{color:var(--warn)!important}
+  .rp-quiet input{width:64px;height:28px;border:1px solid var(--line);border-radius:var(--dds-r,8px);padding:0 6px;font:inherit;font-size:13.5px;text-align:center;background:var(--card);color:var(--ink);margin:0 2px}
+  .rp-parts{display:flex;flex-wrap:wrap;gap:6px;margin:2px 0 6px}
+  .rpart{display:inline-flex;align-items:center;gap:6px;min-height:32px;font:inherit;font-size:13px;font-weight:600;border-radius:999px;padding:3px 12px;border:1px solid transparent;background:var(--p-soft);color:var(--p-deep,var(--p));cursor:pointer}
+  .rpart::before{content:"";width:12px;height:12px;flex:0 0 auto;background:var(--p);-webkit-mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='m5 12.5 4.5 4.5L19 7.5' fill='none' stroke='black' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center/contain no-repeat;mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='m5 12.5 4.5 4.5L19 7.5' fill='none' stroke='black' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center/contain no-repeat}   /* the tick is drawn, so it is never read out or counted as text */
+  .rpart[aria-pressed="false"]{background:var(--card);border-color:var(--line-strong,var(--line));color:var(--soft);font-weight:500}
+  .rpart[aria-pressed="false"]::before{display:none}
+  .rpart[aria-disabled="true"],.rp-x[aria-disabled="true"],.rp-add[aria-disabled="true"],.rp-seg [aria-disabled="true"],.rp-menu [aria-disabled="true"],.linkbtn[aria-disabled="true"]{opacity:.55;cursor:default}
+  .rpart.off{border-style:dashed;background:var(--bg);color:var(--faint)}
+  .rpart:focus-visible,.rp-seg button:focus-visible,.rp-add:focus-visible,.rp-x:focus-visible,.linkbtn:focus-visible{outline:2px solid var(--p);outline-offset:2px}
+  .rp-seg{display:inline-flex;flex-wrap:wrap;gap:2px;padding:4px;border-radius:999px;background:var(--bg);border:1px solid var(--line);max-width:100%}
+  .rp-seg button{font:inherit;font-size:13px;font-weight:500;color:var(--soft);background:transparent;border:none;border-radius:999px;padding:6px 14px;min-height:32px;cursor:pointer}
+  .rp-seg button[aria-checked="true"]{background:var(--card);color:var(--ink);font-weight:600;box-shadow:var(--dds-shadow,0 1px 2px rgba(0,0,0,.08))}
+  .rp-box{display:flex;gap:14px;align-items:flex-start;margin-top:12px;padding:14px 16px;border-radius:14px;background:color-mix(in srgb,var(--p-soft) 70%,var(--card));border:1px solid color-mix(in srgb,var(--p) 25%,var(--line))}
+  .rp-bulb{width:36px;height:36px;border-radius:10px;background:var(--p);display:grid;place-items:center;flex:0 0 auto}
+  .rp-bulb svg{width:20px;height:20px;stroke:#fff;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+  .rp-boxt{min-width:0;flex:1}
+  .rp-eye{display:block;font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--p)}
+  .rp-boxt p{margin:4px 0 6px;font-size:14px;font-weight:500;color:var(--ink);line-height:1.45}
+  .rp-from{display:flex;flex-wrap:wrap;gap:4px 14px;align-items:center;font-size:12.5px;color:var(--faint)}
+  .linkbtn{font:inherit;font-size:12.5px;font-weight:600;color:var(--p);background:none;border:none;padding:2px 0;cursor:pointer}
+  .linkbtn:hover{text-decoration:underline}
+  .rp-pickw{position:relative}
+  .rp-menu{position:absolute;left:0;top:calc(100% + 6px);z-index:20;width:min(360px,80vw);background:var(--card);border:1px solid var(--line);border-radius:12px;box-shadow:var(--dds-shadow-pop,var(--dds-shadow));padding:6px;display:flex;flex-direction:column;gap:2px}
+  .rp-menu button{font:inherit;font-size:13px;text-align:left;color:var(--ink);background:none;border:none;border-radius:8px;padding:8px 10px;cursor:pointer;line-height:1.4}
+  .rp-menu button:hover,.rp-menu button[aria-checked="true"]{background:var(--p-soft)}
+  .rp-own{margin-top:12px}
+  .rp-own textarea{width:100%;font:inherit;font-size:14px;border:1px solid var(--line);background:var(--bg);color:var(--ink);border-radius:var(--dds-r,8px);padding:8px 12px;resize:vertical}
+  .rp-ownb{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:8px}
+  /* a box drawn with display:flex would otherwise show while hidden */
+  .rp-box[hidden],.rp-menu[hidden],.rp-ccform[hidden],.rp-own[hidden],.btn[hidden],.linkbtn[hidden]{display:none}
+  .rp-actions{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:var(--dds-s3,12px);padding-top:var(--dds-s3,12px);border-top:1px solid var(--line)}
+  /* the studio's own Monthly reports card: one row a client (a grid on a computer, stacked on a phone) */
+  .rr-head,.rrow{display:grid;grid-template-columns:52px minmax(0,1.6fr) minmax(0,1.1fr) minmax(0,1fr) minmax(0,1.3fr) 72px;gap:10px;align-items:center}
+  .rr-head{margin-top:var(--dds-s3,12px);padding:0 0 6px;font-size:12px;color:var(--faint);font-weight:600}
+  .rrow{padding:12px 0;border-top:1px solid var(--line);font-size:13.5px}
+  .rrow .rn b{display:block;font-weight:600}
+  .rrow .rn span{display:block;font-size:12.5px;color:var(--faint);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .rrow .rn span.warn{color:var(--warn)}
+  .rrow .rpill{display:inline-block;font-size:12px;font-weight:600;border-radius:999px;padding:2px 9px;background:var(--bg);color:var(--soft)}
+  .rrow .rpill.sent{background:var(--good-soft,#e6f5ec);color:var(--good)}
+  .rrow .rpill.warn{background:var(--warn-soft,#fdf2e2);color:var(--warn)}
+  .rrow .rgo{font-weight:600;color:var(--p);text-decoration:none;justify-self:end;font-size:13px}
+  .rrow .rgo:hover{text-decoration:underline}
+  .rrow .rdim{color:var(--faint)}
+  @media (max-width:767px){
+    .rr-head{display:none}
+    .rrow{grid-template-columns:52px minmax(0,1fr) auto;grid-template-areas:"sw name go" "sw to to" "sw sug sug" "sw last last";row-gap:4px}
+    .rrow>:nth-child(1){grid-area:sw;align-self:start}
+    .rrow>:nth-child(2){grid-area:name} .rrow>:nth-child(3){grid-area:to} .rrow>:nth-child(4){grid-area:sug} .rrow>:nth-child(5){grid-area:last} .rrow>:nth-child(6){grid-area:go}
+    .rrow .rlab{color:var(--faint)}
+  }
+  @media (min-width:768px){.rrow .rlab{display:none}}
+  #reports .how,.rp-block>.how{font-size:12.5px;color:var(--faint);margin-top:6px}
+  /* a phone: the three choices stack inside one rounded box, full width */
+  @media (max-width:560px){.rp-seg{display:grid;grid-template-columns:minmax(0,1fr);width:100%;border-radius:14px}.rp-seg button{border-radius:10px;text-align:left}}
+  @media (max-width:760.98px),(pointer:coarse){.rpart,.rp-add,.rp-seg button,.rp-to li{min-height:44px}.rp-x{width:44px;height:44px}.linkbtn{min-height:44px}.rp-menu button{min-height:44px}}
   .swrow .t .say{margin-top:var(--dds-s2,8px);font-size:13px;color:var(--soft);border-left:3px solid var(--line);padding:6px 10px;border-radius:0 var(--dds-r,8px) var(--dds-r,8px) 0;background:var(--bg)}
   .swrow .t .say .lbl{display:block;font-size:11.5px;color:var(--faint);text-transform:uppercase;letter-spacing:.04em;margin-bottom:2px}
   .stale.snames input{width:150px}
@@ -273,15 +347,41 @@
        Item 13's per-stage "stale after" lives here too. -->
   <!-- builder list item 58 (Nov 2026): the monthly report email to this client. Inside a client
        only; kept once per client (GET/PUT /report/monthly). The switch saves as it flips; the line
-       saves with its button; Send me a preview emails last month's report to you, now. -->
+       saves with its button; Send me a preview emails last month's report to you, now.
+       Builder list items 160 and 176 (Nov 2026, drawn in Figma and agreed): who gets it (their
+       email, up to four more people, a copy to you, skip a quiet month), what it says (each part
+       in or out), and one suggestion a month for what to do next. Each control saves as it changes. -->
   <section class="card" id="report" aria-labelledby="reportHead" hidden data-needs="configure">
-    <div class="card-h"><h2 id="reportHead" tabindex="-1">Monthly report</h2><span class="hint" id="reportHint">Once a month, how their website did, on your brand.</span></div>
+    <div class="card-h"><h2 id="reportHead" tabindex="-1">Monthly report</h2><span class="rp-next" id="reportNext"></span></div>
     <div class="swrow" id="reportSwRow">
       <button type="button" class="sw" role="switch" id="sw-report" aria-checked="false" aria-labelledby="sw-report-l"></button>
       <div class="t"><b id="sw-report-l">Send this client a monthly report</b>
-        <div class="how">In the first days of each month: how their website did, each part when there’s something to say. Sent to the email on their record, from your studio, with a reply address that reaches you.</div>
+        <div class="how">In the first days of each month: how their website did, each part when there’s something to say. From your studio, with a reply address that reaches you.</div>
         <div class="how" id="reportLast"></div>
         <div class="how" id="reportWarn" role="status" hidden style="color:var(--bad,#b3261e)"></div></div>
+    </div>
+    <h3 class="rp-h" id="reportWhoH">Who gets it</h3>
+    <div class="swrow rp-block" id="reportWhoRow">
+      <ul class="rp-to" id="reportTo" aria-label="Who gets the report"></ul>
+      <form class="rp-ccform" id="ccForm" hidden novalidate><label class="sr-only" for="ccIn">Their email</label><input type="email" id="ccIn" placeholder="name@theirbusiness.com" autocomplete="off"><button type="submit" class="btn primary" id="ccSave">Add</button><button type="button" class="btn ghost" id="ccCancel">Cancel</button></form>
+      <div class="how" id="ccHow">Up to four more people at the business, each with their own copy and their own unsubscribe. Someone who unsubscribed or bounces is left out, and this card says so.</div>
+      <div class="how rp-warn" id="ccWarn" role="status" hidden></div>
+    </div>
+    <div class="swrow" id="reportCopyRow">
+      <button type="button" class="sw" role="switch" id="sw-copy" aria-checked="false" aria-labelledby="sw-copy-l" aria-describedby="copyHow"></button>
+      <div class="t"><b id="sw-copy-l">Send me a copy</b>
+        <div class="how" id="copyHow">The same email marked “Your copy”. Handy for checking what went out.</div></div>
+    </div>
+    <div class="swrow" id="reportQuietRow">
+      <button type="button" class="sw" role="switch" id="sw-quiet" aria-checked="false" aria-labelledby="sw-quiet-l" aria-describedby="quietHow"></button>
+      <div class="t"><b id="sw-quiet-l">Skip a quiet month</b>
+        <div class="how rp-quiet" id="quietHow">Fewer than <input type="number" id="n-quiet" min="1" max="1000" value="30" aria-label="The fewest visits a month needs"> visits in the month: no report that month, and this card says it was skipped.</div></div>
+    </div>
+    <h3 class="rp-h" id="reportSaysH">What it says</h3>
+    <div class="swrow rp-block" id="reportInRow">
+      <span class="sr-only" id="reportInL">In the report:</span>
+      <div class="rp-parts" id="reportIn" role="group" aria-labelledby="reportSaysH"></div>
+      <div class="how">Tap a part to leave it out of every report for this client. A part with nothing to say that month leaves itself out anyway.</div>
     </div>
     <!-- builder list item 184: the same report as a PDF on the email, and to download any time -->
     <div class="swrow" id="reportPdfRow">
@@ -297,13 +397,39 @@
         <div class="how" id="aiCost"></div>
         <div class="how" id="aiLast"></div></div>
     </div>
-    <div class="swrow rp-in" id="reportInRow"><span class="lbl" id="reportInL">In the report:</span><ul id="reportIn" aria-labelledby="reportInL"></ul></div>
-    <div class="swrow" style="display:block" id="reportLineRow">
-      <b style="font-weight:600">A line from you</b>
+    <div class="swrow rp-block" id="reportLineRow">
+      <b style="font-weight:600">A line from you, at the top</b>
       <div class="how">Goes at the top of every report, in your words. Written once; change it any time.</div>
       <textarea id="report-note" maxlength="600" rows="3" placeholder="e.g. Thanks for a great month. The new photos are bringing people to the Services page." style="width:100%;margin-top:8px;font:inherit;font-size:14px;border:1px solid var(--line);background:var(--bg);color:var(--ink);border-radius:var(--dds-r,8px);padding:8px 12px;resize:vertical"></textarea>
-      <div style="margin-top:10px;display:flex;align-items:center;gap:10px;flex-wrap:wrap"><button type="button" class="btn" id="reportSave">Save the line</button><button type="button" class="btn ghost" id="reportPreview">Send me a preview</button><button type="button" class="btn ghost" id="reportPdf">Download last month’s PDF</button><span class="how" id="reportMsg" role="status"></span></div>
     </div>
+    <h3 class="rp-h" id="reportSugH">What to suggest next</h3>
+    <div class="swrow rp-block" id="reportSugRow">
+      <div class="rp-seg" id="sugModes" role="radiogroup" aria-labelledby="reportSugH">
+        <button type="button" role="radio" data-mode="auto" aria-checked="false">Pick for me each month</button><button type="button" role="radio" data-mode="own" aria-checked="false">My own words</button><button type="button" role="radio" data-mode="off" aria-checked="true">Leave it out</button>
+      </div>
+      <div class="rp-box" id="sugBox" hidden>
+        <span class="rp-bulb" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-3.5 10.9c.6.4 1 1.1 1 1.8V16h5v-.3c0-.7.4-1.4 1-1.8A6 6 0 0 0 12 3z"/></svg></span>
+        <div class="rp-boxt"><span class="rp-eye" id="sugEye"></span><p id="sugText"></p>
+          <div class="rp-from"><span id="sugFrom"></span><span class="rp-pickw"><button type="button" class="linkbtn" id="sugPick" aria-haspopup="true" aria-expanded="false" aria-controls="sugMenu">Pick another ▾</button><span class="rp-menu" id="sugMenu" role="menu" aria-label="Other suggestions" hidden></span></span><button type="button" class="linkbtn" id="sugEdit">Edit the words</button></div></div>
+      </div>
+      <div class="rp-own" id="sugOwn" hidden>
+        <label class="sr-only" for="sug-text">Your suggestion</label>
+        <textarea id="sug-text" maxlength="400" rows="3" placeholder="e.g. A page for your spring menu, ready before Easter. We can have it live in a week."></textarea>
+        <div class="rp-ownb"><button type="button" class="btn primary" id="sugSave">Save the suggestion</button><span class="how">Goes in every report until you change it.</span></div>
+      </div>
+      <div class="how">One suggestion a month, in plain words, ending “Reply to this email and we’ll set it up”. It’s picked from this client’s Do next list (Growth Coach ideas, searches they miss, AI answers that skip them), never repeats within three months, and shows here and in the preview before it goes. A reply lands in your Inbox.</div>
+    </div>
+    <div class="rp-actions" id="reportActRow"><button type="button" class="btn primary" id="reportSave">Save the line</button><button type="button" class="btn ghost" id="reportPreview">Send me a preview</button><button type="button" class="btn ghost" id="reportPdf">Download last month’s PDF</button><span class="how" id="reportMsg" role="status"></span></div>
+  </section>
+  <!-- builder list item 160 (Nov 2026): every client's monthly report on one card, the studio's own
+       Settings only (GET /agency/monthly-reports). Each switch is that client's own switch
+       (PUT /report/monthly, scoped to them), so there is one setting and one set of rules. -->
+  <section class="card" id="reports" aria-labelledby="reportsHead" hidden>
+    <div class="card-h"><h2 id="reportsHead" tabindex="-1">Monthly reports</h2><button type="button" class="btn sm" id="reportsAll" hidden>Switch on everyone who can get it</button></div>
+    <div class="how" id="reportsHint" style="margin-top:6px">Which clients get a report in the first days of each month, and who it goes to. Each client’s own settings have the rest: the parts, the line from you and what to suggest.</div>
+    <div class="rr-head" aria-hidden="true"><span></span><span>Client</span><span>Goes to</span><span>Suggests</span><span>Last report</span><span></span></div>
+    <div id="reportsRows" role="list" aria-labelledby="reportsHead"></div>
+    <div class="how" id="reportsNote" style="margin-top:10px">A switch here is the same switch as on the client’s own card. A client who can’t be emailed can’t be switched on; the row says why, and Fix opens their record.</div>
   </section>
   <!-- builder list item 54 (Nov 2026): the menu areas a studio hides. Agency members at
        studio level only; saved once per studio (GET/PUT /agency/nav), so everyone on the
@@ -488,6 +614,8 @@ const CARDS = [
   { key: 'agency_team', href: '#team', title: 'Team', desc: 'Who is on your studio’s team, their roles, and the seats your plan covers.', words: 'people seats roles members invite staff', agencyOnly: true },
   // builder list item 58 (Nov 2026): the client's monthly report email, set once per client (inside a client only)
   { key: 'report', icon: 'studio', href: '#report', title: 'Monthly report', desc: 'Once a month, this client gets how their website did, on your brand, with a line from you.', words: 'email client monthly report visitors', scopedOnly: true, feature: 'website', cap: 'configure' },
+  // builder list item 160 (Nov 2026): every client's monthly report on one card, the studio's own Settings
+  { key: 'reports', icon: 'studio', href: '#reports', title: 'Monthly reports', desc: 'Which clients get a monthly report, who it goes to, and how the last one went.', words: 'email clients monthly report send who copy', agencyOnly: true, feature: 'website' },
   // builder list item 54 (Nov 2026): a studio hides the menu areas it doesn't use
   { key: 'menu', icon: 'studio', href: '#menu', title: 'Your menu', desc: 'Hide the areas your studio doesn’t use. A hidden area keeps its page and stays one search away.', words: 'hide areas navigation sidebar', agencyOnly: true, cap: 'configure' },
   { key: 'billing', href: '#billing', title: 'Your plan', desc: 'Your Studio OS plan, how to change it, and closing your account.', words: 'plan billing subscription payment card cancel close delete account export download data', ownerOnly: true, needs: 'owner' },   // item 166: "Plan" alone for the studio's own subscription (billing stays a search word)
@@ -561,6 +689,8 @@ function renderCards() {
   if (tc) tc.addEventListener('click', (e) => { e.preventDefault(); reveal('team', 'teamHead'); });
   const rc = $('cards').querySelector('[data-card="report"]');
   if (rc) rc.addEventListener('click', (e) => { e.preventDefault(); reveal('report', 'reportHead'); });
+  const rsc = $('cards').querySelector('[data-card="reports"]');
+  if (rsc) rsc.addEventListener('click', (e) => { e.preventDefault(); reveal('reports', 'reportsHead'); });
   const mc = $('cards').querySelector('[data-card="menu"]');
   if (mc) mc.addEventListener('click', (e) => { e.preventDefault(); reveal('menu', 'menuHead'); });
   const nc = $('cards').querySelector('[data-card="notify"][href="#notify"]');
@@ -584,7 +714,7 @@ function markCurrent(id) {
 }
 function spySections() {
   if (!('IntersectionObserver' in window)) return;
-  const ids = ['studio', 'stages', 'report', 'menu', 'notify', 'automations', 'team', 'billing'];   // C16: a client's Monthly report too; item 126: Notifications
+  const ids = ['studio', 'stages', 'report', 'reports', 'menu', 'notify', 'automations', 'team', 'billing'];   // C16: a client's Monthly report too; item 160: the studio's Monthly reports; item 126: Notifications
   // C16: the band (15–30% down the screen) never reaches the last part when the page ends
   // first, so Plan & billing never lit up; at the very bottom the last part shown is marked
   const atBottom = () => window.scrollY > 0 && window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 2;
@@ -897,7 +1027,8 @@ const UNREAD = {
   studio: { rows: ['profileForm'], off: ['profileSave'], words: 'Your details couldn’t load just now. Saving is off until they do, so nothing you had is written over.' },
   automations: { rows: [], words: 'Your automations couldn’t load just now. They can’t be changed until they do; nothing is switched on or off meanwhile.' },
   stages: { rows: ['staleRow'], words: 'When a deal counts as stalled couldn’t load just now. It can’t be changed until it does.' },
-  report: { rows: ['reportSwRow', 'reportPdfRow', 'reportAiRow', 'reportInRow', 'reportLineRow'], words: 'This client’s monthly report couldn’t load just now. It can’t be changed until it does, so nothing saved is written over.', retry: () => retryReport() },
+  // items 160 and 176: every new row is held too
+  report: { rows: ['reportSwRow', 'reportWhoH', 'reportWhoRow', 'reportCopyRow', 'reportQuietRow', 'reportSaysH', 'reportInRow', 'reportPdfRow', 'reportAiRow', 'reportLineRow', 'reportSugH', 'reportSugRow', 'reportActRow'], words: 'This client’s monthly report couldn’t load just now. It can’t be changed until it does, so nothing saved is written over.', retry: () => retryReport() },
 };
 function holdUnread() {
   const held = { studio: !IDENT_READ || !SETTINGS_READ, automations: !SETTINGS_READ, stages: !SETTINGS_READ, report: REPORT_TRIED && !REPORT_READ };
@@ -1024,6 +1155,9 @@ function paintAutomations() {
   loadMenu();
 }
 // ── item 58: this client's monthly report (GET/PUT /report/monthly, POST /report/monthly/preview) ──
+// Builder list items 160 and 176 (Nov 2026): who gets it, what it says, what to suggest next.
+// Every control saves as it changes, one save at a time (REPORT_BUSY, item 101), and none can
+// write over a report that couldn't be read (I4).
 let REPORT = null, REPORT_BUSY = false;
 async function loadReport() {
   if (!inClient() || !hasFeature('website') || !hasCap('configure')) return;
@@ -1033,42 +1167,138 @@ async function loadReport() {
   if (REPORT_READ) { REPORT = r.body.data; paintReport(); }
   holdUnread();   // I4: a failed read shows the card with "couldn't load" and Try again, its controls held
   $('report').hidden = false;
+  if (location.hash === '#report') holdAnchor($('report'));   // item 160: the studio's Monthly reports card links here
 }
 async function retryReport(e) {
   const b = e && e.currentTarget; if (b) b.disabled = true;
   await loadReport();
   if (b && b.isConnected) { b.disabled = false; toast('Still couldn’t load — try again in a moment.', true); }
 }
+const REPORT_PARTS = [['visits', 'Visits'], ['enquiries', 'Enquiries'], ['google', 'On Google'], ['ai', 'AI answers'], ['reviews', 'Reviews'], ['health', 'Website health'], ['pages', 'Most read pages'], ['changes', 'What changed']];
+const REPORT_BLOCK_WORDS = { no_email: 'there’s no email on their record', unsubscribed: 'they unsubscribed from emails', bounced: 'emails to them bounce', quiet: 'a quiet month, under your number of visits' };
+const CC_BLOCK_WORDS = { unsubscribed: 'unsubscribed', bounced: 'emails bounce' };
+const SUGGEST_FROM = { idea: 'From their Do next list: a Growth Coach idea', ai: 'From their Do next list: an AI answer that misses them', search: 'From their Do next list: a Search to-do', health: 'From their Do next list: a website fix', reviews: 'From their Do next list: Google reviews waiting', own: 'Your own words' };
+const EMAIL_RE = /^[^\s@<>()",;]+@[^\s@<>()",;]+\.[^\s@<>()",;]{2,}$/;
+const monthAfter = (ym) => { const m = /^(\d{4})-(\d{2})$/.exec(String(ym || '')); if (!m) return ''; return new Date(Date.UTC(+m[1], +m[2], 1)).toLocaleDateString('en-US', { month: 'long', timeZone: 'UTC' }); };   // "2026-11" → "December"
+// who it goes to now: the client (when they can be emailed), the extra people who can, the studio's copy
+function reportPeople(d) {
+  const blocked = d.cc_blocked || {};
+  return (d.to && !d.blocked ? 1 : 0) + (d.cc || []).filter((e) => !blocked[e]).length + (d.copy_to ? 1 : 0);
+}
+let CC_OPEN = false, SUG_EDITING = false, SUG_MENU = false;
 function paintReport() {
   const d = REPORT || {};
   $('sw-report').setAttribute('aria-checked', d.enabled ? 'true' : 'false');
-  paintReportBusy();
   if (document.activeElement !== $('report-note')) $('report-note').value = d.note || '';
   $('reportLast').textContent = reportStatusLine(d);
+  const n = reportPeople(d);
+  $('reportNext').textContent = d.enabled && d.next_month ? 'Next one: ' + monthAfter(d.next_month) + ' 1 · to ' + n + (n === 1 ? ' person' : ' people') : '';
   // item 182: the monthly AI check, its cost in words, and how the last one went
   $('sw-ai').setAttribute('aria-checked', d.ai_checks ? 'true' : 'false');
   $('aiCost').textContent = d.ai_cost ? d.ai_cost + '.' : '';
   $('aiLast').textContent = aiStatusLine(d);
-  // item 184: the PDF switch, and what the report holds (AI answers only with the check on)
+  // item 184: the PDF switch, named for last month's file
   $('sw-pdf').setAttribute('aria-checked', d.pdf === false ? 'false' : 'true');
   const lm = monthBefore(d.next_month);
   $('reportPdf').textContent = lm ? 'Download ' + new Date(Date.UTC(+lm.slice(0, 4), +lm.slice(5, 7) - 1, 1)).toLocaleDateString('en-US', { month: 'long', timeZone: 'UTC' }) + '’s PDF' : 'Download last month’s PDF';
-  $('reportIn').innerHTML = REPORT_PARTS.map(([k, w]) => {
-    const off = k === 'ai' && !d.ai_checks;
-    return '<li' + (off ? ' class="off"' : '') + '>' + esc(w) + (off ? ', off' : '') + '</li>';
-  }).join('');
   // Nov 2026 review (finding 2): a client who can't be emailed is said so on the card, never a silent "On"
   const warn = d.blocked ? 'This client can’t get the report: ' + (REPORT_BLOCK_WORDS[d.blocked] || 'they can’t be emailed') + '.' + (d.blocked === 'no_email' ? ' Add their email on their record.' : '') : '';
   $('reportWarn').textContent = warn; $('reportWarn').hidden = !warn;
+  paintWho(d); paintParts(d); paintSuggest(d);
+  paintReportBusy();
 }
-const REPORT_PARTS = [['visits', 'Visits'], ['enquiries', 'Enquiries'], ['google', 'On Google'], ['ai', 'AI answers'], ['reviews', 'Reviews'], ['health', 'Website health'], ['changes', 'What changed']];
-const REPORT_BLOCK_WORDS = { no_email: 'there’s no email on their record', unsubscribed: 'they unsubscribed from emails', bounced: 'emails to them bounce' };
-// what happened last, in words: sent, skipped (why) or failed; `last_month` alone only means "handled"
+// ── item 160: who gets it ──
+function paintWho(d) {
+  const blocked = d.cc_blocked || {};
+  const cc = d.cc || [], max = Number(d.cc_max) || 4;
+  const main = d.to
+    ? `<li class="main${d.blocked ? ' blocked' : ''}"><span>${esc(d.client_name || 'The client')}</span><span class="sub">${esc(d.to)} · on their record${d.blocked && d.blocked !== 'no_email' ? ' · ' + esc(CC_BLOCK_WORDS[d.blocked] || 'can’t be emailed') : ''}</span></li>`
+    : `<li class="main nomail"><span>${esc(d.client_name || 'The client')}</span><span class="sub">no email on their record</span></li>`;
+  const extra = cc.map((e) => `<li${blocked[e] ? ' class="blocked"' : ''}><span>${esc(e)}</span>${blocked[e] ? `<span class="sub">${esc(CC_BLOCK_WORDS[blocked[e]] || 'left out')}</span>` : ''}<button type="button" class="rp-x" data-ccx="${esc(e)}" aria-label="${esc('Take ' + e + ' off')}">×</button></li>`).join('');
+  const add = cc.length < max && !CC_OPEN ? '<li style="padding:0;border:0;background:none"><button type="button" class="rp-add" id="ccAdd"><span aria-hidden="true">+</span> Add someone</button></li>' : '';
+  $('reportTo').innerHTML = main + extra + add;
+  $('ccForm').hidden = !CC_OPEN;
+  const left = cc.filter((e) => blocked[e]);
+  $('ccWarn').textContent = left.length ? left.join(', ') + (left.length === 1 ? ' is' : ' are') + ' left out: ' + left.map((e) => CC_BLOCK_WORDS[blocked[e]] || 'can’t be emailed').join(', ') + '.' : '';
+  $('ccWarn').hidden = !left.length;
+  const ab = $('ccAdd'); if (ab) ab.addEventListener('click', () => { if (REPORT_BUSY || !REPORT_READ) return; CC_OPEN = true; paintWho(REPORT || {}); paintReportBusy(); const i = $('ccIn'); i.value = ''; i.focus(); });
+  $('reportTo').querySelectorAll('[data-ccx]').forEach((b) => b.addEventListener('click', () => changeCc((REPORT.cc || []).filter((x) => x !== b.getAttribute('data-ccx')), 'Taken off. They won’t get the next report.')));
+  // a copy to you: whoever switched it on is who gets it
+  $('sw-copy').setAttribute('aria-checked', d.copy_to ? 'true' : 'false');
+  $('copyHow').textContent = 'To ' + (d.copy_to || d.me || 'you') + ', the same email marked “Your copy”. Handy for checking what went out.';
+  // a quiet month: the switch, and the number while you're not typing in it
+  $('sw-quiet').setAttribute('aria-checked', d.quiet_min != null ? 'true' : 'false');
+  if (document.activeElement !== $('n-quiet')) $('n-quiet').value = String(d.quiet_min != null ? d.quiet_min : (d.quiet_default || 30));
+}
+async function changeCc(next, said) {
+  if (await saveReport({ cc: next })) {
+    toast(said);
+    const r = await api('/report/monthly', 'GET');   // who of them can't be emailed is only known by a fresh read
+    if (r.ok && r.body && r.body.data && !REPORT_BUSY) { REPORT = r.body.data; paintReport(); }
+  }
+}
+// ── item 160: what it says ──
+function paintParts(d) {
+  const off = new Set(d.parts_off || []);
+  const words = Array.isArray(d.parts) && d.parts.length ? d.parts.map((p) => [p.key, p.words]) : REPORT_PARTS;
+  $('reportIn').innerHTML = words.map(([k, w]) => {
+    const aiOff = k === 'ai' && !d.ai_checks;   // item 184: AI answers only with the check on
+    return `<button type="button" class="rpart${aiOff ? ' off' : ''}" data-part="${esc(k)}" aria-pressed="${!aiOff && !off.has(k) ? 'true' : 'false'}">${esc(w)}${aiOff ? ', off' : ''}</button>`;
+  }).join('');
+  $('reportIn').querySelectorAll('[data-part]').forEach((b) => b.addEventListener('click', () => togglePart(b.getAttribute('data-part'))));
+}
+async function togglePart(k) {
+  if (REPORT_BUSY || !REPORT_READ) return;
+  const d = REPORT || {};
+  if (k === 'ai' && !d.ai_checks) { toast('Switch on “Check AI answers every month” below to put AI answers in the report.'); return; }
+  const off = new Set(d.parts_off || []);
+  const words = (Array.isArray(d.parts) && d.parts.length ? d.parts.map((p) => p.key) : REPORT_PARTS.map((p) => p[0]));
+  if (off.has(k)) off.delete(k); else off.add(k);
+  if (words.every((w) => off.has(w))) { toast('Leave at least one part in the report.', true); return; }
+  const name = (REPORT_PARTS.find((p) => p[0] === k) || [k, k])[1];
+  REPORT = { ...d, parts_off: words.filter((w) => off.has(w)) }; paintParts(REPORT);
+  if (await saveReport({ parts_off: REPORT.parts_off })) toast(off.has(k) ? name + ' is left out of the report.' : name + ' is back in the report.');
+}
+// ── item 176: what to suggest next ──
+function paintSuggest(d) {
+  const p = d.propose || { mode: 'off', text: '' };
+  const mode = SUG_EDITING ? 'own' : p.mode;
+  $('sugModes').querySelectorAll('[data-mode]').forEach((b) => { const on = b.getAttribute('data-mode') === mode; b.setAttribute('aria-checked', on ? 'true' : 'false'); b.tabIndex = on ? 0 : -1; });
+  const next = d.propose_next || null, opts = Array.isArray(d.propose_options) ? d.propose_options : [];
+  $('sugBox').hidden = mode !== 'auto';
+  if (mode === 'auto') {
+    $('sugEye').textContent = (d.next_month ? monthAfter(d.next_month) + ' 1 report suggests' : 'The next report suggests');
+    $('sugText').textContent = next ? next.text : 'Nothing to suggest yet. When their Do next list has an idea, it shows here; until then the report goes without one.';
+    $('sugFrom').textContent = next ? (SUGGEST_FROM[next.source] || '') : '';
+    $('sugPick').hidden = opts.length < 2;
+    $('sugEdit').hidden = !next;
+    $('sugMenu').innerHTML = opts.map((o) => `<button type="button" role="menuitemradio" data-pick="${esc(o.key)}" aria-checked="${next && next.key === o.key ? 'true' : 'false'}">${esc(o.text)}</button>`).join('');
+    $('sugMenu').hidden = !SUG_MENU; $('sugPick').setAttribute('aria-expanded', SUG_MENU ? 'true' : 'false');
+    $('sugMenu').querySelectorAll('[data-pick]').forEach((b) => b.addEventListener('click', async () => {
+      SUG_MENU = false; paintSuggest(REPORT || {});
+      if (await saveReport({ propose: { mode: 'auto', pick: b.getAttribute('data-pick') } })) { toast('That one goes in the next report.'); $('sugPick').focus(); }
+    }));
+  } else { SUG_MENU = false; $('sugMenu').hidden = true; }
+  $('sugOwn').hidden = mode !== 'own';
+  if (mode === 'own' && document.activeElement !== $('sug-text') && !SUG_EDITING) $('sug-text').value = p.text || '';
+}
+async function setSuggestMode(mode) {
+  if (REPORT_BUSY || !REPORT_READ) return;
+  const p = (REPORT && REPORT.propose) || { mode: 'off', text: '' };
+  if (mode === 'own') {
+    // their own words: saved with the button; an earlier text goes straight back in
+    if (p.text) { SUG_EDITING = false; if (await saveReport({ propose: { mode: 'own' } })) toast('Your words go in every report until you change them.'); return; }
+    SUG_EDITING = true; paintSuggest(REPORT || {}); $('sug-text').focus(); return;
+  }
+  SUG_EDITING = false;
+  if (p.mode === mode) { paintSuggest(REPORT || {}); return; }
+  if (await saveReport({ propose: { mode } })) toast(mode === 'auto' ? 'On. Each report suggests one thing from their Do next list.' : 'Off. The report goes without a suggestion.');
+}
 function reportStatusLine(d) {
   const r = d.last_result;
   if (r && r.month) {
     const m = monthWords(r.month);
-    if (r.status === 'sent') return 'Last sent: the ' + m + ' report.';
+    if (r.status === 'sent') return 'Last sent: the ' + m + ' report' + (r.cc ? ', to ' + (r.cc + 1) + ' people' : '') + '.';
     if (r.status === 'skipped') return 'The ' + m + ' report wasn’t sent: ' + (REPORT_BLOCK_WORDS[r.reason] || 'they couldn’t be emailed') + '.';
     if (r.status === 'failed') return 'The ' + m + ' report didn’t go out after three tries. The next one goes out as usual.';
   }
@@ -1081,12 +1311,14 @@ function aiStatusLine(d) {
 }
 function monthBefore(ym) { const m = /^(\d{4})-(\d{2})$/.exec(String(ym || '')); if (!m) return null; const y = +m[1], n = +m[2]; return n === 1 ? (y - 1) + '-12' : y + '-' + String(n - 1).padStart(2, '0'); }
 function monthWords(ym) { const m = /^(\d{4})-(\d{2})$/.exec(String(ym || '')); if (!m) return ym; return new Date(Date.UTC(+m[1], +m[2] - 1, 1)).toLocaleDateString('en-US', { month: 'long', year: 'numeric', timeZone: 'UTC' }); }
-// Item 101 (C16's last line): one save at a time. While one saves, the switch is greyed and
-// "Save the line" is off, the way Your menu does it. A second press used to show the switch
-// flipped while nothing was sent, and a line saved during a switch save was dropped unsaid.
+// Item 101 (C16's last line): one save at a time. While one saves, every switch is greyed and
+// every button that saves is off, the way Your menu does it. A second press used to show the
+// switch flipped while nothing was sent, and a line saved during a switch save was dropped unsaid.
 function paintReportBusy() {
-  for (const id of ['sw-report', 'sw-pdf', 'sw-ai']) { const sw = $(id); if (REPORT_BUSY) sw.setAttribute('aria-disabled', 'true'); else sw.removeAttribute('aria-disabled'); }   // items 182 and 184: the AI and PDF switches wait their turn too
-  $('reportSave').disabled = REPORT_BUSY;
+  for (const id of ['sw-report', 'sw-pdf', 'sw-ai', 'sw-copy', 'sw-quiet']) { const sw = $(id); if (REPORT_BUSY) sw.setAttribute('aria-disabled', 'true'); else sw.removeAttribute('aria-disabled'); }   // items 160, 182 and 184: every switch waits its turn
+  for (const id of ['reportSave', 'ccSave', 'sugSave', 'n-quiet']) { const el = $(id); if (el) el.disabled = REPORT_BUSY; }
+  // greyed, not disabled: a control pressed with the keyboard keeps its focus while it saves
+  $('report').querySelectorAll('.rpart, .rp-x, .rp-add, #sugModes [data-mode], #sugMenu [data-pick], #sugPick, #sugEdit').forEach((b) => { if (REPORT_BUSY) b.setAttribute('aria-disabled', 'true'); else b.removeAttribute('aria-disabled'); });
 }
 async function saveReport(patch) {
   if (REPORT_BUSY || !REPORT_READ) return false;   // I4: never written over what couldn't be read
@@ -1098,7 +1330,7 @@ async function saveReport(patch) {
     paintReport();   // back to what is saved
     toast(nice(r.body, 'That didn’t save — nothing was changed.'), true); return false;
   }
-  REPORT = { ...(REPORT || {}), ...(r.body.data || patch) }; paintReport();   // keeps `blocked`, which only GET answers
+  REPORT = { ...(REPORT || {}), ...(r.body.data || patch) }; paintReport();   // keeps what only GET answers (blocked, who, the suggestion)
   return true;
 }
 function wireReport() {
@@ -1119,6 +1351,63 @@ function wireReport() {
     const next = !!(REPORT && REPORT.pdf === false);
     $('sw-pdf').setAttribute('aria-checked', next ? 'true' : 'false');
     if (await saveReport({ pdf: next })) toast(next ? 'On. The report goes with a PDF copy.' : 'Off. The report goes without a PDF.');
+  });
+  // item 160: a copy to you, a quiet month, and the extra people
+  $('sw-copy').addEventListener('click', async () => {
+    if (REPORT_BUSY || !REPORT_READ) return;
+    const next = !(REPORT && REPORT.copy_to);
+    $('sw-copy').setAttribute('aria-checked', next ? 'true' : 'false');
+    if (await saveReport({ copy: next })) toast(next ? 'On. You’ll get a copy of each report.' : 'Off. No copy to you.');
+  });
+  $('sw-quiet').addEventListener('click', async () => {
+    if (REPORT_BUSY || !REPORT_READ) return;
+    const on = !(REPORT && REPORT.quiet_min != null);
+    const n = Math.trunc(Number($('n-quiet').value)) || (REPORT && REPORT.quiet_default) || 30;
+    $('sw-quiet').setAttribute('aria-checked', on ? 'true' : 'false');
+    if (await saveReport({ quiet_min: on ? n : null })) toast(on ? 'On. A month under ' + n + ' visits is skipped.' : 'Off. The report goes every month.');
+  });
+  const saveQuiet = async () => {
+    if (!REPORT || REPORT.quiet_min == null || REPORT_BUSY || !REPORT_READ) return;   // the number only counts while the switch is on
+    const n = Math.trunc(Number($('n-quiet').value));
+    if (!(n >= 1)) { toast('Give the fewest visits as a whole number, 1 or more.', true); $('n-quiet').value = String(REPORT.quiet_min); return; }
+    if (n === REPORT.quiet_min) return;
+    if (await saveReport({ quiet_min: n })) toast('Saved. A month under ' + Math.min(1000, n) + ' visits is skipped.');
+  };
+  $('n-quiet').addEventListener('change', saveQuiet);
+  $('n-quiet').addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); saveQuiet(); } });
+  $('ccForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    if (REPORT_BUSY || !REPORT_READ) return;
+    const v = $('ccIn').value.trim().toLowerCase(), d = REPORT || {};
+    if (!EMAIL_RE.test(v)) { toast('That isn’t an email address.', true); $('ccIn').focus(); return; }
+    if ((d.cc || []).includes(v) || (d.to && d.to.toLowerCase() === v)) { toast('They already get it.', true); return; }
+    CC_OPEN = false;
+    await changeCc((d.cc || []).concat([v]), 'Added. ' + v + ' gets the next report.');
+    const ab = $('ccAdd'); if (ab) ab.focus();
+  });
+  $('ccCancel').addEventListener('click', () => { CC_OPEN = false; paintWho(REPORT || {}); paintReportBusy(); const ab = $('ccAdd'); if (ab) ab.focus(); });
+  $('ccIn').addEventListener('keydown', (e) => { if (e.key === 'Escape') { e.preventDefault(); $('ccCancel').click(); } });
+  // item 176: what to suggest next
+  $('sugModes').querySelectorAll('[data-mode]').forEach((b) => b.addEventListener('click', () => setSuggestMode(b.getAttribute('data-mode'))));
+  $('sugModes').addEventListener('keydown', (e) => {   // a radio group: the arrow keys move and choose
+    const keys = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 }; if (!keys[e.key]) return;
+    e.preventDefault();
+    const bs = [...$('sugModes').querySelectorAll('[data-mode]')], i = bs.indexOf(document.activeElement), nb = bs[(i + keys[e.key] + bs.length) % bs.length];
+    nb.focus(); setSuggestMode(nb.getAttribute('data-mode'));
+  });
+  $('sugPick').addEventListener('click', () => { if (REPORT_BUSY) return; SUG_MENU = !SUG_MENU; paintSuggest(REPORT || {}); if (SUG_MENU) { const f = $('sugMenu').querySelector('[aria-checked="true"]') || $('sugMenu').querySelector('[data-pick]'); if (f) f.focus(); } });
+  $('sugMenu').addEventListener('keydown', (e) => { if (e.key === 'Escape') { e.preventDefault(); SUG_MENU = false; paintSuggest(REPORT || {}); $('sugPick').focus(); } });
+  document.addEventListener('click', (e) => { if (SUG_MENU && !(e.target instanceof Element && e.target.closest('.rp-pickw'))) { SUG_MENU = false; paintSuggest(REPORT || {}); } });
+  $('sugEdit').addEventListener('click', () => {
+    if (REPORT_BUSY) return;
+    const next = REPORT && REPORT.propose_next;
+    SUG_EDITING = true; paintSuggest(REPORT || {});
+    $('sug-text').value = next ? next.text : ''; $('sug-text').focus();
+  });
+  $('sugSave').addEventListener('click', async () => {
+    const text = $('sug-text').value.trim();
+    if (!text) { toast('Write the suggestion, or pick one of ours.', true); $('sug-text').focus(); return; }
+    if (await saveReport({ propose: { mode: 'own', text } })) { SUG_EDITING = false; paintSuggest(REPORT || {}); toast('Saved. It goes in every report until you change it.'); }
   });
   // GET /report/monthly/pdf: last month's report as a file (a fetch with the sign-in, saved as a download)
   $('reportPdf').addEventListener('click', async () => {
@@ -1142,6 +1431,91 @@ function wireReport() {
     if (!r.ok) { $('reportMsg').textContent = ''; toast(nice(r.body, 'The preview didn’t send.'), true); return; }
     $('reportMsg').textContent = 'Sent to ' + ((r.body.data && r.body.data.sent_to) || 'you') + '. Last month’s numbers, marked [Preview].';
   });
+}
+// ── item 160: every client's monthly report on one card, the studio's own Settings
+//    (GET /agency/monthly-reports). A switch is the client's own (PUT /report/monthly with
+//    that client in scope), one at a time; a client who can't be emailed can't be switched on. ──
+let REPORTS = null, REPORTS_BUSY = false, REPORTS_ASKED = false;
+const SUGGEST_WORDS = { off: 'Left out', auto: 'Picked each month', own: 'Your own words' };
+async function loadReports(again) {
+  const agency = !!(CTX && CTX.is_agency) && !SCOPE;
+  if (!agency || !hasFeature('website')) return;
+  if (REPORTS_ASKED && !again) return; REPORTS_ASKED = true;
+  const r = await api('/agency/monthly-reports', 'GET');
+  // an older server (pages go live before the functions deploy) has no such list: the card stays away
+  if (r.status === 404 || (r.ok && !(r.body && r.body.data && Array.isArray(r.body.data.rows)))) { $('reports').hidden = true; return; }
+  $('reports').hidden = false;
+  if (!r.ok) {   // I5: says so, with Try again; never a list of switches all off
+    REPORTS = null; $('reportsAll').hidden = true;
+    unreadIn($('reportsRows'), 'Your clients’ monthly reports couldn’t load just now.', () => loadReports(true));
+    return;
+  }
+  REPORTS = r.body.data; paintReports();
+  if (location.hash === '#reports') holdAnchor($('reports'));
+}
+function lastWords(row) {
+  const l = row.last;
+  if (!row.email) return ['Can’t send yet', 'warn'];
+  if (row.blocked) return ['Can’t send: ' + (CC_BLOCK_WORDS[row.blocked] || 'can’t be emailed'), 'warn'];
+  if (!l) return [row.enabled ? 'First one next month' : 'Never sent', ''];
+  const m = new Date(Date.UTC(+l.month.slice(0, 4), +l.month.slice(5, 7) - 1, 1)).toLocaleDateString('en-US', { month: 'long', timeZone: 'UTC' });
+  if (l.status === 'sent') return [m + ' · sent', 'sent'];
+  if (l.status === 'skipped') return [l.reason === 'quiet' ? 'Skipped: a quiet month' : m + ' · not sent', l.reason === 'quiet' ? '' : 'warn'];
+  return [m + ' · didn’t go out', 'warn'];
+}
+function paintReports() {
+  const d = REPORTS || { rows: [] }, rows = d.rows || [];
+  const locked = d.can_change === false;
+  if (!rows.length) { $('reportsRows').innerHTML = '<p class="how" style="margin-top:10px">No client sites yet. When you add one, its report shows here.</p>'; $('reportsAll').hidden = true; return; }
+  $('reportsRows').innerHTML = rows.map((row) => {
+    const [last, cls] = lastWords(row);
+    const can = !locked && !(row.blocked && !row.enabled);
+    const to = row.enabled ? (row.email ? (row.who || 'Them') + (row.more ? ' + ' + row.more + ' more' : '') + (row.copy ? ', and you' : '') : '—') : '—';
+    const href = row.blocked === 'no_email' || !row.email ? '/crm.html?client=' + encodeURIComponent(row.site_id) : '/settings.html?client=' + encodeURIComponent(row.site_id) + '#report';
+    return `<div class="rrow" role="listitem" data-report="${esc(row.site_id)}">
+      <span><button type="button" class="sw" role="switch" data-rsw="${esc(row.site_id)}" aria-checked="${row.enabled ? 'true' : 'false'}" aria-labelledby="rn-${esc(row.site_id)}"${!can || REPORTS_BUSY ? ' aria-disabled="true"' : ''}></button></span>
+      <span class="rn"><b id="rn-${esc(row.site_id)}">${esc(row.name)}</b><span class="${row.email ? '' : 'warn'}">${esc(row.email || 'No email on their record')}</span></span>
+      <span class="${row.enabled ? '' : 'rdim'}"><span class="rlab">Goes to: </span>${esc(to)}</span>
+      <span class="${row.enabled ? '' : 'rdim'}"><span class="rlab">Suggests: </span>${esc(row.enabled ? (SUGGEST_WORDS[row.propose] || 'Left out') : '—')}</span>
+      <span><span class="rpill ${cls}">${esc(last)}</span></span>
+      <a class="rgo" href="${esc(href)}" data-noscope="1">${row.blocked === 'no_email' || !row.email ? 'Fix →' : 'Change →'}</a>
+    </div>`;
+  }).join('');
+  $('reportsRows').querySelectorAll('[data-rsw]').forEach((b) => b.addEventListener('click', () => flipClientReport(b.getAttribute('data-rsw'))));
+  const rest = rows.filter((row) => !row.enabled && !row.blocked && row.email);
+  $('reportsAll').hidden = locked || !rest.length;
+  $('reportsAll').disabled = REPORTS_BUSY;
+  $('reportsNote').textContent = locked ? 'Your role can see the reports but not switch them. Your studio’s owner, an admin or an account manager can.' : 'A switch here is the same switch as on the client’s own card. A client who can’t be emailed can’t be switched on; the row says why, and Fix opens their record.';
+}
+// one client's own switch, with that client in scope
+async function putAs(siteId, body) {
+  let r;
+  try { r = await fetch(FN + '/report/monthly', { method: 'PUT', headers: { ...H(), 'x-dds-scope-site': siteId }, body: JSON.stringify(body) }); }
+  catch (_) { return { ok: false, status: 0, body: { message: NET_MSG } }; }
+  return { ok: r.ok, status: r.status, body: await r.json().catch(() => ({})) };
+}
+async function flipClientReport(siteId) {
+  const row = REPORTS && (REPORTS.rows || []).find((x) => x.site_id === siteId);
+  if (!row || REPORTS_BUSY || (REPORTS && REPORTS.can_change === false)) return;
+  if (row.blocked && !row.enabled) { toast('It can’t go out: ' + (REPORT_BLOCK_WORDS[row.blocked] || 'they can’t be emailed') + '.', true); return; }
+  const next = !row.enabled;
+  REPORTS_BUSY = true; row.enabled = next; paintReports();
+  const r = await putAs(siteId, { enabled: next });
+  REPORTS_BUSY = false;
+  if (!r.ok) { row.enabled = !next; if (r.body && r.body.blocked) row.blocked = r.body.blocked; paintReports(); toast(nice(r.body, 'That didn’t save — nothing was changed.'), true); return; }
+  paintReports();
+  const sw = $('reportsRows').querySelector('[data-rsw="' + CSS.escape(siteId) + '"]'); if (sw) sw.focus();
+  toast(next ? 'On. ' + row.name + ' gets a report in the first days of next month.' : 'Off. No more reports to ' + row.name + '.');
+}
+async function switchOnTheRest() {
+  if (REPORTS_BUSY || !REPORTS) return;
+  const rest = (REPORTS.rows || []).filter((row) => !row.enabled && !row.blocked && row.email);
+  if (!rest.length) return;
+  REPORTS_BUSY = true; paintReports();
+  let done = 0;
+  for (const row of rest) { const r = await putAs(row.site_id, { enabled: true }); if (r.ok) { row.enabled = true; done++; } else if (r.body && r.body.blocked) row.blocked = r.body.blocked; }
+  REPORTS_BUSY = false; paintReports();
+  toast(done === rest.length ? 'On for ' + done + ' more client' + (done === 1 ? '' : 's') + '.' : done + ' of ' + rest.length + ' switched on. The rest didn’t save; try again.', done !== rest.length);
 }
 // ── item 54: the menu areas this studio hides (GET/PUT /agency/nav) ──
 let MENU = null;   // { hidden: [...], choices: [{key,label,what}] }
@@ -1458,7 +1832,7 @@ function holdAnchor(sec) {
     }).catch(() => {});
     loadPlan().catch(() => {});
     loadTeam().catch(() => {});
-    if (!inClient()) { loadStageNames(); loadMenu(); }   // with the rest, not after the studio details
+    if (!inClient()) { loadStageNames(); loadMenu(); loadReports(); $('reportsAll').addEventListener('click', switchOnTheRest); }   // with the rest, not after the studio details; item 160: every client's report, which loadReports keeps to the studio's own level
     else { wireReport(); loadReport(); }
     loadNotify();   // item 126: a studio's notifications per client site (agency members only)
     wireDeletion();
