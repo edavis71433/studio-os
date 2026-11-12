@@ -109,5 +109,16 @@ const world = () => ({
   ok('Pipeline: …then Undo brings it straight back', pipe.includes("api('/sales/deals/'+encodeURIComponent(id)+'/restore','POST',{})") && pipe.includes("k.undoToast('Deal deleted. It stays in Recently deleted for 30 days.',back)"));
 }
 
+// ═══ 5. the page and the ways in ═══
+{
+  const page = read('recently-deleted.html'), headers = read('_headers'), redirects = read('_redirects'), nav = read('supabase/functions/presence/lib/navigation.ts'), settings = read('settings.html'), contacts = read('contacts.html');
+  ok('the page reads one list and restores each kind by its own route', page.includes("api('/sales/deleted')") && page.includes("api('/sales/deals/'+encodeURIComponent(id)+'/restore','POST',{})") && page.includes("api('/sales/contacts/'+encodeURIComponent(id)+'/restore','POST')") && page.includes("api('/sales/deal-tasks/'+encodeURIComponent(id),'PATCH',{restore:true})"));
+  ok('the page says where each thing went back to, with Open', page.includes('is back in ${row.home}') && page.includes("{label:'Open'"));
+  ok('a clean address, never cached stale', /\/recently-deleted\n  Cache-Control: no-cache, must-revalidate/.test(headers) && redirects.includes('/recently-deleted.html        /recently-deleted    301!') && redirects.includes('/recently-deleted            /recently-deleted.html 200'));
+  ok('⌘K finds it, at studio level, beside Team (not in the main menu)', nav.includes("settings.push(hid('deleted', 'Recently deleted', '/recently-deleted.html'"));
+  ok('Settings has a card for it', settings.includes("{ key: 'deleted', href: '/recently-deleted.html', title: 'Recently deleted'"));
+  ok('a contact\'s Undo message says where they wait afterwards', contacts.includes("' It stays in Recently deleted for 30 days.'"));
+}
+
 console.log(`\n${pass} passed, ${fail} failed`);
 if (fail) { console.log('Failed:\n  ' + failed.join('\n  ')); Deno.exit(1); }
