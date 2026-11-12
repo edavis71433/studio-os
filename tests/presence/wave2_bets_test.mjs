@@ -69,8 +69,10 @@ eq('7: no topic and no evidence → no chips (nothing invented)', A.sourceLabels
 ok('7: a long evidence line is trimmed with an ellipsis', A.sourceLabels(null, [{ human: 'x'.repeat(80) }])[0].length <= 60 && A.sourceLabels(null, [{ human: 'x'.repeat(80) }])[0].endsWith('…'));
 ok('7: the route ships source_labels on both branches (over the ceiling too)', (concierge.match(/source_labels: a\.source_labels/g) || []).length === 2);
 ok('7: today.html paints chips from source_labels and the honest low-confidence line', /d\.source_labels\) \? d\.source_labels\.filter\(Boolean\)\.slice\(0, 4\)/.test(today) && /class="src"/.test(today) && /Part of this is judgment rather than measurement/.test(today));
-ok('7: help.html does the same', /d\.source_labels\) \? d\.source_labels\.filter\(Boolean\)\.slice\(0, 4\)/.test(help) && /Part of this is judgment rather than measurement/.test(help));
-ok('7: both pages read the route’s `answer` (the old `text` key kept as a fallback)', /d\.answer \|\| d\.text/.test(today) && /d\.answer \|\| d\.text/.test(help));
+// builder item 202: Help's own box asks the product helper (/help/ask), the one the ? panel asks, so
+// one question gets one answer; its answers come from our help copy, with links instead of chips
+ok('7: help.html asks the product helper, as the ? panel does, and shows its links', /apiPost\('\/help\/ask'/.test(help) && /s\.className='links'/.test(help));
+ok('7: today.html reads the route’s `answer` (the old `text` key kept as a fallback)', /d\.answer \|\| d\.text/.test(today));
 ok('7: Draft a reply is on all three Inbox composers', /id="msgDraft">Draft a reply/.test(inbox) && /id="supDraft">Draft a reply/.test(inbox) && /id="leadDraft">Draft a reply/.test(inbox));
 ok('7: the draft comes from the EXISTING /writer/rewrite (action write)', /api\('\/writer\/rewrite','POST',\{action:'write',field:'answer',prompt:/.test(inbox));
 ok('7: the draft lands in the textarea for editing — never submitted', /ta\.value=v\?\(v\+'\\n\\n'\+text\):text;/.test(inbox) && !/draftReply[\s\S]{0,1200}\.submit\(\)/.test(inbox) && !/draftReply[\s\S]{0,1200}'\/forms\/inbox\//.test(inbox));

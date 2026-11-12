@@ -659,10 +659,21 @@ function buildSystem(feed,notifs){
   return rows;
 }
 
+// builder item 202: inside a client this page is their Messages, the name their menu and phone bar
+// use, so its heading and the browser tab say so. At studio level, and for an owner, it is the Inbox.
+function pageName(){return (window.ddsScopeInfo&&window.ddsScopeInfo())?'Messages':'Inbox';}
+function paintPageName(){
+  const sc=window.ddsScopeInfo&&window.ddsScopeInfo(),n=pageName();
+  document.title=n+(sc&&sc.name?' — '+sc.name:'')+' — Studio OS';
+  const h=document.getElementById('inboxH1');if(h)h.textContent=n;
+}
+document.addEventListener('DOMContentLoaded',paintPageName);   // the shell (deferred) is in by then
+document.addEventListener('dds:context',paintPageName);         // …and the client's name once its context lands
+
 // ── the console shell ─────────────────────────────────────────────────────────
 function renderConsole(){
   $('main').innerHTML=`
-  <h1 class="sr-only">Inbox</h1>
+  <h1 class="sr-only" id="inboxH1">${esc(pageName())}</h1>
   <div class="console${COLLAPSED?' collapsed':''}" id="console">
     <aside class="lpane" aria-label="Conversation list">
       <div class="lhead">

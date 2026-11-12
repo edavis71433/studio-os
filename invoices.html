@@ -313,7 +313,7 @@ function downloadCsv(){
   const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([lines.join('\n')+'\n'],{type:'text/csv'}));a.download='invoices-'+today+'.csv';document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove();},0);
 }
 async function load(){
-  if(scope()){$('main').innerHTML=`<div class="center"><h2>Invoices live at the studio level.</h2><p class="muted">You’re looking at one client. Their invoices are on their record’s Billing tab.</p><p style="margin-top:16px"><a class="link" data-noscope href="/invoices.html">Leave this client and open Invoices →</a></p></div>`;return;}
+  if(scope()){$('main').innerHTML=`<div class="center"><h2>Invoices live at the studio level.</h2><p class="muted">You’re looking at one client. Their invoices are on their record’s Invoices tab.</p><p style="margin-top:16px"><a class="link" data-noscope href="/invoices.html">Leave this client and open Invoices →</a></p></div>`;return;}
   const r=await api('/sales/invoices?today='+ymd());
   if(r.status===401){signedOut();return;}
   if(r.status===404&&!(r.body&&r.body.data)){$('main').innerHTML=`<div class="center"><h2>Invoices is on its way.</h2><p class="muted">This page arrives with an update that’s being rolled out. Your invoices are on Pipeline’s Who owes you meanwhile.</p><p style="margin-top:16px"><a class="link" href="/pipeline.html#outstanding">Open Who owes you →</a></p></div>`;return;}

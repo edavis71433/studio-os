@@ -572,7 +572,8 @@ const EXPANDED=new Set();
 // "Project" because that is what the owner calls it.
 // Bold redesign, part B (Nov 2026): Activity comes first — the call box and
 // message box open, then the history — and the record opens on it.
-const TAB_LABEL={activity:'Activity',details:'Details',deal:'Deal',billing:'Billing',delivery:'Project',files:'Files'};
+// builder item 202: the money tab is "Invoices", the name the client's menu and search give it (it read Billing)
+const TAB_LABEL={activity:'Activity',details:'Details',deal:'Deal',billing:'Invoices',delivery:'Project',files:'Files'};
 const TAB_ORDER=['activity','details','deal','billing','delivery','files'];
 // old deep links keep working (inbox.html links ?tab=messages; older links carry overview)
 const TAB_ALIAS={activity:'activity',overview:'details',messages:'activity',deal:'deal',billing:'billing',invoices:'billing',money:'billing',delivery:'delivery',project:'delivery',details:'details',files:'files'};
@@ -759,7 +760,7 @@ function renderSummaryCards(){
       const chip=st==='paid'?'<span class="sc-chip good">Paid</span>':st==='overdue'?'<span class="sc-chip bad">Overdue</span>':st==='processing'?'<span class="sc-chip">On its way</span>':v.due_date?`<span class="sc-chip warn">Due ${esc(dueLabel(v.due_date))}</span>`:'<span class="sc-chip">Open</span>';
       return `<li><span class="sc-t">${esc(v.title||'Invoice')}</span><b>${esc(fmtC(v.amount_cents))}</b>${chip}</li>`;}).join('')
       +(rp.cents?`<li><span class="sc-t">Retainer · ${rp.count} payment${rp.count===1?'':'s'}</span><b>${esc(fmtC(rp.cents))}</b><span class="sc-chip good">Paid</span></li>`:'');
-    out.push(`<section class="card sc" aria-labelledby="sc-money"><div class="sc-h"><h2 id="sc-money">Money</h2><button type="button" class="sc-link" data-sc="invoice">Send invoice →</button></div>${rows?`<ul class="sc-list">${rows}</ul>`:`<p class="muted sc-none">${inv.length?'Nothing open or paid.':'No invoices yet.'}</p>`}${inv.length>Math.min(live.length,rp.cents?3:4)?`<button type="button" class="sc-link" data-sc="billing">All ${inv.length} on Billing →</button>`:''}</section>`);
+    out.push(`<section class="card sc" aria-labelledby="sc-money"><div class="sc-h"><h2 id="sc-money">Money</h2><button type="button" class="sc-link" data-sc="invoice">Send invoice →</button></div>${rows?`<ul class="sc-list">${rows}</ul>`:`<p class="muted sc-none">${inv.length?'Nothing open or paid.':'No invoices yet.'}</p>`}${inv.length>Math.min(live.length,rp.cents?3:4)?`<button type="button" class="sc-link" data-sc="billing">All ${inv.length} under Invoices →</button>`:''}</section>`);
   }
   if(pj){
     // B21: the Project tab's own percent (its tasks) when the project read has one — counting
@@ -1242,18 +1243,18 @@ function renderDealTab(host){
   if(d.stage==='won'){
     const allPaid=paid.reduce((a,b)=>a+(b.amount_cents||0),0)+ret.cents;
     now=owed?`${fmtC(owed)} is awaiting payment across ${open.length} invoice${open.length===1?'':'s'}.`:(allPaid?`All ${fmtC(allPaid)} paid so far${ret.cents?`, ${fmtC(ret.cents)} of it from the retainer`:''}. Send the next invoice when a milestone lands.`:'Nothing invoiced yet.');
-    now+=` <button class="link-btn" data-go="billing">Open Billing →</button>`;
+    now+=` <button class="link-btn" data-go="billing">Open Invoices →</button>`;
   }else if(outcome){
     // item 107 (J3): a declined or expired proposal is not "with them"
     const p=outcome.p; const day=outcome.state==='declined'?(p.decided_at?' on '+atLabel(p.decided_at):''):(p.expires_at?' on '+atLabel(p.expires_at):'');
     now=(outcome.state==='declined'?`They declined your proposal${esc(day)}.`:`Your proposal expired${esc(day)} before they answered, so its link no longer opens.`)+` Revise it and send it again. <a class="link" href="${esc(link)}">Revise in pipeline →</a>`;
   }else if(d.stage==='contract'){
     now=signed?'Agreement signed. Request the deposit, then convert them to a customer.':'The agreement is out for signature.';
-    now+=` <button class="link-btn" data-go="billing">Open Billing →</button>`;
+    now+=` <button class="link-btn" data-go="billing">Open Invoices →</button>`;
   }else if(d.stage==='proposal'){ now='Your proposal is with them. <button class="link-btn" data-go="billing">See proposals →</button>'; }
   else if(d.stage==='lost'){ now='Marked not a fit. The record stays so you can pick it back up.'; }
   if(now)html+=`<section><h2>What now</h2><div class="card"><p style="font-size:14.5px;margin:0">${now}</p></div></section>`;
-  const sum=(label,n,extra)=>`<div class="rrow"><span class="rt">${label}<span class="s">${extra}</span></span><button class="link-btn" data-go="billing">Billing →</button></div>`;
+  const sum=(label,n,extra)=>`<div class="rrow"><span class="rt">${label}<span class="s">${extra}</span></span><button class="link-btn" data-go="billing">Invoices →</button></div>`;
   // item 107 (J9): the total leaves voided invoices out, as the Money card does
   const live=inv.filter(v=>v.status==='open'||v.status==='paid');
   const ests=DEAL.estimates||[]; const recs=(DEAL.recurring||[]).filter(s=>s.status==='active'||s.status==='paused');
@@ -1285,7 +1286,7 @@ function renderDealTab(host){
 // so nothing there is rebuilt — the routes below are the same ones it calls.
 function renderBillingTab(host){
   if(!DEAL){host.innerHTML='<div class="spin" role="status" aria-label="Loading"></div>';return;}
-  if(DEAL.error||!DEAL.deal){host.innerHTML='<p class="muted">Couldn’t load billing just now.</p>';return;}
+  if(DEAL.error||!DEAL.deal){host.innerHTML='<p class="muted">Couldn’t load invoices just now.</p>';return;}
   const d=DEAL.deal||{}; const link=agHref('pipeline.html','deal='+encodeURIComponent(d.id||''));
   const c=DEAL.contact||REC.header||{}; const noEmail=!(c&&c.email);
   const propChip=(s)=>s==='accepted'?'good':s==='declined'?'bad':s==='sent'?'':'warn';
@@ -1634,7 +1635,7 @@ function billingForm(kind){
       if(!amt||amt<1){toast('Enter a retainer amount of at least $1.');go.disabled=false;return;}
       const r=await apiAg('/sales/deals/'+d.id+'/retainer','POST',{amount_cents:Math.round(amt*100),interval:$('bf-int').value||'month'});
       // B21: "copied" only once the link IS on the clipboard — it said so before trying, and a refused copy stayed quiet
-      if(r.ok){const x=r.body.data||{},noCopy='Retainer set up — copy its authorization link from Billing.';
+      if(r.ok){const x=r.body.data||{},noCopy='Retainer set up — copy its authorization link from Invoices.';
         if(x.emailed)toast('Retainer set up — the authorization link was emailed');
         else if(x.url&&navigator.clipboard)navigator.clipboard.writeText(x.url).then(()=>toast('Retainer set up — authorization link copied'),()=>toast(noCopy));
         else toast(noCopy);

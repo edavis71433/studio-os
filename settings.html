@@ -319,7 +319,12 @@
        one. Kept once per studio (GET /agency/notify, PUT /agency/notify/:site). Each switch
        saves as you flip it. -->
   <section class="card" id="notify" aria-labelledby="notifyHead" hidden>
-    <div class="card-h"><h2 id="notifyHead" tabindex="-1">Notifications</h2><span class="hint">What you hear about each client’s site, and how. Each switch saves as you flip it.</span></div>
+    <div class="card-h"><h2 id="notifyHead" tabindex="-1">Notifications</h2><span class="hint" id="notifyHint">What you hear about each client’s site, and how. Each switch saves as you flip it.</span></div>
+    <!-- builder item 202: the same switch as the account menu's row, for this phone or computer -->
+    <div class="swrow" id="row-push" hidden>
+      <button type="button" class="sw" role="switch" id="sw-push" aria-checked="false" aria-labelledby="sw-push-l"></button>
+      <div class="t"><b id="sw-push-l">Ring this device</b><div class="how" id="pushHow">A notification on this phone or computer when something needs you, even with Studio OS closed.</div></div>
+    </div>
     <div id="notifyRows"></div>
     <div class="how" id="notifyNote" style="margin-top:10px">Money owed, something broken and messages from your clients always reach you. The emails your clients get never change.</div>
   </section>
@@ -461,7 +466,8 @@ const IC = {
   calendar: '<rect x="3" y="4" width="18" height="17" rx="2"/><path d="M3 9h18M8 2v4M16 2v4"/>',
 };
 const CARDS = [
-  { key: 'studio', href: '#studio', title: 'Studio profile', desc: 'Name, email, phone, where you work from, and the kind of business — it drives the nudges on Today.', words: 'name email phone address location business industry kind',
+  // builder item 202: a business owner who isn't a studio reads "Business profile"; a studio keeps "Studio profile"
+  { key: 'studio', href: '#studio', title: 'Business profile', agencyTitle: 'Studio profile', desc: 'Name, email, phone, where you work from, and the kind of business — it drives the nudges on Today.', words: 'name email phone address location business industry kind studio profile',
     scopedTitle: (who) => possessive(who) + ' profile', scopedDesc: 'Their name, email, phone, where they work from, and the kind of business — it drives their nudges.' },
   // the studio's own switches — never a client's (the invoices and deals are the studio's book)
   // Bold redesign (Nov 2026): the deal stages are a section of their own (the studio's book, like Automations)
@@ -476,7 +482,8 @@ const CARDS = [
   // builder list item 54 (Nov 2026): a studio hides the menu areas it doesn't use
   { key: 'menu', icon: 'studio', href: '#menu', title: 'Your menu', desc: 'Hide the areas your studio doesn’t use. A hidden area keeps its page and stays one search away.', words: 'hide areas navigation sidebar', agencyOnly: true, cap: 'configure' },
   { key: 'billing', href: '#billing', title: 'Your plan', desc: 'Your Studio OS plan, how to change it, and closing your account.', words: 'plan billing subscription payment card cancel close delete account export download data', ownerOnly: true, needs: 'owner' },   // item 166: "Plan" alone for the studio's own subscription (billing stays a search word)
-  { key: 'money', href: '/pipeline.html?services=1', title: 'Invoices & agreements', desc: 'Your services and prices (they fill proposals), the agreement every deal starts from, deposits.', words: 'services prices proposals deposits contracts tax', feature: 'relationship' },
+  // builder item 202: named for what it opens, Manage services on Pipeline (it read "Invoices & agreements")
+  { key: 'money', href: '/pipeline.html?services=1', title: 'Services and prices', desc: 'What you sell and for how much; they fill your proposals. The agreement every deal starts from and deposits are there too.', words: 'services prices proposals deposits contracts agreements invoices tax', feature: 'relationship' },
   // sales item 83 (Nov 2026): one place for what was deleted lately, with Restore
   { key: 'deleted', href: '/recently-deleted.html', title: 'Recently deleted', desc: 'Deals, contacts and to-dos you deleted in the last 30 days. Bring any of them back.', words: 'trash bin undo restore deleted removed recover', feature: 'relationship', studioOnly: true },
   // Bold redesign (Nov 2026): the private calendar link (sales review item 46) has its own row — it lives on Connections
@@ -489,7 +496,8 @@ const CARDS = [
   { key: 'domains_all', icon: 'domains', href: '/admin-health.html', title: 'Every site’s domains', desc: 'Domains, email records and padlocks across the platform, in the Health Center. Staff only.', operatorOnly: true },
   { key: 'team', href: '/sharing.html', title: 'Team & access', desc: 'Who can sign in, what clients can see, reviewer links.', words: 'sharing access reviewer client portal invite people', feature: 'client_portal', cap: 'invite', scoped: true,
     agencyTitle: 'Sharing & access', agencyDesc: 'What your clients can see in their portal, and reviewer links.' },
-  { key: 'notify', href: '/inbox.html', title: 'Notifications', desc: 'Enquiries, approvals and support requests ring the bell and land in the Inbox; the email digest follows the same list.', words: 'notifications bell digest alerts emails mute quiet', scoped: true,
+  // builder item 202: the card holds the real switch (this device); it opened the Inbox, where there is none
+  { key: 'notify', href: '#notify', title: 'Notifications', desc: 'Ring this phone or computer when something needs you. Enquiries, approvals and support requests also land in your Inbox.', words: 'notifications bell digest alerts emails mute quiet push device phone', scoped: true,
     agencyHref: '#notify', agencyDesc: 'One switch for each client’s site, then the bell and email: what you hear about it, and how.', scopedTitle: () => 'Notifications', scopedDesc: 'What you hear about this client’s site: on Home and in the bell, and by email.' },   // item 126
   // the developer tools are the STUDIO's, never a client's — the card stays unscoped and says so while drilled in
   { key: 'dev', href: '/developer.html', title: 'Developer', desc: 'API keys, webhooks, the schema dump. For you, not clients.', words: 'api keys webhooks schema developer code', feature: 'developer', cap: 'use_developer_mode',
@@ -544,9 +552,11 @@ function renderCards() {
   if (rc) rc.addEventListener('click', (e) => { e.preventDefault(); reveal('report', 'reportHead'); });
   const mc = $('cards').querySelector('[data-card="menu"]');
   if (mc) mc.addEventListener('click', (e) => { e.preventDefault(); reveal('menu', 'menuHead'); });
-  const nc = $('cards').querySelector('[data-card="notify"][href="#notify"]');
+  const nc = [...$('cards').querySelectorAll('[data-card="notify"]')].find((a) => /#notify$/.test(a.getAttribute('href') || ''));
   if (nc) nc.addEventListener('click', (e) => {
     e.preventDefault();
+    // builder item 202: a business owner's card opens this device's switch, on this page
+    if (!(CTX && CTX.is_agency)) { paintPush().then(() => reveal('notify', 'notifyHead')); return; }
     loadNotify().then(() => {
       if (NOTIFY && notifyRows().length) reveal('notify', 'notifyHead');
       else toast(NOTIFY ? 'This client’s site isn’t one your studio looks after.' : 'Your notification choices couldn’t load just now. Try again in a moment.', true);   // never an empty part
@@ -710,6 +720,18 @@ function paintScope() {
   }
 }
 document.addEventListener('dds:context', () => { paintScope(); if (SCOPE && $('cards').children.length) renderCards(); });
+// builder item 202: whoever isn't in a studio's own settings, or a client's, gets a business's words.
+// "The studio's own" is decided as cardHtml decides it (is_agency and no ?client=), so a studio
+// member opening another business of theirs reads "Business profile" on the card and the heading alike.
+const studioOwn = () => !!(CTX && CTX.is_agency && !SCOPE);
+const plainOwner = () => !!CTX && !studioOwn() && !CTX.scope;
+function paintOwnerWords() {
+  if (!plainOwner()) return;
+  const ph = $('profileHead'), ln = document.querySelector('label[for="f-name"]');
+  if (ph) ph.textContent = 'Business profile';
+  if (ln) ln.textContent = 'Business name';
+}
+document.addEventListener('dds:context', paintOwnerWords);
 // List item 175: typing narrows the list; Enter opens the first match, Escape clears.
 $('setFind').addEventListener('input', () => renderCards());
 $('setFind').addEventListener('keydown', (e) => {
@@ -918,7 +940,7 @@ async function saveProfile() {
   if (!IDENT_READ || !SETTINGS_READ) return;   // C4: held — the boxes aren't what is saved
   const b = $('profileSave'); b.disabled = true;
   const name = $('f-name').value.trim();
-  if (!name) { toast('Give your studio a name.', true); b.disabled = false; $('f-name').focus(); return; }
+  if (!name) { toast(studioOwn() ? 'Give your studio a name.' : 'Give the business a name.', true); b.disabled = false; $('f-name').focus(); return; }
   const identity = { business_name: name, email: $('f-email').value.trim(), phone: $('f-phone').value.trim(), service_area: $('f-area').value.trim() };
   const industry = $('f-industry').value || 'generic';
   const writes = [api('/identity', 'PUT', identity)];
@@ -1178,11 +1200,29 @@ function loadNotify() {
     NOTIFY = r.body.data;
     if (!notifyRows().length) return;   // inside a client the studio doesn't look after: nothing to switch
     paintNotify();
+    paintPush();   // builder item 202: this device's switch sits above the sites'
     $('notify').hidden = false;
   }).catch(() => { NOTIFY_ASKED = null; });
   return NOTIFY_ASKED;
 }
 const notifyLocked = () => !!(NOTIFY && NOTIFY.can_edit === false);
+// builder item 202: this device's switch (window.ddsPush, the account menu's row). Anyone can have it;
+// a browser that can't ring says so instead. A business owner's Notifications is this switch.
+let PUSH_BUSY = false;
+async function paintPush() {
+  const row = $('row-push'), sw = $('sw-push'); if (!row || !sw) return;
+  const P = window.ddsPush;
+  if (!(CTX && CTX.is_agency)) { const h = $('notifyHint'); if (h) h.textContent = 'How Studio OS tells you something needs you. The switch saves as you flip it.'; $('notifyNote').textContent = 'Enquiries, approvals and support requests also land in your Inbox, and in your email.'; }
+  row.hidden = false;
+  if (!P || !P.supported()) { sw.setAttribute('aria-disabled', 'true'); $('pushHow').textContent = 'This browser can’t show notifications. On a phone, add Studio OS to your home screen first.'; return; }
+  sw.setAttribute('aria-checked', (await P.state()) ? 'true' : 'false');
+  if (sw.dataset.wired) return; sw.dataset.wired = '1';
+  sw.addEventListener('click', async () => {
+    if (PUSH_BUSY || sw.getAttribute('aria-disabled') === 'true') return;
+    PUSH_BUSY = true; sw.setAttribute('aria-busy', 'true');
+    try { sw.setAttribute('aria-checked', (await P.toggle()) ? 'true' : 'false'); } finally { PUSH_BUSY = false; sw.removeAttribute('aria-busy'); }
+  });
+}
 function notifyRows() { const all = (NOTIFY && NOTIFY.sites) || []; return SCOPE ? all.filter((x) => x.site_id === SCOPE.toLowerCase()) : all; }
 function paintNotify() {
   const had = document.activeElement && document.activeElement.id;
@@ -1398,6 +1438,7 @@ function holdAnchor(sec) {
     try { CTX = window.ddsContext ? await window.ddsContext() : null; } catch (_) { CTX = null; }
     if (!CTX) { const r = await api('/portal/context'); CTX = (r.ok && r.body && r.body.data) || null; }
     paintScope();
+    paintOwnerWords();
     renderCards();
     $('profileSave').addEventListener('click', saveProfile);
     $('profileForm').addEventListener('submit', (e) => { e.preventDefault(); saveProfile(); });
@@ -1449,7 +1490,10 @@ function holdAnchor(sec) {
     if (location.hash === '#billing' && !SCOPE) holdAnchor($('billing'));   // I7: billing is the studio's own, never a client's (a client's "Update payment" link lands at the top)
     if (location.hash === '#automations' && automationsHere()) holdAnchor($('automations'));
     if (location.hash === '#stages' && !SCOPE) holdAnchor($('stages'));
-    if (location.hash === '#notify') loadNotify().then(() => { if (!$('notify').hidden) holdAnchor($('notify')); });
+    if (location.hash === '#notify') {
+      if (CTX && CTX.is_agency) loadNotify().then(() => { if (!$('notify').hidden) holdAnchor($('notify')); });
+      else paintPush().then(() => { $('notify').hidden = false; holdAnchor($('notify')); });   // builder item 202
+    }
     spySections();
   } catch (_) {
     $('main').innerHTML = '<div class="center"><h2>We couldn’t load your settings just now.</h2><p>Nothing’s wrong with your account — refresh to try again.</p></div>';

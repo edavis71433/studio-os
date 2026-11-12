@@ -51,7 +51,8 @@ ok('⌘K "kit" (and "template") → the Templates tab on Sites (item 166)', hits
 ok('⌘K "client" → Customers (studio + owner)', hits(studio, 'client').some((h) => h.href === '/customers.html') && hits(owner, 'client')[0]?.href === '/customers.html');
 ok('⌘K "health" → the Health Center for platform staff only', hits(staff, 'health').some((h) => h.href === '/admin-health.html') && !hits(studio, 'health').some((h) => h.href === '/admin-health.html'));
 ok('every new entry is ⌘K-only (hidden) — the menu did not grow', ['billing', 'plan', 'team', 'kits', 'health'].every((k) => { const e = flatten(staff).filter((i) => i.key === k); return e.length > 0 && e.every((i) => i.hidden); }));
-ok('the website’s "health check" desc still answers "health" for an owner (no regression)', hits(owner, 'health').some((h) => h.href === '/presence.html'));
+// builder item 202: the health check lives on the website's Search tab now (item 184), and "health" opens it there
+ok('"health" still finds the website’s health check for an owner, on its Search tab', hits(owner, 'health').some((h) => h.href === '/presence.html#search'));
 
 // ═══ change 11: the Health Center's door. Item 96 (Nov 8) moved it from the studio's
 //     Home, where it was staff wording on the owner's page, to the account menu ═══

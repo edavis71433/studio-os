@@ -44,12 +44,14 @@ const notice = read('supabase/functions/presence/lib/notice.ts');
 {
   const ctx = { role: 'business_owner', edition: 'presence', capabilities: ['edit', 'publish', 'invite', 'configure', 'view_all'], isAgency: false, isOperator: false, editionKey: 'studio_os', isManagedClient: false, scoped: false };
   const items = buildNav(ctx).flatMap((s) => s.items);
-  const website = items.find((i) => i.key === 'content');
-  ok('gap 3: the Website item carries a desc that names the health check', !!website && /health check/.test(website.desc || ''));
+  // builder item 202 (Nov 12 review, finding 74): item 184 moved the health check to the website's
+  // Search tab, so "health" finds it there, not on the Overview
+  const health = items.find((i) => i.key === 'site_health');
+  ok('gap 3: a Health check entry opens the website\'s Search tab', !!health && health.href === '/presence.html#search');
   // the palette matches on label · section · desc (shell.js) — "health" must find
-  // exactly the overview, and the desc must not widen "page" or "domain" (1 each in §6)
+  // exactly the health check, and the desc must not widen "page" or "domain" (1 each in §6)
   const matches = (q) => items.filter((i) => [i.label, i.desc || ''].some((t) => t.toLowerCase().includes(q)));
-  ok('gap 3: "health" → the Website overview only', matches('health').length === 1 && matches('health')[0].key === 'content');
+  ok('gap 3: "health" → the health check only', matches('health').length === 1 && matches('health')[0].key === 'site_health');
   ok('gap 3: "page" and "domain" still find one destination each (the desc does not say either)', matches('page').length === 1 && matches('domain').length === 1);
 }
 
