@@ -20,6 +20,7 @@ import { runTrafficSpikes } from '../ops/traffic_spikes.ts';
 import { runMonthlyReports } from '../ops/monthly_report.ts';
 import { runAiChecks } from '../ops/ai_checks.ts';
 import { runSiteTrashPurge } from '../ops/site_trash.ts';
+import { runDuePosts } from '../ops/scheduled_posts.ts';
 import { runLifecycleSweep, runWeeklyDigest, runDomainWatch, runLeadFollowups, runDealFollowups, runRenewalReminders, runInvoiceReminders, runSalesDocReminders, runReviewRequests, runProspectNurture, runSupportAging, runAgreementRenewalReminders, runBookingReminders, runBookingFollowups, runEmailAuthNudges, runApexDriftWatch, runApprovalReminders } from '../commerce/lifecycle.ts';
 import { runScheduledBroadcasts } from '../lib/broadcast.ts';
 import { runDeletionSweep } from '../commerce/deletion.ts';
@@ -319,6 +320,7 @@ export async function handleSystem(req: Request, route: string, method: string, 
       if (task === 'coach') return json({ data: await runOperationsCycle({ limit, withCoach: true }) }, 200, cors);
       if (task === 'window_expiry') return json({ data: await runWindowExpiries(limit) }, 200, cors);   // Phase EXP: enqueue rewindow re-emits for crossed show-from/until boundaries
       if (task === 'publish') return json({ data: await runDuePublishes(limit) }, 200, cors);   // FD-1 scheduled publishes
+      if (task === 'scheduled_posts') return json({ data: await runDuePosts(limit) }, 200, cors);   // builder list item 40: blog posts whose time has come
       if (task === 'reconcile') return json({ data: await runReconcileStuckPublishes(limit) }, 200, cors); // M5: finalize stuck publishes
       if (task === 'heartbeat') return json({ data: await runUptimeHeartbeat(limit ?? 25) }, 200, cors); // uptime: probe live hosted sites
       if (task === 'media_gc') return json({ data: await reapMedia(limit ?? 100) }, 200, cors); // M6: reap soft-deleted + orphaned media
@@ -363,6 +365,7 @@ export async function handleSystem(req: Request, route: string, method: string, 
         const GROUPS: Record<string, Array<[string, () => Promise<unknown>]>> = {
           observe: [
             ['cycle', () => runOperationsCycle({ limit })],
+            ['scheduled_posts', () => runDuePosts(limit ?? 25)],   // builder list item 40: blog posts whose time has come go live, before the other publishes
             ['window_expiry', () => runWindowExpiries(limit ?? 40)],   // Phase EXP: enqueue rewindow re-emits BEFORE the due-publish fire, so a crossed boundary flips this same tick
             ['scheduled_publishes', () => runDuePublishes(limit)],
             ['reconcile', () => runReconcileStuckPublishes(50)],
@@ -440,6 +443,7 @@ export async function handleSystem(req: Request, route: string, method: string, 
       const cycle = await step('cycle', () => runOperationsCycle({ limit }));
       // Phase EXP: enqueue rewindow re-emits for any live site whose windowed section
       // just crossed a boundary — BEFORE the due-publish fire, so it flips this tick.
+      await step('scheduled_posts', () => runDuePosts(25));   // builder list item 40: blog posts whose time has come go live, before the other publishes
       const windowExpiry = await step('window_expiry', () => runWindowExpiries(40));
       const scheduled = await step('scheduled_publishes', () => runDuePublishes(limit));
       const reconcile = await step('reconcile', () => runReconcileStuckPublishes(50));   // M5: finalize stuck publishes every tick

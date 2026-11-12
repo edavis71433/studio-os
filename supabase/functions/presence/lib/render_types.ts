@@ -131,7 +131,11 @@ export interface SnapshotContent {
   offerings: Array<{ id: string; name: string; category: string; description?: string; price_text?: string; media?: MediaRef | null; sort_order?: number; is_visible?: boolean }>;
   testimonials: Array<{ id: string; quote: string; author: string; source?: string; quote_date?: string; sort_order?: number }>;
   faqs: Array<{ id: string; question: string; answer: string; sort_order?: number }>;
-  posts: Array<{ id: string; title: string; slug: string; body_md: string; excerpt?: string; hero?: MediaRef | null; published_at: string; noindex?: boolean; tags?: string[] }>;
+  /** Builder list item 40 (0181), all optional: the post's category and author, resolved
+   *  from the site's lists, and the photos its text shows on lines of their own, by id
+   *  (lib/blog.ts). A post without them is unchanged. */
+  posts: Array<{ id: string; title: string; slug: string; body_md: string; excerpt?: string; hero?: MediaRef | null; published_at: string; noindex?: boolean; tags?: string[];
+    category?: { id: string; name: string }; author?: { id: string; name: string; bio?: string; photo?: MediaRef }; images?: Record<string, MediaRef> }>;
   redirects: Array<{ from_path: string; to_path: string }>;
   // voice is present in the snapshot but marked private — the renderer MUST NOT read it.
 }
