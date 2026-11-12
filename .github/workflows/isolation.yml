@@ -1,0 +1,47 @@
+name: Walls between studios (scratch database)
+
+# Builder item 212: the suites that prove one studio can't read another's data run
+# before every release. Until Nov 2026 they ran by hand on a staging project, last on
+# Jul 5 2026, and that project no longer exists. Now scripts/isolation-scratch.sh makes
+# a throwaway database on the runner, with production's migrations, two studios and
+# both servers from this commit, and runs them there. tests/isolation/README.md says
+# what runs and what doesn't yet.
+#
+# deploy.yml calls this before every production deploy, beside the other checks, so it
+# adds no waiting: it takes about ten minutes, and the browser check takes longer. It
+# runs on a pull request only when one of its own files changes.
+#
+# No repository secret, on purpose. Any signed-in GitHub account can read this public
+# repository's logs, and nothing here needs more than the scratch database's own keys.
+# tests/workflows/isolation_scope_test.mjs holds this file's shape in place.
+
+on:
+  workflow_call:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - .github/workflows/isolation.yml
+      - scripts/isolation-scratch.sh
+      - tests/isolation/**
+  push:
+    branches: [claude/isolation-scratch-212]
+
+permissions:
+  contents: read
+
+env:
+  # The CLI version deploy.yml deploys with, so the scratch database and production
+  # are set up by the same tool. tests/workflows/isolation_scope_test.mjs keeps them equal.
+  SUPABASE_CLI_VERSION: "2.122.0"
+
+jobs:
+  isolation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: "2.9.1"
+      - name: Walls between studios, checked on a scratch database
+        run: bash scripts/isolation-scratch.sh
