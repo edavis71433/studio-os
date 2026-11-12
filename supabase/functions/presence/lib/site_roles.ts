@@ -191,6 +191,7 @@ const MEMBER_WRITES: Array<[MemberWriteNeed, string[]]> = [
     `PATCH /broadcasts/${ID}`,
     `POST /broadcasts/${ID}/cancel`,
     `POST /broadcasts/${ID}/test`,   // bold redesign: "Send me a test" — only ever to the member's own address, so edit, not publish
+    'POST /sales/invoices/test',   // builder item 175: a sample invoice email to the member's own address; nothing is made or charged
     'POST /sales/(contacts|customers|deals|templates)',
     'POST /sales/contacts/imports',   // sales review item 86: starting an import (each row is a POST /sales/contacts)
     'POST /sales/prospects(/discover)?',   // sales review item 112: find businesses, save the ticked ones
