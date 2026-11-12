@@ -76,8 +76,9 @@ export async function gather(agencyId: string, nowIso: string): Promise<Portfoli
   // Speed (final pass, Nov 8: batch B): the customer-links read rides this first
   // wave, and the three reads that wait on it (the latest runs' evidence, the
   // client names, their billing) go side by side — six waits became four.
-  const [sitesQ, momQ, oppQ, planQ, draftQ, connQ, revQ, brandQ, evtQ, runQ, leadsQ, noticesQ, filesQ, slQ] = await Promise.all([
-    svc(`presence_sites?id=in.(${ids.join(',')})&select=id,client_id,edition,status,last_published_at,custom_domain,domain_registrar,domain_expires_at,cert_expires_at,cert_pending_since,domain_serving,domain_statuses&limit=1000`),   // cert_*: item 134 (0149); domain_serving (0153); domain_statuses: item 162 (0162)
+  const SITE_FACTS = 'id,client_id,edition,status,last_published_at,custom_domain,domain_registrar,domain_expires_at,cert_expires_at,cert_pending_since,domain_serving,domain_statuses';   // cert_*: item 134 (0149); domain_serving (0153); domain_statuses: item 162 (0162)
+  const [sitesQ0, momQ, oppQ, planQ, draftQ, connQ, revQ, brandQ, runQ, leadsQ, noticesQ, filesQ, slQ] = await Promise.all([
+    svc(`presence_sites?id=in.(${ids.join(',')})&select=${SITE_FACTS},last_change_at&limit=1000`),   // last_change_at: item 209 (0206)
     svc(`presence_moments?${IN}&status=eq.active&select=site_id,moment_key,moment_type,headline&limit=1000`),
     svc(`presence_growth_opportunities?${IN}&status=eq.open&select=site_id,area,opportunity,timing_ends,created_at&limit=1000`),
     svc(`presence_infra_plans?${IN}&status=in.(proposed,approved)&select=site_id,kind,title,status&limit=1000`),
@@ -85,7 +86,6 @@ export async function gather(agencyId: string, nowIso: string): Promise<Portfoli
     svc(`presence_monitor_connections?${IN}&select=site_id,status,readiness&limit=1000`),
     svc(`presence_ai_reviews?${IN}&status=eq.open&select=site_id,status,open_count&limit=1000`),
     svc(`presence_brand_reports?${IN}&status=eq.open&select=site_id,status,open_count&limit=1000`),
-    svc(`presence_change_events?${IN}&select=site_id,created_at&order=created_at.desc&limit=1000`),
     svc(`presence_evidence_runs?${IN}&finished_at=not.is.null&error_text=is.null&select=id,site_id,started_at&order=started_at.desc&limit=500`),
     svc(`presence_form_submissions?${IN}&status=eq.new&spam=is.false&select=id,site_id,name,email,form_kind,created_at&limit=2000`),   // Section 3: leads waiting (+ who/when for Needs you)
     svc(`presence_plan_notices?${IN}&status=eq.active&select=id,site_id,kind,period,headline,body,created_at&limit=2000`),   // Section 3: attention + billing; item 47: the words too, for the bell's news per site
@@ -96,11 +96,26 @@ export async function gather(agencyId: string, nowIso: string): Promise<Portfoli
   for (const m of ((filesQ.json ?? []) as Array<{ site_id: string; metadata: any }>)) {
     if ((m.metadata || {}).pending_replace) filesPending[m.site_id] = (filesPending[m.site_id] || 0) + 1;
   }
-  // latest change per site + latest run per site (reduce, not re-query)
+  // Item 209 (review file 06, finding 86): each site keeps the time of its own latest
+  // change (0206, kept by a trigger on the change history). The newest 1,000 changes
+  // across every client used to stand in for it, so while one site was busy a quieter
+  // one dropped out and stopped showing its unpublished changes. Before 0206 that read
+  // is refused: the sites are read without it, and the newest changes as before.
+  let sitesQ = sitesQ0;
   const lastChange: Record<string, string> = {};
-  for (const e of (evtQ.json ?? []) as Array<{ site_id: string; created_at: string }>) {
-    if (!lastChange[e.site_id]) lastChange[e.site_id] = e.created_at;
+  if (sitesQ0.ok) {
+    for (const s of (sitesQ0.json ?? []) as Array<{ id: string; last_change_at?: string | null }>) if (s.last_change_at) lastChange[s.id] = s.last_change_at;
+  } else {
+    const [old, evtQ] = await Promise.all([
+      svc(`presence_sites?id=in.(${ids.join(',')})&select=${SITE_FACTS}&limit=1000`),
+      svc(`presence_change_events?${IN}&select=site_id,created_at&order=created_at.desc&limit=1000`),
+    ]);
+    sitesQ = old;
+    for (const e of (evtQ.json ?? []) as Array<{ site_id: string; created_at: string }>) {
+      if (!lastChange[e.site_id]) lastChange[e.site_id] = e.created_at;
+    }
   }
+  // latest run per site (reduce, not re-query)
   const latestRun: Record<string, string> = {};
   for (const r of (runQ.json ?? []) as Array<{ id: string; site_id: string }>) {
     if (!latestRun[r.site_id]) latestRun[r.site_id] = r.id;
@@ -261,6 +276,13 @@ async function handleAgencyInner(req: Request, route: string, method: string, me
   {
     const jwt = req.headers.get('x-dds-user-jwt') || '';
     const r = await handleDoNext(req, route, method, member, principal, cors, { needs: () => computeStudioNeeds(member, principal, jwt, now) });
+    if (r) return r;
+  }
+
+  // ── builder list item 160: every client's monthly report on one card (the studio's Settings);
+  //    loaded only when asked for, as the report job's own module is ──
+  if (route === '/agency/monthly-reports') {
+    const r = await (await import('./monthly_reports.ts')).handleMonthlyReports(route, method, member, cors);
     if (r) return r;
   }
 
