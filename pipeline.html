@@ -2719,7 +2719,7 @@ function renderBoard(){
   const stabs=`<div class="stabs" role="group" aria-label="Stage">${BOARD_STAGES.map(stg=>{const n=open.filter(d=>d.stage===stg).length;return `<button type="button" class="stab" data-stab="${stg}" aria-pressed="${PSTAGE===stg?'true':'false'}">${esc(stageLabel(stg))} <span class="n">${n}</span></button>`;}).join('')}<button type="button" class="stab" data-stab="won" aria-pressed="${PSTAGE==='won'?'true':'false'}">Won <span class="n">${Number(wm.count)||0}</span></button></div>`;
   const qa=quickAddNow(host);   // B19: a half-typed "+ Add a deal" is put back after the redraw
   host.innerHTML=bchipsHtml()+stabs+`<div class="board-scroll"><div class="board with-out">${cols}${outcomeColsHtml()}</div></div>`
-    +(open.length?'':`<div class="mut" style="margin-top:12px">${all.length?'Nothing here — try “All open”.':'No open deals yet. Add one to start the pipeline.'}</div>`)
+    +(open.length?'':`<div class="mut" style="margin-top:12px">${all.length?'Nothing here — try “All open”.':'No open deals yet. Add one to start the pipeline.'}</div>${all.length?'':'<p style="margin-top:12px"><button type="button" class="btn" data-first-deal>+ New deal</button></p>'}`)
     +(terminal>0?`<div class="mut board-foot">${terminal} won or not-a-fit deal${terminal===1?'':'s'} — see them in List view.</div>`:'');
   wireBoard();
   if(qa)openQuickAdd(qa.stg,qa);
@@ -2963,6 +2963,8 @@ function wireBoard(){
 // ND_CONTACT: the contact this dialog already made, kept for a retry. The contact goes in first;
 // when the deal then failed, pressing Add again made a second name-only contact beside the first.
 let ND_CONTACT=null;
+// sales item 105: an empty board's one button is the header's + New deal
+document.addEventListener('click',(e)=>{const x=e.target&&e.target.closest?e.target.closest('[data-first-deal]'):null;if(x){const nd=document.getElementById('newDeal');if(nd)nd.click();}});
 function openNewDeal(){ ND_CONTACT=null; $('f-title').value=''; $('f-email').value=''; $('f-name').value=''; $('f-phone').value=''; $('formDlg').showModal(); setTimeout(()=>$('f-title').focus(),20); }
 // Scoped into a client, POST /sales/deals writes site_id = the CLIENT's site —
 // but deals only ever live on the studio's own site, so the deal would vanish

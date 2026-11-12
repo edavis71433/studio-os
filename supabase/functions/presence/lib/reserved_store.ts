@@ -34,6 +34,7 @@ export const RESERVED_NAMES = {
   bookingOptions: '__booking_options__',  // builder list item 149: customers may change or cancel; the owner's own calendar's private address (lib/booking_links.ts)
   projectTemplates: '__project_templates__',   // sales item 106: the studio's own project templates (lib/project_templates.ts)
   todoLists: '__todo_lists__',            // sales item 106: the studio's saved lists of deal to-dos (lib/todo_templates.ts)
+  setupStrip: '__setup_strip__',          // sales item 105: whether the studio hid Home's setup strip (routes/setup_strip.ts)
   bookingBusy: '__booking_busy__',        // builder list item 149: the busy times last read from that calendar, and how the last read went (routes/booking.ts)
 } as const;
 

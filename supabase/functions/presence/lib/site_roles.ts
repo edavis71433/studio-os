@@ -124,6 +124,7 @@ const MEMBER_WRITES: Array<[MemberWriteNeed, string[]]> = [
     '(POST|DELETE) /calendar/link',   // sales review item 46: making or turning off the private calendar link is a setting
     '(POST|DELETE) /email/log-address',   // sales review item 69: the private log-this-email address is a setting too
     'POST /reviews/google-link',   // sales review item 115: where Google review requests send people is a setting
+    'POST /sales/setup',   // sales item 105: hiding Home's setup strip is the studio's setting
     'PUT /report/monthly', 'POST /report/monthly/preview',   // builder list item 58: the client's monthly report is a setting; its preview emails the caller
     '(POST|DELETE) /foundations/domain',
     '(POST|DELETE) /foundations/domain/forward',   // builder list item 174: another domain forwarding here is a domain setting
