@@ -931,6 +931,8 @@ function paintAutomations() {
   const typing = document.activeElement;
   const setVal = (id, v, key) => { const el = $(id); if (el !== typing && !AUTO_FLIGHT[key]) el.value = v; };
   const setSw = (id, key) => { if (!AUTO_FLIGHT[key]) $(id).setAttribute('aria-checked', st[key] === true ? 'true' : 'false'); };
+  // the sentence beside a days box follows the box, so it is left alone while that box is typed in
+  const echoes = (id, key) => $(id) !== typing && !AUTO_FLIGHT[key];
   setSw('sw-ack', 'auto_ack_enquiries'); setSw('sw-inv', 'invoice_reminders'); setSw('sw-deal', 'deal_nudges'); setSw('sw-rev', 'review_requests');
   setSw('sw-fu', 'enquiry_followups'); setSw('sw-inv2', 'invoice_overdue_repeat'); setSw('sw-exp', 'quote_expiry_reminders');   // item 87
   setVal('w-ack', String(st.auto_ack_message || ''), 'auto_ack_message'); setVal('w-fu1', String(st.enquiry_followup_1_message || ''), 'enquiry_followup_1_message'); setVal('w-fu2', String(st.enquiry_followup_2_message || ''), 'enquiry_followup_2_message');
@@ -942,12 +944,12 @@ function paintAutomations() {
   $('automations').querySelectorAll('.swrow').forEach((row) => { row.hidden = !!SCOPE && !row.hasAttribute('data-scoped'); });
   $('autoHint').textContent = SCOPE ? 'What ' + possessive(scopeName() || 'this client') + ' website sends when someone writes in. Each saves as you flip it.' : 'Ready-made recipes, and the switches behind them. Each saves as you flip it.';
   const nRev = Number(st.review_request_after_days) >= 1 ? Math.trunc(Number(st.review_request_after_days)) : 3;
-  setVal('n-rev', String(nRev), 'review_request_after_days'); if (!AUTO_FLIGHT.review_request_after_days) $('n-rev-echo').textContent = String(nRev);
+  setVal('n-rev', String(nRev), 'review_request_after_days'); if (echoes('n-rev', 'review_request_after_days')) $('n-rev-echo').textContent = String(nRev);
   $('say-rev').textContent = reviewAskSentence(IDENT && IDENT.business_name);
   const nInv = Number(st.invoice_remind_after_days) >= 1 ? Math.trunc(Number(st.invoice_remind_after_days)) : 2;
   const nDeal = Number(st.deal_nudge_days) >= 1 ? Math.trunc(Number(st.deal_nudge_days)) : 3;
-  setVal('n-inv', String(nInv), 'invoice_remind_after_days'); if (!AUTO_FLIGHT.invoice_remind_after_days) $('n-inv-echo').textContent = String(nInv);
-  setVal('n-deal', String(nDeal), 'deal_nudge_days'); if (!AUTO_FLIGHT.deal_nudge_days) $('say-deal').textContent = dealNudgeSentence(nDeal);
+  setVal('n-inv', String(nInv), 'invoice_remind_after_days'); if (echoes('n-inv', 'invoice_remind_after_days')) $('n-inv-echo').textContent = String(nInv);
+  setVal('n-deal', String(nDeal), 'deal_nudge_days'); if (echoes('n-deal', 'deal_nudge_days')) $('say-deal').textContent = dealNudgeSentence(nDeal);
   if (!STALE_SAVING) paintStaleDays();   // C3: never under a change still waiting to save
   $('automations').hidden = false;
   if (SCOPE) return;   // the studio's own sections stay out of a client's settings

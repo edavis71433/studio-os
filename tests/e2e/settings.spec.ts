@@ -458,6 +458,25 @@ test.describe('Settings — automations', () => {
     await expect.poll(() => sent.map((p) => p.body)).toEqual([{ review_requests: true }, { review_request_after_days: 5 }]);
   });
 
+  test('a slow answer to the switch never puts the old number back in the sentence while a new one is typed', async ({ page }) => {
+    await installApp(page, { api: { ...API, '/settings': { data: { ...SAVED, review_requests: false, review_request_after_days: 3 } } } });
+    let release = () => {};
+    const held = new Promise<void>((r) => { release = r; });
+    await page.route('**/functions/v1/presence/settings', async (route) => {
+      if (route.request().method() !== 'PUT') return route.fallback();
+      await held;
+      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: { ...SAVED, review_requests: true, review_request_after_days: 3 } }) });
+    });
+    await page.goto('/settings.html#automations');
+    await page.locator('#sw-rev').click();
+    await page.locator('#n-rev').fill('5');
+    await expect(page.locator('#n-rev-echo')).toHaveText('5');
+    release();
+    await expect(page.locator('.dds-toast, #toast').filter({ hasText: 'Saved.' }).first()).toBeVisible();
+    await expect(page.locator('#n-rev')).toHaveValue('5');
+    await expect(page.locator('#n-rev-echo')).toHaveText('5');
+  });
+
   test('a saved row paints on; flipping a switch PUTs just that field and the sentence follows N', async ({ page }) => {
     await installApp(page, { api: { ...API, '/settings': { data: SAVED } } });
     const sent = await puts(page, SAVED);
