@@ -117,6 +117,8 @@ const D = { month: '2026-10', monthLabel: 'October 2026', visitors: 812, pagevie
   ok('card: on, one more person, a copy, picking, last sent', maple.enabled && maple.more === 1 && maple.copy && maple.propose === 'auto' && maple.last.status === 'sent' && maple.blocked === null);
   ok('card: an unreadable setting reads as off; an unsubscribed client says so', !blue.enabled && blue.blocked === 'unsubscribed');
   ok('card: no email on their record says so; the name falls back to the client’s', ortiz.blocked === 'no_email' && ortiz.name === 'Ortiz Photography');
+  ok('card: who it goes to by first name, for “Sam + 1 more”', maple.who === 'Sam' && blue.who === 'Jo');
+  ok('card: a first word that isn’t a name is left out', reportRows({ ids: ['s-x'], sites: [{ id: 's-x', client_id: 'c-x' }], names: [], clients: [{ id: 'c-x', email: 'x@x.example', name: 'x@x.example' }], settings: [], suppressed: {} })[0].who === '');
 }
 
 // ── wiring ──

@@ -15,9 +15,11 @@ import { normalizeReportSetting, blockedReason } from '../ops/monthly_report.ts'
 
 const rows = (r: unknown): any[] => { const j = (r as { json?: unknown } | null)?.json; return Array.isArray(j) ? j : []; };
 const safe = async <T>(p: Promise<T>): Promise<T | null> => { try { return await p; } catch { return null; } };
+// the first word of the person's name, for "Sam + 1 more", when it reads as a name
+const firstWord = (name: unknown) => { const w = String(name || '').trim().split(/\s+/)[0] || ''; return /^[\p{L}][\p{L}'’.-]{0,30}$/u.test(w) ? w : ''; };
 
 export interface ReportRow {
-  site_id: string; name: string; email: string | null; enabled: boolean; blocked: string | null;
+  site_id: string; name: string; who: string; email: string | null; enabled: boolean; blocked: string | null;
   more: number; copy: boolean; propose: 'off' | 'auto' | 'own'; last: { month: string; status: string; reason: string | null } | null;
 }
 
@@ -40,7 +42,7 @@ export function reportRows(i: {
     const email = client?.email ? String(client.email).trim() : null;
     const name = String(i.names.find((n) => n.site_id === id)?.business_name || client?.name || '').trim() || 'Unnamed client';
     out.push({
-      site_id: id, name, email, enabled: s.enabled,
+      site_id: id, name, who: firstWord(client?.name), email, enabled: s.enabled,
       blocked: blockedReason(email, email ? i.suppressed[email.toLowerCase()] || null : null),
       more: s.cc.length, copy: !!s.copy_to, propose: s.propose.mode,
       last: s.last_result ? { month: s.last_result.month, status: s.last_result.status, reason: s.last_result.reason } : null,
