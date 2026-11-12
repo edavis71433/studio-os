@@ -6,7 +6,8 @@ import { installApp, ALL_FEATURES, STUDIO_LEVEL_NAV, CLIENT_NAV } from './helper
 // their page. One button on every page now logs a call, adds a deal, sends an
 // invoice, opens a proposal or adds a to-do; you pick WHO inside the form.
 // The sidebar carries it on a computer and an iPad; a studio's phone bar is
-// Home · Inbox · + · Pipeline · Customers. Runs at all three sizes.
+// Home · Sites · + · Inbox · Menu (builder item 165; it was Home · Inbox · + ·
+// Pipeline · Customers). Runs at all three sizes.
 
 const day = (n: number, from = new Date()) => { const d = new Date(from); d.setHours(12, 0, 0, 0); d.setDate(d.getDate() + n); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); };
 const friday = () => { const d = new Date(); const f = (5 - d.getDay() + 7) % 7; return day(f === 0 ? 7 : f); };
@@ -35,11 +36,16 @@ const PEOPLE = [
 const FAR = [{ id: 'c9', name: 'Zed Far', company: 'Far & Wide', email: 'zed@example.com', updated_at: '2025-01-01T10:00:00Z' }];
 const THEIR_DEALS: Record<string, unknown[]> = { c3: [], c9: [{ id: D9, title: 'Zed — retainer', stage: 'qualified' }] };
 
+// a studio's menu has Sites second (lib/navigation.ts buildNav)
+const SITES = { key: 'sites', label: 'Sites', items: [
+  { key: 'sites', label: 'Sites', href: '/sites.html' },
+  { key: 'domains', label: 'Domains', href: '/domains.html', hidden: true },
+] };
 const STUDIO_CTX = { data: {
   site_role: 'business_owner', edition: 'presence', edition_key: 'studio_os', edition_name: 'Studio OS', edition_features: ALL_FEATURES,
   is_agency: true, is_operator: false, sees_full_workspace: true, is_client_portal: false,
   capabilities: ['edit', 'publish', 'invite', 'configure', 'use_developer_mode', 'view_all'],
-  landing: '/agency.html', attention_count: 0, nav: STUDIO_LEVEL_NAV, plan_key: 'presence', upsell: null, scope: null,
+  landing: '/agency.html', attention_count: 0, nav: [STUDIO_LEVEL_NAV[0], SITES, ...STUDIO_LEVEL_NAV.slice(1)], plan_key: 'presence', upsell: null, scope: null,
 } };
 const dealDetail = (id: string, title: string, proposals: unknown[] = []) => ({ data: {
   deal: { id, title, stage: 'proposal', expected_value_cents: 250000, expected_close: null, next_step: null, next_step_at: null, notes: '', contact_id: 'c1', converted_client_id: null, retainer: null },
@@ -125,10 +131,10 @@ test.describe('+ Create', () => {
       await expect(page.locator('#dds-create')).toBeHidden();
       const bar = page.locator('#dds-mbar');
       await expect(bar.locator('> a, > button')).toHaveCount(5);
-      expect(await bar.locator('> a, > button').evaluateAll((els) => els.map((e) => e.id || (e.textContent || '').trim()))).toEqual(['Home', 'Inbox', 'dds-mbar-create', 'Pipeline', 'Customers']);
+      expect(await bar.locator('> a, > button').evaluateAll((els) => els.map((e) => e.id || (e.textContent || '').trim()))).toEqual(['Home', 'Sites', 'dds-mbar-create', 'Inbox', 'dds-mbar-menu']);
       await expect(bar.locator('#dds-mbar-create')).toHaveAttribute('aria-label', 'Create');
-      await expect(bar.locator('#dds-mbar-menu')).toHaveCount(0);   // the rest of the menu is the top bar's App Launcher
-      await expect(page.locator('#dds-waffle')).toBeVisible();
+      await expect(bar.locator('#dds-mbar-menu')).toHaveText('Menu');   // builder item 165: the rest of the menu, Pipeline and Customers included
+      await expect(page.locator('#dds-waffle')).toBeHidden();
     } else {
       const btn = page.locator('#dds-create');
       await expect(btn).toBeVisible();
@@ -493,7 +499,7 @@ test.describe('+ Create', () => {
 
 // ── Nov 10 review, bug hunt group A ──
 test.describe('+ Create: the bug hunt fixes (A3, A8, A9)', () => {
-  test('A3 — a studio that hid Pipeline in Your menu keeps the + on a phone: Home · Inbox · + · Menu', async ({ page }) => {
+  test('A3 — a studio that hid Pipeline in Your menu keeps the + on a phone: Home · + · Inbox · Menu', async ({ page }) => {
     test.skip(!isPhone(page), 'the phone bar');
     const nav = STUDIO_LEVEL_NAV.map((s) => s.key === 'pipeline' ? { ...s, items: s.items.map((i) => ({ ...i, hidden: true })) } : s);
     await installApp(page, { api: { ...FIXTURES, '/portal/context': { data: { ...STUDIO_CTX.data, nav } } } });
@@ -501,7 +507,7 @@ test.describe('+ Create: the bug hunt fixes (A3, A8, A9)', () => {
     await page.goto('/agency.html');
     const bar = page.locator('#dds-mbar');
     await expect(bar.locator('#dds-mbar-create')).toBeVisible();
-    expect(await bar.locator('> a, > button').evaluateAll((els) => els.map((e) => e.id || (e.textContent || '').trim()))).toEqual(['Home', 'Inbox', 'dds-mbar-create', 'dds-mbar-menu']);
+    expect(await bar.locator('> a, > button').evaluateAll((els) => els.map((e) => e.id || (e.textContent || '').trim()))).toEqual(['Home', 'dds-mbar-create', 'Inbox', 'dds-mbar-menu']);   // this menu has no Sites (item 165 puts it second when it does)
     await bar.locator('#dds-mbar-create').click();
     await expect(dlg(page).locator('.cr-item')).toHaveCount(7);
   });
