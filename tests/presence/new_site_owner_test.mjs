@@ -84,6 +84,7 @@ function rowsFor(table, params) {
   const lim = Number(params.get('limit')); if (lim) rows = rows.slice(0, lim);
   return rows;
 }
+let MAIL_DOWN = false;   // builder item 192: the mail service refuses the email
 globalThis.fetch = async (url, init = {}) => {
   const u = new URL(String(url), 'http://stub.local');
   const method = (init.method || 'GET').toUpperCase();
@@ -95,7 +96,7 @@ globalThis.fetch = async (url, init = {}) => {
     const name = body?.name || u.pathname.split('/').pop();
     return reply({ id: 'nf-new', name, default_domain: `${name}.netlify.app`, state: 'ready' }, method === 'POST' ? 201 : 200);
   }
-  if (u.host === 'api.resend.com') { outside.push({ to: 'resend', method, body }); return reply({ id: 'em-1' }); }
+  if (u.host === 'api.resend.com') { outside.push({ to: 'resend', method, body }); return MAIL_DOWN ? reply({ message: 'refused' }, 422) : reply({ id: 'em-1' }); }
   if (u.pathname.startsWith('/auth/v1/')) {
     outside.push({ to: 'auth', method, path: u.pathname, body });
     if (u.pathname === '/auth/v1/admin/users' && method === 'POST') return opts.authExists ? reply({ msg: 'A user with this email address has already been registered' }, 422) : reply({ id: crypto.randomUUID(), email: body.email }, 200);
@@ -217,6 +218,23 @@ let MADE;
   const r = await call(asMember(), 'POST', `/agency/sites/${made.site_id}/invite`, { email: 'june@juniper.example' });
   ok('invite race: the loser hears "already has an owner"', r.status === 409 && r.body.error === 'has_owner');
   ok('invite race: its sign-in and contact were taken back, and no email went out', outside.some((o) => o.to === 'auth' && o.method === 'DELETE') && writes.some((w) => w.table === 'contacts' && w.method === 'DELETE') && !(T.contacts || []).length && !outside.some((o) => o.to === 'resend'));
+}
+
+// ── Builder item 192: "Invitation sent" only when the email really left ──
+// The mail service refuses the email (a bounced address, an outage). The owner still gets
+// their sign-in and becomes a customer, but the answer says the email didn't go and hands
+// the studio the sign-in page to share. Before, it answered invited: true whatever happened.
+{
+  reset();
+  const made = (await call(asMember(), 'POST', '/agency/sites', { business_name: 'Juniper Floral Co.' })).body.data;
+  writes = []; outside = [];
+  MAIL_DOWN = true;
+  const r = await call(asMember(), 'POST', `/agency/sites/${made.site_id}/invite`, { email: 'june@juniper.example', name: 'June Park' });
+  MAIL_DOWN = false;
+  ok('invite, email refused: the email was tried before the answer came back', outside.some((o) => o.to === 'resend'));
+  ok('invite, email refused: 200, and it does not say invited', r.status === 200 && r.body.data.invited === false, JSON.stringify(r.body));
+  ok('invite, email refused: the studio gets the sign-in page to share, under its own name', r.body.data.portal_url === `https://davisdigitalstudio.com/portal.html?studio=${OWN}`, r.body.data.portal_url);
+  ok('invite, email refused: the owner still has their sign-in and is a customer', outside.some((o) => o.to === 'auth' && o.path === '/auth/v1/admin/users' && o.method === 'POST') && (T.presence_projects || []).some((p) => p.site_id === OWN && p.client_id === made.client_id));
 }
 
 // ── POST /agency/sites/:id/invite: the owner gets a sign-in and becomes a customer ──

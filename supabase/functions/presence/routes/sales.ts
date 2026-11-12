@@ -2648,7 +2648,7 @@ export async function handleSalesConvert(req: Request, site: SiteRow, principal:
       method: 'PATCH', body: JSON.stringify({ customer_client_id: clientId, customer_site_id: acct.siteId || null }),
     });
   } catch { /* best-effort — the studio-side record is already correct */ }
-  return json({ data: { converted: true, client_id: clientId, site_id: acct.siteId, project_id: handoff.project?.id || null, hosted: acct.hosted, invited, managed, plan, onboarding: '/get-started.html' } }, 200, cors);
+  return json({ data: { converted: true, client_id: clientId, site_id: acct.siteId, project_id: handoff.project?.id || null, hosted: acct.hosted, invited, portal_url: `${siteUrl()}/portal.html?studio=${site.id}`, managed, plan, onboarding: '/get-started.html' } }, 200, cors);
 }
 
 /** Re-send the welcome / sign-in email to an already-converted customer —
@@ -2821,6 +2821,12 @@ async function linkAgencyPortfolio(principal: Principal, siteId: string | undefi
  *  can be minted, a signed set-password link is the fallback; if neither can, the
  *  plain portal door (one-time code). Best-effort — never blocks the set-up.
  *
+ *  Answers TRUE ONLY WHEN THE EMAIL LEFT (builder item 192). It used to send without
+ *  waiting and answer true whatever happened, so "Invitation sent" showed for an
+ *  address on the bounce list, with the mail service down, or with no mail key at
+ *  all. Every caller hands the answer to its page as `invited`, and the pages
+ *  already say "our email didn't go out, share their sign-in page" for false.
+ *
  *  ON THE STUDIO'S BRAND, in the studio's voice — never the platform's. The
  *  client just signed with THEIR studio; a "welcome to Studio OS" from an
  *  unknown sender reads like phishing and breaks the same secrecy rule
@@ -2857,7 +2863,7 @@ export async function sendCustomerInvite(siteId: string, email: string, _isNewLo
     : link
     ? `<p class="cta"><a href="${link}" style="${btnStyle}">Create your password &amp; sign in →</a></p>`
     : `<p class="cta"><a href="${base}/portal.html?studio=${siteId}" style="${btnStyle}">Sign in at your portal →</a></p><p style="font-size:13px;color:#6b6478">No password needed — we’ll email you a one-time code.</p>`;
-  sendEmail(email, `Your client portal is ready${studioName ? ` — ${studioName}` : ''}`,
+  const left = await sendEmail(email, `Your client portal is ready${studioName ? ` — ${studioName}` : ''}`,
     `<p>Welcome — your client portal is ready. It’s the one place where we work together from here:</p>` +
     `<ul style="margin:8px 0;padding-left:20px">` +
     `<li>watch your project’s progress as it happens</li>` +
@@ -2867,8 +2873,8 @@ export async function sendCustomerInvite(siteId: string, email: string, _isNewLo
     `</ul>` +
     cta +
     `<p style="font-size:13px;color:#6b6478">You can sign in any time at <a href="${base}/portal.html?studio=${siteId}">your portal</a>. If anything looks off, just reply to this email.</p>`,   // builder list item 59: the sign-in page shows the studio's name and logo
-  brand, { critical: true, asBusiness: true, siteId }).catch(() => {});   // login access = transactional; a message to the studio — their answer lands in the Inbox
-  return true;
+  brand, { critical: true, asBusiness: true, siteId }).catch(() => false);   // login access = transactional; a message to the studio — their answer lands in the Inbox
+  return left === true;
 }
 
 /** Form the Agency–Client Bridge for a customer that has NO originating deal (a

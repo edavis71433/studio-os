@@ -3725,7 +3725,7 @@ async function openDeal(id){
         <div class="mut" style="margin-top:6px">Adding them creates their <strong>client portal</strong> and emails them a link to set their password and sign in — that’s where they work with you: files, approvals, messages, invoices. You bill them for your work the usual way — they never pay for software here. You can change this later.</div>
         <div class="row2" style="margin-top:10px"><button class="btn ghost" id="convNo">Cancel</button><button class="btn" id="convYes">Yes, add them as my customer</button></div>`;
       $('convNo').onclick=()=>openDeal(id);
-      $('convYes').onclick=async()=>{$('convYes').disabled=true;try{const plan=($('convPlan')&&$('convPlan').value)||'presence';const r=await api('/sales/deals/'+id+'/convert','POST',{plan});const x=r.data||{};toast('Converted — workspace + project ready'+(x.idempotent?' (already done)':(x.invited?', customer invited':'')));
+      $('convYes').onclick=async()=>{$('convYes').disabled=true;try{const plan=($('convPlan')&&$('convPlan').value)||'presence';const r=await api('/sales/deals/'+id+'/convert','POST',{plan});const x=r.data||{};toast('Converted — workspace + project ready'+(x.idempotent?' (already done)':(x.invited?', customer invited':'. Our welcome email didn’t go out: use Resend welcome email, or share their sign-in page')),!x.idempotent&&!x.invited);
         // "Won stays put": when this panel is embedded in the unified Client Record,
         // tell the record to reveal + switch to Delivery — the relationship never
         // jumps to a separate destination at closed-won.
