@@ -9,6 +9,7 @@
 // SDK activity — there is no in-app runtime code editor, by design (determinism +
 // no-foreign-code are Product Laws). Pure.
 import { sanitizeCustomCss } from './custom_css.ts';
+import { cleanDevHtml, DEV_HTML_ALLOW } from './dev_html.ts';
 
 export interface DevCustomization {
   theme_tokens: Record<string, string>;   // e.g. { accent:'#5b3fa0', ink:'#1b1525' }
@@ -50,46 +51,17 @@ export function validateThemeTokens(input: unknown): { tokens: Record<string, st
   return { tokens, rejected };
 }
 
-/** Strip anything that could execute or exfiltrate. Denylist + defensive: no
- *  <script>/<iframe>/<object>/<embed>/<link>/<meta>/<style>, no on*= handlers,
- *  no javascript:/data:/vbscript: URLs, no <base>. What remains is inert markup.
- *  DEFENSE LAYERS (published sites): (1) this sanitizer — denylist + an allow-list
- *  tag pass (DEV_HTML_ALLOW) below; (2) re-sanitization at RENDER time (render.ts
- *  never trusts stored values); (3) a partial published-site CSP (object-src
- *  'none' + base-uri 'self', render.ts injectCsp). STILL QUEUED before granting
- *  `developer` beyond trusted people: a STRICT script-src CSP (needs the per-site
- *  analytics script hashed/externalised + a browser smoke) and a full HTML parser.
- *  Until those land, keep the `developer` role narrow. */
+/** Make a developer's HTML block safe (builder item 190). The block is read the way
+ *  a browser reads it and written out again from an allow list (lib/dev_html.ts):
+ *  only the content tags in DEV_HTML_ALLOW, only each tag's listed attributes, no
+ *  on…= handler, no style=, and only http, https, mailto, tel or on-site addresses,
+ *  judged after decoding. DEFENSE LAYERS (published sites): (1) this cleaner on
+ *  save; (2) the same cleaner again at RENDER time (render.ts never trusts stored
+ *  values); (3) the published site's own script rule (lib/site_csp.ts). */
 export function sanitizeDevHtml(html: string): string {
-  let s = String(html || '');
-  // remove dangerous elements entirely (with their content)
-  s = s.replace(/<\s*(script|style|iframe|object|embed|link|meta|base|form|noscript|template|svg|math)\b[\s\S]*?<\s*\/\s*\1\s*>/gi, '');
-  // remove self-closing / unclosed dangerous tags
-  s = s.replace(/<\s*(script|style|iframe|object|embed|link|meta|base|svg|math)\b[^>]*>/gi, '');
-  // strip on*= event handler attributes (quoted or unquoted)
-  s = s.replace(/\son[a-z]+\s*=\s*"[^"]*"/gi, '').replace(/\son[a-z]+\s*=\s*'[^']*'/gi, '').replace(/\son[a-z]+\s*=\s*[^\s>]+/gi, '');
-  // neutralize dangerous URL schemes in href/src
-  s = s.replace(/(href|src|xlink:href)\s*=\s*("|')\s*(javascript|data|vbscript):[^"']*\2/gi, '$1=$2#$2');
-  // strip style="" attributes that could contain url()/expression() (custom_css is the sanctioned styling channel)
-  s = s.replace(/\sstyle\s*=\s*"[^"]*"/gi, '').replace(/\sstyle\s*=\s*'[^']*'/gi, '');
-  // allow-list pass (defense-in-depth toward a parser): keep only safe content
-  // tag wrappers; any other tag is stripped (its inner text is preserved). The
-  // denylist above already removed the dangerous elements with their content;
-  // this ensures nothing exotic survives even if the denylist is later widened.
-  s = s.replace(/<\/?([a-zA-Z][a-zA-Z0-9-]*)\b[^>]*>/g, (m, tag) => DEV_HTML_ALLOW.has(String(tag).toLowerCase()) ? m : '');
-  return s.trim();
+  return cleanDevHtml(html);
 }
-
-/** The only element wrappers permitted in a developer HTML block — presentational
- *  content tags. No scripting, embedding, form, or metadata elements. */
-export const DEV_HTML_ALLOW: ReadonlySet<string> = new Set([
-  'div', 'span', 'p', 'a', 'img', 'picture', 'source', 'figure', 'figcaption',
-  'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'ul', 'ol', 'li', 'strong', 'em', 'b', 'i',
-  'u', 's', 'small', 'sub', 'sup', 'br', 'hr', 'blockquote', 'q', 'cite', 'pre',
-  'code', 'section', 'article', 'header', 'footer', 'nav', 'aside', 'main',
-  'address', 'table', 'thead', 'tbody', 'tfoot', 'tr', 'td', 'th', 'caption',
-  'col', 'colgroup', 'dl', 'dt', 'dd', 'time', 'mark', 'abbr',
-]);
+export { DEV_HTML_ALLOW };
 
 /** Custom CSS is inert (no execution). Sanitizing is delegated to the single
  *  hardened boundary in lib/custom_css.ts (the "Developer" story, layer 1): length
@@ -104,10 +76,18 @@ export function sanitizeDevCss(css: string): string {
 
 /** Build the safe, validated customization from raw input. */
 export function buildCustomization(raw: { theme_tokens?: unknown; custom_css?: unknown; custom_html?: unknown }): DevCustomization {
+  // The cap is applied to what goes IN, so a cut can never land inside a tag that was
+  // already checked; a block that still comes out too long is cut shorter and cleaned again.
+  let source = String(raw.custom_html ?? '').slice(0, 50_000);
+  let custom_html = sanitizeDevHtml(source);
+  while (custom_html.length > 50_000) {
+    source = source.slice(0, Math.floor(source.length * 0.9));
+    custom_html = sanitizeDevHtml(source);
+  }
   return {
     theme_tokens: validateThemeTokens(raw.theme_tokens).tokens,
     custom_css: sanitizeDevCss(String(raw.custom_css ?? '')),
-    custom_html: sanitizeDevHtml(String(raw.custom_html ?? '')).slice(0, 50_000),
+    custom_html,
   };
 }
 
