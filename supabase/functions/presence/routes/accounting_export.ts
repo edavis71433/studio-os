@@ -68,5 +68,5 @@ export async function handleAccountingExport(req: Request, site: SiteRow, princi
     { name: 'payments.csv', data: enc.encode(toCsv(PAYMENT_HEAD, pay.rows)) },
     { name: 'READ-ME.txt', data: enc.encode(exportReadMe(p, inv, pay, book.partial)) },
   ]);
-  return new Response(zip.buffer as ArrayBuffer, { status: 200, headers: { ...cors, 'Content-Type': 'application/zip', 'Content-Disposition': `attachment; filename="for-your-bookkeeper-${p.from}-to-${p.to}.zip"`, 'Cache-Control': 'no-store' } });
+  return new Response(zip.buffer as ArrayBuffer, { status: 200, headers: { ...cors, 'Access-Control-Expose-Headers': 'Content-Disposition', 'Content-Type': 'application/zip', 'Content-Disposition': `attachment; filename="for-your-bookkeeper-${p.from}-to-${p.to}.zip"`, 'Cache-Control': 'no-store' } });
 }

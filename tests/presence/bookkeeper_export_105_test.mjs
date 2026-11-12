@@ -81,7 +81,7 @@ const world = () => ({
 const get = (q, who = owner) => X.handleAccountingExport(new Request(`https://fn.test/functions/v1/presence/sales/export/accounting?${q}`), site, who, cors);
 db.reset(world());
 let r = await get('from=2026-10-01&to=2026-10-31&tzo=420&today=2026-11-12');
-ok('route: a zip, named for the days, never cached', r.status === 200 && r.headers.get('Content-Type') === 'application/zip' && /for-your-bookkeeper-2026-10-01-to-2026-10-31\.zip/.test(r.headers.get('Content-Disposition') || '') && r.headers.get('Cache-Control') === 'no-store');
+ok('route: a zip, named for the days, never cached', r.status === 200 && r.headers.get('Content-Type') === 'application/zip' && /for-your-bookkeeper-2026-10-01-to-2026-10-31\.zip/.test(r.headers.get('Content-Disposition') || '') && r.headers.get('Cache-Control') === 'no-store' && r.headers.get('Access-Control-Expose-Headers') === 'Content-Disposition');
 const files = unzip(await r.arrayBuffer());
 eq('route: three files', Object.keys(files).sort(), ['READ-ME.txt', 'invoices.csv', 'payments.csv']);
 ok('route: invoices.csv has this studio\'s two invoices for its customer', files['invoices.csv'].includes('0031,Harbor Dental,10/05/2026,11/20/2026') && files['invoices.csv'].includes('0032,Harbor Dental') && !files['invoices.csv'].includes('Someone else'));

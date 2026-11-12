@@ -213,6 +213,7 @@ const DECIDED = {
     'POST /sales/customers', 'POST /sales/deals', 'POST /sales/deals/:id/activity',
     'POST /sales/tasks', 'POST /sales/people/activity',   // sales items 85 and 106: to-dos and calls for anyone
     'POST /sales/email',   // sales item 80: an email from the record, like the reply to an enquiry
+    'POST /handover/notify',   // sales item 93: the hand-over pack email (only a studio scoped in gets past the route)
     'POST /sales/deals/:id/contracts', 'POST /sales/deals/:id/convert', 'POST /sales/deals/:id/invoice',
     'POST /sales/deals/:id/proposals', 'POST /sales/deals/:id/resend-invite', 'POST /sales/deals/:id/retainer',
     'POST /sales/deals/:id/schedule', 'POST /sales/deals/:id/send', 'POST /sales/deals/:id/stage',
@@ -510,6 +511,7 @@ const WRITE_HANDLERS = [
   'handleWriteExecute', 'handleWritePrepare', 'handleWriteRollback', 'handleWriterAccept', 'handleWriterDiscard',
   'handleWriterGenerate', 'handleWriterRewrite',
   'handleSetupStrip',   // sales item 105: POST hides Home's setup strip (configure)
+  'handleHandoverPack',   // sales item 93: POST /handover/notify (edit; the route refuses anyone but the studio)
 ];
 {
   const idx = read('supabase/functions/presence/index.ts');

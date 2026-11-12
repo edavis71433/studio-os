@@ -821,6 +821,7 @@ async function route_(req: Request, cors: Record<string, string>): Promise<Respo
   if (route === '/sales/stages' && (method === 'GET' || method === 'PUT')) return handleSalesStages(req, site, principal, cors);   // sales review item 38: rename the open stages
   if (route === '/email/sending' && method === 'GET') return handleEmailSending(cors);
   if (route === '/sales/export' && method === 'GET') return handleSalesExport(site, principal, cors);   // sales review item 69: one zip of CSVs
+  if ((route === '/handover/pack' && method === 'GET') || (route === '/handover/notify' && method === 'POST')) return (await import('./routes/handover_pack.ts')).handleHandoverPack(req, site, principal, cors);   // sales item 93: the hand-over pack for a client who leaves
   if (route === '/sales/setup' && (method === 'GET' || method === 'POST')) return (await import('./routes/setup_strip.ts')).handleSetupStrip(req, site, principal, cors);   // sales item 105: Home's setup strip
   if (route === '/sales/export/accounting' && method === 'GET') return (await import('./routes/accounting_export.ts')).handleAccountingExport(req, site, principal, cors);   // sales item 105: the export for a bookkeeper
   // ── Prospects — the lead list (Semrush review, sales item 112). Lazy: most days nobody prospects. ──
