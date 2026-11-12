@@ -1,7 +1,8 @@
 // ── deploy.yml and rollback.yml: what has to pass before production changes ──
 //   deno run --allow-read --allow-write --allow-run --allow-env tests/workflows/deploy_gate_test.mjs
 // Holds three things in place, each one broken before Nov 8 2026:
-// - a production deploy runs ci.yml itself, not a weaker copy of it;
+// - a production deploy runs ci.yml itself, not a weaker copy of it, and (item 212, Nov 12)
+//   the walls-between-studios check, isolation.yml;
 // - it waits for the browser check on the commit it deploys, and stops unless it
 //   passed (the real step runs here against a stand-in `gh`, so no network);
 // - deploy and rollback both cover every function, and rollback smoke-tests the Free Tools.
@@ -23,7 +24,11 @@ const JOBS = jobsOf(DEPLOY);
 ok('the pre-deploy gate is ci.yml itself', /^ {4}uses: \.\/\.github\/workflows\/ci\.yml$/m.test(JOBS.test || '') && !/^ {4}steps:/m.test(JOBS.test || ''));
 ok('ci.yml can be called by another workflow', /^on:\n(?: {2}.*\n|(?: {4}.*\n))*? {2}workflow_call:/m.test(CI));
 ok('the deploy has no test loop or typecheck of its own to drift', !/deno check|_test\.mjs|setup-deno/.test(DEPLOY));
-ok('production waits for the gate and for the browser check', /^ {4}needs: \[test, browser-gate\]$/m.test(JOBS['deploy-production'] || ''));
+ok('production waits for the gate, the browser check and the walls between studios', /^ {4}needs: \[test, browser-gate, isolation\]$/m.test(JOBS['deploy-production'] || ''));
+// Builder item 212: the suites that prove one studio can't read another's data run before every
+// release, on a scratch database (isolation.yml; tests/workflows/isolation_scope_test.mjs holds its shape).
+ok('the walls between studios are checked by isolation.yml itself', /^ {4}uses: \.\/\.github\/workflows\/isolation\.yml$/m.test(JOBS.isolation || '') && !/^ {4}(steps|if):/m.test(JOBS.isolation || ''));
+ok('isolation.yml can be called by another workflow', /^on:\n(?: {2}.*\n|(?: {4}.*\n))*? {2}workflow_call:/m.test(read('.github/workflows/isolation.yml')));
 ok('there is no staging job (item 112: no staging project ever existed)', !JOBS['deploy-staging'] && !DEPLOY.includes('SUPABASE_PROJECT_REF_STAGING') && !ROLLBACK.includes('SUPABASE_PROJECT_REF_STAGING'));
 ok('a deploy only starts by hand', /^on:\n {2}workflow_dispatch:/m.test(DEPLOY) && !/^ {2}push:/m.test(DEPLOY.slice(0, DEPLOY.indexOf('\njobs:'))));
 ok('the browser gate runs for every production deploy', /^ {4}if: github\.event_name == 'workflow_dispatch'$/m.test(JOBS['browser-gate'] || '') && /^ {4}if: github\.event_name == 'workflow_dispatch'$/m.test(JOBS['deploy-production'] || ''));

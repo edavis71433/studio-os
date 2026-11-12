@@ -99,9 +99,16 @@ jobs:
             sleep "$poll"
           done
 
+  # Builder item 212: the walls between studios, checked on a scratch database made for
+  # this run, with this commit's migrations and servers and two studios (isolation.yml).
+  # It runs beside the two jobs above and takes less time than the browser gate, so a
+  # deploy takes no longer. Nothing deploys unless it passed.
+  isolation:
+    uses: ./.github/workflows/isolation.yml
+
   deploy-production:
     if: github.event_name == 'workflow_dispatch'
-    needs: [test, browser-gate]
+    needs: [test, browser-gate, isolation]
     runs-on: ubuntu-latest
     steps:
       # The typed phrase and the branch arrive as data, never pasted into the script.
