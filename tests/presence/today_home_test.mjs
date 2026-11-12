@@ -593,7 +593,7 @@ ok('today: Done on a This-week row PATCHes the deal\'s next step through the exi
   /todoDone\(id, btn\)\{[\s\S]*?await apiSend\('\/sales\/deals\/'\+encodeURIComponent\(id\), 'PATCH', \{ next_step: '', next_step_at: '' \}\);[\s\S]*?row\.remove\(\)/.test(today)
   && /catch\(_\)\{ btn\.disabled = false;/.test(today));
 ok('today: the Customers card reads /studio/customers for the studio only — never for a drilled-in operator (D7)',
-  today.includes("get('client')?Promise.resolve(null):apiGet('/studio/customers').catch(()=>null)")
+  today.includes("inC?Promise.resolve(null):apiGet('/studio/customers').catch(()=>null)")
   && /function customersCardHtml\(list\)\{\s*const rows=customerRows\(list\);\s*if\(!rows\.length\)return''/.test(today));
 ok('today: the stat strip\'s tiles keep the .hl-panel / .hl anatomy crm.html draws (icon tile · label · value · sub)',
   today.includes('<section class="hl-panel" id="stat-strip"') && today.includes('<div class="hl-k">') && today.includes('<div class="hl-v">') && today.includes('<div class="hl-s">'));

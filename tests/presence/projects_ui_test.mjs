@@ -27,7 +27,7 @@ ok('wires: approvals decide + messages thread', /\/approvals\/'\+.*\/decide','PO
 ok('a11y/ux: no prompt()/alert()/confirm() — uses dialogs + ddsToast', !/\bprompt\(/.test(h) && !/\balert\(/.test(h) && !/\bconfirm\(/.test(h) && /ddsToast/.test(h));
 ok('ux: valid next-stage buttons mirror the bounded ladders (no illegal jumps in UI)', /P_NEXT=\{active:\['on_hold','complete','archived'\]/.test(h) && /T_NEXT=\{todo:\['in_progress','blocked','done'\]/.test(h));
 ok('ux: shared/internal + client-action tags reflect visibility', /tag client/.test(h) && /needs the client/.test(h));
-ok('ux: write controls are hidden for the client view (STUDIO gate)', /STUDIO\?/.test(h) && /NEW_OK=STUDIO&&!scope\(\)/.test(h) && /\$\{NEW_OK\?'<button class="btn" id="newProject"/.test(h));
+ok('ux: write controls are hidden for the client view (STUDIO gate)', /STUDIO\?/.test(h) && /NEW_OK=STUDIO&&!LOADED_IN/.test(h) && /\$\{NEW_OK\?'<button class="btn" id="newProject"/.test(h));
 ok('slice 9: record body is the two-column related-list layout (main + rail)', /class="dgrid/.test(h) && /class="dside"/.test(h) && /class="dmain"/.test(h) && /#detailWrap\{max-width/.test(h));
 ok('FIX B: a customer’s general (project-less) messages surface inside their view', /loadClientGeneral/.test(h) && /\/client-messages/.test(h) && /id="genList"/.test(h));
 ok('nav: Projects is a primary outcome, gated to the relationship area', /single\('projects', 'Projects', '\/projects\.html'\)/.test(nav) && /if \(f\.hasRelationship\) single\('projects'/.test(nav));

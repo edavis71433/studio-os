@@ -40,6 +40,7 @@
   .pill{font:inherit;font-size:14px;font-weight:600;border:1px solid var(--dds-line-strong,#d6d4e2);background:var(--card);color:var(--ink);border-radius:999px;padding:9px 18px;min-height:42px;cursor:pointer}
   .pill:hover{background:var(--p-soft)}
   .pill.go{background:var(--dds-grad-btn,var(--p));border-color:transparent;color:var(--dds-on-p,#fff)}
+  .pill[aria-disabled="true"]{opacity:.65;cursor:progress}
   @media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .pill.go,:root:not([data-theme="light"]) .chip[aria-pressed="true"]{color:#171320}}
   :root[data-theme="dark"] .pill.go,:root[data-theme="dark"] .chip[aria-pressed="true"]{color:#171320}
   /* the four totals */
@@ -153,6 +154,10 @@ const esc=(s)=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;
 let TOKEN="",DATA=null,SHOW='all',Q='',MONTH='',LIMIT=50,PAYING=null;
 sb.auth.onAuthStateChange(function(_e,s){if(s&&s.access_token)TOKEN=s.access_token;});
 const scope=()=>new URLSearchParams(location.search).get('client')||'';
+// builder item 83: ?client= is also how someone with places in two businesses opens their second one. That is
+// their own business, not a studio inside a client, so its own invoices show here. The shell tells the two apart
+// (ddsScopeInfo, once its context is in); without it, the address decides, as before.
+async function inClientNow(){const id=scope();if(!id)return false;if(document.readyState==='loading')await new Promise((r)=>document.addEventListener('DOMContentLoaded',r,{once:true}));if(window.ddsContext)await window.ddsContext().catch(()=>null);return window.ddsScopeInfo&&/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)?!!window.ddsScopeInfo():true;}
 const H=()=>({'Content-Type':'application/json','Authorization':'Bearer '+SUPABASE_KEY,'x-dds-user-jwt':TOKEN,'x-dds-scope-site':scope()});
 async function api(path,method,body){let r;try{r=await fetch(FN+path,{method:method||'GET',headers:H(),body:body?JSON.stringify(body):undefined});}catch(_){return{ok:false,status:0,body:{}};}return{ok:r.ok,status:r.status,body:await r.json().catch(()=>({}))};}
 function toast(m,bad,action){if(window.ddsToast)return void ddsToast(m,bad?'err':'ok',action);}
@@ -208,7 +213,7 @@ function render(focusSel){
   const n=(k)=>k==='all'?all.length:k==='overdue'?all.filter(i=>kindOf(i)==='unpaid'&&!(i.processing||i.state==='processing')&&i.due_date&&dayDiff(i.due_date.slice(0,10),today)<0).length:all.filter(i=>kindOf(i)===k).length;
   const months=[...new Set(all.map(i=>localDay(i.issued_at).slice(0,7)).filter(Boolean))].sort().reverse();
   let h=`<div class="head"><div class="grow"><h1>Invoices</h1><p class="lede">Every invoice you’ve sent, newest first. Record a payment, download the PDF or open the deal from any row.</p></div>
-    <div class="tools"><button type="button" class="pill" id="csvBtn">Download CSV</button><button type="button" class="pill go" id="sendBtn">Send an invoice</button></div></div>
+    <div class="tools"><button type="button" class="pill" id="testInvBtn">Send a test to myself</button><button type="button" class="pill" id="csvBtn">Download CSV</button><button type="button" class="pill go" id="sendBtn">Send an invoice</button></div></div>
     <div class="totals">
       <div class="tot"><div class="l">Owed to you</div><div class="v">${money(t.owed)}</div><div class="s">${t.owedN} unpaid${t.proc?' · '+money(t.proc)+' of it on its way':''}</div></div>
       <div class="tot bad"><div class="l">Overdue</div><div class="v">${money(t.late)}</div><div class="s">${t.lateN?plural(t.lateN,'invoice')+' · the oldest '+plural(t.oldest,'day')+' late':'Nothing late'}</div></div>
@@ -253,6 +258,7 @@ function wire(){
   const f=$('find');if(f)f.addEventListener('input',()=>{Q=f.value;LIMIT=50;renderList();});
   const m=$('month');if(m)m.addEventListener('change',()=>{MONTH=m.value;LIMIT=50;renderList();});
   const cb=$('csvBtn');if(cb)cb.addEventListener('click',downloadCsv);
+  const tb=$('testInvBtn');if(tb)tb.addEventListener('click',()=>sendTestInvoice(tb));
   const sb2=$('sendBtn');if(sb2)sb2.addEventListener('click',()=>{if(!(window.ddsOpenCreate&&window.ddsOpenCreate('invoice',sb2)))location.href='/pipeline.html';});
   wireList();
 }
@@ -305,6 +311,21 @@ $('payForm').addEventListener('submit',async(e)=>{
   toast(cents<(Number(i.amount_cents)||0)?`Recorded ${money(cents)}. The rest stays due.`:`Recorded: ${i.number_label||'the invoice'} is paid.`);
   await load();
 });
+// builder list item 175: the invoice email and PDF a customer gets, with sample lines, to
+// the person signed in only (POST /sales/invoices/test). No invoice is made, no number used.
+let TEST_BUSY=false;
+async function sendTestInvoice(btn){
+  if(TEST_BUSY)return;
+  TEST_BUSY=true;btn.setAttribute('aria-disabled','true');btn.textContent='Sending…';
+  const r=await api('/sales/invoices/test','POST',{});
+  TEST_BUSY=false;
+  const nb=$('testInvBtn');if(nb){nb.removeAttribute('aria-disabled');nb.textContent='Send a test to myself';}
+  const d=r.ok&&r.body&&r.body.data;
+  if(d){toast(`A test invoice is on its way to ${d.sent_to}. It’s a sample: no invoice is made and nobody else gets it.${d.stripe?'':' Real invoices need Stripe connected first.'}`);return;}
+  // a server from before this button answers 404 with no words of its own
+  if(r.status===404&&!(r.body&&r.body.message)){toast('Test invoices are on their way to your account. Try again after the next update.',true);return;}
+  toast((r.body&&r.body.message)||'The test didn’t send. Try again.',true);
+}
 function downloadCsv(){
   const today=DATA.today||ymd(),list=filtered(today);
   const q=(v)=>{const s=String(v==null?'':v);return /[",\n]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s;};
@@ -313,7 +334,7 @@ function downloadCsv(){
   const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([lines.join('\n')+'\n'],{type:'text/csv'}));a.download='invoices-'+today+'.csv';document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove();},0);
 }
 async function load(){
-  if(scope()){$('main').innerHTML=`<div class="center"><h2>Invoices live at the studio level.</h2><p class="muted">You’re looking at one client. Their invoices are on their record’s Billing tab.</p><p style="margin-top:16px"><a class="link" data-noscope href="/invoices.html">Leave this client and open Invoices →</a></p></div>`;return;}
+  if(await inClientNow()){$('main').innerHTML=`<div class="center"><h2>Invoices live at the studio level.</h2><p class="muted">You’re looking at one client. Their invoices are on their record’s Billing tab.</p><p style="margin-top:16px"><a class="link" data-noscope href="/invoices.html">Leave this client and open Invoices →</a></p></div>`;return;}
   const r=await api('/sales/invoices?today='+ymd());
   if(r.status===401){signedOut();return;}
   if(r.status===404&&!(r.body&&r.body.data)){$('main').innerHTML=`<div class="center"><h2>Invoices is on its way.</h2><p class="muted">This page arrives with an update that’s being rolled out. Your invoices are on Pipeline’s Who owes you meanwhile.</p><p style="margin-top:16px"><a class="link" href="/pipeline.html#outstanding">Open Who owes you →</a></p></div>`;return;}

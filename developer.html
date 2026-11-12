@@ -106,7 +106,12 @@ const $=(id)=>document.getElementById(id);
 const esc=(s)=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 let TOKEN="";
 sb.auth.onAuthStateChange((_e,s)=>{ if(s&&s.access_token) TOKEN=s.access_token; });
-const H=()=>({'Content-Type':'application/json','Authorization':'Bearer '+SUPABASE_KEY,'x-dds-user-jwt':TOKEN});
+// builder item 83: ?client= is also how someone with places in two businesses opens their second one, and these
+// tools are then that business's: its reads and saves carry it. A studio inside a client still works on its own
+// site here, as before. The shell tells the two apart (ddsScopeInfo), once the page has waited for its context.
+const ownBusiness=()=>{const id=new URLSearchParams(location.search).get('client')||'';return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)&&window.ddsScopeInfo&&!window.ddsScopeInfo()?id:'';};
+async function businessKnown(){if(!new URLSearchParams(location.search).get('client'))return;if(document.readyState==='loading')await new Promise((r)=>document.addEventListener('DOMContentLoaded',r,{once:true}));if(window.ddsContext)await window.ddsContext().catch(()=>null);}
+const H=()=>({'Content-Type':'application/json','Authorization':'Bearer '+SUPABASE_KEY,'x-dds-user-jwt':TOKEN,'x-dds-scope-site':ownBusiness()});
 async function api(path,method,body){const r=await fetch(FN+path,{method:method||'GET',headers:H(),body:body?JSON.stringify(body):undefined});return{ok:r.ok,status:r.status,body:await r.json().catch(()=>({}))};}
 function toast(m){const t=$('toast');t.textContent=m;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),3200);}
 
@@ -289,7 +294,7 @@ async function load(){
 }
 (async function(){
   try{const{data}=await sb.auth.getSession();TOKEN=(data&&data.session&&data.session.access_token)||"";
-    if(!TOKEN){signedOut();return;}await load();
+    if(!TOKEN){signedOut();return;}await businessKnown();await load();
   }catch(_){trouble();}
 })();
 </script>
