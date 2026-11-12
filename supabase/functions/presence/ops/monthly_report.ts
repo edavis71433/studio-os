@@ -468,45 +468,47 @@ export function afterFailure(s: ReportSetting, month: string, before: string | n
 export async function runMonthlyReports(limit = 20, nowIso = new Date().toISOString()): Promise<{ sent: number; skipped: number; unreachable: number; failures: number; not_due?: boolean }> {
   // D7: each site's month turns on its own clock; on a day no clock is in its first days, read nothing
   if (!anyZoneInSendDays(nowIso)) return { sent: 0, skipped: 0, unreachable: 0, failures: 0, not_due: true };
-  let sent = 0, skipped = 0, unreachable = 0, failures = 0;
   // Item 209 (review file 06, finding 63): every client with the report on, a page at a
   // time in a set order, until `limit` went out. One read of up to 200 in no order used
   // to be all of it, so past about 100 clients the same ones came back every time.
-  for await (const page of svcPaged(`presence_sales_templates?kind=eq.proposal&name=eq.${encodeURIComponent(RESERVED_NAMES.monthlyReport)}&deleted_at=is.null&select=site_id,body`, 'site_id.asc', REPORT_PAGE, REPORT_PAGES)) {
+  let zones = new Map<string, string>();
+  const rows = (async function* () {
+    for await (const page of svcPaged(`presence_sales_templates?kind=eq.proposal&name=eq.${encodeURIComponent(RESERVED_NAMES.monthlyReport)}&deleted_at=is.null&select=site_id,body`, 'site_id.asc', REPORT_PAGE, REPORT_PAGES)) {
+      zones = await zonesOf(page.map((r) => String(r.site_id)));
+      yield* page as Array<{ site_id: string; body: string }>;
+    }
+  })();
+  let sent = 0, skipped = 0, unreachable = 0, failures = 0;
+  for await (const r of rows) {
     if (sent >= limit) break;
-    const rows = page as Array<{ site_id: string; body: string }>;
-    const zones = await zonesOf(rows.map((r) => String(r.site_id)));
-    for (const r of rows) {
-      if (sent >= limit) break;
-      let seen: ReportSetting; try { seen = normalizeReportSetting(JSON.parse(r.body)); } catch { skipped++; continue; }
-      const tz = zones.get(String(r.site_id)) || REPORT_DEFAULT_TZ;
-      if (!reportDueNow(seen, nowIso, tz)) { skipped++; continue; }
-      const win = lastMonth(nowIso, tz);
-      const sq = await svc(`presence_sites?id=eq.${r.site_id}&select=*&limit=1`);
-      const site = (Array.isArray(sq.json) ? sq.json[0] : null) as SiteRow | null;
-      if (!site) { skipped++; continue; }
-      const reach = await reachOf(site);
-      // claim the month: only if it is still due on the LATEST setting; only the month mark (and, for a client who can't be emailed, the reason) changes
-      let before: string | null = null, claimedSetting: ReportSetting | null = null;
-      const claimed = await SAVE(site.id, (s) => {
-        if (!reportDueNow(s, nowIso, tz)) throw new NotDue();
-        before = s.last_month;
-        const next: ReportSetting = { ...s, last_month: win.month };
-        if (reach.blocked) next.last_result = { month: win.month, status: 'skipped', reason: reach.blocked, at: nowIso };
-        claimedSetting = next;
-        return next;
-      }).catch(() => null);
-      if (!claimed || !claimedSetting) { skipped++; continue; }   // another tick has it, it was switched off, or the save failed: nothing sent
-      if (reach.blocked) { unreachable++; continue; }
-      const ok = await sendReport(site, win, claimedSetting, reach.email as string, { clientName: reach.name, timeZone: tz }).catch(() => false);
-      if (ok) {
-        sent++;
-        // item 179: the month joins the client's shelf only now, when it really went out
-        await SAVE(site.id, (s) => ({ ...s, tries: null, last_result: { month: win.month, status: 'sent', reason: null, at: nowIso }, sent_months: withSentMonth(s.sent_months, win.month) })).catch(() => null);
-      } else {
-        failures++;
-        await SAVE(site.id, (s) => afterFailure(s, win.month, before, nowIso)).catch(() => null);
-      }
+    let seen: ReportSetting; try { seen = normalizeReportSetting(JSON.parse(r.body)); } catch { skipped++; continue; }
+    const tz = zones.get(String(r.site_id)) || REPORT_DEFAULT_TZ;
+    if (!reportDueNow(seen, nowIso, tz)) { skipped++; continue; }
+    const win = lastMonth(nowIso, tz);
+    const sq = await svc(`presence_sites?id=eq.${r.site_id}&select=*&limit=1`);
+    const site = (Array.isArray(sq.json) ? sq.json[0] : null) as SiteRow | null;
+    if (!site) { skipped++; continue; }
+    const reach = await reachOf(site);
+    // claim the month: only if it is still due on the LATEST setting; only the month mark (and, for a client who can't be emailed, the reason) changes
+    let before: string | null = null, claimedSetting: ReportSetting | null = null;
+    const claimed = await SAVE(site.id, (s) => {
+      if (!reportDueNow(s, nowIso, tz)) throw new NotDue();
+      before = s.last_month;
+      const next: ReportSetting = { ...s, last_month: win.month };
+      if (reach.blocked) next.last_result = { month: win.month, status: 'skipped', reason: reach.blocked, at: nowIso };
+      claimedSetting = next;
+      return next;
+    }).catch(() => null);
+    if (!claimed || !claimedSetting) { skipped++; continue; }   // another tick has it, it was switched off, or the save failed: nothing sent
+    if (reach.blocked) { unreachable++; continue; }
+    const ok = await sendReport(site, win, claimedSetting, reach.email as string, { clientName: reach.name, timeZone: tz }).catch(() => false);
+    if (ok) {
+      sent++;
+      // item 179: the month joins the client's shelf only now, when it really went out
+      await SAVE(site.id, (s) => ({ ...s, tries: null, last_result: { month: win.month, status: 'sent', reason: null, at: nowIso }, sent_months: withSentMonth(s.sent_months, win.month) })).catch(() => null);
+    } else {
+      failures++;
+      await SAVE(site.id, (s) => afterFailure(s, win.month, before, nowIso)).catch(() => null);
     }
   }
   return { sent, skipped, unreachable, failures };
