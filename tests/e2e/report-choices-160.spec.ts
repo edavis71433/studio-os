@@ -204,7 +204,7 @@ test.describe('Settings › Monthly report: one save at a time, and a read that 
     await expect(sec.getByRole('button', { name: 'Website health' })).toBeDisabled();
     await expect(sec.getByRole('button', { name: 'Add someone' })).toBeDisabled();
     await expect(sec.getByRole('radio', { name: 'Pick for me each month' })).toBeDisabled();
-    await sec.locator('#sw-quiet').click({ force: true });
+    await sec.locator('#sw-quiet').dispatchEvent('click');   // straight to the switch: a forced tap at its spot lands on a phone's bottom bar
     expect(puts).toEqual([{ copy: true }]);
     release();
     await expect(sec.locator('#sw-quiet')).not.toHaveAttribute('aria-disabled', 'true');
@@ -250,7 +250,7 @@ test.describe('Settings › Monthly reports, every client (builder list item 160
     await expect(ortiz).toContainText('No email on their record');
     await expect(ortiz.getByRole('link', { name: 'Fix →' })).toHaveAttribute('href', `/crm.html?client=${NOMAIL}`);
     await expect(ortiz.getByRole('switch')).toHaveAttribute('aria-disabled', 'true');
-    await ortiz.getByRole('switch').click({ force: true });
+    await ortiz.getByRole('switch').dispatchEvent('click');
     await expect(toast(page)).toContainText('It can’t go out: there’s no email on their record.');
     const blue = sec.locator(`[data-report="${OTHER}"]`);
     await blue.getByRole('switch').click();
