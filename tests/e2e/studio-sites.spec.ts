@@ -40,6 +40,11 @@ const studioContext = { data: {
   capabilities: ['edit', 'publish', 'invite', 'configure', 'view_all'], landing: '/agency.html', attention_count: 0, nav: SITES_NAV, plan_key: 'agency', upsell: null,
 } };
 const THUMB_HTML = (name: string) => `<!doctype html><html><head><style>body{margin:0;font:48px Georgia;background:#f4efe6}</style></head><body><h1 id="thumb-mark">${name} home page</h1></body></html>`;
+/** Builder item 165: on a phone the header's other actions (Cards/Table, ↻) wait behind ⋯. */
+async function headerAction(page: Page, sel: string) {
+  if ((page.viewportSize()?.width || 0) < 761 && !(await page.locator(sel).isVisible())) await page.locator('header.dds-ph .dds-ph-dots').click();
+  await page.locator(sel).click();
+}
 const json = (body: unknown, status = 200) => ({ status, contentType: 'application/json', body: JSON.stringify(body) });
 
 /** The app plus the Sites routes. The harness matches by prefix, so the routes under
@@ -331,7 +336,7 @@ test.describe('Sites (builder list items 43 and 45)', () => {
   // Published leave it (who can edit stays on each card); sites-numbers.spec.ts covers the numbers
   test('table: Site · Owner · Health · Visits · Search clicks · Plan · People · Last updated · Tags, sortable, and the choice is remembered', async ({ page }) => {
     await openSites(page);
-    await page.locator('#dispTable').click();
+    await headerAction(page, '#dispTable');
     const table = page.locator('#tableHost table');
     await expect(table.locator('thead .thb')).toHaveText(['Site', 'Owner', 'Health', 'Visits', 'Search clicks', 'Plan', 'People', 'Last updated', 'Tags']);   // builder item 53: Owner and People
     await expect(table.locator('tbody tr')).toHaveCount(3);
@@ -351,7 +356,7 @@ test.describe('Sites (builder list items 43 and 45)', () => {
     await expect(page.locator('#dispTable')).toHaveAttribute('aria-pressed', 'true');
     await expect(page.locator('#tableHost table')).toBeVisible();
     await expect(page.locator('#grid')).toBeHidden();               // …also when the page opens on the table
-    await page.locator('#dispCards').click();
+    await headerAction(page, '#dispCards');
     await expect(page.locator('#tableHost')).toBeHidden();
     await expect(page.locator('.scard:visible')).toHaveCount(3);
   });
@@ -388,7 +393,7 @@ test.describe('Sites (builder list items 43 and 45)', () => {
     await card.locator('[data-menu]').click();
     await expect(page.locator('#rowMenuHost [role="menuitem"]')).toHaveText(['Pin to top', 'View live site']);
     await page.keyboard.press('Escape');
-    await page.locator('#dispTable').click();
+    await headerAction(page, '#dispTable');
     await expect(page.locator('#tableHost tr[data-row]')).toHaveCount(0);           // rows don't open a client either
   });
 
@@ -509,21 +514,20 @@ test.describe('Sites (builder list items 43 and 45)', () => {
   });
 
   // Nov 11 2026: on a phone the h1 gave its width up to the buttons beside it and "Sites"
-  // was drawn over the Cards/Table switch. The letters spill out of a squeezed h1, so its
-  // own box isn't enough: the words are measured too.
-  test('phone width: the title and the Cards/Table switch never overlap', async ({ page }) => {
+  // was drawn over the Cards/Table switch. Builder item 165: on a phone the switch waits behind
+  // ⋯ in the one page header; the title, its line, ⋯ and + New site never overlap.
+  test('phone width: the title never shares its room with the buttons', async ({ page }) => {
     await page.setViewportSize({ width: 375, height: 812 });
     await openSites(page);
-    await expect(page.locator('.lhead .seg')).toBeVisible();
+    await expect(page.locator('header.dds-ph h1')).toBeVisible();
     const b = await page.evaluate(() => {
       const box = (r: DOMRect) => ({ left: r.left, right: r.right, top: r.top, bottom: r.bottom });
-      const h1 = document.getElementById('pagehead')!, words = document.createRange();
-      words.selectNodeContents(h1);
-      return { h1: box(h1.getBoundingClientRect()), words: box(words.getBoundingClientRect()), seg: box(document.querySelector('.lhead .seg')!.getBoundingClientRect()) };
+      const words = document.createRange(); words.selectNodeContents(document.getElementById('pagehead')!);
+      return { words: box(words.getBoundingClientRect()), dots: box(document.querySelector('.dds-ph-dots')!.getBoundingClientRect()), add: box(document.getElementById('newSiteBtn')!.getBoundingClientRect()) };
     });
-    const apart = (a: typeof b.seg, z: typeof b.seg) => a.right <= z.left || z.right <= a.left || a.bottom <= z.top || z.bottom <= a.top;
-    expect(apart(b.h1, b.seg)).toBe(true);
-    expect(apart(b.words, b.seg)).toBe(true);
+    const apart = (a: typeof b.dots, z: typeof b.dots) => a.right <= z.left || z.right <= a.left || a.bottom <= z.top || z.bottom <= a.top;
+    expect(apart(b.words, b.dots)).toBe(true);
+    expect(apart(b.words, b.add)).toBe(true);
     expect(await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)).toBeLessThanOrEqual(0);
   });
 });
@@ -736,7 +740,7 @@ test.describe('Sites: the bug hunt fixes (A1, A10)', () => {
   test('A1 — after Refresh, one click on a number or a pill turns its filter on, and one more turns it off', async ({ page }) => {
     await openSites(page);
     await expect(page.locator('.scard')).toHaveCount(3);
-    await page.locator('#refreshBtn').click();                     // one reload: two listeners used to cancel each other out
+    await headerAction(page, '#refreshBtn');                     // one reload: two listeners used to cancel each other out
     await expect(page.locator('.scard')).toHaveCount(3);
     const band = page.locator('.sband');
     await band.locator('[data-filter="live"]').click();

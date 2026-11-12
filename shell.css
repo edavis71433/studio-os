@@ -1018,7 +1018,7 @@ html.dds-cr-on body{overflow:hidden}
 .dds-ph-pick{display:inline-flex;align-items:center;gap:6px;min-height:28px;padding:0 12px 0 14px;border:1px solid var(--dds-line-strong);border-radius:999px;background:var(--dds-card);color:var(--dds-ink);font:inherit;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap}
 .dds-ph-pick:hover{border-color:var(--dds-p)}
 .dds-ph-pick .car{font-size:10px;color:var(--dds-soft)}
-.dds-ph-acts{flex:0 0 auto;display:flex;align-items:center;flex-wrap:wrap;justify-content:flex-end;gap:8px;margin-left:auto}
+.dds-ph-acts{flex:0 1 auto;max-width:100%;display:flex;align-items:center;flex-wrap:wrap;justify-content:flex-end;gap:8px;margin-left:auto}
 /* the other actions: in the row on a computer (the popover is laid out as a plain row there) */
 .dds-ph-more{display:flex;align-items:center;flex-wrap:wrap;gap:8px;position:static;inset:auto;margin:0;padding:0;width:auto;height:auto;border:0;background:none;color:inherit;overflow:visible}
 .dds-ph-dots{display:none}
