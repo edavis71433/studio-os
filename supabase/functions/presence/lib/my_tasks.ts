@@ -68,22 +68,27 @@ export function buildMyTasks(input: {
     }
   }
   const projById = new Map((input.projects || []).filter((p) => p && p.id).map((p) => [String(p.id), p]));
+  // A studio-side step this list can show: still open, and yours or nobody's.
+  const yoursOpen = (t: any) => !!t && !!t.id && t.client_action_required !== true && !!t.project_id
+    && ['todo', 'in_progress', 'blocked'].includes(String(t.status || 'todo'))
+    && !(t.assigned_to && String(t.assigned_to) !== String(input.userId || ''));
   // Second walk (Nov 8, item 53): Home listed 20 undated project steps — every
   // unticked line of four checklists. Only each project's NEXT open step (the
   // lowest sort_order) counts as now; the steps behind it, unless dated, are
   // `later`: Home hides them until Show all.
+  // Sales 64 (F7): the next step is picked from the same steps the list shows. It was picked
+  // from every step, so with a second seat a teammate's step (or a finished one) at the top
+  // of a checklist turned all of yours on that project into "later", behind Show all.
   const nextOf: Record<string, any> = {};
   for (const t of input.projectTasks || []) {
-    if (!t || !t.id || t.client_action_required === true || !t.project_id) continue;
+    if (!yoursOpen(t)) continue;
     const k = String(t.project_id), cur = nextOf[k];
     const so = Number(t.sort_order ?? Infinity), cso = cur ? Number(cur.sort_order ?? Infinity) : Infinity;
     if (!cur || so < cso || (so === cso && String(t.title || '') < String(cur.title || ''))) nextOf[k] = t;
   }
   for (const t of input.projectTasks || []) {
-    if (!t || !t.id || t.client_action_required === true) continue;
+    if (!yoursOpen(t)) continue;   // a client's to-do, a finished step, or someone else's
     const st = String(t.status || 'todo');
-    if (st !== 'todo' && st !== 'in_progress' && st !== 'blocked') continue;
-    if (t.assigned_to && String(t.assigned_to) !== String(input.userId || '')) continue;   // someone else's
     const p = projById.get(String(t.project_id || ''));
     if (!p || !(p.status === 'active' || p.status === 'on_hold')) continue;
     const title = String(t.title || '').trim();
