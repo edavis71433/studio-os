@@ -839,7 +839,9 @@ export async function handleAgencySites(req: Request, route: string, method: str
     await svc(`presence_agency_clients?site_id=eq.${siteId}&agency_id=eq.${member.agency_id}`, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ owner_email: email }) }).catch(() => null);
     const invited = await sendCustomerInvite(own.id, email, true).catch(() => false);
     await writeChangeEvent({ siteId: own.id, entityType: 'client', entityId: client.id, action: 'invite', summary: `Invited the owner of ${label}`, principal, provenance: 'human' }).catch(() => {});
-    return json({ data: { site_id: siteId, email, invited } }, 200, cors);
+    // builder item 192: the page to share when the email didn't go out (it shows this studio's name)
+    const portal_url = `${(Deno.env.get('SITE_URL') || 'https://davisdigitalstudio.com').replace(/\/$/, '')}/portal.html?studio=${own.id}`;
+    return json({ data: { site_id: siteId, email, invited, portal_url } }, 200, cors);
   }
 
   // ── Move to trash (item 154): the site goes offline (the short "temporarily

@@ -41,10 +41,11 @@ test.describe('Settings page', () => {
     await expect(page.getByRole('heading', { level: 1, name: 'Settings' })).toBeVisible();
     // Oct 2026 nav cut: Settings is a plain item at the foot of the sidebar (the gear went with the cut)
     await expect(page.locator('.dds-nav a[data-href="/settings.html"]')).toHaveAttribute('href', '/settings.html');
-    // the eleven areas (Automations joined in Oct 2026 — benchmark item 6; Deal stages and Calendar joined in
-    // the Nov 2026 bold redesign), each a link to where the thing lives
+    // the twelve areas (Automations joined in Oct 2026 — benchmark item 6; Deal stages and Calendar joined in
+    // the Nov 2026 bold redesign; Recently deleted in sales item 83), each a link to where the thing lives
     const cards = page.locator('#cards .setcard');
-    await expect(cards).toHaveCount(11);
+    await expect(cards).toHaveCount(12);
+    await expect(page.locator('[data-card="deleted"]')).toHaveAttribute('href', '/recently-deleted.html');
     await expect(page.locator('[data-card="stages"]')).toHaveAttribute('href', '#stages');
     await expect(page.locator('[data-card="calendar"]')).toHaveAttribute('href', '/connections.html#calSec');
     await expect(page.locator('[data-card="auto"]')).toHaveAttribute('href', '#automations');
@@ -177,7 +178,7 @@ test.describe('Settings page', () => {
     // the cards that act on a site carry the client
     await expect(page.locator('[data-card="team"]')).toHaveAttribute('href', '/sharing.html?client=' + CLIENT);
     await expect(page.locator('[data-card="connections"]')).toHaveAttribute('href', '/connections.html?client=' + CLIENT);
-    await expect(page.locator('[data-card="notify"]')).toHaveAttribute('href', '/inbox.html?client=' + CLIENT);
+    await expect(page.locator('[data-card="notify"]')).toHaveAttribute('href', '#notify');   // item 126: a studio's Notifications is a part of this page, for this client's site
     await expect(page.locator('[data-card="domains"]')).toHaveAttribute('href', '/presence.html?client=' + CLIENT + '#domain');
     for (const k of ['team', 'connections', 'notify', 'domains']) await expect(page.locator(`[data-card="${k}"]`)).not.toHaveAttribute('data-noscope', /./);
     // the developer tools are the studio's: the card stays unscoped and says so

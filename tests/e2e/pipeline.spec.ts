@@ -2131,6 +2131,29 @@ test.describe('deal page — "Manage their access" carries the customer', () => 
     await expect(accessLink(page)).toHaveAttribute('href', `/sharing.html?client=${CUSTOMER_SITE}`);
   });
 
+  // Builder item 192: the welcome email didn't leave (a bounced address, the mail service
+  // down). The page used to stay silent about it; now it says so and what to do.
+  test('convert when the welcome email could not be sent: the page says so, never "customer invited"', async ({ page }) => {
+    let converted = false;
+    await installApp(page, { api: { ...API, [`/sales/deals/${DEAL7}/tasks`]: { data: [] } } });
+    await page.route((u) => new RegExp(`/presence/sales/deals/${DEAL7}(/convert)?$`).test(u.pathname), (route) => {
+      if (route.request().method() === 'POST') {
+        converted = true;
+        return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: { converted: true, client_id: 'c-marlow', site_id: CUSTOMER_SITE, project_id: null, invited: false, portal_url: 'https://studio.example/portal.html' } }) });
+      }
+      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(converted
+        ? { data: { ...contractDeal(SIGNED_NO_TERM).data, deal: { ...contractDeal(SIGNED_NO_TERM).data.deal, stage: 'won', converted_client_id: 'c-marlow', converted_site_id: CUSTOMER_SITE } } }
+        : contractDeal(SIGNED_NO_TERM)) });
+    });
+    await page.goto(`/pipeline.html?deal=${DEAL7}&dtab=billing`);
+    await page.locator('#convert').click();
+    await page.locator('#convYes').click();
+    const toast = page.locator('.dds-toast').filter({ hasText: 'Converted' });
+    await expect(toast).toContainText('Our welcome email didn’t go out');
+    await expect(toast).toContainText('Resend welcome email');
+    await expect(toast).not.toContainText('customer invited');
+  });
+
   // Final pass (Nov 8, S1): the deal's email already has someone else's account →
   // the server asks them instead of taking it; the page says so and can try again
   test('an email that is someone else\'s account: the request is explained, nothing converts', async ({ page }) => {

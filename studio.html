@@ -133,8 +133,9 @@
   <!-- RESET SENT -->
   <div id="resetSent" class="panel">
     <h2>Check your email</h2>
-    <p>If that address has an account, a reset link is on its way. It lands you on a page to choose a new password.</p>
+    <p>If that address has an account, a code is on its way. Enter it on the next page to choose a new password.</p>
     <div class="mailbtns"><a class="qbtn" href="https://mail.google.com/mail/u/0/#inbox" target="_blank" rel="noopener">Open Gmail</a><a class="qbtn" href="https://outlook.live.com/mail/0/" target="_blank" rel="noopener">Open Outlook</a></div>
+    <p class="muted"><a id="haveCode" href="/set-password.html">I have my code</a></p>
     <p class="muted"><button class="linky" id="backToLogin" type="button">Back to sign in</button></p>
   </div>
 </div>
@@ -167,6 +168,30 @@ if (!sb) err("Connection problem — check your internet and refresh this page."
 
 function withTimeout(p, ms){ return Promise.race([p, new Promise(function(_,rej){ setTimeout(function(){ rej(new Error('timeout')); }, ms); })]); }
 function panel(msg){ if (msg) $('nwMsg').textContent = msg; show('noWorkspace'); }
+
+// Builder item 192: signing in takes you on to the page you came for. A studio page that
+// finds nobody signed in leaves its address behind (shell.js keeps 'dds-studio-return').
+// Only one of this app's own pages counts, only for half an hour, and only once. A
+// client is never sent to a studio page: they follow their own landing.
+var CAME_FOR = (function(){
+  var DOORS = /^\/(studio|portal|set-password|signup|welcome|client|index|app-door)(\.html)?$/;
+  var ok = function(u){
+    try {
+      var x = new URL(u, location.origin);
+      if (x.origin !== location.origin || !/^\/[a-z0-9-]+(\.html)?$/.test(x.pathname) || DOORS.test(x.pathname)) return '';
+      return x.pathname + x.search + x.hash;
+    } catch (e) { return ''; }
+  };
+  try {
+    var k = JSON.parse(localStorage.getItem('dds-studio-return') || 'null');
+    if (k && typeof k.path === 'string' && Date.now() - Number(k.at) < 30 * 60000) return ok(k.path);
+  } catch (e) {}
+  return '';
+})();
+function onward(landing){
+  try { localStorage.removeItem('dds-studio-return'); } catch (e) {}
+  return CAME_FOR && !/^\/(client|portal)/.test(landing) ? CAME_FOR : landing;
+}
 
 // Builder item 83: someone with places in two businesses comes back to one. A link may
 // name it (?client=<site id>, from Switch business); else the last one they used on this
@@ -213,9 +238,9 @@ async function route(token){
       // full workspace" — that is not staff. Only an agency member or staff overrides.
       var operatorCapable = d.is_agency || d.is_operator || (d.sees_full_workspace === true && !d.is_managed_client);
       if (d.landing === '/client.html' && operatorCapable) {
-        location.href = d.is_agency ? '/agency.html' : '/today.html'; return;
+        location.href = onward(d.is_agency ? '/agency.html' : '/today.html'); return;
       }
-      location.href = landingFor(d, picked); return;
+      location.href = onward(landingFor(d, picked)); return;
     }
     // Honest states — a paused/lapsed account gets the server's own words, not a wrong door.
     if (r.status === 403 && j && j.message) { panel(j.message); return; }
@@ -229,7 +254,7 @@ async function route(token){
     }), 9000);
     if (a.status === 200) {
       var aj = await a.json().catch(function(){ return {}; });
-      if (aj && aj.data) { location.href = '/agency.html'; return; }
+      if (aj && aj.data) { location.href = onward('/agency.html'); return; }
     }
   } catch (e) {} // 401/403/timeout → not an agency member; keep the existing fallbacks
   // 2) team member without a connected workspace → honest panel
@@ -270,6 +295,7 @@ $('forgot').addEventListener('click', async function(){
   var em = $('em').value.trim();
   if (!em) { err('Type your email above first, then tap “Forgot your password?” again.'); $('em').focus(); return; }
   try { await sb.auth.resetPasswordForEmail(em, { redirectTo: location.origin + '/set-password.html' }); } catch(e){}
+  try { sessionStorage.setItem('dds-reset-email', em); } catch(e){}   // the next page fills it in
   show('resetSent');
 });
 $('backToLogin').addEventListener('click', function(){ show('loginPanel'); });
@@ -278,7 +304,9 @@ $('retry').addEventListener('click', async function(){
   var s = await sb.auth.getSession(); var t = s && s.data && s.data.session && s.data.session.access_token;
   if (t) route(t); else show('loginPanel');
 });
-$('signout1').addEventListener('click', async function(){ if (sb) { try{ await sb.auth.signOut(); }catch(e){} } show('loginPanel'); });
+// Builder item 192: Sign in was left greyed out, saying "Signing in…", by the sign-in that
+// led to this panel. Signing out gives it back.
+$('signout1').addEventListener('click', async function(){ if (sb) { try{ await sb.auth.signOut(); }catch(e){} } var b = $('go'); b.disabled = false; b.textContent = 'Sign in'; show('loginPanel'); });
 
 // Already signed in? Route straight through — this page is a door, not a stop.
 (async function(){

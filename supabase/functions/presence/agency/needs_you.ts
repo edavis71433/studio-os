@@ -102,6 +102,10 @@ export interface NeedsInput {
   snoozed?: Record<string, string>;
   /** row key → when it was snoozed (ISO); a row whose `since` is later is awake (A2) */
   snoozedAt?: Record<string, string>;
+  /** Builder list item 126: client sites the studio turned off on Home and the bell
+   *  (lib/site_notify.ts). Their visitors' enquiries leave the list; what is owed, what
+   *  is broken and what a client wrote never do. */
+  quiet?: string[];
   // accepted and deliberately IGNORED — the point of this list
   moments?: unknown[]; opportunities?: unknown[]; reviewReports?: unknown[]; brandReports?: unknown[];
 }
@@ -196,8 +200,10 @@ export function buildNeedsYou(i: NeedsInput): NeedsRow[] {
     }
   }
 
-  // ── b. unanswered enquiries on the clients' sites (oldest first) ──
-  for (const e of [...(i.enquiries || [])].filter((e) => active.has(e.site_id)).sort((a, b) => String(a.created_at || '').localeCompare(String(b.created_at || '')))) {
+  // ── b. unanswered enquiries on the clients' sites (oldest first); none from a site the
+  //      studio turned off (item 126) ──
+  const quiet = new Set((i.quiet || []).map((x) => String(x).toLowerCase()));
+  for (const e of [...(i.enquiries || [])].filter((e) => active.has(e.site_id) && !quiet.has(String(e.site_id).toLowerCase())).sort((a, b) => String(a.created_at || '').localeCompare(String(b.created_at || '')))) {
     const who = String(e.name || e.email || '').trim() || 'a visitor';
     const kind = String(e.form_kind || '').trim();
     push({ key: `enquiry:${e.id}`, kind: 'enquiry', site_id: e.site_id, client_id: null, name: nameOf(e.site_id, null),
