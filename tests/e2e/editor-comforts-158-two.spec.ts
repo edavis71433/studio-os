@@ -30,9 +30,9 @@ type Put = { blocks?: Array<Record<string, any>> };
 type Frame = ReturnType<Page['frameLocator']>;
 const MOD = process.platform === 'darwin' ? 'Meta' : 'Control';
 
-async function mount(page: Page, { studio = true, lock }: { studio?: boolean; lock?: unknown } = {}) {
+async function mount(page: Page, { studio = true, lock, site }: { studio?: boolean; lock?: unknown; site?: Record<string, unknown> } = {}) {
   let settings: Record<string, unknown> = { blocks: BLOCKS(lock), section_meta: META };
-  await installApp(page, { api: { ...API, '/portal/context': ctx(studio), '/settings': { data: settings } } });
+  await installApp(page, { api: { ...API, '/site': { data: { site: { ...SITE, ...(site || {}) }, identity: { business_name: 'Marlow’s Kitchen' }, location: {} } }, '/portal/context': ctx(studio), '/settings': { data: settings } } });
   const puts: Put[] = [];
   await page.route('**/functions/v1/presence/**', (route: Route) => {
     const req = route.request();
@@ -130,6 +130,8 @@ test.describe('right-click on a section (builder item 158)', () => {
     await frame.getByRole('menuitem', { name: 'All keyboard shortcuts' }).click();
     const sheet = page.getByRole('dialog', { name: 'Keyboard shortcuts' });
     await expect(sheet).toBeVisible();
+    const box = (await sheet.boundingBox())!, vw = page.viewportSize()!.width;
+    expect(Math.abs(box.x + box.width / 2 - vw / 2)).toBeLessThan(4);   // in the middle of the screen, not pinned to a corner
     await expect(sheet).toContainText('The section you picked');
     await expect(sheet).toContainText('Delete it (asks first)');
     await sheet.getByRole('button', { name: 'Done' }).click();
@@ -317,6 +319,78 @@ test.describe('open the draft on your phone (builder item 158)', () => {
       const card = page.getByRole('dialog', { name: 'Open it on your phone' });
       await expect(card.getByRole('img')).toBeVisible();
       const r = await new AxeBuilder({ page }).include('.op-sheet').withTags(['wcag2a', 'wcag2aa']).analyze();
+      expect(r.violations.filter((v) => ['serious', 'critical'].includes(v.impact || '')).map((v) => `${v.id}: ${v.nodes.map((n) => n.target.join(' ')).join(', ')}`)).toEqual([]);
+    });
+  }
+});
+
+// Figma "A · A Coming soon page": before the first publish, Your site offers a Coming soon page
+// beside Publish; while it's up the panel says so, and Publish puts the real site there.
+// (What visitors see is checked in tests/presence/editor_comforts_158_two_test.mjs.)
+async function soonApi(page: Page) {
+  const posts: Array<Record<string, unknown>> = [];
+  let up: string | null = null;
+  await page.route('**/functions/v1/presence/preview/status', (r: Route) => r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: { draft: { unpublished_changes: 0 }, preview: { exists: false, url: null, updated_at: null, has_password: false }, live: { published: false, last_published_at: null, summary: null, offline_since: null, password_since: null, coming_soon_since: up } } }) }));
+  await page.route('**/functions/v1/presence/site/coming-soon', (r: Route) => {
+    if (r.request().method() === 'GET') return r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: { coming_soon: { line: up ? 'Opening December 1 on Main Street.' : '', phone: true, email: true, list: !!up, up_at: up }, published: false, contact: { phone: '(818) 555-0147', email: 'hello@marlows.example' } } }) });
+    posts.push(r.request().postDataJSON()); up = '2026-11-12T10:00:00Z';
+    return r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: { ok: true, message: 'Your Coming soon page is up. Publishing puts your real site there instead.' } }) });
+  });
+  return posts;
+}
+const yourSite = (page: Page) => page.evaluate(() => { (window as any).go('today'); (window as any).openTodoPanel(); });
+
+test.describe('a Coming soon page before the first publish (builder item 158)', () => {
+  test('Your site offers it beside Publish; the sheet puts it up; then the panel says Coming soon', async ({ page }) => {
+    await mount(page, { site: { netlify_site_id: 'nf-1' } });
+    const posts = await soonApi(page);
+    await yourSite(page);
+    await expect(page.locator('#siteStatusBadge')).toHaveText('Private');
+    await expect(page.locator('#siteStatusBtn')).toHaveText('Publish');
+    await page.locator('#siteSoonBtn').click();
+    const sheet = page.getByRole('dialog', { name: 'A Coming soon page' });
+    await expect(sheet).toContainText('Visitors to your address see this until you publish your site.');
+    await expect(sheet.getByRole('switch', { name: /Show the phone number/ })).toBeChecked();
+    await expect(sheet).toContainText('(818) 555-0147, from Business details');
+    await expect(sheet.getByRole('switch', { name: /Let people join your list/ })).not.toBeChecked();
+    await expect(sheet).toContainText('Search engines are told it’s temporary');
+    await sheet.getByRole('button', { name: 'Put it up' }).click();
+    await expect(sheet.locator('#csLineErr')).toContainText('Write one line first');
+    expect(posts).toEqual([]);
+    await sheet.getByLabel('One line').fill('Opening December 1 on Main Street.');
+    await sheet.getByRole('switch', { name: /Let people join your list/ }).check();
+    await sheet.getByRole('button', { name: 'Put it up' }).click();
+    await expect(sheet).toHaveCount(0);
+    expect(posts).toEqual([{ line: 'Opening December 1 on Main Street.', phone: true, email: true, list: true }]);
+    await expect(page.locator('#siteStatusBadge')).toHaveText('Coming soon');
+    await expect(page.locator('#siteStatusCard')).toContainText('Visitors see your Coming soon page. Publish puts your real site there instead.');
+    await expect(page.locator('#siteStatusBtn')).toHaveText('Publish my site');
+    await expect(page.locator('#siteSoonBtn')).toHaveText('Change the page…');
+    await page.locator('#siteSoonBtn').click();
+    await expect(sheet.getByLabel('One line')).toHaveValue('Opening December 1 on Main Street.');
+    await expect(sheet.getByRole('button', { name: 'Save the page' })).toBeVisible();
+    await sheet.getByRole('button', { name: 'Cancel' }).click();
+    await expect(sheet).toHaveCount(0);
+  });
+
+  test('a site with no address yet isn’t offered one', async ({ page }) => {
+    await mount(page);
+    await soonApi(page);
+    await yourSite(page);
+    await expect(page.locator('#siteStatusBtn')).toHaveText('Publish');
+    await expect(page.locator('#siteSoonBtn')).toHaveCount(0);
+  });
+
+  for (const scheme of ['light', 'dark'] as const) {
+    test(`the sheet passes the accessibility check (${scheme})`, async ({ page }, info) => {
+      test.skip(info.project.name !== 'desktop-chromium', 'one device is enough for the sheet’s colours');
+      await page.emulateMedia({ colorScheme: scheme });
+      await mount(page, { site: { netlify_site_id: 'nf-1' } });
+      await soonApi(page);
+      await yourSite(page);
+      await page.locator('#siteSoonBtn').click();
+      await expect(page.getByRole('dialog', { name: 'A Coming soon page' })).toBeVisible();
+      const r = await new AxeBuilder({ page }).include('.cs-sheet').withTags(['wcag2a', 'wcag2aa']).analyze();
       expect(r.violations.filter((v) => ['serious', 'critical'].includes(v.impact || '')).map((v) => `${v.id}: ${v.nodes.map((n) => n.target.join(' ')).join(', ')}`)).toEqual([]);
     });
   }

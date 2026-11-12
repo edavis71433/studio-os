@@ -149,6 +149,7 @@ html.site-home .content{padding:var(--dds-s3,12px);max-width:none}
 .ts-badge::before{content:"";width:7px;height:7px;border-radius:50%;background:currentColor}
 .ts-badge.public{background:var(--sage-soft);border-color:transparent;color:var(--sage)}
 .ts-badge.off{background:var(--amber-soft);border-color:transparent;color:var(--amber)}
+.ts-badge.soon{background:var(--amber-soft);border-color:transparent;color:var(--amber)}   /* item 158: a Coming soon page is up */
 .ts-url{font-size:13px;color:var(--plum);text-decoration:none;overflow-wrap:anywhere}
 .ts-url:hover{text-decoration:underline}
 #siteStatusCard .note{margin-top:6px;color:var(--ink-3);font-size:12.5px}
@@ -1856,7 +1857,7 @@ body.pd-dragging *{cursor:grabbing !important}
 .ver-star[aria-pressed="true"]{color:var(--amber,#94530a)}
 .ver-star:focus-visible{outline:2px solid var(--plum);outline-offset:1px}
 /* item 158: the list of keys, from ? or the foot of the right-click menu */
-.dck-sheet{border:0;border-radius:20px;padding:22px 24px;width:min(440px,94vw);max-height:88vh;overflow:auto;background:var(--sheet);color:var(--ink);box-shadow:var(--dds-shadow-lg,var(--shadow))}
+.dck-sheet{margin:auto;border:0;border-radius:20px;padding:22px 24px;width:min(440px,94vw);max-height:88vh;overflow:auto;background:var(--sheet);color:var(--ink);box-shadow:var(--dds-shadow-lg,var(--shadow))}
 .dck-sheet::backdrop{background:color-mix(in srgb,var(--ink) 35%,transparent)}
 .dck-head{display:flex;gap:12px;align-items:flex-start;margin-bottom:6px}
 .dck-head > div{flex:1;min-width:0}
@@ -1873,7 +1874,7 @@ body.pd-dragging *{cursor:grabbing !important}
 .stage-phone{display:inline-flex;align-items:center;gap:6px;align-self:center;min-height:34px;padding:0 14px;border:0;border-radius:999px;background:var(--plum);color:var(--fill-ink,#fff);font:inherit;font-size:13px;font-weight:600;cursor:pointer}
 .stage-phone svg{flex:none}
 .stage-phone:focus-visible{outline:2px solid #efeaf7;outline-offset:2px}
-.op-sheet{border:0;border-radius:20px;padding:22px 24px;width:min(400px,94vw);max-height:90vh;overflow:auto;background:var(--sheet);color:var(--ink);box-shadow:var(--dds-shadow-lg,var(--shadow))}
+.op-sheet{margin:auto;border:0;border-radius:20px;padding:22px 24px;width:min(400px,94vw);max-height:90vh;overflow:auto;background:var(--sheet);color:var(--ink);box-shadow:var(--dds-shadow-lg,var(--shadow))}
 .op-sheet::backdrop{background:color-mix(in srgb,var(--ink) 35%,transparent)}
 .op-head{display:flex;gap:12px;align-items:flex-start}
 .op-head > div{flex:1;min-width:0}
@@ -1891,6 +1892,23 @@ body.pd-dragging *{cursor:grabbing !important}
 .op-done{display:inline-flex;align-items:center;justify-content:center;min-height:38px;padding:0 18px;border:0;border-radius:999px;background:var(--plum);color:var(--fill-ink,#fff);font:inherit;font-size:13px;font-weight:600;cursor:pointer;text-decoration:none}
 .op-err{margin:0;color:var(--clay);font-size:14px;text-align:center}
 .op-wait{margin:0;color:var(--ink-2);font-size:14px}
+/* item 158: the Coming soon sheet */
+.cs-lbl{display:block;margin:16px 0 6px;font-size:13px;font-weight:600}
+.cs-in{width:100%;box-sizing:border-box;min-height:42px;padding:0 12px;border:1.5px solid var(--hair);border-radius:12px;background:var(--sheet);color:var(--ink);font:inherit;font-size:16px}
+.cs-in:focus-visible{outline:2px solid var(--plum);outline-offset:1px}
+.cs-err{margin:6px 0 0;text-align:left;font-size:13px}
+.cs-row{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:14px;cursor:pointer}
+.cs-row-t{display:flex;flex-direction:column;gap:2px;min-width:0}
+.cs-row-t b{font-size:14px;font-weight:600}
+.cs-row-t span{font-size:12.5px;color:var(--ink-2);overflow-wrap:anywhere}
+.cs-sw{appearance:none;-webkit-appearance:none;position:relative;flex:none;width:42px;height:26px;margin:0;border-radius:999px;background:color-mix(in srgb,var(--ink) 30%,transparent);cursor:pointer;transition:background var(--dds-t-fast,120ms) var(--dds-ease,ease-out)}
+.cs-sw::after{content:"";position:absolute;top:3px;left:3px;width:20px;height:20px;border-radius:50%;background:var(--sheet);box-shadow:0 1px 2px color-mix(in srgb,var(--ink) 30%,transparent);transition:transform var(--dds-t-fast,120ms) var(--dds-ease,ease-out)}
+.cs-sw:checked{background:var(--plum)}
+.cs-sw:checked::after{transform:translateX(16px)}
+.cs-sw:focus-visible{outline:2px solid var(--plum);outline-offset:2px}
+.cs-sw:disabled{opacity:.45;cursor:default}
+.cs-sheet .op-note{margin-top:16px}
+@media (prefers-reduced-motion:reduce){.cs-sw,.cs-sw::after{transition:none}}
 @media(max-width:760px){   /* a phone's Preview bar wraps, so Open in my browser stays on the screen */
   .stagebar{flex-wrap:wrap;row-gap:var(--dds-s2,8px);column-gap:var(--dds-s4,16px);padding-left:var(--dds-s4,16px);padding-right:var(--dds-s4,16px)}
   .stage-phone{margin-bottom:var(--dds-s2,8px)}
@@ -17897,13 +17915,14 @@ function renderSiteStatus() {
   const published = !!((live && live.published) || S.site.last_published_at);
   const offline = !!(published && live && live.offline_since);
   const locked = !!(published && !offline && live && live.password_since);   // list item 175: a visitor password
+  const soon = !!(!published && live && live.coming_soon_since);   // item 158: a Coming soon page stands in until the first publish
   const url = siteLiveUrl();
   box.textContent = ""; box.hidden = false;
   const row = el("div", "ts-row");
-  const badge = el("span", "ts-badge " + (offline ? "off" : locked ? "pw" : published ? "public" : "private"), offline ? "Offline" : locked ? "Password" : published ? "Public" : "Private");
+  const badge = el("span", "ts-badge " + (offline ? "off" : locked ? "pw" : published ? "public" : soon ? "soon" : "private"), offline ? "Offline" : locked ? "Password" : published ? "Public" : soon ? "Coming soon" : "Private");
   badge.id = "siteStatusBadge";
   row.appendChild(badge);
-  if (published && !offline && url) {
+  if (((published && !offline) || soon) && url) {
     const a = el("a", "ts-url", url.replace(/^https?:\/\//, "")); a.href = url; a.target = "_blank"; a.rel = "noopener";
     row.appendChild(a);
   }
@@ -17911,10 +17930,10 @@ function renderSiteStatus() {
   box.appendChild(el("div", "note", offline
     ? "Visitors see a short “temporarily offline” page. Nothing was deleted."
     : locked ? "Visitors type the password before they see any page."
-    : published ? "Anyone can visit your site." : "Only you can see it. It goes public when you publish."));
+    : published ? "Anyone can visit your site." : soon ? "Visitors see your Coming soon page. Publish puts your real site there instead." : "Only you can see it. It goes public when you publish."));
   let btn;
   if (!published) {
-    btn = el("button", "pillbtn inked", "Publish");
+    btn = el("button", "pillbtn inked", soon ? "Publish my site" : "Publish");
     btn.addEventListener("click", () => { closeTodoPanel(); openRitual(); });
   } else if (offline) {
     btn = el("button", "pillbtn inked", "Bring back online"); btn.dataset.needs = "configure";
@@ -17925,6 +17944,12 @@ function renderSiteStatus() {
   }
   btn.type = "button"; btn.id = "siteStatusBtn";
   box.appendChild(btn);
+  if (!published && S.site.netlify_site_id) {   // item 158: before the first publish, the address can show a Coming soon page
+    const cs = el("button", "pillbtn", soon ? "Change the page…" : "Put up a Coming soon page…");
+    cs.type = "button"; cs.id = "siteSoonBtn"; cs.dataset.needs = "configure";
+    cs.addEventListener("click", () => openComingSoon());
+    box.appendChild(cs);
+  }
   if (published && !offline) {
     const pw = el("button", "pillbtn ghost", locked ? "Change or remove password…" : "Add a visitor password…");
     pw.type = "button"; pw.id = "sitePasswordBtn"; pw.dataset.needs = "configure";
@@ -17941,13 +17966,63 @@ async function siteSetPassword(locked) {
   try { const r = await api("POST", "/site/password", { password: pw }); toast((r.data && r.data.message) || "Saved"); return true; }
   catch (err) { toast(nice(err), true); return false; }
 }
+// Builder list item 158: a Coming soon page, before the first publish. The sheet holds one line,
+// the phone and email from Business details (each with its switch) and an optional list box;
+// Put it up puts the page at the site's address (the draft is untouched), and the first
+// publish replaces it. While it's up, the same sheet changes it.
+async function openComingSoon() {
+  if (document.querySelector("dialog.cs-sheet")) return;
+  let cur = null;
+  try { cur = (await api("GET", "/site/coming-soon")).data || null; } catch (err) { toast(nice(err), true); return; }
+  const cs = (cur && cur.coming_soon) || {}, contact = (cur && cur.contact) || {}, up = !!cs.up_at;
+  const back = document.activeElement;
+  const dlg = el("dialog", "op-sheet cs-sheet"); dlg.setAttribute("aria-labelledby", "csTitle");
+  const form = el("form"); form.noValidate = true;
+  const h = el("h2", null, "A Coming soon page"); h.id = "csTitle";
+  const head = el("div", "op-head"), hx = el("div"); hx.append(h, el("p", null, "Visitors to your address see this until you publish your site.")); head.appendChild(hx);
+  const lab = el("label", "cs-lbl", "One line"); lab.htmlFor = "csLine";
+  const line = el("input", "cs-in"); line.id = "csLine"; line.type = "text"; line.maxLength = 140; line.value = cs.line || ""; line.placeholder = "Opening December 1 on Main Street.";
+  const err = el("p", "op-err cs-err"); err.id = "csLineErr"; err.hidden = true; line.setAttribute("aria-describedby", err.id);
+  form.append(head, lab, line, err);
+  const sw = (id, label, sub, on, off) => {
+    const row = el("label", "cs-row"); row.htmlFor = id;
+    const t = el("span", "cs-row-t"); t.append(el("b", null, label), el("span", null, sub));
+    const box = el("input", "cs-sw"); box.type = "checkbox"; box.id = id; box.setAttribute("role", "switch"); box.checked = !!on && !off; box.disabled = !!off;
+    row.append(t, box); form.appendChild(row); return box;
+  };
+  const ph = sw("csPhone", "Show the phone number", contact.phone ? `${contact.phone}, from Business details` : "Add a phone number in Business details first", cs.phone !== false, !contact.phone);
+  const em = sw("csEmail", "Show the email address", contact.email || "Add an email address in Business details first", cs.email !== false, !contact.email);
+  const li = sw("csList", "Let people join your list", "They hear first when you open", cs.list === true, false);
+  form.appendChild(el("p", "op-note", "Search engines are told it’s temporary, so they don’t list it. Your real site replaces it the moment you publish; nothing in your draft changes."));
+  const acts = el("div", "op-acts");
+  const go = el("button", "op-done", up ? "Save the page" : "Put it up"); go.type = "submit"; go.dataset.needs = "configure";
+  const cancel = el("button", "op-copy", "Cancel"); cancel.type = "button";
+  acts.append(go, cancel); form.appendChild(acts);
+  dlg.appendChild(form); document.body.appendChild(dlg);
+  let shut = false;
+  const close = () => { if (shut) return; shut = true; try { dlg.close(); } catch (_) {} dlg.remove(); if (back && back.isConnected) { try { back.focus({ preventScroll: true }); } catch (_) {} } };
+  cancel.addEventListener("click", close);
+  dlg.addEventListener("cancel", (e) => { e.preventDefault(); close(); });
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    if (!line.value.trim()) { err.textContent = "Write one line first, like when you open."; err.hidden = false; line.setAttribute("aria-invalid", "true"); line.focus(); return; }
+    err.hidden = true; line.removeAttribute("aria-invalid");
+    go.disabled = true; go.textContent = up ? "Saving…" : "Putting it up…";
+    try {
+      const r = await api("POST", "/site/coming-soon", { line: line.value.trim(), phone: ph.checked, email: em.checked, list: li.checked });
+      toast((r.data && r.data.message) || "Your Coming soon page is up.");
+      close(); refreshSiteStatus(true);
+    } catch (e2) { toast(nice(e2), true); go.disabled = false; go.textContent = up ? "Save the page" : "Put it up"; }
+  });
+  dlg.showModal(); line.focus();
+}
 // Whether the live site is offline comes from the same read the Page menu uses;
-// a site never published has nothing to ask about.
+// a site never published has nothing to ask about, unless it may show a Coming soon page.
 let SITE_STATUS_ASKING = false;
 function refreshSiteStatus(force) {
   if (SITE_STATUS_ASKING || !S.site || S.site.edition === "monitor") return;
   if (!force && S.previewStatus) return;
-  if (!force && !S.site.last_published_at) return;
+  if (!force && !S.site.last_published_at && !S.site.netlify_site_id) return;   // never published and no address: nothing to ask (item 158: one with an address may show a Coming soon page)
   SITE_STATUS_ASKING = true;
   api("GET", "/preview/status")
     .then((r) => { S.previewStatus = r.data || null; renderSiteStatus(); renderTodoLine(); })

@@ -32,7 +32,7 @@ const { handleInvoicePaymentUndo } = await import(`${P}/routes/invoice_payments.
 const { handleAssetDelete, handleAssetStatus } = await import(`${P}/routes/assets.ts`);
 const { handleRedirectDelete } = await import(`${P}/routes/search.ts`);
 const { handleContentLibraryDelete } = await import(`${P}/routes/content_library.ts`);
-const { handleCheckpointDelete, handleTakeOffline, handleBackOnline, handleSitePassword } = await import(`${P}/routes/publish.ts`);
+const { handleCheckpointDelete, handleTakeOffline, handleBackOnline, handleSitePassword, handleComingSoon } = await import(`${P}/routes/publish.ts`);
 const { handleBookingTypeDelete, handleBookingSettingsPut } = await import(`${P}/routes/booking.ts`);
 const { handleKnowledgeDelete } = await import(`${P}/routes/knowledge.ts`);
 const { handleCommentDelete } = await import(`${P}/routes/comments.ts`);
@@ -157,6 +157,7 @@ const DECIDED = {
     'DELETE /foundations/domain', 'POST /foundations/domain', 'POST /foundations/prepare',
     'POST /foundations/domain/forward', 'DELETE /foundations/domain/forward',   // builder list item 174
     'POST /preview/settings', 'POST /site/offline', 'POST /site/online', 'POST /site/password', 'PUT /bookings/settings',
+    'POST /site/coming-soon',   // builder list item 158: a Coming soon page before the first publish, a setting like taking the site offline
     'PUT /sales/contacts/fields', 'PUT /sales/stages', 'POST /calendar/link', 'DELETE /calendar/link',
     'POST /email/log-address', 'DELETE /email/log-address',
     'PUT /report/monthly', 'POST /report/monthly/preview',   // builder list item 58
@@ -254,6 +255,7 @@ const ALL = Object.entries(DECIDED).flatMap(([need, names]) => names.map((name) 
   ok('decided: withdrawing an invoice and cancelling a retainer count as delete', has('delete', 'POST /sales/invoices/:id/void', 'POST /sales/deals/:id/retainer/cancel'));
   ok('decided: taking the site offline and back is configure, not publish', has('configure', 'POST /site/offline', 'POST /site/online'));
   ok('decided: a visitor password is configure, like taking the site offline (list item 175)', has('configure', 'POST /site/password'));
+  ok('decided: a Coming soon page is configure, like taking the site offline (builder list item 158)', has('configure', 'POST /site/coming-soon'));
   ok('decided: removing the domain is configure, so a developer keeps it', has('configure', 'DELETE /foundations/domain'));
   ok('decided: the everyday lists stay edit', has('edit', 'PUT /sales/services', 'PUT /service/faq', 'PUT /service/saved-replies', 'POST /bookings/types', 'PATCH /bookings/types/:id', 'POST /redirects'));
   ok('decided: archiving a file is not deleting it', has('edit', 'POST /assets/bulk') && has('approve', 'POST /assets/:id/status'));
@@ -355,6 +357,7 @@ const CHANGED = [
   { name: 'POST /report/monthly/preview', fx: { only: ['clients'] }, run: (r, p) => handleReportPreview(A, p, cors) },   // with every read answering a row the address reads as suppressed; the send is the write
   { name: 'POST /site/offline', run: (r, p) => handleTakeOffline(A, p, cors) },
   { name: 'POST /site/online', fx: { site: { offline_at: '2026-01-01T00:00:00Z' } }, run: (r, p) => handleBackOnline(A, p, cors) },
+  { name: 'POST /site/coming-soon', body: { line: 'Opening soon.' }, fx: { empty: ['presence_publishes'] }, run: (r, p) => handleComingSoon(r, A, p, cors) },   // builder list item 158: never published, so the deploy to Netlify is the outside call that proves the owner reached it
   { name: 'POST /site/password', body: { password: 'letmein' }, run: (r, p) => handleSitePassword(r, A, p, cors) },   // list item 175: Netlify's answer is the outside call that proves the owner reached it
 ];
 {
@@ -501,6 +504,7 @@ const WRITE_HANDLERS = [
   'handleStudioRequests',   // final pass S1: POST /portal/studio-requests/:id/(accept|decline) are open; the route answers the owner only
   'handleMemberRole', 'handleTransferStart', 'handleTransferCancel',   // builder item 53: open on the member list; each route checks the role itself
   'handleSitePassword',   // builder list item 175: POST /site/password needs configure
+  'handleComingSoon',   // builder list item 158: POST /site/coming-soon needs configure
   'handlePostPublish', 'handlePostUnpublish',   // builder list item 40: POST /posts/:id/(publish|unpublish) need publish
   'handleScheduleCancel', 'handleScheduleCreate', 'handleSettings', 'handleShareSet', 'handleStockImport',
   'handleSupport', 'handleSupportMessage', 'handleSupportOne', 'handleSurveyRespond', 'handleTakeOffline',

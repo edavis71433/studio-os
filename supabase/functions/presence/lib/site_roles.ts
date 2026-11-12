@@ -130,7 +130,7 @@ const MEMBER_WRITES: Array<[MemberWriteNeed, string[]]> = [
     '(POST|DELETE) /foundations/domain/forward',   // builder list item 174: another domain forwarding here is a domain setting
     'POST /foundations/prepare',
     'POST /preview/settings',
-    'POST /site/(offline|online|password)',   // list item 175: a visitor password is a setting, like taking the site offline
+    'POST /site/(offline|online|password|coming-soon)',   // list item 175: a visitor password is a setting, like taking the site offline; item 158: so is a Coming soon page
     'PUT /bookings/settings',
     'PUT /sales/contacts/fields',
   ]],

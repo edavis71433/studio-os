@@ -97,11 +97,12 @@ const STATE_WORDS: Record<StateKey, string> = { live: 'Live', not_live: 'Not liv
  *  elsewhere, plus the three facts only the website knows: taken offline, not
  *  answering the uptime probe (two misses in a row, monitor/heartbeat.ts), paused.
  *  "Needs you" is Home's own list; the page lays it over this. Pure. */
-export function siteState(p: { edition?: string | null; status?: string | null; last_published_at?: string | null }, x?: SiteExtra | null): { key: StateKey; words: string } {
+export function siteState(p: { edition?: string | null; status?: string | null; last_published_at?: string | null }, x?: SiteExtra | null, comingSoon = false): { key: StateKey; words: string } {
   const at = (key: StateKey) => ({ key, words: STATE_WORDS[key] });
   if (p.edition === 'monitor') return at('elsewhere');
   if (p.status === 'paused') return at('paused');
-  if (!(p.status === 'live' || p.last_published_at)) return at('not_live');
+  // builder list item 158: still not live, but its address shows a Coming soon page, so the card says so
+  if (!(p.status === 'live' || p.last_published_at)) return comingSoon ? { key: 'not_live', words: 'Coming soon' } : at('not_live');
   if (x?.offline_at) return at('offline');
   if ((Number(x?.uptime_fail_streak) || 0) >= DOWN_THRESHOLD) return at('down');
   return at('live');
@@ -199,6 +200,8 @@ export interface SitesInput {
   nowIso: string;
   /** item 145: the sites started from another site or a template, and whether the studio kept what came across */
   copied?: Record<string, { from: string; kept: boolean }>;
+  /** builder list item 158: the sites whose Coming soon page is up (lib/coming_soon.ts) */
+  comingSoon?: string[];
   /** item 53: the owners' contacts (their names) and any open transfer of ownership, by site */
   contacts?: Array<{ id: string; name?: string | null }>;
   transfers?: Record<string, ReturnType<typeof transferSummary>>;
@@ -216,10 +219,11 @@ export function buildSites(i: SitesInput) {
   const seatsBy = new Map<string, SeatRow[]>();
   for (const s of i.seats) seatsBy.set(s.site_id, [...(seatsBy.get(s.site_id) || []), s]);
   const pinAt = new Map(i.pins.map((id, n) => [id, n]));
+  const soon = new Set(i.comingSoon || []);
   const rows = i.portfolio.map((p) => {
     const x = extra.get(p.site_id) || null;
     const clientId = String(x?.client_id || '');
-    const state = siteState(p, x);
+    const state = siteState(p, x, soon.has(p.site_id));
     const hosted = p.edition !== 'monitor';
     return {
       site_id: p.site_id, name: p.name, edition: p.edition,
@@ -558,7 +562,7 @@ export async function handleAgencySites(req: Request, route: string, method: str
     const soft = () => ({ ok: false, json: null as unknown });
     const userId = UUID_RE.test(String(principal.userId || '')) ? String(principal.userId) : '';
     // each read is best-effort: a failed one leaves its column empty and `partial` says so
-    const [extraQ, planQ, seatQ, ownerQ, linkQ, studioQ, openQ, pins, copiedQ] = await Promise.all([
+    const [extraQ, planQ, seatQ, ownerQ, linkQ, studioQ, openQ, pins, copiedQ, comingQ] = await Promise.all([
       ids.length ? svc(`presence_sites?id=${IN}&select=${EXTRA_COLS}&limit=1000`).catch(soft) : none,
       clientIds.length ? svc(`presence_entitlements?client_id=in.(${clientIds.join(',')})&product=eq.presence&select=client_id,plan,status,term,current_period_end,trial_ends_at,cancel_at_period_end&limit=1000`).catch(soft) : none,
       ids.length ? svc(`presence_site_members?site_id=${IN}&status=in.(active,invited)&select=site_id,email,role,status&limit=2000`).catch(soft) : none,
@@ -572,6 +576,8 @@ export async function handleAgencySites(req: Request, route: string, method: str
       deps.ownSite().then(async (own) => (own ? { ok: true, own: true, pins: normalizePins(await readReservedJson(own.id, RESERVED_NAMES.sitePins))[member.member_id] || [] } : { ok: true, own: false, pins: [] as string[] })).catch(() => ({ ok: false, own: false, pins: [] as string[] })),
       // item 145: which sites were started from another site or a template (their copy records)
       ids.length ? svc(`presence_sales_templates?site_id=${IN}&kind=eq.proposal&name=eq.${encodeURIComponent(RESERVED_NAMES.copiedFrom)}&deleted_at=is.null&select=site_id,body&limit=1000`).catch(soft) : none,
+      // builder list item 158: which sites show a Coming soon page (it went up; siteState asks whether they've gone live since)
+      ids.length ? svc(`presence_sales_templates?site_id=${IN}&kind=eq.proposal&name=eq.${encodeURIComponent(RESERVED_NAMES.comingSoon)}&deleted_at=is.null&select=site_id,body&limit=1000`).catch(soft) : none,
     ]);
     // item 53: the owners' names live on their contacts; one read for every site, and one for open transfers
     const contactIds = [...new Set(rowsOf<OwnerRow>(ownerQ).map((o) => String(o.contact_id || '')).filter((x) => UUID_RE.test(x)))];
@@ -584,7 +590,11 @@ export async function handleAgencySites(req: Request, route: string, method: str
       let rec = null; try { rec = normalizeCopied(JSON.parse(String(r.body || 'null'))); } catch { rec = null; }
       if (rec) copied[r.site_id] = { from: rec.from, kept: rec.kept };
     }
+    const comingSoon = rowsOf<{ site_id: string; body: string }>(comingQ).filter((r) => {
+      try { return typeof (JSON.parse(String(r.body || 'null')) || {}).up_at === 'string'; } catch { return false; }
+    }).map((r) => String(r.site_id));
     const rows = buildSites({
+      comingSoon,
       portfolio, extras: rowsOf<SiteExtra>(extraQ), plans: rowsOf<PlanRow>(planQ), seats: rowsOf<SeatRow>(seatQ), owners: rowsOf<OwnerRow>(ownerQ),
       portalSites: rowsOf<{ customer_site_id: string }>(linkQ).map((l) => String(l.customer_site_id)),
       studio: rowsOf<StudioSeat>(studioQ), me: member.email, opened: lastOpenedBySite(rowsOf(openQ)),
