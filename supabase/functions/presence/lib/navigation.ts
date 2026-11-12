@@ -277,6 +277,8 @@ export function buildNav(c: NavContext): NavSection[] {
   // (Plan & billing is the owner's / the studio's own; Team is the studio's seats).
   settings.push(hid('plan', 'Your plan', '/settings.html#billing', 'Your Studio OS plan, when it renews, and how to change it — not the invoices you send.'));
   if (studioLevel) settings.push(hid('team', 'Team', '/settings.html#team', 'Who is on your studio’s team, their roles, and the seats your plan covers.'));
+  // sales item 83: ⌘K "deleted", "restore" or "trash" finds the one place deleted deals, contacts and to-dos wait
+  if (studioLevel && f.hasRelationship) settings.push(hid('deleted', 'Recently deleted', '/recently-deleted.html', 'Deals, contacts and to-dos deleted in the last 30 days, each with Restore (trash, undo).'));
   if (f.hasClientPortal && has(c, 'invite')) settings.push(hid('sharing', 'Sharing & access', '/sharing.html', 'Who can sign in — your team, what clients can see, reviewer links.'));
   if (f.hasDeveloper && has(c, 'use_developer_mode')) settings.push(hid('developer', 'Developer Mode', '/developer.html'));
   // Oct 2026 audit change 11: the Health Center's door — a status line on the studio's
