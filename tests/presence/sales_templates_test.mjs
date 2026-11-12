@@ -28,7 +28,7 @@ ok('use: contract create accepts template_id + fills placeholders from the deal'
   ok('placeholders: {{studio_name}} comes from the site’s own presence_identity', /presence_identity\?site_id=eq\.\$\{siteId\}&select=business_name/.test(sales));
 }
 ok('UI: one-tap "Use" buttons + "Save as template" on proposals and agreements', /data-use-ptpl/.test(pipeline) && /data-use-ctpl/.test(pipeline) && /data-tpl-prop/.test(pipeline) && /data-tpl-con/.test(pipeline));
-ok('validated line items still gate template proposals (normalizeLineItems after template merge)', /b = \{ \.\.\.b, line_items: t\.line_items[\s\S]*?normalizeLineItems\(b\.line_items\)/.test(sales));
+ok('validated line items still gate template proposals (normalizeLineItems after template merge)', /b = \{ \.\.\.b, line_items: (?:b\.line_items !== undefined \? b\.line_items : )?t\.line_items[\s\S]*?normalizeLineItems\(b\.line_items\)/.test(sales));
 
 const passed = results.filter((r) => r.p).length;
 console.log(`\n════ SALES TEMPLATES (structural): ${passed}/${results.length} ${passed === results.length ? 'PASSED' : 'FAILED'} ════`);

@@ -198,10 +198,14 @@ test.describe('The Invoices page (item 85)', () => {
     await expect(dlg.locator('#payErr')).toHaveText('Pick how they paid.');
     await dlg.locator('#payHow').selectOption('check');
     await dlg.locator('#payNote').fill('Check #1042');
+    // sales item 118: the note says the client sees it, and a private one sits beside it
+    await expect(dlg.getByLabel('Note on their receipt (optional)')).toBeVisible();
+    await expect(dlg.locator('#payNoteH')).toContainText('Shown on their receipt');
+    await dlg.getByLabel('Private note, only you see it (optional)').fill('Paid late');
     await dlg.getByRole('button', { name: 'Record payment' }).click();
     await expect.poll(() => sent.length).toBe(1);
     expect(sent[0].path).toBe(`/sales/invoices/${I(3)}/payment?today=${day(0)}`);
-    expect(sent[0].body).toEqual({ amount_cents: 40000, paid_on: day(0), method: 'check', note: 'Check #1042' });
+    expect(sent[0].body).toEqual({ amount_cents: 40000, paid_on: day(0), method: 'check', note: 'Check #1042', private_note: 'Paid late' });
     await expect(page.locator('.dds-toast', { hasText: 'Recorded $400. The rest stays due.' })).toBeVisible();
     // a paid or processing invoice offers no payment to record
     await menuOf('#0063').click();

@@ -178,7 +178,8 @@ function teardownFor(kind) {
 
   // the healing path: a retry of an already-paid invoice must still clear.
   ok('F2: the ALREADY-PAID short-circuit clears too, so a Stripe retry heals a stranded row',
-    /already paid[\s\S]{0,200}/.test(fn) && /clearInvoiceReminder\(inv\)[\s\S]{0,200}?ok \(already paid\)/.test(fn),
+    // (sales item 116 put the "Paid twice" notice between the clear and the return: the clear is still first)
+    /already paid[\s\S]{0,200}/.test(fn) && /if \(inv\.status === 'paid'\) \{[\s\S]{0,700}?const clientId = await clearInvoiceReminder\(inv\);[\s\S]{0,1600}?ok \(already paid\)/.test(fn),
     'the already-paid return must run the clear first');
 
   ok('F2: the clear can never fail payment processing (its result is ignored, never rethrown)',

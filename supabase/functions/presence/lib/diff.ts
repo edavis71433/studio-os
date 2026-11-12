@@ -42,7 +42,8 @@ export function describeChanges(draftC: SnapshotContent, liveC: SnapshotContent 
     if (d.offerings.length) out.push({ section: 'offerings', sentence: `${d.offerings.length} menu item${d.offerings.length > 1 ? 's' : ''} appear on your menu page.` });
     if (d.faqs.length) out.push({ section: 'faqs', sentence: `${d.faqs.length} answered question${d.faqs.length > 1 ? 's' : ''} appear on your FAQ page.` });
     if (d.testimonials.length) out.push({ section: 'testimonials', sentence: `${d.testimonials.length} kind word${d.testimonials.length > 1 ? 's' : ''} from guests appear.` });
-    if (d.posts.length) out.push({ section: 'updates', sentence: `${d.posts.length} update${d.posts.length > 1 ? 's' : ''} appear on your Updates page.` });
+    if (d.locations[1]) out.push({ section: 'business', sentence: 'Your second location goes up beside the first.' });
+    if (d.posts.length) out.push({ section: 'updates', sentence: `${d.posts.length} blog post${d.posts.length > 1 ? 's' : ''} appear on your Updates page.` });
     return { count: out.length, changes: out, first_publish: true };
   }
   const l = normalizeSnapshotContent(liveC);
@@ -61,6 +62,7 @@ export function describeChanges(draftC: SnapshotContent, liveC: SnapshotContent 
     ['ordering_url', (_a, b) => b ? 'Your online-ordering link is updated.' : 'Your online-ordering link is removed.'],
     ['seo_title', () => 'Your search-listing title is updated.'],
     ['seo_description', () => 'Your search-listing description is updated.'],
+    ['short_description', (_a, b) => b ? 'Your short description, the line Google and AI assistants quote, is updated.' : 'Your short description is removed.'],   // builder list item 127
   ];
   for (const [f, s] of idPairs) {
     const a = String(li[f] ?? ''), b = String(di[f] ?? '');
@@ -89,6 +91,12 @@ export function describeChanges(draftC: SnapshotContent, liveC: SnapshotContent 
       out.push({ section: 'business', sentence: 'Your temporarily-closed notice is reworded.' });
     }
   }
+
+  // ── business: a second location (builder list item 127) ──
+  const d2 = d.locations[1] ?? null, l2 = l.locations[1] ?? null;
+  if (d2 && !l2) out.push({ section: 'business', sentence: `Your second location${d2.city ? ` in ${d2.city}` : ''} goes up beside the first.` });
+  else if (!d2 && l2) out.push({ section: 'business', sentence: 'Your second location comes off your site.' });
+  else if (d2 && l2 && !jeq(d2, l2)) out.push({ section: 'business', sentence: 'Your second location is updated.' });
 
   // ── offerings ──
   const lOff = new Map(l.offerings.map((o) => [o.id, o]));
@@ -129,12 +137,14 @@ export function describeChanges(draftC: SnapshotContent, liveC: SnapshotContent 
   const lP = new Map(l.posts.map((p) => [p.id, p])), dP = new Map(d.posts.map((p) => [p.id, p]));
   for (const p of d.posts) {
     const prev = lP.get(p.id);
-    if (!prev) out.push({ section: 'updates', sentence: `New update: ${q(p.title)}.`, entity_id: p.id });
-    else if (prev.title !== p.title || prev.body_md !== p.body_md || (prev.excerpt || '') !== (p.excerpt || '') || !jeq(prev.hero, p.hero)) {
-      out.push({ section: 'updates', sentence: `The update ${q(p.title)} is edited.`, entity_id: p.id });
+    if (!prev) out.push({ section: 'updates', sentence: `New blog post: ${q(p.title)}.`, entity_id: p.id });
+    // builder list item 40: a post's category, author and photos count as edits too
+    else if (prev.title !== p.title || prev.body_md !== p.body_md || (prev.excerpt || '') !== (p.excerpt || '') || !jeq(prev.hero, p.hero)
+      || !jeq(prev.category ?? null, p.category ?? null) || !jeq(prev.author ?? null, p.author ?? null) || !jeq(prev.images ?? null, p.images ?? null)) {
+      out.push({ section: 'updates', sentence: `The blog post ${q(p.title)} is edited.`, entity_id: p.id });
     }
   }
-  for (const p of l.posts) if (!dP.has(p.id)) out.push({ section: 'updates', sentence: `The update ${q(p.title)} is unpublished.`, entity_id: p.id });
+  for (const p of l.posts) if (!dP.has(p.id)) out.push({ section: 'updates', sentence: `The blog post ${q(p.title)} comes off your site.`, entity_id: p.id });
 
   // ── redirects (rare; keep honest) ──
   if (!jeq(d.redirects, l.redirects)) out.push({ section: 'site', sentence: 'Link redirects are updated.' });

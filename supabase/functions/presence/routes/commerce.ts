@@ -514,7 +514,7 @@ async function handleInvoicePaidEcho(req: Request, cors: Record<string, string>)
     // no resolvable client email → a loud warn, never a quiet skip.
     try {
       if (payerEmail) {
-        const [{ sendEmail }, { loadEmailBrand, EMAIL_BRAND_DEFAULT }] = await Promise.all([
+        const [{ sendEmail }, { loadEmailBrand, EMAIL_BRAND_DEFAULT, emailBand, emailFacts }] = await Promise.all([
           import('../commerce/account.ts'),
           import('../lib/email_brand.ts'),
         ]);
@@ -541,11 +541,9 @@ async function handleInvoicePaidEcho(req: Request, cors: Record<string, string>)
         // like the invoice email's (item 72: it used to reach the platform's mailbox,
         // whichever site sent it).
         receipted = await sendEmail(payerEmail, `Payment received — thank you${no ? ` (${no})` : ''}`,
+          emailBand(`Receipt${no ? ' · ' + (isDeposit ? 'Deposit ' : 'Invoice ') + no : ''}`, 'Payment received. Thank you.') +
           `<p>Your payment went through securely.</p>` +
-          `<table style="margin:8px 0;border-collapse:collapse">` +
-          `<tr><td style="padding:2px 12px 2px 0;color:#666">${isDeposit ? 'Deposit' : 'Invoice'}</td><td><b>${esc(what)}${no ? ` ${esc(no)}` : ''}</b></td></tr>` +
-          `<tr><td style="padding:2px 12px 2px 0;color:#666">Amount</td><td><b>${esc(amount)}</b></td></tr>` +
-          `</table>` +
+          emailFacts([[isDeposit ? 'Deposit' : 'Invoice', `${what}${no ? ` ${no}` : ''}`], ['Amount paid', amount]], { big: true, tone: 'good' }) +
           `<p>${isDeposit ? 'The deposit is in and the work can begin.' : 'The invoice is settled — nothing else is needed from you.'} ${told}, and everything updates on its own.</p>` +
           `<p style="color:#666;font-size:.9rem">${attachments ? 'Your receipt is attached as a PDF. ' : ''}Keep this email for your records.</p>`,
           brand, { critical: true, asBusiness: true, siteId: String(inv.site_id), ...(attachments ? { attachments } : {}) });
@@ -688,7 +686,7 @@ async function handleBillingSync(req: Request, cors: Record<string, string>): Pr
  *  routes below but act on the signed-in caller, so they are not on it. */
 const PUBLIC_ROUTES: ReadonlySet<string> = new Set([
   'GET /commerce/plans', 'POST /commerce/signup', 'POST /commerce/verify', 'GET /commerce/checkout-status',
-  'POST /commerce/billing-sync', 'POST /commerce/invoice-paid',
+  'POST /commerce/billing-sync', 'POST /commerce/invoice-paid', 'POST /commerce/invoice-bounced',
 ]);
 export function isPublicCommerceRoute(route: string, method: string): boolean {
   return PUBLIC_ROUTES.has(`${method} ${route}`);
@@ -781,6 +779,8 @@ export async function handleCommerce(req: Request, route: string, method: string
   if (route === '/commerce/checkout-status' && method === 'GET') return handleCheckoutStatus(req, cors);
   if (route === '/commerce/billing-sync' && method === 'POST') return handleBillingSync(req, cors);
   if (route === '/commerce/invoice-paid' && method === 'POST') return handleInvoicePaidEcho(req, cors);
+  // sales item 116: a bank payment bounced (called by the stripe-webhook, secret-gated like the echo above)
+  if (route === '/commerce/invoice-bounced' && method === 'POST') { const { handleInvoiceBounced } = await import('./invoice_bounced.ts'); return handleInvoiceBounced(req, BILLING_SYNC_SECRET, cors); }
 
   // authed
   const authed = principal.kind === 'client' || principal.kind === 'staff';

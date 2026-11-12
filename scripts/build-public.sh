@@ -50,8 +50,9 @@ for f in audit.html ai-critique.html report-card.html roi-calculator.html pricin
   rm -f "dist/$f"
 done
 
-# platform files (exact names — package.json/deno.json are NOT public)
-for f in _redirects _headers robots.txt tools-robots.txt security.txt sitemap.xml tools-sitemap.xml manifest.json manifest-app.json; do
+# platform files (exact names — package.json/deno.json are NOT public). whats-new.json is the
+# What's new panel's entries (builder item 128): public words and picture paths, nothing else.
+for f in _redirects _headers robots.txt tools-robots.txt security.txt sitemap.xml tools-sitemap.xml manifest.json manifest-app.json whats-new.json; do
   [ -f "$f" ] && cp "$f" dist/
 done
 

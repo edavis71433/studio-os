@@ -135,6 +135,12 @@ export async function deleteMedia(siteId: string, mediaId: string) {
     svc(`presence_settings?site_id=eq.${siteId}&select=logo_media_id,og_media_id,cover_media_id,blocks,pages,page_seo,brand_kit&limit=1`),
     svc(`presence_content_library?site_id=eq.${siteId}&select=name,payload&limit=500`),
   ]);
+  // Builder list item 40: a photo inside a post's text, and an author's photo. Read on their
+  // own, so a database without migration 0181 still checks everything above.
+  const [inPosts, blogQ] = await Promise.all([
+    svc(`presence_posts?site_id=eq.${siteId}&body_md=like.*${mediaId}*&deleted_at=is.null&select=title`).catch(() => ({ ok: false, json: null } as any)),
+    svc(`presence_settings?site_id=eq.${siteId}&select=post_authors&limit=1`).catch(() => ({ ok: false, json: null } as any)),
+  ]);
   const s = Array.isArray(settingsQ.json) ? settingsQ.json[0] : null;
   const siteRefs: string[] = [];
   if (s) {
@@ -154,6 +160,8 @@ export async function deleteMedia(siteId: string, mediaId: string) {
   const refs = [
     ...(Array.isArray(off.json) ? off.json.map((o: any) => `menu item “${o.name}”`) : []),
     ...(Array.isArray(posts.json) ? posts.json.map((p: any) => `post “${p.title}”`) : []),
+    ...(Array.isArray(inPosts.json) ? inPosts.json.map((p: any) => `the post “${p.title}”`) : []),
+    ...(Array.isArray(blogQ.json) && blogQ.json[0]?.post_authors && JSON.stringify(blogQ.json[0].post_authors).includes(mediaId) ? ['an author’s photo on your blog'] : []),
     ...(Array.isArray(deliverables.json) ? deliverables.json.map((d: any) => `deliverable “${d.title || 'file'}”`) : []),
     ...siteRefs,
   ];

@@ -109,7 +109,7 @@ test.describe('Analytics (Business dashboard)', () => {
     const control = seg(page);
     await expect(control).toHaveAttribute('role', 'group');
     await expect(control).toHaveAttribute('aria-label', 'Period');
-    // the FOUR windows the function accepts, in order — nothing invented
+    // the four quick windows, in order (item 175's other presets sit under More dates, beside it)
     await expect(control.locator('[data-period]')).toHaveText(['This month', 'Last 30 days', 'This quarter', 'All time']);
     await expect(control.locator('[data-period="this_month"]')).toHaveAttribute('aria-pressed', 'true');   // opens unfiltered (default)
     await expect(control.locator('[aria-pressed="true"]')).toHaveCount(1);
@@ -121,7 +121,7 @@ test.describe('Analytics (Business dashboard)', () => {
     await expect(control.locator('[aria-pressed="true"]')).toHaveCount(1);
     // the re-render hands focus back to the pressed segment, not to the page
     await expect(control.locator('[data-period="last_30"]')).toBeFocused();
-    // no popup anywhere: nothing to open, close or escape
+    // the segmented control itself opens nothing: no menu or listbox of periods (More dates is its own button, tested in analytics-dates-175.spec.ts)
     await expect(page.locator('#periodMenu, #periodBtn, [aria-haspopup="listbox"]')).toHaveCount(0);
   });
 

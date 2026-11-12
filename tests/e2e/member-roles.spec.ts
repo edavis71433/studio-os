@@ -318,17 +318,22 @@ test.describe('The builder', () => {
       await expectControls(page, p, [['#mediaGrid button.del', 'delete']]);
     });
 
-    test(`${p.who}: "Remove for good" on a service, a question, a kind word and an update, and they keep Save`, async ({ page }) => {
+    test(`${p.who}: "Remove for good" on a service, a question and a kind word, Remove on a blog post, and they keep Save`, async ({ page }) => {
       await openBuilder(page, p, '#offerings');
       await page.getByText('Pasta', { exact: true }).first().click();
       await expectControls(page, p, [['#view-offerings [data-act="del"]', 'delete']]);
       await expect(page.locator('#view-offerings [data-act="save"]').first()).toBeVisible();
-      for (const [hash, view] of [['#faqs', '#view-faqs'], ['#testimonials', '#view-testimonials'], ['#updates', '#view-updates']]) {
+      for (const [hash, view] of [['#faqs', '#view-faqs'], ['#testimonials', '#view-testimonials']]) {
         await page.goto(withScope('/presence.html', p) + hash);
         await page.locator(`${view} button.quietact:text-is("edit")`).first().click();
         await expectControls(page, p, [[`${view} [data-act="del"]`, 'delete']]);
         await expect(page.locator(`${view} [data-act="save"]`).first()).toBeVisible();
       }
+      // builder list item 40: a blog post is a card; its Remove is the delete, and Keep writing stays
+      await page.goto(withScope('/presence.html', p) + '#updates');
+      await expect(page.locator('#view-updates .bl-card')).toHaveCount(1);
+      await expectControls(page, p, [['#view-updates .bl-card [data-act="del"]', 'delete']]);
+      await expect(page.locator('#view-updates .bl-card .bl-act')).toHaveText('Keep writing');
     });
 
     test(`${p.who}: bookings — the on/off and hours, and removing a service, and they keep the services`, async ({ page }) => {

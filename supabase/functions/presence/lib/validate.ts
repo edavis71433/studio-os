@@ -7,6 +7,7 @@ type Rule = { max: number; email?: boolean; url?: boolean; social?: boolean };
 const IDENTITY_FIELDS: Record<string, Rule> = {
   business_name:   { max: 120 },
   description:     { max: 600 },
+  short_description: { max: 150 },   // builder list item 127 (0182): the line AI tools and directories quote
   phone:           { max: 40 },
   email:           { max: 254, email: true },
   tagline:         { max: 140 },

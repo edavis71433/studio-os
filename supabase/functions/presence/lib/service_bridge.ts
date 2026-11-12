@@ -748,6 +748,26 @@ export async function tickChecklistForDeal(agencySiteId: string, dealId: string,
   } catch { return false; }
 }
 
+/** Take a self-ticked step back off (sales item 118): a deposit recorded by hand
+ *  and then undone is not paid, and the checklist must not go on saying it is.
+ *  Only a step that is done moves; no project yet is a clean false. */
+export async function untickChecklistForDeal(agencySiteId: string, dealId: string, key: string, actor = 'system', actorKind = 'system'): Promise<boolean> {
+  try {
+    if (!agencySiteId || !dealId || !key) return false;
+    const deal = rows(await svc(`presence_deals?id=eq.${dealId}&site_id=eq.${agencySiteId}&select=created_project_id&limit=1`))[0];
+    if (!deal?.created_project_id) return false;
+    const { checklistSource } = await import('./project_checklist.ts');
+    const up = await svc(
+      `presence_tasks?project_id=eq.${deal.created_project_id}&site_id=eq.${agencySiteId}&source=eq.${encodeURIComponent(checklistSource(key))}&status=eq.done&deleted_at=is.null&select=id,title,client_visible`,
+      { method: 'PATCH', headers: { Prefer: 'return=representation' }, body: JSON.stringify({ status: 'todo', completed_at: null, updated_at: nowIso() }) },
+    );
+    const row = rows(up)[0];
+    if (!row) return false;
+    await projectEventRow(agencySiteId, String(deal.created_project_id), 'task_status_change', actor, actorKind, row.client_visible === true, { task_id: row.id, title: row.title, status: 'todo', auto: key });
+    return true;
+  } catch { return false; }
+}
+
 /** Tick a step on whatever delivery project is bridged to a CUSTOMER's site —
  *  the seam publishing needs, since a publish knows only the site it just put
  *  live. Scoped through the ACTIVE service link, so the tick lands on the
