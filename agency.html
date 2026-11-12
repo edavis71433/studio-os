@@ -1062,10 +1062,12 @@ function renderTop(){
 // each kind is a chip that narrows the list below to it, and "Go through them"
 // opens the list one at a time.
 // Sales item 91: a brand-new studio (no customers yet, nothing needing it) is told where to start,
-// never "All caught up". The setup steps are sales item 105's strip (#setupStrip, the money session's);
+// never "All caught up". The setup steps are sales item 105's strip (#setup; it paints after the
+// greeting and says so with 'dds:setup', so the greeting repaints then);
 // while it shows, the chip leads there, and Needs you offers the first two things to make.
 function brandNew(){return LOADED_ONCE&&!CLIENTS.length&&!(ARCHIVED&&ARCHIVED.length)&&!!NEEDS&&!Number(NEEDS.total||0)&&!needAll().length;}
-function setupStrip(){const el=document.getElementById('setupStrip');return el&&!el.hidden&&el.getClientRects().length?el:null;}
+function setupStrip(){const el=document.getElementById('setup');return el&&!el.hidden&&el.getClientRects().length?el:null;}
+document.addEventListener('dds:setup',()=>{if(brandNew())paintHero();});
 function paintHero(){
   const sub=$('heroSub'),chips=$('heroChips');if(!sub||!chips)return;
   if(!NEEDS){sub.textContent=NEEDS_FAILED?'':'Checking what needs you…';chips.innerHTML='';return;}
@@ -1073,7 +1075,7 @@ function paintHero(){
   if(brandNew()){
     if(hi)hi.textContent='Welcome to Studio OS';
     sub.textContent='Nothing needs you yet. Here’s where to start.';
-    chips.innerHTML=setupStrip()?'<a class="hchip start" id="startHere" href="#setupStrip">Start here ↓</a>':'<a class="hchip start" id="startHere" href="#add">Start here: add your first customer</a>';
+    chips.innerHTML=setupStrip()?'<a class="hchip start" id="startHere" href="#setup">Start here ↓</a>':'<a class="hchip start" id="startHere" href="#add">Start here: add your first customer</a>';
     const sh=$('startHere');
     if(sh)sh.addEventListener('click',(e)=>{e.preventDefault();const st=setupStrip();if(st){st.scrollIntoView({behavior:'smooth',block:'start'});const f=st.querySelector('a[href],button');if(f)f.focus({preventScroll:true});}else openAddCustomer();});
     return;

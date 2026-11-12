@@ -193,5 +193,12 @@ test.describe('Home (sales 91)', () => {
     await page.keyboard.press('Escape');
     await page.locator('#firstCust').click();
     await expect(page.locator('#custDlg')).toBeVisible();
+    await page.keyboard.press('Escape');
+    // once the setup steps (sales item 105, #setup) are on the page and say so, Start here leads to them
+    await page.evaluate(() => { const st = document.createElement('section'); st.id = 'setup'; st.innerHTML = '<a href="/settings.html#studio">Your business details</a>'; document.getElementById('top')!.after(st); document.dispatchEvent(new CustomEvent('dds:setup', { detail: { shows: true } })); });
+    await expect(page.locator('#startHere')).toHaveText('Start here ↓');
+    await page.locator('#startHere').click();
+    await expect(page.locator('#custDlg')).toBeHidden();
+    await expect(page.locator('#setup a')).toBeFocused();
   });
 });
