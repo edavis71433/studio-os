@@ -28,7 +28,7 @@ import {
 } from '../lib/netlify.ts';
 import { computeReadiness } from './monitor.ts';
 import { applyPlan } from './foundations.ts';
-import { domainHealth, domainTruth, twinName, dnsRecordsSure } from '../lib/domain_health.ts';
+import { domainHealth, domainTruth, twinName, dnsRecordsSure, lookupName, nameCheckFrom, connectRecords, DOMAIN_WAIT } from '../lib/domain_health.ts';
 import { byWhom, domainChangeEmail, tellOwnerAndStudio, afterResponse, escHtml, announceLiveOnce, forwardsOf } from '../lib/domain_notify.ts';
 import { writeReservedJson, RESERVED_NAMES } from '../lib/reserved_store.ts';
 import { rdapLookupDetailed, lookupPatch, whereToGo } from '../lib/rdap.ts';
@@ -269,30 +269,83 @@ export async function handleDomainForward(req: Request, method: string, site: Si
 }
 
 export async function handleDomain(req: Request, method: string, site: SiteRow, principal: Principal, cors: Record<string, string>) {
-  if (method === 'GET') {
-    const [st, facts, changes, nfs] = await Promise.all([
-      domainStatus(site),
+  if (method === 'GET') return json({ data: await domainSheetRead(site) }, 200, cors);
+  return handleDomainWrite(req, method, site, principal, cors);
+}
+
+/** Pure: the client portal's domain card (Nov 12 review, finding 22), from the sheet's read.
+ *  Only what the client needs: is it live, which records are still to add, where, and how long. */
+export function clientDomainCard(d: Record<string, unknown>): Record<string, unknown> {
+  if (!d || !d.custom_domain) return { domain: null };
+  const names = (Array.isArray(d.names) ? d.names : []) as Array<{ name: string; points: boolean }>;
+  const points = new Map(names.map((n) => [n.name, n.points]));
+  const recs = (Array.isArray(d.records) ? d.records : []) as Array<{ type: string; host: string; name: string; value: string }>;
+  const todo = recs.filter((r) => points.get(r.name) !== true).map((r) => ({ type: r.type, host: r.host, value: r.value }));
+  const left = (Array.isArray(d.checklist) ? d.checklist as Array<{ ok: boolean; words: string }> : []).filter((c) => c && !c.ok).map((c) => String(c.words || ''));
+  const state = d.health === 'ok' ? (!Array.isArray(d.checklist) ? 'unchecked' : d.all_ok === true ? 'live' : 'left')
+    : todo.length ? 'records' : d.health === 'ssl_pending' ? 'padlock' : 'records';
+  const at = ((d.provider as { records_at?: { company?: string; sign_in?: string } } | null)?.records_at) || null;
+  return { domain: d.custom_domain, state, records: state === 'records' ? (todo.length ? todo : recs.map((r) => ({ type: r.type, host: r.host, value: r.value }))) : [], left,
+    where: at && at.company ? { company: at.company, sign_in: at.sign_in || '' } : null, wait: DOMAIN_WAIT };
+}
+/** GET /client/domain: the same live check the Domain sheet runs, cut down for the portal.
+ *  Opening it IS the check, so the card's Check button just asks again. */
+export async function handleClientDomain(site: SiteRow, cors: Record<string, string>) {
+  if (!site.custom_domain || !site.netlify_site_id) return json({ data: { domain: null } }, 200, cors);
+  return json({ data: clientDomainCard(await domainSheetRead(site) as Record<string, unknown>) }, 200, { ...cors, 'Cache-Control': 'no-store' });
+}
+
+/** Everything the Domain sheet shows about the domain, from one round of questions. */
+async function domainSheetRead(site: SiteRow) {
+  {
+    // Nov 12 review, finding 25: one open asks each thing once. The hosting company used to be
+    // asked for the site three times and the padlock twice, and the domain was looked up twice.
+    const hosted = !!(site.custom_domain && site.netlify_site_id);
+    const [facts, changes, nfs, ssl] = await Promise.all([
       site.custom_domain ? domainFacts(site) : Promise.resolve({ registered: null, provider: null }),
       svc(`presence_change_events?site_id=eq.${site.id}&entity_type=eq.domain&select=summary,actor_kind,created_at&order=created_at.desc&limit=3`).then((r) => domainChanges(Array.isArray(r.json) ? r.json : [])).catch(() => []),
-      site.custom_domain && site.netlify_site_id ? getSite(site.netlify_site_id).catch(() => null) : Promise.resolve(null),
+      hosted ? getSite(site.netlify_site_id!).catch(() => null) : Promise.resolve(null),
+      hosted ? sslStatus(site.netlify_site_id!).catch(() => null) : Promise.resolve(null),
     ]);
+    if (!hosted || !site.custom_domain) return { ...(await domainStatus(site)), provider: facts.provider, changes, forwards: [] };
+    const target = nfs && nfs.ok && nfs.site ? nfs.site.default_domain.toLowerCase() : null;
     // item 174: the other domains that send visitors here (kept on the site as extra names)
     const forwards = forwardsOf(nfs && nfs.ok && nfs.site ? nfs.site.domain_aliases || [] : [], site.custom_domain);
+    // the registered name the lookup found tells "www." twins from sub-names (shop.example.com has none)
+    const main = site.custom_domain.toLowerCase();
+    const twin = twinName(main, facts.registered);
+    const asked = [main, ...(twin ? [twin] : []), ...forwards];
+    const looked = await Promise.all(asked.map((n) => lookupName(n)));
+    const checks = asked.map((n, i) => nameCheckFrom(n, target, looked[i].cnames, looked[i].aRecords));
+    const names = checks.slice(0, twin ? 2 : 1);
+    const read = { nf: nfs, ssl, lookups: looked[0], names };
+    const st = await domainStatus(site, read);
+    // finding 19: the records to add, as the provider's form wants them (a sub-name gets one)
+    const records = connectRecords(main, facts.registered, target);
+    // finding 20: a forwarded domain says "waiting" until a check sees its records, and shows them
+    const forward_checks = checks.slice(names.length).map((c) => ({ name: c.name, points: c.points, records: c.points ? [] : connectRecords(c.name, null, target).records.filter((r) => r.name === c.name) }));
+    // finding 21: both names, so "nothing for you to do" is only said when it's true
+    const more = { provider: facts.provider, changes, forwards, forward_checks, names, records: records.records, shape: records.kind, wait: DOMAIN_WAIT };
     // review finding 4 (item 134): the padlock used to be asked for once, when the domain was
     // attached and before the client had changed anything. "Check if it's ready" asks again
     // whenever the records are right and the padlock still isn't on (Netlify: safe to repeat).
-    if (st.health === 'ssl_pending' && site.netlify_site_id) await provisionSsl(site.netlify_site_id).catch(() => null);
+    if (st.health === 'ssl_pending') await provisionSsl(site.netlify_site_id!).catch(() => null);
     // item 134 (review findings 3 and 5): "live and secure" only when both names point here,
     // nothing old is left over, the padlock covers both, and the domain shows OUR latest site
-    if (st.health === 'ok' && site.custom_domain && site.netlify_site_id) {
-      // the registered name the lookup found tells "www." twins from sub-names (shop.example.com has none)
-      const truth = await domainTruth({ custom_domain: site.custom_domain, netlify_site_id: site.netlify_site_id }, facts.registered).catch(() => null);
+    if (st.health === 'ok') {
+      const truth = await domainTruth({ custom_domain: site.custom_domain, netlify_site_id: site.netlify_site_id! }, facts.registered, read).catch(() => null);
       // item 164 (finding 13): the first time every check passes, the owner and the studio hear it's live
       if (truth && truth.all_ok) await afterResponse(announceLiveOnce({ id: site.id, client_id: (site as { client_id?: string | null }).client_id || null }, site.custom_domain, new Date().toISOString()));
-      if (truth) return json({ data: { ...st, provider: facts.provider, changes, forwards, serving: truth.serving, checklist: truth.checklist, all_ok: truth.all_ok } }, 200, cors);
+      if (truth) return { ...st, ...more, serving: truth.serving, checklist: truth.checklist, all_ok: truth.all_ok };
+      // Nov 12 review, finding 16: the checks couldn't run (the hosting company was slow, say). The
+      // page used to read a missing checklist as "everything passed"; now it is told, and says so
+      return { ...st, ...more, check_failed: true };
     }
-    return json({ data: { ...st, provider: facts.provider, changes, forwards } }, 200, cors);
+    return { ...st, ...more };
   }
+}
+
+async function handleDomainWrite(req: Request, method: string, site: SiteRow, principal: Principal, cors: Record<string, string>) {
   if (!site.netlify_site_id) return json({ error: 'not_provisioned', message: 'Provision hosting for this site before managing domains.' }, 409, cors);
 
   if (method === 'POST') {
@@ -332,7 +385,24 @@ export async function handleDomain(req: Request, method: string, site: SiteRow, 
       summary: mainSwitch ? `Made ${domain} the main name (${old} sends visitors there)` : old ? `Changed domain from ${old} to ${domain}${keepOld ? ` (${old} forwards)` : ''}` : `Attached domain ${domain}`, principal, provenance: 'human' });
     await saveMailBaseline(site.id, domain, new Date().toISOString()).catch(() => null);   // finding 14
     // finding 11: the owner and the studio hear about every attach and change
-    await afterResponse(tellOwnerAndStudio(who, domainChangeEmail(mainSwitch ? 'main' : old ? 'changed' : 'attached', { domain, old, forwarded: keepOld, by: byWhom(principal) }), mainSwitch ? 'domain-main' : old ? 'domain-changed' : 'domain-attached'));
+    // Nov 12 review, finding 22: the email carries the records, the company that keeps them and a
+    // link back to Check. The new name is looked up now (after the answer has gone), which also
+    // replaces the old name's facts on the site.
+    const hostName = set.site?.default_domain || null;
+    await afterResponse((async () => {
+      let where: { company?: string; sign_in?: string } | null = null; let registered: string | null = null;
+      if (!mainSwitch) {
+        const look = await rdapLookupDetailed(domain).catch(() => null);
+        if (look) {
+          await svc(`presence_sites?id=eq.${site.id}`, { method: 'PATCH', body: JSON.stringify(lookupPatch(look)) }).catch(() => null);
+          if (look.status === 'ok') { registered = look.name; where = whereToGo(look.info.registrar, look.facts.dns_host).records_at || null; }
+        }
+      }
+      const base = (Deno.env.get('SITE_URL') || 'https://davisdigitalstudio.com').replace(/\/$/, '');
+      await tellOwnerAndStudio(who, domainChangeEmail(mainSwitch ? 'main' : old ? 'changed' : 'attached', { domain, old, forwarded: keepOld, by: byWhom(principal),
+        records: mainSwitch ? [] : connectRecords(domain, registered, hostName).records, recordsAt: where?.company || null, signIn: where?.sign_in || null, link: `${base}/presence.html#domain` }),
+        mainSwitch ? 'domain-main' : old ? 'domain-changed' : 'domain-attached');
+    })());
     return json({ data: { ...(await domainStatus({ custom_domain: domain, netlify_site_id: site.netlify_site_id })), forwarding: keepOld ? old : null } }, 200, cors);
   }
 

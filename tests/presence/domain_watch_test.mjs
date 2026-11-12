@@ -51,7 +51,7 @@ ok('issued and renewed are on; pending and none are not', certIsOn('issued') && 
   const base = { site_id: 's1', name: 'Bistro', edition: 'presence', status: 'live', last_published_at: '2026-10-01T00:00:00Z', custom_domain: 'bistro.example', uptime_ok: true, domain_expires_at: '2027-06-01T00:00:00Z', domain_lookup_status: 'ok' };
   const one = (over) => buildDomains([{ ...base, ...over }], NOW).domains[0];
   ok('a padlock stuck over a day reads "Padlock not on yet"', one({ cert_pending_since: '2026-11-10T06:00:00Z' }).status_words === 'Padlock not on yet');
-  ok('…but not before a day', one({ cert_pending_since: '2026-11-11T06:00:00Z' }).status === 'connected');
+  ok('…but not before a day', one({ cert_pending_since: '2026-11-11T06:00:00Z' }).status === 'checking');   // builder item 194: no page comparison yet, so "Not checked yet"
   ok('a padlock ending inside 14 days says when', one({ cert_expires_at: '2026-11-20T00:00:00Z' }).status_words === 'Padlock ends in 9 days');
   ok('its end date travels for the Padlock until column', one({ cert_expires_at: '2027-02-01T00:00:00Z' }).padlock_until === '2027-02-01T00:00:00Z');
   ok('a site on its own host has no padlock of ours', one({ edition: 'monitor', cert_expires_at: '2026-11-20T00:00:00Z' }).padlock_until === null);
@@ -74,7 +74,7 @@ ok('issued and renewed are on; pending and none are not', certIsOn('issued') && 
   ok('the studio gets every rung by email', /emailOperator\(String\(studioSite\)/.test(life));
   ok('a stuck padlock is asked for again each day', /if \(padlock\.reask\) \{ await provisionSsl\(site\.netlify_site_id\)/.test(life));
   const admin = read('supabase/functions/presence/routes/admin.ts');
-  ok('"Check if it’s ready" asks for the padlock again', /if \(st\.health === 'ssl_pending' && site\.netlify_site_id\) await provisionSsl\(site\.netlify_site_id\)/.test(admin));
+  ok('"Check if it’s ready" asks for the padlock again', /if \(st\.health === 'ssl_pending'\) await provisionSsl\(site\.netlify_site_id!\)/.test(admin));
   ok('one home for the DNS check', /import \{ domainHealth[^}]*\} from '\.\.\/lib\/domain_health\.ts';/.test(admin) && !/async function dnsLookup/.test(admin));
   const mig = read('supabase/migrations/0149_domain_watch.sql'), pack = read('docs/presence/APPLY-0149-prod.sql');
   const cols = ['domain_lookup_status', 'cert_state', 'cert_expires_at', 'cert_pending_since', 'cert_checked_at'];

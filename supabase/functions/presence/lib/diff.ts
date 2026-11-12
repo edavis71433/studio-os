@@ -28,6 +28,33 @@ const jeq = (a: unknown, b: unknown): boolean => JSON.stringify(a ?? null) === J
 // a map whose keys were saved in another order is the same map
 const sortedKeys = (o: Record<string, unknown>): Array<[string, string]> => Object.keys(o).sort().map((k) => [k, JSON.stringify(o[k] && typeof o[k] === 'object' ? Object.fromEntries(Object.entries(o[k] as Record<string, unknown>).sort(([a], [b]) => a.localeCompare(b))) : o[k])]);
 
+// Builder item 57: a Blocks section that changed says which blocks did, by name:
+// "“Our story” on your home page: a button added." Counted by kind, so moving one block
+// reads "blocks moved", and editing words or photos reads "2 blocks changed".
+const BLOCK_WORD: Record<string, [string, string]> = {
+  heading: ['a heading', 'headings'], text: ['a text block', 'text blocks'], image: ['a photo', 'photos'],
+  button: ['a button', 'buttons'], video: ['a video', 'videos'], form: ['a form', 'forms'],
+  spacer: ['a space', 'spaces'], divider: ['a line', 'lines'], map: ['a map', 'maps'],
+};
+function stackChange(a: any, b: any, where: string): string {
+  const items = (x: any): any[] => (Array.isArray(x?.items) ? x.items : []);
+  const tally = (x: any) => items(x).reduce((m: Map<string, number>, it: any) => m.set(String(it?.kind || ''), (m.get(String(it?.kind || '')) || 0) + 1), new Map<string, number>());
+  const ta = tally(a), tb = tally(b);
+  const word = (k: string, n: number) => { const w = BLOCK_WORD[k] || ['a block', 'blocks']; return n === 1 ? w[0] : `${n} ${w[1]}`; };
+  const bits: string[] = [];
+  for (const [k, n] of tb) if (n > (ta.get(k) || 0)) bits.push(`${word(k, n - (ta.get(k) || 0))} added`);
+  for (const [k, n] of ta) if (n > (tb.get(k) || 0)) bits.push(`${word(k, n - (tb.get(k) || 0))} removed`);
+  if (!bits.length) {
+    const ja = items(a).map((x) => JSON.stringify(x)), jb = items(b).map((x) => JSON.stringify(x));
+    const edited = ja.filter((x, i) => x !== jb[i]).length;
+    if (!edited) bits.push('its look changed');
+    else if ([...ja].sort().join('\n') === [...jb].sort().join('\n')) bits.push('blocks moved');
+    else bits.push(`${edited} block${edited > 1 ? 's' : ''} changed`);
+  }
+  const h = items(b).find((it) => it && it.kind === 'heading' && it.text) || items(a).find((it) => it && it.kind === 'heading' && it.text);
+  return `${h ? q(String(h.text)) : 'A Blocks section'}${where}: ${bits.join(', ')}.`;
+}
+
 /** Describe every difference between the draft and what is live, in plain language. */
 export function describeChanges(draftC: SnapshotContent, liveC: SnapshotContent | null): ChangeSet {
   const d = normalizeSnapshotContent(draftC);
@@ -195,13 +222,18 @@ export function describeChanges(draftC: SnapshotContent, liveC: SnapshotContent 
     const am = new Map((a || []).map((x: any, i: number) => [key(x, i), x]));
     const bm = new Map((b || []).map((x: any, i: number) => [key(x, i), x]));
     let added = 0, removed = 0, changed = 0;
-    for (const [k, v] of bm) { if (!am.has(k)) added++; else if (!jeq(am.get(k), v)) changed++; }
+    const stacks: string[] = [];
+    for (const [k, v] of bm) {
+      if (!am.has(k)) added++;
+      else if (!jeq(am.get(k), v)) { if ((v as any)?.type === 'stack' && (am.get(k) as any)?.type === 'stack') stacks.push(stackChange(am.get(k), v, where)); else changed++; }
+    }
     for (const k of am.keys()) if (!bm.has(k)) removed++;
     const bits: string[] = [];
     if (added) bits.push(`${added} section${added > 1 ? 's' : ''} added`);
     if (removed) bits.push(`${removed} removed`);
     if (changed) bits.push(`${changed} changed`);
     if (bits.length) out.push({ section: 'site', sentence: `${bits.join(', ')}${where}.` });
+    for (const sentence of stacks) out.push({ section: 'site', sentence });
   };
   type Settings = NonNullable<SnapshotContent['settings']>;
   const ds: Settings = d.settings || {}, ls: Settings = l.settings || {};

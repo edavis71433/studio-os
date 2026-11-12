@@ -18,7 +18,7 @@
 // that writes only the month mark, so two ticks can't both send and a switch
 // flipped mid-run stays flipped; switching on marks last month as handled, so the
 // first report really is next month's; the visits are read in full pages.
-import { svc, svcCount, svcPages } from '../lib/db.ts';
+import { svc, svcCount, svcPages, svcPaged } from '../lib/db.ts';
 import { aggregateVisits } from '../lib/visits.ts';
 import type { VisitRow } from '../lib/visits.ts';
 import { loadEmailBrand, EMAIL_BRAND_DEFAULT } from '../lib/email_brand.ts';
@@ -42,6 +42,8 @@ import { json } from '../../_shared/http.ts';
 export const REPORT_NOTE_MAX = 600;
 export const REPORT_SEND_DAYS = 3;   // the report goes out on the 1st, 2nd or 3rd of the month
 
+/** Item 209: the clients a monthly run reads at once, and at most how many pages. */
+export const REPORT_PAGE = 100, REPORT_PAGES = 50;
 export const REPORT_MAX_TRIES = 3;   // a send that fails is tried again on the next tick, up to this many times a month
 export const REPORT_KEEP_MONTHS = 24;   // item 179: the months the client's Documents shelf lists, newest first
 
@@ -522,11 +524,18 @@ export function afterFailure(s: ReportSetting, month: string, before: string | n
 export async function runMonthlyReports(limit = 20, nowIso = new Date().toISOString()): Promise<{ sent: number; skipped: number; unreachable: number; failures: number; quiet?: number; not_due?: boolean }> {
   // D7: each site's month turns on its own clock; on a day no clock is in its first days, read nothing
   if (!anyZoneInSendDays(nowIso)) return { sent: 0, skipped: 0, unreachable: 0, failures: 0, not_due: true };
-  const q = await svc(`presence_sales_templates?kind=eq.proposal&name=eq.${encodeURIComponent(RESERVED_NAMES.monthlyReport)}&deleted_at=is.null&select=site_id,body&limit=${Math.max(1, Math.min(200, limit * 5))}`);
-  const rows = (Array.isArray(q.json) ? q.json : []) as Array<{ site_id: string; body: string }>;
-  const zones = rows.length ? await zonesOf(rows.map((r) => String(r.site_id))) : new Map<string, string>();
+  // Item 209 (review file 06, finding 63): every client with the report on, a page at a
+  // time in a set order, until `limit` went out. One read of up to 200 in no order used
+  // to be all of it, so past about 100 clients the same ones came back every time.
+  let zones = new Map<string, string>();
+  const rows = (async function* () {
+    for await (const page of svcPaged(`presence_sales_templates?kind=eq.proposal&name=eq.${encodeURIComponent(RESERVED_NAMES.monthlyReport)}&deleted_at=is.null&select=site_id,body`, 'site_id.asc', REPORT_PAGE, REPORT_PAGES)) {
+      zones = await zonesOf(page.map((r) => String(r.site_id)));
+      yield* page as Array<{ site_id: string; body: string }>;
+    }
+  })();
   let sent = 0, skipped = 0, unreachable = 0, failures = 0, quiet = 0;
-  for (const r of rows) {
+  for await (const r of rows) {
     if (sent >= limit) break;
     let seen: ReportSetting; try { seen = normalizeReportSetting(JSON.parse(r.body)); } catch { skipped++; continue; }
     const tz = zones.get(String(r.site_id)) || REPORT_DEFAULT_TZ;

@@ -1,4 +1,4 @@
-// Studio OS — tenant isolation suite (staging).
+// Studio OS — tenant isolation suite.
 //
 // The acceptance gate for the tenancy work (Build Brief §15). Proves, via REAL
 // JWTs and RLS-enforced queries (anon key + caller token, NOT the service role),
@@ -9,12 +9,17 @@
 // SELF-CONTAINED: creates its own fixtures (a second tenant B + a fresh staff and
 // client user in each of tenant A and tenant B, with owned rows), runs the
 // assertions, and tears everything down. Additive: it changes NO app code and
-// touches only its own test rows. Staging only.
+// touches only its own test rows. Never production: it creates and deletes sign-ins.
 //
-// Run (secrets via env, never committed):
+// Before every release it runs on a scratch database (scripts/isolation-scratch.sh, from
+// .github/workflows/isolation.yml), which hands it these settings:
 //   deno run --allow-net --allow-env tests/isolation/isolation_test.ts
-// Required env: STAGING_URL, ANON_KEY, SERVICE_KEY
-//   TENANT_A defaults to the DDS tenant; override with TENANT_A env if needed.
+// Required env: STAGING_URL (the scratch project's address; the name is kept from the
+//   staging days), ANON_KEY, SERVICE_KEY. TENANT_A defaults to the DDS tenant.
+//
+// Its old-server calls use request kinds a page still sends (builder item 213 removed
+// the rest): partnership_list is a staff route, partnership_delete an owner's, concierge
+// a public route with a rate limit, and rec_generate a staff route with one.
 
 const URL_ = Deno.env.get('STAGING_URL')!;
 const ANON = Deno.env.get('ANON_KEY')!;
@@ -73,13 +78,6 @@ async function callFn(jwt: string | null, body: unknown): Promise<number> {
   const r = await fetch(fn, { method: 'POST', headers: h, body: JSON.stringify(body) });
   return r.status;
 }
-async function callFnJson(jwt: string | null, body: unknown): Promise<{ status: number; json: any }> {
-  const h: Record<string, string> = { 'Content-Type': 'application/json' };
-  if (jwt) h['x-dds-user-jwt'] = jwt;
-  const r = await fetch(fn, { method: 'POST', headers: h, body: JSON.stringify(body) });
-  const json = await r.json().catch(() => null);
-  return { status: r.status, json };
-}
 
 // ── fixture handles (filled in setup, removed in teardown) ──
 const ids = { aStaff: '', aClient: '', bStaff: '', bClient: '' };
@@ -111,7 +109,7 @@ async function setup() {
   // client-scoped owned rows (invoices) so my_client_ids isolation is testable
   if (aClientRowId) await svcPost('invoices', { client_id: aClientRowId, name: `ISO-A-INV-${RUN}`, amount: '$100', status: 'pending', tenant_id: TENANT_A }, 'return=minimal');
   if (bClientRowId) await svcPost('invoices', { client_id: bClientRowId, name: `ISO-B-INV-${RUN}`, amount: '$200', status: 'pending', tenant_id: TENANT_B }, 'return=minimal');
-  // one lead per tenant — regression guard for the lead_list service-role→RLS cutover
+  // one lead per tenant, so the row rules on leads are tested from both sides
   await svcPost('leads', { name: `ISO-A-LEAD-${RUN}`, status: 'new', tenant_id: TENANT_A }, 'return=minimal');
   await svcPost('leads', { name: `ISO-B-LEAD-${RUN}`, status: 'new', tenant_id: TENANT_B }, 'return=minimal');
 }
@@ -121,7 +119,6 @@ async function teardown() {
   // rows first (FKs), by marker
   await svcDelete(`invoices?name=like.ISO-*-INV-${RUN}`);
   await svcDelete(`leads?name=like.ISO-*-LEAD-${RUN}`);
-  await svcDelete(`monitored_sites?label=like.ISO-*-SITE-${RUN}`);
   await svcDelete(`clients?name=like.ISO-*-CLIENT-${RUN}`);
   await svcDelete(`memberships?user_id=in.(${[ids.aStaff, ids.bStaff].filter(Boolean).map((x) => `"${x}"`).join(',') || '""'})`);
   await deleteUser(ids.aStaff); await deleteUser(ids.aClient); await deleteUser(ids.bStaff); await deleteUser(ids.bClient);
@@ -171,55 +168,61 @@ async function run() {
   check('B-client cannot read tenant A invoices', Array.isArray(bCliInv.json) && (bCliInv.json as unknown[]).length === 0);
 
   console.log('\n[D] role: clients cannot hit staff routes (edge function)');
-  check('A-client -> lead_list (staff) rejected', [401, 403].includes(await callFn(aClientJwt, { type: 'lead_list' })));
-  check('B-client -> lead_list (staff) rejected', [401, 403].includes(await callFn(bClientJwt, { type: 'lead_list' })));
+  check('A-client -> partnership_list (staff) rejected', [401, 403].includes(await callFn(aClientJwt, { type: 'partnership_list' })));
+  check('B-client -> partnership_list (staff) rejected', [401, 403].includes(await callFn(bClientJwt, { type: 'partnership_list' })));
 
-  console.log('\n[H] lead_list cutover (service-role → caller-JWT RLS): tenant-scoped via the function');
-  const aLeads = await callFnJson(aStaffJwt, { type: 'lead_list' });
-  const aNames = Array.isArray(aLeads.json?.data) ? aLeads.json.data.map((l: any) => l.name) : [];
-  check('A-staff lead_list returns its own tenant lead', aNames.includes(`ISO-A-LEAD-${RUN}`));
-  check('A-staff lead_list does NOT return tenant B lead', !aNames.includes(`ISO-B-LEAD-${RUN}`));
-  const bLeads = await callFnJson(bStaffJwt, { type: 'lead_list' });
-  const bNames = Array.isArray(bLeads.json?.data) ? bLeads.json.data.map((l: any) => l.name) : [];
-  check('B-staff lead_list returns its own tenant lead', bNames.includes(`ISO-B-LEAD-${RUN}`));
-  check('B-staff lead_list does NOT return tenant A lead', !bNames.includes(`ISO-A-LEAD-${RUN}`));
+  // The old server's lead list went with item 213 (no page asked for it); the leads
+  // themselves still sit behind the row rules, so read them as each staff member.
+  console.log('\n[H] leads stay inside their tenant (RLS, JWT+anon)');
+  const leadNames = async (jwt: string) => {
+    const r = await asUser(jwt, 'GET', `leads?select=name&name=like.ISO-*-LEAD-${RUN}`);
+    return Array.isArray(r.json) ? (r.json as { name: string }[]).map((l) => l.name) : [];
+  };
+  const aNames = await leadNames(aStaffJwt);
+  check('A-staff reads its own tenant lead', aNames.includes(`ISO-A-LEAD-${RUN}`));
+  check('A-staff does NOT read tenant B lead', !aNames.includes(`ISO-B-LEAD-${RUN}`));
+  const bNames = await leadNames(bStaffJwt);
+  check('B-staff reads its own tenant lead', bNames.includes(`ISO-B-LEAD-${RUN}`));
+  check('B-staff does NOT read tenant A lead', !bNames.includes(`ISO-A-LEAD-${RUN}`));
+  const cNames = await leadNames(aClientJwt);
+  check('A-client reads no leads at all (staff data)', cNames.length === 0);
 
   console.log('\n[E] pipeline contract (edge function)');
-  check('missing token -> 401', (await callFn(null, { type: 'lead_list' })) === 401);
-  check('insufficient role (staff -> owner route team_list) -> 403', (await callFn(bStaffJwt, { type: 'team_list' })) === 403);
+  check('missing token -> 401', (await callFn(null, { type: 'partnership_list' })) === 401);
+  check('insufficient role (staff -> owner route partnership_delete) -> 403', (await callFn(bStaffJwt, { type: 'partnership_delete', id: '00000000-0000-4000-8000-000000000000' })) === 403);
   // suspended tenant B -> B-staff rejected 403
   await fetch(rest(`tenants?id=eq.${TENANT_B}`), { method: 'PATCH', headers: { ...svcH, Prefer: 'return=minimal' }, body: JSON.stringify({ state: 'suspended' }) });
   await new Promise((r) => setTimeout(r, 800));
-  const suspStatus = await callFn(bStaffJwt, { type: 'lead_list' });
-  const suspBody = await (await fetch(fn, { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-dds-user-jwt': bStaffJwt }, body: JSON.stringify({ type: 'lead_list' }) })).json().catch(() => ({}));
+  const suspStatus = await callFn(bStaffJwt, { type: 'partnership_list' });
+  const suspBody = await (await fetch(fn, { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-dds-user-jwt': bStaffJwt }, body: JSON.stringify({ type: 'partnership_list' }) })).json().catch(() => ({}));
   check('suspended tenant -> 403 tenant_suspended', suspStatus === 403 && (suspBody as { error?: string }).error === 'tenant_suspended');
   await fetch(rest(`tenants?id=eq.${TENANT_B}`), { method: 'PATCH', headers: { ...svcH, Prefer: 'return=minimal' }, body: JSON.stringify({ state: 'active' }) });
   // stale/revoked: bump B-staff membership updated_at past the token iat
   await fetch(rest(`memberships?user_id=eq.${ids.bStaff}`), { method: 'PATCH', headers: { ...svcH, Prefer: 'return=minimal' }, body: JSON.stringify({ role: 'staff' }) });
   await new Promise((r) => setTimeout(r, 1500));
-  const staleStatus = await callFn(bStaffJwt, { type: 'lead_list' });
-  const staleBody = await (await fetch(fn, { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-dds-user-jwt': bStaffJwt }, body: JSON.stringify({ type: 'lead_list' }) })).json().catch(() => ({}));
+  const staleStatus = await callFn(bStaffJwt, { type: 'partnership_list' });
+  const staleBody = await (await fetch(fn, { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-dds-user-jwt': bStaffJwt }, body: JSON.stringify({ type: 'partnership_list' }) })).json().catch(() => ({}));
   check('stale/revoked token -> 401 membership_revoked', staleStatus === 401 && (staleBody as { error?: string }).error === 'membership_revoked');
   // rate limited: exceed the public per-IP limit
-  for (let i = 0; i < 14; i++) await callFn(null, { type: 'psi_fetch' });
-  check('rate-limited request -> 429', (await callFn(null, { type: 'psi_fetch' })) === 429);
+  for (let i = 0; i < 14; i++) await callFn(null, { type: 'concierge', messages: [] });
+  check('rate-limited request -> 429', (await callFn(null, { type: 'concierge', messages: [] })) === 429);
 
   console.log('\n[F] audit rows for rejections carry a valid request_id');
   // clear, trigger exactly one auth_failure, confirm exactly one row w/ uuid request_id
   await svcDelete('audit_log?id=gt.0');
-  await callFn(null, { type: 'lead_list' }); // auth_failure
+  await callFn(null, { type: 'partnership_list' }); // auth_failure
   const auditRows = await (await fetch(rest('audit_log?select=event_type,route,request_id&order=id.desc'), { headers: svcH })).json();
   const uuidRe = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
   check('rejection wrote exactly one audit row', Array.isArray(auditRows) && auditRows.length === 1);
-  check('audit row is auth_failure on lead_list', auditRows?.[0]?.event_type === 'auth_failure' && auditRows?.[0]?.route === 'lead_list');
+  check('audit row is auth_failure on partnership_list', auditRows?.[0]?.event_type === 'auth_failure' && auditRows?.[0]?.route === 'partnership_list');
   check('audit row carries a valid uuid request_id', uuidRe.test(auditRows?.[0]?.request_id || ''));
 
   console.log('\n[G] rate buckets: tenant-scoped for staff, IP-scoped for public');
   await svcDelete('rate_limit_state?count=gt.0');
   // fresh B-staff token (previous is revoked); staff rate-limited route -> tenant bucket
   const bStaffFresh = await mint(emails.bStaff);
-  await callFn(bStaffFresh, { type: 'ai_triage' });       // staff, rate-limited
-  await callFn(null, { type: 'psi_fetch' });               // public, rate-limited
+  await callFn(bStaffFresh, { type: 'rec_generate' });    // staff, rate-limited
+  await callFn(null, { type: 'concierge', messages: [] }); // public, rate-limited
   const buckets = await (await fetch(rest('rate_limit_state?select=bucket_key'), { headers: svcH })).json();
   const keys = (buckets as { bucket_key: string }[]).map((b) => b.bucket_key);
   check('staff route created a tenant bucket (t:B)', keys.some((k) => k === `t:${TENANT_B}`));
