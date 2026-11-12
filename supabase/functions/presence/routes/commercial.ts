@@ -33,6 +33,7 @@ import { leadVisit } from '../lib/visit_source.ts';   // item 89
 import { judgeSend, issueTicket, TICKET_MIN_AGE_S, markSender, spamLinkToken, readSpamLinkToken, SPAM_REASONS } from '../lib/form_check.ts';
 import { storeFormFiles, cleanFileName, filesOf, filePath, fileLink, type StoredFile } from '../lib/form_files.ts';
 import { approvalDetail, cleanNote } from '../lib/approval_page.ts';   // sales item 92
+import { wordsHtml, quoteBlock, followupPlan } from '../lib/follow_ups.ts';   // sales item 87
 
 const SB_URL = Deno.env.get('SUPABASE_URL') || '';
 const APPROVAL_SECRET = Deno.env.get('APPROVAL_SECRET') || Deno.env.get('SCHEDULER_SECRET') || '';
@@ -230,7 +231,7 @@ export async function handleFormSubmit(req: Request, siteId: string, cors: Recor
       if (toPage && siteOrigin) return await notSent('try_again');
       return json({ error: 'write_failed', message: 'That didn’t send — please try again.' }, 502, cors);
     }
-    if (!spam) { notifyOwnerOfLead(siteId, { id: String(ins2.json?.[0]?.id || ''), form_kind: def.kind, name: fv.sub.name, email: fv.sub.email, phone: fv.sub.phone, message: fv.sub.message, files: keptFiles.length }).catch(() => {}); acknowledgeEnquiry(siteId, { name: fv.sub.name, email: fv.sub.email }).catch(() => {}); }
+    if (!spam) { notifyOwnerOfLead(siteId, { id: String(ins2.json?.[0]?.id || ''), form_kind: def.kind, name: fv.sub.name, email: fv.sub.email, phone: fv.sub.phone, message: fv.sub.message, files: keptFiles.length }).catch(() => {}); acknowledgeEnquiry(siteId, { name: fv.sub.name, email: fv.sub.email, message: fv.sub.message }).catch(() => {}); }
     if (toPage && siteOrigin) return redirectTo(def.redirect_url || '/thanks/');
     // the page's sender goes on to the owner's own thank-you address when the form has one
     return ok200(def.confirmation_text || FORM_THANKS, def.redirect_url ? { redirect: def.redirect_url } : {});
@@ -337,13 +338,16 @@ export async function handleFormInbox(site: SiteRow, cors: Record<string, string
   const visits = new Map(rows.map((s: any) => [String(s.id), leadVisit(s.fields)]));
   // `fields` is read only for the studio's replies (fields.__studio_replies) — the raw
   // form values stay server-side as before; each row carries `replies` instead.
+  // item 87: the follow-ups each enquiry got, and when the next one goes (the site's switch)
+  const { automationSettingsFor, followupSettingsOf } = await import('../commerce/lifecycle.ts');   // lazy: lifecycle pulls in the whole sweep
+  const fcfg = followupSettingsOf(await automationSettingsFor(site.id));
   const submissions = rows.map(({ fields, ...s }: any) => {
     const dealId = dealMap.get(String(s.id)) || null;
     // item 147: its files (names, never where they're kept) and the form it came from
-    return { ...s, replies: leadReplies(fields), note: leadNote(fields), files: filesOf(fields), form_id: typeof fields?.__form === 'string' ? fields.__form : null, deal_id: dealId, ...enquiryState(s.status, dealId, customers.has(String(s.email || '').trim().toLowerCase())) };
+    return { ...s, replies: leadReplies(fields), note: leadNote(fields), files: filesOf(fields), form_id: typeof fields?.__form === 'string' ? fields.__form : null, followups: followupPlan(s, fields, fcfg, Date.now()), deal_id: dealId, ...enquiryState(s.status, dealId, customers.has(String(s.email || '').trim().toLowerCase())) };
   });
   for (const s of submissions as any[]) s.visit = visits.get(String(s.id)) || null;
-  return json({ data: { submissions, unread: submissions.filter((s: any) => s.status === 'new').length, more } }, 200, cors);
+  return json({ data: { submissions, unread: submissions.filter((s: any) => s.status === 'new').length, more, followups_on: fcfg.on } }, 200, cors);
 }
 
 // ═══ Builder list item 147 · a form's files, and its own table of answers ═══
@@ -554,12 +558,15 @@ export async function handleFormStatus(req: Request, site: SiteRow, id: string, 
   // item 28: { note } alone saves the studio's note and leaves the status as it is
   // (a note on a Replied enquiry must not knock it back to Read)
   const noteOnly = typeof b?.note === 'string' && b?.status === undefined && spamFlag === null;
-  const status = ENQUIRY_STATUSES.includes(b?.status) ? b.status : (spamFlag === null && !noteOnly ? 'read' : null);
+  // item 87: { followups: 'off' | 'on' } alone stops or restarts the follow-ups, status untouched
+  const followupsFlag = b?.followups === 'off' ? true : b?.followups === 'on' ? false : null;
+  const followupsOnly = followupsFlag !== null && b?.status === undefined && spamFlag === null && typeof b?.note !== 'string';
+  const status = followupsOnly ? null : ENQUIRY_STATUSES.includes(b?.status) ? b.status : (spamFlag === null && !noteOnly ? 'read' : null);
   const patch: Record<string, unknown> = {};
   if (status) patch.status = status;
   if (spamFlag !== null) patch.spam = spamFlag;
   let email = '';
-  if (typeof b?.note === 'string' || spamFlag !== null) {
+  if (typeof b?.note === 'string' || spamFlag !== null || followupsFlag !== null) {
     const cur = await svc(`presence_form_submissions?id=eq.${id}&site_id=eq.${site.id}&select=fields,email&limit=1`);
     const row = Array.isArray(cur.json) ? cur.json[0] : null;
     if (!row) return json({ error: 'not_found' }, 404, cors);
@@ -571,6 +578,7 @@ export async function handleFormStatus(req: Request, site: SiteRow, id: string, 
     }
     // item 140: the owner's own call says why it's in Spam, and Not spam clears the reason
     if (spamFlag === true) fields.__spam = { reason: 'owner' }; else if (spamFlag === false) delete fields.__spam;
+    if (followupsFlag === true) fields.__followups_off = true; else if (followupsFlag === false) delete fields.__followups_off;
     patch.fields = fields;
   }
   if (!Object.keys(patch).length) return json({ data: { ok: true } }, 200, cors);
@@ -604,9 +612,10 @@ export async function hashIp(req: Request): Promise<string> {
 /** "Acknowledge new enquiries within a minute" (benchmark 2026-10, item 6):
  *  the FIRST switch. When the site has it on, the person who just wrote in gets
  *  ONE short email, right now, on the owner's brand, saying exactly the sentence
- *  Settings shows (enquiryAckCopy — pinned by test). Default OFF; no email on
- *  the enquiry → nothing to send; never blocks the submit. */
-async function acknowledgeEnquiry(siteId: string, sub: { name: string; email: string }): Promise<boolean> {
+ *  Settings shows (enquiryAckCopy — pinned by test), or the owner's own words.
+ *  On for a new site since 0175 (sales item 87); no email on the enquiry →
+ *  nothing to send; never blocks the submit. */
+async function acknowledgeEnquiry(siteId: string, sub: { name: string; email: string; message?: string }): Promise<boolean> {
   if (!sub.email) return false;
   const { automationSettingsFor } = await import('../commerce/lifecycle.ts');   // lazy: lifecycle pulls in the whole sweep
   const auto = await automationSettingsFor(siteId);
@@ -617,12 +626,13 @@ async function acknowledgeEnquiry(siteId: string, sub: { name: string; email: st
     ownerReplyTo(siteId),
   ]);
   const studio = String(ident.json?.[0]?.business_name || '').trim();
-  const copy = enquiryAckCopy({ name: sub.name, studio: studio || brand.name });
+  const copy = enquiryAckCopy({ name: sub.name, studio: studio || brand.name, words: auto.auto_ack_message });
   // Item 72: an answer to this reaches the owner's own email. Someone writing in for
   // the first time is no contact yet, so the site's inbound address (siteId, left as
   // the fallback) dropped their answer as a stranger's.
   // they wrote in; this is the reply they are waiting for, from the business they wrote to (sales item 78)
-  return await sendEmail(sub.email, copy.subject, `<p>${esc(copy.sentence)}</p>${copy.footer ? `<p style="color:#6b6478;font-size:13px">${esc(copy.footer)}</p>` : ''}`, brand, { critical: true, asBusiness: true, siteId, replyTo });
+  // item 87: a copy of what they wrote, so the email is proof it arrived (links taken out, lib/follow_ups.ts)
+  return await sendEmail(sub.email, copy.subject, `${wordsHtml(copy.sentence)}${quoteBlock(sub.message)}${copy.footer ? `<p style="color:#6b6478;font-size:13px">${esc(copy.footer)}</p>` : ''}`, brand, { critical: true, asBusiness: true, siteId, replyTo });
 }
 
 async function notifyOwnerOfLead(siteId: string, sub: { id?: string; form_kind: string; name: string; email: string; phone: string; message: string; files?: number }) {

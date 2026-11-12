@@ -210,15 +210,23 @@ async function reviewerRefusal(siteId: string, role: SiteRole): Promise<'check_f
 }
 
 type SeatRow = { id: string; email: string; role: string; status: string };
-export type AddMemberError = 'bad_email' | 'bad_role' | 'shared_site' | 'check_failed' | 'is_owner' | 'already_member' | 'was_removed' | 'write_failed';
+/** Developer seats are paused for everyone but platform staff (Nov 12 2026). A developer
+ *  saves custom HTML (routes/dev.ts), and lib/devmode.ts's cleaner is a pattern list, not
+ *  a parser: its own note says to keep the role narrow until a strict script CSP and a
+ *  real parser land. Builder item 53 offered the role to every owner and studio, so new
+ *  Developer seats wait for that work. A seat that already holds the role keeps it. */
+export const DEVELOPER_PAUSED = true;
+const developerRefused = (role: string, allowDeveloper?: boolean) => role === 'developer' && DEVELOPER_PAUSED && !allowDeveloper;
+export type AddMemberError = 'bad_email' | 'bad_role' | 'role_paused' | 'shared_site' | 'check_failed' | 'is_owner' | 'already_member' | 'was_removed' | 'write_failed';
 /** Invite one person to a site with a role. Builder item 53: an invite never changes
  *  someone already here (that is a role change, by its own route), never makes the
  *  owner a seat, and lets a removed person back only when `restore` says so, with the
  *  role named again. Before, the invite was an upsert, so it rewrote any of those. */
-export async function addSiteMember(siteId: string, email: string, role: SiteRole, invitedBy: string, opts: { restore?: boolean; ownerEmails?: string[] } = {}): Promise<{ ok: boolean; error?: AddMemberError; emailed?: boolean; restored?: boolean; member?: SeatRow }> {
+export async function addSiteMember(siteId: string, email: string, role: SiteRole, invitedBy: string, opts: { restore?: boolean; ownerEmails?: string[]; allowDeveloper?: boolean } = {}): Promise<{ ok: boolean; error?: AddMemberError; emailed?: boolean; restored?: boolean; member?: SeatRow }> {
   const clean = String(email || '').trim().toLowerCase();
   if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(clean)) return { ok: false, error: 'bad_email' };
   if (!isSiteRole(role)) return { ok: false, error: 'bad_role' };
+  if (developerRefused(role, opts.allowDeveloper)) return { ok: false, error: 'role_paused' };
   if ((opts.ownerEmails || []).some((e) => String(e || '').trim().toLowerCase() === clean)) return { ok: false, error: 'is_owner' };
   const refused = await reviewerRefusal(siteId, role);
   if (refused) return { ok: false, error: refused };
@@ -251,8 +259,9 @@ export async function resendSiteInvite(siteId: string, email: string): Promise<{
 }
 
 /** Change a seat's role (builder item 53). Never touches a removed seat. */
-export async function changeSiteMemberRole(siteId: string, memberId: string, role: SiteRole): Promise<{ ok: boolean; error?: 'bad_role' | 'shared_site' | 'check_failed' | 'not_found' | 'write_failed'; member?: SeatRow }> {
+export async function changeSiteMemberRole(siteId: string, memberId: string, role: SiteRole, opts: { allowDeveloper?: boolean } = {}): Promise<{ ok: boolean; error?: 'bad_role' | 'role_paused' | 'shared_site' | 'check_failed' | 'not_found' | 'write_failed'; member?: SeatRow }> {
   if (!isSiteRole(role)) return { ok: false, error: 'bad_role' };
+  if (developerRefused(role, opts.allowDeveloper)) return { ok: false, error: 'role_paused' };
   const refused = await reviewerRefusal(siteId, role);
   if (refused) return { ok: false, error: refused };
   const r = await svc(`presence_site_members?id=eq.${memberId}&site_id=eq.${siteId}&status=neq.revoked&select=id,email,role,status`, { method: 'PATCH', headers: { Prefer: 'return=representation' }, body: JSON.stringify({ role }) });
