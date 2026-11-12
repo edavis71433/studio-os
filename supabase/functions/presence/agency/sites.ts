@@ -605,7 +605,7 @@ export async function handleAgencySites(req: Request, route: string, method: str
     }
     const manage = can(member.role, 'manage_clients');
     // item 53: what the studio is on every client's site, said once (Wix's "Agency · Website Manager")
-    return json({ data: rows, partial, can_open: canOpen, can_pin: pins.own, can_duplicate: manage, can_create: manage, can_trash: manage, can_people: manage, studio_role: canOpen ? 'Website manager' : 'View only', trash, trash_days: TRASH_DAYS }, 200, cors);
+    return json({ data: rows, partial, can_open: canOpen, can_pin: pins.own, can_duplicate: manage, can_create: manage, can_trash: manage, can_people: manage, studio_role: canOpen ? 'Website manager' : 'View only', studio_name: member.agency_name || '', trash, trash_days: TRASH_DAYS }, 200, cors);
   }
 
   // ── + New site (item 135): a site from a business name and, if picked, one of

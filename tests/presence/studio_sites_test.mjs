@@ -285,6 +285,7 @@ async function call(member, method, route, body, { jwt = 'jwt-studio', principal
   ok('owners: each card names its owner (the contact holds no name here, so the email)', by[S1].owner && by[S1].owner.email === 'owner@bistro.example' && by[S1].owner.name === 'owner@bistro.example');
   ok('owners: no transfer is waiting (before 0177 the read just finds none)', rows.every((x) => x.transfer === null));
   ok('owners: the studio is the Website manager; a view-only seat reads View only, and no owner by name', r.body.studio_role === 'Website manager' && r.body.can_people === true && ro.body.studio_role === 'View only' && ro.body.can_people === false && roS1.owner.name === 'The owner' && roS1.owner.email === '');
+  ok('owners: the studio\'s own name rides along, for its mark on the cards', r.body.studio_name === 'Bright Studio');
   ok('sites: reading the page writes nothing', writes.length === 0);
 }
 
