@@ -20,6 +20,7 @@ import { esc } from './markdown.ts';
 import { splitLineItems, computeProposalTotals, subtotalOf, type LineItem } from './sales_lifecycle.ts';
 import { hmacHex, timingSafeEqual } from '../../_shared/hmac.ts';
 import { UUID_RE } from './uuid.ts';
+import { agreementHtml } from './agreement_layout.ts';   // sales item 88: headings and numbered sections
 
 // ── the studio's identity on the page (structurally the EmailBrand shape) ─────
 export interface DocBrand { name: string; accent: string; accentDark: string }
@@ -214,6 +215,21 @@ function shell(o: { title: string; brand: DocBrand; docLabel: string; heading: s
   td.qty,th.qty{text-align:right;width:56px;color:var(--soft)}
   tr.less td{color:var(--soft)}
   .paidbox{background:#e7f1ea;border:1px solid #cfe4d6;color:#2c5c42;border-radius:12px;padding:12px 16px;margin-top:14px;font-size:14px}
+  /* sales item 88: the agreement as a document — a title, numbered headings, paragraphs, list items — and both signatures */
+  .agreement{font-size:14.5px;line-height:1.7;overflow-wrap:anywhere}
+  .agreement .ag-title{font-family:var(--serif);font-size:20px;font-weight:600;letter-spacing:.02em;margin:0 0 12px}
+  .agreement .ag-h{font-size:15px;font-weight:700;margin:22px 0 6px;break-after:avoid;page-break-after:avoid}
+  .agreement .ag-n{font-family:var(--serif);color:var(--accent);margin-right:8px}
+  .agreement .ag-p{margin:0 0 10px;white-space:pre-wrap}
+  .agreement .ag-item{margin:4px 0 4px 20px}
+  .agreement .ag-mark{color:var(--accent);font-weight:600;margin-right:6px}
+  .sigh{font-size:15px;font-weight:700;margin:0 0 10px}
+  .sigs{display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-bottom:6px}
+  .sig .k{text-transform:uppercase;letter-spacing:.08em;font-size:11px;font-weight:700;color:var(--soft)}
+  .sig .sgn{font-family:var(--serif);font-style:italic;font-size:26px;color:var(--accent-deep);line-height:1.3;margin-top:4px;overflow-wrap:anywhere}
+  .sig .line{height:1.5px;background:rgba(27,21,37,.35);margin:2px 0 6px}
+  .sig .who{font-size:12.5px;color:var(--soft);overflow-wrap:anywhere}
+  @media (max-width:560px){.sigs{grid-template-columns:1fr}}
   @media (max-width:560px){.parties{grid-template-columns:1fr}.inner{padding:24px 20px 28px}.docno{text-align:left}}
   footer{color:var(--soft);font-size:12px;text-align:center;margin-top:22px;line-height:1.5}
   @media print{
@@ -377,6 +393,7 @@ export function renderContractDocument(c: any, brandIn?: Partial<DocBrand> | nul
     const rows: string[] = [];
     rows.push(`<div class="kv"><span class="k">Signed by</span><span>${esc(String(c?.signer_name || ''))}</span></div>`);
     if (c?.signer_email) rows.push(`<div class="kv"><span class="k">Signer email</span><span>${esc(String(c.signer_email))}</span></div>`);
+    if (c?.countersigned_name) rows.push(`<div class="kv"><span class="k">Countersigned by</span><span>${esc(String(c.countersigned_name))}${c?.countersigned_title ? ', ' + esc(String(c.countersigned_title)) : ''} for ${esc(brand.name)}</span></div>`);   // sales item 88
     rows.push(`<div class="kv"><span class="k">Signed at</span><span>${esc(utcStamp(c?.signed_at || ev?.at))}</span></div>`);
     rows.push(`<div class="kv"><span class="k">Document fingerprint (SHA-256)</span><span class="mono">${esc(hash)}</span></div>`);
     if (ev?.ip_hash) rows.push(`<div class="kv"><span class="k">Signing evidence (hashed IP)</span><span class="mono">${esc(String(ev.ip_hash))}</span></div>`);
@@ -386,8 +403,24 @@ export function renderContractDocument(c: any, brandIn?: Partial<DocBrand> | nul
   const statusSub = signed ? 'Executed copy — this is the signed document of record.'
     : c?.status === 'sent' ? 'Sent for signature — not yet signed.'
     : 'Draft — not yet sent for signature.';
-  const body = `<div class="body">${esc(String(c?.body || ''))}</div>${cert}${signed ? '' : `<p class="note">This copy is not an executed agreement until it is signed.</p>`}`;
+  // sales item 88: the text laid out as a document (the signed characters unchanged), then both signatures
+  const sigs = signed ? `<div class="hr"></div><h2 class="sigh">Signatures</h2>${signaturesHtml(c, brand, ctx)}` : '';
+  const body = `<div class="agreement">${agreementHtml(String(c?.body || ''))}</div>${sigs}${cert}${signed ? '' : `<p class="note">This copy is not an executed agreement until it is signed.</p>`}`;
   return shell({ title: `${c?.title || 'Agreement'} — ${brand.name}`, brand, docLabel: signed ? 'Signed agreement' : 'Agreement', heading: String(c?.title || 'Service agreement'), sub: statusSub, bodyHtml: body, pdfUrl: ctx?.pdfUrl, pdfName: ctx?.pdfName, lasting: signed });
+}
+
+/** Sales item 88: the two signatures on a signed agreement — the client's, typed by
+ *  them, and the studio's, added at the same moment. Pure. */
+export function signaturesHtml(c: any, brand: DocBrand, ctx?: DocContext | null): string {
+  const tz = ctx?.tz || null;
+  const day = dayLabel(c?.signed_at, tz);
+  const clientName = String(ctx?.billTo?.company || ctx?.billTo?.name || '').trim();
+  const one = (k: string, name: string, who: string) => `<div class="sig"><div class="k">${esc(k)}</div><div class="sgn">${esc(name)}</div><div class="line"></div><div class="who">${esc(who)}</div></div>`;
+  const client = one(clientName ? `For ${clientName}` : 'For the client', String(c?.signer_name || ''), [String(c?.signer_name || ''), String(c?.signer_email || ''), day].filter(Boolean).join(' · '));
+  const studio = c?.countersigned_name
+    ? one(`For ${brand.name}`, String(c.countersigned_name), [String(c.countersigned_name) + (c?.countersigned_title ? ', ' + String(c.countersigned_title) : ''), dayLabel(c?.countersigned_at || c?.signed_at, tz) + ' (countersigned)'].filter(Boolean).join(' · '))
+    : '';
+  return `<div class="sigs">${client}${studio}</div>`;
 }
 
 /** Dispatch by kind. `data` is an already-loaded, site-scoped row. Pure. */

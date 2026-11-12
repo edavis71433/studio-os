@@ -226,7 +226,7 @@ function renderFlow(d,after){
     h+=`<section id="step-sign"><h2><span class="k">Step ${k}</span>${esc(c.title||'Your agreement')}</h2><p class="sub">Read it through — signing takes one typed name, and nothing is final until you do.</p>
       <div class="card"><div class="body">${esc(c.body)}</div></div>
       <div class="card"><label for="nm">Type your full name to sign</label><input id="nm" autocomplete="name" placeholder="Your full name">
-      <label for="em">Your email (optional)</label><input id="em" type="email" autocomplete="email" placeholder="you@business.com">
+      <label for="em">Your email, for your signed copy</label><input id="em" type="email" autocomplete="email" required placeholder="you@business.com">
       <div class="row" id="signRow"><button id="sign">Sign the agreement</button></div>
       <p class="muted">Typing your name here counts as your signature. You’ll always be able to ask your studio for a copy.</p></div></section>`;
   }
@@ -262,6 +262,8 @@ function renderFlow(d,after){
     if(r.ok){announce('Declined. Your studio has been told.');await load({kind:'declined'});}else softFail(r.body&&r.body.message,$('chooseRow'));};
   const s=$('sign');if(s)s.onclick=async()=>{const nm=$('nm').value.trim();
     if(!nm){softFail('Type your full name in the box above — that’s your signature.',$('signRow'));$('nm').focus();return;}
+    // sales item 88: the signed copy goes to them, so their email is needed (the server asks the same)
+    if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test($('em').value.trim())){softFail('Type your email too, so your signed copy can reach you.',$('signRow'));$('em').focus();return;}
     s.disabled=true;
     const r=await api('/sales/contracts/'+c.id+'/sign','POST',{token:TOKEN,signer_name:nm,signer_email:$('em').value.trim(),presented_hash:c.content_hash});
     if(r.ok){announce('Signed — welcome aboard.');await load({kind:'signed',copy_emailed:!!(r.body&&r.body.data&&r.body.data.copy_emailed)});}
@@ -343,12 +345,13 @@ function renderContract(c){
   <div class="card"><div class="body">${esc(c.body)}</div></div>`;
   if(c.status==='signed'){h+=`<div class="ok">✓ Signed${c.signed_at?' on '+esc(new Date(c.signed_at).toLocaleDateString()):''} — you’re all set.</div><div class="row"><button class="ghost" onclick="window.print()">Print / save a copy</button></div>`;}
   else h+=`<div class="card"><label for="nm">Type your full name to sign</label><input id="nm" autocomplete="name" placeholder="Your full name">
-    <label for="em">Your email (optional)</label><input id="em" type="email" autocomplete="email" placeholder="you@business.com">
+    <label for="em">Your email, for your signed copy</label><input id="em" type="email" autocomplete="email" required placeholder="you@business.com">
     <div class="row"><button id="sign">Sign the agreement</button></div>
     <p class="muted">Typing your name here counts as your signature. You’ll always be able to ask your studio for a copy.</p></div>`;
   $('main').innerHTML=h;
   const s=$('sign');if(s)s.onclick=async()=>{const nm=$('nm').value.trim();
     if(!nm){softFail('Type your full name in the box above — that’s your signature.');$('nm').focus();return;}
+    if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test($('em').value.trim())){softFail('Type your email too, so your signed copy can reach you.');$('em').focus();return;}   // sales item 88
     s.disabled=true;
     const r=await api('/sales/contracts/'+c.id+'/sign','POST',{token:TOKEN,signer_name:nm,signer_email:$('em').value.trim(),presented_hash:c.content_hash});
     if(r.ok){

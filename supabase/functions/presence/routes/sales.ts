@@ -33,6 +33,7 @@ import { hmacHex, timingSafeEqual } from '../../_shared/hmac.ts';
 import { signDocToken, readDocToken, lastingRecord, renderDocument, invoiceNo, dayLabel, type DocKind } from '../lib/documents.ts';
 import { documentPdf, pdfFileName } from '../lib/doc_pdf.ts';   // sales item 82: the same documents as real PDFs
 import { docContextFor } from '../lib/doc_context.ts';   // sales item 81: from, billed to, dates, part payments
+import { declineReason, declineWords, validSignerEmail, maskEmail, agreementHtml } from '../lib/agreement_layout.ts';   // sales item 88
 import {
   canTransition, undoLostAllowed, isStage, normalizeLineItems, canDecideProposal, contractHash,
   canSignContract, convertOutcome, clampLimit, type Stage,
@@ -156,7 +157,10 @@ async function flowDocuments(siteId: string, dealId: string): Promise<{ proposal
   let pr = await svc(`presence_proposals?deal_id=eq.${dealId}&site_id=eq.${siteId}&deleted_at=is.null&select=id,title,line_items,subtotal_cents,currency,terms,status,first_viewed_at,expires_at&order=created_at.desc&limit=20`);
   if (!pr.ok) pr = await svc(`presence_proposals?deal_id=eq.${dealId}&site_id=eq.${siteId}&deleted_at=is.null&select=id,title,line_items,subtotal_cents,currency,terms,status&order=created_at.desc&limit=20`);
   const { proposal, pending } = currentProposal<any>(rows(pr));
-  const cons = rows(await svc(`presence_contracts?deal_id=eq.${dealId}&site_id=eq.${siteId}&deleted_at=is.null&select=id,title,body,content_hash,status,signed_at,signer_name&order=created_at.desc&limit=20`));
+  // sales item 88: the studio's countersignature lands with 0176 — tolerant read before it
+  let cr = await svc(`presence_contracts?deal_id=eq.${dealId}&site_id=eq.${siteId}&deleted_at=is.null&select=id,title,body,content_hash,status,signed_at,signer_name,signer_email,countersigned_name,countersigned_title,countersigned_at&order=created_at.desc&limit=20`);
+  if (!cr.ok) cr = await svc(`presence_contracts?deal_id=eq.${dealId}&site_id=eq.${siteId}&deleted_at=is.null&select=id,title,body,content_hash,status,signed_at,signer_name,signer_email&order=created_at.desc&limit=20`);
+  const cons = rows(cr);
   const contract = cons.find((c) => c.status === 'signed') || cons.find((c) => c.status === 'sent') || null;
   return { proposal, proposal_pending: pending, contract, contract_pending: !contract && cons.some((c) => c.status === 'draft') };
 }
@@ -1195,13 +1199,15 @@ export async function handleSalesDeal(req: Request, site: SiteRow, principal: Pr
       deal.contact_id ? svc(`presence_contacts?id=eq.${deal.contact_id}&site_id=eq.${site.id}&select=id,name,email,phone,company,notes,address&limit=1`).then((r) => r.ok ? r : svc(`presence_contacts?id=eq.${deal.contact_id}&site_id=eq.${site.id}&select=id,name,email,phone,company,notes&limit=1`)) : Promise.resolve({ json: [] }),
       // first_viewed_at/expires_at land with migration 0107 — tolerant fetch so the
       // proposals list never disappears if a deploy is ahead of the migration.
-      (async () => { let r = await svc(`presence_proposals?deal_id=eq.${id}&site_id=eq.${site.id}&deleted_at=is.null&select=id,title,line_items,subtotal_cents,currency,status,version,sent_at,decided_at,first_viewed_at,expires_at&order=created_at.desc`); if (!r.ok) r = await svc(`presence_proposals?deal_id=eq.${id}&site_id=eq.${site.id}&deleted_at=is.null&select=id,title,line_items,subtotal_cents,currency,status,version,sent_at,decided_at&order=created_at.desc`); return r; })(),
+      // sales item 88: why a client declined (decided_reason lands with 0176; the note was always there)
+      (async () => { let r = await svc(`presence_proposals?deal_id=eq.${id}&site_id=eq.${site.id}&deleted_at=is.null&select=id,title,line_items,subtotal_cents,currency,status,version,sent_at,decided_at,first_viewed_at,expires_at,decided_note,decided_reason&order=created_at.desc`); if (!r.ok) r = await svc(`presence_proposals?deal_id=eq.${id}&site_id=eq.${site.id}&deleted_at=is.null&select=id,title,line_items,subtotal_cents,currency,status,version,sent_at,decided_at,first_viewed_at,expires_at,decided_note&order=created_at.desc`); if (!r.ok) r = await svc(`presence_proposals?deal_id=eq.${id}&site_id=eq.${site.id}&deleted_at=is.null&select=id,title,line_items,subtotal_cents,currency,status,version,sent_at,decided_at&order=created_at.desc`); return r; })(),
       // `body` rides along so the deal page can run its editorial guard before
       // SENDING a draft: the per-package agreements ship with [BRACKETED] fill-in
       // points, and a client must never receive [LIST THE FIVE CORE PAGES]. It is
       // the same owner-scoped text the agreement form already holds — no new
       // exposure, and the deal read already carries proposals' full line_items.
-      svc(`presence_contracts?deal_id=eq.${id}&site_id=eq.${site.id}&deleted_at=is.null&select=id,title,body,status,signer_name,signed_at,version,terms_snapshot&order=created_at.desc`),
+      // sales item 88: the studio's countersignature (0176) — tolerant read before it
+      svc(`presence_contracts?deal_id=eq.${id}&site_id=eq.${site.id}&deleted_at=is.null&select=id,title,body,status,signer_name,signed_at,version,terms_snapshot,countersigned_name&order=created_at.desc`).then((r) => r.ok ? r : svc(`presence_contracts?deal_id=eq.${id}&site_id=eq.${site.id}&deleted_at=is.null&select=id,title,body,status,signer_name,signed_at,version,terms_snapshot&order=created_at.desc`)),
       svc(`presence_deal_events?deal_id=eq.${id}&site_id=eq.${site.id}&select=id,kind,from_stage,to_stage,detail,actor,created_at&order=created_at.desc&limit=80`),
       // processing_since lands with migration 0132 — tolerant fetch (same posture
       // as the proposals read above) so the record's Billing tab never blanks.
@@ -2239,7 +2245,14 @@ export async function handleSalesProposalDecide(req: Request, id: string, cors: 
   if (decision === 'accepted' && p.expires_at && String(p.expires_at) < nowIso()) return json({ error: 'expired', message: 'This proposal has expired — ask your studio to send an updated one.' }, 409, cors);
   if (p.status === decision) return json({ data: { status: p.status }, already: true }, 200, cors); // idempotent
   if (!canDecideProposal(p.status, decision)) return json({ error: 'bad_state', message: 'This proposal can’t be updated.' }, 409, cors);
-  const up = await svc(`presence_proposals?id=eq.${id}&site_id=eq.${tok.site_id}&status=eq.sent&select=deal_id,status`, { method: 'PATCH', headers: { Prefer: 'return=representation' }, body: JSON.stringify({ status: decision, decided_at: nowIso(), decided_note: clean(b.note, 500) }) });
+  // Sales item 88: a decline can say why — one of the page's reasons and a note ("what would
+  // make this a yes?"). decided_reason lands with 0176; before it the reason rides the note.
+  const reason = decision === 'declined' ? declineReason(b.reason) : '';
+  const note = clean(b.note, 500);
+  const decidedAt = nowIso();
+  const patchUrl = `presence_proposals?id=eq.${id}&site_id=eq.${tok.site_id}&status=eq.sent&select=deal_id,status`;
+  let up = await svc(patchUrl, { method: 'PATCH', headers: { Prefer: 'return=representation' }, body: JSON.stringify({ status: decision, decided_at: decidedAt, decided_note: note, ...(reason ? { decided_reason: reason } : {}) }) });
+  if (!up.ok && reason) up = await svc(patchUrl, { method: 'PATCH', headers: { Prefer: 'return=representation' }, body: JSON.stringify({ status: decision, decided_at: decidedAt, decided_note: declineWords(reason, note).slice(0, 500) }) });
   if (!up.ok || !rows(up)[0]) return json({ error: 'conflict' }, 409, cors);
   const dealId = rows(up)[0].deal_id;
   const sys: Principal = { kind: 'public', userId: 'proposal-link', tenantId: null, role: null, email: null, jwt: null, requestId: 'proposal-decide' } as Principal;
@@ -2265,17 +2278,26 @@ export async function handleSalesProposalDecide(req: Request, id: string, cors: 
       }
     } catch { /* best-effort — the summary and placeholders just keep reading the stored value */ }
   }
-  await dealEvent(tok.site_id, dealId, 'proposal_decided', sys, { detail: { proposal_id: id, decision, ...(backfilledCents ? { value_backfilled_cents: backfilledCents } : {}) } });
+  await dealEvent(tok.site_id, dealId, 'proposal_decided', sys, { detail: { proposal_id: id, decision, ...(backfilledCents ? { value_backfilled_cents: backfilledCents } : {}), ...(decision === 'declined' && (reason || note) ? { reason, note } : {}) } });
   if (decision === 'accepted') {
     await advanceStage(tok.site_id, dealId, 'contract', ['lead', 'qualified', 'proposal'], sys);
     await raiseDealReady(tok.site_id, dealId, 'accepted', id);   // W1: tell the studio (and clear the proposal's reminder row)
   } else {
     // A decline deserves a heads-up too — silence here means the studio keeps
     // waiting on a deal that already said no. Best-effort, idempotent per deal.
+    // Sales item 88: it says what would make it a yes, and the studio gets it by email too.
     try {
       const st = rows(await svc(`presence_sites?id=eq.${tok.site_id}&select=client_id&limit=1`))[0];
       const title = rows(await svc(`presence_deals?id=eq.${dealId}&site_id=eq.${tok.site_id}&select=title&limit=1`))[0]?.title || 'a deal';
-      if (st?.client_id) await raiseNotice({ siteId: tok.site_id, clientId: st.client_id, kind: 'deal_followup', period: `declined:${dealId}`, headline: `They passed on the proposal — ${title}`, body: 'The client declined. A quick follow-up note often keeps the door open — or send an updated proposal.' });
+      const why = declineWords(reason, note);
+      const fresh = st?.client_id ? await raiseNotice({ siteId: tok.site_id, clientId: st.client_id, kind: 'deal_followup', period: `declined:${dealId}`, headline: `They passed on the proposal — ${title}`, body: why ? `What would make it a yes — ${why}. An updated proposal can answer it.` : 'The client declined. A quick follow-up note often keeps the door open — or send an updated proposal.' }) : false;
+      if (fresh) {
+        const base = (Deno.env.get('SITE_URL') || 'https://davisdigitalstudio.com').replace(/\/$/, '');
+        const e = (x: string) => x.replace(/[&<>"]/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[ch] as string));
+        await emailOperator(tok.site_id, `They passed on the proposal — ${title}`,
+          `<p>The client declined the proposal for <b>${e(String(title))}</b>.</p>${why ? `<p>What would make it a yes: ${e(why)}</p>` : '<p>They didn’t say why.</p>'}<p>Revise sends them an updated one on the same link.</p>`,
+          'proposal_declined', { label: 'Open the deal', href: `${base}/pipeline.html?deal=${dealId}` }).catch(() => {});
+      }
     } catch { /* non-fatal */ }
   }
   return json({ data: { status: decision } }, 200, cors);
@@ -2470,14 +2492,24 @@ export async function handleSalesContractSign(req: Request, id: string, cors: Re
   const signerName = clean(b.signer_name, 120);
   const signerEmail = clean(b.signer_email, 160).toLowerCase();
   if (!signerName) return json({ error: 'validation', message: 'Please type your name to sign.' }, 422, cors);
+  // sales item 88 (file 07 finding 9): the signed copy goes to the signer, so their email is required
+  if (!validSignerEmail(signerEmail)) return json({ error: 'email_needed', message: 'Type your email too, so your signed copy can reach you.' }, 422, cors);
   const signedAt = nowIso();   // ONE timestamp — the evidence, the stored row, and the emailed certificate all agree
   const evidence = { hash: c.content_hash, at: signedAt, token_exp: tok.exp, ip_hash: await hmacHex(secret, clientIp(req)) }; // R3: hashed signer IP for legal signing evidence
-  const up = await svc(`presence_contracts?id=eq.${id}&site_id=eq.${tok.site_id}&status=eq.sent&content_hash=eq.${c.content_hash}&select=deal_id`, { method: 'PATCH', headers: { Prefer: 'return=representation' },
-    body: JSON.stringify({ status: 'signed', signer_name: signerName, signer_email: signerEmail, signed_at: signedAt, signed_evidence: evidence }) });
+  // Sales item 88: signed by both sides. The studio's signature (Settings → who signs for the
+  // studio) is added in the SAME write as the client's, with the same moment — one person, no
+  // extra step. Before 0176 the columns aren't there and the client's signature still stands.
+  const { studioSigner } = await import('./proposal_answers.ts');
+  const counter = await studioSigner(tok.site_id).catch(() => null);
+  const signUrl = `presence_contracts?id=eq.${id}&site_id=eq.${tok.site_id}&status=eq.sent&content_hash=eq.${c.content_hash}&select=deal_id`;
+  const signed = { status: 'signed', signer_name: signerName, signer_email: signerEmail, signed_at: signedAt, signed_evidence: evidence };
+  let up = await svc(signUrl, { method: 'PATCH', headers: { Prefer: 'return=representation' },
+    body: JSON.stringify(counter && counter.name ? { ...signed, countersigned_name: counter.name, countersigned_title: counter.title, countersigned_at: signedAt } : signed) });
+  if (!up.ok && up.status === 400 && counter && counter.name) up = await svc(signUrl, { method: 'PATCH', headers: { Prefer: 'return=representation' }, body: JSON.stringify(signed) });
   if (!up.ok || !rows(up)[0]) return json({ error: 'conflict', message: 'This agreement changed — reload and sign again.' }, 409, cors); // hash guard in WHERE = version integrity
   const dealId = rows(up)[0].deal_id;
   const sys: Principal = { kind: 'public', userId: 'contract-link', tenantId: null, role: null, email: null, jwt: null, requestId: 'contract-sign' } as Principal;
-  await dealEvent(tok.site_id, dealId, 'contract_signed', sys, { detail: { contract_id: id, signer: signerName } });
+  await dealEvent(tok.site_id, dealId, 'contract_signed', sys, { detail: { contract_id: id, signer: signerName, ...(counter && counter.name ? { countersigned_by: counter.name } : {}) } });
   await advanceStage(tok.site_id, dealId, 'contract', ['lead', 'qualified', 'proposal'], sys);
   await clearStaleNextStep(tok.site_id, dealId, 'signed');   // Phase 3: "Sign contract" is done now
   // SIGNATURE MOVES THE DEAL (studio audit 2026-10, change 7). The leaders move
@@ -2559,12 +2591,14 @@ export async function handleSalesContractSign(req: Request, id: string, cors: Re
       } catch { signedPdf = null; }
       // Signature certificate: name · timestamp (UTC) · document fingerprint —
       // only facts this request already holds; deliberately no IP or device data.
+      // sales item 88: the agreement laid out with its headings and numbered sections, signed by both
+      const counterLine = counter && counter.name ? `Countersigned for ${escHtml(counter.business || 'the studio')} by: <strong>${escHtml(counter.name)}</strong>${counter.title ? ', ' + escHtml(counter.title) : ''}<br>` : '';
       copyEmailed = await sendEmail(to, `Your signed copy — ${c.title || 'Service agreement'}`,
-        `<p>Here's your copy of the agreement, exactly as signed. Keep this email — it's your record.</p>` +
-        `<div style="border:1px solid #e5e0d6;border-radius:12px;padding:16px 18px;margin:12px 0;white-space:pre-wrap;font-size:14px">${escHtml(String(c.body || ''))}</div>` +
+        `<p>Here's your copy of the agreement, exactly as signed${counter && counter.name ? ' by both of you' : ''}. Keep this email — it's your record.</p>` +
+        `<div style="border:1px solid #e5e0d6;border-radius:12px;padding:16px 18px;margin:12px 0;font-size:14px">${agreementHtml(String(c.body || ''), { email: true, accent: brand.accentDark })}</div>` +
         `<p style="font-size:13px;color:#6b6478;margin:14px 0 4px"><strong>Signature certificate</strong></p>` +
         `<div style="border:1px solid #e5e0d6;border-radius:12px;padding:12px 18px;font-size:13px;color:#6b6478;line-height:1.7">` +
-        `Signed by: <strong>${escHtml(signerName)}</strong><br>` +
+        `Signed by: <strong>${escHtml(signerName)}</strong> (${escHtml(signerEmail)})<br>` + counterLine +
         `Signed at: ${signedAt.slice(0, 19).replace('T', ' ')} UTC<br>` +
         `Document fingerprint: <span style="font-family:ui-monospace,Menlo,Consolas,monospace;overflow-wrap:anywhere">${String(c.content_hash || '')}</span></div>` +
         docLine + (signedPdf ? `<p style="font-size:13px;color:#6b6478;margin:8px 0 0">The signed agreement is attached as a PDF.</p>` : ''),
@@ -2584,6 +2618,24 @@ export async function handleSalesContractSign(req: Request, id: string, cors: Re
     if (dep?.stripe_url) pay = { url: String(dep.stripe_url), amount_cents: Number(dep.amount_cents) || 0 };
   } catch { /* optional */ }
   return json({ data: { status: 'signed', pay_url: pay?.url || null, pay_amount_cents: pay?.amount_cents || null, copy_emailed: copyEmailed } }, 200, cors);
+}
+
+// Sales item 88: who signs for the studio, shown beside the client's signature before they
+// sign (and, once signed, the name that was stamped); and where an answer to a question goes.
+async function pageSigner(siteId: string, contract: any): Promise<{ name: string; title: string; business: string } | null> {
+  if (!contract) return null;
+  const { studioSigner } = await import('./proposal_answers.ts');
+  const now = await studioSigner(siteId).catch(() => null);
+  if (contract.status === 'signed' && contract.countersigned_name) return { name: String(contract.countersigned_name), title: String(contract.countersigned_title || ''), business: now?.business || '' };
+  return now;
+}
+async function askInfo(siteId: string, dealId: unknown): Promise<{ email: string; needs_email: boolean } | null> {
+  if (!UUID_RE.test(String(dealId || ''))) return null;
+  try {
+    const deal = rows(await svc(`presence_deals?id=eq.${dealId}&site_id=eq.${siteId}&select=contact_id&limit=1`))[0];
+    const email = deal?.contact_id ? String(rows(await svc(`presence_contacts?id=eq.${deal.contact_id}&site_id=eq.${siteId}&select=email&limit=1`))[0]?.email || '') : '';
+    return { email: maskEmail(email), needs_email: !email };
+  } catch { return null; }
 }
 
 // ═══ PUBLIC VIEW (token) — a prospect reviews the proposal/contract before acting ═══
@@ -2615,7 +2667,8 @@ export async function handleSalesPublicView(req: Request, token: string, cors: R
     // never had one in play. Between versions (proposal_pending) it stays locked.
     const chosen = proposal ? proposal.status === 'accepted' : !proposal_pending;
     const contractOut = !contract ? null
-      : chosen ? { id: contract.id, title: contract.title, body: contract.body, content_hash: contract.content_hash, status: contract.status, signed_at: contract.signed_at, signer_name: contract.signer_name }
+      : chosen ? { id: contract.id, title: contract.title, body: contract.body, content_hash: contract.content_hash, status: contract.status, signed_at: contract.signed_at, signer_name: contract.signer_name,
+        ...(contract.status === 'signed' ? { signer_email: contract.signer_email || '', countersigned_name: contract.countersigned_name || '', countersigned_title: contract.countersigned_title || '', countersigned_at: contract.countersigned_at || null } : {}) }
       : { id: contract.id, title: contract.title, status: contract.status, locked: true };
     if (contract && chosen) opens.push(firstOpen('presence_contracts', contract.id, tok.site_id, tok.id, 'agreement'));
     let deposit: { amount_cents: number; status: string; paid_at: string | null; url: string | null; processing: boolean } | null = null;
@@ -2634,7 +2687,8 @@ export async function handleSalesPublicView(req: Request, token: string, cors: R
     } catch { /* optional — the page says "nothing to pay right now" */ }
     await Promise.all(opens);
     const expired = !!(proposal?.expires_at && String(proposal.expires_at) < nowIso());
-    return json({ data: { kind: 'flow', brand, deal: { id: deal.id, title: deal.title }, proposal: proposal ? { ...proposal, expired } : null, proposal_pending, contract: contractOut, contract_pending, deposit } }, 200, cors);
+    const [signer, ask] = await Promise.all([pageSigner(tok.site_id, contractOut), askInfo(tok.site_id, tok.id)]);
+    return json({ data: { kind: 'flow', brand, deal: { id: deal.id, title: deal.title }, proposal: proposal ? { ...proposal, expired } : null, proposal_pending, contract: contractOut, contract_pending, deposit, studio_signer: signer, ask } }, 200, cors);
   }
   if (tok.t === 'proposal') {
     // first_viewed_at/expires_at land with migration 0107 — try the full select, fall
@@ -2648,12 +2702,16 @@ export async function handleSalesPublicView(req: Request, token: string, cors: R
     // say so on the deal (best-effort; no-ops before the migration adds the column).
     if (!p.first_viewed_at) await firstOpen('presence_proposals', tok.id, tok.site_id, propDeal, 'proposal');
     const expired = !!(p.expires_at && String(p.expires_at) < nowIso());
-    return json({ data: { kind: 'proposal', brand, expired, ...p } }, 200, cors);
+    return json({ data: { kind: 'proposal', brand, expired, ...p, ask: await askInfo(tok.site_id, propDeal) } }, 200, cors);
   }
-  const { deal_id: conDeal, ...c } = rows(await svc(`presence_contracts?id=eq.${tok.id}&site_id=eq.${tok.site_id}&deleted_at=is.null&select=id,deal_id,title,body,content_hash,status,signed_at&limit=1`))[0] || {} as any;
+  // sales item 88: the countersignature (0176) — tolerant read before it
+  let cq = await svc(`presence_contracts?id=eq.${tok.id}&site_id=eq.${tok.site_id}&deleted_at=is.null&select=id,deal_id,title,body,content_hash,status,signed_at,signer_name,signer_email,countersigned_name,countersigned_title,countersigned_at&limit=1`);
+  if (!cq.ok) cq = await svc(`presence_contracts?id=eq.${tok.id}&site_id=eq.${tok.site_id}&deleted_at=is.null&select=id,deal_id,title,body,content_hash,status,signed_at&limit=1`);
+  const { deal_id: conDeal, ...c } = rows(cq)[0] || {} as any;
   if (!c.id) return json({ error: 'not_found' }, 404, cors);
   await firstOpen('presence_contracts', tok.id, tok.site_id, conDeal, 'agreement');   // item 69
-  return json({ data: { kind: 'contract', brand, ...c } }, 200, cors); // content_hash is presented back on sign (version integrity)
+  const [cSigner, cAsk] = await Promise.all([pageSigner(tok.site_id, c), askInfo(tok.site_id, conDeal)]);
+  return json({ data: { kind: 'contract', brand, ...c, studio_signer: cSigner, ask: cAsk } }, 200, cors); // content_hash is presented back on sign (version integrity)
 }
 
 // ═══ BRANDED DOCUMENT OF RECORD (token) — a printable, keepable copy ═════════
@@ -2710,7 +2768,10 @@ export async function docRow(kind: DocKind, id: string, siteId: string): Promise
     const full = await one(`presence_invoices?id=eq.${id}&site_id=eq.${siteId}&deleted_at=is.null&select=${base},number,paid_method,paid_note,payment_for,lines,processing_since&limit=1`);
     return full !== undefined ? full : ((await one(`presence_invoices?id=eq.${id}&site_id=eq.${siteId}&deleted_at=is.null&select=${base}&limit=1`)) || null);
   }
-  return (await one(`presence_contracts?id=eq.${id}&site_id=eq.${siteId}&deleted_at=is.null&select=id,deal_id,title,body,content_hash,status,signer_name,signer_email,signed_at,signed_evidence,sent_at,created_at&limit=1`)) || null;
+  // sales item 88: the studio's countersignature (APPLY-0176); before it the old shape
+  const cbase = 'id,deal_id,title,body,content_hash,status,signer_name,signer_email,signed_at,signed_evidence,sent_at,created_at';
+  const cfull = await one(`presence_contracts?id=eq.${id}&site_id=eq.${siteId}&deleted_at=is.null&select=${cbase},countersigned_name,countersigned_title,countersigned_at&limit=1`);
+  return cfull !== undefined ? cfull : ((await one(`presence_contracts?id=eq.${id}&site_id=eq.${siteId}&deleted_at=is.null&select=${cbase}&limit=1`)) || null);
 }
 
 // ═══ DOCUMENT LINK (authed) — mint the printable document URL for the CRM ════

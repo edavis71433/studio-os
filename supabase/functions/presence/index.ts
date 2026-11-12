@@ -253,6 +253,8 @@ async function route_(req: Request, cors: Record<string, string>): Promise<Respo
     if (m && method === 'POST') return handleSalesProposalDecide(req, m[1], cors);
     m = route.match(/^\/sales\/contracts\/([0-9a-f-]{36})\/sign$/);
     if (m && method === 'POST') return handleSalesContractSign(req, m[1], cors);
+    // sales item 88: Ask a question from the proposal or agreement page — the page's own signed link
+    if (route === '/sales/ask' && method === 'POST') return (await import('./routes/proposal_answers.ts')).handleSalesAsk(req, cors);
     // item 47: the client's Approve / Not now on an estimate — the estimate's own signed link
     m = route.match(/^\/sales\/estimates\/([0-9a-f-]{36})\/decide$/);
     if (m && method === 'POST') return handleEstimateDecide(req, m[1], cors);
