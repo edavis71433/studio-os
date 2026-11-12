@@ -2992,9 +2992,15 @@
     // getClientRects, NOT offsetParent: offsetParent is always null for
     // position:fixed elements in Chromium, which silently exempted every
     // fixed-position modal (files slide-over, presence ritual) from the trap.
-    var vis = function (el) { return el.getClientRects().length > 0; };
+    // Builder item 195: a closed card can still take up room (the editor's cards fade
+    // out with visibility:hidden and aria-hidden), and a dialog marked
+    // aria-modal="false" (the editor's side cards) never holds the keyboard. Counting
+    // those as open sent every Tab to a button that couldn't take focus, so Tab did
+    // nothing in the editor.
+    var vis = function (el) { return el.getClientRects().length > 0 && getComputedStyle(el).visibility !== 'hidden'; };
+    var open = function (el) { return el.getAttribute('aria-modal') !== 'false' && !el.closest('[aria-hidden="true"],[inert]') && vis(el); };
     var mm = document.querySelectorAll('[aria-modal="true"],[role="dialog"]'), modal = null;
-    for (var i = 0; i < mm.length; i++) { if (vis(mm[i])) modal = mm[i]; }
+    for (var i = 0; i < mm.length; i++) { if (open(mm[i])) modal = mm[i]; }
     if (!modal) return;
     var f = modal.querySelectorAll('a[href],button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])');
     f = Array.prototype.filter.call(f, vis);

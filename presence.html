@@ -11845,6 +11845,7 @@ async function dcClearPage(slug) {
   slug = slug || "";
   if (slug !== DC_PAGE && !(await dcSwitchPage(slug))) return;   // clear the page you picked
   if (!Array.isArray(BLOCKS_WORK) || !BLOCKS_WORK.length) { toast("This page is already blank"); return; }
+  if (BLOCKS_WORK.some(lockedForMe)) { toast(LOCK_PAGE_SAY + " so it can’t be cleared. Ask them if it needs to change.", true); return; }   // item 195: as Delete and Cut do
   if (!(await askYes("Clear all sections from “" + dcPageTitle(slug) + "” and start from a blank canvas? You can Undo this, and your live site is unchanged until you publish.", { ok: "Clear the page", danger: true }))) return;
   dcCaptureScroll(); BLOCKS_WORK = []; BLOCK_FOCUS = null; renderBlocksCard(); saveBlocks();
 }
@@ -12272,11 +12273,22 @@ async function putBlocks() {
     return true;   // review fix 8: callers may announce "Saved" only on a real resolve
   } catch (err) {
     whisper("topWhisper", "failed");
+    // Item 195 (review finding 28): a save refused for a locked section is refused again while
+    // the list still holds that change, so every later edit on the page was refused too, until a
+    // reload threw them all away. The page goes back to how it was last saved; the refusal says why.
+    if (err && err.body && err.body.error === "section_locked" && DC_PAGE === sentPage) lockRefusedPutBack();
     // G7 "someone else is editing": a refused-stale save gets a calm LOAD-LATEST
     // action (with who, when the server knows) instead of a dead-end error.
     if (!(err && err.stale)) toast(nice(err), true);   // a stale one already offers Load the latest (offerLoadLatest)
     return false;
   }
+}
+// The refused save's undo step never landed, so it goes too.
+function lockRefusedPutBack() {
+  if (DC_HIST_LAST != null && DC_UNDO[DC_UNDO.length - 1] === DC_HIST_LAST) DC_UNDO.pop();
+  BLOCKS_WORK = currentBlocks(); BLOCK_FOCUS = null; LIVE_WANTED = false; LIVE_DRAWN = null;
+  dcHistoryCommit();
+  dcCaptureScroll(); renderBlocksCard(); refreshDesignPreview();
 }
 // ── T-STARTER: apply a pre-arranged, pre-filled starter layout. Replaces the
 //    working sections with a ready-made set the owner then EDITS (never a blank
@@ -12285,6 +12297,7 @@ async function putBlocks() {
 //    overwrites — confirms first when the owner already has sections.
 async function applyStarterLayout(starter) {
   if (!starter || !Array.isArray(starter.blocks) || !starter.blocks.length) return;
+  if ((BLOCKS_WORK || []).some(lockedForMe)) { toast(LOCK_PAGE_SAY + " so a layout can’t replace its sections. Ask them if it needs to change.", true); return; }   // item 195
   const hasContent = Array.isArray(BLOCKS_WORK) && BLOCKS_WORK.length > 0;
   if (hasContent && !(await askYes("Start from the “" + starter.name + "” layout? This replaces your current sections with a ready-made set you can then edit. Your existing sections will be removed.", { ok: "Use this layout", danger: true }))) return;
   // Deep copy so the shared suggestion payload is never mutated, and MULTI-INSTANCE
@@ -16171,17 +16184,23 @@ function dcMoveCol(bi, from, gap) {
 // change its words. The client sees a padlock in its name and fewer tools; only the studio
 // unlocks, and the studio is never held by its own lock. A copy is never locked.
 const blkLock = (b) => (b && b.lock && typeof b.lock.id === "string" ? b.lock : null);
-const lockedForMe = (b) => !!blkLock(b) && !S.isStudio;
+// Item 195 (review finding 29): who may lock is decided as the server decides it
+// (lib/actor_kind.ts): platform staff, or a studio working inside its client (?client=, a scope
+// the server granted). On its own site a studio is that site's owner, so its lock would be refused.
+const locksAsStudio = () => { const c = S.ctx; return !!(c && (c.is_operator || (c.scope && c.scope.site_id))); };
+const lockedForMe = (b) => !!blkLock(b) && !locksAsStudio();
 const LOCK_SAY = "Your studio locked this section so it stays as designed.";
+const LOCK_PAGE_SAY = "Your studio locked a section on this page";
 // Every way to move, copy, cut or delete a section asks this first (the tools are hidden too).
 function lockStop(bi) { if (!lockedForMe(BLOCKS_WORK[bi])) return false; toast(LOCK_SAY + " Ask them if it needs to change.", true); return true; }
-function dcLockBlock(bi, on, words) {
+async function dcLockBlock(bi, on, words) {
   const b = BLOCKS_WORK[bi]; if (!b) return;
   if (on) {
     const id = blkLock(b) ? b.lock.id : "lk-" + ((crypto.randomUUID && crypto.randomUUID().replace(/-/g, "").slice(0, 12)) || Date.now().toString(36));
     b.lock = { id, words: words === undefined ? (blkLock(b) ? b.lock.words : true) : !!words };
   } else delete b.lock;
-  renderBlocksCard(); saveBlocks();
+  renderBlocksCard();
+  if (!(await saveBlocks())) return;   // item 195: said only once it saved; a refusal puts the list back and says why
   toast(!on ? "Unlocked: your client can change this section again"
     : words === undefined ? "Locked: your client can change its words, nothing else" : (b.lock.words ? "Your client can change its words" : "Your client can’t change its words either"));
 }
@@ -17317,7 +17336,7 @@ function dcInjectCanvas(doc, main, live) {
           more.appendChild(mkItem("Add a column", "Add a column", () => dcSetColumns(bi, nc + 1), { cls: nc >= 6 ? "dc-off" : "", icon: "plus" }));
           more.appendChild(mkItem("Remove a column", "Remove a column", () => dcSetColumns(bi, nc - 1), { cls: nc <= 1 ? "dc-off" : "", icon: "x" }));
         }
-        if (S.isStudio) more.appendChild(blkLock(b)   // item 155: only the studio locks and unlocks
+        if (locksAsStudio()) more.appendChild(blkLock(b)   // item 155: only the studio locks and unlocks
           ? mkItem("Unlock", "Unlock this section: your client can change it again", () => dcLockBlock(bi, false), { icon: "unlock" })
           : mkItem("Lock this section", "Lock this section: your client can’t move, restyle or delete it", () => dcLockBlock(bi, true), { icon: "lock" }));
         const mb = mkBtn("More", "More", null, { icon: "more" });
