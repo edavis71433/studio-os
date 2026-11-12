@@ -40,3 +40,36 @@ test.describe('item 121 — deal sources in words', () => {
     await expect(page.locator('[data-bchip="web"] .n')).toHaveText('1');
   });
 });
+
+// Eric's pick (Nov 12): people who ran the free Site Review or AI Visibility check stay on
+// Prospects, and the Inbox's Enquiries view says so. GET /sales/tool-leads answers staff only.
+const INBOX = {
+  '/portal/feed': { data: { role: 'business_owner', moments: [], notices: [], pending_approvals: [], last_published: null, enquiries: [], client_messages: [] } },
+  '/forms/inbox': { data: { submissions: [], unread: 0 } },
+  '/notifications': { data: [], unread_count: 0 },
+};
+const toolLead = (id: string, status: string) => ({ id, created_at: now, tool: 'site_review', business_name: 'Made-up Business ' + id.slice(0, 2), client_email: `lead-${id.slice(0, 2)}@example.com`, url: 'https://example.com', city: '', business_type: '', score: 40, status, notes: '', contact_id: null, deal_id: null });
+
+test.describe('item 121 — free-tool leads stay on Prospects; Enquiries says so', () => {
+  test('Enquiries says how many are new on Prospects, with a link', async ({ page }) => {
+    await installApp(page, { api: { ...INBOX, '/sales/tool-leads': { data: [toolLead('a1aaaaaa-0000-4000-8000-000000000001', 'new'), toolLead('a2aaaaaa-0000-4000-8000-000000000002', 'new'), toolLead('a3aaaaaa-0000-4000-8000-000000000003', 'contacted')] } } });
+    await page.goto('/inbox.html#enquiries');
+    const note = page.locator('#enqTool');
+    await expect(note).toHaveText('2 people who ran your free Site Review or AI Visibility check are waiting on Prospects. Open Prospects →');
+    await expect(note.getByRole('link', { name: 'Open Prospects →' })).toHaveAttribute('href', '/prospects.html');
+  });
+
+  test('with none new it still says where they go', async ({ page }) => {
+    await installApp(page, { api: { ...INBOX, '/sales/tool-leads': { data: [toolLead('a3aaaaaa-0000-4000-8000-000000000003', 'contacted')] } } });
+    await page.goto('/inbox.html#enquiries');
+    await expect(page.locator('#enqTool')).toHaveText('People who run your free Site Review or AI Visibility check show up on Prospects, not here. Open Prospects →');
+  });
+
+  test('anyone the read refuses sees no line', async ({ page }) => {
+    await installApp(page, { api: INBOX });
+    await page.route('**/functions/v1/presence/sales/tool-leads', (route) => route.fulfill({ status: 403, contentType: 'application/json', body: JSON.stringify({ error: 'forbidden', message: 'Staff only.' }) }));
+    await page.goto('/inbox.html#enquiries');
+    await expect(page.locator('#efilt')).toBeVisible();
+    await expect(page.locator('#enqTool')).toBeHidden();
+  });
+});
