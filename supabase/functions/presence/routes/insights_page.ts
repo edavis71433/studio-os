@@ -3,7 +3,7 @@
 // projected from the analytics the platform ALREADY composes. No new analytics
 // system, no forked sentences:
 //   • first-party traffic   → trafficInsights (visitors / source / top page /
-//                             contact taps) over aggregateVisits(loadVisits)
+//                             contact taps) over loadVisitAgg
 //   • search performance    → searchInsights over readGsc
 //   • enquiries             → inquiriesInsight over presence_form_submissions
 //   • publishing            → publishingInsight over presence_publishes
@@ -12,8 +12,7 @@
 import { json } from '../../_shared/http.ts';
 import { svc } from '../lib/db.ts';
 import type { SiteRow } from '../lib/site.ts';
-import { loadVisits, readGsc } from './analytics.ts';
-import { aggregateVisits } from '../lib/visits.ts';
+import { loadVisitAgg, readGsc } from './analytics.ts';
 import { trafficInsights, inquiriesInsight, publishingInsight, windowCounts, type Insight } from '../analytics/compose.ts';
 import { searchInsights } from '../analytics/search_perf.ts';
 import { buildBusinessInsights } from '../lib/business_insights.ts';
@@ -26,14 +25,13 @@ export async function handleBusinessInsights(site: SiteRow, cors: Record<string,
   const nowMs = Date.parse(now);
   const period = 'month' as const;
 
-  const [visits, gsc, subsR, pubsR] = await Promise.all([
-    loadVisits(site.id, period, nowMs),
+  const [traffic, gsc, subsR, pubsR] = await Promise.all([
+    loadVisitAgg(site.id, period, nowMs),   // item 207: counted in the database
     readGsc(site.client_id),
     svc(`presence_form_submissions?site_id=eq.${site.id}&spam=is.false&select=created_at,form_kind,status&order=created_at.desc&limit=500`),
     svc(`presence_publishes?site_id=eq.${site.id}&status=eq.live&select=created_at&order=created_at.desc&limit=200`),
   ]);
 
-  const traffic = aggregateVisits(visits, nowMs, WINDOW_DAYS);
   const insights: Insight[] = [];
 
   // Visitors / content / engagement — only when there's real traffic data

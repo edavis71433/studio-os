@@ -431,8 +431,14 @@ const RECENT_DAYS=30;
 // view now go to the server with every page read; a roster that is all here sorts on the page.
 let LOADED_KEY='';
 let TAG='';   // item 89: the tag the list is filtered by ('' = none)
-const serverKey=()=>SORT.key+':'+SORT.dir+':'+(TAG?'tag='+TAG+':':'')+(VIEWNAME==='recent'?'recent':'all');
-const wholeRoster=()=>/:all$/.test(LOADED_KEY)&&!/:tag=/.test(LOADED_KEY)&&!hasMore();
+// sales item 90: field filters (not contacted in 30, 60 or 90 days, owes you money, no deal yet, added
+// this month, how they found you). The server works them out (lib/list_filters.ts), a page at a time.
+let FFILT={};
+const anyFilter=()=>Object.keys(FFILT).some(k=>!!FFILT[k]);
+const fKey=()=>anyFilter()?'f='+Object.keys(FFILT).sort().map(k=>k+'='+FFILT[k]).join('&')+':':'';
+const serverKey=()=>SORT.key+':'+SORT.dir+':'+(TAG?'tag='+TAG+':':'')+fKey()+(VIEWNAME==='recent'?'recent':'all');
+// (with a field filter on, only the server knows who it keeps: the whole roster is never enough)
+const wholeRoster=()=>!anyFilter()&&/:all$/.test(LOADED_KEY)&&!/:tag=/.test(LOADED_KEY)&&!/:f=/.test(LOADED_KEY)&&!hasMore();
 // the loaded pages hold this view in this order (counts from the server describe it)
 const keyLoaded=()=>LOADED_KEY===serverKey();
 // every row this view could show is on the page: a search needs no server
@@ -518,6 +524,7 @@ function applySaved(v){
   VIEWNAME=VIEW_LABEL[v.base]?v.base:'all';Q=v.q||'';
   SORT=(v.sort&&COLS.some(c=>c[0]===v.sort.key))?{key:v.sort.key,dir:v.sort.dir<0?-1:1}:{key:'name',dir:1};
   HIDDEN=(v.cols&&v.cols.length)?new Set(COLS.map(c=>c[0]).filter(k=>k!=='name'&&!v.cols.includes(k))):new Set();
+  FFILT=(v.filters&&typeof v.filters==='object')?{...v.filters}:{};   // item 90
   CURVIEW=v.id;PICKED.clear();SRCH=null;
   // item 110 (K4): a saved search looked only through the people loaded; it asks the server like a typed one
   return reorder('#viewBtn');
@@ -528,7 +535,7 @@ async function saveView(){
   const name=await k.ask({title:'Save this view',label:'Name',value:cur?cur.name:'',ok:'Save view',back:'#saveView'});
   if(!name)return;
   const same=SAVED.find(x=>x.name.toLowerCase()===name.toLowerCase());
-  const view={id:(same&&same.id)||(cur&&cur.name.toLowerCase()===name.toLowerCase()?cur.id:undefined),name,base:VIEWNAME,q:Q,cols:shownCols().map(c=>c[0]),sort:SORT};
+  const view={id:(same&&same.id)||(cur&&cur.name.toLowerCase()===name.toLowerCase()?cur.id:undefined),name,base:VIEWNAME,q:Q,cols:shownCols().map(c=>c[0]),sort:SORT,...(anyFilter()?{filters:FFILT}:{})};
   const out=await k.saveViews('contacts',SAVED.filter(x=>x.id!==view.id&&x.name.toLowerCase()!==name.toLowerCase()).concat(view));
   if(!out){toast('That view didn’t save — try again in a moment.');return;}
   SAVED=out;const now=SAVED.find(x=>x.name.toLowerCase()===name.toLowerCase());CURVIEW=now?now.id:'';
@@ -546,7 +553,57 @@ async function dropView(){
 }
 function bulkHtml(){
   if(!PICKED.size||DISPLAY!=='table')return'';
-  return `<div class="dds-bulk" role="region" aria-label="Selected contacts"><b>${PICKED.size} selected</b><button type="button" class="go" id="bulkSend">Send an update</button><button type="button" class="clr" id="bulkClear">Clear</button></div>`;
+  // sales item 90: more to do with the people picked — how they found you, a tag, delete (each with Undo)
+  return `<div class="dds-bulk" role="region" aria-label="Selected contacts"><b>${PICKED.size} selected</b><button type="button" class="go" id="bulkSend">Send an update</button><select id="bulkVia" aria-label="How the selected people found you"><option value="">Found via…</option>${FOUND_VIA.map(v=>`<option value="${esc(v)}">${esc(v)}</option>`).join('')}</select><button type="button" id="bulkTag">Add a tag</button><button type="button" id="bulkDel" data-needs="delete">Delete</button><button type="button" class="clr" id="bulkClear">Clear</button></div>`;
+}
+const people=(n)=>n===1?'1 person':n+' people';
+function bulkDone(msg,undo){const k=KIT();if(undo&&k&&k.undoToast)k.undoToast(msg,undo);else toast(msg);}
+async function bulkVia(sel){
+  const v=sel.value;if(!v)return;const k=KIT(),n=PICKED.size;if(!k)return;
+  if(!(await k.confirmIn(sel,{text:`Say ${n===1?'this person':'these '+n+' people'} found you via ${v}?`,yes:'Yes, set it'}))){sel.value='';return;}
+  const picked=knownRows().filter(c=>PICKED.has(String(c.id)));
+  PICKED.clear();renderListZone();
+  const done=[];let fail=0;
+  for(const c of picked){let r;try{r=await api('/sales/contacts/'+encodeURIComponent(c.id),'PATCH',{found_via:v});}catch(_){r={ok:false};}if(r.ok){done.push({id:c.id,was:c.found_via||''});c.found_via=v;}else fail++;}
+  bulkDone(`${people(done.length)} now found you via ${v}${fail?` · ${fail} couldn’t change`:''}.`,done.length?async()=>{
+    let bad=0;for(const x of done){let r;try{r=await api('/sales/contacts/'+encodeURIComponent(x.id),'PATCH',{found_via:x.was});}catch(_){r={ok:false};}if(!r.ok)bad++;}
+    toast(bad?`${bad} couldn’t be put back.`:'Put back as they were.');await load().catch(()=>{});
+  }:null);
+  if(anyFilter()||CHARTS)await load().catch(()=>{});else renderListZone();
+}
+async function bulkTag(){
+  const k=KIT(),n=PICKED.size;if(!k)return;
+  const raw=await k.askIn($('bulkTag'),{text:`A tag for ${people(n)}:`,field:{kind:'text',label:'The tag',placeholder:'e.g. restaurant',max:30,required:true,need:'Type the tag first.'},yes:'Add the tag'});
+  if(raw===null)return;
+  const tag=k.cleanTag(raw);if(!tag){toast('That tag is empty once commas and spaces are taken out.');return;}
+  const picked=knownRows().filter(c=>PICKED.has(String(c.id)));
+  PICKED.clear();renderListZone();
+  const done=[];let had=0,full=0,fail=0;
+  for(const c of picked){
+    const was=Array.isArray(c.tags)?c.tags.slice():[];
+    if(was.includes(tag)){had++;continue;}
+    if(was.length>=12){full++;continue;}   // lib/contact_fields.ts keeps twelve at most
+    let r;try{r=await api('/sales/contacts/'+encodeURIComponent(c.id),'PATCH',{tags:was.concat(tag)});}catch(_){r={ok:false};}
+    if(r.ok){done.push({id:c.id,was});c.tags=was.concat(tag);}else fail++;
+  }
+  bulkDone(`Tagged ${people(done.length)} “${tag}”${had?` · ${had} already had it`:''}${full?` · ${full} already have twelve tags`:''}${fail?` · ${fail} couldn’t change`:''}.`,done.length?async()=>{
+    let bad=0;for(const x of done){let r;try{r=await api('/sales/contacts/'+encodeURIComponent(x.id),'PATCH',{tags:x.was});}catch(_){r={ok:false};}if(!r.ok)bad++;}
+    toast(bad?`${bad} couldn’t be put back.`:'Tag taken off again.');await load().catch(()=>{});
+  }:null);
+  renderListZone();
+}
+async function bulkDel(){
+  const k=KIT(),n=PICKED.size;if(!k)return;
+  if(!(await k.confirmIn($('bulkDel'),{text:`Delete ${people(n)}? Their deals, invoices and history stay.`,yes:'Yes, delete them'})))return;
+  const picked=knownRows().filter(c=>PICKED.has(String(c.id)));
+  PICKED.clear();renderListZone();
+  const gone=[];let fail=0;
+  for(const c of picked){const id=c.id;let r;try{r=await api('/sales/contacts/'+encodeURIComponent(id)+'?confirm=1','DELETE');}catch(_){r={ok:false};}if(r.ok)gone.push(id);else fail++;}
+  bulkDone(`Deleted ${people(gone.length)}${fail?` · ${fail} couldn’t be deleted`:''}.`,gone.length?async()=>{
+    let bad=0;for(const id of gone){let r;try{r=await api('/sales/contacts/'+encodeURIComponent(id)+'/restore','POST');}catch(_){r={ok:false};}if(!r.ok)bad++;}
+    toast(bad?`${bad} couldn’t be put back.`:`${people(gone.length)} put back.`);await load().catch(()=>{});
+  }:null);
+  await load().catch(()=>toast('Deleted — but we couldn’t refresh the list. Refresh will catch it up.'));
 }
 async function bulkSend(){
   const k=KIT();if(!k)return;
@@ -678,7 +735,8 @@ function listHtml(rows){
   // and "Add someone" would file them against the wrong tenant. data-noscope on
   // the exit: carryScopeGlobally would otherwise re-scope it straight back in.
   if(!ALL.length&&scope())return `<div class="center"><h2>Contacts live at the studio level.</h2><p class="muted">You’re looking at one client. Your contacts belong to your studio, not to a single client, so there’s nothing here to show — and nothing you could usefully add from inside a client.</p><p style="margin-top:16px"><a class="link" data-noscope href="/contacts.html">Leave this client and open Contacts →</a></p></div>`;
-  if(!ALL.length)return `<div class="center"><h2>No contacts yet.</h2><p class="muted">Add someone, or they’ll appear here automatically when a website enquiry or a new deal comes in.</p><p style="margin-top:16px"><a class="link" href="/pipeline.html">Open Pipeline →</a></p></div>`;
+  if(!ALL.length&&!anyFilter())return `<div class="center"><h2>No contacts yet.</h2><p class="muted">Add someone, or they’ll appear here automatically when a website enquiry or a new deal comes in.</p><p style="margin-top:16px"><a class="link" href="/pipeline.html">Open Pipeline →</a></p></div>`;
+  if(!rows.length&&anyFilter()&&!Q.trim())return `<p class="muted" style="text-align:center;padding:30px">Nobody matches these filters. Turn one off, or clear them above.</p>`+moreHtml();
   if(!rows.length)return `<p class="muted" style="text-align:center;padding:30px">${Q?(Q.trim()&&!haveAll()&&!srchNow()?(SRCH_ERR===Q.trim()?'We couldn’t search all your contacts just now. These are the ones loaded so far.':'Looking through all your contacts…'):'No contacts match “'+esc(Q)+'”.'):'Nothing in this view — try “All contacts”.'}</p>`+moreHtml();
   return (DISPLAY==='table'?bulkHtml()+tableHtml(rows):cardsHtml(rows))+moreHtml();
 }
@@ -695,6 +753,12 @@ async function readPage(off,q){
   const p=new URLSearchParams({limit:String(PAGE),offset:String(off),total:'1',sort:SORT.key,dir:SORT.dir>0?'asc':'desc'});
   if(VIEWNAME==='recent')p.set('since',new Date(Date.now()-RECENT_DAYS*86400000).toISOString());   // item 110 (K4)
   if(TAG)p.set('tag',TAG);   // item 89
+  // item 90: the field filters ("added this month" from the first day of this month, here)
+  if(FFILT.quiet)p.set('quiet',String(FFILT.quiet));
+  if(FFILT.owes)p.set('owes','1');
+  if(FFILT.nodeal)p.set('nodeal','1');
+  if(FFILT.via)p.set('via',FFILT.via);
+  if(FFILT.added){const d=new Date();p.set('created_since',new Date(d.getFullYear(),d.getMonth(),1).toISOString());}
   if(q)p.set('q',q);else p.set('dupes','1');
   return api('/sales/contacts?'+p.toString());
 }
@@ -747,7 +811,7 @@ function addButtons(){
 function render(){
   const rows=sortedRows();
   let h=headerHtml(rows.length)
-    +`<div class="bar"><input class="search" id="q" type="search" aria-label="Search contacts" placeholder="Search name, email, or company…" value="${esc(Q)}">${scope()?'':addButtons()}</div><div id="csvZone"></div><div id="importStrip"></div>`
+    +`<div class="bar"><input class="search" id="q" type="search" aria-label="Search contacts" placeholder="Search name, email, or company…" value="${esc(Q)}">${scope()?'':addButtons()}</div><div id="fchips"></div><div id="csvZone"></div><div id="importStrip"></div>`
     +`<section class="dds-charts" id="charts" aria-label="Charts" hidden></section><div id="listZone">${listHtml(rows)}</div>`;
   // Any re-render (sort, view, display, refresh) must not destroy an open — or
   // in-flight — CSV import panel: carry the LIVE #csvZone node (its handlers,
@@ -755,7 +819,7 @@ function render(){
   // import empties the zone itself, so nothing sticks around after.
   const zPrev=document.getElementById('csvZone');
   const zKeep=!!(zPrev&&zPrev.innerHTML.trim());
-  $('main').innerHTML=h;wire();wireList();
+  $('main').innerHTML=h;wire();wireList();paintFchips();
   if(zKeep){const z=document.getElementById('csvZone');if(z)z.replaceWith(zPrev);}
   paintImportStrip();
   paintCharts();
@@ -839,7 +903,17 @@ function wireList(){
   document.querySelectorAll('[data-pick]').forEach(cb=>cb.addEventListener('change',()=>{const id=cb.getAttribute('data-pick');if(cb.checked)PICKED.add(id);else PICKED.delete(id);renderListZone();refocus('[data-pick="'+id+'"]');}));
   const pa=$('pickAll');if(pa)pa.addEventListener('change',()=>{const ids=sortedRows().map(c=>String(c.id));if(pa.checked)ids.forEach(i=>PICKED.add(i));else ids.forEach(i=>PICKED.delete(i));renderListZone();refocus('#pickAll');});
   const bs=$('bulkSend');if(bs)bs.addEventListener('click',bulkSend);
+  const bv=$('bulkVia');if(bv)bv.addEventListener('change',()=>{bulkVia(bv);});   // item 90
+  const bt=$('bulkTag');if(bt)bt.addEventListener('click',bulkTag);
+  const bd=$('bulkDel');if(bd)bd.addEventListener('click',bulkDel);
   const bc=$('bulkClear');if(bc)bc.addEventListener('click',()=>{PICKED.clear();renderListZone();refocus('#pickAll');});
+}
+// item 90: the field filter chips, under the search. A change asks the server for the people it keeps.
+function paintFchips(){
+  const host=$('fchips'),k=KIT();if(!host)return;
+  host.hidden=!k||!!scope();
+  if(host.hidden){host.innerHTML='';return;}
+  k.filterChips(host,{value:FFILT,offer:['quiet','owes','nodeal','added','via'],vias:FOUND_VIA,onChange:(next,key)=>{FFILT=next;PICKED.clear();SRCH=null;reorder(key&&key!=='clear'?'#fchips [data-fchip="'+key+'"]':'#fchips [data-fchip]');}});
 }
 // item 89: the fields both contact forms share (the new ones beside name and email), read and filled the same way
 const MORE_IDS=['phone','phone2','title','company','street','city','state','zip','found'];
@@ -1384,7 +1458,8 @@ async function askDelete(id){
     }
     $('delDlg').close();
     const kept=(d.body&&d.body.data&&d.body.data.kept_items)||[];
-    const msg=kept.length?((b.name||who)+' removed — their '+kept.join(', ')+' stayed.'):((b.name||who)+' removed.');
+    // sales item 83: and it waits in Recently deleted for 30 days after the Undo has gone
+    const msg=(kept.length?((b.name||who)+' removed — their '+kept.join(', ')+' stayed.'):((b.name||who)+' removed.'))+' It stays in Recently deleted for 30 days.';
     // Phase 4 (delete safety): the removal is a soft delete, so the toast carries
     // ONE Undo that puts the contact straight back (POST …/restore).
     if(window.ddsToast)ddsToast(msg,'ok',{label:'Undo',onClick:async()=>{

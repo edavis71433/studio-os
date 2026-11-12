@@ -34,11 +34,11 @@ import { checkEntitlement } from './middleware/entitlement.ts';
 import { featureForRoute, requireFeature, loadEdition } from './middleware/feature.ts';
 import { loadPlan, draftingDenial } from './commerce/enforce.ts';
 import { handleGetSite, handleTemplatesList, handlePutTemplate } from './routes/site.ts';
-import { handleSearchHealth, handleRedirectsList, handleRedirectCreate, handleRedirectDelete } from './routes/search.ts';
+import { handleSearchHealth, handleRedirectsList, handleRedirectCreate, handleRedirectSuggest, handleRedirectDelete } from './routes/search.ts';
 import { handleGetIdentity, handlePutIdentity } from './routes/identity.ts';
 import { handlePreview, handlePreviewSection } from './routes/preview.ts';
 import { handlePreviewStatus, handlePreviewPublish, handlePreviewPromote, handlePreviewSettings, handlePublicPreview, handlePublicPreviewOpen, handleSignedPreview, handlePreviewShareLink } from './routes/preview_env.ts';
-import { handleDealTasksList, handleDealTaskCreate, handleDealTaskUpdate } from './routes/sales.ts';
+import { handleDealTasksList, handleDealTaskCreate, handleDealTaskUpdate, handleSalesDeleted, handleSalesRestoreDeal } from './routes/sales.ts';
 import { handleSalesSummary, handleSalesMyTasks, handleSalesReports, handleSalesViews, handleSalesStages, handleSalesReceivables, handleSalesContacts, handleSalesContact, handleSalesContactRestore, handleSalesContactFields, handleSalesDeals, handleSalesDeal, handleSalesDealStage, handleSalesDealActivity, handleSalesProposalCreate, handleSalesProposalSend, handleSalesDealSend, handleSalesProposalRevise, handleSalesProposalDecide, handleSalesProposalDelete, handleSalesContractCreate, handleSalesContractSend, handleSalesContractSign, handleSalesContractDelete, handleSalesConvert, handleSalesResendInvite, handleSalesAddCustomer, handleSalesInvoice, handleSalesSchedule, handleSalesInvoiceSend, handleSalesInvoiceVoid, handleSalesRetainer, handleSalesRetainerCancel, handleSalesContractTerm, handleSalesTemplates, handleSalesTemplateDelete, handleSalesServices, handleSalesPublicView, handleSalesDocument, handleSalesDocumentLink } from './routes/sales.ts';
 import { handleProjects, handleProject, handleProjectReport, handleProjectsProgress, handleProjectStatus, handleTasksCreate, handleTask, handleProjectChecklist, handleMilestonesCreate, handleMilestone } from './routes/projects.ts';
 import { handleDeliverableUploadUrl, handleDeliverablesCreate, handleDeliverable, handleDeliverableDownload, handleApprovalsCreate, handleApprovalDecide } from './routes/project_delivery.ts';
@@ -60,7 +60,7 @@ const { handleWebsiteTimeline } = lazyRoutes(() => import('./routes/timeline.ts'
 const { handleWebsiteHealth, handleWebsiteHealthPdf } = lazyRoutes(() => import('./routes/health_page.ts'));
 const { handleBusinessInsights } = lazyRoutes(() => import('./routes/insights_page.ts'));
 const { handleMomentsList, handleMomentDismiss } = lazyRoutes(() => import('./routes/moments.ts'));
-import { handlePortalContext, handlePortalFeed, handleMembersList, handleMemberAdd, handleMemberRevoke, handleSharesList, handleShareSet, reviewerAllowed, memberWriteGate } from './routes/workspace.ts';
+import { handlePortalContext, handlePortalFeed, handleMembersList, handleMemberAdd, handleMemberRevoke, handleMemberRole, handleSharesList, handleShareSet, reviewerAllowed, memberWriteGate } from './routes/workspace.ts';
 const { handleDevFiles, handleDevCustomizationGet, handleDevCustomizationPut, handleBrandKitGet, handleBrandKitPut, handleBrandKitApply } = lazyRoutes(() => import('./routes/dev.ts'));
 const { handleStockSearch, handleStockImport } = lazyRoutes(() => import('./routes/stock.ts'));
 const { handleContentLibraryList, handleContentLibrarySave, handleContentLibraryUpdate, handleContentLibraryDelete } = lazyRoutes(() => import('./routes/content_library.ts'));
@@ -76,7 +76,8 @@ import { handleScheduleCreate, handleScheduleList, handleScheduleCancel, handleF
 const { handleBookingTypes, handleBookingSlots, handleBookingCreate, handleManageGet, handleManagePost, handleManageSlots, handleManageIcs, handleBookingSettingsGet, handleBookingSettingsPut, handleBookingTypesList, handleBookingTypeCreate, handleBookingTypeUpdate, handleBookingTypeDelete, handleBookingAppointments, handleBookingConfirm, handleBookingCancel, handleBookingMark } = lazyRoutes(() => import('./routes/booking.ts'));
 const { handleReviewPage, handleReviewSubmit, handleReviewsList, handleReviewApprove, handleReviewHide, handleReviewReply, handleReviewRequest, handleReviewGoogleLink } = lazyRoutes(() => import('./routes/reviews.ts'));
 const { handleCommentsList, handleCommentCreate, handleCommentResolve, handleCommentDelete, handleTokenSections, handleTokenComment } = lazyRoutes(() => import('./routes/comments.ts'));
-import { resolveMemberSite, resolveSiteRoleCached } from './lib/workspace.ts';
+import { resolveMemberSite, resolveHeldBusiness, resolveSiteRoleCached } from './lib/workspace.ts';
+import type { SiteRole } from './lib/site_roles.ts';
 const { handleConciergeAsk } = lazyRoutes(() => import('./routes/concierge.ts'));
 const { handleHelpAsk } = lazyRoutes(() => import('./routes/help.ts'));
 const { handleWriterGenerate, handleWriterRewrite, handleWriterList, handleWriterGet, handleWriterAccept, handleWriterDiscard } = lazyRoutes(() => import('./routes/writer.ts'));
@@ -428,12 +429,26 @@ async function route_(req: Request, cors: Record<string, string>): Promise<Respo
   //    Concierge; deterministic-first, honest fallback, no invented features.
   if (route === '/help/ask' && method === 'POST') return handleHelpAsk(req, cors);
 
+  // ── Builder item 53: a transfer of ownership, answered by the person an email
+  //    reached. Before any site is resolved: the new owner has no site here yet, and
+  //    the owner answers about theirs. Each route checks the signed-in email itself.
+  if (route === '/transfers' || route.startsWith('/transfers/')) {
+    const { handleTransfersMine, handleTransferAnswer } = await import('./routes/site_transfer.ts');
+    if (route === '/transfers' && method === 'GET') return handleTransfersMine(principal, cors);
+    const tm = route.match(/^\/transfers\/([0-9a-f-]{36})\/(agree|accept|decline)$/);
+    if (tm && method === 'POST') return handleTransferAnswer(req, tm[1], tm[2] as 'agree' | 'accept' | 'decline', principal, cors);
+    return json({ error: 'not_found', message: 'No such page.' }, 404, cors);
+  }
+
   // 3. resolve the caller's site. Un-scoped: RLS confines to the caller's OWN
   //    site. Scoped (SC-1): an agency operator drilled into a client — the
   //    x-dds-scope-site header is a REQUEST, re-validated here against agency
   //    authorization and FAIL-CLOSED (never falls back to another tenant).
-  let site: SiteRow | null;
+  let site: SiteRow | null = null;
   let scopedName: string | null = null;
+  // a seat that admits the caller: their oldest when nothing was picked, or (builder
+  // item 83) the business they picked with ?client=. Stamped in ONE place, below.
+  let seated: { site: SiteRow; member: { site_id: string; role: SiteRole } | null } | null = null;
   const scopeReq = req.headers.get('x-dds-scope-site');
   if (scopeReq) {
     // SC-2: pass the operator identity + request metadata so the drill-in is
@@ -443,14 +458,19 @@ async function route_(req: Request, cors: Record<string, string>): Promise<Respo
       operatorUserId: principal.userId, operatorEmail: principal.email,
       route, method, requestId: principal.requestId,
       ip: req.headers.get('x-forwarded-for') || '', userAgent: req.headers.get('user-agent') || '',
-    });
+    }, (id) => resolveHeldBusiness(jwt, principal, id));
     if (!sc.ok) return json({ error: 'scope_denied', message: 'You don’t have access to that client.' }, sc.status, cors);
-    site = sc.site; scopedName = sc.scoped.name;
-    // Studio audit change 2: the principal now KNOWS it is acting for a client,
-    // so every attribution downstream (publishes, snapshots, change events,
-    // connection events — lib/actor_kind.ts) says "the studio" without a second
-    // membership query. Set only here, only after the scope was authorised.
-    principal.scope = { site_id: sc.scoped.site_id, name: sc.scoped.name };
+    if ('held' in sc) {
+      // builder item 83: one of the caller's own businesses, opened as themself, never as a studio
+      seated = sc.held;
+    } else {
+      site = sc.site; scopedName = sc.scoped.name;
+      // Studio audit change 2: the principal now KNOWS it is acting for a client,
+      // so every attribution downstream (publishes, snapshots, change events,
+      // connection events — lib/actor_kind.ts) says "the studio" without a second
+      // membership query. Set only here, only after the scope was authorised.
+      principal.scope = { site_id: sc.scoped.site_id, name: sc.scoped.name };
+    }
   } else {
     site = await resolveSite(jwt);
     // MEMBERSHIP fallback: an invited member (client_reviewer / staff seat) owns
@@ -459,14 +479,12 @@ async function route_(req: Request, cors: Record<string, string>): Promise<Respo
     // + the reviewer boundary below (fail-closed). Only a client caller carries the
     // seat onto the data path: platform staff operate as the owner already.
     if (!site && (principal.userId || principal.email)) {
-      try {
-        const seated = await resolveMemberSite(principal);
-        if (seated) {
-          site = seated.site;
-          if (principal.kind === 'client') principal.member = seated.member;
-        }
-      } catch { /* fail closed to no_site */ }
+      try { seated = await resolveMemberSite(principal); } catch { /* fail closed to no_site */ }
     }
+  }
+  if (seated) {
+    site = seated.site;
+    if (principal.kind === 'client') principal.member = seated.member;
   }
   if (!site) {
     return json({ error: 'no_site', message: 'No Presence site is set up for this account yet.' }, 404, cors);
@@ -568,6 +586,7 @@ async function route_(req: Request, cors: Record<string, string>): Promise<Respo
   if (route === '/visibility/ai/questions' && method === 'PUT') return handleAiQuestionsPut(req, site, principal, cors);
   if (route === '/redirects' && method === 'GET') return handleRedirectsList(site, cors);                 // Phase SD
   if (route === '/redirects' && method === 'POST') return handleRedirectCreate(req, site, principal, cors);
+  if (route === '/redirects/suggest' && method === 'GET') return handleRedirectSuggest(req, site, cors);   // item 156: the old site's pages, matched
   {
     const rm = route.match(/^\/redirects\/([0-9a-f-]{36})$/);
     if (rm && method === 'DELETE') return handleRedirectDelete(site, principal, rm[1], cors);
@@ -786,6 +805,12 @@ async function route_(req: Request, cors: Record<string, string>): Promise<Respo
   // the site's deals — computed server-side because the list below is paged.
   if (route === '/sales/summary' && method === 'GET') return handleSalesSummary(req, site, principal, cors);
   if (route === '/sales/my-tasks' && method === 'GET') return handleSalesMyTasks(req, site, principal, cors);   // sales review item 29: Home's My tasks
+  // sales items 85 and 106: to-dos for anyone (the To-dos page reads every one), and a call logged for a person with no deal
+  if (route === '/sales/tasks' && (method === 'GET' || method === 'POST')) return (await import('./routes/todos.ts')).handleSalesTasks(req, site, principal, cors);
+  if (route === '/sales/people/activity' && method === 'POST') return (await import('./routes/todos.ts')).handlePeopleActivity(req, site, principal, cors);
+  // sales item 80: email a person from their record or deal; replies come back to the Inbox
+  if (route === '/sales/email' && method === 'POST') return (await import('./routes/record_email.ts')).handleRecordEmail(req, site, principal, cors);
+  if (route === '/sales/email' && method === 'GET') return (await import('./routes/record_email.ts')).handleRecordEmailInfo(req, site, cors);
   if (route === '/sales/reports' && method === 'GET') return handleSalesReports(req, site, principal, cors);   // sales review item 33: Analytics' fixed reports
   if (route === '/sales/views' && (method === 'GET' || method === 'PUT')) return handleSalesViews(req, site, principal, cors);   // sales review item 31: saved list views
   if (route === '/sales/stages' && (method === 'GET' || method === 'PUT')) return handleSalesStages(req, site, principal, cors);   // sales review item 38: rename the open stages
@@ -822,10 +847,15 @@ async function route_(req: Request, cors: Record<string, string>): Promise<Respo
     return handleCalendarLink(req, site, principal, cors);
   }
   if (route === '/sales/receivables' && method === 'GET') return handleSalesReceivables(req, site, principal, cors);
+  if (route === '/sales/invoices' && method === 'GET') return (await import('./routes/invoices_list.ts')).handleSalesInvoicesList(req, site, cors);   // sales item 85: the Invoices page
   if (route === '/sales/deals') return handleSalesDeals(req, site, principal, cors);
+  if (route === '/sales/deleted' && method === 'GET') return handleSalesDeleted(site, cors);   // sales item 83: Recently deleted
   {
     let m = route.match(/^\/sales\/deals\/([0-9a-f-]{36})$/);
     if (m) return handleSalesDeal(req, site, principal, m[1], cors);
+    // sales item 83: a deleted deal comes back (Undo, and Recently deleted)
+    m = route.match(/^\/sales\/deals\/([0-9a-f-]{36})\/restore$/);
+    if (m && method === 'POST') return handleSalesRestoreDeal(site, m[1], cors);
     m = route.match(/^\/sales\/deals\/([0-9a-f-]{36})\/stage$/);
     if (m && method === 'POST') return handleSalesDealStage(req, site, principal, m[1], cors);
     // Log a call / email / meeting / dated note on the deal — the quick-log that
@@ -1000,6 +1030,12 @@ async function route_(req: Request, cors: Record<string, string>): Promise<Respo
   if (route === '/client/projects' && method === 'GET') return handleClientProjects(req, site, principal, cors);
   if (route === '/client/billing' && method === 'GET') return handleClientBilling(req, site, principal, cors);
   if (route === '/client/documents' && method === 'GET') return handleClientDocuments(req, site, principal, cors);
+  // item 179: the monthly reports that went out, for the client's Documents shelf
+  if (route === '/client/reports' && method === 'GET') return (await import('./ops/monthly_report.ts')).handleClientReports(site, cors);
+  {
+    const m = route.match(/^\/client\/reports\/(\d{4}-\d{2})\/pdf$/);
+    if (m && method === 'GET') return (await import('./ops/monthly_report.ts')).handleClientReportPdf(site, m[1], cors);
+  }
   if (route === '/client/book' && method === 'GET') return handleClientBook(req, site, principal, cors);
   if (route === '/client/notifications' && method === 'GET') return handleClientNotifications(req, site, principal, cors);
   if (route === '/client/notifications/read' && method === 'POST') return handleClientNotificationsRead(req, site, principal, cors);
@@ -1026,6 +1062,11 @@ async function route_(req: Request, cors: Record<string, string>): Promise<Respo
     if (m && method === 'GET') return handleClientDeliverableDownload(req, site, principal, m[1], cors);
     m = route.match(/^\/client\/approvals\/([0-9a-f-]{36})\/decide$/);
     if (m && method === 'POST') return handleClientApprovalDecide(req, site, principal, m[1], cors);
+    // builder list item 179, part two: the website draft sent for an OK, drawn in the portal, and notes on its parts
+    m = route.match(/^\/client\/approvals\/([0-9a-f-]{36})\/draft$/);
+    if (m && method === 'GET') return (await import('./routes/client_drafts.ts')).handleClientDraft(req, site, principal, m[1], cors);
+    m = route.match(/^\/client\/approvals\/([0-9a-f-]{36})\/notes$/);
+    if (m && method === 'POST') return (await import('./routes/client_drafts.ts')).handleClientDraftNote(req, site, principal, m[1], cors);
     m = route.match(/^\/client\/surveys\/([0-9a-f-]{36})$/);
     if (m && method === 'GET') return handleClientSurvey(req, site, principal, m[1], cors);
     m = route.match(/^\/client\/surveys\/([0-9a-f-]{36})\/respond$/);
@@ -1048,7 +1089,12 @@ async function route_(req: Request, cors: Record<string, string>): Promise<Respo
   {
     const m = route.match(/^\/portal\/members\/([0-9a-f-]{36})\/revoke$/);
     if (m && method === 'POST') return handleMemberRevoke(jwt, site, m[1], principal, cors);
+    const r = route.match(/^\/portal\/members\/([0-9a-f-]{36})\/role$/);   // builder item 53: change a seat's role
+    if (r && method === 'POST') return handleMemberRole(req, jwt, site, r[1], principal, cors);
   }
+  // builder item 53: hand the site to a new owner (the owner, or the studio asking the owner)
+  if (route === '/portal/transfer' && method === 'POST') { const { handleTransferStart } = await import('./routes/site_transfer.ts'); return handleTransferStart(req, jwt, site, principal, cors); }
+  if (route === '/portal/transfer/cancel' && method === 'POST') { const { handleTransferCancel } = await import('./routes/site_transfer.ts'); return handleTransferCancel(jwt, site, principal, cors); }
   if (route === '/portal/shares' && method === 'GET') return handleSharesList(jwt, site, principal, cors);
   if (route === '/portal/shares' && method === 'POST') return handleShareSet(req, jwt, site, principal, cors);
 

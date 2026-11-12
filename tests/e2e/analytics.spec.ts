@@ -630,16 +630,20 @@ test.describe('Analytics (Business dashboard)', () => {
       .toHaveAttribute('href', '/connections.html');
   });
 
-  test('no serious/critical axe violations on the dashboard', async ({ page }, testInfo) => {
-    test.skip(testInfo.project.name !== 'desktop-chromium', 'axe once, on desktop');
-    await installApp(page, { api: { '/analytics/dashboard': DASH } });
-    await page.goto('/analytics.html');
-    await page.waitForLoadState('networkidle');
-    await expect(dashHead(page)).toBeVisible();
-    const results = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa']).analyze();
-    const serious = results.violations.filter((v) => v.impact === 'critical' || v.impact === 'serious');
-    expect(serious.map((v) => `${v.id} (${v.nodes.length})`)).toEqual([]);
-  });
+  // builder list item 150: light and dark both
+  for (const scheme of ['light', 'dark'] as const) {
+    test(`no serious/critical axe violations on the dashboard (${scheme})`, async ({ page }, testInfo) => {
+      test.skip(testInfo.project.name !== 'desktop-chromium', 'axe once, on desktop');
+      await page.emulateMedia({ colorScheme: scheme });
+      await installApp(page, { api: { '/analytics/dashboard': DASH } });
+      await page.goto('/analytics.html');
+      await page.waitForLoadState('networkidle');
+      await expect(dashHead(page)).toBeVisible();
+      const results = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa']).analyze();
+      const serious = results.violations.filter((v) => v.impact === 'critical' || v.impact === 'serious');
+      expect(serious.map((v) => `${v.id} (${v.nodes.length}): ${v.nodes.map((n) => n.target.join(' ')).join(' | ')}`)).toEqual([]);
+    });
+  }
 });
 
 // ── SS7: the AGENCY PORTFOLIO LENS — an unscoped agency operator lands on the

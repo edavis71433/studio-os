@@ -43,7 +43,8 @@ globalThis.fetch = async (url, init = {}) => {
     const asked = typeof body.redirect_to === 'string' && ALLOWED.some((a) => a.test(body.redirect_to)) ? body.redirect_to : `${SITE_URL}/`;
     return reply({ action_link: `http://stub.local/auth/v1/verify?type=${body.type}&redirect_to=${encodeURIComponent(asked)}` });
   }
-  if (u.pathname === '/rest/v1/presence_site_members') { seats.push(body); return reply(null, 201); }
+  // item 53: an invite reads whether the email is already here, then inserts the row and reads it back
+  if (u.pathname === '/rest/v1/presence_site_members') { if ((init.method || 'GET') === 'GET') return reply([]); seats.push(body); return reply([{ id: 'seat-' + seats.length, ...body }], 201); }
   if (u.pathname.startsWith('/rest/v1/')) return reply([]);
   return reply({}, 404);
 };
@@ -87,7 +88,7 @@ const quiet = (fn) => async (...a) => { const e = console.error, w = console.war
   ok('roles: this covers every role', SITE_ROLES.every((r) => r in DOOR) && Object.keys(DOOR).length === SITE_ROLES.length);
   for (const role of SITE_ROLES) {
     reset();
-    const out = await quiet(addSiteMember)(SITE_A, 'Member@Example.com', role, 'owner');
+    const out = await quiet(addSiteMember)(SITE_A, 'Member@Example.com', role, 'owner', { allowDeveloper: true });   // as platform staff: Developer is paused for everyone else
     const asked = minted[0]?.redirect_to;
     ok(`invite ${role}: saved and emailed`, out.ok === true && out.emailed === true && seats[0]?.role === role && seats[0]?.email === 'member@example.com', JSON.stringify(out));
     ok(`invite ${role}: lands on /${DOOR[role]}`, asked === `${SITE_URL}/${DOOR[role]}`, asked);

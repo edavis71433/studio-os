@@ -85,7 +85,7 @@ test.describe('Sites numbers (builder list items 129 and 180)', () => {
     await openSites(page, { display: 'table' });
     const table = page.locator('#tableHost');
     await expect(table.locator('.tcap')).toContainText('October, compared with September. A drop is red.');
-    await expect(table.locator('thead .thb')).toHaveText(['Site', 'Health', 'Visits', 'Search clicks', 'Plan', 'Last updated', 'Tags']);
+    await expect(table.locator('thead .thb')).toHaveText(['Site', 'Owner', 'Health', 'Visits', 'Search clicks', 'Plan', 'People', 'Last updated', 'Tags']);   // builder item 53 adds Owner and People
     const blue = table.locator('tbody tr', { hasText: 'Bluebird Bakery' });
     await expect(blue.locator('td.num .dchip.down')).toHaveCount(3);
     await expect(table.locator('tbody tr', { hasText: 'Harbor Dental' })).toContainText('No counter');

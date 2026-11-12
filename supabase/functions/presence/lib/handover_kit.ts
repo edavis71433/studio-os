@@ -37,8 +37,8 @@ const iso = (v: unknown) => (typeof v === 'string' && !Number.isNaN(Date.parse(v
 
 /** The three how-tos every kit starts with; the studio rewrites them as it likes. */
 export const DEFAULT_GUIDES: ReadonlyArray<KitGuide> = [
-  { title: 'Change a photo or some words', body: 'Send us the new photo or words in Requests, and we’ll change it for you.' },
-  { title: 'Ask for something new', body: 'Open Requests and press Something else? Nothing is charged until we reply.' },
+  { title: 'Change a photo or some words', body: 'Send us the new photo or words in Messages, and we’ll change it for you.' },
+  { title: 'Ask for something new', body: 'Open Messages, press Ask for a service, then Something else? Nothing is charged until we reply.' },
   { title: 'If something looks wrong', body: 'Message us with a screenshot of what you see. If the site is down, call us.' },
 ];
 

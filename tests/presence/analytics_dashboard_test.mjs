@@ -200,9 +200,9 @@ eq('oldest: none → null (never a fake 0)', oldestAgeDays([], NOW), null);
   // builder list item 175: windows on the caller's clock, and a past window's reads stop at its end
   ok('item 175: the window is worked out on the caller’s clock, with the picked dates', /dashRange\(period, nowMs, \{ offsetMinutes: tzo, \.\.\.\(dates \|\| \{\}\) \}\)/.test(route) && /parseDashDates\(sp\.get\('from'\), sp\.get\('to'\), nowMs, tzo\)/.test(route));
   ok('item 175: picked dates that make no window are this month', /if \(period === 'custom' && !dates\) period = 'this_month';/.test(route));
-  ok('item 175: all three visit reads stop at a past window’s end', (route.match(/\$\{until\}&kind=/g) || []).length === 3);
+  ok('item 175: every visit read stops at a past window’s end (the counted one, item 207, and the two row reads)', /readVisitStats\(site\.id, \{ startMs, endMs: closed \? endMs : null, priorStartMs, weeks: DASH_WEEKS, nowMs: endMs \}\)/.test(route) && (route.match(/\$\{until\}&kind=/g) || []).length === 2);
   ok('item 175: the answer says where the window starts and ends', /window: \{ start: new Date\(startMs\)\.toISOString\(\), end: new Date\(endMs\)\.toISOString\(\), closed/.test(route));
-  ok('item 175: enquiries, invoices and the lines keep to the window', /count: subs\.filter\(\(s\) => inWindow\(/.test(route) && /invoiceBuckets\(invs, nowIso\.slice\(0, 10\), startMs, closed \? endMs : Infinity\)/.test(route) && /weeklyVisitors\(visits, endMs\)/.test(route));
+  ok('item 175: enquiries, invoices and the lines keep to the window', /count: subs\.filter\(\(s\) => inWindow\(/.test(route) && /invoiceBuckets\(invs, nowIso\.slice\(0, 10\), startMs, closed \? endMs : Infinity\)/.test(route) && /weekly: visits\.weekly \|\| \[\]/.test(route));   // the 12-week line ends at nowMs: endMs (item 207's reader)
 }
 
 // ── the period before this one + the per-page table ──

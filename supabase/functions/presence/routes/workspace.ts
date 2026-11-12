@@ -24,7 +24,7 @@ import { resolveAgencyMember } from '../agency/auth.ts';
 import { filterForRole, visibleTo } from '../lib/visibility.ts';
 import { svc, svcCount } from '../lib/db.ts';
 import { displayName } from '../lib/dam.ts';
-import { resolveSiteRoleCached, listSiteMembers, addSiteMember, revokeSiteMember, loadShares, overrideFor, setShare, isSharedStudioSite } from '../lib/workspace.ts';
+import { resolveSiteRoleCached, listSiteMembers, addSiteMember, changeSiteMemberRole, resendSiteInvite, revokeSiteMember, loadShares, overrideFor, setShare, isSharedStudioSite, listBusinesses } from '../lib/workspace.ts';
 import { loadThreadMarks, newestClientMessageAt, threadUnread } from '../lib/thread_reads.ts';
 import { shapeClientConversations, studioBellCount, noticeDismissible, NOTICE_ACCOUNT_KINDS, freshEnquiries, invoiceReminderIds, renderableNotices, noticeTier, noticePriority } from '../lib/inbox_feed.ts';
 import { clearNotice } from '../lib/notice.ts';
@@ -102,6 +102,16 @@ async function requireManager(jwt: string, site: SiteRow, principal: Principal, 
   return { role };
 }
 
+/** A managed client's first name as their studio has it (lib/customer_names.ts:
+ *  the contact behind the customer, else the record's own name). '' when unknown. */
+async function clientGreetingName(agencySiteId: string, clientId: string, siteId: string): Promise<string> {
+  const { loadCustomerNames, greetingName } = await import('../lib/customer_names.ts');
+  const read = async (p: string) => { const r = await svc(p); return r.ok && Array.isArray(r.json) ? r.json : []; };
+  const c = (await read(`clients?id=eq.${clientId}&select=name&limit=1`))[0];
+  const named = await loadCustomerNames(agencySiteId, [{ clientId, clientName: c?.name, customerSiteId: siteId }], read);
+  return greetingName(named[clientId]);
+}
+
 export async function handlePortalContext(jwt: string, site: SiteRow, principal: Principal, cors: Record<string, string>, scopedName?: string | null) {
   const role = await resolveSiteRoleCached(principal, jwt, site.id);
   const isOperator = principal.kind === 'staff' || principal.kind === 'system';
@@ -124,6 +134,9 @@ export async function handlePortalContext(jwt: string, site: SiteRow, principal:
   const studioReqP: Promise<Array<{ id: string; studio: string }>> = role === 'business_owner' && !scopedName && !isOperator && !worksOnSite
     ? import('./connect_requests.ts').then((m) => m.studioRequestsFor(site, principal)).catch(() => [])
     : Promise.resolve([]);
+  // builder item 83: the businesses this person can switch between (someone invited
+  // somewhere, with two or more); started now, read at the end
+  const businessesP = !isOperator && !scopedName ? listBusinesses(jwt, principal).catch(() => []) : Promise.resolve([]);
   const none = Promise.resolve({ ok: true, json: [] as any[] });
   const swallow = () => ({ ok: false, json: null as any });
   const [agencyMember, linksQ, ent, nQ, iQ, wQ, fQ, eQ, supQ, seenQ, msgQ, cmQ] = await Promise.all([
@@ -179,7 +192,12 @@ export async function handlePortalContext(jwt: string, site: SiteRow, principal:
   const isManagedClient = !!(customerLinks && customerLinks.length > 0);
   // builder list item 59: a managed client's pages carry their studio's name and logo (routes/studio_brand.ts)
   const studioSiteId = isManagedClient ? String(customerLinks![0]?.agency_site_id || '') : '';
-  const studio = studioSiteId ? await import('./studio_brand.ts').then((m) => m.studioBrandOf(studioSiteId)).catch(() => null) : null;
+  // builder list item 179: and the client's own first name, from the studio's record
+  // of them, so Home greets the person and not their sign-in. Read beside the brand.
+  const [studio, clientFirstName] = await Promise.all([
+    studioSiteId ? import('./studio_brand.ts').then((m) => m.studioBrandOf(studioSiteId)).catch(() => null) : Promise.resolve(null),
+    studioSiteId && site.client_id ? clientGreetingName(studioSiteId, String(site.client_id), site.id).catch(() => '') : Promise.resolve(''),
+  ]);
 
   // Phase D: resolve the FEATURE edition from the licensed plan (falls back to
   // the site edition when no entitlement plan is recorded). Navigation adapts to
@@ -274,10 +292,13 @@ export async function handlePortalContext(jwt: string, site: SiteRow, principal:
   // its own site, which is the site in hand when nothing is scoped). A failed read hides nothing.
   const hiddenSections = (isAgency && !scopedName) ? normalizeHidden(await readReservedJson(site.id, RESERVED_NAMES.navHidden)) : [];
   const navCtx = { role, edition: site.edition, capabilities: caps, isAgency, isOperator, editionKey, isManagedClient, scoped: !!scopedName, siteLive, hiddenSections };
+  // `default`: the one the server opens when nothing is picked (owned first, else the oldest seat), so a page can open it with no ?client=
+  const businesses = (await businessesP).map((b, i) => ({ site_id: b.site_id, name: b.name, role: b.role, role_words: b.owned ? 'Owner' : (SEAT_ROLE_WORDS[b.role] || b.role), current: b.site_id === site.id, default: i === 0 }));
   return json({ data: {
     site_role: role,
     capabilities: caps,
     studio,                              // builder list item 59: { name, logo_url, accent } for a managed client, else null
+    client_first_name: clientFirstName || null,   // builder list item 179: the name on the studio's record of this client
     edition: site.edition,               // 'monitor' | 'presence' (site hosting dimension)
     site_live: !!siteLive,               // sales review item 24: the client Overview's Website tile (hosted elsewhere · live · not live yet)
     edition_key: editionKey,             // Phase D: the FEATURE edition (cms_only … enterprise)
@@ -296,6 +317,8 @@ export async function handlePortalContext(jwt: string, site: SiteRow, principal:
     attention_count,                     // Phase FLOW: the shell bell badge (notices + pending approvals); null = not known yet (studio level, batch B)
     attention_stale,                     // batch B: the shell refreshes a stale or missing studio total behind the page
     studio_requests: await studioReqP,   // final pass S1: studios asking this owner to connect
+    businesses,                          // builder item 83: [] unless this person can switch between two or more businesses
+    business: businesses.find((b) => b.current) || null,   // …and which one this is
     nav: buildNav(navCtx),               // the ONE navigation source of truth, edition- + entitlement-filtered
   } }, 200, cors);
 }
@@ -388,6 +411,16 @@ export function studioLevelFeed<T extends { notices: any[]; moments: any[]; pend
   return { ...d, notices: (d.notices || []).filter((n) => !STUDIO_WEBSITE_NOTICE_KINDS.has(String(n?.kind ?? ''))), moments: [], pending_approvals: [] };
 }
 
+/** The client themself, not the studio working on their site: no drill-in from the
+ *  studio (principal.scope), no platform staff, no staff or developer seat. Mirrors the
+ *  bridged-customer test in handlePortalContext. Item 173: the studio opening a client's
+ *  Overview was told "An update from your studio", a line written for the client. */
+export function isTheClientThemself(principal: Pick<Principal, 'kind' | 'scope'>, role: string | null | undefined): boolean {
+  if (principal.scope) return false;
+  if (principal.kind === 'staff' || principal.kind === 'system') return false;
+  return role !== 'business_staff' && role !== 'developer';
+}
+
 /** What the feed hands the Inbox, at most: the newest FEED_ENQUIRIES new enquiries,
  *  the newest FEED_CONVERSATIONS conversations, and the first FEED_MESSAGE_CHARS of an
  *  enquiry's message. `enquiries_more` / `client_messages_more` / `message_cut` say
@@ -398,6 +431,7 @@ export const FEED_ENQUIRIES = 50, FEED_CONVERSATIONS = 20, FEED_MESSAGE_CHARS = 
 export async function buildPortalFeed(jwt: string, site: SiteRow, principal: Principal): Promise<any> {
   const role = await resolveSiteRoleCached(principal, jwt, site.id);
   const seesFull = siteCan(role, 'view_all');   // owner surfaces get the notices rail; reviewers don't
+  const clientSelf = isTheClientThemself(principal, role);   // item 173: the studio's updates row is for the client only
   // review finding 5: a reviewer on a studio's shared site gets no waiting files (they'd be every client's)
   const filesHidden = role === 'client_reviewer' ? (await isSharedStudioSite(site.id)) !== false : false;
   const noEnq = Promise.resolve({ ok: true, json: [] as any[] });
@@ -431,7 +465,7 @@ export async function buildPortalFeed(jwt: string, site: SiteRow, principal: Pri
     // (one past FEED_ENQUIRIES, so the Inbox can say when the list stops short; bug hunt C15)
     seesFull ? svc(`presence_form_submissions?site_id=eq.${site.id}&spam=eq.false&status=eq.new&select=id,form_kind,name,email,phone,message,status,created_at&order=created_at.desc&limit=${FEED_ENQUIRIES + 1}`) : noEnq,
     // bridged-customer links (owner-only; the unread reads that DEPEND on them stay below)
-    seesFull && site.client_id ? svc(`presence_service_links?customer_client_id=eq.${site.client_id}&status=eq.active&select=project_id,agency_site_id&limit=50`).catch(swallow) : noEnq,
+    seesFull && site.client_id && clientSelf ? svc(`presence_service_links?customer_client_id=eq.${site.client_id}&status=eq.active&select=project_id,agency_site_id&limit=50`).catch(swallow) : noEnq,
     // FIX 5 inputs: open support requests + client message events (owner-only, best-effort).
     // F3: the select PREFERS the write-time client_id stamp (0115); on a pre-0115
     // database the widened select 400s, so it falls back to the old column list —
@@ -542,7 +576,8 @@ export async function buildPortalFeed(jwt: string, site: SiteRow, principal: Pri
   // (counted into the bell by /portal/context) — without a findable row here the
   // badge points at nothing. One calm row that links where the items actually are.
   // Owners only: a client_reviewer can't open /client/* (403), so never show them the row.
-  if (seesFull && site.client_id) {
+  // And the client only: the studio drilled into this site is the one sending the updates.
+  if (seesFull && site.client_id && clientSelf) {
     try {
       const links = ((bridgeQ.json as any[]) || []);
       if (links.length) {
@@ -722,26 +757,98 @@ export async function buildPortalFeed(jwt: string, site: SiteRow, principal: Pri
   return data;
 }
 
+// Builder item 53: the words a role goes by, everywhere a person reads one
+export const SEAT_ROLE_WORDS: Record<SiteRole, string> = { business_owner: 'Co-owner', business_staff: 'Staff', developer: 'Developer', client_reviewer: 'Reviewer' };
+const STUDIO_ROLE_WORDS: Record<string, string> = { owner: 'Studio owner', admin: 'Admin', account_manager: 'Account manager' };
+
+/** The studio that works on this site, and who on its team can open it (the roles
+ *  lib/scope.ts lets in). Null when no studio works on it or the read failed. */
+async function studioOf(siteId: string, me: string | null): Promise<{ name: string; role: string; people: Array<{ email: string; role: string; me: boolean }> } | null> {
+  try {
+    const link = ((await svc(`presence_agency_clients?site_id=eq.${siteId}&status=eq.active&select=agency_id&limit=1`)).json as any[])?.[0];
+    if (!link?.agency_id) return null;
+    const [ag, team] = await Promise.all([
+      svc(`presence_agencies?id=eq.${link.agency_id}&select=name&limit=1`),
+      svc(`presence_agency_members?agency_id=eq.${link.agency_id}&status=eq.active&select=email,role&order=created_at.asc&limit=200`),
+    ]);
+    const { can } = await import('../agency/auth.ts');
+    const mine = String(me || '').toLowerCase();
+    const people = (((team.json as any[]) || []).filter((m) => can(m.role, 'bulk_publish')))
+      .map((m) => ({ email: String(m.email || '').toLowerCase(), role: STUDIO_ROLE_WORDS[m.role] || String(m.role || ''), me: !!mine && String(m.email || '').toLowerCase() === mine }));
+    return { name: String(((ag.json as any[]) || [])[0]?.name || 'Your studio'), role: 'Website manager', people };
+  } catch { return null; }
+}
+
+/** The People sheet (builder item 53): the owner, the studio that works on the site,
+ *  the seats, an open transfer, and who may start one. `data` stays the seat list. */
 export async function handleMembersList(jwt: string, site: SiteRow, principal: Principal, cors: Record<string, string>) {
   const g = await requireManager(jwt, site, principal, cors); if (g instanceof Response) return g;
-  return json({ data: await listSiteMembers(site.id) }, 200, cors);
+  const now = new Date().toISOString();
+  const { ownerFacts, ownerWho, openTransfer, transferSummary, lastSignIn } = await import('../lib/site_transfer.ts');
+  const { transferSideFor } = await import('./site_transfer.ts');
+  const [members, facts, open, studio, side] = await Promise.all([
+    listSiteMembers(site.id),
+    ownerFacts(site.id).catch(() => null),
+    openTransfer(site.id, now).catch(() => ({ row: null, missing: true })),
+    studioOf(site.id, principal.email),
+    transferSideFor(jwt, site, principal).catch(() => null),
+  ]);
+  const who = ownerWho(facts?.client, facts?.contact?.name);
+  const signedIn = who ? await lastSignIn(facts?.contact?.auth_user_id) : undefined;
+  const owner = who ? { ...who, signed_in: signedIn === undefined ? null : signedIn !== null, me: !!principal.email && who.email === String(principal.email).toLowerCase() } : null;
+  return json({ data: members.map((m) => ({ ...m, role_words: SEAT_ROLE_WORDS[m.role as SiteRole] || m.role })), owner, studio, transfer: transferSummary(open.row, now), transfer_ready: !open.missing, can_transfer: side }, 200, { ...cors, 'Cache-Control': 'no-store' });
 }
+
+const ADD_WORDS: Record<string, [number, string]> = {
+  bad_email: [400, 'That doesn’t look like an email address.'],
+  bad_role: [400, 'Pick a role: Co-owner, Staff or Reviewer.'],
+  role_paused: [409, 'Developer access is paused while custom code gets a stronger safety check. Pick Staff for now.'],
+  shared_site: [400, 'This is your studio’s own site, which holds every client’s files, so a reviewer here would see them all. Open that client and invite the reviewer there instead.'],
+  check_failed: [502, 'We couldn’t check this site just now, so nobody was added. Try again in a moment.'],
+  is_owner: [409, 'That’s the owner’s own email. The owner already has everything.'],
+  write_failed: [502, 'That didn’t save — please try again.'],
+};
 
 export async function handleMemberAdd(req: Request, jwt: string, site: SiteRow, principal: Principal, cors: Record<string, string>) {
   const g = await requireManager(jwt, site, principal, cors); if (g instanceof Response) return g;
   let body: any = {}; try { body = await req.json(); } catch { /* */ }
-  const res = await addSiteMember(site.id, String(body?.email || ''), body?.role, principal.userId || 'owner');
-  if (!res.ok) {
-    const msg = res.error === 'bad_email' ? 'That doesn’t look like an email address.' : res.error === 'bad_role' ? 'Pick a valid role.'
-      : res.error === 'shared_site' ? 'This is your studio’s own site, which holds every client’s files, so a reviewer here would see them all. Open that client and invite the reviewer there instead.'
-      : res.error === 'check_failed' ? 'We couldn’t check this site just now, so nobody was added. Try again in a moment.'
-      : 'That didn’t save — please try again.';
-    return json({ error: res.error, message: msg }, res.error === 'write_failed' || res.error === 'check_failed' ? 502 : 400, cors);
+  if (body?.resend === true) {
+    // "Send it again": the same seat, the same role, a fresh sign-in email; nothing else changes
+    const again = await resendSiteInvite(site.id, String(body?.email || ''));
+    if (!again.ok) return again.error === 'not_found' ? json({ error: 'not_found', message: 'They aren’t on this site any more.' }, 404, cors) : json({ error: 'check_failed', message: ADD_WORDS.check_failed[1] }, 502, cors);
+    return json({ data: { ok: true, emailed: !!again.emailed, member: again.member, message: again.emailed ? `Sent ${again.member?.email || 'them'} a new sign-in link.` : 'The email didn’t send. Try again in a moment.' } }, again.emailed ? 200 : 502, cors);
   }
+  const { ownerFacts, ownerEmailsOf } = await import('../lib/site_transfer.ts');
+  const ownerEmails = ownerEmailsOf(await ownerFacts(site.id).catch(() => null));
+  // platform staff alone may still make a Developer seat (lib/workspace.ts DEVELOPER_PAUSED)
+  const res = await addSiteMember(site.id, String(body?.email || ''), body?.role, principal.userId || 'owner', { restore: body?.restore === true, ownerEmails, allowDeveloper: principal.kind === 'staff' });
+  if (!res.ok) {
+    const m = res.member, words = m ? (SEAT_ROLE_WORDS[m.role as SiteRole] || m.role) : '';
+    // bug hunt I1's rule, here too: someone already here is pointed at, never invited again
+    if (res.error === 'already_member') return json({ error: 'already_member', member: m ? { id: m.id, email: m.email, role: m.role } : null, message: `${m?.email || 'They'} ${m ? `are already here as ${words}` : 'are already here'}. Change their role in the list instead.` }, 409, cors);
+    if (res.error === 'was_removed') return json({ error: 'was_removed', member: m ? { id: m.id, email: m.email, role: m.role } : null, message: `${m?.email || 'They'} were removed earlier. Press Bring them back to let them in again with the role you picked.` }, 409, cors);
+    const [status, message] = ADD_WORDS[res.error || 'write_failed'] || ADD_WORDS.write_failed;
+    return json({ error: res.error, message }, status, cors);
+  }
+  const reviewer = body?.role === 'client_reviewer';
   const message = res.emailed
-    ? 'Invited — we’ve emailed them a sign-in link. They’ll see only what you choose to share.'
+    ? (reviewer ? 'Invited — we’ve emailed them a sign-in link. They’ll see only what you choose to share.' : `Invited as ${SEAT_ROLE_WORDS[body.role as SiteRole] || 'a member'} — we’ve emailed them a sign-in link.`)
     : 'Added — but the invite email didn’t send. Send them their sign-in link yourself, or try again.';
-  return json({ data: { ok: true, emailed: !!res.emailed, message } }, 200, cors);
+  return json({ data: { ok: true, emailed: !!res.emailed, restored: !!res.restored, member: res.member || null, message } }, 200, cors);
+}
+
+/** Change one seat's role (builder item 53). The owner's own role isn't a seat, so it
+ *  can't be changed here; handing the site over is Transfer ownership. */
+export async function handleMemberRole(req: Request, jwt: string, site: SiteRow, memberId: string, principal: Principal, cors: Record<string, string>) {
+  const g = await requireManager(jwt, site, principal, cors); if (g instanceof Response) return g;
+  let body: any = {}; try { body = await req.json(); } catch { /* */ }
+  const res = await changeSiteMemberRole(site.id, memberId, body?.role, { allowDeveloper: principal.kind === 'staff' });
+  if (!res.ok) {
+    if (res.error === 'not_found') return json({ error: 'not_found', message: 'That person isn’t on this site any more.' }, 404, cors);
+    const [status, message] = ADD_WORDS[res.error || 'write_failed'] || ADD_WORDS.write_failed;
+    return json({ error: res.error, message }, status, cors);
+  }
+  return json({ data: { ok: true, member: res.member, message: `${res.member?.email || 'Their role'} is now ${SEAT_ROLE_WORDS[body.role as SiteRole] || body.role}.` } }, 200, cors);
 }
 
 export async function handleMemberRevoke(jwt: string, site: SiteRow, memberId: string, principal: Principal, cors: Record<string, string>) {
