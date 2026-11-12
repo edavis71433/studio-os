@@ -24,6 +24,10 @@
     { key: 'client_reviewer', name: 'Reviewer', desc: 'Sees only what you share with them, approves and leaves notes.', can: [0, 0, 0, 0, 0], also: 'Approve' },
   ];
   var roleName = function (k) { var r = ROLES.filter(function (x) { return x.key === k; })[0]; return r ? r.name : k; };
+  // Developer is paused (Nov 12 2026, lib/workspace.ts DEVELOPER_PAUSED): never offered,
+  // but a seat that already holds it still reads Developer in its list.
+  var OFFERED = ROLES.filter(function (r) { return r.key !== 'developer'; });
+  var choicesFor = function (current) { return ROLES.filter(function (r) { return r.key !== 'developer' || r.key === current; }); };
   var TONES = ['#e3f0fb|#285f95', '#fdf0dc|#8a5a10', '#e6f5ec|#1f6b43', '#fbe7ee|#9b2c55', '#efeafa|#5b3fa0'];
   var tone = function (s) { var n = 0; String(s || '').split('').forEach(function (c) { n = (n * 31 + c.charCodeAt(0)) % 997; }); return TONES[n % TONES.length].split('|'); };
 
@@ -135,7 +139,7 @@
     live.forEach(function (m) {
       var tn = tone(m.email);
       var when = m.joined ? 'Joined ' + day(m.created_at) : 'Invited ' + day(m.created_at);
-      var opts = ROLES.map(function (r) { return '<option value="' + r.key + '"' + (r.key === m.role ? ' selected' : '') + '>' + esc(r.name) + '</option>'; }).join('');
+      var opts = choicesFor(m.role).map(function (r) { return '<option value="' + r.key + '"' + (r.key === m.role ? ' selected' : '') + '>' + esc(r.name) + '</option>'; }).join('');
       h += '<div class="pp-row" data-seat="' + esc(m.id) + '"><span class="pp-av" style="background:' + tn[0] + ';color:' + tn[1] + '" aria-hidden="true">' + esc(initials(m.email)) + '</span><span class="pp-who"><span class="n">' + esc(m.email) + '</span><span class="s">' + esc(when) + (m.joined ? '' : ' · <button type="button" class="pp-link" data-pp="resend" data-email="' + esc(m.email) + '">Send it again</button>') + '</span></span>' +
         '<select class="pp-sel" data-pp="role" data-id="' + esc(m.id) + '" aria-label="Role for ' + esc(m.email) + '">' + opts + '</select>' +
         '<button type="button" class="pp-btn bad' + (me.armed === m.id ? ' armed' : '') + '" data-pp="remove" data-id="' + esc(m.id) + '" aria-label="' + esc((me.armed === m.id ? 'Press again to remove ' : 'Remove ') + m.email) + '">' + (me.armed === m.id ? 'Press again' : 'Remove') + '</button></div>';
@@ -151,7 +155,7 @@
     var owner = ow ? (ow.me ? 'you' : first(ow.name)) : 'the owner';
     var h = '<div class="pp">' + me.headHtml();
     h += '<label class="pp-lab" for="pp-email">Email</label><input class="pp-field" id="pp-email" type="email" autocomplete="off" placeholder="name@theirbusiness.com" value="' + esc(me.email || '') + '">';
-    h += '<fieldset class="pp-roles"><legend class="pp-lab">What can they do?</legend>' + ROLES.map(function (r) {
+    h += '<fieldset class="pp-roles"><legend class="pp-lab">What can they do?</legend>' + OFFERED.map(function (r) {
       var desc = r.key === 'business_owner' ? 'Everything ' + owner + ' can do, except hand the site to someone else.' : r.desc;
       return '<label class="pp-role"><span class="top"><input type="radio" name="pp-role" value="' + r.key + '"' + (me.pick === r.key ? ' checked' : '') + '><span class="nm">' + esc(r.name) + '</span><span class="ds">' + esc(desc) + '</span></span><span class="pp-can">' + CAPS.map(function (c, i) { return '<span class="' + (r.can[i] ? 'y' : '') + '">' + (r.can[i] ? '✓ ' : '✕ ') + esc(c) + '</span>'; }).join('') + (r.also ? '<span class="y">✓ ' + esc(r.also) + '</span>' : '') + '</span></label>';
     }).join('') + '</fieldset>';

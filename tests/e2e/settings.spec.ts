@@ -427,13 +427,15 @@ test.describe('Settings — automations', () => {
     return out;
   };
 
-  test('the card opens the section: four switches, all off by default, each with the sentence it will send', async ({ page }) => {
+  test('the card opens the section: the recipes and seven switches, all off by default, each with the sentence it will send', async ({ page }) => {
     await installApp(page, { api: API });
     await page.goto('/settings.html');
     await page.locator('[data-card="auto"]').click();
     await expect(page.locator('#automations')).toBeVisible();
-    await expect(page.locator('#automations [role="switch"]')).toHaveCount(4);
-    for (const id of ['sw-ack', 'sw-inv', 'sw-deal', 'sw-rev']) await expect(page.locator('#' + id)).toHaveAttribute('aria-checked', 'false');
+    await expect(page.locator('#automations [role="switch"]')).toHaveCount(7);   // sales item 87 added three
+    await expect(page.locator('#recipes [data-recipe]')).toHaveCount(6);
+    await expect(page.locator('#recipes [data-recipe-on]')).toHaveCount(6);       // none on yet
+    for (const id of ['sw-ack', 'sw-inv', 'sw-deal', 'sw-rev', 'sw-fu', 'sw-inv2', 'sw-exp']) await expect(page.locator('#' + id)).toHaveAttribute('aria-checked', 'false');
     await expect(page.locator('#say-ack')).toHaveText('Thanks for getting in touch — we’ve got your message and will reply within one business day.');
     await expect(page.locator('#say-inv')).toContainText('Just a friendly nudge: the invoice for $1,250.00 is still open.');
     await expect(page.locator('#say-deal')).toHaveText('This deal has had no next step for 3 days — a quick follow-up keeps it moving.');
@@ -454,6 +456,25 @@ test.describe('Settings — automations', () => {
     await expect(page.locator('#n-rev-echo')).toHaveText('5');
     await page.locator('#n-rev').press('Tab');
     await expect.poll(() => sent.map((p) => p.body)).toEqual([{ review_requests: true }, { review_request_after_days: 5 }]);
+  });
+
+  test('a slow answer to the switch never puts the old number back in the sentence while a new one is typed', async ({ page }) => {
+    await installApp(page, { api: { ...API, '/settings': { data: { ...SAVED, review_requests: false, review_request_after_days: 3 } } } });
+    let release = () => {};
+    const held = new Promise<void>((r) => { release = r; });
+    await page.route('**/functions/v1/presence/settings', async (route) => {
+      if (route.request().method() !== 'PUT') return route.fallback();
+      await held;
+      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: { ...SAVED, review_requests: true, review_request_after_days: 3 } }) });
+    });
+    await page.goto('/settings.html#automations');
+    await page.locator('#sw-rev').click();
+    await page.locator('#n-rev').fill('5');
+    await expect(page.locator('#n-rev-echo')).toHaveText('5');
+    release();
+    await expect(page.locator('.dds-toast, #toast').filter({ hasText: 'Saved.' }).first()).toBeVisible();
+    await expect(page.locator('#n-rev')).toHaveValue('5');
+    await expect(page.locator('#n-rev-echo')).toHaveText('5');
   });
 
   test('a saved row paints on; flipping a switch PUTs just that field and the sentence follows N', async ({ page }) => {
@@ -497,11 +518,17 @@ test.describe('Settings — automations', () => {
     await expect(page.locator('#sw-ack')).toHaveAttribute('aria-checked', 'false');
   });
 
-  test('drilled into a client the studio’s switches stay out of sight', async ({ page }) => {
+  test('drilled into a client the studio’s switches stay out of sight; their website’s two replies show', async ({ page }) => {
     await installApp(page, { api: { ...API, '/portal/context': SCOPED_CTX } });
     await page.goto('/settings.html?client=' + CLIENT + '#automations');
     await expect(page.locator('[data-card="auto"]')).toHaveCount(0);
-    await expect(page.locator('#automations')).toBeHidden();
+    await expect(page.locator('[data-card="replies"]')).toBeVisible();   // sales item 87
+    await expect(page.locator('#automations')).toBeVisible();
+    await expect(page.locator('#sw-ack')).toBeVisible();
+    await expect(page.locator('#sw-fu')).toBeVisible();
+    for (const id of ['sw-inv', 'sw-deal', 'sw-rev', 'sw-exp']) await expect(page.locator('#' + id)).toBeHidden();
+    await expect(page.locator('#recipes [data-recipe]')).toHaveCount(2);
+    await expect(page.locator('#stages')).toBeHidden();
   });
 });
 // ── Oct 2026 studio audit, change 6: the agency's TEAM lives on Settings ──────
