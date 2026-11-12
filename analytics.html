@@ -839,18 +839,22 @@ function headRow(title,subline,withPeriod,extra){
     </header>`;
 }
 // item 175: More dates. Its button names the window while one of its presets or picked
-// dates is on; the panel lists the presets, then two dates picked by hand.
+// dates is on; the panel lists the presets, then two dates picked by hand. The panel's
+// insides are drawn only while it's open: a closed one holds no words (Print this report
+// checks that nothing but the report has any, and Safari counted the hidden panel's).
 const localYmd=(d)=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
 function datesHtml(){
-  const more=isMore(),today=localYmd(new Date());
+  const more=isMore();
   return `<div class="dates" id="datesWrap"><button type="button" class="btn dbtn${more?' on':''}" id="datesBtn" aria-haspopup="dialog" aria-expanded="false" aria-controls="datesPanel">${esc(more?periodLabel():'More dates')}<span class="car" aria-hidden="true">▾</span></button>
-    <div class="dpanel" id="datesPanel" role="dialog" aria-label="More dates" hidden>
-      <div class="dgrid" role="group" aria-label="Presets">${MORE_PERIODS.map(p=>`<button type="button" data-more="${p[0]}" aria-pressed="${PERIOD===p[0]?'true':'false'}">${esc(p[1])}</button>`).join('')}</div>
+    <div class="dpanel" id="datesPanel" role="dialog" aria-label="More dates" hidden></div></div>`;
+}
+function datesPanelHtml(){
+  const today=localYmd(new Date());
+  return `<div class="dgrid" role="group" aria-label="Presets">${MORE_PERIODS.map(p=>`<button type="button" data-more="${p[0]}" aria-pressed="${PERIOD===p[0]?'true':'false'}">${esc(p[1])}</button>`).join('')}</div>
       <form class="dpick" id="datesForm" novalidate><p class="dlab">Or pick the dates</p>
         <div class="drow"><label>From<input type="date" id="dFrom" value="${esc(DATES?DATES.from:'')}" max="${today}"></label><label>To<input type="date" id="dTo" value="${esc(DATES?DATES.to:today)}" max="${today}"></label></div>
         <p class="dmsg" id="dMsg" role="alert"></p>
-        <button type="submit" class="btn">Show these dates</button></form>
-    </div></div>`;
+        <button type="submit" class="btn">Show these dates</button></form>`;
 }
 const winLine=(d)=>{const w=windowWords(d&&d.window);return w?`<span class="dot">·</span><span id="winDates">${esc(w)}</span>`:'';};
 // ── Sales review item 33 (Nov 2026): five fixed reports from GET /sales/reports,
@@ -1102,29 +1106,33 @@ function wireDash(){
   if(!db||!dp)return;
   const back=()=>{const nb=$('datesBtn');if(nb)nb.focus();};
   db.addEventListener('click',()=>{
-    const open=dp.hidden;dp.hidden=!open;db.setAttribute('aria-expanded',open?'true':'false');
-    if(open){const on=dp.querySelector('[data-more][aria-pressed="true"]')||dp.querySelector('[data-more]');if(on)on.focus();}
+    if(!dp.hidden){closeDates(false);return;}
+    dp.innerHTML=datesPanelHtml();wirePanel();
+    dp.hidden=false;db.setAttribute('aria-expanded','true');
+    const on=dp.querySelector('[data-more][aria-pressed="true"]')||dp.querySelector('[data-more]');if(on)on.focus();
   });
   dp.addEventListener('keydown',(e)=>{if(e.key==='Escape'){e.stopPropagation();closeDates(true);}});
-  dp.querySelectorAll('[data-more]').forEach(b=>b.addEventListener('click',()=>{
-    const p=b.getAttribute('data-more');closeDates(false);
-    if(p===PERIOD){back();return;}
-    loadDash(true,p).then(back);
-  }));
-  $('datesForm').addEventListener('submit',(e)=>{
-    e.preventDefault();
-    const f=$('dFrom').value,t=$('dTo').value,today=localYmd(new Date());
-    const why=!f||!t?'Pick a start date and an end date.':f>t?'The end date comes before the start date.':t>today?'The end date can’t be after today.':'';
-    $('dMsg').textContent=why;
-    if(why)return;
-    closeDates(false);
-    loadDash(true,'custom',{from:f,to:t}).then(back);
-  });
+  function wirePanel(){
+    dp.querySelectorAll('[data-more]').forEach(b=>b.addEventListener('click',()=>{
+      const p=b.getAttribute('data-more');closeDates(false);
+      if(p===PERIOD){back();return;}
+      loadDash(true,p).then(back);
+    }));
+    $('datesForm').addEventListener('submit',(e)=>{
+      e.preventDefault();
+      const f=$('dFrom').value,t=$('dTo').value,today=localYmd(new Date());
+      const why=!f||!t?'Pick a start date and an end date.':f>t?'The end date comes before the start date.':t>today?'The end date can’t be after today.':'';
+      $('dMsg').textContent=why;
+      if(why)return;
+      closeDates(false);
+      loadDash(true,'custom',{from:f,to:t}).then(back);
+    });
+  }
 }
 function closeDates(focus){
   const dp=$('datesPanel'),db=$('datesBtn');
   if(!dp||dp.hidden)return;
-  dp.hidden=true;if(db){db.setAttribute('aria-expanded','false');if(focus)db.focus();}
+  dp.hidden=true;dp.innerHTML='';if(db){db.setAttribute('aria-expanded','false');if(focus)db.focus();}
 }
 
 // stencil loading — layout-shaped gray blocks, shown only when the fetch runs
