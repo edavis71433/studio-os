@@ -390,11 +390,11 @@ test.describe('Client portal — Home queue + project record page', () => {
     await expect(page.getByRole('heading', { name: 'Your account' })).toBeVisible();
   });
 
-  test('mobile: the bottom tab bar keeps its five tabs and the ONE persistent bell shows', async ({ page }, testInfo) => {
+  test('mobile: the bottom tab bar keeps its four tabs and the ONE persistent bell shows', async ({ page }, testInfo) => {
     test.skip(testInfo.project.name !== 'mobile', 'bottom bar is the <720px nav');
     await installApp(page, { api: CLIENT_API });
     await page.goto('/client.html');
-    await expect(page.locator('#tabnav .tab')).toHaveCount(5);   // item 179 part three: Requests folded into Messages
+    await expect(page.locator('#tabnav .tab')).toHaveCount(4);   // item 179: Requests folded into Messages, Files and Invoices into Documents
     await expect(page.locator('.cb-brand')).toBeHidden();
     // PS3 (D3a): the bell is persistent chrome OUTSIDE #main on phones too —
     // one bell (#navbell), one badge, every tab. The old per-render Home
@@ -1375,12 +1375,12 @@ test.describe('Client portal — Ask for a service and Book a call, inside Messa
     await expect(page.getByText('hasn’t opened any times for booking yet', { exact: false })).toBeVisible();
   });
 
-  test('an old #requests link lands in Messages; the tab bar has five tabs', async ({ page }) => {
+  test('an old #requests link lands in Messages; the tab bar has four tabs', async ({ page }) => {
     await installApp(page, { api: REQ_API });
     await page.goto('/client.html#requests');
     await expect(page.locator('#mrows')).toBeVisible();
     await expect(page.locator('#tabnav [data-tab="messages"]')).toHaveAttribute('aria-current', 'page');
-    await expect(page.locator('#tabnav .tab')).toHaveCount(5);
+    await expect(page.locator('#tabnav .tab')).toHaveCount(4);   // part four folded Files and Invoices into Documents
     await expect(page.locator('#tabnav [data-tab="requests"]')).toHaveCount(0);
   });
 
@@ -1412,19 +1412,19 @@ test.describe('Client portal — Ask for a service and Book a call, inside Messa
   });
 });
 
-// ── slice 12: the Files tab redesign ─────────────────────────────────────────
-// A dashed share card ("Share a file with your studio") drives the EXISTING
-// per-project upload backend: POST upload-url → PUT the bytes → POST uploads.
-// Documents and each project's files become list views (icon · title · meta ·
-// chip/action). Client-sent files (the server-stamped 'Uploaded by the client.'
-// note — the payload's only signal) read "Sent to your studio" + a You-shared
-// chip. Failure honesty per read; a reviewer never sees the share card.
+// ── slice 12, now the Documents shelf (item 179 part four) ──────────────────
+// "Send your studio a file" drives the EXISTING per-project upload backend: POST
+// upload-url → PUT the bytes → POST uploads. Proposals, agreements and every
+// project's files sit on one shelf, newest first by month (icon · title · what it
+// is · chip · the one thing to do). Client-sent files (the server-stamped
+// 'Uploaded by the client.' note — the payload's only signal) read "File you sent"
+// + a You-shared chip. Failure honesty per read; a reviewer never gets the send.
 const PID2 = '66666666-6666-4666-8666-666666666666'; // second project (the picker case)
 // PRODUCTION ORDER: handleClientDocuments sorts created_at DESC (one merged
 // list across proposals + contracts) — the fixture models that exactly and the
 // spec asserts the rows render in that order. Status variants cover every chip
 // the route can emit: signed / sent contract, sent / declined / superseded
-// proposal (superseded falls into docRowHtml's default 'Sent' — see the spec).
+// proposal (superseded reads Replaced since item 179 part four).
 const FILES_DOCS = { data: { documents: [
   { kind: 'proposal', id: 'pr2', title: 'Care plan proposal', status: 'declined', created_at: '2026-07-14T00:00:00Z', view_url: 'https://docs.example/view/pr2' },
   { kind: 'contract', id: 'c2', title: 'Care plan agreement', status: 'sent', created_at: '2026-07-13T00:00:00Z', view_url: 'https://docs.example/view/c2' },
@@ -1449,10 +1449,14 @@ const FILES_API = {
   '/client/documents': FILES_DOCS,
   [`/client/projects/${PID}`]: filesBundle(FILES_DELIVERABLES),
 };
+// item 179 part four: Files folded into the Documents shelf
 const openFilesTab = async (page: import('@playwright/test').Page) => {
-  await page.locator('#tabnav [data-tab="files"]').click();
-  await expect(page.locator('#main').getByRole('heading', { name: 'Files & documents' })).toBeVisible();
+  await page.locator('#tabnav [data-tab="documents"]').click();
+  await expect(page.locator('#main').getByRole('heading', { name: 'Documents', exact: true })).toBeVisible();
+  // the header and the shelf paint together; a reviewer gets the calm card and no shelf
 };
+const shelfRow = (page: import('@playwright/test').Page, title: string) =>
+  page.locator('#shelf .srow', { has: page.getByRole('heading', { name: title, exact: true }) });
 // the three fixture routes behind a share-flow send (upload-url → PUT → uploads)
 const routeUploadBackend = async (page: import('@playwright/test').Page, opts: { afterUpload?: unknown[] } = {}) => {
   let recorded = false;
@@ -1470,59 +1474,65 @@ const routeUploadBackend = async (page: import('@playwright/test').Page, opts: {
 };
 const SHARE_FILE = { name: 'Team photos.png', mimeType: 'image/png', buffer: Buffer.from('png-bytes') };
 
-test.describe('Client portal — Files tab (slice 12)', () => {
-  test('Documents is a list view in production order (created_at desc): icons, meta, every status chip, View links', async ({ page }) => {
-    await installApp(page, { api: FILES_API });
+test.describe('Client portal — Documents shelf: files and documents (slice 12, item 179 part four)', () => {
+  test('proposals and agreements sit on the shelf newest first, each with its state and the one thing to do', async ({ page }) => {
+    await installApp(page, { api: { ...FILES_API, '/client/billing': { data: { invoices: [] } } } });
     await page.goto('/client.html');
     await openFilesTab(page);
-    const docs = page.locator('#fdocs');
-    await expect(docs.locator('.frow')).toHaveCount(5);
-    // rows render in the route's order — created_at DESC across kinds
-    await expect(docs.locator('.frow .fname')).toHaveText([
-      'Care plan proposal', 'Care plan agreement', 'Website redesign proposal', 'First draft proposal', 'Service agreement',
+    // the route's order (created_at DESC across kinds) holds on the shelf, files woven in by date
+    await expect(page.locator('#shelf .srow .fname')).toHaveText([
+      'Kitchen photos.zip', 'Homepage mock v2.pdf', 'Care plan proposal', 'Care plan agreement', 'Brand palette.png',
+      'Site copy draft.pdf', 'Website redesign proposal', 'First draft proposal', 'Service agreement',
     ]);
-    // one chip per status the route can emit. NOTE (current behavior, asserted
-    // as-is): a SUPERSEDED proposal falls into docRowHtml's default 'Sent' chip —
-    // arguably it should read 'Replaced' (a newer proposal supersedes it), but
-    // that is a copy decision for its own slice, not a silent change here.
-    await expect(docs.locator('.frow .fst')).toHaveText(['Declined', 'Awaiting signature', 'Sent', 'Sent', 'Signed']);
-    const signed = docs.locator('.frow', { hasText: 'Service agreement' });
-    await expect(signed.locator('.fmeta')).toHaveText('Agreement · signed July 12');
+    // one chip per state the route can emit — a superseded proposal reads Replaced
+    await expect(shelfRow(page, 'Care plan proposal').locator('.fst')).toHaveText('Declined');
+    await expect(shelfRow(page, 'Care plan agreement').locator('.fst')).toHaveText('Your signature');
+    await expect(shelfRow(page, 'Website redesign proposal').locator('.fst')).toHaveText('Your OK');
+    await expect(shelfRow(page, 'First draft proposal').locator('.fst')).toHaveText('Replaced');
+    const signed = shelfRow(page, 'Service agreement');
     await expect(signed.locator('.fst.sig')).toHaveText('Signed');   // Signed = the good/green chip
-    const unsigned = docs.locator('.frow', { hasText: 'Care plan agreement' });
-    await expect(unsigned.locator('.fmeta')).toHaveText('Agreement · sent July 13');
-    await expect(unsigned.locator('.fst.sig')).toHaveCount(0);       // …everything else stays purple
-    const prop = docs.locator('.frow', { hasText: 'Website redesign proposal' });
-    await expect(prop.locator('.fmeta')).toHaveText('Proposal · sent July 8');
+    await expect(signed.locator('.fmeta')).toHaveText('Agreement · signed Jul 12');
+    await expect(shelfRow(page, 'Care plan agreement').locator('.fmeta')).toHaveText('Agreement · waiting for your signature');
+    await expect(shelfRow(page, 'Website redesign proposal').locator('.fmeta')).toHaveText('Proposal · waiting for your OK');
+    // the month heads the rows
+    await expect(page.locator('#shelf .shelfmonth')).toHaveText(['July']);
     // View keeps the existing behavior: the signed doc-viewer URL, new tab, no opener
     const view = signed.getByRole('link', { name: 'View — Service agreement' });
     await expect(view).toHaveAttribute('href', 'https://docs.example/view/c1');
     await expect(view).toHaveAttribute('target', '_blank');
     await expect(view).toHaveAttribute('rel', 'noopener');
+    // one waiting on them says Look
+    await expect(shelfRow(page, 'Care plan agreement').getByRole('link', { name: 'Look — Care plan agreement' })).toHaveAttribute('href', 'https://docs.example/view/c2');
+    // the filters split them: proposals and estimates, agreements
+    await page.locator('[data-shelf="agreements"]').click();
+    await expect(page.locator('#shelf .srow .fname')).toHaveText(['Care plan agreement', 'Service agreement']);
+    await expect(page.locator('[data-shelf="agreements"]')).toHaveAttribute('aria-pressed', 'true');
+    await page.locator('[data-shelf="proposals"]').click();
+    await expect(page.locator('#shelf .srow')).toHaveCount(3);
   });
 
-  test('project files are list rows: type icon, honest meta, You-shared chip on client uploads, Download round-trip', async ({ page }) => {
+  test('project files are shelf rows: type icon, honest meta, You-shared chip on client uploads, Save round-trip', async ({ page }) => {
     await installApp(page, { api: FILES_API });
     await page.addInitScript(() => { (window as any).open = (u: string) => { (window as any).__opened = u; return null; }; });
     await page.route('**/functions/v1/presence/client/deliverables/d1/download', (route) =>
       route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: { url: 'https://files.example/dl/1', title: 'Homepage mock v2.pdf' } }) }));
     await page.goto('/client.html');
     await openFilesTab(page);
-    const sec = page.locator('section', { has: page.getByRole('heading', { name: 'Website redesign', exact: true }) });
-    await expect(sec.locator('.frow')).toHaveCount(4);
-    const studio = sec.locator('.frow', { hasText: 'Homepage mock v2.pdf' });
-    await expect(studio.locator('.fmeta')).toHaveText('Shared by your studio · July 15');
-    await expect(studio.locator('.fyou')).toHaveCount(0);
+    await page.locator('[data-shelf="files"]').click();
+    await expect(page.locator('#shelf .srow')).toHaveCount(4);
+    const studio = shelfRow(page, 'Homepage mock v2.pdf');
+    await expect(studio.locator('.fmeta')).toHaveText('File from your studio · Jul 15');
+    await expect(studio.locator('.fst')).toHaveText('');
     // the client's own upload — detected by the server-stamped note — reads the other way
-    const mine = sec.locator('.frow', { hasText: 'Kitchen photos.zip' });
-    await expect(mine.locator('.fmeta')).toHaveText('Sent to your studio · July 16');
-    await expect(mine.locator('.fyou')).toHaveText('You shared');
+    const mine = shelfRow(page, 'Kitchen photos.zip');
+    await expect(mine.locator('.fmeta')).toHaveText('File you sent · Jul 16');
+    await expect(mine.locator('.fst')).toHaveText('You shared');
     // PREFIX detection: a studio-appended note keeps the You-shared chip
-    const appended = sec.locator('.frow', { hasText: 'Site copy draft.pdf' });
-    await expect(appended.locator('.fyou')).toHaveText('You shared');
-    await expect(appended.locator('.fmeta')).toHaveText('Sent to your studio · July 11');
-    // Download keeps the wireDownloads round-trip: signed URL fetched, then opened
-    await studio.getByRole('button', { name: 'Download — Homepage mock v2.pdf' }).click();
+    const appended = shelfRow(page, 'Site copy draft.pdf');
+    await expect(appended.locator('.fst')).toHaveText('You shared');
+    await expect(appended.locator('.fmeta')).toHaveText('File you sent · Jul 11');
+    // Save keeps the wireDownloads round-trip: signed URL fetched, then opened
+    await studio.getByRole('button', { name: 'Save — Homepage mock v2.pdf' }).click();
     await expect.poll(() => page.evaluate(() => (window as any).__opened)).toBe('https://files.example/dl/1');
   });
 
@@ -1533,8 +1543,7 @@ test.describe('Client portal — Files tab (slice 12)', () => {
       { id: 'nd1', title: 'Team photos.png', note: 'Uploaded by the client.', created_at: '2026-07-19T00:00:00Z' }] });
     await page.goto('/client.html');
     await openFilesTab(page);
-    const share = page.locator('.fshare');
-    await expect(share.getByText('Share a file with your studio')).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Send your studio a file' })).toBeVisible();
     await page.locator('#ffile').setInputFiles(SHARE_FILE);
     // exactly one project → no picker; the optional title defaults to the filename;
     // the pick moves focus into the compose (its title field)
@@ -1559,9 +1568,8 @@ test.describe('Client portal — Files tab (slice 12)', () => {
     expect((await rec).postDataJSON()).toEqual({ media_id: 'm-new', title: 'Team photos.png' });
     await expect(page.locator('#toast')).toContainText('Sent to your studio');
     // the re-render shows the new file with its You-shared mark, and focus lands
-    // back on the share card's button (the compose is gone)
-    const row = page.locator('.frow', { hasText: 'Team photos.png' });
-    await expect(row.locator('.fyou')).toHaveText('You shared');
+    // back on the send button (the compose is gone)
+    await expect(shelfRow(page, 'Team photos.png').locator('.fst')).toHaveText('You shared');
     await expect(page.locator('#fchoose')).toBeFocused();
   });
 
@@ -1617,8 +1625,7 @@ test.describe('Client portal — Files tab (slice 12)', () => {
     // step 3 ties the PICKED project's media id back
     expect((await rec).postDataJSON()).toEqual({ media_id: 'm-p2', title: 'Team photos.png' });
     await expect(page.locator('#toast')).toContainText('Sent to your studio');
-    const sec = page.locator('section', { has: page.getByRole('heading', { name: 'Brand refresh', exact: true }) });
-    await expect(sec.locator('.frow', { hasText: 'Team photos.png' }).locator('.fyou')).toHaveText('You shared');
+    await expect(shelfRow(page, 'Team photos.png').locator('.fst')).toHaveText('You shared');
   });
 
   test('an edited title rides BOTH the upload-url and the record POST — and Enter in the title submits (the compose is a form)', async ({ page }) => {
@@ -1724,14 +1731,16 @@ test.describe('Client portal — Files tab (slice 12)', () => {
     page.on('request', (r) => { if (/upload-url|\/uploads$|storage\.example/.test(r.url())) calls++; });
     await page.goto('/client.html');
     await openFilesTab(page);
-    // the input itself advertises exactly what the store accepts, and the copy names the caps
+    // the input itself advertises exactly what the store accepts
     await expect(page.locator('#ffile')).toHaveAttribute('accept', 'image/jpeg,image/png,image/webp,application/pdf');
-    await expect(page.locator('.fshare-d')).toContainText('10MB');
-    await expect(page.locator('.fshare-d')).toContainText('25MB');
     await page.locator('#ffile').setInputFiles({ name: 'Team photos.zip', mimeType: 'application/zip', buffer: Buffer.from('zip') });
     await expect(page.locator('#toast')).toContainText('a JPEG, PNG or WebP image, or a PDF');
     await expect(page.locator('#fsend')).toBeHidden();      // the compose never opens
     expect(calls).toBe(0);
+    // a file it can take opens the send form, which names the caps
+    await page.locator('#ffile').setInputFiles(SHARE_FILE);
+    await expect(page.locator('#fsend .fshare-d')).toContainText('10MB');
+    await expect(page.locator('#fsend .fshare-d')).toContainText('25MB');
   });
 
   test('pre-flight honesty: an over-cap image is refused with the cap named, no network', async ({ page }) => {
@@ -1772,12 +1781,17 @@ test.describe('Client portal — Files tab (slice 12)', () => {
     await expect(page.locator('#fgo')).toBeEnabled();
   });
 
-  test('zero projects: the share card is hidden entirely (uploads are project-scoped)', async ({ page }) => {
-    await installApp(page, { api: { ...FILES_API, '/client/projects': { data: [] }, '/client/documents': { data: { documents: [] } } } });
+  test('zero projects: the send button is hidden entirely (uploads are project-scoped)', async ({ page }) => {
+    await installApp(page, { api: { ...FILES_API, '/client/projects': { data: [] }, '/client/documents': { data: { documents: [] } }, '/client/billing': { data: { invoices: [] } } } });
     await page.goto('/client.html');
     await openFilesTab(page);
-    await expect(page.locator('.fshare')).toHaveCount(0);
+    await expect(page.locator('#fchoose')).toHaveCount(0);
     // a genuine empty still gets the friendly empty card
+    await expect(page.getByText('Nothing here yet.', { exact: false })).toBeVisible();
+    // an old #files link opens the Files filter, even an empty one, with its own words
+    await page.goto('about:blank');   // a fresh load: an address that only changes its # stays on the same page
+    await page.goto('/client.html#files');
+    await expect(page.locator('[data-shelf="files"]')).toHaveAttribute('aria-pressed', 'true');
     await expect(page.getByText('No files yet.', { exact: false })).toBeVisible();
   });
 
@@ -1828,7 +1842,7 @@ test.describe('Client portal — Files tab (slice 12)', () => {
     await page.goto('/client.html');
     await openFilesTab(page);
     await expect(page.getByText('Your studio’s files and documents will appear here', { exact: false })).toBeVisible();
-    await expect(page.locator('.fshare')).toHaveCount(0);
+    await expect(page.locator('#fchoose')).toHaveCount(0);
     await expect(page.getByText('We couldn’t load', { exact: false })).toHaveCount(0);   // never the error line
     expect(calls).toHaveLength(0);   // the reviewer render makes NO /client/* reads at all
     // Mutation M1 (dropping the persona clause from the share gate) re-verified:
@@ -1846,9 +1860,9 @@ test.describe('Client portal — Files tab (slice 12)', () => {
     await page.goto('/client.html');
     await openFilesTab(page);
     await expect(page.getByText('We couldn’t load your documents just now — please try again in a moment.')).toBeVisible();
-    // the project files read succeeded — that section still renders fully
-    await expect(page.locator('.frow', { hasText: 'Homepage mock v2.pdf' })).toBeVisible();
-    await expect(page.getByText('No files yet.', { exact: false })).toHaveCount(0);
+    // the project files read succeeded — those rows still render fully
+    await expect(shelfRow(page, 'Homepage mock v2.pdf')).toBeVisible();
+    await expect(page.getByText('Nothing here yet', { exact: false })).toHaveCount(0);
   });
 
   test('a failed project-bundle read shows that project’s couldn’t-load line — never the empty card', async ({ page }) => {
@@ -1857,22 +1871,23 @@ test.describe('Client portal — Files tab (slice 12)', () => {
       route.fulfill({ status: 502, contentType: 'application/json', body: JSON.stringify({ error: 'bad_gateway' }) }));
     await page.goto('/client.html');
     await openFilesTab(page);
-    const sec = page.locator('section', { has: page.getByRole('heading', { name: 'Website redesign', exact: true }) });
-    await expect(sec.getByText('We couldn’t load this project’s files just now — please try again in a moment.')).toBeVisible();
-    await expect(page.getByText('No files yet.', { exact: false })).toHaveCount(0);
+    await expect(page.getByText('We couldn’t load the files from Website redesign just now — please try again in a moment.')).toBeVisible();
+    await expect(page.getByText('Nothing here yet', { exact: false })).toHaveCount(0);
+    await expect(page.getByText('No files yet', { exact: false })).toHaveCount(0);
   });
 
-  test('mobile: the share card wraps — the button drops below full-width, rows stay, no horizontal overflow', async ({ page }, testInfo) => {
-    test.skip(testInfo.project.name !== 'mobile', 'the wrapped share card is the <560px contract');
+  test('mobile: the send button sits under the title, clear of the bell; rows fit with no horizontal overflow', async ({ page }, testInfo) => {
+    test.skip(testInfo.project.name !== 'mobile', 'the phone header is the <720px contract');
     await installApp(page, { api: FILES_API });
     await page.goto('/client.html');
     await openFilesTab(page);
-    const text = await page.locator('.fshare-m').boundingBox();
     const btn = await page.locator('#fchoose').boundingBox();
-    expect(btn!.y).toBeGreaterThan(text!.y + text!.height - 1);   // wrapped below the copy
-    const card = await page.locator('.fshare').boundingBox();
-    expect(btn!.width).toBeGreaterThan(card!.width * 0.8);        // …at full width
-    await expect(page.locator('.frow', { hasText: 'Kitchen photos.zip' })).toBeVisible();
+    const bell = await page.locator('#navbell').boundingBox();
+    const h1 = await page.locator('#main h1').boundingBox();
+    expect(btn!.y).toBeGreaterThan(h1!.y + h1!.height - 1);              // on the line under the title…
+    expect(btn!.y).toBeGreaterThan(bell!.y + bell!.height);              // …so the floating bell never covers it
+    await expect(page.locator('#fchoose')).toHaveText('Send a file');   // the short words on a phone
+    await expect(shelfRow(page, 'Kitchen photos.zip')).toBeVisible();
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
     expect(overflow).toBeLessThanOrEqual(1);
   });
@@ -1933,14 +1948,14 @@ test.describe('Batch A regressions — portal', () => {
     await page.goto('/client.html');
     // Home's queue: the failed read keeps its own calm line (never a fake $0)
     await expect(page.locator('#needs-body')).toContainText('We couldn’t check on invoices just now');
-    // first Invoices visit: the couldn't-load line — never "No invoices yet"
-    await page.locator('#tabnav [data-tab="invoices"]').click();
+    // first Documents visit (item 179 part four: invoices live on the shelf): the couldn't-load line — never "No invoices yet"
+    await page.locator('#tabnav [data-tab="documents"]').click();
     await expect(page.getByText('We couldn’t load your invoices just now — please try again in a moment.')).toBeVisible();
     await expect(page.getByText('No invoices yet', { exact: false })).toHaveCount(0);
     // away and back: the failure was NOT cached — the tab refetches and renders
     await page.locator('#tabnav [data-tab="home"]').click();
     await expect(page.getByRole('heading', { name: 'Needs you' })).toBeVisible();
-    await page.locator('#tabnav [data-tab="invoices"]').click();
+    await page.locator('#tabnav [data-tab="documents"]').click();
     await expect(page.getByRole('heading', { name: 'Deposit' })).toBeVisible();
     expect(calls).toBeGreaterThanOrEqual(3);
   });
@@ -2138,11 +2153,11 @@ test.describe('PS1 — failed-read honesty (portal)', () => {
     // the heading paints BEFORE buildNeedsYou's async bundle fetch — poll, or
     // this pin races a request that may not have fired yet
     await expect.poll(() => bundleGets).toBe(1);
-    // Files re-enters ensureSnaps → the failed id is REFETCHED (not served from
-    // a poisoned cache) and this time renders the project's real files
-    await page.locator('#tabnav [data-tab="files"]').click();
-    await expect(page.locator('.frow', { hasText: 'Homepage mockup' })).toBeVisible();
-    await expect(page.getByText('We couldn’t load this project’s files just now', { exact: false })).toHaveCount(0);
+    // the Documents shelf re-enters ensureSnaps → the failed id is REFETCHED (not
+    // served from a poisoned cache) and this time renders the project's real files
+    await page.locator('#tabnav [data-tab="documents"]').click();
+    await expect(page.locator('#shelf .srow', { hasText: 'Homepage mockup' })).toBeVisible();
+    await expect(page.getByText('We couldn’t load the files from', { exact: false })).toHaveCount(0);
     await expect.poll(() => bundleGets).toBe(2);
   });
 
@@ -2179,16 +2194,17 @@ test.describe('PS1 — failed-read honesty (portal)', () => {
 // account-owner copy, ZERO /client/billing reads. VIEW_SEQ: a stale billing
 // response never paints over a newer view. A4's honest-failure card stays
 // verbatim and is never session-cached.
-test.describe('PS2 — Invoices tab (B1)', () => {
+test.describe('PS2 — Invoices on the Documents shelf (B1, item 179 part four)', () => {
   // date-only YYYY-MM-DD in the CLIENT'S LOCAL calendar — the exact sense the
   // page derives "overdue" in, so due-yesterday/due-tomorrow can't tz-drift
   const ymd = (offsetDays: number) => {
     const t = new Date(Date.now() + offsetDays * 86400000);
     return `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, '0')}-${String(t.getDate()).padStart(2, '0')}`;
   };
-  const dueLabel = (offsetDays: number) => {
+  // the shelf's short day ("Nov 14"), with the year only when it isn't this one
+  const dueShort = (offsetDays: number) => {
     const [y, m, d] = ymd(offsetDays).split('-').map(Number);
-    return new Date(y, m - 1, d).toLocaleDateString('en-US', { month: 'long', day: 'numeric' });
+    return new Date(y, m - 1, d).toLocaleDateString('en-US', y === new Date().getFullYear() ? { month: 'short', day: 'numeric' } : { month: 'short', day: 'numeric', year: 'numeric' });
   };
   // the PRODUCTION payload shape (client_delivery.ts handleClientBilling):
   // id · name · description · amount (dollars = amount_cents/100) · status ·
@@ -2200,29 +2216,37 @@ test.describe('PS2 — Invoices tab (B1)', () => {
   ];
   const INV_API = { ...CLIENT_API,
     '/client/billing': { data: { billing_type: 'service', note: 'These are invoices from your studio for project and service work. Your website subscription is billed separately.', invoices: INVOICES, summary: { open_count: 2, paid_count: 1 } } } };
+  // item 179 part four: Invoices is a filter on the Documents shelf — the tab, then
+  // its Invoices chip. With no invoice to show (a failed read) the chip isn't drawn
+  // and All carries the invoices' couldn't-load line; a reviewer gets no shelf.
   const openInvoices = async (page: import('@playwright/test').Page) => {
-    await page.locator('#tabnav [data-tab="invoices"]').click();
+    await page.locator('#tabnav [data-tab="documents"]').click();
+    await expect(page.locator('#main').getByRole('heading', { name: 'Documents', exact: true })).toBeVisible();
+    const chip = page.locator('#shelf [data-shelf="invoices"]');
+    if (await chip.count()) {
+      await chip.click();
+      await expect(chip).toHaveAttribute('aria-pressed', 'true');
+    }
   };
 
-  test('rows are .frow anatomy — 🧾 icon, name heading, "amount · due <date>" meta — with Paid / Overdue (due-yesterday) / server-word (due-tomorrow) chips', async ({ page }) => {
+  test('rows are shelf anatomy — receipt icon, name heading, "Invoice · amount · due <date>" meta — with Paid / Overdue (due-yesterday) / Upcoming (due-tomorrow) chips', async ({ page }) => {
     await installApp(page, { api: INV_API });
     await page.goto('/client.html');
     await openInvoices(page);
-    const rows = page.locator('#main .frow');
+    const rows = page.locator('#shelf .srow');
     await expect(rows).toHaveCount(3);
-    // anatomy: every row leads with the 🧾 type icon and a REAL heading name
+    // anatomy: every row leads with the receipt type icon and a REAL heading name
     await expect(rows.nth(0).locator('.fico svg.si')).toHaveCount(1);   // one SVG icon set, never emoji (Oct 2026 experience review)
-    await expect(page.locator('#main .frow h3.fname')).toHaveCount(3);
-    // paid: green chip, formatted amount, thank-you action — and NO pay link
+    await expect(page.locator('#shelf .srow h3.fname')).toHaveCount(3);
+    // paid: green chip, formatted amount, the day it was paid (portal walk, Nov 8) — and NO pay link
     const paid = rows.filter({ hasText: 'Kickoff deposit' });
     await expect(paid.locator('.fst.sig')).toHaveText('Paid');
-    await expect(paid.locator('.fmeta').first()).toHaveText(`$1,200 · due ${dueLabel(-30)}`);
-    await expect(paid.getByText(/^Paid( [A-Z][a-z]+ \d+)? — thank you\.$/)).toBeVisible();   // with the day it was paid, when the server says (portal walk, Nov 8)
-    await expect(paid.locator('a')).toHaveCount(0);
+    await expect(paid.locator('.fmeta')).toHaveText('Invoice · $1,200 · paid Jun 20');
+    await expect(paid.locator('a')).toHaveCount(0);   // no receipt link in this payload, and never Pay
     // due-yesterday unpaid: the DERIVED Overdue chip (decision D2) + cents kept
     const over = rows.filter({ hasText: 'Design phase' });
     await expect(over.locator('.fst.od')).toHaveText('Overdue');
-    await expect(over.locator('.fmeta').first()).toHaveText(`$1,234.50 · due ${dueLabel(-1)}`);
+    await expect(over.locator('.fmeta')).toHaveText(`Invoice · $1,234.50 · due ${dueShort(-1)}`);
     // due-tomorrow unpaid: NOT overdue — Oct 2026 (item 2): the chip prints the
     // one formula's word for an open invoice that is not late, "Upcoming"
     // (the 0086 schema still stores exactly open|paid|void underneath)
@@ -2232,7 +2256,7 @@ test.describe('PS2 — Invoices tab (B1)', () => {
     await expect(sent.locator('.fst.sig')).toHaveCount(0);
     await expect(sent.getByText('Your studio will send payment details.')).toBeVisible();
     // meta dates are FORMATTED — never a raw ISO date on the money surface
-    await expect(page.locator('#main .frow .fmeta').first()).not.toContainText(/\d{4}-\d{2}-\d{2}/);
+    await expect(page.locator('#shelf')).not.toContainText(/\d{4}-\d{2}-\d{2}/);
   });
 
   test('the Pay action is the pay_url in this same tab, named for its invoice', async ({ page }) => {
@@ -2244,18 +2268,20 @@ test.describe('PS2 — Invoices tab (B1)', () => {
     await expect(pay).toHaveAttribute('href', 'https://pay.example/v2');
     // Nov 10 review (G9): a new tab left this one still saying Pay after Stripe came back to a second copy
     expect(await pay.getAttribute('target')).toBeNull();
-    // paid + no-link rows offer no Pay anywhere else
-    await expect(page.locator('#main a.fbtn')).toHaveCount(1);
+    // paid + no-link rows offer no Pay anywhere else (two unpaid: the You-owe card has no single Pay)
+    await expect(page.locator('#shelf a.fbtn')).toHaveCount(1);
+    await expect(page.locator('#inv-unpaid a')).toHaveCount(0);
   });
 
-  test('the unpaid-total line uses the ONE unpaidInvoices formula and the ONE formatter', async ({ page }) => {
+  test('You owe (item 179 part four) uses the ONE unpaidInvoices formula and the ONE formatter', async ({ page }) => {
     await installApp(page, { api: INV_API });
     await page.goto('/client.html');
     await openInvoices(page);
     // 1234.5 + 800 unpaid (paid excluded) → $2,034.50 — grouped, cents kept
     const total = page.locator('#inv-unpaid');
-    await expect(total).toContainText('Unpaid right now:');
-    await expect(total.locator('strong')).toHaveText('$2,034.50');
+    await expect(total.locator('.owet')).toHaveText('You owe $2,034.50');
+    // two invoices: how many, and the one due first (the overdue one says so)
+    await expect(total.locator('.owes')).toContainText('2 invoices · the next was due');
   });
 
   test('money-formatter consistency: the same cents render as the SAME string on the Needs-you row, the invoice row and the total', async ({ page }) => {
@@ -2270,8 +2296,10 @@ test.describe('PS2 — Invoices tab (B1)', () => {
     // …and the old bare "$1200" never appears anywhere on Home
     await expect(page.locator('#main')).not.toContainText('$1200 ');
     await openInvoices(page);
-    await expect(page.locator('#main .frow .fmeta').first()).toContainText('$1,200 ·');
-    await expect(page.locator('#inv-unpaid strong')).toHaveText('$1,200');
+    await expect(page.locator('#shelf .srow .fmeta').first()).toContainText('$1,200 ·');
+    await expect(page.locator('#inv-unpaid .owet')).toHaveText('You owe $1,200');
+    // one unpaid invoice with a link: the card's one filled Pay names the amount and the invoice
+    await expect(page.getByRole('link', { name: 'Pay $1,200 — Deposit' })).toHaveAttribute('href', 'https://pay.example/w1');
   });
 
   test('reviewer: the calm account-owner copy, with ZERO /client/billing fetches — never the client-shaped empty state', async ({ page }) => {
@@ -2284,7 +2312,7 @@ test.describe('PS2 — Invoices tab (B1)', () => {
     await page.goto('/client.html');
     await openInvoices(page);
     // the calm read-only copy — billing belongs to the account owner…
-    await expect(page.getByText('Billing lives with the account owner')).toBeVisible();
+    await expect(page.getByText('Invoices go to the account owner — there’s nothing here for you to pay.', { exact: false })).toBeVisible();
     // …never the client-shaped "No invoices yet" story, and never an error line
     await expect(page.getByText('No invoices yet', { exact: false })).toHaveCount(0);
     await expect(page.getByText('We couldn’t load', { exact: false })).toHaveCount(0);
@@ -2306,7 +2334,7 @@ test.describe('PS2 — Invoices tab (B1)', () => {
     // no rows, no total (a fake $0 would be a lie built on nothing)
     await expect(page.getByText('We couldn’t load your invoices just now — please try again in a moment.')).toBeVisible();
     await expect(page.getByText('No invoices yet', { exact: false })).toHaveCount(0);
-    await expect(page.locator('#main .frow')).toHaveCount(0);
+    await expect(page.locator('#shelf .srow', { hasText: 'Invoice ·' })).toHaveCount(0);
     await expect(page.locator('#inv-unpaid')).toHaveCount(0);
     await expect.poll(() => calls).toBe(2);
     // away and back: NOT session-cached — the tab genuinely refetches and renders
@@ -2326,14 +2354,14 @@ test.describe('PS2 — Invoices tab (B1)', () => {
     });
     await page.goto('/client.html');
     await expect(page.getByRole('heading', { name: 'Needs you' })).toBeVisible();
-    await openInvoices(page); // the billing read hangs — the tab shows its skeleton
+    await page.locator('#tabnav [data-tab="documents"]').click(); // the billing read hangs — the shelf shows its skeleton
     await page.locator('#tabnav [data-tab="home"]').click(); // the user moves on
     await expect(page.getByRole('heading', { name: 'Needs you' })).toBeVisible();
     waiters.splice(0).forEach((release) => release()); // the STALE response lands now
     await page.waitForTimeout(200);
-    // Home still owns #main — the stale Invoices render was dropped, not painted
+    // Home still owns #main — the stale shelf render was dropped, not painted
     await expect(page.locator('#main header h1')).toHaveText(/^Good (morning|afternoon|evening)/);
-    await expect(page.locator('#main .frow')).toHaveCount(0);
+    await expect(page.locator('#shelf')).toHaveCount(0);
     await expect(page.locator('#inv-unpaid')).toHaveCount(0);
   });
 
@@ -2358,7 +2386,7 @@ test.describe('PS2 — Invoices tab (B1)', () => {
     await installApp(page, { api: FOUR_API });
     await page.goto('/client.html');
     await openInvoices(page);
-    const rows = page.locator('#main .frow');
+    const rows = page.locator('#shelf .srow');
     await expect(rows).toHaveCount(5);
     await expect(rows.filter({ hasText: 'Kickoff deposit' }).locator('.fst.sig')).toHaveText('Paid');
     const proc = rows.filter({ hasText: 'Design phase' });
@@ -2376,8 +2404,8 @@ test.describe('PS2 — Invoices tab (B1)', () => {
     // one colour per state — the four chips are four DIFFERENT colours
     const colours = await Promise.all(['Kickoff deposit', 'Design phase', 'Build phase', 'Launch'].map((n) => rows.filter({ hasText: n }).locator('.fst').evaluate((el) => getComputedStyle(el).color)));
     expect(new Set(colours).size).toBe(4);
-    // the unpaid total counts only what still WAITS on the client: 800 + 500
-    await expect(page.locator('#inv-unpaid strong')).toHaveText('$1,300');
+    // You owe counts only what still WAITS on the client: 800 + 500
+    await expect(page.locator('#inv-unpaid .owet')).toHaveText('You owe $1,300');
   });
 
   test('Home agrees: the Needs-you queue skips the processing invoice, and a queue row prints the SAME state word as the chip', async ({ page }) => {
@@ -2417,23 +2445,24 @@ test.describe('PS2 — Invoices tab (B1)', () => {
     await installApp(page, { api: INV_API });
     const reads = await paidFlow(page, 3);   // the load + two polls still say open; the third poll says paid
     await page.goto('/client.html?paid=v2');
-    await expect(page.locator('#tabnav [data-tab="invoices"]')).toHaveAttribute('aria-current', 'page');
+    await expect(page.locator('#tabnav [data-tab="documents"]')).toHaveAttribute('aria-current', 'page');
+    await expect(page.locator('#shelf [data-shelf="invoices"]')).toHaveAttribute('aria-pressed', 'true');   // the shelf opens on its Invoices filter
     await expect(page).toHaveURL(/\/client\.html#invoices$/);
     await expect(page.locator('.dds-toast, #toast').filter({ hasText: 'Thank you — we’re confirming your payment.' }).first()).toBeVisible();
-    const row = () => page.locator('#main .frow').filter({ hasText: 'Design phase' });
+    const row = () => page.locator('#shelf .srow').filter({ hasText: 'Design phase' });
     await expect(row().locator('.fst.pr')).toHaveText('Processing');
     await expect(row().locator('.fconf')).toContainText('Paid — confirming your payment.');
     await expect(row().locator('.fconf .fchk')).toBeVisible();   // the check mark
     await expect(row().locator('a')).toHaveCount(0);              // no Pay for an invoice they just paid
     await expect(row().locator('.fst.sig')).toHaveCount(0);       // and never "Paid" before the server says so
-    await expect(page.locator('#inv-unpaid strong')).toHaveText('$800');   // the total counts only Build phase now
+    await expect(page.locator('#inv-unpaid .owet')).toHaveText('You owe $800');   // You owe counts only Build phase now
     expect(reads()).toBe(1);
     await page.clock.runFor(5_000); await expect.poll(reads).toBe(2); await settle(page);
     await expect(row().locator('.fst.pr')).toHaveText('Processing');   // still open server-side → still confirming
     await page.clock.runFor(5_000); await expect.poll(reads).toBe(3); await settle(page);
     await page.clock.runFor(5_000); await expect.poll(reads).toBe(4);   // this read says paid
     await expect(row().locator('.fst.sig')).toHaveText('Paid');
-    await expect(row().getByText(/^Paid( [A-Z][a-z]+ \d+)? — thank you\.$/)).toBeVisible();
+    await expect(row().locator('.fmeta')).toContainText('paid Jul 11');
     await expect(page.locator('.dds-toast, #toast').filter({ hasText: 'Paid — thank you.' }).first()).toBeVisible();
     await settle(page);
     await page.clock.runFor(60_000); await settle(page);
@@ -2445,7 +2474,7 @@ test.describe('PS2 — Invoices tab (B1)', () => {
     await installApp(page, { api: INV_API });
     const reads = await paidFlow(page, 1_000_000);   // the server never says paid
     await page.goto('/client.html?paid=v2');
-    const row = () => page.locator('#main .frow').filter({ hasText: 'Design phase' });
+    const row = () => page.locator('#shelf .srow').filter({ hasText: 'Design phase' });
     await expect(row().locator('.fst.pr')).toHaveText('Processing');
     await expect(row().locator('.fconf')).not.toHaveClass(/stale/);
     for (let i = 0; i < 12; i++) { await page.clock.runFor(5_000); await settle(page); }
@@ -2477,28 +2506,30 @@ test.describe('PS2 — Invoices tab (B1)', () => {
     await expect(page.locator('#needs-body .qrow').filter({ hasText: 'Design phase' })).toHaveCount(0);
     await expect(page.locator('.dds-toast, #toast').filter({ hasText: 'confirming' })).toHaveCount(0);
     await openInvoices(page);
-    const row = page.locator('#main .frow').filter({ hasText: 'Design phase' });
+    const row = page.locator('#shelf .srow').filter({ hasText: 'Design phase' });
     await expect(row.locator('.fst.pr')).toHaveText('Processing');
     await expect(row.locator('.fconf')).toContainText('Paid — confirming your payment.');
     await expect(row.locator('a')).toHaveCount(0);
   });
 
-  test('mobile: invoice rows wrap their action under the meta — no horizontal overflow', async ({ page }, testInfo) => {
+  test('mobile: invoice rows fit a phone — one button or a chip, no horizontal overflow', async ({ page }, testInfo) => {
     test.skip(testInfo.project.name !== 'mobile', 'the stacked-rows check is the <720px contract');
     await installApp(page, { api: INV_API });
     await page.goto('/client.html');
     await openInvoices(page);
-    await expect(page.locator('#main .frow')).toHaveCount(3);
+    await expect(page.locator('#shelf .srow')).toHaveCount(3);
+    // a row with its Pay hides the chip (the line under the name says the state); Overdue still shows
+    await expect(page.locator('#shelf .srow').filter({ hasText: 'Design phase' }).locator('.fst.od')).toBeVisible();
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
     expect(overflow).toBeLessThanOrEqual(1);
   });
 
-  test('no serious/critical axe violations on the Invoices tab', async ({ page }, testInfo) => {
+  test('no serious/critical axe violations on the shelf’s Invoices filter', async ({ page }, testInfo) => {
     test.skip(testInfo.project.name !== 'desktop-chromium', 'axe once, on desktop');
     await installApp(page, { api: INV_API });
     await page.goto('/client.html');
     await openInvoices(page);
-    await expect(page.locator('#main .frow')).toHaveCount(3);
+    await expect(page.locator('#shelf .srow')).toHaveCount(3);
     await page.waitForLoadState('networkidle');
     const results = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa']).analyze();
     const serious = results.violations.filter((v) => v.impact === 'serious' || v.impact === 'critical');
@@ -2522,7 +2553,7 @@ test.describe('PS3 — bell chrome + the three numbers (B6 core)', () => {
     test.skip(testInfo.project.name !== 'mobile', 'phone reachability is the <720px contract');
     await installApp(page, { api: CLIENT_API });
     await page.goto('/client.html');
-    for (const tab of ['home', 'messages', 'files', 'invoices', 'help']) {   // five tabs since item 179 part three
+    for (const tab of ['home', 'messages', 'documents', 'help']) {   // four tabs since item 179 part four
       await page.locator(`#tabnav [data-tab="${tab}"]`).click();
       await expect(page.locator('#navbell'), `bell on ${tab}`).toBeVisible();
       await expect(page.locator('#navbell .badge'), `badge on ${tab}`).toHaveText('1');
@@ -2707,7 +2738,7 @@ test.describe('PS3 — bell chrome + the three numbers (B6 core)', () => {
     } });
     await page.goto('/client.html');
     await expect(page.getByRole('heading', { name: 'Needs you' })).toBeVisible();
-    // the tour names Messages/Files/Invoices — tabs a reviewer's
+    // the tour names Messages/Documents — tabs a reviewer's
     // persona renders as calm empty states; don't tour what they can't use
     await expect(page.locator('#welcome')).toHaveCount(0);
     await expect(page.locator('.wl-step')).toHaveCount(0);
@@ -2717,8 +2748,8 @@ test.describe('PS3 — bell chrome + the three numbers (B6 core)', () => {
     await installApp(page, { api: CLIENT_API });
     await page.goto('/client.html');
     await expect(page.locator('#welcome')).toBeVisible();
-    // item 179 part three: Messages, Files, Invoices (Requests folded into Messages)
-    await expect(page.locator('.wl-step')).toHaveCount(3);
+    // item 179: Messages and Documents (Requests folded into Messages, Files and Invoices into Documents)
+    await expect(page.locator('.wl-step')).toHaveCount(2);
   });
 });
 
@@ -3393,14 +3424,15 @@ test.describe('PS6 — project-record cohesion (B3)', () => {
     for (const t of CHECKLIST_TODOS) await expect(body.getByRole('heading', { name: t.title })).toBeVisible();
   });
 
-  test('PS1 residual — Files tab on a failed projects read: the couldn’t-load line, never "No files yet"', async ({ page }) => {
+  test('PS1 residual — the Documents shelf on a failed projects read: the couldn’t-load line, never "No files yet"', async ({ page }) => {
     await installApp(page, { api: CLIENT_API });
     await page.route('**/functions/v1/presence/client/projects', fail500);
     await page.goto('/client.html');
-    await page.locator('#tabnav [data-tab="files"]').click();
-    await expect(page.locator('#main').getByRole('heading', { name: 'Files & documents' })).toBeVisible();
+    await page.locator('#tabnav [data-tab="documents"]').click();
+    await expect(page.locator('#main').getByRole('heading', { name: 'Documents', exact: true })).toBeVisible();
     await expect(page.getByText('We couldn’t load your project files just now — please try again in a moment.')).toBeVisible();
     await expect(page.getByText('No files yet', { exact: false })).toHaveCount(0);
+    await expect(page.getByText('Nothing here yet', { exact: false })).toHaveCount(0);
   });
 
   test('PS1 residual — Messages tab on a failed projects read: couldn’t-check copy, never "No conversations yet"', async ({ page }) => {
@@ -3918,14 +3950,19 @@ test.describe('Client portal walk fixes (Nov 2026)', () => {
   test('each tab names itself in the browser tab', async ({ page }) => {
     await installApp(page, { api: REQ_API });
     await page.goto('/client.html');
-    await page.locator('#tabnav [data-tab="files"]').click();
-    await expect(page).toHaveTitle('Files — Your studio');
+    await page.locator('#tabnav [data-tab="documents"]').click();
+    await expect(page).toHaveTitle('Documents — Your studio');
     await page.locator('#tabnav [data-tab="messages"]').click();
     await expect(page).toHaveTitle('Messages — Your studio');
     // item 179 part three: an old #requests address lands on Messages
     await page.goto('/client.html#requests');
     await expect(page.locator('#mrows')).toBeVisible();
     await expect(page).toHaveTitle('Messages — Your studio');
+    // item 179 part four: old #files and #invoices addresses land on the shelf's filter
+    await page.goto('about:blank');   // a fresh load: an address that only changes its # stays on the same page
+    await page.goto('/client.html#invoices');
+    await expect(page).toHaveTitle('Documents — Your studio');
+    await expect(page.locator('#shelf [data-shelf="invoices"]')).toHaveAttribute('aria-pressed', 'true');
   });
 
   test('a to-do\'s status reads in words, never the raw "todo"', async ({ page }) => {
@@ -3939,7 +3976,7 @@ test.describe('Client portal walk fixes (Nov 2026)', () => {
   test('a paid invoice says the day it was paid', async ({ page }) => {
     await installApp(page, { api: { ...CLIENT_API, '/client/billing': { data: { billing_type: 'service', invoices: [{ id: 'ip', name: 'Deposit', amount: 1, status: 'paid', state: 'paid', due_date: '2026-07-01', paid_at: '2026-07-02T10:00:00Z' }] } } } });
     await page.goto('/client.html');
-    await page.locator('#tabnav [data-tab="invoices"]').click();
-    await expect(page.locator('#main')).toContainText('Paid July 2 — thank you.');
+    await page.locator('#tabnav [data-tab="documents"]').click();
+    await expect(page.locator('#shelf .srow', { hasText: 'Deposit' }).locator('.fmeta')).toContainText('paid Jul 2');
   });
 });

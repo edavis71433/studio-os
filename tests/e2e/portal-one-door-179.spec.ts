@@ -63,12 +63,12 @@ const openMessages = async (page: Page) => {
 const conv = (page: Page, title: string) => page.locator('.mrow', { has: page.locator('.rname', { hasText: title }) });
 
 test.describe('Client portal part three — one Messages door (item 179)', () => {
-  test('five tabs; Messages opens on Write, Book a call and Ask for a service, and counts its conversations', async ({ page }) => {
+  test('one door in the tab bar; Messages opens on Write, Book a call and Ask for a service, and counts its conversations', async ({ page }) => {
     await start(page);
     await page.goto('/client.html');
     const tabs = page.locator('#tabnav [data-tab]');
-    await expect(tabs).toHaveCount(5);
-    expect(await tabs.evaluateAll((els) => els.map((e) => e.getAttribute('data-tab')))).toEqual(['home', 'messages', 'files', 'invoices', 'help']);
+    await expect(tabs).toHaveCount(4);   // part four folded Files and Invoices into Documents
+    expect(await tabs.evaluateAll((els) => els.map((e) => e.getAttribute('data-tab')))).toEqual(['home', 'messages', 'documents', 'help']);
     await openMessages(page);
     await expect(page).toHaveTitle('Messages — Marlow & Co');
     await expect(page.locator('#mnew')).toHaveText('Write');
