@@ -51,6 +51,7 @@ import { composeContactDetail } from '../crm/contact_detail.ts';
 import { normalizeFieldDefs, normalizeFieldValues, applyFieldValues, type CustomFieldDef } from '../crm/custom_fields.ts';
 import { findPossibleDuplicates } from '../crm/dedupe.ts';
 import { normalizeFoundVia } from '../lib/found_via.ts';   // sales review item 69: "How did they find you?"
+import { stageNotes, normalizeStageNotes, withStageNote, isNoteStage, STAGE_NOTE_DEFAULTS } from '../lib/stage_notes.ts';   // item 124: what to do now at each stage
 import { missingInsertColumns } from '../lib/inbound_email.ts';
 import { summarizeAttachments, attachmentWarning, duplicateHints, listSentence } from '../crm/contact_links.ts';
 import type { SiteRow } from '../lib/site.ts';
@@ -62,7 +63,6 @@ import { normEmail, emailMatch, isUniqueViolation } from '../lib/contact_email.t
 import { contactMoreFrom, cleanTag, CONTACT_MORE_COLS } from '../lib/contact_fields.ts';   // item 89: address, job title, second phone, tags
 import { normalizeListFilters, quietCutoff, contactedContactIds, owingContactIds, keepIds, type ListFilters } from '../lib/list_filters.ts';   // item 90: field filters
 import { liveImport, importUpdate, noteImportRow } from './contacts_more.ts';   // item 86: imports that update and can be undone
-import { stageNotes, normalizeStageNotes, withStageNote, isNoteStage, STAGE_NOTE_DEFAULTS } from '../lib/stage_notes.ts';   // item 124: what to do now at each stage
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;                       // expected_close: ISO date only
 const CONVERT_PLANS = new Set(['presence', 'cms_only', 'business_os_only', 'presence_monitor', 'presence_managed']);
