@@ -390,11 +390,11 @@ test.describe('Client portal — Home queue + project record page', () => {
     await expect(page.getByRole('heading', { name: 'Your account' })).toBeVisible();
   });
 
-  test('mobile: the bottom tab bar keeps its six tabs and the ONE persistent bell shows', async ({ page }, testInfo) => {
+  test('mobile: the bottom tab bar keeps its five tabs and the ONE persistent bell shows', async ({ page }, testInfo) => {
     test.skip(testInfo.project.name !== 'mobile', 'bottom bar is the <720px nav');
     await installApp(page, { api: CLIENT_API });
     await page.goto('/client.html');
-    await expect(page.locator('#tabnav .tab')).toHaveCount(6);
+    await expect(page.locator('#tabnav .tab')).toHaveCount(5);   // item 179 part three: Requests folded into Messages
     await expect(page.locator('.cb-brand')).toBeHidden();
     // PS3 (D3a): the bell is persistent chrome OUTSIDE #main on phones too —
     // one bell (#navbell), one badge, every tab. The old per-render Home
@@ -1269,8 +1269,9 @@ test.describe('Client portal — Ask for a service and Book a call, inside Messa
       subject: 'Service request: Custom request', service: 'custom',
       brief: { need: 'Something bespoke.', timeline: '', budget: '' },
     });
-    await expect(page.locator('#mrows')).toBeVisible();
-    await page.locator('#msvc').click();
+    // the ask opens as a conversation in Messages (on a phone the pane has the screen)
+    await expect(page.locator('#mconsole')).toBeAttached();
+    await openRequestsTab(page);
     await page.getByRole('button', { name: 'Ask for this — Extra page' }).click();
     await page.getByLabel('What do you need?').fill('One more page please.');
     post = page.waitForRequest((r) => r.method() === 'POST' && /\/client\/support$/.test(new URL(r.url()).pathname));
@@ -3887,8 +3888,8 @@ test.describe('Client portal walk fixes (Nov 2026)', () => {
     await page.getByLabel('What do you need?').fill('Could we add an events page?');
     await page.getByRole('button', { name: 'Send', exact: true }).click();
     await expect.poll(() => posted).toMatchObject({ subject: 'A new page for events', body: 'Could we add an events page?', new_request: true });
-    // item 179 part three: the new conversation opens in Messages
-    await expect(page.locator('#mrows')).toBeVisible();
+    // item 179 part three: the new conversation opens in Messages (on a phone the pane has the screen)
+    await expect(page.locator('#mconsole')).toBeAttached();
     await expect(page.locator('#mpane .mpname')).toHaveText('A new page for events');
     await expect(page.locator('#mpane')).toContainText('Could we add an events page?');
   });
