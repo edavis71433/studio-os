@@ -101,17 +101,22 @@ export function installFakePostgrest(opts = {}) {
     if (method === 'POST') {
       const conflictCols = (u.searchParams.get('on_conflict') || '').split(',').filter(Boolean);
       const out = [];
+      // one statement, like the database: a many-row insert with one clash writes none of them
+      // (sales item 122 sends a hundred people a request and falls back to one by one)
+      const pending = [];
       for (const rec0 of (Array.isArray(body) ? body : [body])) {
         const now = tick();
         const rec = { id: rec0.id || crypto.randomUUID(), created_at: now, updated_at: now, deleted_at: null, ...rec0 };
-        const clash = conflictCols.length ? rows.find((r) => conflictCols.every((k) => String(r[k]) === String(rec[k]))) : clashOf(table, rows, rec);
+        const pool = [...rows, ...pending];
+        const clash = conflictCols.length ? pool.find((r) => conflictCols.every((k) => String(r[k]) === String(rec[k]))) : clashOf(table, pool, rec);
         if (clash) {
           if (prefer.includes('ignore-duplicates')) continue;
-          if (prefer.includes('merge-duplicates')) { Object.assign(clash, rec0); out.push(clash); continue; }
+          if (prefer.includes('merge-duplicates') && rows.includes(clash)) { Object.assign(clash, rec0); out.push(clash); continue; }
           return reply({ code: '23505', message: 'duplicate key value violates unique constraint' }, 409);
         }
-        rows.push(rec); out.push(rec);
+        pending.push(rec); out.push(rec);
       }
+      rows.push(...pending);
       return rep ? reply(out.map((r) => ({ ...r })), 201) : reply(null, 201);
     }
     if (method === 'PATCH') {

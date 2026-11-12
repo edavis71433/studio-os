@@ -15,22 +15,35 @@ const csvFile = (name: string, text: string) => ({ name, mimeType: 'text/csv', b
 const GOOGLE = 'First Name,Last Name,E-mail 1 - Label,E-mail 1 - Value,Phone 1 - Value,Phone 2 - Value,Organization Name,Organization Title,Address 1 - Formatted,Labels,Notes,Birthday\n'
   + 'Ana,Ruiz,Home,ana@example.com,(555) 010-2211,(555) 010-3300,Bluebird Bakery,Owner,"12 Elm St, Glendale, CA 91203",restaurant ::: * myContacts,Met at the expo,1988-04-02\n'
   + 'Bo,Lee,,bo@example.com,555 0200,,,,,,,\n';
-async function importRoutes(page: Page, opts: { existing?: string[] } = {}) {
+// The server's import routes. Sales item 122: Contacts sends the whole file to POST /sales/contacts/imports
+// in one request and the server answers with what each row did; `older: true` is a server from before
+// that, which only makes the import, so the page sends the rows one by one against it.
+async function importRoutes(page: Page, opts: { existing?: string[]; older?: boolean } = {}) {
   const starts: Record<string, unknown>[] = [], rows: Record<string, unknown>[] = [], undos: string[] = [];
+  const hits = { whole: 0, single: 0 };
   let latest: Record<string, unknown> | null = null;
   await page.route('**/functions/v1/presence/sales/contacts/imports', (route) => {
-    if (route.request().method() === 'POST') { starts.push(route.request().postDataJSON()); latest = { id: 'imp-1', created_at: new Date().toISOString(), added: 0, updated: 0, undone_at: null }; return route.fulfill({ status: 201, contentType: 'application/json', body: JSON.stringify({ data: { id: 'imp-1', undo: true } }) }); }
+    if (route.request().method() === 'POST') {
+      const b = route.request().postDataJSON(); const { rows: file, ...start } = b; starts.push(start);
+      latest = { id: 'imp-1', created_at: new Date().toISOString(), added: 0, updated: 0, undone_at: null };
+      if (!Array.isArray(file) || opts.older) return route.fulfill({ status: 201, contentType: 'application/json', body: JSON.stringify({ data: { id: 'imp-1', undo: true } }) });
+      hits.whole++;
+      const counts = { added: 0, updated: 0, existed: 0, failed: 0 };
+      for (const r of file) { rows.push(r); const here = (opts.existing || []).includes(String(r.email)); if (!here) counts.added++; else if (b.on_existing === 'update') counts.updated++; else counts.existed++; }
+      Object.assign(latest, { added: counts.added, updated: counts.updated });
+      return route.fulfill({ status: 201, contentType: 'application/json', body: JSON.stringify({ data: { id: 'imp-1', undo: true, counts } }) });
+    }
     return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: latest }) });
   });
   await page.route('**/functions/v1/presence/sales/contacts/imports/*/undo', (route) => { undos.push(route.request().url()); latest = null; return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: { removed: 1, restored: 1, kept: 0 } }) }); });
   await page.route(/\/functions\/v1\/presence\/sales\/contacts(\?.*)?$/, (route) => {
     if (route.request().method() !== 'POST') return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: [], total: 0 }) });
-    const b = route.request().postDataJSON(); rows.push(b);
+    const b = route.request().postDataJSON(); rows.push(b); hits.single++;
     const here = (opts.existing || []).includes(String(b.email));
     if (latest) { if (here && b.import_id) (latest as { updated: number }).updated++; else if (!here) (latest as { added: number }).added++; }
     return route.fulfill({ status: here ? 200 : 201, contentType: 'application/json', body: JSON.stringify({ data: { id: 'ct-' + rows.length }, ...(here ? { deduped: true, updated: !!b.import_id } : {}) }) });
   });
-  return { starts, rows, undos };
+  return { starts, rows, undos, hits };
 }
 
 test.describe('Import: match the columns, update people already here, undo (item 86)', () => {
@@ -55,7 +68,8 @@ test.describe('Import: match the columns, update people already here, undo (item
     await expect.poll(() => seen.rows.length).toBe(2);
     expect(seen.starts[0]).toEqual({ file_name: 'google-contacts.csv', on_existing: 'update' });
     expect(seen.rows[0]).toMatchObject({ name: 'Ana Ruiz', email: 'ana@example.com', phone: '(555) 010-2211', phone2: '(555) 010-3300', company: 'Bluebird Bakery', job_title: 'Owner',
-      address: { street: '12 Elm St, Glendale, CA 91203' }, tags: ['restaurant'], notes: 'Met at the expo', import_id: 'imp-1' });
+      address: { street: '12 Elm St, Glendale, CA 91203' }, tags: ['restaurant'], notes: 'Met at the expo' });
+    expect(seen.hits).toEqual({ whole: 1, single: 0 });   // item 122: the whole file in one request, no row on its own
     await expect(page.locator('.dds-toast').filter({ hasText: '1 added, 1 updated.' })).toBeVisible();
     // the newest import of the day sits above the list, with its Undo
     const strip = page.locator('.impstrip');
@@ -86,6 +100,40 @@ test.describe('Import: match the columns, update people already here, undo (item
     await expect.poll(() => seen.rows.length).toBe(1);
     expect(seen.starts[0]).toMatchObject({ on_existing: 'skip' });
     expect(seen.rows[0]).toMatchObject({ name: 'Ana Ruiz', email: 'ana@example.com' });
+  });
+
+  test('item 122: against a server from before, the rows still go in, one by one against its import', async ({ page }) => {
+    await installApp(page, { api: { '/portal/context': STUDIO_CTX, '/sales/contacts/fields': { data: [] } } });
+    const seen = await importRoutes(page, { existing: ['bo@example.com'], older: true });
+    await page.goto('/contacts.html');
+    await page.locator('#importCsv').click();
+    await page.locator('#csvZone input[type=file]').setInputFiles(csvFile('google-contacts.csv', GOOGLE));
+    await page.locator('#csvZone').getByRole('button', { name: 'Import 2' }).click();
+    await expect.poll(() => seen.rows.length).toBe(2);
+    expect(seen.hits.single).toBe(2);
+    expect(seen.rows[0]).toMatchObject({ name: 'Ana Ruiz', email: 'ana@example.com', import_id: 'imp-1' });
+    await expect(page.locator('.dds-toast').filter({ hasText: '1 added, 1 updated.' })).toBeVisible();
+  });
+
+  test('item 122: while the file goes in, Close waits, and the count comes back in one message', async ({ page }) => {
+    await installApp(page, { api: { '/portal/context': STUDIO_CTX, '/sales/contacts/fields': { data: [] } } });
+    await importRoutes(page);   // the list and the rest; the import itself is held below (a later route wins)
+    let release: () => void = () => {};
+    const held = new Promise<void>((r) => { release = r; });
+    await page.route('**/functions/v1/presence/sales/contacts/imports', async (route) => {
+      if (route.request().method() !== 'POST') return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: null }) });
+      await held;
+      return route.fulfill({ status: 201, contentType: 'application/json', body: JSON.stringify({ data: { id: 'imp-1', undo: true, counts: { added: 2, updated: 0, existed: 0, failed: 0 } } }) });
+    });
+    await page.goto('/contacts.html');
+    await page.locator('#importCsv').click();
+    await page.locator('#csvZone input[type=file]').setInputFiles(csvFile('two.csv', 'Name,Email\nAna Ruiz,ana@example.com\nBo Lee,bo@example.com\n'));
+    await page.locator('#csvZone').getByRole('button', { name: 'Import 2' }).click();
+    await expect(page.locator('#csvZone .dds-csvlive')).toHaveText('Importing 2 contacts in one go…');
+    await expect(page.locator('#csvZone .dds-csvx')).toBeDisabled();
+    release();
+    await expect(page.locator('.dds-toast').filter({ hasText: '2 added.' })).toBeVisible();
+    await expect(page.locator('#csvZone .dds-csvx')).toHaveCount(0);
   });
 
   test('your own fields are columns an import can fill', async ({ page }) => {

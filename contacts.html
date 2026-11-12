@@ -1153,6 +1153,8 @@ function importTargets(){
     ['tags','Tags'],['notes','Notes'],['found_via','How they found you']]
     .concat((FIELD_DEFS||[]).map(f=>['custom:'+f.key,f.label||f.key]));
 }
+// one row on its own, carrying its import's id (an older server, or a shell.js from before item 122)
+async function sendOne(it,ctx){const body=Object.assign({},it,ctx&&ctx.importId?{import_id:ctx.importId}:{});const r=await api('/sales/contacts','POST',body);if(!r.ok)return'failed';return r.body&&r.body.updated?'updated':(r.body&&r.body.deduped?'existed':'added');}
 async function openImport(){
   const k=KIT(),z=$('csvZone');if(!k||!z)return;
   await loadFieldDefs().catch(()=>{});   // your own fields are columns an import can fill
@@ -1175,9 +1177,20 @@ async function openImport(){
       if(Object.keys(custom).length)it.custom=custom;
       return it;},
     label:(it)=>it.name||it.email,
-    // the import is a record of its own, so it can be undone; each row carries its id
+    // item 122: the whole file in one request: the server makes the import (for Undo) and takes every
+    // row. An older server answers without counts, having only made the import: then the rows go one by
+    // one against it, as they used to. start and send stay for a shell.js from before sendAll.
+    sendAll:async(items,ctx)=>{
+      let r;try{r=await api('/sales/contacts/imports','POST',{file_name:ctx.fileName||'',on_existing:ctx.onExisting,rows:items});}catch(_){r={ok:false,status:0,body:{}};}
+      const d=r.ok&&r.body&&r.body.data;
+      if(!d){if(r.body&&r.body.message)toast(r.body.message);return{failed:items.length};}
+      ctx.importId=d.id||null;
+      if(d.counts)return d.counts;
+      const c={added:0,updated:0,existed:0,failed:0};
+      for(let i=0;i<items.length;i+=5)await Promise.all(items.slice(i,i+5).map(async it=>{let k='failed';try{k=await sendOne(it,ctx);}catch(_){}c[k]=(c[k]||0)+1;}));
+      return c;},
     start:async(o)=>{let r;try{r=await api('/sales/contacts/imports','POST',{file_name:o.fileName||'',on_existing:o.onExisting});}catch(_){return null;}return r.ok&&r.body&&r.body.data?r.body.data.id:null;},
-    send:async(it,ctx)=>{const body=Object.assign({},it,ctx&&ctx.importId?{import_id:ctx.importId}:{});const r=await api('/sales/contacts','POST',body);if(!r.ok)return'failed';return r.body&&r.body.updated?'updated':(r.body&&r.body.deduped?'existed':'added');},
+    send:(it,ctx)=>sendOne(it,ctx),
     summary:(c)=>`${c.added} added${c.updated?`, ${c.updated} updated`:''}${c.existed?`, ${c.existed} already here and left as they were`:''}${c.failed?`, ${c.failed} couldn’t be imported`:''}.`,
     done:()=>{load().catch(()=>{});loadImportStrip();},
   });
