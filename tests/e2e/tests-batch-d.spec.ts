@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { installApp } from './helpers/app';
+import { headerAction } from './helpers/page-header';
 
 // Final pass on the sales side, batch D (Nov 8 2026): tests that can fail.
 //   csv        the shared reader and Contacts' own, on what Excel saves
@@ -19,7 +20,7 @@ test.describe('batch D — CSV the way Excel saves it', () => {
   test('Contacts\' import finds its Name column behind a byte-order mark', async ({ page }) => {
     await installApp(page, { api: { '/sales/contacts': { data: [] } } });
     await page.goto('/contacts.html');
-    await page.locator('#importCsv').click();
+    await (await headerAction(page, '#importCsv')).click();   // builder item 165: behind the header’s ⋯ on a phone
     await page.locator('#csvZone input[type=file]').setInputFiles({ name: 'contacts.csv', mimeType: 'text/csv', buffer: Buffer.from('﻿Name,Phone\r\nAna Ruiz,555 0100\r\nBo Lee,\r\n', 'utf8') });
     // item 86: Contacts matches the columns first; the Name column is found behind the mark
     await expect(page.locator('#csvZone')).toContainText('2 contacts in the file');
