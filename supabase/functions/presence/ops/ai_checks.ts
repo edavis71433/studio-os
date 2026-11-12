@@ -12,7 +12,7 @@
 //     ticks, three times a month at most.
 // Each check is also saved as an ordinary AI Visibility report (tool_reports), so the
 // Search tab's existing AI card and its report link show the newest one.
-import { svc } from '../lib/db.ts';
+import { svc, svcPaged } from '../lib/db.ts';
 import { insert } from '../../_shared/tools/db.ts';
 import { logUsage, spendCapReached } from '../../_shared/tools/guard.ts';
 import { assertPublicHttpUrl } from '../../_shared/tools/url_guard.ts';
@@ -25,6 +25,8 @@ import { liveAddress, reviewBusinessType } from '../lib/search_visibility.ts';
 import type { SiteRow } from '../lib/site.ts';
 
 export const AI_MAX_TRIES = 3;
+/** Item 209: the clients a run reads at once, and at most how many pages. */
+export const AI_PAGE = 100, AI_PAGES = 50;
 /** Overridable for tests: the scan's network-facing parts. */
 export const aiCheckDeps: Partial<AiScanDeps> = {};
 
@@ -64,54 +66,59 @@ export async function aiInputsFor(site: SiteRow): Promise<{ businessName: string
 /** The job. Returns what it did; `resting` when the spend cap stopped it. */
 export async function runAiChecks(limit = 1, nowIso = new Date().toISOString()): Promise<{ checked: number; failed: number; skipped: number; resting?: boolean; not_ready?: boolean }> {
   const month = nowIso.slice(0, 7);
-  const q = await svc(`presence_sales_templates?kind=eq.proposal&name=eq.${encodeURIComponent(RESERVED_NAMES.monthlyReport)}&deleted_at=is.null&select=site_id,body&limit=500`);
   let checked = 0, failed = 0, skipped = 0;
-  for (const r of rows(q)) {
+  // Item 209 (review file 06, finding 63): every client with the report on, a page at a
+  // time in a set order, until this run's checks are done. One read of 500 in no order
+  // used to be all of it, so a client past it was never checked.
+  for await (const page of svcPaged(`presence_sales_templates?kind=eq.proposal&name=eq.${encodeURIComponent(RESERVED_NAMES.monthlyReport)}&deleted_at=is.null&select=site_id,body`, 'site_id.asc', AI_PAGE, AI_PAGES)) {
     if (checked + failed >= limit) break;
-    let seen: ReportSetting; try { seen = normalizeReportSetting(JSON.parse(r.body)); } catch { skipped++; continue; }
-    if (!aiDueNow(seen, nowIso)) { skipped++; continue; }
-    if (!enabledEngines().length) return { checked, failed, skipped, resting: true };
-    if (await spendCapReached()) return { checked, failed, skipped, resting: true };
-    // the table first: without it there is nowhere to keep what this would pay for
-    const ready = await svc('presence_ai_checks?select=site_id&limit=1').catch(() => null);
-    if (!ready || !ready.ok) return { checked, failed, skipped, not_ready: true };
-    const site = rows(await svc(`presence_sites?id=eq.${r.site_id}&select=*&limit=1`).catch(() => null))[0] as SiteRow | undefined;
-    if (!site) { skipped++; continue; }
-    const inputs = await aiInputsFor(site);
-    let before: string | null = null;
-    const claimed = await SAVE(site.id, (s) => {
-      if (!aiDueNow(s, nowIso)) throw new NotDue();
-      before = s.ai_month;
-      // a client without a name or a town can't be asked about: handled for the month, said why
-      return inputs ? { ...s, ai_month: month } : { ...s, ai_month: month, ai_result: { month, status: 'failed', reason: 'no_name_or_town', at: nowIso } };
-    }).catch(() => null);
-    if (!claimed) { skipped++; continue; }
-    if (!inputs) { failed++; continue; }
-    const prompts = asPrompts(inputs.questions, inputs.businessName);
-    const result = await runAiVisibility(
-      { businessName: inputs.businessName, city: inputs.city, businessType: inputs.businessType, searchPhrases: '', url: inputs.url, detail: '', questions: prompts },
-      { guard: assertPublicHttpUrl, ...aiCheckDeps },
-    ).catch(() => null);
-    if (!result || !result.ok) {
-      failed++;
-      if (result) await logUsage({ tool: 'ai_visibility', kind: 'scan', cost_usd: result.costUsd, note: 'monthly AI check (failed)' }).catch(() => {});
-      await SAVE(site.id, (s) => afterAiFailure(s, month, before, result ? String((result as { error?: string }).error || 'failed') : 'failed', nowIso)).catch(() => null);
-      continue;
-    }
-    const report = await insert('tool_reports', { tool: 'ai_visibility', input: { ...result.input, site_id: site.id }, raw_results: result.raw, findings: result.findings, scores: result.scores, unlocked: true, unlocked_at: nowIso }).catch(() => null);
-    await logUsage({ tool: 'ai_visibility', kind: 'scan', report_id: report ? String(report.id) : null, cost_usd: result.costUsd, note: 'monthly AI check' }).catch(() => {});
-    const names = Object.fromEntries(ENGINES.map((e) => [e.id, e.name]));
-    const got = aiResults(result.raw, prompts, inputs.businessName, names);
-    const kept = await svc('presence_ai_checks?on_conflict=site_id,month', {
-      method: 'POST', headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },
-      body: JSON.stringify({ site_id: site.id, month, checked_at: nowIso, report_id: report ? report.id : null, engines: got.engines, asked: got.asked, named: got.named, results: got.results, cost_usd: Math.round(result.costUsd * 10000) / 10000 }),
-    }).catch(() => null);
-    if (kept && kept.ok) {
-      checked++;
-      await SAVE(site.id, (s) => ({ ...s, ai_tries: null, ai_result: { month, status: 'checked', reason: null, at: nowIso } })).catch(() => null);
-    } else {
-      failed++;
-      await SAVE(site.id, (s) => afterAiFailure(s, month, before, 'not_kept', nowIso)).catch(() => null);
+    for (const r of page as Array<{ site_id: string; body: string }>) {
+      if (checked + failed >= limit) break;
+      let seen: ReportSetting; try { seen = normalizeReportSetting(JSON.parse(r.body)); } catch { skipped++; continue; }
+      if (!aiDueNow(seen, nowIso)) { skipped++; continue; }
+      if (!enabledEngines().length) return { checked, failed, skipped, resting: true };
+      if (await spendCapReached()) return { checked, failed, skipped, resting: true };
+      // the table first: without it there is nowhere to keep what this would pay for
+      const ready = await svc('presence_ai_checks?select=site_id&limit=1').catch(() => null);
+      if (!ready || !ready.ok) return { checked, failed, skipped, not_ready: true };
+      const site = rows(await svc(`presence_sites?id=eq.${r.site_id}&select=*&limit=1`).catch(() => null))[0] as SiteRow | undefined;
+      if (!site) { skipped++; continue; }
+      const inputs = await aiInputsFor(site);
+      let before: string | null = null;
+      const claimed = await SAVE(site.id, (s) => {
+        if (!aiDueNow(s, nowIso)) throw new NotDue();
+        before = s.ai_month;
+        // a client without a name or a town can't be asked about: handled for the month, said why
+        return inputs ? { ...s, ai_month: month } : { ...s, ai_month: month, ai_result: { month, status: 'failed', reason: 'no_name_or_town', at: nowIso } };
+      }).catch(() => null);
+      if (!claimed) { skipped++; continue; }
+      if (!inputs) { failed++; continue; }
+      const prompts = asPrompts(inputs.questions, inputs.businessName);
+      const result = await runAiVisibility(
+        { businessName: inputs.businessName, city: inputs.city, businessType: inputs.businessType, searchPhrases: '', url: inputs.url, detail: '', questions: prompts },
+        { guard: assertPublicHttpUrl, ...aiCheckDeps },
+      ).catch(() => null);
+      if (!result || !result.ok) {
+        failed++;
+        if (result) await logUsage({ tool: 'ai_visibility', kind: 'scan', cost_usd: result.costUsd, note: 'monthly AI check (failed)' }).catch(() => {});
+        await SAVE(site.id, (s) => afterAiFailure(s, month, before, result ? String((result as { error?: string }).error || 'failed') : 'failed', nowIso)).catch(() => null);
+        continue;
+      }
+      const report = await insert('tool_reports', { tool: 'ai_visibility', input: { ...result.input, site_id: site.id }, raw_results: result.raw, findings: result.findings, scores: result.scores, unlocked: true, unlocked_at: nowIso }).catch(() => null);
+      await logUsage({ tool: 'ai_visibility', kind: 'scan', report_id: report ? String(report.id) : null, cost_usd: result.costUsd, note: 'monthly AI check' }).catch(() => {});
+      const names = Object.fromEntries(ENGINES.map((e) => [e.id, e.name]));
+      const got = aiResults(result.raw, prompts, inputs.businessName, names);
+      const kept = await svc('presence_ai_checks?on_conflict=site_id,month', {
+        method: 'POST', headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },
+        body: JSON.stringify({ site_id: site.id, month, checked_at: nowIso, report_id: report ? report.id : null, engines: got.engines, asked: got.asked, named: got.named, results: got.results, cost_usd: Math.round(result.costUsd * 10000) / 10000 }),
+      }).catch(() => null);
+      if (kept && kept.ok) {
+        checked++;
+        await SAVE(site.id, (s) => ({ ...s, ai_tries: null, ai_result: { month, status: 'checked', reason: null, at: nowIso } })).catch(() => null);
+      } else {
+        failed++;
+        await SAVE(site.id, (s) => afterAiFailure(s, month, before, 'not_kept', nowIso)).catch(() => null);
+      }
     }
   }
   return { checked, failed, skipped };
