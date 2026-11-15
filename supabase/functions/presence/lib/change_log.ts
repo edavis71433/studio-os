@@ -217,8 +217,9 @@ export function describePublish(r: RawChange): Words | null {
   if (r.unchanged) return null;
   const n = countFromSummary(r.summary || '');
   const label = String(r.label || '').trim();
-  // item 239: a publish the scheduler sent, for whoever set it (whoOf names them) or by itself
-  const onTime = r.actor_kind === 'system' ? ' on schedule' : '';
+  // item 239: a publish the scheduler sent for someone (whoOf names them), or one whose summary says it
+  // was scheduled. The old 'system' rows with nobody named (July probes) were never scheduled.
+  const onTime = r.actor_kind === 'system' && (UUID.test(lower(r.actor)) || /^scheduled\b/i.test(String(r.summary || '').trim())) ? ' on schedule' : '';
   const versions = { area: 'live' as const, where: 'Website › Versions', go: '/presence.html#history' };
   if (r.status === 'failed') return { text: r.kind === 'restore' ? `tried to restore an earlier version${onTime}; it didn’t go live` : `tried to publish${onTime}; it didn’t go live`, ...versions, sig: `fail:${r.id}` };
   if (r.status !== 'live') return null;   // still on its way; the next read tells it
@@ -247,8 +248,10 @@ export function whoOf(r: RawChange, i: { viewer: string | null; viewerSide: 'stu
   // item 239: a one-tap decision is the client's, made by the link emailed to the business, with no sign-in
   if (!a && r.actor_kind === 'client') return { who: i.viewerSide === 'studio' ? 'Someone on the client’s side' : 'Someone on your team', who_note: '', side: 'unknown', key: 'k:client:link' };
   if (!a || !UUID.test(a) && !a.includes('@') && a !== 'owner') return { who: 'Studio OS', who_note: '', side: 'auto', key: 'auto' };
-  // item 239: work the scheduler sent for someone is theirs, by name, when they're known here
-  if (r.actor_kind === 'system' && !(i.viewer && a === lower(i.viewer)) && !i.people.has(a)) return { who: 'Studio OS', who_note: '', side: 'auto', key: 'auto' };
+  // item 239: work the scheduler sent for someone is theirs, by name and on their side, when they're on
+  // the studio's team, a seat or the owner here. A sign-in found only by its email can't say whose side
+  // it is, so that stays Studio OS by itself.
+  if (r.actor_kind === 'system' && !(i.viewer && a === lower(i.viewer)) && (!i.people.has(a) || i.people.get(a)!.side === 'support')) return { who: 'Studio OS', who_note: '', side: 'auto', key: 'auto' };
   if (i.viewer && a === lower(i.viewer)) return { who: 'You', who_note: '', side: 'you', key: `p:${a}` };
   const p = a === 'owner' ? i.ownerOf?.get(r.site_id) : i.people.get(a);
   if (p) {

@@ -210,19 +210,26 @@ const say = (r, names) => { const w = C.describeEvent(r, { item: 'menu item', it
     pub({ summary: `Launched “${S}”` }), pub({ actor_kind: 'system', summary: `Launched “${S}”` }), pub({ summary: 'Promoted the preview to Live' }),
     pub({ actor_kind: 'system', actor: null, summary: 'Scheduled blog post “Winter hours” went live' }), pub({ actor_kind: 'system', actor: null, summary: 'A timed section went live or came down' }),
     pub({}),
+    // what Studio insights asked (Nov 15): "on schedule" only with a person attached or a summary that says so;
+    // production's July 'system' probes, with nobody named, keep reading as a plain publish
+    pub({ actor_kind: 'system', actor: null, summary: 'probe publish' }), pub({ actor_kind: 'system', actor: null, summary: 'Scheduled publish' }),
   ], ['published the site on schedule. 3 changes went live', 'put an earlier version back live on schedule', 'tried to publish on schedule; it didn’t go live',
     `launched “${S}”. It went live`, `launched “${S}” on schedule. It went live`, 'put the preview live',
     'put the scheduled blog post “Winter hours” live', 'republished the site so a timed section showed or hid on time',
-    'published the site. 3 changes went live']);
+    'published the site. 3 changes went live',
+    'published the site. The changes went live', 'published the site on schedule. The changes went live']);
 
-  const people = new Map([[ERIC, { name: 'Eric', email: 'eric@studio.example', side: 'studio' }], [SAM, { name: 'Sam Lee', email: 'sam@bakery.example', side: 'owner' }]]);
+  const PAT = 'aaaaaaaa-0000-4000-8000-000000000007';   // found only by the sign-in's email (the support lookup)
+  const people = new Map([[ERIC, { name: 'Eric', email: 'eric@studio.example', side: 'studio' }], [SAM, { name: 'Sam Lee', email: 'sam@bakery.example', side: 'owner' }], [PAT, { name: 'Pat Moss', email: 'pat@platform.example', side: 'support' }]]);
   const ctx = (o = {}) => ({ viewer: null, viewerSide: 'studio', people, ownerOf: new Map([[SITE, people.get(SAM)]]), canPeople: true, ...o });
   const w = (r, o) => { const x = C.whoOf(r, ctx(o)); return [x.who, x.who_note, x.side]; };
   const sched = (o) => ({ id: 'p', at: 't', site_id: SITE, source: 'publish', kind: 'publish', status: 'live', summary: '', ...o });
   eq('239 who: scheduled work is whoever set it, by name; nobody, or someone not known here, is Studio OS', [
     w(sched({ actor: SAM, actor_kind: 'system' })), w(sched({ actor: ERIC, actor_kind: 'system' })), w(sched({ actor: ERIC, actor_kind: 'system' }), { viewer: ERIC }),
     w(sched({ actor: null, actor_kind: 'system' })), w(sched({ actor: GONE, actor_kind: 'system' })),
-  ], [['Sam Lee', 'the owner', 'owner'], ['Eric', '', 'studio'], ['You', '', 'you'], ['Studio OS', '', 'auto'], ['Studio OS', '', 'auto']]);
+    w(sched({ actor: PAT, actor_kind: 'system' })), w(sched({ actor: PAT, actor_kind: 'staff' })),
+  ], [['Sam Lee', 'the owner', 'owner'], ['Eric', '', 'studio'], ['You', '', 'you'], ['Studio OS', '', 'auto'], ['Studio OS', '', 'auto'],
+    ['Studio OS', '', 'auto'], ['Pat Moss', 'Studio OS support', 'support']]);
   eq('239 who: a one-tap decision is the client’s side, never Studio OS', [w(ev(1, 't', 'settings', 'update', { actor: null, actor_kind: 'client' })), w(ev(2, 't', 'settings', 'update', { actor: null, actor_kind: 'client' }), { viewer: SAM, viewerSide: 'client' })],
     [['Someone on the client’s side', '', 'unknown'], ['Someone on your team', '', 'unknown']]);
   const items = C.changeItems([sched({ id: 'p1', at: '2026-11-15T09:00:00Z', actor: SAM, actor_kind: 'system', summary: '2 settings changes' }), sched({ id: 'p2', at: '2026-11-15T08:00:00Z', actor: null, actor_kind: 'system', summary: 'A timed section went live or came down' })], ctx());
