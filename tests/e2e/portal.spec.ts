@@ -3952,7 +3952,7 @@ test.describe('Client portal — connect your Google (the studio asked)', () => 
     await expect(card).toContainText('Your studio (eric@davisdigitalstudio.com) asked to read these from your own Google account.');
     await expect(card.locator('[data-ask-connect]')).toHaveCount(2);
     expect(asks[0]).toContain('/connections/ask?token=tok-abc.iv');
-    expect(new URL(page.url()).search).toBe('');
+    await expect.poll(() => new URL(page.url()).search).toBe('');
     // not the filled button: the portal's one filled action stays the approval
     await expect(card.locator('button.approve')).toHaveCount(0);
   });

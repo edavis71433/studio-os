@@ -617,13 +617,13 @@ test.describe('Agency home — one home, one roster', () => {
     await page.goto('/agency.html#add');
     await expect(page.locator('#custDlg')).toBeVisible();
     await expect(page.locator('#cu-name')).toBeFocused();
-    expect(new URL(page.url()).hash).toBe('');                    // Back / reload never reopen it
+    await expect.poll(() => new URL(page.url()).hash).toBe('');                    // Back / reload never reopen it
     // already on the home, the palette only changes the hash — that opens it too
     await page.locator('#cu-cancel').click();
     await expect(page.locator('#custDlg')).toBeHidden();
     await page.evaluate(() => { location.hash = '#add'; });
     await expect(page.locator('#custDlg')).toBeVisible();
-    expect(new URL(page.url()).hash).toBe('');
+    await expect.poll(() => new URL(page.url()).hash).toBe('');
   });
 
   test('Start from a kit: the select lists /agency/kits, a chosen kit is applied to the NEW site, and the done screen names it', async ({ page }) => {
@@ -702,7 +702,7 @@ test.describe('Agency home — one home, one roster', () => {
     await installApp(page, { api: homeApi });
     await page.goto('/agency.html?client=aaaaaaaa-1111-4111-8111-aaaaaaaaaaaa');
     await expect(page.locator('#main')).toContainText('Marlow’s Kitchen');
-    expect(new URL(page.url()).search).toBe('');
+    await expect.poll(() => new URL(page.url()).search).toBe('');
     await expect(page.locator('#dds-ctxbar')).toHaveCount(0);
   });
 
@@ -971,7 +971,7 @@ test.describe('Agency home — the Health Center door and the kits anchor', () =
     await expect(page.locator('#custDlg')).toBeVisible();
     await expect(page.locator('#cu-kit-wrap')).toBeVisible();
     await expect(page.locator('#cu-kit option')).toHaveText(['No kit — start empty', 'Restaurant starter']);
-    expect(new URL(page.url()).hash).toBe('');
+    await expect.poll(() => new URL(page.url()).hash).toBe('');
     await expect(page.locator('#kits, .kitcard')).toHaveCount(0);
   });
 });

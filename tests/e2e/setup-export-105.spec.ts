@@ -119,7 +119,7 @@ test.describe('sales item 105 — setup strip, empty lists, the export for a boo
     await expect(page.locator('#newDlg')).toBeVisible();
     await page.goto('/contacts.html?add=1');
     await expect(page.locator('#newDlg')).toBeVisible();
-    expect(new URL(page.url()).search).toBe('');   // the address loses ?add=1, so a reload doesn't open it again
+    await expect.poll(() => new URL(page.url()).search).toBe('');   // the address loses ?add=1, so a reload doesn't open it again
   });
 
   test('empty lists: a board with no open deals offers + New deal; an empty People list offers + Add a person', async ({ page }) => {

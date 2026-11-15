@@ -357,7 +357,7 @@ test.describe('+ Create', () => {
     await page.waitForURL(/\/pipeline\.html\?deal=/);
     await expect(page.locator('#propForm .pl-label').first()).toBeVisible();
     await expect(page.locator('#detailInner .tabs [data-dtab="billing"]')).toHaveAttribute('aria-selected', 'true');
-    expect(new URL(page.url()).search).toBe(`?deal=${D1}&dtab=billing`);                   // a reload won't open another
+    await expect.poll(() => new URL(page.url()).search).toBe(`?deal=${D1}&dtab=billing`);                   // a reload won't open another
   });
 
   test('a deal with a draft proposal already: that draft is the one to send, never a second', async ({ page }) => {
@@ -396,7 +396,7 @@ test.describe('+ Create', () => {
     // a link from anywhere: #create:invoice
     await page.goto('/agency.html#create:invoice');
     await expect(dlg(page).locator('#dds-cr-title')).toHaveText('Send an invoice');
-    expect(new URL(page.url()).hash).toBe('');
+    await expect.poll(() => new URL(page.url()).hash).toBe('');
   });
 
   test('only a studio: an owner gets no Create; inside a client it stays, for that client (sales item 91)', async ({ page }) => {

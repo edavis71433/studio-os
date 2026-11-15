@@ -159,7 +159,7 @@ test.describe('Getting in (builder item 192)', () => {
     await page.locator('#go').click();
     await expect(page.locator('#door')).toBeVisible();
     expect(went).toBe('/crm.html?client=abc');
-    expect(new URL(page.url()).hash).toBe('#notes');
+    await expect.poll(() => new URL(page.url()).hash).toBe('#notes');
     expect(await page.evaluate(() => localStorage.getItem('dds-studio-return'))).toBeNull();
   });
 

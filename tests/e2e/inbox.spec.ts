@@ -700,11 +700,11 @@ test.describe('Inbox lenses — filter by client and by project without a profil
     await expect(page.locator('#fProject')).toHaveValue(P2);
     // OUT: changing a lens rewrites the URL (pipeline.html's listUrl idiom)
     await page.locator('#fProject').selectOption(P1);
-    expect(new URL(page.url()).searchParams.get('project')).toBe(P1);
-    expect(new URL(page.url()).searchParams.get('client_id')).toBe('c-1');
+    await expect.poll(() => new URL(page.url()).searchParams.get('project')).toBe(P1);
+    await expect.poll(() => new URL(page.url()).searchParams.get('client_id')).toBe('c-1');
     // clearing a lens drops its param entirely rather than leaving an empty one
     await page.locator('#fClient').selectOption('');
-    expect(new URL(page.url()).searchParams.has('client_id')).toBe(false);
+    await expect.poll(() => new URL(page.url()).searchParams.has('client_id')).toBe(false);
     // and that URL, reloaded, is the same view
     await page.reload();
     await expect(page.locator('#fProject')).toHaveValue(P1);
@@ -733,8 +733,8 @@ test.describe('Inbox lenses — filter by client and by project without a profil
     await expect(page.locator('#fClient')).toHaveValue('');
     await expect(page.locator('#fProject')).toHaveValue('');
     await expect(page.locator('#q')).toHaveValue('');
-    expect(new URL(page.url()).searchParams.has('client_id')).toBe(false);
-    expect(new URL(page.url()).searchParams.has('project')).toBe(false);
+    await expect.poll(() => new URL(page.url()).searchParams.has('client_id')).toBe(false);
+    await expect.poll(() => new URL(page.url()).searchParams.has('project')).toBe(false);
     await expect(page.locator('#rows [role=option]')).toHaveCount(5);   // no worklog row (item 18)
   });
 
@@ -839,9 +839,9 @@ test.describe('Inbox lenses — filter by client and by project without a profil
     await page.goto('/inbox.html?client=site-77');
     // the lens writes its own params and leaves the scope param first and intact
     await page.locator('#fClient').selectOption('c-1');
+    await expect.poll(() => new URL(page.url()).searchParams.get('client_id')).toBe('c-1');
     let u = new URL(page.url());
     expect(u.searchParams.get('client')).toBe('site-77');
-    expect(u.searchParams.get('client_id')).toBe('c-1');
     // the scoped read header still goes out with the scope on it
     const req = page.waitForRequest((r) => r.url().includes('/portal/feed'));
     await page.locator('#refreshBtn').click();
@@ -849,9 +849,9 @@ test.describe('Inbox lenses — filter by client and by project without a profil
     // clearing the lenses does not clear the tenant
     await page.locator('#fProject').selectOption(P1);
     await page.locator('#fClient').selectOption('');
+    await expect.poll(() => new URL(page.url()).searchParams.has('client_id')).toBe(false);
     u = new URL(page.url());
     expect(u.searchParams.get('client')).toBe('site-77');
-    expect(u.searchParams.has('client_id')).toBe(false);
   });
 
   test('mobile: the lenses sit in the list header, narrow in one tap, and never strand the pane', async ({ page }, testInfo) => {

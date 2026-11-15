@@ -2377,7 +2377,7 @@ test.describe('Pipeline — the record’s Payment schedule link, ?tab=, #outsta
     await expect(page.locator('#dtab-billing')).toHaveAttribute('aria-selected', 'true');
     await expect(page.locator('#pl-create')).toBeVisible();                    // the builder, open
     await expect(page.locator('#invForm')).toContainText('Total to schedule');
-    expect(new URL(page.url()).hash).toBe('');
+    await expect.poll(() => new URL(page.url()).hash).toBe('');
   });
 
   test('?tab=billing is an alias of ?dtab=billing', async ({ page }) => {
@@ -2390,7 +2390,7 @@ test.describe('Pipeline — the record’s Payment schedule link, ?tab=, #outsta
     await installApp(page, { api: API });
     await page.goto('/pipeline.html#outstanding');
     await expect(page.locator('#detailInner')).toContainText('Who owes you');
-    expect(new URL(page.url()).hash).toBe('');
+    await expect.poll(() => new URL(page.url()).hash).toBe('');
   });
 
   test('the deposit mini-form’s button says "Request deposit", not Save', async ({ page }) => {
