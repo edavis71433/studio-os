@@ -38,10 +38,13 @@ const world = () => { db.reset({ presence_sites: [{ id: SITE, client_id: OWNER }
 {
   world();
   const r = await res(await R.handlePageLockCreate(req('POST', { password: ' abc ' }), site, owner, cors));
-  ok('a short password: 422 and a plain sentence', r.status === 422 && r.body.message === 'Use at least 4 letters or numbers.');
+  ok('a short password: 422 and a plain sentence', r.status === 422 && r.body.message === 'Use at least 8 letters or numbers.');
   ok('a short password: nothing written', locks().length === 1);
   const r2 = await res(await R.handlePageLockCreate(req('POST'), site, owner, cors));
-  ok('no password at all: the same sentence', r2.status === 422 && /at least 4/.test(r2.body.message));
+  ok('no password at all: the same sentence', r2.status === 422 && /at least 8/.test(r2.body.message));
+  // builder item 204: the locked page can be guessed at in a visitor's browser with no limit on tries
+  const r3 = await res(await R.handlePageLockCreate(req('POST', { password: 'letmein' }), site, owner, cors));
+  ok('seven characters is still too short (item 204), and nothing is written', r3.status === 422 && r3.body.message === 'Use at least 8 letters or numbers.' && locks().length === 1);
 }
 
 // ═══ a good password: the key is kept, never the password ═══

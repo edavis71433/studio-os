@@ -12,16 +12,19 @@ import type { SiteRow } from '../lib/site.ts';
 import { siteOrigin, hostedName } from '../lib/site.ts';
 import type { Principal } from '../../_shared/auth.ts';
 import { parseRedirectList, planImport, suggestTargets, sitemapLocs, REDIRECT_CAP } from '../lib/redirect_import.ts';
-import { assertPublicHttpUrl, normalizeSiteUrl } from '../../_shared/tools/url_guard.ts';
+import { assertPublicHttpUrl, normalizeSiteUrl, guardedFetch } from '../../_shared/tools/url_guard.ts';
 import { fetchPublic, sameSite, looksLikeHtml } from '../../_shared/site_discovery.ts';
 
 const fence = async <T>(p: Promise<T>): Promise<T | null> => { try { return await p; } catch { return null; } };
 
-async function linkOk(url: string): Promise<boolean | null> {
+// item 204: a link the owner typed is fetched through the guarded fetcher (no private or
+// internal address, on any redirect hop); a refused one reads as broken
+export async function linkOk(url: string): Promise<boolean | null> {
   if (!/^https?:\/\//i.test(url)) return null;   // internal / relative → correct by construction
-  const head = await fence(fetch(url, { method: 'HEAD', redirect: 'follow', signal: AbortSignal.timeout(4000) }));
+  const head = await fence(guardedFetch(url, { method: 'HEAD', signal: AbortSignal.timeout(4000) }));
   if (head && (head.ok || head.status === 405 || head.status === 403)) return true;  // some hosts refuse HEAD politely
-  const get = await fence(fetch(url, { method: 'GET', redirect: 'follow', signal: AbortSignal.timeout(4000) }));
+  const get = await fence(guardedFetch(url, { method: 'GET', signal: AbortSignal.timeout(4000) }));
+  if (get) await get.body?.cancel().catch(() => {});
   return get ? get.ok : false;
 }
 

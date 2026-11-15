@@ -52,7 +52,8 @@ ok('PATH: STAGE_LABEL is byte-identical to pipeline.html', stageLabelMap(crm) !=
 // too (nested braces per stage → match through the closing "\n};", not [^}]+)
 const guidanceMap = (src) => (src.match(/const PIPELINE_GUIDANCE=\{[\s\S]*?\n\};/) || [''])[0];
 ok('PATH: PIPELINE_GUIDANCE is byte-identical to pipeline.html', guidanceMap(crm) !== '' && guidanceMap(crm) === guidanceMap(pipeline));
-ok('PATH: guidance renders BOTH tip and action (the pipeline.html:694 bug, fixed here)', /esc\(g\.tip\)/.test(crm) && /esc\(g\.action\)/.test(crm) && !/esc\(g\.suggested_action\)/.test(crm));
+// sales item 124 put the stage note where the tip strip was; the deal's own fact (signed, declined…) rides on top, tip and action both
+ok('PATH: the stage note’s fact line renders BOTH tip and action (the pipeline.html:694 bug stays fixed)', /esc\(fact\.tip\)/.test(crm) && /esc\(fact\.action\)/.test(crm) && !/esc\(g\.suggested_action\)/.test(crm));
 ok('PATH: the forward button (Move to <next stage> →, was "Mark stage complete") advances via the stage route', /id="markComplete">Move to \$\{esc\(stageLabel\(fwd\)\)\} →/.test(crm) && /\/stage','POST',\{to\}/.test(crm));
 ok('PATH: won is convert-only — the button becomes a pipeline link', /Convert to customer →/.test(crm) && /signed/.test(crm));
 

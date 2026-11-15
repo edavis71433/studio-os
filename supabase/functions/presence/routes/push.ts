@@ -4,6 +4,7 @@ import { svc } from '../lib/db.ts';
 import { resolveSite } from '../lib/site.ts';
 import { sendPush, pushConfigured, type PushSub } from '../lib/webpush.ts';
 import type { Principal } from '../../_shared/auth.ts';
+import { assertPublicHttpUrl } from '../../_shared/tools/url_guard.ts';   // builder item 204
 
 const clean = (s: unknown, max = 2000) => String(s ?? '').replace(/[\x00-\x1F\x7F]/g, '').trim().slice(0, max);
 
@@ -15,6 +16,8 @@ export async function handlePushSubscribe(req: Request, principal: Principal, co
   const p256dh = clean(keys.p256dh, 200);
   const auth = clean(keys.auth, 200);
   if (!/^https:\/\//.test(endpoint) || !p256dh || !auth) return json({ error: 'validation', message: 'Invalid push subscription.' }, 422, cors);
+  // builder item 204: a browser hands us this address, and we post to it later, so it must be a public one
+  try { await assertPublicHttpUrl(endpoint); } catch { return json({ error: 'validation', message: 'Invalid push subscription.' }, 422, cors); }
   const jwt = principal.jwt || '';
   const site = jwt ? await resolveSite(jwt) : null;
   await svc('presence_push_subscriptions?on_conflict=endpoint', {

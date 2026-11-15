@@ -53,6 +53,7 @@
 <body>
 <main class="box" id="box" aria-live="polite"><div class="spin" role="status" aria-label="Loading"></div></main>
 <script src="/vendor/supabase-js-2.45.4.js"></script>
+<script src="/fresh-code.js?v=191"></script>
 <script>
 // ── Transfer ownership: the page the emails open (builder list item 53, Nov 2026) ─
 // A transfer waits on one person at a time: the owner agrees to a request their
@@ -86,6 +87,25 @@ function signInPanel(note){
     try{await sb.auth.signInWithOtp({email:em,options:{shouldCreateUser:false,emailRedirectTo:location.origin+'/transfer.html'+(WANT?'?id='+WANT:'')}});}catch(_){/* the same calm answer either way */}
     const s=$('sent');s.hidden=false;s.textContent='If '+em+' has an account, a sign-in link is on its way. Open it on this device.';$('go').disabled=false;});
 }
+// builder item 191: an account with two-step sign-in on types the code from its app here,
+// after the emailed link; until then the server treats the link's sign-in as signed out
+function stepPanel(factor){
+  paint(`<h1>One more step.</h1><p id="tstHow">This account has two-step sign-in on. Type the 6-digit code from your authenticator app.</p><div id="tstBox"></div><div class="row"><button type="button" class="pri" id="tstGo">Confirm</button></div><p class="foot">Signed in as ${esc(EMAIL)}. Lost or changed your phone? Ask your studio, or whoever sent you this. They check it’s you, then have two-step sign-in turned off.</p>`);
+  let busy=false;
+  const go=async()=>{
+    if(busy)return;const c=bx.value();
+    if(c.length!==6){bx.fault('Type all six digits.');bx.focus();return;}
+    busy=true;$('tstGo').disabled=true;
+    const r=await window.ddsFresh.verifyApp(sb,factor.id,c);
+    busy=false;$('tstGo').disabled=false;
+    if(r.ok||r.gone){if(r.gone){try{await sb.auth.refreshSession();}catch(_){}}try{const{data}=await sb.auth.getSession();TOKEN=(data&&data.session&&data.session.access_token)||'';}catch(_){}load();return;}
+    bx.fault(r.message);bx.clear();bx.focus();
+  };
+  const bx=window.ddsFresh.boxes({id:'tstCode',describedBy:'tstHow',onFull:go,onEnter:go});
+  $('tstBox').appendChild(bx.el);$('tstBox').appendChild(bx.err);
+  $('tstGo').addEventListener('click',go);
+  bx.focus();
+}
 function nothing(){paint(`<h1>Nothing is waiting on you</h1><p>It may have been answered already, stopped, or have lapsed after 14 days. If you expected one, ask whoever sent it to start it again.</p><p class="foot">Signed in as ${esc(EMAIL)}</p><div class="row"><a class="btn" href="/portal.html">Go to your account</a></div>`);}
 function trouble(msg){paint(`<h1>That didn’t load</h1><p>${esc(msg||'It’s probably the connection. Try again in a moment.')}</p><div class="row"><button type="button" class="pri" id="again">Try again</button></div>`);$('again').addEventListener('click',load);}
 function also(t){const rest=LIST.filter(x=>x.id!==t.id);return rest.length?`<div class="also">Also waiting on you: ${rest.map(x=>`<a href="/transfer.html?id=${encodeURIComponent(x.id)}">${esc(x.business)}</a>`).join(', ')}</div>`:'';}
@@ -108,7 +128,10 @@ function show(t){
 }
 async function answer(t,verb){
   box().querySelectorAll('[data-do]').forEach(b=>{b.disabled=true;});
-  const r=await api('/transfers/'+encodeURIComponent(t.id)+'/'+verb,'POST',{});
+  // builder item 191: agreeing hands the site away, so it asks for a fresh code first (fresh-code.js)
+  const send=(extra)=>api('/transfers/'+encodeURIComponent(t.id)+'/'+verb,'POST',extra||{});
+  const r=(verb==='agree'&&window.ddsFresh)?await window.ddsFresh.run(send,{sb}):await send({});
+  if(r.cancelled){box().querySelectorAll('[data-do]').forEach(b=>{b.disabled=false;});return;}
   if(!r.ok){const m=$('msg');if(m)m.innerHTML=`<div class="err" role="alert">${esc((r.body&&r.body.message)||'That didn’t go through. Nothing changed; try again.')}</div>`;box().querySelectorAll('[data-do]').forEach(b=>{b.disabled=false;});return;}
   const d=r.body.data||{};
   if(verb==='accept'){paint(`<span class="ok" aria-hidden="true">✓</span><h1>${esc(t.business)} is yours now</h1><p>${esc(first(t.owner_name))}${t.studio?' and your studio':''} got an email saying so. You’ll find the people and the plan in Settings.</p><div class="row"><a class="btn pri" href="/portal.html">Open ${esc(t.business)}</a></div>`);return;}
@@ -118,7 +141,12 @@ async function answer(t,verb){
 async function load(){
   box().innerHTML='<div class="spin" role="status" aria-label="Loading"></div>';
   const r=await api('/transfers');
-  if(r.status===401){signInPanel();return;}
+  if(r.status===401){
+    // item 191: refused as signed out may be the second step this device didn't know about
+    const due=(TOKEN&&window.ddsFresh)?await window.ddsFresh.stepDue(sb,{ask:true}):{};
+    if(due.due){stepPanel(due.factor);return;}
+    signInPanel();return;
+  }
   if(!r.ok||!r.body||!Array.isArray(r.body.data)){trouble(r.body&&r.body.message);return;}
   LIST=r.body.data;
   if(!LIST.length){nothing();return;}
@@ -128,6 +156,8 @@ async function load(){
   if(!sb){trouble('Connection problem. Check your internet and refresh this page.');return;}
   try{const{data}=await sb.auth.getSession();TOKEN=(data&&data.session&&data.session.access_token)||'';EMAIL=(data&&data.session&&data.session.user&&data.session.user.email)||'';}catch(_){TOKEN='';}
   if(!TOKEN){signInPanel();return;}
+  const due=window.ddsFresh?await window.ddsFresh.stepDue(sb):{};   // item 191
+  if(due.due){stepPanel(due.factor);return;}
   load();
 })();
 </script>

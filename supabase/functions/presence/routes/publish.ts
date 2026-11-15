@@ -47,6 +47,7 @@ import { checkSoon } from '../lib/check_soon.ts';
 import type { Principal } from '../../_shared/auth.ts';
 import { UUID_LOWER_RE as UUID_RE } from '../lib/uuid.ts';
 import { copiedBlockerFor } from '../lib/copied_record.ts';
+import { guardedFetch } from '../../_shared/tools/url_guard.ts';   // builder item 204
 
 
 export const CALM = 'We hit a snag updating your site and we’re on it — nothing changed on your live site.';
@@ -769,7 +770,8 @@ export async function strangerStatus(url: string, settled: (status: number) => b
   for (let i = 0; i < tries; i++) {
     if (i) await new Promise((r) => setTimeout(r, waitMs));
     try {
-      const r = await fetch(url, { method: 'GET', redirect: 'manual', headers: { 'cache-control': 'no-cache' } });
+      // builder item 204: the live address may be a typed domain; the guard first, and the first answer as it is
+      const r = await guardedFetch(url, { method: 'GET', headers: { 'cache-control': 'no-cache' } }, { follow: false });
       status = r.status;
       await r.body?.cancel().catch(() => {});
     } catch { status = 0; }
