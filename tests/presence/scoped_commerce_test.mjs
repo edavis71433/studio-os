@@ -214,6 +214,13 @@ Deno.listen = () => {
 };
 Deno.serveHttp = () => ({ nextRequest: () => new Promise((res) => { if (queue.length) res(queue.shift()); else wake = res; }), close() {} });
 await import('../../supabase/functions/presence/index.ts');
+// builder item 191: closing the account asks for a fresh code; these people signed in with their
+// authenticator app's code a moment ago, so it counts (lib/fresh_code.ts)
+{
+  const { freshDeps } = await import('../../supabase/functions/presence/lib/fresh_code.ts');
+  freshDeps.user = async (jwt) => (USERS[jwt] ? { id: USERS[jwt].id, email: USERS[jwt].email, factors: [{ id: 'f1', factor_type: 'totp', status: 'verified' }] } : null);
+  freshDeps.claims = () => ({ aal: 'aal2', amr: [{ method: 'totp', timestamp: Math.floor(Date.now() / 1000) }] });
+}
 
 function send(request) {
   return new Promise((resolve) => {
