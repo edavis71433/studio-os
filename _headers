@@ -15,10 +15,6 @@
   Cache-Control: no-store, no-cache, must-revalidate
   X-Robots-Tag: noindex
 
-/dds-studio-manage-9k2p.html
-  Cache-Control: no-store, no-cache, must-revalidate
-  X-Robots-Tag: noindex
-
 /og-image.jpg
   Cache-Control: public, max-age=604800
 
@@ -122,10 +118,6 @@
   Cache-Control: no-cache, must-revalidate
 /project-survey
   Cache-Control: no-cache, must-revalidate
-/welcome
-  Cache-Control: no-cache, must-revalidate
-/provision
-  Cache-Control: no-cache, must-revalidate
 /attention
   Cache-Control: no-cache, must-revalidate
 /approval-center
@@ -147,8 +139,6 @@
 /admin-health
   Cache-Control: no-cache, must-revalidate
 /admin-growth
-  Cache-Control: no-cache, must-revalidate
-/portal-workspace
   Cache-Control: no-cache, must-revalidate
 /payment-success
   Cache-Control: no-cache, must-revalidate

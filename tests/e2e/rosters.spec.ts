@@ -239,23 +239,18 @@ test.describe('Customers — SS6 quick wins', () => {
     await expect(page.locator('#cust-done')).toContainText('jane@acmebakery.com');
   });
 
-  test('C4 — the connect-by-email mode saves without provisioning', async ({ page }) => {
+  test('C4 — builder item 199: no "they\'ll sign up themselves" choice; the dialog sets them up', async ({ page }) => {
     await pinTable('dds-display:customers')(page);
-    await installApp(page, { api: {
-      '/studio/customers': CUSTOMERS,
-      '/sales/customers': { data: { mode: 'connect', pending: true, connected: false } },
-    } });
+    await installApp(page, { api: { '/studio/customers': CUSTOMERS } });
     await page.goto('/customers.html');
     await page.locator('#addCust').click();
-    await page.locator('input[name="cumode"][value="connect"]').check();
-    // provision-only fields hide; the submit relabels honestly
-    await expect(page.locator('#cu-provision-only')).toBeHidden();
-    await expect(page.locator('#cu-submit')).toHaveText('Save');
-    await page.locator('#cu-email').fill('jane@acmebakery.com');
-    const post = page.waitForRequest((r) => r.method() === 'POST' && r.url().includes('/sales/customers'));
-    await page.locator('#cu-submit').click();
-    expect((await post).postDataJSON()).toEqual({ mode: 'connect', email: 'jane@acmebakery.com' });
-    await expect(page.locator('#cust-done')).toContainText('Saved');
+    const dlg = page.locator('#custDlg');
+    await expect(dlg).toBeVisible();
+    await expect(dlg.locator('input[type="radio"]')).toHaveCount(0);
+    await expect(dlg).not.toContainText('sign up themselves');
+    await expect(dlg.locator('a[href*="pricing"], #cu-signup')).toHaveCount(0);
+    await expect(dlg.locator('#cu-biz')).toBeVisible();   // every field shows, no mode hides any
+    await expect(page.locator('#cu-submit')).toHaveText('Set up + invite');
   });
 
   test('D7 — a stray ?client= cannot blank the roster: /studio/customers is asked UNSCOPED', async ({ page }) => {
@@ -564,7 +559,7 @@ test.describe('Customers — the agency member gets the roster (no forward since
     await page.locator('#addCust').click();
     await expect(page.locator('#cu-kit-wrap')).toBeVisible();
     await expect(page.locator('#cu-kit option')).toHaveText(['No kit — start empty', 'Restaurant starter']);
-    await expect(page.locator('#cu-signup')).toBeHidden();      // provision mode: no pricing box
+    await expect(page.locator('#cu-signup')).toHaveCount(0);    // builder item 199: no sign-up link at all
     // the owner's copy: no agency, no field — even with kits fixtured
     await installApp(page, { api: { '/studio/customers': CUSTOMERS, '/agency/kits': KITS } });
     await page.goto('/customers.html');

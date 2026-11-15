@@ -63,20 +63,20 @@ test.describe('the owner answers a studio\'s request', () => {
   });
 });
 
-test('Customers: connecting an account that isn\'t yours says "Request sent"', async ({ page }) => {
+test('Customers: adding someone whose account isn\'t yours says "Request sent"', async ({ page }) => {
   let sent: unknown = null;
   await installApp(page, { api: { '/studio/customers': { data: [] } } });
   await page.route('**/functions/v1/presence/sales/customers', (route) => {
     sent = route.request().postDataJSON();
-    return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: { mode: 'connect', requested: true, pending: true, connected: false, message: 'x' } }) });
+    return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: { already_exists: true, requested: true, created: false, message: 'x' } }) });
   });
   await page.goto('/customers.html');
   await page.locator('#addCust').click();
-  await page.locator('input[name="cumode"][value="connect"]').check();
+  await expect(page.locator('#cu-name')).toBeFocused();   // the dialog focuses Name a beat after opening
   await page.locator('#cu-email').fill('sam@harbor.test');
   await page.locator('#cu-submit').click();
   await expect(page.locator('#cust-done')).toContainText('Request sent');
   await expect(page.locator('#cust-done')).toContainText('they need to say yes first');
   await expect(page.locator('#cust-done')).not.toContainText('Their sign-in page');
-  expect(sent).toMatchObject({ mode: 'connect', email: 'sam@harbor.test' });
+  expect(sent).toMatchObject({ mode: 'provision', email: 'sam@harbor.test' });
 });

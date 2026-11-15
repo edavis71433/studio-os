@@ -846,7 +846,7 @@ export async function handleAgencySites(req: Request, route: string, method: str
     const label = String(client.name || '').trim() || 'New customer';
     // best-effort from here, as in Add a customer: the login is the truth
     await bridgeCustomerToStudio({ agencySiteId: own.id, clientId: client.id, customerSiteId: siteId, label }).catch(() => null);
-    const ct = await ensureConnectContact(own.id, email, person, false).catch(() => null);
+    const ct = await ensureConnectContact(own.id, email, person).catch(() => null);
     await linkContactToCustomer(own.id, ct?.id, client.id).catch(() => {});
     await svc(`presence_agency_clients?site_id=eq.${siteId}&agency_id=eq.${member.agency_id}`, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ owner_email: email }) }).catch(() => null);
     const invited = await sendCustomerInvite(own.id, email, true).catch(() => false);

@@ -23,16 +23,18 @@ const client = read('supabase/functions/presence/routes/client_delivery.ts');
 const subs = read('supabase/functions/presence/commerce/subscriptions.ts');
 
 // ── SIGNUP + TRIAL ──
-step(1, 'Signup creates the auth user + contact/client chain (rollback-safe)', /createAuthUser\(email, password\)/.test(commerce) && /createContactAndClient\(au\.id/.test(commerce));
-step(2, 'Signup records durable terms-acceptance evidence', /await recordAcceptance\(\{/.test(commerce) && /export async function recordAcceptance/.test(terms));
-step(3, 'Trial provisions the workspace immediately (no card)', /if \(isTrial\)/.test(commerce) && /provisionForSignup\(\{ clientId: chain\.clientId/.test(commerce));
+// Builder item 199 (Nov 15 2026): self-serve sign-up is closed. Studios add their clients
+// and invite them, so steps 1 to 3 and 6 to 8 now check that the closed door stays closed.
+step(1, 'Sign-up is closed: the route answers one fixed reply and makes no account', /\(route === '\/commerce\/signup' \|\| route === '\/commerce\/verify'\) && method === 'POST'\) return signupClosed\(cors\)/.test(commerce) && !/createAuthUser\(/.test(commerce));
+step(2, 'The reply is the same for every email (no body read, no lookup); the terms recorder stays for later', /return json\(SIGNUP_CLOSED, 410, cors\)/.test(commerce) && !/findClientByEmail\(/.test(commerce) && /export async function recordAcceptance/.test(terms));
+step(3, 'Nothing joins a studio by signing up (the unproved-email join is gone)', !/autoConnectPreListedStudio|bridgeCustomerToStudio/.test(commerce));
 step(4, 'A no-card trial past its end is FORCE-EXPIRED (the revenue bug)', /export function shouldExpireTrial/.test(life) && /shouldExpireTrial\(e, nowIso\)/.test(life));
 step(5, 'Trial-ending nudge fires in the last 3 days', /days > 0 && days <= 3\) out\.push\('trial_ending'\)/.test(life));
 
 // ── PAID CHECKOUT ──
-step(6, 'Paid signup hands off to Stripe Checkout', /createSubscriptionCheckout\(\{/.test(commerce));
-step(7, 'Checkout reuses an existing Stripe customer (no duplicates)', /const existingCustomer = await findCustomerIdByEmail\(p\.email\)/.test(stripe) && /params\['customer'\] = existingCustomer/.test(stripe));
-step(8, 'Checkout idempotency key includes the unique clientId', /const idem = `signup-\$\{p\.signupId\}-\$\{p\.clientId\}/.test(stripe));
+step(6, 'No plan checkout starts in the app any more (it only served sign-up)', !/createSubscriptionCheckout/.test(stripe) && !/createSubscriptionCheckout/.test(commerce));
+step(7, 'No cancelled checkout returns anyone to the old price page', !/pricing\.html/.test(stripe));
+step(8, 'A plan already paid is still managed in the billing portal, back to Settings → Your plan', /createBillingPortal\(String\(customerId\), `\$\{app\}\/settings\.html#billing`\)/.test(commerce));
 
 // ── WEBHOOK: the single source of payment truth ──
 step(9, 'Webhook verifies the Stripe signature first (else 400)', /verifyStripeSignature\(raw/.test(wh) && /invalid signature/.test(wh));

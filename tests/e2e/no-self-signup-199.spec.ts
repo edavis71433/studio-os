@@ -1,0 +1,62 @@
+import { test, expect } from '@playwright/test';
+import { installApp, STUDIO_NAV, ALL_FEATURES } from './helpers/app';
+
+// Builder item 199 (Nov 15 2026): nobody signs up by themselves. Studios add their
+// clients and invite them, so:
+//   · Add a customer offers no "they'll sign up themselves" choice, on Home too;
+//   · the builder's plan card opens Settings → Your plan, not the old price page;
+//   · Get started says what's missing instead of doing nothing (file 06, finding 46).
+// The server's closed sign-up is pinned by tests/presence/no_self_signup_test.mjs.
+
+const OWNER_CTX = { data: {
+  site_role: 'business_owner', edition: 'presence', edition_key: 'studio_os', edition_name: 'Studio OS', edition_features: ALL_FEATURES,
+  is_agency: false, is_operator: false, sees_full_workspace: true,
+  capabilities: ['edit', 'publish', 'invite', 'configure', 'use_developer_mode', 'view_all'],
+  landing: '/presence.html', attention_count: 0, nav: STUDIO_NAV, plan_key: 'presence', upsell: null,
+} };
+const EDITOR_API = {
+  '/site': { data: { site: { id: 's1', edition: 'presence', status: 'ready', template_slug: 'business-classic', template_version: 1 }, identity: { business_name: 'Test Studio', description: 'Hello' }, location: null } },
+  '/offerings': { data: [] }, '/faqs': { data: [] }, '/testimonials': { data: [] }, '/posts': { data: [] },
+  '/media': { data: [] }, '/settings': { data: {} }, '/health': { data: {} }, '/notes': { data: [] },
+  '/changes': { data: { count: 0, first_publish: false, changes: [], blockers: 0, warnings: 0, draft_hash: 'h' } },
+  '/moments': { data: [] }, '/schedule': { data: { scheduled: [] } }, '/content-library': { data: [] },
+  '/dev/customization': { data: { theme_tokens: {}, custom_css: '', custom_html: '', allowed_tokens: [] } },
+  '/portal/context': OWNER_CTX,
+};
+
+test('Home: Add a customer only sets them up; no sign-up choice, link or price page', async ({ page }) => {
+  await installApp(page);
+  await page.goto('/agency.html');
+  await page.locator('#top').getByRole('button', { name: '+ Add a customer' }).click();
+  const dlg = page.locator('#custDlg');
+  await expect(dlg).toBeVisible();
+  await expect(dlg.locator('input[type="radio"], #cu-signup, a[href*="pricing"]')).toHaveCount(0);
+  await expect(dlg).not.toContainText('sign up themselves');
+  await expect(dlg.locator('#cu-biz')).toBeVisible();
+  await expect(dlg.locator('#cu-submit')).toHaveText('Set up + invite');
+});
+
+test('the builder’s plan card opens Settings → Your plan, never the old price page', async ({ page }) => {
+  await installApp(page, { api: { ...EDITOR_API, '/commerce/notices': { data: { notices: [{ id: 'n3', kind: 'capacity', headline: 'You’re close to your plan’s limit', body: 'b', dismissible: true }] } } } });
+  await page.goto('/presence.html');
+  await expect(page.getByText('You’re close to your plan’s limit')).toBeVisible();
+  const go = page.getByRole('link', { name: 'Open Your plan' });
+  await expect(go).toBeVisible();
+  await expect(go).toHaveAttribute('href', 'settings.html#billing');
+  await expect(page.locator('a[href*="pricing.html"]')).toHaveCount(0);
+});
+
+test('Get started: with nothing to draft from, Build my website says what’s missing', async ({ page }) => {
+  const asked: string[] = [];
+  page.on('request', (r) => { if (r.url().includes('/writer/generate')) asked.push(r.url()); });
+  await installApp(page, { api: { '/portal/context': OWNER_CTX, '/settings': { data: { industry_key: 'generic' } }, '/offerings': { data: [] }, '/identity': { data: { business_name: 'Harbor Lane Bakery' } } } });
+  await page.goto('/get-started.html');
+  await expect(page.getByRole('button', { name: 'Build my website →' })).toBeVisible();
+  for (const box of await page.locator('[data-svc]').all()) await box.fill('');
+  await page.locator('#desc').fill('');
+  await page.getByRole('button', { name: 'Build my website →' }).click();
+  await expect(page.locator('#needMore')).toBeVisible();
+  await expect(page.locator('#needMore')).toHaveText('Add one thing you offer, or a sentence about the business, so there’s something to draft from.');
+  await expect(page.locator('#desc')).toBeFocused();
+  expect(asked).toEqual([]);
+});

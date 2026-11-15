@@ -1,14 +1,14 @@
-// ── /commerce/* — self-serve signup & commerce (L1) ─────────────────────────
+// ── /commerce/* — plans, billing and the account (L1) ─────────────────────────
 // A public-safe bounded context, handled (like /agency) BEFORE the client/staff
-// 401 so a stranger can discover, price, and buy Studio OS with no operator in
-// the loop. The authed routes inside (subscription, billing portal, first-run)
+// 401: the price list and the Stripe echoes need no sign-in. Self-serve sign-up
+// is closed (builder item 199): its routes answer one fixed reply. The authed routes inside (subscription, billing portal, first-run)
 // require a signed-in caller and resolve their own site via RLS.
 //
 // Flow:
 //   GET  /commerce/plans            (public)  the catalog + prices
-//   POST /commerce/signup           (public)  account → trial-provision OR checkout
-//   POST /commerce/verify           (public)  confirm email (non-blocking)
-//   GET  /commerce/checkout-status  (public)  did the webhook provision yet?
+//   POST /commerce/signup           (public)  closed: one fixed "sign-up is closed" reply (item 199)
+//   POST /commerce/verify           (public)  closed, the same reply
+//   GET  /commerce/checkout-status  (public)  closed, the same reply
 //   GET  /commerce/subscription     (authed)  the caller's plan/status/renewal
 //   POST /commerce/portal           (authed)  Stripe billing portal (manage/cancel/change)
 //   GET  /commerce/first-run        (authed)  has the owner hidden their welcome list?
@@ -23,36 +23,26 @@ import { json } from '../../_shared/http.ts';
 import { svc, asUser } from '../lib/db.ts';
 import { raiseNotice, raiseNoticeDetailed } from '../lib/notice.ts';
 import { noticeDismissible } from '../lib/inbox_feed.ts';
-import { rateAllow, clientIp, tooMany } from '../lib/ratelimit.ts';
 import { resolveSite } from '../lib/site.ts';
 import type { Principal } from '../../_shared/auth.ts';
 import {
-  PLANS, planByKey, isPlanKey, isTerm, displayPrice, priceCents, grantFounder,
-  stripeInterval, editionFor, FOUNDERS_OPEN,
+  PLANS, planByKey, isPlanKey, isTerm, displayPrice, grantFounder, editionFor, FOUNDERS_OPEN,
 } from '../commerce/catalog.ts';
-import type { PlanKey, Term } from '../commerce/catalog.ts';
 import { supportFor } from '../commerce/support.ts';
-import { validEmail, passwordProblem, findClientByEmail, createAuthUser, deleteAuthUser, createContactAndClient, sendEmail } from '../commerce/account.ts';
+import { sendEmail } from '../commerce/account.ts';
 import { provisionForSignup } from '../commerce/provision.ts';
 import { seedExampleData, exampleDataCounts, removeExampleData } from '../commerce/example_data.ts';
-import { bridgeCustomerToStudio, CONNECT_INTENT_TAG } from './sales.ts';
-import { trialEntitlementPatch, entitlementPatchFromSubscription } from '../commerce/subscriptions.ts';
+import { entitlementPatchFromSubscription } from '../commerce/subscriptions.ts';
 import type { EntitlementPatch } from '../commerce/subscriptions.ts';
-import { stripeConfigured, siteUrl, createSubscriptionCheckout, createBillingPortal } from '../commerce/stripe.ts';
+import { stripeConfigured, createBillingPortal } from '../commerce/stripe.ts';
 import { requestDeletion, cancelDeletion, coolingOffDays } from '../commerce/deletion.ts';
-import { recordAcceptance } from '../commerce/terms.ts';
 import { applyEntitlementPatch } from '../commerce/entitlement_sync.ts';
 import { isServiceRetainerMeta, applyRetainerSync } from '../commerce/retainers.ts';
 import { checkAiCeiling } from '../commerce/metering.ts';
 import { UUID_RE } from '../lib/uuid.ts';
-import { emailMatch } from '../lib/contact_email.ts';
 import { requireFresh } from '../lib/fresh_code.ts';   // builder item 191
 
 const TRIAL_DAYS = 14;
-
-function query(url: string, key: string): string {
-  try { return new URL(url).searchParams.get(key) || ''; } catch { return ''; }
-}
 
 // ── PUBLIC: the catalog ─────────────────────────────────────────────────────
 function planPayload(founder: boolean) {
@@ -78,166 +68,17 @@ function handlePlans(cors: Record<string, string>) {
   return json({ data: { founders_open: FOUNDERS_OPEN, trial_days: TRIAL_DAYS, plans } }, 200, cors);
 }
 
-// ── Auto-connect: a studio pre-listed this email to connect on signup ────────
-// When a studio records an email via contacts.html → "they'll sign up themselves"
-// (mode='connect'), it leaves a tagged, site-scoped presence_contacts row. The
-// site IS the studio, and presence_contacts.site_id is exactly the agency_site_id
-// the frozen bridge keys on. On a successful self-serve signup we look that record
-// up and bridge the brand-new customer to that studio — reusing the SAME
-// bridgeCustomerToStudio → ensureBridge path convert/add-customer use (never a
-// parallel bridge). Idempotent + best-effort: it must NEVER block or fail signup.
-// Only the explicit connect-intent tag triggers it (a coincidental CRM lead won't).
-// Logs are email-masked.
-async function autoConnectPreListedStudio(clientId: string, customerSiteId: string | null, email: string, businessName: string): Promise<void> {
-  try {
-    const needle = CONNECT_INTENT_TAG.replace(/[^a-z-]/gi, '');   // 'connect-on-signup' — the searchable inner tag (single source of truth)
-    const pending = (await svc(`presence_contacts?${emailMatch(email)}&notes=ilike.*${needle}*&deleted_at=is.null&select=site_id&order=updated_at.desc&limit=1`)).json?.[0];   // item 110 (K1): whatever the capitals
-    const agencySiteId = pending?.site_id ? String(pending.site_id) : '';
-    if (!agencySiteId) return;   // no studio pre-listed this email → nothing to connect
-    const r = await bridgeCustomerToStudio({ agencySiteId, clientId, customerSiteId, label: businessName });
-    const { maskEmail } = await import('./email_infra.ts');
-    console.log(`[signup] auto-connect ${maskEmail(email)} → studio site=${agencySiteId}: ${r.bridged ? 'bridged' : (r.ownedElsewhere ? 'skipped(owned-elsewhere)' : 'noop')}`);
-  } catch (e) {
-    try { const { maskEmail } = await import('./email_infra.ts'); console.warn(`[signup] auto-connect skipped for ${maskEmail(email)}: ${String((e as Error)?.message || e)}`); } catch { /* logging is best-effort too */ }
-  }
-}
-
-// ── PUBLIC: signup ──────────────────────────────────────────────────────────
-async function handleSignup(req: Request, cors: Record<string, string>) {
-  // Phase S / FD-M2: throttle account creation per-IP (brute-force + abuse guard).
-  if (!(await rateAllow(`signup:ip:${clientIp(req)}`, 5, 60))) return tooMany(cors);
-  let body: any = null;
-  try { body = await req.json(); } catch { return json({ error: 'bad_json', message: 'The request body wasn’t valid JSON.' }, 400, cors); }
-
-  const email = String(body?.email || '').trim().toLowerCase();
-  const password = String(body?.password || '');
-  const businessName = String(body?.business_name || '').trim();
-  const planKey = String(body?.plan || '');
-  const wantsTrial = body?.trial === true || (!body?.term && !!planByKey(planKey)?.trialEligible);
-  const term = String(body?.term || '');
-
-  if (!validEmail(email)) return json({ error: 'bad_email', message: 'Please enter a valid email address.' }, 422, cors);
-  const pwProblem = passwordProblem(password);
-  if (pwProblem) return json({ error: 'bad_password', message: pwProblem }, 422, cors);
-  if (!businessName) return json({ error: 'bad_business', message: 'Please tell us your business name.' }, 422, cors);
-  const plan = planByKey(planKey);
-  if (!plan) return json({ error: 'bad_plan', message: 'Please choose a plan.' }, 422, cors);
-  if (!plan.selfServe) return json({ error: 'not_self_serve', message: `${plan.name} is set up with our team — reach out and we’ll get you started.` }, 422, cors);
-
-  // For a paid signup, term is required and valid; for a trial, term is optional.
-  const isTrial = wantsTrial && plan.trialEligible;
-  if (!isTrial && !isTerm(term)) return json({ error: 'bad_term', message: 'Please choose monthly or annual billing.' }, 422, cors);
-
-  // Already have an account? Send them to sign in — never silently reuse.
-  const existing = await findClientByEmail(email);
-  if (existing) return json({ error: 'account_exists', message: 'An account with this email already exists. Please sign in instead.' }, 409, cors);
-
-  // Create the auth user, then the contact+client chain (each rolls back the prior on failure)
-  const au = await createAuthUser(email, password);
-  if ('error' in au) {
-    if (au.error === 'account_exists') return json({ error: 'account_exists', message: 'An account with this email already exists. Please sign in instead.' }, 409, cors);
-    return json({ error: 'signup_failed', message: 'We couldn’t create your account just now. Please try again.' }, 502, cors);
-  }
-  const chain = await createContactAndClient(au.id, email, businessName);
-  if ('error' in chain) {
-    await deleteAuthUser(au.id); // nothing half-made
-    return json({ error: 'signup_failed', message: 'We couldn’t finish setting up your account. Please try again.' }, 502, cors);
-  }
-
-  // M4 — capture durable clickwrap evidence (which version, when, from where).
-  // Best-effort: it must never cost a customer their just-created account.
-  await recordAcceptance({
-    clientId: chain.clientId, email, ip: clientIp(req),
-    userAgent: req.headers.get('user-agent') || '',
-    presentedTermsVersion: typeof body?.terms_version === 'string' ? body.terms_version : '',
-    method: 'clickwrap_signup', context: isTrial ? 'signup_trial' : 'signup_paid',
-  });
-
-  const verifyToken = crypto.randomUUID();
-  const founder = grantFounder();
-  const signupIns = await svc('presence_signups', {
-    method: 'POST', headers: { Prefer: 'return=representation' },
-    body: JSON.stringify({
-      email, plan: plan.key, term: isTrial ? null : term, business_name: businessName,
-      intent: isTrial ? 'trial' : 'paid', auth_user_id: au.id, client_id: chain.clientId,
-      verify_token: verifyToken, status: 'account_created',
-    }),
-  });
-  const signupId = signupIns.json?.[0]?.id;
-
-  // Welcome / confirm-your-email — best effort, never blocks the flow.
-  const verifyUrl = `${siteUrl()}/welcome.html?verify=${encodeURIComponent(verifyToken)}`;
-  sendEmail(email, 'Welcome to Studio OS — confirm your email',
-    `<p>Welcome. Your workspace is being set up.</p><p>Please confirm this is you: <a href="${verifyUrl}">confirm my email</a>.</p><p>You can sign in any time at <a href="${siteUrl()}/portal.html">your portal</a>.</p>`,
-    undefined, { critical: true },   // account verification = transactional; survives an opt-out
-  ).catch(() => {});
-
-  // ── Trial: provision immediately, no card. ──
-  if (isTrial) {
-    const patch = trialEntitlementPatch(plan.key, new Date(), TRIAL_DAYS);
-    const prov = await provisionForSignup({ clientId: chain.clientId, businessName, plan: plan.key, patch, actorEmail: email });
-    if (!prov.ok) {
-      if (signupId) await svc(`presence_signups?id=eq.${signupId}`, { method: 'PATCH', body: JSON.stringify({ status: 'failed', note: prov.error || 'provision_failed' }) });
-      // hosting not configured on a Presence trial → tell the truth, don't fake success
-      const msg = prov.error === 'hosting_unconfigured'
-        ? 'Your account is ready, but website hosting isn’t available on this environment yet. Please reach out and we’ll finish setup.'
-        : 'Your account is ready, but we hit a snag setting up your workspace. Please try again or reach out.';
-      return json({ error: 'provision_incomplete', message: msg, account_created: true }, 502, cors);
-    }
-    if (signupId) await svc(`presence_signups?id=eq.${signupId}`, { method: 'PATCH', body: JSON.stringify({ status: 'provisioned', site_id: prov.siteId }) });
-    // Benchmark 12: a brand-new site (this run CREATED the row — never an existing
-    // one) gets one example customer, deal and enquiry. Best-effort, never blocking.
-    if (prov.created && prov.siteId) await seedExampleData(prov.siteId).catch(() => {});
-    // If a studio pre-listed this email (connect-by-email), connect them now.
-    await autoConnectPreListedStudio(chain.clientId, prov.siteId || null, email, businessName);
-    return json({ data: { mode: 'trial', message: 'Your workspace is ready.', redirect: `${siteUrl()}/presence.html`, site_id: prov.siteId, trial_days: TRIAL_DAYS } }, 201, cors);
-  }
-
-  // ── Paid: hand off to Stripe Checkout; provisioning happens on the webhook. ──
-  if (!stripeConfigured()) {
-    return json({ error: 'billing_unavailable', message: 'Your account is ready, but checkout isn’t available on this environment yet. Please reach out to finish.', account_created: true }, 503, cors);
-  }
-  const cents = priceCents(plan.key, term as Term, founder);
-  if (cents == null) return json({ error: 'no_price', message: 'That plan can’t be purchased online — please reach out.' }, 422, cors);
-  try {
-    const co = await createSubscriptionCheckout({
-      productName: `Studio OS — ${plan.name}`,
-      amountCents: cents, interval: stripeInterval(term as Term),
-      email, clientId: chain.clientId, plan: plan.key, term, founder, signupId: signupId || 'nosignup',
-    });
-    if (signupId) await svc(`presence_signups?id=eq.${signupId}`, { method: 'PATCH', body: JSON.stringify({ status: 'checkout_pending', stripe_session_id: co.id }) });
-    // If a studio pre-listed this email (connect-by-email), form the connection now
-    // (the customer's workspace provisions on the webhook; the bridge is idempotent).
-    await autoConnectPreListedStudio(chain.clientId, null, email, businessName);
-    return json({ data: { mode: 'checkout', url: co.url } }, 200, cors);
-  } catch (e) {
-    return json({ error: 'checkout_failed', message: 'We couldn’t start checkout. Please try again.', detail: String((e as Error).message || e) }, 502, cors);
-  }
-}
-
-// ── PUBLIC: email verification (non-blocking) ───────────────────────────────
-async function handleVerify(req: Request, cors: Record<string, string>) {
-  let body: any = null;
-  try { body = await req.json(); } catch { return json({ error: 'bad_json', message: 'Invalid request.' }, 400, cors); }
-  const token = String(body?.token || '');
-  if (!token) return json({ error: 'bad_token', message: 'Missing verification token.' }, 422, cors);
-  const r = await svc(`presence_signups?verify_token=eq.${encodeURIComponent(token)}&select=id,verified_at&limit=1`);
-  const row = r.json?.[0];
-  if (!row) return json({ error: 'not_found', message: 'That link is no longer valid.' }, 404, cors);
-  if (!row.verified_at) {
-    await svc(`presence_signups?id=eq.${row.id}`, { method: 'PATCH', body: JSON.stringify({ verified_at: new Date().toISOString() }) });
-  }
-  return json({ data: { verified: true } }, 200, cors);
-}
-
-// ── PUBLIC: checkout status (poll after returning from Stripe) ──────────────
-async function handleCheckoutStatus(req: Request, cors: Record<string, string>) {
-  const sessionId = query(req.url, 'session_id');
-  if (!sessionId) return json({ error: 'bad_request', message: 'Missing session_id.' }, 422, cors);
-  const r = await svc(`presence_signups?stripe_session_id=eq.${encodeURIComponent(sessionId)}&select=status,site_id&limit=1`);
-  const row = r.json?.[0];
-  if (!row) return json({ data: { status: 'unknown', ready: false } }, 200, cors);
-  return json({ data: { status: row.status, ready: row.status === 'provisioned', site_id: row.site_id || null } }, 200, cors);
+// ── PUBLIC: self-serve sign-up is closed (builder item 199, Nov 15 2026) ──────
+// Studios add their clients and invite them, and the studio publishes no prices,
+// so nobody makes an account by themselves. The three routes that served the old
+// sign-up pages (signup.html, and welcome.html's email confirm and checkout poll)
+// answer one fixed reply. It is the same for every request: nothing is read from
+// the body and no email is looked up, so the answer can't tell whether an email
+// has an account. Invites (lib/workspace.ts), Add a customer and + New site make
+// accounts the studio's way, and no checkout starts here any more.
+const SIGNUP_CLOSED = { error: 'signup_closed', message: 'Studio OS accounts are made by the studio that looks after your website. Ask them to invite you.' };
+function signupClosed(cors: Record<string, string>) {
+  return json(SIGNUP_CLOSED, 410, cors);
 }
 
 // ── AUTHED: subscription summary ────────────────────────────────────────────
@@ -779,9 +620,8 @@ export async function handleCommerce(req: Request, route: string, method: string
     if (done) await svc(`presence_plan_notices?client_id=eq.${encodeURIComponent(site.client_id)}&kind=eq.deletion_requested&status=eq.active`, { method: 'PATCH', body: JSON.stringify({ status: 'dismissed' }) }).catch(() => {});
     return json({ data: { ok: true, canceled: done, message: done ? 'Your deletion request was canceled — your account stays active.' : 'There was no pending deletion request.' } }, 200, cors);
   }
-  if (route === '/commerce/signup' && method === 'POST') return handleSignup(req, cors);
-  if (route === '/commerce/verify' && method === 'POST') return handleVerify(req, cors);
-  if (route === '/commerce/checkout-status' && method === 'GET') return handleCheckoutStatus(req, cors);
+  if ((route === '/commerce/signup' || route === '/commerce/verify') && method === 'POST') return signupClosed(cors);
+  if (route === '/commerce/checkout-status' && method === 'GET') return signupClosed(cors);
   if (route === '/commerce/billing-sync' && method === 'POST') return handleBillingSync(req, cors);
   if (route === '/commerce/invoice-paid' && method === 'POST') return handleInvoicePaidEcho(req, cors);
   // sales item 116: a bank payment bounced (called by the stripe-webhook, secret-gated like the echo above)

@@ -199,12 +199,6 @@
   .mmoves{margin:14px 0 0;padding:12px 14px;border-radius:12px;background:var(--p-soft);color:var(--p-deep,var(--ink));font-size:14px}
   @media (max-width:640px){.mgrid{grid-template-columns:1fr 1fr}.mgrid .fl{grid-column:1 / -1;margin-top:6px}.mgrid .mhl{display:none}.mgrid .full{grid-column:1 / -1}}
   .tagfilter button{font:inherit;font-size:12px;font-weight:600;border:0;background:var(--p-soft);color:var(--p);border-radius:999px;padding:2px 10px;cursor:pointer;min-height:24px}
-  #cu-mode{display:flex;flex-direction:column;gap:var(--dds-s2,8px);margin:2px 0 var(--dds-s1,4px)}
-  .modeopt{display:flex;align-items:flex-start;gap:var(--dds-s2,8px);border:1px solid var(--line);border-radius:var(--dds-r,8px);padding:10px var(--dds-s3,12px);cursor:pointer;font-size:14px;color:var(--ink)}
-  .modeopt:has(input:checked){border-color:var(--p);background:var(--p-soft)}
-  .modeopt input{width:auto;margin-top:var(--dds-s1,4px);accent-color:var(--p)}
-  .modeopt strong{display:block;font-weight:600;font-size:13.5px}
-  .modehint{display:block;font-size:12px;color:var(--faint);margin-top:2px;line-height:1.45}
   .dbody .done{text-align:center;padding:var(--dds-s2,8px) 0 var(--dds-s1,4px)}
   .dbody .done .tick{width:44px;height:44px;border-radius:50%;background:var(--good-soft);color:var(--good);display:flex;align-items:center;justify-content:center;font-size:22px;margin:0 auto var(--dds-s3,12px)}
   .dbody .done p{color:var(--soft);font-size:14px;margin:6px 0 0}
@@ -289,44 +283,30 @@
   <form id="custForm" class="dbody">
     <div id="cust-fields">
       <h3>Add a customer</h3>
-      <div id="cu-mode" role="radiogroup" aria-label="How would you like to add them?">
-        <label class="modeopt"><input type="radio" name="cumode" value="provision" checked>
-          <span><strong>I’ll set them up now</strong><span class="modehint">Create their workspace and email them a sign-in link.</span></span></label>
-        <label class="modeopt"><input type="radio" name="cumode" value="connect">
-          <span><strong>They’ll sign up themselves — connect by email</strong><span class="modehint">Just record their email. You don’t set anything up.</span></span></label>
-      </div>
       <label for="cu-name">Their name</label>
       <input id="cu-name" maxlength="120" placeholder="Jane Doe" autocomplete="off">
       <label for="cu-email">Email</label>
       <input id="cu-email" type="email" maxlength="160" placeholder="jane@acmebakery.com" autocomplete="off">
-      <div id="cu-provision-only">
-        <label for="cu-biz">Business name</label>
-        <input id="cu-biz" maxlength="120" placeholder="Acme Bakery" autocomplete="off">
-        <label for="cu-edition">What kind of work is this?</label>
-        <select id="cu-edition">
-          <option value="presence" selected>Their site will live on my platform (Studio OS)</option>
-          <option value="business_os_only">Building or redoing their site on another platform — they host it elsewhere</option>
-          <option value="business_os_no_site">Just their client workspace / business tools — no site work</option>
-          <option value="presence_monitor">Just monitoring a site they already have</option>
-        </select>
-        <div id="cu-kit-wrap" style="display:none">
-          <label for="cu-kit">Start from</label>
-          <select id="cu-kit"><option value="">No kit — start empty</option></select>
-          <p class="note">A starter kit copies a saved client’s setup — services, FAQs, voice and colors — onto their new site. Their own business details stay theirs to fill in.</p>
-        </div>
-        <div id="cu-website-wrap" style="display:none">
-          <label for="cu-website">Their existing website address</label>
-          <input id="cu-website" maxlength="200" placeholder="acmebakery.com" autocomplete="off" inputmode="url">
-          <p class="note">You don’t host this one, so record where it lives. Google Search Console reports on a domain whoever hosts it — with the address on file, their existing search numbers start arriving. Visitor counts still can’t come from here (there’s no counter of ours on their pages). You can add or change this later on their website page.</p>
-        </div>
-        <p class="note">Adding them creates their client workspace and their site, and emails them a sign-in link. You bill them for your work the usual way — they never pay for software here.</p>
+      <label for="cu-biz">Business name</label>
+      <input id="cu-biz" maxlength="120" placeholder="Acme Bakery" autocomplete="off">
+      <label for="cu-edition">What kind of work is this?</label>
+      <select id="cu-edition">
+        <option value="presence" selected>Their site will live on my platform (Studio OS)</option>
+        <option value="business_os_only">Building or redoing their site on another platform — they host it elsewhere</option>
+        <option value="business_os_no_site">Just their client workspace / business tools — no site work</option>
+        <option value="presence_monitor">Just monitoring a site they already have</option>
+      </select>
+      <div id="cu-kit-wrap" style="display:none">
+        <label for="cu-kit">Start from</label>
+        <select id="cu-kit"><option value="">No kit — start empty</option></select>
+        <p class="note">A starter kit copies a saved client’s setup — services, FAQs, voice and colors — onto their new site. Their own business details stay theirs to fill in.</p>
       </div>
-      <div id="cu-connect-only" style="display:none">
-        <p class="note">Enter their email. If they already have an account, they connect to you now. If not, they’ll connect automatically the moment they sign up with that email.</p>
-        <!-- the pricing box belongs to CONNECT only: in provision mode nothing is
-             bought — the studio provisions the site and bills for its work -->
-        <div id="cu-signup" class="note" style="border:1px solid var(--line,#ddd);border-radius:8px;padding:10px">If they’ll host with you, they choose and pay for their plan themselves — send them this to sign up:<div class="row2" style="margin-top:6px"><input id="cu-signup-link" readonly style="flex:1;padding:8px;border:1px solid var(--line,#ddd);border-radius:8px;font:inherit" aria-label="Sign-up link"><button type="button" class="btn ghost" id="cu-signup-copy">Copy</button></div></div>
+      <div id="cu-website-wrap" style="display:none">
+        <label for="cu-website">Their existing website address</label>
+        <input id="cu-website" maxlength="200" placeholder="acmebakery.com" autocomplete="off" inputmode="url">
+        <p class="note">You don’t host this one, so record where it lives. Google Search Console reports on a domain whoever hosts it — with the address on file, their existing search numbers start arriving. Visitor counts still can’t come from here (there’s no counter of ours on their pages). You can add or change this later on their website page.</p>
       </div>
+      <p class="note">Adding them creates their client workspace and their site, and emails them a sign-in link. You bill them for your work the usual way — they never pay for software here.</p>
       <div class="row2"><button type="button" class="btn ghost" id="cu-cancel">Cancel</button><button type="submit" class="btn" id="cu-submit">Set up + invite</button></div>
     </div>
     <div id="cust-done" style="display:none"></div>
@@ -998,8 +978,8 @@ function showDupe(payload,matches,again){
 // ── ADD A CUSTOMER: set up an existing customer with their own workspace +
 // a sign-in invitation — no deal/sign/convert ceremony. Reuses the shared
 // provisioning path server-side; here we just collect + show the outcome. ──
-// The signup note + copyable link only apply when their site will live with us
-// (self-serve plan). Hidden otherwise. Paying for software is never picked here.
+// Builder item 199: nobody signs up by themselves, so the choice to let them, and its
+// sign-up link, are gone. Paying for software is never picked here.
 // The four dropdown answers map to THREE server plans (sales.ts CONVERT_PLANS):
 // 'business_os_no_site' is the same Business OS plan as the build-elsewhere
 // option — the server knows no such key, and an unknown value would silently
@@ -1017,20 +997,8 @@ function cuAsksWebsite(){const v=$('cu-edition').value;return v==='business_os_o
 function syncCuSignup(){
   const w=$('cu-website-wrap');if(w)w.style.display=cuAsksWebsite()?'':'none';
 }
-// TWO options (owner's words): "set them up now" (provision) vs "they'll sign up
-// themselves — connect by email" (connect). The mode governs which fields show and
-// what the server does; connect provisions nothing.
-function cuMode(){const r=document.querySelector('input[name="cumode"]:checked');return r?r.value:'provision';}
-function syncCuMode(){
-  const connect=cuMode()==='connect';
-  const po=$('cu-provision-only');if(po)po.style.display=connect?'none':'';
-  const co=$('cu-connect-only');if(co)co.style.display=connect?'':'none';
-  const sb2=$('cu-submit');if(sb2)sb2.textContent=connect?'Save':'Set up + invite';
-  if(!connect)syncCuSignup();
-}
 // Start from a kit (Oct 2026 studio audit, change 4): an agency's saved starter
-// kits, offered in provision mode only, applied to the NEW site once the provision
-// POST answers with its site_id. A studio without an agency never sees the field;
+// kits, applied to the NEW site once the POST answers with its site_id. A studio without an agency never sees the field;
 // no kits (or a failed read) hides it too — the dialog never offers what it can't do.
 // Bug hunt K7 (Nov 10): who you are and your kits are read once per page and reused each
 // time the dialog opens; neither changes between opens. A read that failed is asked again.
@@ -1059,32 +1027,26 @@ async function syncCuKits(){
 function openAddCustomer(){
   $('cu-name').value='';$('cu-biz').value='';$('cu-email').value='';$('cu-edition').value='presence';
   const wf=$('cu-website');if(wf)wf.value='';
-  const pr=document.querySelector('input[name="cumode"][value="provision"]');if(pr)pr.checked=true;
-  const lk=$('cu-signup-link');if(lk)lk.value=location.origin+'/pricing.html';syncCuMode();syncCuKits();
+  syncCuSignup();syncCuKits();
   $('cust-fields').style.display='';$('cust-done').style.display='none';$('cust-done').innerHTML='';
-  const sb2=$('cu-submit');if(sb2)sb2.disabled=false;
+  const sb2=$('cu-submit');if(sb2){sb2.disabled=false;sb2.textContent='Set up + invite';}
   $('custDlg').showModal();setTimeout(()=>$('cu-name').focus(),20);
 }
 $('cu-cancel').onclick=()=>$('custDlg').close();
 $('cu-edition').onchange=syncCuSignup;
-document.querySelectorAll('input[name="cumode"]').forEach(r=>r.addEventListener('change',syncCuMode));
-$('cu-signup-copy').onclick=()=>{const el=$('cu-signup-link');if(el&&el.value&&navigator.clipboard){navigator.clipboard.writeText(el.value).then(()=>toast('Sign-up link copied')).catch(()=>{});}};
 $('custForm').onsubmit=async(e)=>{
   e.preventDefault();
-  const mode=cuMode();
   const name=$('cu-name').value.trim(),business_name=$('cu-biz').value.trim(),email=$('cu-email').value.trim();
-  const kitSel=$('cu-kit'),kitId=(mode==='provision'&&kitSel&&kitSel.value)||'',kitName=kitId?String((kitSel.options[kitSel.selectedIndex]||{}).textContent||'kit').trim():'';
-  if(!email){toast(mode==='connect'?'Enter their email to connect them.':'Enter their email — that’s where the sign-in invitation goes.');$('cu-email').focus();return;}
-  const label=mode==='connect'?'Save':'Set up + invite';
-  const btn=$('cu-submit');btn.disabled=true;btn.textContent=mode==='connect'?'Saving…':'Setting up…';
-  const body=mode==='connect'
-    ?{mode:'connect',name:name||undefined,email}
-    :{mode:'provision',name:name||undefined,business_name:business_name||undefined,email,edition:cuPlan(),
-       website_url:(cuAsksWebsite()&&$('cu-website')&&$('cu-website').value.trim())||undefined};
+  const kitSel=$('cu-kit'),kitId=(kitSel&&kitSel.value)||'',kitName=kitId?String((kitSel.options[kitSel.selectedIndex]||{}).textContent||'kit').trim():'';
+  if(!email){toast('Enter their email — that’s where the sign-in invitation goes.');$('cu-email').focus();return;}
+  const label='Set up + invite';
+  const btn=$('cu-submit');btn.disabled=true;btn.textContent='Setting up…';
+  const body={mode:'provision',name:name||undefined,business_name:business_name||undefined,email,edition:cuPlan(),
+    website_url:(cuAsksWebsite()&&$('cu-website')&&$('cu-website').value.trim())||undefined};
   try{
     const r=await api('/sales/customers','POST',body);
     if(!r.ok){
-      const m=r.status===403?'Customers are part of your plan’s business tools — an upgrade adds them.':((r.body&&r.body.message)||(mode==='connect'?'We couldn’t save that just now.':'We couldn’t set them up just now.'));
+      const m=r.status===403?'Customers are part of your plan’s business tools — an upgrade adds them.':((r.body&&r.body.message)||'We couldn’t set them up just now.');
       toast(m);btn.disabled=false;btn.textContent=label;return;
     }
     const d=(r.body&&r.body.data)||{};
@@ -1094,9 +1056,6 @@ $('custForm').onsubmit=async(e)=>{
       // final pass S1: an account that isn't yours yet is asked, never taken
       heading='Request sent';
       line=who+' already has a Studio OS account, so they need to say yes first. They’ll see your request the next time they sign in.';
-    }else if(mode==='connect'){
-      if(d.connected){heading='Connected to their workspace';line=who+' was already your customer — they’re connected.';}
-      else{heading='Saved';line='When '+esc(email)+' signs up, they’ll connect to you automatically.';}
     }else if(d.already_exists){
       heading='They already have a workspace';
       line=who+' already had an account — connected to their existing workspace. Nothing duplicated. Send them their sign-in link if they need it.';
@@ -1123,7 +1082,7 @@ $('custForm').onsubmit=async(e)=>{
         if(!kitOk)kitRetry=applyKit;
       }
     }
-    const showLink=d.portal_url&&(mode!=='connect'||d.connected);
+    const showLink=!!d.portal_url;
     const link=showLink?('<p style="margin-top:12px"><a class="link" href="'+esc(d.portal_url)+'" target="_blank" rel="noopener">Their sign-in page →</a></p>'):'';
     $('cust-fields').style.display='none';
     const done=$('cust-done');
@@ -1132,7 +1091,7 @@ $('custForm').onsubmit=async(e)=>{
     const cl=$('cu-close');if(cl){cl.focus();cl.onclick=()=>$('custDlg').close();}
     const ka=$('cu-kit-again');if(ka&&kitRetry)ka.onclick=async()=>{ka.disabled=true;ka.textContent='Applying…';const okNow=await kitRetry();const kl=$('cu-kit-line');
       if(okNow){if(kl)kl.textContent=kitName+' applied.';ka.remove();toast(kitName+' applied.');}else{ka.disabled=false;ka.textContent='Try the kit again';toast('The kit didn’t apply this time either.',true);}};
-  }catch(_){toast(mode==='connect'?'We couldn’t save that just now.':'We couldn’t set them up just now.');btn.disabled=false;btn.textContent=label;return;}
+  }catch(_){toast('We couldn’t set them up just now.');btn.disabled=false;btn.textContent=label;return;}
   // The creation SUCCEEDED — the roster refresh is best-effort and must never
   // repaint that success as a failure (SS6): its own failure gets the soft
   // couldn’t-refresh line, never the creation-failed toast.

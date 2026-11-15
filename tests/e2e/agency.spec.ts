@@ -682,20 +682,16 @@ test.describe('Agency home — one home, one roster', () => {
     await expect(page.locator('#cu-kit-wrap')).toBeHidden();
   });
 
-  test('honest money copy: provision mode never shows the pricing box; connect mode does', async ({ page }) => {
+  test('honest money copy: no sign-up choice or price page, and the dialog says what adding does (item 199)', async ({ page }) => {
     await installApp(page, { api: homeApi });
     await page.goto('/agency.html');
     await page.locator('#top').getByRole('button', { name: '+ Add a customer' }).click();
     const dlg = page.locator('#custDlg');
-    await expect(dlg.locator('#cu-signup')).toBeHidden();                              // the pricing box is not on the page the operator sees
-    expect(await dlg.locator('#cust-fields').innerText()).not.toContain('pay for their plan');   // innerText = rendered text only (toContainText reads hidden copy too)
-    await expect(dlg.locator('#cu-provision-only')).toContainText('Adding them creates their client workspace and their site, and emails them a sign-in link. You bill them for your work the usual way — they never pay for software here.');
-    await expect(dlg.locator('#cu-mode')).toContainText('Create their workspace and email them a sign-in link.');
+    await expect(dlg.locator('#cu-signup, input[type="radio"], a[href*="pricing"]')).toHaveCount(0);   // no sign-up link, no choice, no price page
+    expect(await dlg.locator('#cust-fields').innerText()).not.toContain('pay for their plan');   // innerText = rendered text only
+    await expect(dlg.locator('#cust-fields')).toContainText('Adding them creates their client workspace and their site, and emails them a sign-in link. You bill them for your work the usual way — they never pay for software here.');
+    await expect(dlg).not.toContainText('sign up themselves');
     await expect(dlg).not.toContainText('set their password');
-    await page.locator('input[name="cumode"][value="connect"]').check();
-    await expect(dlg.locator('#cu-signup')).toBeVisible();
-    await expect(dlg.locator('#cu-signup-link')).toHaveValue(/\/pricing\.html$/);
-    await expect(dlg.locator('#cu-kit-wrap')).toBeHidden();                            // nothing is provisioned, so nothing to start from
   });
 
   test('the home is never scoped: a stray ?client= is dropped before the shell reads it', async ({ page }) => {

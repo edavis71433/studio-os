@@ -29,12 +29,12 @@ async function underTheRule(page: Page, baseURL: string | undefined): Promise<()
 }
 
 test.describe('the sign-in library no longer holds up a page (item 143)', () => {
-  // Deals, Projects, sign-up and set-password loaded it in the head: nothing drew until it
-  // arrived. Hold it back and the page above its script is already there.
+  // Deals, Projects and set-password loaded it in the head (sign-up did too; builder item 199
+  // removed that page): nothing drew until it arrived. Hold it back and the page above its
+  // script is already there.
   for (const [path, shown] of [
     ['/pipeline.html', '#listWrap'],
     ['/projects.html', '#listWrap'],
-    ['/signup.html', '#headline'],
     ['/set-password.html', '#formState'],
   ] as const) {
     test(`${path} lays out before the library arrives`, async ({ page }) => {
