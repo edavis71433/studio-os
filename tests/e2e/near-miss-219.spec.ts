@@ -43,6 +43,9 @@ const VIS = (over: Record<string, unknown> = {}) => ({ data: {
 async function openSearch(page: Page, vis: unknown = VIS()) {
   const errors: string[] = [];
   page.on('pageerror', (e) => errors.push(String(e)));
+  // the Search tab's tip comes up 400 ms after the tab opens, over the cards; seen already, so a check
+  // (axe above all) never reads the cards through a tip that is still fading in
+  await page.addInitScript(() => { try { localStorage.setItem('dds-hints', JSON.stringify({ 'search-plain': 1 })); } catch { /* storage may be denied */ } });
   await installApp(page, { api: { ...PAGE_API, '/visibility': vis as never, '/visibility/follow': { data: { terms: [], suggestions: [], max: 10, month: '2026-10', prior: '2026-09', connected: true } } } as never });
   await page.goto('/presence.html#search');
   await expect(page.locator('#view-search')).toBeVisible();

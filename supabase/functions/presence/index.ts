@@ -13,8 +13,8 @@
 //      portfolio and help need no site and answer next
 //   6. the caller's site: their own via RLS, a studio's scope re-checked (never
 //      falling back to another site), or an invited member's seat
-//   7. entitlement (full / readonly / denied), the reviewer boundary, the member
-//      write gate (lib/site_roles.ts), then the Monitor and edition feature gates
+//   7. entitlement (full / readonly / denied), the reviewer and Designer boundaries,
+//      the member write gate (lib/site_roles.ts), then the Monitor and edition feature gates
 //   8. exact method + path routes, else 404
 //
 // The route groups most requests never reach load on first use (lib/lazy.ts):
@@ -49,7 +49,7 @@ import { handleSavedReplies, handleFaqAdmin, handleClientFaq } from './routes/se
 import { handlePublish, handleRestore, handlePublishHistory, handleVersionStar, handleVersionLabel, handleCompareVersions, handleTimewarp, handleCheckpointList, handleCheckpointSave, handleCheckpointRestore, handleCheckpointDelete, handleTakeOffline, handleBackOnline, handleSitePassword, handleComingSoon, handleComingSoonRead } from './routes/publish.ts';
 const { handleLaunchList, handleLaunchCreate, handleLaunchGet, handleLaunchRecapture, handleLaunchDecide, handleLaunchSchedule, handleLaunchPromote, handleLaunchRollback, handleLaunchCancel } = lazyRoutes(() => import('./routes/launches.ts'));
 import { handleMediaUpload, handleMediaUpdate, handleMediaDelete } from './routes/media.ts';
-import { handleAssetsList, handleAssetsCollections, handleAssetsHealth, handleAssetsBulk, handleAssetsMatch, handleAssetsFolderMove, handleAssetUpdate, handleAssetStatus, handleAssetDelete, handleAssetDetail, handleAssetDownload, handleAssetReplace, handleAssetRollback, handleAssetDuplicate, handleAssetSuggest, handleAssetSocial, handleAssetCards, handleAssetRemoveBackground, handleAssetCutout, handleCutoutJob } from './routes/assets.ts';
+import { handleAssetsList, handleAssetsCollections, handleAssetsHealth, handleAssetsBulk, handleAssetsMatch, handleAssetsFolderMove, handleAssetUpdate, handleAssetStatus, handleAssetDelete, handleAssetDetail, handleAssetDownload, handleAssetReplace, handleAssetRollback, handleAssetDuplicate, handleAssetSuggest, handleAssetSocial, handleAssetCards, handleAssetRemoveBackground, handleAssetCutout, handleCutoutJob, handleAssetsTrash, handleAssetPutBack, handleAssetDeleteForGood } from './routes/assets.ts';
 const { handleVisualKinds, handleVisualGenerate, handleVisualList, handleVisualGet, handleVisualVary, handleVisualEdit, handleVisualDecide } = lazyRoutes(() => import('./routes/visual.ts'));
 const { handleAdmin, handleDomain, handleDomainLookup, handleDomainForward, handleClientDomain } = lazyRoutes(() => import('./routes/admin.ts'));
 import { handleCollection, handleLocation, handleSettings, handleBlockSuggestions, handlePageDuplicate, handlePageRefs, SPECS } from './routes/content.ts';
@@ -59,10 +59,11 @@ import { handlePageLockCreate, handlePageLockList } from './routes/page_locks.ts
 import { handleHealth, handleChanges, handleContentTree, handleRestoreToDraft, handleMediaList } from './routes/room.ts';
 import { handlePublishLockGet, handlePublishLockPut } from './routes/publish_lock.ts';
 const { handleWebsiteTimeline } = lazyRoutes(() => import('./routes/timeline.ts'));
+const { handleChangeLog, handleWentLive } = lazyRoutes(() => import('./routes/change_log.ts'));   // builder list item 215: Changes
 const { handleWebsiteHealth, handleWebsiteHealthPdf } = lazyRoutes(() => import('./routes/health_page.ts'));
 const { handleBusinessInsights } = lazyRoutes(() => import('./routes/insights_page.ts'));
 const { handleMomentsList, handleMomentDismiss } = lazyRoutes(() => import('./routes/moments.ts'));
-import { handlePortalContext, handlePortalFeed, handleMembersList, handleMemberAdd, handleMemberRevoke, handleMemberRole, handleSharesList, handleShareSet, reviewerAllowed, memberWriteGate } from './routes/workspace.ts';
+import { handlePortalContext, handlePortalPreviewContext, handlePortalFeed, handleMembersList, handleMemberAdd, handleMemberRevoke, handleMemberRole, handleSharesList, handleShareSet, reviewerAllowed, memberWriteGate } from './routes/workspace.ts';
 const { handleDevFiles, handleDevCustomizationGet, handleDevCustomizationPut, handleBrandKitGet, handleBrandKitPut, handleBrandKitApply } = lazyRoutes(() => import('./routes/dev.ts'));
 const { handleStockSearch, handleStockImport } = lazyRoutes(() => import('./routes/stock.ts'));
 const { handleContentLibraryList, handleContentLibrarySave, handleContentLibraryUpdate, handleContentLibraryDelete } = lazyRoutes(() => import('./routes/content_library.ts'));
@@ -75,12 +76,14 @@ import { handleRecurringStart, handleRecurringChange, handleRecurringAction } fr
 import { handleInvoicePayment, handleInvoicePaymentUndo } from './routes/invoice_payments.ts';   // sales review item 77
 import { handleEmailLogAddress } from './routes/email_log.ts';   // sales review item 69: the log-this-email address   // sales review item 69: the sending-domain line
 const { handleBroadcastsList, handleBroadcastCreate, handleBroadcastListCreate, handleBroadcastListDelete, handleBroadcastSegments, handleBroadcastGet, handleBroadcastUpdate, handleBroadcastSend, handleBroadcastCancel, handleBroadcastDraftAssist, handleBroadcastTest } = lazyRoutes(() => import('./routes/broadcasts.ts'));
+const { handleWelcomeGet, handleWelcomePut, handleWelcomeTest } = lazyRoutes(() => import('./routes/list_welcome.ts'));   // builder list item 221
 import { handleScheduleCreate, handleScheduleList, handleScheduleCancel, handleFormSubmit, handleFormInbox, handleFormStatus, handleFormReply, handleApproveSend, handleApproveGet, handleApprovePost, handleSendTicket, handleSpamLinkGet, handleSpamLinkPost, handleFormFile, handleFormAnswers, handleFormDelete, handleJoinGet, handleJoinPost } from './routes/commercial.ts';
 const { handleBookingTypes, handleBookingSlots, handleBookingCreate, handleManageGet, handleManagePost, handleManageSlots, handleManageIcs, handleBookingSettingsGet, handleBookingSettingsPut, handleBookingTypesList, handleBookingTypeCreate, handleBookingTypeUpdate, handleBookingTypeDelete, handleBookingAppointments, handleBookingConfirm, handleBookingCancel, handleBookingMark } = lazyRoutes(() => import('./routes/booking.ts'));
 const { handleReviewPage, handleReviewSubmit, handleReviewsList, handleReviewApprove, handleReviewHide, handleReviewReply, handleReviewRequest, handleReviewGoogleLink } = lazyRoutes(() => import('./routes/reviews.ts'));
 const { handleCommentsList, handleCommentCreate, handleCommentResolve, handleCommentDelete, handleTokenSections, handleTokenComment } = lazyRoutes(() => import('./routes/comments.ts'));
 import { resolveMemberSite, resolveHeldBusiness, resolveSiteRoleCached } from './lib/workspace.ts';
 import type { SiteRole } from './lib/site_roles.ts';
+import { designerAllowed } from './lib/site_roles.ts';
 const { handleConciergeAsk } = lazyRoutes(() => import('./routes/concierge.ts'));
 const { handleHelpAsk } = lazyRoutes(() => import('./routes/help.ts'));
 const { handleWriterGenerate, handleWriterRewrite, handleWriterList, handleWriterGet, handleWriterAccept, handleWriterDiscard } = lazyRoutes(() => import('./routes/writer.ts'));
@@ -492,15 +495,31 @@ async function route_(req: Request, cors: Record<string, string>): Promise<Respo
     return json({ error: 'entitlement_paused', message: ent.message }, 403, cors);
   }
 
+  // 4a. Builder list item 232: a studio previewing a client's portal (client.html?preview=),
+  //     drilled into that client. Reading only: nothing pressed is saved or sent and nothing
+  //     is marked as read, so every write is refused here, before any route runs, and only
+  //     the portal's own reads answer. Its context is the client's, not the studio's.
+  if (req.headers.get('x-dds-preview') === '1') {
+    if (!principal.scope || principal.scope.site_id !== site.id) return json({ error: 'preview_denied', message: 'Only a client’s studio can preview their portal.' }, 403, cors);
+    if (method !== 'GET') return json({ error: 'preview', message: 'This is a preview: nothing is saved or sent.' }, 403, cors);
+    if (route === '/portal/context') return handlePortalPreviewContext(site, principal.scope, principal, cors);
+    if (!(route.startsWith('/client/') || route === '/portal/feed' || route === '/connections/ask')) return json({ error: 'preview', message: 'That isn’t part of a client’s portal.' }, 403, cors);
+  }
+
   // 4b. A7.2 reviewer boundary: a client_reviewer (the client portal audience) may
   //     reach ONLY the shared feed + the approvals put to them. Everything else in
   //     the client gate is refused — the simplified portal is a real boundary, not
   //     a UI facade. Fast-path: sites with no extra members skip this entirely.
-  {
-    const siteRole = await resolveSiteRoleCached(principal, jwt, site.id);
-    if (siteRole === 'client_reviewer' && !reviewerAllowed(route, method)) {
-      return json({ error: 'forbidden', message: 'That lives in your studio’s full workspace — your client view shows what they’ve chosen to share.' }, 403, cors);
-    }
+  //     siteRole stays in reach below: a route a Designer may read can still hold
+  //     some of the business (the website timeline's enquiries), and answers them
+  //     with the website's part only.
+  const siteRole = await resolveSiteRoleCached(principal, jwt, site.id);
+  if (siteRole === 'client_reviewer' && !reviewerAllowed(route, method)) {
+    return json({ error: 'forbidden', message: 'That lives in your studio’s full workspace — your client view shows what they’ve chosen to share.' }, 403, cors);
+  }
+  // builder item 220: a Designer reaches the website and nothing else, reads included
+  if (siteRole === 'designer' && !designerAllowed(route, method)) {
+    return json({ error: 'forbidden', role: 'designer', message: 'That isn’t part of a Designer’s role. Designers work on the website; customers, messages and money stay with the owner and the studio.' }, 403, cors);
   }
 
   // 4c. A member's write gets what lib/site_roles.ts gives their role, on every route.
@@ -672,6 +691,7 @@ async function route_(req: Request, cors: Record<string, string>): Promise<Respo
   if (route === '/assets/bulk' && method === 'POST') return handleAssetsBulk(req, site, principal, cors);
   if (route === '/assets/match' && method === 'GET') return handleAssetsMatch(req, site, cors);   // item 115: already in Files?
   if (route === '/assets/folders/move' && method === 'POST') return handleAssetsFolderMove(req, site, principal, cors);   // item 56
+  if (route === '/assets/trash' && method === 'GET') return handleAssetsTrash(site, cors);   // item 218: the Trash
   {
     const msoc = route.match(/^\/assets\/([0-9a-f-]{36})\/social$/);
     if (msoc && method === 'GET') return handleAssetSocial(site, msoc[1], cors);
@@ -701,6 +721,11 @@ async function route_(req: Request, cors: Record<string, string>): Promise<Respo
     if (mco && method === 'POST') return handleAssetCutout(site, principal, mco[1], cors);
     const mcj = route.match(/^\/assets\/cutout\/([a-z0-9]{10,64}\.[A-Za-z0-9_-]{32})$/);
     if (mcj && method === 'GET') return handleCutoutJob(site, mcj[1], cors);
+    // item 218: out of the Trash, or gone for good
+    const mpb = route.match(/^\/assets\/([0-9a-f-]{36})\/put-back$/);
+    if (mpb && method === 'POST') return handleAssetPutBack(site, principal, mpb[1], cors);
+    const mfg = route.match(/^\/assets\/([0-9a-f-]{36})\/forever$/);
+    if (mfg && method === 'DELETE') return handleAssetDeleteForGood(site, principal, mfg[1], cors);
     const m = route.match(/^\/assets\/([0-9a-f-]{36})$/);
     if (m && method === 'GET') return handleAssetDetail(site, m[1], cors);
     if (m && method === 'PATCH') return handleAssetUpdate(req, site, principal, m[1], cors);
@@ -725,7 +750,10 @@ async function route_(req: Request, cors: Record<string, string>): Promise<Respo
   if (route === '/health' && method === 'GET') return handleHealth(site, cors);
   if (route === '/changes' && method === 'GET') return handleChanges(site, cors);
   if (route === '/content-tree' && method === 'GET') return handleContentTree(site, cors);
-  if (route === '/website-timeline' && method === 'GET') return handleWebsiteTimeline(site, cors);
+  if (route === '/website-timeline' && method === 'GET') return handleWebsiteTimeline(site, cors, { websiteOnly: siteRole === 'designer' });   // builder item 220
+  // builder list item 215: who changed what, in sentences (a reviewer is refused above)
+  if (route === '/change-log' && method === 'GET') return handleChangeLog(req, site, principal, cors);
+  if (route === '/change-log/went-live' && method === 'GET') return handleWentLive(req, site, cors);
   if (route === '/website-health' && method === 'GET') return handleWebsiteHealth(site, cors);
   if (route === '/website-health/pdf' && method === 'GET') return handleWebsiteHealthPdf(site, cors);   // item 183
   if (route === '/business-insights' && method === 'GET') return handleBusinessInsights(site, cors);
@@ -754,6 +782,10 @@ async function route_(req: Request, cors: Record<string, string>): Promise<Respo
   if (route === '/broadcasts/lists' && method === 'POST') return handleBroadcastListCreate(req, site, principal, cors);   // items 31 + 39: picked people
   { const lm = route.match(/^\/broadcasts\/lists\/([A-Za-z0-9-]{6,40})$/); if (lm && method === 'DELETE') return handleBroadcastListDelete(site, principal, lm[1], cors); }
   if (route === '/broadcasts/draft-assist' && method === 'POST') return handleBroadcastDraftAssist(req, site, cors);
+  // builder list item 221: the welcome email to each new person on the site's list, and a test of it to yourself
+  if (route === '/broadcasts/welcome' && method === 'GET') return handleWelcomeGet(site, cors);
+  if (route === '/broadcasts/welcome' && method === 'PUT') return handleWelcomePut(req, site, principal, cors);
+  if (route === '/broadcasts/welcome/test' && method === 'POST') return handleWelcomeTest(req, site, principal, cors);
   {
     let m = route.match(/^\/broadcasts\/([0-9a-f-]{36})$/);
     if (m && method === 'GET') return handleBroadcastGet(site, m[1], cors);
@@ -1049,6 +1081,12 @@ async function route_(req: Request, cors: Record<string, string>): Promise<Respo
     const { partForClientRoute, portalOffFor } = await import('./lib/portal_settings.ts');
     const part = partForClientRoute(route, method);
     if (part && (await portalOffFor(site)).includes(part)) return json({ error: 'hidden', message: 'Your studio has turned this part of your portal off.' }, 403, cors);
+  }
+  // builder list item 234: the pages and quick links the client's studio made for them, and a page's file
+  if (route === '/client/portal-pages' && method === 'GET') return (await import('./routes/client_pages.ts')).handleClientPortalPages(site, cors);
+  {
+    const pf = route.match(/^\/client\/portal-pages\/files\/([^/]+)$/);
+    if (pf && method === 'GET') return (await import('./routes/client_pages.ts')).handleClientPortalPageFile(req, site, decodeURIComponent(pf[1]), cors);
   }
   if (route === '/client/projects' && method === 'GET') return handleClientProjects(req, site, principal, cors);
   if (route === '/client/billing' && method === 'GET') return handleClientBilling(req, site, principal, cors);

@@ -310,7 +310,7 @@ function render(){
       <button type="button" class="lbtn" id="refreshBtn" aria-label="Refresh" title="Refresh">↻</button>
       ${META.can_create?'<a class="btn" href="/sites.html#new">+ New site</a>':''}</div>
     <div class="lmeta">${esc(plural(SITES.length,'site'))} · What each client uses ${WHICH==='this'?'this month':'in '+esc(label)} · Updated just now</div>
-    <nav class="tabs" aria-label="Sites, domains, templates and usage"><a href="/sites.html">Sites</a><a href="/domains.html">Domains</a><a href="/templates.html">Templates</a><a href="/usage.html" aria-current="page">Usage</a></nav></header>`;
+    <nav class="tabs" aria-label="Sites, domains, templates, usage and changes"><a href="/sites.html">Sites</a><a href="/domains.html">Domains</a><a href="/templates.html">Templates</a><a href="/usage.html" aria-current="page">Usage</a><a href="/changes.html">Changes</a></nav></header>`;
   if(!SITES.length){$('main').innerHTML=h+`<div class="center"><p class="muted">No client sites yet, so nothing to count.</p><p style="margin-top:12px"><a class="link" href="/sites.html#new">Make the first one →</a></p></div>`;wire();return;}
   h+=bandHtml();
   if(U.partial)h+=`<p class="partial">Some numbers couldn’t be read just now; the rest are right.</p>`;

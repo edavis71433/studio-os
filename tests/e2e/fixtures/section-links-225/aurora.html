@@ -120,10 +120,10 @@ footer.site table.hours th{color:#b4b5c6}
 :where(.block-richtext,.block-accordion,.block-tabs,.block-columns,.block-spotlight,.block-stack) .prose li{margin:.2em 0}
 :where(.block-richtext,.block-accordion,.block-tabs,.block-columns,.block-spotlight,.block-stack) .prose blockquote{margin:0 0 .8em;padding-left:14px;border-left:3px solid var(--accent);color:var(--soft)}
 :where(.block-richtext,.block-accordion,.block-tabs,.block-columns,.block-spotlight,.block-stack) .prose a{color:var(--accent-dark,var(--accent))}
-.block.block--bg-dark{background:#1a1622;color:#f2eef8}
-.block.block--bg-dark :is(h1,h2,h3,h4,h5,p,li,dt,dd,figcaption,blockquote,strong,em,.nm,.pr,.ds,.stat-v,.stat-l,summary){color:inherit}
+.block.block--bg-dark{background:#1a1622;color:#f2eef8;--soft:currentColor}
+.block.block--bg-dark :is(h1,h2,h3,h4,h5,h6,p,li,dt,dd,figcaption,blockquote,strong,em,small,cite,time,span,label,legend,caption,th,td,summary,.nm,.pr,.ds,.stat-v,.stat-l,.bk-back){color:inherit}
 .block.block--bg-dark a:not(.btn){color:#fff;text-decoration:underline}
-.block.block--bg-dark .btn{background:var(--accent);color:#fff;border-color:var(--accent)}
+.block.block--bg-dark .btn{background:var(--accent-band,var(--accent-dark,var(--accent)));color:#fff;border-color:var(--accent-band,var(--accent-dark,var(--accent)))}
 .block.block--bg-dark .card{background:rgba(255,255,255,.10);border-color:rgba(255,255,255,.22)}
 .block.block--edge{position:relative;border-bottom:0}
 .block--edge,.block.block--edge+*{--edge-h:clamp(20px,4vw,48px)}

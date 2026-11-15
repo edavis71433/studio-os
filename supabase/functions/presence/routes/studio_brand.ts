@@ -41,10 +41,14 @@ export function accountNameFrom(raw: unknown): string {
   return n && n !== EMAIL_BRAND_DEFAULT.name ? n : '';
 }
 
-/** GET /public/studio/:siteId/brand, before sign-in: the sign-in page's header. */
+/** GET /public/studio/:siteId/brand, before sign-in: the sign-in page's header, and (builder
+ *  list item 230) which ways besides the emailed code this studio's clients may sign in. */
 export async function handlePublicStudioBrand(siteId: string, cors: Record<string, string>): Promise<Response> {
-  const data = await studioBrandOf(siteId);
-  return json({ data }, 200, { ...cors, 'Cache-Control': 'public, max-age=900' });
+  const [brand, signin] = await Promise.all([
+    studioBrandOf(siteId),
+    import('../lib/portal_settings.ts').then((m) => m.readPortalSettings(siteId)).then((s) => s.signin).catch(() => ({ google: false, password: true })),
+  ]);
+  return json({ data: { ...brand, signin } }, 200, { ...cors, 'Cache-Control': 'public, max-age=900' });
 }
 
 /** GET /brand/studio, signed in: Settings shows the studio what its clients see. */

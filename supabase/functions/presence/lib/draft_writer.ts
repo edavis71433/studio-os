@@ -14,6 +14,7 @@
 import { svc, svcAll } from './db.ts';
 import { publishActorKind } from './actor_kind.ts';
 import { serializeDraft, variantPath, readMediaByIds } from './serializer.ts';
+import { putBackUsed } from './media_trash.ts';
 import type { DraftRows, MediaManifestEntry } from './serializer.ts';
 import { draftSettingsOf, insertSnapshot, noDraftSettingsColumn, settingsBack, settingsFromContent } from './draft_settings.ts';
 import type { DraftSettings } from './draft_settings.ts';
@@ -96,6 +97,9 @@ export async function applySnapshotToDraft(
   // manifest), so a site with more than 1,000 files can't have one called gone. A version
   // with no manifest reads every live file, a page at a time.
   const keptIds = [...new Set((snapshot.media_manifest || []).map((m) => String(m.media_id || '').toLowerCase()).filter((id) => /^[0-9a-f-]{36}$/.test(id)))];
+  // Item 218: a photo the version kept that has since gone in the Trash comes back out of it,
+  // so the restored draft keeps it instead of leaving it off
+  if (keptIds.length) await putBackUsed(site.id, keptIds, principal, 'the version brought back to the draft uses it');
   const mediaRows: Array<{ id: string; storage_path: string; alt_text?: string | null }> = keptIds.length
     ? await readMediaByIds(site.id, keptIds, 'id,storage_path,alt_text')
     : await svcAll(`presence_media?site_id=eq.${site.id}&deleted_at=is.null&select=id,storage_path,alt_text`, 'id');

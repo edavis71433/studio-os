@@ -16,7 +16,7 @@ const contextOf = (role: SiteRole, extra: Record<string, unknown> = {}) => ({ da
   ...extra,
 } });
 
-type Need = 'delete' | 'configure' | 'owner';
+type Need = 'delete' | 'configure' | 'owner' | 'design';   // builder item 220: design is restyling, which staff lack
 interface Person { who: string; ctx: { data: Record<string, unknown> }; lacks: Need[]; scoped?: boolean }
 const PEOPLE: Person[] = [
   { who: 'the owner', ctx: contextOf('business_owner'), lacks: [] },
@@ -24,7 +24,7 @@ const PEOPLE: Person[] = [
   // index.ts stamps a seat for a client caller alone, so the server never holds this person to it
   { who: 'a studio scoped in who also holds a staff seat there', ctx: contextOf('business_staff', { is_agency: true, scope: SCOPE }), lacks: [], scoped: true },
   { who: 'platform staff', ctx: contextOf('business_owner', { is_operator: true }), lacks: [] },
-  { who: 'a staff member', ctx: contextOf('business_staff'), lacks: ['delete', 'configure', 'owner'] },
+  { who: 'a staff member', ctx: contextOf('business_staff'), lacks: ['delete', 'configure', 'owner', 'design'] },
   { who: 'a developer', ctx: contextOf('developer'), lacks: ['delete', 'owner'] },
 ];
 const STAFF = PEOPLE.find((p) => p.who === 'a staff member')!;
@@ -508,12 +508,12 @@ test.describe('Undo in the builder', () => {
 // ── Styles: the template and the design cards ────────────────────────────────
 test.describe('The Styles panel', () => {
   for (const p of PEOPLE) {
-    test(`${p.who}: ${p.lacks.includes('configure') ? 'no way in, and a note if reached another way' : 'opens as it did'}`, async ({ page }) => {
-      // the real answer for staff: routes/dev.ts designAllowed is the owner or a developer
-      const staff = p.lacks.includes('configure');
+    test(`${p.who}: ${p.lacks.includes('design') ? 'no way in, and a note if reached another way' : 'opens as it did'}`, async ({ page }) => {
+      // the real answer for staff: routes/dev.ts designAllowed is the owner, a developer or (item 220) a Designer
+      const staff = p.lacks.includes('design');
       await page.route('**/functions/v1/presence/dev/**', (r) => (staff ? r.fulfill({ status: 403, contentType: 'application/json', body: '{"error":"forbidden"}' }) : r.fallback()));
       await openBuilder(page, p, '#design');
-      await expectDisplay(page, p, '#btnSettingsOpen', 'configure');
+      await expectDisplay(page, p, '#btnSettingsOpen', 'design');
       await builderScript(page, 'openSettingsPanel("styles");');
       const note = page.locator('#stylesAsk');
       if (staff) await expect(note).toBeVisible(); else await expect(note).toBeHidden();
@@ -537,7 +537,8 @@ test.describe('A member, page by page', () => {
       await page.goto(url);
       await expect(page.locator(drawn).first()).toBeAttached();
       await expect(page.locator(drawn).first()).toBeHidden();
-      const showing = await page.evaluate(() => Array.from(document.querySelectorAll('[data-needs]')).filter((n) => n.getClientRects().length > 0).map((n) => (n as HTMLElement).outerHTML.slice(0, 120)));
+      // builder item 220: a mark staff hold (business, publish) stays; one they lack never shows
+      const showing = await page.evaluate(() => { const lacks = (document.documentElement.getAttribute('data-dds-lacks') || '').split(' '); return Array.from(document.querySelectorAll('[data-needs]')).filter((n) => lacks.includes(n.getAttribute('data-needs') || '') && n.getClientRects().length > 0).map((n) => (n as HTMLElement).outerHTML.slice(0, 120)); });
       expect(showing).toEqual([]);
     });
   }

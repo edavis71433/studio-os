@@ -18,7 +18,7 @@
 <meta name="twitter:title" content="Vermilion &amp; Vine — Wine Bar &amp; Wood-Fired Kitchen, Highland Park">
 <meta name="twitter:description" content="Wood-fired plates and natural wine in Highland Park, Los Angeles. Patio seating, weekend brunch, walk-ins welcome.">
 <style>:root{color-scheme:dark;--ink:#eef1f5;--soft:#9ba4b5;--paper:var(--bg,#101216);--accent:#2dd4bf;--line:#262a33}html{font-size:calc(100% * var(--font-scale,1))}*{margin:0;padding:0;box-sizing:border-box}body{font-family:system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;background:var(--paper);color:var(--ink);line-height:1.65;font-size:16.5px}h1{font-size:clamp(2.5rem,6.4vw,4.2rem);line-height:1.05;letter-spacing:-.035em;font-weight:800}.skip{position:absolute;left:-9999px}.skip:focus{left:0;background:var(--accent);color:#06201c;padding:10px 18px;z-index:99}.wrap{max-width:1120px;margin:0 auto;padding:0 24px}.nav{display:flex;align-items:center;justify-content:space-between;gap:16px;padding-top:14px;padding-bottom:14px;flex-wrap:wrap}nav.primary ul{display:flex;gap:2px;list-style:none;flex-wrap:wrap}nav.primary a{display:inline-block;padding:8px 12px;text-decoration:none;color:#9ba4b5;font-weight:700;font-size:.8rem;letter-spacing:.1em;text-transform:uppercase}.hero{padding-top:88px;padding-bottom:56px}</style>
-<style>:root{color-scheme:dark;--ink:#eef1f5;--soft:#9ba4b5;--paper:var(--bg,#101216);--card:#161a21;--accent:#2dd4bf;--accent-dark:#14b8a6;--accent-band:#115e59;--line:#262a33;--wash:#14171d}
+<style>:root{color-scheme:dark;--ink:#eef1f5;--soft:#9ba4b5;--paper:var(--bg,#101216);--card:#161a21;--accent:#2dd4bf;--accent-dark:#14b8a6;--accent-band:#115e59;--band-box:var(--wash);--line:#262a33;--wash:#14171d}
 html:root{--ink:#eef1f5;--soft:#9ba4b5;--paper:#101216;--accent:#2dd4bf;--accent-dark:#14b8a6}
 html{font-size:calc(100% * var(--font-scale,1))}
 *{margin:0;padding:0;box-sizing:border-box}
@@ -125,10 +125,10 @@ footer.site h2{font-size:1rem;text-transform:uppercase;letter-spacing:.12em}
 :where(.block-richtext,.block-accordion,.block-tabs,.block-columns,.block-spotlight,.block-stack) .prose li{margin:.2em 0}
 :where(.block-richtext,.block-accordion,.block-tabs,.block-columns,.block-spotlight,.block-stack) .prose blockquote{margin:0 0 .8em;padding-left:14px;border-left:3px solid var(--accent);color:var(--soft)}
 :where(.block-richtext,.block-accordion,.block-tabs,.block-columns,.block-spotlight,.block-stack) .prose a{color:var(--accent-dark,var(--accent))}
-.block.block--bg-dark{background:#1a1622;color:#f2eef8}
-.block.block--bg-dark :is(h1,h2,h3,h4,h5,p,li,dt,dd,figcaption,blockquote,strong,em,.nm,.pr,.ds,.stat-v,.stat-l,summary){color:inherit}
+.block.block--bg-dark{background:#1a1622;color:#f2eef8;--soft:currentColor}
+.block.block--bg-dark :is(h1,h2,h3,h4,h5,h6,p,li,dt,dd,figcaption,blockquote,strong,em,small,cite,time,span,label,legend,caption,th,td,summary,.nm,.pr,.ds,.stat-v,.stat-l,.bk-back){color:inherit}
 .block.block--bg-dark a:not(.btn){color:#fff;text-decoration:underline}
-.block.block--bg-dark .btn{background:var(--accent);color:#fff;border-color:var(--accent)}
+.block.block--bg-dark .btn{background:var(--accent-band,var(--accent-dark,var(--accent)));color:#fff;border-color:var(--accent-band,var(--accent-dark,var(--accent)))}
 .block.block--bg-dark .card{background:rgba(255,255,255,.10);border-color:rgba(255,255,255,.22)}
 .block.block--edge{position:relative;border-bottom:0}
 .block--edge,.block.block--edge+*{--edge-h:clamp(20px,4vw,48px)}

@@ -228,7 +228,7 @@ for (const page of ['todos', 'invoices', 'recently-deleted']) {
   const src = grab(html, /async function inClientNow\(\)\{[^\n]*\}/, `${page} inClientNow`);
   const verdicts = await Promise.all([...SHELL_CASES_OF(CASES), ODD].map(async (c) => {
     const win = { ...c.win, ddsContext: c.win === NO_SHELL ? undefined : async () => c.ctx || {} };
-    const got = await new Function('scope', 'document', 'window', `${src}\nreturn inClientNow();`)(() => c.client, { readyState: 'complete' }, win);
+    const got = await new Function('scope', 'SHELL_READY', 'window', `${src}\nreturn inClientNow();`)(() => c.client, Promise.resolve(), win);   // the page's wait for shell.js, made while it parses
     return got === c.want ? '' : c.n;
   }));
   ok(`${page}: shows the studio-level notice only for a studio inside a client`, verdicts.every((v) => !v), verdicts.filter(Boolean).join('; '));

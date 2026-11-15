@@ -113,8 +113,8 @@ test.describe('Usage (builder list item 210)', () => {
     await expect(harbor.locator('.c-vis')).toContainText('No counter');
     await expect(page.locator('.unote')).toContainText('Publishes and storage: November 1 to 12. Visits: October, compared with September. A drop is red.');
     // the tab line, on this page and the three beside it
-    const tabs = page.getByRole('navigation', { name: 'Sites, domains, templates and usage' });
-    await expect(tabs.getByRole('link')).toHaveText(['Sites', 'Domains', 'Templates', 'Usage']);
+    const tabs = page.getByRole('navigation', { name: 'Sites, domains, templates, usage and changes' });
+    await expect(tabs.getByRole('link')).toHaveText(['Sites', 'Domains', 'Templates', 'Usage', 'Changes']);
     await expect(tabs.getByRole('link', { name: 'Usage' })).toHaveAttribute('aria-current', 'page');
   });
 
