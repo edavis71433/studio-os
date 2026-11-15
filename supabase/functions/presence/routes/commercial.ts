@@ -31,7 +31,9 @@ import { enquiryState, customerEmails } from '../lib/enquiry_state.ts';
 import { normEmail, emailMatch, isUniqueViolation } from '../lib/contact_email.ts';
 import { leadVisit } from '../lib/visit_source.ts';   // item 89
 import { judgeSend, issueTicket, TICKET_MIN_AGE_S, markSender, spamLinkToken, readSpamLinkToken, SPAM_REASONS } from '../lib/form_check.ts';
-import { storeFormFiles, cleanFileName, filesOf, filePath, fileLink, type StoredFile } from '../lib/form_files.ts';
+import { storeFormFiles, cleanFileName, filesOf, filePath, fileLink, formFileBytes, filePathsOf, removeFormFiles, SPAM_KEEP_DAYS, type StoredFile } from '../lib/form_files.ts';
+import { autoReplyVerdict } from '../lib/auto_reply.ts';   // item 203
+import { JOINED, JOIN_CHECK_EMAIL, joinLinkToken, readJoinLinkToken, joinEmailSubject, joinEmailHtml } from '../lib/join_confirm.ts';
 import { approvalDetail, cleanNote } from '../lib/approval_page.ts';   // sales item 92
 import { wordsHtml, quoteBlock, followupPlan } from '../lib/follow_ups.ts';   // sales item 87
 import { readVisitStats } from '../lib/visit_stats.ts';
@@ -170,7 +172,7 @@ export async function handleFormSubmit(req: Request, siteId: string, cors: Recor
   if (String((rawMap as any)?.form_kind ?? '') === 'signup') {
     const r = await joinList(siteId, rawMap as Record<string, unknown>);
     if (toPage && siteOrigin) return r.ok ? redirectTo('/thanks/') : await notSent(r.error);
-    return r.ok ? ok200(JOINED) : json({ error: r.error, field: r.field, message: r.message }, r.error === 'write_failed' ? 502 : 400, cors);
+    return r.ok ? ok200(JOIN_CHECK_EMAIL) : json({ error: r.error, field: r.field, message: r.message }, r.error === 'write_failed' ? 502 : 400, cors);
   }
 
   const formId = String((rawMap as any)?.form_id ?? b?.form_id ?? '').trim();
@@ -211,13 +213,14 @@ export async function handleFormSubmit(req: Request, siteId: string, cors: Recor
     const entries = spam ? [] : fileFields.flatMap((k) => (fv.sub.values[k] ? (sentFiles[k] || []) : []).map((file) => ({ key: k, file })));
     let keptFiles: StoredFile[] = [];
     if (entries.length) {
-      const kept = await storeFormFiles(siteId, entries);
+      // item 203: a site keeps so much in files from its forms, all messages together
+      const kept = await storeFormFiles(siteId, entries, undefined, await formFileBytes(siteId));
       if (!kept.ok) {
-        if (toPage && siteOrigin) return await notSent('try_again');
-        const field = entries.find((e) => cleanFileName(e.file.name) === kept.name)?.key;
+        if (toPage && siteOrigin) return await notSent(kept.error === 'site_full' ? 'check' : 'try_again');
+        const field = kept.error === 'site_full' ? entries[0]?.key : entries.find((e) => cleanFileName(e.file.name) === kept.name)?.key;
         return kept.error === 'write_failed'
           ? json({ error: 'write_failed', field, message: 'Your files didn’t send. Please try again in a minute.' }, 502, cors)
-          : json({ error: kept.error, field, message: kept.error === 'not_allowed' ? `“${kept.name}” isn’t a photo or a PDF.` : (kept.name ? `“${kept.name}” is too big. Try a smaller one.` : 'Those files are too big together. Send fewer, or smaller ones.') }, 400, cors);
+          : json({ error: kept.error, field, message: kept.error === 'site_full' ? SITE_FULL : kept.error === 'not_allowed' ? `“${kept.name}” isn’t a photo or a PDF.` : (kept.name ? `“${kept.name}” is too big. Try a smaller one.` : 'Those files are too big together. Send fewer, or smaller ones.') }, 400, cors);
       }
       keptFiles = kept.files;
     }
@@ -264,13 +267,15 @@ export async function handleFormSubmit(req: Request, siteId: string, cors: Recor
 
 // ═══ Builder list item 146 · "Join our list" ═══
 // The Newsletter section's box: an email and a consent tick, sent like a form (the time
-// ticket and the spam checks of item 140 included). Whoever joins becomes a contact of
-// the site with subscribed_at and a note of what they agreed to and where (migration
-// 0157); Send an update's "People who joined your list" writes to them, and the
-// unsubscribe link every update carries is how they leave. A robot is thanked and
-// nothing is kept. Joining twice changes nothing, and a sign-up never lifts an
-// unsubscribe: the one suppression list still decides who gets mail.
-export const JOINED = 'You’re on the list. Thank you!';
+// ticket and the spam checks of item 140 included). Item 203: joining no longer adds
+// anyone. It sends the address one email from the business with a "Yes, add me" link
+// (lib/join_confirm.ts), and only pressing it on join.html makes them a contact of the
+// site with subscribed_at and a note of what they agreed to, where and when they said
+// yes (migration 0157). The box gives the same answer whoever typed the address, and
+// only one such email a day goes to an address (lib/auto_reply.ts). A robot
+// is thanked and nothing is sent. A sign-up never lifts an unsubscribe: the one
+// suppression list still decides who gets mail, and gets no "Yes, add me" email.
+export { JOINED, JOIN_CHECK_EMAIL };
 async function joinList(siteId: string, raw: Record<string, unknown>): Promise<{ ok: true } | { ok: false; error: string; field?: string; message: string }> {
   const email = normEmail(raw.email).slice(0, 254);
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return { ok: false, error: 'bad_email', field: 'email', message: 'That email doesn’t look right.' };
@@ -278,29 +283,75 @@ async function joinList(siteId: string, raw: Record<string, unknown>): Promise<{
   const trap = !!String(raw._hp ?? '').slice(0, 100).trim();
   if (await judgeSend(siteId, { trap, ticket: raw._tk, email, name: '', message: '' })) return { ok: true };
   const page = String(raw.source_page ?? '').replace(/[^\w\-./]/g, '').slice(0, 200) || '/';
-  const patch = { subscribed_at: new Date().toISOString(), subscribed_note: `Joined on ${page}: “${SIGNUP_CONSENT}”` };
-  // the contact whatever capitals it was saved with, matched the way the database's
-  // one-contact-per-email rule matches (sales item 110, lib/contact_email.ts)
-  const lookup = `presence_contacts?site_id=eq.${siteId}&deleted_at=is.null&${emailMatch(email)}&select=id,subscribed_at&limit=1`;
-  const found = await svc(lookup);
+  // on the list already: the same answer, and no email
+  const found = await svc(`presence_contacts?site_id=eq.${siteId}&deleted_at=is.null&${emailMatch(email)}&select=id,subscribed_at&limit=1`);
   if (!found.ok) return { ok: false, error: 'write_failed', message: 'That didn’t go through. Please try again in a minute.' };
-  let row = Array.isArray(found.json) ? found.json[0] : null;
+  if (Array.isArray(found.json) && found.json[0]?.subscribed_at) return { ok: true };
+  if (await autoReplyVerdict('join', siteId, email) !== 'send') return { ok: true };
+  const t = await joinLinkToken(siteId, email, page);
+  if (!t) return { ok: false, error: 'write_failed', message: 'That didn’t go through. Please try again in a minute.' };
+  const [brand, replyTo] = await Promise.all([loadEmailBrand(siteId), ownerReplyTo(siteId)]);
+  const business = await businessName(siteId, brand.name);
+  // to a visitor who typed their address on the business's own site: from the business,
+  // and an answer reaches the owner (items 72 and 78)
+  const went = await sendEmail(email, joinEmailSubject(business), joinEmailHtml({ business, email, link: `${appBase()}/join.html?t=${encodeURIComponent(t)}`, accent: brand.accent }), brand, { critical: true, asBusiness: true, replyTo });
+  return went ? { ok: true } : { ok: false, error: 'write_failed', message: 'We couldn’t send your email just now. Please try again later.' };
+}
+/** The business's name as its visitors know it: the business details, else its brand. */
+async function businessName(siteId: string, fallback: string): Promise<string> {
+  const ident = await svc(`presence_identity?site_id=eq.${siteId}&select=business_name&limit=1`).catch(() => null);
+  return String(ident?.json?.[0]?.business_name || fallback || '').trim();
+}
+
+// ═══ Item 203 · join.html: "Yes, add me" ═══
+// The link in the email opens join.html on the app's address (a function's own address
+// can't show a page). It shows who and what first, since mail scanners open links on their
+// own; the button adds them. Authorized by the link's signature alone.
+async function joinTarget(req: Request, token: unknown, cors: Record<string, string>): Promise<{ siteId: string; email: string; page: string } | Response> {
+  if (!(await rateAllow(`joinlink:ip:${clientIp(req)}`, 30, 60))) return tooMany(cors);
+  const t = await readJoinLinkToken(token);
+  if (t === 'expired') return json({ error: 'expired', message: 'This link has run out. Join again on the website, and use the new email.' }, 410, cors);
+  if (!t) return json({ error: 'bad_link', message: 'This link isn’t complete. Join again on the website.' }, 400, cors);
+  return t;
+}
+async function onList(siteId: string, email: string): Promise<{ id: string; subscribed_at: string | null } | null | false> {
+  const r = await svc(`presence_contacts?site_id=eq.${siteId}&deleted_at=is.null&${emailMatch(email)}&select=id,subscribed_at&limit=1`);
+  if (!r.ok) return false;
+  return Array.isArray(r.json) && r.json[0] ? r.json[0] : null;
+}
+export async function handleJoinGet(req: Request, cors: Record<string, string>) {
+  const hit = await joinTarget(req, new URL(req.url).searchParams.get('t'), cors);
+  if (hit instanceof Response) return hit;
+  const [brand, row] = await Promise.all([loadEmailBrand(hit.siteId), onList(hit.siteId, hit.email)]);
+  return json({ data: { business: await businessName(hit.siteId, brand.name), email: hit.email, joined: !!(row && row.subscribed_at) } }, 200, { ...cors, 'Cache-Control': 'no-store' });
+}
+export async function handleJoinPost(req: Request, cors: Record<string, string>) {
+  let b: any = {}; try { b = await req.json(); } catch { /* */ }
+  const hit = await joinTarget(req, b?.t, cors);
+  if (hit instanceof Response) return hit;
+  const failed = () => json({ error: 'write_failed', message: 'That didn’t go through. Try again in a moment.' }, 502, cors);
+  const now = new Date().toISOString();
+  const patch = { subscribed_at: now, subscribed_note: `Joined on ${hit.page}: “${SIGNUP_CONSENT}” Said yes by email on ${now.slice(0, 10)}.` };
+  let row = await onList(hit.siteId, hit.email);
+  if (row === false) return failed();
+  if (row && row.subscribed_at) return json({ data: { ok: true, joined: true } }, 200, cors);   // pressed twice
   if (!row) {
-    const ins = await svc('presence_contacts', { method: 'POST', headers: { Prefer: 'return=representation' }, body: JSON.stringify({ site_id: siteId, email, name: '', ...patch }) });
-    if (ins.ok && ins.json?.[0]) return { ok: true };
-    if (!isUniqueViolation(ins)) return { ok: false, error: 'write_failed', message: 'That didn’t go through. Please try again in a minute.' };
-    // the same person joined from another tab a moment before: theirs is the row to mark
-    const again = await svc(lookup);
-    row = Array.isArray(again.json) ? again.json[0] : null;
-    if (!row) return { ok: false, error: 'write_failed', message: 'That didn’t go through. Please try again in a minute.' };
+    const ins = await svc('presence_contacts', { method: 'POST', headers: { Prefer: 'return=representation' }, body: JSON.stringify({ site_id: hit.siteId, email: normEmail(hit.email), name: '', ...patch }) });
+    if (ins.ok && ins.json?.[0]) return json({ data: { ok: true, joined: true } }, 200, cors);
+    if (!isUniqueViolation(ins)) return failed();
+    // the same person pressed it in another tab a moment before: theirs is the row to mark
+    row = await onList(hit.siteId, hit.email);
+    if (!row) return failed();
+    if (row.subscribed_at) return json({ data: { ok: true, joined: true } }, 200, cors);
   }
-  if (row.subscribed_at) return { ok: true };   // on the list already
-  const w = await svc(`presence_contacts?id=eq.${row.id}&site_id=eq.${siteId}`, { method: 'PATCH', body: JSON.stringify(patch) });
-  return w.ok ? { ok: true } : { ok: false, error: 'write_failed', message: 'That didn’t go through. Please try again in a minute.' };
+  const w = await svc(`presence_contacts?id=eq.${row.id}&site_id=eq.${hit.siteId}`, { method: 'PATCH', body: JSON.stringify(patch) });
+  return w.ok ? json({ data: { ok: true, joined: true } }, 200, cors) : failed();
 }
 
 /** What the page's sender shows where the contact form was (the thank-you page's words). */
 export const FORM_THANKS = 'Thank you, your message was sent. We’ll get back to you soon.';
+/** Item 203: what a visitor is told when the site's room for form files is full. */
+export const SITE_FULL = 'This form can’t take files just now. Send your message without them, or email the business.';
 
 /** Item 131: the same words from the same person to the same site in the last ten
  *  minutes already arrived. The page's sender gives up after 15 seconds with no answer
@@ -413,7 +464,7 @@ export async function handleFormAnswers(req: Request, site: SiteRow, cors: Recor
 // The Inbox's enquiries gain a Spam filter: the last SPAM_DAYS of messages filed as
 // spam, each with the reason in plain words and Not spam (POST /forms/inbox/:id
 // { spam: false }), so a stricter check never loses a real customer's message.
-export const SPAM_DAYS = 30;
+export const SPAM_DAYS = SPAM_KEEP_DAYS;   // item 203: and then it goes, with its files (ops/retention.ts)
 export async function handleSpamList(site: SiteRow, cors: Record<string, string>) {
   const since = new Date(Date.now() - SPAM_DAYS * 86400_000).toISOString();
   const r = await svc(`presence_form_submissions?site_id=eq.${site.id}&spam=eq.true&created_at=gte.${since}&select=id,form_kind,name,email,phone,message,source_page,status,created_at,fields&order=created_at.desc&limit=${FORM_INBOX_PAGE + 1}`);
@@ -602,6 +653,23 @@ export async function handleFormStatus(req: Request, site: SiteRow, id: string, 
   return json({ data: { ok: true } }, 200, cors);
 }
 
+// ═══ Item 203 · Delete an enquiry, and the files that came with it ═══
+// DELETE /forms/inbox/:id: the message goes for good, and its files first. When the
+// store refuses the files the message stays, so no file is left with nothing pointing
+// to it; the next try removes the rest. Its follow-up nudge goes with it.
+export async function handleFormDelete(site: SiteRow, id: string, cors: Record<string, string>) {
+  const r = await svc(`presence_form_submissions?id=eq.${id}&site_id=eq.${site.id}&select=id,fields&limit=1`);
+  if (!r.ok) return json({ error: 'read_failed', message: 'That didn’t go through. Try again in a moment.' }, 502, cors);
+  const row = Array.isArray(r.json) ? r.json[0] : null;
+  if (!row) return json({ error: 'not_found', message: 'That message isn’t there any more.' }, 404, cors);
+  if (!(await removeFormFiles(filePathsOf(row.fields)))) return json({ error: 'files_kept', message: 'Its files couldn’t be removed just now, so the message stays. Try again in a moment.' }, 502, cors);
+  const d = await svc(`presence_form_submissions?id=eq.${id}&site_id=eq.${site.id}`, { method: 'DELETE', headers: { Prefer: 'return=minimal' } });
+  if (!d.ok) return json({ error: 'write_failed', message: 'That didn’t go through. Try again in a moment.' }, 502, cors);
+  const k = leadFollowupNoticeKey(id);
+  await svc(`presence_plan_notices?site_id=eq.${site.id}&kind=eq.${k.kind}&period=eq.${k.period}&status=eq.active`, { method: 'PATCH', body: JSON.stringify({ status: 'dismissed' }) }).catch(() => {});
+  return json({ data: { ok: true, deleted: true } }, 200, cors);
+}
+
 // the IP hash an enquiry keeps; routes/visit_source.ts finds the enquiry a visitor just sent by it (item 89)
 export async function hashIp(req: Request): Promise<string> {
   const ip = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || '';
@@ -624,6 +692,8 @@ async function acknowledgeEnquiry(siteId: string, sub: { name: string; email: st
   const { automationSettingsFor } = await import('../commerce/lifecycle.ts');   // lazy: lifecycle pulls in the whole sweep
   const auto = await automationSettingsFor(siteId);
   if (!auto.auto_ack_enquiries) return false;
+  // item 203: one acknowledgement a day to an address, and none to the do-not-send list
+  if (await autoReplyVerdict('enquiry', siteId, sub.email) !== 'send') return false;
   const [ident, brand, replyTo] = await Promise.all([
     svc(`presence_identity?site_id=eq.${siteId}&select=business_name&limit=1`),
     loadEmailBrand(siteId),

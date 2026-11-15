@@ -6,6 +6,7 @@
 // what's already past retention. Fail-safe: errors are swallowed (never block the
 // cycle). Retention windows match the comments on the table definitions.
 import { svc } from '../lib/db.ts';
+import { clearOldSpam, SPAM_KEEP_DAYS } from '../lib/form_files.ts';
 
 const VISITS_DAYS = 180;        // presence_visits — 6 months of first-party traffic
 const SEARCH_TERM_MONTHS = 13;  // presence_search_terms — 13 months (year-over-year headroom)
@@ -40,6 +41,10 @@ export async function runRetentionSweep(now: Date = new Date()): Promise<Record<
   await prune('scheduled_runs', `presence_scheduled_runs?created_at=lt.${daysAgo(SCHEDULED_RUNS_DAYS)}&status=in.(done,failed,skipped)`);
   await prune('ops_errors', `ops_errors?created_at=lt.${daysAgo(OPS_ERRORS_DAYS)}`);
   await prune('rate_limit_state', `rate_limit_state?window_start=lt.${daysAgo(RATE_LIMIT_DAYS)}`);
+
+  // Item 203: a message in Spam goes after SPAM_KEEP_DAYS (as long as the Inbox's Spam
+  // shows it), and the files a visitor sent with it go first.
+  try { out.spam_messages = await clearOldSpam(daysAgo(SPAM_KEEP_DAYS)); } catch { out.spam_messages = false; }
 
   // Dismissed notices: nothing ever DELETEd from presence_plan_notices, and a
   // dismissed row is both invisible AND the permanent holder of its unique

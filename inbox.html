@@ -177,6 +177,10 @@
   /* Phase 4 (triage): Spam is a quiet text button at the row's far end */
   .acts button.quiet{border-color:transparent;color:var(--faint);margin-left:auto}
   .acts button.quiet:hover{color:var(--ink);background:var(--bg)}
+  .acts .delask{display:inline-flex;flex-wrap:wrap;align-items:center;gap:var(--dds-s2,8px);margin-left:auto;font-size:13.5px}
+  .acts .delask button.danger{background:var(--bad,#a3423a);border-color:var(--bad,#a3423a);color:#fff}
+  @media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .acts .delask button.danger{color:#171320}}
+  :root[data-theme="dark"] .acts .delask button.danger{color:#171320}
   .pchip.stchip.not_a_fit,.pchip.stchip.archived{background:var(--bg);color:var(--faint);border:1px solid var(--line)}
   /* ── dialogs: Make customer (Phase 2) and Log an enquiry ── */
   /* margin:auto puts the modal back in the middle (the page's *{margin:0} reset pins it top-left) */
@@ -934,7 +938,7 @@ function renderList(){
     // included) with the "M new" qualifier; the chips carry the totals.
     const newN=convs.filter(i=>i.lead&&String(i.lead.status||'new')==='new').length;
     const oldN=convs.filter(i=>i.lead&&String(i.lead.status||'new')==='new'&&oldOf(i)).length;
-    $('lmeta').textContent=EFILTER==='spam'?(SPAM===null?'Looking in Spam…':`${convs.length} in Spam, from the last 30 days`)
+    $('lmeta').textContent=EFILTER==='spam'?(SPAM===null?'Looking in Spam…':`${convs.length} in Spam, from the last 30 days. After that it goes for good, with any files.`)
       :`${convs.length} enquir${convs.length===1?'y':'ies'} · ${newN} new${oldN?`, ${oldN} over a month old`:''} · Sorted by ${SORT==='oldest'?'oldest':'newest'}${CUT.queue?` · Showing your newest ${CUT.queue} only`:''}`;
     paintEnqCounts();
   }else{
@@ -961,7 +965,7 @@ function renderList(){
     if(VIEW==='enquiries'&&!FCLIENT&&!FPROJECT){
       const msg=(Q.trim()||KIND_F!=='all')?`No enquiries match${Q.trim()?` “${esc(Q.trim())}”`:' that filter'}.`
         :EFILTER==='new'?'No new enquiries — you’re caught up.'
-        :EFILTER==='spam'?(SPAM===null?'Looking in Spam…':SPAM_FAILED?'Spam couldn’t load just now. Refresh to try again.':'Nothing in Spam. What the spam checks hold back shows here for 30 days, with Not spam.')
+        :EFILTER==='spam'?(SPAM===null?'Looking in Spam…':SPAM_FAILED?'Spam couldn’t load just now. Refresh to try again.':'Nothing in Spam. What the spam checks hold back shows here for 30 days, with Not spam, then goes for good with any files.')
         :'Nothing yet. When someone fills in your website’s contact form, it lands here — and in Customers.';
       rows.innerHTML=`<li class="lempty" role="presentation">${msg}${bits.length?`<div class="lclear"><button type="button" data-clear>${clearLabel(bits.length)}</button></div>`:''}</li>`;
       renderPane();return;
@@ -1500,6 +1504,7 @@ function paneLead(host,it){
         ${st==='new'?`<button id="leadRead">Mark read</button>`:''}
         ${(settled||st==='not_a_fit'||st==='archived')?'':`<button id="leadNotFit" title="Not what you do, or not a real lead — it leaves the queue and stops counting">Not a fit</button>`}
         ${(l.followups&&l.followups.next&&!l.followups.off)?`<button id="leadFuStop" title="No more automatic follow-ups to them">Stop follow-ups</button>`:''}
+        <button id="leadDel" class="quiet" data-needs="delete" title="Delete this message, and any files that came with it, for good">Delete</button>
       </div>
     </div></div>
     ${l.email?`<div class="pcomposer"><form id="leadForm"><label for="leadBody" style="font-size:12.5px;color:var(--faint)">Reply to ${esc(l.name||l.email)} — sent by email from your studio</label>
@@ -1562,6 +1567,7 @@ function paneLead(host,it){
   const sp=$('leadSpam');if(sp)sp.addEventListener('click',()=>markSpam(it,sp));
   const fpk=$('leadFound');if(fpk)fpk.addEventListener('change',()=>{l.found_pick=fpk.value;const n=$('leadFoundNote');if(n)n.hidden=!(l.visit&&fpk.value===l.visit.found_via);});   // item 89
   const dl=$('leadDeal');if(dl)dl.addEventListener('click',()=>createDeal(it,dl));
+  const dm=$('leadDel');if(dm)dm.addEventListener('click',()=>askDeleteLead(it,dm));   // item 203
   const cv=$('leadConvert');if(cv)cv.addEventListener('click',()=>openConvert(it));
 }
 // ONE path for every enquiry mark. The lead object is shared by the enquiry's
@@ -1572,8 +1578,8 @@ function paneLead(host,it){
 // stays, else returns to the list.
 function leadMarked(it,status){
   const id=it.lead_id;
-  if(status!=='spam'&&it.lead)it.lead.status=status;
-  const leaves=(x)=>status==='spam'||(!x.queue&&(status==='archived'||status==='not_a_fit'));
+  if(status!=='spam'&&status!=='deleted'&&it.lead)it.lead.status=status;
+  const leaves=(x)=>status==='spam'||status==='deleted'||(!x.queue&&(status==='archived'||status==='not_a_fit'));
   ITEMS=ITEMS.filter(x=>!(x.kind==='lead'&&x.lead_id===id&&leaves(x)));
   ITEMS.forEach(x=>{if(x.kind==='lead'&&x.lead_id===id){if(status!=='new')x.unread=false;if(status==='replied')x.needs=false;}});   // C10: replied is no longer waiting for a reply
   TOTAL=inboxCount();
@@ -1604,6 +1610,24 @@ async function setLeadStatus(it,status,btn){
   if(!r.ok){toast('That didn’t update.');if(btn)btn.disabled=false;return;}
   toast(status==='not_a_fit'?'Marked not a fit — it’s off your list.':status==='replied'?'Marked replied.':'Marked read.');
   leadMarked(it,status);
+}
+// Item 203: Delete takes the message, and any files that came with it, for good. It asks
+// first, in place of the button; Keep it puts the button back.
+function askDeleteLead(it,btn){
+  const files=it.lead&&Array.isArray(it.lead.files)?it.lead.files.length:0;
+  const box=document.createElement('span');box.className='delask';box.setAttribute('role','group');box.setAttribute('aria-labelledby','delAskQ');
+  box.innerHTML=`<span id="delAskQ">Delete this message${files?' and the '+(files===1?'file':files+' files')+' with it':''} for good?</span><button type="button" class="danger" data-go>Delete for good</button><button type="button" data-keep>Keep it</button>`;
+  btn.replaceWith(box);
+  const go=box.querySelector('[data-go]'),keep=box.querySelector('[data-keep]');
+  keep.addEventListener('click',()=>{box.replaceWith(btn);btn.focus();});
+  go.addEventListener('click',async()=>{
+    go.disabled=true;keep.disabled=true;go.textContent='Deleting…';
+    const r=await api('/forms/inbox/'+encodeURIComponent(it.lead_id),'DELETE');
+    if(!r.ok){toast((r.body&&r.body.message)||'That didn’t go through. Try again in a moment.');go.disabled=false;keep.disabled=false;go.textContent='Delete for good';return;}
+    toast(files?'Deleted, with the files that came with it.':'Deleted.');
+    leadMarked(it,'deleted');
+  });
+  go.focus();
 }
 async function markSpam(it,btn){
   btn.disabled=true;
