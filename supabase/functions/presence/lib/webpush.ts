@@ -7,6 +7,7 @@
 //   VAPID_PUBLIC_KEY  — base64url of the raw 65-byte uncompressed P-256 point
 //   VAPID_PRIVATE_KEY — base64url of the raw 32-byte private scalar d
 //   VAPID_SUBJECT     — mailto: or https: contact (defaults to support@)
+import { guardedFetch } from '../../_shared/tools/url_guard.ts';   // builder item 204
 
 const b64urlToBytes = (s: string): Uint8Array => {
   const pad = s.length % 4 === 2 ? '==' : s.length % 4 === 3 ? '=' : '';
@@ -102,7 +103,9 @@ export async function sendPush(sub: PushSub, msg: { title?: string; body?: strin
   const payload = new TextEncoder().encode(JSON.stringify(msg));
   const body = await encrypt(payload, b64urlToBytes(sub.p256dh), b64urlToBytes(sub.auth));
   const auth = await vapidAuth(sub.endpoint);
-  const r = await fetch(sub.endpoint, {
+  // builder item 204: a browser handed us this address; the guard runs before every send, and a
+  // push service never redirects, so its first answer is the answer
+  const r = await guardedFetch(sub.endpoint, {
     method: 'POST',
     headers: {
       'Authorization': auth,

@@ -16,6 +16,7 @@ export const RESERVED_NAMES = {
   broadcastLists: '__broadcast_lists__',  // sales review items 31 + 39
   stageNames: '__stage_names__',          // sales review item 38
   stageChances: '__stage_chances__',      // sales review item 69: the chance each open stage closes
+  stageNotes: '__stage_notes__',          // sales item 124: the studio's "what to do now" note for each deal stage (lib/stage_notes.ts)
   emailLog: '__email_log__',              // sales review item 69: the private "log this email" address
   calendarFeed: '__calendar_feed__',      // sales review item 46: the private calendar link
   navHidden: '__nav_hidden__',            // builder list item 54: the menu areas the studio hides (agency/routes.ts, routes/workspace.ts)
@@ -40,6 +41,7 @@ export const RESERVED_NAMES = {
   setupStrip: '__setup_strip__',          // sales item 105: whether the studio hid Home's setup strip (routes/setup_strip.ts)
   salesGoalAi: '__sales_goal_ai__',       // sales item 94: the month's sales goal, and whether AI help is on (routes/sales_ai.ts)
   bookingBusy: '__booking_busy__',        // builder list item 149: the busy times last read from that calendar, and how the last read went (routes/booking.ts)
+  usableCheck: '__usable_check__',        // builder list item 150: the three ticks only a person can judge, and the last check's count and worst line (lib/usable_check.ts)
 } as const;
 
 const rowsOf = (r: { json?: unknown }) => (Array.isArray((r as any).json) ? (r as any).json : []) as any[];
