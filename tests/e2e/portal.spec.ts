@@ -101,6 +101,7 @@ test.describe('Client portal', () => {
 
   test('approving a change confirms and reloads', async ({ page }) => {
     await installApp(page, { api: {
+      'POST /foundations/plans/p1/decide': { data: { id: 'p1', status: 'approved' } },
       '/portal/context': REVIEWER_CTX,
       '/portal/feed': { data: { role: 'client_reviewer', moments: [],
         pending_approvals: [{ id: 'p1', kind: 'infrastructure', title: 'Protect your email', summary: '', decide_path: '/foundations/plans/p1/decide' }],
@@ -142,6 +143,8 @@ const CLIENT_CTX = { data: {
   landing: '/client.html', attention_count: 1, nav: [{ key: 'client', label: 'Your updates', items: [{ key: 'feed', label: 'Updates', href: '/client.html' }] }],
 } };
 const CLIENT_API = {
+  // the client's decision on an approval, answered as the server answers it (builder item 212)
+  'POST /client/approvals/a1/decide': (sent: { decision?: string }) => ({ data: { status: sent?.decision === 'approve' ? 'approved' : (sent?.decision || 'approved') } }),
   '/portal/context': CLIENT_CTX,
   '/portal/feed': { data: { role: 'business_owner', moments: [], notices: [], pending_approvals: [], last_published: null } },
   '/client/notifications': { data: [
@@ -1181,6 +1184,8 @@ test.describe('Client portal — the "Your website" card', () => {
 const SVC_OFFER = '44444444-4444-4444-8444-444444444444'; // a real offering id (uuid-shaped)
 const SUP_PROG = '55555555-5555-4555-8555-555555555555';  // an in_progress request
 const REQ_API = {
+  // a booking made from Messages, answered as the server answers it (builder item 212)
+  'POST /book/site-1': { data: { ok: true, message: 'You’re booked. A confirmation is on its way.', status: 'confirmed', when: 'Saturday, Aug 1 at 10:00 AM', service: 'A call', links: { google: 'https://calendar.google.com/calendar/render?action=TEMPLATE', outlook: 'https://outlook.live.com/calendar/0/deeplink/compose?rru=addevent', ics: '', manage: '' } } },
   ...MSG_API,
   '/client/services': { data: [
     { id: SVC_OFFER, name: 'Brand refresh', category: 'Design', description: 'A light refresh of your logo and colors.', price: 'From $800' },
