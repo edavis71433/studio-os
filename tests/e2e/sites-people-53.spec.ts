@@ -66,7 +66,7 @@ test.describe('Sites: who owns each site (builder item 53)', () => {
     await expect(page.getByRole('dialog', { name: 'People' })).toBeVisible();
     const sheet = page.locator('#dds-people');   // its name follows its heading, which changes with the view
     await expect(sheet.locator('.pp-head .sub')).toHaveText('Maple & Main Realty · maple.example');
-    await expect(sheet.locator('.pp-note')).toHaveText('Sam Reyes owns this site. Your studio works on it as Website manager. People on Sam’s side each get their own sign-in, with a role.');
+    await expect(sheet.locator('.pp-note')).toHaveText('Sam Reyes owns this site. Your studio works on it as Website manager. Each person below sees only what their role says.');   // builder item 220
     await expect(sheet.locator('[data-owner]')).toContainText('Hasn’t signed in yet');
     await expect(sheet.getByRole('combobox', { name: 'Role for dana@maple.example' })).toHaveValue('business_staff');
     await sheet.getByRole('button', { name: '+ Invite someone' }).click();

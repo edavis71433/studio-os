@@ -9,14 +9,15 @@
 // stakeholder, business staff, and Developer-Mode prep all build on. It does NOT
 // change tenant isolation (which site) — only the audience within a site.
 
-export type SiteRole = 'business_owner' | 'business_staff' | 'client_reviewer' | 'developer';
+export type SiteRole = 'business_owner' | 'business_staff' | 'client_reviewer' | 'developer' | 'designer';
 
-export const SITE_ROLES: readonly SiteRole[] = ['business_owner', 'business_staff', 'client_reviewer', 'developer'];
+export const SITE_ROLES: readonly SiteRole[] = ['business_owner', 'business_staff', 'client_reviewer', 'developer', 'designer'];
 export function isSiteRole(r: string): r is SiteRole { return (SITE_ROLES as readonly string[]).includes(r); }
 
 export type SiteCapability =
   | 'view_all'             // see the full business-owner workspace
   | 'view_shared'          // see only items shared to the client (the client portal)
+  | 'view_site'            // builder item 220: see the website itself (its words, pages, styles and files), never the business
   | 'edit'                 // edit content/drafts
   | 'approve'              // approve plans / drafts (the sign-off)
   | 'publish'              // publish to the live site
@@ -26,17 +27,20 @@ export type SiteCapability =
   | 'export'               // download everything you can see (ownership)
   | 'invite'               // invite / manage site members
   | 'comment'              // leave comments on shared items
+  | 'design'               // builder item 220: restyle the site (colours, fonts, the brand kit), never custom code
   | 'use_developer_mode';  // A8 prep — off unless the role grants it
 
 // The one capability table. Business owner = full; business staff = operate but
 // not delete/configure/invite; client reviewer = the client portal (review,
 // approve, comment, export shared); developer = full + developer mode (no
-// delete/invite by default).
+// delete/invite by default); designer = the website and nothing else (builder
+// item 220), with 'publish' coming from their seat's switch (seatCan), never the role.
 const CAPS: Record<SiteRole, SiteCapability[]> = {
-  business_owner: ['view_all', 'edit', 'approve', 'publish', 'connect', 'configure', 'delete', 'export', 'invite', 'comment'],
+  business_owner: ['view_all', 'edit', 'approve', 'publish', 'connect', 'configure', 'delete', 'export', 'invite', 'comment', 'design'],
   business_staff: ['view_all', 'edit', 'approve', 'publish', 'connect', 'export', 'comment'],
   client_reviewer: ['view_shared', 'approve', 'export', 'comment'],
-  developer: ['view_all', 'edit', 'approve', 'publish', 'connect', 'configure', 'export', 'comment', 'use_developer_mode'],
+  developer: ['view_all', 'edit', 'approve', 'publish', 'connect', 'configure', 'export', 'comment', 'design', 'use_developer_mode'],
+  designer: ['view_site', 'edit', 'comment', 'design'],
 };
 
 export function siteCan(role: SiteRole, cap: SiteCapability): boolean {
@@ -48,9 +52,54 @@ export function capabilitiesOf(role: SiteRole): SiteCapability[] {
 }
 
 /** A reviewer is the "client" audience — sees only shared items. Everyone else
- *  (owner/staff/developer, and the operator) sees the full workspace. */
+ *  (owner/staff/developer, and the operator) sees the full workspace. A Designer
+ *  sees the website alone (seesSite). */
 export function seesFullWorkspace(role: SiteRole): boolean {
   return siteCan(role, 'view_all');
+}
+
+/** Builder item 220: whoever sees the website's own content (lib/db.ts siteDb): the full
+ *  workspace, or a Designer's website. A reviewer stays under RLS. */
+export function seesSite(role: SiteRole): boolean {
+  return siteCan(role, 'view_all') || siteCan(role, 'view_site');
+}
+
+// ── Builder item 220: one seat, as it stands ──────────────────────────────────
+// A role says what a seat may do, except for one thing a Designer's seat says for
+// itself: whether they publish. Publishing is "as the owner or the studio allows", a
+// switch on the seat (presence_site_members.can_publish, migration 0223), off unless
+// someone who manages people turns it on. Every other role ignores the switch.
+export interface Seat { role: string; can_publish?: boolean | null }
+export function seatCan(seat: Seat, cap: SiteCapability): boolean {
+  if (!isSiteRole(seat.role)) return false;
+  if (cap === 'publish' && seat.role === 'designer') return seat.can_publish === true;
+  return siteCan(seat.role, cap);
+}
+export function seatCapabilities(seat: Seat): SiteCapability[] {
+  if (!isSiteRole(seat.role)) return [];
+  const caps = capabilitiesOf(seat.role);
+  return seat.role === 'designer' && seat.can_publish === true ? [...caps, 'publish'] : caps;
+}
+
+// ── Builder item 220: each role in one sentence, what it sees and never sees ──
+// Wix's Manage Roles says plainly what each role can't reach (Nov 12 review, file 02,
+// finding 4). These are the words a person reads wherever a role is picked or shown:
+// the invite email (lib/workspace.ts), the People list (GET /portal/members) and the
+// member's own screen (GET /portal/context, `you`). people.js keeps its own copy for
+// the invite sheet; tests/presence/designer_role_test.mjs keeps the two the same.
+export const SEAT_WORDS: Record<SiteRole, { name: string; sees: string; you: string }> = {
+  business_owner: { name: 'Co-owner', sees: 'Sees everything the owner sees, customers, messages and money included, and can do anything except hand the site over.', you: 'You see everything the owner sees, customers, messages and money included, and can do anything except hand the site over.' },
+  business_staff: { name: 'Staff', sees: 'Sees the website, customers, messages and invoices, but can’t delete anything or change settings.', you: 'You see the website, customers, messages and invoices; deleting things and settings stay with the owner.' },
+  developer: { name: 'Developer', sees: 'Sees what Staff sees plus settings and the code tools, but can’t delete anything.', you: 'You see what Staff sees plus settings and the code tools; deleting things stays with the owner.' },
+  designer: { name: 'Designer', sees: 'Sees only the website, its pages, styles and photos, and never customers, contacts, deals, invoices or messages.', you: 'You see the website, its pages, styles and photos. Customers, contacts, deals, invoices and messages stay with the owner and the studio.' },
+  client_reviewer: { name: 'Reviewer', sees: 'Sees only what you share with them, to approve and leave notes, and nothing else.', you: 'You see what the business shares with you, to approve and leave notes.' },
+};
+
+/** Who publishes a Designer's work, in a line under their role. */
+export function publishWords(seat: Seat, you = true): string {
+  if (seat.role !== 'designer') return '';
+  if (seat.can_publish === true) return you ? 'You can publish your changes when they’re ready.' : 'Can publish their changes to the live site.';
+  return you ? 'The owner or the studio publishes your changes.' : 'Their changes wait in the draft until the owner or the studio publishes.';
 }
 
 // ── What a member's write on the content data path needs ─────────────────────
@@ -106,6 +155,7 @@ const MEMBER_WRITES: Array<[MemberWriteNeed, string[]]> = [
   ['delete', [
     `POST /client/retainers/${ID}/cancel`,   // sales item 117: stopping the business's own recurring payment is the owner's call
     `DELETE /(media|assets|redirects|content-library|publishes/checkpoints|bookings/types|knowledge/docs)/${ID}`,
+    `DELETE /assets/${ID}/forever`,   // builder list item 218: a file in the Trash deleted for good, like the Delete that put it there
     `DELETE /sales/(contacts|deals|proposals|contracts|templates|estimates)/${ID}`,
     `DELETE /sales/prospects/${ID}`,   // sales review item 112: taking a prospect off the list
     `DELETE /forms/inbox/${ID}`,   // builder list item 203: an enquiry and its files go for good
@@ -129,6 +179,7 @@ const MEMBER_WRITES: Array<[MemberWriteNeed, string[]]> = [
     'POST /sales/setup',   // sales item 105: hiding Home's setup strip is the studio's setting
     'PUT /sales/goal-ai',   // sales item 94: the month's goal is the studio's setting (the AI help switch in it is the owner's alone, said by the route)
     'PUT /report/monthly', 'POST /report/monthly/preview',   // builder list item 58: the client's monthly report is a setting; its preview emails the caller
+    'PUT /broadcasts/welcome', 'POST /broadcasts/welcome/test',   // builder list item 221: the list's automatic welcome email is a setting, like the auto-reply; its test emails the caller
     '(POST|DELETE) /foundations/domain',
     '(POST|DELETE) /foundations/domain/forward',   // builder list item 174: another domain forwarding here is a domain setting
     'POST /foundations/prepare',
@@ -193,6 +244,7 @@ const MEMBER_WRITES: Array<[MemberWriteNeed, string[]]> = [
     'POST /assets/folders/move',   // item 56: rename a folder, or take its files out — no file is deleted
     `PATCH /assets/${ID}`,
     `POST /assets/${ID}/(replace|rollback|duplicate|suggest|remove-background|cutout)`,
+    `POST /assets/${ID}/put-back`,   // builder list item 218: taking a file out of the Trash deletes nothing
     'POST /visual/generate',
     `POST /visual/plans/${ID}/(vary|edit)`,
     `POST /moments/${ID}/dismiss`,
@@ -257,6 +309,7 @@ const MEMBER_WRITES: Array<[MemberWriteNeed, string[]]> = [
     'POST /portal/(members|shares)',
     `POST /portal/members/${ID}/(revoke|role)`,   // builder item 53: changing a seat's role is managing people, like the invite
     'POST /portal/transfer(/cancel)?',   // builder item 53: only the owner, or their studio asking the owner; the route refuses anyone else and says why
+    'PUT /site/publish-lock',   // builder list item 214: only the studio, platform staff, or the owner of a site no studio looks after; the route refuses anyone else and says why
     'PUT /dev/(customization|brand-kit)',
     'POST /dev/brand-kit/apply',
     'PUT /site/template',
@@ -278,4 +331,63 @@ const MEMBER_WRITE_RULES = MEMBER_WRITES.flatMap(([need, patterns]) => patterns.
 export function memberWriteNeeds(route: string, method: string): MemberWriteNeed | null {
   const asked = `${method} ${route}`;
   return MEMBER_WRITE_RULES.find(([rule]) => rule.test(asked))?.[1] ?? null;
+}
+
+// ── Builder item 220: everything a Designer may reach ────────────────────────
+// A Designer works on the website: its words, pages, styles and photos, and the
+// draft's versions and notes. They never read the business behind it: customers,
+// contacts, deals, invoices, messages, bookings, reviews, numbers or settings.
+// index.ts refuses every route that isn't listed here before any handler runs,
+// reads included, the way reviewerAllowed holds a reviewer, so a page that forgets
+// to hide something still hands a Designer nothing. A write listed here then meets
+// memberWriteGate like any seat's: publishing passes only when their seat may publish,
+// deleting and approving never do. Nothing that emails the business's customers,
+// touches its money or connections, or saves custom code is listed.
+const DESIGNER_ROUTES: string[] = [
+  // the shell's own read, and the website's content (the draft)
+  'GET /portal/context',
+  'GET /site(/templates)?',
+  '(GET|PUT) /(identity|location|settings|brand/profile)',   // PUT /settings past the website's own fields needs configure (contentWriteNeeds)
+  'GET /brand/studio',
+  '(GET|POST) /(offerings|testimonials|faqs|posts)',
+  `(GET|PUT|PATCH) /(offerings|testimonials|faqs|posts)/${ID}`,
+  `POST /posts/${ID}/(publish|unpublish)`,
+  // pages
+  'GET /pages/(ready|refs|deleted)', 'POST /pages/duplicate', `POST /pages/deleted/${ID}/restore`,
+  '(GET|POST) /page-locks', 'GET /blocks/suggested', 'GET /content-tree',
+  '(GET|POST) /redirects', 'GET /redirects/suggest',   // a moved page's old address, in the page's own settings
+  // photos and files
+  'GET /media', 'POST /media/upload-url', `PUT /media/${ID}`,
+  'GET /assets(/collections|/health|/match|/trash)?', 'POST /assets/(bulk|folders/move)',
+  `(GET|PATCH) /assets/${ID}`, `GET /assets/${ID}/(download|social|cards)`,
+  `POST /assets/${ID}/(replace|rollback|duplicate|suggest|remove-background|cutout)`,
+  `POST /assets/${ID}/put-back`,   // builder item 218: the Trash, as staff have it: putting a file back deletes nothing; deleting for good stays with delete
+  'GET /assets/cutout/[a-z0-9]{10,64}\\.[A-Za-z0-9_-]{32}',
+  'GET /stock/search', 'POST /stock/import',
+  '(GET|POST) /content-library', `PUT /content-library/${ID}`,
+  // no Visual Studio: an AI image costs money and is kept only by approving it, which stays with the owner and the studio
+  // looks and words: routes/dev.ts keeps custom code to a developer, so a Designer saves colours and fonts only
+  '(GET|PUT) /dev/(customization|brand-kit)', 'POST /dev/brand-kit/apply',
+  'POST /writer/(generate|rewrite)', 'GET /writer/drafts', `GET /writer/drafts/${ID}`, `POST /writer/drafts/${ID}/(accept|discard)`,
+  'POST /editor/improve',
+  'POST /(review/run|brand/review)', 'GET /(review|brand)/reports', `GET /(review|brand)/reports/${ID}`, `POST /(review|brand)/reports/${ID}/dismiss`,
+  // the draft, its preview and its versions
+  'GET /(preview|preview/status|changes|health|website-timeline)',
+  'POST /preview/(section|share-link|publish)',
+  'GET /publishes(/compare|/timewarp|/checkpoints)?', 'POST /publishes/checkpoints', `POST /publishes/checkpoints/${ID}/restore`,
+  `POST /publishes/${ID}/label`, 'PUT /publishes/stars', 'POST /restore-to-draft',
+  '(GET|POST) /launches', `GET /launches/${ID}`, `POST /launches/${ID}/(recapture|cancel)`,
+  // going live: listed, and memberWriteGate passes it only for a seat that may publish
+  'POST /(publish|restore|preview/promote)', '(GET|POST) /schedule', `POST /schedule/${ID}/cancel`, `POST /launches/${ID}/(schedule|promote|rollback)`,
+  'GET /site/publish-lock',   // builder item 214: whether publishing is locked, and why; locking stays the studio's
+  // notes on the draft
+  '(GET|POST) /comments', `POST /comments/${ID}/resolve`,
+];
+const DESIGNER_RULES = DESIGNER_ROUTES.map((p) => new RegExp(`^${p}$`));
+
+/** May a Designer reach this route at all? Pure. A route not listed is refused, so a
+ *  new route stays closed to Designers until someone decides it is website work. */
+export function designerAllowed(route: string, method: string): boolean {
+  const asked = `${method} ${route}`;
+  return DESIGNER_RULES.some((rule) => rule.test(asked));
 }

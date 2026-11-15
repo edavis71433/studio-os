@@ -61,6 +61,8 @@
   Cache-Control: no-cache, must-revalidate
 /usage
   Cache-Control: no-cache, must-revalidate
+/changes
+  Cache-Control: no-cache, must-revalidate
 /today
   Cache-Control: no-cache, must-revalidate
 /inbox
@@ -70,6 +72,8 @@
 /contacts
   Cache-Control: no-cache, must-revalidate
 /prospects
+  Cache-Control: no-cache, must-revalidate
+/client-portal
   Cache-Control: no-cache, must-revalidate
 /todos
   Cache-Control: no-cache, must-revalidate

@@ -62,13 +62,14 @@ async function studioAddresses(siteId: string): Promise<Set<string> | null> {
   const [site, ident, members] = await Promise.all([
     svc(`presence_sites?id=eq.${siteId}&select=client_id&limit=1`),
     svc(`presence_identity?site_id=eq.${siteId}&select=email&limit=1`),
-    svc(`presence_site_members?site_id=eq.${siteId}&status=eq.active&select=email&limit=50`),
+    svc(`presence_site_members?site_id=eq.${siteId}&status=eq.active&select=email,role&limit=50`),
   ]);
   if (!site.ok || !ident.ok) return null;
   const out = new Set<string>();
   const add = (e: unknown) => { const v = String(e ?? '').trim().toLowerCase(); if (v.includes('@')) out.add(v); };
   add(rows(ident)[0]?.email);
-  if (members.ok) for (const m of rows(members)) add(m.email);
+  // builder item 220: a Designer never reaches customers or deals, so their email logs nothing
+  if (members.ok) for (const m of rows(members)) if (m.role !== 'designer') add(m.email);
   const owner = rows(site)[0]?.client_id;
   if (owner && UUID_RE.test(String(owner))) {
     const c = await svc(`clients?id=eq.${owner}&select=email,contact_email&limit=1`);

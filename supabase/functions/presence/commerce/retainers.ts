@@ -17,6 +17,7 @@
 //
 // Pure cores up top (exhaustively unit-tested); the impure webhook sync below.
 import { svc } from '../lib/db.ts';
+import { stripeMetaOf, stripeSubscriptionIdOf, subscriptionPeriodEnd, invoicePaidCents, invoicePaidAt } from './stripe_shape.ts';
 
 export const RETAINER_PURPOSE = 'service_retainer';
 
@@ -236,6 +237,74 @@ export function agreementRenewalCopy(title: string, termEndIso: string, window: 
   };
 }
 
+// ── A retainer charge, and an approval, are recorded (sales item 128) ────────
+// Stripe reports each monthly charge as an invoice event. The webhook was never
+// told to listen for one, and the code read the charge's subscription where
+// Stripe stopped putting it (commerce/stripe_shape.ts), so no charge reached the
+// deal's history, revenue, the weekly email, the bookkeeper file or the client's
+// portal, which said "No charges yet" to a client charged every month.
+
+/** Stripe's words for "a retainer charge landed": invoice.paid, which the webhook
+ *  listens for since sales item 128, and invoice.payment_succeeded, the older
+ *  name. One charge can arrive under both. Pure. */
+export function isRetainerChargeEvent(type: string): boolean {
+  return type === 'invoice.paid' || type === 'invoice.payment_succeeded';
+}
+
+/** A client approving a retainer is the first move from waiting to live. A replay,
+ *  a recovery or a resumed retainer is not one. Kept apart from retainerTransition,
+ *  which is the dunning rail (Needs you): an approval is news, like money landing,
+ *  so it is told on the Updates tier. Pure. */
+export function retainerApproved(priorStatus: string | undefined, nextStatus: string | undefined): boolean {
+  return String(priorStatus || '') === 'pending' && String(nextStatus || '') === 'active';
+}
+/** One approval line per retainer set-up: a retainer set up again after a cancel is a new one. Pure. */
+export function retainerApprovedPeriod(dealId: string, askedAt: unknown): string {
+  return `${retainerNoticePeriodPrefix(dealId)}approved:${Date.parse(String(askedAt || '')) || 0}`;
+}
+/** What the studio reads when a client approves. Pure. */
+export function retainerApprovedCopy(dealTitle: string, amountCents: number, interval: string): { headline: string; body: string } {
+  const name = (dealTitle || '').trim() || 'a retainer client';
+  const amt = '$' + ((Number(amountCents) || 0) / 100).toLocaleString('en-US', { minimumFractionDigits: 2 });
+  const per = interval === 'year' ? 'year' : 'month';
+  return {
+    headline: `Retainer approved: ${name}, ${amt} a ${per}`,
+    body: `The client approved the ${amt} a ${per} retainer. Stripe charges their card each ${per} until one of you cancels, and every charge shows on the deal.`,
+  };
+}
+
+/** What a retainer charge records on the deal: its amount, and the Stripe invoice
+ *  it came from, so the same charge sent twice, or under both names, is recorded
+ *  once. null when there is nothing to record (a $0 invoice). Pure. */
+export function retainerChargeRow(inv: any, x: { dealId: string; siteId: string; interval: unknown; fallbackCents: unknown; extra?: boolean }): Record<string, unknown> | null {
+  const paid = invoicePaidCents(inv);
+  const cents = paid === null ? (Math.round(Number(inv?.amount_due) || 0) || Math.round(Number(x.fallbackCents) || 0)) : paid;
+  if (!(cents > 0)) return null;
+  const stripeInvoice = String(inv?.id || '');
+  const at = invoicePaidAt(inv);
+  return {
+    deal_id: x.dealId, site_id: x.siteId, kind: 'invoice_paid', actor: 'stripe', actor_kind: 'system',
+    detail: { retainer: true, ...(x.extra ? { extra: true } : {}), amount_cents: cents, interval: x.interval === 'year' ? 'year' : 'month', ...(stripeInvoice ? { stripe_invoice: stripeInvoice } : {}) },
+    // the day Stripe took it, so a charge recorded late (a retry) still counts in its own month
+    ...(at ? { created_at: at } : {}),
+  };
+}
+
+/** Put one charge on the deal, once. ok:false means it may not be recorded and
+ *  Stripe should send the event again (the read or the write failed). */
+async function recordRetainerCharge(inv: any, x: { dealId: string; siteId: string; interval: unknown; fallbackCents: unknown; extra?: boolean }): Promise<{ ok: boolean; recorded: boolean }> {
+  const row = retainerChargeRow(inv, x);
+  if (!row) return { ok: true, recorded: false };
+  const stripeInvoice = String((row.detail as { stripe_invoice?: string }).stripe_invoice || '');
+  if (stripeInvoice) {
+    const seen = await svc(`presence_deal_events?deal_id=eq.${encodeURIComponent(x.dealId)}&site_id=eq.${encodeURIComponent(x.siteId)}&kind=eq.invoice_paid&detail->>stripe_invoice=eq.${encodeURIComponent(stripeInvoice)}&select=id&limit=1`).catch(() => ({ ok: false, json: null as any }));
+    if (!seen.ok) return { ok: false, recorded: false };
+    if (Array.isArray(seen.json) && seen.json.length) return { ok: true, recorded: false };
+  }
+  const ins = await svc('presence_deal_events', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify(row) }).catch(() => ({ ok: false }));
+  return { ok: ins.ok === true, recorded: ins.ok === true };
+}
+
 // ── the impure webhook sync (called by commerce/billing-sync, by PURPOSE) ────
 // Updates the deal's retainer state from Stripe truth. NEVER touches presence_
 // entitlements (SaaS) — it only PATCHes presence_deals.retainer. Resolves the deal
@@ -243,26 +312,29 @@ export function agreementRenewalCopy(title: string, termEndIso: string, window: 
 // subscription id for invoice.* events that carry only the subscription. Best-
 // effort + honest: it will NOT create a retainer it didn't originate (a prior
 // state must already exist), so a stray webhook can never invent one.
-export async function applyRetainerSync(type: string, obj: any): Promise<{ synced: boolean; reason?: string }> {
+//
+// `retry` (sales item 128): the event changed something that didn't save (the
+// retainer itself, or a charge), so billing-sync answers 502 and Stripe sends it
+// again. Every step is safe to run twice. A notice or an email that fails never
+// asks for a retry: the state is what matters, and Stripe would re-send forever.
+export async function applyRetainerSync(type: string, obj: any): Promise<{ synced: boolean; reason?: string; retry?: boolean }> {
   const nowIso = new Date().toISOString();
-  const md = (obj && (obj.metadata || obj.subscription_details?.metadata)) || {};
+  const md = stripeMetaOf(obj);
   let dealId = String(md.deal_id || '');
   let siteId = String(md.site_id || '');
-  const subId = String(
-    (obj?.object === 'subscription' ? obj?.id : '') ||
-    (typeof obj?.subscription === 'string' ? obj.subscription : obj?.subscription?.id) || '',
-  );
+  const subId = stripeSubscriptionIdOf(obj);
 
   // Fallback (invoice.* events): resolve the deal by the stored subscription id.
   // Pre-0096 this jsonb filter simply matches nothing → clean no-op.
   if ((!dealId || !siteId) && subId) {
-    const q = await svc(`presence_deals?retainer->>stripe_subscription_id=eq.${encodeURIComponent(subId)}&deleted_at=is.null&select=id,site_id&limit=1`).catch(() => ({ json: [] as any[] }));
+    const q = await svc(`presence_deals?retainer->>stripe_subscription_id=eq.${encodeURIComponent(subId)}&deleted_at=is.null&select=id,site_id&limit=1`).catch(() => ({ ok: false, json: [] as any[] }));
     const row = Array.isArray(q.json) ? q.json[0] : null;
     if (row) { dealId = String(row.id); siteId = String(row.site_id); }
   }
   if (!dealId || !siteId) return { synced: false, reason: 'no_deal' };
 
-  const dr = await svc(`presence_deals?id=eq.${encodeURIComponent(dealId)}&site_id=eq.${encodeURIComponent(siteId)}&deleted_at=is.null&select=id,title,retainer&limit=1`).catch(() => ({ json: [] as any[] }));
+  const dr = await svc(`presence_deals?id=eq.${encodeURIComponent(dealId)}&site_id=eq.${encodeURIComponent(siteId)}&deleted_at=is.null&select=id,title,retainer&limit=1`).catch(() => ({ ok: false, json: [] as any[] }));
+  if (!dr.ok) return { synced: false, reason: 'read_failed', retry: true };
   const deal = Array.isArray(dr.json) ? dr.json[0] : null;
   const prior: Partial<RetainerState> | null = (deal && deal.retainer && typeof deal.retainer === 'object') ? deal.retainer : null;
   if (!prior) return { synced: false, reason: 'no_retainer' };   // never invent a retainer from a webhook
@@ -278,11 +350,11 @@ export async function applyRetainerSync(type: string, obj: any): Promise<{ synce
     patch.canceled_at = nowIso;
   } else if (type.startsWith('customer.subscription.')) {
     patch.status = retainerStatusFromStripe(String(obj?.status || ''));
-    const cpe = Number(obj?.current_period_end);
-    if (isFinite(cpe) && cpe > 0) patch.current_period_end = new Date(cpe * 1000).toISOString();
+    const cpe = subscriptionPeriodEnd(obj);
+    if (cpe) patch.current_period_end = new Date(cpe * 1000).toISOString();
   } else if (type === 'checkout.session.completed') {
     patch.status = 'active';   // the client authorized; subscription.created reconciles the details
-  } else if (type === 'invoice.payment_succeeded') {
+  } else if (isRetainerChargeEvent(type)) {
     patch.status = 'active';
   } else if (type === 'invoice.payment_failed') {
     patch.status = 'past_due';
@@ -292,6 +364,28 @@ export async function applyRetainerSync(type: string, obj: any): Promise<{ synce
   const up = await svc(`presence_deals?id=eq.${encodeURIComponent(dealId)}&site_id=eq.${encodeURIComponent(siteId)}`, {
     method: 'PATCH', body: JSON.stringify({ retainer: next }),
   }).catch(() => ({ ok: false }));
+  // The retainer didn't save: nothing below may speak for a state we don't hold.
+  if ((up as { ok?: boolean }).ok !== true) return { synced: false, reason: 'write_failed', retry: true };
+
+  // ── APPROVED (sales item 128) — the studio hears it, on the Updates tier ────
+  // Best-effort: once per retainer set-up (the notice's unique key), the email on
+  // the notice's created flag, like a paid invoice's echo.
+  if (retainerApproved(prior.status, next.status)) {
+    try {
+      const { raiseNotice } = await import('../lib/notice.ts');
+      const clientId = String((await svc(`presence_sites?id=eq.${encodeURIComponent(siteId)}&select=client_id&limit=1`).catch(() => ({ json: null as any }))).json?.[0]?.client_id || '');
+      if (clientId) {
+        const copy = retainerApprovedCopy(String((deal as { title?: string }).title || '').slice(0, 80), Number(next.amount_cents) || 0, String(next.interval || 'month'));
+        const fresh = await raiseNotice({ siteId, clientId, kind: 'invoice_paid', period: retainerApprovedPeriod(dealId, prior.created_at), headline: copy.headline, body: copy.body });
+        if (fresh) {
+          const { emailOperator } = await import('../lib/service_bridge.ts');
+          const esc = (s: string) => s.replace(/[&<>"]/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[ch] as string));
+          const base = (Deno.env.get('SITE_URL') || 'https://davisdigitalstudio.com').replace(/\/$/, '');
+          emailOperator(siteId, copy.headline, `<p>${esc(copy.body)}</p>`, 'retainer_approved', { label: 'Open the deal', href: `${base}/pipeline.html?deal=${dealId}&dtab=billing` }).catch(() => {});
+        }
+      }
+    } catch { /* the retainer is live either way */ }
+  }
 
   // ── DUNNING (operator audit #3) — the transition, made audible ─────────────
   // Deliberately INSIDE applyRetainerSync (the SERVICE rail), never the SaaS
@@ -302,58 +396,52 @@ export async function applyRetainerSync(type: string, obj: any): Promise<{ synce
   // Pre-0127 the 'retainer_status' kind fails the notices CHECK → raiseNotice
   // returns false → no email, no throw: dormant until Eric applies the SQL
   // (the 0094–0119 deploy-order posture — SQL lands before or with the deploy).
-  if ((up as { ok?: boolean }).ok === true) {
-    try {
-      const change = retainerTransition(prior.status, next.status);
-      if (change) {
-        const { raiseNotice, clearNoticePrefix } = await import('../lib/notice.ts');
-        const siteRow = (await svc(`presence_sites?id=eq.${encodeURIComponent(siteId)}&select=client_id&limit=1`).catch(() => ({ json: null as any }))).json?.[0];
-        const clientId = String(siteRow?.client_id || '');
-        if (clientId) {
-          if (change === 'recovered') {
-            // the money is flowing again — the bell must stop saying otherwise
-            await clearNoticePrefix(clientId, 'retainer_status', retainerNoticePeriodPrefix(dealId));
-          } else {
-            const title = String((deal as { title?: string }).title || '').slice(0, 80);
-            const copy = retainerNoticeCopy(change, title, Number(next.amount_cents) || 0, String(next.interval || 'month'));
-            const fresh = await raiseNotice({
-              siteId, clientId, kind: 'retainer_status',
-              period: retainerNoticePeriod(dealId, change, Date.now()),
-              headline: copy.headline, body: copy.body,
-            });
-            if (fresh) {
-              const { emailOperator } = await import('../lib/service_bridge.ts');
-              const href = next.stripe_subscription_id
-                ? `https://dashboard.stripe.com/subscriptions/${next.stripe_subscription_id}`
-                : `${(Deno.env.get('SITE_URL') || 'https://davisdigitalstudio.com').replace(/\/$/, '')}/pipeline.html?deal=${dealId}`;
-              emailOperator(siteId, copy.subject, copy.html, 'retainer_status',
-                { label: change === 'past_due' ? 'Open it in Stripe' : 'Open the deal', href }).catch(() => {});
-            }
+  try {
+    const change = retainerTransition(prior.status, next.status);
+    if (change) {
+      const { raiseNotice, clearNoticePrefix } = await import('../lib/notice.ts');
+      const siteRow = (await svc(`presence_sites?id=eq.${encodeURIComponent(siteId)}&select=client_id&limit=1`).catch(() => ({ json: null as any }))).json?.[0];
+      const clientId = String(siteRow?.client_id || '');
+      if (clientId) {
+        if (change === 'recovered') {
+          // the money is flowing again — the bell must stop saying otherwise
+          await clearNoticePrefix(clientId, 'retainer_status', retainerNoticePeriodPrefix(dealId));
+        } else {
+          const title = String((deal as { title?: string }).title || '').slice(0, 80);
+          const copy = retainerNoticeCopy(change, title, Number(next.amount_cents) || 0, String(next.interval || 'month'));
+          const fresh = await raiseNotice({
+            siteId, clientId, kind: 'retainer_status',
+            period: retainerNoticePeriod(dealId, change, Date.now()),
+            headline: copy.headline, body: copy.body,
+          });
+          if (fresh) {
+            const { emailOperator } = await import('../lib/service_bridge.ts');
+            const href = next.stripe_subscription_id
+              ? `https://dashboard.stripe.com/subscriptions/${next.stripe_subscription_id}`
+              : `${(Deno.env.get('SITE_URL') || 'https://davisdigitalstudio.com').replace(/\/$/, '')}/pipeline.html?deal=${dealId}`;
+            emailOperator(siteId, copy.subject, copy.html, 'retainer_status',
+              { label: change === 'past_due' ? 'Open it in Stripe' : 'Open the deal', href }).catch(() => {});
           }
         }
       }
-    } catch { /* the dunning echo is best-effort — retainer truth is already stored */ }
-  }
+    }
+  } catch { /* the dunning echo is best-effort — retainer truth is already stored */ }
 
-  // Settlement echo (best-effort): a recurring charge landed → a calm history line
-  // on the deal, exactly like a paid service invoice. Reuses the allowed
-  // 'invoice_paid' deal-event kind; detail.retainer distinguishes it in the UI.
-  if (type === 'invoice.payment_succeeded') {
-    try {
-      const amt = Number(obj?.amount_paid ?? obj?.amount_due ?? 0) || Number(next.amount_cents) || 0;
-      await svc('presence_deal_events', {
-        method: 'POST', headers: { Prefer: 'return=minimal' },
-        body: JSON.stringify({ deal_id: dealId, site_id: siteId, kind: 'invoice_paid', actor: 'stripe', actor_kind: 'system', detail: { retainer: true, amount_cents: amt, interval: next.interval } }),
-      }).catch(() => {});
-    } catch { /* the echo is best-effort */ }
+  // Settlement: a recurring charge landed → a line on the deal, which is what the
+  // deal's Paid, revenue, the weekly email, the bookkeeper file and the client's
+  // portal all count. Reuses the allowed 'invoice_paid' deal-event kind;
+  // detail.retainer distinguishes it. Once per Stripe invoice (sales item 128).
+  if (isRetainerChargeEvent(type)) {
+    const rec = await recordRetainerCharge(obj, { dealId, siteId, interval: next.interval, fallbackCents: next.amount_cents });
+    if (!rec.ok) return { synced: true, reason: 'charge_not_recorded', retry: true };
   }
-  return { synced: (up as { ok?: boolean }).ok === true };
+  return { synced: true };
 }
 
 /** A subscription that is NOT the retainer's own (a second approval). It is
  *  remembered on the deal, the studio is told once, and its ending takes it off
  *  again. The retainer's own status, subscription and dates are never touched by it. */
-async function syncExtraSubscription(type: string, obj: any, x: { dealId: string; siteId: string; title: string; prior: Partial<RetainerState>; subId: string; nowIso: string }): Promise<{ synced: boolean; reason?: string }> {
+async function syncExtraSubscription(type: string, obj: any, x: { dealId: string; siteId: string; title: string; prior: Partial<RetainerState>; subId: string; nowIso: string }): Promise<{ synced: boolean; reason?: string; retry?: boolean }> {
   const had = (x.prior.extra_subscription_ids || []).map(String);
   const ended = type === 'customer.subscription.deleted' || (type.startsWith('customer.subscription.') && retainerStatusFromStripe(String(obj?.status || '')) === 'canceled');
   const extras = ended ? had.filter((id) => id !== x.subId) : (had.includes(x.subId) ? had : [...had, x.subId]);
@@ -362,7 +450,8 @@ async function syncExtraSubscription(type: string, obj: any, x: { dealId: string
     const up = await svc(`presence_deals?id=eq.${encodeURIComponent(x.dealId)}&site_id=eq.${encodeURIComponent(x.siteId)}`, { method: 'PATCH', body: JSON.stringify({ retainer: { ...x.prior, extra_subscription_ids: extras, updated_at: x.nowIso } }) }).catch(() => ({ ok: false }));
     ok = (up as { ok?: boolean }).ok === true;
   }
-  if (!ended && ok) {
+  if (!ok) return { synced: false, reason: 'second_approval', retry: true };
+  if (!ended) {
     try {
       const { raiseNotice } = await import('../lib/notice.ts');
       const clientId = String((await svc(`presence_sites?id=eq.${encodeURIComponent(x.siteId)}&select=client_id&limit=1`).catch(() => ({ json: null as any }))).json?.[0]?.client_id || '');
@@ -376,10 +465,10 @@ async function syncExtraSubscription(type: string, obj: any, x: { dealId: string
       }
     } catch { /* the extra is remembered either way */ }
   }
-  // the money did land: the deal's history and its retainer total say so
-  if (type === 'invoice.payment_succeeded') {
-    const amt = Number(obj?.amount_paid ?? obj?.amount_due ?? 0) || Number(x.prior.amount_cents) || 0;
-    await svc('presence_deal_events', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ deal_id: x.dealId, site_id: x.siteId, kind: 'invoice_paid', actor: 'stripe', actor_kind: 'system', detail: { retainer: true, extra: true, amount_cents: amt, interval: x.prior.interval } }) }).catch(() => {});
+  // the money did land: the deal's history and its retainer total say so, once per charge
+  if (isRetainerChargeEvent(type)) {
+    const rec = await recordRetainerCharge(obj, { dealId: x.dealId, siteId: x.siteId, interval: x.prior.interval, fallbackCents: x.prior.amount_cents, extra: true });
+    if (!rec.ok) return { synced: true, reason: 'second_approval', retry: true };
   }
-  return { synced: ok, reason: 'second_approval' };
+  return { synced: true, reason: 'second_approval' };
 }

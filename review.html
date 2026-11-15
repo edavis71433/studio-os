@@ -16,6 +16,8 @@
   .center{max-width:520px;margin:80px auto;padding:0 20px;text-align:center}
   h1{font-weight:500;font-size:clamp(22px,5vw,28px);margin-bottom:6px}
   .muted{color:var(--soft);font-size:15px}
+  /* builder list item 200: Try again, for a moment's trouble only */
+  .again{margin-top:22px;font:inherit;font-size:15px;font-weight:600;border:0;border-radius:999px;padding:11px 22px;min-height:44px;background:#5b3fa0;color:#fff;cursor:pointer}
 </style>
 </head>
 <body>
@@ -27,17 +29,32 @@
 // link showed the page's code. This page, on our own address, asks the function and
 // writes what comes back into the document (our own server-rendered HTML). Its form
 // already sends the review to the function directly.
+//
+// Builder list item 200 (review file 06, finding 62): a customer with a link that will never
+// work was told to try again in a moment. A link to a page that's gone (404) now says so and
+// to ask the business for a fresh one; no answer, a busy moment or a failure on our side says
+// the link is still good, with Try again.
 (function(){
   var q=new URLSearchParams(location.search);
   var FN=(q.get('env')==='staging'?'https://wjlpursnwbmlcdwbeowv.supabase.co':'https://qksstlqzbhesadrrofgn.supabase.co')+'/functions/v1/presence';
   var site=q.get('site')||'';
   var state=document.getElementById('state');
-  function fail(head,line){ state.innerHTML='<h1></h1><p class="muted"></p>'; state.querySelector('h1').textContent=head; state.querySelector('p').textContent=line; }
+  function fail(head,line,again){
+    state.innerHTML='<h1></h1><p class="muted"></p>'; state.setAttribute('role','alert');
+    state.querySelector('h1').textContent=head; state.querySelector('p').textContent=line;
+    if(again){ var b=document.createElement('button'); b.type='button'; b.className='again'; b.textContent='Try again'; b.addEventListener('click',open); state.appendChild(b); }
+  }
+  function open(){
+    state.removeAttribute('role'); state.innerHTML='<p class="muted">Opening the review page…</p>';
+    fetch(FN+'/reviews/'+site+'?embed=1').then(function(r){
+      if(r.status===404){ fail('This review link doesn’t work','It may be cut short, or it’s for a page that’s gone. Ask the business for a fresh link.'); return; }
+      if(r.status===429){ fail('Too many tries in a row','Wait a minute, then try again. The link is still good.',true); return; }
+      if(!r.ok){ fail('This review page isn’t available right now','Please try again in a moment. The link is still good.',true); return; }
+      return r.text().then(function(html){ document.open(); document.write(html); document.close(); });
+    }).catch(function(){ fail('This review page couldn’t open','Check your connection, then try again. The link is still good.',true); });
+  }
   if(!/^[0-9a-f-]{36}$/i.test(site)){ fail('This review link isn’t complete','Open the link from the email again, or ask the business for a fresh one.'); return; }
-  fetch(FN+'/reviews/'+site+'?embed=1').then(function(r){
-    if(!r.ok){ fail('This review page isn’t available right now','Please try again in a moment.'); return; }
-    return r.text().then(function(html){ document.open(); document.write(html); document.close(); });
-  }).catch(function(){ fail('This review page couldn’t open','Check your connection, then reload the page.'); });
+  open();
 })();
 </script>
 </body>

@@ -2075,6 +2075,18 @@ const EDGE_CSS = '.block.block--edge{position:relative;border-bottom:0}'
   + '.block.block--edge+*{border-top:var(--edge-h) solid transparent}'
   + 'main>.block--edge:last-child{margin-bottom:var(--edge-h)}'
   + (Object.keys(EDGE_PATHS) as Array<keyof typeof EDGE_PATHS>).map((k) => `.block--edge-${k}{--edge-m:${edgeMask(EDGE_PATHS[k])}}`).join('');
+// ── The bold bands: an accent or a dark section, light words throughout (BLOCK_CSS below).
+// BAND is the accent band's colour: the darker accent, or the deeper one a template names when
+// both its accents are too light for white words (--accent-band, Slate). White words read on it
+// at 4.5:1 or better, so it is also what the accent band's buttons and step numbers write in and
+// what the dark band fills them with (tests/presence/accent_band_test.mjs).
+const BAND = 'var(--accent-band,var(--accent-dark,var(--accent)))';
+/** Both bands' copies of a selector, inside the section; `self` adds classes to the section. */
+const onBands = (sel: string, self = '') => `.block.block--bg-accent${self} ${sel},.block.block--bg-dark${self} ${sel}`;
+// The tab that's showing: the Tabs section's own rule gives it the accent at (0,7,0); on a band
+// these (0,8,0) give it the band's words, and an underline in them that stands out on the strip's
+// fainter line.
+const BAND_TAB_ON = ['accent', 'dark'].flatMap((b) => Array.from({ length: CAP.tabs }, (_, i) => `.block.block-tabs.block--bg-${b} .tab-radio:nth-of-type(${i + 1}):checked~.tab-strip .tab-label:nth-of-type(${i + 1})`)).join(',');
 export const BLOCK_CSS = `.stats{grid-template-columns:repeat(auto-fit,minmax(150px,1fr))}
 .card.stat{text-align:center}.stat-v{font-size:2rem;font-weight:800;color:var(--accent-dark,var(--accent))}.stat-l{color:var(--soft);font-size:.95rem;margin-top:4px}
 ol.process{margin:8px 0 0 0;padding:0;list-style:none;counter-reset:step}
@@ -2119,7 +2131,8 @@ ul.areas li{background:var(--wash);color:var(--ink);padding:5px 12px;border-radi
 .gallery .ga figcaption{font-size:.85rem;color:var(--soft);margin-top:5px}
 .ba-pair{margin-top:12px}
 .ba-pair .ba-fig{position:relative;margin:0 0 10px}
-.ba-pair .ba-lab{position:absolute;top:8px;left:8px;background:var(--ink,#222);color:#fff;font-size:.72rem;font-weight:700;letter-spacing:.04em;text-transform:uppercase;padding:3px 9px;border-radius:999px}
+/* the Before and After labels sit on the photos: a near-black of their own, as the theme's ink is light on Slate */
+.ba-pair .ba-lab{position:absolute;top:8px;left:8px;background:#111;color:#fff;font-size:.72rem;font-weight:700;letter-spacing:.04em;text-transform:uppercase;padding:3px 9px;border-radius:999px}
 .ba-pair .ba-fig img{width:100%;border-radius:10px;display:block}
 .ba-cap{color:var(--soft);font-size:.95rem;margin-top:4px}
 @media(min-width:620px){.ba-pair{display:grid;grid-template-columns:1fr 1fr;gap:12px}.ba-pair .ba-cap{grid-column:1/-1}}
@@ -2279,19 +2292,35 @@ ol.toc a{color:var(--accent-dark,var(--accent))}
 .block.block--bg-tint{background:${TINT_FALLBACK}}
 @supports (background:color-mix(in srgb,red,#fff)){.block.block--bg-tint{background:var(--block-tint,color-mix(in srgb,var(--accent) 8%,var(--paper,#f7f7f5)))}}
 .block.block--bg-plain{background:none;border-top:0;border-bottom:0}
-/* bold bands — a strong accent or dark section with light text throughout. Text
-   colours are forced light so contrast holds regardless of the block's content, and on
-   the accent band a form's red required mark (lib/forms.ts) turns white too. The accent
-   band is the darker accent; a template whose accents are both too light for white
-   words names a deeper one, --accent-band (Slate). tests/presence/accent_band_test.mjs */
-.block.block--bg-accent{background:var(--accent-band,var(--accent-dark,var(--accent)));color:#fff}
-.block.block--bg-dark{background:#1a1622;color:#f2eef8}
-.block.block--bg-accent :is(h1,h2,h3,h4,h5,p,li,dt,dd,figcaption,blockquote,strong,em,.nm,.pr,.ds,.stat-v,.stat-l,summary),.block.block--bg-dark :is(h1,h2,h3,h4,h5,p,li,dt,dd,figcaption,blockquote,strong,em,.nm,.pr,.ds,.stat-v,.stat-l,summary){color:inherit}
-.block.block--bg-accent a:not(.btn),.block.block--bg-dark a:not(.btn){color:#fff;text-decoration:underline}
-.block.block--bg-accent .ff-req{color:#fff}
-.block.block--bg-accent .btn{background:#fff;color:var(--accent-band,var(--accent-dark,var(--accent)));border-color:#fff}
-.block.block--bg-dark .btn{background:var(--accent);color:#fff;border-color:var(--accent)}
-.block.block--bg-accent .card,.block.block--bg-dark .card{background:rgba(255,255,255,.10);border-color:rgba(255,255,255,.22)}
+/* bold bands — a strong accent or dark section with light words throughout, whatever
+   its sections draw. Every element words sit in takes the band's words (the :is() list,
+   a form's red required mark among them); every word drawn in the site's grey follows
+   them, as --soft only ever colours words; the few coloured more specifically are named
+   here. A box with a fill of its own (review cards, the Cards section, a spotlight, area
+   pills, the booking steps) takes a darker shade of the band, outlined, so its words read
+   at least as well as the band's own; a template whose boxes are darker than its bands
+   keeps them (--band-box, Slate). .card keeps its faint white fill. A card-style call to
+   action is drawn in the band, on a plain section. Chrome over a photo keeps its own
+   white. Buttons and step numbers: BAND above.
+   tests/presence/accent_band_test.mjs and band_words_test.mjs */
+.block.block--bg-accent{background:${BAND};color:#fff;--soft:currentColor}
+.block.block--bg-dark{background:#1a1622;color:#f2eef8;--soft:currentColor}
+${onBands(':is(h1,h2,h3,h4,h5,h6,p,li,dt,dd,figcaption,blockquote,strong,em,small,cite,time,span,label,legend,caption,th,td,summary,.nm,.pr,.ds,.stat-v,.stat-l,.bk-back)')}{color:inherit}
+${onBands('.rw-quote-body', '.v-quotes')},${onBands('.pl-price', '.v-list')},${onBands('.acc-item summary::after')}{color:inherit}
+${BAND_TAB_ON}{color:inherit;border-bottom-color:currentColor}
+${onBands('.tab-strip')}{border-bottom-color:rgba(255,255,255,.3)}
+${onBands('a:not(.btn)')}{color:#fff;text-decoration:underline}
+${onBands('a.teaser-card')}{text-decoration:none}
+.block.block--bg-accent .btn{background:#fff;color:${BAND};border-color:#fff}
+.block.block--bg-dark .btn{background:${BAND};color:#fff;border-color:${BAND}}
+.block.block--bg-accent ol.process li::before,.block.block--bg-accent .bk-done-ic{background:#fff;color:${BAND}}
+.block.block--bg-dark ol.process li::before,.block.block--bg-dark .bk-done-ic{background:${BAND};color:#fff}
+${onBands('.card')}{background:rgba(255,255,255,.10);border-color:rgba(255,255,255,.22)}
+${onBands(':is(.rw-card,.sp-inner,.teaser-card,.bk-service,.bk-slot)')}{background:var(--band-box,rgba(0,0,0,.08));border-color:rgba(255,255,255,.22)}
+${onBands('ul.areas li')},${onBands('.bk-summary')}{background:var(--band-box,rgba(0,0,0,.08));box-shadow:inset 0 0 0 1px rgba(255,255,255,.35)}
+.block.block-cta.v-card.block--bg-accent .cta-inner{background:var(--band-box,${BAND});border-color:transparent}
+.block.block-cta.v-card.block--bg-dark .cta-inner{background:var(--band-box,#1a1622);border-color:transparent}
+${onBands(':is(.ba-lab,.v-play)')}{color:#fff}
 /* spacing: vertical padding, honouring the site's --spacing-scale like .block does */
 .block--space-tight{padding-top:calc(28px * var(--spacing-scale,1));padding-bottom:calc(28px * var(--spacing-scale,1))}
 .block--space-roomy{padding-top:calc(84px * var(--spacing-scale,1));padding-bottom:calc(84px * var(--spacing-scale,1))}
@@ -2401,10 +2430,11 @@ table.site-table tbody tr:last-child td{border-bottom:none}
    with no style gets NO ov-* class, so none of these rules can reach a default
    section. These colors deliberately override contrast-by-construction (Eric's G27
    reversal) — recorded + warned (styleContrastWarnings), never hard-blocked. */
-/* text: same forced-inheritance list as the accent/dark bands above, so the owner's
-   ink governs ALL the section's text — which is exactly the pair the contrast
-   warning checked. .block.ov-ink (0,2,0) sits after the band rules, so an explicit
-   text pick wins over a band's forced light text. */
+/* text: the forced-inheritance list the accent/dark bands began with, so the owner's
+   ink governs the section's text — which is exactly the pair the contrast warning
+   checked. (The bands' list has since grown: labels, spans, the site's grey.)
+   .block.ov-ink (0,2,0) sits after the band rules, so an explicit text pick wins over
+   a band's forced light text. */
 .block.ov-ink{color:var(--ov-ink)}
 .block.ov-ink :is(h1,h2,h3,h4,h5,p,li,dt,dd,figcaption,blockquote,strong,em,.nm,.pr,.ds,.stat-v,.stat-l,summary){color:inherit}
 /* background: .block.ov-bg ties .block.alt's (0,2,0) and wins by source order (the
@@ -2492,7 +2522,7 @@ a.ff-el.btn{display:inline-flex;align-items:center;justify-content:center;text-a
 .block-stack.block--align-center .stk-text,.stk .stk-text.stk-ac{margin-left:auto;margin-right:auto}
 .stk .stk-text.stk-ar{margin-left:auto}
 .stk-img{margin-left:0;margin-right:0}
-.stk-img img{width:100%;border-radius:12px;display:block}
+.stk-img img{width:100%;height:auto;border-radius:12px;display:block}
 .stk-img figcaption{font-size:.9rem;color:var(--soft);margin-top:6px}
 .stk-img .img-link{display:block;text-decoration:none;color:inherit}
 .stk-img.stk-ws{max-width:320px}.stk-img.stk-wm{max-width:520px}
@@ -2502,12 +2532,13 @@ a.ff-el.btn{display:inline-flex;align-items:center;justify-content:center;text-a
 .block-stack.block--align-center .stk-btns,.stk .stk-btns.stk-ac{justify-content:center}
 .stk .stk-btns.stk-al{justify-content:flex-start}.stk .stk-btns.stk-ar{justify-content:flex-end}
 .stk-video .v-link{margin-top:0}
+.stk-video .v-poster img{height:auto}
 .stk-space-s{height:12px}.stk-space-m{height:32px}.stk-space-l{height:72px}
 .stk-hr{border:0;border-top:1px solid var(--line);height:0;width:100%}
 .stk-hr.stk-short{width:96px}
 .block-stack.block--align-center .stk-hr.stk-short,.stk .stk-hr.stk-short.stk-ac{margin-left:auto;margin-right:auto}
 .stk .stk-hr.stk-short.stk-ar{margin-left:auto}
-.stk-map .map-img img{width:100%;border-radius:12px;display:block}
+.stk-map .map-img img{width:100%;height:auto;border-radius:12px;display:block}
 .block-stack.block--align-center .stk-form .presence-form,.stk .stk-form.stk-ac .presence-form{margin-left:auto;margin-right:auto;text-align:left}
 @media(max-width:620px){.stk-hide-m{display:none!important}}`;
 

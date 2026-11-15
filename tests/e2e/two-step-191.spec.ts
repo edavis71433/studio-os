@@ -197,8 +197,8 @@ test.describe('Two-step sign-in (builder item 191)', () => {
     await page.addInitScript(() => { try { localStorage.setItem('dds-studio-brand', JSON.stringify({ name: 'Harbor Studio', logo_url: null, accent: '' })); } catch { /* denied */ } });
     await page.goto('/portal.html');
     await page.locator('#em').fill('client@example.com');
-    await page.getByRole('button', { name: 'Email me a sign-in link' }).click();
-    await expect(page.getByRole('heading', { level: 1, name: 'Check your inbox' })).toBeVisible();
+    await page.getByRole('button', { name: 'Email me a code' }).click();   // builder list item 230: the code leads
+    await expect(page.getByRole('heading', { level: 1, name: 'Check your email' })).toBeVisible();
     await page.locator('#code').fill('246810');
     await page.locator('#codeGo').click();
     // A2

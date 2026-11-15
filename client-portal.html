@@ -1,0 +1,172 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Client portal — Studio OS</title>
+<meta name="robots" content="noindex, nofollow">
+<!-- Studio level, never scoped: a stray ?client= is dropped before the shell reads the URL, as on Home. -->
+<script>(function(){try{if(/[?&]client=/.test(location.search)){var u=new URL(location.href);u.searchParams.delete('client');history.replaceState(null,'',u.pathname+(u.search||'')+u.hash);}}catch(_){}})();</script>
+<link rel="stylesheet" href="/fonts/brand.css">
+<style>
+  /* the page skin = the shell's --dds-* tokens, aliased the way agency.html does */
+  :root{
+    --bg:var(--dds-bg,#faf8f5);--card:var(--dds-card,#fff);--ink:var(--dds-ink,#1b1525);--soft:var(--dds-soft,#6b6478);--faint:var(--dds-faint,#746b8a);--line:var(--dds-line,#eee9e0);
+    --p:var(--dds-p,#5b3fa0);--p-soft:var(--dds-p-soft,#efeafa);
+    --good:var(--dds-good,#33664b);--good-soft:var(--dds-good-soft,#e7f1ea);--warn:var(--dds-warn,#775d31);--warn-soft:var(--dds-warn-soft,#f3ead9);
+    --shadow:var(--dds-shadow,0 1px 2px rgba(27,21,37,.04),0 8px 24px rgba(27,21,37,.06));
+    --serif:'Fraunces',"Iowan Old Style",Georgia,serif;
+    --sans:'Inter',-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  }
+  *{box-sizing:border-box;margin:0}
+  [hidden]{display:none!important}
+  body{background:var(--bg);color:var(--ink);font-family:var(--sans);line-height:1.5;-webkit-font-smoothing:antialiased}
+  .wrap{max-width:var(--dds-w-focus,1000px);margin:0 auto;padding:var(--dds-s7,32px) var(--dds-s5,20px) 90px}
+  .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+  .phead{display:flex;align-items:flex-start;gap:12px;flex-wrap:wrap;margin-bottom:var(--dds-s4,16px)}
+  .phead .pt{flex:1 1 260px;min-width:0}
+  .phead h1{font-family:var(--serif);font-weight:500;font-size:30px;line-height:1.15;letter-spacing:-.01em}
+  .phead .sub{color:var(--soft);font-size:14px;margin-top:4px}
+  .phead .acts{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:var(--dds-r-lg,12px);box-shadow:var(--shadow);padding:var(--dds-s5,20px);margin-bottom:var(--dds-s4,16px)}
+  .card h2{font-family:var(--serif);font-weight:500;font-size:20px;line-height:1.25}
+  .card .sub{color:var(--soft);font-size:13px;margin-top:2px}
+  .sbtn{font:inherit;font-size:13px;font-weight:600;border:1px solid var(--line);border-radius:999px;background:var(--card);color:var(--ink);padding:7px 14px;text-decoration:none;min-height:36px;display:inline-flex;align-items:center;justify-content:center;cursor:pointer;white-space:nowrap}
+  .sbtn:hover{border-color:var(--p);color:var(--p)}
+  .sbtn.main{background:var(--p);border-color:var(--p);color:#fff}
+  .sbtn.main:hover{color:#fff;filter:brightness(1.08)}
+  .sbtn[disabled]{opacity:.5;cursor:default}
+  @media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .sbtn.main{color:#171320}}
+  :root[data-theme="dark"] .sbtn.main{color:#171320}
+  /* the address, with Copy and Open */
+  .addr{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap}
+  .addr input{flex:1 1 280px;min-width:0;font:inherit;font-size:14px;border:1px solid var(--line);border-radius:var(--dds-r,8px);background:var(--bg);color:var(--ink);padding:8px 12px;min-height:36px}
+  /* the four numbers */
+  .counts{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+  .counts .k{display:block;font-size:12.5px;color:var(--soft)}
+  .counts b{display:block;font-family:var(--serif);font-weight:500;font-size:30px;line-height:1.2;margin-top:4px;font-variant-numeric:tabular-nums}
+  .counts .how{grid-column:1/-1;font-size:12.5px;color:var(--faint)}
+  /* the set-up list */
+  .steps{list-style:none;padding:0;margin-top:10px}
+  .step{display:flex;align-items:center;gap:12px;padding:12px 0;border-top:1px solid var(--line);min-height:56px}
+  .step:first-child{border-top:none}
+  .step .dot{flex:0 0 auto;width:16px;height:16px;border-radius:50%;border:1.5px solid var(--faint)}
+  .step.done .dot{background:var(--good);border-color:var(--good)}
+  .step .sl{flex:1;min-width:0;font-size:14px}
+  .step.done .sl{color:var(--soft)}
+  /* pick a client to see their portal */
+  dialog.pick{border:1px solid var(--line);border-radius:var(--dds-r-lg,12px);padding:0;width:min(480px,calc(100vw - 32px));max-height:min(80vh,620px);background:var(--card);color:var(--ink);box-shadow:var(--shadow)}
+  dialog.pick::backdrop{background:rgba(27,21,37,.35)}
+  .pick .pin{padding:var(--dds-s5,20px)}
+  .pick ul{list-style:none;padding:0;margin:12px 0 0;max-height:52vh;overflow:auto}
+  .pick li{display:flex;align-items:center;gap:10px;padding:10px 0;border-top:1px solid var(--line)}
+  .pick li:first-child{border-top:none}
+  .pick li .nm{flex:1;min-width:0}
+  .pick li .nm b{display:block;font-weight:600;font-size:14px}
+  .pick li .nm span{font-size:12.5px;color:var(--soft)}
+  .pick .foot{display:flex;justify-content:flex-end;margin-top:14px}
+  .center{text-align:center;padding:52px var(--dds-s5,20px)}.center h2{font-family:var(--serif);font-weight:500;font-size:22px;margin:0 0 8px}
+  .muted{color:var(--soft);font-size:14px}
+  a.link{color:var(--p);text-decoration:none;font-weight:500}a.link:hover{text-decoration:underline}
+  .spin{width:22px;height:22px;border:2.5px solid var(--line);border-top-color:var(--p);border-radius:50%;animation:sp .8s linear infinite;margin:var(--dds-s8,40px) auto}
+  @keyframes sp{to{transform:rotate(360deg)}}
+  @media (prefers-reduced-motion:reduce){.spin{animation:none}}
+  :focus-visible{outline:2px solid var(--p);outline-offset:2px}
+  @media (max-width:767px){
+    .counts{grid-template-columns:repeat(2,minmax(0,1fr))}
+    .sbtn{min-height:44px}
+    .phead h1{font-size:26px}
+  }
+</style>
+<link rel="stylesheet" href="/shell.css"><script src="/shell.js" defer></script>
+</head>
+<body>
+<div class="wrap">
+  <div id="main"><div class="spin" role="status" aria-label="Loading"></div></div>
+</div>
+<script src="/vendor/supabase-js-2.45.4.js"></script>
+<script>
+// ── Client portal (builder list items 236 and 232, Nov 2026) ─────────────────
+// One place for the studio's client portal: its address to share, where its clients
+// stand (active, waiting to join, invites that ran out, in the portal in the last 30
+// days) and a five-step list to set it up. "See a client's portal" opens one client's
+// portal as they see it (client.html?preview=, read-only). All from GET
+// /agency/portal/overview (lib/portal_people.ts). Drawn in Figma first (page "Client
+// portal — from the Agiled check"). In the studio's menu under Customers.
+const SUPABASE_URL="https://qksstlqzbhesadrrofgn.supabase.co";
+const SUPABASE_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFrc3N0bHF6Ymhlc2FkcnJvZmduIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE5NzMwMDMsImV4cCI6MjA5NzU0OTAwM30.4V94Ua7z5cntPWtvtqN24TUnfY5A6K6-zCxY0iEcgYo";
+const FN=SUPABASE_URL+"/functions/v1/presence";
+const sb=supabase.createClient(SUPABASE_URL,SUPABASE_KEY,{auth:{storageKey:'dds-portal-auth',persistSession:true,autoRefreshToken:true}});
+const $=(id)=>document.getElementById(id);
+const esc=(s)=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const toast=(m,bad)=>{ if(window.ddsToast) window.ddsToast(m,bad?'err':'ok'); };
+let TOKEN="";
+sb.auth.onAuthStateChange(function(_e,s){if(s&&s.access_token)TOKEN=s.access_token;});
+const FN_REGION='us-west-2';   // run the server beside the database (Oregon), not nearest the visitor: see shell.js
+const H=()=>({'Content-Type':'application/json','Authorization':'Bearer '+SUPABASE_KEY,'x-dds-user-jwt':TOKEN,'x-region':FN_REGION});
+async function api(path){let r;try{r=await fetch(FN+path,{headers:H()});}catch(_){return{ok:false,status:0,body:{}};}return{ok:r.ok,status:r.status,body:await r.json().catch(()=>({}))};}
+let DATA=null;
+
+const STEP_WORDS={
+  logo:['Add your logo and colours','Add it','/settings.html#studio'],
+  parts:['Choose what clients see','Choose','/settings.html#portalParts'],
+  welcome:['Write a welcome note','Write it','/settings.html#portalHome'],
+  preview:['See your portal as a client does','Open',''],
+  invite:['Invite your first client','Invite','/agency.html#add'],
+};
+const dayWords=(iso)=>{const t=Date.parse(iso||'');return Number.isFinite(t)?new Date(t).toLocaleDateString('en-US',{month:'short',day:'numeric'}):'';};
+function agoWords(iso){const t=Date.parse(iso||'');if(!Number.isFinite(t))return'';const d=Math.floor((Date.now()-t)/86400000);return d<=0?'today':d===1?'yesterday':d<30?d+' days ago':'on '+dayWords(iso);}
+function stateWords(c){
+  if(c.state==='joined')return 'Last in '+agoWords(c.seen_at);
+  if(c.state==='waiting')return 'Invited '+dayWords(c.invited_at)+' · hasn’t signed in yet';
+  if(c.state==='expired')return 'Invited '+dayWords(c.invited_at)+' · the invite ran out';
+  return 'Not invited yet';
+}
+const previewHref=(c)=>'/client.html?preview='+encodeURIComponent(c.site_id)+'&back='+encodeURIComponent('/client-portal.html');
+
+function render(){
+  const d=DATA,n=d.counts||{},steps=d.setup||[],done=steps.filter(s=>s.done).length,clients=d.clients||[];
+  let html=`<header class="phead"><div class="pt"><h1 id="pagehead" tabindex="-1">Client portal</h1><p class="sub">What your clients see, and who has joined.</p></div>`+
+    `<div class="acts"><button type="button" class="sbtn" id="seeOne"${clients.length?'':' disabled'}>See a client’s portal</button>${d.can_edit!==false?'<a class="sbtn main" href="/agency.html#add">Invite a client</a>':''}</div></header>`;
+  html+=`<section class="card" aria-labelledby="addrH"><h2 id="addrH">Your portal’s address</h2><p class="sub">Clients sign in here. Invited clients get this link by email.</p>`+
+    `<div class="addr"><input id="addr" type="text" readonly value="${esc(d.address)}" aria-label="Your portal’s address"><button type="button" class="sbtn" id="copyAddr">Copy</button><a class="sbtn" href="${esc(d.address)}" target="_blank" rel="noopener">Open</a></div></section>`;
+  const tile=(k,v)=>`<div><span class="k">${esc(k)}</span><b>${esc(String(v||0))}</b></div>`;
+  html+=`<section class="card counts" aria-label="Your clients and the portal">${tile('Active clients',n.active)}${tile('Waiting to join',n.waiting)}${tile('Invites run out',n.expired)}${tile('In the last 30 days',n.recent)}`+
+    `<p class="how">People, not sign-ins. An invite runs out after 7 days without them coming in; their portal card in Settings sends a new one.</p></section>`;
+  html+=`<section class="card" aria-labelledby="setH"><h2 id="setH">Set up your portal</h2><p class="sub" id="setN">${done} of ${steps.length} done</p><ol class="steps">`+
+    steps.map(s=>{const w=STEP_WORDS[s.key]||[s.key,'',''];
+      const act=s.done?'<span class="sr-only">Done</span>':s.key==='preview'?`<button type="button" class="sbtn" data-see${clients.length?'':' disabled'}>${esc(w[1])}</button>`:`<a class="sbtn" href="${esc(w[2])}">${esc(w[1])}</a>`;
+      return `<li class="step${s.done?' done':''}" data-step="${esc(s.key)}"><span class="dot" aria-hidden="true"></span><span class="sl">${esc(w[0])}</span>${act}</li>`;}).join('')+`</ol></section>`;
+  html+=`<dialog class="pick" id="pick" aria-labelledby="pickH"><div class="pin"><h2 id="pickH">See a client’s portal</h2><p class="sub">You’ll see their portal as they do. Nothing you press is saved or sent.</p><ul>`+
+    clients.map(c=>`<li><span class="nm"><b>${esc(c.name)}</b><span>${esc(stateWords(c))}</span></span><a class="sbtn" href="${esc(previewHref(c))}" aria-label="See ${esc(c.name)}’s portal">See it</a></li>`).join('')+
+    `</ul><div class="foot"><button type="button" class="sbtn" id="pickClose">Close</button></div></div></dialog>`;
+  $('main').innerHTML=html;
+  document.title='Client portal — Studio OS';
+  const pick=$('pick');
+  const open=()=>{if(!clients.length)return;if(pick.showModal)pick.showModal();else pick.setAttribute('open','');};
+  $('seeOne').addEventListener('click',open);
+  document.querySelectorAll('[data-see]').forEach(b=>b.addEventListener('click',open));
+  $('pickClose').addEventListener('click',()=>{if(pick.close)pick.close();else pick.removeAttribute('open');});
+  $('copyAddr').addEventListener('click',async()=>{try{await navigator.clipboard.writeText(d.address);toast('Copied. Paste it wherever your clients will see it.');}catch(_){const i=$('addr');i.focus();i.select();toast('Your browser didn’t allow copying here. It’s selected: press Ctrl or ⌘ and C.',true);}});
+}
+function notAgency(){$('main').innerHTML=`<div class="center"><h2>This isn’t a studio account.</h2><p class="muted">The client portal page is for a studio and the clients it looks after.</p></div>`;}
+function signedOut(){$('main').innerHTML=`<div class="center"><h2>Sign in to your studio.</h2><p style="margin-top:20px"><a class="link" href="/studio.html">Sign in →</a></p></div>`;}
+function trouble(){
+  $('main').innerHTML=`<div class="center"><h2>We couldn’t load your client portal just now.</h2><p class="muted" style="margin-bottom:16px">A brief hiccup. It usually passes.</p><button id="retry" class="sbtn main">Try again</button></div>`;
+  const rt=$('retry');if(rt)rt.addEventListener('click',()=>boot());
+}
+async function load(){
+  const r=await api('/agency/portal/overview');
+  if(!r.ok){if(r.status===401){signedOut();return;}if(r.status===403){notAgency();return;}trouble();return;}
+  DATA=r.body.data;render();
+}
+async function boot(){
+  try{const{data}=await sb.auth.getSession();TOKEN=(data&&data.session&&data.session.access_token)||"";
+    if(!TOKEN){signedOut();return;}
+    await load();
+  }catch(_){trouble();}
+}
+boot();
+</script>
+</body>
+</html>

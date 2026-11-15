@@ -79,7 +79,7 @@ const list = data.entries;
   const build = read('scripts/build-public.sh');
   ok('the published site carries the entries and their pictures', /^for f in [^\n]*\bwhats-new\.json\b[^\n]*; do$/m.test(build) && /for d in [^\n]*\bthumbs\b/.test(build) && /cp \.\/\*\.js dist\//.test(build));
   const portal = read('client.html');
-  ok('the portal: New in your portal tops the Help tab, between its heading and the kit', /portalHeader\('Help','Quick answers from your studio\.'\)\+whatsNewDoorHtml\(\)\+kitHtml\(kr\)/.test(portal)
+  ok('the portal: New in your portal tops the Help tab, between its heading and the kit', /portalHeader\('Help',answers\?'Quick answers from your studio\.':'[^']+'\)\+whatsNewDoorHtml\(\)\+portalPagesHtml\(\)\+\(answers\?kitHtml\(kr\):''\)/.test(portal)
     && /W\.open\(\{who:'client'/.test(portal));
 }
 

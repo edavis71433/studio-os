@@ -17,6 +17,7 @@
 
 import type { PlanKey, Term } from './catalog.ts';
 import { isPlanKey, isTerm } from './catalog.ts';
+import { subscriptionPeriodEnd } from './stripe_shape.ts';
 
 export type EntStatus = 'active' | 'paused' | 'lapsed';
 
@@ -77,7 +78,8 @@ export function entitlementPatchFromSubscription(sub: any, now: Date): Entitleme
     status,
     stripe_customer_id: sub?.customer ? String(typeof sub.customer === 'string' ? sub.customer : sub.customer.id) : null,
     stripe_subscription_id: sub?.id ? String(sub.id) : null,
-    current_period_end: isoFromUnix(sub?.current_period_end),
+    // since Stripe's 2025-03-31 version the renewal date is on the items (sales item 128)
+    current_period_end: isoFromUnix(subscriptionPeriodEnd(sub)),
     cancel_at_period_end: cancelAtPeriodEnd,
     canceled_at: isoFromUnix(sub?.canceled_at),
     grace_until: (stripeStatus === 'past_due' || stripeStatus === 'unpaid') ? addDays(now, GRACE_DAYS) : null,

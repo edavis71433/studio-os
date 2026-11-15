@@ -137,6 +137,7 @@ test.describe('Contacts hold more (item 89)', () => {
     await expect(dlg.locator('#e-city')).toHaveValue('Glendale');
     await expect(dlg.locator('#e-found')).toHaveValue('Referral');
     await expect(dlg.locator('.dds-tags .chip')).toHaveCount(2);
+    await expect(dlg.locator('#e-name')).toBeFocused();   // the form has opened: it puts the cursor in Name 20 ms after it fills in, and typing elsewhere before that went into Name
     await dlg.locator('#e-phone2').fill('(555) 010-9999');
     await dlg.locator('#e-save').click();
     await expect.poll(() => seen.patches.length).toBe(1);

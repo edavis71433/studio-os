@@ -127,7 +127,7 @@ test.describe('Versions: saves and publishes marked apart (builder item 125)', (
 
   test('a saved checkpoint comes back through the same sheet, which says what it leaves alone', async ({ page }) => {
     const m = await mount(page, '/presence.html#history');
-    await rows(page).nth(1).getByRole('button', { name: 'Restore', exact: true }).click();
+    await rows(page).nth(1).getByRole('button', { name: 'Restore to draft', exact: true }).click();
     await expect(page.locator('#resSheetTitle')).toHaveText('Restore this version?');
     await expect(page.locator('#resSheetSub')).toContainText('“Before the spring menu”, saved Nov 9');
     await expect(page.locator('#resSheetKeeps')).toHaveText('It brings back business details, services, reviews, questions, updates, sections, pages, menu, header and footer, colours and fonts, and leaves your bookings, enquiries, contacts and files as they are now. A page it doesn’t have is kept 30 days in Recently deleted pages.');
@@ -138,7 +138,7 @@ test.describe('Versions: saves and publishes marked apart (builder item 125)', (
 
   test('a publish still comes back from its own version', async ({ page }) => {
     const m = await mount(page, '/presence.html#history');
-    await rows(page).nth(0).getByRole('button', { name: 'Restore', exact: true }).click();
+    await rows(page).nth(0).getByRole('button', { name: 'Restore to draft', exact: true }).click();
     await expect(page.locator('#resSheetKeeps')).toBeVisible();
     await page.locator('#btnRestoreGo').click();
     await expect.poll(() => m.writes.find((w) => w.path === '/restore-to-draft')?.body).toEqual({ publish_id: 'p0' });
@@ -165,7 +165,7 @@ test.describe('a restore brings back sections, pages and the menu (builder item 
   const RESTORED = [{ type: 'title', title: 'Back from the checkpoint', subtitle: 'As it was' }, { type: 'richtext', title: 'Hours', body: 'Open every day.' }];
   async function restoreCheckpoint(page: Page, m: { writes: Write[] }) {
     await js(page, 'go("history")');
-    await rows(page).nth(1).getByRole('button', { name: 'Restore', exact: true }).click();
+    await rows(page).nth(1).getByRole('button', { name: 'Restore to draft', exact: true }).click();
     await page.locator('#btnRestoreGo').click();
     await expect.poll(() => m.writes.map((w) => w.method + ' ' + w.path)).toContain('POST /publishes/checkpoints/cp1/restore');
   }
@@ -208,7 +208,7 @@ test.describe('a restore brings back sections, pages and the menu (builder item 
       body: JSON.stringify({ error: 'section_locked', message: SAYS, sections: [{ name: 'Fresh bread, every morning', what: 'changed' }] }) }));
     const before = await js(page, 'JSON.stringify(BLOCKS_WORK)');
     await js(page, 'go("history")');
-    await rows(page).nth(1).getByRole('button', { name: 'Restore', exact: true }).click();
+    await rows(page).nth(1).getByRole('button', { name: 'Restore to draft', exact: true }).click();
     await page.locator('#btnRestoreGo').click();
     await expect(page.locator('.dds-toast, .toast').filter({ hasText: 'Your studio locked' })).toContainText(SAYS);
     await expect(page.locator('#restoreScrim')).toHaveClass(/\bon\b/);

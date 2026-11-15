@@ -319,6 +319,82 @@
   .drop{border:2px dashed var(--p);border-radius:var(--dds-r-lg,10px);background:var(--p-soft);color:var(--p);text-align:center;padding:var(--dds-s6,24px);margin-bottom:var(--dds-s4,16px);font-weight:600;display:none}
   .drop.on{display:block}
   footer{margin-top:44px;padding-top:var(--dds-s5,20px);border-top:1px solid var(--line);color:var(--faint);font-size:12.5px;text-align:center}
+  /* ── item 218: the Trash (Figma "Files Trash and Ask for access", section A). Its own chip
+        beside Archive, a dark band that says what happens, then each file with its days left. ── */
+  .fchip.trash[aria-current="true"]{background:#3c2d5a;color:#fff;border-color:transparent}
+  .tband{display:flex;align-items:center;gap:var(--dds-s5,20px);border-radius:18px;padding:22px 24px;margin:0 0 var(--dds-s4,16px);color:#fff;background:linear-gradient(90deg,#281c46,#6d3fd4)}
+  .tband .tbi{flex:none;display:grid;place-items:center;width:52px;height:52px;border-radius:14px;background:rgba(255,255,255,.14)}
+  .tband .tbi svg{width:28px;height:28px}
+  .tband .tbt{flex:1;min-width:0}
+  .tband h2{font-family:var(--serif);font-weight:600;font-size:28px;line-height:1.15;margin:0;color:#fff}
+  .tband p{font-size:14px;margin-top:4px;color:#f3efff}
+  .tband .tnext{flex:none;border-radius:14px;background:rgba(255,255,255,.12);padding:12px 16px}
+  .tband .tnext small{display:block;font-size:11.5px;font-weight:600;color:#e8e0ff}
+  .tband .tnext b{font-size:15px;font-weight:600}
+  @media (max-width:760px){.tband{flex-wrap:wrap;padding:16px;gap:12px}.tband h2{font-size:22px}.tband .tbi{width:44px;height:44px}.tband .tnext{width:100%}}
+  .tlist{background:var(--card);border-radius:16px;box-shadow:var(--shadow);overflow:hidden}
+  .trow{display:grid;grid-template-columns:auto minmax(0,1fr) auto auto;gap:16px;align-items:center;padding:16px 20px;border-bottom:1px solid var(--line)}
+  .trow .tth{width:80px;height:55px;border-radius:10px;background:var(--p-soft) center/cover no-repeat;display:grid;place-items:center;opacity:.8}
+  .trow .tth svg{width:24px;height:24px;color:var(--p)}
+  .trow .tn{font-size:15px;font-weight:600;display:flex;flex-wrap:wrap;align-items:center;gap:8px;overflow-wrap:anywhere}
+  .trow .ts{font-size:13px;color:var(--soft);margin-top:2px}
+  .trow .tnote{font-size:12.5px;color:var(--warn);margin-top:4px;max-width:560px}
+  .tlive{display:inline-flex;align-items:center;gap:5px;font-size:12px;font-weight:600;color:var(--warn);background:var(--warn-soft);border-radius:999px;padding:3px 10px}
+  .tlive svg,.tdays svg{width:13px;height:13px;flex:none}
+  .tclock{display:grid;justify-items:end;gap:6px}
+  .tdays{display:inline-flex;align-items:center;gap:5px;font-size:12px;font-weight:600;border-radius:999px;padding:3px 10px;color:var(--p);background:var(--p-soft);white-space:nowrap}
+  .tdays.soon{color:var(--danger);background:var(--dds-bad-soft,#fdeaea)}
+  .tbar{width:140px;height:6px;border-radius:3px;background:var(--line);overflow:hidden}
+  .tbar i{display:block;height:100%;border-radius:3px;background:var(--p)}
+  .tdays.soon+.tbar i{background:var(--danger)}
+  .tgo{font-size:12px;color:var(--faint);white-space:nowrap}
+  .tacts{display:flex;gap:8px;align-items:center}
+  .tacts .btn{padding:var(--dds-s2,8px) var(--dds-s3,12px);font-size:13px;white-space:nowrap}
+  .tacts .btn svg{width:15px;height:15px}
+  .btn.forever{color:var(--danger);border-color:transparent;background:none}
+  .btn.forever:hover{text-decoration:underline;border-color:transparent}
+  .btn.forever[aria-disabled="true"]{color:var(--faint);background:var(--bg);border-color:var(--line);text-decoration:none}
+  .tfoot{padding:12px 20px 14px;font-size:12.5px;color:var(--soft);background:var(--bg)}
+  .thow{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-top:var(--dds-s4,16px)}
+  .thow div{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px 18px}
+  .thow div.warm{background:var(--warn-soft);border-color:transparent}
+  .thow b{display:block;font-size:14px;margin-bottom:6px}
+  .thow p{font-size:13px;color:var(--soft)}
+  .tempty{padding:40px 20px;text-align:center;color:var(--soft);font-size:14px}
+  @media (max-width:980px){.thow{grid-template-columns:1fr}}
+  @media (max-width:760px){
+    .trow{grid-template-columns:auto minmax(0,1fr);gap:12px;padding:14px}
+    .trow .tth{width:64px;height:44px}
+    .trow .tclock{grid-column:1/-1;display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-items:start}
+    .trow .tbar{display:none}
+    .trow .tacts{grid-column:1/-1}
+    .trow .tacts .btn{flex:1;justify-content:center;min-height:44px}
+  }
+  /* the two questions (move to the Trash, delete for good) and the toast that offers Put back */
+  dialog.tq{border:none;border-radius:18px;padding:0;width:min(460px,92vw);box-shadow:0 24px 60px rgba(30,19,56,.28);background:var(--card);color:var(--ink)}
+  dialog.tq.bad{box-shadow:0 0 0 1px #f2c8c4,0 24px 60px rgba(30,19,56,.28)}
+  .tq .tqb{padding:22px}
+  .tq .tqh{display:flex;align-items:center;gap:12px;margin-bottom:14px}
+  .tq .tqi{flex:none;display:grid;place-items:center;width:44px;height:44px;border-radius:12px;background:var(--p-soft);color:var(--p)}
+  .tq .tqi svg{width:22px;height:22px}
+  .tq.bad .tqi{background:var(--dds-bad-soft,#fdeaea);color:var(--danger)}
+  .tq.live .tqi{background:var(--warn-soft);color:var(--warn)}
+  .tq h3{font-family:var(--serif);font-weight:600;font-size:21px;line-height:1.25;margin:0;overflow-wrap:anywhere}
+  .tq ul{list-style:none;padding:0;margin:0;display:grid;gap:10px;font-size:14px;color:var(--soft)}
+  .tq li{display:flex;gap:10px}
+  .tq li::before{content:'';flex:none;width:7px;height:7px;border-radius:50%;background:var(--p);margin-top:7px}
+  .tq li.warn{color:var(--warn)} .tq li.warn::before{background:#c48a1e}
+  .tq.bad li::before{background:var(--danger)}
+  .tq .tqa{display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap;margin-top:18px}
+  .tq .tqa .btn{border-radius:999px;font-weight:600;font-size:14px}
+  .tq .tqa .btn svg{width:16px;height:16px}
+  .btn.dark{background:#3c2d5a;border-color:#3c2d5a;color:#fff}
+  .btn.danger{background:#b3261e;border-color:#b3261e;color:#fff}
+  .utoast{position:fixed;left:50%;bottom:22px;transform:translateX(-50%);display:flex;align-items:center;gap:14px;background:#1f1830;color:#fff;border-radius:14px;padding:10px 10px 10px 16px;font-size:13.5px;font-weight:500;box-shadow:0 12px 30px rgba(0,0,0,.25);z-index:60;max-width:calc(100vw - 32px)}
+  .utoast[hidden]{display:none}
+  .utoast button{flex:none;display:inline-flex;align-items:center;gap:6px;font:inherit;font-size:12.5px;font-weight:600;border:none;border-radius:999px;background:#fff;color:#3c2d5a;padding:8px 12px;cursor:pointer;min-height:36px}
+  .utoast button svg{width:14px;height:14px}
+  @media (max-width:719px){.utoast{bottom:84px}}
 </style>
 <link rel="stylesheet" href="/shell.css"><script src="/shell.js" defer></script>
 </head>
@@ -367,7 +443,13 @@ const IC={
   people:'<circle cx="9" cy="8.5" r="3.2" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M2.5 19.5a6.5 6.5 0 0 1 13 0M16 5.6a3.2 3.2 0 0 1 0 5.8M17.5 13.6a6.5 6.5 0 0 1 4 5.9" fill="none" stroke="currentColor" stroke-width="1.5"/>',
   check:'<path d="M5 12l4.5 4.5L19 7" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>',
   lock:'<rect x="5" y="11" width="14" height="10" rx="2" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M8 11V8a4 4 0 0 1 8 0v3" fill="none" stroke="currentColor" stroke-width="1.6"/>',
-  folder:'<path d="M3 7a2 2 0 0 1 2-2h4l2 2.5h8a2 2 0 0 1 2 2V17a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/>'
+  folder:'<path d="M3 7a2 2 0 0 1 2-2h4l2 2.5h8a2 2 0 0 1 2 2V17a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/>',
+  // item 218: the Trash, Put back, the live site, the days left, and Delete for good's warning
+  trash:'<path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M10 11v6M14 11v6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>',
+  undo:'<path d="M3 7v6h6M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>',
+  globe:'<circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18a14 14 0 0 1 0-18" fill="none" stroke="currentColor" stroke-width="1.8"/>',
+  clock:'<circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M12 7v5l3 2" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>',
+  alert:'<path d="M12 9v4M12 17h.01M10.3 3.9 2.4 17.6A2 2 0 0 0 4.1 20.6h15.8a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>'
 };
 const svg=(p,cls)=>`<svg class="${cls||''}" viewBox="0 0 24 24" fill="none">${p}</svg>`;
 
@@ -383,12 +465,14 @@ const COLS=[
   {key:'downloads',label:'Downloads',ic:'dl',f:{collection:'Downloads'}},
   {key:'private',label:'Client-private',ic:'lock',f:{},priv:true},   // Oct 2026 review: files private to one client (0131)
   {key:'archive',label:'Archive',ic:'arch',f:{status:'archived'}},
+  {key:'trash',label:'Trash',ic:'trash',f:{},trash:true},   // item 218: deleted files, 30 days; its own read (/assets/trash)
   {key:'attn',label:'Could use attention',ic:'all',f:{},attn:true},   // bug hunt D12: the nudge's Review opens it; no button of its own
 ];
 let S={col:'all',q:'',client:'',use:false,caps:[],policy:'immediate',assets:[],full:[],counts:{},countsOk:false,health:[],canEdit:true,loadedOnce:false,current:null,cards:[],   // countsOk stays false until a collections read SUCCEEDS — unknown never paints as 0
   folder:'',newFolders:[],storage:null,   // item 56: the open folder (col 'folder'), folders made here and still empty; the meter
   selectMode:false,selected:new Set(),   // multi-select bulk actions
-  stockResults:[],stockQ:'',stockState:null,stockProvider:'',stockLicense:'',stockError:''};   // FD-T10 stock library state
+  stockResults:[],stockQ:'',stockState:null,stockProvider:'',stockLicense:'',stockError:'',   // FD-T10 stock library state
+  trash:null,trashState:null,trashCount:null,trashDays:30,trashQ:''};   // item 218: the Trash, its count for the chip (null: the server has none)
 let LOADED_AT=0;
 let REQ_SEQ=0;   // request-generation guard: a slow response that resolves after a newer request started is DISCARDED (C5)
 const updatedLabel=()=>{const m=Math.floor((Date.now()-LOADED_AT)/60000);return m<1?'Updated just now':'Updated '+m+' min ago';};
@@ -490,6 +574,7 @@ function railN(key){
   if(key==='templates')return S.countsOk?(S.counts.Templates||0):undefined;
   if(key==='downloads')return S.countsOk?(S.counts.Downloads||0):undefined;
   if(key==='stock')return undefined;   // a browse surface, not a collection
+  if(key==='trash')return typeof S.trashCount==='number'?S.trashCount:undefined;   // item 218
   return RAILN[key];
 }
 
@@ -640,10 +725,13 @@ function askPrompt(title, body, okLabel, placeholder, value){
   });
 }
 
+// shell.js is deferred and runs just before DOMContentLoaded. Made now, while the page parses: after an
+// await, readyState can already say 'interactive' with shell.js still on its way, and the wait was skipped.
+const SHELL_READY=document.readyState==='loading'?new Promise((r)=>document.addEventListener('DOMContentLoaded',r,{once:true})):Promise.resolve();
 async function loadContext(){
   // PERF: reuse the shell's /portal/context (window.ddsContext) — fall back to our own read.
   // shell.js is deferred, so it is not there yet when this runs: wait for it rather than ask twice.
-  if(document.readyState==='loading')await new Promise((r)=>document.addEventListener('DOMContentLoaded',r,{once:true}));
+  await SHELL_READY;
   const c=await (window.ddsContext?window.ddsContext().then((d)=>({ok:true,body:{data:d}})):Promise.reject()).catch(()=>api('/portal/context'));
   if(c.ok&&c.body.data){
     S.caps=c.body.data.capabilities||[];
@@ -699,6 +787,7 @@ async function load(soft,browse){
   // in-flight roster read can never paint over stock; a leftover 'loading' state is
   // an orphan (its request was invalidated by that bump) — re-fetch, don't hang.
   if(S.col==='stock'){ REQ_SEQ++; if(S.stockState==null||S.stockState==='loading') return loadStock(); return renderStock(); }
+  if(S.col==='trash')return loadTrash(soft);   // item 218: its own read and its own surface
   const gen=++REQ_SEQ;
   let a,col,h;
   const side=browse&&KEPT_SIDE&&KEPT_SIDE.col.ok?KEPT_SIDE:null;
@@ -718,6 +807,7 @@ async function load(soft,browse){
   S.full=full;
   S.policy=(a.body.data&&a.body.data.policy)||'immediate';
   S.storage=(a.body.data&&a.body.data.storage)||null;   // absent on a server from before the meter: no meter, never a guess
+  S.trashCount=a.body.data&&typeof a.body.data.trash==='number'?a.body.data.trash:null;   // item 218: no number, no chip
   if(S.col==='all'&&!S.q.trim()){deriveRailCounts(full,a.body.data&&a.body.data.total);deriveClientRail(full);}
   S.health=(h.ok&&h.body.data&&h.body.data.findings)||[];   // health is a nudge — its failure just means no nudge
   applyFilters();
@@ -764,7 +854,9 @@ function kindsHtml(){
   const live=RAILN.live;
   const lens=S.col==='stock'?'':`<button class="fchip" id="useLens" aria-pressed="${S.use?'true':'false'}">On your site${live!==undefined?` <span class="n">${live}</span>`:''}</button>`;
   const open=MORE_OPEN||MORE_COLS.includes(S.col);
-  return `<div class="kinds" role="group" aria-label="Show"><div class="ktrack">${main}</div>${lens}${colBtn(COLS.find(c=>c.key==='archive'),'fchip')}<button class="fchip" id="moreFilters" aria-expanded="${open?'true':'false'}" aria-controls="moreRow">More filters</button></div>`;
+  // item 218: the Trash beside Archive, once the server keeps one
+  const trash=typeof S.trashCount==='number'||S.col==='trash'?colBtn(COLS.find(c=>c.key==='trash'),'fchip trash',true):'';
+  return `<div class="kinds" role="group" aria-label="Show"><div class="ktrack">${main}</div>${lens}${colBtn(COLS.find(c=>c.key==='archive'),'fchip')}${trash}<button class="fchip" id="moreFilters" aria-expanded="${open?'true':'false'}" aria-controls="moreRow">More filters</button></div>`;
 }
 function moreHtml(){
   const open=MORE_OPEN||MORE_COLS.includes(S.col);
@@ -902,7 +994,7 @@ function lheadHtml(shown){
       <span class="obj-ic" aria-hidden="true">🗂</span>
       <h1 id="pagehead" tabindex="-1">Files</h1>
       <div class="seg" role="group" aria-label="Display as"><button id="dispTable" aria-pressed="${DISPLAY==='table'?'true':'false'}">Table</button><button id="dispGrid" aria-pressed="${DISPLAY==='grid'?'true':'false'}">Grid</button></div>
-      <a class="lmake" id="makeImage" href="/visual-studio.html" title="Make an image with Visual Studio">Make an image</a>
+      <a class="lmake" id="makeImage" href="/visual-studio.html" data-needs="approve" title="Make an image with Visual Studio">Make an image</a>
       <button class="lbtn" id="refreshBtn" aria-label="Refresh" title="Refresh">↻</button>
       ${S.canEdit&&DISPLAY==='grid'&&S.assets.length?`<button class="btn" id="selbtn">${S.selectMode?'Done':'Select'}</button>`:''}
       ${S.canEdit?`<button class="btn primary" id="add">＋ Add files</button>`:''}
@@ -1600,9 +1692,166 @@ async function del(id){
   // the SAME places the panel lists (the server refuses on them too)
   const uses=(S.current&&S.current.asset&&S.current.asset.id===id&&S.current.usage)||[];
   if(uses.length){toast('This file is in use ('+uses[0].label+(uses.length>1?' and '+(uses.length-1)+' more':'')+') — remove it there first, or archive it.');return;}
-  if(!(await askConfirm('Delete this file permanently?','This cannot be undone.','Delete')))return;
+  const cur=S.current&&S.current.asset&&S.current.asset.id===id?S.current:null;
+  const name=cur?cur.asset.name:'this file';
+  // a server without the Trash (before its update goes live) still deletes for good: say that, as before
+  const forGood=typeof S.trashCount!=='number';
+  if(forGood){
+    if(!(await askConfirm('Delete this file permanently?','This cannot be undone.','Delete')))return;
+  }else{
+    // item 218: Delete moves the file to the Trash for 30 days, and says so, and what the live site does
+    const until=new Date(Date.now()+S.trashDays*86400000).toLocaleDateString('en-US',{month:'long',day:'numeric'});
+    const points=[['It leaves Files and the photo picker now, and stops counting toward your space.'],['You can put it back until '+until+', '+S.trashDays+' days from now.']];
+    if(cur&&cur.on_live)points.push(['Your live site still shows it until you next publish.','warn']);
+    if(!(await askQuestion({icon:'trash',title:'Move “'+name+'” to the Trash?',points,ok:'Move to the Trash',okClass:'dark',okIcon:'trash'})))return;
+  }
   const r=await api('/assets/'+id,'DELETE');
-  if(r.ok){toast('Deleted');closeDetail();load();}else toast((r.body&&r.body.message)||'Could not delete');
+  if(forGood){if(r.ok){toast('Deleted');closeDetail();load();}else toast((r.body&&r.body.message)||'Could not delete');return;}
+  if(!r.ok){toast((r.body&&r.body.message)||'That didn’t move to the Trash. Try again.');return;}
+  closeDetail();load();
+  undoToast('“'+name+'” is in the Trash.',async()=>{
+    const b=await api('/assets/'+id+'/put-back','POST');
+    if(b.ok){toast('“'+name+'” is back in Files.');load();}else toast((b.body&&b.body.message)||'That didn’t come back. It’s in the Trash.');
+  });
+}
+
+// ── item 218: the Trash ───────────────────────────────────────────────────────
+// A question in the drawn look: an icon, a title, a few plain points, then the buttons.
+// Resolves true for the main button. A red question (Delete for good) starts on Cancel.
+function askQuestion(o){
+  return new Promise((resolve)=>{
+    const dlg=document.createElement('dialog');
+    dlg.className='tq'+(o.tone?' '+o.tone:'');
+    dlg.setAttribute('aria-labelledby','tqTitle');
+    dlg.innerHTML=`<div class="tqb"><div class="tqh"><span class="tqi" aria-hidden="true">${svg(IC[o.icon]||IC.trash)}</span><h3 id="tqTitle">${esc(o.title)}</h3></div>`+
+      `<ul>${(o.points||[]).map(([t,c])=>`<li${c?` class="${c}"`:''}>${esc(t)}</li>`).join('')}</ul>`+
+      `<div class="tqa"><button type="button" class="btn" data-q="no">${esc(o.cancel||'Cancel')}</button><button type="button" class="btn ${o.okClass||'primary'}" data-q="yes">${o.okIcon?svg(IC[o.okIcon]):''}${esc(o.ok)}</button></div></div>`;
+    document.body.appendChild(dlg);
+    let done=false;const finish=(v)=>{if(done)return;done=true;try{dlg.close();}catch(_){/* */}dlg.remove();resolve(v);};
+    dlg.querySelector('[data-q="no"]').addEventListener('click',()=>finish(false));
+    dlg.querySelector('[data-q="yes"]').addEventListener('click',()=>finish(true));
+    dlg.addEventListener('cancel',(e)=>{e.preventDefault();finish(false);});
+    dlg.showModal();setTimeout(()=>{const b=dlg.querySelector(o.tone==='bad'?'[data-q="no"]':'[data-q="yes"]');if(b)b.focus();},20);
+  });
+}
+// The toast after a move to the Trash, with Put back for a few seconds (the Trash keeps it longer).
+let UNDO_T=0;
+function undoToast(msg,fn){
+  let el=$('utoast');
+  if(!el){el=document.createElement('div');el.id='utoast';el.className='utoast';el.setAttribute('role','status');document.body.appendChild(el);}
+  el.innerHTML=`<span>${esc(msg)}</span><button type="button">${svg(IC.undo)}Put back</button>`;
+  el.hidden=false;clearTimeout(UNDO_T);
+  el.querySelector('button').addEventListener('click',()=>{el.hidden=true;clearTimeout(UNDO_T);fn();},{once:true});
+  UNDO_T=setTimeout(()=>{el.hidden=true;},8000);
+}
+const trashDay=(iso)=>{const t=Date.parse(iso||'');return isFinite(t)?new Date(t).toLocaleDateString('en-US',{month:'short',day:'numeric'}):'';};
+function trashDaysWords(f){
+  if(f.kept_live)return'Kept while live';
+  if(f.days_left==null)return'';
+  return f.days_left===0?'Goes today':f.days_left===1?'1 day left':f.days_left+' days left';
+}
+function trashGoesWords(f){
+  if(f.kept_live)return'Goes once a publish takes it off';
+  if(!f.goes_at)return'';
+  return f.days_left===0?'Goes for good today':f.days_left===1?'Goes for good tomorrow':'Goes for good '+trashDay(f.goes_at);
+}
+function trashRowHtml(f){
+  const ic=svg(f.kind==='document'?IC.doc:IC.photo);
+  const th=f.thumb?` style="background-image:url('${esc(f.thumb)}')"`:'';
+  const soon=f.days_left!=null&&f.days_left<=3&&!f.live;
+  const frac=f.days_left==null?0:Math.max(.03,Math.min(1,f.days_left/(S.trashDays||30)));
+  const sub=[f.kind==='document'?'PDF':'Photo',bytes(f.bytes),'Deleted '+when(f.trashed_at)+(f.by?' by '+f.by:''),f.folder?'was in '+folderLabel(f.folder):''].filter(Boolean).join(' · ');
+  return `<div class="trow" role="listitem" data-trash="${esc(f.id)}">
+    <span class="tth"${th}>${f.thumb?'':ic}</span>
+    <div><div class="tn"><span>${esc(f.name)}</span>${f.live?`<span class="tlive">${svg(IC.globe)}Still on your live site</span>`:''}</div>
+      <div class="ts">${esc(sub)}</div>
+      ${f.live?'<div class="tnote">Your live site shows it until you next publish, so it waits here until then. Kept, not deleted for good.</div>':''}</div>
+    <div class="tclock"><span class="tdays${soon?' soon':''}">${svg(IC.clock)}${esc(trashDaysWords(f))}</span><span class="tbar" aria-hidden="true"><i style="width:${Math.round(frac*100)}%"></i></span><span class="tgo">${esc(trashGoesWords(f))}</span></div>
+    ${S.canEdit?`<div class="tacts"><button class="btn" data-putback="${esc(f.id)}" aria-label="Put back ${esc(f.name)}">${svg(IC.undo)}Put back</button><button class="btn forever" data-needs="delete" data-forever="${esc(f.id)}" aria-label="Delete ${esc(f.name)} for good"${f.live?' aria-disabled="true"':''}>Delete for good</button></div>`:''}
+  </div>`;
+}
+function trashHowHtml(){
+  return `<div class="thow" aria-label="What happens to your website">
+    <div><b>A published page keeps it until you publish</b><p>Your live site carries its own copy of every photo, so deleting a file never makes a hole in a page that’s already up. The next publish follows your draft, without it.</p></div>
+    <div class="warm"><b>Not deleted for good while it’s live</b><p>A file your live site still shows waits in the Trash past ${S.trashDays} days, so Back online and Publish again still work. Delete for good says to publish first.</p></div>
+    <div><b>A version that needs it brings it back</b><p>Restore or publish a version that uses a file in the Trash, and the file comes out of the Trash by itself. Nothing goes up with a gap.</p></div>
+  </div>`;
+}
+function renderTrash(){
+  const all=S.trash||[];
+  const q=S.trashQ.trim().toLowerCase();
+  const files=q?all.filter(f=>String(f.name||'').toLowerCase().includes(q)):all;
+  const size=all.reduce((n,f)=>n+(Number(f.bytes)||0),0);
+  const next=all.filter(f=>!f.live&&f.days_left!=null).sort((a,b)=>a.days_left-b.days_left)[0];
+  const nextWords=next?(next.days_left===0?'today':next.days_left===1?'tomorrow':'in '+next.days_left+' days'):'';
+  const lead=all.length?`${all.length} file${all.length===1?'':'s'} · ${bigBytes(size)}. `:'';
+  const band=(S.trashState==='ok')?`<section class="tband" aria-labelledby="tbandH"><span class="tbi" aria-hidden="true">${svg(IC.trash)}</span>
+    <div class="tbt"><h2 id="tbandH">Trash</h2><p>${esc(lead)}Files you delete wait here for ${S.trashDays} days, then they’re deleted for good. They don’t count toward your space.</p></div>
+    ${next?`<div class="tnext"><small>Next to go</small><b>${esc(next.name)}, ${esc(nextWords)}</b></div>`:''}</section>`:'';
+  const body=S.trashState==='loading'?'<div class="spin" role="status" aria-label="Loading"></div>'
+    :S.trashState==='error'?'<div class="empty"><h2>The Trash didn’t load just now.</h2><p style="margin-top:16px"><button class="btn primary" id="retry">Try again</button></p></div>'
+    :S.trashState==='off'?'<div class="empty"><h2>The Trash isn’t switched on yet.</h2><p>Until it is, Delete keeps every file where it is.</p></div>'
+    :!all.length?`<div class="tlist"><p class="tempty">The Trash is empty. Files you delete wait here for ${S.trashDays} days, so you can put them back.</p></div>`
+    :`<div class="tlist" role="list" aria-label="Files in the Trash">${files.length?files.map(trashRowHtml).join(''):'<p class="tempty">No file in the Trash matches that.</p>'}<div class="tfoot">Put back returns a file to Files and the photo picker, in the folder it came from.</div></div>`;
+  const act=document.activeElement;const wasQ=!!(act&&act.id==='tq');const qp=wasQ?act.selectionStart:0;
+  $('root').innerHTML=`<div class="layout"><div>
+    <header class="lhead"><div class="lrow1"><span class="obj-ic" aria-hidden="true">🗂</span><h1 id="pagehead" tabindex="-1">Files</h1><button class="lbtn" id="refreshBtn" aria-label="Refresh" title="Refresh">↻</button></div>
+    <div class="lmeta">The Trash${all.length?` · ${all.length} file${all.length===1?'':'s'}`:''} · ${esc(updatedLabel())}</div>${storageHtml()}</header>
+    ${filtersHtml(`<div class="search">${svg(IC.search)}<input id="tq" type="search" aria-label="Search the Trash" placeholder="Search the Trash" value="${esc(S.trashQ)}" autocomplete="off"></div>`,'')}
+    ${band}${body}${S.trashState==='ok'&&all.length?trashHowHtml():''}</div></div>`;
+  wireRail();
+  // on a phone the kinds scroll sideways: keep the Trash chip in sight while the Trash is open
+  const kr=document.querySelector('#filters .kinds'),tc=kr&&kr.querySelector('[data-col="trash"]');
+  if(kr&&tc&&kr.scrollWidth>kr.clientWidth){const kb=kr.getBoundingClientRect(),cb=tc.getBoundingClientRect();if(cb.right>kb.right||cb.left<kb.left)kr.scrollLeft+=cb.right-kb.right+24;}
+  const rf=$('refreshBtn');if(rf)rf.onclick=()=>loadTrash(true).then(()=>{const nr=$('refreshBtn');if(nr)nr.focus();});
+  const rt=$('retry');if(rt)rt.onclick=()=>loadTrash();
+  const tq=$('tq');if(tq){tq.oninput=()=>{S.trashQ=tq.value;renderTrash();};if(wasQ){tq.focus();try{tq.setSelectionRange(qp,qp);}catch(_){/* */}}}
+  document.querySelectorAll('[data-putback]').forEach(b=>b.onclick=()=>trashPutBack(b.dataset.putback,b));
+  document.querySelectorAll('[data-forever]').forEach(b=>b.onclick=()=>trashForever(b.dataset.forever));
+}
+async function loadTrash(soft){
+  const gen=++REQ_SEQ;   // the same stale-answer rule as load()
+  if(!soft||!S.trash){S.trashState='loading';renderTrash();}
+  await CTX_READY;
+  let r;try{r=await api('/assets/trash');}catch(_){r={ok:false,body:{}};}
+  if(gen!==REQ_SEQ)return;
+  if(!r.ok){if(soft&&S.trash){toast('Couldn’t refresh just now.');return;}S.trashState='error';return renderTrash();}
+  const d=(r.body&&r.body.data)||{};
+  S.trash=Array.isArray(d.files)?d.files:[];S.trashDays=Number(d.days)||30;
+  S.trashState=d.available===false?'off':'ok';
+  S.trashCount=d.available===false?null:S.trash.length;
+  LOADED_AT=Date.now();S.loadedOnce=true;
+  renderTrash();
+}
+// after a row leaves: focus goes to the next row's Put back, else the search
+function trashFocusAfter(id){
+  const ids=(S.trash||[]).map(f=>f.id);const at=ids.indexOf(id);
+  S.trash=(S.trash||[]).filter(f=>f.id!==id);S.trashCount=S.trash.length;KEPT_SIDE=null;
+  renderTrash();
+  const nextId=ids[at+1]||ids[at-1];
+  const nb=nextId&&document.querySelector('[data-putback="'+nextId+'"]');(nb||$('tq')).focus();
+}
+async function trashPutBack(id,btn){
+  const f=(S.trash||[]).find(x=>x.id===id);if(!f)return;
+  if(btn)btn.disabled=true;
+  const r=await api('/assets/'+id+'/put-back','POST');
+  if(!r.ok){if(btn)btn.disabled=false;toast((r.body&&r.body.message)||'That didn’t come back. Try again.');return;}
+  toast('“'+f.name+'” is back in Files.');
+  trashFocusAfter(id);
+}
+function askStillLive(f){
+  return askQuestion({tone:'live',icon:'globe',title:'“'+f.name+'” is still on your live site',points:[['Publish your site first. Your draft doesn’t use it, so the next publish takes it off.'],['Then it can be deleted for good, or it goes by itself once its '+S.trashDays+' days are up.']],cancel:'Close',ok:'Open Publish'})
+    .then((go)=>{if(go)location.href='/presence.html'+(scope()?'?client='+encodeURIComponent(scope()):'')+'#publish';});
+}
+async function trashForever(id){
+  const f=(S.trash||[]).find(x=>x.id===id);if(!f)return;
+  if(f.live)return askStillLive(f);
+  if(!(await askQuestion({tone:'bad',icon:'alert',title:'Delete “'+f.name+'” for good?',points:[['It can’t be put back.'],['An older version of your site that used it can’t bring it back.']],ok:'Delete for good',okClass:'danger'})))return;
+  const r=await api('/assets/'+id+'/forever','DELETE');
+  if(r.status===409&&r.body&&r.body.error==='still_live'){f.live=true;renderTrash();return askStillLive(f);}
+  if(!r.ok){toast((r.body&&r.body.message)||'That didn’t delete. It’s still in the Trash; try again.');return;}
+  toast('“'+f.name+'” is deleted for good.');
+  trashFocusAfter(id);
 }
 
 /* ── upload (images + PDF), reuses /media/upload-url ── */

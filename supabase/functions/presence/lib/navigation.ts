@@ -76,10 +76,30 @@ function reviewerNav(): NavSection[] {
   ] }];
 }
 
+/** Builder item 220: a Designer's whole menu is the website they work on, its files
+ *  and Help. No Home, Inbox, Customers, Pipeline, Invoices, Projects, Analytics or
+ *  Settings: index.ts refuses every one of them to a Designer, so none is listed,
+ *  not even as a search entry. Publish and Versions only for a seat that may publish. */
+function designerNav(c: NavContext): NavSection[] {
+  const hid = (key: string, label: string, href: string, desc?: string): NavItem => ({ key, label, href, desc, hidden: true });
+  const sections: NavSection[] = [];
+  if (flagsOf(c).hasWebsite) {
+    const site: NavItem[] = [{ key: 'content', label: 'Website', href: '/presence.html', desc: 'The website you work on: its pages, styles and photos.' }];
+    if (c.edition !== 'monitor') site.push(hid('design', 'Edit site', '/presence.html#design'), hid('add_page', 'Add a page', '/presence.html#addpage', 'A new page on the site — pick a layout or start blank.'));
+    if (canPublish(c)) site.push(hid('publish', 'Publish', '/presence.html#publish', 'Publish now, or schedule it to go live on its own — and see or cancel what’s scheduled.'));
+    site.push(hid('history', 'Versions', '/presence.html#history'));
+    sections.push({ key: 'website', label: 'Website', items: site });
+    sections.push({ key: 'files', label: 'Files', items: [{ key: 'files_all', label: 'Files', href: '/files.html' }] });   // no Visual Studio: keeping an AI image is an approval
+  }
+  sections.push({ key: 'help', label: 'Help', items: [hid('help', 'Help', '/help.html')], utility: true });
+  return sections;
+}
+
 /** Build the visible navigation for a caller. Empty sections are dropped, so
  *  every edition/role feels intentionally designed. */
 export function buildNav(c: NavContext): NavSection[] {
   if (c.role === 'client_reviewer') return reviewerNav();
+  if (c.role === 'designer') return designerNav(c);   // builder item 220
   // A converted/bridged customer owns their own site (role = business_owner) but is
   // the studio's CLIENT — they get the calm client surface, never the operator
   // workspace (no "Customers"/CRM, no "build your site" prompts). Same one surface
@@ -128,6 +148,8 @@ export function buildNav(c: NavContext): NavSection[] {
     // Publish now or later — one place (Oct 2026 audit change 3: schedule.html retired;
     // the desc keeps "schedule" findable from ⌘K, which matches on desc).
     if (canPublish(c)) items.push(hid('publish', 'Publish', '/presence.html#publish', 'Publish now, or schedule it to go live on its own — and see or cancel what’s scheduled.'));
+    // builder list item 215: who changed what on this site, and when (a reviewer is never shown it)
+    if (has(c, 'edit')) items.push(hid('changes', 'Changes', '/changes.html', 'Who changed what on this website, and when, in sentences: saves, publishes, invites and checkpoints.'));
     if (canPublish(c)) items.push(hid('history', 'Versions', '/presence.html#history'));
     // builder item 202: ⌘K "health" opens the health check where it lives now, the website's Search tab
     // (item 184 moved it there from the Overview, whose description still sent "health" to it)
@@ -188,6 +210,8 @@ export function buildNav(c: NavContext): NavSection[] {
       hid('kits', 'Templates and starter kits', '/templates.html', 'Every template and starter kit you saved: what each brings and where it came from. Rename or remove them.'),
       // builder list item 210: the Usage tab on Sites, one search away
       hid('usage', 'Usage', '/usage.html', 'What each client uses this month: publishes and what they cost at Netlify, storage and visits.'),
+      // builder list item 215: the Changes tab on Sites, one search away
+      hid('changes', 'Changes', '/changes.html', 'Who changed what on every client’s site, and when: the week by who made the changes, then each change in a sentence.'),
       // item 135: ⌘K "new site" opens the New site box (sites.html opens it on #new)
       hid('new_site', 'New site', '/sites.html#new', 'Make a site from a business name and, if you like, a template or starter kit. Nobody is emailed until you invite the owner.'),
     ] });
@@ -225,6 +249,12 @@ export function buildNav(c: NavContext): NavSection[] {
     customers.push(hid('contacts', 'Contacts', '/contacts.html', 'The people — one may belong to a customer. Also the People tab on Customers.'));
     sections.push({ key: 'customers', label: 'Customers', items: customers });
   }
+
+  // Builder list item 236 (Nov 2026): the client portal's own page, right under Customers: its
+  // address to share, who has joined, and a short list to set it up. Studio level only.
+  if (studioLevel && f.hasRelationship && f.hasClientPortal) sections.push({ key: 'client_portal', label: 'Client portal', items: [
+    { key: 'client_portal', label: 'Client portal', href: '/client-portal.html', desc: 'Your clients’ portal: its address to share, who has joined, what they see, and a short list to set it up.' },
+  ] });
 
   // Pipeline — the sales deals, as its own top-level outcome (Phase 1 overhaul:
   // it was a sub-item under Customers, which hid where the money lived).
@@ -315,6 +345,7 @@ export function buildNav(c: NavContext): NavSection[] {
 /** The caller's landing surface, by role + edition. A CMS-Only account lands on
  *  its website; everyone with Business OS lands on Today; agency on the portfolio. */
 export function landingFor(c: NavContext): string {
+  if (c.role === 'designer') return '/presence.html';   // builder item 220: the website they work on
   if (c.role === 'client_reviewer' || c.isManagedClient) return '/client.html';
   if (c.isAgency) return '/agency.html';
   const f = flagsOf(c);

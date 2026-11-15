@@ -975,6 +975,7 @@
     connections: '<circle cx="6" cy="12" r="2.5"/><circle cx="18" cy="6" r="2.5"/><circle cx="18" cy="18" r="2.5"/><path d="M8.3 10.8l7.4-3.6M8.3 13.2l7.4 3.6"/>',
     inbox: '<path d="M3 13l2-8h14l2 8v6H3z"/><path d="M3 13h5l1.5 3h5L16 13h5"/>',
     customers: '<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0"/><circle cx="17" cy="9" r="2.5"/><path d="M15.5 14.5A5 5 0 0 1 21.5 20"/>',
+    client_portal: '<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18"/><circle cx="12" cy="13.5" r="2"/><path d="M8.5 19a3.5 3.5 0 0 1 7 0"/>',   // builder list item 236: the Client portal page
     pipeline: '<rect x="3" y="4" width="5" height="16" rx="1"/><rect x="9.5" y="4" width="5" height="10" rx="1"/><rect x="16" y="4" width="5" height="13" rx="1"/>',
     projects: '<path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>',
     files: '<path d="M6 3h8l5 5v13H6z"/><path d="M14 3v5h5"/>',
@@ -1352,7 +1353,7 @@
       // Builder item 165: its name is Menu, for screen readers too; on a phone the
       // bottom bar's Menu is the one Menu (shell.css hides this there).
       '<button class="dds-ic dds-waffle" id="dds-waffle" aria-label="Menu" aria-haspopup="true" aria-expanded="false" aria-controls="dds-drawer"><span class="wic" aria-hidden="true"></span></button>' +
-      brandHtml +
+      brandHtml + roleCardHtml() +   // builder item 220: the role card beside the brand
       (canCreate() ? '<button type="button" class="dds-create" id="dds-create" aria-haspopup="dialog" aria-expanded="false" aria-keyshortcuts="c">' + icon('plus') + '<span class="lbl">Create</span><kbd aria-hidden="true">C</kbd></button>' : '') +
       '<nav class="dds-nav" aria-label="Workspace">' + navHtml + '</nav>' +
       '<div class="dds-search" id="dds-search" role="button" tabindex="0" aria-label="Search"><span>' + icon('search', 'nic') + '</span><span>Search</span><kbd>' + (/Mac|iPhone|iPad/.test(navigator.platform || '') ? '⌘K' : 'Ctrl K') + '</kbd></div>' +
@@ -1707,7 +1708,7 @@
       : (scopedNow && firstPrimary) ? { href: firstPrimary.href, label: firstPrimary.label }
       : { href: (CTX && CTX.landing) || '/today.html', label: 'Home' };
     // the fallback stands in for a menu that names no Inbox at all, never for one the studio hid
-    var inbox = isReviewer ? null : inboxItem ? { href: inboxItem.href, label: inboxItem.label } : inboxHidden ? null : { href: '/inbox.html', label: 'Inbox' };
+    var inbox = isReviewer || window.ddsLacks('business') ? null : inboxItem ? { href: inboxItem.href, label: inboxItem.label } : inboxHidden ? null : { href: '/inbox.html', label: 'Inbox' };   // item 220: none for a Designer
     // the websites: every client's site (Sites) for a studio, the one site (Website) for
     // an owner or inside a client. A studio's own site is a utility, never this place.
     var siteItem = isReviewer ? null : studioLevel ? first('sites') : first('website');
@@ -2662,7 +2663,8 @@
       return '<div class="g' + (s.key === secKey ? ' active' : '') + (s.utility ? ' util' : '') + '">' + heading + vis.map(function (i) { return '<a href="' + esc(withScope(i.href)) + '" class="' + (i.key === activeKey ? 'here' : '') + '"' + (i.key === activeKey ? ' aria-current="page"' : '') + '>' + (one ? icon(s.key) : '') + '<span class="dl">' + esc(i.label) + '</span></a>'; }).join('') + '</div>';
     }).join('');
     ensureDrawer();
-    drawer.querySelector('.dlist').innerHTML = html; drawer.classList.add('open');
+    drawer.querySelector('.dlist').innerHTML = (sidebarMode() ? '' : roleCardHtml(true)) + html;   // builder item 220: a phone's Menu says the role too
+    drawer.classList.add('open');
     document.documentElement.classList.add('dds-menu-on');
     setExpanded('dds-waffle', true); setExpanded('dds-mbar-menu', true);
     var f = drawer.querySelector('a'); if (f) f.focus();
@@ -2680,7 +2682,7 @@
   // operator. Those two anchors are the intended escape hatch UP to the full
   // list, so they must stay unscoped. (broadcasts stays: its handler is per-site,
   // so a drilled scope correctly shows that client's broadcasts.)
-  var APP_PAGES = /^\/(today|presence|crm|contacts|broadcasts|pipeline|leads|projects|inbox|files|visual-studio|analytics|schedule|connections|sharing|attention|approval-center|timeline|upcoming|business-insights|content-tree|snapshot-history|website-health)\.html/;
+  var APP_PAGES = /^\/(today|presence|crm|contacts|broadcasts|pipeline|leads|projects|inbox|files|visual-studio|analytics|schedule|connections|sharing|attention|approval-center|timeline|upcoming|business-insights|content-tree|snapshot-history|website-health|changes)\.html/;
   function carryScopeGlobally() {
     var s = scopeId(); if (!s) return;
     document.querySelectorAll('a[href^="/"]').forEach(function (a) {
@@ -3131,7 +3133,54 @@
     var lacks = ['owner'];   // a few routes ask for the account owner by role, not by capability
     if (caps.indexOf('delete') < 0) lacks.push('delete');
     if (caps.indexOf('configure') < 0) lacks.push('configure');
+    // builder item 220: a Designer sees the website alone ("business" goes: its places, the bell,
+    // Inbox), publishes only when their seat says so, and restyles ("design", which staff lack)
+    if (caps.indexOf('publish') < 0) lacks.push('publish');
+    if (caps.indexOf('approve') < 0) lacks.push('approve');   // an AI image is kept by approving it
+    if (caps.indexOf('design') < 0) lacks.push('design');
+    if (caps.indexOf('view_all') < 0) lacks.push('business');
     document.documentElement.setAttribute('data-dds-lacks', lacks.join(' '));
+    guardRolePage(ctx);
+  }
+
+  // ── Builder item 220: a member's own role, in one sentence ──
+  // Someone with a seat on a business reads what their role sees and never sees, the words the
+  // owner read when inviting them (GET /portal/context my_role); a Designer also reads who puts
+  // their work live. Owners, a studio and platform staff get no card.
+  var ROLE_SVG = {
+    designer: '<path d="M4 20c2.5 0 4-1.3 4-3.5S9.5 13 11 13l8.5-8.5a1.4 1.4 0 0 0-2-2L9 11c0 1.5-1 3-3.5 3S4 16 4 20z"/>',
+    person: '<circle cx="12" cy="9" r="3.5"/><path d="M5 20a7 7 0 0 1 14 0"/>',
+    clock: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
+    lock: '<rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/>',
+  };
+  function roleSvg(k) { return '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">' + ROLE_SVG[k] + '</svg>'; }
+  function roleCardHtml(inDrawer) {
+    var r = CTX && CTX.my_role;
+    if (!r || !r.name || !r.you) return '';
+    var who = r.name === 'Staff' ? 'Staff' : 'a ' + r.name;
+    return '<div class="dds-rolecard"' + (inDrawer ? '' : ' id="dds-rolecard"') + ' role="note" aria-label="Your role">' +
+      '<p class="rc-t">' + roleSvg(r.role === 'designer' ? 'designer' : 'person') + '<span>You’re ' + esc(who) + (r.business ? ' on ' + esc(r.business) : ' here') + '</span></p>' +
+      '<p class="rc-s">' + esc(r.you) + '</p>' +
+      (r.publish ? '<p class="rc-p">' + roleSvg('clock') + '<span>' + esc(r.publish) + '</span></p>' : '') + '</div>';
+  }
+  // ── Builder item 220: a page outside a Designer's role says so ──
+  // The server refuses a Designer every read on it (index.ts), so an old link, a bookmark or a
+  // typed address would open a page of errors. The page's own content goes (shell.css), and this
+  // says what the role sees, with the way back.
+  var DESIGNER_PAGES = /^\/(presence|files|help)(\.html)?$/;
+  var PAGE_NAMES = { today: 'Home', agency: 'Home', inbox: 'Inbox', customers: 'Customers', contacts: 'Contacts', crm: 'This record', pipeline: 'Pipeline', invoices: 'Invoices', projects: 'Projects', todos: 'To-dos', analytics: 'Analytics', settings: 'Settings', sharing: 'Sharing', connections: 'Connections', broadcasts: 'Updates', prospects: 'Prospects', sites: 'Sites', domains: 'Domains', 'visual-studio': 'Visual Studio', developer: 'Developer tools', week: 'Plan my week' };
+  function guardRolePage(ctx) {
+    if (!ctx || ctx.site_role !== 'designer' || ctx.scope || ctx.is_operator) return;
+    if (DESIGNER_PAGES.test(location.pathname) || document.getElementById('dds-notyours')) return;
+    var page = PAGE_NAMES[location.pathname.replace(/^\//, '').replace(/\.html$/, '')] || 'This page';
+    var biz = ctx.my_role && ctx.my_role.business;
+    document.documentElement.classList.add('dds-notyours');
+    document.body.appendChild(el('<section id="dds-notyours" role="main" aria-labelledby="dds-notyours-h"><span class="ny-ic">' + roleSvg('lock') + '</span>' +
+      '<h1 id="dds-notyours-h" tabindex="-1">' + esc(page) + ' isn’t part of your role</h1>' +
+      '<p>As a Designer' + (biz ? ' on ' + esc(biz) : '') + ' you see the website, its pages, styles and photos. Customers, contacts, deals, invoices and messages stay with the owner and the studio, so this page shows nothing to you.</p>' +
+      '<div class="ny-acts"><a class="ny-pri" href="' + esc(withScope('/presence.html')) + '">Open the website</a><a href="' + esc(withScope('/files.html')) + '">Files</a></div>' +
+      '<p class="ny-note">Need something from here? Ask the owner or the studio, who can change your role on People.</p></section>'));
+    var h = document.getElementById('dds-notyours-h'); if (h) try { h.focus({ preventScroll: true }); } catch (_) { /* */ }
   }
   window.ddsLacks = function (need) {
     return (' ' + (document.documentElement.getAttribute('data-dds-lacks') || '') + ' ').indexOf(' ' + need + ' ') >= 0;

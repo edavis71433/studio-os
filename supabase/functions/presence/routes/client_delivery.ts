@@ -346,7 +346,11 @@ export async function handleClientDocuments(_req: Request, site: SiteRow, _princ
   for (const e of rows(ests)) documents.push({ kind: 'estimate', id: e.id, title: clean(e.title, 200) || 'Estimate', status: e.status, amount: proposalTotals(e.line_items).total_cents / 100, created_at: e.created_at, view_url: await mk('estimate', e.id, e.site_id) });
   for (const c of rows(cons)) documents.push({ kind: 'contract', id: c.id, title: clean(c.title, 200) || 'Agreement', status: c.status, signed_at: c.signed_at, created_at: c.created_at, view_url: await mk('contract', c.id, c.site_id) });
   documents.sort((a, b) => String(b.created_at).localeCompare(String(a.created_at)));
-  return json({ data: { documents } }, 200, cors);
+  // builder list item 229: proposals and estimates, or agreements, the studio turned off for this client
+  const { portalOffFor } = await import('../lib/portal_settings.ts');
+  const off = await portalOffFor(site);
+  const shown = documents.filter((d) => !(off.includes('proposals') && (d.kind === 'proposal' || d.kind === 'estimate')) && !(off.includes('agreements') && d.kind === 'contract'));
+  return json({ data: { documents: shown } }, 200, cors);
 }
 
 // ═══ PROJECTS (list + bundle + report) ═══
