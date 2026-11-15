@@ -81,7 +81,7 @@ test.describe('Agency portfolio', () => {
     await page.goto('/agency.html');
     await expect(page.getByRole('heading', { level: 1, name: 'Home' })).toBeVisible();   // final pass, batch C: the nav says Home
     await expect(page.locator('h1')).toHaveCount(1);
-    await expect(page.locator('.lhead .lmeta')).toContainText('3 businesses · Updated just now');
+    await expect(page.locator('.lhead .lmeta')).toContainText('3 customers · Updated just now');
     await expect(page.locator('#refreshBtn')).toBeVisible();
     await expect(page.locator('.top .brand')).toContainText('Bright Studio');
     expect(errors).toEqual([]);
@@ -176,7 +176,7 @@ test.describe('Agency portfolio', () => {
     await expect(page.locator('[data-view="all"]')).toHaveAttribute('aria-pressed', 'false');
     await expect(page.locator('tbody tr')).toHaveCount(1);
     await expect(page.locator('tbody tr')).toContainText('Marlow’s Kitchen');
-    await expect(page.locator('.lmeta')).toContainText('1 business ·');
+    await expect(page.locator('.lmeta')).toContainText('1 customer ·');
     await page.locator('[data-view="owed"]').click();
     await expect(page.locator('#main')).toContainText('No customers match that.');   // no receivables in this fixture → nobody owes
   });
@@ -575,7 +575,7 @@ test.describe('Agency home — one home, one roster', () => {
     await expect(park).toHaveCount(1);                                                 // on the bridge list only → still a row
     await expect(park.locator('.rowact')).toHaveText(['Open record']);                 // no ⋯: nothing of theirs to edit or save here
     await expect(park.locator('.pill')).toHaveText('Not live yet');
-    await expect(page.locator('.lhead .lmeta')).toContainText('4 businesses');
+    await expect(page.locator('.lhead .lmeta')).toContainText('4 customers');
     await page.locator('[data-view="needs"]').click();
     await expect(table.locator('tbody tr')).toHaveCount(1);                            // Marlow — the one with a Needs-you row
   });
@@ -846,7 +846,7 @@ test.describe('Agency roster — housekeeping', () => {
     await arch.click();
     await expect(page.locator('.dds-toast').filter({ hasText: 'archived' })).toContainText('Cedar Garage archived');
     await expect(page.locator('tbody tr[data-open]')).toHaveCount(3);
-    await expect(page.locator('.lhead .lmeta')).toContainText('3 businesses');
+    await expect(page.locator('.lhead .lmeta')).toContainText('3 customers');
     // the Archived view is its own read, made the first time it is asked for
     expect(calls.filter((c) => c.includes('archived=true'))).toHaveLength(0);
     await page.locator('[data-view="archived"]').click();

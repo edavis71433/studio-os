@@ -11,7 +11,7 @@
   /* Page skin = the shell's --dds-* tokens (shell.css is the canonical palette;
      light/dark/data-theme all follow it automatically). Visual refresh (2026-10):
      the page follows the approved "Help — ask in your own words" board — title ·
-     one big ask box (the existing Concierge, /concierge/ask) · suggested
+     one big ask box (the product helper, /help/ask, as the ? panel uses) · suggested
      questions · Browse by topic · Popular answers (the same plain answers this
      page always had, now one row each) · a rail with Still stuck? and the tour. */
   :root{
@@ -51,9 +51,9 @@
   .answer{margin-top:var(--dds-s3,12px);padding:var(--dds-s3,12px) var(--dds-s4,16px);background:var(--p-soft);border-radius:var(--dds-r-lg,10px);font-size:14px;white-space:pre-wrap;line-height:1.55}
   .answer:empty{padding:0;margin:0;background:transparent}
   /* benchmark 7: what the answer drew on — chips, then an honest line when it's judgment */
-  .answer .srcs{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px;white-space:normal}
-  .answer .srcs .lbl{font-size:12px;color:var(--soft);align-self:center}
-  .answer .src{font-size:12px;color:var(--soft);background:var(--card);border:1px solid var(--line);border-radius:999px;padding:var(--dds-s1,4px) 10px;line-height:18px}
+  .answer .links{display:flex;flex-wrap:wrap;gap:6px 16px;margin-top:10px;white-space:normal}
+  .answer .links a{font-weight:600;color:var(--p);text-decoration:none}
+  .answer .links a:hover{text-decoration:underline}
   .answer .lowc{margin-top:var(--dds-s2,8px);font-size:12.5px;color:var(--soft);white-space:normal}
 
   /* ── sections · topic cards · answers ── */
@@ -63,6 +63,7 @@
   .setgrid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:var(--dds-s4,16px)}
   .setcard{border:1px solid var(--line);border-radius:var(--dds-r-lg,10px);background:var(--card);padding:var(--dds-s4,16px) var(--dds-s5,20px);display:flex;gap:var(--dds-s4,16px);align-items:flex-start;color:inherit;text-decoration:none;transition:var(--dds-t-fast,120ms) var(--dds-ease,ease-out);min-width:0}
   .setcard:hover{border-color:var(--line-strong)}
+  .setcard[hidden]{display:none}
   .setcard .ico{width:36px;height:36px;border-radius:var(--dds-r,8px);background:var(--p-soft);color:var(--p);display:grid;place-items:center;flex:0 0 auto}
   .setcard .ico svg{width:17px;height:17px;stroke:currentColor;fill:none;stroke-width:1.75;stroke-linecap:round;stroke-linejoin:round}
   .setcard .t{flex:1;min-width:0} .setcard .t b{display:block;font-weight:600;margin-bottom:2px} .setcard .t span{color:var(--faint);font-size:13px}
@@ -103,7 +104,7 @@
   <header class="toprow">
     <div>
       <h1 class="title">How can we help?</h1>
-      <p class="subline">Ask in your own words. The answer uses what’s true of your studio — your pages, your customers, your invoices.</p>
+      <p class="subline">Ask how to do something, in your own words. The answer says where it’s done and takes you there.</p>
     </div>
   </header>
 
@@ -122,11 +123,11 @@
   <section class="sec" aria-labelledby="topicsHead">
     <div class="sec-h"><h2 id="topicsHead">Browse by topic</h2></div>
     <div class="setgrid">
-      <a class="setcard" href="/get-started.html"><span class="ico"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l8 4v5c0 5-3.5 8-8 9-4.5-1-8-4-8-9V7z"/><path d="M9 12l2 2 4-4"/></svg></span><span class="t"><b>Getting started</b><span>The first week: your profile, your first customer, your first invoice.</span></span></a>
+      <a class="setcard" href="#a-around" id="card-start"><span class="ico"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l8 4v5c0 5-3.5 8-8 9-4.5-1-8-4-8-9V7z"/><path d="M9 12l2 2 4-4"/></svg></span><span class="t"><b>Getting started</b><span>Where everything is, and the first things to do.</span></span></a>
       <a class="setcard" href="/presence.html"><span class="ico"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/></svg></span><span class="t"><b>Your website</b><span>Editing pages, photos, publishing and scheduling, the live site.</span></span></a>
-      <a class="setcard" href="/crm.html"><span class="ico"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0"/><circle cx="17" cy="9" r="2.5"/><path d="M15.5 14.5A5 5 0 0 1 21.5 20"/></svg></span><span class="t"><b>Customers and deals</b><span>Enquiries, the pipeline, next steps, what “won” means.</span></span></a>
-      <a class="setcard" href="/pipeline.html"><span class="ico"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v18"/><path d="M17 7.5c0-1.9-2.2-3-5-3s-5 1.1-5 3 2.2 2.5 5 3 5 1.1 5 3-2.2 3-5 3-5-1.1-5-3"/></svg></span><span class="t"><b>Invoices and payments</b><span>Sending, deposits, reminders, Stripe payouts.</span></span></a>
-      <a class="setcard" href="/sites.html"><span class="ico"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="14" rx="2"/><path d="M3 8h18M8 21h8"/></svg></span><span class="t"><b>Client sites</b><span>New sites, inviting owners, Pin, Duplicate, templates, domains and the trash.</span></span></a>
+      <a class="setcard" href="/customers.html"><span class="ico"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0"/><circle cx="17" cy="9" r="2.5"/><path d="M15.5 14.5A5 5 0 0 1 21.5 20"/></svg></span><span class="t"><b>Customers and deals</b><span>Enquiries, the pipeline, next steps, what “won” means.</span></span></a>
+      <a class="setcard" href="/invoices.html"><span class="ico"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v18"/><path d="M17 7.5c0-1.9-2.2-3-5-3s-5 1.1-5 3 2.2 2.5 5 3 5 1.1 5 3-2.2 3-5 3-5-1.1-5-3"/></svg></span><span class="t"><b>Invoices and payments</b><span>Sending, deposits, reminders, Stripe payouts.</span></span></a>
+      <a class="setcard" href="/sites.html" id="card-sites" hidden><span class="ico"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="14" rx="2"/><path d="M3 8h18M8 21h8"/></svg></span><span class="t"><b>Client sites</b><span>New sites, inviting owners, Pin, Duplicate, templates, domains and the trash.</span></span></a>
       <a class="setcard" href="/files.html"><span class="ico"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3h8l5 5v13H6z"/><path d="M14 3v5h5"/></svg></span><span class="t"><b>Files and sharing</b><span>What clients see, private files, reviewer links.</span></span></a>
       <a class="setcard" href="/connections.html"><span class="ico"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1"/><path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/></svg></span><span class="t"><b>Connections</b><span>Google, email sending, Stripe, bookings.</span></span></a>
     </div>
@@ -142,7 +143,7 @@
           <details id="a-client"><summary><span class="t"><b>What a client sees in their portal</b><span>Files and sharing</span></span><span class="car" aria-hidden="true">›</span></summary>
             <div class="body"><p><b>Your project, in one place.</b> When a studio builds for you, your project lives in <a href="/client.html">your updates page</a> — progress, files to review, things waiting on your OK, messages, and invoices. Anything that needs you also lands in your email, so nothing depends on you checking in. Proposals and agreements arrive as a link you can read, sign, and (when there’s a deposit) pay — all in one sitting, and a signed copy comes straight back to your inbox.</p></div></details>
           <details id="a-around"><summary><span class="t"><b>Getting around</b><span>Getting started</span></span><span class="car" aria-hidden="true">›</span></summary>
-            <div class="body"><p id="map-owner">The menu is the same on every page: <a href="/today.html">Today</a> for what needs you, <a href="/presence.html">Website</a> to edit and publish, <a href="/todos.html">To-dos</a> for everything you have to do, <a href="/customers.html">Customers</a> for every customer and the people behind them, <a href="/pipeline.html">Pipeline</a> for deals, <a href="/invoices.html">Invoices</a> for what you’ve billed and what’s owed, <a href="/projects.html">Projects</a> for work in motion, <a href="/inbox.html">Inbox</a> for everything that needs a reply, <a href="/files.html">Files</a> for photos, brand and documents, and <a href="/analytics.html">Analytics</a> for how it’s going. Settings sits at the foot of the menu, and Help is the question mark at the top.</p><p id="map-studio" hidden>For a studio, <a href="/agency.html">Home</a> is where the day starts: what needs you, and every customer with how they’re doing. <a href="/sites.html">Sites</a> shows every client’s website as a card, with Domains and Templates a tab away. <a href="/inbox.html">Inbox</a>, <a href="/todos.html">To-dos</a>, <a href="/customers.html">Customers</a>, <a href="/pipeline.html">Pipeline</a>, <a href="/invoices.html">Invoices</a>, <a href="/prospects.html">Prospects</a>, <a href="/projects.html">Projects</a>, <a href="/files.html">Files</a> and <a href="/analytics.html">Analytics</a> cover the whole studio, and Your website is your own site. Open a customer to work inside their account: their menu has their Overview, Website, Record, Project, Messages and Files, and Back to studio brings you home. Settings sits at the foot of the menu, and Help is the question mark at the top.</p><p>Search is one key away (press Ctrl K, or ⌘K on a Mac) and reaches every page, Connections included. What you see adapts to your plan and role; anything you don’t have simply isn’t shown, so there are no dead ends.</p></div></details>
+            <div class="body"><p id="map-owner">The menu is the same on every page: <a href="/today.html">Today</a> for what needs you, <a href="/presence.html">Website</a> to edit and publish, <a href="/todos.html">To-dos</a> for everything you have to do, <a href="/customers.html">Customers</a> for every customer and the people behind them, <a href="/pipeline.html">Pipeline</a> for deals, <a href="/invoices.html">Invoices</a> for what you’ve billed and what’s owed, <a href="/projects.html">Projects</a> for work in motion, <a href="/inbox.html">Inbox</a> for everything that needs a reply, <a href="/files.html">Files</a> for photos, brand and documents, and <a href="/analytics.html">Analytics</a> for how it’s going. Settings sits at the foot of the menu, and Help is the question mark at the top.</p><p id="map-studio" hidden>For a studio, <a href="/agency.html">Home</a> is where the day starts: what needs you, and every customer with how they’re doing. <a href="/sites.html">Sites</a> shows every client’s website as a card, with Domains and Templates a tab away. <a href="/inbox.html">Inbox</a>, <a href="/todos.html">To-dos</a>, <a href="/customers.html">Customers</a>, <a href="/pipeline.html">Pipeline</a>, <a href="/invoices.html">Invoices</a>, <a href="/prospects.html">Prospects</a>, <a href="/projects.html">Projects</a>, <a href="/files.html">Files</a> and <a href="/analytics.html">Analytics</a> cover the whole studio, and Your website is your own site. Open a customer to work inside their account: their menu has their Overview, Website, Record, Project, Messages and Files, and Back to studio brings you home. Settings sits at the foot of the menu, and Help is the question mark at the top.</p><p>Search is one key away (press Ctrl K, or ⌘K on a Mac) and reaches every page, Connections included. What you see adapts to your plan and role; anything you don’t have simply isn’t shown, so there are no dead ends.</p><p id="first-owner"><b>The first things to do:</b> fill in your <a href="/settings.html#studio">business profile</a>, connect a way to get paid in <a href="/connections.html">Connections</a>, then add your first customer from <a href="/customers.html">Customers</a> and send them a proposal or an invoice from Create.</p><p id="first-studio" hidden><b>The first things to do:</b> fill in your <a href="/settings.html#studio">studio profile</a>, connect a way to get paid in <a href="/connections.html">Connections</a>, add your first customer, and start their website from <a href="/sites.html">Sites</a>. Create, at the top of the menu, logs a call or sends an invoice from any page.</p></div></details>
           <details id="a-sites"><summary><span class="t"><b>Running your clients’ sites</b><span>Client sites</span></span><span class="car" aria-hidden="true">›</span></summary>
             <div class="body"><p><b>Every client’s website is a card on <a href="/sites.html">Sites</a>.</b> + New site makes one from a business name and, if you like, a template or a starter kit. Nobody is emailed until you press Invite the owner on its card, so you can build in private. Pin keeps a site at the top of your list.</p><p>Duplicate starts a new site from one you already built, pages and photos included. Whatever came across waits for you to change it, or to press Keep on the new site’s card, before it can go live. Save as a template keeps a site as a starting point; the Templates tab lists your templates and starter kits, where you can rename or remove them. The Domains tab lists every domain and when it renews.</p><p>Inside a client, Switch site on the card at the top of the menu jumps to another one. Move to trash takes a site offline and keeps it in the Trash at the foot of Sites for 90 days, where Restore brings it back. In the editor, Versions keeps the pages you deleted for 30 days, each with Put back.</p><p><b>Before you build,</b> Ask for their content on a site’s ⋯ menu sends the owner a short form for their words and photos. It needs no sign-in, saves as they type, and their photos land in that site’s Files. <b>When it’s theirs,</b> the Hand-over kit puts who to call, short how-tos, video links and files at the top of Help in their portal. <a href="/week.html">Plan my week</a>, on Home and Sites, lists every client in the order they need you over the next seven days.</p></div></details>
           <details id="a-email"><summary><span class="t"><b>Emailing someone from their record</b><span>Customers and deals</span></span><span class="car" aria-hidden="true">›</span></summary>
@@ -156,7 +157,7 @@
           <details id="a-connect"><summary><span class="t"><b>What connecting a service does</b><span>Connections</span></span><span class="car" aria-hidden="true">›</span></summary>
             <div class="body"><p>Connect the tools you already use to read your own data — safely, with only the access you approve. Any change we’d make on your behalf is proposed first and waits for your approval. You can disconnect at any time and your accounts stay exactly as they are. <a href="/connections.html">See your connections</a>.</p></div></details>
           <details id="a-billing"><summary><span class="t"><b>Your plan</b><span>Your account</span></span><span class="car" aria-hidden="true">›</span></summary>
-            <div class="body"><p>Your plan decides which features you see. Upgrading adds capabilities — nothing resets and no data is lost. Downgrading simply hides what you’re not using; your information is preserved and comes back if you upgrade again. Manage your subscription, payment method, or cancel any time from your billing portal.</p><p><a href="/pricing.html">See plans and pricing</a></p></div></details>
+            <div class="body"><p>Your plan decides which features you see. Upgrading adds capabilities — nothing resets and no data is lost. Downgrading simply hides what you’re not using; your information is preserved and comes back if you upgrade again. Manage your subscription, payment method, or cancel any time from your billing portal.</p><p>It’s in <a href="/settings.html#billing">Settings, under Your plan</a>, for the account’s owner.</p></div></details>
           <details id="a-uptime"><summary><span class="t"><b>Reliability and your website’s uptime</b><span>Your website</span></span><span class="car" aria-hidden="true">›</span></summary>
             <div class="body"><p>Your published website is served as plain, fast pages from a global content network — it keeps working even if our platform is having a bad day. Every version you publish is kept and restorable in one click, so a mistake is never more than a minute from fixed. Publishing changes nothing until it succeeds; there are no maintenance windows and your site never goes down for updates.</p><p>The workspace itself runs on infrastructure with independently published uptime commitments and security audits (SOC&nbsp;2). If we’re ever the reason something’s down, we’ll say so plainly and fix it.</p></div></details>
         </div>
@@ -183,7 +184,8 @@
 
 <script src="/vendor/supabase-js-2.45.4.js"></script>
 <script>
-// Item 96: "Getting around" describes the menu this reader has. A studio's menu starts
+// Item 96: "Getting around" describes the menu this reader has. Builder item 202: the Getting
+// started card opens that answer, which also lists the first things to do. A studio's menu starts
 // at Home, not Today (which only forwards a studio there); everyone else keeps the
 // owner's map, signed out too. The shell loads after this script, hence the wait.
 document.addEventListener('DOMContentLoaded', () => {
@@ -192,19 +194,23 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!ctx || !ctx.is_agency) return;
     const o = document.getElementById('map-owner'), st = document.getElementById('map-studio');
     if (o && st) { o.hidden = true; st.hidden = false; }
+    // builder item 202: Client sites is a studio's card, and a studio's first steps start a client's site
+    const cs = document.getElementById('card-sites'); if (cs) cs.hidden = false;
+    const fo = document.getElementById('first-owner'), fs = document.getElementById('first-studio');
+    if (fo && fs) { fo.hidden = true; fs.hidden = false; }
   }).catch(() => {});
 });
 </script>
 <script>
-// The ask box is the EXISTING Concierge (POST /concierge/ask — the same call
-// connections.html and today.html make). Signed out, it says so and points at
-// support; it never guesses an answer.
+// Builder item 202: ONE helper behind both Help boxes. This box asked the site Concierge
+// (/concierge/ask) while the ? panel asked /help/ask, so one question got two answers. Both
+// ask /help/ask now: an answer from our own help, and links straight to where it's done.
+// Signed out, it says so and points at support; it never guesses an answer.
 const SUPABASE_URL = "https://qksstlqzbhesadrrofgn.supabase.co";
 const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFrc3N0bHF6Ymhlc2FkcnJvZmduIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE5NzMwMDMsImV4cCI6MjA5NzU0OTAwM30.4V94Ua7z5cntPWtvtqN24TUnfY5A6K6-zCxY0iEcgYo";
 const FN = SUPABASE_URL + "/functions/v1/presence";
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY, { auth: { storageKey: 'dds-portal-auth', persistSession: true, autoRefreshToken: true } });
 const $ = (id) => document.getElementById(id);
-const esc = (s) => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 let TOKEN = "", BUSY = false;
 sb.auth.onAuthStateChange(function(_e,s){ if(s&&s.access_token) TOKEN=s.access_token; });
 const SCOPE = (new URLSearchParams(location.search).get('client')||'');
@@ -221,21 +227,19 @@ async function ask(question){
   const q=(question||'').trim(); if(!q||BUSY) return;
   const box=$('ans'), btn=$('ask');
   if(!(await ensureToken())){
-    box.textContent='Sign in to ask about your own studio — the answer uses your pages, customers and invoices. Signed out, the answers below still apply, and support is one message away.';
+    box.textContent='Sign in to ask. Signed out, the answers below still apply, and support is one message away.';
     return;
   }
-  BUSY=true; btn.disabled=true; btn.textContent='Asking…'; box.textContent='Looking at your studio…';
-  const r = await apiPost('/concierge/ask', { question:q });
+  BUSY=true; btn.disabled=true; btn.textContent='Asking…'; box.textContent='Looking…';
+  const r = await apiPost('/help/ask', { question:q });
   const d = (r.ok && r.body && r.body.data) || {};
-  // the route returns `answer` (`text` is the older key — neither deploy order blanks the box)
-  box.textContent = d.answer || d.text
+  box.textContent = d.answer
     || (r.offline ? 'Your connection dropped before the question went through — nothing changed. Try again when you’re back online.'
-    : 'I don’t have anything measured on that yet — I’d rather say so than guess. The answers below cover the essentials, and support can look with you.');
-  // benchmark 7: chips naming what it drew on (the route's source_labels, never
-  // invented here) and an honest line when part of the answer is judgment
-  const labels = Array.isArray(d.source_labels) ? d.source_labels.filter(Boolean).slice(0, 4) : [];
-  if(labels.length){ const s=document.createElement('div'); s.className='srcs'; s.innerHTML='<span class="lbl">Drew on:</span>'+labels.map(l=>`<span class="src">${esc(l)}</span>`).join(''); box.appendChild(s); }
-  if(d.low_confidence){ const n=document.createElement('div'); n.className='lowc'; n.textContent='Part of this is judgment rather than measurement — treat it as a nudge.'; box.appendChild(n); }
+    : 'Help couldn’t answer just now. I’d rather say so than guess: the answers below cover the essentials, and support can look with you.');
+  // where it's done: the same links the ? panel shows (our own pages, or an email to a person)
+  const links = Array.isArray(d.links) ? d.links.filter((l) => l && l.label && /^(\/(?![/\\])|mailto:)/.test(String(l.href || ''))) : [];
+  if(links.length){ const s=document.createElement('div'); s.className='links'; for(const l of links){ const a=document.createElement('a'); a.href=String(l.href); a.textContent=String(l.label)+' →'; s.appendChild(a); } box.appendChild(s); }
+  if(d.matched && d.low_confidence){ const n=document.createElement('div'); n.className='lowc'; n.textContent='This is the closest answer we have. If it isn’t it, ask another way or write to support.'; box.appendChild(n); }
   BUSY=false; btn.disabled=false; btn.textContent='Ask';
 }
 $('askForm').addEventListener('submit', (e)=>{ e.preventDefault(); ask($('q').value); });

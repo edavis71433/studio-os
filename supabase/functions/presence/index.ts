@@ -46,7 +46,7 @@ import { handleMessages, handleNotifications, handleNotificationsRead, handlePro
 import { handleProjectSurveys, handleSurvey, handleSurveyRespond, handleSupport, handleSupportOne, handleSupportMessage } from './routes/service_intake.ts';
 import { handleClientProjects, handleClientProject, handleClientReport, handleClientMessages, handleClientDeliverableDownload, handleClientApprovalDecide, handleClientSurvey, handleClientSurveyRespond, handleClientNotifications, handleClientNotificationsRead, handleClientSupport, handleClientSupportOne, handleClientSupportMessage, handleClientBilling, handleClientDocuments, handleClientBook, handleClientTaskDone, handleClientUploadUrl, handleClientUploadCreate, handleClientServices, handleClientWebsiteStats, handleClientWebsiteThumb, handleStudioCustomers } from './routes/client_delivery.ts';
 import { handleSavedReplies, handleFaqAdmin, handleClientFaq } from './routes/service_edges.ts';
-import { handlePublish, handleRestore, handlePublishHistory, handleVersionStar, handleVersionLabel, handleCompareVersions, handleTimewarp, handleCheckpointList, handleCheckpointSave, handleCheckpointRestore, handleCheckpointDelete, handleTakeOffline, handleBackOnline, handleSitePassword } from './routes/publish.ts';
+import { handlePublish, handleRestore, handlePublishHistory, handleVersionStar, handleVersionLabel, handleCompareVersions, handleTimewarp, handleCheckpointList, handleCheckpointSave, handleCheckpointRestore, handleCheckpointDelete, handleTakeOffline, handleBackOnline, handleSitePassword, handleComingSoon, handleComingSoonRead } from './routes/publish.ts';
 const { handleLaunchList, handleLaunchCreate, handleLaunchGet, handleLaunchRecapture, handleLaunchDecide, handleLaunchSchedule, handleLaunchPromote, handleLaunchRollback, handleLaunchCancel } = lazyRoutes(() => import('./routes/launches.ts'));
 import { handleMediaUpload, handleMediaUpdate, handleMediaDelete } from './routes/media.ts';
 import { handleAssetsList, handleAssetsCollections, handleAssetsHealth, handleAssetsBulk, handleAssetsMatch, handleAssetsFolderMove, handleAssetUpdate, handleAssetStatus, handleAssetDelete, handleAssetDetail, handleAssetDownload, handleAssetReplace, handleAssetRollback, handleAssetDuplicate, handleAssetSuggest, handleAssetSocial, handleAssetCards, handleAssetRemoveBackground, handleAssetCutout, handleCutoutJob } from './routes/assets.ts';
@@ -606,6 +606,8 @@ async function route_(req: Request, cors: Record<string, string>): Promise<Respo
   if (route === '/site/offline' && method === 'POST') return handleTakeOffline(site, principal, cors);
   if (route === '/site/online' && method === 'POST') return handleBackOnline(site, principal, cors);
   if (route === '/site/password' && method === 'POST') return handleSitePassword(req, site, principal, cors);   // list item 175
+  if (route === '/site/coming-soon' && method === 'GET') return handleComingSoonRead(site, cors);   // builder list item 158: a Coming soon page before the first publish
+  if (route === '/site/coming-soon' && method === 'POST') return handleComingSoon(req, site, principal, cors);
   if (route === '/site/publish-lock' && method === 'GET') return handlePublishLockGet(jwt, site, principal, cors);   // item 214: a launch freeze or a dispute
   if (route === '/site/publish-lock' && method === 'PUT') return handlePublishLockPut(req, jwt, site, principal, cors);
   if (route === '/publishes' && method === 'GET') return handlePublishHistory(site, cors);

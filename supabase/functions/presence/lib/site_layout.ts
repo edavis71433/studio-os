@@ -59,7 +59,8 @@ const isObj = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 
  *  A menu folder (builder item 48) has no page of its own: it travels with the
  *  pages in it, and only when one is left (item 196). Pure. */
 export function menuForCopy(nav: unknown): unknown[] {
-  const own = (href: unknown) => { const v = String(href ?? '').trim(); return v === '/' || /^\/[a-z0-9][a-z0-9-]*\/$/.test(v); };
+  // item 225: a jump to a named part of one of its own pages travels too
+  const own = (href: unknown) => { const v = String(href ?? '').trim(); return v === '/' || /^\/[a-z0-9][a-z0-9-]*\/$/.test(v) || /^\/(?:[a-z0-9][a-z0-9-]*\/)?#[a-z0-9][a-z0-9-]*$/.test(v); };
   const out: unknown[] = [];
   for (const it of Array.isArray(nav) ? nav : []) {
     const folder = isObj(it) && it.folder === true;
