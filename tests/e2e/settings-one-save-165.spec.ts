@@ -170,6 +170,9 @@ test.describe('Settings: one way to save (builder item 165)', () => {
       await page.locator('#f-phone').fill('555 0100');
       await page.locator('#f-phone').press('Tab');
       await expect(page.locator('#fs-f-phone')).toContainText('Couldn’t save');
+      // a colour still easing in reads as its halfway shade: the side list marks the open section with a
+      // 0.12s change, and axe caught it mid-way in dark about one run in five. Let what's moving settle first.
+      await page.waitForFunction(() => document.getAnimations().every((a) => a.playState !== 'running' || a.effect?.getComputedTiming().iterations === Infinity));
       const results = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa']).include('#main').analyze();
       const serious = results.violations.filter((v) => v.impact === 'critical' || v.impact === 'serious');
       expect(serious.map((v) => `${scheme} ${v.id}: ${v.nodes.map((n) => n.target.join(' ')).join(' | ')}`)).toEqual([]);
