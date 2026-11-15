@@ -152,6 +152,9 @@
   .dbody input,.dbody select{width:100%;font-family:inherit;font-size:16px;border:1px solid var(--line);background:var(--bg);color:var(--ink);border-radius:var(--dds-r,8px);padding:var(--dds-s2,8px) var(--dds-s3,12px);outline:none}
   .dbody input:focus,.dbody select:focus{border-color:var(--p)}
   .dbody .note{font-size:12.5px;color:var(--faint);margin:var(--dds-s3,12px) 0 0;line-height:1.5}
+  /* builder item 198: a full plan is said in the box, where the person is looking, not in a toast */
+  .dbody .cu-full{background:var(--dds-warn-soft,#f3ead9);color:var(--dds-warn,#775d31);border-radius:10px;padding:12px 14px;font-size:13.5px;line-height:1.45}
+  .dbody .cu-full b{display:block}
   /* item 89: the contact forms hold more (two phones, job title and company, an address, tags) */
   #newDlg,#editDlg{max-width:560px}
   .dbody .two{display:grid;grid-template-columns:1fr 1fr;gap:0 10px}
@@ -314,6 +317,7 @@
         </div>
         <p class="note">Adding them creates their client workspace and their site, and emails them a sign-in link. You bill them for your work the usual way — they never pay for software here.</p>
       </div>
+      <p class="note cu-full" id="cu-full" role="alert" hidden></p>
       <div class="row2"><button type="button" class="btn ghost" id="cu-cancel">Cancel</button><button type="submit" class="btn" id="cu-submit">Save</button></div>
     </div>
     <div id="cust-done" style="display:none"></div>
@@ -1019,6 +1023,7 @@ function syncCuMode(){
   const save=cuMode()==='connect';
   const po=$('cu-provision-only');if(po)po.style.display=save?'none':'';
   const sb2=$('cu-submit');if(sb2)sb2.textContent=save?'Save':'Set up + invite';
+  const cf=$('cu-full');if(cf)cf.hidden=true;   // item 198's full-plan words belong to the last set-up attempt
   if(!save)syncCuSignup();
 }
 // Start from a kit (Oct 2026 studio audit, change 4): an agency's saved starter
@@ -1054,6 +1059,7 @@ function openAddCustomer(){
   const sv=document.querySelector('input[name="cumode"][value="connect"]');if(sv)sv.checked=true;
   syncCuMode();syncCuKits();
   $('cust-fields').style.display='';$('cust-done').style.display='none';$('cust-done').innerHTML='';
+  const cf=$('cu-full');if(cf){cf.hidden=true;cf.textContent='';}
   const sb2=$('cu-submit');if(sb2)sb2.disabled=false;
   // Name is the dialog's first field, so showModal already focuses it; the late nudge
   // never pulls focus back from a field someone has moved to
@@ -1075,6 +1081,8 @@ $('custForm').onsubmit=async(e)=>{
   try{
     const r=await api('/sales/customers','POST',body);
     if(!r.ok){
+      // builder item 198: the plan's sites are all in use; nothing was made, and the box says why
+      if(r.status===409&&r.body&&r.body.error==='client_limit'){const cf=$('cu-full'),t=String(r.body.message||''),cut=t.indexOf('. ');if(cf){cf.innerHTML=cut>0?'<b>'+esc(t.slice(0,cut+1))+'</b>'+esc(t.slice(cut+2)):esc(t);cf.hidden=false;}btn.disabled=false;btn.textContent=label;return;}
       const m=r.status===403?'Customers are part of your plan’s business tools — an upgrade adds them.':((r.body&&r.body.message)||(mode==='connect'?'We couldn’t save them just now.':'We couldn’t set them up just now.'));
       toast(m);btn.disabled=false;btn.textContent=label;return;
     }
