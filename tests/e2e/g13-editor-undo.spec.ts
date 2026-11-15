@@ -1,6 +1,7 @@
 import { test, expect, Page, Route } from '@playwright/test';
 import { installApp, STUDIO_NAV, ALL_FEATURES, answerAsks, setAsksAnswer, askedSoFar } from './helpers/app';
 import { ABOUT_BLOCKS, ABOUT_SECTION, aboutField, aboutIn, aboutSaveOut, addGallery, ANSWER_HEADERS, API, backToCanvas, BLOCKS, blocksIn, canvasReplaced, canvasScrollY, CONTACT, draftReads, draftVersion, duplicate, editAndWaitOut, editHome, FAR_DOWN, Field, FORM, FormBlocks, formSaveOut, Frame, GALLERY, hasTheirs, hideOut, holdPuts, holdReads, homeLine, lastPut, lastTwo, markCanvas, menuRows, META, mountCanvas, Mounted, mountPages, moveThenWrite, NORM_BLOCKS, NORM_META, NORM_SECTIONS, nudge, onPill, openAbout, openBusiness, OWN_MENU, OWN_PAGES, PAGE_HTML, Paged, PAGED, pageIn, pageMenu, panelEdit, pill, pillNames, previewHtml, redo, refusal, renameContact, SECTIONS, selectInBody, SETTINGS, slugs, stored, STORY, storyIn, STRIP, THEIRS, theirSection, typeDetail, typeOver, undo, WITH_CONTACT, WITH_FORM, writeOnAboutAndLeave, openPages } from './helpers/editor';
+import { touchScreen } from './helpers/app';
 
 // ── G13 in-place canvas text editor — Undo and Redo of page-menu steps keep the words typed since ──
 // Split from g13-editor.spec.ts (builder list item 109, Nov 2026): the fixtures and
@@ -394,9 +395,9 @@ test.describe('Comments mode offers no editing (item 99)', () => {
   test('the section toolbar and the Contents list edit only in Edit mode', async ({ page }) => {
     const { frame, puts } = await mountCanvas(page);
     const first = frame.locator('section.block-richtext');
-    // a phone brings the toolbar with a tap, a mouse with a hover
+    // a finger brings the toolbar with a tap, a mouse with a hover
     const phone = (page.viewportSize()?.width || 1200) < 768;
-    const point = (loc: ReturnType<typeof frame.locator>) => (phone ? loc.tap() : loc.hover({ position: { x: 600, y: 56 } }));   // right of the floating Contents card, under the section pill
+    const point = (loc: ReturnType<typeof frame.locator>) => (touchScreen() ? loc.tap() : loc.hover({ position: { x: 600, y: 56 } }));   // right of the floating Contents card, under the section pill
     await point(first);
     await expect(frame.locator('#dds-dc-bar button', { hasText: 'Delete' })).toBeVisible();   // Edit mode: the toolbar is there
     if (phone) await page.locator('#dkMore').click();                                         // Notes waits behind More on a phone

@@ -1,4 +1,4 @@
-import { expect, Page, Route } from '@playwright/test';
+import { test, expect, Locator, Page, Route } from '@playwright/test';
 
 // ── The hermetic app harness ─────────────────────────────────────────────────
 // Every signed-in page does two network things: (1) loads supabase-js from a CDN
@@ -274,6 +274,21 @@ export async function installApp(page: Page, opts: AppOptions = {}): Promise<voi
     }
     return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: {} }) });
   });
+}
+
+// ── A finger or a mouse (builder item 108) ───────────────────────────────────
+// The tablet and the phone are touch screens: nothing hovers there. A test that brought a
+// section's toolbar up with a hover passed on them while testing nothing a finger can do,
+// so it points and presses the way the device does.
+/** Whether this test's device is a touch screen (the tablet and phone projects). */
+export const touchScreen = () => !!test.info().project.use.hasTouch;
+/** Points at something: a finger taps it (a section's toolbar comes with the tap), a mouse rests on it. */
+export async function pointAt(target: Locator, opts: { position?: { x: number; y: number }; force?: boolean } = {}): Promise<void> {
+  if (touchScreen()) await target.tap(opts); else await target.hover(opts);
+}
+/** Presses a button: a tap on a touch screen, a click with a mouse. */
+export async function pressButton(target: Locator): Promise<void> {
+  if (touchScreen()) await target.tap(); else await target.click();
 }
 
 /** Lets a test see the editor's one-time tips: call before installApp's page opens. */

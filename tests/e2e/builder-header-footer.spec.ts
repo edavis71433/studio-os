@@ -1,6 +1,7 @@
 import { test, expect, Page, Route } from '@playwright/test';
 import { installApp, STUDIO_NAV, ALL_FEATURES } from './helpers/app';
 import { applyHeaderScroll } from '../../supabase/functions/presence/lib/site_header';
+import { touchScreen } from './helpers/app';
 
 // The site's header and footer, picked on the page (builder list items 41, 50 and 123, Nov 2026;
 // Figma "A · Header and footer on the canvas"): a press on either outlines it, names it "· on
@@ -119,7 +120,7 @@ test.describe('the header and footer, picked on the page (builder items 41, 50 a
     await page.keyboard.press('Enter');
     await expect(panel(page)).toHaveAttribute('data-mode', 'header');
     await page.locator('#btnSettingsClose').click();
-    await frame(page).locator('header.site a.brand').hover();
+    if (!touchScreen()) await frame(page).locator('header.site a.brand').hover();   // a mouse resting on the name; a finger doesn't rest
     const name = (await frame(page).locator('header.site a.brand').boundingBox())!, chip = (await frame(page).locator('header.site .dc-hf-chip').boundingBox())!;
     expect(chip.y).toBeGreaterThanOrEqual(name.y + name.height - 1);   // the chip hangs below; the name stays clear
     await frame(page).locator('header.site a.brand').click();

@@ -1,5 +1,6 @@
 import { test, expect, Page, Route } from '@playwright/test';
 import { installApp, STUDIO_NAV, ALL_FEATURES } from './helpers/app';
+import { touchScreen } from './helpers/app';
 
 // Builder item 195 (Nov 12 review, file 06, findings 27 to 29): the editor answers the Tab key;
 // Clear the page and a starter layout stop at a section the studio locked, and a save the server
@@ -67,9 +68,9 @@ async function mount(page: Page, { who, lock, refuse }: { who: Who; lock?: unkno
   return { frame, puts, refused, draws: () => draws, redrawn, lastBlocks: () => (puts.filter((p) => p && Array.isArray(p.blocks)).at(-1) || {}).blocks };
 }
 async function pick(page: Page, frame: ReturnType<Page['frameLocator']>, sel: string) {
-  const phone = (page.viewportSize()?.width || 1200) < 768;
+  const phone = touchScreen();   // a finger brings the toolbar with a tap, a mouse with a hover
   const sec = frame.locator(sel);
-  if (phone) await sec.tap({ position: { x: 40, y: 20 } }); else await sec.locator('h2').hover();
+  if (phone) await sec.tap({ position: { x: (page.viewportSize()?.width || 0) < 768 ? 40 : 200, y: 20 } }); else await sec.locator('h2').hover();   // on a tablet the dock covers the page's left edge
   await expect(frame.locator('#dds-dc-bar')).toHaveClass(/\bon\b/);
 }
 const working = (page: Page) => page.evaluate(() => (0, eval)('JSON.stringify(BLOCKS_WORK.map((b) => b.title))') as string).then((s) => JSON.parse(s));

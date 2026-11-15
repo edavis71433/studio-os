@@ -1,5 +1,6 @@
 import { test, expect, Page, Route } from '@playwright/test';
 import { installApp, STUDIO_NAV, ALL_FEATURES } from './helpers/app';
+import { touchScreen } from './helpers/app';
 
 // Builder item 190, second half (Nov 12 review, file 06, finding 1): the editor's page frames
 // are walled off from the app, so a drawn page can't reach the signed-in session. The drawn page
@@ -57,8 +58,8 @@ test('Edit’s canvas runs none of the drawn page’s scripts, and the editor st
   expect(await touched(page)).toEqual([]);
   await expect(frame.locator('body')).not.toHaveAttribute('data-own', 'ran');
   // the editor's own tools still answer on the page (WebKit drops them in a script-less sandbox)
-  const phone = (page.viewportSize()?.width || 1200) < 768;
-  if (phone) await frame.locator('#a').tap({ position: { x: 40, y: 20 } }); else await frame.locator('#a h2').hover();
+  const phone = touchScreen();   // a finger brings the toolbar with a tap, a mouse with a hover
+  if (phone) await frame.locator('#a').tap({ position: { x: (page.viewportSize()?.width || 0) < 768 ? 40 : 200, y: 20 } }); else await frame.locator('#a h2').hover();   // on a tablet the dock covers the page's left edge
   await expect(frame.locator('#dds-dc-bar')).toHaveClass(/\bon\b/);
 });
 

@@ -1,5 +1,6 @@
 import { test, expect, Page, Route } from '@playwright/test';
 import { installApp, STUDIO_NAV, ALL_FEATURES } from './helpers/app';
+import { touchScreen } from './helpers/app';
 
 // One icon set, readable small text, one clear main button per card (builder list item 34, Nov
 // 2026). Across the editor's bar, dock and cards: no words smaller than 12 pixels, no typed ↑, ↓,
@@ -123,8 +124,10 @@ test.describe('one icon set, readable small text, one main button (builder item 
     await page.locator('#dkPhotos').click();
     const cell = page.locator('#panelFilesGrid .mcell').first();
     await expect(cell.locator('.usedline')).toHaveText('at work: Home');
-    await cell.hover();
-    await expect(cell.locator('.badge')).toHaveCSS('opacity', '0');   // the caption takes the badge's place, so the two never overlap
+    if (!touchScreen()) {   // a mouse resting on a photo: a finger has no hover
+      await cell.hover();
+      await expect(cell.locator('.badge')).toHaveCSS('opacity', '0');   // the caption takes the badge's place, so the two never overlap
+    }
     expect(await smallWords(page)).toEqual([]);
     expect(await typedIcons(page)).toEqual([]);
   });

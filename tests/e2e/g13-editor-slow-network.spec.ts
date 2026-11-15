@@ -1,6 +1,7 @@
 import { test, expect, Page, Route } from '@playwright/test';
 import { installApp, STUDIO_NAV, ALL_FEATURES, answerAsks, setAsksAnswer, askedSoFar } from './helpers/app';
 import { ABOUT_BLOCKS, ABOUT_SECTION, aboutField, aboutIn, aboutSaveOut, addGallery, ANSWER_HEADERS, API, backToCanvas, BLOCKS, blocksIn, canvasReplaced, canvasScrollY, CONTACT, draftReads, draftVersion, duplicate, editAndWaitOut, editHome, FAR_DOWN, Field, FORM, FormBlocks, formSaveOut, Frame, GALLERY, hasTheirs, hideOut, holdPuts, holdReads, homeLine, lastPut, lastTwo, markCanvas, menuRows, META, mountCanvas, Mounted, mountPages, moveThenWrite, NORM_BLOCKS, NORM_META, NORM_SECTIONS, nudge, onPill, openAbout, openBusiness, OWN_MENU, OWN_PAGES, PAGE_HTML, Paged, PAGED, pageIn, pageMenu, panelEdit, pill, pillNames, previewHtml, redo, refusal, renameContact, SECTIONS, selectInBody, SETTINGS, slugs, stored, STORY, storyIn, STRIP, THEIRS, theirSection, typeDetail, typeOver, undo, WITH_CONTACT, WITH_FORM, writeOnAboutAndLeave, openPages, addBlankPage } from './helpers/editor';
+import { pointAt, touchScreen } from './helpers/app';
 
 // ── G13 in-place canvas text editor — the same page changes on a slow connection ──
 // Split from g13-editor.spec.ts (builder list item 109, Nov 2026): the fixtures and
@@ -192,7 +193,7 @@ test.describe('G13 in-place canvas text editor — the same page changes on a sl
     await openPages(page); await pill(page, 'About').locator('.pp-name').click();
     await expect(onPill(page)).toHaveText('About');
     await expect(rows).toHaveCount(0);                             // their buttons act by index on the open page's list
-    await frame.locator('section.block-richtext').hover({ force: true });
+    await pointAt(frame.locator('section.block-richtext'), { force: true });
     await page.waitForTimeout(100);
     await expect(frame.locator('#dds-dc-bar')).not.toHaveClass(/\bon\b/);
     read.release();
@@ -323,6 +324,7 @@ test.describe('G13 in-place canvas text editor — the same page changes on a sl
   });
 
   test('a section drag under way when the page changes is dropped, not landed on the new page', async ({ page }) => {
+    test.skip(touchScreen(), 'a section is dragged by its grip with a mouse; a finger moves it with the arrows');
     const { frame, puts } = await mountPages(page, '', [{ ...PAGED.pages[0], blocks: [...ABOUT_BLOCKS, { type: 'title', title: 'Second', subtitle: 'Second line' }] }]);
     await frame.locator('section.block-richtext').hover();
     const grip = await frame.locator('#dds-dc-bar .dc-grip').boundingBox();

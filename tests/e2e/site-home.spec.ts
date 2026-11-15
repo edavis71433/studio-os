@@ -1,5 +1,6 @@
 import { test, expect, devices, Page, Route } from '@playwright/test';
-import { installApp, STUDIO_NAV, ALL_FEATURES, answerAsks, showTips } from './helpers/app';
+import { installApp, STUDIO_NAV, ALL_FEATURES, answerAsks } from './helpers/app';
+import { pointAt, pressButton, touchScreen, showTips } from './helpers/app';
 
 // The Website page, Squarespace style (Nov 2026): the Overview is the site itself, with
 // one bar and one to-do line, and the menu lives in the sidebar, grouped by job.
@@ -1057,7 +1058,7 @@ test.describe('one preview screen', () => {
     const frame = page.frameLocator('#previewFrame');
     const sec = frame.locator('#main > section').first();
     await expect(sec).toBeVisible();   // the draft draws into the frame after the screen opens
-    await sec.hover();
+    await pointAt(sec, { position: { x: 4, y: 4 } });   // a plain spot, never a link
     await page.waitForTimeout(300);
     await expect(frame.locator('#dds-ee-bar')).toHaveCount(0);
     await expect(frame.locator('[data-dds-ee], .dds-ee-on')).toHaveCount(0);
@@ -1475,8 +1476,8 @@ test.describe('a save that fails says so', () => {
   test('a section field still being typed in says “Unsaved changes”, and the save says it saved', async ({ page }) => {
     await mount(page, '/presence.html#design');
     const frame = page.frameLocator('#designPreview');
-    await frame.locator('#a').hover();
-    await frame.locator('#dds-dc-bar button[aria-label="Edit this section"]').click();
+    await pointAt(frame.locator('#a'));
+    await pressButton(frame.locator('#dds-dc-bar button[aria-label="Edit this section"]'));
     const field = page.locator('#blocksCard input[type=text]').first();
     await field.click();
     await field.pressSequentially(' more');
@@ -1531,22 +1532,21 @@ test.describe('no drawing nobody asked for (item 85)', () => {
     const frame = page.frameLocator('#designPreview');
     await frame.locator('#a h2').waitFor();
     const draws = await drawsAfter(page, async () => {
-      await frame.locator('#a').hover();
-      await frame.locator('#dds-dc-bar button[aria-label="Edit this section"]').click();
+      await pointAt(frame.locator('#a'));
+      await pressButton(frame.locator('#dds-dc-bar button[aria-label="Edit this section"]'));
     });
     expect(draws).toEqual([]);
     expect(await page.evaluate('BLOCKS_WORK[BLOCK_SOLO].type')).toBe('title');
   });
   test('Hide from the canvas draws the canvas once, and not the hidden Preview', async ({ page }) => {
-    test.skip(isPhone(page), 'a phone selects by tap, with no hover');
     await mount(page, '/presence.html#design');
     const frame = page.frameLocator('#designPreview');
     await frame.locator('#a h2').waitFor();
     const previewBefore = await page.evaluate(() => (document.getElementById('previewFrame') as HTMLIFrameElement).srcdoc);
     const draws = await drawsAfter(page, async () => {
-      await frame.locator('#a').hover();
-      await frame.locator('#dds-dc-bar button[aria-label="More"]').click();   // Hide waits behind the pill's More
-      await frame.locator('#dds-dc-more button[aria-label="Hide this section"]').click();
+      await pointAt(frame.locator('#a'));
+      await pressButton(frame.locator('#dds-dc-bar button[aria-label="More"]'));   // Hide waits behind the pill's More
+      await pressButton(frame.locator('#dds-dc-more button[aria-label="Hide this section"]'));
     });
     expect(draws.length).toBeLessThanOrEqual(1);                        // the canvas's own redraw, no second one
     expect(await page.evaluate(() => (document.getElementById('previewFrame') as HTMLIFrameElement).srcdoc)).toBe(previewBefore);
@@ -1778,9 +1778,9 @@ test.describe('the section panel’s arrows keep the canvas pointing at the righ
     });
     const frame = page.frameLocator('#designPreview');
     const editOn = async (id: string) => {
-      await frame.locator('#b' === id ? '#a' : '#b').hover();
-      await frame.locator(id).hover();
-      await frame.locator('#dds-dc-bar button[aria-label="Edit this section"]').click();
+      await pointAt(frame.locator('#b' === id ? '#a' : '#b'));
+      await pointAt(frame.locator(id));
+      await pressButton(frame.locator('#dds-dc-bar button[aria-label="Edit this section"]'));
     };
     await editOn('#a');
     expect(await page.evaluate('BLOCKS_WORK[BLOCK_SOLO].type')).toBe('title');
@@ -1812,9 +1812,9 @@ test.describe('move the welcome section among the others', () => {
 
   test('the welcome section’s own toolbar moves it below About: one write, in the order the site reads', async ({ page }) => {
     const { writes, frame } = await canvas(page, true);
-    await frame.locator('section[data-dds-core="hero"]').hover();
+    await pointAt(frame.locator('section[data-dds-core="hero"]'));
     await expect(barButton(frame, 'Move this section up')).toHaveClass(/dc-off/);   // already at the top
-    await barButton(frame, 'Move this section down').click();
+    await pressButton(barButton(frame, 'Move this section down'));
     await expect.poll(() => orders(writes)).toEqual([['about', 'hero', 'offerings', 'testimonials', 'faqs']]);
     await page.locator('#btnUndo').click();
     await expect.poll(() => orders(writes).at(-1)).toEqual([]);   // back to the usual order on a site that had none saved
@@ -1822,23 +1822,23 @@ test.describe('move the welcome section among the others', () => {
 
   test('a built-in section moves past its visible neighbour, and the last one can’t go further down', async ({ page }) => {
     const { writes, frame } = await canvas(page, true);
-    await frame.locator('section[data-dds-core="about"]').hover();
+    await pointAt(frame.locator('section[data-dds-core="about"]'));
     await frame.locator('body').evaluate((b) => b.setAttribute('data-e2e-old', ''));
-    await barButton(frame, 'Move this section down').click();
+    await pressButton(barButton(frame, 'Move this section down'));
     await expect.poll(() => orders(writes)).toEqual([['hero', 'offerings', 'about', 'testimonials', 'faqs']]);
     // the move draws the page again; a hover on the page about to go leaves no bar on the new one
     await expect(frame.locator('body[data-e2e-old]')).toHaveCount(0);
     await expect(frame.locator('#dds-dc-bar')).toBeAttached();
-    await frame.locator('section[data-dds-core="offerings"]').hover();
+    await pointAt(frame.locator('section[data-dds-core="offerings"]'));
     await expect(barButton(frame, 'Move this section down')).toHaveClass(/dc-off/);   // added sections follow the built-in ones
   });
 
   test('on a template that keeps the welcome section on top, it has no arrows and nothing goes above it', async ({ page }) => {
     const { writes, frame } = await canvas(page, false);
-    await frame.locator('section[data-dds-core="hero"]').hover();
+    await pointAt(frame.locator('section[data-dds-core="hero"]'));
     await expect(frame.locator('#dds-dc-bar')).toHaveClass(/\bon\b/);
     await expect(barButton(frame, 'Move this section down')).toHaveCount(0);
-    await frame.locator('section[data-dds-core="about"]').hover();
+    await pointAt(frame.locator('section[data-dds-core="about"]'));
     await expect(barButton(frame, 'Move this section up')).toHaveClass(/dc-off/);
     // the Styles list says the same
     const row = (name: string) => page.locator('#sectionsCard > div').filter({ hasText: name });
@@ -1854,8 +1854,8 @@ test.describe('move the welcome section among the others', () => {
     const { writes } = await canvas(page, true);
     await page.evaluate(() => (window as any).openTrayPanel('contents'));   // the list's panel starts closed
     const row = page.locator('#designTreeList .dc-tree-row[data-core="about"]');
-    await row.hover();
-    await row.locator('button[aria-label="Move down"]').click();
+    if (!touchScreen()) await row.hover();   // a mouse brings the row's arrows; a finger sees them already
+    await pressButton(row.locator('button[aria-label="Move down"]'));
     await expect.poll(() => orders(writes)).toEqual([['hero', 'offerings', 'about', 'testimonials', 'faqs']]);
     await expect(page.locator('#designTreeList .dc-tree-row[data-core="about"] button[aria-label="Move down"]')).toBeFocused();
   });
@@ -1870,10 +1870,10 @@ test.describe('move the welcome section among the others', () => {
   test('two quick presses on a built-in section’s arrow make two moves', async ({ page }) => {
     const { writes, frame } = await canvas(page, true);
     await slowSaves(page);
-    await frame.locator('section[data-dds-core="hero"]').hover();
+    await pointAt(frame.locator('section[data-dds-core="hero"]'));
     const down = barButton(frame, 'Move this section down');
-    await down.click();
-    await down.click();
+    await pressButton(down);
+    await pressButton(down);
     await expect.poll(() => orders(writes)).toEqual([['about', 'hero', 'offerings', 'testimonials', 'faqs'], ['about', 'offerings', 'hero', 'testimonials', 'faqs']]);
   });
   test('two quick presses on the Styles list’s arrow make two moves too', async ({ page }) => {
