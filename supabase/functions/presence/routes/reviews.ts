@@ -74,6 +74,13 @@ export async function handleReviewPage(req: Request, siteId: string, cors: Recor
   // a customer opening an older emailed link goes on to the viewer; the viewer asks with ?embed=1
   if (new URL(req.url).searchParams.get('embed') !== '1') return new Response(null, { status: 302, headers: { ...cors, Location: reviewPageUrl(siteId), 'Cache-Control': 'no-store' } });
   if (!(await rateAllow(`rev:page:ip:${clientIp(req)}`, 60, 60))) return new Response('<!doctype html><meta charset="utf-8"><p>Please slow down and try again in a moment.</p>', { status: 429, headers: htmlHeaders });
+  // builder list item 200 (review file 06, finding 62): a link to a site that's gone will never
+  // work, so it says not found and review.html says to ask for a fresh link; a read that failed
+  // is a moment's trouble, and the viewer says to try again
+  const sq = await svc(`presence_sites?id=eq.${siteId}&select=id,status&limit=1`).catch(() => null);
+  if (!sq || !sq.ok) return new Response('<!doctype html><meta charset="utf-8"><p>This review page isn’t available right now. Please try again in a moment.</p>', { status: 503, headers: htmlHeaders });
+  const found = rows(sq)[0] as { status?: string } | undefined;
+  if (!found || found.status === 'deleting') return new Response('<!doctype html><meta charset="utf-8"><title>Not found</title><p>This review page could not be found.</p>', { status: 404, headers: htmlHeaders });
   const brand = await loadEmailBrand(siteId);
   const endpoint = reviewEndpoint(siteId);
   return new Response(reviewPageHtml(brand, endpoint), { status: 200, headers: htmlHeaders });
@@ -503,17 +510,21 @@ button:disabled{opacity:.6;cursor:default}
 <script>
 (function(){
 var F=document.getElementById('rv'),M=document.getElementById('rv-msg'),B=document.getElementById('rv-go');
-function show(cls,txt){M.hidden=false;M.className='msg '+cls;M.textContent=txt;}
+function show(cls,txt){M.hidden=false;M.className='msg '+cls;M.textContent=txt;M.setAttribute('role',cls==='err'?'alert':'status');}
 F.addEventListener('submit',function(e){e.preventDefault();
 var data={};new FormData(F).forEach(function(v,k){data[k]=v;});
 if(!data.rating){show('err','Please choose a rating from 1 to 5 stars.');return;}
 B.disabled=true;show('ok','Sending…');
 fetch(${JSON.stringify(endpoint)},{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)})
-.then(function(r){return r.json().then(function(j){return {ok:r.ok,j:j};});})
+.then(function(r){return r.json().catch(function(){return null;}).then(function(j){return {ok:r.ok,status:r.status,j:j};});})
 .then(function(res){var j=res.j&&res.j.data?res.j.data:res.j;
-if(res.ok&&j&&j.ok){F.style.display='none';show('ok',(j&&j.message)||'Thank you — your review was received.');}
-else{B.disabled=false;show('err',(j&&j.message)||'Something went wrong. Please try again.');}})
-.catch(function(){B.disabled=false;show('err','Something went wrong. Please try again.');});
+if(res.ok&&j&&j.ok){F.style.display='none';show('ok',(j&&j.message)||'Thank you — your review was received.');return;}
+B.disabled=false;
+if(res.status===400&&j&&j.message){show('err',j.message);return;}
+if(res.status===429){show('err','Too many tries in a row. Wait a minute, then send it again. Your review is still here.');return;}
+if(res.status===404){show('err','This review page doesn’t work any more. Please contact the business directly.');return;}
+show('err','That didn’t go through on our side. Try again in a moment. Your review is still here.');})
+.catch(function(){B.disabled=false;show('err','That didn’t go through. Check your connection and try again. Your review is still here.');});
 });
 })();
 </script>
