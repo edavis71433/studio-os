@@ -159,6 +159,9 @@
   .dbody input,.dbody select{width:100%;font-family:inherit;font-size:16px;border:1px solid var(--line);background:var(--bg);color:var(--ink);border-radius:var(--dds-r,8px);padding:var(--dds-s2,8px) var(--dds-s3,12px);outline:none}
   .dbody input:focus,.dbody select:focus{border-color:var(--p)}
   .dbody .note{font-size:12.5px;color:var(--faint);margin:var(--dds-s3,12px) 0 0;line-height:1.5}
+  /* builder item 198: a full plan is said in the box, where the person is looking, not in a toast */
+  .dbody .cu-full{background:var(--dds-warn-soft,#f3ead9);color:var(--dds-warn,#775d31);border-radius:10px;padding:12px 14px;font-size:13.5px;line-height:1.45}
+  .dbody .cu-full b{display:block}
   /* item 89: the contact forms hold more (two phones, job title and company, an address, tags) */
   #newDlg,#editDlg{max-width:560px}
   .dbody .two{display:grid;grid-template-columns:1fr 1fr;gap:0 10px}
@@ -307,6 +310,7 @@
         <p class="note">You don’t host this one, so record where it lives. Google Search Console reports on a domain whoever hosts it — with the address on file, their existing search numbers start arriving. Visitor counts still can’t come from here (there’s no counter of ours on their pages). You can add or change this later on their website page.</p>
       </div>
       <p class="note">Adding them creates their client workspace and their site, and emails them a sign-in link. You bill them for your work the usual way — they never pay for software here.</p>
+      <p class="note cu-full" id="cu-full" role="alert" hidden></p>
       <div class="row2"><button type="button" class="btn ghost" id="cu-cancel">Cancel</button><button type="submit" class="btn" id="cu-submit">Set up + invite</button></div>
     </div>
     <div id="cust-done" style="display:none"></div>
@@ -1029,6 +1033,7 @@ function openAddCustomer(){
   const wf=$('cu-website');if(wf)wf.value='';
   syncCuSignup();syncCuKits();
   $('cust-fields').style.display='';$('cust-done').style.display='none';$('cust-done').innerHTML='';
+  const cf=$('cu-full');if(cf){cf.hidden=true;cf.textContent='';}
   const sb2=$('cu-submit');if(sb2){sb2.disabled=false;sb2.textContent='Set up + invite';}
   $('custDlg').showModal();setTimeout(()=>$('cu-name').focus(),20);
 }
@@ -1046,6 +1051,8 @@ $('custForm').onsubmit=async(e)=>{
   try{
     const r=await api('/sales/customers','POST',body);
     if(!r.ok){
+      // builder item 198: the plan's sites are all in use; nothing was made, and the box says why
+      if(r.status===409&&r.body&&r.body.error==='client_limit'){const cf=$('cu-full'),t=String(r.body.message||''),cut=t.indexOf('. ');if(cf){cf.innerHTML=cut>0?'<b>'+esc(t.slice(0,cut+1))+'</b>'+esc(t.slice(cut+2)):esc(t);cf.hidden=false;}btn.disabled=false;btn.textContent=label;return;}
       const m=r.status===403?'Customers are part of your plan’s business tools — an upgrade adds them.':((r.body&&r.body.message)||'We couldn’t set them up just now.');
       toast(m);btn.disabled=false;btn.textContent=label;return;
     }

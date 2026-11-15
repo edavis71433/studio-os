@@ -120,7 +120,8 @@ test.describe('Sites (builder list items 43 and 45)', () => {
     await expect(dlg.locator('h3')).toHaveText('New site');
     await expect(dlg).toContainText('Nobody is emailed until you invite the owner.');
     await expect(dlg.locator('input[type="email"]')).toHaveCount(0);
-    await expect(dlg.locator('#new-from-wrap')).toBeHidden();        // no kits saved: just the business name
+    await expect(dlg.locator('#new-tpl-wrap')).toBeHidden();         // no kits saved: no templates…
+    await expect(dlg.locator('#new-kit-wrap')).toBeHidden();         // …and no starter kits
     await dlg.locator('#new-submit').click();                       // no name yet → nothing sent
     expect(t.writes).toHaveLength(0);
     await dlg.locator('#new-biz').fill('Juniper Floral Co.');
@@ -135,17 +136,18 @@ test.describe('Sites (builder list items 43 and 45)', () => {
     await expect(dlg).toBeHidden();
   });
 
-  test('+ New site from a starter kit: a blank site first, the kits after; a kit that didn’t apply can be tried again', async ({ page }) => {
+  // item 198: a starter kit is picked under "Bring a starter kit too", beside the design
+  test('+ New site from a starter kit: none by default, then the kit; a kit that didn’t apply can be tried again', async ({ page }) => {
     const t = await openSites(page, [BISTRO, CAFE], {
       kits: { data: [{ id: 'k1', name: 'Florist starter', industry_key: 'florist', created_from_site: 's1', created_by: 'owner@studio.example', created_at: '2026-11-01T00:00:00Z' }] },
       made: { data: { site_id: 's-made', client_id: 'c-made', name: 'Willow Florist', kit: { id: 'k1', name: 'Florist starter', failed: true } } },
     });
     await page.getByRole('button', { name: '+ New site' }).click();
     const dlg = page.locator('#newDlg');
-    await expect(dlg.locator('#new-from .opt strong')).toHaveText(['A blank site', 'Florist starter']);
-    await expect(dlg.locator('#new-from input[value=""]')).toBeChecked();
+    await expect(dlg.locator('#new-kit option')).toHaveText(['None', 'Florist starter']);
+    await expect(dlg.locator('#new-kit')).toHaveValue('');
     await dlg.locator('#new-biz').fill('Willow Florist');
-    await dlg.locator('#new-from .opt', { hasText: 'Florist starter' }).click();
+    await dlg.locator('#new-kit').selectOption('k1');
     await dlg.locator('#new-submit').click();
     const done = dlg.locator('#new-done');
     await expect(done).toContainText('Willow Florist’s site is ready');
@@ -158,7 +160,7 @@ test.describe('Sites (builder list items 43 and 45)', () => {
     expect(t.writes[1].body).toEqual({ site_id: 's-made' });
   });
 
-  // items 135 + 145 together: + New site lists templates beside starter kits, each saying what it brings
+  // items 135 + 145 together: + New site lists templates beside the designs, each saying what it brings (item 198)
   test('+ New site from a template: it says what a template brings, then the pages that came across', async ({ page }) => {
     const t = await openSites(page, [BISTRO, CAFE], {
       kits: { data: [
@@ -169,11 +171,11 @@ test.describe('Sites (builder list items 43 and 45)', () => {
     });
     await page.getByRole('button', { name: '+ New site' }).click();
     const dlg = page.locator('#newDlg');
-    await expect(dlg.locator('#new-from .opt', { hasText: 'Realty — three pages' })).toContainText('Template: 3 pages with their sections and photos, the menu and the look, plus services, FAQs, voice and colors.');
-    await expect(dlg.locator('#new-from .opt', { hasText: 'Florist starter' })).toContainText('Starter kit: the services, FAQs, voice and colors it was saved with.');
-    await expect(dlg).toContainText('A template brings a saved site’s pages, sections, photos, menu and look');
+    await expect(dlg.locator('#new-tpls .tcard', { hasText: 'Realty — three pages' })).toContainText('Template: 3 pages with their sections and photos, the menu and the look, plus services, FAQs, voice and colors.');
+    await expect(dlg.locator('#new-kit option')).toHaveText(['None', 'Florist starter']);
     await dlg.locator('#new-biz').fill('Oak Lane Realty');
-    await dlg.locator('#new-from .opt', { hasText: 'Realty — three pages' }).click();
+    await dlg.locator('#new-tpls .tcard', { hasText: 'Realty — three pages' }).click();
+    await expect(dlg.locator('#new-kit-wrap')).toBeHidden();   // a template brings its own setup
     await dlg.locator('#new-submit').click();
     await expect(dlg.locator('#new-kit-line')).toHaveText('It starts from the Realty — three pages: 3 pages and 14 sections, 9 photos, 4 services, 2 FAQs, the voice, the colors.');
     expect(t.writes[0].body).toEqual({ business_name: 'Oak Lane Realty', kit_id: 't1' });

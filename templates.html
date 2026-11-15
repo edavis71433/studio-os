@@ -55,6 +55,20 @@
   /* dark mode fills with the light accent, which wants dark ink (shell.css's rule for its own buttons) */
   @media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .rowact.main{color:#171320}}
   :root[data-theme="dark"] .rowact.main{color:#171320}
+  /* item 198 (Figma "New site gallery" D): the eight built-in designs come first, so a new studio
+     never opens an empty tab; each one starts a new site with it picked */
+  .bsec{margin-top:var(--dds-s6,24px)}
+  .bsec h2{font-family:'Fraunces',"Iowan Old Style",Georgia,serif;font-weight:600;font-size:24px;margin:0 0 4px;letter-spacing:-.01em}
+  .dgrid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:20px;max-width:1400px}
+  .dcell{display:flex;flex-direction:column;gap:10px;min-width:0}
+  .dcard{display:flex;flex-direction:column;gap:10px;padding:10px 10px 16px;border:1px solid var(--line);border-radius:16px;background:var(--card);box-shadow:var(--shadow);flex:1 1 auto}
+  .dpic{display:block;aspect-ratio:640/440;border-radius:10px;overflow:hidden;background:var(--p-soft);border:1px solid var(--line)}
+  .dpic img{display:block;width:100%;height:100%;object-fit:cover}
+  .dcard b{font-size:15px;font-weight:600}
+  .dline{font-size:13px;color:var(--soft);line-height:1.4}
+  .dgo{display:flex;align-items:center;justify-content:center;text-decoration:none}
+  @media (max-width:1100px){.dgrid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+  @media (max-width:640px){.dgrid{grid-template-columns:minmax(0,1fr)}.dgo{min-height:44px}}
   .center{text-align:center;padding:52px var(--dds-s5,20px)}.center h2{font-weight:600;font-size:20px;margin:0 0 var(--dds-s2,8px)}
   .muted{color:var(--soft);font-size:14px}
   a.link{color:var(--p);text-decoration:none;font-weight:500}a.link:hover{text-decoration:underline}
@@ -99,7 +113,12 @@ async function api(method,path,payload){
 const day=(iso)=>{if(!iso)return'';const d=new Date(iso);return isNaN(d)?'':d.toLocaleDateString('en-US',{month:'short',day:'numeric',year:d.getFullYear()===new Date().getFullYear()?undefined:'numeric'});};
 const n=(c,w)=>(c||0)+' '+w+(c===1?'':'s');
 
-let KITS=[],CAN=false,EDITING=null,BUSY=false;
+let KITS=[],DESIGNS=[],CAN=false,EDITING=null,BUSY=false;
+// item 198: a built-in design's card, its picture and its words ("Quiet and elegant. Good for …")
+function designHtml(d){
+  const what=String(d.line||'').split(':')[0].replace(/\.$/,'');
+  return `<div class="dcell" data-design="${esc(d.slug)}"><div class="dcard"><span class="dpic"><img src="${esc(d.picture)}" alt="" loading="lazy" width="640" height="440"></span><b>${esc(d.name)}</b><span class="dline">${esc(what)}.${d.good_for?' Good for '+esc(d.good_for)+'.':''}</span></div>${CAN?`<a class="rowact dgo" href="/sites.html#new=${encodeURIComponent(d.slug)}" aria-label="New site with ${esc(d.name)}">New site with this</a>`:''}</div>`;
+}
 // what a kit brings, in the words its row says
 function brings(k){
   const b=k.brings||{},kit=[b.offerings?n(b.offerings,'service'):'',b.faqs?n(b.faqs,'FAQ'):'',(b.voice||b.colors)?[b.voice?'voice':'',b.colors?'colors':''].filter(Boolean).join(' and '):''].filter(Boolean);
@@ -117,12 +136,16 @@ function rowHtml(k){
 }
 function render(){
   const t=KITS.filter(k=>k.kind==='template').length,s=KITS.length-t;
+  const meta=[DESIGNS.length?n(DESIGNS.length,'built-in design'):'',KITS.length?n(t,'template')+' · '+n(s,'starter kit'):'nothing saved yet'].filter(Boolean).join(' · ');
   let h=`<header class="lhead"><div class="lrow1"><span class="obj-ic" aria-hidden="true">◫</span><h1 id="pagehead" tabindex="-1">Templates</h1></div>
-    <div class="lmeta">${KITS.length?esc(n(t,'template')+' · '+n(s,'starter kit')+' · newest first'):'Nothing saved yet'}</div>
+    <div class="lmeta">${esc(meta[0].toUpperCase()+meta.slice(1))}</div>
     <nav class="tabs" aria-label="Sites, domains, templates and usage"><a href="/sites.html">Sites</a><a href="/domains.html">Domains</a><a href="/templates.html" aria-current="page">Templates</a><a href="/usage.html">Usage</a></nav></header>
-    <p class="intro">Start a new site from one of these under “Start from”. A template brings a saved site’s pages, sections, menu, photos and look; a starter kit brings the setup only: services, FAQs, voice and colors.</p>`;
+`;
+  if(DESIGNS.length)h+=`<section class="bsec" aria-labelledby="builtH"><h2 id="builtH">Built-in designs</h2><p class="intro">Every new site can start from one of these. A design sets the look; the words and photos stay the client’s own.</p><div class="dgrid">${DESIGNS.map(designHtml).join('')}</div></section>`;
+  h+=`<section class="bsec" aria-labelledby="savedH"><h2 id="savedH">Saved by your studio</h2><p class="intro">A template brings a saved site’s pages, sections, menu, photos and look; a starter kit brings the setup only: services, FAQs, voice and colors. Pick either one in + New site.</p>`;
   if(!KITS.length)h+=`<div class="center"><p class="muted">No templates or starter kits yet.</p><p class="muted" style="margin-top:8px;font-size:13px">Save one from a site’s ⋯ menu on <a class="link" href="/sites.html">Sites</a> (Save as a template), or a customer’s ⋯ on <a class="link" href="/agency.html">Home</a> (Save as a starter kit).</p></div>`;
   else h+=`<div class="klist" id="klist">${KITS.map(rowHtml).join('')}</div>`;
+  h+='</section>';
   $('main').innerHTML=h;
   wire();
 }
@@ -165,9 +188,11 @@ function trouble(){$('main').innerHTML=`<div class="center"><h2>We couldn’t lo
 async function boot(){
   try{const{data}=await sb.auth.getSession();TOKEN=(data&&data.session&&data.session.access_token)||"";ME=String((data&&data.session&&data.session.user&&data.session.user.email)||'').toLowerCase();
     if(!TOKEN){signedOut();return;}
-    const r=await api('GET','/agency/kits');
+    const [r,dz]=await Promise.all([api('GET','/agency/kits'),api('GET','/agency/designs')]);
     if(!r.ok){if(r.status===401){signedOut();return;}if(r.status===403){notAgency();return;}trouble();return;}
     KITS=Array.isArray(r.body.data)?r.body.data:[];CAN=r.body.can_manage!==false;
+    // item 198: the built-in designs; a failed read just leaves them out
+    DESIGNS=dz.ok&&dz.body&&dz.body.data&&Array.isArray(dz.body.data.designs)?dz.body.data.designs:[];
     render();
   }catch(_){trouble();}
 }
