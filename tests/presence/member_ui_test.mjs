@@ -83,6 +83,7 @@ const CONTROLS = [
   ['POST /site/offline', 'presence.html', `siteSetState("/site/offline"`, ['offBtn.dataset.needs = "configure"']],
   ['POST /site/online', 'presence.html', `siteSetState("/site/online"`, ['offBtn.dataset.needs = "configure"']],
   ['POST /site/password', 'presence.html', `api("POST", "/site/password", { password: pw })`, ['pw.dataset.needs = "configure"']],   // list item 175
+  ['POST /site/coming-soon', 'presence.html', `api("POST", "/site/coming-soon", {`, ['cs.dataset.needs = "configure"', 'go.dataset.needs = "configure"']],   // builder list item 158: the panel's button and the sheet's
   ['PUT /bookings/settings', 'presence.html', `api("PUT", "/bookings/settings", payload)`, ['c1.dataset.needs = "configure"', 'c2.dataset.needs = "configure"']],
   ['PUT /sales/contacts/fields', 'contacts.html', `api('/sales/contacts/fields','PUT',{fields})`, ['id="manageFields" data-needs="configure"']],
   ['PUT /sales/stages', 'settings.html', `api('/sales/stages', 'PUT', { names })`, ['id="automations" aria-labelledby="autoHead" hidden data-needs="configure"']],
@@ -136,7 +137,7 @@ const SOURCE = Object.fromEntries(PAGES.map((p) => [p, read(p)]));
   const decided = read('tests/presence/member_capability_test.mjs');
   const listed = (name) => [...decided.split('const DECIDED = {')[1].split(`\n  ${name}: [`)[1].split('\n  ],')[0].matchAll(/'((?:DELETE|POST|PUT|PATCH) [^']+)'/g)].map((m) => m[1]);
   const routes = [...listed('delete'), ...listed('configure')];
-  ok('the decided delete and configure lists were read', routes.length === 49, String(routes.length));   // builder item 203 added the enquiry delete; sales item 94 added the month's goal; sales item 105 added Home's setup strip; item 47 added two; item 104 took away the seven DNS document and zone writes; item 58 added two; item 112 added the prospect delete; item 115 added the Google review link; item 175 the visitor password; item 77 the payment undo; item 174 added the two domain forwards; items 86 + 105 added three (import undo, merge, unmerge); item 106 the project template and saved to-do list removals; sales item 117 the client's retainer cancel
+  ok('the decided delete and configure lists were read', routes.length === 50, String(routes.length));   // builder item 158 added the Coming soon page; builder item 203 added the enquiry delete; sales item 94 added the month's goal; sales item 105 added Home's setup strip; item 47 added two; item 104 took away the seven DNS document and zone writes; item 58 added two; item 112 added the prospect delete; item 115 added the Google review link; item 175 the visitor password; item 77 the payment undo; item 174 added the two domain forwards; items 86 + 105 added three (import undo, merge, unmerge); item 106 the project template and saved to-do list removals; sales item 117 the client's retainer cancel
   const covered = new Set(CONTROLS.map(([r]) => r));
   const open = routes.filter((r) => !covered.has(r) && !NO_CONTROL[r] && !PORTAL_OWNER_ONLY[r]);
   for (const [route, c] of Object.entries(PORTAL_OWNER_ONLY)) {

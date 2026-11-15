@@ -116,6 +116,40 @@ Deno.env.set('PLACES_KEY', 'places-key-for-tests');
   ok('the prospect remembers its deal and reads In pipeline', kept().find((x) => x.id === p.id).deal_id === deal.id && kept().find((x) => x.id === p.id).status === 'In pipeline');
   const again = await res(await PX.handleProspectConvert(req('POST', `/sales/prospects/${p.id}/convert`), site, owner, p.id, cors));
   ok('a second “→ Deal” returns the same deal, never a twin', again.status === 200 && again.body.already_converted === true && (db.tables.presence_deals || []).length === 1);
+  // sales item 119: the deal is WITH someone — the business as a contact, with its phone and address
+  const contacts = (db.tables.presence_contacts || []).filter((c) => !c.deleted_at);
+  const c = contacts[0];
+  ok('item 119: “→ Deal” makes the contact too, and the deal is with them', contacts.length === 1 && deal.contact_id === c.id && r.body.contact && r.body.contact.id === c.id && r.body.contact.reused === false, JSON.stringify({ contacts, deal }));
+  ok('item 119: the contact carries the business’s name, phone and address in parts', c.name === 'Fresh Fades Barbershop' && c.phone === '(818) 555-0102' && c.address && c.address.city === 'Burbank' && c.address.state === 'CA' && c.address.zip === '91501' && c.address.street === '2 Main St', JSON.stringify(c));
+  ok('item 119: and says where it came from, and that there’s no website', /Found on Prospects by searching “plumbers in Burbank”/.test(c.notes) && /No website found/.test(c.notes) && c.email === '');
+  ok('item 119: a second “→ Deal” makes no second contact', (db.tables.presence_contacts || []).length === 1);
+}
+
+// ═══ item 119: a contact already holding the phone number is used, not doubled ═══
+{
+  const before = (db.tables.presence_contacts || []).length;
+  db.tables.presence_contacts.push({ id: uuid('9'), site_id: SITE, name: 'Bakery front desk', email: 'desk@bakery.example', phone: '+1 818-555-0177', company: 'Brand New Bakery', notes: '', deleted_at: null });
+  const sd = kept().find((x) => x.business_name === 'Brand New Bakery');
+  db.tables.presence_prospects.find((x) => x.id === sd.id).phone = '(818) 555-0177';
+  const r = await res(await PX.handleProspectConvert(req('POST', `/sales/prospects/${sd.id}/convert`), site, owner, sd.id, cors));
+  const deal = (db.tables.presence_deals || []).find((d) => d.title === 'Brand New Bakery');
+  ok('item 119: the same number (written another way) links the contact already there', r.status === 201 && deal && deal.contact_id === uuid('9') && r.body.contact.reused === true && (db.tables.presence_contacts || []).length === before + 1, JSON.stringify(r.body));
+}
+
+// ═══ item 119: a contact that won't save starts no deal ═══
+{
+  const p2 = { id: uuid('a'), site_id: SITE, business_name: 'Quiet Cafe', phone: null, website: null, address: null, industry: null, site_health: 'no_website', score: 95, status: 'New', search_query: null, deleted_at: null, deal_id: null };
+  db.tables.presence_prospects.push(p2);
+  const real = globalThis.fetch;
+  globalThis.fetch = async (url, init = {}) => {
+    const u = new URL(String(url));
+    if (u.pathname.endsWith('/presence_contacts') && (init.method || 'GET') === 'POST') return new Response(JSON.stringify({ message: 'boom' }), { status: 500, headers: { 'Content-Type': 'application/json' } });
+    return real(url, init);
+  };
+  const dealsBefore = (db.tables.presence_deals || []).length;
+  const r = await res(await PX.handleProspectConvert(req('POST', `/sales/prospects/${p2.id}/convert`), site, owner, p2.id, cors));
+  globalThis.fetch = real;
+  ok('item 119: no contact, no deal — and the page is told plainly', r.status === 502 && /contact didn’t save/.test(r.body.message) && (db.tables.presence_deals || []).length === dealsBefore);
 }
 
 // ═══ the draft is words, never a send ═══
@@ -125,6 +159,10 @@ Deno.env.set('PLACES_KEY', 'places-key-for-tests');
   const r = await res(await PX.handleProspectDraft(req('POST', `/sales/prospects/${p.id}/draft`), site, owner, p.id, cors));
   ok('the draft names the business, the studio, and the gap', r.status === 200 && /Fresh Fades Barbershop/.test(r.body.data.body) && /Davis Digital Studio/.test(r.body.data.body) && /couldn’t find a website/.test(r.body.data.body));
   ok('the draft says it was not sent, and nothing left the building', r.body.data.sent === false && outside.length === 0);
+  // item 119: Google's addresses end with the country; the draft's town is the town all the same
+  db.tables.presence_prospects.find((x) => x.id === p.id).address = '2 Main St, Burbank, CA 91501, USA';
+  const g = await res(await PX.handleProspectDraft(req('POST', `/sales/prospects/${p.id}/draft`), site, owner, p.id, cors));
+  ok('item 119: the draft reads “here in Burbank” from Google’s address', /here in Burbank\./.test(g.body.data.body), g.body.data.body);
   const src = Deno.readTextFileSync(new URL('../../supabase/functions/presence/routes/prospects.ts', import.meta.url));
   ok('tripwire: the prospects routes import no email sender at all', !/sendEmail|resend|broadcast/i.test(src.replace(/\/\/[^\n]*/g, '')));
 }
