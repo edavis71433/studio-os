@@ -510,6 +510,7 @@
   .pill-build,.pill-draft{display:inline-flex;align-items:center;font-size:10px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;border-radius:999px;padding:3px 9px}
   .pill-build{background:var(--p-soft);color:var(--p)} .pill-draft{background:var(--warn-soft);color:var(--warn)}
   .wsbuild .wsfoot{justify-content:flex-start}
+  .wsbuild .wsbar .tag{margin-bottom:0}
   /* a phone keeps each Needs you row on one line: words left, its button right */
   @media (max-width:560px){.qrow{flex-wrap:nowrap}.qmain{flex:1 1 0}.qact{flex-direction:column;align-items:stretch}}
   .wspic .wsini{position:absolute;inset:0;display:grid;place-items:center;font-family:var(--serif);font-size:42px;color:var(--p)}
@@ -852,7 +853,7 @@ function wsBuildHtml(state,draft,waiting,studio){
   else if(a.status&&a.status!=='pending'&&a.status!=='approved')lead='You asked for a change. '+esc(studio)+' is working on it, and the new draft will show up here.';
   else lead='It isn’t live yet. '+esc(studio)+' is building it. '+(waiting>0?'Next: the '+(waiting===1?'one thing':waiting+' things')+' under Needs you.':'You’ll get a draft to look at here as soon as it’s ready.');
   const act=draft&&(state==='ready'||state==='approved')?'<button type="button" class="'+(state==='ready'?'approve':'')+' wsreview" data-ws-apr="'+esc(a.id)+'" data-ws-proj="'+esc(draft.pid)+'">'+(state==='ready'?'Review the draft':'See the draft again')+'</button>':'';
-  return '<div class="card wscard wsbuild">'+'<div class="wspic'+(state==='building'?' dim':'')+'" id="wspic"><div class="wsini" aria-hidden="true">✦</div></div><div class="wsin"><span class="tag">Your website</span><div class="wsbar">'+pill+'</div>'
+  return '<div class="card wscard wsbuild">'+'<div class="wspic'+(state==='building'?' dim':'')+'" id="wspic"><div class="wsini" aria-hidden="true">✦</div></div><div class="wsin"><div class="wsbar"><span class="tag">Your website</span>'+pill+'</div>'
     +'<h3>'+head+'</h3><p class="wslead">'+lead+'</p>'+(act?'<div class="wsfoot">'+act+'</div>':'')+'</div></div>';
 }
 function wsSiteInfo(d){const s=(d&&d.site)||{};const url=typeof s.url==='string'&&/^https:\/\//.test(s.url)?s.url:'';return{url,host:url.replace(/^https:\/\//,''),published_at:(typeof s.last_published_at==='string'&&s.last_published_at)||''};}
@@ -943,7 +944,7 @@ function anchorTarget(a){const ex=String(a||'').replace(/^#/,'');return(ex&&docu
 // reachable from every view because it lives OUTSIDE #main (innerHTML rewrites
 // never touch it). Home aggregates ACROSS projects; the other tabs are top-level
 // destinations over the SAME existing /client/* + /portal/* reads — no new backend.
-const PORTAL={ready:false,persona:'',ctx:{},projects:[],projectsFailed:false,feed:{},feedFailed:false,unread:0,notifs:[],notifsFailed:false,billing:null,billingFailed:false,snaps:null,wstatsFetch:null,wsthumbFetch:null};
+const PORTAL={ready:false,persona:'',ctx:{},projects:[],projectsFailed:false,feed:{},feedFailed:false,unread:0,notifs:[],notifsFailed:false,billing:null,billingFetch:null,billingFailed:false,snaps:null,snapsFetch:null,snapsBoot:null,wstatsFetch:null,wsthumbFetch:null};
 let CURRENT_TAB='home';
 // A monotonically increasing VIEW token: every function that owns a fresh paint
 // of #main bumps it (showTab AND every drill-in open — openProject, support
@@ -1037,7 +1038,8 @@ async function ensureBilling(){
   if(PORTAL.billing){PORTAL.billingFailed=false;return PORTAL.billing;}
   if(PORTAL.persona!=='client')return{invoices:[]};
   try{
-    const r=await api('/client/billing');
+    const pre=PORTAL.billingFetch;PORTAL.billingFetch=null;   // item 179: the boot's read, used once
+    const r=(await pre)||await api('/client/billing');
     if(!r.ok){PORTAL.billingFailed=true;return{invoices:[],failed:true};}
     PORTAL.billing=(r.body&&r.body.data)||{invoices:[]};
   }catch(_){PORTAL.billingFailed=true;return{invoices:[],failed:true};}
@@ -1048,8 +1050,16 @@ async function ensureBilling(){
 // voided or PROCESSING invoice is nothing to pay: it leaves the to-pay tile and
 // the Needs-you queue together, by the one formula.
 function unpaidInvoices(b){return ((b&&b.invoices)||[]).filter(i=>{const s=invState(i);return s==='upcoming'||s==='overdue';});}
-// per-project snapshots (the full client bundle, capped) — shared by Home + Files
-async function ensureSnaps(){
+// per-project snapshots (the full client bundle, capped) — shared by Home + Files.
+// Item 179: Home's website card and Needs you ask at the same moment, and the boot
+// may already have started the read; every caller shares the one in flight.
+function ensureSnaps(){
+  // the boot's read answers Home's first ask, finished or not (a failed project is retried on the ask after that, as before)
+  if(PORTAL.snapsBoot){const b=PORTAL.snapsBoot;PORTAL.snapsBoot=null;return b;}
+  if(!PORTAL.snapsFetch){const p=snapsRead().finally(()=>{if(PORTAL.snapsFetch===p)PORTAL.snapsFetch=null;});PORTAL.snapsFetch=p;}
+  return PORTAL.snapsFetch;
+}
+async function snapsRead(){
   const fetchSnap=async(p)=>{
     try{const r=await api('/client/projects/'+p.id);
       if(!r.ok)throw 0;   // an error response is a FAILED read, not an empty project
@@ -1339,6 +1349,8 @@ function wsCardHtml(d){
 // full load (like billing); a reviewer never fetches (no website of their own).
 // The in-flight promise is cached too, so Home→away→Home never refires a
 // request that's already running (at most one fetch per load).
+function wsStatsStart(){if(PORTAL.wstats===undefined&&!PORTAL.wstatsFetch)PORTAL.wstatsFetch=api('/client/website-stats').then(r=>r.ok?((r.body&&r.body.data)||null):false).catch(()=>false);}
+function wsThumbStart(){if(PORTAL.wsthumb===undefined&&!PORTAL.wsthumbFetch)PORTAL.wsthumbFetch=api('/client/website-thumb').then(r=>(r.ok&&r.body&&r.body.data&&typeof r.body.data.html==='string')?r.body.data.html:null).catch(()=>null);}
 function wsSlotOff(){const host=document.getElementById('home-website');if(host){host.hidden=true;host.innerHTML='';}}
 // Builder item 194 (Nov 12 review, finding 22): the client is often the only person who can sign in
 // where the domain is kept, and the portal never mentioned a domain. While one is connected and not
@@ -1384,7 +1396,7 @@ async function loadWebsiteCard(){
     // Home visit genuinely retries instead of pinning the card hidden all
     // session (the A4 rule). Only a SUCCESSFUL read caches — its data, or null
     // (the route genuinely has nothing to show; the card hides by design).
-    if(!PORTAL.wstatsFetch)PORTAL.wstatsFetch=api('/client/website-stats').then(r=>r.ok?((r.body&&r.body.data)||null):false).catch(()=>false);
+    wsStatsStart();
     PORTAL.wstats=await PORTAL.wstatsFetch;
     PORTAL.wstatsFetch=null;   // settled — a later call may start a fresh read
     if(PORTAL.wstats===false){PORTAL.wstats=undefined;wsSlotOff();return;}
@@ -1427,7 +1439,7 @@ async function loadWebsiteCard(){
 async function loadWebsiteThumb(){
   if(PORTAL.persona!=='client')return;
   if(PORTAL.wsthumb===undefined){
-    if(!PORTAL.wsthumbFetch)PORTAL.wsthumbFetch=api('/client/website-thumb').then(r=>(r.ok&&r.body&&r.body.data&&typeof r.body.data.html==='string')?r.body.data.html:null).catch(()=>null);
+    wsThumbStart();
     PORTAL.wsthumb=await PORTAL.wsthumbFetch;
     PORTAL.wsthumbFetch=null;
   }
@@ -1610,7 +1622,7 @@ async function renderMessages(focusSup,opts){
   else if(focusSup)openSupportThread(focusSup,null);   // an id not in the list (stale link) — the legacy full view degrades gracefully
   else if(opts&&opts.compose)openComposePane();
   // item 179: beside the list there is room, so the newest conversation is already open
-  else if(MC.rows.length&&window.matchMedia&&window.matchMedia('(min-width:720px)').matches)openConv(MC.rows[0].id,true);
+  else if(MC.rows.length&&window.matchMedia&&window.matchMedia('(min-width:720px)').matches)openConv((MC.rows.find(r=>r.status!=='resolved'&&r.status!=='closed')||MC.rows[0]).id,true);   // a finished request only when nothing is still going
   else renderMPane();
 }
 function renderMRows(){
@@ -3556,7 +3568,7 @@ async function openSurvey(sid,pid,ctrl,from){
     if(q.type==='rating')field=`<select id="svq" class="fieldin" data-q="${esc(q.key)}"><option value="" disabled${val?'':' selected'}>Choose a rating (1–5)…</option>${[1,2,3,4,5].map(n=>`<option${String(n)===val?' selected':''}>${n}</option>`).join('')}</select>`;
     else if(q.type==='choice')field=`<select id="svq" class="fieldin" data-q="${esc(q.key)}"><option value="" disabled${val?'':' selected'}>Choose…</option>${(q.choices||[]).map(c=>`<option${String(c)===val?' selected':''}>${esc(c)}</option>`).join('')}</select>`;
     else field=`<textarea id="svq" class="fieldin" rows="4" data-q="${esc(q.key)}" style="margin-top:0">${esc(val)}</textarea>`;
-    $('main').innerHTML=sheetBackHtml(back)+sheetHead(chips,sv.title||'Survey','')+
+    $('main').innerHTML=sheetBackHtml(back)+sheetHead(chips,sv.title||'Survey',questionnaireOf([sv])?`Your answers help ${studioBrand()} write your pages.`:'')+   // item 179: what the answers are for, as drawn
       `<p class="qprog" id="qprog">Question ${i+1} of ${qs.length}</p><div class="qsteps" aria-hidden="true">${qs.map((_,j)=>`<i class="${j<=i?'on':''}"></i>`).join('')}</div>`+
       `<div class="card qcardq"><label for="svq">${esc(q.label||'Your answer')}</label>${field}</div>`+
       `<div class="qnav"><button class="approve" id="${last?'subSurvey':'qnext'}">${last?'Send your answers':'Next'}</button>${i>0?'<button id="qback">Back</button>':''}</div>`+
@@ -3633,7 +3645,7 @@ function ownerNote(){$('main').innerHTML=`<div class="center"><div class="roleba
 
 async function load(){
   setWide(false);
-  PORTAL.snaps=null;PORTAL.billing=null;PORTAL.billingFailed=false;PORTAL.wstats=undefined;PORTAL.wstatsFetch=null;PORTAL.wsthumb=undefined;PORTAL.wsthumbFetch=null;   // fresh per-load caches (a re-load = fresh data)
+  PORTAL.snaps=null;PORTAL.snapsFetch=null;PORTAL.snapsBoot=null;PORTAL.billing=null;PORTAL.billingFetch=null;PORTAL.billingFailed=false;PORTAL.wstats=undefined;PORTAL.wstatsFetch=null;PORTAL.wsthumb=undefined;PORTAL.wsthumbFetch=null;   // fresh per-load caches (a re-load = fresh data)
   const first=!LOADED_ONCE;LOADED_ONCE=true;
   const params=new URLSearchParams(location.search);
   // G2: the destination kept through a sign-in; an address that names its own wins
@@ -3661,11 +3673,16 @@ async function load(){
   const skipProj=rememberedReviewer();   // G12: a reviewer's projects read is refused every time
   // item 179: someone known to be a client here gets everything Home needs in the same round
   const early=rememberedClient();
+  // Home's own reads are started early only when this load lands on Home; a link that opens a
+  // project, a request or a tab reads what it needs itself (an early read there would be a second one)
+  const toHome=!dsup&&!deep&&!paidId&&!wantTab;
   const askPath='/connections/ask'+(askTok?'?token='+encodeURIComponent(askTok):'');
   const nP=early?api('/client/notifications').catch(()=>null):null,aP=early?api(askPath).catch(()=>null):null;
-  if(early){PORTAL.wstatsFetch=api('/client/website-stats').then(r=>r.ok?((r.body&&r.body.data)||null):false).catch(()=>false);
-    PORTAL.wsthumbFetch=api('/client/website-thumb').then(r=>(r.ok&&r.body&&r.body.data&&typeof r.body.data.html==='string')?r.body.data.html:null).catch(()=>null);}
-  const [ctx,proj0,feed]=await Promise.all([api('/portal/context'),skipProj?Promise.resolve(null):api('/client/projects').catch(()=>null),api('/portal/feed')]);
+  if(early&&toHome){wsStatsStart();wsThumbStart();PORTAL.billingFetch=api('/client/billing').catch(()=>null);}
+  const projP=skipProj?Promise.resolve(null):api('/client/projects').catch(()=>null);
+  // …and each project's details go out the moment the list lands, not after the context
+  if(early&&toHome)projP.then(r=>{const d=r&&r.ok&&r.body&&r.body.data;if(Array.isArray(d)&&d.length&&!PORTAL.projects.length){PORTAL.projects=d;PORTAL.snapsBoot=ensureSnaps();}}).catch(()=>{});
+  const [ctx,proj0,feed]=await Promise.all([api('/portal/context'),projP,api('/portal/feed')]);
   if(!ctx.ok){hideNav();trouble();return;}
   const c=ctx.body.data||{};
   // …unless the answer says they are more than a reviewer now: then the read happens after all
@@ -3692,7 +3709,9 @@ async function load(){
   PORTAL.feedFailed=!feed.ok;   // a failed feed read must never masquerade as zero approvals
   // PS3: the boot notifications GET is persona-gated — a reviewer's /client/*
   // 403 is contract (reviewerAllowed); their bell boots calm with ZERO fetches.
-  if(PORTAL.persona!=='client'){PORTAL.wstatsFetch=null;PORTAL.wsthumbFetch=null;}   // an early read for someone no longer a client is dropped
+  if(PORTAL.persona!=='client'){PORTAL.wstatsFetch=null;PORTAL.wsthumbFetch=null;PORTAL.billingFetch=null;PORTAL.snapsFetch=null;PORTAL.snapsBoot=null;PORTAL.snaps=null;}   // an early read for someone no longer a client is dropped
+  // a client's Home reads go out beside the notifications, not after them (item 179: a first visit took four rounds)
+  else if(toHome){wsStatsStart();wsThumbStart();if(!PORTAL.billing&&!PORTAL.billingFetch)PORTAL.billingFetch=api('/client/billing').catch(()=>null);if(!PORTAL.snapsBoot)PORTAL.snapsBoot=ensureSnaps();}
   const [n,a]=PORTAL.persona==='client'?await Promise.all([
     nP||api('/client/notifications').catch(()=>null),
     aP||api(askPath).catch(()=>null),   // the studio's ask to connect Google, never a blocker
