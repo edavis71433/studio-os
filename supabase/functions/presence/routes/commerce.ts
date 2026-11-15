@@ -1,8 +1,9 @@
 // ── /commerce/* — plans, billing and the account (L1) ─────────────────────────
 // A public-safe bounded context, handled (like /agency) BEFORE the client/staff
 // 401: the price list and the Stripe echoes need no sign-in. Self-serve sign-up
-// is closed (builder item 199): its routes answer one fixed reply. The authed routes inside (subscription, billing portal, first-run)
-// require a signed-in caller and resolve their own site via RLS.
+// is closed (builder item 199): its routes answer one fixed reply. The authed
+// routes inside (subscription, billing portal, first-run) require a signed-in
+// caller and resolve their own site via RLS.
 //
 // Flow:
 //   GET  /commerce/plans            (public)  the catalog + prices

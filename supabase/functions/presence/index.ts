@@ -175,10 +175,11 @@ async function route_(req: Request, cors: Record<string, string>): Promise<Respo
     return handleAgency(req, route, method, member, principal, cors);
   }
 
-  // ── L1: /commerce routes — self-serve signup & commerce. Public-safe by
-  //    design (discover, price, buy with no operator). Handled BEFORE the
-  //    client/staff 401 so a stranger can sign up; the authed routes inside
-  //    (subscription, billing portal, first-run) enforce their own sign-in.
+  // ── L1: /commerce routes — plans, billing and the account. Public-safe by
+  //    design: handled BEFORE the client/staff 401 so the price list, the Stripe
+  //    echoes and the closed sign-up reply (builder item 199) need no sign-in;
+  //    the authed routes inside (subscription, billing portal, first-run)
+  //    enforce their own sign-in.
   //    Those answer for the CALLER, so a signed-in route asked in a client's
   //    context (?client=) doesn't stop here: it goes through the same gate as any
   //    other scoped request, then to handleScopedCommerce. A denied scope is

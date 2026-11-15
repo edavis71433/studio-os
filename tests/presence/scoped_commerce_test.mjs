@@ -1,5 +1,5 @@
 // ── What /commerce answers while a studio works on a client's site (SC-1) ────
-// /commerce is dispatched before the client gate so a stranger can sign up. That
+// /commerce is dispatched before the client gate so the price list needs no sign-in. That
 // left the signed-in routes answering for the CALLER while the pages asked in the
 // CLIENT's context (?client= → x-dds-scope-site). Inside a client's view a studio
 // got its own notices, Dismiss changed its own rows, the portal opened its own
